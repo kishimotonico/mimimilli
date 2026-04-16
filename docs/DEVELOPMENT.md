@@ -66,7 +66,11 @@ App.tsx
 ## 開発コマンド
 
 ```bash
-# 開発サーバー起動（ホットリロード有効）
+# 開発サーバー起動（ブラウザ用）
+pnpm dev
+# => http://mimi.localhost:1355
+
+# デスクトップアプリ起動（内部的に pnpm dev を使う）
 pnpm tauri dev
 
 # TypeScript型チェック
@@ -81,6 +85,8 @@ cargo check --manifest-path src-tauri/Cargo.toml
 # プロダクションビルド
 pnpm tauri build
 ```
+
+`pnpm dev` は `PORTLESS_HTTPS=0 PORTLESS_PORT=1355` 付きで `portless` 経由の Vite を起動する。Vite の実ポートは `portless` が空きを自動選択し、アクセス先だけを常に `http://mimi.localhost:1355` に固定するため、sudo なしで別シェルの既存サーバーとも衝突しにくい。
 
 ## データフロー
 

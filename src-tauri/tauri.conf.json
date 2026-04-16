@@ -5,7 +5,7 @@
   "identifier": "com.nico.mimikago",
   "build": {
     "beforeDevCommand": "pnpm dev",
-    "devUrl": "http://localhost:1420",
+    "devUrl": "http://mimi.localhost:1355",
     "beforeBuildCommand": "pnpm build",
     "frontendDist": "../dist"
   },

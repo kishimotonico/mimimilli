@@ -428,7 +428,6 @@ export default defineConfig({
   },
 
   server: {
-    port: 1420,
     proxy: backendUrl
       ? { "/api": { target: backendUrl, changeOrigin: true } }
       : undefined,

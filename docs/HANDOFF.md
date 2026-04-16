@@ -283,6 +283,10 @@ L/R入替はChannelSplitter(2ch)→ChannelMerger(2ch)で実現。AudioContextは
 
 ```bash
 # 開発サーバー起動
+pnpm dev
+# => http://mimi.localhost:1355
+
+# Tauri 開発起動
 pnpm tauri dev
 
 # TypeScript型チェック
@@ -294,6 +298,8 @@ PATH="$HOME/.cargo/bin:$PATH" cargo check --manifest-path src-tauri/Cargo.toml
 # プロダクションビルド
 pnpm tauri build
 ```
+
+`pnpm dev` は `PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run --name mimi vite` を使う。実際の Vite 待受ポートは固定しないが、ブラウザと Tauri からは `http://mimi.localhost:1355` を使ってアクセスする。
 
 ## 関連ドキュメント
 

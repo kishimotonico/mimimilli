@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run --name mimi vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run",
@@ -27,6 +27,7 @@
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",
     "jsdom": "^28.1.0",
+    "portless": "^0.10.1",
     "typescript": "~5.8.3",
     "vite": "^7.0.4",
     "vitest": "^4.0.18"

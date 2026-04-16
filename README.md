@@ -33,6 +33,7 @@
 - **Rust** 1.75+（`rustup`経由でインストール推奨）
 - **Linux**: `libwebkit2gtk-4.1-dev`, `libappindicator3-dev`, `librsvg2-dev`, `patchelf` 等
 - **Windows**: WebView2（Windows 10以降は標準搭載）
+- **portless 初回セットアップ**: `pnpm dev` / `pnpm tauri dev` は HTTP の `mimi.localhost:1355` を使う
 
 ### インストール
 
@@ -43,6 +44,10 @@ cd mimikago
 
 # フロントエンド依存関係
 pnpm install
+
+# ブラウザで開発サーバー起動
+pnpm dev
+# => http://mimi.localhost:1355
 
 # 開発モードで起動
 pnpm tauri dev
