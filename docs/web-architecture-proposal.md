@@ -1,5 +1,10 @@
 # mimikago Web再設計 提案
 
+> **ステータス（2026年4月時点）:** 本提案に沿って移行着手済み。
+> Phase 0（設計固定・Tauri廃止）と Phase 1（axum サーバー化 — `apps/server`、`/api/...` エンドポイント実装、フロント `src/api.ts` の HTTP client 化）は完了。
+> Phase 2（フロントエンド再構築、検索サーバーサイド化）が進行中。Phase 3 以降は未着手。
+> 文書の提案内容は設計経緯の記録として維持する。
+
 ## 1. 結論
 
 mimikago を今後の本線として作り直すなら、**「ブラウザUI + ローカル常駐APIサーバー」構成**を推奨する。
@@ -309,33 +314,33 @@ apps/server/src/
 
 ## 11. 段階的移行プラン
 
-## Phase 0: 設計の固定
+## Phase 0: 設計の固定 [完了]
 
 - Tauri を本線から外す
 - API 契約を先に決める
 - `.meta.json` スキーマは維持
 
-## Phase 1: サーバー化
+## Phase 1: サーバー化 [完了]
 
 - 既存 Rust サービス層を Tauri command から切り離す
-- axum で HTTP 化
-- `/api/media/...` を実装
+- axum で HTTP 化（`apps/server`）
+- `/api/...` エンドポイントを実装
 - スキャン、一覧、詳細、タグ更新、レジューム保存まで移植
 
-## Phase 2: フロント移植
+## Phase 2: フロント移植 [進行中]
 
-- `src/api.ts` を HTTP client に差し替え
-- `asset://` 依存を削除
-- ライブラリ取得を TanStack Query 化
-- 検索をサーバーサイド化
+- `src/api.ts` を HTTP client に差し替え（完了）
+- `asset://` 依存を削除（完了）
+- フロントエンド全体を再構築中
+- 検索をサーバーサイド化（未着手）
 
-## Phase 3: 体験改善
+## Phase 3: 体験改善 [未着手]
 
 - SSE でスキャン進捗を表示
 - ファイル監視による自動反映
 - DLsite 連携の再整理
 
-## Phase 4: 必要なら配布形態を追加
+## Phase 4: 必要なら配布形態を追加 [未着手]
 
 - ローカルサーバー + ブラウザ起動の配布
 - 後から Tauri / Electron / PWA ラッパーを検討

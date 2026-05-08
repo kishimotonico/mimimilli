@@ -1,6 +1,6 @@
 # mimikago
 
-ローカル音声作品管理・再生アプリ。DLsiteやFANZAからダウンロードした音声作品を快適に管理・再生するためのデスクトップアプリケーション。
+ローカル音声作品管理・再生アプリ。DLsiteやFANZAからダウンロードした音声作品を快適に管理・再生するためのローカルで動かす Web アプリ。
 
 ## 特徴
 
@@ -18,10 +18,11 @@
 
 | レイヤー | 技術 |
 |---------|------|
-| フレームワーク | Tauri v2 (Rust + WebView2) |
+| バックエンド | axum + tokio (Rust) |
 | フロントエンド | React 19 + TypeScript |
-| ビルド | Vite |
+| ビルド | Vite 7 |
 | データベース | SQLite (rusqlite, bundled) |
+| 開発プロキシ | portless |
 | パッケージマネージャ | pnpm |
 
 ## セットアップ
@@ -30,12 +31,10 @@
 
 - **Node.js** 18+
 - **pnpm** 8+
-- **Rust** 1.75+（`rustup`経由でインストール推奨）
-- **Linux**: `libwebkit2gtk-4.1-dev`, `libappindicator3-dev`, `librsvg2-dev`, `patchelf` 等
-- **Windows**: WebView2（Windows 10以降は標準搭載）
-- **portless 初回セットアップ**: `pnpm dev` / `pnpm tauri dev` は HTTP の `mimi.localhost:1355` を使う
+- **Rust** 安定版（`rustup`経由でインストール推奨）
+- **ffprobe**（音声メタデータ取得に使用。`ffmpeg` パッケージに同梱）
 
-### インストール
+### インストールと起動
 
 ```bash
 # リポジトリのクローン
@@ -45,25 +44,31 @@ cd mimikago
 # フロントエンド依存関係
 pnpm install
 
-# ブラウザで開発サーバー起動
+# フロントエンド開発サーバー起動（モック API で動作）
 pnpm dev
 # => http://mimi.localhost:1355
-
-# 開発モードで起動
-pnpm tauri dev
-
-# プロダクションビルド
-pnpm tauri build
 ```
+
+実際の axum バックエンドと接続する場合:
+
+```bash
+# 別ターミナルでバックエンドを起動
+cd apps/server
+cargo run
+# => http://localhost:8080
+
+# フロントをバックエンドへ向けて起動
+BACKEND_URL=http://localhost:8080 pnpm dev
+```
+
+`BACKEND_URL` を未設定のまま `pnpm dev` を実行すると、`vite.config.ts` 内のインメモリモック API が応答する（開発・UI確認用）。
 
 ## 使い方
 
 1. 初回起動時にルートフォルダー（音声作品を保存しているフォルダー）を選択
 2. 自動スキャンが実行され、作品が検出される
 3. ライブラリ一覧からグリッド/テーブル表示で作品を閲覧
-4. シングルクリックでクイックビュー、ダブルクリックで作品フルビュー
-5. タグの追加・削除で作品を整理
-6. トラックをクリックして再生開始
+4. タグの追加・削除で作品を整理
 
 ### メタファイルについて
 
@@ -98,21 +103,18 @@ pnpm tauri build
 
 ```
 mimikago/
-├── src/                    # フロントエンド (React + TypeScript)
-│   ├── components/         # UIコンポーネント
-│   ├── hooks/              # カスタムフック (usePlayer, useLibrary)
-│   ├── api.ts              # Tauriコマンド呼び出し
-│   ├── types.ts            # 型定義
-│   └── App.tsx             # アプリケーションルート
-├── src-tauri/              # Rustバックエンド
+├── src/             # フロントエンド (React + TypeScript、再構築中)
+├── apps/server/     # axum HTTP API サーバー (Rust)
 │   └── src/
-│       ├── lib.rs          # Tauriセットアップ
-│       ├── commands.rs     # Tauriコマンドハンドラ
-│       ├── service.rs      # ビジネスロジック
-│       ├── db.rs           # SQLiteデータベース操作
-│       ├── scanner.rs      # ファイルシステムスキャナー
-│       └── models.rs       # データモデル
-└── docs/                   # 設計ドキュメント
+│       ├── main.rs          # ルーター定義
+│       ├── handlers/        # HTTP ハンドラ
+│       ├── service.rs       # ビジネスロジック
+│       ├── db.rs            # SQLite 操作
+│       ├── scanner.rs       # ファイルシステムスキャナー
+│       ├── dlsite.rs        # DLsite スクレイパー
+│       └── models.rs        # データモデル
+├── vite.config.ts   # 開発時モック API
+└── docs/            # 設計ドキュメント
 ```
 
 ## ライセンス
