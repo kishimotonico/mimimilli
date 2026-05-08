@@ -878,14 +878,17 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 
 /* Annotated tag — category/value 形式 */
 .tag.cat .cat-key {
-  font-family: var(--font-display-latin);
-  font-style: italic;
-  font-size: 10.5px;
-  color: var(--ink-3);
-  letter-spacing: 0.08em;
+  font-family: var(--font-mono);
+  font-style: normal;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  opacity: 0.65;
+  padding-right: 7px;
+  border-right: 1px solid currentColor;
+  margin-right: 1px;
 }
-.tag.cat .sep { color: var(--ink-4); margin: 0 1px; }
-.tag.cat .cat-val { font-weight: 500; }
+.tag.cat .sep { display: none; }
+.tag.cat .cat-val { font-weight: 600; }
 .tag.cat::before { display: none; }
 
 .tag.cv {
