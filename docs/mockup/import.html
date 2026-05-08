@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>mimikago — 取り込み・スキャン</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+
+    <!-- ===== Side rail ===== -->
+    <aside class="rail">
+      <div class="rail-mark">耳</div>
+      <a class="rail-link" href="index.html" title="ライブラリ">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3.5" y="3.5" width="7" height="7" rx="1"/><rect x="13.5" y="3.5" width="7" height="7" rx="1"/><rect x="3.5" y="13.5" width="7" height="7" rx="1"/><rect x="13.5" y="13.5" width="7" height="7" rx="1"/></svg>
+      </a>
+      <a class="rail-link" href="work.html" title="今聴いているもの">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.2"/><path d="M12 5v3M12 16v3M5 12h3M16 12h3"/></svg>
+      </a>
+      <a class="rail-link is-active" href="import.html" title="取り込み・スキャン">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M4 19h16"/></svg>
+      </a>
+      <a class="rail-link" href="settings.html" title="設定">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      </a>
+      <div class="rail-spacer"></div>
+      <div class="rail-foot">夜帳書庫</div>
+    </aside>
+
+    <!-- ===== Top bar ===== -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-name">mimikago</span>
+        <span class="brand-sub">— a private listening room</span>
+      </div>
+      <div class="searchbar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input type="text" placeholder="作品名・タグ・CVで探す" />
+        <span class="search-hint">⌘ K</span>
+      </div>
+      <div class="topbar-tools">
+        <button class="icon-btn" title="メニュー"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button>
+      </div>
+    </header>
+
+    <!-- ===== Main ===== -->
+    <main class="main">
+      <div class="page">
+
+        <div class="page-head">
+          <div>
+            <div class="eyebrow">scan · 取り込み</div>
+            <h1>新しい作品の取り込み <span class="num">— 8 件待ち</span></h1>
+            <div class="meta-line">
+              <span class="muted">最終フルスキャン</span>
+              <span class="font-mono">2026.05.07 03:14</span>
+              <span class="dot-divider"></span>
+              所要 4 分 22 秒
+              <span class="dot-divider"></span>
+              <span class="warm">未確認 8 件</span>
+            </div>
+          </div>
+          <div class="chips-row" style="gap: 8px;">
+            <button class="btn btn-ghost">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
+              クイックスキャン
+            </button>
+            <button class="btn btn-primary">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M4 19h16"/></svg>
+              フルスキャン
+            </button>
+          </div>
+        </div>
+
+        <!-- Summary tiles -->
+        <div class="scan-summary">
+          <div class="summary-tile">
+            <span class="lbl">already in library</span>
+            <span class="num">1,239</span>
+            <span class="sub">既存の作品 — 触れない</span>
+          </div>
+          <div class="summary-tile is-ember">
+            <span class="lbl">newly detected</span>
+            <span class="num">+ 8</span>
+            <span class="sub">確認待ち · 一件ずつ承認</span>
+          </div>
+          <div class="summary-tile is-wine">
+            <span class="lbl">errors</span>
+            <span class="num">2</span>
+            <span class="sub">メタ不正・参照欠損</span>
+          </div>
+          <div class="summary-tile">
+            <span class="lbl">missing</span>
+            <span class="num">1</span>
+            <span class="sub">フォルダーが移動・削除</span>
+          </div>
+        </div>
+
+        <!-- Section -->
+        <div class="section-head">
+          <div class="eyebrow">queue · 確認待ち</div>
+          <h2>新しく見つかった作品</h2>
+          <span class="small muted">3 / 8 を確認済み</span>
+          <div class="section-tools">
+            <button class="toolbtn">表示順 · <span style="color: var(--ink);">DLsite ID</span> <span class="caret">▾</span></button>
+            <button class="toolbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><polyline points="20 6 9 17 4 12"/></svg> すべて承認</button>
+          </div>
+        </div>
+
+        <div class="import-progress">
+          <span>確認中</span>
+          <span class="font-mono" style="color: var(--ember);">3 / 8</span>
+          <div class="bar"><span style="width: 37.5%;"></span></div>
+          <span class="muted font-mono">残 5 件</span>
+        </div>
+
+        <div class="import-queue">
+
+          <!-- Current (highlighted) -->
+          <article class="import-card is-current">
+            <div class="mini-cover">
+              <div class="cover-art cv-9 cv-frame" style="height: 100%;">
+                <div class="cv-art" style="padding: 8px;">
+                  <div class="cv-glyph cv-glyph-2" style="font-size: 60px;">秘</div>
+                </div>
+              </div>
+            </div>
+            <div class="info">
+              <div class="path">/Volumes/audio/works/月光録音室/RJ458002_ツンデレ後輩ちゃんの秘密のお世話ボイス/</div>
+              <input class="title-input" type="text" value="【新作】ツンデレ後輩ちゃんの秘密のお世話ボイス" />
+              <div class="signals">
+                <span class="ok">✓ ffprobe OK · 4 tracks · 44:18</span>
+                <span class="ok">✓ DLsite ヒット · RJ458002</span>
+                <span>cv 候補: 霧島レイ</span>
+                <span>サークル: 月光録音室</span>
+                <span>タグ候補: シチュエーションボイス, ツンデレ, 後輩, ASMR</span>
+              </div>
+            </div>
+            <div class="actions">
+              <button class="btn btn-ghost">スキップ</button>
+              <button class="btn btn-ink">詳細を見る</button>
+              <button class="btn btn-primary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><polyline points="20 6 9 17 4 12"/></svg>
+                登録
+              </button>
+            </div>
+          </article>
+
+          <!-- Pending list -->
+          <article class="import-card">
+            <div class="mini-cover">
+              <div class="cover-art cv-13 cv-frame" style="height: 100%;">
+                <div class="cv-art" style="padding: 8px;">
+                  <div class="cv-glyph cv-glyph-4" style="font-size: 60px;">月</div>
+                </div>
+              </div>
+            </div>
+            <div class="info">
+              <div class="path">/Volumes/audio/works/夜風スタジオ/RJ422098_月夜の独白/</div>
+              <div style="font-family: var(--font-display); font-size: 17px; font-weight: 500; padding: 4px 0;">月夜の独白〜あなたが眠るまで〜</div>
+              <div class="signals">
+                <span class="ok">✓ ffprobe OK · 1 track · 38:00</span>
+                <span class="ok">✓ DLsite ヒット · RJ422098</span>
+                <span>cv 候補: 月城あかり</span>
+              </div>
+            </div>
+            <div class="actions">
+              <button class="btn btn-ghost">スキップ</button>
+              <button class="btn btn-primary">登録</button>
+            </div>
+          </article>
+
+          <article class="import-card">
+            <div class="mini-cover">
+              <div class="cover-art cv-2 cv-cross" style="height: 100%;">
+                <div class="cv-art" style="padding: 8px;">
+                  <div class="cv-glyph cv-glyph-1" style="font-size: 60px;">息</div>
+                </div>
+              </div>
+            </div>
+            <div class="info">
+              <div class="path">/Volumes/audio/works/RJ467019/</div>
+              <div style="font-family: var(--font-display); font-size: 17px; font-weight: 500; padding: 4px 0;">寝息と吐息のためのバイノーラル録音集 vol.4</div>
+              <div class="signals">
+                <span class="ok">✓ ffprobe OK · 8 tracks · 56:00</span>
+                <span class="ok">✓ DLsite ヒット · RJ467019</span>
+                <span>cv 候補: 佐倉ましろ</span>
+              </div>
+            </div>
+            <div class="actions">
+              <button class="btn btn-ghost">スキップ</button>
+              <button class="btn btn-primary">登録</button>
+            </div>
+          </article>
+
+          <article class="import-card">
+            <div class="mini-cover">
+              <div class="cover-art cv-8" style="height: 100%;">
+                <div class="cv-art" style="padding: 8px;">
+                  <div class="cv-glyph cv-glyph-3" style="font-size: 60px;">図</div>
+                </div>
+              </div>
+            </div>
+            <div class="info">
+              <div class="path">/Volumes/audio/works/月光録音室/RJ399812_図書館の静寂/</div>
+              <div style="font-family: var(--font-display); font-size: 17px; font-weight: 500; padding: 4px 0;">図書館の静寂—ページをめくる音とペン先の音</div>
+              <div class="signals">
+                <span class="ok">✓ ffprobe OK · 環境音 · 89:00</span>
+                <span class="warn">⚠ DLsite ID 不明 — 手動入力が必要</span>
+                <span>サークル候補: 月光録音室 (フォルダー名から推定)</span>
+              </div>
+            </div>
+            <div class="actions">
+              <button class="btn btn-ghost">スキップ</button>
+              <button class="btn btn-primary">登録</button>
+            </div>
+          </article>
+
+          <article class="import-card">
+            <div class="mini-cover">
+              <div class="cover-art cv-5 cv-frame" style="height: 100%;">
+                <div class="cv-art" style="padding: 8px;">
+                  <div class="cv-glyph cv-glyph-3" style="font-size: 60px;">朝</div>
+                </div>
+              </div>
+            </div>
+            <div class="info">
+              <div class="path">/Volumes/audio/works/RJ441290_朝の囁き目覚ましボイス/</div>
+              <div style="font-family: var(--font-display); font-size: 17px; font-weight: 500; padding: 4px 0;">朝の囁き目覚ましボイス〜柔らかな声で起こされたい〜</div>
+              <div class="signals">
+                <span class="ok">✓ ffprobe OK · 1 track · 22:00</span>
+                <span class="ok">✓ DLsite ヒット · RJ441290</span>
+                <span>cv 候補: 天音かなで</span>
+              </div>
+            </div>
+            <div class="actions">
+              <button class="btn btn-ghost">スキップ</button>
+              <button class="btn btn-primary">登録</button>
+            </div>
+          </article>
+
+          <article class="import-card" style="opacity: 0.55;">
+            <div class="mini-cover">
+              <div class="cover-art cv-12" style="height: 100%;">
+                <div class="cv-art" style="padding: 8px;">
+                  <div class="cv-glyph cv-glyph-2" style="font-size: 60px; color: var(--wine);">禁</div>
+                </div>
+              </div>
+            </div>
+            <div class="info">
+              <div class="path">/Volumes/audio/works/_unknown/RJ???000_broken_meta/</div>
+              <div style="font-family: var(--font-display); font-size: 17px; font-weight: 500; color: var(--ink-2); padding: 4px 0;">メタデータ読み込みエラー</div>
+              <div class="signals">
+                <span class="warn">⚠ ffprobe が見つかりません — 音声情報を取得できません</span>
+                <span class="warn">⚠ DLsite ヒットなし</span>
+              </div>
+            </div>
+            <div class="actions">
+              <button class="btn btn-ghost">スキップ</button>
+              <button class="btn btn-ink">エラーを確認</button>
+            </div>
+          </article>
+
+        </div>
+
+      </div>
+    </main>
+
+    <!-- ===== Player dock ===== -->
+    <footer class="dock">
+      <div class="dock-now">
+        <div class="dock-cover">
+          <div class="cover-art cv-1 cv-frame" style="height: 100%;">
+            <div class="cv-art" style="padding: 8px;">
+              <div class="cv-glyph cv-glyph-1" style="font-size: 60px;">耳</div>
+            </div>
+          </div>
+        </div>
+        <div class="info">
+          <div class="t">02. お話の前に — 静かな夜の挨拶</div>
+          <div class="s"><span class="c">水瀬なずな</span> <span class="dot-divider"></span> 深夜の耳かき屋さん</div>
+        </div>
+        <button class="dock-fav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 21s-7-4.5-9.5-9C.7 8.7 2 5 5.5 5c2 0 3.4 1.2 4.5 3 1.1-1.8 2.5-3 4.5-3 3.5 0 4.8 3.7 3 7-2.5 4.5-9.5 9-9.5 9Z"/></svg></button>
+      </div>
+
+      <div class="dock-center">
+        <div class="transport">
+          <button class="transport-btn is-on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="m15 15 6 6"/><path d="M4 4l5 5"/></svg></button>
+          <button class="transport-btn jump-tag">−10</button>
+          <button class="transport-btn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h2v14H6zM20 5l-12 7 12 7z"/></svg></button>
+          <button class="transport-btn play"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg></button>
+          <button class="transport-btn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 5h2v14h-2zM4 5l12 7-12 7z"/></svg></button>
+          <button class="transport-btn jump-tag">+10</button>
+          <button class="transport-btn is-on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></button>
+        </div>
+        <div class="scrubber">
+          <span>11:24</span>
+          <div class="scrub-bar"><div class="fill" style="width: 38%;"></div><div class="knob" style="left: 38%;"></div></div>
+          <span>30:00</span>
+        </div>
+      </div>
+
+      <div class="dock-right">
+        <button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 6h13M3 12h13M3 18h9M19 18l3-3-3-3"/></svg></button>
+        <div class="vol">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/></svg>
+          <div class="bar"><span style="width: 64%;"></span></div>
+        </div>
+        <button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 9V3h6"/><path d="M21 9V3h-6"/><path d="M3 15v6h6"/><path d="M21 15v6h-6"/></svg></button>
+      </div>
+    </footer>
+  </div>
+
+  <nav class="mock-nav" style="display: flex;">
+    <a href="index.html">library</a>
+    <a href="work.html">work</a>
+    <a class="is-here" href="import.html">import</a>
+    <a href="settings.html">settings</a>
+  </nav>
+</body>
+</html>

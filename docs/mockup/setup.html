@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>mimikago — はじめる</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="setup-shell">
+
+    <div class="setup-card">
+      <div class="setup-mark">耳籠</div>
+      <div class="setup-eyebrow">mimikago · a private listening room</div>
+
+      <div class="setup-step"><span class="n">1</span> 三つのうち、一つ目</div>
+      <h1>音声作品が並んでいる<br/>フォルダーを教えてください</h1>
+      <p class="lede">
+        ここで指定したフォルダーの配下を、mimikago が「夜帳書庫」として扱います。
+        サブフォルダーがそれぞれ一つの作品になります。後からいつでも変更できます。
+      </p>
+
+      <div class="field" style="margin-bottom: 14px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+        <input placeholder="例 : /Volumes/audio/works  または  D:\audio\works" />
+        <button class="btn btn-ink">参照…</button>
+      </div>
+
+      <div class="font-mono muted" style="font-size: 11px; margin-bottom: 24px; padding: 0 4px;">
+        ヒント : DLsite の作品を RJ コードのフォルダーに展開していると、自動でメタ情報を補完できます
+      </div>
+
+      <div class="setup-actions">
+        <div class="setup-progress">
+          <span class="is-on"></span>
+          <span></span>
+          <span></span>
+        </div>
+        <button class="btn btn-primary">
+          続ける
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <nav class="mock-nav" style="display: flex;">
+    <a href="index.html">library</a>
+    <a href="work.html">work</a>
+    <a href="import.html">import</a>
+    <a href="settings.html">settings</a>
+    <a class="is-here" href="setup.html">setup</a>
+  </nav>
+</body>
+</html>
