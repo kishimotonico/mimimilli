@@ -44,9 +44,10 @@
 
   /* Layout */
   --rail-w:    72px;
-  --topbar-h:  64px;
+  --topbar-h:  56px;
   --dock-h:    96px;
   --pad:       28px;
+  --card-w:    196px;  /* グリッドカード幅 — JS で書き換えてサイズを連続変更 */
 
   /* Misc */
   --radius:    3px;
@@ -296,6 +297,34 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   border: 1px solid var(--line);
   border-radius: 3px;
 }
+/* スキャン状態ピル — topbar 右端 */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-3);
+  background: transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s;
+}
+.status-pill:hover { color: var(--ink-2); border-color: var(--ink-3); }
+.status-pill .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--teal);
+  flex-shrink: 0;
+}
+.status-pill .dot.warn { background: var(--wine); box-shadow: 0 0 6px var(--wine); animation: pulse 2s ease-in-out infinite; }
+.status-pill .warn-n { color: var(--wine); font-weight: 500; }
+
 .topbar-tools {
   display: flex;
   align-items: center;
@@ -406,12 +435,12 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   margin-left: 4px;
 }
 
-/* ----- Hero strip — 聴きかけ -------------------------------- */
+/* ----- Hero strip — 聴きかけ (非対称: 大1 + 小2) ---------- */
 .hero {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 18px;
-  margin-bottom: 44px;
+  grid-template-columns: 5fr 3fr 3fr;  /* 1枚目を大きく */
+  gap: 14px;
+  margin-bottom: 28px;
 }
 .hero-card {
   position: relative;
@@ -420,10 +449,21 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   background: var(--surface);
   overflow: hidden;
   display: grid;
-  grid-template-columns: 130px 1fr;
-  min-height: 138px;
+  grid-template-columns: 110px 1fr;
+  min-height: 120px;
   transition: border-color 0.2s, transform 0.3s var(--ease);
 }
+/* 先頭カードは表紙を広く、少し背を高く */
+.hero-card:first-child {
+  grid-template-columns: 150px 1fr;
+  min-height: 140px;
+}
+/* 2・3枚目は文字を小さく抑える */
+.hero-card:not(:first-child) h3 {
+  font-size: 13.5px;
+  -webkit-line-clamp: 2;
+}
+.hero-card:not(:first-child) .cover { width: 110px; }
 .hero-card:hover {
   border-color: var(--line);
   transform: translateY(-2px);
@@ -537,10 +577,66 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .toolbtn svg { width: 12px; height: 12px; }
 .toolbtn .caret { font-size: 9px; opacity: 0.6; }
 
+/* ----- Grid size slider ------------------------------------- */
+.grid-size-slider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.grid-size-slider .track {
+  position: relative;
+  padding-bottom: 14px;  /* スナップラベル分 */
+}
+.grid-size-slider input[type="range"] {
+  display: block;
+  width: 130px;
+  height: 3px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: linear-gradient(90deg, var(--ember) 45%, var(--line) 45%);
+  border-radius: 99px;
+  outline: none;
+  cursor: pointer;
+}
+.grid-size-slider input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--ember);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.5), 0 0 10px var(--ember-soft);
+  cursor: pointer;
+  transition: transform 0.12s;
+}
+.grid-size-slider input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.2); }
+.grid-size-slider .snaps {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+}
+.grid-size-slider .snaps span {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--ink-4);
+  letter-spacing: 0.04em;
+}
+.grid-size-slider .val {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-2);
+  white-space: nowrap;
+  min-width: 56px;
+}
+
 /* ----- Cover grid ------------------------------------------- */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
+  /* --card-w を JS で書き換えるとカードサイズが連続変化する */
+  grid-template-columns: repeat(auto-fill, minmax(var(--card-w, 196px), 1fr));
   gap: 22px 18px;
 }
 .card {
@@ -1838,6 +1934,126 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 }
 .preset.is-on { color: var(--ember); }
 
+/* ----- Player minimized — フローティング角ピル -------------- */
+/*
+ * 最小化: .app に is-dock-min クラスを付与するとドックが消え、
+ * .dock-pill が固定表示される。遷移は次の CSS で smooth に：
+ *   .dock { transition: opacity 0.25s, height 0.25s; }
+ *   .dock-pill { transition: opacity 0.25s, transform 0.25s; }
+ */
+.app.is-dock-min {
+  --dock-h: 0px;
+  grid-template-rows: var(--topbar-h) 1fr var(--dock-h);
+}
+.app.is-dock-min .dock { display: none; }
+
+.dock-pill {
+  display: none;  /* .is-dock-min 時のみ表示 */
+}
+.app.is-dock-min ~ .dock-pill,
+body:has(.app.is-dock-min) .dock-pill {
+  display: flex;
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  z-index: 300;
+  align-items: center;
+  gap: 10px;
+  width: 268px;
+  height: 58px;
+  padding: 8px 10px 8px 8px;
+  border-radius: var(--radius-lg);
+  background: rgba(14, 11, 20, 0.92);
+  border: 1px solid rgba(255, 220, 180, 0.1);
+  backdrop-filter: blur(16px);
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.65),
+    0 0 0 1px rgba(255, 220, 180, 0.04),
+    0 0 32px rgba(223, 130, 70, 0.08);
+  transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease);
+  cursor: default;
+}
+body:has(.app.is-dock-min) .dock-pill:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 18px 48px rgba(0, 0, 0, 0.7),
+    0 0 0 1px var(--ember-soft),
+    0 0 28px var(--ember-soft);
+}
+.dock-pill .pill-cover {
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius);
+  flex-shrink: 0;
+  overflow: hidden;
+  position: relative;
+  border: 1px solid rgba(255, 220, 180, 0.08);
+}
+.dock-pill .pill-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dock-pill .pill-info .t {
+  font-size: 11.5px;
+  font-family: var(--font-display);
+  font-weight: 500;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.01em;
+}
+.dock-pill .pill-info .scrub-mini {
+  height: 2px;
+  background: var(--line);
+  border-radius: 99px;
+  position: relative;
+  overflow: hidden;
+}
+.dock-pill .pill-info .scrub-mini > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(90deg, var(--ember-2), var(--ember));
+  border-radius: inherit;
+}
+.dock-pill .pill-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.dock-pill .pctl {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--ink-2);
+  flex-shrink: 0;
+  transition: color 0.15s, background 0.15s;
+}
+.dock-pill .pctl:hover { color: var(--ink); background: rgba(255, 220, 180, 0.06); }
+.dock-pill .pctl.play-pill {
+  background: var(--ember);
+  color: #1a0e05;
+  box-shadow: 0 4px 12px rgba(223, 130, 70, 0.45);
+  width: 32px;
+  height: 32px;
+}
+.dock-pill .pctl.play-pill:hover { transform: scale(1.05); }
+.dock-pill .pctl svg { width: 12px; height: 12px; }
+.dock-pill .pctl.expand svg { width: 11px; height: 11px; color: var(--ink-3); }
+
+/* mock-nav: 最小化時はピルの左隣に */
+body:has(.app.is-dock-min) .mock-nav {
+  bottom: 16px;
+  right: 282px;  /* ピル幅 268 + gap 16 */
+  opacity: 0.45;
+}
+
 /* ----- Misc ------------------------------------------------- */
 .divider {
   height: 1px;
@@ -1903,6 +2119,7 @@ body:has(.setup-shell) .mock-nav {
   .lib-layout { grid-template-columns: 1fr; }
   .facet-rail { display: none; }
   .hero { grid-template-columns: 1fr 1fr; }
+  .hero-card:first-child { grid-template-columns: 110px 1fr; min-height: 120px; }
   .hero-card:nth-child(3) { display: none; }
   .scan-summary { grid-template-columns: repeat(2, 1fr); }
 }
