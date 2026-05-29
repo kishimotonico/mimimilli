@@ -61,6 +61,7 @@ export function useLibraryView(): LibraryViewState & LibraryViewActions {
     setState((s) => ({
       ...s,
       drillValue: value,
+      selectedTags: [],
       selectedWorkId: null,
       addressPath: buildAddressPath(s.activeAxis, value),
     }));

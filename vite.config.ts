@@ -1,6 +1,7 @@
 /// <reference types="vitest" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 // ---------------------------------------------------------------------------
@@ -400,6 +401,7 @@ const backendUrl = process.env.BACKEND_URL;
 
 export default defineConfig({
   plugins: [
+    tailwindcss(),
     react(),
     !backendUrl && {
       name: "mock-api",

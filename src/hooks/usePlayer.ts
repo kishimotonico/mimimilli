@@ -27,6 +27,8 @@ export function usePlayer() {
   const channelSwapEnabledRef = useRef(false);
   const playbackRateRef = useRef(1.0);
   const resumeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pendingResumeRef = useRef<{ workId: string; trackIndex: number; position: number } | null>(null);
+  const loadedTrackRef = useRef<{ workId: string; trackIndex: number } | null>(null);
 
   const [state, setState] = useState<PlayerState>({
     isPlaying: false,
@@ -48,6 +50,13 @@ export function usePlayer() {
   abRepeatRef.current = state.abRepeat;
   channelSwapEnabledRef.current = state.channelSwap;
   playbackRateRef.current = state.playbackRate;
+
+  const resumeAudioContext = useCallback(() => {
+    const ctx = audioContextRef.current;
+    if (ctx?.state === "suspended") {
+      ctx.resume().catch(() => {});
+    }
+  }, []);
 
   useEffect(() => {
     if (!audioRef.current) {
@@ -72,6 +81,11 @@ export function usePlayer() {
         audio.currentTime = 0;
         audio.play();
       } else {
+        const loadedTrack = loadedTrackRef.current;
+        if (loadedTrack) {
+          api.saveResumePosition(loadedTrack.workId, audio.duration || audio.currentTime, loadedTrack.trackIndex)
+            .catch(() => {});
+        }
         // Auto-advance to next track
         setState((prev) => {
           if (prev.currentTrackIndex < prev.tracks.length - 1) {
@@ -139,21 +153,60 @@ export function usePlayer() {
       const workId = state.currentWork.id;
       const encoded = track.file.split("/").map(encodeURIComponent).join("/");
       const assetUrl = `/api/audio/${encodeURIComponent(workId)}/${encoded}`;
+      const audio = audioRef.current;
+      const previousTrack = loadedTrackRef.current;
 
-      audioRef.current.src = assetUrl;
-      audioRef.current.playbackRate = playbackRateRef.current;
-
-      if (track.start !== undefined) {
-        audioRef.current.currentTime = track.start;
+      if (
+        previousTrack &&
+        (previousTrack.workId !== workId || previousTrack.trackIndex !== state.currentTrackIndex)
+      ) {
+        api.saveResumePosition(previousTrack.workId, audio.currentTime, previousTrack.trackIndex)
+          .catch(() => {});
       }
 
-      audioRef.current.play().catch(() => {});
+      const pendingResume = pendingResumeRef.current;
+      const shouldResume =
+        pendingResume?.workId === workId &&
+        pendingResume.trackIndex === state.currentTrackIndex &&
+        pendingResume.position > 0;
+
+      const seekAfterMetadata = () => {
+        if (shouldResume) {
+          audio.currentTime = pendingResume.position;
+          pendingResumeRef.current = null;
+          audio.removeEventListener("loadedmetadata", seekAfterMetadata);
+          audio.removeEventListener("canplay", seekAfterMetadata);
+        }
+      };
+
+      if (shouldResume) {
+        audio.addEventListener("loadedmetadata", seekAfterMetadata, { once: true });
+        audio.addEventListener("canplay", seekAfterMetadata, { once: true });
+      }
+
+      audio.src = assetUrl;
+      audio.playbackRate = playbackRateRef.current;
+
+      if (shouldResume && audio.readyState >= HTMLMediaElement.HAVE_METADATA) {
+        seekAfterMetadata();
+      } else if (!shouldResume && track.start !== undefined) {
+        audio.currentTime = track.start;
+      }
+
+      resumeAudioContext();
+      audio.play().catch(() => {});
+      loadedTrackRef.current = { workId, trackIndex: state.currentTrackIndex };
 
       // Update last played
       api.updateLastPlayed(state.currentWork.id).catch(() => {});
+
+      return () => {
+        audio.removeEventListener("loadedmetadata", seekAfterMetadata);
+        audio.removeEventListener("canplay", seekAfterMetadata);
+      };
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.currentTrackIndex, state.tracks, state.currentWork]);
+  }, [state.currentTrackIndex, state.tracks, state.currentWork, resumeAudioContext]);
 
   // Setup Web Audio API for channel swap
   const setupChannelSwap = useCallback(() => {
@@ -162,6 +215,7 @@ export function usePlayer() {
 
     const ctx = new AudioContext();
     audioContextRef.current = ctx;
+    ctx.resume().catch(() => {});
 
     const source = ctx.createMediaElementSource(audioRef.current);
     sourceNodeRef.current = source;
@@ -196,6 +250,10 @@ export function usePlayer() {
     const source = sourceNodeRef.current!;
     const { splitter, merger } = channelSwapNodeRef.current!;
 
+    if (ctx.state === "suspended") {
+      ctx.resume().catch(() => {});
+    }
+
     source.disconnect();
 
     if (enabled) {
@@ -211,6 +269,7 @@ export function usePlayer() {
   const play = useCallback(
     (work: WorkSummary | Work, tracks: Track[], trackIndex: number = 0) => {
       // Clear A-B repeat on new play
+      pendingResumeRef.current = null;
       setState((prev) => ({
         ...prev,
         currentWork: work,
@@ -242,13 +301,12 @@ export function usePlayer() {
         abRepeat: { a: null, b: null },
       }));
 
-      // Seek to resume position after loading
       if (work.resumePosition > 0) {
-        setTimeout(() => {
-          if (audioRef.current) {
-            audioRef.current.currentTime = work.resumePosition;
-          }
-        }, 200);
+        pendingResumeRef.current = {
+          workId: work.id,
+          trackIndex,
+          position: work.resumePosition,
+        };
       }
     },
     []
@@ -257,17 +315,25 @@ export function usePlayer() {
   const togglePlay = useCallback(() => {
     if (!audioRef.current) return;
     if (audioRef.current.paused) {
+      resumeAudioContext();
       audioRef.current.play();
     } else {
       audioRef.current.pause();
     }
-  }, []);
+  }, [resumeAudioContext]);
 
   const stop = useCallback(() => {
     if (audioRef.current) {
+      const loadedTrack = loadedTrackRef.current;
+      if (loadedTrack) {
+        api.saveResumePosition(loadedTrack.workId, audioRef.current.currentTime, loadedTrack.trackIndex)
+          .catch(() => {});
+      }
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
     }
+    loadedTrackRef.current = null;
+    pendingResumeRef.current = null;
     setState((prev) => ({
       ...prev,
       isPlaying: false,
@@ -338,9 +404,10 @@ export function usePlayer() {
   }, []);
 
   const setChannelSwap = useCallback((enabled: boolean) => {
+    resumeAudioContext();
     applyChannelSwap(enabled);
     setState((prev) => ({ ...prev, channelSwap: enabled }));
-  }, [applyChannelSwap]);
+  }, [applyChannelSwap, resumeAudioContext]);
 
   const setABPoint = useCallback((point: "a" | "b") => {
     if (!audioRef.current) return;

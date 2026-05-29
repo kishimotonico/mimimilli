@@ -8,17 +8,16 @@ interface NewWorkPopupProps {
 }
 
 const C = {
-  bgSurface: "#1e1e34",
-  bgInput: "#252540",
-  border: "#2a2a40",
-  borderLight: "#3a3a55",
-  textPrimary: "#e2e2f0",
-  textSecondary: "#888",
-  textDisabled: "#555",
-  accent: "#5b8def",
-  accentDim: "rgba(91,141,239,0.08)",
-  error: "#e53e3e",
-  warning: "#d69e2e",
+  bgSurface: "var(--paper-1)",
+  bgInput: "var(--paper-2)",
+  textPrimary: "var(--ink-0)",
+  textSecondary: "var(--ink-2)",
+  textDisabled: "var(--ink-4)",
+  accent: "var(--acc)",
+  accentDim: "var(--acc-soft)",
+  error: "var(--r-coral)",
+  warning: "var(--r-mustard)",
+  success: "var(--r-leaf)",
 };
 
 const NewWorkPopup: React.FC<NewWorkPopupProps> = ({ scanResult, onClose }) => {
@@ -64,7 +63,7 @@ const NewWorkPopup: React.FC<NewWorkPopupProps> = ({ scanResult, onClose }) => {
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(0, 0, 0, 0.55)",
+        background: "oklch(0% 0 0 / 0.55)",
         zIndex: 250,
         display: "flex",
         alignItems: "center",
@@ -75,6 +74,7 @@ const NewWorkPopup: React.FC<NewWorkPopupProps> = ({ scanResult, onClose }) => {
         onClick={(e) => e.stopPropagation()}
         style={{
           background: C.bgSurface,
+          border: "1px solid var(--line)",
           borderRadius: 10,
           padding: 22,
           width: 520,
@@ -100,7 +100,7 @@ const NewWorkPopup: React.FC<NewWorkPopupProps> = ({ scanResult, onClose }) => {
           }}
         >
           <StatBadge label="登録済み" value={scanResult.registered} color={C.accent} />
-          <StatBadge label="新規検出" value={scanResult.newlyGenerated} color="#48bb78" />
+          <StatBadge label="新規検出" value={scanResult.newlyGenerated} color={C.success} />
           {scanResult.errors > 0 && (
             <StatBadge label="エラー" value={scanResult.errors} color={C.error} />
           )}
@@ -144,7 +144,7 @@ const NewWorkPopup: React.FC<NewWorkPopupProps> = ({ scanResult, onClose }) => {
                 >
                   <span
                     style={{
-                      color: "#48bb78",
+                      color: C.success,
                       fontSize: 11,
                       flexShrink: 0,
                     }}
@@ -210,7 +210,7 @@ const NewWorkPopup: React.FC<NewWorkPopupProps> = ({ scanResult, onClose }) => {
             background: C.accent,
             border: "none",
             borderRadius: 6,
-            color: "#fff",
+            color: "var(--paper-1)",
             cursor: "pointer",
             padding: "10px 28px",
             fontSize: 14,
@@ -240,12 +240,12 @@ function StatBadge({
         textAlign: "center",
         padding: "6px 14px",
         borderRadius: 6,
-        background: `${color}10`,
-        border: `1px solid ${color}30`,
+        background: `color-mix(in oklch, ${color} 12%, transparent)`,
+        border: `1px solid color-mix(in oklch, ${color} 28%, transparent)`,
       }}
     >
       <div style={{ fontSize: 20, fontWeight: 700, color }}>{value}</div>
-      <div style={{ fontSize: 11, color: "#888" }}>{label}</div>
+      <div style={{ fontSize: 11, color: C.textSecondary }}>{label}</div>
     </div>
   );
 }

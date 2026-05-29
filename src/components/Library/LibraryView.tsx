@@ -16,20 +16,20 @@ function isSmartAxis(a: AxisId): boolean { return (a as string).startsWith("smar
 
 interface LibraryViewProps {
   searchQuery: string;
+  scanVersion: number;
   playingWorkId?: string;
   playingTrackIndex?: number;
   onPlay: (work: WorkSummary, trackIndex: number) => void;
 }
 
-export default function LibraryView({ searchQuery, playingWorkId, playingTrackIndex, onPlay }: LibraryViewProps) {
+export default function LibraryView({ searchQuery, scanVersion, playingWorkId, playingTrackIndex, onPlay }: LibraryViewProps) {
   const nav = useLibraryView();
 
   const [works, setWorks] = useState<WorkSummary[]>([]);
   const [facetItems, setFacetItems] = useState<AxisFacetItem[]>([]);
   const [smartFolders, setSmartFolders] = useState<SmartFolder[]>([]);
   const [selectedWork, setSelectedWork] = useState<Work | null>(null);
-  const [smartFolderWorks, setSmartFolderWorks] = useState<WorkSummary[]>([]);
-  const [totalCount, setTotalCount] = useState<number | undefined>(undefined);
+  const [libraryTotal, setLibraryTotal] = useState<number | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(false);
 
   // ── Load smart folders once ─────────────────────────────
@@ -39,16 +39,29 @@ export default function LibraryView({ searchQuery, playingWorkId, playingTrackIn
 
   // ── Load works based on current navigation state ────────
   useEffect(() => {
+    let cancelled = false;
     setIsLoading(true);
+
+    if (isSmartAxis(nav.activeAxis)) {
+      const sfId = (nav.activeAxis as string).slice("smart-".length);
+      api.evalSmartFolder(sfId)
+        .then((w) => {
+          if (!cancelled) setWorks(w);
+        })
+        .catch(() => {
+          if (!cancelled) setWorks([]);
+        })
+        .finally(() => {
+          if (!cancelled) setIsLoading(false);
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
+
     const params: api.WorksQueryParams = { sort: nav.sort };
 
     if (searchQuery) params.q = searchQuery;
-
-    if (isSmartAxis(nav.activeAxis)) {
-      // handled separately below
-      setIsLoading(false);
-      return;
-    }
 
     if (nav.activeAxis === "tag" && nav.selectedTags.length > 0) {
       params.tags = nav.selectedTags;
@@ -65,15 +78,25 @@ export default function LibraryView({ searchQuery, playingWorkId, playingTrackIn
     }
 
     api.searchWorksV2(params)
-      .then((w) => { setWorks(w); setTotalCount(w.length); })
-      .catch(() => setWorks([]))
-      .finally(() => setIsLoading(false));
-  }, [nav.activeAxis, nav.drillValue, nav.selectedTags, nav.sort, searchQuery]);
+      .then((w) => {
+        if (!cancelled) setWorks(w);
+      })
+      .catch(() => {
+        if (!cancelled) setWorks([]);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
 
-  // ── Load total count for "all" axis once ────────────────
+    return () => {
+      cancelled = true;
+    };
+  }, [nav.activeAxis, nav.drillValue, nav.selectedTags, nav.sort, searchQuery, scanVersion]);
+
+  // ── Load library total for axis header ───────────────────
   useEffect(() => {
-    api.searchWorksV2({}).then((w) => setTotalCount(w.length)).catch(() => {});
-  }, []);
+    api.searchWorksV2({}).then((w) => setLibraryTotal(w.length)).catch(() => {});
+  }, [scanVersion]);
 
   // ── Load facet items when entering a facet axis ─────────
   useEffect(() => {
@@ -81,24 +104,13 @@ export default function LibraryView({ searchQuery, playingWorkId, playingTrackIn
     api.getAxisFacets(nav.activeAxis as string)
       .then(setFacetItems)
       .catch(() => setFacetItems([]));
-  }, [nav.activeAxis, nav.drillValue]);
+  }, [nav.activeAxis, nav.drillValue, scanVersion]);
 
   // ── Load tag list for tag axis ──────────────────────────
   useEffect(() => {
     if (nav.activeAxis !== "tag") return;
     api.getAxisFacets("tag").then(setFacetItems).catch(() => setFacetItems([]));
-  }, [nav.activeAxis]);
-
-  // ── Load smart folder works ─────────────────────────────
-  useEffect(() => {
-    if (!isSmartAxis(nav.activeAxis)) { setSmartFolderWorks([]); return; }
-    const sfId = (nav.activeAxis as string).slice("smart-".length);
-    setIsLoading(true);
-    api.evalSmartFolder(sfId)
-      .then((w) => { setSmartFolderWorks(w); setWorks(w); })
-      .catch(() => { setSmartFolderWorks([]); setWorks([]); })
-      .finally(() => setIsLoading(false));
-  }, [nav.activeAxis]);
+  }, [nav.activeAxis, scanVersion]);
 
   // ── Load selected work detail ────────────────────────────
   useEffect(() => {
@@ -146,7 +158,7 @@ export default function LibraryView({ searchQuery, playingWorkId, playingTrackIn
     <>
       <AxisColumn
         activeAxis={nav.activeAxis}
-        totalCount={totalCount}
+        totalCount={libraryTotal}
         smartFolders={smartFolders}
         onSelectAxis={nav.setAxis}
         onNewSmartFolder={() => {
@@ -179,7 +191,7 @@ export default function LibraryView({ searchQuery, playingWorkId, playingTrackIn
         selectedWork={selectedWork}
         smartFolder={activeSmartFolder}
         axisWorks={works}
-        smartFolderWorks={smartFolderWorks}
+        smartFolderWorks={works}
         playingTrackIndex={
           selectedWork && playingWorkId === selectedWork.id ? (playingTrackIndex ?? null) : null
         }

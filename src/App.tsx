@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { usePlayer } from "./hooks/usePlayer";
 import TopBar from "./components/AppShell/TopBar";
 import LeftNav from "./components/AppShell/LeftNav";
@@ -8,31 +8,35 @@ import TransportBar from "./components/Player/TransportBar";
 import FullScreenPlayer from "./components/Player/FullScreenPlayer";
 import SetupScreen from "./components/SetupScreen";
 import SettingsModal from "./components/SettingsModal";
-import type { WorkSummary } from "./types";
+import NewWorkPopup from "./components/NewWorkPopup";
+import type { ScanResult, WorkSummary } from "./types";
 import * as api from "./api";
 
 type AppMode = "library" | "files";
 
 export default function App() {
   const player = usePlayer();
+  const playRequestIdRef = useRef(0);
 
   const [mode] = useState<AppMode>("library");
   const [searchQuery, setSearchQuery] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [rootFolder, setRootFolder] = useState<string | null>(null);
   const [lastScanTime, setLastScanTime] = useState<string | null>(null);
+  const [scanVersion, setScanVersion] = useState(0);
+  const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [scanning, setScanning] = useState(false);
   const [isSetupDone, setIsSetupDone] = useState<boolean | null>(null); // null = loading
 
   // Load settings on mount
   useEffect(() => {
-    api.getRootFolder()
-      .then((folder) => {
-        setRootFolder(folder);
-        setIsSetupDone(folder !== null);
+    api.getSettings()
+      .then((settings) => {
+        setRootFolder(settings.rootFolder);
+        setLastScanTime(settings.lastScanTime);
+        setIsSetupDone(settings.rootFolder !== null);
       })
       .catch(() => setIsSetupDone(false));
-    api.getLastScanTime().then(setLastScanTime).catch(() => {});
   }, []);
 
   // Keyboard shortcuts
@@ -51,8 +55,10 @@ export default function App() {
 
   // Play handler: fetch full work detail, then call player.play
   const handlePlay = useCallback(async (work: WorkSummary, trackIndex: number) => {
+    const requestId = ++playRequestIdRef.current;
     try {
       const fullWork = await api.getWork(work.id);
+      if (requestId !== playRequestIdRef.current) return;
       if (!fullWork) return;
       const playlist = fullWork.playlists.find(
         (p) => p.name === (fullWork.defaultPlaylist ?? "default")
@@ -69,7 +75,9 @@ export default function App() {
   const handleScan = useCallback(async () => {
     setScanning(true);
     try {
-      await api.scanLibrary();
+      const result = await api.scanLibrary();
+      setScanResult(result);
+      setScanVersion((v) => v + 1);
       setLastScanTime(new Date().toISOString());
     } catch {
       // ignore
@@ -83,7 +91,9 @@ export default function App() {
     try {
       await api.setRootFolder(path);
       setRootFolder(path);
-      await api.scanLibrary();
+      const result = await api.scanLibrary();
+      setScanResult(result);
+      setScanVersion((v) => v + 1);
       setLastScanTime(new Date().toISOString());
       setIsSetupDone(true);
     } catch {
@@ -151,6 +161,7 @@ export default function App() {
         <main className="mle-body">
           <LibraryView
             searchQuery={searchQuery}
+            scanVersion={scanVersion}
             playingWorkId={player.state.currentWork?.id}
             playingTrackIndex={player.state.currentTrackIndex}
             onPlay={handlePlay}
@@ -204,6 +215,13 @@ export default function App() {
           onScan={handleScan}
           onChangeFolder={handleChangeFolder}
           onExport={handleExport}
+        />
+      )}
+
+      {scanResult && (
+        <NewWorkPopup
+          scanResult={scanResult}
+          onClose={() => setScanResult(null)}
         />
       )}
     </div>

@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-paper-0: var(--paper-0);
+  --color-paper-1: var(--paper-1);
+  --color-paper-2: var(--paper-2);
+  --color-paper-3: var(--paper-3);
+  --color-paper-4: var(--paper-4);
+  --color-line: var(--line);
+  --color-line-soft: var(--line-soft);
+  --color-line-strong: var(--line-strong);
+  --color-ink-0: var(--ink-0);
+  --color-ink-1: var(--ink-1);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-ink-4: var(--ink-4);
+  --color-acc: var(--acc);
+  --color-acc-soft: var(--acc-soft);
+  --color-acc-line: var(--acc-line);
+  --color-acc-ink: var(--acc-ink);
+  --color-cv: var(--cv-color);
+  --color-circle: var(--circle-color);
+  --color-series: var(--series-color);
+  --color-cat: var(--cat-color);
+  --font-sans: var(--font-sans);
+  --font-jp: var(--font-jp);
+  --font-mono: var(--font-mono);
+  --radius-1: var(--r-1);
+  --radius-2: var(--r-2);
+  --radius-3: var(--r-3);
+  --radius-4: var(--r-4);
+  --radius-pill: var(--r-pill);
+  --shadow-1: var(--shadow-1);
+  --shadow-2: var(--shadow-2);
+  --shadow-pop: var(--shadow-pop);
+  --shadow-cover: var(--shadow-cover);
+}

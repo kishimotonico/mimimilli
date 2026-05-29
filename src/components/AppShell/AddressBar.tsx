@@ -28,6 +28,7 @@ export default function AddressBar({
       <button
         className={`mle-navbtn ${!canBack ? "is-disabled" : ""}`}
         onClick={onBack}
+        disabled={!canBack}
         title="戻る"
       >
         <I.arrowL size={14} />
@@ -35,6 +36,7 @@ export default function AddressBar({
       <button
         className={`mle-navbtn ${!canForward ? "is-disabled" : ""}`}
         onClick={onForward}
+        disabled={!canForward}
         title="進む"
       >
         <I.arrowR size={14} />

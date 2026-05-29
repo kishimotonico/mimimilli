@@ -2,6 +2,11 @@ import type { Work, WorkSummary, ScanResult, SearchPreset, FileEntry, DlsiteWork
 
 const API_BASE = "/api";
 
+export interface Settings {
+  rootFolder: string | null;
+  lastScanTime: string | null;
+}
+
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(API_BASE + path);
   if (!res.ok) throw new Error(`API error ${res.status}: GET ${path}`);
@@ -34,8 +39,12 @@ async function del(path: string): Promise<void> {
 }
 
 export async function getRootFolder(): Promise<string | null> {
-  const s = await get<{ rootFolder: string | null }>("/settings");
+  const s = await getSettings();
   return s.rootFolder;
+}
+
+export async function getSettings(): Promise<Settings> {
+  return get<Settings>("/settings");
 }
 
 export async function setRootFolder(path: string): Promise<void> {
@@ -96,7 +105,7 @@ export function getAudioUrl(workId: string, relativePath: string): string {
 }
 
 export async function getLastScanTime(): Promise<string | null> {
-  const s = await get<{ rootFolder: string | null; lastScanTime: string | null }>("/settings");
+  const s = await getSettings();
   return s.lastScanTime;
 }
 

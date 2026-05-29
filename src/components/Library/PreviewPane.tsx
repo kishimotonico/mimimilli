@@ -2,16 +2,7 @@ import type { Work, SmartFolder, WorkSummary, AxisId } from "../../types";
 import CoverImg from "../CoverImg";
 import Tag from "../Tag";
 import { I } from "../Icon";
-
-// ── Utility ───────────────────────────────────────────────────
-
-function formatDuration(sec: number): string {
-  const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  const s = sec % 60;
-  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-  return `${m}:${String(s).padStart(2, "0")}`;
-}
+import { formatDuration } from "../../hooks/usePlayer";
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("ja-JP", { year: "numeric", month: "short", day: "numeric" });

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import CoverPlaceholder from "./CoverPlaceholder";
 import { getCoverImageUrl } from "../api";
 
@@ -12,6 +12,10 @@ interface CoverImgProps {
 
 export default function CoverImg({ id, title, hasCover, size, radius = 4 }: CoverImgProps) {
   const [errored, setErrored] = useState(false);
+
+  useEffect(() => {
+    setErrored(false);
+  }, [id]);
 
   if (hasCover && !errored) {
     return (

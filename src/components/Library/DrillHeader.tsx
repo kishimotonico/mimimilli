@@ -12,6 +12,7 @@ const AXIS_LABELS: Record<string, string> = {
   cv: "CV",
   series: "シリーズ",
   cat: "カテゴリ",
+  tag: "タグ",
   year: "追加日",
 };
 

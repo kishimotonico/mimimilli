@@ -1,4 +1,5 @@
 import { parseTag } from "../types";
+import { cn } from "../lib/cn";
 
 interface TagProps {
   tag: string;
@@ -16,24 +17,30 @@ const CAT_LABELS: Record<string, string> = {
 };
 
 const CAT_CLASSES: Record<string, string> = {
-  cv: "cv",
-  サークル: "circle",
-  シリーズ: "series",
-  カテゴリ: "cat",
-  category: "cat",
-  genre: "cat",
+  cv: "text-cv",
+  サークル: "text-circle",
+  シリーズ: "text-series",
+  カテゴリ: "text-cat",
+  category: "text-cat",
+  genre: "text-cat",
 };
+
+const TAG_BASE =
+  "inline-flex h-5 items-center gap-[3px] whitespace-nowrap rounded-1 bg-paper-2 px-[7px] font-jp text-[10.5px] text-ink-1 hover:bg-paper-3";
+
+const REMOVE_BUTTON =
+  "cursor-pointer bg-transparent p-0 text-[13px] leading-none text-ink-3";
 
 export default function Tag({ tag, onRemove, onClick }: TagProps) {
   const parsed = parseTag(tag);
 
   if (parsed.kind === "flat") {
     return (
-      <span className="ml-tag flat" onClick={onClick} style={onClick ? { cursor: "pointer" } : undefined}>
+      <span className={cn(TAG_BASE, onClick && "cursor-pointer")} onClick={onClick}>
         {parsed.value}
         {onRemove && (
           <button
-            className="ml-x"
+            className={REMOVE_BUTTON}
             onClick={(e) => { e.stopPropagation(); onRemove(); }}
           >×</button>
         )}
@@ -42,15 +49,15 @@ export default function Tag({ tag, onRemove, onClick }: TagProps) {
   }
 
   const catLabel = CAT_LABELS[parsed.prefix] ?? parsed.prefix.toUpperCase().slice(0, 4);
-  const catClass = CAT_CLASSES[parsed.prefix] ?? "cat";
+  const catClass = CAT_CLASSES[parsed.prefix] ?? "text-cat";
 
   return (
-    <span className={`ml-tag is-anno ${catClass}`} onClick={onClick} style={onClick ? { cursor: "pointer" } : undefined}>
-      <span className="ml-tag__cat">{catLabel}</span>
-      <span className="ml-tag__val">{parsed.value}</span>
+    <span className={cn(TAG_BASE, onClick && "cursor-pointer")} onClick={onClick}>
+      <span className="font-mono text-[9.5px] uppercase text-ink-3">{catLabel}</span>
+      <span className={cn("font-medium", catClass)}>{parsed.value}</span>
       {onRemove && (
         <button
-          className="ml-x"
+          className={REMOVE_BUTTON}
           onClick={(e) => { e.stopPropagation(); onRemove(); }}
         >×</button>
       )}

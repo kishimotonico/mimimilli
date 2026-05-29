@@ -1,19 +1,13 @@
 import type { WorkSummary } from "../../types";
 import CoverImg from "../CoverImg";
 import { I } from "../Icon";
+import { formatDuration } from "../../hooks/usePlayer";
 
 interface WorkRowProps {
   work: WorkSummary;
   isSelected: boolean;
   isPlaying?: boolean;
   onSelect: () => void;
-}
-
-function formatDuration(sec: number): string {
-  const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  if (h > 0) return `${h}:${String(m).padStart(2, "0")}`;
-  return `${m}:${String(sec % 60).padStart(2, "0")}`;
 }
 
 function formatRelativeDate(iso: string): string {

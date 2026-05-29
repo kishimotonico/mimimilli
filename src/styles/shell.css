@@ -670,25 +670,6 @@
   padding: 2px 5px; border-radius: 3px; letter-spacing: 0.02em; backdrop-filter: blur(4px);
 }
 
-/* ── Tag chip ─────────────────────────────────────────────── */
-
-.ml-tag {
-  display: inline-flex; align-items: center;
-  height: 20px; padding: 0 7px;
-  border-radius: 4px; background: var(--paper-2);
-  font-size: 10.5px; color: var(--ink-1);
-  white-space: nowrap; gap: 3px;
-  font-family: var(--font-jp);
-}
-.ml-tag.is-anno .ml-tag__cat { color: var(--ink-3); font-family: var(--font-mono); font-size: 9.5px; text-transform: uppercase; }
-.ml-tag.is-anno .ml-tag__val { font-weight: 500; }
-.ml-tag.is-anno.cv     .ml-tag__val { color: var(--cv-color); }
-.ml-tag.is-anno.circle .ml-tag__val { color: var(--circle-color); }
-.ml-tag.is-anno.series .ml-tag__val { color: var(--series-color); }
-.ml-tag.is-anno.cat    .ml-tag__val { color: var(--cat-color); }
-.ml-tag:hover { background: var(--paper-3); }
-.ml-tag .ml-x { color: var(--ink-3); font-size: 13px; background: none; border: none; cursor: pointer; padding: 0; line-height: 1; }
-
 /* ── FAB action buttons ────────────────────────────────────── */
 
 .mll-fab {
