@@ -1,4 +1,5 @@
-import React, { useEffect } from "react";
+import { useEffect } from "react";
+import { I } from "./Icon";
 
 interface SettingsModalProps {
   rootFolder: string | null;
@@ -6,11 +7,11 @@ interface SettingsModalProps {
   scanning: boolean;
   onClose: () => void;
   onScan: () => void;
-  onChangeFolder: () => void;
+  onChangeFolder: (path: string) => void;
   onExport: () => void;
 }
 
-const SettingsModal: React.FC<SettingsModalProps> = ({
+export default function SettingsModal({
   rootFolder,
   lastScanTime,
   scanning,
@@ -18,182 +19,117 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   onScan,
   onChangeFolder,
   onExport,
-}) => {
+}: SettingsModalProps) {
   useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handleEsc);
-    return () => window.removeEventListener("keydown", handleEsc);
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
 
+  const handleChangeFolder = () => {
+    const p = window.prompt("ルートフォルダーのパスを入力:", rootFolder ?? "");
+    if (p) onChangeFolder(p);
+  };
+
+  const formatDate = (iso: string | null) =>
+    iso ? new Date(iso).toLocaleString("ja-JP") : "未実行";
+
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0, 0, 0, 0.55)",
-        zIndex: 250,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
+    <>
+      {/* Backdrop */}
       <div
-        onClick={(e) => e.stopPropagation()}
+        style={{ position: "fixed", inset: 0, zIndex: 40, background: "oklch(20% 0.020 70 / 0.3)" }}
+        onClick={onClose}
+      />
+      {/* Panel */}
+      <div
         style={{
-          background: "#1e1e34",
-          borderRadius: 10,
-          padding: 22,
-          width: 420,
-          maxWidth: "90vw",
-          color: "#e2e2f0",
+          position: "fixed", zIndex: 41,
+          top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+          width: 440, background: "var(--paper-1)",
+          borderRadius: 12, boxShadow: "var(--shadow-pop)",
+          border: "1px solid var(--line-soft)",
+          overflow: "hidden",
+          fontFamily: "var(--font-jp)",
         }}
       >
         {/* Header */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 20,
-          }}
-        >
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>設定</h2>
+        <div style={{ display: "flex", alignItems: "center", padding: "14px 18px", borderBottom: "1px solid var(--line-soft)" }}>
+          <span style={{ fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: 14, color: "var(--ink-0)", flex: 1 }}>設定</span>
           <button
             onClick={onClose}
-            style={{ background: "none", border: "none", color: "#888", cursor: "pointer", fontSize: 20, lineHeight: 1 }}
+            style={{ width: 26, height: 26, display: "grid", placeItems: "center", borderRadius: 6, color: "var(--ink-2)", border: "none", background: "none", cursor: "pointer" }}
           >
-            ✕
+            <I.x size={14} />
           </button>
         </div>
 
-        {/* Root folder */}
-        <div style={{ marginBottom: 18 }}>
-          <div style={{ color: "#888", fontSize: 12, marginBottom: 6 }}>ルートフォルダー</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div
-              style={{
-                flex: 1,
-                background: "#252540",
-                borderRadius: 6,
-                padding: "8px 12px",
-                fontSize: 13,
-                color: rootFolder ? "#e2e2f0" : "#555",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {rootFolder || "未設定"}
+        {/* Body */}
+        <div style={{ padding: "18px 18px 8px", display: "flex", flexDirection: "column", gap: 18 }}>
+          {/* Root folder */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <label style={{ fontFamily: "var(--font-sans)", fontSize: 10.5, fontWeight: 600, letterSpacing: "0.08em", color: "var(--ink-3)", textTransform: "uppercase" }}>
+              ルートフォルダー
+            </label>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ flex: 1, height: 34, padding: "0 12px", background: "var(--paper-0)", border: "1px solid var(--line-soft)", borderRadius: 6, display: "flex", alignItems: "center", gap: 8, overflow: "hidden" }}>
+                <I.folder size={13} style={{ color: "var(--ink-3)", flexShrink: 0 }} />
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: rootFolder ? "var(--ink-1)" : "var(--ink-4)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {rootFolder ?? "未設定"}
+                </span>
+              </div>
+              <button
+                onClick={handleChangeFolder}
+                style={{ height: 34, padding: "0 12px", borderRadius: 6, border: "1px solid var(--line)", background: "var(--paper-1)", color: "var(--ink-1)", fontFamily: "var(--font-sans)", fontSize: 12, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap" }}
+              >
+                変更
+              </button>
             </div>
+          </div>
+
+          {/* Scan */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <label style={{ fontFamily: "var(--font-sans)", fontSize: 10.5, fontWeight: 600, letterSpacing: "0.08em", color: "var(--ink-3)", textTransform: "uppercase" }}>
+              スキャン
+            </label>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ flex: 1, fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--ink-2)" }}>
+                最終スキャン: {formatDate(lastScanTime)}
+              </span>
+              <button
+                onClick={onScan}
+                disabled={scanning}
+                style={{ height: 34, padding: "0 14px", borderRadius: 6, background: "var(--ink-0)", color: "var(--paper-1)", fontFamily: "var(--font-sans)", fontSize: 12, fontWeight: 600, border: "none", cursor: scanning ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 6, opacity: scanning ? 0.6 : 1 }}
+              >
+                <I.refresh size={12} />{scanning ? "スキャン中..." : "フルスキャン"}
+              </button>
+            </div>
+          </div>
+
+          {/* Export */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <label style={{ fontFamily: "var(--font-sans)", fontSize: 10.5, fontWeight: 600, letterSpacing: "0.08em", color: "var(--ink-3)", textTransform: "uppercase" }}>
+              データ
+            </label>
             <button
-              onClick={onChangeFolder}
-              style={{
-                background: "#252540",
-                border: "1px solid #3a3a55",
-                borderRadius: 6,
-                color: "#e2e2f0",
-                cursor: "pointer",
-                padding: "8px 14px",
-                fontSize: 13,
-                whiteSpace: "nowrap",
-              }}
+              onClick={onExport}
+              style={{ alignSelf: "flex-start", height: 34, padding: "0 14px", borderRadius: 6, border: "1px solid var(--line)", background: "var(--paper-1)", color: "var(--ink-1)", fontFamily: "var(--font-sans)", fontSize: 12, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
             >
-              変更
+              <I.download size={12} /> ライブラリをエクスポート
             </button>
           </div>
         </div>
 
-        {/* Scan */}
-        <div style={{ marginBottom: 18 }}>
-          <div style={{ color: "#888", fontSize: 12, marginBottom: 6 }}>スキャン</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <button
-              onClick={onScan}
-              disabled={scanning}
-              style={{
-                background: scanning ? "#252540" : "#5b8def",
-                border: "none",
-                borderRadius: 6,
-                color: scanning ? "#888" : "#fff",
-                cursor: scanning ? "default" : "pointer",
-                padding: "8px 16px",
-                fontSize: 13,
-                fontWeight: 600,
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-              }}
-            >
-              {scanning && (
-                <span
-                  style={{
-                    display: "inline-block",
-                    width: 14,
-                    height: 14,
-                    border: "2px solid #555",
-                    borderTopColor: "#e2e2f0",
-                    borderRadius: "50%",
-                    animation: "spin 0.8s linear infinite",
-                  }}
-                />
-              )}
-              フルスキャン実行
-            </button>
-            {lastScanTime && (
-              <span style={{ color: "#555", fontSize: 12 }}>前回: {lastScanTime}</span>
-            )}
-          </div>
-          <div style={{ color: "#555", fontSize: 11, marginTop: 6 }}>
-            起動時に自動スキャンが実行されます
-          </div>
-        </div>
-
-        {/* Data */}
-        <div style={{ marginBottom: 18 }}>
-          <div style={{ color: "#888", fontSize: 12, marginBottom: 6 }}>データ管理</div>
+        {/* Footer */}
+        <div style={{ padding: "12px 18px 16px", display: "flex", justifyContent: "flex-end" }}>
           <button
-            onClick={onExport}
-            style={{
-              background: "#252540",
-              border: "1px solid #3a3a55",
-              borderRadius: 6,
-              color: "#e2e2f0",
-              cursor: "pointer",
-              padding: "8px 14px",
-              fontSize: 13,
-            }}
+            onClick={onClose}
+            style={{ height: 32, padding: "0 16px", borderRadius: 6, background: "var(--paper-2)", color: "var(--ink-1)", fontFamily: "var(--font-sans)", fontSize: 12, fontWeight: 500, border: "none", cursor: "pointer" }}
           >
-            ライブラリをエクスポート
+            閉じる
           </button>
-          <div style={{ color: "#555", fontSize: 11, marginTop: 4 }}>
-            作品情報をJSONファイルとしてダウンロードします
-          </div>
-        </div>
-
-        {/* Version */}
-        <div
-          style={{
-            borderTop: "1px solid #2a2a40",
-            paddingTop: 14,
-            color: "#555",
-            fontSize: 12,
-          }}
-        >
-          mimikago v0.2.0
         </div>
       </div>
-
-      <style>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
-    </div>
+    </>
   );
-};
-
-export default SettingsModal;
+}

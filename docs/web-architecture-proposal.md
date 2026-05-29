@@ -1,8 +1,6 @@
 # mimikago Web再設計 提案
 
-> **ステータス（2026年4月時点）:** 本提案に沿って移行着手済み。
-> Phase 0（設計固定・Tauri廃止）と Phase 1（axum サーバー化 — `apps/server`、`/api/...` エンドポイント実装、フロント `src/api.ts` の HTTP client 化）は完了。
-> Phase 2（フロントエンド再構築、検索サーバーサイド化）が進行中。Phase 3 以降は未着手。
+> **ステータス（2026年5月時点）:** axum サーバー化（旧 Phase 1）は完了済み。フロントエンドは mimimilli デザイン（`design_handoff_mimimilli_library/`）をベースに全面再構築中（旧フロントコンポーネントは廃棄予定）。バックエンドも新スコープ（軸ファセット集計・タグAND検索・スマートフォルダー）に合わせて全面再構築。詳細は `docs/requirements-v4.md` を参照。
 > 文書の提案内容は設計経緯の記録として維持する。
 
 ## 1. 結論
@@ -208,23 +206,39 @@ SSE で十分な理由:
 
 ## 7. API 設計の方向性
 
-例:
+設定・スキャン・作品基本 CRUD:
 
-- `GET /api/settings/root-folder`
-- `PUT /api/settings/root-folder`
+- `GET /api/settings` / `POST /api/settings`
 - `POST /api/library/scan`
-- `GET /api/library/works`
+- `GET /api/library/works` （`q`, `tags`(AND), `axis`, `axisValue`, `sort`, `page`, `limit` クエリパラメータ）
 - `GET /api/library/works/:id`
-- `PATCH /api/library/works/:id`
 - `PUT /api/library/works/:id/tags`
-- `POST /api/library/works/:id/bookmark/toggle`
-- `POST /api/library/works/:id/resume`
-- `GET /api/library/works/:id/files`
+- `PUT /api/library/works/:id/title`
+- `POST /api/library/works/:id/bookmark`
+
+軸ファセット集計（Libraryモード新規）:
+
+- `GET /api/library/axes/:axis` — 指定軸（`circle` / `cv` / `series` / `category` / `tag` / `added_date`）のファセット値一覧＋件数を返す
+- `GET /api/library/works?tags=A,B&tagOp=AND` — タグAND積集合検索
+
+スマートフォルダー（新規）:
+
+- `GET /api/library/smart-folders`
+- `POST /api/library/smart-folders`
+- `PUT /api/library/smart-folders/:id`
+- `DELETE /api/library/smart-folders/:id`
+- `GET /api/library/smart-folders/:id/works` — ルール評価結果（リアルタイム）
+
+メディア配信:
+
 - `GET /api/media/cover/:id`
 - `GET /api/media/audio/:id/*path`
-- `POST /api/integrations/dlsite/:id/fetch`
+- `GET /api/media/files/:id/*path`
 
-重要なのは、`src/api.ts` の Tauri invoke 群をそのまま HTTP client に置換できるようにすること。
+DLsite連携:
+
+- `POST /api/integrations/dlsite/:id/fetch`
+- `POST /api/integrations/dlsite/:id/apply`
 
 ## 8. フロント側の再設計ポイント
 
@@ -267,19 +281,31 @@ SSE で十分な理由:
 
 ## 9. データモデル方針
 
-モデルは大きく変えなくてよい。
+基本エンティティは維持する。
 
 - `.meta.json` を SoT
 - SQLite は検索用キャッシュ
 - `Work`, `WorkSummary`, `Track`, `Playlist`, `UrlEntry` はほぼ維持
 
-ただし次版では、以下を最初から整理した方がよい。
+再構築で追加するエンティティ:
 
-- API 用 DTO
-- DB モデル
-- `.meta.json` モデル
+- `SmartFolder { id, name, rules: Vec<SmartFolderRule>, sort, created_at }` — スマートフォルダー保存クエリ
+- `SmartFolderRule { conjunction, field, operator, values }` — WHERE/AND/AND NOT ＋ フィールド・演算子・値
 
-今はこれらが近い形だが、将来の変更容易性のためには層を分けた方が安全。
+DB に追加するテーブル:
+
+- `smart_folders` — スマートフォルダー保存
+- `smart_folder_rules` — ルール（FK: smart_folders.id）
+
+意図的に**追加しないもの**（将来フェーズ）:
+
+- 再生統計（playCount, totalListenedSec, completionRate）
+- レーティング（rating）
+- メモ（note）
+
+これらはデータモデルに含めず、フェーズ3以降で設計する。未再生・ファイル欠損などのビュービューは既存の `lastPlayedAt`/`status` フィールドから導出する。
+
+API 用 DTO / DB モデル / `.meta.json` モデルは再構築時に層を明確に分ける。
 
 ## 10. ディレクトリ構成案
 

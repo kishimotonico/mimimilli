@@ -97,6 +97,58 @@ export type SortId =
   | "random"
   | "id-asc";
 
+// ── Library mode types ────────────────────────────────────────
+
+export interface AxisFacetItem {
+  value: string;
+  count: number;
+}
+
+export interface SmartFolderRule {
+  conjunction: "WHERE" | "AND" | "AND NOT";
+  field: string;
+  operator: string;
+  values: string[];
+}
+
+export interface SmartFolder {
+  id: string;
+  name: string;
+  rules: SmartFolderRule[];
+  sort: string;
+  createdAt: string;
+}
+
+export type LibraryViewAxisId =
+  | "all" | "recent" | "added" | "fav" | "unplayed" | "missing"
+  | "circle" | "cv" | "series" | "cat" | "tag" | "year";
+
+export type AxisId = LibraryViewAxisId | `smart-${string}`;
+
+/** Parse a tag string ("cv/水瀬なずな" or "サークル/夜想曲" or flat "バイノーラル") */
+export interface ParsedTag {
+  kind: "annotated" | "flat";
+  prefix: string;
+  value: string;
+  raw: string;
+}
+
+export function parseTag(tag: string): ParsedTag {
+  const idx = tag.indexOf("/");
+  if (idx > 0) {
+    return { kind: "annotated", prefix: tag.slice(0, idx).toLowerCase(), value: tag.slice(idx + 1), raw: tag };
+  }
+  return { kind: "flat", prefix: "", value: tag, raw: tag };
+}
+
+/** Map axis id → tag prefix used for filtering */
+export const AXIS_TAG_PREFIX: Partial<Record<LibraryViewAxisId, string>> = {
+  circle: "サークル",
+  cv:     "cv",
+  series: "シリーズ",
+  cat:    "カテゴリ",
+};
+
 export type ViewMode = "grid" | "table";
 
 export type GridSize = "S" | "M" | "L" | "XL";

@@ -1,3 +1,4 @@
+// DEPRECATED (2026-05): 旧ワイヤーフレーム JSX。UIデザインの正典は design_handoff_mimimilli_library/ (mimimilli) に移行済み。参照非推奨。
 import { useState, useMemo, useRef, useCallback } from "react";
 
 const MOCK_WORKS = Array.from({ length: 24 }, (_, i) => ({

@@ -39,7 +39,7 @@ const INITIAL_WORKS: WorkSummaryMock[] = [
         url: "https://www.dlsite.com/maniax/work/=/product_id/RJ412801.html",
       },
     ],
-    tags: ["CV:水瀬なずな", "耳かき", "ASMR", "癒し系", "ソロ"],
+    tags: ["cv/水瀬なずな", "耳かき", "ASMR", "癒し系", "ソロ"],
     trackCount: 4,
     bookmarked: true,
     lastPlayedAt: "2024-12-01T10:00:00Z",
@@ -59,7 +59,7 @@ const INITIAL_WORKS: WorkSummaryMock[] = [
         url: "https://www.dlsite.com/maniax/work/=/product_id/RJ389054.html",
       },
     ],
-    tags: ["CV:霧島レイ", "催眠", "バイノーラル", "誘導"],
+    tags: ["cv/霧島レイ", "催眠", "バイノーラル", "誘導"],
     trackCount: 3,
     bookmarked: true,
     lastPlayedAt: "2024-11-15T22:30:00Z",
@@ -79,7 +79,7 @@ const INITIAL_WORKS: WorkSummaryMock[] = [
         url: "https://www.dlsite.com/maniax/work/=/product_id/RJ401237.html",
       },
     ],
-    tags: ["CV:天音かなで", "添い寝", "ASMR", "シリーズ:添い寝ラジオ"],
+    tags: ["cv/天音かなで", "添い寝", "ASMR", "シリーズ/添い寝ラジオ"],
     trackCount: 2,
     bookmarked: false,
     lastPlayedAt: "2024-10-05T23:00:00Z",
@@ -94,7 +94,7 @@ const INITIAL_WORKS: WorkSummaryMock[] = [
     addedAt: "2024-01-07T00:00:00Z",
     errorMessage: null,
     urls: [],
-    tags: ["CV:月城あかり", "バイノーラル", "読み聞かせ", "環境音", "ASMR"],
+    tags: ["cv/月城あかり", "バイノーラル", "読み聞かせ", "環境音", "ASMR"],
     trackCount: 5,
     bookmarked: false,
     lastPlayedAt: "2024-08-20T21:00:00Z",
@@ -114,7 +114,7 @@ const INITIAL_WORKS: WorkSummaryMock[] = [
         url: "https://www.dlsite.com/maniax/work/=/product_id/RJ445612.html",
       },
     ],
-    tags: ["CV:水瀬なずな", "シチュエーションボイス", "日常系", "幼馴染"],
+    tags: ["cv/水瀬なずな", "シチュエーションボイス", "日常系", "幼馴染"],
     trackCount: 6,
     bookmarked: true,
     lastPlayedAt: "2025-01-10T20:00:00Z",
@@ -129,7 +129,7 @@ const INITIAL_WORKS: WorkSummaryMock[] = [
     addedAt: "2024-02-14T00:00:00Z",
     errorMessage: null,
     urls: [],
-    tags: ["CV:霧島レイ", "ASMR", "囁き", "ソロ"],
+    tags: ["cv/霧島レイ", "ASMR", "囁き", "ソロ"],
     trackCount: 3,
     bookmarked: false,
     lastPlayedAt: null,
@@ -149,7 +149,7 @@ const INITIAL_WORKS: WorkSummaryMock[] = [
         url: "https://www.dlsite.com/maniax/work/=/product_id/RJ421088.html",
       },
     ],
-    tags: ["CV:天音かなで", "CV:月城あかり", "フルボイス", "ファンタジー", "長編"],
+    tags: ["cv/天音かなで", "cv/月城あかり", "フルボイス", "ファンタジー", "長編"],
     trackCount: 12,
     bookmarked: false,
     lastPlayedAt: "2024-09-01T19:00:00Z",
@@ -164,7 +164,7 @@ const INITIAL_WORKS: WorkSummaryMock[] = [
     addedAt: "2024-03-28T00:00:00Z",
     errorMessage: null,
     urls: [],
-    tags: ["CV:水瀬なずな", "ASMR", "マッサージ", "癒し系"],
+    tags: ["cv/水瀬なずな", "ASMR", "マッサージ", "癒し系"],
     trackCount: 3,
     bookmarked: false,
     lastPlayedAt: "2024-07-14T22:00:00Z",
@@ -184,7 +184,7 @@ const INITIAL_WORKS: WorkSummaryMock[] = [
         url: "https://www.dlsite.com/maniax/work/=/product_id/RJ460011.html",
       },
     ],
-    tags: ["CV:霧島レイ", "シチュエーションボイス", "ツンデレ", "後輩"],
+    tags: ["cv/霧島レイ", "シチュエーションボイス", "ツンデレ", "後輩"],
     trackCount: 4,
     bookmarked: false,
     lastPlayedAt: null,
@@ -234,7 +234,7 @@ const INITIAL_WORKS: WorkSummaryMock[] = [
         url: "https://www.dlsite.com/maniax/work/=/product_id/RJ311234.html",
       },
     ],
-    tags: ["CV:天音かなで", "ASMR", "癒し系"],
+    tags: ["cv/天音かなで", "ASMR", "癒し系"],
     trackCount: 3,
     bookmarked: true,
     lastPlayedAt: "2024-01-20T21:00:00Z",
@@ -282,12 +282,26 @@ function buildFullWork(summary: WorkSummaryMock) {
   };
 }
 
+interface SmartFolderRuleMock {
+  conjunction: string;
+  field: string;
+  operator: string;
+  values: string[];
+}
+interface SmartFolderMock {
+  id: string;
+  name: string;
+  rules: SmartFolderRuleMock[];
+  sort: string;
+  createdAt: string;
+}
+
 // 開発サーバー再起動でリセットされるインメモリ状態
 const mockState = {
   works: INITIAL_WORKS.map((w) => ({ ...w })),
   presets: [
     { id: 1, name: "ASMR全般", query: "", tagFilters: ["ASMR"], sortId: "added-desc" },
-    { id: 2, name: "水瀬なずな", query: "", tagFilters: ["CV:水瀬なずな"], sortId: "added-desc" },
+    { id: 2, name: "水瀬なずな", query: "", tagFilters: ["cv/水瀬なずな"], sortId: "added-desc" },
     { id: 3, name: "催眠・誘導", query: "催眠", tagFilters: [], sortId: "title-asc" },
   ] as {
     id: number;
@@ -296,9 +310,31 @@ const mockState = {
     tagFilters: string[];
     sortId: string;
   }[],
+  smartFolders: [
+    {
+      id: "sf-1",
+      name: "長時間 ASMR",
+      rules: [
+        { conjunction: "WHERE", field: "長さ", operator: "≥", values: ["3600"] },
+        { conjunction: "AND", field: "タグ", operator: "∋", values: ["ASMR", "環境音"] },
+      ],
+      sort: "added-desc",
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: "sf-2",
+      name: "水瀬なずな 全件",
+      rules: [
+        { conjunction: "WHERE", field: "タグ", operator: "∋", values: ["cv/水瀬なずな"] },
+      ],
+      sort: "added-desc",
+      createdAt: new Date().toISOString(),
+    },
+  ] as SmartFolderMock[],
   rootFolder: "/mock/library" as string | null,
   lastScanTime: new Date().toISOString(),
   nextPresetId: 4,
+  nextSmartFolderId: 3,
 };
 
 // ---------------------------------------------------------------------------
@@ -405,9 +441,170 @@ export default defineConfig({
               });
             }
 
+            // GET /api/library/axes/:axis
+            if (method === "GET" && (params = matchPath(urlPath, "/library/axes/:axis"))) {
+              const axis = params.axis;
+              const PREFIX: Record<string, string> = {
+                circle: "サークル/", cv: "cv/", series: "シリーズ/", cat: "カテゴリ/",
+              };
+              const prefix = PREFIX[axis];
+              const counts = new Map<string, number>();
+              for (const w of mockState.works) {
+                if (axis === "tag") {
+                  for (const t of w.tags) {
+                    if (!t.includes("/")) counts.set(t, (counts.get(t) ?? 0) + 1);
+                  }
+                } else if (axis === "year") {
+                  const yr = w.addedAt.slice(0, 4);
+                  counts.set(yr, (counts.get(yr) ?? 0) + 1);
+                } else if (prefix) {
+                  for (const t of w.tags) {
+                    if (t.startsWith(prefix)) {
+                      const val = t.slice(prefix.length);
+                      counts.set(val, (counts.get(val) ?? 0) + 1);
+                    }
+                  }
+                }
+              }
+              const items = [...counts.entries()]
+                .map(([value, count]) => ({ value, count }))
+                .sort((a, b) => b.count - a.count);
+              return sendJson(res, items);
+            }
+
+            // GET /api/library/smart-folders/:id/works
+            if (method === "GET" && (params = matchPath(urlPath, "/library/smart-folders/:id/works"))) {
+              const sf = mockState.smartFolders.find((s) => s.id === params!.id);
+              if (!sf) return sendJson(res, []);
+              let result = [...mockState.works];
+              for (const rule of sf.rules) {
+                if (rule.field === "タグ" && rule.operator === "∋") {
+                  const vals = rule.values;
+                  if (rule.conjunction === "AND NOT") {
+                    result = result.filter((w) => !vals.some((v) => w.tags.includes(v)));
+                  } else {
+                    result = result.filter((w) => vals.some((v) => w.tags.includes(v)));
+                  }
+                } else if (rule.field === "長さ" && rule.operator === "≥") {
+                  const minSec = parseInt(rule.values[0] ?? "0", 10);
+                  result = result.filter((w) => w.totalDurationSec >= minSec);
+                }
+              }
+              return sendJson(res, result);
+            }
+
+            // GET /api/library/smart-folders/:id
+            if (method === "GET" && (params = matchPath(urlPath, "/library/smart-folders/:id"))) {
+              const sf = mockState.smartFolders.find((s) => s.id === params!.id);
+              return sf ? sendJson(res, sf) : sendNotFound(res);
+            }
+
+            // PUT /api/library/smart-folders/:id
+            if (method === "PUT" && (params = matchPath(urlPath, "/library/smart-folders/:id"))) {
+              const body = await readBody(req);
+              const idx = mockState.smartFolders.findIndex((s) => s.id === params!.id);
+              if (idx < 0) return sendNotFound(res);
+              mockState.smartFolders[idx] = { ...mockState.smartFolders[idx], ...body } as SmartFolderMock;
+              return sendNoContent(res);
+            }
+
+            // DELETE /api/library/smart-folders/:id
+            if (method === "DELETE" && (params = matchPath(urlPath, "/library/smart-folders/:id"))) {
+              mockState.smartFolders = mockState.smartFolders.filter((s) => s.id !== params!.id);
+              return sendNoContent(res);
+            }
+
+            // GET /api/library/smart-folders
+            if (method === "GET" && exactPath(urlPath, "/library/smart-folders")) {
+              return sendJson(res, mockState.smartFolders);
+            }
+
+            // POST /api/library/smart-folders
+            if (method === "POST" && exactPath(urlPath, "/library/smart-folders")) {
+              const body = await readBody(req);
+              const sf: SmartFolderMock = {
+                id: `sf-${mockState.nextSmartFolderId++}`,
+                name: (body.name as string) ?? "新規フォルダー",
+                rules: (body.rules as SmartFolderRuleMock[]) ?? [],
+                sort: (body.sort as string) ?? "added-desc",
+                createdAt: new Date().toISOString(),
+              };
+              mockState.smartFolders.push(sf);
+              return sendJson(res, sf, 201);
+            }
+
             // GET /api/works
             if (method === "GET" && exactPath(urlPath, "/works")) {
-              return sendJson(res, mockState.works);
+              const qs = new URLSearchParams(url.includes("?") ? url.slice(url.indexOf("?") + 1) : "");
+              const q = qs.get("q") ?? "";
+              const tagsRaw = qs.get("tags") ?? "";
+              const tagOp = (qs.get("tagOp") ?? "AND").toUpperCase();
+              const axis = qs.get("axis") ?? "";
+              const axisValue = qs.get("axisValue") ?? "";
+              const view = qs.get("view") ?? "";
+              const sort = qs.get("sort") ?? "added-desc";
+
+              const PREFIX: Record<string, string> = {
+                circle: "サークル/", cv: "cv/", series: "シリーズ/", cat: "カテゴリ/",
+              };
+
+              let results = [...mockState.works];
+
+              // text search
+              if (q) {
+                const ql = q.toLowerCase();
+                results = results.filter((w) =>
+                  w.title.toLowerCase().includes(ql) ||
+                  w.tags.some((t) => t.toLowerCase().includes(ql))
+                );
+              }
+
+              // tag filter
+              if (tagsRaw) {
+                const tagList = tagsRaw.split(",").filter(Boolean);
+                if (tagOp === "AND") {
+                  results = results.filter((w) =>
+                    tagList.every((tf) => w.tags.some((t) => t.toLowerCase().includes(tf.toLowerCase())))
+                  );
+                } else {
+                  results = results.filter((w) =>
+                    tagList.some((tf) => w.tags.some((t) => t.toLowerCase().includes(tf.toLowerCase())))
+                  );
+                }
+              }
+
+              // axis + axisValue filter
+              if (axis && axisValue) {
+                const prefix = PREFIX[axis] ?? (axis + "/");
+                const full = prefix + axisValue;
+                results = results.filter((w) => w.tags.some((t) => t === full || t === axisValue));
+              }
+
+              // view filter
+              if (view === "recent") results = results.filter((w) => w.lastPlayedAt != null);
+              else if (view === "added") {
+                const cutoff = new Date(Date.now() - 30 * 86400000).toISOString();
+                results = results.filter((w) => w.addedAt >= cutoff);
+              }
+              else if (view === "fav")      results = results.filter((w) => w.bookmarked);
+              else if (view === "unplayed") results = results.filter((w) => !w.lastPlayedAt && w.status === "ok");
+              else if (view === "missing")  results = results.filter((w) => w.status === "missing");
+
+              // sort
+              if (sort === "title-asc")       results.sort((a, b) => a.title.localeCompare(b.title, "ja"));
+              else if (sort === "title-desc")  results.sort((a, b) => b.title.localeCompare(a.title, "ja"));
+              else if (sort === "added-asc")   results.sort((a, b) => a.addedAt < b.addedAt ? -1 : 1);
+              else if (sort === "added-desc")  results.sort((a, b) => a.addedAt > b.addedAt ? -1 : 1);
+              else if (sort === "duration-asc") results.sort((a, b) => a.totalDurationSec - b.totalDurationSec);
+              else if (sort === "duration-desc") results.sort((a, b) => b.totalDurationSec - a.totalDurationSec);
+              else if (sort === "last-played") results.sort((a, b) => {
+                if (!a.lastPlayedAt && !b.lastPlayedAt) return 0;
+                if (!a.lastPlayedAt) return 1;
+                if (!b.lastPlayedAt) return -1;
+                return a.lastPlayedAt > b.lastPlayedAt ? -1 : 1;
+              });
+
+              return sendJson(res, results);
             }
 
             // GET /api/works/:id/cover

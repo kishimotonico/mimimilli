@@ -1,9 +1,10 @@
 #![allow(dead_code)]
-use rusqlite::{Connection, params};
+use rusqlite::{params, params_from_iter, Connection};
 use std::path::Path;
 use std::sync::Mutex;
+use uuid::Uuid;
 
-use crate::models::{Work, WorkSummary, UrlEntry, Playlist};
+use crate::models::{AxisFacetItem, Playlist, SmartFolder, UrlEntry, Work, WorkSummary};
 
 pub struct Database {
     pub conn: Mutex<Connection>,
@@ -11,8 +12,8 @@ pub struct Database {
 
 impl Database {
     pub fn new(db_path: &Path) -> Result<Self, String> {
-        let conn = Connection::open(db_path)
-            .map_err(|e| format!("Failed to open database: {}", e))?;
+        let conn =
+            Connection::open(db_path).map_err(|e| format!("Failed to open database: {}", e))?;
 
         let db = Database {
             conn: Mutex::new(conn),
@@ -22,14 +23,21 @@ impl Database {
     }
 
     fn initialize(&self) -> Result<(), String> {
-        let conn = self.conn.lock().map_err(|e| format!("Database lock poisoned: {}", e))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Database lock poisoned: {}", e))?;
 
-        conn.execute_batch("
+        conn.execute_batch(
+            "
             PRAGMA journal_mode=WAL;
             PRAGMA foreign_keys=ON;
-        ").map_err(|e| format!("Failed to set pragmas: {}", e))?;
+        ",
+        )
+        .map_err(|e| format!("Failed to set pragmas: {}", e))?;
 
-        conn.execute_batch("
+        conn.execute_batch(
+            "
             CREATE TABLE IF NOT EXISTS works (
                 id TEXT PRIMARY KEY,
                 title TEXT NOT NULL,
@@ -81,32 +89,48 @@ impl Database {
                 sort_id TEXT NOT NULL DEFAULT 'added-desc',
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
             );
-        ").map_err(|e| format!("Failed to create tables: {}", e))?;
+
+            CREATE TABLE IF NOT EXISTS smart_folders (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                rules_json TEXT NOT NULL DEFAULT '[]',
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+        ",
+        )
+        .map_err(|e| format!("Failed to create tables: {}", e))?;
 
         // Migrate existing databases: add new columns if they don't exist
-        let _ = conn.execute_batch("
+        let _ = conn.execute_batch(
+            "
             ALTER TABLE works ADD COLUMN bookmarked INTEGER NOT NULL DEFAULT 0;
             ALTER TABLE works ADD COLUMN last_played_at TEXT;
             ALTER TABLE works ADD COLUMN resume_position REAL NOT NULL DEFAULT 0;
             ALTER TABLE works ADD COLUMN resume_track_index INTEGER NOT NULL DEFAULT 0;
-        ");
+        ",
+        );
 
         Ok(())
     }
 
     pub fn get_setting(&self, key: &str) -> Result<Option<String>, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Database lock poisoned: {}", e))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Database lock poisoned: {}", e))?;
         let mut stmt = conn
             .prepare("SELECT value FROM app_settings WHERE key = ?1")
             .map_err(|e| e.to_string())?;
-        let result = stmt
-            .query_row(params![key], |row| row.get(0))
-            .ok();
+        let result = stmt.query_row(params![key], |row| row.get(0)).ok();
         Ok(result)
     }
 
     pub fn set_setting(&self, key: &str, value: &str) -> Result<(), String> {
-        let conn = self.conn.lock().map_err(|e| format!("Database lock poisoned: {}", e))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Database lock poisoned: {}", e))?;
         conn.execute(
             "INSERT OR REPLACE INTO app_settings (key, value) VALUES (?1, ?2)",
             params![key, value],
@@ -116,7 +140,10 @@ impl Database {
     }
 
     pub fn upsert_work(&self, work: &Work) -> Result<(), String> {
-        let conn = self.conn.lock().map_err(|e| format!("Database lock poisoned: {}", e))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Database lock poisoned: {}", e))?;
         let urls_json = serde_json::to_string(&work.urls)
             .map_err(|e| format!("Failed to serialize urls: {}", e))?;
         let playlists_json = serde_json::to_string(&work.playlists)
@@ -168,25 +195,163 @@ impl Database {
         Ok(())
     }
 
-    pub fn get_all_works(&self) -> Result<Vec<WorkSummary>, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Database lock poisoned: {}", e))?;
-        let mut stmt = conn
-            .prepare(
-                "SELECT w.id, w.title, w.cover_image, w.status, w.physical_path,
-                        w.total_duration_sec, w.added_at, w.error_message, w.urls_json, w.playlists_json,
-                        w.bookmarked, w.last_played_at
-                 FROM works w
-                 ORDER BY w.added_at DESC",
-            )
-            .map_err(|e| e.to_string())?;
+    fn axis_tag_name(axis: &str, axis_value: &str) -> Option<String> {
+        if axis_value.trim().is_empty() {
+            return None;
+        }
+
+        match axis {
+            "circle" => Some(format!("サークル/{}", axis_value)),
+            "cv" => Some(format!("cv/{}", axis_value)),
+            "series" => Some(format!("シリーズ/{}", axis_value)),
+            "cat" => Some(format!("カテゴリ/{}", axis_value)),
+            "tag" => Some(axis_value.to_string()),
+            _ => None,
+        }
+    }
+
+    fn work_order_clause(sort: Option<&str>, view: Option<&str>) -> &'static str {
+        let sort_id = sort.map(str::trim).filter(|s| !s.is_empty());
+        if sort_id.is_none() && view == Some("recent") {
+            return "w.last_played_at DESC, w.added_at DESC";
+        }
+
+        match sort_id.unwrap_or("added-desc") {
+            "added-asc" => "w.added_at ASC, w.title COLLATE NOCASE ASC",
+            "title-asc" => "w.title COLLATE NOCASE ASC, w.added_at DESC",
+            "title-desc" => "w.title COLLATE NOCASE DESC, w.added_at DESC",
+            "duration-desc" => "w.total_duration_sec DESC, w.added_at DESC",
+            "duration-asc" => "w.total_duration_sec ASC, w.added_at DESC",
+            "last-played" => "w.last_played_at IS NULL ASC, w.last_played_at DESC, w.added_at DESC",
+            _ => "w.added_at DESC, w.title COLLATE NOCASE ASC",
+        }
+    }
+
+    fn query_work_summaries(
+        &self,
+        query: Option<&str>,
+        tag_filters: &[String],
+        axis: Option<&str>,
+        axis_value: Option<&str>,
+        tag_op: Option<&str>,
+        sort: Option<&str>,
+        view: Option<&str>,
+    ) -> Result<Vec<WorkSummary>, String> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Database lock poisoned: {}", e))?;
+        let mut where_clauses: Vec<String> = Vec::new();
+        let mut bindings: Vec<String> = Vec::new();
+
+        if let Some(q) = query.map(str::trim).filter(|q| !q.is_empty()) {
+            where_clauses.push(
+                "(LOWER(w.title) LIKE ? OR EXISTS (
+                    SELECT 1 FROM work_tags wt
+                    JOIN tags t ON wt.tag_id = t.id
+                    WHERE wt.work_id = w.id AND LOWER(t.name) LIKE ?
+                ))"
+                .to_string(),
+            );
+            let pattern = format!("%{}%", q.to_lowercase());
+            bindings.push(pattern.clone());
+            bindings.push(pattern);
+        }
+
+        let tag_filters: Vec<&String> = tag_filters
+            .iter()
+            .filter(|tag| !tag.trim().is_empty())
+            .collect();
+        if !tag_filters.is_empty() {
+            let is_or = tag_op
+                .map(|op| op.eq_ignore_ascii_case("OR"))
+                .unwrap_or(false);
+            if is_or {
+                let filters = tag_filters
+                    .iter()
+                    .map(|_| "LOWER(t.name) LIKE ?")
+                    .collect::<Vec<_>>()
+                    .join(" OR ");
+                where_clauses.push(format!(
+                    "EXISTS (
+                        SELECT 1 FROM work_tags wt
+                        JOIN tags t ON wt.tag_id = t.id
+                        WHERE wt.work_id = w.id AND ({})
+                    )",
+                    filters
+                ));
+                for tag in tag_filters {
+                    bindings.push(format!("%{}%", tag.to_lowercase()));
+                }
+            } else {
+                for tag in tag_filters {
+                    where_clauses.push(
+                        "EXISTS (
+                            SELECT 1 FROM work_tags wt
+                            JOIN tags t ON wt.tag_id = t.id
+                            WHERE wt.work_id = w.id AND LOWER(t.name) LIKE ?
+                        )"
+                        .to_string(),
+                    );
+                    bindings.push(format!("%{}%", tag.to_lowercase()));
+                }
+            }
+        }
+
+        if let (Some(axis), Some(axis_value)) = (axis, axis_value) {
+            if let Some(tag_name) = Self::axis_tag_name(axis, axis_value) {
+                where_clauses.push(
+                    "EXISTS (
+                        SELECT 1 FROM work_tags wt
+                        JOIN tags t ON wt.tag_id = t.id
+                        WHERE wt.work_id = w.id AND t.name = ?
+                    )"
+                    .to_string(),
+                );
+                bindings.push(tag_name);
+            }
+        }
+
+        match view {
+            Some("recent") => where_clauses.push("w.last_played_at IS NOT NULL".to_string()),
+            Some("added") => {
+                where_clauses.push("w.added_at >= datetime('now', '-30 days')".to_string())
+            }
+            Some("fav") => where_clauses.push("w.bookmarked = 1".to_string()),
+            Some("unplayed") => {
+                where_clauses.push("w.last_played_at IS NULL AND w.status = 'normal'".to_string())
+            }
+            Some("missing") => where_clauses.push("w.status = 'missing'".to_string()),
+            _ => {}
+        }
+
+        let where_sql = if where_clauses.is_empty() {
+            String::new()
+        } else {
+            format!("WHERE {}", where_clauses.join(" AND "))
+        };
+
+        let sql = format!(
+            "SELECT w.id, w.title, w.cover_image, w.status, w.physical_path,
+                    w.total_duration_sec, w.added_at, w.error_message, w.urls_json, w.playlists_json,
+                    w.bookmarked, w.last_played_at
+             FROM works w
+             {}
+             ORDER BY {}",
+            where_sql,
+            Self::work_order_clause(sort, view)
+        );
+
+        let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
 
         let works: Vec<WorkSummary> = stmt
-            .query_map([], |row| {
+            .query_map(params_from_iter(bindings.iter()), |row| {
                 let id: String = row.get(0)?;
                 let urls_json: String = row.get(8)?;
                 let playlists_json: String = row.get(9)?;
                 let urls: Vec<UrlEntry> = serde_json::from_str(&urls_json).unwrap_or_default();
-                let playlists: Vec<Playlist> = serde_json::from_str(&playlists_json).unwrap_or_default();
+                let playlists: Vec<Playlist> =
+                    serde_json::from_str(&playlists_json).unwrap_or_default();
                 let track_count = playlists.first().map(|p| p.tracks.len()).unwrap_or(0);
                 let bookmarked_int: i32 = row.get(10)?;
 
@@ -229,8 +394,25 @@ impl Database {
         Ok(result)
     }
 
+    pub fn get_all_works(&self) -> Result<Vec<WorkSummary>, String> {
+        self.query_work_summaries(None, &[], None, None, None, None, None)
+    }
+
+    pub fn get_all_works_filtered(
+        &self,
+        axis: Option<&str>,
+        axis_value: Option<&str>,
+        sort: Option<&str>,
+        view: Option<&str>,
+    ) -> Result<Vec<WorkSummary>, String> {
+        self.query_work_summaries(None, &[], axis, axis_value, None, sort, view)
+    }
+
     pub fn get_work(&self, id: &str) -> Result<Option<Work>, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Database lock poisoned: {}", e))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Database lock poisoned: {}", e))?;
         let mut stmt = conn
             .prepare(
                 "SELECT id, title, cover_image, default_playlist, created_at, status,
@@ -285,38 +467,53 @@ impl Database {
         }
     }
 
-    pub fn search_works(&self, query: &str, tag_filters: &[String]) -> Result<Vec<WorkSummary>, String> {
-        let mut works = self.get_all_works()?;
+    pub fn search_works(
+        &self,
+        query: &str,
+        tag_filters: &[String],
+    ) -> Result<Vec<WorkSummary>, String> {
+        self.query_work_summaries(Some(query), tag_filters, None, None, None, None, None)
+    }
 
-        if !query.is_empty() {
-            let q = query.to_lowercase();
-            works.retain(|w| {
-                w.title.to_lowercase().contains(&q)
-                    || w.tags.iter().any(|t| t.to_lowercase().contains(&q))
-            });
-        }
-
-        if !tag_filters.is_empty() {
-            works.retain(|w| {
-                tag_filters.iter().all(|tf| {
-                    let tf_lower = tf.to_lowercase();
-                    w.tags.iter().any(|t| t.to_lowercase().contains(&tf_lower))
-                })
-            });
-        }
-
-        Ok(works)
+    pub fn search_works_filtered(
+        &self,
+        query: &str,
+        tag_filters: &[String],
+        axis: Option<&str>,
+        axis_value: Option<&str>,
+        tag_op: Option<&str>,
+        sort: Option<&str>,
+        view: Option<&str>,
+    ) -> Result<Vec<WorkSummary>, String> {
+        self.query_work_summaries(
+            Some(query),
+            tag_filters,
+            axis,
+            axis_value,
+            tag_op,
+            sort,
+            view,
+        )
     }
 
     pub fn mark_all_missing(&self) -> Result<(), String> {
-        let conn = self.conn.lock().map_err(|e| format!("Database lock poisoned: {}", e))?;
-        conn.execute("UPDATE works SET status = 'missing' WHERE status = 'normal'", [])
-            .map_err(|e| e.to_string())?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Database lock poisoned: {}", e))?;
+        conn.execute(
+            "UPDATE works SET status = 'missing' WHERE status = 'normal'",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
         Ok(())
     }
 
     pub fn mark_found(&self, id: &str) -> Result<(), String> {
-        let conn = self.conn.lock().map_err(|e| format!("Database lock poisoned: {}", e))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Database lock poisoned: {}", e))?;
         conn.execute(
             "UPDATE works SET status = 'normal' WHERE id = ?1",
             params![id],
@@ -326,20 +523,29 @@ impl Database {
     }
 
     pub fn delete_work(&self, id: &str) -> Result<(), String> {
-        let conn = self.conn.lock().map_err(|e| format!("Database lock poisoned: {}", e))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Database lock poisoned: {}", e))?;
         conn.execute("DELETE FROM works WHERE id = ?1", params![id])
             .map_err(|e| e.to_string())?;
         Ok(())
     }
 
     pub fn update_work_tags(&self, work_id: &str, tags: &[String]) -> Result<(), String> {
-        let conn = self.conn.lock().map_err(|e| format!("Database lock poisoned: {}", e))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Database lock poisoned: {}", e))?;
         conn.execute("DELETE FROM work_tags WHERE work_id = ?1", params![work_id])
             .map_err(|e| e.to_string())?;
 
         for tag in tags {
-            conn.execute("INSERT OR IGNORE INTO tags (name) VALUES (?1)", params![tag])
-                .map_err(|e| e.to_string())?;
+            conn.execute(
+                "INSERT OR IGNORE INTO tags (name) VALUES (?1)",
+                params![tag],
+            )
+            .map_err(|e| e.to_string())?;
             conn.execute(
                 "INSERT OR IGNORE INTO work_tags (work_id, tag_id) SELECT ?1, id FROM tags WHERE name = ?2",
                 params![work_id, tag],
@@ -351,7 +557,10 @@ impl Database {
     }
 
     pub fn get_all_tags(&self) -> Result<Vec<String>, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Database lock poisoned: {}", e))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Database lock poisoned: {}", e))?;
         let mut stmt = conn
             .prepare("SELECT DISTINCT t.name FROM tags t JOIN work_tags wt ON t.id = wt.tag_id ORDER BY t.name")
             .map_err(|e| e.to_string())?;
@@ -364,41 +573,71 @@ impl Database {
     }
 
     pub fn toggle_bookmark(&self, work_id: &str) -> Result<bool, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Database lock poisoned: {}", e))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Database lock poisoned: {}", e))?;
         conn.execute(
             "UPDATE works SET bookmarked = CASE WHEN bookmarked = 0 THEN 1 ELSE 0 END WHERE id = ?1",
             params![work_id],
         ).map_err(|e| e.to_string())?;
-        let bookmarked: bool = conn.query_row(
-            "SELECT bookmarked FROM works WHERE id = ?1",
-            params![work_id],
-            |row| { let v: i32 = row.get(0)?; Ok(v != 0) },
-        ).map_err(|e| e.to_string())?;
+        let bookmarked: bool = conn
+            .query_row(
+                "SELECT bookmarked FROM works WHERE id = ?1",
+                params![work_id],
+                |row| {
+                    let v: i32 = row.get(0)?;
+                    Ok(v != 0)
+                },
+            )
+            .map_err(|e| e.to_string())?;
         Ok(bookmarked)
     }
 
     pub fn update_last_played(&self, work_id: &str) -> Result<(), String> {
-        let conn = self.conn.lock().map_err(|e| format!("Database lock poisoned: {}", e))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Database lock poisoned: {}", e))?;
         let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
         conn.execute(
             "UPDATE works SET last_played_at = ?1 WHERE id = ?2",
             params![now, work_id],
-        ).map_err(|e| e.to_string())?;
+        )
+        .map_err(|e| e.to_string())?;
         Ok(())
     }
 
-    pub fn save_resume_position(&self, work_id: &str, position: f64, track_index: i32) -> Result<(), String> {
-        let conn = self.conn.lock().map_err(|e| format!("Database lock poisoned: {}", e))?;
+    pub fn save_resume_position(
+        &self,
+        work_id: &str,
+        position: f64,
+        track_index: i32,
+    ) -> Result<(), String> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Database lock poisoned: {}", e))?;
         conn.execute(
             "UPDATE works SET resume_position = ?1, resume_track_index = ?2 WHERE id = ?3",
             params![position, track_index, work_id],
-        ).map_err(|e| e.to_string())?;
+        )
+        .map_err(|e| e.to_string())?;
         Ok(())
     }
 
     // Search presets
-    pub fn save_search_preset(&self, name: &str, query: &str, tag_filters: &[String], sort_id: &str) -> Result<i64, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Database lock poisoned: {}", e))?;
+    pub fn save_search_preset(
+        &self,
+        name: &str,
+        query: &str,
+        tag_filters: &[String],
+        sort_id: &str,
+    ) -> Result<i64, String> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Database lock poisoned: {}", e))?;
         let tag_filters_json = serde_json::to_string(tag_filters)
             .map_err(|e| format!("Failed to serialize tag_filters: {}", e))?;
         conn.execute(
@@ -409,55 +648,307 @@ impl Database {
     }
 
     pub fn get_search_presets(&self) -> Result<Vec<crate::models::SearchPreset>, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Database lock poisoned: {}", e))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Database lock poisoned: {}", e))?;
         let mut stmt = conn.prepare(
             "SELECT id, name, query, tag_filters_json, sort_id FROM search_presets ORDER BY created_at DESC"
         ).map_err(|e| e.to_string())?;
-        let presets = stmt.query_map([], |row| {
-            let tag_filters_json: String = row.get(3)?;
-            Ok(crate::models::SearchPreset {
-                id: row.get(0)?,
-                name: row.get(1)?,
-                query: row.get(2)?,
-                tag_filters: serde_json::from_str(&tag_filters_json).unwrap_or_default(),
-                sort_id: row.get(4)?,
+        let presets = stmt
+            .query_map([], |row| {
+                let tag_filters_json: String = row.get(3)?;
+                Ok(crate::models::SearchPreset {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    query: row.get(2)?,
+                    tag_filters: serde_json::from_str(&tag_filters_json).unwrap_or_default(),
+                    sort_id: row.get(4)?,
+                })
             })
-        }).map_err(|e| e.to_string())?
-        .filter_map(|r| r.ok())
-        .collect();
+            .map_err(|e| e.to_string())?
+            .filter_map(|r| r.ok())
+            .collect();
         Ok(presets)
     }
 
     pub fn delete_search_preset(&self, id: i64) -> Result<(), String> {
-        let conn = self.conn.lock().map_err(|e| format!("Database lock poisoned: {}", e))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Database lock poisoned: {}", e))?;
         conn.execute("DELETE FROM search_presets WHERE id = ?1", params![id])
             .map_err(|e| e.to_string())?;
         Ok(())
     }
 
     pub fn find_work_by_id_any_path(&self, id: &str) -> Result<Option<String>, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Database lock poisoned: {}", e))?;
-        let mut stmt = conn.prepare("SELECT physical_path FROM works WHERE id = ?1")
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Database lock poisoned: {}", e))?;
+        let mut stmt = conn
+            .prepare("SELECT physical_path FROM works WHERE id = ?1")
             .map_err(|e| e.to_string())?;
         let result = stmt.query_row(params![id], |row| row.get(0)).ok();
         Ok(result)
     }
 
     pub fn update_work_path(&self, work_id: &str, new_path: &str) -> Result<(), String> {
-        let conn = self.conn.lock().map_err(|e| format!("Database lock poisoned: {}", e))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Database lock poisoned: {}", e))?;
         conn.execute(
             "UPDATE works SET physical_path = ?1 WHERE id = ?2",
             params![new_path, work_id],
-        ).map_err(|e| e.to_string())?;
+        )
+        .map_err(|e| e.to_string())?;
         Ok(())
     }
 
     pub fn work_exists_by_path(&self, path: &str) -> Result<Option<String>, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Database lock poisoned: {}", e))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Database lock poisoned: {}", e))?;
         let mut stmt = conn
             .prepare("SELECT id FROM works WHERE physical_path = ?1")
             .map_err(|e| e.to_string())?;
         let result = stmt.query_row(params![path], |row| row.get(0)).ok();
+        Ok(result)
+    }
+
+    pub fn get_axis_facets(&self, axis: &str) -> Result<Vec<AxisFacetItem>, String> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Database lock poisoned: {}", e))?;
+
+        if axis == "year" {
+            let mut stmt = conn
+                .prepare(
+                    "SELECT substr(added_at, 1, 4) AS value, COUNT(*) AS count
+                     FROM works
+                     WHERE added_at IS NOT NULL AND added_at != '' AND substr(added_at, 1, 4) != ''
+                     GROUP BY value
+                     ORDER BY count DESC, value DESC",
+                )
+                .map_err(|e| e.to_string())?;
+            let facets = stmt
+                .query_map([], |row| {
+                    Ok(AxisFacetItem {
+                        value: row.get(0)?,
+                        count: row.get(1)?,
+                    })
+                })
+                .map_err(|e| e.to_string())?
+                .filter_map(|r| r.ok())
+                .collect();
+            return Ok(facets);
+        }
+
+        if axis == "tag" {
+            let mut stmt = conn
+                .prepare(
+                    "SELECT t.name AS value, COUNT(DISTINCT wt.work_id) AS count
+                     FROM tags t
+                     JOIN work_tags wt ON wt.tag_id = t.id
+                     WHERE instr(t.name, '/') = 0
+                     GROUP BY t.name
+                     ORDER BY count DESC, value COLLATE NOCASE ASC",
+                )
+                .map_err(|e| e.to_string())?;
+            let facets = stmt
+                .query_map([], |row| {
+                    Ok(AxisFacetItem {
+                        value: row.get(0)?,
+                        count: row.get(1)?,
+                    })
+                })
+                .map_err(|e| e.to_string())?
+                .filter_map(|r| r.ok())
+                .collect();
+            return Ok(facets);
+        }
+
+        let prefix = match axis {
+            "circle" => "サークル/",
+            "cv" => "cv/",
+            "series" => "シリーズ/",
+            "cat" => "カテゴリ/",
+            _ => return Err(format!("Invalid axis: {}", axis)),
+        };
+        let value_start = prefix.chars().count() as i64 + 1;
+        let like_pattern = format!("{}%", prefix);
+        let mut stmt = conn
+            .prepare(
+                "SELECT substr(t.name, ?1) AS value, COUNT(DISTINCT wt.work_id) AS count
+                 FROM tags t
+                 JOIN work_tags wt ON wt.tag_id = t.id
+                 WHERE t.name LIKE ?2 AND substr(t.name, ?1) != ''
+                 GROUP BY value
+                 ORDER BY count DESC, value COLLATE NOCASE ASC",
+            )
+            .map_err(|e| e.to_string())?;
+        let facets = stmt
+            .query_map(params![value_start, like_pattern], |row| {
+                Ok(AxisFacetItem {
+                    value: row.get(0)?,
+                    count: row.get(1)?,
+                })
+            })
+            .map_err(|e| e.to_string())?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(facets)
+    }
+
+    pub fn list_smart_folders(&self) -> Result<Vec<SmartFolder>, String> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Database lock poisoned: {}", e))?;
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, name, rules_json, created_at, updated_at
+                 FROM smart_folders
+                 ORDER BY name COLLATE NOCASE ASC",
+            )
+            .map_err(|e| e.to_string())?;
+        let folders = stmt
+            .query_map([], |row| {
+                let rules_json: String = row.get(2)?;
+                Ok(SmartFolder {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    rules: serde_json::from_str(&rules_json).unwrap_or_default(),
+                    created_at: row.get(3)?,
+                    updated_at: row.get(4)?,
+                })
+            })
+            .map_err(|e| e.to_string())?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(folders)
+    }
+
+    pub fn get_smart_folder(&self, id: &str) -> Result<Option<SmartFolder>, String> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Database lock poisoned: {}", e))?;
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, name, rules_json, created_at, updated_at
+                 FROM smart_folders
+                 WHERE id = ?1",
+            )
+            .map_err(|e| e.to_string())?;
+        let folder = stmt
+            .query_row(params![id], |row| {
+                let rules_json: String = row.get(2)?;
+                Ok(SmartFolder {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    rules: serde_json::from_str(&rules_json).unwrap_or_default(),
+                    created_at: row.get(3)?,
+                    updated_at: row.get(4)?,
+                })
+            })
+            .ok();
+        Ok(folder)
+    }
+
+    pub fn create_smart_folder(&self, mut folder: SmartFolder) -> Result<SmartFolder, String> {
+        if folder.id.trim().is_empty() {
+            folder.id = Uuid::new_v4().to_string();
+        }
+        let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+        folder.created_at = Some(folder.created_at.unwrap_or_else(|| now.clone()));
+        folder.updated_at = Some(now);
+        let rules_json = serde_json::to_string(&folder.rules)
+            .map_err(|e| format!("Failed to serialize smart folder rules: {}", e))?;
+
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Database lock poisoned: {}", e))?;
+        conn.execute(
+            "INSERT INTO smart_folders (id, name, rules_json, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![
+                folder.id,
+                folder.name,
+                rules_json,
+                folder.created_at,
+                folder.updated_at,
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(folder)
+    }
+
+    pub fn update_smart_folder(
+        &self,
+        id: &str,
+        mut folder: SmartFolder,
+    ) -> Result<SmartFolder, String> {
+        let existing = self
+            .get_smart_folder(id)?
+            .ok_or_else(|| format!("Smart folder not found: {}", id))?;
+        folder.id = id.to_string();
+        folder.created_at = existing.created_at;
+        folder.updated_at = Some(chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string());
+        let rules_json = serde_json::to_string(&folder.rules)
+            .map_err(|e| format!("Failed to serialize smart folder rules: {}", e))?;
+
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Database lock poisoned: {}", e))?;
+        conn.execute(
+            "UPDATE smart_folders
+             SET name = ?1, rules_json = ?2, updated_at = ?3
+             WHERE id = ?4",
+            params![folder.name, rules_json, folder.updated_at, id],
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(folder)
+    }
+
+    pub fn delete_smart_folder(&self, id: &str) -> Result<(), String> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Database lock poisoned: {}", e))?;
+        conn.execute("DELETE FROM smart_folders WHERE id = ?1", params![id])
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn eval_smart_folder(&self, id: &str) -> Result<Vec<Work>, String> {
+        let folder = self
+            .get_smart_folder(id)?
+            .ok_or_else(|| format!("Smart folder not found: {}", id))?;
+        let mut works = self.get_all_works()?;
+
+        for rule in folder.rules.iter().filter(|rule| {
+            rule.field.contains("タグ") && rule.operator == "∋" && !rule.values.is_empty()
+        }) {
+            works.retain(|work| {
+                rule.values
+                    .iter()
+                    .any(|value| work.tags.iter().any(|tag| tag == value))
+            });
+        }
+
+        let mut result = Vec::new();
+        for work in works {
+            if let Some(full_work) = self.get_work(&work.id)? {
+                result.push(full_work);
+            }
+        }
         Ok(result)
     }
 }
@@ -528,7 +1019,11 @@ mod tests {
     #[test]
     fn test_upsert_and_get_work() {
         let db = create_test_db();
-        let work = make_test_work("w1", "Test Work", vec!["ASMR".to_string(), "癒し".to_string()]);
+        let work = make_test_work(
+            "w1",
+            "Test Work",
+            vec!["ASMR".to_string(), "癒し".to_string()],
+        );
         db.upsert_work(&work).unwrap();
 
         let retrieved = db.get_work("w1").unwrap().unwrap();
@@ -578,8 +1073,10 @@ mod tests {
     #[test]
     fn test_search_works_by_title() {
         let db = create_test_db();
-        db.upsert_work(&make_test_work("w1", "ASMR Collection", vec![])).unwrap();
-        db.upsert_work(&make_test_work("w2", "Music Album", vec![])).unwrap();
+        db.upsert_work(&make_test_work("w1", "ASMR Collection", vec![]))
+            .unwrap();
+        db.upsert_work(&make_test_work("w2", "Music Album", vec![]))
+            .unwrap();
 
         let results = db.search_works("asmr", &[]).unwrap();
         assert_eq!(results.len(), 1);
@@ -589,8 +1086,10 @@ mod tests {
     #[test]
     fn test_search_works_by_tag() {
         let db = create_test_db();
-        db.upsert_work(&make_test_work("w1", "Work 1", vec!["ASMR".to_string()])).unwrap();
-        db.upsert_work(&make_test_work("w2", "Work 2", vec!["Music".to_string()])).unwrap();
+        db.upsert_work(&make_test_work("w1", "Work 1", vec!["ASMR".to_string()]))
+            .unwrap();
+        db.upsert_work(&make_test_work("w2", "Work 2", vec!["Music".to_string()]))
+            .unwrap();
 
         let results = db.search_works("", &["ASMR".to_string()]).unwrap();
         assert_eq!(results.len(), 1);
@@ -600,8 +1099,10 @@ mod tests {
     #[test]
     fn test_search_works_empty_query() {
         let db = create_test_db();
-        db.upsert_work(&make_test_work("w1", "Work 1", vec![])).unwrap();
-        db.upsert_work(&make_test_work("w2", "Work 2", vec![])).unwrap();
+        db.upsert_work(&make_test_work("w1", "Work 1", vec![]))
+            .unwrap();
+        db.upsert_work(&make_test_work("w2", "Work 2", vec![]))
+            .unwrap();
 
         let results = db.search_works("", &[]).unwrap();
         assert_eq!(results.len(), 2);
@@ -610,8 +1111,10 @@ mod tests {
     #[test]
     fn test_search_works_by_tag_in_query() {
         let db = create_test_db();
-        db.upsert_work(&make_test_work("w1", "Work 1", vec!["癒し".to_string()])).unwrap();
-        db.upsert_work(&make_test_work("w2", "Work 2", vec![])).unwrap();
+        db.upsert_work(&make_test_work("w1", "Work 1", vec!["癒し".to_string()]))
+            .unwrap();
+        db.upsert_work(&make_test_work("w2", "Work 2", vec![]))
+            .unwrap();
 
         // Query text also searches tags
         let results = db.search_works("癒し", &[]).unwrap();
@@ -622,9 +1125,11 @@ mod tests {
     #[test]
     fn test_update_work_tags() {
         let db = create_test_db();
-        db.upsert_work(&make_test_work("w1", "Work 1", vec!["old_tag".to_string()])).unwrap();
+        db.upsert_work(&make_test_work("w1", "Work 1", vec!["old_tag".to_string()]))
+            .unwrap();
 
-        db.update_work_tags("w1", &["new_tag1".to_string(), "new_tag2".to_string()]).unwrap();
+        db.update_work_tags("w1", &["new_tag1".to_string(), "new_tag2".to_string()])
+            .unwrap();
 
         let work = db.get_work("w1").unwrap().unwrap();
         assert_eq!(work.tags.len(), 2);
@@ -636,7 +1141,8 @@ mod tests {
     #[test]
     fn test_toggle_bookmark() {
         let db = create_test_db();
-        db.upsert_work(&make_test_work("w1", "Work 1", vec![])).unwrap();
+        db.upsert_work(&make_test_work("w1", "Work 1", vec![]))
+            .unwrap();
 
         // Initially not bookmarked
         let work = db.get_work("w1").unwrap().unwrap();
@@ -660,7 +1166,8 @@ mod tests {
     #[test]
     fn test_save_resume_position() {
         let db = create_test_db();
-        db.upsert_work(&make_test_work("w1", "Work 1", vec![])).unwrap();
+        db.upsert_work(&make_test_work("w1", "Work 1", vec![]))
+            .unwrap();
 
         db.save_resume_position("w1", 42.5, 3).unwrap();
 
@@ -672,8 +1179,10 @@ mod tests {
     #[test]
     fn test_mark_all_missing_and_mark_found() {
         let db = create_test_db();
-        db.upsert_work(&make_test_work("w1", "Work 1", vec![])).unwrap();
-        db.upsert_work(&make_test_work("w2", "Work 2", vec![])).unwrap();
+        db.upsert_work(&make_test_work("w1", "Work 1", vec![]))
+            .unwrap();
+        db.upsert_work(&make_test_work("w2", "Work 2", vec![]))
+            .unwrap();
 
         // Mark all missing
         db.mark_all_missing().unwrap();
@@ -695,12 +1204,14 @@ mod tests {
         let db = create_test_db();
 
         // Save
-        let id = db.save_search_preset(
-            "My Preset",
-            "asmr",
-            &["tag1".to_string(), "tag2".to_string()],
-            "title-asc",
-        ).unwrap();
+        let id = db
+            .save_search_preset(
+                "My Preset",
+                "asmr",
+                &["tag1".to_string(), "tag2".to_string()],
+                "title-asc",
+            )
+            .unwrap();
         assert!(id > 0);
 
         // Get
@@ -722,10 +1233,20 @@ mod tests {
         let db = create_test_db();
 
         // Insert a work with tags
-        db.upsert_work(&make_test_work("w1", "Work 1", vec!["ASMR".to_string(), "癒し".to_string()])).unwrap();
+        db.upsert_work(&make_test_work(
+            "w1",
+            "Work 1",
+            vec!["ASMR".to_string(), "癒し".to_string()],
+        ))
+        .unwrap();
 
         // Create an orphan tag by adding then removing it
-        db.upsert_work(&make_test_work("w2", "Work 2", vec!["orphan_tag".to_string()])).unwrap();
+        db.upsert_work(&make_test_work(
+            "w2",
+            "Work 2",
+            vec!["orphan_tag".to_string()],
+        ))
+        .unwrap();
         db.delete_work("w2").unwrap();
 
         let tags = db.get_all_tags().unwrap();
@@ -739,7 +1260,8 @@ mod tests {
     #[test]
     fn test_delete_work() {
         let db = create_test_db();
-        db.upsert_work(&make_test_work("w1", "Work 1", vec!["tag".to_string()])).unwrap();
+        db.upsert_work(&make_test_work("w1", "Work 1", vec!["tag".to_string()]))
+            .unwrap();
 
         db.delete_work("w1").unwrap();
         assert!(db.get_work("w1").unwrap().is_none());

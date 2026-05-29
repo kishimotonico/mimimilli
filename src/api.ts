@@ -1,4 +1,4 @@
-import type { Work, WorkSummary, ScanResult, SearchPreset, FileEntry, DlsiteWorkInfo } from "./types";
+import type { Work, WorkSummary, ScanResult, SearchPreset, FileEntry, DlsiteWorkInfo, AxisFacetItem, SmartFolder } from "./types";
 
 const API_BASE = "/api";
 
@@ -152,6 +152,54 @@ export async function listWorkFiles(workId: string): Promise<FileEntry | null> {
 export async function exportLibrary(): Promise<string> {
   const r = await post<{ data: string }>("/export");
   return r.data;
+}
+
+// ── Library v2 API ───────────────────────────────────────────
+
+export interface WorksQueryParams {
+  q?: string;
+  tags?: string[];
+  tagOp?: "AND" | "OR";
+  axis?: string;
+  axisValue?: string;
+  view?: string;
+  sort?: string;
+}
+
+export async function searchWorksV2(params: WorksQueryParams): Promise<WorkSummary[]> {
+  const p = new URLSearchParams();
+  if (params.q) p.set("q", params.q);
+  if (params.tags?.length) p.set("tags", params.tags.join(","));
+  if (params.tagOp) p.set("tagOp", params.tagOp);
+  if (params.axis) p.set("axis", params.axis);
+  if (params.axisValue) p.set("axisValue", params.axisValue);
+  if (params.view) p.set("view", params.view);
+  if (params.sort) p.set("sort", params.sort);
+  return get<WorkSummary[]>(`/works?${p}`);
+}
+
+export async function getAxisFacets(axis: string): Promise<AxisFacetItem[]> {
+  return get<AxisFacetItem[]>(`/library/axes/${encodeURIComponent(axis)}`);
+}
+
+export async function listSmartFolders(): Promise<SmartFolder[]> {
+  return get<SmartFolder[]>("/library/smart-folders");
+}
+
+export async function createSmartFolder(data: { name: string; rules: SmartFolder["rules"]; sort: string }): Promise<SmartFolder> {
+  return post<SmartFolder>("/library/smart-folders", data);
+}
+
+export async function updateSmartFolder(id: string, data: { name?: string; rules?: SmartFolder["rules"]; sort?: string }): Promise<void> {
+  await put(`/library/smart-folders/${encodeURIComponent(id)}`, data);
+}
+
+export async function deleteSmartFolder(id: string): Promise<void> {
+  await del(`/library/smart-folders/${encodeURIComponent(id)}`);
+}
+
+export async function evalSmartFolder(id: string): Promise<WorkSummary[]> {
+  return get<WorkSummary[]>(`/library/smart-folders/${encodeURIComponent(id)}/works`);
 }
 
 export async function fetchDlsiteInfo(workId: string): Promise<DlsiteWorkInfo> {

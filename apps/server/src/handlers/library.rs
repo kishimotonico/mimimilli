@@ -6,8 +6,20 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-use crate::models::{FileEntry, ScanResult, SearchPreset, Work, WorkSummary};
+use crate::models::{
+    AxisFacetItem, FileEntry, ScanResult, SearchPreset, SmartFolder, Work, WorkSummary,
+};
 use crate::service::AppService;
+
+fn library_error_status(error: &str) -> StatusCode {
+    if error.starts_with("Invalid axis:") {
+        StatusCode::BAD_REQUEST
+    } else if error.contains("not found") {
+        StatusCode::NOT_FOUND
+    } else {
+        StatusCode::INTERNAL_SERVER_ERROR
+    }
+}
 
 pub async fn scan(
     State(service): State<Arc<AppService>>,
@@ -22,6 +34,11 @@ pub async fn scan(
 pub struct WorksQuery {
     q: Option<String>,
     tags: Option<String>,
+    axis: Option<String>,
+    axis_value: Option<String>,
+    tag_op: Option<String>,
+    sort: Option<String>,
+    view: Option<String>,
 }
 
 pub async fn get_works(
@@ -41,11 +58,24 @@ pub async fn get_works(
             })
             .unwrap_or_default();
         service
-            .search_works(query, &tag_filters)
+            .search_works_filtered(
+                query,
+                &tag_filters,
+                params.axis.as_deref(),
+                params.axis_value.as_deref(),
+                params.tag_op.as_deref(),
+                params.sort.as_deref(),
+                params.view.as_deref(),
+            )
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?
     } else {
         service
-            .get_all_works()
+            .get_all_works_filtered(
+                params.axis.as_deref(),
+                params.axis_value.as_deref(),
+                params.sort.as_deref(),
+                params.view.as_deref(),
+            )
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?
     };
     Ok(Json(works))
@@ -153,6 +183,82 @@ pub async fn get_tags(
         .get_all_tags()
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
     Ok(Json(tags))
+}
+
+pub async fn get_axis_facets(
+    State(service): State<Arc<AppService>>,
+    Path(axis): Path<String>,
+) -> Result<Json<Vec<AxisFacetItem>>, (StatusCode, String)> {
+    let facets = service
+        .get_axis_facets(&axis)
+        .map_err(|e| (library_error_status(&e), e))?;
+    Ok(Json(facets))
+}
+
+pub async fn list_smart_folders(
+    State(service): State<Arc<AppService>>,
+) -> Result<Json<Vec<SmartFolder>>, (StatusCode, String)> {
+    let folders = service
+        .list_smart_folders()
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
+    Ok(Json(folders))
+}
+
+pub async fn create_smart_folder(
+    State(service): State<Arc<AppService>>,
+    Json(folder): Json<SmartFolder>,
+) -> Result<Json<SmartFolder>, (StatusCode, String)> {
+    let folder = service
+        .create_smart_folder(folder)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
+    Ok(Json(folder))
+}
+
+pub async fn get_smart_folder(
+    State(service): State<Arc<AppService>>,
+    Path(id): Path<String>,
+) -> Result<Json<SmartFolder>, (StatusCode, String)> {
+    let folder = service
+        .get_smart_folder(&id)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                format!("Smart folder not found: {}", id),
+            )
+        })?;
+    Ok(Json(folder))
+}
+
+pub async fn update_smart_folder(
+    State(service): State<Arc<AppService>>,
+    Path(id): Path<String>,
+    Json(folder): Json<SmartFolder>,
+) -> Result<Json<SmartFolder>, (StatusCode, String)> {
+    let folder = service
+        .update_smart_folder(&id, folder)
+        .map_err(|e| (library_error_status(&e), e))?;
+    Ok(Json(folder))
+}
+
+pub async fn delete_smart_folder(
+    State(service): State<Arc<AppService>>,
+    Path(id): Path<String>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    service
+        .delete_smart_folder(&id)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+pub async fn eval_smart_folder(
+    State(service): State<Arc<AppService>>,
+    Path(id): Path<String>,
+) -> Result<Json<Vec<Work>>, (StatusCode, String)> {
+    let works = service
+        .eval_smart_folder(&id)
+        .map_err(|e| (library_error_status(&e), e))?;
+    Ok(Json(works))
 }
 
 pub async fn get_presets(

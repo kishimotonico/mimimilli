@@ -3,7 +3,10 @@ use std::path::{Path, PathBuf};
 
 use crate::db::Database;
 use crate::dlsite::{self, DlsiteWorkInfo};
-use crate::models::{FileEntry, MetaFile, ScanResult, SearchPreset, UrlEntry, Work, WorkSummary};
+use crate::models::{
+    AxisFacetItem, FileEntry, MetaFile, ScanResult, SearchPreset, SmartFolder, UrlEntry, Work,
+    WorkSummary,
+};
 use crate::scanner;
 
 pub struct AppService {
@@ -34,9 +37,7 @@ impl AppService {
     }
 
     pub fn scan(&self) -> Result<ScanResult, String> {
-        let root = self
-            .get_root_folder()?
-            .ok_or("Root folder not set")?;
+        let root = self.get_root_folder()?.ok_or("Root folder not set")?;
         let root_path = PathBuf::from(&root);
 
         if !root_path.is_dir() {
@@ -50,12 +51,51 @@ impl AppService {
         self.db.get_all_works()
     }
 
+    pub fn get_all_works_filtered(
+        &self,
+        axis: Option<&str>,
+        axis_value: Option<&str>,
+        sort: Option<&str>,
+        view: Option<&str>,
+    ) -> Result<Vec<WorkSummary>, String> {
+        if axis.is_none() && axis_value.is_none() && sort.is_none() && view.is_none() {
+            return self.get_all_works();
+        }
+        self.db.get_all_works_filtered(axis, axis_value, sort, view)
+    }
+
     pub fn get_work(&self, id: &str) -> Result<Option<Work>, String> {
         self.db.get_work(id)
     }
 
-    pub fn search_works(&self, query: &str, tag_filters: &[String]) -> Result<Vec<WorkSummary>, String> {
+    pub fn search_works(
+        &self,
+        query: &str,
+        tag_filters: &[String],
+    ) -> Result<Vec<WorkSummary>, String> {
         self.db.search_works(query, tag_filters)
+    }
+
+    pub fn search_works_filtered(
+        &self,
+        query: &str,
+        tag_filters: &[String],
+        axis: Option<&str>,
+        axis_value: Option<&str>,
+        tag_op: Option<&str>,
+        sort: Option<&str>,
+        view: Option<&str>,
+    ) -> Result<Vec<WorkSummary>, String> {
+        if axis.is_none()
+            && axis_value.is_none()
+            && tag_op.is_none()
+            && sort.is_none()
+            && view.is_none()
+        {
+            return self.search_works(query, tag_filters);
+        }
+        self.db
+            .search_works_filtered(query, tag_filters, axis, axis_value, tag_op, sort, view)
     }
 
     pub fn update_work_tags(&self, work_id: &str, tags: Vec<String>) -> Result<(), String> {
@@ -89,7 +129,9 @@ impl AppService {
             if let Some(cover) = &w.cover_image {
                 let full_path = Path::new(&w.physical_path).join(cover);
                 let resolved = full_path.canonicalize().map_err(|e| e.to_string())?;
-                let work_dir = Path::new(&w.physical_path).canonicalize().map_err(|e| e.to_string())?;
+                let work_dir = Path::new(&w.physical_path)
+                    .canonicalize()
+                    .map_err(|e| e.to_string())?;
                 if !resolved.starts_with(&work_dir) {
                     return Err("Path traversal detected".to_string());
                 }
@@ -101,12 +143,18 @@ impl AppService {
         Ok(None)
     }
 
-    pub fn get_audio_file_path(&self, work_id: &str, relative_path: &str) -> Result<Option<String>, String> {
+    pub fn get_audio_file_path(
+        &self,
+        work_id: &str,
+        relative_path: &str,
+    ) -> Result<Option<String>, String> {
         let work = self.db.get_work(work_id)?;
         if let Some(w) = work {
             let full_path = Path::new(&w.physical_path).join(relative_path);
             let resolved = full_path.canonicalize().map_err(|e| e.to_string())?;
-            let work_dir = Path::new(&w.physical_path).canonicalize().map_err(|e| e.to_string())?;
+            let work_dir = Path::new(&w.physical_path)
+                .canonicalize()
+                .map_err(|e| e.to_string())?;
             if !resolved.starts_with(&work_dir) {
                 return Err("Path traversal detected".to_string());
             }
@@ -129,12 +177,24 @@ impl AppService {
         self.db.update_last_played(work_id)
     }
 
-    pub fn save_resume_position(&self, work_id: &str, position: f64, track_index: i32) -> Result<(), String> {
+    pub fn save_resume_position(
+        &self,
+        work_id: &str,
+        position: f64,
+        track_index: i32,
+    ) -> Result<(), String> {
         self.db.save_resume_position(work_id, position, track_index)
     }
 
-    pub fn save_search_preset(&self, name: &str, query: &str, tag_filters: &[String], sort_id: &str) -> Result<i64, String> {
-        self.db.save_search_preset(name, query, tag_filters, sort_id)
+    pub fn save_search_preset(
+        &self,
+        name: &str,
+        query: &str,
+        tag_filters: &[String],
+        sort_id: &str,
+    ) -> Result<i64, String> {
+        self.db
+            .save_search_preset(name, query, tag_filters, sort_id)
     }
 
     pub fn get_search_presets(&self) -> Result<Vec<SearchPreset>, String> {
@@ -143,6 +203,38 @@ impl AppService {
 
     pub fn delete_search_preset(&self, id: i64) -> Result<(), String> {
         self.db.delete_search_preset(id)
+    }
+
+    pub fn get_axis_facets(&self, axis: &str) -> Result<Vec<AxisFacetItem>, String> {
+        self.db.get_axis_facets(axis)
+    }
+
+    pub fn list_smart_folders(&self) -> Result<Vec<SmartFolder>, String> {
+        self.db.list_smart_folders()
+    }
+
+    pub fn get_smart_folder(&self, id: &str) -> Result<Option<SmartFolder>, String> {
+        self.db.get_smart_folder(id)
+    }
+
+    pub fn create_smart_folder(&self, folder: SmartFolder) -> Result<SmartFolder, String> {
+        self.db.create_smart_folder(folder)
+    }
+
+    pub fn update_smart_folder(
+        &self,
+        id: &str,
+        folder: SmartFolder,
+    ) -> Result<SmartFolder, String> {
+        self.db.update_smart_folder(id, folder)
+    }
+
+    pub fn delete_smart_folder(&self, id: &str) -> Result<(), String> {
+        self.db.delete_smart_folder(id)
+    }
+
+    pub fn eval_smart_folder(&self, id: &str) -> Result<Vec<Work>, String> {
+        self.db.eval_smart_folder(id)
     }
 
     pub fn list_work_files(&self, work_id: &str) -> Result<Option<FileEntry>, String> {
@@ -175,7 +267,9 @@ impl AppService {
     }
 
     pub fn fetch_dlsite_info(&self, work_id: &str) -> Result<DlsiteWorkInfo, String> {
-        let work = self.db.get_work(work_id)?
+        let work = self
+            .db
+            .get_work(work_id)?
             .ok_or_else(|| format!("Work not found: {}", work_id))?;
 
         // Try to extract RJ code from folder name or title
@@ -186,13 +280,25 @@ impl AppService {
 
         let rj_code = dlsite::extract_rj_code(folder_name)
             .or_else(|| dlsite::extract_rj_code(&work.title))
-            .ok_or_else(|| "RJコードが見つかりません。フォルダ名またはタイトルにRJコードを含めてください。".to_string())?;
+            .ok_or_else(|| {
+                "RJコードが見つかりません。フォルダ名またはタイトルにRJコードを含めてください。"
+                    .to_string()
+            })?;
 
         dlsite::fetch_dlsite_info(&rj_code)
     }
 
-    pub fn apply_dlsite_info(&self, work_id: &str, info: &DlsiteWorkInfo, apply_title: bool, apply_tags: bool, apply_cover: bool) -> Result<(), String> {
-        let mut work = self.db.get_work(work_id)?
+    pub fn apply_dlsite_info(
+        &self,
+        work_id: &str,
+        info: &DlsiteWorkInfo,
+        apply_title: bool,
+        apply_tags: bool,
+        apply_cover: bool,
+    ) -> Result<(), String> {
+        let mut work = self
+            .db
+            .get_work(work_id)?
             .ok_or_else(|| format!("Work not found: {}", work_id))?;
 
         if apply_title {
@@ -254,18 +360,22 @@ impl AppService {
         Ok(())
     }
 
-    fn write_back_meta(&self, work: &Work, tags_override: Option<Vec<String>>) -> Result<(), String> {
+    fn write_back_meta(
+        &self,
+        work: &Work,
+        tags_override: Option<Vec<String>>,
+    ) -> Result<(), String> {
         let meta_path = Path::new(&work.physical_path).join(".meta.json");
         if !meta_path.exists() {
             // Try single-file meta pattern
             return Ok(());
         }
 
-        let content = fs::read_to_string(&meta_path)
-            .map_err(|e| format!("Failed to read meta: {}", e))?;
+        let content =
+            fs::read_to_string(&meta_path).map_err(|e| format!("Failed to read meta: {}", e))?;
 
-        let mut meta: MetaFile = serde_json::from_str(&content)
-            .map_err(|e| format!("Failed to parse meta: {}", e))?;
+        let mut meta: MetaFile =
+            serde_json::from_str(&content).map_err(|e| format!("Failed to parse meta: {}", e))?;
 
         meta.title = work.title.clone();
         if let Some(tags) = tags_override {
@@ -276,15 +386,18 @@ impl AppService {
         let json = serde_json::to_string_pretty(&meta)
             .map_err(|e| format!("Failed to serialize: {}", e))?;
 
-        fs::write(&meta_path, &json)
-            .map_err(|e| format!("Failed to write meta: {}", e))?;
+        fs::write(&meta_path, &json).map_err(|e| format!("Failed to write meta: {}", e))?;
 
         Ok(())
     }
 }
 
 fn build_file_tree(dir: &Path, work_root: &Path) -> Result<FileEntry, String> {
-    let name = dir.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
+    let name = dir
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("")
+        .to_string();
     let relative = dir.strip_prefix(work_root).unwrap_or(dir);
     let mut children = Vec::new();
 
@@ -305,7 +418,11 @@ fn build_file_tree(dir: &Path, work_root: &Path) -> Result<FileEntry, String> {
                 children.push(child);
             } else {
                 let size = path.metadata().map(|m| m.len()).unwrap_or(0);
-                let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+                let ext = path
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .unwrap_or("")
+                    .to_lowercase();
                 let file_type = match ext.as_str() {
                     "mp3" | "m4a" | "aac" | "wav" | "ogg" | "flac" | "webm" | "opus" => "audio",
                     "jpg" | "jpeg" | "png" | "gif" | "bmp" | "webp" => "image",
@@ -414,9 +531,13 @@ mod tests {
         std::fs::write(root.join("j.xyz"), "").unwrap();
 
         let tree = build_file_tree(root, root).unwrap();
-        let mut type_map: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+        let mut type_map: std::collections::HashMap<String, Vec<String>> =
+            std::collections::HashMap::new();
         for child in &tree.children {
-            type_map.entry(child.file_type.clone()).or_default().push(child.name.clone());
+            type_map
+                .entry(child.file_type.clone())
+                .or_default()
+                .push(child.name.clone());
         }
         assert_eq!(type_map.get("audio").map(|v| v.len()).unwrap_or(0), 6);
         assert_eq!(type_map.get("image").map(|v| v.len()).unwrap_or(0), 1);

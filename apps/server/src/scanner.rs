@@ -2,8 +2,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
-use crate::models::{MetaFile, Playlist, Track, Work, ScanResult};
 use crate::db::Database;
+use crate::models::{MetaFile, Playlist, ScanResult, Track, Work};
 
 const AUDIO_EXTENSIONS: &[&str] = &["mp3", "m4a", "aac", "wav", "ogg", "flac", "webm", "opus"];
 const IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "gif", "bmp", "webp"];
@@ -23,7 +23,11 @@ pub fn scan_library(root: &Path, db: &Database) -> Result<ScanResult, String> {
     let mut found_ids = std::collections::HashSet::new();
 
     // Walk the directory tree looking for .meta.json files
-    for entry in WalkDir::new(root).follow_links(true).into_iter().filter_map(|e| e.ok()) {
+    for entry in WalkDir::new(root)
+        .follow_links(true)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
         let path = entry.path();
         let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
 
@@ -97,21 +101,34 @@ fn process_meta_file(meta_path: &Path, db: &Database) -> Result<String, String> 
             .collect();
 
         if !missing_files.is_empty() {
-            error_message = Some(format!(
-                "Missing files: {}",
-                missing_files.join(", ")
-            ));
+            error_message = Some(format!("Missing files: {}", missing_files.join(", ")));
         }
     }
 
-    let status = if error_message.is_some() { "error" } else { "normal" };
+    let status = if error_message.is_some() {
+        "error"
+    } else {
+        "normal"
+    };
 
     // Preserve existing work data (bookmarks, resume, last_played, added_at)
     let (added_at, bookmarked, last_played_at, resume_position, resume_track_index) =
         if let Ok(Some(existing)) = db.get_work(&meta.id) {
-            (existing.added_at, existing.bookmarked, existing.last_played_at, existing.resume_position, existing.resume_track_index)
+            (
+                existing.added_at,
+                existing.bookmarked,
+                existing.last_played_at,
+                existing.resume_position,
+                existing.resume_track_index,
+            )
         } else {
-            (chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string(), false, None, 0.0, 0)
+            (
+                chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+                false,
+                None,
+                0.0,
+                0,
+            )
         };
 
     let work = Work {
@@ -186,7 +203,11 @@ fn auto_generate_meta_files(
     // Find directories containing audio files but no .meta.json
     let mut audio_dirs: Vec<PathBuf> = Vec::new();
 
-    for entry in WalkDir::new(root).follow_links(true).into_iter().filter_map(|e| e.ok()) {
+    for entry in WalkDir::new(root)
+        .follow_links(true)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
         let path = entry.path();
         if !path.is_file() {
             continue;
@@ -375,7 +396,8 @@ fn find_cover_image(dir: &Path) -> Option<String> {
 fn build_default_tracks(dir: &Path) -> Vec<Track> {
     // Find the subfolder structure and pick the best one
     let mut direct_audio: Vec<PathBuf> = Vec::new();
-    let mut subfolder_audio: std::collections::HashMap<PathBuf, Vec<PathBuf>> = std::collections::HashMap::new();
+    let mut subfolder_audio: std::collections::HashMap<PathBuf, Vec<PathBuf>> =
+        std::collections::HashMap::new();
 
     if let Ok(entries) = fs::read_dir(dir) {
         for entry in entries.flatten() {
@@ -394,9 +416,7 @@ fn build_default_tracks(dir: &Path) -> Vec<Track> {
 
     // If there are subfolder audio files, pick the subfolder with most files
     if !subfolder_audio.is_empty() && direct_audio.is_empty() {
-        let best_subfolder = subfolder_audio
-            .iter()
-            .max_by_key(|(_, files)| files.len());
+        let best_subfolder = subfolder_audio.iter().max_by_key(|(_, files)| files.len());
 
         if let Some((_, files)) = best_subfolder {
             let mut sorted_files = files.clone();
@@ -476,8 +496,14 @@ fn natural_cmp(a: &str, b: &str) -> std::cmp::Ordering {
             (Some(_), None) => return std::cmp::Ordering::Greater,
             (Some(&ac), Some(&bc)) => {
                 if ac.is_ascii_digit() && bc.is_ascii_digit() {
-                    let a_num: String = a_chars.by_ref().take_while(|c| c.is_ascii_digit()).collect();
-                    let b_num: String = b_chars.by_ref().take_while(|c| c.is_ascii_digit()).collect();
+                    let a_num: String = a_chars
+                        .by_ref()
+                        .take_while(|c| c.is_ascii_digit())
+                        .collect();
+                    let b_num: String = b_chars
+                        .by_ref()
+                        .take_while(|c| c.is_ascii_digit())
+                        .collect();
                     let a_val: u64 = a_num.parse().unwrap_or(0);
                     let b_val: u64 = b_num.parse().unwrap_or(0);
                     match a_val.cmp(&b_val) {
@@ -558,8 +584,18 @@ mod tests {
             playlists: vec![Playlist {
                 name: "default".to_string(),
                 tracks: vec![
-                    Track { title: "T1".to_string(), file: "t1.mp3".to_string(), start: Some(0.0), end: Some(60.0) },
-                    Track { title: "T2".to_string(), file: "t2.mp3".to_string(), start: Some(60.0), end: Some(180.0) },
+                    Track {
+                        title: "T1".to_string(),
+                        file: "t1.mp3".to_string(),
+                        start: Some(0.0),
+                        end: Some(60.0),
+                    },
+                    Track {
+                        title: "T2".to_string(),
+                        file: "t2.mp3".to_string(),
+                        start: Some(60.0),
+                        end: Some(180.0),
+                    },
                 ],
             }],
             default_playlist: Some("default".to_string()),
@@ -578,9 +614,12 @@ mod tests {
             cover_image: None,
             playlists: vec![Playlist {
                 name: "default".to_string(),
-                tracks: vec![
-                    Track { title: "T1".to_string(), file: "t1.mp3".to_string(), start: None, end: None },
-                ],
+                tracks: vec![Track {
+                    title: "T1".to_string(),
+                    file: "t1.mp3".to_string(),
+                    start: None,
+                    end: None,
+                }],
             }],
             default_playlist: None,
             created_at: None,
@@ -614,10 +653,19 @@ mod tests {
             tags: Vec::new(),
             cover_image: None,
             playlists: vec![
-                Playlist { name: "other".to_string(), tracks: Vec::new() },
-                Playlist { name: "main".to_string(), tracks: vec![
-                    Track { title: "T1".to_string(), file: "t1.mp3".to_string(), start: None, end: None },
-                ]},
+                Playlist {
+                    name: "other".to_string(),
+                    tracks: Vec::new(),
+                },
+                Playlist {
+                    name: "main".to_string(),
+                    tracks: vec![Track {
+                        title: "T1".to_string(),
+                        file: "t1.mp3".to_string(),
+                        start: None,
+                        end: None,
+                    }],
+                },
             ],
             default_playlist: Some("main".to_string()),
             created_at: None,
@@ -635,8 +683,14 @@ mod tests {
             tags: Vec::new(),
             cover_image: None,
             playlists: vec![
-                Playlist { name: "first".to_string(), tracks: Vec::new() },
-                Playlist { name: "second".to_string(), tracks: Vec::new() },
+                Playlist {
+                    name: "first".to_string(),
+                    tracks: Vec::new(),
+                },
+                Playlist {
+                    name: "second".to_string(),
+                    tracks: Vec::new(),
+                },
             ],
             default_playlist: None,
             created_at: None,

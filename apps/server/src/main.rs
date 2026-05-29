@@ -18,12 +18,9 @@ use service::AppService;
 async fn main() {
     env_logger::init();
 
-    let data_dir = PathBuf::from(
-        std::env::var("DATA_DIR").unwrap_or_else(|_| "./data".to_string()),
-    );
-    let service = Arc::new(
-        AppService::new(&data_dir).expect("Failed to initialize AppService"),
-    );
+    let data_dir =
+        PathBuf::from(std::env::var("DATA_DIR").unwrap_or_else(|_| "./data".to_string()));
+    let service = Arc::new(AppService::new(&data_dir).expect("Failed to initialize AppService"));
 
     let app = Router::new()
         // Settings
@@ -49,20 +46,42 @@ async fn main() {
             "/api/works/:id/resume",
             post(handlers::library::save_resume),
         )
-        .route(
-            "/api/works/:id/files",
-            get(handlers::library::list_files),
-        )
+        .route("/api/works/:id/files", get(handlers::library::list_files))
         // Tags & presets
         .route("/api/tags", get(handlers::library::get_tags))
+        .route(
+            "/api/library/axes/:axis",
+            get(handlers::library::get_axis_facets),
+        )
+        .route(
+            "/api/library/smart-folders",
+            get(handlers::library::list_smart_folders),
+        )
+        .route(
+            "/api/library/smart-folders",
+            post(handlers::library::create_smart_folder),
+        )
+        .route(
+            "/api/library/smart-folders/:id",
+            get(handlers::library::get_smart_folder),
+        )
+        .route(
+            "/api/library/smart-folders/:id",
+            put(handlers::library::update_smart_folder),
+        )
+        .route(
+            "/api/library/smart-folders/:id",
+            delete(handlers::library::delete_smart_folder),
+        )
+        .route(
+            "/api/library/smart-folders/:id/works",
+            get(handlers::library::eval_smart_folder),
+        )
         .route("/api/presets", get(handlers::library::get_presets))
         .route("/api/presets", post(handlers::library::save_preset))
         .route("/api/presets/:id", delete(handlers::library::delete_preset))
         // Media
-        .route(
-            "/api/works/:id/cover",
-            get(handlers::media::get_cover),
-        )
+        .route("/api/works/:id/cover", get(handlers::media::get_cover))
         .route("/api/audio/:id/*path", get(handlers::media::get_audio))
         .route("/api/files/:id/*path", get(handlers::media::get_file))
         // DLsite integrations

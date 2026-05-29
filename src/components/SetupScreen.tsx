@@ -1,150 +1,77 @@
-interface Props {
-  onFolderSelected: (path: string) => void;
-  onSelectFolder: () => void;
-  selectedPath: string | null;
+import { useState } from "react";
+import { I } from "./Icon";
+
+interface SetupScreenProps {
+  onComplete: (path: string) => void;
   scanning: boolean;
 }
 
-export function SetupScreen({
-  onFolderSelected,
-  onSelectFolder,
-  selectedPath,
-  scanning,
-}: Props) {
+export default function SetupScreen({ onComplete, scanning }: SetupScreenProps) {
+  const [path, setPath] = useState("");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (path.trim()) onComplete(path.trim());
+  };
+
   return (
     <div
       style={{
-        width: "100%",
-        height: "100vh",
-        background: "#13132a",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 24,
+        width: "100%", height: "100vh",
+        background: "var(--paper-0)", color: "var(--ink-0)",
+        display: "flex", flexDirection: "column",
+        alignItems: "center", justifyContent: "center",
+        fontFamily: "var(--font-jp)",
       }}
     >
-      <div style={{ textAlign: "center", marginBottom: 16 }}>
-        <div
-          style={{
-            fontSize: 32,
-            fontWeight: 700,
-            color: "#e2e2f0",
-            marginBottom: 8,
-            letterSpacing: 1,
-          }}
-        >
-          mimikago
-        </div>
-        <div style={{ fontSize: 13, color: "#888" }}>
-          ローカル音声作品管理・再生アプリ
-        </div>
-      </div>
-
-      <div
-        style={{
-          background: "#1c1c32",
-          borderRadius: 12,
-          padding: 32,
-          width: 460,
-          border: "1px solid #2a2a40",
-        }}
-      >
-        <div
-          style={{
-            fontSize: 15,
-            fontWeight: 600,
-            color: "#e2e2f0",
-            marginBottom: 8,
-          }}
-        >
-          はじめに
-        </div>
-        <div style={{ fontSize: 12, color: "#888", marginBottom: 20, lineHeight: 1.7 }}>
-          音声作品が保存されているルートフォルダーを選択してください。
-          フォルダー内の作品を自動的にスキャンします。
-        </div>
-
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 11, color: "#888", marginBottom: 6 }}>
-            ルートフォルダー
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 32, maxWidth: 480, width: "100%", padding: "0 24px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 9, background: "var(--ink-0)", color: "var(--paper-1)", display: "grid", placeItems: "center", fontFamily: "var(--font-sans)", fontSize: 20, fontWeight: 600, letterSpacing: "-0.04em" }}>
+            m
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <div
-              style={{
-                flex: 1,
-                padding: "8px 12px",
-                background: "#252540",
-                borderRadius: 6,
-                border: "1px solid #3a3a55",
-                fontSize: 12,
-                color: selectedPath ? "#e2e2f0" : "#555",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {selectedPath || "フォルダーを選択してください..."}
-            </div>
-            <button
-              onClick={onSelectFolder}
-              style={{
-                padding: "8px 16px",
-                background: "#5b8def",
-                border: "none",
-                borderRadius: 6,
-                color: "#fff",
-                fontSize: 12,
-                cursor: "pointer",
-                fontWeight: 600,
-                whiteSpace: "nowrap",
-              }}
-            >
-              選択
-            </button>
-          </div>
+          <span style={{ fontFamily: "var(--font-sans)", fontWeight: 500, fontSize: 24, letterSpacing: "-0.01em" }}>mimimilli</span>
         </div>
 
-        {selectedPath && (
+        <div style={{ textAlign: "center", display: "flex", flexDirection: "column", gap: 8 }}>
+          <h1 style={{ fontFamily: "var(--font-jp)", fontSize: 22, fontWeight: 600, letterSpacing: "-0.005em", margin: 0 }}>ようこそ</h1>
+          <p style={{ fontSize: 13, color: "var(--ink-2)", lineHeight: 1.7, margin: 0 }}>
+            音声作品が保存されているルートフォルダーを指定してください。<br />
+            フォルダー内を自動でスキャンしてライブラリを構築します。
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} style={{ width: "100%", display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, height: 40, padding: "0 14px", background: "var(--paper-1)", border: "1px solid var(--line)", borderRadius: 8 }}>
+            <I.folder size={14} style={{ color: "var(--ink-3)", flexShrink: 0 }} />
+            <input
+              value={path}
+              onChange={(e) => setPath(e.target.value)}
+              placeholder="/Users/yourname/Music/ASMR"
+              style={{ flex: 1, fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--ink-0)", background: "none", border: "none", outline: "none" }}
+              autoFocus
+              disabled={scanning}
+            />
+          </div>
           <button
-            onClick={() => onFolderSelected(selectedPath)}
-            disabled={scanning}
+            type="submit"
+            disabled={!path.trim() || scanning}
             style={{
-              width: "100%",
-              padding: "10px 0",
-              background: scanning ? "#3a3a55" : "#5b8def",
-              border: "none",
-              borderRadius: 6,
-              color: "#fff",
-              fontSize: 13,
-              cursor: scanning ? "default" : "pointer",
-              fontWeight: 600,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 8,
+              height: 40, borderRadius: 8,
+              background: path.trim() && !scanning ? "var(--ink-0)" : "var(--paper-3)",
+              color: path.trim() && !scanning ? "var(--paper-1)" : "var(--ink-3)",
+              fontFamily: "var(--font-sans)", fontWeight: 600, fontSize: 13,
+              border: "none", cursor: path.trim() && !scanning ? "pointer" : "not-allowed",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
             }}
           >
-            {scanning ? (
-              <>
-                <span
-                  style={{
-                    display: "inline-block",
-                    animation: "spin 1s linear infinite",
-                  }}
-                >
-                  ↻
-                </span>
-                スキャン中...
-              </>
-            ) : (
-              "スキャンを開始"
-            )}
+            {scanning ? <><I.refresh size={14} /> スキャン中...</> : <><I.refresh size={14} /> スキャン開始</>}
           </button>
-        )}
-      </div>
+        </form>
 
-      <div style={{ fontSize: 10, color: "#444" }}>mimikago v0.1.0</div>
+        <p style={{ fontSize: 11, color: "var(--ink-4)", textAlign: "center" }}>
+          フォルダーパスはあとから設定で変更できます
+        </p>
+      </div>
     </div>
   );
 }

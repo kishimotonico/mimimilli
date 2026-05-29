@@ -73,8 +73,7 @@ fn parse_dlsite_html(html: &str, rj_code: &str, page_url: &str) -> Result<Dlsite
     let document = Html::parse_document(html);
 
     // Title: <h1 id="work_name">...</h1>
-    let title = extract_text(&document, "#work_name")
-        .unwrap_or_else(|| rj_code.to_string());
+    let title = extract_text(&document, "#work_name").unwrap_or_else(|| rj_code.to_string());
 
     // Circle name: <span class="maker_name"><a>...</a></span>
     let circle = extract_text(&document, "span.maker_name a");
@@ -103,7 +102,12 @@ fn parse_dlsite_html(html: &str, rj_code: &str, page_url: &str) -> Result<Dlsite
 fn extract_text(document: &Html, selector_str: &str) -> Option<String> {
     let selector = Selector::parse(selector_str).ok()?;
     let element = document.select(&selector).next()?;
-    let text: String = element.text().collect::<Vec<_>>().join("").trim().to_string();
+    let text: String = element
+        .text()
+        .collect::<Vec<_>>()
+        .join("")
+        .trim()
+        .to_string();
     if text.is_empty() {
         None
     } else {
@@ -163,7 +167,8 @@ fn extract_table_links(document: &Html, label: &str) -> Vec<String> {
                         let parent_ref = scraper::ElementRef::wrap(parent);
                         if let Some(parent_el) = parent_ref {
                             for a in parent_el.select(&td_selector) {
-                                let text: String = a.text().collect::<Vec<_>>().join("").trim().to_string();
+                                let text: String =
+                                    a.text().collect::<Vec<_>>().join("").trim().to_string();
                                 if !text.is_empty() {
                                     results.push(text);
                                 }
@@ -183,7 +188,12 @@ fn extract_genre_tags(document: &Html) -> Vec<String> {
 
     if let Ok(selector) = Selector::parse("div.main_genre a") {
         for element in document.select(&selector) {
-            let text: String = element.text().collect::<Vec<_>>().join("").trim().to_string();
+            let text: String = element
+                .text()
+                .collect::<Vec<_>>()
+                .join("")
+                .trim()
+                .to_string();
             if !text.is_empty() {
                 tags.push(text);
             }
@@ -222,7 +232,10 @@ pub fn download_cover_image(url: &str, save_path: &std::path::Path) -> Result<St
         .map_err(|e| format!("Failed to download image: {}", e))?;
 
     if !response.status().is_success() {
-        return Err(format!("Image download failed: status {}", response.status()));
+        return Err(format!(
+            "Image download failed: status {}",
+            response.status()
+        ));
     }
 
     // Determine file extension from URL or content-type
@@ -245,8 +258,7 @@ pub fn download_cover_image(url: &str, save_path: &std::path::Path) -> Result<St
         .bytes()
         .map_err(|e| format!("Failed to read image bytes: {}", e))?;
 
-    std::fs::write(&file_path, &bytes)
-        .map_err(|e| format!("Failed to save image: {}", e))?;
+    std::fs::write(&file_path, &bytes).map_err(|e| format!("Failed to save image: {}", e))?;
 
     Ok(filename)
 }
@@ -257,11 +269,20 @@ mod tests {
 
     #[test]
     fn test_extract_rj_code() {
-        assert_eq!(extract_rj_code("RJ01234567"), Some("RJ01234567".to_string()));
+        assert_eq!(
+            extract_rj_code("RJ01234567"),
+            Some("RJ01234567".to_string())
+        );
         assert_eq!(extract_rj_code("RJ123456"), Some("RJ123456".to_string()));
-        assert_eq!(extract_rj_code("[RJ01234567] 作品タイトル"), Some("RJ01234567".to_string()));
+        assert_eq!(
+            extract_rj_code("[RJ01234567] 作品タイトル"),
+            Some("RJ01234567".to_string())
+        );
         assert_eq!(extract_rj_code("作品フォルダー"), None);
-        assert_eq!(extract_rj_code("rj01234567_タイトル"), Some("RJ01234567".to_string()));
+        assert_eq!(
+            extract_rj_code("rj01234567_タイトル"),
+            Some("RJ01234567".to_string())
+        );
     }
 
     #[test]
@@ -288,7 +309,10 @@ mod tests {
 
     #[test]
     fn test_extract_rj_code_mixed_case() {
-        assert_eq!(extract_rj_code("Rj01234567"), Some("RJ01234567".to_string()));
+        assert_eq!(
+            extract_rj_code("Rj01234567"),
+            Some("RJ01234567".to_string())
+        );
     }
 
     #[test]
