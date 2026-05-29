@@ -37,6 +37,7 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
+  const [isCompletingSetup, setIsCompletingSetup] = useState(false);
 
   const isPlaying = player.state.currentTrackIndex >= 0 && player.state.currentWork !== null;
 
@@ -102,16 +103,21 @@ export default function App() {
   const handleScan = useCallback(() => scanMutation.mutate(), [scanMutation]);
 
   const handleSetupComplete = useCallback(async (path: string) => {
-    await setRootFolder(path);
-    queryClient.invalidateQueries({ queryKey: SETTINGS_KEY });
-    const result = await scanLibrary();
-    setScanResult(result);
-    queryClient.invalidateQueries({ queryKey: ["works"] });
-    queryClient.invalidateQueries({ queryKey: ["axisFacets"] });
-    queryClient.invalidateQueries({ queryKey: ["smartFolderWorks"] });
-    queryClient.setQueryData(SETTINGS_KEY, (prev: typeof settings) =>
-      prev ? { ...prev, rootFolder: path } : prev
-    );
+    setIsCompletingSetup(true);
+    try {
+      await setRootFolder(path);
+      queryClient.invalidateQueries({ queryKey: SETTINGS_KEY });
+      const result = await scanLibrary();
+      setScanResult(result);
+      queryClient.invalidateQueries({ queryKey: ["works"] });
+      queryClient.invalidateQueries({ queryKey: ["axisFacets"] });
+      queryClient.invalidateQueries({ queryKey: ["smartFolderWorks"] });
+      queryClient.setQueryData(SETTINGS_KEY, (prev: typeof settings) =>
+        prev ? { ...prev, rootFolder: path } : prev
+      );
+    } finally {
+      setIsCompletingSetup(false);
+    }
   }, [queryClient]);
 
   const handleChangeFolder = useCallback(
@@ -142,7 +148,7 @@ export default function App() {
   }
 
   if (!isSetupDone) {
-    return <SetupScreen onComplete={handleSetupComplete} scanning={scanMutation.isPending} />;
+    return <SetupScreen onComplete={handleSetupComplete} scanning={isCompletingSetup} />;
   }
 
   const currentTrack = isPlaying ? player.state.tracks[player.state.currentTrackIndex] : null;

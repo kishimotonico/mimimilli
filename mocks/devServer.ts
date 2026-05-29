@@ -7,7 +7,8 @@ import {
   type SmartFolderRuleMock,
   type WorkSummaryMock,
 } from "./fixtures";
-import { createMockScenario } from "./scenarios";
+import { exactPath, matchPath, readBody, sendJson, sendNoContent, sendNotFound } from "./http";
+import { createMockState } from "./state";
 
 function buildFullWork(summary: WorkSummaryMock) {
   const namedTracks = TRACK_NAMES[summary.id];
@@ -24,71 +25,6 @@ function buildFullWork(summary: WorkSummaryMock) {
     resumePosition: 0,
     resumeTrackIndex: 0,
   };
-}
-
-function createMockState() {
-  const now = new Date().toISOString();
-  const scenario = createMockScenario(process.env.MIMIKAGO_MOCK_SCENARIO, now);
-  return {
-    scenarioId: scenario.id,
-    works: scenario.works,
-    presets: scenario.presets,
-    smartFolders: scenario.smartFolders,
-    rootFolder: scenario.rootFolder,
-    lastScanTime: scenario.lastScanTime,
-    scanNewWorkIds: scenario.scanNewWorkIds,
-    nextPresetId: 4,
-    nextSmartFolderId: 3,
-  };
-}
-
-function matchPath(url: string, pattern: string): Record<string, string> | null {
-  const names: string[] = [];
-  const regexStr =
-    "^" +
-    pattern.replace(/:([a-z_]+)/g, (_, name: string) => {
-      names.push(name);
-      return "([^/?]+)";
-    }) +
-    "(?:[/?].*)?$";
-  const m = url.match(new RegExp(regexStr));
-  if (!m) return null;
-  const params: Record<string, string> = {};
-  names.forEach((n, i) => (params[n] = decodeURIComponent(m[i + 1])));
-  return params;
-}
-
-function exactPath(url: string, pattern: string): boolean {
-  return url === pattern || url.startsWith(pattern + "?");
-}
-
-function sendJson(res: ServerResponse, data: unknown, status = 200) {
-  res.writeHead(status, { "Content-Type": "application/json" });
-  res.end(JSON.stringify(data));
-}
-
-function sendNoContent(res: ServerResponse) {
-  res.writeHead(204);
-  res.end();
-}
-
-function sendNotFound(res: ServerResponse) {
-  res.writeHead(404, { "Content-Type": "application/json" });
-  res.end(JSON.stringify({ error: "not found" }));
-}
-
-async function readBody(req: IncomingMessage): Promise<Record<string, unknown>> {
-  return new Promise((resolve) => {
-    let data = "";
-    req.on("data", (chunk) => (data += chunk));
-    req.on("end", () => {
-      try {
-        resolve(JSON.parse(data) as Record<string, unknown>);
-      } catch {
-        resolve({});
-      }
-    });
-  });
 }
 
 export function mockApiPlugin(): Plugin {

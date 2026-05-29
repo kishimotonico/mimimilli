@@ -161,6 +161,8 @@ src/
   - `empty`
   - `new-work`
   - `errors`
+- [x] mock state 生成を `mocks/state.ts` に分離
+- [x] mock HTTP helper を `mocks/http.ts` に分離
 - [ ] fixture をさらに用途別に細分化する
 - [ ] component gallery または screenshot test の方針を決める
 
@@ -316,4 +318,12 @@ src/
 - scenario 切り替えは UI dev panel ではなく環境変数から始める判断にした。現時点では再起動前提で十分で、状態管理導入前に余計な UI 状態を増やさない
 - `default` / `empty` / `new-work` / `errors` の 4 つを最小セットにした。大量タグや長いタイトルは default fixture に既に一部含まれるが、必要なら後続で専用 scenario に分ける
 - `vite.config.ts` を薄くできたため、今後 fixture や mock handler を増やしても Vite 設定そのものは肥大化しにくい
-- 残る課題は mock handler 自体がまだ 1 ファイルに大きく残っていること。次の小分けでは `handlers/works.ts`、`handlers/library.ts`、`handlers/settings.ts` のように分ける
+- 残る課題は mock handler 自体がまだ 1 ファイルに大きく残っていること。`state` と `http` helper は分離済みなので、次の小分けでは `handlers/works.ts`、`handlers/library.ts`、`handlers/settings.ts` のように分ける
+
+### Claude 作業引き継ぎ後レビュー（2026-05-29）
+
+- feature/entity/shared/app への移動、TanStack Query / Jotai 導入、player audio engine 分離、AppShell 分離は `pnpm test` / `pnpm build` が通る状態まで進んでいる
+- レビューで、初回セットアップ時の `scanning` 表示が `scanMutation.isPending` と別経路になっており、二重送信防止が効かない問題を確認した
+- `App.tsx` に `isCompletingSetup` を追加し、初回セットアップ中の pending state を `SetupScreen` に渡すよう修正した
+- Phase -1 の続きとして、mock state 生成と HTTP helper を `mocks/state.ts` / `mocks/http.ts` へ分離した
+- 検証: `pnpm test` / `pnpm build` / `git diff --check`
