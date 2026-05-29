@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>mimimilli — library concept</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=IBM+Plex+Sans+JP:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="milli/tokens.css">
+  <link rel="stylesheet" href="milli/explorer.css">
+  <link rel="stylesheet" href="milli/library.css">
+  <link rel="stylesheet" href="milli/columns.css">
+
+  <style>
+    html, body { margin: 0; padding: 0; background: #f0eee9; }
+    body { font-family: "IBM Plex Sans JP", -apple-system, system-ui, sans-serif; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <script type="text/babel" src="design-canvas.jsx"></script>
+  <script type="text/babel" src="milli/tweaks-panel.jsx"></script>
+  <script type="text/babel" src="milli/data.jsx"></script>
+  <script type="text/babel" src="milli/chrome.jsx"></script>
+  <script type="text/babel" src="milli/library-bits.jsx"></script>
+  <script type="text/babel" src="milli/library.jsx"></script>
+
+  <script type="text/babel">
+    const AB_W = 1480;
+    const AB_H = 920;
+
+    const DEFAULTS = /*EDITMODE-BEGIN*/{
+      "dark": false,
+      "accent": "#C16B4A"
+    }/*EDITMODE-END*/;
+
+    const ACCENT_CLASS = {
+      "#C16B4A": "",
+      "#E26A52": "ml-acc-coral",
+      "#6E9F58": "ml-acc-grass",
+      "#3A5DC9": "ml-acc-cobalt",
+      "#2A2E3C": "ml-acc-graph",
+    };
+    function ThemeWrap({ tweaks, children }) {
+      const accClass = ACCENT_CLASS[tweaks.accent] || "";
+      return (
+        <div className={`${tweaks.dark ? "ml-dark" : ""} ${accClass}`} style={{width: "100%", height: "100%"}}>
+          {children}
+        </div>
+      );
+    }
+
+    function App() {
+      const [tweaks, setTweak] = window.useTweaks(DEFAULTS);
+
+      return (
+        <>
+          <DesignCanvas>
+            <DCSection
+              id="lib-intro"
+              title="00 · mimimilli / Library 案 (v3)"
+              subtitle="物理ファイル中心の Explorer を土台に、登録済み作品の仮想ファイルシステム = Library を組み立てた案。v3 ではナビ構造を整理: モード切替（ファイル/ライブラリ）を左ナビに移し、現在モードが常に選択状態で映るように。左ナビ＝モード＋横断サーフェス、軸レール（col0）＝ライブラリ内のビュー/分類軸/スマートフォルダー、という役割分担で重複を解消。再生は両モード共通で常駐。"
+            >
+              <DCPostIt top={-40} left={60} rotate={-1.5} width={356}>
+                <b>v3 で直したこと</b><br/>
+                • <b>モード切替を左ナビへ</b>（上部タブ廃止 → 現在モードが常に選択状態）<br/>
+                • 左ナビ＝モード＋横断サーフェス。ビュー類は軸レールに集約し重複解消<br/>
+                • スマートフォルダーは col0=選択 / col1=中身の作品<br/>
+                • facet → 作品は<b>列内ドリルヘッダー</b>に畳む（3ペイン固定）<br/>
+                • 再生バーは <b>1ファイル時コンパクト</b>、重ねると展開<br/>
+                • 深い階層は <b>受動スタック表示</b>（遡りはパンくず）
+              </DCPostIt>
+              <DCPostIt top={-40} left={448} rotate={1.2} width={300}>
+                <b>仮想 FS とは？</b><br/>
+                登録済 347 作品を「サークル別 / CV 別 / タグ別 / スマートフォルダー」など、好きな軸で並べ替えたフォルダーとして扱う。
+                Finder のスマートフォルダー / iTunes のスマートプレイリストの考え方。
+              </DCPostIt>
+            </DCSection>
+
+            <DCSection
+              id="lib-home"
+              title="01 · Library ホーム (= すべての作品)"
+              subtitle="ライブラリ初期状態。3 ペイン: ① 軸レール（ビュー/分類軸/スマートフォルダーのタクソノミー）② コンテンツ列 ③ リッチプレビュー。コンテンツ列の作品行は Explorer の薄い行と違い、サムネイル付き「ワークローカード」 — ライブラリのシグネチャ。下の再生は基本形のコンパクトバー（1ファイル）。"
+            >
+              <DCArtboard id="lib-home" label="A · Library ホーム (3ペイン)" width={AB_W} height={AB_H}>
+                <ThemeWrap tweaks={tweaks}><LibraryHome/></ThemeWrap>
+              </DCArtboard>
+            </DCSection>
+
+            <DCSection
+              id="lib-circle"
+              title="02 · サークル別 — ドリルは列内に畳む"
+              subtitle="「サークル」軸 → 一覧 → 作品。ここがポイント: サークルを選んでも新しいカラムを開かず、選んだサークル（夜想曲）を列の上部の『ドリルヘッダー』に畳み、その下に作品を重ねて表示する。だからライブラリは何階層降りても 3 ペインのまま。ヘッダーをタップすればサークル一覧へ戻る。"
+            >
+              <DCArtboard id="lib-circle" label="B · ドリルヘッダー (col 重ね)" width={AB_W} height={AB_H}>
+                <ThemeWrap tweaks={tweaks}><LibraryByCircle/></ThemeWrap>
+              </DCArtboard>
+            </DCSection>
+
+            <DCSection
+              id="lib-tag"
+              title="03 · タグ × 多軸 (積集合)"
+              subtitle="タグ軸は複数選択で積集合をとる。選択中タグはカラム上部に AND チップで並び、ヒット件数が即更新。マッチ結果は別カラムを増やさず右の<b>プレビュー側</b>にまとめて表示（空カラムを作らない）。物理 FS では不可能な「雨音 × 長時間」の立体的な絞り込み。"
+            >
+              <DCArtboard id="lib-tag" label="C · タグ多軸絞り込み" width={AB_W} height={AB_H}>
+                <ThemeWrap tweaks={tweaks}><LibraryByTag/></ThemeWrap>
+              </DCArtboard>
+            </DCSection>
+
+            <DCSection
+              id="lib-smart"
+              title="04 · スマートフォルダー (保存済みクエリ)"
+              subtitle="多軸絞り込みは保存できる。スマートフォルダー = ルールの集合体。プレビューに可視化されたルール（長さ ≥ 3:00:00 AND カテゴリ = 環境音 OR ASMR ...）が並び、手で編集すると結果が即反映。「就寝用ロング」など用途別のプレイリストを編成。"
+            >
+              <DCArtboard id="lib-smart" label="D · スマートフォルダー" width={AB_W} height={AB_H}>
+                <ThemeWrap tweaks={tweaks}><LibrarySmart/></ThemeWrap>
+              </DCArtboard>
+            </DCSection>
+
+            <DCSection
+              id="lib-detail"
+              title="05 · 作品ディテール (リッチプレビュー)"
+              subtitle="ファイルモードのプレビューが「フォルダー内訳 + 販売リンク」だったのに対し、ライブラリは再生体験そのものに焦点 — 再生回数 / 累計時間 / 最終再生 / 完聴率、★レーティング、付箋メモ、トラック別の再生回数履歴、関連作品（同サークル/同タグ）のサジェスト。"
+            >
+              <DCArtboard id="lib-detail" label="E · リッチディテール" width={AB_W} height={AB_H}>
+                <ThemeWrap tweaks={tweaks}><LibraryDetail/></ThemeWrap>
+              </DCArtboard>
+            </DCSection>
+
+            <DCSection
+              id="lib-mixer"
+              title="06 · 再生バーの段階 (0 → 1 → 3)"
+              subtitle="「基本は 1 ファイル再生」を前提に、再生バーは状態で姿を変える。停止中は細いヒントバー、1 ファイル時は落ち着いた単独トランスポート（デフォルト）、環境音などを重ねたいときだけ最大 3ch のミキサーに展開する。常に下部に常駐し、モードをまたいでも途切れない。"
+            >
+              <DCArtboard id="lib-mixer" label="再生バー 3 状態" width={1180} height={560}>
+                <ThemeWrap tweaks={tweaks}><MixerStates/></ThemeWrap>
+              </DCArtboard>
+            </DCSection>
+
+            <DCSection
+              id="file-spine"
+              title="07 · ファイルモード — 深い階層はスタック表示"
+              subtitle="前回のスパイン（背表紙・クリックで再展開）はやりすぎて違和感があったため採用しない。フォルダーを遡るのは上部のパンくず UI に一本化し、カラム側は「末尾 2 階層 + プレビュー」だけを全幅で保ち、それより前は左端に<b>受動的に重なってスタック</b>されていることだけを示す（カードの小口だけ覗く表現）。実 UI では子を開くと右から新カラムがスライドインし、古いカラムが左の束に吸い込まれるアニメーションを想定。"
+            >
+              <DCArtboard id="file-spine" label="G · カラムスタック (6階層)" width={AB_W} height={AB_H}>
+                <ThemeWrap tweaks={tweaks}><FileDeepSpine/></ThemeWrap>
+              </DCArtboard>
+              <DCPostIt top={-30} left={40} rotate={-1.2} width={300}>
+                <b>アニメーション（実装イメージ）</b><br/>
+                子フォルダーを開く → 新カラムが<b>右からスライドイン</b>、はみ出した最古カラムは左の束へ<b>スッと吸い込まれる</b>。束は奥行きのある小口だけ見せる受動表示で、クリックでの再展開はしない。階層移動はパンくず。
+              </DCPostIt>
+            </DCSection>
+
+            <DCSection
+              id="lib-cross"
+              title="08 · クロスモード — 再生は両モード共通"
+              subtitle="ライブラリで重ねた 3ch を聴きながら、ファイルモードで _未整理 フォルダーを片付けている状態。上部メニューの ● 3ch インジケータと下部ミキサーはモードに関係なく常駐し再生は中断されない。フキダシは説明用 — 実装では初回のみ表示などに留める。"
+            >
+              <DCArtboard id="lib-cross" label="H · ライブラリ⇄ファイル共通再生" width={AB_W} height={AB_H}>
+                <ThemeWrap tweaks={tweaks}><LibraryCrossMode/></ThemeWrap>
+              </DCArtboard>
+            </DCSection>
+          </DesignCanvas>
+
+          <TweaksPanel title="Tweaks">
+            <TweakSection title="テーマ">
+              <TweakToggle label="ダークモード" value={tweaks.dark} onChange={(v) => setTweak("dark", v)}/>
+              <TweakColor
+                label="アクセント"
+                value={tweaks.accent}
+                onChange={(v) => setTweak("accent", v)}
+                options={["#C16B4A", "#E26A52", "#6E9F58", "#3A5DC9", "#2A2E3C"]}
+              />
+            </TweakSection>
+          </TweaksPanel>
+        </>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+  </script>
+</body>
+</html>
