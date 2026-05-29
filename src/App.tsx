@@ -1,63 +1,92 @@
 import { useState, useCallback, useEffect, useRef } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { usePlayer } from "./hooks/usePlayer";
 import TopBar from "./components/AppShell/TopBar";
 import LeftNav from "./components/AppShell/LeftNav";
 import AddressBar from "./components/AppShell/AddressBar";
-import LibraryView from "./features/library/ui/LibraryView";
+import LibraryView, { LIBRARY_KEYS } from "./features/library/ui/LibraryView";
 import TransportBar from "./components/Player/TransportBar";
 import FullScreenPlayer from "./components/Player/FullScreenPlayer";
 import SetupScreen from "./components/SetupScreen";
 import SettingsModal from "./components/SettingsModal";
 import NewWorkPopup from "./components/NewWorkPopup";
 import type { ScanResult, WorkSummary } from "./types";
-import * as api from "./api";
+import { getWork } from "./entities/work/api";
+import { exportLibrary } from "./features/library/api";
+import { scanLibrary } from "./features/scan/api";
+import { getSettings, setRootFolder } from "./features/settings/api";
 
 type AppMode = "library" | "files";
 
+// settings query key（App と SettingsModal が同じキャッシュを参照）
+const SETTINGS_KEY = ["settings"] as const;
+
 export default function App() {
   const player = usePlayer();
+  const queryClient = useQueryClient();
   const playRequestIdRef = useRef(0);
 
   const [mode] = useState<AppMode>("library");
   const [searchQuery, setSearchQuery] = useState("");
   const [showSettings, setShowSettings] = useState(false);
-  const [rootFolder, setRootFolder] = useState<string | null>(null);
-  const [lastScanTime, setLastScanTime] = useState<string | null>(null);
-  const [scanVersion, setScanVersion] = useState(0);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
-  const [scanning, setScanning] = useState(false);
-  const [isSetupDone, setIsSetupDone] = useState<boolean | null>(null); // null = loading
 
-  // Load settings on mount
-  useEffect(() => {
-    api.getSettings()
-      .then((settings) => {
-        setRootFolder(settings.rootFolder);
-        setLastScanTime(settings.lastScanTime);
-        setIsSetupDone(settings.rootFolder !== null);
-      })
-      .catch(() => setIsSetupDone(false));
-  }, []);
+  // ── Settings (TanStack Query) ──────────────────────────────
+  const settingsQuery = useQuery({
+    queryKey: SETTINGS_KEY,
+    queryFn: getSettings,
+    retry: 1,
+  });
+  const settings = settingsQuery.data;
+  const isSetupDone: boolean | null = settingsQuery.isPending
+    ? null
+    : (settings?.rootFolder != null) || settingsQuery.isError ? (settings?.rootFolder != null) : false;
 
-  // Keyboard shortcuts
+  // ── Scan mutation ─────────────────────────────────────────
+  // 完了後に library の全クエリを invalidate し、scanVersion なしで自動再取得させる
+  const scanMutation = useMutation({
+    mutationFn: scanLibrary,
+    onSuccess: (result) => {
+      setScanResult(result);
+      queryClient.invalidateQueries({ queryKey: ["works"] });
+      queryClient.invalidateQueries({ queryKey: ["axisFacets"] });
+      queryClient.invalidateQueries({ queryKey: ["smartFolderWorks"] });
+      queryClient.invalidateQueries({ queryKey: SETTINGS_KEY });
+    },
+  });
+
+  // ── Change folder mutation ────────────────────────────────
+  const changefolderMutation = useMutation({
+    mutationFn: setRootFolder,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: SETTINGS_KEY });
+    },
+  });
+
+  // Keyboard shortcuts（player 参照が変わっても安定するよう refs 経由）
+  const playerRef = useRef(player);
+  playerRef.current = player;
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
-      if (e.code === "Space" && player.state.currentWork) {
+      if (e.code === "Space" && playerRef.current.state.currentWork) {
         e.preventDefault();
-        player.togglePlay();
+        playerRef.current.togglePlay();
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [player]);
+  }, []); // deps なし — handler は ref 越しに常に最新の player を参照
 
-  // Play handler: fetch full work detail, then call player.play
+  // Play handler: LibraryView の workDetail query のキャッシュを再利用し、なければ fetch
   const handlePlay = useCallback(async (work: WorkSummary, trackIndex: number) => {
     const requestId = ++playRequestIdRef.current;
     try {
-      const fullWork = await api.getWork(work.id);
+      const cached = queryClient.getQueryData<Awaited<ReturnType<typeof getWork>>>(
+        LIBRARY_KEYS.workDetail(work.id)
+      );
+      const fullWork = cached ?? await getWork(work.id);
       if (requestId !== playRequestIdRef.current) return;
       if (!fullWork) return;
       const playlist = fullWork.playlists.find(
@@ -70,47 +99,32 @@ export default function App() {
     } catch {
       // ignore
     }
-  }, [player]);
+  }, [player, queryClient]);
 
-  const handleScan = useCallback(async () => {
-    setScanning(true);
-    try {
-      const result = await api.scanLibrary();
-      setScanResult(result);
-      setScanVersion((v) => v + 1);
-      setLastScanTime(new Date().toISOString());
-    } catch {
-      // ignore
-    } finally {
-      setScanning(false);
-    }
-  }, []);
+  const handleScan = useCallback(() => {
+    scanMutation.mutate();
+  }, [scanMutation]);
 
   const handleSetupComplete = useCallback(async (path: string) => {
-    setScanning(true);
-    try {
-      await api.setRootFolder(path);
-      setRootFolder(path);
-      const result = await api.scanLibrary();
-      setScanResult(result);
-      setScanVersion((v) => v + 1);
-      setLastScanTime(new Date().toISOString());
-      setIsSetupDone(true);
-    } catch {
-      // ignore
-    } finally {
-      setScanning(false);
-    }
-  }, []);
+    await setRootFolder(path);
+    queryClient.invalidateQueries({ queryKey: SETTINGS_KEY });
+    const result = await scanLibrary();
+    setScanResult(result);
+    queryClient.invalidateQueries({ queryKey: ["works"] });
+    queryClient.invalidateQueries({ queryKey: ["axisFacets"] });
+    queryClient.invalidateQueries({ queryKey: ["smartFolderWorks"] });
+    queryClient.setQueryData(SETTINGS_KEY, (prev: typeof settings) =>
+      prev ? { ...prev, rootFolder: path } : prev
+    );
+  }, [queryClient]);
 
-  const handleChangeFolder = useCallback(async (path: string) => {
-    await api.setRootFolder(path);
-    setRootFolder(path);
-  }, []);
+  const handleChangeFolder = useCallback((path: string) => {
+    changefolderMutation.mutate(path);
+  }, [changefolderMutation]);
 
   const handleExport = useCallback(async () => {
     try {
-      const data = await api.exportLibrary();
+      const data = await exportLibrary();
       const blob = new Blob([data], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -134,7 +148,7 @@ export default function App() {
 
   // Setup screen
   if (!isSetupDone) {
-    return <SetupScreen onComplete={handleSetupComplete} scanning={scanning} />;
+    return <SetupScreen onComplete={handleSetupComplete} scanning={scanMutation.isPending} />;
   }
 
   const isPlaying = player.state.currentTrackIndex >= 0 && player.state.currentWork !== null;
@@ -161,7 +175,6 @@ export default function App() {
         <main className="mle-body">
           <LibraryView
             searchQuery={searchQuery}
-            scanVersion={scanVersion}
             playingWorkId={player.state.currentWork?.id}
             playingTrackIndex={player.state.currentTrackIndex}
             onPlay={handlePlay}
@@ -208,9 +221,9 @@ export default function App() {
       {/* Settings modal */}
       {showSettings && (
         <SettingsModal
-          rootFolder={rootFolder}
-          lastScanTime={lastScanTime}
-          scanning={scanning}
+          rootFolder={settings?.rootFolder ?? null}
+          lastScanTime={settings?.lastScanTime ?? null}
+          scanning={scanMutation.isPending}
           onClose={() => setShowSettings(false)}
           onScan={handleScan}
           onChangeFolder={handleChangeFolder}

@@ -1,5 +1,20 @@
-import { useState, useCallback } from "react";
-import type { AxisId, SortId } from "../../../types";
+// library feature のナビゲーション state フック。
+// Jotai atom をラップし、setAxis・drillInto・drillBack・toggleTag などの
+// ハイレベルな操作を提供する。
+// atom が feature 外の Provider スコープにあるため、兄弟コンポーネントでも
+// 同じ state を参照できる（例: AddressBar が addressPath を購読）。
+
+import { useAtom, useAtomValue } from "jotai";
+import { useCallback } from "react";
+import type { AxisId, SortId } from "../model/types";
+import {
+  activeAxisAtom,
+  drillValueAtom,
+  selectedTagsAtom,
+  selectedWorkIdAtom,
+  sortAtom,
+  addressPathAtom,
+} from "./atoms";
 
 export interface LibraryViewState {
   activeAxis: AxisId;
@@ -20,83 +35,54 @@ export interface LibraryViewActions {
   setSort: (sort: SortId) => void;
 }
 
-function buildAddressPath(axis: AxisId, drillValue: string | null): string[] {
-  const axisLabels: Partial<Record<string, string>> = {
-    all: "すべての作品", recent: "最近再生", added: "最近追加",
-    fav: "お気に入り", unplayed: "未再生", missing: "ファイル欠損",
-    circle: "サークル", cv: "CV", series: "シリーズ",
-    cat: "カテゴリ", tag: "タグ", year: "追加日",
-  };
-  const label = axis.startsWith("smart-")
-    ? "スマートフォルダー"
-    : (axisLabels[axis] ?? axis);
-  const base = ["ライブラリ", label];
-  return drillValue ? [...base, drillValue] : base;
-}
-
-const INITIAL_STATE: LibraryViewState = {
-  activeAxis: "all",
-  drillValue: null,
-  selectedTags: [],
-  selectedWorkId: null,
-  sort: "added-desc",
-  addressPath: ["ライブラリ", "すべての作品"],
-};
-
 export function useLibraryView(): LibraryViewState & LibraryViewActions {
-  const [state, setState] = useState<LibraryViewState>(INITIAL_STATE);
+  const [activeAxis, setActiveAxis] = useAtom(activeAxisAtom);
+  const [drillValue, setDrillValue] = useAtom(drillValueAtom);
+  const [selectedTags, setSelectedTags] = useAtom(selectedTagsAtom);
+  const [selectedWorkId, setSelectedWorkId] = useAtom(selectedWorkIdAtom);
+  const [sort, setSort_] = useAtom(sortAtom);
+  const addressPath = useAtomValue(addressPathAtom);
 
   const setAxis = useCallback((axis: AxisId) => {
-    setState((s) => ({
-      ...s,
-      activeAxis: axis,
-      drillValue: null,
-      selectedTags: [],
-      selectedWorkId: null,
-      addressPath: buildAddressPath(axis, null),
-    }));
-  }, []);
+    setActiveAxis(axis);
+    setDrillValue(null);
+    setSelectedTags([]);
+    setSelectedWorkId(null);
+  }, [setActiveAxis, setDrillValue, setSelectedTags, setSelectedWorkId]);
 
   const drillInto = useCallback((value: string) => {
-    setState((s) => ({
-      ...s,
-      drillValue: value,
-      selectedTags: [],
-      selectedWorkId: null,
-      addressPath: buildAddressPath(s.activeAxis, value),
-    }));
-  }, []);
+    setDrillValue(value);
+    setSelectedTags([]);
+    setSelectedWorkId(null);
+  }, [setDrillValue, setSelectedTags, setSelectedWorkId]);
 
   const drillBack = useCallback(() => {
-    setState((s) => ({
-      ...s,
-      drillValue: null,
-      selectedWorkId: null,
-      addressPath: buildAddressPath(s.activeAxis, null),
-    }));
-  }, []);
+    setDrillValue(null);
+    setSelectedWorkId(null);
+  }, [setDrillValue, setSelectedWorkId]);
 
   const toggleTag = useCallback((tag: string) => {
-    setState((s) => ({
-      ...s,
-      selectedTags: s.selectedTags.includes(tag)
-        ? s.selectedTags.filter((t) => t !== tag)
-        : [...s.selectedTags, tag],
-      selectedWorkId: null,
-    }));
-  }, []);
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    );
+    setSelectedWorkId(null);
+  }, [setSelectedTags, setSelectedWorkId]);
 
   const clearTags = useCallback(() => {
-    setState((s) => ({ ...s, selectedTags: [], selectedWorkId: null }));
-  }, []);
+    setSelectedTags([]);
+    setSelectedWorkId(null);
+  }, [setSelectedTags, setSelectedWorkId]);
 
   const selectWork = useCallback((id: string | null) => {
-    setState((s) => ({ ...s, selectedWorkId: id }));
-  }, []);
+    setSelectedWorkId(id);
+  }, [setSelectedWorkId]);
 
-  const setSort = useCallback((sort: SortId) => {
-    setState((s) => ({ ...s, sort }));
-  }, []);
+  const setSort = useCallback((s: SortId) => {
+    setSort_(s);
+  }, [setSort_]);
 
-  return { ...state, setAxis, drillInto, drillBack, toggleTag, clearTags, selectWork, setSort };
+  return {
+    activeAxis, drillValue, selectedTags, selectedWorkId, sort, addressPath,
+    setAxis, drillInto, drillBack, toggleTag, clearTags, selectWork, setSort,
+  };
 }

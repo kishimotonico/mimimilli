@@ -13,6 +13,7 @@ interface ContentColumnProps {
   selectedTags: string[];
   playingWorkId?: string;
   isLoading?: boolean;
+  isError?: boolean;
   onWorkSelect: (id: string) => void;
   onDrillSelect: (value: string) => void;
   onDrillBack: () => void;
@@ -41,6 +42,7 @@ export default function ContentColumn({
   selectedTags,
   playingWorkId,
   isLoading,
+  isError,
   onWorkSelect,
   onDrillSelect,
   onDrillBack,
@@ -80,6 +82,8 @@ export default function ContentColumn({
         <div className="mle-col__list">
           {isLoading ? (
             <EmptyState message="読み込み中..." />
+          ) : isError ? (
+            <EmptyState message="読み込みに失敗しました" />
           ) : facetItems.length === 0 ? (
             <EmptyState message="タグがありません" />
           ) : (
@@ -114,6 +118,8 @@ export default function ContentColumn({
         <div className="mle-col__list">
           {isLoading ? (
             <EmptyState message="読み込み中..." />
+          ) : isError ? (
+            <EmptyState message="読み込みに失敗しました" />
           ) : facetItems.length === 0 ? (
             <EmptyState message="項目がありません" />
           ) : (
@@ -163,6 +169,8 @@ export default function ContentColumn({
       <div className="mle-col__list">
         {isLoading ? (
           <EmptyState message="読み込み中..." />
+        ) : isError ? (
+          <EmptyState message="読み込みに失敗しました" />
         ) : works.length === 0 ? (
           <EmptyState message="作品が見つかりません" />
         ) : (

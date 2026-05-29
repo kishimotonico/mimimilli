@@ -1,6 +1,14 @@
-import { useEffect, useState, useCallback } from "react";
-import type { WorkSummary, Work, AxisFacetItem, SmartFolder, AxisId } from "../../../types";
-import * as api from "../../../api";
+import { useCallback } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import type { WorkSummary, AxisId } from "../../../types";
+import {
+  searchWorksV2,
+  getAxisFacets,
+  listSmartFolders,
+  createSmartFolder,
+  evalSmartFolder,
+} from "../../../features/library/api";
+import { getWork } from "../../../entities/work/api";
 import { useLibraryView } from "../model/useLibraryNavigation";
 import AxisColumn from "./AxisColumn";
 import ContentColumn from "./ContentColumn";
@@ -14,111 +22,119 @@ const FACET_AXES = new Set(["circle", "cv", "series", "cat", "year"]);
 function isFacetAxis(a: AxisId): boolean { return FACET_AXES.has(a as string); }
 function isSmartAxis(a: AxisId): boolean { return (a as string).startsWith("smart-"); }
 
+// ── Query key factory ─────────────────────────────────────────
+// query key を一箇所で管理し、invalidation と依存を一致させる。
+const LIBRARY_KEYS = {
+  works: (params: object) => ["works", params] as const,
+  libraryTotal: () => ["works", "total"] as const,
+  smartFolderWorks: (id: string) => ["smartFolderWorks", id] as const,
+  facets: (axis: string) => ["axisFacets", axis] as const,
+  smartFolders: () => ["smartFolders"] as const,
+  workDetail: (id: string) => ["work", id] as const,
+} as const;
+
+export { LIBRARY_KEYS };
+
 interface LibraryViewProps {
   searchQuery: string;
-  scanVersion: number;
   playingWorkId?: string;
   playingTrackIndex?: number;
   onPlay: (work: WorkSummary, trackIndex: number) => void;
 }
 
-export default function LibraryView({ searchQuery, scanVersion, playingWorkId, playingTrackIndex, onPlay }: LibraryViewProps) {
+export default function LibraryView({ searchQuery, playingWorkId, playingTrackIndex, onPlay }: LibraryViewProps) {
   const nav = useLibraryView();
+  const queryClient = useQueryClient();
 
-  const [works, setWorks] = useState<WorkSummary[]>([]);
-  const [facetItems, setFacetItems] = useState<AxisFacetItem[]>([]);
-  const [smartFolders, setSmartFolders] = useState<SmartFolder[]>([]);
-  const [selectedWork, setSelectedWork] = useState<Work | null>(null);
-  const [libraryTotal, setLibraryTotal] = useState<number | undefined>(undefined);
-  const [isLoading, setIsLoading] = useState(false);
-
-  // ── Load smart folders once ─────────────────────────────
-  useEffect(() => {
-    api.listSmartFolders().then(setSmartFolders).catch(() => {});
-  }, []);
-
-  // ── Load works based on current navigation state ────────
-  useEffect(() => {
-    let cancelled = false;
-    setIsLoading(true);
-
-    if (isSmartAxis(nav.activeAxis)) {
-      const sfId = (nav.activeAxis as string).slice("smart-".length);
-      api.evalSmartFolder(sfId)
-        .then((w) => {
-          if (!cancelled) setWorks(w);
-        })
-        .catch(() => {
-          if (!cancelled) setWorks([]);
-        })
-        .finally(() => {
-          if (!cancelled) setIsLoading(false);
-        });
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    const params: api.WorksQueryParams = { sort: nav.sort };
-
-    if (searchQuery) params.q = searchQuery;
-
+  // ── Works（通常軸）─────────────────────────────────────────
+  const worksParams = (() => {
+    if (isSmartAxis(nav.activeAxis)) return null; // 別 query
+    const p: Parameters<typeof searchWorksV2>[0] = { sort: nav.sort };
+    if (searchQuery) p.q = searchQuery;
     if (nav.activeAxis === "tag" && nav.selectedTags.length > 0) {
-      params.tags = nav.selectedTags;
-      params.tagOp = "AND";
+      p.tags = nav.selectedTags;
+      p.tagOp = "AND";
     }
-
     if (VIEW_AXES.has(nav.activeAxis as string) && nav.activeAxis !== "all") {
-      params.view = nav.activeAxis as string;
+      p.view = nav.activeAxis as string;
     }
-
     if (isFacetAxis(nav.activeAxis) && nav.drillValue) {
-      params.axis = nav.activeAxis as string;
-      params.axisValue = nav.drillValue;
+      p.axis = nav.activeAxis as string;
+      p.axisValue = nav.drillValue;
     }
+    return p;
+  })();
 
-    api.searchWorksV2(params)
-      .then((w) => {
-        if (!cancelled) setWorks(w);
-      })
-      .catch(() => {
-        if (!cancelled) setWorks([]);
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false);
-      });
+  const worksQuery = useQuery({
+    queryKey: LIBRARY_KEYS.works(worksParams ?? {}),
+    queryFn: () => searchWorksV2(worksParams!),
+    enabled: worksParams !== null,
+  });
 
-    return () => {
-      cancelled = true;
-    };
-  }, [nav.activeAxis, nav.drillValue, nav.selectedTags, nav.sort, searchQuery, scanVersion]);
+  // ── Works（スマートフォルダー軸）──────────────────────────
+  const smartAxisId = isSmartAxis(nav.activeAxis)
+    ? (nav.activeAxis as string).slice("smart-".length)
+    : null;
 
-  // ── Load library total for axis header ───────────────────
-  useEffect(() => {
-    api.searchWorksV2({}).then((w) => setLibraryTotal(w.length)).catch(() => {});
-  }, [scanVersion]);
+  const smartWorksQuery = useQuery({
+    queryKey: LIBRARY_KEYS.smartFolderWorks(smartAxisId ?? ""),
+    queryFn: () => evalSmartFolder(smartAxisId!),
+    enabled: smartAxisId !== null,
+  });
 
-  // ── Load facet items when entering a facet axis ─────────
-  useEffect(() => {
-    if (!isFacetAxis(nav.activeAxis) || nav.drillValue) { setFacetItems([]); return; }
-    api.getAxisFacets(nav.activeAxis as string)
-      .then(setFacetItems)
-      .catch(() => setFacetItems([]));
-  }, [nav.activeAxis, nav.drillValue, scanVersion]);
+  const works = isSmartAxis(nav.activeAxis)
+    ? (smartWorksQuery.data ?? [])
+    : (worksQuery.data ?? []);
+  const isLoading = isSmartAxis(nav.activeAxis)
+    ? smartWorksQuery.isPending
+    : worksQuery.isPending;
+  const isError = isSmartAxis(nav.activeAxis)
+    ? smartWorksQuery.isError
+    : worksQuery.isError;
 
-  // ── Load tag list for tag axis ──────────────────────────
-  useEffect(() => {
-    if (nav.activeAxis !== "tag") return;
-    api.getAxisFacets("tag").then(setFacetItems).catch(() => setFacetItems([]));
-  }, [nav.activeAxis, scanVersion]);
+  // ── ライブラリ総件数 ──────────────────────────────────────
+  const libraryTotalQuery = useQuery({
+    queryKey: LIBRARY_KEYS.libraryTotal(),
+    queryFn: () => searchWorksV2({}).then((w) => w.length),
+  });
 
-  // ── Load selected work detail ────────────────────────────
-  useEffect(() => {
-    if (!nav.selectedWorkId) { setSelectedWork(null); return; }
-    api.getWork(nav.selectedWorkId).then(setSelectedWork).catch(() => setSelectedWork(null));
-  }, [nav.selectedWorkId]);
+  // ── ファセット items ──────────────────────────────────────
+  const facetAxis =
+    (isFacetAxis(nav.activeAxis) && !nav.drillValue) || nav.activeAxis === "tag"
+      ? (nav.activeAxis as string)
+      : null;
 
-  // ── Determine preview mode ───────────────────────────────
+  const facetQuery = useQuery({
+    queryKey: LIBRARY_KEYS.facets(facetAxis ?? ""),
+    queryFn: () => getAxisFacets(facetAxis!),
+    enabled: facetAxis !== null,
+  });
+
+  // ── スマートフォルダー一覧 ────────────────────────────────
+  const smartFoldersQuery = useQuery({
+    queryKey: LIBRARY_KEYS.smartFolders(),
+    queryFn: listSmartFolders,
+  });
+  const smartFolders = smartFoldersQuery.data ?? [];
+
+  // ── スマートフォルダー作成 mutation ───────────────────────
+  const createSmartFolderMutation = useMutation({
+    mutationFn: createSmartFolder,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: LIBRARY_KEYS.smartFolders() });
+    },
+  });
+
+  // ── 選択中作品の詳細 ──────────────────────────────────────
+  const workDetailQuery = useQuery({
+    queryKey: LIBRARY_KEYS.workDetail(nav.selectedWorkId ?? ""),
+    queryFn: () => getWork(nav.selectedWorkId!),
+    enabled: nav.selectedWorkId !== null,
+  });
+  const selectedWork = workDetailQuery.data ?? null;
+
+  // ── previewMode: UI state + server state を組み合わせてコンポーネントで計算 ──
+  // (derived atom にしない — issue の制約参照)
   const previewMode: PreviewMode = nav.selectedWorkId && selectedWork
     ? "work"
     : isSmartAxis(nav.activeAxis)
@@ -158,15 +174,13 @@ export default function LibraryView({ searchQuery, scanVersion, playingWorkId, p
     <>
       <AxisColumn
         activeAxis={nav.activeAxis}
-        totalCount={libraryTotal}
+        totalCount={libraryTotalQuery.data}
         smartFolders={smartFolders}
         onSelectAxis={nav.setAxis}
         onNewSmartFolder={() => {
           const name = window.prompt("スマートフォルダー名:");
           if (!name) return;
-          api.createSmartFolder({ name, rules: [], sort: "added-desc" })
-            .then((sf) => setSmartFolders((prev) => [...prev, sf]))
-            .catch(() => {});
+          createSmartFolderMutation.mutate({ name, rules: [], sort: "added-desc" });
         }}
       />
 
@@ -174,11 +188,12 @@ export default function LibraryView({ searchQuery, scanVersion, playingWorkId, p
         axis={nav.activeAxis}
         drillValue={nav.drillValue}
         works={works}
-        facetItems={facetItems}
+        facetItems={facetQuery.data ?? []}
         selectedWorkId={nav.selectedWorkId}
         selectedTags={nav.selectedTags}
         playingWorkId={playingWorkId}
         isLoading={isLoading}
+        isError={isError}
         onWorkSelect={nav.selectWork}
         onDrillSelect={nav.drillInto}
         onDrillBack={nav.drillBack}
