@@ -5,7 +5,7 @@ import {
   type SearchPresetMock,
   type SmartFolderMock,
   type WorkSummaryMock,
-} from "./fixtures";
+} from "./fixtures/index";
 
 export type MockScenarioId = "default" | "empty" | "new-work" | "errors";
 

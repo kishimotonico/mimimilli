@@ -2,7 +2,7 @@ import {
   type SearchPresetMock,
   type SmartFolderMock,
   type WorkSummaryMock,
-} from "./fixtures";
+} from "./fixtures/index";
 import { createMockScenario, type MockScenarioId } from "./scenarios";
 
 export interface MockState {

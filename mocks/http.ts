@@ -4,7 +4,7 @@ export function matchPath(url: string, pattern: string): Record<string, string> 
   const names: string[] = [];
   const regexStr =
     "^" +
-    pattern.replace(/:([a-z_]+)/g, (_, name: string) => {
+    pattern.replace(/:([A-Za-z_][A-Za-z0-9_]*)/g, (_, name: string) => {
       names.push(name);
       return "([^/?]+)";
     }) +

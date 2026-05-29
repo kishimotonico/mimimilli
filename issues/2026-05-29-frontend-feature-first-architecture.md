@@ -163,8 +163,21 @@ src/
   - `errors`
 - [x] mock state 生成を `mocks/state.ts` に分離
 - [x] mock HTTP helper を `mocks/http.ts` に分離
-- [ ] fixture をさらに用途別に細分化する
-- [ ] component gallery または screenshot test の方針を決める
+- [x] mock API handler を `mocks/handlers/*` へ責務別に分割
+  - settings
+  - scan
+  - library
+  - works / tags / presets / DLsite
+  - assets
+- [x] Node/Vite 側の mock server を `tsconfig.node.json` で直接型チェックできるようにする
+- [x] fixture をさらに用途別に細分化する
+  - works
+  - tracks
+  - presets
+  - smart folders
+- [x] component gallery または screenshot test の方針を決める
+  - Phase -1 では実装しない
+  - fixture / scenario と handler 分割を先に固め、visual regression は Phase 5 で Playwright screenshot を第一候補として検討する
 
 ### Phase 0: 状態管理の基盤を入れる
 
