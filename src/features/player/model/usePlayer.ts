@@ -446,25 +446,5 @@ export function usePlayer() {
   };
 }
 
-// Helper to format seconds to time string
-export function formatTime(sec: number): string {
-  if (!sec || !isFinite(sec)) return "0:00";
-  const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  const s = Math.floor(sec % 60);
-  if (h > 0) {
-    return `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-  }
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
-
-export function formatDuration(totalSec: number): string {
-  if (!totalSec) return "0:00";
-  return formatTime(totalSec);
-}
-
-export function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
+// 後方互換 re-export。新規コードは shared/lib/format を直接 import すること。
+export { formatTime, formatDuration, formatFileSize } from "../../../shared/lib/format";

@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import type { PlayerState } from "../model/usePlayer";
-import { formatTime } from "../model/usePlayer";
+import { formatTime } from "../../../shared/lib/format";
 import CoverImg from "../../../components/CoverImg";
 import { I } from "../../../components/Icon";
 
