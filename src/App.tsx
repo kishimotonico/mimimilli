@@ -1,12 +1,12 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { usePlayer } from "./hooks/usePlayer";
+import { usePlayer } from "./features/player/model/usePlayer";
 import TopBar from "./components/AppShell/TopBar";
 import LeftNav from "./components/AppShell/LeftNav";
 import AddressBar from "./components/AppShell/AddressBar";
 import LibraryView, { LIBRARY_KEYS } from "./features/library/ui/LibraryView";
-import TransportBar from "./components/Player/TransportBar";
-import FullScreenPlayer from "./components/Player/FullScreenPlayer";
+import TransportBar from "./features/player/ui/TransportBar";
+import FullScreenPlayer from "./features/player/ui/FullScreenPlayer";
 import SetupScreen from "./components/SetupScreen";
 import SettingsModal from "./components/SettingsModal";
 import NewWorkPopup from "./components/NewWorkPopup";

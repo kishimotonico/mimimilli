@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatTime, formatDuration, formatFileSize } from '../hooks/usePlayer';
+import { formatTime, formatDuration, formatFileSize } from '../features/player/model/usePlayer';
 
 describe('formatTime', () => {
   it('formats 0 seconds', () => {

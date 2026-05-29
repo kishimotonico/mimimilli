@@ -2,7 +2,7 @@ import type { Work, SmartFolder, WorkSummary, AxisId } from "../../../types";
 import CoverImg from "../../../components/CoverImg";
 import Tag from "../../../components/Tag";
 import { I } from "../../../components/Icon";
-import { formatDuration } from "../../../hooks/usePlayer";
+import { formatDuration } from "../../player/model/usePlayer";
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("ja-JP", { year: "numeric", month: "short", day: "numeric" });

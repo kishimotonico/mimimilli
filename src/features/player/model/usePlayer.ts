@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import type { Track, WorkSummary, Work } from "../types";
-import * as api from "../api";
+import type { Track, WorkSummary, Work } from "../../../types";
+import * as api from "../../../api";
 
 export interface PlayerState {
   isPlaying: boolean;

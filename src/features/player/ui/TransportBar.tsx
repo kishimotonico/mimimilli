@@ -1,7 +1,7 @@
-import type { PlayerState } from "../../hooks/usePlayer";
-import { formatTime } from "../../hooks/usePlayer";
-import CoverImg from "../CoverImg";
-import { I } from "../Icon";
+import type { PlayerState } from "../model/usePlayer";
+import { formatTime } from "../model/usePlayer";
+import CoverImg from "../../../components/CoverImg";
+import { I } from "../../../components/Icon";
 
 interface TransportBarProps {
   state: PlayerState;

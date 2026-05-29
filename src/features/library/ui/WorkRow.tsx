@@ -1,7 +1,7 @@
 import type { WorkSummary } from "../../../types";
 import CoverImg from "../../../components/CoverImg";
 import { I } from "../../../components/Icon";
-import { formatDuration } from "../../../hooks/usePlayer";
+import { formatDuration } from "../../player/model/usePlayer";
 
 interface WorkRowProps {
   work: WorkSummary;
