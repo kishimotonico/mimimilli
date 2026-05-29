@@ -1,4 +1,4 @@
-import { I } from "../Icon";
+import { I } from "../../../components/Icon";
 
 interface DrillHeaderProps {
   axisLabel: string;

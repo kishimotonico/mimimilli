@@ -1,8 +1,8 @@
 import React from "react";
-import type { WorkSummary, AxisFacetItem, AxisId } from "../../types";
+import type { WorkSummary, AxisFacetItem, AxisId } from "../../../types";
 import WorkRow from "./WorkRow";
 import DrillHeader from "./DrillHeader";
-import { I } from "../Icon";
+import { I } from "../../../components/Icon";
 
 interface ContentColumnProps {
   axis: AxisId;

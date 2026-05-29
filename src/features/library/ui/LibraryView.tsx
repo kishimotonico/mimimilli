@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
-import type { WorkSummary, Work, AxisFacetItem, SmartFolder, AxisId } from "../../types";
-import * as api from "../../api";
-import { useLibraryView } from "../../hooks/useLibraryView";
+import type { WorkSummary, Work, AxisFacetItem, SmartFolder, AxisId } from "../../../types";
+import * as api from "../../../api";
+import { useLibraryView } from "../model/useLibraryNavigation";
 import AxisColumn from "./AxisColumn";
 import ContentColumn from "./ContentColumn";
 import PreviewPane from "./PreviewPane";

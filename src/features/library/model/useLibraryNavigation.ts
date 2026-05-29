@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import type { AxisId, SortId } from "../types";
+import type { AxisId, SortId } from "../../../types";
 
 export interface LibraryViewState {
   activeAxis: AxisId;

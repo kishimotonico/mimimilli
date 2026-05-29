@@ -3,7 +3,7 @@ import { usePlayer } from "./hooks/usePlayer";
 import TopBar from "./components/AppShell/TopBar";
 import LeftNav from "./components/AppShell/LeftNav";
 import AddressBar from "./components/AppShell/AddressBar";
-import LibraryView from "./components/Library/LibraryView";
+import LibraryView from "./features/library/ui/LibraryView";
 import TransportBar from "./components/Player/TransportBar";
 import FullScreenPlayer from "./components/Player/FullScreenPlayer";
 import SetupScreen from "./components/SetupScreen";

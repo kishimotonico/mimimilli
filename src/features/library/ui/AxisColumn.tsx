@@ -1,5 +1,5 @@
-import type { AxisId, SmartFolder } from "../../types";
-import { I } from "../Icon";
+import type { AxisId, SmartFolder } from "../../../types";
+import { I } from "../../../components/Icon";
 
 interface AxisRow {
   id: AxisId;
