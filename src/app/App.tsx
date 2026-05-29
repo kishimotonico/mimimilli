@@ -1,20 +1,27 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+// App: アプリ全体のオーケストレーション。
+// - 設定・スキャン・フォルダー変更を TanStack Query で管理
+// - player フックを保持し、library / player UI に props を流す
+// - レイアウトは AppShell に委譲
+
+import { useState, useCallback, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { usePlayer } from "./features/player/model/usePlayer";
-import TopBar from "./app/ui/TopBar";
-import LeftNav from "./app/ui/LeftNav";
-import AddressBar from "./app/ui/AddressBar";
-import LibraryView, { LIBRARY_KEYS } from "./features/library/ui/LibraryView";
-import TransportBar from "./features/player/ui/TransportBar";
-import FullScreenPlayer from "./features/player/ui/FullScreenPlayer";
-import SetupScreen from "./features/setup/ui/SetupScreen";
-import SettingsModal from "./features/settings/ui/SettingsModal";
-import NewWorkPopup from "./features/scan/ui/NewWorkPopup";
-import type { ScanResult, WorkSummary } from "./types";
-import { getWork } from "./entities/work/api";
-import { exportLibrary } from "./features/library/api";
-import { scanLibrary } from "./features/scan/api";
-import { getSettings, setRootFolder } from "./features/settings/api";
+import { usePlayer } from "../features/player/model/usePlayer";
+import { useGlobalShortcuts } from "./model/useGlobalShortcuts";
+import AppShell from "./AppShell";
+import TopBar from "./ui/TopBar";
+import LeftNav from "./ui/LeftNav";
+import AddressBar from "./ui/AddressBar";
+import LibraryView, { LIBRARY_KEYS } from "../features/library/ui/LibraryView";
+import TransportBar from "../features/player/ui/TransportBar";
+import FullScreenPlayer from "../features/player/ui/FullScreenPlayer";
+import SetupScreen from "../features/setup/ui/SetupScreen";
+import SettingsModal from "../features/settings/ui/SettingsModal";
+import NewWorkPopup from "../features/scan/ui/NewWorkPopup";
+import type { ScanResult, WorkSummary } from "../types";
+import { getWork } from "../entities/work/api";
+import { exportLibrary } from "../features/library/api";
+import { scanLibrary } from "../features/scan/api";
+import { getSettings, setRootFolder } from "../features/settings/api";
 
 type AppMode = "library" | "files";
 
@@ -31,7 +38,15 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
 
-  // ── Settings (TanStack Query) ──────────────────────────────
+  const isPlaying = player.state.currentTrackIndex >= 0 && player.state.currentWork !== null;
+
+  // ── キーボードショートカット ───────────────────────────────
+  useGlobalShortcuts({
+    onTogglePlay: player.togglePlay,
+    isActive: isPlaying,
+  });
+
+  // ── Settings ─────────────────────────────────────────────
   const settingsQuery = useQuery({
     queryKey: SETTINGS_KEY,
     queryFn: getSettings,
@@ -40,10 +55,9 @@ export default function App() {
   const settings = settingsQuery.data;
   const isSetupDone: boolean | null = settingsQuery.isPending
     ? null
-    : (settings?.rootFolder != null) || settingsQuery.isError ? (settings?.rootFolder != null) : false;
+    : settings?.rootFolder != null ? true : settingsQuery.isError ? false : false;
 
   // ── Scan mutation ─────────────────────────────────────────
-  // 完了後に library の全クエリを invalidate し、scanVersion なしで自動再取得させる
   const scanMutation = useMutation({
     mutationFn: scanLibrary,
     onSuccess: (result) => {
@@ -56,30 +70,14 @@ export default function App() {
   });
 
   // ── Change folder mutation ────────────────────────────────
-  const changefolderMutation = useMutation({
+  const changeFolderMutation = useMutation({
     mutationFn: setRootFolder,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: SETTINGS_KEY });
     },
   });
 
-  // Keyboard shortcuts（player 参照が変わっても安定するよう refs 経由）
-  const playerRef = useRef(player);
-  playerRef.current = player;
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
-      if (e.code === "Space" && playerRef.current.state.currentWork) {
-        e.preventDefault();
-        playerRef.current.togglePlay();
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, []); // deps なし — handler は ref 越しに常に最新の player を参照
-
-  // Play handler: LibraryView の workDetail query のキャッシュを再利用し、なければ fetch
+  // ── Play handler ──────────────────────────────────────────
   const handlePlay = useCallback(async (work: WorkSummary, trackIndex: number) => {
     const requestId = ++playRequestIdRef.current;
     try {
@@ -101,9 +99,7 @@ export default function App() {
     }
   }, [player, queryClient]);
 
-  const handleScan = useCallback(() => {
-    scanMutation.mutate();
-  }, [scanMutation]);
+  const handleScan = useCallback(() => scanMutation.mutate(), [scanMutation]);
 
   const handleSetupComplete = useCallback(async (path: string) => {
     await setRootFolder(path);
@@ -118,9 +114,10 @@ export default function App() {
     );
   }, [queryClient]);
 
-  const handleChangeFolder = useCallback((path: string) => {
-    changefolderMutation.mutate(path);
-  }, [changefolderMutation]);
+  const handleChangeFolder = useCallback(
+    (path: string) => changeFolderMutation.mutate(path),
+    [changeFolderMutation]
+  );
 
   const handleExport = useCallback(async () => {
     try {
@@ -132,12 +129,10 @@ export default function App() {
       a.download = "mimimilli-export.json";
       a.click();
       URL.revokeObjectURL(url);
-    } catch {
-      // ignore
-    }
+    } catch { /* ignore */ }
   }, []);
 
-  // Loading
+  // ── ローディング ──────────────────────────────────────────
   if (isSetupDone === null) {
     return (
       <div style={{ width: "100%", height: "100vh", background: "var(--paper-0)", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -146,18 +141,16 @@ export default function App() {
     );
   }
 
-  // Setup screen
   if (!isSetupDone) {
     return <SetupScreen onComplete={handleSetupComplete} scanning={scanMutation.isPending} />;
   }
 
-  const isPlaying = player.state.currentTrackIndex >= 0 && player.state.currentWork !== null;
   const currentTrack = isPlaying ? player.state.tracks[player.state.currentTrackIndex] : null;
-  const mixerClass = isPlaying ? "is-mixer-single" : "is-mixer-empty";
 
   return (
-    <div className="mle-app">
-      <div className={`mle-frame is-lib ${mixerClass}`}>
+    <AppShell
+      isPlaying={isPlaying}
+      topBar={
         <TopBar
           mode={mode}
           searchQuery={searchQuery}
@@ -167,21 +160,19 @@ export default function App() {
           isPlaying={isPlaying}
           playingTrack={currentTrack?.title}
         />
-
-        <AddressBar path={["ライブラリ"]} />
-
-        <LeftNav mode={mode} playingCount={isPlaying ? 1 : 0} />
-
-        <main className="mle-body">
-          <LibraryView
-            searchQuery={searchQuery}
-            playingWorkId={player.state.currentWork?.id}
-            playingTrackIndex={player.state.currentTrackIndex}
-            onPlay={handlePlay}
-          />
-        </main>
-
-        {isPlaying ? (
+      }
+      addressBar={<AddressBar path={["ライブラリ"]} />}
+      leftNav={<LeftNav mode={mode} playingCount={isPlaying ? 1 : 0} />}
+      body={
+        <LibraryView
+          searchQuery={searchQuery}
+          playingWorkId={player.state.currentWork?.id}
+          playingTrackIndex={player.state.currentTrackIndex}
+          onPlay={handlePlay}
+        />
+      }
+      transportBar={
+        isPlaying ? (
           <TransportBar
             state={player.state}
             onTogglePlay={player.togglePlay}
@@ -199,44 +190,45 @@ export default function App() {
             <span className="k">Space</span>
             <span>で再生 / 一時停止</span>
           </div>
-        )}
-      </div>
-
-      {/* Full screen player */}
-      {isPlaying && player.state.showFullPlayer && (
-        <FullScreenPlayer
-          state={player.state}
-          onTogglePlay={player.togglePlay}
-          onSeek={player.seek}
-          onSeekRelative={player.seekRelative}
-          onSetVolume={player.setVolume}
-          onSetLoop={player.setLoop}
-          onNext={player.nextTrack}
-          onPrev={player.prevTrack}
-          onSelectTrack={player.setTrackIndex}
-          onClose={() => player.setShowFullPlayer(false)}
-        />
-      )}
-
-      {/* Settings modal */}
-      {showSettings && (
-        <SettingsModal
-          rootFolder={settings?.rootFolder ?? null}
-          lastScanTime={settings?.lastScanTime ?? null}
-          scanning={scanMutation.isPending}
-          onClose={() => setShowSettings(false)}
-          onScan={handleScan}
-          onChangeFolder={handleChangeFolder}
-          onExport={handleExport}
-        />
-      )}
-
-      {scanResult && (
-        <NewWorkPopup
-          scanResult={scanResult}
-          onClose={() => setScanResult(null)}
-        />
-      )}
-    </div>
+        )
+      }
+      fullScreenPlayer={
+        isPlaying && player.state.showFullPlayer ? (
+          <FullScreenPlayer
+            state={player.state}
+            onTogglePlay={player.togglePlay}
+            onSeek={player.seek}
+            onSeekRelative={player.seekRelative}
+            onSetVolume={player.setVolume}
+            onSetLoop={player.setLoop}
+            onNext={player.nextTrack}
+            onPrev={player.prevTrack}
+            onSelectTrack={player.setTrackIndex}
+            onClose={() => player.setShowFullPlayer(false)}
+          />
+        ) : undefined
+      }
+      overlays={
+        <>
+          {showSettings && (
+            <SettingsModal
+              rootFolder={settings?.rootFolder ?? null}
+              lastScanTime={settings?.lastScanTime ?? null}
+              scanning={scanMutation.isPending}
+              onClose={() => setShowSettings(false)}
+              onScan={handleScan}
+              onChangeFolder={handleChangeFolder}
+              onExport={handleExport}
+            />
+          )}
+          {scanResult && (
+            <NewWorkPopup
+              scanResult={scanResult}
+              onClose={() => setScanResult(null)}
+            />
+          )}
+        </>
+      }
+    />
   );
 }

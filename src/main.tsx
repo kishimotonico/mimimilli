@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import App from "./App";
+import App from "./app/App";
 import Providers from "./app/Providers";
 import "./styles/tokens.css";
 import "./styles/tailwind.css";
