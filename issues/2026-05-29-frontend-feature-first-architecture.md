@@ -36,8 +36,17 @@
   - モック API と実サーバー API の切り替え時にも、UI 側の取得ロジックを安定させる
 - client/UI state は Jotai を採用する
   - feature 単位で atom を colocate し、巨大な store を作らない
-  - derived atom で preview mode や query params などの派生状態を表現する
+  - derived atom は「UI state のみから導出できる派生」に限定する（query params など）
+  - server state と UI state の両方に依存する派生（例: `previewMode` は `selectedWorkId`(UI) と `selectedWork`(server query) の両方に依存する）は derived atom にせず、コンポーネント側で `useQuery` の結果と atom 値を組み合わせて計算する。`jotai-tanstack-query` などの追加依存は当面入れない
   - atom の粒度を細かくし、React Context の広範囲 re-render を避ける
+
+レイヤー間の依存方向ルール:
+
+- import の許可方向は `app → features → entities → shared` の一方向のみとする
+- 上位レイヤーへの import（例: `entities` から `features` を参照）と、feature 間の直接 import は禁止する
+  - feature 間で共有が必要なものは `entities` か `shared` に引き上げる
+  - 例: `WorkSummary` は library / player / scan から参照されるため `entities/work` に置き、各 feature はそこを import する
+- このルールにより循環依存を防ぐ（特に player が work 型を使う箇所で重要）
 - 高頻度に更新される audio currentTime は慎重に扱う
   - すべてを Jotai に流すと不要な re-render を増やしやすい
   - player feature 内で購読範囲を限定するか、audio engine から必要な UI だけへ通知する
@@ -171,6 +180,7 @@ src/
   - 一時的な input draft
   - hover / focus
   - そのコンポーネント内だけで閉じる小さな UI state
+- **derived atom の設計制約**: server state（Query）と UI state（Jotai atom）の両方に依存する派生値（例: `previewMode`）は Jotai derived atom にしない。コンポーネント内で `useQuery` の結果と atom を組み合わせて計算する。この制約を意識した上で atom 設計を行う
 
 ### Phase 1: API と型の境界を分ける
 
@@ -186,6 +196,10 @@ src/
   - `features/scan/model.ts`: `ScanResult`
   - `features/settings/model.ts`: `Settings`
 - 互換のため、一時的に `src/types.ts` は re-export ファイルとして残してもよい
+- **テスト import の追従に注意**: `tsconfig.json` は `exclude: ["src/test"]` のため、`pnpm build`(tsc) はテストを型チェックしない。テスト破壊はビルドでは検知できず、`pnpm test`(vitest) でのみ顕在化する
+  - 現状テストは `src/test/api.test.ts`(`../api`)、`src/test/types.test.ts`(`../types`)、`src/test/usePlayer.test.ts`(`../hooks/usePlayer` の format 関数) を import している
+  - `types.ts` だけでなく `api.ts`・`usePlayer` の format 関数も、移動するなら **re-export shim を残すか、同じコミットでテスト import を更新する**
+  - 各ファイル移動の後は build だけでなく **必ず `pnpm test` を実行**して確認する
 
 ### Phase 2: Library feature を切り出す
 
@@ -195,6 +209,7 @@ src/
 - 作品一覧、分類軸、作品詳細、スマートフォルダー取得を TanStack Query 化する
 - active axis / drill value / selected tags / selected work id を Jotai atom 化する
 - scan 後の一覧更新は `scanVersion` prop ではなく query invalidation で行う
+  - ただし `scanVersion` は現状 App.tsx が所有し（scan トリガー）LibraryView が消費している。完全に撤去できるのは、scan を Query mutation 化して invalidation を発行する側（App / scan feature）と、works/facets を `useQuery` 化する消費側（library feature）の両方が揃ってから。Phase 2 と scan feature 化（Phase 4 で扱う App orchestration）の協調が必要なので、移行途中は `scanVersion` を一時的に残してよい
 - `LibraryView.tsx` は container として薄く保ち、表示コンポーネントに props を渡すだけに近づける
 - smart folder 作成処理は UI 内の inline callback ではなく、feature action として整理する
 
@@ -205,6 +220,7 @@ src/
 - DOM Audio / Web Audio API 操作を `audioEngine.ts` に切り出す
 - resume persistence は `usePlayer` 内に直書きせず、player API または work API 経由に寄せる
 - `formatTime` / `formatDuration` / `formatFileSize` は `shared/lib/format.ts` へ移動する
+  - `src/test/usePlayer.test.ts` はこれらを `../hooks/usePlayer` から import しているため、移動時に同じコミットでテスト import を `../../shared/lib/format` などへ更新するか re-export を残す（Phase 1 の「テスト追従」注意と同様）
 - player の UI state は Jotai atom に寄せるが、audio engine の高頻度イベントは購読範囲を限定する
 - resume 保存や last played 更新は TanStack Query mutation または feature API 経由にする
 
@@ -250,6 +266,8 @@ src/
 - `src/api.ts` と `src/types.ts` が巨大な集約ファイルではなくなっている
 - `LibraryView.tsx` の責務が UI composition 中心になっている
 - `usePlayer.ts` から低レベル audio 操作が分離されている
+- Query に移行した箇所で `isLoading`/`isError` が UI に反映されており、`.catch(() => {})` の握り潰しが解消されている
+- `features → entities → shared` の依存方向ルールが守られており、feature 間の直接 import および上位レイヤーへの import が存在しない（移行後に rg で確認できる水準）
 
 ## リスク
 
