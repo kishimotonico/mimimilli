@@ -1,5 +1,7 @@
 import { useEffect } from "react";
+import { useAtomValue } from "jotai";
 import type { PlayerState } from "../model/usePlayer";
+import { playerCurrentTimeAtom, playerDurationAtom } from "../model/atoms";
 import { formatTime } from "../../../shared/lib/format";
 import CoverImg from "../../../components/CoverImg";
 import { I } from "../../../components/Icon";
@@ -29,7 +31,10 @@ export default function FullScreenPlayer({
   onSelectTrack,
   onClose,
 }: FullScreenPlayerProps) {
-  const { currentWork, isPlaying, currentTime, duration, volume, loop, tracks, currentTrackIndex } = state;
+  // currentTime / duration は高頻度 atom から直接読む（App.tsx を re-render させない）
+  const currentTime = useAtomValue(playerCurrentTimeAtom);
+  const duration = useAtomValue(playerDurationAtom);
+  const { currentWork, isPlaying, volume, loop, tracks, currentTrackIndex } = state;
   const track = tracks[currentTrackIndex] ?? null;
   const pct = duration > 0 ? (currentTime / duration) * 100 : 0;
 

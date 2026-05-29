@@ -1,276 +1,175 @@
-import { useState, useRef, useCallback, useEffect } from "react";
-import type { Track, WorkSummary, Work } from "../../../types";
-import * as api from "../../../api";
+// player feature の React フック。
+// audioEngine（低レベル Audio 操作）と Jotai atoms（state）を橋渡しする。
+//
+// 高頻度更新（currentTime / duration）は atoms から直接 subscribe せず useSetAtom で書くだけ。
+// → App.tsx が player を使っても timeupdate による re-render が起きない。
+// → TransportBar / FullScreenPlayer だけが playerCurrentTimeAtom を subscribe する。
 
-export interface PlayerState {
-  isPlaying: boolean;
-  currentTrackIndex: number;
-  currentWork: WorkSummary | Work | null;
-  tracks: Track[];
-  currentTime: number;
-  duration: number;
-  volume: number;
-  loop: boolean;
-  showFullPlayer: boolean;
-  playbackRate: number;
-  channelSwap: boolean;
-  abRepeat: { a: number | null; b: number | null };
+import { useRef, useCallback, useEffect } from "react";
+import { useAtom, useSetAtom } from "jotai";
+import type { Track, WorkSummary, Work } from "../../../entities/work/model";
+import { saveResumePosition, updateLastPlayed } from "../api";
+import { createAudioEngine } from "./audioEngine";
+import {
+  playerCoreAtom,
+  playerCurrentTimeAtom,
+  playerDurationAtom,
+  type PlayerCoreState,
+} from "./atoms";
+import { formatTime, formatDuration, formatFileSize } from "../../../shared/lib/format";
+
+// ── 後方互換 re-export ─────────────────────────────────────────
+export { formatTime, formatDuration, formatFileSize };
+export type { PlayerCoreState };
+
+/**
+ * PlayerState: コンポーネントの props として渡す state。
+ * currentTime / duration は含まない — TransportBar / FullScreenPlayer は
+ * playerCurrentTimeAtom / playerDurationAtom から直接読む。
+ */
+export type PlayerState = PlayerCoreState;
+
+// ── pending resume ref の型 ───────────────────────────────────
+interface PendingResume {
+  workId: string;
+  trackIndex: number;
+  position: number;
 }
 
 export function usePlayer() {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const loopRef = useRef(false);
-  const abRepeatRef = useRef<{ a: number | null; b: number | null }>({ a: null, b: null });
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const channelSwapNodeRef = useRef<{ splitter: ChannelSplitterNode; merger: ChannelMergerNode } | null>(null);
-  const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
-  const channelSwapEnabledRef = useRef(false);
-  const playbackRateRef = useRef(1.0);
-  const resumeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pendingResumeRef = useRef<{ workId: string; trackIndex: number; position: number } | null>(null);
+  const [coreState, setCoreState] = useAtom(playerCoreAtom);
+  const setCurrentTime = useSetAtom(playerCurrentTimeAtom); // subscribe しない
+  const setDuration = useSetAtom(playerDurationAtom);       // subscribe しない
+
+  // loopRef: onEnded callback が最新の loop 値を参照するための ref
+  const loopRef = useRef(coreState.loop);
+  loopRef.current = coreState.loop;
+
+  const abRepeatRef = useRef(coreState.abRepeat);
+  abRepeatRef.current = coreState.abRepeat;
+
+  const pendingResumeRef = useRef<PendingResume | null>(null);
   const loadedTrackRef = useRef<{ workId: string; trackIndex: number } | null>(null);
 
-  const [state, setState] = useState<PlayerState>({
-    isPlaying: false,
-    currentTrackIndex: -1,
-    currentWork: null,
-    tracks: [],
-    currentTime: 0,
-    duration: 0,
-    volume: 75,
-    loop: false,
-    showFullPlayer: false,
-    playbackRate: 1.0,
-    channelSwap: false,
-    abRepeat: { a: null, b: null },
-  });
+  // Audio engine を useRef で保持（再マウントしない）
+  const engineRef = useRef<ReturnType<typeof createAudioEngine> | null>(null);
 
-  // Keep refs in sync with state
-  loopRef.current = state.loop;
-  abRepeatRef.current = state.abRepeat;
-  channelSwapEnabledRef.current = state.channelSwap;
-  playbackRateRef.current = state.playbackRate;
-
-  const resumeAudioContext = useCallback(() => {
-    const ctx = audioContextRef.current;
-    if (ctx?.state === "suspended") {
-      ctx.resume().catch(() => {});
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!audioRef.current) {
-      audioRef.current = new Audio();
-      audioRef.current.volume = state.volume / 100;
-    }
-
-    const audio = audioRef.current;
-
-    const onTimeUpdate = () => {
-      const ab = abRepeatRef.current;
-      if (ab.a !== null && ab.b !== null && audio.currentTime >= ab.b) {
-        audio.currentTime = ab.a;
-      }
-      setState((s) => ({ ...s, currentTime: audio.currentTime }));
-    };
-    const onDurationChange = () => {
-      setState((s) => ({ ...s, duration: audio.duration || 0 }));
-    };
-    const onEnded = () => {
-      if (loopRef.current) {
-        audio.currentTime = 0;
-        audio.play();
-      } else {
+  if (!engineRef.current) {
+    engineRef.current = createAudioEngine(coreState.volume, {
+      onPlay: () => setCoreState((s) => ({ ...s, isPlaying: true })),
+      onPause: () => setCoreState((s) => ({ ...s, isPlaying: false })),
+      onTimeUpdate: (time) => {
+        // A-B リピート（ref 経由で最新値を参照）
+        const ab = abRepeatRef.current;
+        if (ab.a !== null && ab.b !== null && time >= ab.b) {
+          engineRef.current?.seek(ab.a);
+        }
+        setCurrentTime(time);
+      },
+      onDurationChange: (dur) => setDuration(dur),
+      onEnded: () => {
+        if (loopRef.current) {
+          engineRef.current?.seek(0);
+          engineRef.current?.play();
+          return;
+        }
+        // トラック終了時に resume position を保存
         const loadedTrack = loadedTrackRef.current;
         if (loadedTrack) {
-          api.saveResumePosition(loadedTrack.workId, audio.duration || audio.currentTime, loadedTrack.trackIndex)
-            .catch(() => {});
+          const dur = engineRef.current?.getDuration() ?? 0;
+          saveResumePosition(loadedTrack.workId, dur, loadedTrack.trackIndex).catch(() => {});
         }
-        // Auto-advance to next track
-        setState((prev) => {
+        // 次トラックへ自動送り
+        setCoreState((prev) => {
           if (prev.currentTrackIndex < prev.tracks.length - 1) {
             return { ...prev, currentTrackIndex: prev.currentTrackIndex + 1 };
           }
           return { ...prev, isPlaying: false };
         });
+      },
+    });
+  }
+
+  const engine = engineRef.current;
+
+  // ── トラック変更時に読み込み・再生 ────────────────────────
+  const coreStateRef = useRef(coreState);
+  coreStateRef.current = coreState;
+
+  useEffect(() => {
+    const { currentTrackIndex, tracks, currentWork } = coreState;
+    if (currentTrackIndex < 0 || currentTrackIndex >= tracks.length || !currentWork) return;
+
+    const track = tracks[currentTrackIndex];
+    const workId = currentWork.id;
+    const encoded = track.file.split("/").map(encodeURIComponent).join("/");
+    const assetUrl = `/api/audio/${encodeURIComponent(workId)}/${encoded}`;
+
+    // 前トラックの位置を保存
+    const prev = loadedTrackRef.current;
+    if (prev && (prev.workId !== workId || prev.trackIndex !== currentTrackIndex)) {
+      const time = engine.getCurrentTime();
+      saveResumePosition(prev.workId, time, prev.trackIndex).catch(() => {});
+    }
+
+    // pending resume の確認
+    const pending = pendingResumeRef.current;
+    const pendingSeekSec =
+      pending?.workId === workId && pending.trackIndex === currentTrackIndex && pending.position > 0
+        ? pending.position
+        : undefined;
+
+    if (pendingSeekSec) {
+      pendingResumeRef.current = null;
+    }
+
+    const cleanup = engine.load(assetUrl, {
+      playbackRate: coreState.playbackRate,
+      startSec: pendingSeekSec === undefined && track.start !== undefined ? track.start : undefined,
+      pendingSeekSec,
+    });
+
+    loadedTrackRef.current = { workId, trackIndex: currentTrackIndex };
+    updateLastPlayed(workId).catch(() => {});
+
+    return cleanup;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coreState.currentTrackIndex, coreState.tracks, coreState.currentWork]);
+
+  // ── 定期 resume 保存 ──────────────────────────────────────
+  useEffect(() => {
+    if (!coreState.isPlaying || !coreState.currentWork) return;
+    const workId = coreState.currentWork.id;
+    const tid = setInterval(() => {
+      const loaded = loadedTrackRef.current;
+      if (loaded && loaded.workId === workId) {
+        saveResumePosition(workId, engine.getCurrentTime(), loaded.trackIndex).catch(() => {});
       }
-    };
-    const onPlay = () => setState((s) => ({ ...s, isPlaying: true }));
-    const onPause = () => setState((s) => ({ ...s, isPlaying: false }));
+    }, 5000);
+    return () => clearInterval(tid);
+  }, [coreState.isPlaying, coreState.currentWork, coreState.currentTrackIndex, engine]);
 
-    audio.addEventListener("timeupdate", onTimeUpdate);
-    audio.addEventListener("durationchange", onDurationChange);
-    audio.addEventListener("ended", onEnded);
-    audio.addEventListener("play", onPlay);
-    audio.addEventListener("pause", onPause);
+  // ── 一時停止時に resume 保存 ──────────────────────────────
+  useEffect(() => {
+    if (coreState.isPlaying || !coreState.currentWork || coreState.currentTrackIndex < 0) return;
+    const loaded = loadedTrackRef.current;
+    if (loaded) {
+      saveResumePosition(loaded.workId, engine.getCurrentTime(), loaded.trackIndex).catch(() => {});
+    }
+  }, [coreState.isPlaying, coreState.currentWork, coreState.currentTrackIndex, engine]);
 
-    return () => {
-      audio.removeEventListener("timeupdate", onTimeUpdate);
-      audio.removeEventListener("durationchange", onDurationChange);
-      audio.removeEventListener("ended", onEnded);
-      audio.removeEventListener("play", onPlay);
-      audio.removeEventListener("pause", onPause);
-    };
+  // ── cleanup on unmount ────────────────────────────────────
+  useEffect(() => {
+    return () => { engine.destroy(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Save resume position periodically
-  useEffect(() => {
-    if (state.isPlaying && state.currentWork) {
-      const workId = state.currentWork.id;
-      resumeTimerRef.current = setInterval(() => {
-        if (audioRef.current && state.currentWork?.id === workId) {
-          api.saveResumePosition(workId, audioRef.current.currentTime, state.currentTrackIndex)
-            .catch(() => {});
-        }
-      }, 5000);
-    }
-    return () => {
-      if (resumeTimerRef.current) {
-        clearInterval(resumeTimerRef.current);
-        resumeTimerRef.current = null;
-      }
-    };
-  }, [state.isPlaying, state.currentWork, state.currentTrackIndex]);
-
-  // Save resume on pause/stop
-  useEffect(() => {
-    if (!state.isPlaying && state.currentWork && audioRef.current && state.currentTrackIndex >= 0) {
-      api.saveResumePosition(state.currentWork.id, audioRef.current.currentTime, state.currentTrackIndex)
-        .catch(() => {});
-    }
-  }, [state.isPlaying, state.currentWork, state.currentTrackIndex]);
-
-  // Load and play when track index changes
-  useEffect(() => {
-    if (
-      state.currentTrackIndex >= 0 &&
-      state.currentTrackIndex < state.tracks.length &&
-      state.currentWork &&
-      audioRef.current
-    ) {
-      const track = state.tracks[state.currentTrackIndex];
-      const workId = state.currentWork.id;
-      const encoded = track.file.split("/").map(encodeURIComponent).join("/");
-      const assetUrl = `/api/audio/${encodeURIComponent(workId)}/${encoded}`;
-      const audio = audioRef.current;
-      const previousTrack = loadedTrackRef.current;
-
-      if (
-        previousTrack &&
-        (previousTrack.workId !== workId || previousTrack.trackIndex !== state.currentTrackIndex)
-      ) {
-        api.saveResumePosition(previousTrack.workId, audio.currentTime, previousTrack.trackIndex)
-          .catch(() => {});
-      }
-
-      const pendingResume = pendingResumeRef.current;
-      const shouldResume =
-        pendingResume?.workId === workId &&
-        pendingResume.trackIndex === state.currentTrackIndex &&
-        pendingResume.position > 0;
-
-      const seekAfterMetadata = () => {
-        if (shouldResume) {
-          audio.currentTime = pendingResume.position;
-          pendingResumeRef.current = null;
-          audio.removeEventListener("loadedmetadata", seekAfterMetadata);
-          audio.removeEventListener("canplay", seekAfterMetadata);
-        }
-      };
-
-      if (shouldResume) {
-        audio.addEventListener("loadedmetadata", seekAfterMetadata, { once: true });
-        audio.addEventListener("canplay", seekAfterMetadata, { once: true });
-      }
-
-      audio.src = assetUrl;
-      audio.playbackRate = playbackRateRef.current;
-
-      if (shouldResume && audio.readyState >= HTMLMediaElement.HAVE_METADATA) {
-        seekAfterMetadata();
-      } else if (!shouldResume && track.start !== undefined) {
-        audio.currentTime = track.start;
-      }
-
-      resumeAudioContext();
-      audio.play().catch(() => {});
-      loadedTrackRef.current = { workId, trackIndex: state.currentTrackIndex };
-
-      // Update last played
-      api.updateLastPlayed(state.currentWork.id).catch(() => {});
-
-      return () => {
-        audio.removeEventListener("loadedmetadata", seekAfterMetadata);
-        audio.removeEventListener("canplay", seekAfterMetadata);
-      };
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.currentTrackIndex, state.tracks, state.currentWork, resumeAudioContext]);
-
-  // Setup Web Audio API for channel swap
-  const setupChannelSwap = useCallback(() => {
-    if (!audioRef.current) return;
-    if (audioContextRef.current) return; // already set up
-
-    const ctx = new AudioContext();
-    audioContextRef.current = ctx;
-    ctx.resume().catch(() => {});
-
-    const source = ctx.createMediaElementSource(audioRef.current);
-    sourceNodeRef.current = source;
-
-    const splitter = ctx.createChannelSplitter(2);
-    const merger = ctx.createChannelMerger(2);
-    channelSwapNodeRef.current = { splitter, merger };
-
-    // Connect normally first
-    source.connect(ctx.destination);
-  }, []);
-
-  const applyChannelSwap = useCallback((enabled: boolean) => {
-    if (!audioContextRef.current || !sourceNodeRef.current || !channelSwapNodeRef.current) {
-      if (enabled) {
-        setupChannelSwap();
-        // retry after setup
-        setTimeout(() => {
-          if (audioContextRef.current && sourceNodeRef.current && channelSwapNodeRef.current) {
-            applyChannelSwapInternal(enabled);
-          }
-        }, 100);
-        return;
-      }
-      return;
-    }
-    applyChannelSwapInternal(enabled);
-  }, [setupChannelSwap]);
-
-  const applyChannelSwapInternal = (enabled: boolean) => {
-    const ctx = audioContextRef.current!;
-    const source = sourceNodeRef.current!;
-    const { splitter, merger } = channelSwapNodeRef.current!;
-
-    if (ctx.state === "suspended") {
-      ctx.resume().catch(() => {});
-    }
-
-    source.disconnect();
-
-    if (enabled) {
-      source.connect(splitter);
-      splitter.connect(merger, 0, 1); // L -> R
-      splitter.connect(merger, 1, 0); // R -> L
-      merger.connect(ctx.destination);
-    } else {
-      source.connect(ctx.destination);
-    }
-  };
+  // ── アクション ────────────────────────────────────────────
 
   const play = useCallback(
     (work: WorkSummary | Work, tracks: Track[], trackIndex: number = 0) => {
-      // Clear A-B repeat on new play
       pendingResumeRef.current = null;
-      setState((prev) => ({
+      setCoreState((prev) => ({
         ...prev,
         currentWork: work,
         tracks,
@@ -279,20 +178,23 @@ export function usePlayer() {
         abRepeat: { a: null, b: null },
       }));
     },
-    []
+    [setCoreState]
   );
 
   const playWithResume = useCallback(
     (work: Work) => {
-      const defaultPlaylist = work.playlists.find(
-        (p) => p.name === (work.defaultPlaylist || "default")
-      );
-      const tracks = defaultPlaylist?.tracks || work.playlists[0]?.tracks || [];
+      const playlist = work.playlists.find((p) => p.name === (work.defaultPlaylist ?? "default"))
+        ?? work.playlists[0];
+      const tracks = playlist?.tracks ?? [];
       if (tracks.length === 0) return;
 
       const trackIndex = Math.min(work.resumeTrackIndex, tracks.length - 1);
 
-      setState((prev) => ({
+      if (work.resumePosition > 0) {
+        pendingResumeRef.current = { workId: work.id, trackIndex, position: work.resumePosition };
+      }
+
+      setCoreState((prev) => ({
         ...prev,
         currentWork: work,
         tracks,
@@ -300,133 +202,98 @@ export function usePlayer() {
         isPlaying: true,
         abRepeat: { a: null, b: null },
       }));
-
-      if (work.resumePosition > 0) {
-        pendingResumeRef.current = {
-          workId: work.id,
-          trackIndex,
-          position: work.resumePosition,
-        };
-      }
     },
-    []
+    [setCoreState]
   );
 
   const togglePlay = useCallback(() => {
-    if (!audioRef.current) return;
-    if (audioRef.current.paused) {
-      resumeAudioContext();
-      audioRef.current.play();
+    if (coreState.isPlaying) {
+      engine.pause();
     } else {
-      audioRef.current.pause();
+      engine.play();
     }
-  }, [resumeAudioContext]);
+  }, [coreState.isPlaying, engine]);
 
   const stop = useCallback(() => {
-    if (audioRef.current) {
-      const loadedTrack = loadedTrackRef.current;
-      if (loadedTrack) {
-        api.saveResumePosition(loadedTrack.workId, audioRef.current.currentTime, loadedTrack.trackIndex)
-          .catch(() => {});
-      }
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
+    const loaded = loadedTrackRef.current;
+    if (loaded) {
+      saveResumePosition(loaded.workId, engine.getCurrentTime(), loaded.trackIndex).catch(() => {});
     }
+    engine.pause();
+    engine.seek(0);
     loadedTrackRef.current = null;
     pendingResumeRef.current = null;
-    setState((prev) => ({
+    setCoreState((prev) => ({
       ...prev,
       isPlaying: false,
       currentTrackIndex: -1,
       currentWork: null,
       tracks: [],
     }));
-  }, []);
+  }, [engine, setCoreState]);
 
-  const seek = useCallback((time: number) => {
-    if (audioRef.current) {
-      audioRef.current.currentTime = time;
-    }
-  }, []);
-
-  const seekRelative = useCallback((delta: number) => {
-    if (audioRef.current) {
-      audioRef.current.currentTime = Math.max(
-        0,
-        Math.min(audioRef.current.duration, audioRef.current.currentTime + delta)
-      );
-    }
-  }, []);
+  const seek = useCallback((time: number) => engine.seek(time), [engine]);
+  const seekRelative = useCallback((delta: number) => engine.seekRelative(delta), [engine]);
 
   const setVolume = useCallback((vol: number) => {
-    const v = Math.max(0, Math.min(100, vol));
-    if (audioRef.current) {
-      audioRef.current.volume = v / 100;
-    }
-    setState((prev) => ({ ...prev, volume: v }));
-  }, []);
+    engine.setVolume(vol);
+    setCoreState((prev) => ({ ...prev, volume: Math.max(0, Math.min(100, vol)) }));
+  }, [engine, setCoreState]);
 
   const setLoop = useCallback((loop: boolean) => {
-    setState((prev) => ({ ...prev, loop }));
-  }, []);
+    setCoreState((prev) => ({ ...prev, loop }));
+  }, [setCoreState]);
 
   const nextTrack = useCallback(() => {
-    setState((prev) => {
+    setCoreState((prev) => {
       if (prev.currentTrackIndex < prev.tracks.length - 1) {
         return { ...prev, currentTrackIndex: prev.currentTrackIndex + 1, abRepeat: { a: null, b: null } };
       }
       return prev;
     });
-  }, []);
+  }, [setCoreState]);
 
   const prevTrack = useCallback(() => {
-    setState((prev) => {
+    setCoreState((prev) => {
       if (prev.currentTrackIndex > 0) {
         return { ...prev, currentTrackIndex: prev.currentTrackIndex - 1, abRepeat: { a: null, b: null } };
       }
       return prev;
     });
-  }, []);
+  }, [setCoreState]);
 
   const setTrackIndex = useCallback((index: number) => {
-    setState((prev) => ({ ...prev, currentTrackIndex: index, abRepeat: { a: null, b: null } }));
-  }, []);
+    setCoreState((prev) => ({ ...prev, currentTrackIndex: index, abRepeat: { a: null, b: null } }));
+  }, [setCoreState]);
 
   const setShowFullPlayer = useCallback((show: boolean) => {
-    setState((prev) => ({ ...prev, showFullPlayer: show }));
-  }, []);
+    setCoreState((prev) => ({ ...prev, showFullPlayer: show }));
+  }, [setCoreState]);
 
   const setPlaybackRate = useCallback((rate: number) => {
-    if (audioRef.current) {
-      audioRef.current.playbackRate = rate;
-    }
-    setState((prev) => ({ ...prev, playbackRate: rate }));
-  }, []);
+    engine.setPlaybackRate(rate);
+    setCoreState((prev) => ({ ...prev, playbackRate: rate }));
+  }, [engine, setCoreState]);
 
   const setChannelSwap = useCallback((enabled: boolean) => {
-    resumeAudioContext();
-    applyChannelSwap(enabled);
-    setState((prev) => ({ ...prev, channelSwap: enabled }));
-  }, [applyChannelSwap, resumeAudioContext]);
+    engine.setChannelSwap(enabled);
+    setCoreState((prev) => ({ ...prev, channelSwap: enabled }));
+  }, [engine, setCoreState]);
 
   const setABPoint = useCallback((point: "a" | "b") => {
-    if (!audioRef.current) return;
-    const time = audioRef.current.currentTime;
-    setState((prev) => ({
+    const time = engine.getCurrentTime();
+    setCoreState((prev) => ({
       ...prev,
       abRepeat: { ...prev.abRepeat, [point]: time },
     }));
-  }, []);
+  }, [engine, setCoreState]);
 
   const clearABRepeat = useCallback(() => {
-    setState((prev) => ({
-      ...prev,
-      abRepeat: { a: null, b: null },
-    }));
-  }, []);
+    setCoreState((prev) => ({ ...prev, abRepeat: { a: null, b: null } }));
+  }, [setCoreState]);
 
   return {
-    state,
+    state: coreState,
     play,
     playWithResume,
     togglePlay,
@@ -445,6 +312,3 @@ export function usePlayer() {
     clearABRepeat,
   };
 }
-
-// 後方互換 re-export。新規コードは shared/lib/format を直接 import すること。
-export { formatTime, formatDuration, formatFileSize } from "../../../shared/lib/format";
