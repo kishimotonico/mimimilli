@@ -1,4 +1,4 @@
-import { I } from "../Icon";
+import { I } from "../../shared/ui/Icon";
 
 interface TopBarProps {
   mode?: "library" | "files";

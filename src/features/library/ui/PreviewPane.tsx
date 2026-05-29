@@ -1,7 +1,7 @@
 import type { Work, SmartFolder, WorkSummary, AxisId } from "../../../types";
-import CoverImg from "../../../components/CoverImg";
-import Tag from "../../../components/Tag";
-import { I } from "../../../components/Icon";
+import CoverImg from "../../../entities/work/ui/CoverImg";
+import Tag from "../../../entities/work/ui/Tag";
+import { I } from "../../../shared/ui/Icon";
 import { formatDuration } from "../../../shared/lib/format";
 
 function formatDate(iso: string): string {

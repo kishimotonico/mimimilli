@@ -1,6 +1,6 @@
 import type { WorkSummary } from "../../../types";
-import CoverImg from "../../../components/CoverImg";
-import { I } from "../../../components/Icon";
+import CoverImg from "../../../entities/work/ui/CoverImg";
+import { I } from "../../../shared/ui/Icon";
 import { formatDuration } from "../../../shared/lib/format";
 
 interface WorkRowProps {

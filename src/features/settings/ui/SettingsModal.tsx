@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { I } from "./Icon";
+import { I } from "../../../shared/ui/Icon";
 
 interface SettingsModalProps {
   rootFolder: string | null;

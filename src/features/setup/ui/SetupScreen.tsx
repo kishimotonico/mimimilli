@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { I } from "./Icon";
+import { I } from "../../../shared/ui/Icon";
 
 interface SetupScreenProps {
   onComplete: (path: string) => void;

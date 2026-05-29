@@ -1,4 +1,4 @@
-import { I } from "../Icon";
+import { I } from "../../shared/ui/Icon";
 
 interface LeftNavProps {
   mode?: "library" | "files";

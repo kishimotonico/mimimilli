@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import type { ScanResult, WorkSummary } from "../types";
-import * as api from "../api";
+import type { ScanResult, WorkSummary } from "../../../types";
+import * as api from "../../../api";
 
 interface NewWorkPopupProps {
   scanResult: ScanResult;

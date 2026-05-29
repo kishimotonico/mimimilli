@@ -1,5 +1,5 @@
-import { parseTag } from "../types";
-import { cn } from "../lib/cn";
+import { parseTag } from "../model";
+import { cn } from "../../../shared/lib/cn";
 
 interface TagProps {
   tag: string;

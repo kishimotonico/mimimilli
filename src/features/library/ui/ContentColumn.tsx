@@ -2,7 +2,7 @@ import React from "react";
 import type { WorkSummary, AxisFacetItem, AxisId } from "../../../types";
 import WorkRow from "./WorkRow";
 import DrillHeader from "./DrillHeader";
-import { I } from "../../../components/Icon";
+import { I } from "../../../shared/ui/Icon";
 
 interface ContentColumnProps {
   axis: AxisId;

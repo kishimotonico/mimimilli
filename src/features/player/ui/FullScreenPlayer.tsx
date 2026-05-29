@@ -3,8 +3,8 @@ import { useAtomValue } from "jotai";
 import type { PlayerState } from "../model/usePlayer";
 import { playerCurrentTimeAtom, playerDurationAtom } from "../model/atoms";
 import { formatTime } from "../../../shared/lib/format";
-import CoverImg from "../../../components/CoverImg";
-import { I } from "../../../components/Icon";
+import CoverImg from "../../../entities/work/ui/CoverImg";
+import { I } from "../../../shared/ui/Icon";
 
 interface FullScreenPlayerProps {
   state: PlayerState;
