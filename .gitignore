@@ -11,9 +11,12 @@ node_modules
 dist
 dist-ssr
 *.local
+*.tsbuildinfo
+test-results/
+playwright-report/
 
 # Rust build artifacts
-apps/server/target/
+server/target/
 
 # Editor directories and files
 .vscode/*
