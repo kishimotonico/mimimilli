@@ -105,7 +105,11 @@ BACKEND_URL=http://localhost:8080 pnpm dev
 
 ```
 mimikago/
-├── src/             # フロントエンド (React + TypeScript、再構築中)
+├── src/             # フロントエンド (React + TypeScript)
+│   ├── app/         # アプリルート・プロバイダー
+│   ├── features/    # 機能単位のモジュール (library/player/scan/settings/setup)
+│   ├── entities/    # ドメインエンティティ (work/)
+│   └── shared/      # 共通ユーティリティ・UI・API クライアント
 ├── apps/server/     # axum HTTP API サーバー (Rust)
 │   └── src/
 │       ├── main.rs          # ルーター定義
@@ -115,8 +119,12 @@ mimikago/
 │       ├── scanner.rs       # ファイルシステムスキャナー
 │       ├── dlsite.rs        # DLsite スクレイパー
 │       └── models.rs        # データモデル
-├── vite.config.ts   # 開発時モック API
-└── docs/            # 設計ドキュメント
+├── mocks/           # 開発用インメモリ API (fixtures/ + handlers/)
+├── tests/
+│   ├── unit/        # vitest 単体テスト
+│   └── visual/      # Playwright ビジュアルリグレッションテスト
+└── docs/            # 設計ドキュメント・デザイン資料
+    └── design_handoff_mimimilli_library/  # デザイン正典 (mimimilli)
 ```
 
 ## ライセンス
