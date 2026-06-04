@@ -44,7 +44,7 @@ git clone <repository-url>
 cd mimikago
 
 # フロントエンド依存関係
-pnpm install
+cd client && pnpm install
 
 # フロントエンド開発サーバー起動（モック API で動作）
 pnpm dev
@@ -55,12 +55,11 @@ pnpm dev
 
 ```bash
 # 別ターミナルでバックエンドを起動
-cd server
-cargo run
+cd server && cargo run
 # => http://localhost:8080
 
-# フロントをバックエンドへ向けて起動
-BACKEND_URL=http://localhost:8080 pnpm dev
+# フロントをバックエンドへ向けて起動（client/ で）
+cd client && BACKEND_URL=http://localhost:8080 pnpm dev
 ```
 
 `BACKEND_URL` を未設定のまま `pnpm dev` を実行すると、`vite.config.ts` 内のインメモリモック API が応答する（開発・UI確認用）。
@@ -105,12 +104,19 @@ BACKEND_URL=http://localhost:8080 pnpm dev
 
 ```
 mimikago/
-├── src/             # フロントエンド (React + TypeScript)
-│   ├── app/         # アプリルート・プロバイダー
-│   ├── features/    # 機能単位のモジュール (library/player/scan/settings/setup)
-│   ├── entities/    # ドメインエンティティ (work/)
-│   └── shared/      # 共通ユーティリティ・UI・API クライアント
-├── server/     # axum HTTP API サーバー (Rust)
+├── client/                  # フロントエンド (React 19 + TypeScript + Vite)
+│   ├── src/
+│   │   ├── app/             # アプリルート・プロバイダー
+│   │   ├── features/        # 機能単位モジュール (library/player/scan/settings/setup)
+│   │   ├── entities/        # ドメインエンティティ (work/)
+│   │   └── shared/          # 共通ユーティリティ・UI・API クライアント
+│   ├── mocks/               # 開発用インメモリ API (fixtures/ + handlers/)
+│   ├── tests/
+│   │   ├── unit/            # vitest 単体テスト
+│   │   └── visual/          # Playwright ビジュアルリグレッションテスト
+│   ├── vite.config.ts
+│   └── package.json
+├── server/                  # axum HTTP API サーバー (Rust)
 │   └── src/
 │       ├── main.rs          # ルーター定義
 │       ├── handlers/        # HTTP ハンドラ
@@ -119,12 +125,10 @@ mimikago/
 │       ├── scanner.rs       # ファイルシステムスキャナー
 │       ├── dlsite.rs        # DLsite スクレイパー
 │       └── models.rs        # データモデル
-├── mocks/           # 開発用インメモリ API (fixtures/ + handlers/)
-├── tests/
-│   ├── unit/        # vitest 単体テスト
-│   └── visual/      # Playwright ビジュアルリグレッションテスト
-└── docs/            # 設計ドキュメント・デザイン資料
-    └── design_handoff_mimimilli_library/  # デザイン正典 (mimimilli)
+└── docs/                    # 設計ドキュメント・デザイン資料
+    ├── design_handoff_mimimilli_library/  # デザイン正典 (mimimilli)
+    ├── adr/                 # アーキテクチャ決定記録
+    └── issues/              # 作業記録
 ```
 
 ## ライセンス

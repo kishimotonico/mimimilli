@@ -40,15 +40,17 @@ search_presets -- 検索プリセット
 - Mutex poisoning対策: 全ての`lock()`に`map_err()`でエラー伝搬
 - JSON serialization: `unwrap_or_default()`ではなく`map_err()`でエラー伝搬
 
-### フロントエンド（React + TypeScript — src/）
+### フロントエンド（React + TypeScript — client/）
 
-**現在再構築中。** `src/api.ts` が `/api` を fetch ベースで呼び出す HTTP client として実装されている。型定義は `src/types.ts`。
+**現在再構築中。** `client/src/api.ts` が `/api` を fetch ベースで呼び出す HTTP client として実装されている。型定義は `client/src/types.ts`。
 
 ## 開発コマンド
 
+フロント・バックエンドはそれぞれのディレクトリで独立して操作する。
+
 ```bash
 # フロントエンド開発サーバー起動（モック API で動作）
-pnpm dev
+cd client && pnpm dev
 # => http://mimi.localhost:1355
 
 # バックエンドを起動
@@ -56,24 +58,24 @@ cd server && cargo run
 # => http://localhost:8080
 
 # フロントを実バックエンドに向けて起動
-BACKEND_URL=http://localhost:8080 pnpm dev
+cd client && BACKEND_URL=http://localhost:8080 pnpm dev
 
 # TypeScript型チェック
-npx tsc --noEmit
+cd client && npx tsc --noEmit
 
 # フロントエンドのみビルド
-npx vite build
+cd client && pnpm build
 
 # Rustのみチェック
-PATH="$HOME/.cargo/bin:$PATH" cargo check --manifest-path server/Cargo.toml
+cd server && PATH="$HOME/.cargo/bin:$PATH" cargo check
 
 # テスト
-pnpm test
+cd client && pnpm test
 ```
 
 `pnpm dev` は `PORTLESS_HTTPS=0 PORTLESS_PORT=1355` 付きで `portless` 経由の Vite を起動する。ブラウザからは常に `http://mimi.localhost:1355` でアクセスする。
 
-`BACKEND_URL` が未設定のとき、Vite の `vite.config.ts` 内インメモリモック API が `/api` リクエストを全て処理する（実ファイルは返さない）。
+`BACKEND_URL` が未設定のとき、`client/vite.config.ts` 内インメモリモック API が `/api` リクエストを全て処理する（実ファイルは返さない）。
 
 ## データフロー
 
