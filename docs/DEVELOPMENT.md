@@ -2,7 +2,7 @@
 
 ## アーキテクチャ
 
-### バックエンド（Rust — apps/server/）
+### バックエンド（Rust — server/）
 
 サービス層パターンを採用。
 
@@ -52,7 +52,7 @@ pnpm dev
 # => http://mimi.localhost:1355
 
 # バックエンドを起動
-cd apps/server && cargo run
+cd server && cargo run
 # => http://localhost:8080
 
 # フロントを実バックエンドに向けて起動
@@ -65,7 +65,7 @@ npx tsc --noEmit
 npx vite build
 
 # Rustのみチェック
-PATH="$HOME/.cargo/bin:$PATH" cargo check --manifest-path apps/server/Cargo.toml
+PATH="$HOME/.cargo/bin:$PATH" cargo check --manifest-path server/Cargo.toml
 
 # テスト
 pnpm test

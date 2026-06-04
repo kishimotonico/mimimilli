@@ -320,10 +320,10 @@ mimikago/
 └── sample-library/
 ```
 
-Rust を使うなら、`apps/server` の内部は概ね以下。
+Rust を使うなら、`server` の内部は概ね以下。
 
 ```text
-apps/server/src/
+server/src/
 ├── main.rs
 ├── api/
 ├── application/
@@ -349,7 +349,7 @@ apps/server/src/
 ## Phase 1: サーバー化 [完了]
 
 - 既存 Rust サービス層を Tauri command から切り離す
-- axum で HTTP 化（`apps/server`）
+- axum で HTTP 化（`server`）
 - `/api/...` エンドポイントを実装
 - スキャン、一覧、詳細、タグ更新、レジューム保存まで移植
 

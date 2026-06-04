@@ -55,7 +55,7 @@ pnpm dev
 
 ```bash
 # 別ターミナルでバックエンドを起動
-cd apps/server
+cd server
 cargo run
 # => http://localhost:8080
 
@@ -110,7 +110,7 @@ mimikago/
 │   ├── features/    # 機能単位のモジュール (library/player/scan/settings/setup)
 │   ├── entities/    # ドメインエンティティ (work/)
 │   └── shared/      # 共通ユーティリティ・UI・API クライアント
-├── apps/server/     # axum HTTP API サーバー (Rust)
+├── server/     # axum HTTP API サーバー (Rust)
 │   └── src/
 │       ├── main.rs          # ルーター定義
 │       ├── handlers/        # HTTP ハンドラ
