@@ -1,6 +1,6 @@
 # mimikago Web再設計 提案
 
-> **ステータス（2026年5月時点）:** axum サーバー化（旧 Phase 1）は完了済み。フロントエンドは mimimilli デザイン（`design_handoff_mimimilli_library/`）をベースに全面再構築中（旧フロントコンポーネントは廃棄予定）。バックエンドも新スコープ（軸ファセット集計・タグAND検索・スマートフォルダー）に合わせて全面再構築。詳細は `docs/requirements-v4.md` を参照。
+> **ステータス（2026年5月時点）:** axum サーバー化（旧 Phase 1）は完了済み。フロントエンドは mimimilli デザイン（`docs/design_handoff_mimimilli_library/`）をベースに全面再構築中（旧フロントコンポーネントは廃棄予定）。バックエンドも新スコープ（軸ファセット集計・タグAND検索・スマートフォルダー）に合わせて全面再構築。詳細は `docs/requirements-v4.md` を参照。
 > 文書の提案内容は設計経緯の記録として維持する。
 
 ## 1. 結論
