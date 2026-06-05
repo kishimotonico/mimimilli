@@ -157,7 +157,7 @@ export const handleFs: MockHandler = ({ res, url, urlPath, method, state }) => {
   const parent = target === rootAbs ? null : target.slice(0, target.lastIndexOf("/")) || rootAbs;
 
   if (!dir) {
-    sendJson(res, { path: target, parent, entries: [] });
+    sendJson(res, { path: target, parent, workId: null, entries: [] });
     return true;
   }
 
@@ -172,6 +172,6 @@ export const handleFs: MockHandler = ({ res, url, urlPath, method, state }) => {
     workRelPath: c.workRelPath,
   }));
 
-  sendJson(res, { path: target, parent, entries });
+  sendJson(res, { path: target, parent, workId: dir.workId, entries });
   return true;
 };

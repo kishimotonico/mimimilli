@@ -7,8 +7,6 @@ interface FileRowProps {
   entry: FsEntry;
   /** 選択中エントリ本体（濃いハイライト） */
   isFocused: boolean;
-  /** パス上の祖先 dir（淡いハイライト・親カラムで cwd を示す） */
-  isActiveAncestor: boolean;
   /** このファイルが今再生中 */
   isPlaying: boolean;
   onClick: () => void;
@@ -17,7 +15,7 @@ interface FileRowProps {
 
 const IconSet = I as Record<string, (p: { size?: number }) => React.ReactElement>;
 
-export default function FileRow({ entry, isFocused, isActiveAncestor, isPlaying, onClick, onActivate }: FileRowProps) {
+export default function FileRow({ entry, isFocused, isPlaying, onClick, onActivate }: FileRowProps) {
   const kind = classifyFile(entry);
   const Ic = IconSet[FILE_KIND_ICON[kind]] ?? I.file;
   const isWorkFolder = entry.isDir && !!entry.workId;
@@ -26,8 +24,7 @@ export default function FileRow({ entry, isFocused, isActiveAncestor, isPlaying,
     "mle-row",
     FILE_KIND_ROW_CLASS[kind],
     isWorkFolder ? "is-folder-work" : "",
-    isFocused || isActiveAncestor ? "is-on" : "",
-    isFocused ? "is-focused" : "",
+    isFocused ? "is-on is-focused" : "",
     isPlaying ? "is-now" : "",
   ].filter(Boolean).join(" ");
 

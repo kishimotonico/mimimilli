@@ -1,19 +1,36 @@
 // FilesView: ファイルモード = 物理ファイルシステムのファイラー。
-// ルートフォルダー起点で実ディレクトリを巡回する。深い階層でもカラムを増やさず、
-// 末尾2階層（親 + カレント）+ プレビューだけ全幅を保ち、それ以前は受動スタックに畳む。
+// 表示は「現在開いているフォルダー1階層のみ」。子へ潜ると、その時点のカラムは
+// 左の受動スタックへ吸い込まれ（exit アニメ）、子のカラムが右からスライドインする。
 // 階層を遡るのはパンくず（アドレスバー）のみ。再生エンジンは Library と共通・常駐。
 
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { AnimatePresence, motion } from "motion/react";
+import { useAtomValue } from "jotai";
 import { browseFs } from "../api";
 import { useFilesNavigation } from "../model/useFilesNavigation";
-import { joinPath, rootLabel, type FsEntry } from "../model/types";
+import { filesDirectionAtom } from "../model/atoms";
+import { rootLabel, type FsEntry } from "../model/types";
 import FileColumn from "./FileColumn";
 import FilePreview from "./FilePreview";
 import StackEdge from "./StackEdge";
 
 export const FILES_KEYS = {
   dir: (path: string) => ["fs", path] as const,
+};
+
+const colVariants = {
+  enter: (dir: number) => ({ x: dir >= 0 ? "62%" : "-50%", opacity: 0, scaleX: dir >= 0 ? 1 : 0.9 }),
+  center: {
+    x: "0%", opacity: 1, scaleX: 1,
+    transition: { type: "spring" as const, stiffness: 470, damping: 40, mass: 0.8 },
+  },
+  exit: (dir: number) => ({
+    x: dir >= 0 ? "-55%" : "72%",
+    opacity: 0,
+    scaleX: dir >= 0 ? 0.42 : 1,
+    transition: { duration: 0.28, ease: [0.4, 0, 0.2, 1] as const },
+  }),
 };
 
 interface FilesViewProps {
@@ -27,21 +44,13 @@ interface FilesViewProps {
 
 export default function FilesView({ rootFolder, playingWorkId, playingRelPath, onPlayFile }: FilesViewProps) {
   const nav = useFilesNavigation(rootFolder);
-
-  const parentAbs = nav.relPath.length > 0 ? joinPath(rootFolder, nav.relPath.slice(0, -1)) : null;
+  const direction = useAtomValue(filesDirectionAtom);
 
   const cwdQuery = useQuery({
     queryKey: FILES_KEYS.dir(nav.cwd),
     queryFn: () => browseFs(nav.cwd),
   });
-  const parentQuery = useQuery({
-    queryKey: FILES_KEYS.dir(parentAbs ?? ""),
-    queryFn: () => browseFs(parentAbs!),
-    enabled: parentAbs !== null,
-  });
-
   const cwdEntries = cwdQuery.data?.entries ?? [];
-  const parentEntries = parentQuery.data?.entries ?? [];
 
   const matchPlaying = useMemo(
     () => (entry: FsEntry) =>
@@ -49,63 +58,66 @@ export default function FilesView({ rootFolder, playingWorkId, playingRelPath, o
     [playingWorkId, playingRelPath]
   );
 
-  // ── プレビュー対象の解決 ──────────────────────────────────
-  const previewEntry: FsEntry | null = useMemo(() => {
-    if (nav.selectedPath) {
-      return (
-        cwdEntries.find((e) => e.path === nav.selectedPath) ??
-        parentEntries.find((e) => e.path === nav.selectedPath) ??
-        null
-      );
-    }
-    // 未選択: カレント dir そのものを表示（ルートでは親に存在しないため null）
-    return parentEntries.find((e) => e.path === nav.cwd) ?? null;
-  }, [nav.selectedPath, nav.cwd, cwdEntries, parentEntries]);
-
-  const folderEntries =
-    previewEntry && previewEntry.isDir && previewEntry.path === nav.cwd ? cwdEntries : null;
-
   const cwdTitle = nav.relPath.length > 0 ? nav.relPath[nav.relPath.length - 1] : rootLabel(rootFolder);
-  const parentTitle = nav.relPath.length >= 2 ? nav.relPath[nav.relPath.length - 2] : rootLabel(rootFolder);
+
+  // ── プレビュー対象 ────────────────────────────────────────
+  // ファイル選択中はそのファイル、それ以外はカレント dir 自身。
+  const cwdFolderEntry: FsEntry = {
+    name: cwdTitle,
+    path: nav.cwd,
+    isDir: true,
+    size: 0,
+    fileType: "dir",
+    childCount: cwdEntries.length,
+    workId: cwdQuery.data?.workId ?? null,
+    workRelPath: null,
+  };
+  const fileSelection =
+    nav.selectedPath && nav.selectedPath !== nav.cwd
+      ? cwdEntries.find((e) => e.path === nav.selectedPath) ?? null
+      : null;
+  const previewEntry = fileSelection ?? cwdFolderEntry;
+  const folderEntries = previewEntry.isDir ? cwdEntries : null;
+
+  const hasAncestors = nav.relPath.length >= 1;
 
   return (
     <>
-      <div className="mle-cols">
-        {/* 末尾2階層より前の祖先は受動スタックに畳む */}
-        {nav.relPath.length >= 2 && <StackEdge />}
+      <AnimatePresence initial={false}>
+        {hasAncestors && <StackEdge key="stack" />}
+      </AnimatePresence>
 
-        {parentAbs !== null && (
-          <FileColumn
-            title={parentTitle}
-            entries={parentEntries}
-            activeAncestorPath={nav.cwd}
-            selectedPath={nav.selectedPath}
-            matchPlaying={matchPlaying}
-            onOpenDir={nav.openDir}
-            onSelectFile={nav.selectFile}
-            onPlayFile={onPlayFile}
-            isLoading={parentQuery.isPending}
-          />
-        )}
-
-        <FileColumn
-          title={cwdTitle}
-          entries={cwdEntries}
-          activeAncestorPath={null}
-          selectedPath={nav.selectedPath}
-          matchPlaying={matchPlaying}
-          onOpenDir={nav.openDir}
-          onSelectFile={nav.selectFile}
-          onPlayFile={onPlayFile}
-          isLoading={cwdQuery.isPending}
-        />
+      <div className="mle-filestage">
+        <AnimatePresence custom={direction} initial={false}>
+          <motion.div
+            key={nav.cwd}
+            className="mle-col is-wide mle-filestage__col"
+            custom={direction}
+            variants={colVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            style={{ transformOrigin: "left center" }}
+          >
+            <FileColumn
+              title={cwdTitle}
+              entries={cwdEntries}
+              selectedPath={nav.selectedPath}
+              matchPlaying={matchPlaying}
+              onOpenDir={nav.openDir}
+              onSelectFile={nav.selectFile}
+              onPlayFile={onPlayFile}
+              isLoading={cwdQuery.isPending}
+            />
+          </motion.div>
+        </AnimatePresence>
       </div>
 
       <FilePreview
         entry={previewEntry}
         folderEntries={folderEntries}
         depth={nav.addressPath.length}
-        isPlayingEntry={previewEntry != null && matchPlaying(previewEntry)}
+        isPlayingEntry={matchPlaying(previewEntry)}
         onPlay={onPlayFile}
       />
     </>

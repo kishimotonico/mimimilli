@@ -2,9 +2,9 @@
 // ルート絶対パス（settings 由来）を引数に取り、現在地（cwd）・選択・パンくずを束ねる。
 // 階層を遡るのはパンくず（goToSegment）のみ。受動スタックはクリックしない（正典 README 準拠）。
 
-import { useAtom } from "jotai";
+import { useAtom, useSetAtom } from "jotai";
 import { useCallback } from "react";
-import { filesRelPathAtom, filesSelectedPathAtom } from "./atoms";
+import { filesRelPathAtom, filesSelectedPathAtom, filesDirectionAtom } from "./atoms";
 import { joinPath, relSegments, rootLabel } from "./types";
 
 export interface FilesNav {
@@ -30,14 +30,16 @@ export interface FilesNav {
 export function useFilesNavigation(root: string): FilesNav {
   const [relPath, setRelPath] = useAtom(filesRelPathAtom);
   const [selectedPath, setSelectedPath] = useAtom(filesSelectedPathAtom);
+  const setDirection = useSetAtom(filesDirectionAtom);
 
   const cwd = joinPath(root, relPath);
   const addressPath = [rootLabel(root), ...relPath];
 
   const openDir = useCallback((absPath: string) => {
+    setDirection(1); // 子へ潜る
     setRelPath(relSegments(root, absPath));
     setSelectedPath(absPath);
-  }, [root, setRelPath, setSelectedPath]);
+  }, [root, setRelPath, setSelectedPath, setDirection]);
 
   const selectFile = useCallback((absPath: string) => {
     setSelectedPath(absPath);
@@ -45,9 +47,10 @@ export function useFilesNavigation(root: string): FilesNav {
 
   const goToSegment = useCallback((index: number) => {
     // index 0 = ルート、以降は子 segments。relPath を index 件に切り詰める。
+    setDirection(-1); // 親へ遡る
     setRelPath((prev) => prev.slice(0, index));
     setSelectedPath(null);
-  }, [setRelPath, setSelectedPath]);
+  }, [setRelPath, setSelectedPath, setDirection]);
 
   return { root, cwd, relPath, selectedPath, addressPath, openDir, selectFile, goToSegment };
 }

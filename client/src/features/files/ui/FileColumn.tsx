@@ -1,13 +1,13 @@
+// カラムの中身（ヘッダー + 行リスト）。外側の .mle-col 枠と出入りアニメーションは
+// FilesView 側の motion.div が担うため、ここはフラグメントを返す。
+
 import { classifyFile, sortEntries, type FsEntry } from "../model/types";
 import FileRow from "./FileRow";
 
 interface FileColumnProps {
   title: string;
   entries: FsEntry[];
-  /** このカラムで「開かれている子」の絶対パス（親カラムで cwd を示す）。無ければ null */
-  activeAncestorPath: string | null;
   selectedPath: string | null;
-  /** 再生中エントリの判定 */
   matchPlaying: (entry: FsEntry) => boolean;
   onOpenDir: (absPath: string) => void;
   onSelectFile: (absPath: string) => void;
@@ -16,12 +16,12 @@ interface FileColumnProps {
 }
 
 export default function FileColumn({
-  title, entries, activeAncestorPath, selectedPath, matchPlaying,
+  title, entries, selectedPath, matchPlaying,
   onOpenDir, onSelectFile, onPlayFile, isLoading,
 }: FileColumnProps) {
   const sorted = sortEntries(entries);
   return (
-    <div className="mle-col is-wide">
+    <>
       <div className="mle-col__hd">
         <span>{title}</span>
         <span className="count">{entries.length}</span>
@@ -45,7 +45,6 @@ export default function FileColumn({
                 key={entry.path}
                 entry={entry}
                 isFocused={entry.path === selectedPath}
-                isActiveAncestor={entry.path === activeAncestorPath}
                 isPlaying={matchPlaying(entry)}
                 onClick={onClick}
                 onActivate={onActivate}
@@ -54,7 +53,7 @@ export default function FileColumn({
           })
         )}
       </div>
-    </div>
+    </>
   );
 }
 

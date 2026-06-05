@@ -779,9 +779,25 @@
 .mle-bar1__stack.is-disabled:hover { background: var(--paper-0); color: var(--ink-1); border-color: var(--line); }
 .mle-bar1__divider { width: 1px; height: 30px; background: var(--line); flex-shrink: 0; }
 
-/* ── File mode — preview pane (mle-fprev) ─────────────────── */
+/* ── File mode — single column stage + preview ────────────── */
 
-.mle-prv.is-files { flex: 0 0 400px; min-width: 0; }
+/* 現在フォルダー1カラムを載せる舞台。出入りするカラムをクリップする */
+.mle-filestage {
+  position: relative;
+  flex: 0 0 300px;
+  overflow: hidden;
+  border-right: 1px solid var(--line);
+  background: var(--paper-0);
+}
+.mle-filestage__col {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  border-right: none;
+  will-change: transform, opacity;
+}
+
+.mle-prv.is-files { flex: 1; min-width: 0; }
 
 .mle-fprev { display: flex; flex-direction: column; gap: 16px; }
 .mle-fprev__media {

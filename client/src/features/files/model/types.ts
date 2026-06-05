@@ -24,6 +24,8 @@ export interface FsListing {
   path: string;
   /** 親 dir 絶対パス（ルートなら null） */
   parent: string | null;
+  /** この dir 自身が登録作品ルートなら作品 ID（cwd フォルダープレビュー用） */
+  workId: string | null;
   entries: FsEntry[];
 }
 
