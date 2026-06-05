@@ -19,18 +19,27 @@ export const FILES_KEYS = {
   dir: (path: string) => ["fs", path] as const,
 };
 
+// transformOrigin は左端（=スタック側）。子へ潜るとき、出ていくカラムは
+// 横方向に潰れながら左へ寄り、背表紙へ収束する。遡上時は背表紙から開き直す。
 const colVariants = {
-  enter: (dir: number) => ({ x: dir >= 0 ? "62%" : "-50%", opacity: 0, scaleX: dir >= 0 ? 1 : 0.9 }),
+  enter: (dir: number) =>
+    dir >= 0
+      ? { x: "60%", opacity: 0, scaleX: 1, scaleY: 1 }
+      : { x: "-8%", opacity: 0, scaleX: 0.28, scaleY: 0.94 },
   center: {
-    x: "0%", opacity: 1, scaleX: 1,
-    transition: { type: "spring" as const, stiffness: 470, damping: 40, mass: 0.8 },
+    x: "0%", opacity: 1, scaleX: 1, scaleY: 1,
+    transition: { type: "spring" as const, stiffness: 460, damping: 38, mass: 0.8 },
   },
-  exit: (dir: number) => ({
-    x: dir >= 0 ? "-55%" : "72%",
-    opacity: 0,
-    scaleX: dir >= 0 ? 0.42 : 1,
-    transition: { duration: 0.28, ease: [0.4, 0, 0.2, 1] as const },
-  }),
+  exit: (dir: number) =>
+    dir >= 0
+      ? {
+          x: "-6%", opacity: 0, scaleX: 0.05, scaleY: 0.86,
+          transition: { duration: 0.4, ease: [0.55, 0, 0.35, 1] as const },
+        }
+      : {
+          x: "75%", opacity: 0, scaleX: 0.92,
+          transition: { duration: 0.26, ease: [0.4, 0, 0.2, 1] as const },
+        },
 };
 
 interface FilesViewProps {
@@ -59,6 +68,7 @@ export default function FilesView({ rootFolder, playingWorkId, playingRelPath, o
   );
 
   const cwdTitle = nav.relPath.length > 0 ? nav.relPath[nav.relPath.length - 1] : rootLabel(rootFolder);
+  const parentName = nav.relPath.length >= 2 ? nav.relPath[nav.relPath.length - 2] : rootLabel(rootFolder);
 
   // ── プレビュー対象 ────────────────────────────────────────
   // ファイル選択中はそのファイル、それ以外はカレント dir 自身。
@@ -84,7 +94,9 @@ export default function FilesView({ rootFolder, playingWorkId, playingRelPath, o
   return (
     <>
       <AnimatePresence initial={false}>
-        {hasAncestors && <StackEdge key="stack" />}
+        {hasAncestors && (
+          <StackEdge key="stack" parentName={parentName} depth={nav.relPath.length} onUp={nav.goUp} />
+        )}
       </AnimatePresence>
 
       <div className="mle-filestage">

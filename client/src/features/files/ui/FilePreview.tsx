@@ -15,7 +15,7 @@ import {
 const IconSet = I as Record<string, (p: { size?: number }) => React.ReactElement>;
 
 interface FilePreviewProps {
-  /** 選択中エントリ（ファイル or dir）。null ならカレント dir そのもの */
+  /** 選択中エントリ（ファイル or dir）。null ならプレビューなし */
   entry: FsEntry | null;
   /** entry が dir のときその直下エントリ（種別内訳・全wav再生に使用） */
   folderEntries: FsEntry[] | null;
@@ -27,27 +27,99 @@ interface FilePreviewProps {
 
 export default function FilePreview({ entry, folderEntries, depth, isPlayingEntry, onPlay }: FilePreviewProps) {
   const kind = entry ? classifyFile(entry) : null;
-  const isDir = !entry || kind === "dir";
+  const isDir = kind === "dir";
+  const canServe = !!entry && !!entry.workId && !!entry.workRelPath;
+  const showImage = kind === "image" && canServe;
+
+  const label = isDir ? "フォルダー · 物理" : kind ? `${FILE_KIND_LABEL[kind]} · 物理` : "プレビュー";
+  const audioFiles = isDir ? (folderEntries ?? []).filter((e) => classifyFile(e) === "audio") : [];
+  const breakdown = isDir && folderEntries ? summarizeKinds(folderEntries) : [];
+  const isWorkFolder = isDir && !!entry?.workId;
 
   return (
     <div className="mle-prv is-files">
       <div className="mle-prv__hd">
-        <span className="label">{isDir ? "フォルダー · 物理" : `${FILE_KIND_LABEL[kind!]} · 物理`}</span>
-        {entry && !isDir && <span className="pill" style={{ marginLeft: "auto" }}>{kind?.toUpperCase()}</span>}
-        {isDir && <span className="pill" style={{ marginLeft: "auto" }}>深さ {depth} 階層</span>}
+        <span className="label">{label}</span>
+        {entry && (
+          <span className="pill" style={{ marginLeft: "auto" }}>
+            {isDir ? `深さ ${depth} 階層` : kind?.toUpperCase()}
+          </span>
+        )}
       </div>
+
       <div className="mle-prv__body">
         {!entry ? (
           <EmptyPreview />
-        ) : isDir ? (
-          <FolderPreview entry={entry} folderEntries={folderEntries} onPlay={onPlay} />
         ) : (
-          <FileBody entry={entry} kind={kind!} isPlayingEntry={isPlayingEntry} onPlay={onPlay} />
+          <div className="mle-fprev">
+            {showImage ? (
+              <ImageMedia workId={entry.workId!} relPath={entry.workRelPath!} name={entry.name} kind={kind!} />
+            ) : (
+              <Hero kind={kind!} entry={entry} isWorkFolder={isWorkFolder} />
+            )}
+
+            {breakdown.length > 0 && (
+              <div className="mle-fprev__chips">
+                {breakdown.map(({ kind: k, count }) => {
+                  const Ic = IconSet[FILE_KIND_ICON[k]] ?? I.file;
+                  return (
+                    <span key={k} className="mle-fprev__chip">
+                      <Ic size={12} />
+                      {FILE_KIND_LABEL[k]} <b>{count}</b>
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+
+            {kind === "audio" && (
+              <div className="mle-fprev__actions">
+                <button className="mll-fab is-primary" onClick={() => onPlay(entry)} disabled={!canServe}>
+                  {isPlayingEntry ? <><I.audio size={12} /> 再生中</> : <><I.play size={12} /> このファイルを再生</>}
+                </button>
+              </div>
+            )}
+            {isDir && audioFiles.length > 0 && (
+              <div className="mle-fprev__actions">
+                <button className="mll-fab is-primary" onClick={() => onPlay(audioFiles[0])} disabled={!audioFiles[0].workId}>
+                  <I.play size={12} /> 先頭の音声を再生
+                </button>
+              </div>
+            )}
+
+            <MetaGrid rows={metaRows(entry, kind!, isDir, isWorkFolder)} />
+
+            {!isDir && !canServe && kind !== "other" && (
+              <p className="mle-fprev__note">このファイルは登録作品の外にあるため、プレビュー / 再生はできません。</p>
+            )}
+            {!isDir && canServe && (kind === "pdf" || kind === "text" || kind === "video") && (
+              <p className="mle-fprev__note">
+                {kind === "video" ? "動画" : kind === "pdf" ? "PDF" : "テキスト"}の埋め込みプレビューは未対応です。
+              </p>
+            )}
+          </div>
         )}
       </div>
     </div>
   );
 }
+
+function metaRows(entry: FsEntry, kind: FileKind, isDir: boolean, isWorkFolder: boolean): [string, string][] {
+  if (isDir) {
+    return [
+      ["項目数", `${entry.childCount} 件`],
+      ["種類", isWorkFolder ? "登録作品フォルダー" : "フォルダー"],
+      ["パス", entry.path],
+    ];
+  }
+  return [
+    ["種類", FILE_KIND_LABEL[kind]],
+    ["サイズ", formatFileSize(entry.size)],
+    ["パス", entry.path],
+  ];
+}
+
+// ── 空 ────────────────────────────────────────────────────────
 
 function EmptyPreview() {
   return (
@@ -58,116 +130,41 @@ function EmptyPreview() {
   );
 }
 
-// ── フォルダー ────────────────────────────────────────────────
+// ── コンパクトなヒーロー（巨大な空ボックスを置かない） ──────────
 
-function FolderPreview({ entry, folderEntries, onPlay }: { entry: FsEntry; folderEntries: FsEntry[] | null; onPlay: (e: FsEntry) => void }) {
-  const breakdown = folderEntries ? summarizeKinds(folderEntries) : [];
-  const audioFiles = (folderEntries ?? []).filter((e) => classifyFile(e) === "audio");
-  const isWork = !!entry.workId;
-
+function Hero({ kind, entry, isWorkFolder }: { kind: FileKind; entry: FsEntry; isWorkFolder: boolean }) {
+  const Ic = IconSet[FILE_KIND_ICON[kind]] ?? I.file;
+  const badge = isWorkFolder ? (entry.workId!.startsWith("RJ") ? "RJ" : "作品") : null;
   return (
-    <div className="mle-fprev">
-      <div className="mle-fprev__media is-icon">
-        <I.folder size={64} />
-      </div>
-      <div>
+    <div className={`mle-fprev__hero is-${kind}`}>
+      <span className="ic"><Ic size={28} /></span>
+      <div className="bd">
         <div className="mle-fprev__name">
-          {isWork && <span className="wbadge">{entry.workId!.startsWith("RJ") ? "RJ" : "作品"}</span>}
+          {badge && <span className="wbadge">{badge}</span>}
           {entry.name}
         </div>
         <div className="mle-fprev__path">{entry.path}</div>
       </div>
-
-      {breakdown.length > 0 && (
-        <div className="mle-fprev__chips">
-          {breakdown.map(({ kind, count }) => {
-            const Ic = IconSet[FILE_KIND_ICON[kind]] ?? I.file;
-            return (
-              <span key={kind} className="mle-fprev__chip">
-                <Ic size={12} />
-                {FILE_KIND_LABEL[kind]} <b>{count}</b>
-              </span>
-            );
-          })}
-        </div>
-      )}
-
-      {audioFiles.length > 0 && (
-        <div className="mle-fprev__actions">
-          <button className="mll-fab is-primary" onClick={() => onPlay(audioFiles[0])} disabled={!audioFiles[0].workId}>
-            <I.play size={12} /> 先頭の音声を再生
-          </button>
-        </div>
-      )}
-
-      <MetaGrid
-        rows={[
-          ["項目数", `${entry.childCount} 件`],
-          ["種類", isWork ? "登録作品フォルダー" : "フォルダー"],
-          ["パス", entry.path],
-        ]}
-      />
     </div>
   );
 }
 
-// ── ファイル ──────────────────────────────────────────────────
+// ── 画像だけ大きく表示 ────────────────────────────────────────
 
-function FileBody({ entry, kind, isPlayingEntry, onPlay }: { entry: FsEntry; kind: FileKind; isPlayingEntry: boolean; onPlay: (e: FsEntry) => void }) {
-  const Ic = IconSet[FILE_KIND_ICON[kind]] ?? I.file;
-  const canServe = !!entry.workId && !!entry.workRelPath;
-
-  return (
-    <div className="mle-fprev">
-      {kind === "image" && canServe ? (
-        <ImagePreview workId={entry.workId!} relPath={entry.workRelPath!} name={entry.name} fallbackIcon={<Ic size={56} />} />
-      ) : (
-        <div className={`mle-fprev__media is-icon is-${kind}`}>
-          <Ic size={56} />
-        </div>
-      )}
-
-      <div>
-        <div className="mle-fprev__name">{entry.name}</div>
-        <div className="mle-fprev__path">{entry.path}</div>
-      </div>
-
-      {kind === "audio" && (
-        <div className="mle-fprev__actions">
-          <button className="mll-fab is-primary" onClick={() => onPlay(entry)} disabled={!canServe}>
-            {isPlayingEntry ? <><I.audio size={12} /> 再生中</> : <><I.play size={12} /> このファイルを再生</>}
-          </button>
-        </div>
-      )}
-
-      <MetaGrid
-        rows={[
-          ["種類", FILE_KIND_LABEL[kind]],
-          ["サイズ", formatFileSize(entry.size)],
-          ["パス", entry.path],
-        ]}
-      />
-
-      {!canServe && kind !== "other" && (
-        <p className="mle-fprev__note">
-          このファイルは登録作品の外にあるため、プレビュー / 再生はできません。
-        </p>
-      )}
-      {canServe && (kind === "pdf" || kind === "text" || kind === "video") && (
-        <p className="mle-fprev__note">
-          {kind === "video" ? "動画" : kind === "pdf" ? "PDF" : "テキスト"}の埋め込みプレビューは未対応です。
-        </p>
-      )}
-    </div>
-  );
-}
-
-function ImagePreview({ workId, relPath, name, fallbackIcon }: { workId: string; relPath: string; name: string; fallbackIcon: React.ReactNode }) {
+function ImageMedia({ workId, relPath, name, kind }: { workId: string; relPath: string; name: string; kind: FileKind }) {
   const [errored, setErrored] = useState(false);
   useEffect(() => setErrored(false), [workId, relPath]);
 
   if (errored) {
-    return <div className="mle-fprev__media is-icon is-image">{fallbackIcon}</div>;
+    return (
+      <div className={`mle-fprev__hero is-${kind}`}>
+        <span className="ic"><I.image size={28} /></span>
+        <div className="bd">
+          <div className="mle-fprev__name">{name}</div>
+          <div className="mle-fprev__path">プレビューを読み込めませんでした</div>
+        </div>
+      </div>
+    );
   }
   return (
     <div className="mle-fprev__media">

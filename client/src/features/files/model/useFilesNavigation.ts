@@ -25,6 +25,8 @@ export interface FilesNav {
   selectFile: (absPath: string) => void;
   /** パンくず index へ移動（0 = ルート） */
   goToSegment: (index: number) => void;
+  /** 1つ上の階層へ（受動スタックのクリック用） */
+  goUp: () => void;
 }
 
 export function useFilesNavigation(root: string): FilesNav {
@@ -52,5 +54,11 @@ export function useFilesNavigation(root: string): FilesNav {
     setSelectedPath(null);
   }, [setRelPath, setSelectedPath, setDirection]);
 
-  return { root, cwd, relPath, selectedPath, addressPath, openDir, selectFile, goToSegment };
+  const goUp = useCallback(() => {
+    setDirection(-1);
+    setRelPath((prev) => (prev.length > 0 ? prev.slice(0, -1) : prev));
+    setSelectedPath(null);
+  }, [setRelPath, setSelectedPath, setDirection]);
+
+  return { root, cwd, relPath, selectedPath, addressPath, openDir, selectFile, goToSegment, goUp };
 }
