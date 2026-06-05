@@ -28,7 +28,7 @@
   width: 100%; height: 100%;
   display: grid;
   grid-template-rows: 48px 38px 1fr 96px;
-  grid-template-columns: 64px 1fr;
+  grid-template-columns: 56px 1fr;
   background: var(--paper-0);
 }
 .mle-frame.is-lib                 { grid-template-rows: 48px 38px 1fr 96px; }
@@ -159,45 +159,38 @@
   background: var(--paper-1);
   border-right: 1px solid var(--line-soft);
   display: flex; flex-direction: column;
-  padding: 14px 0; gap: 4px; align-items: center;
-}
-.mle-side__hd {
-  font-family: var(--font-sans);
-  font-size: 8px; letter-spacing: 0.1em;
-  text-transform: uppercase; color: var(--ink-4);
-  font-weight: 700; padding-bottom: 3px;
+  padding: 12px 0; gap: 2px; align-items: center;
 }
 .mle-side__group {
   display: flex; flex-direction: column;
-  padding: 6px 0; gap: 2px; align-items: center; width: 100%;
+  padding: 8px 0; gap: 4px; align-items: center; width: 100%;
 }
 .mle-side__group + .mle-side__group { border-top: 1px solid var(--line-soft); }
+.mle-side__group.is-foot { border-top: none; padding-bottom: 0; }
 .mle-side__btn {
-  width: 44px; padding: 8px 0;
-  display: flex; flex-direction: column;
-  align-items: center; gap: 3px; border-radius: 8px;
-  color: var(--ink-2);
-  font-family: var(--font-sans); font-size: 9.5px; font-weight: 500; letter-spacing: 0.005em;
+  position: relative;
+  width: 40px; height: 40px;
+  display: grid; place-items: center;
+  border-radius: 10px; color: var(--ink-2);
+  transition: background 0.12s ease, color 0.12s ease;
 }
 .mle-side__btn:hover { background: var(--paper-2); color: var(--ink-0); }
-.mle-side__btn.is-on { background: var(--paper-3); color: var(--ink-0); }
-.mle-side__btn.is-on .mle-side__icbox { color: var(--acc); }
-.mle-side__icbox { display: grid; place-items: center; }
-.mle-side__btn.has-badge { position: relative; }
+.mle-side__btn:active { background: var(--paper-3); }
+.mle-side__btn.is-on { color: var(--acc); background: var(--acc-soft); }
+/* 選択中: 左端に細い柿バー */
+.mle-side__btn.is-on::before {
+  content: ""; position: absolute; left: -8px; top: 50%;
+  transform: translateY(-50%); width: 3px; height: 20px;
+  border-radius: 0 2px 2px 0; background: var(--acc);
+}
 .mle-side__badge {
-  position: absolute; top: 4px; right: 6px;
-  font-family: var(--font-mono); font-size: 9px;
+  position: absolute; top: 2px; right: 2px;
+  font-family: var(--font-mono); font-size: 9px; font-weight: 600;
   background: var(--acc); color: var(--paper-1);
-  border-radius: 9px; padding: 1px 4px; min-width: 14px;
-  text-align: center; font-weight: 600;
+  border-radius: 9px; min-width: 14px; padding: 0 4px;
+  text-align: center; border: 1.5px solid var(--paper-1);
 }
 .mle-side__sp { flex: 1; }
-.mle-side__btn.is-mode { width: 50px; padding: 9px 0; gap: 4px; }
-.mle-side__btn.is-mode.is-on {
-  background: var(--acc-soft); color: var(--acc-ink);
-  box-shadow: inset 0 0 0 1px var(--acc-line); font-weight: 600;
-}
-.mle-side__btn.is-mode.is-on .mle-side__icbox { color: var(--acc); }
 
 /* ── Body / column view ──────────────────────────────────── */
 
