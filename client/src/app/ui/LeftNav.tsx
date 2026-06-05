@@ -18,9 +18,7 @@ export default function LeftNav({
         <button
           className={`mle-side__btn is-mode ${mode === "files" ? "is-on" : ""}`}
           onClick={() => onModeChange?.("files")}
-          title="ファイル（将来実装）"
-          disabled
-          style={{ opacity: 0.4, cursor: "not-allowed" }}
+          title="ファイル"
         >
           <span className="mle-side__icbox"><I.folderO size={20} /></span>
           ファイル

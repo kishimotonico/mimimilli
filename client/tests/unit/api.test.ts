@@ -96,4 +96,11 @@ describe('api', () => {
   it('getAudioUrl returns correct URL', () => {
     expect(api.getAudioUrl('RJ001001', 'track01.mp3')).toBe('/api/audio/RJ001001/track01.mp3');
   });
+
+  it('getFileUrl returns correct URL and encodes nested segments', () => {
+    expect(api.getFileUrl('RJ001001', 'cover.jpg')).toBe('/api/files/RJ001001/cover.jpg');
+    expect(api.getFileUrl('RJ001001', '特典/台本.pdf')).toBe(
+      `/api/files/RJ001001/${encodeURIComponent('特典')}/${encodeURIComponent('台本.pdf')}`
+    );
+  });
 });

@@ -39,6 +39,15 @@ export function getAudioUrl(workId: string, relativePath: string): string {
   return `${API_BASE}/audio/${encodeURIComponent(workId)}/${encoded}`;
 }
 
+/** 物理ファイル（画像・PDF・テキスト等）のURLを返す（<img src> 等で直接使用可） */
+export function getFileUrl(workId: string, relativePath: string): string {
+  const encoded = relativePath
+    .split("/")
+    .map(encodeURIComponent)
+    .join("/");
+  return `${API_BASE}/files/${encodeURIComponent(workId)}/${encoded}`;
+}
+
 export async function toggleBookmark(workId: string): Promise<boolean> {
   const r = await post<{ bookmarked: boolean }>(
     `/works/${encodeURIComponent(workId)}/bookmark`
