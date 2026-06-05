@@ -482,7 +482,7 @@
 /* ── Column stack (ancestor spine — click to go up one level) ─ */
 
 .mle-colstack {
-  flex: 0 0 auto; width: 64px; position: relative;
+  flex: 0 0 auto; width: 46px; position: relative;
   background: var(--paper-2); border-right: 1px solid var(--line-soft);
   overflow: hidden; cursor: pointer; display: block; padding: 0; text-align: left;
 }
@@ -499,20 +499,19 @@
 .mle-colstack__edges span:nth-child(2) { transform: translateX(-9px);  opacity: 0.62; }
 .mle-colstack__edges span:nth-child(3) { transform: translateX(-4px);  opacity: 0.82; }
 .mle-colstack__edges span:nth-child(4) { transform: translateX(0); }
+/* ラベルは束の一番右＝前面カードの上に重ねる */
 .mle-colstack__label {
-  position: absolute; left: 0; top: 0; bottom: 0; width: 34px;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
-  color: var(--ink-3); pointer-events: none; padding: 10px 0;
+  position: absolute; right: 0; top: 0; bottom: 0; width: 30px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  color: var(--ink-2); pointer-events: none; padding: 12px 0;
 }
-.mle-colstack:hover .mle-colstack__label { color: var(--ink-1); }
-.mle-colstack__label .up {
-  font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.04em;
-  white-space: nowrap; flex-shrink: 0;
-}
+.mle-colstack:hover .mle-colstack__label { color: var(--ink-0); }
+.mle-colstack__label .up { display: grid; place-items: center; color: var(--ink-3); flex-shrink: 0; }
+.mle-colstack:hover .mle-colstack__label .up { color: var(--acc); }
 .mle-colstack__label .nm {
   writing-mode: vertical-rl; text-orientation: mixed;
   font-family: var(--font-jp); font-size: 11px; font-weight: 500;
-  max-height: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-height: calc(100% - 26px); overflow: hidden; white-space: nowrap;
 }
 
 /* ── Preview pane ─────────────────────────────────────────── */

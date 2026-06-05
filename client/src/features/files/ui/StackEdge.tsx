@@ -1,8 +1,9 @@
-// 受動スタック（背表紙）。末尾カラムより前の祖先を左端に畳んだ見た目。
-// クリックで1つ上の階層へ戻る（パンくずの代替の軽い導線）。親フォルダー名を縦書きで表示。
+// 祖先スパイン（背表紙）。クリックで1つ上の階層へ戻る。
+// ラベル（上向き矢印 + 親フォルダー名の縦書き）は束の一番右＝前面カードの上に置く。
 // 子へ潜るたびに背表紙が軽くパルスして「カードが1枚吸い込まれた」感を出す。
 
 import { motion } from "motion/react";
+import { I } from "../../../shared/ui/Icon";
 
 interface StackEdgeProps {
   parentName: string;
@@ -19,7 +20,7 @@ export default function StackEdge({ parentName, depth, onUp }: StackEdgeProps) {
       title={`1つ上の階層（${parentName}）へ戻る`}
       onClick={onUp}
       initial={{ width: 0, opacity: 0 }}
-      animate={{ width: 64, opacity: 1 }}
+      animate={{ width: 46, opacity: 1 }}
       exit={{ width: 0, opacity: 0 }}
       transition={{ duration: 0.24, ease: [0.4, 0, 0.2, 1] }}
     >
@@ -33,7 +34,7 @@ export default function StackEdge({ parentName, depth, onUp }: StackEdgeProps) {
         <span /><span /><span /><span />
       </motion.div>
       <span className="mle-colstack__label">
-        <span className="up">▲ 上へ</span>
+        <span className="up"><I.chevD size={13} style={{ transform: "rotate(180deg)" }} /></span>
         <span className="nm">{parentName}</span>
       </span>
     </motion.button>

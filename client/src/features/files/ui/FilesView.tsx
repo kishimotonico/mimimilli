@@ -103,7 +103,7 @@ export default function FilesView({ rootFolder, playingWorkId, playingRelPath, o
         <AnimatePresence custom={direction} initial={false}>
           <motion.div
             key={nav.cwd}
-            className="mle-col is-wide mle-filestage__col"
+            className="mle-col mle-filestage__col"
             custom={direction}
             variants={colVariants}
             initial="enter"
