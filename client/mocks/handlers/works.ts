@@ -3,6 +3,7 @@ import {
   type SearchPresetMock,
   type WorkSummaryMock,
 } from "../fixtures/index";
+import { buildFileTree } from "../fixtures/fileTree";
 import { exactPath, matchPath, readBody, sendJson, sendNoContent, sendNotFound } from "../http";
 import type { MockHandler } from "./types";
 
@@ -32,24 +33,7 @@ export const handleWorks: MockHandler = async ({ req, res, url, urlPath, method,
       sendJson(res, null);
       return true;
     }
-
-    const children = Array.from({ length: work.trackCount }, (_, i) => ({
-      name: `track${String(i + 1).padStart(2, "0")}.mp3`,
-      path: `track${String(i + 1).padStart(2, "0")}.mp3`,
-      isDir: false,
-      size: 1024 * 1024 * (i + 1),
-      fileType: "audio",
-      children: [],
-    }));
-
-    sendJson(res, {
-      name: work.id,
-      path: "",
-      isDir: true,
-      size: 0,
-      fileType: "dir",
-      children,
-    });
+    sendJson(res, buildFileTree(work));
     return true;
   }
 

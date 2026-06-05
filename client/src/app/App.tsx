@@ -12,6 +12,9 @@ import TopBar from "./ui/TopBar";
 import LeftNav from "./ui/LeftNav";
 import AddressBar from "./ui/AddressBar";
 import LibraryView, { LIBRARY_KEYS } from "../features/library/ui/LibraryView";
+import FilesView from "../features/files/ui/FilesView";
+import { useFilesNavigation } from "../features/files/model/useFilesNavigation";
+import type { FsEntry } from "../features/files/model/types";
 import TransportBar from "../features/player/ui/TransportBar";
 import FullScreenPlayer from "../features/player/ui/FullScreenPlayer";
 import SetupScreen from "../features/setup/ui/SetupScreen";
@@ -33,7 +36,7 @@ export default function App() {
   const queryClient = useQueryClient();
   const playRequestIdRef = useRef(0);
 
-  const [mode] = useState<AppMode>("library");
+  const [mode, setMode] = useState<AppMode>("library");
   const [searchQuery, setSearchQuery] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
@@ -57,6 +60,10 @@ export default function App() {
   const isSetupDone: boolean | null = settingsQuery.isPending
     ? null
     : settings?.rootFolder != null ? true : settingsQuery.isError ? false : false;
+
+  // ファイルモードのナビゲーション（フックは早期 return 前に呼ぶ）。
+  const rootFolder = settings?.rootFolder ?? "/";
+  const filesNav = useFilesNavigation(rootFolder);
 
   // ── Scan mutation ─────────────────────────────────────────
   const scanMutation = useMutation({
@@ -95,6 +102,24 @@ export default function App() {
       if (tracks.length > 0) {
         player.play(work, tracks, Math.min(trackIndex, tracks.length - 1));
       }
+    } catch {
+      // ignore
+    }
+  }, [player, queryClient]);
+
+  // ファイルモード: 作品配下の音声ファイルを単一トラックとして常駐プレイヤーで再生する。
+  // 作品の外にあるファイル（workId/workRelPath なし）は既存メディア配信で扱えないため再生しない。
+  const handlePlayFile = useCallback(async (entry: FsEntry) => {
+    if (!entry.workId || !entry.workRelPath) return;
+    const requestId = ++playRequestIdRef.current;
+    try {
+      const cached = queryClient.getQueryData<Awaited<ReturnType<typeof getWork>>>(
+        LIBRARY_KEYS.workDetail(entry.workId)
+      );
+      const fullWork = cached ?? await getWork(entry.workId);
+      if (requestId !== playRequestIdRef.current) return;
+      if (!fullWork) return;
+      player.play(fullWork, [{ title: entry.name, file: entry.workRelPath }], 0);
     } catch {
       // ignore
     }
@@ -152,6 +177,7 @@ export default function App() {
   }
 
   const currentTrack = isPlaying ? player.state.tracks[player.state.currentTrackIndex] : null;
+  const playingRelPath = currentTrack?.file ?? null;
 
   return (
     <AppShell
@@ -167,15 +193,29 @@ export default function App() {
           playingTrack={currentTrack?.title}
         />
       }
-      addressBar={<AddressBar path={["ライブラリ"]} />}
-      leftNav={<LeftNav mode={mode} playingCount={isPlaying ? 1 : 0} />}
-      body={
-        <LibraryView
-          searchQuery={searchQuery}
-          playingWorkId={player.state.currentWork?.id}
-          playingTrackIndex={player.state.currentTrackIndex}
-          onPlay={handlePlay}
+      addressBar={
+        <AddressBar
+          path={mode === "files" ? filesNav.addressPath : ["ライブラリ"]}
+          onNavigate={mode === "files" ? filesNav.goToSegment : undefined}
         />
+      }
+      leftNav={<LeftNav mode={mode} onModeChange={setMode} playingCount={isPlaying ? 1 : 0} />}
+      body={
+        mode === "files" ? (
+          <FilesView
+            rootFolder={rootFolder}
+            playingWorkId={player.state.currentWork?.id}
+            playingRelPath={playingRelPath}
+            onPlayFile={handlePlayFile}
+          />
+        ) : (
+          <LibraryView
+            searchQuery={searchQuery}
+            playingWorkId={player.state.currentWork?.id}
+            playingTrackIndex={player.state.currentTrackIndex}
+            onPlay={handlePlay}
+          />
+        )
       }
       transportBar={
         isPlaying ? (
