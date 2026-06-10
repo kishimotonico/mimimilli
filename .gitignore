@@ -17,7 +17,7 @@ test-results/
 playwright-report/
 
 # Rust build artifacts
-server/target/
+server-rust/target/
 
 # Editor directories and files
 .vscode/*
