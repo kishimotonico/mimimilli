@@ -1,0 +1,13 @@
+{
+  "name": "mimikago-workspace",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev:server": "pnpm --filter @mimikago/server dev",
+    "check": "pnpm --filter @mimikago/shared check && pnpm --filter @mimikago/server check",
+    "test:server": "pnpm --filter @mimikago/server test"
+  }
+}

@@ -1,0 +1,6 @@
+# ルート workspace（server / shared）。
+# client/ は並行してモック作業中のため独立 workspace のまま（client/pnpm-workspace.yaml）。
+# モック→fixture アダプタ統合（ADR-0002）の完了時に client もここへ合流させる。
+packages:
+  - server
+  - shared

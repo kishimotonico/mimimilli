@@ -1,0 +1,22 @@
+{
+  "name": "@mimikago/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/index.ts",
+    "start": "node src/index.ts",
+    "check": "tsc --noEmit",
+    "test": "node --test \"tests/**/*.test.ts\""
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.14.0",
+    "@mimikago/shared": "workspace:*",
+    "hono": "^4.7.0",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "typescript": "~5.8.3"
+  }
+}
