@@ -4,3 +4,6 @@
 packages:
   - server
   - shared
+
+allowBuilds:
+  better-sqlite3: true

@@ -29,3 +29,6 @@ server-rust/target/
 *.njsproj
 *.sln
 *.sw?
+
+# server runtime data (SQLite cache)
+server/data/

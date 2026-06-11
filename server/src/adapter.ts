@@ -25,6 +25,9 @@ import type {
   WorkSummary,
 } from "@mimikago/shared";
 
+/** 前提条件（ルートフォルダー未設定等）を満たしていない操作。HTTP では 409 conflict */
+export class NotConfiguredError extends Error {}
+
 /** メディア実体の所在。ルートがストリーミング（Range 対応）を担当する */
 export interface MediaLocation {
   absolutePath: string;

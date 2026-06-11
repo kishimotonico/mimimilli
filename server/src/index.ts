@@ -1,21 +1,24 @@
 // エントリーポイント。@hono/node-server で起動する。
 // env:
 //   PORT             … 待受ポート（デフォルト 8080）
-//   MIMIKAGO_ADAPTER … "fixture"（デフォルト） | "real"（移行プラン ステップ3で実装）
+//   MIMIKAGO_ADAPTER … "real"（デフォルト） | "fixture"（インメモリ開発データ）
+//   MIMIKAGO_DB      … real アダプタの SQLite パス（デフォルト ./data/mimikago.db）
 import { serve } from "@hono/node-server";
 import { createApp } from "./app.ts";
 import { createFixtureAdapter } from "./adapters/fixture/index.ts";
+import { createRealAdapter } from "./adapters/real/index.ts";
 import type { DataAdapter } from "./adapter.ts";
 
+const adapterKind = process.env.MIMIKAGO_ADAPTER ?? "real";
+
 function createAdapter(): DataAdapter {
-  const kind = process.env.MIMIKAGO_ADAPTER ?? "fixture";
-  switch (kind) {
+  switch (adapterKind) {
     case "fixture":
       return createFixtureAdapter();
     case "real":
-      throw new Error("real adapter は未実装（移行プラン ステップ3）");
+      return createRealAdapter({ dbPath: process.env.MIMIKAGO_DB ?? "data/mimikago.db" });
     default:
-      throw new Error(`不明な MIMIKAGO_ADAPTER です: ${kind}`);
+      throw new Error(`不明な MIMIKAGO_ADAPTER です: ${adapterKind}`);
   }
 }
 
@@ -23,6 +26,6 @@ const port = Number(process.env.PORT ?? 8080);
 const adapter = createAdapter();
 const app = createApp(adapter);
 
-serve({ fetch: app.fetch, port }, (info) => {
-  console.log(`mimikago server listening on http://localhost:${info.port} (adapter: ${process.env.MIMIKAGO_ADAPTER ?? "fixture"})`);
+serve({ fetch: app.fetch, hostname: "127.0.0.1", port }, (info) => {
+  console.log(`mimikago server listening on http://localhost:${info.port} (adapter: ${adapterKind})`);
 });

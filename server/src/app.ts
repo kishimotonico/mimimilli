@@ -3,7 +3,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ApiError } from "@mimikago/shared";
-import type { DataAdapter } from "./adapter.ts";
+import { NotConfiguredError, type DataAdapter } from "./adapter.ts";
 import { axesRoute } from "./routes/axes.ts";
 import { dlsiteRoute } from "./routes/dlsite.ts";
 import { fsRoute } from "./routes/fs.ts";
@@ -38,6 +38,10 @@ export function createApp(adapter: DataAdapter): Hono {
   app.onError((err, c) => {
     if (err instanceof HTTPException) {
       return err.getResponse();
+    }
+    if (err instanceof NotConfiguredError) {
+      const body: ApiError = { error: { code: "conflict", message: err.message } };
+      return c.json(body, 409);
     }
     console.error(err);
     const body: ApiError = { error: { code: "internal", message: "サーバー内部エラーが発生しました" } };
