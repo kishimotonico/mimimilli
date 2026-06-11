@@ -21,6 +21,7 @@ import { basename, dirname, extname, join } from "node:path";
 import type { MetaFile, Playlist, ScanResult, Track, Work } from "@mimikago/shared";
 import type { Db } from "./db.ts";
 import { isMetaFileName, MetaParseError, patchMetaFile, readMetaFile, writeMetaFile } from "./meta.ts";
+import { isPathWithin, toPortableRelativePath } from "./paths.ts";
 import { probeDurationSec } from "./probe.ts";
 import type { WorkRepo } from "./workRepo.ts";
 
@@ -77,7 +78,7 @@ function walk(root: string): WalkResult {
 /** dir またはルートまでの祖先にメタファイルがあるか */
 function isCoveredByMeta(dir: string, root: string, metaDirs: Set<string>): boolean {
   let cur = dir;
-  while (cur.startsWith(root)) {
+  while (isPathWithin(root, cur)) {
     if (metaDirs.has(cur)) return true;
     if (cur === root) break;
     cur = dirname(cur);
@@ -90,12 +91,12 @@ function findWorkRoot(audioDir: string, root: string, metaDirs: Set<string>): st
   let cur = audioDir;
   while (true) {
     const parent = dirname(cur);
-    if (cur === root || parent === cur || !parent.startsWith(root) || parent === root) break;
+    if (cur === root || parent === cur || !isPathWithin(root, parent) || parent === root) break;
 
     // 親の下に既存メタ作品があるなら昇格しない（登録済み作品を飲み込まない）
     let swallowsMeta = false;
     for (const metaDir of metaDirs) {
-      if (metaDir.startsWith(parent + "/") || metaDir === parent) {
+      if (isPathWithin(parent, metaDir)) {
         swallowsMeta = true;
         break;
       }
@@ -180,14 +181,14 @@ function buildDefaultTracks(workDir: string): Track[] {
   files.sort(naturalCompare);
   return files.map((f) => ({
     title: basename(f, extname(f)),
-    file: f.slice(workDir.length + 1).split("\\").join("/"),
+    file: toPortableRelativePath(workDir, f),
   }));
 }
 
 function defaultPlaylistOf(meta: MetaFile): Playlist | null {
   if (meta.playlists.length === 0) return null;
   if (meta.defaultPlaylist) {
-    return meta.playlists.find((p) => p.name === meta.defaultPlaylist) ?? meta.playlists[0]!;
+    return meta.playlists.find((p) => p.name === meta.defaultPlaylist)!;
   }
   return meta.playlists[0]!;
 }
@@ -204,7 +205,6 @@ export class Scanner {
   async scan(root: string): Promise<ScanResult> {
     const result: ScanResult = { registered: 0, newlyGenerated: 0, errors: 0, missing: 0, newWorkIds: [] };
 
-    this.repo.markAllMissing();
     const tree = walk(root);
     const seenIds = new Set<string>();
 
@@ -216,6 +216,13 @@ export class Scanner {
       } catch (e) {
         if (e instanceof MetaParseError) {
           console.warn(e.message);
+          const workDir = dirname(metaPath);
+          const existingById = e.candidateId && !seenIds.has(e.candidateId) ? this.repo.getWork(e.candidateId) : null;
+          const existing = existingById ?? this.repo.getWorkByPhysicalPath(workDir);
+          if (existing) {
+            this.repo.markWorkError(existing.id, workDir, e.message);
+            seenIds.add(existing.id);
+          }
           result.errors += 1;
         } else {
           throw e;
@@ -233,7 +240,7 @@ export class Scanner {
     }
     // 祖先が同時に検出された場合は祖先側に統合する
     const roots = [...workRoots].filter(
-      (dir) => ![...workRoots].some((other) => other !== dir && dir.startsWith(other + "/"))
+      (dir) => ![...workRoots].some((other) => other !== dir && isPathWithin(other, dir))
     );
 
     for (const workDir of roots.sort(naturalCompare)) {
@@ -248,6 +255,7 @@ export class Scanner {
       }
     }
 
+    this.repo.markMissingExcept([...seenIds]);
     result.missing = this.repo.countByStatus("missing");
     return result;
   }

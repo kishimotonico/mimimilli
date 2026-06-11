@@ -42,12 +42,22 @@ export type AxisFacetItem = z.infer<typeof axisFacetItemSchema>;
 
 // ── スマートフォルダー ────────────────────────────────────────
 
-export const smartFolderRuleSchema = z.object({
-  conjunction: z.enum(["WHERE", "AND", "AND NOT"]),
-  field: z.string(),
-  operator: z.string(),
-  values: z.array(z.string()),
-});
+const smartFolderConjunctionSchema = z.enum(["WHERE", "AND", "AND NOT"]);
+
+export const smartFolderRuleSchema = z.discriminatedUnion("field", [
+  z.object({
+    conjunction: smartFolderConjunctionSchema,
+    field: z.literal("タグ"),
+    operator: z.literal("∋"),
+    values: z.array(z.string().min(1)).min(1),
+  }),
+  z.object({
+    conjunction: z.enum(["WHERE", "AND"]),
+    field: z.literal("長さ"),
+    operator: z.literal("≥"),
+    values: z.array(z.string().regex(/^\d+$/)).length(1),
+  }),
+]);
 export type SmartFolderRule = z.infer<typeof smartFolderRuleSchema>;
 
 export const smartFolderSchema = z.object({

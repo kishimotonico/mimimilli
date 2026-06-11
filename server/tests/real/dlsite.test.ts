@@ -94,9 +94,11 @@ test("dlsiteApply: タグマージとメタ書き戻し（カバー DL なし）
 
   const meta = JSON.parse(
     readFileSync(join(work!.physicalPath, ".meta.json"), "utf-8")
-  ) as { title: string; tags: string[] };
+  ) as { title: string; tags: string[]; urls: { label: string; url: string }[] };
   assert.equal(meta.title, "DLsite から取得したタイトル");
   assert.deepEqual(meta.tags, work!.tags);
+  assert.deepEqual(work?.urls, [{ label: "DLsite", url: info.url }]);
+  assert.deepEqual(meta.urls, work?.urls);
 });
 
 test("dlsiteFetch: RJ コードが検出できない作品は null", async () => {

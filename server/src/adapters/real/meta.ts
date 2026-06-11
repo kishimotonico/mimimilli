@@ -14,10 +14,12 @@ export function isMetaFileName(name: string): boolean {
 
 export class MetaParseError extends Error {
   readonly metaPath: string;
+  readonly candidateId: string | null;
 
-  constructor(metaPath: string, detail: string) {
+  constructor(metaPath: string, detail: string, candidateId: string | null = null) {
     super(`メタファイルが不正です（${basename(metaPath)}）: ${detail}`);
     this.metaPath = metaPath;
+    this.candidateId = candidateId;
   }
 }
 
@@ -33,7 +35,13 @@ export function readMetaFile(metaPath: string): MetaFile {
   const parsed = metaFileSchema.safeParse(raw);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
-    throw new MetaParseError(metaPath, `${issue?.path.join(".") ?? ""} ${issue?.message ?? "不明"}`);
+    const candidateId =
+      typeof raw === "object" && raw !== null && "id" in raw && typeof raw.id === "string" ? raw.id : null;
+    throw new MetaParseError(
+      metaPath,
+      `${issue?.path.join(".") ?? ""} ${issue?.message ?? "不明"}`,
+      candidateId
+    );
   }
   return parsed.data;
 }
@@ -55,13 +63,19 @@ export function writeMetaFile(metaPath: string, meta: MetaFile): void {
  */
 export function patchMetaFile(
   metaPath: string,
-  patch: { title?: string; tags?: string[]; id?: string; coverImage?: string | null }
+  patch: { title?: string; tags?: string[]; id?: string; coverImage?: string | null; urls?: MetaFile["urls"] }
 ): void {
   const raw = JSON.parse(readFileSync(metaPath, "utf-8")) as Record<string, unknown>;
   if (patch.title !== undefined) raw.title = patch.title;
   if (patch.tags !== undefined) raw.tags = patch.tags;
   if (patch.id !== undefined) raw.id = patch.id;
   if (patch.coverImage !== undefined) raw.coverImage = patch.coverImage;
+  if (patch.urls !== undefined) raw.urls = patch.urls;
+  const parsed = metaFileSchema.safeParse(raw);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    throw new MetaParseError(metaPath, `${issue?.path.join(".") ?? ""} ${issue?.message ?? "不明"}`);
+  }
   writeJsonAtomic(metaPath, raw);
 }
 

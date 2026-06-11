@@ -1,7 +1,7 @@
 // 作品検索（GET /api/works）の純粋関数。
 // client/mocks/handlers/works.ts の searchWorks と同じセマンティクスを再現する。
 import { AXIS_TAG_PREFIX } from "@mimikago/shared";
-import type { WorksPage, WorksQuery, WorkSummary } from "@mimikago/shared";
+import type { SortId, WorksPage, WorksQuery, WorkSummary } from "@mimikago/shared";
 
 const RECENT_VIEW_WINDOW_DAYS = 30;
 
@@ -13,7 +13,7 @@ export function applyWorksQuery(works: WorkSummary[], params: WorksQuery): Works
   results = filterByTags(results, params.tags, params.tagOp);
   results = filterByAxis(results, params.axis, params.axisValue);
   results = filterByView(results, params.view);
-  results = sortWorks(results, params.sort);
+  results = sortWorkSummaries(results, params.sort);
 
   const total = results.length;
   const items = paginate(results, params.page, params.limit);
@@ -80,7 +80,7 @@ function filterByView(works: WorkSummary[], view: WorksQuery["view"]): WorkSumma
   }
 }
 
-function sortWorks(works: WorkSummary[], sort: WorksQuery["sort"]): WorkSummary[] {
+export function sortWorkSummaries(works: WorkSummary[], sort: SortId): WorkSummary[] {
   const sorted = [...works];
   switch (sort) {
     case "title-asc":

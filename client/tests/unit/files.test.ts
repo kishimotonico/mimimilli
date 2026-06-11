@@ -95,4 +95,18 @@ describe('path helpers', () => {
     expect(rootLabel('/mock/library')).toBe('library');
     expect(rootLabel('/')).toBe('/');
   });
+
+  it('handles Windows absolute paths without changing separators', () => {
+    const windowsRoot = 'C:\\Users\\nico\\Music';
+    const windowsPath = 'C:\\Users\\nico\\Music\\ASMR\\RJ123456';
+    expect(relSegments(windowsRoot, windowsPath)).toEqual(['ASMR', 'RJ123456']);
+    expect(joinPath(windowsRoot, ['ASMR', 'RJ123456'])).toBe(windowsPath);
+    expect(rootLabel(windowsRoot)).toBe('Music');
+  });
+
+  it('handles a Windows drive root explicitly', () => {
+    expect(relSegments('D:\\', 'D:\\library\\work')).toEqual(['library', 'work']);
+    expect(joinPath('D:\\', ['library', 'work'])).toBe('D:\\library\\work');
+    expect(joinPath('D:\\', [])).toBe('D:\\');
+  });
 });

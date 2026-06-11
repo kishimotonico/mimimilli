@@ -27,7 +27,7 @@ import type {
 } from "@mimikago/shared";
 import { NotConfiguredError, type DataAdapter, type MediaKind, type MediaLocation } from "../../adapter.ts";
 import { buildAxisFacets } from "../../core/axisFacets.ts";
-import { evalSmartFolderRules } from "../../core/smartFolder.ts";
+import { evalSmartFolder } from "../../core/smartFolder.ts";
 import { applyWorksQuery } from "../../core/worksQuery.ts";
 import { openDb, type Db } from "./db.ts";
 import { detectRjCode, downloadCover, fetchDlsiteInfo, mergeDlsiteTags } from "./dlsite.ts";
@@ -97,15 +97,15 @@ export function createRealAdapter(options: RealAdapterOptions): DataAdapter {
     },
 
     async patchWork(id: string, patch: WorkPatch): Promise<Work | null> {
-      const updated = repo.patchWork(id, patch);
-      if (!updated) return null;
-      // title / tags はメタファイルへ即時書き戻す（同一操作内、要件 v4 §3.1）。
-      // bookmarked は DB 固有情報のため書き戻さない。
-      if (patch.title !== undefined || patch.tags !== undefined) {
-        const metaPath = findMetaPath(updated);
-        patchMetaFile(metaPath, { title: patch.title, tags: patch.tags });
+      if (patch.title === undefined && patch.tags === undefined) {
+        return repo.patchWork(id, patch);
       }
-      return updated;
+      return db.transaction(() => {
+        const updated = repo.patchWork(id, patch);
+        if (!updated) return null;
+        patchMetaFile(findMetaPath(updated), { title: patch.title, tags: patch.tags });
+        return updated;
+      });
     },
 
     async saveResume(id: string, body: ResumeBody): Promise<boolean> {
@@ -150,7 +150,7 @@ export function createRealAdapter(options: RealAdapterOptions): DataAdapter {
     async evalSmartFolder(id: string): Promise<WorkSummary[] | null> {
       const folder = repo.getSmartFolder(id);
       if (!folder) return null;
-      return evalSmartFolderRules(folder.rules, repo.listSummaries());
+      return evalSmartFolder(folder, repo.listSummaries());
     },
 
     async listPresets(): Promise<SearchPreset[]> {
@@ -194,22 +194,27 @@ export function createRealAdapter(options: RealAdapterOptions): DataAdapter {
       const work = repo.getWork(workId);
       if (!work) return false;
 
-      const patch: { title?: string; tags?: string[]; coverImage?: string } = {};
+      const patch: { title?: string; tags?: string[]; coverImage?: string; urls?: Work["urls"] } = {};
       if (body.applyTitle && body.info.title) patch.title = body.info.title;
       if (body.applyTags) patch.tags = mergeDlsiteTags(work.tags, body.info);
+      if (body.info.url && !work.urls.some((entry) => entry.url.includes("dlsite.com"))) {
+        patch.urls = [...work.urls, { label: "DLsite", url: body.info.url }];
+      }
       if (body.applyCover && body.info.coverUrl) {
         patch.coverImage = await downloadCover(body.info.coverUrl, work.physicalPath);
       }
 
-      const updated = repo.patchWork(workId, patch);
-      if (!updated) return false;
-      // DB 編集とメタファイル更新は同一操作内で行う（要件 v4 §3.1）
-      patchMetaFile(findMetaPath(updated), {
-        title: patch.title,
-        tags: patch.tags,
-        coverImage: patch.coverImage,
+      return db.transaction(() => {
+        const updated = repo.patchWork(workId, patch);
+        if (!updated) return false;
+        patchMetaFile(findMetaPath(updated), {
+          title: patch.title,
+          tags: patch.tags,
+          coverImage: patch.coverImage,
+          urls: patch.urls,
+        });
+        return true;
       });
-      return true;
     },
   };
 }

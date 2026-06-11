@@ -25,7 +25,7 @@ import type {
 } from "@mimikago/shared";
 import type { DataAdapter, MediaKind, MediaLocation } from "../../adapter.ts";
 import { buildAxisFacets } from "../../core/axisFacets.ts";
-import { evalSmartFolderRules } from "../../core/smartFolder.ts";
+import { evalSmartFolder } from "../../core/smartFolder.ts";
 import { applyWorksQuery } from "../../core/worksQuery.ts";
 import {
   buildFsRoot,
@@ -243,7 +243,7 @@ export function createFixtureAdapter(): DataAdapter {
     async evalSmartFolder(id: string): Promise<WorkSummary[] | null> {
       const folder = state.smartFolders.find((f) => f.id === id);
       if (!folder) return null;
-      return evalSmartFolderRules(folder.rules, state.works);
+      return evalSmartFolder(folder, state.works);
     },
 
     async listPresets(): Promise<SearchPreset[]> {

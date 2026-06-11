@@ -1,7 +1,33 @@
 // パス解決とトラバーサル対策。Rust 版（canonicalize + starts_with）と同水準。
 // /api/fs と /api/media/* のすべての物理パス解決はここを通すこと。
 import { realpathSync } from "node:fs";
-import { sep } from "node:path";
+import { isAbsolute, relative, sep } from "node:path";
+
+export interface PathOperations {
+  isAbsolute(path: string): boolean;
+  relative(from: string, to: string): string;
+  sep: string;
+}
+
+const nativePathOperations: PathOperations = { isAbsolute, relative, sep };
+
+/** target が base 自身または配下かを、パス区切り文字を含む境界で判定する。 */
+export function isPathWithin(
+  base: string,
+  target: string,
+  operations: PathOperations = nativePathOperations
+): boolean {
+  const rel = operations.relative(base, target);
+  return rel === "" || (rel !== ".." && !rel.startsWith(`..${operations.sep}`) && !operations.isAbsolute(rel));
+}
+
+/** base 配下の target を API 用の `/` 区切り相対パスへ変換する。 */
+export function toPortableRelativePath(base: string, target: string): string {
+  if (!isPathWithin(base, target)) {
+    throw new Error(`基準パス配下ではありません: ${target}`);
+  }
+  return relative(base, target).split(sep).join("/");
+}
 
 /**
  * realpath 解決した上で、base 配下にあることを検証する。
@@ -16,10 +42,7 @@ export function resolveWithin(base: string, target: string): string | null {
   } catch {
     return null;
   }
-  if (realTarget === realBase || realTarget.startsWith(realBase + sep)) {
-    return realTarget;
-  }
-  return null;
+  return isPathWithin(realBase, realTarget) ? realTarget : null;
 }
 
 const MIME_BY_EXT: Record<string, string> = {

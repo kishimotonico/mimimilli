@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import type { SmartFolderRule, WorkSummary } from "@mimikago/shared";
-import { evalSmartFolderRules } from "../src/core/smartFolder.ts";
+import { smartFolderRuleSchema, type SmartFolderRule, type WorkSummary } from "@mimikago/shared";
+import { evalSmartFolder, evalSmartFolderRules } from "../src/core/smartFolder.ts";
 
 function work(overrides: Partial<WorkSummary> & Pick<WorkSummary, "id">): WorkSummary {
   return {
@@ -72,10 +72,27 @@ test("複合: 長さ条件とタグ条件をAND適用する", () => {
   );
 });
 
-test("未知の field/operator のルールはスキップされる", () => {
-  const rules: SmartFolderRule[] = [
+test("未知の field/operator のルールは契約で拒否する", () => {
+  const parsed = smartFolderRuleSchema.safeParse({
+    conjunction: "WHERE",
+    field: "不明な軸",
+    operator: "=",
+    values: ["x"],
+  });
+  assert.equal(parsed.success, false);
+});
+
+test("DB に不正ルールが混入しても評価時に黙って無視しない", () => {
+  const invalidRules = [
     { conjunction: "WHERE", field: "不明な軸", operator: "=", values: ["x"] },
-  ];
-  const result = evalSmartFolderRules(rules, WORKS);
-  assert.equal(result.length, WORKS.length);
+  ] as unknown as SmartFolderRule[];
+  assert.throws(() => evalSmartFolderRules(invalidRules, WORKS), /未対応のスマートフォルダールール/);
+});
+
+test("保存済み sort を評価結果へ適用する", () => {
+  const result = evalSmartFolder({ rules: [], sort: "title-desc" }, WORKS);
+  assert.deepEqual(
+    result.map((w) => w.id),
+    ["RJ004", "RJ003", "RJ002", "RJ001"]
+  );
 });

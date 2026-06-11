@@ -1,26 +1,41 @@
 // スマートフォルダーのルール評価（GET /api/smart-folders/:id/works）の純粋関数。
 // client/mocks/handlers/library.ts の filterSmartFolderWorks と同じセマンティクスを再現する。
-// 未知の field/operator の組み合わせを持つルールは評価をスキップする（隠蔽せず無視するだけ）。
-import type { SmartFolderRule, WorkSummary } from "@mimikago/shared";
+// shared スキーマが許可した field/operator のみを評価する。DB 内の不正値も黙って無視しない。
+import type { SmartFolder, SmartFolderRule, WorkSummary } from "@mimikago/shared";
+import { sortWorkSummaries } from "./worksQuery.ts";
 
 /** rules を順に適用し、works をフィルタリングして返す */
 export function evalSmartFolderRules(rules: SmartFolderRule[], works: WorkSummary[]): WorkSummary[] {
   let result = [...works];
 
   for (const rule of rules) {
-    if (rule.field === "タグ" && rule.operator === "∋") {
-      const values = rule.values;
-      if (rule.conjunction === "AND NOT") {
-        result = result.filter((w) => !values.some((v) => w.tags.includes(v)));
-      } else {
-        result = result.filter((w) => values.some((v) => w.tags.includes(v)));
+    switch (rule.field) {
+      case "タグ": {
+        const values = rule.values;
+        if (rule.conjunction === "AND NOT") {
+          result = result.filter((w) => !values.some((v) => w.tags.includes(v)));
+        } else {
+          result = result.filter((w) => values.some((v) => w.tags.includes(v)));
+        }
+        break;
       }
-    } else if (rule.field === "長さ" && rule.operator === "≥") {
-      const minSec = parseInt(rule.values[0] ?? "0", 10);
-      result = result.filter((w) => w.totalDurationSec >= minSec);
+      case "長さ": {
+        const minSec = Number(rule.values[0]);
+        if (!Number.isFinite(minSec)) {
+          throw new Error(`スマートフォルダーの長さ条件が不正です: ${rule.values[0]}`);
+        }
+        result = result.filter((w) => w.totalDurationSec >= minSec);
+        break;
+      }
+      default:
+        throw new Error(`未対応のスマートフォルダールールです: ${JSON.stringify(rule)}`);
     }
-    // 未知の field/operator はこのルールをスキップする
   }
 
   return result;
+}
+
+/** 保存済みルールと sort を一体で評価する。 */
+export function evalSmartFolder(folder: Pick<SmartFolder, "rules" | "sort">, works: WorkSummary[]): WorkSummary[] {
+  return sortWorkSummaries(evalSmartFolderRules(folder.rules, works), folder.sort);
 }

@@ -96,6 +96,39 @@ test("POST /api/smart-folders は201 + 作成されたSmartFolderを返す", asy
   assert.equal(typeof body.createdAt, "string");
 });
 
+test("POST /api/smart-folders は未対応ルールを400で拒否する", async () => {
+  const app = buildApp();
+  const res = await app.request("/api/smart-folders", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: "不正ルール",
+      rules: [{ conjunction: "WHERE", field: "不明", operator: "=", values: ["x"] }],
+      sort: "added-desc",
+    }),
+  });
+  assert.equal(res.status, 400);
+  const body = await res.json();
+  assert.equal(body.error.code, "invalid_request");
+});
+
+test("スマートフォルダーの作品一覧は保存済み sort を適用する", async () => {
+  const app = buildApp();
+  const createRes = await app.request("/api/smart-folders", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: "タイトル降順", rules: [], sort: "title-desc" }),
+  });
+  const folder = await createRes.json();
+
+  const worksRes = await app.request(`/api/smart-folders/${folder.id}/works`);
+  assert.equal(worksRes.status, 200);
+  const works = await worksRes.json();
+  const titles = works.map((work: { title: string }) => work.title);
+  const expected = [...titles].sort((a, b) => b.localeCompare(a, "ja"));
+  assert.deepEqual(titles, expected);
+});
+
 test("未知ルートは404 + not_found", async () => {
   const app = buildApp();
   const res = await app.request("/api/unknown-route");

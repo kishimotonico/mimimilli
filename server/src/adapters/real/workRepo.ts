@@ -1,6 +1,6 @@
 // works / tags / smart_folders / search_presets / app_settings の CRUD と行⇄ドメイン変換。
 // 検索・絞り込みは core/worksQuery（インメモリ）で行うため、ここは取得と更新に徹する。
-import { asc, eq, inArray } from "drizzle-orm";
+import { asc, eq, inArray, notInArray } from "drizzle-orm";
 import type {
   Playlist,
   SearchPreset,
@@ -12,6 +12,7 @@ import type {
   Work,
   WorkStatus,
   WorkSummary,
+  UrlEntry,
 } from "@mimikago/shared";
 import type { Db } from "./db.ts";
 import { appSettings, searchPresets, smartFolders, tags, workTags, works } from "./schema.ts";
@@ -21,7 +22,11 @@ type WorkRow = typeof works.$inferSelect;
 function defaultPlaylistOf(row: WorkRow): Playlist | null {
   if (row.playlistsJson.length === 0) return null;
   if (row.defaultPlaylist) {
-    return row.playlistsJson.find((p) => p.name === row.defaultPlaylist) ?? row.playlistsJson[0]!;
+    const playlist = row.playlistsJson.find((p) => p.name === row.defaultPlaylist);
+    if (!playlist) {
+      throw new Error(`DB の defaultPlaylist が不正です: ${row.id}/${row.defaultPlaylist}`);
+    }
+    return playlist;
   }
   return row.playlistsJson[0]!;
 }
@@ -137,6 +142,12 @@ export class WorkRepo {
     return rowToWork(row, this.tagMap([id]).get(id) ?? []);
   }
 
+  getWorkByPhysicalPath(physicalPath: string): Work | null {
+    const row = this.db.select().from(works).where(eq(works.physicalPath, physicalPath)).get();
+    if (!row) return null;
+    return rowToWork(row, this.tagMap([row.id]).get(row.id) ?? []);
+  }
+
   /** scan からの登録。タグも置き換える */
   upsertWork(work: Work): void {
     const values = {
@@ -164,7 +175,7 @@ export class WorkRepo {
   /** PATCH /works/:id および DLsite 適用の DB 側。メタファイル書き戻しは呼び出し側（アダプタ）が行う */
   patchWork(
     id: string,
-    patch: { title?: string; tags?: string[]; bookmarked?: boolean; coverImage?: string }
+    patch: { title?: string; tags?: string[]; bookmarked?: boolean; coverImage?: string; urls?: UrlEntry[] }
   ): Work | null {
     const row = this.db.select().from(works).where(eq(works.id, id)).get();
     if (!row) return null;
@@ -172,6 +183,7 @@ export class WorkRepo {
     if (patch.title !== undefined) set.title = patch.title;
     if (patch.bookmarked !== undefined) set.bookmarked = patch.bookmarked;
     if (patch.coverImage !== undefined) set.coverImage = patch.coverImage;
+    if (patch.urls !== undefined) set.urlsJson = patch.urls;
     if (Object.keys(set).length > 0) {
       this.db.update(works).set(set).where(eq(works.id, id)).run();
     }
@@ -199,8 +211,23 @@ export class WorkRepo {
     return r.changes > 0;
   }
 
-  markAllMissing(): void {
-    this.db.update(works).set({ status: "missing" }).run();
+  markWorkError(id: string, physicalPath: string, errorMessage: string): boolean {
+    return (
+      this.db
+        .update(works)
+        .set({ status: "error", physicalPath, errorMessage })
+        .where(eq(works.id, id))
+        .run().changes > 0
+    );
+  }
+
+  markMissingExcept(foundIds: string[]): void {
+    const set = { status: "missing", errorMessage: null } as const;
+    if (foundIds.length === 0) {
+      this.db.update(works).set(set).run();
+      return;
+    }
+    this.db.update(works).set(set).where(notInArray(works.id, foundIds)).run();
   }
 
   countByStatus(status: string): number {

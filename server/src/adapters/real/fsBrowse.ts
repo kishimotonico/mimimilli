@@ -3,9 +3,9 @@
 // 作品との対応付け: ディレクトリは physical_path 完全一致、ファイルは
 // 「physical_path が祖先である作品」のうち最も深いものに紐づけ、workRelPath を付与する。
 import { readdirSync, statSync } from "node:fs";
-import { dirname, join, sep } from "node:path";
+import { dirname, join } from "node:path";
 import type { FsEntry, FsListing, WorkSummary } from "@mimikago/shared";
-import { resolveWithin } from "./paths.ts";
+import { isPathWithin, resolveWithin, toPortableRelativePath } from "./paths.ts";
 
 function extOf(name: string): string {
   const i = name.lastIndexOf(".");
@@ -16,7 +16,7 @@ function extOf(name: string): string {
 function findOwnerWork(path: string, works: WorkSummary[]): WorkSummary | null {
   let owner: WorkSummary | null = null;
   for (const w of works) {
-    if (path === w.physicalPath || path.startsWith(w.physicalPath + sep)) {
+    if (isPathWithin(w.physicalPath, path)) {
       if (!owner || w.physicalPath.length > owner.physicalPath.length) owner = w;
     }
   }
@@ -74,7 +74,7 @@ export function browseFs(root: string, works: WorkSummary[], path?: string): FsL
         fileType: extOf(entry.name),
         childCount: 0,
         workId: owner?.id ?? null,
-        workRelPath: owner ? full.slice(owner.physicalPath.length + 1).split(sep).join("/") : null,
+        workRelPath: owner ? toPortableRelativePath(owner.physicalPath, full) : null,
       });
     }
   }
