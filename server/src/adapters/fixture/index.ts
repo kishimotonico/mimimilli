@@ -27,17 +27,8 @@ import type { DataAdapter, MediaKind, MediaLocation } from "../../adapter.ts";
 import { buildAxisFacets } from "../../core/axisFacets.ts";
 import { evalSmartFolder } from "../../core/smartFolder.ts";
 import { applyWorksQuery } from "../../core/worksQuery.ts";
-import {
-  buildFsRoot,
-  buildWorkFileTree,
-  createSeedSmartFolders,
-  SEED_PRESETS,
-  SEED_TRACK_NAMES,
-  SEED_WORKS,
-  type FsNode,
-} from "./data.ts";
-
-const FS_ROOT_PATH = "/library";
+import { buildFsRoot, buildWorkFileTree, SEED_TRACK_NAMES, type FsNode } from "./data.ts";
+import { createFixtureScenario } from "./scenarios.ts";
 
 interface FixtureState {
   rootFolder: string | null;
@@ -49,19 +40,33 @@ interface FixtureState {
   nextSmartFolderId: number;
   /** 作品ごとのレジューム位置 */
   resumes: Map<string, ResumeBody>;
+  /** scan() が newWorkIds として返す、未取り込みの新規作品ID（シナリオ "new-work" 用） */
+  scanNewWorkIds: string[];
 }
 
-function createInitialState(): FixtureState {
+export interface FixtureAdapterOptions {
+  /** データシナリオ（省略時 "default"）。不明なIDはエラー */
+  scenario?: string;
+}
+
+function createInitialState(options: FixtureAdapterOptions): FixtureState {
   const now = new Date().toISOString();
+  const scenario = createFixtureScenario(options.scenario, now);
+  const maxPresetId = scenario.presets.reduce((max, p) => Math.max(max, p.id), 0);
+  const maxSmartFolderNum = scenario.smartFolders.reduce((max, sf) => {
+    const m = /^sf-(\d+)$/.exec(sf.id);
+    return m ? Math.max(max, Number(m[1])) : max;
+  }, 0);
   return {
-    rootFolder: FS_ROOT_PATH,
-    lastScanTime: now,
-    works: SEED_WORKS.map((w) => ({ ...w, tags: [...w.tags], urls: w.urls.map((u) => ({ ...u })) })),
-    smartFolders: createSeedSmartFolders(now),
-    presets: SEED_PRESETS.map((p) => ({ ...p, tagFilters: [...p.tagFilters] })),
-    nextPresetId: SEED_PRESETS.length + 1,
-    nextSmartFolderId: 3,
+    rootFolder: scenario.rootFolder,
+    lastScanTime: scenario.lastScanTime,
+    works: scenario.works,
+    smartFolders: scenario.smartFolders,
+    presets: scenario.presets,
+    nextPresetId: maxPresetId + 1,
+    nextSmartFolderId: maxSmartFolderNum + 1,
     resumes: new Map(),
+    scanNewWorkIds: scenario.scanNewWorkIds,
   };
 }
 
@@ -133,8 +138,8 @@ function resolveFsNode(root: FsNode, rootAbs: string, target: string): FsNode | 
   return cur;
 }
 
-export function createFixtureAdapter(): DataAdapter {
-  const state = createInitialState();
+export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataAdapter {
+  const state = createInitialState(options);
 
   return {
     // ── 設定・スキャン ──────────────────────────────────────
@@ -151,10 +156,10 @@ export function createFixtureAdapter(): DataAdapter {
       state.lastScanTime = new Date().toISOString();
       return {
         registered: state.works.length,
-        newlyGenerated: 0,
+        newlyGenerated: state.scanNewWorkIds.length,
         errors: state.works.filter((w) => w.status === "error").length,
         missing: state.works.filter((w) => w.status === "missing").length,
-        newWorkIds: [],
+        newWorkIds: state.scanNewWorkIds,
       };
     },
 
@@ -270,7 +275,7 @@ export function createFixtureAdapter(): DataAdapter {
 
     // ── 物理ファイルシステム（Filesモード） ────────────────────
     async browseFs(path?: string): Promise<FsListing | null> {
-      const rootAbs = normalizeFsPath(state.rootFolder ?? FS_ROOT_PATH);
+      const rootAbs = normalizeFsPath(state.rootFolder ?? "/library");
       const target = path ? normalizeFsPath(path) : rootAbs;
 
       const root = buildFsRoot(state.works);

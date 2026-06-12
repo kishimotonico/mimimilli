@@ -1,8 +1,10 @@
 // エントリーポイント。@hono/node-server で起動する。
 // env:
-//   PORT             … 待受ポート（デフォルト 8080）
-//   MIMIKAGO_ADAPTER … "real"（デフォルト） | "fixture"（インメモリ開発データ）
-//   MIMIKAGO_DB      … real アダプタの SQLite パス（デフォルト ./data/mimikago.db）
+//   PORT                  … 待受ポート（デフォルト 8080）
+//   MIMIKAGO_ADAPTER      … "real"（デフォルト） | "fixture"（インメモリ開発データ）
+//   MIMIKAGO_DB           … real アダプタの SQLite パス（デフォルト ./data/mimikago.db）
+//   MIMIKAGO_MOCK_SCENARIO … fixture アダプタのデータシナリオ
+//                            ("default" | "empty" | "new-work" | "errors"、省略時 "default")
 import { serve } from "@hono/node-server";
 import { createApp } from "./app.ts";
 import { createFixtureAdapter } from "./adapters/fixture/index.ts";
@@ -14,7 +16,7 @@ const adapterKind = process.env.MIMIKAGO_ADAPTER ?? "real";
 function createAdapter(): DataAdapter {
   switch (adapterKind) {
     case "fixture":
-      return createFixtureAdapter();
+      return createFixtureAdapter({ scenario: process.env.MIMIKAGO_MOCK_SCENARIO });
     case "real":
       return createRealAdapter({ dbPath: process.env.MIMIKAGO_DB ?? "data/mimikago.db" });
     default:

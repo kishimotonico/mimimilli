@@ -160,6 +160,21 @@ export const SEED_WORKS: WorkSummary[] = [
     bookmarked: true,
     lastPlayedAt: "2024-10-10T18:00:00.000Z",
   },
+  {
+    id: "RJ501011",
+    title: "【新作】ツンデレ後輩ちゃんの秘密のお世話ボイス",
+    coverImage: "cover.jpg",
+    status: "ok",
+    physicalPath: "/library/dlsite/月白製作所/RJ501011_ツンデレ後輩の秘密のお世話ボイス",
+    totalDurationSec: 2100, // 35分
+    addedAt: "2026-06-12T00:00:00.000Z",
+    errorMessage: null,
+    urls: [{ label: "DLsite", url: "https://www.dlsite.com/maniax/work/=/product_id/RJ501011.html" }],
+    tags: ["サークル/月白製作所", "cv/霧島レイ", "カテゴリ/シチュエーションボイス", "ツンデレ", "後輩"],
+    trackCount: 4,
+    bookmarked: false,
+    lastPlayedAt: null,
+  },
 ];
 
 /** 各作品のトラック名（収録曲名）。trackCount に満たない分は呼び出し側で `Track N` を補う */
@@ -188,6 +203,7 @@ export const SEED_TRACK_NAMES: Record<string, string[]> = {
   RJ501007: ["小雨の夜の読み聞かせ"],
   RJ501008: ["走り込み開始", "クールダウン"],
   RJ501010: ["第一幕", "第二幕", "第三幕", "終幕"],
+  RJ501011: ["ツンな日常", "デレの瞬間", "お世話の時間", "おやすみの言葉（照れ気味）"],
 };
 
 // ── /fs 用のインメモリディレクトリツリー ──────────────────────
