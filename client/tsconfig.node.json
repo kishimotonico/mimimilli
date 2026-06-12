@@ -9,5 +9,5 @@
     "moduleResolution": "bundler",
     "allowSyntheticDefaultImports": true
   },
-  "include": ["vite.config.ts", "mocks/**/*.ts"]
+  "include": ["vite.config.ts"]
 }

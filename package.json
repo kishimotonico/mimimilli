@@ -6,8 +6,13 @@
     "node": ">=24"
   },
   "scripts": {
+    "dev": "pnpm --filter @mimikago/client dev",
     "dev:server": "pnpm --filter @mimikago/server dev",
-    "check": "pnpm --filter @mimikago/shared check && pnpm --filter @mimikago/server check",
-    "test:server": "pnpm --filter @mimikago/server test"
+    "check": "pnpm --filter @mimikago/shared check && pnpm --filter @mimikago/server check && pnpm --filter @mimikago/client check",
+    "test": "pnpm --filter @mimikago/server test && pnpm --filter @mimikago/client test",
+    "test:server": "pnpm --filter @mimikago/server test",
+    "test:client": "pnpm --filter @mimikago/client test",
+    "test:visual": "pnpm --filter @mimikago/client test:visual",
+    "test:visual:update": "pnpm --filter @mimikago/client test:visual:update"
   }
 }

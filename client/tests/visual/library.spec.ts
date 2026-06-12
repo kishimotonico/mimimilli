@@ -51,8 +51,12 @@ test("scan result dialog", async ({ page }, testInfo) => {
 
   await openApp(page);
   await page.getByRole("button", { name: "スキャン" }).click();
+  const dialog = page.getByRole("dialog", { name: "スキャン完了" });
   await expect(page.getByRole("heading", { name: "スキャン完了" })).toBeVisible();
   await expect(page.getByText("新規検出された作品")).toBeVisible();
 
-  await expect(page).toHaveScreenshot("scan-result-dialog.png", { fullPage: true });
+  // fullPage 撮影だと半透明オーバーレイ越しの背景差分が閾値未満に圧縮され、
+  // ダイアログ内容の変化を maxDiffPixelRatio が薄めて検出できない（偽パス）。
+  // ダイアログ要素のみを撮影して差分の分母を内容に限定する。
+  await expect(dialog).toHaveScreenshot("scan-result-dialog.png");
 });

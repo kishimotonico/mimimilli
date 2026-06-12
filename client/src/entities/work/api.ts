@@ -2,23 +2,31 @@
 // ファイル一覧・DLsite メタデータ）を扱う。
 // 依存方向: shared/api/http と自 entity の model のみを参照する。
 
-import { API_BASE, get, post, put } from "../../shared/api/http";
-import type { Work, WorkSummary, FileEntry, DlsiteWorkInfo } from "./model";
-
-export async function getAllWorks(): Promise<WorkSummary[]> {
-  return get<WorkSummary[]>("/works");
-}
+import { API_BASE, get, patch, post } from "../../shared/api/http";
+import type { Work, WorkSummary, WorksPage, WorkPatch, FileEntry, DlsiteWorkInfo } from "@mimikago/shared";
 
 export async function getWork(id: string): Promise<Work | null> {
   return get<Work | null>(`/works/${encodeURIComponent(id)}`);
 }
 
-export async function updateWorkTags(workId: string, tags: string[]): Promise<void> {
-  await put(`/works/${encodeURIComponent(workId)}/tags`, { tags });
+/** WorksPage をそのまま返す（{ items, total }）。page/limit 省略時は items に全件が入る */
+export async function queryWorks(params: Record<string, string | number>): Promise<WorksPage> {
+  const p = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    p.set(key, String(value));
+  }
+  const q = p.toString();
+  return get<WorksPage>(`/works${q ? `?${q}` : ""}`);
 }
 
-export async function updateWorkTitle(workId: string, title: string): Promise<void> {
-  await put(`/works/${encodeURIComponent(workId)}/title`, { title });
+/** スキャン後の新規作品検出など、全件取得が必要な場合に使う */
+export async function getAllWorks(): Promise<WorkSummary[]> {
+  const page = await queryWorks({});
+  return page.items;
+}
+
+export async function patchWork(workId: string, body: WorkPatch): Promise<Work> {
+  return patch<Work>(`/works/${encodeURIComponent(workId)}`, body);
 }
 
 export async function getAllTags(): Promise<string[]> {
@@ -27,7 +35,7 @@ export async function getAllTags(): Promise<string[]> {
 
 /** カバー画像のURLを返す（<img src> で直接使用可） */
 export function getCoverImageUrl(workId: string): string {
-  return `${API_BASE}/works/${encodeURIComponent(workId)}/cover`;
+  return `${API_BASE}/media/cover/${encodeURIComponent(workId)}`;
 }
 
 /** 音声ファイルのURLを返す（<audio src> で直接使用可） */
@@ -36,7 +44,7 @@ export function getAudioUrl(workId: string, relativePath: string): string {
     .split("/")
     .map(encodeURIComponent)
     .join("/");
-  return `${API_BASE}/audio/${encodeURIComponent(workId)}/${encoded}`;
+  return `${API_BASE}/media/audio/${encodeURIComponent(workId)}/${encoded}`;
 }
 
 /** 物理ファイル（画像・PDF・テキスト等）のURLを返す（<img src> 等で直接使用可） */
@@ -45,14 +53,7 @@ export function getFileUrl(workId: string, relativePath: string): string {
     .split("/")
     .map(encodeURIComponent)
     .join("/");
-  return `${API_BASE}/files/${encodeURIComponent(workId)}/${encoded}`;
-}
-
-export async function toggleBookmark(workId: string): Promise<boolean> {
-  const r = await post<{ bookmarked: boolean }>(
-    `/works/${encodeURIComponent(workId)}/bookmark`
-  );
-  return r.bookmarked;
+  return `${API_BASE}/media/file/${encodeURIComponent(workId)}/${encoded}`;
 }
 
 export async function updateLastPlayed(workId: string): Promise<void> {

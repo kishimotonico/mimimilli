@@ -1,4 +1,5 @@
-import type { AxisId, SmartFolder } from "../../../types";
+import type { SmartFolder } from "@mimikago/shared";
+import type { AxisId } from "../model/types";
 import { I } from "../../../shared/ui/Icon";
 
 interface AxisRow {

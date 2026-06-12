@@ -1,8 +1,2 @@
-/** スキャン結果 */
-export interface ScanResult {
-  registered: number;
-  newlyGenerated: number;
-  errors: number;
-  missing: number;
-  newWorkIds: string[];
-}
+// スキャン結果（POST /api/scan）の型は @mimikago/shared を正典として re-export する。
+export type { ScanResult } from "@mimikago/shared";

@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "exports": {
+    "./app": "./src/app.ts",
+    "./adapters/fixture": "./src/adapters/fixture/index.ts"
+  },
   "scripts": {
     "dev": "node --watch src/index.ts",
     "start": "node src/index.ts",

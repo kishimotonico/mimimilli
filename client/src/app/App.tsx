@@ -20,7 +20,7 @@ import FullScreenPlayer from "../features/player/ui/FullScreenPlayer";
 import SetupScreen from "../features/setup/ui/SetupScreen";
 import SettingsModal from "../features/settings/ui/SettingsModal";
 import NewWorkPopup from "../features/scan/ui/NewWorkPopup";
-import type { ScanResult, WorkSummary } from "../types";
+import type { ScanResult, WorkSummary } from "@mimikago/shared";
 import { getWork } from "../entities/work/api";
 import { exportLibrary } from "../features/library/api";
 import { scanLibrary } from "../features/scan/api";

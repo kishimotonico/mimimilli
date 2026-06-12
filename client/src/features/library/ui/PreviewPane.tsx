@@ -1,4 +1,5 @@
-import type { Work, SmartFolder, WorkSummary, AxisId } from "../../../types";
+import type { Work, SmartFolder, WorkSummary } from "@mimikago/shared";
+import type { AxisId } from "../model/types";
 import CoverImg from "../../../entities/work/ui/CoverImg";
 import Tag from "../../../entities/work/ui/Tag";
 import { I } from "../../../shared/ui/Icon";

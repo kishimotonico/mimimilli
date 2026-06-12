@@ -3,31 +3,9 @@
 // React / API に依存しない（テスト容易性のため）。
 
 // ── /api/fs レスポンス型 ──────────────────────────────────────
+// API 契約に属する型は @mimikago/shared を正典として re-export する。
 
-export interface FsEntry {
-  name: string;
-  /** 絶対物理パス（次に browse する dir / 選択キー） */
-  path: string;
-  isDir: boolean;
-  size: number;
-  fileType: string;
-  /** dir のとき子要素数 */
-  childCount: number;
-  /** dir が登録作品ルート、または file が作品配下のとき所属作品 ID */
-  workId: string | null;
-  /** file のとき所属作品からの相対パス（既存メディア配信 URL 用） */
-  workRelPath: string | null;
-}
-
-export interface FsListing {
-  /** この listing の dir 絶対パス */
-  path: string;
-  /** 親 dir 絶対パス（ルートなら null） */
-  parent: string | null;
-  /** この dir 自身が登録作品ルートなら作品 ID（cwd フォルダープレビュー用） */
-  workId: string | null;
-  entries: FsEntry[];
-}
+export type { FsEntry, FsListing } from "@mimikago/shared";
 
 // ── ファイル種別 ──────────────────────────────────────────────
 

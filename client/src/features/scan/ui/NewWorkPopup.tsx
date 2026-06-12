@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import type { ScanResult, WorkSummary } from "../../../types";
-import * as api from "../../../api";
+import type { ScanResult, WorkSummary } from "@mimikago/shared";
+import { getAllWorks, patchWork } from "../../../entities/work/api";
 
 interface NewWorkPopupProps {
   scanResult: ScanResult;
@@ -35,7 +35,7 @@ const NewWorkPopup: React.FC<NewWorkPopupProps> = ({ scanResult, onClose }) => {
 
   useEffect(() => {
     if (scanResult.newWorkIds.length > 0) {
-      api.getAllWorks().then((all) => {
+      getAllWorks().then((all) => {
         const found = all.filter((w) => scanResult.newWorkIds.includes(w.id));
         setNewWorks(found);
       }).catch(() => {});
@@ -49,7 +49,7 @@ const NewWorkPopup: React.FC<NewWorkPopupProps> = ({ scanResult, onClose }) => {
 
   const handleSaveTitle = async (workId: string) => {
     if (editTitle.trim()) {
-      await api.updateWorkTitle(workId, editTitle.trim()).catch(() => {});
+      await patchWork(workId, { title: editTitle.trim() }).catch(() => {});
       setNewWorks((prev) =>
         prev.map((w) => (w.id === workId ? { ...w, title: editTitle.trim() } : w))
       );
@@ -71,6 +71,9 @@ const NewWorkPopup: React.FC<NewWorkPopupProps> = ({ scanResult, onClose }) => {
       }}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="スキャン完了"
         onClick={(e) => e.stopPropagation()}
         style={{
           background: C.bgSurface,

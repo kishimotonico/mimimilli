@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SORT_OPTIONS, GRID_SIZES, GRID_SIZE_KEYS } from '../../src/types';
+import { SORT_OPTIONS, GRID_SIZES, GRID_SIZE_KEYS } from '../../src/features/library/model/types';
 
 describe('types constants', () => {
   it('has correct sort options', () => {

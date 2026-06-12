@@ -8,6 +8,7 @@
 import { useRef, useCallback, useEffect } from "react";
 import { useAtom, useSetAtom } from "jotai";
 import type { Track, WorkSummary, Work } from "../../../entities/work/model";
+import { getAudioUrl } from "../../../entities/work/api";
 import { saveResumePosition, updateLastPlayed } from "../api";
 import { createAudioEngine } from "./audioEngine";
 import {
@@ -102,8 +103,7 @@ export function usePlayer() {
 
     const track = tracks[currentTrackIndex];
     const workId = currentWork.id;
-    const encoded = track.file.split("/").map(encodeURIComponent).join("/");
-    const assetUrl = `/api/audio/${encodeURIComponent(workId)}/${encoded}`;
+    const assetUrl = getAudioUrl(workId, track.file);
 
     // 前トラックの位置を保存
     const prev = loadedTrackRef.current;

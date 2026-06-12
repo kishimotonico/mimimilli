@@ -1,10 +1,11 @@
 {
-  "name": "mimikago",
+  "name": "@mimikago/client",
   "private": true,
   "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run --name mimi vite",
+    "check": "tsc",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run",
@@ -12,12 +13,8 @@
     "test:visual": "playwright test",
     "test:visual:update": "playwright test --update-snapshots"
   },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild"
-    ]
-  },
   "dependencies": {
+    "@mimikago/shared": "workspace:*",
     "@tanstack/react-query": "^5.100.14",
     "jotai": "^2.20.0",
     "motion": "^12.40.0",
@@ -25,6 +22,8 @@
     "react-dom": "^19.1.0"
   },
   "devDependencies": {
+    "@hono/node-server": "^1.14.0",
+    "@mimikago/server": "workspace:*",
     "@playwright/test": "^1.60.0",
     "@tailwindcss/vite": "^4.3.0",
     "@tanstack/react-query-devtools": "^5.100.14",

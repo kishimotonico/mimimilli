@@ -1,8 +1,9 @@
 import { useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { WorkSummary, AxisId } from "../../../types";
+import type { WorkSummary } from "@mimikago/shared";
+import type { AxisId } from "../model/types";
 import {
-  searchWorksV2,
+  searchWorks,
   getAxisFacets,
   listSmartFolders,
   createSmartFolder,
@@ -49,17 +50,17 @@ export default function LibraryView({ searchQuery, playingWorkId, playingTrackIn
   // ── Works（通常軸）─────────────────────────────────────────
   const worksParams = (() => {
     if (isSmartAxis(nav.activeAxis)) return null; // 別 query
-    const p: Parameters<typeof searchWorksV2>[0] = { sort: nav.sort };
+    const p: Parameters<typeof searchWorks>[0] = { sort: nav.sort };
     if (searchQuery) p.q = searchQuery;
     if (nav.activeAxis === "tag" && nav.selectedTags.length > 0) {
       p.tags = nav.selectedTags;
       p.tagOp = "AND";
     }
     if (VIEW_AXES.has(nav.activeAxis as string) && nav.activeAxis !== "all") {
-      p.view = nav.activeAxis as string;
+      p.view = nav.activeAxis as Parameters<typeof searchWorks>[0]["view"];
     }
     if (isFacetAxis(nav.activeAxis) && nav.drillValue) {
-      p.axis = nav.activeAxis as string;
+      p.axis = nav.activeAxis as Parameters<typeof searchWorks>[0]["axis"];
       p.axisValue = nav.drillValue;
     }
     return p;
@@ -67,7 +68,7 @@ export default function LibraryView({ searchQuery, playingWorkId, playingTrackIn
 
   const worksQuery = useQuery({
     queryKey: LIBRARY_KEYS.works(worksParams ?? {}),
-    queryFn: () => searchWorksV2(worksParams!),
+    queryFn: () => searchWorks(worksParams!),
     enabled: worksParams !== null,
   });
 
@@ -84,7 +85,7 @@ export default function LibraryView({ searchQuery, playingWorkId, playingTrackIn
 
   const works = isSmartAxis(nav.activeAxis)
     ? (smartWorksQuery.data ?? [])
-    : (worksQuery.data ?? []);
+    : (worksQuery.data?.items ?? []);
   const isLoading = isSmartAxis(nav.activeAxis)
     ? smartWorksQuery.isPending
     : worksQuery.isPending;
@@ -95,13 +96,13 @@ export default function LibraryView({ searchQuery, playingWorkId, playingTrackIn
   // ── ライブラリ総件数 ──────────────────────────────────────
   const libraryTotalQuery = useQuery({
     queryKey: LIBRARY_KEYS.libraryTotal(),
-    queryFn: () => searchWorksV2({}).then((w) => w.length),
+    queryFn: () => searchWorks({ limit: 1 }).then((page) => page.total),
   });
 
   // ── ファセット items ──────────────────────────────────────
   const facetAxis =
     (isFacetAxis(nav.activeAxis) && !nav.drillValue) || nav.activeAxis === "tag"
-      ? (nav.activeAxis as string)
+      ? (nav.activeAxis as Parameters<typeof getAxisFacets>[0])
       : null;
 
   const facetQuery = useQuery({

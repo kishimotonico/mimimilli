@@ -1,18 +1,12 @@
 // library feature のドメイン型。
+// API 契約に属する型（SortId, AxisFacetItem, SmartFolder, SearchPreset）は
+// @mimikago/shared を正典として re-export する。
 // Work / WorkSummary など work entity の型は entities/work/model から import する。
 
-// ── ソート ───────────────────────────────────────────────────
+export type { SortId, AxisFacetItem, SmartFolder, SearchPreset } from "@mimikago/shared";
+import type { SortId } from "@mimikago/shared";
 
-export type SortId =
-  | "added-desc"
-  | "added-asc"
-  | "title-asc"
-  | "title-desc"
-  | "duration-desc"
-  | "duration-asc"
-  | "last-played"
-  | "random"
-  | "id-asc";
+// ── ソート ───────────────────────────────────────────────────
 
 export const SORT_OPTIONS: { id: SortId; label: string }[] = [
   { id: "added-desc", label: "追加日（新しい順）" },
@@ -41,50 +35,10 @@ export const GRID_SIZES: Record<GridSize, number> = {
 
 export const GRID_SIZE_KEYS: GridSize[] = ["S", "M", "L", "XL"];
 
-// ── 軸・ファセット ────────────────────────────────────────────
+// ── 軸 ───────────────────────────────────────────────────────
 
 export type LibraryViewAxisId =
   | "all" | "recent" | "added" | "fav" | "unplayed" | "missing"
   | "circle" | "cv" | "series" | "cat" | "tag" | "year";
 
 export type AxisId = LibraryViewAxisId | `smart-${string}`;
-
-/** 軸 ID → タグプレフィックスのマッピング（作品フィルタリング用） */
-export const AXIS_TAG_PREFIX: Partial<Record<LibraryViewAxisId, string>> = {
-  circle: "サークル",
-  cv:     "cv",
-  series: "シリーズ",
-  cat:    "カテゴリ",
-};
-
-export interface AxisFacetItem {
-  value: string;
-  count: number;
-}
-
-// ── スマートフォルダー ────────────────────────────────────────
-
-export interface SmartFolderRule {
-  conjunction: "WHERE" | "AND" | "AND NOT";
-  field: string;
-  operator: string;
-  values: string[];
-}
-
-export interface SmartFolder {
-  id: string;
-  name: string;
-  rules: SmartFolderRule[];
-  sort: string;
-  createdAt: string;
-}
-
-// ── 検索プリセット ────────────────────────────────────────────
-
-export interface SearchPreset {
-  id: number;
-  name: string;
-  query: string;
-  tagFilters: string[];
-  sortId: string;
-}

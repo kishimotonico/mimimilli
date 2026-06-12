@@ -1,4 +1,4 @@
-import type { WorkSummary } from "../../../types";
+import type { WorkSummary } from "@mimikago/shared";
 import CoverImg from "../../../entities/work/ui/CoverImg";
 import { I } from "../../../shared/ui/Icon";
 import { formatDuration } from "../../../shared/lib/format";

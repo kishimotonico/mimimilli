@@ -1,5 +1,2 @@
-/** 設定 API のレスポンス型 */
-export interface Settings {
-  rootFolder: string | null;
-  lastScanTime: string | null;
-}
+// 設定（GET/PUT /api/settings）の型は @mimikago/shared を正典として re-export する。
+export type { Settings, SettingsUpdate } from "@mimikago/shared";
