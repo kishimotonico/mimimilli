@@ -1,5 +1,7 @@
 // GET /media/cover/:id, GET /media/audio/:id/*path, GET /media/file/:id/*path
-// adapter.locateMedia が null なら404。non-null なら node:fs でストリーミング。
+// adapter.locateMedia が null なら404。non-null なら location.type に応じて配信する:
+//   - "file": node:fs でストリーミング（real アダプタ）
+//   - "synthetic": メモリ上で合成したコンテンツを配信（fixture アダプタ）
 // audio は HTTP Range（206, Accept-Ranges, Content-Range）対応。
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
@@ -32,8 +34,26 @@ export function mediaRoute(adapter: DataAdapter): Hono {
   return app;
 }
 
+/** location のサイズを取得する（"file" は stat、"synthetic" は size プロパティ） */
+async function sizeOf(location: MediaLocation): Promise<number> {
+  if (location.type === "synthetic") return location.size;
+  const stats = await stat(location.absolutePath);
+  return stats.size;
+}
+
 /** Range 非対応の通常ストリーミング（200） */
 async function streamWhole(location: MediaLocation): Promise<Response> {
+  if (location.type === "synthetic") {
+    const body = location.read(0, location.size - 1);
+    return new Response(body, {
+      status: 200,
+      headers: {
+        "Content-Type": location.mime,
+        "Content-Length": String(location.size),
+      },
+    });
+  }
+
   const stats = await stat(location.absolutePath);
   const stream = Readable.toWeb(createReadStream(location.absolutePath)) as ReadableStream;
   return new Response(stream, {
@@ -47,10 +67,21 @@ async function streamWhole(location: MediaLocation): Promise<Response> {
 
 /** HTTP Range 対応のストリーミング（Range ヘッダーがあれば 206、無ければ 200） */
 async function streamWithRange(location: MediaLocation, rangeHeader: string | undefined): Promise<Response> {
-  const stats = await stat(location.absolutePath);
-  const fileSize = stats.size;
+  const fileSize = await sizeOf(location);
 
   if (!rangeHeader) {
+    if (location.type === "synthetic") {
+      const body = location.read(0, fileSize - 1);
+      return new Response(body, {
+        status: 200,
+        headers: {
+          "Content-Type": location.mime,
+          "Content-Length": String(fileSize),
+          "Accept-Ranges": "bytes",
+        },
+      });
+    }
+
     const stream = Readable.toWeb(createReadStream(location.absolutePath)) as ReadableStream;
     return new Response(stream, {
       status: 200,
@@ -72,6 +103,20 @@ async function streamWithRange(location: MediaLocation, rangeHeader: string | un
 
   const { start, end } = range;
   const chunkSize = end - start + 1;
+
+  if (location.type === "synthetic") {
+    const body = location.read(start, end);
+    return new Response(body, {
+      status: 206,
+      headers: {
+        "Content-Type": location.mime,
+        "Content-Length": String(chunkSize),
+        "Content-Range": `bytes ${start}-${end}/${fileSize}`,
+        "Accept-Ranges": "bytes",
+      },
+    });
+  }
+
   const stream = Readable.toWeb(
     createReadStream(location.absolutePath, { start, end })
   ) as ReadableStream;

@@ -179,7 +179,7 @@ export function createRealAdapter(options: RealAdapterOptions): DataAdapter {
 
       const resolved = resolveWithin(work.physicalPath, join(work.physicalPath, rel));
       if (!resolved) return null;
-      return { absolutePath: resolved, mime: mimeOf(resolved) };
+      return { type: "file", absolutePath: resolved, mime: mimeOf(resolved) };
     },
 
     async dlsiteFetch(workId: string): Promise<DlsiteWorkInfo | null> {

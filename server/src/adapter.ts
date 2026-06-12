@@ -28,11 +28,13 @@ import type {
 /** 前提条件（ルートフォルダー未設定等）を満たしていない操作。HTTP では 409 conflict */
 export class NotConfiguredError extends Error {}
 
-/** メディア実体の所在。ルートがストリーミング（Range 対応）を担当する */
-export interface MediaLocation {
-  absolutePath: string;
-  mime: string;
-}
+/** メディア実体の所在。ルートがストリーミング（Range 対応）を担当する。
+ *  - "file": 実ファイル参照（real アダプタ）。ルートが node:fs でストリーミングする
+ *  - "synthetic": メモリ上で合成するコンテンツ（fixture アダプタ）。
+ *    全体をメモリに保持せず、`read(start, end)` で要求された byte range 分だけ生成する */
+export type MediaLocation =
+  | { type: "file"; absolutePath: string; mime: string }
+  | { type: "synthetic"; mime: string; size: number; read: (start: number, end: number) => Uint8Array };
 
 export type MediaKind = "cover" | "audio" | "file";
 

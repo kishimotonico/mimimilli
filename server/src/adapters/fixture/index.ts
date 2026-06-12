@@ -28,6 +28,13 @@ import { buildAxisFacets } from "../../core/axisFacets.ts";
 import { evalSmartFolder } from "../../core/smartFolder.ts";
 import { applyWorksQuery } from "../../core/worksQuery.ts";
 import { buildFsRoot, buildWorkFileTree, SEED_TRACK_NAMES, type FsNode } from "./data.ts";
+import {
+  resolveTrackDurationSec,
+  synthesizeCoverSvg,
+  synthesizeFilePlaceholderSvg,
+  synthesizeFilePlaceholderText,
+  synthesizeSilentWav,
+} from "./media.ts";
 import { createFixtureScenario } from "./scenarios.ts";
 
 interface FixtureState {
@@ -122,6 +129,29 @@ function buildWorkFileEntryTree(work: WorkSummary): FileEntry {
 function normalizeFsPath(path: string): string {
   const trimmed = path.replace(/\/+$/, "");
   return trimmed === "" ? "/" : trimmed;
+}
+
+/** 作品配下のファイルツリーから相対パス（"特典/台本.pdf" 等）でノードを探す。
+ *  存在しない・ディレクトリの場合は null */
+function findWorkFile(work: WorkSummary, relPath: string): FsNode | null {
+  const segments = relPath.split("/").filter(Boolean);
+  if (segments.length === 0) return null;
+
+  let nodes = buildWorkFileTree(work);
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i];
+    const node = nodes.find((n) => n.name === seg);
+    if (!node) return null;
+    if (i === segments.length - 1) return node.isDir ? null : node;
+    if (!node.isDir) return null;
+    nodes = node.children;
+  }
+  return null;
+}
+
+/** 画像っぽい拡張子か */
+function isImagePath(path: string): boolean {
+  return /\.(jpe?g|png|gif|bmp|webp|avif|svg)$/i.test(path);
 }
 
 /** root 配下の絶対パスからノードを辿る。root 配下でない・存在しなければ null */
@@ -302,9 +332,39 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
     },
 
     // ── メディア・DLsite ────────────────────────────────────
-    async locateMedia(_kind: MediaKind, _workId: string, _relPath?: string): Promise<MediaLocation | null> {
-      // fixture アダプタには実体ファイルが無いため常に null（呼び出し元ルートが 404 を返す）
-      return null;
+    // fixture アダプタには実体ファイルが無いため、再生・シーク・カバー表示が
+    // 成立するようメモリ上でコンテンツを合成する（synthetic MediaLocation）。
+    async locateMedia(kind: MediaKind, workId: string, relPath?: string): Promise<MediaLocation | null> {
+      const work = state.works.find((w) => w.id === workId);
+      if (!work) return null;
+
+      if (kind === "cover") {
+        // real アダプタと同様、coverImage 未設定なら 404（クライアント側で placeholder 表示）
+        if (!work.coverImage) return null;
+        return synthesizeCoverSvg(work);
+      }
+
+      if (!relPath) return null;
+
+      if (kind === "audio") {
+        const namedTracks = SEED_TRACK_NAMES[work.id];
+        const tracks = Array.from({ length: work.trackCount }, (_, i) => ({
+          title: namedTracks?.[i] ?? `Track ${i + 1}`,
+          file: `track${String(i + 1).padStart(2, "0")}.mp3`,
+        }));
+        const track = tracks.find((t) => t.file === relPath);
+        if (!track) return null;
+
+        const durationSec = resolveTrackDurationSec(track, work, tracks.length);
+        return synthesizeSilentWav(durationSec);
+      }
+
+      // kind === "file": 作品配下に実在するパスのみ応答する
+      const node = findWorkFile(work, relPath);
+      if (!node) return null;
+
+      if (isImagePath(relPath)) return synthesizeFilePlaceholderSvg(relPath);
+      return synthesizeFilePlaceholderText(relPath);
     },
 
     async dlsiteFetch(workId: string): Promise<DlsiteWorkInfo | null> {
