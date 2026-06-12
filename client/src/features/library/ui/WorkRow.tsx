@@ -33,13 +33,25 @@ export default function WorkRow({ work, isSelected, isPlaying, onSelect }: WorkR
     work.totalDurationSec > 0 ? formatDuration(work.totalDurationSec) : null,
   ].filter(Boolean).join(" · ");
 
+  const statusLabel =
+    work.status === "missing" ? "ファイル欠損"
+    : work.status === "error" ? "メタ読み込みエラー"
+    : null;
+
   return (
     <div className={`mll-wrow ${isSelected ? "is-on" : ""}`} onClick={onSelect}>
       <div className="mll-wrow__cv">
         <CoverImg id={work.id} title={work.title} hasCover={!!work.coverImage} size={32} radius={4} />
       </div>
       <div className="mll-wrow__body">
-        <span className="mll-wrow__title">{work.title}</span>
+        <span className="mll-wrow__title">
+          {statusLabel && (
+            <span className="mll-wrow__status" title={statusLabel}>
+              <I.err size={11} />
+            </span>
+          )}
+          {work.title}
+        </span>
         {sub && <span className="mll-wrow__sub">{sub}</span>}
       </div>
       <div className="mll-wrow__meta">

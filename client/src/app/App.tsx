@@ -87,6 +87,8 @@ export default function App() {
 
   // ── Play handler ──────────────────────────────────────────
   const handlePlay = useCallback(async (work: WorkSummary, trackIndex: number) => {
+    // ファイル欠損・メタ読み込みエラーの作品は再生できない（UI側の無効化が第一線、これは防衛線）。
+    if (work.status !== "ok") return;
     const requestId = ++playRequestIdRef.current;
     try {
       const cached = queryClient.getQueryData<Awaited<ReturnType<typeof getWork>>>(
@@ -102,8 +104,8 @@ export default function App() {
       if (tracks.length > 0) {
         player.play(work, tracks, Math.min(trackIndex, tracks.length - 1));
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      console.error("作品の再生に失敗しました", err);
     }
   }, [player, queryClient]);
 
@@ -119,9 +121,11 @@ export default function App() {
       const fullWork = cached ?? await getWork(entry.workId);
       if (requestId !== playRequestIdRef.current) return;
       if (!fullWork) return;
+      // ファイル欠損・メタ読み込みエラーの作品配下のファイルは再生できない。
+      if (fullWork.status !== "ok") return;
       player.play(fullWork, [{ title: entry.name, file: entry.workRelPath }], 0);
-    } catch {
-      // ignore
+    } catch (err) {
+      console.error("ファイルの再生に失敗しました", err);
     }
   }, [player, queryClient]);
 

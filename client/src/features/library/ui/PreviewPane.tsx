@@ -20,7 +20,7 @@ interface WorkDetailProps {
 function WorkDetail({ work, onPlay, playingTrackIndex }: WorkDetailProps) {
   const playlist = work.playlists.find((p) => p.name === (work.defaultPlaylist ?? "default")) ?? work.playlists[0];
   const tracks = playlist?.tracks ?? [];
-
+  const isPlayable = work.status === "ok";
 
   return (
     <div className="mle-prv__body">
@@ -30,7 +30,9 @@ function WorkDetail({ work, onPlay, playingTrackIndex }: WorkDetailProps) {
         </div>
         <div className="mle-prv__meta">
           <div className="mle-prv__kicker">
-            <span className="reg">登録済</span>
+            {work.status === "ok" && <span className="reg">登録済</span>}
+            {work.status === "missing" && <span className="warn"><I.err size={11} /> ファイル欠損</span>}
+            {work.status === "error" && <span className="warn"><I.err size={11} /> メタ読み込みエラー</span>}
             <span>追加 {formatDate(work.addedAt)}</span>
             {work.lastPlayedAt && <span>· 最終再生 {formatDate(work.lastPlayedAt)}</span>}
           </div>
@@ -47,7 +49,12 @@ function WorkDetail({ work, onPlay, playingTrackIndex }: WorkDetailProps) {
             {work.tags.map((t) => <Tag key={t} tag={t} />)}
           </div>
           <div className="mle-prv__actions">
-            <button className="mll-fab is-primary" onClick={() => onPlay(0)}>
+            <button
+              className="mll-fab is-primary"
+              disabled={!isPlayable}
+              aria-disabled={!isPlayable}
+              onClick={() => { if (isPlayable) onPlay(0); }}
+            >
               <I.play size={12} /> 最初から再生
             </button>
             <button className="mll-fab">
@@ -62,6 +69,28 @@ function WorkDetail({ work, onPlay, playingTrackIndex }: WorkDetailProps) {
         </div>
       </div>
 
+      {work.status === "missing" && (
+        <div className="mle-prv__warn">
+          <I.err size={16} />
+          <div className="mle-prv__warn-body">
+            <p className="mle-prv__warn-title">ファイルが見つかりません</p>
+            <p className="mle-prv__warn-text">登録時のフォルダーが移動または削除された可能性があります。再生はできません。</p>
+            <p className="mle-prv__warn-path">{work.physicalPath}</p>
+          </div>
+        </div>
+      )}
+
+      {work.status === "error" && (
+        <div className="mle-prv__warn">
+          <I.err size={16} />
+          <div className="mle-prv__warn-body">
+            <p className="mle-prv__warn-title">メタデータの読み込みに失敗しました</p>
+            <p className="mle-prv__warn-text">{work.errorMessage ?? "詳細不明のエラーが発生しました。"}</p>
+            <p className="mle-prv__warn-path">{work.physicalPath}</p>
+          </div>
+        </div>
+      )}
+
       {tracks.length > 0 && (
         <>
           <div className="mle-sect">
@@ -72,8 +101,8 @@ function WorkDetail({ work, onPlay, playingTrackIndex }: WorkDetailProps) {
             {tracks.map((tr, i) => (
               <div
                 key={i}
-                className={`mle-prv__trk ${playingTrackIndex === i ? "is-now" : ""}`}
-                onClick={() => onPlay(i)}
+                className={`mle-prv__trk ${playingTrackIndex === i ? "is-now" : ""} ${!isPlayable ? "is-disabled" : ""}`}
+                onClick={() => { if (isPlayable) onPlay(i); }}
               >
                 <span className="num">{String(i + 1).padStart(2, "0")}</span>
                 <span className="name">{tr.title}</span>
@@ -81,7 +110,7 @@ function WorkDetail({ work, onPlay, playingTrackIndex }: WorkDetailProps) {
                   <span className="dur">{formatDuration(Math.round(tr.end - tr.start))}</span>
                 )}
                 <div className="src">
-                  <button className="mle-icbtn" title="再生">
+                  <button className="mle-icbtn" title="再生" disabled={!isPlayable} aria-disabled={!isPlayable}>
                     <I.play size={11} />
                   </button>
                 </div>

@@ -344,6 +344,8 @@
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: 0.005em;
 }
 .mll-wrow.is-on.is-focused .mll-wrow__title { color: var(--paper-1); }
+.mll-wrow__status { display: inline-flex; color: var(--r-coral); margin-right: 4px; flex-shrink: 0; vertical-align: -1px; }
+.mll-wrow.is-on.is-focused .mll-wrow__status { color: oklch(80% 0.12 25); }
 .mll-wrow__sub {
   font-family: var(--font-mono); font-size: 9.5px; color: var(--ink-3);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -541,6 +543,11 @@
   letter-spacing: 0.08em; color: var(--ink-3);
 }
 .mle-prv__kicker .reg { background: var(--acc-soft); color: var(--acc-ink); padding: 1px 6px; border-radius: 4px; font-weight: 600; }
+.mle-prv__kicker .warn {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: oklch(72% 0.165 25 / 0.14); color: var(--r-coral);
+  padding: 1px 6px; border-radius: 4px; font-weight: 600;
+}
 .mle-prv__title {
   font-family: var(--font-jp); font-size: 22px; font-weight: 600;
   letter-spacing: -0.005em; color: var(--ink-0); line-height: 1.25; margin: 0; text-wrap: balance;
@@ -551,6 +558,18 @@
 .mle-prv__row .dot { color: var(--ink-4); }
 .mle-prv__tags    { display: flex; flex-wrap: wrap; gap: 4px; }
 .mle-prv__actions { display: flex; gap: 6px; padding-top: 4px; flex-wrap: wrap; }
+
+.mle-prv__warn {
+  display: flex; gap: 10px; align-items: flex-start;
+  margin-top: 18px; padding: 12px 14px; border-radius: var(--r-2);
+  background: oklch(72% 0.165 25 / 0.08); border: 1px solid oklch(72% 0.165 25 / 0.28);
+  color: var(--r-coral);
+}
+.mle-prv__warn-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.mle-prv__warn-title { font-family: var(--font-jp); font-size: 12.5px; font-weight: 600; color: var(--ink-0); margin: 0; }
+.mle-prv__warn-text  { font-size: 12px; color: var(--ink-1); margin: 0; }
+.mle-prv__warn-path  { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-3); margin: 2px 0 0; word-break: break-all; }
+
 .mle-prv__tracks  { display: flex; flex-direction: column; gap: 1px; }
 .mle-prv__trk {
   display: grid; grid-template-columns: 22px 1fr 56px auto;
@@ -564,6 +583,10 @@
 .mle-prv__trk.is-now { background: var(--acc-soft); }
 .mle-prv__trk.is-now .name { color: var(--acc-ink); font-weight: 600; }
 .mle-prv__trk.is-now .num  { color: var(--acc); }
+.mle-prv__trk.is-disabled { cursor: not-allowed; color: var(--ink-3); }
+.mle-prv__trk.is-disabled:hover { background: transparent; }
+.mle-prv__trk.is-disabled .name { color: var(--ink-3); }
+.mle-prv__trk.is-disabled .dur  { color: var(--ink-4); }
 
 /* ── Section labels ───────────────────────────────────────── */
 
@@ -692,6 +715,12 @@
 .mll-fab.is-primary { background: var(--ink-0); color: var(--paper-1); }
 .mll-fab.is-primary:hover { background: var(--acc); }
 .mll-fab.is-on { background: var(--acc-soft); color: var(--acc-ink); border-color: var(--acc-line); }
+.mll-fab:disabled, .mll-fab[aria-disabled="true"] {
+  cursor: not-allowed; background: var(--paper-2); color: var(--ink-4);
+}
+.mll-fab.is-primary:disabled, .mll-fab.is-primary[aria-disabled="true"] {
+  background: var(--paper-2); color: var(--ink-4);
+}
 
 /* ── Generic icon button ──────────────────────────────────── */
 
@@ -700,6 +729,8 @@
   display: grid; place-items: center; color: var(--ink-2);
 }
 .mle-icbtn:hover { background: var(--paper-3); color: var(--ink-0); }
+.mle-icbtn:disabled, .mle-icbtn[aria-disabled="true"] { cursor: not-allowed; color: var(--ink-4); }
+.mle-icbtn:disabled:hover, .mle-icbtn[aria-disabled="true"]:hover { background: transparent; color: var(--ink-4); }
 
 /* ── Barwave (now-playing animation) ─────────────────────── */
 

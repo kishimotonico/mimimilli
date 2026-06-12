@@ -46,6 +46,19 @@ test("library shell", async ({ page }) => {
   await expect(page).toHaveScreenshot("library-shell.png", { fullPage: true });
 });
 
+test("work detail panel - missing file", async ({ page }) => {
+  await openApp(page);
+
+  await page.getByText("お気に入りだった朗読劇", { exact: false }).click();
+
+  const panel = page.locator(".mle-prv");
+  await expect(panel.getByText("ファイル欠損", { exact: true })).toBeVisible();
+  await expect(panel.getByText("ファイルが見つかりません")).toBeVisible();
+
+  // パネル要素のみを撮影し、リスト側のレイアウト差分を含めない。
+  await expect(panel).toHaveScreenshot("work-detail-missing.png");
+});
+
 test("scan result dialog", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop-chromium", "desktop scenario only");
 
