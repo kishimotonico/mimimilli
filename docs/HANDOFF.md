@@ -1,242 +1,168 @@
 # 引き継ぎドキュメント
 
-このドキュメントは mimikago プロジェクトの現状と今後の作業を後任が把握するためのものです。
+mimikago の現状と進行中の作業を、後続のエージェント／セッションが把握するための資料。
+最終更新: 2026-06-13。
 
-## プロジェクト概要
+## このアプリは何か
 
-DLsite/FANZAからダウンロードした音声作品（ASMR等）をローカルで管理・再生するアプリ。タグベースの検索と物理フォルダー管理を両立する設計。
+DLsite/FANZA 等からダウンロードした音声作品（ASMR・ボイスドラマ等）をローカルで管理・再生する常駐 Web アプリ。タグ／分類軸ベースの検索と、物理フォルダー（ファイラー）の両モードを持つ。`.meta.json` を Source of Truth、SQLite を検索キャッシュとする。
 
-**技術スタック:** axum 0.8 + tokio (Rust) + React 19 + TypeScript + SQLite (rusqlite) + Vite 7 + pnpm
+設計の基準ドキュメントは [docs/architecture-v2-proposal.md](architecture-v2-proposal.md)（承認済み）と [ADR-0001](adr/0001-typescript-api-server.md) / [ADR-0002](adr/0002-mock-as-fixture-adapter.md)。要件は [docs/requirements-v4.md](requirements-v4.md)。
 
-## 現在のステータス
+## アーキテクチャ（v2、現行）
 
-**2026年5月:** mimimilli デザイン（`docs/design_handoff_mimimilli_library/`）をベースにフロントエンドとバックエンドを全面再構築中。
-
-- **デザイン正典:** `docs/design_handoff_mimimilli_library/` の mimimilli モック（3ペイン Library モード・tokens.css ベースデザインシステム）
-- **フロントエンド:** 既存の `client/src/components/*` は廃棄し、mimimilli デザインで全面置き換え予定。現時点では旧コンポーネントが残っているが、新実装と混在させない方針
-- **バックエンド:** 既存の axum サーバーは動作するが、軸ファセット集計・タグAND検索・スマートフォルダーの新エンドポイントを追加するため全面再構築予定
-- **スコープ:** フェーズ1は Library モードのみ（File Explorer は将来）。詳細は `docs/requirements-v4.md`
+旧 Rust/axum サーバーは廃止し `server-rust/` へ退避済み（参照実装）。現行は **TypeScript モノレポ**。
 
 ```
-npx tsc --noEmit                                    → エラーなし（フロント）
-cargo check --manifest-path server/Cargo.toml → OK
+mimikago/                      # pnpm workspace（ルートに統合済み）
+├── client/   React 19 + Vite SPA（feature-first: app → features → entities → shared）
+├── server/   Hono + Node。routes（薄い） / core（ドメイン） / adapters（real | fixture）
+└── shared/   API契約の正典。Zod スキーマ + 型（client / server 双方が依存）
 ```
 
-## アーキテクチャ
+- **契約の正典は `shared/`**（Zod）。client は `@mimikago/shared` から型を import し、server も同じ型でルートを実装する。契約のズレは `tsc` が機械検出する
+- **アダプタ境界（ADR-0002）**: ルーター・ドメインロジックは1系統。データの出どころだけ差し替える
+  - `fixture` アダプタ: インメモリの開発データ（旧 `client/mocks/` を昇格させたもの）。シナリオ切替（`MIMIKAGO_MOCK_SCENARIO` = default/empty/new-work/errors）と**合成メディア**（無音WAV・SVGカバー、Range対応）を持つ
+  - `real` アダプタ: SQLite（Drizzle）+ 実FS + スキャナー + DLsite
+- **dev は vite middleware**: `client/vite.config.ts` が `BACKEND_URL` 未指定時、server の Hono アプリ（fixture注入）を dev middleware としてマウント。`pnpm dev` 一発で UI もモックAPIも動く
 
-### バックエンド（Rust — server/）
+### ⚠ dev サーバーの落とし穴（重要）
 
-サービス層パターンを採用。
+vite middleware は fixture アダプタと Hono アプリを**プラグイン初期化時に1度だけ生成**する。そのため **`server/src` を変更しても起動中の dev サーバーには反映されない**（fixtureもアプリも古いインスタンスのまま）。
 
-```
-HTTP Handler (handlers/*.rs) → 薄いラッパー
-  ↓
-サービス層 (service.rs) → ビジネスロジック
-  ↓
-DB (db.rs) / スキャナー (scanner.rs) / DLsiteスクレイパー (dlsite.rs)
-```
+- 症状例: 合成メディアを server に足しても、起動中 dev サーバーは cover/audio を 404 のまま返す
+- 切り分け: `MIMIKAGO_ADAPTER=fixture PORT=18099 node server/src/index.ts` で別ポート起動して `curl` 確認（こちらは最新コードで応答する）
+- 対処: **サーバー側を変えたら dev サーバーを手動再起動**。client 側（`src/`）の変更は HMR で反映されるので影響なし
 
-**モジュール一覧:**
+## 起動・検証コマンド
 
-| ファイル | 責務 |
-|---------|------|
-| `main.rs` | axum Router 定義、`AppService` の初期化 |
-| `handlers/settings.rs` | `GET/POST /api/settings` |
-| `handlers/library.rs` | スキャン・作品CRUD・タグ・プリセット |
-| `handlers/media.rs` | カバー画像・音声・ファイル配信 |
-| `handlers/integrations.rs` | DLsite fetch/apply |
-| `service.rs` | ルートフォルダー管理、スキャン、タグ更新、メタファイル書き戻し、DLsite連携 |
-| `db.rs` | SQLite CRUD。WALモード |
-| `scanner.rs` | ファイルシステム再帰走査、`.meta.json` 検出・自動生成、IDベース移動追従 |
-| `dlsite.rs` | DLsiteスクレイピング。HTMLパース、RJコード抽出、カバー画像ダウンロード |
-| `models.rs` | 全データモデル。`serde`の`camelCase`シリアライゼーション |
-
-**エンドポイント一覧:**
-
-| メソッド | パス | 概要 |
-|---------|------|------|
-| `GET` | `/api/settings` | 設定取得 |
-| `POST` | `/api/settings` | 設定更新（ルートフォルダー等） |
-| `POST` | `/api/scan` | ライブラリスキャン実行 |
-| `POST` | `/api/export` | ライブラリJSONエクスポート |
-| `GET` | `/api/works` | 作品一覧取得 |
-| `GET` | `/api/works/:id` | 作品詳細取得 |
-| `PUT` | `/api/works/:id/tags` | タグ更新 |
-| `PUT` | `/api/works/:id/title` | タイトル更新 |
-| `POST` | `/api/works/:id/bookmark` | ブックマーク切り替え |
-| `POST` | `/api/works/:id/last-played` | 最終再生日時更新 |
-| `POST` | `/api/works/:id/resume` | レジューム位置保存 |
-| `GET` | `/api/works/:id/files` | 物理ファイル一覧取得 |
-| `GET` | `/api/tags` | 全タグ一覧取得 |
-| `GET` | `/api/presets` | 検索プリセット一覧 |
-| `POST` | `/api/presets` | 検索プリセット保存 |
-| `DELETE` | `/api/presets/:id` | 検索プリセット削除 |
-| `GET` | `/api/works/:id/cover` | カバー画像配信 |
-| `GET` | `/api/audio/:id/*path` | 音声ファイル配信 |
-| `GET` | `/api/files/:id/*path` | 物理ファイル配信 |
-| `POST` | `/api/dlsite/:id/fetch` | DLsite情報取得 |
-| `POST` | `/api/dlsite/:id/apply` | DLsite情報適用 |
-
-**DBスキーマ:**
-
-| テーブル | 用途 |
-|---------|------|
-| `works` | 作品テーブル（`urls_json`, `playlists_json`はJSON列、`bookmarked`, `last_played_at`, `resume_position`, `resume_track_index`を含む） |
-| `tags` | タグマスタ |
-| `work_tags` | 多対多リレーション |
-| `app_settings` | KVストア（ルートフォルダー、最終スキャン日時等） |
-| `search_presets` | 検索プリセット保存 |
-
-**Rust依存関係（主要）:** axum 0.8, tokio, tower-http (cors), rusqlite 0.31 (bundled), walkdir 2, uuid 1, chrono 0.4, serde/serde_json 1, reqwest 0.12 (blocking, rustls-tls, cookies), scraper 0.22, env_logger
-
-### フロントエンド（React + TypeScript — client/）
-
-**現在再構築中。** 確定次第このセクションを補完する。
-
-API 層は `client/src/api.ts` が `/api` を fetch ベースで呼び出す HTTP client として実装されている。型定義は `client/src/types.ts`（`Work`, `WorkSummary`, `ScanResult`, `SearchPreset`, `FileEntry`, `DlsiteWorkInfo`）。
-
-**フロント依存関係:** react 19, react-dom 19, portless（開発サーバー固定ポート用）
-
-## データフロー
-
-### メタファイルとDBの関係
-
-```
-.meta.json (Source of Truth)
-  ↓ スキャン時に読み込み
-SQLite DB (パフォーマンスキャッシュ)
-  ↓ UIから編集時
-.meta.json に書き戻し（同一操作内）
-```
-
-### スキャンフロー
-
-1. `mark_all_missing()` で全作品を「行方不明」にマーク
-2. ルートフォルダーを再帰走査し `.meta.json` を検出
-3. 見つかった作品は `mark_found()` で「正常」に復帰（ブックマーク・レジューム情報は保持）
-4. メタファイルのないフォルダーに音声ファイルがあれば `.meta.json` を自動生成
-5. IDベースの移動追従：同一IDで異なるパスの作品を検出し、パスを更新
-6. 最終的にmissingのまま残った作品 = 物理パスが消失
-
-### 音声再生フロー
-
-1. フロントエンドでトラック選択
-2. `/api/audio/:id/*path` で音声を HTTP ストリーミング取得
-3. HTML5 Audio の `src` に設定して再生
-4. イベントリスナーで状態同期（`timeupdate`, `durationchange`, `ended`, `play`, `pause`）
-5. レジューム位置を5秒ごとに `POST /api/works/:id/resume` で自動保存
-
-### DLsiteスクレイピングフロー
-
-1. FullView の「DLsite情報を取得」ボタンをクリック → `POST /api/dlsite/:id/fetch`
-2. サーバー側でフォルダ名 → タイトルの順でRJコードを自動検出
-3. `reqwest` でDLsiteのHTMLを取得（Cookie `adultchecked=1` で年齢確認バイパス）
-4. `scraper` クレートで以下を抽出:
-   - タイトル: `#work_name`
-   - サークル名: `span.maker_name a`
-   - CV: `<th>声優</th>` の親行内の `<td> a`
-   - ジャンルタグ: `div.main_genre a`
-   - カバー画像: `div.product-slider-data div[data-src]`
-5. フロントでプレビューUI表示後、ユーザーが「すべて適用」「タグのみ」「タイトルのみ」を選択
-6. 「適用」で `POST /api/dlsite/:id/apply` → DB・メタファイルに書き戻し
-
-## バックエンドで確認済みの機能
-
-### 実装済み（API レベルで保証）
-
-- ルートフォルダー指定と設定保存
-- フルスキャン（手動 + axum エンドポイント経由）
-- `.meta.json` の読み書き + 自動生成
-- IDベースの作品移動追従
-- タグの追加・削除・テキスト検索
-- 作品タイトル編集
-- 複数URLの保存
-- ブックマーク切り替え
-- レジューム再生（再生位置保存・復元）
-- 最終再生日時の記録
-- 検索プリセットの保存・適用・削除
-- フォルダービュー（物理ファイル一覧取得）
-- ライブラリエクスポート（JSON）
-- DLsiteスクレイピング（タイトル、サークル、CV、ジャンルタグ、カバー画像）
-- カバー画像・音声・物理ファイルの HTTP 配信
-
-### フロント再構築中
-
-プレイヤー UI（再生速度、L⇄R 入替、A-B リピート、フル画面プレイヤー）等は、フロントエンド再構築後に順次復元・確定する。
-
-## セキュリティ対策
-
-| 項目 | 対策 |
-|------|------|
-| パストラバーサル | `get_audio_file_path`/`get_cover_image_path`で`canonicalize()` + `starts_with()`検証 |
-| Mutex poisoning | 全`lock()`に`map_err()`でエラー伝搬（panicしない） |
-| JSONシリアライゼーション | `map_err()`で明示的エラー処理 |
-| DLsiteスクレイピング | 認証情報不要、Cookie最小限（`adultchecked=1`のみ） |
-
-## 実装上の注意点（サーバー側）
-
-### DLsiteスクレイピングのセレクタ
-
-実際のDLsite HTMLで検証済み（2026年3月時点）。DLsiteのHTML構造が変更された場合は `dlsite.rs` のセレクタ修正が必要。
-
-| セレクタ | 対象 |
-|---------|------|
-| `#work_name` | 作品タイトル（`<h1 id="work_name">`） |
-| `span.maker_name a` | サークル名 |
-| `th`内「声優」→ 親の`td a` | CV名 |
-| `div.main_genre a` | ジャンルタグ |
-| `div.product-slider-data div[data-src]` | カバー画像URL |
-
-## 既知の制約
-
-- ブラウザ単体ではバックエンドが必須（カバー画像・音声は `/api/...` 経由で配信）。`pnpm dev` のみの場合はモック API が代替応答する
-- 検索はクライアントサイドフィルタリング（大量データではパフォーマンス要検討）
-- 合計再生時間は`start`/`end`指定がある場合のみ計算可能
-
-## Phase 3以降の未実装項目
-
-要件定義の全文は `docs/requirements-v4.md` を参照。
-
-- バックグラウンド再生 + グローバルホットキー
-- ギャップレス再生
-- 作品横断プレイリスト
-- プレイヤーバーのフローティングモード
-- DLsite自動スクレイピング（スキャン時にRJコード検出で自動取得）
-- 差分スキャン（変更検出による高速化）
-- SSE によるスキャン進捗リアルタイム通知
-- ファイル監視（watcherによるリアルタイム検知）
-
-## 開発環境
+開発サーバーは別シェルで起動済みのことが多い（`pnpm dev` を勝手に実行しない）。アクセスは `http://mimi.localhost:1355`（IP不可）。`agent-browser` を使うときは必ず `--session <名前>` を付ける（他セッションとブラウザ／タブを共有して奪い合うのを防ぐ）。
 
 ```bash
-# フロントエンド開発サーバー起動（モック API）
-cd client && pnpm dev
-# => http://mimi.localhost:1355
+# ルートから
+pnpm check          # shared + server + client の tsc
+pnpm test           # server (node:test) + client (vitest)
+pnpm test:server
+pnpm test:client
 
-# バックエンド起動
-cd server && cargo run
-# => http://localhost:8080
+# ビジュアル回帰（Playwright。client/ から）
+cd client && pnpm exec playwright test                    # 比較
+cd client && pnpm exec playwright test --update-snapshots # 再生成
+# webServer は MIMIKAGO_MOCK_SCENARIO=new-work で別ポート(4175)に自前で立つ
 
-# フロントを実バックエンドに向けて起動
-cd client && BACKEND_URL=http://localhost:8080 pnpm dev
-
-# TypeScript型チェック
-cd client && npx tsc --noEmit
-
-# Rustのみチェック
-cd server && PATH="$HOME/.cargo/bin:$PATH" cargo check
+# fixture サーバーを単体起動して curl 確認（合成メディアの検証等）
+MIMIKAGO_ADAPTER=fixture PORT=18099 node server/src/index.ts
 ```
 
-`pnpm dev` は `PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run --name mimi vite` を使う。ブラウザからは常に `http://mimi.localhost:1355` でアクセスする。
+ビジュアルテストの注意:
+- スナップショットは**必ず Playwright で生成**する（agent-browser で撮った画像はレンダリングが違い、CI 比較で落ちる）
+- パネル等の**要素単位**で `toHaveScreenshot` する。`fullPage` は半透明オーバーレイ越しの背景差分が `maxDiffPixelRatio` で薄まり**偽パス**になる（scan結果ダイアログで実際に踏んだ。`role=dialog` 要素を撮る形に修正済み）
 
-## 関連ドキュメント
+## API 契約 v2（現行エンドポイント）
 
-| ファイル | 内容 |
-|---------|------|
-| `README.md` | ユーザー向けの概要・セットアップ手順 |
-| `docs/requirements-v4.md` | 要件定義（フェーズ1〜3）。**mimimilli 移行後の最新版** |
-| `docs/design-brief.md` | デザイン依頼書＋採用方針（§10 に採用決定内容を記載） |
-| `docs/design_handoff_mimimilli_library/README.md` | UIデザインシステムの正典（mimimilli）|
-| `docs/DEVELOPMENT.md` | 開発者ガイド |
-| `docs/web-architecture-proposal.md` | Tauri廃止・axumサーバー化の設計経緯＋新API設計 |
+すべて `/api` 配下。リクエスト/レスポンスは `shared/src/*.ts` の Zod スキーマが正典。エラーは `{ error: { code, message } }`（`apiErrorSchema`）。
 
+| メソッド | パス | 備考 |
+|---|---|---|
+| GET / PUT | `/settings` | |
+| POST | `/scan` | |
+| GET | `/works` | **ページングエンベロープ `{ items, total }`**（page/limit省略時は全件） |
+| GET | `/works/:id` | 完全な Work（playlists・resumePosition・resumeTrackIndex 含む） |
+| PATCH | `/works/:id` | `{ title?, tags?, bookmarked? }` を統合（旧 PUT tags/title・POST bookmark を廃止） |
+| POST | `/works/:id/resume` | `{ position, trackIndex }`（高頻度のため PATCH と分離） |
+| POST | `/works/:id/last-played` | |
+| GET | `/works/:id/files` | 物理ファイルツリー |
+| GET | `/tags` | フラット/構造化タグの一覧 |
+| POST | `/export` | `{ data }`（JSON文字列） |
+| GET | `/axes/:axis` | ファセット集計（circle/cv/series/cat/tag/year） |
+| GET/POST | `/smart-folders` | |
+| PUT/DELETE | `/smart-folders/:id` | |
+| GET | `/smart-folders/:id/works` | スマートフォルダー評価結果 |
+| GET/POST | `/presets`、DELETE `/presets/:id` | 検索プリセット |
+| GET | `/fs` | 物理FSブラウズ（Filesモード） |
+| GET | `/media/cover/:id`、`/media/audio/:id/:path`、`/media/file/:id/:path` | audio は Range(206) 対応 |
+| POST | `/dlsite/:id/fetch`、`/dlsite/:id/apply` | |
+
+メディアURLは client の `entities/work/api.ts` の `getCoverImageUrl`/`getAudioUrl`/`getFileUrl` が組み立てる（`<img src>`/`<audio src>` に直接使える）。
+
+### タグの構造（編集時に注意）
+
+`work.tags` には2種が混在する:
+- 構造化タグ（プレフィックス付き）: `cv/水瀬なずな`、`サークル/月白製作所`、`シリーズ/...`、`カテゴリ/...` — 分類軸／ファセットの素
+- フラットタグ: `ASMR`、`癒し系` 等の自由タグ
+
+種別判定は `entities/work/model.ts` の `parseTag`。編集UIは構造化タグを保護し、フラットタグのみ追加/削除する（合成ロジックは `entities/work/editableTags.ts`、`buildWorkPatchTags`）。PATCH の tags は**全置換**なので保存時に『構造化タグ＋編集後フラット』を合成して送る。
+
+## クライアントの状態管理
+
+- **Jotai atom**: API由来でない UI 操作状態。library（`features/library/model/atoms.ts`: activeAxis/drillValue/selectedTags/selectedWorkId/sort）、files（`features/files/model/atoms.ts`: relPath/selectedPath/direction）、player（後述）
+- **TanStack Query**: サーバー状態。キーは `LibraryView.tsx` の `LIBRARY_KEYS` で一元管理（works/libraryTotal/facets/smartFolders/smartFolderWorks/workDetail/tags と、広域 invalidate 用の allWorks/allFacets/allSmartFolderWorks プレフィックスキー）
+- **URL同期**: `features/navigation/`（`navigationUrl.ts` codec + `useNavigationHistory.ts` の history 同期層）。モード・軸・ドリル・タグ・選択作品・ソート・ファイルパスを URL に双方向同期。ナビ操作は `push`、選択/ソート等の軽微変更は `replace`。`requestNavigationHistoryCommitAtom` を各操作（useLibraryNavigation / useFilesNavigation / LeftNav の setMode）が叩いて push/replace を宣言する。AddressBar の戻る/進む・パンくずも本物
+
+## プレイヤーのアーキテクチャ（次のUI刷新で触る中心）
+
+`client/src/features/player/`。
+
+- `model/atoms.ts`:
+  - `playerCoreAtom`（低頻度 state: isPlaying / currentWork / tracks / currentTrackIndex / volume / loop / showFullPlayer / **playbackRate / channelSwap / abRepeat**）
+  - `playerCurrentTimeAtom` / `playerDurationAtom`（**高頻度**。timeupdate 毎に更新。**TransportBar と FullScreenPlayer だけが subscribe**する。App.tsx は subscribe しないので再生中に App が再レンダリングされない — この分離は**維持必須**）
+- `model/audioEngine.ts`: 低レベル。`new Audio()`（DOM外）。load/play/pause/seek/seekRelative/setVolume/setPlaybackRate/setChannelSwap、timeupdate/durationchange/ended コールバック
+- `model/usePlayer.ts`: エンジンと atom の橋渡し。公開アクション:
+  - 配線済み: `play` / `togglePlay` / `seek` / `seekRelative` / `setVolume` / `setLoop` / `nextTrack` / `prevTrack` / `setTrackIndex` / `setShowFullPlayer`
+  - **実装済みだが UI 未配線**: `playWithResume`（→「続きから再生」で配線済み）、`setPlaybackRate`（倍速）、`setChannelSwap`（L⇄R入替）、`setABPoint`/`clearABRepeat`（A-Bリピート）。state にも `playbackRate`/`channelSwap`/`abRepeat` がある
+- `ui/TransportBar.tsx`（常駐バー）: now playing / 前・再生・次 / シークバー / ループ・音量・**「重ねて再生」(disabled飾り)**・-10/+10・全画面展開ボタン
+- `ui/FullScreenPlayer.tsx`: 全画面。トラックリスト・シーク・音量・ループ。Esc で閉じる
+
+### プレイヤー UI 刷新で対応したい既知の課題（レビュー issue 由来）
+
+- TransportBar 右端のレイアウト崩れ: 「重ねて再生」ボタンが音量スライダーに重なる、全画面展開ボタンが画面隅すぎる（dev では TanStack Devtools のボタンに覆われる）
+- 倍速・A-Bリピート・L⇄R入替の UI が無い（エンジンは実装済み、配線するだけ）
+- 全画面プレイヤーのアイコンボタンに aria-label が無い、フォーカストラップ無し
+- フローティング/ポップアップモード（要件 Phase3、お兄ちゃんが検討中）
+- TransportBar now playing のハートが飾り（詳細パネルのブックマークは実働化済み。同じ `patchWork({bookmarked})` で配線できる）
+
+### ⚠ 自動検証の限界（音声）
+
+headless Chromium（agent-browser / Playwright）は fixture の合成 8bit WAV の**メタデータをデコードしない**。そのため自動環境では duration/currentTime が 0:00 のままで、**シークバーが実時間で動く様子・続きから再生の位置seek は自動では確認できない**（通常再生も同様＝resume固有ではない）。トラック選択・UI状態までは確認可能。**実時間の再生／シークの手触りは実ブラウザ（Chrome で `mimi.localhost:1355`）で人が確認する**必要がある。
+
+## 今セッション（2026-06-13）の成果
+
+レビュー issue [docs/issues/2026-06-12-mock-ui-ux-and-architecture-review.md](issues/2026-06-12-mock-ui-ux-and-architecture-review.md) の§進捗に対応済み一覧。主なコミット:
+
+- 契約統合（ADR-0002完了）: client/mocks 廃止 → fixture アダプタへ吸収、型を shared へ、API を v2 へ全面切替、vite middleware化
+- fixture シナリオ移植、合成メディア（無音WAV/SVGカバー/Range）
+- 欠損・エラー作品の状態表示＋再生無効化、サイレント失敗（`catch{}`）解消
+- 並び替えメニュー実働化、タグ絞り込み結果カードからの作品導線
+- **URL同期とナビ履歴**（戻る/進む・パンくず・リロード復元）
+- **レジューム再生**（続きから再生）
+- **ブックマーク切替・タイトル/タグ編集UI**
+
+各タスクの詳細は `docs/issues/2026-06-13-*.md`（url-navigation-history / resume-playback / work-metadata-editing）。
+
+### 残タスク（レビュー issue §残 と対応）
+
+1. **プレイヤー UI 刷新**（今から着手。上記「課題」＋シークバー/ボタン/ポップアップモード）
+2. 残りの飾り: ビュー切替（リスト/グリッド）・通知ベル・スマートフォルダー条件エディタ
+3. fixture のサークル/カテゴリタグ拡充（現状ファセットが circle/cat で 0件）
+4. 軽微: AxisLanding の案内文「左の列から…」が結果表示時も残る
+
+## 開発上のルール（AGENTS.md より）
+
+- コミットは日本語・Conventional Commits。`git -C` 禁止。コミットはユーザー指示があるまでしない（監督がレビュー後にまとめる）
+- 過度なフォールバック禁止・エラー隠蔽禁止。互換性より適切な設計（破壊的変更OK）。場当たり的修正禁止
+- フロントの見た目は mimimilli 正典 [docs/design_handoff_mimimilli_library/README.md](design_handoff_mimimilli_library/README.md) に従う（カラートークン・`mle-`/`mll-` クラス体系・motion 等）。トークンは `client/src/styles/`
+- WSL 環境。Windows パスは WSL パスへ変換。jq でJSON処理、rg 推奨
+
+## ⚠ まだ更新されていないドキュメント
+
+以下は**旧 Rust/axum 時代の記述のまま**で信用しないこと（v2 への一括更新は未実施。architecture-v2 §10.4 の方針で後でまとめて直す）:
+
+- `README.md` — 技術スタックが Rust/axum 前提
+- `docs/DEVELOPMENT.md` — server を Rust として記述
+- `server-rust/` — 退避した旧実装（参照用、ビルド対象外）
+
+現行の正は本 HANDOFF と [docs/architecture-v2-proposal.md](architecture-v2-proposal.md)、`shared/src/`（契約）、`server/src/`（実装）。
+
+## 実装を委譲する場合
+
+実装・調査・デバッグは Codex（`codex exec --json -s workspace-write`、thread_id を控えて resume で反復）か Sonnet サブエージェントに委譲し、**監督側が差分レビュー・テスト・実機確認してからコミット**する運用。Codex のサンドボックスは Playwright（Chromium 起動・vite listen）が EPERM で動かないことがあるので、**スナップショット生成は監督側の環境で行う**。
