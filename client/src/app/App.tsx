@@ -6,6 +6,7 @@
 import { useState, useCallback, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { usePlayer } from "../features/player/model/usePlayer";
+import { useLibraryView } from "../features/library/model/useLibraryNavigation";
 import { useGlobalShortcuts } from "./model/useGlobalShortcuts";
 import AppShell from "./AppShell";
 import TopBar from "./ui/TopBar";
@@ -33,6 +34,7 @@ const SETTINGS_KEY = ["settings"] as const;
 
 export default function App() {
   const player = usePlayer();
+  const libraryNav = useLibraryView();
   const queryClient = useQueryClient();
   const playRequestIdRef = useRef(0);
 
@@ -201,6 +203,9 @@ export default function App() {
         <AddressBar
           path={mode === "files" ? filesNav.addressPath : ["ライブラリ"]}
           onNavigate={mode === "files" ? filesNav.goToSegment : undefined}
+          showSort={mode === "library"}
+          sort={libraryNav.sort}
+          onSortChange={libraryNav.setSort}
         />
       }
       leftNav={<LeftNav mode={mode} onModeChange={setMode} playingCount={isPlaying ? 1 : 0} />}

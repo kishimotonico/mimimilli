@@ -125,7 +125,7 @@ function WorkDetail({ work, onPlay, playingTrackIndex }: WorkDetailProps) {
 
 // ── Axis Landing ──────────────────────────────────────────────
 
-function AxisLanding({ axis, works }: { axis: AxisId; works: WorkSummary[] }) {
+function AxisLanding({ axis, works, onSelectWork }: { axis: AxisId; works: WorkSummary[]; onSelectWork: (id: string) => void }) {
   const axisLabels: Record<string, string> = {
     circle: "サークル", cv: "CV", series: "シリーズ", cat: "カテゴリ",
     tag: "タグ", year: "追加日",
@@ -135,19 +135,40 @@ function AxisLanding({ axis, works }: { axis: AxisId; works: WorkSummary[] }) {
       <div className="mle-sect">
         <span>{axisLabels[axis] ?? axis}</span>
         <div className="mle-sect__rule" />
+        <span className="count">{works.length} 件</span>
       </div>
       <p style={{ fontSize: 12, color: "var(--ink-2)", marginBottom: 16 }}>
         左の列から絞り込みを選択してください
       </p>
       <div className="mll-related">
-        {works.slice(0, 8).map((w) => (
-          <div key={w.id} className="mll-related__card">
-            <div className="mll-related__cover">
-              <CoverImg id={w.id} title={w.title} hasCover={!!w.coverImage} size={80} radius={6} />
+        {works.map((w) => {
+          const statusLabel =
+            w.status === "missing" ? "ファイル欠損"
+            : w.status === "error" ? "メタ読み込みエラー"
+            : null;
+          return (
+            <div
+              key={w.id}
+              className="mll-related__card"
+              role="button"
+              tabIndex={0}
+              onClick={() => onSelectWork(w.id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") onSelectWork(w.id);
+              }}
+            >
+              <div className="mll-related__cover">
+                <CoverImg id={w.id} title={w.title} hasCover={!!w.coverImage} size={80} radius={6} />
+                {statusLabel && (
+                  <span className="mll-related__status" title={statusLabel}>
+                    <I.err size={12} />
+                  </span>
+                )}
+              </div>
+              <div className="mll-related__title">{w.title}</div>
             </div>
-            <div className="mll-related__title">{w.title}</div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -208,6 +229,7 @@ interface PreviewPaneProps {
   smartFolderWorks: WorkSummary[];
   playingTrackIndex: number | null;
   onPlay: (trackIndex: number) => void;
+  onSelectWork: (id: string) => void;
 }
 
 export default function PreviewPane({
@@ -219,6 +241,7 @@ export default function PreviewPane({
   smartFolderWorks,
   playingTrackIndex,
   onPlay,
+  onSelectWork,
 }: PreviewPaneProps) {
   const title =
     mode === "work" ? "詳細"
@@ -235,7 +258,7 @@ export default function PreviewPane({
         <WorkDetail work={selectedWork} onPlay={onPlay} playingTrackIndex={playingTrackIndex} />
       )}
       {mode === "axis-landing" && (
-        <AxisLanding axis={axis} works={axisWorks} />
+        <AxisLanding axis={axis} works={axisWorks} onSelectWork={onSelectWork} />
       )}
       {mode === "smart-folder" && smartFolder && (
         <SmartFolderView sf={smartFolder} works={smartFolderWorks} />

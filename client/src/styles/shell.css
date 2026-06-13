@@ -152,6 +152,29 @@
 .mle-addr__search input { flex: 1; }
 .mle-addr__search input::placeholder { color: var(--ink-3); }
 
+/* ── 並び替えメニュー ─────────────────────────────────────── */
+
+.mle-sortmenu { position: relative; }
+.mle-sortmenu__pop {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 30;
+  min-width: 188px; padding: 4px;
+  background: var(--paper-1); border: 1px solid var(--line-soft);
+  border-radius: var(--r-2); box-shadow: var(--shadow-pop);
+}
+.mle-sortmenu__item {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 6px 8px; border-radius: 4px;
+  font-family: var(--font-jp); font-size: 12px; color: var(--ink-1);
+  text-align: left; white-space: nowrap;
+}
+.mle-sortmenu__item:hover { background: var(--paper-2); color: var(--ink-0); }
+.mle-sortmenu__item.is-checked { color: var(--ink-0); font-weight: 600; }
+.mle-sortmenu__item .check {
+  width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0;
+  display: grid; place-items: center; color: var(--paper-1);
+}
+.mle-sortmenu__item.is-checked .check { background: var(--ink-0); }
+
 /* ── Left nav (sidebar) ───────────────────────────────────── */
 
 .mle-side {
@@ -598,6 +621,7 @@
   margin: 18px 0 8px;
 }
 .mle-sect__rule { flex: 1; height: 1px; background: var(--line-soft); }
+.mle-sect .count { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0; text-transform: none; color: var(--ink-3); }
 
 .mll-sect { display: flex; align-items: baseline; gap: 10px; margin: 18px 0 10px; }
 .mll-sect__title { font-family: var(--font-sans); font-size: 11px; letter-spacing: 0.08em; color: var(--ink-2); text-transform: uppercase; font-weight: 600; }
@@ -684,7 +708,8 @@
 /* ── Related works ────────────────────────────────────────── */
 
 .mll-related { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-.mll-related__card { display: flex; flex-direction: column; gap: 6px; cursor: pointer; min-width: 0; }
+.mll-related__card { display: flex; flex-direction: column; gap: 6px; cursor: pointer; min-width: 0; border-radius: var(--r-2); }
+.mll-related__card:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
 .mll-related__cover {
   aspect-ratio: 1; width: 100%; border-radius: var(--r-2);
   overflow: hidden; background: var(--paper-2);
@@ -700,6 +725,13 @@
   background: oklch(20% 0.020 70 / 0.72); color: oklch(98% 0.005 70);
   font-family: var(--font-mono); font-size: 9px; font-weight: 600;
   padding: 2px 5px; border-radius: 3px; letter-spacing: 0.02em; backdrop-filter: blur(4px);
+}
+.mll-related__status {
+  position: absolute; top: 6px; left: 6px;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: oklch(20% 0.020 70 / 0.72); color: var(--r-coral);
+  backdrop-filter: blur(4px);
 }
 
 /* ── FAB action buttons ────────────────────────────────────── */

@@ -59,6 +59,20 @@ test("work detail panel - missing file", async ({ page }) => {
   await expect(panel).toHaveScreenshot("work-detail-missing.png");
 });
 
+test("tag filter result grid", async ({ page }) => {
+  await openApp(page);
+
+  // タグ軸 → 「癒し系」を選択（AND絞り込み）。プレビューに結果グリッドが出る。
+  await page.locator(".mll-axis", { hasText: "タグ" }).click();
+  await page.locator(".mll-tagrow", { hasText: "癒し系" }).click();
+
+  const panel = page.locator(".mle-prv");
+  await expect(panel.locator(".mll-related__card").first()).toBeVisible();
+
+  // パネル要素のみを撮影し、結果グリッドの導線（カード）を回帰対象にする。
+  await expect(panel).toHaveScreenshot("tag-filter-result-grid.png");
+});
+
 test("scan result dialog", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop-chromium", "desktop scenario only");
 

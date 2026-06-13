@@ -212,6 +212,7 @@ export default function LibraryView({ searchQuery, playingWorkId, playingTrackIn
           selectedWork && playingWorkId === selectedWork.id ? (playingTrackIndex ?? null) : null
         }
         onPlay={handlePlay}
+        onSelectWork={nav.selectWork}
       />
     </>
   );

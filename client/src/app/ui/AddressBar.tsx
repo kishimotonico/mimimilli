@@ -1,3 +1,6 @@
+import { useEffect, useRef, useState } from "react";
+import type { SortId } from "@mimikago/shared";
+import { SORT_OPTIONS } from "../../features/library/model/types";
 import { I } from "../../shared/ui/Icon";
 
 interface AddressBarProps {
@@ -9,7 +12,9 @@ interface AddressBarProps {
   canForward?: boolean;
   viewMode?: "column" | "list" | "grid";
   onViewChange?: (v: "column" | "list" | "grid") => void;
-  onSort?: () => void;
+  showSort?: boolean;
+  sort?: SortId;
+  onSortChange?: (sort: SortId) => void;
 }
 
 export default function AddressBar({
@@ -21,8 +26,33 @@ export default function AddressBar({
   canForward = false,
   viewMode = "column",
   onViewChange,
-  onSort,
+  showSort = false,
+  sort,
+  onSortChange,
 }: AddressBarProps) {
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  const sortRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!sortMenuOpen) return;
+
+    const handlePointerDown = (e: PointerEvent) => {
+      if (sortRef.current && !sortRef.current.contains(e.target as Node)) {
+        setSortMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSortMenuOpen(false);
+    };
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [sortMenuOpen]);
+
   return (
     <div className="mle-addr is-lib">
       <button
@@ -80,9 +110,41 @@ export default function AddressBar({
         </button>
       </div>
 
-      <button className="mle-navbtn" title="並び替え" onClick={onSort}>
-        <I.sort size={13} />
-      </button>
+      {showSort && (
+        <div className="mle-sortmenu" ref={sortRef}>
+          <button
+            className={`mle-navbtn ${sortMenuOpen ? "is-on" : ""}`}
+            title="並び替え"
+            aria-label="並び替え"
+            aria-haspopup="menu"
+            aria-expanded={sortMenuOpen}
+            onClick={() => setSortMenuOpen((v) => !v)}
+          >
+            <I.sort size={13} />
+          </button>
+          {sortMenuOpen && (
+            <div className="mle-sortmenu__pop" role="menu">
+              {SORT_OPTIONS.map((opt) => (
+                <button
+                  key={opt.id}
+                  role="menuitemradio"
+                  aria-checked={sort === opt.id}
+                  className={`mle-sortmenu__item ${sort === opt.id ? "is-checked" : ""}`}
+                  onClick={() => {
+                    onSortChange?.(opt.id);
+                    setSortMenuOpen(false);
+                  }}
+                >
+                  <span className="check">
+                    {sort === opt.id && <I.x size={9} style={{ transform: "rotate(45deg)" }} />}
+                  </span>
+                  <span className="label">{opt.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       <button className="mle-navbtn" title="その他">
         <I.more size={14} />
       </button>
