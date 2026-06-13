@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { WorkSummary } from "@mimikago/shared";
+import type { Work, WorkSummary } from "@mimikago/shared";
 import type { AxisId } from "../model/types";
 import {
   searchWorks,
@@ -41,9 +41,10 @@ interface LibraryViewProps {
   playingWorkId?: string;
   playingTrackIndex?: number;
   onPlay: (work: WorkSummary, trackIndex: number) => void;
+  onResume: (work: Work) => void;
 }
 
-export default function LibraryView({ searchQuery, playingWorkId, playingTrackIndex, onPlay }: LibraryViewProps) {
+export default function LibraryView({ searchQuery, playingWorkId, playingTrackIndex, onPlay, onResume }: LibraryViewProps) {
   const nav = useLibraryView();
   const queryClient = useQueryClient();
 
@@ -171,6 +172,10 @@ export default function LibraryView({ searchQuery, playingWorkId, playingTrackIn
     }
   }, [selectedWork, onPlay]);
 
+  const handleResume = useCallback(() => {
+    if (selectedWork) onResume(selectedWork);
+  }, [selectedWork, onResume]);
+
   return (
     <>
       <AxisColumn
@@ -212,6 +217,7 @@ export default function LibraryView({ searchQuery, playingWorkId, playingTrackIn
           selectedWork && playingWorkId === selectedWork.id ? (playingTrackIndex ?? null) : null
         }
         onPlay={handlePlay}
+        onResume={handleResume}
         onSelectWork={nav.selectWork}
       />
     </>

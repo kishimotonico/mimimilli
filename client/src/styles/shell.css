@@ -581,6 +581,9 @@
 .mle-prv__row .dot { color: var(--ink-4); }
 .mle-prv__tags    { display: flex; flex-wrap: wrap; gap: 4px; }
 .mle-prv__actions { display: flex; gap: 6px; padding-top: 4px; flex-wrap: wrap; }
+.mle-prv__resume {
+  align-self: center; font-family: var(--font-mono); font-size: 10px; color: var(--acc-ink);
+}
 
 .mle-prv__warn {
   display: flex; gap: 10px; align-items: flex-start;
@@ -601,8 +604,11 @@
 }
 .mle-prv__trk:hover { background: var(--paper-2); }
 .mle-prv__trk .num  { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-3); text-align: center; }
-.mle-prv__trk .name { color: var(--ink-0); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.mle-prv__trk .name { min-width: 0; display: flex; align-items: center; gap: 6px; color: var(--ink-0); font-weight: 500; }
+.mle-prv__trk .name .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mle-prv__trk .resume { flex: none; font-family: var(--font-mono); font-size: 9px; color: var(--acc-ink); }
 .mle-prv__trk .dur  { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-2); text-align: right; }
+.mle-prv__trk.is-resume .num { color: var(--acc); }
 .mle-prv__trk.is-now { background: var(--acc-soft); }
 .mle-prv__trk.is-now .name { color: var(--acc-ink); font-weight: 600; }
 .mle-prv__trk.is-now .num  { color: var(--acc); }

@@ -21,7 +21,7 @@ import FullScreenPlayer from "../features/player/ui/FullScreenPlayer";
 import SetupScreen from "../features/setup/ui/SetupScreen";
 import SettingsModal from "../features/settings/ui/SettingsModal";
 import NewWorkPopup from "../features/scan/ui/NewWorkPopup";
-import type { ScanResult, WorkSummary } from "@mimikago/shared";
+import type { ScanResult, Work, WorkSummary } from "@mimikago/shared";
 import { getWork } from "../entities/work/api";
 import { exportLibrary } from "../features/library/api";
 import { scanLibrary } from "../features/scan/api";
@@ -117,6 +117,12 @@ export default function App() {
       console.error("作品の再生に失敗しました", err);
     }
   }, [player, queryClient]);
+
+  const handleResume = useCallback((work: Work) => {
+    if (work.status !== "ok") return;
+    ++playRequestIdRef.current;
+    player.playWithResume(work);
+  }, [player]);
 
   // ファイルモード: 作品配下の音声ファイルを単一トラックとして常駐プレイヤーで再生する。
   // 作品の外にあるファイル（workId/workRelPath なし）は既存メディア配信で扱えないため再生しない。
@@ -234,6 +240,7 @@ export default function App() {
             playingWorkId={player.state.currentWork?.id}
             playingTrackIndex={player.state.currentTrackIndex}
             onPlay={handlePlay}
+            onResume={handleResume}
           />
         )
       }

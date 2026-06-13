@@ -59,6 +59,24 @@ test("work detail panel - missing file", async ({ page }) => {
   await expect(panel).toHaveScreenshot("work-detail-missing.png");
 });
 
+test("work detail panel - resume playback", async ({ page }) => {
+  await openApp(page);
+
+  const resumeResponse = await page.request.post("/api/works/RJ501001/resume", {
+    data: { position: 201, trackIndex: 2 },
+  });
+  expect(resumeResponse.ok()).toBe(true);
+
+  await page.getByText("夜更けの図書室で囁き朗読", { exact: false }).click();
+
+  const panel = page.locator(".mle-prv");
+  await expect(panel.getByRole("button", { name: "続きから再生" })).toBeVisible();
+  await expect(panel.getByText("古い本の読み聞かせ · 3:21 から再開")).toBeVisible();
+  await expect(panel.getByText("再開 3:21", { exact: true })).toBeVisible();
+
+  await expect(panel).toHaveScreenshot("work-detail-resume.png");
+});
+
 test("tag filter result grid", async ({ page }) => {
   await openApp(page);
 

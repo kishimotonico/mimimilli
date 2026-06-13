@@ -3,7 +3,7 @@ import type { AxisId } from "../model/types";
 import CoverImg from "../../../entities/work/ui/CoverImg";
 import Tag from "../../../entities/work/ui/Tag";
 import { I } from "../../../shared/ui/Icon";
-import { formatDuration } from "../../../shared/lib/format";
+import { formatDuration, formatTime } from "../../../shared/lib/format";
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("ja-JP", { year: "numeric", month: "short", day: "numeric" });
@@ -14,13 +14,19 @@ function formatDate(iso: string): string {
 interface WorkDetailProps {
   work: Work;
   onPlay: (trackIndex: number) => void;
+  onResume: () => void;
   playingTrackIndex: number | null;
 }
 
-function WorkDetail({ work, onPlay, playingTrackIndex }: WorkDetailProps) {
+function WorkDetail({ work, onPlay, onResume, playingTrackIndex }: WorkDetailProps) {
   const playlist = work.playlists.find((p) => p.name === (work.defaultPlaylist ?? "default")) ?? work.playlists[0];
   const tracks = playlist?.tracks ?? [];
   const isPlayable = work.status === "ok";
+  const hasResume =
+    work.resumePosition > 0
+    && work.resumeTrackIndex >= 0
+    && work.resumeTrackIndex < tracks.length;
+  const resumeTrack = hasResume ? tracks[work.resumeTrackIndex] : null;
 
   return (
     <div className="mle-prv__body">
@@ -49,14 +55,28 @@ function WorkDetail({ work, onPlay, playingTrackIndex }: WorkDetailProps) {
             {work.tags.map((t) => <Tag key={t} tag={t} />)}
           </div>
           <div className="mle-prv__actions">
-            <button
-              className="mll-fab is-primary"
-              disabled={!isPlayable}
-              aria-disabled={!isPlayable}
-              onClick={() => { if (isPlayable) onPlay(0); }}
-            >
-              <I.play size={12} /> 最初から再生
-            </button>
+            {hasResume && isPlayable ? (
+              <>
+                <button className="mll-fab is-primary" onClick={onResume}>
+                  <I.play size={12} /> 続きから再生
+                </button>
+                <span className="mle-prv__resume">
+                  {resumeTrack?.title} · {formatTime(work.resumePosition)} から再開
+                </span>
+                <button className="mll-fab" onClick={() => onPlay(0)}>
+                  最初から再生
+                </button>
+              </>
+            ) : (
+              <button
+                className="mll-fab is-primary"
+                disabled={!isPlayable}
+                aria-disabled={!isPlayable}
+                onClick={() => { if (isPlayable) onPlay(0); }}
+              >
+                <I.play size={12} /> 最初から再生
+              </button>
+            )}
             <button className="mll-fab">
               <I.heart size={12} />
             </button>
@@ -101,11 +121,16 @@ function WorkDetail({ work, onPlay, playingTrackIndex }: WorkDetailProps) {
             {tracks.map((tr, i) => (
               <div
                 key={i}
-                className={`mle-prv__trk ${playingTrackIndex === i ? "is-now" : ""} ${!isPlayable ? "is-disabled" : ""}`}
+                className={`mle-prv__trk ${playingTrackIndex === i ? "is-now" : ""} ${hasResume && work.resumeTrackIndex === i ? "is-resume" : ""} ${!isPlayable ? "is-disabled" : ""}`}
                 onClick={() => { if (isPlayable) onPlay(i); }}
               >
                 <span className="num">{String(i + 1).padStart(2, "0")}</span>
-                <span className="name">{tr.title}</span>
+                <span className="name">
+                  <span className="title">{tr.title}</span>
+                  {hasResume && work.resumeTrackIndex === i && (
+                    <span className="resume">再開 {formatTime(work.resumePosition)}</span>
+                  )}
+                </span>
                 {tr.end != null && tr.start != null && (
                   <span className="dur">{formatDuration(Math.round(tr.end - tr.start))}</span>
                 )}
@@ -229,6 +254,7 @@ interface PreviewPaneProps {
   smartFolderWorks: WorkSummary[];
   playingTrackIndex: number | null;
   onPlay: (trackIndex: number) => void;
+  onResume: () => void;
   onSelectWork: (id: string) => void;
 }
 
@@ -241,6 +267,7 @@ export default function PreviewPane({
   smartFolderWorks,
   playingTrackIndex,
   onPlay,
+  onResume,
   onSelectWork,
 }: PreviewPaneProps) {
   const title =
@@ -255,7 +282,7 @@ export default function PreviewPane({
         <span className="label">{title}</span>
       </div>
       {mode === "work" && selectedWork && (
-        <WorkDetail work={selectedWork} onPlay={onPlay} playingTrackIndex={playingTrackIndex} />
+        <WorkDetail work={selectedWork} onPlay={onPlay} onResume={onResume} playingTrackIndex={playingTrackIndex} />
       )}
       {mode === "axis-landing" && (
         <AxisLanding axis={axis} works={axisWorks} onSelectWork={onSelectWork} />
