@@ -20,21 +20,20 @@
 
 | レイヤー | 技術 |
 |---------|------|
-| バックエンド | axum + tokio (Rust) |
+| バックエンド | Hono + Node (TypeScript) |
 | フロントエンド | React 19 + TypeScript |
 | ビルド | Vite 7 |
-| データベース | SQLite (rusqlite, bundled) |
+| データベース | SQLite (Drizzle ORM) |
+| API契約 | Zod スキーマ（`shared/`、client/server 共有） |
 | 開発プロキシ | portless |
-| パッケージマネージャ | pnpm |
+| パッケージマネージャ | pnpm（ワークスペース: client / server / shared） |
 
 ## セットアップ
 
 ### 前提条件
 
-- **Node.js** 18+
+- **Node.js** 24+
 - **pnpm** 8+
-- **Rust** 安定版（`rustup`経由でインストール推奨）
-- **ffprobe**（音声メタデータ取得に使用。`ffmpeg` パッケージに同梱）
 
 ### インストールと起動
 
@@ -43,26 +42,35 @@
 git clone <repository-url>
 cd mimikago
 
-# フロントエンド依存関係
-cd client && pnpm install
+# 依存関係（ルートのワークスペースで一括）
+pnpm install
 
-# フロントエンド開発サーバー起動（モック API で動作）
-pnpm dev
+# 開発サーバー起動（client/ で。fixture アダプタの API が同居して動く）
+cd client && pnpm dev
 # => http://mimi.localhost:1355
 ```
 
-実際の axum バックエンドと接続する場合:
+`pnpm dev` は `vite.config.ts` が server の Hono アプリ（fixture アダプタ注入）を
+dev middleware としてマウントするため、UI もモック API も**これ一発**で動く。
+`MIMIKAGO_MOCK_SCENARIO`（default / empty / new-work / errors）でデータを切替できる。
+
+実 SQLite + 実ファイルシステムの real アダプタへ接続する場合:
 
 ```bash
-# 別ターミナルでバックエンドを起動
-cd server && cargo run
+# 別ターミナルで API サーバーを起動（real アダプタ）
+pnpm dev:server
 # => http://localhost:8080
 
-# フロントをバックエンドへ向けて起動（client/ で）
+# フロントを API サーバーへ向けて起動（client/ で）
 cd client && BACKEND_URL=http://localhost:8080 pnpm dev
 ```
 
-`BACKEND_URL` を未設定のまま `pnpm dev` を実行すると、`vite.config.ts` 内のインメモリモック API が応答する（開発・UI確認用）。
+### 検証
+
+```bash
+pnpm check   # shared + server + client の型チェック
+pnpm test    # server + client のユニットテスト
+```
 
 ## 使い方
 

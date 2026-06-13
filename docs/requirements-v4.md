@@ -1,5 +1,7 @@
 # ローカル音声作品管理・再生アプリ 要件定義
 
+> **注記（2026-06-13）:** 本書の**要件（機能・UX）は有効**。ただし技術スタックの記述（「バックエンド = Rust + axum」等）は古い。バックエンドは [ADR-0001](adr/0001-typescript-api-server.md) により **TypeScript（Hono + Node）で新規実装**に変更済み。アーキテクチャの現行は [architecture-v2-proposal.md](architecture-v2-proposal.md)、開発の現状は [HANDOFF.md](HANDOFF.md) を参照。本文中の「Rust / axum」は読み替えること。
+
 ## 1. 概要
 
 ### 1.1 背景

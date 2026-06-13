@@ -155,11 +155,13 @@ headless Chromium（agent-browser / Playwright）は fixture の合成 8bit WAV 
 
 ## ⚠ まだ更新されていないドキュメント
 
-以下は**旧 Rust/axum 時代の記述のまま**で信用しないこと（v2 への一括更新は未実施。architecture-v2 §10.4 の方針で後でまとめて直す）:
+以下は旧 Rust/axum 時代の名残:
 
-- `README.md` — 技術スタックが Rust/axum 前提
-- `docs/DEVELOPMENT.md` — server を Rust として記述
+- `docs/requirements-v4.md` — **要件（機能）は有効**だが技術スタック記述が Rust 前提（冒頭バナーで読み替えを明記済み）
+- `docs/web-architecture-proposal.md` — architecture-v2 に置き換え済み（設計経緯の記録として意図的に保持。冒頭にバナーあり）
 - `server-rust/` — 退避した旧実装（参照用、ビルド対象外）
+
+`README.md` は技術スタック表と開発コマンドを v2 へ更新済み。`docs/DEVELOPMENT.md` は内容が全面的に旧 Rust 前提かつ本 HANDOFF と重複していたため削除した（開発ワークフローは本書がカバーする）。
 
 現行の正は本 HANDOFF と [docs/architecture-v2-proposal.md](architecture-v2-proposal.md)、`shared/src/`（契約）、`server/src/`（実装）。
 
