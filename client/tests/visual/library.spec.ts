@@ -77,6 +77,21 @@ test("work detail panel - resume playback", async ({ page }) => {
   await expect(panel).toHaveScreenshot("work-detail-resume.png");
 });
 
+test("work detail panel - tag editing", async ({ page }) => {
+  await openApp(page);
+
+  await page.getByText("夜更けの図書室で囁き朗読", { exact: false }).click();
+
+  const panel = page.locator(".mle-prv");
+  await panel.getByRole("button", { name: "タグを編集" }).click();
+
+  await expect(panel.getByRole("combobox", { name: "追加するタグ" })).toBeVisible();
+  await expect(panel.getByText("分類タグはメタデータ保護のため編集対象外です。")).toBeVisible();
+  await expect(panel.locator(".mle-prv__tags button")).toHaveCount(3);
+
+  await expect(panel).toHaveScreenshot("work-detail-tag-editing.png");
+});
+
 test("tag filter result grid", async ({ page }) => {
   await openApp(page);
 

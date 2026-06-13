@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Work, WorkSummary } from "@mimikago/shared";
+import type { Work, WorkPatch, WorkSummary } from "@mimikago/shared";
 import type { AxisId } from "../model/types";
 import {
   searchWorks,
@@ -9,7 +9,7 @@ import {
   createSmartFolder,
   evalSmartFolder,
 } from "../../../features/library/api";
-import { getWork } from "../../../entities/work/api";
+import { getAllTags, getWork, patchWork } from "../../../entities/work/api";
 import { useLibraryView } from "../model/useLibraryNavigation";
 import AxisColumn from "./AxisColumn";
 import ContentColumn from "./ContentColumn";
@@ -26,12 +26,16 @@ function isSmartAxis(a: AxisId): boolean { return (a as string).startsWith("smar
 // ── Query key factory ─────────────────────────────────────────
 // query key を一箇所で管理し、invalidation と依存を一致させる。
 const LIBRARY_KEYS = {
+  allWorks: () => ["works"] as const,
   works: (params: object) => ["works", params] as const,
   libraryTotal: () => ["works", "total"] as const,
+  allSmartFolderWorks: () => ["smartFolderWorks"] as const,
   smartFolderWorks: (id: string) => ["smartFolderWorks", id] as const,
+  allFacets: () => ["axisFacets"] as const,
   facets: (axis: string) => ["axisFacets", axis] as const,
   smartFolders: () => ["smartFolders"] as const,
   workDetail: (id: string) => ["work", id] as const,
+  tags: () => ["tags"] as const,
 } as const;
 
 export { LIBRARY_KEYS };
@@ -135,6 +139,30 @@ export default function LibraryView({ searchQuery, playingWorkId, playingTrackIn
   });
   const selectedWork = workDetailQuery.data ?? null;
 
+  const tagsQuery = useQuery({
+    queryKey: LIBRARY_KEYS.tags(),
+    queryFn: getAllTags,
+  });
+
+  const patchWorkMutation = useMutation({
+    mutationFn: ({ workId, body }: { workId: string; body: WorkPatch }) =>
+      patchWork(workId, body),
+    onSuccess: async (updatedWork, { workId }) => {
+      queryClient.setQueryData(LIBRARY_KEYS.workDetail(workId), updatedWork);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: LIBRARY_KEYS.allWorks() }),
+        queryClient.invalidateQueries({ queryKey: LIBRARY_KEYS.libraryTotal() }),
+        queryClient.invalidateQueries({ queryKey: LIBRARY_KEYS.allFacets() }),
+        queryClient.invalidateQueries({ queryKey: LIBRARY_KEYS.allSmartFolderWorks() }),
+        queryClient.invalidateQueries({ queryKey: LIBRARY_KEYS.workDetail(workId) }),
+        queryClient.invalidateQueries({ queryKey: LIBRARY_KEYS.tags() }),
+      ]);
+    },
+    onError: (error, { workId, body }) => {
+      console.error("作品メタデータの更新に失敗しました", { workId, body, error });
+    },
+  });
+
   // ── previewMode: UI state + server state を組み合わせてコンポーネントで計算 ──
   // (derived atom にしない — issue の制約参照)
   const previewMode: PreviewMode = nav.selectedWorkId && selectedWork
@@ -219,6 +247,14 @@ export default function LibraryView({ searchQuery, playingWorkId, playingTrackIn
         onPlay={handlePlay}
         onResume={handleResume}
         onSelectWork={nav.selectWork}
+        tagSuggestions={tagsQuery.data ?? []}
+        isPatching={patchWorkMutation.isPending}
+        onPatchWork={(body) => {
+          if (!selectedWork) {
+            return Promise.reject(new Error("更新対象の作品が選択されていません"));
+          }
+          return patchWorkMutation.mutateAsync({ workId: selectedWork.id, body });
+        }}
       />
     </>
   );

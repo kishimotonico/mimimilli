@@ -41,6 +41,7 @@ export default function Tag({ tag, onRemove, onClick }: TagProps) {
         {onRemove && (
           <button
             className={REMOVE_BUTTON}
+            aria-label={`タグ「${parsed.value}」を削除`}
             onClick={(e) => { e.stopPropagation(); onRemove(); }}
           >×</button>
         )}
@@ -58,6 +59,7 @@ export default function Tag({ tag, onRemove, onClick }: TagProps) {
       {onRemove && (
         <button
           className={REMOVE_BUTTON}
+          aria-label={`タグ「${parsed.value}」を削除`}
           onClick={(e) => { e.stopPropagation(); onRemove(); }}
         >×</button>
       )}

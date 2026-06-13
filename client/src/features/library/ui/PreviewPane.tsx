@@ -1,7 +1,13 @@
-import type { Work, SmartFolder, WorkSummary } from "@mimikago/shared";
+import { useId, useMemo, useState } from "react";
+import type { Work, WorkPatch, SmartFolder, WorkSummary } from "@mimikago/shared";
 import type { AxisId } from "../model/types";
 import CoverImg from "../../../entities/work/ui/CoverImg";
 import Tag from "../../../entities/work/ui/Tag";
+import { parseTag } from "../../../entities/work/model";
+import {
+  buildWorkPatchTags,
+  getEditableFlatTags,
+} from "../../../entities/work/editableTags";
 import { I } from "../../../shared/ui/Icon";
 import { formatDuration, formatTime } from "../../../shared/lib/format";
 
@@ -16,9 +22,20 @@ interface WorkDetailProps {
   onPlay: (trackIndex: number) => void;
   onResume: () => void;
   playingTrackIndex: number | null;
+  tagSuggestions: string[];
+  isPatching: boolean;
+  onPatchWork: (body: WorkPatch) => Promise<Work>;
 }
 
-function WorkDetail({ work, onPlay, onResume, playingTrackIndex }: WorkDetailProps) {
+function WorkDetail({
+  work,
+  onPlay,
+  onResume,
+  playingTrackIndex,
+  tagSuggestions,
+  isPatching,
+  onPatchWork,
+}: WorkDetailProps) {
   const playlist = work.playlists.find((p) => p.name === (work.defaultPlaylist ?? "default")) ?? work.playlists[0];
   const tracks = playlist?.tracks ?? [];
   const isPlayable = work.status === "ok";
@@ -27,6 +44,113 @@ function WorkDetail({ work, onPlay, onResume, playingTrackIndex }: WorkDetailPro
     && work.resumeTrackIndex >= 0
     && work.resumeTrackIndex < tracks.length;
   const resumeTrack = hasResume ? tracks[work.resumeTrackIndex] : null;
+  const [isTitleEditing, setIsTitleEditing] = useState(false);
+  const [titleDraft, setTitleDraft] = useState(work.title);
+  const [isTitleSaving, setIsTitleSaving] = useState(false);
+  const [isTagEditing, setIsTagEditing] = useState(false);
+  const [flatTagDraft, setFlatTagDraft] = useState(() => getEditableFlatTags(work.tags));
+  const [tagInput, setTagInput] = useState("");
+  const [isTagSaving, setIsTagSaving] = useState(false);
+  const [isBookmarkSaving, setIsBookmarkSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const tagListId = useId();
+
+  const structuredTags = useMemo(
+    () => work.tags.filter((tag) => parseTag(tag).kind !== "flat"),
+    [work.tags]
+  );
+  const flatTagSuggestions = useMemo(
+    () => [
+      ...new Set(
+        tagSuggestions.filter(
+          (tag) => parseTag(tag).kind === "flat" && !flatTagDraft.includes(tag)
+        )
+      ),
+    ],
+    [flatTagDraft, tagSuggestions]
+  );
+
+  const startTitleEditing = () => {
+    setTitleDraft(work.title);
+    setEditError(null);
+    setIsTitleEditing(true);
+  };
+
+  const cancelTitleEditing = () => {
+    setTitleDraft(work.title);
+    setEditError(null);
+    setIsTitleEditing(false);
+  };
+
+  const saveTitle = async () => {
+    const title = titleDraft.trim();
+    if (!title || isPatching) return;
+    if (title === work.title) {
+      setIsTitleEditing(false);
+      return;
+    }
+
+    setIsTitleSaving(true);
+    setEditError(null);
+    try {
+      await onPatchWork({ title });
+      setIsTitleEditing(false);
+    } catch {
+      setEditError("タイトルを保存できませんでした。");
+    } finally {
+      setIsTitleSaving(false);
+    }
+  };
+
+  const startTagEditing = () => {
+    setFlatTagDraft(getEditableFlatTags(work.tags));
+    setTagInput("");
+    setEditError(null);
+    setIsTagEditing(true);
+  };
+
+  const cancelTagEditing = () => {
+    setFlatTagDraft(getEditableFlatTags(work.tags));
+    setTagInput("");
+    setEditError(null);
+    setIsTagEditing(false);
+  };
+
+  const addFlatTag = () => {
+    const tag = tagInput.trim();
+    if (!tag || parseTag(tag).kind !== "flat" || flatTagDraft.includes(tag)) return;
+    setFlatTagDraft((current) => [...current, tag]);
+    setTagInput("");
+  };
+
+  const saveTags = async () => {
+    if (isPatching) return;
+    const tags = buildWorkPatchTags(work.tags, flatTagDraft);
+    setIsTagSaving(true);
+    setEditError(null);
+    try {
+      await onPatchWork({ tags });
+      setIsTagEditing(false);
+      setTagInput("");
+    } catch {
+      setEditError("タグを保存できませんでした。");
+    } finally {
+      setIsTagSaving(false);
+    }
+  };
+
+  const toggleBookmark = async () => {
+    if (isPatching) return;
+    setIsBookmarkSaving(true);
+    setEditError(null);
+    try {
+      await onPatchWork({ bookmarked: !work.bookmarked });
+    } catch {
+      setEditError("ブックマークを更新できませんでした。");
+    } finally {
+      setIsBookmarkSaving(false);
+    }
+  };
 
   return (
     <div className="mle-prv__body">
@@ -42,7 +166,40 @@ function WorkDetail({ work, onPlay, onResume, playingTrackIndex }: WorkDetailPro
             <span>追加 {formatDate(work.addedAt)}</span>
             {work.lastPlayedAt && <span>· 最終再生 {formatDate(work.lastPlayedAt)}</span>}
           </div>
-          <h2 className="mle-prv__title">{work.title}</h2>
+          {isTitleEditing ? (
+            <form
+              className="mle-prv__title-editor"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void saveTitle();
+              }}
+            >
+              <input
+                autoFocus
+                className="mle-prv__title-input"
+                value={titleDraft}
+                aria-label="作品タイトル"
+                aria-invalid={titleDraft.trim().length === 0}
+                onChange={(event) => setTitleDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") cancelTitleEditing();
+                }}
+              />
+              <button className="mle-prv__edit-action" type="submit" disabled={!titleDraft.trim() || isTitleSaving || isPatching}>
+                保存
+              </button>
+              <button className="mle-prv__edit-action" type="button" onClick={cancelTitleEditing} disabled={isTitleSaving}>
+                キャンセル
+              </button>
+            </form>
+          ) : (
+            <div className="mle-prv__title-row">
+              <h2 className="mle-prv__title">{work.title}</h2>
+              <button className="mle-prv__edit-action" type="button" onClick={startTitleEditing} disabled={isPatching}>
+                編集
+              </button>
+            </div>
+          )}
           {(work.totalDurationSec > 0 || tracks.length > 0) && (
             <div className="mle-prv__row">
               {tracks.length > 0 && <span>{tracks.length} トラック</span>}
@@ -51,9 +208,67 @@ function WorkDetail({ work, onPlay, onResume, playingTrackIndex }: WorkDetailPro
               )}
             </div>
           )}
-          <div className="mle-prv__tags">
-            {work.tags.map((t) => <Tag key={t} tag={t} />)}
-          </div>
+          {isTagEditing ? (
+            <div className="mle-prv__tag-editor">
+              <div className="mle-prv__tags">
+                {structuredTags.map((tag) => <Tag key={tag} tag={tag} />)}
+                {flatTagDraft.map((tag) => (
+                  <Tag
+                    key={tag}
+                    tag={tag}
+                    onRemove={() => setFlatTagDraft((current) => current.filter((item) => item !== tag))}
+                  />
+                ))}
+              </div>
+              {structuredTags.length > 0 && (
+                <p className="mle-prv__tag-note">分類タグはメタデータ保護のため編集対象外です。</p>
+              )}
+              <div className="mle-prv__tag-add">
+                <input
+                  className="mle-prv__tag-input"
+                  list={tagListId}
+                  value={tagInput}
+                  aria-label="追加するタグ"
+                  placeholder="フラットタグを追加"
+                  onChange={(event) => setTagInput(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      addFlatTag();
+                    }
+                    if (event.key === "Escape") cancelTagEditing();
+                  }}
+                />
+                <datalist id={tagListId}>
+                  {flatTagSuggestions.map((tag) => <option key={tag} value={tag} />)}
+                </datalist>
+                <button
+                  className="mle-prv__edit-action"
+                  type="button"
+                  disabled={!tagInput.trim() || parseTag(tagInput.trim()).kind !== "flat" || flatTagDraft.includes(tagInput.trim())}
+                  onClick={addFlatTag}
+                >
+                  追加
+                </button>
+                <button className="mle-prv__edit-action is-primary" type="button" disabled={isTagSaving || isPatching} onClick={() => void saveTags()}>
+                  保存
+                </button>
+                <button className="mle-prv__edit-action" type="button" disabled={isTagSaving} onClick={cancelTagEditing}>
+                  キャンセル
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="mle-prv__tag-row">
+              <div className="mle-prv__tags">
+                {work.tags.map((tag) => <Tag key={tag} tag={tag} />)}
+              </div>
+              <button className="mle-prv__edit-action" type="button" onClick={startTagEditing} disabled={isPatching}>
+                タグを編集
+              </button>
+            </div>
+          )}
+          {editError && <p className="mle-prv__edit-error" role="alert">{editError}</p>}
           <div className="mle-prv__actions">
             {hasResume && isPlayable ? (
               <>
@@ -77,7 +292,14 @@ function WorkDetail({ work, onPlay, onResume, playingTrackIndex }: WorkDetailPro
                 <I.play size={12} /> 最初から再生
               </button>
             )}
-            <button className="mll-fab">
+            <button
+              className={`mll-fab ${work.bookmarked ? "is-on" : ""}`}
+              type="button"
+              aria-label={work.bookmarked ? "ブックマークを解除" : "ブックマークに追加"}
+              aria-pressed={work.bookmarked}
+              disabled={isBookmarkSaving || isPatching}
+              onClick={() => void toggleBookmark()}
+            >
               <I.heart size={12} />
             </button>
             {work.urls.map((u) => (
@@ -256,6 +478,9 @@ interface PreviewPaneProps {
   onPlay: (trackIndex: number) => void;
   onResume: () => void;
   onSelectWork: (id: string) => void;
+  tagSuggestions: string[];
+  isPatching: boolean;
+  onPatchWork: (body: WorkPatch) => Promise<Work>;
 }
 
 export default function PreviewPane({
@@ -269,6 +494,9 @@ export default function PreviewPane({
   onPlay,
   onResume,
   onSelectWork,
+  tagSuggestions,
+  isPatching,
+  onPatchWork,
 }: PreviewPaneProps) {
   const title =
     mode === "work" ? "詳細"
@@ -282,7 +510,16 @@ export default function PreviewPane({
         <span className="label">{title}</span>
       </div>
       {mode === "work" && selectedWork && (
-        <WorkDetail work={selectedWork} onPlay={onPlay} onResume={onResume} playingTrackIndex={playingTrackIndex} />
+        <WorkDetail
+          key={selectedWork.id}
+          work={selectedWork}
+          onPlay={onPlay}
+          onResume={onResume}
+          playingTrackIndex={playingTrackIndex}
+          tagSuggestions={tagSuggestions}
+          isPatching={isPatching}
+          onPatchWork={onPatchWork}
+        />
       )}
       {mode === "axis-landing" && (
         <AxisLanding axis={axis} works={axisWorks} onSelectWork={onSelectWork} />
