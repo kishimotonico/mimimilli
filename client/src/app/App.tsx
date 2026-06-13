@@ -26,8 +26,8 @@ import { getWork } from "../entities/work/api";
 import { exportLibrary } from "../features/library/api";
 import { scanLibrary } from "../features/scan/api";
 import { getSettings, setRootFolder } from "../features/settings/api";
-
-type AppMode = "library" | "files";
+import { parseNavigationUrl, type AppMode } from "../features/navigation/model/navigationUrl";
+import { useNavigationHistory } from "../features/navigation/model/useNavigationHistory";
 
 // settings query key（App と SettingsModal が同じキャッシュを参照）
 const SETTINGS_KEY = ["settings"] as const;
@@ -38,7 +38,9 @@ export default function App() {
   const queryClient = useQueryClient();
   const playRequestIdRef = useRef(0);
 
-  const [mode, setMode] = useState<AppMode>("library");
+  const [mode, setMode] = useState<AppMode>(
+    () => parseNavigationUrl(window.location.href).state.mode
+  );
   const [searchQuery, setSearchQuery] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
@@ -66,6 +68,11 @@ export default function App() {
   // ファイルモードのナビゲーション（フックは早期 return 前に呼ぶ）。
   const rootFolder = settings?.rootFolder ?? "/";
   const filesNav = useFilesNavigation(rootFolder);
+  const navigationHistory = useNavigationHistory({
+    mode,
+    setMode,
+    rootFolder: settings?.rootFolder ?? null,
+  });
 
   // ── Scan mutation ─────────────────────────────────────────
   const scanMutation = useMutation({
@@ -201,14 +208,18 @@ export default function App() {
       }
       addressBar={
         <AddressBar
-          path={mode === "files" ? filesNav.addressPath : ["ライブラリ"]}
-          onNavigate={mode === "files" ? filesNav.goToSegment : undefined}
+          path={mode === "files" ? filesNav.addressPath : libraryNav.addressPath}
+          onNavigate={mode === "files" ? filesNav.goToSegment : libraryNav.goToSegment}
+          onBack={navigationHistory.back}
+          onForward={navigationHistory.forward}
+          canBack={navigationHistory.canBack}
+          canForward={navigationHistory.canForward}
           showSort={mode === "library"}
           sort={libraryNav.sort}
           onSortChange={libraryNav.setSort}
         />
       }
-      leftNav={<LeftNav mode={mode} onModeChange={setMode} playingCount={isPlaying ? 1 : 0} />}
+      leftNav={<LeftNav mode={mode} onModeChange={navigationHistory.setMode} playingCount={isPlaying ? 1 : 0} />}
       body={
         mode === "files" ? (
           <FilesView

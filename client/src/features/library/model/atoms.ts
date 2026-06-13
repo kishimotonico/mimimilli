@@ -24,6 +24,7 @@ const AXIS_LABELS: Partial<Record<string, string>> = {
 };
 
 function buildAddressPath(axis: AxisId, drillValue: string | null): string[] {
+  if (axis === "all") return ["ライブラリ"];
   const label = (axis as string).startsWith("smart-")
     ? "スマートフォルダー"
     : (AXIS_LABELS[axis] ?? axis);
