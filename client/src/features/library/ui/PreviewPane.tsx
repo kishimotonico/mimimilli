@@ -1,6 +1,6 @@
 import { useId, useMemo, useState } from "react";
 import type { Work, WorkPatch, SmartFolder, WorkSummary } from "@mimikago/shared";
-import type { AxisId } from "../model/types";
+import type { AxisLandingPresentation } from "../model/axisLandingPresentation";
 import CoverImg from "../../../entities/work/ui/CoverImg";
 import Tag from "../../../entities/work/ui/Tag";
 import { parseTag } from "../../../entities/work/model";
@@ -372,21 +372,27 @@ function WorkDetail({
 
 // ── Axis Landing ──────────────────────────────────────────────
 
-function AxisLanding({ axis, works, onSelectWork }: { axis: AxisId; works: WorkSummary[]; onSelectWork: (id: string) => void }) {
-  const axisLabels: Record<string, string> = {
-    circle: "サークル", cv: "CV", series: "シリーズ", cat: "カテゴリ",
-    tag: "タグ", year: "追加日",
-  };
+function AxisLanding({
+  presentation,
+  works,
+  onSelectWork,
+}: {
+  presentation: AxisLandingPresentation;
+  works: WorkSummary[];
+  onSelectWork: (id: string) => void;
+}) {
   return (
     <div className="mle-prv__body">
       <div className="mle-sect">
-        <span>{axisLabels[axis] ?? axis}</span>
+        <span>{presentation.sectionTitle}</span>
         <div className="mle-sect__rule" />
         <span className="count">{works.length} 件</span>
       </div>
-      <p style={{ fontSize: 12, color: "var(--ink-2)", marginBottom: 16 }}>
-        左の列から絞り込みを選択してください
-      </p>
+      {presentation.instruction && (
+        <p style={{ fontSize: 12, color: "var(--ink-2)", marginBottom: 16 }}>
+          {presentation.instruction}
+        </p>
+      )}
       <div className="mll-related">
         {works.map((w) => {
           const statusLabel =
@@ -469,7 +475,7 @@ type PreviewMode = "work" | "axis-landing" | "smart-folder" | "empty";
 
 interface PreviewPaneProps {
   mode: PreviewMode;
-  axis: AxisId;
+  axisLandingPresentation: AxisLandingPresentation;
   selectedWork: Work | null;
   smartFolder: SmartFolder | null;
   axisWorks: WorkSummary[];
@@ -485,7 +491,7 @@ interface PreviewPaneProps {
 
 export default function PreviewPane({
   mode,
-  axis,
+  axisLandingPresentation,
   selectedWork,
   smartFolder,
   axisWorks,
@@ -501,7 +507,7 @@ export default function PreviewPane({
   const title =
     mode === "work" ? "詳細"
     : mode === "smart-folder" ? "スマートフォルダー"
-    : mode === "axis-landing" ? "概要"
+    : mode === "axis-landing" ? axisLandingPresentation.panelTitle
     : "プレビュー";
 
   return (
@@ -522,7 +528,11 @@ export default function PreviewPane({
         />
       )}
       {mode === "axis-landing" && (
-        <AxisLanding axis={axis} works={axisWorks} onSelectWork={onSelectWork} />
+        <AxisLanding
+          presentation={axisLandingPresentation}
+          works={axisWorks}
+          onSelectWork={onSelectWork}
+        />
       )}
       {mode === "smart-folder" && smartFolder && (
         <SmartFolderView sf={smartFolder} works={smartFolderWorks} />

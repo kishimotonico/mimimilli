@@ -101,6 +101,9 @@ test("tag filter result grid", async ({ page }) => {
 
   const panel = page.locator(".mle-prv");
   await expect(panel.locator(".mll-related__card").first()).toBeVisible();
+  await expect(panel.locator(".mle-prv__hd .label")).toHaveText("絞り込み結果");
+  await expect(panel.getByText("タグの結果", { exact: true })).toBeVisible();
+  await expect(panel.getByText("左の列から絞り込みを選択してください")).toHaveCount(0);
 
   // パネル要素のみを撮影し、結果グリッドの導線（カード）を回帰対象にする。
   await expect(panel).toHaveScreenshot("tag-filter-result-grid.png");

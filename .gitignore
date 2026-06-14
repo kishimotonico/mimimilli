@@ -32,3 +32,6 @@ server-rust/target/
 
 # server runtime data (SQLite cache)
 server/data/
+
+# QA / dogfooding artifacts (screenshots, videos, report)
+dogfood-output/

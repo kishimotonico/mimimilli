@@ -3,6 +3,7 @@ import React from "react";
 import { I } from "../../../shared/ui/Icon";
 import { formatFileSize } from "../../../shared/lib/format";
 import { getFileUrl } from "../api";
+import { getWorkFolderDisplay } from "../model/workFolderDisplay";
 import {
   classifyFile,
   summarizeKinds,
@@ -134,14 +135,14 @@ function EmptyPreview() {
 
 function Hero({ kind, entry, isWorkFolder }: { kind: FileKind; entry: FsEntry; isWorkFolder: boolean }) {
   const Ic = IconSet[FILE_KIND_ICON[kind]] ?? I.file;
-  const badge = isWorkFolder ? (entry.workId!.startsWith("RJ") ? "RJ" : "作品") : null;
+  const display = getWorkFolderDisplay(entry.name, isWorkFolder ? entry.workId : null);
   return (
     <div className={`mle-fprev__hero is-${kind}`}>
       <span className="ic"><Ic size={28} /></span>
       <div className="bd">
         <div className="mle-fprev__name">
-          {badge && <span className="wbadge">{badge}</span>}
-          {entry.name}
+          {display.badge && <span className="wbadge">{display.badge}</span>}
+          {display.name}
         </div>
         <div className="mle-fprev__path">{entry.path}</div>
       </div>

@@ -293,7 +293,8 @@
 .mle-row.is-now { color: var(--acc-ink); }
 .mle-row.is-now .ficon { color: var(--acc); }
 .mle-row.is-now .name  { font-weight: 600; }
-.mle-row .wbadge {
+.mle-row .wbadge,
+.mle-fprev__name .wbadge {
   display: inline-flex; align-items: center;
   font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.04em;
   background: var(--acc-soft); color: var(--acc-ink);

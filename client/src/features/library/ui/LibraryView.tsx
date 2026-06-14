@@ -11,6 +11,7 @@ import {
 } from "../../../features/library/api";
 import { getAllTags, getWork, patchWork } from "../../../entities/work/api";
 import { useLibraryView } from "../model/useLibraryNavigation";
+import { getAxisLandingPresentation } from "../model/axisLandingPresentation";
 import AxisColumn from "./AxisColumn";
 import ContentColumn from "./ContentColumn";
 import PreviewPane from "./PreviewPane";
@@ -174,6 +175,7 @@ export default function LibraryView({ searchQuery, playingWorkId, playingTrackIn
     : nav.activeAxis === "tag" && nav.selectedTags.length > 0
     ? "axis-landing"
     : "empty";
+  const isAxisFilterApplied = nav.activeAxis === "tag" && nav.selectedTags.length > 0;
 
   const activeSmartFolder = isSmartAxis(nav.activeAxis)
     ? smartFolders.find((sf) => sf.id === (nav.activeAxis as string).slice("smart-".length)) ?? null
@@ -236,7 +238,7 @@ export default function LibraryView({ searchQuery, playingWorkId, playingTrackIn
 
       <PreviewPane
         mode={previewMode}
-        axis={nav.activeAxis}
+        axisLandingPresentation={getAxisLandingPresentation(nav.activeAxis, isAxisFilterApplied)}
         selectedWork={selectedWork}
         smartFolder={activeSmartFolder}
         axisWorks={works}

@@ -2,6 +2,7 @@ import React from "react";
 import { I } from "../../../shared/ui/Icon";
 import { formatFileSize } from "../../../shared/lib/format";
 import { classifyFile, FILE_KIND_ICON, FILE_KIND_ROW_CLASS, type FsEntry } from "../model/types";
+import { getWorkFolderDisplay } from "../model/workFolderDisplay";
 
 interface FileRowProps {
   entry: FsEntry;
@@ -19,6 +20,7 @@ export default function FileRow({ entry, isFocused, isPlaying, onClick, onActiva
   const kind = classifyFile(entry);
   const Ic = IconSet[FILE_KIND_ICON[kind]] ?? I.file;
   const isWorkFolder = entry.isDir && !!entry.workId;
+  const display = getWorkFolderDisplay(entry.name, isWorkFolder ? entry.workId : null);
 
   const cls = [
     "mle-row",
@@ -28,16 +30,14 @@ export default function FileRow({ entry, isFocused, isPlaying, onClick, onActiva
     isPlaying ? "is-now" : "",
   ].filter(Boolean).join(" ");
 
-  const badge = isWorkFolder ? (entry.workId!.startsWith("RJ") ? "RJ" : "作品") : null;
-
   return (
     <div className={cls} onClick={onClick} onDoubleClick={onActivate} title={entry.name}>
       <span className="ficon">
         {isPlaying ? <span className="barwave"><span /><span /><span /></span> : <Ic size={15} />}
       </span>
       <span className="name">
-        {badge && <span className="wbadge">{badge}</span>}
-        {entry.name}
+        {display.badge && <span className="wbadge">{display.badge}</span>}
+        {display.name}
       </span>
       <span className="meta">{entry.isDir ? `${entry.childCount}` : formatFileSize(entry.size)}</span>
       <span className="chev">{entry.isDir ? <I.chev size={11} /> : null}</span>
