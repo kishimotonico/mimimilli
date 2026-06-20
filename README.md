@@ -1,16 +1,18 @@
 # mimikago
 
-ローカル音声作品管理・再生アプリ。DLsiteやFANZAからダウンロードした音声作品を快適に管理・再生するためのローカルで動かす Web アプリ。
+ローカル音声作品を管理して再生する Web アプリ。
+DLsite や FANZA からダウンロードした音声作品を、手元の環境で快適に扱うためのツールです。
 
 ## 特徴
 
-- **3ペインLibraryモード**: 軸レール（サークル/CV/タグ別ピボット）→ コンテンツ列 → プレビューの固定3ペインで大量作品を快適にブラウズ
-- **タグAND積集合絞り込み**: 複数タグをANDで組み合わせてヒット件数をリアルタイム更新
-- **スマートフォルダー**: WHERE/AND/AND NOT の保存クエリで作品を動的抽出
-- **タグベースの管理**: フラットタグ・Annotatedタグ（`cv/名前`, `サークル/名前`）による柔軟な整理
-- **メタファイル駆動**: `.meta.json`をSource of Truthとし、手動編集も可能
-- **自動スキャン**: 音声ファイルを含むフォルダーからメタファイルを自動生成
-- **常駐プレイヤー**: 作品を眺めながら再生を継続。全画面プレイヤーへ展開可能
+- **Library モード**：軸レール（サークル、CV、タグ別ピボット）、コンテンツ列、プレビューの 3 ペインで登録済み作品をブラウズ
+- **Files モード**：ルートフォルダー以下の物理ファイルシステムをそのまま巡回し、未登録フォルダーも表示
+- **タグ AND/OR 絞り込み**：複数タグを組み合わせ、ヒット件数をリアルタイム更新
+- **スマートフォルダー**：WHERE/AND/AND NOT の保存クエリで作品を動的に抽出
+- **タグベースの管理**：フラットタグと Annotated タグ（`cv/名前`、`サークル/名前`）で作品を整理
+- **メタファイル駆動**：`.meta.json` を正本とし、SQLite は検索と一覧表示のキャッシュとして再構築可能
+- **自動スキャン**：音声ファイルを含むフォルダーからメタファイルを自動生成
+- **常駐プレイヤー**：作品を眺めながら再生を継続し、必要に応じて全画面プレイヤーへ展開
 
 ## スクリーンショット
 
@@ -20,20 +22,22 @@
 
 | レイヤー | 技術 |
 |---------|------|
-| バックエンド | Hono + Node (TypeScript) |
+| バックエンド | Hono + Node.js（TypeScript、`node --watch` でネイティブ実行） |
 | フロントエンド | React 19 + TypeScript |
 | ビルド | Vite 7 |
-| データベース | SQLite (Drizzle ORM) |
-| API契約 | Zod スキーマ（`shared/`、client/server 共有） |
+| 状態管理 | TanStack Query + Jotai |
+| スタイリング | Tailwind CSS 4 |
+| データベース | SQLite（Drizzle ORM / better-sqlite3） |
+| API 契約 | Zod スキーマ（`shared/` で client と server が共有） |
 | 開発プロキシ | portless |
-| パッケージマネージャ | pnpm（ワークスペース: client / server / shared） |
+| パッケージマネージャ | pnpm（ワークスペース：client / server / shared） |
 
 ## セットアップ
 
 ### 前提条件
 
 - **Node.js** 24+
-- **pnpm** 8+
+- **pnpm**（開発は v11 系で確認）
 
 ### インストールと起動
 
@@ -45,43 +49,53 @@ cd mimikago
 # 依存関係（ルートのワークスペースで一括）
 pnpm install
 
-# 開発サーバー起動（client/ で。fixture アダプタの API が同居して動く）
-cd client && pnpm dev
+# 開発サーバー起動（fixture アダプタの API も同じプロセスで動く）
+pnpm dev
 # => http://mimi.localhost:1355
 ```
 
-`pnpm dev` は `vite.config.ts` が server の Hono アプリ（fixture アダプタ注入）を
-dev middleware としてマウントするため、UI もモック API も**これ一発**で動く。
-`MIMIKAGO_MOCK_SCENARIO`（default / empty / new-work / errors）でデータを切替できる。
-
-実 SQLite + 実ファイルシステムの real アダプタへ接続する場合:
+`pnpm dev` はルートから client を起動する。
+`vite.config.ts` は server の Hono アプリ（fixture アダプタ注入）を dev middleware として `/api/*` にマウントするため、UI とモック API が同一プロセスで動く。
+`MIMIKAGO_MOCK_SCENARIO`（default / empty / new-work / errors）でデータを切り替えられる。
 
 ```bash
-# 別ターミナルで API サーバーを起動（real アダプタ）
+MIMIKAGO_MOCK_SCENARIO=new-work pnpm dev
+```
+
+実 SQLite と実ファイルシステムの real アダプタへ接続する場合は、サーバーとフロントを別々に起動する。
+
+```bash
+# ターミナル 1: API サーバーを起動（real アダプタ）
 pnpm dev:server
 # => http://localhost:8080
+# SQLite パスは MIMIKAGO_DB で変更可（デフォルト ./data/mimikago.db）
 
-# フロントを API サーバーへ向けて起動（client/ で）
-cd client && BACKEND_URL=http://localhost:8080 pnpm dev
+# ターミナル 2: フロントを API サーバーへ向けて起動
+pnpm dev:real
+# => http://mimi.localhost:1355（BACKEND_URL=http://localhost:8080 を内包）
 ```
 
 ### 検証
 
 ```bash
-pnpm check   # shared + server + client の型チェック
-pnpm test    # server + client のユニットテスト
+pnpm check          # shared + server + client の型チェック
+pnpm test           # server + client のユニットテスト
+pnpm test:server    # server のみ（node --test）
+pnpm test:client    # client のみ（vitest）
+pnpm test:visual    # Playwright ビジュアルリグレッション
 ```
 
 ## 使い方
 
 1. 初回起動時にルートフォルダー（音声作品を保存しているフォルダー）を選択
 2. 自動スキャンが実行され、作品が検出される
-3. ライブラリ一覧からグリッド/テーブル表示で作品を閲覧
-4. タグの追加・削除で作品を整理
+3. Library モードで軸ピボットを表示し、Files モードで物理フォルダーを巡回
+4. タグの追加や削除で作品を整理
 
 ### メタファイルについて
 
-各作品フォルダー内に `.meta.json` を配置することで、作品として認識されます。スキャン時にメタファイルがないフォルダーは自動生成されます。
+各作品フォルダー内に `.meta.json` を配置すると、mimikago はそのフォルダーを作品として認識します。
+スキャン時にメタファイルがないフォルダーでは、`.meta.json` が自動生成されます。
 
 ```jsonc
 {
@@ -97,7 +111,8 @@ pnpm test    # server + client のユニットテスト
       { "title": "本編", "file": "02_本編.mp3" }
     ]
   }],
-  "defaultPlaylist": "default"
+  "defaultPlaylist": "default",
+  "createdAt": "2026-01-01T00:00:00.000Z"
 }
 ```
 
@@ -106,7 +121,7 @@ pnpm test    # server + client のユニットテスト
 | キー | 機能 |
 |------|------|
 | `Space` | 再生/一時停止 |
-| `Escape` | パネル・モーダルを閉じる |
+| `Escape` | パネルやモーダルを閉じる |
 
 ## プロジェクト構造
 
@@ -114,26 +129,28 @@ pnpm test    # server + client のユニットテスト
 mimikago/
 ├── client/                  # フロントエンド (React 19 + TypeScript + Vite)
 │   ├── src/
-│   │   ├── app/             # アプリルート・プロバイダー
-│   │   ├── features/        # 機能単位モジュール (library/player/scan/settings/setup)
+│   │   ├── app/             # アプリルート、プロバイダー、グローバルショートカット
+│   │   ├── features/        # 機能単位モジュール (library/files/player/scan/settings/setup/navigation)
 │   │   ├── entities/        # ドメインエンティティ (work/)
-│   │   └── shared/          # 共通ユーティリティ・UI・API クライアント
-│   ├── mocks/               # 開発用インメモリ API (fixtures/ + handlers/)
+│   │   └── shared/          # 共通ユーティリティ、UI、API クライアント
 │   ├── tests/
 │   │   ├── unit/            # vitest 単体テスト
 │   │   └── visual/          # Playwright ビジュアルリグレッションテスト
 │   ├── vite.config.ts
 │   └── package.json
-├── server/                  # axum HTTP API サーバー (Rust)
+├── server/                  # HTTP API サーバー (Hono + Node.js / TypeScript)
 │   └── src/
-│       ├── main.rs          # ルーター定義
-│       ├── handlers/        # HTTP ハンドラ
-│       ├── service.rs       # ビジネスロジック
-│       ├── db.rs            # SQLite 操作
-│       ├── scanner.rs       # ファイルシステムスキャナー
-│       ├── dlsite.rs        # DLsite スクレイパー
-│       └── models.rs        # データモデル
-└── docs/                    # 設計ドキュメント・デザイン資料
+│       ├── index.ts         # エントリポイント (env: PORT/MIMIKAGO_ADAPTER/MIMIKAGO_DB/MIMIKAGO_MOCK_SCENARIO)
+│       ├── app.ts           # createApp（アダプタ注入）
+│       ├── adapter.ts       # DataAdapter インターフェース
+│       ├── adapters/
+│       │   ├── fixture/     # インメモリ開発データ（旧 client/mocks を統合）
+│       │   └── real/        # SQLite(Drizzle) + 実FS: scanner / dlsite / meta / workRepo ほか
+│       ├── core/            # ドメインロジック (worksQuery / axisFacets / smartFolder)
+│       └── routes/          # HTTP ルート定義
+├── server-rust/             # 旧 axum (Rust) 実装。退避と参照用（ビルド対象外）
+├── shared/                  # Zod スキーマ正典（API 契約 v2、client/server 共有）
+└── docs/                    # 設計ドキュメントとデザイン資料
     ├── design_handoff_mimimilli_library/  # デザイン正典 (mimimilli)
     ├── adr/                 # アーキテクチャ決定記録
     └── issues/              # 作業記録
