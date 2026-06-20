@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run --name mimi vite",
+    "dev": "cross-env PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run --name mimi vite",
     "check": "tsc",
     "build": "tsc && vite build",
     "preview": "vite preview",
@@ -34,6 +34,7 @@
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",
+    "cross-env": "^10.1.0",
     "jsdom": "^28.1.0",
     "portless": "^0.10.1",
     "tailwindcss": "^4.3.0",
