@@ -7,6 +7,7 @@
   },
   "scripts": {
     "dev": "pnpm --filter @mimikago/client dev",
+    "dev:real": "pnpm --filter @mimikago/client dev:real",
     "dev:server": "pnpm --filter @mimikago/server dev",
     "check": "pnpm --filter @mimikago/shared check && pnpm --filter @mimikago/server check && pnpm --filter @mimikago/client check",
     "test": "pnpm --filter @mimikago/server test && pnpm --filter @mimikago/client test",
