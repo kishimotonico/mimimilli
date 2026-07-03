@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { smartFolderRuleSchema, type SmartFolderRule, type WorkSummary } from "@mimikago/shared";
+import { smartFolderRuleSchema, type SmartFolderRule, type WorkSummary } from "@mimimilli/shared";
 import { evalSmartFolder, evalSmartFolderRules } from "../src/core/smartFolder.ts";
 
 function work(overrides: Partial<WorkSummary> & Pick<WorkSummary, "id">): WorkSummary {

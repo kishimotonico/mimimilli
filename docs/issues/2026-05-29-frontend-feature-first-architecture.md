@@ -2,7 +2,7 @@
 
 ## 背景
 
-現在の mimikago フロントエンドは、Claude Design で作成した mimimilli 系モックをベースに、実アプリとして必要な機能・仕様・画面構成を考え直している段階にある。
+現在の mimimilli フロントエンドは、Claude Design で作成した mimimilli 系モックをベースに、実アプリとして必要な機能・仕様・画面構成を考え直している段階にある。
 
 直近のリファクタで旧モック由来の到達不能コンポーネントは削除し、Tailwind v4 の基盤導入と主要バグ修正も完了した。一方で、今後しばらくはモックを作り込みながら UX と仕様を詰めるフェーズに入るため、早い段階でディレクトリ構成と責務境界を整理しておきたい。
 
@@ -21,7 +21,7 @@
 
 ## 方針
 
-厳密な Feature-Sliced Design を全面採用するのではなく、mimikago の現在規模に合う軽量な feature-first 構成へ段階的に寄せる。
+厳密な Feature-Sliced Design を全面採用するのではなく、mimimilli の現在規模に合う軽量な feature-first 構成へ段階的に寄せる。
 
 また、今後のモック作り込みと実装拡張を考えると、状態管理ライブラリは早い段階で導入する。ここで重要なのは、全状態を 1 つのグローバルストアに寄せるのではなく、server state と client/UI state を明確に分けること。
 
@@ -156,7 +156,7 @@ src/
 - [x] `vite.config.ts` から mock data / handlers を分離
 - [x] Node/Vite 専用 mock server 実装を `mocks/devServer.ts` に移動
 - [x] 初期データを `mocks/fixtures.ts` に分離
-- [x] `MIMIKAGO_MOCK_SCENARIO` による最小の scenario 切り替えを追加
+- [x] `MIMIMILLI_MOCK_SCENARIO` による最小の scenario 切り替えを追加
   - `default`
   - `empty`
   - `new-work`

@@ -64,6 +64,6 @@ export type PlayerUiMode = "bar" | "popup";
  * localStorage に永続化し、次回再生時に復元する（issue参照）。
  */
 export const playerUiModeAtom = atomWithStorage<PlayerUiMode>(
-  "mimikago:playerUiMode",
+  "mimimilli:playerUiMode",
   "bar"
 );

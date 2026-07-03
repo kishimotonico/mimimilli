@@ -1,13 +1,13 @@
 {
-  "name": "@mimikago/client",
+  "name": "@mimimilli/client",
   "private": true,
   "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "cross-env PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run --name mimi vite",
-    "dev:new-work": "cross-env MIMIKAGO_MOCK_SCENARIO=new-work PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run --name mimi vite",
-    "dev:empty": "cross-env MIMIKAGO_MOCK_SCENARIO=empty PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run --name mimi vite",
-    "dev:errors": "cross-env MIMIKAGO_MOCK_SCENARIO=errors PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run --name mimi vite",
+    "dev:new-work": "cross-env MIMIMILLI_MOCK_SCENARIO=new-work PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run --name mimi vite",
+    "dev:empty": "cross-env MIMIMILLI_MOCK_SCENARIO=empty PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run --name mimi vite",
+    "dev:errors": "cross-env MIMIMILLI_MOCK_SCENARIO=errors PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run --name mimi vite",
     "dev:real": "cross-env BACKEND_URL=http://localhost:8080 PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run --name mimi vite",
     "check": "tsc",
     "build": "tsc && vite build",
@@ -18,7 +18,7 @@
     "test:visual:update": "playwright test --update-snapshots"
   },
   "dependencies": {
-    "@mimikago/shared": "workspace:*",
+    "@mimimilli/shared": "workspace:*",
     "@tanstack/react-query": "^5.100.14",
     "jotai": "^2.20.0",
     "motion": "^12.40.0",
@@ -27,7 +27,7 @@
   },
   "devDependencies": {
     "@hono/node-server": "^1.14.0",
-    "@mimikago/server": "workspace:*",
+    "@mimimilli/server": "workspace:*",
     "@playwright/test": "^1.60.0",
     "@tailwindcss/vite": "^4.3.0",
     "@tanstack/react-query-devtools": "^5.100.14",

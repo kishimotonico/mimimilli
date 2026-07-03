@@ -25,8 +25,8 @@ import {
   type NavigationUrlState,
 } from "./navigationUrl";
 
-const HISTORY_STATE_KEY = "__mimikagoNavigation";
-const MAX_INDEX_KEY = "mimikago.navigation.maxIndex";
+const HISTORY_STATE_KEY = "__mimimilliNavigation";
+const MAX_INDEX_KEY = "mimimilli.navigation.maxIndex";
 
 interface HistoryMarker {
   index: number;

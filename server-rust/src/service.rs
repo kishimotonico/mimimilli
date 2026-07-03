@@ -18,7 +18,7 @@ impl AppService {
         fs::create_dir_all(app_data_dir)
             .map_err(|e| format!("Failed to create app data dir: {}", e))?;
 
-        let db_path = app_data_dir.join("mimikago.db");
+        let db_path = app_data_dir.join("mimimilli.db");
         let db = Database::new(&db_path)?;
 
         Ok(AppService { db })

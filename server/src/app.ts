@@ -2,7 +2,7 @@
 // notFound / onError ハンドラを shared の apiErrorSchema 形式で設定する。
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import type { ApiError } from "@mimikago/shared";
+import type { ApiError } from "@mimimilli/shared";
 import { NotConfiguredError, type DataAdapter } from "./adapter.ts";
 import { axesRoute } from "./routes/axes.ts";
 import { dlsiteRoute } from "./routes/dlsite.ts";

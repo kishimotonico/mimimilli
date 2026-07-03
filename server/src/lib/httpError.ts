@@ -1,6 +1,6 @@
 // ルート共通のエラーレスポンスヘルパー。
 // shared の apiErrorSchema 形式 `{error: {code, message}}` で常に返す。
-import type { ApiError } from "@mimikago/shared";
+import type { ApiError } from "@mimimilli/shared";
 import { HTTPException } from "hono/http-exception";
 
 const STATUS_BY_CODE = {

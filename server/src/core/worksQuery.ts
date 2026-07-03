@@ -1,7 +1,7 @@
 // 作品検索（GET /api/works）の純粋関数。
 // client/mocks/handlers/works.ts の searchWorks と同じセマンティクスを再現する。
-import { AXIS_TAG_PREFIX } from "@mimikago/shared";
-import type { SortId, WorksPage, WorksQuery, WorkSummary } from "@mimikago/shared";
+import { AXIS_TAG_PREFIX } from "@mimimilli/shared";
+import type { SortId, WorksPage, WorksQuery, WorkSummary } from "@mimimilli/shared";
 
 const RECENT_VIEW_WINDOW_DAYS = 30;
 

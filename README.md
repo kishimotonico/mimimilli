@@ -1,4 +1,4 @@
-# mimikago
+# mimimilli
 
 ローカル音声作品を管理して再生する Web アプリ。
 DLsite や FANZA からダウンロードした音声作品を、手元の環境で快適に扱うためのツールです。
@@ -43,8 +43,8 @@ DLsite や FANZA からダウンロードした音声作品を、手元の環境
 
 ```bash
 # リポジトリのクローン
-git clone <repository-url>
-cd mimikago
+git clone <repository-url> mimimilli
+cd mimimilli
 
 # 依存関係（ルートのワークスペースで一括）
 pnpm install
@@ -71,7 +71,7 @@ pnpm dev:fixture:errors
 pnpm dev:real
 # => http://localhost:8080
 # => http://mimi.localhost:1355
-# SQLite パスは MIMIKAGO_DB で変更可（デフォルト ./data/mimikago.db）
+# SQLite パスは MIMIMILLI_DB で変更可（デフォルト ./data/mimimilli.db）
 ```
 
 サーバーとフロントを別々に起動する場合は、次のコマンドを使う。
@@ -114,7 +114,7 @@ pnpm test:visual    # Playwright ビジュアルリグレッション
 
 ### メタファイルについて
 
-各作品フォルダー内に `.meta.json` を配置すると、mimikago はそのフォルダーを作品として認識します。
+各作品フォルダー内に `.meta.json` を配置すると、mimimilli はそのフォルダーを作品として認識します。
 スキャン時にメタファイルがないフォルダーでは、`.meta.json` が自動生成されます。
 
 ```jsonc
@@ -146,7 +146,7 @@ pnpm test:visual    # Playwright ビジュアルリグレッション
 ## プロジェクト構造
 
 ```
-mimikago/
+mimimilli/
 ├── client/                  # フロントエンド (React 19 + TypeScript + Vite)
 │   ├── src/
 │   │   ├── app/             # アプリルート、プロバイダー、グローバルショートカット
@@ -160,7 +160,7 @@ mimikago/
 │   └── package.json
 ├── server/                  # HTTP API サーバー (Hono + Node.js / TypeScript)
 │   └── src/
-│       ├── index.ts         # エントリポイント (env: PORT/MIMIKAGO_ADAPTER/MIMIKAGO_DB/MIMIKAGO_MOCK_SCENARIO)
+│       ├── index.ts         # エントリポイント (env: PORT/MIMIMILLI_ADAPTER/MIMIMILLI_DB/MIMIMILLI_MOCK_SCENARIO)
 │       ├── app.ts           # createApp（アダプタ注入）
 │       ├── adapter.ts       # DataAdapter インターフェース
 │       ├── adapters/

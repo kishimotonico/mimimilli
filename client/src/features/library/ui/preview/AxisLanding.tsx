@@ -1,4 +1,4 @@
-import type { WorkSummary } from "@mimikago/shared";
+import type { WorkSummary } from "@mimimilli/shared";
 import type { AxisLandingPresentation } from "../../model/axisLandingPresentation";
 import CoverImg from "../../../../entities/work/ui/CoverImg";
 import { I } from "../../../../shared/ui/Icon";

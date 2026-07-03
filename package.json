@@ -1,5 +1,5 @@
 {
-  "name": "mimikago-workspace",
+  "name": "mimimilli-workspace",
   "private": true,
   "type": "module",
   "engines": {
@@ -7,19 +7,19 @@
   },
   "scripts": {
     "dev": "pnpm dev:fixture",
-    "dev:fixture": "pnpm --filter @mimikago/client dev",
-    "dev:fixture:new-work": "pnpm --filter @mimikago/client dev:new-work",
-    "dev:fixture:empty": "pnpm --filter @mimikago/client dev:empty",
-    "dev:fixture:errors": "pnpm --filter @mimikago/client dev:errors",
+    "dev:fixture": "pnpm --filter @mimimilli/client dev",
+    "dev:fixture:new-work": "pnpm --filter @mimimilli/client dev:new-work",
+    "dev:fixture:empty": "pnpm --filter @mimimilli/client dev:empty",
+    "dev:fixture:errors": "pnpm --filter @mimimilli/client dev:errors",
     "dev:real": "pnpm -r --parallel --if-present run dev:real",
-    "dev:real:server": "pnpm --filter @mimikago/server dev:real",
-    "dev:real:client": "pnpm --filter @mimikago/client dev:real",
-    "check": "pnpm --filter @mimikago/shared check && pnpm --filter @mimikago/server check && pnpm --filter @mimikago/client check",
-    "test": "pnpm --filter @mimikago/server test && pnpm --filter @mimikago/client test",
-    "smoke:real": "pnpm --filter @mimikago/server smoke:real",
-    "test:server": "pnpm --filter @mimikago/server test",
-    "test:client": "pnpm --filter @mimikago/client test",
-    "test:visual": "pnpm --filter @mimikago/client test:visual",
-    "test:visual:update": "pnpm --filter @mimikago/client test:visual:update"
+    "dev:real:server": "pnpm --filter @mimimilli/server dev:real",
+    "dev:real:client": "pnpm --filter @mimimilli/client dev:real",
+    "check": "pnpm --filter @mimimilli/shared check && pnpm --filter @mimimilli/server check && pnpm --filter @mimimilli/client check",
+    "test": "pnpm --filter @mimimilli/server test && pnpm --filter @mimimilli/client test",
+    "smoke:real": "pnpm --filter @mimimilli/server smoke:real",
+    "test:server": "pnpm --filter @mimimilli/server test",
+    "test:client": "pnpm --filter @mimimilli/client test",
+    "test:visual": "pnpm --filter @mimimilli/client test:visual",
+    "test:visual:update": "pnpm --filter @mimimilli/client test:visual:update"
   }
 }

@@ -100,7 +100,7 @@ function parseSelectedRelPath(value: string, warnings: string[]): string[] | nul
 }
 
 export function parseNavigationUrl(input: string | URL): NavigationParseResult {
-  const url = input instanceof URL ? input : new URL(input, "http://mimikago.local");
+  const url = input instanceof URL ? input : new URL(input, "http://mimimilli.local");
   const warnings: string[] = [];
 
   if (url.hash) warnings.push(`未対応の URL hash を削除しました: ${url.hash}`);

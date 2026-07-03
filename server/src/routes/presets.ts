@@ -1,6 +1,6 @@
 // GET/POST /presets, DELETE /presets/:id
 import { Hono } from "hono";
-import { searchPresetCreateSchema } from "@mimikago/shared";
+import { searchPresetCreateSchema } from "@mimimilli/shared";
 import type { DataAdapter } from "../adapter.ts";
 import { invalidRequest, notFound } from "../lib/httpError.ts";
 

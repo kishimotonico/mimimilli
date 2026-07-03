@@ -1,7 +1,7 @@
 // 分類軸のファセット集計（GET /api/axes/:axis）の純粋関数。
 // client/mocks/handlers/library.ts の buildAxisFacetItems と同じセマンティクスを再現する。
-import { AXIS_TAG_PREFIX } from "@mimikago/shared";
-import type { AxisFacetItem, FacetAxis, WorkSummary } from "@mimikago/shared";
+import { AXIS_TAG_PREFIX } from "@mimimilli/shared";
+import type { AxisFacetItem, FacetAxis, WorkSummary } from "@mimimilli/shared";
 
 /** 指定された分類軸について、works から値ごとの件数を集計し count 降順で返す */
 export function buildAxisFacets(axis: FacetAxis, works: WorkSummary[]): AxisFacetItem[] {

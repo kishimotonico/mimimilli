@@ -1,4 +1,4 @@
-import type { Work, WorkPatch, SmartFolder, WorkSummary } from "@mimikago/shared";
+import type { Work, WorkPatch, SmartFolder, WorkSummary } from "@mimimilli/shared";
 import type { AxisLandingPresentation } from "../model/axisLandingPresentation";
 import { AxisLanding } from "./preview/AxisLanding";
 import { EmptyPreview } from "./preview/EmptyPreview";

@@ -4,7 +4,7 @@
 
 ## 前提
 
-- agent-browser（`--session mimi-design`）で全画面を実際に操作して確認した。コード側は client/ 全体を調査済み
+- agent-browser（`--session mimimilli-design`）で全画面を実際に操作して確認した。コード側は client/ 全体を調査済み
 - モックを正典とするフェーズは終了しており、本提案は動いているフロントエンドを出発点にする。モックとの差分自体は課題として扱わない
 - 再生UIの「バー + ポップアップ + 全画面」の2層+α構成（`a2b4e4a`）は意図的な設計として維持する
 - 未配線のUI（左ナビの履歴/ピン留め、ビュー切替、スマートフォルダーの条件追加など）は将来機能の枠なので本提案のスコープ外。ただし「押せるのに無反応」への手当てだけ T5 に含めた
@@ -102,7 +102,7 @@
 
 ## 調査時のスクリーンショット
 
-セッションのscratchpad（`/tmp/claude-1000/-home-nico-projects-mimikago/*/scratchpad/01〜16*.png`）に保存。一時領域のため消える可能性あり。再取得は agent-browser の `--session mimi-design` で可能。
+セッションのscratchpad（`/tmp/claude-1000/-home-nico-projects-mimimilli/*/scratchpad/01〜16*.png`）に保存。一時領域のため消える可能性あり。再取得は agent-browser の `--session mimimilli-design` で可能。
 
 ## 実施記録（2026-07-03）
 
@@ -116,4 +116,4 @@
 - Wave 3（Sonnet 5）: click-throughバグの根本修正（`.mle-body` がバー領域まで伸びていたため `.has-docked-bar .mle-body` に padding-bottom 68px を追加、従来の帳尻合わせpaddingは縮小）。バーにクリック可能なシーク行（経過/総時間 mono 表示、useSeekDrag再利用、stopPropagationでポップアップ切替と分離）。FullScreenPlayer のインラインstyle を Tailwind へ全面移行
 - Wave 4（Codex）: WorkRow「▸ 再生中」→3本バーのイコライザーアニメ（prefers-reduced-motion対応）。スマートルールの整形表示（`3600`→`1:00:00`、タグはprefix+値チップ）。AxisLanding カードにメタ（サークル · 尺）追加。未配線ボタン（ビュー切替リスト/グリッド、左ナビ横断サーフェス、条件を追加）を disabled + title「近日実装」化
 
-各Wave完了ごとに agent-browser（`--session mimi-design`）で実機検証済み。タグ追加/削除・タイトル編集は保存往復まで確認。
+各Wave完了ごとに agent-browser（`--session mimimilli-design`）で実機検証済み。タグ追加/削除・タイトル編集は保存往復まで確認。

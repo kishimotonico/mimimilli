@@ -102,7 +102,7 @@ async fn main() {
         .unwrap_or(8080);
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
 
-    log::info!("mimikago-server listening on http://{}", addr);
+    log::info!("mimimilli-server listening on http://{}", addr);
 
     let listener = tokio::net::TcpListener::bind(addr)
         .await

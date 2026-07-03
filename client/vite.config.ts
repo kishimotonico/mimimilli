@@ -3,8 +3,8 @@ import { defineConfig, type Plugin } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { getRequestListener } from "@hono/node-server";
-import { createApp } from "@mimikago/server/app";
-import { createFixtureAdapter } from "@mimikago/server/adapters/fixture";
+import { createApp } from "@mimimilli/server/app";
+import { createFixtureAdapter } from "@mimimilli/server/adapters/fixture";
 
 // ---------------------------------------------------------------------------
 // Vite 設定
@@ -17,7 +17,7 @@ const backendUrl = process.env.BACKEND_URL;
 
 /** server の Hono アプリ（fixture アダプタ）を dev middleware としてマウントする plugin */
 function fixtureApiPlugin(): Plugin {
-  const adapter = createFixtureAdapter({ scenario: process.env.MIMIKAGO_MOCK_SCENARIO });
+  const adapter = createFixtureAdapter({ scenario: process.env.MIMIMILLI_MOCK_SCENARIO });
   const app = createApp(adapter);
   const listener = getRequestListener(app.fetch);
 

@@ -1,4 +1,4 @@
-import type { SmartFolder } from "@mimikago/shared";
+import type { SmartFolder } from "@mimimilli/shared";
 import type { AxisId } from "../model/types";
 import { I } from "../../../shared/ui/Icon";
 

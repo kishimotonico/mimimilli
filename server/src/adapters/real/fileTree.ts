@@ -1,7 +1,7 @@
 // 作品フォルダー配下の物理ファイルツリー（GET /api/works/:id/files、フォルダービュー用）。
 import { readdirSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
-import type { FileEntry } from "@mimikago/shared";
+import type { FileEntry } from "@mimimilli/shared";
 
 function extOf(name: string): string {
   const i = name.lastIndexOf(".");

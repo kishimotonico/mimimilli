@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import type { ScanResult, WorkSummary } from "@mimikago/shared";
+import type { ScanResult, WorkSummary } from "@mimimilli/shared";
 import { getAllWorks, patchWork } from "../../../entities/work/api";
 
 interface NewWorkPopupProps {

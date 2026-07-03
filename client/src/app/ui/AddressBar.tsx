@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { SortId } from "@mimikago/shared";
+import type { SortId } from "@mimimilli/shared";
 import { SORT_OPTIONS } from "../../features/library/model/types";
 import { I } from "../../shared/ui/Icon";
 import IconButton from "../../shared/ui/IconButton";

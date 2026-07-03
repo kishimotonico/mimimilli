@@ -1,7 +1,7 @@
 // スマートフォルダーのルール評価（GET /api/smart-folders/:id/works）の純粋関数。
 // client/mocks/handlers/library.ts の filterSmartFolderWorks と同じセマンティクスを再現する。
 // shared スキーマが許可した field/operator のみを評価する。DB 内の不正値も黙って無視しない。
-import type { SmartFolder, SmartFolderRule, WorkSummary } from "@mimikago/shared";
+import type { SmartFolder, SmartFolderRule, WorkSummary } from "@mimimilli/shared";
 import { sortWorkSummaries } from "./worksQuery.ts";
 
 /** rules を順に適用し、works をフィルタリングして返す */

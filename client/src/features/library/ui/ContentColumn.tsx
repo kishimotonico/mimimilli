@@ -1,5 +1,5 @@
 import React from "react";
-import type { WorkSummary, AxisFacetItem } from "@mimikago/shared";
+import type { WorkSummary, AxisFacetItem } from "@mimimilli/shared";
 import type { AxisId } from "../model/types";
 import WorkRow from "./WorkRow";
 import DrillHeader from "./DrillHeader";

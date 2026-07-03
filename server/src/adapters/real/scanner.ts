@@ -18,7 +18,7 @@
 //   - シンボリックリンクのディレクトリは辿らない（循環防止）
 import { existsSync, readdirSync } from "node:fs";
 import { basename, dirname, extname, join } from "node:path";
-import type { MetaFile, Playlist, ScanResult, Track, Work } from "@mimikago/shared";
+import type { MetaFile, Playlist, ScanResult, Track, Work } from "@mimimilli/shared";
 import type { Db } from "./db.ts";
 import { isMetaFileName, MetaParseError, patchMetaFile, readMetaFile, writeMetaFile } from "./meta.ts";
 import { isPathWithin, toPortableRelativePath } from "./paths.ts";

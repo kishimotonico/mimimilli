@@ -1,6 +1,6 @@
 # 引き継ぎドキュメント
 
-mimikago の現状と進行中の作業を、後続のエージェント／セッションが把握するための資料。
+mimimilli の現状と進行中の作業を、後続のエージェント／セッションが把握するための資料。
 最終更新: 2026-07-03。
 
 ## このアプリは何か
@@ -14,15 +14,15 @@ DLsite/FANZA 等からダウンロードした音声作品（ASMR・ボイスド
 旧 Rust/axum サーバーは廃止し `server-rust/` へ退避済み（参照実装）。現行は **TypeScript モノレポ**。
 
 ```
-mimikago/                      # pnpm workspace（ルートに統合済み）
+mimimilli/                     # pnpm workspace（ルートに統合済み）
 ├── client/   React 19 + Vite SPA（feature-first: app → features → entities → shared）
 ├── server/   Hono + Node。routes（薄い） / core（ドメイン） / adapters（real | fixture）
 └── shared/   API契約の正典。Zod スキーマ + 型（client / server 双方が依存）
 ```
 
-- **契約の正典は `shared/`**（Zod）。client は `@mimikago/shared` から型を import し、server も同じ型でルートを実装する。契約のズレは `tsc` が機械検出する
+- **契約の正典は `shared/`**（Zod）。client は `@mimimilli/shared` から型を import し、server も同じ型でルートを実装する。契約のズレは `tsc` が機械検出する
 - **アダプタ境界（ADR-0002）**: ルーター・ドメインロジックは1系統。データの出どころだけ差し替える
-  - `fixture` アダプタ: インメモリの開発データ（旧 `client/mocks/` を昇格させたもの）。シナリオ切替（`MIMIKAGO_MOCK_SCENARIO` = default/empty/new-work/errors）と**合成メディア**（無音WAV・SVGカバー、Range対応）を持つ
+  - `fixture` アダプタ: インメモリの開発データ（旧 `client/mocks/` を昇格させたもの）。シナリオ切替（`MIMIMILLI_MOCK_SCENARIO` = default/empty/new-work/errors）と**合成メディア**（無音WAV・SVGカバー、Range対応）を持つ
   - `real` アダプタ: SQLite（Drizzle）+ 実FS + スキャナー + DLsite
 - **dev は vite middleware**: `client/vite.config.ts` が `BACKEND_URL` 未指定時、server の Hono アプリ（fixture注入）を dev middleware としてマウント。`pnpm dev` 一発で UI もモックAPIも動く
 
@@ -31,7 +31,7 @@ mimikago/                      # pnpm workspace（ルートに統合済み）
 vite middleware は fixture アダプタと Hono アプリを**プラグイン初期化時に1度だけ生成**する。そのため **`server/src` を変更しても起動中の dev サーバーには反映されない**（fixtureもアプリも古いインスタンスのまま）。
 
 - 症状例: 合成メディアを server に足しても、起動中 dev サーバーは cover/audio を 404 のまま返す
-- 切り分け: `MIMIKAGO_ADAPTER=fixture PORT=18099 node server/src/index.ts` で別ポート起動して `curl` 確認（こちらは最新コードで応答する）
+- 切り分け: `MIMIMILLI_ADAPTER=fixture PORT=18099 node server/src/index.ts` で別ポート起動して `curl` 確認（こちらは最新コードで応答する）
 - 対処: **サーバー側を変えたら dev サーバーを手動再起動**。client 側（`src/`）の変更は HMR で反映されるので影響なし
 
 ## 起動・検証コマンド
@@ -47,7 +47,7 @@ pnpm test:server
 pnpm test:client
 pnpm test:visual         # Playwright 比較
 pnpm test:visual:update  # スナップショット再生成
-# ビジュアルテストの webServer は MIMIKAGO_MOCK_SCENARIO=new-work で別ポート(4175)に自前で立つ
+# ビジュアルテストの webServer は MIMIMILLI_MOCK_SCENARIO=new-work で別ポート(4175)に自前で立つ
 
 # fixture シナリオ
 pnpm dev:fixture:new-work
@@ -56,12 +56,12 @@ pnpm dev:fixture:errors
 
 # real アダプタ（実SQLite + 実FS）
 pnpm dev:real          # API サーバー + client を並行起動
-pnpm dev:real:server   # API サーバーのみ => http://localhost:8080（DB は MIMIKAGO_DB、既定 ./data/mimikago.db）
+pnpm dev:real:server   # API サーバーのみ => http://localhost:8080（DB は MIMIMILLI_DB、既定 ./data/mimimilli.db）
 pnpm dev:real:client   # client のみ。BACKEND_URL=http://localhost:8080 へ向けて起動
 pnpm smoke:real        # 固定のサンプル音声で real 経路を手動スモーク
 
 # fixture サーバーを単体起動して curl 確認（合成メディアの検証等）
-MIMIKAGO_ADAPTER=fixture PORT=18099 node server/src/index.ts
+MIMIMILLI_ADAPTER=fixture PORT=18099 node server/src/index.ts
 ```
 
 ビジュアルテストの注意:

@@ -3,9 +3,9 @@
 // React / API に依存しない（テスト容易性のため）。
 
 // ── /api/fs レスポンス型 ──────────────────────────────────────
-// API 契約に属する型は @mimikago/shared を正典として re-export する。
+// API 契約に属する型は @mimimilli/shared を正典として re-export する。
 
-export type { FsEntry, FsListing } from "@mimikago/shared";
+export type { FsEntry, FsListing } from "@mimimilli/shared";
 
 // ── ファイル種別 ──────────────────────────────────────────────
 

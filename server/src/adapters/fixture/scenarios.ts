@@ -1,6 +1,6 @@
 // fixture アダプタのシナリオ（ADR-0002 / client/mocks/scenarios.ts からの移植）。
 // 開発サーバー・Playwright ビジュアルテストでのデータ切替に使う。
-import type { SearchPreset, SmartFolder, WorkSummary } from "@mimikago/shared";
+import type { SearchPreset, SmartFolder, WorkSummary } from "@mimimilli/shared";
 import { createSeedSmartFolders, SEED_PRESETS, SEED_WORKS } from "./data.ts";
 
 export type FixtureScenarioId = "default" | "empty" | "new-work" | "errors";
@@ -40,7 +40,7 @@ export function parseFixtureScenarioId(rawId: string | undefined): FixtureScenar
     return rawId as FixtureScenarioId;
   }
   throw new Error(
-    `不明な MIMIKAGO_MOCK_SCENARIO です: ${rawId}（指定可能な値: ${SCENARIO_IDS.join(", ")}）`
+    `不明な MIMIMILLI_MOCK_SCENARIO です: ${rawId}（指定可能な値: ${SCENARIO_IDS.join(", ")}）`
   );
 }
 

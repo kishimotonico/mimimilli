@@ -1,4 +1,4 @@
-# mimikago モノレポ workspace（client / server / shared）。
+# mimimilli モノレポ workspace（client / server / shared）。
 packages:
   - client
   - server

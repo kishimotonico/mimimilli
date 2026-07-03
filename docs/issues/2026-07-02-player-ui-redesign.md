@@ -89,7 +89,7 @@
 実装は Sonnet 5 サブエージェントに委譲し、オーケストレーター側で agent-browser により実機検証した。
 
 - 新規: PlayerDock.tsx（外枠・モード切替・AnimatePresence）、BarContent.tsx、PopupContent.tsx、useSeekDrag.ts
-- 変更: atoms.ts（playerUiModeAtom, atomWithStorage `mimikago:playerUiMode`）、usePlayer.ts（toggleMute）、App.tsx、AppShell.tsx（バーを fixed オーバーレイ化）、useGlobalShortcuts.ts（←/→ ±10秒）、shell.css
+- 変更: atoms.ts（playerUiModeAtom, atomWithStorage `mimimilli:playerUiMode`）、usePlayer.ts（toggleMute）、App.tsx、AppShell.tsx（バーを fixed オーバーレイ化）、useGlobalShortcuts.ts（←/→ ±10秒）、shell.css
 - バー⇄ポップアップの切替は motion の layout / layoutId（再生ボタン共有）による FLIP アニメーション
 - 並行セッションが実装した playbackError 表示は BarContent に統合済み
 - 旧 TransportBar.tsx は未参照だが削除保留（並行セッションが編集中のため）

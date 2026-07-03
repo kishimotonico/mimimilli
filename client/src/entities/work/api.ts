@@ -3,7 +3,7 @@
 // 依存方向: shared/api/http と自 entity の model のみを参照する。
 
 import { API_BASE, get, patch, post } from "../../shared/api/http";
-import type { Work, WorkSummary, WorksPage, WorkPatch, FileEntry, DlsiteWorkInfo } from "@mimikago/shared";
+import type { Work, WorkSummary, WorksPage, WorkPatch, FileEntry, DlsiteWorkInfo } from "@mimimilli/shared";
 
 export async function getWork(id: string): Promise<Work | null> {
   return get<Work | null>(`/works/${encodeURIComponent(id)}`);

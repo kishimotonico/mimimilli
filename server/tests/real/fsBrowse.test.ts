@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { join, resolve } from "node:path";
 import { test } from "node:test";
-import type { FsListing, WorksPage } from "@mimikago/shared";
+import type { FsListing, WorksPage } from "@mimimilli/shared";
 import type { Hono } from "hono";
 import { createRealAdapter } from "../../src/adapters/real/index.ts";
 import { createApp } from "../../src/app.ts";

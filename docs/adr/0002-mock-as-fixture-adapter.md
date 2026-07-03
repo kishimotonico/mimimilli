@@ -13,7 +13,7 @@
 モックを「捨てる仮実装」ではなく、本実装サーバー（ADR-0001）の fixture アダプタへ昇格させる。
 
 - `server/` はルーター＋ドメインロジックを1系統だけ持ち、データ層を adapters（real: SQLite＋実FS / fixture: インメモリ fixtures）として差し替える
-- `client/` の dev サーバーは `BACKEND_URL` 未指定時、workspace 依存で server の Hono アプリ（fixture アダプタ注入）をマウントする。`pnpm dev` 一発の DX とシナリオ切替（`MIMIKAGO_MOCK_SCENARIO`）を維持する
+- `client/` の dev サーバーは `BACKEND_URL` 未指定時、workspace 依存で server の Hono アプリ（fixture アダプタ注入）をマウントする。`pnpm dev` 一発の DX とシナリオ切替（`MIMIMILLI_MOCK_SCENARIO`）を維持する
 - Playwright ビジュアルテストも fixture アダプタ経由とし、決定的なデータで実行する
 - 移行完了後、`client/mocks/` は削除する
 

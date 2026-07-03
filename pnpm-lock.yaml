@@ -10,7 +10,7 @@ importers:
 
   client:
     dependencies:
-      '@mimikago/shared':
+      '@mimimilli/shared':
         specifier: workspace:*
         version: link:../shared
       '@tanstack/react-query':
@@ -32,7 +32,7 @@ importers:
       '@hono/node-server':
         specifier: ^1.14.0
         version: 1.19.14(hono@4.12.25)
-      '@mimikago/server':
+      '@mimimilli/server':
         specifier: workspace:*
         version: link:../server
       '@playwright/test':
@@ -92,7 +92,7 @@ importers:
       '@hono/node-server':
         specifier: ^1.14.0
         version: 1.19.14(hono@4.12.25)
-      '@mimikago/shared':
+      '@mimimilli/shared':
         specifier: workspace:*
         version: link:../shared
       better-sqlite3:

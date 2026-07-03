@@ -1,6 +1,6 @@
 // POST /dlsite/:id/fetch, POST /dlsite/:id/apply
 import { Hono } from "hono";
-import { dlsiteApplyBodySchema } from "@mimikago/shared";
+import { dlsiteApplyBodySchema } from "@mimimilli/shared";
 import type { DataAdapter } from "../adapter.ts";
 import { invalidRequest, notFound } from "../lib/httpError.ts";
 

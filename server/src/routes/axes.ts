@@ -1,6 +1,6 @@
 // GET /axes/:axis
 import { Hono } from "hono";
-import { facetAxisSchema } from "@mimikago/shared";
+import { facetAxisSchema } from "@mimimilli/shared";
 import type { DataAdapter } from "../adapter.ts";
 import { invalidRequest } from "../lib/httpError.ts";
 

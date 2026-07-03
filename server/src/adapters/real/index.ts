@@ -24,7 +24,7 @@ import type {
   WorksPage,
   WorksQuery,
   WorkSummary,
-} from "@mimikago/shared";
+} from "@mimimilli/shared";
 import { NotConfiguredError, type DataAdapter, type MediaKind, type MediaLocation } from "../../adapter.ts";
 import { buildAxisFacets } from "../../core/axisFacets.ts";
 import { evalSmartFolder } from "../../core/smartFolder.ts";

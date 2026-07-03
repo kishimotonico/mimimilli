@@ -1,6 +1,6 @@
 // GET/PUT /settings
 import { Hono } from "hono";
-import { settingsUpdateSchema } from "@mimikago/shared";
+import { settingsUpdateSchema } from "@mimimilli/shared";
 import type { DataAdapter } from "../adapter.ts";
 import { invalidRequest } from "../lib/httpError.ts";
 

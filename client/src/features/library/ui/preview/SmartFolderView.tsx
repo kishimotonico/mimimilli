@@ -1,4 +1,4 @@
-import { parseTag, type SmartFolder, type SmartFolderRule, type WorkSummary } from "@mimikago/shared";
+import { parseTag, type SmartFolder, type SmartFolderRule, type WorkSummary } from "@mimimilli/shared";
 import { I } from "../../../../shared/ui/Icon";
 import { formatDuration } from "./format";
 

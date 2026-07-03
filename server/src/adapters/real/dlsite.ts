@@ -5,10 +5,10 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { load } from "cheerio";
-import type { DlsiteWorkInfo } from "@mimikago/shared";
+import type { DlsiteWorkInfo } from "@mimimilli/shared";
 
 const FETCH_TIMEOUT_MS = 15_000;
-const USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) mimikago/0.1";
+const USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) mimimilli/0.1";
 
 export function dlsiteWorkUrl(rjCode: string): string {
   return `https://www.dlsite.com/maniax/work/=/product_id/${rjCode}.html`;

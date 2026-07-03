@@ -18,7 +18,7 @@
 - `paths.ts` / `media` — realpath + 前方一致のパストラバーサル対策（Rust 版と同水準）、MIME マップ
 - `fsBrowse.ts` / `fileTree.ts` — /api/fs と /api/works/:id/files の実体。作品対応付け（workId / workRelPath）
 - `dlsite.ts` — fetch + cheerio へ移植。パースは pure 関数（HANDOFF.md のセレクタ準拠）、RJ コード検出、タグ prefix マージ（サークル/・cv/・genre/）、カバーダウンロード
-- エントリポイント: `MIMIKAGO_ADAPTER` のデフォルトを real に変更（fixture は明示指定）。bind は 127.0.0.1 固定
+- エントリポイント: `MIMIMILLI_ADAPTER` のデフォルトを real に変更（fixture は明示指定）。bind は 127.0.0.1 固定
 
 ## 修正したバグ
 

@@ -1,4 +1,4 @@
-# mimikago アーキテクチャ v2 提案
+# mimimilli アーキテクチャ v2 提案
 
 > ステータス: 承認（2026-06-11）。決定記録は [ADR-0001](adr/0001-typescript-api-server.md) / [ADR-0002](adr/0002-mock-as-fixture-adapter.md)。本文書は設計の基準ドキュメントとして維持する。
 > 旧提案 `docs/web-architecture-proposal.md`（Tauri廃止・axumサーバー化）は本文書が置き換える。
@@ -78,7 +78,7 @@ API Server (Hono + Node)
 ### 4.1 リポジトリ構成
 
 ```text
-mimikago/
+mimimilli/
 ├── pnpm-workspace.yaml      # ルートに移設（現在は client/ 内にある）
 ├── client/                  # React SPA（現行のまま）
 ├── server/                  # TypeScript API サーバー（新規。Rust を置き換え）
@@ -157,7 +157,7 @@ DLsite 連携
 ### 5.3 モック＝fixture アダプタの開発フロー
 
 - `client/vite.config.ts` は `BACKEND_URL` 未指定時、workspace 依存で `server` の Hono アプリ（fixture アダプタ注入）を dev middleware としてマウントする。`pnpm dev` 一発で動く DX は維持
-- `MIMIKAGO_MOCK_SCENARIO`（default / empty / new-work / errors …）は fixture アダプタのシナリオとしてそのまま引き継ぐ
+- `MIMIMILLI_MOCK_SCENARIO`（default / empty / new-work / errors …）は fixture アダプタのシナリオとしてそのまま引き継ぐ
 - Playwright ビジュアルテストも fixture アダプタ経由になり、「モックと本番でルーターが違う」ことに起因する回帰が構造的に消える
 - 新機能の進め方は今までどおり「fixture で UI を作り込む → 仕様が固まったら real アダプタを実装する」。契約は `shared/` のスキーマが先に固定する
 

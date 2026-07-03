@@ -4,7 +4,7 @@
 // DDL は db.ts の CREATE TABLE IF NOT EXISTS と手動で同期する（キャッシュ DB のため
 // 互換マイグレーションは持たない。スキーマ変更時は user_version を上げて作り直す）。
 import { index, integer, primaryKey, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
-import type { Playlist, UrlEntry, SmartFolderRule } from "@mimikago/shared";
+import type { Playlist, UrlEntry, SmartFolderRule } from "@mimimilli/shared";
 
 export const works = sqliteTable("works", {
   id: text("id").primaryKey(),

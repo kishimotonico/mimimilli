@@ -1,6 +1,6 @@
 // fixture アダプタ用の自己完結シードデータ。
 // client/mocks からは import せず、本ファイル内で完結させる。
-import type { SearchPreset, SmartFolder, WorkSummary } from "@mimikago/shared";
+import type { SearchPreset, SmartFolder, WorkSummary } from "@mimimilli/shared";
 
 /** シードとなる作品データ（約10件）。
  *  - サークル/cv/シリーズ/カテゴリの annotated タグとフラットタグを混在させる

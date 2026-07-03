@@ -1,7 +1,7 @@
 // 作品関連: GET/PATCH /works, /works/:id/resume, /works/:id/last-played, /works/:id/files,
 //          GET /tags, POST /export
 import { Hono } from "hono";
-import { resumeBodySchema, workPatchSchema, worksQuerySchema } from "@mimikago/shared";
+import { resumeBodySchema, workPatchSchema, worksQuerySchema } from "@mimimilli/shared";
 import type { DataAdapter } from "../adapter.ts";
 import { invalidRequest, notFound } from "../lib/httpError.ts";
 

@@ -13,7 +13,7 @@ import type {
   WorkStatus,
   WorkSummary,
   UrlEntry,
-} from "@mimikago/shared";
+} from "@mimimilli/shared";
 import type { Db } from "./db.ts";
 import { appSettings, searchPresets, smartFolders, tags, workTags, works } from "./schema.ts";
 

@@ -22,7 +22,7 @@ import type {
   WorksPage,
   WorksQuery,
   WorkSummary,
-} from "@mimikago/shared";
+} from "@mimimilli/shared";
 import type { DataAdapter, MediaKind, MediaLocation } from "../../adapter.ts";
 import { buildAxisFacets } from "../../core/axisFacets.ts";
 import { evalSmartFolder } from "../../core/smartFolder.ts";

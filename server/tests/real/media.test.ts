@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
-import type { WorksPage } from "@mimikago/shared";
+import type { WorksPage } from "@mimimilli/shared";
 import { createRealAdapter } from "../../src/adapters/real/index.ts";
 import { createApp } from "../../src/app.ts";
 import { makeSampleLibrary } from "../helpers/sampleLibrary.ts";

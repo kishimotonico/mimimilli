@@ -24,7 +24,7 @@ export default defineConfig({
     },
   },
   webServer: {
-    command: `MIMIKAGO_MOCK_SCENARIO=new-work pnpm exec vite --host 127.0.0.1 --port ${visualPort} --strictPort`,
+    command: `pnpm exec cross-env MIMIMILLI_MOCK_SCENARIO=new-work vite --host 127.0.0.1 --port ${visualPort} --strictPort`,
     port: visualPort,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

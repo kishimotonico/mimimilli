@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Work, WorkPatch, WorkSummary } from "@mimikago/shared";
+import type { Work, WorkPatch, WorkSummary } from "@mimimilli/shared";
 import type { AxisId } from "../model/types";
 import {
   searchWorks,

@@ -4,7 +4,7 @@
 // 「physical_path が祖先である作品」のうち最も深いものに紐づけ、workRelPath を付与する。
 import { readdirSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
-import type { FsEntry, FsListing, WorkSummary } from "@mimikago/shared";
+import type { FsEntry, FsListing, WorkSummary } from "@mimimilli/shared";
 import { isPathWithin, resolveWithin, toPortableRelativePath } from "./paths.ts";
 
 function extOf(name: string): string {

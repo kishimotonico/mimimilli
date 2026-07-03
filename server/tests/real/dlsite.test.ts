@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
-import type { DlsiteWorkInfo } from "@mimikago/shared";
+import type { DlsiteWorkInfo } from "@mimimilli/shared";
 import { detectRjCode, mergeDlsiteTags, parseDlsiteHtml } from "../../src/adapters/real/dlsite.ts";
 import { createRealAdapter } from "../../src/adapters/real/index.ts";
 import { makeSampleLibrary } from "../helpers/sampleLibrary.ts";

@@ -13,7 +13,7 @@
 
 ### shared/ — API 契約 v2（Zod スキーマ）
 
-`@mimikago/shared` として、work / meta（`.meta.json`）/ library（ソート・軸・スマートフォルダー・プリセット）/ fs / settings / scan / dlsite / api（クエリ・エンベロープ・エラー形式）を定義。契約上の主な決定:
+`@mimimilli/shared` として、work / meta（`.meta.json`）/ library（ソート・軸・スマートフォルダー・プリセット）/ fs / settings / scan / dlsite / api（クエリ・エンベロープ・エラー形式）を定義。契約上の主な決定:
 
 - `GET /api/works` はページングエンベロープ `{items, total}` を返す（page/limit 未指定時は全件）
 - 旧 PUT tags / PUT title / POST bookmark は `PATCH /api/works/:id` に統合
@@ -40,5 +40,5 @@
 ## 次のステップ
 
 - ステップ3: real アダプタ（SQLite + Drizzle、scanner、`.meta.json` 読み書き、メディア配信の実体）
-- client 合流: モック作業の完了後、`client/mocks/` を fixture アダプタへ置き換え、`api.ts` 群を `@mimikago/shared` の型へ差し替え、Vite dev middleware を server マウントに切り替える
+- client 合流: モック作業の完了後、`client/mocks/` を fixture アダプタへ置き換え、`api.ts` 群を `@mimimilli/shared` の型へ差し替え、Vite dev middleware を server マウントに切り替える
 - 既知の契約差分（client 側の追従が必要）: works のエンベロープ化、PATCH 統合、パス変更（axes / smart-folders / media）、`GET /works/:id` が null ではなく 404 を返す

@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { Work, WorkPatch } from "@mimikago/shared";
+import type { Work, WorkPatch } from "@mimimilli/shared";
 import CoverImg from "../../../../entities/work/ui/CoverImg";
 import Tag from "../../../../entities/work/ui/Tag";
 import { parseTag } from "../../../../entities/work/model";

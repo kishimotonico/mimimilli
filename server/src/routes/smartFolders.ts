@@ -1,6 +1,6 @@
 // GET/POST /smart-folders, PUT/DELETE /smart-folders/:id, GET /smart-folders/:id/works
 import { Hono } from "hono";
-import { smartFolderCreateSchema, smartFolderUpdateSchema } from "@mimikago/shared";
+import { smartFolderCreateSchema, smartFolderUpdateSchema } from "@mimimilli/shared";
 import type { DataAdapter } from "../adapter.ts";
 import { invalidRequest, notFound } from "../lib/httpError.ts";
 

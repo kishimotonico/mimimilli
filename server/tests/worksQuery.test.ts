@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import type { WorkSummary, WorksQuery } from "@mimikago/shared";
+import type { WorkSummary, WorksQuery } from "@mimimilli/shared";
 import { applyWorksQuery } from "../src/core/worksQuery.ts";
 
 const NOW = new Date();

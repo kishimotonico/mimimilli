@@ -3,7 +3,7 @@
 // 生 JSON を直接編集し、スキーマが知らないユーザー定義フィールドを保持する。
 import { readFileSync, renameSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
-import { metaFileSchema, type MetaFile } from "@mimikago/shared";
+import { metaFileSchema, type MetaFile } from "@mimimilli/shared";
 
 export const META_SUFFIX = ".meta.json";
 

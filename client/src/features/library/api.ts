@@ -14,7 +14,7 @@ import type {
   ViewId,
   WorksPage,
   WorkSummary,
-} from "@mimikago/shared";
+} from "@mimimilli/shared";
 
 // ── 作品検索（GET /api/works）────────────────────────────────
 

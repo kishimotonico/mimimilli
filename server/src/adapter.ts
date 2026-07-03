@@ -23,7 +23,7 @@ import type {
   WorksPage,
   WorksQuery,
   WorkSummary,
-} from "@mimikago/shared";
+} from "@mimimilli/shared";
 
 /** 前提条件（ルートフォルダー未設定等）を満たしていない操作。HTTP では 409 conflict */
 export class NotConfiguredError extends Error {}

@@ -4,7 +4,7 @@
 // エラーレスポンスは契約v2の apiErrorSchema（{ error: { code, message } }）形式。
 // 失敗時はパースしたメッセージを Error に含める。パースできない場合はステータスのみ報告する。
 
-import { apiErrorSchema } from "@mimikago/shared";
+import { apiErrorSchema } from "@mimimilli/shared";
 
 export const API_BASE = "/api";
 

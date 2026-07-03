@@ -1,7 +1,7 @@
 // fixture アダプタ用のメディア合成ロジック。
 // 実ファイルを持たない fixture でも再生・シーク・カバー表示が成立するよう、
 // 「指定秒数の無音WAV」と「作品ごとのSVGプレースホルダー」をメモリ上で合成する。
-import type { Track, WorkSummary } from "@mimikago/shared";
+import type { Track, WorkSummary } from "@mimimilli/shared";
 import type { MediaLocation } from "../../adapter.ts";
 
 /** 合成WAVのフォーマット: 8kHz / mono / 8bit PCM（符号なし、無音=128） → 8,000 byte/sec */
