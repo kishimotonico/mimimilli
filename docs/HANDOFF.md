@@ -49,9 +49,16 @@ pnpm test:visual         # Playwright 比較
 pnpm test:visual:update  # スナップショット再生成
 # ビジュアルテストの webServer は MIMIKAGO_MOCK_SCENARIO=new-work で別ポート(4175)に自前で立つ
 
-# real アダプタ（実SQLite + 実FS）で動かす場合は2プロセス
-pnpm dev:server     # API サーバーを real アダプタで起動 => http://localhost:8080（DB は MIMIKAGO_DB、既定 ./data/mimikago.db）
-pnpm dev:real       # client を BACKEND_URL=http://localhost:8080 へ向けて起動
+# fixture シナリオ
+pnpm dev:fixture:new-work
+pnpm dev:fixture:empty
+pnpm dev:fixture:errors
+
+# real アダプタ（実SQLite + 実FS）
+pnpm dev:real          # API サーバー + client を並行起動
+pnpm dev:real:server   # API サーバーのみ => http://localhost:8080（DB は MIMIKAGO_DB、既定 ./data/mimikago.db）
+pnpm dev:real:client   # client のみ。BACKEND_URL=http://localhost:8080 へ向けて起動
+pnpm smoke:real        # 固定のサンプル音声で real 経路を手動スモーク
 
 # fixture サーバーを単体起動して curl 確認（合成メディアの検証等）
 MIMIKAGO_ADAPTER=fixture PORT=18099 node server/src/index.ts

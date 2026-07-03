@@ -54,32 +54,52 @@ pnpm dev
 # => http://mimi.localhost:1355
 ```
 
-`pnpm dev` はルートから client を起動する。
+`pnpm dev` は `pnpm dev:fixture` のエイリアスとして、ルートから client を起動する。
 `vite.config.ts` は server の Hono アプリ（fixture アダプタ注入）を dev middleware として `/api/*` にマウントするため、UI とモック API が同一プロセスで動く。
-`MIMIKAGO_MOCK_SCENARIO`（default / empty / new-work / errors）でデータを切り替えられる。
+代表的な fixture シナリオは、次のコマンドで切り替える。
 
 ```bash
-MIMIKAGO_MOCK_SCENARIO=new-work pnpm dev
+pnpm dev:fixture:new-work
+pnpm dev:fixture:empty
+pnpm dev:fixture:errors
 ```
 
-実 SQLite と実ファイルシステムの real アダプタへ接続する場合は、サーバーとフロントを別々に起動する。
+実 SQLite と実ファイルシステムの real アダプタへ接続する場合は、サーバーとフロントを一括起動できる。
+
+```bash
+# API サーバー（real アダプタ）とフロントを起動
+pnpm dev:real
+# => http://localhost:8080
+# => http://mimi.localhost:1355
+# SQLite パスは MIMIKAGO_DB で変更可（デフォルト ./data/mimikago.db）
+```
+
+サーバーとフロントを別々に起動する場合は、次のコマンドを使う。
 
 ```bash
 # ターミナル 1: API サーバーを起動（real アダプタ）
-pnpm dev:server
+pnpm dev:real:server
 # => http://localhost:8080
-# SQLite パスは MIMIKAGO_DB で変更可（デフォルト ./data/mimikago.db）
 
 # ターミナル 2: フロントを API サーバーへ向けて起動
-pnpm dev:real
+pnpm dev:real:client
 # => http://mimi.localhost:1355（BACKEND_URL=http://localhost:8080 を内包）
 ```
+
+`pnpm dev:real` はサーバーと client を並行起動するため、サーバーの起動完了前に client が一時的に API 接続に失敗することがある。
+その場合はブラウザをリロードすればよい。
+`dev:real:client` の接続先はサーバーのデフォルトポート `8080` を前提にしている。
+`PORT` を変える場合は client 側の `BACKEND_URL` も合わせる。
+
+real アダプタを使う場合、初回起動後に UI からルートフォルダーを設定する。
+`better-sqlite3` などのネイティブモジュールは WSL と Windows で同じ `node_modules` を共有できないため、両方の環境で扱うなら環境ごとに別クローンを使うか `pnpm install` をやり直す。
 
 ### 検証
 
 ```bash
 pnpm check          # shared + server + client の型チェック
 pnpm test           # server + client のユニットテスト
+pnpm smoke:real     # 固定のサンプル音声で real 経路を手動スモーク
 pnpm test:server    # server のみ（node --test）
 pnpm test:client    # client のみ（vitest）
 pnpm test:visual    # Playwright ビジュアルリグレッション

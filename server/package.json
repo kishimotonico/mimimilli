@@ -9,9 +9,11 @@
   },
   "scripts": {
     "dev": "node --watch src/index.ts",
+    "dev:real": "node --watch src/index.ts",
     "start": "node src/index.ts",
     "check": "tsc --noEmit",
-    "test": "node --test \"tests/**/*.test.ts\""
+    "test": "node --test \"tests/**/*.test.ts\"",
+    "smoke:real": "node tests/helpers/smoke.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.14.0",
