@@ -10,8 +10,9 @@
 - 仕様・設計ドキュメントは `docs/` に適宜整理する。全体の地図は `docs/README.md`
 - ADRを `docs/adr/` に保存する
 - Claude CodeやCodexは `docs/issues/yyyy-mm-dd-summary-description.md` に作業内容を読み書きする
-  - 本文2行目に `Status: done | wip | todo | note` 行を置き、`docs/issues/README.md` の一覧表にも1行足す（ファイル名にステータスは含めない）
+  - 本文2行目に `Status: done | wip | todo | note` 行を置き、`docs/issues/README.md` の一覧表にも1行足す
 - 未完了タスクは `docs/BACKLOG.md` に一元管理する（HANDOFF や issue に残タスクリストを分散させない）
+- メンテナンス対象のドキュメント（HANDOFF・BACKLOG・docs/README 等）は追記で積み上げず、書き換え・削除で「現在の状態」だけを保つ。時系列の経緯は docs/issues/ と Git 履歴に任せる
 
 ## 実装方針
 

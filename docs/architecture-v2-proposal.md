@@ -197,6 +197,8 @@ DLsite 連携
 
 ## 10. 合わせて見直すべきこと
 
+> 注記（2026-07-03）: 本節の指摘は解消済み（3 のフェーズ再編は実装完了により実質不要となった）。提案当時の記録として残す。
+
 アーキテクチャ以外で、今の段階でズレているもの。
 
 1. **`docs/frontend-design.md` が存在しない。** AGENTS.md がフロント作業時の必読として参照しているが未作成。mimimilli 正典・tokens.css・motion 等の規約を実際に書き起こすか、参照を `docs/design_handoff_mimimilli_library/README.md` へ修正する
