@@ -74,6 +74,7 @@ export const I: Record<string, IconFC> = {
   gridS:    (p) => <Svg {...p} d="M3 3h5v5H3zM10 3h5v5h-5zM17 3h5v5h-5zM3 10h5v5H3zM10 10h5v5h-5zM17 10h5v5h-5zM3 17h5v5H3zM10 17h5v5h-5zM17 17h5v5h-5z" />,
   sort:     (p) => <Svg {...p} d={["M8 4v16M4 8l4 -4 4 4", "M16 20V4M20 16l-4 4 -4 -4"]} />,
   filter:   (p) => <Svg {...p} d="M4 4h16l-6 8v6l-4 2v-8z" />,
+  check:    (p) => <Svg {...p} d="M5 12l4 4 10 -10" />,
   x:        (p) => <Svg {...p} d="M6 6l12 12M18 6L6 18" />,
   err:      (p) => <Svg {...p} d={["M12 4l10 17H2z", "M12 10v5", "M12 18v0"]} />,
   heart:    (p) => <Svg {...p} d="M12 20s-7 -4.3 -7 -10a4 4 0 0 1 7 -2.7A4 4 0 0 1 19 10c0 5.7 -7 10 -7 10z" />,

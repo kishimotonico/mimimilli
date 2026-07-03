@@ -9,6 +9,14 @@ export interface AudioEngineCallbacks {
   onDurationChange: (duration: number) => void;
   /** トラック再生終了時。自動送りするか、ループするかはフック側が判断する。 */
   onEnded: (looping: boolean) => void;
+  onError: (error: AudioEngineError) => void;
+}
+
+export interface AudioEngineError {
+  source: "play" | "media";
+  name?: string;
+  code?: number;
+  message: string;
 }
 
 export interface AudioEngine {
@@ -51,12 +59,66 @@ export function createAudioEngine(
   const onTimeUpdate = () => callbacks.onTimeUpdate(audio.currentTime);
   const onDurationChange = () => callbacks.onDurationChange(audio.duration || 0);
   const onEnded = () => callbacks.onEnded(false); // ループ判定はフック側
+  const onError = () => callbacks.onError(toMediaError(audio.error));
 
   audio.addEventListener("play", onPlay);
   audio.addEventListener("pause", onPause);
   audio.addEventListener("timeupdate", onTimeUpdate);
   audio.addEventListener("durationchange", onDurationChange);
   audio.addEventListener("ended", onEnded);
+  audio.addEventListener("error", onError);
+
+  function toPlayError(error: unknown): AudioEngineError {
+    if (error instanceof Error) {
+      return {
+        source: "play",
+        name: error.name,
+        message: error.message || "音声の再生に失敗しました。",
+      };
+    }
+    if (isErrorLike(error)) {
+      return {
+        source: "play",
+        name: error.name,
+        message: error.message || "音声の再生に失敗しました。",
+      };
+    }
+    return {
+      source: "play",
+      message: typeof error === "string" && error ? error : "音声の再生に失敗しました。",
+    };
+  }
+
+  function isErrorLike(error: unknown): error is { name?: string; message?: string } {
+    return typeof error === "object" && error !== null && ("message" in error || "name" in error);
+  }
+
+  function toMediaError(error: MediaError | null): AudioEngineError {
+    return {
+      source: "media",
+      code: error?.code,
+      message: error?.message || mediaErrorMessage(error?.code),
+    };
+  }
+
+  function mediaErrorMessage(code: number | undefined): string {
+    switch (code) {
+      case 1:
+        return "音声の読み込みが中断されました。";
+      case 2:
+        return "ネットワークエラーにより音声を読み込めませんでした。";
+      case 3:
+        return "音声データのデコードに失敗しました。";
+      case 4:
+        return "この音声形式またはURLは再生できません。";
+      default:
+        return "音声の読み込みに失敗しました。";
+    }
+  }
+
+  function playAudio() {
+    audio.play().catch((error: unknown) => callbacks.onError(toPlayError(error)));
+  }
 
   function resumeAudioContext() {
     if (audioCtx?.state === "suspended") {
@@ -114,7 +176,7 @@ export function createAudioEngine(
       }
 
       resumeAudioContext();
-      audio.play().catch(() => {});
+      playAudio();
 
       return () => {
         cleaned = true;
@@ -125,7 +187,7 @@ export function createAudioEngine(
 
     play() {
       resumeAudioContext();
-      audio.play().catch(() => {});
+      playAudio();
     },
 
     pause() {
@@ -174,6 +236,7 @@ export function createAudioEngine(
       audio.removeEventListener("timeupdate", onTimeUpdate);
       audio.removeEventListener("durationchange", onDurationChange);
       audio.removeEventListener("ended", onEnded);
+      audio.removeEventListener("error", onError);
       audioCtx?.close().catch(() => {});
       // channelSwapEnabled は GC に任せる
       void channelSwapEnabled;

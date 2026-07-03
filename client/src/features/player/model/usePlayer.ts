@@ -3,7 +3,7 @@
 //
 // 高頻度更新（currentTime / duration）は atoms から直接 subscribe せず useSetAtom で書くだけ。
 // → App.tsx が player を使っても timeupdate による re-render が起きない。
-// → TransportBar / FullScreenPlayer だけが playerCurrentTimeAtom を subscribe する。
+// → BarContent / PopupContent / FullScreenPlayer だけが playerCurrentTimeAtom を subscribe する。
 
 import { useRef, useCallback, useEffect } from "react";
 import { useAtom, useSetAtom } from "jotai";
@@ -25,7 +25,7 @@ export type { PlayerCoreState };
 
 /**
  * PlayerState: コンポーネントの props として渡す state。
- * currentTime / duration は含まない — TransportBar / FullScreenPlayer は
+ * currentTime / duration は含まない — BarContent / PopupContent / FullScreenPlayer は
  * playerCurrentTimeAtom / playerDurationAtom から直接読む。
  */
 export type PlayerState = PlayerCoreState;
@@ -42,6 +42,10 @@ export function usePlayer() {
   const setCurrentTime = useSetAtom(playerCurrentTimeAtom); // subscribe しない
   const setDuration = useSetAtom(playerDurationAtom);       // subscribe しない
 
+  // ── Audio engine と callback が読む最新状態 ───────────────
+  const coreStateRef = useRef(coreState);
+  coreStateRef.current = coreState;
+
   // loopRef: onEnded callback が最新の loop 値を参照するための ref
   const loopRef = useRef(coreState.loop);
   loopRef.current = coreState.loop;
@@ -52,12 +56,12 @@ export function usePlayer() {
   const pendingResumeRef = useRef<PendingResume | null>(null);
   const loadedTrackRef = useRef<{ workId: string; trackIndex: number } | null>(null);
 
-  // Audio engine を useRef で保持（再マウントしない）
+  // Audio engine は effect の寿命に合わせて生成・破棄する。
   const engineRef = useRef<ReturnType<typeof createAudioEngine> | null>(null);
 
-  if (!engineRef.current) {
-    engineRef.current = createAudioEngine(coreState.volume, {
-      onPlay: () => setCoreState((s) => ({ ...s, isPlaying: true })),
+  useEffect(() => {
+    const engine = createAudioEngine(coreStateRef.current.volume, {
+      onPlay: () => setCoreState((s) => ({ ...s, isPlaying: true, playbackError: null })),
       onPause: () => setCoreState((s) => ({ ...s, isPlaying: false })),
       onTimeUpdate: (time) => {
         // A-B リピート（ref 経由で最新値を参照）
@@ -88,16 +92,25 @@ export function usePlayer() {
           return { ...prev, isPlaying: false };
         });
       },
+      onError: (error) => {
+        setCoreState((s) => ({ ...s, isPlaying: false, playbackError: error }));
+      },
     });
-  }
+    engineRef.current = engine;
 
-  const engine = engineRef.current;
+    return () => {
+      if (engineRef.current === engine) {
+        engineRef.current = null;
+      }
+      engine.destroy();
+    };
+  }, [setCoreState, setCurrentTime, setDuration]);
 
   // ── トラック変更時に読み込み・再生 ────────────────────────
-  const coreStateRef = useRef(coreState);
-  coreStateRef.current = coreState;
-
   useEffect(() => {
+    const engine = engineRef.current;
+    if (!engine) return;
+
     const { currentTrackIndex, tracks, currentWork } = coreState;
     if (currentTrackIndex < 0 || currentTrackIndex >= tracks.length || !currentWork) return;
 
@@ -139,6 +152,9 @@ export function usePlayer() {
   // ── 定期 resume 保存 ──────────────────────────────────────
   useEffect(() => {
     if (!coreState.isPlaying || !coreState.currentWork) return;
+    const engine = engineRef.current;
+    if (!engine) return;
+
     const workId = coreState.currentWork.id;
     const tid = setInterval(() => {
       const loaded = loadedTrackRef.current;
@@ -147,22 +163,19 @@ export function usePlayer() {
       }
     }, 5000);
     return () => clearInterval(tid);
-  }, [coreState.isPlaying, coreState.currentWork, coreState.currentTrackIndex, engine]);
+  }, [coreState.isPlaying, coreState.currentWork, coreState.currentTrackIndex]);
 
   // ── 一時停止時に resume 保存 ──────────────────────────────
   useEffect(() => {
     if (coreState.isPlaying || !coreState.currentWork || coreState.currentTrackIndex < 0) return;
+    const engine = engineRef.current;
+    if (!engine) return;
+
     const loaded = loadedTrackRef.current;
     if (loaded) {
       saveResumePosition(loaded.workId, engine.getCurrentTime(), loaded.trackIndex).catch(() => {});
     }
-  }, [coreState.isPlaying, coreState.currentWork, coreState.currentTrackIndex, engine]);
-
-  // ── cleanup on unmount ────────────────────────────────────
-  useEffect(() => {
-    return () => { engine.destroy(); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [coreState.isPlaying, coreState.currentWork, coreState.currentTrackIndex]);
 
   // ── アクション ────────────────────────────────────────────
 
@@ -175,6 +188,7 @@ export function usePlayer() {
         tracks,
         currentTrackIndex: trackIndex,
         isPlaying: true,
+        playbackError: null,
         abRepeat: { a: null, b: null },
       }));
     },
@@ -200,6 +214,7 @@ export function usePlayer() {
         tracks,
         currentTrackIndex: trackIndex,
         isPlaying: true,
+        playbackError: null,
         abRepeat: { a: null, b: null },
       }));
     },
@@ -208,19 +223,20 @@ export function usePlayer() {
 
   const togglePlay = useCallback(() => {
     if (coreState.isPlaying) {
-      engine.pause();
+      engineRef.current?.pause();
     } else {
-      engine.play();
+      engineRef.current?.play();
     }
-  }, [coreState.isPlaying, engine]);
+  }, [coreState.isPlaying]);
 
   const stop = useCallback(() => {
+    const engine = engineRef.current;
     const loaded = loadedTrackRef.current;
-    if (loaded) {
+    if (loaded && engine) {
       saveResumePosition(loaded.workId, engine.getCurrentTime(), loaded.trackIndex).catch(() => {});
     }
-    engine.pause();
-    engine.seek(0);
+    engine?.pause();
+    engine?.seek(0);
     loadedTrackRef.current = null;
     pendingResumeRef.current = null;
     setCoreState((prev) => ({
@@ -229,16 +245,32 @@ export function usePlayer() {
       currentTrackIndex: -1,
       currentWork: null,
       tracks: [],
+      playbackError: null,
     }));
-  }, [engine, setCoreState]);
+  }, [setCoreState]);
 
-  const seek = useCallback((time: number) => engine.seek(time), [engine]);
-  const seekRelative = useCallback((delta: number) => engine.seekRelative(delta), [engine]);
+  const seek = useCallback((time: number) => engineRef.current?.seek(time), []);
+  const seekRelative = useCallback((delta: number) => engineRef.current?.seekRelative(delta), []);
 
   const setVolume = useCallback((vol: number) => {
-    engine.setVolume(vol);
+    engineRef.current?.setVolume(vol);
     setCoreState((prev) => ({ ...prev, volume: Math.max(0, Math.min(100, vol)) }));
-  }, [engine, setCoreState]);
+  }, [setCoreState]);
+
+  // ミュート前の音量を覚えておき、解除時に復元する。
+  const lastVolumeRef = useRef(coreState.volume || 75);
+  const toggleMute = useCallback(() => {
+    setCoreState((prev) => {
+      if (prev.volume > 0) {
+        lastVolumeRef.current = prev.volume;
+        engineRef.current?.setVolume(0);
+        return { ...prev, volume: 0 };
+      }
+      const restored = lastVolumeRef.current || 75;
+      engineRef.current?.setVolume(restored);
+      return { ...prev, volume: restored };
+    });
+  }, [setCoreState]);
 
   const setLoop = useCallback((loop: boolean) => {
     setCoreState((prev) => ({ ...prev, loop }));
@@ -271,22 +303,22 @@ export function usePlayer() {
   }, [setCoreState]);
 
   const setPlaybackRate = useCallback((rate: number) => {
-    engine.setPlaybackRate(rate);
+    engineRef.current?.setPlaybackRate(rate);
     setCoreState((prev) => ({ ...prev, playbackRate: rate }));
-  }, [engine, setCoreState]);
+  }, [setCoreState]);
 
   const setChannelSwap = useCallback((enabled: boolean) => {
-    engine.setChannelSwap(enabled);
+    engineRef.current?.setChannelSwap(enabled);
     setCoreState((prev) => ({ ...prev, channelSwap: enabled }));
-  }, [engine, setCoreState]);
+  }, [setCoreState]);
 
   const setABPoint = useCallback((point: "a" | "b") => {
-    const time = engine.getCurrentTime();
+    const time = engineRef.current?.getCurrentTime() ?? 0;
     setCoreState((prev) => ({
       ...prev,
       abRepeat: { ...prev.abRepeat, [point]: time },
     }));
-  }, [engine, setCoreState]);
+  }, [setCoreState]);
 
   const clearABRepeat = useCallback(() => {
     setCoreState((prev) => ({ ...prev, abRepeat: { a: null, b: null } }));
@@ -301,6 +333,7 @@ export function usePlayer() {
     seek,
     seekRelative,
     setVolume,
+    toggleMute,
     setLoop,
     nextTrack,
     prevTrack,

@@ -1,16 +1,20 @@
 // アプリのシェルレイアウト。グリッド構造と各スロットへの配置のみを担当する。
 // データ・ロジックは持たず、全て props 経由で受け取る。
+//
+// 再生UI（transportBar）は画面下張り付きバー / 右下ポップアップのいずれも
+// position: fixed のオーバーレイとして自身の見た目を管理するため、
+// グリッド行には含めない（PlayerDock 参照）。
 
 import type { ReactNode } from "react";
 
 interface AppShellProps {
-  /** 再生中かどうか（グリッド行高の切り替えに使用） */
-  isPlaying: boolean;
+  /** 画面下張り付きバー表示中か（コンテンツの padding-bottom 確保に使用） */
+  dockedBarActive: boolean;
   topBar: ReactNode;
   addressBar: ReactNode;
   leftNav: ReactNode;
   body: ReactNode;
-  /** 再生バー or 空バー */
+  /** 常駐再生UI（PlayerDock。fixed オーバーレイなので自身で表示/非表示を制御する） */
   transportBar: ReactNode;
   /** フルスクリーンプレイヤー（表示条件は呼び出し側で制御） */
   fullScreenPlayer?: ReactNode;
@@ -19,7 +23,7 @@ interface AppShellProps {
 }
 
 export default function AppShell({
-  isPlaying,
+  dockedBarActive,
   topBar,
   addressBar,
   leftNav,
@@ -28,18 +32,16 @@ export default function AppShell({
   fullScreenPlayer,
   overlays,
 }: AppShellProps) {
-  const mixerClass = isPlaying ? "is-mixer-single" : "is-mixer-empty";
-
   return (
-    <div className="mle-app">
-      <div className={`mle-frame is-lib ${mixerClass}`}>
+    <div className={`mle-app ${dockedBarActive ? "has-docked-bar" : ""}`}>
+      <div className="mle-frame is-lib">
         {topBar}
         {addressBar}
         {leftNav}
         <main className="mle-body">{body}</main>
-        {transportBar}
       </div>
 
+      {transportBar}
       {fullScreenPlayer}
       {overlays}
     </div>

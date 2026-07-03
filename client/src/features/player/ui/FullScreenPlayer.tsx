@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useAtomValue } from "jotai";
 import type { PlayerState } from "../model/usePlayer";
 import { playerCurrentTimeAtom, playerDurationAtom } from "../model/atoms";
+import { useSeekDrag } from "./useSeekDrag";
 import { formatTime } from "../../../shared/lib/format";
 import CoverImg from "../../../entities/work/ui/CoverImg";
 import { I } from "../../../shared/ui/Icon";
@@ -37,6 +38,7 @@ export default function FullScreenPlayer({
   const { currentWork, isPlaying, volume, loop, tracks, currentTrackIndex } = state;
   const track = tracks[currentTrackIndex] ?? null;
   const pct = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const seek = useSeekDrag({ duration, onSeek });
 
   // Esc to close
   useEffect(() => {
@@ -46,13 +48,6 @@ export default function FullScreenPlayer({
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
-
-  const handleScrubClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!duration) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const t = ((e.clientX - rect.left) / rect.width) * duration;
-    onSeek(Math.max(0, Math.min(duration, t)));
-  };
 
   if (!currentWork) return null;
 
@@ -99,10 +94,22 @@ export default function FullScreenPlayer({
             {/* Scrub */}
             <div style={{ marginTop: 14 }}>
               <div
-                style={{ height: 4, background: "var(--paper-3)", borderRadius: 2, position: "relative", cursor: "pointer" }}
-                onClick={handleScrubClick}
+                ref={seek.trackRef}
+                className={`mle-fullscreen__seek ${seek.dragging ? "is-dragging" : ""}`}
+                style={{ height: 18, display: "flex", alignItems: "center", position: "relative", cursor: "pointer" }}
+                onPointerDown={seek.onPointerDown}
+                onPointerMove={seek.onPointerMove}
+                onPointerUp={seek.onPointerUp}
+                onPointerLeave={seek.onPointerLeave}
               >
-                <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${Math.min(100, pct)}%`, background: "var(--ink-0)", borderRadius: 2 }} />
+                <div style={{ width: "100%", height: 4, background: "var(--paper-3)", borderRadius: 2, position: "relative" }}>
+                  <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${Math.min(100, pct)}%`, background: "var(--ink-0)", borderRadius: 2 }} />
+                </div>
+                {seek.hoverRatio !== null && duration > 0 && (
+                  <div className="mle-seek-tooltip" style={{ left: `${seek.hoverRatio * 100}%` }}>
+                    {formatTime(seek.hoverTime ?? 0)}
+                  </div>
+                )}
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10, paddingTop: 4, fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--ink-2)" }}>
                 <span style={{ color: "var(--ink-0)" }}>{formatTime(currentTime)}</span>

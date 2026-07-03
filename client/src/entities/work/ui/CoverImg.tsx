@@ -6,28 +6,31 @@ interface CoverImgProps {
   id: string;
   title: string;
   hasCover: boolean;
-  size: number;
+  size?: number;
   radius?: number;
+  fit?: "fixed" | "fill";
 }
 
-export default function CoverImg({ id, title, hasCover, size, radius = 4 }: CoverImgProps) {
+export default function CoverImg({ id, title, hasCover, size = 32, radius = 4, fit = "fixed" }: CoverImgProps) {
   const [errored, setErrored] = useState(false);
 
   useEffect(() => {
     setErrored(false);
   }, [id]);
 
+  const fixedSize = fit === "fixed" ? size : undefined;
+
   if (hasCover && !errored) {
     return (
       <img
         src={getCoverImageUrl(id)}
         alt=""
-        width={size}
-        height={size}
+        width={fixedSize}
+        height={fixedSize}
         style={{ display: "block", width: "100%", height: "100%", objectFit: "cover", borderRadius: radius }}
         onError={() => setErrored(true)}
       />
     );
   }
-  return <CoverPlaceholder id={id} title={title} size={size} borderRadius={radius} />;
+  return <CoverPlaceholder id={id} title={title} size={fixedSize} borderRadius={radius} />;
 }

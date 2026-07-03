@@ -4,8 +4,10 @@
 // - レイアウトは AppShell に委譲
 
 import { useState, useCallback, useRef } from "react";
+import { useAtomValue } from "jotai";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { usePlayer } from "../features/player/model/usePlayer";
+import { playerUiModeAtom } from "../features/player/model/atoms";
 import { useLibraryView } from "../features/library/model/useLibraryNavigation";
 import { useGlobalShortcuts } from "./model/useGlobalShortcuts";
 import AppShell from "./AppShell";
@@ -16,7 +18,7 @@ import LibraryView, { LIBRARY_KEYS } from "../features/library/ui/LibraryView";
 import FilesView from "../features/files/ui/FilesView";
 import { useFilesNavigation } from "../features/files/model/useFilesNavigation";
 import type { FsEntry } from "../features/files/model/types";
-import TransportBar from "../features/player/ui/TransportBar";
+import PlayerDock from "../features/player/ui/PlayerDock";
 import FullScreenPlayer from "../features/player/ui/FullScreenPlayer";
 import SetupScreen from "../features/setup/ui/SetupScreen";
 import SettingsModal from "../features/settings/ui/SettingsModal";
@@ -47,10 +49,14 @@ export default function App() {
   const [isCompletingSetup, setIsCompletingSetup] = useState(false);
 
   const isPlaying = player.state.currentTrackIndex >= 0 && player.state.currentWork !== null;
+  // バー表示中のみコンテンツ側に padding-bottom を確保する（ポップアップは小さく被りが少ないため対象外）
+  const uiMode = useAtomValue(playerUiModeAtom);
+  const dockedBarActive = isPlaying && uiMode === "bar";
 
   // ── キーボードショートカット ───────────────────────────────
   useGlobalShortcuts({
     onTogglePlay: player.togglePlay,
+    onSeekRelative: player.seekRelative,
     isActive: isPlaying,
   });
 
@@ -144,6 +150,16 @@ export default function App() {
     }
   }, [player, queryClient]);
 
+  // 再生中の作品をライブラリ「すべての作品」上で選択状態にして表示する。
+  // ファイル欠損等で登録から外れた作品の場合、該当なしになるが実害はない。
+  const handleShowPlayingWork = useCallback(() => {
+    const workId = player.state.currentWork?.id;
+    if (!workId) return;
+    navigationHistory.setMode("library");
+    libraryNav.setAxis("all");
+    libraryNav.selectWork(workId);
+  }, [player.state.currentWork, navigationHistory, libraryNav]);
+
   const handleScan = useCallback(() => scanMutation.mutate(), [scanMutation]);
 
   const handleSetupComplete = useCallback(async (path: string) => {
@@ -200,7 +216,7 @@ export default function App() {
 
   return (
     <AppShell
-      isPlaying={isPlaying}
+      dockedBarActive={dockedBarActive}
       topBar={
         <TopBar
           mode={mode}
@@ -245,25 +261,21 @@ export default function App() {
         )
       }
       transportBar={
-        isPlaying ? (
-          <TransportBar
-            state={player.state}
-            onTogglePlay={player.togglePlay}
-            onSeek={player.seek}
-            onSeekRelative={player.seekRelative}
-            onSetVolume={player.setVolume}
-            onSetLoop={player.setLoop}
-            onNext={player.nextTrack}
-            onPrev={player.prevTrack}
-            onExpand={() => player.setShowFullPlayer(true)}
-          />
-        ) : (
-          <div className="mle-bar1 is-empty">
-            <span>ファイル / 作品をクリックして再生</span>
-            <span className="k">Space</span>
-            <span>で再生 / 一時停止</span>
-          </div>
-        )
+        <PlayerDock
+          isPlaying={isPlaying}
+          state={player.state}
+          onTogglePlay={player.togglePlay}
+          onSeek={player.seek}
+          onSeekRelative={player.seekRelative}
+          onSetVolume={player.setVolume}
+          onToggleMute={player.toggleMute}
+          onSetLoop={player.setLoop}
+          onSetPlaybackRate={player.setPlaybackRate}
+          onNext={player.nextTrack}
+          onPrev={player.prevTrack}
+          onExpandFullScreen={() => player.setShowFullPlayer(true)}
+          onShowPlayingWork={handleShowPlayingWork}
+        />
       }
       fullScreenPlayer={
         isPlaying && player.state.showFullPlayer ? (
