@@ -1,5 +1,7 @@
 # フロントエンドUI改善提案
 
+Status: done — 残タスクは BACKLOG.md へ
+
 作成: 2026-07-03 / Claude（agent-browser実地調査 + コード調査を統合）
 
 ## 前提

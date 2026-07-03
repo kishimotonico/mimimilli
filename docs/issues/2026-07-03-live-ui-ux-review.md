@@ -1,5 +1,7 @@
 # 実UIベースのUI/UX調査メモ
 
+Status: todo — 調査完了・対応未着手。改善候補は BACKLOG.md に転記済み
+
 作成: 2026-07-03 / Codex（agent-browser実地確認）
 
 ## 前提

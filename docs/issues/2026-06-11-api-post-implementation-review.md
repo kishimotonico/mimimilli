@@ -1,6 +1,6 @@
 # TypeScript API 実装の事後レビュー
 
-Status: 修正実装・回帰テスト追加済み
+Status: done — レビュー指摘は修正・回帰テスト追加済み
 
 ## 対象
 

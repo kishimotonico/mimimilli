@@ -35,3 +35,6 @@ server/data/
 
 # QA / dogfooding artifacts (screenshots, videos, report)
 dogfood-output/
+
+# 作業証跡・一時ファイル（スクリーンショット等）
+tmp/

@@ -1,5 +1,7 @@
 # mimimilli への名称変更
 
+Status: done
+
 作成: 2026-07-03 / Codex
 
 ## 背景

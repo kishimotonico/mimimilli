@@ -1,7 +1,7 @@
 # mimimilli アーキテクチャ v2 提案
 
 > ステータス: 承認（2026-06-11）。決定記録は [ADR-0001](adr/0001-typescript-api-server.md) / [ADR-0002](adr/0002-mock-as-fixture-adapter.md)。本文書は設計の基準ドキュメントとして維持する。
-> 旧提案 `docs/web-architecture-proposal.md`（Tauri廃止・axumサーバー化）は本文書が置き換える。
+> 旧提案 `docs/web-architecture-proposal.md`（Tauri廃止・axumサーバー化）は本文書が置き換え、2026-07-03 に削除済み（Git履歴参照）。
 
 ## 1. 結論
 

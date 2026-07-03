@@ -1,5 +1,7 @@
 # real アダプタの実装（移行プラン ステップ3 + DLsite 前倒し）
 
+Status: done
+
 ## 背景
 
 `docs/architecture-v2-proposal.md` 移行プラン ステップ3。fixture アダプタと同じ `DataAdapter` 境界の中に、SQLite + 実ファイルシステムの実装を追加した。client/ ではモック作業が並行中のため、引き続き server/ と shared/ のみに閉じている。ステップ4予定だった DLsite 連携も自己完結だったため前倒しで移植した。

@@ -1,5 +1,7 @@
 # フロントエンドを feature-first 構成へ整理する
 
+Status: done
+
 ## 背景
 
 現在の mimimilli フロントエンドは、Claude Design で作成した mimimilli 系モックをベースに、実アプリとして必要な機能・仕様・画面構成を考え直している段階にある。

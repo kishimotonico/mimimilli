@@ -1,5 +1,7 @@
 # shared 契約パッケージと TS サーバー骨格の実装（移行プラン ステップ1〜2）
 
+Status: done
+
 ## 背景
 
 アーキテクチャ v2（`docs/architecture-v2-proposal.md`、ADR-0001/0002）の承認を受け、移行プランのステップ1（契約確定）とステップ2（server 骨格 + fixture アダプタ）に着手した。client/ ではモック作り込みが並行進行中のため、**client/ には一切手を入れない**制約で進めた。
