@@ -1,7 +1,7 @@
 # 引き継ぎドキュメント
 
 mimikago の現状と進行中の作業を、後続のエージェント／セッションが把握するための資料。
-最終更新: 2026-06-21。
+最終更新: 2026-07-03。
 
 ## このアプリは何か
 
@@ -103,27 +103,28 @@ MIMIKAGO_ADAPTER=fixture PORT=18099 node server/src/index.ts
 - **TanStack Query**: サーバー状態。キーは `LibraryView.tsx` の `LIBRARY_KEYS` で一元管理（works/libraryTotal/facets/smartFolders/smartFolderWorks/workDetail/tags と、広域 invalidate 用の allWorks/allFacets/allSmartFolderWorks プレフィックスキー）
 - **URL同期**: `features/navigation/`（`navigationUrl.ts` codec + `useNavigationHistory.ts` の history 同期層）。モード・軸・ドリル・タグ・選択作品・ソート・ファイルパスを URL に双方向同期。ナビ操作は `push`、選択/ソート等の軽微変更は `replace`。`requestNavigationHistoryCommitAtom` を各操作（useLibraryNavigation / useFilesNavigation / LeftNav の setMode）が叩いて push/replace を宣言する。AddressBar の戻る/進む・パンくずも本物
 
-## プレイヤーのアーキテクチャ（次のUI刷新で触る中心）
+## プレイヤーのアーキテクチャ
 
-`client/src/features/player/`。
+`client/src/features/player/`。UIは「画面下バー + 右下ポップアップ + 全画面」の3層構成（バー⇄ポップアップは `PlayerDock.tsx` が AnimatePresence で切替）。
 
 - `model/atoms.ts`:
   - `playerCoreAtom`（低頻度 state: isPlaying / currentWork / tracks / currentTrackIndex / volume / loop / showFullPlayer / **playbackRate / channelSwap / abRepeat**）
   - `playerCurrentTimeAtom` / `playerDurationAtom`（**高頻度**。timeupdate 毎に更新。**TransportBar と FullScreenPlayer だけが subscribe**する。App.tsx は subscribe しないので再生中に App が再レンダリングされない — この分離は**維持必須**）
 - `model/audioEngine.ts`: 低レベル。`new Audio()`（DOM外）。load/play/pause/seek/seekRelative/setVolume/setPlaybackRate/setChannelSwap、timeupdate/durationchange/ended コールバック
 - `model/usePlayer.ts`: エンジンと atom の橋渡し。公開アクション:
-  - 配線済み: `play` / `togglePlay` / `seek` / `seekRelative` / `setVolume` / `setLoop` / `nextTrack` / `prevTrack` / `setTrackIndex` / `setShowFullPlayer`
-  - **実装済みだが UI 未配線**: `playWithResume`（→「続きから再生」で配線済み）、`setPlaybackRate`（倍速）、`setChannelSwap`（L⇄R入替）、`setABPoint`/`clearABRepeat`（A-Bリピート）。state にも `playbackRate`/`channelSwap`/`abRepeat` がある
-- `ui/TransportBar.tsx`（常駐バー）: now playing / 前・再生・次 / シークバー / ループ・音量・**「重ねて再生」(disabled飾り)**・-10/+10・全画面展開ボタン
-- `ui/FullScreenPlayer.tsx`: 全画面。トラックリスト・シーク・音量・ループ。Esc で閉じる
+  - 配線済み: `play` / `togglePlay` / `seek` / `seekRelative` / `setVolume` / `setLoop` / `nextTrack` / `prevTrack` / `setTrackIndex` / `setShowFullPlayer` / `playWithResume` / `setPlaybackRate`（ポップアップの倍速メニュー）
+  - **実装済みだが UI 未配線**: `setChannelSwap`（L⇄R入替）、`setABPoint`/`clearABRepeat`（A-Bリピート）。state にも `channelSwap`/`abRepeat` がある
+- `ui/PlayerDock.tsx`: バー⇄ポップアップの外枠・層切替
+- `ui/BarContent.tsx`（画面下バー）: カバー / トラック名 / クリック可能なシーク行（経過・総時間） / 再生切替。バークリックでポップアップへ
+- `ui/PopupContent.tsx`（右下ポップアップ）: 大カバー / シーク / 前・次・ループ / ±10秒 / 倍速 / 音量 / 再生中の作品へジャンプ / 全画面展開
+- `ui/FullScreenPlayer.tsx`: 全画面。トラックリスト・シーク・音量・ループ。Esc で閉じる（Tailwind移行済み）
+- `ui/useSeekDrag.ts`: シーク操作の共通フック（バー・ポップアップ・全画面で共用）
 
-### プレイヤー UI 刷新で対応したい既知の課題（レビュー issue 由来）
+### プレイヤーの残課題
 
-- TransportBar 右端のレイアウト崩れ: 「重ねて再生」ボタンが音量スライダーに重なる、全画面展開ボタンが画面隅すぎる（dev では TanStack Devtools のボタンに覆われる）
-- 倍速・A-Bリピート・L⇄R入替の UI が無い（エンジンは実装済み、配線するだけ）
-- 全画面プレイヤーのアイコンボタンに aria-label が無い、フォーカストラップ無し
-- フローティング/ポップアップモード（要件 Phase3、お兄ちゃんが検討中）
-- TransportBar now playing のハートが飾り（詳細パネルのブックマークは実働化済み。同じ `patchWork({bookmarked})` で配線できる）
+- L⇄R入替・A-Bリピートの UI が無い（エンジンは実装済み、配線するだけ）
+- 全画面プレイヤーのフォーカストラップ無し
+- バーへの前/次トラックボタン追加は判断保留（ポップアップで完結しているため）
 
 ### ⚠ 自動検証の限界（音声）
 
@@ -142,10 +143,21 @@ headless Chromium（agent-browser / Playwright）は fixture の合成 8bit WAV 
 
 各タスクの詳細は `docs/issues/2026-06-13-*.md`（url-navigation-history / resume-playback / work-metadata-editing）。
 
-### 残タスク（レビュー issue §残 と対応）
+## 直近の成果（2026-07-03: UI操作系の全面改善）
 
-1. **プレイヤー UI 刷新**（未着手。上記「課題」＋シークバー/ボタン/ポップアップモード）
-2. 飾りのままのコントロール: 通知ベル（`TopBar.tsx` にハンドラ無し）、スマートフォルダー条件エディタ（`LibraryView.tsx` の新規作成は `window.prompt` で名前のみ取得・`rules: []` 固定）、AddressBar のビュー切替（リスト/グリッド）と「その他」ボタン（UI/props はあるが `App.tsx` が配線していない配線漏れ）。戻る/進む・パンくず・並び替えは配線済み
+[docs/issues/2026-07-03-frontend-ui-improvement-proposal.md](issues/2026-07-03-frontend-ui-improvement-proposal.md)（提案+実施記録）参照。要点:
+
+- `shared/ui/` に `Button` / `IconButton` / `TagCombobox` を新設し、CSSクラス直付けボタンを置換（LeftNav と円形トランスポートは固有意匠のため据え置き）
+- タグ編集を直編集化（チップ×即削除+「+」ポップオーバー即追加、datalist廃止）、タイトル編集は `⋯` メニュー→ポップオーバー化
+- 再生バーにクリック可能なシーク行を追加、バーが下のコンテンツのクリックを奪うバグを修正、FullScreenPlayer を Tailwind 移行
+- `shell.css` の `.mle-app button` リセットを `@layer base` 化（レイヤー外CSSがTailwindユーティリティに常勝していた統合バグの修正。**今後 shell.css に素の button セレクタを追加するときは注意**）
+- ビジュアルテストのスペック更新+スナップショット再生成済み
+
+### 残タスク
+
+1. 飾り/未実装のコントロール: 通知ベル（`TopBar.tsx` にハンドラ無し）、スマートフォルダー条件エディタ（新規作成は `window.prompt` で名前のみ・`rules: []` 固定。「条件を追加」は disabled+「近日実装」表示に変更済み）、AddressBar のビュー切替リスト/グリッド・左ナビの再生中/履歴/お気に入り/ピン留め（いずれも disabled+「近日実装」表示に変更済み、機能は未実装）
+2. プレイヤー: L⇄R入替・A-Bリピートの UI 配線、フォーカストラップ（上記「プレイヤーの残課題」）
+3. 任意の磨き残し: `shell.css` の未参照クラス整理（`.mll-rtrk` 等の orphaned CSS、置換で未参照になった `.mle-icbtn` 系）、LeftNav のラベル付与検討、ダークテーマ（`.ml-dark`）での新コンポーネント確認
 
 ## 開発上のルール（AGENTS.md より）
 
