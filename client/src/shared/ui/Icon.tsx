@@ -35,7 +35,7 @@ function Svg({ d, size = 16, fill, strokeWidth = 1.5, viewBox = "0 0 24 24", cla
   );
 }
 
-type IconFC = React.FC<IconProps>;
+export type IconFC = React.FC<IconProps>;
 
 export const I: Record<string, IconFC> = {
   search:   (p) => <Svg {...p} d={["M11 19a8 8 0 1 1 0 -16 8 8 0 0 1 0 16Z", "M21 21l-4.3-4.3"]} />,
@@ -84,4 +84,6 @@ export const I: Record<string, IconFC> = {
   bookmark: (p) => <Svg {...p} d="M6 4h12v17l-6 -4 -6 4z" />,
   back:     (p) => <Svg {...p} d={["M19 12H5", "M11 6l-6 6 6 6"]} />,
   caret:    (p) => <Svg {...p} fill="currentColor" d="M7 10l5 5 5 -5z" />,
+  minimize: (p) => <Svg {...p} d={["M9 4v5H4", "M15 4v5h5", "M4 15h5v5", "M20 15h-5v5"]} />,
+  locate:   (p) => <Svg {...p} d={["M12 20a8 8 0 1 1 0 -16 8 8 0 0 1 0 16Z", "M12 2v2", "M12 20v2", "M2 12h2", "M20 12h2"]} />,
 };

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { SortId } from "@mimikago/shared";
 import { SORT_OPTIONS } from "../../features/library/model/types";
 import { I } from "../../shared/ui/Icon";
+import IconButton from "../../shared/ui/IconButton";
 
 interface AddressBarProps {
   path: string[];
@@ -55,22 +56,8 @@ export default function AddressBar({
 
   return (
     <div className="mle-addr is-lib">
-      <button
-        className={`mle-navbtn ${!canBack ? "is-disabled" : ""}`}
-        onClick={onBack}
-        disabled={!canBack}
-        title="戻る"
-      >
-        <I.arrowL size={14} />
-      </button>
-      <button
-        className={`mle-navbtn ${!canForward ? "is-disabled" : ""}`}
-        onClick={onForward}
-        disabled={!canForward}
-        title="進む"
-      >
-        <I.arrowR size={14} />
-      </button>
+      <IconButton size="sm" icon={I.arrowL} label="戻る" onClick={onBack} disabled={!canBack} />
+      <IconButton size="sm" icon={I.arrowR} label="進む" onClick={onForward} disabled={!canForward} />
 
       <div className="mle-crumbs">
         {path.map((seg, i) => (
@@ -86,42 +73,23 @@ export default function AddressBar({
         ))}
       </div>
 
-      <div className="mle-addr__vtoggle">
-        <button
-          className={viewMode === "column" ? "is-on" : ""}
-          title="カラム"
-          onClick={() => onViewChange?.("column")}
-        >
-          <I.gridS size={13} />
-        </button>
-        <button
-          className={viewMode === "list" ? "is-on" : ""}
-          title="リスト"
-          onClick={() => onViewChange?.("list")}
-        >
-          <I.list size={14} />
-        </button>
-        <button
-          className={viewMode === "grid" ? "is-on" : ""}
-          title="グリッド"
-          onClick={() => onViewChange?.("grid")}
-        >
-          <I.grid size={13} />
-        </button>
+      <div className="inline-flex items-center gap-[1px] rounded-2 bg-paper-2 p-[2px]">
+        <IconButton size="sm" icon={I.gridS} label="カラム" active={viewMode === "column"} onClick={() => onViewChange?.("column")} />
+        <IconButton size="sm" icon={I.list} label="リスト" active={viewMode === "list"} onClick={() => onViewChange?.("list")} disabled title="近日実装" />
+        <IconButton size="sm" icon={I.grid} label="グリッド" active={viewMode === "grid"} onClick={() => onViewChange?.("grid")} disabled title="近日実装" />
       </div>
 
       {showSort && (
         <div className="mle-sortmenu" ref={sortRef}>
-          <button
-            className={`mle-navbtn ${sortMenuOpen ? "is-on" : ""}`}
-            title="並び替え"
-            aria-label="並び替え"
+          <IconButton
+            size="sm"
+            icon={I.sort}
+            label="並び替え"
+            active={sortMenuOpen}
             aria-haspopup="menu"
             aria-expanded={sortMenuOpen}
             onClick={() => setSortMenuOpen((v) => !v)}
-          >
-            <I.sort size={13} />
-          </button>
+          />
           {sortMenuOpen && (
             <div className="mle-sortmenu__pop" role="menu">
               {SORT_OPTIONS.map((opt) => (
@@ -145,9 +113,7 @@ export default function AddressBar({
           )}
         </div>
       )}
-      <button className="mle-navbtn" title="その他">
-        <I.more size={14} />
-      </button>
+      <IconButton size="sm" icon={I.more} label="その他" />
     </div>
   );
 }

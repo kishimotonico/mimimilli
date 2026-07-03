@@ -1,4 +1,5 @@
 import { I } from "../../shared/ui/Icon";
+import IconButton from "../../shared/ui/IconButton";
 
 interface TopBarProps {
   mode?: "library" | "files";
@@ -54,15 +55,9 @@ export default function TopBar({
         <span className="kbd">⌘K</span>
       </div>
 
-      <button className="mll-bar__icbtn" title="スキャン" onClick={onScan}>
-        <I.refresh size={14} />
-      </button>
-      <button className="mll-bar__icbtn" title="通知">
-        <I.bell size={14} />
-      </button>
-      <button className="mll-bar__icbtn" title="設定" onClick={onSettings}>
-        <I.cog size={14} />
-      </button>
+      <IconButton size="md" icon={I.refresh} label="スキャン" onClick={onScan} />
+      <IconButton size="md" icon={I.bell} label="通知" />
+      <IconButton size="md" icon={I.cog} label="設定" onClick={onSettings} />
     </header>
   );
 }

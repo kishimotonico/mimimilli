@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import React from "react";
 import { I } from "../../../shared/ui/Icon";
+import Button from "../../../shared/ui/Button";
 import { formatFileSize } from "../../../shared/lib/format";
 import { getFileUrl } from "../api";
 import { getWorkFolderDisplay } from "../model/workFolderDisplay";
@@ -75,16 +76,16 @@ export default function FilePreview({ entry, folderEntries, depth, isPlayingEntr
 
             {kind === "audio" && (
               <div className="mle-fprev__actions">
-                <button className="mll-fab is-primary" onClick={() => onPlay(entry)} disabled={!canServe}>
-                  {isPlayingEntry ? <><I.audio size={12} /> 再生中</> : <><I.play size={12} /> このファイルを再生</>}
-                </button>
+                <Button variant="primary" icon={isPlayingEntry ? I.audio : I.play} onClick={() => onPlay(entry)} disabled={!canServe}>
+                  {isPlayingEntry ? "再生中" : "このファイルを再生"}
+                </Button>
               </div>
             )}
             {isDir && audioFiles.length > 0 && (
               <div className="mle-fprev__actions">
-                <button className="mll-fab is-primary" onClick={() => onPlay(audioFiles[0])} disabled={!audioFiles[0].workId}>
-                  <I.play size={12} /> 先頭の音声を再生
-                </button>
+                <Button variant="primary" icon={I.play} onClick={() => onPlay(audioFiles[0])} disabled={!audioFiles[0].workId}>
+                  先頭の音声を再生
+                </Button>
               </div>
             )}
 

@@ -51,7 +51,13 @@ export default function LeftNav({ mode = "library", onModeChange, playingCount =
           const Ic = IconSet[s.icon] ?? I.folder;
           const badge = s.label === "再生中" ? playingCount : s.badge;
           return (
-            <button key={s.label} className="mle-side__btn" title={s.label} aria-label={s.label}>
+            <button
+              key={s.label}
+              className="mle-side__btn !cursor-not-allowed !text-ink-4 hover:!bg-transparent hover:!text-ink-4"
+              title="近日実装"
+              aria-label={s.label}
+              disabled
+            >
               <Ic size={19} />
               {badge != null && badge > 0 && <span className="mle-side__badge">{badge}</span>}
             </button>

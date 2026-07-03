@@ -17,7 +17,13 @@
   line-height: 1.5;
   overflow: hidden;
 }
-.mle-app button { font: inherit; color: inherit; background: transparent; border: 0; cursor: pointer; padding: 0; }
+/* Tailwind の @layer utilities はレイヤー内なので、button リセットが unlayered のままだと
+   カスケードレイヤーの規則（unlayered が常に layered に勝つ）でユーティリティの色指定を
+   問答無用で潰してしまう。base レイヤーに収めて utilities より弱くする（他の mle-/mll- ルールは
+   unlayered のまま = 現状の優先関係を維持）。 */
+@layer base {
+  .mle-app button { font: inherit; color: inherit; background: transparent; border: 0; cursor: pointer; padding: 0; }
+}
 .mle-app input  { font: inherit; color: inherit; background: transparent; border: 0; outline: 0; padding: 0; }
 .mle-app a      { color: inherit; text-decoration: none; }
 .mle-app ul, .mle-app ol { list-style: none; }
@@ -220,6 +226,14 @@
   display: flex; min-height: 0; overflow: hidden;
   border-bottom: 1px solid var(--line);
 }
+/* PlayerDock（画面下張り付きバー）はグリッド行を持たない fixed オーバーレイなので、
+   row 3 は素の状態だとウィンドウ最下端まで伸びてバーの下に潜り込む。
+   その結果、各カラムの実クライアント高さがバーの領域と物理的に重なり、
+   スクロールしていない静止状態でも末尾付近の行がバーの下に「見えているのにクリックできない」
+   状態になる（子要素側の padding-bottom だけでは、この重なり自体は解消できない）。
+   ここで body 自体の内容領域をバー高さぶん縮め、カラムのクライアント高さがバーへ
+   絶対に重ならないようにする。 */
+.mle-app.has-docked-bar .mle-body { padding-bottom: 68px; }
 .mle-body__placeholder {
   flex: 1; display: flex; align-items: center; justify-content: center;
   color: var(--ink-3); font-size: 13px;
@@ -255,8 +269,9 @@
   flex: 1; overflow: hidden auto; padding: 4px;
   display: flex; flex-direction: column; gap: 1px;
 }
-/* 画面下張り付きバー表示中、リスト最下部の項目がバーに隠れないよう余白を確保する */
-.mle-app.has-docked-bar .mle-col__list { padding-bottom: 84px; }
+/* バー本体との重なりは .mle-body の padding-bottom で解消済み。ここでは
+   スクロール終端の視覚的な余白だけを少し足す。 */
+.mle-app.has-docked-bar .mle-col__list { padding-bottom: 12px; }
 .mle-col__list::-webkit-scrollbar { width: 6px; }
 .mle-col__list::-webkit-scrollbar-thumb { background: var(--paper-4); border-radius: 3px; }
 .mle-col__ft {
@@ -554,7 +569,9 @@
   padding: 1px 6px; border-radius: 4px; letter-spacing: 0; text-transform: none;
 }
 .mle-prv__body { flex: 1; overflow: hidden auto; padding: 18px; }
-.mle-app.has-docked-bar .mle-prv__body { padding-bottom: 98px; }
+/* バー本体との重なりは .mle-body の padding-bottom で解消済み。ここでは
+   スクロール終端の視覚的な余白だけを少し足す。 */
+.mle-app.has-docked-bar .mle-prv__body { padding-bottom: 30px; }
 .mle-prv__hero { display: grid; grid-template-columns: 140px 1fr; gap: 20px; margin-bottom: 18px; }
 .mle-prv__cover {
   width: 140px; height: 140px; border-radius: var(--r-2);
@@ -844,7 +861,7 @@
   background: var(--paper-2); flex-shrink: 0; box-shadow: var(--shadow-cover);
 }
 .mle-bar1__cover img, .mle-bar1__cover svg { display: block; width: 100%; height: 100%; object-fit: cover; }
-.mle-bar1__meta { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.mle-bar1__meta { min-width: 0; flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 2px; }
 .mle-bar1__track { font-family: var(--font-jp); font-size: 13px; font-weight: 600; color: var(--ink-0); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: 0.005em; }
 .mle-bar1__work  { font-family: var(--font-mono); font-size: 10px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mle-bar1__error { display: inline-flex; align-items: center; gap: 4px; min-width: 0; max-width: 100%; font-family: var(--font-jp); font-size: 10.5px; color: var(--r-coral); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -860,24 +877,21 @@
 .mle-bar1__expand { color: var(--ink-3); flex-shrink: 0; display: grid; place-items: center; width: 20px; }
 .mle-bar1__body:hover .mle-bar1__expand { color: var(--ink-1); }
 
-/* シークバーは要素全体の下辺を使う（DLsite Play 風。スライダーではない）。
-   当たり判定は表示より広く取り、バー最下端（= 画面最下端）まで含める。 */
-.mle-bar1__seek {
-  position: absolute; left: 0; right: 0; bottom: 0; z-index: 3;
-  height: 18px;
-  display: flex; align-items: flex-end;
-  cursor: pointer;
+/* シークバー（経過/総時間つき）。ポップアップのシーク（track/fill/thumb）と
+   視覚言語を揃える。クリックでポップアップへ切り替わらないよう行全体で伝播を止める。 */
+.mle-bar1__seekrow { display: flex; align-items: center; gap: 8px; margin-top: 3px; }
+.mle-bar1__time {
+  flex-shrink: 0; font-family: var(--font-mono); font-size: 11px; color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
 }
-.mle-bar1__seek-track {
-  position: relative; width: 100%; height: 5px;
-  background: var(--paper-3);
-  transition: height 0.12s ease;
+.mle-bar1__seek { flex: 1; min-width: 0; padding: 5px 0; cursor: pointer; position: relative; }
+.mle-bar1__seek-track { position: relative; height: 4px; border-radius: 2px; background: var(--paper-3); }
+.mle-bar1__seek-fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--acc); border-radius: 2px; }
+.mle-bar1__seek-thumb {
+  position: absolute; top: 50%; width: 10px; height: 10px; border-radius: 50%;
+  background: var(--paper-1); box-shadow: 0 0 0 1.5px var(--acc), var(--shadow-1);
+  transform: translate(-50%, -50%);
 }
-.mle-bar1__seek:hover .mle-bar1__seek-track,
-.mle-bar1__seek.is-dragging .mle-bar1__seek-track {
-  height: 8px;
-}
-.mle-bar1__seek-fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--acc); }
 .mle-bar1__seek-tooltip,
 .mle-seek-tooltip {
   position: absolute; bottom: 100%; margin-bottom: 8px;

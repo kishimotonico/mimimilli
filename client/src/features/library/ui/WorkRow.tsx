@@ -55,7 +55,18 @@ export default function WorkRow({ work, isSelected, isPlaying, onSelect }: WorkR
         {sub && <span className="mll-wrow__sub">{sub}</span>}
       </div>
       <div className="mll-wrow__meta">
-        {isPlaying && <span className="now">▸ 再生中</span>}
+        {isPlaying && (
+          <span className="now inline-flex items-center gap-[1px]" role="img" aria-label="再生中" title="再生中">
+            {[6, 10, 8].map((height, i) => (
+              <span
+                key={height}
+                aria-hidden="true"
+                className="block w-[2px] origin-bottom rounded-[1px] bg-current motion-safe:animate-[mll-eq-bar_840ms_ease-in-out_infinite] motion-reduce:animate-none"
+                style={{ height, animationDelay: `${i * 120}ms` }}
+              />
+            ))}
+          </span>
+        )}
         {!isPlaying && work.bookmarked && <span className="fav"><I.starF size={10} /></span>}
         {!isPlaying && !work.bookmarked && (
           <span>{formatRelativeDate(work.addedAt)}</span>

@@ -70,8 +70,11 @@ test("work detail panel - resume playback", async ({ page }) => {
   await page.getByText("夜更けの図書室で囁き朗読", { exact: false }).click();
 
   const panel = page.locator(".mle-prv");
-  await expect(panel.getByRole("button", { name: "続きから再生" })).toBeVisible();
-  await expect(panel.getByText("古い本の読み聞かせ · 3:21 から再開")).toBeVisible();
+  // 再開情報はプライマリボタンに内包され、トラック名は title ツールチップに移った。
+  const resumeButton = panel.getByRole("button", { name: "続きから 3:21" });
+  await expect(resumeButton).toBeVisible();
+  await expect(resumeButton).toHaveAttribute("title", "古い本の読み聞かせ · 3:21 から再開");
+  await expect(panel.getByRole("button", { name: "最初から再生" })).toBeVisible();
   await expect(panel.getByText("再開 3:21", { exact: true })).toBeVisible();
 
   await expect(panel).toHaveScreenshot("work-detail-resume.png");
@@ -83,11 +86,12 @@ test("work detail panel - tag editing", async ({ page }) => {
   await page.getByText("夜更けの図書室で囁き朗読", { exact: false }).click();
 
   const panel = page.locator(".mle-prv");
-  await panel.getByRole("button", { name: "タグを編集" }).click();
+  // 編集モードは廃止され、常設の「+」からポップオーバーで直編集する。
+  await panel.getByRole("button", { name: "タグを追加" }).click();
 
   await expect(panel.getByRole("combobox", { name: "追加するタグ" })).toBeVisible();
-  await expect(panel.getByText("分類タグはメタデータ保護のため編集対象外です。")).toBeVisible();
-  await expect(panel.locator(".mle-prv__tags button")).toHaveCount(3);
+  // フラットタグの×（削除）が常設されている。
+  await expect(panel.getByRole("button", { name: /^タグ「.+」を削除$/ }).first()).toBeVisible();
 
   await expect(panel).toHaveScreenshot("work-detail-tag-editing.png");
 });

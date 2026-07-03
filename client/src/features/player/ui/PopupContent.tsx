@@ -10,6 +10,7 @@ import { formatPlaybackError } from "./formatPlaybackError";
 import { formatTime } from "../../../shared/lib/format";
 import CoverImg from "../../../entities/work/ui/CoverImg";
 import { I } from "../../../shared/ui/Icon";
+import IconButton from "../../../shared/ui/IconButton";
 
 interface PopupContentProps {
   state: PlayerState;
@@ -87,12 +88,8 @@ export default function PopupContent({
   return (
     <>
       <div className="mle-popup__head">
-        <button className="mle-popup__fold" title="バーへ戻る" onClick={onFold}>
-          <I.chevD size={14} />
-        </button>
-        <button className="mle-popup__headbtn" title="全画面プレイヤー" onClick={onExpandFullScreen}>
-          <I.fs size={13} />
-        </button>
+        <IconButton size="sm" icon={I.chevD} label="バーへ戻る" onClick={onFold} />
+        <IconButton size="sm" icon={I.fs} label="全画面プレイヤー" onClick={onExpandFullScreen} />
       </div>
 
       <div className="mle-popup__cover-wrap">
@@ -212,13 +209,13 @@ export default function PopupContent({
       </div>
 
       <div className="mle-popup__row">
-        <button
-          className={`mle-icbtn ${volume === 0 ? "is-muted" : ""}`}
-          title={volume === 0 ? "ミュート解除" : "ミュート"}
+        <IconButton
+          size="sm"
+          icon={I.volume}
+          label={volume === 0 ? "ミュート解除" : "ミュート"}
           onClick={onToggleMute}
-        >
-          <I.volume size={15} />
-        </button>
+          className={volume === 0 ? "text-ink-4" : undefined}
+        />
         <input
           type="range"
           min={0}
@@ -230,10 +227,9 @@ export default function PopupContent({
         />
       </div>
 
-      <button className="mle-popup__link" onClick={onShowPlayingWork}>
-        <I.audio size={13} />
-        再生中の作品を表示
-      </button>
+      <div className="mt-[2px] flex justify-center border-t border-line-soft pt-2">
+        <IconButton size="sm" icon={I.locate} label="再生中の作品を表示" onClick={onShowPlayingWork} />
+      </div>
     </>
   );
 }
