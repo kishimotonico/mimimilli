@@ -49,7 +49,7 @@
 
 ## 将来構想（着手時期未定）
 
-- 配布: Bun compile 単一 exe（ネイティブモジュール依存を避ける方針。architecture-v2 参照)
+- 配布: Bun compile 単一 exe（ネイティブモジュール依存を避ける方針。[ARCHITECTURE.md](ARCHITECTURE.md) 参照)
 - トレイ常駐（基本機能完成後に設計）
 - リモートストリーミング拡張: 認証付きアクセス等（requirements-v4 §9）
 - Windows ネイティブ環境でのデバッグ対応（scripts の env 素書き禁止・cross-env 徹底）

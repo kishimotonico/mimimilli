@@ -1,6 +1,6 @@
 # ローカル音声作品管理・再生アプリ 要件定義
 
-> **注記:** 本書の要件（機能・UX）が正。技術スタックの記述は 2026-07-03 に現行実装（TypeScript / Hono、[ADR-0001](adr/0001-typescript-api-server.md)）へ更新済み。アーキテクチャの現行は [architecture-v2-proposal.md](architecture-v2-proposal.md)、開発の現状は [HANDOFF.md](HANDOFF.md) を参照。
+> **注記:** 本書の要件（機能・UX）が正。技術スタックの記述は 2026-07-03 に現行実装（TypeScript / Hono、[ADR-0001](adr/0001-typescript-api-server.md)）へ更新済み。アーキテクチャの現行は [ARCHITECTURE.md](ARCHITECTURE.md)、開発の現状は [HANDOFF.md](HANDOFF.md) を参照。
 
 ## 1. 概要
 

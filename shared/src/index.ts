@@ -1,4 +1,4 @@
-// @mimimilli/shared — API 契約 v2 の正典（docs/architecture-v2-proposal.md §5）。
+// @mimimilli/shared — API 契約 v2 の正典（docs/ARCHITECTURE.md）。
 // client / server / fixture アダプタはすべてここの型・スキーマを参照する。
 export * from "./work.ts";
 export * from "./meta.ts";

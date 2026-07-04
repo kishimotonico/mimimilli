@@ -2,7 +2,7 @@
 
 - ステータス: 承認
 - 日付: 2026-06-11
-- 関連: [アーキテクチャ v2 提案](../architecture-v2-proposal.md)、[ADR-0001](0001-typescript-api-server.md)
+- 関連: `docs/architecture-v2-proposal.md`（2026-07-04 削除、Git履歴参照。現行は [../ARCHITECTURE.md](../ARCHITECTURE.md)）、[ADR-0001](0001-typescript-api-server.md)
 
 ## 文脈
 

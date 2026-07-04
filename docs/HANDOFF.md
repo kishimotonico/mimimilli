@@ -1,30 +1,20 @@
 # 引き継ぎドキュメント
 
 mimimilli の現状と進行中の作業を、後続のエージェント／セッションが把握するための資料。
-最終更新: 2026-07-03。
+最終更新: 2026-07-04。
 
 ## このアプリは何か
 
 DLsite/FANZA 等からダウンロードした音声作品（ASMR・ボイスドラマ等）をローカルで管理・再生する常駐 Web アプリ。タグ／分類軸ベースの検索と、物理フォルダー（ファイラー）の両モードを持つ。`.meta.json` を Source of Truth、SQLite を検索キャッシュとする。
 
-設計の基準ドキュメントは [docs/architecture-v2-proposal.md](architecture-v2-proposal.md)（承認済み）と [ADR-0001](adr/0001-typescript-api-server.md) / [ADR-0002](adr/0002-mock-as-fixture-adapter.md)。要件は [docs/requirements-v4.md](requirements-v4.md)。ドキュメント全体の地図は [docs/README.md](README.md)、未完了タスクは [docs/BACKLOG.md](BACKLOG.md)。
+アーキテクチャは [docs/ARCHITECTURE.md](ARCHITECTURE.md)、決定の経緯は [ADR-0001](adr/0001-typescript-api-server.md) / [ADR-0002](adr/0002-mock-as-fixture-adapter.md)。要件は [docs/requirements-v4.md](requirements-v4.md)。ドキュメント全体の地図は [docs/README.md](README.md)、未完了タスクは [docs/BACKLOG.md](BACKLOG.md)。
 
-## アーキテクチャ（v2、現行）
+## アーキテクチャ
 
-旧 Rust/axum サーバーは廃止し `server-rust/` へ退避済み（参照実装）。現行は **TypeScript モノレポ**。
+構造・境界・データフローは [docs/ARCHITECTURE.md](ARCHITECTURE.md) を参照。
 
-```
-mimimilli/                     # pnpm workspace（ルートに統合済み）
-├── client/   React 19 + Vite SPA（feature-first: app → features → entities → shared）
-├── server/   Hono + Node。routes（薄い） / core（ドメイン） / adapters（real | fixture）
-└── shared/   API契約の正典。Zod スキーマ + 型（client / server 双方が依存）
-```
-
-- **契約の正典は `shared/`**（Zod）。client は `@mimimilli/shared` から型を import し、server も同じ型でルートを実装する。契約のズレは `tsc` が機械検出する
-- **アダプタ境界（ADR-0002）**: ルーター・ドメインロジックは1系統。データの出どころだけ差し替える
-  - `fixture` アダプタ: インメモリの開発データ（旧 `client/mocks/` を昇格させたもの）。シナリオ切替（`MIMIMILLI_MOCK_SCENARIO` = default/empty/new-work/errors）と**合成メディア**（無音WAV・SVGカバー、Range対応）を持つ
-  - `real` アダプタ: SQLite（Drizzle）+ 実FS + スキャナー + DLsite
-- **dev は vite middleware**: `client/vite.config.ts` が `BACKEND_URL` 未指定時、server の Hono アプリ（fixture注入）を dev middleware としてマウント。`pnpm dev` 一発で UI もモックAPIも動く
+- fixture アダプタはシナリオ切替（`MIMIMILLI_MOCK_SCENARIO` = default/empty/new-work/errors）と**合成メディア**（無音WAV・SVGカバー、Range対応）を持つ
+- dev は vite middleware: `client/vite.config.ts` が `BACKEND_URL` 未指定時、server の Hono アプリ（fixture注入）を dev middleware としてマウントし、`pnpm dev` 一発で UI もモックAPIも動く
 
 ### ⚠ dev サーバーの落とし穴（重要）
 
@@ -151,7 +141,7 @@ headless Chromium（agent-browser / Playwright）は fixture の合成 8bit WAV 
 
 ドキュメントの地図（現行の正典・規約・削除済みの区分）は [docs/README.md](README.md) が正。2026-07-03 の棚卸しで、旧 Rust 時代の名残は解消済み: `requirements-v4.md` の技術記述を現行（Hono + TS）へ更新、`web-architecture-proposal.md` と `design-brief.md` は削除（Git 履歴に残る）。`server-rust/` は退避した旧実装（参照用、ビルド対象外）。
 
-現行の正は本 HANDOFF と [docs/architecture-v2-proposal.md](architecture-v2-proposal.md)、`shared/src/`（契約）、`server/src/`（実装）。
+現行の正は本 HANDOFF と [docs/ARCHITECTURE.md](ARCHITECTURE.md)、`shared/src/`（契約）、`server/src/`（実装）。
 
 本書は「現在の状態」だけを記述する方針で、時系列の経緯（いつ何をやったか）は [docs/issues/](issues/README.md) と Git 履歴が持つ。
 
