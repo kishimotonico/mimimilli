@@ -183,7 +183,7 @@ mimimilli/
     ├── BACKLOG.md           # 残タスクの一元管理
     ├── adr/                 # アーキテクチャ決定記録
     ├── issues/              # 作業記録（索引は issues/README.md）
-    └── design_handoff_mimimilli_library/  # デザインシステム規約（カラートークン等）
+    └── design-system.md      # デザインシステム規約（カラートークン等）
 ```
 
 ## 開発ドキュメント

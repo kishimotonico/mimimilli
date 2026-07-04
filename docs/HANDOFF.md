@@ -144,7 +144,7 @@ headless Chromium（agent-browser / Playwright）は fixture の合成 8bit WAV 
 
 - コミットは日本語・Conventional Commits。`git -C` 禁止。コミットはユーザー指示があるまでしない（監督がレビュー後にまとめる）
 - 過度なフォールバック禁止・エラー隠蔽禁止。互換性より適切な設計（破壊的変更OK）。場当たり的修正禁止
-- フロントの見た目は mimimilli 正典 [docs/design_handoff_mimimilli_library/README.md](design_handoff_mimimilli_library/README.md) に従う（カラートークン・`mle-`/`mll-` クラス体系・motion 等）。トークンは `client/src/styles/`
+- フロントの見た目は [docs/design-system.md](design-system.md) の規約に従う（カラートークン・`mle-`/`mll-` クラス体系・motion 等）。トークンの正は `client/src/styles/tokens.css`
 - WSL 環境。Windows パスは WSL パスへ変換。jq でJSON処理、rg 推奨
 
 ## ドキュメントの現状
