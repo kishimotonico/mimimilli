@@ -27,3 +27,7 @@
 
 - 新機能の API は必ず shared スキーマ → fixture アダプタ → real アダプタの順で実装される（fixture が先行してよい）
 - fixture アダプタは本番コードの一部としてメンテナンスされる（テスト・dev 専用の使い捨てではない）
+
+## 現状（2026-07-04）
+
+実装完了。`client/mocks/` は fixture アダプタ（`server/src/adapters/fixture/`）へ統合済みで、Vite dev middleware 経由のマウント・`MIMIMILLI_MOCK_SCENARIO` によるシナリオ切替・音声やカバー画像の合成メディア配信まで稼働している。「shared → fixture → real」の実装順は現在も有効な方針で、real / fixture 両アダプタとも core の純粋関数（[ADR-0004](0004-core-functions-over-sql.md)）を通して同じロジックを実行する。
