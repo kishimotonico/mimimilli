@@ -178,11 +178,11 @@ mimimilli/
 │       └── routes/          # HTTP ルート定義
 ├── server-rust/             # 旧 axum (Rust) 実装。退避と参照用（ビルド対象外）
 ├── shared/                  # Zod スキーマ正典（API 契約 v2、client/server 共有）
+├── backlog/                 # タスク管理（Backlog.md CLI。`backlog` コマンドで操作、直接編集禁止）
 └── docs/                    # 設計ドキュメント（地図は docs/README.md）
     ├── HANDOFF.md           # 開発の現状・引き継ぎ
-    ├── BACKLOG.md           # 残タスクの一元管理
     ├── adr/                 # アーキテクチャ決定記録
-    ├── issues/              # 作業記録（索引は issues/README.md）
+    ├── issues/              # 過去の作業記録アーカイブ（凍結）
     └── design-system.md      # デザインシステム規約（カラートークン等）
 ```
 
@@ -192,7 +192,7 @@ mimimilli/
 
 - [docs/README.md](docs/README.md) — ドキュメント全体の地図（どれが現行の正か）
 - [docs/HANDOFF.md](docs/HANDOFF.md) — アーキテクチャ・開発コマンド・ハマりどころの引き継ぎ
-- [docs/BACKLOG.md](docs/BACKLOG.md) — 未完了タスクの一覧
+- 未完了タスク — `backlog task list --plain`（[Backlog.md CLI](https://github.com/MrLesk/Backlog.md) で管理）
 - [AGENTS.md](AGENTS.md) — コミット規約・実装方針などの開発ルール
 
 ## ライセンス

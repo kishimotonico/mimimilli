@@ -1,6 +1,6 @@
 # アーキテクチャ
 
-本書は mimimilli の現在の構造と境界を実装ベースで説明する。開発手順・落とし穴は [HANDOFF.md](HANDOFF.md)、設計判断の経緯は [ADR-0001](adr/0001-typescript-api-server.md) / [ADR-0002](adr/0002-mock-as-fixture-adapter.md)、機能・UX 要件は [requirements-v4.md](requirements-v4.md)、未完了タスクは [BACKLOG.md](BACKLOG.md) を参照。
+本書は mimimilli の現在の構造と境界を実装ベースで説明する。開発手順・落とし穴は [HANDOFF.md](HANDOFF.md)、設計判断の経緯は [ADR-0001](adr/0001-typescript-api-server.md) / [ADR-0002](adr/0002-mock-as-fixture-adapter.md)、機能・UX 要件は [requirements-v4.md](requirements-v4.md)、未完了タスクは Backlog.md CLI（`backlog task list --plain`）を参照。
 
 ## 全体像
 
@@ -51,7 +51,7 @@ pnpm workspace のモノレポで、`client/` / `server/` / `shared/` の3パッ
 ## 主要データフロー
 
 - 開発時（fixture）: `client/vite.config.ts` の plugin が、fixture アダプタを注入した Hono アプリ（`createApp`）を Vite の dev middleware として `/api/*` にマウントする。`BACKEND_URL` を指定すると、代わりにそちらへプロキシする
-- スキャン: `POST /api/scan` は同期実行で `ScanResult` を返す。SSE による進捗配信は未実装（[BACKLOG.md](BACKLOG.md) 参照）
+- スキャン: `POST /api/scan` は同期実行で `ScanResult` を返す。SSE による進捗配信は未実装（backlog にタスクあり）
 - メディア配信: client がメディア URL を組み立て（`entities/work/api.ts`）、`/api/media/*` ルートが `DataAdapter.locateMedia()` 経由でアダプタ（実ファイル or fixture の合成メディア）から実体を取得して配信する
 
 ## ファイルシステムと配信の安全性
@@ -70,5 +70,4 @@ pnpm workspace のモノレポで、`client/` / `server/` / `shared/` の3パッ
 - [ADR-0002: モックを本実装サーバーの fixture アダプタとして統合する](adr/0002-mock-as-fixture-adapter.md)
 - [requirements-v4.md](requirements-v4.md) — 機能・UX 要件
 - [HANDOFF.md](HANDOFF.md) — 開発の現状・引き継ぎ
-- [BACKLOG.md](BACKLOG.md) — 未完了タスク
 - [design-system.md](design-system.md) — フロントエンドのデザイン規約

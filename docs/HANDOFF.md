@@ -1,13 +1,13 @@
 # 引き継ぎドキュメント
 
 mimimilli の現状と進行中の作業を、後続のエージェント／セッションが把握するための資料。
-最終更新: 2026-07-04。
+最終更新: 2026-07-06。
 
 ## このアプリは何か
 
 DLsite/FANZA 等からダウンロードした音声作品（ASMR・ボイスドラマ等）をローカルで管理・再生する常駐 Web アプリ。タグ／分類軸ベースの検索と、物理フォルダー（ファイラー）の両モードを持つ。`.meta.json` を Source of Truth、SQLite を検索キャッシュとする。
 
-アーキテクチャは [docs/ARCHITECTURE.md](ARCHITECTURE.md)、決定の経緯は [ADR-0001](adr/0001-typescript-api-server.md) / [ADR-0002](adr/0002-mock-as-fixture-adapter.md)。要件は [docs/requirements-v4.md](requirements-v4.md)。ドキュメント全体の地図は [docs/README.md](README.md)、未完了タスクは [docs/BACKLOG.md](BACKLOG.md)。
+アーキテクチャは [docs/ARCHITECTURE.md](ARCHITECTURE.md)、決定の経緯は [ADR-0001](adr/0001-typescript-api-server.md) / [ADR-0002](adr/0002-mock-as-fixture-adapter.md)。要件は [docs/requirements-v4.md](requirements-v4.md)。ドキュメント全体の地図は [docs/README.md](README.md)、未完了タスクは Backlog.md CLI（`backlog task list --plain`）。
 
 ## アーキテクチャ
 
@@ -117,14 +117,14 @@ MIMIMILLI_ADAPTER=fixture PORT=18099 node server/src/index.ts
   - 配線済み: `play` / `togglePlay` / `seek` / `seekRelative` / `setVolume` / `setLoop` / `nextTrack` / `prevTrack` / `setTrackIndex` / `setShowFullPlayer` / `playWithResume` / `setPlaybackRate`（ポップアップの倍速メニュー）
   - **実装済みだが UI 未配線**: `setChannelSwap`（L⇄R入替）、`setABPoint`/`clearABRepeat`（A-Bリピート）。state にも `channelSwap`/`abRepeat` がある
 - `ui/PlayerDock.tsx`: バー⇄ポップアップの外枠・層切替
-- `ui/BarContent.tsx`（画面下バー）: カバー / トラック名 / クリック可能なシーク行（経過・総時間） / 再生切替。バークリックでポップアップへ
+- `ui/BarContent.tsx`（画面下バー）: カバー / トラック名 / 再生切替 + バー下辺に貼り付くシークバー（時間表示なし）。バークリックでポップアップへ
 - `ui/PopupContent.tsx`（右下ポップアップ）: 大カバー / シーク / 前・次・ループ / ±10秒 / 倍速 / 音量 / 再生中の作品へジャンプ / 全画面展開
 - `ui/FullScreenPlayer.tsx`: 全画面。トラックリスト・シーク・音量・ループ。Esc で閉じる（Tailwind移行済み）
 - `ui/useSeekDrag.ts`: シーク操作の共通フック（バー・ポップアップ・全画面で共用）
 
 ### プレイヤーの残課題
 
-[docs/BACKLOG.md](BACKLOG.md) の「プレイヤー」節を参照（L⇄R・A-Bリピートの UI 配線、フォーカストラップ等）。
+backlog の `player` ラベルのタスクを参照（`backlog task list --labels player --plain`。L⇄R・A-Bリピートの UI 配線、フォーカストラップ等）。
 
 ### ⚠ 自動検証の限界（音声）
 

@@ -1,6 +1,8 @@
 # issues 索引
 
-日々の作業記録・提案・レビューの置き場。命名は `yyyy-mm-dd-summary-description.md`（AGENTS.md 参照）。
+過去の作業記録・提案・レビューのアーカイブ。**2026-07-06 に凍結**し、以降のタスク管理・作業記録は Backlog.md CLI（`backlog/`）へ移行した。新規ファイルの追加・既存ファイルの編集はしない。
+
+命名は `yyyy-mm-dd-summary-description.md`。
 
 各ファイルは本文2行目に `Status:` 行を持つ（ファイル名にはステータスを含めない。リネームによるリンク切れを避けるため）。
 
@@ -30,4 +32,4 @@
 | 2026-07-03 | [live-ui-ux-review](2026-07-03-live-ui-ux-review.md) | レビュー | todo |
 | 2026-07-05 | [player-ui-adjustments](2026-07-05-player-ui-adjustments.md) | 作業記録 | done |
 
-新しいファイルを追加したら、この表にも1行足すこと。未完了タスクの一元管理は [../BACKLOG.md](../BACKLOG.md)（issue 側には詳細、BACKLOG 側には項目とリンク）。
+（凍結済みのため、この表への追記も不要）

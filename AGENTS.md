@@ -9,10 +9,9 @@
 
 - 仕様・設計ドキュメントは `docs/` に適宜整理する。全体の地図は `docs/README.md`
 - ADRを `docs/adr/` に保存する
-- Claude CodeやCodexは `docs/issues/yyyy-mm-dd-summary-description.md` に作業内容を読み書きする
-  - 本文2行目に `Status: done | wip | todo | note` 行を置き、`docs/issues/README.md` の一覧表にも1行足す
-- 未完了タスクは `docs/BACKLOG.md` に一元管理する（HANDOFF や issue に残タスクリストを分散させない）
-- メンテナンス対象のドキュメント（HANDOFF・BACKLOG・docs/README 等）は追記で積み上げず、書き換え・削除で「現在の状態」だけを保つ。時系列の経緯は docs/issues/ と Git 履歴に任せる
+- タスク管理は Backlog.md CLI（`backlog` コマンド、`backlog/` ディレクトリ）に一元化する。残タスク・実装計画・作業メモはタスクに集約し、HANDOFF や他の docs に残タスクリストを分散させない
+- `docs/issues/` は過去の作業記録アーカイブ（2026-07-06 凍結）。新規追加・編集はしない
+- メンテナンス対象のドキュメント（HANDOFF・docs/README 等）は追記で積み上げず、書き換え・削除で「現在の状態」だけを保つ。時系列の経緯は Git 履歴と backlog のタスクに任せる
 
 ## 実装方針
 
@@ -28,3 +27,26 @@
 - 開発サーバーは別のシェルで起動済みのことが多いので、`pnpm dev`を実行せず直接アクセスしてOK
 - アクセスURLは `http://mimi.localhost:1355`（`client/package.json` の `portless run --name mimi` 由来）。IPアドレスによるアクセスは不可
 - agent-browser は他セッションとブラウザを共有してタブを奪われることがあるため、`--session <名前>` を付けて専用セッションで操作する
+
+<!-- BACKLOG.MD GUIDELINES START -->
+<CRITICAL_INSTRUCTION>
+
+## Backlog.md Workflow
+
+This project uses Backlog.md for task and project management.
+
+**For every user request in this project, run `backlog instructions overview` before answering or taking action.**
+
+Use the overview to decide whether to search, read, create, or update Backlog tasks.
+
+Use the detailed guides when needed:
+- `backlog instructions task-creation` for creating or splitting tasks
+- `backlog instructions task-execution` for planning and implementation workflow
+- `backlog instructions task-finalization` for completion and handoff
+
+Use `backlog <command> --help` before running unfamiliar commands. Help shows options, fields, and examples.
+
+Do not edit Backlog task, draft, document, decision, or milestone markdown files directly. Use the `backlog` CLI so metadata, relationships, and history stay consistent.
+
+</CRITICAL_INSTRUCTION>
+<!-- BACKLOG.MD GUIDELINES END -->
