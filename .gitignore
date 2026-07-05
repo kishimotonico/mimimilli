@@ -33,6 +33,9 @@ server-rust/target/
 # server runtime data (SQLite cache)
 server/data/
 
+# テストが生成するサンプルライブラリ（server/tests/helpers/sampleLibrary.ts）
+/data/
+
 # QA / dogfooding artifacts (screenshots, videos, report)
 dogfood-output/
 
