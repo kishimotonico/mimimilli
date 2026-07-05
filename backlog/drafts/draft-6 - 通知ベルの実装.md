@@ -1,5 +1,5 @@
 ---
-id: TASK-12
+id: DRAFT-6
 title: 通知ベルの実装
 status: To Do
 assignee: []

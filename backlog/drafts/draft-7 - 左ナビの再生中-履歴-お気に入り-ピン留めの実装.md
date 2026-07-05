@@ -1,5 +1,5 @@
 ---
-id: TASK-15
+id: DRAFT-7
 title: 左ナビの再生中/履歴/お気に入り/ピン留めの実装
 status: To Do
 assignee: []
