@@ -13,6 +13,7 @@ interface ContentColumnProps {
   selectedWorkId: string | null;
   selectedTags: string[];
   playingWorkId?: string;
+  isPlaybackActive?: boolean;
   isLoading?: boolean;
   isError?: boolean;
   onWorkSelect: (id: string) => void;
@@ -42,6 +43,7 @@ export default function ContentColumn({
   selectedWorkId,
   selectedTags,
   playingWorkId,
+  isPlaybackActive,
   isLoading,
   isError,
   onWorkSelect,
@@ -181,6 +183,7 @@ export default function ContentColumn({
               work={w}
               isSelected={w.id === selectedWorkId}
               isPlaying={w.id === playingWorkId}
+              isPlaybackActive={isPlaybackActive}
               onSelect={() => onWorkSelect(w.id)}
             />
           ))

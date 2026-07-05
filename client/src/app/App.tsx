@@ -49,6 +49,7 @@ export default function App() {
   const [isCompletingSetup, setIsCompletingSetup] = useState(false);
 
   const isPlaying = player.state.currentTrackIndex >= 0 && player.state.currentWork !== null;
+  const isPlaybackActive = player.state.isPlaying;
   // バー表示中のみコンテンツ側に padding-bottom を確保する（ポップアップは小さく被りが少ないため対象外）
   const uiMode = useAtomValue(playerUiModeAtom);
   const dockedBarActive = isPlaying && uiMode === "bar";
@@ -248,6 +249,7 @@ export default function App() {
             rootFolder={rootFolder}
             playingWorkId={player.state.currentWork?.id}
             playingRelPath={playingRelPath}
+            isPlaybackActive={isPlaybackActive}
             onPlayFile={handlePlayFile}
           />
         ) : (
@@ -255,6 +257,7 @@ export default function App() {
             searchQuery={searchQuery}
             playingWorkId={player.state.currentWork?.id}
             playingTrackIndex={player.state.currentTrackIndex}
+            isPlaybackActive={isPlaybackActive}
             onPlay={handlePlay}
             onResume={handleResume}
           />

@@ -48,10 +48,11 @@ interface FilesViewProps {
   playingWorkId?: string;
   /** 再生中トラックの作品相対パス（= FsEntry.workRelPath と突合） */
   playingRelPath?: string | null;
+  isPlaybackActive?: boolean;
   onPlayFile: (entry: FsEntry) => void;
 }
 
-export default function FilesView({ rootFolder, playingWorkId, playingRelPath, onPlayFile }: FilesViewProps) {
+export default function FilesView({ rootFolder, playingWorkId, playingRelPath, isPlaybackActive, onPlayFile }: FilesViewProps) {
   const nav = useFilesNavigation(rootFolder);
   const direction = useAtomValue(filesDirectionAtom);
 
@@ -116,6 +117,7 @@ export default function FilesView({ rootFolder, playingWorkId, playingRelPath, o
               entries={cwdEntries}
               selectedPath={nav.selectedPath}
               matchPlaying={matchPlaying}
+              isPlaybackActive={isPlaybackActive}
               onOpenDir={nav.openDir}
               onSelectFile={nav.selectFile}
               onPlayFile={onPlayFile}

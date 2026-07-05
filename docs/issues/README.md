@@ -28,5 +28,6 @@
 | 2026-07-03 | [dev-command-real-audio-proposal](2026-07-03-dev-command-real-audio-proposal.md) | 提案 | done |
 | 2026-07-03 | [frontend-ui-improvement-proposal](2026-07-03-frontend-ui-improvement-proposal.md) | 提案+実施記録 | done |
 | 2026-07-03 | [live-ui-ux-review](2026-07-03-live-ui-ux-review.md) | レビュー | todo |
+| 2026-07-05 | [player-ui-adjustments](2026-07-05-player-ui-adjustments.md) | 作業記録 | done |
 
 新しいファイルを追加したら、この表にも1行足すこと。未完了タスクの一元管理は [../BACKLOG.md](../BACKLOG.md)（issue 側には詳細、BACKLOG 側には項目とリンク）。

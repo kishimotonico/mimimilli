@@ -10,13 +10,14 @@ interface FileRowProps {
   isFocused: boolean;
   /** このファイルが今再生中 */
   isPlaying: boolean;
+  isPlaybackActive?: boolean;
   onClick: () => void;
   onActivate: () => void;
 }
 
 const IconSet = I as Record<string, (p: { size?: number }) => React.ReactElement>;
 
-export default function FileRow({ entry, isFocused, isPlaying, onClick, onActivate }: FileRowProps) {
+export default function FileRow({ entry, isFocused, isPlaying, isPlaybackActive, onClick, onActivate }: FileRowProps) {
   const kind = classifyFile(entry);
   const Ic = IconSet[FILE_KIND_ICON[kind]] ?? I.file;
   const isWorkFolder = entry.isDir && !!entry.workId;
@@ -33,7 +34,16 @@ export default function FileRow({ entry, isFocused, isPlaying, onClick, onActiva
   return (
     <div className={cls} onClick={onClick} onDoubleClick={onActivate} title={entry.name}>
       <span className="ficon">
-        {isPlaying ? <span className="barwave"><span /><span /><span /></span> : <Ic size={15} />}
+        {isPlaying ? (
+          <span
+            className={`barwave ${isPlaybackActive ? "" : "is-paused"}`}
+            role="img"
+            aria-label={isPlaybackActive ? "再生中" : "一時停止中"}
+            title={isPlaybackActive ? "再生中" : "一時停止中"}
+          >
+            <span /><span /><span />
+          </span>
+        ) : <Ic size={15} />}
       </span>
       <span className="name">
         {display.badge && <span className="wbadge">{display.badge}</span>}

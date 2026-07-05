@@ -45,11 +45,12 @@ interface LibraryViewProps {
   searchQuery: string;
   playingWorkId?: string;
   playingTrackIndex?: number;
+  isPlaybackActive?: boolean;
   onPlay: (work: WorkSummary, trackIndex: number) => void;
   onResume: (work: Work) => void;
 }
 
-export default function LibraryView({ searchQuery, playingWorkId, playingTrackIndex, onPlay, onResume }: LibraryViewProps) {
+export default function LibraryView({ searchQuery, playingWorkId, playingTrackIndex, isPlaybackActive, onPlay, onResume }: LibraryViewProps) {
   const nav = useLibraryView();
   const queryClient = useQueryClient();
 
@@ -228,6 +229,7 @@ export default function LibraryView({ searchQuery, playingWorkId, playingTrackIn
         selectedWorkId={nav.selectedWorkId}
         selectedTags={nav.selectedTags}
         playingWorkId={playingWorkId}
+        isPlaybackActive={isPlaybackActive}
         isLoading={isLoading}
         isError={isError}
         onWorkSelect={nav.selectWork}

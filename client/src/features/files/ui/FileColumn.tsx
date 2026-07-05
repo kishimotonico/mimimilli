@@ -9,6 +9,7 @@ interface FileColumnProps {
   entries: FsEntry[];
   selectedPath: string | null;
   matchPlaying: (entry: FsEntry) => boolean;
+  isPlaybackActive?: boolean;
   onOpenDir: (absPath: string) => void;
   onSelectFile: (absPath: string) => void;
   onPlayFile: (entry: FsEntry) => void;
@@ -16,7 +17,7 @@ interface FileColumnProps {
 }
 
 export default function FileColumn({
-  title, entries, selectedPath, matchPlaying,
+  title, entries, selectedPath, matchPlaying, isPlaybackActive,
   onOpenDir, onSelectFile, onPlayFile, isLoading,
 }: FileColumnProps) {
   const sorted = sortEntries(entries);
@@ -46,6 +47,7 @@ export default function FileColumn({
                 entry={entry}
                 isFocused={entry.path === selectedPath}
                 isPlaying={matchPlaying(entry)}
+                isPlaybackActive={isPlaybackActive}
                 onClick={onClick}
                 onActivate={onActivate}
               />

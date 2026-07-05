@@ -836,6 +836,7 @@
 .barwave span:nth-child(3) { height: 60%; animation-delay: -0.7s; }
 @keyframes barwave-anim { 0%, 100% { transform: scaleY(0.6); } 50% { transform: scaleY(1); } }
 .mle-row.is-now .barwave { display: inline-flex; margin-right: 2px; }
+.barwave.is-paused span { animation: none; }
 
 /* ── Player dock — 画面下張り付きバー / 右下ポップアップ共通 ─── */
 /* 両モードとも常駐チェック用 UI で position: fixed のオーバーレイ。
@@ -877,21 +878,24 @@
 .mle-bar1__expand { color: var(--ink-3); flex-shrink: 0; display: grid; place-items: center; width: 20px; }
 .mle-bar1__body:hover .mle-bar1__expand { color: var(--ink-1); }
 
-/* シークバー（経過/総時間つき）。ポップアップのシーク（track/fill/thumb）と
-   視覚言語を揃える。クリックでポップアップへ切り替わらないよう行全体で伝播を止める。 */
-.mle-bar1__seekrow { display: flex; align-items: center; gap: 8px; margin-top: 3px; }
-.mle-bar1__time {
-  flex-shrink: 0; font-family: var(--font-mono); font-size: 11px; color: var(--ink-3);
-  font-variant-numeric: tabular-nums;
+/* シークバーは要素全体の下辺を使う（DLsite Play 風。スライダーではない）。
+   当たり判定は表示より広く取り、バー最下端（= 画面最下端）まで含める。 */
+.mle-bar1__seek {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 3;
+  height: 18px;
+  display: flex; align-items: flex-end;
+  cursor: pointer;
 }
-.mle-bar1__seek { flex: 1; min-width: 0; padding: 5px 0; cursor: pointer; position: relative; }
-.mle-bar1__seek-track { position: relative; height: 4px; border-radius: 2px; background: var(--paper-3); }
-.mle-bar1__seek-fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--acc); border-radius: 2px; }
-.mle-bar1__seek-thumb {
-  position: absolute; top: 50%; width: 10px; height: 10px; border-radius: 50%;
-  background: var(--paper-1); box-shadow: 0 0 0 1.5px var(--acc), var(--shadow-1);
-  transform: translate(-50%, -50%);
+.mle-bar1__seek-track {
+  position: relative; width: 100%; height: 5px;
+  background: var(--paper-3);
+  transition: height 0.12s ease;
 }
+.mle-bar1__seek:hover .mle-bar1__seek-track,
+.mle-bar1__seek.is-dragging .mle-bar1__seek-track {
+  height: 8px;
+}
+.mle-bar1__seek-fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--acc); }
 .mle-bar1__seek-tooltip,
 .mle-seek-tooltip {
   position: absolute; bottom: 100%; margin-bottom: 8px;
@@ -924,8 +928,9 @@
   box-shadow: var(--shadow-pop);
   padding: 14px;
 }
-/* 最小化（バーへ戻る）/ 最大化（全画面）を隣り合わせに配置 */
-.mle-popup__head { flex-shrink: 0; display: flex; align-items: center; gap: 4px; }
+/* 左に再生中作品への導線、右にサイズ変更系ボタンをまとめる。 */
+.mle-popup__head { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.mle-popup__head-actions { display: flex; align-items: center; gap: 4px; }
 .mle-popup__fold, .mle-popup__headbtn {
   width: 26px; height: 26px; border-radius: 6px;
   display: grid; place-items: center; color: var(--ink-2);
@@ -1034,15 +1039,6 @@
 .mle-popup__tbtn.is-on { color: var(--acc); background: var(--acc-soft); }
 .mle-popup__row { flex-shrink: 0; display: flex; align-items: center; gap: 10px; }
 .mle-popup__volrange { flex: 1; height: 3px; accent-color: var(--ink-2); cursor: pointer; }
-.mle-popup__link {
-  flex-shrink: 0;
-  display: flex; align-items: center; gap: 7px;
-  padding: 8px 8px; border-radius: var(--r-2);
-  font-family: var(--font-sans); font-size: 11.5px; color: var(--ink-2);
-  border-top: 1px solid var(--line-soft); margin-top: 2px;
-}
-.mle-popup__link:hover { background: var(--paper-2); color: var(--ink-0); }
-
 /* ── 共有アイコンボタン / 再生速度ピル（バー・ポップアップ共通） ── */
 
 .mle-icbtn.is-on { color: var(--acc); background: var(--acc-soft); }

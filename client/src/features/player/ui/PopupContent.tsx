@@ -88,8 +88,11 @@ export default function PopupContent({
   return (
     <>
       <div className="mle-popup__head">
-        <IconButton size="sm" icon={I.chevD} label="バーへ戻る" onClick={onFold} />
-        <IconButton size="sm" icon={I.fs} label="全画面プレイヤー" onClick={onExpandFullScreen} />
+        <IconButton size="sm" icon={I.locate} label="再生中の作品を表示" onClick={onShowPlayingWork} />
+        <div className="mle-popup__head-actions">
+          <IconButton size="sm" icon={I.chevD} label="バーへ戻る" onClick={onFold} />
+          <IconButton size="sm" icon={I.fs} label="全画面プレイヤー" onClick={onExpandFullScreen} />
+        </div>
       </div>
 
       <div className="mle-popup__cover-wrap">
@@ -227,9 +230,6 @@ export default function PopupContent({
         />
       </div>
 
-      <div className="mt-[2px] flex justify-center border-t border-line-soft pt-2">
-        <IconButton size="sm" icon={I.locate} label="再生中の作品を表示" onClick={onShowPlayingWork} />
-      </div>
     </>
   );
 }
