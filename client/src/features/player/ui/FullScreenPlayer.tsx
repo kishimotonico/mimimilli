@@ -162,7 +162,8 @@ export default function FullScreenPlayer({
           {tracks.map((t, i) => {
             const isCurrent = i === currentTrackIndex;
             return (
-              <div
+              <button
+                type="button"
                 key={i}
                 onClick={() => onSelectTrack(i)}
                 className={cn(
@@ -184,7 +185,7 @@ export default function FullScreenPlayer({
                 <span className="text-right font-mono text-[10.5px] text-ink-3">
                   {t.end != null && t.start != null ? formatTime(Math.round(t.end - t.start)) : ""}
                 </span>
-              </div>
+              </button>
             );
           })}
         </div>

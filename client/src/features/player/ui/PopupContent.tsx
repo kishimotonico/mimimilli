@@ -160,10 +160,10 @@ export default function PopupContent({
       <div className="mle-popup__meta">
         <div className="mle-popup__track" title={track?.title ?? ""}>{track?.title ?? "—"}</div>
         {formattedError ? (
-          <div className="mle-popup__error" role="status" title={formattedError.details}>
+          <output className="mle-popup__error" title={formattedError.details}>
             <I.err size={11} />
             {formattedError.label}
-          </div>
+          </output>
         ) : (
           <div className="mle-popup__work" title={currentWork?.title ?? ""}>{currentWork?.title ?? ""}</div>
         )}

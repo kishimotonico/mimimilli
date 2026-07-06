@@ -63,7 +63,7 @@ export interface TagComboboxProps {
   suggestions: string[];
   excludeTags?: string[];
   disabled?: boolean;
-  autoFocus?: boolean;
+  focusOnMount?: boolean;
   placeholder?: string;
   label?: string;
   width?: number;
@@ -76,7 +76,7 @@ export default function TagCombobox({
   suggestions,
   excludeTags = [],
   disabled = false,
-  autoFocus = false,
+  focusOnMount = false,
   placeholder = "タグを追加",
   label = "追加するタグ",
   width = 220,
@@ -113,15 +113,16 @@ export default function TagCombobox({
   };
 
   useEffect(() => {
-    if (!autoFocus || disabled) return;
+    if (!focusOnMount || disabled) return;
 
     const frameId = requestAnimationFrame(() => {
       inputRef.current?.focus({ preventScroll: true });
     });
 
     return () => cancelAnimationFrame(frameId);
-  }, [autoFocus, disabled]);
+  }, [focusOnMount, disabled]);
 
+  /* oxlint-disable jsx-a11y/prefer-tag-over-role -- Custom combobox needs ARIA listbox/option semantics and cannot use native select/datalist without changing tag creation behavior. */
   return (
     <div className="relative" style={{ width }}>
       <input
@@ -210,4 +211,5 @@ export default function TagCombobox({
       )}
     </div>
   );
+  /* oxlint-enable jsx-a11y/prefer-tag-over-role */
 }

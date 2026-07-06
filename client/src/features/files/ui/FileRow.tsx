@@ -32,12 +32,11 @@ export default function FileRow({ entry, isFocused, isPlaying, isPlaybackActive,
   ].filter(Boolean).join(" ");
 
   return (
-    <div className={cls} onClick={onClick} onDoubleClick={onActivate} title={entry.name}>
+    <button type="button" className={cls} onClick={onClick} onDoubleClick={onActivate} title={entry.name}>
       <span className="ficon">
         {isPlaying ? (
           <span
             className={`barwave ${isPlaybackActive ? "" : "is-paused"}`}
-            role="img"
             aria-label={isPlaybackActive ? "再生中" : "一時停止中"}
             title={isPlaybackActive ? "再生中" : "一時停止中"}
           >
@@ -51,6 +50,6 @@ export default function FileRow({ entry, isFocused, isPlaying, isPlaybackActive,
       </span>
       <span className="meta">{entry.isDir ? `${entry.childCount}` : formatFileSize(entry.size)}</span>
       <span className="chev">{entry.isDir ? <I.chev size={11} /> : null}</span>
-    </div>
+    </button>
   );
 }

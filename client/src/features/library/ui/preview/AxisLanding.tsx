@@ -43,15 +43,11 @@ export function AxisLanding({
           ].filter(Boolean);
 
           return (
-            <div
+            <button
+              type="button"
               key={w.id}
               className="mll-related__card"
-              role="button"
-              tabIndex={0}
               onClick={() => onSelectWork(w.id)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") onSelectWork(w.id);
-              }}
             >
               <div className="mll-related__cover">
                 <CoverImg id={w.id} title={w.title} hasCover={!!w.coverImage} size={80} radius={6} />
@@ -63,7 +59,7 @@ export function AxisLanding({
               </div>
               <div className="mll-related__title">{w.title}</div>
               {meta.length > 0 && <div className="mll-related__meta">{meta.join(" · ")}</div>}
-            </div>
+            </button>
           );
         })}
       </div>

@@ -14,12 +14,19 @@
     "dev:real": "pnpm -r --parallel --if-present run dev:real",
     "dev:real:server": "pnpm --filter @mimimilli/server dev:real",
     "dev:real:client": "pnpm --filter @mimimilli/client dev:real",
-    "check": "pnpm --filter @mimimilli/shared check && pnpm --filter @mimimilli/server check && pnpm --filter @mimimilli/client check",
+    "lint": "oxlint --deny-warnings client server shared",
+    "fmt": "oxfmt --write .",
+    "fmt:check": "oxfmt --check .",
+    "check": "pnpm --filter @mimimilli/shared check && pnpm --filter @mimimilli/server check && pnpm --filter @mimimilli/client check && pnpm lint && pnpm fmt:check",
     "test": "pnpm --filter @mimimilli/server test && pnpm --filter @mimimilli/client test",
     "smoke:real": "pnpm --filter @mimimilli/server smoke:real",
     "test:server": "pnpm --filter @mimimilli/server test",
     "test:client": "pnpm --filter @mimimilli/client test",
     "test:visual": "pnpm --filter @mimimilli/client test:visual",
     "test:visual:update": "pnpm --filter @mimimilli/client test:visual:update"
+  },
+  "devDependencies": {
+    "oxfmt": "^0.57.0",
+    "oxlint": "^1.72.0"
   }
 }

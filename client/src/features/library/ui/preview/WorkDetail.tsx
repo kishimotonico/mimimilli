@@ -85,6 +85,7 @@ export function WorkDetail({
   const [editError, setEditError] = useState<string | null>(null);
   const tagPopoverRef = useRef<HTMLDivElement | null>(null);
   const actionPopoverRef = useRef<HTMLDivElement | null>(null);
+  const titleInputRef = useRef<HTMLInputElement | null>(null);
 
   const structuredTags = useMemo(
     () => work.tags.filter((tag) => parseTag(tag).kind !== "flat"),
@@ -102,6 +103,11 @@ export function WorkDetail({
     ],
     [tagSuggestions]
   );
+
+  useEffect(() => {
+    if (actionPopoverMode !== "title") return;
+    titleInputRef.current?.focus({ preventScroll: true });
+  }, [actionPopoverMode]);
 
   useEffect(() => {
     if (!isTagPopoverOpen) return;
@@ -358,7 +364,7 @@ export function WorkDetail({
                     }}
                   >
                     <TagCombobox
-                      autoFocus
+                      focusOnMount
                       width={tagPopoverLayout.width}
                       suggestions={flatTagSuggestions}
                       excludeTags={editableFlatTags}
@@ -469,7 +475,7 @@ export function WorkDetail({
                       }}
                     >
                       <input
-                        autoFocus
+                        ref={titleInputRef}
                         className="h-8 w-full rounded-[6px] border border-line bg-paper-1 px-2.5 font-jp text-[12px] text-ink-0 placeholder:text-ink-4 focus:border-acc focus:outline-none focus:ring-2 focus:ring-acc-soft"
                         value={titleDraft}
                         aria-label="作品タイトル"
@@ -532,9 +538,11 @@ export function WorkDetail({
           </div>
           <div className="mle-prv__tracks">
             {tracks.map((tr, i) => (
-              <div
+              <button
+                type="button"
                 key={i}
                 className={`mle-prv__trk ${playingTrackIndex === i ? "is-now" : ""} ${hasResume && work.resumeTrackIndex === i ? "is-resume" : ""} ${!isPlayable ? "is-disabled" : ""}`}
+                disabled={!isPlayable}
                 onClick={() => { if (isPlayable) onPlay(i); }}
               >
                 <span className="num">{String(i + 1).padStart(2, "0")}</span>
@@ -548,11 +556,11 @@ export function WorkDetail({
                   <span className="dur">{formatDuration(Math.round(tr.end - tr.start))}</span>
                 )}
                 <div className="src">
-                  <button className="mle-icbtn" title="再生" disabled={!isPlayable} aria-disabled={!isPlayable}>
+                  <span className="mle-icbtn" title="再生" aria-disabled={!isPlayable}>
                     <I.play size={11} />
-                  </button>
+                  </span>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </>

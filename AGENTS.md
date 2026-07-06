@@ -21,6 +21,7 @@
 - 既存仕様や要件も柔軟に変更OK。必要に応じて仕様を見直し、より良い設計を追求する
 - 場当たり的、その場しのぎの修正は禁止。工数がかかっても本質的に改善する
 - フロントエンド（`client/`）の見た目・操作系を触るときは `docs/design-system.md` の規約（カラートークン・テーマ・z-index・motion 等）に従う。レイアウトの正は実装
+- 共通のDefinition of Doneは、typecheck・lint・fmt:check・テストがすべて通ること。該当する変更では `pnpm check` と `pnpm test` を確認する
 
 ## デバッグ方法
 

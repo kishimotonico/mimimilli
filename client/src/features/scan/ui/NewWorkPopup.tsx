@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import type { ScanResult, WorkSummary } from "@mimimilli/shared";
 import { getAllWorks, patchWork } from "../../../entities/work/api";
 
@@ -24,6 +24,7 @@ const NewWorkPopup: React.FC<NewWorkPopupProps> = ({ scanResult, onClose }) => {
   const [newWorks, setNewWorks] = useState<WorkSummary[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
+  const titleInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -42,6 +43,11 @@ const NewWorkPopup: React.FC<NewWorkPopupProps> = ({ scanResult, onClose }) => {
     }
   }, [scanResult.newWorkIds]);
 
+  useEffect(() => {
+    if (!editingId) return;
+    titleInputRef.current?.focus({ preventScroll: true });
+  }, [editingId]);
+
   const handleStartEdit = (work: WorkSummary) => {
     setEditingId(work.id);
     setEditTitle(work.title);
@@ -57,6 +63,7 @@ const NewWorkPopup: React.FC<NewWorkPopupProps> = ({ scanResult, onClose }) => {
     setEditingId(null);
   };
 
+  /* oxlint-disable jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions, jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/prefer-tag-over-role -- Backdrop click closes the popup, and the dialog stops backdrop clicks without changing modal positioning/focus behavior. */
   return (
     <div
       onClick={onClose}
@@ -156,7 +163,7 @@ const NewWorkPopup: React.FC<NewWorkPopupProps> = ({ scanResult, onClose }) => {
                   </span>
                   {editingId === work.id ? (
                     <input
-                      autoFocus
+                      ref={titleInputRef}
                       value={editTitle}
                       onChange={(e) => setEditTitle(e.target.value)}
                       onBlur={() => handleSaveTitle(work.id)}
@@ -176,7 +183,8 @@ const NewWorkPopup: React.FC<NewWorkPopupProps> = ({ scanResult, onClose }) => {
                       }}
                     />
                   ) : (
-                    <span
+                    <button
+                      type="button"
                       onClick={() => handleStartEdit(work)}
                       style={{
                         flex: 1,
@@ -185,11 +193,16 @@ const NewWorkPopup: React.FC<NewWorkPopupProps> = ({ scanResult, onClose }) => {
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                         whiteSpace: "nowrap",
+                        background: "none",
+                        border: "none",
+                        color: "inherit",
+                        padding: 0,
+                        textAlign: "left",
                       }}
                       title="クリックしてタイトルを編集"
                     >
                       {work.title}
-                    </span>
+                    </button>
                   )}
                   <span
                     style={{
@@ -226,6 +239,7 @@ const NewWorkPopup: React.FC<NewWorkPopupProps> = ({ scanResult, onClose }) => {
       </div>
     </div>
   );
+  /* oxlint-enable jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions, jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/prefer-tag-over-role */
 };
 
 function StatBadge({

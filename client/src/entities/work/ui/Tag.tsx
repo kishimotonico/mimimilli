@@ -33,10 +33,11 @@ const REMOVE_BUTTON =
 
 export default function Tag({ tag, onRemove, onClick }: TagProps) {
   const parsed = parseTag(tag);
+  const tagClass = cn(TAG_BASE, onClick && "cursor-pointer");
 
   if (parsed.kind === "flat") {
-    return (
-      <span className={cn(TAG_BASE, onClick && "cursor-pointer")} onClick={onClick}>
+    const content = (
+      <>
         {parsed.value}
         {onRemove && (
           <button
@@ -45,6 +46,20 @@ export default function Tag({ tag, onRemove, onClick }: TagProps) {
             onClick={(e) => { e.stopPropagation(); onRemove(); }}
           >×</button>
         )}
+      </>
+    );
+
+    if (onClick && !onRemove) {
+      return (
+        <button type="button" className={tagClass} onClick={onClick}>
+          {content}
+        </button>
+      );
+    }
+
+    return (
+      <span className={tagClass}>
+        {content}
       </span>
     );
   }
@@ -52,8 +67,8 @@ export default function Tag({ tag, onRemove, onClick }: TagProps) {
   const catLabel = CAT_LABELS[parsed.prefix] ?? parsed.prefix.toUpperCase().slice(0, 4);
   const catClass = CAT_CLASSES[parsed.prefix] ?? "text-cat";
 
-  return (
-    <span className={cn(TAG_BASE, onClick && "cursor-pointer")} onClick={onClick}>
+  const content = (
+    <>
       <span className="font-mono text-[9.5px] uppercase text-ink-3">{catLabel}</span>
       <span className={cn("font-medium", catClass)}>{parsed.value}</span>
       {onRemove && (
@@ -63,6 +78,20 @@ export default function Tag({ tag, onRemove, onClick }: TagProps) {
           onClick={(e) => { e.stopPropagation(); onRemove(); }}
         >×</button>
       )}
+    </>
+  );
+
+  if (onClick && !onRemove) {
+    return (
+      <button type="button" className={tagClass} onClick={onClick}>
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <span className={tagClass}>
+      {content}
     </span>
   );
 }

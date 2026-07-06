@@ -37,6 +37,7 @@ export default function SettingsModal({
   return (
     <>
       {/* Backdrop */}
+      {/* oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- Backdrop click closes the modal; Escape handling is registered above. */}
       <div
         style={{ position: "fixed", inset: 0, zIndex: 40, background: "oklch(20% 0.020 70 / 0.3)" }}
         onClick={onClose}
@@ -68,9 +69,9 @@ export default function SettingsModal({
         <div style={{ padding: "18px 18px 8px", display: "flex", flexDirection: "column", gap: 18 }}>
           {/* Root folder */}
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <label style={{ fontFamily: "var(--font-sans)", fontSize: 10.5, fontWeight: 600, letterSpacing: "0.08em", color: "var(--ink-3)", textTransform: "uppercase" }}>
+            <span style={{ fontFamily: "var(--font-sans)", fontSize: 10.5, fontWeight: 600, letterSpacing: "0.08em", color: "var(--ink-3)", textTransform: "uppercase" }}>
               ルートフォルダー
-            </label>
+            </span>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <div style={{ flex: 1, height: 34, padding: "0 12px", background: "var(--paper-0)", border: "1px solid var(--line-soft)", borderRadius: 6, display: "flex", alignItems: "center", gap: 8, overflow: "hidden" }}>
                 <I.folder size={13} style={{ color: "var(--ink-3)", flexShrink: 0 }} />
@@ -89,9 +90,9 @@ export default function SettingsModal({
 
           {/* Scan */}
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <label style={{ fontFamily: "var(--font-sans)", fontSize: 10.5, fontWeight: 600, letterSpacing: "0.08em", color: "var(--ink-3)", textTransform: "uppercase" }}>
+            <span style={{ fontFamily: "var(--font-sans)", fontSize: 10.5, fontWeight: 600, letterSpacing: "0.08em", color: "var(--ink-3)", textTransform: "uppercase" }}>
               スキャン
-            </label>
+            </span>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ flex: 1, fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--ink-2)" }}>
                 最終スキャン: {formatDate(lastScanTime)}
@@ -108,9 +109,9 @@ export default function SettingsModal({
 
           {/* Export */}
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <label style={{ fontFamily: "var(--font-sans)", fontSize: 10.5, fontWeight: 600, letterSpacing: "0.08em", color: "var(--ink-3)", textTransform: "uppercase" }}>
+            <span style={{ fontFamily: "var(--font-sans)", fontSize: 10.5, fontWeight: 600, letterSpacing: "0.08em", color: "var(--ink-3)", textTransform: "uppercase" }}>
               データ
-            </label>
+            </span>
             <button
               onClick={onExport}
               style={{ alignSelf: "flex-start", height: 34, padding: "0 14px", borderRadius: 6, border: "1px solid var(--line)", background: "var(--paper-1)", color: "var(--ink-1)", fontFamily: "var(--font-sans)", fontSize: 12, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}

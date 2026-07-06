@@ -42,7 +42,8 @@ interface AxisColumnProps {
 function AxisRowItem({ ax, isActive, onSelect }: { ax: AxisRow; isActive: boolean; onSelect: () => void }) {
   const Ic = (I as Record<string, (p: { size?: number }) => React.ReactElement>)[ax.icon] ?? I.folder;
   return (
-    <div
+    <button
+      type="button"
       className={`mll-axis ${isActive ? "is-on" : ""}`}
       onClick={onSelect}
     >
@@ -51,7 +52,7 @@ function AxisRowItem({ ax, isActive, onSelect }: { ax: AxisRow; isActive: boolea
       {ax.badge != null && <span className="badge">{ax.badge}</span>}
       {ax.count != null && <span className="count">{ax.count}</span>}
       {!ax.isAction && <span className="chev"><I.chev size={11} /></span>}
-    </div>
+    </button>
   );
 }
 
@@ -105,10 +106,10 @@ export default function AxisColumn({
               onSelect={() => onSelectAxis(`smart-${sf.id}` as AxisId)}
             />
           ))}
-          <div className="mll-axis is-action" onClick={onNewSmartFolder}>
+          <button type="button" className="mll-axis is-action" onClick={onNewSmartFolder}>
             <span className="ic"><I.add size={14} /></span>
             <span className="nm">+ 新規スマートフォルダー</span>
-          </div>
+          </button>
         </div>
       </div>
     </div>

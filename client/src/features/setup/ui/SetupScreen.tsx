@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { I } from "../../../shared/ui/Icon";
 
 interface SetupScreenProps {
@@ -8,6 +8,12 @@ interface SetupScreenProps {
 
 export default function SetupScreen({ onComplete, scanning }: SetupScreenProps) {
   const [path, setPath] = useState("");
+  const pathInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (scanning) return;
+    pathInputRef.current?.focus({ preventScroll: true });
+  }, [scanning]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,11 +50,11 @@ export default function SetupScreen({ onComplete, scanning }: SetupScreenProps) 
           <div style={{ display: "flex", alignItems: "center", gap: 8, height: 40, padding: "0 14px", background: "var(--paper-1)", border: "1px solid var(--line)", borderRadius: 8 }}>
             <I.folder size={14} style={{ color: "var(--ink-3)", flexShrink: 0 }} />
             <input
+              ref={pathInputRef}
               value={path}
               onChange={(e) => setPath(e.target.value)}
               placeholder="/Users/yourname/Music/ASMR"
               style={{ flex: 1, fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--ink-0)", background: "none", border: "none", outline: "none" }}
-              autoFocus
               disabled={scanning}
             />
           </div>

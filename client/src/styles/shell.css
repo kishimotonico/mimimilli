@@ -22,7 +22,9 @@
    問答無用で潰してしまう。base レイヤーに収めて utilities より弱くする（他の mle-/mll- ルールは
    unlayered のまま = 現状の優先関係を維持）。 */
 @layer base {
-  .mle-app button { font: inherit; color: inherit; background: transparent; border: 0; cursor: pointer; padding: 0; }
+  /* text-align: inherit は UA 既定の center を打ち消す。行系UI（mll-axis / mll-wrow / mle-row 等）を
+     a11y 対応で div→button 化しても左寄せレイアウトが崩れないようにする。 */
+  .mle-app button { font: inherit; color: inherit; background: transparent; border: 0; cursor: pointer; padding: 0; text-align: inherit; }
 }
 .mle-app input  { font: inherit; color: inherit; background: transparent; border: 0; outline: 0; padding: 0; }
 .mle-app a      { color: inherit; text-decoration: none; }

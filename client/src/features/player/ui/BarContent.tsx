@@ -31,6 +31,7 @@ export default function BarContent({ state, onTogglePlay, onSeek, onSwitchToPopu
 
   return (
     <>
+      {/* oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- Wrapper contains the play button; making it a button would nest interactive controls. */}
       <div className="mle-bar1__body" onClick={onSwitchToPopup}>
         <div className="mle-bar1__cover">
           {currentWork && (
@@ -41,10 +42,10 @@ export default function BarContent({ state, onTogglePlay, onSeek, onSwitchToPopu
         <div className="mle-bar1__meta">
           <span className="mle-bar1__track" title={track?.title ?? ""}>{track?.title ?? "—"}</span>
           {formattedError ? (
-            <span className="mle-bar1__error" role="status" title={formattedError.details}>
+            <output className="mle-bar1__error" title={formattedError.details}>
               <I.err size={11} />
               {formattedError.label}
-            </span>
+            </output>
           ) : (
             <span className="mle-bar1__work" title={currentWork?.title ?? ""}>{currentWork?.title ?? ""}</span>
           )}

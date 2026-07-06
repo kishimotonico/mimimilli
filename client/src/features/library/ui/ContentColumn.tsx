@@ -91,7 +91,8 @@ export default function ContentColumn({
             <EmptyState message="タグがありません" />
           ) : (
             facetItems.map((item) => (
-              <div
+              <button
+                type="button"
                 key={item.value}
                 className={`mll-tagrow ${selectedTags.includes(item.value) ? "is-checked" : ""}`}
                 onClick={() => onTagToggle(item.value)}
@@ -101,7 +102,7 @@ export default function ContentColumn({
                 </div>
                 <span className="nm">{item.value}</span>
                 <span className="count">{item.count}</span>
-              </div>
+              </button>
             ))
           )}
         </div>
@@ -127,7 +128,8 @@ export default function ContentColumn({
             <EmptyState message="項目がありません" />
           ) : (
             facetItems.map((item) => (
-              <div
+              <button
+                type="button"
                 key={item.value}
                 className="mll-erow"
                 onClick={() => onDrillSelect(item.value)}
@@ -143,7 +145,7 @@ export default function ContentColumn({
                 </span>
                 <span className="nm">{item.value}</span>
                 <span className="count">{item.count}</span>
-              </div>
+              </button>
             ))
           )}
         </div>

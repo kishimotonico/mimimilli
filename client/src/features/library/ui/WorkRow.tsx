@@ -28,7 +28,7 @@ export default function WorkRow({ work, isSelected, isPlaying, isPlaybackActive,
     : null;
 
   return (
-    <div className={`mll-wrow ${isSelected ? "is-on" : ""}`} onClick={onSelect}>
+    <button type="button" className={`mll-wrow ${isSelected ? "is-on" : ""}`} onClick={onSelect}>
       <div className="mll-wrow__cv">
         <CoverImg id={work.id} title={work.title} hasCover={!!work.coverImage} size={32} radius={4} />
       </div>
@@ -47,7 +47,6 @@ export default function WorkRow({ work, isSelected, isPlaying, isPlaybackActive,
         {isPlaying && (
           <span
             className="now inline-flex items-center gap-[1px]"
-            role="img"
             aria-label={isPlaybackActive ? "再生中" : "一時停止中"}
             title={isPlaybackActive ? "再生中" : "一時停止中"}
           >
@@ -66,6 +65,6 @@ export default function WorkRow({ work, isSelected, isPlaying, isPlaybackActive,
         )}
         {!isPlaying && work.bookmarked && <span className="fav"><I.starF size={10} /></span>}
       </div>
-    </div>
+    </button>
   );
 }
