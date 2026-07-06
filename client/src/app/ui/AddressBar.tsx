@@ -33,6 +33,7 @@ export default function AddressBar({
 }: AddressBarProps) {
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
+  const currentSortLabel = SORT_OPTIONS.find((opt) => opt.id === sort)?.label;
 
   useEffect(() => {
     if (!sortMenuOpen) return;
@@ -113,16 +114,18 @@ export default function AddressBar({
             size="sm"
             icon={I.sort}
             label="並び替え"
+            title={currentSortLabel ? `並び替え: ${currentSortLabel}` : "並び替え"}
             active={sortMenuOpen}
             aria-haspopup="menu"
             aria-expanded={sortMenuOpen}
             onClick={() => setSortMenuOpen((v) => !v)}
           />
           {sortMenuOpen && (
-            <div className="mle-sortmenu__pop" role="menu">
+            <div className="mle-sortmenu__pop" role="menu" aria-label="並び替え">
               {SORT_OPTIONS.map((opt) => (
                 <button
                   key={opt.id}
+                  type="button"
                   role="menuitemradio"
                   aria-checked={sort === opt.id}
                   className={`mle-sortmenu__item ${sort === opt.id ? "is-checked" : ""}`}
@@ -131,9 +134,7 @@ export default function AddressBar({
                     setSortMenuOpen(false);
                   }}
                 >
-                  <span className="check">
-                    {sort === opt.id && <I.x size={9} style={{ transform: "rotate(45deg)" }} />}
-                  </span>
+                  <span className="check">{sort === opt.id && <I.check size={14} />}</span>
                   <span className="label">{opt.label}</span>
                 </button>
               ))}

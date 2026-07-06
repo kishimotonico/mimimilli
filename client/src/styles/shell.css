@@ -262,20 +262,17 @@
   color: var(--ink-0);
 }
 .mle-sortmenu__item.is-checked {
-  color: var(--ink-0);
+  background: var(--acc-soft);
+  color: var(--acc-ink);
   font-weight: 600;
 }
 .mle-sortmenu__item .check {
-  width: 14px;
+  width: 16px;
   height: 14px;
-  border-radius: 3px;
   flex-shrink: 0;
   display: grid;
   place-items: center;
-  color: var(--paper-1);
-}
-.mle-sortmenu__item.is-checked .check {
-  background: var(--ink-0);
+  color: var(--acc);
 }
 
 /* ── Left nav (sidebar) ───────────────────────────────────── */
