@@ -200,7 +200,9 @@ export default function TagCombobox({
                 onClick={() => commitOption(option)}
               >
                 {option.kind === "create" ? (
-                  <span><span className="font-medium">"{option.value}"</span> を新規作成</span>
+                  <span>
+                    <span className="font-medium">"{option.value}"</span> を新規作成
+                  </span>
                 ) : (
                   <span>{option.value}</span>
                 )}

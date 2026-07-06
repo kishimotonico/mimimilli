@@ -1,7 +1,7 @@
 {
   "name": "@mimimilli/client",
-  "private": true,
   "version": "0.1.0",
+  "private": true,
   "type": "module",
   "scripts": {
     "dev": "cross-env PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run --name mimi vite",

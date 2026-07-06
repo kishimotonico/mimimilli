@@ -85,7 +85,7 @@ export function openDb(dbPath: string): Db {
   if (current !== 0 && current !== SCHEMA_VERSION) {
     throw new Error(
       `DB スキーマバージョン不一致（DB: v${current}, アプリ: v${SCHEMA_VERSION}）。` +
-        `キャッシュ DB を削除して再スキャンしてください: ${dbPath}`
+        `キャッシュ DB を削除して再スキャンしてください: ${dbPath}`,
     );
   }
   sqlite.exec(DDL);

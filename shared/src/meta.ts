@@ -15,7 +15,10 @@ export const metaFileSchema = z
     createdAt: z.iso.datetime({ offset: true }).optional(),
   })
   .superRefine((meta, ctx) => {
-    if (meta.defaultPlaylist && !meta.playlists.some((playlist) => playlist.name === meta.defaultPlaylist)) {
+    if (
+      meta.defaultPlaylist &&
+      !meta.playlists.some((playlist) => playlist.name === meta.defaultPlaylist)
+    ) {
       ctx.addIssue({
         code: "custom",
         path: ["defaultPlaylist"],

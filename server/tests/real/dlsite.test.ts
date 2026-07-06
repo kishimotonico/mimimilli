@@ -29,7 +29,10 @@ test("parseDlsiteHtml: HANDOFF.md のセレクタで各情報を抽出する", (
   assert.equal(info.circle, "夜想曲");
   assert.deepEqual(info.cvs, ["水瀬なずな", "早乙女しおん"]);
   assert.deepEqual(info.genreTags, ["耳かき", "バイノーラル"]);
-  assert.equal(info.coverUrl, "https://img.dlsite.jp/modpub/images2/work/doujin/RJ900000/RJ899999_img_main.jpg");
+  assert.equal(
+    info.coverUrl,
+    "https://img.dlsite.jp/modpub/images2/work/doujin/RJ900000/RJ899999_img_main.jpg",
+  );
   assert.equal(info.url, "https://www.dlsite.com/maniax/work/=/product_id/RJ899999.html");
 });
 
@@ -59,7 +62,13 @@ test("mergeDlsiteTags: prefix 変換と重複排除", () => {
     url: "",
   };
   const merged = mergeDlsiteTags(["サークル/夜想曲", "cv/水瀬なずな", "バイノーラル"], info);
-  assert.deepEqual(merged, ["サークル/夜想曲", "cv/水瀬なずな", "バイノーラル", "cv/新CV", "genre/耳かき"]);
+  assert.deepEqual(merged, [
+    "サークル/夜想曲",
+    "cv/水瀬なずな",
+    "バイノーラル",
+    "cv/新CV",
+    "genre/耳かき",
+  ]);
 });
 
 test("dlsiteApply: タグマージとメタ書き戻し（カバー DL なし）", async () => {
@@ -92,9 +101,11 @@ test("dlsiteApply: タグマージとメタ書き戻し（カバー DL なし）
   // 既存タグの重複なし
   assert.equal(work?.tags.filter((t) => t === "cv/水瀬なずな").length, 1);
 
-  const meta = JSON.parse(
-    readFileSync(join(work!.physicalPath, ".meta.json"), "utf-8")
-  ) as { title: string; tags: string[]; urls: { label: string; url: string }[] };
+  const meta = JSON.parse(readFileSync(join(work!.physicalPath, ".meta.json"), "utf-8")) as {
+    title: string;
+    tags: string[];
+    urls: { label: string; url: string }[];
+  };
   assert.equal(meta.title, "DLsite から取得したタイトル");
   assert.deepEqual(meta.tags, work!.tags);
   assert.deepEqual(work?.urls, [{ label: "DLsite", url: info.url }]);

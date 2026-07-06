@@ -20,9 +20,12 @@ function stateClass(variant: ButtonVariant, active: boolean, disabled: boolean):
   }
   if (active) return "bg-acc-soft text-acc-ink";
   switch (variant) {
-    case "primary": return "bg-ink-0 text-paper-1 hover:bg-acc";
-    case "ghost": return "bg-paper-2 text-ink-1 hover:bg-paper-3 hover:text-ink-0";
-    case "quiet": return "bg-transparent text-ink-2 hover:bg-paper-2 hover:text-ink-0";
+    case "primary":
+      return "bg-ink-0 text-paper-1 hover:bg-acc";
+    case "ghost":
+      return "bg-paper-2 text-ink-1 hover:bg-paper-3 hover:text-ink-0";
+    case "quiet":
+      return "bg-transparent text-ink-2 hover:bg-paper-2 hover:text-ink-0";
   }
 }
 

@@ -17,7 +17,7 @@ const AXIS_LABELS: Partial<Record<AxisId, string>> = {
 
 export function getAxisLandingPresentation(
   axis: AxisId,
-  isFilterApplied: boolean
+  isFilterApplied: boolean,
 ): AxisLandingPresentation {
   const axisLabel = AXIS_LABELS[axis] ?? axis;
 

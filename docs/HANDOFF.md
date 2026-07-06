@@ -59,6 +59,7 @@ MIMIMILLI_ADAPTER=fixture PORT=18099 node server/src/index.ts
 ```
 
 ビジュアルテストの注意:
+
 - スナップショットは**必ず Playwright で生成**する（agent-browser で撮った画像はレンダリングが違い、CI 比較で落ちる）
 - パネル等の**要素単位**で `toHaveScreenshot` する。`fullPage` は半透明オーバーレイ越しの背景差分が `maxDiffPixelRatio` で薄まり**偽パス**になる（scan結果ダイアログで実際に踏んだ。`role=dialog` 要素を撮る形に修正済み）
 - 共有 fixture 状態に依存するため直列実行が前提（`playwright.config.ts`: workers:1 / fullyParallel:false / retries:2 / maxDiffPixelRatio 0.03）
@@ -67,32 +68,33 @@ MIMIMILLI_ADAPTER=fixture PORT=18099 node server/src/index.ts
 
 すべて `/api` 配下。リクエスト/レスポンスは `shared/src/*.ts` の Zod スキーマが正典。エラーは `{ error: { code, message } }`（`apiErrorSchema`）。**下表はあくまで概観で、エンドポイントを追加・変更したときに更新漏れしうる。実装時は必ず `shared/src/` を直接確認すること。**
 
-| メソッド | パス | 備考 |
-|---|---|---|
-| GET / PUT | `/settings` | |
-| POST | `/scan` | |
-| GET | `/works` | **ページングエンベロープ `{ items, total }`**（page/limit省略時は全件） |
-| GET | `/works/:id` | 完全な Work（playlists・resumePosition・resumeTrackIndex 含む） |
-| PATCH | `/works/:id` | `{ title?, tags?, bookmarked? }` を統合（旧 PUT tags/title・POST bookmark を廃止） |
-| POST | `/works/:id/resume` | `{ position, trackIndex }`（高頻度のため PATCH と分離） |
-| POST | `/works/:id/last-played` | |
-| GET | `/works/:id/files` | 物理ファイルツリー |
-| GET | `/tags` | フラット/構造化タグの一覧 |
-| POST | `/export` | `{ data }`（JSON文字列） |
-| GET | `/axes/:axis` | ファセット集計（circle/cv/series/cat/tag/year） |
-| GET/POST | `/smart-folders` | |
-| PUT/DELETE | `/smart-folders/:id` | |
-| GET | `/smart-folders/:id/works` | スマートフォルダー評価結果 |
-| GET/POST | `/presets`、DELETE `/presets/:id` | 検索プリセット |
-| GET | `/fs` | 物理FSブラウズ（Filesモード） |
-| GET | `/media/cover/:id`、`/media/audio/:id/:path`、`/media/file/:id/:path` | audio は Range(206) 対応 |
-| POST | `/dlsite/:id/fetch`、`/dlsite/:id/apply` | |
+| メソッド   | パス                                                                  | 備考                                                                               |
+| ---------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| GET / PUT  | `/settings`                                                           |                                                                                    |
+| POST       | `/scan`                                                               |                                                                                    |
+| GET        | `/works`                                                              | **ページングエンベロープ `{ items, total }`**（page/limit省略時は全件）            |
+| GET        | `/works/:id`                                                          | 完全な Work（playlists・resumePosition・resumeTrackIndex 含む）                    |
+| PATCH      | `/works/:id`                                                          | `{ title?, tags?, bookmarked? }` を統合（旧 PUT tags/title・POST bookmark を廃止） |
+| POST       | `/works/:id/resume`                                                   | `{ position, trackIndex }`（高頻度のため PATCH と分離）                            |
+| POST       | `/works/:id/last-played`                                              |                                                                                    |
+| GET        | `/works/:id/files`                                                    | 物理ファイルツリー                                                                 |
+| GET        | `/tags`                                                               | フラット/構造化タグの一覧                                                          |
+| POST       | `/export`                                                             | `{ data }`（JSON文字列）                                                           |
+| GET        | `/axes/:axis`                                                         | ファセット集計（circle/cv/series/cat/tag/year）                                    |
+| GET/POST   | `/smart-folders`                                                      |                                                                                    |
+| PUT/DELETE | `/smart-folders/:id`                                                  |                                                                                    |
+| GET        | `/smart-folders/:id/works`                                            | スマートフォルダー評価結果                                                         |
+| GET/POST   | `/presets`、DELETE `/presets/:id`                                     | 検索プリセット                                                                     |
+| GET        | `/fs`                                                                 | 物理FSブラウズ（Filesモード）                                                      |
+| GET        | `/media/cover/:id`、`/media/audio/:id/:path`、`/media/file/:id/:path` | audio は Range(206) 対応                                                           |
+| POST       | `/dlsite/:id/fetch`、`/dlsite/:id/apply`                              |                                                                                    |
 
 メディアURLは client の `entities/work/api.ts` の `getCoverImageUrl`/`getAudioUrl`/`getFileUrl` が組み立てる（`<img src>`/`<audio src>` に直接使える）。
 
 ### タグの構造（編集時に注意）
 
 `work.tags` には2種が混在する:
+
 - 構造化タグ（プレフィックス付き）: `cv/水瀬なずな`、`サークル/月白製作所`、`シリーズ/...`、`カテゴリ/...` — 分類軸／ファセットの素
 - フラットタグ: `ASMR`、`癒し系` 等の自由タグ
 

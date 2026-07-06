@@ -58,8 +58,11 @@ test("メタ書き戻し失敗時は DB の title / tags もロールバック�
   rmSync(metaPath);
 
   await assert.rejects(
-    adapter.patchWork(existingWorkId, { title: "反映されないタイトル", tags: ["反映されないタグ"] }),
-    /ENOENT/
+    adapter.patchWork(existingWorkId, {
+      title: "反映されないタイトル",
+      tags: ["反映されないタグ"],
+    }),
+    /ENOENT/,
   );
 
   const after = await adapter.getWork(existingWorkId);

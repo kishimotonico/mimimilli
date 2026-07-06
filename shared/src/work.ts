@@ -69,7 +69,7 @@ export const fileEntrySchema: z.ZodType<FileEntry> = z.lazy(() =>
     size: z.number(),
     fileType: z.string(),
     children: z.array(fileEntrySchema),
-  })
+  }),
 );
 
 // ── タグ解析 ──────────────────────────────────────────────────

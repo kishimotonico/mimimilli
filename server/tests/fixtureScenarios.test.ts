@@ -61,5 +61,8 @@ test("errors: エラー・行方不明の作品のみが含まれる", async () 
 });
 
 test("不明なシナリオIDはエラーになる（黙って default にフォールバックしない）", () => {
-  assert.throws(() => createFixtureAdapter({ scenario: "no-such-scenario" }), /不明な MIMIMILLI_MOCK_SCENARIO/);
+  assert.throws(
+    () => createFixtureAdapter({ scenario: "no-such-scenario" }),
+    /不明な MIMIMILLI_MOCK_SCENARIO/,
+  );
 });

@@ -12,7 +12,13 @@ interface WorkRowProps {
   onSelect: () => void;
 }
 
-export default function WorkRow({ work, isSelected, isPlaying, isPlaybackActive, onSelect }: WorkRowProps) {
+export default function WorkRow({
+  work,
+  isSelected,
+  isPlaying,
+  isPlaybackActive,
+  onSelect,
+}: WorkRowProps) {
   const circleTag = work.tags.find((t) => t.startsWith("サークル/") || t.startsWith("circle/"));
   const circleValue = circleTag ? circleTag.split("/")[1] : null;
 
@@ -20,17 +26,27 @@ export default function WorkRow({ work, isSelected, isPlaying, isPlaybackActive,
     circleValue,
     work.trackCount > 0 ? `${work.trackCount}tr` : null,
     work.totalDurationSec > 0 ? formatDuration(work.totalDurationSec) : null,
-  ].filter(Boolean).join(" · ");
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   const statusLabel =
-    work.status === "missing" ? "ファイル欠損"
-    : work.status === "error" ? "メタ読み込みエラー"
-    : null;
+    work.status === "missing"
+      ? "ファイル欠損"
+      : work.status === "error"
+        ? "メタ読み込みエラー"
+        : null;
 
   return (
     <button type="button" className={`mll-wrow ${isSelected ? "is-on" : ""}`} onClick={onSelect}>
       <div className="mll-wrow__cv">
-        <CoverImg id={work.id} title={work.title} hasCover={!!work.coverImage} size={32} radius={4} />
+        <CoverImg
+          id={work.id}
+          title={work.title}
+          hasCover={!!work.coverImage}
+          size={32}
+          radius={4}
+        />
       </div>
       <div className="mll-wrow__body">
         <span className="mll-wrow__title">
@@ -63,7 +79,11 @@ export default function WorkRow({ work, isSelected, isPlaying, isPlaybackActive,
             ))}
           </span>
         )}
-        {!isPlaying && work.bookmarked && <span className="fav"><I.starF size={10} /></span>}
+        {!isPlaying && work.bookmarked && (
+          <span className="fav">
+            <I.starF size={10} />
+          </span>
+        )}
       </div>
     </button>
   );

@@ -21,16 +21,19 @@ export interface AudioEngineError {
 
 export interface AudioEngine {
   /** トラックを読み込み再生開始する。pendingSeekSec > 0 のとき metadata 取得後にシークする。 */
-  load: (url: string, opts: {
-    playbackRate: number;
-    startSec?: number;
-    pendingSeekSec?: number;
-  }) => () => void; // クリーンアップ関数を返す
+  load: (
+    url: string,
+    opts: {
+      playbackRate: number;
+      startSec?: number;
+      pendingSeekSec?: number;
+    },
+  ) => () => void; // クリーンアップ関数を返す
   play: () => void;
   pause: () => void;
   seek: (time: number) => void;
   seekRelative: (delta: number) => void;
-  setVolume: (vol: number) => void;         // 0-100
+  setVolume: (vol: number) => void; // 0-100
   setPlaybackRate: (rate: number) => void;
   setChannelSwap: (enabled: boolean) => void;
   resumeAudioContext: () => void;
@@ -40,8 +43,8 @@ export interface AudioEngine {
 }
 
 export function createAudioEngine(
-  initialVolume: number,   // 0-100
-  callbacks: AudioEngineCallbacks
+  initialVolume: number, // 0-100
+  callbacks: AudioEngineCallbacks,
 ): AudioEngine {
   const audio = new Audio();
   audio.volume = initialVolume / 100;

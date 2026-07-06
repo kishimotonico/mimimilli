@@ -18,7 +18,12 @@ interface BarContentProps {
   onSwitchToPopup: () => void;
 }
 
-export default function BarContent({ state, onTogglePlay, onSeek, onSwitchToPopup }: BarContentProps) {
+export default function BarContent({
+  state,
+  onTogglePlay,
+  onSeek,
+  onSwitchToPopup,
+}: BarContentProps) {
   // currentTime / duration は高頻度 atom から直接読む（App.tsx を re-render させない）
   const currentTime = useAtomValue(playerCurrentTimeAtom);
   const duration = useAtomValue(playerDurationAtom);
@@ -35,26 +40,39 @@ export default function BarContent({ state, onTogglePlay, onSeek, onSwitchToPopu
       <div className="mle-bar1__body" onClick={onSwitchToPopup}>
         <div className="mle-bar1__cover">
           {currentWork && (
-            <CoverImg id={currentWork.id} title={currentWork.title} hasCover={!!currentWork.coverImage} size={46} radius={6} />
+            <CoverImg
+              id={currentWork.id}
+              title={currentWork.title}
+              hasCover={!!currentWork.coverImage}
+              size={46}
+              radius={6}
+            />
           )}
         </div>
 
         <div className="mle-bar1__meta">
-          <span className="mle-bar1__track" title={track?.title ?? ""}>{track?.title ?? "—"}</span>
+          <span className="mle-bar1__track" title={track?.title ?? ""}>
+            {track?.title ?? "—"}
+          </span>
           {formattedError ? (
             <output className="mle-bar1__error" title={formattedError.details}>
               <I.err size={11} />
               {formattedError.label}
             </output>
           ) : (
-            <span className="mle-bar1__work" title={currentWork?.title ?? ""}>{currentWork?.title ?? ""}</span>
+            <span className="mle-bar1__work" title={currentWork?.title ?? ""}>
+              {currentWork?.title ?? ""}
+            </span>
           )}
         </div>
 
         <button
           className="mle-bar1__play"
           title={isPlaying ? "一時停止" : "再生"}
-          onClick={(e) => { e.stopPropagation(); onTogglePlay(); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onTogglePlay();
+          }}
         >
           {isPlaying ? <I.pause size={16} /> : <I.play size={16} />}
         </button>

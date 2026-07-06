@@ -44,7 +44,11 @@ test("音声配信: 200 全体取得と Range 206", async () => {
 
 test("パストラバーサル: ../ を含む相対パスは 404", async () => {
   const { app, generated } = await setup();
-  for (const rel of ["..%2Fsecret.txt", "..%2F..%2F..%2Fetc%2Fpasswd", "mp3%2F..%2F..%2Fsecret.txt"]) {
+  for (const rel of [
+    "..%2Fsecret.txt",
+    "..%2F..%2F..%2Fetc%2Fpasswd",
+    "mp3%2F..%2F..%2Fsecret.txt",
+  ]) {
     const res = await app.request(`/api/media/file/${generated.id}/${rel}`);
     assert.equal(res.status, 404, `should block: ${rel}`);
   }

@@ -38,7 +38,17 @@ export const GRID_SIZE_KEYS: GridSize[] = ["S", "M", "L", "XL"];
 // ── 軸 ───────────────────────────────────────────────────────
 
 export type LibraryViewAxisId =
-  | "all" | "recent" | "added" | "fav" | "unplayed" | "missing"
-  | "circle" | "cv" | "series" | "cat" | "tag" | "year";
+  | "all"
+  | "recent"
+  | "added"
+  | "fav"
+  | "unplayed"
+  | "missing"
+  | "circle"
+  | "cv"
+  | "series"
+  | "cat"
+  | "tag"
+  | "year";
 
 export type AxisId = LibraryViewAxisId | `smart-${string}`;

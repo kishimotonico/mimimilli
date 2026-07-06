@@ -30,7 +30,11 @@ interface PopupContentProps {
 
 const RATE_PRESETS = [0.75, 1, 1.25, 1.5, 2];
 const RATE_LABELS: Record<number, string> = {
-  1: "1.0x", 1.25: "1.25x", 1.5: "1.5x", 2: "2.0x", 0.75: "0.75x",
+  1: "1.0x",
+  1.25: "1.25x",
+  1.5: "1.5x",
+  2: "2.0x",
+  0.75: "0.75x",
 };
 
 function isRateSelected(a: number, b: number): boolean {
@@ -55,7 +59,16 @@ export default function PopupContent({
   // currentTime / duration は高頻度 atom から直接読む（App.tsx を re-render させない）
   const currentTime = useAtomValue(playerCurrentTimeAtom);
   const duration = useAtomValue(playerDurationAtom);
-  const { currentWork, isPlaying, tracks, currentTrackIndex, volume, loop, playbackRate, playbackError } = state;
+  const {
+    currentWork,
+    isPlaying,
+    tracks,
+    currentTrackIndex,
+    volume,
+    loop,
+    playbackRate,
+    playbackError,
+  } = state;
   const track = tracks[currentTrackIndex] ?? null;
   const pct = duration > 0 ? (currentTime / duration) * 100 : 0;
   const formattedError = playbackError ? formatPlaybackError(playbackError) : null;
@@ -88,7 +101,12 @@ export default function PopupContent({
   return (
     <>
       <div className="mle-popup__head">
-        <IconButton size="sm" icon={I.locate} label="再生中の作品を表示" onClick={onShowPlayingWork} />
+        <IconButton
+          size="sm"
+          icon={I.locate}
+          label="再生中の作品を表示"
+          onClick={onShowPlayingWork}
+        />
         <div className="mle-popup__head-actions">
           <IconButton size="sm" icon={I.chevD} label="バーへ戻る" onClick={onFold} />
           <IconButton size="sm" icon={I.fs} label="全画面プレイヤー" onClick={onExpandFullScreen} />
@@ -98,7 +116,13 @@ export default function PopupContent({
       <div className="mle-popup__cover-wrap">
         <div className="mle-popup__cover">
           {currentWork && (
-            <CoverImg id={currentWork.id} title={currentWork.title} hasCover={!!currentWork.coverImage} radius={8} fit="fill" />
+            <CoverImg
+              id={currentWork.id}
+              title={currentWork.title}
+              hasCover={!!currentWork.coverImage}
+              radius={8}
+              fit="fill"
+            />
           )}
           {/* ±10秒: カバーへのホバー時のみ表示 */}
           {!rateMenuOpen && (
@@ -135,9 +159,7 @@ export default function PopupContent({
                         setRateMenuOpen(false);
                       }}
                     >
-                      <span className="check">
-                        {checked && <I.check size={10} />}
-                      </span>
+                      <span className="check">{checked && <I.check size={10} />}</span>
                       <span className="label">{RATE_LABELS[rate]}</span>
                     </button>
                   );
@@ -158,14 +180,18 @@ export default function PopupContent({
       </div>
 
       <div className="mle-popup__meta">
-        <div className="mle-popup__track" title={track?.title ?? ""}>{track?.title ?? "—"}</div>
+        <div className="mle-popup__track" title={track?.title ?? ""}>
+          {track?.title ?? "—"}
+        </div>
         {formattedError ? (
           <output className="mle-popup__error" title={formattedError.details}>
             <I.err size={11} />
             {formattedError.label}
           </output>
         ) : (
-          <div className="mle-popup__work" title={currentWork?.title ?? ""}>{currentWork?.title ?? ""}</div>
+          <div className="mle-popup__work" title={currentWork?.title ?? ""}>
+            {currentWork?.title ?? ""}
+          </div>
         )}
       </div>
 
@@ -229,7 +255,6 @@ export default function PopupContent({
           title={`音量 ${volume}%`}
         />
       </div>
-
     </>
   );
 }

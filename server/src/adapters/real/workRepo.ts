@@ -168,14 +168,24 @@ export class WorkRepo {
       resumePosition: work.resumePosition,
       resumeTrackIndex: work.resumeTrackIndex,
     };
-    this.db.insert(works).values(values).onConflictDoUpdate({ target: works.id, set: values }).run();
+    this.db
+      .insert(works)
+      .values(values)
+      .onConflictDoUpdate({ target: works.id, set: values })
+      .run();
     this.replaceWorkTags(work.id, work.tags);
   }
 
   /** PATCH /works/:id および DLsite 適用の DB 側。メタファイル書き戻しは呼び出し側（アダプタ）が行う */
   patchWork(
     id: string,
-    patch: { title?: string; tags?: string[]; bookmarked?: boolean; coverImage?: string; urls?: UrlEntry[] }
+    patch: {
+      title?: string;
+      tags?: string[];
+      bookmarked?: boolean;
+      coverImage?: string;
+      urls?: UrlEntry[];
+    },
   ): Work | null {
     const row = this.db.select().from(works).where(eq(works.id, id)).get();
     if (!row) return null;
@@ -231,7 +241,8 @@ export class WorkRepo {
   }
 
   countByStatus(status: string): number {
-    return this.db.select({ id: works.id }).from(works).where(eq(works.status, status)).all().length;
+    return this.db.select({ id: works.id }).from(works).where(eq(works.status, status)).all()
+      .length;
   }
 
   // ── app_settings（KVストア）──────────────────────────────
@@ -257,13 +268,25 @@ export class WorkRepo {
       .from(smartFolders)
       .orderBy(asc(smartFolders.createdAt))
       .all()
-      .map((r) => ({ id: r.id, name: r.name, rules: r.rulesJson, sort: r.sort as SortId, createdAt: r.createdAt }));
+      .map((r) => ({
+        id: r.id,
+        name: r.name,
+        rules: r.rulesJson,
+        sort: r.sort as SortId,
+        createdAt: r.createdAt,
+      }));
   }
 
   getSmartFolder(id: string): SmartFolder | null {
     const r = this.db.select().from(smartFolders).where(eq(smartFolders.id, id)).get();
     if (!r) return null;
-    return { id: r.id, name: r.name, rules: r.rulesJson, sort: r.sort as SortId, createdAt: r.createdAt };
+    return {
+      id: r.id,
+      name: r.name,
+      rules: r.rulesJson,
+      sort: r.sort as SortId,
+      createdAt: r.createdAt,
+    };
   }
 
   createSmartFolder(input: SmartFolderCreate): SmartFolder {
@@ -276,7 +299,13 @@ export class WorkRepo {
     };
     this.db
       .insert(smartFolders)
-      .values({ id: folder.id, name: folder.name, rulesJson: folder.rules, sort: folder.sort, createdAt: folder.createdAt })
+      .values({
+        id: folder.id,
+        name: folder.name,
+        rulesJson: folder.rules,
+        sort: folder.sort,
+        createdAt: folder.createdAt,
+      })
       .run();
     return folder;
   }
@@ -306,15 +335,32 @@ export class WorkRepo {
       .from(searchPresets)
       .orderBy(asc(searchPresets.id))
       .all()
-      .map((r) => ({ id: r.id, name: r.name, query: r.query, tagFilters: r.tagFiltersJson, sortId: r.sortId as SortId }));
+      .map((r) => ({
+        id: r.id,
+        name: r.name,
+        query: r.query,
+        tagFilters: r.tagFiltersJson,
+        sortId: r.sortId as SortId,
+      }));
   }
 
   createPreset(input: SearchPresetCreate): SearchPreset {
     const r = this.db
       .insert(searchPresets)
-      .values({ name: input.name, query: input.query, tagFiltersJson: input.tagFilters, sortId: input.sortId })
+      .values({
+        name: input.name,
+        query: input.query,
+        tagFiltersJson: input.tagFilters,
+        sortId: input.sortId,
+      })
       .run();
-    return { id: Number(r.lastInsertRowid), name: input.name, query: input.query, tagFilters: input.tagFilters, sortId: input.sortId };
+    return {
+      id: Number(r.lastInsertRowid),
+      name: input.name,
+      query: input.query,
+      tagFilters: input.tagFilters,
+      sortId: input.sortId,
+    };
   }
 
   deletePreset(id: number): boolean {

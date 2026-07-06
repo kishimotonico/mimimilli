@@ -31,10 +31,15 @@ export default function StackEdge({ parentName, depth, onUp }: StackEdgeProps) {
         animate={{ scale: 1, x: 0 }}
         transition={{ type: "spring", stiffness: 420, damping: 26 }}
       >
-        <span /><span /><span /><span />
+        <span />
+        <span />
+        <span />
+        <span />
       </motion.div>
       <span className="mle-colstack__label">
-        <span className="up"><I.chevD size={13} style={{ transform: "rotate(180deg)" }} /></span>
+        <span className="up">
+          <I.chevD size={13} style={{ transform: "rotate(180deg)" }} />
+        </span>
         <span className="nm">{parentName}</span>
       </span>
     </motion.button>

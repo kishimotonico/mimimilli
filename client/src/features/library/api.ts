@@ -79,7 +79,7 @@ export async function saveSearchPreset(
   name: string,
   query: string,
   tagFilters: string[],
-  sortId: SortId
+  sortId: SortId,
 ): Promise<number> {
   const r = await post<{ id: number }>("/presets", { name, query, tagFilters, sortId });
   return r.id;

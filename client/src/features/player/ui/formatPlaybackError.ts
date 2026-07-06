@@ -14,10 +14,9 @@ const ERROR_LABELS: Record<string, string> = {
 };
 
 export function formatPlaybackError(error: AudioEngineError): FormattedPlaybackError {
-  const details = [
-    error.name,
-    error.code !== undefined ? `code ${error.code}` : null,
-  ].filter(Boolean).join(" / ");
+  const details = [error.name, error.code !== undefined ? `code ${error.code}` : null]
+    .filter(Boolean)
+    .join(" / ");
 
   const rawDetails = details ? `${error.message} (${details})` : error.message;
   const knownLabel = error.name ? ERROR_LABELS[error.name] : undefined;

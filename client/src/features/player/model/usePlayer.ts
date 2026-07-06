@@ -40,7 +40,7 @@ interface PendingResume {
 export function usePlayer() {
   const [coreState, setCoreState] = useAtom(playerCoreAtom);
   const setCurrentTime = useSetAtom(playerCurrentTimeAtom); // subscribe しない
-  const setDuration = useSetAtom(playerDurationAtom);       // subscribe しない
+  const setDuration = useSetAtom(playerDurationAtom); // subscribe しない
 
   // ── Audio engine と callback が読む最新状態 ───────────────
   const coreStateRef = useRef(coreState);
@@ -146,7 +146,7 @@ export function usePlayer() {
     updateLastPlayed(workId).catch(() => {});
 
     return cleanup;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coreState.currentTrackIndex, coreState.tracks, coreState.currentWork]);
 
   // ── 定期 resume 保存 ──────────────────────────────────────
@@ -192,13 +192,14 @@ export function usePlayer() {
         abRepeat: { a: null, b: null },
       }));
     },
-    [setCoreState]
+    [setCoreState],
   );
 
   const playWithResume = useCallback(
     (work: Work) => {
-      const playlist = work.playlists.find((p) => p.name === (work.defaultPlaylist ?? "default"))
-        ?? work.playlists[0];
+      const playlist =
+        work.playlists.find((p) => p.name === (work.defaultPlaylist ?? "default")) ??
+        work.playlists[0];
       const tracks = playlist?.tracks ?? [];
       if (tracks.length === 0) return;
 
@@ -218,7 +219,7 @@ export function usePlayer() {
         abRepeat: { a: null, b: null },
       }));
     },
-    [setCoreState]
+    [setCoreState],
   );
 
   const togglePlay = useCallback(() => {
@@ -252,10 +253,13 @@ export function usePlayer() {
   const seek = useCallback((time: number) => engineRef.current?.seek(time), []);
   const seekRelative = useCallback((delta: number) => engineRef.current?.seekRelative(delta), []);
 
-  const setVolume = useCallback((vol: number) => {
-    engineRef.current?.setVolume(vol);
-    setCoreState((prev) => ({ ...prev, volume: Math.max(0, Math.min(100, vol)) }));
-  }, [setCoreState]);
+  const setVolume = useCallback(
+    (vol: number) => {
+      engineRef.current?.setVolume(vol);
+      setCoreState((prev) => ({ ...prev, volume: Math.max(0, Math.min(100, vol)) }));
+    },
+    [setCoreState],
+  );
 
   // ミュート前の音量を覚えておき、解除時に復元する。
   const lastVolumeRef = useRef(coreState.volume || 75);
@@ -272,14 +276,21 @@ export function usePlayer() {
     });
   }, [setCoreState]);
 
-  const setLoop = useCallback((loop: boolean) => {
-    setCoreState((prev) => ({ ...prev, loop }));
-  }, [setCoreState]);
+  const setLoop = useCallback(
+    (loop: boolean) => {
+      setCoreState((prev) => ({ ...prev, loop }));
+    },
+    [setCoreState],
+  );
 
   const nextTrack = useCallback(() => {
     setCoreState((prev) => {
       if (prev.currentTrackIndex < prev.tracks.length - 1) {
-        return { ...prev, currentTrackIndex: prev.currentTrackIndex + 1, abRepeat: { a: null, b: null } };
+        return {
+          ...prev,
+          currentTrackIndex: prev.currentTrackIndex + 1,
+          abRepeat: { a: null, b: null },
+        };
       }
       return prev;
     });
@@ -288,37 +299,60 @@ export function usePlayer() {
   const prevTrack = useCallback(() => {
     setCoreState((prev) => {
       if (prev.currentTrackIndex > 0) {
-        return { ...prev, currentTrackIndex: prev.currentTrackIndex - 1, abRepeat: { a: null, b: null } };
+        return {
+          ...prev,
+          currentTrackIndex: prev.currentTrackIndex - 1,
+          abRepeat: { a: null, b: null },
+        };
       }
       return prev;
     });
   }, [setCoreState]);
 
-  const setTrackIndex = useCallback((index: number) => {
-    setCoreState((prev) => ({ ...prev, currentTrackIndex: index, abRepeat: { a: null, b: null } }));
-  }, [setCoreState]);
+  const setTrackIndex = useCallback(
+    (index: number) => {
+      setCoreState((prev) => ({
+        ...prev,
+        currentTrackIndex: index,
+        abRepeat: { a: null, b: null },
+      }));
+    },
+    [setCoreState],
+  );
 
-  const setShowFullPlayer = useCallback((show: boolean) => {
-    setCoreState((prev) => ({ ...prev, showFullPlayer: show }));
-  }, [setCoreState]);
+  const setShowFullPlayer = useCallback(
+    (show: boolean) => {
+      setCoreState((prev) => ({ ...prev, showFullPlayer: show }));
+    },
+    [setCoreState],
+  );
 
-  const setPlaybackRate = useCallback((rate: number) => {
-    engineRef.current?.setPlaybackRate(rate);
-    setCoreState((prev) => ({ ...prev, playbackRate: rate }));
-  }, [setCoreState]);
+  const setPlaybackRate = useCallback(
+    (rate: number) => {
+      engineRef.current?.setPlaybackRate(rate);
+      setCoreState((prev) => ({ ...prev, playbackRate: rate }));
+    },
+    [setCoreState],
+  );
 
-  const setChannelSwap = useCallback((enabled: boolean) => {
-    engineRef.current?.setChannelSwap(enabled);
-    setCoreState((prev) => ({ ...prev, channelSwap: enabled }));
-  }, [setCoreState]);
+  const setChannelSwap = useCallback(
+    (enabled: boolean) => {
+      engineRef.current?.setChannelSwap(enabled);
+      setCoreState((prev) => ({ ...prev, channelSwap: enabled }));
+    },
+    [setCoreState],
+  );
 
-  const setABPoint = useCallback((point: "a" | "b") => {
-    const time = engineRef.current?.getCurrentTime() ?? 0;
-    setCoreState((prev) => ({
-      ...prev,
-      abRepeat: { ...prev.abRepeat, [point]: time },
-    }));
-  }, [setCoreState]);
+  const setABPoint = useCallback(
+    (point: "a" | "b") => {
+      const time = engineRef.current?.getCurrentTime() ?? 0;
+      setCoreState((prev) => ({
+        ...prev,
+        abRepeat: { ...prev.abRepeat, [point]: time },
+      }));
+    },
+    [setCoreState],
+  );
 
   const clearABRepeat = useCallback(() => {
     setCoreState((prev) => ({ ...prev, abRepeat: { a: null, b: null } }));

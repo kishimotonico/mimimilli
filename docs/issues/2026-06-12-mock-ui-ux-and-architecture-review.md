@@ -40,15 +40,15 @@ Status: done — 主要項目は対応済み。モック正典フェーズ終了
 
 API・プレイヤーエンジン側に実装があるのに UI が存在しない（または飾りボタンだけある）もの。モックUXを詰めるうえで「画面がない仕様」が積み上がっている。
 
-| 機能 | 実装箇所 | UI の現状 |
-|---|---|---|
-| ブックマーク切替 | `entities/work/api.ts` toggleBookmark | 詳細パネルのハートボタンは onClick なし（飾り）。「お気に入り」ビューは fixture 固定値しか映らない |
-| レジューム再生 | `usePlayer.ts` playWithResume | どこからも呼ばれていない。resume 保存だけ5秒毎に走り、再生は常に先頭から |
-| タグ・タイトル編集 | updateWorkTags / updateWorkTitle | 詳細パネルに編集UIなし（タイトル編集は NewWorkPopup のみ） |
-| DLsite 情報取得・適用 | fetchDlsiteInfo / applyDlsiteInfo | UIなし。サーバー側は real アダプタまで実装済みなのに使う画面がない |
-| 検索プリセット | saveSearchPreset ほか | UIなし |
-| 倍速・ABリピート・チャンネルスワップ | usePlayer / audioEngine | 全画面プレイヤーにもUIなし（プレイヤー刷新時に拾う想定でOK） |
-| 並び替え | useLibraryNavigation の sort | 変更UIなし（AddressBar の onSort 未配線） |
+| 機能                                 | 実装箇所                              | UI の現状                                                                                          |
+| ------------------------------------ | ------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| ブックマーク切替                     | `entities/work/api.ts` toggleBookmark | 詳細パネルのハートボタンは onClick なし（飾り）。「お気に入り」ビューは fixture 固定値しか映らない |
+| レジューム再生                       | `usePlayer.ts` playWithResume         | どこからも呼ばれていない。resume 保存だけ5秒毎に走り、再生は常に先頭から                           |
+| タグ・タイトル編集                   | updateWorkTags / updateWorkTitle      | 詳細パネルに編集UIなし（タイトル編集は NewWorkPopup のみ）                                         |
+| DLsite 情報取得・適用                | fetchDlsiteInfo / applyDlsiteInfo     | UIなし。サーバー側は real アダプタまで実装済みなのに使う画面がない                                 |
+| 検索プリセット                       | saveSearchPreset ほか                 | UIなし                                                                                             |
+| 倍速・ABリピート・チャンネルスワップ | usePlayer / audioEngine               | 全画面プレイヤーにもUIなし（プレイヤー刷新時に拾う想定でOK）                                       |
+| 並び替え                             | useLibraryNavigation の sort          | 変更UIなし（AddressBar の onSort 未配線）                                                          |
 
 ## 3. 飾りUI・配線漏れ（実機確認済み）
 

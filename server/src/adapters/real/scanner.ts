@@ -20,7 +20,13 @@ import { existsSync, readdirSync } from "node:fs";
 import { basename, dirname, extname, join } from "node:path";
 import type { MetaFile, Playlist, ScanResult, Track, Work } from "@mimimilli/shared";
 import type { Db } from "./db.ts";
-import { isMetaFileName, MetaParseError, patchMetaFile, readMetaFile, writeMetaFile } from "./meta.ts";
+import {
+  isMetaFileName,
+  MetaParseError,
+  patchMetaFile,
+  readMetaFile,
+  writeMetaFile,
+} from "./meta.ts";
 import { isPathWithin, toPortableRelativePath } from "./paths.ts";
 import { probeDurationSec } from "./probe.ts";
 import type { WorkRepo } from "./workRepo.ts";
@@ -203,7 +209,13 @@ export class Scanner {
   }
 
   async scan(root: string): Promise<ScanResult> {
-    const result: ScanResult = { registered: 0, newlyGenerated: 0, errors: 0, missing: 0, newWorkIds: [] };
+    const result: ScanResult = {
+      registered: 0,
+      newlyGenerated: 0,
+      errors: 0,
+      missing: 0,
+      newWorkIds: [],
+    };
 
     const tree = walk(root);
     const seenIds = new Set<string>();
@@ -217,7 +229,8 @@ export class Scanner {
         if (e instanceof MetaParseError) {
           console.warn(e.message);
           const workDir = dirname(metaPath);
-          const existingById = e.candidateId && !seenIds.has(e.candidateId) ? this.repo.getWork(e.candidateId) : null;
+          const existingById =
+            e.candidateId && !seenIds.has(e.candidateId) ? this.repo.getWork(e.candidateId) : null;
           const existing = existingById ?? this.repo.getWorkByPhysicalPath(workDir);
           if (existing) {
             this.repo.markWorkError(existing.id, workDir, e.message);
@@ -240,7 +253,7 @@ export class Scanner {
     }
     // 祖先が同時に検出された場合は祖先側に統合する
     const roots = [...workRoots].filter(
-      (dir) => ![...workRoots].some((other) => other !== dir && isPathWithin(other, dir))
+      (dir) => ![...workRoots].some((other) => other !== dir && isPathWithin(other, dir)),
     );
 
     for (const workDir of roots.sort(naturalCompare)) {

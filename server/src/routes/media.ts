@@ -21,13 +21,15 @@ export function mediaRoute(adapter: DataAdapter): Hono {
 
   app.get("/media/audio/:id/:path{.+}", async (c) => {
     const location = await adapter.locateMedia("audio", c.req.param("id"), c.req.param("path"));
-    if (!location) notFound(`音声ファイルが見つかりません: ${c.req.param("id")}/${c.req.param("path")}`);
+    if (!location)
+      notFound(`音声ファイルが見つかりません: ${c.req.param("id")}/${c.req.param("path")}`);
     return streamWithRange(location, c.req.header("Range"));
   });
 
   app.get("/media/file/:id/:path{.+}", async (c) => {
     const location = await adapter.locateMedia("file", c.req.param("id"), c.req.param("path"));
-    if (!location) notFound(`ファイルが見つかりません: ${c.req.param("id")}/${c.req.param("path")}`);
+    if (!location)
+      notFound(`ファイルが見つかりません: ${c.req.param("id")}/${c.req.param("path")}`);
     return streamWhole(location);
   });
 
@@ -66,7 +68,10 @@ async function streamWhole(location: MediaLocation): Promise<Response> {
 }
 
 /** HTTP Range 対応のストリーミング（Range ヘッダーがあれば 206、無ければ 200） */
-async function streamWithRange(location: MediaLocation, rangeHeader: string | undefined): Promise<Response> {
+async function streamWithRange(
+  location: MediaLocation,
+  rangeHeader: string | undefined,
+): Promise<Response> {
   const fileSize = await sizeOf(location);
 
   if (!rangeHeader) {
@@ -118,7 +123,7 @@ async function streamWithRange(location: MediaLocation, rangeHeader: string | un
   }
 
   const stream = Readable.toWeb(
-    createReadStream(location.absolutePath, { start, end })
+    createReadStream(location.absolutePath, { start, end }),
   ) as ReadableStream;
 
   return new Response(stream, {

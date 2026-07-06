@@ -63,7 +63,4 @@ export type PlayerUiMode = "bar" | "popup";
  * 画面下張り付きバー / 右下ポップアップのどちらを使っていたか。
  * localStorage に永続化し、次回再生時に復元する（issue参照）。
  */
-export const playerUiModeAtom = atomWithStorage<PlayerUiMode>(
-  "mimimilli:playerUiMode",
-  "bar"
-);
+export const playerUiModeAtom = atomWithStorage<PlayerUiMode>("mimimilli:playerUiMode", "bar");

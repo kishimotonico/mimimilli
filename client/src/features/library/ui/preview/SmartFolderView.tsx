@@ -1,4 +1,9 @@
-import { parseTag, type SmartFolder, type SmartFolderRule, type WorkSummary } from "@mimimilli/shared";
+import {
+  parseTag,
+  type SmartFolder,
+  type SmartFolderRule,
+  type WorkSummary,
+} from "@mimimilli/shared";
 import { I } from "../../../../shared/ui/Icon";
 import { formatDuration } from "./format";
 
@@ -8,9 +13,9 @@ const TAG_PREFIX_LABEL: Record<string, string> = {
   series: "シリーズ",
   cat: "カテゴリ",
   genre: "ジャンル",
-  "サークル": "サークル",
-  "シリーズ": "シリーズ",
-  "カテゴリ": "カテゴリ",
+  サークル: "サークル",
+  シリーズ: "シリーズ",
+  カテゴリ: "カテゴリ",
 };
 
 function formatRuleDuration(value: string): string {
@@ -19,7 +24,8 @@ function formatRuleDuration(value: string): string {
 
 function TagValueChip({ value }: { value: string }) {
   const tag = parseTag(value);
-  const prefixLabel = tag.kind === "annotated" ? (TAG_PREFIX_LABEL[tag.prefix] ?? tag.prefix) : null;
+  const prefixLabel =
+    tag.kind === "annotated" ? (TAG_PREFIX_LABEL[tag.prefix] ?? tag.prefix) : null;
 
   return (
     <span
@@ -47,7 +53,9 @@ function RuleValue({ rule }: { rule: SmartFolderRule }) {
     <span className="val flex min-w-0 items-center gap-1">
       {rule.values.map((value, i) => (
         <span key={`${value}-${i}`} className="inline-flex min-w-0 items-center gap-1">
-          {i > 0 && <span className="shrink-0 font-mono text-[9px] font-semibold text-ink-4">OR</span>}
+          {i > 0 && (
+            <span className="shrink-0 font-mono text-[9px] font-semibold text-ink-4">OR</span>
+          )}
           <TagValueChip value={value} />
         </span>
       ))}
@@ -65,15 +73,23 @@ export function SmartFolderView({ sf, works }: { sf: SmartFolder; works: WorkSum
         </div>
         <div className="mll-smart__rules">
           {sf.rules.length === 0 ? (
-            <div style={{ padding: "12px 8px", fontSize: 12, color: "var(--ink-3)" }}>ルールなし（すべての作品）</div>
-          ) : sf.rules.map((rule, i) => (
-            <div key={i} className="mll-smart__rule">
-              <span className={`conj ${i === 0 ? "first" : ""}`}>{i === 0 ? "WHERE" : rule.conjunction}</span>
-              <span className="field"><I.filter size={10} /> {rule.field}</span>
-              <span className="op">{rule.operator}</span>
-              <RuleValue rule={rule} />
+            <div style={{ padding: "12px 8px", fontSize: 12, color: "var(--ink-3)" }}>
+              ルールなし（すべての作品）
             </div>
-          ))}
+          ) : (
+            sf.rules.map((rule, i) => (
+              <div key={i} className="mll-smart__rule">
+                <span className={`conj ${i === 0 ? "first" : ""}`}>
+                  {i === 0 ? "WHERE" : rule.conjunction}
+                </span>
+                <span className="field">
+                  <I.filter size={10} /> {rule.field}
+                </span>
+                <span className="op">{rule.operator}</span>
+                <RuleValue rule={rule} />
+              </div>
+            ))
+          )}
         </div>
         <button
           className="mll-smart__add !cursor-not-allowed !text-ink-4 hover:!bg-transparent hover:!text-ink-4"
@@ -83,7 +99,9 @@ export function SmartFolderView({ sf, works }: { sf: SmartFolder; works: WorkSum
           <I.add size={11} /> 条件を追加
         </button>
         <div className="mll-smart__ft">
-          <span className="hits"><b>{works.length}</b> 件マッチ</span>
+          <span className="hits">
+            <b>{works.length}</b> 件マッチ
+          </span>
         </div>
       </div>
     </div>

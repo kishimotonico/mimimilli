@@ -48,7 +48,7 @@ function readMarker(state: unknown): HistoryMarker | null {
 
 function stateWithMarker(index: number): Record<string, unknown> {
   const current = history.state;
-  const base = current && typeof current === "object" ? current as Record<string, unknown> : {};
+  const base = current && typeof current === "object" ? (current as Record<string, unknown>) : {};
   return { ...base, [HISTORY_STATE_KEY]: { index } };
 }
 
@@ -97,40 +97,41 @@ export function useNavigationHistory({ mode, setMode, rootFolder }: UseNavigatio
   const [currentIndex, setCurrentIndex] = useState(0);
   const [maxIndex, setMaxIndex] = useState(0);
 
-  const applyParsedState = useCallback((result: NavigationParseResult, fileDirection: 1 | -1 = 1) => {
-    warnForInvalidUrl(result);
-    const { state } = result;
-    setMode(state.mode);
+  const applyParsedState = useCallback(
+    (result: NavigationParseResult, fileDirection: 1 | -1 = 1) => {
+      warnForInvalidUrl(result);
+      const { state } = result;
+      setMode(state.mode);
 
-    if (state.mode === "library") {
-      setActiveAxis(state.library.activeAxis);
-      setDrillValue(state.library.drillValue);
-      setSelectedTags(state.library.selectedTags);
-      setSelectedWorkId(state.library.selectedWorkId);
-      setSort(state.library.sort);
-      return;
-    }
+      if (state.mode === "library") {
+        setActiveAxis(state.library.activeAxis);
+        setDrillValue(state.library.drillValue);
+        setSelectedTags(state.library.selectedTags);
+        setSelectedWorkId(state.library.selectedWorkId);
+        setSort(state.library.sort);
+        return;
+      }
 
-    setFilesDirection(fileDirection);
-    setFilesRelPath(state.files.relPath);
-    pendingFileSelectionRef.current = state.files.selectedRelPath;
-    const root = rootFolderRef.current;
-    setFilesSelectedPath(
-      root && state.files.selectedRelPath
-        ? joinPath(root, state.files.selectedRelPath)
-        : null
-    );
-  }, [
-    setActiveAxis,
-    setDrillValue,
-    setFilesDirection,
-    setFilesRelPath,
-    setFilesSelectedPath,
-    setMode,
-    setSelectedTags,
-    setSelectedWorkId,
-    setSort,
-  ]);
+      setFilesDirection(fileDirection);
+      setFilesRelPath(state.files.relPath);
+      pendingFileSelectionRef.current = state.files.selectedRelPath;
+      const root = rootFolderRef.current;
+      setFilesSelectedPath(
+        root && state.files.selectedRelPath ? joinPath(root, state.files.selectedRelPath) : null,
+      );
+    },
+    [
+      setActiveAxis,
+      setDrillValue,
+      setFilesDirection,
+      setFilesRelPath,
+      setFilesSelectedPath,
+      setMode,
+      setSelectedTags,
+      setSelectedWorkId,
+      setSort,
+    ],
+  );
 
   useLayoutEffect(() => {
     if (!initializedRef.current) {
@@ -149,7 +150,7 @@ export function useNavigationHistory({ mode, setMode, rootFolder }: UseNavigatio
       history.replaceState(
         stateWithMarker(index),
         "",
-        parsed.canonicalUrl === currentUrl ? currentUrl : parsed.canonicalUrl
+        parsed.canonicalUrl === currentUrl ? currentUrl : parsed.canonicalUrl,
       );
       applyParsedState(parsed);
       setReady(true);
@@ -243,11 +244,14 @@ export function useNavigationHistory({ mode, setMode, rootFolder }: UseNavigatio
     sort,
   ]);
 
-  const navigateMode = useCallback((nextMode: AppMode) => {
-    if (nextMode === mode) return;
-    requestCommit("push");
-    setMode(nextMode);
-  }, [mode, requestCommit, setMode]);
+  const navigateMode = useCallback(
+    (nextMode: AppMode) => {
+      if (nextMode === mode) return;
+      requestCommit("push");
+      setMode(nextMode);
+    },
+    [mode, requestCommit, setMode],
+  );
 
   const back = useCallback(() => window.history.back(), []);
   const forward = useCallback(() => window.history.forward(), []);

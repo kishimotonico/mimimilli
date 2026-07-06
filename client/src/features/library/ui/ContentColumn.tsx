@@ -24,12 +24,26 @@ interface ContentColumnProps {
 
 const FACET_AXES = new Set(["circle", "cv", "series", "cat", "year"]);
 
-function isFacetAxis(a: AxisId): boolean { return FACET_AXES.has(a as string); }
-function isSmartAxis(a: AxisId): boolean { return (a as string).startsWith("smart-"); }
+function isFacetAxis(a: AxisId): boolean {
+  return FACET_AXES.has(a as string);
+}
+function isSmartAxis(a: AxisId): boolean {
+  return (a as string).startsWith("smart-");
+}
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px 16px", color: "var(--ink-4)", fontSize: 12 }}>
+    <div
+      style={{
+        flex: 1,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "24px 16px",
+        color: "var(--ink-4)",
+        fontSize: 12,
+      }}
+    >
       {message}
     </div>
   );
@@ -54,8 +68,8 @@ export default function ContentColumn({
   const hd = drillValue
     ? `${works.length} 件`
     : facetItems.length > 0
-    ? `${facetItems.length} 件`
-    : `${works.length} 件`;
+      ? `${facetItems.length} 件`
+      : `${works.length} 件`;
 
   // ── Tag axis: show tag list with checkboxes ───────────────
   if (axis === "tag" && !drillValue) {
@@ -98,7 +112,9 @@ export default function ContentColumn({
                 onClick={() => onTagToggle(item.value)}
               >
                 <div className="check">
-                  {selectedTags.includes(item.value) && <I.x size={9} style={{ transform: "rotate(45deg)" }} />}
+                  {selectedTags.includes(item.value) && (
+                    <I.x size={9} style={{ transform: "rotate(45deg)" }} />
+                  )}
                 </div>
                 <span className="nm">{item.value}</span>
                 <span className="count">{item.count}</span>
@@ -112,7 +128,13 @@ export default function ContentColumn({
 
   // ── Facet axis, no drill: show facet value list ──────────
   if (isFacetAxis(axis) && !drillValue) {
-    const axisLabels: Record<string, string> = { circle: "サークル", cv: "CV", series: "シリーズ", cat: "カテゴリ", year: "追加日" };
+    const axisLabels: Record<string, string> = {
+      circle: "サークル",
+      cv: "CV",
+      series: "シリーズ",
+      cat: "カテゴリ",
+      year: "追加日",
+    };
     return (
       <div className="mle-col is-content">
         <div className="mle-col__hd">
@@ -136,7 +158,18 @@ export default function ContentColumn({
               >
                 <span className="ic">
                   {axis === "cv" ? (
-                    <span style={{ width: 22, height: 22, borderRadius: "50%", background: "var(--paper-3)", display: "grid", placeItems: "center", fontSize: 10, fontWeight: 600 }}>
+                    <span
+                      style={{
+                        width: 22,
+                        height: 22,
+                        borderRadius: "50%",
+                        background: "var(--paper-3)",
+                        display: "grid",
+                        placeItems: "center",
+                        fontSize: 10,
+                        fontWeight: 600,
+                      }}
+                    >
                       {item.value.slice(0, 1)}
                     </span>
                   ) : (

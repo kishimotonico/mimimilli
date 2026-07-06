@@ -46,20 +46,26 @@ export function useLibraryView(): LibraryViewState & LibraryViewActions {
   const addressPath = useAtomValue(addressPathAtom);
   const requestCommit = useSetAtom(requestNavigationHistoryCommitAtom);
 
-  const setAxis = useCallback((axis: AxisId) => {
-    requestCommit("push");
-    setActiveAxis(axis);
-    setDrillValue(null);
-    setSelectedTags([]);
-    setSelectedWorkId(null);
-  }, [requestCommit, setActiveAxis, setDrillValue, setSelectedTags, setSelectedWorkId]);
+  const setAxis = useCallback(
+    (axis: AxisId) => {
+      requestCommit("push");
+      setActiveAxis(axis);
+      setDrillValue(null);
+      setSelectedTags([]);
+      setSelectedWorkId(null);
+    },
+    [requestCommit, setActiveAxis, setDrillValue, setSelectedTags, setSelectedWorkId],
+  );
 
-  const drillInto = useCallback((value: string) => {
-    requestCommit("push");
-    setDrillValue(value);
-    setSelectedTags([]);
-    setSelectedWorkId(null);
-  }, [requestCommit, setDrillValue, setSelectedTags, setSelectedWorkId]);
+  const drillInto = useCallback(
+    (value: string) => {
+      requestCommit("push");
+      setDrillValue(value);
+      setSelectedTags([]);
+      setSelectedWorkId(null);
+    },
+    [requestCommit, setDrillValue, setSelectedTags, setSelectedWorkId],
+  );
 
   const drillBack = useCallback(() => {
     requestCommit("push");
@@ -67,13 +73,16 @@ export function useLibraryView(): LibraryViewState & LibraryViewActions {
     setSelectedWorkId(null);
   }, [requestCommit, setDrillValue, setSelectedWorkId]);
 
-  const toggleTag = useCallback((tag: string) => {
-    requestCommit("push");
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-    );
-    setSelectedWorkId(null);
-  }, [requestCommit, setSelectedTags, setSelectedWorkId]);
+  const toggleTag = useCallback(
+    (tag: string) => {
+      requestCommit("push");
+      setSelectedTags((prev) =>
+        prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
+      );
+      setSelectedWorkId(null);
+    },
+    [requestCommit, setSelectedTags, setSelectedWorkId],
+  );
 
   const clearTags = useCallback(() => {
     requestCommit("push");
@@ -81,27 +90,48 @@ export function useLibraryView(): LibraryViewState & LibraryViewActions {
     setSelectedWorkId(null);
   }, [requestCommit, setSelectedTags, setSelectedWorkId]);
 
-  const selectWork = useCallback((id: string | null) => {
-    // 詳細パネルの開閉は同一ビュー内の選択なので履歴を増やさない。
-    requestCommit("replace");
-    setSelectedWorkId(id);
-  }, [requestCommit, setSelectedWorkId]);
+  const selectWork = useCallback(
+    (id: string | null) => {
+      // 詳細パネルの開閉は同一ビュー内の選択なので履歴を増やさない。
+      requestCommit("replace");
+      setSelectedWorkId(id);
+    },
+    [requestCommit, setSelectedWorkId],
+  );
 
-  const setSort = useCallback((s: SortId) => {
-    requestCommit("replace");
-    setSort_(s);
-  }, [requestCommit, setSort_]);
+  const setSort = useCallback(
+    (s: SortId) => {
+      requestCommit("replace");
+      setSort_(s);
+    },
+    [requestCommit, setSort_],
+  );
 
-  const goToSegment = useCallback((index: number) => {
-    if (index <= 0) {
-      if (activeAxis !== "all") setAxis("all");
-      return;
-    }
-    if (index === 1 && drillValue !== null) drillBack();
-  }, [activeAxis, drillBack, drillValue, setAxis]);
+  const goToSegment = useCallback(
+    (index: number) => {
+      if (index <= 0) {
+        if (activeAxis !== "all") setAxis("all");
+        return;
+      }
+      if (index === 1 && drillValue !== null) drillBack();
+    },
+    [activeAxis, drillBack, drillValue, setAxis],
+  );
 
   return {
-    activeAxis, drillValue, selectedTags, selectedWorkId, sort, addressPath,
-    setAxis, drillInto, drillBack, toggleTag, clearTags, selectWork, setSort, goToSegment,
+    activeAxis,
+    drillValue,
+    selectedTags,
+    selectedWorkId,
+    sort,
+    addressPath,
+    setAxis,
+    drillInto,
+    drillBack,
+    toggleTag,
+    clearTags,
+    selectWork,
+    setSort,
+    goToSegment,
   };
 }

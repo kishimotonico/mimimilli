@@ -34,9 +34,11 @@ export function AxisLanding({
       <div className="mll-related">
         {works.map((w) => {
           const statusLabel =
-            w.status === "missing" ? "ファイル欠損"
-            : w.status === "error" ? "メタ読み込みエラー"
-            : null;
+            w.status === "missing"
+              ? "ファイル欠損"
+              : w.status === "error"
+                ? "メタ読み込みエラー"
+                : null;
           const meta = [
             getCircleName(w),
             w.totalDurationSec > 0 ? formatDuration(w.totalDurationSec) : null,
@@ -50,7 +52,13 @@ export function AxisLanding({
               onClick={() => onSelectWork(w.id)}
             >
               <div className="mll-related__cover">
-                <CoverImg id={w.id} title={w.title} hasCover={!!w.coverImage} size={80} radius={6} />
+                <CoverImg
+                  id={w.id}
+                  title={w.title}
+                  hasCover={!!w.coverImage}
+                  size={80}
+                  radius={6}
+                />
                 {statusLabel && (
                   <span className="mll-related__status" title={statusLabel}>
                     <I.err size={12} />

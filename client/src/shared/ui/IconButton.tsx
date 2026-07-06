@@ -13,7 +13,10 @@ const BOX_CLASS: Record<IconButtonSize, string> = {
 
 const ICON_PX: Record<IconButtonSize, number> = { sm: 14, md: 16, lg: 20 };
 
-export interface IconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "aria-label"> {
+export interface IconButtonProps extends Omit<
+  ButtonHTMLAttributes<HTMLButtonElement>,
+  "aria-label"
+> {
   icon: IconFC;
   /** aria-label と title ツールチップの両方に使う */
   label: string;

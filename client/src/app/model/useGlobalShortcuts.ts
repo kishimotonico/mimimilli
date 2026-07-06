@@ -12,7 +12,11 @@ interface UseGlobalShortcutsOptions {
   isActive: boolean;
 }
 
-export function useGlobalShortcuts({ onTogglePlay, onSeekRelative, isActive }: UseGlobalShortcutsOptions) {
+export function useGlobalShortcuts({
+  onTogglePlay,
+  onSeekRelative,
+  isActive,
+}: UseGlobalShortcutsOptions) {
   // ref 経由にすることでコールバック変化ごとの再登録を防ぐ
   const onTogglePlayRef = useRef(onTogglePlay);
   const onSeekRelativeRef = useRef(onSeekRelative);
@@ -23,7 +27,8 @@ export function useGlobalShortcuts({ onTogglePlay, onSeekRelative, isActive }: U
 
   const handler = useCallback((e: KeyboardEvent) => {
     const target = e.target as HTMLElement;
-    if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
+    if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)
+      return;
     if (!isActiveRef.current) return;
 
     if (e.code === "Space") {

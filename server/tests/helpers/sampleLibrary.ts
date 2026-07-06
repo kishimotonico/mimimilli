@@ -71,8 +71,8 @@ export function makeSampleLibrary(baseDir: string): SampleLibrary {
         defaultPlaylist: "default",
       },
       null,
-      2
-    )
+      2,
+    ),
   );
 
   return { root, existingWorkId };

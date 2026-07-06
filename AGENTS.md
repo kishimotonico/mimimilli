@@ -31,6 +31,7 @@
 - agent-browser は他セッションとブラウザを共有してタブを奪われることがあるため、`--session <名前>` を付けて専用セッションで操作する
 
 <!-- BACKLOG.MD GUIDELINES START -->
+
 ## タスク管理（Backlog.md CLI）
 
 - タスクの参照・作成・更新は `backlog` CLI で行う。`backlog/` 配下のMarkdown直接編集は禁止（メタデータが壊れる）

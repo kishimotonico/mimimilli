@@ -36,11 +36,7 @@ function fixtureApiPlugin(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [
-    tailwindcss(),
-    react(),
-    !backendUrl && fixtureApiPlugin(),
-  ].filter(Boolean),
+  plugins: [tailwindcss(), react(), !backendUrl && fixtureApiPlugin()].filter(Boolean),
 
   test: {
     environment: "jsdom",
@@ -50,8 +46,6 @@ export default defineConfig({
   },
 
   server: {
-    proxy: backendUrl
-      ? { "/api": { target: backendUrl, changeOrigin: true } }
-      : undefined,
+    proxy: backendUrl ? { "/api": { target: backendUrl, changeOrigin: true } } : undefined,
   },
 });

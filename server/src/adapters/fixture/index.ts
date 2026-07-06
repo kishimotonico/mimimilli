@@ -158,7 +158,10 @@ function isImagePath(path: string): boolean {
 function resolveFsNode(root: FsNode, rootAbs: string, target: string): FsNode | null {
   if (target === rootAbs) return root;
   if (!target.startsWith(`${rootAbs}/`)) return null;
-  const segments = target.slice(rootAbs.length + 1).split("/").filter(Boolean);
+  const segments = target
+    .slice(rootAbs.length + 1)
+    .split("/")
+    .filter(Boolean);
   let cur = root;
   for (const seg of segments) {
     const next = cur.children.find((c) => c.isDir && c.name === seg);
@@ -312,7 +315,8 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
       const dir = resolveFsNode(root, rootAbs, target);
       if (!dir) return null;
 
-      const parent = target === rootAbs ? null : target.slice(0, target.lastIndexOf("/")) || rootAbs;
+      const parent =
+        target === rootAbs ? null : target.slice(0, target.lastIndexOf("/")) || rootAbs;
 
       return {
         path: target,
@@ -334,7 +338,11 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
     // ── メディア・DLsite ────────────────────────────────────
     // fixture アダプタには実体ファイルが無いため、再生・シーク・カバー表示が
     // 成立するようメモリ上でコンテンツを合成する（synthetic MediaLocation）。
-    async locateMedia(kind: MediaKind, workId: string, relPath?: string): Promise<MediaLocation | null> {
+    async locateMedia(
+      kind: MediaKind,
+      workId: string,
+      relPath?: string,
+    ): Promise<MediaLocation | null> {
       const work = state.works.find((w) => w.id === workId);
       if (!work) return null;
 

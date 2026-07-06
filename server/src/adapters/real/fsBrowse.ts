@@ -81,7 +81,11 @@ export function browseFs(root: string, works: WorkSummary[], path?: string): FsL
 
   // ディレクトリ優先 → 自然順
   fsEntries.sort((a, b) =>
-    a.isDir !== b.isDir ? (a.isDir ? -1 : 1) : a.name.localeCompare(b.name, "ja", { numeric: true })
+    a.isDir !== b.isDir
+      ? a.isDir
+        ? -1
+        : 1
+      : a.name.localeCompare(b.name, "ja", { numeric: true }),
   );
 
   return {

@@ -17,10 +17,18 @@ export const sortAtom = atom<SortId>("added-desc");
 // ── 派生: アドレスバーパス ────────────────────────────────────
 
 const AXIS_LABELS: Partial<Record<string, string>> = {
-  all: "すべての作品", recent: "最近再生", added: "最近追加",
-  fav: "お気に入り", unplayed: "未再生", missing: "ファイル欠損",
-  circle: "サークル", cv: "CV", series: "シリーズ",
-  cat: "カテゴリ", tag: "タグ", year: "追加日",
+  all: "すべての作品",
+  recent: "最近再生",
+  added: "最近追加",
+  fav: "お気に入り",
+  unplayed: "未再生",
+  missing: "ファイル欠損",
+  circle: "サークル",
+  cv: "CV",
+  series: "シリーズ",
+  cat: "カテゴリ",
+  tag: "タグ",
+  year: "追加日",
 };
 
 function buildAddressPath(axis: AxisId, drillValue: string | null): string[] {

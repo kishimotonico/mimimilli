@@ -39,37 +39,46 @@ export function useFilesNavigation(root: string): FilesNav {
   const cwd = joinPath(root, relPath);
   const addressPath = [rootLabel(root), ...relPath];
 
-  const openDir = useCallback((absPath: string) => {
-    const nextRelPath = relSegments(root, absPath);
-    if (joinPath(root, nextRelPath) !== absPath) {
-      console.warn(`[navigation] root 外のディレクトリを拒否しました: ${absPath}`);
-      return;
-    }
-    requestCommit("push");
-    setDirection(1); // 子へ潜る
-    setRelPath(nextRelPath);
-    setSelectedPath(absPath);
-  }, [requestCommit, root, setRelPath, setSelectedPath, setDirection]);
+  const openDir = useCallback(
+    (absPath: string) => {
+      const nextRelPath = relSegments(root, absPath);
+      if (joinPath(root, nextRelPath) !== absPath) {
+        console.warn(`[navigation] root 外のディレクトリを拒否しました: ${absPath}`);
+        return;
+      }
+      requestCommit("push");
+      setDirection(1); // 子へ潜る
+      setRelPath(nextRelPath);
+      setSelectedPath(absPath);
+    },
+    [requestCommit, root, setRelPath, setSelectedPath, setDirection],
+  );
 
-  const selectFile = useCallback((absPath: string) => {
-    const selectedRelPath = relSegments(root, absPath);
-    if (joinPath(root, selectedRelPath) !== absPath) {
-      console.warn(`[navigation] root 外のファイルを拒否しました: ${absPath}`);
-      return;
-    }
-    // プレビュー対象の変更は同一ディレクトリ内の軽微な選択なので replace する。
-    requestCommit("replace");
-    setSelectedPath(absPath);
-  }, [requestCommit, root, setSelectedPath]);
+  const selectFile = useCallback(
+    (absPath: string) => {
+      const selectedRelPath = relSegments(root, absPath);
+      if (joinPath(root, selectedRelPath) !== absPath) {
+        console.warn(`[navigation] root 外のファイルを拒否しました: ${absPath}`);
+        return;
+      }
+      // プレビュー対象の変更は同一ディレクトリ内の軽微な選択なので replace する。
+      requestCommit("replace");
+      setSelectedPath(absPath);
+    },
+    [requestCommit, root, setSelectedPath],
+  );
 
-  const goToSegment = useCallback((index: number) => {
-    if (index === relPath.length && selectedPath === null) return;
-    requestCommit("push");
-    // index 0 = ルート、以降は子 segments。relPath を index 件に切り詰める。
-    setDirection(-1); // 親へ遡る
-    setRelPath((prev) => prev.slice(0, index));
-    setSelectedPath(null);
-  }, [relPath.length, requestCommit, selectedPath, setRelPath, setSelectedPath, setDirection]);
+  const goToSegment = useCallback(
+    (index: number) => {
+      if (index === relPath.length && selectedPath === null) return;
+      requestCommit("push");
+      // index 0 = ルート、以降は子 segments。relPath を index 件に切り詰める。
+      setDirection(-1); // 親へ遡る
+      setRelPath((prev) => prev.slice(0, index));
+      setSelectedPath(null);
+    },
+    [relPath.length, requestCommit, selectedPath, setRelPath, setSelectedPath, setDirection],
+  );
 
   const goUp = useCallback(() => {
     if (relPath.length === 0) return;

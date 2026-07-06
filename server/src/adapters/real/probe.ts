@@ -28,7 +28,12 @@ export async function probeDurationSec(db: Db, filePath: string): Promise<number
     console.warn(`再生時間を取得できません: ${filePath}: ${(e as Error).message}`);
   }
 
-  const values = { path: filePath, size: stat.size, mtimeMs: Math.floor(stat.mtimeMs), durationSec: duration };
+  const values = {
+    path: filePath,
+    size: stat.size,
+    mtimeMs: Math.floor(stat.mtimeMs),
+    durationSec: duration,
+  };
   db.insert(audioProbeCache)
     .values(values)
     .onConflictDoUpdate({ target: audioProbeCache.path, set: values })

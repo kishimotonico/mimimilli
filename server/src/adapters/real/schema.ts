@@ -36,7 +36,7 @@ export const workTags = sqliteTable(
     workId: text("work_id").notNull(),
     tagId: integer("tag_id").notNull(),
   },
-  (t) => [primaryKey({ columns: [t.workId, t.tagId] }), index("idx_work_tags_tag").on(t.tagId)]
+  (t) => [primaryKey({ columns: [t.workId, t.tagId] }), index("idx_work_tags_tag").on(t.tagId)],
 );
 
 export const appSettings = sqliteTable("app_settings", {

@@ -27,7 +27,7 @@ function filterByQuery(works: WorkSummary[], q: string): WorkSummary[] {
   return works.filter(
     (work) =>
       work.title.toLowerCase().includes(normalizedQuery) ||
-      work.tags.some((tag) => tag.toLowerCase().includes(normalizedQuery))
+      work.tags.some((tag) => tag.toLowerCase().includes(normalizedQuery)),
   );
 }
 
@@ -36,21 +36,21 @@ function filterByTags(works: WorkSummary[], tags: string[], tagOp: "AND" | "OR")
   if (tagOp === "AND") {
     return works.filter((work) =>
       tags.every((tagFilter) =>
-        work.tags.some((tag) => tag.toLowerCase().includes(tagFilter.toLowerCase()))
-      )
+        work.tags.some((tag) => tag.toLowerCase().includes(tagFilter.toLowerCase())),
+      ),
     );
   }
   return works.filter((work) =>
     tags.some((tagFilter) =>
-      work.tags.some((tag) => tag.toLowerCase().includes(tagFilter.toLowerCase()))
-    )
+      work.tags.some((tag) => tag.toLowerCase().includes(tagFilter.toLowerCase())),
+    ),
   );
 }
 
 function filterByAxis(
   works: WorkSummary[],
   axis: WorksQuery["axis"],
-  axisValue: WorksQuery["axisValue"]
+  axisValue: WorksQuery["axisValue"],
 ): WorkSummary[] {
   if (!axis || !axisValue) return works;
   const prefix = AXIS_TAG_PREFIX[axis] ?? `${axis}/`;
@@ -130,7 +130,11 @@ function shuffleInPlace<T>(items: T[]): void {
 }
 
 /** page/limit が両方指定されているときのみ slice する */
-function paginate(works: WorkSummary[], page: number | undefined, limit: number | undefined): WorkSummary[] {
+function paginate(
+  works: WorkSummary[],
+  page: number | undefined,
+  limit: number | undefined,
+): WorkSummary[] {
   if (page === undefined || limit === undefined) return works;
   const start = (page - 1) * limit;
   return works.slice(start, start + limit);

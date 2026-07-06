@@ -2,9 +2,6 @@
   "name": "mimimilli-workspace",
   "private": true,
   "type": "module",
-  "engines": {
-    "node": ">=24"
-  },
   "scripts": {
     "dev": "pnpm dev:fixture",
     "dev:fixture": "pnpm --filter @mimimilli/client dev",
@@ -28,5 +25,8 @@
   "devDependencies": {
     "oxfmt": "^0.57.0",
     "oxlint": "^1.72.0"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

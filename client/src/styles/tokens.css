@@ -3,49 +3,49 @@
 
 :root {
   /* Surfaces — soft warm paper */
-  --paper-0: oklch(97.6% 0.006 85);   /* page floor */
-  --paper-1: oklch(99.2% 0.003 85);   /* cards, raised surfaces */
-  --paper-2: oklch(95.4% 0.006 85);   /* hover */
-  --paper-3: oklch(92.6% 0.008 85);   /* pressed / row stripe */
-  --paper-4: oklch(89%   0.010 85);   /* selected */
+  --paper-0: oklch(97.6% 0.006 85); /* page floor */
+  --paper-1: oklch(99.2% 0.003 85); /* cards, raised surfaces */
+  --paper-2: oklch(95.4% 0.006 85); /* hover */
+  --paper-3: oklch(92.6% 0.008 85); /* pressed / row stripe */
+  --paper-4: oklch(89% 0.01 85); /* selected */
 
   /* Lines */
-  --line:        oklch(86% 0.008 85);
-  --line-soft:   oklch(91% 0.006 85);
-  --line-strong: oklch(78% 0.010 85);
+  --line: oklch(86% 0.008 85);
+  --line-soft: oklch(91% 0.006 85);
+  --line-strong: oklch(78% 0.01 85);
 
   /* Ink — warm dark graphite, never pure black */
-  --ink-0: oklch(22% 0.018 70);    /* primary text */
-  --ink-1: oklch(38% 0.016 70);    /* secondary text */
-  --ink-2: oklch(54% 0.014 70);    /* tertiary, captions */
-  --ink-3: oklch(70% 0.012 70);    /* placeholder, faint */
-  --ink-4: oklch(82% 0.010 70);    /* very faint */
+  --ink-0: oklch(22% 0.018 70); /* primary text */
+  --ink-1: oklch(38% 0.016 70); /* secondary text */
+  --ink-2: oklch(54% 0.014 70); /* tertiary, captions */
+  --ink-3: oklch(70% 0.012 70); /* placeholder, faint */
+  --ink-4: oklch(82% 0.01 70); /* very faint */
 
   /* Accent — single primary (persimmon by default, swappable) */
-  --acc:        oklch(60% 0.155 38);
-  --acc-soft:   oklch(60% 0.155 38 / 0.12);
-  --acc-line:   oklch(60% 0.155 38 / 0.45);
-  --acc-ink:    oklch(34% 0.110 38);
+  --acc: oklch(60% 0.155 38);
+  --acc-soft: oklch(60% 0.155 38 / 0.12);
+  --acc-line: oklch(60% 0.155 38 / 0.45);
+  --acc-ink: oklch(34% 0.11 38);
 
   /* Riso ink palette — used in covers (light & punchy) */
-  --r-coral:   oklch(72% 0.165 25);
-  --r-sky:     oklch(72% 0.110 235);
-  --r-leaf:    oklch(74% 0.115 145);
+  --r-coral: oklch(72% 0.165 25);
+  --r-sky: oklch(72% 0.11 235);
+  --r-leaf: oklch(74% 0.115 145);
   --r-mustard: oklch(78% 0.135 88);
-  --r-plum:    oklch(64% 0.140 320);
-  --r-stone:   oklch(70% 0.020 85);
-  --r-ink:     oklch(30% 0.030 250);
-  --r-ivory:   oklch(95% 0.018 85);
+  --r-plum: oklch(64% 0.14 320);
+  --r-stone: oklch(70% 0.02 85);
+  --r-ink: oklch(30% 0.03 250);
+  --r-ivory: oklch(95% 0.018 85);
 
   /* Tag category — muted */
-  --cv-color:     oklch(58% 0.140 350);
-  --circle-color: oklch(54% 0.110 195);
-  --series-color: oklch(58% 0.140 78);
-  --cat-color:    oklch(58% 0.110 285);
+  --cv-color: oklch(58% 0.14 350);
+  --circle-color: oklch(54% 0.11 195);
+  --series-color: oklch(58% 0.14 78);
+  --cat-color: oklch(58% 0.11 285);
 
   /* Type stacks */
   --font-sans: "Geist", -apple-system, system-ui, "Segoe UI", sans-serif;
-  --font-jp:   "IBM Plex Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+  --font-jp: "IBM Plex Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
   --font-mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
 
   /* Radii */
@@ -56,10 +56,10 @@
   --r-pill: 999px;
 
   /* Shadows */
-  --shadow-1: 0 1px 0 0 oklch(20% 0.020 70 / 0.02), 0 1px 2px oklch(20% 0.020 70 / 0.04);
-  --shadow-2: 0 4px 14px -6px oklch(20% 0.020 70 / 0.12), 0 1px 2px oklch(20% 0.020 70 / 0.05);
-  --shadow-pop: 0 18px 40px -12px oklch(20% 0.020 70 / 0.22), 0 2px 6px oklch(20% 0.020 70 / 0.08);
-  --shadow-cover: 0 1px 0 0 oklch(100% 0 0 / 0.5) inset, 0 6px 16px -8px oklch(20% 0.020 70 / 0.18);
+  --shadow-1: 0 1px 0 0 oklch(20% 0.02 70 / 0.02), 0 1px 2px oklch(20% 0.02 70 / 0.04);
+  --shadow-2: 0 4px 14px -6px oklch(20% 0.02 70 / 0.12), 0 1px 2px oklch(20% 0.02 70 / 0.05);
+  --shadow-pop: 0 18px 40px -12px oklch(20% 0.02 70 / 0.22), 0 2px 6px oklch(20% 0.02 70 / 0.08);
+  --shadow-cover: 0 1px 0 0 oklch(100% 0 0 / 0.5) inset, 0 6px 16px -8px oklch(20% 0.02 70 / 0.18);
 
   /* Spacing */
   --sp-1: 4px;
@@ -73,26 +73,26 @@
 
 /* ── Dark theme override ───────────────────────────────────── */
 .ml-dark {
-  --paper-0: oklch(15% 0.010 70);
+  --paper-0: oklch(15% 0.01 70);
   --paper-1: oklch(18% 0.012 70);
   --paper-2: oklch(22% 0.012 70);
   --paper-3: oklch(26% 0.014 70);
   --paper-4: oklch(31% 0.014 70);
 
-  --line:        oklch(30% 0.012 70);
-  --line-soft:   oklch(25% 0.010 70);
+  --line: oklch(30% 0.012 70);
+  --line-soft: oklch(25% 0.01 70);
   --line-strong: oklch(40% 0.014 70);
 
   --ink-0: oklch(94% 0.008 85);
-  --ink-1: oklch(80% 0.010 85);
+  --ink-1: oklch(80% 0.01 85);
   --ink-2: oklch(64% 0.012 85);
-  --ink-3: oklch(50% 0.010 85);
-  --ink-4: oklch(38% 0.010 85);
+  --ink-3: oklch(50% 0.01 85);
+  --ink-4: oklch(38% 0.01 85);
 
-  --acc:      oklch(76% 0.155 38);
+  --acc: oklch(76% 0.155 38);
   --acc-soft: oklch(76% 0.155 38 / 0.18);
   --acc-line: oklch(76% 0.155 38 / 0.45);
-  --acc-ink:  oklch(96% 0.030 60);
+  --acc-ink: oklch(96% 0.03 60);
 
   --shadow-1: none;
   --shadow-2: 0 8px 24px -12px rgb(0 0 0 / 0.6);
@@ -101,6 +101,21 @@
 }
 
 /* ── Accent palette swaps ─────────────────────────────────── */
-.ml-acc-coral  { --acc: oklch(60% 0.155 28);  --acc-soft: oklch(60% 0.155 28 / 0.12);  --acc-line: oklch(60% 0.155 28 / 0.45);  --acc-ink: oklch(34% 0.110 28); }
-.ml-acc-grass  { --acc: oklch(56% 0.140 148); --acc-soft: oklch(56% 0.140 148 / 0.12); --acc-line: oklch(56% 0.140 148 / 0.45); --acc-ink: oklch(30% 0.100 148); }
-.ml-acc-cobalt { --acc: oklch(50% 0.180 256); --acc-soft: oklch(50% 0.180 256 / 0.12); --acc-line: oklch(50% 0.180 256 / 0.45); --acc-ink: oklch(28% 0.110 256); }
+.ml-acc-coral {
+  --acc: oklch(60% 0.155 28);
+  --acc-soft: oklch(60% 0.155 28 / 0.12);
+  --acc-line: oklch(60% 0.155 28 / 0.45);
+  --acc-ink: oklch(34% 0.11 28);
+}
+.ml-acc-grass {
+  --acc: oklch(56% 0.14 148);
+  --acc-soft: oklch(56% 0.14 148 / 0.12);
+  --acc-line: oklch(56% 0.14 148 / 0.45);
+  --acc-ink: oklch(30% 0.1 148);
+}
+.ml-acc-cobalt {
+  --acc: oklch(50% 0.18 256);
+  --acc-soft: oklch(50% 0.18 256 / 0.12);
+  --acc-line: oklch(50% 0.18 256 / 0.45);
+  --acc-ink: oklch(28% 0.11 256);
+}

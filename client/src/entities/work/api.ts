@@ -3,7 +3,14 @@
 // 依存方向: shared/api/http と自 entity の model のみを参照する。
 
 import { API_BASE, get, patch, post } from "../../shared/api/http";
-import type { Work, WorkSummary, WorksPage, WorkPatch, FileEntry, DlsiteWorkInfo } from "@mimimilli/shared";
+import type {
+  Work,
+  WorkSummary,
+  WorksPage,
+  WorkPatch,
+  FileEntry,
+  DlsiteWorkInfo,
+} from "@mimimilli/shared";
 
 export async function getWork(id: string): Promise<Work | null> {
   return get<Work | null>(`/works/${encodeURIComponent(id)}`);
@@ -40,19 +47,13 @@ export function getCoverImageUrl(workId: string): string {
 
 /** 音声ファイルのURLを返す（<audio src> で直接使用可） */
 export function getAudioUrl(workId: string, relativePath: string): string {
-  const encoded = relativePath
-    .split("/")
-    .map(encodeURIComponent)
-    .join("/");
+  const encoded = relativePath.split("/").map(encodeURIComponent).join("/");
   return `${API_BASE}/media/audio/${encodeURIComponent(workId)}/${encoded}`;
 }
 
 /** 物理ファイル（画像・PDF・テキスト等）のURLを返す（<img src> 等で直接使用可） */
 export function getFileUrl(workId: string, relativePath: string): string {
-  const encoded = relativePath
-    .split("/")
-    .map(encodeURIComponent)
-    .join("/");
+  const encoded = relativePath.split("/").map(encodeURIComponent).join("/");
   return `${API_BASE}/media/file/${encodeURIComponent(workId)}/${encoded}`;
 }
 
@@ -63,7 +64,7 @@ export async function updateLastPlayed(workId: string): Promise<void> {
 export async function saveResumePosition(
   workId: string,
   position: number,
-  trackIndex: number
+  trackIndex: number,
 ): Promise<void> {
   await post(`/works/${encodeURIComponent(workId)}/resume`, {
     position,
@@ -84,7 +85,7 @@ export async function applyDlsiteInfo(
   info: DlsiteWorkInfo,
   applyTitle: boolean,
   applyTags: boolean,
-  applyCover: boolean
+  applyCover: boolean,
 ): Promise<void> {
   await post(`/dlsite/${encodeURIComponent(workId)}/apply`, {
     info,

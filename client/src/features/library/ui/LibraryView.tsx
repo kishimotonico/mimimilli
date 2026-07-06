@@ -21,8 +21,12 @@ type PreviewMode = "work" | "axis-landing" | "smart-folder" | "empty";
 const VIEW_AXES = new Set(["all", "recent", "added", "fav", "unplayed", "missing"]);
 const FACET_AXES = new Set(["circle", "cv", "series", "cat", "year"]);
 
-function isFacetAxis(a: AxisId): boolean { return FACET_AXES.has(a as string); }
-function isSmartAxis(a: AxisId): boolean { return (a as string).startsWith("smart-"); }
+function isFacetAxis(a: AxisId): boolean {
+  return FACET_AXES.has(a as string);
+}
+function isSmartAxis(a: AxisId): boolean {
+  return (a as string).startsWith("smart-");
+}
 
 // ── Query key factory ─────────────────────────────────────────
 // query key を一箇所で管理し、invalidation と依存を一致させる。
@@ -50,7 +54,14 @@ interface LibraryViewProps {
   onResume: (work: Work) => void;
 }
 
-export default function LibraryView({ searchQuery, playingWorkId, playingTrackIndex, isPlaybackActive, onPlay, onResume }: LibraryViewProps) {
+export default function LibraryView({
+  searchQuery,
+  playingWorkId,
+  playingTrackIndex,
+  isPlaybackActive,
+  onPlay,
+  onResume,
+}: LibraryViewProps) {
   const nav = useLibraryView();
   const queryClient = useQueryClient();
 
@@ -93,12 +104,8 @@ export default function LibraryView({ searchQuery, playingWorkId, playingTrackIn
   const works = isSmartAxis(nav.activeAxis)
     ? (smartWorksQuery.data ?? [])
     : (worksQuery.data?.items ?? []);
-  const isLoading = isSmartAxis(nav.activeAxis)
-    ? smartWorksQuery.isPending
-    : worksQuery.isPending;
-  const isError = isSmartAxis(nav.activeAxis)
-    ? smartWorksQuery.isError
-    : worksQuery.isError;
+  const isLoading = isSmartAxis(nav.activeAxis) ? smartWorksQuery.isPending : worksQuery.isPending;
+  const isError = isSmartAxis(nav.activeAxis) ? smartWorksQuery.isError : worksQuery.isError;
 
   // ── ライブラリ総件数 ──────────────────────────────────────
   const libraryTotalQuery = useQuery({
@@ -147,8 +154,7 @@ export default function LibraryView({ searchQuery, playingWorkId, playingTrackIn
   });
 
   const patchWorkMutation = useMutation({
-    mutationFn: ({ workId, body }: { workId: string; body: WorkPatch }) =>
-      patchWork(workId, body),
+    mutationFn: ({ workId, body }: { workId: string; body: WorkPatch }) => patchWork(workId, body),
     onSuccess: async (updatedWork, { workId }) => {
       queryClient.setQueryData(LIBRARY_KEYS.workDetail(workId), updatedWork);
       await Promise.all([
@@ -167,41 +173,46 @@ export default function LibraryView({ searchQuery, playingWorkId, playingTrackIn
 
   // ── previewMode: UI state + server state を組み合わせてコンポーネントで計算 ──
   // (derived atom にしない — issue の制約参照)
-  const previewMode: PreviewMode = nav.selectedWorkId && selectedWork
-    ? "work"
-    : isSmartAxis(nav.activeAxis)
-    ? "smart-folder"
-    : isFacetAxis(nav.activeAxis) && !nav.drillValue
-    ? "axis-landing"
-    : nav.activeAxis === "tag" && nav.selectedTags.length > 0
-    ? "axis-landing"
-    : "empty";
+  const previewMode: PreviewMode =
+    nav.selectedWorkId && selectedWork
+      ? "work"
+      : isSmartAxis(nav.activeAxis)
+        ? "smart-folder"
+        : isFacetAxis(nav.activeAxis) && !nav.drillValue
+          ? "axis-landing"
+          : nav.activeAxis === "tag" && nav.selectedTags.length > 0
+            ? "axis-landing"
+            : "empty";
   const isAxisFilterApplied = nav.activeAxis === "tag" && nav.selectedTags.length > 0;
 
   const activeSmartFolder = isSmartAxis(nav.activeAxis)
-    ? smartFolders.find((sf) => sf.id === (nav.activeAxis as string).slice("smart-".length)) ?? null
+    ? (smartFolders.find((sf) => sf.id === (nav.activeAxis as string).slice("smart-".length)) ??
+      null)
     : null;
 
-  const handlePlay = useCallback((trackIndex: number) => {
-    if (selectedWork) {
-      const summary: Parameters<typeof onPlay>[0] = {
-        id: selectedWork.id,
-        title: selectedWork.title,
-        coverImage: selectedWork.coverImage,
-        status: selectedWork.status,
-        physicalPath: selectedWork.physicalPath,
-        totalDurationSec: selectedWork.totalDurationSec,
-        addedAt: selectedWork.addedAt,
-        errorMessage: selectedWork.errorMessage,
-        urls: selectedWork.urls,
-        tags: selectedWork.tags,
-        trackCount: selectedWork.playlists[0]?.tracks.length ?? 0,
-        bookmarked: selectedWork.bookmarked,
-        lastPlayedAt: selectedWork.lastPlayedAt,
-      };
-      onPlay(summary, trackIndex);
-    }
-  }, [selectedWork, onPlay]);
+  const handlePlay = useCallback(
+    (trackIndex: number) => {
+      if (selectedWork) {
+        const summary: Parameters<typeof onPlay>[0] = {
+          id: selectedWork.id,
+          title: selectedWork.title,
+          coverImage: selectedWork.coverImage,
+          status: selectedWork.status,
+          physicalPath: selectedWork.physicalPath,
+          totalDurationSec: selectedWork.totalDurationSec,
+          addedAt: selectedWork.addedAt,
+          errorMessage: selectedWork.errorMessage,
+          urls: selectedWork.urls,
+          tags: selectedWork.tags,
+          trackCount: selectedWork.playlists[0]?.tracks.length ?? 0,
+          bookmarked: selectedWork.bookmarked,
+          lastPlayedAt: selectedWork.lastPlayedAt,
+        };
+        onPlay(summary, trackIndex);
+      }
+    },
+    [selectedWork, onPlay],
+  );
 
   const handleResume = useCallback(() => {
     if (selectedWork) onResume(selectedWork);

@@ -12,5 +12,5 @@ export const requestNavigationHistoryCommitAtom = atom(
   (get, set, kind: NavigationHistoryCommit) => {
     const current = get(navigationHistoryCommitAtom);
     set(navigationHistoryCommitAtom, { kind, revision: current.revision + 1 });
-  }
+  },
 );

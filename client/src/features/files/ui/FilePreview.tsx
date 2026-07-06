@@ -27,13 +27,23 @@ interface FilePreviewProps {
   onPlay: (entry: FsEntry) => void;
 }
 
-export default function FilePreview({ entry, folderEntries, depth, isPlayingEntry, onPlay }: FilePreviewProps) {
+export default function FilePreview({
+  entry,
+  folderEntries,
+  depth,
+  isPlayingEntry,
+  onPlay,
+}: FilePreviewProps) {
   const kind = entry ? classifyFile(entry) : null;
   const isDir = kind === "dir";
   const canServe = !!entry && !!entry.workId && !!entry.workRelPath;
   const showImage = kind === "image" && canServe;
 
-  const label = isDir ? "フォルダー · 物理" : kind ? `${FILE_KIND_LABEL[kind]} · 物理` : "プレビュー";
+  const label = isDir
+    ? "フォルダー · 物理"
+    : kind
+      ? `${FILE_KIND_LABEL[kind]} · 物理`
+      : "プレビュー";
   const audioFiles = isDir ? (folderEntries ?? []).filter((e) => classifyFile(e) === "audio") : [];
   const breakdown = isDir && folderEntries ? summarizeKinds(folderEntries) : [];
   const isWorkFolder = isDir && !!entry?.workId;
@@ -55,7 +65,12 @@ export default function FilePreview({ entry, folderEntries, depth, isPlayingEntr
         ) : (
           <div className="mle-fprev">
             {showImage ? (
-              <ImageMedia workId={entry.workId!} relPath={entry.workRelPath!} name={entry.name} kind={kind!} />
+              <ImageMedia
+                workId={entry.workId!}
+                relPath={entry.workRelPath!}
+                name={entry.name}
+                kind={kind!}
+              />
             ) : (
               <Hero kind={kind!} entry={entry} isWorkFolder={isWorkFolder} />
             )}
@@ -76,14 +91,24 @@ export default function FilePreview({ entry, folderEntries, depth, isPlayingEntr
 
             {kind === "audio" && (
               <div className="mle-fprev__actions">
-                <Button variant="primary" icon={isPlayingEntry ? I.audio : I.play} onClick={() => onPlay(entry)} disabled={!canServe}>
+                <Button
+                  variant="primary"
+                  icon={isPlayingEntry ? I.audio : I.play}
+                  onClick={() => onPlay(entry)}
+                  disabled={!canServe}
+                >
                   {isPlayingEntry ? "再生中" : "このファイルを再生"}
                 </Button>
               </div>
             )}
             {isDir && audioFiles.length > 0 && (
               <div className="mle-fprev__actions">
-                <Button variant="primary" icon={I.play} onClick={() => onPlay(audioFiles[0])} disabled={!audioFiles[0].workId}>
+                <Button
+                  variant="primary"
+                  icon={I.play}
+                  onClick={() => onPlay(audioFiles[0])}
+                  disabled={!audioFiles[0].workId}
+                >
                   先頭の音声を再生
                 </Button>
               </div>
@@ -92,11 +117,14 @@ export default function FilePreview({ entry, folderEntries, depth, isPlayingEntr
             <MetaGrid rows={metaRows(entry, kind!, isDir, isWorkFolder)} />
 
             {!isDir && !canServe && kind !== "other" && (
-              <p className="mle-fprev__note">このファイルは登録作品の外にあるため、プレビュー / 再生はできません。</p>
+              <p className="mle-fprev__note">
+                このファイルは登録作品の外にあるため、プレビュー / 再生はできません。
+              </p>
             )}
             {!isDir && canServe && (kind === "pdf" || kind === "text" || kind === "video") && (
               <p className="mle-fprev__note">
-                {kind === "video" ? "動画" : kind === "pdf" ? "PDF" : "テキスト"}の埋め込みプレビューは未対応です。
+                {kind === "video" ? "動画" : kind === "pdf" ? "PDF" : "テキスト"}
+                の埋め込みプレビューは未対応です。
               </p>
             )}
           </div>
@@ -106,7 +134,12 @@ export default function FilePreview({ entry, folderEntries, depth, isPlayingEntr
   );
 }
 
-function metaRows(entry: FsEntry, kind: FileKind, isDir: boolean, isWorkFolder: boolean): [string, string][] {
+function metaRows(
+  entry: FsEntry,
+  kind: FileKind,
+  isDir: boolean,
+  isWorkFolder: boolean,
+): [string, string][] {
   if (isDir) {
     return [
       ["項目数", `${entry.childCount} 件`],
@@ -125,7 +158,18 @@ function metaRows(entry: FsEntry, kind: FileKind, isDir: boolean, isWorkFolder: 
 
 function EmptyPreview() {
   return (
-    <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12, color: "var(--ink-4)", minHeight: 240 }}>
+    <div
+      style={{
+        flex: 1,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexDirection: "column",
+        gap: 12,
+        color: "var(--ink-4)",
+        minHeight: 240,
+      }}
+    >
       <I.folderO size={28} />
       <span style={{ fontSize: 12 }}>フォルダーまたはファイルを選択してください</span>
     </div>
@@ -134,12 +178,22 @@ function EmptyPreview() {
 
 // ── コンパクトなヒーロー（巨大な空ボックスを置かない） ──────────
 
-function Hero({ kind, entry, isWorkFolder }: { kind: FileKind; entry: FsEntry; isWorkFolder: boolean }) {
+function Hero({
+  kind,
+  entry,
+  isWorkFolder,
+}: {
+  kind: FileKind;
+  entry: FsEntry;
+  isWorkFolder: boolean;
+}) {
   const Ic = IconSet[FILE_KIND_ICON[kind]] ?? I.file;
   const display = getWorkFolderDisplay(entry.name, isWorkFolder ? entry.workId : null);
   return (
     <div className={`mle-fprev__hero is-${kind}`}>
-      <span className="ic"><Ic size={28} /></span>
+      <span className="ic">
+        <Ic size={28} />
+      </span>
       <div className="bd">
         <div className="mle-fprev__name">
           {display.badge && <span className="wbadge">{display.badge}</span>}
@@ -153,14 +207,26 @@ function Hero({ kind, entry, isWorkFolder }: { kind: FileKind; entry: FsEntry; i
 
 // ── 画像だけ大きく表示 ────────────────────────────────────────
 
-function ImageMedia({ workId, relPath, name, kind }: { workId: string; relPath: string; name: string; kind: FileKind }) {
+function ImageMedia({
+  workId,
+  relPath,
+  name,
+  kind,
+}: {
+  workId: string;
+  relPath: string;
+  name: string;
+  kind: FileKind;
+}) {
   const [errored, setErrored] = useState(false);
   useEffect(() => setErrored(false), [workId, relPath]);
 
   if (errored) {
     return (
       <div className={`mle-fprev__hero is-${kind}`}>
-        <span className="ic"><I.image size={28} /></span>
+        <span className="ic">
+          <I.image size={28} />
+        </span>
         <div className="bd">
           <div className="mle-fprev__name">{name}</div>
           <div className="mle-fprev__path">プレビューを読み込めませんでした</div>
@@ -170,7 +236,12 @@ function ImageMedia({ workId, relPath, name, kind }: { workId: string; relPath: 
   }
   return (
     <div className="mle-fprev__media">
-      <img className="mle-fprev__img" src={getFileUrl(workId, relPath)} alt={name} onError={() => setErrored(true)} />
+      <img
+        className="mle-fprev__img"
+        src={getFileUrl(workId, relPath)}
+        alt={name}
+        onError={() => setErrored(true)}
+      />
     </div>
   );
 }

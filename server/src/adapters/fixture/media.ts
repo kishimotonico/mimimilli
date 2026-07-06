@@ -77,7 +77,11 @@ function writeAscii(view: DataView, offset: number, text: string): void {
 /** トラックの再生尺（秒）を決める。
  *  Track.start/end が両方あればその差分、無ければ作品の totalDurationSec を
  *  trackCount で等分する。どちらも得られない場合は既定値を返す。 */
-export function resolveTrackDurationSec(track: Track, work: WorkSummary, trackCount: number): number {
+export function resolveTrackDurationSec(
+  track: Track,
+  work: WorkSummary,
+  trackCount: number,
+): number {
   if (track.start !== undefined && track.end !== undefined && track.end > track.start) {
     return track.end - track.start;
   }

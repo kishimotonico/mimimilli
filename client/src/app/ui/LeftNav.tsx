@@ -22,7 +22,11 @@ const SURFACES: SurfaceItem[] = [
   { icon: "bookmark", label: "ピン留め" },
 ];
 
-export default function LeftNav({ mode = "library", onModeChange, playingCount = 0 }: LeftNavProps) {
+export default function LeftNav({
+  mode = "library",
+  onModeChange,
+  playingCount = 0,
+}: LeftNavProps) {
   return (
     <aside className="mle-side">
       <div className="mle-side__group is-mode">

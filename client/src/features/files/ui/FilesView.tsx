@@ -27,17 +27,25 @@ const colVariants = {
       ? { x: "60%", opacity: 0, scaleX: 1, scaleY: 1 }
       : { x: "-8%", opacity: 0, scaleX: 0.28, scaleY: 0.94 },
   center: {
-    x: "0%", opacity: 1, scaleX: 1, scaleY: 1,
+    x: "0%",
+    opacity: 1,
+    scaleX: 1,
+    scaleY: 1,
     transition: { type: "spring" as const, stiffness: 460, damping: 38, mass: 0.8 },
   },
   exit: (dir: number) =>
     dir >= 0
       ? {
-          x: "-6%", opacity: 0, scaleX: 0.05, scaleY: 0.86,
+          x: "-6%",
+          opacity: 0,
+          scaleX: 0.05,
+          scaleY: 0.86,
           transition: { duration: 0.4, ease: [0.55, 0, 0.35, 1] as const },
         }
       : {
-          x: "75%", opacity: 0, scaleX: 0.92,
+          x: "75%",
+          opacity: 0,
+          scaleX: 0.92,
           transition: { duration: 0.26, ease: [0.4, 0, 0.2, 1] as const },
         },
 };
@@ -52,7 +60,13 @@ interface FilesViewProps {
   onPlayFile: (entry: FsEntry) => void;
 }
 
-export default function FilesView({ rootFolder, playingWorkId, playingRelPath, isPlaybackActive, onPlayFile }: FilesViewProps) {
+export default function FilesView({
+  rootFolder,
+  playingWorkId,
+  playingRelPath,
+  isPlaybackActive,
+  onPlayFile,
+}: FilesViewProps) {
   const nav = useFilesNavigation(rootFolder);
   const direction = useAtomValue(filesDirectionAtom);
 
@@ -64,12 +78,17 @@ export default function FilesView({ rootFolder, playingWorkId, playingRelPath, i
 
   const matchPlaying = useMemo(
     () => (entry: FsEntry) =>
-      !!playingWorkId && entry.workId === playingWorkId && entry.workRelPath != null && entry.workRelPath === playingRelPath,
-    [playingWorkId, playingRelPath]
+      !!playingWorkId &&
+      entry.workId === playingWorkId &&
+      entry.workRelPath != null &&
+      entry.workRelPath === playingRelPath,
+    [playingWorkId, playingRelPath],
   );
 
-  const cwdTitle = nav.relPath.length > 0 ? nav.relPath[nav.relPath.length - 1] : rootLabel(rootFolder);
-  const parentName = nav.relPath.length >= 2 ? nav.relPath[nav.relPath.length - 2] : rootLabel(rootFolder);
+  const cwdTitle =
+    nav.relPath.length > 0 ? nav.relPath[nav.relPath.length - 1] : rootLabel(rootFolder);
+  const parentName =
+    nav.relPath.length >= 2 ? nav.relPath[nav.relPath.length - 2] : rootLabel(rootFolder);
 
   // ── プレビュー対象 ────────────────────────────────────────
   // ファイル選択中はそのファイル、それ以外はカレント dir 自身。
@@ -85,7 +104,7 @@ export default function FilesView({ rootFolder, playingWorkId, playingRelPath, i
   };
   const fileSelection =
     nav.selectedPath && nav.selectedPath !== nav.cwd
-      ? cwdEntries.find((e) => e.path === nav.selectedPath) ?? null
+      ? (cwdEntries.find((e) => e.path === nav.selectedPath) ?? null)
       : null;
   const previewEntry = fileSelection ?? cwdFolderEntry;
   const folderEntries = previewEntry.isDir ? cwdEntries : null;
@@ -96,7 +115,12 @@ export default function FilesView({ rootFolder, playingWorkId, playingRelPath, i
     <>
       <AnimatePresence initial={false}>
         {hasAncestors && (
-          <StackEdge key="stack" parentName={parentName} depth={nav.relPath.length} onUp={nav.goUp} />
+          <StackEdge
+            key="stack"
+            parentName={parentName}
+            depth={nav.relPath.length}
+            onUp={nav.goUp}
+          />
         )}
       </AnimatePresence>
 

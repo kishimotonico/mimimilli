@@ -19,7 +19,11 @@ rusqlite = { version = "0.31", features = ["bundled"] }
 walkdir = "2"
 uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
-reqwest = { version = "0.12", default-features = false, features = ["blocking", "cookies", "rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = [
+  "blocking",
+  "cookies",
+  "rustls-tls",
+] }
 scraper = "0.22"
 mime_guess = "2"
 log = "0.4"

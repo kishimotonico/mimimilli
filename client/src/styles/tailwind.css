@@ -37,7 +37,8 @@
 }
 
 @keyframes mll-eq-bar {
-  0%, 100% {
+  0%,
+  100% {
     transform: scaleY(0.45);
   }
   50% {

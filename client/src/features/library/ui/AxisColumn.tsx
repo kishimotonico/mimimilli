@@ -12,21 +12,21 @@ interface AxisRow {
 }
 
 const VIEW_AXES: AxisRow[] = [
-  { id: "all",      name: "すべての作品", icon: "gridS" },
-  { id: "recent",   name: "最近再生",     icon: "refresh" },
-  { id: "added",    name: "最近追加",     icon: "add" },
-  { id: "fav",      name: "お気に入り",   icon: "star" },
-  { id: "unplayed", name: "未再生",       icon: "audio" },
-  { id: "missing",  name: "ファイル欠損", icon: "err" },
+  { id: "all", name: "すべての作品", icon: "gridS" },
+  { id: "recent", name: "最近再生", icon: "refresh" },
+  { id: "added", name: "最近追加", icon: "add" },
+  { id: "fav", name: "お気に入り", icon: "star" },
+  { id: "unplayed", name: "未再生", icon: "audio" },
+  { id: "missing", name: "ファイル欠損", icon: "err" },
 ];
 
 const FACET_AXES: AxisRow[] = [
   { id: "circle", name: "サークル", icon: "folder" },
-  { id: "cv",     name: "CV",       icon: "user" },
+  { id: "cv", name: "CV", icon: "user" },
   { id: "series", name: "シリーズ", icon: "bookmark" },
-  { id: "cat",    name: "カテゴリ", icon: "list" },
-  { id: "tag",    name: "タグ",     icon: "filter" },
-  { id: "year",   name: "追加日",   icon: "refresh" },
+  { id: "cat", name: "カテゴリ", icon: "list" },
+  { id: "tag", name: "タグ", icon: "filter" },
+  { id: "year", name: "追加日", icon: "refresh" },
 ];
 
 interface AxisColumnProps {
@@ -39,19 +39,30 @@ interface AxisColumnProps {
   onNewSmartFolder?: () => void;
 }
 
-function AxisRowItem({ ax, isActive, onSelect }: { ax: AxisRow; isActive: boolean; onSelect: () => void }) {
-  const Ic = (I as Record<string, (p: { size?: number }) => React.ReactElement>)[ax.icon] ?? I.folder;
+function AxisRowItem({
+  ax,
+  isActive,
+  onSelect,
+}: {
+  ax: AxisRow;
+  isActive: boolean;
+  onSelect: () => void;
+}) {
+  const Ic =
+    (I as Record<string, (p: { size?: number }) => React.ReactElement>)[ax.icon] ?? I.folder;
   return (
-    <button
-      type="button"
-      className={`mll-axis ${isActive ? "is-on" : ""}`}
-      onClick={onSelect}
-    >
-      <span className="ic"><Ic size={14} /></span>
+    <button type="button" className={`mll-axis ${isActive ? "is-on" : ""}`} onClick={onSelect}>
+      <span className="ic">
+        <Ic size={14} />
+      </span>
       <span className="nm">{ax.name}</span>
       {ax.badge != null && <span className="badge">{ax.badge}</span>}
       {ax.count != null && <span className="count">{ax.count}</span>}
-      {!ax.isAction && <span className="chev"><I.chev size={11} /></span>}
+      {!ax.isAction && (
+        <span className="chev">
+          <I.chev size={11} />
+        </span>
+      )}
     </button>
   );
 }
@@ -107,7 +118,9 @@ export default function AxisColumn({
             />
           ))}
           <button type="button" className="mll-axis is-action" onClick={onNewSmartFolder}>
-            <span className="ic"><I.add size={14} /></span>
+            <span className="ic">
+              <I.add size={14} />
+            </span>
             <span className="nm">+ 新規スマートフォルダー</span>
           </button>
         </div>

@@ -15,10 +15,13 @@ const nativePathOperations: PathOperations = { isAbsolute, relative, sep };
 export function isPathWithin(
   base: string,
   target: string,
-  operations: PathOperations = nativePathOperations
+  operations: PathOperations = nativePathOperations,
 ): boolean {
   const rel = operations.relative(base, target);
-  return rel === "" || (rel !== ".." && !rel.startsWith(`..${operations.sep}`) && !operations.isAbsolute(rel));
+  return (
+    rel === "" ||
+    (rel !== ".." && !rel.startsWith(`..${operations.sep}`) && !operations.isAbsolute(rel))
+  );
 }
 
 /** base 配下の target を API 用の `/` 区切り相対パスへ変換する。 */

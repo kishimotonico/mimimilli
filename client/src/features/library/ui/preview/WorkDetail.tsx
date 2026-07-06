@@ -3,10 +3,7 @@ import type { Work, WorkPatch } from "@mimimilli/shared";
 import CoverImg from "../../../../entities/work/ui/CoverImg";
 import Tag from "../../../../entities/work/ui/Tag";
 import { parseTag } from "../../../../entities/work/model";
-import {
-  buildWorkPatchTags,
-  getEditableFlatTags,
-} from "../../../../entities/work/editableTags";
+import { buildWorkPatchTags, getEditableFlatTags } from "../../../../entities/work/editableTags";
 import { I } from "../../../../shared/ui/Icon";
 import Button from "../../../../shared/ui/Button";
 import IconButton from "../../../../shared/ui/IconButton";
@@ -33,9 +30,7 @@ function getClampedPopoverLayout(anchor: HTMLElement, preferredWidth: number): P
   const width = Math.min(preferredWidth, availableWidth);
   const minLeft = visibleLeft - anchorRect.left;
   const maxLeft = visibleRight - width - anchorRect.left;
-  const left = maxLeft < minLeft
-    ? minLeft
-    : Math.min(Math.max(0, minLeft), maxLeft);
+  const left = maxLeft < minLeft ? minLeft : Math.min(Math.max(0, minLeft), maxLeft);
 
   return { left, width };
 }
@@ -59,13 +54,12 @@ export function WorkDetail({
   isPatching,
   onPatchWork,
 }: WorkDetailProps) {
-  const playlist = work.playlists.find((p) => p.name === (work.defaultPlaylist ?? "default")) ?? work.playlists[0];
+  const playlist =
+    work.playlists.find((p) => p.name === (work.defaultPlaylist ?? "default")) ?? work.playlists[0];
   const tracks = playlist?.tracks ?? [];
   const isPlayable = work.status === "ok";
   const hasResume =
-    work.resumePosition > 0
-    && work.resumeTrackIndex >= 0
-    && work.resumeTrackIndex < tracks.length;
+    work.resumePosition > 0 && work.resumeTrackIndex >= 0 && work.resumeTrackIndex < tracks.length;
   const resumeTrack = hasResume ? tracks[work.resumeTrackIndex] : null;
   const resumeTime = formatTime(work.resumePosition);
   const [actionPopoverMode, setActionPopoverMode] = useState<"menu" | "title" | null>(null);
@@ -89,19 +83,12 @@ export function WorkDetail({
 
   const structuredTags = useMemo(
     () => work.tags.filter((tag) => parseTag(tag).kind !== "flat"),
-    [work.tags]
+    [work.tags],
   );
-  const editableFlatTags = useMemo(
-    () => getEditableFlatTags(work.tags),
-    [work.tags]
-  );
+  const editableFlatTags = useMemo(() => getEditableFlatTags(work.tags), [work.tags]);
   const flatTagSuggestions = useMemo(
-    () => [
-      ...new Set(
-        tagSuggestions.filter((tag) => parseTag(tag).kind === "flat")
-      ),
-    ],
-    [tagSuggestions]
+    () => [...new Set(tagSuggestions.filter((tag) => parseTag(tag).kind === "flat"))],
+    [tagSuggestions],
   );
 
   useEffect(() => {
@@ -114,9 +101,9 @@ export function WorkDetail({
 
     const closeOnOutsidePointerDown = (event: PointerEvent) => {
       if (
-        tagPopoverRef.current
-        && event.target instanceof Node
-        && !tagPopoverRef.current.contains(event.target)
+        tagPopoverRef.current &&
+        event.target instanceof Node &&
+        !tagPopoverRef.current.contains(event.target)
       ) {
         setIsTagPopoverOpen(false);
       }
@@ -140,9 +127,9 @@ export function WorkDetail({
 
     const closeOnOutsidePointerDown = (event: PointerEvent) => {
       if (
-        actionPopoverRef.current
-        && event.target instanceof Node
-        && !actionPopoverRef.current.contains(event.target)
+        actionPopoverRef.current &&
+        event.target instanceof Node &&
+        !actionPopoverRef.current.contains(event.target)
       ) {
         setActionPopoverMode(null);
         setTitleDraft(work.title);
@@ -173,11 +160,11 @@ export function WorkDetail({
 
       const nextLayout = getClampedPopoverLayout(anchor, TAG_POPOVER_WIDTH);
 
-      setTagPopoverLayout((current) => (
+      setTagPopoverLayout((current) =>
         current.left === nextLayout.left && current.width === nextLayout.width
           ? current
-          : nextLayout
-      ));
+          : nextLayout,
+      );
     };
 
     updateTagPopoverLayout();
@@ -199,11 +186,11 @@ export function WorkDetail({
 
       const nextLayout = getClampedPopoverLayout(anchor, ACTION_POPOVER_WIDTH);
 
-      setActionPopoverLayout((current) => (
+      setActionPopoverLayout((current) =>
         current.left === nextLayout.left && current.width === nextLayout.width
           ? current
-          : nextLayout
-      ));
+          : nextLayout,
+      );
     };
 
     updateActionPopoverLayout();
@@ -265,9 +252,11 @@ export function WorkDetail({
   const addFlatTag = async (tag: string) => {
     const nextTag = tag.trim();
     if (
-      !nextTag
-      || parseTag(nextTag).kind !== "flat"
-      || editableFlatTags.some((current) => current.toLocaleLowerCase() === nextTag.toLocaleLowerCase())
+      !nextTag ||
+      parseTag(nextTag).kind !== "flat" ||
+      editableFlatTags.some(
+        (current) => current.toLocaleLowerCase() === nextTag.toLocaleLowerCase(),
+      )
     ) {
       return;
     }
@@ -297,13 +286,27 @@ export function WorkDetail({
     <div className="mle-prv__body">
       <div className="mle-prv__hero">
         <div className="mle-prv__cover">
-          <CoverImg id={work.id} title={work.title} hasCover={!!work.coverImage} size={140} radius={6} />
+          <CoverImg
+            id={work.id}
+            title={work.title}
+            hasCover={!!work.coverImage}
+            size={140}
+            radius={6}
+          />
         </div>
         <div className="mle-prv__meta">
           <div className="mle-prv__kicker">
             {work.status === "ok" && <span className="reg">登録済</span>}
-            {work.status === "missing" && <span className="warn"><I.err size={11} /> ファイル欠損</span>}
-            {work.status === "error" && <span className="warn"><I.err size={11} /> メタ読み込みエラー</span>}
+            {work.status === "missing" && (
+              <span className="warn">
+                <I.err size={11} /> ファイル欠損
+              </span>
+            )}
+            {work.status === "error" && (
+              <span className="warn">
+                <I.err size={11} /> メタ読み込みエラー
+              </span>
+            )}
             <span className="inline-flex items-center gap-[3px] tracking-normal">
               <span className="font-sans text-[9.5px] text-ink-4">追加</span>
               <span className="font-mono text-[10px] text-ink-2">{formatDate(work.addedAt)}</span>
@@ -313,7 +316,9 @@ export function WorkDetail({
                 <span className="text-ink-4">·</span>
                 <span className="inline-flex items-center gap-[3px] tracking-normal">
                   <span className="font-sans text-[9.5px] text-ink-4">最終再生</span>
-                  <span className="font-mono text-[10px] text-ink-2">{formatDate(work.lastPlayedAt)}</span>
+                  <span className="font-mono text-[10px] text-ink-2">
+                    {formatDate(work.lastPlayedAt)}
+                  </span>
                 </span>
               </>
             )}
@@ -325,14 +330,21 @@ export function WorkDetail({
             <div className="mle-prv__row">
               {tracks.length > 0 && <span>{tracks.length} トラック</span>}
               {work.totalDurationSec > 0 && (
-                <><span className="dot">·</span><span>{formatDuration(work.totalDurationSec)}</span></>
+                <>
+                  <span className="dot">·</span>
+                  <span>{formatDuration(work.totalDurationSec)}</span>
+                </>
               )}
             </div>
           )}
           <div className="mle-prv__tag-row">
             <div className="mle-prv__tags">
               {structuredTags.map((tag) => (
-                <span key={tag} className="inline-flex" title="分類タグはメタデータ保護のため編集対象外です">
+                <span
+                  key={tag}
+                  className="inline-flex"
+                  title="分類タグはメタデータ保護のため編集対象外です"
+                >
                   <Tag tag={tag} />
                 </span>
               ))}
@@ -378,7 +390,11 @@ export function WorkDetail({
               </div>
             </div>
           </div>
-          {editError && <p className="mle-prv__edit-error" role="alert">{editError}</p>}
+          {editError && (
+            <p className="mle-prv__edit-error" role="alert">
+              {editError}
+            </p>
+          )}
           <div className="mle-prv__actions">
             {hasResume && isPlayable ? (
               <>
@@ -403,7 +419,9 @@ export function WorkDetail({
                 icon={I.play}
                 disabled={!isPlayable}
                 aria-disabled={!isPlayable}
-                onClick={() => { if (isPlayable) onPlay(0); }}
+                onClick={() => {
+                  if (isPlayable) onPlay(0);
+                }}
               >
                 最初から再生
               </Button>
@@ -427,7 +445,7 @@ export function WorkDetail({
                 active={actionPopoverMode !== null}
                 onClick={() => {
                   setEditError(null);
-                  setActionPopoverMode((mode) => mode === "menu" ? null : "menu");
+                  setActionPopoverMode((mode) => (mode === "menu" ? null : "menu"));
                 }}
               />
               {actionPopoverMode && (
@@ -513,7 +531,9 @@ export function WorkDetail({
           <I.err size={16} />
           <div className="mle-prv__warn-body">
             <p className="mle-prv__warn-title">ファイルが見つかりません</p>
-            <p className="mle-prv__warn-text">登録時のフォルダーが移動または削除された可能性があります。再生はできません。</p>
+            <p className="mle-prv__warn-text">
+              登録時のフォルダーが移動または削除された可能性があります。再生はできません。
+            </p>
             <p className="mle-prv__warn-path">{work.physicalPath}</p>
           </div>
         </div>
@@ -524,7 +544,9 @@ export function WorkDetail({
           <I.err size={16} />
           <div className="mle-prv__warn-body">
             <p className="mle-prv__warn-title">メタデータの読み込みに失敗しました</p>
-            <p className="mle-prv__warn-text">{work.errorMessage ?? "詳細不明のエラーが発生しました。"}</p>
+            <p className="mle-prv__warn-text">
+              {work.errorMessage ?? "詳細不明のエラーが発生しました。"}
+            </p>
             <p className="mle-prv__warn-path">{work.physicalPath}</p>
           </div>
         </div>
@@ -543,7 +565,9 @@ export function WorkDetail({
                 key={i}
                 className={`mle-prv__trk ${playingTrackIndex === i ? "is-now" : ""} ${hasResume && work.resumeTrackIndex === i ? "is-resume" : ""} ${!isPlayable ? "is-disabled" : ""}`}
                 disabled={!isPlayable}
-                onClick={() => { if (isPlayable) onPlay(i); }}
+                onClick={() => {
+                  if (isPlayable) onPlay(i);
+                }}
               >
                 <span className="num">{String(i + 1).padStart(2, "0")}</span>
                 <span className="name">

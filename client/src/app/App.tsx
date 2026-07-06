@@ -41,7 +41,7 @@ export default function App() {
   const playRequestIdRef = useRef(0);
 
   const [mode, setMode] = useState<AppMode>(
-    () => parseNavigationUrl(window.location.href).state.mode
+    () => parseNavigationUrl(window.location.href).state.mode,
   );
   const [searchQuery, setSearchQuery] = useState("");
   const [showSettings, setShowSettings] = useState(false);
@@ -70,7 +70,11 @@ export default function App() {
   const settings = settingsQuery.data;
   const isSetupDone: boolean | null = settingsQuery.isPending
     ? null
-    : settings?.rootFolder != null ? true : settingsQuery.isError ? false : false;
+    : settings?.rootFolder != null
+      ? true
+      : settingsQuery.isError
+        ? false
+        : false;
 
   // ファイルモードのナビゲーション（フックは早期 return 前に呼ぶ）。
   const rootFolder = settings?.rootFolder ?? "/";
@@ -102,54 +106,63 @@ export default function App() {
   });
 
   // ── Play handler ──────────────────────────────────────────
-  const handlePlay = useCallback(async (work: WorkSummary, trackIndex: number) => {
-    // ファイル欠損・メタ読み込みエラーの作品は再生できない（UI側の無効化が第一線、これは防衛線）。
-    if (work.status !== "ok") return;
-    const requestId = ++playRequestIdRef.current;
-    try {
-      const cached = queryClient.getQueryData<Awaited<ReturnType<typeof getWork>>>(
-        LIBRARY_KEYS.workDetail(work.id)
-      );
-      const fullWork = cached ?? await getWork(work.id);
-      if (requestId !== playRequestIdRef.current) return;
-      if (!fullWork) return;
-      const playlist = fullWork.playlists.find(
-        (p) => p.name === (fullWork.defaultPlaylist ?? "default")
-      ) ?? fullWork.playlists[0];
-      const tracks = playlist?.tracks ?? [];
-      if (tracks.length > 0) {
-        player.play(work, tracks, Math.min(trackIndex, tracks.length - 1));
+  const handlePlay = useCallback(
+    async (work: WorkSummary, trackIndex: number) => {
+      // ファイル欠損・メタ読み込みエラーの作品は再生できない（UI側の無効化が第一線、これは防衛線）。
+      if (work.status !== "ok") return;
+      const requestId = ++playRequestIdRef.current;
+      try {
+        const cached = queryClient.getQueryData<Awaited<ReturnType<typeof getWork>>>(
+          LIBRARY_KEYS.workDetail(work.id),
+        );
+        const fullWork = cached ?? (await getWork(work.id));
+        if (requestId !== playRequestIdRef.current) return;
+        if (!fullWork) return;
+        const playlist =
+          fullWork.playlists.find((p) => p.name === (fullWork.defaultPlaylist ?? "default")) ??
+          fullWork.playlists[0];
+        const tracks = playlist?.tracks ?? [];
+        if (tracks.length > 0) {
+          player.play(work, tracks, Math.min(trackIndex, tracks.length - 1));
+        }
+      } catch (err) {
+        console.error("作品の再生に失敗しました", err);
       }
-    } catch (err) {
-      console.error("作品の再生に失敗しました", err);
-    }
-  }, [player, queryClient]);
+    },
+    [player, queryClient],
+  );
 
-  const handleResume = useCallback((work: Work) => {
-    if (work.status !== "ok") return;
-    ++playRequestIdRef.current;
-    player.playWithResume(work);
-  }, [player]);
+  const handleResume = useCallback(
+    (work: Work) => {
+      if (work.status !== "ok") return;
+      ++playRequestIdRef.current;
+      player.playWithResume(work);
+    },
+    [player],
+  );
 
   // ファイルモード: 作品配下の音声ファイルを単一トラックとして常駐プレイヤーで再生する。
   // 作品の外にあるファイル（workId/workRelPath なし）は既存メディア配信で扱えないため再生しない。
-  const handlePlayFile = useCallback(async (entry: FsEntry) => {
-    if (!entry.workId || !entry.workRelPath) return;
-    const requestId = ++playRequestIdRef.current;
-    try {
-      const cached = queryClient.getQueryData<Awaited<ReturnType<typeof getWork>>>(
-        LIBRARY_KEYS.workDetail(entry.workId)
-      );
-      const fullWork = cached ?? await getWork(entry.workId);
-      if (requestId !== playRequestIdRef.current) return;
-      if (!fullWork) return;
-      // ファイル欠損・メタ読み込みエラーの作品配下のファイルは再生できない。
-      if (fullWork.status !== "ok") return;
-      player.play(fullWork, [{ title: entry.name, file: entry.workRelPath }], 0);
-    } catch (err) {
-      console.error("ファイルの再生に失敗しました", err);
-    }
-  }, [player, queryClient]);
+  const handlePlayFile = useCallback(
+    async (entry: FsEntry) => {
+      if (!entry.workId || !entry.workRelPath) return;
+      const requestId = ++playRequestIdRef.current;
+      try {
+        const cached = queryClient.getQueryData<Awaited<ReturnType<typeof getWork>>>(
+          LIBRARY_KEYS.workDetail(entry.workId),
+        );
+        const fullWork = cached ?? (await getWork(entry.workId));
+        if (requestId !== playRequestIdRef.current) return;
+        if (!fullWork) return;
+        // ファイル欠損・メタ読み込みエラーの作品配下のファイルは再生できない。
+        if (fullWork.status !== "ok") return;
+        player.play(fullWork, [{ title: entry.name, file: entry.workRelPath }], 0);
+      } catch (err) {
+        console.error("ファイルの再生に失敗しました", err);
+      }
+    },
+    [player, queryClient],
+  );
 
   // 再生中の作品をライブラリ「すべての作品」上で選択状態にして表示する。
   // ファイル欠損等で登録から外れた作品の場合、該当なしになるが実害はない。
@@ -163,27 +176,30 @@ export default function App() {
 
   const handleScan = useCallback(() => scanMutation.mutate(), [scanMutation]);
 
-  const handleSetupComplete = useCallback(async (path: string) => {
-    setIsCompletingSetup(true);
-    try {
-      await setRootFolder(path);
-      queryClient.invalidateQueries({ queryKey: SETTINGS_KEY });
-      const result = await scanLibrary();
-      setScanResult(result);
-      queryClient.invalidateQueries({ queryKey: ["works"] });
-      queryClient.invalidateQueries({ queryKey: ["axisFacets"] });
-      queryClient.invalidateQueries({ queryKey: ["smartFolderWorks"] });
-      queryClient.setQueryData(SETTINGS_KEY, (prev: typeof settings) =>
-        prev ? { ...prev, rootFolder: path } : prev
-      );
-    } finally {
-      setIsCompletingSetup(false);
-    }
-  }, [queryClient]);
+  const handleSetupComplete = useCallback(
+    async (path: string) => {
+      setIsCompletingSetup(true);
+      try {
+        await setRootFolder(path);
+        queryClient.invalidateQueries({ queryKey: SETTINGS_KEY });
+        const result = await scanLibrary();
+        setScanResult(result);
+        queryClient.invalidateQueries({ queryKey: ["works"] });
+        queryClient.invalidateQueries({ queryKey: ["axisFacets"] });
+        queryClient.invalidateQueries({ queryKey: ["smartFolderWorks"] });
+        queryClient.setQueryData(SETTINGS_KEY, (prev: typeof settings) =>
+          prev ? { ...prev, rootFolder: path } : prev,
+        );
+      } finally {
+        setIsCompletingSetup(false);
+      }
+    },
+    [queryClient],
+  );
 
   const handleChangeFolder = useCallback(
     (path: string) => changeFolderMutation.mutate(path),
-    [changeFolderMutation]
+    [changeFolderMutation],
   );
 
   const handleExport = useCallback(async () => {
@@ -196,14 +212,27 @@ export default function App() {
       a.download = "mimimilli-export.json";
       a.click();
       URL.revokeObjectURL(url);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   // ── ローディング ──────────────────────────────────────────
   if (isSetupDone === null) {
     return (
-      <div style={{ width: "100%", height: "100vh", background: "var(--paper-0)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <span style={{ fontFamily: "var(--font-jp)", fontSize: 13, color: "var(--ink-4)" }}>読み込み中...</span>
+      <div
+        style={{
+          width: "100%",
+          height: "100vh",
+          background: "var(--paper-0)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <span style={{ fontFamily: "var(--font-jp)", fontSize: 13, color: "var(--ink-4)" }}>
+          読み込み中...
+        </span>
       </div>
     );
   }
@@ -242,7 +271,13 @@ export default function App() {
           onSortChange={libraryNav.setSort}
         />
       }
-      leftNav={<LeftNav mode={mode} onModeChange={navigationHistory.setMode} playingCount={isPlaying ? 1 : 0} />}
+      leftNav={
+        <LeftNav
+          mode={mode}
+          onModeChange={navigationHistory.setMode}
+          playingCount={isPlaying ? 1 : 0}
+        />
+      }
       body={
         mode === "files" ? (
           <FilesView
@@ -310,10 +345,7 @@ export default function App() {
             />
           )}
           {scanResult && (
-            <NewWorkPopup
-              scanResult={scanResult}
-              onClose={() => setScanResult(null)}
-            />
+            <NewWorkPopup scanResult={scanResult} onClose={() => setScanResult(null)} />
           )}
         </>
       }

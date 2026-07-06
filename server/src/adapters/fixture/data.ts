@@ -19,8 +19,18 @@ export const SEED_WORKS: WorkSummary[] = [
     totalDurationSec: 5400, // 1時間30分
     addedAt: "2025-04-12T09:00:00.000Z",
     errorMessage: null,
-    urls: [{ label: "DLsite", url: "https://www.dlsite.com/maniax/work/=/product_id/RJ501001.html" }],
-    tags: ["サークル/夜想曲スタジオ", "cv/水瀬なずな", "シリーズ/図書室シリーズ", "カテゴリ/ASMR", "囁き", "朗読", "癒し系"],
+    urls: [
+      { label: "DLsite", url: "https://www.dlsite.com/maniax/work/=/product_id/RJ501001.html" },
+    ],
+    tags: [
+      "サークル/夜想曲スタジオ",
+      "cv/水瀬なずな",
+      "シリーズ/図書室シリーズ",
+      "カテゴリ/ASMR",
+      "囁き",
+      "朗読",
+      "癒し系",
+    ],
     trackCount: 6,
     bookmarked: true,
     lastPlayedAt: "2026-06-01T21:00:00.000Z",
@@ -34,8 +44,17 @@ export const SEED_WORKS: WorkSummary[] = [
     totalDurationSec: 9000, // 2時間30分
     addedAt: "2025-05-20T10:30:00.000Z",
     errorMessage: null,
-    urls: [{ label: "DLsite", url: "https://www.dlsite.com/maniax/work/=/product_id/RJ501002.html" }],
-    tags: ["サークル/夜想曲スタジオ", "cv/霧島レイ", "シリーズ/添い寝カフェ", "カテゴリ/ASMR", "添い寝", "日常系"],
+    urls: [
+      { label: "DLsite", url: "https://www.dlsite.com/maniax/work/=/product_id/RJ501002.html" },
+    ],
+    tags: [
+      "サークル/夜想曲スタジオ",
+      "cv/霧島レイ",
+      "シリーズ/添い寝カフェ",
+      "カテゴリ/ASMR",
+      "添い寝",
+      "日常系",
+    ],
     trackCount: 4,
     bookmarked: true,
     lastPlayedAt: "2026-05-28T22:15:00.000Z",
@@ -49,8 +68,16 @@ export const SEED_WORKS: WorkSummary[] = [
     totalDurationSec: 1800, // 30分
     addedAt: "2025-06-03T08:00:00.000Z",
     errorMessage: null,
-    urls: [{ label: "DLsite", url: "https://www.dlsite.com/maniax/work/=/product_id/RJ501003.html" }],
-    tags: ["サークル/月白製作所", "cv/天音かなで", "カテゴリ/シチュエーションボイス", "幼馴染", "日常系"],
+    urls: [
+      { label: "DLsite", url: "https://www.dlsite.com/maniax/work/=/product_id/RJ501003.html" },
+    ],
+    tags: [
+      "サークル/月白製作所",
+      "cv/天音かなで",
+      "カテゴリ/シチュエーションボイス",
+      "幼馴染",
+      "日常系",
+    ],
     trackCount: 3,
     bookmarked: false,
     lastPlayedAt: null,
@@ -64,8 +91,17 @@ export const SEED_WORKS: WorkSummary[] = [
     totalDurationSec: 7200, // 2時間
     addedAt: "2024-09-15T12:00:00.000Z",
     errorMessage: null,
-    urls: [{ label: "DLsite", url: "https://www.dlsite.com/maniax/work/=/product_id/RJ501004.html" }],
-    tags: ["サークル/月白製作所", "cv/霧島レイ", "シリーズ/誘導ボイスシリーズ", "カテゴリ/催眠", "バイノーラル", "誘導"],
+    urls: [
+      { label: "DLsite", url: "https://www.dlsite.com/maniax/work/=/product_id/RJ501004.html" },
+    ],
+    tags: [
+      "サークル/月白製作所",
+      "cv/霧島レイ",
+      "シリーズ/誘導ボイスシリーズ",
+      "カテゴリ/催眠",
+      "バイノーラル",
+      "誘導",
+    ],
     trackCount: 5,
     bookmarked: false,
     lastPlayedAt: "2025-12-20T23:00:00.000Z",
@@ -79,8 +115,18 @@ export const SEED_WORKS: WorkSummary[] = [
     totalDurationSec: 10800, // 3時間
     addedAt: "2024-11-02T07:30:00.000Z",
     errorMessage: null,
-    urls: [{ label: "DLsite", url: "https://www.dlsite.com/maniax/work/=/product_id/RJ501005.html" }],
-    tags: ["サークル/夜想曲スタジオ", "cv/水瀬なずな", "カテゴリ/ASMR", "耳かき", "マッサージ", "癒し系", "ソロ"],
+    urls: [
+      { label: "DLsite", url: "https://www.dlsite.com/maniax/work/=/product_id/RJ501005.html" },
+    ],
+    tags: [
+      "サークル/夜想曲スタジオ",
+      "cv/水瀬なずな",
+      "カテゴリ/ASMR",
+      "耳かき",
+      "マッサージ",
+      "癒し系",
+      "ソロ",
+    ],
     trackCount: 8,
     bookmarked: true,
     lastPlayedAt: "2026-03-11T19:45:00.000Z",
@@ -94,8 +140,19 @@ export const SEED_WORKS: WorkSummary[] = [
     totalDurationSec: 18000, // 5時間
     addedAt: "2024-07-19T11:00:00.000Z",
     errorMessage: null,
-    urls: [{ label: "DLsite", url: "https://www.dlsite.com/maniax/work/=/product_id/RJ501006.html" }],
-    tags: ["サークル/月白製作所", "cv/天音かなで", "cv/霧島レイ", "シリーズ/辺境の魔法使いシリーズ", "カテゴリ/ドラマ", "フルボイス", "ファンタジー", "長編"],
+    urls: [
+      { label: "DLsite", url: "https://www.dlsite.com/maniax/work/=/product_id/RJ501006.html" },
+    ],
+    tags: [
+      "サークル/月白製作所",
+      "cv/天音かなで",
+      "cv/霧島レイ",
+      "シリーズ/辺境の魔法使いシリーズ",
+      "カテゴリ/ドラマ",
+      "フルボイス",
+      "ファンタジー",
+      "長編",
+    ],
     trackCount: 20,
     bookmarked: false,
     lastPlayedAt: "2025-08-05T20:00:00.000Z",
@@ -124,8 +181,17 @@ export const SEED_WORKS: WorkSummary[] = [
     totalDurationSec: 3600, // 1時間
     addedAt: "2026-05-25T13:00:00.000Z",
     errorMessage: null,
-    urls: [{ label: "DLsite", url: "https://www.dlsite.com/maniax/work/=/product_id/RJ501008.html" }],
-    tags: ["サークル/月白製作所", "cv/天音かなで", "カテゴリ/シチュエーションボイス", "ツンデレ", "後輩", "スポーツ"],
+    urls: [
+      { label: "DLsite", url: "https://www.dlsite.com/maniax/work/=/product_id/RJ501008.html" },
+    ],
+    tags: [
+      "サークル/月白製作所",
+      "cv/天音かなで",
+      "カテゴリ/シチュエーションボイス",
+      "ツンデレ",
+      "後輩",
+      "スポーツ",
+    ],
     trackCount: 2,
     bookmarked: false,
     lastPlayedAt: null,
@@ -154,7 +220,9 @@ export const SEED_WORKS: WorkSummary[] = [
     totalDurationSec: 6300, // 1時間45分
     addedAt: "2023-05-30T15:00:00.000Z",
     errorMessage: null,
-    urls: [{ label: "DLsite", url: "https://www.dlsite.com/maniax/work/=/product_id/RJ501010.html" }],
+    urls: [
+      { label: "DLsite", url: "https://www.dlsite.com/maniax/work/=/product_id/RJ501010.html" },
+    ],
     tags: ["サークル/夜想曲スタジオ", "cv/水瀬なずな", "カテゴリ/ドラマ", "朗読", "癒し系"],
     trackCount: 4,
     bookmarked: true,
@@ -169,8 +237,16 @@ export const SEED_WORKS: WorkSummary[] = [
     totalDurationSec: 2100, // 35分
     addedAt: "2026-06-12T00:00:00.000Z",
     errorMessage: null,
-    urls: [{ label: "DLsite", url: "https://www.dlsite.com/maniax/work/=/product_id/RJ501011.html" }],
-    tags: ["サークル/月白製作所", "cv/霧島レイ", "カテゴリ/シチュエーションボイス", "ツンデレ", "後輩"],
+    urls: [
+      { label: "DLsite", url: "https://www.dlsite.com/maniax/work/=/product_id/RJ501011.html" },
+    ],
+    tags: [
+      "サークル/月白製作所",
+      "cv/霧島レイ",
+      "カテゴリ/シチュエーションボイス",
+      "ツンデレ",
+      "後輩",
+    ],
     trackCount: 4,
     bookmarked: false,
     lastPlayedAt: null,
@@ -261,7 +337,7 @@ export function buildWorkFileTree(work: WorkSummary): FsNode[] {
       fsDir("特典", [
         fsFile("台本.pdf", "pdf", 640 * 1024),
         fsFile("あとがき.txt", "text", 3 * 1024),
-      ])
+      ]),
     );
   }
 
@@ -273,10 +349,11 @@ function fsWorkFolder(work: WorkSummary): FsNode {
   const folderName = work.physicalPath.split("/").filter(Boolean).pop() ?? work.id;
 
   function annotate(nodes: FsNode[]): FsNode[] {
-    return nodes.map((n): FsNode =>
-      n.isDir
-        ? { ...n, children: annotate(n.children) }
-        : { ...n, workId: work.id, workRelPath: n.name }
+    return nodes.map(
+      (n): FsNode =>
+        n.isDir
+          ? { ...n, children: annotate(n.children) }
+          : { ...n, workId: work.id, workRelPath: n.name },
     );
   }
 
@@ -304,7 +381,12 @@ export function buildFsRoot(works: WorkSummary[]): FsNode {
 
   const circleDirs: FsNode[] = [...byCircle.entries()]
     .sort(([a], [b]) => a.localeCompare(b, "ja"))
-    .map(([circle, circleWorks]) => fsDir(circle, circleWorks.map((w) => fsWorkFolder(w))));
+    .map(([circle, circleWorks]) =>
+      fsDir(
+        circle,
+        circleWorks.map((w) => fsWorkFolder(w)),
+      ),
+    );
 
   return fsDir("library", [fsDir("dlsite", circleDirs), fsFile("readme.txt", "text", 512)]);
 }

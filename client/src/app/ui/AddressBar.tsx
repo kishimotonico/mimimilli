@@ -57,7 +57,13 @@ export default function AddressBar({
   return (
     <div className="mle-addr is-lib">
       <IconButton size="sm" icon={I.arrowL} label="戻る" onClick={onBack} disabled={!canBack} />
-      <IconButton size="sm" icon={I.arrowR} label="進む" onClick={onForward} disabled={!canForward} />
+      <IconButton
+        size="sm"
+        icon={I.arrowR}
+        label="進む"
+        onClick={onForward}
+        disabled={!canForward}
+      />
 
       <div className="mle-crumbs">
         {path.map((seg, i) => (
@@ -74,9 +80,31 @@ export default function AddressBar({
       </div>
 
       <div className="inline-flex items-center gap-[1px] rounded-2 bg-paper-2 p-[2px]">
-        <IconButton size="sm" icon={I.gridS} label="カラム" active={viewMode === "column"} onClick={() => onViewChange?.("column")} />
-        <IconButton size="sm" icon={I.list} label="リスト" active={viewMode === "list"} onClick={() => onViewChange?.("list")} disabled title="近日実装" />
-        <IconButton size="sm" icon={I.grid} label="グリッド" active={viewMode === "grid"} onClick={() => onViewChange?.("grid")} disabled title="近日実装" />
+        <IconButton
+          size="sm"
+          icon={I.gridS}
+          label="カラム"
+          active={viewMode === "column"}
+          onClick={() => onViewChange?.("column")}
+        />
+        <IconButton
+          size="sm"
+          icon={I.list}
+          label="リスト"
+          active={viewMode === "list"}
+          onClick={() => onViewChange?.("list")}
+          disabled
+          title="近日実装"
+        />
+        <IconButton
+          size="sm"
+          icon={I.grid}
+          label="グリッド"
+          active={viewMode === "grid"}
+          onClick={() => onViewChange?.("grid")}
+          disabled
+          title="近日実装"
+        />
       </div>
 
       {showSort && (

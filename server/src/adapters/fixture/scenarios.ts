@@ -40,7 +40,7 @@ export function parseFixtureScenarioId(rawId: string | undefined): FixtureScenar
     return rawId as FixtureScenarioId;
   }
   throw new Error(
-    `不明な MIMIMILLI_MOCK_SCENARIO です: ${rawId}（指定可能な値: ${SCENARIO_IDS.join(", ")}）`
+    `不明な MIMIMILLI_MOCK_SCENARIO です: ${rawId}（指定可能な値: ${SCENARIO_IDS.join(", ")}）`,
   );
 }
 

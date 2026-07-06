@@ -72,7 +72,13 @@ export default function FullScreenPlayer({
         {/* Stage: cover + metadata */}
         <div className="grid min-h-0 flex-1 grid-cols-[320px_1fr] items-center gap-12">
           <div className="h-[320px] w-[320px] overflow-hidden rounded-[10px] shadow-[var(--shadow-cover),0_30px_60px_-16px_oklch(20%_0.020_70/0.25)]">
-            <CoverImg id={currentWork.id} title={currentWork.title} hasCover={!!currentWork.coverImage} size={320} radius={10} />
+            <CoverImg
+              id={currentWork.id}
+              title={currentWork.title}
+              hasCover={!!currentWork.coverImage}
+              size={320}
+              radius={10}
+            />
           </div>
 
           <div className="flex min-w-0 flex-col gap-2.5">
@@ -87,14 +93,20 @@ export default function FullScreenPlayer({
             <div className="mt-3.5">
               <div
                 ref={seek.trackRef}
-                className={cn("mle-fullscreen__seek relative flex h-[18px] cursor-pointer items-center", seek.dragging && "is-dragging")}
+                className={cn(
+                  "mle-fullscreen__seek relative flex h-[18px] cursor-pointer items-center",
+                  seek.dragging && "is-dragging",
+                )}
                 onPointerDown={seek.onPointerDown}
                 onPointerMove={seek.onPointerMove}
                 onPointerUp={seek.onPointerUp}
                 onPointerLeave={seek.onPointerLeave}
               >
                 <div className="relative h-1 w-full rounded-[2px] bg-paper-3">
-                  <div className="absolute bottom-0 left-0 top-0 rounded-[2px] bg-ink-0" style={{ width: `${Math.min(100, pct)}%` }} />
+                  <div
+                    className="absolute bottom-0 left-0 top-0 rounded-[2px] bg-ink-0"
+                    style={{ width: `${Math.min(100, pct)}%` }}
+                  />
                 </div>
                 {seek.hoverRatio !== null && duration > 0 && (
                   <div className="mle-seek-tooltip" style={{ left: `${seek.hoverRatio * 100}%` }}>
@@ -171,7 +183,9 @@ export default function FullScreenPlayer({
                   isCurrent ? "bg-acc-soft" : "bg-transparent",
                 )}
               >
-                <span className={cn("font-mono text-[10.5px]", isCurrent ? "text-acc" : "text-ink-3")}>
+                <span
+                  className={cn("font-mono text-[10.5px]", isCurrent ? "text-acc" : "text-ink-3")}
+                >
                   {String(i + 1).padStart(2, "0")}
                 </span>
                 <span

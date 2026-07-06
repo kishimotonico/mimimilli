@@ -25,7 +25,12 @@ import type {
   WorksQuery,
   WorkSummary,
 } from "@mimimilli/shared";
-import { NotConfiguredError, type DataAdapter, type MediaKind, type MediaLocation } from "../../adapter.ts";
+import {
+  NotConfiguredError,
+  type DataAdapter,
+  type MediaKind,
+  type MediaLocation,
+} from "../../adapter.ts";
 import { buildAxisFacets } from "../../core/axisFacets.ts";
 import { evalSmartFolder } from "../../core/smartFolder.ts";
 import { applyWorksQuery } from "../../core/worksQuery.ts";
@@ -53,7 +58,9 @@ export function createRealAdapter(options: RealAdapterOptions): DataAdapter {
   function requireRoot(): string {
     const root = repo.getSetting(KEY_ROOT_FOLDER);
     if (!root) {
-      throw new NotConfiguredError("ルートフォルダーが設定されていません（PUT /api/settings で設定してください）");
+      throw new NotConfiguredError(
+        "ルートフォルダーが設定されていません（PUT /api/settings で設定してください）",
+      );
     }
     return root;
   }
@@ -74,7 +81,9 @@ export function createRealAdapter(options: RealAdapterOptions): DataAdapter {
       try {
         absRoot = realpathSync(resolve(patch.rootFolder));
       } catch {
-        throw new NotConfiguredError(`指定されたルートフォルダーが存在しません: ${patch.rootFolder}`);
+        throw new NotConfiguredError(
+          `指定されたルートフォルダーが存在しません: ${patch.rootFolder}`,
+        );
       }
       repo.setSetting(KEY_ROOT_FOLDER, absRoot);
       return this.getSettings();
@@ -170,7 +179,11 @@ export function createRealAdapter(options: RealAdapterOptions): DataAdapter {
     },
 
     // ── メディア・DLsite ──────────────────────────────────────
-    async locateMedia(kind: MediaKind, workId: string, relPath?: string): Promise<MediaLocation | null> {
+    async locateMedia(
+      kind: MediaKind,
+      workId: string,
+      relPath?: string,
+    ): Promise<MediaLocation | null> {
       const work = repo.getWork(workId);
       if (!work) return null;
 
@@ -194,7 +207,8 @@ export function createRealAdapter(options: RealAdapterOptions): DataAdapter {
       const work = repo.getWork(workId);
       if (!work) return false;
 
-      const patch: { title?: string; tags?: string[]; coverImage?: string; urls?: Work["urls"] } = {};
+      const patch: { title?: string; tags?: string[]; coverImage?: string; urls?: Work["urls"] } =
+        {};
       if (body.applyTitle && body.info.title) patch.title = body.info.title;
       if (body.applyTags) patch.tags = mergeDlsiteTags(work.tags, body.info);
       if (body.info.url && !work.urls.some((entry) => entry.url.includes("dlsite.com"))) {

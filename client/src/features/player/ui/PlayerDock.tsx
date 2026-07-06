@@ -33,7 +33,12 @@ interface PlayerDockProps {
 const DOCK_SLIDE_TRANSITION = { type: "spring" as const, stiffness: 420, damping: 32, mass: 0.9 };
 const DOCK_SWITCH_TRANSITION = { type: "tween" as const, duration: 0.18, ease: "easeOut" as const };
 
-export default function PlayerDock({ isPlaying, state, onExpandFullScreen, ...actions }: PlayerDockProps) {
+export default function PlayerDock({
+  isPlaying,
+  state,
+  onExpandFullScreen,
+  ...actions
+}: PlayerDockProps) {
   const [uiMode, setUiMode] = useAtom(playerUiModeAtom);
   const [switchingUiMode, setSwitchingUiMode] = useState(false);
 

@@ -30,12 +30,30 @@ export function buildFileTree(dirPath: string): FileEntry | null {
       } catch {
         // stat できないファイルはサイズ 0 のまま表示
       }
-      children.push({ name: entry.name, path: full, isDir: false, size, fileType: extOf(entry.name), children: [] });
+      children.push({
+        name: entry.name,
+        path: full,
+        isDir: false,
+        size,
+        fileType: extOf(entry.name),
+        children: [],
+      });
     }
   }
   children.sort((a, b) =>
-    a.isDir !== b.isDir ? (a.isDir ? -1 : 1) : a.name.localeCompare(b.name, "ja", { numeric: true })
+    a.isDir !== b.isDir
+      ? a.isDir
+        ? -1
+        : 1
+      : a.name.localeCompare(b.name, "ja", { numeric: true }),
   );
 
-  return { name: basename(dirPath), path: dirPath, isDir: true, size: 0, fileType: "dir", children };
+  return {
+    name: basename(dirPath),
+    path: dirPath,
+    isDir: true,
+    size: 0,
+    fileType: "dir",
+    children,
+  };
 }

@@ -31,7 +31,9 @@ export function createApp(adapter: DataAdapter): Hono {
   app.route("/api", api);
 
   app.notFound((c) => {
-    const body: ApiError = { error: { code: "not_found", message: `エンドポイントが見つかりません: ${c.req.path}` } };
+    const body: ApiError = {
+      error: { code: "not_found", message: `エンドポイントが見つかりません: ${c.req.path}` },
+    };
     return c.json(body, 404);
   });
 
@@ -44,7 +46,9 @@ export function createApp(adapter: DataAdapter): Hono {
       return c.json(body, 409);
     }
     console.error(err);
-    const body: ApiError = { error: { code: "internal", message: "サーバー内部エラーが発生しました" } };
+    const body: ApiError = {
+      error: { code: "internal", message: "サーバー内部エラーが発生しました" },
+    };
     return c.json(body, 500);
   });
 

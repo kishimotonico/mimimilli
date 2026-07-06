@@ -29,5 +29,7 @@ const adapter = createAdapter();
 const app = createApp(adapter);
 
 serve({ fetch: app.fetch, hostname: "127.0.0.1", port }, (info) => {
-  console.log(`mimimilli server listening on http://localhost:${info.port} (adapter: ${adapterKind})`);
+  console.log(
+    `mimimilli server listening on http://localhost:${info.port} (adapter: ${adapterKind})`,
+  );
 });

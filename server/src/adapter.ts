@@ -34,7 +34,12 @@ export class NotConfiguredError extends Error {}
  *    全体をメモリに保持せず、`read(start, end)` で要求された byte range 分だけ生成する */
 export type MediaLocation =
   | { type: "file"; absolutePath: string; mime: string }
-  | { type: "synthetic"; mime: string; size: number; read: (start: number, end: number) => Uint8Array };
+  | {
+      type: "synthetic";
+      mime: string;
+      size: number;
+      read: (start: number, end: number) => Uint8Array;
+    };
 
 export type MediaKind = "cover" | "audio" | "file";
 

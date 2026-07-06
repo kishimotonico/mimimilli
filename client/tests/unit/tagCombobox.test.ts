@@ -8,9 +8,7 @@ describe("getTagComboboxOptions", () => {
   });
 
   it("filters suggestions by case-insensitive partial match", () => {
-    expect(
-      getTagComboboxOptions("as", ["ASMR", "睡眠用", "Relax ASMR", "環境音"])
-    ).toEqual([
+    expect(getTagComboboxOptions("as", ["ASMR", "睡眠用", "Relax ASMR", "環境音"])).toEqual([
       { kind: "suggestion", value: "ASMR" },
       { kind: "suggestion", value: "Relax ASMR" },
       { kind: "create", value: "as" },
@@ -66,9 +64,7 @@ describe("getTagComboboxOptions", () => {
 
   it("does not show excluded tags or create an excluded exact tag", () => {
     expect(
-      getTagComboboxOptions("ASMR", ["ASMR", "Relax ASMR"], { excludeTags: ["asmr"] })
-    ).toEqual([
-      { kind: "suggestion", value: "Relax ASMR" },
-    ]);
+      getTagComboboxOptions("ASMR", ["ASMR", "Relax ASMR"], { excludeTags: ["asmr"] }),
+    ).toEqual([{ kind: "suggestion", value: "Relax ASMR" }]);
   });
 });

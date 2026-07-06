@@ -21,7 +21,7 @@ describe("navigation URL codec", () => {
 
     const url = serializeNavigationUrl(state);
     expect(url).toBe(
-      "/library/cv/%E6%B0%B4%E7%80%AC%E3%81%AA%E3%81%9A%E3%81%AA?work=RJ01234567&sort=title-asc"
+      "/library/cv/%E6%B0%B4%E7%80%AC%E3%81%AA%E3%81%9A%E3%81%AA?work=RJ01234567&sort=title-asc",
     );
     expect(parseNavigationUrl(url)).toMatchObject({ state, warnings: [] });
   });
@@ -87,9 +87,7 @@ describe("navigation URL codec", () => {
       library: DEFAULT_LIBRARY_URL_STATE,
     });
     expect(result.canonicalUrl).toBe("/library/all");
-    expect(result.warnings).toEqual([
-      "存在しないライブラリ軸を拒否しました: not-an-axis",
-    ]);
+    expect(result.warnings).toEqual(["存在しないライブラリ軸を拒否しました: not-an-axis"]);
   });
 
   it("rejects paths that can escape or impersonate the configured root", () => {
@@ -117,8 +115,6 @@ describe("navigation URL codec", () => {
       mode: "library",
       library: DEFAULT_LIBRARY_URL_STATE,
     });
-    expect(result.warnings).toEqual([
-      "存在しない sort を既定値へ戻しました: nope",
-    ]);
+    expect(result.warnings).toEqual(["存在しない sort を既定値へ戻しました: nope"]);
   });
 });

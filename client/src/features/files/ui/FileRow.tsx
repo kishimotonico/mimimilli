@@ -17,7 +17,14 @@ interface FileRowProps {
 
 const IconSet = I as Record<string, (p: { size?: number }) => React.ReactElement>;
 
-export default function FileRow({ entry, isFocused, isPlaying, isPlaybackActive, onClick, onActivate }: FileRowProps) {
+export default function FileRow({
+  entry,
+  isFocused,
+  isPlaying,
+  isPlaybackActive,
+  onClick,
+  onActivate,
+}: FileRowProps) {
   const kind = classifyFile(entry);
   const Ic = IconSet[FILE_KIND_ICON[kind]] ?? I.file;
   const isWorkFolder = entry.isDir && !!entry.workId;
@@ -29,10 +36,18 @@ export default function FileRow({ entry, isFocused, isPlaying, isPlaybackActive,
     isWorkFolder ? "is-folder-work" : "",
     isFocused ? "is-on is-focused" : "",
     isPlaying ? "is-now" : "",
-  ].filter(Boolean).join(" ");
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
-    <button type="button" className={cls} onClick={onClick} onDoubleClick={onActivate} title={entry.name}>
+    <button
+      type="button"
+      className={cls}
+      onClick={onClick}
+      onDoubleClick={onActivate}
+      title={entry.name}
+    >
       <span className="ficon">
         {isPlaying ? (
           <span
@@ -40,15 +55,21 @@ export default function FileRow({ entry, isFocused, isPlaying, isPlaybackActive,
             aria-label={isPlaybackActive ? "再生中" : "一時停止中"}
             title={isPlaybackActive ? "再生中" : "一時停止中"}
           >
-            <span /><span /><span />
+            <span />
+            <span />
+            <span />
           </span>
-        ) : <Ic size={15} />}
+        ) : (
+          <Ic size={15} />
+        )}
       </span>
       <span className="name">
         {display.badge && <span className="wbadge">{display.badge}</span>}
         {display.name}
       </span>
-      <span className="meta">{entry.isDir ? `${entry.childCount}` : formatFileSize(entry.size)}</span>
+      <span className="meta">
+        {entry.isDir ? `${entry.childCount}` : formatFileSize(entry.size)}
+      </span>
       <span className="chev">{entry.isDir ? <I.chev size={11} /> : null}</span>
     </button>
   );

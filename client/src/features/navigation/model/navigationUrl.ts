@@ -36,13 +36,30 @@ export const DEFAULT_LIBRARY_URL_STATE: LibraryUrlState = {
 };
 
 const AXES = new Set<AxisId>([
-  "all", "recent", "added", "fav", "unplayed", "missing",
-  "circle", "cv", "series", "cat", "tag", "year",
+  "all",
+  "recent",
+  "added",
+  "fav",
+  "unplayed",
+  "missing",
+  "circle",
+  "cv",
+  "series",
+  "cat",
+  "tag",
+  "year",
 ]);
 const DRILL_AXES = new Set<AxisId>(["circle", "cv", "series", "cat", "year"]);
 const SORTS = new Set<SortId>([
-  "added-desc", "added-asc", "title-asc", "title-desc",
-  "duration-desc", "duration-asc", "last-played", "random", "id-asc",
+  "added-desc",
+  "added-asc",
+  "title-asc",
+  "title-desc",
+  "duration-desc",
+  "duration-asc",
+  "last-played",
+  "random",
+  "id-asc",
 ]);
 
 function defaultResult(warnings: string[]): NavigationParseResult {
@@ -68,12 +85,14 @@ function decodePathSegment(raw: string, warnings: string[]): string | null {
 }
 
 function isSafeRelativeSegment(value: string): boolean {
-  return value.length > 0
-    && value !== "."
-    && value !== ".."
-    && !value.includes("/")
-    && !value.includes("\\")
-    && !value.includes("\0");
+  return (
+    value.length > 0 &&
+    value !== "." &&
+    value !== ".." &&
+    !value.includes("/") &&
+    !value.includes("\\") &&
+    !value.includes("\0")
+  );
 }
 
 function parseAxis(value: string): AxisId | null {
@@ -139,9 +158,7 @@ export function parseNavigationUrl(input: string | URL): NavigationParseResult {
 
     const selectedWorkId = url.searchParams.get("work") || null;
     const sortValue = url.searchParams.get("sort");
-    const sort = sortValue && SORTS.has(sortValue as SortId)
-      ? sortValue as SortId
-      : DEFAULT_SORT;
+    const sort = sortValue && SORTS.has(sortValue as SortId) ? (sortValue as SortId) : DEFAULT_SORT;
     if (sortValue && sort === DEFAULT_SORT && sortValue !== DEFAULT_SORT) {
       warnings.push(`存在しない sort を既定値へ戻しました: ${sortValue}`);
     }

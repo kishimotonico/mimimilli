@@ -12,11 +12,32 @@ export type { FsEntry, FsListing } from "@mimimilli/shared";
 export type FileKind = "dir" | "audio" | "image" | "video" | "pdf" | "text" | "other";
 
 const EXT_KIND: Record<string, FileKind> = {
-  mp3: "audio", wav: "audio", flac: "audio", m4a: "audio", ogg: "audio", opus: "audio", aac: "audio",
-  jpg: "image", jpeg: "image", png: "image", gif: "image", webp: "image", bmp: "image", avif: "image",
-  mp4: "video", mov: "video", mkv: "video", webm: "video", avi: "video",
+  mp3: "audio",
+  wav: "audio",
+  flac: "audio",
+  m4a: "audio",
+  ogg: "audio",
+  opus: "audio",
+  aac: "audio",
+  jpg: "image",
+  jpeg: "image",
+  png: "image",
+  gif: "image",
+  webp: "image",
+  bmp: "image",
+  avif: "image",
+  mp4: "video",
+  mov: "video",
+  mkv: "video",
+  webm: "video",
+  avi: "video",
   pdf: "pdf",
-  txt: "text", md: "text", lrc: "text", json: "text", vtt: "text", srt: "text",
+  txt: "text",
+  md: "text",
+  lrc: "text",
+  json: "text",
+  vtt: "text",
+  srt: "text",
 };
 
 const KNOWN_KINDS = new Set<FileKind>(["audio", "image", "video", "pdf", "text"]);
@@ -40,17 +61,35 @@ export function classifyFile(entry: Classifiable): FileKind {
 
 /** 種別 → Icon キー（shared/ui/Icon の I[...] に対応） */
 export const FILE_KIND_ICON: Record<FileKind, string> = {
-  dir: "folder", audio: "audio", image: "image", video: "video", pdf: "pdf", text: "text", other: "file",
+  dir: "folder",
+  audio: "audio",
+  image: "image",
+  video: "video",
+  pdf: "pdf",
+  text: "text",
+  other: "file",
 };
 
 /** 種別 → mle-row の修飾クラス（shell.css に定義済み） */
 export const FILE_KIND_ROW_CLASS: Record<FileKind, string> = {
-  dir: "is-folder", audio: "is-audio", image: "is-image", video: "is-video", pdf: "is-pdf", text: "", other: "",
+  dir: "is-folder",
+  audio: "is-audio",
+  image: "is-image",
+  video: "is-video",
+  pdf: "is-pdf",
+  text: "",
+  other: "",
 };
 
 /** 種別 → 日本語ラベル */
 export const FILE_KIND_LABEL: Record<FileKind, string> = {
-  dir: "フォルダー", audio: "音声", image: "画像", video: "動画", pdf: "PDF", text: "テキスト", other: "ファイル",
+  dir: "フォルダー",
+  audio: "音声",
+  image: "画像",
+  video: "動画",
+  pdf: "PDF",
+  text: "テキスト",
+  other: "ファイル",
 };
 
 /** dir 優先 → 名前昇順（数値混在を考慮）でソートした新規配列を返す */

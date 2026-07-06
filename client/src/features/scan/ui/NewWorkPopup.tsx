@@ -36,10 +36,12 @@ const NewWorkPopup: React.FC<NewWorkPopupProps> = ({ scanResult, onClose }) => {
 
   useEffect(() => {
     if (scanResult.newWorkIds.length > 0) {
-      getAllWorks().then((all) => {
-        const found = all.filter((w) => scanResult.newWorkIds.includes(w.id));
-        setNewWorks(found);
-      }).catch(() => {});
+      getAllWorks()
+        .then((all) => {
+          const found = all.filter((w) => scanResult.newWorkIds.includes(w.id));
+          setNewWorks(found);
+        })
+        .catch(() => {});
     }
   }, [scanResult.newWorkIds]);
 
@@ -57,7 +59,7 @@ const NewWorkPopup: React.FC<NewWorkPopupProps> = ({ scanResult, onClose }) => {
     if (editTitle.trim()) {
       await patchWork(workId, { title: editTitle.trim() }).catch(() => {});
       setNewWorks((prev) =>
-        prev.map((w) => (w.id === workId ? { ...w, title: editTitle.trim() } : w))
+        prev.map((w) => (w.id === workId ? { ...w, title: editTitle.trim() } : w)),
       );
     }
     setEditingId(null);
@@ -242,15 +244,7 @@ const NewWorkPopup: React.FC<NewWorkPopupProps> = ({ scanResult, onClose }) => {
   /* oxlint-enable jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions, jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/prefer-tag-over-role */
 };
 
-function StatBadge({
-  label,
-  value,
-  color,
-}: {
-  label: string;
-  value: number;
-  color: string;
-}) {
+function StatBadge({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <div
       style={{

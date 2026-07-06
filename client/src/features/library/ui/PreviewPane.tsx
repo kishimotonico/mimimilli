@@ -41,10 +41,13 @@ export default function PreviewPane({
   onPatchWork,
 }: PreviewPaneProps) {
   const title =
-    mode === "work" ? "詳細"
-    : mode === "smart-folder" ? "スマートフォルダー"
-    : mode === "axis-landing" ? axisLandingPresentation.panelTitle
-    : "プレビュー";
+    mode === "work"
+      ? "詳細"
+      : mode === "smart-folder"
+        ? "スマートフォルダー"
+        : mode === "axis-landing"
+          ? axisLandingPresentation.panelTitle
+          : "プレビュー";
 
   return (
     <div className="mle-prv">

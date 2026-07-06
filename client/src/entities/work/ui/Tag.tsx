@@ -28,8 +28,7 @@ const CAT_CLASSES: Record<string, string> = {
 const TAG_BASE =
   "inline-flex h-5 items-center gap-[3px] whitespace-nowrap rounded-1 bg-paper-2 px-[7px] font-jp text-[10.5px] text-ink-1 hover:bg-paper-3";
 
-const REMOVE_BUTTON =
-  "cursor-pointer bg-transparent p-0 text-[13px] leading-none text-ink-3";
+const REMOVE_BUTTON = "cursor-pointer bg-transparent p-0 text-[13px] leading-none text-ink-3";
 
 export default function Tag({ tag, onRemove, onClick }: TagProps) {
   const parsed = parseTag(tag);
@@ -43,8 +42,13 @@ export default function Tag({ tag, onRemove, onClick }: TagProps) {
           <button
             className={REMOVE_BUTTON}
             aria-label={`タグ「${parsed.value}」を削除`}
-            onClick={(e) => { e.stopPropagation(); onRemove(); }}
-          >×</button>
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemove();
+            }}
+          >
+            ×
+          </button>
         )}
       </>
     );
@@ -57,11 +61,7 @@ export default function Tag({ tag, onRemove, onClick }: TagProps) {
       );
     }
 
-    return (
-      <span className={tagClass}>
-        {content}
-      </span>
-    );
+    return <span className={tagClass}>{content}</span>;
   }
 
   const catLabel = CAT_LABELS[parsed.prefix] ?? parsed.prefix.toUpperCase().slice(0, 4);
@@ -75,8 +75,13 @@ export default function Tag({ tag, onRemove, onClick }: TagProps) {
         <button
           className={REMOVE_BUTTON}
           aria-label={`タグ「${parsed.value}」を削除`}
-          onClick={(e) => { e.stopPropagation(); onRemove(); }}
-        >×</button>
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+        >
+          ×
+        </button>
       )}
     </>
   );
@@ -89,9 +94,5 @@ export default function Tag({ tag, onRemove, onClick }: TagProps) {
     );
   }
 
-  return (
-    <span className={tagClass}>
-      {content}
-    </span>
-  );
+  return <span className={tagClass}>{content}</span>;
 }

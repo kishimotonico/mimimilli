@@ -17,8 +17,15 @@ interface FileColumnProps {
 }
 
 export default function FileColumn({
-  title, entries, selectedPath, matchPlaying, isPlaybackActive,
-  onOpenDir, onSelectFile, onPlayFile, isLoading,
+  title,
+  entries,
+  selectedPath,
+  matchPlaying,
+  isPlaybackActive,
+  onOpenDir,
+  onSelectFile,
+  onPlayFile,
+  isLoading,
 }: FileColumnProps) {
   const sorted = sortEntries(entries);
   return (
@@ -34,8 +41,7 @@ export default function FileColumn({
           <Empty message="空のフォルダー" />
         ) : (
           sorted.map((entry) => {
-            const onClick = () =>
-              entry.isDir ? onOpenDir(entry.path) : onSelectFile(entry.path);
+            const onClick = () => (entry.isDir ? onOpenDir(entry.path) : onSelectFile(entry.path));
             const onActivate = () => {
               if (entry.isDir) onOpenDir(entry.path);
               else if (classifyFile(entry) === "audio") onPlayFile(entry);
@@ -61,7 +67,17 @@ export default function FileColumn({
 
 function Empty({ message }: { message: string }) {
   return (
-    <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "24px 16px", color: "var(--ink-4)", fontSize: 12 }}>
+    <div
+      style={{
+        flex: 1,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "24px 16px",
+        color: "var(--ink-4)",
+        fontSize: 12,
+      }}
+    >
       {message}
     </div>
   );

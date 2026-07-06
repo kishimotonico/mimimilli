@@ -35,29 +35,38 @@ export function useSeekDrag({ duration, onSeek }: UseSeekDragOptions): SeekDragB
     return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
   }, []);
 
-  const onPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (!duration) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
-    setDragging(true);
-    const ratio = ratioFromClientX(e.clientX);
-    setHoverRatio(ratio);
-    onSeek(ratio * duration);
-  }, [duration, onSeek, ratioFromClientX]);
+  const onPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!duration) return;
+      e.currentTarget.setPointerCapture(e.pointerId);
+      setDragging(true);
+      const ratio = ratioFromClientX(e.clientX);
+      setHoverRatio(ratio);
+      onSeek(ratio * duration);
+    },
+    [duration, onSeek, ratioFromClientX],
+  );
 
-  const onPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (!duration) return;
-    const ratio = ratioFromClientX(e.clientX);
-    setHoverRatio(ratio);
-    if (dragging) onSeek(ratio * duration);
-  }, [dragging, duration, onSeek, ratioFromClientX]);
+  const onPointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!duration) return;
+      const ratio = ratioFromClientX(e.clientX);
+      setHoverRatio(ratio);
+      if (dragging) onSeek(ratio * duration);
+    },
+    [dragging, duration, onSeek, ratioFromClientX],
+  );
 
   const onPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     setDragging(false);
     e.currentTarget.releasePointerCapture(e.pointerId);
     const rect = trackRef.current?.getBoundingClientRect();
     if (rect) {
-      const inside = e.clientX >= rect.left && e.clientX <= rect.right
-        && e.clientY >= rect.top && e.clientY <= rect.bottom;
+      const inside =
+        e.clientX >= rect.left &&
+        e.clientX <= rect.right &&
+        e.clientY >= rect.top &&
+        e.clientY <= rect.bottom;
       if (!inside) setHoverRatio(null);
     }
   }, []);

@@ -5,7 +5,10 @@ import type { SmartFolder, SmartFolderRule, WorkSummary } from "@mimimilli/share
 import { sortWorkSummaries } from "./worksQuery.ts";
 
 /** rules を順に適用し、works をフィルタリングして返す */
-export function evalSmartFolderRules(rules: SmartFolderRule[], works: WorkSummary[]): WorkSummary[] {
+export function evalSmartFolderRules(
+  rules: SmartFolderRule[],
+  works: WorkSummary[],
+): WorkSummary[] {
   let result = [...works];
 
   for (const rule of rules) {
@@ -36,6 +39,9 @@ export function evalSmartFolderRules(rules: SmartFolderRule[], works: WorkSummar
 }
 
 /** 保存済みルールと sort を一体で評価する。 */
-export function evalSmartFolder(folder: Pick<SmartFolder, "rules" | "sort">, works: WorkSummary[]): WorkSummary[] {
+export function evalSmartFolder(
+  folder: Pick<SmartFolder, "rules" | "sort">,
+  works: WorkSummary[],
+): WorkSummary[] {
   return sortWorkSummaries(evalSmartFolderRules(folder.rules, works), folder.sort);
 }

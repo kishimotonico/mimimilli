@@ -20,9 +20,10 @@ export default function TopBar({
   isPlaying = false,
   playingTrack,
 }: TopBarProps) {
-  const placeholder = mode === "files"
-    ? "このフォルダー内を検索（ファイル名 · 拡張子 ...）"
-    : "ライブラリを検索（タイトル · CV · タグ · RJ ...）";
+  const placeholder =
+    mode === "files"
+      ? "このフォルダー内を検索（ファイル名 · 拡張子 ...）"
+      : "ライブラリを検索（タイトル · CV · タグ · RJ ...）";
 
   return (
     <header className="mll-bar">

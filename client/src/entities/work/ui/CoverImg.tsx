@@ -11,7 +11,14 @@ interface CoverImgProps {
   fit?: "fixed" | "fill";
 }
 
-export default function CoverImg({ id, title, hasCover, size = 32, radius = 4, fit = "fixed" }: CoverImgProps) {
+export default function CoverImg({
+  id,
+  title,
+  hasCover,
+  size = 32,
+  radius = 4,
+  fit = "fixed",
+}: CoverImgProps) {
   const [errored, setErrored] = useState(false);
 
   useEffect(() => {
@@ -27,7 +34,13 @@ export default function CoverImg({ id, title, hasCover, size = 32, radius = 4, f
         alt=""
         width={fixedSize}
         height={fixedSize}
-        style={{ display: "block", width: "100%", height: "100%", objectFit: "cover", borderRadius: radius }}
+        style={{
+          display: "block",
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          borderRadius: radius,
+        }}
         onError={() => setErrored(true)}
       />
     );

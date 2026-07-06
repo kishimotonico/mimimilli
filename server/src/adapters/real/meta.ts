@@ -36,11 +36,13 @@ export function readMetaFile(metaPath: string): MetaFile {
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
     const candidateId =
-      typeof raw === "object" && raw !== null && "id" in raw && typeof raw.id === "string" ? raw.id : null;
+      typeof raw === "object" && raw !== null && "id" in raw && typeof raw.id === "string"
+        ? raw.id
+        : null;
     throw new MetaParseError(
       metaPath,
       `${issue?.path.join(".") ?? ""} ${issue?.message ?? "不明"}`,
-      candidateId
+      candidateId,
     );
   }
   return parsed.data;
@@ -63,7 +65,13 @@ export function writeMetaFile(metaPath: string, meta: MetaFile): void {
  */
 export function patchMetaFile(
   metaPath: string,
-  patch: { title?: string; tags?: string[]; id?: string; coverImage?: string | null; urls?: MetaFile["urls"] }
+  patch: {
+    title?: string;
+    tags?: string[];
+    id?: string;
+    coverImage?: string | null;
+    urls?: MetaFile["urls"];
+  },
 ): void {
   const raw = JSON.parse(readFileSync(metaPath, "utf-8")) as Record<string, unknown>;
   if (patch.title !== undefined) raw.title = patch.title;
@@ -74,7 +82,10 @@ export function patchMetaFile(
   const parsed = metaFileSchema.safeParse(raw);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
-    throw new MetaParseError(metaPath, `${issue?.path.join(".") ?? ""} ${issue?.message ?? "不明"}`);
+    throw new MetaParseError(
+      metaPath,
+      `${issue?.path.join(".") ?? ""} ${issue?.message ?? "不明"}`,
+    );
   }
   writeJsonAtomic(metaPath, raw);
 }

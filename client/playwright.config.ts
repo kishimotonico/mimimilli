@@ -12,10 +12,7 @@ export default defineConfig({
   // vite のコールドスタート（初回ナビゲーションが React マウント前に networkidle 到達）や
   // フォント描画ゆらぎによる初回フレークをリトライで吸収する。
   retries: 2,
-  reporter: [
-    ["list"],
-    ["html", { outputFolder: "playwright-report", open: "never" }],
-  ],
+  reporter: [["list"], ["html", { outputFolder: "playwright-report", open: "never" }]],
   expect: {
     toHaveScreenshot: {
       animations: "disabled",
