@@ -123,25 +123,50 @@ export default function FullScreenPlayer({
 
             {/* Controls */}
             <div className="flex items-center gap-3.5 pt-2">
-              <button onClick={() => onSeekRelative(-10)} className={cn(ROUND_BTN, "text-ink-1")}>
+              <button
+                aria-label="10秒戻る"
+                title="10秒戻る"
+                onClick={() => onSeekRelative(-10)}
+                className={cn(ROUND_BTN, "text-ink-1")}
+              >
                 <span className="font-mono text-[11px] font-bold">−10</span>
               </button>
-              <button onClick={onPrev} className={cn(ROUND_BTN, "text-ink-1")}>
+              <button
+                aria-label="前のトラック"
+                title="前のトラック"
+                onClick={onPrev}
+                className={cn(ROUND_BTN, "text-ink-1")}
+              >
                 <I.prev size={16} />
               </button>
               <button
+                aria-label={isPlaying ? "一時停止" : "再生"}
+                title={isPlaying ? "一時停止" : "再生"}
                 onClick={onTogglePlay}
                 className="grid h-[56px] w-[56px] cursor-pointer place-items-center rounded-full bg-ink-0 text-paper-1"
               >
                 {isPlaying ? <I.pause size={18} /> : <I.play size={18} />}
               </button>
-              <button onClick={onNext} className={cn(ROUND_BTN, "text-ink-1")}>
+              <button
+                aria-label="次のトラック"
+                title="次のトラック"
+                onClick={onNext}
+                className={cn(ROUND_BTN, "text-ink-1")}
+              >
                 <I.next size={16} />
               </button>
-              <button onClick={() => onSeekRelative(10)} className={cn(ROUND_BTN, "text-ink-1")}>
+              <button
+                aria-label="10秒進む"
+                title="10秒進む"
+                onClick={() => onSeekRelative(10)}
+                className={cn(ROUND_BTN, "text-ink-1")}
+              >
                 <span className="font-mono text-[11px] font-bold">+10</span>
               </button>
               <button
+                aria-label="ループ"
+                title="ループ"
+                aria-pressed={loop}
                 onClick={() => onSetLoop(!loop)}
                 className={cn(ROUND_BTN, loop ? "bg-acc-soft text-acc" : "text-ink-1")}
               >
@@ -152,6 +177,8 @@ export default function FullScreenPlayer({
                 <I.volume size={13} className="text-ink-3" />
                 <input
                   type="range"
+                  aria-label="音量"
+                  title={`音量 ${volume}%`}
                   min={0}
                   max={100}
                   value={volume}
