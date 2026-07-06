@@ -16,13 +16,9 @@ DLsite/FANZA 等からダウンロードした音声作品（ASMR・ボイスド
 - fixture アダプタはシナリオ切替（`MIMIMILLI_MOCK_SCENARIO` = default/empty/new-work/errors）と**合成メディア**（無音WAV・SVGカバー、Range対応）を持つ
 - dev は vite middleware: `client/vite.config.ts` が `BACKEND_URL` 未指定時、server の Hono アプリ（fixture注入）を dev middleware としてマウントし、`pnpm dev` 一発で UI もモックAPIも動く
 
-### ⚠ dev サーバーの落とし穴（重要）
+### dev サーバーへの server/src 自動反映
 
-vite middleware は fixture アダプタと Hono アプリを**プラグイン初期化時に1度だけ生成**する。そのため **`server/src` を変更しても起動中の dev サーバーには反映されない**（fixtureもアプリも古いインスタンスのまま）。
-
-- 症状例: 合成メディアを server に足しても、起動中 dev サーバーは cover/audio を 404 のまま返す
-- 切り分け: `MIMIMILLI_ADAPTER=fixture PORT=18099 node server/src/index.ts` で別ポート起動して `curl` 確認（こちらは最新コードで応答する）
-- 対処: **サーバー側を変えたら dev サーバーを手動再起動**。client 側（`src/`）の変更は HMR で反映されるので影響なし
+fixture API は `ssrLoadModule` 経由の遅延読み込みで、`server/src`・`shared/src` の変更は watcher がモジュールグラフを無効化し**次の `/api` リクエストで自動反映される**（手動再起動は不要）。client 側（`src/`）は通常の HMR。仕組みの詳細は `client/vite.config.ts` の `fixtureApiPlugin` を参照。
 
 ### ⚠ CSS レイヤーの罠
 
