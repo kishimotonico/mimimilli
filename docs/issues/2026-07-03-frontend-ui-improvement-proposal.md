@@ -35,15 +35,15 @@ Status: done — 残タスクは BACKLOG.md へ
 
 具体的な置き換えマップ:
 
-| 現状                           | 置き換え                                        | 場所                      |
-| ------------------------------ | ----------------------------------------------- | ------------------------- |
-| 「編集」テキスト               | 鉛筆アイコン                                    | `PreviewPane.tsx:199`     |
-| 「タグを編集」テキスト         | T2で編集導線ごと再設計                          | `PreviewPane.tsx:267`     |
-| 「保存」「キャンセル」×2組     | T3でポップオーバー化に伴い消滅                  | `PreviewPane.tsx:189-257` |
-| 「最初から再生」テキスト       | ↺ アイコン（続きから再生の隣）                  | `PreviewPane.tsx:282,292` |
-| 「再生中の作品を表示」テキスト | 照準アイコン + ツールチップ                     | `PopupContent.tsx:235`    |
-| 「縮小」テキスト               | minimize アイコン                               | `FullScreenPlayer.tsx:72` |
-| 「▸ 再生中」チップ（作品行）   | イコライザーアニメ（3本バー）+ アクセント色維持 | `WorkRow.tsx:58`          |
+| 現状 | 置き換え | 場所 |
+|---|---|---|
+| 「編集」テキスト | 鉛筆アイコン | `PreviewPane.tsx:199` |
+| 「タグを編集」テキスト | T2で編集導線ごと再設計 | `PreviewPane.tsx:267` |
+| 「保存」「キャンセル」×2組 | T3でポップオーバー化に伴い消滅 | `PreviewPane.tsx:189-257` |
+| 「最初から再生」テキスト | ↺ アイコン（続きから再生の隣） | `PreviewPane.tsx:282,292` |
+| 「再生中の作品を表示」テキスト | 照準アイコン + ツールチップ | `PopupContent.tsx:235` |
+| 「縮小」テキスト | minimize アイコン | `FullScreenPlayer.tsx:72` |
+| 「▸ 再生中」チップ（作品行） | イコライザーアニメ（3本バー）+ アクセント色維持 | `WorkRow.tsx:58` |
 
 アイコンは既存の自前セット（`shared/ui/Icon.tsx`、24pxグリッド線画）に追加する形でよい。lucide等の導入は不要。
 
@@ -93,14 +93,14 @@ Status: done — 残タスクは BACKLOG.md へ
 
 検証は各Wave完了ごとにClaudeがagent-browserで実施する。
 
-| Wave | 内容                                                                            | 担当     | 依存               |
-| ---- | ------------------------------------------------------------------------------- | -------- | ------------------ |
-| 1a   | `Button` / `IconButton` 新設 + 全既存ボタン置換（T1）                           | Sonnet 5 | なし               |
-| 1b   | `PreviewPane.tsx` の4コンポーネント分割（T3の準備）                             | Codex    | なし（1aと並行可） |
-| 2a   | `TagCombobox` + タグ即時編集（T2）                                              | Codex    | 1a, 1b             |
-| 2b   | WorkDetail ヒーロー/アクション行の再構成 + 編集ポップオーバー（T3）             | Codex    | 1a, 1b             |
-| 3    | 再生バーのシーク昇格・click-throughバグ修正・FullScreenPlayerスタイル移行（T4） | Sonnet 5 | 1a                 |
-| 4    | T5 の小粒改善一式                                                               | Codex    | 2b                 |
+| Wave | 内容 | 担当 | 依存 |
+|---|---|---|---|
+| 1a | `Button` / `IconButton` 新設 + 全既存ボタン置換（T1） | Sonnet 5 | なし |
+| 1b | `PreviewPane.tsx` の4コンポーネント分割（T3の準備） | Codex | なし（1aと並行可） |
+| 2a | `TagCombobox` + タグ即時編集（T2） | Codex | 1a, 1b |
+| 2b | WorkDetail ヒーロー/アクション行の再構成 + 編集ポップオーバー（T3） | Codex | 1a, 1b |
+| 3 | 再生バーのシーク昇格・click-throughバグ修正・FullScreenPlayerスタイル移行（T4） | Sonnet 5 | 1a |
+| 4 | T5 の小粒改善一式 | Codex | 2b |
 
 ## 調査時のスクリーンショット
 
