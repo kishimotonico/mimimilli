@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useLayoutEffect, useRef } from "react";
 import { useAtomValue } from "jotai";
 import type { PlayerState } from "../model/usePlayer";
 import { playerCurrentTimeAtom, playerDurationAtom } from "../model/atoms";
@@ -39,6 +39,8 @@ export default function FullScreenPlayer({
   onSelectTrack,
   onClose,
 }: FullScreenPlayerProps) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
   // currentTime / duration は高頻度 atom から直接読む（App.tsx を re-render させない）
   const currentTime = useAtomValue(playerCurrentTimeAtom);
   const duration = useAtomValue(playerDurationAtom);
@@ -47,24 +49,47 @@ export default function FullScreenPlayer({
   const pct = duration > 0 ? (currentTime / duration) * 100 : 0;
   const seek = useSeekDrag({ duration, onSeek });
 
-  // Esc to close
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+  useLayoutEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    const previousActiveElement =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+    dialog.showModal();
+    closeButtonRef.current?.focus({ preventScroll: true });
+
+    return () => {
+      dialog.close();
+      if (previousActiveElement?.isConnected) {
+        previousActiveElement.focus({ preventScroll: true });
+      }
     };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [onClose]);
+  }, []);
 
   if (!currentWork) return null;
 
   return (
-    <div className="fixed inset-0 z-50 grid grid-cols-[1fr_340px] overflow-hidden bg-paper-0">
+    <dialog
+      ref={dialogRef}
+      aria-label="全画面プレイヤー"
+      onCancel={(e) => {
+        e.preventDefault();
+        onClose();
+      }}
+      className="m-0 grid h-screen max-h-none w-screen max-w-none grid-cols-[1fr_340px] overflow-hidden border-0 bg-paper-0 p-0 text-ink-0 backdrop:bg-transparent"
+    >
       {/* Main: cover + controls */}
       <div className="flex min-h-0 flex-col px-9 pb-8 pt-6">
         {/* Top bar */}
         <div className="mb-6 flex items-center gap-3">
-          <IconButton size="md" icon={I.minimize} label="縮小" onClick={onClose} />
+          <IconButton
+            ref={closeButtonRef}
+            size="md"
+            icon={I.minimize}
+            label="縮小"
+            onClick={onClose}
+          />
           <div className="flex-1" />
           <span className="font-mono text-[11px] text-ink-3">{currentWork.title}</span>
         </div>
@@ -231,6 +256,6 @@ export default function FullScreenPlayer({
           })}
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }

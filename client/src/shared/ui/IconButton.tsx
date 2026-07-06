@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes } from "react";
+import type { ButtonHTMLAttributes, Ref } from "react";
 import { cn } from "../lib/cn";
 import type { IconFC } from "./Icon";
 
@@ -22,6 +22,7 @@ export interface IconButtonProps extends Omit<
   label: string;
   size?: IconButtonSize;
   active?: boolean;
+  ref?: Ref<HTMLButtonElement>;
 }
 
 export default function IconButton({
@@ -31,6 +32,7 @@ export default function IconButton({
   active = false,
   disabled = false,
   className,
+  ref,
   type = "button",
   ...rest
 }: IconButtonProps) {
@@ -42,6 +44,7 @@ export default function IconButton({
 
   return (
     <button
+      ref={ref}
       type={type}
       aria-label={label}
       title={label}

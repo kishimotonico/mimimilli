@@ -1692,7 +1692,7 @@
 
 /* ── Player dock — 画面下張り付きバー / 右下ポップアップ共通 ─── */
 /* 両モードとも常駐チェック用 UI で position: fixed のオーバーレイ。
-   FullScreenPlayer(z-index 50) より下、SettingsModal(z-index 40/41) より下に置く。 */
+   FullScreenPlayer は dialog の top layer に出るため、ここでは SettingsModal(z-index 40/41) より下に置く。 */
 
 /* ── 画面下張り付きバー（最小構成）───────────────────────── */
 
