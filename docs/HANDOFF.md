@@ -1,7 +1,7 @@
 # 引き継ぎドキュメント
 
 mimimilli の現状と進行中の作業を、後続のエージェント／セッションが把握するための資料。
-最終更新: 2026-07-06。
+最終更新: 2026-07-08。
 
 ## このアプリは何か
 
@@ -31,7 +31,7 @@ fixture API は `ssrLoadModule` 経由の遅延読み込みで、`server/src`・
 ```bash
 # ルートから（fixture アダプタ同居の通常開発）
 pnpm dev            # client 起動。vite middleware が fixture API を /api/* にマウント
-pnpm check          # shared + server + client の tsc
+pnpm check          # shared/server/client の tsc + oxlint + oxfmt --check（これが通れば typecheck/lint/fmt の DoD を満たす）
 pnpm test           # server (node:test) + client (vitest)
 pnpm test:server
 pnpm test:client
@@ -117,12 +117,12 @@ MIMIMILLI_ADAPTER=fixture PORT=18099 node server/src/index.ts
 - `ui/PlayerDock.tsx`: バー⇄ポップアップの外枠・層切替
 - `ui/BarContent.tsx`（画面下バー）: カバー / トラック名 / 再生切替 + バー下辺に貼り付くシークバー（時間表示なし）。バークリックでポップアップへ
 - `ui/PopupContent.tsx`（右下ポップアップ）: 大カバー / シーク / 前・次・ループ / ±10秒 / 倍速 / 音量 / 再生中の作品へジャンプ / 全画面展開
-- `ui/FullScreenPlayer.tsx`: 全画面。トラックリスト・シーク・音量・ループ。Esc で閉じる（Tailwind移行済み）
+- `ui/FullScreenPlayer.tsx`: 全画面。トラックリスト・シーク・音量・ループ。ネイティブ `<dialog>` + `showModal()` の完全モーダル（フォーカストラップ・Esc はブラウザ標準に委譲）
 - `ui/useSeekDrag.ts`: シーク操作の共通フック（バー・ポップアップ・全画面で共用）
 
 ### プレイヤーの残課題
 
-backlog の `player` ラベルのタスクを参照（`backlog task list --labels player --plain`。L⇄R・A-Bリピートの UI 配線、フォーカストラップ等）。
+backlog の `player` ラベルのタスクを参照（`backlog task list --labels player --plain`。L⇄R・A-Bリピートの UI 配線等）。
 
 ### ⚠ 自動検証の限界（音声）
 
