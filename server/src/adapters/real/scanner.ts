@@ -17,6 +17,7 @@
 //     1作品に誤認しない）。自動生成はあくまで下書きで、ユーザー修正を前提とする
 //   - シンボリックリンクのディレクトリは辿らない（循環防止）
 import { existsSync, readdirSync } from "node:fs";
+import { readdir } from "node:fs/promises";
 import { basename, dirname, extname, join } from "node:path";
 import type {
   MetaFile,
@@ -57,14 +58,24 @@ interface WalkResult {
   audioDirs: Set<string>;
 }
 
-function walk(root: string): WalkResult {
+/** walking フェーズの進捗を emit する間隔（ディレクトリ数）。頻繁すぎる emit を避けつつ、
+ *  大規模ライブラリでも SSE の heartbeat・接続処理がイベントループを取り戻せる粒度にする */
+const WALK_PROGRESS_INTERVAL = 50;
+
+/**
+ * ディレクトリ木を非同期に走査する。fs/promises の readdir は都度 I/O を挟むため、
+ * 大規模ライブラリでも SSE 接続や heartbeat の処理がイベントループに割り込める
+ * （readdirSync の同期ループは処理完了までイベントループを完全に塞いでしまう）。
+ */
+async function walk(root: string, onDirVisited?: (visited: number) => void): Promise<WalkResult> {
   const result: WalkResult = { metaPaths: [], metaDirs: new Set(), audioDirs: new Set() };
   const stack = [root];
+  let visited = 0;
   while (stack.length > 0) {
     const dir = stack.pop()!;
     let entries;
     try {
-      entries = readdirSync(dir, { withFileTypes: true });
+      entries = await readdir(dir, { withFileTypes: true });
     } catch (e) {
       console.warn(`ディレクトリを読めません: ${dir}: ${(e as Error).message}`);
       continue;
@@ -82,6 +93,10 @@ function walk(root: string): WalkResult {
         }
       }
       // シンボリックリンクは辿らない（循環防止）
+    }
+    visited += 1;
+    if (visited % WALK_PROGRESS_INTERVAL === 0) {
+      onDirVisited?.(visited);
     }
   }
   result.metaPaths.sort(naturalCompare);
@@ -227,7 +242,9 @@ export class Scanner {
 
     // walking フェーズ: ディレクトリ走査自体は件数が事前に分からないため不定（total=0）で通知する
     emit({ type: "progress", phase: "walking", processed: 0, total: 0 });
-    const tree = walk(root);
+    const tree = await walk(root, (visited) => {
+      emit({ type: "progress", phase: "walking", processed: visited, total: 0 });
+    });
     const seenIds = new Set<string>();
 
     // 1. 既存メタファイルの登録

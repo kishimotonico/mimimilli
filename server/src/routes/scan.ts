@@ -62,12 +62,24 @@ export function scanRoute(adapter: DataAdapter): Hono {
         resolveDone = resolve;
       });
 
+      // 同一接続への write を直列化する（listener 発火が並んでも writeSSE 呼び出しが交錯しないように）
+      let writeChain: Promise<void> = Promise.resolve();
+      const enqueueWrite = (frame: { event: string; data: string }): Promise<void> => {
+        writeChain = writeChain
+          .then(() => stream.writeSSE(frame))
+          .catch((e: unknown) => {
+            console.error("SSE write に失敗しました", e);
+          });
+        return writeChain;
+      };
+
       const send = (event: ScanProgressEvent) =>
-        stream.writeSSE({ event: event.type, data: JSON.stringify(event) });
+        enqueueWrite({ event: event.type, data: JSON.stringify(event) });
 
       const listener = (event: ScanProgressEvent) => {
-        void send(event);
-        if (event.type !== "progress") resolveDone();
+        const written = send(event);
+        // complete/error は write 完了を待ってからストリームを閉じる（未完了での終了を防ぐ）
+        if (event.type !== "progress") void written.then(() => resolveDone());
       };
 
       const { replay, unsubscribe, isLive } = subscribeToScan(listener);
@@ -95,9 +107,12 @@ export function scanRoute(adapter: DataAdapter): Hono {
         if (winner === "done") {
           waiting = false;
         } else {
-          await stream.writeSSE({ event: "ping", data: "" }).catch(() => {});
+          await enqueueWrite({ event: "ping", data: "" });
         }
       }
+      // complete/error の write 完了は listener 側で待機済みだが、直列化した write チェーンの
+      // 完了を保険として待ってからストリームを閉じる
+      await writeChain;
       unsubscribe();
     });
   });

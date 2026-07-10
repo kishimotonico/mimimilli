@@ -96,6 +96,38 @@ describe("useScanProgress", () => {
     expect(result.current).toEqual({ phase: "generating", processed: 1, total: 2 });
   });
 
+  it("EventSource自体の接続エラー（dataなし）はJSON解析せず例外にならない", () => {
+    const { rerender } = renderHook(({ active }) => useScanProgress(active), {
+      initialProps: { active: false },
+    });
+    rerender({ active: true });
+
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(() => {
+      act(() => {
+        instances[0]!.dispatchEvent(new Event("error"));
+      });
+    }).not.toThrow();
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  it("名前付きerrorイベントの不正JSONも未処理例外にせず可視化する", () => {
+    const { rerender } = renderHook(({ active }) => useScanProgress(active), {
+      initialProps: { active: false },
+    });
+    rerender({ active: true });
+
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(() => {
+      act(() => {
+        instances[0]!.dispatchEvent(new MessageEvent("error", { data: "{ 不正なJSON" }));
+      });
+    }).not.toThrow();
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
   it("active が false に戻ると接続を閉じて状態をリセットする", () => {
     const { result, rerender } = renderHook(({ active }) => useScanProgress(active), {
       initialProps: { active: false },
