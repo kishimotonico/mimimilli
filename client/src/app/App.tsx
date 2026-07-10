@@ -290,6 +290,7 @@ export default function App() {
         ) : (
           <LibraryView
             searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
             playingWorkId={player.state.currentWork?.id}
             playingTrackIndex={player.state.currentTrackIndex}
             isPlaybackActive={isPlaybackActive}

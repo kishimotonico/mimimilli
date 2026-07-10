@@ -11,6 +11,7 @@ type PreviewMode = "work" | "axis-landing" | "smart-folder" | "empty";
 
 interface PreviewPaneProps {
   mode: PreviewMode;
+  showNoResultsHint: boolean;
   axisLandingPresentation: AxisLandingPresentation;
   selectedWork: Work | null;
   smartFolder: SmartFolder | null;
@@ -27,6 +28,7 @@ interface PreviewPaneProps {
 
 export default function PreviewPane({
   mode,
+  showNoResultsHint,
   axisLandingPresentation,
   selectedWork,
   smartFolder,
@@ -76,7 +78,7 @@ export default function PreviewPane({
       {mode === "smart-folder" && smartFolder && (
         <SmartFolderView sf={smartFolder} works={smartFolderWorks} />
       )}
-      {mode === "empty" && <EmptyPreview />}
+      {mode === "empty" && <EmptyPreview showNoResultsHint={showNoResultsHint} />}
     </div>
   );
 }

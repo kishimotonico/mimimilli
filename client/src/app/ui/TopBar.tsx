@@ -53,7 +53,16 @@ export default function TopBar({
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder={placeholder}
         />
-        <span className="kbd">⌘K</span>
+        {searchQuery ? (
+          <IconButton
+            size="sm"
+            icon={I.x}
+            label="検索をクリア"
+            onClick={() => onSearchChange("")}
+          />
+        ) : (
+          <span className="kbd">⌘K</span>
+        )}
       </div>
 
       <IconButton size="md" icon={I.refresh} label="スキャン" onClick={onScan} />

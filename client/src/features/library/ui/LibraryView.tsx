@@ -47,6 +47,7 @@ export { LIBRARY_KEYS };
 
 interface LibraryViewProps {
   searchQuery: string;
+  onSearchChange: (q: string) => void;
   playingWorkId?: string;
   playingTrackIndex?: number;
   isPlaybackActive?: boolean;
@@ -56,6 +57,7 @@ interface LibraryViewProps {
 
 export default function LibraryView({
   searchQuery,
+  onSearchChange,
   playingWorkId,
   playingTrackIndex,
   isPlaybackActive,
@@ -185,6 +187,13 @@ export default function LibraryView({
             : "empty";
   const isAxisFilterApplied = nav.activeAxis === "tag" && nav.selectedTags.length > 0;
 
+  // 「empty」プレビュー時、検索語や軸ドリルの絞り込みが原因で0件になっているかどうか。
+  // fav/unplayed等が本来的に0件のケースとは区別し、原因表示が必要な場合だけ案内する。
+  const isNoResultsDueToFilter =
+    previewMode === "empty" &&
+    works.length === 0 &&
+    (Boolean(searchQuery) || (isFacetAxis(nav.activeAxis) && nav.drillValue !== null));
+
   const activeSmartFolder = isSmartAxis(nav.activeAxis)
     ? (smartFolders.find((sf) => sf.id === (nav.activeAxis as string).slice("smart-".length)) ??
       null)
@@ -239,6 +248,7 @@ export default function LibraryView({
         facetItems={facetQuery.data ?? []}
         selectedWorkId={nav.selectedWorkId}
         selectedTags={nav.selectedTags}
+        searchQuery={searchQuery}
         playingWorkId={playingWorkId}
         isPlaybackActive={isPlaybackActive}
         isLoading={isLoading}
@@ -247,10 +257,12 @@ export default function LibraryView({
         onDrillSelect={nav.drillInto}
         onDrillBack={nav.drillBack}
         onTagToggle={nav.toggleTag}
+        onClearSearch={() => onSearchChange("")}
       />
 
       <PreviewPane
         mode={previewMode}
+        showNoResultsHint={isNoResultsDueToFilter}
         axisLandingPresentation={getAxisLandingPresentation(nav.activeAxis, isAxisFilterApplied)}
         selectedWork={selectedWork}
         smartFolder={activeSmartFolder}
