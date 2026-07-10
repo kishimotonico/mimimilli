@@ -28,7 +28,7 @@ export default function LeftNav({
   playingCount = 0,
 }: LeftNavProps) {
   return (
-    <aside className="mle-side">
+    <nav className="mle-side" aria-label="メインナビゲーション">
       <div className="mle-side__group is-mode">
         <button
           className={`mle-side__btn ${mode === "files" ? "is-on" : ""}`}
@@ -76,6 +76,6 @@ export default function LeftNav({
           <I.user size={19} />
         </button>
       </div>
-    </aside>
+    </nav>
   );
 }
