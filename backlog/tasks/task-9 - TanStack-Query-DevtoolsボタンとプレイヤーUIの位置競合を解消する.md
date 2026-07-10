@@ -1,9 +1,11 @@
 ---
 id: TASK-9
 title: TanStack Query DevtoolsボタンとプレイヤーUIの位置競合を解消する
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@codex'
 created_date: '2026-07-05 17:59'
+updated_date: '2026-07-10 09:48'
 labels:
   - ui
   - dx
@@ -22,6 +24,20 @@ TanStack Query Devtoolsの右下ボタンが、再生バー・ポップアップ
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Devtoolsボタンの初期位置を左下や上部などプレイヤーUIと重ならない位置に変更する、またはプレイヤー表示中だけDevtoolsの位置をずらす
-- [ ] #2 ビジュアル検証時にDevtoolsを無効化できるフラグを用意する
+- [x] #1 Devtoolsボタンの初期位置を左下や上部などプレイヤーUIと重ならない位置に変更する、またはプレイヤー表示中だけDevtoolsの位置をずらす
+- [x] #2 ビジュアル検証時にDevtoolsを無効化できるフラグを用意する
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Sonnetエージェントがセッション制限で中断（途中差分あり・tsc通過状態）。Codexへ引き継ぎ、残実装を委譲。
+
+Codexが引き継ぎ完成、Fable検証: Devtoolsトグルが左下(12,12)に移動したことを実測、VITE_DISABLE_QUERY_DEVTOOLS=1をplaywright webServerに配線。コミット b16a593。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Devtoolsトグルを左下へ移動、ビジュアルテスト時は環境変数で無効化。
+<!-- SECTION:FINAL_SUMMARY:END -->
