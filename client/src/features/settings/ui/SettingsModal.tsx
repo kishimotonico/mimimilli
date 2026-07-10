@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { I } from "../../../shared/ui/Icon";
 
 interface SettingsModalProps {
@@ -23,17 +23,37 @@ export default function SettingsModal({
   onChangeFolder,
   onExport,
 }: SettingsModalProps) {
+  const [isEditingFolder, setIsEditingFolder] = useState(false);
+  const [folderDraft, setFolderDraft] = useState(rootFolder ?? "");
+  const folderInputRef = useRef<HTMLInputElement | null>(null);
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        if (isEditingFolder) {
+          setIsEditingFolder(false);
+          return;
+        }
+        onClose();
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [onClose]);
+  }, [isEditingFolder, onClose]);
 
-  const handleChangeFolder = () => {
-    const p = window.prompt("ルートフォルダーのパスを入力:", rootFolder ?? "");
-    if (p) onChangeFolder(p);
+  useEffect(() => {
+    if (isEditingFolder) folderInputRef.current?.focus({ preventScroll: true });
+  }, [isEditingFolder]);
+
+  const startEditingFolder = () => {
+    setFolderDraft(rootFolder ?? "");
+    setIsEditingFolder(true);
+  };
+
+  const saveFolder = () => {
+    const path = folderDraft.trim();
+    if (path) onChangeFolder(path);
+    setIsEditingFolder(false);
   };
 
   const formatDate = (iso: string | null) =>
@@ -120,54 +140,123 @@ export default function SettingsModal({
             >
               ルートフォルダー
             </span>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div
-                style={{
-                  flex: 1,
-                  height: 34,
-                  padding: "0 12px",
-                  background: "var(--paper-0)",
-                  border: "1px solid var(--line-soft)",
-                  borderRadius: 6,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  overflow: "hidden",
+            {isEditingFolder ? (
+              <form
+                style={{ display: "flex", alignItems: "center", gap: 8 }}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  saveFolder();
                 }}
               >
-                <I.folder size={13} style={{ color: "var(--ink-3)", flexShrink: 0 }} />
-                <span
+                <input
+                  ref={folderInputRef}
+                  value={folderDraft}
+                  onChange={(e) => setFolderDraft(e.target.value)}
+                  aria-label="ルートフォルダーのパス"
+                  placeholder="ルートフォルダーのパスを入力"
                   style={{
+                    flex: 1,
+                    height: 34,
+                    padding: "0 12px",
+                    background: "var(--paper-0)",
+                    border: "1px solid var(--acc)",
+                    borderRadius: 6,
                     fontFamily: "var(--font-mono)",
                     fontSize: 11,
-                    color: rootFolder ? "var(--ink-1)" : "var(--ink-4)",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
+                    color: "var(--ink-1)",
+                    outline: "none",
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setIsEditingFolder(false)}
+                  style={{
+                    height: 34,
+                    padding: "0 12px",
+                    borderRadius: 6,
+                    border: "1px solid var(--line)",
+                    background: "var(--paper-1)",
+                    color: "var(--ink-1)",
+                    fontFamily: "var(--font-sans)",
+                    fontSize: 12,
+                    fontWeight: 500,
+                    cursor: "pointer",
                     whiteSpace: "nowrap",
                   }}
                 >
-                  {rootFolder ?? "未設定"}
-                </span>
+                  キャンセル
+                </button>
+                <button
+                  type="submit"
+                  disabled={!folderDraft.trim()}
+                  style={{
+                    height: 34,
+                    padding: "0 12px",
+                    borderRadius: 6,
+                    border: "none",
+                    background: "var(--ink-0)",
+                    color: "var(--paper-1)",
+                    fontFamily: "var(--font-sans)",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: folderDraft.trim() ? "pointer" : "not-allowed",
+                    opacity: folderDraft.trim() ? 1 : 0.6,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  保存
+                </button>
+              </form>
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div
+                  style={{
+                    flex: 1,
+                    height: 34,
+                    padding: "0 12px",
+                    background: "var(--paper-0)",
+                    border: "1px solid var(--line-soft)",
+                    borderRadius: 6,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    overflow: "hidden",
+                  }}
+                >
+                  <I.folder size={13} style={{ color: "var(--ink-3)", flexShrink: 0 }} />
+                  <span
+                    style={{
+                      fontFamily: "var(--font-mono)",
+                      fontSize: 11,
+                      color: rootFolder ? "var(--ink-1)" : "var(--ink-4)",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {rootFolder ?? "未設定"}
+                  </span>
+                </div>
+                <button
+                  onClick={startEditingFolder}
+                  style={{
+                    height: 34,
+                    padding: "0 12px",
+                    borderRadius: 6,
+                    border: "1px solid var(--line)",
+                    background: "var(--paper-1)",
+                    color: "var(--ink-1)",
+                    fontFamily: "var(--font-sans)",
+                    fontSize: 12,
+                    fontWeight: 500,
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  変更
+                </button>
               </div>
-              <button
-                onClick={handleChangeFolder}
-                style={{
-                  height: 34,
-                  padding: "0 12px",
-                  borderRadius: 6,
-                  border: "1px solid var(--line)",
-                  background: "var(--paper-1)",
-                  color: "var(--ink-1)",
-                  fontFamily: "var(--font-sans)",
-                  fontSize: 12,
-                  fontWeight: 500,
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                変更
-              </button>
-            </div>
+            )}
           </div>
 
           {/* Scan */}
