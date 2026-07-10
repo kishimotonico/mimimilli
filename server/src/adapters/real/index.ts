@@ -41,19 +41,24 @@ import { buildFileTree } from "./fileTree.ts";
 import { patchMetaFile } from "./meta.ts";
 import { mimeOf, resolveWithin } from "./paths.ts";
 import { Scanner } from "./scanner.ts";
+import { getOrCreateThumbnail } from "./thumbnailCache.ts";
 import { WorkRepo } from "./workRepo.ts";
 
 const KEY_ROOT_FOLDER = "root_folder";
 const KEY_LAST_SCAN_TIME = "last_scan_time";
+const DEFAULT_THUMBNAIL_CACHE_DIR = "data/cache/thumbnails";
 
 export interface RealAdapterOptions {
   dbPath: string;
+  /** カバーサムネイルのキャッシュ置き場（省略時 "data/cache/thumbnails"） */
+  thumbnailCacheDir?: string;
 }
 
 export function createRealAdapter(options: RealAdapterOptions): DataAdapter {
   const db: Db = openDb(options.dbPath);
   const repo = new WorkRepo(db);
   const scanner = new Scanner(db, repo);
+  const thumbnailCacheDir = options.thumbnailCacheDir ?? DEFAULT_THUMBNAIL_CACHE_DIR;
 
   function requireRoot(): string {
     const root = repo.getSetting(KEY_ROOT_FOLDER);
@@ -183,6 +188,7 @@ export function createRealAdapter(options: RealAdapterOptions): DataAdapter {
       kind: MediaKind,
       workId: string,
       relPath?: string,
+      width?: number,
     ): Promise<MediaLocation | null> {
       const work = repo.getWork(workId);
       if (!work) return null;
@@ -192,6 +198,12 @@ export function createRealAdapter(options: RealAdapterOptions): DataAdapter {
 
       const resolved = resolveWithin(work.physicalPath, join(work.physicalPath, rel));
       if (!resolved) return null;
+
+      if (kind === "cover" && width !== undefined) {
+        const thumbnail = await getOrCreateThumbnail(thumbnailCacheDir, workId, width, resolved);
+        return { type: "file", absolutePath: thumbnail.absolutePath, mime: thumbnail.mime };
+      }
+
       return { type: "file", absolutePath: resolved, mime: mimeOf(resolved) };
     },
 

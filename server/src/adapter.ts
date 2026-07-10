@@ -76,8 +76,15 @@ export interface DataAdapter {
   browseFs(path?: string): Promise<FsListing | null>;
 
   // メディア・DLsite
-  /** 実体が無い（fixture 等）場合は null → ルートが 404 を返す */
-  locateMedia(kind: MediaKind, workId: string, relPath?: string): Promise<MediaLocation | null>;
+  /** 実体が無い（fixture 等）場合は null → ルートが 404 を返す。
+   *  width は kind === "cover" のときのみ意味を持つ（サムネイル幅、既に許可値へ正規化済み）。
+   *  fixture 等ラスタライズ元を持たないアダプタは無視してよい */
+  locateMedia(
+    kind: MediaKind,
+    workId: string,
+    relPath?: string,
+    width?: number,
+  ): Promise<MediaLocation | null>;
   dlsiteFetch(workId: string): Promise<DlsiteWorkInfo | null>;
   dlsiteApply(workId: string, body: DlsiteApplyBody): Promise<boolean>;
 }

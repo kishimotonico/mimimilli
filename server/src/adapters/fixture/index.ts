@@ -342,6 +342,8 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
       kind: MediaKind,
       workId: string,
       relPath?: string,
+      // カバーは SVG（ベクタ）合成のためリサイズ不要。width 指定は無視して原寸のまま返す
+      _width?: number,
     ): Promise<MediaLocation | null> {
       const work = state.works.find((w) => w.id === workId);
       if (!work) return null;

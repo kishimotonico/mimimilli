@@ -7,14 +7,19 @@ import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { Readable } from "node:stream";
 import { Hono } from "hono";
+import { coverQuerySchema, normalizeThumbnailWidth } from "@mimimilli/shared";
 import type { DataAdapter, MediaLocation } from "../adapter.ts";
-import { notFound } from "../lib/httpError.ts";
+import { invalidRequest, notFound } from "../lib/httpError.ts";
 
 export function mediaRoute(adapter: DataAdapter): Hono {
   const app = new Hono();
 
   app.get("/media/cover/:id", async (c) => {
-    const location = await adapter.locateMedia("cover", c.req.param("id"));
+    const parsed = coverQuerySchema.safeParse(c.req.query());
+    if (!parsed.success) invalidRequest(`不正なクエリパラメータです: ${parsed.error.message}`);
+    const width = parsed.data.w === undefined ? undefined : normalizeThumbnailWidth(parsed.data.w);
+
+    const location = await adapter.locateMedia("cover", c.req.param("id"), undefined, width);
     if (!location) notFound(`カバー画像が見つかりません: ${c.req.param("id")}`);
     return streamWhole(location);
   });

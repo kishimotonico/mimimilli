@@ -40,9 +40,11 @@ export async function getAllTags(): Promise<string[]> {
   return get<string[]>("/tags");
 }
 
-/** カバー画像のURLを返す（<img src> で直接使用可） */
-export function getCoverImageUrl(workId: string): string {
-  return `${API_BASE}/media/cover/${encodeURIComponent(workId)}`;
+/** カバー画像のURLを返す（<img src> で直接使用可）。
+ *  width を指定すると `?w=` でサムネイル幅を要求する（サーバー側で許可幅へ正規化される） */
+export function getCoverImageUrl(workId: string, width?: number): string {
+  const query = width === undefined ? "" : `?w=${encodeURIComponent(width)}`;
+  return `${API_BASE}/media/cover/${encodeURIComponent(workId)}${query}`;
 }
 
 /** 音声ファイルのURLを返す（<audio src> で直接使用可） */

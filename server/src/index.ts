@@ -3,6 +3,8 @@
 //   PORT                    … 待受ポート（デフォルト 8080）
 //   MIMIMILLI_ADAPTER       … "real"（デフォルト） | "fixture"（インメモリ開発データ）
 //   MIMIMILLI_DB            … real アダプタの SQLite パス（デフォルト ./data/mimimilli.db）
+//   MIMIMILLI_THUMBNAIL_CACHE_DIR … カバーサムネイルのキャッシュ置き場
+//                                   （デフォルト ./data/cache/thumbnails）
 //   MIMIMILLI_MOCK_SCENARIO … fixture アダプタのデータシナリオ
 //                             ("default" | "empty" | "new-work" | "errors"、省略時 "default")
 import { serve } from "@hono/node-server";
@@ -18,7 +20,10 @@ function createAdapter(): DataAdapter {
     case "fixture":
       return createFixtureAdapter({ scenario: process.env.MIMIMILLI_MOCK_SCENARIO });
     case "real":
-      return createRealAdapter({ dbPath: process.env.MIMIMILLI_DB ?? "data/mimimilli.db" });
+      return createRealAdapter({
+        dbPath: process.env.MIMIMILLI_DB ?? "data/mimimilli.db",
+        thumbnailCacheDir: process.env.MIMIMILLI_THUMBNAIL_CACHE_DIR,
+      });
     default:
       throw new Error(`不明な MIMIMILLI_ADAPTER です: ${adapterKind}`);
   }

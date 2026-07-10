@@ -46,6 +46,24 @@ export const resumeBodySchema = z.object({
 });
 export type ResumeBody = z.infer<typeof resumeBodySchema>;
 
+// ── カバー画像サムネイル（GET /api/media/cover/:id?w=）───────
+// キャッシュを有界にするため、許可する幅は離散値のみ。未対応の幅はリクエストされても
+// normalizeThumbnailWidth() が最近傍の許可幅へ丸める（丸め方の挙動はテストで担保する）。
+
+export const THUMBNAIL_WIDTHS = [128, 256, 512] as const;
+export type ThumbnailWidth = (typeof THUMBNAIL_WIDTHS)[number];
+
+export function normalizeThumbnailWidth(width: number): ThumbnailWidth {
+  return THUMBNAIL_WIDTHS.reduce((closest, candidate) =>
+    Math.abs(candidate - width) < Math.abs(closest - width) ? candidate : closest,
+  );
+}
+
+export const coverQuerySchema = z.object({
+  w: z.coerce.number().int().positive().optional(),
+});
+export type CoverQuery = z.infer<typeof coverQuerySchema>;
+
 // ── エクスポート（POST /api/export）──────────────────────────
 
 export const exportResponseSchema = z.object({

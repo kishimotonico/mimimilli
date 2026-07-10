@@ -20,6 +20,14 @@ test("カバー画像: coverImage ありの作品は 200 + image/svg+xml", async
   assert.match(svg, /<svg/);
 });
 
+test("カバー画像: 幅指定（?w=256）付きでも破綻せず SVG をそのまま返す", async () => {
+  const app = buildApp();
+
+  const res = await app.request("/api/media/cover/RJ501001?w=256");
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get("content-type"), "image/svg+xml");
+});
+
 test("カバー画像: coverImage なしの作品は 404", async () => {
   const app = buildApp();
 
