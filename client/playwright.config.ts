@@ -16,8 +16,12 @@ export default defineConfig({
   expect: {
     toHaveScreenshot: {
       animations: "disabled",
-      // フォントのサブピクセル描画ゆらぎ（直列実行でも数百px・~0.02 程度）を吸収する。
-      maxDiffPixelRatio: 0.03,
+      // フォントのサブピクセル描画ゆらぎ（直列実行でも数百px程度）を吸収しつつ、
+      // レイアウト回帰は検出できるよう絶対値で指定する。
+      // 旧設定の比率 0.03 はフルページ（1440x960）換算で約4.1万pxまで許容してしまい、
+      // TASK-22 の text-align 回帰（行テキストの寄せズレ=数千px規模）を素通りさせた。
+      // 1200px なら「ゆらぎの実測上限（数百px）<しきい値<最小の回帰規模（数千px）」に収まる。
+      maxDiffPixels: 1200,
     },
   },
   webServer: {
