@@ -66,7 +66,7 @@ export function usePlayer() {
       onTimeUpdate: (time) => {
         // A-B リピート（ref 経由で最新値を参照）
         const ab = abRepeatRef.current;
-        if (ab.a !== null && ab.b !== null && time >= ab.b) {
+        if (ab.a !== null && ab.b !== null && ab.a < ab.b && time >= ab.b) {
           engineRef.current?.seek(ab.a);
         }
         setCurrentTime(time);
@@ -346,10 +346,14 @@ export function usePlayer() {
   const setABPoint = useCallback(
     (point: "a" | "b") => {
       const time = engineRef.current?.getCurrentTime() ?? 0;
-      setCoreState((prev) => ({
-        ...prev,
-        abRepeat: { ...prev.abRepeat, [point]: time },
-      }));
+      setCoreState((prev) => {
+        const next = { ...prev.abRepeat, [point]: time };
+        // B→A の順で設定して区間が逆転した場合は入れ替えて成立させる
+        if (next.a !== null && next.b !== null && next.a > next.b) {
+          return { ...prev, abRepeat: { a: next.b, b: next.a } };
+        }
+        return { ...prev, abRepeat: next };
+      });
     },
     [setCoreState],
   );

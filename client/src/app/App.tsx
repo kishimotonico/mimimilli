@@ -329,6 +329,9 @@ export default function App() {
             onPrev={player.prevTrack}
             onSelectTrack={player.setTrackIndex}
             onClose={() => player.setShowFullPlayer(false)}
+            onSetChannelSwap={player.setChannelSwap}
+            onSetABPoint={player.setABPoint}
+            onClearABRepeat={player.clearABRepeat}
           />
         ) : undefined
       }

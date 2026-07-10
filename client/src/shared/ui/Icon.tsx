@@ -215,4 +215,5 @@ export const I: Record<string, IconFC> = {
       d={["M12 20a8 8 0 1 1 0 -16 8 8 0 0 1 0 16Z", "M12 2v2", "M12 20v2", "M2 12h2", "M20 12h2"]}
     />
   ),
+  swapLR: (p) => <Svg {...p} d={["M4 8h13", "M14 4l3 4 -3 4", "M20 16H7", "M10 12l-3 4 3 4"]} />,
 };

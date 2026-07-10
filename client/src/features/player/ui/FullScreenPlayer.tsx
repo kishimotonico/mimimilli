@@ -20,6 +20,9 @@ interface FullScreenPlayerProps {
   onPrev: () => void;
   onSelectTrack: (i: number) => void;
   onClose: () => void;
+  onSetChannelSwap: (enabled: boolean) => void;
+  onSetABPoint: (point: "a" | "b") => void;
+  onClearABRepeat: () => void;
 }
 
 // 円形のトランスポートボタン（±10秒 / prev / next / ループ）共通スタイル。
@@ -38,16 +41,23 @@ export default function FullScreenPlayer({
   onPrev,
   onSelectTrack,
   onClose,
+  onSetChannelSwap,
+  onSetABPoint,
+  onClearABRepeat,
 }: FullScreenPlayerProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   // currentTime / duration は高頻度 atom から直接読む（App.tsx を re-render させない）
   const currentTime = useAtomValue(playerCurrentTimeAtom);
   const duration = useAtomValue(playerDurationAtom);
-  const { currentWork, isPlaying, volume, loop, tracks, currentTrackIndex } = state;
+  const { currentWork, isPlaying, volume, loop, tracks, currentTrackIndex, channelSwap, abRepeat } =
+    state;
   const track = tracks[currentTrackIndex] ?? null;
   const pct = duration > 0 ? (currentTime / duration) * 100 : 0;
   const seek = useSeekDrag({ duration, onSeek });
+  const abStartPct = duration > 0 && abRepeat.a !== null ? (abRepeat.a / duration) * 100 : null;
+  const abEndPct = duration > 0 && abRepeat.b !== null ? (abRepeat.b / duration) * 100 : null;
+  const hasABRepeat = abRepeat.a !== null && abRepeat.b !== null;
 
   useLayoutEffect(() => {
     const dialog = dialogRef.current;
@@ -128,6 +138,15 @@ export default function FullScreenPlayer({
                 onPointerLeave={seek.onPointerLeave}
               >
                 <div className="relative h-1 w-full rounded-[2px] bg-paper-3">
+                  {abStartPct !== null && (
+                    <div
+                      className="absolute bottom-0 top-0 rounded-[2px] bg-acc-soft"
+                      style={{
+                        left: `${abStartPct}%`,
+                        width: `${Math.max(0, (abEndPct ?? 100) - abStartPct)}%`,
+                      }}
+                    />
+                  )}
                   <div
                     className="absolute bottom-0 left-0 top-0 rounded-[2px] bg-ink-0"
                     style={{ width: `${Math.min(100, pct)}%` }}
@@ -197,6 +216,15 @@ export default function FullScreenPlayer({
               >
                 <I.loopOne size={16} />
               </button>
+              <button
+                aria-label="左右チャンネル入替"
+                title="左右チャンネル入替"
+                aria-pressed={channelSwap}
+                onClick={() => onSetChannelSwap(!channelSwap)}
+                className={cn(ROUND_BTN, channelSwap ? "bg-acc-soft text-acc" : "text-ink-1")}
+              >
+                <I.swapLR size={16} />
+              </button>
 
               <div className="ml-auto flex items-center gap-2">
                 <I.volume size={13} className="text-ink-3" />
@@ -211,6 +239,57 @@ export default function FullScreenPlayer({
                   className="w-20 cursor-pointer accent-[var(--ink-2)]"
                 />
               </div>
+            </div>
+
+            {/* A-Bリピート: A/B点の設定・解除。設定中はシークバー上の範囲表示（上部）で分かる */}
+            <div className="flex items-center gap-2 pt-2.5">
+              <span className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-ink-3">
+                A-Bリピート
+              </span>
+              <button
+                type="button"
+                aria-label="A地点を設定"
+                title="A地点を設定"
+                onClick={() => onSetABPoint("a")}
+                className={cn(
+                  "grid h-[26px] w-[26px] cursor-pointer place-items-center rounded-2 font-mono text-[11px] font-bold",
+                  abRepeat.a !== null ? "bg-acc-soft text-acc" : "text-ink-1 hover:bg-paper-2",
+                )}
+              >
+                A
+              </button>
+              <button
+                type="button"
+                aria-label="B地点を設定"
+                title="B地点を設定"
+                onClick={() => onSetABPoint("b")}
+                className={cn(
+                  "grid h-[26px] w-[26px] cursor-pointer place-items-center rounded-2 font-mono text-[11px] font-bold",
+                  abRepeat.b !== null ? "bg-acc-soft text-acc" : "text-ink-1 hover:bg-paper-2",
+                )}
+              >
+                B
+              </button>
+              {(abRepeat.a !== null || abRepeat.b !== null) && (
+                <>
+                  <span className="font-mono text-[10.5px] text-ink-3">
+                    {abRepeat.a !== null ? formatTime(abRepeat.a) : "--:--"}
+                    {" – "}
+                    {abRepeat.b !== null ? formatTime(abRepeat.b) : "--:--"}
+                  </span>
+                  <IconButton
+                    size="sm"
+                    icon={I.x}
+                    label="A-Bリピートを解除"
+                    onClick={onClearABRepeat}
+                  />
+                </>
+              )}
+              {hasABRepeat && (
+                <span className="font-mono text-[10.5px] text-acc" aria-live="polite">
+                  リピート中
+                </span>
+              )}
             </div>
           </div>
         </div>
