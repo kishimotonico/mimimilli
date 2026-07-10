@@ -1,4 +1,4 @@
-// DLsite スクレイパー。server-rust/src/dlsite.rs の移植（fetch + cheerio）。
+// DLsite スクレイパー（fetch + cheerio）。
 // セレクタは docs/HANDOFF.md「DLsiteスクレイピングのセレクタ」を正典とする
 // （DLsite の HTML 構造変更時はここを修正する）。
 // HTML パースは pure 関数に分離し、ネットワークなしでテストできるようにする。

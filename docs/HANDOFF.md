@@ -137,7 +137,7 @@ headless Chromium（agent-browser / Playwright）は fixture の合成 8bit WAV 
 
 ## ドキュメントの現状
 
-ドキュメントの地図（現行の正典・規約・削除済みの区分）は [docs/README.md](README.md) が正。2026-07-03 の棚卸しで、旧 Rust 時代の名残は解消済み: `requirements-v4.md` の技術記述を現行（Hono + TS）へ更新、`web-architecture-proposal.md` と `design-brief.md` は削除（Git 履歴に残る）。`server-rust/` は退避した旧実装（参照用、ビルド対象外）。
+ドキュメントの地図（現行の正典・規約・削除済みの区分）は [docs/README.md](README.md) が正。2026-07-03 の棚卸しで、旧 Rust 時代の名残は解消済み: `requirements-v4.md` の技術記述を現行（Hono + TS）へ更新、`web-architecture-proposal.md` と `design-brief.md` は削除（Git 履歴に残る）。旧 Rust 実装 `server-rust/` も TS 版への移植完了を確認して削除済み（Git 履歴に残る）。
 
 現行の正は本 HANDOFF と [docs/ARCHITECTURE.md](ARCHITECTURE.md)、`shared/src/`（契約）、`server/src/`（実装）。
 
