@@ -1,12 +1,11 @@
 // library feature の API。作品検索（v2）、分類軸ファセット、スマートフォルダー、
-// 検索プリセット、ライブラリのエクスポート。
+// ライブラリのエクスポート。
 // 依存方向: shared/api/http、entities/work（戻り値の WorkSummary）、自 feature の model を参照する。
 
 import { get, post, put, del } from "../../shared/api/http";
 import type {
   AxisFacetItem,
   FacetAxis,
-  SearchPreset,
   SmartFolder,
   SmartFolderCreate,
   SmartFolderUpdate,
@@ -71,26 +70,6 @@ export async function deleteSmartFolder(id: string): Promise<void> {
 
 export async function evalSmartFolder(id: string): Promise<WorkSummary[]> {
   return get<WorkSummary[]>(`/smart-folders/${encodeURIComponent(id)}/works`);
-}
-
-// ── 検索プリセット ────────────────────────────────────────────
-
-export async function saveSearchPreset(
-  name: string,
-  query: string,
-  tagFilters: string[],
-  sortId: SortId,
-): Promise<number> {
-  const r = await post<{ id: number }>("/presets", { name, query, tagFilters, sortId });
-  return r.id;
-}
-
-export async function getSearchPresets(): Promise<SearchPreset[]> {
-  return get<SearchPreset[]>("/presets");
-}
-
-export async function deleteSearchPreset(id: number): Promise<void> {
-  await del(`/presets/${id}`);
 }
 
 // ── エクスポート ──────────────────────────────────────────────

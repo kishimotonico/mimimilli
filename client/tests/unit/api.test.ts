@@ -182,24 +182,6 @@ describe("library api", () => {
     expect(mockFetch).toHaveBeenCalledWith("/api/smart-folders/sf-1/works");
   });
 
-  it("saveSearchPreset POSTs to /api/presets and returns id", async () => {
-    mockFetch.mockResolvedValue(makeResponse({ id: 1 }));
-    const result = await libraryApi.saveSearchPreset("preset1", "query", ["tag"], "added-desc");
-    expect(mockFetch).toHaveBeenCalledWith(
-      "/api/presets",
-      expect.objectContaining({
-        method: "POST",
-        body: JSON.stringify({
-          name: "preset1",
-          query: "query",
-          tagFilters: ["tag"],
-          sortId: "added-desc",
-        }),
-      }),
-    );
-    expect(result).toBe(1);
-  });
-
   it("exportLibrary POSTs to /api/export and returns data string", async () => {
     mockFetch.mockResolvedValue(makeResponse({ data: '{"version":1}' }));
     const result = await libraryApi.exportLibrary();
