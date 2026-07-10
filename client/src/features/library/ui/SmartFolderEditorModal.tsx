@@ -285,7 +285,7 @@ export default function SmartFolderEditorModal({
                         setDraft((current) => removeSmartFolderRule(current, rule.id));
                         setErrors((current) => {
                           const { [rule.id]: _removed, ...ruleValues } = current.ruleValues;
-                          return { ...current, rules: undefined, ruleValues };
+                          return { ...current, ruleValues };
                         });
                       }}
                     />
@@ -366,13 +366,14 @@ export default function SmartFolderEditorModal({
               onClick={() => {
                 const id = `rule-${nextRuleId.current++}`;
                 setDraft((current) => addSmartFolderRule(current, id));
-                setErrors((current) => ({ ...current, rules: undefined }));
               }}
             >
               条件を追加
             </Button>
-            {errors.rules && (
-              <span className="text-[11px] text-[var(--r-coral)]">{errors.rules}</span>
+            {draft.rules.length === 0 && (
+              <span className="font-jp text-[11px] text-ink-3">
+                条件なし: すべての作品に一致します
+              </span>
             )}
           </section>
 

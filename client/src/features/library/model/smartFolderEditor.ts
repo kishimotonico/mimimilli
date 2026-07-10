@@ -25,13 +25,31 @@ export interface SmartFolderEditorDraft {
 
 export interface SmartFolderEditorErrors {
   name?: string;
-  rules?: string;
   ruleValues: Record<string, string>;
 }
 
 export type SmartFolderEditorResult =
   | { success: true; data: SmartFolderCreate }
   | { success: false; errors: SmartFolderEditorErrors };
+
+/**
+ * SmartFolderEditorModal の開閉状態。`SmartFolder | null | undefined` という
+ * 3値の組み合わせ（閉/新規/編集）は呼び出し側で判別しづらいため、判別可能unionにする。
+ * 現状 LibraryView.tsx が `useState<SmartFolder | null | undefined>()` でこの状態を持っており、
+ * この型へ置き換えるには同ファイルの変更が必要（本タスクのファイル境界外のため、型と
+ * コンストラクタの用意のみ行う）。
+ */
+export type SmartFolderEditorState =
+  | { status: "closed" }
+  | { status: "create" }
+  | { status: "edit"; folder: SmartFolder };
+
+export const closedSmartFolderEditorState: SmartFolderEditorState = { status: "closed" };
+export const createSmartFolderEditorState: SmartFolderEditorState = { status: "create" };
+
+export function editSmartFolderEditorState(folder: SmartFolder): SmartFolderEditorState {
+  return { status: "edit", folder };
+}
 
 export function createEmptySmartFolderRule(
   id: string,
@@ -112,8 +130,9 @@ export function validateSmartFolderDraft(draft: SmartFolderEditorDraft): SmartFo
   const errors: SmartFolderEditorErrors = { ruleValues: {} };
   const name = draft.name.trim();
 
+  // 条件0件は「すべての作品に一致する」正式な仕様として保存を許可する
+  // （shared契約・server評価・SmartFolderView表示のいずれも rules: [] を全作品として扱う）。
   if (name.length === 0) errors.name = "名前を入力してください";
-  if (draft.rules.length === 0) errors.rules = "条件を1つ以上追加してください";
 
   const rules: SmartFolderRule[] = [];
   draft.rules.forEach((rule, index) => {
@@ -137,7 +156,7 @@ export function validateSmartFolderDraft(draft: SmartFolderEditorDraft): SmartFo
     rules.push({ conjunction: lengthConjunction, field: "長さ", operator: "≥", values: [value] });
   });
 
-  if (errors.name || errors.rules || Object.keys(errors.ruleValues).length > 0) {
+  if (errors.name || Object.keys(errors.ruleValues).length > 0) {
     return { success: false, errors };
   }
 

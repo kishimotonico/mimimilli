@@ -62,19 +62,21 @@ describe("smart folder editor state", () => {
 });
 
 describe("smart folder editor validation", () => {
-  test("名前・条件・条件値が空ならエラーを返す", () => {
+  test("名前・条件値が空ならエラーを返す", () => {
     const emptyValue = validateSmartFolderDraft(createSmartFolderDraft());
     expect(emptyValue.success).toBe(false);
     if (!emptyValue.success) {
       expect(emptyValue.errors.name).toBe("名前を入力してください");
       expect(emptyValue.errors.ruleValues["rule-0"]).toBe("タグを1つ以上選択してください");
     }
+  });
 
-    const noRules = validateSmartFolderDraft({ name: "テスト", rules: [] });
-    expect(noRules.success).toBe(false);
-    if (!noRules.success) {
-      expect(noRules.errors.rules).toBe("条件を1つ以上追加してください");
-    }
+  test("条件0件は「すべての作品に一致」として保存できる", () => {
+    const result = validateSmartFolderDraft({ name: "テスト", rules: [] });
+    expect(result).toEqual({
+      success: true,
+      data: { name: "テスト", rules: [], sort: "added-desc" },
+    });
   });
 
   test("入力を整形し、条件間ORを含むAPI入力へ変換する", () => {
