@@ -307,9 +307,7 @@ export function WorkDetail({
     if (isPatching || isTagSaving) return;
     // 削除したタグだけを現在の集合へ戻す。undo待ちの間に行われた他のタグ編集は巻き戻さない。
     // 復元に失敗した場合はトーストを残して再試行可能にする（editError も表示される）
-    const restored = editableFlatTags.includes(tag)
-      ? editableFlatTags
-      : [...editableFlatTags, tag];
+    const restored = editableFlatTags.includes(tag) ? editableFlatTags : [...editableFlatTags, tag];
     const ok = await patchFlatTags(restored);
     if (ok) {
       if (tagUndoTimerRef.current) clearTimeout(tagUndoTimerRef.current);
