@@ -1,8 +1,11 @@
 import React from "react";
 import type { WorkSummary, AxisFacetItem } from "@mimimilli/shared";
 import type { AxisId } from "../model/types";
+import { getAxisLabel, isFacetAxis, isSmartAxis } from "../model/axisDefinitions";
+import { buildEmptyWorksMessage } from "../model/emptyWorks";
 import WorkRow from "./WorkRow";
 import DrillHeader from "./DrillHeader";
+import CollectionStatus from "./CollectionStatus";
 import { I } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
 
@@ -23,68 +26,6 @@ interface ContentColumnProps {
   onDrillBack: () => void;
   onTagToggle: (tag: string) => void;
   onClearSearch: () => void;
-}
-
-const FACET_AXES = new Set(["circle", "cv", "series", "cat", "year"]);
-
-const AXIS_LABELS: Record<string, string> = {
-  circle: "サークル",
-  cv: "CV",
-  series: "シリーズ",
-  cat: "カテゴリ",
-  year: "追加日",
-};
-
-function isFacetAxis(a: AxisId): boolean {
-  return FACET_AXES.has(a as string);
-}
-function isSmartAxis(a: AxisId): boolean {
-  return (a as string).startsWith("smart-");
-}
-
-// 0件の原因（検索語・軸ドリル絞り込み）を明示するメッセージを組み立てる。
-// どちらも効いていない場合は「そもそもこの軸に作品がない」ケースなので原因表示はしない。
-function buildEmptyWorksMessage(
-  searchQuery: string,
-  drillAxis: AxisId | null,
-  drillValue: string | null,
-): string {
-  const drillLabel =
-    drillAxis && drillValue
-      ? `${AXIS_LABELS[drillAxis as string] ?? drillAxis}「${drillValue}」`
-      : null;
-  if (searchQuery && drillLabel) {
-    return `「${searchQuery}」・${drillLabel} に一致する作品はありません`;
-  }
-  if (searchQuery) {
-    return `「${searchQuery}」に一致する作品はありません`;
-  }
-  if (drillLabel) {
-    return `${drillLabel} に一致する作品はありません`;
-  }
-  return "作品が見つかりません";
-}
-
-function EmptyState({ message, action }: { message: string; action?: React.ReactNode }) {
-  return (
-    <div
-      style={{
-        flex: 1,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 10,
-        padding: "24px 16px",
-        color: "var(--ink-4)",
-        fontSize: 12,
-        textAlign: "center",
-      }}
-    >
-      <span>{message}</span>
-      {action}
-    </div>
-  );
 }
 
 export default function ContentColumn({
@@ -138,11 +79,11 @@ export default function ContentColumn({
         )}
         <div className="mle-col__list">
           {isLoading ? (
-            <EmptyState message="読み込み中..." />
+            <CollectionStatus variant="list" kind="loading" />
           ) : isError ? (
-            <EmptyState message="読み込みに失敗しました" />
+            <CollectionStatus variant="list" kind="error" />
           ) : facetItems.length === 0 ? (
-            <EmptyState message="タグがありません" />
+            <CollectionStatus variant="list" kind="empty" message="タグがありません" />
           ) : (
             facetItems.map((item) => (
               <button
@@ -171,16 +112,16 @@ export default function ContentColumn({
     return (
       <div className="mle-col is-content">
         <div className="mle-col__hd">
-          <span>{AXIS_LABELS[axis] ?? axis}</span>
+          <span>{getAxisLabel(axis)}</span>
           <span className="count">{facetItems.length} 件</span>
         </div>
         <div className="mle-col__list">
           {isLoading ? (
-            <EmptyState message="読み込み中..." />
+            <CollectionStatus variant="list" kind="loading" />
           ) : isError ? (
-            <EmptyState message="読み込みに失敗しました" />
+            <CollectionStatus variant="list" kind="error" />
           ) : facetItems.length === 0 ? (
-            <EmptyState message="項目がありません" />
+            <CollectionStatus variant="list" kind="empty" message="項目がありません" />
           ) : (
             facetItems.map((item) => (
               <button
@@ -239,11 +180,13 @@ export default function ContentColumn({
       )}
       <div className="mle-col__list">
         {isLoading ? (
-          <EmptyState message="読み込み中..." />
+          <CollectionStatus variant="list" kind="loading" />
         ) : isError ? (
-          <EmptyState message="読み込みに失敗しました" />
+          <CollectionStatus variant="list" kind="error" />
         ) : works.length === 0 ? (
-          <EmptyState
+          <CollectionStatus
+            variant="list"
+            kind="empty"
             message={buildEmptyWorksMessage(searchQuery, showDrill ? axis : null, drillValue)}
             action={
               searchQuery ? (

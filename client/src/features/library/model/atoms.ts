@@ -6,6 +6,7 @@
 import { atom } from "jotai";
 import { atomWithStorage } from "jotai/utils";
 import type { AxisId, SortId, ViewMode } from "../../../features/library/model/types";
+import { getAxisLabel } from "./axisDefinitions";
 
 // ── ナビゲーション state ──────────────────────────────────────
 
@@ -21,27 +22,9 @@ export const libraryTileSizeAtom = atomWithStorage<number>("mimimilli:libraryTil
 
 // ── 派生: アドレスバーパス ────────────────────────────────────
 
-const AXIS_LABELS: Partial<Record<string, string>> = {
-  all: "すべての作品",
-  recent: "最近再生",
-  added: "最近追加",
-  fav: "お気に入り",
-  unplayed: "未再生",
-  missing: "ファイル欠損",
-  circle: "サークル",
-  cv: "CV",
-  series: "シリーズ",
-  cat: "カテゴリ",
-  tag: "タグ",
-  year: "追加日",
-};
-
 function buildAddressPath(axis: AxisId, drillValue: string | null): string[] {
   if (axis === "all") return ["ライブラリ"];
-  const label = (axis as string).startsWith("smart-")
-    ? "スマートフォルダー"
-    : (AXIS_LABELS[axis] ?? axis);
-  const base = ["ライブラリ", label];
+  const base = ["ライブラリ", getAxisLabel(axis)];
   return drillValue ? [...base, drillValue] : base;
 }
 

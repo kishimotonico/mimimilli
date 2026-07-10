@@ -2,10 +2,14 @@ import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import type { AxisId } from "../model/types";
 import type { WorkSummary } from "@mimimilli/shared";
 import CoverImg from "../../../entities/work/ui/CoverImg";
+import { getCircleName } from "../../../entities/work/model";
 import Button from "../../../shared/ui/Button";
 import { I } from "../../../shared/ui/Icon";
 import { clampTileSize, selectCoverThumbnailWidth } from "../model/gridSizing";
 import { countGridColumns, getNextGridIndex, type GridArrowKey } from "../model/gridNavigation";
+import { buildEmptyWorksMessage } from "../model/emptyWorks";
+import { isFacetAxis, isSmartAxis } from "../model/axisDefinitions";
+import CollectionStatus from "./CollectionStatus";
 import DrillHeader from "./DrillHeader";
 
 interface WorkGridProps {
@@ -27,13 +31,6 @@ interface WorkGridProps {
 }
 
 const GRID_ARROW_KEYS = new Set<GridArrowKey>(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"]);
-
-function circleName(work: WorkSummary): string {
-  const tag = work.tags.find(
-    (value) => value.startsWith("サークル/") || value.startsWith("circle/"),
-  );
-  return tag?.slice(tag.indexOf("/") + 1) || "サークル不明";
-}
 
 export default function WorkGrid({
   axis,
@@ -142,28 +139,32 @@ export default function WorkGrid({
         />
       ) : (
         <div className="mle-col__hd">
-          <span>{String(axis).startsWith("smart-") ? "スマートフォルダー" : "作品"}</span>
+          <span>{isSmartAxis(axis) ? "スマートフォルダー" : "作品"}</span>
           <span className="count">{works.length} 件</span>
         </div>
       )}
       <div ref={scrollRef} className="mll-grid-scroll">
         {isLoading ? (
-          <div className="mll-grid-empty">読み込み中...</div>
+          <CollectionStatus variant="grid" kind="loading" />
         ) : isError ? (
-          <div className="mll-grid-empty">読み込みに失敗しました</div>
+          <CollectionStatus variant="grid" kind="error" />
         ) : works.length === 0 ? (
-          <div className="mll-grid-empty">
-            <span>
-              {searchQuery
-                ? `「${searchQuery}」に一致する作品はありません`
-                : "作品が見つかりません"}
-            </span>
-            {searchQuery && (
-              <Button variant="ghost" icon={I.x} onClick={onClearSearch}>
-                検索をクリア
-              </Button>
+          <CollectionStatus
+            variant="grid"
+            kind="empty"
+            message={buildEmptyWorksMessage(
+              searchQuery,
+              isDrilled && isFacetAxis(axis) ? axis : null,
+              drillValue,
             )}
-          </div>
+            action={
+              searchQuery ? (
+                <Button variant="ghost" icon={I.x} onClick={onClearSearch}>
+                  検索をクリア
+                </Button>
+              ) : undefined
+            }
+          />
         ) : (
           <div
             ref={gridRef}
@@ -202,7 +203,9 @@ export default function WorkGrid({
                   />
                 </span>
                 <span className="mll-grid-tile__title">{work.title}</span>
-                <span className="mll-grid-tile__circle">{circleName(work)}</span>
+                <span className="mll-grid-tile__circle">
+                  {getCircleName(work) ?? "サークル不明"}
+                </span>
               </button>
             ))}
           </div>

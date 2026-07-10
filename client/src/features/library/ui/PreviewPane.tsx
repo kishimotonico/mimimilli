@@ -1,13 +1,12 @@
 import type { Work, WorkPatch, SmartFolder, WorkSummary } from "@mimimilli/shared";
 import type { AxisLandingPresentation } from "../model/axisLandingPresentation";
+import type { PreviewMode } from "../model/libraryPresentation";
 import { AxisLanding } from "./preview/AxisLanding";
 import { EmptyPreview } from "./preview/EmptyPreview";
 import { SmartFolderView } from "./preview/SmartFolderView";
 import { WorkDetail } from "./preview/WorkDetail";
 
 // ── Main ──────────────────────────────────────────────────────
-
-type PreviewMode = "work" | "axis-landing" | "smart-folder" | "empty";
 
 interface PreviewPaneProps {
   mode: PreviewMode;

@@ -1,5 +1,6 @@
 import type { WorkSummary } from "@mimimilli/shared";
 import CoverImg from "../../../entities/work/ui/CoverImg";
+import { getCircleName } from "../../../entities/work/model";
 import { I } from "../../../shared/ui/Icon";
 import { formatDuration } from "../../../shared/lib/format";
 import { cn } from "../../../shared/lib/cn";
@@ -19,11 +20,8 @@ export default function WorkRow({
   isPlaybackActive,
   onSelect,
 }: WorkRowProps) {
-  const circleTag = work.tags.find((t) => t.startsWith("サークル/") || t.startsWith("circle/"));
-  const circleValue = circleTag ? circleTag.split("/")[1] : null;
-
   const sub = [
-    circleValue,
+    getCircleName(work),
     work.trackCount > 0 ? `${work.trackCount}tr` : null,
     work.totalDurationSec > 0 ? formatDuration(work.totalDurationSec) : null,
   ]

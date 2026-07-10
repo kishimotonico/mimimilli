@@ -1,23 +1,16 @@
 import { I } from "../../../shared/ui/Icon";
+import { getAxisLabel } from "../model/axisDefinitions";
+import type { AxisId } from "../model/types";
 
 interface DrillHeaderProps {
-  axisLabel: string;
+  axisLabel: AxisId;
   value: string;
   count?: number;
   onBack: () => void;
 }
 
-const AXIS_LABELS: Record<string, string> = {
-  circle: "サークル",
-  cv: "CV",
-  series: "シリーズ",
-  cat: "カテゴリ",
-  tag: "タグ",
-  year: "追加日",
-};
-
 export default function DrillHeader({ axisLabel, value, count, onBack }: DrillHeaderProps) {
-  const label = AXIS_LABELS[axisLabel] ?? axisLabel;
+  const label = getAxisLabel(axisLabel);
   return (
     <div className="mle-drill">
       <button type="button" className="mle-drill__crumb" onClick={onBack}>

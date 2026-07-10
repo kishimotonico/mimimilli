@@ -1,4 +1,5 @@
 import type { AxisId } from "./types";
+import { getAxisLabel } from "./axisDefinitions";
 
 export interface AxisLandingPresentation {
   panelTitle: string;
@@ -6,20 +7,11 @@ export interface AxisLandingPresentation {
   instruction: string | null;
 }
 
-const AXIS_LABELS: Partial<Record<AxisId, string>> = {
-  circle: "サークル",
-  cv: "CV",
-  series: "シリーズ",
-  cat: "カテゴリ",
-  tag: "タグ",
-  year: "追加日",
-};
-
 export function getAxisLandingPresentation(
   axis: AxisId,
   isFilterApplied: boolean,
 ): AxisLandingPresentation {
-  const axisLabel = AXIS_LABELS[axis] ?? axis;
+  const axisLabel = getAxisLabel(axis);
 
   if (isFilterApplied) {
     return {
