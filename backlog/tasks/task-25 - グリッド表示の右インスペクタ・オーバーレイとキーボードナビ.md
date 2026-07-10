@@ -1,9 +1,11 @@
 ---
 id: TASK-25
 title: グリッド表示の右インスペクタ・オーバーレイとキーボードナビ
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@codex'
 created_date: '2026-07-07 11:59'
+updated_date: '2026-07-10 09:49'
 labels:
   - feature
   - frontend

@@ -16,6 +16,7 @@ import AxisColumn from "./AxisColumn";
 import ContentColumn from "./ContentColumn";
 import PreviewPane from "./PreviewPane";
 import WorkGrid from "./WorkGrid";
+import WorkGridInspector from "./WorkGridInspector";
 
 type PreviewMode = "work" | "axis-landing" | "smart-folder" | "empty";
 
@@ -273,6 +274,33 @@ export default function LibraryView({
           onWorkPlay={(work) => onPlay(work, 0)}
           onDrillBack={nav.drillBack}
           onClearSearch={() => onSearchChange("")}
+          onInspectorClose={() => nav.selectWork(null)}
+          inspector={
+            nav.selectedWorkId ? (
+              <WorkGridInspector
+                work={selectedWork}
+                isLoading={workDetailQuery.isPending}
+                isError={workDetailQuery.isError}
+                playingTrackIndex={
+                  selectedWork && playingWorkId === selectedWork.id
+                    ? (playingTrackIndex ?? null)
+                    : null
+                }
+                isPlaybackActive={isPlaybackActive}
+                tagSuggestions={tagsQuery.data ?? []}
+                isPatching={patchWorkMutation.isPending}
+                onClose={() => nav.selectWork(null)}
+                onPlay={handlePlay}
+                onResume={handleResume}
+                onPatchWork={(body) => {
+                  if (!selectedWork) {
+                    return Promise.reject(new Error("更新対象の作品が選択されていません"));
+                  }
+                  return patchWorkMutation.mutateAsync({ workId: selectedWork.id, body });
+                }}
+              />
+            ) : null
+          }
         />
       ) : (
         <ContentColumn
@@ -295,7 +323,7 @@ export default function LibraryView({
         />
       )}
 
-      {(!showGrid || previewMode === "work") && (
+      {!showGrid && (
         <PreviewPane
           mode={previewMode}
           showNoResultsHint={isNoResultsDueToFilter}
