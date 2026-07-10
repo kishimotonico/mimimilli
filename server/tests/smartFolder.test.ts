@@ -62,6 +62,31 @@ test("複合: 長さ条件とタグ条件をAND適用する", () => {
   assert.deepEqual(result.map((w) => w.id).sort(), ["RJ001", "RJ004"]);
 });
 
+test("OR: 直前までの結果と条件に一致する作品を和集合にする", () => {
+  const rules: SmartFolderRule[] = [
+    { conjunction: "WHERE", field: "タグ", operator: "∋", values: ["催眠"] },
+    { conjunction: "OR", field: "長さ", operator: "≥", values: ["3600"] },
+  ];
+  const result = evalSmartFolderRules(rules, WORKS);
+  assert.deepEqual(
+    result.map((w) => w.id),
+    ["RJ001", "RJ003", "RJ004"],
+  );
+});
+
+test("ANDとORをルール順に評価する", () => {
+  const rules: SmartFolderRule[] = [
+    { conjunction: "WHERE", field: "タグ", operator: "∋", values: ["ASMR"] },
+    { conjunction: "AND", field: "長さ", operator: "≥", values: ["3600"] },
+    { conjunction: "OR", field: "タグ", operator: "∋", values: ["催眠"] },
+  ];
+  const result = evalSmartFolderRules(rules, WORKS);
+  assert.deepEqual(
+    result.map((w) => w.id),
+    ["RJ001", "RJ003"],
+  );
+});
+
 test("未知の field/operator のルールは契約で拒否する", () => {
   const parsed = smartFolderRuleSchema.safeParse({
     conjunction: "WHERE",

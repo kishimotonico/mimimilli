@@ -5,6 +5,7 @@ import {
   type WorkSummary,
 } from "@mimimilli/shared";
 import { I } from "../../../../shared/ui/Icon";
+import Button from "../../../../shared/ui/Button";
 import { formatDuration } from "./format";
 
 const TAG_PREFIX_LABEL: Record<string, string> = {
@@ -61,7 +62,15 @@ function RuleValue({ rule }: { rule: SmartFolderRule }) {
   );
 }
 
-export function SmartFolderView({ sf, works }: { sf: SmartFolder; works: WorkSummary[] }) {
+export function SmartFolderView({
+  sf,
+  works,
+  onEdit,
+}: {
+  sf: SmartFolder;
+  works: WorkSummary[];
+  onEdit: () => void;
+}) {
   return (
     <div className="mle-prv__body">
       <div className="mll-smart">
@@ -89,16 +98,14 @@ export function SmartFolderView({ sf, works }: { sf: SmartFolder; works: WorkSum
             ))
           )}
         </div>
-        <button
-          className="mll-smart__add !cursor-not-allowed !text-ink-4 hover:!bg-transparent hover:!text-ink-4"
-          disabled
-          title="近日実装"
-        >
-          <I.add size={11} /> 条件を追加
-        </button>
         <div className="mll-smart__ft">
           <span className="hits">
             <b>{works.length}</b> 件マッチ
+          </span>
+          <span className="right">
+            <Button variant="ghost" icon={I.cog} onClick={onEdit}>
+              条件を編集
+            </Button>
           </span>
         </div>
       </div>

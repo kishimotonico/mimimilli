@@ -42,7 +42,7 @@ export type AxisFacetItem = z.infer<typeof axisFacetItemSchema>;
 
 // ── スマートフォルダー ────────────────────────────────────────
 
-const smartFolderConjunctionSchema = z.enum(["WHERE", "AND", "AND NOT"]);
+const smartFolderConjunctionSchema = z.enum(["WHERE", "AND", "OR", "AND NOT"]);
 
 export const smartFolderRuleSchema = z.discriminatedUnion("field", [
   z.object({
@@ -52,7 +52,7 @@ export const smartFolderRuleSchema = z.discriminatedUnion("field", [
     values: z.array(z.string().min(1)).min(1),
   }),
   z.object({
-    conjunction: z.enum(["WHERE", "AND"]),
+    conjunction: z.enum(["WHERE", "AND", "OR"]),
     field: z.literal("長さ"),
     operator: z.literal("≥"),
     values: z.array(z.string().regex(/^\d+$/)).length(1),

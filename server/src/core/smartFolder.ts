@@ -9,17 +9,18 @@ export function evalSmartFolderRules(
   rules: SmartFolderRule[],
   works: WorkSummary[],
 ): WorkSummary[] {
-  let result = [...works];
+  if (rules.length === 0) return [...works];
 
-  for (const rule of rules) {
+  let resultIds = new Set<string>();
+
+  for (const [index, rule] of rules.entries()) {
+    let matchingIds: Set<string>;
     switch (rule.field) {
       case "タグ": {
         const values = rule.values;
-        if (rule.conjunction === "AND NOT") {
-          result = result.filter((w) => !values.some((v) => w.tags.includes(v)));
-        } else {
-          result = result.filter((w) => values.some((v) => w.tags.includes(v)));
-        }
+        matchingIds = new Set(
+          works.filter((w) => values.some((v) => w.tags.includes(v))).map((w) => w.id),
+        );
         break;
       }
       case "長さ": {
@@ -27,15 +28,25 @@ export function evalSmartFolderRules(
         if (!Number.isFinite(minSec)) {
           throw new Error(`スマートフォルダーの長さ条件が不正です: ${rule.values[0]}`);
         }
-        result = result.filter((w) => w.totalDurationSec >= minSec);
+        matchingIds = new Set(works.filter((w) => w.totalDurationSec >= minSec).map((w) => w.id));
         break;
       }
       default:
         throw new Error(`未対応のスマートフォルダールールです: ${JSON.stringify(rule)}`);
     }
+
+    if (index === 0 || rule.conjunction === "WHERE") {
+      resultIds = matchingIds;
+    } else if (rule.conjunction === "AND") {
+      resultIds = new Set([...resultIds].filter((id) => matchingIds.has(id)));
+    } else if (rule.conjunction === "OR") {
+      resultIds = new Set([...resultIds, ...matchingIds]);
+    } else if (rule.conjunction === "AND NOT") {
+      resultIds = new Set([...resultIds].filter((id) => !matchingIds.has(id)));
+    }
   }
 
-  return result;
+  return works.filter((work) => resultIds.has(work.id));
 }
 
 /** 保存済みルールと sort を一体で評価する。 */

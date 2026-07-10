@@ -25,6 +25,7 @@ interface PreviewPaneProps {
   tagSuggestions: string[];
   isPatching: boolean;
   onPatchWork: (body: WorkPatch) => Promise<Work>;
+  onEditSmartFolder: (folder: SmartFolder) => void;
 }
 
 export default function PreviewPane({
@@ -43,6 +44,7 @@ export default function PreviewPane({
   tagSuggestions,
   isPatching,
   onPatchWork,
+  onEditSmartFolder,
 }: PreviewPaneProps) {
   const title =
     mode === "work"
@@ -79,7 +81,11 @@ export default function PreviewPane({
         />
       )}
       {mode === "smart-folder" && smartFolder && (
-        <SmartFolderView sf={smartFolder} works={smartFolderWorks} />
+        <SmartFolderView
+          sf={smartFolder}
+          works={smartFolderWorks}
+          onEdit={() => onEditSmartFolder(smartFolder)}
+        />
       )}
       {mode === "empty" && <EmptyPreview showNoResultsHint={showNoResultsHint} />}
     </div>

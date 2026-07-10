@@ -1,12 +1,19 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Work, WorkPatch, WorkSummary } from "@mimimilli/shared";
+import type {
+  SmartFolder,
+  SmartFolderCreate,
+  Work,
+  WorkPatch,
+  WorkSummary,
+} from "@mimimilli/shared";
 import type { AxisId, ViewMode } from "../model/types";
 import {
   searchWorks,
   getAxisFacets,
   listSmartFolders,
   createSmartFolder,
+  updateSmartFolder,
   evalSmartFolder,
 } from "../../../features/library/api";
 import { getAllTags, getWork, patchWork } from "../../../entities/work/api";
@@ -17,6 +24,7 @@ import ContentColumn from "./ContentColumn";
 import PreviewPane from "./PreviewPane";
 import WorkGrid from "./WorkGrid";
 import WorkGridInspector from "./WorkGridInspector";
+import SmartFolderEditorModal from "./SmartFolderEditorModal";
 
 type PreviewMode = "work" | "axis-landing" | "smart-folder" | "empty";
 
@@ -74,6 +82,7 @@ export default function LibraryView({
 }: LibraryViewProps) {
   const nav = useLibraryView();
   const queryClient = useQueryClient();
+  const [smartFolderEditor, setSmartFolderEditor] = useState<SmartFolder | null | undefined>();
 
   // ── Works（通常軸）─────────────────────────────────────────
   const worksParams = (() => {
@@ -142,11 +151,25 @@ export default function LibraryView({
   });
   const smartFolders = smartFoldersQuery.data ?? [];
 
-  // ── スマートフォルダー作成 mutation ───────────────────────
-  const createSmartFolderMutation = useMutation({
-    mutationFn: createSmartFolder,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: LIBRARY_KEYS.smartFolders() });
+  // ── スマートフォルダー作成・編集 mutation ─────────────────
+  const saveSmartFolderMutation = useMutation({
+    mutationFn: ({ folder, input }: { folder: SmartFolder | null; input: SmartFolderCreate }) =>
+      folder ? updateSmartFolder(folder.id, input) : createSmartFolder(input),
+    onSuccess: async (savedFolder, { folder }) => {
+      setSmartFolderEditor(undefined);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: LIBRARY_KEYS.smartFolders() }),
+        queryClient.invalidateQueries({ queryKey: LIBRARY_KEYS.allSmartFolderWorks() }),
+      ]);
+      if (!folder) nav.setAxis(`smart-${savedFolder.id}`);
+    },
+    onError: (error, { folder }) => {
+      console.error(
+        folder
+          ? "スマートフォルダーの更新に失敗しました"
+          : "スマートフォルダーの作成に失敗しました",
+        error,
+      );
     },
   });
 
@@ -253,9 +276,8 @@ export default function LibraryView({
         smartFolders={smartFolders}
         onSelectAxis={nav.setAxis}
         onNewSmartFolder={() => {
-          const name = window.prompt("スマートフォルダー名:");
-          if (!name) return;
-          createSmartFolderMutation.mutate({ name, rules: [], sort: "added-desc" });
+          saveSmartFolderMutation.reset();
+          setSmartFolderEditor(null);
         }}
       />
 
@@ -347,6 +369,30 @@ export default function LibraryView({
             }
             return patchWorkMutation.mutateAsync({ workId: selectedWork.id, body });
           }}
+          onEditSmartFolder={(folder) => {
+            saveSmartFolderMutation.reset();
+            setSmartFolderEditor(folder);
+          }}
+        />
+      )}
+
+      {smartFolderEditor !== undefined && (
+        <SmartFolderEditorModal
+          folder={smartFolderEditor}
+          tagSuggestions={tagsQuery.data ?? []}
+          isSaving={saveSmartFolderMutation.isPending}
+          saveError={
+            saveSmartFolderMutation.error instanceof Error
+              ? saveSmartFolderMutation.error.message
+              : saveSmartFolderMutation.error
+                ? "保存に失敗しました"
+                : null
+          }
+          onClose={() => {
+            if (saveSmartFolderMutation.isPending) return;
+            setSmartFolderEditor(undefined);
+          }}
+          onSave={(input) => saveSmartFolderMutation.mutate({ folder: smartFolderEditor, input })}
         />
       )}
     </>
