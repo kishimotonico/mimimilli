@@ -116,6 +116,7 @@ describe("work api", () => {
 
   it("getCoverImageUrl returns the media/cover URL", () => {
     expect(workApi.getCoverImageUrl("RJ001001")).toBe("/api/media/cover/RJ001001");
+    expect(workApi.getCoverImageUrl("RJ001001", 256)).toBe("/api/media/cover/RJ001001?w=256");
   });
 
   it("getAudioUrl returns the media/audio URL", () => {

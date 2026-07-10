@@ -22,18 +22,7 @@ export const SORT_OPTIONS: { id: SortId; label: string }[] = [
 
 // ── 表示モード ───────────────────────────────────────────────
 
-export type ViewMode = "grid" | "table";
-
-export type GridSize = "S" | "M" | "L" | "XL";
-
-export const GRID_SIZES: Record<GridSize, number> = {
-  S: 120,
-  M: 160,
-  L: 200,
-  XL: 260,
-};
-
-export const GRID_SIZE_KEYS: GridSize[] = ["S", "M", "L", "XL"];
+export type ViewMode = "list" | "grid";
 
 // ── 軸 ───────────────────────────────────────────────────────
 

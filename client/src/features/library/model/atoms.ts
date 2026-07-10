@@ -4,7 +4,8 @@
 // コンポーネント側で useQuery 結果と atom 値を組み合わせて計算する（issue 参照）。
 
 import { atom } from "jotai";
-import type { AxisId, SortId } from "../../../features/library/model/types";
+import { atomWithStorage } from "jotai/utils";
+import type { AxisId, SortId, ViewMode } from "../../../features/library/model/types";
 
 // ── ナビゲーション state ──────────────────────────────────────
 
@@ -13,6 +14,10 @@ export const drillValueAtom = atom<string | null>(null);
 export const selectedTagsAtom = atom<string[]>([]);
 export const selectedWorkIdAtom = atom<string | null>(null);
 export const sortAtom = atom<SortId>("added-desc");
+
+// URLには含めない表示設定。ブラウザーを再起動しても直前の見た目を復元する。
+export const libraryViewModeAtom = atomWithStorage<ViewMode>("mimimilli:libraryViewMode", "list");
+export const libraryTileSizeAtom = atomWithStorage<number>("mimimilli:libraryTileSize", 176);
 
 // ── 派生: アドレスバーパス ────────────────────────────────────
 

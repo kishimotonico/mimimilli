@@ -3,6 +3,7 @@ import type { SortId } from "@mimimilli/shared";
 import { SORT_OPTIONS } from "../../features/library/model/types";
 import { I } from "../../shared/ui/Icon";
 import IconButton from "../../shared/ui/IconButton";
+import { MAX_TILE_SIZE, MIN_TILE_SIZE } from "../../features/library/model/gridSizing";
 
 interface AddressBarProps {
   path: string[];
@@ -13,6 +14,9 @@ interface AddressBarProps {
   canForward?: boolean;
   viewMode?: "column" | "list" | "grid";
   onViewChange?: (v: "column" | "list" | "grid") => void;
+  availableViewModes?: readonly ("column" | "list" | "grid")[];
+  tileSize?: number;
+  onTileSizeChange?: (size: number) => void;
   showSort?: boolean;
   sort?: SortId;
   onSortChange?: (sort: SortId) => void;
@@ -27,6 +31,9 @@ export default function AddressBar({
   canForward = false,
   viewMode = "column",
   onViewChange,
+  availableViewModes = ["column"],
+  tileSize,
+  onTileSizeChange,
   showSort = false,
   sort,
   onSortChange,
@@ -87,6 +94,7 @@ export default function AddressBar({
           label="カラム"
           active={viewMode === "column"}
           onClick={() => onViewChange?.("column")}
+          disabled={!availableViewModes.includes("column")}
         />
         <IconButton
           size="sm"
@@ -94,8 +102,7 @@ export default function AddressBar({
           label="リスト"
           active={viewMode === "list"}
           onClick={() => onViewChange?.("list")}
-          disabled
-          title="近日実装"
+          disabled={!availableViewModes.includes("list")}
         />
         <IconButton
           size="sm"
@@ -103,10 +110,25 @@ export default function AddressBar({
           label="グリッド"
           active={viewMode === "grid"}
           onClick={() => onViewChange?.("grid")}
-          disabled
-          title="近日実装"
+          disabled={!availableViewModes.includes("grid")}
         />
       </div>
+
+      {viewMode === "grid" && tileSize !== undefined && onTileSizeChange && (
+        <label className="mll-grid-size">
+          <span>タイル</span>
+          <input
+            type="range"
+            min={MIN_TILE_SIZE}
+            max={MAX_TILE_SIZE}
+            step={1}
+            value={tileSize}
+            aria-label="グリッドのタイルサイズ"
+            onChange={(event) => onTileSizeChange(Number(event.currentTarget.value))}
+          />
+          <output>{tileSize}px</output>
+        </label>
+      )}
 
       {showSort && (
         <div className="mle-sortmenu" ref={sortRef}>
