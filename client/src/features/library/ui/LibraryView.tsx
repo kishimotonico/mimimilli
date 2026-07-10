@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Work, WorkPatch, WorkSummary } from "@mimimilli/shared";
-import type { AxisId } from "../model/types";
+import type { AxisId, ViewMode } from "../model/types";
 import {
   searchWorks,
   getAxisFacets,
@@ -15,6 +15,7 @@ import { getAxisLandingPresentation } from "../model/axisLandingPresentation";
 import AxisColumn from "./AxisColumn";
 import ContentColumn from "./ContentColumn";
 import PreviewPane from "./PreviewPane";
+import WorkGrid from "./WorkGrid";
 
 type PreviewMode = "work" | "axis-landing" | "smart-folder" | "empty";
 
@@ -53,6 +54,9 @@ interface LibraryViewProps {
   isPlaybackActive?: boolean;
   onPlay: (work: WorkSummary, trackIndex: number) => void;
   onResume: (work: Work) => void;
+  viewMode: ViewMode;
+  tileSize: number;
+  onTileSizeChange: (size: number) => void;
 }
 
 export default function LibraryView({
@@ -63,6 +67,9 @@ export default function LibraryView({
   isPlaybackActive,
   onPlay,
   onResume,
+  viewMode,
+  tileSize,
+  onTileSizeChange,
 }: LibraryViewProps) {
   const nav = useLibraryView();
   const queryClient = useQueryClient();
@@ -178,6 +185,11 @@ export default function LibraryView({
   // 中央カラムが作品リストを表示する状態（非ファセット軸 or ドリル済み）に限る。
   const showsWorksList =
     !isSmartAxis(nav.activeAxis) && (!isFacetAxis(nav.activeAxis) || nav.drillValue !== null);
+  const canShowWorksGrid =
+    isSmartAxis(nav.activeAxis) ||
+    (!isFacetAxis(nav.activeAxis) && nav.activeAxis !== "tag") ||
+    (isFacetAxis(nav.activeAxis) && nav.drillValue !== null);
+  const showGrid = viewMode === "grid" && canShowWorksGrid;
   const isNoResultsDueToFilter =
     showsWorksList &&
     works.length === 0 &&
@@ -246,48 +258,68 @@ export default function LibraryView({
         }}
       />
 
-      <ContentColumn
-        axis={nav.activeAxis}
-        drillValue={nav.drillValue}
-        works={works}
-        facetItems={facetQuery.data ?? []}
-        selectedWorkId={nav.selectedWorkId}
-        selectedTags={nav.selectedTags}
-        searchQuery={searchQuery}
-        playingWorkId={playingWorkId}
-        isPlaybackActive={isPlaybackActive}
-        isLoading={isLoading}
-        isError={isError}
-        onWorkSelect={nav.selectWork}
-        onDrillSelect={nav.drillInto}
-        onDrillBack={nav.drillBack}
-        onTagToggle={nav.toggleTag}
-        onClearSearch={() => onSearchChange("")}
-      />
+      {showGrid ? (
+        <WorkGrid
+          axis={nav.activeAxis}
+          drillValue={nav.drillValue}
+          works={works}
+          selectedWorkId={nav.selectedWorkId}
+          searchQuery={searchQuery}
+          tileSize={tileSize}
+          isLoading={isLoading}
+          isError={isError}
+          onTileSizeChange={onTileSizeChange}
+          onWorkSelect={nav.selectWork}
+          onWorkPlay={(work) => onPlay(work, 0)}
+          onDrillBack={nav.drillBack}
+          onClearSearch={() => onSearchChange("")}
+        />
+      ) : (
+        <ContentColumn
+          axis={nav.activeAxis}
+          drillValue={nav.drillValue}
+          works={works}
+          facetItems={facetQuery.data ?? []}
+          selectedWorkId={nav.selectedWorkId}
+          selectedTags={nav.selectedTags}
+          searchQuery={searchQuery}
+          playingWorkId={playingWorkId}
+          isPlaybackActive={isPlaybackActive}
+          isLoading={isLoading}
+          isError={isError}
+          onWorkSelect={nav.selectWork}
+          onDrillSelect={nav.drillInto}
+          onDrillBack={nav.drillBack}
+          onTagToggle={nav.toggleTag}
+          onClearSearch={() => onSearchChange("")}
+        />
+      )}
 
-      <PreviewPane
-        mode={previewMode}
-        showNoResultsHint={isNoResultsDueToFilter}
-        axisLandingPresentation={getAxisLandingPresentation(nav.activeAxis, isAxisFilterApplied)}
-        selectedWork={selectedWork}
-        smartFolder={activeSmartFolder}
-        axisWorks={works}
-        smartFolderWorks={works}
-        playingTrackIndex={
-          selectedWork && playingWorkId === selectedWork.id ? (playingTrackIndex ?? null) : null
-        }
-        onPlay={handlePlay}
-        onResume={handleResume}
-        onSelectWork={nav.selectWork}
-        tagSuggestions={tagsQuery.data ?? []}
-        isPatching={patchWorkMutation.isPending}
-        onPatchWork={(body) => {
-          if (!selectedWork) {
-            return Promise.reject(new Error("更新対象の作品が選択されていません"));
+      {(!showGrid || previewMode === "work") && (
+        <PreviewPane
+          mode={previewMode}
+          showNoResultsHint={isNoResultsDueToFilter}
+          axisLandingPresentation={getAxisLandingPresentation(nav.activeAxis, isAxisFilterApplied)}
+          selectedWork={selectedWork}
+          smartFolder={activeSmartFolder}
+          axisWorks={works}
+          smartFolderWorks={works}
+          playingTrackIndex={
+            selectedWork && playingWorkId === selectedWork.id ? (playingTrackIndex ?? null) : null
           }
-          return patchWorkMutation.mutateAsync({ workId: selectedWork.id, body });
-        }}
-      />
+          onPlay={handlePlay}
+          onResume={handleResume}
+          onSelectWork={nav.selectWork}
+          tagSuggestions={tagsQuery.data ?? []}
+          isPatching={patchWorkMutation.isPending}
+          onPatchWork={(body) => {
+            if (!selectedWork) {
+              return Promise.reject(new Error("更新対象の作品が選択されていません"));
+            }
+            return patchWorkMutation.mutateAsync({ workId: selectedWork.id, body });
+          }}
+        />
+      )}
     </>
   );
 }

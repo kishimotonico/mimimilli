@@ -4,7 +4,7 @@
 // - レイアウトは AppShell に委譲
 
 import { useState, useCallback, useRef } from "react";
-import { useAtomValue } from "jotai";
+import { useAtom, useAtomValue } from "jotai";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { usePlayer } from "../features/player/model/usePlayer";
 import { playerUiModeAtom } from "../features/player/model/atoms";
@@ -32,6 +32,8 @@ import { useScanProgress } from "../features/scan/useScanProgress";
 import { getSettings, setRootFolder } from "../features/settings/api";
 import { parseNavigationUrl, type AppMode } from "../features/navigation/model/navigationUrl";
 import { useNavigationHistory } from "../features/navigation/model/useNavigationHistory";
+import { libraryTileSizeAtom, libraryViewModeAtom } from "../features/library/model/atoms";
+import { clampTileSize } from "../features/library/model/gridSizing";
 
 // settings query key（App と SettingsModal が同じキャッシュを参照）
 const SETTINGS_KEY = ["settings"] as const;
@@ -41,6 +43,8 @@ export default function App() {
   const libraryNav = useLibraryView();
   const queryClient = useQueryClient();
   const playRequestIdRef = useRef(0);
+  const [libraryViewMode, setLibraryViewMode] = useAtom(libraryViewModeAtom);
+  const [libraryTileSize, setLibraryTileSize] = useAtom(libraryTileSizeAtom);
 
   const [mode, setMode] = useState<AppMode>(
     () => parseNavigationUrl(window.location.href).state.mode,
@@ -283,6 +287,13 @@ export default function App() {
           showSort={mode === "library"}
           sort={libraryNav.sort}
           onSortChange={libraryNav.setSort}
+          viewMode={mode === "library" ? libraryViewMode : "column"}
+          availableViewModes={mode === "library" ? ["list", "grid"] : ["column"]}
+          onViewChange={(viewMode) => {
+            if (mode === "library" && viewMode !== "column") setLibraryViewMode(viewMode);
+          }}
+          tileSize={mode === "library" ? clampTileSize(libraryTileSize) : undefined}
+          onTileSizeChange={mode === "library" ? setLibraryTileSize : undefined}
         />
       }
       leftNav={
@@ -310,6 +321,9 @@ export default function App() {
             isPlaybackActive={isPlaybackActive}
             onPlay={handlePlay}
             onResume={handleResume}
+            viewMode={libraryViewMode}
+            tileSize={clampTileSize(libraryTileSize)}
+            onTileSizeChange={setLibraryTileSize}
           />
         )
       }

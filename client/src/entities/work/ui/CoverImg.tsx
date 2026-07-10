@@ -9,6 +9,8 @@ interface CoverImgProps {
   size?: number;
   radius?: number;
   fit?: "fixed" | "fill";
+  requestWidth?: number;
+  loading?: "eager" | "lazy";
 }
 
 export default function CoverImg({
@@ -18,6 +20,8 @@ export default function CoverImg({
   size = 32,
   radius = 4,
   fit = "fixed",
+  requestWidth,
+  loading = "eager",
 }: CoverImgProps) {
   const [errored, setErrored] = useState(false);
 
@@ -30,8 +34,9 @@ export default function CoverImg({
   if (hasCover && !errored) {
     return (
       <img
-        src={getCoverImageUrl(id)}
+        src={getCoverImageUrl(id, requestWidth)}
         alt=""
+        loading={loading}
         width={fixedSize}
         height={fixedSize}
         style={{
