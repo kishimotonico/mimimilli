@@ -21,7 +21,9 @@ export default defineConfig({
     },
   },
   webServer: {
-    command: `pnpm exec cross-env MIMIMILLI_MOCK_SCENARIO=new-work vite --host 127.0.0.1 --port ${visualPort} --strictPort`,
+    // VITE_DISABLE_QUERY_DEVTOOLS: スクリーンショットに devtools のトグルボタンが
+    // 写り込まないよう、ビジュアルテスト用サーバーでは無効化する（TASK-9）
+    command: `pnpm exec cross-env MIMIMILLI_MOCK_SCENARIO=new-work VITE_DISABLE_QUERY_DEVTOOLS=1 vite --host 127.0.0.1 --port ${visualPort} --strictPort`,
     port: visualPort,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

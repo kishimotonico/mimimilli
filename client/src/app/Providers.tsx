@@ -10,13 +10,17 @@ interface ProvidersProps {
 // 開発時のみ devtools を遅延ロードする。
 // import.meta.env.DEV は本番ビルドで静的に false になり、この dynamic import 自体が
 // dead-code-elimination されるため、本番バンドルには含まれない。
-const ReactQueryDevtools = import.meta.env.DEV
-  ? lazy(() =>
-      import("@tanstack/react-query-devtools").then((m) => ({
-        default: m.ReactQueryDevtools,
-      })),
-    )
-  : null;
+// VITE_DISABLE_QUERY_DEVTOOLS=1 で明示的に無効化できる（ビジュアルテスト等、
+// 画面右下のトグルボタンがスクリーンショットに写り込むと困る場面向け。
+// playwright.config.ts の webServer がこのフラグを立てて起動する）。
+const ReactQueryDevtools =
+  import.meta.env.DEV && import.meta.env.VITE_DISABLE_QUERY_DEVTOOLS !== "1"
+    ? lazy(() =>
+        import("@tanstack/react-query-devtools").then((m) => ({
+          default: m.ReactQueryDevtools,
+        })),
+      )
+    : null;
 
 /**
  * アプリ全体の Provider をまとめたコンポーネント。
@@ -38,7 +42,8 @@ export default function Providers({ children }: ProvidersProps) {
         {children}
         {ReactQueryDevtools && (
           <Suspense fallback={null}>
-            <ReactQueryDevtools initialIsOpen={false} />
+            {/* 既定の bottom-right だとプレイヤーのバー/ポップアップと重なるため左下に配置する */}
+            <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-left" />
           </Suspense>
         )}
       </JotaiProvider>
