@@ -57,7 +57,8 @@ export default function FullScreenPlayer({
   const seek = useSeekDrag({ duration, onSeek });
   const abStartPct = duration > 0 && abRepeat.a !== null ? (abRepeat.a / duration) * 100 : null;
   const abEndPct = duration > 0 && abRepeat.b !== null ? (abRepeat.b / duration) * 100 : null;
-  const hasABRepeat = abRepeat.a !== null && abRepeat.b !== null;
+  // リピートが実際に成立する条件（usePlayer 側のループ発動条件と同じ a < b）
+  const hasABRepeat = abRepeat.a !== null && abRepeat.b !== null && abRepeat.a < abRepeat.b;
 
   useLayoutEffect(() => {
     const dialog = dialogRef.current;

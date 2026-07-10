@@ -173,10 +173,22 @@ export default function LibraryView({
     },
   });
 
+  // 検索語や軸ドリルの絞り込みが原因で作品一覧が0件になっているかどうか。
+  // fav/unplayed等が本来的に0件のケースとは区別し、原因表示が必要な場合だけ案内する。
+  // 中央カラムが作品リストを表示する状態（非ファセット軸 or ドリル済み）に限る。
+  const showsWorksList =
+    !isSmartAxis(nav.activeAxis) && (!isFacetAxis(nav.activeAxis) || nav.drillValue !== null);
+  const isNoResultsDueToFilter =
+    showsWorksList &&
+    works.length === 0 &&
+    (Boolean(searchQuery) || (isFacetAxis(nav.activeAxis) && nav.drillValue !== null));
+
   // ── previewMode: UI state + server state を組み合わせてコンポーネントで計算 ──
   // (derived atom にしない — issue の制約参照)
-  const previewMode: PreviewMode =
-    nav.selectedWorkId && selectedWork
+  // 0件時は選択中の作品が一覧に存在しないため、古い詳細を出さず案内を優先する
+  const previewMode: PreviewMode = isNoResultsDueToFilter
+    ? "empty"
+    : nav.selectedWorkId && selectedWork
       ? "work"
       : isSmartAxis(nav.activeAxis)
         ? "smart-folder"
@@ -186,13 +198,6 @@ export default function LibraryView({
             ? "axis-landing"
             : "empty";
   const isAxisFilterApplied = nav.activeAxis === "tag" && nav.selectedTags.length > 0;
-
-  // 「empty」プレビュー時、検索語や軸ドリルの絞り込みが原因で0件になっているかどうか。
-  // fav/unplayed等が本来的に0件のケースとは区別し、原因表示が必要な場合だけ案内する。
-  const isNoResultsDueToFilter =
-    previewMode === "empty" &&
-    works.length === 0 &&
-    (Boolean(searchQuery) || (isFacetAxis(nav.activeAxis) && nav.drillValue !== null));
 
   const activeSmartFolder = isSmartAxis(nav.activeAxis)
     ? (smartFolders.find((sf) => sf.id === (nav.activeAxis as string).slice("smart-".length)) ??

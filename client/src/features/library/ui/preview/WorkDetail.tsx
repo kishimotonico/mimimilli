@@ -82,10 +82,7 @@ export function WorkDetail({
   const [editError, setEditError] = useState<string | null>(null);
   const [pendingRemoveTag, setPendingRemoveTag] = useState<string | null>(null);
   const [failedRemoveTag, setFailedRemoveTag] = useState<string | null>(null);
-  const [tagUndoToast, setTagUndoToast] = useState<{
-    tag: string;
-    previousFlatTags: string[];
-  } | null>(null);
+  const [tagUndoToast, setTagUndoToast] = useState<string | null>(null);
   const tagPopoverRef = useRef<HTMLDivElement | null>(null);
   const actionPopoverRef = useRef<HTMLDivElement | null>(null);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
@@ -283,35 +280,41 @@ export function WorkDetail({
     await patchFlatTags([...editableFlatTags, nextTag]);
   };
 
-  const showTagUndoToast = (tag: string, previousFlatTags: string[]) => {
+  const showTagUndoToast = (tag: string) => {
     if (tagUndoTimerRef.current) clearTimeout(tagUndoTimerRef.current);
-    setTagUndoToast({ tag, previousFlatTags });
+    setTagUndoToast(tag);
     tagUndoTimerRef.current = setTimeout(() => setTagUndoToast(null), TAG_UNDO_TOAST_MS);
   };
 
   const removeFlatTag = async (tag: string) => {
     if (isPatching || isTagSaving) return;
-    const previousFlatTags = editableFlatTags;
-    const nextFlatTags = previousFlatTags.filter((current) => current !== tag);
+    const nextFlatTags = editableFlatTags.filter((current) => current !== tag);
     setPendingRemoveTag(tag);
     setFailedRemoveTag(null);
     const ok = await patchFlatTags(nextFlatTags);
     setPendingRemoveTag(null);
     if (ok) {
-      showTagUndoToast(tag, previousFlatTags);
+      showTagUndoToast(tag);
     } else {
       setFailedRemoveTag(tag);
     }
   };
 
   const undoRemoveTag = async () => {
-    const toast = tagUndoToast;
-    if (!toast) return;
-    if (tagUndoTimerRef.current) clearTimeout(tagUndoTimerRef.current);
-    setTagUndoToast(null);
-    // 復元自体が失敗した場合、タグは削除されたままになる。チップは既に存在しないため
-    // per-chip の失敗表示はできず、共通の editError（patchFlatTags 内で設定済み）で伝える。
-    await patchFlatTags(toast.previousFlatTags);
+    const tag = tagUndoToast;
+    if (!tag) return;
+    // 別の保存が進行中の間は何もしない（トーストを消さず、undo要求を黙って捨てない）
+    if (isPatching || isTagSaving) return;
+    // 削除したタグだけを現在の集合へ戻す。undo待ちの間に行われた他のタグ編集は巻き戻さない。
+    // 復元に失敗した場合はトーストを残して再試行可能にする（editError も表示される）
+    const restored = editableFlatTags.includes(tag)
+      ? editableFlatTags
+      : [...editableFlatTags, tag];
+    const ok = await patchFlatTags(restored);
+    if (ok) {
+      if (tagUndoTimerRef.current) clearTimeout(tagUndoTimerRef.current);
+      setTagUndoToast(null);
+    }
   };
 
   const toggleBookmark = async () => {
@@ -443,7 +446,7 @@ export function WorkDetail({
             </div>
           </div>
           <Toast
-            message={tagUndoToast ? `タグ「${tagUndoToast.tag}」を削除しました` : null}
+            message={tagUndoToast ? `タグ「${tagUndoToast}」を削除しました` : null}
             actionLabel="元に戻す"
             onAction={() => void undoRemoveTag()}
             onDismiss={() => setTagUndoToast(null)}
