@@ -1,10 +1,11 @@
-import { useEffect, useRef, type CSSProperties } from "react";
+import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import type { AxisId } from "../model/types";
 import type { WorkSummary } from "@mimimilli/shared";
 import CoverImg from "../../../entities/work/ui/CoverImg";
 import Button from "../../../shared/ui/Button";
 import { I } from "../../../shared/ui/Icon";
 import { clampTileSize, selectCoverThumbnailWidth } from "../model/gridSizing";
+import { countGridColumns, getNextGridIndex, type GridArrowKey } from "../model/gridNavigation";
 import DrillHeader from "./DrillHeader";
 
 interface WorkGridProps {
@@ -21,7 +22,11 @@ interface WorkGridProps {
   onWorkPlay: (work: WorkSummary) => void;
   onDrillBack: () => void;
   onClearSearch: () => void;
+  inspector: ReactNode | null;
+  onInspectorClose: () => void;
 }
+
+const GRID_ARROW_KEYS = new Set<GridArrowKey>(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"]);
 
 function circleName(work: WorkSummary): string {
   const tag = work.tags.find(
@@ -44,11 +49,16 @@ export default function WorkGrid({
   onWorkPlay,
   onDrillBack,
   onClearSearch,
+  inspector,
+  onInspectorClose,
 }: WorkGridProps) {
   const safeTileSize = clampTileSize(tileSize);
   const requestWidth = selectCoverThumbnailWidth(safeTileSize, window.devicePixelRatio);
   const isDrilled = drillValue !== null;
   const paneRef = useRef<HTMLElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
+  const isInspectorOpen = inspector !== null;
 
   useEffect(() => {
     const pane = paneRef.current;
@@ -64,8 +74,65 @@ export default function WorkGrid({
     return () => pane.removeEventListener("wheel", handleWheel);
   }, [onTileSizeChange, safeTileSize]);
 
+  useEffect(() => {
+    if (!isInspectorOpen) return;
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+
+      const target = event.target instanceof Element ? event.target : null;
+      if (
+        document.querySelector("dialog[open]") ||
+        target?.closest('dialog, [role="dialog"]') ||
+        target?.closest('input, textarea, select, [contenteditable="true"], [aria-expanded="true"]')
+      ) {
+        return;
+      }
+
+      onInspectorClose();
+    };
+
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [isInspectorOpen, onInspectorClose]);
+
+  useEffect(() => {
+    if (!isInspectorOpen) return;
+    const scroll = scrollRef.current;
+    if (!scroll) return;
+
+    const handleGridBackgroundClick = (event: MouseEvent) => {
+      const target = event.target;
+      if (target instanceof Element && target.closest(".mll-grid-tile")) return;
+      onInspectorClose();
+    };
+
+    scroll.addEventListener("click", handleGridBackgroundClick);
+    return () => scroll.removeEventListener("click", handleGridBackgroundClick);
+  }, [isInspectorOpen, onInspectorClose]);
+
+  const moveTileFocus = (currentIndex: number, key: GridArrowKey) => {
+    const grid = gridRef.current;
+    if (!grid) return;
+
+    const tiles = Array.from(grid.children).filter(
+      (child): child is HTMLElement => child instanceof HTMLElement,
+    );
+    const columnCount = countGridColumns(tiles.map((tile) => tile.offsetTop));
+    const nextIndex = getNextGridIndex(currentIndex, key, columnCount, tiles.length);
+    if (nextIndex === currentIndex) return;
+
+    const nextTile = tiles[nextIndex];
+    nextTile.focus({ preventScroll: true });
+    nextTile.scrollIntoView({ block: "nearest", inline: "nearest" });
+  };
+
   return (
-    <section ref={paneRef} className="mll-grid-pane" aria-label="作品グリッド">
+    <section
+      ref={paneRef}
+      className={`mll-grid-pane ${isInspectorOpen ? "is-inspector-open" : ""}`}
+      aria-label="作品グリッド"
+    >
       {isDrilled ? (
         <DrillHeader
           axisLabel={axis}
@@ -79,7 +146,7 @@ export default function WorkGrid({
           <span className="count">{works.length} 件</span>
         </div>
       )}
-      <div className="mll-grid-scroll">
+      <div ref={scrollRef} className="mll-grid-scroll">
         {isLoading ? (
           <div className="mll-grid-empty">読み込み中...</div>
         ) : isError ? (
@@ -98,8 +165,12 @@ export default function WorkGrid({
             )}
           </div>
         ) : (
-          <div className="mll-grid" style={{ "--tile-size": `${safeTileSize}px` } as CSSProperties}>
-            {works.map((work) => (
+          <div
+            ref={gridRef}
+            className="mll-grid"
+            style={{ "--tile-size": `${safeTileSize}px` } as CSSProperties}
+          >
+            {works.map((work, index) => (
               <button
                 key={work.id}
                 type="button"
@@ -109,9 +180,14 @@ export default function WorkGrid({
                 onClick={() => onWorkSelect(work.id)}
                 onDoubleClick={() => onWorkPlay(work)}
                 onKeyDown={(event) => {
-                  if (event.key !== "Enter") return;
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    onWorkPlay(work);
+                    return;
+                  }
+                  if (!GRID_ARROW_KEYS.has(event.key as GridArrowKey)) return;
                   event.preventDefault();
-                  onWorkPlay(work);
+                  moveTileFocus(index, event.key as GridArrowKey);
                 }}
               >
                 <span className="mll-grid-tile__cover">
@@ -132,6 +208,7 @@ export default function WorkGrid({
           </div>
         )}
       </div>
+      {inspector}
     </section>
   );
 }
