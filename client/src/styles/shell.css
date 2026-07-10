@@ -1569,6 +1569,10 @@
   border: 1px solid var(--line-soft);
   border-radius: 6px;
   padding: 8px;
+  /* プレビューペインの実幅（ウィンドウ幅ではない）に応じてルール行のレイアウトを
+     切り替えるためのクエリコンテナ。狭幅時の自然文寄り表示は下の @container を参照 */
+  container-type: inline-size;
+  container-name: smart-rules;
 }
 .mll-smart__rule {
   display: grid;
@@ -1616,9 +1620,8 @@
   font-size: 12px;
   color: var(--ink-0);
   font-weight: 500;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  flex-wrap: wrap;
+  white-space: normal;
 }
 .mll-smart__rule .x {
   width: 20px;
@@ -1631,6 +1634,52 @@
 .mll-smart__rule .x:hover {
   background: var(--paper-2);
   color: var(--ink-0);
+}
+/* OR区切り: 値チップの間に挟まる小さなバッジ。単なる薄字ラベルではなく
+   区切りとして視認できるよう背景・角丸を持たせる（幅に関わらず常時適用） */
+.mll-smart__rule .or-sep {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--ink-2);
+  background: var(--paper-3);
+  border-radius: 999px;
+  padding: 1px 6px;
+}
+
+/* ── 狭幅（プレビューペイン実幅が小さいとき）: 自然文寄り表示 ──────── */
+@container smart-rules (max-width: 420px) {
+  .mll-smart__rule {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 6px;
+    row-gap: 4px;
+  }
+  .mll-smart__rule .conj {
+    text-align: left;
+  }
+  /* field/operator を装飾なしのテキストに戻し、conj → field → op → values が
+     ひと続きの文として読めるようにする（例:「WHERE 長さ ≥ 1:00:00」） */
+  .mll-smart__rule .field {
+    background: none;
+    border-radius: 0;
+    padding: 0;
+    gap: 0;
+  }
+  .mll-smart__rule .field svg {
+    display: none;
+  }
+  .mll-smart__rule .op {
+    text-align: left;
+  }
+  .mll-smart__rule .val {
+    flex-wrap: wrap;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
 }
 .mll-smart__add {
   display: inline-flex;

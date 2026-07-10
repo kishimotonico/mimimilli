@@ -53,9 +53,7 @@ function RuleValue({ rule }: { rule: SmartFolderRule }) {
     <span className="val flex min-w-0 items-center gap-1">
       {rule.values.map((value, i) => (
         <span key={`${value}-${i}`} className="inline-flex min-w-0 items-center gap-1">
-          {i > 0 && (
-            <span className="shrink-0 font-mono text-[9px] font-semibold text-ink-4">OR</span>
-          )}
+          {i > 0 && <span className="or-sep shrink-0">OR</span>}
           <TagValueChip value={value} />
         </span>
       ))}
