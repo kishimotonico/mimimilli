@@ -171,7 +171,13 @@ const NewWorkPopup: React.FC<NewWorkPopupProps> = ({ scanResult, onClose }) => {
                       onBlur={() => handleSaveTitle(work.id)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") handleSaveTitle(work.id);
-                        if (e.key === "Escape") setEditingId(null);
+                        if (e.key === "Escape") {
+                          // 編集キャンセルだけに留める。stopPropagationしないと window の
+                          // Escapeハンドラーまで伝播してポップアップ全体が閉じてしまう。
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setEditingId(null);
+                        }
                       }}
                       style={{
                         flex: 1,
