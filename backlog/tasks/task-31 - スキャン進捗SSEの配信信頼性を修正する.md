@@ -1,9 +1,11 @@
 ---
 id: TASK-31
 title: スキャン進捗SSEの配信信頼性を修正する
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@sonnet'
 created_date: '2026-07-10 13:40'
+updated_date: '2026-07-10 13:55'
 labels:
   - bug
   - scan
@@ -24,8 +26,20 @@ TASK-20で追加したスキャン進捗通知には、realアダプタの同期
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 realアダプタのwalking中もSSE接続が確立し、heartbeatまたは進捗イベントを受信できる
-- [ ] #2 complete/errorイベントのwrite完了前にストリームを終了せず、同一接続へのwriteを安全に直列化する
-- [ ] #3 EventSourceの接続errorではJSONを解析せず、名前付きSSEイベントの不正JSONも未処理例外にしない
-- [ ] #4 遅い実走査・接続終了・再接続を含む自動テストで上記を検証する
+- [x] #1 realアダプタのwalking中もSSE接続が確立し、heartbeatまたは進捗イベントを受信できる
+- [x] #2 complete/errorイベントのwrite完了前にストリームを終了せず、同一接続へのwriteを安全に直列化する
+- [x] #3 EventSourceの接続errorではJSONを解析せず、名前付きSSEイベントの不正JSONも未処理例外にしない
+- [x] #4 遅い実走査・接続終了・再接続を含む自動テストで上記を検証する
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Sonnet実装、Fableレビュー・検証。walkをfs/promises readdirの非同期走査に書き換え50dirごとにwalking進捗をemit（120dirのテストで単調増加を検証）。scan.tsはenqueueWriteでwrite直列化しterminal write完了後にクローズ（curlでライブ購読6イベント+complete受信を実測）。クライアントはMessageEvent判定で接続エラーとJSON系エラーを分離しconsole.errorで可視化。check・server 97件・client 134件全パス。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+SSE配信の3つの信頼性問題（同期walkのループ閉塞・write未await・接続エラーのparse例外）を修正。
+<!-- SECTION:FINAL_SUMMARY:END -->
