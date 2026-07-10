@@ -8,8 +8,11 @@ import { I } from "../../../../shared/ui/Icon";
 import Button from "../../../../shared/ui/Button";
 import IconButton from "../../../../shared/ui/IconButton";
 import TagCombobox from "../../../../shared/ui/TagCombobox";
+import Toast from "../../../../shared/ui/Toast";
 import { formatDuration, formatTime } from "../../../../shared/lib/format";
 import { formatDate } from "./format";
+
+const TAG_UNDO_TOAST_MS = 6000;
 
 const TAG_POPOVER_WIDTH = 220;
 const ACTION_POPOVER_WIDTH = 240;
@@ -77,9 +80,22 @@ export function WorkDetail({
   const [isTagSaving, setIsTagSaving] = useState(false);
   const [isBookmarkSaving, setIsBookmarkSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const [pendingRemoveTag, setPendingRemoveTag] = useState<string | null>(null);
+  const [failedRemoveTag, setFailedRemoveTag] = useState<string | null>(null);
+  const [tagUndoToast, setTagUndoToast] = useState<{
+    tag: string;
+    previousFlatTags: string[];
+  } | null>(null);
   const tagPopoverRef = useRef<HTMLDivElement | null>(null);
   const actionPopoverRef = useRef<HTMLDivElement | null>(null);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
+  const tagUndoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (tagUndoTimerRef.current) clearTimeout(tagUndoTimerRef.current);
+    };
+  }, []);
 
   const structuredTags = useMemo(
     () => work.tags.filter((tag) => parseTag(tag).kind !== "flat"),
@@ -235,15 +251,17 @@ export function WorkDetail({
     }
   };
 
-  const patchFlatTags = async (nextFlatTags: string[]) => {
-    if (isPatching || isTagSaving) return;
+  const patchFlatTags = async (nextFlatTags: string[]): Promise<boolean> => {
+    if (isPatching || isTagSaving) return false;
     const tags = buildWorkPatchTags(work.tags, nextFlatTags);
     setIsTagSaving(true);
     setEditError(null);
     try {
       await onPatchWork({ tags });
+      return true;
     } catch {
       setEditError("タグを保存できませんでした。");
+      return false;
     } finally {
       setIsTagSaving(false);
     }
@@ -265,8 +283,35 @@ export function WorkDetail({
     await patchFlatTags([...editableFlatTags, nextTag]);
   };
 
+  const showTagUndoToast = (tag: string, previousFlatTags: string[]) => {
+    if (tagUndoTimerRef.current) clearTimeout(tagUndoTimerRef.current);
+    setTagUndoToast({ tag, previousFlatTags });
+    tagUndoTimerRef.current = setTimeout(() => setTagUndoToast(null), TAG_UNDO_TOAST_MS);
+  };
+
   const removeFlatTag = async (tag: string) => {
-    await patchFlatTags(editableFlatTags.filter((current) => current !== tag));
+    if (isPatching || isTagSaving) return;
+    const previousFlatTags = editableFlatTags;
+    const nextFlatTags = previousFlatTags.filter((current) => current !== tag);
+    setPendingRemoveTag(tag);
+    setFailedRemoveTag(null);
+    const ok = await patchFlatTags(nextFlatTags);
+    setPendingRemoveTag(null);
+    if (ok) {
+      showTagUndoToast(tag, previousFlatTags);
+    } else {
+      setFailedRemoveTag(tag);
+    }
+  };
+
+  const undoRemoveTag = async () => {
+    const toast = tagUndoToast;
+    if (!toast) return;
+    if (tagUndoTimerRef.current) clearTimeout(tagUndoTimerRef.current);
+    setTagUndoToast(null);
+    // 復元自体が失敗した場合、タグは削除されたままになる。チップは既に存在しないため
+    // per-chip の失敗表示はできず、共通の editError（patchFlatTags 内で設定済み）で伝える。
+    await patchFlatTags(toast.previousFlatTags);
   };
 
   const toggleBookmark = async () => {
@@ -348,13 +393,20 @@ export function WorkDetail({
                   <Tag tag={tag} />
                 </span>
               ))}
-              {editableFlatTags.map((tag) => (
-                <Tag
-                  key={tag}
-                  tag={tag}
-                  onRemove={isTagSaving || isPatching ? undefined : () => void removeFlatTag(tag)}
-                />
-              ))}
+              {editableFlatTags.map((tag) => {
+                const isPending = pendingRemoveTag === tag;
+                const isFailed = failedRemoveTag === tag;
+                const isBlocked = isPatching || (isTagSaving && !isPending);
+                return (
+                  <Tag
+                    key={tag}
+                    tag={tag}
+                    pending={isPending}
+                    failed={isFailed}
+                    onRemove={isBlocked ? undefined : () => void removeFlatTag(tag)}
+                  />
+                );
+              })}
               <div ref={tagPopoverRef} className="relative inline-flex">
                 <IconButton
                   icon={I.add}
@@ -390,6 +442,12 @@ export function WorkDetail({
               </div>
             </div>
           </div>
+          <Toast
+            message={tagUndoToast ? `タグ「${tagUndoToast.tag}」を削除しました` : null}
+            actionLabel="元に戻す"
+            onAction={() => void undoRemoveTag()}
+            onDismiss={() => setTagUndoToast(null)}
+          />
           {editError && (
             <p className="mle-prv__edit-error" role="alert">
               {editError}
