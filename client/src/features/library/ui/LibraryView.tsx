@@ -307,6 +307,7 @@ export default function LibraryView({
           playingTrackIndex={
             selectedWork && playingWorkId === selectedWork.id ? (playingTrackIndex ?? null) : null
           }
+          isPlaybackActive={isPlaybackActive}
           onPlay={handlePlay}
           onResume={handleResume}
           onSelectWork={nav.selectWork}

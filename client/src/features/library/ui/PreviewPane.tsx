@@ -18,6 +18,7 @@ interface PreviewPaneProps {
   axisWorks: WorkSummary[];
   smartFolderWorks: WorkSummary[];
   playingTrackIndex: number | null;
+  isPlaybackActive?: boolean;
   onPlay: (trackIndex: number) => void;
   onResume: () => void;
   onSelectWork: (id: string) => void;
@@ -35,6 +36,7 @@ export default function PreviewPane({
   axisWorks,
   smartFolderWorks,
   playingTrackIndex,
+  isPlaybackActive,
   onPlay,
   onResume,
   onSelectWork,
@@ -63,6 +65,7 @@ export default function PreviewPane({
           onPlay={onPlay}
           onResume={onResume}
           playingTrackIndex={playingTrackIndex}
+          isPlaybackActive={isPlaybackActive}
           tagSuggestions={tagSuggestions}
           isPatching={isPatching}
           onPatchWork={onPatchWork}

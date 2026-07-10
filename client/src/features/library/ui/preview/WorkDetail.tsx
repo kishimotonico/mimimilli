@@ -10,22 +10,36 @@ import IconButton from "../../../../shared/ui/IconButton";
 import TagCombobox from "../../../../shared/ui/TagCombobox";
 import Toast from "../../../../shared/ui/Toast";
 import { formatDuration, formatTime } from "../../../../shared/lib/format";
+import { cn } from "../../../../shared/lib/cn";
 import { formatDate } from "./format";
 
 const TAG_UNDO_TOAST_MS = 6000;
 
-const TAG_POPOVER_WIDTH = 220;
+const TAG_POPOVER_WIDTH = 260;
 const ACTION_POPOVER_WIDTH = 240;
 const POPOVER_MARGIN = 8;
+// 右ペインの実幅がこれを下回る場合、タグ追加UIは浮遊ポップオーバーではなく
+// チップ列下のフル幅行として展開する（狭幅で右方向に展開する余地がないため）。
+const NARROW_TAG_PANE_PX = 320;
 
 interface PopoverLayout {
   left: number;
   width: number;
+  /** 展開先コンテナの実幅。狭幅判定など呼び出し側の追加ロジックに使う */
+  containerWidth: number;
+}
+
+function anchorContainer(anchor: HTMLElement | null): HTMLElement | null {
+  return (anchor?.closest(".mle-prv__meta") ??
+    anchor?.closest(".mle-prv__body") ??
+    null) as HTMLElement | null;
 }
 
 function getClampedPopoverLayout(anchor: HTMLElement, preferredWidth: number): PopoverLayout {
   const anchorRect = anchor.getBoundingClientRect();
-  const container = anchor.closest(".mle-prv__body") as HTMLElement | null;
+  // タグ・アクション行が実際に収まる列は `.mle-prv__meta`（カバー画像列を含まない）。
+  // 無ければ `.mle-prv__body` 全体にフォールバックする。
+  const container = anchorContainer(anchor);
   const containerRect = container?.getBoundingClientRect();
   const visibleLeft = (containerRect?.left ?? 0) + POPOVER_MARGIN;
   const visibleRight = (containerRect?.right ?? window.innerWidth) - POPOVER_MARGIN;
@@ -35,7 +49,7 @@ function getClampedPopoverLayout(anchor: HTMLElement, preferredWidth: number): P
   const maxLeft = visibleRight - width - anchorRect.left;
   const left = maxLeft < minLeft ? minLeft : Math.min(Math.max(0, minLeft), maxLeft);
 
-  return { left, width };
+  return { left, width, containerWidth: containerRect?.width ?? window.innerWidth };
 }
 
 interface WorkDetailProps {
@@ -43,6 +57,7 @@ interface WorkDetailProps {
   onPlay: (trackIndex: number) => void;
   onResume: () => void;
   playingTrackIndex: number | null;
+  isPlaybackActive?: boolean;
   tagSuggestions: string[];
   isPatching: boolean;
   onPatchWork: (body: WorkPatch) => Promise<Work>;
@@ -53,6 +68,7 @@ export function WorkDetail({
   onPlay,
   onResume,
   playingTrackIndex,
+  isPlaybackActive,
   tagSuggestions,
   isPatching,
   onPatchWork,
@@ -69,6 +85,7 @@ export function WorkDetail({
   const [actionPopoverLayout, setActionPopoverLayout] = useState<PopoverLayout>({
     left: 0,
     width: ACTION_POPOVER_WIDTH,
+    containerWidth: ACTION_POPOVER_WIDTH,
   });
   const [titleDraft, setTitleDraft] = useState(work.title);
   const [isTitleSaving, setIsTitleSaving] = useState(false);
@@ -76,14 +93,17 @@ export function WorkDetail({
   const [tagPopoverLayout, setTagPopoverLayout] = useState<PopoverLayout>({
     left: 0,
     width: TAG_POPOVER_WIDTH,
+    containerWidth: TAG_POPOVER_WIDTH,
   });
+  const [isNarrowTagPane, setIsNarrowTagPane] = useState(false);
   const [isTagSaving, setIsTagSaving] = useState(false);
   const [isBookmarkSaving, setIsBookmarkSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [pendingRemoveTag, setPendingRemoveTag] = useState<string | null>(null);
   const [failedRemoveTag, setFailedRemoveTag] = useState<string | null>(null);
   const [tagUndoToast, setTagUndoToast] = useState<string | null>(null);
-  const tagPopoverRef = useRef<HTMLDivElement | null>(null);
+  const tagEditorRef = useRef<HTMLDivElement | null>(null);
+  const tagPopoverAnchorRef = useRef<HTMLDivElement | null>(null);
   const actionPopoverRef = useRef<HTMLDivElement | null>(null);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
   const tagUndoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -114,9 +134,9 @@ export function WorkDetail({
 
     const closeOnOutsidePointerDown = (event: PointerEvent) => {
       if (
-        tagPopoverRef.current &&
+        tagEditorRef.current &&
         event.target instanceof Node &&
-        !tagPopoverRef.current.contains(event.target)
+        !tagEditorRef.current.contains(event.target)
       ) {
         setIsTagPopoverOpen(false);
       }
@@ -168,7 +188,7 @@ export function WorkDetail({
     if (!isTagPopoverOpen) return;
 
     const updateTagPopoverLayout = () => {
-      const anchor = tagPopoverRef.current;
+      const anchor = tagPopoverAnchorRef.current;
       if (!anchor) return;
 
       const nextLayout = getClampedPopoverLayout(anchor, TAG_POPOVER_WIDTH);
@@ -178,13 +198,18 @@ export function WorkDetail({
           ? current
           : nextLayout,
       );
+      setIsNarrowTagPane(nextLayout.containerWidth < NARROW_TAG_PANE_PX);
     };
 
     updateTagPopoverLayout();
+    const container = anchorContainer(tagPopoverAnchorRef.current);
+    const resizeObserver = container ? new ResizeObserver(updateTagPopoverLayout) : null;
+    if (container) resizeObserver?.observe(container);
     window.addEventListener("resize", updateTagPopoverLayout);
     window.addEventListener("scroll", updateTagPopoverLayout, true);
 
     return () => {
+      resizeObserver?.disconnect();
       window.removeEventListener("resize", updateTagPopoverLayout);
       window.removeEventListener("scroll", updateTagPopoverLayout, true);
     };
@@ -384,7 +409,7 @@ export function WorkDetail({
             </div>
           )}
           <div className="mle-prv__tag-row">
-            <div className="mle-prv__tags">
+            <div className="mle-prv__tags w-full">
               {structuredTags.map((tag) => (
                 <span
                   key={tag}
@@ -408,38 +433,57 @@ export function WorkDetail({
                   />
                 );
               })}
-              <div ref={tagPopoverRef} className="relative inline-flex">
-                <IconButton
-                  icon={I.add}
-                  label="タグを追加"
-                  size="sm"
-                  className="h-5 w-5 rounded-1 bg-paper-2 text-ink-2 hover:bg-paper-3 hover:text-ink-0"
-                  disabled={isTagSaving || isPatching}
-                  onClick={() => {
-                    setEditError(null);
-                    setIsTagPopoverOpen((open) => !open);
-                  }}
-                />
-                {isTagPopoverOpen && (
-                  <div
-                    className="absolute top-[calc(100%+6px)] z-10 rounded-[6px] bg-paper-1 shadow-pop"
-                    style={{
-                      left: tagPopoverLayout.left,
-                      width: tagPopoverLayout.width,
+              <div ref={tagEditorRef} className="contents">
+                <div ref={tagPopoverAnchorRef} className="relative inline-flex">
+                  <IconButton
+                    icon={I.add}
+                    label="タグを追加"
+                    size="sm"
+                    className="h-5 w-5 rounded-1 bg-paper-2 text-ink-2 hover:bg-paper-3 hover:text-ink-0"
+                    disabled={isTagSaving || isPatching}
+                    onClick={() => {
+                      setEditError(null);
+                      setIsTagPopoverOpen((open) => !open);
                     }}
-                  >
-                    <TagCombobox
-                      focusOnMount
-                      width={tagPopoverLayout.width}
-                      suggestions={flatTagSuggestions}
-                      excludeTags={editableFlatTags}
-                      disabled={isTagSaving || isPatching}
-                      canCreate={(tag) => parseTag(tag).kind === "flat"}
-                      onSelect={(tag) => void addFlatTag(tag)}
-                      onCancel={() => setIsTagPopoverOpen(false)}
-                    />
-                  </div>
-                )}
+                  />
+                  {isTagPopoverOpen && !isNarrowTagPane && (
+                    <div
+                      className="absolute top-[calc(100%+6px)] z-10 rounded-[6px] bg-paper-1 shadow-pop"
+                      style={{
+                        left: tagPopoverLayout.left,
+                        width: tagPopoverLayout.width,
+                      }}
+                    >
+                      <TagCombobox
+                        focusOnMount
+                        width={tagPopoverLayout.width}
+                        suggestions={flatTagSuggestions}
+                        excludeTags={editableFlatTags}
+                        disabled={isTagSaving || isPatching}
+                        canCreate={(tag) => parseTag(tag).kind === "flat"}
+                        onSelect={(tag) => void addFlatTag(tag)}
+                        onCancel={() => setIsTagPopoverOpen(false)}
+                      />
+                    </div>
+                  )}
+                </div>
+                {isTagPopoverOpen &&
+                  isNarrowTagPane && (
+                    // 右ペインが狭く浮遊ポップオーバーを展開する余地がないため、
+                    // チップ列の下にフル幅の行として展開する（flex-wrap の basis-full で改行させる）。
+                    <div className="mt-1 basis-full rounded-[6px] bg-paper-1 shadow-pop">
+                      <TagCombobox
+                        focusOnMount
+                        width="full"
+                        suggestions={flatTagSuggestions}
+                        excludeTags={editableFlatTags}
+                        disabled={isTagSaving || isPatching}
+                        canCreate={(tag) => parseTag(tag).kind === "flat"}
+                        onSelect={(tag) => void addFlatTag(tag)}
+                        onCancel={() => setIsTagPopoverOpen(false)}
+                      />
+                    </div>
+                  )}
               </div>
             </div>
           </div>
@@ -618,33 +662,66 @@ export function WorkDetail({
             <div className="mle-sect__rule" />
           </div>
           <div className="mle-prv__tracks">
-            {tracks.map((tr, i) => (
-              <button
-                type="button"
-                key={i}
-                className={`mle-prv__trk ${playingTrackIndex === i ? "is-now" : ""} ${hasResume && work.resumeTrackIndex === i ? "is-resume" : ""} ${!isPlayable ? "is-disabled" : ""}`}
-                disabled={!isPlayable}
-                onClick={() => {
-                  if (isPlayable) onPlay(i);
-                }}
-              >
-                <span className="num">{String(i + 1).padStart(2, "0")}</span>
-                <span className="name">
-                  <span className="title">{tr.title}</span>
-                  {hasResume && work.resumeTrackIndex === i && (
-                    <span className="resume">再開 {formatTime(work.resumePosition)}</span>
+            {tracks.map((tr, i) => {
+              const isNowPlaying = playingTrackIndex === i;
+              return (
+                <button
+                  type="button"
+                  key={i}
+                  className={cn(
+                    "group mle-prv__trk",
+                    isNowPlaying && "is-now",
+                    hasResume && work.resumeTrackIndex === i && "is-resume",
+                    !isPlayable && "is-disabled",
                   )}
-                </span>
-                {tr.end != null && tr.start != null && (
-                  <span className="dur">{formatDuration(Math.round(tr.end - tr.start))}</span>
-                )}
-                <div className="src">
-                  <span className="mle-icbtn" title="再生" aria-disabled={!isPlayable}>
-                    <I.play size={11} />
+                  disabled={!isPlayable}
+                  aria-label={`${tr.title}を再生`}
+                  // 行全体がトラックの再生操作。右端のアイコンは補助的な視覚ヒントで、
+                  // 独立したボタンではない（トラックに「選択」概念は持たせない）。
+                  onClick={() => {
+                    if (isPlayable) onPlay(i);
+                  }}
+                >
+                  <span className="num">{String(i + 1).padStart(2, "0")}</span>
+                  <span className="name">
+                    <span className="title">{tr.title}</span>
+                    {hasResume && work.resumeTrackIndex === i && (
+                      <span className="resume">再開 {formatTime(work.resumePosition)}</span>
+                    )}
                   </span>
-                </div>
-              </button>
-            ))}
+                  {tr.end != null && tr.start != null && (
+                    <span className="dur">{formatDuration(Math.round(tr.end - tr.start))}</span>
+                  )}
+                  <div className="src">
+                    {isNowPlaying ? (
+                      <span
+                        className="mle-icbtn inline-flex items-center gap-[1px] text-acc"
+                        aria-hidden="true"
+                      >
+                        {[6, 10, 8].map((height, barIndex) => (
+                          <span
+                            key={height}
+                            className={cn(
+                              "block w-[2px] origin-bottom rounded-[1px] bg-current motion-reduce:animate-none",
+                              isPlaybackActive &&
+                                "motion-safe:animate-[mll-eq-bar_840ms_ease-in-out_infinite]",
+                            )}
+                            style={{ height, animationDelay: `${barIndex * 120}ms` }}
+                          />
+                        ))}
+                      </span>
+                    ) : (
+                      <span
+                        className="mle-icbtn opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100"
+                        aria-hidden="true"
+                      >
+                        <I.play size={11} />
+                      </span>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </>
       )}

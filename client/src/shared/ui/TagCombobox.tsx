@@ -66,7 +66,8 @@ export interface TagComboboxProps {
   focusOnMount?: boolean;
   placeholder?: string;
   label?: string;
-  width?: number;
+  /** px指定の固定幅、または親要素いっぱいに広げる "full"（狭幅レイアウト用） */
+  width?: number | "full";
   canCreate?: (tag: string) => boolean;
   onSelect: (tag: string) => void;
   onCancel?: () => void;
@@ -124,7 +125,10 @@ export default function TagCombobox({
 
   /* oxlint-disable jsx-a11y/prefer-tag-over-role -- Custom combobox needs ARIA listbox/option semantics and cannot use native select/datalist without changing tag creation behavior. */
   return (
-    <div className="relative" style={{ width }}>
+    <div
+      className={cn("relative", width === "full" && "w-full")}
+      style={width === "full" ? undefined : { width }}
+    >
       <input
         ref={inputRef}
         role="combobox"
@@ -190,8 +194,9 @@ export default function TagCombobox({
                 role="option"
                 type="button"
                 aria-selected={isActive}
+                title={option.value}
                 className={cn(
-                  "flex min-h-7 w-full items-center px-2.5 text-left font-jp text-[12px] text-ink-1",
+                  "flex min-h-7 w-full min-w-0 items-center gap-2 px-2.5 text-left font-jp text-[12px] text-ink-1",
                   "hover:bg-paper-2 focus:bg-paper-2 focus:outline-none",
                   isActive && "bg-acc-soft text-acc-ink",
                 )}
@@ -199,12 +204,12 @@ export default function TagCombobox({
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => commitOption(option)}
               >
-                {option.kind === "create" ? (
-                  <span>
-                    <span className="font-medium">"{option.value}"</span> を新規作成
+                {/* タグ名を主情報として省略記号+tooltipで表示し、「新規作成」は補足として控えめに添える */}
+                <span className="min-w-0 flex-1 truncate">{option.value}</span>
+                {option.kind === "create" && (
+                  <span className="shrink-0 font-mono text-[9px] uppercase tracking-wide text-ink-3">
+                    新規作成
                   </span>
-                ) : (
-                  <span>{option.value}</span>
                 )}
               </button>
             );
