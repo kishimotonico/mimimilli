@@ -1,9 +1,11 @@
 ---
 id: TASK-4
 title: タグ削除の誤操作耐性を高める（hover時強調 + undoトースト）
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@fable'
 created_date: '2026-07-05 17:58'
+updated_date: '2026-07-10 00:22'
 labels:
   - ui
 dependencies: []
@@ -25,3 +27,9 @@ ordinal: 4000
 - [ ] #2 削除操作後に「タグ『○○』を削除しました / 元に戻す」の形式でundoトーストを表示する
 - [ ] #3 保存中/失敗時の状態をチップ単位で表示する（失敗時に黙って元に戻るだけにしない）
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. タグチップ削除UIの現状把握(editableTags/TagCombobox周辺) 2. 削除ボタンをhover/focus時のみ強調 3. undoトースト(削除タグ名+元に戻す) 4. チップ単位の保存中/失敗表示 5. テスト・check
+<!-- SECTION:PLAN:END -->
