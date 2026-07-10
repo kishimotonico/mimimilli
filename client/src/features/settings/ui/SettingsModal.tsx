@@ -5,6 +5,8 @@ interface SettingsModalProps {
   rootFolder: string | null;
   lastScanTime: string | null;
   scanning: boolean;
+  /** scanning 中の進捗ラベル（例: "作品を登録中 (3/12)"）。TASK-20: SSEで受信した進捗 */
+  scanProgressLabel?: string | null;
   onClose: () => void;
   onScan: () => void;
   onChangeFolder: (path: string) => void;
@@ -15,6 +17,7 @@ export default function SettingsModal({
   rootFolder,
   lastScanTime,
   scanning,
+  scanProgressLabel = null,
   onClose,
   onScan,
   onChangeFolder,
@@ -212,8 +215,8 @@ export default function SettingsModal({
                   opacity: scanning ? 0.6 : 1,
                 }}
               >
-                <I.refresh size={12} />
-                {scanning ? "スキャン中..." : "フルスキャン"}
+                <I.refresh size={12} className={scanning ? "animate-spin" : undefined} />
+                {scanning ? (scanProgressLabel ?? "スキャン中...") : "フルスキャン"}
               </button>
             </div>
           </div>

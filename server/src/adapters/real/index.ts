@@ -11,6 +11,7 @@ import type {
   FileEntry,
   FsListing,
   ResumeBody,
+  ScanProgressEvent,
   ScanResult,
   SearchPreset,
   SearchPresetCreate,
@@ -94,9 +95,9 @@ export function createRealAdapter(options: RealAdapterOptions): DataAdapter {
       return this.getSettings();
     },
 
-    async scan(): Promise<ScanResult> {
+    async scan(onProgress?: (event: ScanProgressEvent) => void): Promise<ScanResult> {
       const root = requireRoot();
-      const result = await scanner.scan(root);
+      const result = await scanner.scan(root, onProgress);
       repo.setSetting(KEY_LAST_SCAN_TIME, new Date().toISOString());
       return result;
     },

@@ -4,9 +4,15 @@ import { I } from "../../../shared/ui/Icon";
 interface SetupScreenProps {
   onComplete: (path: string) => void;
   scanning: boolean;
+  /** scanning 中の進捗ラベル（例: "作品を登録中 (3/12)"）。TASK-20: SSEで受信した進捗 */
+  scanProgressLabel?: string | null;
 }
 
-export default function SetupScreen({ onComplete, scanning }: SetupScreenProps) {
+export default function SetupScreen({
+  onComplete,
+  scanning,
+  scanProgressLabel = null,
+}: SetupScreenProps) {
   const [path, setPath] = useState("");
   const pathInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -149,7 +155,8 @@ export default function SetupScreen({ onComplete, scanning }: SetupScreenProps) 
           >
             {scanning ? (
               <>
-                <I.refresh size={14} /> スキャン中...
+                <I.refresh size={14} className="animate-spin" />
+                {scanProgressLabel ?? "スキャン中..."}
               </>
             ) : (
               <>

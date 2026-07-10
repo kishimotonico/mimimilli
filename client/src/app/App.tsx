@@ -27,6 +27,8 @@ import type { ScanResult, Work, WorkSummary } from "@mimimilli/shared";
 import { getWork } from "../entities/work/api";
 import { exportLibrary } from "../features/library/api";
 import { scanLibrary } from "../features/scan/api";
+import { formatScanProgressLabel } from "../features/scan/model";
+import { useScanProgress } from "../features/scan/useScanProgress";
 import { getSettings, setRootFolder } from "../features/settings/api";
 import { parseNavigationUrl, type AppMode } from "../features/navigation/model/navigationUrl";
 import { useNavigationHistory } from "../features/navigation/model/useNavigationHistory";
@@ -176,6 +178,10 @@ export default function App() {
 
   const handleScan = useCallback(() => scanMutation.mutate(), [scanMutation]);
 
+  // スキャン進捗のリアルタイム表示（TASK-20）。TopBar / SettingsModal / SetupScreen で共有する。
+  const scanProgress = useScanProgress(scanMutation.isPending || isCompletingSetup);
+  const scanProgressLabel = formatScanProgressLabel(scanProgress);
+
   const handleSetupComplete = useCallback(
     async (path: string) => {
       setIsCompletingSetup(true);
@@ -238,7 +244,13 @@ export default function App() {
   }
 
   if (!isSetupDone) {
-    return <SetupScreen onComplete={handleSetupComplete} scanning={isCompletingSetup} />;
+    return (
+      <SetupScreen
+        onComplete={handleSetupComplete}
+        scanning={isCompletingSetup}
+        scanProgressLabel={scanProgressLabel}
+      />
+    );
   }
 
   const currentTrack = isPlaying ? player.state.tracks[player.state.currentTrackIndex] : null;
@@ -256,6 +268,8 @@ export default function App() {
           onSettings={() => setShowSettings(true)}
           isPlaying={isPlaying}
           playingTrack={currentTrack?.title}
+          scanning={scanMutation.isPending}
+          scanProgressLabel={scanProgressLabel}
         />
       }
       addressBar={
@@ -342,6 +356,7 @@ export default function App() {
               rootFolder={settings?.rootFolder ?? null}
               lastScanTime={settings?.lastScanTime ?? null}
               scanning={scanMutation.isPending}
+              scanProgressLabel={scanProgressLabel}
               onClose={() => setShowSettings(false)}
               onScan={handleScan}
               onChangeFolder={handleChangeFolder}

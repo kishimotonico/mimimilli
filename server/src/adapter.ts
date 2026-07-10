@@ -10,6 +10,7 @@ import type {
   FileEntry,
   FsListing,
   ResumeBody,
+  ScanProgressEvent,
   ScanResult,
   SearchPreset,
   SearchPresetCreate,
@@ -47,7 +48,8 @@ export interface DataAdapter {
   // 設定・スキャン
   getSettings(): Promise<Settings>;
   updateSettings(patch: SettingsUpdate): Promise<Settings>;
-  scan(): Promise<ScanResult>;
+  /** onProgress は任意。呼ぶたびに進捗イベントを通知する（TASK-20、GET /scan/events の配信元） */
+  scan(onProgress?: (event: ScanProgressEvent) => void): Promise<ScanResult>;
 
   // 作品
   queryWorks(params: WorksQuery): Promise<WorksPage>;

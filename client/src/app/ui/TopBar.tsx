@@ -9,6 +9,10 @@ interface TopBarProps {
   onSettings?: () => void;
   isPlaying?: boolean;
   playingTrack?: string;
+  /** スキャン実行中かどうか（TASK-20: SSE進捗表示） */
+  scanning?: boolean;
+  /** scanning 中の進捗ラベル（例: "作品を登録中 (3/12)"）。null は「進捗未受信」を表す */
+  scanProgressLabel?: string | null;
 }
 
 export default function TopBar({
@@ -19,6 +23,8 @@ export default function TopBar({
   onSettings,
   isPlaying = false,
   playingTrack,
+  scanning = false,
+  scanProgressLabel = null,
 }: TopBarProps) {
   const placeholder =
     mode === "files"
@@ -65,7 +71,19 @@ export default function TopBar({
         )}
       </div>
 
-      <IconButton size="md" icon={I.refresh} label="スキャン" onClick={onScan} />
+      {scanning && (
+        <span className="font-mono text-[10.5px] text-ink-3" aria-live="polite">
+          {scanProgressLabel ?? "スキャン中..."}
+        </span>
+      )}
+      <IconButton
+        size="md"
+        icon={I.refresh}
+        label={scanning ? (scanProgressLabel ?? "スキャン中...") : "スキャン"}
+        onClick={onScan}
+        disabled={scanning}
+        className={scanning ? "animate-spin" : undefined}
+      />
       <IconButton size="md" icon={I.bell} label="通知" />
       <IconButton size="md" icon={I.cog} label="設定" onClick={onSettings} />
     </header>

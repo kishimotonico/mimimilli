@@ -18,7 +18,14 @@
 //   - シンボリックリンクのディレクトリは辿らない（循環防止）
 import { existsSync, readdirSync } from "node:fs";
 import { basename, dirname, extname, join } from "node:path";
-import type { MetaFile, Playlist, ScanResult, Track, Work } from "@mimimilli/shared";
+import type {
+  MetaFile,
+  Playlist,
+  ScanProgressEvent,
+  ScanResult,
+  Track,
+  Work,
+} from "@mimimilli/shared";
 import type { Db } from "./db.ts";
 import {
   isMetaFileName,
@@ -208,7 +215,8 @@ export class Scanner {
     this.repo = repo;
   }
 
-  async scan(root: string): Promise<ScanResult> {
+  async scan(root: string, onProgress?: (event: ScanProgressEvent) => void): Promise<ScanResult> {
+    const emit = onProgress ?? ((): void => {});
     const result: ScanResult = {
       registered: 0,
       newlyGenerated: 0,
@@ -217,11 +225,15 @@ export class Scanner {
       newWorkIds: [],
     };
 
+    // walking フェーズ: ディレクトリ走査自体は件数が事前に分からないため不定（total=0）で通知する
+    emit({ type: "progress", phase: "walking", processed: 0, total: 0 });
     const tree = walk(root);
     const seenIds = new Set<string>();
 
     // 1. 既存メタファイルの登録
-    for (const metaPath of tree.metaPaths) {
+    emit({ type: "progress", phase: "registering", processed: 0, total: tree.metaPaths.length });
+    for (let i = 0; i < tree.metaPaths.length; i++) {
+      const metaPath = tree.metaPaths[i]!;
       try {
         await this.registerMetaFile(metaPath, seenIds);
         result.registered += 1;
@@ -241,6 +253,12 @@ export class Scanner {
           throw e;
         }
       }
+      emit({
+        type: "progress",
+        phase: "registering",
+        processed: i + 1,
+        total: tree.metaPaths.length,
+      });
     }
 
     // 2. メタファイルのない音声フォルダーへ自動生成（下書き）
@@ -252,11 +270,13 @@ export class Scanner {
       workRoots.add(findWorkRoot(audioDir, root, tree.metaDirs));
     }
     // 祖先が同時に検出された場合は祖先側に統合する
-    const roots = [...workRoots].filter(
-      (dir) => ![...workRoots].some((other) => other !== dir && isPathWithin(other, dir)),
-    );
+    const roots = [...workRoots]
+      .filter((dir) => ![...workRoots].some((other) => other !== dir && isPathWithin(other, dir)))
+      .sort(naturalCompare);
 
-    for (const workDir of roots.sort(naturalCompare)) {
+    emit({ type: "progress", phase: "generating", processed: 0, total: roots.length });
+    for (let i = 0; i < roots.length; i++) {
+      const workDir = roots[i]!;
       try {
         const id = this.generateMetaForFolder(workDir);
         await this.registerMetaFile(join(workDir, ".meta.json"), seenIds);
@@ -266,10 +286,13 @@ export class Scanner {
         console.warn(`メタファイルの自動生成に失敗: ${workDir}: ${(e as Error).message}`);
         result.errors += 1;
       }
+      emit({ type: "progress", phase: "generating", processed: i + 1, total: roots.length });
     }
 
+    emit({ type: "progress", phase: "finalizing", processed: 0, total: 1 });
     this.repo.markMissingExcept([...seenIds]);
     result.missing = this.repo.countByStatus("missing");
+    emit({ type: "progress", phase: "finalizing", processed: 1, total: 1 });
     return result;
   }
 

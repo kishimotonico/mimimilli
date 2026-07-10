@@ -8,6 +8,7 @@ import type {
   FileEntry,
   FsListing,
   ResumeBody,
+  ScanProgressEvent,
   ScanResult,
   SearchPreset,
   SearchPresetCreate,
@@ -126,6 +127,13 @@ function buildWorkFileEntryTree(work: WorkSummary): FileEntry {
   };
 }
 
+/** 疑似スキャン進捗の1ステップあたりの待機時間（ms） */
+const FIXTURE_SCAN_STEP_MS = 20;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function normalizeFsPath(path: string): string {
   const trimmed = path.replace(/\/+$/, "");
   return trimmed === "" ? "/" : trimmed;
@@ -185,7 +193,22 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
       return { rootFolder: state.rootFolder, lastScanTime: state.lastScanTime };
     },
 
-    async scan(): Promise<ScanResult> {
+    // fixture には実際に走査するファイルシステムが無いため、数ステップのタイマー進行で
+    // 疑似的な進捗を流す（本物のスキャンと同じイベント契約を dev/デモ環境でも確認できるように）。
+    async scan(onProgress?: (event: ScanProgressEvent) => void): Promise<ScanResult> {
+      const emit = onProgress ?? ((): void => {});
+      const pseudoSteps = 4;
+
+      emit({ type: "progress", phase: "walking", processed: 0, total: 0 });
+      await sleep(FIXTURE_SCAN_STEP_MS);
+      emit({ type: "progress", phase: "registering", processed: 0, total: pseudoSteps });
+      for (let i = 1; i <= pseudoSteps; i++) {
+        await sleep(FIXTURE_SCAN_STEP_MS);
+        emit({ type: "progress", phase: "registering", processed: i, total: pseudoSteps });
+      }
+      await sleep(FIXTURE_SCAN_STEP_MS);
+      emit({ type: "progress", phase: "finalizing", processed: 1, total: 1 });
+
       state.lastScanTime = new Date().toISOString();
       return {
         registered: state.works.length,
