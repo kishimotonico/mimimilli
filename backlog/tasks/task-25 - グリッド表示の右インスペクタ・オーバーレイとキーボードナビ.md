@@ -1,11 +1,11 @@
 ---
 id: TASK-25
 title: グリッド表示の右インスペクタ・オーバーレイとキーボードナビ
-status: In Progress
+status: Done
 assignee:
   - '@codex'
 created_date: '2026-07-07 11:59'
-updated_date: '2026-07-10 09:49'
+updated_date: '2026-07-10 10:08'
 labels:
   - feature
   - frontend
@@ -31,9 +31,21 @@ ordinal: 25000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 グリッドで作品を選ぶと右端にインスペクタが重なって表示され、WorkDetailの内容が出る
-- [ ] #2 作品を次々クリックしてもグリッドがリフローせず、スクロール位置・タイル配置が保たれる
-- [ ] #3 インスペクタ表示中、選択したタイルがパネルの下に隠れず視認できる
-- [ ] #4 ✕ / Esc / 空き領域クリックでインスペクタを閉じられ、別タイルのクリックでは閉じず内容が更新される
-- [ ] #5 矢印キーでタイル間をフォーカス移動でき、Enter/ダブルクリックで再生できる
+- [x] #1 グリッドで作品を選ぶと右端にインスペクタが重なって表示され、WorkDetailの内容が出る
+- [x] #2 作品を次々クリックしてもグリッドがリフローせず、スクロール位置・タイル配置が保たれる
+- [x] #3 インスペクタ表示中、選択したタイルがパネルの下に隠れず視認できる
+- [x] #4 ✕ / Esc / 空き領域クリックでインスペクタを閉じられ、別タイルのクリックでは閉じず内容が更新される
+- [x] #5 矢印キーでタイル間をフォーカス移動でき、Enter/ダブルクリックで再生できる
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Codex実装（worktree、コミット 8ae1b53）、Fableが実機検証: インスペクタ表示（WorkDetail再利用・z=20）、選択切替時のgrid-template-columns完全一致とスクロール位置維持（リフロー無し）、Esc/✕/空き領域クリックで閉じる、矢印キー（右+1・下+列数）でのフォーカス移動、Enter再生。可視化方式は右ガター確保案を採用（scrollIntoView案はトリアージ時の位置保持と相性が悪いため見送り、妥当と判断）。design-system.mdのz-index表も更新済み。マージ後 check・client 91件・ビジュアル6件全パス。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+グリッド選択時の詳細を右オーバーレイのインスペクタに変更（リフロー無し・右ガター方式）、矢印キーの2次元ナビとEnter再生を追加。コミット 8ae1b53（マージ済み）。
+<!-- SECTION:FINAL_SUMMARY:END -->
