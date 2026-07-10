@@ -1,9 +1,11 @@
 ---
 id: TASK-1
 title: 検索0件時の空状態に原因表示とクリア導線を追加
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@fable'
 created_date: '2026-07-05 17:58'
+updated_date: '2026-07-09 23:55'
 labels:
   - ui
 dependencies: []
@@ -26,3 +28,9 @@ ordinal: 1000
 - [ ] #3 タグ/軸フィルタが併用されている場合、現在効いている条件を空状態表示に含める
 - [ ] #4 0件時に右ペインへ「検索条件を変える」などの案内を表示する
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. LibraryViewの0件空状態の現状把握 2. 検索語・適用中フィルタを空状態表示に反映 3. クリア導線（空状態内+検索欄内）実装 4. 右ペイン案内 5. テスト・check
+<!-- SECTION:PLAN:END -->
