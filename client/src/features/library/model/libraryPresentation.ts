@@ -2,7 +2,7 @@
 // query 結果と Jotai state を組み合わせて「何を表示するか」を決める部分を、
 // コンポーネントの配線から切り離してテスト可能にする。
 
-import type { FacetAxis } from "@mimimilli/shared";
+import type { FacetAxisId } from "@mimimilli/shared";
 import type { WorksQueryParams } from "../api";
 import type { AxisId, SortId, ViewMode } from "./types";
 import { isFacetAxis, isSmartAxis, isViewAxis } from "./axisDefinitions";
@@ -44,9 +44,9 @@ export function buildWorksParams(input: WorksParamsInput): WorksQueryParams | nu
 export function getFacetAxisForQuery(
   activeAxis: AxisId,
   drillValue: string | null,
-): FacetAxis | null {
+): FacetAxisId | null {
   if ((isFacetAxis(activeAxis) && !drillValue) || activeAxis === "tag") {
-    return activeAxis as FacetAxis;
+    return activeAxis as FacetAxisId;
   }
   return null;
 }

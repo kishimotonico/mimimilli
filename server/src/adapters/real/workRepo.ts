@@ -1,6 +1,7 @@
 // works / tags / smart_folders / search_presets / app_settings の CRUD と行⇄ドメイン変換。
 // 検索・絞り込みは core/worksQuery（インメモリ）で行うため、ここは取得と更新に徹する。
 import { asc, eq, inArray, notInArray } from "drizzle-orm";
+import { normalizeTags } from "@mimimilli/shared";
 import type {
   Playlist,
   SearchPreset,
@@ -9,13 +10,24 @@ import type {
   SmartFolderCreate,
   SmartFolderUpdate,
   SortId,
+  TagPrefix,
+  TagPrefixCreate,
+  TagPrefixUpdate,
   Work,
   WorkStatus,
   WorkSummary,
   UrlEntry,
 } from "@mimimilli/shared";
 import type { Db } from "./db.ts";
-import { appSettings, searchPresets, smartFolders, tags, workTags, works } from "./schema.ts";
+import {
+  appSettings,
+  searchPresets,
+  smartFolders,
+  tagPrefixes,
+  tags,
+  workTags,
+  works,
+} from "./schema.ts";
 
 type WorkRow = typeof works.$inferSelect;
 
@@ -108,7 +120,9 @@ export class WorkRepo {
 
   private replaceWorkTags(workId: string, tagNames: string[]): void {
     this.db.delete(workTags).where(eq(workTags.workId, workId)).run();
-    for (const name of tagNames) {
+    // DB キャッシュには常に正規形で入れる（ADR-0005 決定5）。メタファイル側の正規化は
+    // 編集経路（PATCH / DLsite 適用）で行い、スキャン取り込みはメタを書き換えない
+    for (const name of normalizeTags(tagNames)) {
       this.db.insert(tags).values({ name }).onConflictDoNothing().run();
       const tag = this.db.select().from(tags).where(eq(tags.name, name)).get();
       if (tag) {
@@ -243,6 +257,70 @@ export class WorkRepo {
   countByStatus(status: string): number {
     return this.db.select({ id: works.id }).from(works).where(eq(works.status, status)).all()
       .length;
+  }
+
+  // ── タグ prefix 定義（ADR-0005）───────────────────────────
+
+  listTagPrefixes(): TagPrefix[] {
+    return this.db
+      .select()
+      .from(tagPrefixes)
+      .orderBy(asc(tagPrefixes.id))
+      .all()
+      .map((r) => ({
+        prefix: r.prefix,
+        label: r.label,
+        color: r.color,
+        showAsAxis: r.showAsAxis,
+        protected: r.protected,
+      }));
+  }
+
+  getTagPrefix(prefix: string): TagPrefix | null {
+    const r = this.db.select().from(tagPrefixes).where(eq(tagPrefixes.prefix, prefix)).get();
+    if (!r) return null;
+    return {
+      prefix: r.prefix,
+      label: r.label,
+      color: r.color,
+      showAsAxis: r.showAsAxis,
+      protected: r.protected,
+    };
+  }
+
+  /** 既に存在する prefix なら null（呼び出し側で 409 にする） */
+  createTagPrefix(input: TagPrefixCreate): TagPrefix | null {
+    const r = this.db
+      .insert(tagPrefixes)
+      .values({
+        prefix: input.prefix,
+        label: input.label,
+        color: input.color,
+        showAsAxis: input.showAsAxis,
+        protected: input.protected,
+      })
+      .onConflictDoNothing()
+      .run();
+    if (r.changes === 0) return null;
+    return this.getTagPrefix(input.prefix);
+  }
+
+  updateTagPrefix(prefix: string, patch: TagPrefixUpdate): TagPrefix | null {
+    const existing = this.getTagPrefix(prefix);
+    if (!existing) return null;
+    const set: Partial<typeof tagPrefixes.$inferInsert> = {};
+    if (patch.label !== undefined) set.label = patch.label;
+    if (patch.color !== undefined) set.color = patch.color;
+    if (patch.showAsAxis !== undefined) set.showAsAxis = patch.showAsAxis;
+    if (patch.protected !== undefined) set.protected = patch.protected;
+    if (Object.keys(set).length > 0) {
+      this.db.update(tagPrefixes).set(set).where(eq(tagPrefixes.prefix, prefix)).run();
+    }
+    return this.getTagPrefix(prefix);
+  }
+
+  deleteTagPrefix(prefix: string): boolean {
+    return this.db.delete(tagPrefixes).where(eq(tagPrefixes.prefix, prefix)).run().changes > 0;
   }
 
   // ── app_settings（KVストア）──────────────────────────────

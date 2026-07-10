@@ -1,6 +1,5 @@
 // 作品検索（GET /api/works）の純粋関数。
-// client/mocks/handlers/works.ts の searchWorks と同じセマンティクスを再現する。
-import { AXIS_TAG_PREFIX } from "@mimimilli/shared";
+import { parseTag, tagEquals } from "@mimimilli/shared";
 import type { SortId, WorksPage, WorksQuery, WorkSummary } from "@mimimilli/shared";
 
 const RECENT_VIEW_WINDOW_DAYS = 30;
@@ -31,31 +30,35 @@ function filterByQuery(works: WorkSummary[], q: string): WorkSummary[] {
   );
 }
 
+// タグ絞り込みは完全一致（ADR-0005 決定6。prefix は大文字小文字を無視、値は区別）
 function filterByTags(works: WorkSummary[], tags: string[], tagOp: "AND" | "OR"): WorkSummary[] {
   if (tags.length === 0) return works;
   if (tagOp === "AND") {
     return works.filter((work) =>
-      tags.every((tagFilter) =>
-        work.tags.some((tag) => tag.toLowerCase().includes(tagFilter.toLowerCase())),
-      ),
+      tags.every((tagFilter) => work.tags.some((tag) => tagEquals(tag, tagFilter))),
     );
   }
   return works.filter((work) =>
-    tags.some((tagFilter) =>
-      work.tags.some((tag) => tag.toLowerCase().includes(tagFilter.toLowerCase())),
-    ),
+    tags.some((tagFilter) => work.tags.some((tag) => tagEquals(tag, tagFilter))),
   );
 }
 
+// 軸ドリル。"year" は addedAt の年、それ以外は prefix 軸としてタグの完全一致（ADR-0005）
 function filterByAxis(
   works: WorkSummary[],
   axis: WorksQuery["axis"],
   axisValue: WorksQuery["axisValue"],
 ): WorkSummary[] {
   if (!axis || !axisValue) return works;
-  const prefix = AXIS_TAG_PREFIX[axis] ?? `${axis}/`;
-  const fullValue = prefix + axisValue;
-  return works.filter((work) => work.tags.some((tag) => tag === fullValue || tag === axisValue));
+  if (axis === "year") {
+    return works.filter((work) => work.addedAt.slice(0, 4) === axisValue);
+  }
+  return works.filter((work) =>
+    work.tags.some((tag) => {
+      const parsed = parseTag(tag);
+      return parsed.kind === "annotated" && parsed.prefix === axis && parsed.value === axisValue;
+    }),
+  );
 }
 
 function filterByView(works: WorkSummary[], view: WorksQuery["view"]): WorkSummary[] {

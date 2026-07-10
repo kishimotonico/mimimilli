@@ -3,6 +3,7 @@
 export * from "./work.ts";
 export * from "./meta.ts";
 export * from "./library.ts";
+export * from "./tagPrefix.ts";
 export * from "./fs.ts";
 export * from "./settings.ts";
 export * from "./scan.ts";

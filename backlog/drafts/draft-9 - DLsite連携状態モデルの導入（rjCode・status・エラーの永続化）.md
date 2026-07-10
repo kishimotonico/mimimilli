@@ -29,9 +29,11 @@ dlsite: {
 - not_found（実在しない/販売終了）と error（一時的失敗）の区別
 - 「RJコードはあるが連携しない」というユーザー意思（skip）を状態に含めるか
 - スマートフォルダー条件（未連携のみ抽出等）への露出
+- ユーザーが削除したタグの復活防止: mergeDlsiteTags は「存在しなければ追加」のため、ユーザーが削除したタグが再取得・再適用で復活する。最後に適用した info のスナップショットを持って差分適用するか、除外タグリストを持つか（ADR-0005 の決定7）
 
 ## 関連
-- server/src/adapters/real/dlsite.ts（detectRjCode / fetchDlsiteInfo）
+- server/src/adapters/real/dlsite.ts（detectRjCode / fetchDlsiteInfo / mergeDlsiteTags）
 - shared/src/dlsite.ts（契約）
 - docs/requirements-v4.md §4.4
+- docs/adr/0005-tags-as-sole-attribute.md、DRAFT-19（タグ設定・prefix定義）
 <!-- SECTION:DESCRIPTION:END -->

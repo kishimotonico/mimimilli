@@ -65,9 +65,16 @@ test("GET /api/axes/cv は AxisFacetItem[] を count 降順で返す", async () 
   }
 });
 
-test("GET /api/axes/:axis に不正な軸を渡すと400", async () => {
+test("GET /api/axes/:axis は未登録 prefix でも集計する（該当なしは空配列）", async () => {
   const app = buildApp();
-  const res = await app.request("/api/axes/invalid-axis");
+  const res = await app.request("/api/axes/unknown-prefix");
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), []);
+});
+
+test("GET /api/axes/:axis にスラッシュ入りの軸を渡すと400", async () => {
+  const app = buildApp();
+  const res = await app.request(`/api/axes/${encodeURIComponent("a/b")}`);
   assert.equal(res.status, 400);
   const body = await res.json();
   assert.equal(body.error.code, "invalid_request");

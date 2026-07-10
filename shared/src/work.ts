@@ -95,3 +95,34 @@ export function parseTag(tag: string): ParsedTag {
   }
   return { kind: "flat", prefix: "", value: tag, raw: tag };
 }
+
+/** タグを正規形へ寄せる（ADR-0005 決定5）。
+ *  Annotated: prefix を trim + 小文字化、値を trim。フラット: 全体を trim。
+ *  値の大文字小文字は保持する */
+export function normalizeTag(tag: string): string {
+  const idx = tag.indexOf("/");
+  if (idx > 0) {
+    const prefix = tag.slice(0, idx).trim().toLowerCase();
+    const value = tag.slice(idx + 1).trim();
+    if (prefix && value) return `${prefix}/${value}`;
+  }
+  return tag.trim();
+}
+
+/** 正規化しつつ空タグと重複を除く（順序は保持）。タグ書き込み経路の共通入口 */
+export function normalizeTags(tags: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const tag of tags) {
+    const normalized = normalizeTag(tag);
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    result.push(normalized);
+  }
+  return result;
+}
+
+/** タグの同一性判定（prefix は大文字小文字を無視、値は区別） */
+export function tagEquals(a: string, b: string): boolean {
+  return normalizeTag(a) === normalizeTag(b);
+}

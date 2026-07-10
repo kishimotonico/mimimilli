@@ -1,10 +1,10 @@
 // fixture アダプタ: インメモリの seed データを使う DataAdapter 実装。
 // 開発・ビジュアルテスト用（ADR-0002）。core/ の pure 関数を使って全メソッドを実装する。
+import { DEFAULT_TAG_PREFIXES } from "@mimimilli/shared";
 import type {
   AxisFacetItem,
   DlsiteApplyBody,
   DlsiteWorkInfo,
-  FacetAxis,
   FileEntry,
   FsListing,
   ResumeBody,
@@ -17,6 +17,10 @@ import type {
   SmartFolder,
   SmartFolderCreate,
   SmartFolderUpdate,
+  TagPrefix,
+  TagPrefixCandidate,
+  TagPrefixCreate,
+  TagPrefixUpdate,
   Track,
   Work,
   WorkPatch,
@@ -26,6 +30,7 @@ import type {
 } from "@mimimilli/shared";
 import type { DataAdapter, MediaKind, MediaLocation } from "../../adapter.ts";
 import { buildAxisFacets } from "../../core/axisFacets.ts";
+import { buildTagPrefixCandidates } from "../../core/tagPrefixCandidates.ts";
 import { evalSmartFolder } from "../../core/smartFolder.ts";
 import { applyWorksQuery } from "../../core/worksQuery.ts";
 import { buildFsRoot, buildWorkFileTree, SEED_TRACK_NAMES, type FsNode } from "./data.ts";
@@ -42,6 +47,7 @@ interface FixtureState {
   rootFolder: string | null;
   lastScanTime: string | null;
   works: WorkSummary[];
+  tagPrefixes: TagPrefix[];
   smartFolders: SmartFolder[];
   presets: SearchPreset[];
   nextPresetId: number;
@@ -69,6 +75,7 @@ function createInitialState(options: FixtureAdapterOptions): FixtureState {
     rootFolder: scenario.rootFolder,
     lastScanTime: scenario.lastScanTime,
     works: scenario.works,
+    tagPrefixes: DEFAULT_TAG_PREFIXES.map((def) => ({ ...def })),
     smartFolders: scenario.smartFolders,
     presets: scenario.presets,
     nextPresetId: maxPresetId + 1,
@@ -265,9 +272,43 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
       return JSON.stringify({ version: 1, works: state.works }, null, 2);
     },
 
-    // ── 分類軸・スマートフォルダー・プリセット ────────────────
-    async getAxisFacets(axis: FacetAxis): Promise<AxisFacetItem[]> {
+    // ── 分類軸・タグ prefix 定義・スマートフォルダー・プリセット ──
+    async getAxisFacets(axis: string): Promise<AxisFacetItem[]> {
       return buildAxisFacets(axis, state.works);
+    },
+
+    async listTagPrefixes(): Promise<TagPrefix[]> {
+      return state.tagPrefixes;
+    },
+
+    async createTagPrefix(input: TagPrefixCreate): Promise<TagPrefix | null> {
+      if (state.tagPrefixes.some((p) => p.prefix === input.prefix)) return null;
+      const created: TagPrefix = { ...input };
+      state.tagPrefixes.push(created);
+      return created;
+    },
+
+    async updateTagPrefix(prefix: string, patch: TagPrefixUpdate): Promise<TagPrefix | null> {
+      const def = state.tagPrefixes.find((p) => p.prefix === prefix);
+      if (!def) return null;
+      if (patch.label !== undefined) def.label = patch.label;
+      if (patch.color !== undefined) def.color = patch.color;
+      if (patch.showAsAxis !== undefined) def.showAsAxis = patch.showAsAxis;
+      if (patch.protected !== undefined) def.protected = patch.protected;
+      return def;
+    },
+
+    async deleteTagPrefix(prefix: string): Promise<boolean> {
+      const before = state.tagPrefixes.length;
+      state.tagPrefixes = state.tagPrefixes.filter((p) => p.prefix !== prefix);
+      return state.tagPrefixes.length < before;
+    },
+
+    async listTagPrefixCandidates(): Promise<TagPrefixCandidate[]> {
+      return buildTagPrefixCandidates(
+        state.works,
+        state.tagPrefixes.map((p) => p.prefix),
+      );
     },
 
     async listSmartFolders(): Promise<SmartFolder[]> {

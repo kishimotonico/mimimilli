@@ -30,3 +30,8 @@ export function notFound(message: string): never {
 export function invalidRequest(message: string): never {
   throw apiError("invalid_request", message);
 }
+
+/** 409 conflict を投げる */
+export function conflict(message: string): never {
+  throw apiError("conflict", message);
+}

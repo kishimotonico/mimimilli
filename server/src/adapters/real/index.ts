@@ -3,11 +3,11 @@
 // core/ の pure 関数で処理する（規模が増えたら SQL 化する余地をこの境界の内側に残す）。
 import { existsSync, realpathSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
+import { DEFAULT_TAG_PREFIXES } from "@mimimilli/shared";
 import type {
   AxisFacetItem,
   DlsiteApplyBody,
   DlsiteWorkInfo,
-  FacetAxis,
   FileEntry,
   FsListing,
   ResumeBody,
@@ -20,6 +20,10 @@ import type {
   SmartFolder,
   SmartFolderCreate,
   SmartFolderUpdate,
+  TagPrefix,
+  TagPrefixCandidate,
+  TagPrefixCreate,
+  TagPrefixUpdate,
   Work,
   WorkPatch,
   WorksPage,
@@ -33,6 +37,7 @@ import {
   type MediaLocation,
 } from "../../adapter.ts";
 import { buildAxisFacets } from "../../core/axisFacets.ts";
+import { buildTagPrefixCandidates } from "../../core/tagPrefixCandidates.ts";
 import { evalSmartFolder } from "../../core/smartFolder.ts";
 import { applyWorksQuery } from "../../core/worksQuery.ts";
 import { openDb, type Db } from "./db.ts";
@@ -47,6 +52,7 @@ import { WorkRepo } from "./workRepo.ts";
 
 const KEY_ROOT_FOLDER = "root_folder";
 const KEY_LAST_SCAN_TIME = "last_scan_time";
+const KEY_TAG_PREFIXES_SEEDED = "tag_prefixes_seeded";
 const DEFAULT_THUMBNAIL_CACHE_DIR = "data/cache/thumbnails";
 
 export interface RealAdapterOptions {
@@ -60,6 +66,15 @@ export function createRealAdapter(options: RealAdapterOptions): DataAdapter {
   const repo = new WorkRepo(db);
   const scanner = new Scanner(db, repo);
   const thumbnailCacheDir = options.thumbnailCacheDir ?? DEFAULT_THUMBNAIL_CACHE_DIR;
+
+  // prefix 定義の初回 seed（ADR-0005）。seed 済みフラグで管理し、
+  // ユーザーが全定義を削除しても再投入しない
+  if (repo.getSetting(KEY_TAG_PREFIXES_SEEDED) === null) {
+    for (const def of DEFAULT_TAG_PREFIXES) {
+      repo.createTagPrefix(def);
+    }
+    repo.setSetting(KEY_TAG_PREFIXES_SEEDED, "1");
+  }
 
   function requireRoot(): string {
     const root = repo.getSetting(KEY_ROOT_FOLDER);
@@ -145,9 +160,28 @@ export function createRealAdapter(options: RealAdapterOptions): DataAdapter {
       return JSON.stringify({ version: 1, works: repo.listSummaries() }, null, 2);
     },
 
-    // ── 分類軸・スマートフォルダー・プリセット ─────────────────
-    async getAxisFacets(axis: FacetAxis): Promise<AxisFacetItem[]> {
+    // ── 分類軸・タグ prefix 定義・スマートフォルダー・プリセット ──
+    async getAxisFacets(axis: string): Promise<AxisFacetItem[]> {
       return buildAxisFacets(axis, repo.listSummaries());
+    },
+
+    async listTagPrefixes(): Promise<TagPrefix[]> {
+      return repo.listTagPrefixes();
+    },
+    async createTagPrefix(input: TagPrefixCreate): Promise<TagPrefix | null> {
+      return repo.createTagPrefix(input);
+    },
+    async updateTagPrefix(prefix: string, patch: TagPrefixUpdate): Promise<TagPrefix | null> {
+      return repo.updateTagPrefix(prefix, patch);
+    },
+    async deleteTagPrefix(prefix: string): Promise<boolean> {
+      return repo.deleteTagPrefix(prefix);
+    },
+    async listTagPrefixCandidates(): Promise<TagPrefixCandidate[]> {
+      return buildTagPrefixCandidates(
+        repo.listSummaries(),
+        repo.listTagPrefixes().map((p) => p.prefix),
+      );
     },
 
     async listSmartFolders(): Promise<SmartFolder[]> {

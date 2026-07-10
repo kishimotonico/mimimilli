@@ -1,7 +1,7 @@
 // エンドポイント横断の契約: 作品検索クエリ、ページングエンベロープ、部分更新、エラー形式。
 import { z } from "zod";
-import { facetAxisSchema, sortIdSchema, viewIdSchema } from "./library.ts";
-import { workSummarySchema } from "./work.ts";
+import { facetAxisIdSchema, sortIdSchema, viewIdSchema } from "./library.ts";
+import { normalizeTags, workSummarySchema } from "./work.ts";
 
 // ── 作品検索（GET /api/works）────────────────────────────────
 
@@ -13,7 +13,7 @@ export const worksQuerySchema = z.object({
     .default("")
     .transform((s) => s.split(",").filter(Boolean)),
   tagOp: z.enum(["AND", "OR"]).default("AND"),
-  axis: facetAxisSchema.optional(),
+  axis: facetAxisIdSchema.optional(),
   axisValue: z.string().optional(),
   view: viewIdSchema.optional(),
   sort: sortIdSchema.default("added-desc"),
@@ -34,7 +34,8 @@ export type WorksPage = z.infer<typeof worksPageSchema>;
 
 export const workPatchSchema = z.object({
   title: z.string().min(1).optional(),
-  tags: z.array(z.string()).optional(),
+  /** タグは契約の入口で正規形へ寄せる（ADR-0005 決定5。prefix 小文字化・trim・重複排除） */
+  tags: z.array(z.string()).transform(normalizeTags).optional(),
   bookmarked: z.boolean().optional(),
 });
 export type WorkPatch = z.infer<typeof workPatchSchema>;

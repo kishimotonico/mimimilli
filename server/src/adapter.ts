@@ -6,7 +6,6 @@ import type {
   AxisFacetItem,
   DlsiteApplyBody,
   DlsiteWorkInfo,
-  FacetAxis,
   FileEntry,
   FsListing,
   ResumeBody,
@@ -19,6 +18,10 @@ import type {
   SmartFolder,
   SmartFolderCreate,
   SmartFolderUpdate,
+  TagPrefix,
+  TagPrefixCandidate,
+  TagPrefixCreate,
+  TagPrefixUpdate,
   Work,
   WorkPatch,
   WorksPage,
@@ -62,8 +65,15 @@ export interface DataAdapter {
   listTags(): Promise<string[]>;
   exportLibrary(): Promise<string>;
 
-  // 分類軸・スマートフォルダー・プリセット
-  getAxisFacets(axis: FacetAxis): Promise<AxisFacetItem[]>;
+  // 分類軸・タグ prefix 定義・スマートフォルダー・プリセット
+  /** axis は "tag" / "year" / 任意の prefix 文字列（正規形・小文字）（ADR-0005） */
+  getAxisFacets(axis: string): Promise<AxisFacetItem[]>;
+  listTagPrefixes(): Promise<TagPrefix[]>;
+  /** 既存の prefix と重複する場合は null（ルートが 409 を返す） */
+  createTagPrefix(input: TagPrefixCreate): Promise<TagPrefix | null>;
+  updateTagPrefix(prefix: string, patch: TagPrefixUpdate): Promise<TagPrefix | null>;
+  deleteTagPrefix(prefix: string): Promise<boolean>;
+  listTagPrefixCandidates(): Promise<TagPrefixCandidate[]>;
   listSmartFolders(): Promise<SmartFolder[]>;
   createSmartFolder(input: SmartFolderCreate): Promise<SmartFolder>;
   updateSmartFolder(id: string, input: SmartFolderUpdate): Promise<SmartFolder | null>;

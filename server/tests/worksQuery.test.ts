@@ -94,9 +94,35 @@ test("tags: OR はいずれかのタグにマッチする作品を返す", () =>
   assert.deepEqual(result.items.map((w) => w.id).sort(), ["RJ002", "RJ003"]);
 });
 
-test("axis+axisValue: AXIS_TAG_PREFIX を使った完全一致", () => {
+test("tags: 完全一致であり部分文字列ではヒットしない（ADR-0005 決定6）", () => {
+  const result = applyWorksQuery(WORKS, baseQuery({ tags: ["cv/なずな"], tagOp: "AND" }));
+  assert.equal(result.items.length, 0);
+});
+
+test("tags: prefix の大文字小文字は無視して一致する", () => {
+  const result = applyWorksQuery(WORKS, baseQuery({ tags: ["CV/水瀬なずな"], tagOp: "AND" }));
+  assert.deepEqual(result.items.map((w) => w.id).sort(), ["RJ001", "RJ003"]);
+});
+
+test("axis+axisValue: prefix 軸はタグの完全一致でドリルする", () => {
   const result = applyWorksQuery(WORKS, baseQuery({ axis: "cv", axisValue: "水瀬なずな" }));
   assert.deepEqual(result.items.map((w) => w.id).sort(), ["RJ001", "RJ003"]);
+});
+
+test("axis+axisValue: 値の部分一致ではドリルにヒットしない", () => {
+  const result = applyWorksQuery(WORKS, baseQuery({ axis: "cv", axisValue: "水瀬" }));
+  assert.equal(result.items.length, 0);
+});
+
+test("axis+axisValue: year 軸は addedAt の年で絞り込む（タグ照合ではない）", () => {
+  const year = RECENT.slice(0, 4);
+  const result = applyWorksQuery(WORKS, baseQuery({ axis: "year", axisValue: year }));
+  assert.ok(result.items.length > 0);
+  for (const work of result.items) {
+    assert.equal(work.addedAt.slice(0, 4), year);
+  }
+  const none = applyWorksQuery(WORKS, baseQuery({ axis: "year", axisValue: "1999" }));
+  assert.equal(none.items.length, 0);
 });
 
 test("view: fav はブックマーク済みのみ", () => {

@@ -39,6 +39,16 @@ export const workTags = sqliteTable(
   (t) => [primaryKey({ columns: [t.workId, t.tagId] }), index("idx_work_tags_tag").on(t.tagId)],
 );
 
+/** タグ prefix 定義（ADR-0005）。id は表示順（登録順）の安定化用で、APIのキーは prefix */
+export const tagPrefixes = sqliteTable("tag_prefixes", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  prefix: text("prefix").notNull().unique(),
+  label: text("label").notNull(),
+  color: text("color"),
+  showAsAxis: integer("show_as_axis", { mode: "boolean" }).notNull().default(true),
+  protected: integer("protected", { mode: "boolean" }).notNull().default(false),
+});
+
 export const appSettings = sqliteTable("app_settings", {
   key: text("key").primaryKey(),
   value: text("value"),

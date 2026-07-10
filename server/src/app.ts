@@ -12,6 +12,7 @@ import { presetsRoute } from "./routes/presets.ts";
 import { scanRoute } from "./routes/scan.ts";
 import { settingsRoute } from "./routes/settings.ts";
 import { smartFoldersRoute } from "./routes/smartFolders.ts";
+import { tagPrefixesRoute } from "./routes/tagPrefixes.ts";
 import { worksRoute } from "./routes/works.ts";
 
 export function createApp(adapter: DataAdapter): Hono {
@@ -22,6 +23,7 @@ export function createApp(adapter: DataAdapter): Hono {
   api.route("/", scanRoute(adapter));
   api.route("/", worksRoute(adapter));
   api.route("/", axesRoute(adapter));
+  api.route("/", tagPrefixesRoute(adapter));
   api.route("/", smartFoldersRoute(adapter));
   api.route("/", presetsRoute(adapter));
   api.route("/", fsRoute(adapter));

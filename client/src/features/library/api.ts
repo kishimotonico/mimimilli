@@ -5,7 +5,7 @@
 import { get, post, put, del } from "../../shared/api/http";
 import type {
   AxisFacetItem,
-  FacetAxis,
+  FacetAxisId,
   SmartFolder,
   SmartFolderCreate,
   SmartFolderUpdate,
@@ -21,7 +21,7 @@ export interface WorksQueryParams {
   q?: string;
   tags?: string[];
   tagOp?: "AND" | "OR";
-  axis?: FacetAxis;
+  axis?: FacetAxisId;
   axisValue?: string;
   view?: ViewId;
   sort?: SortId;
@@ -46,7 +46,7 @@ export async function searchWorks(params: WorksQueryParams): Promise<WorksPage> 
 
 // ── 分類軸ファセット ───────────────────────────────────────────
 
-export async function getAxisFacets(axis: FacetAxis): Promise<AxisFacetItem[]> {
+export async function getAxisFacets(axis: FacetAxisId): Promise<AxisFacetItem[]> {
   return get<AxisFacetItem[]>(`/axes/${encodeURIComponent(axis)}`);
 }
 

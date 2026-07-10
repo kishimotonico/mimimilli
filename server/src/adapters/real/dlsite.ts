@@ -5,6 +5,7 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { load } from "cheerio";
+import { normalizeTags } from "@mimimilli/shared";
 import type { DlsiteWorkInfo } from "@mimimilli/shared";
 
 const FETCH_TIMEOUT_MS = 15_000;
@@ -71,18 +72,16 @@ export async function fetchDlsiteInfo(rjCode: string): Promise<DlsiteWorkInfo> {
 }
 
 /**
- * 取得情報を既存タグへマージする（要件 v4 §4.4 の prefix 変換、重複は追加しない）。
+ * 取得情報を既存タグへマージする（要件 v4 §4.4 の prefix 変換）。
  * circle → `サークル/`, cvs → `cv/`, genreTags → `genre/`
+ * 結果は正規形（ADR-0005 決定5）で返し、正規化後の重複は追加しない
  */
 export function mergeDlsiteTags(existing: string[], info: DlsiteWorkInfo): string[] {
   const merged = [...existing];
-  const push = (tag: string) => {
-    if (!merged.includes(tag)) merged.push(tag);
-  };
-  if (info.circle) push(`サークル/${info.circle}`);
-  for (const cv of info.cvs) push(`cv/${cv}`);
-  for (const genre of info.genreTags) push(`genre/${genre}`);
-  return merged;
+  if (info.circle) merged.push(`サークル/${info.circle}`);
+  for (const cv of info.cvs) merged.push(`cv/${cv}`);
+  for (const genre of info.genreTags) merged.push(`genre/${genre}`);
+  return normalizeTags(merged);
 }
 
 /** カバー画像をダウンロードして作品フォルダーへ保存し、ファイル名を返す */

@@ -41,6 +41,15 @@ CREATE TABLE IF NOT EXISTS work_tags (
 );
 CREATE INDEX IF NOT EXISTS idx_work_tags_tag ON work_tags(tag_id);
 
+CREATE TABLE IF NOT EXISTS tag_prefixes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  prefix TEXT NOT NULL UNIQUE,
+  label TEXT NOT NULL,
+  color TEXT,
+  show_as_axis INTEGER NOT NULL DEFAULT 1,
+  protected INTEGER NOT NULL DEFAULT 0
+);
+
 CREATE TABLE IF NOT EXISTS app_settings (
   key TEXT PRIMARY KEY,
   value TEXT

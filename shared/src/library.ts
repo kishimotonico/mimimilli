@@ -22,17 +22,17 @@ export type SortId = z.infer<typeof sortIdSchema>;
 export const viewIdSchema = z.enum(["all", "recent", "added", "fav", "unplayed", "missing"]);
 export type ViewId = z.infer<typeof viewIdSchema>;
 
-/** 分類軸（ファセット集計の対象） */
-export const facetAxisSchema = z.enum(["circle", "cv", "series", "cat", "tag", "year"]);
-export type FacetAxis = z.infer<typeof facetAxisSchema>;
-
-/** 分類軸 → Annotated タグのプレフィックス（前方一致用。tag / year は対象外） */
-export const AXIS_TAG_PREFIX: Partial<Record<FacetAxis, string>> = {
-  circle: "サークル/",
-  cv: "cv/",
-  series: "シリーズ/",
-  cat: "カテゴリ/",
-};
+/** 分類軸の ID（ADR-0005）。enum ではなく文字列:
+ *  - "tag": フラットタグ軸（組み込み）
+ *  - "year": 追加日の年（組み込み。addedAt 由来でタグではない）
+ *  - それ以外: 登録済み prefix そのもの（例: "cv", "サークル"）。正規形（小文字）で扱う */
+export const facetAxisIdSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .transform((s) => s.toLowerCase())
+  .refine((s) => !s.includes("/"), { message: "軸IDにスラッシュは使えません" });
+export type FacetAxisId = string;
 
 export const axisFacetItemSchema = z.object({
   value: z.string(),
