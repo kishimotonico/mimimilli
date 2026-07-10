@@ -1,7 +1,7 @@
 # 引き継ぎドキュメント
 
 mimimilli の現状と進行中の作業を、後続のエージェント／セッションが把握するための資料。
-最終更新: 2026-07-08。
+最終更新: 2026-07-10。
 
 ## このアプリは何か
 
@@ -67,7 +67,8 @@ MIMIMILLI_ADAPTER=fixture PORT=18099 node server/src/index.ts
 | メソッド   | パス                                                                  | 備考                                                                               |
 | ---------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | GET / PUT  | `/settings`                                                           |                                                                                    |
-| POST       | `/scan`                                                               |                                                                                    |
+| POST       | `/scan`                                                               | 同期実行（完了までブロックし ScanResult を返す）。実行中の二重POSTは409           |
+| GET        | `/scan/events`                                                        | スキャン進捗のSSE（progress/complete/error。再接続挙動は routes/scan.ts 冒頭）    |
 | GET        | `/works`                                                              | **ページングエンベロープ `{ items, total }`**（page/limit省略時は全件）            |
 | GET        | `/works/:id`                                                          | 完全な Work（playlists・resumePosition・resumeTrackIndex 含む）                    |
 | PATCH      | `/works/:id`                                                          | `{ title?, tags?, bookmarked? }` を統合（旧 PUT tags/title・POST bookmark を廃止） |
@@ -82,7 +83,7 @@ MIMIMILLI_ADAPTER=fixture PORT=18099 node server/src/index.ts
 | GET        | `/smart-folders/:id/works`                                            | スマートフォルダー評価結果                                                         |
 | GET/POST   | `/presets`、DELETE `/presets/:id`                                     | 検索プリセット                                                                     |
 | GET        | `/fs`                                                                 | 物理FSブラウズ（Filesモード）                                                      |
-| GET        | `/media/cover/:id`、`/media/audio/:id/:path`、`/media/file/:id/:path` | audio は Range(206) 対応                                                           |
+| GET        | `/media/cover/:id`、`/media/audio/:id/:path`、`/media/file/:id/:path` | audio は Range(206) 対応。cover は `?w=128\|256\|512` でサムネイル（realはwebp化+ディスクキャッシュ、fixtureのSVGは原寸） |
 | POST       | `/dlsite/:id/fetch`、`/dlsite/:id/apply`                              |                                                                                    |
 
 メディアURLは client の `entities/work/api.ts` の `getCoverImageUrl`/`getAudioUrl`/`getFileUrl` が組み立てる（`<img src>`/`<audio src>` に直接使える）。
@@ -113,7 +114,7 @@ MIMIMILLI_ADAPTER=fixture PORT=18099 node server/src/index.ts
 - `model/audioEngine.ts`: 低レベル。`new Audio()`（DOM外）。load/play/pause/seek/seekRelative/setVolume/setPlaybackRate/setChannelSwap、timeupdate/durationchange/ended コールバック
 - `model/usePlayer.ts`: エンジンと atom の橋渡し。公開アクション:
   - 配線済み: `play` / `togglePlay` / `seek` / `seekRelative` / `setVolume` / `setLoop` / `nextTrack` / `prevTrack` / `setTrackIndex` / `setShowFullPlayer` / `playWithResume` / `setPlaybackRate`（ポップアップの倍速メニュー）
-  - **実装済みだが UI 未配線**: `setChannelSwap`（L⇄R入替）、`setABPoint`/`clearABRepeat`（A-Bリピート）。state にも `channelSwap`/`abRepeat` がある
+  - `setChannelSwap`（L⇄R入替）、`setABPoint`/`clearABRepeat`（A-Bリピート）: 全画面プレイヤーに配線済み。A-B は a < b のときだけ成立（B→A の順で設定すると自動で入れ替え）
 - `ui/PlayerDock.tsx`: バー⇄ポップアップの外枠・層切替
 - `ui/BarContent.tsx`（画面下バー）: カバー / トラック名 / 再生切替 + バー下辺に貼り付くシークバー（時間表示なし）。バークリックでポップアップへ
 - `ui/PopupContent.tsx`（右下ポップアップ）: 大カバー / シーク / 前・次・ループ / ±10秒 / 倍速 / 音量 / 再生中の作品へジャンプ / 全画面展開
