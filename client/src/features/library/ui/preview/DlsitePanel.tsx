@@ -4,6 +4,7 @@ import type { DlsiteWorkInfo, Work } from "@mimimilli/shared";
 import { applyDlsiteInfo, fetchDlsiteInfo, updateDlsiteState } from "../../../../entities/work/api";
 import { ApiRequestError } from "../../../../shared/api/http";
 import { LIBRARY_KEYS } from "../../model/queryKeys";
+import { getDlsiteInvalidationKeys } from "../../model/dlsiteInvalidation";
 import {
   buildDlsiteApplyBody,
   dlsiteInfoTags,
@@ -40,12 +41,11 @@ export function DlsitePanel({ work }: { work: Work }) {
 
   const refresh = async (updated?: Work) => {
     if (updated) queryClient.setQueryData(LIBRARY_KEYS.workDetail(work.id), updated);
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: LIBRARY_KEYS.allWorks() }),
-      queryClient.invalidateQueries({ queryKey: LIBRARY_KEYS.allFacets() }),
-      queryClient.invalidateQueries({ queryKey: LIBRARY_KEYS.tags() }),
-      queryClient.invalidateQueries({ queryKey: LIBRARY_KEYS.allSmartFolderWorks() }),
-    ]);
+    await Promise.all(
+      getDlsiteInvalidationKeys(updated ? undefined : work.id).map((queryKey) =>
+        queryClient.invalidateQueries({ queryKey }),
+      ),
+    );
   };
 
   const saveCode = async () => {

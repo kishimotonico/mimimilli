@@ -4,7 +4,7 @@ import { dlsiteBulkProgressEventSchema } from "@mimimilli/shared";
 import type { DlsiteBulkResult } from "@mimimilli/shared";
 import { startDlsiteBulk } from "../../../entities/work/api";
 import { API_BASE } from "../../../shared/api/http";
-import { LIBRARY_KEYS } from "../../library/model/queryKeys";
+import { getDlsiteInvalidationKeys } from "../../library/model/dlsiteInvalidation";
 
 export function useDlsiteBulk() {
   const queryClient = useQueryClient();
@@ -32,12 +32,11 @@ export function useDlsiteBulk() {
         setResult(parsed.data.result);
         setActive(false);
         source.close();
-        void Promise.all([
-          queryClient.invalidateQueries({ queryKey: LIBRARY_KEYS.allWorks() }),
-          queryClient.invalidateQueries({ queryKey: LIBRARY_KEYS.allFacets() }),
-          queryClient.invalidateQueries({ queryKey: LIBRARY_KEYS.tags() }),
-          queryClient.invalidateQueries({ queryKey: LIBRARY_KEYS.allSmartFolderWorks() }),
-        ]);
+        void Promise.all(
+          getDlsiteInvalidationKeys().map((queryKey) =>
+            queryClient.invalidateQueries({ queryKey }),
+          ),
+        );
       } else {
         setError(parsed.data.message);
         setActive(false);
