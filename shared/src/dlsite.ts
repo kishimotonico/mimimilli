@@ -44,7 +44,21 @@ export type DlsiteFetchResult = z.infer<typeof dlsiteFetchResultSchema>;
 export const dlsiteApplyBodySchema = z.object({
   info: dlsiteWorkInfoSchema,
   applyTitle: z.boolean(),
-  applyTags: z.boolean(),
+  applyTags: z.array(z.string()),
   applyCover: z.boolean(),
 });
 export type DlsiteApplyBody = z.infer<typeof dlsiteApplyBodySchema>;
+
+export const dlsiteStatePatchSchema = z
+  .object({
+    rjCode: z
+      .string()
+      .trim()
+      .regex(/^RJ\d{6,8}$/i, "RJコードはRJに続く6〜8桁で入力してください")
+      .transform((value) => value.toUpperCase())
+      .nullable()
+      .optional(),
+    skipped: z.boolean().optional(),
+  })
+  .refine((patch) => patch.rjCode !== undefined || patch.skipped !== undefined);
+export type DlsiteStatePatch = z.infer<typeof dlsiteStatePatchSchema>;

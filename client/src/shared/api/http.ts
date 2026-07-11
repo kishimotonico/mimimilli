@@ -8,11 +8,21 @@ import { apiErrorSchema } from "@mimimilli/shared";
 
 export const API_BASE = "/api";
 
+export class ApiRequestError extends Error {
+  constructor(
+    readonly status: number,
+    readonly code: string,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
 async function throwApiError(method: string, path: string, res: Response): Promise<never> {
   const body = await res.json().catch(() => null);
   const parsed = apiErrorSchema.safeParse(body);
   if (parsed.success) {
-    throw new Error(`API error ${res.status} ${method} ${path}: ${parsed.data.error.message}`);
+    throw new ApiRequestError(res.status, parsed.data.error.code, parsed.data.error.message);
   }
   throw new Error(`API error ${res.status}: ${method} ${path}`);
 }

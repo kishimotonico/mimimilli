@@ -5,6 +5,7 @@ import type {
   AxisFacetItem,
   DlsiteApplyBody,
   DlsiteFetchResult,
+  DlsiteStatePatch,
   FileEntry,
   FsListing,
   ResumeBody,
@@ -463,15 +464,30 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
       const work = state.works.find((w) => w.id === workId);
       if (!work) return false;
       if (body.applyTitle) work.title = body.info.title;
-      if (body.applyTags) {
-        const circleTag = body.info.circle ? [`サークル/${body.info.circle}`] : [];
-        const cvTags = body.info.cvs.map((cv) => `cv/${cv}`);
-        work.tags = [...new Set([...circleTag, ...cvTags, ...body.info.genreTags])];
-      }
+      const applyTags = normalizeTags(body.applyTags);
+      work.tags = normalizeTags([...work.tags, ...applyTags]);
       if (body.applyCover && body.info.coverUrl) {
         work.coverImage = body.info.coverUrl;
       }
+      work.dlsite = {
+        rjCode: body.info.rjCode,
+        status: "applied",
+        lastAttemptAt: new Date().toISOString(),
+        error: null,
+        appliedTags: normalizeTags([...work.dlsite.appliedTags, ...applyTags]),
+      };
       return true;
+    },
+
+    async updateDlsiteState(workId: string, patch: DlsiteStatePatch): Promise<Work | null> {
+      const work = state.works.find((candidate) => candidate.id === workId);
+      if (!work) return null;
+      if (patch.rjCode !== undefined) work.dlsite.rjCode = patch.rjCode;
+      if (patch.skipped !== undefined) {
+        work.dlsite.status = patch.skipped ? "skipped" : "none";
+        work.dlsite.error = null;
+      }
+      return buildFullWork(work, state.resumes);
     },
   };
 }

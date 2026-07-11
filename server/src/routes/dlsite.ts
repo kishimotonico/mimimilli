@@ -1,6 +1,6 @@
 // POST /dlsite/:id/fetch, POST /dlsite/:id/apply
 import { Hono } from "hono";
-import { dlsiteApplyBodySchema } from "@mimimilli/shared";
+import { dlsiteApplyBodySchema, dlsiteStatePatchSchema } from "@mimimilli/shared";
 import type { DataAdapter } from "../adapter.ts";
 import { apiError, invalidRequest, notFound } from "../lib/httpError.ts";
 
@@ -22,6 +22,15 @@ export function dlsiteRoute(adapter: DataAdapter): Hono {
     const ok = await adapter.dlsiteApply(c.req.param("id"), parsed.data);
     if (!ok) notFound(`作品が見つかりません: ${c.req.param("id")}`);
     return c.body(null, 204);
+  });
+
+  app.patch("/dlsite/:id", async (c) => {
+    const body = await c.req.json().catch(() => null);
+    const parsed = dlsiteStatePatchSchema.safeParse(body);
+    if (!parsed.success) invalidRequest(parsed.error.issues[0]?.message ?? "DLsite状態が不正です");
+    const work = await adapter.updateDlsiteState(c.req.param("id"), parsed.data);
+    if (!work) notFound(`作品が見つかりません: ${c.req.param("id")}`);
+    return c.json(work);
   });
 
   return app;

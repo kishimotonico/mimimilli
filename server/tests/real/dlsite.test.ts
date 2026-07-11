@@ -112,7 +112,7 @@ test("dlsiteApply: タグマージとメタ書き戻し（カバー DL なし）
   const ok = await adapter.dlsiteApply(lib.existingWorkId, {
     info,
     applyTitle: true,
-    applyTags: true,
+    applyTags: ["サークル/夜想曲", "cv/水瀬なずな", "genre/耳かき", "genre/睡眠"],
     applyCover: false,
   });
   assert.equal(ok, true);
@@ -133,6 +133,32 @@ test("dlsiteApply: タグマージとメタ書き戻し（カバー DL なし）
   assert.deepEqual(meta.tags, work!.tags);
   assert.deepEqual(work?.urls, [{ label: "DLsite", url: info.url }]);
   assert.deepEqual(meta.urls, work?.urls);
+  assert.equal(work?.dlsite.status, "applied");
+  assert.deepEqual(work?.dlsite.appliedTags, [
+    "サークル/夜想曲",
+    "cv/水瀬なずな",
+    "genre/耳かき",
+    "genre/睡眠",
+  ]);
+});
+
+test("updateDlsiteState: RJコード修正とskipped切替をメタへ保存する", async () => {
+  const lib = makeSampleLibrary("data/test-dlsite-state");
+  const adapter = createRealAdapter({ dbPath: ":memory:" });
+  await adapter.updateSettings({ rootFolder: lib.root });
+  await adapter.scan();
+
+  const skipped = await adapter.updateDlsiteState(lib.existingWorkId, {
+    rjCode: "RJ1234567",
+    skipped: true,
+  });
+  assert.equal(skipped?.dlsite.rjCode, "RJ1234567");
+  assert.equal(skipped?.dlsite.status, "skipped");
+  const meta = JSON.parse(readFileSync(join(skipped!.physicalPath, ".meta.json"), "utf-8"));
+  assert.deepEqual(meta.dlsite, skipped?.dlsite);
+
+  const enabled = await adapter.updateDlsiteState(lib.existingWorkId, { skipped: false });
+  assert.equal(enabled?.dlsite.status, "none");
 });
 
 test("dlsiteFetch: 存在しない作品はnot_found", async () => {

@@ -10,6 +10,8 @@ import type {
   WorkPatch,
   FileEntry,
   DlsiteWorkInfo,
+  DlsiteApplyBody,
+  DlsiteStatePatch,
 } from "@mimimilli/shared";
 
 export async function getWork(id: string): Promise<Work | null> {
@@ -82,17 +84,10 @@ export async function fetchDlsiteInfo(workId: string): Promise<DlsiteWorkInfo> {
   return post<DlsiteWorkInfo>(`/dlsite/${encodeURIComponent(workId)}/fetch`);
 }
 
-export async function applyDlsiteInfo(
-  workId: string,
-  info: DlsiteWorkInfo,
-  applyTitle: boolean,
-  applyTags: boolean,
-  applyCover: boolean,
-): Promise<void> {
-  await post(`/dlsite/${encodeURIComponent(workId)}/apply`, {
-    info,
-    applyTitle,
-    applyTags,
-    applyCover,
-  });
+export async function applyDlsiteInfo(workId: string, body: DlsiteApplyBody): Promise<void> {
+  await post(`/dlsite/${encodeURIComponent(workId)}/apply`, body);
+}
+
+export async function updateDlsiteState(workId: string, body: DlsiteStatePatch): Promise<Work> {
+  return patch<Work>(`/dlsite/${encodeURIComponent(workId)}`, body);
 }

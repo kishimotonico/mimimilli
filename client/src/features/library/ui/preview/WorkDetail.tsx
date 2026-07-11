@@ -8,6 +8,7 @@ import { WorkMetadataActions } from "./WorkMetadataActions";
 import { WorkStatusWarnings } from "./WorkStatusWarnings";
 import { WorkTagEditor } from "./WorkTagEditor";
 import { WorkTrackList } from "./WorkTrackList";
+import { DlsitePanel } from "./DlsitePanel";
 
 interface WorkDetailProps {
   work: Work;
@@ -125,6 +126,7 @@ export function WorkDetail({
       </div>
 
       <WorkStatusWarnings work={work} />
+      <DlsitePanel work={work} />
 
       <WorkTrackList
         tracks={tracks}

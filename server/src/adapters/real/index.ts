@@ -3,11 +3,12 @@
 // core/ の pure 関数で処理する（規模が増えたら SQL 化する余地をこの境界の内側に残す）。
 import { existsSync, realpathSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
-import { DEFAULT_TAG_PREFIXES } from "@mimimilli/shared";
+import { DEFAULT_TAG_PREFIXES, normalizeTags } from "@mimimilli/shared";
 import type {
   AxisFacetItem,
   DlsiteApplyBody,
   DlsiteFetchResult,
+  DlsiteStatePatch,
   FileEntry,
   FsListing,
   ResumeBody,
@@ -41,7 +42,7 @@ import { buildTagPrefixCandidates } from "../../core/tagPrefixCandidates.ts";
 import { evalSmartFolder } from "../../core/smartFolder.ts";
 import { applyWorksQuery } from "../../core/worksQuery.ts";
 import { openDb, type Db } from "./db.ts";
-import { detectRjCode, downloadCover, fetchDlsiteInfo, mergeDlsiteTags } from "./dlsite.ts";
+import { detectRjCode, downloadCover, fetchDlsiteInfo } from "./dlsite.ts";
 import { browseFs } from "./fsBrowse.ts";
 import { buildFileTree } from "./fileTree.ts";
 import { patchMetaFile } from "./meta.ts";
@@ -260,7 +261,8 @@ export function createRealAdapter(options: RealAdapterOptions): DataAdapter {
       const patch: { title?: string; tags?: string[]; coverImage?: string; urls?: Work["urls"] } =
         {};
       if (body.applyTitle && body.info.title) patch.title = body.info.title;
-      if (body.applyTags) patch.tags = mergeDlsiteTags(work.tags, body.info);
+      const applyTags = normalizeTags(body.applyTags);
+      if (applyTags.length > 0) patch.tags = normalizeTags([...work.tags, ...applyTags]);
       if (body.info.url && !work.urls.some((entry) => entry.url.includes("dlsite.com"))) {
         patch.urls = [...work.urls, { label: "DLsite", url: body.info.url }];
       }
@@ -271,13 +273,39 @@ export function createRealAdapter(options: RealAdapterOptions): DataAdapter {
       return db.transaction(() => {
         const updated = repo.patchWork(workId, patch);
         if (!updated) return false;
+        const dlsite = {
+          rjCode: body.info.rjCode,
+          status: "applied" as const,
+          lastAttemptAt: new Date().toISOString(),
+          error: null,
+          appliedTags: normalizeTags([...work.dlsite.appliedTags, ...applyTags]),
+        };
+        repo.setDlsiteState(workId, dlsite);
         patchMetaFile(findMetaPath(updated), {
           title: patch.title,
           tags: patch.tags,
           coverImage: patch.coverImage,
           urls: patch.urls,
+          dlsite,
         });
         return true;
+      });
+    },
+
+    async updateDlsiteState(workId: string, patch: DlsiteStatePatch): Promise<Work | null> {
+      const work = repo.getWork(workId);
+      if (!work) return null;
+      const dlsite = {
+        ...work.dlsite,
+        ...(patch.rjCode !== undefined ? { rjCode: patch.rjCode } : {}),
+        ...(patch.skipped !== undefined
+          ? { status: patch.skipped ? ("skipped" as const) : ("none" as const), error: null }
+          : {}),
+      };
+      return db.transaction(() => {
+        repo.setDlsiteState(workId, dlsite);
+        patchMetaFile(findMetaPath(work), { dlsite });
+        return repo.getWork(workId);
       });
     },
   };
