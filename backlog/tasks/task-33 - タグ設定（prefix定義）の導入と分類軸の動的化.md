@@ -1,10 +1,10 @@
 ---
 id: TASK-33
 title: タグ設定（prefix定義）の導入と分類軸の動的化
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-10 16:07'
-updated_date: '2026-07-10 19:37'
+updated_date: '2026-07-11 15:58'
 labels: []
 dependencies: []
 priority: high
@@ -31,6 +31,12 @@ priority: high
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 サブタスク（契約・コア / サーバー / クライアント）がすべて完了している
-- [ ] #2 pnpm check と pnpm test が通る
+- [x] #1 サブタスク（契約・コア / サーバー / クライアント）がすべて完了している
+- [x] #2 pnpm check と pnpm test が通る
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+サブタスク33.1〜33.3完了。ADR-0005は承認（実装済み）へ更新。requirements-v4 §4.5とHANDOFFタグ節をCodexで更新
+<!-- SECTION:FINAL_SUMMARY:END -->

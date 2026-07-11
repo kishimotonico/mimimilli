@@ -1,10 +1,10 @@
 ---
 id: TASK-33.3
 title: 'クライアント: 軸レール動的化・タグ編集解禁・タグ設定UI'
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-07-10 19:38'
-updated_date: '2026-07-11 10:47'
+updated_date: '2026-07-11 15:58'
 labels: []
 dependencies:
   - TASK-33.2
@@ -28,10 +28,16 @@ ordinal: 35000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 登録prefixの軸が軸レールに現れ、ドリル・URL直叩き・戻る進むが動く
-- [ ] #2 cv/サークルタグをWorkDetailから削除でき、削除時に確認ダイアログが出る
-- [ ] #3 構造化タグ（例: cv/新人）を追加できる
-- [ ] #4 設定UIでprefixの追加・編集・削除と候補からの登録ができる
-- [ ] #5 year軸（追加日）のドリルで該当年の作品が表示される
-- [ ] #6 pnpm checkとclientテストが通る
+- [x] #1 登録prefixの軸が軸レールに現れ、ドリル・URL直叩き・戻る進むが動く
+- [x] #2 cv/サークルタグをWorkDetailから削除でき、削除時に確認ダイアログが出る
+- [x] #3 構造化タグ（例: cv/新人）を追加できる
+- [x] #4 設定UIでprefixの追加・編集・削除と候補からの登録ができる
+- [x] #5 year軸（追加日）のドリルで該当年の作品が表示される
+- [x] #6 pnpm checkとclientテストが通る
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+軸レールをGET /tag-prefixesから動的生成（AxisId文字列化・URLパーサー動的化）、タグ編集を全タグに解禁し保護prefixはConfirmDialogで確認、Tag.tsxをprefix定義参照に、設定モーダルにタグ設定セクション（CRUD+候補登録）を追加。agent-browserで軸ドリル・日本語prefixのURL直叩き・保護確認ダイアログ・undo・prefix追加の軸レール即時反映を実機確認。unit 140件・visual 6件グリーン（ベースライン3枚更新）
+<!-- SECTION:FINAL_SUMMARY:END -->

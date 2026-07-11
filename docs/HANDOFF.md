@@ -64,27 +64,30 @@ MIMIMILLI_ADAPTER=fixture PORT=18099 node server/src/index.ts
 
 すべて `/api` 配下。リクエスト/レスポンスは `shared/src/*.ts` の Zod スキーマが正典。エラーは `{ error: { code, message } }`（`apiErrorSchema`）。**下表はあくまで概観で、エンドポイントを追加・変更したときに更新漏れしうる。実装時は必ず `shared/src/` を直接確認すること。**
 
-| メソッド   | パス                                                                  | 備考                                                                                                                      |
-| ---------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| GET / PUT  | `/settings`                                                           |                                                                                                                           |
-| POST       | `/scan`                                                               | 同期実行（完了までブロックし ScanResult を返す）。実行中の二重POSTは409                                                   |
-| GET        | `/scan/events`                                                        | スキャン進捗のSSE（progress/complete/error。再接続挙動は routes/scan.ts 冒頭）                                            |
-| GET        | `/works`                                                              | **ページングエンベロープ `{ items, total }`**（page/limit省略時は全件）                                                   |
-| GET        | `/works/:id`                                                          | 完全な Work（playlists・resumePosition・resumeTrackIndex 含む）                                                           |
-| PATCH      | `/works/:id`                                                          | `{ title?, tags?, bookmarked? }` を統合（旧 PUT tags/title・POST bookmark を廃止）                                        |
-| POST       | `/works/:id/resume`                                                   | `{ position, trackIndex }`（高頻度のため PATCH と分離）                                                                   |
-| POST       | `/works/:id/last-played`                                              |                                                                                                                           |
-| GET        | `/works/:id/files`                                                    | 物理ファイルツリー                                                                                                        |
-| GET        | `/tags`                                                               | フラット/構造化タグの一覧                                                                                                 |
-| POST       | `/export`                                                             | `{ data }`（JSON文字列）                                                                                                  |
-| GET        | `/axes/:axis`                                                         | ファセット集計（circle/cv/series/cat/tag/year）                                                                           |
-| GET/POST   | `/smart-folders`                                                      |                                                                                                                           |
-| PUT/DELETE | `/smart-folders/:id`                                                  |                                                                                                                           |
-| GET        | `/smart-folders/:id/works`                                            | スマートフォルダー評価結果                                                                                                |
-| GET/POST   | `/presets`、DELETE `/presets/:id`                                     | 検索プリセット                                                                                                            |
-| GET        | `/fs`                                                                 | 物理FSブラウズ（Filesモード）                                                                                             |
-| GET        | `/media/cover/:id`、`/media/audio/:id/:path`、`/media/file/:id/:path` | audio は Range(206) 対応。cover は `?w=128\|256\|512` でサムネイル（realはwebp化+ディスクキャッシュ、fixtureのSVGは原寸） |
-| POST       | `/dlsite/:id/fetch`、`/dlsite/:id/apply`                              |                                                                                                                           |
+| メソッド     | パス                                                                  | 備考                                                                                                                      |
+| ------------ | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| GET / PUT    | `/settings`                                                           |                                                                                                                           |
+| POST         | `/scan`                                                               | 同期実行（完了までブロックし ScanResult を返す）。実行中の二重POSTは409                                                   |
+| GET          | `/scan/events`                                                        | スキャン進捗のSSE（progress/complete/error。再接続挙動は routes/scan.ts 冒頭）                                            |
+| GET          | `/works`                                                              | **ページングエンベロープ `{ items, total }`**（page/limit省略時は全件）                                                   |
+| GET          | `/works/:id`                                                          | 完全な Work（playlists・resumePosition・resumeTrackIndex 含む）                                                           |
+| PATCH        | `/works/:id`                                                          | `{ title?, tags?, bookmarked? }` を統合（旧 PUT tags/title・POST bookmark を廃止）                                        |
+| POST         | `/works/:id/resume`                                                   | `{ position, trackIndex }`（高頻度のため PATCH と分離）                                                                   |
+| POST         | `/works/:id/last-played`                                              |                                                                                                                           |
+| GET          | `/works/:id/files`                                                    | 物理ファイルツリー                                                                                                        |
+| GET          | `/tags`                                                               | フラット/構造化タグの一覧                                                                                                 |
+| GET/POST     | `/tag-prefixes`                                                       | prefix定義の一覧・追加                                                                                                    |
+| PATCH/DELETE | `/tag-prefixes/:prefix`                                               | prefix定義の変更・削除                                                                                                    |
+| GET          | `/tag-prefixes/candidates`                                            | データ中に存在する未登録prefixの候補                                                                                      |
+| POST         | `/export`                                                             | `{ data }`（JSON文字列）                                                                                                  |
+| GET          | `/axes/:axis`                                                         | prefix定義から動的生成した軸と、組み込みのタグ・追加日軸のファセット集計                                                  |
+| GET/POST     | `/smart-folders`                                                      |                                                                                                                           |
+| PUT/DELETE   | `/smart-folders/:id`                                                  |                                                                                                                           |
+| GET          | `/smart-folders/:id/works`                                            | スマートフォルダー評価結果                                                                                                |
+| GET/POST     | `/presets`、DELETE `/presets/:id`                                     | 検索プリセット                                                                                                            |
+| GET          | `/fs`                                                                 | 物理FSブラウズ（Filesモード）                                                                                             |
+| GET          | `/media/cover/:id`、`/media/audio/:id/:path`、`/media/file/:id/:path` | audio は Range(206) 対応。cover は `?w=128\|256\|512` でサムネイル（realはwebp化+ディスクキャッシュ、fixtureのSVGは原寸） |
+| POST         | `/dlsite/:id/fetch`、`/dlsite/:id/apply`                              |                                                                                                                           |
 
 メディアURLは client の `entities/work/api.ts` の `getCoverImageUrl`/`getAudioUrl`/`getFileUrl` が組み立てる（`<img src>`/`<audio src>` に直接使える）。
 
@@ -92,10 +95,14 @@ MIMIMILLI_ADAPTER=fixture PORT=18099 node server/src/index.ts
 
 `work.tags` には2種が混在する:
 
-- 構造化タグ（プレフィックス付き）: `cv/水瀬なずな`、`サークル/月白製作所`、`シリーズ/...`、`カテゴリ/...` — 分類軸／ファセットの素
+- Annotatedタグ（prefix付き）: `cv/水瀬なずな`、`サークル/月白製作所`、`シリーズ/...`、`カテゴリ/...`。軸表示がONのprefixは分類軸／ファセットの素になる
 - フラットタグ: `ASMR`、`癒し系` 等の自由タグ
 
-種別判定は `entities/work/model.ts` の `parseTag`。編集UIは構造化タグを保護し、フラットタグのみ追加/削除する（合成ロジックは `entities/work/editableTags.ts`、`buildWorkPatchTags`）。PATCH の tags は**全置換**なので保存時に『構造化タグ＋編集後フラット』を合成して送る。
+編集UIでは両方のタグを追加・削除できる。prefix定義で保護されたタグを削除するときだけ確認ダイアログを表示し、確認後は削除できる。prefix定義は軸表示・保護・ラベル・色を持つユーザー編集可能な設定データであり、特定prefixをコードで分岐しない。
+
+タグは `shared/src/work.ts` の `normalizeTag` で正規化する。Annotatedタグはprefixをtrimして小文字化し、値をtrimする。フラットタグは全体をtrimする。`shared/src/api.ts` の `workPatchSchema` がPATCH契約の入口で正規化を適用する。
+
+クライアントの追加・削除ロジックは `entities/work/editableTags.ts` の `buildTagsWithAdded` / `buildTagsWithRemoved`、編集フローと保護確認は `features/library/ui/preview/useWorkTagEditor.ts` を参照する。PATCHの `tags` は全置換なので、変更後の全タグを送る。
 
 ## クライアントの状態管理
 
