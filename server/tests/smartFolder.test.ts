@@ -36,6 +36,17 @@ test("タグ ∋: values のいずれかを含む作品にマッチする", () =
   assert.deepEqual(result.map((w) => w.id).sort(), ["RJ001", "RJ002", "RJ004"]);
 });
 
+test("タグ ∋: prefix の大文字小文字を無視してマッチする", () => {
+  const rules: SmartFolderRule[] = [
+    { conjunction: "WHERE", field: "タグ", operator: "∋", values: ["CV/x"] },
+  ];
+  const result = evalSmartFolderRules(rules, [work({ id: "RJ005", tags: ["cv/x"] })]);
+  assert.deepEqual(
+    result.map((w) => w.id),
+    ["RJ005"],
+  );
+});
+
 test("長さ ≥: totalDurationSec が閾値以上の作品にマッチする", () => {
   const rules: SmartFolderRule[] = [
     { conjunction: "WHERE", field: "長さ", operator: "≥", values: ["3600"] },

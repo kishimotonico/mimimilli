@@ -1,7 +1,7 @@
 // スマートフォルダーのルール評価（GET /api/smart-folders/:id/works）の純粋関数。
-// client/mocks/handlers/library.ts の filterSmartFolderWorks と同じセマンティクスを再現する。
 // shared スキーマが許可した field/operator のみを評価する。DB 内の不正値も黙って無視しない。
 import type { SmartFolder, SmartFolderRule, WorkSummary } from "@mimimilli/shared";
+import { tagEquals } from "@mimimilli/shared";
 import { sortWorkSummaries } from "./worksQuery.ts";
 
 /** rules を順に適用し、works をフィルタリングして返す */
@@ -19,7 +19,9 @@ export function evalSmartFolderRules(
       case "タグ": {
         const values = rule.values;
         matchingIds = new Set(
-          works.filter((w) => values.some((v) => w.tags.includes(v))).map((w) => w.id),
+          works
+            .filter((w) => values.some((v) => w.tags.some((tag) => tagEquals(tag, v))))
+            .map((w) => w.id),
         );
         break;
       }
