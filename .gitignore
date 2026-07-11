@@ -1,4 +1,4 @@
-# Logs
+# Logs and dependencies
 logs
 *.log
 npm-debug.log*
@@ -6,8 +6,9 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
-
 node_modules
+
+# Build and test output
 dist
 dist-ssr
 .vite/
@@ -16,12 +17,8 @@ dist-ssr
 test-results/
 playwright-report/
 
-# Rust build artifacts
-server-rust/target/
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
+# Editor and OS files
+.vscode/
 .idea
 .DS_Store
 *.suo
@@ -30,14 +27,11 @@ server-rust/target/
 *.sln
 *.sw?
 
-# server runtime data (SQLite cache)
+# Runtime data
 server/data/
 
-# テストが生成するサンプルライブラリ（server/tests/helpers/sampleLibrary.ts）
+# Test fixtures
 /data/
 
-# QA / dogfooding artifacts (screenshots, videos, report)
-dogfood-output/
-
-# 作業証跡・一時ファイル（スクリーンショット等）
+# Local artifacts
 tmp/
