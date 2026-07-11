@@ -4,7 +4,7 @@ import { streamSSE } from "hono/streaming";
 import { dlsiteApplyBodySchema, dlsiteStatePatchSchema } from "@mimimilli/shared";
 import type { DataAdapter } from "../adapter.ts";
 import { apiError, invalidRequest, notFound } from "../lib/httpError.ts";
-import { isDlsiteJobInProgress, startDlsiteJob, subscribeToDlsite } from "./dlsiteProgress.ts";
+import { enqueueDlsiteJob, isDlsiteJobInProgress, subscribeToDlsite } from "./dlsiteProgress.ts";
 
 export function dlsiteRoute(adapter: DataAdapter): Hono {
   const app = new Hono();
@@ -37,17 +37,7 @@ export function dlsiteRoute(adapter: DataAdapter): Hono {
 
   app.post("/dlsite/bulk", async (c) => {
     if (isDlsiteJobInProgress()) throw apiError("conflict", "DLsite取得は既に実行中です");
-    const job = startDlsiteJob();
-    void adapter
-      .runDlsiteBulk("existing", undefined, (event) => job.emit(event))
-      .then((result) => job.emit({ type: "complete", result }))
-      .catch((error: unknown) =>
-        job.emit({
-          type: "error",
-          message: error instanceof Error ? error.message : "DLsite一括取得に失敗しました",
-        }),
-      )
-      .finally(() => job.finish());
+    enqueueDlsiteJob(adapter, "existing", undefined);
     return c.json({ started: true }, 202);
   });
 
