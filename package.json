@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "backlog": "backlog",
     "dev": "pnpm dev:fixture",
     "dev:fixture": "pnpm --filter @mimimilli/client dev",
     "dev:fixture:new-work": "pnpm --filter @mimimilli/client dev:new-work",
@@ -23,6 +24,7 @@
     "test:visual:update": "pnpm --filter @mimimilli/client test:visual:update"
   },
   "devDependencies": {
+    "backlog.md": "1.47.1",
     "oxfmt": "^0.57.0",
     "oxlint": "^1.72.0"
   },

@@ -9,8 +9,8 @@
 
 - 仕様・設計ドキュメントは `docs/` に適宜整理する。全体の地図は `docs/README.md`
 - ADRを `docs/adr/` に保存する
-- タスク管理は Backlog.md CLI（`backlog` コマンド、`backlog/` ディレクトリ）に一元化する。残タスク・実装計画・作業メモはタスクに集約し、HANDOFF や他の docs に残タスクリストを分散させない
-- タスクにするのは「検証可能な受け入れ条件が書けて、1〜数PRで完結する見通しがある」ものだけ。要件が未定・ふんわりしたものはドラフト（`backlog draft`）に置き、着手を決めたらまず「要件を決める」タスクを切る
+- タスク管理は Backlog.md CLI（`pnpm backlog` コマンド、`backlog/` ディレクトリ）に一元化する。残タスク・実装計画・作業メモはタスクに集約し、HANDOFF や他の docs に残タスクリストを分散させない
+- タスクにするのは「検証可能な受け入れ条件が書けて、1〜数PRで完結する見通しがある」ものだけ。要件が未定・ふんわりしたものはドラフト（`pnpm backlog draft`）に置き、着手を決めたらまず「要件を決める」タスクを切る
 - `docs/issues/` は過去の作業記録アーカイブ（2026-07-06 凍結）。新規追加・編集はしない
 - メンテナンス対象のドキュメント（HANDOFF・docs/README 等）は追記で積み上げず、書き換え・削除で「現在の状態」だけを保つ。時系列の経緯は Git 履歴と backlog のタスクに任せる
 
@@ -34,8 +34,8 @@
 
 ## タスク管理（Backlog.md CLI）
 
-- タスクの参照・作成・更新は `backlog` CLI で行う。`backlog/` 配下のMarkdown直接編集は禁止（メタデータが壊れる）
-- 一覧: `backlog task list --plain`、詳細: `backlog task view <id> --plain`、検索: `backlog search "<語>" --plain`
-- タスクの作成・着手・完了の前に、対応するガイドを読む: `backlog instructions task-creation | task-execution | task-finalization`
-- 迷ったら `backlog <コマンド> --help`
+- タスクの参照・作成・更新は `pnpm backlog` CLI で行う。`backlog/` 配下のMarkdown直接編集は禁止（メタデータが壊れる）
+- 一覧: `pnpm backlog task list --plain`、詳細: `pnpm backlog task view <id> --plain`、検索: `pnpm backlog search "<語>" --plain`
+- タスクの作成・着手・完了の前に、対応するガイドを読む: `pnpm backlog instructions task-creation | task-execution | task-finalization`
+- 迷ったら `pnpm backlog <コマンド> --help`
 <!-- BACKLOG.MD GUIDELINES END -->

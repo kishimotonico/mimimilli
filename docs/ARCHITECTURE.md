@@ -1,6 +1,6 @@
 # アーキテクチャ
 
-本書は mimimilli の現在の構造と境界を実装ベースで説明する。開発手順・落とし穴は [HANDOFF.md](HANDOFF.md)、設計判断の経緯は [ADR-0001](adr/0001-typescript-api-server.md) / [ADR-0002](adr/0002-mock-as-fixture-adapter.md)、機能・UX 要件は [requirements-v4.md](requirements-v4.md)、未完了タスクは Backlog.md CLI（`backlog task list --plain`）を参照。
+本書は mimimilli の現在の構造と境界を実装ベースで説明する。開発手順・落とし穴は [HANDOFF.md](HANDOFF.md)、設計判断の経緯は [ADR-0001](adr/0001-typescript-api-server.md) / [ADR-0002](adr/0002-mock-as-fixture-adapter.md)、機能・UX 要件は [requirements-v4.md](requirements-v4.md)、未完了タスクは Backlog.md CLI（`pnpm backlog task list --plain`）を参照。
 
 ## 全体像
 
