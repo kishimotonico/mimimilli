@@ -83,5 +83,5 @@ ADR起草（docs/adr/0005）→ design-system.md へモバイル規約追記 →
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-モバイルUI方針を docs/adr/0005-mobile-ui-strategy.md として記録（スコープ=再生+マークのみ、URL共通、768px単一分岐、MobileShell新設、ボトムタブ、マークはフラットタグ、PWA）。design-system.md にモバイルレイアウト節を追加。TASK-6/14/25 との整合方針をADR帰結に記載。モバイル実装ドラフト（DRAFT-14/17/18/19/20/21）を決定内容へ更新し、次フェーズ候補として DRAFT-22（続きから再生）を起票。
+モバイルUI方針を docs/adr/0006-mobile-ui-strategy.md として記録（スコープ=再生+マークのみ、URL共通、768px単一分岐、MobileShell新設、ボトムタブ、マークはフラットタグ、PWA）。design-system.md にモバイルレイアウト節を追加。TASK-6/14/25 との整合方針をADR帰結に記載。モバイル実装ドラフト（DRAFT-14/17/18/19/20/21）を決定内容へ更新し、次フェーズ候補として DRAFT-22（続きから再生）を起票。
 <!-- SECTION:FINAL_SUMMARY:END -->

@@ -13,7 +13,7 @@ dependencies:
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-狭幅時にAppShellのデスクトップ3ペイン構成をモバイル向けレイアウトに切り替える。方針はADR-0005（docs/adr/0005-mobile-ui-strategy.md）に従う。
+狭幅時にAppShellのデスクトップ3ペイン構成をモバイル向けレイアウトに切り替える。方針はADR-0006（docs/adr/0006-mobile-ui-strategy.md）に従う。
 
 決定事項:
 - ブレークポイントは768pxの単一分岐。tokens.cssにトークン定義し、共有useMediaQueryフック経由で参照
