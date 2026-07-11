@@ -1,5 +1,6 @@
 // work ドメインのスキーマ。client/src/entities/work/model.ts の型を契約として固定したもの。
 import { z } from "zod";
+import { dlsiteStateSchema } from "./dlsite.ts";
 
 export const urlEntrySchema = z.object({
   label: z.string(),
@@ -39,6 +40,7 @@ export const workSummarySchema = z.object({
   trackCount: z.number().int().nonnegative(),
   bookmarked: z.boolean(),
   lastPlayedAt: z.string().nullable(),
+  dlsite: dlsiteStateSchema,
 });
 export type WorkSummary = z.infer<typeof workSummarySchema>;
 

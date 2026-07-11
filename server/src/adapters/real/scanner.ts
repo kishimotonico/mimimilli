@@ -27,7 +27,9 @@ import type {
   Track,
   Work,
 } from "@mimimilli/shared";
+import { emptyDlsiteState } from "@mimimilli/shared";
 import type { Db } from "./db.ts";
+import { detectRjCode } from "./dlsite.ts";
 import {
   isMetaFileName,
   MetaParseError,
@@ -347,6 +349,11 @@ export class Scanner {
 
     // 既存作品の DB 固有情報を保持（移動追従時も含む）
     const existing = this.repo.getWork(id);
+    const detectedRjCode = meta.dlsite.rjCode ?? detectRjCode([basename(workDir), meta.title]);
+    const dlsite = detectedRjCode ? { ...meta.dlsite, rjCode: detectedRjCode } : meta.dlsite;
+    if (detectedRjCode !== meta.dlsite.rjCode) {
+      patchMetaFile(metaPath, { dlsite });
+    }
     const work: Work = {
       id,
       title: meta.title,
@@ -365,6 +372,7 @@ export class Scanner {
       lastPlayedAt: existing?.lastPlayedAt ?? null,
       resumePosition: existing?.resumePosition ?? 0,
       resumeTrackIndex: existing?.resumeTrackIndex ?? 0,
+      dlsite,
     };
     this.repo.upsertWork(work);
     return id;
@@ -383,6 +391,7 @@ export class Scanner {
       playlists: tracks.length > 0 ? [{ name: "default", tracks }] : [],
       defaultPlaylist: tracks.length > 0 ? "default" : null,
       createdAt: new Date().toISOString(),
+      dlsite: emptyDlsiteState(),
     };
     writeMetaFile(join(workDir, ".meta.json"), meta);
     return id;

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import type { WorkSummary, WorksQuery } from "@mimimilli/shared";
+import { emptyDlsiteState, type WorkSummary, type WorksQuery } from "@mimimilli/shared";
 import { applyWorksQuery } from "../src/core/worksQuery.ts";
 
 const NOW = new Date();
@@ -22,6 +22,7 @@ const WORKS: WorkSummary[] = [
     trackCount: 3,
     bookmarked: true,
     lastPlayedAt: "2025-01-01T00:00:00.000Z",
+    dlsite: emptyDlsiteState(),
   },
   {
     id: "RJ002",
@@ -37,6 +38,7 @@ const WORKS: WorkSummary[] = [
     trackCount: 2,
     bookmarked: false,
     lastPlayedAt: null,
+    dlsite: emptyDlsiteState(),
   },
   {
     id: "RJ003",
@@ -52,6 +54,7 @@ const WORKS: WorkSummary[] = [
     trackCount: 1,
     bookmarked: false,
     lastPlayedAt: "2024-06-01T00:00:00.000Z",
+    dlsite: emptyDlsiteState(),
   },
 ];
 

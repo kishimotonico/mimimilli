@@ -1,6 +1,7 @@
 // `.meta.json`（Source of Truth）のスキーマ。要件 v4 §3.2 を契約として固定したもの。
 // パース失敗・必須フィールド欠落は「メタファイル不正」エラーとして作品に表示する（隠蔽しない）。
 import { z } from "zod";
+import { dlsiteStateSchema, emptyDlsiteState } from "./dlsite.ts";
 import { playlistSchema, urlEntrySchema } from "./work.ts";
 
 export const metaFileSchema = z
@@ -13,6 +14,7 @@ export const metaFileSchema = z
     playlists: z.array(playlistSchema).default([]),
     defaultPlaylist: z.string().nullish().default(null),
     createdAt: z.iso.datetime({ offset: true }).optional(),
+    dlsite: dlsiteStateSchema.default(emptyDlsiteState),
   })
   .superRefine((meta, ctx) => {
     if (

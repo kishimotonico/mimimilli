@@ -5,6 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   DEFAULT_TAG_PREFIXES,
+  emptyDlsiteState,
   normalizeTag,
   normalizeTags,
   tagEquals,
@@ -39,6 +40,7 @@ function summaryWith(
     trackCount: 0,
     bookmarked: false,
     lastPlayedAt: null,
+    dlsite: emptyDlsiteState(),
   };
 }
 

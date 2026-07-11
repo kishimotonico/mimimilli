@@ -1,6 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { smartFolderRuleSchema, type SmartFolderRule, type WorkSummary } from "@mimimilli/shared";
+import {
+  emptyDlsiteState,
+  smartFolderRuleSchema,
+  type SmartFolderRule,
+  type WorkSummary,
+} from "@mimimilli/shared";
 import { evalSmartFolder, evalSmartFolderRules } from "../src/core/smartFolder.ts";
 
 function work(overrides: Partial<WorkSummary> & Pick<WorkSummary, "id">): WorkSummary {
@@ -17,6 +22,7 @@ function work(overrides: Partial<WorkSummary> & Pick<WorkSummary, "id">): WorkSu
     trackCount: 0,
     bookmarked: false,
     lastPlayedAt: null,
+    dlsite: emptyDlsiteState(),
     ...overrides,
   };
 }

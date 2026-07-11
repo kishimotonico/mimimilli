@@ -4,7 +4,7 @@
 // DDL は db.ts の CREATE TABLE IF NOT EXISTS と手動で同期する（キャッシュ DB のため
 // 互換マイグレーションは持たない。スキーマ変更時は user_version を上げて作り直す）。
 import { index, integer, primaryKey, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
-import type { Playlist, UrlEntry, SmartFolderRule } from "@mimimilli/shared";
+import type { DlsiteState, Playlist, UrlEntry, SmartFolderRule } from "@mimimilli/shared";
 
 export const works = sqliteTable("works", {
   id: text("id").primaryKey(),
@@ -38,6 +38,11 @@ export const workTags = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.workId, t.tagId] }), index("idx_work_tags_tag").on(t.tagId)],
 );
+
+export const workDlsite = sqliteTable("work_dlsite", {
+  workId: text("work_id").primaryKey(),
+  stateJson: text("state_json", { mode: "json" }).$type<DlsiteState>().notNull(),
+});
 
 /** タグ prefix 定義（ADR-0005）。id は表示順（登録順）の安定化用で、APIのキーは prefix */
 export const tagPrefixes = sqliteTable("tag_prefixes", {

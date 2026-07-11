@@ -71,6 +71,7 @@ export function patchMetaFile(
     id?: string;
     coverImage?: string | null;
     urls?: MetaFile["urls"];
+    dlsite?: MetaFile["dlsite"];
   },
 ): void {
   const raw = JSON.parse(readFileSync(metaPath, "utf-8")) as Record<string, unknown>;
@@ -79,6 +80,7 @@ export function patchMetaFile(
   if (patch.id !== undefined) raw.id = patch.id;
   if (patch.coverImage !== undefined) raw.coverImage = patch.coverImage;
   if (patch.urls !== undefined) raw.urls = patch.urls;
+  if (patch.dlsite !== undefined) raw.dlsite = patch.dlsite;
   const parsed = metaFileSchema.safeParse(raw);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];

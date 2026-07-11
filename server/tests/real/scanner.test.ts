@@ -34,6 +34,13 @@ test("初回スキャン: 登録・自動生成・エラー検出・duration プ
   assert.equal(meta.coverImage, "cover.jpg");
   assert.equal(meta.playlists[0].tracks.length, 2);
   assert.equal(meta.playlists[0].tracks[0].file, "mp3/01_intro.wav");
+  assert.deepEqual(meta.dlsite, {
+    rjCode: "RJ900001",
+    status: "none",
+    lastAttemptAt: null,
+    error: null,
+    appliedTags: [],
+  });
 
   // duration プローブ（2秒 + 3秒）
   const generated = await adapter.getWork(result.newWorkIds[0]!);
@@ -48,6 +55,26 @@ test("初回スキャン: 登録・自動生成・エラー検出・duration プ
   assert.ok(existing);
   assert.equal(existing.status, "error");
   assert.match(existing.errorMessage ?? "", /missing\.wav/);
+  assert.equal(existing.dlsite.rjCode, "RJ900002");
+});
+
+test("DLsite状態: メタ未定義はnone扱いで検出コードを書き戻し、再スキャンでDBへ復元する", async () => {
+  const { adapter, existingWorkId, root } = await setup();
+  await adapter.scan();
+  const metaPath = join(root, "dlsite", "RJ900002_既存メタ", ".meta.json");
+  const meta = JSON.parse(readFileSync(metaPath, "utf-8"));
+  meta.dlsite = {
+    rjCode: "RJ7654321",
+    status: "error",
+    lastAttemptAt: "2026-07-12T00:00:00.000Z",
+    error: "一時的な取得失敗",
+    appliedTags: ["genre/耳かき"],
+  };
+  writeFileSync(metaPath, JSON.stringify(meta, null, 2));
+
+  await adapter.scan();
+  const restored = await adapter.getWork(existingWorkId);
+  assert.deepEqual(restored?.dlsite, meta.dlsite);
 });
 
 test("移動追従: フォルダー移動後も同一 ID で path 更新・DB固有情報を保持", async () => {

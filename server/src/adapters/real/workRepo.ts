@@ -1,8 +1,9 @@
 // works / tags / smart_folders / search_presets / app_settings の CRUD と行⇄ドメイン変換。
 // 検索・絞り込みは core/worksQuery（インメモリ）で行うため、ここは取得と更新に徹する。
 import { asc, eq, inArray, notInArray } from "drizzle-orm";
-import { normalizeTags } from "@mimimilli/shared";
+import { emptyDlsiteState, normalizeTags } from "@mimimilli/shared";
 import type {
+  DlsiteState,
   Playlist,
   SearchPreset,
   SearchPresetCreate,
@@ -25,6 +26,7 @@ import {
   smartFolders,
   tagPrefixes,
   tags,
+  workDlsite,
   workTags,
   works,
 } from "./schema.ts";
@@ -43,7 +45,7 @@ function defaultPlaylistOf(row: WorkRow): Playlist | null {
   return row.playlistsJson[0]!;
 }
 
-function rowToSummary(row: WorkRow, tagNames: string[]): WorkSummary {
+function rowToSummary(row: WorkRow, tagNames: string[], dlsite: DlsiteState): WorkSummary {
   return {
     id: row.id,
     title: row.title,
@@ -58,10 +60,11 @@ function rowToSummary(row: WorkRow, tagNames: string[]): WorkSummary {
     trackCount: defaultPlaylistOf(row)?.tracks.length ?? 0,
     bookmarked: row.bookmarked,
     lastPlayedAt: row.lastPlayedAt,
+    dlsite,
   };
 }
 
-function rowToWork(row: WorkRow, tagNames: string[]): Work {
+function rowToWork(row: WorkRow, tagNames: string[], dlsite: DlsiteState): Work {
   return {
     id: row.id,
     title: row.title,
@@ -80,6 +83,7 @@ function rowToWork(row: WorkRow, tagNames: string[]): Work {
     lastPlayedAt: row.lastPlayedAt,
     resumePosition: row.resumePosition,
     resumeTrackIndex: row.resumeTrackIndex,
+    dlsite,
   };
 }
 
@@ -144,22 +148,39 @@ export class WorkRepo {
 
   // ── works ─────────────────────────────────────────────────
 
+  private dlsiteState(workId: string): DlsiteState {
+    return (
+      this.db.select().from(workDlsite).where(eq(workDlsite.workId, workId)).get()?.stateJson ??
+      emptyDlsiteState()
+    );
+  }
+
+  setDlsiteState(workId: string, state: DlsiteState): void {
+    this.db
+      .insert(workDlsite)
+      .values({ workId, stateJson: state })
+      .onConflictDoUpdate({ target: workDlsite.workId, set: { stateJson: state } })
+      .run();
+  }
+
   listSummaries(): WorkSummary[] {
     const rows = this.db.select().from(works).all();
     const tagsByWork = this.tagMap();
-    return rows.map((row) => rowToSummary(row, tagsByWork.get(row.id) ?? []));
+    return rows.map((row) =>
+      rowToSummary(row, tagsByWork.get(row.id) ?? [], this.dlsiteState(row.id)),
+    );
   }
 
   getWork(id: string): Work | null {
     const row = this.db.select().from(works).where(eq(works.id, id)).get();
     if (!row) return null;
-    return rowToWork(row, this.tagMap([id]).get(id) ?? []);
+    return rowToWork(row, this.tagMap([id]).get(id) ?? [], this.dlsiteState(id));
   }
 
   getWorkByPhysicalPath(physicalPath: string): Work | null {
     const row = this.db.select().from(works).where(eq(works.physicalPath, physicalPath)).get();
     if (!row) return null;
-    return rowToWork(row, this.tagMap([row.id]).get(row.id) ?? []);
+    return rowToWork(row, this.tagMap([row.id]).get(row.id) ?? [], this.dlsiteState(row.id));
   }
 
   /** scan からの登録。タグも置き換える */
@@ -188,6 +209,7 @@ export class WorkRepo {
       .onConflictDoUpdate({ target: works.id, set: values })
       .run();
     this.replaceWorkTags(work.id, work.tags);
+    this.setDlsiteState(work.id, work.dlsite);
   }
 
   /** PATCH /works/:id および DLsite 適用の DB 側。メタファイル書き戻しは呼び出し側（アダプタ）が行う */

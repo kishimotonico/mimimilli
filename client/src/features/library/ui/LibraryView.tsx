@@ -126,6 +126,7 @@ export default function LibraryView({
           trackCount: selectedWork.playlists[0]?.tracks.length ?? 0,
           bookmarked: selectedWork.bookmarked,
           lastPlayedAt: selectedWork.lastPlayedAt,
+          dlsite: selectedWork.dlsite,
         };
         onPlay(summary, trackIndex);
       }

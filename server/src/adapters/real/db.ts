@@ -41,6 +41,11 @@ CREATE TABLE IF NOT EXISTS work_tags (
 );
 CREATE INDEX IF NOT EXISTS idx_work_tags_tag ON work_tags(tag_id);
 
+CREATE TABLE IF NOT EXISTS work_dlsite (
+  work_id TEXT PRIMARY KEY,
+  state_json TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS tag_prefixes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   prefix TEXT NOT NULL UNIQUE,

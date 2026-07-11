@@ -1,5 +1,6 @@
 // fixture アダプタ用の自己完結シードデータ。
 // client/mocks からは import せず、本ファイル内で完結させる。
+import { emptyDlsiteState } from "@mimimilli/shared";
 import type { SearchPreset, SmartFolder, WorkSummary } from "@mimimilli/shared";
 
 /** シードとなる作品データ（約10件）。
@@ -9,7 +10,7 @@ import type { SearchPreset, SmartFolder, WorkSummary } from "@mimimilli/shared";
  *  - bookmarked / lastPlayedAt の有無を混在させる
  *  - trackCount は1〜20の範囲でばらつかせる
  */
-export const SEED_WORKS: WorkSummary[] = [
+const RAW_SEED_WORKS: Omit<WorkSummary, "dlsite">[] = [
   {
     id: "RJ501001",
     title: "【ASMR】夜更けの図書室で囁き朗読",
@@ -252,6 +253,29 @@ export const SEED_WORKS: WorkSummary[] = [
     lastPlayedAt: null,
   },
 ];
+
+export const SEED_WORKS: WorkSummary[] = RAW_SEED_WORKS.map((work, index) => ({
+  ...work,
+  dlsite:
+    index === 0
+      ? {
+          rjCode: work.id,
+          status: "applied",
+          lastAttemptAt: "2026-06-10T12:00:00.000Z",
+          error: null,
+          appliedTags: work.tags.filter((tag) => /^(?:cv|genre|サークル)\//.test(tag)),
+        }
+      : index === 2
+        ? {
+            ...emptyDlsiteState(),
+            rjCode: work.id,
+            status: "not_found",
+            error: "作品が見つかりません",
+          }
+        : index === 6
+          ? { ...emptyDlsiteState(), rjCode: work.id, status: "skipped" }
+          : { ...emptyDlsiteState(), rjCode: /^RJ\d+$/i.test(work.id) ? work.id : null },
+}));
 
 /** 各作品のトラック名（収録曲名）。trackCount に満たない分は呼び出し側で `Track N` を補う */
 export const SEED_TRACK_NAMES: Record<string, string[]> = {
