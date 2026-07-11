@@ -5,7 +5,7 @@
 import type {
   AxisFacetItem,
   DlsiteApplyBody,
-  DlsiteWorkInfo,
+  DlsiteFetchResult,
   FileEntry,
   FsListing,
   ResumeBody,
@@ -97,6 +97,6 @@ export interface DataAdapter {
     relPath?: string,
     width?: number,
   ): Promise<MediaLocation | null>;
-  dlsiteFetch(workId: string): Promise<DlsiteWorkInfo | null>;
+  dlsiteFetch(workId: string): Promise<DlsiteFetchResult>;
   dlsiteApply(workId: string, body: DlsiteApplyBody): Promise<boolean>;
 }

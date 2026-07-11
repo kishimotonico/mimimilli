@@ -1,10 +1,10 @@
 ---
 id: TASK-35
 title: DLsiteスクレイパーの堅牢化（実在しない作品・RJコード誤検出・構造変更の検知）
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-10 10:30'
-updated_date: '2026-07-11 16:54'
+updated_date: '2026-07-11 20:15'
 labels: []
 dependencies:
   - TASK-34
@@ -34,8 +34,29 @@ DLsite取得の失敗を分類して正しく報告できるようにする。�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 404 / タイトル空 / ネットワークエラーが3分類で区別されて返る
-- [ ] #2 クライアントから分類を判別できるHTTPレスポンスになっている
-- [ ] #3 parseDlsiteHtmlのフィクスチャテストで3分類をカバー
-- [ ] #4 pnpm check / pnpm test が通る
+- [x] #1 404 / タイトル空 / ネットワークエラーが3分類で区別されて返る
+- [x] #2 クライアントから分類を判別できるHTTPレスポンスになっている
+- [x] #3 parseDlsiteHtmlのフィクスチャテストで3分類をカバー
+- [x] #4 pnpm check / pnpm test が通る
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. sharedにDLsite取得の分類付き結果契約を追加する
+2. パーサーのタイトル検証とHTTP・通信失敗の3分類を実装する
+3. real/fixtureアダプタとHTTPルートを分類付きレスポンスへ変更する
+4. HTMLフィクスチャ中心のテストを追加し、全体検証後に完了・コミットする
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+分類付きDlsiteFetchResultへ統一し、HTTP 404はnot_found、タイトル空はparse_error、5xx・通信例外はerrorとして返す。API error.codeでクライアントが判別できる。検証: pnpm check / pnpm test（server 126件、client 140件）成功。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+DLsite取得を3分類の結果型へ変更し、パーサーのタイトル必須検証、HTTPエラー変換、fixtureとルートの契約を更新した。外部通信なしのHTML・fetchスタブテストで分類を確認した。
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -7,7 +7,7 @@ import { DEFAULT_TAG_PREFIXES } from "@mimimilli/shared";
 import type {
   AxisFacetItem,
   DlsiteApplyBody,
-  DlsiteWorkInfo,
+  DlsiteFetchResult,
   FileEntry,
   FsListing,
   ResumeBody,
@@ -242,11 +242,14 @@ export function createRealAdapter(options: RealAdapterOptions): DataAdapter {
       return { type: "file", absolutePath: resolved, mime: mimeOf(resolved) };
     },
 
-    async dlsiteFetch(workId: string): Promise<DlsiteWorkInfo | null> {
+    async dlsiteFetch(workId: string): Promise<DlsiteFetchResult> {
       const work = repo.getWork(workId);
-      if (!work) return null;
-      const rjCode = detectRjCode([basename(work.physicalPath), work.title]);
-      if (!rjCode) return null;
+      if (!work)
+        return { ok: false, kind: "not_found", message: `作品が見つかりません: ${workId}` };
+      const rjCode = work.dlsite.rjCode ?? detectRjCode([basename(work.physicalPath), work.title]);
+      if (!rjCode) {
+        return { ok: false, kind: "not_found", message: "RJコードが検出されていません" };
+      }
       return fetchDlsiteInfo(rjCode);
     },
 

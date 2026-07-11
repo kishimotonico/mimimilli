@@ -79,7 +79,7 @@ export type ExportResponse = z.infer<typeof exportResponseSchema>;
 
 export const apiErrorSchema = z.object({
   error: z.object({
-    code: z.enum(["not_found", "invalid_request", "conflict", "internal"]),
+    code: z.enum(["not_found", "parse_error", "error", "invalid_request", "conflict", "internal"]),
     message: z.string(),
   }),
 });

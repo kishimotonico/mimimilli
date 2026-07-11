@@ -1,12 +1,11 @@
-// DLsite スクレイパー（fetch + cheerio）。
-// セレクタは docs/HANDOFF.md「DLsiteスクレイピングのセレクタ」を正典とする
-// （DLsite の HTML 構造変更時はここを修正する）。
+// DLsite スクレイパー（fetch + cheerio）。このファイルのセレクタとフィクスチャテストを正典とする。
+// HTML 構造変更を parse_error として検知したら、セレクタとテストを同時に更新する。
 // HTML パースは pure 関数に分離し、ネットワークなしでテストできるようにする。
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { load } from "cheerio";
 import { normalizeTags } from "@mimimilli/shared";
-import type { DlsiteWorkInfo } from "@mimimilli/shared";
+import type { DlsiteFetchResult, DlsiteWorkInfo } from "@mimimilli/shared";
 
 const FETCH_TIMEOUT_MS = 15_000;
 const USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) mimimilli/0.1";
@@ -25,10 +24,17 @@ export function detectRjCode(candidates: string[]): string | null {
 }
 
 /** DLsite 作品ページの HTML から作品情報を抽出する（pure） */
-export function parseDlsiteHtml(html: string, rjCode: string): DlsiteWorkInfo {
+export function parseDlsiteHtml(html: string, rjCode: string): DlsiteFetchResult {
   const $ = load(html);
 
   const title = $("#work_name").first().text().trim();
+  if (!title) {
+    return {
+      ok: false,
+      kind: "parse_error",
+      message: `DLsite作品ページのタイトルを取得できませんでした（${rjCode}）`,
+    };
+  }
   const circle = $("span.maker_name a").first().text().trim() || null;
 
   const cvs: string[] = [];
@@ -51,24 +57,49 @@ export function parseDlsiteHtml(html: string, rjCode: string): DlsiteWorkInfo {
   let coverUrl = $("div.product-slider-data div[data-src]").first().attr("data-src") ?? null;
   if (coverUrl && coverUrl.startsWith("//")) coverUrl = `https:${coverUrl}`;
 
-  return { rjCode, title, circle, cvs, genreTags, coverUrl, url: dlsiteWorkUrl(rjCode) };
+  return {
+    ok: true,
+    info: { rjCode, title, circle, cvs, genreTags, coverUrl, url: dlsiteWorkUrl(rjCode) },
+  };
 }
 
 /** DLsite から作品情報を取得する（年齢確認は Cookie adultchecked=1 でバイパス） */
-export async function fetchDlsiteInfo(rjCode: string): Promise<DlsiteWorkInfo> {
-  const res = await fetch(dlsiteWorkUrl(rjCode), {
-    headers: {
-      Cookie: "adultchecked=1",
-      "User-Agent": USER_AGENT,
-      "Accept-Language": "ja",
-    },
-    redirect: "follow",
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-  });
-  if (!res.ok) {
-    throw new Error(`DLsite の取得に失敗しました（${rjCode}: HTTP ${res.status}）`);
+export async function fetchDlsiteInfo(
+  rjCode: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<DlsiteFetchResult> {
+  try {
+    const res = await fetchImpl(dlsiteWorkUrl(rjCode), {
+      headers: {
+        Cookie: "adultchecked=1",
+        "User-Agent": USER_AGENT,
+        "Accept-Language": "ja",
+      },
+      redirect: "follow",
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    if (res.status === 404) {
+      return {
+        ok: false,
+        kind: "not_found",
+        message: `DLsite作品が見つかりません（${rjCode}）`,
+      };
+    }
+    if (!res.ok) {
+      return {
+        ok: false,
+        kind: "error",
+        message: `DLsiteの取得に失敗しました（${rjCode}: HTTP ${res.status}）`,
+      };
+    }
+    return parseDlsiteHtml(await res.text(), rjCode);
+  } catch (error) {
+    return {
+      ok: false,
+      kind: "error",
+      message: `DLsiteとの通信に失敗しました（${rjCode}: ${(error as Error).message}）`,
+    };
   }
-  return parseDlsiteHtml(await res.text(), rjCode);
 }
 
 /**

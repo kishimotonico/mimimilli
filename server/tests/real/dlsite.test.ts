@@ -5,7 +5,12 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import type { DlsiteWorkInfo } from "@mimimilli/shared";
-import { detectRjCode, mergeDlsiteTags, parseDlsiteHtml } from "../../src/adapters/real/dlsite.ts";
+import {
+  detectRjCode,
+  fetchDlsiteInfo,
+  mergeDlsiteTags,
+  parseDlsiteHtml,
+} from "../../src/adapters/real/dlsite.ts";
 import { createRealAdapter } from "../../src/adapters/real/index.ts";
 import { makeSampleLibrary } from "../helpers/sampleLibrary.ts";
 
@@ -23,8 +28,11 @@ const SAMPLE_HTML = `
   </div>
 </body></html>`;
 
-test("parseDlsiteHtml: HANDOFF.md のセレクタで各情報を抽出する", () => {
-  const info = parseDlsiteHtml(SAMPLE_HTML, "RJ899999");
+test("parseDlsiteHtml: 正常HTMLフィクスチャから各情報を抽出する", () => {
+  const result = parseDlsiteHtml(SAMPLE_HTML, "RJ899999");
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  const info = result.info;
   assert.equal(info.title, "耳元ささやきの夜");
   assert.equal(info.circle, "夜想曲");
   assert.deepEqual(info.cvs, ["水瀬なずな", "早乙女しおん"]);
@@ -36,13 +44,28 @@ test("parseDlsiteHtml: HANDOFF.md のセレクタで各情報を抽出する", (
   assert.equal(info.url, "https://www.dlsite.com/maniax/work/=/product_id/RJ899999.html");
 });
 
-test("parseDlsiteHtml: 要素が無い場合は null / 空配列", () => {
-  const info = parseDlsiteHtml("<html><body></body></html>", "RJ000001");
-  assert.equal(info.title, "");
-  assert.equal(info.circle, null);
-  assert.deepEqual(info.cvs, []);
-  assert.deepEqual(info.genreTags, []);
-  assert.equal(info.coverUrl, null);
+test("parseDlsiteHtml: タイトルが空のHTMLはparse_error", () => {
+  const result = parseDlsiteHtml("<html><body>not found</body></html>", "RJ000001");
+  assert.deepEqual(result, {
+    ok: false,
+    kind: "parse_error",
+    message: "DLsite作品ページのタイトルを取得できませんでした（RJ000001）",
+  });
+});
+
+test("fetchDlsiteInfo: HTTP 404 / 通信エラーを分類する", async () => {
+  const notFound = await fetchDlsiteInfo(
+    "RJ000001",
+    async () => new Response("<html>404</html>", { status: 404 }),
+  );
+  assert.equal(notFound.ok, false);
+  if (!notFound.ok) assert.equal(notFound.kind, "not_found");
+
+  const networkError = await fetchDlsiteInfo("RJ000001", async () => {
+    throw new TypeError("connection reset");
+  });
+  assert.equal(networkError.ok, false);
+  if (!networkError.ok) assert.equal(networkError.kind, "error");
 });
 
 test("detectRjCode: フォルダー名優先・大文字化・桁数", () => {
@@ -112,7 +135,7 @@ test("dlsiteApply: タグマージとメタ書き戻し（カバー DL なし）
   assert.deepEqual(meta.urls, work?.urls);
 });
 
-test("dlsiteFetch: RJ コードが検出できない作品は null", async () => {
+test("dlsiteFetch: 存在しない作品はnot_found", async () => {
   const lib = makeSampleLibrary("data/test-dlsite-norj");
   const adapter = createRealAdapter({ dbPath: ":memory:" });
   await adapter.updateSettings({ rootFolder: lib.root });
@@ -120,5 +143,6 @@ test("dlsiteFetch: RJ コードが検出できない作品は null", async () =>
   // 既存メタ作品はフォルダー名 RJ900002… なので、タイトル・パスとも RJ なしに変更してから検証
   await adapter.patchWork(lib.existingWorkId, { title: "コードなし作品" });
   const generatedFree = await adapter.dlsiteFetch("no-such-work");
-  assert.equal(generatedFree, null);
+  assert.equal(generatedFree.ok, false);
+  if (!generatedFree.ok) assert.equal(generatedFree.kind, "not_found");
 });

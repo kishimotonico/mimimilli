@@ -28,6 +28,19 @@ export const dlsiteWorkInfoSchema = z.object({
 });
 export type DlsiteWorkInfo = z.infer<typeof dlsiteWorkInfoSchema>;
 
+export const dlsiteFetchErrorKindSchema = z.enum(["not_found", "parse_error", "error"]);
+export type DlsiteFetchErrorKind = z.infer<typeof dlsiteFetchErrorKindSchema>;
+
+export const dlsiteFetchResultSchema = z.discriminatedUnion("ok", [
+  z.object({ ok: z.literal(true), info: dlsiteWorkInfoSchema }),
+  z.object({
+    ok: z.literal(false),
+    kind: dlsiteFetchErrorKindSchema,
+    message: z.string(),
+  }),
+]);
+export type DlsiteFetchResult = z.infer<typeof dlsiteFetchResultSchema>;
+
 export const dlsiteApplyBodySchema = z.object({
   info: dlsiteWorkInfoSchema,
   applyTitle: z.boolean(),

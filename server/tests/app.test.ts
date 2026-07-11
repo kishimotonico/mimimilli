@@ -26,6 +26,22 @@ test("GET /api/works/:id 存在しないIDは404 + apiErrorSchema形式", async 
   assert.equal(typeof body.error.message, "string");
 });
 
+test("POST /api/dlsite/:id/fetch は取得分類をHTTPエラーコードへ反映する", async () => {
+  for (const [kind, status] of [
+    ["not_found", 404],
+    ["parse_error", 502],
+    ["error", 502],
+  ] as const) {
+    const adapter = createFixtureAdapter();
+    adapter.dlsiteFetch = async () => ({ ok: false, kind, message: `${kind} message` });
+    const res = await createApp(adapter).request("/api/dlsite/RJ000001/fetch", { method: "POST" });
+    assert.equal(res.status, status);
+    const body = await res.json();
+    assert.equal(body.error.code, kind);
+    assert.equal(body.error.message, `${kind} message`);
+  }
+});
+
 test("PATCH /api/works/:id でタグ更新が反映される", async () => {
   const app = buildApp();
 

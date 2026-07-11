@@ -2,15 +2,15 @@
 import { Hono } from "hono";
 import { dlsiteApplyBodySchema } from "@mimimilli/shared";
 import type { DataAdapter } from "../adapter.ts";
-import { invalidRequest, notFound } from "../lib/httpError.ts";
+import { apiError, invalidRequest, notFound } from "../lib/httpError.ts";
 
 export function dlsiteRoute(adapter: DataAdapter): Hono {
   const app = new Hono();
 
   app.post("/dlsite/:id/fetch", async (c) => {
-    const info = await adapter.dlsiteFetch(c.req.param("id"));
-    if (!info) notFound(`DLsite情報が取得できません: ${c.req.param("id")}`);
-    return c.json(info);
+    const result = await adapter.dlsiteFetch(c.req.param("id"));
+    if (!result.ok) throw apiError(result.kind, result.message);
+    return c.json(result.info);
   });
 
   app.post("/dlsite/:id/apply", async (c) => {

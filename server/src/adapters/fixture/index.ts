@@ -4,7 +4,7 @@ import { DEFAULT_TAG_PREFIXES, normalizeTags } from "@mimimilli/shared";
 import type {
   AxisFacetItem,
   DlsiteApplyBody,
-  DlsiteWorkInfo,
+  DlsiteFetchResult,
   FileEntry,
   FsListing,
   ResumeBody,
@@ -441,15 +441,21 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
       return synthesizeFilePlaceholderText(relPath);
     },
 
-    async dlsiteFetch(workId: string): Promise<DlsiteWorkInfo | null> {
+    async dlsiteFetch(workId: string): Promise<DlsiteFetchResult> {
+      const work = state.works.find((candidate) => candidate.id === workId);
+      if (!work)
+        return { ok: false, kind: "not_found", message: `作品が見つかりません: ${workId}` };
       return {
-        rjCode: workId,
-        title: `（fixture）${workId}`,
-        circle: "fixtureサークル",
-        cvs: ["fixture CV"],
-        genreTags: ["テスト"],
-        coverUrl: null,
-        url: `https://www.dlsite.com/maniax/work/=/product_id/${workId}.html`,
+        ok: true,
+        info: {
+          rjCode: workId,
+          title: `（fixture）${workId}`,
+          circle: "fixtureサークル",
+          cvs: ["fixture CV"],
+          genreTags: ["テスト"],
+          coverUrl: null,
+          url: `https://www.dlsite.com/maniax/work/=/product_id/${workId}.html`,
+        },
       };
     },
 
