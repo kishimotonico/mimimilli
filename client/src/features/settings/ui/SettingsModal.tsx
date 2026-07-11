@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { I } from "../../../shared/ui/Icon";
 import TagPrefixSettings from "./TagPrefixSettings";
+import Toast from "../../../shared/ui/Toast";
+import { useDlsiteBulk } from "../model/useDlsiteBulk";
 
 interface SettingsModalProps {
   rootFolder: string | null;
@@ -27,6 +29,7 @@ export default function SettingsModal({
   const [isEditingFolder, setIsEditingFolder] = useState(false);
   const [folderDraft, setFolderDraft] = useState(rootFolder ?? "");
   const folderInputRef = useRef<HTMLInputElement | null>(null);
+  const dlsiteBulk = useDlsiteBulk();
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -319,6 +322,42 @@ export default function SettingsModal({
           </div>
 
           {/* Tag prefixes（ADR-0005） */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <span
+              style={{
+                fontFamily: "var(--font-sans)",
+                fontSize: 10.5,
+                fontWeight: 600,
+                letterSpacing: "0.08em",
+                color: "var(--ink-3)",
+              }}
+            >
+              DLSITE連携
+            </span>
+            <button
+              type="button"
+              disabled={dlsiteBulk.active}
+              onClick={dlsiteBulk.start}
+              style={{
+                alignSelf: "flex-start",
+                height: 34,
+                padding: "0 14px",
+                borderRadius: 6,
+                border: "1px solid var(--line)",
+                background: "var(--paper-1)",
+                color: "var(--ink-1)",
+                fontFamily: "var(--font-sans)",
+                fontSize: 12,
+                cursor: dlsiteBulk.active ? "not-allowed" : "pointer",
+              }}
+            >
+              {dlsiteBulk.active
+                ? `取得中${dlsiteBulk.progress ? ` (${dlsiteBulk.progress.processed}/${dlsiteBulk.progress.total})` : "..."}`
+                : "未連携をまとめて取得"}
+            </button>
+          </div>
+
+          {/* Tag prefixes（ADR-0005） */}
           <TagPrefixSettings />
 
           {/* Export */}
@@ -380,6 +419,14 @@ export default function SettingsModal({
           </button>
         </div>
       </div>
+      <Toast
+        message={
+          dlsiteBulk.result
+            ? `取得 ${dlsiteBulk.result.fetched}件・失敗 ${dlsiteBulk.result.failed}件`
+            : dlsiteBulk.error
+        }
+        onDismiss={dlsiteBulk.dismiss}
+      />
     </>
   );
 }

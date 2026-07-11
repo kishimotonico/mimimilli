@@ -18,6 +18,7 @@ import type { ScanProgressEvent } from "@mimimilli/shared";
 import { NotConfiguredError, type DataAdapter } from "../adapter.ts";
 import { apiError } from "../lib/httpError.ts";
 import { isScanInProgress, startScanJob, subscribeToScan } from "./scanProgress.ts";
+import { isDlsiteJobInProgress, startDlsiteJob } from "./dlsiteProgress.ts";
 
 /** SSE 接続を生かし続けるための ping 間隔（ms）。walking フェーズ等、進捗が長く無音になり得るため */
 const HEARTBEAT_INTERVAL_MS = 15000;
@@ -44,6 +45,19 @@ export function scanRoute(adapter: DataAdapter): Hono {
     try {
       const result = await adapter.scan((event) => job.emit(event));
       job.emit({ type: "complete", result });
+      if (result.newWorkIds.length > 0 && !isDlsiteJobInProgress()) {
+        const dlsiteJob = startDlsiteJob();
+        void adapter
+          .runDlsiteBulk("new", result.newWorkIds, (event) => dlsiteJob.emit(event))
+          .then((bulkResult) => dlsiteJob.emit({ type: "complete", result: bulkResult }))
+          .catch((error: unknown) =>
+            dlsiteJob.emit({
+              type: "error",
+              message: error instanceof Error ? error.message : "DLsite自動取得に失敗しました",
+            }),
+          )
+          .finally(() => dlsiteJob.finish());
+      }
       return c.json(result);
     } catch (e) {
       const message =

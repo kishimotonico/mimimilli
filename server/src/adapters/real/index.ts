@@ -7,6 +7,9 @@ import { DEFAULT_TAG_PREFIXES, normalizeTags } from "@mimimilli/shared";
 import type {
   AxisFacetItem,
   DlsiteApplyBody,
+  DlsiteBulkMode,
+  DlsiteBulkProgressEvent,
+  DlsiteBulkResult,
   DlsiteFetchResult,
   DlsiteStatePatch,
   FileEntry,
@@ -42,7 +45,7 @@ import { buildTagPrefixCandidates } from "../../core/tagPrefixCandidates.ts";
 import { evalSmartFolder } from "../../core/smartFolder.ts";
 import { applyWorksQuery } from "../../core/worksQuery.ts";
 import { openDb, type Db } from "./db.ts";
-import { detectRjCode, downloadCover, fetchDlsiteInfo } from "./dlsite.ts";
+import { detectRjCode, downloadCover, fetchDlsiteInfo, mergeDlsiteTags } from "./dlsite.ts";
 import { browseFs } from "./fsBrowse.ts";
 import { buildFileTree } from "./fileTree.ts";
 import { patchMetaFile } from "./meta.ts";
@@ -60,6 +63,10 @@ export interface RealAdapterOptions {
   dbPath: string;
   /** カバーサムネイルのキャッシュ置き場（省略時 "data/cache/thumbnails"） */
   thumbnailCacheDir?: string;
+  /** 一括取得のリクエスト間隔。実運用は1秒、テストのみ短縮可 */
+  dlsiteRequestIntervalMs?: number;
+  /** テスト用の取得関数差し替え。省略時は実DLsite取得 */
+  dlsiteFetcher?: (rjCode: string) => Promise<DlsiteFetchResult>;
 }
 
 export function createRealAdapter(options: RealAdapterOptions): DataAdapter {
@@ -67,6 +74,8 @@ export function createRealAdapter(options: RealAdapterOptions): DataAdapter {
   const repo = new WorkRepo(db);
   const scanner = new Scanner(db, repo);
   const thumbnailCacheDir = options.thumbnailCacheDir ?? DEFAULT_THUMBNAIL_CACHE_DIR;
+  const dlsiteRequestIntervalMs = options.dlsiteRequestIntervalMs ?? 1000;
+  const dlsiteFetcher = options.dlsiteFetcher ?? fetchDlsiteInfo;
 
   // prefix 定義の初回 seed（ADR-0005）。seed 済みフラグで管理し、
   // ユーザーが全定義を削除しても再投入しない
@@ -251,7 +260,7 @@ export function createRealAdapter(options: RealAdapterOptions): DataAdapter {
       if (!rjCode) {
         return { ok: false, kind: "not_found", message: "RJコードが検出されていません" };
       }
-      return fetchDlsiteInfo(rjCode);
+      return dlsiteFetcher(rjCode);
     },
 
     async dlsiteApply(workId: string, body: DlsiteApplyBody): Promise<boolean> {
@@ -307,6 +316,89 @@ export function createRealAdapter(options: RealAdapterOptions): DataAdapter {
         patchMetaFile(findMetaPath(work), { dlsite });
         return repo.getWork(workId);
       });
+    },
+
+    async runDlsiteBulk(
+      mode: DlsiteBulkMode,
+      workIds: string[] | undefined,
+      onProgress?: (event: Extract<DlsiteBulkProgressEvent, { type: "progress" }>) => void,
+    ): Promise<DlsiteBulkResult> {
+      const requested = workIds
+        ? workIds.map((id) => repo.getWork(id)).filter((work): work is Work => work !== null)
+        : repo.listSummaries().map((summary) => repo.getWork(summary.id)!);
+      const targets = requested.filter(
+        (work) =>
+          work.dlsite.rjCode && (work.dlsite.status === "none" || work.dlsite.status === "error"),
+      );
+      const result: DlsiteBulkResult = {
+        fetched: 0,
+        failed: 0,
+        skipped: requested.length - targets.length,
+      };
+
+      for (let index = 0; index < targets.length; index++) {
+        const work = targets[index]!;
+        if (index > 0 && dlsiteRequestIntervalMs > 0) {
+          await new Promise((resolve) => setTimeout(resolve, dlsiteRequestIntervalMs));
+        }
+        const fetched = await dlsiteFetcher(work.dlsite.rjCode!);
+        const attemptedAt = new Date().toISOString();
+        if (!fetched.ok) {
+          const dlsite = {
+            ...work.dlsite,
+            status: fetched.kind === "not_found" ? ("not_found" as const) : ("error" as const),
+            lastAttemptAt: attemptedAt,
+            error: fetched.message,
+          };
+          db.transaction(() => {
+            repo.setDlsiteState(work.id, dlsite);
+            patchMetaFile(findMetaPath(work), { dlsite });
+          });
+          result.failed += 1;
+        } else {
+          const allInfoTags = mergeDlsiteTags([], fetched.info);
+          const applyTags =
+            mode === "new"
+              ? allInfoTags
+              : allInfoTags.filter((tag) => !work.dlsite.appliedTags.includes(tag));
+          const patch: {
+            title?: string;
+            tags?: string[];
+            coverImage?: string;
+            urls?: Work["urls"];
+          } = {
+            tags: normalizeTags([...work.tags, ...applyTags]),
+          };
+          if (mode === "new") patch.title = fetched.info.title;
+          if (!work.urls.some((entry) => entry.url.includes("dlsite.com"))) {
+            patch.urls = [...work.urls, { label: "DLsite", url: fetched.info.url }];
+          }
+          if (!work.coverImage && fetched.info.coverUrl) {
+            patch.coverImage = await downloadCover(fetched.info.coverUrl, work.physicalPath);
+          }
+          const dlsite = {
+            rjCode: fetched.info.rjCode,
+            status: "applied" as const,
+            lastAttemptAt: attemptedAt,
+            error: null,
+            appliedTags: normalizeTags([...work.dlsite.appliedTags, ...allInfoTags]),
+          };
+          db.transaction(() => {
+            const updated = repo.patchWork(work.id, patch);
+            if (!updated) throw new Error(`一括取得中に作品が見つからなくなりました: ${work.id}`);
+            repo.setDlsiteState(work.id, dlsite);
+            patchMetaFile(findMetaPath(updated), { ...patch, dlsite });
+          });
+          result.fetched += 1;
+        }
+        onProgress?.({
+          type: "progress",
+          processed: index + 1,
+          total: targets.length,
+          workId: work.id,
+        });
+      }
+      return result;
     },
   };
 }

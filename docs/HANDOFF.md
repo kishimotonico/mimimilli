@@ -74,6 +74,11 @@ MIMIMILLI_ADAPTER=fixture PORT=18099 node server/src/index.ts
 | PATCH        | `/works/:id`                                                          | `{ title?, tags?, bookmarked? }` を統合（旧 PUT tags/title・POST bookmark を廃止）                                        |
 | POST         | `/works/:id/resume`                                                   | `{ position, trackIndex }`（高頻度のため PATCH と分離）                                                                   |
 | POST         | `/works/:id/last-played`                                              |                                                                                                                           |
+| POST         | `/dlsite/:id/fetch`                                                   | DLsite情報のプレビュー取得。失敗分類は `not_found / parse_error / error`                                                  |
+| POST         | `/dlsite/:id/apply`                                                   | タイトル・カバー・選択タグを適用し、連携状態をメタへ保存                                                                  |
+| PATCH        | `/dlsite/:id`                                                         | RJコード修正・skipped切替                                                                                                 |
+| POST         | `/dlsite/bulk`                                                        | none/error作品の一括取得ジョブを開始                                                                                      |
+| GET          | `/dlsite/events`                                                      | 一括取得ジョブの進捗SSE                                                                                                   |
 | GET          | `/works/:id/files`                                                    | 物理ファイルツリー                                                                                                        |
 | GET          | `/tags`                                                               | フラット/構造化タグの一覧                                                                                                 |
 | GET/POST     | `/tag-prefixes`                                                       | prefix定義の一覧・追加                                                                                                    |

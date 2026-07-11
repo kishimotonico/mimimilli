@@ -91,3 +91,7 @@ export async function applyDlsiteInfo(workId: string, body: DlsiteApplyBody): Pr
 export async function updateDlsiteState(workId: string, body: DlsiteStatePatch): Promise<Work> {
   return patch<Work>(`/dlsite/${encodeURIComponent(workId)}`, body);
 }
+
+export async function startDlsiteBulk(): Promise<void> {
+  await post("/dlsite/bulk");
+}

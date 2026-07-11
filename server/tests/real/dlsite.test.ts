@@ -1,7 +1,7 @@
 // DLsite スクレイパーのテスト。ネットワークアクセスはしない:
 // パースは合成 HTML、apply はモック info（coverUrl: null でカバー DL をスキップ）。
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import type { DlsiteWorkInfo } from "@mimimilli/shared";
@@ -171,4 +171,76 @@ test("dlsiteFetch: 存在しない作品はnot_found", async () => {
   const generatedFree = await adapter.dlsiteFetch("no-such-work");
   assert.equal(generatedFree.ok, false);
   if (!generatedFree.ok) assert.equal(generatedFree.kind, "not_found");
+});
+
+test("一括取得: 既存タイトルを保持し、appliedTagsの差分だけ追加して1秒相当の間隔を空ける", async () => {
+  const lib = makeSampleLibrary("data/test-dlsite-bulk");
+  const calls: number[] = [];
+  const adapter = createRealAdapter({
+    dbPath: ":memory:",
+    dlsiteRequestIntervalMs: 40,
+    dlsiteFetcher: async (rjCode) => {
+      calls.push(Date.now());
+      return {
+        ok: true,
+        info: {
+          rjCode,
+          title: `上書き禁止 ${rjCode}`,
+          circle: null,
+          cvs: [],
+          genreTags: ["削除済み", "新着"],
+          coverUrl: null,
+          url: `https://www.dlsite.com/maniax/work/=/product_id/${rjCode}.html`,
+        },
+      };
+    },
+  });
+  await adapter.updateSettings({ rootFolder: lib.root });
+  const scan = await adapter.scan();
+  const beforeExisting = await adapter.getWork(lib.existingWorkId);
+  const metaPath = join(beforeExisting!.physicalPath, ".meta.json");
+  const meta = JSON.parse(readFileSync(metaPath, "utf-8"));
+  meta.dlsite = {
+    rjCode: "RJ900002",
+    status: "error",
+    lastAttemptAt: "2026-07-01T00:00:00.000Z",
+    error: "前回失敗",
+    appliedTags: ["genre/削除済み"],
+  };
+  writeFileSync(metaPath, JSON.stringify(meta, null, 2));
+  await adapter.scan();
+
+  const result = await adapter.runDlsiteBulk("existing", undefined);
+  assert.equal(result.fetched, 2);
+  assert.ok(calls[1]! - calls[0]! >= 35, `request interval: ${calls[1]! - calls[0]!}ms`);
+  const existing = await adapter.getWork(lib.existingWorkId);
+  assert.equal(existing?.title, beforeExisting?.title);
+  assert.ok(!existing?.tags.includes("genre/削除済み"));
+  assert.ok(existing?.tags.includes("genre/新着"));
+  assert.deepEqual(existing?.dlsite.appliedTags, ["genre/削除済み", "genre/新着"]);
+  const generated = await adapter.getWork(scan.newWorkIds[0]!);
+  assert.ok(generated?.title !== `上書き禁止 ${generated?.dlsite.rjCode}`);
+});
+
+test("一括取得: not_found記録後とskipped作品は次回対象外", async () => {
+  const lib = makeSampleLibrary("data/test-dlsite-bulk-skip");
+  let calls = 0;
+  const adapter = createRealAdapter({
+    dbPath: ":memory:",
+    dlsiteRequestIntervalMs: 0,
+    dlsiteFetcher: async () => {
+      calls += 1;
+      return { ok: false, kind: "not_found", message: "見つかりません" };
+    },
+  });
+  await adapter.updateSettings({ rootFolder: lib.root });
+  const scan = await adapter.scan();
+  await adapter.updateDlsiteState(scan.newWorkIds[0]!, { skipped: true });
+  const first = await adapter.runDlsiteBulk("existing", undefined);
+  assert.equal(first.failed, 1);
+  assert.equal(first.skipped, 1);
+  const second = await adapter.runDlsiteBulk("existing", undefined);
+  assert.equal(second.fetched, 0);
+  assert.equal(second.failed, 0);
+  assert.equal(calls, 1);
 });

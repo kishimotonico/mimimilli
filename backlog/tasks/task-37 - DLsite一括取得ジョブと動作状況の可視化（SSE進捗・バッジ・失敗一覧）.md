@@ -1,10 +1,10 @@
 ---
 id: TASK-37
 title: DLsite一括取得ジョブと動作状況の可視化（SSE進捗・バッジ・失敗一覧）
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-10 10:30'
-updated_date: '2026-07-11 16:55'
+updated_date: '2026-07-11 20:25'
 labels: []
 dependencies:
   - TASK-36
@@ -38,10 +38,32 @@ priority: high
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 スキャンで新規作品を置く→自動でタイトル・タグ・カバーが入る（実RJコードでのsmoke確認）
-- [ ] #2 既存作品への一括取得でタイトルが変更されない
-- [ ] #3 ユーザーが削除したDLsite由来タグが一括取得で復活しない（appliedTags差分）
-- [ ] #4 skipped/not_found/appliedの作品がスキップされる
-- [ ] #5 進捗が配信され、完了トーストに成功・失敗件数が出る
-- [ ] #6 レート制限（1秒以上間隔）が入っている
-- [ ] #7 pnpm check / pnpm test が通る
+- [x] #2 既存作品への一括取得でタイトルが変更されない
+- [x] #3 ユーザーが削除したDLsite由来タグが一括取得で復活しない（appliedTags差分）
+- [x] #4 skipped/not_found/appliedの作品がスキップされる
+- [x] #5 進捗が配信され、完了トーストに成功・失敗件数が出る
+- [x] #6 レート制限（1秒以上間隔）が入っている
+- [x] #7 pnpm check / pnpm test が通る
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. DLsite一括ジョブの進捗契約とadapter境界を定義し、独立ジョブ基盤を追加する
+2. realで新規/既存の適用方針、appliedTags差分、対象スキップ、1秒レート制限を実装する
+3. スキャン完了後の新規作品ジョブ起動とfixtureスタブフローを配線する
+4. 設定モーダルへ一括取得ボタン、SSE進捗購読、完了トーストを追加する
+5. 自動テストと全体検証を行い、実機系ACを残して完了・コミットする
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+runDlsiteBulkをnew/existing共通ジョブとして実装し、スキャン完了後はnewWorkIdsを別ジョブへ渡す。既存一括はタイトルを保持し、appliedTagsに含まれる削除済みタグを再追加しない。既定の取得間隔は1000ms。SSEはprogress/complete/errorとterminal replayを配信し、設定モーダルで進捗と件数トーストを表示する。検証: pnpm check / pnpm test（server 131件、client 142件）成功。AC#1の実RJコードsmokeは依頼どおり未実施。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+スキャン後の新規作品自動取得と、設定モーダルからの既存作品一括取得を共通の独立ジョブで実装した。状態除外、差分タグ適用、1秒レート制限、SSE進捗、完了件数トーストを追加した。自動テストは成功。実RJコードでの新規作品smokeはAC#1を未チェックで残した。
+<!-- SECTION:FINAL_SUMMARY:END -->

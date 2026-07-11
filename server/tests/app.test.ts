@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createApp } from "../src/app.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
+import { resetDlsiteProgressStateForTest } from "../src/routes/dlsiteProgress.ts";
 
 function buildApp() {
   return createApp(createFixtureAdapter());
@@ -40,6 +41,19 @@ test("POST /api/dlsite/:id/fetch は取得分類をHTTPエラーコードへ反�
     assert.equal(body.error.code, kind);
     assert.equal(body.error.message, `${kind} message`);
   }
+});
+
+test("DLsite一括取得は202で開始し、SSEに進捗と完了件数を配信する", async () => {
+  resetDlsiteProgressStateForTest();
+  const app = buildApp();
+  const start = await app.request("/api/dlsite/bulk", { method: "POST" });
+  assert.equal(start.status, 202);
+  const events = await app.request("/api/dlsite/events");
+  assert.equal(events.status, 200);
+  const text = await events.text();
+  assert.match(text, /event: complete/);
+  assert.match(text, /"fetched":/);
+  assert.match(text, /"failed":0/);
 });
 
 test("PATCH /api/works/:id でタグ更新が反映される", async () => {

@@ -6,6 +6,9 @@ import type {
   AxisFacetItem,
   DlsiteApplyBody,
   DlsiteFetchResult,
+  DlsiteBulkMode,
+  DlsiteBulkProgressEvent,
+  DlsiteBulkResult,
   DlsiteStatePatch,
   FileEntry,
   FsListing,
@@ -101,4 +104,9 @@ export interface DataAdapter {
   dlsiteFetch(workId: string): Promise<DlsiteFetchResult>;
   dlsiteApply(workId: string, body: DlsiteApplyBody): Promise<boolean>;
   updateDlsiteState(workId: string, patch: DlsiteStatePatch): Promise<Work | null>;
+  runDlsiteBulk(
+    mode: DlsiteBulkMode,
+    workIds: string[] | undefined,
+    onProgress?: (event: Extract<DlsiteBulkProgressEvent, { type: "progress" }>) => void,
+  ): Promise<DlsiteBulkResult>;
 }

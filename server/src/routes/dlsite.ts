@@ -1,8 +1,10 @@
 // POST /dlsite/:id/fetch, POST /dlsite/:id/apply
 import { Hono } from "hono";
+import { streamSSE } from "hono/streaming";
 import { dlsiteApplyBodySchema, dlsiteStatePatchSchema } from "@mimimilli/shared";
 import type { DataAdapter } from "../adapter.ts";
 import { apiError, invalidRequest, notFound } from "../lib/httpError.ts";
+import { isDlsiteJobInProgress, startDlsiteJob, subscribeToDlsite } from "./dlsiteProgress.ts";
 
 export function dlsiteRoute(adapter: DataAdapter): Hono {
   const app = new Hono();
@@ -32,6 +34,50 @@ export function dlsiteRoute(adapter: DataAdapter): Hono {
     if (!work) notFound(`作品が見つかりません: ${c.req.param("id")}`);
     return c.json(work);
   });
+
+  app.post("/dlsite/bulk", async (c) => {
+    if (isDlsiteJobInProgress()) throw apiError("conflict", "DLsite取得は既に実行中です");
+    const job = startDlsiteJob();
+    void adapter
+      .runDlsiteBulk("existing", undefined, (event) => job.emit(event))
+      .then((result) => job.emit({ type: "complete", result }))
+      .catch((error: unknown) =>
+        job.emit({
+          type: "error",
+          message: error instanceof Error ? error.message : "DLsite一括取得に失敗しました",
+        }),
+      )
+      .finally(() => job.finish());
+    return c.json({ started: true }, 202);
+  });
+
+  app.get("/dlsite/events", (c) =>
+    streamSSE(c, async (stream) => {
+      let resolveDone!: () => void;
+      const done = new Promise<void>((resolve) => (resolveDone = resolve));
+      let chain = Promise.resolve();
+      const send = (event: import("@mimimilli/shared").DlsiteBulkProgressEvent) => {
+        chain = chain.then(() =>
+          stream.writeSSE({ event: event.type, data: JSON.stringify(event) }),
+        );
+        return chain;
+      };
+      const listener = (event: import("@mimimilli/shared").DlsiteBulkProgressEvent) => {
+        const written = send(event);
+        if (event.type !== "progress") void written.then(resolveDone);
+      };
+      const subscription = subscribeToDlsite(listener);
+      for (const event of subscription.replay) await send(event);
+      if (!subscription.isLive || subscription.replay.some((event) => event.type !== "progress")) {
+        subscription.unsubscribe();
+        return;
+      }
+      stream.onAbort(resolveDone);
+      await done;
+      await chain;
+      subscription.unsubscribe();
+    }),
+  );
 
   return app;
 }

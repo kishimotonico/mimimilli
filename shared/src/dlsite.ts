@@ -62,3 +62,25 @@ export const dlsiteStatePatchSchema = z
   })
   .refine((patch) => patch.rjCode !== undefined || patch.skipped !== undefined);
 export type DlsiteStatePatch = z.infer<typeof dlsiteStatePatchSchema>;
+
+export const dlsiteBulkModeSchema = z.enum(["new", "existing"]);
+export type DlsiteBulkMode = z.infer<typeof dlsiteBulkModeSchema>;
+
+export const dlsiteBulkResultSchema = z.object({
+  fetched: z.number().int().nonnegative(),
+  failed: z.number().int().nonnegative(),
+  skipped: z.number().int().nonnegative(),
+});
+export type DlsiteBulkResult = z.infer<typeof dlsiteBulkResultSchema>;
+
+export const dlsiteBulkProgressEventSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("progress"),
+    processed: z.number().int().nonnegative(),
+    total: z.number().int().nonnegative(),
+    workId: z.string(),
+  }),
+  z.object({ type: z.literal("complete"), result: dlsiteBulkResultSchema }),
+  z.object({ type: z.literal("error"), message: z.string() }),
+]);
+export type DlsiteBulkProgressEvent = z.infer<typeof dlsiteBulkProgressEventSchema>;

@@ -4,6 +4,9 @@ import { DEFAULT_TAG_PREFIXES, normalizeTags } from "@mimimilli/shared";
 import type {
   AxisFacetItem,
   DlsiteApplyBody,
+  DlsiteBulkMode,
+  DlsiteBulkProgressEvent,
+  DlsiteBulkResult,
   DlsiteFetchResult,
   DlsiteStatePatch,
   FileEntry,
@@ -488,6 +491,52 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
         work.dlsite.error = null;
       }
       return buildFullWork(work, state.resumes);
+    },
+
+    async runDlsiteBulk(
+      mode: DlsiteBulkMode,
+      workIds: string[] | undefined,
+      onProgress?: (event: Extract<DlsiteBulkProgressEvent, { type: "progress" }>) => void,
+    ): Promise<DlsiteBulkResult> {
+      const requested = workIds
+        ? state.works.filter((work) => workIds.includes(work.id))
+        : state.works;
+      const targets = requested.filter(
+        (work) =>
+          work.dlsite.rjCode && (work.dlsite.status === "none" || work.dlsite.status === "error"),
+      );
+      for (let index = 0; index < targets.length; index++) {
+        const work = targets[index]!;
+        const fetchedTags = normalizeTags([
+          "サークル/fixtureサークル",
+          "cv/fixture CV",
+          "genre/テスト",
+        ]);
+        const applyTags =
+          mode === "new"
+            ? fetchedTags
+            : fetchedTags.filter((tag) => !work.dlsite.appliedTags.includes(tag));
+        if (mode === "new") work.title = `（fixture）${work.dlsite.rjCode}`;
+        work.tags = normalizeTags([...work.tags, ...applyTags]);
+        work.dlsite = {
+          ...work.dlsite,
+          status: "applied",
+          lastAttemptAt: new Date().toISOString(),
+          error: null,
+          appliedTags: normalizeTags([...work.dlsite.appliedTags, ...fetchedTags]),
+        };
+        onProgress?.({
+          type: "progress",
+          processed: index + 1,
+          total: targets.length,
+          workId: work.id,
+        });
+      }
+      return {
+        fetched: targets.length,
+        failed: 0,
+        skipped: requested.length - targets.length,
+      };
     },
   };
 }
