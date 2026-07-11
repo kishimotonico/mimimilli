@@ -1,9 +1,11 @@
 ---
 id: TASK-28
 title: APIレスポンスのZod検証をclient境界に導入
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@sonnet'
 created_date: '2026-07-10 10:39'
+updated_date: '2026-07-11 23:45'
 labels:
   - frontend
 dependencies: []

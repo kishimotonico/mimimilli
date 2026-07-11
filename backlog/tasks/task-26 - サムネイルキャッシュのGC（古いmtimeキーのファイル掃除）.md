@@ -1,9 +1,11 @@
 ---
 id: TASK-26
 title: サムネイルキャッシュのGC（古いmtimeキーのファイル掃除）
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@sonnet'
 created_date: '2026-07-10 10:31'
+updated_date: '2026-07-11 23:49'
 labels:
   - backend
 dependencies: []
@@ -21,7 +23,19 @@ TASK-24のサムネイルキャッシュ（data/cache/thumbnails/、キー=sha25
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 スキャン完了時（または同等の自然なタイミング）に、参照されなくなったサムネイルキャッシュファイルが削除される
-- [ ] #2 現役のキャッシュ（現mtime・許可幅に対応するファイル）は削除されない
-- [ ] #3 GCの発動タイミングと削除基準がthumbnailCache.ts（または関連モジュール）のコメントで説明されている
+- [x] #1 スキャン完了時（または同等の自然なタイミング）に、参照されなくなったサムネイルキャッシュファイルが削除される
+- [x] #2 現役のキャッシュ（現mtime・許可幅に対応するファイル）は削除されない
+- [x] #3 GCの発動タイミングと削除基準がthumbnailCache.ts（または関連モジュール）のコメントで説明されている
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Sonnet実装、Fableレビュー。有効キー集合方式（現存作品×許可幅×現mtime）、tmp孤児は命名規則不一致で自然に対象、stat不能作品はスキップ+件数可視化。生成中tmpとの競合はENOENT再試行で許容（コメント明記）。テスト4ケース、server 135件全パス。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+スキャン完了時のサムネイルキャッシュGCを実装。
+<!-- SECTION:FINAL_SUMMARY:END -->

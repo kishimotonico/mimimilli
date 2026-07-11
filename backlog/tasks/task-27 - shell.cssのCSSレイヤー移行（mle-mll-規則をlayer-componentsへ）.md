@@ -1,9 +1,11 @@
 ---
 id: TASK-27
 title: shell.cssのCSSレイヤー移行（mle-/mll-規則を@layer componentsへ）
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@sonnet'
 created_date: '2026-07-10 10:39'
+updated_date: '2026-07-11 23:45'
 labels:
   - ui
   - dx
