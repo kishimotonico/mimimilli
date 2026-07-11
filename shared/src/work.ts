@@ -98,13 +98,14 @@ export function parseTag(tag: string): ParsedTag {
 
 /** タグを正規形へ寄せる（ADR-0005 決定5）。
  *  Annotated: prefix を trim + 小文字化、値を trim。フラット: 全体を trim。
- *  値の大文字小文字は保持する */
+ *  Annotated の prefix または値が空なら空文字列。値の大文字小文字は保持する */
 export function normalizeTag(tag: string): string {
   const idx = tag.indexOf("/");
   if (idx > 0) {
     const prefix = tag.slice(0, idx).trim().toLowerCase();
     const value = tag.slice(idx + 1).trim();
-    if (prefix && value) return `${prefix}/${value}`;
+    if (!prefix || !value) return "";
+    return `${prefix}/${value}`;
   }
   return tag.trim();
 }
