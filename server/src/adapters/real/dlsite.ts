@@ -49,7 +49,10 @@ export function parseDlsiteHtml(html: string, rjCode: string): DlsiteFetchResult
       });
   });
 
+  // 作品ジャンルのリンク先は `/fs/=/genre/` または `/fsr/=/genre/` 形式。
+  // main_genre 内には特集・キャンペーンへの通常リンクも混在するため、リンク先で限定する。
   const genreTags = $("div.main_genre a")
+    .filter((_, a) => /\/fsr?\/=\/genre\//.test($(a).attr("href") ?? ""))
     .map((_, a) => $(a).text().trim())
     .get()
     .filter((t) => t.length > 0);

@@ -22,7 +22,12 @@ const SAMPLE_HTML = `
     <tr><th>販売日</th><td>2026年01月01日</td></tr>
     <tr><th>声優</th><td><a href="#">水瀬なずな</a> / <a href="#">早乙女しおん</a></td></tr>
   </table>
-  <div class="main_genre"><a href="#">耳かき</a><a href="#">バイノーラル</a><a href="#"> </a></div>
+  <div class="main_genre">
+    <a href="https://www.dlsite.com/maniax/fs/=/genre/123/from/work.genre">耳かき</a>
+    <a href="/maniax/fsr/=/genre/456/from/work.genre">バイノーラル</a>
+    <a href="/maniax/campaign/award">DLsiteアワード！！注目マンガ・CG作品の特集です！</a>
+    <a href="/maniax/fs/=/genre/999/from/work.genre"> </a>
+  </div>
   <div class="product-slider-data">
     <div data-src="//img.dlsite.jp/modpub/images2/work/doujin/RJ900000/RJ899999_img_main.jpg"></div>
   </div>
