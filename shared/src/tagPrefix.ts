@@ -67,11 +67,36 @@ export const tagPrefixCandidateSchema = z.object({
 export type TagPrefixCandidate = z.infer<typeof tagPrefixCandidateSchema>;
 
 /** 初回起動時に seed する prefix 定義。投入後の変更・削除はユーザーの自由
- *  （seed 済みフラグで管理し、全削除しても再投入しない） */
+ *  （seed 済みフラグで管理し、全削除しても再投入しない）。
+ *  color はクライアントのデザイントークン（styles/tokens.css）への参照 */
 export const DEFAULT_TAG_PREFIXES: TagPrefix[] = [
-  { prefix: "cv", label: "CV", color: null, showAsAxis: true, protected: true },
-  { prefix: "サークル", label: "サークル", color: null, showAsAxis: true, protected: true },
-  { prefix: "シリーズ", label: "シリーズ", color: null, showAsAxis: true, protected: false },
-  { prefix: "カテゴリ", label: "カテゴリ", color: null, showAsAxis: true, protected: false },
-  { prefix: "genre", label: "ジャンル", color: null, showAsAxis: false, protected: false },
+  { prefix: "cv", label: "CV", color: "var(--cv-color)", showAsAxis: true, protected: true },
+  {
+    prefix: "サークル",
+    label: "サークル",
+    color: "var(--circle-color)",
+    showAsAxis: true,
+    protected: true,
+  },
+  {
+    prefix: "シリーズ",
+    label: "シリーズ",
+    color: "var(--series-color)",
+    showAsAxis: true,
+    protected: false,
+  },
+  {
+    prefix: "カテゴリ",
+    label: "カテゴリ",
+    color: "var(--cat-color)",
+    showAsAxis: true,
+    protected: false,
+  },
+  {
+    prefix: "genre",
+    label: "ジャンル",
+    color: "var(--cat-color)",
+    showAsAxis: false,
+    protected: false,
+  },
 ];

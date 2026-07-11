@@ -1,10 +1,11 @@
 ---
 id: TASK-30
 title: モバイルUI方針を決定しADR化する
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-07-10 12:34'
-updated_date: '2026-07-10 19:40'
+updated_date: '2026-07-11 10:54'
 labels: []
 dependencies: []
 documentation:
@@ -35,10 +36,10 @@ ordinal: 30000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 ブレークポイント戦略とシェル分岐方式が docs/adr/ に新規ADRとして記録されている
-- [ ] #2 スマホ初期スコープ（再生＋マーキングのみ・URL共通・管理系はPC専用）が仕様として docs/ に明文化されている
-- [ ] #3 TASK-6・TASK-14・TASK-25 との整合方針がADRまたは各タスクのノートに反映されている
-- [ ] #4 モバイル実装ドラフト群が決定内容に合わせて更新されている
+- [x] #1 ブレークポイント戦略とシェル分岐方式が docs/adr/ に新規ADRとして記録されている
+- [x] #2 スマホ初期スコープ（再生＋マーキングのみ・URL共通・管理系はPC専用）が仕様として docs/ に明文化されている
+- [x] #3 TASK-6・TASK-14・TASK-25 との整合方針がADRまたは各タスクのノートに反映されている
+- [x] #4 モバイル実装ドラフト群が決定内容に合わせて更新されている
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -72,3 +73,15 @@ ordinal: 30000
 ### 決定後の流れ
 ADR起草（docs/adr/0005）→ design-system.md へモバイル規約追記 → DRAFT-13〜18 を決定内容で更新・順次promote
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+5論点すべてユーザー決定済み（2026-07-11）: 768px単一分岐 / ボトムタブ / MobileShell分岐 / マークはタグ表現 / 続きから再生は初期スコープ外。マークのタグ化はユーザー提案（個別属性を増やさず仕様を単純に保つ）。お気に入りも同原則でタグとし、スマートフォルダーのタグ条件と整合させた。ドラフト更新は promote→edit→demote で実施したためドラフトIDが変動（シェル=DRAFT-19、ブラウズ=DRAFT-20、マーキング=DRAFT-21）。続きから再生を DRAFT-22 として次フェーズ候補に起票。別エージェント作業中のため docs 変更はコミットしていない。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+モバイルUI方針を docs/adr/0005-mobile-ui-strategy.md として記録（スコープ=再生+マークのみ、URL共通、768px単一分岐、MobileShell新設、ボトムタブ、マークはフラットタグ、PWA）。design-system.md にモバイルレイアウト節を追加。TASK-6/14/25 との整合方針をADR帰結に記載。モバイル実装ドラフト（DRAFT-14/17/18/19/20/21）を決定内容へ更新し、次フェーズ候補として DRAFT-22（続きから再生）を起票。
+<!-- SECTION:FINAL_SUMMARY:END -->

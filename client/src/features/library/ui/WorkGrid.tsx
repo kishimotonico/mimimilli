@@ -1,5 +1,7 @@
 import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
+import { useAtomValue } from "jotai";
 import type { AxisId } from "../model/types";
+import { tagPrefixesAtom } from "../model/atoms";
 import type { WorkSummary } from "@mimimilli/shared";
 import CoverImg from "../../../entities/work/ui/CoverImg";
 import { getCircleName } from "../../../entities/work/model";
@@ -49,6 +51,7 @@ export default function WorkGrid({
   inspector,
   onInspectorClose,
 }: WorkGridProps) {
+  const tagPrefixes = useAtomValue(tagPrefixesAtom);
   const safeTileSize = clampTileSize(tileSize);
   const requestWidth = selectCoverThumbnailWidth(safeTileSize, window.devicePixelRatio);
   const isDrilled = drillValue !== null;
@@ -156,6 +159,7 @@ export default function WorkGrid({
               searchQuery,
               isDrilled && isFacetAxis(axis) ? axis : null,
               drillValue,
+              tagPrefixes,
             )}
             action={
               searchQuery ? (

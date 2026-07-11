@@ -35,21 +35,9 @@ export const DEFAULT_LIBRARY_URL_STATE: LibraryUrlState = {
   sort: DEFAULT_SORT,
 };
 
-const AXES = new Set<AxisId>([
-  "all",
-  "recent",
-  "added",
-  "fav",
-  "unplayed",
-  "missing",
-  "circle",
-  "cv",
-  "series",
-  "cat",
-  "tag",
-  "year",
-]);
-const DRILL_AXES = new Set<AxisId>(["circle", "cv", "series", "cat", "year"]);
+// ビュー軸（ドリル不可）。それ以外のセグメントは tag / smart-* を除きファセット軸
+// （year または任意の prefix 軸）として受理する（ADR-0005: 軸IDの動的化）
+const VIEW_AXES = new Set<string>(["all", "recent", "added", "fav", "unplayed", "missing"]);
 const SORTS = new Set<SortId>([
   "added-desc",
   "added-asc",
@@ -96,9 +84,17 @@ function isSafeRelativeSegment(value: string): boolean {
 }
 
 function parseAxis(value: string): AxisId | null {
-  if (AXES.has(value as AxisId)) return value as AxisId;
-  if (value.startsWith("smart-") && value.length > "smart-".length) return value as AxisId;
-  return null;
+  if (VIEW_AXES.has(value) || value === "tag") return value;
+  if (value.startsWith("smart-")) {
+    return value.length > "smart-".length ? value : null;
+  }
+  // ファセット軸（year / 任意 prefix）。prefix は正規形（小文字）で扱う
+  return value.toLowerCase();
+}
+
+/** ドリル（/library/:axis/:value）できるのはファセット軸のみ */
+function isDrillableAxis(axis: AxisId): boolean {
+  return !VIEW_AXES.has(axis) && axis !== "tag" && !axis.startsWith("smart-");
 }
 
 function uniqueNonEmpty(values: string[]): string[] {
@@ -145,7 +141,7 @@ export function parseNavigationUrl(input: string | URL): NavigationParseResult {
     }
 
     const drillValue = segments[2] ?? null;
-    if (segments.length > 3 || (drillValue !== null && !DRILL_AXES.has(axis))) {
+    if (segments.length > 3 || (drillValue !== null && !isDrillableAxis(axis))) {
       warnings.push(`軸の階層として不正な URL を拒否しました: ${url.pathname}`);
       return defaultResult(warnings);
     }

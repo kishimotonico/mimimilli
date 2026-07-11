@@ -1,3 +1,4 @@
+import type { TagPrefix } from "@mimimilli/shared";
 import type { AxisId } from "./types";
 import { getAxisLabel } from "./axisDefinitions";
 
@@ -10,8 +11,9 @@ export interface AxisLandingPresentation {
 export function getAxisLandingPresentation(
   axis: AxisId,
   isFilterApplied: boolean,
+  tagPrefixes: TagPrefix[] = [],
 ): AxisLandingPresentation {
-  const axisLabel = getAxisLabel(axis);
+  const axisLabel = getAxisLabel(axis, tagPrefixes);
 
   if (isFilterApplied) {
     return {

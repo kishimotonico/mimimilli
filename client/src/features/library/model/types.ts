@@ -25,19 +25,11 @@ export const SORT_OPTIONS: { id: SortId; label: string }[] = [
 export type ViewMode = "list" | "grid";
 
 // ── 軸 ───────────────────────────────────────────────────────
+// ADR-0005: 軸IDは固定 enum ではなく文字列。
+//   - ビュー: all / recent / added / fav / unplayed / missing
+//   - 組み込み軸: "tag"（フラットタグ）・"year"（追加日）
+//   - スマートフォルダー: "smart-<id>"
+//   - それ以外: 登録済み prefix そのもの（例: "cv", "サークル"。正規形＝小文字）
+// 判定は axisDefinitions.ts の isViewAxis / isFacetAxis / isSmartAxis を使う。
 
-export type LibraryViewAxisId =
-  | "all"
-  | "recent"
-  | "added"
-  | "fav"
-  | "unplayed"
-  | "missing"
-  | "circle"
-  | "cv"
-  | "series"
-  | "cat"
-  | "tag"
-  | "year";
-
-export type AxisId = LibraryViewAxisId | `smart-${string}`;
+export type AxisId = string;

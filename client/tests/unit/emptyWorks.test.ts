@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
+import type { TagPrefix } from "@mimimilli/shared";
 import { buildEmptyWorksMessage } from "../../src/features/library/model/emptyWorks";
+
+const PREFIXES: TagPrefix[] = [
+  { prefix: "サークル", label: "サークル", color: null, showAsAxis: true, protected: true },
+];
 
 describe("buildEmptyWorksMessage", () => {
   it("shows a generic message when nothing narrows the result", () => {
@@ -11,13 +16,13 @@ describe("buildEmptyWorksMessage", () => {
   });
 
   it("mentions the drill axis/value alone", () => {
-    expect(buildEmptyWorksMessage("", "circle", "月白製作所")).toBe(
+    expect(buildEmptyWorksMessage("", "サークル", "月白製作所", PREFIXES)).toBe(
       "サークル「月白製作所」 に一致する作品はありません",
     );
   });
 
   it("combines search query and drill when both narrow the result", () => {
-    expect(buildEmptyWorksMessage("癒し", "circle", "月白製作所")).toBe(
+    expect(buildEmptyWorksMessage("癒し", "サークル", "月白製作所", PREFIXES)).toBe(
       "「癒し」・サークル「月白製作所」 に一致する作品はありません",
     );
   });

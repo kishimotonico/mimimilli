@@ -1,9 +1,10 @@
 ---
 id: TASK-33.3
 title: 'クライアント: 軸レール動的化・タグ編集解禁・タグ設定UI'
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-07-10 19:38'
+updated_date: '2026-07-11 10:47'
 labels: []
 dependencies:
   - TASK-33.2

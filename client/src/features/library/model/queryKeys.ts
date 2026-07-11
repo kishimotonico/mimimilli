@@ -12,4 +12,6 @@ export const LIBRARY_KEYS = {
   smartFolders: () => ["smartFolders"] as const,
   workDetail: (id: string) => ["work", id] as const,
   tags: () => ["tags"] as const,
+  tagPrefixes: () => ["tagPrefixes"] as const,
+  tagPrefixCandidates: () => ["tagPrefixes", "candidates"] as const,
 } as const;

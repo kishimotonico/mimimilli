@@ -3,7 +3,11 @@ import { getAxisLandingPresentation } from "../../src/features/library/model/axi
 
 describe("getAxisLandingPresentation", () => {
   it("shows the selection instruction before a facet value is selected", () => {
-    expect(getAxisLandingPresentation("circle", false)).toEqual({
+    expect(
+      getAxisLandingPresentation("サークル", false, [
+        { prefix: "サークル", label: "サークル", color: null, showAsAxis: true, protected: true },
+      ]),
+    ).toEqual({
       panelTitle: "概要",
       sectionTitle: "サークル",
       instruction: "左の列から絞り込みを選択してください",

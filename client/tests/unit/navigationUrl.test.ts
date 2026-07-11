@@ -79,15 +79,41 @@ describe("navigation URL codec", () => {
     });
   });
 
-  it("warns and falls back for an unknown axis", () => {
-    const result = parseNavigationUrl("/library/not-an-axis?work=ignored");
+  it("accepts arbitrary prefix segments as facet axes (lowercased)", () => {
+    // ADR-0005: 予約ID以外のセグメントは prefix 軸として受理する
+    const result = parseNavigationUrl("/library/%E6%B0%97%E5%88%86/%E7%9D%A1%E7%9C%A0%E7%94%A8");
+    expect(result.state).toEqual({
+      mode: "library",
+      library: {
+        ...DEFAULT_LIBRARY_URL_STATE,
+        activeAxis: "気分",
+        drillValue: "睡眠用",
+      },
+    });
+    expect(result.warnings).toEqual([]);
+
+    const upper = parseNavigationUrl("/library/CV");
+    expect(upper.state).toMatchObject({ library: { activeAxis: "cv" } });
+  });
+
+  it("warns and falls back for a bare smart- axis", () => {
+    const result = parseNavigationUrl("/library/smart-?work=ignored");
 
     expect(result.state).toEqual({
       mode: "library",
       library: DEFAULT_LIBRARY_URL_STATE,
     });
     expect(result.canonicalUrl).toBe("/library/all");
-    expect(result.warnings).toEqual(["存在しないライブラリ軸を拒否しました: not-an-axis"]);
+    expect(result.warnings).toEqual(["存在しないライブラリ軸を拒否しました: smart-"]);
+  });
+
+  it("rejects drill values on non-drillable axes (view / tag)", () => {
+    const result = parseNavigationUrl("/library/fav/value");
+    expect(result.state).toEqual({
+      mode: "library",
+      library: DEFAULT_LIBRARY_URL_STATE,
+    });
+    expect(result.warnings[0]).toContain("軸の階層として不正な URL");
   });
 
   it("rejects paths that can escape or impersonate the configured root", () => {

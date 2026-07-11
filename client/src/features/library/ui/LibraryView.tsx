@@ -63,6 +63,7 @@ export default function LibraryView({
     selectedWork,
     workDetailQuery,
     tagSuggestions,
+    tagPrefixes,
     patchWorkMutation,
   } = useLibraryQueries(nav, searchQuery);
 
@@ -141,6 +142,7 @@ export default function LibraryView({
       <AxisColumn
         activeAxis={nav.activeAxis}
         totalCount={libraryTotal}
+        tagPrefixes={tagPrefixes}
         smartFolders={smartFolders}
         onSelectAxis={nav.setAxis}
         onNewSmartFolder={() => {
@@ -217,7 +219,11 @@ export default function LibraryView({
         <PreviewPane
           mode={previewMode}
           showNoResultsHint={isNoResultsDueToFilter}
-          axisLandingPresentation={getAxisLandingPresentation(nav.activeAxis, isAxisFilterApplied)}
+          axisLandingPresentation={getAxisLandingPresentation(
+            nav.activeAxis,
+            isAxisFilterApplied,
+            tagPrefixes,
+          )}
           selectedWork={selectedWork}
           smartFolder={activeSmartFolder}
           axisWorks={works}

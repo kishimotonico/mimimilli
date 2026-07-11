@@ -1,9 +1,13 @@
+import type { TagPrefix } from "@mimimilli/shared";
 import { parseTag } from "../model";
 import { cn } from "../../../shared/lib/cn";
 import { I } from "../../../shared/ui/Icon";
 
 interface TagProps {
   tag: string;
+  /** このタグの prefix に対応する定義（ADR-0005）。ラベル・色をここから引く。
+   *  未登録 prefix は prefix 文字列そのままのフォールバック表示 */
+  definition?: TagPrefix | null;
   onRemove?: () => void;
   onClick?: () => void;
   /** 削除リクエスト送信中。専用のスピナーに差し替え、クリック不可にする */
@@ -11,24 +15,6 @@ interface TagProps {
   /** 直前の削除が失敗した。目立たせて onRemove をリトライ導線として使う */
   failed?: boolean;
 }
-
-const CAT_LABELS: Record<string, string> = {
-  cv: "CV",
-  サークル: "CIR",
-  シリーズ: "SR",
-  カテゴリ: "CAT",
-  category: "CAT",
-  genre: "GNR",
-};
-
-const CAT_CLASSES: Record<string, string> = {
-  cv: "text-cv",
-  サークル: "text-circle",
-  シリーズ: "text-series",
-  カテゴリ: "text-cat",
-  category: "text-cat",
-  genre: "text-cat",
-};
 
 const TAG_BASE =
   "group inline-flex h-5 items-center gap-[3px] whitespace-nowrap rounded-1 bg-paper-2 px-[7px] font-jp text-[10.5px] text-ink-1 hover:bg-paper-3";
@@ -79,7 +65,7 @@ function RemoveSlot({
   );
 }
 
-export default function Tag({ tag, onRemove, onClick, pending, failed }: TagProps) {
+export default function Tag({ tag, definition, onRemove, onClick, pending, failed }: TagProps) {
   const parsed = parseTag(tag);
   const tagClass = cn(
     TAG_BASE,
@@ -106,13 +92,15 @@ export default function Tag({ tag, onRemove, onClick, pending, failed }: TagProp
     return <span className={tagClass}>{content}</span>;
   }
 
-  const catLabel = CAT_LABELS[parsed.prefix] ?? parsed.prefix.toUpperCase().slice(0, 4);
-  const catClass = CAT_CLASSES[parsed.prefix] ?? "text-cat";
+  const catLabel = definition?.label ?? parsed.prefix.toUpperCase().slice(0, 4);
+  const valueStyle = { color: definition?.color ?? "var(--cat-color)" };
 
   const content = (
     <>
       <span className="font-mono text-[9.5px] uppercase text-ink-3">{catLabel}</span>
-      <span className={cn("font-medium", catClass)}>{parsed.value}</span>
+      <span className="font-medium" style={valueStyle}>
+        {parsed.value}
+      </span>
       <RemoveSlot value={parsed.value} onRemove={onRemove} pending={pending} failed={failed} />
     </>
   );

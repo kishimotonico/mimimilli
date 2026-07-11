@@ -1,4 +1,6 @@
+import { useAtomValue } from "jotai";
 import { I } from "../../../shared/ui/Icon";
+import { tagPrefixesAtom } from "../model/atoms";
 import { getAxisLabel } from "../model/axisDefinitions";
 import type { AxisId } from "../model/types";
 
@@ -10,7 +12,8 @@ interface DrillHeaderProps {
 }
 
 export default function DrillHeader({ axisLabel, value, count, onBack }: DrillHeaderProps) {
-  const label = getAxisLabel(axisLabel);
+  const tagPrefixes = useAtomValue(tagPrefixesAtom);
+  const label = getAxisLabel(axisLabel, tagPrefixes);
   return (
     <div className="mle-drill">
       <button type="button" className="mle-drill__crumb" onClick={onBack}>

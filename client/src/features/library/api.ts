@@ -2,7 +2,7 @@
 // ライブラリのエクスポート。
 // 依存方向: shared/api/http、entities/work（戻り値の WorkSummary）、自 feature の model を参照する。
 
-import { get, post, put, del } from "../../shared/api/http";
+import { get, post, put, del, patch } from "../../shared/api/http";
 import type {
   AxisFacetItem,
   FacetAxisId,
@@ -10,6 +10,10 @@ import type {
   SmartFolderCreate,
   SmartFolderUpdate,
   SortId,
+  TagPrefix,
+  TagPrefixCandidate,
+  TagPrefixCreate,
+  TagPrefixUpdate,
   ViewId,
   WorksPage,
   WorkSummary,
@@ -48,6 +52,28 @@ export async function searchWorks(params: WorksQueryParams): Promise<WorksPage> 
 
 export async function getAxisFacets(axis: FacetAxisId): Promise<AxisFacetItem[]> {
   return get<AxisFacetItem[]>(`/axes/${encodeURIComponent(axis)}`);
+}
+
+// ── タグ prefix 定義（ADR-0005）──────────────────────────────
+
+export async function listTagPrefixes(): Promise<TagPrefix[]> {
+  return get<TagPrefix[]>("/tag-prefixes");
+}
+
+export async function createTagPrefix(data: TagPrefixCreate): Promise<TagPrefix> {
+  return post<TagPrefix>("/tag-prefixes", data);
+}
+
+export async function updateTagPrefix(prefix: string, data: TagPrefixUpdate): Promise<TagPrefix> {
+  return patch<TagPrefix>(`/tag-prefixes/${encodeURIComponent(prefix)}`, data);
+}
+
+export async function deleteTagPrefix(prefix: string): Promise<void> {
+  await del(`/tag-prefixes/${encodeURIComponent(prefix)}`);
+}
+
+export async function listTagPrefixCandidates(): Promise<TagPrefixCandidate[]> {
+  return get<TagPrefixCandidate[]>("/tag-prefixes/candidates");
 }
 
 // ── スマートフォルダー ────────────────────────────────────────

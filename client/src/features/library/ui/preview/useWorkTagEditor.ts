@@ -1,13 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { Work, WorkPatch } from "@mimimilli/shared";
-import { parseTag } from "../../../../entities/work/model";
-import { buildWorkPatchTags, getEditableFlatTags } from "../../../../entities/work/editableTags";
+import { useEffect, useRef, useState } from "react";
+import { parseTag, tagEquals } from "@mimimilli/shared";
+import type { TagPrefix, Work, WorkPatch } from "@mimimilli/shared";
+import { buildTagsWithAdded, buildTagsWithRemoved } from "../../../../entities/work/editableTags";
 
 const TAG_UNDO_TOAST_MS = 6000;
 
 export interface UseWorkTagEditorOptions {
   work: Work;
   tagSuggestions: string[];
+  /** 保護判定（protected な prefix のタグは削除前に確認を挟む。ADR-0005） */
+  tagPrefixes: TagPrefix[];
   isPatching: boolean;
   onPatchWork: (body: WorkPatch) => Promise<Work>;
   /** タグ保存の成否をタイトル編集等と共有するエラー表示へ伝える。開始時は null で呼ぶ */
@@ -15,26 +17,32 @@ export interface UseWorkTagEditorOptions {
 }
 
 export interface UseWorkTagEditorResult {
-  structuredTags: string[];
-  editableFlatTags: string[];
-  flatTagSuggestions: string[];
+  tags: string[];
+  suggestions: string[];
   isTagSaving: boolean;
   pendingRemoveTag: string | null;
   failedRemoveTag: string | null;
+  /** 保護タグの削除確認待ち。ConfirmDialog の表示トリガー */
+  confirmingRemoveTag: string | null;
   tagUndoToast: string | null;
-  addFlatTag: (tag: string) => Promise<void>;
-  removeFlatTag: (tag: string) => Promise<void>;
+  addTag: (tag: string) => Promise<void>;
+  /** 削除要求。保護タグなら確認待ちにし、それ以外は即削除する */
+  requestRemoveTag: (tag: string) => Promise<void>;
+  confirmRemoveTag: () => Promise<void>;
+  cancelRemoveTag: () => void;
   undoRemoveTag: () => Promise<void>;
   dismissTagUndoToast: () => void;
 }
 
 /**
- * フラットタグの追加・削除と、削除の undo（トースト経由）をまとめて扱うフック。
- * undo は非同期の再保存トランザクションなので、pending/failed/トースト表示までここで完結させる。
+ * タグの追加・削除・削除の undo（トースト経由）と、保護タグの削除確認をまとめて扱うフック。
+ * 全タグが編集対象（ADR-0005）。undo は非同期の再保存トランザクションなので、
+ * pending/failed/トースト表示までここで完結させる。
  */
 export function useWorkTagEditor({
   work,
   tagSuggestions,
+  tagPrefixes,
   isPatching,
   onPatchWork,
   onError,
@@ -42,6 +50,7 @@ export function useWorkTagEditor({
   const [isTagSaving, setIsTagSaving] = useState(false);
   const [pendingRemoveTag, setPendingRemoveTag] = useState<string | null>(null);
   const [failedRemoveTag, setFailedRemoveTag] = useState<string | null>(null);
+  const [confirmingRemoveTag, setConfirmingRemoveTag] = useState<string | null>(null);
   const [tagUndoToast, setTagUndoToast] = useState<string | null>(null);
   const tagUndoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -51,23 +60,18 @@ export function useWorkTagEditor({
     };
   }, []);
 
-  const structuredTags = useMemo(
-    () => work.tags.filter((tag) => parseTag(tag).kind !== "flat"),
-    [work.tags],
-  );
-  const editableFlatTags = useMemo(() => getEditableFlatTags(work.tags), [work.tags]);
-  const flatTagSuggestions = useMemo(
-    () => [...new Set(tagSuggestions.filter((tag) => parseTag(tag).kind === "flat"))],
-    [tagSuggestions],
-  );
+  const isProtectedTag = (tag: string): boolean => {
+    const parsed = parseTag(tag);
+    if (parsed.kind !== "annotated") return false;
+    return tagPrefixes.some((p) => p.prefix === parsed.prefix && p.protected);
+  };
 
-  const patchFlatTags = async (nextFlatTags: string[]): Promise<boolean> => {
+  const patchTags = async (nextTags: string[]): Promise<boolean> => {
     if (isPatching || isTagSaving) return false;
-    const tags = buildWorkPatchTags(work.tags, nextFlatTags);
     setIsTagSaving(true);
     onError(null);
     try {
-      await onPatchWork({ tags });
+      await onPatchWork({ tags: nextTags });
       return true;
     } catch {
       onError("タグを保存できませんでした。");
@@ -77,19 +81,10 @@ export function useWorkTagEditor({
     }
   };
 
-  const addFlatTag = async (tag: string) => {
-    const nextTag = tag.trim();
-    if (
-      !nextTag ||
-      parseTag(nextTag).kind !== "flat" ||
-      editableFlatTags.some(
-        (current) => current.toLocaleLowerCase() === nextTag.toLocaleLowerCase(),
-      )
-    ) {
-      return;
-    }
-
-    await patchFlatTags([...editableFlatTags, nextTag]);
+  const addTag = async (tag: string) => {
+    const nextTags = buildTagsWithAdded(work.tags, tag);
+    if (!nextTags) return;
+    await patchTags(nextTags);
   };
 
   const showTagUndoToast = (tag: string) => {
@@ -98,12 +93,11 @@ export function useWorkTagEditor({
     tagUndoTimerRef.current = setTimeout(() => setTagUndoToast(null), TAG_UNDO_TOAST_MS);
   };
 
-  const removeFlatTag = async (tag: string) => {
+  const removeTag = async (tag: string) => {
     if (isPatching || isTagSaving) return;
-    const nextFlatTags = editableFlatTags.filter((current) => current !== tag);
     setPendingRemoveTag(tag);
     setFailedRemoveTag(null);
-    const ok = await patchFlatTags(nextFlatTags);
+    const ok = await patchTags(buildTagsWithRemoved(work.tags, tag));
     setPendingRemoveTag(null);
     if (ok) {
       showTagUndoToast(tag);
@@ -112,6 +106,23 @@ export function useWorkTagEditor({
     }
   };
 
+  const requestRemoveTag = async (tag: string) => {
+    if (isPatching || isTagSaving) return;
+    if (isProtectedTag(tag)) {
+      setConfirmingRemoveTag(tag);
+      return;
+    }
+    await removeTag(tag);
+  };
+
+  const confirmRemoveTag = async () => {
+    const tag = confirmingRemoveTag;
+    setConfirmingRemoveTag(null);
+    if (tag) await removeTag(tag);
+  };
+
+  const cancelRemoveTag = () => setConfirmingRemoveTag(null);
+
   const undoRemoveTag = async () => {
     const tag = tagUndoToast;
     if (!tag) return;
@@ -119,8 +130,10 @@ export function useWorkTagEditor({
     if (isPatching || isTagSaving) return;
     // 削除したタグだけを現在の集合へ戻す。undo待ちの間に行われた他のタグ編集は巻き戻さない。
     // 復元に失敗した場合はトーストを残して再試行可能にする（onError も呼ばれる）
-    const restored = editableFlatTags.includes(tag) ? editableFlatTags : [...editableFlatTags, tag];
-    const ok = await patchFlatTags(restored);
+    const restored = work.tags.some((current) => tagEquals(current, tag))
+      ? work.tags
+      : [...work.tags, tag];
+    const ok = await patchTags(restored);
     if (ok) {
       if (tagUndoTimerRef.current) clearTimeout(tagUndoTimerRef.current);
       setTagUndoToast(null);
@@ -130,15 +143,17 @@ export function useWorkTagEditor({
   const dismissTagUndoToast = () => setTagUndoToast(null);
 
   return {
-    structuredTags,
-    editableFlatTags,
-    flatTagSuggestions,
+    tags: work.tags,
+    suggestions: [...new Set(tagSuggestions)],
     isTagSaving,
     pendingRemoveTag,
     failedRemoveTag,
+    confirmingRemoveTag,
     tagUndoToast,
-    addFlatTag,
-    removeFlatTag,
+    addTag,
+    requestRemoveTag,
+    confirmRemoveTag,
+    cancelRemoveTag,
     undoRemoveTag,
     dismissTagUndoToast,
   };

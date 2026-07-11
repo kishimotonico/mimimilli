@@ -1,6 +1,8 @@
 import React from "react";
+import { useAtomValue } from "jotai";
 import type { WorkSummary, AxisFacetItem } from "@mimimilli/shared";
 import type { AxisId } from "../model/types";
+import { tagPrefixesAtom } from "../model/atoms";
 import { getAxisLabel, isFacetAxis, isSmartAxis } from "../model/axisDefinitions";
 import { buildEmptyWorksMessage } from "../model/emptyWorks";
 import WorkRow from "./WorkRow";
@@ -46,6 +48,7 @@ export default function ContentColumn({
   onTagToggle,
   onClearSearch,
 }: ContentColumnProps) {
+  const tagPrefixes = useAtomValue(tagPrefixesAtom);
   const hd = drillValue
     ? `${works.length} 件`
     : facetItems.length > 0
@@ -112,7 +115,7 @@ export default function ContentColumn({
     return (
       <div className="mle-col is-content">
         <div className="mle-col__hd">
-          <span>{getAxisLabel(axis)}</span>
+          <span>{getAxisLabel(axis, tagPrefixes)}</span>
           <span className="count">{facetItems.length} 件</span>
         </div>
         <div className="mle-col__list">
@@ -187,7 +190,12 @@ export default function ContentColumn({
           <CollectionStatus
             variant="list"
             kind="empty"
-            message={buildEmptyWorksMessage(searchQuery, showDrill ? axis : null, drillValue)}
+            message={buildEmptyWorksMessage(
+              searchQuery,
+              showDrill ? axis : null,
+              drillValue,
+              tagPrefixes,
+            )}
             action={
               searchQuery ? (
                 <Button variant="ghost" icon={I.x} onClick={onClearSearch}>

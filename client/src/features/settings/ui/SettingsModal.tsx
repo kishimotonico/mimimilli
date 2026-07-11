@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { I } from "../../../shared/ui/Icon";
+import TagPrefixSettings from "./TagPrefixSettings";
 
 interface SettingsModalProps {
   rootFolder: string | null;
@@ -124,7 +125,14 @@ export default function SettingsModal({
 
         {/* Body */}
         <div
-          style={{ padding: "18px 18px 8px", display: "flex", flexDirection: "column", gap: 18 }}
+          style={{
+            padding: "18px 18px 8px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 18,
+            maxHeight: "min(72vh, 640px)",
+            overflowY: "auto",
+          }}
         >
           {/* Root folder */}
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -309,6 +317,9 @@ export default function SettingsModal({
               </button>
             </div>
           </div>
+
+          {/* Tag prefixes（ADR-0005） */}
+          <TagPrefixSettings />
 
           {/* Export */}
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

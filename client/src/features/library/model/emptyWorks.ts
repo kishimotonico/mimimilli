@@ -3,6 +3,7 @@
 // グリッド側は検索語しか考慮していなかった（軸ドリルの絞り込みは無視）。
 // 両者から参照する単一実装に統一する。
 
+import type { TagPrefix } from "@mimimilli/shared";
 import { getAxisLabel } from "./axisDefinitions";
 import type { AxisId } from "./types";
 
@@ -12,8 +13,10 @@ export function buildEmptyWorksMessage(
   searchQuery: string,
   drillAxis: AxisId | null,
   drillValue: string | null,
+  tagPrefixes: TagPrefix[] = [],
 ): string {
-  const drillLabel = drillAxis && drillValue ? `${getAxisLabel(drillAxis)}「${drillValue}」` : null;
+  const drillLabel =
+    drillAxis && drillValue ? `${getAxisLabel(drillAxis, tagPrefixes)}「${drillValue}」` : null;
   if (searchQuery && drillLabel) {
     return `「${searchQuery}」・${drillLabel} に一致する作品はありません`;
   }

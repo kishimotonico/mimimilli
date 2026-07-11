@@ -5,6 +5,7 @@
 
 import { atom } from "jotai";
 import { atomWithStorage } from "jotai/utils";
+import type { TagPrefix } from "@mimimilli/shared";
 import type { AxisId, SortId, ViewMode } from "../../../features/library/model/types";
 import { getAxisLabel } from "./axisDefinitions";
 
@@ -16,18 +17,28 @@ export const selectedTagsAtom = atom<string[]>([]);
 export const selectedWorkIdAtom = atom<string | null>(null);
 export const sortAtom = atom<SortId>("added-desc");
 
+// ── タグ prefix 定義（ADR-0005）───────────────────────────────
+// GET /tag-prefixes の内容を useLibraryQueries が同期する。軸ラベル・タグチップの
+// 表示（label / color / protected）はここから引く。
+
+export const tagPrefixesAtom = atom<TagPrefix[]>([]);
+
 // URLには含めない表示設定。ブラウザーを再起動しても直前の見た目を復元する。
 export const libraryViewModeAtom = atomWithStorage<ViewMode>("mimimilli:libraryViewMode", "list");
 export const libraryTileSizeAtom = atomWithStorage<number>("mimimilli:libraryTileSize", 176);
 
 // ── 派生: アドレスバーパス ────────────────────────────────────
 
-function buildAddressPath(axis: AxisId, drillValue: string | null): string[] {
+function buildAddressPath(
+  axis: AxisId,
+  drillValue: string | null,
+  tagPrefixes: TagPrefix[],
+): string[] {
   if (axis === "all") return ["ライブラリ"];
-  const base = ["ライブラリ", getAxisLabel(axis)];
+  const base = ["ライブラリ", getAxisLabel(axis, tagPrefixes)];
   return drillValue ? [...base, drillValue] : base;
 }
 
 export const addressPathAtom = atom<string[]>((get) => {
-  return buildAddressPath(get(activeAxisAtom), get(drillValueAtom));
+  return buildAddressPath(get(activeAxisAtom), get(drillValueAtom), get(tagPrefixesAtom));
 });

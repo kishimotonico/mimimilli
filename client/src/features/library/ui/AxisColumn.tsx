@@ -1,4 +1,4 @@
-import type { SmartFolder } from "@mimimilli/shared";
+import type { SmartFolder, TagPrefix } from "@mimimilli/shared";
 import type { AxisId } from "../model/types";
 import { I } from "../../../shared/ui/Icon";
 
@@ -20,19 +20,33 @@ const VIEW_AXES: AxisRow[] = [
   { id: "missing", name: "ファイル欠損", icon: "err" },
 ];
 
-const FACET_AXES: AxisRow[] = [
-  { id: "circle", name: "サークル", icon: "folder" },
-  { id: "cv", name: "CV", icon: "user" },
-  { id: "series", name: "シリーズ", icon: "bookmark" },
-  { id: "cat", name: "カテゴリ", icon: "list" },
-  { id: "tag", name: "タグ", icon: "filter" },
-  { id: "year", name: "追加日", icon: "refresh" },
-];
+// 初期 seed の prefix に対する見慣れたアイコン。未知の prefix は folder に落ちる
+// （アイコンは prefix 定義に持たせていない表示上の便宜）
+const PREFIX_ICONS: Record<string, string> = {
+  cv: "user",
+  サークル: "folder",
+  シリーズ: "bookmark",
+  カテゴリ: "list",
+  genre: "list",
+};
+
+/** 分類軸の行 = 軸表示ONの prefix 定義（定義順）＋ 組み込みの tag / year（ADR-0005） */
+function buildFacetAxisRows(tagPrefixes: TagPrefix[]): AxisRow[] {
+  const prefixRows = tagPrefixes
+    .filter((p) => p.showAsAxis)
+    .map((p) => ({ id: p.prefix, name: p.label, icon: PREFIX_ICONS[p.prefix] ?? "folder" }));
+  return [
+    ...prefixRows,
+    { id: "tag", name: "タグ", icon: "filter" },
+    { id: "year", name: "追加日", icon: "refresh" },
+  ];
+}
 
 interface AxisColumnProps {
   activeAxis: AxisId;
   viewCounts?: Partial<Record<string, number>>;
   facetCounts?: Partial<Record<string, number>>;
+  tagPrefixes: TagPrefix[];
   smartFolders: SmartFolder[];
   totalCount?: number;
   onSelectAxis: (axis: AxisId) => void;
@@ -71,11 +85,13 @@ export default function AxisColumn({
   activeAxis,
   viewCounts = {},
   facetCounts = {},
+  tagPrefixes,
   smartFolders,
   totalCount,
   onSelectAxis,
   onNewSmartFolder,
 }: AxisColumnProps) {
+  const facetAxisRows = buildFacetAxisRows(tagPrefixes);
   return (
     <div className="mle-col is-axis">
       <div className="mle-col__hd">
@@ -97,7 +113,7 @@ export default function AxisColumn({
 
         <div className="mll-axisgroup">
           <div className="mll-axisgroup__hd">分類軸</div>
-          {FACET_AXES.map((ax) => (
+          {facetAxisRows.map((ax) => (
             <AxisRowItem
               key={ax.id}
               ax={{ ...ax, count: facetCounts[ax.id] }}
