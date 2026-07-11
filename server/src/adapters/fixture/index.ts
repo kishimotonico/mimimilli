@@ -449,16 +449,20 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
       const work = state.works.find((candidate) => candidate.id === workId);
       if (!work)
         return { ok: false, kind: "not_found", message: `作品が見つかりません: ${workId}` };
+      const rjCode = work.dlsite.rjCode;
+      if (!rjCode) {
+        return { ok: false, kind: "not_found", message: "RJコードが検出されていません" };
+      }
       return {
         ok: true,
         info: {
-          rjCode: workId,
-          title: `（fixture）${workId}`,
+          rjCode,
+          title: `（fixture）${rjCode}`,
           circle: "fixtureサークル",
           cvs: ["fixture CV"],
           genreTags: ["テスト"],
           coverUrl: null,
-          url: `https://www.dlsite.com/maniax/work/=/product_id/${workId}.html`,
+          url: `https://www.dlsite.com/maniax/work/=/product_id/${rjCode}.html`,
         },
       };
     },

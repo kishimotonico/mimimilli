@@ -66,3 +66,17 @@ test("不明なシナリオIDはエラーになる（黙って default にフォ
     /不明な MIMIMILLI_MOCK_SCENARIO/,
   );
 });
+
+test("fixtureのDLsite取得は保存済みRJコードの修正を反映する", async () => {
+  const adapter = createFixtureAdapter();
+  const workId = "RJ501001";
+  await adapter.updateDlsiteState(workId, { rjCode: "RJ7654321" });
+
+  const result = await adapter.dlsiteFetch(workId);
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.info.rjCode, "RJ7654321");
+  assert.equal(result.info.title, "（fixture）RJ7654321");
+  assert.match(result.info.url, /RJ7654321\.html$/);
+});
