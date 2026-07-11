@@ -51,7 +51,7 @@ import { buildFileTree } from "./fileTree.ts";
 import { patchMetaFile } from "./meta.ts";
 import { mimeOf, resolveWithin } from "./paths.ts";
 import { Scanner } from "./scanner.ts";
-import { getOrCreateThumbnail } from "./thumbnailCache.ts";
+import { gcThumbnailCache, getOrCreateThumbnail, type WorkCoverEntry } from "./thumbnailCache.ts";
 import { WorkRepo } from "./workRepo.ts";
 
 const KEY_ROOT_FOLDER = "root_folder";
@@ -124,6 +124,22 @@ export function createRealAdapter(options: RealAdapterOptions): DataAdapter {
       const root = requireRoot();
       const result = await scanner.scan(root, onProgress);
       repo.setSetting(KEY_LAST_SCAN_TIME, new Date().toISOString());
+
+      // 全作品を走査した直後の自然なタイミングでサムネイルキャッシュをGCする（TASK-26）
+      const coverEntries: WorkCoverEntry[] = [];
+      for (const work of repo.listSummaries()) {
+        if (!work.coverImage) continue;
+        const resolved = resolveWithin(work.physicalPath, join(work.physicalPath, work.coverImage));
+        if (!resolved) continue;
+        coverEntries.push({ workId: work.id, coverAbsolutePath: resolved });
+      }
+      const gcResult = await gcThumbnailCache(thumbnailCacheDir, coverEntries);
+      if (gcResult.deleted > 0 || gcResult.skippedWorks > 0) {
+        console.warn(
+          `サムネイルキャッシュGC: 削除${gcResult.deleted}件 / 保持${gcResult.kept}件 / カバー未解決でスキップ${gcResult.skippedWorks}件`,
+        );
+      }
+
       return result;
     },
 
