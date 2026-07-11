@@ -67,6 +67,8 @@ export interface RealAdapterOptions {
   dlsiteRequestIntervalMs?: number;
   /** テスト用の取得関数差し替え。省略時は実DLsite取得 */
   dlsiteFetcher?: (rjCode: string) => Promise<DlsiteFetchResult>;
+  /** テスト用のカバーダウンロード関数差し替え */
+  dlsiteCoverDownloader?: (coverUrl: string, workDir: string) => Promise<string>;
 }
 
 export function createRealAdapter(options: RealAdapterOptions): DataAdapter {
@@ -76,6 +78,7 @@ export function createRealAdapter(options: RealAdapterOptions): DataAdapter {
   const thumbnailCacheDir = options.thumbnailCacheDir ?? DEFAULT_THUMBNAIL_CACHE_DIR;
   const dlsiteRequestIntervalMs = options.dlsiteRequestIntervalMs ?? 1000;
   const dlsiteFetcher = options.dlsiteFetcher ?? fetchDlsiteInfo;
+  const dlsiteCoverDownloader = options.dlsiteCoverDownloader ?? downloadCover;
 
   // prefix 定義の初回 seed（ADR-0005）。seed 済みフラグで管理し、
   // ユーザーが全定義を削除しても再投入しない
@@ -357,55 +360,72 @@ export function createRealAdapter(options: RealAdapterOptions): DataAdapter {
         if (index > 0 && dlsiteRequestIntervalMs > 0) {
           await new Promise((resolve) => setTimeout(resolve, dlsiteRequestIntervalMs));
         }
-        const fetched = await dlsiteFetcher(work.dlsite.rjCode!);
         const attemptedAt = new Date().toISOString();
-        if (!fetched.ok) {
+        try {
+          const fetched = await dlsiteFetcher(work.dlsite.rjCode!);
+          if (!fetched.ok) {
+            const dlsite = {
+              ...work.dlsite,
+              status: fetched.kind === "not_found" ? ("not_found" as const) : ("error" as const),
+              lastAttemptAt: attemptedAt,
+              error: fetched.message,
+            };
+            db.transaction(() => {
+              repo.setDlsiteState(work.id, dlsite);
+              patchMetaFile(findMetaPath(work), { dlsite });
+            });
+            result.failed += 1;
+          } else {
+            const allInfoTags = mergeDlsiteTags([], fetched.info);
+            const applyTags =
+              mode === "new"
+                ? allInfoTags
+                : allInfoTags.filter((tag) => !work.dlsite.appliedTags.includes(tag));
+            const patch: {
+              title?: string;
+              tags?: string[];
+              coverImage?: string;
+              urls?: Work["urls"];
+            } = {
+              tags: normalizeTags([...work.tags, ...applyTags]),
+            };
+            if (mode === "new") patch.title = fetched.info.title;
+            if (!work.urls.some((entry) => entry.url.includes("dlsite.com"))) {
+              patch.urls = [...work.urls, { label: "DLsite", url: fetched.info.url }];
+            }
+            if (!work.coverImage && fetched.info.coverUrl) {
+              patch.coverImage = await dlsiteCoverDownloader(
+                fetched.info.coverUrl,
+                work.physicalPath,
+              );
+            }
+            const dlsite = {
+              rjCode: fetched.info.rjCode,
+              status: "applied" as const,
+              lastAttemptAt: attemptedAt,
+              error: null,
+              appliedTags: normalizeTags([...work.dlsite.appliedTags, ...allInfoTags]),
+            };
+            db.transaction(() => {
+              const updated = repo.patchWork(work.id, patch);
+              if (!updated) throw new Error(`一括取得中に作品が見つからなくなりました: ${work.id}`);
+              repo.setDlsiteState(work.id, dlsite);
+              patchMetaFile(findMetaPath(updated), { ...patch, dlsite });
+            });
+            result.fetched += 1;
+          }
+        } catch (error) {
           const dlsite = {
             ...work.dlsite,
-            status: fetched.kind === "not_found" ? ("not_found" as const) : ("error" as const),
+            status: "error" as const,
             lastAttemptAt: attemptedAt,
-            error: fetched.message,
+            error: error instanceof Error ? error.message : "DLsite情報の適用に失敗しました",
           };
           db.transaction(() => {
             repo.setDlsiteState(work.id, dlsite);
             patchMetaFile(findMetaPath(work), { dlsite });
           });
           result.failed += 1;
-        } else {
-          const allInfoTags = mergeDlsiteTags([], fetched.info);
-          const applyTags =
-            mode === "new"
-              ? allInfoTags
-              : allInfoTags.filter((tag) => !work.dlsite.appliedTags.includes(tag));
-          const patch: {
-            title?: string;
-            tags?: string[];
-            coverImage?: string;
-            urls?: Work["urls"];
-          } = {
-            tags: normalizeTags([...work.tags, ...applyTags]),
-          };
-          if (mode === "new") patch.title = fetched.info.title;
-          if (!work.urls.some((entry) => entry.url.includes("dlsite.com"))) {
-            patch.urls = [...work.urls, { label: "DLsite", url: fetched.info.url }];
-          }
-          if (!work.coverImage && fetched.info.coverUrl) {
-            patch.coverImage = await downloadCover(fetched.info.coverUrl, work.physicalPath);
-          }
-          const dlsite = {
-            rjCode: fetched.info.rjCode,
-            status: "applied" as const,
-            lastAttemptAt: attemptedAt,
-            error: null,
-            appliedTags: normalizeTags([...work.dlsite.appliedTags, ...allInfoTags]),
-          };
-          db.transaction(() => {
-            const updated = repo.patchWork(work.id, patch);
-            if (!updated) throw new Error(`一括取得中に作品が見つからなくなりました: ${work.id}`);
-            repo.setDlsiteState(work.id, dlsite);
-            patchMetaFile(findMetaPath(updated), { ...patch, dlsite });
-          });
-          result.fetched += 1;
         }
         onProgress?.({
           type: "progress",

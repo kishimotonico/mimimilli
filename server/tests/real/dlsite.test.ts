@@ -244,3 +244,41 @@ test("一括取得: not_found記録後とskipped作品は次回対象外", async
   assert.equal(second.failed, 0);
   assert.equal(calls, 1);
 });
+
+test("一括取得: カバー取得失敗を作品のerrorへ記録し、後続作品を処理する", async () => {
+  const lib = makeSampleLibrary("data/test-dlsite-bulk-cover-error");
+  let downloads = 0;
+  const adapter = createRealAdapter({
+    dbPath: ":memory:",
+    dlsiteRequestIntervalMs: 0,
+    dlsiteFetcher: async (rjCode) => ({
+      ok: true,
+      info: {
+        rjCode,
+        title: `取得済み ${rjCode}`,
+        circle: null,
+        cvs: [],
+        genreTags: ["テスト"],
+        coverUrl: "https://example.test/cover.jpg",
+        url: `https://www.dlsite.com/maniax/work/=/product_id/${rjCode}.html`,
+      },
+    }),
+    dlsiteCoverDownloader: async () => {
+      downloads += 1;
+      throw new Error("カバー取得失敗");
+    },
+  });
+  await adapter.updateSettings({ rootFolder: lib.root });
+  const scan = await adapter.scan();
+
+  const result = await adapter.runDlsiteBulk("existing", undefined);
+
+  assert.deepEqual(result, { fetched: 1, failed: 1, skipped: 0 });
+  assert.equal(downloads, 1);
+  const failed = await adapter.getWork(lib.existingWorkId);
+  assert.equal(failed?.dlsite.status, "error");
+  assert.equal(failed?.dlsite.error, "カバー取得失敗");
+  assert.ok(failed?.dlsite.lastAttemptAt);
+  const succeeded = await adapter.getWork(scan.newWorkIds[0]!);
+  assert.equal(succeeded?.dlsite.status, "applied");
+});
