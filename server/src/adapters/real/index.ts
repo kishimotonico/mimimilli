@@ -421,10 +421,19 @@ export function createRealAdapter(options: RealAdapterOptions): DataAdapter {
             lastAttemptAt: attemptedAt,
             error: error instanceof Error ? error.message : "DLsite情報の適用に失敗しました",
           };
-          db.transaction(() => {
-            repo.setDlsiteState(work.id, dlsite);
-            patchMetaFile(findMetaPath(work), { dlsite });
-          });
+          // 失敗状態の永続化自体が失敗しても（メタ書き込み不能等）ジョブは中断しない。
+          // failed への加算と進捗通知は必ず行い、次の作品へ続行する
+          try {
+            db.transaction(() => {
+              repo.setDlsiteState(work.id, dlsite);
+              patchMetaFile(findMetaPath(work), { dlsite });
+            });
+          } catch (persistError) {
+            console.error("DLsite失敗状態の保存に失敗しました", {
+              workId: work.id,
+              persistError,
+            });
+          }
           result.failed += 1;
         }
         onProgress?.({

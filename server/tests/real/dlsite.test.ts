@@ -1,7 +1,7 @@
 // DLsite スクレイパーのテスト。ネットワークアクセスはしない:
 // パースは合成 HTML、apply はモック info（coverUrl: null でカバー DL をスキップ）。
 import assert from "node:assert/strict";
-import { readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import type { DlsiteWorkInfo } from "@mimimilli/shared";
@@ -284,6 +284,44 @@ test("一括取得: カバー取得失敗を作品のerrorへ記録し、後続�
   assert.equal(failed?.dlsite.status, "error");
   assert.equal(failed?.dlsite.error, "カバー取得失敗");
   assert.ok(failed?.dlsite.lastAttemptAt);
+  const succeeded = await adapter.getWork(scan.newWorkIds[0]!);
+  assert.equal(succeeded?.dlsite.status, "applied");
+});
+
+test("一括取得: 失敗状態のメタ書き戻しが例外を投げても後続作品を処理する", async (t) => {
+  const lib = makeSampleLibrary("data/test-dlsite-bulk-persist-error");
+  const adapter = createRealAdapter({
+    dbPath: ":memory:",
+    dlsiteRequestIntervalMs: 0,
+    dlsiteFetcher: async (rjCode) => ({
+      ok: true,
+      info: {
+        rjCode,
+        title: `取得済み ${rjCode}`,
+        circle: null,
+        cvs: [],
+        genreTags: ["テスト"],
+        coverUrl: "https://example.test/cover.jpg",
+        url: `https://www.dlsite.com/maniax/work/=/product_id/${rjCode}.html`,
+      },
+    }),
+    // 1作品目: カバーDL失敗で catch へ → メタが読み取り専用のため失敗状態の保存も失敗する
+    dlsiteCoverDownloader: async (_url, workDir) => {
+      if (workDir.includes("RJ900002")) throw new Error("カバー取得失敗");
+      return "dlsite_cover.jpg";
+    },
+  });
+  await adapter.updateSettings({ rootFolder: lib.root });
+  const scan = await adapter.scan();
+
+  const failedMetaPath = join(lib.root, "dlsite", "RJ900002_既存メタ", ".meta.json");
+  chmodSync(failedMetaPath, 0o444);
+  t.after(() => chmodSync(failedMetaPath, 0o644));
+
+  const result = await adapter.runDlsiteBulk("existing", undefined);
+
+  // 保存に失敗した作品も failed に数え、後続作品は処理される（ジョブは中断しない）
+  assert.deepEqual(result, { fetched: 1, failed: 1, skipped: 0 });
   const succeeded = await adapter.getWork(scan.newWorkIds[0]!);
   assert.equal(succeeded?.dlsite.status, "applied");
 });
