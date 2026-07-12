@@ -2,21 +2,30 @@
 // ライブラリのエクスポート。
 // 依存方向: shared/api/http、entities/work（戻り値の WorkSummary）、自 feature の model を参照する。
 
-import { get, post, put, del, patch } from "../../shared/api/http";
-import type {
-  AxisFacetItem,
-  FacetAxisId,
-  SmartFolder,
-  SmartFolderCreate,
-  SmartFolderUpdate,
-  SortId,
-  TagPrefix,
-  TagPrefixCandidate,
-  TagPrefixCreate,
-  TagPrefixUpdate,
-  ViewId,
-  WorksPage,
-  WorkSummary,
+import { getParsed, postParsed, putParsed, del, patchParsed } from "../../shared/api/http";
+import {
+  worksPageSchema,
+  axisFacetListSchema,
+  tagPrefixSchema,
+  tagPrefixListSchema,
+  tagPrefixCandidateListSchema,
+  smartFolderSchema,
+  smartFolderListSchema,
+  workSummaryListSchema,
+  exportResponseSchema,
+  type AxisFacetItem,
+  type FacetAxisId,
+  type SmartFolder,
+  type SmartFolderCreate,
+  type SmartFolderUpdate,
+  type SortId,
+  type TagPrefix,
+  type TagPrefixCandidate,
+  type TagPrefixCreate,
+  type TagPrefixUpdate,
+  type ViewId,
+  type WorksPage,
+  type WorkSummary,
 } from "@mimimilli/shared";
 
 // ── 作品検索（GET /api/works）────────────────────────────────
@@ -45,27 +54,27 @@ export async function searchWorks(params: WorksQueryParams): Promise<WorksPage> 
   if (params.page !== undefined) p.set("page", String(params.page));
   if (params.limit !== undefined) p.set("limit", String(params.limit));
   const q = p.toString();
-  return get<WorksPage>(`/works${q ? `?${q}` : ""}`);
+  return getParsed(worksPageSchema, `/works${q ? `?${q}` : ""}`);
 }
 
 // ── 分類軸ファセット ───────────────────────────────────────────
 
 export async function getAxisFacets(axis: FacetAxisId): Promise<AxisFacetItem[]> {
-  return get<AxisFacetItem[]>(`/axes/${encodeURIComponent(axis)}`);
+  return getParsed(axisFacetListSchema, `/axes/${encodeURIComponent(axis)}`);
 }
 
 // ── タグ prefix 定義（ADR-0005）──────────────────────────────
 
 export async function listTagPrefixes(): Promise<TagPrefix[]> {
-  return get<TagPrefix[]>("/tag-prefixes");
+  return getParsed(tagPrefixListSchema, "/tag-prefixes");
 }
 
 export async function createTagPrefix(data: TagPrefixCreate): Promise<TagPrefix> {
-  return post<TagPrefix>("/tag-prefixes", data);
+  return postParsed(tagPrefixSchema, "/tag-prefixes", data);
 }
 
 export async function updateTagPrefix(prefix: string, data: TagPrefixUpdate): Promise<TagPrefix> {
-  return patch<TagPrefix>(`/tag-prefixes/${encodeURIComponent(prefix)}`, data);
+  return patchParsed(tagPrefixSchema, `/tag-prefixes/${encodeURIComponent(prefix)}`, data);
 }
 
 export async function deleteTagPrefix(prefix: string): Promise<void> {
@@ -73,21 +82,21 @@ export async function deleteTagPrefix(prefix: string): Promise<void> {
 }
 
 export async function listTagPrefixCandidates(): Promise<TagPrefixCandidate[]> {
-  return get<TagPrefixCandidate[]>("/tag-prefixes/candidates");
+  return getParsed(tagPrefixCandidateListSchema, "/tag-prefixes/candidates");
 }
 
 // ── スマートフォルダー ────────────────────────────────────────
 
 export async function listSmartFolders(): Promise<SmartFolder[]> {
-  return get<SmartFolder[]>("/smart-folders");
+  return getParsed(smartFolderListSchema, "/smart-folders");
 }
 
 export async function createSmartFolder(data: SmartFolderCreate): Promise<SmartFolder> {
-  return post<SmartFolder>("/smart-folders", data);
+  return postParsed(smartFolderSchema, "/smart-folders", data);
 }
 
 export async function updateSmartFolder(id: string, data: SmartFolderUpdate): Promise<SmartFolder> {
-  return put<SmartFolder>(`/smart-folders/${encodeURIComponent(id)}`, data);
+  return putParsed(smartFolderSchema, `/smart-folders/${encodeURIComponent(id)}`, data);
 }
 
 export async function deleteSmartFolder(id: string): Promise<void> {
@@ -95,12 +104,12 @@ export async function deleteSmartFolder(id: string): Promise<void> {
 }
 
 export async function evalSmartFolder(id: string): Promise<WorkSummary[]> {
-  return get<WorkSummary[]>(`/smart-folders/${encodeURIComponent(id)}/works`);
+  return getParsed(workSummaryListSchema, `/smart-folders/${encodeURIComponent(id)}/works`);
 }
 
 // ── エクスポート ──────────────────────────────────────────────
 
 export async function exportLibrary(): Promise<string> {
-  const r = await post<{ data: string }>("/export");
+  const r = await postParsed(exportResponseSchema, "/export");
   return r.data;
 }

@@ -3,6 +3,7 @@ import * as workApi from "../../src/entities/work/api";
 import * as libraryApi from "../../src/features/library/api";
 import * as settingsApi from "../../src/features/settings/api";
 import * as scanApi from "../../src/features/scan/api";
+import { emptyDlsiteState, type Work, type WorkSummary } from "@mimimilli/shared";
 
 const mockFetch = vi.mocked(fetch);
 
@@ -12,6 +13,40 @@ function makeResponse(data: unknown, status = 200) {
     status,
     json: () => Promise.resolve(data),
   } as Response;
+}
+
+/** workSchema/workSummarySchema に適合する最小のfixtureを作る（レスポンス検証テスト用） */
+function makeWorkSummary(overrides: Partial<WorkSummary> = {}): WorkSummary {
+  return {
+    id: "work-1",
+    title: "テスト作品",
+    coverImage: null,
+    status: "ok",
+    physicalPath: "/library/work-1",
+    totalDurationSec: 120,
+    addedAt: "2026-01-01T00:00:00.000Z",
+    errorMessage: null,
+    urls: [],
+    tags: [],
+    trackCount: 1,
+    bookmarked: false,
+    lastPlayedAt: null,
+    dlsite: emptyDlsiteState(),
+    ...overrides,
+  };
+}
+
+function makeWork(overrides: Partial<Work> = {}): Work {
+  const { trackCount: _trackCount, ...summary } = makeWorkSummary();
+  return {
+    ...summary,
+    defaultPlaylist: null,
+    createdAt: null,
+    playlists: [{ name: "default", tracks: [{ title: "track1", file: "track1.mp3" }] }],
+    resumePosition: 0,
+    resumeTrackIndex: 0,
+    ...overrides,
+  };
 }
 
 describe("settings api", () => {
@@ -62,7 +97,7 @@ describe("work api", () => {
   });
 
   it("patchWork PATCHes to /api/works/:id with the given fields", async () => {
-    const mockWork = { id: "work-1", title: "new title", tags: ["tag1", "tag2"], bookmarked: true };
+    const mockWork = makeWork({ title: "new title", tags: ["tag1", "tag2"], bookmarked: true });
     mockFetch.mockResolvedValue(makeResponse(mockWork));
     const result = await workApi.patchWork("work-1", {
       title: "new title",
@@ -133,7 +168,10 @@ describe("work api", () => {
   });
 
   it("getAllWorks fetches /api/works and returns items", async () => {
-    const mockPage = { items: [{ id: "work-1" }, { id: "work-2" }], total: 2 };
+    const mockPage = {
+      items: [makeWorkSummary({ id: "work-1" }), makeWorkSummary({ id: "work-2" })],
+      total: 2,
+    };
     mockFetch.mockResolvedValue(makeResponse(mockPage));
     const result = await workApi.getAllWorks();
     expect(mockFetch).toHaveBeenCalledWith("/api/works");
@@ -147,7 +185,7 @@ describe("library api", () => {
   });
 
   it("searchWorks fetches /api/works and returns the WorksPage envelope", async () => {
-    const mockPage = { items: [{ id: "work-1" }], total: 1 };
+    const mockPage = { items: [makeWorkSummary({ id: "work-1" })], total: 1 };
     mockFetch.mockResolvedValue(makeResponse(mockPage));
     const result = await libraryApi.searchWorks({ q: "test", tags: ["tag1"] });
     expect(mockFetch).toHaveBeenCalledWith("/api/works?q=test&tags=tag1");
@@ -155,7 +193,7 @@ describe("library api", () => {
   });
 
   it("searchWorks supports limit/page for the library total count", async () => {
-    const mockPage = { items: [{ id: "work-1" }], total: 42 };
+    const mockPage = { items: [makeWorkSummary({ id: "work-1" })], total: 42 };
     mockFetch.mockResolvedValue(makeResponse(mockPage));
     const result = await libraryApi.searchWorks({ limit: 1 });
     expect(mockFetch).toHaveBeenCalledWith("/api/works?limit=1");
@@ -199,5 +237,35 @@ describe("error handling", () => {
       makeResponse({ error: { code: "not_found", message: "作品が見つかりません: work-1" } }, 404),
     );
     await expect(workApi.getWork("work-1")).rejects.toThrow(/作品が見つかりません: work-1/);
+  });
+});
+
+describe("レスポンス検証（getParsed等）", () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it("getWork: 200かつ契約に適合するレスポンスはWorkとして解決する", async () => {
+    const mockWork = makeWork({ id: "work-1" });
+    mockFetch.mockResolvedValue(makeResponse(mockWork));
+    const result = await workApi.getWork("work-1");
+    expect(result).toEqual(mockWork);
+  });
+
+  it("getWork: 404はnullへフォールバックせずApiRequestErrorとして伝播する", async () => {
+    mockFetch.mockResolvedValue(
+      makeResponse({ error: { code: "not_found", message: "作品が見つかりません: work-1" } }, 404),
+    );
+    await expect(workApi.getWork("work-1")).rejects.toThrow(/作品が見つかりません: work-1/);
+  });
+
+  it("getWork: 200だが契約に適合しないレスポンスは握りつぶさずエンドポイント名を含むエラーを投げる", async () => {
+    mockFetch.mockResolvedValue(makeResponse({ id: "work-1" }));
+    await expect(workApi.getWork("work-1")).rejects.toThrow(/GET \/works\/work-1/);
+  });
+
+  it("searchWorks: 契約に適合しないitemsは検証エラーになる", async () => {
+    mockFetch.mockResolvedValue(makeResponse({ items: [{ id: "work-1" }], total: 1 }));
+    await expect(libraryApi.searchWorks({})).rejects.toThrow(/GET \/works/);
   });
 });

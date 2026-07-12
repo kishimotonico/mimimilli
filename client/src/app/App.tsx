@@ -124,7 +124,6 @@ export default function App() {
         );
         const fullWork = cached ?? (await getWork(work.id));
         if (requestId !== playRequestIdRef.current) return;
-        if (!fullWork) return;
         const playlist =
           fullWork.playlists.find((p) => p.name === (fullWork.defaultPlaylist ?? "default")) ??
           fullWork.playlists[0];
@@ -160,7 +159,6 @@ export default function App() {
         );
         const fullWork = cached ?? (await getWork(entry.workId));
         if (requestId !== playRequestIdRef.current) return;
-        if (!fullWork) return;
         // ファイル欠損・メタ読み込みエラーの作品配下のファイルは再生できない。
         if (fullWork.status !== "ok") return;
         player.play(fullWork, [{ title: entry.name, file: entry.workRelPath }], 0);

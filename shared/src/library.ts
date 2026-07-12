@@ -39,6 +39,7 @@ export const axisFacetItemSchema = z.object({
   count: z.number().int().nonnegative(),
 });
 export type AxisFacetItem = z.infer<typeof axisFacetItemSchema>;
+export const axisFacetListSchema = z.array(axisFacetItemSchema);
 
 // ── スマートフォルダー ────────────────────────────────────────
 
@@ -68,6 +69,7 @@ export const smartFolderSchema = z.object({
   createdAt: z.string(),
 });
 export type SmartFolder = z.infer<typeof smartFolderSchema>;
+export const smartFolderListSchema = z.array(smartFolderSchema);
 
 export const smartFolderCreateSchema = z.object({
   name: z.string().min(1),

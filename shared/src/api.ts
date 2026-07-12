@@ -29,6 +29,12 @@ export const worksPageSchema = z.object({
 });
 export type WorksPage = z.infer<typeof worksPageSchema>;
 
+/** GET /api/smart-folders/:id/works の評価結果 */
+export const workSummaryListSchema = z.array(workSummarySchema);
+
+/** GET /api/tags */
+export const tagListSchema = z.array(z.string());
+
 // ── 作品の部分更新（PATCH /api/works/:id）────────────────────
 // 旧 PUT /works/:id/tags・PUT /works/:id/title・POST /works/:id/bookmark を統合。
 

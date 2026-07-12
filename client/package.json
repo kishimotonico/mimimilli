@@ -23,7 +23,8 @@
     "jotai": "^2.20.0",
     "motion": "^12.40.0",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "zod": "^4.1.0"
   },
   "devDependencies": {
     "@hono/node-server": "^1.14.0",

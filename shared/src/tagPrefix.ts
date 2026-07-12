@@ -41,6 +41,7 @@ export const tagPrefixSchema = z.object({
   protected: z.boolean(),
 });
 export type TagPrefix = z.infer<typeof tagPrefixSchema>;
+export const tagPrefixListSchema = z.array(tagPrefixSchema);
 
 export const tagPrefixCreateSchema = z.object({
   prefix: tagPrefixNameSchema,
@@ -65,6 +66,7 @@ export const tagPrefixCandidateSchema = z.object({
   count: z.number().int().nonnegative(),
 });
 export type TagPrefixCandidate = z.infer<typeof tagPrefixCandidateSchema>;
+export const tagPrefixCandidateListSchema = z.array(tagPrefixCandidateSchema);
 
 /** 初回起動時に seed する prefix 定義。投入後の変更・削除はユーザーの自由
  *  （seed 済みフラグで管理し、全削除しても再投入しない）。

@@ -2,20 +2,26 @@
 // ファイル一覧・DLsite メタデータ）を扱う。
 // 依存方向: shared/api/http と自 entity の model のみを参照する。
 
-import { API_BASE, get, patch, post } from "../../shared/api/http";
-import type {
-  Work,
-  WorkSummary,
-  WorksPage,
-  WorkPatch,
-  FileEntry,
-  DlsiteWorkInfo,
-  DlsiteApplyBody,
-  DlsiteStatePatch,
+import { API_BASE, getParsed, patchParsed, post, postParsed } from "../../shared/api/http";
+import {
+  workSchema,
+  worksPageSchema,
+  tagListSchema,
+  dlsiteWorkInfoSchema,
+  fileEntrySchema,
+  type Work,
+  type WorkSummary,
+  type WorksPage,
+  type WorkPatch,
+  type FileEntry,
+  type DlsiteWorkInfo,
+  type DlsiteApplyBody,
+  type DlsiteStatePatch,
 } from "@mimimilli/shared";
 
-export async function getWork(id: string): Promise<Work | null> {
-  return get<Work | null>(`/works/${encodeURIComponent(id)}`);
+/** GET /works/:id は存在しない場合404を返す契約。呼び出し側はnull分岐でなくエラー（TanStack QueryのisError等）で扱う */
+export async function getWork(id: string): Promise<Work> {
+  return getParsed(workSchema, `/works/${encodeURIComponent(id)}`);
 }
 
 /** WorksPage をそのまま返す（{ items, total }）。page/limit 省略時は items に全件が入る */
@@ -25,7 +31,7 @@ export async function queryWorks(params: Record<string, string | number>): Promi
     p.set(key, String(value));
   }
   const q = p.toString();
-  return get<WorksPage>(`/works${q ? `?${q}` : ""}`);
+  return getParsed(worksPageSchema, `/works${q ? `?${q}` : ""}`);
 }
 
 /** スキャン後の新規作品検出など、全件取得が必要な場合に使う */
@@ -35,11 +41,11 @@ export async function getAllWorks(): Promise<WorkSummary[]> {
 }
 
 export async function patchWork(workId: string, body: WorkPatch): Promise<Work> {
-  return patch<Work>(`/works/${encodeURIComponent(workId)}`, body);
+  return patchParsed(workSchema, `/works/${encodeURIComponent(workId)}`, body);
 }
 
 export async function getAllTags(): Promise<string[]> {
-  return get<string[]>("/tags");
+  return getParsed(tagListSchema, "/tags");
 }
 
 /** カバー画像のURLを返す（<img src> で直接使用可）。
@@ -76,12 +82,13 @@ export async function saveResumePosition(
   });
 }
 
-export async function listWorkFiles(workId: string): Promise<FileEntry | null> {
-  return get<FileEntry | null>(`/works/${encodeURIComponent(workId)}/files`);
+/** GET /works/:id/files も存在しない場合404を返す契約なので、getWork同様にnull分岐は伝播させない（現状未使用） */
+export async function listWorkFiles(workId: string): Promise<FileEntry> {
+  return getParsed(fileEntrySchema, `/works/${encodeURIComponent(workId)}/files`);
 }
 
 export async function fetchDlsiteInfo(workId: string): Promise<DlsiteWorkInfo> {
-  return post<DlsiteWorkInfo>(`/dlsite/${encodeURIComponent(workId)}/fetch`);
+  return postParsed(dlsiteWorkInfoSchema, `/dlsite/${encodeURIComponent(workId)}/fetch`);
 }
 
 export async function applyDlsiteInfo(workId: string, body: DlsiteApplyBody): Promise<void> {
@@ -89,7 +96,7 @@ export async function applyDlsiteInfo(workId: string, body: DlsiteApplyBody): Pr
 }
 
 export async function updateDlsiteState(workId: string, body: DlsiteStatePatch): Promise<Work> {
-  return patch<Work>(`/dlsite/${encodeURIComponent(workId)}`, body);
+  return patchParsed(workSchema, `/dlsite/${encodeURIComponent(workId)}`, body);
 }
 
 export async function startDlsiteBulk(): Promise<void> {
