@@ -32,7 +32,7 @@
 - `mll-`: Library モード固有（軸レール・作品行・リッチ詳細・スマートルールなど）
 - 状態は `is-` プレフィックス: 選択 = `.is-on`（paper-4 背景）、選択+フォーカス = `.is-on.is-focused`（黒地白文字に反転）。行・軸系コンポーネントを追加するときはこのパターンを踏襲する
 
-`shell.css` は `@layer base` で運用する。レイヤー外に素の `button` セレクタを書くと Tailwind ユーティリティに常勝してしまう不具合が過去に発生済み（詳細は [HANDOFF.md](HANDOFF.md) の「CSS レイヤーの罠」参照）。セレクタを足すときは必ずレイヤー内に置く。
+`shell.css` は全規則がカスケードレイヤー内にある。UA要素のリセット（`button` / `input` / `a` / `ul` / `ol` 等）は `@layer base`、`mle-`/`mll-` のコンポーネント規則は `@layer components` に置く。Tailwind v4 のレイヤー順（`theme, base, components, utilities`）により、`@layer utilities`（Tailwindユーティリティ）が `components` より強く効くため、tsx側で `mle-`/`mll-` クラスと Tailwind ユーティリティを併用すると、ユーティリティ側で局所的に上書きできる。レイヤー外に素のセレクタを書くと、レイヤーの規則（unlayered が常に layered に勝つ）で utilities を問答無用で潰してしまうため、セレクタを足すときは必ずどちらかのレイヤー内に置く（詳細は [HANDOFF.md](HANDOFF.md) の「CSS レイヤー」参照）。
 
 ## Overlay / z-index の現在の階層
 

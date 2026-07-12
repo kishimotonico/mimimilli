@@ -20,9 +20,9 @@ DLsite/FANZA 等からダウンロードした音声作品（ASMR・ボイスド
 
 fixture API は `ssrLoadModule` 経由の遅延読み込みで、`server/src`・`shared/src` の変更は watcher がモジュールグラフを無効化し**次の `/api` リクエストで自動反映される**（手動再起動は不要）。client 側（`src/`）は通常の HMR。仕組みの詳細は `client/vite.config.ts` の `fixtureApiPlugin` を参照。
 
-### ⚠ CSS レイヤーの罠
+### CSS レイヤー
 
-`shell.css` の `.mle-app button` リセットは `@layer base` 内にある。レイヤー外に素の button セレクタを書くと Tailwind ユーティリティに常勝してしまう（実際に統合バグになった）。shell.css にセレクタを足すときはレイヤーを意識すること。
+`shell.css` は全規則がカスケードレイヤー内（UAリセット系 = `@layer base`、`mle-`/`mll-` コンポーネント規則 = `@layer components`）にある。Tailwind v4 のレイヤー順（`theme, base, components, utilities`）により、tsx側で `mle-`/`mll-` クラスと Tailwind ユーティリティを併用したとき、ユーティリティ側が局所的に上書きできる。レイヤー外に素のセレクタを書くと、レイヤーの規則（unlayered が常に layered に勝つ）で utilities を問答無用で潰してしまう不具合が過去に発生済みなので、shell.css にセレクタを足すときは必ずどちらかのレイヤー内に置くこと。規約は [design-system.md](design-system.md) 参照。
 
 ## 起動・検証コマンド
 
