@@ -1,0 +1,65 @@
+import { useLayoutEffect, useRef } from "react";
+import type { MouseEvent as ReactMouseEvent, RefObject, SyntheticEvent } from "react";
+
+interface UseDialogModalOptions {
+  /**
+   * Escape（dialogのcancelイベント）で呼ぶ処理。編集中フォームがあればそちらだけを
+   * 閉じるなど、内側の状態を優先する分岐はここに書く（例: SettingsModal）。
+   * backdropクリックの挙動は各モーダルの現状維持のため handleBackdropClick に別途渡す。
+   */
+  onClose: () => void;
+  /** マウント時にフォーカスする要素。省略時は dialog 自身にフォーカスする。 */
+  initialFocusRef?: RefObject<HTMLElement | null>;
+}
+
+/**
+ * ネイティブ <dialog> + showModal() を薄くラップする共通フック（TASK-29）。
+ * フォーカストラップと「多重モーダル時は最前面のEscだけが効く」挙動は
+ * ブラウザの top layer 実装に任せ、ここでは開閉のライフサイクルだけを扱う。
+ */
+export function useDialogModal({ onClose, initialFocusRef }: UseDialogModalOptions) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+
+  useLayoutEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    const previousActiveElement =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+    dialog.showModal();
+    (initialFocusRef?.current ?? dialog).focus({ preventScroll: true });
+
+    return () => {
+      dialog.close();
+      if (previousActiveElement?.isConnected) {
+        previousActiveElement.focus({ preventScroll: true });
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 開閉は一度きりのライフサイクルとして扱う
+  }, []);
+
+  const handleCancel = (event: SyntheticEvent<HTMLDialogElement>) => {
+    // ブラウザ既定のクローズ動作を止め、呼び出し側の onClose に委譲する
+    // （呼び出し側は内側の編集状態を先に閉じる分岐を持てる）。
+    event.preventDefault();
+    onClose();
+  };
+
+  /**
+   * <dialog> のbackdropクリックは e.target === dialog自身として届く
+   * （dialog は幅がcontentにfitするため、backdrop領域のクリックはdialog要素にヒットする）。
+   * onBackdropClose は呼び出し側のEscape分岐（onClose）と揃えるとは限らないため、
+   * 各モーダルの既存backdrop挙動をそのまま渡す（例: SettingsModalは編集中でも問答無用で閉じる）。
+   * shouldClose で保存中などの条件を差し込める。
+   */
+  const handleBackdropClick = (
+    event: ReactMouseEvent<HTMLDialogElement>,
+    onBackdropClose: () => void,
+    shouldClose: () => boolean = () => true,
+  ) => {
+    if (event.target === dialogRef.current && shouldClose()) onBackdropClose();
+  };
+
+  return { dialogRef, handleCancel, handleBackdropClick };
+}

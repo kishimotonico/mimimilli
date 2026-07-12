@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import type { ScanResult, WorkSummary } from "@mimimilli/shared";
 import { getAllWorks, patchWork } from "../../../entities/work/api";
+import { useDialogModal } from "../../../shared/ui/useDialogModal";
 
 interface NewWorkPopupProps {
   scanResult: ScanResult;
@@ -26,13 +27,16 @@ const NewWorkPopup: React.FC<NewWorkPopupProps> = ({ scanResult, onClose }) => {
   const [editTitle, setEditTitle] = useState("");
   const titleInputRef = useRef<HTMLInputElement | null>(null);
 
-  useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handleEsc);
-    return () => window.removeEventListener("keydown", handleEsc);
-  }, [onClose]);
+  // Escapeはタイトル編集中ならそちらだけをキャンセルし、ポップアップ自体は閉じない
+  const { dialogRef, handleCancel, handleBackdropClick } = useDialogModal({
+    onClose: () => {
+      if (editingId) {
+        setEditingId(null);
+        return;
+      }
+      onClose();
+    },
+  });
 
   useEffect(() => {
     if (scanResult.newWorkIds.length > 0) {
@@ -65,189 +69,171 @@ const NewWorkPopup: React.FC<NewWorkPopupProps> = ({ scanResult, onClose }) => {
     setEditingId(null);
   };
 
-  /* oxlint-disable jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions, jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/prefer-tag-over-role -- Backdrop click closes the popup, and the dialog stops backdrop clicks without changing modal positioning/focus behavior. */
   return (
-    <div
-      onClick={onClose}
+    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- backdropクリックで閉じる。EscapeはonCancel（useDialogModal）で処理する。
+    <dialog
+      ref={dialogRef}
+      aria-label="スキャン完了"
+      onCancel={handleCancel}
+      onClick={(e) => handleBackdropClick(e, onClose)}
+      className="backdrop:bg-[oklch(0%_0_0_/_0.55)]"
       style={{
-        position: "fixed",
-        inset: 0,
-        background: "oklch(0% 0 0 / 0.55)",
-        zIndex: 250,
+        background: C.bgSurface,
+        border: "1px solid var(--line)",
+        borderRadius: 10,
+        padding: 22,
+        margin: "auto",
+        width: 520,
+        maxWidth: "min(90vw, calc(100vw - 32px))",
+        maxHeight: "min(80vh, calc(100vh - 32px))",
+        color: C.textPrimary,
         display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
+        flexDirection: "column",
       }}
     >
+      {/* Header */}
+      <h2 style={{ margin: "0 0 16px", fontSize: 18, fontWeight: 700, textAlign: "center" }}>
+        スキャン完了
+      </h2>
+
+      {/* Summary stats */}
       <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="スキャン完了"
-        onClick={(e) => e.stopPropagation()}
         style={{
-          background: C.bgSurface,
-          border: "1px solid var(--line)",
-          borderRadius: 10,
-          padding: 22,
-          width: 520,
-          maxWidth: "90vw",
-          maxHeight: "80vh",
-          color: C.textPrimary,
           display: "flex",
-          flexDirection: "column",
+          gap: 12,
+          marginBottom: 16,
+          justifyContent: "center",
         }}
       >
-        {/* Header */}
-        <h2 style={{ margin: "0 0 16px", fontSize: 18, fontWeight: 700, textAlign: "center" }}>
-          スキャン完了
-        </h2>
+        <StatBadge label="登録済み" value={scanResult.registered} color={C.accent} />
+        <StatBadge label="新規検出" value={scanResult.newlyGenerated} color={C.success} />
+        {scanResult.errors > 0 && (
+          <StatBadge label="エラー" value={scanResult.errors} color={C.error} />
+        )}
+        {scanResult.missing > 0 && (
+          <StatBadge label="行方不明" value={scanResult.missing} color={C.warning} />
+        )}
+      </div>
 
-        {/* Summary stats */}
-        <div
-          style={{
-            display: "flex",
-            gap: 12,
-            marginBottom: 16,
-            justifyContent: "center",
-          }}
-        >
-          <StatBadge label="登録済み" value={scanResult.registered} color={C.accent} />
-          <StatBadge label="新規検出" value={scanResult.newlyGenerated} color={C.success} />
-          {scanResult.errors > 0 && (
-            <StatBadge label="エラー" value={scanResult.errors} color={C.error} />
-          )}
-          {scanResult.missing > 0 && (
-            <StatBadge label="行方不明" value={scanResult.missing} color={C.warning} />
-          )}
-        </div>
-
-        {/* New works list */}
-        {newWorks.length > 0 && (
-          <>
-            <div
-              style={{
-                color: C.textSecondary,
-                fontSize: 12,
-                marginBottom: 8,
-              }}
-            >
-              新規検出された作品（タイトルをクリックして編集できます）:
-            </div>
-            <div
-              style={{
-                flex: 1,
-                overflowY: "auto",
-                marginBottom: 16,
-                maxHeight: 300,
-              }}
-            >
-              {newWorks.map((work) => (
-                <div
-                  key={work.id}
+      {/* New works list */}
+      {newWorks.length > 0 && (
+        <>
+          <div
+            style={{
+              color: C.textSecondary,
+              fontSize: 12,
+              marginBottom: 8,
+            }}
+          >
+            新規検出された作品（タイトルをクリックして編集できます）:
+          </div>
+          <div
+            style={{
+              flex: 1,
+              overflowY: "auto",
+              marginBottom: 16,
+              maxHeight: 300,
+            }}
+          >
+            {newWorks.map((work) => (
+              <div
+                key={work.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "6px 8px",
+                  borderRadius: 4,
+                  background: C.accentDim,
+                  marginBottom: 4,
+                }}
+              >
+                <span
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    padding: "6px 8px",
-                    borderRadius: 4,
-                    background: C.accentDim,
-                    marginBottom: 4,
+                    color: C.success,
+                    fontSize: 11,
+                    flexShrink: 0,
                   }}
                 >
-                  <span
-                    style={{
-                      color: C.success,
-                      fontSize: 11,
-                      flexShrink: 0,
+                  NEW
+                </span>
+                {editingId === work.id ? (
+                  <input
+                    ref={titleInputRef}
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    onBlur={() => handleSaveTitle(work.id)}
+                    onKeyDown={(e) => {
+                      // Escapeのキャンセルは dialog の onCancel（useDialogModal）に一元化する
+                      if (e.key === "Enter") handleSaveTitle(work.id);
                     }}
-                  >
-                    NEW
-                  </span>
-                  {editingId === work.id ? (
-                    <input
-                      ref={titleInputRef}
-                      value={editTitle}
-                      onChange={(e) => setEditTitle(e.target.value)}
-                      onBlur={() => handleSaveTitle(work.id)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") handleSaveTitle(work.id);
-                        if (e.key === "Escape") {
-                          // 編集キャンセルだけに留める。stopPropagationしないと window の
-                          // Escapeハンドラーまで伝播してポップアップ全体が閉じてしまう。
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setEditingId(null);
-                        }
-                      }}
-                      style={{
-                        flex: 1,
-                        background: C.bgInput,
-                        border: `1px solid ${C.accent}`,
-                        borderRadius: 4,
-                        padding: "3px 8px",
-                        fontSize: 13,
-                        color: C.textPrimary,
-                        outline: "none",
-                      }}
-                    />
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => handleStartEdit(work)}
-                      style={{
-                        flex: 1,
-                        fontSize: 13,
-                        cursor: "pointer",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                        background: "none",
-                        border: "none",
-                        color: "inherit",
-                        padding: 0,
-                        textAlign: "left",
-                      }}
-                      title="クリックしてタイトルを編集"
-                    >
-                      {work.title}
-                    </button>
-                  )}
-                  <span
                     style={{
-                      color: C.textDisabled,
-                      fontSize: 11,
-                      flexShrink: 0,
+                      flex: 1,
+                      background: C.bgInput,
+                      border: `1px solid ${C.accent}`,
+                      borderRadius: 4,
+                      padding: "3px 8px",
+                      fontSize: 13,
+                      color: C.textPrimary,
+                      outline: "none",
                     }}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleStartEdit(work)}
+                    style={{
+                      flex: 1,
+                      fontSize: 13,
+                      cursor: "pointer",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      background: "none",
+                      border: "none",
+                      color: "inherit",
+                      padding: 0,
+                      textAlign: "left",
+                    }}
+                    title="クリックしてタイトルを編集"
                   >
-                    {work.trackCount} tracks
-                  </span>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
+                    {work.title}
+                  </button>
+                )}
+                <span
+                  style={{
+                    color: C.textDisabled,
+                    fontSize: 11,
+                    flexShrink: 0,
+                  }}
+                >
+                  {work.trackCount} tracks
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
-        {/* Close button */}
-        <button
-          onClick={onClose}
-          style={{
-            background: C.accent,
-            border: "none",
-            borderRadius: 6,
-            color: "var(--paper-1)",
-            cursor: "pointer",
-            padding: "10px 28px",
-            fontSize: 14,
-            fontWeight: 600,
-            alignSelf: "center",
-          }}
-        >
-          OK
-        </button>
-      </div>
-    </div>
+      {/* Close button */}
+      <button
+        onClick={onClose}
+        style={{
+          background: C.accent,
+          border: "none",
+          borderRadius: 6,
+          color: "var(--paper-1)",
+          cursor: "pointer",
+          padding: "10px 28px",
+          fontSize: 14,
+          fontWeight: 600,
+          alignSelf: "center",
+        }}
+      >
+        OK
+      </button>
+    </dialog>
   );
-  /* oxlint-enable jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions, jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/prefer-tag-over-role */
 };
 
 function StatBadge({ label, value, color }: { label: string; value: number; color: string }) {

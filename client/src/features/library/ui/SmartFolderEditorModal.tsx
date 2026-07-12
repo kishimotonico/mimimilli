@@ -1,10 +1,4 @@
-import {
-  useEffect,
-  useRef,
-  useState,
-  type FormEvent,
-  type KeyboardEvent as ReactKeyboardEvent,
-} from "react";
+import { useRef, useState, type FormEvent } from "react";
 import type { SmartFolder, SmartFolderCreate } from "@mimimilli/shared";
 import {
   addSmartFolderRule,
@@ -20,6 +14,7 @@ import Button from "../../../shared/ui/Button";
 import IconButton from "../../../shared/ui/IconButton";
 import { I } from "../../../shared/ui/Icon";
 import TagCombobox from "../../../shared/ui/TagCombobox";
+import { useDialogModal } from "../../../shared/ui/useDialogModal";
 
 interface SmartFolderEditorModalProps {
   folder: SmartFolder | null;
@@ -90,20 +85,14 @@ export default function SmartFolderEditorModal({
   const [errors, setErrors] = useState<SmartFolderEditorErrors>({ ruleValues: {} });
   const nextRuleId = useRef(draft.rules.length);
   const nameInputRef = useRef<HTMLInputElement>(null);
-  const modalRef = useRef<HTMLFormElement>(null);
 
-  useEffect(() => {
-    nameInputRef.current?.focus({ preventScroll: true });
-  }, []);
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented) return;
-      if (event.key === "Escape" && !isSaving) onClose();
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isSaving, onClose]);
+  // 保存中はEscapeでもbackdropクリックでも閉じない（既存挙動を維持）
+  const { dialogRef, handleCancel, handleBackdropClick } = useDialogModal({
+    onClose: () => {
+      if (!isSaving) onClose();
+    },
+    initialFocusRef: nameInputRef,
+  });
 
   const updateRule = (
     id: string,
@@ -127,41 +116,18 @@ export default function SmartFolderEditorModal({
     onSave({ ...result.data, sort: folder?.sort ?? result.data.sort });
   };
 
-  const trapFocus = (event: ReactKeyboardEvent<HTMLFormElement>) => {
-    if (event.key !== "Tab") return;
-    const focusable = [
-      ...(modalRef.current?.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
-      ) ?? []),
-    ].filter((element) => element.getClientRects().length > 0);
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    if (!first || !last) return;
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first.focus();
-    }
-  };
-
-  /* oxlint-disable jsx-a11y/prefer-tag-over-role, jsx-a11y/no-noninteractive-element-interactions -- デザインシステムのz-index階層に合わせたform製モーダル。キーボードイベントはフォーカストラップに使う。 */
   return (
-    <>
-      {/* oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- モーダル背景はクリックで閉じ、Escapeも上のeffectで処理する。 */}
-      <div
-        className="fixed inset-0 z-40 bg-[oklch(20%_0.020_70_/_0.3)]"
-        onClick={() => !isSaving && onClose()}
-      />
+    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- backdropクリックで閉じる。EscapeはonCancel（useDialogModal）で処理する。
+    <dialog
+      ref={dialogRef}
+      aria-labelledby="smart-folder-editor-title"
+      onCancel={handleCancel}
+      onClick={(e) => handleBackdropClick(e, onClose, () => !isSaving)}
+      className="m-auto w-[min(720px,calc(100vw-32px))] overflow-hidden rounded-[12px] border border-line-soft bg-paper-1 p-0 font-jp shadow-pop backdrop:bg-[oklch(20%_0.020_70_/_0.3)]"
+    >
       <form
-        ref={modalRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="smart-folder-editor-title"
         onSubmit={handleSubmit}
-        onKeyDown={trapFocus}
-        className="fixed left-1/2 top-1/2 z-[41] flex max-h-[min(760px,calc(100vh-32px))] w-[min(720px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[12px] border border-line-soft bg-paper-1 font-jp shadow-pop"
+        className="flex max-h-[min(760px,calc(100vh-32px))] min-h-0 flex-col overflow-hidden"
       >
         <div className="flex shrink-0 items-center border-b border-line-soft px-[18px] py-[14px]">
           <div className="min-w-0 flex-1">
@@ -396,6 +362,6 @@ export default function SmartFolderEditorModal({
           </Button>
         </div>
       </form>
-    </>
+    </dialog>
   );
 }

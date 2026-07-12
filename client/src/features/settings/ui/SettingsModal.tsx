@@ -3,6 +3,7 @@ import { I } from "../../../shared/ui/Icon";
 import TagPrefixSettings from "./TagPrefixSettings";
 import Toast from "../../../shared/ui/Toast";
 import { useDlsiteBulk } from "../model/useDlsiteBulk";
+import { useDialogModal } from "../../../shared/ui/useDialogModal";
 
 interface SettingsModalProps {
   rootFolder: string | null;
@@ -31,19 +32,16 @@ export default function SettingsModal({
   const folderInputRef = useRef<HTMLInputElement | null>(null);
   const dlsiteBulk = useDlsiteBulk();
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        if (isEditingFolder) {
-          setIsEditingFolder(false);
-          return;
-        }
-        onClose();
+  // Escapeは編集中フォームがあればそちらだけを閉じ、モーダル自体は閉じない
+  const { dialogRef, handleCancel, handleBackdropClick } = useDialogModal({
+    onClose: () => {
+      if (isEditingFolder) {
+        setIsEditingFolder(false);
+        return;
       }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [isEditingFolder, onClose]);
+      onClose();
+    },
+  });
 
   useEffect(() => {
     if (isEditingFolder) folderInputRef.current?.focus({ preventScroll: true });
@@ -65,27 +63,26 @@ export default function SettingsModal({
 
   return (
     <>
-      {/* Backdrop */}
-      {/* oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- Backdrop click closes the modal; Escape handling is registered above. */}
-      <div
-        style={{ position: "fixed", inset: 0, zIndex: 40, background: "oklch(20% 0.020 70 / 0.3)" }}
-        onClick={onClose}
-      />
-      {/* Panel */}
-      <div
+      {/* oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- backdropクリックで閉じる。EscapeはonCancel（useDialogModal）で処理する。 */}
+      <dialog
+        ref={dialogRef}
+        aria-label="設定"
+        onCancel={handleCancel}
+        onClick={(e) => handleBackdropClick(e, onClose)}
+        className="backdrop:bg-[oklch(20%_0.020_70_/_0.3)]"
         style={{
-          position: "fixed",
-          zIndex: 41,
-          top: "50%",
-          left: "50%",
-          transform: "translate(-50%, -50%)",
           width: 440,
+          maxWidth: "calc(100vw - 32px)",
+          maxHeight: "calc(100vh - 32px)",
+          margin: "auto",
+          padding: 0,
           background: "var(--paper-1)",
           borderRadius: 12,
           boxShadow: "var(--shadow-pop)",
           border: "1px solid var(--line-soft)",
           overflow: "hidden",
           fontFamily: "var(--font-jp)",
+          color: "var(--ink-0)",
         }}
       >
         {/* Header */}
@@ -418,7 +415,7 @@ export default function SettingsModal({
             閉じる
           </button>
         </div>
-      </div>
+      </dialog>
       <Toast
         message={
           dlsiteBulk.result
