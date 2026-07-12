@@ -1,11 +1,11 @@
 ---
 id: TASK-28
 title: APIレスポンスのZod検証をclient境界に導入
-status: In Progress
+status: Done
 assignee:
   - '@sonnet'
 created_date: '2026-07-10 10:39'
-updated_date: '2026-07-11 23:45'
+updated_date: '2026-07-12 00:08'
 labels:
   - frontend
 dependencies: []
@@ -21,7 +21,19 @@ ordinal: 28000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 get/post等にレスポンススキーマ検証版が導入され、getWork・searchWorks・smart-folders系が検証付きになる
-- [ ] #2 getWorkがPromise<Work>になり、null分岐の伝播が除去される
-- [ ] #3 検証失敗は握りつぶさずエラー表示につながる
+- [x] #1 get/post等にレスポンススキーマ検証版が導入され、getWork・searchWorks・smart-folders系が検証付きになる
+- [x] #2 getWorkがPromise<Work>になり、null分岐の伝播が除去される
+- [x] #3 検証失敗は握りつぶさずエラー表示につながる
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Sonnet実装、Fableレビュー・検証。getParsed系導入、getWork/searchWorks/smart-folders/tag-prefixes/DLsite系まで適用。getWorkはPromise<Work>化しnull分岐を除去（App.tsxの死んだ分岐2箇所も削除）。表面化した不整合: listWorkFilesが同型のnull誤り（未使用関数、同時修正）。shared追加は一覧ラッパースキーマのみで契約変更なし。check・client 148件・server 135件全パス。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+client API境界にZodレスポンス検証を導入。検証失敗はエンドポイント・フィールド付きのエラーで伝播。
+<!-- SECTION:FINAL_SUMMARY:END -->

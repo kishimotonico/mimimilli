@@ -1,11 +1,11 @@
 ---
 id: TASK-27
 title: shell.cssのCSSレイヤー移行（mle-/mll-規則を@layer componentsへ）
-status: In Progress
+status: Done
 assignee:
   - '@sonnet'
 created_date: '2026-07-10 10:39'
-updated_date: '2026-07-11 23:45'
+updated_date: '2026-07-12 00:08'
 labels:
   - ui
   - dx
@@ -22,8 +22,20 @@ ordinal: 27000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 mll-系規則が@layer componentsに移り、Tailwindユーティリティで局所上書きできる
-- [ ] #2 mle-系規則も段階的に移行される（段数は実装時に判断、完了時点で全規則がレイヤー内）
-- [ ] #3 各段階でビジュアルテスト全パス（意図的な見た目変更はベースライン更新で記録）
-- [ ] #4 docs/design-system.mdのレイヤー記述が実態と一致する
+- [x] #1 mll-系規則が@layer componentsに移り、Tailwindユーティリティで局所上書きできる
+- [x] #2 mle-系規則も段階的に移行される（段数は実装時に判断、完了時点で全規則がレイヤー内）
+- [x] #3 各段階でビジュアルテスト全パス（意図的な見た目変更はベースライン更新で記録）
+- [x] #4 docs/design-system.mdのレイヤー記述が実態と一致する
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Sonnet実装、Fableレビュー・検証。リセット=@layer base、mle-/mll-全規則=@layer componentsへ一括移行（レイヤー内の相対順序は不変）。見た目が変わる箇所は事前洗い出し通り2件のみで、両方とも意図した是正: SmartFolderEditorModalのgap/padding（実測8px/10pxでユーティリティが有効化）、WorkTrackListのイコライザー（横並び+アクセント色、実機確認済み）。work detailスナップショット3枚の差分はstash切り分けでTASK-36のDLsite UI追加による既存の未更新と特定し、ベースライン更新（visual 3回連続全パス）。design-system.md/HANDOFFのレイヤー記述も更新。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+shell.css全規則をCSSレイヤー内へ移行しTailwindユーティリティの局所上書きを可能に。コミット a853241。
+<!-- SECTION:FINAL_SUMMARY:END -->
