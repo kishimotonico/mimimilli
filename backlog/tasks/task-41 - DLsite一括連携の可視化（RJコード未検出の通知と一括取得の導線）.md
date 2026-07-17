@@ -1,11 +1,11 @@
 ---
 id: TASK-41
 title: DLsite一括連携の可視化（RJコード未検出の通知と一括取得の導線）
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-07-17 12:19'
-updated_date: '2026-07-17 12:28'
+updated_date: '2026-07-17 12:54'
 labels: []
 dependencies: []
 priority: medium
@@ -27,10 +27,10 @@ ordinal: 39000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 スキャン完了後、RJコード未検出の作品数が通知され、該当作品の一覧に到達できる
-- [ ] #2 一覧から各作品のRJコード入力（→取得）へ迷わず進める
-- [ ] #3 未連携の一括取得を設定モーダルを開かずにライブラリ画面から起動できる
-- [ ] #4 一括取得の進捗・失敗の既存可視化と矛盾しない
+- [x] #1 スキャン完了後、RJコード未検出の作品数が通知され、該当作品の一覧に到達できる
+- [x] #2 一覧から各作品のRJコード入力（→取得）へ迷わず進める
+- [x] #3 未連携の一括取得を設定モーダルを開かずにライブラリ画面から起動できる
+- [x] #4 一括取得の進捗・失敗の既存可視化と矛盾しない
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -41,3 +41,15 @@ ordinal: 39000
 3. 未連携一括取得をライブラリ画面（ヘッダーのスキャン/通知まわり）から起動可能に
 4. pnpm check/testはエージェント側、ブラウザ検証とコミットはClaude側
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Sonnetサブエージェント（worktree/task41ブランチ）に実装委譲しmasterへマージ（コンフリクトなし）。shared: isRjCodeMissing/ScanResult.rjCodeMissingCount追加。client: useDlsiteBulkをApp単一インスタンスへリフト、TopBarに一括取得ボタン＋通知ベルにRJ未検出バッジ、RjCodeMissingModal新設、NewWorkPopupに件数バッジ＋確認導線。統合修正（Claude）: TASK-39でDLsiteフォームが閲覧ビューから消えたため、WorkStatusWarningsにRJコード未検出の案内＋「連携設定を編集」導線を追加。RjCodeMissingModalをインラインstyleからTailwindユーティリティ＋useDialogModal流儀に統一。実機検証: ベルバッジ3件→一覧→詳細→警告→編集ダイアログ、一括取得ボタンPOST /dlsite/bulk 202＋SSE接続を確認。check/test/visualベースライン更新済み。既知の制約: リロード直後に進行中ジョブへ自動attachしない（useScanProgressと同設計）。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+スキャン完了時のRJコード未検出件数を契約に追加し、通知ベルのバッジ・一覧モーダル・作品詳細の警告導線で可視化。未連携一括取得をTopBarから起動可能にし、SSE進捗と統合。実機検証・ビジュアルベースライン更新済み。
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -1,6 +1,7 @@
 // RJコード未検出（フォルダー名からDLsite作品を特定できなかった）作品の一覧。
 // スキャン完了ポップアップの「確認する」、ヘッダーの通知ベルの両方から開ける（TASK-41）。
-// 各行から作品詳細（DlsitePanelのRJコード入力欄）へ迷わず遷移できることが目的。
+// 各行から作品詳細へ遷移し、警告の「連携設定を編集」から編集ダイアログのRJコード入力に進める。
+import Button from "../../../shared/ui/Button";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
 import { useRjCodeMissingWorks } from "../model/dlsiteMissingRjCode";
 
@@ -14,117 +15,53 @@ export default function RjCodeMissingModal({ onClose, onOpenWork }: RjCodeMissin
   const { dialogRef, handleCancel, handleBackdropClick } = useDialogModal({ onClose });
 
   return (
-    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- backdropクリックで閉じる。EscapeはonCancel（useDialogModal）で処理する。
+    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- backdropクリックはuseDialogModalで判定する。
     <dialog
       ref={dialogRef}
-      aria-label="RJコード未検出の作品"
+      aria-labelledby="rj-missing-title"
       onCancel={handleCancel}
-      onClick={(e) => handleBackdropClick(e, onClose)}
-      className="backdrop:bg-[oklch(0%_0_0_/_0.55)]"
-      style={{
-        background: "var(--paper-1)",
-        border: "1px solid var(--line)",
-        borderRadius: 10,
-        padding: 22,
-        margin: "auto",
-        width: 480,
-        maxWidth: "min(90vw, calc(100vw - 32px))",
-        maxHeight: "min(80vh, calc(100vh - 32px))",
-        color: "var(--ink-0)",
-        display: "flex",
-        flexDirection: "column",
-        fontFamily: "var(--font-jp)",
-      }}
+      onClick={(event) => handleBackdropClick(event, onClose)}
+      className="m-auto w-[min(480px,calc(100vw-32px))] overflow-hidden rounded-[12px] border border-line-soft bg-paper-1 p-0 font-jp text-ink-0 shadow-pop backdrop:bg-[oklch(20%_0.020_70_/_0.3)]"
     >
-      <h2 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700 }}>RJコード未検出の作品</h2>
-      <p style={{ margin: "0 0 14px", fontSize: 12, color: "var(--ink-2)" }}>
-        フォルダー名からDLsiteのRJコードを自動検出できませんでした。作品を開いてRJコードを手入力するか、連携しない設定にできます。
-      </p>
-
-      {isLoading ? (
-        <p style={{ fontSize: 12, color: "var(--ink-3)" }}>読み込み中...</p>
-      ) : works.length === 0 ? (
-        <p style={{ fontSize: 12, color: "var(--ink-3)" }}>RJコード未検出の作品はありません。</p>
-      ) : (
-        <ul
-          style={{
-            listStyle: "none",
-            margin: 0,
-            padding: 0,
-            overflowY: "auto",
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            gap: 4,
-          }}
-        >
-          {works.map((work) => (
-            <li key={work.id}>
-              <button
-                type="button"
-                onClick={() => onOpenWork(work.id)}
-                style={{
-                  width: "100%",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "flex-start",
-                  gap: 2,
-                  padding: "8px 10px",
-                  borderRadius: 6,
-                  border: "1px solid var(--line-soft)",
-                  background: "var(--paper-0)",
-                  color: "inherit",
-                  cursor: "pointer",
-                  textAlign: "left",
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: 13,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    width: "100%",
-                  }}
-                >
-                  {work.title}
-                </span>
-                <span
-                  style={{
-                    fontFamily: "var(--font-mono)",
-                    fontSize: 10.5,
-                    color: "var(--ink-3)",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    width: "100%",
-                  }}
-                >
-                  {work.physicalPath}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <button
-        onClick={onClose}
-        style={{
-          marginTop: 16,
-          background: "var(--acc)",
-          border: "none",
-          borderRadius: 6,
-          color: "var(--paper-1)",
-          cursor: "pointer",
-          padding: "10px 28px",
-          fontSize: 14,
-          fontWeight: 600,
-          alignSelf: "center",
-        }}
-      >
-        閉じる
-      </button>
+      <div className="flex max-h-[min(80vh,calc(100vh-32px))] min-h-0 flex-col overflow-hidden">
+        <header className="shrink-0 border-b border-line-soft px-[18px] py-[14px]">
+          <h2 id="rj-missing-title" className="font-sans text-[14px] font-semibold">
+            RJコード未検出の作品
+          </h2>
+          <p className="mt-1 text-[11.5px] text-ink-2">
+            フォルダー名からDLsiteのRJコードを自動検出できませんでした。作品を開いてRJコードを入力するか、連携しない設定にできます。
+          </p>
+        </header>
+        <div className="min-h-0 flex-1 overflow-y-auto px-[18px] py-3">
+          {isLoading ? (
+            <p className="text-[11.5px] text-ink-3">読み込み中...</p>
+          ) : works.length === 0 ? (
+            <p className="text-[11.5px] text-ink-3">RJコード未検出の作品はありません。</p>
+          ) : (
+            <ul className="flex list-none flex-col gap-1 p-0">
+              {works.map((work) => (
+                <li key={work.id}>
+                  <button
+                    type="button"
+                    className="flex w-full flex-col items-start gap-0.5 rounded-[6px] border border-line-soft bg-paper-0 px-2.5 py-2 text-left hover:bg-paper-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
+                    onClick={() => onOpenWork(work.id)}
+                  >
+                    <span className="w-full truncate text-[12px]">{work.title}</span>
+                    <span className="w-full truncate font-mono text-[10px] text-ink-3">
+                      {work.physicalPath}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <footer className="flex shrink-0 justify-end border-t border-line-soft px-[18px] py-3">
+          <Button variant="quiet" onClick={onClose}>
+            閉じる
+          </Button>
+        </footer>
+      </div>
     </dialog>
   );
 }

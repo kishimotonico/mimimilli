@@ -1,4 +1,5 @@
 import type { Work } from "@mimimilli/shared";
+import { isRjCodeMissing } from "@mimimilli/shared";
 import { I } from "../../../../shared/ui/Icon";
 
 interface WorkStatusWarningsProps {
@@ -31,6 +32,25 @@ export function WorkStatusWarnings({ work, onEdit }: WorkStatusWarningsProps) {
               {work.errorMessage ?? "詳細不明のエラーが発生しました。"}
             </p>
             <p className="mle-prv__warn-path">{work.physicalPath}</p>
+          </div>
+        </div>
+      )}
+
+      {isRjCodeMissing(work.dlsite) && (
+        <div className="mle-prv__warn">
+          <I.err size={16} />
+          <div className="mle-prv__warn-body">
+            <p className="mle-prv__warn-title">DLsite未連携（RJコード未検出）</p>
+            <p className="mle-prv__warn-text">
+              フォルダー名からRJコードを自動検出できませんでした。RJコードを入力して取得するか、連携しない設定にできます。
+            </p>
+            <button
+              type="button"
+              className="mt-1 w-fit rounded-pill bg-paper-2 px-2.5 py-1 font-sans text-[10.5px] font-medium text-ink-1 hover:bg-paper-3 hover:text-ink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
+              onClick={onEdit}
+            >
+              連携設定を編集
+            </button>
           </div>
         </div>
       )}
