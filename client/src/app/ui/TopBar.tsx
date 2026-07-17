@@ -1,5 +1,7 @@
+import type { ScanResult } from "@mimimilli/shared";
 import { I } from "../../shared/ui/Icon";
 import IconButton from "../../shared/ui/IconButton";
+import NotificationBell from "./NotificationBell";
 
 interface TopBarProps {
   mode?: "library" | "files";
@@ -15,14 +17,22 @@ interface TopBarProps {
   scanProgressLabel?: string | null;
   /** RJコード未検出の作品数（0件ならバッジを出さない、TASK-41） */
   rjCodeMissingCount?: number;
-  /** 通知ベル押下でRJコード未検出一覧を開く */
-  onOpenDlsiteMissing?: () => void;
+  /** 通知ベルからRJコード未検出一覧を開く */
+  onOpenRjCodeMissing?: () => void;
+  /** DLsite取得失敗（error/not_found）の作品数（TASK-44） */
+  dlsiteFetchFailedCount?: number;
+  /** 通知ベルからDLsite取得失敗一覧を開く */
+  onOpenDlsiteFetchFailed?: () => void;
+  /** DLsite未連携（RJコードはあるが未取得）の作品数（TASK-44） */
+  dlsiteUnlinkedCount?: number;
   /** DLsite一括取得（mode: "existing"）が実行中か */
   dlsiteBulkActive?: boolean;
   /** dlsiteBulkActive 中の進捗（例: "3/12"）。null は進捗未受信 */
   dlsiteBulkProgress?: { processed: number; total: number } | null;
-  /** 設定モーダルを開かずにライブラリ画面から一括取得を起動する */
+  /** 通知ベルから一括取得を起動する */
   onStartDlsiteBulk?: () => void;
+  /** 直近のスキャン結果（通知ベルのサマリ表示用、TASK-44） */
+  scanResult?: ScanResult | null;
 }
 
 export default function TopBar({
@@ -36,10 +46,14 @@ export default function TopBar({
   scanning = false,
   scanProgressLabel = null,
   rjCodeMissingCount = 0,
-  onOpenDlsiteMissing,
+  onOpenRjCodeMissing = () => {},
+  dlsiteFetchFailedCount = 0,
+  onOpenDlsiteFetchFailed = () => {},
+  dlsiteUnlinkedCount = 0,
   dlsiteBulkActive = false,
   dlsiteBulkProgress = null,
-  onStartDlsiteBulk,
+  onStartDlsiteBulk = () => {},
+  scanResult = null,
 }: TopBarProps) {
   const placeholder =
     mode === "files"
@@ -99,39 +113,24 @@ export default function TopBar({
         disabled={scanning}
         className={scanning ? "animate-spin" : undefined}
       />
-      <IconButton
-        size="md"
-        icon={I.link}
-        label={
-          dlsiteBulkActive
-            ? `DLsite未連携をまとめて取得中${dlsiteBulkProgress ? ` (${dlsiteBulkProgress.processed}/${dlsiteBulkProgress.total})` : "..."}`
-            : "DLsite未連携をまとめて取得"
-        }
-        onClick={onStartDlsiteBulk}
-        disabled={dlsiteBulkActive}
-        className={dlsiteBulkActive ? "animate-pulse" : undefined}
+      {dlsiteBulkActive && (
+        <span className="font-mono text-[10.5px] text-ink-3" aria-live="polite">
+          {dlsiteBulkProgress
+            ? `DLsite取得中 (${dlsiteBulkProgress.processed}/${dlsiteBulkProgress.total})`
+            : "DLsite取得中..."}
+        </span>
+      )}
+      <NotificationBell
+        rjCodeMissingCount={rjCodeMissingCount}
+        onOpenRjCodeMissing={onOpenRjCodeMissing}
+        dlsiteFetchFailedCount={dlsiteFetchFailedCount}
+        onOpenDlsiteFetchFailed={onOpenDlsiteFetchFailed}
+        dlsiteUnlinkedCount={dlsiteUnlinkedCount}
+        dlsiteBulkActive={dlsiteBulkActive}
+        dlsiteBulkProgress={dlsiteBulkProgress}
+        onStartDlsiteBulk={onStartDlsiteBulk}
+        scanResult={scanResult}
       />
-      <div className="relative">
-        <IconButton
-          size="md"
-          icon={I.bell}
-          label={
-            rjCodeMissingCount > 0
-              ? `通知（RJコード未検出の作品が${rjCodeMissingCount}件）`
-              : "通知"
-          }
-          onClick={onOpenDlsiteMissing}
-        />
-        {rjCodeMissingCount > 0 && (
-          <span
-            aria-hidden="true"
-            className="pointer-events-none absolute top-0 right-0 flex h-[15px] min-w-[15px] items-center justify-center rounded-pill px-[3px] font-mono text-[9px] font-bold text-paper-1"
-            style={{ background: "var(--r-coral)" }}
-          >
-            {rjCodeMissingCount > 99 ? "99+" : rjCodeMissingCount}
-          </span>
-        )}
-      </div>
       <IconButton size="md" icon={I.cog} label="設定" onClick={onSettings} />
     </header>
   );

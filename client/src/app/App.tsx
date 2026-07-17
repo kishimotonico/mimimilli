@@ -25,15 +25,18 @@ import SetupScreen from "../features/setup/ui/SetupScreen";
 import SettingsModal from "../features/settings/ui/SettingsModal";
 import NewWorkPopup from "../features/scan/ui/NewWorkPopup";
 import RjCodeMissingModal from "../features/library/ui/RjCodeMissingModal";
+import DlsiteFetchFailedModal from "../features/library/ui/DlsiteFetchFailedModal";
 import Toast from "../shared/ui/Toast";
 import type { ScanResult, Work, WorkSummary } from "@mimimilli/shared";
 import { getWork } from "../entities/work/api";
 import { exportLibrary } from "../features/library/api";
 import { scanLibrary } from "../features/scan/api";
-import { formatScanProgressLabel } from "../features/scan/model";
+import { formatScanProgressLabel, shouldShowNewWorkPopup } from "../features/scan/model";
 import { useScanProgress } from "../features/scan/useScanProgress";
 import { useDlsiteBulk } from "./model/useDlsiteBulk";
 import { useRjCodeMissingWorks } from "../features/library/model/dlsiteMissingRjCode";
+import { useDlsiteFetchFailedWorks } from "../features/library/model/dlsiteFetchFailed";
+import { useDlsiteUnlinkedCount } from "../features/library/model/dlsiteUnlinked";
 import { getSettings, setRootFolder } from "../features/settings/api";
 import { parseNavigationUrl, type AppMode } from "../features/navigation/model/navigationUrl";
 import { useNavigationHistory } from "../features/navigation/model/useNavigationHistory";
@@ -58,7 +61,8 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [isCompletingSetup, setIsCompletingSetup] = useState(false);
-  const [showDlsiteMissing, setShowDlsiteMissing] = useState(false);
+  const [showRjCodeMissing, setShowRjCodeMissing] = useState(false);
+  const [showDlsiteFetchFailed, setShowDlsiteFetchFailed] = useState(false);
 
   const isPlaying = player.state.currentTrackIndex >= 0 && player.state.currentWork !== null;
   const isPlaybackActive = player.state.isPlaying;
@@ -100,6 +104,8 @@ export default function App() {
   // ── DLsite一括取得（設定モーダル・TopBar共有、TASK-41） ────────
   const dlsiteBulk = useDlsiteBulk();
   const dlsiteRjMissing = useRjCodeMissingWorks();
+  const dlsiteFetchFailed = useDlsiteFetchFailedWorks();
+  const dlsiteUnlinked = useDlsiteUnlinkedCount();
 
   // ── Scan mutation ─────────────────────────────────────────
   const scanMutation = useMutation({
@@ -193,10 +199,12 @@ export default function App() {
 
   const handleScan = useCallback(() => scanMutation.mutate(), [scanMutation]);
 
-  // RJコード未検出一覧から作品を選び、作品詳細（DlsitePanelのRJコード入力欄）へ遷移する。
+  // 通知ベルの一覧（RJコード未検出・DLsite取得失敗）から作品を選び、
+  // 作品詳細（DlsitePanel）へ遷移する。
   const handleOpenWorkFromNotification = useCallback(
     (workId: string) => {
-      setShowDlsiteMissing(false);
+      setShowRjCodeMissing(false);
+      setShowDlsiteFetchFailed(false);
       setScanResult(null);
       navigationHistory.setMode("library");
       libraryNav.setAxis("all");
@@ -298,10 +306,14 @@ export default function App() {
           scanning={scanMutation.isPending}
           scanProgressLabel={scanProgressLabel}
           rjCodeMissingCount={dlsiteRjMissing.count}
-          onOpenDlsiteMissing={() => setShowDlsiteMissing(true)}
+          onOpenRjCodeMissing={() => setShowRjCodeMissing(true)}
+          dlsiteFetchFailedCount={dlsiteFetchFailed.count}
+          onOpenDlsiteFetchFailed={() => setShowDlsiteFetchFailed(true)}
+          dlsiteUnlinkedCount={dlsiteUnlinked.count}
           dlsiteBulkActive={dlsiteBulk.active}
           dlsiteBulkProgress={dlsiteBulk.progress}
           onStartDlsiteBulk={dlsiteBulk.start}
+          scanResult={scanResult}
         />
       }
       addressBar={
@@ -410,19 +422,25 @@ export default function App() {
               onExport={handleExport}
             />
           )}
-          {scanResult && (
+          {shouldShowNewWorkPopup(scanResult) && (
             <NewWorkPopup
               scanResult={scanResult}
               onClose={() => setScanResult(null)}
               onOpenRjCodeMissing={() => {
                 setScanResult(null);
-                setShowDlsiteMissing(true);
+                setShowRjCodeMissing(true);
               }}
             />
           )}
-          {showDlsiteMissing && (
+          {showRjCodeMissing && (
             <RjCodeMissingModal
-              onClose={() => setShowDlsiteMissing(false)}
+              onClose={() => setShowRjCodeMissing(false)}
+              onOpenWork={handleOpenWorkFromNotification}
+            />
+          )}
+          {showDlsiteFetchFailed && (
+            <DlsiteFetchFailedModal
+              onClose={() => setShowDlsiteFetchFailed(false)}
               onOpenWork={handleOpenWorkFromNotification}
             />
           )}

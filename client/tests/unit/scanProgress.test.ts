@@ -1,8 +1,13 @@
 // TASK-20: スキャン進捗のリアルタイム表示（useScanProgress フック・ラベル整形）のテスト。
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import type { ScanResult } from "@mimimilli/shared";
 import { useScanProgress } from "../../src/features/scan/useScanProgress";
-import { formatScanProgressLabel, type ScanProgress } from "../../src/features/scan/model";
+import {
+  formatScanProgressLabel,
+  shouldShowNewWorkPopup,
+  type ScanProgress,
+} from "../../src/features/scan/model";
 
 class FakeEventSource extends EventTarget {
   url: string;
@@ -167,5 +172,28 @@ describe("formatScanProgressLabel", () => {
   it("total>0 は「フェーズ名 (processed/total)」の形式", () => {
     const progress: ScanProgress = { phase: "registering", processed: 3, total: 12 };
     expect(formatScanProgressLabel(progress)).toBe("作品を登録中 (3/12)");
+  });
+});
+
+describe("shouldShowNewWorkPopup", () => {
+  const baseResult: ScanResult = {
+    registered: 10,
+    newlyGenerated: 0,
+    errors: 0,
+    missing: 0,
+    newWorkIds: [],
+    rjCodeMissingCount: 0,
+  };
+
+  it("scanResult が null なら表示しない", () => {
+    expect(shouldShowNewWorkPopup(null)).toBe(false);
+  });
+
+  it("新規作品0件なら表示しない（TASK-44: 通知ベルのサマリ表示に留める）", () => {
+    expect(shouldShowNewWorkPopup({ ...baseResult, newlyGenerated: 0 })).toBe(false);
+  });
+
+  it("新規作品1件以上なら表示する", () => {
+    expect(shouldShowNewWorkPopup({ ...baseResult, newlyGenerated: 1 })).toBe(true);
   });
 });

@@ -23,6 +23,20 @@ export function isRjCodeMissing(state: DlsiteState): boolean {
   return state.rjCode === null && state.status !== "skipped";
 }
 
+/** DLsite取得が失敗したまま残っている（RJコードはあるが取得できなかった）作品か。
+ *  作品詳細の警告表示・通知ベル（TASK-44）の判定基準の正典 */
+export function isDlsiteFetchFailed(state: DlsiteState): boolean {
+  return state.status === "error" || state.status === "not_found";
+}
+
+/** DLsite未連携（RJコードは判明しているが取得を一度も試みていない）作品か。
+ *  通知ベルの「まとめて取得」対象件数（TASK-44）の判定基準。
+ *  POST /dlsite/bulk（mode: "existing"）は取得失敗（error）も再試行対象に含めるため、
+ *  実際に処理される件数とは意図的に区別している（error は isDlsiteFetchFailed 側で別掲する）。 */
+export function isDlsiteUnlinked(state: DlsiteState): boolean {
+  return state.rjCode !== null && state.status === "none";
+}
+
 export const dlsiteWorkInfoSchema = z.object({
   rjCode: z.string(),
   title: z.string(),
