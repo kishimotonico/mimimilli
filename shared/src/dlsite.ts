@@ -60,7 +60,7 @@ export const dlsiteStatePatchSchema = z
     rjCode: z
       .string()
       .trim()
-      .regex(/^RJ\d{6,8}$/i, "RJコードはRJに続く6〜8桁で入力してください")
+      .regex(/^(RJ|VJ)\d{6,8}$/i, "RJ/VJコードはRJまたはVJに続く6〜8桁で入力してください")
       .transform((value) => value.toUpperCase())
       .nullable()
       .optional(),

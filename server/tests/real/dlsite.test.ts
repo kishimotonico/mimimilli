@@ -4,9 +4,10 @@ import assert from "node:assert/strict";
 import { chmodSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
-import type { DlsiteWorkInfo } from "@mimimilli/shared";
+import { dlsiteStatePatchSchema, type DlsiteWorkInfo } from "@mimimilli/shared";
 import {
   detectRjCode,
+  dlsiteWorkUrl,
   fetchDlsiteInfo,
   mergeDlsiteTags,
   parseDlsiteHtml,
@@ -77,6 +78,41 @@ test("detectRjCode: フォルダー名優先・大文字化・桁数", () => {
   assert.equal(detectRjCode(["RJ900001_テスト作品", "別タイトル RJ123456"]), "RJ900001");
   assert.equal(detectRjCode(["タイトルのみ", "[rj01234567] 作品"]), "RJ01234567");
   assert.equal(detectRjCode(["RJ123 桁不足", "なし"]), null);
+});
+
+test("detectRjCode: VJコードのフォルダー名は自動検出しない（フォルダー名検出はRJのみ）", () => {
+  assert.equal(detectRjCode(["VJ014780_商業作品"]), null);
+});
+
+test("dlsiteWorkUrl: RJコードはmaniax、VJコードはproのURLを組み立てる", () => {
+  assert.equal(
+    dlsiteWorkUrl("RJ123456"),
+    "https://www.dlsite.com/maniax/work/=/product_id/RJ123456.html",
+  );
+  assert.equal(
+    dlsiteWorkUrl("VJ014780"),
+    "https://www.dlsite.com/pro/work/=/product_id/VJ014780.html",
+  );
+  assert.equal(
+    dlsiteWorkUrl("vj014780"),
+    "https://www.dlsite.com/pro/work/=/product_id/vj014780.html",
+  );
+});
+
+test("dlsiteStatePatchSchema: RJ/VJコードの手動入力を受け付け、それ以外は拒否する", () => {
+  const rj = dlsiteStatePatchSchema.safeParse({ rjCode: "rj1234567" });
+  assert.equal(rj.success, true);
+  if (rj.success) assert.equal(rj.data.rjCode, "RJ1234567");
+
+  const vj = dlsiteStatePatchSchema.safeParse({ rjCode: "vj014780" });
+  assert.equal(vj.success, true);
+  if (vj.success) assert.equal(vj.data.rjCode, "VJ014780");
+
+  const tooShort = dlsiteStatePatchSchema.safeParse({ rjCode: "VJ123" });
+  assert.equal(tooShort.success, false);
+
+  const unknownPrefix = dlsiteStatePatchSchema.safeParse({ rjCode: "BJ123456" });
+  assert.equal(unknownPrefix.success, false);
 });
 
 test("mergeDlsiteTags: prefix 変換と重複排除", () => {
