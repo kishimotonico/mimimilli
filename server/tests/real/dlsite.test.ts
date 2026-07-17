@@ -178,7 +178,7 @@ test("dlsiteFetch: 存在しない作品はnot_found", async () => {
   if (!generatedFree.ok) assert.equal(generatedFree.kind, "not_found");
 });
 
-test("一括取得: 既存タイトルを保持し、appliedTagsの差分だけ追加して1秒相当の間隔を空ける", async () => {
+test("一括取得: 編集済みタイトルは保持しフォルダー名のままのタイトルはDLsite情報で更新する。appliedTagsは差分だけ追加し1秒相当の間隔を空ける", async () => {
   const lib = makeSampleLibrary("data/test-dlsite-bulk");
   const calls: number[] = [];
   const adapter = createRealAdapter({
@@ -190,7 +190,7 @@ test("一括取得: 既存タイトルを保持し、appliedTagsの差分だけ�
         ok: true,
         info: {
           rjCode,
-          title: `上書き禁止 ${rjCode}`,
+          title: `DLsite取得タイトル ${rjCode}`,
           circle: null,
           cvs: [],
           genreTags: ["削除済み", "新着"],
@@ -218,13 +218,18 @@ test("一括取得: 既存タイトルを保持し、appliedTagsの差分だけ�
   const result = await adapter.runDlsiteBulk("existing", undefined);
   assert.equal(result.fetched, 2);
   assert.ok(calls[1]! - calls[0]! >= 35, `request interval: ${calls[1]! - calls[0]!}ms`);
+
+  // 既存メタのタイトル「既存メタの作品」はフォルダー名ともRJコードとも一致しない
+  // ＝ユーザー編集済みとみなし、タグの差分だけ追加してタイトルは保持する
   const existing = await adapter.getWork(lib.existingWorkId);
   assert.equal(existing?.title, beforeExisting?.title);
   assert.ok(!existing?.tags.includes("genre/削除済み"));
   assert.ok(existing?.tags.includes("genre/新着"));
   assert.deepEqual(existing?.dlsite.appliedTags, ["genre/削除済み", "genre/新着"]);
+
+  // スキャナー自動生成のタイトル（フォルダー名そのまま）は初期値のままとみなし、DLsite情報で更新する
   const generated = await adapter.getWork(scan.newWorkIds[0]!);
-  assert.ok(generated?.title !== `上書き禁止 ${generated?.dlsite.rjCode}`);
+  assert.equal(generated?.title, `DLsite取得タイトル ${generated?.dlsite.rjCode}`);
 });
 
 test("一括取得: not_found記録後とskipped作品は次回対象外", async () => {

@@ -41,6 +41,7 @@ import {
   type MediaLocation,
 } from "../../adapter.ts";
 import { buildAxisFacets } from "../../core/axisFacets.ts";
+import { isDefaultTitle } from "../../core/dlsiteTitle.ts";
 import { buildTagPrefixCandidates } from "../../core/tagPrefixCandidates.ts";
 import { evalSmartFolder } from "../../core/smartFolder.ts";
 import { applyWorksQuery } from "../../core/worksQuery.ts";
@@ -389,7 +390,12 @@ export function createRealAdapter(options: RealAdapterOptions): DataAdapter {
             } = {
               tags: normalizeTags([...work.tags, ...applyTags]),
             };
-            if (mode === "new") patch.title = fetched.info.title;
+            if (
+              mode === "new" ||
+              isDefaultTitle(work.title, work.physicalPath, work.dlsite.rjCode)
+            ) {
+              patch.title = fetched.info.title;
+            }
             if (!work.urls.some((entry) => entry.url.includes("dlsite.com"))) {
               patch.urls = [...work.urls, { label: "DLsite", url: fetched.info.url }];
             }
