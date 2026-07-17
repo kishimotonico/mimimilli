@@ -10,8 +10,13 @@ import type { DlsiteFetchResult, DlsiteWorkInfo } from "@mimimilli/shared";
 const FETCH_TIMEOUT_MS = 15_000;
 const USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) mimimilli/0.1";
 
-export function dlsiteWorkUrl(rjCode: string): string {
-  return `https://www.dlsite.com/maniax/work/=/product_id/${rjCode}.html`;
+// DLsite の作品ページURLはIDのカテゴリprefixで公開ストアが分かれる:
+// RJ（同人）は maniax、VJ（商業/美少女ゲーム）は pro。カテゴリを誤ると
+// 常に404（not_found）になるため、prefixで振り分ける。
+// 例: https://www.dlsite.com/pro/work/=/product_id/VJ014780.html
+export function dlsiteWorkUrl(code: string): string {
+  const category = code.toUpperCase().startsWith("VJ") ? "pro" : "maniax";
+  return `https://www.dlsite.com/${category}/work/=/product_id/${code}.html`;
 }
 
 /** 候補文字列（フォルダー名 → タイトルの順）から RJ コードを検出する */
