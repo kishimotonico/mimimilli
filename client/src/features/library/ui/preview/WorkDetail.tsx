@@ -3,12 +3,12 @@ import type { Work, WorkPatch } from "@mimimilli/shared";
 import CoverImg from "../../../../entities/work/ui/CoverImg";
 import { I } from "../../../../shared/ui/Icon";
 import { formatDuration, formatTime } from "../../../../shared/lib/format";
-import { formatDate } from "./format";
 import { WorkMetadataActions } from "./WorkMetadataActions";
 import { WorkStatusWarnings } from "./WorkStatusWarnings";
 import { WorkTagEditor } from "./WorkTagEditor";
 import { WorkTrackList } from "./WorkTrackList";
 import { WorkEditDialog } from "./WorkEditDialog";
+import { WorkInfoDialog } from "./WorkInfoDialog";
 
 interface WorkDetailProps {
   work: Work;
@@ -43,6 +43,8 @@ export function WorkDetail({
   // 閲覧ビューに残るタグ編集とブックマーク更新は同じエラー表示スロットを共有する。
   const [editError, setEditError] = useState<string | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isInfoDialogOpen, setIsInfoDialogOpen] = useState(false);
+  const hasKickerWarning = work.status === "missing" || work.status === "error";
 
   return (
     <div className="mle-prv__body">
@@ -57,39 +59,20 @@ export function WorkDetail({
           />
         </div>
         <div className="mle-prv__meta">
-          <div className="mle-prv__kicker">
-            {work.status === "ok" && <span className="reg">登録済</span>}
-            {work.status === "missing" && (
-              <span className="warn">
-                <I.err size={11} /> ファイル欠損
-              </span>
-            )}
-            {work.status === "error" && (
-              <span className="warn">
-                <I.err size={11} /> メタ読み込みエラー
-              </span>
-            )}
-            {work.dlsite.status === "applied" && (
-              <span className="inline-flex items-center rounded-pill bg-[color-mix(in_oklch,var(--r-leaf)_12%,transparent)] px-1.5 py-0.5 font-sans text-[9.5px] font-medium tracking-normal text-[var(--r-leaf)]">
-                DLsite連携済み
-              </span>
-            )}
-            <span className="inline-flex items-center gap-[3px] tracking-normal">
-              <span className="font-sans text-[9.5px] text-ink-4">追加</span>
-              <span className="font-mono text-[10px] text-ink-2">{formatDate(work.addedAt)}</span>
-            </span>
-            {work.lastPlayedAt && (
-              <>
-                <span className="text-ink-4">·</span>
-                <span className="inline-flex items-center gap-[3px] tracking-normal">
-                  <span className="font-sans text-[9.5px] text-ink-4">最終再生</span>
-                  <span className="font-mono text-[10px] text-ink-2">
-                    {formatDate(work.lastPlayedAt)}
-                  </span>
+          {hasKickerWarning && (
+            <div className="mle-prv__kicker">
+              {work.status === "missing" && (
+                <span className="warn">
+                  <I.err size={11} /> ファイル欠損
                 </span>
-              </>
-            )}
-          </div>
+              )}
+              {work.status === "error" && (
+                <span className="warn">
+                  <I.err size={11} /> メタ読み込みエラー
+                </span>
+              )}
+            </div>
+          )}
           <div className="mle-prv__title-row">
             <h2 className="mle-prv__title">{work.title}</h2>
           </div>
@@ -128,6 +111,7 @@ export function WorkDetail({
             onPatchWork={onPatchWork}
             onError={setEditError}
             onEdit={() => setIsEditDialogOpen(true)}
+            onShowInfo={() => setIsInfoDialogOpen(true)}
           />
         </div>
       </div>
@@ -151,6 +135,16 @@ export function WorkDetail({
           isPatching={isPatching}
           onPatchWork={onPatchWork}
           onClose={() => setIsEditDialogOpen(false)}
+        />
+      )}
+      {isInfoDialogOpen && (
+        <WorkInfoDialog
+          work={work}
+          trackCount={tracks.length}
+          hasResume={hasResume}
+          resumeTrack={resumeTrack}
+          resumeTime={resumeTime}
+          onClose={() => setIsInfoDialogOpen(false)}
         />
       )}
     </div>

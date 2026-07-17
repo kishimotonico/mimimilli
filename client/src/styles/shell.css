@@ -1366,13 +1366,6 @@
     letter-spacing: 0.08em;
     color: var(--ink-3);
   }
-  .mle-prv__kicker .reg {
-    background: var(--acc-soft);
-    color: var(--acc-ink);
-    padding: 1px 6px;
-    border-radius: 4px;
-    font-weight: 600;
-  }
   .mle-prv__kicker .warn {
     display: inline-flex;
     align-items: center;
