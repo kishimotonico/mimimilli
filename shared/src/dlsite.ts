@@ -17,6 +17,12 @@ export function emptyDlsiteState(): DlsiteState {
   return { rjCode: null, status: "none", lastAttemptAt: null, error: null, appliedTags: [] };
 }
 
+/** RJコードが未検出のまま放置されている作品か（ユーザーが明示的にスキップした作品は除く）。
+ *  スキャン完了通知・一覧の両方で判定基準を一致させるための正典 */
+export function isRjCodeMissing(state: DlsiteState): boolean {
+  return state.rjCode === null && state.status !== "skipped";
+}
+
 export const dlsiteWorkInfoSchema = z.object({
   rjCode: z.string(),
   title: z.string(),

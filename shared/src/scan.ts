@@ -12,6 +12,9 @@ export const scanResultSchema = z.object({
   errors: z.number().int().nonnegative(),
   missing: z.number().int().nonnegative(),
   newWorkIds: z.array(z.string()),
+  /** スキャン完了時点でRJコード未検出（かつ未スキップ）のまま残っている作品数。
+   *  新規作品に限らずライブラリ全体を対象に数える（isRjCodeMissing が判定基準） */
+  rjCodeMissingCount: z.number().int().nonnegative(),
 });
 export type ScanResult = z.infer<typeof scanResultSchema>;
 

@@ -90,7 +90,14 @@ describe("useScanProgress", () => {
 
     dispatch(instances[0]!, "complete", {
       type: "complete",
-      result: { registered: 1, newlyGenerated: 0, errors: 0, missing: 0, newWorkIds: [] },
+      result: {
+        registered: 1,
+        newlyGenerated: 0,
+        errors: 0,
+        missing: 0,
+        newWorkIds: [],
+        rjCodeMissingCount: 0,
+      },
     });
     // complete はこのフックの状態を変えない（progress のまま据え置き）
     expect(result.current).toEqual({ phase: "generating", processed: 1, total: 2 });

@@ -13,6 +13,16 @@ interface TopBarProps {
   scanning?: boolean;
   /** scanning 中の進捗ラベル（例: "作品を登録中 (3/12)"）。null は「進捗未受信」を表す */
   scanProgressLabel?: string | null;
+  /** RJコード未検出の作品数（0件ならバッジを出さない、TASK-41） */
+  rjCodeMissingCount?: number;
+  /** 通知ベル押下でRJコード未検出一覧を開く */
+  onOpenDlsiteMissing?: () => void;
+  /** DLsite一括取得（mode: "existing"）が実行中か */
+  dlsiteBulkActive?: boolean;
+  /** dlsiteBulkActive 中の進捗（例: "3/12"）。null は進捗未受信 */
+  dlsiteBulkProgress?: { processed: number; total: number } | null;
+  /** 設定モーダルを開かずにライブラリ画面から一括取得を起動する */
+  onStartDlsiteBulk?: () => void;
 }
 
 export default function TopBar({
@@ -25,6 +35,11 @@ export default function TopBar({
   playingTrack,
   scanning = false,
   scanProgressLabel = null,
+  rjCodeMissingCount = 0,
+  onOpenDlsiteMissing,
+  dlsiteBulkActive = false,
+  dlsiteBulkProgress = null,
+  onStartDlsiteBulk,
 }: TopBarProps) {
   const placeholder =
     mode === "files"
@@ -84,7 +99,39 @@ export default function TopBar({
         disabled={scanning}
         className={scanning ? "animate-spin" : undefined}
       />
-      <IconButton size="md" icon={I.bell} label="通知" />
+      <IconButton
+        size="md"
+        icon={I.link}
+        label={
+          dlsiteBulkActive
+            ? `DLsite未連携をまとめて取得中${dlsiteBulkProgress ? ` (${dlsiteBulkProgress.processed}/${dlsiteBulkProgress.total})` : "..."}`
+            : "DLsite未連携をまとめて取得"
+        }
+        onClick={onStartDlsiteBulk}
+        disabled={dlsiteBulkActive}
+        className={dlsiteBulkActive ? "animate-pulse" : undefined}
+      />
+      <div className="relative">
+        <IconButton
+          size="md"
+          icon={I.bell}
+          label={
+            rjCodeMissingCount > 0
+              ? `通知（RJコード未検出の作品が${rjCodeMissingCount}件）`
+              : "通知"
+          }
+          onClick={onOpenDlsiteMissing}
+        />
+        {rjCodeMissingCount > 0 && (
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute top-0 right-0 flex h-[15px] min-w-[15px] items-center justify-center rounded-pill px-[3px] font-mono text-[9px] font-bold text-paper-1"
+            style={{ background: "var(--r-coral)" }}
+          >
+            {rjCodeMissingCount > 99 ? "99+" : rjCodeMissingCount}
+          </span>
+        )}
+      </div>
       <IconButton size="md" icon={I.cog} label="設定" onClick={onSettings} />
     </header>
   );

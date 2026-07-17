@@ -1,10 +1,13 @@
+// DLsite一括取得ジョブ（POST /dlsite/bulk）の進捗をSSE購読するApp共有フック（TASK-41）。
+// 設定モーダルの「未連携をまとめて取得」ボタンとTopBarの一括取得ボタンが同じジョブ状態を
+// 見られるよう、App.tsxで単一インスタンスを保持し両者へpropsとして配る（scanProgressと同じ設計）。
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { dlsiteBulkProgressEventSchema } from "@mimimilli/shared";
 import type { DlsiteBulkResult } from "@mimimilli/shared";
-import { startDlsiteBulk } from "../../../entities/work/api";
-import { API_BASE } from "../../../shared/api/http";
-import { getDlsiteInvalidationKeys } from "../../library/model/dlsiteInvalidation";
+import { startDlsiteBulk } from "../../entities/work/api";
+import { API_BASE } from "../../shared/api/http";
+import { getDlsiteInvalidationKeys } from "../../features/library/model/dlsiteInvalidation";
 
 export function useDlsiteBulk() {
   const queryClient = useQueryClient();
@@ -64,12 +67,22 @@ export function useDlsiteBulk() {
     }
   };
 
+  /** スキャン完了後にサーバー側が自動で起動したジョブ（mode: "new"）を観測するだけの入口。
+   *  POST /dlsite/bulk は呼ばず、既に動いているジョブのSSE進捗へ相乗りする。 */
+  const attach = () => {
+    setResult(null);
+    setError(null);
+    setProgress(null);
+    setActive(true);
+  };
+
   return {
     active,
     progress,
     result,
     error,
     start,
+    attach,
     dismiss: () => {
       setResult(null);
       setError(null);

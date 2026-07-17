@@ -1,6 +1,6 @@
 // fixture アダプタ: インメモリの seed データを使う DataAdapter 実装。
 // 開発・ビジュアルテスト用（ADR-0002）。core/ の pure 関数を使って全メソッドを実装する。
-import { DEFAULT_TAG_PREFIXES, normalizeTags } from "@mimimilli/shared";
+import { DEFAULT_TAG_PREFIXES, isRjCodeMissing, normalizeTags } from "@mimimilli/shared";
 import type {
   AxisFacetItem,
   DlsiteApplyBody,
@@ -227,6 +227,7 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
         errors: state.works.filter((w) => w.status === "error").length,
         missing: state.works.filter((w) => w.status === "missing").length,
         newWorkIds: state.scanNewWorkIds,
+        rjCodeMissingCount: state.works.filter((w) => isRjCodeMissing(w.dlsite)).length,
       };
     },
 
