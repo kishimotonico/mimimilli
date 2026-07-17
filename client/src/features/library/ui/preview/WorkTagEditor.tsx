@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { useAtomValue } from "jotai";
 import { normalizeTag, parseTag } from "@mimimilli/shared";
 import type { Work, WorkPatch } from "@mimimilli/shared";
+import { sortTagsForDisplay } from "../../../../entities/work/sortTagsForDisplay";
 import Tag from "../../../../entities/work/ui/Tag";
 import { I } from "../../../../shared/ui/Icon";
 import ConfirmDialog from "../../../../shared/ui/ConfirmDialog";
@@ -13,6 +14,8 @@ import { useAnchoredPopover } from "./useAnchoredPopover";
 import { useWorkTagEditor } from "./useWorkTagEditor";
 
 const TAG_POPOVER_WIDTH = 260;
+// 詳細ペインをタグで圧迫せず、優先度の高い分類を一目で確認できる表示上限。
+const COLLAPSED_TAG_LIMIT = 8;
 // 右ペインの実幅がこれを下回る場合、タグ追加UIは浮遊ポップオーバーではなく
 // チップ列下のフル幅行として展開する（狭幅で右方向に展開する余地がないため）。
 const NARROW_TAG_PANE_PX = 320;
@@ -33,6 +36,7 @@ export function WorkTagEditor({
   onError,
 }: WorkTagEditorProps) {
   const [isTagPopoverOpen, setIsTagPopoverOpen] = useState(false);
+  const [areAllTagsVisible, setAreAllTagsVisible] = useState(false);
   const tagEditorRef = useRef<HTMLDivElement | null>(null);
   const tagPrefixes = useAtomValue(tagPrefixesAtom);
 
@@ -61,6 +65,9 @@ export function WorkTagEditor({
     boundaryRef: tagEditorRef,
   });
   const isNarrowTagPane = tagPopoverLayout.containerWidth < NARROW_TAG_PANE_PX;
+  const sortedTags = sortTagsForDisplay(tags, tagPrefixes);
+  const hiddenTagCount = Math.max(0, sortedTags.length - COLLAPSED_TAG_LIMIT);
+  const visibleTags = areAllTagsVisible ? sortedTags : sortedTags.slice(0, COLLAPSED_TAG_LIMIT);
 
   const selectTag = (tag: string) => {
     closeTagPopover();
@@ -86,7 +93,7 @@ export function WorkTagEditor({
     <>
       <div className="mle-prv__tag-row">
         <div className="mle-prv__tags w-full">
-          {tags.map((tag) => {
+          {visibleTags.map((tag) => {
             const isPending = pendingRemoveTag === tag;
             const isFailed = failedRemoveTag === tag;
             const isBlocked = isPatching || (isTagSaving && !isPending);
@@ -101,6 +108,13 @@ export function WorkTagEditor({
               />
             );
           })}
+          {hiddenTagCount > 0 && !areAllTagsVisible && (
+            <Tag
+              tag={`+${hiddenTagCount}`}
+              ariaLabel={`残り${hiddenTagCount}個のタグを表示`}
+              onClick={() => setAreAllTagsVisible(true)}
+            />
+          )}
           <div ref={tagEditorRef} className="contents">
             <div ref={tagPopoverAnchorRef} className="relative inline-flex">
               <IconButton

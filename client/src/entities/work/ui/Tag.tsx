@@ -10,6 +10,8 @@ interface TagProps {
   definition?: TagPrefix | null;
   onRemove?: () => void;
   onClick?: () => void;
+  /** onClick を持つ操作チップのアクセシブルネーム */
+  ariaLabel?: string;
   /** 削除リクエスト送信中。専用のスピナーに差し替え、クリック不可にする */
   pending?: boolean;
   /** 直前の削除が失敗した。目立たせて onRemove をリトライ導線として使う */
@@ -65,7 +67,15 @@ function RemoveSlot({
   );
 }
 
-export default function Tag({ tag, definition, onRemove, onClick, pending, failed }: TagProps) {
+export default function Tag({
+  tag,
+  definition,
+  onRemove,
+  onClick,
+  ariaLabel,
+  pending,
+  failed,
+}: TagProps) {
   const parsed = parseTag(tag);
   const tagClass = cn(
     TAG_BASE,
@@ -83,7 +93,7 @@ export default function Tag({ tag, definition, onRemove, onClick, pending, faile
 
     if (onClick && !onRemove) {
       return (
-        <button type="button" className={tagClass} onClick={onClick}>
+        <button type="button" className={tagClass} aria-label={ariaLabel} onClick={onClick}>
           {content}
         </button>
       );
@@ -107,7 +117,7 @@ export default function Tag({ tag, definition, onRemove, onClick, pending, faile
 
   if (onClick && !onRemove) {
     return (
-      <button type="button" className={tagClass} onClick={onClick}>
+      <button type="button" className={tagClass} aria-label={ariaLabel} onClick={onClick}>
         {content}
       </button>
     );
