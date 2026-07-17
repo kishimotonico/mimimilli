@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { SortId } from "@mimimilli/shared";
-import { SORT_OPTIONS } from "../../features/library/model/types";
+import { SORT_OPTIONS, type GridLayoutMode } from "../../features/library/model/types";
 import { I } from "../../shared/ui/Icon";
 import IconButton from "../../shared/ui/IconButton";
 import { MAX_TILE_SIZE, MIN_TILE_SIZE } from "../../features/library/model/gridSizing";
@@ -17,6 +17,8 @@ interface AddressBarProps {
   availableViewModes?: readonly ("column" | "list" | "grid")[];
   tileSize?: number;
   onTileSizeChange?: (size: number) => void;
+  gridLayoutMode?: GridLayoutMode;
+  onGridLayoutModeChange?: (mode: GridLayoutMode) => void;
   showSort?: boolean;
   sort?: SortId;
   onSortChange?: (sort: SortId) => void;
@@ -34,6 +36,8 @@ export default function AddressBar({
   availableViewModes = ["column"],
   tileSize,
   onTileSizeChange,
+  gridLayoutMode,
+  onGridLayoutModeChange,
   showSort = false,
   sort,
   onSortChange,
@@ -114,16 +118,37 @@ export default function AddressBar({
         />
       </div>
 
+      {viewMode === "grid" && gridLayoutMode !== undefined && onGridLayoutModeChange && (
+        <div className="inline-flex items-center gap-[1px] rounded-2 bg-paper-2 p-[2px]">
+          <IconButton
+            size="sm"
+            icon={I.gridUniform}
+            label="1:1タイル"
+            active={gridLayoutMode === "square"}
+            onClick={() => onGridLayoutModeChange("square")}
+          />
+          <IconButton
+            size="sm"
+            icon={I.gridJustified}
+            label="原寸（ジャスティファイド）"
+            active={gridLayoutMode === "justified"}
+            onClick={() => onGridLayoutModeChange("justified")}
+          />
+        </div>
+      )}
+
       {viewMode === "grid" && tileSize !== undefined && onTileSizeChange && (
         <label className="mll-grid-size">
-          <span>タイル</span>
+          <span>{gridLayoutMode === "justified" ? "行高さ" : "タイル"}</span>
           <input
             type="range"
             min={MIN_TILE_SIZE}
             max={MAX_TILE_SIZE}
             step={1}
             value={tileSize}
-            aria-label="グリッドのタイルサイズ"
+            aria-label={
+              gridLayoutMode === "justified" ? "グリッドの行高さ" : "グリッドのタイルサイズ"
+            }
             onChange={(event) => onTileSizeChange(Number(event.currentTarget.value))}
           />
           <output>{tileSize}px</output>

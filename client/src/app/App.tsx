@@ -37,7 +37,11 @@ import { useRjCodeMissingWorks } from "../features/library/model/dlsiteMissingRj
 import { getSettings, setRootFolder } from "../features/settings/api";
 import { parseNavigationUrl, type AppMode } from "../features/navigation/model/navigationUrl";
 import { useNavigationHistory } from "../features/navigation/model/useNavigationHistory";
-import { libraryTileSizeAtom, libraryViewModeAtom } from "../features/library/model/atoms";
+import {
+  libraryGridLayoutModeAtom,
+  libraryTileSizeAtom,
+  libraryViewModeAtom,
+} from "../features/library/model/atoms";
 import { clampTileSize } from "../features/library/model/gridSizing";
 
 // settings query key（App と SettingsModal が同じキャッシュを参照）
@@ -50,6 +54,7 @@ export default function App() {
   const playRequestIdRef = useRef(0);
   const [libraryViewMode, setLibraryViewMode] = useAtom(libraryViewModeAtom);
   const [libraryTileSize, setLibraryTileSize] = useAtom(libraryTileSizeAtom);
+  const [libraryGridLayoutMode, setLibraryGridLayoutMode] = useAtom(libraryGridLayoutModeAtom);
 
   const [mode, setMode] = useState<AppMode>(
     () => parseNavigationUrl(window.location.href).state.mode,
@@ -322,6 +327,8 @@ export default function App() {
           }}
           tileSize={mode === "library" ? clampTileSize(libraryTileSize) : undefined}
           onTileSizeChange={mode === "library" ? setLibraryTileSize : undefined}
+          gridLayoutMode={mode === "library" ? libraryGridLayoutMode : undefined}
+          onGridLayoutModeChange={mode === "library" ? setLibraryGridLayoutMode : undefined}
         />
       }
       leftNav={
@@ -352,6 +359,7 @@ export default function App() {
             viewMode={libraryViewMode}
             tileSize={clampTileSize(libraryTileSize)}
             onTileSizeChange={setLibraryTileSize}
+            gridLayoutMode={libraryGridLayoutMode}
           />
         )
       }

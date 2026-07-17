@@ -11,6 +11,9 @@ interface CoverImgProps {
   fit?: "fixed" | "fill";
   requestWidth?: number;
   loading?: "eager" | "lazy";
+  /** 画像読み込み完了時に実寸（naturalWidth/naturalHeight）を通知する。
+   *  原寸ジャスティファイドグリッドのアスペクト比計測（TASK-45）に使用 */
+  onLoadDimensions?: (naturalWidth: number, naturalHeight: number) => void;
 }
 
 export default function CoverImg({
@@ -22,6 +25,7 @@ export default function CoverImg({
   fit = "fixed",
   requestWidth,
   loading = "eager",
+  onLoadDimensions,
 }: CoverImgProps) {
   const [errored, setErrored] = useState(false);
 
@@ -45,6 +49,10 @@ export default function CoverImg({
           height: "100%",
           objectFit: "cover",
           borderRadius: radius,
+        }}
+        onLoad={(event) => {
+          const img = event.currentTarget;
+          onLoadDimensions?.(img.naturalWidth, img.naturalHeight);
         }}
         onError={() => setErrored(true)}
       />
