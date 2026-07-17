@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import type { Track, Work, WorkPatch } from "@mimimilli/shared";
 import { I } from "../../../../shared/ui/Icon";
 import Button from "../../../../shared/ui/Button";
@@ -18,6 +18,7 @@ interface WorkMetadataActionsProps {
   isPatching: boolean;
   onPatchWork: (body: WorkPatch) => Promise<Work>;
   onError: (message: string | null) => void;
+  onEdit: () => void;
 }
 
 export function WorkMetadataActions({
@@ -31,16 +32,13 @@ export function WorkMetadataActions({
   isPatching,
   onPatchWork,
   onError,
+  onEdit,
 }: WorkMetadataActionsProps) {
-  const [actionPopoverMode, setActionPopoverMode] = useState<"menu" | "title" | null>(null);
-  const [titleDraft, setTitleDraft] = useState(work.title);
-  const [isTitleSaving, setIsTitleSaving] = useState(false);
+  const [isActionPopoverOpen, setIsActionPopoverOpen] = useState(false);
   const [isBookmarkSaving, setIsBookmarkSaving] = useState(false);
-  const titleInputRef = useRef<HTMLInputElement | null>(null);
 
   const closeActionPopover = () => {
-    setActionPopoverMode(null);
-    setTitleDraft(work.title);
+    setIsActionPopoverOpen(false);
   };
   const closeActionPopoverOnEscape = () => {
     closeActionPopover();
@@ -48,48 +46,11 @@ export function WorkMetadataActions({
   };
 
   const { anchorRef: actionPopoverRef, layout: actionPopoverLayout } = useAnchoredPopover({
-    isOpen: actionPopoverMode !== null,
+    isOpen: isActionPopoverOpen,
     preferredWidth: ACTION_POPOVER_WIDTH,
     onOutsideClick: closeActionPopover,
     onEscape: closeActionPopoverOnEscape,
   });
-
-  useEffect(() => {
-    if (actionPopoverMode !== "title") return;
-    titleInputRef.current?.focus({ preventScroll: true });
-  }, [actionPopoverMode]);
-
-  const startTitleEditing = () => {
-    setTitleDraft(work.title);
-    onError(null);
-    setActionPopoverMode("title");
-  };
-
-  const cancelTitleEditing = () => {
-    setTitleDraft(work.title);
-    onError(null);
-    setActionPopoverMode(null);
-  };
-
-  const saveTitle = async () => {
-    const title = titleDraft.trim();
-    if (!title || isPatching) return;
-    if (title === work.title) {
-      setActionPopoverMode(null);
-      return;
-    }
-
-    setIsTitleSaving(true);
-    onError(null);
-    try {
-      await onPatchWork({ title });
-      setActionPopoverMode(null);
-    } catch {
-      onError("タイトルを保存できませんでした。");
-    } finally {
-      setIsTitleSaving(false);
-    }
-  };
 
   const toggleBookmark = async () => {
     if (isPatching) return;
@@ -140,38 +101,30 @@ export function WorkMetadataActions({
         className={work.bookmarked ? "[&_svg]:fill-current" : undefined}
         onClick={() => void toggleBookmark()}
       />
-      <div ref={actionPopoverRef} className="relative inline-flex">
-        <IconButton
-          icon={I.more}
-          label="その他"
-          size="sm"
-          aria-haspopup="menu"
-          aria-expanded={actionPopoverMode !== null}
-          active={actionPopoverMode !== null}
-          onClick={() => {
-            onError(null);
-            setActionPopoverMode((mode) => (mode === "menu" ? null : "menu"));
-          }}
-        />
-        {actionPopoverMode && (
-          <div
-            className="absolute top-[calc(100%+6px)] z-10 rounded-[6px] border border-line-soft bg-paper-1 p-1 shadow-pop"
-            style={{
-              left: actionPopoverLayout.left,
-              width: actionPopoverLayout.width,
+      <IconButton icon={I.edit} label="作品を編集" size="sm" onClick={onEdit} />
+      {work.urls.length > 0 && (
+        <div ref={actionPopoverRef} className="relative inline-flex">
+          <IconButton
+            icon={I.more}
+            label="その他"
+            size="sm"
+            aria-haspopup="menu"
+            aria-expanded={isActionPopoverOpen}
+            active={isActionPopoverOpen}
+            onClick={() => {
+              onError(null);
+              setIsActionPopoverOpen((open) => !open);
             }}
-          >
-            {actionPopoverMode === "menu" ? (
+          />
+          {isActionPopoverOpen && (
+            <div
+              className="absolute top-[calc(100%+6px)] z-10 rounded-[6px] border border-line-soft bg-paper-1 p-1 shadow-pop"
+              style={{
+                left: actionPopoverLayout.left,
+                width: actionPopoverLayout.width,
+              }}
+            >
               <div className="flex flex-col gap-1" role="menu">
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="flex min-h-7 w-full items-center gap-2 rounded-1 px-2 text-left font-jp text-[12px] text-ink-1 hover:bg-paper-2 hover:text-ink-0 focus:bg-paper-2 focus:outline-none disabled:cursor-not-allowed disabled:text-ink-4"
-                  disabled={isPatching}
-                  onClick={startTitleEditing}
-                >
-                  <span className="min-w-0 flex-1">タイトルを編集</span>
-                </button>
                 {work.urls.map((u) => (
                   <a
                     key={u.url}
@@ -180,7 +133,7 @@ export function WorkMetadataActions({
                     href={u.url}
                     target="_blank"
                     rel="noreferrer"
-                    onClick={() => setActionPopoverMode(null)}
+                    onClick={closeActionPopover}
                   >
                     <I.ext size={13} />
                     <span className="min-w-0 flex-1 truncate">
@@ -189,44 +142,10 @@ export function WorkMetadataActions({
                   </a>
                 ))}
               </div>
-            ) : (
-              <form
-                className="flex flex-col gap-2 p-2"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void saveTitle();
-                }}
-              >
-                <input
-                  ref={titleInputRef}
-                  className="h-8 w-full rounded-[6px] border border-line bg-paper-1 px-2.5 font-jp text-[12px] text-ink-0 placeholder:text-ink-4 focus:border-acc focus:outline-none focus:ring-2 focus:ring-acc-soft"
-                  value={titleDraft}
-                  aria-label="作品タイトル"
-                  aria-invalid={titleDraft.trim().length === 0}
-                  onChange={(event) => setTitleDraft(event.target.value)}
-                />
-                <div className="flex justify-end gap-1">
-                  <Button
-                    variant="quiet"
-                    type="button"
-                    disabled={isTitleSaving}
-                    onClick={cancelTitleEditing}
-                  >
-                    キャンセル
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    type="submit"
-                    disabled={!titleDraft.trim() || isTitleSaving || isPatching}
-                  >
-                    保存
-                  </Button>
-                </div>
-              </form>
-            )}
-          </div>
-        )}
-      </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

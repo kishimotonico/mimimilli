@@ -43,6 +43,10 @@ export function useDialogModal({ onClose, initialFocusRef }: UseDialogModalOptio
     // ブラウザ既定のクローズ動作を止め、呼び出し側の onClose に委譲する
     // （呼び出し側は内側の編集状態を先に閉じる分岐を持てる）。
     event.preventDefault();
+    // ネイティブのcancelは最前面のdialogにしか発火しないが、Reactの合成イベントは
+    // Reactツリーを伝播するため、ポータルで重ねた親dialogのonCancelにも届いてしまう。
+    // 多重モーダルで最前面だけを閉じるため、ここで伝播を止める。
+    event.stopPropagation();
     onClose();
   };
 

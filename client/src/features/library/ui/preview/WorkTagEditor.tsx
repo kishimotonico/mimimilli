@@ -26,6 +26,8 @@ interface WorkTagEditorProps {
   isPatching: boolean;
   onPatchWork: (body: WorkPatch) => Promise<Work>;
   onError: (message: string | null) => void;
+  /** 編集ダイアログなど、折りたたむ必要がない場所では全タグを表示する。 */
+  expanded?: boolean;
 }
 
 export function WorkTagEditor({
@@ -34,6 +36,7 @@ export function WorkTagEditor({
   isPatching,
   onPatchWork,
   onError,
+  expanded = false,
 }: WorkTagEditorProps) {
   const [isTagPopoverOpen, setIsTagPopoverOpen] = useState(false);
   const [areAllTagsVisible, setAreAllTagsVisible] = useState(false);
@@ -67,7 +70,8 @@ export function WorkTagEditor({
   const isNarrowTagPane = tagPopoverLayout.containerWidth < NARROW_TAG_PANE_PX;
   const sortedTags = sortTagsForDisplay(tags, tagPrefixes);
   const hiddenTagCount = Math.max(0, sortedTags.length - COLLAPSED_TAG_LIMIT);
-  const visibleTags = areAllTagsVisible ? sortedTags : sortedTags.slice(0, COLLAPSED_TAG_LIMIT);
+  const visibleTags =
+    expanded || areAllTagsVisible ? sortedTags : sortedTags.slice(0, COLLAPSED_TAG_LIMIT);
 
   const selectTag = (tag: string) => {
     closeTagPopover();
@@ -108,7 +112,7 @@ export function WorkTagEditor({
               />
             );
           })}
-          {hiddenTagCount > 0 && !areAllTagsVisible && (
+          {hiddenTagCount > 0 && !expanded && !areAllTagsVisible && (
             <Tag
               tag={`+${hiddenTagCount}`}
               ariaLabel={`残り${hiddenTagCount}個のタグを表示`}

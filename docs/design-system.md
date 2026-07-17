@@ -46,8 +46,9 @@
 | 全画面プレイヤー                | top layer（下記） |
 | スキャン新規作品ポップアップ    | top layer（下記） |
 | スマートフォルダーエディタ      | top layer（下記） |
+| 作品編集・DLsite適用プレビュー  | top layer（下記） |
 
-設定モーダル・全画面プレイヤー・スキャン新規作品ポップアップ・スマートフォルダーエディタは
+設定モーダル・全画面プレイヤー・スキャン新規作品ポップアップ・スマートフォルダーエディタ・作品編集・DLsite適用プレビューは
 ネイティブ `<dialog>` + `showModal()` で実装しており、z-index ではなくブラウザの
 top layer によって最前面に重なる（TASK-29）。開閉ライフサイクル・Escapeキャンセル・
 backdropクリックの共通処理は `client/src/shared/ui/useDialogModal.ts` に集約している。

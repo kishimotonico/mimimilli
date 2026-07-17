@@ -175,6 +175,7 @@ export const I: Record<string, IconFC> = {
       ]}
     />
   ),
+  edit: (p) => <Svg {...p} d={["M4 20h4l11 -11a2.8 2.8 0 0 0 -4 -4L4 16z", "M13.5 6.5l4 4"]} />,
   add: (p) => <Svg {...p} d={["M12 5v14", "M5 12h14"]} />,
   list: (p) => <Svg {...p} d={["M8 6h13M8 12h13M8 18h13", "M3 6h.01M3 12h.01M3 18h.01"]} />,
   grid: (p) => <Svg {...p} d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" />,

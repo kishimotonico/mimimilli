@@ -8,7 +8,7 @@ import { WorkMetadataActions } from "./WorkMetadataActions";
 import { WorkStatusWarnings } from "./WorkStatusWarnings";
 import { WorkTagEditor } from "./WorkTagEditor";
 import { WorkTrackList } from "./WorkTrackList";
-import { DlsitePanel } from "./DlsitePanel";
+import { WorkEditDialog } from "./WorkEditDialog";
 
 interface WorkDetailProps {
   work: Work;
@@ -40,8 +40,9 @@ export function WorkDetail({
   const resumeTrack = hasResume ? tracks[work.resumeTrackIndex] : null;
   const resumeTime = formatTime(work.resumePosition);
 
-  // タグ編集・タイトル編集・ブックマークの3つの保存操作は同じエラー表示スロットを共有する。
+  // 閲覧ビューに残るタグ編集とブックマーク更新は同じエラー表示スロットを共有する。
   const [editError, setEditError] = useState<string | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   return (
     <div className="mle-prv__body">
@@ -66,6 +67,11 @@ export function WorkDetail({
             {work.status === "error" && (
               <span className="warn">
                 <I.err size={11} /> メタ読み込みエラー
+              </span>
+            )}
+            {work.dlsite.status === "applied" && (
+              <span className="inline-flex items-center rounded-pill bg-[color-mix(in_oklch,var(--r-leaf)_12%,transparent)] px-1.5 py-0.5 font-sans text-[9.5px] font-medium tracking-normal text-[var(--r-leaf)]">
+                DLsite連携済み
               </span>
             )}
             <span className="inline-flex items-center gap-[3px] tracking-normal">
@@ -121,12 +127,12 @@ export function WorkDetail({
             isPatching={isPatching}
             onPatchWork={onPatchWork}
             onError={setEditError}
+            onEdit={() => setIsEditDialogOpen(true)}
           />
         </div>
       </div>
 
-      <WorkStatusWarnings work={work} />
-      <DlsitePanel work={work} />
+      <WorkStatusWarnings work={work} onEdit={() => setIsEditDialogOpen(true)} />
 
       <WorkTrackList
         tracks={tracks}
@@ -138,6 +144,15 @@ export function WorkDetail({
         resumePosition={work.resumePosition}
         onPlay={onPlay}
       />
+      {isEditDialogOpen && (
+        <WorkEditDialog
+          work={work}
+          tagSuggestions={tagSuggestions}
+          isPatching={isPatching}
+          onPatchWork={onPatchWork}
+          onClose={() => setIsEditDialogOpen(false)}
+        />
+      )}
     </div>
   );
 }
