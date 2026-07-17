@@ -1,5 +1,5 @@
 import type { Work } from "@mimimilli/shared";
-import { isRjCodeMissing } from "@mimimilli/shared";
+import { isDlsiteFetchFailed, isRjCodeMissing } from "@mimimilli/shared";
 import { I } from "../../../../shared/ui/Icon";
 
 interface WorkStatusWarningsProps {
@@ -55,7 +55,7 @@ export function WorkStatusWarnings({ work, onEdit }: WorkStatusWarningsProps) {
         </div>
       )}
 
-      {(work.dlsite.status === "error" || work.dlsite.status === "not_found") && (
+      {isDlsiteFetchFailed(work.dlsite) && (
         <div className="mle-prv__warn">
           <I.err size={16} />
           <div className="mle-prv__warn-body">

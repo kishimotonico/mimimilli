@@ -1,8 +1,14 @@
 // スキャン結果・進捗イベント（POST /api/scan、GET /api/scan/events）の型は
 // @mimimilli/shared を正典として re-export する。
-import type { ScanPhase } from "@mimimilli/shared";
+import type { ScanPhase, ScanResult } from "@mimimilli/shared";
 
 export type { ScanResult, ScanPhase, ScanProgressEvent } from "@mimimilli/shared";
+
+/** スキャン完了ポップアップ（NewWorkPopup）を表示するか。新規作品0件のスキャンでは
+ *  表示せず、通知ベルのサマリ表示だけに留める（TASK-44） */
+export function shouldShowNewWorkPopup(scanResult: ScanResult | null): scanResult is ScanResult {
+  return scanResult !== null && scanResult.newlyGenerated > 0;
+}
 
 /** GET /api/scan/events の progress イベントから抜き出した表示用の状態 */
 export interface ScanProgress {
