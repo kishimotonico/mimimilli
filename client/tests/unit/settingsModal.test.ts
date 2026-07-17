@@ -1,6 +1,7 @@
 // SettingsModal のEsc/backdrop挙動（TASK-29: ネイティブdialogへの統合）のコンポーネントテスト。
 // jsdom は <dialog> の showModal/close を実装していないため、テスト対象に必要な分だけ差し替える。
-// TagPrefixSettings/useDlsiteBulk が react-query を使うため QueryClientProvider で包む。
+// TagPrefixSettings が react-query を使うため QueryClientProvider で包む。
+// DLsite一括取得の状態はTASK-41でApp側へ持ち上げたため、SettingsModalへはpropsで渡す。
 import { createElement } from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -32,6 +33,7 @@ function renderModal(onClose = vi.fn()) {
         rootFolder: "/audio",
         lastScanTime: null,
         scanning: false,
+        dlsiteBulk: { active: false, progress: null, onStart: vi.fn() },
         onClose,
         onScan: vi.fn(),
         onChangeFolder: vi.fn(),

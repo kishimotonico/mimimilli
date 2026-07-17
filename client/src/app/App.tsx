@@ -24,12 +24,16 @@ import FullScreenPlayer from "../features/player/ui/FullScreenPlayer";
 import SetupScreen from "../features/setup/ui/SetupScreen";
 import SettingsModal from "../features/settings/ui/SettingsModal";
 import NewWorkPopup from "../features/scan/ui/NewWorkPopup";
+import RjCodeMissingModal from "../features/library/ui/RjCodeMissingModal";
+import Toast from "../shared/ui/Toast";
 import type { ScanResult, Work, WorkSummary } from "@mimimilli/shared";
 import { getWork } from "../entities/work/api";
 import { exportLibrary } from "../features/library/api";
 import { scanLibrary } from "../features/scan/api";
 import { formatScanProgressLabel } from "../features/scan/model";
 import { useScanProgress } from "../features/scan/useScanProgress";
+import { useDlsiteBulk } from "./model/useDlsiteBulk";
+import { useRjCodeMissingWorks } from "../features/library/model/dlsiteMissingRjCode";
 import { getSettings, setRootFolder } from "../features/settings/api";
 import { parseNavigationUrl, type AppMode } from "../features/navigation/model/navigationUrl";
 import { useNavigationHistory } from "../features/navigation/model/useNavigationHistory";
@@ -54,6 +58,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [isCompletingSetup, setIsCompletingSetup] = useState(false);
+  const [showDlsiteMissing, setShowDlsiteMissing] = useState(false);
 
   const isPlaying = player.state.currentTrackIndex >= 0 && player.state.currentWork !== null;
   const isPlaybackActive = player.state.isPlaying;
@@ -92,6 +97,10 @@ export default function App() {
     rootFolder: settings?.rootFolder ?? null,
   });
 
+  // ── DLsite一括取得（設定モーダル・TopBar共有、TASK-41） ────────
+  const dlsiteBulk = useDlsiteBulk();
+  const dlsiteRjMissing = useRjCodeMissingWorks();
+
   // ── Scan mutation ─────────────────────────────────────────
   const scanMutation = useMutation({
     mutationFn: scanLibrary,
@@ -101,6 +110,9 @@ export default function App() {
       queryClient.invalidateQueries({ queryKey: ["axisFacets"] });
       queryClient.invalidateQueries({ queryKey: ["smartFolderWorks"] });
       queryClient.invalidateQueries({ queryKey: SETTINGS_KEY });
+      // スキャンで新規作品が見つかった場合、サーバーは自動でDLsite一括取得ジョブを
+      // キューイングする（server/src/routes/scan.ts）。ここではAPIを呼ばずSSEに相乗りするだけ。
+      if (result.newWorkIds.length > 0) dlsiteBulk.attach();
     },
   });
 
@@ -180,6 +192,18 @@ export default function App() {
   }, [player.state.currentWork, navigationHistory, libraryNav]);
 
   const handleScan = useCallback(() => scanMutation.mutate(), [scanMutation]);
+
+  // RJコード未検出一覧から作品を選び、作品詳細（DlsitePanelのRJコード入力欄）へ遷移する。
+  const handleOpenWorkFromNotification = useCallback(
+    (workId: string) => {
+      setShowDlsiteMissing(false);
+      setScanResult(null);
+      navigationHistory.setMode("library");
+      libraryNav.setAxis("all");
+      libraryNav.selectWork(workId);
+    },
+    [navigationHistory, libraryNav],
+  );
 
   // スキャン進捗のリアルタイム表示（TASK-20）。TopBar / SettingsModal / SetupScreen で共有する。
   const scanProgress = useScanProgress(scanMutation.isPending || isCompletingSetup);
@@ -273,6 +297,11 @@ export default function App() {
           playingTrack={currentTrack?.title}
           scanning={scanMutation.isPending}
           scanProgressLabel={scanProgressLabel}
+          rjCodeMissingCount={dlsiteRjMissing.count}
+          onOpenDlsiteMissing={() => setShowDlsiteMissing(true)}
+          dlsiteBulkActive={dlsiteBulk.active}
+          dlsiteBulkProgress={dlsiteBulk.progress}
+          onStartDlsiteBulk={dlsiteBulk.start}
         />
       }
       addressBar={
@@ -370,6 +399,11 @@ export default function App() {
               lastScanTime={settings?.lastScanTime ?? null}
               scanning={scanMutation.isPending}
               scanProgressLabel={scanProgressLabel}
+              dlsiteBulk={{
+                active: dlsiteBulk.active,
+                progress: dlsiteBulk.progress,
+                onStart: dlsiteBulk.start,
+              }}
               onClose={() => setShowSettings(false)}
               onScan={handleScan}
               onChangeFolder={handleChangeFolder}
@@ -377,8 +411,29 @@ export default function App() {
             />
           )}
           {scanResult && (
-            <NewWorkPopup scanResult={scanResult} onClose={() => setScanResult(null)} />
+            <NewWorkPopup
+              scanResult={scanResult}
+              onClose={() => setScanResult(null)}
+              onOpenRjCodeMissing={() => {
+                setScanResult(null);
+                setShowDlsiteMissing(true);
+              }}
+            />
           )}
+          {showDlsiteMissing && (
+            <RjCodeMissingModal
+              onClose={() => setShowDlsiteMissing(false)}
+              onOpenWork={handleOpenWorkFromNotification}
+            />
+          )}
+          <Toast
+            message={
+              dlsiteBulk.result
+                ? `DLsite一括取得: 取得 ${dlsiteBulk.result.fetched}件・失敗 ${dlsiteBulk.result.failed}件`
+                : dlsiteBulk.error
+            }
+            onDismiss={dlsiteBulk.dismiss}
+          />
         </>
       }
     />

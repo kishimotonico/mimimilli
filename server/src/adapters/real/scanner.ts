@@ -27,7 +27,7 @@ import type {
   Track,
   Work,
 } from "@mimimilli/shared";
-import { emptyDlsiteState } from "@mimimilli/shared";
+import { emptyDlsiteState, isRjCodeMissing } from "@mimimilli/shared";
 import type { Db } from "./db.ts";
 import { detectRjCode } from "./dlsite.ts";
 import {
@@ -240,6 +240,7 @@ export class Scanner {
       errors: 0,
       missing: 0,
       newWorkIds: [],
+      rjCodeMissingCount: 0,
     };
 
     // walking フェーズ: ディレクトリ走査自体は件数が事前に分からないため不定（total=0）で通知する
@@ -311,6 +312,9 @@ export class Scanner {
     emit({ type: "progress", phase: "finalizing", processed: 0, total: 1 });
     this.repo.markMissingExcept([...seenIds]);
     result.missing = this.repo.countByStatus("missing");
+    result.rjCodeMissingCount = this.repo
+      .listSummaries()
+      .filter((work) => isRjCodeMissing(work.dlsite)).length;
     emit({ type: "progress", phase: "finalizing", processed: 1, total: 1 });
     return result;
   }

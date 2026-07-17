@@ -38,6 +38,7 @@ const scanResult: ScanResult = {
   errors: 0,
   missing: 0,
   newWorkIds: [work.id],
+  rjCodeMissingCount: 0,
 };
 
 function dispatchCancel(dialog: HTMLElement) {
@@ -48,7 +49,7 @@ describe("NewWorkPopup", () => {
   it("タイトル編集中のEscapeは編集だけをキャンセルし、ポップアップは閉じない", async () => {
     vi.spyOn(workApi, "getAllWorks").mockResolvedValue([work]);
     const onClose = vi.fn();
-    render(createElement(NewWorkPopup, { scanResult, onClose }));
+    render(createElement(NewWorkPopup, { scanResult, onClose, onOpenRjCodeMissing: vi.fn() }));
 
     await waitFor(() => screen.getByText(work.title));
     fireEvent.click(screen.getByText(work.title));
@@ -67,7 +68,7 @@ describe("NewWorkPopup", () => {
   it("編集中でないときのEscapeはポップアップを閉じる", () => {
     vi.spyOn(workApi, "getAllWorks").mockResolvedValue([]);
     const onClose = vi.fn();
-    render(createElement(NewWorkPopup, { scanResult, onClose }));
+    render(createElement(NewWorkPopup, { scanResult, onClose, onOpenRjCodeMissing: vi.fn() }));
 
     const dialog = screen.getByRole("dialog", { name: "スキャン完了" });
     dispatchCancel(dialog);
@@ -78,7 +79,7 @@ describe("NewWorkPopup", () => {
   it("backdropクリックは編集中でも問答無用でポップアップを閉じる（既存挙動を維持）", async () => {
     vi.spyOn(workApi, "getAllWorks").mockResolvedValue([work]);
     const onClose = vi.fn();
-    render(createElement(NewWorkPopup, { scanResult, onClose }));
+    render(createElement(NewWorkPopup, { scanResult, onClose, onOpenRjCodeMissing: vi.fn() }));
 
     await waitFor(() => screen.getByText(work.title));
     fireEvent.click(screen.getByText(work.title));
@@ -93,7 +94,7 @@ describe("NewWorkPopup", () => {
   it("パネル内側のクリックではポップアップを閉じない", () => {
     vi.spyOn(workApi, "getAllWorks").mockResolvedValue([]);
     const onClose = vi.fn();
-    render(createElement(NewWorkPopup, { scanResult, onClose }));
+    render(createElement(NewWorkPopup, { scanResult, onClose, onOpenRjCodeMissing: vi.fn() }));
 
     fireEvent.click(screen.getByRole("heading", { name: "スキャン完了" }));
     expect(onClose).not.toHaveBeenCalled();

@@ -1,9 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { I } from "../../../shared/ui/Icon";
 import TagPrefixSettings from "./TagPrefixSettings";
-import Toast from "../../../shared/ui/Toast";
-import { useDlsiteBulk } from "../model/useDlsiteBulk";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
+
+/** TopBarと状態を共有するため、DLsite一括取得の進捗はAppが保持するuseDlsiteBulkから
+ *  propsとして受け取る（Toastの表示もApp側に一元化し、二重表示を避ける）。 */
+interface DlsiteBulkProps {
+  active: boolean;
+  progress: { processed: number; total: number } | null;
+  onStart: () => void;
+}
 
 interface SettingsModalProps {
   rootFolder: string | null;
@@ -11,6 +17,7 @@ interface SettingsModalProps {
   scanning: boolean;
   /** scanning 中の進捗ラベル（例: "作品を登録中 (3/12)"）。TASK-20: SSEで受信した進捗 */
   scanProgressLabel?: string | null;
+  dlsiteBulk: DlsiteBulkProps;
   onClose: () => void;
   onScan: () => void;
   onChangeFolder: (path: string) => void;
@@ -22,6 +29,7 @@ export default function SettingsModal({
   lastScanTime,
   scanning,
   scanProgressLabel = null,
+  dlsiteBulk,
   onClose,
   onScan,
   onChangeFolder,
@@ -30,7 +38,6 @@ export default function SettingsModal({
   const [isEditingFolder, setIsEditingFolder] = useState(false);
   const [folderDraft, setFolderDraft] = useState(rootFolder ?? "");
   const folderInputRef = useRef<HTMLInputElement | null>(null);
-  const dlsiteBulk = useDlsiteBulk();
 
   // Escapeは編集中フォームがあればそちらだけを閉じ、モーダル自体は閉じない
   const { dialogRef, handleCancel, handleBackdropClick } = useDialogModal({
@@ -62,368 +69,358 @@ export default function SettingsModal({
     iso ? new Date(iso).toLocaleString("ja-JP") : "未実行";
 
   return (
-    <>
-      {/* oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- backdropクリックで閉じる。EscapeはonCancel（useDialogModal）で処理する。 */}
-      <dialog
-        ref={dialogRef}
-        aria-label="設定"
-        onCancel={handleCancel}
-        onClick={(e) => handleBackdropClick(e, onClose)}
-        className="backdrop:bg-[oklch(20%_0.020_70_/_0.3)]"
+    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- backdropクリックで閉じる。EscapeはonCancel（useDialogModal）で処理する。
+    <dialog
+      ref={dialogRef}
+      aria-label="設定"
+      onCancel={handleCancel}
+      onClick={(e) => handleBackdropClick(e, onClose)}
+      className="backdrop:bg-[oklch(20%_0.020_70_/_0.3)]"
+      style={{
+        width: 440,
+        maxWidth: "calc(100vw - 32px)",
+        maxHeight: "calc(100vh - 32px)",
+        margin: "auto",
+        padding: 0,
+        background: "var(--paper-1)",
+        borderRadius: 12,
+        boxShadow: "var(--shadow-pop)",
+        border: "1px solid var(--line-soft)",
+        overflow: "hidden",
+        fontFamily: "var(--font-jp)",
+        color: "var(--ink-0)",
+      }}
+    >
+      {/* Header */}
+      <div
         style={{
-          width: 440,
-          maxWidth: "calc(100vw - 32px)",
-          maxHeight: "calc(100vh - 32px)",
-          margin: "auto",
-          padding: 0,
-          background: "var(--paper-1)",
-          borderRadius: 12,
-          boxShadow: "var(--shadow-pop)",
-          border: "1px solid var(--line-soft)",
-          overflow: "hidden",
-          fontFamily: "var(--font-jp)",
-          color: "var(--ink-0)",
+          display: "flex",
+          alignItems: "center",
+          padding: "14px 18px",
+          borderBottom: "1px solid var(--line-soft)",
         }}
       >
-        {/* Header */}
-        <div
+        <span
           style={{
-            display: "flex",
-            alignItems: "center",
-            padding: "14px 18px",
-            borderBottom: "1px solid var(--line-soft)",
+            fontFamily: "var(--font-sans)",
+            fontWeight: 600,
+            fontSize: 14,
+            color: "var(--ink-0)",
+            flex: 1,
           }}
         >
+          設定
+        </span>
+        <button
+          onClick={onClose}
+          style={{
+            width: 26,
+            height: 26,
+            display: "grid",
+            placeItems: "center",
+            borderRadius: 6,
+            color: "var(--ink-2)",
+            border: "none",
+            background: "none",
+            cursor: "pointer",
+          }}
+        >
+          <I.x size={14} />
+        </button>
+      </div>
+
+      {/* Body */}
+      <div
+        style={{
+          padding: "18px 18px 8px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 18,
+          maxHeight: "min(72vh, 640px)",
+          overflowY: "auto",
+        }}
+      >
+        {/* Root folder */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <span
             style={{
               fontFamily: "var(--font-sans)",
+              fontSize: 10.5,
               fontWeight: 600,
-              fontSize: 14,
-              color: "var(--ink-0)",
-              flex: 1,
+              letterSpacing: "0.08em",
+              color: "var(--ink-3)",
+              textTransform: "uppercase",
             }}
           >
-            設定
+            ルートフォルダー
           </span>
-          <button
-            onClick={onClose}
-            style={{
-              width: 26,
-              height: 26,
-              display: "grid",
-              placeItems: "center",
-              borderRadius: 6,
-              color: "var(--ink-2)",
-              border: "none",
-              background: "none",
-              cursor: "pointer",
-            }}
-          >
-            <I.x size={14} />
-          </button>
-        </div>
-
-        {/* Body */}
-        <div
-          style={{
-            padding: "18px 18px 8px",
-            display: "flex",
-            flexDirection: "column",
-            gap: 18,
-            maxHeight: "min(72vh, 640px)",
-            overflowY: "auto",
-          }}
-        >
-          {/* Root folder */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <span
-              style={{
-                fontFamily: "var(--font-sans)",
-                fontSize: 10.5,
-                fontWeight: 600,
-                letterSpacing: "0.08em",
-                color: "var(--ink-3)",
-                textTransform: "uppercase",
+          {isEditingFolder ? (
+            <form
+              style={{ display: "flex", alignItems: "center", gap: 8 }}
+              onSubmit={(e) => {
+                e.preventDefault();
+                saveFolder();
               }}
             >
-              ルートフォルダー
-            </span>
-            {isEditingFolder ? (
-              <form
-                style={{ display: "flex", alignItems: "center", gap: 8 }}
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  saveFolder();
-                }}
-              >
-                <input
-                  ref={folderInputRef}
-                  value={folderDraft}
-                  onChange={(e) => setFolderDraft(e.target.value)}
-                  aria-label="ルートフォルダーのパス"
-                  placeholder="ルートフォルダーのパスを入力"
-                  style={{
-                    flex: 1,
-                    height: 34,
-                    padding: "0 12px",
-                    background: "var(--paper-0)",
-                    border: "1px solid var(--acc)",
-                    borderRadius: 6,
-                    fontFamily: "var(--font-mono)",
-                    fontSize: 11,
-                    color: "var(--ink-1)",
-                    outline: "none",
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setIsEditingFolder(false)}
-                  style={{
-                    height: 34,
-                    padding: "0 12px",
-                    borderRadius: 6,
-                    border: "1px solid var(--line)",
-                    background: "var(--paper-1)",
-                    color: "var(--ink-1)",
-                    fontFamily: "var(--font-sans)",
-                    fontSize: 12,
-                    fontWeight: 500,
-                    cursor: "pointer",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  キャンセル
-                </button>
-                <button
-                  type="submit"
-                  disabled={!folderDraft.trim()}
-                  style={{
-                    height: 34,
-                    padding: "0 12px",
-                    borderRadius: 6,
-                    border: "none",
-                    background: "var(--ink-0)",
-                    color: "var(--paper-1)",
-                    fontFamily: "var(--font-sans)",
-                    fontSize: 12,
-                    fontWeight: 600,
-                    cursor: folderDraft.trim() ? "pointer" : "not-allowed",
-                    opacity: folderDraft.trim() ? 1 : 0.6,
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  保存
-                </button>
-              </form>
-            ) : (
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div
-                  style={{
-                    flex: 1,
-                    height: 34,
-                    padding: "0 12px",
-                    background: "var(--paper-0)",
-                    border: "1px solid var(--line-soft)",
-                    borderRadius: 6,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    overflow: "hidden",
-                  }}
-                >
-                  <I.folder size={13} style={{ color: "var(--ink-3)", flexShrink: 0 }} />
-                  <span
-                    style={{
-                      fontFamily: "var(--font-mono)",
-                      fontSize: 11,
-                      color: rootFolder ? "var(--ink-1)" : "var(--ink-4)",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {rootFolder ?? "未設定"}
-                  </span>
-                </div>
-                <button
-                  onClick={startEditingFolder}
-                  style={{
-                    height: 34,
-                    padding: "0 12px",
-                    borderRadius: 6,
-                    border: "1px solid var(--line)",
-                    background: "var(--paper-1)",
-                    color: "var(--ink-1)",
-                    fontFamily: "var(--font-sans)",
-                    fontSize: 12,
-                    fontWeight: 500,
-                    cursor: "pointer",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  変更
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Scan */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <span
-              style={{
-                fontFamily: "var(--font-sans)",
-                fontSize: 10.5,
-                fontWeight: 600,
-                letterSpacing: "0.08em",
-                color: "var(--ink-3)",
-                textTransform: "uppercase",
-              }}
-            >
-              スキャン
-            </span>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span
+              <input
+                ref={folderInputRef}
+                value={folderDraft}
+                onChange={(e) => setFolderDraft(e.target.value)}
+                aria-label="ルートフォルダーのパス"
+                placeholder="ルートフォルダーのパスを入力"
                 style={{
                   flex: 1,
+                  height: 34,
+                  padding: "0 12px",
+                  background: "var(--paper-0)",
+                  border: "1px solid var(--acc)",
+                  borderRadius: 6,
                   fontFamily: "var(--font-mono)",
                   fontSize: 11,
-                  color: "var(--ink-2)",
+                  color: "var(--ink-1)",
+                  outline: "none",
                 }}
-              >
-                最終スキャン: {formatDate(lastScanTime)}
-              </span>
+              />
               <button
-                onClick={onScan}
-                disabled={scanning}
+                type="button"
+                onClick={() => setIsEditingFolder(false)}
                 style={{
                   height: 34,
-                  padding: "0 14px",
+                  padding: "0 12px",
                   borderRadius: 6,
+                  border: "1px solid var(--line)",
+                  background: "var(--paper-1)",
+                  color: "var(--ink-1)",
+                  fontFamily: "var(--font-sans)",
+                  fontSize: 12,
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                キャンセル
+              </button>
+              <button
+                type="submit"
+                disabled={!folderDraft.trim()}
+                style={{
+                  height: 34,
+                  padding: "0 12px",
+                  borderRadius: 6,
+                  border: "none",
                   background: "var(--ink-0)",
                   color: "var(--paper-1)",
                   fontFamily: "var(--font-sans)",
                   fontSize: 12,
                   fontWeight: 600,
-                  border: "none",
-                  cursor: scanning ? "not-allowed" : "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  opacity: scanning ? 0.6 : 1,
+                  cursor: folderDraft.trim() ? "pointer" : "not-allowed",
+                  opacity: folderDraft.trim() ? 1 : 0.6,
+                  whiteSpace: "nowrap",
                 }}
               >
-                <I.refresh size={12} className={scanning ? "animate-spin" : undefined} />
-                {scanning ? (scanProgressLabel ?? "スキャン中...") : "フルスキャン"}
+                保存
+              </button>
+            </form>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div
+                style={{
+                  flex: 1,
+                  height: 34,
+                  padding: "0 12px",
+                  background: "var(--paper-0)",
+                  border: "1px solid var(--line-soft)",
+                  borderRadius: 6,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  overflow: "hidden",
+                }}
+              >
+                <I.folder size={13} style={{ color: "var(--ink-3)", flexShrink: 0 }} />
+                <span
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 11,
+                    color: rootFolder ? "var(--ink-1)" : "var(--ink-4)",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {rootFolder ?? "未設定"}
+                </span>
+              </div>
+              <button
+                onClick={startEditingFolder}
+                style={{
+                  height: 34,
+                  padding: "0 12px",
+                  borderRadius: 6,
+                  border: "1px solid var(--line)",
+                  background: "var(--paper-1)",
+                  color: "var(--ink-1)",
+                  fontFamily: "var(--font-sans)",
+                  fontSize: 12,
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                変更
               </button>
             </div>
-          </div>
+          )}
+        </div>
 
-          {/* Tag prefixes（ADR-0005） */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {/* Scan */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <span
+            style={{
+              fontFamily: "var(--font-sans)",
+              fontSize: 10.5,
+              fontWeight: 600,
+              letterSpacing: "0.08em",
+              color: "var(--ink-3)",
+              textTransform: "uppercase",
+            }}
+          >
+            スキャン
+          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span
               style={{
-                fontFamily: "var(--font-sans)",
-                fontSize: 10.5,
-                fontWeight: 600,
-                letterSpacing: "0.08em",
-                color: "var(--ink-3)",
+                flex: 1,
+                fontFamily: "var(--font-mono)",
+                fontSize: 11,
+                color: "var(--ink-2)",
               }}
             >
-              DLSITE連携
+              最終スキャン: {formatDate(lastScanTime)}
             </span>
             <button
-              type="button"
-              disabled={dlsiteBulk.active}
-              onClick={dlsiteBulk.start}
+              onClick={onScan}
+              disabled={scanning}
               style={{
-                alignSelf: "flex-start",
                 height: 34,
                 padding: "0 14px",
                 borderRadius: 6,
-                border: "1px solid var(--line)",
-                background: "var(--paper-1)",
-                color: "var(--ink-1)",
+                background: "var(--ink-0)",
+                color: "var(--paper-1)",
                 fontFamily: "var(--font-sans)",
                 fontSize: 12,
-                cursor: dlsiteBulk.active ? "not-allowed" : "pointer",
-              }}
-            >
-              {dlsiteBulk.active
-                ? `取得中${dlsiteBulk.progress ? ` (${dlsiteBulk.progress.processed}/${dlsiteBulk.progress.total})` : "..."}`
-                : "未連携をまとめて取得"}
-            </button>
-          </div>
-
-          {/* Tag prefixes（ADR-0005） */}
-          <TagPrefixSettings />
-
-          {/* Export */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <span
-              style={{
-                fontFamily: "var(--font-sans)",
-                fontSize: 10.5,
                 fontWeight: 600,
-                letterSpacing: "0.08em",
-                color: "var(--ink-3)",
-                textTransform: "uppercase",
-              }}
-            >
-              データ
-            </span>
-            <button
-              onClick={onExport}
-              style={{
-                alignSelf: "flex-start",
-                height: 34,
-                padding: "0 14px",
-                borderRadius: 6,
-                border: "1px solid var(--line)",
-                background: "var(--paper-1)",
-                color: "var(--ink-1)",
-                fontFamily: "var(--font-sans)",
-                fontSize: 12,
-                fontWeight: 500,
-                cursor: "pointer",
+                border: "none",
+                cursor: scanning ? "not-allowed" : "pointer",
                 display: "flex",
                 alignItems: "center",
                 gap: 6,
+                opacity: scanning ? 0.6 : 1,
               }}
             >
-              <I.download size={12} /> ライブラリをエクスポート
+              <I.refresh size={12} className={scanning ? "animate-spin" : undefined} />
+              {scanning ? (scanProgressLabel ?? "スキャン中...") : "フルスキャン"}
             </button>
           </div>
         </div>
 
-        {/* Footer */}
-        <div style={{ padding: "12px 18px 16px", display: "flex", justifyContent: "flex-end" }}>
-          <button
-            onClick={onClose}
+        {/* Tag prefixes（ADR-0005） */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <span
             style={{
-              height: 32,
-              padding: "0 16px",
+              fontFamily: "var(--font-sans)",
+              fontSize: 10.5,
+              fontWeight: 600,
+              letterSpacing: "0.08em",
+              color: "var(--ink-3)",
+            }}
+          >
+            DLSITE連携
+          </span>
+          <button
+            type="button"
+            disabled={dlsiteBulk.active}
+            onClick={dlsiteBulk.onStart}
+            style={{
+              alignSelf: "flex-start",
+              height: 34,
+              padding: "0 14px",
               borderRadius: 6,
-              background: "var(--paper-2)",
+              border: "1px solid var(--line)",
+              background: "var(--paper-1)",
+              color: "var(--ink-1)",
+              fontFamily: "var(--font-sans)",
+              fontSize: 12,
+              cursor: dlsiteBulk.active ? "not-allowed" : "pointer",
+            }}
+          >
+            {dlsiteBulk.active
+              ? `取得中${dlsiteBulk.progress ? ` (${dlsiteBulk.progress.processed}/${dlsiteBulk.progress.total})` : "..."}`
+              : "未連携をまとめて取得"}
+          </button>
+        </div>
+
+        {/* Tag prefixes（ADR-0005） */}
+        <TagPrefixSettings />
+
+        {/* Export */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <span
+            style={{
+              fontFamily: "var(--font-sans)",
+              fontSize: 10.5,
+              fontWeight: 600,
+              letterSpacing: "0.08em",
+              color: "var(--ink-3)",
+              textTransform: "uppercase",
+            }}
+          >
+            データ
+          </span>
+          <button
+            onClick={onExport}
+            style={{
+              alignSelf: "flex-start",
+              height: 34,
+              padding: "0 14px",
+              borderRadius: 6,
+              border: "1px solid var(--line)",
+              background: "var(--paper-1)",
               color: "var(--ink-1)",
               fontFamily: "var(--font-sans)",
               fontSize: 12,
               fontWeight: 500,
-              border: "none",
               cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
             }}
           >
-            閉じる
+            <I.download size={12} /> ライブラリをエクスポート
           </button>
         </div>
-      </dialog>
-      <Toast
-        message={
-          dlsiteBulk.result
-            ? `取得 ${dlsiteBulk.result.fetched}件・失敗 ${dlsiteBulk.result.failed}件`
-            : dlsiteBulk.error
-        }
-        onDismiss={dlsiteBulk.dismiss}
-      />
-    </>
+      </div>
+
+      {/* Footer */}
+      <div style={{ padding: "12px 18px 16px", display: "flex", justifyContent: "flex-end" }}>
+        <button
+          onClick={onClose}
+          style={{
+            height: 32,
+            padding: "0 16px",
+            borderRadius: 6,
+            background: "var(--paper-2)",
+            color: "var(--ink-1)",
+            fontFamily: "var(--font-sans)",
+            fontSize: 12,
+            fontWeight: 500,
+            border: "none",
+            cursor: "pointer",
+          }}
+        >
+          閉じる
+        </button>
+      </div>
+    </dialog>
   );
 }

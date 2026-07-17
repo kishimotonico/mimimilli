@@ -80,7 +80,14 @@ describe("scan api", () => {
   });
 
   it("scanLibrary POSTs to /api/scan", async () => {
-    const mockResult = { registered: 5, newlyGenerated: 2, errors: 0, missing: 0, newWorkIds: [] };
+    const mockResult = {
+      registered: 5,
+      newlyGenerated: 2,
+      errors: 0,
+      missing: 0,
+      newWorkIds: [],
+      rjCodeMissingCount: 0,
+    };
     mockFetch.mockResolvedValue(makeResponse(mockResult));
     const result = await scanApi.scanLibrary();
     expect(mockFetch).toHaveBeenCalledWith(

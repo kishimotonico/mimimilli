@@ -6,6 +6,8 @@ import { useDialogModal } from "../../../shared/ui/useDialogModal";
 interface NewWorkPopupProps {
   scanResult: ScanResult;
   onClose: () => void;
+  /** RJコード未検出の作品一覧を開く（scanResult.rjCodeMissingCount > 0 のときのみ表示） */
+  onOpenRjCodeMissing: () => void;
 }
 
 const C = {
@@ -21,7 +23,11 @@ const C = {
   success: "var(--r-leaf)",
 };
 
-const NewWorkPopup: React.FC<NewWorkPopupProps> = ({ scanResult, onClose }) => {
+const NewWorkPopup: React.FC<NewWorkPopupProps> = ({
+  scanResult,
+  onClose,
+  onOpenRjCodeMissing,
+}) => {
   const [newWorks, setNewWorks] = useState<WorkSummary[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
@@ -113,7 +119,30 @@ const NewWorkPopup: React.FC<NewWorkPopupProps> = ({ scanResult, onClose }) => {
         {scanResult.missing > 0 && (
           <StatBadge label="行方不明" value={scanResult.missing} color={C.warning} />
         )}
+        {scanResult.rjCodeMissingCount > 0 && (
+          <StatBadge label="RJ未検出" value={scanResult.rjCodeMissingCount} color={C.warning} />
+        )}
       </div>
+
+      {scanResult.rjCodeMissingCount > 0 && (
+        <button
+          type="button"
+          onClick={onOpenRjCodeMissing}
+          style={{
+            alignSelf: "center",
+            marginBottom: 16,
+            padding: "8px 16px",
+            borderRadius: 6,
+            border: `1px solid ${C.warning}`,
+            background: "color-mix(in oklch, var(--r-mustard) 12%, transparent)",
+            color: C.textPrimary,
+            fontSize: 12,
+            cursor: "pointer",
+          }}
+        >
+          RJコード未検出の作品を確認する（{scanResult.rjCodeMissingCount}件）
+        </button>
+      )}
 
       {/* New works list */}
       {newWorks.length > 0 && (
