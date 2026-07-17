@@ -1,9 +1,11 @@
 ---
 id: TASK-46
 title: 作品詳細の情報表示の整理（異常のみバッジ表示＋作品情報モーダル）
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-07-17 13:49'
+updated_date: '2026-07-17 13:51'
 labels: []
 dependencies: []
 priority: medium
@@ -29,3 +31,9 @@ ordinal: 44000
 - [ ] #2 「…」メニューの「作品の情報」から追加日・最終再生・物理パス・DLsite状態等を確認できる
 - [ ] #3 ビジュアルベースラインが更新される
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Sonnetサブエージェント（worktree/task46）に委譲。kicker整理と作品情報モーダル。検証・ベースライン更新・コミットはClaude側
+<!-- SECTION:PLAN:END -->

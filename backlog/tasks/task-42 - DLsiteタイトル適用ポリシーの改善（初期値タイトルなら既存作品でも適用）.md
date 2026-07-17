@@ -1,9 +1,11 @@
 ---
 id: TASK-42
 title: DLsiteタイトル適用ポリシーの改善（初期値タイトルなら既存作品でも適用）
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-07-17 13:48'
+updated_date: '2026-07-17 14:03'
 labels: []
 dependencies: []
 priority: high
@@ -25,8 +27,26 @@ ordinal: 40000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 タイトルがフォルダ名/RJコード一致の作品は、existingモードの一括取得でDLsiteタイトルに更新される
-- [ ] #2 ユーザー編集済みタイトルはexistingモードで上書きされない
-- [ ] #3 既存のタイトルがRJコードのままの作品が、再取得（一括または個別）で正しいタイトルになる
-- [ ] #4 適用判定のユニットテストがある
+- [x] #1 タイトルがフォルダ名/RJコード一致の作品は、existingモードの一括取得でDLsiteタイトルに更新される
+- [x] #2 ユーザー編集済みタイトルはexistingモードで上書きされない
+- [x] #3 既存のタイトルがRJコードのままの作品が、再取得（一括または個別）で正しいタイトルになる
+- [x] #4 適用判定のユニットテストがある
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Sonnetサブエージェント（worktree/task42）に委譲。完了・マージ後に同エージェントがTASK-43を継続。検証・コミットはClaude側
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Sonnetエージェント（worktree/task42）実装をレビューしマージ（a8c165d）。server/src/core/dlsiteTitle.ts の isDefaultTitle（title==basename(physicalPath) or ==rjCode、case-insensitive）でexistingモードのタイトル適用を判定。旧仕様をアサートしていた既存テストは新仕様に更新。実データ修復: applied済みでRJコードタイトルの7件を個別fetch→applyTitle=trueで適用し、全件実タイトルに更新済み（API実機確認）。既知エッジ: wav/mp3のフォーマット別サブフォルダ作品はスキャナー粒度の問題として対象外。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+existing一括取得でタイトルが初期値（フォルダ名/RJコード一致）なら適用するよう判定関数isDefaultTitleを導入。ユーザー編集タイトルは保護。既存7件は個別取得APIで修復済み。unit test追加、check/test通過。
+<!-- SECTION:FINAL_SUMMARY:END -->

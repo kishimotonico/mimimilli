@@ -1,9 +1,11 @@
 ---
 id: TASK-44
 title: 通知ベルセンターの実装（TopBar整理とスキャン結果UIの統合）
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-07-17 13:49'
+updated_date: '2026-07-17 13:51'
 labels: []
 dependencies: []
 priority: high
@@ -36,3 +38,9 @@ ordinal: 42000
 - [ ] #4 ベルのバッジが要対応件数を反映する
 - [ ] #5 ビジュアルベースラインが更新される
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Sonnetサブエージェント（worktree/task44）に委譲。ベルパネルへの通知集約とTopBar整理。検証・ベースライン更新・コミットはClaude側
+<!-- SECTION:PLAN:END -->
