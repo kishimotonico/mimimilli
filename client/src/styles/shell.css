@@ -1312,6 +1312,7 @@
     flex: 1;
     overflow: hidden auto;
     padding: 18px;
+    container: work-detail / inline-size;
   }
   /* バー本体との重なりは .mle-body の padding-bottom で解消済み。ここでは
    スクロール終端の視覚的な余白だけを少し足す。 */
@@ -1338,6 +1339,17 @@
     width: 100%;
     height: 100%;
     object-fit: cover;
+  }
+  /* 140px のカバーと 20px の間隔を除いたメタ列に、タイトル・タグ・操作を
+     無理なく置ける 220px を残せない幅では、ヒーローを縦積みにする。 */
+  @container work-detail (max-width: 380px) {
+    .mle-prv__hero {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 16px;
+    }
+    .mle-prv__cover {
+      justify-self: center;
+    }
   }
   .mle-prv__meta {
     min-width: 0;
