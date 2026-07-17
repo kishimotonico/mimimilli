@@ -6,7 +6,12 @@
 import { atom } from "jotai";
 import { atomWithStorage } from "jotai/utils";
 import type { TagPrefix } from "@mimimilli/shared";
-import type { AxisId, SortId, ViewMode } from "../../../features/library/model/types";
+import type {
+  AxisId,
+  GridLayoutMode,
+  SortId,
+  ViewMode,
+} from "../../../features/library/model/types";
 import { getAxisLabel } from "./axisDefinitions";
 
 // ── ナビゲーション state ──────────────────────────────────────
@@ -26,6 +31,11 @@ export const tagPrefixesAtom = atom<TagPrefix[]>([]);
 // URLには含めない表示設定。ブラウザーを再起動しても直前の見た目を復元する。
 export const libraryViewModeAtom = atomWithStorage<ViewMode>("mimimilli:libraryViewMode", "list");
 export const libraryTileSizeAtom = atomWithStorage<number>("mimimilli:libraryTileSize", 176);
+// グリッドの敷き詰め形式（TASK-45）。square=1:1タイル / justified=原寸ジャスティファイド
+export const libraryGridLayoutModeAtom = atomWithStorage<GridLayoutMode>(
+  "mimimilli:libraryGridLayoutMode",
+  "square",
+);
 
 // ── 派生: アドレスバーパス ────────────────────────────────────
 

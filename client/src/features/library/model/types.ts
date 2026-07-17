@@ -24,6 +24,11 @@ export const SORT_OPTIONS: { id: SortId; label: string }[] = [
 
 export type ViewMode = "list" | "grid";
 
+// グリッド内カバーの敷き詰め形式（TASK-45）。
+//   - square: 1:1トリム（従来のCSS Gridタイル）
+//   - justified: 原寸比率を保ったまま行ごとに敷き詰める（Eagle/Googleフォト風）
+export type GridLayoutMode = "square" | "justified";
+
 // ── 軸 ───────────────────────────────────────────────────────
 // ADR-0005: 軸IDは固定 enum ではなく文字列。
 //   - ビュー: all / recent / added / fav / unplayed / missing

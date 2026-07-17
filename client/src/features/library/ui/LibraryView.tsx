@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import type { Work, WorkSummary } from "@mimimilli/shared";
-import type { ViewMode } from "../model/types";
+import type { GridLayoutMode, ViewMode } from "../model/types";
 import { useLibraryView } from "../model/useLibraryNavigation";
 import { useLibraryQueries, useSmartFolderMutation } from "../model/useLibraryQueries";
 import {
@@ -34,6 +34,7 @@ interface LibraryViewProps {
   viewMode: ViewMode;
   tileSize: number;
   onTileSizeChange: (size: number) => void;
+  gridLayoutMode: GridLayoutMode;
 }
 
 export default function LibraryView({
@@ -47,6 +48,7 @@ export default function LibraryView({
   viewMode,
   tileSize,
   onTileSizeChange,
+  gridLayoutMode,
 }: LibraryViewProps) {
   const nav = useLibraryView();
   const [smartFolderEditor, setSmartFolderEditor] = useState<SmartFolderEditorState>(
@@ -160,6 +162,7 @@ export default function LibraryView({
           selectedWorkId={nav.selectedWorkId}
           searchQuery={searchQuery}
           tileSize={tileSize}
+          gridLayoutMode={gridLayoutMode}
           isLoading={isLoading}
           isError={isError}
           onTileSizeChange={onTileSizeChange}
