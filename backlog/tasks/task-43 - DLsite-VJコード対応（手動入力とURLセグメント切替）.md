@@ -1,9 +1,10 @@
 ---
 id: TASK-43
 title: DLsite VJコード対応（手動入力とURLセグメント切替）
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-17 13:48'
+updated_date: '2026-07-17 17:24'
 labels: []
 dependencies:
   - TASK-42
@@ -26,7 +27,19 @@ VJ始まりの商業作品（例 VJ014780）がDLsite取得の入口から弾か
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 編集ダイアログでVJコードを入力・保存でき、DLsiteから取得が成功する（VJ014780で実機確認）
-- [ ] #2 RJコードの既存動作（検出・取得）が変わらない
-- [ ] #3 不正な形式のコードは従来どおりバリデーションで弾かれる
+- [x] #1 編集ダイアログでVJコードを入力・保存でき、DLsiteから取得が成功する（VJ014780で実機確認）
+- [x] #2 RJコードの既存動作（検出・取得）が変わらない
+- [x] #3 不正な形式のコードは従来どおりバリデーションで弾かれる
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Sonnetエージェント（worktree/task43）実装をレビューしマージ。dlsiteWorkUrlをprefix分岐（RJ→maniax、VJ→pro）、バリデーションを^(RJ|VJ)\d{6,8}$に拡張、VJテスト4件追加。追加でClaudeがUIラベル更新（aria-label RJ/VJコード、placeholder RJ123456 / VJ123456、エラーメッセージの表記）。実機検証: VJ014780で入力→保存→取得→適用まで成功（タイトル・サークル・CV・タグ・カバー反映、pro URLで取得確認）。check/test通過。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+VJコードの手動入力とpro URLでの取得に対応。RJ既存動作は不変、自動検出はRJのみ維持。VJ014780で実機検証済み。
+<!-- SECTION:FINAL_SUMMARY:END -->

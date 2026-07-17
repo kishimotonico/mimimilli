@@ -29,7 +29,7 @@ const inputClass =
 
 function errorMessage(error: unknown): string {
   if (!(error instanceof ApiRequestError)) return "DLsite情報の取得に失敗しました";
-  if (error.code === "not_found") return "作品が見つかりません。RJコードが違うかもしれません。";
+  if (error.code === "not_found") return "作品が見つかりません。コードが違うかもしれません。";
   if (error.code === "parse_error") return "DLsiteのページ構造が変わった可能性があります。";
   return "DLsiteとの通信に失敗しました。時間をおいて再試行してください。";
 }
@@ -177,7 +177,7 @@ export function DlsiteEditor({ work }: { work: Work }) {
       const updated = await updateDlsiteState(work.id, { rjCode: rjCode.trim() || null });
       await refresh(updated);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "RJコードを保存できませんでした");
+      setError(cause instanceof Error ? cause.message : "コードを保存できませんでした");
     } finally {
       setBusy(false);
     }
@@ -273,11 +273,11 @@ export function DlsiteEditor({ work }: { work: Work }) {
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <input
-          aria-label="DLsite RJコード"
+          aria-label="DLsite RJ/VJコード"
           className={`${inputClass} min-w-[150px] flex-1`}
           value={rjCode}
           disabled={busy}
-          placeholder="RJ123456"
+          placeholder="RJ123456 / VJ123456"
           onChange={(event) => setRjCode(event.target.value)}
         />
         <Button disabled={busy} onClick={() => void saveCode()}>
