@@ -16,7 +16,7 @@ import {
   unappliedDlsiteTags,
 } from "../../model/dlsitePreview";
 
-const STATUS_LABEL = {
+export const STATUS_LABEL = {
   none: "未連携",
   applied: "連携済み",
   not_found: "見つかりません",

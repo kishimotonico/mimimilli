@@ -19,6 +19,7 @@ interface WorkMetadataActionsProps {
   onPatchWork: (body: WorkPatch) => Promise<Work>;
   onError: (message: string | null) => void;
   onEdit: () => void;
+  onShowInfo: () => void;
 }
 
 export function WorkMetadataActions({
@@ -33,6 +34,7 @@ export function WorkMetadataActions({
   onPatchWork,
   onError,
   onEdit,
+  onShowInfo,
 }: WorkMetadataActionsProps) {
   const [isActionPopoverOpen, setIsActionPopoverOpen] = useState(false);
   const [isBookmarkSaving, setIsBookmarkSaving] = useState(false);
@@ -102,50 +104,65 @@ export function WorkMetadataActions({
         onClick={() => void toggleBookmark()}
       />
       <IconButton icon={I.edit} label="作品を編集" size="sm" onClick={onEdit} />
-      {work.urls.length > 0 && (
-        <div ref={actionPopoverRef} className="relative inline-flex">
-          <IconButton
-            icon={I.more}
-            label="その他"
-            size="sm"
-            aria-haspopup="menu"
-            aria-expanded={isActionPopoverOpen}
-            active={isActionPopoverOpen}
-            onClick={() => {
-              onError(null);
-              setIsActionPopoverOpen((open) => !open);
+      <div ref={actionPopoverRef} className="relative inline-flex">
+        <IconButton
+          icon={I.more}
+          label="その他"
+          size="sm"
+          aria-haspopup="menu"
+          aria-expanded={isActionPopoverOpen}
+          active={isActionPopoverOpen}
+          onClick={() => {
+            onError(null);
+            setIsActionPopoverOpen((open) => !open);
+          }}
+        />
+        {isActionPopoverOpen && (
+          <div
+            className="absolute top-[calc(100%+6px)] z-10 rounded-[6px] border border-line-soft bg-paper-1 p-1 shadow-pop"
+            style={{
+              left: actionPopoverLayout.left,
+              width: actionPopoverLayout.width,
             }}
-          />
-          {isActionPopoverOpen && (
-            <div
-              className="absolute top-[calc(100%+6px)] z-10 rounded-[6px] border border-line-soft bg-paper-1 p-1 shadow-pop"
-              style={{
-                left: actionPopoverLayout.left,
-                width: actionPopoverLayout.width,
-              }}
-            >
-              <div className="flex flex-col gap-1" role="menu">
-                {work.urls.map((u) => (
-                  <a
-                    key={u.url}
-                    role="menuitem"
-                    className="flex min-h-7 w-full items-center gap-2 rounded-1 px-2 font-jp text-[12px] text-ink-1 hover:bg-paper-2 hover:text-ink-0 focus:bg-paper-2 focus:outline-none"
-                    href={u.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={closeActionPopover}
-                  >
-                    <I.ext size={13} />
-                    <span className="min-w-0 flex-1 truncate">
-                      {u.label === "DLsite" ? "DLsiteを開く" : `${u.label}を開く`}
-                    </span>
-                  </a>
-                ))}
-              </div>
+          >
+            <div className="flex flex-col gap-1" role="menu">
+              <button
+                type="button"
+                role="menuitem"
+                className="flex min-h-7 w-full items-center gap-2 rounded-1 px-2 font-jp text-[12px] text-ink-1 hover:bg-paper-2 hover:text-ink-0 focus:bg-paper-2 focus:outline-none"
+                onClick={() => {
+                  closeActionPopover();
+                  onShowInfo();
+                }}
+              >
+                <I.info size={13} />
+                <span className="min-w-0 flex-1 truncate">作品の情報</span>
+              </button>
+              {work.urls.length > 0 && (
+                <>
+                  <hr className="my-1 border-0 border-t border-t-line-soft" />
+                  {work.urls.map((u) => (
+                    <a
+                      key={u.url}
+                      role="menuitem"
+                      className="flex min-h-7 w-full items-center gap-2 rounded-1 px-2 font-jp text-[12px] text-ink-1 hover:bg-paper-2 hover:text-ink-0 focus:bg-paper-2 focus:outline-none"
+                      href={u.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={closeActionPopover}
+                    >
+                      <I.ext size={13} />
+                      <span className="min-w-0 flex-1 truncate">
+                        {u.label === "DLsite" ? "DLsiteを開く" : `${u.label}を開く`}
+                      </span>
+                    </a>
+                  ))}
+                </>
+              )}
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
