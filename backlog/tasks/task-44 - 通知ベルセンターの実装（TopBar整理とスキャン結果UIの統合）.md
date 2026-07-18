@@ -1,11 +1,11 @@
 ---
 id: TASK-44
 title: 通知ベルセンターの実装（TopBar整理とスキャン結果UIの統合）
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-07-17 13:49'
-updated_date: '2026-07-17 13:51'
+updated_date: '2026-07-18 10:54'
 labels: []
 dependencies: []
 priority: high
@@ -32,11 +32,11 @@ ordinal: 42000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 通知ベルからRJ未検出一覧・取得失敗一覧・未連携一括取得・直近スキャン結果に到達できる
-- [ ] #2 TopBarに常設の一括取得ボタンがなくなり、実行中の進捗は引き続き視認できる
-- [ ] #3 新規0件のスキャンでは完了ポップアップが出ず、新規>0では従来どおり表示される
-- [ ] #4 ベルのバッジが要対応件数を反映する
-- [ ] #5 ビジュアルベースラインが更新される
+- [x] #1 通知ベルからRJ未検出一覧・取得失敗一覧・未連携一括取得・直近スキャン結果に到達できる
+- [x] #2 TopBarに常設の一括取得ボタンがなくなり、実行中の進捗は引き続き視認できる
+- [x] #3 新規0件のスキャンでは完了ポップアップが出ず、新規>0では従来どおり表示される
+- [x] #4 ベルのバッジが要対応件数を反映する
+- [x] #5 ビジュアルベースラインが更新される
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -44,3 +44,15 @@ ordinal: 42000
 <!-- SECTION:PLAN:BEGIN -->
 Sonnetサブエージェント（worktree/task44）に委譲。ベルパネルへの通知集約とTopBar整理。検証・ベースライン更新・コミットはClaude側
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Sonnetエージェント（worktree/task44）実装をレビューしマージ（7ff66b2）。NotificationBell新設（バッジ=RJ未検出+取得失敗の合算）、パネルからRJ未検出一覧・取得失敗一覧・まとめて取得・直近スキャンサマリに到達。TopBar常設一括取得ボタン撤去。NewWorkPopupは新規0件で非表示（shouldShowNewWorkPopup）。実機検証: ベル→RJ未検出一覧→パネルのスキャンサマリ（登録済み11/新規0/エラー0/行方不明1）表示OK、新規0件スキャンでポップアップ非表示を確認。マージ後にshared/src新export起因のdev server白画面が発生（Vite変換キャッシュ問題、再起動で解消、メモリに記録済み）。check/test/visualベースライン確認済み。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+通知ベルをライブラリ健康状態のセンターに統合。RJ未検出・取得失敗・一括取得・スキャンサマリを集約し、TopBar常設ボタンと新規0件ポップアップを廃止。実機検証済み。
+<!-- SECTION:FINAL_SUMMARY:END -->
