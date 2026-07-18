@@ -126,16 +126,24 @@ export function usePlayer() {
         state.currentWork?.id === loadedTrack.workId &&
         nextTrack !== undefined &&
         getAudioUrl(loadedTrack.workId, nextTrack.file) === loadedTrack.assetUrl;
+      const finishedWork =
+        loadedTrack !== null &&
+        state.currentWork?.id === loadedTrack.workId &&
+        nextTrack === undefined;
 
       // 区間トラックではファイル自体の再生が続くため、継続できない境界では明示的に止める。
       if (virtualEnd && !continuesSameAsset) engineRef.current?.pause();
 
       if (loadedTrack) {
-        const absoluteEnd =
-          loadedTrack.track.end ??
-          engineRef.current?.getDuration() ??
-          getTrackStart(loadedTrack.track);
-        saveCurrentResume(absoluteEnd, loadedTrack);
+        if (finishedWork) {
+          saveResumePosition(loadedTrack.workId, 0, 0).catch(() => {});
+        } else {
+          const absoluteEnd =
+            loadedTrack.track.end ??
+            engineRef.current?.getDuration() ??
+            getTrackStart(loadedTrack.track);
+          saveCurrentResume(absoluteEnd, loadedTrack);
+        }
       }
 
       setCoreState((prev) => {
@@ -278,7 +286,7 @@ export function usePlayer() {
     const workId = coreState.currentWork.id;
     const tid = setInterval(() => {
       const loaded = loadedTrackRef.current;
-      if (loaded && loaded.workId === workId) {
+      if (!trackEndedRef.current && loaded && loaded.workId === workId) {
         saveCurrentResume();
       }
     }, 5000);
@@ -287,7 +295,14 @@ export function usePlayer() {
 
   // ── 一時停止時に resume 保存 ──────────────────────────────
   useEffect(() => {
-    if (coreState.isPlaying || !coreState.currentWork || coreState.currentTrackIndex < 0) return;
+    if (
+      coreState.isPlaying ||
+      trackEndedRef.current ||
+      !coreState.currentWork ||
+      coreState.currentTrackIndex < 0
+    ) {
+      return;
+    }
     const engine = engineRef.current;
     if (!engine) return;
 
@@ -332,9 +347,10 @@ export function usePlayer() {
 
       const trackIndex = Math.min(work.resumeTrackIndex, tracks.length - 1);
 
-      if (work.resumePosition > 0) {
-        pendingResumeRef.current = { workId: work.id, trackIndex, position: work.resumePosition };
-      }
+      pendingResumeRef.current =
+        work.resumePosition > 0
+          ? { workId: work.id, trackIndex, position: work.resumePosition }
+          : null;
 
       startPlayback(work, tracks, trackIndex);
     },

@@ -298,6 +298,67 @@ describe("usePlayer audio engine lifecycle", () => {
     expect(result.current.player.state.isPlaying).toBe(true);
   });
 
+  it("最終トラック聴了時はレジューム位置を作品の先頭へ戻す", async () => {
+    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
+
+    act(() => result.current.player.play(work, [track]));
+    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
+    vi.mocked(saveResumePosition).mockClear();
+
+    act(() => {
+      latestAudio().duration = 120;
+      latestAudio().currentTime = 120;
+      latestAudio().dispatchEvent(new Event("ended"));
+    });
+
+    expect(result.current.player.state.isPlaying).toBe(false);
+    expect(saveResumePosition).toHaveBeenCalledTimes(1);
+    expect(saveResumePosition).toHaveBeenCalledWith(work.id, 0, 0);
+  });
+
+  it("途中トラックの終端では従来どおり終端位置とトラック番号を保存する", async () => {
+    const tracks: Track[] = [
+      { ...track, start: 0, end: 30 },
+      { title: "Track 2", file: "audio/track-2.wav" },
+    ];
+    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
+
+    act(() => result.current.player.play(work, tracks));
+    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
+    vi.mocked(saveResumePosition).mockClear();
+
+    act(() => {
+      latestAudio().duration = 30;
+      latestAudio().currentTime = 30;
+      latestAudio().dispatchEvent(new Event("timeupdate"));
+    });
+    await waitFor(() => expect(result.current.player.state.currentTrackIndex).toBe(1));
+
+    expect(saveResumePosition).toHaveBeenCalledWith(work.id, 30, 0);
+    expect(saveResumePosition).not.toHaveBeenCalledWith(work.id, 0, 0);
+  });
+
+  it("聴了後の一時停止処理は終端位置でレジュームを上書きしない", async () => {
+    const segment: Track = { ...track, start: 30, end: 90 };
+    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
+
+    act(() => result.current.player.play(work, [segment]));
+    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
+    vi.mocked(saveResumePosition).mockClear();
+
+    act(() => {
+      latestAudio().duration = 120;
+      latestAudio().currentTime = 90;
+      latestAudio().dispatchEvent(new Event("timeupdate"));
+      latestAudio().dispatchEvent(new Event("pause"));
+    });
+
+    expect(result.current.player.state.isPlaying).toBe(false);
+    expect(saveResumePosition).toHaveBeenCalledTimes(1);
+    expect(saveResumePosition).toHaveBeenLastCalledWith(work.id, 0, 0);
+    expect(saveResumePosition).not.toHaveBeenCalledWith(work.id, 90, 0);
+  });
+
   it("最終区間の終端から戻って再生した場合も終了検知を再武装する", async () => {
     const segment: Track = { ...track, start: 30, end: 90 };
     const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
