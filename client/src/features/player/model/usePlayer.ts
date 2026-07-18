@@ -12,6 +12,13 @@ import { getAudioUrl } from "../../../entities/work/api";
 import { saveResumePosition, updateLastPlayed } from "../api";
 import { createAudioEngine } from "./audioEngine";
 import {
+  getTrackDuration,
+  getTrackStart,
+  hasReachedTrackEnd,
+  toAudioAbsoluteTime,
+  toTrackRelativeTime,
+} from "./trackTime";
+import {
   playerCoreAtom,
   playerCurrentTimeAtom,
   playerDurationAtom,
@@ -37,6 +44,12 @@ interface PendingResume {
   position: number;
 }
 
+interface LoadedTrack {
+  workId: string;
+  trackIndex: number;
+  track: Track;
+}
+
 export function usePlayer() {
   const [coreState, setCoreState] = useAtom(playerCoreAtom);
   const setCurrentTime = useSetAtom(playerCurrentTimeAtom); // subscribe しない
@@ -54,44 +67,79 @@ export function usePlayer() {
   abRepeatRef.current = coreState.abRepeat;
 
   const pendingResumeRef = useRef<PendingResume | null>(null);
-  const loadedTrackRef = useRef<{ workId: string; trackIndex: number } | null>(null);
+  const loadedTrackRef = useRef<LoadedTrack | null>(null);
+  const trackEndedRef = useRef(false);
 
   // Audio engine は effect の寿命に合わせて生成・破棄する。
   const engineRef = useRef<ReturnType<typeof createAudioEngine> | null>(null);
 
   useEffect(() => {
+    const finishCurrentTrack = (virtualEnd: boolean) => {
+      if (trackEndedRef.current) return;
+      trackEndedRef.current = true;
+
+      const loadedTrack = loadedTrackRef.current;
+      if (loopRef.current) {
+        const start = loadedTrack ? getTrackStart(loadedTrack.track) : 0;
+        engineRef.current?.seek(start);
+        engineRef.current?.play();
+        trackEndedRef.current = false;
+        return;
+      }
+
+      // 区間トラックではファイル自体の再生が続くため、境界到達時に明示的に止める。
+      if (virtualEnd) engineRef.current?.pause();
+
+      // resumePosition は既存データとの互換性を保つため、ファイル絶対秒で保存する。
+      if (loadedTrack) {
+        const absoluteEnd =
+          loadedTrack.track.end ??
+          engineRef.current?.getDuration() ??
+          getTrackStart(loadedTrack.track);
+        saveResumePosition(loadedTrack.workId, absoluteEnd, loadedTrack.trackIndex).catch(() => {});
+      }
+
+      setCoreState((prev) => {
+        if (prev.currentTrackIndex < prev.tracks.length - 1) {
+          return { ...prev, currentTrackIndex: prev.currentTrackIndex + 1 };
+        }
+        return { ...prev, isPlaying: false };
+      });
+    };
+
     const engine = createAudioEngine(coreStateRef.current.volume, {
       onPlay: () => setCoreState((s) => ({ ...s, isPlaying: true, playbackError: null })),
       onPause: () => setCoreState((s) => ({ ...s, isPlaying: false })),
       onTimeUpdate: (time) => {
+        const loadedTrack = loadedTrackRef.current;
+        if (!loadedTrack) return;
+        const duration = getTrackDuration(loadedTrack.track, engineRef.current?.getDuration() ?? 0);
+        const relativeTime = toTrackRelativeTime(time, loadedTrack.track, duration);
+        const reachedTrackEnd = hasReachedTrackEnd(time, loadedTrack.track);
+
+        // 終端より手前へ戻ったら、同じトラックでも次の終端到達を検知できるよう再武装する。
+        if (!reachedTrackEnd) {
+          trackEndedRef.current = false;
+        }
+
         // A-B リピート（ref 経由で最新値を参照）
         const ab = abRepeatRef.current;
-        if (ab.a !== null && ab.b !== null && ab.a < ab.b && time >= ab.b) {
-          engineRef.current?.seek(ab.a);
-        }
-        setCurrentTime(time);
-      },
-      onDurationChange: (dur) => setDuration(dur),
-      onEnded: () => {
-        if (loopRef.current) {
-          engineRef.current?.seek(0);
-          engineRef.current?.play();
+        if (ab.a !== null && ab.b !== null && ab.a < ab.b && relativeTime >= ab.b) {
+          engineRef.current?.seek(toAudioAbsoluteTime(ab.a, loadedTrack.track, duration));
+          setCurrentTime(ab.a);
           return;
         }
-        // トラック終了時に resume position を保存
-        const loadedTrack = loadedTrackRef.current;
-        if (loadedTrack) {
-          const dur = engineRef.current?.getDuration() ?? 0;
-          saveResumePosition(loadedTrack.workId, dur, loadedTrack.trackIndex).catch(() => {});
+        setCurrentTime(relativeTime);
+
+        if (reachedTrackEnd) {
+          finishCurrentTrack(true);
         }
-        // 次トラックへ自動送り
-        setCoreState((prev) => {
-          if (prev.currentTrackIndex < prev.tracks.length - 1) {
-            return { ...prev, currentTrackIndex: prev.currentTrackIndex + 1 };
-          }
-          return { ...prev, isPlaying: false };
-        });
       },
+      onDurationChange: (dur) => {
+        const loadedTrack = loadedTrackRef.current;
+        setDuration(loadedTrack ? getTrackDuration(loadedTrack.track, dur) : dur);
+      },
+      onEnded: () => finishCurrentTrack(false),
       onError: (error) => {
         setCoreState((s) => ({ ...s, isPlaying: false, playbackError: error }));
       },
@@ -129,11 +177,21 @@ export function usePlayer() {
     const pending = pendingResumeRef.current;
     const pendingSeekSec =
       pending?.workId === workId && pending.trackIndex === currentTrackIndex && pending.position > 0
-        ? pending.position
+        ? Math.max(
+            getTrackStart(track),
+            track.end === undefined ? pending.position : Math.min(track.end, pending.position),
+          )
         : undefined;
 
-    if (pendingSeekSec) {
+    if (pendingSeekSec !== undefined) {
       pendingResumeRef.current = null;
+    }
+
+    loadedTrackRef.current = { workId, trackIndex: currentTrackIndex, track };
+    trackEndedRef.current = false;
+    if (track.start !== undefined || track.end !== undefined) {
+      setCurrentTime(0);
+      setDuration(track.end === undefined ? 0 : getTrackDuration(track, track.end));
     }
 
     const cleanup = engine.load(assetUrl, {
@@ -142,7 +200,6 @@ export function usePlayer() {
       pendingSeekSec,
     });
 
-    loadedTrackRef.current = { workId, trackIndex: currentTrackIndex };
     updateLastPlayed(workId).catch(() => {});
 
     return cleanup;
@@ -250,8 +307,21 @@ export function usePlayer() {
     }));
   }, [setCoreState]);
 
-  const seek = useCallback((time: number) => engineRef.current?.seek(time), []);
-  const seekRelative = useCallback((delta: number) => engineRef.current?.seekRelative(delta), []);
+  const seek = useCallback((time: number) => {
+    const engine = engineRef.current;
+    const loadedTrack = loadedTrackRef.current;
+    if (!engine || !loadedTrack) return;
+    const duration = getTrackDuration(loadedTrack.track, engine.getDuration());
+    engine.seek(toAudioAbsoluteTime(time, loadedTrack.track, duration));
+  }, []);
+  const seekRelative = useCallback((delta: number) => {
+    const engine = engineRef.current;
+    const loadedTrack = loadedTrackRef.current;
+    if (!engine || !loadedTrack) return;
+    const duration = getTrackDuration(loadedTrack.track, engine.getDuration());
+    const current = toTrackRelativeTime(engine.getCurrentTime(), loadedTrack.track, duration);
+    engine.seek(toAudioAbsoluteTime(current + delta, loadedTrack.track, duration));
+  }, []);
 
   const setVolume = useCallback(
     (vol: number) => {
@@ -345,7 +415,16 @@ export function usePlayer() {
 
   const setABPoint = useCallback(
     (point: "a" | "b") => {
-      const time = engineRef.current?.getCurrentTime() ?? 0;
+      const engine = engineRef.current;
+      const loadedTrack = loadedTrackRef.current;
+      const time =
+        engine && loadedTrack
+          ? toTrackRelativeTime(
+              engine.getCurrentTime(),
+              loadedTrack.track,
+              getTrackDuration(loadedTrack.track, engine.getDuration()),
+            )
+          : 0;
       setCoreState((prev) => {
         const next = { ...prev.abRepeat, [point]: time };
         // B→A の順で設定して区間が逆転した場合は入れ替えて成立させる

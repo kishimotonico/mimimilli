@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { formatTime, formatDuration, formatFileSize } from "../../src/shared/lib/format";
 import { usePlayer } from "../../src/features/player/model/usePlayer";
 import { playerCurrentTimeAtom, playerDurationAtom } from "../../src/features/player/model/atoms";
-import type { Track, WorkSummary } from "../../src/entities/work/model";
+import type { Track, Work, WorkSummary } from "../../src/entities/work/model";
 
 vi.mock("../../src/features/player/api", () => ({
   saveResumePosition: vi.fn(() => Promise.resolve()),
@@ -197,5 +197,140 @@ describe("usePlayer audio engine lifecycle", () => {
       });
     });
     expect(result.current.player.state.isPlaying).toBe(false);
+  });
+
+  it("区間トラックの atom とシークをトラック相対時間で扱う", async () => {
+    const segment: Track = { ...track, start: 30, end: 90 };
+    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
+
+    act(() => result.current.player.play(work, [segment]));
+    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
+
+    act(() => {
+      const audio = latestAudio();
+      audio.duration = 120;
+      audio.dispatchEvent(new Event("durationchange"));
+      audio.currentTime = 45;
+      audio.dispatchEvent(new Event("timeupdate"));
+    });
+
+    expect(result.current.duration).toBe(60);
+    expect(result.current.currentTime).toBe(15);
+
+    act(() => result.current.player.seek(20));
+    expect(latestAudio().currentTime).toBe(50);
+
+    act(() => result.current.player.seek(-10));
+    expect(latestAudio().currentTime).toBe(30);
+
+    act(() => result.current.player.seek(100));
+    expect(latestAudio().currentTime).toBe(90);
+  });
+
+  it("区間終端を一度だけ通常のトラック終了として扱う", async () => {
+    const tracks: Track[] = [
+      { ...track, start: 30, end: 90 },
+      { title: "Track 2", file: "audio/track-2.wav" },
+    ];
+    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
+
+    act(() => result.current.player.play(work, tracks));
+    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
+
+    act(() => {
+      const audio = latestAudio();
+      audio.duration = 90;
+      audio.currentTime = 90;
+      audio.dispatchEvent(new Event("timeupdate"));
+      audio.dispatchEvent(new Event("ended"));
+    });
+
+    await waitFor(() => expect(result.current.player.state.currentTrackIndex).toBe(1));
+  });
+
+  it("最終区間の終端から戻って再生した場合も終了検知を再武装する", async () => {
+    const segment: Track = { ...track, start: 30, end: 90 };
+    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
+
+    act(() => result.current.player.play(work, [segment]));
+    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
+
+    act(() => {
+      const audio = latestAudio();
+      audio.duration = 120;
+      audio.currentTime = 90;
+      audio.dispatchEvent(new Event("timeupdate"));
+    });
+    expect(result.current.player.state.isPlaying).toBe(false);
+    expect(latestAudio().pause).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      result.current.player.seek(10);
+      latestAudio().dispatchEvent(new Event("timeupdate"));
+    });
+    expect(result.current.currentTime).toBe(10);
+
+    act(() => result.current.player.togglePlay());
+    expect(result.current.player.state.isPlaying).toBe(true);
+
+    act(() => {
+      latestAudio().currentTime = 90;
+      latestAudio().dispatchEvent(new Event("timeupdate"));
+    });
+    expect(result.current.player.state.isPlaying).toBe(false);
+    expect(latestAudio().pause).toHaveBeenCalledTimes(2);
+  });
+
+  it("A-B 点をトラック相対時間で保持して絶対時刻へシークする", async () => {
+    const segment: Track = { ...track, start: 30, end: 90 };
+    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
+
+    act(() => result.current.player.play(work, [segment]));
+    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
+
+    act(() => {
+      latestAudio().duration = 120;
+      latestAudio().currentTime = 40;
+      result.current.player.setABPoint("a");
+    });
+    act(() => {
+      latestAudio().currentTime = 50;
+      result.current.player.setABPoint("b");
+    });
+
+    expect(result.current.player.state.abRepeat).toEqual({ a: 10, b: 20 });
+
+    act(() => {
+      latestAudio().dispatchEvent(new Event("timeupdate"));
+    });
+    expect(latestAudio().currentTime).toBe(40);
+    expect(result.current.currentTime).toBe(10);
+  });
+
+  it("既存形式の絶対 resumePosition を区間トラック内へ復元する", async () => {
+    const segment: Track = { ...track, start: 30, end: 90 };
+    const resumableWork: Work = {
+      ...work,
+      defaultPlaylist: "default",
+      createdAt: null,
+      playlists: [{ name: "default", tracks: [segment] }],
+      resumePosition: 45,
+      resumeTrackIndex: 0,
+    };
+    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
+
+    act(() => result.current.player.playWithResume(resumableWork));
+    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
+
+    act(() => {
+      latestAudio().duration = 120;
+      latestAudio().dispatchEvent(new Event("loadedmetadata"));
+      latestAudio().dispatchEvent(new Event("durationchange"));
+      latestAudio().dispatchEvent(new Event("timeupdate"));
+    });
+
+    expect(latestAudio().currentTime).toBe(45);
+    expect(result.current.currentTime).toBe(15);
+    expect(result.current.duration).toBe(60);
   });
 });
