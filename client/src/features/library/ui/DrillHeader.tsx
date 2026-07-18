@@ -28,10 +28,6 @@ export default function DrillHeader({ axisLabel, value, count, onBack }: DrillHe
           <I.chevD size={11} />
         </span>
       </button>
-      <div className="mle-drill__sub">
-        <span>この {label} の作品</span>
-        {count != null && <span className="count">{count}</span>}
-      </div>
     </div>
   );
 }

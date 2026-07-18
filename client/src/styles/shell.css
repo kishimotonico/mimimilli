@@ -1192,24 +1192,6 @@
     place-items: center;
     flex-shrink: 0;
   }
-  .mle-drill__sub {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 10px;
-    background: var(--paper-0);
-    border-top: 1px solid var(--line-soft);
-    font-family: var(--font-sans);
-    font-size: 10px;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    font-weight: 600;
-    color: var(--ink-3);
-  }
-  .mle-drill__sub .count {
-    font-family: var(--font-mono);
-    margin-left: auto;
-  }
 
   /* ── Column stack (ancestor spine — click to go up one level) ─ */
 
