@@ -19,8 +19,18 @@ class FakeAudio extends EventTarget {
   error: MediaError | null = null;
   playbackRate = 1;
   readyState = 0;
-  src = "";
+  private _src = "";
+  readonly srcAssignments: string[] = [];
   volume = 1;
+
+  get src() {
+    return this._src;
+  }
+
+  set src(value: string) {
+    this._src = value;
+    this.srcAssignments.push(value);
+  }
 
   play = vi.fn(() => {
     if (nextPlayError) {
@@ -414,6 +424,129 @@ describe("usePlayer audio engine lifecycle", () => {
 
     expect(result.current.player.state.currentTrackIndex).toBe(1);
     expect(result.current.player.state.abRepeat).toEqual({ a: null, b: null });
+  });
+
+  it("同一ファイルのトラック切替では再ロードせず開始位置へシークする", async () => {
+    const tracks: Track[] = [
+      { ...track, start: 0, end: 30 },
+      { title: "Track 2", file: track.file, start: 30, end: 60 },
+    ];
+    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
+
+    act(() => result.current.player.play(work, tracks));
+    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
+    latestAudio().duration = 60;
+    vi.mocked(saveResumePosition).mockClear();
+
+    act(() => result.current.player.nextTrack());
+    await waitFor(() => expect(latestAudio().currentTime).toBe(30));
+
+    expect(latestAudio().srcAssignments).toHaveLength(1);
+    expect(result.current.currentTime).toBe(0);
+    expect(result.current.duration).toBe(30);
+    expect(result.current.player.state.isPlaying).toBe(true);
+    expect(saveResumePosition).toHaveBeenCalledWith(work.id, 0, 0);
+  });
+
+  it("一時停止中の同一ファイル切替では位置だけを変える", async () => {
+    const tracks: Track[] = [
+      { ...track, start: 0, end: 30 },
+      { title: "Track 2", file: track.file, start: 30, end: 60 },
+    ];
+    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
+
+    act(() => result.current.player.play(work, tracks));
+    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
+    latestAudio().duration = 60;
+    act(() => result.current.player.togglePlay());
+    expect(result.current.player.state.isPlaying).toBe(false);
+    latestAudio().play.mockClear();
+
+    act(() => result.current.player.setTrackIndex(1));
+    await waitFor(() => expect(latestAudio().currentTime).toBe(30));
+
+    expect(latestAudio().srcAssignments).toHaveLength(1);
+    expect(latestAudio().play).not.toHaveBeenCalled();
+    expect(result.current.player.state.isPlaying).toBe(false);
+  });
+
+  it("同一ファイルの仮想終端では停止せず次トラックへシークする", async () => {
+    const tracks: Track[] = [
+      { ...track, start: 0, end: 30 },
+      { title: "Track 2", file: track.file, start: 30, end: 60 },
+    ];
+    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
+
+    act(() => result.current.player.play(work, tracks));
+    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
+
+    act(() => {
+      latestAudio().duration = 60;
+      latestAudio().currentTime = 30;
+      latestAudio().dispatchEvent(new Event("timeupdate"));
+    });
+    await waitFor(() => expect(result.current.player.state.currentTrackIndex).toBe(1));
+
+    expect(latestAudio().pause).not.toHaveBeenCalled();
+    expect(latestAudio().currentTime).toBe(30);
+    expect(latestAudio().srcAssignments).toHaveLength(1);
+    expect(result.current.player.state.isPlaying).toBe(true);
+  });
+
+  it("同一ファイル切替でも pending resume の位置を優先する", async () => {
+    const tracks: Track[] = [
+      { ...track, start: 0, end: 30 },
+      { title: "Track 2", file: track.file, start: 30, end: 60 },
+    ];
+    const resumableWork: Work = {
+      ...work,
+      defaultPlaylist: "default",
+      createdAt: null,
+      playlists: [{ name: "default", tracks }],
+      resumePosition: 45,
+      resumeTrackIndex: 1,
+    };
+    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
+
+    act(() => result.current.player.play(work, tracks));
+    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
+    latestAudio().duration = 60;
+
+    act(() => result.current.player.playWithResume(resumableWork));
+    await waitFor(() => expect(latestAudio().currentTime).toBe(45));
+
+    expect(latestAudio().srcAssignments).toHaveLength(1);
+    expect(result.current.currentTime).toBe(15);
+    expect(result.current.duration).toBe(30);
+  });
+
+  it("異なるファイルのトラック切替では従来どおり再ロードする", async () => {
+    const tracks: Track[] = [
+      { ...track, start: 0, end: 30 },
+      { title: "Track 2", file: "audio/track-2.wav", start: 0, end: 45 },
+    ];
+    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
+
+    act(() => result.current.player.play(work, tracks));
+    await waitFor(() => expect(latestAudio().srcAssignments).toHaveLength(1));
+
+    act(() => result.current.player.nextTrack());
+    await waitFor(() => expect(latestAudio().srcAssignments).toHaveLength(2));
+
+    expect(latestAudio().srcAssignments[1]).toContain("audio/track-2.wav");
+  });
+
+  it("同じファイル名でも作品が異なれば再ロードする", async () => {
+    const otherWork: WorkSummary = { ...work, id: "work-2", title: "Work 2" };
+    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
+
+    act(() => result.current.player.play(work, [track]));
+    await waitFor(() => expect(latestAudio().srcAssignments).toHaveLength(1));
+
+    act(() => result.current.player.play(otherWork, [track]));
+    await waitFor(() => expect(latestAudio().srcAssignments).toHaveLength(2));
+
+    expect(latestAudio().srcAssignments[1]).toContain("/work-2/");
   });
 
   it("stop は絶対時刻の resumePosition を保存して再生 state を初期化する", async () => {

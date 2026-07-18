@@ -48,6 +48,7 @@ interface LoadedTrack {
   workId: string;
   trackIndex: number;
   track: Track;
+  assetUrl: string;
 }
 
 export function usePlayer() {
@@ -114,8 +115,17 @@ export function usePlayer() {
         return;
       }
 
-      // 区間トラックではファイル自体の再生が続くため、境界到達時に明示的に止める。
-      if (virtualEnd) engineRef.current?.pause();
+      // 同一ファイル内の次トラックへ進む場合は、再生を止めずにロード effect のシークへ渡す。
+      const state = coreStateRef.current;
+      const nextTrack = loadedTrack ? state.tracks[loadedTrack.trackIndex + 1] : undefined;
+      const continuesSameAsset =
+        loadedTrack !== null &&
+        state.currentWork?.id === loadedTrack.workId &&
+        nextTrack !== undefined &&
+        getAudioUrl(loadedTrack.workId, nextTrack.file) === loadedTrack.assetUrl;
+
+      // 区間トラックではファイル自体の再生が続くため、継続できない境界では明示的に止める。
+      if (virtualEnd && !continuesSameAsset) engineRef.current?.pause();
 
       if (loadedTrack) {
         const absoluteEnd =
@@ -193,7 +203,9 @@ export function usePlayer() {
 
     // 前トラックの位置を保存
     const prev = loadedTrackRef.current;
-    if (prev && (prev.workId !== workId || prev.trackIndex !== currentTrackIndex)) {
+    const switchedTrack =
+      prev !== null && (prev.workId !== workId || prev.trackIndex !== currentTrackIndex);
+    if (switchedTrack) {
       saveCurrentResume(undefined, prev);
     }
 
@@ -211,8 +223,28 @@ export function usePlayer() {
       pendingResumeRef.current = null;
     }
 
-    loadedTrackRef.current = { workId, trackIndex: currentTrackIndex, track };
+    const reusesLoadedAsset = switchedTrack && prev.workId === workId && prev.assetUrl === assetUrl;
+
+    loadedTrackRef.current = { workId, trackIndex: currentTrackIndex, track, assetUrl };
     trackEndedRef.current = false;
+
+    if (reusesLoadedAsset) {
+      const seekSec = pendingSeekSec ?? getTrackStart(track);
+      const trackDuration = getTrackDuration(track, engine.getDuration());
+      engine.seek(seekSec);
+      setCurrentTime(toTrackRelativeTime(seekSec, track, trackDuration));
+      setDuration(trackDuration);
+
+      // 通常のトラック移動では既存の再生状態を保つ。play / playWithResume から
+      // isPlaying=true で切り替えられた場合も、再ロードせず再生を開始できる。
+      if (coreState.isPlaying) {
+        engine.play();
+      }
+
+      updateLastPlayed(workId).catch(() => {});
+      return;
+    }
+
     if (track.start !== undefined || track.end !== undefined) {
       setCurrentTime(0);
       setDuration(track.end === undefined ? 0 : getTrackDuration(track, track.end));
