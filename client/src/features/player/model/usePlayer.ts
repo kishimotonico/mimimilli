@@ -11,6 +11,7 @@ import type { Track, WorkSummary, Work } from "../../../entities/work/model";
 import { getAudioUrl } from "../../../entities/work/api";
 import { saveResumePosition, updateLastPlayed } from "../api";
 import { createAudioEngine } from "./audioEngine";
+import { useMediaSession } from "./useMediaSession";
 import {
   getTrackDuration,
   getTrackStart,
@@ -70,6 +71,7 @@ export function usePlayer() {
   const pendingResumeRef = useRef<PendingResume | null>(null);
   const loadedTrackRef = useRef<LoadedTrack | null>(null);
   const trackEndedRef = useRef(false);
+  const updateMediaSessionPositionRef = useRef<(position?: number) => void>(() => {});
 
   // Audio engine は effect の寿命に合わせて生成・破棄する。
   const engineRef = useRef<ReturnType<typeof createAudioEngine> | null>(null);
@@ -110,6 +112,7 @@ export function usePlayer() {
       if (loopRef.current) {
         const start = loadedTrack ? getTrackStart(loadedTrack.track) : 0;
         engineRef.current?.seek(start);
+        updateMediaSessionPositionRef.current(0);
         engineRef.current?.play();
         trackEndedRef.current = false;
         return;
@@ -162,6 +165,7 @@ export function usePlayer() {
         if (ab.a !== null && ab.b !== null && ab.a < ab.b && currentTime >= ab.b) {
           engine.seek(toAudioAbsoluteTime(ab.a, track, trackDuration));
           setCurrentTime(ab.a);
+          updateMediaSessionPositionRef.current(ab.a);
           return;
         }
         setCurrentTime(currentTime);
@@ -173,6 +177,7 @@ export function usePlayer() {
       onDurationChange: (dur) => {
         const loadedTrack = loadedTrackRef.current;
         setDuration(loadedTrack ? getTrackDuration(loadedTrack.track, dur) : dur);
+        updateMediaSessionPositionRef.current();
       },
       onEnded: () => finishCurrentTrack(false),
       onError: (error) => {
@@ -232,8 +237,10 @@ export function usePlayer() {
       const seekSec = pendingSeekSec ?? getTrackStart(track);
       const trackDuration = getTrackDuration(track, engine.getDuration());
       engine.seek(seekSec);
-      setCurrentTime(toTrackRelativeTime(seekSec, track, trackDuration));
+      const relativeTime = toTrackRelativeTime(seekSec, track, trackDuration);
+      setCurrentTime(relativeTime);
       setDuration(trackDuration);
+      updateMediaSessionPositionRef.current(relativeTime);
 
       // 通常のトラック移動では既存の再生状態を保つ。play / playWithResume から
       // isPlaying=true で切り替えられた場合も、再ロードせず再生を開始できる。
@@ -342,6 +349,14 @@ export function usePlayer() {
     }
   }, [coreState.isPlaying]);
 
+  const resume = useCallback(() => {
+    engineRef.current?.play();
+  }, []);
+
+  const pause = useCallback(() => {
+    engineRef.current?.pause();
+  }, []);
+
   const stop = useCallback(() => {
     const engine = engineRef.current;
     saveCurrentResume();
@@ -363,7 +378,9 @@ export function usePlayer() {
     (time: number) => {
       const context = getCurrentPlaybackContext();
       if (!context) return;
-      context.engine.seek(toAudioAbsoluteTime(time, context.track, context.trackDuration));
+      const position = Math.max(0, Math.min(time, context.trackDuration));
+      context.engine.seek(toAudioAbsoluteTime(position, context.track, context.trackDuration));
+      updateMediaSessionPositionRef.current(position);
     },
     [getCurrentPlaybackContext],
   );
@@ -371,9 +388,9 @@ export function usePlayer() {
     (delta: number) => {
       const context = getCurrentPlaybackContext();
       if (!context) return;
-      context.engine.seek(
-        toAudioAbsoluteTime(context.currentTime + delta, context.track, context.trackDuration),
-      );
+      const position = Math.max(0, Math.min(context.currentTime + delta, context.trackDuration));
+      context.engine.seek(toAudioAbsoluteTime(position, context.track, context.trackDuration));
+      updateMediaSessionPositionRef.current(position);
     },
     [getCurrentPlaybackContext],
   );
@@ -486,6 +503,33 @@ export function usePlayer() {
   const clearABRepeat = useCallback(() => {
     setCoreState((prev) => ({ ...prev, abRepeat: { a: null, b: null } }));
   }, [setCoreState]);
+
+  const getMediaSessionPosition = useCallback(() => {
+    const context = getCurrentPlaybackContext();
+    if (!context) return null;
+    return {
+      duration: context.trackDuration,
+      position: context.currentTime,
+      playbackRate: coreStateRef.current.playbackRate,
+    };
+  }, [getCurrentPlaybackContext]);
+
+  const updateMediaSessionPosition = useMediaSession({
+    currentWork: coreState.currentWork,
+    currentTrack: coreState.tracks[coreState.currentTrackIndex] ?? null,
+    currentTrackIndex: coreState.currentTrackIndex,
+    trackCount: coreState.tracks.length,
+    isPlaying: coreState.isPlaying,
+    playbackRate: coreState.playbackRate,
+    getPosition: getMediaSessionPosition,
+    onPlay: resume,
+    onPause: pause,
+    onPreviousTrack: prevTrack,
+    onNextTrack: nextTrack,
+    onSeek: seek,
+    onSeekRelative: seekRelative,
+  });
+  updateMediaSessionPositionRef.current = updateMediaSessionPosition;
 
   return {
     state: coreState,
