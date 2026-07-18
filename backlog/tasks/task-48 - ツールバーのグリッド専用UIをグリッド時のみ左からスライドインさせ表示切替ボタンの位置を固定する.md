@@ -1,11 +1,11 @@
 ---
 id: TASK-48
 title: ツールバーのグリッド専用UIをグリッド時のみ左からスライドインさせ表示切替ボタンの位置を固定する
-status: In Progress
+status: Done
 assignee:
   - '@codex'
 created_date: '2026-07-18 20:22'
-updated_date: '2026-07-18 20:31'
+updated_date: '2026-07-18 20:52'
 labels: []
 dependencies: []
 ordinal: 46000
@@ -25,9 +25,9 @@ ordinal: 46000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 グリッド⇔リスト/カラムを切り替えても、表示形式トグル・並び替え・その他ボタンの画面上の位置が動かない
-- [ ] #2 グリッド選択時、グリッドレイアウトモードトグルとタイルサイズスライダーが表示形式トグルの左側にスライドインして出現し、非グリッド時は消える
-- [ ] #3 出現・退場にmotion規約に沿ったトランジションがあり、prefers-reduced-motionでは即時切替になる
+- [x] #1 グリッド⇔リスト/カラムを切り替えても、表示形式トグル・並び替え・その他ボタンの画面上の位置が動かない
+- [x] #2 グリッド選択時、グリッドレイアウトモードトグルとタイルサイズスライダーが表示形式トグルの左側にスライドインして出現し、非グリッド時は消える
+- [x] #3 出現・退場にmotion規約に沿ったトランジションがあり、prefers-reduced-motionでは即時切替になる
 - [x] #4 pnpm check と pnpm test が通る
 <!-- AC:END -->
 
@@ -35,4 +35,12 @@ ordinal: 46000
 
 <!-- SECTION:NOTES:BEGIN -->
 Codex(thread 019f76e9-80d4)が実装。グリッド専用UIを表示形式トグルの左隣へ移動し、.mle-grid-controls（grid-template-columns 0fr/1fr + opacity + translateX、180ms ease-out、prefers-reduced-motion対応）でスライドイン。非表示時は disabled + aria-hidden。pnpm check・test通過。AC1-3はブラウザ実機確認で検証予定。
+
+ブラウザ実機検証(agent-browser): 切替前後で主要ボタンのbounding box完全一致、スライドイン出現・aria-hidden/disabled・Tabフォーカス除外・スライダー動作を確認。
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+グリッド専用UI(レイアウトトグル+タイルサイズスライダー)を表示形式トグルの左隣へ移動し、.mle-grid-controls(grid-template-columns 0fr/1fr+opacity+translateX、prefers-reduced-motion対応)でスライドイン化。主要ボタンの位置は切替前後でピクセル一致することを実機確認。check/test通過。
+<!-- SECTION:FINAL_SUMMARY:END -->

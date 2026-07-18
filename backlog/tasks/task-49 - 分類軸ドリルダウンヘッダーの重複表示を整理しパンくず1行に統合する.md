@@ -1,11 +1,11 @@
 ---
 id: TASK-49
 title: 分類軸ドリルダウンヘッダーの重複表示を整理しパンくず1行に統合する
-status: In Progress
+status: Done
 assignee:
   - '@codex'
 created_date: '2026-07-18 20:22'
-updated_date: '2026-07-18 20:26'
+updated_date: '2026-07-18 20:52'
 labels: []
 dependencies: []
 ordinal: 47000
@@ -25,7 +25,7 @@ DrillHeaderは isFacetAxis の全軸（CV・サークル・シリーズ・カテ
 <!-- AC:BEGIN -->
 - [x] #1 分類軸ドリルダウン画面のヘッダーが1行（戻る導線+軸ラベル+値+件数）になり、「この○○の作品」の行が表示されない
 - [x] #2 件数の表示が1箇所のみになる
-- [ ] #3 リスト表示（ContentColumn）とグリッド表示（WorkGrid）の両方で崩れなく表示される
+- [x] #3 リスト表示（ContentColumn）とグリッド表示（WorkGrid）の両方で崩れなく表示される
 - [x] #4 未使用になったCSSクラスが削除されている
 - [x] #5 pnpm check と pnpm test が通る
 <!-- AC:END -->
@@ -34,4 +34,12 @@ DrillHeaderは isFacetAxis の全軸（CV・サークル・シリーズ・カテ
 
 <!-- SECTION:NOTES:BEGIN -->
 Codex(thread 019f76e6-9582)が実装。DrillHeader.tsxのサブ見出し行と shell.css の .mle-drill__sub / .count を削除。pnpm check・test(202件)通過。AC3(両表示の実機確認)はブラウザ検証で確認予定。
+
+ブラウザ実機検証: リスト/グリッド両表示でヘッダー1行・件数1箇所・パンくず遷移の回帰なしを確認。
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+DrillHeaderのサブ見出し行(「この○○の作品」+重複件数)を削除しパンくず1行に統合。未使用CSS(.mle-drill__sub系)も削除。全分類軸共通で解消。実機確認・check/test通過。
+<!-- SECTION:FINAL_SUMMARY:END -->

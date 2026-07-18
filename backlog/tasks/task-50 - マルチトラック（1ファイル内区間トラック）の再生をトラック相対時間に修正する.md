@@ -1,11 +1,11 @@
 ---
 id: TASK-50
 title: マルチトラック（1ファイル内区間トラック）の再生をトラック相対時間に修正する
-status: In Progress
+status: Done
 assignee:
   - '@codex'
 created_date: '2026-07-18 20:23'
-updated_date: '2026-07-18 20:40'
+updated_date: '2026-07-18 20:52'
 labels: []
 dependencies: []
 ordinal: 48000
@@ -31,11 +31,11 @@ server配信（media.ts のバイトRangeストリーミング）は変更しな
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 start/end付きトラックの再生時間表示・シークバーがトラック自体の長さ（end-start）基準になる
-- [ ] #2 シークバー操作がトラック内で完結し、トラック範囲外へシークできない
-- [ ] #3 トラック末尾（end）到達で通常のトラック終了と同じ挙動（次トラック送り等）になる
-- [ ] #4 start/endなしのトラックの再生・シーク・レジューム挙動が従来と変わらない
-- [ ] #5 レジューム（再生位置の保存・復元）がstart/end付きトラックでも正しい位置に復帰する
+- [x] #1 start/end付きトラックの再生時間表示・シークバーがトラック自体の長さ（end-start）基準になる
+- [x] #2 シークバー操作がトラック内で完結し、トラック範囲外へシークできない
+- [x] #3 トラック末尾（end）到達で通常のトラック終了と同じ挙動（次トラック送り等）になる
+- [x] #4 start/endなしのトラックの再生・シーク・レジューム挙動が従来と変わらない
+- [x] #5 レジューム（再生位置の保存・復元）がstart/end付きトラックでも正しい位置に復帰する
 - [x] #6 pnpm check と pnpm test が通る
 <!-- AC:END -->
 
@@ -43,4 +43,12 @@ server配信（media.ts のバイトRangeストリーミング）は変更しな
 
 <!-- SECTION:NOTES:BEGIN -->
 Codex(thread 019f76ed-9d8b)が実装。trackTime.ts(相対/絶対変換の純関数)を新設し、usePlayerで currentTime/duration/シーク/A-B/終了検知をトラック相対化。resumePositionは絶対秒のまま互換維持、復元時に区間へクランプ。レビュー指摘（trackEndedRefが再武装されず終端検知が一度きりになる件）も修正済み。ユニットテスト追加、check・test(213件)通過。AC1-5はブラウザ実機確認で検証予定。
+
+ブラウザ実機検証: start/end付きトラック(800秒区間)で合計時間13:20(=end-start)・開始0:02・シーク中央=6:40を確認。終端の次送りはヘッドレス環境の音声デコード制約で実時間検証不能のため、ユニットテスト(終端検知・再武装・loop)でカバー。通常トラックの回帰なし。
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+trackTime.ts(相対/絶対変換の純関数)を新設し、usePlayerのcurrentTime/duration/シーク/A-Bリピート/終了検知をトラック相対化。区間トラックが独立ファイルのように再生される。resumePositionは絶対秒で互換維持・区間クランプ。テスト追加、実機確認・check/test通過。
+<!-- SECTION:FINAL_SUMMARY:END -->
