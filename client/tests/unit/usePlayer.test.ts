@@ -4,6 +4,7 @@ import { Provider as JotaiProvider, createStore, useAtomValue } from "jotai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { formatTime, formatDuration, formatFileSize } from "../../src/shared/lib/format";
 import { usePlayer } from "../../src/features/player/model/usePlayer";
+import { saveResumePosition } from "../../src/features/player/api";
 import { playerCurrentTimeAtom, playerDurationAtom } from "../../src/features/player/model/atoms";
 import type { Track, Work, WorkSummary } from "../../src/entities/work/model";
 
@@ -248,6 +249,45 @@ describe("usePlayer audio engine lifecycle", () => {
     await waitFor(() => expect(result.current.player.state.currentTrackIndex).toBe(1));
   });
 
+  it("loop 有効時は区間トラックの先頭へ戻って再生を続ける", async () => {
+    const segment: Track = { ...track, start: 30, end: 90 };
+    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
+
+    act(() => result.current.player.play(work, [segment]));
+    await waitFor(() => expect(latestAudio().play).toHaveBeenCalledTimes(1));
+    act(() => result.current.player.setLoop(true));
+
+    act(() => {
+      latestAudio().duration = 120;
+      latestAudio().currentTime = 90;
+      latestAudio().dispatchEvent(new Event("timeupdate"));
+    });
+
+    expect(latestAudio().currentTime).toBe(30);
+    expect(latestAudio().play).toHaveBeenCalledTimes(2);
+    expect(result.current.player.state.currentTrackIndex).toBe(0);
+    expect(result.current.player.state.isPlaying).toBe(true);
+  });
+
+  it("loop 有効時は通常トラックの先頭へ戻って再生を続ける", async () => {
+    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
+
+    act(() => result.current.player.play(work, [track]));
+    await waitFor(() => expect(latestAudio().play).toHaveBeenCalledTimes(1));
+    act(() => result.current.player.setLoop(true));
+
+    act(() => {
+      latestAudio().duration = 120;
+      latestAudio().currentTime = 120;
+      latestAudio().dispatchEvent(new Event("ended"));
+    });
+
+    expect(latestAudio().currentTime).toBe(0);
+    expect(latestAudio().play).toHaveBeenCalledTimes(2);
+    expect(result.current.player.state.currentTrackIndex).toBe(0);
+    expect(result.current.player.state.isPlaying).toBe(true);
+  });
+
   it("最終区間の終端から戻って再生した場合も終了検知を再武装する", async () => {
     const segment: Track = { ...track, start: 30, end: 90 };
     const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
@@ -305,6 +345,114 @@ describe("usePlayer audio engine lifecycle", () => {
     });
     expect(latestAudio().currentTime).toBe(40);
     expect(result.current.currentTime).toBe(10);
+  });
+
+  it("nextTrack と prevTrack はトラックを移動して A-B リピートを解除する", async () => {
+    const tracks: Track[] = [
+      track,
+      { title: "Track 2", file: "audio/track-2.wav" },
+      { title: "Track 3", file: "audio/track-3.wav" },
+    ];
+    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
+
+    act(() => result.current.player.play(work, tracks, 1));
+    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
+    act(() => {
+      latestAudio().currentTime = 10;
+      result.current.player.setABPoint("a");
+    });
+
+    act(() => result.current.player.nextTrack());
+    expect(result.current.player.state.currentTrackIndex).toBe(2);
+    expect(result.current.player.state.abRepeat).toEqual({ a: null, b: null });
+
+    act(() => {
+      latestAudio().currentTime = 20;
+      result.current.player.setABPoint("a");
+      result.current.player.prevTrack();
+    });
+    expect(result.current.player.state.currentTrackIndex).toBe(1);
+    expect(result.current.player.state.abRepeat).toEqual({ a: null, b: null });
+  });
+
+  it("nextTrack と prevTrack は末尾と先頭を越えず A-B リピートも維持する", async () => {
+    const tracks: Track[] = [track, { title: "Track 2", file: "audio/track-2.wav" }];
+    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
+
+    act(() => result.current.player.play(work, tracks));
+    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
+    latestAudio().duration = 120;
+    act(() => {
+      latestAudio().currentTime = 10;
+      result.current.player.setABPoint("a");
+    });
+    act(() => result.current.player.prevTrack());
+    expect(result.current.player.state.currentTrackIndex).toBe(0);
+    expect(result.current.player.state.abRepeat).toEqual({ a: 10, b: null });
+
+    act(() => result.current.player.setTrackIndex(1));
+    act(() => {
+      latestAudio().currentTime = 20;
+      result.current.player.setABPoint("a");
+    });
+    act(() => result.current.player.nextTrack());
+    expect(result.current.player.state.currentTrackIndex).toBe(1);
+    expect(result.current.player.state.abRepeat).toEqual({ a: 20, b: null });
+  });
+
+  it("setTrackIndex は指定位置へ移動して A-B リピートを解除する", async () => {
+    const tracks: Track[] = [track, { title: "Track 2", file: "audio/track-2.wav" }];
+    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
+
+    act(() => result.current.player.play(work, tracks));
+    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
+    act(() => {
+      latestAudio().currentTime = 10;
+      result.current.player.setABPoint("a");
+    });
+    act(() => result.current.player.setTrackIndex(1));
+
+    expect(result.current.player.state.currentTrackIndex).toBe(1);
+    expect(result.current.player.state.abRepeat).toEqual({ a: null, b: null });
+  });
+
+  it("stop は絶対時刻の resumePosition を保存して再生 state を初期化する", async () => {
+    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
+
+    act(() => result.current.player.play(work, [track]));
+    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
+    latestAudio().currentTime = 42;
+    vi.mocked(saveResumePosition).mockClear();
+
+    act(() => result.current.player.stop());
+
+    expect(saveResumePosition).toHaveBeenCalledWith(work.id, 42, 0);
+    expect(result.current.player.state).toMatchObject({
+      isPlaying: false,
+      currentWork: null,
+      tracks: [],
+      currentTrackIndex: -1,
+    });
+  });
+
+  it("seekRelative は区間相対の現在位置から移動して区間内へクランプする", async () => {
+    const segment: Track = { ...track, start: 30, end: 90 };
+    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
+
+    act(() => result.current.player.play(work, [segment]));
+    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
+    latestAudio().duration = 120;
+
+    latestAudio().currentTime = 50;
+    act(() => result.current.player.seekRelative(10));
+    expect(latestAudio().currentTime).toBe(60);
+
+    act(() => result.current.player.seekRelative(-100));
+    expect(latestAudio().currentTime).toBe(30);
+
+    latestAudio().currentTime = 80;
+    act(() => result.current.player.seekRelative(100));
+    expect(latestAudio().currentTime).toBe(90);
   });
 
   it("既存形式の絶対 resumePosition を区間トラック内へ復元する", async () => {

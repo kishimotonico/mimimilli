@@ -73,6 +73,33 @@ export function usePlayer() {
   // Audio engine は effect の寿命に合わせて生成・破棄する。
   const engineRef = useRef<ReturnType<typeof createAudioEngine> | null>(null);
 
+  const getCurrentPlaybackContext = useCallback((absoluteCurrentTime?: number) => {
+    const engine = engineRef.current;
+    const loadedTrack = loadedTrackRef.current;
+    if (!engine || !loadedTrack) return null;
+
+    const trackDuration = getTrackDuration(loadedTrack.track, engine.getDuration());
+    const currentTime = toTrackRelativeTime(
+      absoluteCurrentTime ?? engine.getCurrentTime(),
+      loadedTrack.track,
+      trackDuration,
+    );
+    return { engine, track: loadedTrack.track, trackDuration, currentTime };
+  }, []);
+
+  const saveCurrentResume = useCallback(
+    (absolutePosition?: number, loadedTrack: LoadedTrack | null = loadedTrackRef.current) => {
+      if (!loadedTrack) return;
+
+      const position = absolutePosition ?? engineRef.current?.getCurrentTime();
+      if (position === undefined) return;
+
+      // resumePosition は既存データとの互換性を保つため、ファイル絶対秒で保存する。
+      saveResumePosition(loadedTrack.workId, position, loadedTrack.trackIndex).catch(() => {});
+    },
+    [],
+  );
+
   useEffect(() => {
     const finishCurrentTrack = (virtualEnd: boolean) => {
       if (trackEndedRef.current) return;
@@ -90,13 +117,12 @@ export function usePlayer() {
       // 区間トラックではファイル自体の再生が続くため、境界到達時に明示的に止める。
       if (virtualEnd) engineRef.current?.pause();
 
-      // resumePosition は既存データとの互換性を保つため、ファイル絶対秒で保存する。
       if (loadedTrack) {
         const absoluteEnd =
           loadedTrack.track.end ??
           engineRef.current?.getDuration() ??
           getTrackStart(loadedTrack.track);
-        saveResumePosition(loadedTrack.workId, absoluteEnd, loadedTrack.trackIndex).catch(() => {});
+        saveCurrentResume(absoluteEnd, loadedTrack);
       }
 
       setCoreState((prev) => {
@@ -111,11 +137,10 @@ export function usePlayer() {
       onPlay: () => setCoreState((s) => ({ ...s, isPlaying: true, playbackError: null })),
       onPause: () => setCoreState((s) => ({ ...s, isPlaying: false })),
       onTimeUpdate: (time) => {
-        const loadedTrack = loadedTrackRef.current;
-        if (!loadedTrack) return;
-        const duration = getTrackDuration(loadedTrack.track, engineRef.current?.getDuration() ?? 0);
-        const relativeTime = toTrackRelativeTime(time, loadedTrack.track, duration);
-        const reachedTrackEnd = hasReachedTrackEnd(time, loadedTrack.track);
+        const context = getCurrentPlaybackContext(time);
+        if (!context) return;
+        const { engine, track, trackDuration, currentTime } = context;
+        const reachedTrackEnd = hasReachedTrackEnd(time, track);
 
         // 終端より手前へ戻ったら、同じトラックでも次の終端到達を検知できるよう再武装する。
         if (!reachedTrackEnd) {
@@ -124,12 +149,12 @@ export function usePlayer() {
 
         // A-B リピート（ref 経由で最新値を参照）
         const ab = abRepeatRef.current;
-        if (ab.a !== null && ab.b !== null && ab.a < ab.b && relativeTime >= ab.b) {
-          engineRef.current?.seek(toAudioAbsoluteTime(ab.a, loadedTrack.track, duration));
+        if (ab.a !== null && ab.b !== null && ab.a < ab.b && currentTime >= ab.b) {
+          engine.seek(toAudioAbsoluteTime(ab.a, track, trackDuration));
           setCurrentTime(ab.a);
           return;
         }
-        setCurrentTime(relativeTime);
+        setCurrentTime(currentTime);
 
         if (reachedTrackEnd) {
           finishCurrentTrack(true);
@@ -152,7 +177,7 @@ export function usePlayer() {
       }
       engine.destroy();
     };
-  }, [setCoreState, setCurrentTime, setDuration]);
+  }, [getCurrentPlaybackContext, saveCurrentResume, setCoreState, setCurrentTime, setDuration]);
 
   // ── トラック変更時に読み込み・再生 ────────────────────────
   useEffect(() => {
@@ -169,8 +194,7 @@ export function usePlayer() {
     // 前トラックの位置を保存
     const prev = loadedTrackRef.current;
     if (prev && (prev.workId !== workId || prev.trackIndex !== currentTrackIndex)) {
-      const time = engine.getCurrentTime();
-      saveResumePosition(prev.workId, time, prev.trackIndex).catch(() => {});
+      saveCurrentResume(undefined, prev);
     }
 
     // pending resume の確認
@@ -216,11 +240,11 @@ export function usePlayer() {
     const tid = setInterval(() => {
       const loaded = loadedTrackRef.current;
       if (loaded && loaded.workId === workId) {
-        saveResumePosition(workId, engine.getCurrentTime(), loaded.trackIndex).catch(() => {});
+        saveCurrentResume();
       }
     }, 5000);
     return () => clearInterval(tid);
-  }, [coreState.isPlaying, coreState.currentWork, coreState.currentTrackIndex]);
+  }, [coreState.isPlaying, coreState.currentWork, coreState.currentTrackIndex, saveCurrentResume]);
 
   // ── 一時停止時に resume 保存 ──────────────────────────────
   useEffect(() => {
@@ -230,15 +254,14 @@ export function usePlayer() {
 
     const loaded = loadedTrackRef.current;
     if (loaded) {
-      saveResumePosition(loaded.workId, engine.getCurrentTime(), loaded.trackIndex).catch(() => {});
+      saveCurrentResume();
     }
-  }, [coreState.isPlaying, coreState.currentWork, coreState.currentTrackIndex]);
+  }, [coreState.isPlaying, coreState.currentWork, coreState.currentTrackIndex, saveCurrentResume]);
 
   // ── アクション ────────────────────────────────────────────
 
-  const play = useCallback(
-    (work: WorkSummary | Work, tracks: Track[], trackIndex: number = 0) => {
-      pendingResumeRef.current = null;
+  const startPlayback = useCallback(
+    (work: WorkSummary | Work, tracks: Track[], trackIndex: number) => {
       setCoreState((prev) => ({
         ...prev,
         currentWork: work,
@@ -250,6 +273,14 @@ export function usePlayer() {
       }));
     },
     [setCoreState],
+  );
+
+  const play = useCallback(
+    (work: WorkSummary | Work, tracks: Track[], trackIndex: number = 0) => {
+      pendingResumeRef.current = null;
+      startPlayback(work, tracks, trackIndex);
+    },
+    [startPlayback],
   );
 
   const playWithResume = useCallback(
@@ -266,17 +297,9 @@ export function usePlayer() {
         pendingResumeRef.current = { workId: work.id, trackIndex, position: work.resumePosition };
       }
 
-      setCoreState((prev) => ({
-        ...prev,
-        currentWork: work,
-        tracks,
-        currentTrackIndex: trackIndex,
-        isPlaying: true,
-        playbackError: null,
-        abRepeat: { a: null, b: null },
-      }));
+      startPlayback(work, tracks, trackIndex);
     },
-    [setCoreState],
+    [startPlayback],
   );
 
   const togglePlay = useCallback(() => {
@@ -289,10 +312,7 @@ export function usePlayer() {
 
   const stop = useCallback(() => {
     const engine = engineRef.current;
-    const loaded = loadedTrackRef.current;
-    if (loaded && engine) {
-      saveResumePosition(loaded.workId, engine.getCurrentTime(), loaded.trackIndex).catch(() => {});
-    }
+    saveCurrentResume();
     engine?.pause();
     engine?.seek(0);
     loadedTrackRef.current = null;
@@ -305,23 +325,26 @@ export function usePlayer() {
       tracks: [],
       playbackError: null,
     }));
-  }, [setCoreState]);
+  }, [saveCurrentResume, setCoreState]);
 
-  const seek = useCallback((time: number) => {
-    const engine = engineRef.current;
-    const loadedTrack = loadedTrackRef.current;
-    if (!engine || !loadedTrack) return;
-    const duration = getTrackDuration(loadedTrack.track, engine.getDuration());
-    engine.seek(toAudioAbsoluteTime(time, loadedTrack.track, duration));
-  }, []);
-  const seekRelative = useCallback((delta: number) => {
-    const engine = engineRef.current;
-    const loadedTrack = loadedTrackRef.current;
-    if (!engine || !loadedTrack) return;
-    const duration = getTrackDuration(loadedTrack.track, engine.getDuration());
-    const current = toTrackRelativeTime(engine.getCurrentTime(), loadedTrack.track, duration);
-    engine.seek(toAudioAbsoluteTime(current + delta, loadedTrack.track, duration));
-  }, []);
+  const seek = useCallback(
+    (time: number) => {
+      const context = getCurrentPlaybackContext();
+      if (!context) return;
+      context.engine.seek(toAudioAbsoluteTime(time, context.track, context.trackDuration));
+    },
+    [getCurrentPlaybackContext],
+  );
+  const seekRelative = useCallback(
+    (delta: number) => {
+      const context = getCurrentPlaybackContext();
+      if (!context) return;
+      context.engine.seek(
+        toAudioAbsoluteTime(context.currentTime + delta, context.track, context.trackDuration),
+      );
+    },
+    [getCurrentPlaybackContext],
+  );
 
   const setVolume = useCallback(
     (vol: number) => {
@@ -415,16 +438,7 @@ export function usePlayer() {
 
   const setABPoint = useCallback(
     (point: "a" | "b") => {
-      const engine = engineRef.current;
-      const loadedTrack = loadedTrackRef.current;
-      const time =
-        engine && loadedTrack
-          ? toTrackRelativeTime(
-              engine.getCurrentTime(),
-              loadedTrack.track,
-              getTrackDuration(loadedTrack.track, engine.getDuration()),
-            )
-          : 0;
+      const time = getCurrentPlaybackContext()?.currentTime ?? 0;
       setCoreState((prev) => {
         const next = { ...prev.abRepeat, [point]: time };
         // B→A の順で設定して区間が逆転した場合は入れ替えて成立させる
@@ -434,7 +448,7 @@ export function usePlayer() {
         return { ...prev, abRepeat: next };
       });
     },
-    [setCoreState],
+    [getCurrentPlaybackContext, setCoreState],
   );
 
   const clearABRepeat = useCallback(() => {

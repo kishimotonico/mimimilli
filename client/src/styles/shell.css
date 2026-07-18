@@ -1774,25 +1774,6 @@
       text-overflow: clip;
     }
   }
-  .mll-smart__add {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    align-self: flex-start;
-    height: 24px;
-    padding: 0 10px;
-    border-radius: 4px;
-    border: 1px dashed var(--line-strong);
-    color: var(--ink-2);
-    font-family: var(--font-sans);
-    font-size: 11px;
-    font-weight: 500;
-  }
-  .mll-smart__add:hover {
-    background: var(--paper-2);
-    color: var(--ink-0);
-    border-color: var(--ink-2);
-  }
   .mll-smart__ft {
     display: flex;
     align-items: center;
