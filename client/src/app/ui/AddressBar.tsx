@@ -45,6 +45,7 @@ export default function AddressBar({
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
   const currentSortLabel = SORT_OPTIONS.find((opt) => opt.id === sort)?.label;
+  const gridControlsVisible = viewMode === "grid";
 
   useEffect(() => {
     if (!sortMenuOpen) return;
@@ -91,6 +92,54 @@ export default function AddressBar({
         ))}
       </div>
 
+      {gridLayoutMode !== undefined &&
+        onGridLayoutModeChange &&
+        tileSize !== undefined &&
+        onTileSizeChange && (
+          <div
+            className={`mle-grid-controls ${gridControlsVisible ? "is-visible" : ""}`}
+            aria-hidden={!gridControlsVisible}
+          >
+            <div className="mle-grid-controls__inner">
+              <div className="inline-flex items-center gap-[1px] rounded-2 bg-paper-2 p-[2px]">
+                <IconButton
+                  size="sm"
+                  icon={I.gridUniform}
+                  label="1:1タイル"
+                  active={gridLayoutMode === "square"}
+                  onClick={() => onGridLayoutModeChange("square")}
+                  disabled={!gridControlsVisible}
+                />
+                <IconButton
+                  size="sm"
+                  icon={I.gridJustified}
+                  label="原寸（ジャスティファイド）"
+                  active={gridLayoutMode === "justified"}
+                  onClick={() => onGridLayoutModeChange("justified")}
+                  disabled={!gridControlsVisible}
+                />
+              </div>
+
+              <label className="mll-grid-size">
+                <span>{gridLayoutMode === "justified" ? "行高さ" : "タイル"}</span>
+                <input
+                  type="range"
+                  min={MIN_TILE_SIZE}
+                  max={MAX_TILE_SIZE}
+                  step={1}
+                  value={tileSize}
+                  disabled={!gridControlsVisible}
+                  aria-label={
+                    gridLayoutMode === "justified" ? "グリッドの行高さ" : "グリッドのタイルサイズ"
+                  }
+                  onChange={(event) => onTileSizeChange(Number(event.currentTarget.value))}
+                />
+                <output>{tileSize}px</output>
+              </label>
+            </div>
+          </div>
+        )}
+
       <div className="inline-flex items-center gap-[1px] rounded-2 bg-paper-2 p-[2px]">
         <IconButton
           size="sm"
@@ -117,43 +166,6 @@ export default function AddressBar({
           disabled={!availableViewModes.includes("grid")}
         />
       </div>
-
-      {viewMode === "grid" && gridLayoutMode !== undefined && onGridLayoutModeChange && (
-        <div className="inline-flex items-center gap-[1px] rounded-2 bg-paper-2 p-[2px]">
-          <IconButton
-            size="sm"
-            icon={I.gridUniform}
-            label="1:1タイル"
-            active={gridLayoutMode === "square"}
-            onClick={() => onGridLayoutModeChange("square")}
-          />
-          <IconButton
-            size="sm"
-            icon={I.gridJustified}
-            label="原寸（ジャスティファイド）"
-            active={gridLayoutMode === "justified"}
-            onClick={() => onGridLayoutModeChange("justified")}
-          />
-        </div>
-      )}
-
-      {viewMode === "grid" && tileSize !== undefined && onTileSizeChange && (
-        <label className="mll-grid-size">
-          <span>{gridLayoutMode === "justified" ? "行高さ" : "タイル"}</span>
-          <input
-            type="range"
-            min={MIN_TILE_SIZE}
-            max={MAX_TILE_SIZE}
-            step={1}
-            value={tileSize}
-            aria-label={
-              gridLayoutMode === "justified" ? "グリッドの行高さ" : "グリッドのタイルサイズ"
-            }
-            onChange={(event) => onTileSizeChange(Number(event.currentTarget.value))}
-          />
-          <output>{tileSize}px</output>
-        </label>
-      )}
 
       {showSort && (
         <div className="mle-sortmenu" ref={sortRef}>
