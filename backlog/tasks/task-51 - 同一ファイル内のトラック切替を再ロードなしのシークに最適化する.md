@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@codex'
 created_date: '2026-07-18 21:02'
-updated_date: '2026-07-18 21:08'
+updated_date: '2026-07-18 21:29'
 labels: []
 dependencies: []
 modified_files:
@@ -49,6 +49,8 @@ ordinal: 49000
 調査結果: engine.load が返す cleanup は pending seek 用の loadedmetadata/canplay リスナーだけを解除し、Audio 要素や src は破棄しない。Audio 要素全体の破棄は engine.destroy の寿命で行われる。同一URLでも load は audio.src を再設定するため、再ロードとバッファ・再生位置のリセットが発生する。
 実装判断: ロード済みコンテキストに解決済み assetUrl を保持し、トラック番号が変わり、かつ workId と assetUrl が一致するときだけ seek 経路へ分岐した。pending resume を開始位置より優先し、resume保存、atom、trackEndedRef、A-B解除の既存経路を維持した。仮想終端から同一アセットへ進む場合は pause しない。
 検証: pnpm check 成功。pnpm test 成功（server 20件、client 226件）。
+
+ブラウザ実機検証: 即時切替・時間表示・音声再リクエストなし・別作品切替の回帰なしを確認。一時停止維持は全画面プレイヤー(setTrackIndex経由)で合格。プレビュー側トラック行クリックで再生が始まるのはplay()経由の意図された仕様(TASK-7)であり退行ではない。
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
