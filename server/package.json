@@ -9,7 +9,7 @@
   },
   "scripts": {
     "dev": "node --watch src/index.ts",
-    "dev:real": "node --watch src/index.ts",
+    "dev:real": "cross-env PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run node --watch src/index.ts",
     "start": "node src/index.ts",
     "check": "tsc --noEmit",
     "test": "node --test \"tests/**/*.test.ts\"",
@@ -30,5 +30,6 @@
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^25.9.1",
     "typescript": "~5.8.3"
-  }
+  },
+  "portless": "api.mimi"
 }

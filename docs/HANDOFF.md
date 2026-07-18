@@ -1,7 +1,7 @@
 # 引き継ぎドキュメント
 
 mimimilli の現状と進行中の作業を、後続のエージェント／セッションが把握するための資料。
-最終更新: 2026-07-10。
+最終更新: 2026-07-18。
 
 ## このアプリは何か
 
@@ -14,7 +14,8 @@ DLsite/FANZA 等からダウンロードした音声作品（ASMR・ボイスド
 構造・境界・データフローは [docs/ARCHITECTURE.md](ARCHITECTURE.md) を参照。
 
 - fixture アダプタはシナリオ切替（`MIMIMILLI_MOCK_SCENARIO` = default/empty/new-work/errors）と**合成メディア**（無音WAV・SVGカバー、Range対応）を持つ
-- dev は vite middleware: `client/vite.config.ts` が `BACKEND_URL` 未指定時、server の Hono アプリ（fixture注入）を dev middleware としてマウントし、`pnpm dev` 一発で UI もモックAPIも動く
+- 通常のdevは vite middleware: `client/vite.config.ts` が server の Hono アプリ（fixture注入）を dev middleware としてマウントし、`pnpm dev` 一発で UI もモックAPIも動く
+- real devは serverを `api.mimi`、clientを `mimi` という別々のportlessサービスとして起動する。clientは `portless get api.mimi` で同じworktreeのAPIを参照する
 
 ### dev サーバーへの server/src 自動反映
 
@@ -46,8 +47,8 @@ pnpm dev:fixture:errors
 
 # real アダプタ（実SQLite + 実FS）
 pnpm dev:real          # API サーバー + client を並行起動
-pnpm dev:real:server   # API サーバーのみ => http://localhost:8080（DB は MIMIMILLI_DB、既定 ./data/mimimilli.db）
-pnpm dev:real:client   # client のみ。BACKEND_URL=http://localhost:8080 へ向けて起動
+pnpm dev:real:server   # API サーバーのみ => http://api.mimi.localhost:1355（DB は MIMIMILLI_DB、既定 ./data/mimimilli.db）
+pnpm dev:real:client   # client のみ。同じworktreeのapi.mimiへ向けて起動
 pnpm smoke:real        # 固定のサンプル音声で real 経路を手動スモーク
 
 # fixture サーバーを単体起動して curl 確認（合成メディアの検証等）

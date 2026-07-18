@@ -4,11 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "cross-env PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run --name mimi vite",
-    "dev:new-work": "cross-env MIMIMILLI_MOCK_SCENARIO=new-work PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run --name mimi vite",
-    "dev:empty": "cross-env MIMIMILLI_MOCK_SCENARIO=empty PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run --name mimi vite",
-    "dev:errors": "cross-env MIMIMILLI_MOCK_SCENARIO=errors PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run --name mimi vite",
-    "dev:real": "cross-env BACKEND_URL=http://localhost:8080 PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run --name mimi vite",
+    "dev": "cross-env PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run vite",
+    "dev:new-work": "cross-env MIMIMILLI_MOCK_SCENARIO=new-work PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run vite",
+    "dev:empty": "cross-env MIMIMILLI_MOCK_SCENARIO=empty PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run vite",
+    "dev:errors": "cross-env MIMIMILLI_MOCK_SCENARIO=errors PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run vite",
+    "dev:real": "cross-env MIMIMILLI_BACKEND_SERVICE=api.mimi PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run vite",
     "check": "tsc",
     "build": "tsc && vite build",
     "preview": "vite preview",
@@ -41,10 +41,10 @@
     "@vitejs/plugin-react": "^4.6.0",
     "cross-env": "^10.1.0",
     "jsdom": "^28.1.0",
-    "portless": "^0.10.1",
     "tailwindcss": "^4.3.0",
     "typescript": "~5.8.3",
     "vite": "^7.0.4",
     "vitest": "^4.0.18"
-  }
+  },
+  "portless": "mimi"
 }

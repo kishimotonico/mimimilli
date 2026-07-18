@@ -73,7 +73,7 @@ pnpm dev:fixture:errors
 ```bash
 # API サーバー（real アダプタ）とフロントを起動
 pnpm dev:real
-# => http://localhost:8080
+# => http://api.mimi.localhost:1355
 # => http://mimi.localhost:1355
 # SQLite パスは MIMIMILLI_DB で変更可（デフォルト ./data/mimimilli.db）
 ```
@@ -83,17 +83,17 @@ pnpm dev:real
 ```bash
 # ターミナル 1: API サーバーを起動（real アダプタ）
 pnpm dev:real:server
-# => http://localhost:8080
+# => http://api.mimi.localhost:1355
 
 # ターミナル 2: フロントを API サーバーへ向けて起動
 pnpm dev:real:client
-# => http://mimi.localhost:1355（BACKEND_URL=http://localhost:8080 を内包）
+# => http://mimi.localhost:1355
 ```
 
 `pnpm dev:real` はサーバーと client を並行起動するため、サーバーの起動完了前に client が一時的に API 接続に失敗することがある。
 その場合はブラウザをリロードすればよい。
-`dev:real:client` の接続先はサーバーのデフォルトポート `8080` を前提にしている。
-`PORT` を変える場合は client 側の `BACKEND_URL` も合わせる。
+real サーバーと client は portless から動的ポートを割り当てられる。
+client は `portless get api.mimi` で同じ worktree の API URLを解決するため、複数の worktree でも接続先が混ざらない。
 
 real アダプタを使う場合、初回起動後に UI からルートフォルダーを設定する。
 `better-sqlite3` などのネイティブモジュールは WSL と Windows で同じ `node_modules` を共有できないため、両方の環境で扱うなら環境ごとに別クローンを使うか `pnpm install` をやり直す。

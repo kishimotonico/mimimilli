@@ -1,5 +1,6 @@
 /// <reference types="vitest" />
 import { defineConfig, type Plugin } from "vitest/config";
+import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
@@ -11,15 +12,36 @@ import type { ViteDevServer } from "vite";
 // Vite 設定
 // ---------------------------------------------------------------------------
 
-// BACKEND_URL が設定されていれば本物のサーバーにプロキシ、なければ
-// server の Hono アプリ（fixture アダプタ）を dev middleware としてマウントする
-// 例: BACKEND_URL=http://localhost:8080 pnpm dev
-const backendUrl = process.env.BACKEND_URL;
+// MIMIMILLI_BACKEND_SERVICE が設定されていれば同じ worktree の portless サービスへ
+// プロキシし、なければ server の Hono アプリ（fixture アダプタ）を
+// dev middleware としてマウントする。
+const backendService = process.env.MIMIMILLI_BACKEND_SERVICE;
 const serverSrcDir = fileURLToPath(new URL("../server/src", import.meta.url));
 const sharedSrcDir = fileURLToPath(new URL("../shared/src", import.meta.url));
 const fixtureApiWatchDirs = [serverSrcDir, sharedSrcDir];
 
 type FixtureApiListener = ReturnType<typeof getRequestListener>;
+
+function resolveBackendProxy(service: string) {
+  // Windows の portless は node_modules/.bin のバッチシム（.CMD）なので shell 経由が必須。
+  // 引数は静的な文字列のみのため shell 経由でもエスケープの懸念はない。
+  const publicUrl = new URL(
+    execFileSync("portless", ["get", service], {
+      encoding: "utf8",
+      shell: process.platform === "win32",
+    }).trim(),
+  );
+  if (publicUrl.protocol !== "http:") {
+    throw new Error(
+      `real バックエンドの portless URL は http である必要があります: ${publicUrl.href}`,
+    );
+  }
+
+  return {
+    target: `http://127.0.0.1${publicUrl.port ? `:${publicUrl.port}` : ""}`,
+    headers: { host: publicUrl.hostname },
+  };
+}
 
 function toViteFsUrl(filePath: string): string {
   return `/@fs/${filePath.split(path.sep).join("/")}`;
@@ -103,7 +125,7 @@ function fixtureApiPlugin(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [tailwindcss(), react(), !backendUrl && fixtureApiPlugin()].filter(Boolean),
+  plugins: [tailwindcss(), react(), !backendService && fixtureApiPlugin()].filter(Boolean),
 
   test: {
     environment: "jsdom",
@@ -113,7 +135,7 @@ export default defineConfig({
   },
 
   server: {
-    proxy: backendUrl ? { "/api": { target: backendUrl, changeOrigin: true } } : undefined,
+    proxy: backendService ? { "/api": resolveBackendProxy(backendService) } : undefined,
   },
 
   ssr: {

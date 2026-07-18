@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "backlog": "backlog",
+    "backlog:browser": "cross-env PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run -- backlog browser --port 6420 --no-open",
     "dev": "pnpm dev:fixture",
     "dev:fixture": "pnpm --filter @mimimilli/client dev",
     "dev:fixture:new-work": "pnpm --filter @mimimilli/client dev:new-work",
@@ -25,10 +26,16 @@
   },
   "devDependencies": {
     "backlog.md": "1.47.1",
+    "cross-env": "^10.1.0",
     "oxfmt": "^0.57.0",
-    "oxlint": "^1.72.0"
+    "oxlint": "^1.72.0",
+    "portless": "^0.15.4"
   },
   "engines": {
     "node": ">=24"
+  },
+  "portless": {
+    "name": "backlog",
+    "appPort": 6420
   }
 }
