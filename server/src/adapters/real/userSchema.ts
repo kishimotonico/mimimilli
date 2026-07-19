@@ -12,9 +12,16 @@ export const workStates = sqliteTable("work_states", {
   addedAt: text("added_at").notNull(),
   bookmarked: integer("bookmarked", { mode: "boolean" }).notNull().default(false),
   lastPlayedAt: text("last_played_at"),
-  // Playlist/Track ID移行までは既存APIのresume v1を保持する。
-  resumePosition: real("resume_position").notNull().default(0),
-  resumeTrackIndex: integer("resume_track_index").notNull().default(0),
+  resumePlaylistId: text("resume_playlist_id"),
+  resumeTrackId: text("resume_track_id"),
+  resumeOffsetSec: real("resume_offset_sec"),
+});
+
+/** v1からv2への変換時だけ使う一時データ。変換後は行を残さない。 */
+export const resumeV1Pending = sqliteTable("resume_v1_pending", {
+  workId: text("work_id").primaryKey(),
+  position: real("position").notNull(),
+  trackIndex: integer("track_index").notNull(),
 });
 
 /** タグ prefix 定義。id は表示順（登録順）の安定化用で、APIのキーは prefix。 */

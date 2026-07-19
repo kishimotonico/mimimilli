@@ -9,8 +9,8 @@ interface WorkTrackListProps {
   playingTrackIndex: number | null;
   isPlaybackActive?: boolean;
   hasResume: boolean;
-  resumeTrackIndex: number;
-  resumePosition: number;
+  resumeTrackId: string | null;
+  resumeOffsetSec: number;
   onPlay: (trackIndex: number) => void;
 }
 
@@ -20,8 +20,8 @@ export function WorkTrackList({
   playingTrackIndex,
   isPlaybackActive,
   hasResume,
-  resumeTrackIndex,
-  resumePosition,
+  resumeTrackId,
+  resumeOffsetSec,
   onPlay,
 }: WorkTrackListProps) {
   if (tracks.length === 0) return null;
@@ -38,11 +38,11 @@ export function WorkTrackList({
           return (
             <button
               type="button"
-              key={i}
+              key={tr.id}
               className={cn(
                 "group mle-prv__trk",
                 isNowPlaying && "is-now",
-                hasResume && resumeTrackIndex === i && "is-resume",
+                hasResume && resumeTrackId === tr.id && "is-resume",
                 !isPlayable && "is-disabled",
               )}
               disabled={!isPlayable}
@@ -56,8 +56,8 @@ export function WorkTrackList({
               <span className="num">{String(i + 1).padStart(2, "0")}</span>
               <span className="name">
                 <span className="title">{tr.title}</span>
-                {hasResume && resumeTrackIndex === i && (
-                  <span className="resume">再開 {formatTime(resumePosition)}</span>
+                {hasResume && resumeTrackId === tr.id && (
+                  <span className="resume">再開 {formatTime(resumeOffsetSec)}</span>
                 )}
               </span>
               {tr.end != null && tr.start != null && (

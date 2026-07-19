@@ -1,4 +1,5 @@
 // works / tags / smart_folders / search_presets / app_settings の CRUD、検索、行⇄ドメイン変換。
+import { join } from "node:path";
 import { asc, eq, inArray, notInArray } from "drizzle-orm";
 import {
   dlsiteStateSchema,
@@ -16,6 +17,7 @@ import type {
   AxisFacetItem,
   DlsiteState,
   Playlist,
+  ResumeBody,
   SearchPreset,
   SearchPresetCreate,
   SmartFolder,
@@ -24,6 +26,7 @@ import type {
   TagPrefix,
   TagPrefixCreate,
   TagPrefixUpdate,
+  Track,
   Work,
   WorkSummary,
   UrlEntry,
@@ -32,8 +35,10 @@ import type {
 } from "@mimimilli/shared";
 import { z } from "zod";
 import { japaneseSortKey } from "../../core/japaneseSortKey.ts";
+import { InvalidResumeError } from "../../adapter.ts";
 import type { Db } from "./db.ts";
 import {
+  audioProbeCache,
   playlists as catalogPlaylists,
   scanState,
   tags,
@@ -45,8 +50,11 @@ import {
 import { appSettings, searchPresets, smartFolders, tagPrefixes, workStates } from "./userSchema.ts";
 
 type CatalogWorkRow = typeof works.$inferSelect;
-type WorkRow = CatalogWorkRow & typeof workStates.$inferSelect;
-type RawWorkRow = Omit<WorkRow, "bookmarked"> & { bookmarked: number };
+type WorkRow = CatalogWorkRow & typeof workStates.$inferSelect & { resumeResolved: boolean };
+type RawWorkRow = Omit<WorkRow, "bookmarked" | "resumeResolved"> & {
+  bookmarked: number;
+  resumeResolved: number;
+};
 type RawSummaryRow = RawWorkRow & { dlsiteStateJson: string | null };
 
 const RECENT_VIEW_WINDOW_DAYS = 30;
@@ -135,7 +143,19 @@ function rowToSummary(row: WorkRow, tagNames: string[], dlsite: DlsiteState): Wo
   );
 }
 
-function rowToWork(row: WorkRow, tagNames: string[], dlsite: DlsiteState): Work {
+function rowToWork(
+  row: WorkRow,
+  tagNames: string[],
+  dlsite: DlsiteState,
+  cachedFileDurationSec: (track: Track) => number | null,
+): Work {
+  const playlists = parseRecord(
+    z.array(playlistSchema),
+    parseJsonField(row.playlistsJson, "works", row.id, "playlists_json"),
+    "works",
+    row.id,
+  );
+  const resume = resolveResume(row, playlists, cachedFileDurationSec);
   return parseRecord(
     workSchema,
     {
@@ -151,16 +171,40 @@ function rowToWork(row: WorkRow, tagNames: string[], dlsite: DlsiteState): Work 
       tags: tagNames,
       defaultPlaylistId: row.defaultPlaylistId,
       createdAt: row.createdAt,
-      playlists: parseJsonField(row.playlistsJson, "works", row.id, "playlists_json"),
+      playlists,
       bookmarked: row.bookmarked,
       lastPlayedAt: row.lastPlayedAt,
-      resumePosition: row.resumePosition,
-      resumeTrackIndex: row.resumeTrackIndex,
+      resume,
       dlsite,
     },
     "works",
     row.id,
   );
+}
+
+/** catalogでIDと区間を解決できない行は、user DBに残したままAPIでは無効にする。 */
+function resolveResume(
+  row: WorkRow,
+  playlists: Playlist[],
+  cachedFileDurationSec: (track: Track) => number | null,
+): Work["resume"] {
+  const { resumePlaylistId: playlistId, resumeTrackId: trackId, resumeOffsetSec: offsetSec } = row;
+  if (!row.resumeResolved || playlistId === null || trackId === null || offsetSec === null) {
+    return null;
+  }
+  const playlist = playlists.find((candidate) => candidate.id === playlistId);
+  const track = playlist?.tracks.find((candidate) => candidate.id === trackId);
+  if (!track || offsetSec < 0) return null;
+  if (track.end !== undefined) {
+    if (offsetSec > track.end - (track.start ?? 0)) return null;
+  } else {
+    const fileDurationSec = cachedFileDurationSec(track);
+    // プローブ未取得または取得失敗（0秒）の場合は上限が分からないため検証をスキップする。
+    if (fileDurationSec !== null && fileDurationSec > 0) {
+      if (offsetSec > fileDurationSec - (track.start ?? 0)) return null;
+    }
+  }
+  return { playlistId, trackId, offsetSec };
 }
 
 function randomSeed(): number {
@@ -208,6 +252,16 @@ export class WorkRepo {
 
   constructor(db: Db) {
     this.db = db;
+  }
+
+  private cachedFileDurationSec(physicalPath: string, track: Track): number | null {
+    return (
+      this.db.catalog
+        .select({ durationSec: audioProbeCache.durationSec })
+        .from(audioProbeCache)
+        .where(eq(audioProbeCache.path, join(physicalPath, track.file)))
+        .get()?.durationSec ?? null
+    );
   }
 
   // ── タグ ──────────────────────────────────────────────────
@@ -322,8 +376,20 @@ export class WorkRepo {
         work_states.added_at AS addedAt,
         work_states.bookmarked,
         work_states.last_played_at AS lastPlayedAt,
-        work_states.resume_position AS resumePosition,
-        work_states.resume_track_index AS resumeTrackIndex
+        work_states.resume_playlist_id AS resumePlaylistId,
+        work_states.resume_track_id AS resumeTrackId,
+        work_states.resume_offset_sec AS resumeOffsetSec,
+        CASE WHEN EXISTS (
+          SELECT 1 FROM main.playlists AS resume_playlists
+          INNER JOIN main.tracks AS resume_tracks
+            ON resume_tracks.playlist_id = resume_playlists.id
+          WHERE resume_playlists.work_id = works.id
+            AND resume_playlists.id = work_states.resume_playlist_id
+            AND resume_tracks.work_id = works.id
+            AND resume_tracks.id = work_states.resume_track_id
+            AND work_states.resume_offset_sec >= 0
+            AND (resume_tracks.end IS NULL OR work_states.resume_offset_sec <= resume_tracks.end - COALESCE(resume_tracks.start, 0))
+        ) THEN 1 ELSE 0 END AS resumeResolved
       FROM main.works
       INNER JOIN user.work_states ON work_states.work_id = works.id
       ${whereSql}
@@ -335,6 +401,7 @@ export class WorkRepo {
     return (rows as RawWorkRow[]).map((row) => ({
       ...row,
       bookmarked: row.bookmarked !== 0,
+      resumeResolved: row.resumeResolved !== 0,
     }));
   }
 
@@ -462,8 +529,10 @@ export class WorkRepo {
           work_states.added_at AS addedAt,
           work_states.bookmarked,
           work_states.last_played_at AS lastPlayedAt,
-          work_states.resume_position AS resumePosition,
-          work_states.resume_track_index AS resumeTrackIndex,
+          work_states.resume_playlist_id AS resumePlaylistId,
+          work_states.resume_track_id AS resumeTrackId,
+          work_states.resume_offset_sec AS resumeOffsetSec,
+          0 AS resumeResolved,
           work_dlsite.state_json AS dlsiteStateJson
         ${fromSql}
         LEFT JOIN main.work_dlsite AS work_dlsite ON work_dlsite.work_id = works.id
@@ -475,7 +544,11 @@ export class WorkRepo {
       const workIds = rows.map((row) => row.id);
       const tagsByWork = this.tagMap(workIds);
       const items = rows.map((rawRow) => {
-        const row: WorkRow = { ...rawRow, bookmarked: rawRow.bookmarked !== 0 };
+        const row: WorkRow = {
+          ...rawRow,
+          bookmarked: rawRow.bookmarked !== 0,
+          resumeResolved: rawRow.resumeResolved !== 0,
+        };
         const dlsite = rawRow.dlsiteStateJson
           ? parseRecord(
               dlsiteStateSchema,
@@ -528,13 +601,20 @@ export class WorkRepo {
   getWork(id: string): Work | null {
     const row = this.joinedWorks("WHERE works.id = ?", id)[0];
     if (!row) return null;
-    return rowToWork(row, this.tagMap([id]).get(id) ?? [], this.dlsiteState(id));
+    return rowToWork(row, this.tagMap([id]).get(id) ?? [], this.dlsiteState(id), (track) =>
+      this.cachedFileDurationSec(row.physicalPath, track),
+    );
   }
 
   getWorkByPhysicalPath(physicalPath: string): Work | null {
     const row = this.joinedWorks("WHERE works.physical_path = ?", physicalPath)[0];
     if (!row) return null;
-    return rowToWork(row, this.tagMap([row.id]).get(row.id) ?? [], this.dlsiteState(row.id));
+    return rowToWork(
+      row,
+      this.tagMap([row.id]).get(row.id) ?? [],
+      this.dlsiteState(row.id),
+      (track) => this.cachedFileDurationSec(row.physicalPath, track),
+    );
   }
 
   /** scan からの登録。タグも置き換える */
@@ -547,8 +627,9 @@ export class WorkRepo {
         addedAt: work.addedAt,
         bookmarked: work.bookmarked,
         lastPlayedAt: work.lastPlayedAt,
-        resumePosition: work.resumePosition,
-        resumeTrackIndex: work.resumeTrackIndex,
+        resumePlaylistId: work.resume?.playlistId ?? null,
+        resumeTrackId: work.resume?.trackId ?? null,
+        resumeOffsetSec: work.resume?.offsetSec ?? null,
       })
       .onConflictDoNothing()
       .run();
@@ -645,13 +726,48 @@ export class WorkRepo {
     return this.getWork(id);
   }
 
-  saveResume(id: string, position: number, trackIndex: number): boolean {
+  saveResume(id: string, body: ResumeBody): boolean {
     if (!this.db.catalog.select({ id: works.id }).from(works).where(eq(works.id, id)).get()) {
       return false;
     }
+    const track = this.db.sqlite
+      .query(`
+        SELECT tracks.start, tracks.end, tracks.file, works.physical_path AS physicalPath
+        FROM main.playlists
+        INNER JOIN main.tracks ON tracks.playlist_id = playlists.id
+        INNER JOIN main.works ON works.id = playlists.work_id
+        WHERE playlists.work_id = ? AND playlists.id = ?
+          AND tracks.work_id = ? AND tracks.id = ?
+      `)
+      .get(id, body.playlistId, id, body.trackId) as {
+      start: number | null;
+      end: number | null;
+      file: string;
+      physicalPath: string;
+    } | null;
+    if (!track) {
+      throw new InvalidResumeError("resumeのPlaylistまたはTrackが作品に属していません");
+    }
+    let duration = track.end === null ? null : track.end - (track.start ?? 0);
+    if (duration === null) {
+      const cached = this.db.catalog
+        .select({ durationSec: audioProbeCache.durationSec })
+        .from(audioProbeCache)
+        .where(eq(audioProbeCache.path, join(track.physicalPath, track.file)))
+        .get()?.durationSec;
+      // プローブ未取得または取得失敗（0秒）の場合は上限が分からないため検証をスキップする。
+      if (cached !== undefined && cached > 0) duration = cached - (track.start ?? 0);
+    }
+    if (body.offsetSec < 0 || (duration !== null && body.offsetSec > duration)) {
+      throw new InvalidResumeError("resumeのoffsetSecがトラック区間外です");
+    }
     const r = this.db.user
       .update(workStates)
-      .set({ resumePosition: position, resumeTrackIndex: trackIndex })
+      .set({
+        resumePlaylistId: body.playlistId,
+        resumeTrackId: body.trackId,
+        resumeOffsetSec: body.offsetSec,
+      })
       .where(eq(workStates.workId, id))
       .returning({ id: workStates.workId })
       .get();

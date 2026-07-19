@@ -95,6 +95,7 @@ const track: Track = {
   title: "Track 1",
   file: "audio/track-1.wav",
 };
+const playlistId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 
 const work: WorkSummary = {
   id: "work-1",
@@ -295,7 +296,7 @@ describe("usePlayer audio engine lifecycle", () => {
   it("loop 有効時は通常トラックの先頭へ戻って再生を続ける", async () => {
     const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
 
-    act(() => result.current.player.play(work, [track]));
+    act(() => result.current.player.play(work, [track], 0, playlistId));
     await waitFor(() => expect(latestAudio().play).toHaveBeenCalledTimes(1));
     act(() => result.current.player.setLoop(true));
 
@@ -314,7 +315,7 @@ describe("usePlayer audio engine lifecycle", () => {
   it("最終トラック聴了時はレジューム位置を作品の先頭へ戻す", async () => {
     const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
 
-    act(() => result.current.player.play(work, [track]));
+    act(() => result.current.player.play(work, [track], 0, playlistId));
     await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
     vi.mocked(saveResumePosition).mockClear();
 
@@ -326,17 +327,21 @@ describe("usePlayer audio engine lifecycle", () => {
 
     expect(result.current.player.state.isPlaying).toBe(false);
     expect(saveResumePosition).toHaveBeenCalledTimes(1);
-    expect(saveResumePosition).toHaveBeenCalledWith(work.id, 0, 0);
+    expect(saveResumePosition).toHaveBeenCalledWith(work.id, {
+      playlistId,
+      trackId: track.id,
+      offsetSec: 0,
+    });
   });
 
-  it("途中トラックの終端では従来どおり終端位置とトラック番号を保存する", async () => {
+  it("途中トラックの終端ではトラックIDと区間相対の終端位置を保存する", async () => {
     const tracks: Track[] = [
       { ...track, start: 0, end: 30 },
       { title: "Track 2", file: "audio/track-2.wav" },
     ];
     const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
 
-    act(() => result.current.player.play(work, tracks));
+    act(() => result.current.player.play(work, tracks, 0, playlistId));
     await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
     vi.mocked(saveResumePosition).mockClear();
 
@@ -347,15 +352,18 @@ describe("usePlayer audio engine lifecycle", () => {
     });
     await waitFor(() => expect(result.current.player.state.currentTrackIndex).toBe(1));
 
-    expect(saveResumePosition).toHaveBeenCalledWith(work.id, 30, 0);
-    expect(saveResumePosition).not.toHaveBeenCalledWith(work.id, 0, 0);
+    expect(saveResumePosition).toHaveBeenCalledWith(work.id, {
+      playlistId,
+      trackId: track.id,
+      offsetSec: 30,
+    });
   });
 
   it("聴了後の一時停止処理は終端位置でレジュームを上書きしない", async () => {
     const segment: Track = { ...track, start: 30, end: 90 };
     const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
 
-    act(() => result.current.player.play(work, [segment]));
+    act(() => result.current.player.play(work, [segment], 0, playlistId));
     await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
     vi.mocked(saveResumePosition).mockClear();
 
@@ -368,8 +376,11 @@ describe("usePlayer audio engine lifecycle", () => {
 
     expect(result.current.player.state.isPlaying).toBe(false);
     expect(saveResumePosition).toHaveBeenCalledTimes(1);
-    expect(saveResumePosition).toHaveBeenLastCalledWith(work.id, 0, 0);
-    expect(saveResumePosition).not.toHaveBeenCalledWith(work.id, 90, 0);
+    expect(saveResumePosition).toHaveBeenLastCalledWith(work.id, {
+      playlistId,
+      trackId: track.id,
+      offsetSec: 0,
+    });
   });
 
   it("最終区間の終端で再生を再開すると区間先頭へ戻して終了検知を再武装する", async () => {
@@ -404,17 +415,16 @@ describe("usePlayer audio engine lifecycle", () => {
   it("最終トラック聴了時はwork detailキャッシュのレジューム位置も先頭へ戻す", async () => {
     const resumableWork: Work = {
       ...work,
-      defaultPlaylistId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      defaultPlaylistId: playlistId,
       createdAt: null,
       playlists: [
         {
-          id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          id: playlistId,
           name: "default",
           tracks: [track],
         },
       ],
-      resumePosition: 42,
-      resumeTrackIndex: 0,
+      resume: { playlistId, trackId: track.id, offsetSec: 42 },
     };
     const queryClient = new QueryClient();
     queryClient.setQueryData(WORK_QUERY_KEYS.detail(work.id), resumableWork);
@@ -422,7 +432,7 @@ describe("usePlayer audio engine lifecycle", () => {
       wrapper: makeWrapper({ queryClient }),
     });
 
-    act(() => result.current.player.play(work, [track]));
+    act(() => result.current.player.play(work, [track], 0, playlistId));
     await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
 
     act(() => {
@@ -432,8 +442,7 @@ describe("usePlayer audio engine lifecycle", () => {
     });
 
     expect(queryClient.getQueryData<Work>(WORK_QUERY_KEYS.detail(work.id))).toMatchObject({
-      resumePosition: 0,
-      resumeTrackIndex: 0,
+      resume: { playlistId, trackId: track.id, offsetSec: 0 },
     });
   });
 
@@ -495,7 +504,7 @@ describe("usePlayer audio engine lifecycle", () => {
     const tracks: Track[] = [track, { title: "Track 2", file: "audio/track-2.wav" }];
     const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
 
-    act(() => result.current.player.play(work, tracks));
+    act(() => result.current.player.play(work, tracks, 0, playlistId));
     await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
     latestAudio().duration = 120;
     act(() => {
@@ -545,7 +554,7 @@ describe("usePlayer audio engine lifecycle", () => {
     ];
     const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
 
-    act(() => result.current.player.play(work, tracks));
+    act(() => result.current.player.play(work, tracks, 0, playlistId));
     await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
     latestAudio().duration = 60;
     vi.mocked(saveResumePosition).mockClear();
@@ -557,13 +566,23 @@ describe("usePlayer audio engine lifecycle", () => {
     expect(result.current.currentTime).toBe(0);
     expect(result.current.duration).toBe(30);
     expect(result.current.player.state.isPlaying).toBe(true);
-    expect(saveResumePosition).toHaveBeenCalledWith(work.id, 0, 0);
+    expect(saveResumePosition).toHaveBeenCalledWith(work.id, {
+      playlistId,
+      trackId: track.id,
+      offsetSec: 0,
+    });
   });
 
   it("一時停止中の同一ファイル切替では位置だけを変える", async () => {
     const tracks: Track[] = [
       { ...track, start: 0, end: 30 },
-      { title: "Track 2", file: track.file, start: 30, end: 60 },
+      {
+        id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        title: "Track 2",
+        file: track.file,
+        start: 30,
+        end: 60,
+      },
     ];
     const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
 
@@ -608,21 +627,26 @@ describe("usePlayer audio engine lifecycle", () => {
   it("同一ファイル切替でも pending resume の位置を優先する", async () => {
     const tracks: Track[] = [
       { ...track, start: 0, end: 30 },
-      { title: "Track 2", file: track.file, start: 30, end: 60 },
+      {
+        id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        title: "Track 2",
+        file: track.file,
+        start: 30,
+        end: 60,
+      },
     ];
     const resumableWork: Work = {
       ...work,
-      defaultPlaylistId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      defaultPlaylistId: playlistId,
       createdAt: null,
       playlists: [
         {
-          id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          id: playlistId,
           name: "default",
           tracks,
         },
       ],
-      resumePosition: 45,
-      resumeTrackIndex: 1,
+      resume: { playlistId, trackId: tracks[1]!.id, offsetSec: 15 },
     };
     const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
 
@@ -636,6 +660,29 @@ describe("usePlayer audio engine lifecycle", () => {
     expect(latestAudio().srcAssignments).toHaveLength(1);
     expect(result.current.currentTime).toBe(15);
     expect(result.current.duration).toBe(30);
+  });
+
+  it("resumeのIDを解決できない場合はdefault Playlistの先頭から再生する", async () => {
+    const resumableWork: Work = {
+      ...work,
+      defaultPlaylistId: playlistId,
+      createdAt: null,
+      playlists: [{ id: playlistId, name: "default", tracks: [track] }],
+      resume: {
+        playlistId,
+        trackId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        offsetSec: 45,
+      },
+    };
+    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
+
+    act(() => result.current.player.playWithResume(resumableWork));
+    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
+
+    expect(result.current.player.state.currentTrackIndex).toBe(0);
+    expect(result.current.player.state.currentPlaylistId).toBe(playlistId);
+    expect(latestAudio().srcAssignments[0]).toContain(track.file);
+    expect(latestAudio().currentTime).toBe(0);
   });
 
   it("異なるファイルのトラック切替では従来どおり再ロードする", async () => {
@@ -667,17 +714,21 @@ describe("usePlayer audio engine lifecycle", () => {
     expect(latestAudio().srcAssignments[1]).toContain("/work-2/");
   });
 
-  it("stop は絶対時刻の resumePosition を保存して再生 state を初期化する", async () => {
+  it("stop はトラック相対のoffsetSecを保存して再生stateを初期化する", async () => {
     const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
 
-    act(() => result.current.player.play(work, [track]));
+    act(() => result.current.player.play(work, [track], 0, playlistId));
     await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
     latestAudio().currentTime = 42;
     vi.mocked(saveResumePosition).mockClear();
 
     act(() => result.current.player.stop());
 
-    expect(saveResumePosition).toHaveBeenCalledWith(work.id, 42, 0);
+    expect(saveResumePosition).toHaveBeenCalledWith(work.id, {
+      playlistId,
+      trackId: track.id,
+      offsetSec: 42,
+    });
     expect(result.current.player.state).toMatchObject({
       isPlaying: false,
       currentWork: null,
@@ -706,21 +757,20 @@ describe("usePlayer audio engine lifecycle", () => {
     expect(latestAudio().currentTime).toBe(90);
   });
 
-  it("既存形式の絶対 resumePosition を区間トラック内へ復元する", async () => {
+  it("v2の区間相対offsetSecを区間トラック内へ復元する", async () => {
     const segment: Track = { ...track, start: 30, end: 90 };
     const resumableWork: Work = {
       ...work,
-      defaultPlaylistId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      defaultPlaylistId: playlistId,
       createdAt: null,
       playlists: [
         {
-          id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          id: playlistId,
           name: "default",
           tracks: [segment],
         },
       ],
-      resumePosition: 45,
-      resumeTrackIndex: 0,
+      resume: { playlistId, trackId: segment.id, offsetSec: 15 },
     };
     const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
 
@@ -754,6 +804,7 @@ describe("useResumePersistenceController", () => {
 
     const loadedTrack = {
       workId: work.id,
+      playlistId,
       trackIndex: 0,
       track,
       assetUrl: "/audio/work-1/track-1.wav",
@@ -767,15 +818,27 @@ describe("useResumePersistenceController", () => {
 
     act(() => {
       result.current.saveCurrentResume(75);
-      result.current.enqueueResumeSave(work.id, 0, 0);
+      result.current.enqueueResumeSave(work.id, {
+        playlistId,
+        trackId: track.id,
+        offsetSec: 0,
+      });
     });
 
     expect(saveResumePosition).toHaveBeenCalledTimes(1);
-    expect(saveResumePosition).toHaveBeenNthCalledWith(1, work.id, 75, 0);
+    expect(saveResumePosition).toHaveBeenNthCalledWith(1, work.id, {
+      playlistId,
+      trackId: track.id,
+      offsetSec: 75,
+    });
 
     act(() => rejectFirstSave?.(new Error("保存失敗")));
 
     await waitFor(() => expect(saveResumePosition).toHaveBeenCalledTimes(2));
-    expect(saveResumePosition).toHaveBeenNthCalledWith(2, work.id, 0, 0);
+    expect(saveResumePosition).toHaveBeenNthCalledWith(2, work.id, {
+      playlistId,
+      trackId: track.id,
+      offsetSec: 0,
+    });
   });
 });

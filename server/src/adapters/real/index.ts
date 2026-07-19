@@ -43,7 +43,7 @@ import {
 import { isDefaultTitle } from "../../core/dlsiteTitle.ts";
 import { buildTagPrefixCandidates } from "../../core/tagPrefixCandidates.ts";
 import { evalSmartFolder } from "../../core/smartFolder.ts";
-import { openDb, type Db, type DbLocation } from "./db.ts";
+import { migrateResumeV1, openDb, type Db, type DbLocation } from "./db.ts";
 import { detectRjCode, downloadCover, fetchDlsiteInfo, mergeDlsiteTags } from "./dlsite.ts";
 import { browseFs } from "./fsBrowse.ts";
 import { buildFileTree } from "./fileTree.ts";
@@ -134,6 +134,9 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
     async scan(onProgress?: (event: ScanProgressEvent) => void): Promise<ScanResult> {
       const root = requireRoot();
       const result = await scanner.scan(root, onProgress);
+      // v1 resumeはcatalogのPlaylist/Track関係が揃ってから変換する。
+      // 未解決行はpendingに残るため、次回スキャン後にも同じ処理で再試行される。
+      migrateResumeV1(db.sqlite);
       repo.setScanState(KEY_LAST_SCAN_TIME, new Date().toISOString());
 
       // 全作品を走査した直後の自然なタイミングでサムネイルキャッシュをGCする（TASK-26）
@@ -184,7 +187,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
     },
 
     async saveResume(id: string, body: ResumeBody): Promise<boolean> {
-      return repo.saveResume(id, body.position, body.trackIndex);
+      return repo.saveResume(id, body);
     },
 
     async touchLastPlayed(id: string): Promise<boolean> {

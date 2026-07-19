@@ -37,6 +37,14 @@ export const playlistSchema = z.object({
 });
 export type Playlist = z.infer<typeof playlistSchema>;
 
+/** 作品の再開位置。offsetSec はトラック区間先頭からの相対秒。 */
+export const resumeSchema = z.object({
+  playlistId: uuidV4Schema,
+  trackId: uuidV4Schema,
+  offsetSec: z.number().nonnegative(),
+});
+export type Resume = z.infer<typeof resumeSchema>;
+
 export const workStatusSchema = z.enum(["ok", "missing", "error"]);
 export type WorkStatus = z.infer<typeof workStatusSchema>;
 
@@ -102,8 +110,7 @@ export const workSchema = workSummarySchema
     defaultPlaylistId: uuidV4Schema.nullable(),
     createdAt: z.string().nullable(),
     playlists: z.array(playlistSchema),
-    resumePosition: z.number().nonnegative(),
-    resumeTrackIndex: z.number().int().nonnegative(),
+    resume: resumeSchema.nullable(),
   })
   .superRefine((work, ctx) =>
     refinePlaylistCollection(work.playlists, work.defaultPlaylistId, ctx),

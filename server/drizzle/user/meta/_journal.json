@@ -15,6 +15,13 @@
       "when": 1784445943241,
       "tag": "0001_majestic_sugar_man",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1784450081455,
+      "tag": "0002_daffy_ares",
+      "breakpoints": true
     }
   ]
 }

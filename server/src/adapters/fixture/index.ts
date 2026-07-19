@@ -33,6 +33,7 @@ import type {
   WorkSummary,
 } from "@mimimilli/shared";
 import type { DataAdapter, MediaKind, MediaLocation } from "../../adapter.ts";
+import { InvalidResumeError } from "../../adapter.ts";
 import { buildAxisFacets } from "../../core/axisFacets.ts";
 import { buildTagPrefixCandidates } from "../../core/tagPrefixCandidates.ts";
 import { evalSmartFolder } from "../../core/smartFolder.ts";
@@ -58,6 +59,7 @@ interface FixtureState {
   nextSmartFolderId: number;
   /** 作品ごとのレジューム位置 */
   resumes: Map<string, ResumeBody>;
+  playbackIds: Map<string, { playlistId: string; trackIds: string[] }>;
   /** scan() が newWorkIds として返す、未取り込みの新規作品ID（シナリオ "new-work" 用） */
   scanNewWorkIds: string[];
 }
@@ -85,15 +87,28 @@ function createInitialState(options: FixtureAdapterOptions): FixtureState {
     nextPresetId: maxPresetId + 1,
     nextSmartFolderId: maxSmartFolderNum + 1,
     resumes: new Map(),
+    playbackIds: new Map(),
     scanNewWorkIds: scenario.scanNewWorkIds,
   };
 }
 
 /** WorkSummary から完全形 Work を構築する（trackCount からトラック一覧を生成） */
-function buildFullWork(summary: WorkSummary, resumes: Map<string, ResumeBody>): Work {
+function buildFullWork(
+  summary: WorkSummary,
+  resumes: Map<string, ResumeBody>,
+  playbackIds: Map<string, { playlistId: string; trackIds: string[] }>,
+): Work {
   const namedTracks = SEED_TRACK_NAMES[summary.id];
+  let ids = playbackIds.get(summary.id);
+  if (!ids) {
+    ids = {
+      playlistId: crypto.randomUUID(),
+      trackIds: Array.from({ length: summary.trackCount }, () => crypto.randomUUID()),
+    };
+    playbackIds.set(summary.id, ids);
+  }
   const tracks: Track[] = Array.from({ length: summary.trackCount }, (_, i) => ({
-    id: crypto.randomUUID(),
+    id: ids.trackIds[i]!,
     title: namedTracks?.[i] ?? `Track ${i + 1}`,
     file: `track${String(i + 1).padStart(2, "0")}.mp3`,
   }));
@@ -101,14 +116,13 @@ function buildFullWork(summary: WorkSummary, resumes: Map<string, ResumeBody>): 
   const { trackCount: _trackCount, ...rest } = summary;
   const resume = resumes.get(summary.id);
 
-  const playlistId = tracks.length > 0 ? crypto.randomUUID() : null;
+  const playlistId = tracks.length > 0 ? ids.playlistId : null;
   return {
     ...rest,
     defaultPlaylistId: playlistId,
     createdAt: summary.addedAt,
     playlists: playlistId ? [{ id: playlistId, name: "default", tracks }] : [],
-    resumePosition: resume?.position ?? 0,
-    resumeTrackIndex: resume?.trackIndex ?? 0,
+    resume: resume ?? null,
   };
 }
 
@@ -240,7 +254,7 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
 
     async getWork(id: string): Promise<Work | null> {
       const work = state.works.find((w) => w.id === id);
-      return work ? buildFullWork(work, state.resumes) : null;
+      return work ? buildFullWork(work, state.resumes, state.playbackIds) : null;
     },
 
     async patchWork(id: string, patch: WorkPatch): Promise<Work | null> {
@@ -249,12 +263,22 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
       if (patch.title !== undefined) work.title = patch.title;
       if (patch.tags !== undefined) work.tags = normalizeTags(patch.tags);
       if (patch.bookmarked !== undefined) work.bookmarked = patch.bookmarked;
-      return buildFullWork(work, state.resumes);
+      return buildFullWork(work, state.resumes, state.playbackIds);
     },
 
     async saveResume(id: string, body: ResumeBody): Promise<boolean> {
       const work = state.works.find((w) => w.id === id);
       if (!work) return false;
+      const fullWork = buildFullWork(work, state.resumes, state.playbackIds);
+      const playlist = fullWork.playlists.find((candidate) => candidate.id === body.playlistId);
+      const track = playlist?.tracks.find((candidate) => candidate.id === body.trackId);
+      if (!track) {
+        throw new InvalidResumeError("resumeのPlaylistまたはTrackが作品に属していません");
+      }
+      const duration = track.end === undefined ? null : track.end - (track.start ?? 0);
+      if (duration !== null && body.offsetSec > duration) {
+        throw new InvalidResumeError("resumeのoffsetSecがトラック区間外です");
+      }
       state.resumes.set(id, body);
       return true;
     },
@@ -498,7 +522,7 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
         work.dlsite.status = patch.skipped ? "skipped" : "none";
         work.dlsite.error = null;
       }
-      return buildFullWork(work, state.resumes);
+      return buildFullWork(work, state.resumes, state.playbackIds);
     },
 
     async runDlsiteBulk(

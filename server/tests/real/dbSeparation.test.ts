@@ -19,8 +19,16 @@ test("catalog削除後の再スキャンでもuser状態を保持し、ATTACH JO
   const before = await adapter.getWork(library.existingWorkId);
   assert.ok(before);
   const addedAt = before.addedAt;
+  const playlist = before.playlists[0]!;
+  const resumedTrack = playlist.tracks[1]!;
   assert.ok(await adapter.patchWork(library.existingWorkId, { bookmarked: true }));
-  assert.ok(await adapter.saveResume(library.existingWorkId, { position: 12.5, trackIndex: 1 }));
+  assert.ok(
+    await adapter.saveResume(library.existingWorkId, {
+      playlistId: playlist.id,
+      trackId: resumedTrack.id,
+      offsetSec: 12.5,
+    }),
+  );
   assert.ok(await adapter.touchLastPlayed(library.existingWorkId));
   assert.ok(
     await adapter.createTagPrefix({
@@ -92,8 +100,11 @@ test("catalog削除後の再スキャンでもuser状態を保持し、ATTACH JO
   assert.ok(after);
   assert.equal(after.addedAt, addedAt);
   assert.equal(after.bookmarked, true);
-  assert.equal(after.resumePosition, 12.5);
-  assert.equal(after.resumeTrackIndex, 1);
+  assert.deepEqual(after.resume, {
+    playlistId: playlist.id,
+    trackId: resumedTrack.id,
+    offsetSec: 12.5,
+  });
   assert.ok(after.lastPlayedAt);
   assert.ok((await rebuilt.listTagPrefixes()).some((prefix) => prefix.prefix === "気分"));
   assert.equal((await rebuilt.listPresets())[0]?.name, "保持プリセット");

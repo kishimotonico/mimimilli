@@ -37,8 +37,7 @@ function sampleWork(id: string): Work {
     ],
     bookmarked: false,
     lastPlayedAt: null,
-    resumePosition: 0,
-    resumeTrackIndex: 0,
+    resume: null,
     dlsite: {
       rjCode: null,
       status: "none",
@@ -83,7 +82,7 @@ test("works.playlists_json が不正なら作品IDとフィールド名を含む
 
   assertPersistentDataError(
     () => repo.getWork(work.id),
-    /works レコード "work-bad-playlists".*playlists\.0\.tracks:/,
+    /works レコード "work-bad-playlists".*0\.tracks:/,
   );
 });
 

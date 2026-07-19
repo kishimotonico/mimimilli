@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef } from "react";
+import type { ResumeBody } from "@mimimilli/shared";
 import type { Track } from "../../../entities/work/model";
 import { saveResumePosition } from "../api";
-import { getTrackStart } from "./trackTime";
+import { getTrackStart, toTrackRelativeTime } from "./trackTime";
 import type { LoadedTrack, MutableRef, PendingResume, PlayerRuntimeRefs } from "./playerRuntime";
 import type { PlayerCoreState } from "./atoms";
 
@@ -13,8 +14,8 @@ export function useResumePersistenceController({ refs }: UseResumePersistenceOpt
   const pendingResumeRef = useRef<PendingResume | null>(null);
   const savePromiseRef = useRef<Promise<void> | null>(null);
 
-  const enqueueResumeSave = useCallback((workId: string, position: number, trackIndex: number) => {
-    const save = () => saveResumePosition(workId, position, trackIndex).catch(() => {});
+  const enqueueResumeSave = useCallback((workId: string, resume: ResumeBody) => {
+    const save = () => saveResumePosition(workId, resume).catch(() => {});
     const currentSave = savePromiseRef.current;
     const nextSave = currentSave ? currentSave.then(save, save) : save();
 
@@ -33,24 +34,38 @@ export function useResumePersistenceController({ refs }: UseResumePersistenceOpt
       const position = absolutePosition ?? refs.engine.current?.getCurrentTime();
       if (position === undefined) return;
 
-      // resumePosition は既存データとの互換性を保つため、ファイル絶対秒で保存する。
-      enqueueResumeSave(loadedTrack.workId, position, loadedTrack.trackIndex);
+      if (loadedTrack.playlistId === null) return;
+      const trackDuration =
+        loadedTrack.track.end === undefined
+          ? Number.POSITIVE_INFINITY
+          : loadedTrack.track.end - getTrackStart(loadedTrack.track);
+      const offsetSec = toTrackRelativeTime(position, loadedTrack.track, trackDuration);
+      enqueueResumeSave(loadedTrack.workId, {
+        playlistId: loadedTrack.playlistId,
+        trackId: loadedTrack.track.id,
+        offsetSec,
+      });
     },
     [enqueueResumeSave, refs.engine, refs.loadedTrack],
   );
 
-  const consumePendingResume = useCallback((workId: string, trackIndex: number, track: Track) => {
-    const pending = pendingResumeRef.current;
-    if (pending?.workId !== workId || pending.trackIndex !== trackIndex || pending.position <= 0) {
-      return undefined;
-    }
+  const consumePendingResume = useCallback(
+    (workId: string, playlistId: string | null, track: Track) => {
+      const pending = pendingResumeRef.current;
+      if (
+        pending?.workId !== workId ||
+        pending.playlistId !== playlistId ||
+        pending.trackId !== track.id ||
+        pending.offsetSec <= 0
+      ) {
+        return undefined;
+      }
 
-    pendingResumeRef.current = null;
-    return Math.max(
-      getTrackStart(track),
-      track.end === undefined ? pending.position : Math.min(track.end, pending.position),
-    );
-  }, []);
+      pendingResumeRef.current = null;
+      return getTrackStart(track) + pending.offsetSec;
+    },
+    [],
+  );
 
   return {
     pendingResumeRef: pendingResumeRef as MutableRef<PendingResume | null>,

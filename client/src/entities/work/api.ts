@@ -18,6 +18,7 @@ import {
   type DlsiteWorkInfo,
   type DlsiteApplyBody,
   type DlsiteStatePatch,
+  type ResumeBody,
 } from "@mimimilli/shared";
 
 /** GET /works/:id は存在しない場合404を返す契約。呼び出し側はnull分岐でなくエラー（TanStack QueryのisError等）で扱う */
@@ -72,15 +73,8 @@ export async function updateLastPlayed(workId: string): Promise<void> {
   await postVoid(`/works/${encodeURIComponent(workId)}/last-played`);
 }
 
-export async function saveResumePosition(
-  workId: string,
-  position: number,
-  trackIndex: number,
-): Promise<void> {
-  await postVoid(`/works/${encodeURIComponent(workId)}/resume`, {
-    position,
-    trackIndex,
-  });
+export async function saveResumePosition(workId: string, resume: ResumeBody): Promise<void> {
+  await postVoid(`/works/${encodeURIComponent(workId)}/resume`, resume);
 }
 
 /** GET /works/:id/files も存在しない場合404を返す契約なので、getWork同様にnull分岐は伝播させない（現状未使用） */

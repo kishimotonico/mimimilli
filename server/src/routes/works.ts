@@ -2,7 +2,7 @@
 //          GET /tags, POST /export
 import { Hono } from "hono";
 import { resumeBodySchema, workPatchSchema, worksQuerySchema } from "@mimimilli/shared";
-import type { DataAdapter } from "../adapter.ts";
+import { InvalidResumeError, type DataAdapter } from "../adapter.ts";
 import { invalidRequest, notFound } from "../lib/httpError.ts";
 
 export function worksRoute(adapter: DataAdapter): Hono {
@@ -43,7 +43,10 @@ export function worksRoute(adapter: DataAdapter): Hono {
     if (!parsed.success) {
       invalidRequest("resume の内容が不正です");
     }
-    const ok = await adapter.saveResume(c.req.param("id"), parsed.data);
+    const ok = await adapter.saveResume(c.req.param("id"), parsed.data).catch((error) => {
+      if (error instanceof InvalidResumeError) invalidRequest(error.message);
+      throw error;
+    });
     if (!ok) notFound(`作品が見つかりません: ${c.req.param("id")}`);
     return c.body(null, 204);
   });

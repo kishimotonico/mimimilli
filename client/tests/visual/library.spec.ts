@@ -62,8 +62,13 @@ test("work detail panel - missing file", async ({ page }) => {
 test("work detail panel - resume playback", async ({ page }) => {
   await openApp(page);
 
+  const work = (await (await page.request.get("/api/works/RJ501001")).json()) as {
+    defaultPlaylistId: string;
+    playlists: Array<{ id: string; tracks: Array<{ id: string }> }>;
+  };
+  const playlist = work.playlists.find((candidate) => candidate.id === work.defaultPlaylistId)!;
   const resumeResponse = await page.request.post("/api/works/RJ501001/resume", {
-    data: { position: 201, trackIndex: 2 },
+    data: { playlistId: playlist.id, trackId: playlist.tracks[2]!.id, offsetSec: 201 },
   });
   expect(resumeResponse.ok()).toBe(true);
 

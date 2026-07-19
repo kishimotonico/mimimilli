@@ -36,6 +36,9 @@ import type {
 /** 前提条件（ルートフォルダー未設定等）を満たしていない操作。HTTP では 409 conflict */
 export class NotConfiguredError extends Error {}
 
+/** Workは存在するが、resumeのPlaylist/Track所属またはoffsetが不正。 */
+export class InvalidResumeError extends Error {}
+
 /** メディア実体の所在。ルートがストリーミング（Range 対応）を担当する。
  *  - "file": 実ファイル参照（real アダプタ）。ルートが node:fs でストリーミングする
  *  - "synthetic": メモリ上で合成するコンテンツ（fixture アダプタ）。

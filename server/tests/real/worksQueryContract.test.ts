@@ -78,8 +78,7 @@ function fullWork(item: WorkSummary): Work {
             },
           ]
         : [],
-    resumePosition: 0,
-    resumeTrackIndex: 0,
+    resume: null,
   };
 }
 
@@ -109,8 +108,8 @@ test("core参照実装とreal SQLは固定例・生成クエリで同値", () =>
     db.sqlite
       .query(`
         INSERT INTO user.work_states
-          (work_id, added_at, bookmarked, last_played_at, resume_position, resume_track_index)
-        VALUES (?, ?, 1, NULL, 10, 1)
+          (work_id, added_at, bookmarked, last_played_at)
+        VALUES (?, ?, 1, NULL)
       `)
       .run("orphan-user-work", recent);
 

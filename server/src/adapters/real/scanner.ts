@@ -382,8 +382,7 @@ export class Scanner {
       playlists: meta.playlists,
       bookmarked: existing?.bookmarked ?? false,
       lastPlayedAt: existing?.lastPlayedAt ?? null,
-      resumePosition: existing?.resumePosition ?? 0,
-      resumeTrackIndex: existing?.resumeTrackIndex ?? 0,
+      resume: existing?.resume ?? null,
       dlsite,
     };
     this.repo.upsertWork(work);

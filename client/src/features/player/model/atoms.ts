@@ -17,6 +17,7 @@ import type { AudioEngineError } from "./audioEngine";
 export interface PlayerCoreState {
   isPlaying: boolean;
   currentTrackIndex: number;
+  currentPlaylistId: string | null;
   currentWork: WorkSummary | Work | null;
   tracks: Track[];
   volume: number;
@@ -31,6 +32,7 @@ export interface PlayerCoreState {
 export const PLAYER_CORE_INITIAL: PlayerCoreState = {
   isPlaying: false,
   currentTrackIndex: -1,
+  currentPlaylistId: null,
   currentWork: null,
   tracks: [],
   volume: 75,

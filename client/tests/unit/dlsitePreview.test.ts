@@ -34,8 +34,7 @@ const work = {
   defaultPlaylistId: null,
   createdAt: null,
   playlists: [],
-  resumePosition: 0,
-  resumeTrackIndex: 0,
+  resume: null,
 } satisfies Work;
 
 describe("DLsite適用プレビュー", () => {

@@ -8,12 +8,14 @@ export interface MutableRef<T> {
 
 export interface PendingResume {
   workId: string;
-  trackIndex: number;
-  position: number;
+  playlistId: string;
+  trackId: string;
+  offsetSec: number;
 }
 
 export interface LoadedTrack {
   workId: string;
+  playlistId: string | null;
   trackIndex: number;
   track: Track;
   assetUrl: string;

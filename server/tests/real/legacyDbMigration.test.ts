@@ -1,12 +1,18 @@
 import assert from "node:assert/strict";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { Database } from "bun:sqlite";
 import { eq } from "drizzle-orm";
+import { createRealAdapter } from "../../src/adapters/real/index.ts";
 import { openDb } from "../../src/adapters/real/db.ts";
-import { appSettings, persistenceMeta, workStates } from "../../src/adapters/real/userSchema.ts";
-import { makeTestDirectory } from "../helpers/sampleLibrary.ts";
+import {
+  appSettings,
+  persistenceMeta,
+  resumeV1Pending,
+  workStates,
+} from "../../src/adapters/real/userSchema.ts";
+import { makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 
 function createLegacyDb(legacyPath: string): void {
   const legacy = new Database(legacyPath, { create: true });
@@ -41,6 +47,50 @@ function createLegacyDb(legacyPath: string): void {
   legacy.close();
 }
 
+function createConvertibleLegacyDb(legacyPath: string, root: string): void {
+  const workId = "11111111-1111-4111-8111-111111111111";
+  const workDir = join(root, "legacy-work");
+  mkdirSync(workDir, { recursive: true });
+  writeWav(join(workDir, "track.wav"), 60);
+  writeFileSync(
+    join(workDir, ".meta.json"),
+    JSON.stringify({
+      id: workId,
+      title: "旧resume変換用",
+      urls: [],
+      tags: [],
+      coverImage: null,
+      defaultPlaylistId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      playlists: [
+        {
+          id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          name: "default",
+          tracks: [
+            {
+              id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+              title: "区間",
+              file: "track.wav",
+              start: 30,
+              end: 60,
+            },
+          ],
+        },
+      ],
+      dlsite: { rjCode: null, status: "none", lastAttemptAt: null, error: null, appliedTags: [] },
+    }),
+  );
+
+  createLegacyDb(legacyPath);
+  const legacy = new Database(legacyPath);
+  legacy
+    .query(
+      "UPDATE works SET id = ?, resume_position = 45, resume_track_index = 0 WHERE id = 'legacy-work'",
+    )
+    .run(workId);
+  legacy.query("UPDATE app_settings SET value = ? WHERE key = 'root_folder'").run(root);
+  legacy.close();
+}
+
 test("旧単一DBを検出するとuser所有データを移し、旧DBを残す", (t) => {
   const directory = makeTestDirectory("legacy-db");
   t.after(directory.cleanup);
@@ -59,9 +109,13 @@ test("旧単一DBを検出するとuser所有データを移し、旧DBを残す
     addedAt: "2026-01-02T03:04:05.000Z",
     bookmarked: true,
     lastPlayedAt: "2026-02-03T04:05:06.000Z",
-    resumePosition: 42.5,
-    resumeTrackIndex: 3,
+    resumePlaylistId: null,
+    resumeTrackId: null,
+    resumeOffsetSec: null,
   });
+  assert.deepEqual(db.user.select().from(resumeV1Pending).all(), [
+    { workId: "legacy-work", position: 42.5, trackIndex: 3 },
+  ]);
   assert.equal(
     db.user.select().from(appSettings).where(eq(appSettings.key, "root_folder")).get()?.value,
     "/legacy/library",
@@ -98,8 +152,9 @@ test("移行中断でマーカーのないuser DBが残っても、再起動時�
       addedAt: "wrong",
       bookmarked: false,
       lastPlayedAt: null,
-      resumePosition: 0,
-      resumeTrackIndex: 0,
+      resumePlaylistId: null,
+      resumeTrackId: null,
+      resumeOffsetSec: null,
     })
     .run();
   interrupted.user.insert(appSettings).values({ key: "root_folder", value: "/wrong" }).run();
@@ -114,8 +169,9 @@ test("移行中断でマーカーのないuser DBが残っても、再起動時�
       addedAt: "2026-01-02T03:04:05.000Z",
       bookmarked: true,
       lastPlayedAt: "2026-02-03T04:05:06.000Z",
-      resumePosition: 42.5,
-      resumeTrackIndex: 3,
+      resumePlaylistId: null,
+      resumeTrackId: null,
+      resumeOffsetSec: null,
     },
   );
   assert.equal(
@@ -130,4 +186,34 @@ test("移行中断でマーカーのないuser DBが残っても、再起動時�
   assert.equal(reopened.user.select().from(workStates).all().length, 1);
   assert.equal(reopened.user.select().from(persistenceMeta).all().length, 1);
   reopened.close();
+});
+
+test("初回legacy移行後のスキャンでpending resume v1をv2へ変換する", async (t) => {
+  const directory = makeTestDirectory("legacy-db-scan-resume");
+  t.after(directory.cleanup);
+  const root = join(directory.path, "library");
+  const legacyPath = join(directory.path, "mimimilli.db");
+  const catalogPath = join(directory.path, "db", "catalog.sqlite");
+  const userPath = join(directory.path, "db", "user.sqlite");
+  createConvertibleLegacyDb(legacyPath, root);
+
+  const adapter = createRealAdapter({
+    database: { kind: "files", catalogPath, userPath, legacyPath },
+  });
+  await adapter.scan();
+  const work = await adapter.getWork("11111111-1111-4111-8111-111111111111");
+  assert.deepEqual(work?.resume, {
+    playlistId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    trackId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    offsetSec: 15,
+  });
+  adapter.close();
+
+  const user = new Database(userPath, { readonly: true });
+  assert.equal(
+    (user.query("SELECT COUNT(*) AS count FROM resume_v1_pending").get() as { count: number })
+      .count,
+    0,
+  );
+  user.close();
 });

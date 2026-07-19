@@ -34,10 +34,14 @@ export function WorkDetail({
   const playlist = work.playlists.find((p) => p.id === work.defaultPlaylistId) ?? work.playlists[0];
   const tracks = playlist?.tracks ?? [];
   const isPlayable = work.status === "ok";
-  const hasResume =
-    work.resumePosition > 0 && work.resumeTrackIndex >= 0 && work.resumeTrackIndex < tracks.length;
-  const resumeTrack = hasResume ? tracks[work.resumeTrackIndex] : null;
-  const resumeTime = formatTime(work.resumePosition);
+  const resumePlaylist = work.resume
+    ? work.playlists.find((candidate) => candidate.id === work.resume?.playlistId)
+    : null;
+  const resumeTrack = work.resume
+    ? (resumePlaylist?.tracks.find((candidate) => candidate.id === work.resume?.trackId) ?? null)
+    : null;
+  const hasResume = work.resume !== null && work.resume.offsetSec > 0 && resumeTrack !== null;
+  const resumeTime = formatTime(work.resume?.offsetSec ?? 0);
 
   // 閲覧ビューに残るタグ編集とブックマーク更新は同じエラー表示スロットを共有する。
   const [editError, setEditError] = useState<string | null>(null);
@@ -123,8 +127,10 @@ export function WorkDetail({
         playingTrackIndex={playingTrackIndex}
         isPlaybackActive={isPlaybackActive}
         hasResume={hasResume}
-        resumeTrackIndex={work.resumeTrackIndex}
-        resumePosition={work.resumePosition}
+        resumeTrackId={
+          playlist?.id === work.resume?.playlistId ? (work.resume?.trackId ?? null) : null
+        }
+        resumeOffsetSec={work.resume?.offsetSec ?? 0}
         onPlay={onPlay}
       />
       {isEditDialogOpen && (

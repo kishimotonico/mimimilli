@@ -25,8 +25,7 @@ function makeWork(tags: string[]): Work {
     defaultPlaylistId: null,
     createdAt: "2026-01-01T00:00:00.000Z",
     playlists: [],
-    resumePosition: 0,
-    resumeTrackIndex: 0,
+    resume: null,
   };
 }
 

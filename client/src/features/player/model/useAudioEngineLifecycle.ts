@@ -25,11 +25,18 @@ interface UseAudioEngineLifecycleOptions {
   setDuration: (duration: number) => void;
   consumePendingResume: (
     workId: string,
-    trackIndex: number,
+    playlistId: string | null,
     track: LoadedTrack["track"],
   ) => number | undefined;
-  enqueueResumeSave: (workId: string, position: number, trackIndex: number) => void;
-  resetResumeCache: (workId: string) => void;
+  enqueueResumeSave: (
+    workId: string,
+    resume: {
+      playlistId: string;
+      trackId: string;
+      offsetSec: number;
+    },
+  ) => void;
+  resetResumeCache: (workId: string, playlistId: string, trackId: string) => void;
   saveCurrentResume: (absolutePosition?: number, loadedTrack?: LoadedTrack | null) => void;
 }
 
@@ -95,8 +102,15 @@ export function useAudioEngineLifecycle({
 
       if (loadedTrack) {
         if (finishedWork) {
-          enqueueResumeSave(loadedTrack.workId, 0, 0);
-          resetResumeCache(loadedTrack.workId);
+          const firstTrack = state.tracks[0];
+          if (loadedTrack.playlistId !== null && firstTrack) {
+            enqueueResumeSave(loadedTrack.workId, {
+              playlistId: loadedTrack.playlistId,
+              trackId: firstTrack.id,
+              offsetSec: 0,
+            });
+            resetResumeCache(loadedTrack.workId, loadedTrack.playlistId, firstTrack.id);
+          }
         } else {
           const absoluteEnd =
             loadedTrack.track.end ??
@@ -190,7 +204,7 @@ export function useAudioEngineLifecycle({
     const engine = refs.engine.current;
     if (!engine) return;
 
-    const { currentTrackIndex, tracks, currentWork } = coreState;
+    const { currentTrackIndex, currentPlaylistId, tracks, currentWork } = coreState;
     if (currentTrackIndex < 0 || currentTrackIndex >= tracks.length || !currentWork) return;
 
     const track = tracks[currentTrackIndex];
@@ -200,16 +214,24 @@ export function useAudioEngineLifecycle({
     const previousTrack = refs.loadedTrack.current;
     const switchedTrack =
       previousTrack !== null &&
-      (previousTrack.workId !== workId || previousTrack.trackIndex !== currentTrackIndex);
+      (previousTrack.workId !== workId ||
+        previousTrack.playlistId !== currentPlaylistId ||
+        previousTrack.track.id !== track.id);
     if (switchedTrack) {
       saveCurrentResume(undefined, previousTrack);
     }
 
-    const pendingSeekSec = consumePendingResume(workId, currentTrackIndex, track);
+    const pendingSeekSec = consumePendingResume(workId, currentPlaylistId, track);
     const reusesLoadedAsset =
       switchedTrack && previousTrack.workId === workId && previousTrack.assetUrl === assetUrl;
 
-    refs.loadedTrack.current = { workId, trackIndex: currentTrackIndex, track, assetUrl };
+    refs.loadedTrack.current = {
+      workId,
+      playlistId: currentPlaylistId,
+      trackIndex: currentTrackIndex,
+      track,
+      assetUrl,
+    };
     refs.trackEnded.current = false;
 
     if (reusesLoadedAsset) {

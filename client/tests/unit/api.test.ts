@@ -57,8 +57,7 @@ function makeWork(overrides: Partial<Work> = {}): Work {
         ],
       },
     ],
-    resumePosition: 0,
-    resumeTrackIndex: 0,
+    resume: null,
     ...overrides,
   };
 }
@@ -141,21 +140,30 @@ describe("work api", () => {
       status: 204,
       json: () => Promise.resolve(undefined),
     } as Response);
-    await workApi.saveResumePosition("work-1", 42.5, 2);
+    const resume = {
+      playlistId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      trackId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      offsetSec: 42.5,
+    };
+    await workApi.saveResumePosition("work-1", resume);
     expect(mockFetch).toHaveBeenCalledWith(
       "/api/works/work-1/resume",
       expect.objectContaining({
         method: "POST",
-        body: JSON.stringify({ position: 42.5, trackIndex: 2 }),
+        body: JSON.stringify(resume),
       }),
     );
   });
 
   it("saveResumePosition: 204以外の成功レスポンスは契約違反になる", async () => {
     mockFetch.mockResolvedValue(makeResponse({ saved: true }));
-    await expect(workApi.saveResumePosition("work-1", 42.5, 2)).rejects.toThrow(
-      /POST \/works\/work-1\/resume/,
-    );
+    await expect(
+      workApi.saveResumePosition("work-1", {
+        playlistId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        trackId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        offsetSec: 42.5,
+      }),
+    ).rejects.toThrow(/POST \/works\/work-1\/resume/);
   });
 
   it("fetchDlsiteInfo POSTs to /api/dlsite/:workId/fetch", async () => {

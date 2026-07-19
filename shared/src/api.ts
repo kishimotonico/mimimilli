@@ -1,7 +1,7 @@
 // エンドポイント横断の契約: 作品検索クエリ、ページングエンベロープ、部分更新、エラー形式。
 import { z } from "zod";
 import { facetAxisIdSchema, sortIdSchema, viewIdSchema } from "./library.ts";
-import { normalizeTags, workSummarySchema } from "./work.ts";
+import { normalizeTags, resumeSchema, workSummarySchema } from "./work.ts";
 
 // ── 作品検索（GET /api/works）────────────────────────────────
 
@@ -47,10 +47,7 @@ export const workPatchSchema = z.object({
 export type WorkPatch = z.infer<typeof workPatchSchema>;
 
 /** POST /api/works/:id/resume（高頻度更新のため PATCH と分離） */
-export const resumeBodySchema = z.object({
-  position: z.number().nonnegative(),
-  trackIndex: z.number().int().nonnegative(),
-});
+export const resumeBodySchema = resumeSchema;
 export type ResumeBody = z.infer<typeof resumeBodySchema>;
 
 // ── カバー画像サムネイル（GET /api/media/cover/:id?w=）───────

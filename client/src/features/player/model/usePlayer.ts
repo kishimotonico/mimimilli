@@ -69,9 +69,9 @@ export function usePlayer() {
       refs: runtimeRefs,
     });
   const resetResumeCache = useCallback(
-    (workId: string) => {
+    (workId: string, playlistId: string, trackId: string) => {
       queryClient.setQueryData<Work>(WORK_QUERY_KEYS.detail(workId), (cachedWork) =>
-        cachedWork ? { ...cachedWork, resumePosition: 0, resumeTrackIndex: 0 } : cachedWork,
+        cachedWork ? { ...cachedWork, resume: { playlistId, trackId, offsetSec: 0 } } : cachedWork,
       );
     },
     [queryClient],
@@ -96,12 +96,13 @@ export function usePlayer() {
   // ── アクション ────────────────────────────────────────────
 
   const startPlayback = useCallback(
-    (work: WorkSummary | Work, tracks: Track[], trackIndex: number) => {
+    (work: WorkSummary | Work, tracks: Track[], trackIndex: number, playlistId: string | null) => {
       setCoreState((prev) => ({
         ...prev,
         currentWork: work,
         tracks,
         currentTrackIndex: trackIndex,
+        currentPlaylistId: playlistId,
         isPlaying: true,
         playbackError: null,
         abRepeat: { a: null, b: null },
@@ -111,28 +112,39 @@ export function usePlayer() {
   );
 
   const play = useCallback(
-    (work: WorkSummary | Work, tracks: Track[], trackIndex: number = 0) => {
+    (
+      work: WorkSummary | Work,
+      tracks: Track[],
+      trackIndex: number = 0,
+      playlistId: string | null = null,
+    ) => {
       pendingResumeRef.current = null;
-      startPlayback(work, tracks, trackIndex);
+      startPlayback(work, tracks, trackIndex, playlistId);
     },
     [pendingResumeRef, startPlayback],
   );
 
   const playWithResume = useCallback(
     (work: Work) => {
-      const playlist =
-        work.playlists.find((p) => p.id === work.defaultPlaylistId) ?? work.playlists[0];
-      const tracks = playlist?.tracks ?? [];
-      if (tracks.length === 0) return;
+      const resume = work.resume;
+      const defaultPlaylist =
+        work.playlists.find((candidate) => candidate.id === work.defaultPlaylistId) ??
+        work.playlists[0];
+      const resumePlaylist = resume
+        ? work.playlists.find((candidate) => candidate.id === resume.playlistId)
+        : undefined;
+      const resumeTrackIndex =
+        resume && resumePlaylist
+          ? resumePlaylist.tracks.findIndex((candidate) => candidate.id === resume.trackId)
+          : -1;
+      const hasValidResume =
+        resume !== null && resumePlaylist !== undefined && resumeTrackIndex >= 0;
+      const playlist = hasValidResume ? resumePlaylist : defaultPlaylist;
+      if (!playlist || playlist.tracks.length === 0) return;
 
-      const trackIndex = Math.min(work.resumeTrackIndex, tracks.length - 1);
-
-      pendingResumeRef.current =
-        work.resumePosition > 0
-          ? { workId: work.id, trackIndex, position: work.resumePosition }
-          : null;
-
-      startPlayback(work, tracks, trackIndex);
+      const trackIndex = hasValidResume ? resumeTrackIndex : 0;
+      pendingResumeRef.current = hasValidResume ? { workId: work.id, ...resume } : null;
+      startPlayback(work, playlist.tracks, trackIndex, playlist.id);
     },
     [pendingResumeRef, startPlayback],
   );
@@ -164,6 +176,7 @@ export function usePlayer() {
       ...prev,
       isPlaying: false,
       currentTrackIndex: -1,
+      currentPlaylistId: null,
       currentWork: null,
       tracks: [],
       playbackError: null,

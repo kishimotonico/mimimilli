@@ -151,7 +151,7 @@ export default function App() {
           fullWork.playlists[0];
         const tracks = playlist?.tracks ?? [];
         if (tracks.length > 0) {
-          player.play(work, tracks, Math.min(trackIndex, tracks.length - 1));
+          player.play(work, tracks, Math.min(trackIndex, tracks.length - 1), playlist!.id);
         }
       } catch (err) {
         console.error("作品の再生に失敗しました", err);
