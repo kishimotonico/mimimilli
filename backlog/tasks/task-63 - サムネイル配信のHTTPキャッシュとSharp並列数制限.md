@@ -4,7 +4,7 @@ title: サムネイル配信のHTTPキャッシュとSharp並列数制限
 status: To Do
 assignee: []
 created_date: '2026-07-19 02:03'
-updated_date: '2026-07-19 04:07'
+updated_date: '2026-07-19 04:28'
 labels: []
 dependencies: []
 priority: medium
@@ -24,7 +24,12 @@ ordinal: 60000
 - [ ] #1 サムネイル・カバー配信が条件付きGET（304）またはimmutableキャッシュで再取得を回避できる
 - [ ] #2 サムネイル生成の同時実行数が制限される
 - [ ] #3 pnpm check と pnpm test が通る
+- [ ] #4 ETagはrepresentation（作品×幅×元画像mtime）ごとに異なり、元画像変更で変わる。同一ETagのIf-None-Matchには304でbodyを返さない
+- [ ] #5 安定URLにimmutableを付けない（使う場合はバージョントークン付きURLに限る。DTOへのcover version搭載はTASK-58のDTO設計と調整）
+- [ ] #6 異なるキーの同時多数要求でも実行中のSharp変換数が上限以下。変換失敗時もキューslotが解放され、一時ファイルが残らない。既存single-flightは維持
 <!-- AC:END -->
+
+
 
 ## Comments
 

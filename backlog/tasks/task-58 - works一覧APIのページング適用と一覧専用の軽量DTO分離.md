@@ -1,10 +1,10 @@
 ---
 id: TASK-58
-title: works一覧APIのページング適用と一覧専用の軽量DTO分離
+title: 一覧専用DTO（WorkListItem）の分離とgetAllWorks依存の整理
 status: To Do
 assignee: []
 created_date: '2026-07-19 02:01'
-updated_date: '2026-07-19 04:07'
+updated_date: '2026-07-19 04:26'
 labels: []
 dependencies: []
 priority: high
@@ -14,19 +14,20 @@ ordinal: 55000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-クライアントの buildWorksParams()（client/src/features/library/model/libraryPresentation.ts:23）が page/limit を送らず、サーバー側 paginate（server/src/core/worksQuery.ts:135）は両方指定時のみsliceするため、通常一覧は常に全件転送になっている。加えて WorkSummary に physicalPath/urls/dlsite状態全体/全タグが含まれ、30,000件で21〜45MB規模。総件数取得（useLibraryQueries.ts:61 の searchWorks({limit:1})）は page 未指定のため実際は全件返している。スマートフォルダーAPI（routes/smartFolders.ts:42）にはページング契約自体がない。
+Codexレビュー（2026-07-19）により旧TASK-58を3分割した1つ目（58A相当）。ページング適用は TASK-73（通常works）・TASK-74（スマートフォルダー）へ分離し、本タスクはDTO分離と全件取得依存の整理のみを扱う。
 
-方針: サーバーにデフォルトlimit（未指定でも上限適用）を導入し、一覧専用の軽量DTO（id/title/coverImage/status/totalDurationSec/trackCount/bookmarked/lastPlayedAt/circleName等）を shared に定義。詳細は GET /works/:id で取得。総件数は専用のCOUNT APIか正しいページング指定に。スマートフォルダーにも同じページングエンベロープを適用。将来SQL化するなら深いoffsetを避けるためkeysetページングも視野（本タスクではoffsetで可）。
+内容: 一覧専用の軽量DTO WorkListItem（id/title/coverImage/status/totalDurationSec/trackCount/bookmarked/lastPlayedAt/circleName等）を shared に定義し、real/fixture両アダプタでDTO生成。一覧UI・プレビュー・再生開始コールバック（App.tsx:140 / WorkGrid.tsx:41 / ContentColumn.tsx:17 / usePlayer.ts:86 がWorkSummary前提）を型移行。サークル表示は全タグを渡さず circleName を投影。
 
-2026-07-19のパフォーマンス調査で高優先度と判定。
+重要な退行リスク: 通知系フック（client/src/features/.../dlsiteMissingRjCode.ts:19・dlsiteFetchFailed.ts:19・dlsiteUnlinked.ts:16、entities/work/api.ts:37）が getAllWorks() で全件取得して dlsite 状態を判定している。一覧DTOから dlsite を外すと壊れ、将来デフォルトlimitが入ると先頭ページだけで判定して件数が誤る。これらは専用API（RJコード未検出/DLsite取得失敗/未連携の件数・一覧）へ移行する。
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 GET /works が limit 未指定でも全件返さない（サーバー側デフォルト上限がある）
-- [ ] #2 一覧レスポンスが軽量DTOになり、physicalPath・urls・dlsite詳細・プレイリスト詳細を含まない
-- [ ] #3 クライアントの一覧・総件数・スマートフォルダー表示がページング契約で動作する
-- [ ] #4 fixture/real 両アダプタで契約が一致し、pnpm check と pnpm test が通る
+- [ ] #1 一覧UI・プレビュー・再生開始が軽量DTO移行後も動作する
+- [ ] #2 通知系フックが getAllWorks() でなく専用APIで判定し、先頭ページだけで件数判定しない
+- [ ] #3 fixture/real 両アダプタで契約が一致する
+- [ ] #4 pnpm check と pnpm test が通る
+- [ ] #5 WorkListItem が shared に定義され、一覧レスポンスに physicalPath・urls・dlsite詳細・プレイリスト詳細を含まない（生HTTPレスポンスのJSONキーを検査するテストで保証。Zod型だけでなく実キー検査）
 <!-- AC:END -->
 
 ## Comments
