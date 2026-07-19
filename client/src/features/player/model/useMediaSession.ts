@@ -39,6 +39,18 @@ function getSupportedMediaSession(): MediaSession | null {
   return navigator.mediaSession;
 }
 
+function trySetActionHandler(
+  mediaSession: MediaSession,
+  action: MediaSessionAction,
+  handler: MediaSessionActionHandler | null,
+) {
+  try {
+    mediaSession.setActionHandler(action, handler);
+  } catch {
+    // ブラウザが個別の Media Session action に未対応の場合は、その action だけ無効にする。
+  }
+}
+
 export function useMediaSession({
   currentWork,
   currentTrack,
@@ -106,11 +118,12 @@ export function useMediaSession({
   useEffect(() => {
     if (!mediaSession) return;
 
-    mediaSession.setActionHandler("play", isActive ? onPlay : null);
-    mediaSession.setActionHandler("pause", isActive ? onPause : null);
-    mediaSession.setActionHandler("previoustrack", hasPreviousTrack ? onPreviousTrack : null);
-    mediaSession.setActionHandler("nexttrack", hasNextTrack ? onNextTrack : null);
-    mediaSession.setActionHandler(
+    trySetActionHandler(mediaSession, "play", isActive ? onPlay : null);
+    trySetActionHandler(mediaSession, "pause", isActive ? onPause : null);
+    trySetActionHandler(mediaSession, "previoustrack", hasPreviousTrack ? onPreviousTrack : null);
+    trySetActionHandler(mediaSession, "nexttrack", hasNextTrack ? onNextTrack : null);
+    trySetActionHandler(
+      mediaSession,
       "seekbackward",
       isActive
         ? (details) => {
@@ -118,7 +131,8 @@ export function useMediaSession({
           }
         : null,
     );
-    mediaSession.setActionHandler(
+    trySetActionHandler(
+      mediaSession,
       "seekforward",
       isActive
         ? (details) => {
@@ -126,7 +140,8 @@ export function useMediaSession({
           }
         : null,
     );
-    mediaSession.setActionHandler(
+    trySetActionHandler(
+      mediaSession,
       "seekto",
       isActive
         ? (details) => {
@@ -136,13 +151,13 @@ export function useMediaSession({
     );
 
     return () => {
-      mediaSession.setActionHandler("play", null);
-      mediaSession.setActionHandler("pause", null);
-      mediaSession.setActionHandler("previoustrack", null);
-      mediaSession.setActionHandler("nexttrack", null);
-      mediaSession.setActionHandler("seekbackward", null);
-      mediaSession.setActionHandler("seekforward", null);
-      mediaSession.setActionHandler("seekto", null);
+      trySetActionHandler(mediaSession, "play", null);
+      trySetActionHandler(mediaSession, "pause", null);
+      trySetActionHandler(mediaSession, "previoustrack", null);
+      trySetActionHandler(mediaSession, "nexttrack", null);
+      trySetActionHandler(mediaSession, "seekbackward", null);
+      trySetActionHandler(mediaSession, "seekforward", null);
+      trySetActionHandler(mediaSession, "seekto", null);
     };
   }, [
     hasNextTrack,

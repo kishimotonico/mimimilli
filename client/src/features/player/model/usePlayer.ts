@@ -7,7 +7,9 @@
 
 import { useRef, useCallback, useMemo } from "react";
 import { useAtom, useSetAtom } from "jotai";
+import { useQueryClient } from "@tanstack/react-query";
 import type { Track, WorkSummary, Work } from "../../../entities/work/model";
+import { LIBRARY_KEYS } from "../../library/model/queryKeys";
 import { useMediaSession } from "./useMediaSession";
 import { toAudioAbsoluteTime } from "./trackTime";
 import {
@@ -33,6 +35,7 @@ export type { PlayerCoreState };
 export type PlayerState = PlayerCoreState;
 
 export function usePlayer() {
+  const queryClient = useQueryClient();
   const [coreState, setCoreState] = useAtom(playerCoreAtom);
   const setCurrentTime = useSetAtom(playerCurrentTimeAtom); // subscribe しない
   const setDuration = useSetAtom(playerDurationAtom); // subscribe しない
@@ -61,10 +64,18 @@ export function usePlayer() {
     [],
   );
 
-  const { pendingResumeRef, consumePendingResume, saveCurrentResume } =
+  const { pendingResumeRef, consumePendingResume, enqueueResumeSave, saveCurrentResume } =
     useResumePersistenceController({
       refs: runtimeRefs,
     });
+  const resetResumeCache = useCallback(
+    (workId: string) => {
+      queryClient.setQueryData<Work>(LIBRARY_KEYS.workDetail(workId), (cachedWork) =>
+        cachedWork ? { ...cachedWork, resumePosition: 0, resumeTrackIndex: 0 } : cachedWork,
+      );
+    },
+    [queryClient],
+  );
   const { getCurrentPlaybackContext } = useAudioEngineLifecycle({
     coreState,
     refs: runtimeRefs,
@@ -72,6 +83,8 @@ export function usePlayer() {
     setCurrentTime,
     setDuration,
     consumePendingResume,
+    enqueueResumeSave,
+    resetResumeCache,
     saveCurrentResume,
   });
   useResumePersistence({

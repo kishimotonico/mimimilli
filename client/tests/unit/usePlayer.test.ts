@@ -1,11 +1,14 @@
 import { StrictMode, createElement, useMemo, type ReactNode } from "react";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore, useAtomValue } from "jotai";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { formatTime, formatDuration, formatFileSize } from "../../src/shared/lib/format";
 import { usePlayer } from "../../src/features/player/model/usePlayer";
+import { useResumePersistenceController } from "../../src/features/player/model/useResumePersistence";
 import { saveResumePosition } from "../../src/features/player/api";
 import { playerCurrentTimeAtom, playerDurationAtom } from "../../src/features/player/model/atoms";
+import { LIBRARY_KEYS } from "../../src/features/library/model/queryKeys";
 import type { Track, Work, WorkSummary } from "../../src/entities/work/model";
 
 vi.mock("../../src/features/player/api", () => ({
@@ -65,10 +68,17 @@ function latestAudio() {
   return audio;
 }
 
-function makeWrapper({ strict = false }: { strict?: boolean } = {}) {
+function makeWrapper({
+  strict = false,
+  queryClient = new QueryClient(),
+}: { strict?: boolean; queryClient?: QueryClient } = {}) {
   return function Wrapper({ children }: { children: ReactNode }) {
     const store = useMemo(() => createStore(), []);
-    const tree = createElement(JotaiProvider, { store }, children);
+    const tree = createElement(
+      QueryClientProvider,
+      { client: queryClient },
+      createElement(JotaiProvider, { store }, children),
+    );
     return strict ? createElement(StrictMode, null, tree) : tree;
   };
 }
@@ -104,6 +114,8 @@ const work: WorkSummary = {
 beforeEach(() => {
   audioInstances.length = 0;
   nextPlayError = null;
+  vi.mocked(saveResumePosition).mockReset();
+  vi.mocked(saveResumePosition).mockResolvedValue(undefined);
   installFakeAudio();
 });
 
@@ -359,7 +371,7 @@ describe("usePlayer audio engine lifecycle", () => {
     expect(saveResumePosition).not.toHaveBeenCalledWith(work.id, 90, 0);
   });
 
-  it("最終区間の終端から戻って再生した場合も終了検知を再武装する", async () => {
+  it("最終区間の終端で再生を再開すると区間先頭へ戻して終了検知を再武装する", async () => {
     const segment: Track = { ...track, start: 30, end: 90 };
     const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
 
@@ -375,13 +387,9 @@ describe("usePlayer audio engine lifecycle", () => {
     expect(result.current.player.state.isPlaying).toBe(false);
     expect(latestAudio().pause).toHaveBeenCalledTimes(1);
 
-    act(() => {
-      result.current.player.seek(10);
-      latestAudio().dispatchEvent(new Event("timeupdate"));
-    });
-    expect(result.current.currentTime).toBe(10);
-
     act(() => result.current.player.togglePlay());
+    expect(latestAudio().currentTime).toBe(30);
+    expect(result.current.currentTime).toBe(0);
     expect(result.current.player.state.isPlaying).toBe(true);
 
     act(() => {
@@ -390,6 +398,36 @@ describe("usePlayer audio engine lifecycle", () => {
     });
     expect(result.current.player.state.isPlaying).toBe(false);
     expect(latestAudio().pause).toHaveBeenCalledTimes(2);
+  });
+
+  it("最終トラック聴了時はwork detailキャッシュのレジューム位置も先頭へ戻す", async () => {
+    const resumableWork: Work = {
+      ...work,
+      defaultPlaylist: "default",
+      createdAt: null,
+      playlists: [{ name: "default", tracks: [track] }],
+      resumePosition: 42,
+      resumeTrackIndex: 0,
+    };
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(LIBRARY_KEYS.workDetail(work.id), resumableWork);
+    const { result } = renderHook(() => usePlayerWithClock(), {
+      wrapper: makeWrapper({ queryClient }),
+    });
+
+    act(() => result.current.player.play(work, [track]));
+    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
+
+    act(() => {
+      latestAudio().duration = 120;
+      latestAudio().currentTime = 120;
+      latestAudio().dispatchEvent(new Event("ended"));
+    });
+
+    expect(queryClient.getQueryData<Work>(LIBRARY_KEYS.workDetail(work.id))).toMatchObject({
+      resumePosition: 0,
+      resumeTrackIndex: 0,
+    });
   });
 
   it("A-B 点をトラック相対時間で保持して絶対時刻へシークする", async () => {
@@ -674,5 +712,45 @@ describe("usePlayer audio engine lifecycle", () => {
     expect(latestAudio().currentTime).toBe(45);
     expect(result.current.currentTime).toBe(15);
     expect(result.current.duration).toBe(60);
+  });
+});
+
+describe("useResumePersistenceController", () => {
+  it("飛行中の保存を待ってから聴了リセットを送り、先行保存が失敗しても処理を続ける", async () => {
+    let rejectFirstSave: ((reason?: unknown) => void) | undefined;
+    vi.mocked(saveResumePosition)
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((_resolve, reject) => {
+            rejectFirstSave = reject;
+          }),
+      )
+      .mockResolvedValueOnce(undefined);
+
+    const loadedTrack = {
+      workId: work.id,
+      trackIndex: 0,
+      track,
+      assetUrl: "/audio/work-1/track-1.wav",
+    };
+    const refs = {
+      engine: { current: null },
+      loadedTrack: { current: loadedTrack },
+      trackEnded: { current: false },
+    };
+    const { result } = renderHook(() => useResumePersistenceController({ refs }));
+
+    act(() => {
+      result.current.saveCurrentResume(75);
+      result.current.enqueueResumeSave(work.id, 0, 0);
+    });
+
+    expect(saveResumePosition).toHaveBeenCalledTimes(1);
+    expect(saveResumePosition).toHaveBeenNthCalledWith(1, work.id, 75, 0);
+
+    act(() => rejectFirstSave?.(new Error("保存失敗")));
+
+    await waitFor(() => expect(saveResumePosition).toHaveBeenCalledTimes(2));
+    expect(saveResumePosition).toHaveBeenNthCalledWith(2, work.id, 0, 0);
   });
 });

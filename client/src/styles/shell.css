@@ -234,15 +234,18 @@
   .mle-grid-controls {
     display: grid;
     grid-template-columns: 0fr;
+    margin-right: -10px;
     opacity: 0;
     transform: translateX(8px);
     transition:
       grid-template-columns 180ms ease-out,
+      margin-right 180ms ease-out,
       opacity 120ms ease-out,
       transform 180ms ease-out;
   }
   .mle-grid-controls.is-visible {
     grid-template-columns: 1fr;
+    margin-right: 0;
     opacity: 1;
     transform: translateX(0);
   }

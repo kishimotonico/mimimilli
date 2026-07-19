@@ -56,7 +56,10 @@ describe("useMediaSession", () => {
 
   beforeEach(() => {
     handlers.clear();
-    setActionHandler.mockClear();
+    setActionHandler.mockReset();
+    setActionHandler.mockImplementation((action: MediaSessionAction, handler: ActionHandler) => {
+      handlers.set(action, handler);
+    });
     setPositionState.mockClear();
     Object.assign(mediaSession, { metadata: null, playbackState: "none" });
     Object.defineProperty(navigator, "mediaSession", {
@@ -185,6 +188,39 @@ describe("useMediaSession", () => {
     expect(handlers.get("play")).toBeNull();
     expect(handlers.get("pause")).toBeNull();
     expect(handlers.get("seekto")).toBeNull();
+  });
+
+  it("未対応actionの登録と解除が例外になっても他のhandlerは動作する", () => {
+    setActionHandler.mockImplementation((action: MediaSessionAction, handler: ActionHandler) => {
+      if (action === "seekbackward") {
+        throw new DOMException("Unsupported action", "NotSupportedError");
+      }
+      handlers.set(action, handler);
+    });
+    const onPlay = vi.fn();
+
+    const { unmount } = renderHook(() =>
+      useMediaSession({
+        currentWork: makeWork(),
+        currentTrack: track,
+        currentTrackIndex: 0,
+        trackCount: 2,
+        isPlaying: false,
+        playbackRate: 1,
+        getPosition: () => ({ duration: 20, position: 5, playbackRate: 1 }),
+        onPlay,
+        onPause: vi.fn(),
+        onPreviousTrack: vi.fn(),
+        onNextTrack: vi.fn(),
+        onSeek: vi.fn(),
+        onSeekRelative: vi.fn(),
+      }),
+    );
+
+    act(() => handlers.get("play")?.({ action: "play" }));
+    expect(onPlay).toHaveBeenCalledOnce();
+    expect(handlers.has("seekforward")).toBe(true);
+    expect(() => unmount()).not.toThrow();
   });
 
   it("MediaSession非対応環境では何もしない", () => {

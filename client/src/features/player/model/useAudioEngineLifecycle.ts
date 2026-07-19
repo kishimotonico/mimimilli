@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from "react";
 import { getAudioUrl } from "../../../entities/work/api";
-import { saveResumePosition, updateLastPlayed } from "../api";
+import { updateLastPlayed } from "../api";
 import { createAudioEngine } from "./audioEngine";
 import {
   getTrackDuration,
@@ -28,6 +28,8 @@ interface UseAudioEngineLifecycleOptions {
     trackIndex: number,
     track: LoadedTrack["track"],
   ) => number | undefined;
+  enqueueResumeSave: (workId: string, position: number, trackIndex: number) => void;
+  resetResumeCache: (workId: string) => void;
   saveCurrentResume: (absolutePosition?: number, loadedTrack?: LoadedTrack | null) => void;
 }
 
@@ -38,6 +40,8 @@ export function useAudioEngineLifecycle({
   setCurrentTime,
   setDuration,
   consumePendingResume,
+  enqueueResumeSave,
+  resetResumeCache,
   saveCurrentResume,
 }: UseAudioEngineLifecycleOptions) {
   const getCurrentPlaybackContext = useCallback(
@@ -91,7 +95,8 @@ export function useAudioEngineLifecycle({
 
       if (loadedTrack) {
         if (finishedWork) {
-          saveResumePosition(loadedTrack.workId, 0, 0).catch(() => {});
+          enqueueResumeSave(loadedTrack.workId, 0, 0);
+          resetResumeCache(loadedTrack.workId);
         } else {
           const absoluteEnd =
             loadedTrack.track.end ??
@@ -110,7 +115,18 @@ export function useAudioEngineLifecycle({
     };
 
     const engine = createAudioEngine(refs.coreState.current.volume, {
-      onPlay: () => setCoreState((state) => ({ ...state, isPlaying: true, playbackError: null })),
+      onPlay: () => {
+        if (refs.trackEnded.current) {
+          const loadedTrack = refs.loadedTrack.current;
+          if (loadedTrack) {
+            engineRef.current?.seek(getTrackStart(loadedTrack.track));
+            setCurrentTime(0);
+            refs.updateMediaSessionPosition.current(0);
+          }
+          refs.trackEnded.current = false;
+        }
+        setCoreState((state) => ({ ...state, isPlaying: true, playbackError: null }));
+      },
       onPause: () => setCoreState((state) => ({ ...state, isPlaying: false })),
       onTimeUpdate: (time) => {
         const context = getCurrentPlaybackContext(time);
@@ -160,7 +176,9 @@ export function useAudioEngineLifecycle({
     };
   }, [
     getCurrentPlaybackContext,
+    enqueueResumeSave,
     refs,
+    resetResumeCache,
     saveCurrentResume,
     setCoreState,
     setCurrentTime,

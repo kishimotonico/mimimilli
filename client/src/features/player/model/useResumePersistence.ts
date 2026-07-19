@@ -11,6 +11,20 @@ interface UseResumePersistenceOptions {
 
 export function useResumePersistenceController({ refs }: UseResumePersistenceOptions) {
   const pendingResumeRef = useRef<PendingResume | null>(null);
+  const savePromiseRef = useRef<Promise<void> | null>(null);
+
+  const enqueueResumeSave = useCallback((workId: string, position: number, trackIndex: number) => {
+    const save = () => saveResumePosition(workId, position, trackIndex).catch(() => {});
+    const currentSave = savePromiseRef.current;
+    const nextSave = currentSave ? currentSave.then(save, save) : save();
+
+    savePromiseRef.current = nextSave;
+    void nextSave.then(() => {
+      if (savePromiseRef.current === nextSave) {
+        savePromiseRef.current = null;
+      }
+    });
+  }, []);
 
   const saveCurrentResume = useCallback(
     (absolutePosition?: number, loadedTrack: LoadedTrack | null = refs.loadedTrack.current) => {
@@ -20,9 +34,9 @@ export function useResumePersistenceController({ refs }: UseResumePersistenceOpt
       if (position === undefined) return;
 
       // resumePosition は既存データとの互換性を保つため、ファイル絶対秒で保存する。
-      saveResumePosition(loadedTrack.workId, position, loadedTrack.trackIndex).catch(() => {});
+      enqueueResumeSave(loadedTrack.workId, position, loadedTrack.trackIndex);
     },
-    [refs.engine, refs.loadedTrack],
+    [enqueueResumeSave, refs.engine, refs.loadedTrack],
   );
 
   const consumePendingResume = useCallback((workId: string, trackIndex: number, track: Track) => {
@@ -41,6 +55,7 @@ export function useResumePersistenceController({ refs }: UseResumePersistenceOpt
   return {
     pendingResumeRef: pendingResumeRef as MutableRef<PendingResume | null>,
     consumePendingResume,
+    enqueueResumeSave,
     saveCurrentResume,
   };
 }
