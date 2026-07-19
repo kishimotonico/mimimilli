@@ -1,7 +1,16 @@
 // works / tags / smart_folders / search_presets / app_settings の CRUD と行⇄ドメイン変換。
 // 検索・絞り込みは core/worksQuery（インメモリ）で行うため、ここは取得と更新に徹する。
 import { asc, eq, inArray, notInArray } from "drizzle-orm";
-import { emptyDlsiteState, normalizeTags } from "@mimimilli/shared";
+import {
+  dlsiteStateSchema,
+  emptyDlsiteState,
+  normalizeTags,
+  playlistSchema,
+  searchPresetSchema,
+  smartFolderSchema,
+  workSchema,
+  workSummarySchema,
+} from "@mimimilli/shared";
 import type {
   DlsiteState,
   Playlist,
@@ -10,15 +19,14 @@ import type {
   SmartFolder,
   SmartFolderCreate,
   SmartFolderUpdate,
-  SortId,
   TagPrefix,
   TagPrefixCreate,
   TagPrefixUpdate,
   Work,
-  WorkStatus,
   WorkSummary,
   UrlEntry,
 } from "@mimimilli/shared";
+import { z } from "zod";
 import type { Db } from "./db.ts";
 import {
   appSettings,
@@ -33,58 +41,116 @@ import {
 
 type WorkRow = typeof works.$inferSelect;
 
-function defaultPlaylistOf(row: WorkRow): Playlist | null {
-  if (row.playlistsJson.length === 0) return null;
+export class PersistentDataError extends Error {
+  constructor(table: string, recordId: string | number, detail: string) {
+    super(`SQLite の ${table} レコード "${recordId}" が不正です: ${detail}`);
+    this.name = "PersistentDataError";
+  }
+}
+
+function parseJsonField(
+  raw: string,
+  table: string,
+  recordId: string | number,
+  field: string,
+): unknown {
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new PersistentDataError(table, recordId, `${field}: JSON パースエラー: ${message}`);
+  }
+}
+
+function parseRecord<T>(
+  schema: z.ZodType<T>,
+  value: unknown,
+  table: string,
+  recordId: string | number,
+): T {
+  const result = schema.safeParse(value);
+  if (result.success) return result.data;
+  const detail = result.error.issues
+    .map((issue) => `${issue.path.join(".") || "(record)"}: ${issue.message}`)
+    .join("; ");
+  throw new PersistentDataError(table, recordId, detail);
+}
+
+function defaultPlaylistOf(
+  row: Pick<WorkRow, "id" | "defaultPlaylist">,
+  playlists: Playlist[],
+): Playlist | null {
+  if (playlists.length === 0) return null;
   if (row.defaultPlaylist) {
-    const playlist = row.playlistsJson.find((p) => p.name === row.defaultPlaylist);
+    const playlist = playlists.find((p) => p.name === row.defaultPlaylist);
     if (!playlist) {
-      throw new Error(`DB の defaultPlaylist が不正です: ${row.id}/${row.defaultPlaylist}`);
+      throw new PersistentDataError(
+        "works",
+        row.id,
+        `defaultPlaylist: playlists_json に "${row.defaultPlaylist}" がありません`,
+      );
     }
     return playlist;
   }
-  return row.playlistsJson[0]!;
+  return playlists[0]!;
 }
 
 function rowToSummary(row: WorkRow, tagNames: string[], dlsite: DlsiteState): WorkSummary {
-  return {
-    id: row.id,
-    title: row.title,
-    coverImage: row.coverImage,
-    status: row.status as WorkStatus,
-    physicalPath: row.physicalPath,
-    totalDurationSec: row.totalDurationSec,
-    addedAt: row.addedAt,
-    errorMessage: row.errorMessage,
-    urls: row.urlsJson,
-    tags: tagNames,
-    trackCount: defaultPlaylistOf(row)?.tracks.length ?? 0,
-    bookmarked: row.bookmarked,
-    lastPlayedAt: row.lastPlayedAt,
-    dlsite,
-  };
+  const playlists = parseRecord(
+    z.array(playlistSchema),
+    parseJsonField(row.playlistsJson, "works", row.id, "playlists_json"),
+    "works",
+    row.id,
+  );
+  return parseRecord(
+    workSummarySchema,
+    {
+      id: row.id,
+      title: row.title,
+      coverImage: row.coverImage,
+      status: row.status,
+      physicalPath: row.physicalPath,
+      totalDurationSec: row.totalDurationSec,
+      addedAt: row.addedAt,
+      errorMessage: row.errorMessage,
+      urls: parseJsonField(row.urlsJson, "works", row.id, "urls_json"),
+      tags: tagNames,
+      trackCount: defaultPlaylistOf(row, playlists)?.tracks.length ?? 0,
+      bookmarked: row.bookmarked,
+      lastPlayedAt: row.lastPlayedAt,
+      dlsite,
+    },
+    "works",
+    row.id,
+  );
 }
 
 function rowToWork(row: WorkRow, tagNames: string[], dlsite: DlsiteState): Work {
-  return {
-    id: row.id,
-    title: row.title,
-    coverImage: row.coverImage,
-    status: row.status as WorkStatus,
-    physicalPath: row.physicalPath,
-    totalDurationSec: row.totalDurationSec,
-    addedAt: row.addedAt,
-    errorMessage: row.errorMessage,
-    urls: row.urlsJson,
-    tags: tagNames,
-    defaultPlaylist: row.defaultPlaylist,
-    createdAt: row.createdAt,
-    playlists: row.playlistsJson,
-    bookmarked: row.bookmarked,
-    lastPlayedAt: row.lastPlayedAt,
-    resumePosition: row.resumePosition,
-    resumeTrackIndex: row.resumeTrackIndex,
-    dlsite,
-  };
+  return parseRecord(
+    workSchema,
+    {
+      id: row.id,
+      title: row.title,
+      coverImage: row.coverImage,
+      status: row.status,
+      physicalPath: row.physicalPath,
+      totalDurationSec: row.totalDurationSec,
+      addedAt: row.addedAt,
+      errorMessage: row.errorMessage,
+      urls: parseJsonField(row.urlsJson, "works", row.id, "urls_json"),
+      tags: tagNames,
+      defaultPlaylist: row.defaultPlaylist,
+      createdAt: row.createdAt,
+      playlists: parseJsonField(row.playlistsJson, "works", row.id, "playlists_json"),
+      bookmarked: row.bookmarked,
+      lastPlayedAt: row.lastPlayedAt,
+      resumePosition: row.resumePosition,
+      resumeTrackIndex: row.resumeTrackIndex,
+      dlsite,
+    },
+    "works",
+    row.id,
+  );
 }
 
 export class WorkRepo {
@@ -149,17 +215,24 @@ export class WorkRepo {
   // ── works ─────────────────────────────────────────────────
 
   private dlsiteState(workId: string): DlsiteState {
-    return (
-      this.db.select().from(workDlsite).where(eq(workDlsite.workId, workId)).get()?.stateJson ??
-      emptyDlsiteState()
+    const row = this.db.select().from(workDlsite).where(eq(workDlsite.workId, workId)).get();
+    if (!row) return emptyDlsiteState();
+    return parseRecord(
+      dlsiteStateSchema,
+      parseJsonField(row.stateJson, "work_dlsite", workId, "state_json"),
+      "work_dlsite",
+      workId,
     );
   }
 
   setDlsiteState(workId: string, state: DlsiteState): void {
     this.db
       .insert(workDlsite)
-      .values({ workId, stateJson: state })
-      .onConflictDoUpdate({ target: workDlsite.workId, set: { stateJson: state } })
+      .values({ workId, stateJson: JSON.stringify(state) })
+      .onConflictDoUpdate({
+        target: workDlsite.workId,
+        set: { stateJson: JSON.stringify(state) },
+      })
       .run();
   }
 
@@ -196,8 +269,8 @@ export class WorkRepo {
       totalDurationSec: work.totalDurationSec,
       addedAt: work.addedAt,
       errorMessage: work.errorMessage,
-      urlsJson: work.urls,
-      playlistsJson: work.playlists,
+      urlsJson: JSON.stringify(work.urls),
+      playlistsJson: JSON.stringify(work.playlists),
       bookmarked: work.bookmarked,
       lastPlayedAt: work.lastPlayedAt,
       resumePosition: work.resumePosition,
@@ -229,7 +302,7 @@ export class WorkRepo {
     if (patch.title !== undefined) set.title = patch.title;
     if (patch.bookmarked !== undefined) set.bookmarked = patch.bookmarked;
     if (patch.coverImage !== undefined) set.coverImage = patch.coverImage;
-    if (patch.urls !== undefined) set.urlsJson = patch.urls;
+    if (patch.urls !== undefined) set.urlsJson = JSON.stringify(patch.urls);
     if (Object.keys(set).length > 0) {
       this.db.update(works).set(set).where(eq(works.id, id)).run();
     }
@@ -368,25 +441,37 @@ export class WorkRepo {
       .from(smartFolders)
       .orderBy(asc(smartFolders.createdAt))
       .all()
-      .map((r) => ({
-        id: r.id,
-        name: r.name,
-        rules: r.rulesJson,
-        sort: r.sort as SortId,
-        createdAt: r.createdAt,
-      }));
+      .map((r) =>
+        parseRecord(
+          smartFolderSchema,
+          {
+            id: r.id,
+            name: r.name,
+            rules: parseJsonField(r.rulesJson, "smart_folders", r.id, "rules_json"),
+            sort: r.sort,
+            createdAt: r.createdAt,
+          },
+          "smart_folders",
+          r.id,
+        ),
+      );
   }
 
   getSmartFolder(id: string): SmartFolder | null {
     const r = this.db.select().from(smartFolders).where(eq(smartFolders.id, id)).get();
     if (!r) return null;
-    return {
-      id: r.id,
-      name: r.name,
-      rules: r.rulesJson,
-      sort: r.sort as SortId,
-      createdAt: r.createdAt,
-    };
+    return parseRecord(
+      smartFolderSchema,
+      {
+        id: r.id,
+        name: r.name,
+        rules: parseJsonField(r.rulesJson, "smart_folders", r.id, "rules_json"),
+        sort: r.sort,
+        createdAt: r.createdAt,
+      },
+      "smart_folders",
+      r.id,
+    );
   }
 
   createSmartFolder(input: SmartFolderCreate): SmartFolder {
@@ -402,7 +487,7 @@ export class WorkRepo {
       .values({
         id: folder.id,
         name: folder.name,
-        rulesJson: folder.rules,
+        rulesJson: JSON.stringify(folder.rules),
         sort: folder.sort,
         createdAt: folder.createdAt,
       })
@@ -415,7 +500,7 @@ export class WorkRepo {
     if (!existing) return null;
     const set: Partial<typeof smartFolders.$inferInsert> = {};
     if (input.name !== undefined) set.name = input.name;
-    if (input.rules !== undefined) set.rulesJson = input.rules;
+    if (input.rules !== undefined) set.rulesJson = JSON.stringify(input.rules);
     if (input.sort !== undefined) set.sort = input.sort;
     if (Object.keys(set).length > 0) {
       this.db.update(smartFolders).set(set).where(eq(smartFolders.id, id)).run();
@@ -435,13 +520,25 @@ export class WorkRepo {
       .from(searchPresets)
       .orderBy(asc(searchPresets.id))
       .all()
-      .map((r) => ({
-        id: r.id,
-        name: r.name,
-        query: r.query,
-        tagFilters: r.tagFiltersJson,
-        sortId: r.sortId as SortId,
-      }));
+      .map((r) =>
+        parseRecord(
+          searchPresetSchema,
+          {
+            id: r.id,
+            name: r.name,
+            query: r.query,
+            tagFilters: parseJsonField(
+              r.tagFiltersJson,
+              "search_presets",
+              r.id,
+              "tag_filters_json",
+            ),
+            sortId: r.sortId,
+          },
+          "search_presets",
+          r.id,
+        ),
+      );
   }
 
   createPreset(input: SearchPresetCreate): SearchPreset {
@@ -450,7 +547,7 @@ export class WorkRepo {
       .values({
         name: input.name,
         query: input.query,
-        tagFiltersJson: input.tagFilters,
+        tagFiltersJson: JSON.stringify(input.tagFilters),
         sortId: input.sortId,
       })
       .run();

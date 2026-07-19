@@ -4,7 +4,6 @@
 // DDL は db.ts の CREATE TABLE IF NOT EXISTS と手動で同期する（キャッシュ DB のため
 // 互換マイグレーションは持たない。スキーマ変更時は user_version を上げて作り直す）。
 import { index, integer, primaryKey, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
-import type { DlsiteState, Playlist, UrlEntry, SmartFolderRule } from "@mimimilli/shared";
 
 export const works = sqliteTable("works", {
   id: text("id").primaryKey(),
@@ -17,8 +16,8 @@ export const works = sqliteTable("works", {
   totalDurationSec: real("total_duration_sec").notNull().default(0),
   addedAt: text("added_at").notNull(),
   errorMessage: text("error_message"),
-  urlsJson: text("urls_json", { mode: "json" }).$type<UrlEntry[]>().notNull(),
-  playlistsJson: text("playlists_json", { mode: "json" }).$type<Playlist[]>().notNull(),
+  urlsJson: text("urls_json").notNull(),
+  playlistsJson: text("playlists_json").notNull(),
   bookmarked: integer("bookmarked", { mode: "boolean" }).notNull().default(false),
   lastPlayedAt: text("last_played_at"),
   resumePosition: real("resume_position").notNull().default(0),
@@ -41,7 +40,7 @@ export const workTags = sqliteTable(
 
 export const workDlsite = sqliteTable("work_dlsite", {
   workId: text("work_id").primaryKey(),
-  stateJson: text("state_json", { mode: "json" }).$type<DlsiteState>().notNull(),
+  stateJson: text("state_json").notNull(),
 });
 
 /** タグ prefix 定義（ADR-0005）。id は表示順（登録順）の安定化用で、APIのキーは prefix */
@@ -63,14 +62,14 @@ export const searchPresets = sqliteTable("search_presets", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
   query: text("query").notNull(),
-  tagFiltersJson: text("tag_filters_json", { mode: "json" }).$type<string[]>().notNull(),
+  tagFiltersJson: text("tag_filters_json").notNull(),
   sortId: text("sort_id").notNull(),
 });
 
 export const smartFolders = sqliteTable("smart_folders", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
-  rulesJson: text("rules_json", { mode: "json" }).$type<SmartFolderRule[]>().notNull(),
+  rulesJson: text("rules_json").notNull(),
   sort: text("sort").notNull(),
   createdAt: text("created_at").notNull(),
 });
