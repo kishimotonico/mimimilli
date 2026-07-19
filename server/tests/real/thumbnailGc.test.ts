@@ -2,20 +2,19 @@
 // 有効なキャッシュファイル名の集合を作り、それ以外の .webp を削除することを検証する。
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import { join } from "node:path";
-import { test } from "node:test";
+import { test, type TestContext } from "node:test";
 import { THUMBNAIL_WIDTHS } from "@mimimilli/shared";
 import sharp from "sharp";
 import { gcThumbnailCache, getOrCreateThumbnail } from "../../src/adapters/real/thumbnailCache.ts";
+import { makeTestDirectory } from "../helpers/sampleLibrary.ts";
 
-const BASE = "data/test-thumbnail-gc";
-const CACHE_DIR = join(BASE, "cache");
-
-function reset(): void {
-  rmSync(BASE, { recursive: true, force: true });
-  mkdirSync(BASE, { recursive: true });
+function setup(t: TestContext): { baseDir: string; cacheDir: string } {
+  const directory = makeTestDirectory("thumbnail-gc");
+  t.after(directory.cleanup);
+  return { baseDir: directory.path, cacheDir: join(directory.path, "cache") };
 }
 
 async function writeCoverJpeg(
@@ -27,23 +26,23 @@ async function writeCoverJpeg(
     .toFile(path);
 }
 
-test("現存する作品の現mtimeに対応するキャッシュは温存される", async () => {
-  reset();
-  const coverPath = join(BASE, "cover.jpg");
+test("現存する作品の現mtimeに対応するキャッシュは温存される", async (t) => {
+  const { baseDir, cacheDir } = setup(t);
+  const coverPath = join(baseDir, "cover.jpg");
   writeFileSync(coverPath, "dummy content for stat only");
 
   // GC自体はファイル名の一致だけで判定するため、有効キー名のダミーファイルを直接置いて検証する
-  mkdirSync(CACHE_DIR, { recursive: true });
+  mkdirSync(cacheDir, { recursive: true });
   const { mtimeMs } = await stat(coverPath);
   const validNames = THUMBNAIL_WIDTHS.map((width) => {
     const hash = createHash("sha256").update(`work-a\0${width}\0${mtimeMs}`).digest("hex");
     return `${hash}.webp`;
   });
   for (const name of validNames) {
-    writeFileSync(join(CACHE_DIR, name), "thumb");
+    writeFileSync(join(cacheDir, name), "thumb");
   }
 
-  const result = await gcThumbnailCache(CACHE_DIR, [
+  const result = await gcThumbnailCache(cacheDir, [
     { workId: "work-a", coverAbsolutePath: coverPath },
   ]);
 
@@ -51,18 +50,18 @@ test("現存する作品の現mtimeに対応するキャッシュは温存され
   assert.equal(result.kept, validNames.length);
   assert.equal(result.skippedWorks, 0);
   for (const name of validNames) {
-    assert.ok(existsSync(join(CACHE_DIR, name)), `${name} が残っていること`);
+    assert.ok(existsSync(join(cacheDir, name)), `${name} が残っていること`);
   }
 });
 
-test("旧mtimeキーのキャッシュファイルはカバー更新後のGCで削除される", async () => {
-  reset();
-  const coverPath = join(BASE, "cover.jpg");
+test("旧mtimeキーのキャッシュファイルはカバー更新後のGCで削除される", async (t) => {
+  const { baseDir, cacheDir } = setup(t);
+  const coverPath = join(baseDir, "cover.jpg");
   await writeCoverJpeg(coverPath, { r: 10, g: 20, b: 30 });
 
   const oldThumbnailPaths = await Promise.all(
     THUMBNAIL_WIDTHS.map((width) =>
-      getOrCreateThumbnail(CACHE_DIR, "work-b", width, coverPath).then((t) => t.absolutePath),
+      getOrCreateThumbnail(cacheDir, "work-b", width, coverPath).then((t) => t.absolutePath),
     ),
   );
   for (const p of oldThumbnailPaths) assert.ok(existsSync(p));
@@ -71,7 +70,7 @@ test("旧mtimeキーのキャッシュファイルはカバー更新後のGCで�
   await new Promise((r) => setTimeout(r, 10));
   await writeCoverJpeg(coverPath, { r: 200, g: 100, b: 50 });
 
-  const result = await gcThumbnailCache(CACHE_DIR, [
+  const result = await gcThumbnailCache(cacheDir, [
     { workId: "work-b", coverAbsolutePath: coverPath },
   ]);
 
@@ -79,15 +78,15 @@ test("旧mtimeキーのキャッシュファイルはカバー更新後のGCで�
   for (const p of oldThumbnailPaths) assert.ok(!existsSync(p), "旧キーのファイルは削除済み");
 });
 
-test("孤児の .tmp- ファイルは削除され、カバーをstatできない作品はスキップされ全体は止まらない", async () => {
-  reset();
-  mkdirSync(CACHE_DIR, { recursive: true });
-  const orphanTmp = join(CACHE_DIR, "deadbeef.webp.tmp-123-0");
+test("孤児の .tmp- ファイルは削除され、カバーをstatできない作品はスキップされ全体は止まらない", async (t) => {
+  const { baseDir, cacheDir } = setup(t);
+  mkdirSync(cacheDir, { recursive: true });
+  const orphanTmp = join(cacheDir, "deadbeef.webp.tmp-123-0");
   writeFileSync(orphanTmp, "orphan");
 
-  const missingCoverPath = join(BASE, "does-not-exist.jpg");
+  const missingCoverPath = join(baseDir, "does-not-exist.jpg");
 
-  const result = await gcThumbnailCache(CACHE_DIR, [
+  const result = await gcThumbnailCache(cacheDir, [
     { workId: "work-missing", coverAbsolutePath: missingCoverPath },
   ]);
 
@@ -96,8 +95,8 @@ test("孤児の .tmp- ファイルは削除され、カバーをstatできない
   assert.ok(!existsSync(orphanTmp));
 });
 
-test("cacheDirがまだ作成されていない場合は削除0件で終える", async () => {
-  reset();
-  const result = await gcThumbnailCache(CACHE_DIR, []);
+test("cacheDirがまだ作成されていない場合は削除0件で終える", async (t) => {
+  const { cacheDir } = setup(t);
+  const result = await gcThumbnailCache(cacheDir, []);
   assert.deepEqual(result, { deleted: 0, kept: 0, skippedWorks: 0 });
 });

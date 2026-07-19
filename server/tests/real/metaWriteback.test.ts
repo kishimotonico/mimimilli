@@ -2,14 +2,13 @@
 import assert from "node:assert/strict";
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { test } from "node:test";
+import { test, type TestContext } from "node:test";
 import { createRealAdapter } from "../../src/adapters/real/index.ts";
 import { makeSampleLibrary } from "../helpers/sampleLibrary.ts";
 
-const BASE = "data/test-writeback";
-
-async function setup() {
-  const lib = makeSampleLibrary(BASE);
+async function setup(t: TestContext) {
+  const lib = makeSampleLibrary();
+  t.after(lib.cleanup);
   // スキーマ外のユーザー定義フィールドを仕込む
   const metaPath = join(lib.root, "dlsite", "RJ900002_既存メタ", ".meta.json");
   const raw = JSON.parse(readFileSync(metaPath, "utf-8"));
@@ -22,8 +21,8 @@ async function setup() {
   return { ...lib, adapter, metaPath };
 }
 
-test("patchWork の title / tags がメタファイルへ反映され、スキーマ外フィールドは保持される", async () => {
-  const { adapter, existingWorkId, metaPath } = await setup();
+test("patchWork の title / tags がメタファイルへ反映され、スキーマ外フィールドは保持される", async (t) => {
+  const { adapter, existingWorkId, metaPath } = await setup(t);
 
   const updated = await adapter.patchWork(existingWorkId, {
     title: "改題された作品",
@@ -38,8 +37,8 @@ test("patchWork の title / tags がメタファイルへ反映され、スキ�
   assert.equal(meta.id, existingWorkId);
 });
 
-test("bookmarked の PATCH はメタファイルを変更しない（DB 固有情報）", async () => {
-  const { adapter, existingWorkId, metaPath } = await setup();
+test("bookmarked の PATCH はメタファイルを変更しない（DB 固有情報）", async (t) => {
+  const { adapter, existingWorkId, metaPath } = await setup(t);
   const before = readFileSync(metaPath, "utf-8");
 
   const updated = await adapter.patchWork(existingWorkId, { bookmarked: true });
@@ -47,13 +46,13 @@ test("bookmarked の PATCH はメタファイルを変更しない（DB 固有�
   assert.equal(readFileSync(metaPath, "utf-8"), before);
 });
 
-test("存在しない作品の patchWork は null", async () => {
-  const { adapter } = await setup();
+test("存在しない作品の patchWork は null", async (t) => {
+  const { adapter } = await setup(t);
   assert.equal(await adapter.patchWork("no-such-id", { title: "x" }), null);
 });
 
-test("メタ書き戻し失敗時は DB の title / tags もロールバックされる", async () => {
-  const { adapter, existingWorkId, metaPath } = await setup();
+test("メタ書き戻し失敗時は DB の title / tags もロールバックされる", async (t) => {
+  const { adapter, existingWorkId, metaPath } = await setup(t);
   const before = await adapter.getWork(existingWorkId);
   rmSync(metaPath);
 

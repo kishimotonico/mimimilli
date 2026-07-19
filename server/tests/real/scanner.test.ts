@@ -5,21 +5,20 @@
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { test } from "node:test";
+import { test, type TestContext } from "node:test";
 import { createRealAdapter } from "../../src/adapters/real/index.ts";
 import { makeSampleLibrary, writeWav } from "../helpers/sampleLibrary.ts";
 
-const BASE = "data/test-scanner";
-
-async function setup() {
-  const lib = makeSampleLibrary(BASE);
+async function setup(t: TestContext) {
+  const lib = makeSampleLibrary();
+  t.after(lib.cleanup);
   const adapter = createRealAdapter({ dbPath: ":memory:" });
   await adapter.updateSettings({ rootFolder: lib.root });
   return { ...lib, adapter };
 }
 
-test("初回スキャン: 登録・自動生成・エラー検出・duration プローブ", async () => {
-  const { adapter, existingWorkId, root } = await setup();
+test("初回スキャン: 登録・自動生成・エラー検出・duration プローブ", async (t) => {
+  const { adapter, existingWorkId, root } = await setup(t);
   const result = await adapter.scan();
 
   assert.equal(result.registered, 1);
@@ -58,8 +57,8 @@ test("初回スキャン: 登録・自動生成・エラー検出・duration プ
   assert.equal(existing.dlsite.rjCode, "RJ900002");
 });
 
-test("DLsite状態: メタ未定義はnone扱いで検出コードを書き戻し、再スキャンでDBへ復元する", async () => {
-  const { adapter, existingWorkId, root } = await setup();
+test("DLsite状態: メタ未定義はnone扱いで検出コードを書き戻し、再スキャンでDBへ復元する", async (t) => {
+  const { adapter, existingWorkId, root } = await setup(t);
   await adapter.scan();
   const metaPath = join(root, "dlsite", "RJ900002_既存メタ", ".meta.json");
   const meta = JSON.parse(readFileSync(metaPath, "utf-8"));
@@ -77,8 +76,8 @@ test("DLsite状態: メタ未定義はnone扱いで検出コードを書き戻�
   assert.deepEqual(restored?.dlsite, meta.dlsite);
 });
 
-test("移動追従: フォルダー移動後も同一 ID で path 更新・DB固有情報を保持", async () => {
-  const { adapter, existingWorkId, root } = await setup();
+test("移動追従: フォルダー移動後も同一 ID で path 更新・DB固有情報を保持", async (t) => {
+  const { adapter, existingWorkId, root } = await setup(t);
   await adapter.scan();
   await adapter.patchWork(existingWorkId, { bookmarked: true });
 
@@ -95,8 +94,8 @@ test("移動追従: フォルダー移動後も同一 ID で path 更新・DB固
   assert.equal(work.bookmarked, true);
 });
 
-test("行方不明: フォルダー削除後の再スキャンで missing になる", async () => {
-  const { adapter, existingWorkId, root } = await setup();
+test("行方不明: フォルダー削除後の再スキャンで missing になる", async (t) => {
+  const { adapter, existingWorkId, root } = await setup(t);
   await adapter.scan();
 
   rmSync(join(root, "dlsite", "RJ900002_既存メタ"), { recursive: true });
@@ -107,9 +106,10 @@ test("行方不明: フォルダー削除後の再スキャンで missing にな
   assert.equal(work?.status, "missing");
 });
 
-test("UUID 重複: 後に検出された方が再採番されメタファイルへ書き戻される", async () => {
-  const root = join(BASE, "lib-dup");
-  rmSync(root, { recursive: true, force: true });
+test("UUID 重複: 後に検出された方が再採番されメタファイルへ書き戻される", async (t) => {
+  const lib = makeSampleLibrary();
+  t.after(lib.cleanup);
+  const root = join(lib.baseDir, "lib-dup");
   const id = "22222222-2222-4222-8222-222222222222";
   for (const name of ["work-a", "work-b"]) {
     mkdirSync(join(root, name), { recursive: true });
@@ -136,8 +136,8 @@ test("UUID 重複: 後に検出された方が再採番されメタファイル�
   assert.equal(works.total, 2);
 });
 
-test("メタ不正: 壊れた JSON は errors にカウントされスキャン自体は成功する", async () => {
-  const { adapter, root } = await setup();
+test("メタ不正: 壊れた JSON は errors にカウントされスキャン自体は成功する", async (t) => {
+  const { adapter, root } = await setup(t);
   const brokenDir = join(root, "broken-work");
   mkdirSync(brokenDir, { recursive: true });
   writeWav(join(brokenDir, "track.wav"), 1);
@@ -150,9 +150,10 @@ test("メタ不正: 壊れた JSON は errors にカウントされスキャン�
   assert.equal(result.newlyGenerated, 1); // RJ900001 のみ
 });
 
-test("大量ディレクトリの走査中、walking フェーズの進捗イベントが複数回発火する（同期walkの詰まり修正の検証）", async () => {
-  const root = join(BASE, "lib-many-dirs");
-  rmSync(root, { recursive: true, force: true });
+test("大量ディレクトリの走査中、walking フェーズの進捗イベントが複数回発火する（同期walkの詰まり修正の検証）", async (t) => {
+  const lib = makeSampleLibrary();
+  t.after(lib.cleanup);
+  const root = join(lib.baseDir, "lib-many-dirs");
   const dirCount = 120;
   for (let i = 0; i < dirCount; i++) {
     mkdirSync(join(root, `dir-${i}`), { recursive: true });
@@ -185,8 +186,8 @@ test("大量ディレクトリの走査中、walking フェーズの進捗イベ
   );
 });
 
-test("登録済み作品のメタが壊れた場合は missing ではなく error にする", async () => {
-  const { adapter, existingWorkId, root } = await setup();
+test("登録済み作品のメタが壊れた場合は missing ではなく error にする", async (t) => {
+  const { adapter, existingWorkId, root } = await setup(t);
   await adapter.scan();
   const metaPath = join(root, "dlsite", "RJ900002_既存メタ", ".meta.json");
   writeFileSync(metaPath, "{ broken");

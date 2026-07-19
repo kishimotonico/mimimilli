@@ -2,16 +2,15 @@
 import assert from "node:assert/strict";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { test } from "node:test";
+import { test, type TestContext } from "node:test";
 import type { WorksPage } from "@mimimilli/shared";
 import { createRealAdapter } from "../../src/adapters/real/index.ts";
 import { createApp } from "../../src/app.ts";
 import { makeSampleLibrary } from "../helpers/sampleLibrary.ts";
 
-const BASE = "data/test-media";
-
-async function setup() {
-  const lib = makeSampleLibrary(BASE);
+async function setup(t: TestContext) {
+  const lib = makeSampleLibrary();
+  t.after(lib.cleanup);
   // ルート直下（作品フォルダー外）に「秘密ファイル」を置き、トラバーサルの検証に使う
   writeFileSync(join(lib.root, "secret.txt"), "library-secret");
   const adapter = createRealAdapter({ dbPath: ":memory:" });
@@ -26,8 +25,8 @@ async function setup() {
   return { app, generated, existing };
 }
 
-test("音声配信: 200 全体取得と Range 206", async () => {
-  const { app, generated } = await setup();
+test("音声配信: 200 全体取得と Range 206", async (t) => {
+  const { app, generated } = await setup(t);
 
   const whole = await app.request(`/api/media/audio/${generated.id}/mp3/01_intro.wav`);
   assert.equal(whole.status, 200);
@@ -42,8 +41,8 @@ test("音声配信: 200 全体取得と Range 206", async () => {
   assert.equal((await part.arrayBuffer()).byteLength, 100);
 });
 
-test("パストラバーサル: ../ を含む相対パスは 404", async () => {
-  const { app, generated } = await setup();
+test("パストラバーサル: ../ を含む相対パスは 404", async (t) => {
+  const { app, generated } = await setup(t);
   for (const rel of [
     "..%2Fsecret.txt",
     "..%2F..%2F..%2Fetc%2Fpasswd",
@@ -54,8 +53,8 @@ test("パストラバーサル: ../ を含む相対パスは 404", async () => {
   }
 });
 
-test("カバー画像: coverImage あり 200 / なし 404 / 作品なし 404", async () => {
-  const { app, generated, existing } = await setup();
+test("カバー画像: coverImage あり 200 / なし 404 / 作品なし 404", async (t) => {
+  const { app, generated, existing } = await setup(t);
 
   const ok = await app.request(`/api/media/cover/${generated.id}`);
   assert.equal(ok.status, 200);

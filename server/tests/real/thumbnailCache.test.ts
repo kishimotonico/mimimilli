@@ -1,14 +1,18 @@
 // サムネイル初回生成の排他（TASK-32）: 同一キャッシュキーへの同時リクエストが
 // 変換を1回だけ実行すること、生成失敗時に残骸を残さず再試行できることを検証する。
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { test } from "node:test";
+import { test, type TestContext } from "node:test";
 import sharp from "sharp";
 import { getOrCreateThumbnail } from "../../src/adapters/real/thumbnailCache.ts";
+import { makeTestDirectory } from "../helpers/sampleLibrary.ts";
 
-const BASE = "data/test-thumbnail-cache";
-const CACHE_DIR = join(BASE, "cache");
+function setup(t: TestContext): { baseDir: string; cacheDir: string } {
+  const directory = makeTestDirectory("thumbnail-cache");
+  t.after(directory.cleanup);
+  return { baseDir: directory.path, cacheDir: join(directory.path, "cache") };
+}
 
 async function writeCoverJpeg(path: string): Promise<void> {
   await sharp({
@@ -18,14 +22,13 @@ async function writeCoverJpeg(path: string): Promise<void> {
     .toFile(path);
 }
 
-test("同一キーへの同時リクエストは変換を1回だけ実行し、全員同じ完成ファイルを受け取る", async () => {
-  rmSync(CACHE_DIR, { recursive: true, force: true });
-  mkdirSync(BASE, { recursive: true });
-  const coverPath = join(BASE, "cover-concurrent.jpg");
+test("同一キーへの同時リクエストは変換を1回だけ実行し、全員同じ完成ファイルを受け取る", async (t) => {
+  const { baseDir, cacheDir } = setup(t);
+  const coverPath = join(baseDir, "cover-concurrent.jpg");
   await writeCoverJpeg(coverPath);
 
   const promises = Array.from({ length: 5 }, () =>
-    getOrCreateThumbnail(CACHE_DIR, "work-concurrent", 256, coverPath),
+    getOrCreateThumbnail(cacheDir, "work-concurrent", 256, coverPath),
   );
   const results = await Promise.all(promises);
 
@@ -36,38 +39,36 @@ test("同一キーへの同時リクエストは変換を1回だけ実行し、�
   }
 
   // 完成ファイルのみが残り、一時ファイルの残骸は無い
-  const files = readdirSync(CACHE_DIR);
+  const files = readdirSync(cacheDir);
   assert.equal(files.length, 1);
   assert.ok(!files[0]!.includes(".tmp-"));
   assert.ok(existsSync(first.absolutePath));
 });
 
-test("異なるキーの生成は並行のまま進む", async () => {
-  rmSync(CACHE_DIR, { recursive: true, force: true });
-  mkdirSync(BASE, { recursive: true });
-  const coverA = join(BASE, "cover-a.jpg");
-  const coverB = join(BASE, "cover-b.jpg");
+test("異なるキーの生成は並行のまま進む", async (t) => {
+  const { baseDir, cacheDir } = setup(t);
+  const coverA = join(baseDir, "cover-a.jpg");
+  const coverB = join(baseDir, "cover-b.jpg");
   await Promise.all([writeCoverJpeg(coverA), writeCoverJpeg(coverB)]);
 
   const [resultA, resultB] = await Promise.all([
-    getOrCreateThumbnail(CACHE_DIR, "work-a", 256, coverA),
-    getOrCreateThumbnail(CACHE_DIR, "work-b", 256, coverB),
+    getOrCreateThumbnail(cacheDir, "work-a", 256, coverA),
+    getOrCreateThumbnail(cacheDir, "work-b", 256, coverB),
   ]);
 
   assert.notEqual(resultA.absolutePath, resultB.absolutePath);
-  assert.equal(readdirSync(CACHE_DIR).length, 2);
+  assert.equal(readdirSync(cacheDir).length, 2);
 });
 
-test("生成失敗時は壊れたキャッシュを残さず、修正後の再試行で成功する", async () => {
-  rmSync(CACHE_DIR, { recursive: true, force: true });
-  mkdirSync(BASE, { recursive: true });
-  const brokenPath = join(BASE, "broken.jpg");
+test("生成失敗時は壊れたキャッシュを残さず、修正後の再試行で成功する", async (t) => {
+  const { baseDir, cacheDir } = setup(t);
+  const brokenPath = join(baseDir, "broken.jpg");
   writeFileSync(brokenPath, "これは画像ではない");
 
-  await assert.rejects(() => getOrCreateThumbnail(CACHE_DIR, "work-broken", 256, brokenPath));
+  await assert.rejects(() => getOrCreateThumbnail(cacheDir, "work-broken", 256, brokenPath));
 
-  if (existsSync(CACHE_DIR)) {
-    const files = readdirSync(CACHE_DIR);
+  if (existsSync(cacheDir)) {
+    const files = readdirSync(cacheDir);
     assert.equal(
       files.filter((f) => f.includes(".tmp-")).length,
       0,
@@ -77,6 +78,6 @@ test("生成失敗時は壊れたキャッシュを残さず、修正後の再�
   }
 
   await writeCoverJpeg(brokenPath);
-  const result = await getOrCreateThumbnail(CACHE_DIR, "work-broken", 256, brokenPath);
+  const result = await getOrCreateThumbnail(cacheDir, "work-broken", 256, brokenPath);
   assert.ok(existsSync(result.absolutePath));
 });

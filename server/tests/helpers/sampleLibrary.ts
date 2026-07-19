@@ -1,6 +1,7 @@
 // テスト・スモーク用のサンプルライブラリ生成。
 // 有効な PCM WAV（既知の再生時間）を生成するため、duration プローブの検証にも使える。
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 /** 指定秒数の有効な 8kHz mono PCM WAV を生成する */
@@ -27,19 +28,36 @@ export function writeWav(path: string, seconds: number): void {
 }
 
 export interface SampleLibrary {
+  baseDir: string;
   root: string;
   /** 既存メタを持つ作品の ID */
   existingWorkId: string;
+  cleanup: () => void;
+}
+
+export interface TestDirectory {
+  path: string;
+  cleanup: () => void;
+}
+
+/** os.tmpdir() 配下にテスト専用ディレクトリを作る。呼び出し側は t.after で cleanup を登録する。 */
+export function makeTestDirectory(name: string): TestDirectory {
+  const path = mkdtempSync(join(tmpdir(), `mimimilli-${name}-`));
+  return {
+    path,
+    cleanup: () => rmSync(path, { recursive: true, force: true }),
+  };
 }
 
 /**
- * サンプルライブラリを baseDir に作る（既存があれば作り直す）。
+ * サンプルライブラリをテスト専用の一時ディレクトリに作る。
  * - dlsite/RJ900001_テスト作品/  … メタなし（自動生成対象）。mp3/ サブフォルダー + cover.jpg
  * - dlsite/RJ900002_既存メタ/    … .meta.json あり。トラック1本欠損（status: error になる）
  */
-export function makeSampleLibrary(baseDir: string): SampleLibrary {
+export function makeSampleLibrary(): SampleLibrary {
+  const directory = makeTestDirectory("sample-library");
+  const baseDir = directory.path;
   const root = join(baseDir, "lib");
-  rmSync(root, { recursive: true, force: true });
 
   const work1 = join(root, "dlsite", "RJ900001_テスト作品");
   const work2 = join(root, "dlsite", "RJ900002_既存メタ");
@@ -75,5 +93,5 @@ export function makeSampleLibrary(baseDir: string): SampleLibrary {
     ),
   );
 
-  return { root, existingWorkId };
+  return { baseDir, root, existingWorkId, cleanup: directory.cleanup };
 }

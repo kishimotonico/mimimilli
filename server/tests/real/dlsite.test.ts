@@ -135,8 +135,9 @@ test("mergeDlsiteTags: prefix 変換と重複排除", () => {
   ]);
 });
 
-test("dlsiteApply: タグマージとメタ書き戻し（カバー DL なし）", async () => {
-  const lib = makeSampleLibrary("data/test-dlsite");
+test("dlsiteApply: タグマージとメタ書き戻し（カバー DL なし）", async (t) => {
+  const lib = makeSampleLibrary();
+  t.after(lib.cleanup);
   const adapter = createRealAdapter({ dbPath: ":memory:" });
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
@@ -183,8 +184,9 @@ test("dlsiteApply: タグマージとメタ書き戻し（カバー DL なし）
   ]);
 });
 
-test("updateDlsiteState: RJコード修正とskipped切替をメタへ保存する", async () => {
-  const lib = makeSampleLibrary("data/test-dlsite-state");
+test("updateDlsiteState: RJコード修正とskipped切替をメタへ保存する", async (t) => {
+  const lib = makeSampleLibrary();
+  t.after(lib.cleanup);
   const adapter = createRealAdapter({ dbPath: ":memory:" });
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
@@ -202,8 +204,9 @@ test("updateDlsiteState: RJコード修正とskipped切替をメタへ保存す�
   assert.equal(enabled?.dlsite.status, "none");
 });
 
-test("dlsiteFetch: 存在しない作品はnot_found", async () => {
-  const lib = makeSampleLibrary("data/test-dlsite-norj");
+test("dlsiteFetch: 存在しない作品はnot_found", async (t) => {
+  const lib = makeSampleLibrary();
+  t.after(lib.cleanup);
   const adapter = createRealAdapter({ dbPath: ":memory:" });
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
@@ -214,8 +217,9 @@ test("dlsiteFetch: 存在しない作品はnot_found", async () => {
   if (!generatedFree.ok) assert.equal(generatedFree.kind, "not_found");
 });
 
-test("一括取得: 編集済みタイトルは保持しフォルダー名のままのタイトルはDLsite情報で更新する。appliedTagsは差分だけ追加し1秒相当の間隔を空ける", async () => {
-  const lib = makeSampleLibrary("data/test-dlsite-bulk");
+test("一括取得: 編集済みタイトルは保持しフォルダー名のままのタイトルはDLsite情報で更新する。appliedTagsは差分だけ追加し1秒相当の間隔を空ける", async (t) => {
+  const lib = makeSampleLibrary();
+  t.after(lib.cleanup);
   const calls: number[] = [];
   const adapter = createRealAdapter({
     dbPath: ":memory:",
@@ -268,8 +272,9 @@ test("一括取得: 編集済みタイトルは保持しフォルダー名のま
   assert.equal(generated?.title, `DLsite取得タイトル ${generated?.dlsite.rjCode}`);
 });
 
-test("一括取得: not_found記録後とskipped作品は次回対象外", async () => {
-  const lib = makeSampleLibrary("data/test-dlsite-bulk-skip");
+test("一括取得: not_found記録後とskipped作品は次回対象外", async (t) => {
+  const lib = makeSampleLibrary();
+  t.after(lib.cleanup);
   let calls = 0;
   const adapter = createRealAdapter({
     dbPath: ":memory:",
@@ -291,8 +296,9 @@ test("一括取得: not_found記録後とskipped作品は次回対象外", async
   assert.equal(calls, 1);
 });
 
-test("一括取得: カバー取得失敗を作品のerrorへ記録し、後続作品を処理する", async () => {
-  const lib = makeSampleLibrary("data/test-dlsite-bulk-cover-error");
+test("一括取得: カバー取得失敗を作品のerrorへ記録し、後続作品を処理する", async (t) => {
+  const lib = makeSampleLibrary();
+  t.after(lib.cleanup);
   let downloads = 0;
   const adapter = createRealAdapter({
     dbPath: ":memory:",
@@ -330,7 +336,8 @@ test("一括取得: カバー取得失敗を作品のerrorへ記録し、後続�
 });
 
 test("一括取得: 失敗状態のメタ書き戻しが例外を投げても後続作品を処理する", async (t) => {
-  const lib = makeSampleLibrary("data/test-dlsite-bulk-persist-error");
+  const lib = makeSampleLibrary();
+  t.after(lib.cleanup);
   const adapter = createRealAdapter({
     dbPath: ":memory:",
     dlsiteRequestIntervalMs: 0,
@@ -357,7 +364,6 @@ test("一括取得: 失敗状態のメタ書き戻しが例外を投げても後
 
   const failedMetaPath = join(lib.root, "dlsite", "RJ900002_既存メタ", ".meta.json");
   chmodSync(failedMetaPath, 0o444);
-  t.after(() => chmodSync(failedMetaPath, 0o644));
 
   const result = await adapter.runDlsiteBulk("existing", undefined);
 

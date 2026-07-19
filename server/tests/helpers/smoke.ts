@@ -4,7 +4,8 @@ import { createApp } from "../../src/app.ts";
 import { createRealAdapter } from "../../src/adapters/real/index.ts";
 import { makeSampleLibrary } from "./sampleLibrary.ts";
 
-const { root } = makeSampleLibrary("data/smoke");
+const { root, cleanup } = makeSampleLibrary();
+process.once("exit", cleanup);
 const adapter = createRealAdapter({ dbPath: ":memory:" });
 const app = createApp(adapter);
 
