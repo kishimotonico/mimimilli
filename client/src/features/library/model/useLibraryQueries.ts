@@ -16,8 +16,10 @@ import {
   listTagPrefixes,
 } from "../api";
 import { getAllTags, getWork, patchWork } from "../../../entities/work/api";
+import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
+import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
+import { TAG_QUERY_KEYS } from "../../../entities/tag/queryKeys";
 import { tagPrefixesAtom } from "./atoms";
-import { LIBRARY_KEYS } from "./queryKeys";
 import { buildWorksParams, getFacetAxisForQuery } from "./libraryPresentation";
 import { getWorkPatchInvalidationTargets } from "./workPatchInvalidation";
 import { isSmartAxis, getSmartFolderId } from "./axisDefinitions";
@@ -36,7 +38,7 @@ export function useLibraryQueries(nav: LibraryViewState, searchQuery: string) {
   });
 
   const worksQuery = useQuery({
-    queryKey: LIBRARY_KEYS.works(worksParams ?? {}),
+    queryKey: WORK_QUERY_KEYS.list(worksParams ?? {}),
     queryFn: () => searchWorks(worksParams!),
     enabled: worksParams !== null,
   });
@@ -44,7 +46,7 @@ export function useLibraryQueries(nav: LibraryViewState, searchQuery: string) {
   const smartAxisId = isSmartAxis(nav.activeAxis) ? getSmartFolderId(nav.activeAxis) : null;
 
   const smartWorksQuery = useQuery({
-    queryKey: LIBRARY_KEYS.smartFolderWorks(smartAxisId ?? ""),
+    queryKey: SMART_FOLDER_QUERY_KEYS.works(smartAxisId ?? ""),
     queryFn: () => evalSmartFolder(smartAxisId!),
     enabled: smartAxisId !== null,
   });
@@ -57,7 +59,7 @@ export function useLibraryQueries(nav: LibraryViewState, searchQuery: string) {
 
   // ── ライブラリ総件数 ──────────────────────────────────────
   const libraryTotalQuery = useQuery({
-    queryKey: LIBRARY_KEYS.libraryTotal(),
+    queryKey: WORK_QUERY_KEYS.total(),
     queryFn: () => searchWorks({ limit: 1 }).then((page) => page.total),
   });
 
@@ -65,28 +67,28 @@ export function useLibraryQueries(nav: LibraryViewState, searchQuery: string) {
   const facetAxis = getFacetAxisForQuery(nav.activeAxis, nav.drillValue);
 
   const facetQuery = useQuery({
-    queryKey: LIBRARY_KEYS.facets(facetAxis ?? ""),
+    queryKey: WORK_QUERY_KEYS.facets(facetAxis ?? ""),
     queryFn: () => getAxisFacets(facetAxis!),
     enabled: facetAxis !== null,
   });
 
   // ── スマートフォルダー一覧 ────────────────────────────────
   const smartFoldersQuery = useQuery({
-    queryKey: LIBRARY_KEYS.smartFolders(),
+    queryKey: SMART_FOLDER_QUERY_KEYS.all(),
     queryFn: listSmartFolders,
   });
   const smartFolders = smartFoldersQuery.data ?? [];
 
   // ── 選択中作品の詳細 ──────────────────────────────────────
   const workDetailQuery = useQuery({
-    queryKey: LIBRARY_KEYS.workDetail(nav.selectedWorkId ?? ""),
+    queryKey: WORK_QUERY_KEYS.detail(nav.selectedWorkId ?? ""),
     queryFn: () => getWork(nav.selectedWorkId!),
     enabled: nav.selectedWorkId !== null,
   });
   const selectedWork = workDetailQuery.data ?? null;
 
   const tagsQuery = useQuery({
-    queryKey: LIBRARY_KEYS.tags(),
+    queryKey: TAG_QUERY_KEYS.all(),
     queryFn: getAllTags,
   });
 
@@ -94,7 +96,7 @@ export function useLibraryQueries(nav: LibraryViewState, searchQuery: string) {
   // 軸レール・タグチップ表示・保護判定の元データ。atom へ同期し、
   // query を持たない場所（アドレスバー等の派生 atom）からも参照できるようにする。
   const tagPrefixesQuery = useQuery({
-    queryKey: LIBRARY_KEYS.tagPrefixes(),
+    queryKey: TAG_QUERY_KEYS.prefixes(),
     queryFn: listTagPrefixes,
   });
   const setTagPrefixes = useSetAtom(tagPrefixesAtom);
@@ -110,17 +112,17 @@ export function useLibraryQueries(nav: LibraryViewState, searchQuery: string) {
   const patchWorkMutation = useMutation({
     mutationFn: ({ workId, body }: { workId: string; body: WorkPatch }) => patchWork(workId, body),
     onSuccess: async (updatedWork, { workId, body }) => {
-      queryClient.setQueryData(LIBRARY_KEYS.workDetail(workId), updatedWork);
+      queryClient.setQueryData(WORK_QUERY_KEYS.detail(workId), updatedWork);
       const targets = getWorkPatchInvalidationTargets(body);
       await Promise.all([
-        targets.works ? queryClient.invalidateQueries({ queryKey: LIBRARY_KEYS.allWorks() }) : null,
+        targets.works ? queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.all() }) : null,
         targets.facets
-          ? queryClient.invalidateQueries({ queryKey: LIBRARY_KEYS.allFacets() })
+          ? queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.allFacets() })
           : null,
         targets.smartFolderWorks
-          ? queryClient.invalidateQueries({ queryKey: LIBRARY_KEYS.allSmartFolderWorks() })
+          ? queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.allWorks() })
           : null,
-        targets.tags ? queryClient.invalidateQueries({ queryKey: LIBRARY_KEYS.tags() }) : null,
+        targets.tags ? queryClient.invalidateQueries({ queryKey: TAG_QUERY_KEYS.all() }) : null,
       ]);
     },
     onError: (error, { workId, body }) => {
@@ -157,8 +159,8 @@ export function useSmartFolderMutation(callbacks: {
       folder ? updateSmartFolder(folder.id, input) : createSmartFolder(input),
     onSuccess: async (savedFolder, { folder }) => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: LIBRARY_KEYS.smartFolders() }),
-        queryClient.invalidateQueries({ queryKey: LIBRARY_KEYS.allSmartFolderWorks() }),
+        queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.all() }),
+        queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.allWorks() }),
       ]);
       callbacks.onSaved(savedFolder, folder === null);
     },

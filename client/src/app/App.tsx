@@ -15,7 +15,9 @@ import TopBar from "./ui/TopBar";
 import LeftNav from "./ui/LeftNav";
 import AddressBar from "./ui/AddressBar";
 import LibraryView from "../features/library/ui/LibraryView";
-import { LIBRARY_KEYS } from "../features/library/model/queryKeys";
+import { WORK_QUERY_KEYS } from "../entities/work/queryKeys";
+import { SMART_FOLDER_QUERY_KEYS } from "../entities/smart-folder/queryKeys";
+import { SETTINGS_QUERY_KEYS } from "../entities/settings/queryKeys";
 import FilesView from "../features/files/ui/FilesView";
 import { useFilesNavigation } from "../features/files/model/useFilesNavigation";
 import type { FsEntry } from "../features/files/model/types";
@@ -46,9 +48,6 @@ import {
   libraryViewModeAtom,
 } from "../features/library/model/atoms";
 import { clampTileSize } from "../features/library/model/gridSizing";
-
-// settings query key（App と SettingsModal が同じキャッシュを参照）
-const SETTINGS_KEY = ["settings"] as const;
 
 export default function App() {
   const player = usePlayer();
@@ -84,7 +83,7 @@ export default function App() {
 
   // ── Settings ─────────────────────────────────────────────
   const settingsQuery = useQuery({
-    queryKey: SETTINGS_KEY,
+    queryKey: SETTINGS_QUERY_KEYS.all(),
     queryFn: getSettings,
     retry: 1,
   });
@@ -117,10 +116,10 @@ export default function App() {
     mutationFn: scanLibrary,
     onSuccess: (result) => {
       setScanResult(result);
-      queryClient.invalidateQueries({ queryKey: ["works"] });
-      queryClient.invalidateQueries({ queryKey: ["axisFacets"] });
-      queryClient.invalidateQueries({ queryKey: ["smartFolderWorks"] });
-      queryClient.invalidateQueries({ queryKey: SETTINGS_KEY });
+      queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.all() });
+      queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.allFacets() });
+      queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.allWorks() });
+      queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() });
       // スキャンで新規作品が見つかった場合、サーバーは自動でDLsite一括取得ジョブを
       // キューイングする（server/src/routes/scan.ts）。ここではAPIを呼ばずSSEに相乗りするだけ。
       if (result.newWorkIds.length > 0) dlsiteBulk.attach();
@@ -131,7 +130,7 @@ export default function App() {
   const changeFolderMutation = useMutation({
     mutationFn: setRootFolder,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: SETTINGS_KEY });
+      queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() });
     },
   });
 
@@ -143,7 +142,7 @@ export default function App() {
       const requestId = ++playRequestIdRef.current;
       try {
         const cached = queryClient.getQueryData<Awaited<ReturnType<typeof getWork>>>(
-          LIBRARY_KEYS.workDetail(work.id),
+          WORK_QUERY_KEYS.detail(work.id),
         );
         const fullWork = cached ?? (await getWork(work.id));
         if (requestId !== playRequestIdRef.current) return;
@@ -178,7 +177,7 @@ export default function App() {
       const requestId = ++playRequestIdRef.current;
       try {
         const cached = queryClient.getQueryData<Awaited<ReturnType<typeof getWork>>>(
-          LIBRARY_KEYS.workDetail(entry.workId),
+          WORK_QUERY_KEYS.detail(entry.workId),
         );
         const fullWork = cached ?? (await getWork(entry.workId));
         if (requestId !== playRequestIdRef.current) return;
@@ -227,13 +226,13 @@ export default function App() {
       setIsCompletingSetup(true);
       try {
         await setRootFolder(path);
-        queryClient.invalidateQueries({ queryKey: SETTINGS_KEY });
+        queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() });
         const result = await scanLibrary();
         setScanResult(result);
-        queryClient.invalidateQueries({ queryKey: ["works"] });
-        queryClient.invalidateQueries({ queryKey: ["axisFacets"] });
-        queryClient.invalidateQueries({ queryKey: ["smartFolderWorks"] });
-        queryClient.setQueryData(SETTINGS_KEY, (prev: typeof settings) =>
+        queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.all() });
+        queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.allFacets() });
+        queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.allWorks() });
+        queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), (prev: typeof settings) =>
           prev ? { ...prev, rootFolder: path } : prev,
         );
       } finally {

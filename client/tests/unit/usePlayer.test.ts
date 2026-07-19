@@ -8,7 +8,7 @@ import { usePlayer } from "../../src/features/player/model/usePlayer";
 import { useResumePersistenceController } from "../../src/features/player/model/useResumePersistence";
 import { saveResumePosition } from "../../src/features/player/api";
 import { playerCurrentTimeAtom, playerDurationAtom } from "../../src/features/player/model/atoms";
-import { LIBRARY_KEYS } from "../../src/features/library/model/queryKeys";
+import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import type { Track, Work, WorkSummary } from "../../src/entities/work/model";
 
 vi.mock("../../src/features/player/api", () => ({
@@ -410,7 +410,7 @@ describe("usePlayer audio engine lifecycle", () => {
       resumeTrackIndex: 0,
     };
     const queryClient = new QueryClient();
-    queryClient.setQueryData(LIBRARY_KEYS.workDetail(work.id), resumableWork);
+    queryClient.setQueryData(WORK_QUERY_KEYS.detail(work.id), resumableWork);
     const { result } = renderHook(() => usePlayerWithClock(), {
       wrapper: makeWrapper({ queryClient }),
     });
@@ -424,7 +424,7 @@ describe("usePlayer audio engine lifecycle", () => {
       latestAudio().dispatchEvent(new Event("ended"));
     });
 
-    expect(queryClient.getQueryData<Work>(LIBRARY_KEYS.workDetail(work.id))).toMatchObject({
+    expect(queryClient.getQueryData<Work>(WORK_QUERY_KEYS.detail(work.id))).toMatchObject({
       resumePosition: 0,
       resumeTrackIndex: 0,
     });

@@ -5,17 +5,17 @@ import { useQuery } from "@tanstack/react-query";
 import { isDlsiteUnlinked } from "@mimimilli/shared";
 import type { WorkSummary } from "@mimimilli/shared";
 import { getAllWorks } from "../../../entities/work/api";
-import { LIBRARY_KEYS } from "./queryKeys";
+import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 
 export function filterDlsiteUnlinkedWorks(works: WorkSummary[]): WorkSummary[] {
   return works.filter((work) => isDlsiteUnlinked(work.dlsite));
 }
 
-/** DLsite未連携の作品件数。他のDLsite系フックと同じく LIBRARY_KEYS.allWorks() を共有し、
+/** DLsite未連携の作品件数。他のDLsite系フックと同じく WORK_QUERY_KEYS.all() を共有し、
  *  一括取得完了時の invalidateQueries で自動的に再取得される。 */
 export function useDlsiteUnlinkedCount() {
   const query = useQuery({
-    queryKey: LIBRARY_KEYS.allWorks(),
+    queryKey: WORK_QUERY_KEYS.all(),
     queryFn: getAllWorks,
   });
   const count = query.data ? filterDlsiteUnlinkedWorks(query.data).length : 0;

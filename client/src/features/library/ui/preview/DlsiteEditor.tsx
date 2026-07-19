@@ -8,7 +8,7 @@ import Button from "../../../../shared/ui/Button";
 import IconButton from "../../../../shared/ui/IconButton";
 import { I } from "../../../../shared/ui/Icon";
 import { useDialogModal } from "../../../../shared/ui/useDialogModal";
-import { LIBRARY_KEYS } from "../../model/queryKeys";
+import { WORK_QUERY_KEYS } from "../../../../entities/work/queryKeys";
 import { getDlsiteInvalidationKeys } from "../../model/dlsiteInvalidation";
 import {
   buildDlsiteApplyBody,
@@ -162,7 +162,7 @@ export function DlsiteEditor({ work }: { work: Work }) {
   useEffect(() => setRjCode(work.dlsite.rjCode ?? ""), [work.dlsite.rjCode]);
 
   const refresh = async (updated?: Work) => {
-    if (updated) queryClient.setQueryData(LIBRARY_KEYS.workDetail(work.id), updated);
+    if (updated) queryClient.setQueryData(WORK_QUERY_KEYS.detail(work.id), updated);
     await Promise.all(
       getDlsiteInvalidationKeys(updated ? undefined : work.id).map((queryKey) =>
         queryClient.invalidateQueries({ queryKey }),
@@ -189,7 +189,7 @@ export function DlsiteEditor({ work }: { work: Work }) {
     try {
       if (rjCode.trim().toUpperCase() !== work.dlsite.rjCode) {
         const updated = await updateDlsiteState(work.id, { rjCode: rjCode.trim() || null });
-        queryClient.setQueryData(LIBRARY_KEYS.workDetail(work.id), updated);
+        queryClient.setQueryData(WORK_QUERY_KEYS.detail(work.id), updated);
       }
       const fetched = await fetchDlsiteInfo(work.id);
       setSelectedTags(unappliedDlsiteTags(work, fetched));

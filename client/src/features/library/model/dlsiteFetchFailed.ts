@@ -8,17 +8,17 @@ import { useQuery } from "@tanstack/react-query";
 import { isDlsiteFetchFailed } from "@mimimilli/shared";
 import type { WorkSummary } from "@mimimilli/shared";
 import { getAllWorks } from "../../../entities/work/api";
-import { LIBRARY_KEYS } from "./queryKeys";
+import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 
 export function filterDlsiteFetchFailedWorks(works: WorkSummary[]): WorkSummary[] {
   return works.filter((work) => isDlsiteFetchFailed(work.dlsite));
 }
 
-/** DLsite取得失敗の作品一覧・件数。scan完了やDLsite一括取得完了時の invalidateQueries(["works"]) に
- *  乗って自動的に再取得される（LIBRARY_KEYS.allWorks() と同じキーを使うため）。 */
+/** DLsite取得失敗の作品一覧・件数。scan完了やDLsite一括取得完了時の作品一覧invalidateに
+ *  乗って自動的に再取得される（WORK_QUERY_KEYS.all() と同じキーを使うため）。 */
 export function useDlsiteFetchFailedWorks() {
   const query = useQuery({
-    queryKey: LIBRARY_KEYS.allWorks(),
+    queryKey: WORK_QUERY_KEYS.all(),
     queryFn: getAllWorks,
   });
   const works = query.data ? filterDlsiteFetchFailedWorks(query.data) : [];

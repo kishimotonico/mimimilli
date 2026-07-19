@@ -11,13 +11,10 @@ import { browseFs } from "../api";
 import { useFilesNavigation } from "../model/useFilesNavigation";
 import { filesDirectionAtom } from "../model/atoms";
 import { rootLabel, type FsEntry } from "../model/types";
+import { FILE_SYSTEM_QUERY_KEYS } from "../../../entities/file-system/queryKeys";
 import FileColumn from "./FileColumn";
 import FilePreview from "./FilePreview";
 import StackEdge from "./StackEdge";
-
-export const FILES_KEYS = {
-  dir: (path: string) => ["fs", path] as const,
-};
 
 // transformOrigin は左端（=スタック側）。子へ潜るとき、出ていくカラムは
 // 横方向に潰れながら左へ寄り、背表紙へ収束する。遡上時は背表紙から開き直す。
@@ -71,7 +68,7 @@ export default function FilesView({
   const direction = useAtomValue(filesDirectionAtom);
 
   const cwdQuery = useQuery({
-    queryKey: FILES_KEYS.dir(nav.cwd),
+    queryKey: FILE_SYSTEM_QUERY_KEYS.directory(nav.cwd),
     queryFn: () => browseFs(nav.cwd),
   });
   const cwdEntries = cwdQuery.data?.entries ?? [];

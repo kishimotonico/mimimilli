@@ -11,7 +11,7 @@ import {
   listTagPrefixes,
   updateTagPrefix,
 } from "../../library/api";
-import { LIBRARY_KEYS } from "../../library/model/queryKeys";
+import { TAG_QUERY_KEYS } from "../../../entities/tag/queryKeys";
 import { I } from "../../../shared/ui/Icon";
 
 const SECTION_LABEL_STYLE: React.CSSProperties = {
@@ -41,16 +41,16 @@ export default function TagPrefixSettings() {
   const [error, setError] = useState<string | null>(null);
 
   const prefixesQuery = useQuery({
-    queryKey: LIBRARY_KEYS.tagPrefixes(),
+    queryKey: TAG_QUERY_KEYS.prefixes(),
     queryFn: listTagPrefixes,
   });
   const candidatesQuery = useQuery({
-    queryKey: LIBRARY_KEYS.tagPrefixCandidates(),
+    queryKey: TAG_QUERY_KEYS.prefixCandidates(),
     queryFn: listTagPrefixCandidates,
   });
 
   const invalidate = async () => {
-    await queryClient.invalidateQueries({ queryKey: LIBRARY_KEYS.tagPrefixes() });
+    await queryClient.invalidateQueries({ queryKey: TAG_QUERY_KEYS.prefixes() });
   };
 
   const createMutation = useMutation({

@@ -9,7 +9,7 @@ import { useRef, useCallback, useMemo } from "react";
 import { useAtom, useSetAtom } from "jotai";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Track, WorkSummary, Work } from "../../../entities/work/model";
-import { LIBRARY_KEYS } from "../../library/model/queryKeys";
+import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { useMediaSession } from "./useMediaSession";
 import { toAudioAbsoluteTime } from "./trackTime";
 import {
@@ -70,7 +70,7 @@ export function usePlayer() {
     });
   const resetResumeCache = useCallback(
     (workId: string) => {
-      queryClient.setQueryData<Work>(LIBRARY_KEYS.workDetail(workId), (cachedWork) =>
+      queryClient.setQueryData<Work>(WORK_QUERY_KEYS.detail(workId), (cachedWork) =>
         cachedWork ? { ...cachedWork, resumePosition: 0, resumeTrackIndex: 0 } : cachedWork,
       );
     },
