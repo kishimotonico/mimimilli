@@ -1,11 +1,11 @@
 ---
 id: TASK-55
 title: usePlayerの責務分割（エンジンライフサイクル・レジューム永続化・アクションの3分割）
-status: In Progress
+status: Done
 assignee:
   - '@codex'
 created_date: '2026-07-19 01:33'
-updated_date: '2026-07-19 01:34'
+updated_date: '2026-07-19 01:40'
 labels: []
 dependencies: []
 ordinal: 52000
@@ -27,7 +27,27 @@ client/src/features/player/model/usePlayer.ts が530行超に肥大化（TASK-50
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 usePlayerが責務ごとに複数モジュールへ分割され、本体は薄い合成層になる
-- [ ] #2 フックの公開APIが変わらず、既存テストが無修正で通る
-- [ ] #3 pnpm check と pnpm test が通る
+- [x] #1 usePlayerが責務ごとに複数モジュールへ分割され、本体は薄い合成層になる
+- [x] #2 フックの公開APIが変わらず、既存テストが無修正で通る
+- [x] #3 pnpm check と pnpm test が通る
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. usePlayerの共有ref・再生コンテキストの境界を定義する\n2. Audio engineの生成・イベント配線・トラック読込・終端処理をuseAudioEngineLifecycleへ分離する\n3. pending resume・定期保存・一時停止保存をuseResumePersistenceへ分離し、usePlayerをアクション中心の合成層にする\n4. 既存対象テスト、pnpm check、pnpm testで挙動不変を検証する\n5. 受け入れ条件と実装記録をBacklogへ反映して完了する
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+実装判断: Audio engineの生成・破棄、イベント配線、トラック読込、同一asset切替、finishCurrentTrackをuseAudioEngineLifecycleへ移した。pending resumeの解決、saveCurrentResume、5秒間隔保存、一時停止時保存はuseResumePersistence.tsへ移した。元実装とeffect登録順を揃えるため、同モジュール内でcontroller準備と保存effect登録を分け、usePlayerではengine lifecycleの後に保存effectを登録した。共有refと内部型はplayerRuntime.tsに集約した。公開APIと既存テストは変更していない。
+
+検証結果: pnpm check 成功。pnpm test 成功（server 20件、client 32ファイル・233件）。対象のusePlayer.test.ts、useMediaSession.test.ts、trackTime.test.tsは無修正。git diff --checkも成功。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+usePlayerをアクション中心の合成層へ縮小し、Audio engine lifecycleとresume永続化を専用フックへ分離した。共有refは内部型で明示し、effect順を維持して挙動を変えずに整理した。pnpm checkとpnpm testが成功し、既存テストは無修正で通過した。
+<!-- SECTION:FINAL_SUMMARY:END -->
