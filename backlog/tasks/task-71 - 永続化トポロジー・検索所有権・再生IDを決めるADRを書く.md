@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@codex'
 created_date: '2026-07-19 04:07'
-updated_date: '2026-07-19 04:33'
+updated_date: '2026-07-19 05:09'
 labels: []
 dependencies:
   - TASK-70
@@ -50,6 +50,8 @@ ADR番号は作成直前に docs/adr/ を確認（並行セッションの衝突
 
 <!-- SECTION:NOTES:BEGIN -->
 ADR-0008で全現行テーブル・列の分類、catalog主DB+user ATTACH JOIN、検索のcore契約/SQL実行分担、UUID移行、resume v2、missing保持、WAL対応バックアップ、旧単一DB移行順を決定。ADR-0003/0004を廃止へ更新。DRAFT-25/26/27はdraft CLIに本文編集コマンドがないため変更せず、重複記述をADR-0008参照へ置き換える必要がある旨をADRと完了報告に記録。検証: pnpm check成功。
+
+2026-07-19ユーザーフィードバックをADR-0008へ反映。開発中のuser DB再作成を許容し、forward migration・事前スナップショット・復元検証を配布開始条件へ変更。resume v1変換をベストエフォート化し、meta ID移行と旧単一DB移行を簡略化。日本語向け事前計算ソートキーと開発serverのBun移行を明記。pnpm check成功。
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
