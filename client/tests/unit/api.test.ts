@@ -194,8 +194,8 @@ describe("library api", () => {
   it("searchWorks fetches /api/works and returns the WorksPage envelope", async () => {
     const mockPage = { items: [makeWorkSummary({ id: "work-1" })], total: 1 };
     mockFetch.mockResolvedValue(makeResponse(mockPage));
-    const result = await libraryApi.searchWorks({ q: "test", tags: ["tag1"] });
-    expect(mockFetch).toHaveBeenCalledWith("/api/works?q=test&tags=tag1");
+    const result = await libraryApi.searchWorks({ q: "test", tags: ["tag,one", "tag2"] });
+    expect(mockFetch).toHaveBeenCalledWith("/api/works?q=test&tags=tag%2Cone&tags=tag2");
     expect(result).toEqual(mockPage);
   });
 

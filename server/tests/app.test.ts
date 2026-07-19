@@ -18,6 +18,21 @@ test("GET /api/works は {items, total} を返す", async () => {
   assert.ok(body.items.length > 0);
 });
 
+test("GET /api/works は複数の tags を配列で受け、タグ内のカンマを保持する", async () => {
+  const adapter = createFixtureAdapter();
+  let receivedTags: string[] | undefined;
+  adapter.queryWorks = async (query) => {
+    receivedTags = query.tags;
+    return { items: [], total: 0 };
+  };
+
+  const app = createApp(adapter);
+  const res = await app.request("/api/works?tags=tag%2Cone&tags=tag2");
+
+  assert.equal(res.status, 200);
+  assert.deepEqual(receivedTags, ["tag,one", "tag2"]);
+});
+
 test("GET /api/works/:id 存在しないIDは404 + apiErrorSchema形式", async () => {
   const app = buildApp();
   const res = await app.request("/api/works/NOT_EXIST");

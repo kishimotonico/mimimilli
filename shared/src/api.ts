@@ -5,13 +5,10 @@ import { normalizeTags, workSummarySchema } from "./work.ts";
 
 // ── 作品検索（GET /api/works）────────────────────────────────
 
-/** クエリパラメータ。tags はカンマ区切り文字列で受け、配列へ変換する */
+/** クエリパラメータ。tags は同名パラメータを繰り返して配列で受ける */
 export const worksQuerySchema = z.object({
   q: z.string().default(""),
-  tags: z
-    .string()
-    .default("")
-    .transform((s) => s.split(",").filter(Boolean)),
+  tags: z.array(z.string()).default([]),
   tagOp: z.enum(["AND", "OR"]).default("AND"),
   axis: facetAxisIdSchema.optional(),
   axisValue: z.string().optional(),

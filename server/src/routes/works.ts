@@ -9,7 +9,10 @@ export function worksRoute(adapter: DataAdapter): Hono {
   const app = new Hono();
 
   app.get("/works", async (c) => {
-    const parsed = worksQuerySchema.safeParse(c.req.query());
+    const parsed = worksQuerySchema.safeParse({
+      ...c.req.query(),
+      tags: c.req.queries("tags"),
+    });
     if (!parsed.success) {
       invalidRequest("works のクエリパラメータが不正です");
     }

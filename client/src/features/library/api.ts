@@ -45,7 +45,7 @@ export interface WorksQueryParams {
 export async function searchWorks(params: WorksQueryParams): Promise<WorksPage> {
   const p = new URLSearchParams();
   if (params.q) p.set("q", params.q);
-  if (params.tags?.length) p.set("tags", params.tags.join(","));
+  for (const tag of params.tags ?? []) p.append("tags", tag);
   if (params.tagOp) p.set("tagOp", params.tagOp);
   if (params.axis) p.set("axis", params.axis);
   if (params.axisValue) p.set("axisValue", params.axisValue);
