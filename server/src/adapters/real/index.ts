@@ -361,9 +361,14 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       workIds: string[] | undefined,
       onProgress?: (event: Extract<DlsiteBulkProgressEvent, { type: "progress" }>) => void,
     ): Promise<DlsiteBulkResult> {
-      const requested = workIds
-        ? workIds.map((id) => repo.getWork(id)).filter((work): work is Work => work !== null)
-        : repo.listSummaries().map((summary) => repo.getWork(summary.id)!);
+      // 対象抽出は listSummaries で完結させる（全件 getWork の N+1 を解消。TASK-57）。
+      // 以降の個別処理で完全な Work が必要な場合だけ、その作品の getWork を呼ぶ
+      const summaries = repo.listSummaries();
+      const requested = (() => {
+        if (!workIds) return summaries;
+        const idSet = new Set(workIds);
+        return summaries.filter((summary) => idSet.has(summary.id));
+      })();
       const targets = requested.filter(
         (work) =>
           work.dlsite.rjCode && (work.dlsite.status === "none" || work.dlsite.status === "error"),
@@ -391,7 +396,8 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
             };
             db.transaction(() => {
               repo.setDlsiteState(work.id, dlsite);
-              patchMetaFile(findMetaPath(work), { dlsite });
+              const fullWork = repo.getWork(work.id);
+              if (fullWork) patchMetaFile(findMetaPath(fullWork), { dlsite });
             });
             result.failed += 1;
           } else {
@@ -450,7 +456,8 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
           try {
             db.transaction(() => {
               repo.setDlsiteState(work.id, dlsite);
-              patchMetaFile(findMetaPath(work), { dlsite });
+              const fullWork = repo.getWork(work.id);
+              if (fullWork) patchMetaFile(findMetaPath(fullWork), { dlsite });
             });
           } catch (persistError) {
             console.error("DLsite失敗状態の保存に失敗しました", {

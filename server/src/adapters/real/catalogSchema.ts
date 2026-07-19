@@ -13,6 +13,10 @@ export const works = sqliteTable(
     status: text("status").notNull(),
     physicalPath: text("physical_path").notNull(),
     totalDurationSec: real("total_duration_sec").notNull().default(0),
+    /** デフォルトプレイリストのトラック数。upsert時に維持する（TASK-57: 一覧でplaylists_jsonを読まないため） */
+    trackCount: integer("track_count").notNull().default(0),
+    /** 増分スキャンの変更検知フィンガープリント（TASK-75で値を設定する。列はTASK-57と同じv5で先行追加） */
+    fingerprint: text("fingerprint"),
     errorMessage: text("error_message"),
     urlsJson: text("urls_json").notNull(),
     playlistsJson: text("playlists_json").notNull(),

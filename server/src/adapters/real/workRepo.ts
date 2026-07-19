@@ -1,6 +1,6 @@
 // works / tags / smart_folders / search_presets / app_settings の CRUD、検索、行⇄ドメイン変換。
 import { join } from "node:path";
-import { asc, eq, inArray } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import {
   dlsiteStateSchema,
   emptyDlsiteState,
@@ -55,7 +55,26 @@ type RawWorkRow = Omit<WorkRow, "bookmarked" | "resumeResolved"> & {
   bookmarked: number;
   resumeResolved: number;
 };
-type RawSummaryRow = RawWorkRow & { dlsiteStateJson: string | null };
+/** rowToSummary が参照する列。listSummaries の軽量クエリはこの列集合だけを取得する（TASK-57） */
+type SummaryRow = Pick<
+  WorkRow,
+  | "id"
+  | "title"
+  | "coverImage"
+  | "status"
+  | "physicalPath"
+  | "totalDurationSec"
+  | "addedAt"
+  | "errorMessage"
+  | "urlsJson"
+  | "trackCount"
+  | "bookmarked"
+  | "lastPlayedAt"
+>;
+type RawSummaryListRow = Omit<SummaryRow, "bookmarked"> & {
+  bookmarked: number;
+  dlsiteStateJson: string | null;
+};
 
 const RECENT_VIEW_WINDOW_DAYS = 30;
 
@@ -113,13 +132,8 @@ function defaultPlaylistOf(
   return playlists[0]!;
 }
 
-function rowToSummary(row: WorkRow, tagNames: string[], dlsite: DlsiteState): WorkSummary {
-  const playlists = parseRecord(
-    z.array(playlistSchema),
-    parseJsonField(row.playlistsJson, "works", row.id, "playlists_json"),
-    "works",
-    row.id,
-  );
+function rowToSummary(row: SummaryRow, tagNames: string[], dlsite: DlsiteState): WorkSummary {
+  // trackCount は works.track_count 列を使う（playlists_json の全件パースを避ける。TASK-57）
   return parseRecord(
     workSummarySchema,
     {
@@ -133,7 +147,7 @@ function rowToSummary(row: WorkRow, tagNames: string[], dlsite: DlsiteState): Wo
       errorMessage: row.errorMessage,
       urls: parseJsonField(row.urlsJson, "works", row.id, "urls_json"),
       tags: tagNames,
-      trackCount: defaultPlaylistOf(row, playlists)?.tracks.length ?? 0,
+      trackCount: row.trackCount,
       bookmarked: row.bookmarked,
       lastPlayedAt: row.lastPlayedAt,
       dlsite,
@@ -268,21 +282,20 @@ export class WorkRepo {
 
   /** workId → タグ名一覧のマップを作る（対象未指定なら全件） */
   private tagMap(workIds?: string[]): Map<string, string[]> {
-    const rows =
+    const baseSql = `
+      SELECT work_tags.work_id AS workId, tags.name AS name
+      FROM main.work_tags AS work_tags
+      INNER JOIN main.tags AS tags ON tags.id = work_tags.tag_id
+    `;
+    const rows = (
       workIds === undefined
-        ? this.db.catalog
-            .select({ workId: workTags.workId, name: tags.name })
-            .from(workTags)
-            .innerJoin(tags, eq(workTags.tagId, tags.id))
-            .all()
+        ? this.db.sqlite.query(baseSql).all()
         : workIds.length === 0
           ? []
-          : this.db.catalog
-              .select({ workId: workTags.workId, name: tags.name })
-              .from(workTags)
-              .innerJoin(tags, eq(workTags.tagId, tags.id))
-              .where(inArray(workTags.workId, workIds))
-              .all();
+          : this.db.sqlite
+              .query(`${baseSql} WHERE work_tags.work_id IN (${workIds.map(() => "?").join(", ")})`)
+              .all(...workIds)
+    ) as Array<{ workId: string; name: string }>;
     const map = new Map<string, string[]>();
     for (const r of rows) {
       const list = map.get(r.workId);
@@ -331,19 +344,24 @@ export class WorkRepo {
 
   // ── works ─────────────────────────────────────────────────
 
+  /** state_json を検証して DlsiteState に復元する。行がない（null）場合は空状態 */
+  private parseDlsiteStateJson(workId: string, stateJson: string | null): DlsiteState {
+    if (stateJson === null) return emptyDlsiteState();
+    return parseRecord(
+      dlsiteStateSchema,
+      parseJsonField(stateJson, "work_dlsite", workId, "state_json"),
+      "work_dlsite",
+      workId,
+    );
+  }
+
   private dlsiteState(workId: string): DlsiteState {
     const row = this.db.catalog
       .select()
       .from(workDlsite)
       .where(eq(workDlsite.workId, workId))
       .get();
-    if (!row) return emptyDlsiteState();
-    return parseRecord(
-      dlsiteStateSchema,
-      parseJsonField(row.stateJson, "work_dlsite", workId, "state_json"),
-      "work_dlsite",
-      workId,
-    );
+    return this.parseDlsiteStateJson(workId, row?.stateJson ?? null);
   }
 
   setDlsiteState(workId: string, state: DlsiteState): void {
@@ -369,6 +387,7 @@ export class WorkRepo {
         works.status,
         works.physical_path AS physicalPath,
         works.total_duration_sec AS totalDurationSec,
+        works.track_count AS trackCount,
         works.error_message AS errorMessage,
         works.urls_json AS urlsJson,
         works.playlists_json AS playlistsJson,
@@ -406,11 +425,40 @@ export class WorkRepo {
   }
 
   listSummaries(): WorkSummary[] {
-    const rows = this.joinedWorks();
+    // 一覧専用クエリ。dlsite まで JOIN して一括取得し、playlists_json は読まない（TASK-57）。
+    // SQL 発行数は作品数に比例しない（本クエリ + tagMap の定数2本）
+    const rows = this.db.sqlite
+      .query(
+        `
+      SELECT
+        works.id,
+        works.title,
+        works.cover_image AS coverImage,
+        works.status,
+        works.physical_path AS physicalPath,
+        works.total_duration_sec AS totalDurationSec,
+        works.track_count AS trackCount,
+        works.error_message AS errorMessage,
+        works.urls_json AS urlsJson,
+        work_states.added_at AS addedAt,
+        work_states.bookmarked,
+        work_states.last_played_at AS lastPlayedAt,
+        work_dlsite.state_json AS dlsiteStateJson
+      FROM main.works
+      INNER JOIN user.work_states AS work_states ON work_states.work_id = works.id
+      LEFT JOIN main.work_dlsite AS work_dlsite ON work_dlsite.work_id = works.id
+    `,
+      )
+      .all() as RawSummaryListRow[];
     const tagsByWork = this.tagMap();
-    return rows.map((row) =>
-      rowToSummary(row, tagsByWork.get(row.id) ?? [], this.dlsiteState(row.id)),
-    );
+    return rows.map((rawRow) => {
+      const row: SummaryRow = { ...rawRow, bookmarked: rawRow.bookmarked !== 0 };
+      return rowToSummary(
+        row,
+        tagsByWork.get(row.id) ?? [],
+        this.parseDlsiteStateJson(row.id, rawRow.dlsiteStateJson),
+      );
+    });
   }
 
   /** ADR-0008: ATTACH JOINした同じ絞り込み集合から件数とページを求める。 */
@@ -510,29 +558,22 @@ export class WorkRepo {
         params.page !== undefined && params.limit !== undefined
           ? [params.limit, (params.page - 1) * params.limit]
           : [];
+      // 一覧用の列だけを取得する（playlists_json は読まない。TASK-57）
       const rows = this.db.sqlite
         .query(`
         SELECT
           works.id,
           works.title,
-          works.title_sort_key AS titleSortKey,
           works.cover_image AS coverImage,
-          works.default_playlist_id AS defaultPlaylistId,
-          works.created_at AS createdAt,
           works.status,
           works.physical_path AS physicalPath,
           works.total_duration_sec AS totalDurationSec,
+          works.track_count AS trackCount,
           works.error_message AS errorMessage,
           works.urls_json AS urlsJson,
-          works.playlists_json AS playlistsJson,
-          work_states.work_id AS workId,
           work_states.added_at AS addedAt,
           work_states.bookmarked,
           work_states.last_played_at AS lastPlayedAt,
-          work_states.resume_playlist_id AS resumePlaylistId,
-          work_states.resume_track_id AS resumeTrackId,
-          work_states.resume_offset_sec AS resumeOffsetSec,
-          0 AS resumeResolved,
           work_dlsite.state_json AS dlsiteStateJson
         ${fromSql}
         LEFT JOIN main.work_dlsite AS work_dlsite ON work_dlsite.work_id = works.id
@@ -540,24 +581,16 @@ export class WorkRepo {
         ORDER BY ${orderSql}
         ${paginationSql}
       `)
-        .all(...bindings, ...orderBindings, ...paginationBindings) as RawSummaryRow[];
+        .all(...bindings, ...orderBindings, ...paginationBindings) as RawSummaryListRow[];
       const workIds = rows.map((row) => row.id);
       const tagsByWork = this.tagMap(workIds);
       const items = rows.map((rawRow) => {
-        const row: WorkRow = {
-          ...rawRow,
-          bookmarked: rawRow.bookmarked !== 0,
-          resumeResolved: rawRow.resumeResolved !== 0,
-        };
-        const dlsite = rawRow.dlsiteStateJson
-          ? parseRecord(
-              dlsiteStateSchema,
-              parseJsonField(rawRow.dlsiteStateJson, "work_dlsite", rawRow.id, "state_json"),
-              "work_dlsite",
-              rawRow.id,
-            )
-          : emptyDlsiteState();
-        return rowToSummary(row, tagsByWork.get(row.id) ?? [], dlsite);
+        const row: SummaryRow = { ...rawRow, bookmarked: rawRow.bookmarked !== 0 };
+        return rowToSummary(
+          row,
+          tagsByWork.get(row.id) ?? [],
+          this.parseDlsiteStateJson(row.id, rawRow.dlsiteStateJson),
+        );
       });
       return seed === undefined
         ? { items, total: countRow.total }
@@ -643,6 +676,10 @@ export class WorkRepo {
       })
       .onConflictDoNothing()
       .run();
+    // track_count はデフォルトプレイリストのトラック数（一覧がplaylists_jsonを読まないためここで維持。TASK-57）
+    const trackCount =
+      defaultPlaylistOf({ id: work.id, defaultPlaylistId: work.defaultPlaylistId }, work.playlists)
+        ?.tracks.length ?? 0;
     const values = {
       id: work.id,
       title: work.title,
@@ -653,6 +690,7 @@ export class WorkRepo {
       status: work.status,
       physicalPath: work.physicalPath,
       totalDurationSec: work.totalDurationSec,
+      trackCount,
       errorMessage: work.errorMessage,
       urlsJson: JSON.stringify(work.urls),
       playlistsJson: JSON.stringify(work.playlists),
