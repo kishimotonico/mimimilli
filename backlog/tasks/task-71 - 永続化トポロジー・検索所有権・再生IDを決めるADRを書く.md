@@ -1,12 +1,18 @@
 ---
 id: TASK-71
 title: 永続化トポロジー・検索所有権・再生IDを決めるADRを書く
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@codex'
 created_date: '2026-07-19 04:07'
+updated_date: '2026-07-19 04:33'
 labels: []
 dependencies:
   - TASK-70
+modified_files:
+  - docs/adr/0008-persistence-topology-query-ownership-playback-ids.md
+  - docs/adr/0003-no-db-migrations.md
+  - docs/adr/0004-core-functions-over-sql.md
 ordinal: 68000
 ---
 
@@ -29,7 +35,25 @@ ADR番号は作成直前に docs/adr/ を確認（並行セッションの衝突
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 上記の決定事項を網羅したADRが docs/adr/ に追加されている
-- [ ] #2 保留した判断（CAS競合制御等）が保留理由つきで記録されている
-- [ ] #3 DRAFT-25/26/27から参照される決定の重複記述が整理されている
+- [x] #1 上記の決定事項を網羅したADRが docs/adr/ に追加されている
+- [x] #2 保留した判断（CAS競合制御等）が保留理由つきで記録されている
+- [x] #3 DRAFT-25/26/27から参照される決定の重複記述が整理されている
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. 前提ADR・設計レビュー・ドラフト・スパイク・現行スキーマを照合する\n2. データ分類、2DB接続、検索所有権、ID・resume・バックアップ・移行を決定する\n3. ADR-0008を作成し、superseded対象ADRのステータスを更新する\n4. 差分とpnpm checkを検証し、受け入れ条件を確認して完了する
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+ADR-0008で全現行テーブル・列の分類、catalog主DB+user ATTACH JOIN、検索のcore契約/SQL実行分担、UUID移行、resume v2、missing保持、WAL対応バックアップ、旧単一DB移行順を決定。ADR-0003/0004を廃止へ更新。DRAFT-25/26/27はdraft CLIに本文編集コマンドがないため変更せず、重複記述をADR-0008参照へ置き換える必要がある旨をADRと完了報告に記録。検証: pnpm check成功。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+ADR-0008を追加し、永続化トポロジー・検索所有権・再生IDと無損失移行手順を確定した。ADR-0003/0004はADR-0008による置換として廃止へ更新。pnpm check成功。DRAFT-25/26/27の本文はCLI制約により未変更で、次回編集時に決定部分をADR-0008参照へ寄せる。
+<!-- SECTION:FINAL_SUMMARY:END -->

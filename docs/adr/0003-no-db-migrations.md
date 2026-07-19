@@ -1,6 +1,6 @@
 # ADR-0003: DB に互換マイグレーションを持たない
 
-- ステータス: 承認（実装済み）
+- ステータス: 廃止（[ADR-0008](0008-persistence-topology-query-ownership-playback-ids.md)により置換）
 - 日付: 2026-07-04
 - 関連: [ADR-0004](0004-core-functions-over-sql.md)、[../ARCHITECTURE.md](../ARCHITECTURE.md)
 

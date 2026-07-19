@@ -1,6 +1,6 @@
 # ADR-0004: 検索・集計・評価は SQL でなく core の純粋関数で行う
 
-- ステータス: 承認（実装済み）
+- ステータス: 廃止（[ADR-0008](0008-persistence-topology-query-ownership-playback-ids.md)により置換）
 - 日付: 2026-07-04
 - 関連: [ADR-0002](0002-mock-as-fixture-adapter.md)、[ADR-0003](0003-no-db-migrations.md)、[../ARCHITECTURE.md](../ARCHITECTURE.md)
 
