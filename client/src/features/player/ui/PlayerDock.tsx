@@ -61,6 +61,8 @@ export default function PlayerDock({
           <BarContent
             state={state}
             onTogglePlay={actions.onTogglePlay}
+            onNext={actions.onNext}
+            onPrev={actions.onPrev}
             onSeek={actions.onSeek}
             onSwitchToPopup={() => switchUiMode("popup")}
           />

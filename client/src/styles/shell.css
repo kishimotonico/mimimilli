@@ -2028,7 +2028,30 @@
   .mle-bar1__error svg {
     flex-shrink: 0;
   }
-  /* ミスクリックで展開しないよう、ボタン自体を大きめ + 周囲に余白 */
+  .mle-bar1__controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .mle-bar1__track-button {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    color: var(--ink-1);
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+  }
+  .mle-bar1__track-button:hover:not(:disabled) {
+    background: var(--paper-2);
+    color: var(--ink-0);
+  }
+  .mle-bar1__track-button:disabled {
+    color: var(--ink-4);
+    cursor: not-allowed;
+  }
+  /* ミスクリックで展開しないよう、再生ボタン自体を大きめにする */
   .mle-bar1__play {
     width: 44px;
     height: 44px;
@@ -2038,7 +2061,6 @@
     display: grid;
     place-items: center;
     flex-shrink: 0;
-    margin: 0 4px;
   }
   .mle-bar1__play:hover {
     background: var(--acc);
