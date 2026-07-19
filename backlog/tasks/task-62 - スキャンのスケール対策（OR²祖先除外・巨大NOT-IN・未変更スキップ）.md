@@ -1,7 +1,7 @@
 ---
 id: TASK-62
 title: スキャンの計算量・SQLite上限対策（O(R²)祖先除外・巨大NOT IN）
-status: In Progress
+status: Done
 assignee:
   - '@kimi'
 created_date: '2026-07-19 02:03'
