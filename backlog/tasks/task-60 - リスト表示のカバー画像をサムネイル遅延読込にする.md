@@ -1,11 +1,11 @@
 ---
 id: TASK-60
 title: リスト表示のカバー画像をサムネイル+遅延読込にする
-status: In Progress
+status: Done
 assignee:
   - '@kimi'
 created_date: '2026-07-19 02:02'
-updated_date: '2026-07-19 12:30'
+updated_date: '2026-07-19 12:31'
 labels: []
 dependencies: []
 priority: high
