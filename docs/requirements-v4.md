@@ -20,7 +20,7 @@ DLsiteやDMMのWebプレイヤーが使いにくく、横断的な検索がで�
 ### 1.4 技術スタック
 
 - **フロントエンド:** React 19 + TypeScript + Vite
-- **バックエンド:** TypeScript + Hono + Node（ローカル HTTP API サーバー）
+- **バックエンド:** TypeScript + Hono + Bun（ローカル HTTP API サーバー。[ADR-0007](adr/0007-bun-distribution-runtime.md)）
 - **音声再生:** HTML5 Audio + Web Audio API（フロントエンド完結）
   - 将来的に高度な機能（ギャップレス再生等）が必要になった場合、サーバー側への移行余地を残す
 - **データベース:** SQLite（Drizzle ORM / `bun:sqlite`、catalog/userの2DB）
@@ -86,9 +86,11 @@ root/
 
 ### 3.2 メタファイル フォーマット
 
+フォーマットの正典は `shared/src/meta.ts` の `metaFileSchema`。作品・プレイリスト・トラックはそれぞれ UUID v4 の `id` を持ち、スキャン時に自動生成・補完される。
+
 ```jsonc
 {
-  "id": "uuid-xxxx-xxxx-xxxx",
+  "id": "<uuid>",
   "title": "作品タイトル",
   "urls": [
     { "label": "DLsite", "url": "https://www.dlsite.com/..." },
@@ -98,14 +100,15 @@ root/
   "coverImage": "cover.jpg",
   "playlists": [
     {
+      "id": "<uuid>",
       "name": "default",
       "tracks": [
-        { "title": "導入", "file": "SE無し/mp3/01_導入.mp3" },
-        { "title": "本編", "file": "SE無し/mp3/02_本編.mp3" },
+        { "id": "<uuid>", "title": "導入", "file": "SE無し/mp3/01_導入.mp3" },
+        { "id": "<uuid>", "title": "本編", "file": "SE無し/mp3/02_本編.mp3" },
       ],
     },
   ],
-  "defaultPlaylist": "default",
+  "defaultPlaylistId": "<uuid>",
   "createdAt": "2025-01-01T00:00:00Z",
 }
 ```
@@ -134,25 +137,13 @@ root/
 
 ```jsonc
 "playlists": [
-  {
-    "name": "SE無し",
-    "tracks": [
-      { "title": "導入", "file": "SE無し/mp3/01_導入.mp3" },
-      { "title": "本編", "file": "SE無し/mp3/02_本編.mp3" }
-    ]
-  },
-  {
-    "name": "SE有り",
-    "tracks": [
-      { "title": "導入", "file": "SE有り/mp3/01_導入.mp3" },
-      { "title": "本編", "file": "SE有り/mp3/02_本編.mp3" }
-    ]
-  }
+  { "id": "<uuid>", "name": "SE無し", "tracks": [/* ... */] },
+  { "id": "<uuid>", "name": "SE有り", "tracks": [/* ... */] }
 ],
-"defaultPlaylist": "SE無し"
+"defaultPlaylistId": "<SE無しのuuid>"
 ```
 
-大半の作品ではプレイリストは1つのみの想定。データ構造は複数プレイリストに対応するが、管理UIは現在提供せず、プレイヤーは `defaultPlaylist` を再生する。
+大半の作品ではプレイリストは1つのみの想定。データ構造は複数プレイリストに対応するが、管理UIは現在提供せず、プレイヤーは `defaultPlaylistId` のプレイリストを再生する。
 
 ### 3.5 メタファイルの自動生成
 
@@ -228,7 +219,7 @@ prefix定義はAnnotatedタグの表示ラベル、色、軸レールへの表�
 - 再生速度変更
 - L/R入れ替え
 - A-Bリピート。A点とB点は再生中のトラックで設定し、トラック切り替え時に解除する。ポイントは永続化しない
-- レジューム。再生位置とトラック番号をDBへ5秒間隔、一時停止時、停止時、トラック切り替え時に保存し、作品詳細の「続きから」で再開する
+- レジューム。再生位置（プレイリスト・トラック・区間内オフセット秒）をDBへ5秒間隔、一時停止時、停止時、トラック切り替え時に保存し、作品詳細の「続きから」で再開する
 - Media Session API。対応ブラウザーでは作品・トラック情報、カバー、再生状態、再生位置をOSへ公開し、再生、一時停止、前後トラック、前後シーク、位置指定を受け付ける
 
 ### 5.2 プレイヤーの表示モード
@@ -243,7 +234,7 @@ prefix定義はAnnotatedタグの表示ラベル、色、軸レールへの表�
 
 ### 5.3 再生モード
 
-**トラックモード:** メタファイルのプレイリスト（`defaultPlaylist`）に基づき、音声ファイルをトラックリストとして表示。トラック単位の再生が可能。
+**トラックモード:** メタファイルのプレイリスト（`defaultPlaylistId` が指すもの）に基づき、音声ファイルをトラックリストとして表示。トラック単位の再生が可能。
 
 プレイヤー内のフォルダービューは現在提供せず、File Explorerモードを別画面として提供する。
 
@@ -401,7 +392,7 @@ ASMR作品の特性を考慮し、シークバーは十分な幅と当たり判�
 
 ### 9.1 概要
 
-PC上のローカル API サーバー（Hono + Node）を常駐させ、iPadなど別端末のWebブラウザからLAN経由で音声をストリーミング再生する。基本的なローカルサーバー化（`server/`）は実装済み。
+PC上のローカル API サーバー（Hono + Bun）を常駐させ、iPadなど別端末のWebブラウザからLAN経由で音声をストリーミング再生する。基本的なローカルサーバー化（`server/`）は実装済み。
 
 ### 9.2 アーキテクチャ
 

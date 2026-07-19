@@ -42,6 +42,7 @@ Files モード（物理フォルダーの巡回とポップアッププレイ�
 
 - **Node.js** 24+
 - **pnpm**（開発は v11 系で確認）
+- **Bun**（server の実行・テストに使用。fixture のみの UI 開発なら不要）
 
 ### インストールと起動
 
@@ -124,24 +125,27 @@ pnpm test:visual:update  # ビジュアルスナップショット再生成
 
 ```jsonc
 {
-  "id": "uuid-xxxx-xxxx",
+  "id": "<uuid>",
   "title": "作品タイトル",
   "urls": [{ "label": "DLsite", "url": "https://..." }],
   "tags": ["バイノーラル", "cv/名前", "サークル/名前"],
   "coverImage": "cover.jpg",
   "playlists": [
     {
+      "id": "<uuid>",
       "name": "default",
       "tracks": [
-        { "title": "導入", "file": "01_導入.mp3" },
-        { "title": "本編", "file": "02_本編.mp3" },
+        { "id": "<uuid>", "title": "導入", "file": "01_導入.mp3" },
+        { "id": "<uuid>", "title": "本編", "file": "02_本編.mp3" },
       ],
     },
   ],
-  "defaultPlaylist": "default",
+  "defaultPlaylistId": "<uuid>",
   "createdAt": "2026-01-01T00:00:00.000Z",
 }
 ```
+
+各 `id`（作品・プレイリスト・トラック）は UUID v4 で、スキャン時に自動生成・補完される。手書きする必要はない。スキーマの正典は `shared/src/meta.ts`（`metaFileSchema`）。
 
 ### キーボードショートカット
 
@@ -161,7 +165,7 @@ mimimilli/
 │   ├── src/
 │   │   ├── app/             # アプリルート、プロバイダー、グローバルショートカット
 │   │   ├── features/        # 機能単位モジュール (library/files/player/scan/settings/setup/navigation)
-│   │   ├── entities/        # ドメインエンティティ (work/)
+│   │   ├── entities/        # ドメインエンティティ (work / tag / smart-folder / settings / file-system)
 │   │   └── shared/          # 共通ユーティリティ、UI、API クライアント
 │   ├── tests/
 │   │   ├── unit/            # vitest 単体テスト
