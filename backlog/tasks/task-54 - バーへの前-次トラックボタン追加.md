@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@codex'
 created_date: '2026-07-05 18:00'
-updated_date: '2026-07-19 01:46'
+updated_date: '2026-07-19 01:53'
 labels:
   - player
   - future
@@ -47,6 +47,8 @@ modified_files:
 <!-- SECTION:NOTES:BEGIN -->
 BarContentの操作部を固定幅の前・再生/一時停止・次グループに変更。曲名領域は既存のflex縮小とellipsisを維持し、操作群はflex-shrink: 0として狭幅でも崩れない構造にした。disabledボタン由来のクリックではポップアップへ切り替わらないよう、親クリック処理でbuttonを除外した。
 検証: pnpm check 成功。pnpm test 成功（server 20件、client 235件）。BarContentのコンポーネントテスト2件を追加。ブラウザ確認は依頼どおり委譲元で実施する。
+
+ブラウザ実機検証(6項目全合格): ボタン表示・トラック移動・境界disabled(not-allowed)・ポップアップ誤展開なし・再生/シーク回帰なし・狭幅900pxレイアウト崩れなし。
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

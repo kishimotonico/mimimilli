@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@codex'
 created_date: '2026-07-19 01:33'
-updated_date: '2026-07-19 01:40'
+updated_date: '2026-07-19 01:53'
 labels: []
 dependencies: []
 ordinal: 52000
@@ -44,6 +44,8 @@ client/src/features/player/model/usePlayer.ts が530行超に肥大化（TASK-50
 実装判断: Audio engineの生成・破棄、イベント配線、トラック読込、同一asset切替、finishCurrentTrackをuseAudioEngineLifecycleへ移した。pending resumeの解決、saveCurrentResume、5秒間隔保存、一時停止時保存はuseResumePersistence.tsへ移した。元実装とeffect登録順を揃えるため、同モジュール内でcontroller準備と保存effect登録を分け、usePlayerではengine lifecycleの後に保存effectを登録した。共有refと内部型はplayerRuntime.tsに集約した。公開APIと既存テストは変更していない。
 
 検証結果: pnpm check 成功。pnpm test 成功（server 20件、client 32ファイル・233件）。対象のusePlayer.test.ts、useMediaSession.test.ts、trackTime.test.tsは無修正。git diff --checkも成功。
+
+ブラウザ実機検証で再生/一時停止・シーク・時間表示・トラック切替の回帰なしを確認。
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
