@@ -1,11 +1,11 @@
 ---
 id: TASK-61
 title: ライブラリ検索のデバウンスとリクエスト中断（AbortSignal）
-status: In Progress
+status: Done
 assignee:
   - '@kimi'
 created_date: '2026-07-19 02:02'
-updated_date: '2026-07-19 12:47'
+updated_date: '2026-07-19 12:48'
 labels: []
 dependencies: []
 priority: high
