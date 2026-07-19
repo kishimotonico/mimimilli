@@ -11,38 +11,9 @@
 
 import { atom } from "jotai";
 import { atomWithStorage } from "jotai/utils";
-import type { Track, WorkSummary, Work } from "../../../entities/work/model";
-import type { AudioEngineError } from "./audioEngine";
+import { PLAYER_CORE_INITIAL, type PlayerCoreState } from "./playerController";
 
-export interface PlayerCoreState {
-  isPlaying: boolean;
-  currentTrackIndex: number;
-  currentPlaylistId: string | null;
-  currentWork: WorkSummary | Work | null;
-  tracks: Track[];
-  volume: number;
-  loop: boolean;
-  showFullPlayer: boolean;
-  playbackRate: number;
-  channelSwap: boolean;
-  abRepeat: { a: number | null; b: number | null };
-  playbackError: AudioEngineError | null;
-}
-
-export const PLAYER_CORE_INITIAL: PlayerCoreState = {
-  isPlaying: false,
-  currentTrackIndex: -1,
-  currentPlaylistId: null,
-  currentWork: null,
-  tracks: [],
-  volume: 75,
-  loop: false,
-  showFullPlayer: false,
-  playbackRate: 1.0,
-  channelSwap: false,
-  abRepeat: { a: null, b: null },
-  playbackError: null,
-};
+export { PLAYER_CORE_INITIAL, type PlayerCoreState } from "./playerController";
 
 /** 低頻度更新の player core state */
 export const playerCoreAtom = atom<PlayerCoreState>(PLAYER_CORE_INITIAL);

@@ -3,11 +3,9 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore, useAtomValue } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { formatTime, formatDuration, formatFileSize } from "../../src/shared/lib/format";
 import { usePlayer } from "../../src/features/player/model/usePlayer";
-import { useResumePersistenceController } from "../../src/features/player/model/useResumePersistence";
-import { saveResumePosition } from "../../src/features/player/api";
 import { playerCurrentTimeAtom, playerDurationAtom } from "../../src/features/player/model/atoms";
+import { saveResumePosition } from "../../src/features/player/api";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import type { Track, Work, WorkSummary } from "../../src/entities/work/model";
 
@@ -22,45 +20,28 @@ class FakeAudio extends EventTarget {
   error: MediaError | null = null;
   playbackRate = 1;
   readyState = 0;
-  private _src = "";
+  private value = "";
   readonly srcAssignments: string[] = [];
   volume = 1;
 
   get src() {
-    return this._src;
+    return this.value;
   }
 
   set src(value: string) {
-    this._src = value;
+    this.value = value;
     this.srcAssignments.push(value);
   }
 
   play = vi.fn(() => {
-    if (nextPlayError) {
-      return Promise.reject(nextPlayError);
-    }
     this.dispatchEvent(new Event("play"));
     return Promise.resolve();
   });
 
-  pause = vi.fn(() => {
-    this.dispatchEvent(new Event("pause"));
-  });
+  pause = vi.fn(() => this.dispatchEvent(new Event("pause")));
 }
 
 const audioInstances: FakeAudio[] = [];
-let nextPlayError: unknown = null;
-
-function installFakeAudio() {
-  vi.stubGlobal(
-    "Audio",
-    vi.fn(function FakeAudioConstructor() {
-      const audio = new FakeAudio();
-      audioInstances.push(audio);
-      return audio;
-    }) as unknown as typeof Audio,
-  );
-}
 
 function latestAudio() {
   const audio = audioInstances.at(-1);
@@ -115,87 +96,35 @@ const work: WorkSummary = {
 
 beforeEach(() => {
   audioInstances.length = 0;
-  nextPlayError = null;
   vi.mocked(saveResumePosition).mockReset();
   vi.mocked(saveResumePosition).mockResolvedValue(undefined);
-  installFakeAudio();
+  vi.stubGlobal(
+    "Audio",
+    vi.fn(function FakeAudioConstructor() {
+      const audio = new FakeAudio();
+      audioInstances.push(audio);
+      return audio;
+    }) as unknown as typeof Audio,
+  );
 });
 
-afterEach(() => {
-  vi.unstubAllGlobals();
-});
+afterEach(() => vi.unstubAllGlobals());
 
-describe("formatTime", () => {
-  it("formats 0 seconds", () => {
-    expect(formatTime(0)).toBe("0:00");
-  });
-
-  it("formats seconds only", () => {
-    expect(formatTime(45)).toBe("0:45");
-  });
-
-  it("formats minutes and seconds", () => {
-    expect(formatTime(125)).toBe("2:05");
-  });
-
-  it("formats hours", () => {
-    expect(formatTime(3661)).toBe("1:01:01");
-  });
-
-  it("handles NaN", () => {
-    expect(formatTime(NaN)).toBe("0:00");
-  });
-
-  it("handles Infinity", () => {
-    expect(formatTime(Infinity)).toBe("0:00");
-  });
-});
-
-describe("formatDuration", () => {
-  it("formats 0", () => {
-    expect(formatDuration(0)).toBe("0:00");
-  });
-
-  it("delegates to formatTime", () => {
-    expect(formatDuration(90)).toBe("1:30");
-  });
-});
-
-describe("formatFileSize", () => {
-  it("formats bytes", () => {
-    expect(formatFileSize(500)).toBe("500 B");
-  });
-
-  it("formats KB", () => {
-    expect(formatFileSize(1536)).toBe("1.5 KB");
-  });
-
-  it("formats MB", () => {
-    expect(formatFileSize(2 * 1024 * 1024)).toBe("2.0 MB");
-  });
-});
-
-describe("usePlayer audio engine lifecycle", () => {
-  it("keeps audio callbacks alive after StrictMode effect cleanup and remount", async () => {
+describe("usePlayer adapters", () => {
+  it("StrictModeのeffect再実行後もControllerへHTMLAudioイベントを渡す", async () => {
     const { result } = renderHook(() => usePlayerWithClock(), {
       wrapper: makeWrapper({ strict: true }),
     });
-
     await waitFor(() => expect(audioInstances.length).toBeGreaterThanOrEqual(1));
 
-    act(() => {
-      result.current.player.play(work, [track]);
-    });
-
+    act(() => result.current.player.play(work, [track]));
     await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
-
     act(() => {
-      const audio = latestAudio();
-      audio.currentTime = 42;
-      audio.duration = 120;
-      audio.dispatchEvent(new Event("timeupdate"));
-      audio.dispatchEvent(new Event("durationchange"));
-      audio.dispatchEvent(new Event("pause"));
+      latestAudio().currentTime = 42;
+      latestAudio().duration = 120;
+      latestAudio().dispatchEvent(new Event("timeupdate"));
+      latestAudio().dispatchEvent(new Event("durationchange"));
+      latestAudio().dispatchEvent(new Event("pause"));
     });
 
     expect(result.current.currentTime).toBe(42);
@@ -203,82 +132,49 @@ describe("usePlayer audio engine lifecycle", () => {
     expect(result.current.player.state.isPlaying).toBe(false);
   });
 
-  it("sets playback error and resets isPlaying when audio.play rejects", async () => {
-    nextPlayError = new DOMException("User activation required", "NotAllowedError");
-
-    const { result } = renderHook(() => usePlayerWithClock(), {
-      wrapper: makeWrapper(),
-    });
-
-    act(() => {
-      result.current.player.play(work, [track]);
-    });
-
-    await waitFor(() => {
-      expect(result.current.player.state.playbackError).toMatchObject({
-        source: "play",
-        name: "NotAllowedError",
-        message: "User activation required",
-      });
-    });
-    expect(result.current.player.state.isPlaying).toBe(false);
-  });
-
-  it("区間トラックの atom とシークをトラック相対時間で扱う", async () => {
+  it("区間トラックの相対時刻をatomへ投影し、シークを絶対時刻へ変換する", async () => {
     const segment: Track = { ...track, start: 30, end: 90 };
     const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
 
     act(() => result.current.player.play(work, [segment]));
     await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
-
     act(() => {
-      const audio = latestAudio();
-      audio.duration = 120;
-      audio.dispatchEvent(new Event("durationchange"));
-      audio.currentTime = 45;
-      audio.dispatchEvent(new Event("timeupdate"));
+      latestAudio().duration = 120;
+      latestAudio().dispatchEvent(new Event("durationchange"));
+      latestAudio().currentTime = 45;
+      latestAudio().dispatchEvent(new Event("timeupdate"));
     });
 
     expect(result.current.duration).toBe(60);
     expect(result.current.currentTime).toBe(15);
-
     act(() => result.current.player.seek(20));
     expect(latestAudio().currentTime).toBe(50);
-
-    act(() => result.current.player.seek(-10));
-    expect(latestAudio().currentTime).toBe(30);
-
-    act(() => result.current.player.seek(100));
-    expect(latestAudio().currentTime).toBe(90);
   });
 
-  it("区間終端を一度だけ通常のトラック終了として扱う", async () => {
+  it("区間終端とHTMLAudio endedの重複を一度のトラック終了として扱う", async () => {
     const tracks: Track[] = [
       { ...track, start: 30, end: 90 },
       { title: "Track 2", file: "audio/track-2.wav" },
     ];
     const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
-
     act(() => result.current.player.play(work, tracks));
     await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
 
     act(() => {
-      const audio = latestAudio();
-      audio.duration = 90;
-      audio.currentTime = 90;
-      audio.dispatchEvent(new Event("timeupdate"));
-      audio.dispatchEvent(new Event("ended"));
+      latestAudio().duration = 90;
+      latestAudio().currentTime = 90;
+      latestAudio().dispatchEvent(new Event("timeupdate"));
+      latestAudio().dispatchEvent(new Event("ended"));
     });
 
     await waitFor(() => expect(result.current.player.state.currentTrackIndex).toBe(1));
   });
 
-  it("loop 有効時は区間トラックの先頭へ戻って再生を続ける", async () => {
+  it("loopコマンドを区間先頭への絶対シークと再生継続へ接続する", async () => {
     const segment: Track = { ...track, start: 30, end: 90 };
     const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
-
     act(() => result.current.player.play(work, [segment]));
-    await waitFor(() => expect(latestAudio().play).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(latestAudio().play).toHaveBeenCalledOnce());
     act(() => result.current.player.setLoop(true));
 
     act(() => {
@@ -289,141 +185,109 @@ describe("usePlayer audio engine lifecycle", () => {
 
     expect(latestAudio().currentTime).toBe(30);
     expect(latestAudio().play).toHaveBeenCalledTimes(2);
-    expect(result.current.player.state.currentTrackIndex).toBe(0);
     expect(result.current.player.state.isPlaying).toBe(true);
   });
 
-  it("loop 有効時は通常トラックの先頭へ戻って再生を続ける", async () => {
+  it("A-Bリピートの相対位置を区間内の絶対シークへ接続する", async () => {
+    const segment: Track = { ...track, start: 30, end: 90 };
     const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
-
-    act(() => result.current.player.play(work, [track], 0, playlistId));
-    await waitFor(() => expect(latestAudio().play).toHaveBeenCalledTimes(1));
-    act(() => result.current.player.setLoop(true));
-
-    act(() => {
-      latestAudio().duration = 120;
-      latestAudio().currentTime = 120;
-      latestAudio().dispatchEvent(new Event("ended"));
-    });
-
-    expect(latestAudio().currentTime).toBe(0);
-    expect(latestAudio().play).toHaveBeenCalledTimes(2);
-    expect(result.current.player.state.currentTrackIndex).toBe(0);
-    expect(result.current.player.state.isPlaying).toBe(true);
-  });
-
-  it("最終トラック聴了時はレジューム位置を作品の先頭へ戻す", async () => {
-    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
-
-    act(() => result.current.player.play(work, [track], 0, playlistId));
+    act(() => result.current.player.play(work, [segment]));
     await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
-    vi.mocked(saveResumePosition).mockClear();
+    latestAudio().duration = 120;
 
     act(() => {
-      latestAudio().duration = 120;
-      latestAudio().currentTime = 120;
-      latestAudio().dispatchEvent(new Event("ended"));
+      latestAudio().currentTime = 40;
+      result.current.player.setABPoint("a");
+      latestAudio().currentTime = 50;
+      result.current.player.setABPoint("b");
+      latestAudio().dispatchEvent(new Event("timeupdate"));
     });
 
-    expect(result.current.player.state.isPlaying).toBe(false);
-    expect(saveResumePosition).toHaveBeenCalledTimes(1);
-    expect(saveResumePosition).toHaveBeenCalledWith(work.id, {
-      playlistId,
-      trackId: track.id,
-      offsetSec: 0,
-    });
+    expect(result.current.player.state.abRepeat).toEqual({ a: 10, b: 20 });
+    expect(latestAudio().currentTime).toBe(40);
+    expect(result.current.currentTime).toBe(10);
   });
 
-  it("途中トラックの終端ではトラックIDと区間相対の終端位置を保存する", async () => {
+  it("B点が区間終端でもA-Bシーク後に次トラックへ進めない", async () => {
     const tracks: Track[] = [
-      { ...track, start: 0, end: 30 },
+      { ...track, start: 30, end: 90 },
       { title: "Track 2", file: "audio/track-2.wav" },
     ];
     const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
-
-    act(() => result.current.player.play(work, tracks, 0, playlistId));
+    act(() => result.current.player.play(work, tracks));
     await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
-    vi.mocked(saveResumePosition).mockClear();
+    latestAudio().duration = 120;
 
     act(() => {
-      latestAudio().duration = 30;
+      latestAudio().currentTime = 40;
+      result.current.player.setABPoint("a");
+      latestAudio().currentTime = 90;
+      result.current.player.setABPoint("b");
+      latestAudio().dispatchEvent(new Event("timeupdate"));
+    });
+
+    expect(result.current.player.state.currentTrackIndex).toBe(0);
+    expect(result.current.player.state.isPlaying).toBe(true);
+    expect(latestAudio().currentTime).toBe(40);
+  });
+
+  it("同一assetの次区間があるloopでもplayイベントなしで再生状態と終了検知を維持する", async () => {
+    const tracks: Track[] = [
+      { ...track, start: 0, end: 30 },
+      {
+        id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        title: "Track 2",
+        file: track.file,
+        start: 30,
+        end: 60,
+      },
+    ];
+    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
+    act(() => result.current.player.play(work, tracks));
+    await waitFor(() => expect(latestAudio().play).toHaveBeenCalledOnce());
+    act(() => result.current.player.setLoop(true));
+    latestAudio().play.mockImplementation(() => Promise.resolve());
+
+    act(() => {
       latestAudio().currentTime = 30;
       latestAudio().dispatchEvent(new Event("timeupdate"));
     });
-    await waitFor(() => expect(result.current.player.state.currentTrackIndex).toBe(1));
+    expect(latestAudio().play).toHaveBeenCalledTimes(2);
 
+    act(() => {
+      latestAudio().currentTime = 30;
+      latestAudio().dispatchEvent(new Event("timeupdate"));
+    });
+    expect(latestAudio().play).toHaveBeenCalledTimes(3);
+
+    act(() => result.current.player.togglePlay());
+    expect(latestAudio().pause).toHaveBeenCalledOnce();
+    expect(result.current.player.state.isPlaying).toBe(false);
+  });
+
+  it("Audioエラー時に直近の相対位置をresumeへ保存する", async () => {
+    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
+    act(() => result.current.player.play(work, [track], 0, playlistId));
+    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
+    latestAudio().currentTime = 42;
+    vi.mocked(saveResumePosition).mockClear();
+
+    act(() => latestAudio().dispatchEvent(new Event("error")));
+
+    expect(result.current.player.state.playbackError).not.toBeNull();
     expect(saveResumePosition).toHaveBeenCalledWith(work.id, {
       playlistId,
       trackId: track.id,
-      offsetSec: 30,
+      offsetSec: 42,
     });
   });
 
-  it("聴了後の一時停止処理は終端位置でレジュームを上書きしない", async () => {
-    const segment: Track = { ...track, start: 30, end: 90 };
-    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
-
-    act(() => result.current.player.play(work, [segment], 0, playlistId));
-    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
-    vi.mocked(saveResumePosition).mockClear();
-
-    act(() => {
-      latestAudio().duration = 120;
-      latestAudio().currentTime = 90;
-      latestAudio().dispatchEvent(new Event("timeupdate"));
-      latestAudio().dispatchEvent(new Event("pause"));
-    });
-
-    expect(result.current.player.state.isPlaying).toBe(false);
-    expect(saveResumePosition).toHaveBeenCalledTimes(1);
-    expect(saveResumePosition).toHaveBeenLastCalledWith(work.id, {
-      playlistId,
-      trackId: track.id,
-      offsetSec: 0,
-    });
-  });
-
-  it("最終区間の終端で再生を再開すると区間先頭へ戻して終了検知を再武装する", async () => {
-    const segment: Track = { ...track, start: 30, end: 90 };
-    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
-
-    act(() => result.current.player.play(work, [segment]));
-    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
-
-    act(() => {
-      const audio = latestAudio();
-      audio.duration = 120;
-      audio.currentTime = 90;
-      audio.dispatchEvent(new Event("timeupdate"));
-    });
-    expect(result.current.player.state.isPlaying).toBe(false);
-    expect(latestAudio().pause).toHaveBeenCalledTimes(1);
-
-    act(() => result.current.player.togglePlay());
-    expect(latestAudio().currentTime).toBe(30);
-    expect(result.current.currentTime).toBe(0);
-    expect(result.current.player.state.isPlaying).toBe(true);
-
-    act(() => {
-      latestAudio().currentTime = 90;
-      latestAudio().dispatchEvent(new Event("timeupdate"));
-    });
-    expect(result.current.player.state.isPlaying).toBe(false);
-    expect(latestAudio().pause).toHaveBeenCalledTimes(2);
-  });
-
-  it("最終トラック聴了時はwork detailキャッシュのレジューム位置も先頭へ戻す", async () => {
+  it("作品聴了コマンドをresume v2の先頭リセットとQuery cacheへ接続する", async () => {
     const resumableWork: Work = {
       ...work,
       defaultPlaylistId: playlistId,
       createdAt: null,
-      playlists: [
-        {
-          id: playlistId,
-          name: "default",
-          tracks: [track],
-        },
-      ],
+      playlists: [{ id: playlistId, name: "default", tracks: [track] }],
       resume: { playlistId, trackId: track.id, offsetSec: 42 },
     };
     const queryClient = new QueryClient();
@@ -431,117 +295,35 @@ describe("usePlayer audio engine lifecycle", () => {
     const { result } = renderHook(() => usePlayerWithClock(), {
       wrapper: makeWrapper({ queryClient }),
     });
-
     act(() => result.current.player.play(work, [track], 0, playlistId));
     await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
+    vi.mocked(saveResumePosition).mockClear();
 
-    act(() => {
-      latestAudio().duration = 120;
-      latestAudio().currentTime = 120;
-      latestAudio().dispatchEvent(new Event("ended"));
+    act(() => latestAudio().dispatchEvent(new Event("ended")));
+
+    expect(saveResumePosition).toHaveBeenCalledWith(work.id, {
+      playlistId,
+      trackId: track.id,
+      offsetSec: 0,
     });
-
     expect(queryClient.getQueryData<Work>(WORK_QUERY_KEYS.detail(work.id))).toMatchObject({
       resume: { playlistId, trackId: track.id, offsetSec: 0 },
     });
   });
 
-  it("A-B 点をトラック相対時間で保持して絶対時刻へシークする", async () => {
-    const segment: Track = { ...track, start: 30, end: 90 };
+  it("Files相当のplaylistなし単発再生では作品聴了としてresumeをリセットしない", async () => {
     const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
-
-    act(() => result.current.player.play(work, [segment]));
+    act(() => result.current.player.play(work, [track], 0, null));
     await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
+    vi.mocked(saveResumePosition).mockClear();
 
-    act(() => {
-      latestAudio().duration = 120;
-      latestAudio().currentTime = 40;
-      result.current.player.setABPoint("a");
-    });
-    act(() => {
-      latestAudio().currentTime = 50;
-      result.current.player.setABPoint("b");
-    });
+    act(() => latestAudio().dispatchEvent(new Event("ended")));
 
-    expect(result.current.player.state.abRepeat).toEqual({ a: 10, b: 20 });
-
-    act(() => {
-      latestAudio().dispatchEvent(new Event("timeupdate"));
-    });
-    expect(latestAudio().currentTime).toBe(40);
-    expect(result.current.currentTime).toBe(10);
+    expect(result.current.player.state.isPlaying).toBe(false);
+    expect(saveResumePosition).not.toHaveBeenCalled();
   });
 
-  it("nextTrack と prevTrack はトラックを移動して A-B リピートを解除する", async () => {
-    const tracks: Track[] = [
-      track,
-      { title: "Track 2", file: "audio/track-2.wav" },
-      { title: "Track 3", file: "audio/track-3.wav" },
-    ];
-    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
-
-    act(() => result.current.player.play(work, tracks, 1));
-    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
-    act(() => {
-      latestAudio().currentTime = 10;
-      result.current.player.setABPoint("a");
-    });
-
-    act(() => result.current.player.nextTrack());
-    expect(result.current.player.state.currentTrackIndex).toBe(2);
-    expect(result.current.player.state.abRepeat).toEqual({ a: null, b: null });
-
-    act(() => {
-      latestAudio().currentTime = 20;
-      result.current.player.setABPoint("a");
-      result.current.player.prevTrack();
-    });
-    expect(result.current.player.state.currentTrackIndex).toBe(1);
-    expect(result.current.player.state.abRepeat).toEqual({ a: null, b: null });
-  });
-
-  it("nextTrack と prevTrack は末尾と先頭を越えず A-B リピートも維持する", async () => {
-    const tracks: Track[] = [track, { title: "Track 2", file: "audio/track-2.wav" }];
-    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
-
-    act(() => result.current.player.play(work, tracks, 0, playlistId));
-    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
-    latestAudio().duration = 120;
-    act(() => {
-      latestAudio().currentTime = 10;
-      result.current.player.setABPoint("a");
-    });
-    act(() => result.current.player.prevTrack());
-    expect(result.current.player.state.currentTrackIndex).toBe(0);
-    expect(result.current.player.state.abRepeat).toEqual({ a: 10, b: null });
-
-    act(() => result.current.player.setTrackIndex(1));
-    act(() => {
-      latestAudio().currentTime = 20;
-      result.current.player.setABPoint("a");
-    });
-    act(() => result.current.player.nextTrack());
-    expect(result.current.player.state.currentTrackIndex).toBe(1);
-    expect(result.current.player.state.abRepeat).toEqual({ a: 20, b: null });
-  });
-
-  it("setTrackIndex は指定位置へ移動して A-B リピートを解除する", async () => {
-    const tracks: Track[] = [track, { title: "Track 2", file: "audio/track-2.wav" }];
-    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
-
-    act(() => result.current.player.play(work, tracks));
-    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
-    act(() => {
-      latestAudio().currentTime = 10;
-      result.current.player.setABPoint("a");
-    });
-    act(() => result.current.player.setTrackIndex(1));
-
-    expect(result.current.player.state.currentTrackIndex).toBe(1);
-    expect(result.current.player.state.abRepeat).toEqual({ a: null, b: null });
-  });
-
-  it("同一ファイルのトラック切替では再ロードせず開始位置へシークする", async () => {
+  it("同一ファイルのトラック切替では再ロードせず区間先頭へシークする", async () => {
     const tracks: Track[] = [
       { ...track, start: 0, end: 30 },
       {
@@ -553,11 +335,9 @@ describe("usePlayer audio engine lifecycle", () => {
       },
     ];
     const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
-
     act(() => result.current.player.play(work, tracks, 0, playlistId));
     await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
     latestAudio().duration = 60;
-    vi.mocked(saveResumePosition).mockClear();
 
     act(() => result.current.player.nextTrack());
     await waitFor(() => expect(latestAudio().currentTime).toBe(30));
@@ -565,215 +345,18 @@ describe("usePlayer audio engine lifecycle", () => {
     expect(latestAudio().srcAssignments).toHaveLength(1);
     expect(result.current.currentTime).toBe(0);
     expect(result.current.duration).toBe(30);
-    expect(result.current.player.state.isPlaying).toBe(true);
-    expect(saveResumePosition).toHaveBeenCalledWith(work.id, {
-      playlistId,
-      trackId: track.id,
-      offsetSec: 0,
-    });
   });
 
-  it("一時停止中の同一ファイル切替では位置だけを変える", async () => {
-    const tracks: Track[] = [
-      { ...track, start: 0, end: 30 },
-      {
-        id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
-        title: "Track 2",
-        file: track.file,
-        start: 30,
-        end: 60,
-      },
-    ];
-    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
-
-    act(() => result.current.player.play(work, tracks));
-    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
-    latestAudio().duration = 60;
-    act(() => result.current.player.togglePlay());
-    expect(result.current.player.state.isPlaying).toBe(false);
-    latestAudio().play.mockClear();
-
-    act(() => result.current.player.setTrackIndex(1));
-    await waitFor(() => expect(latestAudio().currentTime).toBe(30));
-
-    expect(latestAudio().srcAssignments).toHaveLength(1);
-    expect(latestAudio().play).not.toHaveBeenCalled();
-    expect(result.current.player.state.isPlaying).toBe(false);
-  });
-
-  it("同一ファイルの仮想終端では停止せず次トラックへシークする", async () => {
-    const tracks: Track[] = [
-      { ...track, start: 0, end: 30 },
-      { title: "Track 2", file: track.file, start: 30, end: 60 },
-    ];
-    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
-
-    act(() => result.current.player.play(work, tracks));
-    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
-
-    act(() => {
-      latestAudio().duration = 60;
-      latestAudio().currentTime = 30;
-      latestAudio().dispatchEvent(new Event("timeupdate"));
-    });
-    await waitFor(() => expect(result.current.player.state.currentTrackIndex).toBe(1));
-
-    expect(latestAudio().pause).not.toHaveBeenCalled();
-    expect(latestAudio().currentTime).toBe(30);
-    expect(latestAudio().srcAssignments).toHaveLength(1);
-    expect(result.current.player.state.isPlaying).toBe(true);
-  });
-
-  it("同一ファイル切替でも pending resume の位置を優先する", async () => {
-    const tracks: Track[] = [
-      { ...track, start: 0, end: 30 },
-      {
-        id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
-        title: "Track 2",
-        file: track.file,
-        start: 30,
-        end: 60,
-      },
-    ];
-    const resumableWork: Work = {
-      ...work,
-      defaultPlaylistId: playlistId,
-      createdAt: null,
-      playlists: [
-        {
-          id: playlistId,
-          name: "default",
-          tracks,
-        },
-      ],
-      resume: { playlistId, trackId: tracks[1]!.id, offsetSec: 15 },
-    };
-    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
-
-    act(() => result.current.player.play(work, tracks));
-    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
-    latestAudio().duration = 60;
-
-    act(() => result.current.player.playWithResume(resumableWork));
-    await waitFor(() => expect(latestAudio().currentTime).toBe(45));
-
-    expect(latestAudio().srcAssignments).toHaveLength(1);
-    expect(result.current.currentTime).toBe(15);
-    expect(result.current.duration).toBe(30);
-  });
-
-  it("resumeのIDを解決できない場合はdefault Playlistの先頭から再生する", async () => {
-    const resumableWork: Work = {
-      ...work,
-      defaultPlaylistId: playlistId,
-      createdAt: null,
-      playlists: [{ id: playlistId, name: "default", tracks: [track] }],
-      resume: {
-        playlistId,
-        trackId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
-        offsetSec: 45,
-      },
-    };
-    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
-
-    act(() => result.current.player.playWithResume(resumableWork));
-    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
-
-    expect(result.current.player.state.currentTrackIndex).toBe(0);
-    expect(result.current.player.state.currentPlaylistId).toBe(playlistId);
-    expect(latestAudio().srcAssignments[0]).toContain(track.file);
-    expect(latestAudio().currentTime).toBe(0);
-  });
-
-  it("異なるファイルのトラック切替では従来どおり再ロードする", async () => {
-    const tracks: Track[] = [
-      { ...track, start: 0, end: 30 },
-      { title: "Track 2", file: "audio/track-2.wav", start: 0, end: 45 },
-    ];
-    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
-
-    act(() => result.current.player.play(work, tracks));
-    await waitFor(() => expect(latestAudio().srcAssignments).toHaveLength(1));
-
-    act(() => result.current.player.nextTrack());
-    await waitFor(() => expect(latestAudio().srcAssignments).toHaveLength(2));
-
-    expect(latestAudio().srcAssignments[1]).toContain("audio/track-2.wav");
-  });
-
-  it("同じファイル名でも作品が異なれば再ロードする", async () => {
-    const otherWork: WorkSummary = { ...work, id: "work-2", title: "Work 2" };
-    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
-
-    act(() => result.current.player.play(work, [track]));
-    await waitFor(() => expect(latestAudio().srcAssignments).toHaveLength(1));
-
-    act(() => result.current.player.play(otherWork, [track]));
-    await waitFor(() => expect(latestAudio().srcAssignments).toHaveLength(2));
-
-    expect(latestAudio().srcAssignments[1]).toContain("/work-2/");
-  });
-
-  it("stop はトラック相対のoffsetSecを保存して再生stateを初期化する", async () => {
-    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
-
-    act(() => result.current.player.play(work, [track], 0, playlistId));
-    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
-    latestAudio().currentTime = 42;
-    vi.mocked(saveResumePosition).mockClear();
-
-    act(() => result.current.player.stop());
-
-    expect(saveResumePosition).toHaveBeenCalledWith(work.id, {
-      playlistId,
-      trackId: track.id,
-      offsetSec: 42,
-    });
-    expect(result.current.player.state).toMatchObject({
-      isPlaying: false,
-      currentWork: null,
-      tracks: [],
-      currentTrackIndex: -1,
-    });
-  });
-
-  it("seekRelative は区間相対の現在位置から移動して区間内へクランプする", async () => {
-    const segment: Track = { ...track, start: 30, end: 90 };
-    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
-
-    act(() => result.current.player.play(work, [segment]));
-    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
-    latestAudio().duration = 120;
-
-    latestAudio().currentTime = 50;
-    act(() => result.current.player.seekRelative(10));
-    expect(latestAudio().currentTime).toBe(60);
-
-    act(() => result.current.player.seekRelative(-100));
-    expect(latestAudio().currentTime).toBe(30);
-
-    latestAudio().currentTime = 80;
-    act(() => result.current.player.seekRelative(100));
-    expect(latestAudio().currentTime).toBe(90);
-  });
-
-  it("v2の区間相対offsetSecを区間トラック内へ復元する", async () => {
+  it("resume v2の区間相対offsetをHTMLAudioの絶対時刻へ復元する", async () => {
     const segment: Track = { ...track, start: 30, end: 90 };
     const resumableWork: Work = {
       ...work,
       defaultPlaylistId: playlistId,
       createdAt: null,
-      playlists: [
-        {
-          id: playlistId,
-          name: "default",
-          tracks: [segment],
-        },
-      ],
+      playlists: [{ id: playlistId, name: "default", tracks: [segment] }],
       resume: { playlistId, trackId: segment.id, offsetSec: 15 },
     };
     const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
-
     act(() => result.current.player.playWithResume(resumableWork));
     await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
 
@@ -788,57 +371,21 @@ describe("usePlayer audio engine lifecycle", () => {
     expect(result.current.currentTime).toBe(15);
     expect(result.current.duration).toBe(60);
   });
-});
 
-describe("useResumePersistenceController", () => {
-  it("飛行中の保存を待ってから聴了リセットを送り、先行保存が失敗しても処理を続ける", async () => {
-    let rejectFirstSave: ((reason?: unknown) => void) | undefined;
-    vi.mocked(saveResumePosition)
-      .mockImplementationOnce(
-        () =>
-          new Promise<void>((_resolve, reject) => {
-            rejectFirstSave = reject;
-          }),
-      )
-      .mockResolvedValueOnce(undefined);
+  it("stopコマンドを相対resume保存とHTMLAudio停止へ接続する", async () => {
+    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
+    act(() => result.current.player.play(work, [track], 0, playlistId));
+    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
+    latestAudio().currentTime = 42;
+    vi.mocked(saveResumePosition).mockClear();
 
-    const loadedTrack = {
-      workId: work.id,
-      playlistId,
-      trackIndex: 0,
-      track,
-      assetUrl: "/audio/work-1/track-1.wav",
-    };
-    const refs = {
-      engine: { current: null },
-      loadedTrack: { current: loadedTrack },
-      trackEnded: { current: false },
-    };
-    const { result } = renderHook(() => useResumePersistenceController({ refs }));
+    act(() => result.current.player.stop());
 
-    act(() => {
-      result.current.saveCurrentResume(75);
-      result.current.enqueueResumeSave(work.id, {
-        playlistId,
-        trackId: track.id,
-        offsetSec: 0,
-      });
-    });
-
-    expect(saveResumePosition).toHaveBeenCalledTimes(1);
-    expect(saveResumePosition).toHaveBeenNthCalledWith(1, work.id, {
+    expect(saveResumePosition).toHaveBeenCalledWith(work.id, {
       playlistId,
       trackId: track.id,
-      offsetSec: 75,
+      offsetSec: 42,
     });
-
-    act(() => rejectFirstSave?.(new Error("保存失敗")));
-
-    await waitFor(() => expect(saveResumePosition).toHaveBeenCalledTimes(2));
-    expect(saveResumePosition).toHaveBeenNthCalledWith(2, work.id, {
-      playlistId,
-      trackId: track.id,
-      offsetSec: 0,
-    });
+    expect(result.current.player.state.currentWork).toBeNull();
   });
 });

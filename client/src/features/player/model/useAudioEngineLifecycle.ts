@@ -6,50 +6,28 @@ import {
   getTrackDuration,
   getTrackStart,
   hasReachedTrackEnd,
-  toAudioAbsoluteTime,
   toTrackRelativeTime,
 } from "./trackTime";
-import type {
-  LoadedTrack,
-  PlaybackContext,
-  PlayerRuntimeRefs,
-  SetCoreState,
-} from "./playerRuntime";
+import type { LoadedTrack, PlaybackContext, PlayerRuntimeRefs } from "./playerRuntime";
 import type { PlayerCoreState } from "./atoms";
+import type { PlayerController } from "./playerController";
 
 interface UseAudioEngineLifecycleOptions {
   coreState: PlayerCoreState;
   refs: PlayerRuntimeRefs;
-  setCoreState: SetCoreState;
-  setCurrentTime: (time: number) => void;
-  setDuration: (duration: number) => void;
+  controller: PlayerController;
   consumePendingResume: (
     workId: string,
     playlistId: string | null,
     track: LoadedTrack["track"],
   ) => number | undefined;
-  enqueueResumeSave: (
-    workId: string,
-    resume: {
-      playlistId: string;
-      trackId: string;
-      offsetSec: number;
-    },
-  ) => void;
-  resetResumeCache: (workId: string, playlistId: string, trackId: string) => void;
-  saveCurrentResume: (absolutePosition?: number, loadedTrack?: LoadedTrack | null) => void;
 }
 
 export function useAudioEngineLifecycle({
   coreState,
   refs,
-  setCoreState,
-  setCurrentTime,
-  setDuration,
+  controller,
   consumePendingResume,
-  enqueueResumeSave,
-  resetResumeCache,
-  saveCurrentResume,
 }: UseAudioEngineLifecycleOptions) {
   const getCurrentPlaybackContext = useCallback(
     (absoluteCurrentTime?: number): PlaybackContext | null => {
@@ -76,15 +54,6 @@ export function useAudioEngineLifecycle({
       refs.trackEnded.current = true;
 
       const loadedTrack = refs.loadedTrack.current;
-      if (refs.loop.current) {
-        const start = loadedTrack ? getTrackStart(loadedTrack.track) : 0;
-        engineRef.current?.seek(start);
-        refs.updateMediaSessionPosition.current(0);
-        engineRef.current?.play();
-        refs.trackEnded.current = false;
-        return;
-      }
-
       const state = refs.coreState.current;
       const nextTrack = loadedTrack ? state.tracks[loadedTrack.trackIndex + 1] : undefined;
       const continuesSameAsset =
@@ -92,40 +61,10 @@ export function useAudioEngineLifecycle({
         state.currentWork?.id === loadedTrack.workId &&
         nextTrack !== undefined &&
         getAudioUrl(loadedTrack.workId, nextTrack.file) === loadedTrack.assetUrl;
-      const finishedWork =
-        loadedTrack !== null &&
-        state.currentWork?.id === loadedTrack.workId &&
-        nextTrack === undefined;
-
       // 区間トラックではファイル自体の再生が続くため、継続できない境界では明示的に止める。
       if (virtualEnd && !continuesSameAsset) engineRef.current?.pause();
-
-      if (loadedTrack) {
-        if (finishedWork) {
-          const firstTrack = state.tracks[0];
-          if (loadedTrack.playlistId !== null && firstTrack) {
-            enqueueResumeSave(loadedTrack.workId, {
-              playlistId: loadedTrack.playlistId,
-              trackId: firstTrack.id,
-              offsetSec: 0,
-            });
-            resetResumeCache(loadedTrack.workId, loadedTrack.playlistId, firstTrack.id);
-          }
-        } else {
-          const absoluteEnd =
-            loadedTrack.track.end ??
-            engineRef.current?.getDuration() ??
-            getTrackStart(loadedTrack.track);
-          saveCurrentResume(absoluteEnd, loadedTrack);
-        }
-      }
-
-      setCoreState((previous) => {
-        if (previous.currentTrackIndex < previous.tracks.length - 1) {
-          return { ...previous, currentTrackIndex: previous.currentTrackIndex + 1 };
-        }
-        return { ...previous, isPlaying: false };
-      });
+      controller.dispatch({ type: "audioEnded" });
+      if (controller.getState().loop) refs.trackEnded.current = false;
     };
 
     const engine = createAudioEngine(refs.coreState.current.volume, {
@@ -134,37 +73,33 @@ export function useAudioEngineLifecycle({
           const loadedTrack = refs.loadedTrack.current;
           if (loadedTrack) {
             engineRef.current?.seek(getTrackStart(loadedTrack.track));
-            setCurrentTime(0);
+            controller.dispatch({ type: "audioTimeUpdated", positionSec: 0 });
             refs.updateMediaSessionPosition.current(0);
           }
           refs.trackEnded.current = false;
         }
-        setCoreState((state) => ({ ...state, isPlaying: true, playbackError: null }));
+        controller.dispatch({ type: "audioPlaying" });
       },
-      onPause: () => setCoreState((state) => ({ ...state, isPlaying: false })),
+      onPause: () => {
+        if (!refs.trackEnded.current) controller.dispatch({ type: "audioPaused" });
+      },
       onTimeUpdate: (time) => {
         const context = getCurrentPlaybackContext(time);
         if (!context) return;
-        const { engine: currentEngine, track, trackDuration, currentTime } = context;
+        const { track, currentTime } = context;
         const reachedTrackEnd = hasReachedTrackEnd(time, track);
 
         if (!reachedTrackEnd) {
           refs.trackEnded.current = false;
         }
 
-        const abRepeat = refs.abRepeat.current;
-        if (
-          abRepeat.a !== null &&
-          abRepeat.b !== null &&
-          abRepeat.a < abRepeat.b &&
-          currentTime >= abRepeat.b
-        ) {
-          currentEngine.seek(toAudioAbsoluteTime(abRepeat.a, track, trackDuration));
-          setCurrentTime(abRepeat.a);
-          refs.updateMediaSessionPosition.current(abRepeat.a);
-          return;
-        }
-        setCurrentTime(currentTime);
+        const commands = controller.dispatch({
+          type: "audioTimeUpdated",
+          positionSec: currentTime,
+        });
+
+        // B点が区間終端と一致する場合も、Aへのシークをトラック終了より優先する。
+        if (commands.some((command) => command.type === "seekAudio")) return;
 
         if (reachedTrackEnd) {
           finishCurrentTrack(true);
@@ -172,12 +107,15 @@ export function useAudioEngineLifecycle({
       },
       onDurationChange: (duration) => {
         const loadedTrack = refs.loadedTrack.current;
-        setDuration(loadedTrack ? getTrackDuration(loadedTrack.track, duration) : duration);
+        controller.dispatch({
+          type: "audioDurationChanged",
+          durationSec: loadedTrack ? getTrackDuration(loadedTrack.track, duration) : duration,
+        });
         refs.updateMediaSessionPosition.current();
       },
       onEnded: () => finishCurrentTrack(false),
       onError: (error) => {
-        setCoreState((state) => ({ ...state, isPlaying: false, playbackError: error }));
+        controller.dispatch({ type: "audioFailed", error });
       },
     });
     engineRef.current = engine;
@@ -188,16 +126,7 @@ export function useAudioEngineLifecycle({
       }
       engine.destroy();
     };
-  }, [
-    getCurrentPlaybackContext,
-    enqueueResumeSave,
-    refs,
-    resetResumeCache,
-    saveCurrentResume,
-    setCoreState,
-    setCurrentTime,
-    setDuration,
-  ]);
+  }, [getCurrentPlaybackContext, controller, refs]);
 
   // トラック変更時に音源を読み込み、同じ音源ならロードせず区間だけを切り替える。
   useEffect(() => {
@@ -217,10 +146,6 @@ export function useAudioEngineLifecycle({
       (previousTrack.workId !== workId ||
         previousTrack.playlistId !== currentPlaylistId ||
         previousTrack.track.id !== track.id);
-    if (switchedTrack) {
-      saveCurrentResume(undefined, previousTrack);
-    }
-
     const pendingSeekSec = consumePendingResume(workId, currentPlaylistId, track);
     const reusesLoadedAsset =
       switchedTrack && previousTrack.workId === workId && previousTrack.assetUrl === assetUrl;
@@ -239,8 +164,8 @@ export function useAudioEngineLifecycle({
       const trackDuration = getTrackDuration(track, engine.getDuration());
       engine.seek(seekSec);
       const relativeTime = toTrackRelativeTime(seekSec, track, trackDuration);
-      setCurrentTime(relativeTime);
-      setDuration(trackDuration);
+      controller.dispatch({ type: "audioTimeUpdated", positionSec: relativeTime });
+      controller.dispatch({ type: "audioDurationChanged", durationSec: trackDuration });
       refs.updateMediaSessionPosition.current(relativeTime);
 
       if (coreState.isPlaying) {
@@ -252,8 +177,11 @@ export function useAudioEngineLifecycle({
     }
 
     if (track.start !== undefined || track.end !== undefined) {
-      setCurrentTime(0);
-      setDuration(track.end === undefined ? 0 : getTrackDuration(track, track.end));
+      controller.dispatch({ type: "audioTimeUpdated", positionSec: 0 });
+      controller.dispatch({
+        type: "audioDurationChanged",
+        durationSec: track.end === undefined ? 0 : getTrackDuration(track, track.end),
+      });
     }
 
     const cleanup = engine.load(assetUrl, {

@@ -30,14 +30,8 @@ export interface PlaybackContext {
 
 export interface PlayerRuntimeRefs {
   coreState: MutableRef<PlayerCoreState>;
-  loop: MutableRef<boolean>;
-  abRepeat: MutableRef<PlayerCoreState["abRepeat"]>;
   engine: MutableRef<AudioEngine | null>;
   loadedTrack: MutableRef<LoadedTrack | null>;
   trackEnded: MutableRef<boolean>;
   updateMediaSessionPosition: MutableRef<(position?: number) => void>;
 }
-
-export type SetCoreState = (
-  update: PlayerCoreState | ((previous: PlayerCoreState) => PlayerCoreState),
-) => void;
