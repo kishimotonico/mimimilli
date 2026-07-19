@@ -38,7 +38,12 @@ export function useScanProgress(active: boolean): ScanProgress | null {
         console.error("スキャン進捗イベントのスキーマ検証に失敗しました", parsed.error);
         return;
       }
-      if (parsed.data.type !== "progress") return;
+      if (parsed.data.type !== "progress") {
+        // server は terminal event を最後にSSEストリームを閉じる。EventSourceは正常なEOFも
+        // errorとして通知して再接続するため、terminalを受け取った時点でclient側から閉じる。
+        source.close();
+        return;
+      }
       const { phase, processed, total } = parsed.data;
       setProgress({ phase, processed, total });
     };

@@ -16,6 +16,7 @@ async function readSseUntil(
   res: Response,
   predicate: (frame: SseFrame) => boolean,
   maxFrames = 50,
+  cancelOnMatch = true,
 ): Promise<SseFrame[]> {
   const reader = res.body!.getReader();
   const decoder = new TextDecoder();
@@ -41,8 +42,10 @@ async function readSseUntil(
       const frame: SseFrame = { event, data: dataLines.join("\n") };
       frames.push(frame);
       if (predicate(frame)) {
-        await reader.cancel();
-        return frames;
+        if (cancelOnMatch) {
+          await reader.cancel();
+          return frames;
+        }
       }
     }
   }
@@ -72,7 +75,7 @@ test("GET /scan/events: スキャン実行中に接続すると progress → com
   assert.equal(eventsRes.status, 200);
   assert.match(eventsRes.headers.get("content-type") ?? "", /text\/event-stream/);
 
-  const frames = await readSseUntil(eventsRes, (f) => f.event === "complete");
+  const frames = await readSseUntil(eventsRes, (f) => f.event === "complete", 50, false);
   assert.ok(
     frames.some((f) => f.event === "progress"),
     "progress イベントが届くこと",
@@ -82,6 +85,7 @@ test("GET /scan/events: スキャン実行中に接続すると progress → com
   const completePayload = JSON.parse(completeFrame.data);
   assert.equal(completePayload.type, "complete");
   assert.deepEqual(completePayload.result.newWorkIds, ["RJ501011"]);
+  assert.equal(frames.at(-1)?.event, "complete", "terminal event の送信後に正常終了すること");
 
   const scanRes = await scanPromise;
   assert.equal(scanRes.status, 200);

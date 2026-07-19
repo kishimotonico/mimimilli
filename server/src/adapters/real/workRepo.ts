@@ -579,23 +579,33 @@ export class WorkRepo {
         .all() as AxisFacetItem[];
     }
 
-    const prefixCondition =
-      axis === "tag"
-        ? "instr(tags.name, '/') = 0"
-        : "substr(tags.name, 1, instr(tags.name, '/') - 1) = ?";
-    const valueSql = axis === "tag" ? "tags.name" : "substr(tags.name, instr(tags.name, '/') + 1)";
+    if (axis === "tag") {
+      return this.db.sqlite
+        .query(`
+          SELECT tags.name AS value, COUNT(*) AS count
+          FROM main.works
+          INNER JOIN user.work_states AS work_states ON work_states.work_id = works.id
+          INNER JOIN main.work_tags AS work_tags ON work_tags.work_id = works.id
+          INNER JOIN main.tags AS tags ON tags.id = work_tags.tag_id
+          WHERE instr(tags.name, '/') = 0
+          GROUP BY tags.name
+          ORDER BY count DESC, tags.facet_sort_key COLLATE BINARY ASC, value COLLATE BINARY ASC
+        `)
+        .all() as AxisFacetItem[];
+    }
+
     return this.db.sqlite
       .query(`
-        SELECT ${valueSql} AS value, COUNT(*) AS count
+        SELECT substr(tags.name, instr(tags.name, '/') + 1) AS value, COUNT(*) AS count
         FROM main.works
         INNER JOIN user.work_states AS work_states ON work_states.work_id = works.id
         INNER JOIN main.work_tags AS work_tags ON work_tags.work_id = works.id
         INNER JOIN main.tags AS tags ON tags.id = work_tags.tag_id
-        WHERE ${prefixCondition}
+        WHERE substr(tags.name, 1, instr(tags.name, '/') - 1) = ?
         GROUP BY value
         ORDER BY count DESC, tags.facet_sort_key COLLATE BINARY ASC, value COLLATE BINARY ASC
       `)
-      .all(...(axis === "tag" ? [] : [axis])) as AxisFacetItem[];
+      .all(axis) as AxisFacetItem[];
   }
 
   getWork(id: string): Work | null {

@@ -207,3 +207,21 @@ test("core参照実装とreal SQLのファセット値・件数・順序が同�
     db.close();
   }
 });
+
+test("tag軸はprefixタグを数えず、自由タグが無ければ空になる", () => {
+  const db = openDb({ kind: "memory" });
+  const repo = new WorkRepo(db);
+  const annotatedOnly = dataset.map((item) => ({
+    ...item,
+    tags: item.tags.filter((tag) => tag.includes("/")),
+  }));
+  try {
+    for (const item of annotatedOnly) repo.upsertWork(fullWork(item));
+
+    assert.deepEqual(repo.getAxisFacets("tag"), buildAxisFacets("tag", annotatedOnly));
+    assert.deepEqual(repo.getAxisFacets("tag"), []);
+    assert.notDeepEqual(repo.getAxisFacets("cv"), []);
+  } finally {
+    db.close();
+  }
+});

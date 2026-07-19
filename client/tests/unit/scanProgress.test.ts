@@ -79,7 +79,7 @@ describe("useScanProgress", () => {
     expect(result.current).toEqual({ phase: "registering", processed: 3, total: 12 });
   });
 
-  it("complete/error イベントは progress 状態を変更しない", () => {
+  it("completeイベントは progress 状態を変更せず、正常終了として接続を閉じる", () => {
     const { result, rerender } = renderHook(({ active }) => useScanProgress(active), {
       initialProps: { active: false },
     });
@@ -106,6 +106,18 @@ describe("useScanProgress", () => {
     });
     // complete はこのフックの状態を変えない（progress のまま据え置き）
     expect(result.current).toEqual({ phase: "generating", processed: 1, total: 2 });
+    expect(instances[0]!.closed).toBe(true);
+  });
+
+  it("名前付きerrorイベントを受け取ったら接続を閉じる", () => {
+    const { rerender } = renderHook(({ active }) => useScanProgress(active), {
+      initialProps: { active: false },
+    });
+    rerender({ active: true });
+
+    dispatch(instances[0]!, "error", { type: "error", message: "scan failed" });
+
+    expect(instances[0]!.closed).toBe(true);
   });
 
   it("EventSource自体の接続エラー（dataなし）はJSON解析せず例外にならない", () => {
