@@ -59,16 +59,19 @@ function summary(index: number): WorkSummary {
 
 function fullWork(item: WorkSummary): Work {
   const { trackCount, ...rest } = item;
+  const playlistId = trackCount > 0 ? crypto.randomUUID() : null;
   return {
     ...rest,
-    defaultPlaylist: trackCount > 0 ? "default" : null,
+    defaultPlaylistId: playlistId,
     createdAt: item.addedAt,
     playlists:
       trackCount > 0
         ? [
             {
+              id: playlistId!,
               name: "default",
               tracks: Array.from({ length: trackCount }, (_, index) => ({
+                id: crypto.randomUUID(),
                 title: `track-${index}`,
                 file: `track-${index}.wav`,
               })),

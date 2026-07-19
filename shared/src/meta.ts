@@ -2,7 +2,7 @@
 // パース失敗・必須フィールド欠落は「メタファイル不正」エラーとして作品に表示する（隠蔽しない）。
 import { z } from "zod";
 import { dlsiteStateSchema, emptyDlsiteState } from "./dlsite.ts";
-import { playlistSchema, urlEntrySchema } from "./work.ts";
+import { playlistSchema, refinePlaylistCollection, urlEntrySchema } from "./work.ts";
 
 export const metaFileSchema = z
   .object({
@@ -12,21 +12,12 @@ export const metaFileSchema = z
     tags: z.array(z.string()).default([]),
     coverImage: z.string().nullish().default(null),
     playlists: z.array(playlistSchema).default([]),
-    defaultPlaylist: z.string().nullish().default(null),
+    defaultPlaylistId: z.uuid({ version: "v4" }).nullish().default(null),
     createdAt: z.iso.datetime({ offset: true }).optional(),
     dlsite: dlsiteStateSchema.default(emptyDlsiteState),
   })
   .superRefine((meta, ctx) => {
-    if (
-      meta.defaultPlaylist &&
-      !meta.playlists.some((playlist) => playlist.name === meta.defaultPlaylist)
-    ) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["defaultPlaylist"],
-        message: `指定されたプレイリストが存在しません: ${meta.defaultPlaylist}`,
-      });
-    }
+    refinePlaylistCollection(meta.playlists, meta.defaultPlaylistId, ctx);
   });
 export type MetaFile = z.infer<typeof metaFileSchema>;
 

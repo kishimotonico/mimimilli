@@ -2,7 +2,7 @@
 // 作品検索・件数・ページングはcatalog接続からuser DBをATTACH JOINしてSQLで実行する。
 import { existsSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { DEFAULT_TAG_PREFIXES, normalizeTags } from "@mimimilli/shared";
 import type {
   AxisFacetItem,
@@ -60,6 +60,8 @@ export interface RealAdapterOptions {
   database: DbLocation;
   /** カバーサムネイルのキャッシュ置き場。ファイルDBの通常起動ではデータルート配下を渡す。 */
   thumbnailCacheDir?: string;
+  /** manifestとバックアップを保存するデータルート。 */
+  dataRoot?: string;
   /** 一括取得のリクエスト間隔。実運用は1秒、テストのみ短縮可 */
   dlsiteRequestIntervalMs?: number;
   /** テスト用の取得関数差し替え。省略時は実DLsite取得 */
@@ -75,8 +77,13 @@ export interface RealAdapter extends DataAdapter {
 export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
   const db: Db = openDb(options.database);
   const repo = new WorkRepo(db);
-  const scanner = new Scanner(db.catalog, repo);
   const thumbnailCacheDir = options.thumbnailCacheDir ?? join(tmpdir(), "mimikago-memory-cache");
+  const dataRoot =
+    options.dataRoot ??
+    (options.database.kind === "files"
+      ? dirname(dirname(options.database.catalogPath))
+      : join(tmpdir(), "mimikago-memory-data"));
+  const scanner = new Scanner(db.catalog, repo, dataRoot);
   const dlsiteRequestIntervalMs = options.dlsiteRequestIntervalMs ?? 1000;
   const dlsiteFetcher = options.dlsiteFetcher ?? fetchDlsiteInfo;
   const dlsiteCoverDownloader = options.dlsiteCoverDownloader ?? downloadCover;

@@ -9,16 +9,30 @@ export const urlEntrySchema = z.object({
 export type UrlEntry = z.infer<typeof urlEntrySchema>;
 
 /** トラック = 「指定ファイルの指定区間を再生する」。start/end 省略時はファイル全体 */
-export const trackSchema = z.object({
-  title: z.string(),
-  file: z.string(),
-  start: z.number().nonnegative().optional(),
-  end: z.number().nonnegative().optional(),
-});
+const uuidV4Schema = z.uuid({ version: "v4" });
+
+export const trackSchema = z
+  .object({
+    id: uuidV4Schema,
+    title: z.string(),
+    file: z.string(),
+    start: z.number().nonnegative().optional(),
+    end: z.number().nonnegative().optional(),
+  })
+  .superRefine((track, ctx) => {
+    if (track.end !== undefined && track.end <= (track.start ?? 0)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["end"],
+        message: "endはstartより大きい値である必要があります",
+      });
+    }
+  });
 export type Track = z.infer<typeof trackSchema>;
 
 export const playlistSchema = z.object({
-  name: z.string(),
+  id: uuidV4Schema,
+  name: z.string().min(1),
   tracks: z.array(trackSchema),
 });
 export type Playlist = z.infer<typeof playlistSchema>;
@@ -44,13 +58,56 @@ export const workSummarySchema = z.object({
 });
 export type WorkSummary = z.infer<typeof workSummarySchema>;
 
-export const workSchema = workSummarySchema.omit({ trackCount: true }).extend({
-  defaultPlaylist: z.string().nullable(),
-  createdAt: z.string().nullable(),
-  playlists: z.array(playlistSchema),
-  resumePosition: z.number().nonnegative(),
-  resumeTrackIndex: z.number().int().nonnegative(),
-});
+export function refinePlaylistCollection(
+  playlists: Playlist[],
+  defaultPlaylistId: string | null,
+  ctx: z.RefinementCtx,
+): void {
+  const playlistIds = new Set<string>();
+  const trackIds = new Set<string>();
+  for (let playlistIndex = 0; playlistIndex < playlists.length; playlistIndex++) {
+    const playlist = playlists[playlistIndex]!;
+    if (playlistIds.has(playlist.id)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["playlists", playlistIndex, "id"],
+        message: `プレイリストIDが重複しています: ${playlist.id}`,
+      });
+    }
+    playlistIds.add(playlist.id);
+    for (let trackIndex = 0; trackIndex < playlist.tracks.length; trackIndex++) {
+      const track = playlist.tracks[trackIndex]!;
+      if (trackIds.has(track.id)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["playlists", playlistIndex, "tracks", trackIndex, "id"],
+          message: `トラックIDが重複しています: ${track.id}`,
+        });
+      }
+      trackIds.add(track.id);
+    }
+  }
+  if (defaultPlaylistId !== null && !playlistIds.has(defaultPlaylistId)) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["defaultPlaylistId"],
+      message: `指定されたプレイリストIDが存在しません: ${defaultPlaylistId}`,
+    });
+  }
+}
+
+export const workSchema = workSummarySchema
+  .omit({ trackCount: true })
+  .extend({
+    defaultPlaylistId: uuidV4Schema.nullable(),
+    createdAt: z.string().nullable(),
+    playlists: z.array(playlistSchema),
+    resumePosition: z.number().nonnegative(),
+    resumeTrackIndex: z.number().int().nonnegative(),
+  })
+  .superRefine((work, ctx) =>
+    refinePlaylistCollection(work.playlists, work.defaultPlaylistId, ctx),
+  );
 export type Work = z.infer<typeof workSchema>;
 
 /** 作品配下の物理ファイルツリー（GET /api/works/:id/files） */

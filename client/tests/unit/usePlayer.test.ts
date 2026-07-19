@@ -91,6 +91,7 @@ function usePlayerWithClock() {
 }
 
 const track: Track = {
+  id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
   title: "Track 1",
   file: "audio/track-1.wav",
 };
@@ -403,9 +404,15 @@ describe("usePlayer audio engine lifecycle", () => {
   it("最終トラック聴了時はwork detailキャッシュのレジューム位置も先頭へ戻す", async () => {
     const resumableWork: Work = {
       ...work,
-      defaultPlaylist: "default",
+      defaultPlaylistId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       createdAt: null,
-      playlists: [{ name: "default", tracks: [track] }],
+      playlists: [
+        {
+          id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          name: "default",
+          tracks: [track],
+        },
+      ],
       resumePosition: 42,
       resumeTrackIndex: 0,
     };
@@ -528,7 +535,13 @@ describe("usePlayer audio engine lifecycle", () => {
   it("同一ファイルのトラック切替では再ロードせず開始位置へシークする", async () => {
     const tracks: Track[] = [
       { ...track, start: 0, end: 30 },
-      { title: "Track 2", file: track.file, start: 30, end: 60 },
+      {
+        id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        title: "Track 2",
+        file: track.file,
+        start: 30,
+        end: 60,
+      },
     ];
     const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
 
@@ -599,9 +612,15 @@ describe("usePlayer audio engine lifecycle", () => {
     ];
     const resumableWork: Work = {
       ...work,
-      defaultPlaylist: "default",
+      defaultPlaylistId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       createdAt: null,
-      playlists: [{ name: "default", tracks }],
+      playlists: [
+        {
+          id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          name: "default",
+          tracks,
+        },
+      ],
       resumePosition: 45,
       resumeTrackIndex: 1,
     };
@@ -691,9 +710,15 @@ describe("usePlayer audio engine lifecycle", () => {
     const segment: Track = { ...track, start: 30, end: 90 };
     const resumableWork: Work = {
       ...work,
-      defaultPlaylist: "default",
+      defaultPlaylistId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       createdAt: null,
-      playlists: [{ name: "default", tracks: [segment] }],
+      playlists: [
+        {
+          id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          name: "default",
+          tracks: [segment],
+        },
+      ],
       resumePosition: 45,
       resumeTrackIndex: 0,
     };

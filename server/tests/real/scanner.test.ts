@@ -31,7 +31,18 @@ test("初回スキャン: 登録・自動生成・エラー検出・duration プ
   assert.ok(existsSync(generatedMeta));
   const meta = JSON.parse(readFileSync(generatedMeta, "utf-8"));
   assert.equal(meta.coverImage, "cover.jpg");
+  assert.match(meta.id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  assert.match(
+    meta.playlists[0].id,
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+  );
+  assert.equal(meta.defaultPlaylistId, meta.playlists[0].id);
   assert.equal(meta.playlists[0].tracks.length, 2);
+  assert.ok(
+    meta.playlists[0].tracks.every((track: { id: string }) =>
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(track.id),
+    ),
+  );
   assert.equal(meta.playlists[0].tracks[0].file, "mp3/01_intro.wav");
   assert.deepEqual(meta.dlsite, {
     rjCode: "RJ900001",
@@ -111,6 +122,8 @@ test("UUID 重複: 後に検出された方が再採番されメタファイル�
   t.after(lib.cleanup);
   const root = join(lib.baseDir, "lib-dup");
   const id = "22222222-2222-4222-8222-222222222222";
+  const playlistId = "33333333-3333-4333-8333-333333333333";
+  const trackId = "44444444-4444-4444-8444-444444444444";
   for (const name of ["work-a", "work-b"]) {
     mkdirSync(join(root, name), { recursive: true });
     writeWav(join(root, name, "track.wav"), 1);
@@ -119,7 +132,14 @@ test("UUID 重複: 後に検出された方が再採番されメタファイル�
       JSON.stringify({
         id,
         title: name,
-        playlists: [{ name: "default", tracks: [{ title: "t", file: "track.wav" }] }],
+        playlists: [
+          {
+            id: playlistId,
+            name: "default",
+            tracks: [{ id: trackId, title: "t", file: "track.wav" }],
+          },
+        ],
+        defaultPlaylistId: playlistId,
       }),
     );
   }
@@ -128,10 +148,15 @@ test("UUID 重複: 後に検出された方が再採番されメタファイル�
   const result = await adapter.scan();
 
   assert.equal(result.registered, 2);
-  const idA = JSON.parse(readFileSync(join(root, "work-a", ".meta.json"), "utf-8")).id;
-  const idB = JSON.parse(readFileSync(join(root, "work-b", ".meta.json"), "utf-8")).id;
-  assert.notEqual(idA, idB);
-  assert.ok([idA, idB].includes(id)); // 片方は元の ID のまま
+  const metaA = JSON.parse(readFileSync(join(root, "work-a", ".meta.json"), "utf-8"));
+  const metaB = JSON.parse(readFileSync(join(root, "work-b", ".meta.json"), "utf-8"));
+  assert.equal(metaA.id, id); // 正規化パス順の先頭が所有する
+  assert.equal(metaA.playlists[0].id, playlistId);
+  assert.equal(metaA.playlists[0].tracks[0].id, trackId);
+  assert.notEqual(metaB.id, id);
+  assert.notEqual(metaB.playlists[0].id, playlistId);
+  assert.notEqual(metaB.playlists[0].tracks[0].id, trackId);
+  assert.equal(metaB.defaultPlaylistId, metaB.playlists[0].id);
   const works = await adapter.queryWorks({ q: "", tags: [], tagOp: "AND", sort: "added-desc" });
   assert.equal(works.total, 2);
 });

@@ -8,6 +8,7 @@ import { PersistentDataError, WorkRepo } from "../../src/adapters/real/workRepo.
 import { searchPresets, smartFolders } from "../../src/adapters/real/userSchema.ts";
 
 function sampleWork(id: string): Work {
+  const playlistId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
   return {
     id,
     title: "永続データ検証用",
@@ -19,12 +20,19 @@ function sampleWork(id: string): Work {
     errorMessage: null,
     urls: [],
     tags: [],
-    defaultPlaylist: "default",
+    defaultPlaylistId: playlistId,
     createdAt: null,
     playlists: [
       {
+        id: playlistId,
         name: "default",
-        tracks: [{ title: "track", file: "track.wav" }],
+        tracks: [
+          {
+            id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            title: "track",
+            file: "track.wav",
+          },
+        ],
       },
     ],
     bookmarked: false,

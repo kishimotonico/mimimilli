@@ -31,6 +31,7 @@ function createAdapter(): DataAdapter {
           userPath: paths.userDb,
           legacyPath: legacyPath ?? undefined,
         },
+        dataRoot: paths.root,
         thumbnailCacheDir: process.env.MIMIMILLI_THUMBNAIL_CACHE_DIR
           ? resolve(process.env.MIMIMILLI_THUMBNAIL_CACHE_DIR)
           : paths.thumbnailCache,

@@ -17,7 +17,11 @@ beforeEach(() => {
   });
 });
 
-const track: Track = { title: "Track 1", file: "audio/track-1.wav" };
+const track: Track = {
+  id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+  title: "Track 1",
+  file: "audio/track-1.wav",
+};
 
 const work: WorkSummary = {
   id: "work-1",

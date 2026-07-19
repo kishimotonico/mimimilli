@@ -33,7 +33,15 @@ import type {
 import { z } from "zod";
 import { japaneseSortKey } from "../../core/japaneseSortKey.ts";
 import type { Db } from "./db.ts";
-import { tags, workDlsite, workTags, works, scanState } from "./catalogSchema.ts";
+import {
+  playlists as catalogPlaylists,
+  scanState,
+  tags,
+  tracks as catalogTracks,
+  workDlsite,
+  workTags,
+  works,
+} from "./catalogSchema.ts";
 import { appSettings, searchPresets, smartFolders, tagPrefixes, workStates } from "./userSchema.ts";
 
 type CatalogWorkRow = typeof works.$inferSelect;
@@ -79,17 +87,17 @@ function parseRecord<T>(
 }
 
 function defaultPlaylistOf(
-  row: Pick<CatalogWorkRow, "id" | "defaultPlaylist">,
+  row: Pick<CatalogWorkRow, "id" | "defaultPlaylistId">,
   playlists: Playlist[],
 ): Playlist | null {
   if (playlists.length === 0) return null;
-  if (row.defaultPlaylist) {
-    const playlist = playlists.find((p) => p.name === row.defaultPlaylist);
+  if (row.defaultPlaylistId) {
+    const playlist = playlists.find((p) => p.id === row.defaultPlaylistId);
     if (!playlist) {
       throw new PersistentDataError(
         "works",
         row.id,
-        `defaultPlaylist: playlists_json に "${row.defaultPlaylist}" がありません`,
+        `defaultPlaylistId: playlists_json に "${row.defaultPlaylistId}" がありません`,
       );
     }
     return playlist;
@@ -141,7 +149,7 @@ function rowToWork(row: WorkRow, tagNames: string[], dlsite: DlsiteState): Work 
       errorMessage: row.errorMessage,
       urls: parseJsonField(row.urlsJson, "works", row.id, "urls_json"),
       tags: tagNames,
-      defaultPlaylist: row.defaultPlaylist,
+      defaultPlaylistId: row.defaultPlaylistId,
       createdAt: row.createdAt,
       playlists: parseJsonField(row.playlistsJson, "works", row.id, "playlists_json"),
       bookmarked: row.bookmarked,
@@ -302,7 +310,7 @@ export class WorkRepo {
         works.title,
         works.title_sort_key AS titleSortKey,
         works.cover_image AS coverImage,
-        works.default_playlist AS defaultPlaylist,
+        works.default_playlist_id AS defaultPlaylistId,
         works.created_at AS createdAt,
         works.status,
         works.physical_path AS physicalPath,
@@ -442,7 +450,7 @@ export class WorkRepo {
           works.title,
           works.title_sort_key AS titleSortKey,
           works.cover_image AS coverImage,
-          works.default_playlist AS defaultPlaylist,
+          works.default_playlist_id AS defaultPlaylistId,
           works.created_at AS createdAt,
           works.status,
           works.physical_path AS physicalPath,
@@ -549,7 +557,7 @@ export class WorkRepo {
       title: work.title,
       titleSortKey: japaneseSortKey(work.title),
       coverImage: work.coverImage,
-      defaultPlaylist: work.defaultPlaylist,
+      defaultPlaylistId: work.defaultPlaylistId,
       createdAt: work.createdAt,
       status: work.status,
       physicalPath: work.physicalPath,
@@ -563,8 +571,42 @@ export class WorkRepo {
       .values(values)
       .onConflictDoUpdate({ target: works.id, set: values })
       .run();
+    this.db.catalog.delete(catalogPlaylists).where(eq(catalogPlaylists.workId, work.id)).run();
+    for (let playlistPosition = 0; playlistPosition < work.playlists.length; playlistPosition++) {
+      const playlist = work.playlists[playlistPosition]!;
+      this.db.catalog
+        .insert(catalogPlaylists)
+        .values({
+          id: playlist.id,
+          workId: work.id,
+          position: playlistPosition,
+          name: playlist.name,
+        })
+        .run();
+      for (let trackPosition = 0; trackPosition < playlist.tracks.length; trackPosition++) {
+        const track = playlist.tracks[trackPosition]!;
+        this.db.catalog
+          .insert(catalogTracks)
+          .values({
+            id: track.id,
+            playlistId: playlist.id,
+            workId: work.id,
+            position: trackPosition,
+            title: track.title,
+            file: track.file,
+            start: track.start,
+            end: track.end,
+          })
+          .run();
+      }
+    }
     this.replaceWorkTags(work.id, work.tags);
     this.setDlsiteState(work.id, work.dlsite);
+  }
+
+  /** Playlist/Track関係表は現在見つかるメタだけから毎スキャン再構築する。 */
+  clearPlaybackRelations(): void {
+    this.db.catalog.delete(catalogPlaylists).run();
   }
 
   /** PATCH /works/:id および DLsite 適用の DB 側。メタファイル書き戻しは呼び出し側（アダプタ）が行う */

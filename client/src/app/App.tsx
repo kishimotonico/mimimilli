@@ -147,7 +147,7 @@ export default function App() {
         const fullWork = cached ?? (await getWork(work.id));
         if (requestId !== playRequestIdRef.current) return;
         const playlist =
-          fullWork.playlists.find((p) => p.name === (fullWork.defaultPlaylist ?? "default")) ??
+          fullWork.playlists.find((p) => p.id === fullWork.defaultPlaylistId) ??
           fullWork.playlists[0];
         const tracks = playlist?.tracks ?? [];
         if (tracks.length > 0) {
@@ -183,7 +183,11 @@ export default function App() {
         if (requestId !== playRequestIdRef.current) return;
         // ファイル欠損・メタ読み込みエラーの作品配下のファイルは再生できない。
         if (fullWork.status !== "ok") return;
-        player.play(fullWork, [{ title: entry.name, file: entry.workRelPath }], 0);
+        player.play(
+          fullWork,
+          [{ id: crypto.randomUUID(), title: entry.name, file: entry.workRelPath }],
+          0,
+        );
       } catch (err) {
         console.error("ファイルの再生に失敗しました", err);
       }

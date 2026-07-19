@@ -22,7 +22,7 @@ function makeWork(tags: string[]): Work {
     tags,
     bookmarked: false,
     lastPlayedAt: null,
-    defaultPlaylist: null,
+    defaultPlaylistId: null,
     createdAt: "2026-01-01T00:00:00.000Z",
     playlists: [],
     resumePosition: 0,

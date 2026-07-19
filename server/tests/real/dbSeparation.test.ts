@@ -51,6 +51,24 @@ test("catalog削除後の再スキャンでもuser状態を保持し、ATTACH JO
     )
     .get(library.existingWorkId) as { id: string; bookmarked: number } | null;
   assert.deepEqual(joined, { id: library.existingWorkId, bookmarked: 1 });
+  const playlistRows = catalog
+    .query("SELECT id, work_id AS workId, position, name FROM playlists WHERE work_id = ?")
+    .all(library.existingWorkId) as Array<{
+    id: string;
+    workId: string;
+    position: number;
+    name: string;
+  }>;
+  assert.equal(playlistRows.length, 1);
+  assert.equal(playlistRows[0]?.name, "default");
+  assert.match(playlistRows[0]!.id, /^[0-9a-f-]{36}$/);
+  const trackRows = catalog
+    .query(
+      "SELECT id, playlist_id AS playlistId, position FROM tracks WHERE work_id = ? ORDER BY position",
+    )
+    .all(library.existingWorkId) as Array<{ id: string; playlistId: string; position: number }>;
+  assert.equal(trackRows.length, 2);
+  assert.ok(trackRows.every((track) => track.playlistId === playlistRows[0]!.id));
   assert.equal(
     catalog
       .query("PRAGMA main.table_info(works)")

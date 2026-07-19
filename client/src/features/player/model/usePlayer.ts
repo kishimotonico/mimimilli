@@ -121,8 +121,7 @@ export function usePlayer() {
   const playWithResume = useCallback(
     (work: Work) => {
       const playlist =
-        work.playlists.find((p) => p.name === (work.defaultPlaylist ?? "default")) ??
-        work.playlists[0];
+        work.playlists.find((p) => p.id === work.defaultPlaylistId) ?? work.playlists[0];
       const tracks = playlist?.tracks ?? [];
       if (tracks.length === 0) return;
 

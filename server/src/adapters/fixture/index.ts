@@ -93,6 +93,7 @@ function createInitialState(options: FixtureAdapterOptions): FixtureState {
 function buildFullWork(summary: WorkSummary, resumes: Map<string, ResumeBody>): Work {
   const namedTracks = SEED_TRACK_NAMES[summary.id];
   const tracks: Track[] = Array.from({ length: summary.trackCount }, (_, i) => ({
+    id: crypto.randomUUID(),
     title: namedTracks?.[i] ?? `Track ${i + 1}`,
     file: `track${String(i + 1).padStart(2, "0")}.mp3`,
   }));
@@ -100,11 +101,12 @@ function buildFullWork(summary: WorkSummary, resumes: Map<string, ResumeBody>): 
   const { trackCount: _trackCount, ...rest } = summary;
   const resume = resumes.get(summary.id);
 
+  const playlistId = tracks.length > 0 ? crypto.randomUUID() : null;
   return {
     ...rest,
-    defaultPlaylist: tracks.length > 0 ? "default" : null,
+    defaultPlaylistId: playlistId,
     createdAt: summary.addedAt,
-    playlists: tracks.length > 0 ? [{ name: "default", tracks }] : [],
+    playlists: playlistId ? [{ id: playlistId, name: "default", tracks }] : [],
     resumePosition: resume?.position ?? 0,
     resumeTrackIndex: resume?.trackIndex ?? 0,
   };
@@ -428,6 +430,7 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
       if (kind === "audio") {
         const namedTracks = SEED_TRACK_NAMES[work.id];
         const tracks = Array.from({ length: work.trackCount }, (_, i) => ({
+          id: crypto.randomUUID(),
           title: namedTracks?.[i] ?? `Track ${i + 1}`,
           file: `track${String(i + 1).padStart(2, "0")}.mp3`,
         }));

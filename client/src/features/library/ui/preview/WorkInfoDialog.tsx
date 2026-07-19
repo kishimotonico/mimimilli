@@ -45,7 +45,7 @@ export function WorkInfoDialog({
   const playlistLabel =
     work.playlists.length === 0
       ? "なし"
-      : `${work.defaultPlaylist ?? "default"}${
+      : `${work.playlists.find((playlist) => playlist.id === work.defaultPlaylistId)?.name ?? work.playlists[0]!.name}${
           work.playlists.length > 1 ? `（全${work.playlists.length}件）` : ""
         }`;
 

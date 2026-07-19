@@ -39,11 +39,24 @@ function makeWorkSummary(overrides: Partial<WorkSummary> = {}): WorkSummary {
 
 function makeWork(overrides: Partial<Work> = {}): Work {
   const { trackCount: _trackCount, ...summary } = makeWorkSummary();
+  const playlistId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
   return {
     ...summary,
-    defaultPlaylist: null,
+    defaultPlaylistId: playlistId,
     createdAt: null,
-    playlists: [{ name: "default", tracks: [{ title: "track1", file: "track1.mp3" }] }],
+    playlists: [
+      {
+        id: playlistId,
+        name: "default",
+        tracks: [
+          {
+            id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            title: "track1",
+            file: "track1.mp3",
+          },
+        ],
+      },
+    ],
     resumePosition: 0,
     resumeTrackIndex: 0,
     ...overrides,

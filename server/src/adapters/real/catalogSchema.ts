@@ -8,7 +8,7 @@ export const works = sqliteTable(
     title: text("title").notNull(),
     titleSortKey: text("title_sort_key").notNull(),
     coverImage: text("cover_image"),
-    defaultPlaylist: text("default_playlist"),
+    defaultPlaylistId: text("default_playlist_id"),
     createdAt: text("created_at"),
     status: text("status").notNull(),
     physicalPath: text("physical_path").notNull(),
@@ -20,6 +20,44 @@ export const works = sqliteTable(
   (table) => [
     index("idx_works_physical_path").on(table.physicalPath),
     index("idx_works_title_sort_key").on(table.titleSortKey, table.id),
+  ],
+);
+
+export const playlists = sqliteTable(
+  "playlists",
+  {
+    id: text("id").primaryKey(),
+    workId: text("work_id")
+      .notNull()
+      .references(() => works.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    name: text("name").notNull(),
+  },
+  (table) => [
+    index("idx_playlists_work_position").on(table.workId, table.position),
+    index("idx_playlists_work_name").on(table.workId, table.name),
+  ],
+);
+
+export const tracks = sqliteTable(
+  "tracks",
+  {
+    id: text("id").primaryKey(),
+    playlistId: text("playlist_id")
+      .notNull()
+      .references(() => playlists.id, { onDelete: "cascade" }),
+    workId: text("work_id")
+      .notNull()
+      .references(() => works.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    title: text("title").notNull(),
+    file: text("file").notNull(),
+    start: real("start"),
+    end: real("end"),
+  },
+  (table) => [
+    index("idx_tracks_playlist_position").on(table.playlistId, table.position),
+    index("idx_tracks_work").on(table.workId),
   ],
 );
 

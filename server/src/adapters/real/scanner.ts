@@ -37,6 +37,7 @@ import {
   readMetaFile,
   writeMetaFile,
 } from "./meta.ts";
+import { migrateMetaIds } from "./metaIdMigration.ts";
 import { isPathWithin, toPortableRelativePath } from "./paths.ts";
 import { probeDurationSec } from "./probe.ts";
 import type { WorkRepo } from "./workRepo.ts";
@@ -210,6 +211,7 @@ function buildDefaultTracks(workDir: string): Track[] {
 
   files.sort(naturalCompare);
   return files.map((f) => ({
+    id: crypto.randomUUID(),
     title: basename(f, extname(f)),
     file: toPortableRelativePath(workDir, f),
   }));
@@ -217,8 +219,8 @@ function buildDefaultTracks(workDir: string): Track[] {
 
 function defaultPlaylistOf(meta: MetaFile): Playlist | null {
   if (meta.playlists.length === 0) return null;
-  if (meta.defaultPlaylist) {
-    return meta.playlists.find((p) => p.name === meta.defaultPlaylist)!;
+  if (meta.defaultPlaylistId) {
+    return meta.playlists.find((p) => p.id === meta.defaultPlaylistId)!;
   }
   return meta.playlists[0]!;
 }
@@ -226,10 +228,12 @@ function defaultPlaylistOf(meta: MetaFile): Playlist | null {
 export class Scanner {
   private readonly db: CatalogDb;
   private readonly repo: WorkRepo;
+  private readonly dataRoot: string;
 
-  constructor(db: CatalogDb, repo: WorkRepo) {
+  constructor(db: CatalogDb, repo: WorkRepo, dataRoot: string) {
     this.db = db;
     this.repo = repo;
+    this.dataRoot = dataRoot;
   }
 
   async scan(root: string, onProgress?: (event: ScanProgressEvent) => void): Promise<ScanResult> {
@@ -248,6 +252,13 @@ export class Scanner {
     const tree = await walk(root, (visited) => {
       emit({ type: "progress", phase: "walking", processed: visited, total: 0 });
     });
+    const migration = migrateMetaIds({ root, metaPaths: tree.metaPaths, dataRoot: this.dataRoot });
+    if (migration.externallyModified.length > 0) {
+      console.warn(
+        `Playlist/Track ID移行: 外部編集を検出したため上書きしませんでした: ${migration.externallyModified.join(", ")}`,
+      );
+    }
+    this.repo.clearPlaybackRelations();
     const seenIds = new Set<string>();
 
     // 1. 既存メタファイルの登録
@@ -319,17 +330,14 @@ export class Scanner {
     return result;
   }
 
-  /** メタファイル1件を DB に登録する（ID 突合・重複再採番・欠損検出・duration プローブ込み） */
+  /** メタファイル1件を DB に登録する（ID 突合・欠損検出・duration プローブ込み） */
   private async registerMetaFile(metaPath: string, seenIds: Set<string>): Promise<string> {
     const meta = readMetaFile(metaPath);
     const workDir = dirname(metaPath);
 
-    // 同一 UUID 重複 → 後に検出された方を再採番（要件 v4 §3.1）
-    let id = meta.id;
+    const id = meta.id;
     if (seenIds.has(id)) {
-      id = crypto.randomUUID();
-      patchMetaFile(metaPath, { id });
-      console.warn(`UUID 重複を検出したため再採番しました: ${metaPath}（${meta.id} → ${id}）`);
+      throw new MetaParseError(metaPath, `Work IDが重複しています: ${id}`, id);
     }
     seenIds.add(id);
 
@@ -362,7 +370,7 @@ export class Scanner {
       id,
       title: meta.title,
       coverImage: meta.coverImage,
-      defaultPlaylist: meta.defaultPlaylist,
+      defaultPlaylistId: meta.defaultPlaylistId,
       createdAt: meta.createdAt ?? null,
       status: errorMessage ? "error" : "ok",
       physicalPath: workDir,
@@ -386,14 +394,15 @@ export class Scanner {
   private generateMetaForFolder(workDir: string): string {
     const id = crypto.randomUUID();
     const tracks = buildDefaultTracks(workDir);
+    const playlistId = tracks.length > 0 ? crypto.randomUUID() : null;
     const meta: MetaFile = {
       id,
       title: basename(workDir),
       urls: [],
       tags: [],
       coverImage: findCoverImage(workDir),
-      playlists: tracks.length > 0 ? [{ name: "default", tracks }] : [],
-      defaultPlaylist: tracks.length > 0 ? "default" : null,
+      playlists: playlistId ? [{ id: playlistId, name: "default", tracks }] : [],
+      defaultPlaylistId: playlistId,
       createdAt: new Date().toISOString(),
       dlsite: emptyDlsiteState(),
     };

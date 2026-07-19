@@ -31,7 +31,7 @@ const work = {
   bookmarked: false,
   lastPlayedAt: null,
   dlsite: emptyDlsiteState(),
-  defaultPlaylist: null,
+  defaultPlaylistId: null,
   createdAt: null,
   playlists: [],
   resumePosition: 0,

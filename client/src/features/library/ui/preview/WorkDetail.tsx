@@ -31,8 +31,7 @@ export function WorkDetail({
   isPatching,
   onPatchWork,
 }: WorkDetailProps) {
-  const playlist =
-    work.playlists.find((p) => p.name === (work.defaultPlaylist ?? "default")) ?? work.playlists[0];
+  const playlist = work.playlists.find((p) => p.id === work.defaultPlaylistId) ?? work.playlists[0];
   const tracks = playlist?.tracks ?? [];
   const isPlayable = work.status === "ok";
   const hasResume =
