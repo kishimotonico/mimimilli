@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@codex'
 created_date: '2026-07-19 02:24'
-updated_date: '2026-07-19 02:30'
+updated_date: '2026-07-19 02:38'
 labels: []
 dependencies: []
 modified_files:
@@ -66,6 +66,8 @@ ordinal: 61000
 - pnpm check: 成功
 - pnpm test: 成功（server 20件、client 238件）
 - 区間終端再開、保存直列化と失敗後継続、MediaSession部分対応、work detailキャッシュ同期のユニットテストを追加。
+
+ブラウザ実機検証: リスト表示時のパンくず〜表示形式トグル間隔が実測10px（修正前20px）、margin-rightのトランジション整合、切替前後のボタン位置回帰なしを確認。区間終端再開・保存直列化・キャッシュ整合はユニットテストで担保。
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
