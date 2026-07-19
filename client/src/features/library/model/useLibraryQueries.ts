@@ -21,25 +21,36 @@ import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKey
 import { TAG_QUERY_KEYS } from "../../../entities/tag/queryKeys";
 import { tagPrefixesAtom } from "./atoms";
 import { buildWorksParams, getFacetAxisForQuery } from "./libraryPresentation";
+import { useDebouncedValue } from "../../../shared/lib/useDebouncedValue";
 import { getWorkPatchInvalidationTargets } from "./workPatchInvalidation";
 import { isSmartAxis, getSmartFolderId } from "./axisDefinitions";
 import type { LibraryViewState } from "./useLibraryNavigation";
 
+/** 検索クエリのデバウンス時間（TASK-61）。1文字ごとの全件検索発行を間引く */
+const SEARCH_DEBOUNCE_MS = 250;
+
 export function useLibraryQueries(nav: LibraryViewState, searchQuery: string) {
   const queryClient = useQueryClient();
+
+  // 検索語はデバウンスしてから queryKey・パラメータに使う（空文字へのクリアは即時反映）
+  const debouncedSearchQuery = useDebouncedValue(
+    searchQuery,
+    SEARCH_DEBOUNCE_MS,
+    searchQuery === "",
+  );
 
   // ── Works（通常軸 / スマートフォルダー軸）─────────────────
   const worksParams = buildWorksParams({
     activeAxis: nav.activeAxis,
     sort: nav.sort,
-    searchQuery,
+    searchQuery: debouncedSearchQuery,
     selectedTags: nav.selectedTags,
     drillValue: nav.drillValue,
   });
 
   const worksQuery = useQuery({
     queryKey: WORK_QUERY_KEYS.list(worksParams ?? {}),
-    queryFn: () => searchWorks(worksParams!),
+    queryFn: ({ signal }) => searchWorks(worksParams!, { signal }),
     enabled: worksParams !== null,
   });
 

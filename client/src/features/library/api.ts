@@ -43,7 +43,10 @@ export interface WorksQueryParams {
   limit?: number;
 }
 
-export async function searchWorks(params: WorksQueryParams): Promise<WorksPage> {
+export async function searchWorks(
+  params: WorksQueryParams,
+  options?: { signal?: AbortSignal },
+): Promise<WorksPage> {
   const p = new URLSearchParams();
   if (params.q) p.set("q", params.q);
   for (const tag of params.tags ?? []) p.append("tags", tag);
@@ -56,7 +59,7 @@ export async function searchWorks(params: WorksQueryParams): Promise<WorksPage> 
   if (params.page !== undefined) p.set("page", String(params.page));
   if (params.limit !== undefined) p.set("limit", String(params.limit));
   const q = p.toString();
-  return getParsed(worksPageSchema, `/works${q ? `?${q}` : ""}`);
+  return getParsed(worksPageSchema, `/works${q ? `?${q}` : ""}`, options);
 }
 
 // ── 分類軸ファセット ───────────────────────────────────────────

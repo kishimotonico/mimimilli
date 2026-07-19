@@ -51,9 +51,21 @@ function parseResponse<T>(schema: z.ZodType<T>, method: string, path: string, da
   return parsed.data;
 }
 
+export interface GetOptions {
+  /** React Query の queryFn signal などを渡すと中断を伝播できる */
+  signal?: AbortSignal;
+}
+
 /** shared契約のスキーマでレスポンスを検証する GET。検証失敗は握りつぶさず ApiResponseSchemaError を投げる */
-export async function getParsed<T>(schema: z.ZodType<T>, path: string): Promise<T> {
-  const res = await fetch(API_BASE + path);
+export async function getParsed<T>(
+  schema: z.ZodType<T>,
+  path: string,
+  options?: GetOptions,
+): Promise<T> {
+  // signal 指定時のみ fetch の第2引数を渡す（undefined を渡すと呼び出し形が変わるため）
+  const res = options?.signal
+    ? await fetch(API_BASE + path, { signal: options.signal })
+    : await fetch(API_BASE + path);
   if (!res.ok) return throwApiError("GET", path, res);
   return parseResponse(schema, "GET", path, await res.json());
 }

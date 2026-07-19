@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import type { ScanResult } from "@mimimilli/shared";
 import { I } from "../../shared/ui/Icon";
 import IconButton from "../../shared/ui/IconButton";
@@ -60,6 +61,16 @@ export default function TopBar({
       ? "このフォルダー内を検索（ファイル名 · 拡張子 ...）"
       : "ライブラリを検索（タイトル · CV · タグ · RJ ...）";
 
+  // 検索入力はローカル draft を即時表示し、親への通知は IME composition 中は保留する
+  // （composition 中間文字列でのリクエスト乱発を防ぐ。TASK-61）
+  const [draft, setDraft] = useState(searchQuery);
+  const composingRef = useRef(false);
+
+  // クリアボタンやナビゲーション復元など、親側の値が外部要因で変わったときは draft を追従させる
+  useEffect(() => {
+    setDraft(searchQuery);
+  }, [searchQuery]);
+
   return (
     <header className="mll-bar">
       <div className="mll-bar__brand">
@@ -84,16 +95,29 @@ export default function TopBar({
       <div className="mll-bar__search">
         <I.search size={13} />
         <input
-          value={searchQuery}
-          onChange={(e) => onSearchChange(e.target.value)}
+          value={draft}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            if (!composingRef.current) onSearchChange(e.target.value);
+          }}
+          onCompositionStart={() => {
+            composingRef.current = true;
+          }}
+          onCompositionEnd={(e) => {
+            composingRef.current = false;
+            onSearchChange(e.currentTarget.value);
+          }}
           placeholder={placeholder}
         />
-        {searchQuery ? (
+        {draft ? (
           <IconButton
             size="sm"
             icon={I.x}
             label="検索をクリア"
-            onClick={() => onSearchChange("")}
+            onClick={() => {
+              setDraft("");
+              onSearchChange("");
+            }}
           />
         ) : (
           <span className="kbd">⌘K</span>
