@@ -15,7 +15,7 @@ async function setup(t: TestContext) {
   raw.myNote = "ユーザーの手書きメモ";
   writeFileSync(metaPath, JSON.stringify(raw, null, 2));
 
-  const adapter = createRealAdapter({ dbPath: ":memory:" });
+  const adapter = createRealAdapter({ database: { kind: "memory" } });
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
   return { ...lib, adapter, metaPath };

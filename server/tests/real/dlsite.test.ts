@@ -138,7 +138,7 @@ test("mergeDlsiteTags: prefix 変換と重複排除", () => {
 test("dlsiteApply: タグマージとメタ書き戻し（カバー DL なし）", async (t) => {
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
-  const adapter = createRealAdapter({ dbPath: ":memory:" });
+  const adapter = createRealAdapter({ database: { kind: "memory" } });
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
 
@@ -187,7 +187,7 @@ test("dlsiteApply: タグマージとメタ書き戻し（カバー DL なし）
 test("updateDlsiteState: RJコード修正とskipped切替をメタへ保存する", async (t) => {
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
-  const adapter = createRealAdapter({ dbPath: ":memory:" });
+  const adapter = createRealAdapter({ database: { kind: "memory" } });
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
 
@@ -207,7 +207,7 @@ test("updateDlsiteState: RJコード修正とskipped切替をメタへ保存す�
 test("dlsiteFetch: 存在しない作品はnot_found", async (t) => {
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
-  const adapter = createRealAdapter({ dbPath: ":memory:" });
+  const adapter = createRealAdapter({ database: { kind: "memory" } });
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
   // 既存メタ作品はフォルダー名 RJ900002… なので、タイトル・パスとも RJ なしに変更してから検証
@@ -222,7 +222,7 @@ test("一括取得: 編集済みタイトルは保持しフォルダー名のま
   t.after(lib.cleanup);
   const calls: number[] = [];
   const adapter = createRealAdapter({
-    dbPath: ":memory:",
+    database: { kind: "memory" },
     dlsiteRequestIntervalMs: 40,
     dlsiteFetcher: async (rjCode) => {
       calls.push(Date.now());
@@ -277,7 +277,7 @@ test("一括取得: not_found記録後とskipped作品は次回対象外", async
   t.after(lib.cleanup);
   let calls = 0;
   const adapter = createRealAdapter({
-    dbPath: ":memory:",
+    database: { kind: "memory" },
     dlsiteRequestIntervalMs: 0,
     dlsiteFetcher: async () => {
       calls += 1;
@@ -301,7 +301,7 @@ test("一括取得: カバー取得失敗を作品のerrorへ記録し、後続�
   t.after(lib.cleanup);
   let downloads = 0;
   const adapter = createRealAdapter({
-    dbPath: ":memory:",
+    database: { kind: "memory" },
     dlsiteRequestIntervalMs: 0,
     dlsiteFetcher: async (rjCode) => ({
       ok: true,
@@ -339,7 +339,7 @@ test("一括取得: 失敗状態のメタ書き戻しが例外を投げても後
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
   const adapter = createRealAdapter({
-    dbPath: ":memory:",
+    database: { kind: "memory" },
     dlsiteRequestIntervalMs: 0,
     dlsiteFetcher: async (rjCode) => ({
       ok: true,

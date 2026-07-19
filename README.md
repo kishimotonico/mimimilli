@@ -24,17 +24,17 @@ Files モード（物理フォルダーの巡回とポップアッププレイ�
 
 ## 技術スタック
 
-| レイヤー             | 技術                                                          |
-| -------------------- | ------------------------------------------------------------- |
-| バックエンド         | Hono + Node.js（TypeScript、`node --watch` でネイティブ実行） |
-| フロントエンド       | React 19 + TypeScript                                         |
-| ビルド               | Vite 7                                                        |
-| 状態管理             | TanStack Query + Jotai                                        |
-| スタイリング         | Tailwind CSS 4                                                |
-| データベース         | SQLite（Drizzle ORM / better-sqlite3）                        |
-| API 契約             | Zod スキーマ（`shared/` で client と server が共有）          |
-| 開発プロキシ         | portless                                                      |
-| パッケージマネージャ | pnpm（ワークスペース：client / server / shared）              |
+| レイヤー             | 技術                                                    |
+| -------------------- | ------------------------------------------------------- |
+| バックエンド         | Hono + Bun（TypeScript、`bun --watch` で実行）          |
+| フロントエンド       | React 19 + TypeScript                                   |
+| ビルド               | Vite 7                                                  |
+| 状態管理             | TanStack Query + Jotai                                  |
+| スタイリング         | Tailwind CSS 4                                          |
+| データベース         | SQLite（Drizzle ORM / `bun:sqlite`、catalog/userの2DB） |
+| API 契約             | Zod スキーマ（`shared/` で client と server が共有）    |
+| 開発プロキシ         | portless                                                |
+| パッケージマネージャ | pnpm（ワークスペース：client / server / shared）        |
 
 ## セットアップ
 
@@ -75,7 +75,7 @@ pnpm dev:fixture:errors
 pnpm dev:real
 # => http://api.mimi.localhost:1355
 # => http://mimi.localhost:1355
-# SQLite パスは MIMIMILLI_DB で変更可（デフォルト ./data/mimimilli.db）
+# データルートは MIMIKAGO_DATA_DIR で上書き可
 ```
 
 サーバーとフロントを別々に起動する場合は、次のコマンドを使う。
@@ -96,7 +96,7 @@ real サーバーと client は portless から動的ポートを割り当てら
 client は `portless get api.mimi` で同じ worktree の API URLを解決するため、複数の worktree でも接続先が混ざらない。
 
 real アダプタを使う場合、初回起動後に UI からルートフォルダーを設定する。
-`better-sqlite3` などのネイティブモジュールは WSL と Windows で同じ `node_modules` を共有できないため、両方の環境で扱うなら環境ごとに別クローンを使うか `pnpm install` をやり直す。
+DBはデータルートの `db/catalog.sqlite` と `db/user.sqlite` に作る。既定のデータルートはLinuxが `${XDG_DATA_HOME:-$HOME/.local/share}/mimikago`、Windowsが `%LOCALAPPDATA%\Mimikago`。`MIMIKAGO_DATA_DIR` には相対パスも指定でき、起動時に絶対パスへ解決する。
 
 ### 検証
 
@@ -104,7 +104,7 @@ real アダプタを使う場合、初回起動後に UI からルートフォ�
 pnpm check          # shared + server + client の型チェック
 pnpm test           # server + client のユニットテスト
 pnpm smoke:real     # 固定のサンプル音声で real 経路を手動スモーク
-pnpm test:server    # server のみ（node --test）
+pnpm test:server    # server のみ（Bunランナー、テストAPIはnode:test互換）
 pnpm test:client    # client のみ（vitest）
 pnpm test:visual    # Playwright ビジュアルリグレッション
 pnpm test:visual:update  # ビジュアルスナップショット再生成
@@ -168,9 +168,9 @@ mimimilli/
 │   │   └── visual/          # Playwright ビジュアルリグレッションテスト
 │   ├── vite.config.ts
 │   └── package.json
-├── server/                  # HTTP API サーバー (Hono + Node.js / TypeScript)
+├── server/                  # HTTP API サーバー (Hono + Bun / TypeScript)
 │   └── src/
-│       ├── index.ts         # エントリポイント (env: PORT/MIMIMILLI_ADAPTER/MIMIMILLI_DB/MIMIMILLI_MOCK_SCENARIO)
+│       ├── index.ts         # エントリポイント (env: PORT/MIMIMILLI_ADAPTER/MIMIKAGO_DATA_DIR/MIMIMILLI_MOCK_SCENARIO)
 │       ├── app.ts           # createApp（アダプタ注入）
 │       ├── adapter.ts       # DataAdapter インターフェース
 │       ├── adapters/

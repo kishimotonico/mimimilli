@@ -11,7 +11,7 @@ import { makeSampleLibrary } from "../helpers/sampleLibrary.ts";
 async function setup(t: TestContext) {
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
-  const adapter = createRealAdapter({ dbPath: ":memory:" });
+  const adapter = createRealAdapter({ database: { kind: "memory" } });
   const app = createApp(adapter);
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();

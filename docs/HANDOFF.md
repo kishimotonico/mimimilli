@@ -33,7 +33,7 @@ fixture API は `ssrLoadModule` 経由の遅延読み込みで、`server/src`・
 # ルートから（fixture アダプタ同居の通常開発）
 pnpm dev            # client 起動。vite middleware が fixture API を /api/* にマウント
 pnpm check          # shared/server/client の tsc + oxlint + oxfmt --check（これが通れば typecheck/lint/fmt の DoD を満たす）
-pnpm test           # server (node:test) + client (vitest)
+pnpm test           # server (Bunランナー + node:test API) + client (vitest)
 pnpm test:server
 pnpm test:client
 pnpm test:visual         # Playwright 比較
@@ -47,12 +47,12 @@ pnpm dev:fixture:errors
 
 # real アダプタ（実SQLite + 実FS）
 pnpm dev:real          # API サーバー + client を並行起動
-pnpm dev:real:server   # API サーバーのみ => http://api.mimi.localhost:1355（DB は MIMIMILLI_DB、既定 ./data/mimimilli.db）
+pnpm dev:real:server   # API サーバーのみ => http://api.mimi.localhost:1355（Bun。データルートはMIMIKAGO_DATA_DIRで上書き可）
 pnpm dev:real:client   # client のみ。同じworktreeのapi.mimiへ向けて起動
 pnpm smoke:real        # 固定のサンプル音声で real 経路を手動スモーク
 
 # fixture サーバーを単体起動して curl 確認（合成メディアの検証等）
-MIMIMILLI_ADAPTER=fixture PORT=18099 node server/src/index.ts
+MIMIMILLI_ADAPTER=fixture PORT=18099 pnpm --filter @mimimilli/server start
 ```
 
 ビジュアルテストの注意:

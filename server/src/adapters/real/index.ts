@@ -2,6 +2,7 @@
 // 検索・絞り込み・ソートは数千作品規模を前提に、DB から全サマリーを読んで
 // core/ の pure 関数で処理する（規模が増えたら SQL 化する余地をこの境界の内側に残す）。
 import { existsSync, realpathSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { DEFAULT_TAG_PREFIXES, normalizeTags } from "@mimimilli/shared";
 import type {
@@ -45,7 +46,7 @@ import { isDefaultTitle } from "../../core/dlsiteTitle.ts";
 import { buildTagPrefixCandidates } from "../../core/tagPrefixCandidates.ts";
 import { evalSmartFolder } from "../../core/smartFolder.ts";
 import { applyWorksQuery } from "../../core/worksQuery.ts";
-import { openDb, type Db } from "./db.ts";
+import { openDb, type Db, type DbLocation } from "./db.ts";
 import { detectRjCode, downloadCover, fetchDlsiteInfo, mergeDlsiteTags } from "./dlsite.ts";
 import { browseFs } from "./fsBrowse.ts";
 import { buildFileTree } from "./fileTree.ts";
@@ -58,11 +59,9 @@ import { WorkRepo } from "./workRepo.ts";
 const KEY_ROOT_FOLDER = "root_folder";
 const KEY_LAST_SCAN_TIME = "last_scan_time";
 const KEY_TAG_PREFIXES_SEEDED = "tag_prefixes_seeded";
-const DEFAULT_THUMBNAIL_CACHE_DIR = "data/cache/thumbnails";
-
 export interface RealAdapterOptions {
-  dbPath: string;
-  /** カバーサムネイルのキャッシュ置き場（省略時 "data/cache/thumbnails"） */
+  database: DbLocation;
+  /** カバーサムネイルのキャッシュ置き場。ファイルDBの通常起動ではデータルート配下を渡す。 */
   thumbnailCacheDir?: string;
   /** 一括取得のリクエスト間隔。実運用は1秒、テストのみ短縮可 */
   dlsiteRequestIntervalMs?: number;
@@ -72,26 +71,30 @@ export interface RealAdapterOptions {
   dlsiteCoverDownloader?: (coverUrl: string, workDir: string) => Promise<string>;
 }
 
-export function createRealAdapter(options: RealAdapterOptions): DataAdapter {
-  const db: Db = openDb(options.dbPath);
+export interface RealAdapter extends DataAdapter {
+  close(): void;
+}
+
+export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
+  const db: Db = openDb(options.database);
   const repo = new WorkRepo(db);
-  const scanner = new Scanner(db, repo);
-  const thumbnailCacheDir = options.thumbnailCacheDir ?? DEFAULT_THUMBNAIL_CACHE_DIR;
+  const scanner = new Scanner(db.catalog, repo);
+  const thumbnailCacheDir = options.thumbnailCacheDir ?? join(tmpdir(), "mimikago-memory-cache");
   const dlsiteRequestIntervalMs = options.dlsiteRequestIntervalMs ?? 1000;
   const dlsiteFetcher = options.dlsiteFetcher ?? fetchDlsiteInfo;
   const dlsiteCoverDownloader = options.dlsiteCoverDownloader ?? downloadCover;
 
   // prefix 定義の初回 seed（ADR-0005）。seed 済みフラグで管理し、
   // ユーザーが全定義を削除しても再投入しない
-  if (repo.getSetting(KEY_TAG_PREFIXES_SEEDED) === null) {
+  if (repo.getUserSetting(KEY_TAG_PREFIXES_SEEDED) === null) {
     for (const def of DEFAULT_TAG_PREFIXES) {
       repo.createTagPrefix(def);
     }
-    repo.setSetting(KEY_TAG_PREFIXES_SEEDED, "1");
+    repo.setUserSetting(KEY_TAG_PREFIXES_SEEDED, "1");
   }
 
   function requireRoot(): string {
-    const root = repo.getSetting(KEY_ROOT_FOLDER);
+    const root = repo.getUserSetting(KEY_ROOT_FOLDER);
     if (!root) {
       throw new NotConfiguredError(
         "ルートフォルダーが設定されていません（PUT /api/settings で設定してください）",
@@ -104,8 +107,8 @@ export function createRealAdapter(options: RealAdapterOptions): DataAdapter {
     // ── 設定・スキャン ────────────────────────────────────────
     async getSettings(): Promise<Settings> {
       return {
-        rootFolder: repo.getSetting(KEY_ROOT_FOLDER),
-        lastScanTime: repo.getSetting(KEY_LAST_SCAN_TIME),
+        rootFolder: repo.getUserSetting(KEY_ROOT_FOLDER),
+        lastScanTime: repo.getScanState(KEY_LAST_SCAN_TIME),
       };
     },
 
@@ -120,14 +123,14 @@ export function createRealAdapter(options: RealAdapterOptions): DataAdapter {
           `指定されたルートフォルダーが存在しません: ${patch.rootFolder}`,
         );
       }
-      repo.setSetting(KEY_ROOT_FOLDER, absRoot);
+      repo.setUserSetting(KEY_ROOT_FOLDER, absRoot);
       return this.getSettings();
     },
 
     async scan(onProgress?: (event: ScanProgressEvent) => void): Promise<ScanResult> {
       const root = requireRoot();
       const result = await scanner.scan(root, onProgress);
-      repo.setSetting(KEY_LAST_SCAN_TIME, new Date().toISOString());
+      repo.setScanState(KEY_LAST_SCAN_TIME, new Date().toISOString());
 
       // 全作品を走査した直後の自然なタイミングでサムネイルキャッシュをGCする（TASK-26）
       const coverEntries: WorkCoverEntry[] = [];
@@ -160,8 +163,16 @@ export function createRealAdapter(options: RealAdapterOptions): DataAdapter {
       if (patch.title === undefined && patch.tags === undefined) {
         return repo.patchWork(id, patch);
       }
+      // user書き込みはcatalogトランザクションの外で先に確定させる。
+      if (patch.bookmarked !== undefined) {
+        const updated = repo.patchWork(id, { bookmarked: patch.bookmarked });
+        if (!updated) return null;
+      }
       return db.transaction(() => {
-        const updated = repo.patchWork(id, patch);
+        const updated = repo.patchWork(id, {
+          title: patch.title,
+          tags: patch.tags,
+        });
         if (!updated) return null;
         patchMetaFile(findMetaPath(updated), { title: patch.title, tags: patch.tags });
         return updated;
@@ -450,6 +461,9 @@ export function createRealAdapter(options: RealAdapterOptions): DataAdapter {
         });
       }
       return result;
+    },
+    close(): void {
+      db.close();
     },
   };
 }

@@ -62,7 +62,9 @@ async function streamWhole(location: MediaLocation): Promise<Response> {
   }
 
   const stats = await stat(location.absolutePath);
-  const stream = Readable.toWeb(createReadStream(location.absolutePath)) as ReadableStream;
+  const stream = Readable.toWeb(
+    createReadStream(location.absolutePath),
+  ) as unknown as ReadableStream;
   return new Response(stream, {
     status: 200,
     headers: {
@@ -92,7 +94,9 @@ async function streamWithRange(
       });
     }
 
-    const stream = Readable.toWeb(createReadStream(location.absolutePath)) as ReadableStream;
+    const stream = Readable.toWeb(
+      createReadStream(location.absolutePath),
+    ) as unknown as ReadableStream;
     return new Response(stream, {
       status: 200,
       headers: {
@@ -129,7 +133,7 @@ async function streamWithRange(
 
   const stream = Readable.toWeb(
     createReadStream(location.absolutePath, { start, end }),
-  ) as ReadableStream;
+  ) as unknown as ReadableStream;
 
   return new Response(stream, {
     status: 206,

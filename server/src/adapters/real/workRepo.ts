@@ -28,18 +28,12 @@ import type {
 } from "@mimimilli/shared";
 import { z } from "zod";
 import type { Db } from "./db.ts";
-import {
-  appSettings,
-  searchPresets,
-  smartFolders,
-  tagPrefixes,
-  tags,
-  workDlsite,
-  workTags,
-  works,
-} from "./schema.ts";
+import { tags, workDlsite, workTags, works, scanState } from "./catalogSchema.ts";
+import { appSettings, searchPresets, smartFolders, tagPrefixes, workStates } from "./userSchema.ts";
 
-type WorkRow = typeof works.$inferSelect;
+type CatalogWorkRow = typeof works.$inferSelect;
+type WorkRow = CatalogWorkRow & typeof workStates.$inferSelect;
+type RawWorkRow = Omit<WorkRow, "bookmarked"> & { bookmarked: number };
 
 export class PersistentDataError extends Error {
   constructor(table: string, recordId: string | number, detail: string) {
@@ -77,7 +71,7 @@ function parseRecord<T>(
 }
 
 function defaultPlaylistOf(
-  row: Pick<WorkRow, "id" | "defaultPlaylist">,
+  row: Pick<CatalogWorkRow, "id" | "defaultPlaylist">,
   playlists: Playlist[],
 ): Playlist | null {
   if (playlists.length === 0) return null;
@@ -166,14 +160,14 @@ export class WorkRepo {
   private tagMap(workIds?: string[]): Map<string, string[]> {
     const rows =
       workIds === undefined
-        ? this.db
+        ? this.db.catalog
             .select({ workId: workTags.workId, name: tags.name })
             .from(workTags)
             .innerJoin(tags, eq(workTags.tagId, tags.id))
             .all()
         : workIds.length === 0
           ? []
-          : this.db
+          : this.db.catalog
               .select({ workId: workTags.workId, name: tags.name })
               .from(workTags)
               .innerJoin(tags, eq(workTags.tagId, tags.id))
@@ -189,21 +183,25 @@ export class WorkRepo {
   }
 
   private replaceWorkTags(workId: string, tagNames: string[]): void {
-    this.db.delete(workTags).where(eq(workTags.workId, workId)).run();
+    this.db.catalog.delete(workTags).where(eq(workTags.workId, workId)).run();
     // DB キャッシュには常に正規形で入れる（ADR-0005 決定5）。メタファイル側の正規化は
     // 編集経路（PATCH / DLsite 適用）で行い、スキャン取り込みはメタを書き換えない
     for (const name of normalizeTags(tagNames)) {
-      this.db.insert(tags).values({ name }).onConflictDoNothing().run();
-      const tag = this.db.select().from(tags).where(eq(tags.name, name)).get();
+      this.db.catalog.insert(tags).values({ name }).onConflictDoNothing().run();
+      const tag = this.db.catalog.select().from(tags).where(eq(tags.name, name)).get();
       if (tag) {
-        this.db.insert(workTags).values({ workId, tagId: tag.id }).onConflictDoNothing().run();
+        this.db.catalog
+          .insert(workTags)
+          .values({ workId, tagId: tag.id })
+          .onConflictDoNothing()
+          .run();
       }
     }
   }
 
   listAllTagNames(): string[] {
     // 作品に紐づいているタグのみ（孤児タグは出さない）
-    return this.db
+    return this.db.catalog
       .selectDistinct({ name: tags.name })
       .from(tags)
       .innerJoin(workTags, eq(workTags.tagId, tags.id))
@@ -215,7 +213,11 @@ export class WorkRepo {
   // ── works ─────────────────────────────────────────────────
 
   private dlsiteState(workId: string): DlsiteState {
-    const row = this.db.select().from(workDlsite).where(eq(workDlsite.workId, workId)).get();
+    const row = this.db.catalog
+      .select()
+      .from(workDlsite)
+      .where(eq(workDlsite.workId, workId))
+      .get();
     if (!row) return emptyDlsiteState();
     return parseRecord(
       dlsiteStateSchema,
@@ -226,7 +228,7 @@ export class WorkRepo {
   }
 
   setDlsiteState(workId: string, state: DlsiteState): void {
-    this.db
+    this.db.catalog
       .insert(workDlsite)
       .values({ workId, stateJson: JSON.stringify(state) })
       .onConflictDoUpdate({
@@ -236,8 +238,42 @@ export class WorkRepo {
       .run();
   }
 
+  private joinedWorks(whereSql = "", parameter?: string): WorkRow[] {
+    const sql = `
+      SELECT
+        works.id,
+        works.title,
+        works.cover_image AS coverImage,
+        works.default_playlist AS defaultPlaylist,
+        works.created_at AS createdAt,
+        works.status,
+        works.physical_path AS physicalPath,
+        works.total_duration_sec AS totalDurationSec,
+        works.error_message AS errorMessage,
+        works.urls_json AS urlsJson,
+        works.playlists_json AS playlistsJson,
+        work_states.work_id AS workId,
+        work_states.added_at AS addedAt,
+        work_states.bookmarked,
+        work_states.last_played_at AS lastPlayedAt,
+        work_states.resume_position AS resumePosition,
+        work_states.resume_track_index AS resumeTrackIndex
+      FROM main.works
+      INNER JOIN user.work_states ON work_states.work_id = works.id
+      ${whereSql}
+    `;
+    const rows =
+      parameter !== undefined
+        ? this.db.sqlite.query(sql).all(parameter)
+        : this.db.sqlite.query(sql).all();
+    return (rows as RawWorkRow[]).map((row) => ({
+      ...row,
+      bookmarked: row.bookmarked !== 0,
+    }));
+  }
+
   listSummaries(): WorkSummary[] {
-    const rows = this.db.select().from(works).all();
+    const rows = this.joinedWorks();
     const tagsByWork = this.tagMap();
     return rows.map((row) =>
       rowToSummary(row, tagsByWork.get(row.id) ?? [], this.dlsiteState(row.id)),
@@ -245,19 +281,32 @@ export class WorkRepo {
   }
 
   getWork(id: string): Work | null {
-    const row = this.db.select().from(works).where(eq(works.id, id)).get();
+    const row = this.joinedWorks("WHERE works.id = ?", id)[0];
     if (!row) return null;
     return rowToWork(row, this.tagMap([id]).get(id) ?? [], this.dlsiteState(id));
   }
 
   getWorkByPhysicalPath(physicalPath: string): Work | null {
-    const row = this.db.select().from(works).where(eq(works.physicalPath, physicalPath)).get();
+    const row = this.joinedWorks("WHERE works.physical_path = ?", physicalPath)[0];
     if (!row) return null;
     return rowToWork(row, this.tagMap([row.id]).get(row.id) ?? [], this.dlsiteState(row.id));
   }
 
   /** scan からの登録。タグも置き換える */
   upsertWork(work: Work): void {
+    // 2DBをまたぐ原子性には依存せず、user状態を先に冪等作成してからcatalogを書く。
+    this.db.user
+      .insert(workStates)
+      .values({
+        workId: work.id,
+        addedAt: work.addedAt,
+        bookmarked: work.bookmarked,
+        lastPlayedAt: work.lastPlayedAt,
+        resumePosition: work.resumePosition,
+        resumeTrackIndex: work.resumeTrackIndex,
+      })
+      .onConflictDoNothing()
+      .run();
     const values = {
       id: work.id,
       title: work.title,
@@ -267,16 +316,11 @@ export class WorkRepo {
       status: work.status,
       physicalPath: work.physicalPath,
       totalDurationSec: work.totalDurationSec,
-      addedAt: work.addedAt,
       errorMessage: work.errorMessage,
       urlsJson: JSON.stringify(work.urls),
       playlistsJson: JSON.stringify(work.playlists),
-      bookmarked: work.bookmarked,
-      lastPlayedAt: work.lastPlayedAt,
-      resumePosition: work.resumePosition,
-      resumeTrackIndex: work.resumeTrackIndex,
     };
-    this.db
+    this.db.catalog
       .insert(works)
       .values(values)
       .onConflictDoUpdate({ target: works.id, set: values })
@@ -296,15 +340,21 @@ export class WorkRepo {
       urls?: UrlEntry[];
     },
   ): Work | null {
-    const row = this.db.select().from(works).where(eq(works.id, id)).get();
+    const row = this.db.catalog.select().from(works).where(eq(works.id, id)).get();
     if (!row) return null;
     const set: Partial<typeof works.$inferInsert> = {};
     if (patch.title !== undefined) set.title = patch.title;
-    if (patch.bookmarked !== undefined) set.bookmarked = patch.bookmarked;
     if (patch.coverImage !== undefined) set.coverImage = patch.coverImage;
     if (patch.urls !== undefined) set.urlsJson = JSON.stringify(patch.urls);
     if (Object.keys(set).length > 0) {
-      this.db.update(works).set(set).where(eq(works.id, id)).run();
+      this.db.catalog.update(works).set(set).where(eq(works.id, id)).run();
+    }
+    if (patch.bookmarked !== undefined) {
+      this.db.user
+        .update(workStates)
+        .set({ bookmarked: patch.bookmarked })
+        .where(eq(workStates.workId, id))
+        .run();
     }
     if (patch.tags !== undefined) {
       this.replaceWorkTags(id, patch.tags);
@@ -313,51 +363,63 @@ export class WorkRepo {
   }
 
   saveResume(id: string, position: number, trackIndex: number): boolean {
-    const r = this.db
-      .update(works)
+    if (!this.db.catalog.select({ id: works.id }).from(works).where(eq(works.id, id)).get()) {
+      return false;
+    }
+    const r = this.db.user
+      .update(workStates)
       .set({ resumePosition: position, resumeTrackIndex: trackIndex })
-      .where(eq(works.id, id))
-      .run();
-    return r.changes > 0;
+      .where(eq(workStates.workId, id))
+      .returning({ id: workStates.workId })
+      .get();
+    return r !== undefined;
   }
 
   touchLastPlayed(id: string): boolean {
-    const r = this.db
-      .update(works)
+    if (!this.db.catalog.select({ id: works.id }).from(works).where(eq(works.id, id)).get()) {
+      return false;
+    }
+    const r = this.db.user
+      .update(workStates)
       .set({ lastPlayedAt: new Date().toISOString() })
-      .where(eq(works.id, id))
-      .run();
-    return r.changes > 0;
+      .where(eq(workStates.workId, id))
+      .returning({ id: workStates.workId })
+      .get();
+    return r !== undefined;
   }
 
   markWorkError(id: string, physicalPath: string, errorMessage: string): boolean {
     return (
-      this.db
+      this.db.catalog
         .update(works)
         .set({ status: "error", physicalPath, errorMessage })
         .where(eq(works.id, id))
-        .run().changes > 0
+        .returning({ id: works.id })
+        .get() !== undefined
     );
   }
 
   markMissingExcept(foundIds: string[]): void {
     const set = { status: "missing", errorMessage: null } as const;
     if (foundIds.length === 0) {
-      this.db.update(works).set(set).run();
+      this.db.catalog.update(works).set(set).run();
       return;
     }
-    this.db.update(works).set(set).where(notInArray(works.id, foundIds)).run();
+    this.db.catalog.update(works).set(set).where(notInArray(works.id, foundIds)).run();
   }
 
   countByStatus(status: string): number {
-    return this.db.select({ id: works.id }).from(works).where(eq(works.status, status)).all()
-      .length;
+    return this.db.catalog
+      .select({ id: works.id })
+      .from(works)
+      .where(eq(works.status, status))
+      .all().length;
   }
 
   // ── タグ prefix 定義（ADR-0005）───────────────────────────
 
   listTagPrefixes(): TagPrefix[] {
-    return this.db
+    return this.db.user
       .select()
       .from(tagPrefixes)
       .orderBy(asc(tagPrefixes.id))
@@ -372,7 +434,7 @@ export class WorkRepo {
   }
 
   getTagPrefix(prefix: string): TagPrefix | null {
-    const r = this.db.select().from(tagPrefixes).where(eq(tagPrefixes.prefix, prefix)).get();
+    const r = this.db.user.select().from(tagPrefixes).where(eq(tagPrefixes.prefix, prefix)).get();
     if (!r) return null;
     return {
       prefix: r.prefix,
@@ -385,7 +447,7 @@ export class WorkRepo {
 
   /** 既に存在する prefix なら null（呼び出し側で 409 にする） */
   createTagPrefix(input: TagPrefixCreate): TagPrefix | null {
-    const r = this.db
+    const r = this.db.user
       .insert(tagPrefixes)
       .values({
         prefix: input.prefix,
@@ -395,8 +457,9 @@ export class WorkRepo {
         protected: input.protected,
       })
       .onConflictDoNothing()
-      .run();
-    if (r.changes === 0) return null;
+      .returning({ id: tagPrefixes.id })
+      .get();
+    if (!r) return null;
     return this.getTagPrefix(input.prefix);
   }
 
@@ -409,34 +472,53 @@ export class WorkRepo {
     if (patch.showAsAxis !== undefined) set.showAsAxis = patch.showAsAxis;
     if (patch.protected !== undefined) set.protected = patch.protected;
     if (Object.keys(set).length > 0) {
-      this.db.update(tagPrefixes).set(set).where(eq(tagPrefixes.prefix, prefix)).run();
+      this.db.user.update(tagPrefixes).set(set).where(eq(tagPrefixes.prefix, prefix)).run();
     }
     return this.getTagPrefix(prefix);
   }
 
   deleteTagPrefix(prefix: string): boolean {
-    return this.db.delete(tagPrefixes).where(eq(tagPrefixes.prefix, prefix)).run().changes > 0;
+    return (
+      this.db.user
+        .delete(tagPrefixes)
+        .where(eq(tagPrefixes.prefix, prefix))
+        .returning({ id: tagPrefixes.id })
+        .get() !== undefined
+    );
   }
 
   // ── app_settings（KVストア）──────────────────────────────
 
-  getSetting(key: string): string | null {
-    const row = this.db.select().from(appSettings).where(eq(appSettings.key, key)).get();
+  getUserSetting(key: string): string | null {
+    const row = this.db.user.select().from(appSettings).where(eq(appSettings.key, key)).get();
     return row?.value ?? null;
   }
 
-  setSetting(key: string, value: string | null): void {
-    this.db
+  setUserSetting(key: string, value: string | null): void {
+    this.db.user
       .insert(appSettings)
       .values({ key, value })
       .onConflictDoUpdate({ target: appSettings.key, set: { value } })
       .run();
   }
 
+  getScanState(key: string): string | null {
+    const row = this.db.catalog.select().from(scanState).where(eq(scanState.key, key)).get();
+    return row?.value ?? null;
+  }
+
+  setScanState(key: string, value: string | null): void {
+    this.db.catalog
+      .insert(scanState)
+      .values({ key, value })
+      .onConflictDoUpdate({ target: scanState.key, set: { value } })
+      .run();
+  }
+
   // ── スマートフォルダー ─────────────────────────────────────
 
   listSmartFolders(): SmartFolder[] {
-    return this.db
+    return this.db.user
       .select()
       .from(smartFolders)
       .orderBy(asc(smartFolders.createdAt))
@@ -458,7 +540,7 @@ export class WorkRepo {
   }
 
   getSmartFolder(id: string): SmartFolder | null {
-    const r = this.db.select().from(smartFolders).where(eq(smartFolders.id, id)).get();
+    const r = this.db.user.select().from(smartFolders).where(eq(smartFolders.id, id)).get();
     if (!r) return null;
     return parseRecord(
       smartFolderSchema,
@@ -482,7 +564,7 @@ export class WorkRepo {
       sort: input.sort,
       createdAt: new Date().toISOString(),
     };
-    this.db
+    this.db.user
       .insert(smartFolders)
       .values({
         id: folder.id,
@@ -503,19 +585,25 @@ export class WorkRepo {
     if (input.rules !== undefined) set.rulesJson = JSON.stringify(input.rules);
     if (input.sort !== undefined) set.sort = input.sort;
     if (Object.keys(set).length > 0) {
-      this.db.update(smartFolders).set(set).where(eq(smartFolders.id, id)).run();
+      this.db.user.update(smartFolders).set(set).where(eq(smartFolders.id, id)).run();
     }
     return this.getSmartFolder(id);
   }
 
   deleteSmartFolder(id: string): boolean {
-    return this.db.delete(smartFolders).where(eq(smartFolders.id, id)).run().changes > 0;
+    return (
+      this.db.user
+        .delete(smartFolders)
+        .where(eq(smartFolders.id, id))
+        .returning({ id: smartFolders.id })
+        .get() !== undefined
+    );
   }
 
   // ── 検索プリセット ─────────────────────────────────────────
 
   listPresets(): SearchPreset[] {
-    return this.db
+    return this.db.user
       .select()
       .from(searchPresets)
       .orderBy(asc(searchPresets.id))
@@ -542,7 +630,7 @@ export class WorkRepo {
   }
 
   createPreset(input: SearchPresetCreate): SearchPreset {
-    const r = this.db
+    const r = this.db.user
       .insert(searchPresets)
       .values({
         name: input.name,
@@ -550,9 +638,11 @@ export class WorkRepo {
         tagFiltersJson: JSON.stringify(input.tagFilters),
         sortId: input.sortId,
       })
-      .run();
+      .returning({ id: searchPresets.id })
+      .get();
+    if (!r) throw new Error("検索プリセットを保存できませんでした");
     return {
-      id: Number(r.lastInsertRowid),
+      id: r.id,
       name: input.name,
       query: input.query,
       tagFilters: input.tagFilters,
@@ -561,6 +651,12 @@ export class WorkRepo {
   }
 
   deletePreset(id: number): boolean {
-    return this.db.delete(searchPresets).where(eq(searchPresets.id, id)).run().changes > 0;
+    return (
+      this.db.user
+        .delete(searchPresets)
+        .where(eq(searchPresets.id, id))
+        .returning({ id: searchPresets.id })
+        .get() !== undefined
+    );
   }
 }

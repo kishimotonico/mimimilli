@@ -3,8 +3,9 @@ import { test } from "node:test";
 import { eq } from "drizzle-orm";
 import type { Work } from "@mimimilli/shared";
 import { openDb } from "../../src/adapters/real/db.ts";
-import { searchPresets, smartFolders, works } from "../../src/adapters/real/schema.ts";
+import { works } from "../../src/adapters/real/catalogSchema.ts";
 import { PersistentDataError, WorkRepo } from "../../src/adapters/real/workRepo.ts";
+import { searchPresets, smartFolders } from "../../src/adapters/real/userSchema.ts";
 
 function sampleWork(id: string): Work {
   return {
@@ -49,11 +50,11 @@ function assertPersistentDataError(action: () => unknown, expectedMessage: RegEx
 }
 
 test("works.status が不正なら作品IDとフィールド名を含むエラーになる", () => {
-  const db = openDb(":memory:");
+  const db = openDb({ kind: "memory" });
   const repo = new WorkRepo(db);
   const work = sampleWork("work-bad-status");
   repo.upsertWork(work);
-  db.update(works).set({ status: "unknown" }).where(eq(works.id, work.id)).run();
+  db.catalog.update(works).set({ status: "unknown" }).where(eq(works.id, work.id)).run();
 
   assertPersistentDataError(
     () => repo.listSummaries(),
@@ -62,11 +63,12 @@ test("works.status が不正なら作品IDとフィールド名を含むエラ�
 });
 
 test("works.playlists_json が不正なら作品IDとフィールド名を含むエラーになる", () => {
-  const db = openDb(":memory:");
+  const db = openDb({ kind: "memory" });
   const repo = new WorkRepo(db);
   const work = sampleWork("work-bad-playlists");
   repo.upsertWork(work);
-  db.update(works)
+  db.catalog
+    .update(works)
     .set({ playlistsJson: '[{"name":"default","tracks":"broken"}]' })
     .where(eq(works.id, work.id))
     .run();
@@ -78,11 +80,11 @@ test("works.playlists_json が不正なら作品IDとフィールド名を含む
 });
 
 test("壊れたJSON構文は作品IDとSQLite列名を含むエラーになる", () => {
-  const db = openDb(":memory:");
+  const db = openDb({ kind: "memory" });
   const repo = new WorkRepo(db);
   const work = sampleWork("work-bad-json");
   repo.upsertWork(work);
-  db.update(works).set({ playlistsJson: "[{" }).where(eq(works.id, work.id)).run();
+  db.catalog.update(works).set({ playlistsJson: "[{" }).where(eq(works.id, work.id)).run();
 
   assertPersistentDataError(
     () => repo.getWork(work.id),
@@ -91,9 +93,10 @@ test("壊れたJSON構文は作品IDとSQLite列名を含むエラーになる",
 });
 
 test("smart folderとsearch presetのsortも復元時に検証する", () => {
-  const db = openDb(":memory:");
+  const db = openDb({ kind: "memory" });
   const repo = new WorkRepo(db);
-  db.insert(smartFolders)
+  db.user
+    .insert(smartFolders)
     .values({
       id: "sf-bad-sort",
       name: "不正sort",
@@ -102,7 +105,8 @@ test("smart folderとsearch presetのsortも復元時に検証する", () => {
       createdAt: "2026-07-19T00:00:00.000Z",
     })
     .run();
-  db.insert(searchPresets)
+  db.user
+    .insert(searchPresets)
     .values({
       name: "不正sort",
       query: "",

@@ -8,5 +8,5 @@ onlyBuiltDependencies:
   - esbuild
 
 allowBuilds:
-  better-sqlite3: true
+  bun: true
   esbuild: true

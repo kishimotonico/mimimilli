@@ -12,7 +12,7 @@ import { makeSampleLibrary, writeWav } from "../helpers/sampleLibrary.ts";
 async function setup(t: TestContext) {
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
-  const adapter = createRealAdapter({ dbPath: ":memory:" });
+  const adapter = createRealAdapter({ database: { kind: "memory" } });
   await adapter.updateSettings({ rootFolder: lib.root });
   return { ...lib, adapter };
 }
@@ -123,7 +123,7 @@ test("UUID 重複: 後に検出された方が再採番されメタファイル�
       }),
     );
   }
-  const adapter = createRealAdapter({ dbPath: ":memory:" });
+  const adapter = createRealAdapter({ database: { kind: "memory" } });
   await adapter.updateSettings({ rootFolder: root });
   const result = await adapter.scan();
 
@@ -158,7 +158,7 @@ test("大量ディレクトリの走査中、walking フェーズの進捗イベ
   for (let i = 0; i < dirCount; i++) {
     mkdirSync(join(root, `dir-${i}`), { recursive: true });
   }
-  const adapter = createRealAdapter({ dbPath: ":memory:" });
+  const adapter = createRealAdapter({ database: { kind: "memory" } });
   await adapter.updateSettings({ rootFolder: root });
 
   const walkingEvents: { processed: number; total: number }[] = [];

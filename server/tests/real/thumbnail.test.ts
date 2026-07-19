@@ -27,7 +27,7 @@ async function setup(t: TestContext) {
   const coverPath = join(lib.root, "dlsite", "RJ900001_テスト作品", "cover.jpg");
   await writeCoverJpeg(coverPath, 800, { r: 255, g: 0, b: 0 });
 
-  const adapter = createRealAdapter({ dbPath: ":memory:", thumbnailCacheDir: cacheDir });
+  const adapter = createRealAdapter({ database: { kind: "memory" }, thumbnailCacheDir: cacheDir });
   const app = createApp(adapter);
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();

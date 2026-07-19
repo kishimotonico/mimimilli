@@ -9,6 +9,7 @@ import type { DlsiteFetchResult, DlsiteWorkInfo } from "@mimimilli/shared";
 
 const FETCH_TIMEOUT_MS = 15_000;
 const USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) mimimilli/0.1";
+type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 // DLsite の作品ページURLはIDのカテゴリprefixで公開ストアが分かれる:
 // RJ（同人）は maniax、VJ（商業/美少女ゲーム）は pro。カテゴリを誤ると
@@ -74,7 +75,7 @@ export function parseDlsiteHtml(html: string, rjCode: string): DlsiteFetchResult
 /** DLsite から作品情報を取得する（年齢確認は Cookie adultchecked=1 でバイパス） */
 export async function fetchDlsiteInfo(
   rjCode: string,
-  fetchImpl: typeof fetch = fetch,
+  fetchImpl: FetchLike = fetch,
 ): Promise<DlsiteFetchResult> {
   try {
     const res = await fetchImpl(dlsiteWorkUrl(rjCode), {

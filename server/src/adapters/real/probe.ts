@@ -4,10 +4,10 @@
 import { statSync } from "node:fs";
 import { eq } from "drizzle-orm";
 import { parseFile } from "music-metadata";
-import type { Db } from "./db.ts";
-import { audioProbeCache } from "./schema.ts";
+import { audioProbeCache } from "./catalogSchema.ts";
+import type { CatalogDb } from "./db.ts";
 
-export async function probeDurationSec(db: Db, filePath: string): Promise<number> {
+export async function probeDurationSec(db: CatalogDb, filePath: string): Promise<number> {
   let stat;
   try {
     stat = statSync(filePath);

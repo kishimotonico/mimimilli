@@ -28,7 +28,7 @@ import type {
   Work,
 } from "@mimimilli/shared";
 import { emptyDlsiteState, isRjCodeMissing } from "@mimimilli/shared";
-import type { Db } from "./db.ts";
+import type { CatalogDb } from "./db.ts";
 import { detectRjCode } from "./dlsite.ts";
 import {
   isMetaFileName,
@@ -224,10 +224,10 @@ function defaultPlaylistOf(meta: MetaFile): Playlist | null {
 }
 
 export class Scanner {
-  private readonly db: Db;
+  private readonly db: CatalogDb;
   private readonly repo: WorkRepo;
 
-  constructor(db: Db, repo: WorkRepo) {
+  constructor(db: CatalogDb, repo: WorkRepo) {
     this.db = db;
     this.repo = repo;
   }

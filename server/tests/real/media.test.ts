@@ -13,7 +13,7 @@ async function setup(t: TestContext) {
   t.after(lib.cleanup);
   // ルート直下（作品フォルダー外）に「秘密ファイル」を置き、トラバーサルの検証に使う
   writeFileSync(join(lib.root, "secret.txt"), "library-secret");
-  const adapter = createRealAdapter({ dbPath: ":memory:" });
+  const adapter = createRealAdapter({ database: { kind: "memory" } });
   const app = createApp(adapter);
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();

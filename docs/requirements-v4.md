@@ -23,7 +23,7 @@ DLsiteやDMMのWebプレイヤーが使いにくく、横断的な検索がで�
 - **バックエンド:** TypeScript + Hono + Node（ローカル HTTP API サーバー）
 - **音声再生:** HTML5 Audio + Web Audio API（フロントエンド完結）
   - 将来的に高度な機能（ギャップレス再生等）が必要になった場合、サーバー側への移行余地を残す
-- **データベース:** SQLite（Drizzle ORM / better-sqlite3）
+- **データベース:** SQLite（Drizzle ORM / `bun:sqlite`、catalog/userの2DB）
 - **設計方針:** ルート（HTTP ハンドラ）は薄く保ち、ドメインロジックは core、データの出どころはアダプタ（real / fixture）に分離する（[ADR-0002](adr/0002-mock-as-fixture-adapter.md)）。ローカルUIとリモートUIで同じ API を共有できる設計。
 
 ### 1.5 対応音声フォーマット

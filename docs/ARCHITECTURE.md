@@ -44,9 +44,11 @@ pnpm workspace のモノレポで、`client/` / `server/` / `shared/` の3パッ
 ## データモデルと永続化
 
 - `.meta.json` が Source of Truth。タイトル・タグ・分類軸情報などの作品メタデータはここに保持する
-- SQLite（better-sqlite3 + Drizzle）は検索・集計用のキャッシュだが、DB 固有情報（`app_settings` / `search_presets` / `smart_folders` / ブックマーク・レジューム・最終再生・物理パス・ステータス）も同時に持つ
+- SQLiteは `bun:sqlite` + Drizzleを使い、`catalog.sqlite` と `user.sqlite` に分ける。catalogには作品メタ・走査状態・派生キャッシュ、userには設定・プリセット・スマートフォルダー・ブックマーク・レジューム・最終再生を置く
+- catalog接続をmainとしてuser DBを `user` でATTACHし、作品とuser状態をJOINして読む。DB間外部キーとcascade deleteは使わない
 - UI からの編集は `.meta.json` へ即時書き戻す
-- DDL（`server/src/adapters/real/db.ts` の `CREATE TABLE IF NOT EXISTS` 群）は手動同期で、互換マイグレーションは持たない。スキーマを変更したときは `user_version`（`server/src/adapters/real/schema.ts`）を上げ、起動時に不一致を検知して DB を作り直す
+- スキーマの正本は `catalogSchema.ts` / `userSchema.ts` のDrizzle定義。`pnpm --filter @mimimilli/server db:generate` で生成したSQLを起動時に適用する。開発中は `user_version` 不一致のDBを再作成し、配布開始後のuser migration基盤は別途整備する
+- データルートはADR-0007に従い、Linuxでは `${XDG_DATA_HOME:-$HOME/.local/share}/mimikago`、Windowsでは `%LOCALAPPDATA%\Mimikago`。`MIMIKAGO_DATA_DIR` で上書きできる
 
 ## 主要データフロー
 
@@ -62,13 +64,15 @@ pnpm workspace のモノレポで、`client/` / `server/` / `shared/` の3パッ
 ## 公開範囲と配布
 
 - サーバーの bind は `127.0.0.1` に固定している。LAN 内の別端末への公開は認証とセットで将来対応する
-- 配布は `bun build --compile` による単一 exe を将来方針としているが未実装。現状は `better-sqlite3`（ネイティブ依存）を使っており、実施時には `bun:sqlite` 等の pure JS 実装への差し替えが必要になる
+- 開発serverと配布ランタイムはBunを使う。Windows配布物はsharpの外部資産を含むzipを前提とし、compile・実機smokeは配布タスクで整備する
 - システムトレイ常駐・インストーラー・コード署名も将来検討事項で、詳細設計は未着手
 
 ## 関連文書
 
 - [ADR-0001: API サーバーを TypeScript（Hono）で新規開発する](adr/0001-typescript-api-server.md)
 - [ADR-0002: モックを本実装サーバーの fixture アダプタとして統合する](adr/0002-mock-as-fixture-adapter.md)
+- [ADR-0007: Windows配布ランタイムにBunを使う](adr/0007-bun-distribution-runtime.md)
+- [ADR-0008: 永続化トポロジー・検索所有権・再生IDを分離する](adr/0008-persistence-topology-query-ownership-playback-ids.md)
 - [requirements-v4.md](requirements-v4.md) — 機能・UX 要件
 - [HANDOFF.md](HANDOFF.md) — 開発の現状・引き継ぎ
 - [design-system.md](design-system.md) — フロントエンドのデザイン規約

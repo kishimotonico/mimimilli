@@ -6,7 +6,7 @@ import { makeSampleLibrary } from "./sampleLibrary.ts";
 
 const { root, cleanup } = makeSampleLibrary();
 process.once("exit", cleanup);
-const adapter = createRealAdapter({ dbPath: ":memory:" });
+const adapter = createRealAdapter({ database: { kind: "memory" } });
 const app = createApp(adapter);
 
 async function json(path: string, init?: RequestInit) {

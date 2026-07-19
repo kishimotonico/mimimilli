@@ -11,9 +11,13 @@ import { createRealAdapter } from "../../src/adapters/real/index.ts";
 test("初回起動で DEFAULT_TAG_PREFIXES が seed され、全削除後の再起動で再 seed されない", async (t) => {
   const dir = mkdtempSync(join(tmpdir(), "mimimilli-tagprefix-"));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
-  const dbPath = join(dir, "test.db");
+  const database = {
+    kind: "files" as const,
+    catalogPath: join(dir, "catalog.sqlite"),
+    userPath: join(dir, "user.sqlite"),
+  };
 
-  const adapter = createRealAdapter({ dbPath });
+  const adapter = createRealAdapter({ database });
   const seeded = await adapter.listTagPrefixes();
   assert.deepEqual(
     seeded.map((p) => p.prefix),
@@ -26,14 +30,23 @@ test("初回起動で DEFAULT_TAG_PREFIXES が seed され、全削除後の再�
   assert.deepEqual(await adapter.listTagPrefixes(), []);
 
   // 再起動相当: 同じ DB ファイルでアダプタを作り直す
-  const reopened = createRealAdapter({ dbPath });
+  adapter.close();
+  const reopened = createRealAdapter({ database });
+  t.after(() => reopened.close());
   assert.deepEqual(await reopened.listTagPrefixes(), []);
 });
 
 test("real アダプタで prefix 定義の CRUD が動く", async (t) => {
   const dir = mkdtempSync(join(tmpdir(), "mimimilli-tagprefix-"));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
-  const adapter = createRealAdapter({ dbPath: join(dir, "test.db") });
+  const adapter = createRealAdapter({
+    database: {
+      kind: "files",
+      catalogPath: join(dir, "catalog.sqlite"),
+      userPath: join(dir, "user.sqlite"),
+    },
+  });
+  t.after(() => adapter.close());
 
   const created = await adapter.createTagPrefix({
     prefix: "気分",
