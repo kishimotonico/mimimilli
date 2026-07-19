@@ -1,6 +1,6 @@
 // works / tags / smart_folders / search_presets / app_settings の CRUD、検索、行⇄ドメイン変換。
 import { join } from "node:path";
-import { asc, eq, inArray, notInArray } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 import {
   dlsiteStateSchema,
   emptyDlsiteState,
@@ -814,7 +814,24 @@ export class WorkRepo {
       this.db.catalog.update(works).set(set).run();
       return;
     }
-    this.db.catalog.update(works).set(set).where(notInArray(works.id, foundIds)).run();
+    // NOT IN のプレースホルダーがSQLiteパラメータ上限に達しないよう、
+    // seen ID は一時テーブルへ入れてサブクエリで参照する（TASK-62）。
+    // 失敗時に中途半端な一時テーブルを残さないよう finally で必ず破棄する。
+    const sqlite = this.db.sqlite;
+    sqlite.exec("DROP TABLE IF EXISTS temp.scan_seen_ids");
+    sqlite.exec("CREATE TEMP TABLE scan_seen_ids (id TEXT PRIMARY KEY)");
+    try {
+      const insert = sqlite.prepare("INSERT INTO temp.scan_seen_ids (id) VALUES (?)");
+      sqlite.transaction((ids: string[]) => {
+        for (const id of ids) insert.run(id);
+      })(foundIds);
+      sqlite.exec(
+        "UPDATE main.works SET status = 'missing', error_message = NULL " +
+          "WHERE id NOT IN (SELECT id FROM temp.scan_seen_ids)",
+      );
+    } finally {
+      sqlite.exec("DROP TABLE IF EXISTS temp.scan_seen_ids");
+    }
   }
 
   countByStatus(status: string): number {

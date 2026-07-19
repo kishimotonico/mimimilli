@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { posix, win32 } from "node:path";
 import { test } from "node:test";
-import { isPathWithin } from "../../src/adapters/real/paths.ts";
+import { excludeDescendantPaths, isPathWithin } from "../../src/adapters/real/paths.ts";
 
 test("POSIX パスは名前の前方一致ではなくディレクトリ境界で判定する", () => {
   assert.equal(isPathWithin("/library", "/library", posix), true);
@@ -14,4 +14,52 @@ test("Windows パスの親子関係をバックスラッシュ境界で判定す
   assert.equal(isPathWithin("C:\\library", "C:\\library\\genre\\work", win32), true);
   assert.equal(isPathWithin("C:\\library", "C:\\library-other\\work", win32), false);
   assert.equal(isPathWithin("C:\\library", "D:\\library\\work", win32), false);
+});
+
+// ── excludeDescendantPaths（TASK-62: 祖先除外の線形化） ─────────
+
+test("祖先除外: 候補0件は空を返す", () => {
+  assert.deepEqual(excludeDescendantPaths(new Set(), undefined, posix), []);
+});
+
+test("祖先除外: 祖先と子孫が混在するとき祖先だけを残す", () => {
+  const input = new Set(["/library/work", "/library", "/other"]);
+  const result = excludeDescendantPaths(input, undefined, posix);
+  assert.deepEqual(new Set(result), new Set(["/library", "/other"]));
+});
+
+test("祖先除外: 深い子孫が浅い祖先より先に登録されても祖先だけを残す", () => {
+  // 深さ昇順に処理するため Set の挿入順には依存しない
+  const input = new Set(["/a/b/c", "/a/b", "/a"]);
+  assert.deepEqual(excludeDescendantPaths(input, undefined, posix), ["/a"]);
+});
+
+test("祖先除外: 兄弟パスと名前の前方一致だけのパスは残す", () => {
+  // "/a/bc" は "/a/b" の子孫ではない（ディレクトリ境界で判定する）
+  const input = new Set(["/a/b", "/a/bc", "/a/c"]);
+  const result = excludeDescendantPaths(input, undefined, posix);
+  assert.deepEqual(new Set(result), input);
+});
+
+test("祖先除外: 同一パスは1件として扱う", () => {
+  assert.deepEqual(excludeDescendantPaths(new Set(["/a", "/a"]), undefined, posix), ["/a"]);
+});
+
+test("祖先除外: Windows パスもバックスラッシュ境界で判定する", () => {
+  const input = new Set(["C:\\lib\\work", "C:\\lib", "C:\\lib-other"]);
+  const result = excludeDescendantPaths(input, undefined, win32);
+  assert.deepEqual(new Set(result), new Set(["C:\\lib", "C:\\lib-other"]));
+});
+
+test("祖先除外: 比較回数は全ペア比較 O(N²) を大きく下回る", () => {
+  // 深さ3の候補2,000件。全ペア比較なら約400万回のところ、
+  // 深さ比例の探索なら数万回以下に収まるはず。
+  const input = new Set<string>();
+  for (let i = 0; i < 2000; i++) input.add(`/root/g${i % 20}/work-${i}`);
+  const stats = { ancestorLookups: 0 };
+  excludeDescendantPaths(input, stats, posix);
+  assert.ok(
+    stats.ancestorLookups < 100_000,
+    `ancestorLookups=${stats.ancestorLookups} が線形水準を超過`,
+  );
 });

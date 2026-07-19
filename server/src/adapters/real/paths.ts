@@ -1,7 +1,7 @@
 // パス解決とトラバーサル対策。Rust 版（canonicalize + starts_with）と同水準。
 // /api/fs と /api/media/* のすべての物理パス解決はここを通すこと。
 import { realpathSync } from "node:fs";
-import { isAbsolute, relative, sep } from "node:path";
+import { dirname, isAbsolute, relative, sep } from "node:path";
 
 export interface PathOperations {
   isAbsolute(path: string): boolean;
@@ -30,6 +30,68 @@ export function toPortableRelativePath(base: string, target: string): string {
     throw new Error(`基準パス配下ではありません: ${target}`);
   }
   return relative(base, target).split(sep).join("/");
+}
+
+// ── 祖先パス除外（スキャンの workRoots 統合用。TASK-62） ─────────
+
+export interface AncestorExclusionOps {
+  dirname(path: string): string;
+  sep: string;
+}
+
+const nativeAncestorExclusionOps: AncestorExclusionOps = { dirname, sep };
+
+/** excludeDescendantPaths の計算量計測（テスト用） */
+export interface AncestorExclusionStats {
+  /** 採用済み祖先 Set への参照回数。全ペア比較なら O(N²) になる指標 */
+  ancestorLookups: number;
+}
+
+/**
+ * 候補パス群から、他の候補の子孫にあたるものを除外して返す。
+ * 深さ昇順に処理して採用済み祖先を Set で管理するため、各候補の判定は
+ * 自パスの深さに比例する探索で済む（全ペア比較 O(N²) の代替）。
+ * stats を渡すと祖先 Set への参照回数を記録する（計算量の検証用）。
+ */
+export function excludeDescendantPaths(
+  candidates: ReadonlySet<string>,
+  stats?: AncestorExclusionStats,
+  operations: AncestorExclusionOps = nativeAncestorExclusionOps,
+): string[] {
+  const byDepthAsc = [...candidates].sort(
+    (a, b) =>
+      countPathSeparators(a, operations.sep) - countPathSeparators(b, operations.sep) ||
+      (a < b ? -1 : a > b ? 1 : 0),
+  );
+  const adopted = new Set<string>();
+  const result: string[] = [];
+  for (const dir of byDepthAsc) {
+    let excluded = false;
+    let ancestor = operations.dirname(dir);
+    while (true) {
+      if (stats) stats.ancestorLookups += 1;
+      if (adopted.has(ancestor)) {
+        excluded = true;
+        break;
+      }
+      const parent = operations.dirname(ancestor);
+      if (parent === ancestor) break;
+      ancestor = parent;
+    }
+    if (!excluded) {
+      adopted.add(dir);
+      result.push(dir);
+    }
+  }
+  return result;
+}
+
+function countPathSeparators(path: string, separator: string): number {
+  let count = 0;
+  for (let i = 0; i < path.length; i++) {
+    if (path[i] === separator) count += 1;
+  }
+  return count;
 }
 
 /**

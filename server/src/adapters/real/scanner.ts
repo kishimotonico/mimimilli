@@ -38,7 +38,7 @@ import {
   writeMetaFile,
 } from "./meta.ts";
 import { migrateMetaIds } from "./metaIdMigration.ts";
-import { isPathWithin, toPortableRelativePath } from "./paths.ts";
+import { excludeDescendantPaths, isPathWithin, toPortableRelativePath } from "./paths.ts";
 import { probeDurationSec } from "./probe.ts";
 import type { WorkRepo } from "./workRepo.ts";
 
@@ -300,10 +300,8 @@ export class Scanner {
       if (audioDir === root) continue;
       workRoots.add(findWorkRoot(audioDir, root, tree.metaDirs));
     }
-    // 祖先が同時に検出された場合は祖先側に統合する
-    const roots = [...workRoots]
-      .filter((dir) => ![...workRoots].some((other) => other !== dir && isPathWithin(other, dir)))
-      .sort(naturalCompare);
+    // 祖先が同時に検出された場合は祖先側に統合する（深さ昇順+採用済み祖先Setで線形化。TASK-62）
+    const roots = excludeDescendantPaths(workRoots).sort(naturalCompare);
 
     emit({ type: "progress", phase: "generating", processed: 0, total: roots.length });
     for (let i = 0; i < roots.length; i++) {
