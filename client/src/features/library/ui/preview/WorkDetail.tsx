@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Work, WorkPatch } from "@mimimilli/shared";
 import CoverImg from "../../../../entities/work/ui/CoverImg";
+import { selectFixedCoverThumbnailWidth } from "../../../../entities/work/ui/coverThumbnailWidth";
 import { I } from "../../../../shared/ui/Icon";
 import { formatDuration, formatTime } from "../../../../shared/lib/format";
 import { WorkMetadataActions } from "./WorkMetadataActions";
@@ -59,6 +60,7 @@ export function WorkDetail({
             hasCover={!!work.coverImage}
             size={140}
             radius={6}
+            requestWidth={selectFixedCoverThumbnailWidth(140, window.devicePixelRatio)}
           />
         </div>
         <div className="mle-prv__meta">

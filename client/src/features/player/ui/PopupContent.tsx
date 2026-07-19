@@ -9,6 +9,7 @@ import { useSeekDrag } from "./useSeekDrag";
 import { formatPlaybackError } from "./formatPlaybackError";
 import { formatTime } from "../../../shared/lib/format";
 import CoverImg from "../../../entities/work/ui/CoverImg";
+import { selectFixedCoverThumbnailWidth } from "../../../entities/work/ui/coverThumbnailWidth";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
 
@@ -122,6 +123,8 @@ export default function PopupContent({
               hasCover={!!currentWork.coverImage}
               radius={8}
               fit="fill"
+              // ポップアップ幅336px・padding 14px 両側からカバーは最大308px（低ビューポート時は縮小）
+              requestWidth={selectFixedCoverThumbnailWidth(308, window.devicePixelRatio)}
             />
           )}
           {/* ±10秒: カバーへのホバー時のみ表示 */}

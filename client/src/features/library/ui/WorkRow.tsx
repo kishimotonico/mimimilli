@@ -1,5 +1,6 @@
 import type { WorkSummary } from "@mimimilli/shared";
 import CoverImg from "../../../entities/work/ui/CoverImg";
+import { selectFixedCoverThumbnailWidth } from "../../../entities/work/ui/coverThumbnailWidth";
 import { getCircleName } from "../../../entities/work/model";
 import { I } from "../../../shared/ui/Icon";
 import { formatDuration } from "../../../shared/lib/format";
@@ -44,6 +45,8 @@ export default function WorkRow({
           hasCover={!!work.coverImage}
           size={32}
           radius={4}
+          requestWidth={selectFixedCoverThumbnailWidth(32, window.devicePixelRatio)}
+          loading="lazy"
         />
       </div>
       <div className="mll-wrow__body">

@@ -5,6 +5,7 @@ import { playerCurrentTimeAtom, playerDurationAtom } from "../model/atoms";
 import { useSeekDrag } from "./useSeekDrag";
 import { formatTime } from "../../../shared/lib/format";
 import CoverImg from "../../../entities/work/ui/CoverImg";
+import { selectFixedCoverThumbnailWidth } from "../../../entities/work/ui/coverThumbnailWidth";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
 import { cn } from "../../../shared/lib/cn";
@@ -114,6 +115,7 @@ export default function FullScreenPlayer({
               hasCover={!!currentWork.coverImage}
               size={320}
               radius={10}
+              requestWidth={selectFixedCoverThumbnailWidth(320, window.devicePixelRatio)}
             />
           </div>
 

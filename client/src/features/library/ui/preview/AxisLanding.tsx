@@ -1,6 +1,7 @@
 import type { WorkSummary } from "@mimimilli/shared";
 import type { AxisLandingPresentation } from "../../model/axisLandingPresentation";
 import CoverImg from "../../../../entities/work/ui/CoverImg";
+import { selectFixedCoverThumbnailWidth } from "../../../../entities/work/ui/coverThumbnailWidth";
 import { I } from "../../../../shared/ui/Icon";
 import { formatDuration } from "./format";
 
@@ -58,6 +59,7 @@ export function AxisLanding({
                   hasCover={!!w.coverImage}
                   size={80}
                   radius={6}
+                  requestWidth={selectFixedCoverThumbnailWidth(80, window.devicePixelRatio)}
                 />
                 {statusLabel && (
                   <span className="mll-related__status" title={statusLabel}>

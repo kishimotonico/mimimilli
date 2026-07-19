@@ -9,6 +9,7 @@ import { useSeekDrag } from "./useSeekDrag";
 import { formatPlaybackError } from "./formatPlaybackError";
 import { formatTime } from "../../../shared/lib/format";
 import CoverImg from "../../../entities/work/ui/CoverImg";
+import { selectFixedCoverThumbnailWidth } from "../../../entities/work/ui/coverThumbnailWidth";
 import { I } from "../../../shared/ui/Icon";
 
 interface BarContentProps {
@@ -56,6 +57,7 @@ export default function BarContent({
               hasCover={!!currentWork.coverImage}
               size={46}
               radius={6}
+              requestWidth={selectFixedCoverThumbnailWidth(46, window.devicePixelRatio)}
             />
           )}
         </div>
