@@ -52,7 +52,7 @@ pnpm workspace のモノレポで、`client/` / `server/` / `shared/` の3パッ
 
 - 開発時（fixture）: `client/vite.config.ts` の plugin が、fixture アダプタを注入した Hono アプリ（`createApp`）を Vite の dev middleware として `/api/*` にマウントする
 - 開発時（real）: server と client を別々の portless サービスとして起動する。client は `portless get api.mimi` で同じ worktree のAPIホスト名を求め、Vite proxyからportlessの待受へ接続してHostヘッダーでreal serverへルーティングする
-- スキャン: `POST /api/scan` は同期実行で `ScanResult` を返す。SSE による進捗配信は未実装（backlog にタスクあり）
+- スキャン: `POST /api/scan` は完了まで待って `ScanResult` を返し、同じ実行の進捗を `GET /api/scan/events` から SSE で配信する。サーバーは実行中ジョブの直近の進捗と、直近の完了またはエラーを保持し、EventSource の再接続時に1件リプレイする
 - メディア配信: client がメディア URL を組み立て（`entities/work/api.ts`）、`/api/media/*` ルートが `DataAdapter.locateMedia()` 経由でアダプタ（実ファイル or fixture の合成メディア）から実体を取得して配信する
 
 ## ファイルシステムと配信の安全性
