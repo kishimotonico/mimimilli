@@ -2,7 +2,7 @@
 // ライブラリのエクスポート。
 // 依存方向: shared/api/http、entities/work（戻り値の WorkSummary）、自 feature の model を参照する。
 
-import { getParsed, postParsed, putParsed, del, patchParsed } from "../../shared/api/http";
+import { deleteVoid, getParsed, patchParsed, postParsed, putParsed } from "../../shared/api/http";
 import {
   worksPageSchema,
   axisFacetListSchema,
@@ -78,7 +78,7 @@ export async function updateTagPrefix(prefix: string, data: TagPrefixUpdate): Pr
 }
 
 export async function deleteTagPrefix(prefix: string): Promise<void> {
-  await del(`/tag-prefixes/${encodeURIComponent(prefix)}`);
+  await deleteVoid(`/tag-prefixes/${encodeURIComponent(prefix)}`);
 }
 
 export async function listTagPrefixCandidates(): Promise<TagPrefixCandidate[]> {
@@ -100,7 +100,7 @@ export async function updateSmartFolder(id: string, data: SmartFolderUpdate): Pr
 }
 
 export async function deleteSmartFolder(id: string): Promise<void> {
-  await del(`/smart-folders/${encodeURIComponent(id)}`);
+  await deleteVoid(`/smart-folders/${encodeURIComponent(id)}`);
 }
 
 export async function evalSmartFolder(id: string): Promise<WorkSummary[]> {

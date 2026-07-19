@@ -2,12 +2,13 @@
 // ファイル一覧・DLsite メタデータ）を扱う。
 // 依存方向: shared/api/http と自 entity の model のみを参照する。
 
-import { API_BASE, getParsed, patchParsed, post, postParsed } from "../../shared/api/http";
+import { API_BASE, getParsed, patchParsed, postParsed, postVoid } from "../../shared/api/http";
 import {
   workSchema,
   worksPageSchema,
   tagListSchema,
   dlsiteWorkInfoSchema,
+  dlsiteBulkStartResponseSchema,
   fileEntrySchema,
   type Work,
   type WorkSummary,
@@ -68,7 +69,7 @@ export function getFileUrl(workId: string, relativePath: string): string {
 }
 
 export async function updateLastPlayed(workId: string): Promise<void> {
-  await post(`/works/${encodeURIComponent(workId)}/last-played`);
+  await postVoid(`/works/${encodeURIComponent(workId)}/last-played`);
 }
 
 export async function saveResumePosition(
@@ -76,7 +77,7 @@ export async function saveResumePosition(
   position: number,
   trackIndex: number,
 ): Promise<void> {
-  await post(`/works/${encodeURIComponent(workId)}/resume`, {
+  await postVoid(`/works/${encodeURIComponent(workId)}/resume`, {
     position,
     trackIndex,
   });
@@ -92,7 +93,7 @@ export async function fetchDlsiteInfo(workId: string): Promise<DlsiteWorkInfo> {
 }
 
 export async function applyDlsiteInfo(workId: string, body: DlsiteApplyBody): Promise<void> {
-  await post(`/dlsite/${encodeURIComponent(workId)}/apply`, body);
+  await postVoid(`/dlsite/${encodeURIComponent(workId)}/apply`, body);
 }
 
 export async function updateDlsiteState(workId: string, body: DlsiteStatePatch): Promise<Work> {
@@ -100,5 +101,5 @@ export async function updateDlsiteState(workId: string, body: DlsiteStatePatch):
 }
 
 export async function startDlsiteBulk(): Promise<void> {
-  await post("/dlsite/bulk");
+  await postParsed(dlsiteBulkStartResponseSchema, "/dlsite/bulk");
 }

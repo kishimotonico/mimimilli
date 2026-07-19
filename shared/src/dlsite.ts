@@ -86,6 +86,12 @@ export type DlsiteStatePatch = z.infer<typeof dlsiteStatePatchSchema>;
 export const dlsiteBulkModeSchema = z.enum(["new", "existing"]);
 export type DlsiteBulkMode = z.infer<typeof dlsiteBulkModeSchema>;
 
+/** POST /api/dlsite/bulk のジョブ開始レスポンス */
+export const dlsiteBulkStartResponseSchema = z.object({
+  started: z.literal(true),
+});
+export type DlsiteBulkStartResponse = z.infer<typeof dlsiteBulkStartResponseSchema>;
+
 export const dlsiteBulkResultSchema = z.object({
   fetched: z.number().int().nonnegative(),
   failed: z.number().int().nonnegative(),

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import * as workApi from "../../src/entities/work/api";
+import * as filesApi from "../../src/features/files/api";
 import * as libraryApi from "../../src/features/library/api";
 import * as settingsApi from "../../src/features/settings/api";
 import * as scanApi from "../../src/features/scan/api";
@@ -137,6 +138,13 @@ describe("work api", () => {
     );
   });
 
+  it("saveResumePosition: 204以外の成功レスポンスは契約違反になる", async () => {
+    mockFetch.mockResolvedValue(makeResponse({ saved: true }));
+    await expect(workApi.saveResumePosition("work-1", 42.5, 2)).rejects.toThrow(
+      /POST \/works\/work-1\/resume/,
+    );
+  });
+
   it("fetchDlsiteInfo POSTs to /api/dlsite/:workId/fetch", async () => {
     const mockInfo = {
       rjCode: "RJ123456",
@@ -154,6 +162,11 @@ describe("work api", () => {
       expect.objectContaining({ method: "POST" }),
     );
     expect(result).toEqual(mockInfo);
+  });
+
+  it("startDlsiteBulk: ジョブ開始レスポンスを検証する", async () => {
+    mockFetch.mockResolvedValue(makeResponse({ started: false }, 202));
+    await expect(workApi.startDlsiteBulk()).rejects.toThrow(/POST \/dlsite\/bulk/);
   });
 
   it("getCoverImageUrl returns the media/cover URL", () => {
@@ -274,5 +287,31 @@ describe("レスポンス検証（getParsed等）", () => {
   it("searchWorks: 契約に適合しないitemsは検証エラーになる", async () => {
     mockFetch.mockResolvedValue(makeResponse({ items: [{ id: "work-1" }], total: 1 }));
     await expect(libraryApi.searchWorks({})).rejects.toThrow(/GET \/works/);
+  });
+
+  it("getSettings: 契約に適合しない設定は検証エラーになる", async () => {
+    mockFetch.mockResolvedValue(makeResponse({ rootFolder: 42, lastScanTime: null }));
+    await expect(settingsApi.getSettings()).rejects.toThrow(/GET \/settings/);
+  });
+
+  it("scanLibrary: 契約に適合しないスキャン結果は検証エラーになる", async () => {
+    mockFetch.mockResolvedValue(
+      makeResponse({
+        registered: -1,
+        newlyGenerated: 0,
+        errors: 0,
+        missing: 0,
+        newWorkIds: [],
+        rjCodeMissingCount: 0,
+      }),
+    );
+    await expect(scanApi.scanLibrary()).rejects.toThrow(/POST \/scan/);
+  });
+
+  it("browseFs: 契約に適合しない一覧は検証エラーになる", async () => {
+    mockFetch.mockResolvedValue(
+      makeResponse({ path: "/library", parent: null, workId: null, entries: [{ name: "x" }] }),
+    );
+    await expect(filesApi.browseFs()).rejects.toThrow(/GET \/fs/);
   });
 });

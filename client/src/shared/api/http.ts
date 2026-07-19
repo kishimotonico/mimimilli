@@ -51,28 +51,11 @@ function parseResponse<T>(schema: z.ZodType<T>, method: string, path: string, da
   return parsed.data;
 }
 
-export async function get<T>(path: string): Promise<T> {
-  const res = await fetch(API_BASE + path);
-  if (!res.ok) return throwApiError("GET", path, res);
-  return res.json();
-}
-
 /** shared契約のスキーマでレスポンスを検証する GET。検証失敗は握りつぶさず ApiResponseSchemaError を投げる */
 export async function getParsed<T>(schema: z.ZodType<T>, path: string): Promise<T> {
   const res = await fetch(API_BASE + path);
   if (!res.ok) return throwApiError("GET", path, res);
   return parseResponse(schema, "GET", path, await res.json());
-}
-
-export async function post<T = void>(path: string, body?: unknown): Promise<T> {
-  const res = await fetch(API_BASE + path, {
-    method: "POST",
-    headers: body !== undefined ? { "Content-Type": "application/json" } : {},
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
-  if (!res.ok) return throwApiError("POST", path, res);
-  if (res.status === 204) return undefined as T;
-  return res.json();
 }
 
 /** shared契約のスキーマでレスポンスを検証する POST */
@@ -90,15 +73,15 @@ export async function postParsed<T>(
   return parseResponse(schema, "POST", path, await res.json());
 }
 
-export async function put<T = void>(path: string, body: unknown): Promise<T> {
+/** レスポンスボディを持たない POST。成功時のステータスも204であることを検証する */
+export async function postVoid(path: string, body?: unknown): Promise<void> {
   const res = await fetch(API_BASE + path, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    method: "POST",
+    headers: body !== undefined ? { "Content-Type": "application/json" } : {},
+    body: body !== undefined ? JSON.stringify(body) : undefined,
   });
-  if (!res.ok) return throwApiError("PUT", path, res);
-  if (res.status === 204) return undefined as T;
-  return res.json();
+  if (!res.ok) return throwApiError("POST", path, res);
+  assertNoContent("POST", path, res);
 }
 
 /** shared契約のスキーマでレスポンスを検証する PUT */
@@ -110,16 +93,6 @@ export async function putParsed<T>(schema: z.ZodType<T>, path: string, body: unk
   });
   if (!res.ok) return throwApiError("PUT", path, res);
   return parseResponse(schema, "PUT", path, await res.json());
-}
-
-export async function patch<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(API_BASE + path, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) return throwApiError("PATCH", path, res);
-  return res.json();
 }
 
 /** shared契約のスキーマでレスポンスを検証する PATCH */
@@ -137,7 +110,17 @@ export async function patchParsed<T>(
   return parseResponse(schema, "PATCH", path, await res.json());
 }
 
-export async function del(path: string): Promise<void> {
+/** レスポンスボディを持たない DELETE。成功時のステータスも204であることを検証する */
+export async function deleteVoid(path: string): Promise<void> {
   const res = await fetch(API_BASE + path, { method: "DELETE" });
   if (!res.ok) return throwApiError("DELETE", path, res);
+  assertNoContent("DELETE", path, res);
+}
+
+function assertNoContent(method: string, path: string, res: Response): void {
+  if (res.status !== 204) {
+    throw new Error(
+      `APIレスポンスが契約と一致しません: ${method} ${path}\n- (status): 204を期待しましたが${res.status}でした`,
+    );
+  }
 }
