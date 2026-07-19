@@ -1,0 +1,1 @@
+ALTER TABLE `tags` ADD `facet_sort_key` text NOT NULL;

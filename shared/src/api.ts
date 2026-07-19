@@ -14,6 +14,8 @@ export const worksQuerySchema = z.object({
   axisValue: z.string().optional(),
   view: viewIdSchema.optional(),
   sort: sortIdSchema.default("added-desc"),
+  /** randomソートの安定順序を決める。省略時はアダプタが発行してレスポンスで返す。 */
+  seed: z.coerce.number().int().min(0).max(0x7fffffff).optional(),
   page: z.coerce.number().int().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(500).optional(),
 });
@@ -23,6 +25,7 @@ export type WorksQuery = z.infer<typeof worksQuerySchema>;
 export const worksPageSchema = z.object({
   items: z.array(workSummarySchema),
   total: z.number().int().nonnegative(),
+  seed: z.number().int().min(0).max(0x7fffffff).optional(),
 });
 export type WorksPage = z.infer<typeof worksPageSchema>;
 

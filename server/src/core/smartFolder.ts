@@ -2,7 +2,7 @@
 // shared スキーマが許可した field/operator のみを評価する。DB 内の不正値も黙って無視しない。
 import type { SmartFolder, SmartFolderRule, WorkSummary } from "@mimimilli/shared";
 import { tagEquals } from "@mimimilli/shared";
-import { sortWorkSummaries } from "./worksQuery.ts";
+import { createRandomSeed, sortWorkSummaries } from "./worksQuery.ts";
 
 /** rules を順に適用し、works をフィルタリングして返す */
 export function evalSmartFolderRules(
@@ -56,5 +56,6 @@ export function evalSmartFolder(
   folder: Pick<SmartFolder, "rules" | "sort">,
   works: WorkSummary[],
 ): WorkSummary[] {
-  return sortWorkSummaries(evalSmartFolderRules(folder.rules, works), folder.sort);
+  const seed = folder.sort === "random" ? createRandomSeed() : undefined;
+  return sortWorkSummaries(evalSmartFolderRules(folder.rules, works), folder.sort, seed);
 }

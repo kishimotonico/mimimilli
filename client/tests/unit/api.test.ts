@@ -220,6 +220,39 @@ describe("library api", () => {
     expect(result.total).toBe(42);
   });
 
+  it("randomのレスポンスseedを次ページへ送り、ページ間の重複・欠落を防げる", async () => {
+    const seed = 2468;
+    mockFetch
+      .mockResolvedValueOnce(
+        makeResponse({
+          items: [makeWorkSummary({ id: "work-1" }), makeWorkSummary({ id: "work-3" })],
+          total: 4,
+          seed,
+        }),
+      )
+      .mockResolvedValueOnce(
+        makeResponse({
+          items: [makeWorkSummary({ id: "work-4" }), makeWorkSummary({ id: "work-2" })],
+          total: 4,
+          seed,
+        }),
+      );
+
+    const first = await libraryApi.searchWorks({ sort: "random", page: 1, limit: 2 });
+    const second = await libraryApi.searchWorks({
+      sort: "random",
+      seed: first.seed,
+      page: 2,
+      limit: 2,
+    });
+
+    expect(mockFetch).toHaveBeenNthCalledWith(1, "/api/works?sort=random&page=1&limit=2");
+    expect(mockFetch).toHaveBeenNthCalledWith(2, "/api/works?sort=random&seed=2468&page=2&limit=2");
+    const ids = [...first.items, ...second.items].map((work) => work.id);
+    expect(new Set(ids).size).toBe(4);
+    expect(ids.toSorted()).toEqual(["work-1", "work-2", "work-3", "work-4"]);
+  });
+
   it("getAxisFacets fetches /api/axes/:axis", async () => {
     const mockFacets = [{ value: "cv/水瀬なずな", count: 3 }];
     mockFetch.mockResolvedValue(makeResponse(mockFacets));

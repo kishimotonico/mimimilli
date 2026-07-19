@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { compareJapaneseSortKeys } from "../src/core/japaneseSortKey.ts";
 import { createApp } from "../src/app.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { resetDlsiteProgressStateForTest } from "../src/routes/dlsiteProgress.ts";
@@ -177,8 +178,23 @@ test("スマートフォルダーの作品一覧は保存済み sort を適用�
   assert.equal(worksRes.status, 200);
   const works = await worksRes.json();
   const titles = works.map((work: { title: string }) => work.title);
-  const expected = [...titles].sort((a, b) => b.localeCompare(a, "ja"));
+  const expected = [...titles].sort((a, b) => compareJapaneseSortKeys(b, a));
   assert.deepEqual(titles, expected);
+});
+
+test("randomソートのスマートフォルダーも作品一覧を返す", async () => {
+  const app = buildApp();
+  const createRes = await app.request("/api/smart-folders", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: "ランダム", rules: [], sort: "random" }),
+  });
+  const folder = await createRes.json();
+
+  const worksRes = await app.request(`/api/smart-folders/${folder.id}/works`);
+  assert.equal(worksRes.status, 200);
+  const works = await worksRes.json();
+  assert.ok(works.length > 0);
 });
 
 test("未知ルートは404 + not_found", async () => {

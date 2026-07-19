@@ -2,6 +2,7 @@
 // 軸ID は "tag"（フラットタグ）・"year"（追加日の年）・任意の prefix 文字列（ADR-0005）。
 import { parseTag } from "@mimimilli/shared";
 import type { AxisFacetItem, WorkSummary } from "@mimimilli/shared";
+import { compareJapaneseSortKeys, compareUtf8Bytes } from "./japaneseSortKey.ts";
 
 /** 指定された分類軸について、works から値ごとの件数を集計し count 降順で返す。
  *  axis は正規形（小文字）を前提とする */
@@ -28,5 +29,10 @@ export function buildAxisFacets(axis: string, works: WorkSummary[]): AxisFacetIt
 
   return [...counts.entries()]
     .map(([value, count]) => ({ value, count }))
-    .sort((a, b) => b.count - a.count);
+    .sort(
+      (a, b) =>
+        b.count - a.count ||
+        compareJapaneseSortKeys(a.value, b.value) ||
+        compareUtf8Bytes(a.value, b.value),
+    );
 }

@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { emptyDlsiteState, type WorkSummary, type WorksQuery } from "@mimimilli/shared";
 import { applyWorksQuery } from "../src/core/worksQuery.ts";
+import { compareJapaneseSortKeys } from "../src/core/japaneseSortKey.ts";
 
 const NOW = new Date();
 const RECENT = new Date(NOW.getTime() - 5 * 86400000).toISOString(); // 5日前
@@ -170,10 +171,10 @@ test("view: all は無条件（フィルタなし）", () => {
   assert.equal(result.items.length, 3);
 });
 
-test("sort: title-asc は localeCompare(ja) で並び替える", () => {
+test("sort: title-asc は共通の日本語ソートキーで並び替える", () => {
   const result = applyWorksQuery(WORKS, baseQuery({ sort: "title-asc" }));
   const titles = result.items.map((w) => w.title);
-  const sorted = [...titles].sort((a, b) => a.localeCompare(b, "ja"));
+  const sorted = [...titles].sort(compareJapaneseSortKeys);
   assert.deepEqual(titles, sorted);
 });
 

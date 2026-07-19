@@ -93,8 +93,8 @@ test("buildAxisFacets: 任意の prefix 軸を集計できる（prefix の大小
   ];
   const items = buildAxisFacets("気分", works);
   assert.deepEqual(items, [
-    { value: "睡眠用", count: 2 },
     { value: "作業用", count: 2 },
+    { value: "睡眠用", count: 2 },
   ]);
 });
 

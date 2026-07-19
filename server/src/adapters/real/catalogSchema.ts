@@ -6,6 +6,7 @@ export const works = sqliteTable(
   {
     id: text("id").primaryKey(),
     title: text("title").notNull(),
+    titleSortKey: text("title_sort_key").notNull(),
     coverImage: text("cover_image"),
     defaultPlaylist: text("default_playlist"),
     createdAt: text("created_at"),
@@ -16,12 +17,17 @@ export const works = sqliteTable(
     urlsJson: text("urls_json").notNull(),
     playlistsJson: text("playlists_json").notNull(),
   },
-  (table) => [index("idx_works_physical_path").on(table.physicalPath)],
+  (table) => [
+    index("idx_works_physical_path").on(table.physicalPath),
+    index("idx_works_title_sort_key").on(table.titleSortKey, table.id),
+  ],
 );
 
 export const tags = sqliteTable("tags", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull().unique(),
+  searchKey: text("search_key").notNull(),
+  facetSortKey: text("facet_sort_key").notNull(),
 });
 
 export const workTags = sqliteTable(

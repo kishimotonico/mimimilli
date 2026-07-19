@@ -1,10 +1,11 @@
-// works / tags / smart_folders / search_presets / app_settings の CRUD と行⇄ドメイン変換。
-// 検索・絞り込みは core/worksQuery（インメモリ）で行うため、ここは取得と更新に徹する。
+// works / tags / smart_folders / search_presets / app_settings の CRUD、検索、行⇄ドメイン変換。
 import { asc, eq, inArray, notInArray } from "drizzle-orm";
 import {
   dlsiteStateSchema,
   emptyDlsiteState,
+  normalizeTag,
   normalizeTags,
+  parseTag,
   playlistSchema,
   searchPresetSchema,
   smartFolderSchema,
@@ -12,6 +13,7 @@ import {
   workSummarySchema,
 } from "@mimimilli/shared";
 import type {
+  AxisFacetItem,
   DlsiteState,
   Playlist,
   SearchPreset,
@@ -25,8 +27,11 @@ import type {
   Work,
   WorkSummary,
   UrlEntry,
+  WorksPage,
+  WorksQuery,
 } from "@mimimilli/shared";
 import { z } from "zod";
+import { japaneseSortKey } from "../../core/japaneseSortKey.ts";
 import type { Db } from "./db.ts";
 import { tags, workDlsite, workTags, works, scanState } from "./catalogSchema.ts";
 import { appSettings, searchPresets, smartFolders, tagPrefixes, workStates } from "./userSchema.ts";
@@ -34,6 +39,9 @@ import { appSettings, searchPresets, smartFolders, tagPrefixes, workStates } fro
 type CatalogWorkRow = typeof works.$inferSelect;
 type WorkRow = CatalogWorkRow & typeof workStates.$inferSelect;
 type RawWorkRow = Omit<WorkRow, "bookmarked"> & { bookmarked: number };
+type RawSummaryRow = RawWorkRow & { dlsiteStateJson: string | null };
+
+const RECENT_VIEW_WINDOW_DAYS = 30;
 
 export class PersistentDataError extends Error {
   constructor(table: string, recordId: string | number, detail: string) {
@@ -147,6 +155,46 @@ function rowToWork(row: WorkRow, tagNames: string[], dlsite: DlsiteState): Work 
   );
 }
 
+function randomSeed(): number {
+  return crypto.getRandomValues(new Uint32Array(1))[0]! & 0x7fffffff;
+}
+
+function worksOrderSql(
+  sort: WorksQuery["sort"],
+  seed: number | undefined,
+  bindings: number[],
+): string {
+  const idTieBreaker = "works.id COLLATE BINARY ASC";
+  switch (sort) {
+    case "title-asc":
+      return `works.title_sort_key COLLATE BINARY ASC, ${idTieBreaker}`;
+    case "title-desc":
+      return `works.title_sort_key COLLATE BINARY DESC, ${idTieBreaker}`;
+    case "added-asc":
+      return `work_states.added_at ASC, ${idTieBreaker}`;
+    case "added-desc":
+      return `work_states.added_at DESC, ${idTieBreaker}`;
+    case "duration-asc":
+      return `works.total_duration_sec ASC, ${idTieBreaker}`;
+    case "duration-desc":
+      return `works.total_duration_sec DESC, ${idTieBreaker}`;
+    case "last-played":
+      return `work_states.last_played_at IS NULL ASC, work_states.last_played_at DESC, ${idTieBreaker}`;
+    case "id-asc":
+      return idTieBreaker;
+    case "random": {
+      if (seed === undefined) throw new Error("randomソートにはseedが必要です");
+      bindings.push(seed, seed);
+      const hexId = "hex(works.id)";
+      const rotated =
+        `CASE WHEN length(${hexId}) = 0 THEN '' ELSE ` +
+        `substr(${hexId}, (? % length(${hexId})) + 1) || ` +
+        `substr(${hexId}, 1, ? % length(${hexId})) END`;
+      return `${rotated} COLLATE BINARY ASC, ${idTieBreaker}`;
+    }
+  }
+}
+
 export class WorkRepo {
   private readonly db: Db;
 
@@ -187,7 +235,16 @@ export class WorkRepo {
     // DB キャッシュには常に正規形で入れる（ADR-0005 決定5）。メタファイル側の正規化は
     // 編集経路（PATCH / DLsite 適用）で行い、スキャン取り込みはメタを書き換えない
     for (const name of normalizeTags(tagNames)) {
-      this.db.catalog.insert(tags).values({ name }).onConflictDoNothing().run();
+      const parsed = parseTag(name);
+      this.db.catalog
+        .insert(tags)
+        .values({
+          name,
+          searchKey: japaneseSortKey(name),
+          facetSortKey: japaneseSortKey(parsed.kind === "annotated" ? parsed.value : name),
+        })
+        .onConflictDoNothing()
+        .run();
       const tag = this.db.catalog.select().from(tags).where(eq(tags.name, name)).get();
       if (tag) {
         this.db.catalog
@@ -243,6 +300,7 @@ export class WorkRepo {
       SELECT
         works.id,
         works.title,
+        works.title_sort_key AS titleSortKey,
         works.cover_image AS coverImage,
         works.default_playlist AS defaultPlaylist,
         works.created_at AS createdAt,
@@ -280,6 +338,185 @@ export class WorkRepo {
     );
   }
 
+  /** ADR-0008: ATTACH JOINした同じ絞り込み集合から件数とページを求める。 */
+  queryWorks(params: WorksQuery): WorksPage {
+    const seed = params.sort === "random" ? (params.seed ?? randomSeed()) : undefined;
+    const conditions: string[] = [];
+    const bindings: Array<string | number> = [];
+
+    if (params.q) {
+      const key = japaneseSortKey(params.q);
+      conditions.push(`(
+        instr(works.title_sort_key, ?) > 0 OR EXISTS (
+          SELECT 1
+          FROM main.work_tags AS query_work_tags
+          INNER JOIN main.tags AS query_tags ON query_tags.id = query_work_tags.tag_id
+          WHERE query_work_tags.work_id = works.id
+            AND instr(query_tags.search_key, ?) > 0
+        )
+      )`);
+      bindings.push(key, key);
+    }
+
+    const normalizedTags = params.tags.map(normalizeTag);
+    if (normalizedTags.length > 0) {
+      if (params.tagOp === "AND") {
+        for (const tag of normalizedTags) {
+          conditions.push(`EXISTS (
+            SELECT 1
+            FROM main.work_tags AS filter_work_tags
+            INNER JOIN main.tags AS filter_tags ON filter_tags.id = filter_work_tags.tag_id
+            WHERE filter_work_tags.work_id = works.id AND filter_tags.name = ?
+          )`);
+          bindings.push(tag);
+        }
+      } else {
+        const placeholders = normalizedTags.map(() => "?").join(", ");
+        conditions.push(`EXISTS (
+          SELECT 1
+          FROM main.work_tags AS filter_work_tags
+          INNER JOIN main.tags AS filter_tags ON filter_tags.id = filter_work_tags.tag_id
+          WHERE filter_work_tags.work_id = works.id
+            AND filter_tags.name IN (${placeholders})
+        )`);
+        bindings.push(...normalizedTags);
+      }
+    }
+
+    if (params.axis && params.axisValue) {
+      if (params.axis === "year") {
+        conditions.push("substr(work_states.added_at, 1, 4) = ?");
+        bindings.push(params.axisValue);
+      } else {
+        conditions.push(`EXISTS (
+          SELECT 1
+          FROM main.work_tags AS axis_work_tags
+          INNER JOIN main.tags AS axis_tags ON axis_tags.id = axis_work_tags.tag_id
+          WHERE axis_work_tags.work_id = works.id AND axis_tags.name = ?
+        )`);
+        bindings.push(`${params.axis}/${params.axisValue}`);
+      }
+    }
+
+    switch (params.view) {
+      case "recent":
+        conditions.push("work_states.last_played_at IS NOT NULL");
+        break;
+      case "added":
+        conditions.push("work_states.added_at >= ?");
+        bindings.push(new Date(Date.now() - RECENT_VIEW_WINDOW_DAYS * 86400000).toISOString());
+        break;
+      case "fav":
+        conditions.push("work_states.bookmarked = 1");
+        break;
+      case "unplayed":
+        conditions.push("work_states.last_played_at IS NULL AND works.status = 'ok'");
+        break;
+      case "missing":
+        conditions.push("works.status = 'missing'");
+        break;
+    }
+
+    const fromSql = `
+      FROM main.works
+      INNER JOIN user.work_states AS work_states ON work_states.work_id = works.id
+    `;
+    const whereSql = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    return this.db.transaction(() => {
+      const countRow = this.db.sqlite
+        .query(`SELECT COUNT(*) AS total ${fromSql} ${whereSql}`)
+        .get(...bindings) as { total: number };
+
+      const orderBindings: number[] = [];
+      const orderSql = worksOrderSql(params.sort, seed, orderBindings);
+      const paginationSql =
+        params.page !== undefined && params.limit !== undefined ? "LIMIT ? OFFSET ?" : "";
+      const paginationBindings =
+        params.page !== undefined && params.limit !== undefined
+          ? [params.limit, (params.page - 1) * params.limit]
+          : [];
+      const rows = this.db.sqlite
+        .query(`
+        SELECT
+          works.id,
+          works.title,
+          works.title_sort_key AS titleSortKey,
+          works.cover_image AS coverImage,
+          works.default_playlist AS defaultPlaylist,
+          works.created_at AS createdAt,
+          works.status,
+          works.physical_path AS physicalPath,
+          works.total_duration_sec AS totalDurationSec,
+          works.error_message AS errorMessage,
+          works.urls_json AS urlsJson,
+          works.playlists_json AS playlistsJson,
+          work_states.work_id AS workId,
+          work_states.added_at AS addedAt,
+          work_states.bookmarked,
+          work_states.last_played_at AS lastPlayedAt,
+          work_states.resume_position AS resumePosition,
+          work_states.resume_track_index AS resumeTrackIndex,
+          work_dlsite.state_json AS dlsiteStateJson
+        ${fromSql}
+        LEFT JOIN main.work_dlsite AS work_dlsite ON work_dlsite.work_id = works.id
+        ${whereSql}
+        ORDER BY ${orderSql}
+        ${paginationSql}
+      `)
+        .all(...bindings, ...orderBindings, ...paginationBindings) as RawSummaryRow[];
+      const workIds = rows.map((row) => row.id);
+      const tagsByWork = this.tagMap(workIds);
+      const items = rows.map((rawRow) => {
+        const row: WorkRow = { ...rawRow, bookmarked: rawRow.bookmarked !== 0 };
+        const dlsite = rawRow.dlsiteStateJson
+          ? parseRecord(
+              dlsiteStateSchema,
+              parseJsonField(rawRow.dlsiteStateJson, "work_dlsite", rawRow.id, "state_json"),
+              "work_dlsite",
+              rawRow.id,
+            )
+          : emptyDlsiteState();
+        return rowToSummary(row, tagsByWork.get(row.id) ?? [], dlsite);
+      });
+      return seed === undefined
+        ? { items, total: countRow.total }
+        : { items, total: countRow.total, seed };
+    });
+  }
+
+  /** 作品全件のロードをせず、SQLのGROUP BYで軸ファセットを集計する。 */
+  getAxisFacets(axis: string): AxisFacetItem[] {
+    if (axis === "year") {
+      return this.db.sqlite
+        .query(`
+          SELECT substr(work_states.added_at, 1, 4) AS value, COUNT(*) AS count
+          FROM main.works
+          INNER JOIN user.work_states AS work_states ON work_states.work_id = works.id
+          GROUP BY value
+          ORDER BY count DESC, value COLLATE BINARY ASC
+        `)
+        .all() as AxisFacetItem[];
+    }
+
+    const prefixCondition =
+      axis === "tag"
+        ? "instr(tags.name, '/') = 0"
+        : "substr(tags.name, 1, instr(tags.name, '/') - 1) = ?";
+    const valueSql = axis === "tag" ? "tags.name" : "substr(tags.name, instr(tags.name, '/') + 1)";
+    return this.db.sqlite
+      .query(`
+        SELECT ${valueSql} AS value, COUNT(*) AS count
+        FROM main.works
+        INNER JOIN user.work_states AS work_states ON work_states.work_id = works.id
+        INNER JOIN main.work_tags AS work_tags ON work_tags.work_id = works.id
+        INNER JOIN main.tags AS tags ON tags.id = work_tags.tag_id
+        WHERE ${prefixCondition}
+        GROUP BY value
+        ORDER BY count DESC, tags.facet_sort_key COLLATE BINARY ASC, value COLLATE BINARY ASC
+      `)
+      .all(...(axis === "tag" ? [] : [axis])) as AxisFacetItem[];
+  }
+
   getWork(id: string): Work | null {
     const row = this.joinedWorks("WHERE works.id = ?", id)[0];
     if (!row) return null;
@@ -310,6 +547,7 @@ export class WorkRepo {
     const values = {
       id: work.id,
       title: work.title,
+      titleSortKey: japaneseSortKey(work.title),
       coverImage: work.coverImage,
       defaultPlaylist: work.defaultPlaylist,
       createdAt: work.createdAt,
@@ -343,7 +581,10 @@ export class WorkRepo {
     const row = this.db.catalog.select().from(works).where(eq(works.id, id)).get();
     if (!row) return null;
     const set: Partial<typeof works.$inferInsert> = {};
-    if (patch.title !== undefined) set.title = patch.title;
+    if (patch.title !== undefined) {
+      set.title = patch.title;
+      set.titleSortKey = japaneseSortKey(patch.title);
+    }
     if (patch.coverImage !== undefined) set.coverImage = patch.coverImage;
     if (patch.urls !== undefined) set.urlsJson = JSON.stringify(patch.urls);
     if (Object.keys(set).length > 0) {

@@ -1,6 +1,5 @@
 // real アダプタ: SQLite（キャッシュ）+ 実ファイルシステム + `.meta.json`（Source of Truth）。
-// 検索・絞り込み・ソートは数千作品規模を前提に、DB から全サマリーを読んで
-// core/ の pure 関数で処理する（規模が増えたら SQL 化する余地をこの境界の内側に残す）。
+// 作品検索・件数・ページングはcatalog接続からuser DBをATTACH JOINしてSQLで実行する。
 import { existsSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
@@ -41,11 +40,9 @@ import {
   type MediaKind,
   type MediaLocation,
 } from "../../adapter.ts";
-import { buildAxisFacets } from "../../core/axisFacets.ts";
 import { isDefaultTitle } from "../../core/dlsiteTitle.ts";
 import { buildTagPrefixCandidates } from "../../core/tagPrefixCandidates.ts";
 import { evalSmartFolder } from "../../core/smartFolder.ts";
-import { applyWorksQuery } from "../../core/worksQuery.ts";
 import { openDb, type Db, type DbLocation } from "./db.ts";
 import { detectRjCode, downloadCover, fetchDlsiteInfo, mergeDlsiteTags } from "./dlsite.ts";
 import { browseFs } from "./fsBrowse.ts";
@@ -152,7 +149,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
 
     // ── 作品 ──────────────────────────────────────────────────
     async queryWorks(params: WorksQuery): Promise<WorksPage> {
-      return applyWorksQuery(repo.listSummaries(), params);
+      return repo.queryWorks(params);
     },
 
     async getWork(id: string): Promise<Work | null> {
@@ -203,7 +200,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
 
     // ── 分類軸・タグ prefix 定義・スマートフォルダー・プリセット ──
     async getAxisFacets(axis: string): Promise<AxisFacetItem[]> {
-      return buildAxisFacets(axis, repo.listSummaries());
+      return repo.getAxisFacets(axis);
     },
 
     async listTagPrefixes(): Promise<TagPrefix[]> {

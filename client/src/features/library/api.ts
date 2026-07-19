@@ -38,6 +38,7 @@ export interface WorksQueryParams {
   axisValue?: string;
   view?: ViewId;
   sort?: SortId;
+  seed?: number;
   page?: number;
   limit?: number;
 }
@@ -51,6 +52,7 @@ export async function searchWorks(params: WorksQueryParams): Promise<WorksPage> 
   if (params.axisValue) p.set("axisValue", params.axisValue);
   if (params.view) p.set("view", params.view);
   if (params.sort) p.set("sort", params.sort);
+  if (params.seed !== undefined) p.set("seed", String(params.seed));
   if (params.page !== undefined) p.set("page", String(params.page));
   if (params.limit !== undefined) p.set("limit", String(params.limit));
   const q = p.toString();

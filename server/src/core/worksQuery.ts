@@ -1,6 +1,12 @@
 // 作品検索（GET /api/works）の純粋関数。
 import { parseTag, tagEquals } from "@mimimilli/shared";
 import type { SortId, WorksPage, WorksQuery, WorkSummary } from "@mimimilli/shared";
+import {
+  compareJapaneseSortKeys,
+  compareUtf8Bytes,
+  japaneseSortKey,
+  stableRandomSortKey,
+} from "./japaneseSortKey.ts";
 
 const RECENT_VIEW_WINDOW_DAYS = 30;
 
@@ -12,21 +18,22 @@ export function applyWorksQuery(works: WorkSummary[], params: WorksQuery): Works
   results = filterByTags(results, params.tags, params.tagOp);
   results = filterByAxis(results, params.axis, params.axisValue);
   results = filterByView(results, params.view);
-  results = sortWorkSummaries(results, params.sort);
+  const seed = params.sort === "random" ? (params.seed ?? createRandomSeed()) : undefined;
+  results = sortWorkSummaries(results, params.sort, seed);
 
   const total = results.length;
   const items = paginate(results, params.page, params.limit);
 
-  return { items, total };
+  return seed === undefined ? { items, total } : { items, total, seed };
 }
 
 function filterByQuery(works: WorkSummary[], q: string): WorkSummary[] {
   if (!q) return works;
-  const normalizedQuery = q.toLowerCase();
+  const normalizedQuery = japaneseSortKey(q);
   return works.filter(
     (work) =>
-      work.title.toLowerCase().includes(normalizedQuery) ||
-      work.tags.some((tag) => tag.toLowerCase().includes(normalizedQuery)),
+      japaneseSortKey(work.title).includes(normalizedQuery) ||
+      work.tags.some((tag) => japaneseSortKey(tag).includes(normalizedQuery)),
   );
 }
 
@@ -83,40 +90,50 @@ function filterByView(works: WorkSummary[], view: WorksQuery["view"]): WorkSumma
   }
 }
 
-export function sortWorkSummaries(works: WorkSummary[], sort: SortId): WorkSummary[] {
+export function sortWorkSummaries(
+  works: WorkSummary[],
+  sort: SortId,
+  seed?: number,
+): WorkSummary[] {
   const sorted = [...works];
+  const byId = (a: WorkSummary, b: WorkSummary): number => compareUtf8Bytes(a.id, b.id);
   switch (sort) {
     case "title-asc":
-      sorted.sort((a, b) => a.title.localeCompare(b.title, "ja"));
+      sorted.sort((a, b) => compareJapaneseSortKeys(a.title, b.title) || byId(a, b));
       break;
     case "title-desc":
-      sorted.sort((a, b) => b.title.localeCompare(a.title, "ja"));
+      sorted.sort((a, b) => compareJapaneseSortKeys(b.title, a.title) || byId(a, b));
       break;
     case "added-asc":
-      sorted.sort((a, b) => (a.addedAt < b.addedAt ? -1 : 1));
+      sorted.sort((a, b) => compareStrings(a.addedAt, b.addedAt) || byId(a, b));
       break;
     case "added-desc":
-      sorted.sort((a, b) => (a.addedAt > b.addedAt ? -1 : 1));
+      sorted.sort((a, b) => compareStrings(b.addedAt, a.addedAt) || byId(a, b));
       break;
     case "duration-asc":
-      sorted.sort((a, b) => a.totalDurationSec - b.totalDurationSec);
+      sorted.sort((a, b) => a.totalDurationSec - b.totalDurationSec || byId(a, b));
       break;
     case "duration-desc":
-      sorted.sort((a, b) => b.totalDurationSec - a.totalDurationSec);
+      sorted.sort((a, b) => b.totalDurationSec - a.totalDurationSec || byId(a, b));
       break;
     case "last-played":
       sorted.sort((a, b) => {
-        if (!a.lastPlayedAt && !b.lastPlayedAt) return 0;
+        if (!a.lastPlayedAt && !b.lastPlayedAt) return byId(a, b);
         if (!a.lastPlayedAt) return 1;
         if (!b.lastPlayedAt) return -1;
-        return a.lastPlayedAt > b.lastPlayedAt ? -1 : 1;
+        return compareStrings(b.lastPlayedAt, a.lastPlayedAt) || byId(a, b);
       });
       break;
     case "id-asc":
-      sorted.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+      sorted.sort(byId);
       break;
     case "random":
-      shuffleInPlace(sorted);
+      if (seed === undefined) throw new Error("randomソートにはseedが必要です");
+      sorted.sort(
+        (a, b) =>
+          compareStrings(stableRandomSortKey(seed, a.id), stableRandomSortKey(seed, b.id)) ||
+          byId(a, b),
+      );
       break;
     default:
       break;
@@ -124,12 +141,12 @@ export function sortWorkSummaries(works: WorkSummary[], sort: SortId): WorkSumma
   return sorted;
 }
 
-/** Fisher-Yates シャッフル（破壊的） */
-function shuffleInPlace<T>(items: T[]): void {
-  for (let i = items.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [items[i], items[j]] = [items[j]!, items[i]!];
-  }
+function compareStrings(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+export function createRandomSeed(): number {
+  return crypto.getRandomValues(new Uint32Array(1))[0]! & 0x7fffffff;
 }
 
 /** page/limit が両方指定されているときのみ slice する */
