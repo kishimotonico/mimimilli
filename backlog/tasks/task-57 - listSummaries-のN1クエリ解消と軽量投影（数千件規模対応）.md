@@ -1,7 +1,7 @@
 ---
 id: TASK-57
 title: listSummaries のN+1クエリ解消と軽量投影（数千件規模対応）
-status: In Progress
+status: Done
 assignee:
   - '@kimi'
 created_date: '2026-07-19 02:01'
