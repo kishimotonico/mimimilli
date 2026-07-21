@@ -8,6 +8,7 @@ import { buildEmptyWorksMessage } from "../model/emptyWorks";
 import WorkRow from "./WorkRow";
 import DrillHeader from "./DrillHeader";
 import CollectionStatus from "./CollectionStatus";
+import LoadMore from "./LoadMore";
 import { I } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
 
@@ -23,6 +24,12 @@ interface ContentColumnProps {
   isPlaybackActive?: boolean;
   isLoading?: boolean;
   isError?: boolean;
+  /** 次ページがあるか（追加読み込みボタンの表示判定。TASK-73） */
+  hasNextPage?: boolean;
+  /** サーバー側の総件数（残件数の表示用） */
+  worksTotal?: number;
+  isFetchingNextPage?: boolean;
+  onLoadMore?: () => void;
   onWorkSelect: (id: string) => void;
   onDrillSelect: (value: string) => void;
   onDrillBack: () => void;
@@ -42,6 +49,10 @@ export default function ContentColumn({
   isPlaybackActive,
   isLoading,
   isError,
+  hasNextPage = false,
+  worksTotal,
+  isFetchingNextPage = false,
+  onLoadMore,
   onWorkSelect,
   onDrillSelect,
   onDrillBack,
@@ -215,6 +226,14 @@ export default function ContentColumn({
               onSelect={() => onWorkSelect(w.id)}
             />
           ))
+        )}
+        {hasNextPage && onLoadMore && (
+          <LoadMore
+            loadedCount={works.length}
+            totalCount={worksTotal}
+            isFetching={isFetchingNextPage}
+            onLoadMore={onLoadMore}
+          />
         )}
       </div>
     </div>

@@ -1,10 +1,11 @@
 ---
 id: TASK-73
 title: 通常works一覧のページング適用（デフォルトlimit・総件数COUNT・追加読み込み）
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@kimi'
 created_date: '2026-07-19 04:26'
-updated_date: '2026-07-19 05:08'
+updated_date: '2026-07-21 19:15'
 labels: []
 dependencies:
   - TASK-58
@@ -26,13 +27,19 @@ randomソートの仕様化が必須: server/src/core/worksQuery.ts:118 はリ�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 GET /works が limit 未指定でも全件返さない（サーバー側デフォルト上限）
-- [ ] #2 limitのみ指定時も page=1 として動作し、searchWorks({limit:1}) の総件数取得が退行しない（専用COUNTまたは正しいページング指定へ移行）
-- [ ] #3 1ページ目と2ページ目で重複・欠落がない（安定タイブレーカー）。検索・タグAND/OR・軸・view・全sortでページング前後の集合が一致する
-- [ ] #4 randomソートのページング仕様が決定・実装・テストされている
-- [ ] #5 スキャン完了後の新規作品が先頭ページ外でも取得できる
-- [ ] #6 fixture/real 契約一致、pnpm check と pnpm test が通る
+- [x] #1 GET /works が limit 未指定でも全件返さない（サーバー側デフォルト上限）
+- [x] #2 limitのみ指定時も page=1 として動作し、searchWorks({limit:1}) の総件数取得が退行しない（専用COUNTまたは正しいページング指定へ移行）
+- [x] #3 1ページ目と2ページ目で重複・欠落がない（安定タイブレーカー）。検索・タグAND/OR・軸・view・全sortでページング前後の集合が一致する
+- [x] #4 randomソートのページング仕様が決定・実装・テストされている
+- [x] #5 スキャン完了後の新規作品が先頭ページ外でも取得できる
+- [x] #6 fixture/real 契約一致、pnpm check と pnpm test が通る
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+randomソートのページング仕様（AC#4の決定）: seed方式を採用。初回（seed未指定）はサーバーがseedを発行しWorksPage.seedで返す。clientはそのseedをpageParam経由で次ページ以降のリクエストに引き継ぐ。同一seedではstableRandomSortKey(seed, id)の安定順序が保たれ、ページ間の重複・欠落が起きない。「単一ページのランダムサンプル」案は追加読み込みと両立しないため却下。総件数取得（searchWorks({limit:1})）はroutesでpage=1が入るため正しいページング指定として退行しない（専用COUNT化は不要と判断）。
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
@@ -43,3 +50,9 @@ created: 2026-07-19 05:08
 調整(ADR-0008): API契約・client側・core実装の変更は継続OK。real側のSQLページング実装はTASK-78(DB分離)→TASK-79(SQL移行)に統合するので旧DDL上に実装しないこと。
 ---
 <!-- COMMENTS:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+GET /worksにサーバー側デフォルトページング（page=1, limit=200=WORKS_DEFAULT_PAGE_SIZE）を適用。clientはuseInfiniteQueryのページ蓄積+LoadMoreボタン（グリッド/リスト末尾）。randomソートはseed方式でclientがpageParam経由で次ページへ引き継ぐ。テスト: server側デフォルト適用・ページ連結一致・random seed（7件）、core全sort/フィルタのページ連結一致（2件）、clientページ蓄積・seed伝播・LoadMore（7件）。client実装の一部はimplementサブエージェント（kimi-k2.7-code）へ委譲し監督側でレビュー・再検証。pnpm check・pnpm test(server207/client280)すべてパス
+<!-- SECTION:FINAL_SUMMARY:END -->

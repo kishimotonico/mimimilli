@@ -3,9 +3,14 @@
 // コンポーネント側は返された view model を配線するだけにする。
 
 import { useEffect } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSetAtom } from "jotai";
-import type { SmartFolder, SmartFolderCreate, WorkPatch } from "@mimimilli/shared";
+import {
+  WORKS_DEFAULT_PAGE_SIZE,
+  type SmartFolder,
+  type SmartFolderCreate,
+  type WorkPatch,
+} from "@mimimilli/shared";
 import {
   searchWorks,
   getAxisFacets,
@@ -29,6 +34,12 @@ import type { LibraryViewState } from "./useLibraryNavigation";
 /** 検索クエリのデバウンス時間（TASK-61）。1文字ごとの全件検索発行を間引く */
 const SEARCH_DEBOUNCE_MS = 250;
 
+/** 追加読み込みのページ指定。randomソートのseedを次ページへ引き継ぐ（TASK-73） */
+interface WorksPageParam {
+  page: number;
+  seed: number | undefined;
+}
+
 export function useLibraryQueries(nav: LibraryViewState, searchQuery: string) {
   const queryClient = useQueryClient();
 
@@ -48,9 +59,27 @@ export function useLibraryQueries(nav: LibraryViewState, searchQuery: string) {
     drillValue: nav.drillValue,
   });
 
-  const worksQuery = useQuery({
+  // ── Works（通常軸 / スマートフォルダー軸）─────────────────
+  // 通常一覧はページ蓄積（追加読み込み）。randomソートは初回レスポンスのseedを
+  // pageParam 経由で次ページへ引き継ぎ、ページ間の重複・欠落を防ぐ（TASK-73）
+  const worksQuery = useInfiniteQuery({
     queryKey: WORK_QUERY_KEYS.list(worksParams ?? {}),
-    queryFn: ({ signal }) => searchWorks(worksParams!, { signal }),
+    queryFn: ({ pageParam, signal }) =>
+      searchWorks(
+        {
+          ...worksParams!,
+          page: pageParam.page,
+          limit: WORKS_DEFAULT_PAGE_SIZE,
+          seed: pageParam.seed,
+        },
+        { signal },
+      ),
+    initialPageParam: { page: 1, seed: undefined } as WorksPageParam,
+    getNextPageParam: (lastPage, allPages, lastPageParam): WorksPageParam | undefined => {
+      const loadedCount = allPages.reduce((sum, page) => sum + page.items.length, 0);
+      if (lastPage.items.length === 0 || loadedCount >= lastPage.total) return undefined;
+      return { page: lastPageParam.page + 1, seed: lastPage.seed ?? lastPageParam.seed };
+    },
     enabled: worksParams !== null,
   });
 
@@ -64,9 +93,13 @@ export function useLibraryQueries(nav: LibraryViewState, searchQuery: string) {
 
   const works = isSmartAxis(nav.activeAxis)
     ? (smartWorksQuery.data ?? [])
-    : (worksQuery.data?.items ?? []);
+    : (worksQuery.data?.pages.flatMap((page) => page.items) ?? []);
   const isLoading = isSmartAxis(nav.activeAxis) ? smartWorksQuery.isPending : worksQuery.isPending;
   const isError = isSmartAxis(nav.activeAxis) ? smartWorksQuery.isError : worksQuery.isError;
+  // スマートフォルダー軸のページングは TASK-74 で扱う（通常一覧のみ追加読み込み）
+  const hasNextPage = !isSmartAxis(nav.activeAxis) && (worksQuery.hasNextPage ?? false);
+  const pages = worksQuery.data?.pages;
+  const worksTotal = pages ? pages[pages.length - 1]?.total : undefined;
 
   // ── ライブラリ総件数 ──────────────────────────────────────
   const libraryTotalQuery = useQuery({
@@ -145,6 +178,10 @@ export function useLibraryQueries(nav: LibraryViewState, searchQuery: string) {
     works,
     isLoading,
     isError,
+    hasNextPage,
+    worksTotal,
+    isFetchingNextPage: worksQuery.isFetchingNextPage,
+    fetchNextPage: worksQuery.fetchNextPage,
     libraryTotal: libraryTotalQuery.data,
     facetItems: facetQuery.data ?? [],
     smartFolders,

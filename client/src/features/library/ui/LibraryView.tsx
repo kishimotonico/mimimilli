@@ -67,6 +67,10 @@ export default function LibraryView({
     tagSuggestions,
     tagPrefixes,
     patchWorkMutation,
+    hasNextPage,
+    worksTotal,
+    isFetchingNextPage,
+    fetchNextPage,
   } = useLibraryQueries(nav, searchQuery);
 
   const saveSmartFolderMutation = useSmartFolderMutation({
@@ -165,6 +169,10 @@ export default function LibraryView({
           gridLayoutMode={gridLayoutMode}
           isLoading={isLoading}
           isError={isError}
+          hasNextPage={hasNextPage}
+          worksTotal={worksTotal}
+          isFetchingNextPage={isFetchingNextPage}
+          onLoadMore={fetchNextPage}
           onTileSizeChange={onTileSizeChange}
           onWorkSelect={nav.selectWork}
           onWorkPlay={(work) => onPlay(work, 0)}
@@ -211,6 +219,10 @@ export default function LibraryView({
           isPlaybackActive={isPlaybackActive}
           isLoading={isLoading}
           isError={isError}
+          hasNextPage={hasNextPage}
+          worksTotal={worksTotal}
+          isFetchingNextPage={isFetchingNextPage}
+          onLoadMore={fetchNextPage}
           onWorkSelect={nav.selectWork}
           onDrillSelect={nav.drillInto}
           onDrillBack={nav.drillBack}

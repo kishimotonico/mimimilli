@@ -5,6 +5,10 @@ import { normalizeTags, resumeSchema, workSummarySchema } from "./work.ts";
 
 // ── 作品検索（GET /api/works）────────────────────────────────
 
+/** GET /works のページサイズ。limit 未指定時にサーバー側で適用するデフォルト（TASK-73）。
+ *  client の追加読み込みも同じサイズでページを要求する */
+export const WORKS_DEFAULT_PAGE_SIZE = 200;
+
 /** クエリパラメータ。tags は同名パラメータを繰り返して配列で受ける */
 export const worksQuerySchema = z.object({
   q: z.string().default(""),
@@ -21,7 +25,8 @@ export const worksQuerySchema = z.object({
 });
 export type WorksQuery = z.infer<typeof worksQuerySchema>;
 
-/** ページングエンベロープ。page/limit 未指定時は全件を items に返す（total = items.length） */
+/** ページングエンベロープ。total は検索・フィルター後・ページング前の件数。
+ *  サーバーは page/limit 未指定でもデフォルト（page=1, limit=WORKS_DEFAULT_PAGE_SIZE）でページングする */
 export const worksPageSchema = z.object({
   items: z.array(workSummarySchema),
   total: z.number().int().nonnegative(),

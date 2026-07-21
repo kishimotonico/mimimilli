@@ -1,6 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { emptyDlsiteState, type WorkSummary, type WorksQuery } from "@mimimilli/shared";
+import {
+  emptyDlsiteState,
+  sortIdSchema,
+  type WorkSummary,
+  type WorksQuery,
+} from "@mimimilli/shared";
 import { applyWorksQuery } from "../src/core/worksQuery.ts";
 import { compareJapaneseSortKeys } from "../src/core/japaneseSortKey.ts";
 
@@ -216,4 +221,67 @@ test("ページング: page か limit の片方のみ指定された場合は全
   const result = applyWorksQuery(WORKS, baseQuery({ sort: "id-asc", page: 2 }));
   assert.equal(result.total, 3);
   assert.equal(result.items.length, 3);
+});
+
+// ── TASK-73: ページング前後の集合一致（重複・欠落なし） ──────────
+
+const MANY_WORKS: WorkSummary[] = Array.from({ length: 10 }, (_, index) => ({
+  id: `w-${String(index).padStart(2, "0")}`,
+  title: `作品${index}`,
+  coverImage: null,
+  status: index % 4 === 0 ? "missing" : "ok",
+  physicalPath: `/lib/w-${index}`,
+  totalDurationSec: index * 300,
+  addedAt: new Date(Date.now() - index * 86400000).toISOString(),
+  errorMessage: null,
+  urls: [],
+  tags: index % 2 === 0 ? ["cv/水瀬なずな", "ASMR"] : ["cv/霧島レイ"],
+  trackCount: 1,
+  bookmarked: index % 3 === 0,
+  lastPlayedAt: index % 2 === 0 ? RECENT : null,
+  dlsite: emptyDlsiteState(),
+}));
+
+/** page を順に取って連結する（取得件数が total に達したら終了） */
+function collectAllPages(query: Partial<WorksQuery>, limit = 3): WorkSummary[] {
+  const collected: WorkSummary[] = [];
+  for (let page = 1; ; page++) {
+    const result = applyWorksQuery(MANY_WORKS, baseQuery({ ...query, page, limit }));
+    collected.push(...result.items);
+    if (collected.length >= result.total) return collected;
+  }
+}
+
+test("ページング: 全sortでページ連結が全件と一致する（重複・欠落なし）", () => {
+  for (const sort of sortIdSchema.options) {
+    const collected = collectAllPages({ sort, seed: sort === "random" ? 42 : undefined });
+    assert.equal(collected.length, MANY_WORKS.length, `${sort}: 欠落があります`);
+    assert.equal(
+      new Set(collected.map((w) => w.id)).size,
+      MANY_WORKS.length,
+      `${sort}: 重複があります`,
+    );
+  }
+});
+
+test("ページング: 検索・タグAND/OR・軸・viewでもページ連結がフィルタ結果と一致する", () => {
+  const cases: Array<[string, Partial<WorksQuery>]> = [
+    ["検索", { q: "ASMR" }],
+    ["タグAND", { tags: ["cv/水瀬なずな", "ASMR"], tagOp: "AND" }],
+    ["タグOR", { tags: ["cv/水瀬なずな", "cv/霧島レイ"], tagOp: "OR" }],
+    ["軸", { axis: "cv", axisValue: "水瀬なずな" }],
+    ["view:fav", { view: "fav" }],
+    ["view:missing", { view: "missing" }],
+    ["view:unplayed", { view: "unplayed" }],
+    ["view:recent", { view: "recent" }],
+  ];
+  for (const [label, query] of cases) {
+    const unpaginated = applyWorksQuery(MANY_WORKS, baseQuery(query));
+    const collected = collectAllPages(query);
+    assert.deepEqual(
+      collected.map((w) => w.id),
+      unpaginated.items.map((w) => w.id),
+      `${label}: ページ連結がフィルタ結果と一致しません`,
+    );
+  }
 });

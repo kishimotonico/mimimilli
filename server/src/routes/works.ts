@@ -1,7 +1,12 @@
 // 作品関連: GET/PATCH /works, /works/:id/resume, /works/:id/last-played, /works/:id/files,
 //          GET /tags, POST /export
 import { Hono } from "hono";
-import { resumeBodySchema, workPatchSchema, worksQuerySchema } from "@mimimilli/shared";
+import {
+  resumeBodySchema,
+  WORKS_DEFAULT_PAGE_SIZE,
+  workPatchSchema,
+  worksQuerySchema,
+} from "@mimimilli/shared";
 import { InvalidResumeError, type DataAdapter } from "../adapter.ts";
 import { invalidRequest, notFound } from "../lib/httpError.ts";
 
@@ -16,7 +21,13 @@ export function worksRoute(adapter: DataAdapter): Hono {
     if (!parsed.success) {
       invalidRequest("works のクエリパラメータが不正です");
     }
-    const page = await adapter.queryWorks(parsed.data);
+    // page/limit 未指定でもサーバー側デフォルトでページングする（TASK-73）。
+    // limit だけの指定は page=1 として扱う
+    const page = await adapter.queryWorks({
+      ...parsed.data,
+      page: parsed.data.page ?? 1,
+      limit: parsed.data.limit ?? WORKS_DEFAULT_PAGE_SIZE,
+    });
     return c.json(page);
   });
 

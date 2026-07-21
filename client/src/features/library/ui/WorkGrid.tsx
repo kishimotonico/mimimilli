@@ -34,6 +34,7 @@ import { buildEmptyWorksMessage } from "../model/emptyWorks";
 import { isFacetAxis, isSmartAxis } from "../model/axisDefinitions";
 import CollectionStatus from "./CollectionStatus";
 import DrillHeader from "./DrillHeader";
+import LoadMore from "./LoadMore";
 
 interface WorkGridProps {
   axis: AxisId;
@@ -45,6 +46,12 @@ interface WorkGridProps {
   gridLayoutMode: GridLayoutMode;
   isLoading: boolean;
   isError: boolean;
+  /** 次ページがあるか（追加読み込みボタンの表示判定。TASK-73） */
+  hasNextPage?: boolean;
+  /** サーバー側の総件数（残件数の表示用） */
+  worksTotal?: number;
+  isFetchingNextPage?: boolean;
+  onLoadMore?: () => void;
   onTileSizeChange: (size: number) => void;
   onWorkSelect: (id: string) => void;
   onWorkPlay: (work: WorkSummary) => void;
@@ -88,6 +95,10 @@ export default function WorkGrid({
   gridLayoutMode,
   isLoading,
   isError,
+  hasNextPage = false,
+  worksTotal,
+  isFetchingNextPage = false,
+  onLoadMore,
   onTileSizeChange,
   onWorkSelect,
   onWorkPlay,
@@ -396,6 +407,14 @@ export default function WorkGrid({
                 ))
               : works.map((work, index) => renderTile(work, index, undefined, undefined))}
           </div>
+        )}
+        {hasNextPage && onLoadMore && (
+          <LoadMore
+            loadedCount={works.length}
+            totalCount={worksTotal}
+            isFetching={isFetchingNextPage}
+            onLoadMore={onLoadMore}
+          />
         )}
       </div>
       {inspector}
