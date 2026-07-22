@@ -200,6 +200,7 @@ export function useLibraryQueries(nav: LibraryViewState, searchQuery: string) {
 
   return {
     works,
+    worksParams,
     isLoading,
     isError,
     hasNextPage,

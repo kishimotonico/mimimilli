@@ -1,10 +1,12 @@
-import React from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useAtomValue } from "jotai";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import type { WorkSummary, AxisFacetItem } from "@mimimilli/shared";
 import type { AxisId } from "../model/types";
 import { tagPrefixesAtom } from "../model/atoms";
 import { getAxisLabel, isFacetAxis, isSmartAxis } from "../model/axisDefinitions";
 import { buildEmptyWorksMessage } from "../model/emptyWorks";
+import { shouldLoadMore } from "../model/virtualScroll";
 import WorkRow from "./WorkRow";
 import DrillHeader from "./DrillHeader";
 import CollectionStatus from "./CollectionStatus";
@@ -16,6 +18,8 @@ interface ContentColumnProps {
   axis: AxisId;
   drillValue: string | null;
   works: WorkSummary[];
+  /** 検索・軸・ソート・タグ・ドリル変更を検知してスクロール位置をリセットする key */
+  worksQueryKey: string;
   facetItems: AxisFacetItem[];
   selectedWorkId: string | null;
   selectedTags: string[];
@@ -37,10 +41,18 @@ interface ContentColumnProps {
   onClearSearch: () => void;
 }
 
+/** WorkRow の概算高さ（padding 上下 10px + カバー 32px） */
+const WORK_ROW_ESTIMATE_SIZE = 42;
+/** .mle-col__list の padding（has-docked-bar 時は padding-bottom が広がる） */
+const LIST_PADDING_START = 4;
+const LIST_PADDING_END_BASE = 4;
+const LIST_DOCKED_BAR_EXTRA = 8;
+
 export default function ContentColumn({
   axis,
   drillValue,
   works,
+  worksQueryKey,
   facetItems,
   selectedWorkId,
   selectedTags,
@@ -65,6 +77,77 @@ export default function ContentColumn({
     : facetItems.length > 0
       ? `${facetItems.length} 件`
       : `${works.length} 件`;
+
+  const listRef = useRef<HTMLDivElement>(null);
+  const [paddingEnd, setPaddingEnd] = useState(LIST_PADDING_END_BASE);
+
+  // ドッキングバー表示状態を検知してスクロール終端の余白を調整する。
+  useEffect(() => {
+    const app = listRef.current?.closest(".mle-app");
+    if (!app) return;
+    const update = () => {
+      setPaddingEnd(
+        app.classList.contains("has-docked-bar")
+          ? LIST_PADDING_END_BASE + LIST_DOCKED_BAR_EXTRA
+          : LIST_PADDING_END_BASE,
+      );
+    };
+    const observer = new MutationObserver(update);
+    observer.observe(app, { attributes: true, attributeFilter: ["class"] });
+    update();
+    return () => observer.disconnect();
+  }, []);
+
+  // WorkRow の高さは .mll-wrow の block-size で 42px に固定されている。
+  // measureElement も estimateSize と同値を返し、行ごとの高さずれを防ぐ（TASK-59）。
+  // （デフォルトの measureElement は jsdom で offsetHeight=0 を返し無限ループになる）
+  const measureElement = useCallback(() => WORK_ROW_ESTIMATE_SIZE, []);
+
+  const virtualizer = useVirtualizer({
+    count: works.length,
+    getScrollElement: () => listRef.current,
+    estimateSize: () => WORK_ROW_ESTIMATE_SIZE,
+    overscan: 5,
+    gap: 1,
+    paddingStart: LIST_PADDING_START,
+    paddingEnd,
+    measureElement,
+  });
+
+  // 検索・軸・ソート・タグ・ドリル変更時にスクロール位置をリセット（AC#3）。
+  // virtualizer 自体の再作成（リサイズ等）ではリセットしない。
+  const prevWorksQueryKeyRef = useRef(worksQueryKey);
+  useEffect(() => {
+    if (prevWorksQueryKeyRef.current === worksQueryKey) return;
+    prevWorksQueryKeyRef.current = worksQueryKey;
+    virtualizer.scrollToIndex(0);
+  }, [virtualizer, worksQueryKey]);
+
+  // 末尾近傍の仮想行が表示されたら次ページを自動取得（AC#2）。
+  const virtualItems = virtualizer.getVirtualItems();
+  useEffect(() => {
+    if (!hasNextPage || isFetchingNextPage || !onLoadMore) return;
+    if (shouldLoadMore(virtualItems, works.length, virtualizer.options.overscan)) {
+      onLoadMore();
+    }
+  }, [virtualItems, hasNextPage, isFetchingNextPage, onLoadMore, works.length, virtualizer]);
+
+  const renderWorkRow = useCallback(
+    (index: number) => {
+      const work = works[index];
+      if (!work) return null;
+      return (
+        <WorkRow
+          work={work}
+          isSelected={work.id === selectedWorkId}
+          isPlaying={work.id === playingWorkId}
+          isPlaybackActive={isPlaybackActive}
+          onSelect={() => onWorkSelect(work.id)}
+        />
+      );
+    },
+    [works, selectedWorkId, playingWorkId, isPlaybackActive, onWorkSelect],
+  );
 
   // ── Tag axis: show tag list with checkboxes ───────────────
   if (axis === "tag" && !drillValue) {
@@ -91,7 +174,7 @@ export default function ContentColumn({
             <span className="mll-tagband__count">{works.length} 件</span>
           </div>
         )}
-        <div className="mle-col__list">
+        <div ref={listRef} className="mle-col__list">
           {isLoading ? (
             <CollectionStatus variant="list" kind="loading" />
           ) : isError ? (
@@ -129,7 +212,7 @@ export default function ContentColumn({
           <span>{getAxisLabel(axis, tagPrefixes)}</span>
           <span className="count">{facetItems.length} 件</span>
         </div>
-        <div className="mle-col__list">
+        <div ref={listRef} className="mle-col__list">
           {isLoading ? (
             <CollectionStatus variant="list" kind="loading" />
           ) : isError ? (
@@ -192,7 +275,7 @@ export default function ContentColumn({
           <span className="count">{hd}</span>
         </div>
       )}
-      <div className="mle-col__list">
+      <div ref={listRef} className="mle-col__list">
         {isLoading ? (
           <CollectionStatus variant="list" kind="loading" />
         ) : isError ? (
@@ -216,16 +299,30 @@ export default function ContentColumn({
             }
           />
         ) : (
-          works.map((w) => (
-            <WorkRow
-              key={w.id}
-              work={w}
-              isSelected={w.id === selectedWorkId}
-              isPlaying={w.id === playingWorkId}
-              isPlaybackActive={isPlaybackActive}
-              onSelect={() => onWorkSelect(w.id)}
-            />
-          ))
+          <div
+            style={{
+              position: "relative",
+              width: "100%",
+              height: virtualizer.getTotalSize(),
+            }}
+          >
+            {virtualizer.getVirtualItems().map((virtualRow) => (
+              <div
+                key={virtualRow.key}
+                data-index={virtualRow.index}
+                ref={virtualizer.measureElement}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  transform: `translateY(${virtualRow.start}px)`,
+                }}
+              >
+                {renderWorkRow(virtualRow.index)}
+              </div>
+            ))}
+          </div>
         )}
         {hasNextPage && onLoadMore && (
           <LoadMore

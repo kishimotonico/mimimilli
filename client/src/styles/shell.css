@@ -552,6 +552,13 @@
     gap: var(--grid-col-gap);
     content-visibility: auto;
   }
+  /* 1:1タイルの仮想化行（TASK-59）。行内は grid で列数を固定し、gap は列間のみ。 */
+  .mll-grid-row--square {
+    display: grid;
+    align-items: start;
+    width: 100%;
+    content-visibility: auto;
+  }
   .mll-grid-pane.is-inspector-open .mll-grid {
     padding-right: calc(var(--grid-inspector-width) + 16px);
   }
@@ -893,6 +900,9 @@
     grid-template-columns: 32px 1fr auto;
     gap: 8px;
     align-items: center;
+    /* 行高を固定する（仮想スクロールの estimateSize と一致させ、行ごとの高さずれを防ぐ。TASK-59） */
+    block-size: 42px;
+    box-sizing: border-box;
     padding: 5px 6px;
     border-radius: 4px;
     cursor: pointer;

@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { useAtomValue } from "jotai";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import type { AxisId, GridLayoutMode } from "../model/types";
 import { tagPrefixesAtom } from "../model/atoms";
 import type { WorkSummary } from "@mimimilli/shared";
@@ -24,12 +25,12 @@ import {
   selectCoverThumbnailWidth,
 } from "../model/gridSizing";
 import {
-  countGridColumns,
   getNextGridIndex,
   getNextJustifiedIndex,
   type GridArrowKey,
 } from "../model/gridNavigation";
 import { computeJustifiedLayout, type JustifiedLayout } from "../model/justifiedLayout";
+import { shouldLoadMore } from "../model/virtualScroll";
 import { buildEmptyWorksMessage } from "../model/emptyWorks";
 import { isFacetAxis, isSmartAxis } from "../model/axisDefinitions";
 import CollectionStatus from "./CollectionStatus";
@@ -40,6 +41,8 @@ interface WorkGridProps {
   axis: AxisId;
   drillValue: string | null;
   works: WorkSummary[];
+  /** 検索・軸・ソート・タグ・ドリル変更を検知してスクロール位置をリセットする key */
+  worksQueryKey: string;
   selectedWorkId: string | null;
   searchQuery: string;
   tileSize: number;
@@ -85,10 +88,17 @@ function groupJustifiedRows(works: WorkSummary[], layout: JustifiedLayout): Just
   return rows;
 }
 
+/** スクロールコンテナ (.mll-grid) の padding を virtualizer に反映する */
+const GRID_PADDING_START = 16;
+const GRID_PADDING_END_BASE = 16;
+/** .mle-app.has-docked-bar の際の追加余白（TASK-59: スクロール終端が見切れないよう） */
+const GRID_DOCKED_BAR_EXTRA = 28;
+
 export default function WorkGrid({
   axis,
   drillValue,
   works,
+  worksQueryKey,
   selectedWorkId,
   searchQuery,
   tileSize,
@@ -120,6 +130,7 @@ export default function WorkGrid({
   // useRef + useEffect だけでは DOM 出現タイミングを取り逃すため。
   const [gridEl, setGridEl] = useState<HTMLDivElement | null>(null);
   const [containerWidth, setContainerWidth] = useState(0);
+  const [paddingEnd, setPaddingEnd] = useState(GRID_PADDING_END_BASE);
 
   useEffect(() => {
     if (!gridEl) return;
@@ -131,17 +142,27 @@ export default function WorkGrid({
     return () => observer.disconnect();
   }, [gridEl]);
 
+  // ドッキングバー表示状態を検知してスクロール終端の余白を調整する。
+  useEffect(() => {
+    const app = paneRef.current?.closest(".mle-app");
+    if (!app) return;
+    const update = () => {
+      setPaddingEnd(
+        app.classList.contains("has-docked-bar")
+          ? GRID_PADDING_END_BASE + GRID_DOCKED_BAR_EXTRA
+          : GRID_PADDING_END_BASE,
+      );
+    };
+    const observer = new MutationObserver(update);
+    observer.observe(app, { attributes: true, attributeFilter: ["class"] });
+    update();
+    return () => observer.disconnect();
+  }, []);
+
   // ジャスティファイド用のカバー実寸（アスペクト比）計測キャッシュ。
   // サーバーは画像寸法を返さないため、実際に読み込まれた <img> の
   // naturalWidth/naturalHeight から計測する（CoverImg.onLoadDimensions）。
   // works が入れ替わっても（軸切り替え等）このキャッシュは保持し、同じ作品の再計測を避ける。
-  //
-  // レイアウトシフト対策:
-  //   - 未計測の作品はプレースホルダ比率 1:1 として扱う（初回レイアウトが破綻しない）
-  //   - 画像読み込みが短時間に連続すると（初回マウント・高速スクロール時）その都度
-  //     再レイアウトすると再描画が連発するため、rAF で1フレーム分バッチしてからまとめて state を更新する
-  //   - それでも「未計測→実測」の切り替わり時に行の高さがずれる一度きりのシフトは
-  //     サーバーに画像寸法がない以上避けられない（将来サーバー側で寸法を保持できれば解消できる）
   const [coverRatios, setCoverRatios] = useState<Map<string, number>>(() => new Map());
   const pendingRatiosRef = useRef<Map<string, number>>(new Map());
   const flushHandleRef = useRef<number | null>(null);
@@ -199,6 +220,75 @@ export default function WorkGrid({
     [containerWidth, safeTileSize],
   );
 
+  const rowCount = useMemo(
+    () =>
+      gridLayoutMode === "justified" ? justifiedRows.length : Math.ceil(works.length / columnCount),
+    [gridLayoutMode, justifiedRows.length, works.length, columnCount],
+  );
+
+  const estimateSize = useCallback(
+    (index: number) => {
+      if (gridLayoutMode === "justified") {
+        return (justifiedLayout?.rowHeights[index] ?? 0) + GRID_TILE_CHROME_HEIGHT;
+      }
+      // square: 行高 = タイル実寸 + chrome。containerWidth=0 の間は仮に目標値を返す。
+      const tileWidth =
+        containerWidth > 0
+          ? (containerWidth - (columnCount - 1) * GRID_COLUMN_GAP) / columnCount
+          : safeTileSize;
+      return tileWidth + GRID_TILE_CHROME_HEIGHT;
+    },
+    [gridLayoutMode, justifiedLayout, containerWidth, columnCount, safeTileSize],
+  );
+
+  // square モードは estimateSize が正確なので測定不要。
+  // justified モードは画像読み込み後のレイアウト変化を反映するためデフォルト測定を使う。
+  const measureElement = useMemo(
+    () =>
+      gridLayoutMode === "square"
+        ? (element: HTMLDivElement) => {
+            const index = Number(element.getAttribute("data-index"));
+            return estimateSize(index);
+          }
+        : undefined,
+    [gridLayoutMode, estimateSize],
+  );
+
+  const virtualizer = useVirtualizer({
+    count: rowCount,
+    getScrollElement: () => scrollRef.current,
+    estimateSize,
+    overscan: 5,
+    gap: GRID_ROW_GAP,
+    paddingStart: GRID_PADDING_START,
+    paddingEnd,
+    measureElement,
+  });
+
+  // 検索・軸・ソート・タグ・ドリル変更時にスクロール位置をリセット（AC#3）。
+  // virtualizer 自体の再作成（リサイズ等）ではリセットしない。
+  const prevWorksQueryKeyRef = useRef(worksQueryKey);
+  useEffect(() => {
+    if (prevWorksQueryKeyRef.current === worksQueryKey) return;
+    prevWorksQueryKeyRef.current = worksQueryKey;
+    virtualizer.scrollToIndex(0);
+  }, [virtualizer, worksQueryKey]);
+
+  // 末尾近傍の仮想行が表示されたら次ページを自動取得（AC#2）。
+  const virtualItems = virtualizer.getVirtualItems();
+  useEffect(() => {
+    if (!hasNextPage || isFetchingNextPage || !onLoadMore) return;
+    if (shouldLoadMore(virtualItems, rowCount, virtualizer.options.overscan)) {
+      onLoadMore();
+    }
+  }, [virtualItems, hasNextPage, isFetchingNextPage, onLoadMore, rowCount, virtualizer]);
+
+  // ジャスティファイドは画像読み込み後にレイアウトが変わるため、measure で再計測を伝える。
+  useEffect(() => {
+    if (gridLayoutMode !== "justified") return;
+    virtualizer.measure();
+  }, [gridLayoutMode, justifiedLayout, virtualizer]);
+
   useEffect(() => {
     const pane = paneRef.current;
     if (!pane) return;
@@ -250,86 +340,145 @@ export default function WorkGrid({
     return () => scroll.removeEventListener("click", handleGridBackgroundClick);
   }, [isInspectorOpen, onInspectorClose]);
 
-  // 2次元キーボードナビ（TASK-45で両形式対応）。
-  // 1:1タイルは列数が一定なので固定ストライドで、ジャスティファイドは行ごとに
-  // アイテム数が不揃いなので justifiedLayout の行内中心x座標を使った近傍探索で移動する。
-  const moveTileFocus = (currentIndex: number, key: GridArrowKey) => {
-    if (!gridEl) return;
+  // 2次元キーボードナビ（TASK-45）。DOM 計測（querySelectorAll）をやめ、
+  // レイアウト計算済みの columnCount / justifiedLayout.tiles から次インデックスを求める。
+  const moveTileFocus = useCallback(
+    (currentIndex: number, key: GridArrowKey) => {
+      if (!gridEl) return;
 
-    const tiles = Array.from(gridEl.querySelectorAll<HTMLElement>(".mll-grid-tile"));
-    const nextIndex =
-      gridLayoutMode === "justified" && justifiedLayout
-        ? getNextJustifiedIndex(justifiedLayout.tiles, currentIndex, key)
-        : getNextGridIndex(
-            currentIndex,
-            key,
-            countGridColumns(tiles.map((tile) => tile.offsetTop)),
-            tiles.length,
-          );
-    if (nextIndex === currentIndex) return;
+      const nextIndex =
+        gridLayoutMode === "justified" && justifiedLayout
+          ? getNextJustifiedIndex(justifiedLayout.tiles, currentIndex, key)
+          : getNextGridIndex(currentIndex, key, columnCount, works.length);
+      if (nextIndex === currentIndex) return;
 
-    const nextTile = tiles[nextIndex];
-    nextTile?.focus({ preventScroll: true });
-    nextTile?.scrollIntoView({ block: "nearest", inline: "nearest" });
-  };
+      const rowIndex =
+        gridLayoutMode === "justified" && justifiedLayout
+          ? justifiedLayout.tiles[nextIndex]?.rowIndex
+          : Math.floor(nextIndex / columnCount);
+      if (rowIndex === undefined || rowIndex < 0) return;
 
-  const renderTile = (
-    work: WorkSummary,
-    flatIndex: number,
-    tileWidth: number | undefined,
-    coverHeight: number | undefined,
-  ) => {
-    const requestWidth = selectCoverThumbnailWidth(
-      tileWidth ?? safeTileSize,
-      window.devicePixelRatio,
-    );
+      virtualizer.scrollToIndex(rowIndex, { align: "auto" });
 
-    return (
-      <button
-        key={work.id}
-        type="button"
-        className={`mll-grid-tile ${work.id === selectedWorkId ? "is-on" : ""}`}
-        aria-label={`${work.title}を選択`}
-        aria-pressed={work.id === selectedWorkId}
-        style={tileWidth !== undefined ? { width: tileWidth } : undefined}
-        onClick={() => onWorkSelect(work.id)}
-        onDoubleClick={() => onWorkPlay(work)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            onWorkPlay(work);
-            return;
-          }
-          if (!GRID_ARROW_KEYS.has(event.key as GridArrowKey)) return;
-          event.preventDefault();
-          moveTileFocus(flatIndex, event.key as GridArrowKey);
-        }}
-      >
-        <span
-          className="mll-grid-tile__cover"
-          style={coverHeight !== undefined ? { height: coverHeight } : undefined}
-        >
-          <CoverImg
-            id={work.id}
-            title={work.title}
-            hasCover={Boolean(work.coverImage)}
-            fit="fill"
-            radius={6}
-            requestWidth={requestWidth}
-            loading="lazy"
-            onLoadDimensions={
-              gridLayoutMode === "justified"
-                ? (naturalWidth, naturalHeight) =>
-                    handleCoverLoad(work.id, naturalWidth, naturalHeight)
-                : undefined
+      let attempts = 0;
+      const tryFocus = () => {
+        if (attempts++ > 20) return;
+        const tile = gridEl.querySelector<HTMLElement>(`[data-flat-index="${nextIndex}"]`);
+        if (tile) {
+          tile.focus({ preventScroll: true });
+          tile.scrollIntoView({ block: "nearest", inline: "nearest" });
+        } else {
+          requestAnimationFrame(tryFocus);
+        }
+      };
+      requestAnimationFrame(tryFocus);
+    },
+    [gridEl, gridLayoutMode, justifiedLayout, columnCount, works.length, virtualizer],
+  );
+
+  const renderTile = useCallback(
+    (
+      work: WorkSummary,
+      flatIndex: number,
+      tileWidth: number | undefined,
+      coverHeight: number | undefined,
+    ) => {
+      const requestWidth = selectCoverThumbnailWidth(
+        tileWidth ?? safeTileSize,
+        window.devicePixelRatio,
+      );
+
+      return (
+        <button
+          key={work.id}
+          type="button"
+          className={`mll-grid-tile ${work.id === selectedWorkId ? "is-on" : ""}`}
+          data-flat-index={flatIndex}
+          aria-label={`${work.title}を選択`}
+          aria-pressed={work.id === selectedWorkId}
+          style={tileWidth !== undefined ? { width: tileWidth } : undefined}
+          onClick={() => onWorkSelect(work.id)}
+          onDoubleClick={() => onWorkPlay(work)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              onWorkPlay(work);
+              return;
             }
-          />
-        </span>
-        <span className="mll-grid-tile__title">{work.title}</span>
-        <span className="mll-grid-tile__circle">{getCircleName(work) ?? "サークル不明"}</span>
-      </button>
-    );
-  };
+            if (!GRID_ARROW_KEYS.has(event.key as GridArrowKey)) return;
+            event.preventDefault();
+            moveTileFocus(flatIndex, event.key as GridArrowKey);
+          }}
+        >
+          <span
+            className="mll-grid-tile__cover"
+            style={coverHeight !== undefined ? { height: coverHeight } : undefined}
+          >
+            <CoverImg
+              id={work.id}
+              title={work.title}
+              hasCover={Boolean(work.coverImage)}
+              fit="fill"
+              radius={6}
+              requestWidth={requestWidth}
+              loading="lazy"
+              onLoadDimensions={
+                gridLayoutMode === "justified"
+                  ? (naturalWidth, naturalHeight) =>
+                      handleCoverLoad(work.id, naturalWidth, naturalHeight)
+                  : undefined
+              }
+            />
+          </span>
+          <span className="mll-grid-tile__title">{work.title}</span>
+          <span className="mll-grid-tile__circle">{getCircleName(work) ?? "サークル不明"}</span>
+        </button>
+      );
+    },
+    [
+      gridLayoutMode,
+      selectedWorkId,
+      safeTileSize,
+      onWorkSelect,
+      onWorkPlay,
+      moveTileFocus,
+      handleCoverLoad,
+    ],
+  );
+
+  const renderRow = useCallback(
+    (rowIndex: number) => {
+      if (gridLayoutMode === "justified" && justifiedLayout) {
+        const row = justifiedRows[rowIndex];
+        if (!row) return null;
+        return (
+          <div className="mll-grid-row">
+            {row.entries.map((entry) =>
+              renderTile(entry.work, entry.flatIndex, entry.width, row.height),
+            )}
+          </div>
+        );
+      }
+
+      const start = rowIndex * columnCount;
+      const rowWorks = works.slice(start, start + columnCount);
+      return (
+        <div
+          className="mll-grid-row mll-grid-row--square"
+          style={
+            {
+              display: "grid",
+              gridTemplateColumns: `repeat(${columnCount}, 1fr)`,
+              gap: `var(--grid-col-gap)`,
+            } as CSSProperties
+          }
+        >
+          {rowWorks.map((work, i) => renderTile(work, start + i, undefined, undefined))}
+        </div>
+      );
+    },
+    [gridLayoutMode, justifiedLayout, justifiedRows, columnCount, works, renderTile],
+  );
 
   return (
     <section
@@ -379,33 +528,34 @@ export default function WorkGrid({
             className={`mll-grid ${gridLayoutMode === "justified" ? "mll-grid--justified" : ""}`}
             style={
               {
+                position: "relative",
+                width: "100%",
+                height: `${virtualizer.getTotalSize()}px`,
                 "--tile-size": `${safeTileSize}px`,
                 "--grid-row-gap": `${GRID_ROW_GAP}px`,
                 "--grid-col-gap": `${GRID_COLUMN_GAP}px`,
                 "--tile-chrome-h": `${GRID_TILE_CHROME_HEIGHT}px`,
-                ...(gridLayoutMode === "square" && containerWidth > 0
-                  ? { gridTemplateColumns: `repeat(${columnCount}, 1fr)` }
-                  : {}),
               } as CSSProperties
             }
           >
-            {gridLayoutMode === "justified" && justifiedLayout
-              ? justifiedRows.map((row) => (
-                  <div
-                    key={row.rowIndex}
-                    className="mll-grid-row"
-                    style={
-                      {
-                        containIntrinsicSize: `auto ${row.height + GRID_TILE_CHROME_HEIGHT}px`,
-                      } as CSSProperties
-                    }
-                  >
-                    {row.entries.map((entry) =>
-                      renderTile(entry.work, entry.flatIndex, entry.width, row.height),
-                    )}
-                  </div>
-                ))
-              : works.map((work, index) => renderTile(work, index, undefined, undefined))}
+            {virtualizer.getVirtualItems().map((virtualRow) => (
+              <div
+                key={virtualRow.key}
+                data-index={virtualRow.index}
+                ref={virtualizer.measureElement}
+                style={
+                  {
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: "100%",
+                    transform: `translateY(${virtualRow.start}px)`,
+                  } as CSSProperties
+                }
+              >
+                {renderRow(virtualRow.index)}
+              </div>
+            ))}
           </div>
         )}
         {hasNextPage && onLoadMore && (

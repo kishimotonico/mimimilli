@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { Work, WorkSummary } from "@mimimilli/shared";
 import type { GridLayoutMode, ViewMode } from "../model/types";
 import { useLibraryView } from "../model/useLibraryNavigation";
@@ -57,6 +57,7 @@ export default function LibraryView({
 
   const {
     works,
+    worksParams,
     isLoading,
     isError,
     libraryTotal,
@@ -115,6 +116,23 @@ export default function LibraryView({
     ? (smartFolders.find((sf) => sf.id === getSmartFolderId(nav.activeAxis)) ?? null)
     : null;
 
+  // 検索・軸・ソート・タグ・ドリル変更時にグリッド/リストのスクロール位置を
+  // リセットするための key。ページ追加（useInfiniteQuery）時は worksParams が
+  // 変わらないのでリセットしない（TASK-59）。
+  const worksQueryKey = useMemo(() => {
+    if (isSmartAxis(nav.activeAxis)) {
+      return JSON.stringify({
+        type: "smart",
+        id: getSmartFolderId(nav.activeAxis),
+        sort: nav.sort,
+      });
+    }
+    return JSON.stringify({
+      type: "works",
+      params: worksParams,
+    });
+  }, [nav.activeAxis, nav.sort, worksParams]);
+
   const handlePlay = useCallback(
     (trackIndex: number) => {
       if (selectedWork) {
@@ -163,6 +181,7 @@ export default function LibraryView({
           axis={nav.activeAxis}
           drillValue={nav.drillValue}
           works={works}
+          worksQueryKey={worksQueryKey}
           selectedWorkId={nav.selectedWorkId}
           searchQuery={searchQuery}
           tileSize={tileSize}
@@ -211,6 +230,7 @@ export default function LibraryView({
           axis={nav.activeAxis}
           drillValue={nav.drillValue}
           works={works}
+          worksQueryKey={worksQueryKey}
           facetItems={facetItems}
           selectedWorkId={nav.selectedWorkId}
           selectedTags={nav.selectedTags}

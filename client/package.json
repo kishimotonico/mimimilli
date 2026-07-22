@@ -20,6 +20,7 @@
   "dependencies": {
     "@mimimilli/shared": "workspace:*",
     "@tanstack/react-query": "^5.100.14",
+    "@tanstack/react-virtual": "^3.14.7",
     "jotai": "^2.20.0",
     "motion": "^12.40.0",
     "react": "^19.1.0",
