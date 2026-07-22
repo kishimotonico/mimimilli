@@ -50,6 +50,7 @@ import {
   type MediaKind,
   type MediaLocation,
 } from "../../adapter.ts";
+import type { ScanOptions } from "../../adapter.ts";
 import { buildAxisFacets } from "../../core/axisFacets.ts";
 import { buildTagPrefixCandidates } from "../../core/tagPrefixCandidates.ts";
 import { evalSmartFolder } from "../../core/smartFolder.ts";
@@ -247,18 +248,27 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
 
     // fixture には実際に走査するファイルシステムが無いため、数ステップのタイマー進行で
     // 疑似的な進捗を流す（本物のスキャンと同じイベント契約を dev/デモ環境でも確認できるように）。
-    async scan(onProgress?: (event: ScanProgressEvent) => void): Promise<ScanResult> {
-      const emit = onProgress ?? ((): void => {});
+    async scan(options?: ScanOptions | ((event: ScanProgressEvent) => void)): Promise<ScanResult> {
+      const normalized = typeof options === "function" ? { onProgress: options } : (options ?? {});
+      const emit = normalized.onProgress ?? ((): void => {});
+      const checkAbort = () => {
+        if (normalized.signal?.aborted)
+          throw new DOMException("スキャンはキャンセルされました", "AbortError");
+      };
       const pseudoSteps = 4;
 
+      checkAbort();
       emit({ type: "progress", phase: "walking", processed: 0, total: 0 });
       await sleep(FIXTURE_SCAN_STEP_MS);
+      checkAbort();
       emit({ type: "progress", phase: "registering", processed: 0, total: pseudoSteps });
       for (let i = 1; i <= pseudoSteps; i++) {
         await sleep(FIXTURE_SCAN_STEP_MS);
+        checkAbort();
         emit({ type: "progress", phase: "registering", processed: i, total: pseudoSteps });
       }
       await sleep(FIXTURE_SCAN_STEP_MS);
+      checkAbort();
       emit({ type: "progress", phase: "finalizing", processed: 1, total: 1 });
 
       state.lastScanTime = new Date().toISOString();

@@ -29,6 +29,7 @@ import type {
 } from "@mimimilli/shared";
 import { emptyDlsiteState, isRjCodeMissing } from "@mimimilli/shared";
 import type { Db } from "./db.ts";
+import type { ScanOptions } from "../../adapter.ts";
 import { detectRjCode } from "./dlsite.ts";
 import { computeFingerprint, computeRawFingerprint } from "./fingerprint.ts";
 import {
@@ -72,11 +73,28 @@ const WALK_PROGRESS_INTERVAL = 50;
  * 大規模ライブラリでも SSE 接続や heartbeat の処理がイベントループに割り込める
  * （readdirSync の同期ループは処理完了までイベントループを完全に塞いでしまう）。
  */
-async function walk(root: string, onDirVisited?: (visited: number) => void): Promise<WalkResult> {
+export class ScanCancelledError extends Error {
+  constructor() {
+    super("スキャンはキャンセルされました");
+  }
+}
+
+function throwIfAborted(signal?: AbortSignal, abortToken?: Int32Array): void {
+  if (signal?.aborted || (abortToken && Atomics.load(abortToken, 0) !== 0))
+    throw new ScanCancelledError();
+}
+
+async function walk(
+  root: string,
+  onDirVisited?: (visited: number) => void,
+  signal?: AbortSignal,
+  abortToken?: Int32Array,
+): Promise<WalkResult> {
   const result: WalkResult = { metaPaths: [], metaDirs: new Set(), audioDirs: new Set() };
   const stack = [root];
   let visited = 0;
   while (stack.length > 0) {
+    throwIfAborted(signal, abortToken);
     const dir = stack.pop()!;
     let entries;
     try {
@@ -86,6 +104,7 @@ async function walk(root: string, onDirVisited?: (visited: number) => void): Pro
       continue;
     }
     for (const entry of entries) {
+      throwIfAborted(signal, abortToken);
       const full = join(dir, entry.name);
       if (entry.isDirectory()) {
         stack.push(full);
@@ -241,25 +260,30 @@ class UpsertBatch {
   private readonly db: Db;
   private readonly repo: WorkRepo;
   private readonly limit: number;
+  private readonly checkAbort: () => void;
 
-  constructor(db: Db, repo: WorkRepo, limit: number) {
+  constructor(db: Db, repo: WorkRepo, limit: number, checkAbort: () => void = () => {}) {
     this.db = db;
     this.repo = repo;
     this.limit = limit;
+    this.checkAbort = checkAbort;
   }
 
   add(work: Work, fingerprint: string): void {
     this.queue.push({ work, fingerprint });
     if (this.queue.length >= this.limit) {
+      this.checkAbort();
       this.flush();
     }
   }
 
   flush(): void {
+    this.checkAbort();
     if (this.queue.length === 0) return;
     const items = this.queue;
     this.db.transaction(() => {
       for (const item of items) {
+        this.checkAbort();
         this.repo.upsertWork(item.work, { fingerprint: item.fingerprint });
       }
     });
@@ -311,8 +335,16 @@ export class Scanner {
     this.upsertBatchSize = upsertBatchSize;
   }
 
-  async scan(root: string, onProgress?: (event: ScanProgressEvent) => void): Promise<ScanResult> {
-    const emit = onProgress ?? ((): void => {});
+  async scan(
+    root: string,
+    options?: ScanOptions | ((event: ScanProgressEvent) => void),
+  ): Promise<ScanResult> {
+    const normalized = typeof options === "function" ? { onProgress: options } : (options ?? {});
+    const emit = normalized.onProgress ?? ((): void => {});
+    const signal = normalized.signal;
+    const abortToken = normalized.abortToken;
+    const checkAbort = () => throwIfAborted(signal, abortToken);
+    checkAbort();
     const result: ScanResult = {
       registered: 0,
       newlyGenerated: 0,
@@ -325,10 +357,22 @@ export class Scanner {
 
     // walking フェーズ: ディレクトリ走査自体は件数が事前に分からないため不定（total=0）で通知する
     emit({ type: "progress", phase: "walking", processed: 0, total: 0 });
-    const tree = await walk(root, (visited) => {
-      emit({ type: "progress", phase: "walking", processed: visited, total: 0 });
+    const tree = await walk(
+      root,
+      (visited) => {
+        checkAbort();
+        emit({ type: "progress", phase: "walking", processed: visited, total: 0 });
+      },
+      signal,
+      abortToken,
+    );
+    checkAbort();
+    const migration = migrateMetaIds({
+      root,
+      metaPaths: tree.metaPaths,
+      dataRoot: this.dataRoot,
+      throwIfCancelled: checkAbort,
     });
-    const migration = migrateMetaIds({ root, metaPaths: tree.metaPaths, dataRoot: this.dataRoot });
     if (migration.externallyModified.length > 0) {
       console.warn(
         `Playlist/Track ID移行: 外部編集を検出したため上書きしませんでした: ${migration.externallyModified.join(", ")}`,
@@ -347,15 +391,16 @@ export class Scanner {
 
     // 1-a. メタを読み込み、fingerprint を計算する前処理パス。
     //      この時点では DB 書き込みやプローブは行わない。重複検出は後段の registerMetaFile で行う。
-    const prepared = this.prepareMetaEntries(tree.metaPaths, existingWorks);
+    const prepared = this.prepareMetaEntries(tree.metaPaths, existingWorks, checkAbort);
 
     // 1-b. fingerprint が不一致の作品だけのトラックパスを収集し、probe cache を一括取得する。
     //      これによりトラックごとの個別 SELECT が発生しなくなる（TASK-75）。
-    const probeCache = this.buildProbeCache(prepared);
+    const probeCache = this.buildProbeCache(prepared, checkAbort);
 
     // 1-c. 実際の登録処理。fingerprint 一致作品はスキップし、それ以外は probe cache を使って処理する。
-    const batch = new UpsertBatch(this.db, this.repo, this.upsertBatchSize);
+    const batch = new UpsertBatch(this.db, this.repo, this.upsertBatchSize, checkAbort);
     for (let i = 0; i < prepared.length; i++) {
+      checkAbort();
       const entry = prepared[i]!;
       try {
         if (entry.kind === "error") {
@@ -384,6 +429,7 @@ export class Scanner {
             probeCache,
             batch,
             existingWorks,
+            checkAbort,
           );
           if (outcome === "skipped") {
             result.skipped! += 1;
@@ -412,11 +458,13 @@ export class Scanner {
         total: tree.metaPaths.length,
       });
     }
+    checkAbort();
     batch.flush();
 
     // 2. メタファイルのない音声フォルダーへ自動生成（下書き）
     const workRoots = new Set<string>();
     for (const audioDir of tree.audioDirs) {
+      checkAbort();
       if (isCoveredByMeta(audioDir, root, tree.metaDirs)) continue;
       // ルート直下に直接置かれた音声（単一ファイル形式）は自動生成の対象外（要件 v4 §3.5）
       if (audioDir === root) continue;
@@ -428,6 +476,7 @@ export class Scanner {
     emit({ type: "progress", phase: "generating", processed: 0, total: roots.length });
     const generated: Array<{ id: string; prepared: PreparedMeta }> = [];
     for (let i = 0; i < roots.length; i++) {
+      checkAbort();
       const workDir = roots[i]!;
       try {
         const id = this.generateMetaForFolder(workDir);
@@ -439,8 +488,12 @@ export class Scanner {
       emit({ type: "progress", phase: "generating", processed: i + 1, total: roots.length });
     }
     // 自動生成分もまとめてcacheを読む。cache hit時を含め、track単位のSELECTを発生させない。
-    const generatedProbeCache = this.buildProbeCache(generated.map((entry) => entry.prepared));
+    const generatedProbeCache = this.buildProbeCache(
+      generated.map((entry) => entry.prepared),
+      checkAbort,
+    );
     for (const entry of generated) {
+      checkAbort();
       try {
         await this.registerMetaFile(
           entry.prepared,
@@ -448,6 +501,7 @@ export class Scanner {
           generatedProbeCache,
           batch,
           existingWorks,
+          checkAbort,
         );
         result.newlyGenerated += 1;
         result.newWorkIds.push(entry.id);
@@ -459,9 +513,13 @@ export class Scanner {
         result.errors += 1;
       }
     }
+    checkAbort();
     batch.flush();
 
+    checkAbort();
     emit({ type: "progress", phase: "finalizing", processed: 0, total: 1 });
+    normalized.beforeFinalize?.();
+    checkAbort();
     this.repo.markMissingExcept([...seenIds]);
     result.missing = this.repo.countByStatus("missing");
     result.rjCodeMissingCount = this.repo
@@ -475,10 +533,12 @@ export class Scanner {
   private prepareMetaEntries(
     metaPaths: string[],
     existingWorks: Map<string, ScanWorkState>,
+    checkAbort: () => void = () => {},
   ): PreparedEntry[] {
     const prepared: PreparedEntry[] = [];
 
     for (const metaPath of metaPaths) {
+      checkAbort();
       try {
         const raw = readMetaFileRaw(metaPath);
         const rawFingerprint = computeRawFingerprint(metaPath, raw);
@@ -522,14 +582,19 @@ export class Scanner {
   }
 
   /** fingerprint が不一致の作品のトラックパスから probe cache を一括取得する */
-  private buildProbeCache(prepared: PreparedEntry[]): Map<string, ProbeCacheEntry> {
+  private buildProbeCache(
+    prepared: PreparedEntry[],
+    checkAbort: () => void = () => {},
+  ): Map<string, ProbeCacheEntry> {
     const trackPaths: string[] = [];
     for (const entry of prepared) {
+      checkAbort();
       if (entry.kind !== "ok") continue;
       if (entry.cachedFingerprint === entry.fingerprint) continue; // スキップ対象
       const workDir = dirname(entry.metaPath);
       const playlist = defaultPlaylistOf(entry.meta);
       for (const track of playlist?.tracks ?? []) {
+        checkAbort();
         trackPaths.push(join(workDir, track.file));
       }
     }
@@ -567,6 +632,7 @@ export class Scanner {
     probeCache: Map<string, ProbeCacheEntry> | undefined,
     batch: UpsertBatch,
     existingWorks: Map<string, ScanWorkState>,
+    checkAbort: () => void = () => {},
   ): Promise<"skipped" | string> {
     const { metaPath, meta, fingerprint, cachedFingerprint } = prepared;
     const workDir = dirname(metaPath);
@@ -594,6 +660,7 @@ export class Scanner {
     // 再生時間（デフォルトプレイリストの合計）
     let totalDurationSec = 0;
     for (const track of playlist?.tracks ?? []) {
+      checkAbort();
       if (track.start !== undefined && track.end !== undefined) {
         totalDurationSec += Math.max(0, track.end - track.start);
       } else {
@@ -602,6 +669,7 @@ export class Scanner {
           join(workDir, track.file),
           probeCache,
         );
+        checkAbort();
       }
     }
 
@@ -610,8 +678,10 @@ export class Scanner {
     const detectedRjCode = meta.dlsite.rjCode ?? detectRjCode([basename(workDir), meta.title]);
     let dlsite = meta.dlsite;
     if (detectedRjCode !== meta.dlsite.rjCode) {
+      checkAbort();
       dlsite = { ...meta.dlsite, rjCode: detectedRjCode };
       patchMetaFile(metaPath, { dlsite });
+      checkAbort();
     }
     // メタへの書き戻し（RJコード等）があった場合、保存する fingerprint は書き戻し後の内容に合わせる
     const finalFingerprint = computeFingerprint(metaPath, { ...meta, dlsite });
@@ -634,6 +704,7 @@ export class Scanner {
       resume: existing?.resume ?? null,
       dlsite,
     };
+    checkAbort();
     batch.add(work, finalFingerprint);
     return id;
   }

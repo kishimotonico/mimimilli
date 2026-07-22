@@ -87,6 +87,8 @@ class FifoSemaphore {
 /** single-flight と待機列をサービス単位に閉じ込めるサムネイル生成サービス。 */
 export class ThumbnailCache {
   private readonly inFlight = new Map<string, Promise<Thumbnail>>();
+  /** cache判定とsingle-flight登録を呼出順に行い、非同期statの完了順でFIFOを崩さない。 */
+  private admissionTail: Promise<void> = Promise.resolve();
   private readonly semaphore: FifoSemaphore;
   private readonly transform: (input: ThumbnailTransformInput) => Promise<void>;
   private readonly renameFile: (oldPath: string, newPath: string) => Promise<void>;
@@ -103,12 +105,10 @@ export class ThumbnailCache {
   }
 
   private async generate(
-    cacheDir: string,
     cachedPath: string,
     width: number,
     sourceAbsolutePath: string,
   ): Promise<Thumbnail> {
-    await mkdir(cacheDir, { recursive: true });
     const tmpPath = `${cachedPath}.tmp-${process.pid}-${this.tmpFileCounter++}`;
     await this.semaphore.acquire();
     try {
@@ -128,26 +128,46 @@ export class ThumbnailCache {
     }
   }
 
-  async getOrCreate(
+  private async admit(
+    cacheDir: string,
+    workId: string,
+    width: number,
+    sourceAbsolutePath: string,
+    source?: ThumbnailSource,
+  ): Promise<{ result: Promise<Thumbnail> }> {
+    const sourceStat = source ?? (await stat(sourceAbsolutePath));
+    const sourceKey: ThumbnailSource = { size: sourceStat.size, mtimeMs: sourceStat.mtimeMs };
+    const cachedPath = join(cacheDir, cacheFileName(workId, width, sourceKey));
+    if (await fileExists(cachedPath)) {
+      return { result: Promise.resolve({ absolutePath: cachedPath, mime: "image/webp" }) };
+    }
+
+    const existing = this.inFlight.get(cachedPath);
+    if (existing) return { result: existing };
+
+    await mkdir(cacheDir, { recursive: true });
+    const promise = this.generate(cachedPath, width, sourceAbsolutePath).finally(() => {
+      this.inFlight.delete(cachedPath);
+    });
+    this.inFlight.set(cachedPath, promise);
+    return { result: promise };
+  }
+
+  getOrCreate(
     cacheDir: string,
     workId: string,
     width: number,
     sourceAbsolutePath: string,
     source?: ThumbnailSource,
   ): Promise<Thumbnail> {
-    const sourceStat = source ?? (await stat(sourceAbsolutePath));
-    const sourceKey: ThumbnailSource = { size: sourceStat.size, mtimeMs: sourceStat.mtimeMs };
-    const cachedPath = join(cacheDir, cacheFileName(workId, width, sourceKey));
-    if (await fileExists(cachedPath)) return { absolutePath: cachedPath, mime: "image/webp" };
-
-    const existing = this.inFlight.get(cachedPath);
-    if (existing) return existing;
-
-    const promise = this.generate(cacheDir, cachedPath, width, sourceAbsolutePath).finally(() => {
-      this.inFlight.delete(cachedPath);
-    });
-    this.inFlight.set(cachedPath, promise);
-    return promise;
+    const admitted = this.admissionTail.then(() =>
+      this.admit(cacheDir, workId, width, sourceAbsolutePath, source),
+    );
+    this.admissionTail = admitted.then(
+      () => {},
+      () => {},
+    );
+    return admitted.then(({ result }) => result);
   }
 }
 
@@ -205,10 +225,14 @@ export interface ThumbnailGcResult {
 export async function gcThumbnailCache(
   cacheDir: string,
   works: WorkCoverEntry[],
+  options: { throwIfCancelled?: () => void } = {},
 ): Promise<ThumbnailGcResult> {
+  const checkpoint = options.throwIfCancelled ?? (() => {});
+  checkpoint();
   const validNames = new Set<string>();
   let skippedWorks = 0;
   for (const work of works) {
+    checkpoint();
     let source: ThumbnailSource;
     try {
       const sourceStat = await stat(work.coverAbsolutePath);
@@ -217,27 +241,33 @@ export async function gcThumbnailCache(
       skippedWorks++;
       continue;
     }
+    checkpoint();
     for (const width of THUMBNAIL_WIDTHS) {
+      checkpoint();
       validNames.add(cacheFileName(work.workId, width, source));
     }
   }
 
   let entries: string[];
+  checkpoint();
   try {
     entries = await readdir(cacheDir);
   } catch {
     // cacheDir 自体が未作成（一度もサムネイルを生成していない）なら削除対象は無い
     return { deleted: 0, kept: 0, skippedWorks };
   }
+  checkpoint();
 
   let deleted = 0;
   let kept = 0;
   for (const name of entries) {
+    checkpoint();
     if (validNames.has(name)) {
       kept++;
       continue;
     }
     await rm(join(cacheDir, name), { force: true });
+    checkpoint();
     deleted++;
   }
   return { deleted, kept, skippedWorks };

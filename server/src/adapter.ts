@@ -36,6 +36,15 @@ import type {
   WorksQuery,
 } from "@mimimilli/shared";
 
+export interface ScanOptions {
+  signal?: AbortSignal;
+  onProgress?: (event: ScanProgressEvent) => void;
+  /** Worker 内の同期処理にも到達する取消トークン。adapter 内部だけで設定する。 */
+  abortToken?: Int32Array;
+  /** Worker結合テストでfinalize直前に同期停止する内部フック。 */
+  beforeFinalize?: () => void;
+}
+
 /** 前提条件（ルートフォルダー未設定等）を満たしていない操作。HTTP では 409 conflict */
 export class NotConfiguredError extends Error {}
 
@@ -87,8 +96,8 @@ export interface DataAdapter {
   // 設定・スキャン
   getSettings(): Promise<Settings>;
   updateSettings(patch: SettingsUpdate): Promise<Settings>;
-  /** onProgress は任意。呼ぶたびに進捗イベントを通知する（TASK-20、GET /scan/events の配信元） */
-  scan(onProgress?: (event: ScanProgressEvent) => void): Promise<ScanResult>;
+  /** signal はジョブ取消用。旧来の progress callback 指定もテスト・外部利用のため受け付ける。 */
+  scan(options?: ScanOptions | ((event: ScanProgressEvent) => void)): Promise<ScanResult>;
 
   // 作品
   queryWorks(params: WorksQuery): Promise<WorksPage>;

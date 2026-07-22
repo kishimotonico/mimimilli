@@ -32,9 +32,8 @@ import Toast from "../shared/ui/Toast";
 import type { ScanResult, Work, WorkListItem } from "@mimimilli/shared";
 import { getWork } from "../entities/work/api";
 import { exportLibrary } from "../features/library/api";
-import { scanLibrary } from "../features/scan/api";
 import { formatScanProgressLabel, shouldShowNewWorkPopup } from "../features/scan/model";
-import { useScanProgress } from "../features/scan/useScanProgress";
+import { useScanJob } from "../features/scan/useScanJob";
 import { useDlsiteBulk } from "./model/useDlsiteBulk";
 import { useRjCodeMissingWorks } from "../features/library/model/dlsiteMissingRjCode";
 import { useDlsiteFetchFailedWorks } from "../features/library/model/dlsiteFetchFailed";
@@ -111,10 +110,11 @@ export default function App() {
   const dlsiteFetchFailed = useDlsiteFetchFailedWorks();
   const dlsiteUnlinked = useDlsiteUnlinkedCount();
 
-  // ── Scan mutation ─────────────────────────────────────────
-  const scanMutation = useMutation({
-    mutationFn: scanLibrary,
-    onSuccess: (result) => {
+  const handleScanTerminal = useCallback(
+    (job: import("@mimimilli/shared").ScanJobSnapshot) => {
+      setIsCompletingSetup(false);
+      if (job.status !== "completed" || !job.result) return;
+      const result = job.result;
       setScanResult(result);
       queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.all() });
       queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.dlsiteNotifications() });
@@ -125,7 +125,9 @@ export default function App() {
       // キューイングする（server/src/routes/scan.ts）。ここではAPIを呼ばずSSEに相乗りするだけ。
       if (result.newWorkIds.length > 0) dlsiteBulk.attach();
     },
-  });
+    [dlsiteBulk, queryClient],
+  );
+  const scanJob = useScanJob({ onTerminal: handleScanTerminal });
 
   // ── Change folder mutation ────────────────────────────────
   const changeFolderMutation = useMutation({
@@ -206,7 +208,12 @@ export default function App() {
     libraryNav.selectWork(workId);
   }, [player.state.currentWork, navigationHistory, libraryNav]);
 
-  const handleScan = useCallback(() => scanMutation.mutate(), [scanMutation]);
+  const handleScan = useCallback(() => {
+    void scanJob.start().catch(() => {});
+  }, [scanJob]);
+  const handleCancelScan = useCallback(() => {
+    void scanJob.cancel().catch(() => {});
+  }, [scanJob]);
 
   // 通知ベルの一覧（RJコード未検出・DLsite取得失敗）から作品を選び、
   // 作品詳細（DlsitePanel）へ遷移する。
@@ -223,7 +230,7 @@ export default function App() {
   );
 
   // スキャン進捗のリアルタイム表示（TASK-20）。TopBar / SettingsModal / SetupScreen で共有する。
-  const scanProgress = useScanProgress(scanMutation.isPending || isCompletingSetup);
+  const scanProgress = scanJob.job?.progress ?? null;
   const scanProgressLabel = formatScanProgressLabel(scanProgress);
 
   const handleSetupComplete = useCallback(
@@ -232,20 +239,16 @@ export default function App() {
       try {
         await setRootFolder(path);
         queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() });
-        const result = await scanLibrary();
-        setScanResult(result);
-        queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.all() });
-        queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.dlsiteNotifications() });
-        queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.allFacets() });
-        queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.allWorks() });
+        await scanJob.start();
         queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), (prev: typeof settings) =>
           prev ? { ...prev, rootFolder: path } : prev,
         );
-      } finally {
+      } catch (error) {
         setIsCompletingSetup(false);
+        console.error("初回スキャンの開始に失敗しました", error);
       }
     },
-    [queryClient],
+    [queryClient, scanJob],
   );
 
   const handleChangeFolder = useCallback(
@@ -292,8 +295,10 @@ export default function App() {
     return (
       <SetupScreen
         onComplete={handleSetupComplete}
-        scanning={isCompletingSetup}
+        onCancelScan={handleCancelScan}
+        scanning={isCompletingSetup || scanJob.scanning}
         scanProgressLabel={scanProgressLabel}
+        scanError={scanJob.error}
       />
     );
   }
@@ -310,10 +315,11 @@ export default function App() {
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onScan={handleScan}
+          onCancelScan={handleCancelScan}
           onSettings={() => setShowSettings(true)}
           isPlaying={isPlaying}
           playingTrack={currentTrack?.title}
-          scanning={scanMutation.isPending}
+          scanning={scanJob.scanning}
           scanProgressLabel={scanProgressLabel}
           rjCodeMissingCount={dlsiteRjMissing.count}
           onOpenRjCodeMissing={() => setShowRjCodeMissing(true)}
@@ -422,7 +428,7 @@ export default function App() {
             <SettingsModal
               rootFolder={settings?.rootFolder ?? null}
               lastScanTime={settings?.lastScanTime ?? null}
-              scanning={scanMutation.isPending}
+              scanning={scanJob.scanning}
               scanProgressLabel={scanProgressLabel}
               dlsiteBulk={{
                 active: dlsiteBulk.active,
@@ -459,11 +465,12 @@ export default function App() {
           )}
           <Toast
             message={
-              dlsiteBulk.result
+              scanJob.error ??
+              (dlsiteBulk.result
                 ? `DLsite一括取得: 取得 ${dlsiteBulk.result.fetched}件・失敗 ${dlsiteBulk.result.failed}件`
-                : dlsiteBulk.error
+                : dlsiteBulk.error)
             }
-            onDismiss={dlsiteBulk.dismiss}
+            onDismiss={scanJob.error ? scanJob.clearError : dlsiteBulk.dismiss}
           />
         </>
       }

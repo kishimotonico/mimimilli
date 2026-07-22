@@ -37,6 +37,8 @@ export interface MetaIdMigrationOptions {
   beforeFinalHashCheck?: (metaPath: string) => void;
   /** メタ本文のSHA-256計算回数を観測するテスト専用フック。 */
   onMetaHash?: () => void;
+  /** WorkerのSharedArrayBufferを含む、同期処理中のキャンセル確認。throwして中断する。 */
+  throwIfCancelled?: () => void;
 }
 
 export interface MetaIdMigrationResult {
@@ -67,11 +69,20 @@ function serialize(value: unknown): string {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
 
-function writeJsonAtomic(path: string, value: unknown): void {
+function writeJsonAtomic(path: string, value: unknown, checkpoint: () => void = () => {}): void {
+  checkpoint();
   mkdirSync(dirname(path), { recursive: true });
+  checkpoint();
   const temporary = join(dirname(path), `.${basename(path)}.${crypto.randomUUID()}.tmp`);
   writeFileSync(temporary, serialize(value), "utf-8");
+  try {
+    checkpoint();
+  } catch (error) {
+    rmSync(temporary, { force: true });
+    throw error;
+  }
   renameSync(temporary, path);
+  checkpoint();
 }
 
 function parseObject(content: string): JsonObject | null {
@@ -152,17 +163,21 @@ function hasCompleteUniqueIds(
   root: string,
   platform: NodeJS.Platform,
   operationsByPath: Map<string, MigrationOperation[]>,
+  checkpoint: () => void = () => {},
 ): boolean {
   const workIds = new Set<string>();
   const playlistIds = new Set<string>();
   const trackIds = new Set<string>();
   for (const path of paths) {
+    checkpoint();
     const raw = parseObject(readFileSync(path, "utf-8"));
+    checkpoint();
     const playlists = raw ? playlistsOf(raw) : null;
     if (!raw || !playlists || typeof raw.id !== "string" || workIds.has(raw.id)) return false;
     const operations = operationsByPath.get(pathKey(portableRelative(root, path), platform));
     let latestCompletedOperation: MigrationOperation | undefined;
     for (let index = (operations?.length ?? 0) - 1; index >= 0; index--) {
+      checkpoint();
       if (operations![index]!.completed) {
         latestCompletedOperation = operations![index];
         break;
@@ -179,6 +194,7 @@ function hasCompleteUniqueIds(
     if (raw.defaultPlaylistId !== null && typeof raw.defaultPlaylistId !== "string") return false;
     let hasDefaultPlaylist = raw.defaultPlaylistId === null;
     for (const playlist of playlists) {
+      checkpoint();
       if (
         typeof playlist.id !== "string" ||
         !UUID_V4_PATTERN.test(playlist.id) ||
@@ -189,6 +205,7 @@ function hasCompleteUniqueIds(
       playlistIds.add(playlist.id);
       if (playlist.id === raw.defaultPlaylistId) hasDefaultPlaylist = true;
       for (const track of playlist.tracks as JsonObject[]) {
+        checkpoint();
         if (
           typeof track.id !== "string" ||
           !UUID_V4_PATTERN.test(track.id) ||
@@ -234,11 +251,17 @@ function applyAssignment(raw: JsonObject, assignment: IdAssignment): boolean {
   return true;
 }
 
-function readManifest(path: string, root: string): MigrationManifest {
+function readManifest(
+  path: string,
+  root: string,
+  checkpoint: () => void = () => {},
+): MigrationManifest {
+  checkpoint();
   if (!existsSync(path)) {
     return { version: 1, libraryRoot: root, libraryCompleted: false, operations: [] };
   }
   const value: unknown = JSON.parse(readFileSync(path, "utf-8"));
+  checkpoint();
   if (
     typeof value !== "object" ||
     value === null ||
@@ -253,28 +276,43 @@ function readManifest(path: string, root: string): MigrationManifest {
   return manifest;
 }
 
-function ensureBackup(path: string, content: string): void {
+function ensureBackup(path: string, content: string, checkpoint: () => void = () => {}): void {
+  checkpoint();
   if (existsSync(path)) {
     if (sha256(readFileSync(path, "utf-8")) !== sha256(content)) {
       throw new Error(`メタ移行バックアップの内容が一致しません: ${path}`);
     }
+    checkpoint();
     return;
   }
   mkdirSync(dirname(path), { recursive: true });
+  checkpoint();
   const temporary = join(dirname(path), `.${basename(path)}.${crypto.randomUUID()}.tmp`);
   writeFileSync(temporary, content, "utf-8");
+  try {
+    checkpoint();
+  } catch (error) {
+    rmSync(temporary, { force: true });
+    throw error;
+  }
   renameSync(temporary, path);
+  checkpoint();
 }
 
 /** strictなメタ読込より前に、旧メタと重複IDを保全付きで一括移行する。 */
 export function migrateMetaIds(options: MetaIdMigrationOptions): MetaIdMigrationResult {
+  const checkpoint = options.throwIfCancelled ?? (() => {});
+  checkpoint();
   const platform = options.platform ?? process.platform;
   const rootKey = sha256(options.root).slice(0, 16);
   const migrationRoot = join(options.dataRoot, "migrations", "playlist-track-ids", rootKey);
   const manifestPath = join(migrationRoot, "manifest.json");
-  const manifest = readManifest(manifestPath, options.root);
+  checkpoint();
+  const manifest = readManifest(manifestPath, options.root, checkpoint);
+  checkpoint();
   const operationsByPath = new Map<string, MigrationOperation[]>();
   for (const operation of manifest.operations) {
+    checkpoint();
     const key = pathKey(operation.relativePath, platform);
     const operations = operationsByPath.get(key);
     if (operations) operations.push(operation);
@@ -288,8 +326,9 @@ export function migrateMetaIds(options: MetaIdMigrationOptions): MetaIdMigration
   );
   if (
     manifest.libraryCompleted &&
-    hasCompleteUniqueIds(paths, options.root, platform, operationsByPath)
+    hasCompleteUniqueIds(paths, options.root, platform, operationsByPath, checkpoint)
   ) {
+    checkpoint();
     return { migrated: 0, alreadyMigrated: 0, externallyModified: [] };
   }
 
@@ -311,8 +350,10 @@ export function migrateMetaIds(options: MetaIdMigrationOptions): MetaIdMigration
   let alreadyMigrated = 0;
 
   for (const path of paths) {
+    checkpoint();
     const relativePath = portableRelative(options.root, path);
     const content = readFileSync(path, "utf-8");
+    checkpoint();
     const currentHash = hashMeta(content);
     const key = pathKey(relativePath, platform);
     const pathOperations = operationsByPath.get(key) ?? [];
@@ -361,8 +402,10 @@ export function migrateMetaIds(options: MetaIdMigrationOptions): MetaIdMigration
     if (!pendingOperation && !migratedOperation && unfinishedOperations.length > 0) {
       // manifest記録後に外部編集されたファイルは所有IDとして読むだけで、書き換えない。
       for (const playlist of playlists) {
+        checkpoint();
         if (typeof playlist.id === "string") seenPlaylistIds.add(playlist.id);
         for (const track of playlist.tracks as JsonObject[]) {
+          checkpoint();
           if (typeof track.id === "string") seenTrackIds.add(track.id);
         }
       }
@@ -373,20 +416,26 @@ export function migrateMetaIds(options: MetaIdMigrationOptions): MetaIdMigration
     if (seenWorkIds.has(raw.id)) {
       raw.id = crypto.randomUUID();
       for (const playlist of playlists) {
+        checkpoint();
         playlist.id = crypto.randomUUID();
-        for (const track of playlist.tracks as JsonObject[]) track.id = crypto.randomUUID();
+        for (const track of playlist.tracks as JsonObject[]) {
+          checkpoint();
+          track.id = crypto.randomUUID();
+        }
       }
       changed = true;
     }
     seenWorkIds.add(raw.id as string);
 
     for (const playlist of playlists) {
+      checkpoint();
       if (typeof playlist.id !== "string" || seenPlaylistIds.has(playlist.id)) {
         playlist.id = crypto.randomUUID();
         changed = true;
       }
       seenPlaylistIds.add(playlist.id as string);
       for (const track of playlist.tracks as JsonObject[]) {
+        checkpoint();
         if (typeof track.id !== "string" || seenTrackIds.has(track.id)) {
           track.id = crypto.randomUUID();
           changed = true;
@@ -434,7 +483,9 @@ export function migrateMetaIds(options: MetaIdMigrationOptions): MetaIdMigration
 
   // 採番結果と未完了状態はメタを書き換える前に必ず永続化する。
   if (manifestChanged) {
-    writeJsonAtomic(manifestPath, manifest);
+    checkpoint();
+    writeJsonAtomic(manifestPath, manifest, checkpoint);
+    checkpoint();
     manifestChanged = false;
   }
 
@@ -442,11 +493,13 @@ export function migrateMetaIds(options: MetaIdMigrationOptions): MetaIdMigration
   let completedSinceFlush = 0;
   let stoppedEarly = false;
   for (const item of pending) {
+    checkpoint();
     if (options.maxWrites !== undefined && migrated >= options.maxWrites) {
       stoppedEarly = true;
       break;
     }
     const current = readFileSync(item.path, "utf-8");
+    checkpoint();
     const currentHash = hashMeta(current);
     if (currentHash === item.operation.migratedHash) {
       alreadyMigrated += 1;
@@ -464,14 +517,33 @@ export function migrateMetaIds(options: MetaIdMigrationOptions): MetaIdMigration
       item.operation.originalHash,
       item.operation.relativePath,
     );
-    ensureBackup(backupPath, current);
+    ensureBackup(backupPath, current, checkpoint);
+    checkpoint();
     const temporary = join(
       dirname(item.path),
       `.${basename(item.path)}.${crypto.randomUUID()}.tmp`,
     );
     writeFileSync(temporary, item.output, "utf-8");
+    try {
+      checkpoint();
+    } catch (error) {
+      rmSync(temporary, { force: true });
+      throw error;
+    }
     options.beforeFinalHashCheck?.(item.path);
+    try {
+      checkpoint();
+    } catch (error) {
+      rmSync(temporary, { force: true });
+      throw error;
+    }
     const hashImmediatelyBeforeRename = hashMeta(readFileSync(item.path, "utf-8"));
+    try {
+      checkpoint();
+    } catch (error) {
+      rmSync(temporary, { force: true });
+      throw error;
+    }
     if (hashImmediatelyBeforeRename !== item.operation.originalHash) {
       rmSync(temporary, { force: true });
       externallyModified.push(item.operation.relativePath);
@@ -480,11 +552,14 @@ export function migrateMetaIds(options: MetaIdMigrationOptions): MetaIdMigration
     // Nodeの標準APIでは別プロセスの書込みをrenameと排他的にできないため、再ハッシュ後にも
     // ごく短い競合窓は残る。検証をrename直前へ置き、上書き可能な時間を最小化する。
     renameSync(temporary, item.path);
+    checkpoint();
     item.operation.completed = true;
     completedSinceFlush += 1;
     migrated += 1;
     if (completedSinceFlush >= 100) {
-      writeJsonAtomic(manifestPath, manifest);
+      checkpoint();
+      writeJsonAtomic(manifestPath, manifest, checkpoint);
+      checkpoint();
       completedSinceFlush = 0;
     }
   }
@@ -493,12 +568,16 @@ export function migrateMetaIds(options: MetaIdMigrationOptions): MetaIdMigration
     !stoppedEarly &&
     externallyModified.length === 0 &&
     manifest.operations.every((operation) => operation.completed) &&
-    hasCompleteUniqueIds(paths, options.root, platform, operationsByPath);
+    hasCompleteUniqueIds(paths, options.root, platform, operationsByPath, checkpoint);
   if (manifest.libraryCompleted !== canMarkLibraryCompleted) {
     manifest.libraryCompleted = canMarkLibraryCompleted;
     manifestChanged = true;
   }
-  if (completedSinceFlush > 0 || manifestChanged) writeJsonAtomic(manifestPath, manifest);
+  checkpoint();
+  if (completedSinceFlush > 0 || manifestChanged) {
+    writeJsonAtomic(manifestPath, manifest, checkpoint);
+  }
+  checkpoint();
 
   return {
     migrated,

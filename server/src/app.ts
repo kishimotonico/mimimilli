@@ -10,6 +10,7 @@ import { fsRoute } from "./routes/fs.ts";
 import { mediaRoute } from "./routes/media.ts";
 import { presetsRoute } from "./routes/presets.ts";
 import { scanRoute } from "./routes/scan.ts";
+import { ScanJobManager } from "./scanJobManager.ts";
 import { settingsRoute } from "./routes/settings.ts";
 import { smartFoldersRoute } from "./routes/smartFolders.ts";
 import { tagPrefixesRoute } from "./routes/tagPrefixes.ts";
@@ -19,8 +20,9 @@ export function createApp(adapter: DataAdapter): Hono {
   const app = new Hono();
 
   const api = new Hono();
+  const scanJobs = new ScanJobManager(adapter);
   api.route("/", settingsRoute(adapter));
-  api.route("/", scanRoute(adapter));
+  api.route("/", scanRoute(scanJobs));
   api.route("/", worksRoute(adapter));
   api.route("/", axesRoute(adapter));
   api.route("/", tagPrefixesRoute(adapter));

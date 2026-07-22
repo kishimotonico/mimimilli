@@ -3,15 +3,19 @@ import { I } from "../../../shared/ui/Icon";
 
 interface SetupScreenProps {
   onComplete: (path: string) => void;
+  onCancelScan?: () => void;
   scanning: boolean;
   /** scanning 中の進捗ラベル（例: "作品を登録中 (3/12)"）。TASK-20: SSEで受信した進捗 */
   scanProgressLabel?: string | null;
+  scanError?: string | null;
 }
 
 export default function SetupScreen({
   onComplete,
+  onCancelScan,
   scanning,
   scanProgressLabel = null,
+  scanError = null,
 }: SetupScreenProps) {
   const [path, setPath] = useState("");
   const pathInputRef = useRef<HTMLInputElement | null>(null);
@@ -164,6 +168,30 @@ export default function SetupScreen({
               </>
             )}
           </button>
+          {scanning && onCancelScan && (
+            <button
+              type="button"
+              onClick={onCancelScan}
+              style={{
+                height: 36,
+                borderRadius: 8,
+                background: "var(--paper-1)",
+                color: "var(--ink-2)",
+                fontFamily: "var(--font-sans)",
+                fontWeight: 600,
+                fontSize: 12,
+                border: "1px solid var(--line)",
+                cursor: "pointer",
+              }}
+            >
+              スキャンを中止
+            </button>
+          )}
+          {scanError && (
+            <p role="alert" style={{ margin: 0, color: "var(--danger)", fontSize: 12 }}>
+              {scanError}
+            </p>
+          )}
         </form>
 
         <p style={{ fontSize: 11, color: "var(--ink-4)", textAlign: "center" }}>

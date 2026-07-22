@@ -19,9 +19,20 @@ test("シナリオ省略時は default として動作する", async () => {
 test("new-work: スキャン結果に新規作品IDが含まれる", async () => {
   const app = buildApp("new-work");
 
-  const scanRes = await app.request("/api/scan", { method: "POST" });
-  assert.equal(scanRes.status, 200);
-  const scanResult = await scanRes.json();
+  const started = await app.request("/api/scan", { method: "POST" });
+  assert.equal(started.status, 202);
+  const { job } = await started.json();
+  let scanResult: { newWorkIds: string[]; newlyGenerated: number } | null = null;
+  for (let attempt = 0; attempt < 80; attempt++) {
+    const state = await app.request(`/api/scan/${job.id}`);
+    const snapshot = await state.json();
+    if (snapshot.status === "completed") {
+      scanResult = snapshot.result;
+      break;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  assert.ok(scanResult);
   assert.deepEqual(scanResult.newWorkIds, ["RJ501011"]);
   assert.equal(scanResult.newlyGenerated, 1);
 

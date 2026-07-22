@@ -9,6 +9,7 @@ interface TopBarProps {
   searchQuery: string;
   onSearchChange: (q: string) => void;
   onScan?: () => void;
+  onCancelScan?: () => void;
   onSettings?: () => void;
   isPlaying?: boolean;
   playingTrack?: string;
@@ -41,6 +42,7 @@ export default function TopBar({
   searchQuery,
   onSearchChange,
   onScan,
+  onCancelScan,
   onSettings,
   isPlaying = false,
   playingTrack,
@@ -137,6 +139,9 @@ export default function TopBar({
         disabled={scanning}
         className={scanning ? "animate-spin" : undefined}
       />
+      {scanning && onCancelScan && (
+        <IconButton size="sm" icon={I.x} label="スキャンを中止" onClick={onCancelScan} />
+      )}
       {dlsiteBulkActive && (
         <span className="font-mono text-[10.5px] text-ink-3" aria-live="polite">
           {dlsiteBulkProgress

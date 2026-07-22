@@ -45,6 +45,7 @@ import {
   type MediaKind,
   type MediaLocation,
 } from "../../adapter.ts";
+import type { ScanOptions } from "../../adapter.ts";
 import { isDefaultTitle } from "../../core/dlsiteTitle.ts";
 import { buildTagPrefixCandidates } from "../../core/tagPrefixCandidates.ts";
 import { evalSmartFolder } from "../../core/smartFolder.ts";
@@ -80,10 +81,115 @@ export interface RealAdapterOptions {
   dlsiteFetcher?: (rjCode: string) => Promise<DlsiteFetchResult>;
   /** テスト用のカバーダウンロード関数差し替え */
   dlsiteCoverDownloader?: (coverUrl: string, workDir: string) => Promise<string>;
+  /** Worker隔離の結合テストで同期停止を作るSharedArrayBuffer。実運用では指定しない。 */
+  scanWorkerTestGate?: SharedArrayBuffer;
+  /** test gateを停止させる位置。省略時はscanner開始前。 */
+  scanWorkerTestGateStage?: "before-scan" | "before-finalize";
+  /** Workerがtest gateへ到達したことを通知する結合テスト用フック。 */
+  onScanWorkerTestGateReady?: () => void;
 }
 
 export interface RealAdapter extends DataAdapter {
   close(): void;
+}
+
+interface ScanWorkerMessage {
+  type: "progress" | "completed" | "cancelled" | "error" | "test-gate-ready";
+  progress?: ScanProgressEvent;
+  result?: ScanResult;
+  message?: string;
+}
+
+async function runFileScanInWorker(
+  database: Extract<DbLocation, { kind: "files" }>,
+  root: string,
+  dataRoot: string,
+  thumbnailCacheDir: string,
+  options: ScanOptions,
+  testGate?: SharedArrayBuffer,
+  testGateStage: "before-scan" | "before-finalize" = "before-scan",
+  onTestGateReady?: () => void,
+): Promise<ScanResult> {
+  const abortBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT);
+  const token = new Int32Array(abortBuffer);
+  const worker = new Worker(new URL("./scanWorker.ts", import.meta.url), { type: "module" });
+  return new Promise<ScanResult>((resolveResult, rejectResult) => {
+    let settled = false;
+    let terminalReceived = false;
+    const abort = () => {
+      Atomics.store(token, 0, 1);
+      if (testGate) {
+        const gate = new Int32Array(testGate);
+        Atomics.store(gate, 0, 2);
+        Atomics.notify(gate, 0);
+      }
+    };
+    const onMessage = (event: MessageEvent<ScanWorkerMessage>) => {
+      const message = event.data;
+      if (message.type === "test-gate-ready") {
+        onTestGateReady?.();
+        return;
+      }
+      if (message.type === "progress" && message.progress) {
+        options.onProgress?.(message.progress);
+        return;
+      }
+      terminalReceived = true;
+      if (message.type === "completed" && message.result) {
+        settle(() => resolveResult(message.result!));
+      } else if (message.type === "cancelled") {
+        settle(() =>
+          rejectResult(new DOMException("スキャンはキャンセルされました", "AbortError")),
+        );
+      } else {
+        settle(() => rejectResult(new Error(message.message ?? "スキャンワーカーが失敗しました")));
+      }
+    };
+    const onError = (event: ErrorEvent) => {
+      settle(() => rejectResult(event.error ?? new Error(event.message)));
+    };
+    const onMessageError = () => {
+      settle(() => rejectResult(new Error("スキャンワーカーのメッセージを復元できません")));
+    };
+    const onClose = () => {
+      if (!terminalReceived) {
+        settle(() => rejectResult(new Error("スキャンワーカーが結果を返さず終了しました")));
+      }
+    };
+    const cleanup = () => {
+      options.signal?.removeEventListener("abort", abort);
+      worker.removeEventListener("message", onMessage);
+      worker.removeEventListener("error", onError);
+      worker.removeEventListener("messageerror", onMessageError);
+      worker.removeEventListener("close", onClose);
+      worker.terminate();
+    };
+    const settle = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      fn();
+    };
+    if (options.signal?.aborted) abort();
+    options.signal?.addEventListener("abort", abort, { once: true });
+    worker.addEventListener("message", onMessage);
+    worker.addEventListener("error", onError);
+    worker.addEventListener("messageerror", onMessageError);
+    // Bun 1.3.14のWorkerEventMapはcloseを公開する。exitイベントは公開されていない。
+    worker.addEventListener("close", onClose);
+    worker.postMessage({
+      type: "start",
+      input: {
+        database,
+        root,
+        dataRoot,
+        thumbnailCacheDir,
+        abortBuffer,
+        testGate,
+        testGateStage,
+      },
+    });
+  });
 }
 
 export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
@@ -187,28 +293,65 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       return this.getSettings();
     },
 
-    async scan(onProgress?: (event: ScanProgressEvent) => void): Promise<ScanResult> {
+    async scan(
+      scanOptions?: ScanOptions | ((event: ScanProgressEvent) => void),
+    ): Promise<ScanResult> {
       const root = requireRoot();
-      const result = await scanner.scan(root, onProgress);
+      const normalized =
+        typeof scanOptions === "function" ? { onProgress: scanOptions } : (scanOptions ?? {});
+      if (options.database?.kind === "files") {
+        return runFileScanInWorker(
+          {
+            ...options.database,
+            catalogPath: resolve(options.database.catalogPath),
+            userPath: resolve(options.database.userPath),
+            legacyPath: options.database.legacyPath
+              ? resolve(options.database.legacyPath)
+              : undefined,
+          },
+          resolve(root),
+          resolve(dataRoot),
+          resolve(thumbnailCacheDir),
+          normalized,
+          options.scanWorkerTestGate,
+          options.scanWorkerTestGateStage,
+          options.onScanWorkerTestGateReady,
+        );
+      }
+      const result = await scanner.scan(root, normalized);
+      const checkAbort = () => {
+        if (normalized.signal?.aborted) {
+          throw new DOMException("スキャンはキャンセルされました", "AbortError");
+        }
+      };
+      checkAbort();
       // v1 resumeはcatalogのPlaylist/Track関係が揃ってから変換する。
       // 未解決行はpendingに残るため、次回スキャン後にも同じ処理で再試行される。
-      migrateResumeV1(db.sqlite);
-      repo.setScanState(KEY_LAST_SCAN_TIME, new Date().toISOString());
+      migrateResumeV1(db.sqlite, checkAbort);
+      checkAbort();
 
       // 全作品を走査した直後の自然なタイミングでサムネイルキャッシュをGCする（TASK-26）
       const coverEntries: WorkCoverEntry[] = [];
       for (const work of repo.listSummaries()) {
+        checkAbort();
         if (!work.coverImage) continue;
         const resolved = resolveWithin(work.physicalPath, join(work.physicalPath, work.coverImage));
         if (!resolved) continue;
         coverEntries.push({ workId: work.id, coverAbsolutePath: resolved });
       }
-      const gcResult = await gcThumbnailCache(thumbnailCacheDir, coverEntries);
+      checkAbort();
+      const gcResult = await gcThumbnailCache(thumbnailCacheDir, coverEntries, {
+        throwIfCancelled: checkAbort,
+      });
+      checkAbort();
       if (gcResult.deleted > 0 || gcResult.skippedWorks > 0) {
         console.warn(
           `サムネイルキャッシュGC: 削除${gcResult.deleted}件 / 保持${gcResult.kept}件 / カバー未解決でスキップ${gcResult.skippedWorks}件`,
         );
       }
+
+      checkAbort();
+      repo.setScanState(KEY_LAST_SCAN_TIME, new Date().toISOString());
 
       return result;
     },

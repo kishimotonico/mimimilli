@@ -1,5 +1,4 @@
-// スキャン結果・進捗イベント（POST /api/scan、GET /api/scan/events）の型は
-// @mimimilli/shared を正典として re-export する。
+// スキャン結果・進捗表示の型はsharedのジョブ契約を正典としてre-exportする。
 import type { ScanPhase, ScanResult } from "@mimimilli/shared";
 
 export type { ScanResult, ScanPhase, ScanProgressEvent } from "@mimimilli/shared";
@@ -10,7 +9,7 @@ export function shouldShowNewWorkPopup(scanResult: ScanResult | null): scanResul
   return scanResult !== null && scanResult.newlyGenerated > 0;
 }
 
-/** GET /api/scan/events の progress イベントから抜き出した表示用の状態 */
+/** job scoped SSEのprogressイベントから抜き出した表示用の状態 */
 export interface ScanProgress {
   phase: ScanPhase;
   processed: number;

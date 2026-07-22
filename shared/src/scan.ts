@@ -1,9 +1,4 @@
-// スキャン（POST /api/scan、GET /api/scan/events）の契約。
-//
-// POST /api/scan は完了まで待って ScanResult を返す（同期）。
-// GET /api/scan/events はその実行と並行して進捗を SSE で配信する副チャンネル（TASK-20）。
-// スキャンが実行中でないときに接続した場合は、直近の終了イベント（あれば）を1件だけ
-// 流してすぐにストリームを閉じる（サーバー側の挙動は server/src/routes/scanProgress.ts）。
+// サーバー側スキャンジョブ（TASK-76）の HTTP / SSE 契約。
 import { z } from "zod";
 
 export const scanResultSchema = z.object({
@@ -24,12 +19,7 @@ export type ScanResult = z.infer<typeof scanResultSchema>;
 export const scanPhaseSchema = z.enum(["walking", "registering", "generating", "finalizing"]);
 export type ScanPhase = z.infer<typeof scanPhaseSchema>;
 
-/**
- * GET /api/scan/events が配信する SSE イベント（SSE の `event:` フィールドに type を使う）。
- * - progress: phase 内での processed/total（total=0 は「未確定・不定」を表す）
- * - complete: ScanResult を伴う終了イベント
- * - error: スキャン失敗時の終了イベント
- */
+/** adapter内部の進捗コールバック契約。HTTP SSEではScanJobEventへ変換する。 */
 export const scanProgressEventSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("progress"),
@@ -47,3 +37,68 @@ export const scanProgressEventSchema = z.discriminatedUnion("type", [
   }),
 ]);
 export type ScanProgressEvent = z.infer<typeof scanProgressEventSchema>;
+
+export const scanJobStatusSchema = z.enum([
+  "queued",
+  "running",
+  "cancelling",
+  "completed",
+  "failed",
+  "cancelled",
+]);
+export type ScanJobStatus = z.infer<typeof scanJobStatusSchema>;
+
+const scanProgressSchema = z.object({
+  phase: scanPhaseSchema,
+  processed: z.number().int().nonnegative(),
+  total: z.number().int().nonnegative(),
+});
+
+/** GET /scan/:id と POST /scan の返却値。日時は ISO 8601 文字列で統一する。 */
+export const scanJobSnapshotSchema = z.object({
+  id: z.string().min(1),
+  status: scanJobStatusSchema,
+  createdAt: z.string(),
+  startedAt: z.string().nullable(),
+  finishedAt: z.string().nullable(),
+  progress: scanProgressSchema.nullable(),
+  result: scanResultSchema.nullable(),
+  error: z.string().nullable(),
+});
+export type ScanJobSnapshot = z.infer<typeof scanJobSnapshotSchema>;
+
+export const startScanResponseSchema = z.object({ job: scanJobSnapshotSchema });
+export type StartScanResponse = z.infer<typeof startScanResponseSchema>;
+
+export const scanConflictResponseSchema = z.object({
+  error: z.object({ code: z.literal("conflict"), message: z.string() }),
+  active: scanJobSnapshotSchema,
+});
+export type ScanConflictResponse = z.infer<typeof scanConflictResponseSchema>;
+
+/** `seq` はジョブ内で単調増加する。reset は履歴が切り詰められた再接続時の完全状態である。 */
+export const scanJobEventSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("reset"),
+    seq: z.number().int().nonnegative(),
+    snapshot: scanJobSnapshotSchema,
+  }),
+  z.object({
+    type: z.literal("state"),
+    seq: z.number().int().nonnegative(),
+    snapshot: scanJobSnapshotSchema,
+  }),
+  z.object({
+    type: z.literal("progress"),
+    seq: z.number().int().nonnegative(),
+    progress: scanProgressSchema,
+  }),
+  z.object({
+    type: z.literal("completed"),
+    seq: z.number().int().nonnegative(),
+    result: scanResultSchema,
+  }),
+  z.object({ type: z.literal("failed"), seq: z.number().int().nonnegative(), error: z.string() }),
+  z.object({ type: z.literal("cancelled"), seq: z.number().int().nonnegative() }),
+]);
+export type ScanJobEvent = z.infer<typeof scanJobEventSchema>;

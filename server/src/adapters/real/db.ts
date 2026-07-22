@@ -181,12 +181,17 @@ function migrateLegacyUserData(legacyPath: string, user: Database): void {
 }
 
 /** resume v1をdefault Playlistの同じ順番のTrackへ解決し、絶対秒を区間相対秒へ直す。 */
-export function migrateResumeV1(sqlite: Database): { converted: number; pending: number } {
+export function migrateResumeV1(
+  sqlite: Database,
+  throwIfCancelled: () => void = () => {},
+): { converted: number; pending: number } {
+  throwIfCancelled();
   const pending = sqlite
     .query(
       "SELECT work_id AS workId, position, track_index AS trackIndex FROM user.resume_v1_pending",
     )
     .all() as Array<{ workId: string; position: number; trackIndex: number }>;
+  throwIfCancelled();
   if (pending.length === 0) return { converted: 0, pending: 0 };
 
   const resolveTrack = sqlite.query(`
@@ -211,21 +216,28 @@ export function migrateResumeV1(sqlite: Database): { converted: number; pending:
   let converted = 0;
   const migrateRows = sqlite.transaction(() => {
     for (const row of pending) {
+      throwIfCancelled();
       const track = resolveTrack.get(row.trackIndex, row.workId) as {
         trackId: string;
         playlistId: string;
         start: number | null;
         end: number | null;
       } | null;
+      throwIfCancelled();
       const offsetSec = track ? row.position - (track.start ?? 0) : -1;
       if (track && offsetSec >= 0 && (track.end === null || row.position <= track.end)) {
+        throwIfCancelled();
         updateResume.run(track.playlistId, track.trackId, offsetSec, row.workId);
+        throwIfCancelled();
         deletePending.run(row.workId);
+        throwIfCancelled();
         converted++;
       }
     }
   });
+  throwIfCancelled();
   migrateRows();
+  throwIfCancelled();
   const remaining = pending.length - converted;
   console.info(`resume v1をv2へ変換しました（成功: ${converted}件、保留: ${remaining}件）`);
   return { converted, pending: remaining };

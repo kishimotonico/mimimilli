@@ -112,22 +112,26 @@ describe("scan api", () => {
     mockFetch.mockReset();
   });
 
-  it("scanLibrary POSTs to /api/scan", async () => {
+  it("startScan POSTs to /api/scan", async () => {
     const mockResult = {
-      registered: 5,
-      newlyGenerated: 2,
-      errors: 0,
-      missing: 0,
-      newWorkIds: [],
-      rjCodeMissingCount: 0,
+      job: {
+        id: "job-1",
+        status: "running",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        startedAt: "2026-01-01T00:00:00.000Z",
+        finishedAt: null,
+        progress: null,
+        result: null,
+        error: null,
+      },
     };
-    mockFetch.mockResolvedValue(makeResponse(mockResult));
-    const result = await scanApi.scanLibrary();
+    mockFetch.mockResolvedValue(makeResponse(mockResult, 202));
+    const result = await scanApi.startScan();
     expect(mockFetch).toHaveBeenCalledWith(
       "/api/scan",
       expect.objectContaining({ method: "POST" }),
     );
-    expect(result).toEqual(mockResult);
+    expect(result).toEqual(mockResult.job);
   });
 });
 
@@ -366,18 +370,13 @@ describe("レスポンス検証（getParsed等）", () => {
     await expect(settingsApi.getSettings()).rejects.toThrow(/GET \/settings/);
   });
 
-  it("scanLibrary: 契約に適合しないスキャン結果は検証エラーになる", async () => {
+  it("startScan: 契約に適合しないジョブは検証エラーになる", async () => {
     mockFetch.mockResolvedValue(
       makeResponse({
-        registered: -1,
-        newlyGenerated: 0,
-        errors: 0,
-        missing: 0,
-        newWorkIds: [],
-        rjCodeMissingCount: 0,
+        job: { id: 1 },
       }),
     );
-    await expect(scanApi.scanLibrary()).rejects.toThrow(/POST \/scan/);
+    await expect(scanApi.startScan()).rejects.toThrow(/POST \/scan/);
   });
 
   it("browseFs: 契約に適合しない一覧は検証エラーになる", async () => {

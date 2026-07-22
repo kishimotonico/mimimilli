@@ -1,123 +1,159 @@
-// POST /scan、GET /scan/events（TASK-20 スキャン進捗のリアルタイム通知）。
-//
-// POST /scan は従来どおり完了まで待って ScanResult を返す（クライアント・既存テストへの
-// 互換性を壊さない）。実行中は同時に進捗イベントをジョブへ流し、GET /scan/events が
-// それを SSE で配信する副チャンネルとして機能する（scanProgress.ts の状態を参照）。
-//
-// 接続断・再接続の挙動:
-//   - スキャン実行中に SSE 接続が切れても、EventSource 標準の自動再接続で
-//     GET /scan/events に再接続すれば、直近の progress イベントを1件 replay してから
-//     ライブで続行する（取りこぼした細かい進捗は失われるが、最新値には追いつく）
-//   - 再接続した時点でスキャンが既に完了していた場合は、直近の complete/error を
-//     1件だけ replay してストリームを閉じる（進行中のスキャンが無いことをすぐ伝える）
-//   - スキャンが一度も実行されていない場合は、replay するイベントが無いまま
-//     ストリームを閉じる
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
-import type { ScanProgressEvent } from "@mimimilli/shared";
-import { NotConfiguredError, type DataAdapter } from "../adapter.ts";
-import { apiError } from "../lib/httpError.ts";
-import { isScanInProgress, startScanJob, subscribeToScan } from "./scanProgress.ts";
-import { enqueueDlsiteJob } from "./dlsiteProgress.ts";
+import {
+  scanConflictResponseSchema,
+  startScanResponseSchema,
+  type ScanJobEvent,
+  type ScanJobStatus,
+} from "@mimimilli/shared";
+import { ActiveScanConflictError, ScanJobManager } from "../scanJobManager.ts";
 
-/** SSE 接続を生かし続けるための ping 間隔（ms）。walking フェーズ等、進捗が長く無音になり得るため */
-const HEARTBEAT_INTERVAL_MS = 15000;
-
-/** clearTimeout 可能な sleep。stream.sleep() は内部の setTimeout を解放できず、
- *  Promise.race で負けても発火予約が残ってプロセス終了を妨げるため自前で用意する */
-function cancellableSleep(ms: number): { promise: Promise<"tick">; cancel: () => void } {
-  let timer: ReturnType<typeof setTimeout>;
-  const promise = new Promise<"tick">((resolve) => {
-    timer = setTimeout(() => resolve("tick"), ms);
-  });
-  return { promise, cancel: () => clearTimeout(timer) };
+function asLastEventId(value: string | undefined): number | null {
+  if (!value) return null;
+  const id = Number(value);
+  return Number.isInteger(id) && id >= 0 ? id : null;
 }
 
-export function scanRoute(adapter: DataAdapter): Hono {
+function isTerminalStatus(status: ScanJobStatus): boolean {
+  return status === "completed" || status === "failed" || status === "cancelled";
+}
+
+function isTerminalEvent(event: ScanJobEvent): boolean {
+  return event.type === "completed" || event.type === "failed" || event.type === "cancelled";
+}
+
+export function scanRoute(jobs: ScanJobManager): Hono {
   const app = new Hono();
 
-  app.post("/scan", async (c) => {
-    if (isScanInProgress()) {
-      throw apiError("conflict", "スキャンは既に実行中です。完了をお待ちください");
-    }
-
-    const job = startScanJob();
+  app.post("/scan", (c) => {
     try {
-      const result = await adapter.scan((event) => job.emit(event));
-      job.emit({ type: "complete", result });
-      if (result.newWorkIds.length > 0) {
-        enqueueDlsiteJob(adapter, "new", result.newWorkIds);
-      }
-      return c.json(result);
-    } catch (e) {
-      const message =
-        e instanceof NotConfiguredError ? e.message : "サーバー内部エラーが発生しました";
-      job.emit({ type: "error", message });
-      throw e;
-    } finally {
-      job.finish();
+      const job = jobs.start();
+      return c.json(startScanResponseSchema.parse({ job }), 202, {
+        Location: `/api/scan/${job.id}`,
+      });
+    } catch (error) {
+      if (!(error instanceof ActiveScanConflictError)) throw error;
+      return c.json(
+        scanConflictResponseSchema.parse({
+          error: { code: "conflict", message: error.message },
+          active: error.active,
+        }),
+        409,
+      );
     }
   });
 
-  app.get("/scan/events", (c) => {
+  app.get("/scan/active", (c) => {
+    const job = jobs.getActive();
+    return job ? c.json(job) : c.body(null, 204);
+  });
+
+  app.get("/scan/:id", (c) => {
+    const job = jobs.get(c.req.param("id"));
+    return job
+      ? c.json(job)
+      : c.json({ error: { code: "not_found", message: "スキャンジョブが見つかりません" } }, 404);
+  });
+
+  app.delete("/scan/:id", (c) => {
+    const job = jobs.cancel(c.req.param("id"));
+    return job
+      ? c.json(job)
+      : c.json({ error: { code: "not_found", message: "スキャンジョブが見つかりません" } }, 404);
+  });
+
+  app.get("/scan/:id/events", (c) => {
+    const jobId = c.req.param("id");
+    if (!jobs.get(jobId)) {
+      return c.json(
+        { error: { code: "not_found", message: "スキャンジョブが見つかりません" } },
+        404,
+      );
+    }
     return streamSSE(c, async (stream) => {
-      let resolveDone: () => void;
-      const donePromise = new Promise<void>((resolve) => {
+      let resolveDone!: () => void;
+      const done = new Promise<void>((resolve) => {
         resolveDone = resolve;
       });
+      let stopped = false;
+      let writing = false;
+      let closeWhenDrained = false;
+      let replayBoundarySeq = 0;
+      const queue: ScanJobEvent[] = [];
+      let unsubscribe = (): void => {};
 
-      // 同一接続への write を直列化する（listener 発火が並んでも writeSSE 呼び出しが交錯しないように）
-      let writeChain: Promise<void> = Promise.resolve();
-      const enqueueWrite = (frame: { event: string; data: string }): Promise<void> => {
-        writeChain = writeChain
-          .then(() => stream.writeSSE(frame))
-          .catch((e: unknown) => {
-            console.error("SSE write に失敗しました", e);
-          });
-        return writeChain;
-      };
-
-      const send = (event: ScanProgressEvent) =>
-        enqueueWrite({ event: event.type, data: JSON.stringify(event) });
-
-      const listener = (event: ScanProgressEvent) => {
-        const written = send(event);
-        // complete/error は write 完了を待ってからストリームを閉じる（未完了での終了を防ぐ）
-        if (event.type !== "progress") void written.then(() => resolveDone());
-      };
-
-      const { replay, unsubscribe, isLive } = subscribeToScan(listener);
-      for (const event of replay) {
-        await send(event);
-      }
-      const replayHasTerminal = replay.some((event) => event.type !== "progress");
-
-      if (!isLive || replayHasTerminal) {
+      const stop = (): void => {
+        if (stopped) return;
+        stopped = true;
         unsubscribe();
-        return;
-      }
+        resolveDone();
+      };
 
-      stream.onAbort(() => resolveDone());
-
-      // ライブ配信中は進捗が無い区間（walking フェーズ等）でも接続が切れないよう定期的に ping する
-      let waiting = true;
-      while (waiting) {
-        const heartbeat = cancellableSleep(HEARTBEAT_INTERVAL_MS);
-        const winner = await Promise.race([
-          donePromise.then(() => "done" as const),
-          heartbeat.promise,
-        ]);
-        heartbeat.cancel();
-        if (winner === "done") {
-          waiting = false;
-        } else {
-          await enqueueWrite({ event: "ping", data: "" });
+      const pump = async (): Promise<void> => {
+        if (writing || stopped) return;
+        writing = true;
+        try {
+          while (!stopped && queue.length > 0) {
+            const event = queue.shift()!;
+            await stream.writeSSE({
+              event: event.type,
+              id: String(event.seq),
+              data: JSON.stringify(event),
+            });
+            if (isTerminalEvent(event)) stop();
+          }
+          if (!stopped && closeWhenDrained && queue.length === 0) stop();
+        } catch {
+          stop();
+        } finally {
+          writing = false;
         }
+      };
+
+      const enqueue = (event: ScanJobEvent): void => {
+        if (stopped) return;
+        if (event.type === "progress") {
+          let pendingIndex = -1;
+          for (let index = queue.length - 1; index >= 0; index--) {
+            const queued: ScanJobEvent = queue[index]!;
+            if (queued.type === "progress" && queued.seq > replayBoundarySeq) {
+              pendingIndex = index;
+              break;
+            }
+          }
+          if (pendingIndex >= 0) queue[pendingIndex] = event;
+          else queue.push(event);
+        } else {
+          if (isTerminalEvent(event)) {
+            for (let index = queue.length - 1; index >= 0; index--) {
+              if (queue[index]!.type === "progress" && queue[index]!.seq > replayBoundarySeq) {
+                queue.splice(index, 1);
+              }
+            }
+          }
+          queue.push(event);
+        }
+        void pump();
+      };
+
+      const subscription = jobs.subscribe(
+        jobId,
+        asLastEventId(c.req.header("Last-Event-ID")),
+        enqueue,
+      );
+      if (!subscription) return;
+      unsubscribe = subscription.unsubscribe;
+      replayBoundarySeq = subscription.initial.at(-1)?.seq ?? 0;
+      closeWhenDrained =
+        isTerminalStatus(subscription.snapshot.status) &&
+        !subscription.initial.some(isTerminalEvent);
+      stream.onAbort(stop);
+      for (const event of subscription.initial) enqueue(event);
+
+      if (isTerminalStatus(subscription.snapshot.status) && subscription.initial.length === 0) {
+        stop();
       }
-      // complete/error の write 完了は listener 側で待機済みだが、直列化した write チェーンの
-      // 完了を保険として待ってからストリームを閉じる
-      await writeChain;
-      unsubscribe();
+      await done;
     });
   });
 
