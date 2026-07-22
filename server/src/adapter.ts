@@ -2,6 +2,7 @@
 // ルーター・ドメインロジックは1系統だけ持ち、データの出どころをこのインターフェースで差し替える:
 //   - fixture アダプタ: インメモリ fixtures（開発・ビジュアルテスト用）
 //   - real アダプタ:    SQLite + 実ファイルシステム（移行プラン ステップ3で実装）
+import { createHash } from "node:crypto";
 import type {
   AxisFacetItem,
   DlsiteApplyBody,
@@ -46,7 +47,7 @@ export class InvalidResumeError extends Error {}
  *  - "synthetic": メモリ上で合成するコンテンツ（fixture アダプタ）。
  *    全体をメモリに保持せず、`read(start, end)` で要求された byte range 分だけ生成する */
 export type MediaLocation =
-  | { type: "file"; absolutePath: string; mime: string }
+  | { type: "file"; absolutePath: string; mime: string; size?: number }
   | {
       type: "synthetic";
       mime: string;
@@ -55,6 +56,32 @@ export type MediaLocation =
     };
 
 export type MediaKind = "cover" | "audio" | "file";
+
+/**
+ * カバーの条件付きGETを、実体の生成・読み込みより先に判定するための情報。
+ * materialize は304を返さない場合だけ呼ばれる。
+ */
+export interface CoverDescriptor {
+  etag: string;
+  /** 元ファイルの更新時刻。HTTP-dateへの秒丸めはルートでだけ行う。 */
+  lastModifiedMs: number;
+  materialize(): Promise<MediaLocation>;
+}
+
+/** カバーrepresentationのvalidator。mtimeはHTTP-dateの精度へ丸める。 */
+export function createCoverValidators(
+  workId: string,
+  width: number | undefined,
+  source: { size: number; mtimeMs: number },
+): Pick<CoverDescriptor, "etag" | "lastModifiedMs"> {
+  const representation = width === undefined ? "original" : String(width);
+  const canonical = `mimimilli-cover-v1\0${workId}\0${representation}\0${source.size}\0${source.mtimeMs}`;
+  const digest = createHash("sha256").update(canonical).digest("base64url");
+  return {
+    etag: `W/"mimimilli-cover-v1-${digest}"`,
+    lastModifiedMs: source.mtimeMs,
+  };
+}
 
 export interface DataAdapter {
   // 設定・スキャン
@@ -114,6 +141,8 @@ export interface DataAdapter {
     relPath?: string,
     width?: number,
   ): Promise<MediaLocation | null>;
+  /** カバー専用の軽量な事前確認。音声・通常ファイルの契約は locateMedia のまま維持する。 */
+  describeCover(workId: string, width?: number): Promise<CoverDescriptor | null>;
   dlsiteFetch(workId: string): Promise<DlsiteFetchResult>;
   dlsiteApply(workId: string, body: DlsiteApplyBody): Promise<boolean>;
   updateDlsiteState(workId: string, patch: DlsiteStatePatch): Promise<Work | null>;

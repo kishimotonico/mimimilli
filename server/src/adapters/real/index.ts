@@ -1,6 +1,7 @@
 // real アダプタ: SQLite（キャッシュ）+ 実ファイルシステム + `.meta.json`（Source of Truth）。
 // 作品検索・件数・ページングはcatalog接続からuser DBをATTACH JOINしてSQLで実行する。
 import { existsSync, realpathSync } from "node:fs";
+import { stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { DEFAULT_TAG_PREFIXES, normalizeTags, toWorkListItem } from "@mimimilli/shared";
@@ -37,7 +38,9 @@ import type {
   WorksQuery,
 } from "@mimimilli/shared";
 import {
+  createCoverValidators,
   NotConfiguredError,
+  type CoverDescriptor,
   type DataAdapter,
   type MediaKind,
   type MediaLocation,
@@ -52,7 +55,12 @@ import { buildFileTree } from "./fileTree.ts";
 import { patchMetaFile } from "./meta.ts";
 import { mimeOf, resolveWithin } from "./paths.ts";
 import { Scanner } from "./scanner.ts";
-import { gcThumbnailCache, getOrCreateThumbnail, type WorkCoverEntry } from "./thumbnailCache.ts";
+import {
+  gcThumbnailCache,
+  ThumbnailCache,
+  type ThumbnailCacheOptions,
+  type WorkCoverEntry,
+} from "./thumbnailCache.ts";
 import { WorkRepo } from "./workRepo.ts";
 
 const KEY_ROOT_FOLDER = "root_folder";
@@ -62,6 +70,8 @@ export interface RealAdapterOptions {
   database: DbLocation;
   /** カバーサムネイルのキャッシュ置き場。ファイルDBの通常起動ではデータルート配下を渡す。 */
   thumbnailCacheDir?: string;
+  /** サムネイル変換の同時実行数・変換関数（テスト用）を注入する。 */
+  thumbnailCache?: ThumbnailCacheOptions;
   /** manifestとバックアップを保存するデータルート。 */
   dataRoot?: string;
   /** 一括取得のリクエスト間隔。実運用は1秒、テストのみ短縮可 */
@@ -80,6 +90,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
   const db: Db = openDb(options.database);
   const repo = new WorkRepo(db);
   const thumbnailCacheDir = options.thumbnailCacheDir ?? join(tmpdir(), "mimikago-memory-cache");
+  const thumbnailCache = new ThumbnailCache(options.thumbnailCache);
   const dataRoot =
     options.dataRoot ??
     (options.database.kind === "files"
@@ -107,6 +118,49 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       );
     }
     return root;
+  }
+
+  async function describeCover(workId: string, width?: number): Promise<CoverDescriptor | null> {
+    const work = repo.getCoverLocation(workId);
+    if (!work?.coverImage) return null;
+
+    const sourceAbsolutePath = resolveWithin(
+      work.physicalPath,
+      join(work.physicalPath, work.coverImage),
+    );
+    if (!sourceAbsolutePath) return null;
+
+    let sourceStat: Awaited<ReturnType<typeof stat>>;
+    try {
+      sourceStat = await stat(sourceAbsolutePath);
+    } catch {
+      return null;
+    }
+    if (!sourceStat.isFile()) return null;
+    const source = { size: sourceStat.size, mtimeMs: sourceStat.mtimeMs };
+    const validators = createCoverValidators(work.id, width, source);
+
+    return {
+      ...validators,
+      async materialize(): Promise<MediaLocation> {
+        if (width === undefined) {
+          return {
+            type: "file",
+            absolutePath: sourceAbsolutePath,
+            mime: mimeOf(sourceAbsolutePath),
+            size: source.size,
+          };
+        }
+        const thumbnail = await thumbnailCache.getOrCreate(
+          thumbnailCacheDir,
+          work.id,
+          width,
+          sourceAbsolutePath,
+          source,
+        );
+        return { type: "file", absolutePath: thumbnail.absolutePath, mime: thumbnail.mime };
+      },
+    };
   }
 
   return {
@@ -292,21 +346,24 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       relPath?: string,
       width?: number,
     ): Promise<MediaLocation | null> {
+      if (kind === "cover") {
+        const descriptor = await describeCover(workId, width);
+        return descriptor?.materialize() ?? null;
+      }
       const work = repo.getWork(workId);
       if (!work) return null;
 
-      const rel = kind === "cover" ? work.coverImage : relPath;
+      const rel = relPath;
       if (!rel) return null;
 
       const resolved = resolveWithin(work.physicalPath, join(work.physicalPath, rel));
       if (!resolved) return null;
 
-      if (kind === "cover" && width !== undefined) {
-        const thumbnail = await getOrCreateThumbnail(thumbnailCacheDir, workId, width, resolved);
-        return { type: "file", absolutePath: thumbnail.absolutePath, mime: thumbnail.mime };
-      }
-
       return { type: "file", absolutePath: resolved, mime: mimeOf(resolved) };
+    },
+
+    async describeCover(workId: string, width?: number): Promise<CoverDescriptor | null> {
+      return describeCover(workId, width);
     },
 
     async dlsiteFetch(workId: string): Promise<DlsiteFetchResult> {

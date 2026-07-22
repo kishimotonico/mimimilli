@@ -28,6 +28,42 @@ test("カバー画像: 幅指定（?w=256）付きでも破綻せず SVG をそ�
   assert.equal(res.headers.get("content-type"), "image/svg+xml");
 });
 
+test("カバー画像: ETagによる条件付きGETは304・空bodyで、validatorを維持する", async () => {
+  const app = buildApp();
+  const first = await app.request("/api/media/cover/RJ501001?w=256");
+  const etag = first.headers.get("etag");
+  assert.ok(etag);
+  assert.equal(first.headers.get("cache-control"), "private, max-age=0, must-revalidate");
+  assert.ok(first.headers.get("last-modified"));
+
+  const notModified = await app.request("/api/media/cover/RJ501001?w=256", {
+    headers: { "If-None-Match": `"other", ${etag}` },
+  });
+  assert.equal(notModified.status, 304);
+  assert.equal((await notModified.arrayBuffer()).byteLength, 0);
+  assert.equal(notModified.headers.get("content-type"), null);
+  assert.equal(notModified.headers.get("content-length"), null);
+  assert.equal(notModified.headers.get("etag"), etag);
+  assert.equal(notModified.headers.get("cache-control"), "private, max-age=0, must-revalidate");
+});
+
+test("カバー画像: fixtureのETagは作品とrepresentationごとに決まり、INMをIMSより優先する", async () => {
+  const app = buildApp();
+  const base = await app.request("/api/media/cover/RJ501001?w=256");
+  const original = await app.request("/api/media/cover/RJ501001");
+  const otherWork = await app.request("/api/media/cover/RJ501002?w=256");
+  assert.notEqual(base.headers.get("etag"), original.headers.get("etag"));
+  assert.notEqual(base.headers.get("etag"), otherWork.headers.get("etag"));
+
+  const response = await app.request("/api/media/cover/RJ501001?w=256", {
+    headers: {
+      "If-None-Match": '"does-not-match"',
+      "If-Modified-Since": "Wed, 31 Dec 9999 23:59:59 GMT",
+    },
+  });
+  assert.equal(response.status, 200);
+});
+
 test("カバー画像: coverImage なしの作品は 404", async () => {
   const app = buildApp();
 

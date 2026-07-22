@@ -42,8 +42,14 @@ import type {
   WorksQuery,
   WorkSummary,
 } from "@mimimilli/shared";
-import type { DataAdapter, MediaKind, MediaLocation } from "../../adapter.ts";
-import { InvalidResumeError } from "../../adapter.ts";
+import {
+  createCoverValidators,
+  InvalidResumeError,
+  type CoverDescriptor,
+  type DataAdapter,
+  type MediaKind,
+  type MediaLocation,
+} from "../../adapter.ts";
 import { buildAxisFacets } from "../../core/axisFacets.ts";
 import { buildTagPrefixCandidates } from "../../core/tagPrefixCandidates.ts";
 import { evalSmartFolder } from "../../core/smartFolder.ts";
@@ -520,6 +526,22 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
 
       if (isImagePath(relPath)) return synthesizeFilePlaceholderSvg(relPath);
       return synthesizeFilePlaceholderText(relPath);
+    },
+
+    async describeCover(workId: string, width?: number): Promise<CoverDescriptor | null> {
+      const work = state.works.find((entry) => entry.id === workId);
+      if (!work?.coverImage) return null;
+      const location = synthesizeCoverSvg(work);
+      if (location.type !== "synthetic") {
+        throw new Error("fixtureのカバー画像はsynthetic MediaLocationである必要があります");
+      }
+      const validators = createCoverValidators(work.id, width, { size: location.size, mtimeMs: 0 });
+      return {
+        ...validators,
+        async materialize(): Promise<MediaLocation> {
+          return location;
+        },
+      };
     },
 
     async dlsiteFetch(workId: string): Promise<DlsiteFetchResult> {

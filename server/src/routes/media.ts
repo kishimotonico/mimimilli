@@ -8,7 +8,7 @@ import { stat } from "node:fs/promises";
 import { Readable } from "node:stream";
 import { Hono } from "hono";
 import { coverQuerySchema, normalizeThumbnailWidth } from "@mimimilli/shared";
-import type { DataAdapter, MediaLocation } from "../adapter.ts";
+import type { CoverDescriptor, DataAdapter, MediaLocation } from "../adapter.ts";
 import { invalidRequest, notFound } from "../lib/httpError.ts";
 
 export function mediaRoute(adapter: DataAdapter): Hono {
@@ -19,9 +19,16 @@ export function mediaRoute(adapter: DataAdapter): Hono {
     if (!parsed.success) invalidRequest(`不正なクエリパラメータです: ${parsed.error.message}`);
     const width = parsed.data.w === undefined ? undefined : normalizeThumbnailWidth(parsed.data.w);
 
-    const location = await adapter.locateMedia("cover", c.req.param("id"), undefined, width);
-    if (!location) notFound(`カバー画像が見つかりません: ${c.req.param("id")}`);
-    return streamWhole(location);
+    const descriptor = await adapter.describeCover(c.req.param("id"), width);
+    if (!descriptor) notFound(`カバー画像が見つかりません: ${c.req.param("id")}`);
+    const cacheHeaders = coverCacheHeaders(descriptor);
+    if (
+      isNotModified(c.req.header("If-None-Match"), c.req.header("If-Modified-Since"), descriptor)
+    ) {
+      return new Response(null, { status: 304, headers: cacheHeaders });
+    }
+    const location = await descriptor.materialize();
+    return streamWhole(location, cacheHeaders);
   });
 
   app.get("/media/audio/:id/:path{.+}", async (c) => {
@@ -49,29 +56,66 @@ async function sizeOf(location: MediaLocation): Promise<number> {
 }
 
 /** Range 非対応の通常ストリーミング（200） */
-async function streamWhole(location: MediaLocation): Promise<Response> {
+async function streamWhole(
+  location: MediaLocation,
+  extraHeaders: Record<string, string> = {},
+): Promise<Response> {
   if (location.type === "synthetic") {
     const body = location.read(0, location.size - 1);
     return new Response(body, {
       status: 200,
       headers: {
+        ...extraHeaders,
         "Content-Type": location.mime,
         "Content-Length": String(location.size),
       },
     });
   }
 
-  const stats = await stat(location.absolutePath);
+  const size = location.size ?? (await stat(location.absolutePath)).size;
   const stream = Readable.toWeb(
     createReadStream(location.absolutePath),
   ) as unknown as ReadableStream;
   return new Response(stream, {
     status: 200,
     headers: {
+      ...extraHeaders,
       "Content-Type": location.mime,
-      "Content-Length": String(stats.size),
+      "Content-Length": String(size),
     },
   });
+}
+
+function coverCacheHeaders(descriptor: CoverDescriptor): Record<string, string> {
+  return {
+    ETag: descriptor.etag,
+    "Last-Modified": new Date(Math.floor(descriptor.lastModifiedMs / 1000) * 1000).toUTCString(),
+    "Cache-Control": "private, max-age=0, must-revalidate",
+  };
+}
+
+/** If-None-Matchはweak比較。ヘッダーが存在する場合はIMSを評価しない。 */
+function isNotModified(
+  ifNoneMatch: string | undefined,
+  ifModifiedSince: string | undefined,
+  descriptor: CoverDescriptor,
+): boolean {
+  if (ifNoneMatch !== undefined) return etagMatches(ifNoneMatch, descriptor.etag);
+  if (ifModifiedSince === undefined) return false;
+  const modifiedSince = Date.parse(ifModifiedSince);
+  return !Number.isNaN(modifiedSince) && descriptor.lastModifiedMs <= modifiedSince;
+}
+
+function etagMatches(header: string, current: string): boolean {
+  const currentOpaque = stripWeakPrefix(current);
+  return header.split(",").some((candidate) => {
+    const trimmed = candidate.trim();
+    return trimmed === "*" || stripWeakPrefix(trimmed) === currentOpaque;
+  });
+}
+
+function stripWeakPrefix(etag: string): string {
+  return etag.replace(/^W\//i, "");
 }
 
 /** HTTP Range 対応のストリーミング（Range ヘッダーがあれば 206、無ければ 200） */

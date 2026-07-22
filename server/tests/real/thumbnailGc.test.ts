@@ -33,9 +33,9 @@ test("現存する作品の現mtimeに対応するキャッシュは温存され
 
   // GC自体はファイル名の一致だけで判定するため、有効キー名のダミーファイルを直接置いて検証する
   mkdirSync(cacheDir, { recursive: true });
-  const { mtimeMs } = await stat(coverPath);
+  const { size, mtimeMs } = await stat(coverPath);
   const validNames = THUMBNAIL_WIDTHS.map((width) => {
-    const hash = createHash("sha256").update(`work-a\0${width}\0${mtimeMs}`).digest("hex");
+    const hash = createHash("sha256").update(`work-a\0${width}\0${size}\0${mtimeMs}`).digest("hex");
     return `${hash}.webp`;
   });
   for (const name of validNames) {

@@ -104,6 +104,13 @@ export interface ScanWorkState {
   resume: Work["resume"];
 }
 
+/** カバー配信の事前確認に必要な列だけを取得する軽量行。 */
+export interface CoverLocationRow {
+  id: string;
+  physicalPath: string;
+  coverImage: string | null;
+}
+
 const RECENT_VIEW_WINDOW_DAYS = 30;
 
 export class PersistentDataError extends Error {
@@ -848,6 +855,21 @@ export class WorkRepo {
     if (!row) return null;
     return rowToWork(row, this.tagMap([id]).get(id) ?? [], this.dlsiteState(id), (track) =>
       this.cachedFileDurationSec(row.physicalPath, track),
+    );
+  }
+
+  /**
+   * カバー配信専用の一点取得。getWork() のJSON復元・関連表問い合わせを避けるため、
+   * ルートとファイル名だけを1クエリで取得する。
+   */
+  getCoverLocation(id: string): CoverLocationRow | null {
+    return (
+      (this.db.sqlite
+        .query(
+          `SELECT id, physical_path AS physicalPath, cover_image AS coverImage
+           FROM main.works WHERE id = ?`,
+        )
+        .get(id) as CoverLocationRow | undefined) ?? null
     );
   }
 

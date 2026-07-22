@@ -1,7 +1,8 @@
 // カバー画像サムネイル配信（GET /api/media/cover/:id?w=）のテスト。
 // 幅の正規化・ディスクキャッシュ・mtime によるキャッシュ無効化を検証する。
 import assert from "node:assert/strict";
-import { readdirSync, statSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
+import { utimes } from "node:fs/promises";
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
 import sharp from "sharp";
@@ -35,7 +36,7 @@ async function setup(t: TestContext) {
   const res = await app.request("/api/works");
   const works = (await res.json()) as WorksPage;
   const work = works.items.find((w) => w.title.includes("RJ900001"))!;
-  return { app, work, coverPath, cacheDir };
+  return { app, adapter, work, coverPath, cacheDir };
 }
 
 test("カバーサムネイル: w=256 で webp・幅256に縮小され、ディスクにキャッシュされる", async (t) => {
@@ -68,6 +69,59 @@ test("カバーサムネイル: 2回目のリクエストは再生成されな�
   assert.equal(filesAfter.length, 1);
   assert.equal(filesAfter[0], filesBefore[0]);
   assert.equal(statSync(join(cacheDir, filesAfter[0])).mtimeMs, mtimeBefore);
+});
+
+test("カバーサムネイル: ETag一致なら生成前に304を返し、bodyを返さない", async (t) => {
+  const { app, adapter, work, cacheDir } = await setup(t);
+  const descriptor = await adapter.describeCover(work.id, 256);
+  assert.ok(descriptor);
+
+  const res = await app.request(`/api/media/cover/${work.id}?w=256`, {
+    headers: { "If-None-Match": descriptor.etag },
+  });
+  assert.equal(res.status, 304);
+  assert.equal((await res.arrayBuffer()).byteLength, 0);
+  assert.equal(res.headers.get("content-type"), null);
+  assert.equal(res.headers.get("content-length"), null);
+  assert.equal(res.headers.get("etag"), descriptor.etag);
+  assert.equal(
+    res.headers.get("last-modified"),
+    new Date(Math.floor(descriptor.lastModifiedMs / 1000) * 1000).toUTCString(),
+  );
+  assert.equal(res.headers.get("cache-control"), "private, max-age=0, must-revalidate");
+  assert.ok(!existsSync(cacheDir) || !readdirSync(cacheDir).some((name) => name.endsWith(".webp")));
+
+  const modifiedSince = await app.request(`/api/media/cover/${work.id}?w=256`, {
+    headers: {
+      "If-Modified-Since": new Date(
+        Math.ceil(descriptor.lastModifiedMs / 1000) * 1000,
+      ).toUTCString(),
+    },
+  });
+  assert.equal(modifiedSince.status, 304);
+});
+
+test("カバーサムネイル: weak ETagのlistと*に対応し、INMはIMSより優先する", async (t) => {
+  const { app, work } = await setup(t);
+  const first = await app.request(`/api/media/cover/${work.id}?w=256`);
+  const etag = first.headers.get("etag");
+  assert.ok(etag);
+
+  const weakMatch = await app.request(`/api/media/cover/${work.id}?w=256`, {
+    headers: { "If-None-Match": `"miss", ${etag.replace("W/", "")}` },
+  });
+  assert.equal(weakMatch.status, 304);
+  const star = await app.request(`/api/media/cover/${work.id}?w=256`, {
+    headers: { "If-None-Match": "*" },
+  });
+  assert.equal(star.status, 304);
+  const priority = await app.request(`/api/media/cover/${work.id}?w=256`, {
+    headers: {
+      "If-None-Match": '"miss"',
+      "If-Modified-Since": "Wed, 31 Dec 9999 23:59:59 GMT",
+    },
+  });
+  assert.equal(priority.status, 200);
 });
 
 test("カバーサムネイル: 許可されない幅は最近傍の許可幅へ正規化される（w=200→256）", async (t) => {
@@ -105,6 +159,35 @@ test("カバーサムネイル: 元カバー更新（mtime変化）で別キャ�
 
   // mtime が変わった旧カバーのキャッシュは消さない設計のため、キャッシュファイルは2つになる
   assert.equal(readdirSync(cacheDir).length, 2);
+});
+
+test("カバーサムネイル: 元画像のsizeまたはmtime変更でETagが変わる", async (t) => {
+  const { app, work, coverPath } = await setup(t);
+  const before = await app.request(`/api/media/cover/${work.id}?w=256`);
+  const beforeEtag = before.headers.get("etag");
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  await writeCoverJpeg(coverPath, 600, { r: 0, g: 255, b: 0 });
+  const after = await app.request(`/api/media/cover/${work.id}?w=256`);
+  assert.notEqual(after.headers.get("etag"), beforeEtag);
+});
+
+test("カバーサムネイル: 同じHTTP秒内の更新は旧IMSで304にしない", async (t) => {
+  const { app, work, coverPath } = await setup(t);
+  const second = Math.floor(Date.now() / 1000) * 1000;
+  await utimes(coverPath, new Date(second + 100), new Date(second + 100));
+  const before = await app.request(`/api/media/cover/${work.id}?w=256`);
+  const oldEtag = before.headers.get("etag");
+  const oldLastModified = before.headers.get("last-modified");
+  assert.ok(oldEtag);
+  assert.ok(oldLastModified);
+
+  await writeCoverJpeg(coverPath, 640, { r: 0, g: 0, b: 255 });
+  await utimes(coverPath, new Date(second + 900), new Date(second + 900));
+  const after = await app.request(`/api/media/cover/${work.id}?w=256`, {
+    headers: { "If-Modified-Since": oldLastModified },
+  });
+  assert.equal(after.status, 200);
+  assert.notEqual(after.headers.get("etag"), oldEtag);
 });
 
 test("カバーサムネイル: 幅指定なしは原寸(jpeg)のまま返す", async (t) => {

@@ -2,10 +2,11 @@
 // 変換を1回だけ実行すること、生成失敗時に残骸を残さず再試行できることを検証する。
 import assert from "node:assert/strict";
 import { existsSync, readdirSync, writeFileSync } from "node:fs";
+import { rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
 import sharp from "sharp";
-import { getOrCreateThumbnail } from "../../src/adapters/real/thumbnailCache.ts";
+import { getOrCreateThumbnail, ThumbnailCache } from "../../src/adapters/real/thumbnailCache.ts";
 import { makeTestDirectory } from "../helpers/sampleLibrary.ts";
 
 function setup(t: TestContext): { baseDir: string; cacheDir: string } {
@@ -79,5 +80,135 @@ test("生成失敗時は壊れたキャッシュを残さず、修正後の再�
 
   await writeCoverJpeg(brokenPath);
   const result = await getOrCreateThumbnail(cacheDir, "work-broken", 256, brokenPath);
+  assert.ok(existsSync(result.absolutePath));
+});
+
+test("異なるキーはFIFOキューで上限以下に変換し、同一キーはqueue投入前に合流する", async (t) => {
+  const { baseDir, cacheDir } = setup(t);
+  let running = 0;
+  let maxRunning = 0;
+  const started: string[] = [];
+  const cache = new ThumbnailCache({
+    maxConcurrent: 1,
+    async transform({ sourceAbsolutePath, tmpPath }) {
+      started.push(sourceAbsolutePath);
+      running++;
+      maxRunning = Math.max(maxRunning, running);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      await writeFile(tmpPath, "thumbnail");
+      running--;
+    },
+  });
+  const source = { size: 1, mtimeMs: 1 };
+  const first = cache.getOrCreate(cacheDir, "a", 256, join(baseDir, "a.jpg"), source);
+  const duplicate = cache.getOrCreate(cacheDir, "a", 256, join(baseDir, "a.jpg"), source);
+  const second = cache.getOrCreate(cacheDir, "b", 256, join(baseDir, "b.jpg"), source);
+  const [a, aAgain, b] = await Promise.all([first, duplicate, second]);
+
+  assert.equal(maxRunning, 1);
+  assert.deepEqual(started, [join(baseDir, "a.jpg"), join(baseDir, "b.jpg")]);
+  assert.equal(a.absolutePath, aAgain.absolutePath);
+  assert.notEqual(a.absolutePath, b.absolutePath);
+});
+
+test("queued/runningの失敗後もslotを解放し、同じキーを再試行できる", async (t) => {
+  const { baseDir, cacheDir } = setup(t);
+  let shouldFail = true;
+  const cache = new ThumbnailCache({
+    maxConcurrent: 1,
+    async transform({ tmpPath }) {
+      if (shouldFail) throw new Error("transform failed");
+      await writeFile(tmpPath, "thumbnail");
+    },
+  });
+  const source = { size: 1, mtimeMs: 1 };
+  const sourcePath = join(baseDir, "retry.jpg");
+  await assert.rejects(() => cache.getOrCreate(cacheDir, "retry", 256, sourcePath, source));
+  assert.ok(
+    !existsSync(cacheDir) || readdirSync(cacheDir).every((name) => !name.includes(".tmp-")),
+  );
+
+  shouldFail = false;
+  const result = await cache.getOrCreate(cacheDir, "retry", 256, sourcePath, source);
+  assert.ok(existsSync(result.absolutePath));
+});
+
+test("tmp作成後のasync失敗でも元エラーを保ち、queued要求とretryを解放する", async (t) => {
+  const { baseDir, cacheDir } = setup(t);
+  const source = { size: 1, mtimeMs: 1 };
+  const original = new Error("async transform failed");
+  let fail = true;
+  const cache = new ThumbnailCache({
+    maxConcurrent: 1,
+    async transform({ sourceAbsolutePath, tmpPath }) {
+      await writeFile(tmpPath, "temporary thumbnail");
+      if (sourceAbsolutePath.endsWith("fail.jpg") && fail) throw original;
+    },
+  });
+  const failed = cache.getOrCreate(cacheDir, "fail", 256, join(baseDir, "fail.jpg"), source);
+  const queued = cache.getOrCreate(cacheDir, "next", 256, join(baseDir, "next.jpg"), source);
+  await assert.rejects(
+    () => failed,
+    (error) => error === original,
+  );
+  const next = await queued;
+  assert.ok(existsSync(next.absolutePath));
+  assert.ok(readdirSync(cacheDir).every((name) => !name.includes(".tmp-")));
+
+  fail = false;
+  const retried = await cache.getOrCreate(cacheDir, "fail", 256, join(baseDir, "fail.jpg"), source);
+  assert.ok(existsSync(retried.absolutePath));
+});
+
+test("sync throw後もinFlightとslotを解放して後続を生成できる", async (t) => {
+  const { baseDir, cacheDir } = setup(t);
+  const source = { size: 1, mtimeMs: 1 };
+  const original = new Error("sync transform failed");
+  let fail = true;
+  const cache = new ThumbnailCache({
+    maxConcurrent: 1,
+    transform({ tmpPath }) {
+      if (fail) throw original;
+      return writeFile(tmpPath, "thumbnail");
+    },
+  });
+  await assert.rejects(
+    () => cache.getOrCreate(cacheDir, "sync", 256, join(baseDir, "sync.jpg"), source),
+    (error) => error === original,
+  );
+  fail = false;
+  const result = await cache.getOrCreate(cacheDir, "sync", 256, join(baseDir, "sync.jpg"), source);
+  assert.ok(existsSync(result.absolutePath));
+  assert.ok(readdirSync(cacheDir).every((name) => !name.includes(".tmp-")));
+});
+
+test("rename失敗後もtmpを掃除して同じキーを再試行できる", async (t) => {
+  const { baseDir, cacheDir } = setup(t);
+  const source = { size: 1, mtimeMs: 1 };
+  const original = new Error("rename failed");
+  let fail = true;
+  const cache = new ThumbnailCache({
+    maxConcurrent: 1,
+    async transform({ tmpPath }) {
+      await writeFile(tmpPath, "thumbnail");
+    },
+    async rename(oldPath, newPath) {
+      if (fail) throw original;
+      await rename(oldPath, newPath);
+    },
+  });
+  await assert.rejects(
+    () => cache.getOrCreate(cacheDir, "rename", 256, join(baseDir, "rename.jpg"), source),
+    (error) => error === original,
+  );
+  assert.ok(readdirSync(cacheDir).every((name) => !name.includes(".tmp-")));
+  fail = false;
+  const result = await cache.getOrCreate(
+    cacheDir,
+    "rename",
+    256,
+    join(baseDir, "rename.jpg"),
+    source,
+  );
   assert.ok(existsSync(result.absolutePath));
 });

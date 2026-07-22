@@ -3,6 +3,7 @@
 // mtime が変わればキーは変わるが、旧ファイルは自然には消えないため、
 // gcThumbnailCache による明示的な削除（GC）で掃除する（TASK-26）。
 import { createHash } from "node:crypto";
+import { availableParallelism } from "node:os";
 import { mkdir, readdir, rename, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { THUMBNAIL_WIDTHS } from "@mimimilli/shared";
@@ -13,9 +14,29 @@ export interface Thumbnail {
   mime: string;
 }
 
-/** cacheDir 配下に workId・width・元ファイル mtime をキーにしたキャッシュファイル名を作る */
-function cacheFileName(workId: string, width: number, mtimeMs: number): string {
-  const hash = createHash("sha256").update(`${workId}\0${width}\0${mtimeMs}`).digest("hex");
+export interface ThumbnailSource {
+  size: number;
+  mtimeMs: number;
+}
+
+export interface ThumbnailTransformInput {
+  sourceAbsolutePath: string;
+  width: number;
+  tmpPath: string;
+}
+
+export interface ThumbnailCacheOptions {
+  maxConcurrent?: number;
+  transform?: (input: ThumbnailTransformInput) => Promise<void>;
+  /** rename失敗を含むファイル確定処理の検証用。通常はnode:fs/promisesのrenameを使う。 */
+  rename?: (oldPath: string, newPath: string) => Promise<void>;
+}
+
+/** cacheDir配下にworkId・width・元ファイルsize/mtimeをキーにしたキャッシュファイル名を作る。 */
+function cacheFileName(workId: string, width: number, source: ThumbnailSource): string {
+  const hash = createHash("sha256")
+    .update(`${workId}\0${width}\0${source.size}\0${source.mtimeMs}`)
+    .digest("hex");
   return `${hash}.webp`;
 }
 
@@ -28,32 +49,109 @@ async function fileExists(path: string): Promise<boolean> {
   }
 }
 
-/** 同一 cachedPath への初回生成リクエストを束ねる single-flight マップ */
-const inFlight = new Map<string, Promise<Thumbnail>>();
-let tmpFileCounter = 0;
-
-/** 一時ファイルへ生成してから rename する（生成途中のファイルを配信しないため）。
- *  失敗時は一時ファイルを削除して呼び出し側へそのままエラーを伝える（エラー隠蔽しない）。 */
-async function generateThumbnail(
-  cacheDir: string,
-  cachedPath: string,
-  width: number,
-  sourceAbsolutePath: string,
-): Promise<Thumbnail> {
-  await mkdir(cacheDir, { recursive: true });
-  const tmpPath = `${cachedPath}.tmp-${process.pid}-${tmpFileCounter++}`;
-  try {
-    await sharp(sourceAbsolutePath)
-      .resize({ width, withoutEnlargement: true })
-      .webp()
-      .toFile(tmpPath);
-    await rename(tmpPath, cachedPath);
-  } catch (e) {
-    await rm(tmpPath, { force: true });
-    throw e;
-  }
-  return { absolutePath: cachedPath, mime: "image/webp" };
+async function sharpTransform({
+  sourceAbsolutePath,
+  width,
+  tmpPath,
+}: ThumbnailTransformInput): Promise<void> {
+  await sharp(sourceAbsolutePath)
+    .resize({ width, withoutEnlargement: true })
+    .webp()
+    .toFile(tmpPath);
 }
+
+/** FIFO順で変換slotを渡す、サービス内の小さなsemaphore。 */
+class FifoSemaphore {
+  private available: number;
+  private readonly waiting: Array<() => void> = [];
+
+  constructor(maxConcurrent: number) {
+    this.available = maxConcurrent;
+  }
+
+  async acquire(): Promise<void> {
+    if (this.available > 0) {
+      this.available--;
+      return;
+    }
+    await new Promise<void>((resolve) => this.waiting.push(resolve));
+  }
+
+  release(): void {
+    const next = this.waiting.shift();
+    if (next) next();
+    else this.available++;
+  }
+}
+
+/** single-flight と待機列をサービス単位に閉じ込めるサムネイル生成サービス。 */
+export class ThumbnailCache {
+  private readonly inFlight = new Map<string, Promise<Thumbnail>>();
+  private readonly semaphore: FifoSemaphore;
+  private readonly transform: (input: ThumbnailTransformInput) => Promise<void>;
+  private readonly renameFile: (oldPath: string, newPath: string) => Promise<void>;
+  private tmpFileCounter = 0;
+
+  constructor(options: ThumbnailCacheOptions = {}) {
+    const maxConcurrent = options.maxConcurrent ?? Math.max(1, availableParallelism());
+    if (!Number.isInteger(maxConcurrent) || maxConcurrent < 1) {
+      throw new Error("thumbnailCache.maxConcurrent は1以上の整数で指定してください");
+    }
+    this.semaphore = new FifoSemaphore(maxConcurrent);
+    this.transform = options.transform ?? sharpTransform;
+    this.renameFile = options.rename ?? rename;
+  }
+
+  private async generate(
+    cacheDir: string,
+    cachedPath: string,
+    width: number,
+    sourceAbsolutePath: string,
+  ): Promise<Thumbnail> {
+    await mkdir(cacheDir, { recursive: true });
+    const tmpPath = `${cachedPath}.tmp-${process.pid}-${this.tmpFileCounter++}`;
+    await this.semaphore.acquire();
+    try {
+      await this.transform({ sourceAbsolutePath, width, tmpPath });
+      await this.renameFile(tmpPath, cachedPath);
+      return { absolutePath: cachedPath, mime: "image/webp" };
+    } catch (error) {
+      // cleanup失敗で変換/renameの原因を覆い隠さない。
+      try {
+        await rm(tmpPath, { force: true });
+      } catch {
+        // 元のエラーを返す。
+      }
+      throw error;
+    } finally {
+      this.semaphore.release();
+    }
+  }
+
+  async getOrCreate(
+    cacheDir: string,
+    workId: string,
+    width: number,
+    sourceAbsolutePath: string,
+    source?: ThumbnailSource,
+  ): Promise<Thumbnail> {
+    const sourceStat = source ?? (await stat(sourceAbsolutePath));
+    const sourceKey: ThumbnailSource = { size: sourceStat.size, mtimeMs: sourceStat.mtimeMs };
+    const cachedPath = join(cacheDir, cacheFileName(workId, width, sourceKey));
+    if (await fileExists(cachedPath)) return { absolutePath: cachedPath, mime: "image/webp" };
+
+    const existing = this.inFlight.get(cachedPath);
+    if (existing) return existing;
+
+    const promise = this.generate(cacheDir, cachedPath, width, sourceAbsolutePath).finally(() => {
+      this.inFlight.delete(cachedPath);
+    });
+    this.inFlight.set(cachedPath, promise);
+    return promise;
+  }
+}
+
+const defaultThumbnailCache = new ThumbnailCache();
 
 /**
  * 指定幅の webp サムネイルを返す。キャッシュがあればそれを使い、無ければ sharp で生成して
@@ -66,23 +164,9 @@ export async function getOrCreateThumbnail(
   workId: string,
   width: number,
   sourceAbsolutePath: string,
+  source?: ThumbnailSource,
 ): Promise<Thumbnail> {
-  const sourceStat = await stat(sourceAbsolutePath);
-  const fileName = cacheFileName(workId, width, sourceStat.mtimeMs);
-  const cachedPath = join(cacheDir, fileName);
-
-  if (await fileExists(cachedPath)) {
-    return { absolutePath: cachedPath, mime: "image/webp" };
-  }
-
-  const existing = inFlight.get(cachedPath);
-  if (existing) return existing;
-
-  const promise = generateThumbnail(cacheDir, cachedPath, width, sourceAbsolutePath).finally(() => {
-    inFlight.delete(cachedPath);
-  });
-  inFlight.set(cachedPath, promise);
-  return promise;
+  return defaultThumbnailCache.getOrCreate(cacheDir, workId, width, sourceAbsolutePath, source);
 }
 
 /** GC対象を判定するために必要な、作品ごとのカバー実パス */
@@ -125,15 +209,16 @@ export async function gcThumbnailCache(
   const validNames = new Set<string>();
   let skippedWorks = 0;
   for (const work of works) {
-    let mtimeMs: number;
+    let source: ThumbnailSource;
     try {
-      mtimeMs = (await stat(work.coverAbsolutePath)).mtimeMs;
+      const sourceStat = await stat(work.coverAbsolutePath);
+      source = { size: sourceStat.size, mtimeMs: sourceStat.mtimeMs };
     } catch {
       skippedWorks++;
       continue;
     }
     for (const width of THUMBNAIL_WIDTHS) {
-      validNames.add(cacheFileName(work.workId, width, mtimeMs));
+      validNames.add(cacheFileName(work.workId, width, source));
     }
   }
 
