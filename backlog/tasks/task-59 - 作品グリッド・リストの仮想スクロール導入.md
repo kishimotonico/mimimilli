@@ -1,11 +1,11 @@
 ---
 id: TASK-59
 title: 作品グリッド・リストの仮想スクロール導入
-status: In Progress
+status: Done
 assignee:
   - '@kimi'
 created_date: '2026-07-19 02:02'
-updated_date: '2026-07-22 06:37'
+updated_date: '2026-07-22 06:38'
 labels: []
 dependencies:
   - TASK-73
