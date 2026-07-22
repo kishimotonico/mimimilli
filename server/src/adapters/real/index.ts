@@ -82,7 +82,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
     (options.database.kind === "files"
       ? dirname(dirname(options.database.catalogPath))
       : join(tmpdir(), "mimikago-memory-data"));
-  const scanner = new Scanner(db.catalog, repo, dataRoot);
+  const scanner = new Scanner(db, repo, dataRoot);
   const dlsiteRequestIntervalMs = options.dlsiteRequestIntervalMs ?? 1000;
   const dlsiteFetcher = options.dlsiteFetcher ?? fetchDlsiteInfo;
   const dlsiteCoverDownloader = options.dlsiteCoverDownloader ?? downloadCover;

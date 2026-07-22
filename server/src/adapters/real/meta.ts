@@ -23,15 +23,19 @@ export class MetaParseError extends Error {
   }
 }
 
-/** メタファイルを読み込み・検証する。JSON 不正・スキーマ違反は MetaParseError */
-export function readMetaFile(metaPath: string): MetaFile {
+/** JSONだけを読む軽量経路。fingerprint 一致時はスキーマ検証を省略するために使う。 */
+export function readMetaFileRaw(metaPath: string): unknown {
   const content = readFileSync(metaPath, "utf-8");
-  let raw: unknown;
   try {
-    raw = JSON.parse(content);
+    return JSON.parse(content);
   } catch (e) {
     throw new MetaParseError(metaPath, `JSON パースエラー: ${(e as Error).message}`);
   }
+}
+
+/** メタファイルを読み込み・検証する。JSON 不正・スキーマ違反は MetaParseError */
+export function readMetaFile(metaPath: string): MetaFile {
+  const raw = readMetaFileRaw(metaPath);
   const parsed = metaFileSchema.safeParse(raw);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];

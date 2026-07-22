@@ -3,11 +3,22 @@
 //   dlsite/RJ900001_テスト作品/ … メタなし（mp3/ に 2秒+3秒 の WAV、cover.jpg）→ 自動生成対象
 //   dlsite/RJ900002_既存メタ/   … .meta.json あり、トラック1本欠損 → status "error"
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
 import { createRealAdapter } from "../../src/adapters/real/index.ts";
-import { makeSampleLibrary, writeWav } from "../helpers/sampleLibrary.ts";
+import { openDb, type Db } from "../../src/adapters/real/db.ts";
+import { Scanner } from "../../src/adapters/real/scanner.ts";
+import { WorkRepo } from "../../src/adapters/real/workRepo.ts";
+import { makeSampleLibrary, makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 
 async function setup(t: TestContext) {
   const lib = makeSampleLibrary();
@@ -224,4 +235,498 @@ test("登録済み作品のメタが壊れた場合は missing ではなく erro
   assert.equal(result.missing, 0);
   assert.equal(work?.status, "error");
   assert.match(work?.errorMessage ?? "", /JSON パースエラー/);
+});
+
+// ── 増分スキャン（TASK-75） ─────────────────────────────────────────────────
+
+test("増分スキャン: 完全未変更の作品は2回目以降スキップされる", async (t) => {
+  const { adapter } = await setup(t);
+  const first = await adapter.scan();
+  assert.equal(first.skipped, 0);
+  assert.equal(first.registered, 1);
+  assert.equal(first.newlyGenerated, 1);
+
+  const second = await adapter.scan();
+  assert.equal(second.registered, 0);
+  assert.equal(second.newlyGenerated, 0);
+  assert.equal(second.skipped, 2); // 既存メタ + 自動生成メタ
+  assert.equal(second.missing, 0);
+  assert.equal(second.errors, 0);
+});
+
+test("増分スキャン: スキップした作品もPlaylist/Trackとresumeを維持する", async (t) => {
+  const { adapter } = await setup(t);
+  const first = await adapter.scan();
+  const workId = first.newWorkIds[0]!;
+  const before = await adapter.getWork(workId);
+  assert.ok(before);
+  const playlist = before!.playlists[0]!;
+  const track = playlist.tracks[0]!;
+  assert.ok(
+    await adapter.saveResume(workId, { playlistId: playlist.id, trackId: track.id, offsetSec: 1 }),
+  );
+
+  const second = await adapter.scan();
+  assert.equal(second.skipped, 2);
+  assert.deepEqual((await adapter.getWork(workId))?.resume, {
+    playlistId: playlist.id,
+    trackId: track.id,
+    offsetSec: 1,
+  });
+});
+
+test("増分スキャン: 除外対象のcreatedAtが不正でも完全未変更ならschema検証を省略する", async (t) => {
+  const { adapter, root } = await setup(t);
+  await adapter.scan();
+  const metaPath = join(root, "dlsite", "RJ900001_テスト作品", ".meta.json");
+  const meta = JSON.parse(readFileSync(metaPath, "utf-8")) as Record<string, unknown>;
+  meta.createdAt = "これはISO日時ではない";
+  writeFileSync(metaPath, JSON.stringify(meta, null, 2));
+
+  const second = await adapter.scan();
+  assert.equal(second.skipped, 2);
+  assert.equal(second.errors, 0);
+});
+
+test("増分スキャン: playlists/tracks/urlsの未知キーはfingerprintから除外してスキップする", async (t) => {
+  const directory = makeTestDirectory("raw-fingerprint-projection");
+  t.after(directory.cleanup);
+  const root = join(directory.path, "lib");
+  const workDir = join(root, "work");
+  const workId = "12345678-1234-4234-8234-123456789012";
+  const playlistId = "22345678-1234-4234-8234-123456789012";
+  const trackId = "32345678-1234-4234-8234-123456789012";
+  mkdirSync(workDir, { recursive: true });
+  writeWav(join(workDir, "track.wav"), 1);
+  writeFileSync(
+    join(workDir, ".meta.json"),
+    JSON.stringify({
+      id: workId,
+      title: "unknown fields",
+      urls: [{ label: "source", url: "https://example.com", ignored: "url" }],
+      playlists: [
+        {
+          id: playlistId,
+          name: "default",
+          ignored: "playlist",
+          tracks: [
+            {
+              id: trackId,
+              title: "track",
+              file: "track.wav",
+              ignored: "track",
+            },
+          ],
+        },
+      ],
+      defaultPlaylistId: playlistId,
+    }),
+  );
+  const db = openDb({ kind: "memory" });
+  t.after(() => db.close());
+  const repo = new WorkRepo(db);
+  const scanner = new Scanner(db, repo, directory.path);
+  await scanner.scan(root);
+
+  // createdAtはfingerprint対象外かつ不正値なので、ここでZodを通るとerrorになる。
+  const metaPath = join(workDir, ".meta.json");
+  const meta = JSON.parse(readFileSync(metaPath, "utf-8")) as Record<string, unknown>;
+  meta.createdAt = "invalid timestamp";
+  writeFileSync(metaPath, JSON.stringify(meta, null, 2));
+
+  let upsertCount = 0;
+  const originalUpsert = repo.upsertWork.bind(repo);
+  let probeCacheQueryCount = 0;
+  const originalQuery = db.sqlite.query.bind(db.sqlite);
+  repo.upsertWork = (work, options) => {
+    upsertCount += 1;
+    originalUpsert(work, options);
+  };
+  db.sqlite.query = ((sql: string, ...params: unknown[]) => {
+    if (typeof sql === "string" && sql.includes("audio_probe_cache")) probeCacheQueryCount += 1;
+    return (
+      originalQuery as (sql: string, ...params: unknown[]) => ReturnType<typeof db.sqlite.query>
+    )(sql, ...params);
+  }) as unknown as Db["sqlite"]["query"];
+  try {
+    const second = await scanner.scan(root);
+    assert.equal(second.skipped, 1);
+    assert.equal(second.registered, 0);
+    assert.equal(second.errors, 0);
+  } finally {
+    repo.upsertWork = originalUpsert;
+    db.sqlite.query = originalQuery;
+  }
+  assert.equal(upsertCount, 0);
+  assert.equal(probeCacheQueryCount, 0);
+});
+
+test("増分スキャン: 音声削除時は fingerprint 不一致で再処理され error になる", async (t) => {
+  const { adapter, root } = await setup(t);
+  const first = await adapter.scan();
+  const generatedId = first.newWorkIds[0]!;
+
+  const before = await adapter.getWork(generatedId);
+  assert.equal(before?.status, "ok");
+
+  rmSync(join(root, "dlsite", "RJ900001_テスト作品", "mp3", "01_intro.wav"));
+
+  const second = await adapter.scan();
+  assert.equal(second.skipped, 1); // 既存メタ作品は未変更のままスキップ
+  assert.equal(second.missing, 0);
+
+  const after = await adapter.getWork(generatedId);
+  assert.equal(after?.status, "error");
+  assert.match(after?.errorMessage ?? "", /01_intro\.wav/);
+});
+
+test("増分スキャン: 音声 mtime/size 変更時は duration が再計算される", async (t) => {
+  const { adapter, root } = await setup(t);
+  const first = await adapter.scan();
+  const generatedId = first.newWorkIds[0]!;
+
+  const before = await adapter.getWork(generatedId);
+  assert.ok(before);
+  const beforeDuration = before!.totalDurationSec;
+
+  // 01_intro.wav を 2秒 → 4秒 に差し替え、合計 duration が 2秒増えるはず
+  writeWav(join(root, "dlsite", "RJ900001_テスト作品", "mp3", "01_intro.wav"), 4);
+
+  const second = await adapter.scan();
+  assert.equal(second.skipped, 1); // 既存メタ作品は未変更のままスキップ
+
+  const after = await adapter.getWork(generatedId);
+  assert.ok(after);
+  assert.ok(
+    Math.abs(after!.totalDurationSec - (beforeDuration + 2)) < 0.05,
+    `expected duration +2, before=${beforeDuration}, after=${after!.totalDurationSec}`,
+  );
+});
+
+test("増分スキャン: 音声のmtimeだけが変わっても再処理する", async (t) => {
+  const { adapter, root } = await setup(t);
+  await adapter.scan();
+  const audioPath = join(root, "dlsite", "RJ900001_テスト作品", "mp3", "01_intro.wav");
+  utimesSync(audioPath, new Date(), new Date(Date.now() + 2_000));
+
+  const second = await adapter.scan();
+  assert.equal(second.skipped, 1);
+  assert.equal(second.registered, 1);
+});
+
+test("増分スキャン: カバー画像の更新でも再処理する", async (t) => {
+  const { adapter, root } = await setup(t);
+  await adapter.scan();
+  const coverPath = join(root, "dlsite", "RJ900001_テスト作品", "cover.jpg");
+  writeFileSync(coverPath, "updated cover image");
+
+  const second = await adapter.scan();
+  assert.equal(second.skipped, 1);
+  assert.equal(second.registered, 1);
+});
+
+test("増分スキャン: ディレクトリ移動を同一 UUID で追跡し fingerprint を再計算する", async (t) => {
+  const { adapter, existingWorkId, root } = await setup(t);
+  await adapter.scan();
+  await adapter.patchWork(existingWorkId, { bookmarked: true });
+
+  const oldDir = join(root, "dlsite", "RJ900002_既存メタ");
+  const newDir = join(root, "RJ900002_移動先");
+  renameSync(oldDir, newDir);
+
+  const second = await adapter.scan();
+  assert.equal(second.skipped, 1); // 自動生成作品は未変更のままスキップ
+  assert.equal(second.missing, 0);
+
+  const work = await adapter.getWork(existingWorkId);
+  assert.ok(work);
+  assert.ok(work!.physicalPath.endsWith("RJ900002_移動先"));
+  assert.equal(work!.bookmarked, true);
+});
+
+test("増分スキャン: registering 進捗の processed/total はスキップ含む全作品数が正しい", async (t) => {
+  const { adapter } = await setup(t);
+  await adapter.scan();
+
+  const events: Array<{ processed: number; total: number }> = [];
+  await adapter.scan((event) => {
+    if (event.type === "progress" && event.phase === "registering") {
+      events.push({ processed: event.processed, total: event.total });
+    }
+  });
+
+  assert.equal(events[events.length - 1]!.processed, 2);
+  assert.equal(events[events.length - 1]!.total, 2);
+  assert.ok(events.every((e) => e.total === 2));
+  const processedValues = events.map((e) => e.processed);
+  for (let i = 1; i < processedValues.length; i++) {
+    assert.ok(processedValues[i]! >= processedValues[i - 1]!, "processed は単調非減少");
+  }
+});
+
+test("増分スキャン: 2回目に検出したduplicate UUIDもID移行後に別作品として登録する", async (t) => {
+  const { adapter, root } = await setup(t);
+  await adapter.scan();
+  const sourceDir = join(root, "dlsite", "RJ900001_テスト作品");
+  const duplicateDir = join(root, "duplicate-work");
+  mkdirSync(duplicateDir, { recursive: true });
+  writeWav(join(duplicateDir, "track.wav"), 1);
+  const source = JSON.parse(readFileSync(join(sourceDir, ".meta.json"), "utf-8")) as Record<
+    string,
+    unknown
+  >;
+  source.title = "duplicate-work";
+  source.playlists = [
+    {
+      id: (source.playlists as Array<Record<string, unknown>>)[0]!.id,
+      name: "default",
+      tracks: [
+        {
+          id: (
+            (source.playlists as Array<Record<string, unknown>>)[0]!.tracks as Array<
+              Record<string, unknown>
+            >
+          )[0]!.id,
+          title: "track",
+          file: "track.wav",
+        },
+      ],
+    },
+  ];
+  source.defaultPlaylistId = (source.playlists as Array<Record<string, unknown>>)[0]!.id;
+  writeFileSync(join(duplicateDir, ".meta.json"), JSON.stringify(source, null, 2));
+
+  const second = await adapter.scan();
+  assert.equal(second.registered, 1);
+  assert.equal(second.skipped, 2);
+  const copiedMeta = JSON.parse(readFileSync(join(duplicateDir, ".meta.json"), "utf-8"));
+  assert.notEqual(copiedMeta.id, source.id);
+  assert.equal(
+    (await adapter.queryWorks({ q: "", tags: [], tagOp: "AND", sort: "id-asc" })).total,
+    3,
+  );
+});
+
+function metaWithSingleTrack(id: string, title: string): unknown {
+  return {
+    id,
+    title,
+    playlists: [
+      {
+        id: crypto.randomUUID(),
+        name: "default",
+        tracks: [{ id: crypto.randomUUID(), title: "track", file: "track.wav" }],
+      },
+    ],
+    defaultPlaylistId: null,
+  };
+}
+
+test("probe cache は一括取得され作品数に比例しない", async (t) => {
+  const directory = makeTestDirectory("probe-cache");
+  t.after(directory.cleanup);
+  const root = join(directory.path, "lib");
+  const workCount = 50;
+  for (let i = 0; i < workCount; i++) {
+    const workDir = join(root, `work-${i}`);
+    mkdirSync(workDir, { recursive: true });
+    writeWav(join(workDir, "track.wav"), 1);
+    writeFileSync(
+      join(workDir, ".meta.json"),
+      JSON.stringify(
+        metaWithSingleTrack(`00000000-0000-4000-8000-${String(i).padStart(12, "0")}`, `work-${i}`),
+        null,
+        2,
+      ),
+    );
+  }
+
+  const db = openDb({ kind: "memory" });
+  t.after(() => db.close());
+  const repo = new WorkRepo(db);
+  const scanner = new Scanner(db, repo, directory.path);
+
+  let queryCount = 0;
+  const originalQuery = db.sqlite.query.bind(db.sqlite);
+  db.sqlite.query = ((sql: string, ...params: unknown[]) => {
+    if (typeof sql === "string" && sql.includes("audio_probe_cache")) {
+      queryCount += 1;
+    }
+    return (
+      originalQuery as (sql: string, ...params: unknown[]) => ReturnType<typeof db.sqlite.query>
+    )(sql, ...params);
+  }) as unknown as Db["sqlite"]["query"];
+  try {
+    await scanner.scan(root);
+  } finally {
+    db.sqlite.query = originalQuery;
+  }
+
+  // 50作品のトラックを一括取得するため、audio_probe_cache への SELECT は 1 回だけ。
+  // トラックごとの個別 SELECT が発生していれば 50 回近くになる。
+  assert.equal(
+    queryCount,
+    1,
+    `probe cache へのアクセス数が作品数に比例しています (N=${workCount}, queries=${queryCount})`,
+  );
+});
+
+test("probe cache一括取得は空集合を問い合わせず、重複排除して900件境界で分割する", (t) => {
+  const db = openDb({ kind: "memory" });
+  t.after(() => db.close());
+  const repo = new WorkRepo(db);
+  let queryCount = 0;
+  const originalQuery = db.sqlite.query.bind(db.sqlite);
+  db.sqlite.query = ((sql: string, ...params: unknown[]) => {
+    if (typeof sql === "string" && sql.includes("audio_probe_cache")) queryCount += 1;
+    return (
+      originalQuery as (sql: string, ...params: unknown[]) => ReturnType<typeof db.sqlite.query>
+    )(sql, ...params);
+  }) as unknown as Db["sqlite"]["query"];
+  try {
+    assert.deepEqual(repo.fetchProbeCache([]), new Map());
+    const paths = Array.from({ length: 901 }, (_, index) => `/audio/${index}.wav`);
+    repo.fetchProbeCache([...paths, paths[0]!, paths[900]!]);
+  } finally {
+    db.sqlite.query = originalQuery;
+  }
+  assert.equal(queryCount, 2);
+});
+
+test("変更済みの複数resume作品でもprobe cache SELECTは一括取得だけで済む", async (t) => {
+  const directory = makeTestDirectory("scan-existing-state-map");
+  t.after(directory.cleanup);
+  const root = join(directory.path, "lib");
+  const workIds = Array.from(
+    { length: 3 },
+    (_, index) => `22222222-2222-4222-8222-${String(index).padStart(12, "0")}`,
+  );
+  for (const [index, id] of workIds.entries()) {
+    const workDir = join(root, `work-${index}`);
+    mkdirSync(workDir, { recursive: true });
+    writeWav(join(workDir, "track.wav"), 2);
+    writeFileSync(
+      join(workDir, ".meta.json"),
+      JSON.stringify(metaWithSingleTrack(id, `work-${index}`)),
+    );
+  }
+  const db = openDb({ kind: "memory" });
+  t.after(() => db.close());
+  const repo = new WorkRepo(db);
+  const scanner = new Scanner(db, repo, directory.path);
+  await scanner.scan(root);
+  for (const id of workIds) {
+    const work = repo.getWork(id)!;
+    const playlist = work.playlists[0]!;
+    const track = playlist.tracks[0]!;
+    assert.ok(repo.saveResume(id, { playlistId: playlist.id, trackId: track.id, offsetSec: 1 }));
+    const metaPath = join(root, work.title, ".meta.json");
+    const meta = JSON.parse(readFileSync(metaPath, "utf-8")) as Record<string, unknown>;
+    meta.title = `${work.title} updated`;
+    writeFileSync(metaPath, JSON.stringify(meta, null, 2));
+  }
+
+  let queryCount = 0;
+  const originalQuery = db.sqlite.query.bind(db.sqlite);
+  db.sqlite.query = ((sql: string, ...params: unknown[]) => {
+    if (typeof sql === "string" && sql.includes("audio_probe_cache")) queryCount += 1;
+    return (
+      originalQuery as (sql: string, ...params: unknown[]) => ReturnType<typeof db.sqlite.query>
+    )(sql, ...params);
+  }) as unknown as Db["sqlite"]["query"];
+  try {
+    await scanner.scan(root);
+  } finally {
+    db.sqlite.query = originalQuery;
+  }
+  assert.equal(queryCount, 1);
+});
+
+test("upsertWork はバッチトランザクションで処理され件数上限で分割される", async (t) => {
+  const directory = makeTestDirectory("batch-transaction");
+  t.after(directory.cleanup);
+  const root = join(directory.path, "lib");
+  const workCount = 5;
+  for (let i = 0; i < workCount; i++) {
+    const workDir = join(root, `work-${i}`);
+    mkdirSync(workDir, { recursive: true });
+    writeWav(join(workDir, "track.wav"), 1);
+    writeFileSync(
+      join(workDir, ".meta.json"),
+      JSON.stringify(
+        metaWithSingleTrack(`11111111-1111-4111-8111-${String(i).padStart(12, "0")}`, `work-${i}`),
+        null,
+        2,
+      ),
+    );
+  }
+
+  const db = openDb({ kind: "memory" });
+  t.after(() => db.close());
+  const repo = new WorkRepo(db);
+  const scanner = new Scanner(db, repo, directory.path, { upsertBatchSize: 2 });
+
+  let transactionCount = 0;
+  const originalTransaction = db.transaction;
+  db.transaction = <T>(callback: () => T): T => {
+    transactionCount += 1;
+    return originalTransaction(callback);
+  };
+
+  await scanner.scan(root);
+
+  assert.ok(
+    transactionCount >= 3,
+    `バッチトランザクションが分割されること: expected >=3, got ${transactionCount}`,
+  );
+  assert.equal(repo.countByStatus("ok"), workCount);
+});
+
+test("upsertBatchSizeは有限の正整数だけを受け付ける", (t) => {
+  const db = openDb({ kind: "memory" });
+  t.after(() => db.close());
+  const repo = new WorkRepo(db);
+  for (const upsertBatchSize of [0, -1, 1.5, Number.POSITIVE_INFINITY]) {
+    assert.throws(() => new Scanner(db, repo, "/test", { upsertBatchSize }), /有限の正整数/);
+  }
+});
+
+test("バッチ途中のcatalog書込失敗はロールバックされ、再スキャンできる", async (t) => {
+  const directory = makeTestDirectory("batch-rollback");
+  t.after(directory.cleanup);
+  const root = join(directory.path, "lib");
+  for (let index = 0; index < 2; index++) {
+    const workDir = join(root, `work-${index}`);
+    mkdirSync(workDir, { recursive: true });
+    writeWav(join(workDir, "track.wav"), 1);
+    writeFileSync(
+      join(workDir, ".meta.json"),
+      JSON.stringify(
+        metaWithSingleTrack(
+          `33333333-3333-4333-8333-${String(index).padStart(12, "0")}`,
+          `work-${index}`,
+        ),
+      ),
+    );
+  }
+  const db = openDb({ kind: "memory" });
+  t.after(() => db.close());
+  const repo = new WorkRepo(db);
+  const scanner = new Scanner(db, repo, directory.path, { upsertBatchSize: 2 });
+  const originalUpsert = repo.upsertWork.bind(repo);
+  let calls = 0;
+  repo.upsertWork = (work, options) => {
+    originalUpsert(work, options);
+    calls += 1;
+    if (calls === 2) throw new Error("injected catalog write failure");
+  };
+  try {
+    await assert.rejects(scanner.scan(root), /injected catalog write failure/);
+  } finally {
+    repo.upsertWork = originalUpsert;
+  }
+  assert.equal(repo.countByStatus("ok"), 0);
+
+  await scanner.scan(root);
+  assert.equal(repo.countByStatus("ok"), 2);
 });

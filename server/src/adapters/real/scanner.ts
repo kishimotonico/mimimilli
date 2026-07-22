@@ -28,19 +28,21 @@ import type {
   Work,
 } from "@mimimilli/shared";
 import { emptyDlsiteState, isRjCodeMissing } from "@mimimilli/shared";
-import type { CatalogDb } from "./db.ts";
+import type { Db } from "./db.ts";
 import { detectRjCode } from "./dlsite.ts";
+import { computeFingerprint, computeRawFingerprint } from "./fingerprint.ts";
 import {
   isMetaFileName,
   MetaParseError,
   patchMetaFile,
   readMetaFile,
+  readMetaFileRaw,
   writeMetaFile,
 } from "./meta.ts";
 import { migrateMetaIds } from "./metaIdMigration.ts";
 import { excludeDescendantPaths, isPathWithin, toPortableRelativePath } from "./paths.ts";
-import { probeDurationSec } from "./probe.ts";
-import type { WorkRepo } from "./workRepo.ts";
+import { probeDurationSec, type ProbeCacheEntry } from "./probe.ts";
+import type { ScanWorkState, WorkRepo } from "./workRepo.ts";
 
 const AUDIO_EXTENSIONS = new Set(["mp3", "m4a", "aac", "wav", "ogg", "flac", "webm", "opus"]);
 const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "gif", "bmp", "webp"]);
@@ -225,15 +227,88 @@ function defaultPlaylistOf(meta: MetaFile): Playlist | null {
   return meta.playlists[0]!;
 }
 
+const DEFAULT_UPSERT_BATCH_SIZE = 500;
+
+interface UpsertItem {
+  work: Work;
+  fingerprint: string;
+}
+
+/** upsertWork の呼び出しを一定件数ごとに catalog トランザクションでまとめる（TASK-75）。
+ *  バッチ途中で失敗すればトランザクションがロールバックされ、不整合な status を残さない。 */
+class UpsertBatch {
+  private queue: UpsertItem[] = [];
+  private readonly db: Db;
+  private readonly repo: WorkRepo;
+  private readonly limit: number;
+
+  constructor(db: Db, repo: WorkRepo, limit: number) {
+    this.db = db;
+    this.repo = repo;
+    this.limit = limit;
+  }
+
+  add(work: Work, fingerprint: string): void {
+    this.queue.push({ work, fingerprint });
+    if (this.queue.length >= this.limit) {
+      this.flush();
+    }
+  }
+
+  flush(): void {
+    if (this.queue.length === 0) return;
+    const items = this.queue;
+    this.db.transaction(() => {
+      for (const item of items) {
+        this.repo.upsertWork(item.work, { fingerprint: item.fingerprint });
+      }
+    });
+    this.queue = [];
+  }
+}
+
+interface PreparedMeta {
+  kind: "ok";
+  metaPath: string;
+  meta: MetaFile;
+  fingerprint: string;
+  cachedFingerprint: string | undefined;
+}
+
+interface PreparedError {
+  kind: "error";
+  metaPath: string;
+  error: MetaParseError;
+}
+
+interface PreparedSkip {
+  kind: "skip";
+  metaPath: string;
+  id: string;
+}
+
+type PreparedEntry = PreparedMeta | PreparedError | PreparedSkip;
+
+export interface ScannerOptions {
+  /** upsertWork をバッチ化する件数上限。テスト用に変更可 */
+  upsertBatchSize?: number;
+}
+
 export class Scanner {
-  private readonly db: CatalogDb;
+  private readonly db: Db;
   private readonly repo: WorkRepo;
   private readonly dataRoot: string;
+  private readonly upsertBatchSize: number;
 
-  constructor(db: CatalogDb, repo: WorkRepo, dataRoot: string) {
+  constructor(db: Db, repo: WorkRepo, dataRoot: string, options?: ScannerOptions) {
     this.db = db;
     this.repo = repo;
     this.dataRoot = dataRoot;
+    const upsertBatchSize = options?.upsertBatchSize ?? DEFAULT_UPSERT_BATCH_SIZE;
+    if (!Number.isInteger(upsertBatchSize) || upsertBatchSize <= 0) {
+      throw new RangeError("upsertBatchSize は有限の正整数である必要があります");
+    }
+    this.upsertBatchSize = upsertBatchSize;
   }
 
   async scan(root: string, onProgress?: (event: ScanProgressEvent) => void): Promise<ScanResult> {
@@ -245,6 +320,7 @@ export class Scanner {
       missing: 0,
       newWorkIds: [],
       rjCodeMissingCount: 0,
+      skipped: 0,
     };
 
     // walking フェーズ: ディレクトリ走査自体は件数が事前に分からないため不定（total=0）で通知する
@@ -258,28 +334,73 @@ export class Scanner {
         `Playlist/Track ID移行: 外部編集を検出したため上書きしませんでした: ${migration.externallyModified.join(", ")}`,
       );
     }
-    this.repo.clearPlaybackRelations();
+    // 変更のない作品のPlaylist/Track関係は再生位置の解決にも使う。全削除してから
+    // スキップすると関係だけ失われるため、変更作品のupsert時だけ置き換える。
     const seenIds = new Set<string>();
+    const existingWorks = this.repo.getScanWorkMap();
+    const existingByPhysicalPath = new Map(
+      [...existingWorks].map(([id, state]) => [state.physicalPath, { id, state }]),
+    );
 
     // 1. 既存メタファイルの登録
     emit({ type: "progress", phase: "registering", processed: 0, total: tree.metaPaths.length });
-    for (let i = 0; i < tree.metaPaths.length; i++) {
-      const metaPath = tree.metaPaths[i]!;
+
+    // 1-a. メタを読み込み、fingerprint を計算する前処理パス。
+    //      この時点では DB 書き込みやプローブは行わない。重複検出は後段の registerMetaFile で行う。
+    const prepared = this.prepareMetaEntries(tree.metaPaths, existingWorks);
+
+    // 1-b. fingerprint が不一致の作品だけのトラックパスを収集し、probe cache を一括取得する。
+    //      これによりトラックごとの個別 SELECT が発生しなくなる（TASK-75）。
+    const probeCache = this.buildProbeCache(prepared);
+
+    // 1-c. 実際の登録処理。fingerprint 一致作品はスキップし、それ以外は probe cache を使って処理する。
+    const batch = new UpsertBatch(this.db, this.repo, this.upsertBatchSize);
+    for (let i = 0; i < prepared.length; i++) {
+      const entry = prepared[i]!;
       try {
-        await this.registerMetaFile(metaPath, seenIds);
-        result.registered += 1;
+        if (entry.kind === "error") {
+          this.handleMetaParseError(
+            entry.metaPath,
+            entry.error,
+            seenIds,
+            result,
+            existingWorks,
+            existingByPhysicalPath,
+          );
+        } else if (entry.kind === "skip") {
+          if (seenIds.has(entry.id)) {
+            throw new MetaParseError(
+              entry.metaPath,
+              `Work IDが重複しています: ${entry.id}`,
+              entry.id,
+            );
+          }
+          seenIds.add(entry.id);
+          result.skipped! += 1;
+        } else {
+          const outcome = await this.registerMetaFile(
+            entry,
+            seenIds,
+            probeCache,
+            batch,
+            existingWorks,
+          );
+          if (outcome === "skipped") {
+            result.skipped! += 1;
+          } else {
+            result.registered += 1;
+          }
+        }
       } catch (e) {
         if (e instanceof MetaParseError) {
-          console.warn(e.message);
-          const workDir = dirname(metaPath);
-          const existingById =
-            e.candidateId && !seenIds.has(e.candidateId) ? this.repo.getWork(e.candidateId) : null;
-          const existing = existingById ?? this.repo.getWorkByPhysicalPath(workDir);
-          if (existing) {
-            this.repo.markWorkError(existing.id, workDir, e.message);
-            seenIds.add(existing.id);
-          }
-          result.errors += 1;
+          this.handleMetaParseError(
+            entry.metaPath,
+            e,
+            seenIds,
+            result,
+            existingWorks,
+            existingByPhysicalPath,
+          );
         } else {
           throw e;
         }
@@ -291,6 +412,7 @@ export class Scanner {
         total: tree.metaPaths.length,
       });
     }
+    batch.flush();
 
     // 2. メタファイルのない音声フォルダーへ自動生成（下書き）
     const workRoots = new Set<string>();
@@ -304,19 +426,40 @@ export class Scanner {
     const roots = excludeDescendantPaths(workRoots).sort(naturalCompare);
 
     emit({ type: "progress", phase: "generating", processed: 0, total: roots.length });
+    const generated: Array<{ id: string; prepared: PreparedMeta }> = [];
     for (let i = 0; i < roots.length; i++) {
       const workDir = roots[i]!;
       try {
         const id = this.generateMetaForFolder(workDir);
-        await this.registerMetaFile(join(workDir, ".meta.json"), seenIds);
-        result.newlyGenerated += 1;
-        result.newWorkIds.push(id);
+        generated.push({ id, prepared: this.prepareSingleMeta(join(workDir, ".meta.json")) });
       } catch (e) {
         console.warn(`メタファイルの自動生成に失敗: ${workDir}: ${(e as Error).message}`);
         result.errors += 1;
       }
       emit({ type: "progress", phase: "generating", processed: i + 1, total: roots.length });
     }
+    // 自動生成分もまとめてcacheを読む。cache hit時を含め、track単位のSELECTを発生させない。
+    const generatedProbeCache = this.buildProbeCache(generated.map((entry) => entry.prepared));
+    for (const entry of generated) {
+      try {
+        await this.registerMetaFile(
+          entry.prepared,
+          seenIds,
+          generatedProbeCache,
+          batch,
+          existingWorks,
+        );
+        result.newlyGenerated += 1;
+        result.newWorkIds.push(entry.id);
+      } catch (e) {
+        if (!(e instanceof MetaParseError)) throw e;
+        console.warn(
+          `メタファイルの自動生成に失敗: ${dirname(entry.prepared.metaPath)}: ${(e as Error).message}`,
+        );
+        result.errors += 1;
+      }
+    }
+    batch.flush();
 
     emit({ type: "progress", phase: "finalizing", processed: 0, total: 1 });
     this.repo.markMissingExcept([...seenIds]);
@@ -328,16 +471,117 @@ export class Scanner {
     return result;
   }
 
-  /** メタファイル1件を DB に登録する（ID 突合・欠損検出・duration プローブ込み） */
-  private async registerMetaFile(metaPath: string, seenIds: Set<string>): Promise<string> {
-    const meta = readMetaFile(metaPath);
-    const workDir = dirname(metaPath);
+  /** メタファイルを前処理する。エラーは収集して後段で処理し、正常なものは fingerprint 付きで返す。 */
+  private prepareMetaEntries(
+    metaPaths: string[],
+    existingWorks: Map<string, ScanWorkState>,
+  ): PreparedEntry[] {
+    const prepared: PreparedEntry[] = [];
 
+    for (const metaPath of metaPaths) {
+      try {
+        const raw = readMetaFileRaw(metaPath);
+        const rawFingerprint = computeRawFingerprint(metaPath, raw);
+        if (
+          rawFingerprint &&
+          existingWorks.get(rawFingerprint.id)?.fingerprint === rawFingerprint.fingerprint
+        ) {
+          prepared.push({ kind: "skip", metaPath, id: rawFingerprint.id });
+          continue;
+        }
+
+        // fingerprint不一致時だけ厳密なスキーマ検証を行う。これにより、機械的な
+        // createdAt等を除く完全未変更作品ではZodの全件検証を避けられる。
+        const meta = readMetaFile(metaPath);
+        const fingerprint = computeFingerprint(metaPath, meta);
+        const cachedFingerprint = existingWorks.get(meta.id)?.fingerprint ?? undefined;
+        prepared.push({ kind: "ok", metaPath, meta, fingerprint, cachedFingerprint });
+      } catch (e) {
+        if (e instanceof MetaParseError) {
+          prepared.push({ kind: "error", metaPath, error: e });
+        } else {
+          throw e;
+        }
+      }
+    }
+
+    return prepared;
+  }
+
+  /** 自動生成後の1件だけを前処理する */
+  private prepareSingleMeta(metaPath: string): PreparedMeta {
+    const meta = readMetaFile(metaPath);
+    const fingerprint = computeFingerprint(metaPath, meta);
+    return {
+      kind: "ok",
+      metaPath,
+      meta,
+      fingerprint,
+      cachedFingerprint: undefined,
+    };
+  }
+
+  /** fingerprint が不一致の作品のトラックパスから probe cache を一括取得する */
+  private buildProbeCache(prepared: PreparedEntry[]): Map<string, ProbeCacheEntry> {
+    const trackPaths: string[] = [];
+    for (const entry of prepared) {
+      if (entry.kind !== "ok") continue;
+      if (entry.cachedFingerprint === entry.fingerprint) continue; // スキップ対象
+      const workDir = dirname(entry.metaPath);
+      const playlist = defaultPlaylistOf(entry.meta);
+      for (const track of playlist?.tracks ?? []) {
+        trackPaths.push(join(workDir, track.file));
+      }
+    }
+    return this.repo.fetchProbeCache(trackPaths);
+  }
+
+  private handleMetaParseError(
+    metaPath: string,
+    error: MetaParseError,
+    seenIds: Set<string>,
+    result: ScanResult,
+    existingWorks: Map<string, ScanWorkState>,
+    existingByPhysicalPath: Map<string, { id: string; state: ScanWorkState }>,
+  ): void {
+    console.warn(error.message);
+    const workDir = dirname(metaPath);
+    const existingById =
+      error.candidateId && !seenIds.has(error.candidateId)
+        ? existingWorks.get(error.candidateId)
+          ? { id: error.candidateId, state: existingWorks.get(error.candidateId)! }
+          : null
+        : null;
+    const existing = existingById ?? existingByPhysicalPath.get(workDir) ?? null;
+    if (existing) {
+      this.repo.markWorkError(existing.id, workDir, error.message);
+      seenIds.add(existing.id);
+    }
+    result.errors += 1;
+  }
+
+  /** メタファイル1件を DB に登録する（ID 突合・欠損検出・duration プローブ込み） */
+  private async registerMetaFile(
+    prepared: PreparedMeta,
+    seenIds: Set<string>,
+    probeCache: Map<string, ProbeCacheEntry> | undefined,
+    batch: UpsertBatch,
+    existingWorks: Map<string, ScanWorkState>,
+  ): Promise<"skipped" | string> {
+    const { metaPath, meta, fingerprint, cachedFingerprint } = prepared;
+    const workDir = dirname(metaPath);
     const id = meta.id;
+
+    // 同一スキャン内での重複検出（migrateMetaIds 後のセーフティネット）
     if (seenIds.has(id)) {
       throw new MetaParseError(metaPath, `Work IDが重複しています: ${id}`, id);
     }
     seenIds.add(id);
+
+    // fingerprint 一致なら完全未変更として、プローブ・upsertWork を省略する
+    if (cachedFingerprint === fingerprint) {
+      return "skipped";
+    }
 
     // 参照先ファイルの欠損チェック
     const playlist = defaultPlaylistOf(meta);
@@ -353,17 +597,24 @@ export class Scanner {
       if (track.start !== undefined && track.end !== undefined) {
         totalDurationSec += Math.max(0, track.end - track.start);
       } else {
-        totalDurationSec += await probeDurationSec(this.db, join(workDir, track.file));
+        totalDurationSec += await probeDurationSec(
+          this.db.catalog,
+          join(workDir, track.file),
+          probeCache,
+        );
       }
     }
 
     // 既存作品の DB 固有情報を保持（移動追従時も含む）
-    const existing = this.repo.getWork(id);
+    const existing = existingWorks.get(id);
     const detectedRjCode = meta.dlsite.rjCode ?? detectRjCode([basename(workDir), meta.title]);
-    const dlsite = detectedRjCode ? { ...meta.dlsite, rjCode: detectedRjCode } : meta.dlsite;
+    let dlsite = meta.dlsite;
     if (detectedRjCode !== meta.dlsite.rjCode) {
+      dlsite = { ...meta.dlsite, rjCode: detectedRjCode };
       patchMetaFile(metaPath, { dlsite });
     }
+    // メタへの書き戻し（RJコード等）があった場合、保存する fingerprint は書き戻し後の内容に合わせる
+    const finalFingerprint = computeFingerprint(metaPath, { ...meta, dlsite });
     const work: Work = {
       id,
       title: meta.title,
@@ -383,7 +634,7 @@ export class Scanner {
       resume: existing?.resume ?? null,
       dlsite,
     };
-    this.repo.upsertWork(work);
+    batch.add(work, finalFingerprint);
     return id;
   }
 

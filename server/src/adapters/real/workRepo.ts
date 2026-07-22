@@ -76,6 +76,20 @@ type RawSummaryListRow = Omit<SummaryRow, "bookmarked"> & {
   dlsiteStateJson: string | null;
 };
 
+/**
+ * scanner が変更作品の登録時に引き継ぐ user 所有の状態。
+ * resume は関係表で解決せず生の値を保持する。スキャン中に作品ごとのgetWorkを呼ぶと
+ * end未指定トラックのresume解決がprobe cacheへの個別SELECTを発生させるためである。
+ */
+export interface ScanWorkState {
+  fingerprint: string | null;
+  physicalPath: string;
+  addedAt: string;
+  bookmarked: boolean;
+  lastPlayedAt: string | null;
+  resume: Work["resume"];
+}
+
 const RECENT_VIEW_WINDOW_DAYS = 30;
 
 export class PersistentDataError extends Error {
@@ -598,6 +612,94 @@ export class WorkRepo {
     });
   }
 
+  /**
+   * 増分スキャン用の既存作品状態を一括取得する（TASK-75）。
+   * ここではresumeを解決しないため、audio_probe_cacheへの作品ごとのSELECTは発生しない。
+   */
+  getScanWorkMap(): Map<string, ScanWorkState> {
+    const rows = this.db.sqlite
+      .query(
+        `
+          SELECT
+            works.id AS id,
+            works.fingerprint AS fingerprint,
+            works.physical_path AS physicalPath,
+            work_states.added_at AS addedAt,
+            work_states.bookmarked AS bookmarked,
+            work_states.last_played_at AS lastPlayedAt,
+            work_states.resume_playlist_id AS resumePlaylistId,
+            work_states.resume_track_id AS resumeTrackId,
+            work_states.resume_offset_sec AS resumeOffsetSec
+          FROM main.works AS works
+          INNER JOIN user.work_states AS work_states ON work_states.work_id = works.id
+        `,
+      )
+      .all() as Array<{
+      id: string;
+      fingerprint: string | null;
+      physicalPath: string;
+      addedAt: string;
+      bookmarked: number;
+      lastPlayedAt: string | null;
+      resumePlaylistId: string | null;
+      resumeTrackId: string | null;
+      resumeOffsetSec: number | null;
+    }>;
+    const map = new Map<string, ScanWorkState>();
+    for (const row of rows) {
+      map.set(row.id, {
+        fingerprint: row.fingerprint,
+        physicalPath: row.physicalPath,
+        addedAt: row.addedAt,
+        bookmarked: row.bookmarked !== 0,
+        lastPlayedAt: row.lastPlayedAt,
+        resume:
+          row.resumePlaylistId !== null &&
+          row.resumeTrackId !== null &&
+          row.resumeOffsetSec !== null
+            ? {
+                playlistId: row.resumePlaylistId,
+                trackId: row.resumeTrackId,
+                offsetSec: row.resumeOffsetSec,
+              }
+            : null,
+      });
+    }
+    return map;
+  }
+
+  /**
+   * 指定された音声パスの probe cache を一括取得する（TASK-75）。
+   * SQLite のパラメータ上限を避けるため、一定件数ごとに分割して IN 句で取得する。
+   */
+  fetchProbeCache(
+    paths: string[],
+  ): Map<string, { size: number; mtimeMs: number; durationSec: number }> {
+    const map = new Map<string, { size: number; mtimeMs: number; durationSec: number }>();
+    const uniquePaths = [...new Set(paths)];
+    if (uniquePaths.length === 0) return map;
+
+    const chunkSize = 900; // SQLite パラメータ上限に余裕を持たせる
+    for (let i = 0; i < uniquePaths.length; i += chunkSize) {
+      const chunk = uniquePaths.slice(i, i + chunkSize);
+      const placeholders = chunk.map(() => "?").join(", ");
+      const rows = this.db.sqlite
+        .query(
+          `SELECT path, size, mtime_ms AS mtimeMs, duration_sec AS durationSec FROM main.audio_probe_cache WHERE path IN (${placeholders})`,
+        )
+        .all(...chunk) as Array<{
+        path: string;
+        size: number;
+        mtimeMs: number;
+        durationSec: number;
+      }>;
+      for (const row of rows) {
+        map.set(row.path, row);
+      }
+    }
+    return map;
+  }
+
   /** 作品全件のロードをせず、SQLのGROUP BYで軸ファセットを集計する。 */
   getAxisFacets(axis: string): AxisFacetItem[] {
     if (axis === "year") {
@@ -661,7 +763,7 @@ export class WorkRepo {
   }
 
   /** scan からの登録。タグも置き換える */
-  upsertWork(work: Work): void {
+  upsertWork(work: Work, options?: { fingerprint?: string }): void {
     // 2DBをまたぐ原子性には依存せず、user状態を先に冪等作成してからcatalogを書く。
     this.db.user
       .insert(workStates)
@@ -680,7 +782,7 @@ export class WorkRepo {
     const trackCount =
       defaultPlaylistOf({ id: work.id, defaultPlaylistId: work.defaultPlaylistId }, work.playlists)
         ?.tracks.length ?? 0;
-    const values = {
+    const values: typeof works.$inferInsert = {
       id: work.id,
       title: work.title,
       titleSortKey: japaneseSortKey(work.title),
@@ -691,6 +793,7 @@ export class WorkRepo {
       physicalPath: work.physicalPath,
       totalDurationSec: work.totalDurationSec,
       trackCount,
+      fingerprint: options?.fingerprint ?? null,
       errorMessage: work.errorMessage,
       urlsJson: JSON.stringify(work.urls),
       playlistsJson: JSON.stringify(work.playlists),
@@ -731,11 +834,6 @@ export class WorkRepo {
     }
     this.replaceWorkTags(work.id, work.tags);
     this.setDlsiteState(work.id, work.dlsite);
-  }
-
-  /** Playlist/Track関係表は現在見つかるメタだけから毎スキャン再構築する。 */
-  clearPlaybackRelations(): void {
-    this.db.catalog.delete(catalogPlaylists).run();
   }
 
   /** PATCH /works/:id および DLsite 適用の DB 側。メタファイル書き戻しは呼び出し側（アダプタ）が行う */
