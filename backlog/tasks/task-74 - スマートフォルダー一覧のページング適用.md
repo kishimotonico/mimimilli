@@ -1,7 +1,7 @@
 ---
 id: TASK-74
 title: スマートフォルダー一覧のページング適用
-status: In Progress
+status: Done
 assignee:
   - '@kimi'
 created_date: '2026-07-19 04:26'
