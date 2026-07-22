@@ -1,6 +1,11 @@
 // GET/POST /smart-folders, PUT/DELETE /smart-folders/:id, GET /smart-folders/:id/works
 import { Hono } from "hono";
-import { smartFolderCreateSchema, smartFolderUpdateSchema } from "@mimimilli/shared";
+import {
+  smartFolderCreateSchema,
+  smartFolderUpdateSchema,
+  smartFolderWorksQuerySchema,
+  WORKS_DEFAULT_PAGE_SIZE,
+} from "@mimimilli/shared";
 import type { DataAdapter } from "../adapter.ts";
 import { invalidRequest, notFound } from "../lib/httpError.ts";
 
@@ -40,9 +45,17 @@ export function smartFoldersRoute(adapter: DataAdapter): Hono {
   });
 
   app.get("/smart-folders/:id/works", async (c) => {
-    const works = await adapter.evalSmartFolder(c.req.param("id"));
-    if (!works) notFound(`スマートフォルダーが見つかりません: ${c.req.param("id")}`);
-    return c.json(works);
+    const parsed = smartFolderWorksQuerySchema.safeParse(c.req.query());
+    if (!parsed.success) {
+      invalidRequest("スマートフォルダーのクエリパラメータが不正です");
+    }
+    const page = await adapter.evalSmartFolder(c.req.param("id"), {
+      page: parsed.data.page ?? 1,
+      limit: parsed.data.limit ?? WORKS_DEFAULT_PAGE_SIZE,
+      seed: parsed.data.seed,
+    });
+    if (!page) notFound(`スマートフォルダーが見つかりません: ${c.req.param("id")}`);
+    return c.json(page);
   });
 
   return app;

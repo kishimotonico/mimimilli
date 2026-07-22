@@ -289,9 +289,11 @@ describe("library api", () => {
   });
 
   it("evalSmartFolder fetches /api/smart-folders/:id/works", async () => {
-    mockFetch.mockResolvedValue(makeResponse([]));
-    await libraryApi.evalSmartFolder("sf-1");
-    expect(mockFetch).toHaveBeenCalledWith("/api/smart-folders/sf-1/works");
+    const mockPage = { items: [makeWorkSummary({ id: "work-1" })], total: 1 };
+    mockFetch.mockResolvedValue(makeResponse(mockPage));
+    const result = await libraryApi.evalSmartFolder("sf-1", { page: 1, limit: 200 });
+    expect(mockFetch).toHaveBeenCalledWith("/api/smart-folders/sf-1/works?page=1&limit=200");
+    expect(result).toEqual(mockPage);
   });
 
   it("exportLibrary POSTs to /api/export and returns data string", async () => {

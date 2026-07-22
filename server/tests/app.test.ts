@@ -176,8 +176,9 @@ test("スマートフォルダーの作品一覧は保存済み sort を適用�
 
   const worksRes = await app.request(`/api/smart-folders/${folder.id}/works`);
   assert.equal(worksRes.status, 200);
-  const works = await worksRes.json();
-  const titles = works.map((work: { title: string }) => work.title);
+  const page = await worksRes.json();
+  assert.equal(typeof page.total, "number");
+  const titles = page.items.map((work: { title: string }) => work.title);
   const expected = [...titles].sort((a, b) => compareJapaneseSortKeys(b, a));
   assert.deepEqual(titles, expected);
 });
@@ -193,8 +194,10 @@ test("randomソートのスマートフォルダーも作品一覧を返す", as
 
   const worksRes = await app.request(`/api/smart-folders/${folder.id}/works`);
   assert.equal(worksRes.status, 200);
-  const works = await worksRes.json();
-  assert.ok(works.length > 0);
+  const page = await worksRes.json();
+  assert.equal(typeof page.total, "number");
+  assert.ok(page.items.length > 0);
+  assert.equal(typeof page.seed, "number");
 });
 
 test("未知ルートは404 + not_found", async () => {

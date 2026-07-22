@@ -34,8 +34,14 @@ export const worksPageSchema = z.object({
 });
 export type WorksPage = z.infer<typeof worksPageSchema>;
 
-/** GET /api/smart-folders/:id/works の評価結果 */
-export const workSummaryListSchema = z.array(workSummarySchema);
+/** GET /api/smart-folders/:id/works のクエリパラメータ。
+ *  ソートはフォルダー自身が保持するため、page/limit/seed のみを受け取る */
+export const smartFolderWorksQuerySchema = worksQuerySchema.pick({
+  page: true,
+  limit: true,
+  seed: true,
+});
+export type SmartFolderWorksQuery = z.infer<typeof smartFolderWorksQuerySchema>;
 
 /** GET /api/tags */
 export const tagListSchema = z.array(z.string());

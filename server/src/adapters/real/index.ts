@@ -32,7 +32,6 @@ import type {
   WorkPatch,
   WorksPage,
   WorksQuery,
-  WorkSummary,
 } from "@mimimilli/shared";
 import {
   NotConfiguredError,
@@ -244,10 +243,13 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
     async deleteSmartFolder(id: string): Promise<boolean> {
       return repo.deleteSmartFolder(id);
     },
-    async evalSmartFolder(id: string): Promise<WorkSummary[] | null> {
+    async evalSmartFolder(
+      id: string,
+      query: { page: number; limit: number; seed?: number },
+    ): Promise<WorksPage | null> {
       const folder = repo.getSmartFolder(id);
       if (!folder) return null;
-      return evalSmartFolder(folder, repo.listSummaries());
+      return evalSmartFolder(folder, repo.listSummaries(), query);
     },
 
     async listPresets(): Promise<SearchPreset[]> {

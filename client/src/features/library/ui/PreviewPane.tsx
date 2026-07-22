@@ -16,6 +16,7 @@ interface PreviewPaneProps {
   smartFolder: SmartFolder | null;
   axisWorks: WorkSummary[];
   smartFolderWorks: WorkSummary[];
+  smartFolderTotal?: number;
   playingTrackIndex: number | null;
   isPlaybackActive?: boolean;
   onPlay: (trackIndex: number) => void;
@@ -35,6 +36,7 @@ export default function PreviewPane({
   smartFolder,
   axisWorks,
   smartFolderWorks,
+  smartFolderTotal,
   playingTrackIndex,
   isPlaybackActive,
   onPlay,
@@ -83,6 +85,7 @@ export default function PreviewPane({
         <SmartFolderView
           sf={smartFolder}
           works={smartFolderWorks}
+          total={smartFolderTotal}
           onEdit={() => onEditSmartFolder(smartFolder)}
         />
       )}

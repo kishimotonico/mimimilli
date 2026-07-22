@@ -36,8 +36,8 @@ pnpm workspace のモノレポで、`client/` / `server/` / `shared/` の3パッ
 サーバー内部は3層に分かれるが、過剰なレイヤリングは避ける方針で、各層の責務は最小限にとどめている。
 
 - `routes/`（`server/src/routes/`）: HTTP とバリデーションだけを担う薄い層。ドメインロジックは持たない
-- `core/`（`server/src/core/`）: 純粋関数によるドメイン処理。`worksQuery`（検索・フィルタ・ソート・ページング）、`axisFacets`（分類軸の値集計）、`smartFolder`（スマートフォルダー条件の評価）の3つがある。fixture アダプタはインメモリ配列をこの純粋関数群（`applyWorksQuery` / `buildAxisFacets` / `evalSmartFolder`）に渡して検索・集計する
-- real アダプタの検索・ファセット集計は SQL で行う。`workRepo.ts` の `queryWorks()` が catalog に user を ATTACH した JOIN で件数とページを同じ絞り込み集合から求め（ADR-0008）、`getAxisFacets()` がタグ軸専用 SQL を含むファセット集計を担う。日本語ソートキー（`japaneseSortKey`）は書き込み時に列へ事前計算する。SQL と core 純粋関数の結果が一致することは `server/tests/real/worksQueryContract.test.ts` の同値性契約テストで担保する。スマートフォルダー評価だけは real でも `listSummaries()` + `evalSmartFolder` を使う
+- `core/`（`server/src/core/`）: 純粋関数によるドメイン処理。`worksQuery`（検索・フィルタ・ソート・ページング）、`axisFacets`（分類軸の値集計）、`smartFolder`（スマートフォルダー条件の評価・ソート・ページング）の3つがある。fixture アダプタはインメモリ配列をこの純粋関数群（`applyWorksQuery` / `buildAxisFacets` / `evalSmartFolder`）に渡して検索・集計する
+- real アダプタの検索・ファセット集計は SQL で行う。`workRepo.ts` の `queryWorks()` が catalog に user を ATTACH した JOIN で件数とページを同じ絞り込み集合から求め（ADR-0008）、`getAxisFacets()` がタグ軸専用 SQL を含むファセット集計を担う。日本語ソートキー（`japaneseSortKey`）は書き込み時に列へ事前計算する。SQL と core 純粋関数の結果が一致することは `server/tests/real/worksQueryContract.test.ts` の同値性契約テストで担保する。スマートフォルダー評価だけは real でも `listSummaries()` + `evalSmartFolder` を使い、戻り値は `WorksPage`（ページングエンベロープ）である
 - `adapters/`（`server/src/adapters/`）: `DataAdapter` インターフェース（`server/src/adapter.ts`）でデータの出どころ（real | fixture）だけを差し替える。ルーターとドメインロジックは1系統のみ
 
 新機能は `shared` → fixture アダプタ → real アダプタの順に実装を揃える（fixture が先行してよい）。

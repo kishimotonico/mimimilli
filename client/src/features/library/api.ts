@@ -11,7 +11,6 @@ import {
   tagPrefixCandidateListSchema,
   smartFolderSchema,
   smartFolderListSchema,
-  workSummaryListSchema,
   exportResponseSchema,
   type AxisFacetItem,
   type FacetAxisId,
@@ -25,7 +24,6 @@ import {
   type TagPrefixUpdate,
   type ViewId,
   type WorksPage,
-  type WorkSummary,
 } from "@mimimilli/shared";
 
 // ── 作品検索（GET /api/works）────────────────────────────────
@@ -108,8 +106,21 @@ export async function deleteSmartFolder(id: string): Promise<void> {
   await deleteVoid(`/smart-folders/${encodeURIComponent(id)}`);
 }
 
-export async function evalSmartFolder(id: string): Promise<WorkSummary[]> {
-  return getParsed(workSummaryListSchema, `/smart-folders/${encodeURIComponent(id)}/works`);
+export async function evalSmartFolder(
+  id: string,
+  params: { page: number; limit: number; seed?: number },
+  options?: { signal?: AbortSignal },
+): Promise<WorksPage> {
+  const p = new URLSearchParams();
+  if (params.seed !== undefined) p.set("seed", String(params.seed));
+  p.set("page", String(params.page));
+  p.set("limit", String(params.limit));
+  const q = p.toString();
+  return getParsed(
+    worksPageSchema,
+    `/smart-folders/${encodeURIComponent(id)}/works${q ? `?${q}` : ""}`,
+    options,
+  );
 }
 
 // ── エクスポート ──────────────────────────────────────────────

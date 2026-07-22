@@ -1,6 +1,6 @@
 // スマートフォルダーのルール評価（GET /api/smart-folders/:id/works）の純粋関数。
 // shared スキーマが許可した field/operator のみを評価する。DB 内の不正値も黙って無視しない。
-import type { SmartFolder, SmartFolderRule, WorkSummary } from "@mimimilli/shared";
+import type { SmartFolder, SmartFolderRule, WorksPage, WorkSummary } from "@mimimilli/shared";
 import { tagEquals } from "@mimimilli/shared";
 import { createRandomSeed, sortWorkSummaries } from "./worksQuery.ts";
 
@@ -51,11 +51,19 @@ export function evalSmartFolderRules(
   return works.filter((work) => resultIds.has(work.id));
 }
 
-/** 保存済みルールと sort を一体で評価する。 */
+/** 保存済みルールと sort を一体で評価し、ページングエンベロープを返す。
+ *  total はソート後・ページング前の評価結果件数。random ソート時は seed を発行・継承する。 */
 export function evalSmartFolder(
   folder: Pick<SmartFolder, "rules" | "sort">,
   works: WorkSummary[],
-): WorkSummary[] {
-  const seed = folder.sort === "random" ? createRandomSeed() : undefined;
-  return sortWorkSummaries(evalSmartFolderRules(folder.rules, works), folder.sort, seed);
+  query: { page: number; limit: number; seed?: number },
+): WorksPage {
+  const seed = folder.sort === "random" ? (query.seed ?? createRandomSeed()) : undefined;
+  const matched = sortWorkSummaries(evalSmartFolderRules(folder.rules, works), folder.sort, seed);
+
+  const total = matched.length;
+  const start = (query.page - 1) * query.limit;
+  const items = matched.slice(start, start + query.limit);
+
+  return seed === undefined ? { items, total } : { items, total, seed };
 }

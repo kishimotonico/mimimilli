@@ -125,9 +125,13 @@ test("DB に不正ルールが混入しても評価時に黙って無視しな�
 });
 
 test("保存済み sort を評価結果へ適用する", () => {
-  const result = evalSmartFolder({ rules: [], sort: "title-desc" }, WORKS);
+  const result = evalSmartFolder({ rules: [], sort: "title-desc" }, WORKS, {
+    page: 1,
+    limit: 100,
+  });
   assert.deepEqual(
-    result.map((w) => w.id),
+    result.items.map((w) => w.id),
     ["RJ004", "RJ003", "RJ002", "RJ001"],
   );
+  assert.equal(result.total, 4);
 });

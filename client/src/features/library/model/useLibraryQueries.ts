@@ -85,21 +85,45 @@ export function useLibraryQueries(nav: LibraryViewState, searchQuery: string) {
 
   const smartAxisId = isSmartAxis(nav.activeAxis) ? getSmartFolderId(nav.activeAxis) : null;
 
-  const smartWorksQuery = useQuery({
+  // スマートフォルダー軸もページ蓄積。random ソート時は seed を次ページへ引き継ぐ（TASK-74）
+  const smartWorksQuery = useInfiniteQuery({
     queryKey: SMART_FOLDER_QUERY_KEYS.works(smartAxisId ?? ""),
-    queryFn: () => evalSmartFolder(smartAxisId!),
+    queryFn: ({ pageParam, signal }) =>
+      evalSmartFolder(
+        smartAxisId!,
+        {
+          page: pageParam.page,
+          limit: WORKS_DEFAULT_PAGE_SIZE,
+          seed: pageParam.seed,
+        },
+        { signal },
+      ),
+    initialPageParam: { page: 1, seed: undefined } as WorksPageParam,
+    getNextPageParam: (lastPage, allPages, lastPageParam): WorksPageParam | undefined => {
+      const loadedCount = allPages.reduce((sum, page) => sum + page.items.length, 0);
+      if (lastPage.items.length === 0 || loadedCount >= lastPage.total) return undefined;
+      return { page: lastPageParam.page + 1, seed: lastPage.seed ?? lastPageParam.seed };
+    },
     enabled: smartAxisId !== null,
   });
 
   const works = isSmartAxis(nav.activeAxis)
-    ? (smartWorksQuery.data ?? [])
+    ? (smartWorksQuery.data?.pages.flatMap((page) => page.items) ?? [])
     : (worksQuery.data?.pages.flatMap((page) => page.items) ?? []);
   const isLoading = isSmartAxis(nav.activeAxis) ? smartWorksQuery.isPending : worksQuery.isPending;
   const isError = isSmartAxis(nav.activeAxis) ? smartWorksQuery.isError : worksQuery.isError;
-  // スマートフォルダー軸のページングは TASK-74 で扱う（通常一覧のみ追加読み込み）
-  const hasNextPage = !isSmartAxis(nav.activeAxis) && (worksQuery.hasNextPage ?? false);
-  const pages = worksQuery.data?.pages;
-  const worksTotal = pages ? pages[pages.length - 1]?.total : undefined;
+  const hasNextPage = isSmartAxis(nav.activeAxis)
+    ? (smartWorksQuery.hasNextPage ?? false)
+    : (worksQuery.hasNextPage ?? false);
+  const isFetchingNextPage = isSmartAxis(nav.activeAxis)
+    ? smartWorksQuery.isFetchingNextPage
+    : worksQuery.isFetchingNextPage;
+  const fetchNextPage = isSmartAxis(nav.activeAxis)
+    ? smartWorksQuery.fetchNextPage
+    : worksQuery.fetchNextPage;
+  const worksTotal = isSmartAxis(nav.activeAxis)
+    ? smartWorksQuery.data?.pages[smartWorksQuery.data.pages.length - 1]?.total
+    : (worksQuery.data?.pages[worksQuery.data.pages.length - 1]?.total ?? undefined);
 
   // ── ライブラリ総件数 ──────────────────────────────────────
   const libraryTotalQuery = useQuery({
@@ -180,8 +204,8 @@ export function useLibraryQueries(nav: LibraryViewState, searchQuery: string) {
     isError,
     hasNextPage,
     worksTotal,
-    isFetchingNextPage: worksQuery.isFetchingNextPage,
-    fetchNextPage: worksQuery.fetchNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
     libraryTotal: libraryTotalQuery.data,
     facetItems: facetQuery.data ?? [],
     smartFolders,

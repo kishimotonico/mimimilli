@@ -65,10 +65,12 @@ function RuleValue({ rule }: { rule: SmartFolderRule }) {
 export function SmartFolderView({
   sf,
   works,
+  total,
   onEdit,
 }: {
   sf: SmartFolder;
   works: WorkSummary[];
+  total?: number;
   onEdit: () => void;
 }) {
   return (
@@ -100,7 +102,7 @@ export function SmartFolderView({
         </div>
         <div className="mll-smart__ft">
           <span className="hits">
-            <b>{works.length}</b> 件マッチ
+            <b>{total ?? works.length}</b> 件マッチ
           </span>
           <span className="right">
             <Button variant="ghost" icon={I.cog} onClick={onEdit}>

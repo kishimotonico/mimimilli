@@ -373,10 +373,13 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
       return state.smartFolders.length < before;
     },
 
-    async evalSmartFolder(id: string): Promise<WorkSummary[] | null> {
+    async evalSmartFolder(
+      id: string,
+      query: { page: number; limit: number; seed?: number },
+    ): Promise<WorksPage | null> {
       const folder = state.smartFolders.find((f) => f.id === id);
       if (!folder) return null;
-      return evalSmartFolder(folder, state.works);
+      return evalSmartFolder(folder, state.works, query);
     },
 
     async listPresets(): Promise<SearchPreset[]> {

@@ -244,6 +244,7 @@ export default function LibraryView({
           smartFolder={activeSmartFolder}
           axisWorks={works}
           smartFolderWorks={works}
+          smartFolderTotal={worksTotal}
           playingTrackIndex={
             selectedWork && playingWorkId === selectedWork.id ? (playingTrackIndex ?? null) : null
           }
