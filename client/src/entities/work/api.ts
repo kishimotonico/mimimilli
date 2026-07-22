@@ -11,8 +11,11 @@ import {
   dlsiteBulkStartResponseSchema,
   fileEntrySchema,
   type Work,
-  type WorkSummary,
   type WorksPage,
+  dlsiteNotificationPageSchema,
+  dlsiteNotificationSummarySchema,
+  type DlsiteNotificationPage,
+  type DlsiteNotificationSummary,
   type WorkPatch,
   type FileEntry,
   type DlsiteWorkInfo,
@@ -36,10 +39,16 @@ export async function queryWorks(params: Record<string, string | number>): Promi
   return getParsed(worksPageSchema, `/works${q ? `?${q}` : ""}`);
 }
 
-/** スキャン後の新規作品検出など、全件取得が必要な場合に使う */
-export async function getAllWorks(): Promise<WorkSummary[]> {
-  const page = await queryWorks({});
-  return page.items;
+export async function getDlsiteNotificationSummary(): Promise<DlsiteNotificationSummary> {
+  return getParsed(dlsiteNotificationSummarySchema, "/dlsite/notifications");
+}
+
+export async function queryDlsiteNotifications(
+  kind: "rj-missing" | "fetch-failed",
+  params: { page: number; limit: number },
+): Promise<DlsiteNotificationPage> {
+  const query = new URLSearchParams({ page: String(params.page), limit: String(params.limit) });
+  return getParsed(dlsiteNotificationPageSchema, `/dlsite/notifications/${kind}?${query}`);
 }
 
 export async function patchWork(workId: string, body: WorkPatch): Promise<Work> {

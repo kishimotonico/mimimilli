@@ -1,7 +1,8 @@
 // エンドポイント横断の契約: 作品検索クエリ、ページングエンベロープ、部分更新、エラー形式。
 import { z } from "zod";
 import { facetAxisIdSchema, sortIdSchema, viewIdSchema } from "./library.ts";
-import { normalizeTags, resumeSchema, workSummarySchema } from "./work.ts";
+import { normalizeTags, resumeSchema, workListItemSchema } from "./work.ts";
+import { dlsiteStatusSchema } from "./dlsite.ts";
 
 // ── 作品検索（GET /api/works）────────────────────────────────
 
@@ -28,7 +29,7 @@ export type WorksQuery = z.infer<typeof worksQuerySchema>;
 /** ページングエンベロープ。total は検索・フィルター後・ページング前の件数。
  *  サーバーは page/limit 未指定でもデフォルト（page=1, limit=WORKS_DEFAULT_PAGE_SIZE）でページングする */
 export const worksPageSchema = z.object({
-  items: z.array(workSummarySchema),
+  items: z.array(workListItemSchema),
   total: z.number().int().nonnegative(),
   seed: z.number().int().min(0).max(0x7fffffff).optional(),
 });
@@ -42,6 +43,36 @@ export const smartFolderWorksQuerySchema = worksQuerySchema.pick({
   seed: true,
 });
 export type SmartFolderWorksQuery = z.infer<typeof smartFolderWorksQuerySchema>;
+
+// ── DLsite 通知 ─────────────────────────────────────────────
+
+/** 通知ベルが表示するDLsite状態の集計。通常の作品一覧とは独立して取得する。 */
+export const dlsiteNotificationSummarySchema = z.object({
+  rjCodeMissingCount: z.number().int().nonnegative(),
+  fetchFailedCount: z.number().int().nonnegative(),
+  unlinkedCount: z.number().int().nonnegative(),
+});
+export type DlsiteNotificationSummary = z.infer<typeof dlsiteNotificationSummarySchema>;
+
+/** RJ未検出・取得失敗モーダルの最小行DTO。 */
+export const dlsiteNotificationItemSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  status: dlsiteStatusSchema,
+});
+export type DlsiteNotificationItem = z.infer<typeof dlsiteNotificationItemSchema>;
+
+export const dlsiteNotificationPageSchema = z.object({
+  items: z.array(dlsiteNotificationItemSchema),
+  total: z.number().int().nonnegative(),
+});
+export type DlsiteNotificationPage = z.infer<typeof dlsiteNotificationPageSchema>;
+
+export const dlsiteNotificationQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(500).optional(),
+});
+export type DlsiteNotificationQuery = z.infer<typeof dlsiteNotificationQuerySchema>;
 
 /** GET /api/tags */
 export const tagListSchema = z.array(z.string());

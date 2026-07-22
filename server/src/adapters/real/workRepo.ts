@@ -16,6 +16,9 @@ import {
 import type {
   AxisFacetItem,
   DlsiteState,
+  DlsiteNotificationPage,
+  DlsiteNotificationQuery,
+  DlsiteNotificationSummary,
   Playlist,
   ResumeBody,
   SearchPreset,
@@ -74,6 +77,17 @@ type SummaryRow = Pick<
 type RawSummaryListRow = Omit<SummaryRow, "bookmarked"> & {
   bookmarked: number;
   dlsiteStateJson: string | null;
+};
+/** GET /works の公開DTOを作るためだけの軽量な行。JSON列や物理パスは含めない。 */
+type RawWorkListRow = {
+  id: string;
+  title: string;
+  coverImage: string | null;
+  status: WorkSummary["status"];
+  totalDurationSec: number;
+  trackCount: number;
+  bookmarked: number;
+  lastPlayedAt: string | null;
 };
 
 /**
@@ -315,6 +329,28 @@ export class WorkRepo {
       const list = map.get(r.workId);
       if (list) list.push(r.name);
       else map.set(r.workId, [r.name]);
+    }
+    return map;
+  }
+
+  /** 一覧で使うサークル名だけをページ対象へ一括取得する。タグ全体は復元しない。 */
+  private circleNameMap(workIds: string[]): Map<string, string> {
+    if (workIds.length === 0) return new Map();
+    const rows = this.db.sqlite
+      .query(
+        `
+          SELECT work_tags.work_id AS workId, tags.name AS name
+          FROM main.work_tags AS work_tags
+          INNER JOIN main.tags AS tags ON tags.id = work_tags.tag_id
+          WHERE work_tags.work_id IN (${workIds.map(() => "?").join(", ")})
+            AND (tags.name LIKE 'サークル/%' OR tags.name LIKE 'circle/%')
+          ORDER BY work_tags.work_id, tags.name COLLATE BINARY ASC
+        `,
+      )
+      .all(...workIds) as Array<{ workId: string; name: string }>;
+    const map = new Map<string, string>();
+    for (const row of rows) {
+      if (!map.has(row.workId)) map.set(row.workId, row.name.slice(row.name.indexOf("/") + 1));
     }
     return map;
   }
@@ -572,7 +608,8 @@ export class WorkRepo {
         params.page !== undefined && params.limit !== undefined
           ? [params.limit, (params.page - 1) * params.limit]
           : [];
-      // 一覧用の列だけを取得する（playlists_json は読まない。TASK-57）
+      // 一覧DTOに必要なスカラー列だけを取得する。物理パス・JSON列・DLsite状態・タグ全体は
+      // ここで読まない。サークル名はページ対象だけを別クエリで一括取得する。
       const rows = this.db.sqlite
         .query(`
         SELECT
@@ -580,36 +617,99 @@ export class WorkRepo {
           works.title,
           works.cover_image AS coverImage,
           works.status,
-          works.physical_path AS physicalPath,
           works.total_duration_sec AS totalDurationSec,
           works.track_count AS trackCount,
-          works.error_message AS errorMessage,
-          works.urls_json AS urlsJson,
-          work_states.added_at AS addedAt,
           work_states.bookmarked,
-          work_states.last_played_at AS lastPlayedAt,
-          work_dlsite.state_json AS dlsiteStateJson
+          work_states.last_played_at AS lastPlayedAt
         ${fromSql}
-        LEFT JOIN main.work_dlsite AS work_dlsite ON work_dlsite.work_id = works.id
         ${whereSql}
         ORDER BY ${orderSql}
         ${paginationSql}
       `)
-        .all(...bindings, ...orderBindings, ...paginationBindings) as RawSummaryListRow[];
+        .all(...bindings, ...orderBindings, ...paginationBindings) as RawWorkListRow[];
       const workIds = rows.map((row) => row.id);
-      const tagsByWork = this.tagMap(workIds);
-      const items = rows.map((rawRow) => {
-        const row: SummaryRow = { ...rawRow, bookmarked: rawRow.bookmarked !== 0 };
-        return rowToSummary(
-          row,
-          tagsByWork.get(row.id) ?? [],
-          this.parseDlsiteStateJson(row.id, rawRow.dlsiteStateJson),
-        );
-      });
+      const circleNames = this.circleNameMap(workIds);
+      const items = rows.map((row) => ({
+        id: row.id,
+        title: row.title,
+        coverImage: row.coverImage,
+        status: row.status,
+        totalDurationSec: row.totalDurationSec,
+        trackCount: row.trackCount,
+        bookmarked: row.bookmarked !== 0,
+        lastPlayedAt: row.lastPlayedAt,
+        circleName: circleNames.get(row.id) ?? null,
+      }));
       return seed === undefined
         ? { items, total: countRow.total }
         : { items, total: countRow.total, seed };
     });
+  }
+
+  /** 通知ベル専用の集計。作品一覧を経由せず、DLsite状態だけを一括評価する。 */
+  getDlsiteNotificationSummary(): DlsiteNotificationSummary {
+    const row = this.db.sqlite
+      .query(
+        `
+          SELECT
+            SUM(CASE WHEN json_extract(work_dlsite.state_json, '$.rjCode') IS NULL
+                           AND COALESCE(json_extract(work_dlsite.state_json, '$.status'), 'none') != 'skipped'
+                     THEN 1 ELSE 0 END) AS rjCodeMissingCount,
+            SUM(CASE WHEN json_extract(work_dlsite.state_json, '$.status') IN ('error', 'not_found')
+                     THEN 1 ELSE 0 END) AS fetchFailedCount,
+            SUM(CASE WHEN json_extract(work_dlsite.state_json, '$.rjCode') IS NOT NULL
+                           AND json_extract(work_dlsite.state_json, '$.status') = 'none'
+                     THEN 1 ELSE 0 END) AS unlinkedCount
+          FROM main.works AS works
+          LEFT JOIN main.work_dlsite AS work_dlsite ON work_dlsite.work_id = works.id
+        `,
+      )
+      .get() as {
+      rjCodeMissingCount: number | null;
+      fetchFailedCount: number | null;
+      unlinkedCount: number | null;
+    };
+    return {
+      rjCodeMissingCount: row.rjCodeMissingCount ?? 0,
+      fetchFailedCount: row.fetchFailedCount ?? 0,
+      unlinkedCount: row.unlinkedCount ?? 0,
+    };
+  }
+
+  /** RJ未検出・取得失敗モーダルのページ。物理パス等を返さない専用DTO。 */
+  queryDlsiteNotifications(
+    kind: "rj-missing" | "fetch-failed",
+    query: Required<DlsiteNotificationQuery>,
+  ): DlsiteNotificationPage {
+    const condition =
+      kind === "rj-missing"
+        ? `json_extract(work_dlsite.state_json, '$.rjCode') IS NULL
+           AND COALESCE(json_extract(work_dlsite.state_json, '$.status'), 'none') != 'skipped'`
+        : `json_extract(work_dlsite.state_json, '$.status') IN ('error', 'not_found')`;
+    const count = this.db.sqlite
+      .query(
+        `SELECT COUNT(*) AS total
+         FROM main.works AS works
+         LEFT JOIN main.work_dlsite AS work_dlsite ON work_dlsite.work_id = works.id
+         WHERE ${condition}`,
+      )
+      .get() as { total: number };
+    const rows = this.db.sqlite
+      .query(
+        `SELECT works.id AS id, works.title AS title,
+                COALESCE(json_extract(work_dlsite.state_json, '$.status'), 'none') AS status
+         FROM main.works AS works
+         LEFT JOIN main.work_dlsite AS work_dlsite ON work_dlsite.work_id = works.id
+         WHERE ${condition}
+         ORDER BY works.title_sort_key COLLATE BINARY ASC, works.id COLLATE BINARY ASC
+         LIMIT ? OFFSET ?`,
+      )
+      .all(query.limit, (query.page - 1) * query.limit) as Array<{
+      id: string;
+      title: string;
+      status: "none" | "applied" | "not_found" | "error" | "skipped";
+    }>;
+    return { items: rows, total: count.total };
   }
 
   /**

@@ -1,23 +1,17 @@
-// DLsite未連携（RJコードは判明しているが取得を一度も試みていない）作品の件数。
-// 通知ベルの「まとめて取得」対象件数として表示する（TASK-44）。判定基準は
-// @mimimilli/shared の isDlsiteUnlinked を正典とする。
 import { useQuery } from "@tanstack/react-query";
-import { isDlsiteUnlinked } from "@mimimilli/shared";
-import type { WorkSummary } from "@mimimilli/shared";
-import { getAllWorks } from "../../../entities/work/api";
+import { isDlsiteUnlinked, type WorkSummary } from "@mimimilli/shared";
+import { getDlsiteNotificationSummary } from "../../../entities/work/api";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 
+/** 後方互換の純粋関数。通知件数は専用APIで取得する。 */
 export function filterDlsiteUnlinkedWorks(works: WorkSummary[]): WorkSummary[] {
   return works.filter((work) => isDlsiteUnlinked(work.dlsite));
 }
 
-/** DLsite未連携の作品件数。他のDLsite系フックと同じく WORK_QUERY_KEYS.all() を共有し、
- *  一括取得完了時の invalidateQueries で自動的に再取得される。 */
 export function useDlsiteUnlinkedCount() {
   const query = useQuery({
-    queryKey: WORK_QUERY_KEYS.all(),
-    queryFn: getAllWorks,
+    queryKey: WORK_QUERY_KEYS.dlsiteNotificationSummary(),
+    queryFn: getDlsiteNotificationSummary,
   });
-  const count = query.data ? filterDlsiteUnlinkedWorks(query.data).length : 0;
-  return { count, isLoading: query.isPending };
+  return { count: query.data?.unlinkedCount ?? 0, isLoading: query.isPending };
 }

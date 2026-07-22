@@ -2,7 +2,7 @@ import {
   parseTag,
   type SmartFolder,
   type SmartFolderRule,
-  type WorkSummary,
+  type WorkListItem,
 } from "@mimimilli/shared";
 import { I } from "../../../../shared/ui/Icon";
 import Button from "../../../../shared/ui/Button";
@@ -69,7 +69,7 @@ export function SmartFolderView({
   onEdit,
 }: {
   sf: SmartFolder;
-  works: WorkSummary[];
+  works: WorkListItem[];
   total?: number;
   onEdit: () => void;
 }) {

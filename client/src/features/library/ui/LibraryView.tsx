@@ -1,5 +1,10 @@
 import { useCallback, useMemo, useState } from "react";
-import type { Work, WorkSummary } from "@mimimilli/shared";
+import {
+  getDefaultPlaylistTrackCount,
+  toWorkListItem,
+  type Work,
+  type WorkListItem,
+} from "@mimimilli/shared";
 import type { GridLayoutMode, ViewMode } from "../model/types";
 import { useLibraryView } from "../model/useLibraryNavigation";
 import { useLibraryQueries, useSmartFolderMutation } from "../model/useLibraryQueries";
@@ -29,7 +34,7 @@ interface LibraryViewProps {
   playingWorkId?: string;
   playingTrackIndex?: number;
   isPlaybackActive?: boolean;
-  onPlay: (work: WorkSummary, trackIndex: number) => void;
+  onPlay: (work: WorkListItem, trackIndex: number) => void;
   onResume: (work: Work) => void;
   viewMode: ViewMode;
   tileSize: number;
@@ -136,23 +141,13 @@ export default function LibraryView({
   const handlePlay = useCallback(
     (trackIndex: number) => {
       if (selectedWork) {
-        const summary: Parameters<typeof onPlay>[0] = {
-          id: selectedWork.id,
-          title: selectedWork.title,
-          coverImage: selectedWork.coverImage,
-          status: selectedWork.status,
-          physicalPath: selectedWork.physicalPath,
-          totalDurationSec: selectedWork.totalDurationSec,
-          addedAt: selectedWork.addedAt,
-          errorMessage: selectedWork.errorMessage,
-          urls: selectedWork.urls,
-          tags: selectedWork.tags,
-          trackCount: selectedWork.playlists[0]?.tracks.length ?? 0,
-          bookmarked: selectedWork.bookmarked,
-          lastPlayedAt: selectedWork.lastPlayedAt,
-          dlsite: selectedWork.dlsite,
-        };
-        onPlay(summary, trackIndex);
+        onPlay(
+          toWorkListItem({
+            ...selectedWork,
+            trackCount: getDefaultPlaylistTrackCount(selectedWork),
+          }),
+          trackIndex,
+        );
       }
     },
     [selectedWork, onPlay],

@@ -1,13 +1,34 @@
 // POST /dlsite/:id/fetch, POST /dlsite/:id/apply
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
-import { dlsiteApplyBodySchema, dlsiteStatePatchSchema } from "@mimimilli/shared";
+import {
+  dlsiteApplyBodySchema,
+  dlsiteNotificationQuerySchema,
+  dlsiteStatePatchSchema,
+} from "@mimimilli/shared";
 import type { DataAdapter } from "../adapter.ts";
 import { apiError, invalidRequest, notFound } from "../lib/httpError.ts";
 import { enqueueDlsiteJob, isDlsiteJobInProgress, subscribeToDlsite } from "./dlsiteProgress.ts";
 
 export function dlsiteRoute(adapter: DataAdapter): Hono {
   const app = new Hono();
+
+  app.get("/dlsite/notifications", async (c) =>
+    c.json(await adapter.getDlsiteNotificationSummary()),
+  );
+
+  app.get("/dlsite/notifications/:kind", async (c) => {
+    const kind = c.req.param("kind");
+    if (kind !== "rj-missing" && kind !== "fetch-failed") notFound("通知種別が見つかりません");
+    const parsed = dlsiteNotificationQuerySchema.safeParse(c.req.query());
+    if (!parsed.success) invalidRequest("DLsite通知のクエリパラメータが不正です");
+    return c.json(
+      await adapter.queryDlsiteNotifications(kind, {
+        page: parsed.data.page ?? 1,
+        limit: parsed.data.limit ?? 200,
+      }),
+    );
+  });
 
   app.post("/dlsite/:id/fetch", async (c) => {
     const result = await adapter.dlsiteFetch(c.req.param("id"));

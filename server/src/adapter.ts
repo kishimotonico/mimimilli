@@ -5,6 +5,9 @@
 import type {
   AxisFacetItem,
   DlsiteApplyBody,
+  DlsiteNotificationPage,
+  DlsiteNotificationQuery,
+  DlsiteNotificationSummary,
   DlsiteFetchResult,
   DlsiteBulkMode,
   DlsiteBulkProgressEvent,
@@ -62,6 +65,11 @@ export interface DataAdapter {
 
   // 作品
   queryWorks(params: WorksQuery): Promise<WorksPage>;
+  getDlsiteNotificationSummary(): Promise<DlsiteNotificationSummary>;
+  queryDlsiteNotifications(
+    kind: "rj-missing" | "fetch-failed",
+    query: Required<DlsiteNotificationQuery>,
+  ): Promise<DlsiteNotificationPage>;
   getWork(id: string): Promise<Work | null>;
   /** 更新後の Work を返す。存在しなければ null */
   patchWork(id: string, patch: WorkPatch): Promise<Work | null>;

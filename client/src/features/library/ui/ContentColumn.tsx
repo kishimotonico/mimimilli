@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useAtomValue } from "jotai";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import type { WorkSummary, AxisFacetItem } from "@mimimilli/shared";
+import type { WorkListItem, AxisFacetItem } from "@mimimilli/shared";
 import type { AxisId } from "../model/types";
 import { tagPrefixesAtom } from "../model/atoms";
 import { getAxisLabel, isFacetAxis, isSmartAxis } from "../model/axisDefinitions";
@@ -17,7 +17,7 @@ import Button from "../../../shared/ui/Button";
 interface ContentColumnProps {
   axis: AxisId;
   drillValue: string | null;
-  works: WorkSummary[];
+  works: WorkListItem[];
   /** 検索・軸・ソート・タグ・ドリル変更を検知してスクロール位置をリセットする key */
   worksQueryKey: string;
   facetItems: AxisFacetItem[];

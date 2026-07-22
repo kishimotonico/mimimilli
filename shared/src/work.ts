@@ -1,6 +1,7 @@
 // work ドメインのスキーマ。client/src/entities/work/model.ts の型を契約として固定したもの。
 import { z } from "zod";
 import { dlsiteStateSchema } from "./dlsite.ts";
+import { compareUtf8Bytes } from "./library.ts";
 
 export const urlEntrySchema = z.object({
   label: z.string(),
@@ -66,6 +67,38 @@ export const workSummarySchema = z.object({
 });
 export type WorkSummary = z.infer<typeof workSummarySchema>;
 
+/** 一覧表示専用の軽量な作品DTO。検索・詳細編集で必要な情報は含めない。 */
+export const workListItemSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  coverImage: z.string().nullable(),
+  status: workStatusSchema,
+  totalDurationSec: z.number(),
+  trackCount: z.number().int().nonnegative(),
+  bookmarked: z.boolean(),
+  lastPlayedAt: z.string().nullable(),
+  circleName: z.string().nullable(),
+});
+export type WorkListItem = z.infer<typeof workListItemSchema>;
+
+/** WorkSummary を一覧用の公開契約へ投影する。 */
+export function toWorkListItem(work: WorkSummary): WorkListItem {
+  const circleTag = work.tags
+    .filter((tag) => tag.startsWith("サークル/") || tag.startsWith("circle/"))
+    .sort(compareUtf8Bytes)[0];
+  return {
+    id: work.id,
+    title: work.title,
+    coverImage: work.coverImage,
+    status: work.status,
+    totalDurationSec: work.totalDurationSec,
+    trackCount: work.trackCount,
+    bookmarked: work.bookmarked,
+    lastPlayedAt: work.lastPlayedAt,
+    circleName: circleTag ? circleTag.slice(circleTag.indexOf("/") + 1) : null,
+  };
+}
+
 export function refinePlaylistCollection(
   playlists: Playlist[],
   defaultPlaylistId: string | null,
@@ -116,6 +149,16 @@ export const workSchema = workSummarySchema
     refinePlaylistCollection(work.playlists, work.defaultPlaylistId, ctx),
   );
 export type Work = z.infer<typeof workSchema>;
+
+/** 詳細作品から一覧と同じデフォルトプレイリスト基準のトラック数を求める。 */
+export function getDefaultPlaylistTrackCount(
+  work: Pick<Work, "playlists" | "defaultPlaylistId">,
+): number {
+  const playlist =
+    work.playlists.find((candidate) => candidate.id === work.defaultPlaylistId) ??
+    work.playlists[0];
+  return playlist?.tracks.length ?? 0;
+}
 
 /** 作品配下の物理ファイルツリー（GET /api/works/:id/files） */
 export interface FileEntry {

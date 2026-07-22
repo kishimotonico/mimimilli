@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo } from "react";
-import type { Track, Work, WorkSummary } from "../../../entities/work/model";
+import type { Track, Work, WorkListItem } from "../../../entities/work/model";
 import { getCircleName } from "../../../entities/work/model";
 import { getCoverImageUrl } from "../../../entities/work/api";
 
@@ -13,7 +13,7 @@ interface MediaSessionPosition {
 }
 
 interface UseMediaSessionOptions {
-  currentWork: WorkSummary | Work | null;
+  currentWork: WorkListItem | Work | null;
   currentTrack: Track | null;
   currentTrackIndex: number;
   trackCount: number;

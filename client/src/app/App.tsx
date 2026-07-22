@@ -29,7 +29,7 @@ import NewWorkPopup from "../features/scan/ui/NewWorkPopup";
 import RjCodeMissingModal from "../features/library/ui/RjCodeMissingModal";
 import DlsiteFetchFailedModal from "../features/library/ui/DlsiteFetchFailedModal";
 import Toast from "../shared/ui/Toast";
-import type { ScanResult, Work, WorkSummary } from "@mimimilli/shared";
+import type { ScanResult, Work, WorkListItem } from "@mimimilli/shared";
 import { getWork } from "../entities/work/api";
 import { exportLibrary } from "../features/library/api";
 import { scanLibrary } from "../features/scan/api";
@@ -117,6 +117,7 @@ export default function App() {
     onSuccess: (result) => {
       setScanResult(result);
       queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.all() });
+      queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.dlsiteNotifications() });
       queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.allFacets() });
       queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.allWorks() });
       queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() });
@@ -136,7 +137,7 @@ export default function App() {
 
   // ── Play handler ──────────────────────────────────────────
   const handlePlay = useCallback(
-    async (work: WorkSummary, trackIndex: number) => {
+    async (work: WorkListItem, trackIndex: number) => {
       // ファイル欠損・メタ読み込みエラーの作品は再生できない（UI側の無効化が第一線、これは防衛線）。
       if (work.status !== "ok") return;
       const requestId = ++playRequestIdRef.current;
@@ -234,6 +235,7 @@ export default function App() {
         const result = await scanLibrary();
         setScanResult(result);
         queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.all() });
+        queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.dlsiteNotifications() });
         queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.allFacets() });
         queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.allWorks() });
         queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), (prev: typeof settings) =>

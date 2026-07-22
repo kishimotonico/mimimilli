@@ -1,6 +1,20 @@
 // ライブラリ（検索・分類軸・スマートフォルダー・検索プリセット）の契約。
 import { z } from "zod";
 
+const utf8Encoder = new TextEncoder();
+
+/** SQLiteのBINARY照合と同じUTF-8バイト順で文字列を比較する。 */
+export function compareUtf8Bytes(a: string, b: string): number {
+  const aBytes = utf8Encoder.encode(a);
+  const bBytes = utf8Encoder.encode(b);
+  const length = Math.min(aBytes.length, bBytes.length);
+  for (let index = 0; index < length; index++) {
+    const difference = aBytes[index]! - bBytes[index]!;
+    if (difference !== 0) return difference;
+  }
+  return aBytes.length - bBytes.length;
+}
+
 // ── ソート ───────────────────────────────────────────────────
 
 export const sortIdSchema = z.enum([

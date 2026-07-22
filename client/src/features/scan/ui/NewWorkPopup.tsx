@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
-import type { ScanResult, WorkSummary } from "@mimimilli/shared";
-import { getAllWorks, patchWork } from "../../../entities/work/api";
+import { getDefaultPlaylistTrackCount, type ScanResult, type Work } from "@mimimilli/shared";
+import { getWork, patchWork } from "../../../entities/work/api";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
 
 interface NewWorkPopupProps {
@@ -28,7 +28,7 @@ const NewWorkPopup: React.FC<NewWorkPopupProps> = ({
   onClose,
   onOpenRjCodeMissing,
 }) => {
-  const [newWorks, setNewWorks] = useState<WorkSummary[]>([]);
+  const [newWorks, setNewWorks] = useState<Work[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const titleInputRef = useRef<HTMLInputElement | null>(null);
@@ -46,11 +46,8 @@ const NewWorkPopup: React.FC<NewWorkPopupProps> = ({
 
   useEffect(() => {
     if (scanResult.newWorkIds.length > 0) {
-      getAllWorks()
-        .then((all) => {
-          const found = all.filter((w) => scanResult.newWorkIds.includes(w.id));
-          setNewWorks(found);
-        })
+      Promise.all(scanResult.newWorkIds.map((id) => getWork(id)))
+        .then(setNewWorks)
         .catch(() => {});
     }
   }, [scanResult.newWorkIds]);
@@ -60,7 +57,7 @@ const NewWorkPopup: React.FC<NewWorkPopupProps> = ({
     titleInputRef.current?.focus({ preventScroll: true });
   }, [editingId]);
 
-  const handleStartEdit = (work: WorkSummary) => {
+  const handleStartEdit = (work: Work) => {
     setEditingId(work.id);
     setEditTitle(work.title);
   };
@@ -236,7 +233,7 @@ const NewWorkPopup: React.FC<NewWorkPopupProps> = ({
                     flexShrink: 0,
                   }}
                 >
-                  {work.trackCount} tracks
+                  {getDefaultPlaylistTrackCount(work)} tracks
                 </span>
               </div>
             ))}

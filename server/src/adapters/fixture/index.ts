@@ -1,6 +1,13 @@
 // fixture アダプタ: インメモリの seed データを使う DataAdapter 実装。
 // 開発・ビジュアルテスト用（ADR-0002）。core/ の pure 関数を使って全メソッドを実装する。
-import { DEFAULT_TAG_PREFIXES, isRjCodeMissing, normalizeTags } from "@mimimilli/shared";
+import {
+  DEFAULT_TAG_PREFIXES,
+  isDlsiteFetchFailed,
+  isDlsiteUnlinked,
+  isRjCodeMissing,
+  normalizeTags,
+  toWorkListItem,
+} from "@mimimilli/shared";
 import type {
   AxisFacetItem,
   DlsiteApplyBody,
@@ -8,6 +15,9 @@ import type {
   DlsiteBulkProgressEvent,
   DlsiteBulkResult,
   DlsiteFetchResult,
+  DlsiteNotificationPage,
+  DlsiteNotificationQuery,
+  DlsiteNotificationSummary,
   DlsiteStatePatch,
   FileEntry,
   FsListing,
@@ -37,6 +47,7 @@ import { InvalidResumeError } from "../../adapter.ts";
 import { buildAxisFacets } from "../../core/axisFacets.ts";
 import { buildTagPrefixCandidates } from "../../core/tagPrefixCandidates.ts";
 import { evalSmartFolder } from "../../core/smartFolder.ts";
+import { compareJapaneseSortKeys, compareUtf8Bytes } from "../../core/japaneseSortKey.ts";
 import { applyWorksQuery } from "../../core/worksQuery.ts";
 import { buildFsRoot, buildWorkFileTree, SEED_TRACK_NAMES, type FsNode } from "./data.ts";
 import {
@@ -64,9 +75,17 @@ interface FixtureState {
   scanNewWorkIds: string[];
 }
 
+function toListPage(page: { items: WorkSummary[]; total: number; seed?: number }): WorksPage {
+  return page.seed === undefined
+    ? { items: page.items.map(toWorkListItem), total: page.total }
+    : { items: page.items.map(toWorkListItem), total: page.total, seed: page.seed };
+}
+
 export interface FixtureAdapterOptions {
   /** データシナリオ（省略時 "default"）。不明なIDはエラー */
   scenario?: string;
+  /** 契約テスト用に差し替える作品一覧。省略時はscenarioのseedを使う。 */
+  works?: WorkSummary[];
 }
 
 function createInitialState(options: FixtureAdapterOptions): FixtureState {
@@ -80,7 +99,7 @@ function createInitialState(options: FixtureAdapterOptions): FixtureState {
   return {
     rootFolder: scenario.rootFolder,
     lastScanTime: scenario.lastScanTime,
-    works: scenario.works,
+    works: options.works ?? scenario.works,
     tagPrefixes: DEFAULT_TAG_PREFIXES.map((def) => ({ ...def })),
     smartFolders: scenario.smartFolders,
     presets: scenario.presets,
@@ -249,7 +268,34 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
 
     // ── 作品 ────────────────────────────────────────────────
     async queryWorks(params: WorksQuery): Promise<WorksPage> {
-      return applyWorksQuery(state.works, params);
+      return toListPage(applyWorksQuery(state.works, params));
+    },
+
+    async getDlsiteNotificationSummary(): Promise<DlsiteNotificationSummary> {
+      return {
+        rjCodeMissingCount: state.works.filter((work) => isRjCodeMissing(work.dlsite)).length,
+        fetchFailedCount: state.works.filter((work) => isDlsiteFetchFailed(work.dlsite)).length,
+        unlinkedCount: state.works.filter((work) => isDlsiteUnlinked(work.dlsite)).length,
+      };
+    },
+
+    async queryDlsiteNotifications(
+      kind: "rj-missing" | "fetch-failed",
+      query: Required<DlsiteNotificationQuery>,
+    ): Promise<DlsiteNotificationPage> {
+      const predicate = kind === "rj-missing" ? isRjCodeMissing : isDlsiteFetchFailed;
+      const matches = state.works
+        .filter((work) => predicate(work.dlsite))
+        .sort((a, b) => compareJapaneseSortKeys(a.title, b.title) || compareUtf8Bytes(a.id, b.id));
+      const start = (query.page - 1) * query.limit;
+      return {
+        items: matches.slice(start, start + query.limit).map((work) => ({
+          id: work.id,
+          title: work.title,
+          status: work.dlsite.status,
+        })),
+        total: matches.length,
+      };
     },
 
     async getWork(id: string): Promise<Work | null> {
@@ -379,7 +425,7 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
     ): Promise<WorksPage | null> {
       const folder = state.smartFolders.find((f) => f.id === id);
       if (!folder) return null;
-      return evalSmartFolder(folder, state.works, query);
+      return toListPage(evalSmartFolder(folder, state.works, query));
     },
 
     async listPresets(): Promise<SearchPreset[]> {

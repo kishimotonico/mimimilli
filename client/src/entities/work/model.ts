@@ -7,6 +7,7 @@ export type {
   Track,
   Playlist,
   Work,
+  WorkListItem,
   WorkSummary,
   FileEntry,
   DlsiteWorkInfo,
@@ -20,7 +21,12 @@ const CIRCLE_TAG_PREFIX = "サークル/";
  * 作品の構造化タグからサークル名を抽出する。
  * サークルタグが無ければ null（呼び出し側でフォールバック表示を決める）。
  */
-export function getCircleName(work: { tags: string[] }): string | null {
+export function getCircleName(work: {
+  tags?: string[];
+  circleName?: string | null;
+}): string | null {
+  if (work.circleName !== undefined) return work.circleName;
+  if (!work.tags) return null;
   const tag = work.tags.find((t) => t.startsWith(CIRCLE_TAG_PREFIX));
   return tag ? tag.slice(CIRCLE_TAG_PREFIX.length) : null;
 }

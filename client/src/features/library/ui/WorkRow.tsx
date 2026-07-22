@@ -1,13 +1,12 @@
-import type { WorkSummary } from "@mimimilli/shared";
+import type { WorkListItem } from "@mimimilli/shared";
 import CoverImg from "../../../entities/work/ui/CoverImg";
 import { selectFixedCoverThumbnailWidth } from "../../../entities/work/ui/coverThumbnailWidth";
-import { getCircleName } from "../../../entities/work/model";
 import { I } from "../../../shared/ui/Icon";
 import { formatDuration } from "../../../shared/lib/format";
 import { cn } from "../../../shared/lib/cn";
 
 interface WorkRowProps {
-  work: WorkSummary;
+  work: WorkListItem;
   isSelected: boolean;
   isPlaying?: boolean;
   isPlaybackActive?: boolean;
@@ -22,7 +21,7 @@ export default function WorkRow({
   onSelect,
 }: WorkRowProps) {
   const sub = [
-    getCircleName(work),
+    work.circleName,
     work.trackCount > 0 ? `${work.trackCount}tr` : null,
     work.totalDurationSec > 0 ? formatDuration(work.totalDurationSec) : null,
   ]

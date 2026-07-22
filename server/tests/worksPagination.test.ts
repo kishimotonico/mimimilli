@@ -3,6 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   emptyDlsiteState,
+  toWorkListItem,
   WORKS_DEFAULT_PAGE_SIZE,
   type WorksPage,
   type WorkSummary,
@@ -37,7 +38,12 @@ function summary(index: number): WorkSummary {
 function buildAppWithManyWorks(count = 210) {
   const adapter = createFixtureAdapter();
   const manyWorks = Array.from({ length: count }, (_, index) => summary(index));
-  adapter.queryWorks = async (query) => applyWorksQuery(manyWorks, query);
+  adapter.queryWorks = async (query) => {
+    const page = applyWorksQuery(manyWorks, query);
+    return page.seed === undefined
+      ? { items: page.items.map(toWorkListItem), total: page.total }
+      : { items: page.items.map(toWorkListItem), total: page.total, seed: page.seed };
+  };
   return createApp(adapter);
 }
 
@@ -52,6 +58,25 @@ test("limit 未指定でも全件返さない（デフォルト page=1 + デフ�
   const body = await getWorks(app);
   assert.equal(body.items.length, WORKS_DEFAULT_PAGE_SIZE);
   assert.equal(body.total, 210);
+});
+
+test("一覧HTTPレスポンスは軽量DTOの許可キーだけを返す", async () => {
+  const app = buildAppWithManyWorks(1);
+  const body = await getWorks(app);
+  assert.deepEqual(Object.keys(body.items[0]!).sort(), [
+    "bookmarked",
+    "circleName",
+    "coverImage",
+    "id",
+    "lastPlayedAt",
+    "status",
+    "title",
+    "totalDurationSec",
+    "trackCount",
+  ]);
+  assert.equal("physicalPath" in body.items[0]!, false);
+  assert.equal("dlsite" in body.items[0]!, false);
+  assert.equal("playlists" in body.items[0]!, false);
 });
 
 test("limit のみ指定時は page=1 として動作する", async () => {

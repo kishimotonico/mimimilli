@@ -4,7 +4,12 @@ import * as filesApi from "../../src/features/files/api";
 import * as libraryApi from "../../src/features/library/api";
 import * as settingsApi from "../../src/features/settings/api";
 import * as scanApi from "../../src/features/scan/api";
-import { emptyDlsiteState, type Work, type WorkSummary } from "@mimimilli/shared";
+import {
+  emptyDlsiteState,
+  type Work,
+  type WorkListItem,
+  type WorkSummary,
+} from "@mimimilli/shared";
 
 const mockFetch = vi.mocked(fetch);
 
@@ -33,6 +38,21 @@ function makeWorkSummary(overrides: Partial<WorkSummary> = {}): WorkSummary {
     bookmarked: false,
     lastPlayedAt: null,
     dlsite: emptyDlsiteState(),
+    ...overrides,
+  };
+}
+
+function makeWorkListItem(overrides: Partial<WorkListItem> = {}): WorkListItem {
+  return {
+    id: "work-1",
+    title: "テスト作品",
+    coverImage: null,
+    status: "ok",
+    totalDurationSec: 120,
+    trackCount: 1,
+    bookmarked: false,
+    lastPlayedAt: null,
+    circleName: null,
     ...overrides,
   };
 }
@@ -208,15 +228,11 @@ describe("work api", () => {
     );
   });
 
-  it("getAllWorks fetches /api/works and returns items", async () => {
-    const mockPage = {
-      items: [makeWorkSummary({ id: "work-1" }), makeWorkSummary({ id: "work-2" })],
-      total: 2,
-    };
-    mockFetch.mockResolvedValue(makeResponse(mockPage));
-    const result = await workApi.getAllWorks();
-    expect(mockFetch).toHaveBeenCalledWith("/api/works");
-    expect(result).toEqual(mockPage.items);
+  it("getDlsiteNotificationSummary fetches the dedicated endpoint", async () => {
+    const summary = { rjCodeMissingCount: 2, fetchFailedCount: 1, unlinkedCount: 3 };
+    mockFetch.mockResolvedValue(makeResponse(summary));
+    await expect(workApi.getDlsiteNotificationSummary()).resolves.toEqual(summary);
+    expect(mockFetch).toHaveBeenCalledWith("/api/dlsite/notifications");
   });
 });
 
@@ -226,7 +242,7 @@ describe("library api", () => {
   });
 
   it("searchWorks fetches /api/works and returns the WorksPage envelope", async () => {
-    const mockPage = { items: [makeWorkSummary({ id: "work-1" })], total: 1 };
+    const mockPage = { items: [makeWorkListItem({ id: "work-1" })], total: 1 };
     mockFetch.mockResolvedValue(makeResponse(mockPage));
     const result = await libraryApi.searchWorks({ q: "test", tags: ["tag,one", "tag2"] });
     expect(mockFetch).toHaveBeenCalledWith("/api/works?q=test&tags=tag%2Cone&tags=tag2");
@@ -234,7 +250,7 @@ describe("library api", () => {
   });
 
   it("searchWorks supports limit/page for the library total count", async () => {
-    const mockPage = { items: [makeWorkSummary({ id: "work-1" })], total: 42 };
+    const mockPage = { items: [makeWorkListItem({ id: "work-1" })], total: 42 };
     mockFetch.mockResolvedValue(makeResponse(mockPage));
     const result = await libraryApi.searchWorks({ limit: 1 });
     expect(mockFetch).toHaveBeenCalledWith("/api/works?limit=1");
@@ -246,14 +262,14 @@ describe("library api", () => {
     mockFetch
       .mockResolvedValueOnce(
         makeResponse({
-          items: [makeWorkSummary({ id: "work-1" }), makeWorkSummary({ id: "work-3" })],
+          items: [makeWorkListItem({ id: "work-1" }), makeWorkListItem({ id: "work-3" })],
           total: 4,
           seed,
         }),
       )
       .mockResolvedValueOnce(
         makeResponse({
-          items: [makeWorkSummary({ id: "work-4" }), makeWorkSummary({ id: "work-2" })],
+          items: [makeWorkListItem({ id: "work-4" }), makeWorkListItem({ id: "work-2" })],
           total: 4,
           seed,
         }),
@@ -289,7 +305,7 @@ describe("library api", () => {
   });
 
   it("evalSmartFolder fetches /api/smart-folders/:id/works", async () => {
-    const mockPage = { items: [makeWorkSummary({ id: "work-1" })], total: 1 };
+    const mockPage = { items: [makeWorkListItem({ id: "work-1" })], total: 1 };
     mockFetch.mockResolvedValue(makeResponse(mockPage));
     const result = await libraryApi.evalSmartFolder("sf-1", { page: 1, limit: 200 });
     expect(mockFetch).toHaveBeenCalledWith("/api/smart-folders/sf-1/works?page=1&limit=200");

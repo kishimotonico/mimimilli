@@ -20,7 +20,8 @@ export default function DlsiteFetchFailedModal({
   onClose,
   onOpenWork,
 }: DlsiteFetchFailedModalProps) {
-  const { works, isLoading } = useDlsiteFetchFailedWorks();
+  const { works, isLoading, total, hasNextPage, isFetchingNextPage, fetchNextPage } =
+    useDlsiteFetchFailedWorks();
   const { dialogRef, handleCancel, handleBackdropClick } = useDialogModal({ onClose });
 
   return (
@@ -57,17 +58,26 @@ export default function DlsiteFetchFailedModal({
                   >
                     <span className="min-w-0 flex-1">
                       <span className="block w-full truncate text-[12px]">{work.title}</span>
-                      <span className="block w-full truncate font-mono text-[10px] text-ink-3">
-                        {work.physicalPath}
-                      </span>
                     </span>
                     <span className="mt-0.5 shrink-0 rounded-pill bg-[color-mix(in_oklch,var(--r-coral)_12%,transparent)] px-2 py-0.5 font-sans text-[10px] text-[var(--r-coral)]">
-                      {STATUS_LABEL[work.dlsite.status] ?? "取得失敗"}
+                      {STATUS_LABEL[work.status] ?? "取得失敗"}
                     </span>
                   </button>
                 </li>
               ))}
             </ul>
+          )}
+          {hasNextPage && (
+            <Button
+              className="mt-3 w-full"
+              variant="quiet"
+              disabled={isFetchingNextPage}
+              onClick={() => fetchNextPage()}
+            >
+              {isFetchingNextPage
+                ? "読み込み中..."
+                : `さらに読み込む（${works.length}/${total}件）`}
+            </Button>
           )}
         </div>
         <footer className="flex shrink-0 justify-end border-t border-line-soft px-[18px] py-3">

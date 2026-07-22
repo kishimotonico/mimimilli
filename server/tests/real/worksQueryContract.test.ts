@@ -4,6 +4,7 @@ import {
   emptyDlsiteState,
   normalizeTags,
   sortIdSchema,
+  toWorkListItem,
   type Work,
   type WorksQuery,
   type WorkSummary,
@@ -186,6 +187,70 @@ test("realのrandomはseedを発行し、同じseedの次要求でページ順�
       repeated.items.map((work) => work.id),
       first.items.map((work) => work.id),
     );
+  } finally {
+    db.close();
+  }
+});
+
+test("複数サークルタグのcircleNameはsharedとrealでUTF-8 BINARY順の先頭に揃う", () => {
+  const db = openDb({ kind: "memory" });
+  const repo = new WorkRepo(db);
+  const item = {
+    ...dataset[0]!,
+    tags: ["サークル/和風", "circle/Zeta", "circle/Alpha", "ASMR"],
+  };
+  try {
+    repo.upsertWork(fullWork(item));
+    const page = repo.queryWorks(baseQuery({ page: 1, limit: 1 }));
+    assert.equal(toWorkListItem(item).circleName, "Alpha");
+    assert.equal(page.items[0]?.circleName, toWorkListItem(item).circleName);
+  } finally {
+    db.close();
+  }
+});
+
+test("realのDLsite通知集計とページは状態別に一覧契約を返す", () => {
+  const db = openDb({ kind: "memory" });
+  const repo = new WorkRepo(db);
+  try {
+    const missing = fullWork({ ...dataset[0]!, dlsite: emptyDlsiteState() });
+    const failed = fullWork({
+      ...dataset[1]!,
+      dlsite: {
+        rjCode: "RJ123456",
+        status: "error",
+        lastAttemptAt: null,
+        error: "failed",
+        appliedTags: [],
+      },
+    });
+    const unlinked = fullWork({
+      ...dataset[2]!,
+      dlsite: {
+        rjCode: "RJ123457",
+        status: "none",
+        lastAttemptAt: null,
+        error: null,
+        appliedTags: [],
+      },
+    });
+    repo.upsertWork(missing);
+    repo.upsertWork(failed);
+    repo.upsertWork(unlinked);
+
+    assert.deepEqual(repo.getDlsiteNotificationSummary(), {
+      rjCodeMissingCount: 1,
+      fetchFailedCount: 1,
+      unlinkedCount: 1,
+    });
+    assert.deepEqual(repo.queryDlsiteNotifications("rj-missing", { page: 1, limit: 10 }), {
+      items: [{ id: missing.id, title: missing.title, status: "none" }],
+      total: 1,
+    });
+    assert.deepEqual(repo.queryDlsiteNotifications("fetch-failed", { page: 1, limit: 10 }), {
+      items: [{ id: failed.id, title: failed.title, status: "error" }],
+      total: 1,
+    });
   } finally {
     db.close();
   }

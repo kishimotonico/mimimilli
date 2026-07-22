@@ -5,6 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   emptyDlsiteState,
+  toWorkListItem,
   WORKS_DEFAULT_PAGE_SIZE,
   type SmartFolder,
   type WorksPage,
@@ -52,7 +53,10 @@ function buildAppWithManyWorks(count = 210) {
   const folder = buildFolder("added-desc");
   adapter.evalSmartFolder = async (id, query) => {
     if (id !== folder.id) return null;
-    return evalSmartFolder(folder, manyWorks, query);
+    const page = evalSmartFolder(folder, manyWorks, query);
+    return page.seed === undefined
+      ? { items: page.items.map(toWorkListItem), total: page.total }
+      : { items: page.items.map(toWorkListItem), total: page.total, seed: page.seed };
   };
   adapter.listSmartFolders = async () => [folder];
   return createApp(adapter);
@@ -97,7 +101,10 @@ test("randomソートは発行されたseedを次ページへ送ると重複・�
   const manyWorks = Array.from({ length: 210 }, (_, index) => summary(index));
   adapter.evalSmartFolder = async (id, query) => {
     if (id !== folder.id) return null;
-    return evalSmartFolder(folder, manyWorks, query);
+    const page = evalSmartFolder(folder, manyWorks, query);
+    return page.seed === undefined
+      ? { items: page.items.map(toWorkListItem), total: page.total }
+      : { items: page.items.map(toWorkListItem), total: page.total, seed: page.seed };
   };
   adapter.listSmartFolders = async () => [folder];
   const app = createApp(adapter);
@@ -123,7 +130,10 @@ test("スマートフォルダー固有の sort が維持される", async () =>
   const manyWorks = Array.from({ length: 210 }, (_, index) => summary(index));
   adapter.evalSmartFolder = async (id, query) => {
     if (id !== folder.id) return null;
-    return evalSmartFolder(folder, manyWorks, query);
+    const page = evalSmartFolder(folder, manyWorks, query);
+    return page.seed === undefined
+      ? { items: page.items.map(toWorkListItem), total: page.total }
+      : { items: page.items.map(toWorkListItem), total: page.total, seed: page.seed };
   };
   adapter.listSmartFolders = async () => [folder];
   const appSorted = createApp(adapter);

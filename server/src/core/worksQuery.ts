@@ -10,8 +10,11 @@ import {
 
 const RECENT_VIEW_WINDOW_DAYS = 30;
 
+/** 検索・フィルター・ソート中だけ使う内部ページ型。公開前にWorkListItemへ投影する。 */
+export type WorkSummaryPage = Omit<WorksPage, "items"> & { items: WorkSummary[] };
+
 /** WorkSummary[] にクエリ（検索・フィルタ・ソート・ページング）を適用する */
-export function applyWorksQuery(works: WorkSummary[], params: WorksQuery): WorksPage {
+export function applyWorksQuery(works: WorkSummary[], params: WorksQuery): WorkSummaryPage {
   let results = [...works];
 
   results = filterByQuery(results, params.q);

@@ -2,26 +2,21 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Provider } from "jotai";
-import { emptyDlsiteState, type WorkSummary } from "@mimimilli/shared";
+import type { WorkListItem } from "@mimimilli/shared";
 import WorkGrid from "../../src/features/library/ui/WorkGrid";
 import { clearResizeObservers, flushAllResizeObservers, mockElementSize } from "./setup";
 
-function createWorks(count: number): WorkSummary[] {
+function createWorks(count: number): WorkListItem[] {
   return Array.from({ length: count }, (_, i) => ({
     id: `work-${i}`,
     title: `作品 ${i}`,
     coverImage: null,
     status: "ok",
-    physicalPath: `/path/${i}`,
     totalDurationSec: 0,
-    addedAt: "2024-01-01T00:00:00Z",
-    errorMessage: null,
-    urls: [],
-    tags: [],
     trackCount: 0,
     bookmarked: false,
     lastPlayedAt: null,
-    dlsite: emptyDlsiteState(),
+    circleName: null,
   }));
 }
 

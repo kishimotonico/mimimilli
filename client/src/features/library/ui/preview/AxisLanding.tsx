@@ -1,15 +1,9 @@
-import type { WorkSummary } from "@mimimilli/shared";
+import type { WorkListItem } from "@mimimilli/shared";
 import type { AxisLandingPresentation } from "../../model/axisLandingPresentation";
 import CoverImg from "../../../../entities/work/ui/CoverImg";
 import { selectFixedCoverThumbnailWidth } from "../../../../entities/work/ui/coverThumbnailWidth";
 import { I } from "../../../../shared/ui/Icon";
 import { formatDuration } from "./format";
-
-function getCircleName(work: WorkSummary): string | null {
-  const tag = work.tags.find((t) => t.startsWith("サークル/") || t.startsWith("circle/"));
-  if (!tag) return null;
-  return tag.slice(tag.indexOf("/") + 1);
-}
 
 export function AxisLanding({
   presentation,
@@ -17,7 +11,7 @@ export function AxisLanding({
   onSelectWork,
 }: {
   presentation: AxisLandingPresentation;
-  works: WorkSummary[];
+  works: WorkListItem[];
   onSelectWork: (id: string) => void;
 }) {
   return (
@@ -41,7 +35,7 @@ export function AxisLanding({
                 ? "メタ読み込みエラー"
                 : null;
           const meta = [
-            getCircleName(w),
+            w.circleName,
             w.totalDurationSec > 0 ? formatDuration(w.totalDurationSec) : null,
           ].filter(Boolean);
 

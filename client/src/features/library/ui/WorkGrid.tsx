@@ -11,9 +11,8 @@ import { useAtomValue } from "jotai";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { AxisId, GridLayoutMode } from "../model/types";
 import { tagPrefixesAtom } from "../model/atoms";
-import type { WorkSummary } from "@mimimilli/shared";
+import type { WorkListItem } from "@mimimilli/shared";
 import CoverImg from "../../../entities/work/ui/CoverImg";
-import { getCircleName } from "../../../entities/work/model";
 import Button from "../../../shared/ui/Button";
 import { I } from "../../../shared/ui/Icon";
 import {
@@ -40,7 +39,7 @@ import LoadMore from "./LoadMore";
 interface WorkGridProps {
   axis: AxisId;
   drillValue: string | null;
-  works: WorkSummary[];
+  works: WorkListItem[];
   /** 検索・軸・ソート・タグ・ドリル変更を検知してスクロール位置をリセットする key */
   worksQueryKey: string;
   selectedWorkId: string | null;
@@ -57,7 +56,7 @@ interface WorkGridProps {
   onLoadMore?: () => void;
   onTileSizeChange: (size: number) => void;
   onWorkSelect: (id: string) => void;
-  onWorkPlay: (work: WorkSummary) => void;
+  onWorkPlay: (work: WorkListItem) => void;
   onDrillBack: () => void;
   onClearSearch: () => void;
   inspector: ReactNode | null;
@@ -69,11 +68,11 @@ const GRID_ARROW_KEYS = new Set<GridArrowKey>(["ArrowLeft", "ArrowRight", "Arrow
 interface JustifiedRowGroup {
   rowIndex: number;
   height: number;
-  entries: { work: WorkSummary; width: number; flatIndex: number }[];
+  entries: { work: WorkListItem; width: number; flatIndex: number }[];
 }
 
 // justifiedLayout.tiles（入力 works と同順序・同長さ）を行ごとにグルーピングする（レンダリング用）。
-function groupJustifiedRows(works: WorkSummary[], layout: JustifiedLayout): JustifiedRowGroup[] {
+function groupJustifiedRows(works: WorkListItem[], layout: JustifiedLayout): JustifiedRowGroup[] {
   const rows: JustifiedRowGroup[] = [];
   layout.tiles.forEach((tile, flatIndex) => {
     const work = works[flatIndex];
@@ -378,7 +377,7 @@ export default function WorkGrid({
 
   const renderTile = useCallback(
     (
-      work: WorkSummary,
+      work: WorkListItem,
       flatIndex: number,
       tileWidth: number | undefined,
       coverHeight: number | undefined,
@@ -431,7 +430,7 @@ export default function WorkGrid({
             />
           </span>
           <span className="mll-grid-tile__title">{work.title}</span>
-          <span className="mll-grid-tile__circle">{getCircleName(work) ?? "サークル不明"}</span>
+          <span className="mll-grid-tile__circle">{work.circleName ?? "サークル不明"}</span>
         </button>
       );
     },

@@ -1,26 +1,38 @@
-// DLsite取得に失敗したまま残っている（work.dlsite.status が "error" または "not_found"）作品の一覧・件数。
-// 判定基準は @mimimilli/shared の isDlsiteFetchFailed を正典とする（TASK-44: 通知ベル）。
-//
-// 数千作品規模でも GET /works は全件をメモリ上で返す設計（server/src/adapters/real/index.ts の
-// コメント参照）なので、既存の useRjCodeMissingWorks と同じく getAllWorks() を使い、
-// クライアント側でフィルタする。
-import { useQuery } from "@tanstack/react-query";
-import { isDlsiteFetchFailed } from "@mimimilli/shared";
-import type { WorkSummary } from "@mimimilli/shared";
-import { getAllWorks } from "../../../entities/work/api";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { isDlsiteFetchFailed, type WorkSummary } from "@mimimilli/shared";
+import { getDlsiteNotificationSummary, queryDlsiteNotifications } from "../../../entities/work/api";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 
+const NOTIFICATION_PAGE_SIZE = 100;
+
+/** 後方互換の純粋関数。通知API自体はこの全件フィルターを使わない。 */
 export function filterDlsiteFetchFailedWorks(works: WorkSummary[]): WorkSummary[] {
   return works.filter((work) => isDlsiteFetchFailed(work.dlsite));
 }
 
-/** DLsite取得失敗の作品一覧・件数。scan完了やDLsite一括取得完了時の作品一覧invalidateに
- *  乗って自動的に再取得される（WORK_QUERY_KEYS.all() と同じキーを使うため）。 */
 export function useDlsiteFetchFailedWorks() {
-  const query = useQuery({
-    queryKey: WORK_QUERY_KEYS.all(),
-    queryFn: getAllWorks,
+  const summary = useQuery({
+    queryKey: WORK_QUERY_KEYS.dlsiteNotificationSummary(),
+    queryFn: getDlsiteNotificationSummary,
   });
-  const works = query.data ? filterDlsiteFetchFailedWorks(query.data) : [];
-  return { works, count: works.length, isLoading: query.isPending };
+  const list = useInfiniteQuery({
+    queryKey: WORK_QUERY_KEYS.dlsiteNotificationList("fetch-failed"),
+    queryFn: ({ pageParam }) =>
+      queryDlsiteNotifications("fetch-failed", { page: pageParam, limit: NOTIFICATION_PAGE_SIZE }),
+    initialPageParam: 1,
+    getNextPageParam: (last, pages) => {
+      const loaded = pages.reduce((sum, page) => sum + page.items.length, 0);
+      return loaded < last.total ? pages.length + 1 : undefined;
+    },
+  });
+  const listTotal = list.data?.pages[list.data.pages.length - 1]?.total;
+  return {
+    works: list.data?.pages.flatMap((page) => page.items) ?? [],
+    count: summary.data?.fetchFailedCount ?? 0,
+    total: listTotal ?? summary.data?.fetchFailedCount ?? 0,
+    isLoading: summary.isPending || list.isPending,
+    hasNextPage: list.hasNextPage ?? false,
+    isFetchingNextPage: list.isFetchingNextPage,
+    fetchNextPage: list.fetchNextPage,
+  };
 }

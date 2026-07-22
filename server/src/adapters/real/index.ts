@@ -3,7 +3,7 @@
 import { existsSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
-import { DEFAULT_TAG_PREFIXES, normalizeTags } from "@mimimilli/shared";
+import { DEFAULT_TAG_PREFIXES, normalizeTags, toWorkListItem } from "@mimimilli/shared";
 import type {
   AxisFacetItem,
   DlsiteApplyBody,
@@ -11,6 +11,9 @@ import type {
   DlsiteBulkProgressEvent,
   DlsiteBulkResult,
   DlsiteFetchResult,
+  DlsiteNotificationPage,
+  DlsiteNotificationQuery,
+  DlsiteNotificationSummary,
   DlsiteStatePatch,
   FileEntry,
   FsListing,
@@ -161,6 +164,17 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       return repo.queryWorks(params);
     },
 
+    async getDlsiteNotificationSummary(): Promise<DlsiteNotificationSummary> {
+      return repo.getDlsiteNotificationSummary();
+    },
+
+    async queryDlsiteNotifications(
+      kind: "rj-missing" | "fetch-failed",
+      query: Required<DlsiteNotificationQuery>,
+    ): Promise<DlsiteNotificationPage> {
+      return repo.queryDlsiteNotifications(kind, query);
+    },
+
     async getWork(id: string): Promise<Work | null> {
       return repo.getWork(id);
     },
@@ -249,7 +263,10 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
     ): Promise<WorksPage | null> {
       const folder = repo.getSmartFolder(id);
       if (!folder) return null;
-      return evalSmartFolder(folder, repo.listSummaries(), query);
+      const page = evalSmartFolder(folder, repo.listSummaries(), query);
+      return page.seed === undefined
+        ? { items: page.items.map(toWorkListItem), total: page.total }
+        : { items: page.items.map(toWorkListItem), total: page.total, seed: page.seed };
     },
 
     async listPresets(): Promise<SearchPreset[]> {

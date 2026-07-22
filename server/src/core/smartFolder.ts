@@ -1,6 +1,7 @@
 // スマートフォルダーのルール評価（GET /api/smart-folders/:id/works）の純粋関数。
 // shared スキーマが許可した field/operator のみを評価する。DB 内の不正値も黙って無視しない。
-import type { SmartFolder, SmartFolderRule, WorksPage, WorkSummary } from "@mimimilli/shared";
+import type { SmartFolder, SmartFolderRule, WorkSummary } from "@mimimilli/shared";
+import type { WorkSummaryPage } from "./worksQuery.ts";
 import { tagEquals } from "@mimimilli/shared";
 import { createRandomSeed, sortWorkSummaries } from "./worksQuery.ts";
 
@@ -57,7 +58,7 @@ export function evalSmartFolder(
   folder: Pick<SmartFolder, "rules" | "sort">,
   works: WorkSummary[],
   query: { page: number; limit: number; seed?: number },
-): WorksPage {
+): WorkSummaryPage {
   const seed = folder.sort === "random" ? (query.seed ?? createRandomSeed()) : undefined;
   const matched = sortWorkSummaries(evalSmartFolderRules(folder.rules, works), folder.sort, seed);
 

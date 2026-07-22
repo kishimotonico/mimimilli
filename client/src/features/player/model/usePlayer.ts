@@ -8,7 +8,7 @@
 import { useRef, useCallback, useMemo, useEffect } from "react";
 import { useAtom, useSetAtom } from "jotai";
 import { useQueryClient } from "@tanstack/react-query";
-import type { Track, WorkSummary, Work } from "../../../entities/work/model";
+import type { Track, WorkListItem, Work } from "../../../entities/work/model";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { useMediaSession } from "./useMediaSession";
 import { toAudioAbsoluteTime } from "./trackTime";
@@ -156,7 +156,7 @@ export function usePlayer() {
 
   const startPlayback = useCallback(
     (
-      work: WorkSummary | Work,
+      work: WorkListItem | Work,
       tracks: Track[],
       trackIndex: number,
       playlistId: string | null,
@@ -176,7 +176,7 @@ export function usePlayer() {
 
   const play = useCallback(
     (
-      work: WorkSummary | Work,
+      work: WorkListItem | Work,
       tracks: Track[],
       trackIndex: number = 0,
       playlistId: string | null = null,

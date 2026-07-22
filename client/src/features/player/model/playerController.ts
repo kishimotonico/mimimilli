@@ -1,11 +1,11 @@
-import type { Track, Work, WorkSummary } from "../../../entities/work/model";
+import type { Track, Work, WorkListItem } from "../../../entities/work/model";
 import type { AudioEngineError } from "./audioEngine";
 
 export type PlaybackStatus = "idle" | "loading" | "playing" | "paused" | "ended" | "error";
 export type PlaybackCompletionScope = "queue" | "work";
 
 export interface PlaybackItem {
-  work: WorkSummary | Work;
+  work: WorkListItem | Work;
   playlistId: string | null;
   tracks: Track[];
   trackIndex: number;
@@ -30,7 +30,7 @@ export interface PlayerCoreState {
   isPlaying: boolean;
   currentTrackIndex: number;
   currentPlaylistId: string | null;
-  currentWork: WorkSummary | Work | null;
+  currentWork: WorkListItem | Work | null;
   tracks: Track[];
   volume: number;
   loop: boolean;

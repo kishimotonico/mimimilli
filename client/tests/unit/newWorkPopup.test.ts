@@ -3,7 +3,7 @@
 import { createElement } from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ScanResult, WorkSummary } from "@mimimilli/shared";
+import type { ScanResult, Work } from "@mimimilli/shared";
 import NewWorkPopup from "../../src/features/scan/ui/NewWorkPopup";
 import * as workApi from "../../src/entities/work/api";
 
@@ -16,7 +16,7 @@ beforeEach(() => {
   });
 });
 
-const work: WorkSummary = {
+const work: Work = {
   id: "work-1",
   title: "新規作品",
   coverImage: null,
@@ -30,6 +30,11 @@ const work: WorkSummary = {
   trackCount: 1,
   bookmarked: false,
   lastPlayedAt: null,
+  dlsite: { rjCode: null, status: "none", lastAttemptAt: null, error: null, appliedTags: [] },
+  defaultPlaylistId: null,
+  createdAt: null,
+  playlists: [],
+  resume: null,
 };
 
 const scanResult: ScanResult = {
@@ -47,7 +52,7 @@ function dispatchCancel(dialog: HTMLElement) {
 
 describe("NewWorkPopup", () => {
   it("タイトル編集中のEscapeは編集だけをキャンセルし、ポップアップは閉じない", async () => {
-    vi.spyOn(workApi, "getAllWorks").mockResolvedValue([work]);
+    vi.spyOn(workApi, "getWork").mockResolvedValue(work);
     const onClose = vi.fn();
     render(createElement(NewWorkPopup, { scanResult, onClose, onOpenRjCodeMissing: vi.fn() }));
 
@@ -66,7 +71,7 @@ describe("NewWorkPopup", () => {
   });
 
   it("編集中でないときのEscapeはポップアップを閉じる", () => {
-    vi.spyOn(workApi, "getAllWorks").mockResolvedValue([]);
+    vi.spyOn(workApi, "getWork").mockResolvedValue(work);
     const onClose = vi.fn();
     render(createElement(NewWorkPopup, { scanResult, onClose, onOpenRjCodeMissing: vi.fn() }));
 
@@ -77,7 +82,7 @@ describe("NewWorkPopup", () => {
   });
 
   it("backdropクリックは編集中でも問答無用でポップアップを閉じる（既存挙動を維持）", async () => {
-    vi.spyOn(workApi, "getAllWorks").mockResolvedValue([work]);
+    vi.spyOn(workApi, "getWork").mockResolvedValue(work);
     const onClose = vi.fn();
     render(createElement(NewWorkPopup, { scanResult, onClose, onOpenRjCodeMissing: vi.fn() }));
 
@@ -92,7 +97,7 @@ describe("NewWorkPopup", () => {
   });
 
   it("パネル内側のクリックではポップアップを閉じない", () => {
-    vi.spyOn(workApi, "getAllWorks").mockResolvedValue([]);
+    vi.spyOn(workApi, "getWork").mockResolvedValue(work);
     const onClose = vi.fn();
     render(createElement(NewWorkPopup, { scanResult, onClose, onOpenRjCodeMissing: vi.fn() }));
 

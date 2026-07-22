@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WORKS_DEFAULT_PAGE_SIZE } from "@mimimilli/shared";
 import { useLibraryQueries } from "../../src/features/library/model/useLibraryQueries";
 import type { LibraryViewState } from "../../src/features/library/model/useLibraryNavigation";
-import type { WorkSummary } from "@mimimilli/shared";
+import type { WorkListItem } from "@mimimilli/shared";
 
 const SMART_FOLDER_ID = "sf-1";
 
@@ -36,28 +36,17 @@ function urlOf(input: RequestInfo | URL): string {
   return input.url;
 }
 
-function makeWork(id: string): WorkSummary {
+function makeWork(id: string): WorkListItem {
   return {
     id,
     title: `作品 ${id}`,
     coverImage: null,
     status: "ok",
-    physicalPath: `/works/${id}`,
     totalDurationSec: 60,
-    addedAt: "2024-01-01T00:00:00Z",
-    errorMessage: null,
-    urls: [],
-    tags: [],
     trackCount: 1,
     bookmarked: false,
     lastPlayedAt: null,
-    dlsite: {
-      rjCode: null,
-      status: "none",
-      lastAttemptAt: null,
-      error: null,
-      appliedTags: [],
-    },
+    circleName: null,
   };
 }
 
@@ -74,10 +63,10 @@ function createFetchMock(
       const pageSize = WORKS_DEFAULT_PAGE_SIZE;
       const start = (page - 1) * pageSize;
       const count = Math.max(0, Math.min(pageSize, total - start));
-      const items: WorkSummary[] = Array.from({ length: count }, (_, i) =>
+      const items: WorkListItem[] = Array.from({ length: count }, (_, i) =>
         makeWork(`p${page}-w${i + 1}`),
       );
-      const body: { items: WorkSummary[]; total: number; seed?: number } = {
+      const body: { items: WorkListItem[]; total: number; seed?: number } = {
         items,
         total,
       };

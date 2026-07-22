@@ -11,7 +11,8 @@ interface RjCodeMissingModalProps {
 }
 
 export default function RjCodeMissingModal({ onClose, onOpenWork }: RjCodeMissingModalProps) {
-  const { works, isLoading } = useRjCodeMissingWorks();
+  const { works, isLoading, total, hasNextPage, isFetchingNextPage, fetchNextPage } =
+    useRjCodeMissingWorks();
   const { dialogRef, handleCancel, handleBackdropClick } = useDialogModal({ onClose });
 
   return (
@@ -47,13 +48,22 @@ export default function RjCodeMissingModal({ onClose, onOpenWork }: RjCodeMissin
                     onClick={() => onOpenWork(work.id)}
                   >
                     <span className="w-full truncate text-[12px]">{work.title}</span>
-                    <span className="w-full truncate font-mono text-[10px] text-ink-3">
-                      {work.physicalPath}
-                    </span>
                   </button>
                 </li>
               ))}
             </ul>
+          )}
+          {hasNextPage && (
+            <Button
+              className="mt-3 w-full"
+              variant="quiet"
+              disabled={isFetchingNextPage}
+              onClick={() => fetchNextPage()}
+            >
+              {isFetchingNextPage
+                ? "読み込み中..."
+                : `さらに読み込む（${works.length}/${total}件）`}
+            </Button>
           )}
         </div>
         <footer className="flex shrink-0 justify-end border-t border-line-soft px-[18px] py-3">

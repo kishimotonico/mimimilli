@@ -1,4 +1,4 @@
-import type { Work, WorkPatch, SmartFolder, WorkSummary } from "@mimimilli/shared";
+import type { Work, WorkListItem, WorkPatch, SmartFolder } from "@mimimilli/shared";
 import type { AxisLandingPresentation } from "../model/axisLandingPresentation";
 import type { PreviewMode } from "../model/libraryPresentation";
 import { AxisLanding } from "./preview/AxisLanding";
@@ -14,8 +14,8 @@ interface PreviewPaneProps {
   axisLandingPresentation: AxisLandingPresentation;
   selectedWork: Work | null;
   smartFolder: SmartFolder | null;
-  axisWorks: WorkSummary[];
-  smartFolderWorks: WorkSummary[];
+  axisWorks: WorkListItem[];
+  smartFolderWorks: WorkListItem[];
   smartFolderTotal?: number;
   playingTrackIndex: number | null;
   isPlaybackActive?: boolean;

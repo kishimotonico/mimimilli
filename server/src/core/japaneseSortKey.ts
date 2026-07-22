@@ -1,3 +1,5 @@
+import { compareUtf8Bytes } from "@mimimilli/shared";
+
 /** ADR-0008で定義した、日本語検索・ソート用の共通キー。 */
 export function japaneseSortKey(value: string): string {
   const normalized = value.normalize("NFKC");
@@ -12,18 +14,9 @@ export function japaneseSortKey(value: string): string {
   return folded.toLowerCase();
 }
 
-const textEncoder = new TextEncoder();
+export { compareUtf8Bytes };
 
-export function compareUtf8Bytes(a: string, b: string): number {
-  const aBytes = textEncoder.encode(a);
-  const bBytes = textEncoder.encode(b);
-  const length = Math.min(aBytes.length, bBytes.length);
-  for (let index = 0; index < length; index++) {
-    const difference = aBytes[index]! - bBytes[index]!;
-    if (difference !== 0) return difference;
-  }
-  return aBytes.length - bBytes.length;
-}
+const textEncoder = new TextEncoder();
 
 /** SQLiteのBINARY照合と同じUTF-8バイト順でキーを比較する。 */
 export function compareJapaneseSortKeys(a: string, b: string): number {
