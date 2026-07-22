@@ -12,20 +12,41 @@ function extOf(name: string): string {
   return i > 0 ? name.slice(i + 1).toLowerCase() : "";
 }
 
-/** path（絶対パス）の所属作品を探す。最も深い physical_path を持つ作品を返す */
-function findOwnerWork(path: string, works: WorkSummary[]): WorkSummary | null {
-  let owner: WorkSummary | null = null;
-  for (const w of works) {
-    if (isPathWithin(w.physicalPath, path)) {
-      if (!owner || w.physicalPath.length > owner.physicalPath.length) owner = w;
+/** 物理パスで作品を引ける索引。重複時は従来の Array.find と同じく先勝ちにする。 */
+export function buildWorkPathIndex(works: readonly WorkSummary[]): Map<string, WorkSummary> {
+  const byPhysicalPath = new Map<string, WorkSummary>();
+  for (const work of works) {
+    if (!byPhysicalPath.has(work.physicalPath)) {
+      byPhysicalPath.set(work.physicalPath, work);
     }
   }
-  return owner;
+  return byPhysicalPath;
+}
+
+/**
+ * path（絶対パス）の所属作品を索引から探す。葉から祖先へたどるため、
+ * ネストした作品ルートでは最も深い physical_path を持つ作品を返す。
+ */
+export function findOwnerWork(
+  root: string,
+  path: string,
+  worksByPhysicalPath: ReadonlyMap<string, WorkSummary>,
+): WorkSummary | null {
+  let current = path;
+  while (isPathWithin(root, current)) {
+    const owner = worksByPhysicalPath.get(current);
+    if (owner) return owner;
+    if (current === root) break;
+    current = dirname(current);
+  }
+  return null;
 }
 
 export function browseFs(root: string, works: WorkSummary[], path?: string): FsListing | null {
   const target = resolveWithin(root, path ?? root);
   if (target === null) return null;
+
+  const worksByPhysicalPath = buildWorkPathIndex(works);
 
   let entries;
   try {
@@ -35,7 +56,7 @@ export function browseFs(root: string, works: WorkSummary[], path?: string): FsL
   }
 
   const realRoot = resolveWithin(root, root)!;
-  const dirWork = works.find((w) => w.physicalPath === target) ?? null;
+  const dirWork = worksByPhysicalPath.get(target) ?? null;
 
   const fsEntries: FsEntry[] = [];
   for (const entry of entries) {
@@ -54,7 +75,7 @@ export function browseFs(root: string, works: WorkSummary[], path?: string): FsL
         size: 0,
         fileType: "dir",
         childCount,
-        workId: works.find((w) => w.physicalPath === full)?.id ?? null,
+        workId: worksByPhysicalPath.get(full)?.id ?? null,
         workRelPath: null,
       });
     } else if (entry.isFile()) {
@@ -65,7 +86,7 @@ export function browseFs(root: string, works: WorkSummary[], path?: string): FsL
       } catch {
         // stat できないファイルはサイズ不明のまま表示
       }
-      const owner = findOwnerWork(full, works);
+      const owner = findOwnerWork(realRoot, full, worksByPhysicalPath);
       fsEntries.push({
         name: entry.name,
         path: full,
