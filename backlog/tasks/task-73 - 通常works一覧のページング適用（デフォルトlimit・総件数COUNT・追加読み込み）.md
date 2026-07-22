@@ -1,11 +1,11 @@
 ---
 id: TASK-73
 title: 通常works一覧のページング適用（デフォルトlimit・総件数COUNT・追加読み込み）
-status: In Progress
+status: Done
 assignee:
   - '@kimi'
 created_date: '2026-07-19 04:26'
-updated_date: '2026-07-21 19:15'
+updated_date: '2026-07-22 01:12'
 labels: []
 dependencies:
   - TASK-58
@@ -39,6 +39,8 @@ randomソートの仕様化が必須: server/src/core/worksQuery.ts:118 はリ�
 
 <!-- SECTION:NOTES:BEGIN -->
 randomソートのページング仕様（AC#4の決定）: seed方式を採用。初回（seed未指定）はサーバーがseedを発行しWorksPage.seedで返す。clientはそのseedをpageParam経由で次ページ以降のリクエストに引き継ぐ。同一seedではstableRandomSortKey(seed, id)の安定順序が保たれ、ページ間の重複・欠落が起きない。「単一ページのランダムサンプル」案は追加読み込みと両立しないため却下。総件数取得（searchWorks({limit:1})）はroutesでpage=1が入るため正しいページング指定として退行しない（専用COUNT化は不要と判断）。
+
+client実装の一部はimplementサブエージェント（kimi-k2.7-code）に委譲。監督側でdiffレビューと pnpm check/test の再実行で検証済み。今後は動作確認・検証もサブエージェントへ委譲する運用（依頼者指示 2026-07-22）。
 <!-- SECTION:NOTES:END -->
 
 ## Comments
