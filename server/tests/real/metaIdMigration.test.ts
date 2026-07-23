@@ -200,6 +200,119 @@ test("旧メタの同名PlaylistをID付きへ移行して厳格スキーマで�
   assert.equal(migrated.defaultPlaylistId, migrated.playlists[0].id);
 });
 
+function readManifestFile(dataRoot: string): Record<string, unknown> {
+  const migrationsRoot = join(dataRoot, "migrations", "playlist-track-ids");
+  const operationRoot = join(migrationsRoot, readdirSync(migrationsRoot)[0]!);
+  return JSON.parse(readFileSync(join(operationRoot, "manifest.json"), "utf-8"));
+}
+
+test("完了済みライブラリでは変更のないメタの本文を読み直さない（TASK-86）", (t) => {
+  const directory = makeTestDirectory("meta-id-signature-cache-hit");
+  t.after(directory.cleanup);
+  const root = join(directory.path, "library");
+  const dataRoot = join(directory.path, "data");
+  const paths = ["work-a", "work-b"].map((name, index) => {
+    const workDir = join(root, name);
+    const metaPath = join(workDir, ".meta.json");
+    mkdirSync(workDir, { recursive: true });
+    writeLegacyMeta(metaPath, index === 0 ? "作品A" : "作品B");
+    return metaPath;
+  });
+  // 2作品とも同じレガシーidなので、そのまま移行すると重複再採番されてしまう。
+  // ここではID重複判定の軽量化を検証したいだけなので、別々のidへ書き換えておく。
+  writeFileSync(
+    paths[1]!,
+    readFileSync(paths[1]!, "utf-8").replace(
+      "11111111-1111-4111-8111-111111111111",
+      "22222222-2222-4222-8222-222222222222",
+    ),
+  );
+
+  // 1回目: 採番して完了状態にする
+  migrateMetaIds({ root, metaPaths: paths, dataRoot });
+  // 2回目: libraryCompletedがtrueになるまで最終チェックを通す
+  const second = migrateMetaIds({ root, metaPaths: paths, dataRoot });
+  assert.equal(second.migrated, 0);
+  const manifestAfterSecond = readManifestFile(dataRoot);
+  assert.equal(manifestAfterSecond.libraryCompleted, true);
+  assert.equal(typeof manifestAfterSecond.verifiedIdSignatures, "object");
+
+  // 3回目: 何も変更していないので、IDチェックのために本文を読み直してはいけない
+  let signatureMisses = 0;
+  const third = migrateMetaIds({
+    root,
+    metaPaths: paths,
+    dataRoot,
+    onIdSignatureMiss: () => {
+      signatureMisses += 1;
+    },
+  });
+  assert.equal(third.migrated, 0);
+  assert.equal(signatureMisses, 0);
+});
+
+test("キャッシュ済み作品と外部編集で重複IDになった作品が混在しても重複を見逃さず再採番する（TASK-86）", (t) => {
+  const directory = makeTestDirectory("meta-id-signature-cache-miss-duplicate");
+  t.after(directory.cleanup);
+  const root = join(directory.path, "library");
+  const dataRoot = join(directory.path, "data");
+  const paths = ["work-a", "work-b"].map((name, index) => {
+    const workDir = join(root, name);
+    const metaPath = join(workDir, ".meta.json");
+    mkdirSync(workDir, { recursive: true });
+    writeLegacyMeta(metaPath, index === 0 ? "作品A" : "作品B");
+    return metaPath;
+  });
+  writeFileSync(
+    paths[1]!,
+    readFileSync(paths[1]!, "utf-8").replace(
+      "11111111-1111-4111-8111-111111111111",
+      "22222222-2222-4222-8222-222222222222",
+    ),
+  );
+
+  migrateMetaIds({ root, metaPaths: paths, dataRoot });
+  migrateMetaIds({ root, metaPaths: paths, dataRoot });
+  const manifestBefore = readManifestFile(dataRoot);
+  assert.equal(manifestBefore.libraryCompleted, true);
+
+  // work-a はキャッシュヒットで済むよう変更しない。work-b だけ外部編集して
+  // work-a と同じworkId/playlistId/trackIdを持たせる（重複注入）。
+  const migratedA = JSON.parse(readFileSync(paths[0]!, "utf-8"));
+  const corrupted = JSON.parse(readFileSync(paths[1]!, "utf-8"));
+  corrupted.id = migratedA.id;
+  corrupted.playlists[0].id = migratedA.playlists[0].id;
+  corrupted.playlists[0].tracks[0].id = migratedA.playlists[0].tracks[0].id;
+  writeFileSync(paths[1]!, `${JSON.stringify(corrupted, null, 2)}\n`);
+
+  // work-a はキャッシュヒットで済むはず（size/mtime変更なし）。work-b は本文を読み直して
+  // work-a との重複を検出し、キャッシュに頼らず再採番できなければならない。
+  let signatureMisses = 0;
+  const result = migrateMetaIds({
+    root,
+    metaPaths: paths,
+    dataRoot,
+    onIdSignatureMiss: () => {
+      signatureMisses += 1;
+    },
+  });
+  assert.equal(result.externallyModified.length, 0);
+  assert.equal(result.migrated, 1);
+  assert.ok(signatureMisses >= 1);
+
+  const reassignedA = JSON.parse(readFileSync(paths[0]!, "utf-8"));
+  const reassignedB = JSON.parse(readFileSync(paths[1]!, "utf-8"));
+  // work-a はキャッシュヒットにより一切書き換わっていない
+  assert.deepEqual(reassignedA, migratedA);
+  // work-b は重複を検知して新しいIDへ再採番されている（検知漏れなし）
+  assert.notEqual(reassignedB.id, reassignedA.id);
+  assert.notEqual(reassignedB.playlists[0].id, reassignedA.playlists[0].id);
+  assert.notEqual(reassignedB.playlists[0].tracks[0].id, reassignedA.playlists[0].tracks[0].id);
+
+  const manifestAfter = readManifestFile(dataRoot);
+  assert.equal(manifestAfter.libraryCompleted, true);
+});
+
 test("Windowsではmanifestの相対パスキーをケース非区別で照合する", (t) => {
   const directory = makeTestDirectory("meta-id-win32-path");
   t.after(directory.cleanup);
