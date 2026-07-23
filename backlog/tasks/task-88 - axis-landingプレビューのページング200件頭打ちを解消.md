@@ -1,9 +1,10 @@
 ---
 id: TASK-88
 title: axis-landingプレビューのページング200件頭打ちを解消
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-23 05:59'
+updated_date: '2026-07-23 10:22'
 labels: []
 dependencies: []
 priority: high

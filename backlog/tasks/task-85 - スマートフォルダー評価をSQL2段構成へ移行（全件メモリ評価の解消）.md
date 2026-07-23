@@ -1,9 +1,10 @@
 ---
 id: TASK-85
 title: スマートフォルダー評価をSQL2段構成へ移行（全件メモリ評価の解消）
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-23 05:58'
+updated_date: '2026-07-23 10:22'
 labels: []
 dependencies: []
 priority: high

@@ -1,9 +1,10 @@
 ---
 id: TASK-86
 title: 増分スキャンのID移行チェックを全件フルread+parseから軽量判定へ
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-23 05:58'
+updated_date: '2026-07-23 10:22'
 labels: []
 dependencies: []
 priority: high

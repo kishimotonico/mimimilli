@@ -1,9 +1,10 @@
 ---
 id: TASK-87
 title: サムネイル配信のadmission直列化をキー単位ロックへ縮小
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-23 05:58'
+updated_date: '2026-07-23 10:22'
 labels: []
 dependencies: []
 priority: high
