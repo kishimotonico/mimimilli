@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { act, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import { Provider } from "jotai";
 import type { WorkListItem } from "@mimimilli/shared";
 import ContentColumn from "../../src/features/library/ui/ContentColumn";
@@ -55,7 +55,14 @@ describe("ContentColumn virtual scrolling", () => {
     sizeMock = mockElementSize(300, 600) as unknown as { restore: () => void };
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    // react-virtual の scroll debounce（isScrollingResetDelay=150ms）が
+    // unmountしても生き残るため、jsdom環境が生きているうちに消化してから破棄する。
+    // 消化前にunmountしないとタイマーが残り続けるため、cleanup()を先に呼ぶ。
+    cleanup();
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    });
     sizeMock.restore();
     clearResizeObservers();
   });

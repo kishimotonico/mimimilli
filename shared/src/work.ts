@@ -81,11 +81,22 @@ export const workListItemSchema = z.object({
 });
 export type WorkListItem = z.infer<typeof workListItemSchema>;
 
+const CIRCLE_TAG_PREFIXES = ["サークル/", "circle/"];
+
+/**
+ * タグ群から代表サークル名を選ぶ。
+ * サークルタグが複数ある場合は compareUtf8Bytes 昇順で先頭を採用する（正の挙動）。
+ * サークルタグが無ければ null。
+ */
+export function extractCircleName(tags: string[]): string | null {
+  const circleTag = tags
+    .filter((tag) => CIRCLE_TAG_PREFIXES.some((prefix) => tag.startsWith(prefix)))
+    .sort(compareUtf8Bytes)[0];
+  return circleTag ? circleTag.slice(circleTag.indexOf("/") + 1) : null;
+}
+
 /** WorkSummary を一覧用の公開契約へ投影する。 */
 export function toWorkListItem(work: WorkSummary): WorkListItem {
-  const circleTag = work.tags
-    .filter((tag) => tag.startsWith("サークル/") || tag.startsWith("circle/"))
-    .sort(compareUtf8Bytes)[0];
   return {
     id: work.id,
     title: work.title,
@@ -95,7 +106,7 @@ export function toWorkListItem(work: WorkSummary): WorkListItem {
     trackCount: work.trackCount,
     bookmarked: work.bookmarked,
     lastPlayedAt: work.lastPlayedAt,
-    circleName: circleTag ? circleTag.slice(circleTag.indexOf("/") + 1) : null,
+    circleName: extractCircleName(work.tags),
   };
 }
 

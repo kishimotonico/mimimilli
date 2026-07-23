@@ -8,6 +8,19 @@ import {
 } from "@mimimilli/shared";
 import { ActiveScanConflictError, ScanJobManager } from "../scanJobManager.ts";
 
+/** SSE 接続を生かし続けるための ping 間隔（ms）。walking フェーズ等、進捗が長く無音になり得るため */
+const HEARTBEAT_INTERVAL_MS = 15000;
+
+/** clearTimeout 可能な sleep。stream.sleep() は内部の setTimeout を解放できず、
+ *  Promise.race で負けても発火予約が残ってプロセス終了を妨げるため自前で用意する */
+function cancellableSleep(ms: number): { promise: Promise<"tick">; cancel: () => void } {
+  let timer: ReturnType<typeof setTimeout>;
+  const promise = new Promise<"tick">((resolve) => {
+    timer = setTimeout(() => resolve("tick"), ms);
+  });
+  return { promise, cancel: () => clearTimeout(timer) };
+}
+
 function asLastEventId(value: string | undefined): number | null {
   if (!value) return null;
   const id = Number(value);
@@ -22,7 +35,10 @@ function isTerminalEvent(event: ScanJobEvent): boolean {
   return event.type === "completed" || event.type === "failed" || event.type === "cancelled";
 }
 
-export function scanRoute(jobs: ScanJobManager): Hono {
+export function scanRoute(
+  jobs: ScanJobManager,
+  heartbeatIntervalMs: number = HEARTBEAT_INTERVAL_MS,
+): Hono {
   const app = new Hono();
 
   app.post("/scan", (c) => {
@@ -82,6 +98,21 @@ export function scanRoute(jobs: ScanJobManager): Hono {
       const queue: ScanJobEvent[] = [];
       let unsubscribe = (): void => {};
 
+      // 同一接続への write を直列化する（ping と pump のイベント書き込みが交錯しないように）
+      let writeChain: Promise<void> = Promise.resolve();
+      const writeSerialized = (frame: {
+        event: string;
+        id?: string;
+        data: string;
+      }): Promise<void> => {
+        const next = writeChain.then(() => stream.writeSSE(frame));
+        writeChain = next.then(
+          () => {},
+          () => {},
+        );
+        return next;
+      };
+
       const stop = (): void => {
         if (stopped) return;
         stopped = true;
@@ -95,7 +126,7 @@ export function scanRoute(jobs: ScanJobManager): Hono {
         try {
           while (!stopped && queue.length > 0) {
             const event = queue.shift()!;
-            await stream.writeSSE({
+            await writeSerialized({
               event: event.type,
               id: String(event.seq),
               data: JSON.stringify(event),
@@ -153,7 +184,25 @@ export function scanRoute(jobs: ScanJobManager): Hono {
       if (isTerminalStatus(subscription.snapshot.status) && subscription.initial.length === 0) {
         stop();
       }
-      await done;
+
+      // ライブ配信中は進捗が無い区間（walking フェーズ等）でも接続が切れないよう定期的に ping する。
+      // done 解決時は必ずタイマーを clear してから抜けるため、残留タイマーは残らない。
+      const heartbeat = async (): Promise<void> => {
+        while (!stopped) {
+          const sleep = cancellableSleep(heartbeatIntervalMs);
+          const winner = await Promise.race([done.then(() => "done" as const), sleep.promise]);
+          sleep.cancel();
+          if (winner === "done") return;
+          try {
+            await writeSerialized({ event: "ping", data: "" });
+          } catch {
+            stop();
+            return;
+          }
+        }
+      };
+
+      await Promise.all([done, heartbeat()]);
     });
   });
 

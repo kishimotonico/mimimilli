@@ -279,6 +279,8 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
         missing: state.works.filter((w) => w.status === "missing").length,
         newWorkIds: state.scanNewWorkIds,
         rjCodeMissingCount: state.works.filter((w) => isRjCodeMissing(w.dlsite)).length,
+        // fixture には増分スキャンの fingerprint 比較が無く、常に全件を処理し直すため0固定
+        skipped: 0,
       };
     },
 

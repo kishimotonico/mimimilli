@@ -37,6 +37,7 @@ const result = {
   missing: 0,
   newWorkIds: [],
   rjCodeMissingCount: 0,
+  skipped: 0,
 };
 const completed: ScanJobSnapshot = {
   ...running,

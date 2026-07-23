@@ -44,6 +44,7 @@ const scanResult: ScanResult = {
   missing: 0,
   newWorkIds: [work.id],
   rjCodeMissingCount: 0,
+  skipped: 0,
 };
 
 function dispatchCancel(dialog: HTMLElement) {

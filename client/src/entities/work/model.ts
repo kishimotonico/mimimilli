@@ -13,13 +13,14 @@ export type {
   DlsiteWorkInfo,
   ParsedTag,
 } from "@mimimilli/shared";
-export { parseTag } from "@mimimilli/shared";
+export { parseTag, extractCircleName } from "@mimimilli/shared";
 
-const CIRCLE_TAG_PREFIX = "サークル/";
+import { extractCircleName } from "@mimimilli/shared";
 
 /**
  * 作品の構造化タグからサークル名を抽出する。
  * サークルタグが無ければ null（呼び出し側でフォールバック表示を決める）。
+ * 複数サークルタグがある場合の代表選出は shared の extractCircleName（サーバー側と同一ロジック）に委ねる。
  */
 export function getCircleName(work: {
   tags?: string[];
@@ -27,6 +28,5 @@ export function getCircleName(work: {
 }): string | null {
   if (work.circleName !== undefined) return work.circleName;
   if (!work.tags) return null;
-  const tag = work.tags.find((t) => t.startsWith(CIRCLE_TAG_PREFIX));
-  return tag ? tag.slice(CIRCLE_TAG_PREFIX.length) : null;
+  return extractCircleName(work.tags);
 }

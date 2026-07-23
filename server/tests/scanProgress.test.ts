@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { Hono } from "hono";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { createApp } from "../src/app.ts";
 import type { DataAdapter } from "../src/adapter.ts";
+import { scanRoute } from "../src/routes/scan.ts";
 import { ScanJobManager } from "../src/scanJobManager.ts";
 
 const emptyResult = {
@@ -12,6 +14,7 @@ const emptyResult = {
   missing: 0,
   newWorkIds: [],
   rjCodeMissingCount: 0,
+  skipped: 0,
 };
 
 async function start(
@@ -195,5 +198,43 @@ test("reset IDで即再接続すると古い履歴を再送せず、以後のliv
   finishScan();
   while (!manager.get(job.id)?.finishedAt) {
     await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+});
+
+test("進捗の無い区間でも一定間隔でpingを送り、完了時にハートビートを残さず閉じる", async () => {
+  let finishScan!: () => void;
+  const scanDone = new Promise<typeof emptyResult>((resolve) => {
+    finishScan = () => resolve(emptyResult);
+  });
+  const fixture = createFixtureAdapter();
+  const adapter: DataAdapter = { ...fixture, scan: () => scanDone };
+  const manager = new ScanJobManager(adapter);
+  const job = manager.start();
+
+  // heartbeat間隔を20msに短縮したscanRouteだけを直に積んだ最小appでテストする
+  const app = new Hono();
+  app.route("/", scanRoute(manager, 20));
+
+  const response = await app.request(`/scan/${job.id}/events`);
+  assert.equal(response.status, 200);
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  const deadline = Date.now() + 2000;
+  while ([...buffer.matchAll(/event: ping/g)].length < 2 && Date.now() < deadline) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value);
+  }
+  const pingCount = [...buffer.matchAll(/event: ping/g)].length;
+  assert.ok(pingCount >= 2, `無音区間中にpingが複数回送られること (got ${pingCount})`);
+
+  // 完了イベント配信後、ハートビートのタイマーも解放されてストリームが閉じること
+  finishScan();
+  const closedAt = Date.now();
+  for (;;) {
+    const { done } = await reader.read();
+    if (done) break;
+    assert.ok(Date.now() - closedAt < 2000, "完了後は速やかにストリームが閉じること");
   }
 });

@@ -1,14 +1,8 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { isRjCodeMissing, type WorkSummary } from "@mimimilli/shared";
 import { getDlsiteNotificationSummary, queryDlsiteNotifications } from "../../../entities/work/api";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 
 const NOTIFICATION_PAGE_SIZE = 100;
-
-/** 後方互換の純粋関数。通知API自体はこの全件フィルターを使わない。 */
-export function filterRjCodeMissingWorks(works: WorkSummary[]): WorkSummary[] {
-  return works.filter((work) => isRjCodeMissing(work.dlsite));
-}
 
 export function useRjCodeMissingWorks() {
   const summary = useQuery({

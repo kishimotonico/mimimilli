@@ -421,7 +421,7 @@ export class Scanner {
             );
           }
           seenIds.add(entry.id);
-          result.skipped! += 1;
+          result.skipped += 1;
         } else {
           const outcome = await this.registerMetaFile(
             entry,
@@ -432,7 +432,7 @@ export class Scanner {
             checkAbort,
           );
           if (outcome === "skipped") {
-            result.skipped! += 1;
+            result.skipped += 1;
           } else {
             result.registered += 1;
           }
