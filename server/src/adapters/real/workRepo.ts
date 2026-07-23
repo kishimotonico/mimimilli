@@ -25,6 +25,7 @@ import type {
   SearchPresetCreate,
   SmartFolder,
   SmartFolderCreate,
+  SmartFolderRule,
   SmartFolderUpdate,
   TagPrefix,
   TagPrefixCreate,
@@ -260,6 +261,15 @@ function randomSeed(): number {
   return crypto.getRandomValues(new Uint32Array(1))[0]! & 0x7fffffff;
 }
 
+/** SQLite の IN 句パラメータ上限を避けるため、配列を一定件数ごとに分割する */
+function chunk<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+
 function worksOrderSql(
   sort: WorksQuery["sort"],
   seed: number | undefined,
@@ -315,7 +325,10 @@ export class WorkRepo {
 
   // ── タグ ──────────────────────────────────────────────────
 
-  /** workId → タグ名一覧のマップを作る（対象未指定なら全件） */
+  /**
+   * workId → タグ名一覧のマップを作る（対象未指定なら全件）。
+   * SQLite のパラメータ上限を避けるため、対象指定時は一定件数ごとに分割して取得する。
+   */
   private tagMap(workIds?: string[]): Map<string, string[]> {
     const baseSql = `
       SELECT work_tags.work_id AS workId, tags.name AS name
@@ -325,11 +338,13 @@ export class WorkRepo {
     const rows = (
       workIds === undefined
         ? this.db.sqlite.query(baseSql).all()
-        : workIds.length === 0
-          ? []
-          : this.db.sqlite
-              .query(`${baseSql} WHERE work_tags.work_id IN (${workIds.map(() => "?").join(", ")})`)
-              .all(...workIds)
+        : chunk(workIds, 900).flatMap((idsChunk) =>
+            this.db.sqlite
+              .query(
+                `${baseSql} WHERE work_tags.work_id IN (${idsChunk.map(() => "?").join(", ")})`,
+              )
+              .all(...idsChunk),
+          )
     ) as Array<{ workId: string; name: string }>;
     const map = new Map<string, string[]>();
     for (const r of rows) {
@@ -481,12 +496,16 @@ export class WorkRepo {
     }));
   }
 
-  listSummaries(): WorkSummary[] {
-    // 一覧専用クエリ。dlsite まで JOIN して一括取得し、playlists_json は読まない（TASK-57）。
-    // SQL 発行数は作品数に比例しない（本クエリ + tagMap の定数2本）
-    const rows = this.db.sqlite
-      .query(
-        `
+  /**
+   * 一覧専用クエリ。dlsite まで JOIN して一括取得し、playlists_json は読まない（TASK-57）。
+   * SQL 発行数は作品数に比例しない（本クエリ + tagMap の定数2本）。
+   * workIds を指定すると、その集合だけを対象にする（TASK-85: スマートフォルダーの候補絞り込み後の取得用）。
+   * SQLite のパラメータ上限を避けるため、一定件数ごとに分割して IN 句で取得する。
+   */
+  listSummaries(workIds?: string[]): WorkSummary[] {
+    if (workIds !== undefined && workIds.length === 0) return [];
+
+    const baseSql = `
       SELECT
         works.id,
         works.title,
@@ -504,10 +523,18 @@ export class WorkRepo {
       FROM main.works
       INNER JOIN user.work_states AS work_states ON work_states.work_id = works.id
       LEFT JOIN main.work_dlsite AS work_dlsite ON work_dlsite.work_id = works.id
-    `,
-      )
-      .all() as RawSummaryListRow[];
-    const tagsByWork = this.tagMap();
+    `;
+    const chunkSize = 900; // SQLite パラメータ上限に余裕を持たせる
+    const rows: RawSummaryListRow[] =
+      workIds === undefined
+        ? (this.db.sqlite.query(baseSql).all() as RawSummaryListRow[])
+        : chunk(workIds, chunkSize).flatMap(
+            (idsChunk) =>
+              this.db.sqlite
+                .query(`${baseSql} WHERE works.id IN (${idsChunk.map(() => "?").join(", ")})`)
+                .all(...idsChunk) as RawSummaryListRow[],
+          );
+    const tagsByWork = this.tagMap(workIds);
     return rows.map((rawRow) => {
       const row: SummaryRow = { ...rawRow, bookmarked: rawRow.bookmarked !== 0 };
       return rowToSummary(
@@ -516,6 +543,53 @@ export class WorkRepo {
         this.parseDlsiteStateJson(row.id, rawRow.dlsiteStateJson),
       );
     });
+  }
+
+  /**
+   * スマートフォルダー評価の第1段（ADR-0008）。SQLへ落とせるルール条件で候補IDへ絞り込む。
+   * ルールなしはSQLで絞り込めないため null を返し、呼び出し側は全件を使う。
+   * ルールがある場合は各ルールに一致するIDの和集合を返す（AND/OR/AND NOTの畳み込みは行わない）。
+   * WHERE始端のリセットやAND NOTでの除外があっても、最終結果は必ずどこかのルールの一致集合に
+   * 含まれるため、和集合は安全な上界になる。畳み込み・最終フィルタ・ソート・ページングは
+   * core/smartFolder.ts の純粋関数が候補の WorkSummary に対して行う。
+   */
+  resolveSmartFolderCandidateIds(rules: SmartFolderRule[]): Set<string> | null {
+    if (rules.length === 0) return null;
+
+    const predicates: string[] = [];
+    const bindings: Array<string | number> = [];
+    for (const rule of rules) {
+      switch (rule.field) {
+        case "タグ": {
+          const normalized = rule.values.map(normalizeTag);
+          const placeholders = normalized.map(() => "?").join(", ");
+          predicates.push(`EXISTS (
+            SELECT 1
+            FROM main.work_tags AS rule_work_tags
+            INNER JOIN main.tags AS rule_tags ON rule_tags.id = rule_work_tags.tag_id
+            WHERE rule_work_tags.work_id = works.id AND rule_tags.name IN (${placeholders})
+          )`);
+          bindings.push(...normalized);
+          break;
+        }
+        case "長さ": {
+          const minSec = Number(rule.values[0]);
+          if (!Number.isFinite(minSec)) {
+            throw new Error(`スマートフォルダーの長さ条件が不正です: ${rule.values[0]}`);
+          }
+          predicates.push("works.total_duration_sec >= ?");
+          bindings.push(minSec);
+          break;
+        }
+        default:
+          throw new Error(`未対応のスマートフォルダールールです: ${JSON.stringify(rule)}`);
+      }
+    }
+
+    const rows = this.db.sqlite
+      .query(`SELECT works.id AS id FROM main.works WHERE ${predicates.join(" OR ")}`)
+      .all(...bindings) as Array<{ id: string }>;
+    return new Set(rows.map((row) => row.id));
   }
 
   /** ADR-0008: ATTACH JOINした同じ絞り込み集合から件数とページを求める。 */

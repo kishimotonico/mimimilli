@@ -5,6 +5,7 @@ import {
   normalizeTags,
   sortIdSchema,
   toWorkListItem,
+  type SmartFolderRule,
   type Work,
   type WorksQuery,
   type WorkSummary,
@@ -12,6 +13,7 @@ import {
 import { WorkRepo } from "../../src/adapters/real/workRepo.ts";
 import { openDb } from "../../src/adapters/real/db.ts";
 import { buildAxisFacets } from "../../src/core/axisFacets.ts";
+import { evalSmartFolder } from "../../src/core/smartFolder.ts";
 import { applyWorksQuery } from "../../src/core/worksQuery.ts";
 
 const recent = new Date(Date.now() - 5 * 86400000).toISOString();
@@ -268,6 +270,162 @@ test("core参照実装とreal SQLのファセット値・件数・順序が同�
       { value: "Ａlpha", count: dataset.length },
       { value: "Ｂeta", count: dataset.length },
     ]);
+  } finally {
+    db.close();
+  }
+});
+
+// server/src/adapters/real/index.ts の evalSmartFolder ハンドラと同じ2段構成（ADR-0008）。
+// resolveSmartFolderCandidateIds でSQLへ落とせるルールから候補IDを絞り込み、
+// その候補だけを listSummaries で取得してから core の純粋関数へ渡す。
+function realEvalSmartFolder(
+  repo: WorkRepo,
+  rules: SmartFolderRule[],
+  sort: WorksQuery["sort"],
+  query: { page: number; limit: number; seed?: number },
+) {
+  const candidateIds = repo.resolveSmartFolderCandidateIds(rules);
+  const works = repo.listSummaries(candidateIds === null ? undefined : [...candidateIds]);
+  return evalSmartFolder({ rules, sort }, works, query);
+}
+
+function assertSmartFolderEquivalent(
+  repo: WorkRepo,
+  rules: SmartFolderRule[],
+  sort: WorksQuery["sort"],
+  query: { page: number; limit: number; seed?: number },
+): void {
+  const fixture = evalSmartFolder({ rules, sort }, dataset, query);
+  const real = realEvalSmartFolder(repo, rules, sort, query);
+  assert.deepEqual(
+    real.items.map((work) => work.id),
+    fixture.items.map((work) => work.id),
+    `smart folder ordered IDs: ${JSON.stringify({ rules, sort, query })}`,
+  );
+  assert.equal(
+    real.total,
+    fixture.total,
+    `smart folder total: ${JSON.stringify({ rules, query })}`,
+  );
+  assert.equal(real.seed, fixture.seed, `smart folder seed: ${JSON.stringify({ rules, query })}`);
+}
+
+test("スマートフォルダーのSQL候補絞り込み(第1段)とcore純粋関数の最終評価(第2段)がfixtureと同値", () => {
+  const db = openDb({ kind: "memory" });
+  const repo = new WorkRepo(db);
+  try {
+    for (const item of dataset) repo.upsertWork(fullWork(item));
+
+    const tagRule = (values: string[], conjunction: SmartFolderRule["conjunction"] = "WHERE") =>
+      ({ conjunction, field: "タグ", operator: "∋", values }) as SmartFolderRule;
+    const lengthRule = (minSec: number, conjunction: SmartFolderRule["conjunction"] = "WHERE") =>
+      ({ conjunction, field: "長さ", operator: "≥", values: [String(minSec)] }) as SmartFolderRule;
+
+    const fixedCases: Array<{ rules: SmartFolderRule[]; sort: WorksQuery["sort"] }> = [
+      { rules: [], sort: "added-desc" }, // ルールなし = SQLで絞り込めず全件が候補
+      { rules: [tagRule(["ASMR", "cv/水瀬なずな"])], sort: "title-asc" },
+      { rules: [tagRule(["存在しないタグ"])], sort: "added-desc" },
+      { rules: [lengthRule(1200)], sort: "duration-desc" },
+      { rules: [lengthRule(1200), tagRule(["催眠"], "AND")], sort: "duration-asc" },
+      { rules: [lengthRule(1800), tagRule(["添い寝"], "OR")], sort: "id-asc" },
+      { rules: [lengthRule(1800), tagRule(["添い寝"], "AND NOT")], sort: "last-played" },
+      {
+        rules: [tagRule(["ASMR"]), lengthRule(1200, "AND"), tagRule(["催眠"], "OR")],
+        sort: "added-asc",
+      },
+      // 先頭ルールの conjunction が "AND NOT" でも、評価関数は index===0 を WHERE として
+      // 扱う（先頭に否定は効かない）。real経路の候補ID絞り込みはconjunctionを見ずに
+      // 全ルールの一致IDを和集合するだけなので、このエッジでも取りこぼしが無いことを確認する。
+      { rules: [tagRule(["ASMR"], "AND NOT")], sort: "added-desc" }, // 否定のみの単一ルール
+      { rules: [lengthRule(1200, "AND NOT")], sort: "duration-asc" }, // 否定のみの単一ルール（長さ）
+      {
+        rules: [tagRule(["ASMR"], "AND NOT"), tagRule(["催眠"], "OR")],
+        sort: "id-asc",
+      },
+    ];
+    for (const { rules, sort } of fixedCases) {
+      assertSmartFolderEquivalent(repo, rules, sort, { page: 1, limit: 7 });
+      assertSmartFolderEquivalent(repo, rules, sort, { page: 2, limit: 5 });
+    }
+    // random は同じseedを両経路へ与えて比較する
+    assertSmartFolderEquivalent(repo, [lengthRule(0)], "random", {
+      page: 1,
+      limit: 6,
+      seed: 42,
+    });
+
+    let state = 0x1234abcd;
+    const next = (): number => {
+      state = Math.imul(state ^ (state >>> 15), state | 1);
+      state ^= state + Math.imul(state ^ (state >>> 7), state | 61);
+      return (state ^ (state >>> 14)) >>> 0;
+    };
+    const tagPool = ["ASMR", "asmr", "催眠", "添い寝", "耳かき", "cv/水瀬なずな", "存在しない"];
+    const conjunctions: SmartFolderRule["conjunction"][] = ["AND", "OR", "AND NOT"];
+    // 先頭ルールも "WHERE" 固定にせず全conjunctionから選ぶ（index===0はconjunctionを無視して
+    // WHERE相当に振る舞うため、"先頭AND NOT"のようなエッジも生成テストへ混ぜる）。
+    const leadingConjunctions: SmartFolderRule["conjunction"][] = ["WHERE", "AND", "OR", "AND NOT"];
+    for (let index = 0; index < 40; index++) {
+      const ruleCount = (next() % 3) + 1;
+      const rules: SmartFolderRule[] = [];
+      for (let i = 0; i < ruleCount; i++) {
+        const conjunction =
+          i === 0
+            ? leadingConjunctions[next() % leadingConjunctions.length]!
+            : conjunctions[next() % conjunctions.length]!;
+        rules.push(
+          next() % 2 === 0
+            ? tagRule([tagPool[next() % tagPool.length]!], conjunction)
+            : lengthRule((next() % 4) * 600, conjunction),
+        );
+      }
+      const sort = sortIdSchema.options[next() % sortIdSchema.options.length]!;
+      assertSmartFolderEquivalent(repo, rules, sort, {
+        page: (next() % 4) + 1,
+        limit: (next() % 6) + 1,
+        seed: sort === "random" ? next() & 0x7fffffff : undefined,
+      });
+    }
+  } finally {
+    db.close();
+  }
+});
+
+test("スマートフォルダー候補IDが900件を超えてもlistSummariesのchunk境界をまたいで同値", () => {
+  const db = openDb({ kind: "memory" });
+  const repo = new WorkRepo(db);
+  try {
+    // listSummaries(workIds) はSQLiteのパラメータ上限を避けるため900件ごとに分割してIN句を発行する
+    // （TASK-85）。候補IDがちょうどその境界をまたぐ件数になるデータセットで、分割・再結合が
+    // 欠落や重複なく行われることを直接検証する。
+    const largeDataset = Array.from({ length: 950 }, (_, index) => summary(index));
+    for (const item of largeDataset) repo.upsertWork(fullWork(item));
+
+    const rule: SmartFolderRule = {
+      conjunction: "WHERE",
+      field: "長さ",
+      operator: "≥",
+      values: ["0"],
+    };
+    const query = { page: 1, limit: largeDataset.length };
+
+    const candidateIds = repo.resolveSmartFolderCandidateIds([rule]);
+    assert.notEqual(candidateIds, null);
+    assert.ok(
+      candidateIds!.size > 900,
+      `候補IDがchunk境界(900件)を超えている前提が崩れている: ${candidateIds!.size}`,
+    );
+
+    const works = repo.listSummaries([...candidateIds!]);
+    assert.equal(works.length, candidateIds!.size, "chunk分割後も欠落・重複がない");
+
+    const fixture = evalSmartFolder({ rules: [rule], sort: "id-asc" }, largeDataset, query);
+    const real = evalSmartFolder({ rules: [rule], sort: "id-asc" }, works, query);
+    assert.deepEqual(
+      real.items.map((work) => work.id),
+      fixture.items.map((work) => work.id),
+    );
+    assert.equal(real.total, fixture.total);
   } finally {
     db.close();
   }

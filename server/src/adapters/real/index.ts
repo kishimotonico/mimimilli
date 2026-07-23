@@ -264,7 +264,12 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
           sourceAbsolutePath,
           source,
         );
-        return { type: "file", absolutePath: thumbnail.absolutePath, mime: thumbnail.mime };
+        return {
+          type: "file",
+          absolutePath: thumbnail.absolutePath,
+          mime: thumbnail.mime,
+          size: thumbnail.size,
+        };
       },
     };
   }
@@ -460,7 +465,11 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
     ): Promise<WorksPage | null> {
       const folder = repo.getSmartFolder(id);
       if (!folder) return null;
-      const page = evalSmartFolder(folder, repo.listSummaries(), query);
+      // ADR-0008: SQLでルール一致の候補IDへ絞り込んでから（第1段）、その候補だけを
+      // WorkSummary化して純粋関数の最終評価・ソート・ページングへ渡す（第2段）。
+      const candidateIds = repo.resolveSmartFolderCandidateIds(folder.rules);
+      const works = repo.listSummaries(candidateIds === null ? undefined : [...candidateIds]);
+      const page = evalSmartFolder(folder, works, query);
       return page.seed === undefined
         ? { items: page.items.map(toWorkListItem), total: page.total }
         : { items: page.items.map(toWorkListItem), total: page.total, seed: page.seed };
