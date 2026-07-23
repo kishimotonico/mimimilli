@@ -12,6 +12,7 @@ import sharp from "sharp";
 export interface Thumbnail {
   absolutePath: string;
   mime: string;
+  size: number;
 }
 
 export interface ThumbnailSource {
@@ -30,6 +31,11 @@ export interface ThumbnailCacheOptions {
   transform?: (input: ThumbnailTransformInput) => Promise<void>;
   /** rename失敗を含むファイル確定処理の検証用。通常はnode:fs/promisesのrenameを使う。 */
   rename?: (oldPath: string, newPath: string) => Promise<void>;
+  /**
+   * admission時のキャッシュ有無判定に使うstat。キー単位ロックの並行性を検証するテスト用に
+   * 差し替え可能にしてある（本番ではstatSizeOrNullそのもの）。
+   */
+  statCachedFile?: (path: string) => Promise<number | null>;
 }
 
 /** cacheDir配下にworkId・width・元ファイルsize/mtimeをキーにしたキャッシュファイル名を作る。 */
@@ -40,12 +46,11 @@ function cacheFileName(workId: string, width: number, source: ThumbnailSource): 
   return `${hash}.webp`;
 }
 
-async function fileExists(path: string): Promise<boolean> {
+async function statSizeOrNull(path: string): Promise<number | null> {
   try {
-    await stat(path);
-    return true;
+    return (await stat(path)).size;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -87,11 +92,16 @@ class FifoSemaphore {
 /** single-flight と待機列をサービス単位に閉じ込めるサムネイル生成サービス。 */
 export class ThumbnailCache {
   private readonly inFlight = new Map<string, Promise<Thumbnail>>();
-  /** cache判定とsingle-flight登録を呼出順に行い、非同期statの完了順でFIFOを崩さない。 */
-  private admissionTail: Promise<void> = Promise.resolve();
+  /**
+   * cache判定とsingle-flight登録をcachedPathキー単位で直列化する（同一キーのcheck-then-act
+   * を原子的にし、二重生成を防ぐ）。キーが異なればエントリも別なので、あるキーの判定待ちが
+   * 他キーの判定をブロックしない（グローバル直列化によるhead-of-lineブロッキングの解消）。
+   */
+  private readonly admissionTails = new Map<string, Promise<void>>();
   private readonly semaphore: FifoSemaphore;
   private readonly transform: (input: ThumbnailTransformInput) => Promise<void>;
   private readonly renameFile: (oldPath: string, newPath: string) => Promise<void>;
+  private readonly statCachedFile: (path: string) => Promise<number | null>;
   private tmpFileCounter = 0;
 
   constructor(options: ThumbnailCacheOptions = {}) {
@@ -102,6 +112,7 @@ export class ThumbnailCache {
     this.semaphore = new FifoSemaphore(maxConcurrent);
     this.transform = options.transform ?? sharpTransform;
     this.renameFile = options.rename ?? rename;
+    this.statCachedFile = options.statCachedFile ?? statSizeOrNull;
   }
 
   private async generate(
@@ -114,7 +125,11 @@ export class ThumbnailCache {
     try {
       await this.transform({ sourceAbsolutePath, width, tmpPath });
       await this.renameFile(tmpPath, cachedPath);
-      return { absolutePath: cachedPath, mime: "image/webp" };
+      const size = await statSizeOrNull(cachedPath);
+      if (size === null) {
+        throw new Error(`サムネイル生成直後のstatに失敗しました: ${cachedPath}`);
+      }
+      return { absolutePath: cachedPath, mime: "image/webp", size };
     } catch (error) {
       // cleanup失敗で変換/renameの原因を覆い隠さない。
       try {
@@ -128,18 +143,18 @@ export class ThumbnailCache {
     }
   }
 
+  /** cache判定とsingle-flight登録。cachedPathが確定した後、呼出元でキー単位に直列化される。 */
   private async admit(
     cacheDir: string,
-    workId: string,
+    cachedPath: string,
     width: number,
     sourceAbsolutePath: string,
-    source?: ThumbnailSource,
   ): Promise<{ result: Promise<Thumbnail> }> {
-    const sourceStat = source ?? (await stat(sourceAbsolutePath));
-    const sourceKey: ThumbnailSource = { size: sourceStat.size, mtimeMs: sourceStat.mtimeMs };
-    const cachedPath = join(cacheDir, cacheFileName(workId, width, sourceKey));
-    if (await fileExists(cachedPath)) {
-      return { result: Promise.resolve({ absolutePath: cachedPath, mime: "image/webp" }) };
+    const cachedSize = await this.statCachedFile(cachedPath);
+    if (cachedSize !== null) {
+      return {
+        result: Promise.resolve({ absolutePath: cachedPath, mime: "image/webp", size: cachedSize }),
+      };
     }
 
     const existing = this.inFlight.get(cachedPath);
@@ -153,20 +168,35 @@ export class ThumbnailCache {
     return { result: promise };
   }
 
-  getOrCreate(
+  async getOrCreate(
     cacheDir: string,
     workId: string,
     width: number,
     sourceAbsolutePath: string,
     source?: ThumbnailSource,
   ): Promise<Thumbnail> {
-    const admitted = this.admissionTail.then(() =>
-      this.admit(cacheDir, workId, width, sourceAbsolutePath, source),
+    // cachedPathの計算自体はキー無関係の純粋な読み取りなのでロック不要。
+    const sourceStat = source ?? (await stat(sourceAbsolutePath));
+    const sourceKey: ThumbnailSource = { size: sourceStat.size, mtimeMs: sourceStat.mtimeMs };
+    const cachedPath = join(cacheDir, cacheFileName(workId, width, sourceKey));
+
+    // admit（check-then-act）だけをcachedPath単位で直列化する。異なるキーは別エントリなので
+    // 互いを待たず並行に進む。
+    const previousTail = this.admissionTails.get(cachedPath) ?? Promise.resolve();
+    const admitted = previousTail.then(() =>
+      this.admit(cacheDir, cachedPath, width, sourceAbsolutePath),
     );
-    this.admissionTail = admitted.then(
+    const tail = admitted.then(
       () => {},
       () => {},
     );
+    this.admissionTails.set(cachedPath, tail);
+    // このキーの末尾がまだ自分のままなら（後続の予約が入っていなければ）掃除してMapの肥大を防ぐ。
+    void tail.finally(() => {
+      if (this.admissionTails.get(cachedPath) === tail) {
+        this.admissionTails.delete(cachedPath);
+      }
+    });
     return admitted.then(({ result }) => result);
   }
 }

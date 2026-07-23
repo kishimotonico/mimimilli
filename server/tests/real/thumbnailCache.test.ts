@@ -2,7 +2,7 @@
 // 変換を1回だけ実行すること、生成失敗時に残骸を残さず再試行できることを検証する。
 import assert from "node:assert/strict";
 import { existsSync, readdirSync, writeFileSync } from "node:fs";
-import { rename, writeFile } from "node:fs/promises";
+import { rename, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
 import sharp from "sharp";
@@ -37,13 +37,28 @@ test("同一キーへの同時リクエストは変換を1回だけ実行し、�
   for (const r of results) {
     assert.equal(r.absolutePath, first.absolutePath);
     assert.equal(r.mime, "image/webp");
+    assert.equal(r.size, first.size);
   }
+  assert.ok(first.size > 0);
 
   // 完成ファイルのみが残り、一時ファイルの残骸は無い
   const files = readdirSync(cacheDir);
   assert.equal(files.length, 1);
   assert.ok(!files[0]!.includes(".tmp-"));
   assert.ok(existsSync(first.absolutePath));
+});
+
+test("キャッシュヒット時もファイルの実サイズを返す", async (t) => {
+  const { baseDir, cacheDir } = setup(t);
+  const coverPath = join(baseDir, "cover-cached.jpg");
+  await writeCoverJpeg(coverPath);
+
+  const first = await getOrCreateThumbnail(cacheDir, "work-cached", 256, coverPath);
+  const second = await getOrCreateThumbnail(cacheDir, "work-cached", 256, coverPath);
+
+  assert.equal(second.absolutePath, first.absolutePath);
+  assert.equal(second.size, first.size);
+  assert.ok(second.size > 0);
 });
 
 test("異なるキーの生成は並行のまま進む", async (t) => {
@@ -83,7 +98,7 @@ test("生成失敗時は壊れたキャッシュを残さず、修正後の再�
   assert.ok(existsSync(result.absolutePath));
 });
 
-test("異なるキーはFIFOキューで上限以下に変換し、同一キーはqueue投入前に合流する", async (t) => {
+test("異なるキーはSharp側semaphoreの上限以下に変換し、同一キーはqueue投入前に合流する", async (t) => {
   const { baseDir, cacheDir } = setup(t);
   let running = 0;
   let maxRunning = 0;
@@ -105,10 +120,53 @@ test("異なるキーはFIFOキューで上限以下に変換し、同一キー�
   const second = cache.getOrCreate(cacheDir, "b", 256, join(baseDir, "b.jpg"), source);
   const [a, aAgain, b] = await Promise.all([first, duplicate, second]);
 
+  // admission（stat/mkdir/inFlight登録）はキー単位のロックに縮小されており、異なるキー間の
+  // 開始順序は保証しない（TASK-87）。変換の同時実行数がmaxConcurrentを超えないことと、
+  // 両方とも実行されたことだけを検証する。
   assert.equal(maxRunning, 1);
-  assert.deepEqual(started, [join(baseDir, "a.jpg"), join(baseDir, "b.jpg")]);
+  assert.deepEqual([...started].sort(), [join(baseDir, "a.jpg"), join(baseDir, "b.jpg")].sort());
   assert.equal(a.absolutePath, aAgain.absolutePath);
   assert.notEqual(a.absolutePath, b.absolutePath);
+});
+
+test("片方のキーのadmission判定が保留中でも、別キーのキャッシュヒットはブロックされず解決する", async (t) => {
+  const { baseDir, cacheDir } = setup(t);
+  const coverSlow = join(baseDir, "cover-slow.jpg");
+  const coverFast = join(baseDir, "cover-fast.jpg");
+  await Promise.all([writeCoverJpeg(coverSlow), writeCoverJpeg(coverFast)]);
+  const source = { size: 1, mtimeMs: 1 };
+
+  // fast-key は先に生成しておき、以降はキャッシュヒットになる状態を作る。
+  await getOrCreateThumbnail(cacheDir, "fast-key", 256, coverFast, source);
+
+  let resolveGate: (value: number | null) => void = () => {};
+  const gate = new Promise<number | null>((resolve) => {
+    resolveGate = resolve;
+  });
+  let calls = 0;
+  const cache = new ThumbnailCache({
+    async statCachedFile(path) {
+      calls++;
+      // 最初の呼び出し（slow-key側）だけ意図的にゲートで止め、admission判定を保留にする。
+      if (calls === 1) return gate;
+      try {
+        return (await stat(path)).size;
+      } catch {
+        return null;
+      }
+    },
+  });
+
+  const slow = cache.getOrCreate(cacheDir, "slow-key", 256, coverSlow, source);
+  const raced = await Promise.race([
+    cache.getOrCreate(cacheDir, "fast-key", 256, coverFast, source),
+    new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), 200)),
+  ]);
+  assert.notEqual(raced, "timeout", "別キーのキャッシュヒットが保留中のadmissionに待たされている");
+
+  resolveGate(null);
+  const slowResult = await slow;
+  assert.ok(existsSync(slowResult.absolutePath));
 });
 
 test("queued/runningの失敗後もslotを解放し、同じキーを再試行できる", async (t) => {
