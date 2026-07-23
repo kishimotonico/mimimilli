@@ -15,6 +15,7 @@ interface PreviewPaneProps {
   selectedWork: Work | null;
   smartFolder: SmartFolder | null;
   axisWorks: WorkListItem[];
+  axisTotal?: number;
   smartFolderWorks: WorkListItem[];
   smartFolderTotal?: number;
   playingTrackIndex: number | null;
@@ -35,6 +36,7 @@ export default function PreviewPane({
   selectedWork,
   smartFolder,
   axisWorks,
+  axisTotal,
   smartFolderWorks,
   smartFolderTotal,
   playingTrackIndex,
@@ -78,6 +80,7 @@ export default function PreviewPane({
         <AxisLanding
           presentation={axisLandingPresentation}
           works={axisWorks}
+          total={axisTotal}
           onSelectWork={onSelectWork}
         />
       )}

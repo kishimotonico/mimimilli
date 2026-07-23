@@ -258,6 +258,7 @@ export default function LibraryView({
           selectedWork={selectedWork}
           smartFolder={activeSmartFolder}
           axisWorks={works}
+          axisTotal={worksTotal}
           smartFolderWorks={works}
           smartFolderTotal={worksTotal}
           playingTrackIndex={

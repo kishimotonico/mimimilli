@@ -8,10 +8,12 @@ import { formatDuration } from "./format";
 export function AxisLanding({
   presentation,
   works,
+  total,
   onSelectWork,
 }: {
   presentation: AxisLandingPresentation;
   works: WorkListItem[];
+  total?: number;
   onSelectWork: (id: string) => void;
 }) {
   return (
@@ -19,7 +21,7 @@ export function AxisLanding({
       <div className="mle-sect">
         <span>{presentation.sectionTitle}</span>
         <div className="mle-sect__rule" />
-        <span className="count">{works.length} 件</span>
+        <span className="count">{total ?? works.length} 件</span>
       </div>
       {presentation.instruction && (
         <p style={{ fontSize: 12, color: "var(--ink-2)", marginBottom: 16 }}>
