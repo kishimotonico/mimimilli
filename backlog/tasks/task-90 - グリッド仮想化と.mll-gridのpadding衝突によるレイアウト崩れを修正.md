@@ -1,9 +1,10 @@
 ---
 id: TASK-90
 title: グリッド仮想化と.mll-gridのpadding衝突によるレイアウト崩れを修正
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-24 13:28'
+updated_date: '2026-07-24 13:40'
 labels: []
 dependencies: []
 priority: high
