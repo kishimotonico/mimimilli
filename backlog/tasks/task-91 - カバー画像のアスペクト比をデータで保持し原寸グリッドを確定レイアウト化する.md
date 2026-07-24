@@ -1,10 +1,10 @@
 ---
 id: TASK-91
 title: カバー画像のアスペクト比をデータで保持し原寸グリッドを確定レイアウト化する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-24 14:13'
-updated_date: '2026-07-24 15:27'
+updated_date: '2026-07-24 19:00'
 labels: []
 dependencies: []
 priority: high
