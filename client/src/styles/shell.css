@@ -517,6 +517,9 @@
     flex: 1;
     min-height: 0;
     overflow: hidden auto;
+    /* 水平paddingはここに。.mll-grid側だと絶対配置の仮想化行に効かない。
+       縦は virtualizer の paddingStart/End（WorkGrid.tsx）に一本化 */
+    padding: 0 16px;
   }
   .mll-grid-scroll::-webkit-scrollbar {
     width: 8px;
@@ -534,7 +537,6 @@
     grid-template-columns: repeat(auto-fill, minmax(var(--tile-size), 1fr));
     align-items: start;
     gap: var(--grid-row-gap) var(--grid-col-gap);
-    padding: 16px;
   }
   /* 原寸ジャスティファイド（TASK-45）。行ごとに display:flex な .mll-grid-row を
      縦積みし、各タイルの幅・行高さは WorkGrid が justifiedLayout の計算結果を
@@ -559,12 +561,10 @@
     width: 100%;
     content-visibility: auto;
   }
-  .mll-grid-pane.is-inspector-open .mll-grid {
+  .mll-grid-pane.is-inspector-open .mll-grid-scroll {
     padding-right: calc(var(--grid-inspector-width) + 16px);
   }
-  .mle-app.has-docked-bar .mll-grid {
-    padding-bottom: 28px;
-  }
+  /* ドッキングバー下余白は JS 側 GRID_DOCKED_BAR_EXTRA（paddingEnd）に一本化 */
   .mll-grid-empty {
     min-height: 100%;
     display: flex;
