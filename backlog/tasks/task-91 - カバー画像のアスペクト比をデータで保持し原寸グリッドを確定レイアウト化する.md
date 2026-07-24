@@ -4,7 +4,7 @@ title: カバー画像のアスペクト比をデータで保持し原寸グリ�
 status: To Do
 assignee: []
 created_date: '2026-07-24 14:13'
-updated_date: '2026-07-24 14:30'
+updated_date: '2026-07-24 15:27'
 labels: []
 dependencies: []
 priority: high
@@ -55,7 +55,29 @@ EXIF回転後の表示寸法一致 / GIF等マルチページ画像の寸法解�
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
-設計決定(2026-07-24, ユーザー確定):
-- 契約の形(b): coverImage フラットではなく cover: { image, dimensions: {width,height} } | null のオブジェクトに統合する。既存 coverImage 参照箇所は cover.image への移行を伴う（範囲やや広を許容）。
-- 計測失敗時(d): 壊れたカバー等のエラー整備は有用なので入れる。ただし既存仕様を複雑化しない範囲で。新たな作品statusenumを増やすような重い作りは避け、既存のスキャン結果/通知/ログ経路に軽く載せる方向で『適切なエラー処理』を実装する（cover_probe_error専用状態をフル導入するかは実装時に既存プラミングとの兼ね合いで最小構成を選ぶ）。計測失敗画像はUIで正方形プレースホルダ、次回スキャンで再試行、は維持。
+設計確定(2026-07-24, ユーザー決定+Codexレビュー反映)。
+
+## 契約(b)
+API DTOは cover: { image: string; dimensions: { width:number; height:number } } | null に統合。dimensions は必須(optional/nullable禁止)、cover自体は必須nullable。.meta.json は coverImage のまま据え置き、正本に派生値を入れない。切る後方互換は client/server 間の旧DTOのみ(ユーザーの既存.meta.jsonは非対象)。編集画面が元の設定値を要る場合、公開表示用 cover と編集用設定値を分ける。単位pxを型名/コメントで明示。
+
+## 計測失敗(d, ユーザー決定=明示的な未知)
+cover:null は「表示可能なカバーが無い」を意味(未設定とは別だが同一null投影。情報/編集画面で『なし』誤表示しない配慮)。0/1で埋めない。失敗は ScanResult に coverErrors 件数として載せる(既存 errors とは別)。DLsite適用時の計測失敗はそのAPI操作を失敗として返す。計測失敗画像はUIで正方形プレースホルダ、次回スキャンで再試行。cover===null の1:1はフォールバックでなくプレースホルダ仕様として明示。
+
+## EXIF/画像向き
+サムネ生成(thumbnailCache.ts)にSharp自動回転を明示し、保存する cover_width/height を回転後の表示寸法に一致させる。配信WebPのピクセル方向・幅指定なし原画像返却・保存寸法を同一規則に。orientation 5-8のテスト画像で寸法一致テスト。GIF等マルチページは先頭ページの表示寸法(合成高さを誤保存しない)。
+
+## 再計測トリガ/スキップ
+カバー専用fingerprintは無い。fingerprint不一致で再登録する作品はカバーも毎回再計測(Sharp metadataは軽い)。ScanWorkStateにカバー有無・寸法充足を持たせ、skip許可は『メタ無カバー&DB無カバー』or『メタ有カバー&DB両正寸法』のみ。prepareMetaEntriesの早期skipより前に欠損を判定する。
+
+## カバー書き換え全経路(寸法と同一更新単位)
+scanner / dlsiteApply / runDlsiteBulk / WorkRepo.patchWork / fixture / catalog再構築 / 自動生成作品の初回登録。計測はDBトランザクション外で先に実行し、成功した{image,dimensions}を1回のDB更新に渡す。計測失敗時に既存カバーを残すか利用不能にするかを明示。
+
+## DB
+works に cover_width/cover_height nullable列 + CHECK制約(両NULL、または両方 typeof=integer かつ >0)。catalog schema version更新・生成migration・空DBの実スキーマ検証も作業範囲。
+
+## client移行範囲(WorkGridより広い)
+行表示/プレビュー/プレイヤー/MediaSession artwork/DLsite編集/fixture/各種テスト。hasCover={!!coverImage} 判定、情報画面の有無、DLsite一括の既カバー判定を cover 基準へ。CoverImg の errored リセット条件に cover.image(世代)を含め、同一IDのカバー差替後も復帰できるように。
+
+## 投影箇所(toWorkListItemだけでは不足)
+WorkSummary/WorkListItem/Work/toWorkListItem/rowToSummary/rowToWork/listSummaries/queryWorks の直接SELECT投影/fixture一覧投影/APIキー固定テスト。real SQL経路との契約同値テスト必須。
 <!-- SECTION:NOTES:END -->
