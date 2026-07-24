@@ -20,6 +20,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { basename, dirname, extname, join } from "node:path";
 import type {
+  Cover,
   MetaFile,
   Playlist,
   ScanProgressEvent,
@@ -43,7 +44,8 @@ import {
 import { migrateMetaIds } from "./metaIdMigration.ts";
 import { excludeDescendantPaths, isPathWithin, toPortableRelativePath } from "./paths.ts";
 import { probeDurationSec, type ProbeCacheEntry } from "./probe.ts";
-import type { ScanWorkState, WorkRepo } from "./workRepo.ts";
+import { measureCoverDimensions, type CoverDimensions } from "./thumbnailCache.ts";
+import type { CoverColumns, ScanWorkState, WorkRepo } from "./workRepo.ts";
 
 const AUDIO_EXTENSIONS = new Set(["mp3", "m4a", "aac", "wav", "ogg", "flac", "webm", "opus"]);
 const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "gif", "bmp", "webp"]);
@@ -251,6 +253,7 @@ const DEFAULT_UPSERT_BATCH_SIZE = 500;
 interface UpsertItem {
   work: Work;
   fingerprint: string;
+  cover: CoverColumns;
 }
 
 /** upsertWork の呼び出しを一定件数ごとに catalog トランザクションでまとめる（TASK-75）。
@@ -269,8 +272,8 @@ class UpsertBatch {
     this.checkAbort = checkAbort;
   }
 
-  add(work: Work, fingerprint: string): void {
-    this.queue.push({ work, fingerprint });
+  add(work: Work, fingerprint: string, cover: CoverColumns): void {
+    this.queue.push({ work, fingerprint, cover });
     if (this.queue.length >= this.limit) {
       this.checkAbort();
       this.flush();
@@ -284,7 +287,7 @@ class UpsertBatch {
     this.db.transaction(() => {
       for (const item of items) {
         this.checkAbort();
-        this.repo.upsertWork(item.work, { fingerprint: item.fingerprint });
+        this.repo.upsertWork(item.work, { fingerprint: item.fingerprint, cover: item.cover });
       }
     });
     this.queue = [];
@@ -297,6 +300,8 @@ interface PreparedMeta {
   meta: MetaFile;
   fingerprint: string;
   cachedFingerprint: string | undefined;
+  /** カバー欠損判定（DBの寸法充足状況）。false ならfingerprint一致でも再処理が必要。 */
+  coverSatisfied: boolean;
 }
 
 interface PreparedError {
@@ -316,6 +321,8 @@ type PreparedEntry = PreparedMeta | PreparedError | PreparedSkip;
 export interface ScannerOptions {
   /** upsertWork をバッチ化する件数上限。テスト用に変更可 */
   upsertBatchSize?: number;
+  /** カバー寸法の計測関数。省略時は Sharp 実装。テスト用に差し替え可 */
+  measureCover?: (sourceAbsolutePath: string) => Promise<CoverDimensions | null>;
 }
 
 export class Scanner {
@@ -323,6 +330,7 @@ export class Scanner {
   private readonly repo: WorkRepo;
   private readonly dataRoot: string;
   private readonly upsertBatchSize: number;
+  private readonly measureCover: (sourceAbsolutePath: string) => Promise<CoverDimensions | null>;
 
   constructor(db: Db, repo: WorkRepo, dataRoot: string, options?: ScannerOptions) {
     this.db = db;
@@ -333,6 +341,7 @@ export class Scanner {
       throw new RangeError("upsertBatchSize は有限の正整数である必要があります");
     }
     this.upsertBatchSize = upsertBatchSize;
+    this.measureCover = options?.measureCover ?? measureCoverDimensions;
   }
 
   async scan(
@@ -353,6 +362,7 @@ export class Scanner {
       newWorkIds: [],
       rjCodeMissingCount: 0,
       skipped: 0,
+      coverErrors: 0,
     };
 
     // walking フェーズ: ディレクトリ走査自体は件数が事前に分からないため不定（total=0）で通知する
@@ -429,6 +439,7 @@ export class Scanner {
             probeCache,
             batch,
             existingWorks,
+            result,
             checkAbort,
           );
           if (outcome === "skipped") {
@@ -501,6 +512,7 @@ export class Scanner {
           generatedProbeCache,
           batch,
           existingWorks,
+          result,
           checkAbort,
         );
         result.newlyGenerated += 1;
@@ -542,20 +554,37 @@ export class Scanner {
       try {
         const raw = readMetaFileRaw(metaPath);
         const rawFingerprint = computeRawFingerprint(metaPath, raw);
-        if (
-          rawFingerprint &&
-          existingWorks.get(rawFingerprint.id)?.fingerprint === rawFingerprint.fingerprint
-        ) {
-          prepared.push({ kind: "skip", metaPath, id: rawFingerprint.id });
-          continue;
+        if (rawFingerprint) {
+          const state = existingWorks.get(rawFingerprint.id);
+          const fingerprintMatch = state?.fingerprint === rawFingerprint.fingerprint;
+          // カバー欠損を早期skipより前に判定する。skip許可は「メタ無カバー&DB無カバー」
+          // または「メタ有カバー&DB両正寸法」のみ。それ以外はカバー再計測のため再登録する。
+          const coverSatisfied =
+            rawFingerprint.coverImage === null
+              ? state?.cover.image == null
+              : state?.cover.dimensions != null;
+          if (fingerprintMatch && coverSatisfied) {
+            prepared.push({ kind: "skip", metaPath, id: rawFingerprint.id });
+            continue;
+          }
         }
 
         // fingerprint不一致時だけ厳密なスキーマ検証を行う。これにより、機械的な
         // createdAt等を除く完全未変更作品ではZodの全件検証を避けられる。
         const meta = readMetaFile(metaPath);
         const fingerprint = computeFingerprint(metaPath, meta);
-        const cachedFingerprint = existingWorks.get(meta.id)?.fingerprint ?? undefined;
-        prepared.push({ kind: "ok", metaPath, meta, fingerprint, cachedFingerprint });
+        const state = existingWorks.get(meta.id);
+        const cachedFingerprint = state?.fingerprint ?? undefined;
+        const coverSatisfied =
+          meta.coverImage === null ? state?.cover.image == null : state?.cover.dimensions != null;
+        prepared.push({
+          kind: "ok",
+          metaPath,
+          meta,
+          fingerprint,
+          cachedFingerprint,
+          coverSatisfied,
+        });
       } catch (e) {
         if (e instanceof MetaParseError) {
           prepared.push({ kind: "error", metaPath, error: e });
@@ -578,6 +607,9 @@ export class Scanner {
       meta,
       fingerprint,
       cachedFingerprint: undefined,
+      // 自動生成直後のメタにはまだDB行が無く、coverSatisfiedの意味を持たない
+      // （cachedFingerprintがundefinedのため下のcachedFingerprint===fingerprint判定で必ずfalseになる）
+      coverSatisfied: false,
     };
   }
 
@@ -632,9 +664,10 @@ export class Scanner {
     probeCache: Map<string, ProbeCacheEntry> | undefined,
     batch: UpsertBatch,
     existingWorks: Map<string, ScanWorkState>,
+    result: ScanResult,
     checkAbort: () => void = () => {},
   ): Promise<"skipped" | string> {
-    const { metaPath, meta, fingerprint, cachedFingerprint } = prepared;
+    const { metaPath, meta, fingerprint, cachedFingerprint, coverSatisfied } = prepared;
     const workDir = dirname(metaPath);
     const id = meta.id;
 
@@ -644,8 +677,8 @@ export class Scanner {
     }
     seenIds.add(id);
 
-    // fingerprint 一致なら完全未変更として、プローブ・upsertWork を省略する
-    if (cachedFingerprint === fingerprint) {
+    // fingerprint 一致かつカバー寸法も充足済みなら完全未変更として、プローブ・upsertWork を省略する
+    if (cachedFingerprint === fingerprint && coverSatisfied) {
       return "skipped";
     }
 
@@ -683,12 +716,27 @@ export class Scanner {
       patchMetaFile(metaPath, { dlsite });
       checkAbort();
     }
+    // カバー寸法を計測する（DBトランザクション外。成功した寸法だけを1回のupsertへ渡す）。
+    // 画像はあるが計測できない場合は寸法NULLで記録し、coverErrorsを数えて次回スキャンで再試行する。
+    const cover: CoverColumns = { image: meta.coverImage, dimensions: null };
+    if (meta.coverImage) {
+      checkAbort();
+      const dimensions = await this.measureCover(join(workDir, meta.coverImage));
+      checkAbort();
+      if (dimensions) cover.dimensions = dimensions;
+      else result.coverErrors += 1;
+    }
+    const workCover: Cover =
+      cover.image !== null && cover.dimensions !== null
+        ? { image: cover.image, dimensions: cover.dimensions }
+        : null;
+
     // メタへの書き戻し（RJコード等）があった場合、保存する fingerprint は書き戻し後の内容に合わせる
     const finalFingerprint = computeFingerprint(metaPath, { ...meta, dlsite });
     const work: Work = {
       id,
       title: meta.title,
-      coverImage: meta.coverImage,
+      cover: workCover,
       defaultPlaylistId: meta.defaultPlaylistId,
       createdAt: meta.createdAt ?? null,
       status: errorMessage ? "error" : "ok",
@@ -705,7 +753,7 @@ export class Scanner {
       dlsite,
     };
     checkAbort();
-    batch.add(work, finalFingerprint);
+    batch.add(work, finalFingerprint, cover);
     return id;
   }
 

@@ -216,6 +216,7 @@ export function computeRawFingerprint(
 ): {
   id: string;
   fingerprint: string;
+  coverImage: string | null;
 } | null {
   const raw = asObject(value);
   if (!raw || typeof raw.id !== "string") return null;
@@ -223,6 +224,7 @@ export function computeRawFingerprint(
   const coverImage = typeof raw.coverImage === "string" ? raw.coverImage : null;
   return {
     id: raw.id,
+    coverImage,
     fingerprint: fingerprintFromParts({
       metaContent: normalizeRawMetaContent(raw),
       trackStats: fileStats(workDir, rawTrackFiles(raw)),

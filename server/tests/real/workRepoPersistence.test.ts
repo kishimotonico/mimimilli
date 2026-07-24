@@ -12,7 +12,7 @@ function sampleWork(id: string): Work {
   return {
     id,
     title: "永続データ検証用",
-    coverImage: null,
+    cover: null,
     status: "ok",
     physicalPath: `/library/${id}`,
     totalDurationSec: 10,

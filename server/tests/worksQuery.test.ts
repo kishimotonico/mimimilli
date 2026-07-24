@@ -17,7 +17,7 @@ const WORKS: WorkSummary[] = [
   {
     id: "RJ001",
     title: "耳かきASMR",
-    coverImage: null,
+    cover: null,
     status: "ok",
     physicalPath: "/lib/RJ001",
     totalDurationSec: 1800,
@@ -33,7 +33,7 @@ const WORKS: WorkSummary[] = [
   {
     id: "RJ002",
     title: "添い寝ボイス",
-    coverImage: null,
+    cover: null,
     status: "ok",
     physicalPath: "/lib/RJ002",
     totalDurationSec: 3600,
@@ -49,7 +49,7 @@ const WORKS: WorkSummary[] = [
   {
     id: "RJ003",
     title: "催眠音声",
-    coverImage: null,
+    cover: null,
     status: "missing",
     physicalPath: "/lib/RJ003",
     totalDurationSec: 5400,
@@ -228,7 +228,7 @@ test("ページング: page か limit の片方のみ指定された場合は全
 const MANY_WORKS: WorkSummary[] = Array.from({ length: 10 }, (_, index) => ({
   id: `w-${String(index).padStart(2, "0")}`,
   title: `作品${index}`,
-  coverImage: null,
+  cover: null,
   status: index % 4 === 0 ? "missing" : "ok",
   physicalPath: `/lib/w-${index}`,
   totalDurationSec: index * 300,

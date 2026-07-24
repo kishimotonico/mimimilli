@@ -7,7 +7,7 @@ import { migrate } from "drizzle-orm/bun-sqlite/migrator";
 import * as catalogSchema from "./catalogSchema.ts";
 import * as userSchema from "./userSchema.ts";
 
-const CATALOG_SCHEMA_VERSION = 5;
+const CATALOG_SCHEMA_VERSION = 6;
 const USER_SCHEMA_VERSION = 3;
 const LEGACY_IMPORT_MARKER = "legacy_import_completed";
 const SQLITE_URI_FLAGS =

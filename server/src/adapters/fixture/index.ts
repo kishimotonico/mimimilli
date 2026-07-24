@@ -281,6 +281,8 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
         rjCodeMissingCount: state.works.filter((w) => isRjCodeMissing(w.dlsite)).length,
         // fixture には増分スキャンの fingerprint 比較が無く、常に全件を処理し直すため0固定
         skipped: 0,
+        // fixture のカバーは合成SVGで計測失敗が起きないため0固定
+        coverErrors: 0,
       };
     },
 
@@ -511,8 +513,8 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
       if (!work) return null;
 
       if (kind === "cover") {
-        // real アダプタと同様、coverImage 未設定なら 404（クライアント側で placeholder 表示）
-        if (!work.coverImage) return null;
+        // real アダプタと同様、cover 未設定なら 404（クライアント側で placeholder 表示）
+        if (!work.cover) return null;
         return synthesizeCoverSvg(work);
       }
 
@@ -542,7 +544,7 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
 
     async describeCover(workId: string, width?: number): Promise<CoverDescriptor | null> {
       const work = state.works.find((entry) => entry.id === workId);
-      if (!work?.coverImage) return null;
+      if (!work?.cover) return null;
       const location = synthesizeCoverSvg(work);
       if (location.type !== "synthetic") {
         throw new Error("fixtureのカバー画像はsynthetic MediaLocationである必要があります");
@@ -585,7 +587,11 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
       const applyTags = normalizeTags(body.applyTags);
       work.tags = normalizeTags([...work.tags, ...applyTags]);
       if (body.applyCover && body.info.coverUrl) {
-        work.coverImage = body.info.coverUrl;
+        // fixture には実画像が無いため、既存寸法を引き継ぐか無ければ正方形で確定させる
+        work.cover = {
+          image: body.info.coverUrl,
+          dimensions: work.cover?.dimensions ?? { width: 900, height: 900 },
+        };
       }
       work.dlsite = {
         rjCode: body.info.rjCode,

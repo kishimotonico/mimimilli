@@ -12,7 +12,7 @@ function notificationWorks(count: number): WorkSummary[] {
   return Array.from({ length: count }, (_, index) => ({
     id: `work-${String(index).padStart(3, "0")}`,
     title: `作品 ${String(count - index).padStart(3, "0")}`,
-    coverImage: null,
+    cover: null,
     status: "ok" as const,
     physicalPath: `/library/${index}`,
     totalDurationSec: 0,
@@ -120,7 +120,7 @@ test("real adapter経由のHTTP一覧もWorkListItemの許可キーだけを返�
     assert.deepEqual(Object.keys(body.items[0]!).sort(), [
       "bookmarked",
       "circleName",
-      "coverImage",
+      "cover",
       "id",
       "lastPlayedAt",
       "status",

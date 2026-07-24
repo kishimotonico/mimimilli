@@ -29,7 +29,7 @@ function summaryWith(
   return {
     id,
     title: id,
-    coverImage: null,
+    cover: null,
     status: "ok",
     physicalPath: `/lib/${id}`,
     totalDurationSec: 0,

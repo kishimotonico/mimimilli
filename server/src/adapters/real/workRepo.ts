@@ -15,6 +15,7 @@ import {
 } from "@mimimilli/shared";
 import type {
   AxisFacetItem,
+  Cover,
   DlsiteState,
   DlsiteNotificationPage,
   DlsiteNotificationQuery,
@@ -65,6 +66,8 @@ type SummaryRow = Pick<
   | "id"
   | "title"
   | "coverImage"
+  | "coverWidth"
+  | "coverHeight"
   | "status"
   | "physicalPath"
   | "totalDurationSec"
@@ -84,6 +87,8 @@ type RawWorkListRow = {
   id: string;
   title: string;
   coverImage: string | null;
+  coverWidth: number | null;
+  coverHeight: number | null;
   status: WorkSummary["status"];
   totalDurationSec: number;
   trackCount: number;
@@ -103,6 +108,31 @@ export interface ScanWorkState {
   bookmarked: boolean;
   lastPlayedAt: string | null;
   resume: Work["resume"];
+  /** DBに記録済みのカバー状態。スキャンのカバー再計測要否の判定に使う。 */
+  cover: CoverColumns;
+}
+
+/**
+ * DBのカバー3列（cover_image / cover_width / cover_height）の生表現。
+ * image は .meta.json 由来のファイル名、dimensions は計測成功時のみ。
+ * image あり・dimensions null は「カバーはあるが寸法を計測できていない」状態を表す。
+ */
+export interface CoverColumns {
+  image: string | null;
+  dimensions: { width: number; height: number } | null;
+}
+
+/** DBのカバー列を公開DTOの cover へ投影する。画像かつ両寸法が揃うときだけ表示可能とみなす。 */
+function projectCover(image: string | null, width: number | null, height: number | null): Cover {
+  if (image === null || width === null || height === null) return null;
+  return { image, dimensions: { width, height } };
+}
+
+/** ドメインの cover から書き込み列を導く。upsertWork に明示指定が無いときの既定。 */
+function coverColumnsFromCover(cover: Cover): CoverColumns {
+  return cover === null
+    ? { image: null, dimensions: null }
+    : { image: cover.image, dimensions: cover.dimensions };
 }
 
 /** カバー配信の事前確認に必要な列だけを取得する軽量行。 */
@@ -175,7 +205,7 @@ function rowToSummary(row: SummaryRow, tagNames: string[], dlsite: DlsiteState):
     {
       id: row.id,
       title: row.title,
-      coverImage: row.coverImage,
+      cover: projectCover(row.coverImage, row.coverWidth, row.coverHeight),
       status: row.status,
       physicalPath: row.physicalPath,
       totalDurationSec: row.totalDurationSec,
@@ -211,7 +241,7 @@ function rowToWork(
     {
       id: row.id,
       title: row.title,
-      coverImage: row.coverImage,
+      cover: projectCover(row.coverImage, row.coverWidth, row.coverHeight),
       status: row.status,
       physicalPath: row.physicalPath,
       totalDurationSec: row.totalDurationSec,
@@ -454,6 +484,8 @@ export class WorkRepo {
         works.title,
         works.title_sort_key AS titleSortKey,
         works.cover_image AS coverImage,
+        works.cover_width AS coverWidth,
+        works.cover_height AS coverHeight,
         works.default_playlist_id AS defaultPlaylistId,
         works.created_at AS createdAt,
         works.status,
@@ -510,6 +542,8 @@ export class WorkRepo {
         works.id,
         works.title,
         works.cover_image AS coverImage,
+        works.cover_width AS coverWidth,
+        works.cover_height AS coverHeight,
         works.status,
         works.physical_path AS physicalPath,
         works.total_duration_sec AS totalDurationSec,
@@ -697,6 +731,8 @@ export class WorkRepo {
           works.id,
           works.title,
           works.cover_image AS coverImage,
+          works.cover_width AS coverWidth,
+          works.cover_height AS coverHeight,
           works.status,
           works.total_duration_sec AS totalDurationSec,
           works.track_count AS trackCount,
@@ -713,7 +749,7 @@ export class WorkRepo {
       const items = rows.map((row) => ({
         id: row.id,
         title: row.title,
-        coverImage: row.coverImage,
+        cover: projectCover(row.coverImage, row.coverWidth, row.coverHeight),
         status: row.status,
         totalDurationSec: row.totalDurationSec,
         trackCount: row.trackCount,
@@ -805,6 +841,9 @@ export class WorkRepo {
             works.id AS id,
             works.fingerprint AS fingerprint,
             works.physical_path AS physicalPath,
+            works.cover_image AS coverImage,
+            works.cover_width AS coverWidth,
+            works.cover_height AS coverHeight,
             work_states.added_at AS addedAt,
             work_states.bookmarked AS bookmarked,
             work_states.last_played_at AS lastPlayedAt,
@@ -819,6 +858,9 @@ export class WorkRepo {
       id: string;
       fingerprint: string | null;
       physicalPath: string;
+      coverImage: string | null;
+      coverWidth: number | null;
+      coverHeight: number | null;
       addedAt: string;
       bookmarked: number;
       lastPlayedAt: string | null;
@@ -834,6 +876,13 @@ export class WorkRepo {
         addedAt: row.addedAt,
         bookmarked: row.bookmarked !== 0,
         lastPlayedAt: row.lastPlayedAt,
+        cover: {
+          image: row.coverImage,
+          dimensions:
+            row.coverWidth !== null && row.coverHeight !== null
+              ? { width: row.coverWidth, height: row.coverHeight }
+              : null,
+        },
         resume:
           row.resumePlaylistId !== null &&
           row.resumeTrackId !== null &&
@@ -958,8 +1007,12 @@ export class WorkRepo {
     );
   }
 
-  /** scan からの登録。タグも置き換える */
-  upsertWork(work: Work, options?: { fingerprint?: string }): void {
+  /**
+   * scan からの登録。タグも置き換える。
+   * カバー列は options.cover（.meta.json のファイル名＋計測寸法）を正とし、省略時は work.cover から導く。
+   * options.cover は「画像あり・寸法null（計測失敗）」も表現でき、work.cover では表せない状態を書ける。
+   */
+  upsertWork(work: Work, options?: { fingerprint?: string; cover?: CoverColumns }): void {
     // 2DBをまたぐ原子性には依存せず、user状態を先に冪等作成してからcatalogを書く。
     this.db.user
       .insert(workStates)
@@ -978,11 +1031,14 @@ export class WorkRepo {
     const trackCount =
       defaultPlaylistOf({ id: work.id, defaultPlaylistId: work.defaultPlaylistId }, work.playlists)
         ?.tracks.length ?? 0;
+    const cover = options?.cover ?? coverColumnsFromCover(work.cover);
     const values: typeof works.$inferInsert = {
       id: work.id,
       title: work.title,
       titleSortKey: japaneseSortKey(work.title),
-      coverImage: work.coverImage,
+      coverImage: cover.image,
+      coverWidth: cover.dimensions?.width ?? null,
+      coverHeight: cover.dimensions?.height ?? null,
       defaultPlaylistId: work.defaultPlaylistId,
       createdAt: work.createdAt,
       status: work.status,
@@ -1039,7 +1095,7 @@ export class WorkRepo {
       title?: string;
       tags?: string[];
       bookmarked?: boolean;
-      coverImage?: string;
+      cover?: CoverColumns;
       urls?: UrlEntry[];
     },
   ): Work | null {
@@ -1050,7 +1106,11 @@ export class WorkRepo {
       set.title = patch.title;
       set.titleSortKey = japaneseSortKey(patch.title);
     }
-    if (patch.coverImage !== undefined) set.coverImage = patch.coverImage;
+    if (patch.cover !== undefined) {
+      set.coverImage = patch.cover.image;
+      set.coverWidth = patch.cover.dimensions?.width ?? null;
+      set.coverHeight = patch.cover.dimensions?.height ?? null;
+    }
     if (patch.urls !== undefined) set.urlsJson = JSON.stringify(patch.urls);
     if (Object.keys(set).length > 0) {
       this.db.catalog.update(works).set(set).where(eq(works.id, id)).run();

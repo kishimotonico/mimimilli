@@ -1,4 +1,13 @@
-import { index, integer, primaryKey, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import {
+  check,
+  index,
+  integer,
+  primaryKey,
+  real,
+  sqliteTable,
+  text,
+} from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
 
 /** `.meta.json` とファイル走査から再構築できる作品カタログ。 */
 export const works = sqliteTable(
@@ -8,6 +17,9 @@ export const works = sqliteTable(
     title: text("title").notNull(),
     titleSortKey: text("title_sort_key").notNull(),
     coverImage: text("cover_image"),
+    /** カバーの表示ピクセル寸法（EXIF回転後・マルチページは先頭ページ）。両NULL＝未計測/カバー無し。 */
+    coverWidth: integer("cover_width"),
+    coverHeight: integer("cover_height"),
     defaultPlaylistId: text("default_playlist_id"),
     createdAt: text("created_at"),
     status: text("status").notNull(),
@@ -24,6 +36,11 @@ export const works = sqliteTable(
   (table) => [
     index("idx_works_physical_path").on(table.physicalPath),
     index("idx_works_title_sort_key").on(table.titleSortKey, table.id),
+    // 寸法は両NULL、または両方とも正の整数のみ許可する（0/1埋めや片側欠損を弾く）。
+    check(
+      "cover_dimensions_valid",
+      sql`(${table.coverWidth} IS NULL AND ${table.coverHeight} IS NULL) OR (typeof(${table.coverWidth}) = 'integer' AND typeof(${table.coverHeight}) = 'integer' AND ${table.coverWidth} > 0 AND ${table.coverHeight} > 0)`,
+    ),
   ],
 );
 

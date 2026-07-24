@@ -12,6 +12,8 @@ export const scanResultSchema = z.object({
   rjCodeMissingCount: z.number().int().nonnegative(),
   /** 増分スキャンで fingerprint が一致し、プローブ・upsertWork を省略した作品数（TASK-75） */
   skipped: z.number().int().nonnegative(),
+  /** カバー画像はあるが寸法を計測できなかった作品数（errors とは別枠。次回スキャンで再試行） */
+  coverErrors: z.number().int().nonnegative(),
 });
 export type ScanResult = z.infer<typeof scanResultSchema>;
 

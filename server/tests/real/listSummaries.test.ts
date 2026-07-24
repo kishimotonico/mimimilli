@@ -24,7 +24,7 @@ function sampleWork(id: string, playlists: Playlist[], defaultPlaylistId: string
   return {
     id,
     title: `作品 ${id}`,
-    coverImage: null,
+    cover: null,
     status: "ok",
     physicalPath: `/library/${id}`,
     totalDurationSec: 10,

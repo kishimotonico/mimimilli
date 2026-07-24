@@ -27,6 +27,15 @@ export function writeWav(path: string, seconds: number): void {
   writeFileSync(path, buf);
 }
 
+/** Sharp で寸法計測できる本物の 6x4 JPEG（cover_width/height の検証にも使える）。 */
+const SAMPLE_COVER_JPEG_BASE64 =
+  "/9j/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAEAAYDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAP/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAABv/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AJAB58//2Q==";
+
+/** 作品ルートに本物のカバー画像（6x4 JPEG）を書き出す。 */
+export function writeSampleCover(path: string): void {
+  writeFileSync(path, Buffer.from(SAMPLE_COVER_JPEG_BASE64, "base64"));
+}
+
 export interface SampleLibrary {
   baseDir: string;
   root: string;
@@ -67,7 +76,7 @@ export function makeSampleLibrary(): SampleLibrary {
   writeWav(join(work1, "mp3", "01_intro.wav"), 2);
   writeWav(join(work1, "mp3", "02_main.wav"), 3);
   writeWav(join(work2, "track.wav"), 1);
-  writeFileSync(join(work1, "cover.jpg"), Buffer.from([0xff, 0xd8, 0xff, 0xe0]));
+  writeSampleCover(join(work1, "cover.jpg"));
 
   const existingWorkId = "11111111-1111-4111-8111-111111111111";
   writeFileSync(

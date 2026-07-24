@@ -15,6 +15,7 @@ const emptyResult = {
   newWorkIds: [],
   rjCodeMissingCount: 0,
   skipped: 0,
+  coverErrors: 0,
 };
 
 async function start(

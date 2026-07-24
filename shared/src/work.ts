@@ -49,10 +49,26 @@ export type Resume = z.infer<typeof resumeSchema>;
 export const workStatusSchema = z.enum(["ok", "missing", "error"]);
 export type WorkStatus = z.infer<typeof workStatusSchema>;
 
+/**
+ * 表示可能なカバー画像。image は作品ルート相対のファイル名、dimensions は EXIF 回転適用後の
+ * 表示ピクセル寸法（単位 px）。カバー未設定・計測失敗はいずれも null に投影する
+ * （「表示可能なカバーが無い」を意味し、UI は正方形プレースホルダで表す）。
+ */
+export const coverSchema = z
+  .object({
+    image: z.string(),
+    dimensions: z.object({
+      width: z.number().int().positive(),
+      height: z.number().int().positive(),
+    }),
+  })
+  .nullable();
+export type Cover = z.infer<typeof coverSchema>;
+
 export const workSummarySchema = z.object({
   id: z.string(),
   title: z.string(),
-  coverImage: z.string().nullable(),
+  cover: coverSchema,
   status: workStatusSchema,
   physicalPath: z.string(),
   totalDurationSec: z.number(),
@@ -71,7 +87,7 @@ export type WorkSummary = z.infer<typeof workSummarySchema>;
 export const workListItemSchema = z.object({
   id: z.string(),
   title: z.string(),
-  coverImage: z.string().nullable(),
+  cover: coverSchema,
   status: workStatusSchema,
   totalDurationSec: z.number(),
   trackCount: z.number().int().nonnegative(),
@@ -100,7 +116,7 @@ export function toWorkListItem(work: WorkSummary): WorkListItem {
   return {
     id: work.id,
     title: work.title,
-    coverImage: work.coverImage,
+    cover: work.cover,
     status: work.status,
     totalDurationSec: work.totalDurationSec,
     trackCount: work.trackCount,

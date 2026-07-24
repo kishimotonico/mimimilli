@@ -45,7 +45,7 @@ function summary(index: number): WorkSummary {
   return {
     id,
     title: titles[index % titles.length]!,
-    coverImage: null,
+    cover: null,
     status: index % 7 === 0 ? "missing" : index % 11 === 0 ? "error" : "ok",
     physicalPath: `/library/${id}`,
     totalDurationSec: (index % 4) * 600,

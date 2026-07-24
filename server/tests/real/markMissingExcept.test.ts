@@ -11,7 +11,7 @@ function sampleWork(id: string): Work {
   return {
     id,
     title: `作品 ${id}`,
-    coverImage: null,
+    cover: null,
     status: "ok",
     physicalPath: `/library/${id}`,
     totalDurationSec: 10,

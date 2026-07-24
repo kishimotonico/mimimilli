@@ -7,7 +7,7 @@ import { availableParallelism } from "node:os";
 import { mkdir, readdir, rename, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { THUMBNAIL_WIDTHS } from "@mimimilli/shared";
-import sharp from "sharp";
+import sharp, { type Metadata } from "sharp";
 
 export interface Thumbnail {
   absolutePath: string;
@@ -59,10 +59,48 @@ async function sharpTransform({
   width,
   tmpPath,
 }: ThumbnailTransformInput): Promise<void> {
+  // .rotate() はEXIF orientationを適用してピクセルを実際に回転させる（配信WebPの向きを
+  // 保存済み cover_width/height と一致させる。measureCoverDimensions と同じ規則）。
   await sharp(sourceAbsolutePath)
+    .rotate()
     .resize({ width, withoutEnlargement: true })
     .webp()
     .toFile(tmpPath);
+}
+
+export interface CoverDimensions {
+  /** px（EXIF回転後の表示幅） */
+  width: number;
+  /** px（EXIF回転後の表示高さ） */
+  height: number;
+}
+
+/**
+ * カバー画像の表示寸法を計測する。EXIF orientation を反映した表示向きで返し、
+ * GIF等マルチページは先頭ページの寸法にする（合成高さを誤って保存しない）。
+ * 画像が読めない・寸法を取得できない場合は null（呼び出し側で計測失敗として扱う）。
+ */
+export async function measureCoverDimensions(
+  sourceAbsolutePath: string,
+): Promise<CoverDimensions | null> {
+  let metadata: Metadata;
+  try {
+    metadata = await sharp(sourceAbsolutePath).metadata();
+  } catch {
+    return null;
+  }
+  const rawWidth = metadata.width;
+  // pageHeight はマルチページ画像の1ページ分の高さ。無ければ height を使う。
+  const rawHeight = metadata.pageHeight ?? metadata.height;
+  if (!rawWidth || !rawHeight) return null;
+  // orientation 5-8 は90°回転が伴うため表示上の幅高さが入れ替わる。
+  const swapped = metadata.orientation !== undefined && metadata.orientation >= 5;
+  const width = swapped ? rawHeight : rawWidth;
+  const height = swapped ? rawWidth : rawHeight;
+  if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) {
+    return null;
+  }
+  return { width, height };
 }
 
 /** FIFO順で変換slotを渡す、サービス内の小さなsemaphore。 */

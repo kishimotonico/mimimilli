@@ -58,10 +58,13 @@ import { mimeOf, resolveWithin } from "./paths.ts";
 import { Scanner } from "./scanner.ts";
 import {
   gcThumbnailCache,
+  measureCoverDimensions,
   ThumbnailCache,
+  type CoverDimensions,
   type ThumbnailCacheOptions,
   type WorkCoverEntry,
 } from "./thumbnailCache.ts";
+import type { CoverColumns } from "./workRepo.ts";
 import { WorkRepo } from "./workRepo.ts";
 
 const KEY_ROOT_FOLDER = "root_folder";
@@ -81,6 +84,8 @@ export interface RealAdapterOptions {
   dlsiteFetcher?: (rjCode: string) => Promise<DlsiteFetchResult>;
   /** テスト用のカバーダウンロード関数差し替え */
   dlsiteCoverDownloader?: (coverUrl: string, workDir: string) => Promise<string>;
+  /** カバー寸法の計測関数（テスト用差し替え）。省略時は Sharp 実装 */
+  coverMeasurer?: (sourceAbsolutePath: string) => Promise<CoverDimensions | null>;
   /** Worker隔離の結合テストで同期停止を作るSharedArrayBuffer。実運用では指定しない。 */
   scanWorkerTestGate?: SharedArrayBuffer;
   /** test gateを停止させる位置。省略時はscanner開始前。 */
@@ -202,10 +207,26 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
     (options.database.kind === "files"
       ? dirname(dirname(options.database.catalogPath))
       : join(tmpdir(), "mimikago-memory-data"));
-  const scanner = new Scanner(db, repo, dataRoot);
+  const coverMeasurer = options.coverMeasurer ?? measureCoverDimensions;
+  const scanner = new Scanner(db, repo, dataRoot, { measureCover: coverMeasurer });
   const dlsiteRequestIntervalMs = options.dlsiteRequestIntervalMs ?? 1000;
   const dlsiteFetcher = options.dlsiteFetcher ?? fetchDlsiteInfo;
   const dlsiteCoverDownloader = options.dlsiteCoverDownloader ?? downloadCover;
+
+  /**
+   * ダウンロード済みカバーの寸法を計測して DB 書き込み用の cover 列を作る。
+   * 計測に失敗したら null を返し、呼び出し側は DLsite 適用自体を失敗として扱う。
+   */
+  async function measureDownloadedCover(
+    workDir: string,
+    coverImage: string,
+  ): Promise<CoverColumns | null> {
+    const resolved = resolveWithin(workDir, join(workDir, coverImage));
+    if (!resolved) return null;
+    const dimensions = await coverMeasurer(resolved);
+    if (!dimensions) return null;
+    return { image: coverImage, dimensions };
+  }
 
   // prefix 定義の初回 seed（ADR-0005）。seed 済みフラグで管理し、
   // ユーザーが全定義を削除しても再投入しない
@@ -339,8 +360,11 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       const coverEntries: WorkCoverEntry[] = [];
       for (const work of repo.listSummaries()) {
         checkAbort();
-        if (!work.coverImage) continue;
-        const resolved = resolveWithin(work.physicalPath, join(work.physicalPath, work.coverImage));
+        if (!work.cover) continue;
+        const resolved = resolveWithin(
+          work.physicalPath,
+          join(work.physicalPath, work.cover.image),
+        );
         if (!resolved) continue;
         coverEntries.push({ workId: work.id, coverAbsolutePath: resolved });
       }
@@ -533,7 +557,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       const work = repo.getWork(workId);
       if (!work) return false;
 
-      const patch: { title?: string; tags?: string[]; coverImage?: string; urls?: Work["urls"] } =
+      const patch: { title?: string; tags?: string[]; cover?: CoverColumns; urls?: Work["urls"] } =
         {};
       if (body.applyTitle && body.info.title) patch.title = body.info.title;
       const applyTags = normalizeTags(body.applyTags);
@@ -541,8 +565,13 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       if (body.info.url && !work.urls.some((entry) => entry.url.includes("dlsite.com"))) {
         patch.urls = [...work.urls, { label: "DLsite", url: body.info.url }];
       }
+      let coverImage: string | undefined;
       if (body.applyCover && body.info.coverUrl) {
-        patch.coverImage = await downloadCover(body.info.coverUrl, work.physicalPath);
+        coverImage = await downloadCover(body.info.coverUrl, work.physicalPath);
+        // カバー計測に失敗したら適用自体を失敗として返す（寸法欠損のまま確定させない）。
+        const cover = await measureDownloadedCover(work.physicalPath, coverImage);
+        if (!cover) return false;
+        patch.cover = cover;
       }
 
       return db.transaction(() => {
@@ -559,7 +588,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
         patchMetaFile(findMetaPath(updated), {
           title: patch.title,
           tags: patch.tags,
-          coverImage: patch.coverImage,
+          coverImage,
           urls: patch.urls,
           dlsite,
         });
@@ -637,7 +666,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
             const patch: {
               title?: string;
               tags?: string[];
-              coverImage?: string;
+              cover?: CoverColumns;
               urls?: Work["urls"];
             } = {
               tags: normalizeTags([...work.tags, ...applyTags]),
@@ -651,11 +680,13 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
             if (!work.urls.some((entry) => entry.url.includes("dlsite.com"))) {
               patch.urls = [...work.urls, { label: "DLsite", url: fetched.info.url }];
             }
-            if (!work.coverImage && fetched.info.coverUrl) {
-              patch.coverImage = await dlsiteCoverDownloader(
-                fetched.info.coverUrl,
-                work.physicalPath,
-              );
+            let coverImage: string | undefined;
+            if (!work.cover && fetched.info.coverUrl) {
+              coverImage = await dlsiteCoverDownloader(fetched.info.coverUrl, work.physicalPath);
+              // カバー計測失敗はこの作品の適用失敗として扱う（error状態へ落として次作品へ続行）。
+              const cover = await measureDownloadedCover(work.physicalPath, coverImage);
+              if (!cover) throw new Error(`カバー寸法を計測できません: ${coverImage}`);
+              patch.cover = cover;
             }
             const dlsite = {
               rjCode: fetched.info.rjCode,
@@ -668,7 +699,13 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
               const updated = repo.patchWork(work.id, patch);
               if (!updated) throw new Error(`一括取得中に作品が見つからなくなりました: ${work.id}`);
               repo.setDlsiteState(work.id, dlsite);
-              patchMetaFile(findMetaPath(updated), { ...patch, dlsite });
+              patchMetaFile(findMetaPath(updated), {
+                title: patch.title,
+                tags: patch.tags,
+                coverImage,
+                urls: patch.urls,
+                dlsite,
+              });
             });
             result.fetched += 1;
           }

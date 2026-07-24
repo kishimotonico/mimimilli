@@ -70,6 +70,9 @@ test("初回スキャン: 登録・自動生成・エラー検出・duration プ
     Math.abs(generated.totalDurationSec - 5) < 0.05,
     `expected ~5, got ${generated.totalDurationSec}`,
   );
+  // カバー寸法がSharpで計測されDBへ永続化・DTOへ投影されている（writeSampleCoverは6x4 JPEG）
+  assert.deepEqual(generated!.cover, { image: "cover.jpg", dimensions: { width: 6, height: 4 } });
+  assert.equal(result.coverErrors, 0);
 
   // 欠損トラックの作品は error
   const existing = await adapter.getWork(existingWorkId);
@@ -423,6 +426,23 @@ test("増分スキャン: カバー画像の更新でも再処理する", async 
   const second = await adapter.scan();
   assert.equal(second.skipped, 1);
   assert.equal(second.registered, 1);
+});
+
+test("カバー計測失敗: 画像が読めない場合は寸法NULLでcoverErrorsに計上され、DTOはcover:nullになる", async (t) => {
+  const { adapter, root } = await setup(t);
+  const coverPath = join(root, "dlsite", "RJ900001_テスト作品", "cover.jpg");
+  writeFileSync(coverPath, "not an image");
+
+  const first = await adapter.scan();
+  assert.equal(first.coverErrors, 1);
+  const generated = await adapter.getWork(first.newWorkIds[0]!);
+  // 画像はあるが計測失敗＝表示可能なカバー無しとしてnull投影する（0/1で埋めない）
+  assert.equal(generated!.cover, null);
+
+  // 寸法が欠損したままなのでearly skipは許可されず、次回スキャンでも再試行される
+  const second = await adapter.scan();
+  assert.equal(second.skipped, 1); // 既存メタ（RJ900002）のみスキップ
+  assert.equal(second.coverErrors, 1);
 });
 
 test("増分スキャン: ディレクトリ移動を同一 UUID で追跡し fingerprint を再計算する", async (t) => {

@@ -113,14 +113,19 @@ function colorForWorkId(workId: string): string {
   return SVG_BACKGROUND_COLORS[hash % SVG_BACKGROUND_COLORS.length];
 }
 
-/** タイトル先頭1文字＋作品IDから決まる背景色で、簡易カバー画像SVGを合成する */
+/** タイトル先頭1文字＋作品IDから決まる背景色で、簡易カバー画像SVGを合成する。
+ *  viewBox は work.cover.dimensions（DTOに載る寸法）に合わせ、見かけと寸法データを一致させる。 */
 export function synthesizeCoverSvg(work: WorkSummary): MediaLocation {
   const initial = (work.title.trim().charAt(0) || "?").replace(/[<>&"']/g, "");
   const bg = colorForWorkId(work.id);
+  const { width, height } = work.cover?.dimensions ?? { width: 400, height: 400 };
+  const cx = width / 2;
+  const cy = height / 2;
+  const fontSize = Math.round(Math.min(width, height) * 0.4);
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" role="img" aria-label="${escapeXml(work.title)}">
-  <rect width="400" height="400" fill="${bg}" />
-  <text x="200" y="220" font-family="sans-serif" font-size="160" font-weight="700" fill="#ffffff" text-anchor="middle" dominant-baseline="middle">${escapeXml(initial)}</text>
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeXml(work.title)}">
+  <rect width="${width}" height="${height}" fill="${bg}" />
+  <text x="${cx}" y="${cy}" font-family="sans-serif" font-size="${fontSize}" font-weight="700" fill="#ffffff" text-anchor="middle" dominant-baseline="middle">${escapeXml(initial)}</text>
 </svg>`;
 
   return synthesizeStaticContent(svg, "image/svg+xml");

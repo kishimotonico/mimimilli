@@ -71,10 +71,10 @@ async function run(input: WorkerInput): Promise<void> {
         const covers: WorkCoverEntry[] = [];
         for (const work of repo.listSummaries()) {
           if (cancelled(token)) break;
-          if (!work.coverImage) continue;
+          if (!work.cover) continue;
           const absolutePath = resolveWithin(
             work.physicalPath,
-            join(work.physicalPath, work.coverImage),
+            join(work.physicalPath, work.cover.image),
           );
           if (absolutePath) {
             covers.push({ workId: work.id, coverAbsolutePath: absolutePath });

@@ -11,7 +11,7 @@ import { evalSmartFolder, evalSmartFolderRules } from "../src/core/smartFolder.t
 function work(overrides: Partial<WorkSummary> & Pick<WorkSummary, "id">): WorkSummary {
   return {
     title: overrides.id,
-    coverImage: null,
+    cover: null,
     status: "ok",
     physicalPath: `/lib/${overrides.id}`,
     totalDurationSec: 0,

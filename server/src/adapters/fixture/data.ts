@@ -14,7 +14,7 @@ const RAW_SEED_WORKS: Omit<WorkSummary, "dlsite">[] = [
   {
     id: "RJ501001",
     title: "【ASMR】夜更けの図書室で囁き朗読",
-    coverImage: "cover.jpg",
+    cover: { image: "cover.jpg", dimensions: { width: 800, height: 1200 } },
     status: "ok",
     physicalPath: "/library/dlsite/夜想曲スタジオ/RJ501001_夜更けの図書室で囁き朗読",
     totalDurationSec: 5400, // 1時間30分
@@ -39,7 +39,7 @@ const RAW_SEED_WORKS: Omit<WorkSummary, "dlsite">[] = [
   {
     id: "RJ501002",
     title: "添い寝カフェへようこそ ~深夜のまったりトーク~",
-    coverImage: "cover.jpg",
+    cover: { image: "cover.jpg", dimensions: { width: 1200, height: 800 } },
     status: "ok",
     physicalPath: "/library/dlsite/夜想曲スタジオ/RJ501002_添い寝カフェへようこそ",
     totalDurationSec: 9000, // 2時間30分
@@ -63,7 +63,7 @@ const RAW_SEED_WORKS: Omit<WorkSummary, "dlsite">[] = [
   {
     id: "RJ501003",
     title: "【シチュエーションボイス】幼馴染と過ごす雨の日",
-    coverImage: null,
+    cover: null,
     status: "ok",
     physicalPath: "/library/dlsite/月白製作所/RJ501003_幼馴染と過ごす雨の日",
     totalDurationSec: 1800, // 30分
@@ -86,7 +86,7 @@ const RAW_SEED_WORKS: Omit<WorkSummary, "dlsite">[] = [
   {
     id: "RJ501004",
     title: "【催眠】意識がとろける誘導ボイス ~深層への扉~",
-    coverImage: "cover.jpg",
+    cover: { image: "cover.jpg", dimensions: { width: 900, height: 900 } },
     status: "ok",
     physicalPath: "/library/dlsite/月白製作所/RJ501004_意識がとろける誘導ボイス",
     totalDurationSec: 7200, // 2時間
@@ -110,7 +110,7 @@ const RAW_SEED_WORKS: Omit<WorkSummary, "dlsite">[] = [
   {
     id: "RJ501005",
     title: "耳かき専門店「みみより」開店しました",
-    coverImage: "cover.jpg",
+    cover: { image: "cover.jpg", dimensions: { width: 750, height: 1000 } },
     status: "ok",
     physicalPath: "/library/dlsite/夜想曲スタジオ/RJ501005_耳かき専門店みみより",
     totalDurationSec: 10800, // 3時間
@@ -135,7 +135,7 @@ const RAW_SEED_WORKS: Omit<WorkSummary, "dlsite">[] = [
   {
     id: "RJ501006",
     title: "【長編フルボイス】辺境の魔法使いと旅する日々",
-    coverImage: null,
+    cover: null,
     status: "ok",
     physicalPath: "/library/dlsite/月白製作所/RJ501006_辺境の魔法使いと旅する日々",
     totalDurationSec: 18000, // 5時間
@@ -161,7 +161,7 @@ const RAW_SEED_WORKS: Omit<WorkSummary, "dlsite">[] = [
   {
     id: "RJ501007",
     title: "【睡眠導入】環境音と読み聞かせ ~小雨の降る夜に~",
-    coverImage: null,
+    cover: null,
     status: "ok",
     physicalPath: "/library/dlsite/_その他/RJ501007_環境音と読み聞かせ",
     totalDurationSec: 14400, // 4時間
@@ -176,7 +176,7 @@ const RAW_SEED_WORKS: Omit<WorkSummary, "dlsite">[] = [
   {
     id: "RJ501008",
     title: "ツンデレ後輩との放課後トレーニング【ボイスドラマ】",
-    coverImage: "cover.jpg",
+    cover: { image: "cover.jpg", dimensions: { width: 1000, height: 1000 } },
     status: "ok",
     physicalPath: "/library/dlsite/月白製作所/RJ501008_ツンデレ後輩との放課後トレーニング",
     totalDurationSec: 3600, // 1時間
@@ -200,7 +200,7 @@ const RAW_SEED_WORKS: Omit<WorkSummary, "dlsite">[] = [
   {
     id: "RJ501009",
     title: "メタデータ生成エラー作品（音声ファイル破損）",
-    coverImage: null,
+    cover: null,
     status: "error",
     physicalPath: "/library/dlsite/_その他/RJ501009_破損ファイル",
     totalDurationSec: 0,
@@ -215,7 +215,7 @@ const RAW_SEED_WORKS: Omit<WorkSummary, "dlsite">[] = [
   {
     id: "RJ501010",
     title: "お気に入りだった朗読劇（フォルダー移動済み）",
-    coverImage: null,
+    cover: null,
     status: "missing",
     physicalPath: "/library/dlsite/夜想曲スタジオ/RJ501010_朗読劇",
     totalDurationSec: 6300, // 1時間45分
@@ -232,7 +232,7 @@ const RAW_SEED_WORKS: Omit<WorkSummary, "dlsite">[] = [
   {
     id: "RJ501011",
     title: "【新作】ツンデレ後輩ちゃんの秘密のお世話ボイス",
-    coverImage: "cover.jpg",
+    cover: { image: "cover.jpg", dimensions: { width: 850, height: 1100 } },
     status: "ok",
     physicalPath: "/library/dlsite/月白製作所/RJ501011_ツンデレ後輩の秘密のお世話ボイス",
     totalDurationSec: 2100, // 35分
@@ -347,8 +347,8 @@ const fsDir = (name: string, children: FsNode[]): FsNode => ({
 export function buildWorkFileTree(work: WorkSummary): FsNode[] {
   const children: FsNode[] = [];
 
-  if (work.coverImage) {
-    children.push(fsFile(work.coverImage, "image", 420 * 1024));
+  if (work.cover) {
+    children.push(fsFile(work.cover.image, "image", 420 * 1024));
   }
 
   for (let i = 0; i < work.trackCount; i++) {

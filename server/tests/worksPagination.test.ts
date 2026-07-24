@@ -19,7 +19,7 @@ function summary(index: number): WorkSummary {
   return {
     id,
     title: `作品 ${id}`,
-    coverImage: null,
+    cover: null,
     status: "ok",
     physicalPath: `/library/${id}`,
     totalDurationSec: 600,
@@ -66,7 +66,7 @@ test("一覧HTTPレスポンスは軽量DTOの許可キーだけを返す", asyn
   assert.deepEqual(Object.keys(body.items[0]!).sort(), [
     "bookmarked",
     "circleName",
-    "coverImage",
+    "cover",
     "id",
     "lastPlayedAt",
     "status",
