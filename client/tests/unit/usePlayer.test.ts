@@ -81,7 +81,7 @@ const playlistId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const work: WorkSummary = {
   id: "work-1",
   title: "Work 1",
-  coverImage: null,
+  cover: null,
   status: "ok",
   physicalPath: "/audio/work-1",
   totalDurationSec: 120,

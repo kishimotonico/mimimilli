@@ -57,7 +57,7 @@ export function WorkDetail({
           <CoverImg
             id={work.id}
             title={work.title}
-            hasCover={!!work.coverImage}
+            cover={work.cover}
             size={140}
             radius={6}
             requestWidth={selectFixedCoverThumbnailWidth(140, window.devicePixelRatio)}

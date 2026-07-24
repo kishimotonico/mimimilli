@@ -1,41 +1,41 @@
 import { useEffect, useState } from "react";
+import type { Cover } from "@mimimilli/shared";
 import CoverPlaceholder from "./CoverPlaceholder";
 import { getCoverImageUrl } from "../api";
 
 interface CoverImgProps {
   id: string;
   title: string;
-  hasCover: boolean;
+  /** 表示可能なカバー。null は正方形プレースホルダで表す */
+  cover: Cover;
   size?: number;
   radius?: number;
   fit?: "fixed" | "fill";
   requestWidth?: number;
   loading?: "eager" | "lazy";
-  /** 画像読み込み完了時に実寸（naturalWidth/naturalHeight）を通知する。
-   *  原寸ジャスティファイドグリッドのアスペクト比計測（TASK-45）に使用 */
-  onLoadDimensions?: (naturalWidth: number, naturalHeight: number) => void;
 }
 
 export default function CoverImg({
   id,
   title,
-  hasCover,
+  cover,
   size = 32,
   radius = 4,
   fit = "fixed",
   requestWidth,
   loading = "eager",
-  onLoadDimensions,
 }: CoverImgProps) {
   const [errored, setErrored] = useState(false);
 
+  // 作品IDだけでなくカバー画像（世代）が変わったらエラー状態を解除し、
+  // 同一作品のカバー差し替え後も表示を復帰させる。
   useEffect(() => {
     setErrored(false);
-  }, [id]);
+  }, [id, cover?.image]);
 
   const fixedSize = fit === "fixed" ? size : undefined;
 
-  if (hasCover && !errored) {
+  if (cover && !errored) {
     return (
       <img
         src={getCoverImageUrl(id, requestWidth)}
@@ -49,10 +49,6 @@ export default function CoverImg({
           height: "100%",
           objectFit: "cover",
           borderRadius: radius,
-        }}
-        onLoad={(event) => {
-          const img = event.currentTarget;
-          onLoadDimensions?.(img.naturalWidth, img.naturalHeight);
         }}
         onError={() => setErrored(true)}
       />

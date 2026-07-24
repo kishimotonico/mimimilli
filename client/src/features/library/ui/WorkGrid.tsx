@@ -158,56 +158,20 @@ export default function WorkGrid({
     return () => observer.disconnect();
   }, []);
 
-  // ジャスティファイド用のカバー実寸（アスペクト比）計測キャッシュ。
-  // サーバーは画像寸法を返さないため、実際に読み込まれた <img> の
-  // naturalWidth/naturalHeight から計測する（CoverImg.onLoadDimensions）。
-  // works が入れ替わっても（軸切り替え等）このキャッシュは保持し、同じ作品の再計測を避ける。
-  const [coverRatios, setCoverRatios] = useState<Map<string, number>>(() => new Map());
-  const pendingRatiosRef = useRef<Map<string, number>>(new Map());
-  const flushHandleRef = useRef<number | null>(null);
-
-  const scheduleRatioFlush = useCallback(() => {
-    if (flushHandleRef.current !== null) return;
-    flushHandleRef.current = requestAnimationFrame(() => {
-      flushHandleRef.current = null;
-      setCoverRatios((prev) => {
-        if (pendingRatiosRef.current.size === 0) return prev;
-        const next = new Map(prev);
-        for (const [id, ratio] of pendingRatiosRef.current) next.set(id, ratio);
-        pendingRatiosRef.current.clear();
-        return next;
-      });
-    });
-  }, []);
-
-  useEffect(
-    () => () => {
-      if (flushHandleRef.current !== null) cancelAnimationFrame(flushHandleRef.current);
-    },
-    [],
-  );
-
-  const handleCoverLoad = useCallback(
-    (workId: string, naturalWidth: number, naturalHeight: number) => {
-      if (naturalWidth <= 0 || naturalHeight <= 0) return;
-      pendingRatiosRef.current.set(workId, naturalWidth / naturalHeight);
-      scheduleRatioFlush();
-    },
-    [scheduleRatioFlush],
-  );
-
   const justifiedLayout = useMemo<JustifiedLayout | null>(() => {
     if (gridLayoutMode !== "justified" || containerWidth <= 0 || works.length === 0) return null;
+    // アスペクト比はサーバー提供の cover.dimensions から確定させる（画像ロードを待たない）。
+    // cover===null は「表示可能なカバーが無い」仕様として正方形プレースホルダで表す。
     const items = works.map((work) => ({
       id: work.id,
-      aspectRatio: coverRatios.get(work.id) ?? 1,
+      aspectRatio: work.cover ? work.cover.dimensions.width / work.cover.dimensions.height : 1,
     }));
     return computeJustifiedLayout(items, {
       containerWidth,
       targetRowHeight: safeTileSize,
       gap: GRID_COLUMN_GAP,
     });
-  }, [gridLayoutMode, containerWidth, works, coverRatios, safeTileSize]);
+  }, [gridLayoutMode, containerWidth, works, safeTileSize]);
 
   const justifiedRows = useMemo(
     () => (justifiedLayout ? groupJustifiedRows(works, justifiedLayout) : []),
@@ -240,17 +204,11 @@ export default function WorkGrid({
     [gridLayoutMode, justifiedLayout, containerWidth, columnCount, safeTileSize],
   );
 
-  // square モードは estimateSize が正確なので測定不要。
-  // justified モードは画像読み込み後のレイアウト変化を反映するためデフォルト測定を使う。
-  const measureElement = useMemo(
-    () =>
-      gridLayoutMode === "square"
-        ? (element: HTMLDivElement) => {
-            const index = Number(element.getAttribute("data-index"));
-            return estimateSize(index);
-          }
-        : undefined,
-    [gridLayoutMode, estimateSize],
+  // 両モードとも行高はレイアウト計算（justified は cover.dimensions 由来）で確定するため、
+  // DOM 実測ではなく estimateSize をそのまま採用する。
+  const measureElement = useCallback(
+    (element: HTMLDivElement) => estimateSize(Number(element.getAttribute("data-index"))),
+    [estimateSize],
   );
 
   const virtualizer = useVirtualizer({
@@ -282,7 +240,7 @@ export default function WorkGrid({
     }
   }, [virtualItems, hasNextPage, isFetchingNextPage, onLoadMore, rowCount, virtualizer]);
 
-  // ジャスティファイドは画像読み込み後にレイアウトが変わるため、measure で再計測を伝える。
+  // justified の行高はリサイズ・ページ追加でレイアウトが再計算されると変わるため、measure で伝える。
   useEffect(() => {
     if (gridLayoutMode !== "justified") return;
     virtualizer.measure();
@@ -416,17 +374,11 @@ export default function WorkGrid({
             <CoverImg
               id={work.id}
               title={work.title}
-              hasCover={Boolean(work.coverImage)}
+              cover={work.cover}
               fit="fill"
               radius={6}
               requestWidth={requestWidth}
               loading="lazy"
-              onLoadDimensions={
-                gridLayoutMode === "justified"
-                  ? (naturalWidth, naturalHeight) =>
-                      handleCoverLoad(work.id, naturalWidth, naturalHeight)
-                  : undefined
-              }
             />
           </span>
           <span className="mll-grid-tile__title">{work.title}</span>
@@ -434,15 +386,7 @@ export default function WorkGrid({
         </button>
       );
     },
-    [
-      gridLayoutMode,
-      selectedWorkId,
-      safeTileSize,
-      onWorkSelect,
-      onWorkPlay,
-      moveTileFocus,
-      handleCoverLoad,
-    ],
+    [selectedWorkId, safeTileSize, onWorkSelect, onWorkPlay, moveTileFocus],
   );
 
   const renderRow = useCallback(

@@ -38,6 +38,7 @@ const result = {
   newWorkIds: [],
   rjCodeMissingCount: 0,
   skipped: 0,
+  coverErrors: 0,
 };
 const completed: ScanJobSnapshot = {
   ...running,

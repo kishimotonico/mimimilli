@@ -112,7 +112,7 @@ export default function FullScreenPlayer({
             <CoverImg
               id={currentWork.id}
               title={currentWork.title}
-              hasCover={!!currentWork.coverImage}
+              cover={currentWork.cover}
               size={320}
               radius={10}
               requestWidth={selectFixedCoverThumbnailWidth(320, window.devicePixelRatio)}

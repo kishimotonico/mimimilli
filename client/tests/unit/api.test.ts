@@ -26,7 +26,7 @@ function makeWorkSummary(overrides: Partial<WorkSummary> = {}): WorkSummary {
   return {
     id: "work-1",
     title: "テスト作品",
-    coverImage: null,
+    cover: null,
     status: "ok",
     physicalPath: "/library/work-1",
     totalDurationSec: 120,
@@ -46,7 +46,7 @@ function makeWorkListItem(overrides: Partial<WorkListItem> = {}): WorkListItem {
   return {
     id: "work-1",
     title: "テスト作品",
-    coverImage: null,
+    cover: null,
     status: "ok",
     totalDurationSec: 120,
     trackCount: 1,

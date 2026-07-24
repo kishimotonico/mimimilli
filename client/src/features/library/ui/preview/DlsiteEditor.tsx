@@ -106,7 +106,7 @@ function DlsiteApplyDialog({
               onChange={(event) => onApplyCoverChange(event.target.checked)}
             />
             <span>カバー</span>
-            <span className="min-w-0 break-words text-ink-2">{work.coverImage ?? "未設定"}</span>
+            <span className="min-w-0 break-words text-ink-2">{work.cover?.image ?? "未設定"}</span>
             <span className="text-ink-3">→</span>
             <span>{info.coverUrl ? "DLsite画像" : "画像なし"}</span>
           </label>

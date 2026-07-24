@@ -109,9 +109,7 @@ export function useMediaSession({
       title: currentTrack.title,
       artist: getCircleName(currentWork) ?? "",
       album: currentWork.title,
-      artwork: currentWork.coverImage
-        ? [{ src: getCoverImageUrl(currentWork.id, ARTWORK_WIDTH) }]
-        : [],
+      artwork: currentWork.cover ? [{ src: getCoverImageUrl(currentWork.id, ARTWORK_WIDTH) }] : [],
     });
   }, [currentTrack, currentWork, mediaSession]);
 

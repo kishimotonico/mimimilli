@@ -19,7 +19,7 @@ function makeWork(): WorkSummary {
   return {
     id: "work-1",
     title: "作品タイトル",
-    coverImage: "cover.jpg",
+    cover: { image: "cover.jpg", dimensions: { width: 800, height: 600 } },
     status: "ok",
     physicalPath: "/works/work-1",
     totalDurationSec: 120,

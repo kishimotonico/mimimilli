@@ -43,7 +43,7 @@ describe("WorkRow のカバー画像", () => {
   const workWithCover: WorkSummary = {
     id: "work-1",
     title: "Work 1",
-    coverImage: "cover.jpg",
+    cover: { image: "cover.jpg", dimensions: { width: 800, height: 600 } },
     status: "ok",
     physicalPath: "/audio/work-1",
     totalDurationSec: 120,
@@ -71,7 +71,7 @@ describe("WorkRow のカバー画像", () => {
   });
 
   it("カバーなし作品はプレースホルダー表示のまま（imgを出さない）", () => {
-    const { container } = renderRow({ ...workWithCover, coverImage: null });
+    const { container } = renderRow({ ...workWithCover, cover: null });
     expect(container.querySelector("img")).toBeNull();
   });
 });

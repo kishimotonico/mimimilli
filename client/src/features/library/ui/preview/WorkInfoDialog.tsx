@@ -99,7 +99,7 @@ export function WorkInfoDialog({
                   : "なし"}
               </InfoRow>
               <InfoRow label="プレイリスト">{playlistLabel}</InfoRow>
-              <InfoRow label="カバー画像">{work.coverImage ? "あり" : "なし"}</InfoRow>
+              <InfoRow label="カバー画像">{work.cover ? "あり" : "なし"}</InfoRow>
               <InfoRow label="物理パス">
                 <span className="break-all font-mono text-[11px]">{work.physicalPath}</span>
               </InfoRow>

@@ -20,7 +20,7 @@ const info: DlsiteWorkInfo = {
 const work = {
   id: "work-1",
   title: "現在タイトル",
-  coverImage: null,
+  cover: null,
   status: "ok",
   physicalPath: "/lib/work-1",
   totalDurationSec: 0,

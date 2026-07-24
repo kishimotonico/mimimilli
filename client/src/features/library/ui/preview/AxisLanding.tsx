@@ -52,7 +52,7 @@ export function AxisLanding({
                 <CoverImg
                   id={w.id}
                   title={w.title}
-                  hasCover={!!w.coverImage}
+                  cover={w.cover}
                   size={80}
                   radius={6}
                   requestWidth={selectFixedCoverThumbnailWidth(80, window.devicePixelRatio)}

@@ -40,7 +40,7 @@ function makeWork(id: string): WorkListItem {
   return {
     id,
     title: `作品 ${id}`,
-    coverImage: null,
+    cover: null,
     status: "ok",
     totalDurationSec: 60,
     trackCount: 1,

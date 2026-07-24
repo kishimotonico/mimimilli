@@ -10,7 +10,7 @@ function createWorks(count: number): WorkListItem[] {
   return Array.from({ length: count }, (_, i) => ({
     id: `work-${i}`,
     title: `作品 ${i}`,
-    coverImage: null,
+    cover: null,
     status: "ok",
     totalDurationSec: 0,
     trackCount: 0,

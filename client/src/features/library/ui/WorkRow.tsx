@@ -41,7 +41,7 @@ export default function WorkRow({
         <CoverImg
           id={work.id}
           title={work.title}
-          hasCover={!!work.coverImage}
+          cover={work.cover}
           size={32}
           radius={4}
           requestWidth={selectFixedCoverThumbnailWidth(32, window.devicePixelRatio)}

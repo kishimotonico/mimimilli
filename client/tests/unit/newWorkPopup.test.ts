@@ -19,7 +19,7 @@ beforeEach(() => {
 const work: Work = {
   id: "work-1",
   title: "新規作品",
-  coverImage: null,
+  cover: null,
   status: "ok",
   physicalPath: "/audio/work-1",
   totalDurationSec: 120,

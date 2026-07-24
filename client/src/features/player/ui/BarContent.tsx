@@ -54,7 +54,7 @@ export default function BarContent({
             <CoverImg
               id={currentWork.id}
               title={currentWork.title}
-              hasCover={!!currentWork.coverImage}
+              cover={currentWork.cover}
               size={46}
               radius={6}
               requestWidth={selectFixedCoverThumbnailWidth(46, window.devicePixelRatio)}

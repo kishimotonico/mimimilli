@@ -120,7 +120,7 @@ export default function PopupContent({
             <CoverImg
               id={currentWork.id}
               title={currentWork.title}
-              hasCover={!!currentWork.coverImage}
+              cover={currentWork.cover}
               radius={8}
               fit="fill"
               // ポップアップ幅336px・padding 14px 両側からカバーは最大308px（低ビューポート時は縮小）
