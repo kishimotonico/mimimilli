@@ -10,6 +10,7 @@ test("MIMIKAGO_DATA_DIRを絶対化し、DBとcacheを用途別に配置する",
   assert.ok(paths.root.endsWith("/custom-data"));
   assert.equal(paths.catalogDb, `${paths.root}/db/catalog.sqlite`);
   assert.equal(paths.userDb, `${paths.root}/db/user.sqlite`);
+  assert.equal(paths.dlsiteCacheDb, `${paths.root}/db/dlsite-cache.sqlite`);
   assert.equal(paths.thumbnailCache, `${paths.root}/cache/thumbnails`);
 });
 

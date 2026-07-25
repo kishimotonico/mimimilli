@@ -1,6 +1,7 @@
 // real アダプタ: SQLite（キャッシュ）+ 実ファイルシステム + `.meta.json`（Source of Truth）。
 // 作品検索・件数・ページングはcatalog接続からuser DBをATTACH JOINしてSQLで実行する。
-import { existsSync, realpathSync } from "node:fs";
+import { existsSync, realpathSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
@@ -50,7 +51,30 @@ import { isDefaultTitle } from "../../core/dlsiteTitle.ts";
 import { buildTagPrefixCandidates } from "../../core/tagPrefixCandidates.ts";
 import { evalSmartFolder } from "../../core/smartFolder.ts";
 import { migrateResumeV1, openDb, type Db, type DbLocation } from "./db.ts";
-import { detectRjCode, downloadCover, fetchDlsiteInfo, mergeDlsiteTags } from "./dlsite.ts";
+import {
+  detectRjCode,
+  downloadCover,
+  fetchDlsiteCover,
+  fetchDlsiteHtml,
+  fetchDlsiteInfo,
+  mergeDlsiteTags,
+  normalizeDlsiteCoverUrl,
+  parseDlsiteHtml,
+  type DlsiteCoverResponse,
+  type DlsiteHtmlResponse,
+} from "./dlsite.ts";
+import {
+  DEFAULT_DLSITE_CACHE_MAX_EXPANDED_BYTES,
+  DEFAULT_DLSITE_CACHE_MAX_TRANSFER_BYTES,
+  DlsiteCache,
+  type DlsiteCacheOptions,
+} from "./dlsiteCache.ts";
+import { DEFAULT_DLSITE_REQUEST_CONFIG, type DlsiteRequestConfig } from "./dlsiteConfig.ts";
+import {
+  DlsiteOfflineError,
+  DlsiteScheduler,
+  type DlsiteSchedulerDependencies,
+} from "./dlsiteScheduler.ts";
 import { browseFs } from "./fsBrowse.ts";
 import { buildFileTree } from "./fileTree.ts";
 import { patchMetaFile } from "./meta.ts";
@@ -78,12 +102,24 @@ export interface RealAdapterOptions {
   thumbnailCache?: ThumbnailCacheOptions;
   /** manifestとバックアップを保存するデータルート。 */
   dataRoot?: string;
-  /** 一括取得のリクエスト間隔。実運用は1秒、テストのみ短縮可 */
+  /** @deprecated dlsiteRequestConfig.requestIntervalMs を使う。既存テスト互換用。 */
   dlsiteRequestIntervalMs?: number;
+  /** DLsiteの実HTTP設定。環境変数の解決はserver/src/index.tsだけで行う。 */
+  dlsiteRequestConfig?: DlsiteRequestConfig;
+  /** schedulerのtransport/clock/sleep/random/logger注入。実ネットワークなしの試験用。 */
+  dlsiteSchedulerDependencies?: DlsiteSchedulerDependencies;
+  /** DLsiteレスポンスキャッシュ。TASK-93.1ではDBを開くだけで、live取得経路の利用はTASK-93.2で行う。 */
+  dlsiteCache?: DlsiteCacheOptions;
   /** テスト用の取得関数差し替え。省略時は実DLsite取得 */
   dlsiteFetcher?: (rjCode: string) => Promise<DlsiteFetchResult>;
+  /** キャッシュ統合用の生HTML取得関数。テストでは実ネットワークを使わずここを注入する。 */
+  dlsiteHtmlFetcher?: (productCode: string) => Promise<DlsiteHtmlResponse>;
+  /** HTMLパーサの差し替え（cache hit時も毎回呼ばれることの検証用）。 */
+  dlsiteParser?: (html: string, productCode: string) => DlsiteFetchResult;
   /** テスト用のカバーダウンロード関数差し替え */
   dlsiteCoverDownloader?: (coverUrl: string, workDir: string) => Promise<string>;
+  /** キャッシュ統合用のカバーHTTP取得関数。 */
+  dlsiteCoverFetcher?: (coverUrl: string) => Promise<DlsiteCoverResponse>;
   /** カバー寸法の計測関数（テスト用差し替え）。省略時は Sharp 実装 */
   coverMeasurer?: (sourceAbsolutePath: string) => Promise<CoverDimensions | null>;
   /** Worker隔離の結合テストで同期停止を作るSharedArrayBuffer。実運用では指定しない。 */
@@ -199,6 +235,7 @@ async function runFileScanInWorker(
 
 export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
   const db: Db = openDb(options.database);
+  const dlsiteCache = options.dlsiteCache ? new DlsiteCache(options.dlsiteCache) : undefined;
   const repo = new WorkRepo(db);
   const thumbnailCacheDir = options.thumbnailCacheDir ?? join(tmpdir(), "mimikago-memory-cache");
   const thumbnailCache = new ThumbnailCache(options.thumbnailCache);
@@ -209,9 +246,206 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       : join(tmpdir(), "mimikago-memory-data"));
   const coverMeasurer = options.coverMeasurer ?? measureCoverDimensions;
   const scanner = new Scanner(db, repo, dataRoot, { measureCover: coverMeasurer });
-  const dlsiteRequestIntervalMs = options.dlsiteRequestIntervalMs ?? 1000;
-  const dlsiteFetcher = options.dlsiteFetcher ?? fetchDlsiteInfo;
+  const dlsiteRequestConfig: DlsiteRequestConfig = {
+    ...DEFAULT_DLSITE_REQUEST_CONFIG,
+    ...options.dlsiteRequestConfig,
+    ...(options.dlsiteRequestIntervalMs === undefined
+      ? {}
+      : { requestIntervalMs: options.dlsiteRequestIntervalMs }),
+  };
+  const dlsiteScheduler = new DlsiteScheduler(
+    dlsiteRequestConfig,
+    options.dlsiteSchedulerDependencies,
+  );
+  const dlsiteHtmlTransferBytes =
+    options.dlsiteCache?.maxTransferBytes ?? DEFAULT_DLSITE_CACHE_MAX_TRANSFER_BYTES;
+  const dlsiteHtmlExpandedBytes =
+    options.dlsiteCache?.maxExpandedBytes ?? DEFAULT_DLSITE_CACHE_MAX_EXPANDED_BYTES;
+  const dlsiteCoverMaximumBytes =
+    options.dlsiteCache?.maxTransferBytes ?? DEFAULT_DLSITE_CACHE_MAX_TRANSFER_BYTES;
+  const dlsiteFetcher =
+    options.dlsiteFetcher ??
+    ((rjCode: string) =>
+      fetchDlsiteInfo(
+        rjCode,
+        dlsiteScheduler.fetch.bind(dlsiteScheduler),
+        dlsiteHtmlTransferBytes,
+        dlsiteHtmlExpandedBytes,
+      ));
+  const dlsiteHtmlFetcher =
+    options.dlsiteHtmlFetcher ??
+    ((productCode: string) =>
+      fetchDlsiteHtml(
+        productCode,
+        dlsiteScheduler.fetch.bind(dlsiteScheduler),
+        dlsiteHtmlTransferBytes,
+        dlsiteHtmlExpandedBytes,
+      ));
+  const dlsiteParser = options.dlsiteParser ?? parseDlsiteHtml;
   const dlsiteCoverDownloader = options.dlsiteCoverDownloader ?? downloadCover;
+  const dlsiteCoverFetcher =
+    options.dlsiteCoverFetcher ??
+    ((coverUrl: string) =>
+      fetchDlsiteCover(
+        coverUrl,
+        dlsiteScheduler.fetch.bind(dlsiteScheduler),
+        dlsiteCoverMaximumBytes,
+      ));
+  const scheduledDlsiteFetcher = options.dlsiteFetcher
+    ? (rjCode: string) => dlsiteScheduler.schedule(() => dlsiteFetcher(rjCode))
+    : dlsiteFetcher;
+  const scheduledDlsiteHtmlFetcher = options.dlsiteHtmlFetcher
+    ? (productCode: string) => dlsiteScheduler.schedule(() => dlsiteHtmlFetcher(productCode))
+    : dlsiteHtmlFetcher;
+  const scheduledDlsiteCoverFetcher = options.dlsiteCoverFetcher
+    ? (coverUrl: string) => dlsiteScheduler.schedule(() => dlsiteCoverFetcher(coverUrl))
+    : dlsiteCoverFetcher;
+  const scheduledDlsiteCoverDownloader = (coverUrl: string, workDir: string) =>
+    dlsiteScheduler.schedule(() => dlsiteCoverDownloader(coverUrl, workDir));
+  const dlsiteFlights = new Map<string, Promise<DlsiteFetchResult>>();
+  const dlsiteCoverFlights = new Map<
+    string,
+    Promise<{ body: Uint8Array; normalizedUrl: string }>
+  >();
+
+  async function fetchCachedDlsite(productCode: string, force = false): Promise<DlsiteFetchResult> {
+    // キャッシュ未設定の既存テスト注入契約は維持する。
+    if (!dlsiteCache) {
+      dlsiteScheduler.assertOnline();
+      return scheduledDlsiteFetcher(productCode);
+    }
+    const key = productCode.trim().toUpperCase();
+    if (!force) {
+      const cached = dlsiteCache.get({ productCode: key });
+      if (cached) {
+        options.dlsiteSchedulerDependencies?.logger?.({
+          event: "dlsite_cache_hit",
+          resource: "html",
+          key,
+        });
+        if (cached.outcome === "ok" || cached.outcome === "parse_error") {
+          if (cached.html === null) throw new Error("DLsite HTMLキャッシュ本文がありません");
+          return dlsiteParser(cached.html, key);
+        }
+        return {
+          ok: false,
+          kind: cached.outcome,
+          message: `DLsite取得キャッシュ: ${cached.outcome}（${key}）`,
+        };
+      }
+    }
+    options.dlsiteSchedulerDependencies?.logger?.({
+      event: "dlsite_cache_miss",
+      resource: "html",
+      key,
+      force,
+    });
+    try {
+      dlsiteScheduler.assertOnline();
+    } catch (error) {
+      if (error instanceof DlsiteOfflineError) {
+        return { ok: false, kind: "offline", message: error.message };
+      }
+      throw error;
+    }
+    // fresh hitはここまでに返す。networkを始める場合だけforce/normalを問わず合流する。
+    const ongoing = dlsiteFlights.get(key);
+    if (ongoing) return ongoing;
+    const existing = dlsiteCache.getStored({ productCode: key });
+    const request: Promise<DlsiteFetchResult> = (async (): Promise<DlsiteFetchResult> => {
+      try {
+        const response = await scheduledDlsiteHtmlFetcher(key);
+        if (response.status === 404) {
+          if (force && existing?.outcome === "ok") dlsiteCache.expire({ productCode: key });
+          else dlsiteCache.putNegative({ productCode: key, outcome: "not_found" });
+          return { ok: false, kind: "not_found", message: `DLsite作品が見つかりません（${key}）` };
+        }
+        if (response.status < 200 || response.status >= 300) {
+          if (force && existing?.outcome === "ok") dlsiteCache.expire({ productCode: key });
+          else if (!existing) dlsiteCache.putNegative({ productCode: key, outcome: "error" });
+          return {
+            ok: false,
+            kind: "error",
+            message: `DLsiteの取得に失敗しました（${key}: HTTP ${response.status}）`,
+          };
+        }
+        const parsed = dlsiteParser(response.body, key);
+        if (parsed.ok || !force) {
+          dlsiteCache.putHtml({
+            productCode: key,
+            outcome: parsed.ok ? "ok" : "parse_error",
+            contentType: response.contentType ?? "",
+            html: response.body,
+            transferSize: response.transferSize,
+          });
+        }
+        return parsed;
+      } catch (error) {
+        if (force && existing?.outcome === "ok") dlsiteCache.expire({ productCode: key });
+        else if (!existing) dlsiteCache.putNegative({ productCode: key, outcome: "error" });
+        return {
+          ok: false,
+          kind: "error",
+          message: `DLsiteとの通信に失敗しました（${key}: ${(error as Error).message}）`,
+        };
+      }
+    })();
+    dlsiteFlights.set(key, request);
+    try {
+      return await request;
+    } finally {
+      dlsiteFlights.delete(key);
+    }
+  }
+
+  async function cachedCover(coverUrl: string, workDir: string): Promise<string> {
+    if (!dlsiteCache) {
+      dlsiteScheduler.assertOnline();
+      return scheduledDlsiteCoverDownloader(coverUrl, workDir);
+    }
+    const normalizedUrl = normalizeDlsiteCoverUrl(coverUrl);
+    const key = `cover:${createHash("sha256").update(normalizedUrl).digest("hex")}`;
+    let request = dlsiteCoverFlights.get(key);
+    if (!request) {
+      request = (async () => {
+        const cached = dlsiteCache.getCover(normalizedUrl);
+        if (cached) {
+          options.dlsiteSchedulerDependencies?.logger?.({
+            event: "dlsite_cache_hit",
+            resource: "cover",
+            key: normalizedUrl,
+          });
+          return { body: cached.body, normalizedUrl };
+        }
+        options.dlsiteSchedulerDependencies?.logger?.({
+          event: "dlsite_cache_miss",
+          resource: "cover",
+          key: normalizedUrl,
+        });
+        dlsiteScheduler.assertOnline();
+        const fetched = await scheduledDlsiteCoverFetcher(normalizedUrl);
+        const finalUrl = normalizeDlsiteCoverUrl(fetched.finalUrl);
+        dlsiteCache.putCover(finalUrl, fetched.body, fetched.contentType);
+        // リダイレクトがあっても、要求した正規化URLでも次回hitさせる。
+        if (finalUrl !== normalizedUrl) {
+          dlsiteCache.putCover(normalizedUrl, fetched.body, fetched.contentType);
+        }
+        return { body: fetched.body, normalizedUrl: finalUrl };
+      })();
+      dlsiteCoverFlights.set(key, request);
+    }
+    try {
+      const image = await request;
+      const extension = (
+        new URL(image.normalizedUrl).pathname.split(".").pop() ?? "jpg"
+      ).toLowerCase();
+      const fileName = `dlsite_cover.${extension}`;
+      writeFileSync(join(workDir, fileName), image.body);
+      return fileName;
+    } finally {
+      if (dlsiteCoverFlights.get(key) === request) dlsiteCoverFlights.delete(key);
+    }
+  }
 
   /**
    * ダウンロード済みカバーの寸法を計測して DB 書き込み用の cover 列を作る。
@@ -546,7 +780,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       return describeCover(workId, width);
     },
 
-    async dlsiteFetch(workId: string): Promise<DlsiteFetchResult> {
+    async dlsiteFetch(workId: string, force = false): Promise<DlsiteFetchResult> {
       const work = await repo.getWork(workId);
       if (!work)
         return { ok: false, kind: "not_found", message: `作品が見つかりません: ${workId}` };
@@ -554,7 +788,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       if (!rjCode) {
         return { ok: false, kind: "not_found", message: "RJコードが検出されていません" };
       }
-      return dlsiteFetcher(rjCode);
+      return fetchCachedDlsite(rjCode, force);
     },
 
     async dlsiteApply(workId: string, body: DlsiteApplyBody): Promise<boolean> {
@@ -571,7 +805,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       }
       let coverImage: string | undefined;
       if (body.applyCover && body.info.coverUrl) {
-        coverImage = await downloadCover(body.info.coverUrl, work.physicalPath);
+        coverImage = await cachedCover(body.info.coverUrl, work.physicalPath);
         // カバー計測に失敗したら適用自体を失敗として返す（寸法欠損のまま確定させない）。
         const cover = await measureDownloadedCover(work.physicalPath, coverImage);
         if (!cover) return false;
@@ -630,9 +864,9 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
         const idSet = new Set(workIds);
         return summaries.filter((summary) => idSet.has(summary.id));
       })();
+      // statusは表示・適用状態であり、HTTP再取得可否には使わない。skippedだけは明示的な除外。
       const targets = requested.filter(
-        (work) =>
-          work.dlsite.rjCode && (work.dlsite.status === "none" || work.dlsite.status === "error"),
+        (work) => work.dlsite.rjCode && work.dlsite.status !== "skipped",
       );
       const result: DlsiteBulkResult = {
         fetched: 0,
@@ -642,13 +876,20 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
 
       for (let index = 0; index < targets.length; index++) {
         const work = targets[index]!;
-        if (index > 0 && dlsiteRequestIntervalMs > 0) {
-          await new Promise((resolve) => setTimeout(resolve, dlsiteRequestIntervalMs));
-        }
         const attemptedAt = new Date().toISOString();
         try {
-          const fetched = await dlsiteFetcher(work.dlsite.rjCode!);
+          const fetched = await fetchCachedDlsite(work.dlsite.rjCode!);
           if (!fetched.ok) {
+            if (fetched.kind === "offline") {
+              result.failed += 1;
+              onProgress?.({
+                type: "progress",
+                processed: index + 1,
+                total: targets.length,
+                workId: work.id,
+              });
+              continue;
+            }
             const dlsite = {
               ...work.dlsite,
               status: fetched.kind === "not_found" ? ("not_found" as const) : ("error" as const),
@@ -686,7 +927,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
             }
             let coverImage: string | undefined;
             if (!work.cover && fetched.info.coverUrl) {
-              coverImage = await dlsiteCoverDownloader(fetched.info.coverUrl, work.physicalPath);
+              coverImage = await cachedCover(fetched.info.coverUrl, work.physicalPath);
               // カバー計測失敗はこの作品の適用失敗として扱う（error状態へ落として次作品へ続行）。
               const cover = await measureDownloadedCover(work.physicalPath, coverImage);
               if (!cover) throw new Error(`カバー寸法を計測できません: ${coverImage}`);
@@ -714,6 +955,16 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
             result.fetched += 1;
           }
         } catch (error) {
+          if (error instanceof DlsiteOfflineError) {
+            result.failed += 1;
+            onProgress?.({
+              type: "progress",
+              processed: index + 1,
+              total: targets.length,
+              workId: work.id,
+            });
+            continue;
+          }
           const dlsite = {
             ...work.dlsite,
             status: "error" as const,
@@ -746,6 +997,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       return result;
     },
     close(): void {
+      dlsiteCache?.close();
       db.close();
     },
   };

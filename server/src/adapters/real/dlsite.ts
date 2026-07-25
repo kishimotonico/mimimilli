@@ -7,9 +7,58 @@ import { load } from "cheerio";
 import { normalizeTags } from "@mimimilli/shared";
 import type { DlsiteFetchResult, DlsiteWorkInfo } from "@mimimilli/shared";
 
-const FETCH_TIMEOUT_MS = 15_000;
 const USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) mimimilli/0.1";
 type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
+
+export interface DlsiteHtmlResponse {
+  status: number;
+  contentType: string | null;
+  body: string;
+  transferSize?: number;
+}
+
+export interface DlsiteCoverResponse {
+  contentType: string | null;
+  body: Uint8Array;
+  finalUrl: string;
+}
+
+async function readLimitedBody(
+  response: Response,
+  transferMax: number,
+  expandedMax: number,
+): Promise<{ body: Uint8Array; transferSize: number }> {
+  const declared = response.headers.get("content-length");
+  if (declared !== null && (!/^\d+$/.test(declared) || Number(declared) > transferMax)) {
+    await response.body?.cancel();
+    throw new Error(`DLsiteレスポンスのサイズが上限を超えました: ${declared}`);
+  }
+  if (!response.body) return { body: new Uint8Array(), transferSize: 0 };
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      total += chunk.value.byteLength;
+      if (total > expandedMax) {
+        await reader.cancel();
+        throw new Error(`DLsiteレスポンスのサイズが上限を超えました: ${total}`);
+      }
+      chunks.push(chunk.value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const body = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return { body, transferSize: declared === null ? total : Number(declared) };
+}
 
 // DLsite の作品ページURLはIDのカテゴリprefixで公開ストアが分かれる:
 // RJ（同人）は maniax、VJ（商業/美少女ゲーム）は pro。カテゴリを誤ると
@@ -76,6 +125,8 @@ export function parseDlsiteHtml(html: string, rjCode: string): DlsiteFetchResult
 export async function fetchDlsiteInfo(
   rjCode: string,
   fetchImpl: FetchLike = fetch,
+  transferMax = Number.MAX_SAFE_INTEGER,
+  expandedMax = Number.MAX_SAFE_INTEGER,
 ): Promise<DlsiteFetchResult> {
   try {
     const res = await fetchImpl(dlsiteWorkUrl(rjCode), {
@@ -85,7 +136,6 @@ export async function fetchDlsiteInfo(
         "Accept-Language": "ja",
       },
       redirect: "follow",
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
     if (res.status === 404) {
       return {
@@ -101,14 +151,80 @@ export async function fetchDlsiteInfo(
         message: `DLsiteの取得に失敗しました（${rjCode}: HTTP ${res.status}）`,
       };
     }
-    return parseDlsiteHtml(await res.text(), rjCode);
+    return parseDlsiteHtml(
+      new TextDecoder().decode((await readLimitedBody(res, transferMax, expandedMax)).body),
+      rjCode,
+    );
   } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") throw error;
     return {
       ok: false,
       kind: "error",
       message: `DLsiteとの通信に失敗しました（${rjCode}: ${(error as Error).message}）`,
     };
   }
+}
+
+/** HTTP取得だけを担当する。パースとキャッシュは呼び出し側で行う。 */
+export async function fetchDlsiteHtml(
+  rjCode: string,
+  fetchImpl: FetchLike = fetch,
+  transferMax = Number.MAX_SAFE_INTEGER,
+  expandedMax = Number.MAX_SAFE_INTEGER,
+): Promise<DlsiteHtmlResponse> {
+  const res = await fetchImpl(dlsiteWorkUrl(rjCode), {
+    headers: { Cookie: "adultchecked=1", "User-Agent": USER_AGENT, "Accept-Language": "ja" },
+    redirect: "follow",
+  });
+  const read = await readLimitedBody(res, transferMax, expandedMax);
+  return {
+    status: res.status,
+    contentType: res.headers.get("content-type"),
+    body: new TextDecoder().decode(read.body),
+    transferSize: read.transferSize,
+  };
+}
+
+const DLSITE_IMAGE_HOSTS = new Set(["img.dlsite.jp", "img.dlsite.com"]);
+
+/** クライアント由来のURLもここで検証し、任意URLへのアクセスを防ぐ。 */
+export function normalizeDlsiteCoverUrl(value: string): string {
+  const url = new URL(value);
+  if (url.protocol !== "https:" || !DLSITE_IMAGE_HOSTS.has(url.hostname.toLowerCase())) {
+    throw new Error("DLsiteカバー画像URLが許可されていません");
+  }
+  if (url.username || url.password) throw new Error("DLsiteカバー画像URLが不正です");
+  if (url.port && url.port !== "443") throw new Error("DLsiteカバー画像URLのポートが不正です");
+  url.hash = "";
+  return url.toString();
+}
+
+/** カバーのHTTP取得だけを担当する。リダイレクト後のURLも再検証する。 */
+export async function fetchDlsiteCover(
+  coverUrl: string,
+  fetchImpl: FetchLike = fetch,
+  maximumBytes = Number.MAX_SAFE_INTEGER,
+): Promise<DlsiteCoverResponse> {
+  let currentUrl = normalizeDlsiteCoverUrl(coverUrl);
+  let res: Response | undefined;
+  for (let redirects = 0; redirects <= 5; redirects += 1) {
+    res = await fetchImpl(currentUrl, {
+      headers: { "User-Agent": USER_AGENT },
+      redirect: "manual",
+    });
+    if (![301, 302, 303, 307, 308].includes(res.status)) break;
+    const location = res.headers.get("location");
+    if (!location) throw new Error("カバー画像リダイレクトにLocationがありません");
+    currentUrl = normalizeDlsiteCoverUrl(new URL(location, currentUrl).toString());
+    if (redirects === 5) throw new Error("カバー画像リダイレクトが多すぎます");
+  }
+  if (!res) throw new Error("カバー画像を取得できませんでした");
+  if (!res.ok) throw new Error(`カバー画像のダウンロードに失敗しました（HTTP ${res.status}）`);
+  return {
+    contentType: res.headers.get("content-type"),
+    body: (await readLimitedBody(res, maximumBytes, maximumBytes)).body,
+    finalUrl: currentUrl,
+  };
 }
 
 /**
@@ -126,15 +242,9 @@ export function mergeDlsiteTags(existing: string[], info: DlsiteWorkInfo): strin
 
 /** カバー画像をダウンロードして作品フォルダーへ保存し、ファイル名を返す */
 export async function downloadCover(coverUrl: string, workDir: string): Promise<string> {
-  const res = await fetch(coverUrl, {
-    headers: { "User-Agent": USER_AGENT },
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-  });
-  if (!res.ok) {
-    throw new Error(`カバー画像のダウンロードに失敗しました（HTTP ${res.status}）`);
-  }
-  const ext = (new URL(coverUrl).pathname.split(".").pop() ?? "jpg").toLowerCase();
+  const cover = await fetchDlsiteCover(coverUrl);
+  const ext = (new URL(cover.finalUrl).pathname.split(".").pop() ?? "jpg").toLowerCase();
   const fileName = `dlsite_cover.${ext}`;
-  writeFileSync(join(workDir, fileName), Buffer.from(await res.arrayBuffer()));
+  writeFileSync(join(workDir, fileName), cover.body);
   return fileName;
 }

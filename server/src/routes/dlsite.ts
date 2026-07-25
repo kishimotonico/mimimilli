@@ -9,6 +9,7 @@ import {
 import type { DataAdapter } from "../adapter.ts";
 import { apiError, invalidRequest, notFound } from "../lib/httpError.ts";
 import { enqueueDlsiteJob, isDlsiteJobInProgress, subscribeToDlsite } from "./dlsiteProgress.ts";
+import { DlsiteOfflineError } from "../adapters/real/dlsiteScheduler.ts";
 
 export function dlsiteRoute(adapter: DataAdapter): Hono {
   const app = new Hono();
@@ -31,7 +32,11 @@ export function dlsiteRoute(adapter: DataAdapter): Hono {
   });
 
   app.post("/dlsite/:id/fetch", async (c) => {
-    const result = await adapter.dlsiteFetch(c.req.param("id"));
+    const forceValue = c.req.query("force");
+    if (forceValue !== undefined && forceValue !== "true" && forceValue !== "false") {
+      invalidRequest("force は true または false で指定してください");
+    }
+    const result = await adapter.dlsiteFetch(c.req.param("id"), forceValue === "true");
     if (!result.ok) throw apiError(result.kind, result.message);
     return c.json(result.info);
   });
@@ -42,7 +47,13 @@ export function dlsiteRoute(adapter: DataAdapter): Hono {
     if (!parsed.success) {
       invalidRequest("DLsite適用内容が不正です");
     }
-    const ok = await adapter.dlsiteApply(c.req.param("id"), parsed.data);
+    let ok: boolean;
+    try {
+      ok = await adapter.dlsiteApply(c.req.param("id"), parsed.data);
+    } catch (error) {
+      if (error instanceof DlsiteOfflineError) throw apiError("offline", error.message);
+      throw error;
+    }
     if (!ok) notFound(`作品が見つかりません: ${c.req.param("id")}`);
     return c.body(null, 204);
   });

@@ -6,6 +6,7 @@ import { HTTPException } from "hono/http-exception";
 const STATUS_BY_CODE = {
   not_found: 404,
   parse_error: 502,
+  offline: 503,
   error: 502,
   invalid_request: 400,
   conflict: 409,

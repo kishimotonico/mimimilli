@@ -48,7 +48,7 @@ export const dlsiteWorkInfoSchema = z.object({
 });
 export type DlsiteWorkInfo = z.infer<typeof dlsiteWorkInfoSchema>;
 
-export const dlsiteFetchErrorKindSchema = z.enum(["not_found", "parse_error", "error"]);
+export const dlsiteFetchErrorKindSchema = z.enum(["not_found", "parse_error", "offline", "error"]);
 export type DlsiteFetchErrorKind = z.infer<typeof dlsiteFetchErrorKindSchema>;
 
 export const dlsiteFetchResultSchema = z.discriminatedUnion("ok", [

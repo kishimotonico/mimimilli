@@ -6,6 +6,7 @@ export interface DataPaths {
   root: string;
   catalogDb: string;
   userDb: string;
+  dlsiteCacheDb: string;
   thumbnailCache: string;
 }
 
@@ -58,6 +59,7 @@ export function resolveDataPaths(
     root,
     catalogDb: path.join(root, "db", "catalog.sqlite"),
     userDb: path.join(root, "db", "user.sqlite"),
+    dlsiteCacheDb: path.join(root, "db", "dlsite-cache.sqlite"),
     thumbnailCache: path.join(root, "cache", "thumbnails"),
   };
 }

@@ -152,7 +152,8 @@ export interface DataAdapter {
   ): Promise<MediaLocation | null>;
   /** カバー専用の軽量な事前確認。音声・通常ファイルの契約は locateMedia のまま維持する。 */
   describeCover(workId: string, width?: number): Promise<CoverDescriptor | null>;
-  dlsiteFetch(workId: string): Promise<DlsiteFetchResult>;
+  /** force=true はキャッシュを無視して明示的に再取得する。 */
+  dlsiteFetch(workId: string, force?: boolean): Promise<DlsiteFetchResult>;
   dlsiteApply(workId: string, body: DlsiteApplyBody): Promise<boolean>;
   updateDlsiteState(workId: string, patch: DlsiteStatePatch): Promise<Work | null>;
   runDlsiteBulk(
