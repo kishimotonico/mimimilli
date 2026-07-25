@@ -34,7 +34,7 @@ export default function BarContent({
   const duration = useAtomValue(playerDurationAtom);
   const { currentWork, isPlaying, tracks, currentTrackIndex, playbackError } = state;
   const track = tracks[currentTrackIndex] ?? null;
-  const pct = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const pct = duration !== null && duration > 0 ? (currentTime / duration) * 100 : 0;
   const formattedError = playbackError ? formatPlaybackError(playbackError) : null;
 
   const seek = useSeekDrag({ duration, onSeek });
@@ -132,7 +132,7 @@ export default function BarContent({
         <div className="mle-bar1__seek-track">
           <div className="mle-bar1__seek-fill" style={{ width: `${Math.min(100, pct)}%` }} />
         </div>
-        {seek.hoverRatio !== null && duration > 0 && (
+        {seek.hoverRatio !== null && duration !== null && duration > 0 && (
           <div className="mle-bar1__seek-tooltip" style={{ left: `${seek.hoverRatio * 100}%` }}>
             {formatTime(seek.hoverTime ?? 0)}
           </div>

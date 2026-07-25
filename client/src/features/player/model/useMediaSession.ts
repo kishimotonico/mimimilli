@@ -1,20 +1,21 @@
 import { useCallback, useEffect, useMemo } from "react";
-import type { Track, Work, WorkListItem } from "../../../entities/work/model";
+import type { Work, WorkListItem } from "../../../entities/work/model";
 import { getCircleName } from "../../../entities/work/model";
 import { getCoverImageUrl } from "../../../entities/work/api";
+import type { PlaybackTrack } from "./trackTime";
 
 const DEFAULT_SEEK_OFFSET = 10;
 const ARTWORK_WIDTH = 512;
 
 interface MediaSessionPosition {
-  duration: number;
+  duration: number | null;
   position: number;
   playbackRate: number;
 }
 
 interface UseMediaSessionOptions {
   currentWork: WorkListItem | Work | null;
-  currentTrack: Track | null;
+  currentTrack: PlaybackTrack | null;
   currentTrackIndex: number;
   trackCount: number;
   isPlaying: boolean;
@@ -78,6 +79,7 @@ export function useMediaSession({
       const state = getPosition();
       if (
         !state ||
+        state.duration === null ||
         !Number.isFinite(state.duration) ||
         state.duration <= 0 ||
         !Number.isFinite(state.position) ||

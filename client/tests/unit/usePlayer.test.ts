@@ -7,7 +7,7 @@ import { usePlayer } from "../../src/features/player/model/usePlayer";
 import { playerCurrentTimeAtom, playerDurationAtom } from "../../src/features/player/model/atoms";
 import { saveResumePosition } from "../../src/features/player/api";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
-import type { Track, Work, WorkSummary } from "../../src/entities/work/model";
+import type { ResolvedTrack, Track, Work, WorkSummary } from "../../src/entities/work/model";
 
 vi.mock("../../src/features/player/api", () => ({
   saveResumePosition: vi.fn(() => Promise.resolve()),
@@ -324,14 +324,15 @@ describe("usePlayer adapters", () => {
   });
 
   it("同一ファイルのトラック切替では再ロードせず区間先頭へシークする", async () => {
-    const tracks: Track[] = [
-      { ...track, start: 0, end: 30 },
+    const tracks: ResolvedTrack[] = [
+      { ...track, start: 0, end: 30, durationSec: 30 },
       {
         id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
         title: "Track 2",
         file: track.file,
         start: 30,
         end: 60,
+        durationSec: 30,
       },
     ];
     const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });

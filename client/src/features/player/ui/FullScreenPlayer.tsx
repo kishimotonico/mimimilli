@@ -54,10 +54,12 @@ export default function FullScreenPlayer({
   const { currentWork, isPlaying, volume, loop, tracks, currentTrackIndex, channelSwap, abRepeat } =
     state;
   const track = tracks[currentTrackIndex] ?? null;
-  const pct = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const pct = duration !== null && duration > 0 ? (currentTime / duration) * 100 : 0;
   const seek = useSeekDrag({ duration, onSeek });
-  const abStartPct = duration > 0 && abRepeat.a !== null ? (abRepeat.a / duration) * 100 : null;
-  const abEndPct = duration > 0 && abRepeat.b !== null ? (abRepeat.b / duration) * 100 : null;
+  const abStartPct =
+    duration !== null && duration > 0 && abRepeat.a !== null ? (abRepeat.a / duration) * 100 : null;
+  const abEndPct =
+    duration !== null && duration > 0 && abRepeat.b !== null ? (abRepeat.b / duration) * 100 : null;
   // リピートが実際に成立する条件（usePlayer 側のループ発動条件と同じ a < b）
   const hasABRepeat = abRepeat.a !== null && abRepeat.b !== null && abRepeat.a < abRepeat.b;
 
@@ -155,7 +157,7 @@ export default function FullScreenPlayer({
                     style={{ width: `${Math.min(100, pct)}%` }}
                   />
                 </div>
-                {seek.hoverRatio !== null && duration > 0 && (
+                {seek.hoverRatio !== null && duration !== null && duration > 0 && (
                   <div className="mle-seek-tooltip" style={{ left: `${seek.hoverRatio * 100}%` }}>
                     {formatTime(seek.hoverTime ?? 0)}
                   </div>
@@ -164,7 +166,7 @@ export default function FullScreenPlayer({
               <div className="flex items-center gap-2.5 pt-1 font-mono text-xs text-ink-2">
                 <span className="text-ink-0">{formatTime(currentTime)}</span>
                 <div className="flex-1" />
-                <span>{formatTime(duration)}</span>
+                <span>{duration !== null ? formatTime(duration) : "--:--"}</span>
               </div>
             </div>
 

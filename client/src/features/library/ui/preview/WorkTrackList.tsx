@@ -1,10 +1,10 @@
-import type { Track } from "@mimimilli/shared";
+import type { ResolvedTrack } from "@mimimilli/shared";
 import { I } from "../../../../shared/ui/Icon";
 import { formatDuration, formatTime } from "../../../../shared/lib/format";
 import { cn } from "../../../../shared/lib/cn";
 
 interface WorkTrackListProps {
-  tracks: Track[];
+  tracks: ResolvedTrack[];
   isPlayable: boolean;
   playingTrackIndex: number | null;
   isPlaybackActive?: boolean;
@@ -60,8 +60,8 @@ export function WorkTrackList({
                   <span className="resume">再開 {formatTime(resumeOffsetSec)}</span>
                 )}
               </span>
-              {tr.end != null && tr.start != null && (
-                <span className="dur">{formatDuration(Math.round(tr.end - tr.start))}</span>
+              {tr.durationSec !== null && (
+                <span className="dur">{formatDuration(Math.round(tr.durationSec))}</span>
               )}
               <div className="src">
                 {isNowPlaying ? (

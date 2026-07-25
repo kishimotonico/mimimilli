@@ -1,6 +1,6 @@
-import type { Track } from "../../../entities/work/model";
 import type { AudioEngine } from "./audioEngine";
 import type { PlayerCoreState } from "./atoms";
+import type { PlaybackTrack } from "./trackTime";
 
 export interface MutableRef<T> {
   current: T;
@@ -17,14 +17,14 @@ export interface LoadedTrack {
   workId: string;
   playlistId: string | null;
   trackIndex: number;
-  track: Track;
+  track: PlaybackTrack;
   assetUrl: string;
 }
 
 export interface PlaybackContext {
   engine: AudioEngine;
-  track: Track;
-  trackDuration: number;
+  track: PlaybackTrack;
+  trackDuration: number | null;
   currentTime: number;
 }
 
@@ -34,4 +34,6 @@ export interface PlayerRuntimeRefs {
   loadedTrack: MutableRef<LoadedTrack | null>;
   trackEnded: MutableRef<boolean>;
   updateMediaSessionPosition: MutableRef<(position?: number) => void>;
+  /** Files モード即席トラックの durationchange 由来ファイル全体長。登録トラックでは未使用。 */
+  filesModeFileDurationSec: MutableRef<number | null>;
 }

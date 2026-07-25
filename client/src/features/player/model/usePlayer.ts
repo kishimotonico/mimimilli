@@ -8,16 +8,15 @@
 import { useRef, useCallback, useMemo, useEffect } from "react";
 import { useAtom, useSetAtom } from "jotai";
 import { useQueryClient } from "@tanstack/react-query";
-import type { Track, WorkListItem, Work } from "../../../entities/work/model";
+import type { WorkListItem, Work } from "../../../entities/work/model";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { useMediaSession } from "./useMediaSession";
-import { toAudioAbsoluteTime } from "./trackTime";
+import { toAudioAbsoluteTime, getTrackDurationSec, type PlaybackTrack } from "./trackTime";
 import { playerCoreAtom, playerCurrentTimeAtom, playerDurationAtom } from "./atoms";
 import type { PlayerRuntimeRefs } from "./playerRuntime";
 import { useAudioEngineLifecycle } from "./useAudioEngineLifecycle";
 import { useResumePersistenceController } from "./useResumePersistence";
 import { formatTime, formatDuration, formatFileSize } from "../../../shared/lib/format";
-import { getTrackDuration } from "./trackTime";
 import {
   PlayerController,
   toPlayerCoreState,
@@ -51,6 +50,7 @@ export function usePlayer() {
   const loadedTrackRef = useRef<PlayerRuntimeRefs["loadedTrack"]["current"]>(null);
   const trackEndedRef = useRef(false);
   const updateMediaSessionPositionRef = useRef<(position?: number) => void>(() => {});
+  const filesModeFileDurationSecRef = useRef<number | null>(null);
 
   const runtimeRefs = useMemo<PlayerRuntimeRefs>(
     () => ({
@@ -59,6 +59,7 @@ export function usePlayer() {
       loadedTrack: loadedTrackRef,
       trackEnded: trackEndedRef,
       updateMediaSessionPosition: updateMediaSessionPositionRef,
+      filesModeFileDurationSec: filesModeFileDurationSecRef,
     }),
     [],
   );
@@ -110,7 +111,7 @@ export function usePlayer() {
         case "seekAudio": {
           const loaded = loadedTrackRef.current;
           if (!engine || !loaded) break;
-          const duration = getTrackDuration(loaded.track, engine.getDuration());
+          const duration = getTrackDurationSec(loaded.track, filesModeFileDurationSecRef.current);
           engine.seek(toAudioAbsoluteTime(command.positionSec, loaded.track, duration));
           setCurrentTime(command.positionSec);
           updateMediaSessionPositionRef.current(command.positionSec);
@@ -157,7 +158,7 @@ export function usePlayer() {
   const startPlayback = useCallback(
     (
       work: WorkListItem | Work,
-      tracks: Track[],
+      tracks: PlaybackTrack[],
       trackIndex: number,
       playlistId: string | null,
       positionSec?: number,
@@ -177,7 +178,7 @@ export function usePlayer() {
   const play = useCallback(
     (
       work: WorkListItem | Work,
-      tracks: Track[],
+      tracks: PlaybackTrack[],
       trackIndex: number = 0,
       playlistId: string | null = null,
     ) => {
@@ -216,11 +217,8 @@ export function usePlayer() {
 
   const seek = useCallback(
     (time: number) => {
-      const context = getCurrentPlaybackContext();
-      if (!context) return;
-      const positionSec = Math.max(0, Math.min(time, context.trackDuration));
-      controller.dispatch({ type: "audioDurationChanged", durationSec: context.trackDuration });
-      controller.dispatch({ type: "seekRequested", positionSec });
+      if (!getCurrentPlaybackContext()) return;
+      controller.dispatch({ type: "seekRequested", positionSec: time });
     },
     [controller, getCurrentPlaybackContext],
   );
@@ -228,9 +226,7 @@ export function usePlayer() {
     (delta: number) => {
       const context = getCurrentPlaybackContext();
       if (!context) return;
-      const positionSec = Math.max(0, Math.min(context.currentTime + delta, context.trackDuration));
-      controller.dispatch({ type: "audioDurationChanged", durationSec: context.trackDuration });
-      controller.dispatch({ type: "seekRequested", positionSec });
+      controller.dispatch({ type: "seekRequested", positionSec: context.currentTime + delta });
     },
     [controller, getCurrentPlaybackContext],
   );

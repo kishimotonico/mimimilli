@@ -5,7 +5,9 @@
 export type {
   UrlEntry,
   Track,
+  ResolvedTrack,
   Playlist,
+  ResolvedPlaylist,
   Work,
   WorkListItem,
   WorkSummary,

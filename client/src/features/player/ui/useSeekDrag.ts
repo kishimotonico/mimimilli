@@ -5,7 +5,7 @@
 import { useCallback, useRef, useState } from "react";
 
 interface UseSeekDragOptions {
-  duration: number;
+  duration: number | null;
   onSeek: (time: number) => void;
 }
 
@@ -79,7 +79,7 @@ export function useSeekDrag({ duration, onSeek }: UseSeekDragOptions): SeekDragB
     trackRef,
     dragging,
     hoverRatio,
-    hoverTime: hoverRatio !== null ? hoverRatio * duration : null,
+    hoverTime: hoverRatio !== null && duration !== null ? hoverRatio * duration : null,
     onPointerDown,
     onPointerMove,
     onPointerUp,

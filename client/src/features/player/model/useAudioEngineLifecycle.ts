@@ -3,9 +3,10 @@ import { getAudioUrl } from "../../../entities/work/api";
 import { updateLastPlayed } from "../api";
 import { createAudioEngine } from "./audioEngine";
 import {
-  getTrackDuration,
+  getTrackDurationSec,
   getTrackStart,
   hasReachedTrackEnd,
+  isResolvedTrack,
   toTrackRelativeTime,
 } from "./trackTime";
 import type { LoadedTrack, PlaybackContext, PlayerRuntimeRefs } from "./playerRuntime";
@@ -35,7 +36,10 @@ export function useAudioEngineLifecycle({
       const loadedTrack = refs.loadedTrack.current;
       if (!engine || !loadedTrack) return null;
 
-      const trackDuration = getTrackDuration(loadedTrack.track, engine.getDuration());
+      const trackDuration = getTrackDurationSec(
+        loadedTrack.track,
+        refs.filesModeFileDurationSec.current,
+      );
       const currentTime = toTrackRelativeTime(
         absoluteCurrentTime ?? engine.getCurrentTime(),
         loadedTrack.track,
@@ -43,7 +47,7 @@ export function useAudioEngineLifecycle({
       );
       return { engine, track: loadedTrack.track, trackDuration, currentTime };
     },
-    [refs.engine, refs.loadedTrack],
+    [refs.engine, refs.loadedTrack, refs.filesModeFileDurationSec],
   );
 
   useEffect(() => {
@@ -105,11 +109,15 @@ export function useAudioEngineLifecycle({
           finishCurrentTrack(true);
         }
       },
+      // durationchange は Files モードの即席トラック専用経路。登録トラックは DTO の durationSec が
+      // 権威であり、ここでは上書きしない。
       onDurationChange: (duration) => {
         const loadedTrack = refs.loadedTrack.current;
+        if (!loadedTrack || isResolvedTrack(loadedTrack.track)) return;
+        refs.filesModeFileDurationSec.current = duration;
         controller.dispatch({
           type: "audioDurationChanged",
-          durationSec: loadedTrack ? getTrackDuration(loadedTrack.track, duration) : duration,
+          durationSec: getTrackDurationSec(loadedTrack.track, duration),
         });
         refs.updateMediaSessionPosition.current();
       },
@@ -158,14 +166,14 @@ export function useAudioEngineLifecycle({
       assetUrl,
     };
     refs.trackEnded.current = false;
+    if (!reusesLoadedAsset) refs.filesModeFileDurationSec.current = null;
 
     if (reusesLoadedAsset) {
       const seekSec = pendingSeekSec ?? getTrackStart(track);
-      const trackDuration = getTrackDuration(track, engine.getDuration());
+      const trackDuration = getTrackDurationSec(track, refs.filesModeFileDurationSec.current);
       engine.seek(seekSec);
       const relativeTime = toTrackRelativeTime(seekSec, track, trackDuration);
       controller.dispatch({ type: "audioTimeUpdated", positionSec: relativeTime });
-      controller.dispatch({ type: "audioDurationChanged", durationSec: trackDuration });
       refs.updateMediaSessionPosition.current(relativeTime);
 
       if (coreState.isPlaying) {
@@ -176,13 +184,9 @@ export function useAudioEngineLifecycle({
       return;
     }
 
-    if (track.start !== undefined || track.end !== undefined) {
-      controller.dispatch({ type: "audioTimeUpdated", positionSec: 0 });
-      controller.dispatch({
-        type: "audioDurationChanged",
-        durationSec: track.end === undefined ? 0 : getTrackDuration(track, track.end),
-      });
-    }
+    // durationSec は startRequested/trackSelected で選択時点の DTO 値が既に反映済み。
+    // 位置だけ 0 へ戻す（登録トラックは正確な durationSec、Files モードは durationchange を待つ）。
+    controller.dispatch({ type: "audioTimeUpdated", positionSec: 0 });
 
     const cleanup = engine.load(assetUrl, {
       playbackRate: coreState.playbackRate,

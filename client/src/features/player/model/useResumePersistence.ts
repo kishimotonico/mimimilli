@@ -1,8 +1,13 @@
 import { useCallback, useRef } from "react";
 import type { ResumeBody } from "@mimimilli/shared";
-import type { Track, Work } from "../../../entities/work/model";
+import type { Work } from "../../../entities/work/model";
 import { saveResumePosition } from "../api";
-import { getTrackStart, toTrackRelativeTime } from "./trackTime";
+import {
+  getTrackStart,
+  isResolvedTrack,
+  toTrackRelativeTime,
+  type PlaybackTrack,
+} from "./trackTime";
 import type { LoadedTrack, MutableRef, PendingResume, PlayerRuntimeRefs } from "./playerRuntime";
 
 interface UseResumePersistenceOptions {
@@ -34,10 +39,9 @@ export function useResumePersistenceController({ refs }: UseResumePersistenceOpt
       if (position === undefined) return;
 
       if (loadedTrack.playlistId === null) return;
-      const trackDuration =
-        loadedTrack.track.end === undefined
-          ? Number.POSITIVE_INFINITY
-          : loadedTrack.track.end - getTrackStart(loadedTrack.track);
+      const trackDuration = isResolvedTrack(loadedTrack.track)
+        ? loadedTrack.track.durationSec
+        : Number.POSITIVE_INFINITY;
       const offsetSec = toTrackRelativeTime(position, loadedTrack.track, trackDuration);
       enqueueResumeSave(loadedTrack.workId, {
         playlistId: loadedTrack.playlistId,
@@ -49,7 +53,7 @@ export function useResumePersistenceController({ refs }: UseResumePersistenceOpt
   );
 
   const consumePendingResume = useCallback(
-    (workId: string, playlistId: string | null, track: Track) => {
+    (workId: string, playlistId: string | null, track: PlaybackTrack) => {
       const pending = pendingResumeRef.current;
       if (
         pending?.workId !== workId ||

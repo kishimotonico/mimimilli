@@ -1,5 +1,6 @@
-import type { Track, Work, WorkListItem } from "../../../entities/work/model";
+import type { Work, WorkListItem } from "../../../entities/work/model";
 import type { AudioEngineError } from "./audioEngine";
+import { isResolvedTrack, type PlaybackTrack } from "./trackTime";
 
 export type PlaybackStatus = "idle" | "loading" | "playing" | "paused" | "ended" | "error";
 export type PlaybackCompletionScope = "queue" | "work";
@@ -7,7 +8,7 @@ export type PlaybackCompletionScope = "queue" | "work";
 export interface PlaybackItem {
   work: WorkListItem | Work;
   playlistId: string | null;
-  tracks: Track[];
+  tracks: PlaybackTrack[];
   trackIndex: number;
   completionScope: PlaybackCompletionScope;
 }
@@ -16,7 +17,7 @@ export interface PlayerControllerState {
   status: PlaybackStatus;
   item: PlaybackItem | null;
   positionSec: number;
-  durationSec: number;
+  durationSec: number | null;
   volume: number;
   loop: boolean;
   showFullPlayer: boolean;
@@ -31,7 +32,7 @@ export interface PlayerCoreState {
   currentTrackIndex: number;
   currentPlaylistId: string | null;
   currentWork: WorkListItem | Work | null;
-  tracks: Track[];
+  tracks: PlaybackTrack[];
   volume: number;
   loop: boolean;
   showFullPlayer: boolean;
@@ -78,7 +79,7 @@ export type PlayerControllerInput =
   | { type: "audioPlaying" }
   | { type: "audioPaused" }
   | { type: "audioTimeUpdated"; positionSec: number }
-  | { type: "audioDurationChanged"; durationSec: number }
+  | { type: "audioDurationChanged"; durationSec: number | null }
   | { type: "audioEnded" }
   | { type: "audioFailed"; error: AudioEngineError }
   | { type: "persistTick" };
@@ -100,6 +101,12 @@ export interface PlayerTransition {
   commands: PlayerControllerCommand[];
 }
 
+/** 選択トラックの再生時間を求める。登録トラックは DTO の durationSec、Files モードは未知（null）。 */
+function selectedTrackDurationSec(item: PlaybackItem, trackIndex: number): number | null {
+  const track = item.tracks[trackIndex];
+  return track && isResolvedTrack(track) ? track.durationSec : null;
+}
+
 function withTrackIndex(state: PlayerControllerState, trackIndex: number): PlayerTransition {
   const item = state.item;
   if (
@@ -116,7 +123,7 @@ function withTrackIndex(state: PlayerControllerState, trackIndex: number): Playe
       ...state,
       item: nextItem,
       positionSec: 0,
-      durationSec: 0,
+      durationSec: selectedTrackDurationSec(item, trackIndex),
       abRepeat: { a: null, b: null },
       playbackError: null,
     },
@@ -139,7 +146,7 @@ export function reducePlayer(
           status: "loading",
           item: input.item,
           positionSec: input.positionSec ?? 0,
-          durationSec: 0,
+          durationSec: selectedTrackDurationSec(input.item, input.item.trackIndex),
           abRepeat: { a: null, b: null },
           playbackError: null,
         },
@@ -179,7 +186,8 @@ export function reducePlayer(
           : [],
       };
     case "seekRequested": {
-      const positionSec = Math.max(0, Math.min(input.positionSec, state.durationSec));
+      const maxSec = state.durationSec ?? Number.POSITIVE_INFINITY;
+      const positionSec = Math.max(0, Math.min(input.positionSec, maxSec));
       return {
         state: { ...state, positionSec },
         commands: state.item ? [{ type: "seekAudio", positionSec }] : [],

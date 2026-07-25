@@ -71,7 +71,7 @@ export default function PopupContent({
     playbackError,
   } = state;
   const track = tracks[currentTrackIndex] ?? null;
-  const pct = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const pct = duration !== null && duration > 0 ? (currentTime / duration) * 100 : 0;
   const formattedError = playbackError ? formatPlaybackError(playbackError) : null;
   const [rateMenuOpen, setRateMenuOpen] = useState(false);
   const rateMenuRef = useRef<HTMLDivElement>(null);
@@ -213,7 +213,7 @@ export default function PopupContent({
       </div>
       <div className="mle-popup__time-row">
         <span>{formatTime(currentTime)}</span>
-        <span>{formatTime(duration)}</span>
+        <span>{duration !== null ? formatTime(duration) : "--:--"}</span>
       </div>
 
       <div className="mle-popup__controls">

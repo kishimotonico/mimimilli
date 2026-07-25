@@ -6,6 +6,7 @@ export interface AudioEngineCallbacks {
   onPlay: () => void;
   onPause: () => void;
   onTimeUpdate: (time: number) => void;
+  /** ファイル全体長が判明した時点で発火する。登録トラックは DTO の durationSec を使うため無視する。 */
   onDurationChange: (duration: number) => void;
   /** トラック再生終了時。自動送りするか、ループするかはフック側が判断する。 */
   onEnded: (looping: boolean) => void;

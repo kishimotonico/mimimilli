@@ -1,35 +1,56 @@
-import type { Track } from "../../../entities/work/model";
+import type { ResolvedTrack, Track } from "../../../entities/work/model";
+import { resolveTrackDurationSec } from "@mimimilli/shared";
 
-export function getTrackStart(track: Track): number {
+/** プレイヤーが扱うトラック。登録トラックは ResolvedTrack、Files モードの即席トラックは Track。 */
+export type PlaybackTrack = Track | ResolvedTrack;
+
+/** durationSec を持つ ResolvedTrack（登録トラック）かどうかを判定する。 */
+export function isResolvedTrack(track: PlaybackTrack): track is ResolvedTrack {
+  return "durationSec" in track;
+}
+
+export function getTrackStart(track: PlaybackTrack): number {
   return track.start ?? 0;
 }
 
-/** ファイル全体の長さから、UI が扱うトラック相対の長さを求める。 */
-export function getTrackDuration(track: Track, audioDuration: number): number {
-  const start = getTrackStart(track);
-  const absoluteEnd = track.end ?? audioDuration;
-  return Math.max(0, absoluteEnd - start);
+/**
+ * トラックの再生時間（秒）。登録トラックは DTO の durationSec をそのまま使う。
+ * Files モードの即席トラックは start/end なしのため、durationchange で得たファイル全体長
+ * （filesModeFileDurationSec、未取得なら null）から解決する。未知は null。
+ */
+export function getTrackDurationSec(
+  track: PlaybackTrack,
+  filesModeFileDurationSec: number | null,
+): number | null {
+  if (isResolvedTrack(track)) return track.durationSec;
+  return resolveTrackDurationSec(track, filesModeFileDurationSec);
 }
 
-/** HTML Audio の絶対時刻を、UI が扱うトラック相対時刻へ変換する。 */
+/** HTML Audio の絶対時刻を、UI が扱うトラック相対時刻へ変換する。trackDurationSec が null なら上限クランプなし。 */
 export function toTrackRelativeTime(
   absoluteTime: number,
-  track: Track,
-  trackDuration: number,
+  track: PlaybackTrack,
+  trackDurationSec: number | null,
 ): number {
-  return clamp(absoluteTime - getTrackStart(track), 0, trackDuration);
+  return clamp(
+    absoluteTime - getTrackStart(track),
+    0,
+    trackDurationSec ?? Number.POSITIVE_INFINITY,
+  );
 }
 
-/** UI のトラック相対時刻を、HTML Audio が扱う絶対時刻へ変換する。 */
+/** UI のトラック相対時刻を、HTML Audio が扱う絶対時刻へ変換する。trackDurationSec が null なら上限クランプなし。 */
 export function toAudioAbsoluteTime(
   relativeTime: number,
-  track: Track,
-  trackDuration: number,
+  track: PlaybackTrack,
+  trackDurationSec: number | null,
 ): number {
-  return getTrackStart(track) + clamp(relativeTime, 0, trackDuration);
+  return (
+    getTrackStart(track) + clamp(relativeTime, 0, trackDurationSec ?? Number.POSITIVE_INFINITY)
+  );
 }
 
-export function hasReachedTrackEnd(absoluteTime: number, track: Track): boolean {
+export function hasReachedTrackEnd(absoluteTime: number, track: PlaybackTrack): boolean {
   return track.end !== undefined && absoluteTime >= track.end;
 }
 
