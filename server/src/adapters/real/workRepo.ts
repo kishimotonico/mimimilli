@@ -8,6 +8,7 @@ import {
   normalizeTags,
   parseTag,
   playlistSchema,
+  resolveTrackDurationSec,
   searchPresetSchema,
   smartFolderSchema,
   workSchema,
@@ -21,6 +22,7 @@ import type {
   DlsiteNotificationQuery,
   DlsiteNotificationSummary,
   Playlist,
+  ResolvedPlaylist,
   ResumeBody,
   SearchPreset,
   SearchPresetCreate,
@@ -31,7 +33,6 @@ import type {
   TagPrefix,
   TagPrefixCreate,
   TagPrefixUpdate,
-  Track,
   Work,
   WorkSummary,
   UrlEntry,
@@ -179,10 +180,10 @@ function parseRecord<T>(
   throw new PersistentDataError(table, recordId, detail);
 }
 
-function defaultPlaylistOf(
+function defaultPlaylistOf<P extends { id: string; tracks: unknown[] }>(
   row: Pick<CatalogWorkRow, "id" | "defaultPlaylistId">,
-  playlists: Playlist[],
-): Playlist | null {
+  playlists: P[],
+): P | null {
   if (playlists.length === 0) return null;
   if (row.defaultPlaylistId) {
     const playlist = playlists.find((p) => p.id === row.defaultPlaylistId);
@@ -223,19 +224,41 @@ function rowToSummary(row: SummaryRow, tagNames: string[], dlsite: DlsiteState):
   );
 }
 
-function rowToWork(
-  row: WorkRow,
-  tagNames: string[],
-  dlsite: DlsiteState,
-  cachedFileDurationSec: (track: Track) => number | null,
-): Work {
-  const playlists = parseRecord(
+function parseWorkPlaylists(row: Pick<WorkRow, "id" | "playlistsJson">): Playlist[] {
+  return parseRecord(
     z.array(playlistSchema),
     parseJsonField(row.playlistsJson, "works", row.id, "playlists_json"),
     "works",
     row.id,
   );
-  const resume = resolveResume(row, playlists, cachedFileDurationSec);
+}
+
+function rowToWork(
+  row: WorkRow,
+  rawPlaylists: Playlist[],
+  tagNames: string[],
+  dlsite: DlsiteState,
+  liveFileDurations: Map<string, number | null>,
+): Work {
+  // end指定済みトラックは自明値（end-start）で合成する。
+  // end未指定トラックはファイル置換をrescan無しで検知できるよう、audio_probe_cacheの
+  // 現在値を作品内全ファイルパス一括取得（liveFileDurations）で都度解決する。
+  // playlists_json（正本）には派生値を書かない。
+  const playlists: ResolvedPlaylist[] = rawPlaylists.map((playlist) => ({
+    id: playlist.id,
+    name: playlist.name,
+    tracks: playlist.tracks.map((track) => {
+      const durationSec =
+        track.end !== undefined
+          ? track.end - (track.start ?? 0)
+          : resolveTrackDurationSec(
+              track,
+              liveFileDurations.get(join(row.physicalPath, track.file)) ?? null,
+            );
+      return { ...track, durationSec };
+    }),
+  }));
+  const resume = resolveResume(row, playlists);
   return parseRecord(
     workSchema,
     {
@@ -263,11 +286,7 @@ function rowToWork(
 }
 
 /** catalogでIDと区間を解決できない行は、user DBに残したままAPIでは無効にする。 */
-function resolveResume(
-  row: WorkRow,
-  playlists: Playlist[],
-  cachedFileDurationSec: (track: Track) => number | null,
-): Work["resume"] {
+function resolveResume(row: WorkRow, playlists: ResolvedPlaylist[]): Work["resume"] {
   const { resumePlaylistId: playlistId, resumeTrackId: trackId, resumeOffsetSec: offsetSec } = row;
   if (!row.resumeResolved || playlistId === null || trackId === null || offsetSec === null) {
     return null;
@@ -275,15 +294,8 @@ function resolveResume(
   const playlist = playlists.find((candidate) => candidate.id === playlistId);
   const track = playlist?.tracks.find((candidate) => candidate.id === trackId);
   if (!track || offsetSec < 0) return null;
-  if (track.end !== undefined) {
-    if (offsetSec > track.end - (track.start ?? 0)) return null;
-  } else {
-    const fileDurationSec = cachedFileDurationSec(track);
-    // プローブ未取得または取得失敗（0秒）の場合は上限が分からないため検証をスキップする。
-    if (fileDurationSec !== null && fileDurationSec > 0) {
-      if (offsetSec > fileDurationSec - (track.start ?? 0)) return null;
-    }
-  }
+  // durationSec が未知（プローブ未取得・失敗）の場合は上限が分からないため検証をスキップする。
+  if (track.durationSec !== null && offsetSec > track.durationSec) return null;
   return { playlistId, trackId, offsetSec };
 }
 
@@ -343,14 +355,33 @@ export class WorkRepo {
     this.db = db;
   }
 
-  private cachedFileDurationSec(physicalPath: string, track: Track): number | null {
-    return (
-      this.db.catalog
-        .select({ durationSec: audioProbeCache.durationSec })
-        .from(audioProbeCache)
-        .where(eq(audioProbeCache.path, join(physicalPath, track.file)))
-        .get()?.durationSec ?? null
-    );
+  /**
+   * end未指定トラックが参照するファイルの現在の audio_probe_cache 値を、
+   * 作品内の全該当パスを一括取得して求める（N+1回避）。ここでは probe を実行せず、
+   * 既にキャッシュされている値をそのまま読む（フレッシュネス確認はスキャン/probe実行時に行う）。
+   */
+  private liveFileDurationMap(
+    physicalPath: string,
+    playlists: Array<{ tracks: Array<{ file: string; end?: number }> }>,
+  ): Map<string, number | null> {
+    const paths = [
+      ...new Set(
+        playlists
+          .flatMap((p) => p.tracks)
+          .filter((t) => t.end === undefined)
+          .map((t) => join(physicalPath, t.file)),
+      ),
+    ];
+    const map = new Map<string, number | null>();
+    if (paths.length === 0) return map;
+    const placeholders = paths.map(() => "?").join(", ");
+    const rows = this.db.sqlite
+      .query(
+        `SELECT path, duration_sec AS durationSec FROM main.audio_probe_cache WHERE path IN (${placeholders})`,
+      )
+      .all(...paths) as Array<{ path: string; durationSec: number | null }>;
+    for (const row of rows) map.set(row.path, row.durationSec);
+    return map;
   }
 
   // ── タグ ──────────────────────────────────────────────────
@@ -904,8 +935,8 @@ export class WorkRepo {
    */
   fetchProbeCache(
     paths: string[],
-  ): Map<string, { size: number; mtimeMs: number; durationSec: number }> {
-    const map = new Map<string, { size: number; mtimeMs: number; durationSec: number }>();
+  ): Map<string, { size: number; mtimeMs: number; durationSec: number | null }> {
+    const map = new Map<string, { size: number; mtimeMs: number; durationSec: number | null }>();
     const uniquePaths = [...new Set(paths)];
     if (uniquePaths.length === 0) return map;
 
@@ -921,7 +952,7 @@ export class WorkRepo {
         path: string;
         size: number;
         mtimeMs: number;
-        durationSec: number;
+        durationSec: number | null;
       }>;
       for (const row of rows) {
         map.set(row.path, row);
@@ -976,8 +1007,13 @@ export class WorkRepo {
   getWork(id: string): Work | null {
     const row = this.joinedWorks("WHERE works.id = ?", id)[0];
     if (!row) return null;
-    return rowToWork(row, this.tagMap([id]).get(id) ?? [], this.dlsiteState(id), (track) =>
-      this.cachedFileDurationSec(row.physicalPath, track),
+    const rawPlaylists = parseWorkPlaylists(row);
+    return rowToWork(
+      row,
+      rawPlaylists,
+      this.tagMap([id]).get(id) ?? [],
+      this.dlsiteState(id),
+      this.liveFileDurationMap(row.physicalPath, rawPlaylists),
     );
   }
 
@@ -999,11 +1035,13 @@ export class WorkRepo {
   getWorkByPhysicalPath(physicalPath: string): Work | null {
     const row = this.joinedWorks("WHERE works.physical_path = ?", physicalPath)[0];
     if (!row) return null;
+    const rawPlaylists = parseWorkPlaylists(row);
     return rowToWork(
       row,
+      rawPlaylists,
       this.tagMap([row.id]).get(row.id) ?? [],
       this.dlsiteState(row.id),
-      (track) => this.cachedFileDurationSec(row.physicalPath, track),
+      this.liveFileDurationMap(row.physicalPath, rawPlaylists),
     );
   }
 
@@ -1048,7 +1086,14 @@ export class WorkRepo {
       fingerprint: options?.fingerprint ?? null,
       errorMessage: work.errorMessage,
       urlsJson: JSON.stringify(work.urls),
-      playlistsJson: JSON.stringify(work.playlists),
+      // durationSec は派生値のため正本（playlists_json）には書かず、読み取り時に動的解決する。
+      playlistsJson: JSON.stringify(
+        work.playlists.map((playlist) => ({
+          id: playlist.id,
+          name: playlist.name,
+          tracks: playlist.tracks.map(({ durationSec: _durationSec, ...track }) => track),
+        })),
+      ),
     };
     this.db.catalog
       .insert(works)
@@ -1134,7 +1179,8 @@ export class WorkRepo {
     }
     const track = this.db.sqlite
       .query(`
-        SELECT tracks.start, tracks.end, tracks.file, works.physical_path AS physicalPath
+        SELECT tracks.start, tracks.end, tracks.file,
+               works.physical_path AS physicalPath
         FROM main.playlists
         INNER JOIN main.tracks ON tracks.playlist_id = playlists.id
         INNER JOIN main.works ON works.id = playlists.work_id
@@ -1150,17 +1196,20 @@ export class WorkRepo {
     if (!track) {
       throw new InvalidResumeError("resumeのPlaylistまたはTrackが作品に属していません");
     }
-    let duration = track.end === null ? null : track.end - (track.start ?? 0);
-    if (duration === null) {
-      const cached = this.db.catalog
-        .select({ durationSec: audioProbeCache.durationSec })
-        .from(audioProbeCache)
-        .where(eq(audioProbeCache.path, join(track.physicalPath, track.file)))
-        .get()?.durationSec;
-      // プローブ未取得または取得失敗（0秒）の場合は上限が分からないため検証をスキップする。
-      if (cached !== undefined && cached > 0) duration = cached - (track.start ?? 0);
-    }
-    if (body.offsetSec < 0 || (duration !== null && body.offsetSec > duration)) {
+    // end指定済みは自明値（end-start）、未指定はaudio_probe_cacheの現在値から解決する。
+    const durationSec =
+      track.end !== null
+        ? track.end - (track.start ?? 0)
+        : resolveTrackDurationSec(
+            { start: track.start ?? undefined },
+            this.db.catalog
+              .select({ durationSec: audioProbeCache.durationSec })
+              .from(audioProbeCache)
+              .where(eq(audioProbeCache.path, join(track.physicalPath, track.file)))
+              .get()?.durationSec ?? null,
+          );
+    // durationSec が未知（プローブ未取得・失敗）の場合は上限が分からないため検証をスキップする。
+    if (body.offsetSec < 0 || (durationSec !== null && body.offsetSec > durationSec)) {
       throw new InvalidResumeError("resumeのoffsetSecがトラック区間外です");
     }
     const r = this.db.user

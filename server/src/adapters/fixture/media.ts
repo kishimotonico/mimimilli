@@ -1,7 +1,7 @@
 // fixture アダプタ用のメディア合成ロジック。
 // 実ファイルを持たない fixture でも再生・シーク・カバー表示が成立するよう、
 // 「指定秒数の無音WAV」と「作品ごとのSVGプレースホルダー」をメモリ上で合成する。
-import type { Track, WorkSummary } from "@mimimilli/shared";
+import type { WorkSummary } from "@mimimilli/shared";
 import type { MediaLocation } from "../../adapter.ts";
 
 /** 合成WAVのフォーマット: 8kHz / mono / 8bit PCM（符号なし、無音=128） → 8,000 byte/sec */
@@ -13,8 +13,8 @@ const WAV_HEADER_SIZE = 44;
 /** 8bit unsigned PCM の無音値（中央値） */
 const SILENCE_BYTE = 128;
 
-/** トラック尺が不明なときの既定値（秒） */
-const DEFAULT_TRACK_DURATION_SEC = 300;
+/** durationSec が未知（null）の合成トラックに使う既定の再生尺（秒）。DTO自体はnullのまま返す。 */
+export const DEFAULT_TRACK_DURATION_SEC = 300;
 
 /** 指定秒数ぶんの無音WAVを表す MediaLocation を返す。
  *  全体をメモリに持たず、要求された byte range に応じてヘッダー部/無音データ部を都度生成する。 */
@@ -72,23 +72,6 @@ function writeAscii(view: DataView, offset: number, text: string): void {
   for (let i = 0; i < text.length; i++) {
     view.setUint8(offset + i, text.charCodeAt(i));
   }
-}
-
-/** トラックの再生尺（秒）を決める。
- *  Track.start/end が両方あればその差分、無ければ作品の totalDurationSec を
- *  trackCount で等分する。どちらも得られない場合は既定値を返す。 */
-export function resolveTrackDurationSec(
-  track: Track,
-  work: WorkSummary,
-  trackCount: number,
-): number {
-  if (track.start !== undefined && track.end !== undefined && track.end > track.start) {
-    return track.end - track.start;
-  }
-  if (work.totalDurationSec > 0 && trackCount > 0) {
-    return work.totalDurationSec / trackCount;
-  }
-  return DEFAULT_TRACK_DURATION_SEC;
 }
 
 const SVG_BACKGROUND_COLORS = [

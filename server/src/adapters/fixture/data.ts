@@ -306,6 +306,51 @@ export const SEED_TRACK_NAMES: Record<string, string[]> = {
   RJ501011: ["ツンな日常", "デレの瞬間", "お世話の時間", "おやすみの言葉（照れ気味）"],
 };
 
+/** シードのトラック仕様（TASK-92）。指定された作品だけ明示的なplaylists/start/end/durationSecを持ち、
+ *  未指定の作品は buildFullWork が trackCount からファイル全体トラックを自動生成する（従来通り）。 */
+export interface SeedTrackSpec {
+  title: string;
+  file: string;
+  start?: number;
+  end?: number;
+  /** 解決済みdurationSec。fixtureには実ファイルが無いため直接指定する（null=計測不能を模す） */
+  durationSec: number | null;
+}
+
+export interface SeedPlaylistSpec {
+  name: string;
+  tracks: SeedTrackSpec[];
+}
+
+/** end-start / end有start無 / start有end無 / 両無 / 同一ファイル複数区間 / デフォルト外playlist
+ *  の組み合わせを1作品(RJ501001)でカバーする。1つ目のプレイリストがデフォルト。 */
+export const SEED_PLAYLIST_SPECS: Record<string, SeedPlaylistSpec[]> = {
+  RJ501001: [
+    {
+      name: "default",
+      tracks: [
+        // end有 start無（ファイル先頭からの一区間）
+        { title: "開館のごあいさつ", file: "track01.mp3", end: 200, durationSec: 200 },
+        // start有 end有（同一ファイルtrack01.mp3の後続区間 = 同一ファイル複数区間）
+        { title: "書架の間で", file: "track01.mp3", start: 200, end: 900, durationSec: 700 },
+        // start有 end無（ファイル末尾までを既知のファイル全体長から解決）
+        { title: "古い本の読み聞かせ", file: "track02.mp3", start: 30, durationSec: 270 },
+        // start無 end無（ファイル全体、既知）
+        { title: "閲覧席での囁き", file: "track03.mp3", durationSec: 300 },
+        // start無 end無（計測不能=未知を模す）
+        { title: "閉館前のひととき", file: "track04.mp3", durationSec: null },
+        // start有 end無（計測不能=未知を模す）
+        { title: "おやすみのページ", file: "track05.mp3", start: 60, durationSec: null },
+      ],
+    },
+    {
+      // デフォルト外playlist。全playlistがprobe対象であることのfixtureカバレッジ用
+      name: "chill mix",
+      tracks: [{ title: "Lo-fi Loop", file: "track01.mp3", end: 60, durationSec: 60 }],
+    },
+  ],
+};
+
 // ── /fs 用のインメモリディレクトリツリー ──────────────────────
 //   root(/library) / dlsite / サークル別 / 作品フォルダー構成。
 //   作品フォルダーには workId を付与し、配下のファイルには workRelPath を付与する。

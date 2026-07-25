@@ -25,7 +25,7 @@ function sampleWork(id: string): Work {
       {
         id: playlistId,
         name: "default",
-        tracks: [{ id: crypto.randomUUID(), title: "track", file: "track.wav" }],
+        tracks: [{ id: crypto.randomUUID(), title: "track", file: "track.wav", durationSec: 60 }],
       },
     ],
     bookmarked: false,

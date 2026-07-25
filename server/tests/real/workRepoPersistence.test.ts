@@ -31,6 +31,7 @@ function sampleWork(id: string): Work {
             id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
             title: "track",
             file: "track.wav",
+            durationSec: 60,
           },
         ],
       },

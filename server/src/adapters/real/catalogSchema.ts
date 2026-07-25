@@ -112,10 +112,10 @@ export const scanState = sqliteTable("scan_state", {
   value: text("value"),
 });
 
-/** 音声ファイル長のプローブ結果キャッシュ。 */
+/** 音声ファイル長のプローブ結果キャッシュ。durationSec は計測失敗時 NULL（未知。0 では埋めない）。 */
 export const audioProbeCache = sqliteTable("audio_probe_cache", {
   path: text("path").primaryKey(),
   size: integer("size").notNull(),
   mtimeMs: integer("mtime_ms").notNull(),
-  durationSec: real("duration_sec").notNull(),
+  durationSec: real("duration_sec"),
 });

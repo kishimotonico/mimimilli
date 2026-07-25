@@ -35,7 +35,8 @@ import type {
   TagPrefixCandidate,
   TagPrefixCreate,
   TagPrefixUpdate,
-  Track,
+  ResolvedPlaylist,
+  ResolvedTrack,
   Work,
   WorkPatch,
   WorksPage,
@@ -56,15 +57,26 @@ import { buildTagPrefixCandidates } from "../../core/tagPrefixCandidates.ts";
 import { evalSmartFolder } from "../../core/smartFolder.ts";
 import { compareJapaneseSortKeys, compareUtf8Bytes } from "../../core/japaneseSortKey.ts";
 import { applyWorksQuery } from "../../core/worksQuery.ts";
-import { buildFsRoot, buildWorkFileTree, SEED_TRACK_NAMES, type FsNode } from "./data.ts";
 import {
-  resolveTrackDurationSec,
+  buildFsRoot,
+  buildWorkFileTree,
+  SEED_PLAYLIST_SPECS,
+  SEED_TRACK_NAMES,
+  type FsNode,
+} from "./data.ts";
+import {
+  DEFAULT_TRACK_DURATION_SEC,
   synthesizeCoverSvg,
   synthesizeFilePlaceholderSvg,
   synthesizeFilePlaceholderText,
   synthesizeSilentWav,
 } from "./media.ts";
 import { createFixtureScenario } from "./scenarios.ts";
+
+/** 作品1件ぶんの安定したplaylist/track ID（呼び出しをまたいで同一IDを保つ） */
+interface PlaybackIds {
+  playlists: Array<{ id: string; trackIds: string[] }>;
+}
 
 interface FixtureState {
   rootFolder: string | null;
@@ -77,7 +89,7 @@ interface FixtureState {
   nextSmartFolderId: number;
   /** 作品ごとのレジューム位置 */
   resumes: Map<string, ResumeBody>;
-  playbackIds: Map<string, { playlistId: string; trackIds: string[] }>;
+  playbackIds: Map<string, PlaybackIds>;
   /** scan() が newWorkIds として返す、未取り込みの新規作品ID（シナリオ "new-work" 用） */
   scanNewWorkIds: string[];
 }
@@ -118,38 +130,99 @@ function createInitialState(options: FixtureAdapterOptions): FixtureState {
   };
 }
 
-/** WorkSummary から完全形 Work を構築する（trackCount からトラック一覧を生成） */
+/** totalDurationSec を trackCount で等分した決定的な durationSec（端数は最終トラックに寄せる） */
+function splitDurationSec(totalDurationSec: number, trackCount: number, index: number): number {
+  const base = Math.floor(totalDurationSec / trackCount);
+  const remainder = totalDurationSec - base * trackCount;
+  return index === trackCount - 1 ? base + remainder : base;
+}
+
+/** 作品の playlist/track 数に対応する安定したIDを割り当てる（初回のみ生成しキャッシュ） */
+function ensurePlaybackIds(
+  summary: WorkSummary,
+  playbackIds: Map<string, PlaybackIds>,
+): PlaybackIds {
+  const cached = playbackIds.get(summary.id);
+  if (cached) return cached;
+
+  const specPlaylists = SEED_PLAYLIST_SPECS[summary.id];
+  const trackCounts = specPlaylists
+    ? specPlaylists.map((p) => p.tracks.length)
+    : summary.trackCount > 0
+      ? [summary.trackCount]
+      : [];
+  const ids: PlaybackIds = {
+    playlists: trackCounts.map((count) => ({
+      id: crypto.randomUUID(),
+      trackIds: Array.from({ length: count }, () => crypto.randomUUID()),
+    })),
+  };
+  playbackIds.set(summary.id, ids);
+  return ids;
+}
+
+/** WorkSummary から完全形 Work を構築する。
+ *  SEED_PLAYLIST_SPECS で明示指定された作品はそれをそのまま解決済みplaylistsにし、
+ *  未指定の作品は trackCount からファイル全体トラック（durationSecはtotalDurationSecの等分）を自動生成する。 */
 function buildFullWork(
   summary: WorkSummary,
   resumes: Map<string, ResumeBody>,
-  playbackIds: Map<string, { playlistId: string; trackIds: string[] }>,
+  playbackIds: Map<string, PlaybackIds>,
 ): Work {
+  const ids = ensurePlaybackIds(summary, playbackIds);
+  const specPlaylists = SEED_PLAYLIST_SPECS[summary.id];
   const namedTracks = SEED_TRACK_NAMES[summary.id];
-  let ids = playbackIds.get(summary.id);
-  if (!ids) {
-    ids = {
-      playlistId: crypto.randomUUID(),
-      trackIds: Array.from({ length: summary.trackCount }, () => crypto.randomUUID()),
-    };
-    playbackIds.set(summary.id, ids);
-  }
-  const tracks: Track[] = Array.from({ length: summary.trackCount }, (_, i) => ({
-    id: ids.trackIds[i]!,
-    title: namedTracks?.[i] ?? `Track ${i + 1}`,
-    file: `track${String(i + 1).padStart(2, "0")}.mp3`,
-  }));
+
+  const playlists: ResolvedPlaylist[] = specPlaylists
+    ? specPlaylists.map((spec, playlistIndex) => ({
+        id: ids.playlists[playlistIndex]!.id,
+        name: spec.name,
+        tracks: spec.tracks.map((track, trackIndex) => ({
+          id: ids.playlists[playlistIndex]!.trackIds[trackIndex]!,
+          title: track.title,
+          file: track.file,
+          start: track.start,
+          end: track.end,
+          durationSec: track.durationSec,
+        })),
+      }))
+    : ids.playlists.length > 0
+      ? [
+          {
+            id: ids.playlists[0]!.id,
+            name: "default",
+            tracks: Array.from({ length: summary.trackCount }, (_, i) => ({
+              id: ids.playlists[0]!.trackIds[i]!,
+              title: namedTracks?.[i] ?? `Track ${i + 1}`,
+              file: `track${String(i + 1).padStart(2, "0")}.mp3`,
+              durationSec:
+                summary.totalDurationSec > 0
+                  ? splitDurationSec(summary.totalDurationSec, summary.trackCount, i)
+                  : null,
+            })),
+          },
+        ]
+      : [];
 
   const { trackCount: _trackCount, ...rest } = summary;
   const resume = resumes.get(summary.id);
 
-  const playlistId = tracks.length > 0 ? ids.playlistId : null;
   return {
     ...rest,
-    defaultPlaylistId: playlistId,
+    defaultPlaylistId: playlists[0]?.id ?? null,
     createdAt: summary.addedAt,
-    playlists: playlistId ? [{ id: playlistId, name: "default", tracks }] : [],
+    playlists,
     resume: resume ?? null,
   };
+}
+
+/** 作品の全playlistから file が一致する最初のトラックを探す（audio locateMedia用） */
+function findTrackByFile(work: Work, relPath: string): ResolvedTrack | undefined {
+  for (const playlist of work.playlists) {
+    const track = playlist.tracks.find((t) => t.file === relPath);
+    if (track) return track;
+  }
+  return undefined;
 }
 
 /** 作品の FileEntry ツリー（ルートは作品フォルダー自体。path は相対パスで `""` がルート直下を示す） */
@@ -341,8 +414,7 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
       if (!track) {
         throw new InvalidResumeError("resumeのPlaylistまたはTrackが作品に属していません");
       }
-      const duration = track.end === undefined ? null : track.end - (track.start ?? 0);
-      if (duration !== null && body.offsetSec > duration) {
+      if (track.durationSec !== null && body.offsetSec > track.durationSec) {
         throw new InvalidResumeError("resumeのoffsetSecがトラック区間外です");
       }
       state.resumes.set(id, body);
@@ -521,17 +593,13 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
       if (!relPath) return null;
 
       if (kind === "audio") {
-        const namedTracks = SEED_TRACK_NAMES[work.id];
-        const tracks = Array.from({ length: work.trackCount }, (_, i) => ({
-          id: crypto.randomUUID(),
-          title: namedTracks?.[i] ?? `Track ${i + 1}`,
-          file: `track${String(i + 1).padStart(2, "0")}.mp3`,
-        }));
-        const track = tracks.find((t) => t.file === relPath);
+        const fullWork = buildFullWork(work, state.resumes, state.playbackIds);
+        const track = findTrackByFile(fullWork, relPath);
         if (!track) return null;
 
-        const durationSec = resolveTrackDurationSec(track, work, tracks.length);
-        return synthesizeSilentWav(durationSec);
+        // 合成WAVには具体的な長さが必要なため、durationSec未知（null）時だけ既定値で代替する
+        // （DTO自体はnullのまま返し、UIの「未知」表現には影響しない）。
+        return synthesizeSilentWav(track.durationSec ?? DEFAULT_TRACK_DURATION_SEC);
       }
 
       // kind === "file": 作品配下に実在するパスのみ応答する

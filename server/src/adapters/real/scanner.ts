@@ -23,12 +23,13 @@ import type {
   Cover,
   MetaFile,
   Playlist,
+  ResolvedPlaylist,
   ScanProgressEvent,
   ScanResult,
   Track,
   Work,
 } from "@mimimilli/shared";
-import { emptyDlsiteState, isRjCodeMissing } from "@mimimilli/shared";
+import { emptyDlsiteState, isRjCodeMissing, resolveTrackDurationSec } from "@mimimilli/shared";
 import type { Db } from "./db.ts";
 import type { ScanOptions } from "../../adapter.ts";
 import { detectRjCode } from "./dlsite.ts";
@@ -624,10 +625,14 @@ export class Scanner {
       if (entry.kind !== "ok") continue;
       if (entry.cachedFingerprint === entry.fingerprint) continue; // スキップ対象
       const workDir = dirname(entry.metaPath);
-      const playlist = defaultPlaylistOf(entry.meta);
-      for (const track of playlist?.tracks ?? []) {
-        checkAbort();
-        trackPaths.push(join(workDir, track.file));
+      // 詳細DTOは全playlistを返すため、デフォルト以外も含め全playlistのトラックをprobeする。
+      // end指定済みトラックはファイル全体長が不要なためprobe対象から外す。
+      for (const playlist of entry.meta.playlists) {
+        for (const track of playlist.tracks) {
+          checkAbort();
+          if (track.end !== undefined) continue;
+          trackPaths.push(join(workDir, track.file));
+        }
       }
     }
     return this.repo.fetchProbeCache(trackPaths);
@@ -690,21 +695,35 @@ export class Scanner {
         ? `参照先ファイルが見つかりません: ${missingFiles.map((t) => t.file).join(", ")}`
         : null;
 
-    // 再生時間（デフォルトプレイリストの合計）
-    let totalDurationSec = 0;
-    for (const track of playlist?.tracks ?? []) {
-      checkAbort();
-      if (track.start !== undefined && track.end !== undefined) {
-        totalDurationSec += Math.max(0, track.end - track.start);
-      } else {
-        totalDurationSec += await probeDurationSec(
-          this.db.catalog,
-          join(workDir, track.file),
-          probeCache,
-        );
+    // 全playlistのトラックについて解決済みdurationSecを求める（DTO・total・resume検証で共有する式）。
+    const resolvedPlaylists: ResolvedPlaylist[] = [];
+    for (const p of meta.playlists) {
+      const tracks = [];
+      for (const track of p.tracks) {
         checkAbort();
+        let fileDurationSec: number | null = null;
+        if (track.end === undefined) {
+          fileDurationSec = await probeDurationSec(
+            this.db.catalog,
+            join(workDir, track.file),
+            probeCache,
+          );
+          checkAbort();
+        }
+        tracks.push({ ...track, durationSec: resolveTrackDurationSec(track, fileDurationSec) });
       }
+      resolvedPlaylists.push({ id: p.id, name: p.name, tracks });
     }
+
+    // 再生時間（デフォルトプレイリストの合計）。未解決（null）分は0扱いで合算する集計値のため、
+    // トラック単位のUI表示（未知はnull）とは別の扱い（是正対象は加算式の不整合であり、
+    // 集計値そのものをnullableにはしない）。
+    const defaultResolved =
+      resolvedPlaylists.find((p) => p.id === meta.defaultPlaylistId) ?? resolvedPlaylists[0];
+    const totalDurationSec = (defaultResolved?.tracks ?? []).reduce(
+      (sum, track) => sum + (track.durationSec ?? 0),
+      0,
+    );
 
     // 既存作品の DB 固有情報を保持（移動追従時も含む）
     const existing = existingWorks.get(id);
@@ -746,7 +765,7 @@ export class Scanner {
       errorMessage,
       urls: meta.urls,
       tags: meta.tags,
-      playlists: meta.playlists,
+      playlists: resolvedPlaylists,
       bookmarked: existing?.bookmarked ?? false,
       lastPlayedAt: existing?.lastPlayedAt ?? null,
       resume: existing?.resume ?? null,

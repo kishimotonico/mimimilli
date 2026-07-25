@@ -2,13 +2,13 @@
 // SQL 発行数が作品数に比例しないこと、track_count 列の維持、playlists_json を読まないことを確認する。
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { Playlist, Work } from "@mimimilli/shared";
+import type { ResolvedPlaylist, Work } from "@mimimilli/shared";
 import { openDb, type Db } from "../../src/adapters/real/db.ts";
 import { workDlsite } from "../../src/adapters/real/catalogSchema.ts";
 import { WorkRepo } from "../../src/adapters/real/workRepo.ts";
 import { eq } from "drizzle-orm";
 
-function makePlaylist(trackCount: number, id = crypto.randomUUID()): Playlist {
+function makePlaylist(trackCount: number, id = crypto.randomUUID()): ResolvedPlaylist {
   return {
     id,
     name: "default",
@@ -16,11 +16,16 @@ function makePlaylist(trackCount: number, id = crypto.randomUUID()): Playlist {
       id: crypto.randomUUID(),
       title: `track-${i + 1}`,
       file: `track-${i + 1}.wav`,
+      durationSec: 60,
     })),
   };
 }
 
-function sampleWork(id: string, playlists: Playlist[], defaultPlaylistId: string | null): Work {
+function sampleWork(
+  id: string,
+  playlists: ResolvedPlaylist[],
+  defaultPlaylistId: string | null,
+): Work {
   return {
     id,
     title: `作品 ${id}`,

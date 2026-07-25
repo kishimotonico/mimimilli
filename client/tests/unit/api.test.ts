@@ -73,6 +73,7 @@ function makeWork(overrides: Partial<Work> = {}): Work {
             id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
             title: "track1",
             file: "track1.mp3",
+            durationSec: 120,
           },
         ],
       },

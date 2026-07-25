@@ -12,23 +12,29 @@ export type UrlEntry = z.infer<typeof urlEntrySchema>;
 /** トラック = 「指定ファイルの指定区間を再生する」。start/end 省略時はファイル全体 */
 const uuidV4Schema = z.uuid({ version: "v4" });
 
-export const trackSchema = z
-  .object({
-    id: uuidV4Schema,
-    title: z.string(),
-    file: z.string(),
-    start: z.number().nonnegative().optional(),
-    end: z.number().nonnegative().optional(),
-  })
-  .superRefine((track, ctx) => {
-    if (track.end !== undefined && track.end <= (track.start ?? 0)) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["end"],
-        message: "endはstartより大きい値である必要があります",
-      });
-    }
-  });
+/** start/endはファイル内の絶対時刻（秒）。トラックの正本表現で、.meta.json にもこの形で保存する */
+const trackBaseSchema = z.object({
+  id: uuidV4Schema,
+  title: z.string(),
+  file: z.string(),
+  start: z.number().nonnegative().optional(),
+  end: z.number().nonnegative().optional(),
+});
+
+function refineTrackEndAfterStart(
+  track: { start?: number; end?: number },
+  ctx: z.RefinementCtx,
+): void {
+  if (track.end !== undefined && track.end <= (track.start ?? 0)) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["end"],
+      message: "endはstartより大きい値である必要があります",
+    });
+  }
+}
+
+export const trackSchema = trackBaseSchema.superRefine(refineTrackEndAfterStart);
 export type Track = z.infer<typeof trackSchema>;
 
 export const playlistSchema = z.object({
@@ -37,6 +43,37 @@ export const playlistSchema = z.object({
   tracks: z.array(trackSchema),
 });
 export type Playlist = z.infer<typeof playlistSchema>;
+
+/**
+ * API DTO 用の解決済みトラック。durationSec はトラック区間の相対長（秒）で、
+ * end 省略時はファイル全体長から解決する。計測不能（プローブ未取得・失敗・ファイル欠損）は
+ * 0 で埋めず、明示的に null（未知）とする。
+ */
+export const resolvedTrackSchema = trackBaseSchema
+  .extend({ durationSec: z.number().finite().positive().nullable() })
+  .superRefine(refineTrackEndAfterStart);
+export type ResolvedTrack = z.infer<typeof resolvedTrackSchema>;
+
+export const resolvedPlaylistSchema = z.object({
+  id: uuidV4Schema,
+  name: z.string().min(1),
+  tracks: z.array(resolvedTrackSchema),
+});
+export type ResolvedPlaylist = z.infer<typeof resolvedPlaylistSchema>;
+
+/**
+ * トラックの解決済み再生時間（秒）を求める共通式。start/end は絶対ファイル時刻、
+ * 戻り値は相対長。end 省略時は fileDurationSec（ファイル全体長）から導く。
+ * fileDurationSec が null（未計測・計測失敗）なら解決不能として null を返す。
+ */
+export function resolveTrackDurationSec(
+  track: Pick<Track, "start" | "end">,
+  fileDurationSec: number | null,
+): number | null {
+  const startSec = track.start ?? 0;
+  if (track.end !== undefined) return track.end - startSec;
+  return fileDurationSec !== null ? fileDurationSec - startSec : null;
+}
 
 /** 作品の再開位置。offsetSec はトラック区間先頭からの相対秒。 */
 export const resumeSchema = z.object({
@@ -127,7 +164,7 @@ export function toWorkListItem(work: WorkSummary): WorkListItem {
 }
 
 export function refinePlaylistCollection(
-  playlists: Playlist[],
+  playlists: Array<Pick<Playlist, "id"> & { tracks: Array<Pick<Track, "id">> }>,
   defaultPlaylistId: string | null,
   ctx: z.RefinementCtx,
 ): void {
@@ -169,7 +206,7 @@ export const workSchema = workSummarySchema
   .extend({
     defaultPlaylistId: uuidV4Schema.nullable(),
     createdAt: z.string().nullable(),
-    playlists: z.array(playlistSchema),
+    playlists: z.array(resolvedPlaylistSchema),
     resume: resumeSchema.nullable(),
   })
   .superRefine((work, ctx) =>

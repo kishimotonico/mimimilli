@@ -81,13 +81,13 @@ test("カバー画像: 存在しない作品は 404", async () => {
 test("音声配信: 200 で全長を返し、WAVヘッダーの宣言サイズと一致する", async () => {
   const app = buildApp();
 
-  // RJ501001: totalDurationSec=5400, trackCount=6 → 1トラック900秒 → data=900*8000=7,200,000B
+  // RJ501001: SEED_PLAYLIST_SPECSでtrack01.mp3の最初の区間はend=200（durationSec=200）
   const res = await app.request("/api/media/audio/RJ501001/track01.mp3");
   assert.equal(res.status, 200);
   assert.equal(res.headers.get("content-type"), "audio/wav");
   assert.equal(res.headers.get("accept-ranges"), "bytes");
 
-  const expectedDataSize = 900 * 8000;
+  const expectedDataSize = 200 * 8000;
   const expectedTotalSize = 44 + expectedDataSize;
   assert.equal(res.headers.get("content-length"), String(expectedTotalSize));
 

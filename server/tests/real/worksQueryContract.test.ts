@@ -77,6 +77,7 @@ function fullWork(item: WorkSummary): Work {
                 id: crypto.randomUUID(),
                 title: `track-${index}`,
                 file: `track-${index}.wav`,
+                durationSec: 60,
               })),
             },
           ]

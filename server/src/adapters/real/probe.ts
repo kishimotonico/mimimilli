@@ -1,6 +1,6 @@
 // 音声ファイルの再生時間プローブ。music-metadata（pure JS）でヘッダー解析し、
-// (size, mtime) キーで SQLite にキャッシュする。読めないファイルは 0 を返して警告ログ
-// （非対応フォーマットは仕様上あり得るため、作品全体をエラーにはしない）。
+// (size, mtime) キーで SQLite にキャッシュする。ファイル欠損・非対応フォーマット・解析失敗は
+// いずれも durationSec: null（未知）としてキャッシュする（0 で埋めると既知の0秒と区別できない）。
 import { statSync } from "node:fs";
 import { eq } from "drizzle-orm";
 import { parseFile } from "music-metadata";
@@ -10,11 +10,11 @@ import type { CatalogDb } from "./db.ts";
 export interface ProbeCacheEntry {
   size: number;
   mtimeMs: number;
-  durationSec: number;
+  durationSec: number | null;
 }
 
 /**
- * 音声ファイルの再生時間を取得する。
+ * 音声ファイルの再生時間を取得する。計測不能（ファイル欠損・解析失敗）は null。
  * @param cache 一括取得済みの probe cache。提供された場合は個別 SELECT を行わず、
  *              キャッシュの (size, mtimeMs) が一致しなければ parseFile して個別 INSERT する。
  */
@@ -22,12 +22,12 @@ export async function probeDurationSec(
   db: CatalogDb,
   filePath: string,
   cache?: Map<string, ProbeCacheEntry>,
-): Promise<number> {
+): Promise<number | null> {
   let stat;
   try {
     stat = statSync(filePath);
   } catch {
-    return 0; // ファイル欠損は scanner 側で errorMessage として扱う
+    return null; // ファイル欠損は scanner 側で errorMessage として扱う
   }
 
   const size = stat.size;
@@ -50,10 +50,10 @@ export async function probeDurationSec(
     }
   }
 
-  let duration = 0;
+  let duration: number | null = null;
   try {
     const meta = await parseFile(filePath, { duration: true });
-    duration = meta.format.duration ?? 0;
+    duration = meta.format.duration ?? null;
   } catch (e) {
     console.warn(`再生時間を取得できません: ${filePath}: ${(e as Error).message}`);
   }
