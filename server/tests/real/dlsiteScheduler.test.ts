@@ -74,6 +74,36 @@ test("DLsite scheduler: Retry-After cooldownは後続リクエストにも適用
   assert.deepEqual(starts, [0, 3_000]);
 });
 
+test("DLsite scheduler: 先行がqueue解放前にcooldownを更新するため、待機中の後続にも即座に反映する", async () => {
+  const time = fakeTime();
+  const starts: number[] = [];
+  let calls = 0;
+  let releaseFirst!: (response: Response) => void;
+  const pending = new Promise<Response>((resolve) => (releaseFirst = resolve));
+  const scheduler = new DlsiteScheduler(
+    { ...config, requestIntervalMs: 0, retryCount: 0 },
+    {
+      now: time.now,
+      sleep: time.sleep,
+      transport: async () => {
+        calls += 1;
+        starts.push(time.now());
+        if (calls === 1) return pending;
+        return new Response(null, { status: 200 });
+      },
+    },
+  );
+
+  const first = scheduler.fetch("https://www.dlsite.com/a");
+  // 先行が429を返す前に後続をqueueへ積んでおく。
+  const second = scheduler.fetch("https://www.dlsite.com/b");
+  releaseFirst(new Response(null, { status: 429, headers: { "retry-after": "3" } }));
+
+  await first;
+  await second;
+  assert.deepEqual(starts, [0, 3_000]);
+});
+
 test("DLsite scheduler: jitter後もmaxBackoffを超えず、retry responseのbodyをcancelする", async () => {
   const time = fakeTime();
   let cancelled = false;

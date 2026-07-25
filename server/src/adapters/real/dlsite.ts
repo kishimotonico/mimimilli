@@ -208,10 +208,12 @@ export async function fetchDlsiteCover(
   let currentUrl = normalizeDlsiteCoverUrl(coverUrl);
   let res: Response | undefined;
   for (let redirects = 0; redirects <= 5; redirects += 1) {
+    const previous = res;
     res = await fetchImpl(currentUrl, {
       headers: { "User-Agent": USER_AGENT },
       redirect: "manual",
     });
+    await previous?.body?.cancel();
     if (![301, 302, 303, 307, 308].includes(res.status)) break;
     const location = res.headers.get("location");
     if (!location) throw new Error("カバー画像リダイレクトにLocationがありません");

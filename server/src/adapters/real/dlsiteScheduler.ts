@@ -104,16 +104,21 @@ export class DlsiteScheduler {
       const signal = this.timeoutSignal(init.signal, deadline);
       try {
         const response = await this.start(
-          () => this.transport(input, { ...init, signal }),
+          async () => {
+            const response = await this.transport(input, { ...init, signal });
+            // cooldownの反映はqueue解放前に行う。解放後だと後続がqueue待機から
+            // 抜けた直後に古いcooldownUntilで待機時間を計算してしまう。
+            if (response.status === 429 || response.status === 503) {
+              const delay = retryAfterMs(response.headers.get("retry-after"), this.now());
+              if (delay !== null)
+                this.cooldownUntil = Math.max(this.cooldownUntil, this.addDelay(delay));
+            }
+            return response;
+          },
           signal,
           deadline,
         );
         const retryable = response.status === 429 || response.status >= 500;
-        if (response.status === 429 || response.status === 503) {
-          const delay = retryAfterMs(response.headers.get("retry-after"), this.now());
-          if (delay !== null)
-            this.cooldownUntil = Math.max(this.cooldownUntil, this.addDelay(delay));
-        }
         if (!retryable || retry >= this.config.retryCount) return response;
         await response.body?.cancel();
       } catch (error) {

@@ -47,7 +47,17 @@ HTML snapshotのoutcomeと既定TTLは次のとおりです。
 pnpm --filter @mimimilli/server dlsite-cache -- import --product-code RJ123456 --file /absolute/path/work.html
 ```
 
-importは通常ファイルの `.html` だけを受け付け、symlink・gzip入力・上限超過を拒否します。実HTTPを新たに取得して試料を作ることはしません。importはHTML snapshotだけを更新し（成功記録と同じ扱い）、失敗記録には触れません。
+複数ファイルをまとめて取り込む場合はディレクトリ一括importを使います（非再帰。サブディレクトリは対象外）。
+
+```sh
+pnpm --filter @mimimilli/server dlsite-cache -- import --dir /absolute/path/to/bulk-html
+```
+
+ディレクトリ一括importの対象ファイルは `<product_code>.html` または `<product_code>.html.gz` という命名規約に従います（例: `RJ123456.html`、`VJ012345.html.gz`）。product codeはファイル名から取り出して既存の `normalizeDlsiteProductCode` で検証するため、`RJ`/`VJ` + 6〜8桁の数字以外は失敗として扱います。この命名規約に合わない拡張子のファイル（`.txt` など）は対象外として無視します。実行結果は成功・失敗の件数と、失敗したファイル名・理由の一覧をJSONで返します。1件の失敗で全体の処理は止まりません。
+
+gzip入力はheaderのmagic byte（`0x1f 0x8b`）で判定するため、単一ファイルimport（`--file`）でもディレクトリ一括importでも拡張子に関わらず自動で展開して取り込みます。圧縮サイズ（転送サイズ）・展開後サイズの両方に `MIMIKAGO_DLSITE_CACHE_MAX_TRANSFER_BYTES` / `MIMIKAGO_DLSITE_CACHE_MAX_EXPANDED_BYTES` の上限を適用します。
+
+importはsymlink・上限超過を拒否します。実HTTPを新たに取得して試料を作ることはしません。importはHTML snapshotだけを更新し（成功記録と同じ扱い）、失敗記録には触れません。
 
 ## 一括取得（bulk）の対象
 

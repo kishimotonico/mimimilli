@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
 import { Database } from "bun:sqlite";
@@ -294,7 +294,7 @@ test("DLsiteキャッシュCLI: status、import、cleanupと同一キー上書�
   assert.equal(JSON.parse(runDlsiteCacheCli(["cleanup"], env, overrides)).deleted, 1);
 });
 
-test("DLsiteキャッシュCLI: symlinkとgzip入力を拒否する", (t) => {
+test("DLsiteキャッシュCLI: symlinkを拒否し、magic byteでgzip入力を受け入れる", (t) => {
   const directory = makeTestDirectory("dlsite-cache-cli-input");
   t.after(directory.cleanup);
   const source = join(directory.path, "source.html");
@@ -302,7 +302,7 @@ test("DLsiteキャッシュCLI: symlinkとgzip入力を拒否する", (t) => {
   const gzip = join(directory.path, "compressed.html");
   writeFileSync(source, VALID_HTML);
   symlinkSync(source, symlink);
-  writeFileSync(gzip, Buffer.from([0x1f, 0x8b, 0x08, 0x00]));
+  writeFileSync(gzip, gzipSync(VALID_HTML));
   const env = {
     MIMIKAGO_DATA_DIR: directory.path,
     MIMIKAGO_DLSITE_CACHE_DB: join(directory.path, "cache.sqlite"),
@@ -311,11 +311,57 @@ test("DLsiteキャッシュCLI: symlinkとgzip入力を拒否する", (t) => {
     () => runDlsiteCacheCli(["import", "--product-code", "RJ123456", "--file", symlink], env),
     /symlink/,
   );
-  assert.throws(
-    () => runDlsiteCacheCli(["import", "--product-code", "RJ123456", "--file", gzip], env),
-    /gzip入力/,
+  assert.deepEqual(
+    JSON.parse(runDlsiteCacheCli(["import", "--product-code", "RJ123457", "--file", gzip], env)),
+    { productCode: "RJ123457", outcome: "ok" },
   );
   assert.equal(readFileSync(source, "utf8"), VALID_HTML);
+});
+
+test("DLsiteキャッシュCLI: gzip展開サイズが上限を超えると拒否する", (t) => {
+  const directory = makeTestDirectory("dlsite-cache-cli-gzip-limit");
+  t.after(directory.cleanup);
+  const gzip = join(directory.path, "huge.html");
+  writeFileSync(gzip, gzipSync("x".repeat(1_000)));
+  const env = {
+    MIMIKAGO_DATA_DIR: directory.path,
+    MIMIKAGO_DLSITE_CACHE_DB: join(directory.path, "cache.sqlite"),
+    MIMIKAGO_DLSITE_CACHE_MAX_EXPANDED_BYTES: "100",
+  };
+  assert.throws(
+    () => runDlsiteCacheCli(["import", "--product-code", "RJ123456", "--file", gzip], env),
+    /展開サイズ|展開に失敗/,
+  );
+});
+
+test("DLsiteキャッシュCLI: ディレクトリを一括importし、成功・失敗件数を返す", (t) => {
+  const directory = makeTestDirectory("dlsite-cache-cli-dir");
+  t.after(directory.cleanup);
+  const sourceDir = join(directory.path, "bulk");
+  mkdirSync(sourceDir);
+  writeFileSync(join(sourceDir, "RJ123456.html"), VALID_HTML);
+  writeFileSync(join(sourceDir, "rj123457.html.gz"), gzipSync("<html>broken</html>"));
+  writeFileSync(join(sourceDir, "RJ999.html"), VALID_HTML); // 桁数不足でファイル名からproduct code決定不可
+  writeFileSync(join(sourceDir, "readme.txt"), "ignored"); // 対象外拡張子はスキップ
+  const nested = join(sourceDir, "nested");
+  mkdirSync(nested);
+  writeFileSync(join(nested, "RJ000001.html"), VALID_HTML); // 非再帰なので対象外
+
+  const env = {
+    MIMIKAGO_DATA_DIR: directory.path,
+    MIMIKAGO_DLSITE_CACHE_DB: join(directory.path, "cache.sqlite"),
+  };
+  const result = JSON.parse(runDlsiteCacheCli(["import", "--dir", sourceDir], env)) as {
+    succeeded: number;
+    failed: number;
+    failures: { file: string; error: string }[];
+  };
+  assert.equal(result.succeeded, 2);
+  assert.equal(result.failed, 1);
+  assert.equal(result.failures[0]?.file, "RJ999.html");
+
+  const status = JSON.parse(runDlsiteCacheCli(["status"], env)) as { entries: number };
+  assert.equal(status.entries, 2);
 });
 
 test("DLsiteカバーキャッシュ: 正規化URLのhashごとに非圧縮バイト列を保持する", (t) => {
