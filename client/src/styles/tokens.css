@@ -29,13 +29,9 @@
 
   /* Riso ink palette — used in covers (light & punchy) */
   --r-coral: oklch(72% 0.165 25);
-  --r-sky: oklch(72% 0.11 235);
   --r-leaf: oklch(74% 0.115 145);
   --r-mustard: oklch(78% 0.135 88);
   --r-plum: oklch(64% 0.14 320);
-  --r-stone: oklch(70% 0.02 85);
-  --r-ink: oklch(30% 0.03 250);
-  --r-ivory: oklch(95% 0.018 85);
 
   /* Tag category — muted */
   --cv-color: oklch(58% 0.14 350);
@@ -69,35 +65,6 @@
   --sp-5: 24px;
   --sp-6: 32px;
   --sp-7: 48px;
-}
-
-/* ── Dark theme override ───────────────────────────────────── */
-.ml-dark {
-  --paper-0: oklch(15% 0.01 70);
-  --paper-1: oklch(18% 0.012 70);
-  --paper-2: oklch(22% 0.012 70);
-  --paper-3: oklch(26% 0.014 70);
-  --paper-4: oklch(31% 0.014 70);
-
-  --line: oklch(30% 0.012 70);
-  --line-soft: oklch(25% 0.01 70);
-  --line-strong: oklch(40% 0.014 70);
-
-  --ink-0: oklch(94% 0.008 85);
-  --ink-1: oklch(80% 0.01 85);
-  --ink-2: oklch(64% 0.012 85);
-  --ink-3: oklch(50% 0.01 85);
-  --ink-4: oklch(38% 0.01 85);
-
-  --acc: oklch(76% 0.155 38);
-  --acc-soft: oklch(76% 0.155 38 / 0.18);
-  --acc-line: oklch(76% 0.155 38 / 0.45);
-  --acc-ink: oklch(96% 0.03 60);
-
-  --shadow-1: none;
-  --shadow-2: 0 8px 24px -12px rgb(0 0 0 / 0.6);
-  --shadow-pop: 0 20px 40px -14px rgb(0 0 0 / 0.55);
-  --shadow-cover: 0 0 0 1px oklch(100% 0 0 / 0.04) inset, 0 8px 18px -8px rgb(0 0 0 / 0.55);
 }
 
 /* ── Accent palette swaps ─────────────────────────────────── */

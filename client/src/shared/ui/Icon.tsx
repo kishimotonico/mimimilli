@@ -49,18 +49,6 @@ export const I: Record<string, IconFC> = {
   pause: (p) => <Svg {...p} fill="currentColor" d="M6.5 4h3.5v16H6.5zM14 4h3.5v16H14z" />,
   prev: (p) => <Svg {...p} fill="currentColor" d="M6 4h2v16H6zM20 4L9 12l11 8z" />,
   next: (p) => <Svg {...p} fill="currentColor" d="M16 4h2v16h-2zM4 4l11 8 -11 8z" />,
-  shuffle: (p) => (
-    <Svg
-      {...p}
-      d={[
-        "M3 6h2.5a3 3 0 0 1 2.5 1.4l8 11.2a3 3 0 0 0 2.5 1.4H21",
-        "M16 18l3 3 3 -3",
-        "M3 18h2.5a3 3 0 0 0 2.5 -1.4l1 -1.4",
-        "M21 6h-2.5a3 3 0 0 0 -2.5 1.4l-1 1.4",
-        "M16 6l3 -3 3 3",
-      ]}
-    />
-  ),
   loopOne: (p) => (
     <Svg
       {...p}
@@ -76,7 +64,6 @@ export const I: Record<string, IconFC> = {
   volume: (p) => (
     <Svg {...p} d={["M11 4L6 8H3v8h3l5 4z", "M15 9.5a3 3 0 0 1 0 5", "M18 6.5a7 7 0 0 1 0 11"]} />
   ),
-  queue: (p) => <Svg {...p} d={["M3 6h13M3 12h10M3 18h7", "M19 14v6M16 17h6"]} />,
   fs: (p) => <Svg {...p} d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />,
   ext: (p) => (
     <Svg
@@ -141,7 +128,6 @@ export const I: Record<string, IconFC> = {
     />
   ),
   download: (p) => <Svg {...p} d={["M12 4v12", "M7 11l5 5 5 -5", "M5 20h14"]} />,
-  pin: (p) => <Svg {...p} d={["M9 4h6l-1 6 4 4H6l4 -4z", "M12 14v6"]} />,
   star: (p) => (
     <Svg
       {...p}
@@ -204,18 +190,7 @@ export const I: Record<string, IconFC> = {
     <Svg {...p} d={["M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3 -2 3 -9", "M10 21a2 2 0 0 0 4 0"]} />
   ),
   user: (p) => <Svg {...p} d={["M4 21a8 8 0 0 1 16 0", "M12 12a4 4 0 1 0 0 -8 4 4 0 0 0 0 8z"]} />,
-  link: (p) => (
-    <Svg
-      {...p}
-      d={[
-        "M10 14a4 4 0 0 0 5.6 0L19 10.6a4 4 0 0 0 -5.6 -5.6l-.7 .7",
-        "M14 10a4 4 0 0 0 -5.6 0L5 13.4a4 4 0 0 0 5.6 5.6l.7 -.7",
-      ]}
-    />
-  ),
   bookmark: (p) => <Svg {...p} d="M6 4h12v17l-6 -4 -6 4z" />,
-  back: (p) => <Svg {...p} d={["M19 12H5", "M11 6l-6 6 6 6"]} />,
-  caret: (p) => <Svg {...p} fill="currentColor" d="M7 10l5 5 5 -5z" />,
   minimize: (p) => <Svg {...p} d={["M9 4v5H4", "M15 4v5h5", "M4 15h5v5", "M20 15h-5v5"]} />,
   locate: (p) => (
     <Svg
