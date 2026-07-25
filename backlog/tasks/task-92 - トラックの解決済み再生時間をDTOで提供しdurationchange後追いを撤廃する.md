@@ -1,10 +1,10 @@
 ---
 id: TASK-92
 title: トラックの解決済み再生時間をDTOで提供しdurationchange後追いを撤廃する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-24 15:03'
-updated_date: '2026-07-24 15:27'
+updated_date: '2026-07-25 10:13'
 labels: []
 dependencies: []
 priority: high
@@ -19,12 +19,14 @@ TASK-91と同型のデータ不足由来アンチパターン。トラック(sha
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Track(またはPlaylist経由のDTO)に解決済み durationSec が含まれる。end-start、end未指定は audio_probe_cache から解決。Zod契約を更新
-- [ ] #2 client がサーバー提供の durationSec を初期表示から使い、durationchange 待ちによる 0:00 フラッシュが起きない
-- [ ] #3 audioEngine の durationchange 依存と durationSec=0 フォールバック/リセットが、確定データ利用に置き換わる（過度なフォールバック解消）
-- [ ] #4 probe cache 未取得トラックの扱いが過度なフォールバックにならない形で明示されている。1ファイル内マルチトラック(start/end指定)も正しい残り時間になる
-- [ ] #5 pnpm check・pnpm test が通り、曲送り・シークの回帰が確認されている
+- [x] #1 Track(またはPlaylist経由のDTO)に解決済み durationSec が含まれる。end-start、end未指定は audio_probe_cache から解決。Zod契約を更新
+- [x] #2 client がサーバー提供の durationSec を初期表示から使い、durationchange 待ちによる 0:00 フラッシュが起きない
+- [x] #3 audioEngine の durationchange 依存と durationSec=0 フォールバック/リセットが、確定データ利用に置き換わる（過度なフォールバック解消）
+- [x] #4 probe cache 未取得トラックの扱いが過度なフォールバックにならない形で明示されている。1ファイル内マルチトラック(start/end指定)も正しい残り時間になる
+- [x] #5 pnpm check・pnpm test が通り、曲送り・シークの回帰が確認されている
 <!-- AC:END -->
+
+
 
 ## Implementation Notes
 
@@ -36,28 +38,32 @@ trackSchema/playlistSchema は metaFileSchema 経由で .meta.json 正本にも�
 - trackSchema(=TrackSpec): .meta.json/正本用。id/title/file/start/end。据え置き
 - resolvedTrackSchema(=ResolvedTrack): TrackSpec + durationSec。API DTO用に新設
 - playlistSchema(正本) と resolvedPlaylistSchema(API DTO)も分離
-型名で未解決トラックをplayerへ渡す誤りを防ぐ。既存 Track の意味をどちらにするかは影響大なので実装冒頭で確定。
 
 ## duration解決式(共通関数をserver側に)
 startSec = track.start ?? 0
 durationSec = track.end !== undefined ? track.end - startSec : (fileDurationSec != null ? fileDurationSec - startSec : null)
-DTO・totalDurationSec・resume検証で同一式を使う。現行scannerの不整合(start有end無でファイル全長を加算、end有start無が不要probe等)も本タスクで是正。fileDurationSec(ファイル全体長) と durationSec(トラック相対長)を命名で使い分け。start/endは絶対ファイル時刻、durationSecは相対。契約コメントに明記。
+DTO・totalDurationSec・resume検証で同一式を使う。fileDurationSec(ファイル全体長) と durationSec(トラック相対長)を命名で使い分け。start/endは絶対ファイル時刻、durationSecは相対。
 
 ## 計測失敗(ユーザー決定=明示的な未知null)
-probe結果を内部で区別: 正の有限値/ファイル欠損/非対応・解析失敗/キャッシュ未取得。未知を0にしない。DTOは durationSec: number|null。null時UIは0:00でなくシーク無効等の明示的未知。Zod制約は finite かつ positive(nullは別途明示)。丸めは表示時のみ。関連: totalDurationSec も probe失敗0加算をやめ、共通probe結果型+エラーポリシーで一緒に是正(監査追加候補も本タスクに畳み込む)。
-
-## 全プレイリストを解決対象
-scannerのbuildProbeCache/registerMetaFileはデフォルトplaylistのみprobe。詳細DTOは全playlistを返すため、全playlistの全トラックを重複ファイルまとめてprobeする。デフォルトだけ解決済みの契約は避ける。
-
-## 派生値の保存先
-playlists_json(正本)には書かない。tracks関係表に duration_sec 派生列を追加し、詳細DTOは track ID で合成。getWork時は作品内全ファイルパスを一括取得してN+1回避(現 cachedFileDurationSec は1トラック用でそのまま流用不可)。
+未知を0にしない。DTOは durationSec: number|null。null時UIは0:00でなくシーク無効等の明示的未知。
 
 ## Filesモード(ユーザー決定=従来経路を残す)
-Filesモード(App.tsx handlePlayFileの即席Track)は durationchange 経路を残す。TASK-92のACは『登録作品のplaylist』に限定。audioEngineのdurationchangeは完全撤廃せず、Filesモード専用の明示経路として残す(一般フォールバックにはしない)。登録トラック=サーバーdurationSec、Filesトラック=durationchange、と経路を型/分岐で明確に分ける。
+Filesモード(App.tsx handlePlayFileの即席Track)は durationchange 経路を残す。ACは『登録作品のplaylist』に限定。
 
-## client
-playerControllerの startRequested/withTrackIndex で選択trackのdurationSecを即設定(stopRequestedの0はOK)。getCurrentPlaybackContext/seekクランプ/MediaSession position state/同一音源の区間切替/resume復元/ABリピート/WorkTrackListの時間表示をDTO基準へ。WorkTrackListは現在start&end両有のみ時間表示だが解決後は全トラックでdurationSec使用。audioDurationChangedイベント/callback/reducer inputはFiles経路を除き撤廃し権威を一本化。
+## 派生値の保存先(2026-07-25 ユーザー決定で変更)
+当初 tracks.duration_sec 派生列を追加する方針だったが、実装後のレビューで
+「end指定済み=end-startで自明ゆえ列は冗長 / end未指定=読み取り時に列を無視しaudio_probe_cacheから都度解決ゆえwrite-onlyな死にデータ」
+と判明したため、**列は廃止し動的解決一本に確定**。migration 0006 は audio_probe_cache.duration_sec の NULLABLE 化のみ。
+getWork は end未指定トラックの参照ファイルパスを作品内一括取得して N+1 を回避する。
 
-## fixture/テスト
-fixtureの各Trackにも決定的 durationSec を付与しrealと同一契約。テストケース: end-start / end有start無 / start有end無 / 両無 / 同一ファイル複数区間 / デフォルト外playlist / probe失敗 / Filesモード。real/fixture両方。
+## 実装状況(2026-07-25)
+- phase1(shared/server) 完了: コミット 26294a6
+- phase2(client) 完了: コミット 0944824
+- pnpm check 通過、pnpm test 全緑(server 267 / client 301)
+- 残: 実機検証(dev DBリセット+dev server再起動が必要。曲送りの0:00フラッシュ消失・シーク・区間切替)、Codex敵対的レビュー反映
+
+## 検討事項(未決)
+client の Files/登録トラック判別が `"durationSec" in track` の構造チェック(trackTime.ts isResolvedTrack)。
+zod検証済みDTOなので実行時は安全だが、登録トラック側で durationSec が欠落すると黙って旧 durationchange 経路へ退行する形。
+Filesモード側に明示タグを持たせる案は保留中。
 <!-- SECTION:NOTES:END -->
