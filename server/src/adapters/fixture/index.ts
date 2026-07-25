@@ -196,7 +196,7 @@ function buildFullWork(
               title: namedTracks?.[i] ?? `Track ${i + 1}`,
               file: `track${String(i + 1).padStart(2, "0")}.mp3`,
               durationSec:
-                summary.totalDurationSec > 0
+                summary.totalDurationSec !== null && summary.totalDurationSec > 0
                   ? splitDurationSec(summary.totalDurationSec, summary.trackCount, i)
                   : null,
             })),

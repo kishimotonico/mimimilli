@@ -81,15 +81,13 @@ export function WorkDetail({
           <div className="mle-prv__title-row">
             <h2 className="mle-prv__title">{work.title}</h2>
           </div>
-          {(work.totalDurationSec > 0 || tracks.length > 0) && (
+          {(tracks.length > 0 || (work.totalDurationSec !== null && work.totalDurationSec > 0)) && (
             <div className="mle-prv__row">
               {tracks.length > 0 && <span>{tracks.length} トラック</span>}
-              {work.totalDurationSec > 0 && (
-                <>
-                  <span className="dot">·</span>
-                  <span>{formatDuration(work.totalDurationSec)}</span>
-                </>
-              )}
+              <span className="dot">·</span>
+              <span>
+                {work.totalDurationSec !== null ? formatDuration(work.totalDurationSec) : "--:--"}
+              </span>
             </div>
           )}
           <WorkTagEditor

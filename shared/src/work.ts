@@ -64,7 +64,10 @@ export type ResolvedPlaylist = z.infer<typeof resolvedPlaylistSchema>;
 /**
  * トラックの解決済み再生時間（秒）を求める共通式。start/end は絶対ファイル時刻、
  * 戻り値は相対長。end 省略時は fileDurationSec（ファイル全体長）から導く。
- * fileDurationSec が null（未計測・計測失敗）なら解決不能として null を返す。
+ * fileDurationSec が null（未計測・計測失敗）、または start がファイル全体長以上
+ * （データ不正。ファイル差し替え等で起こりうる）の場合は、resolvedTrackSchema の
+ * .positive() 契約を破らないよう解決不能として null を返す（0/負の値をDTOへ流さない）。
+ * データ不正の可視化（作品のerror化）はスキャン側の責務。
  */
 export function resolveTrackDurationSec(
   track: Pick<Track, "start" | "end">,
@@ -72,7 +75,9 @@ export function resolveTrackDurationSec(
 ): number | null {
   const startSec = track.start ?? 0;
   if (track.end !== undefined) return track.end - startSec;
-  return fileDurationSec !== null ? fileDurationSec - startSec : null;
+  if (fileDurationSec === null) return null;
+  const durationSec = fileDurationSec - startSec;
+  return durationSec > 0 ? durationSec : null;
 }
 
 /** 作品の再開位置。offsetSec はトラック区間先頭からの相対秒。 */
@@ -108,7 +113,8 @@ export const workSummarySchema = z.object({
   cover: coverSchema,
   status: workStatusSchema,
   physicalPath: z.string(),
-  totalDurationSec: z.number(),
+  /** デフォルトプレイリストの合計再生時間（秒）。未解決トラックを1件でも含む場合はnull（未知）。 */
+  totalDurationSec: z.number().nullable(),
   addedAt: z.string(),
   errorMessage: z.string().nullable(),
   urls: z.array(urlEntrySchema),
@@ -126,7 +132,7 @@ export const workListItemSchema = z.object({
   title: z.string(),
   cover: coverSchema,
   status: workStatusSchema,
-  totalDurationSec: z.number(),
+  totalDurationSec: z.number().nullable(),
   trackCount: z.number().int().nonnegative(),
   bookmarked: z.boolean(),
   lastPlayedAt: z.string().nullable(),

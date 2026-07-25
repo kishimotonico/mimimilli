@@ -95,7 +95,7 @@ export function WorkInfoDialog({
               </InfoRow>
               <InfoRow label="トラック・時間">
                 {trackCount > 0
-                  ? `${trackCount} トラック · ${formatDuration(work.totalDurationSec)}`
+                  ? `${trackCount} トラック · ${work.totalDurationSec !== null ? formatDuration(work.totalDurationSec) : "--:--"}`
                   : "なし"}
               </InfoRow>
               <InfoRow label="プレイリスト">{playlistLabel}</InfoRow>

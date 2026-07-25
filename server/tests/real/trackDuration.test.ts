@@ -95,9 +95,9 @@ test("durationSec: end-start / end有start無 / start有end無 / 両無 / 同一
   assert.ok(extraPlaylist);
   assert.equal(extraPlaylist.tracks[0]?.durationSec, 5);
 
-  // totalDurationSec（デフォルトplaylist集計）はprobe失敗分を0扱いで合算する
-  // （集計値としての仕様。トラック単位のDTOはnullのまま、0埋めしない）
-  assert.equal(work.totalDurationSec, 3 + 5 + 2 + 5 + 0);
+  // totalDurationSec（デフォルトplaylist集計）は未解決トラックを1件でも含む場合はnull
+  // （部分和を完全な総時間として保存しない）
+  assert.equal(work.totalDurationSec, null);
 
   // resume検証: durationSec既知のトラックは区間外offsetを拒否する
   assert.equal(
@@ -125,4 +125,59 @@ test("durationSec: end-start / end有start無 / start有end無 / 両無 / 同一
     }),
     true,
   );
+});
+
+test("startがファイル全体長以上のトラックは作品をerror状態にし、durationSecは0でなくnullになる", async (t) => {
+  const directory = makeTestDirectory("track-duration-invalid-start");
+  t.after(directory.cleanup);
+  const root = join(directory.path, "lib");
+  const workDir = join(root, "RJ900011_不正start");
+  mkdirSync(workDir, { recursive: true });
+
+  // 実ファイルは5秒。start=5（ちょうど全体長）と start=9（超過）はいずれも区間長が0以下になる。
+  writeWav(join(workDir, "short.wav"), 5);
+
+  const id = crypto.randomUUID();
+  const defaultPlaylistId = crypto.randomUUID();
+  writeFileSync(
+    join(workDir, ".meta.json"),
+    JSON.stringify(
+      {
+        id,
+        title: "不正start",
+        tags: [],
+        defaultPlaylistId,
+        playlists: [
+          {
+            id: defaultPlaylistId,
+            name: "default",
+            tracks: [
+              { id: crypto.randomUUID(), title: "start=全体長", file: "short.wav", start: 5 },
+              { id: crypto.randomUUID(), title: "start超過", file: "short.wav", start: 9 },
+            ],
+          },
+        ],
+      },
+      null,
+      2,
+    ),
+  );
+
+  const adapter = createRealAdapter({ database: { kind: "memory" } });
+  await adapter.updateSettings({ rootFolder: root });
+  await adapter.scan();
+
+  const work = await adapter.getWork(id);
+  assert.ok(work);
+
+  // データ不正はDTOへ0/負値を流さず、作品のerrorとして可視化する。
+  assert.equal(work.status, "error");
+  assert.match(work.errorMessage ?? "", /開始位置がファイル長を超えています/);
+
+  const tracks = work.playlists.find((p) => p.id === defaultPlaylistId)?.tracks;
+  assert.equal(tracks?.[0]?.durationSec, null);
+  assert.equal(tracks?.[1]?.durationSec, null);
+
+  // 未解決トラックを含むため合計も未知。
+  assert.equal(work.totalDurationSec, null);
 });

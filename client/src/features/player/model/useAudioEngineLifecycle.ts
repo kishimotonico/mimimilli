@@ -166,7 +166,14 @@ export function useAudioEngineLifecycle({
       assetUrl,
     };
     refs.trackEnded.current = false;
-    if (!reusesLoadedAsset) refs.filesModeFileDurationSec.current = null;
+    if (!reusesLoadedAsset) {
+      refs.filesModeFileDurationSec.current = null;
+    } else if (!isResolvedTrack(track) && refs.filesModeFileDurationSec.current === null) {
+      // 登録トラック→同一音源のFilesモード即席トラックへの切り替え。再ロードもdurationchangeも
+      // 発生しないため、既にロード済みのengineが持つファイル全体長を直接引き継ぐ。
+      const engineDurationSec = engine.getDuration();
+      refs.filesModeFileDurationSec.current = engineDurationSec > 0 ? engineDurationSec : null;
+    }
 
     if (reusesLoadedAsset) {
       const seekSec = pendingSeekSec ?? getTrackStart(track);

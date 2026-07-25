@@ -57,6 +57,17 @@ function assertPersistentDataError(action: () => unknown, expectedMessage: RegEx
   });
 }
 
+async function assertPersistentDataErrorAsync(
+  action: () => Promise<unknown>,
+  expectedMessage: RegExp,
+): Promise<void> {
+  await assert.rejects(action, (error: unknown) => {
+    assert.ok(error instanceof PersistentDataError);
+    assert.match(error.message, expectedMessage);
+    return true;
+  });
+}
+
 test("works.status が不正なら作品IDとフィールド名を含むエラーになる", () => {
   const db = openDb({ kind: "memory" });
   const repo = new WorkRepo(db);
@@ -70,7 +81,7 @@ test("works.status が不正なら作品IDとフィールド名を含むエラ�
   );
 });
 
-test("works.playlists_json が不正なら作品IDとフィールド名を含むエラーになる", () => {
+test("works.playlists_json が不正なら作品IDとフィールド名を含むエラーになる", async () => {
   const db = openDb({ kind: "memory" });
   const repo = new WorkRepo(db);
   const work = sampleWork("work-bad-playlists");
@@ -81,20 +92,20 @@ test("works.playlists_json が不正なら作品IDとフィールド名を含む
     .where(eq(works.id, work.id))
     .run();
 
-  assertPersistentDataError(
+  await assertPersistentDataErrorAsync(
     () => repo.getWork(work.id),
     /works レコード "work-bad-playlists".*0\.tracks:/,
   );
 });
 
-test("壊れたJSON構文は作品IDとSQLite列名を含むエラーになる", () => {
+test("壊れたJSON構文は作品IDとSQLite列名を含むエラーになる", async () => {
   const db = openDb({ kind: "memory" });
   const repo = new WorkRepo(db);
   const work = sampleWork("work-bad-json");
   repo.upsertWork(work);
   db.catalog.update(works).set({ playlistsJson: "[{" }).where(eq(works.id, work.id)).run();
 
-  assertPersistentDataError(
+  await assertPersistentDataErrorAsync(
     () => repo.getWork(work.id),
     /works レコード "work-bad-json".*playlists_json: JSON パースエラー:/,
   );

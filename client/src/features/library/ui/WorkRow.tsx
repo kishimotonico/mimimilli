@@ -23,7 +23,9 @@ export default function WorkRow({
   const sub = [
     work.circleName,
     work.trackCount > 0 ? `${work.trackCount}tr` : null,
-    work.totalDurationSec > 0 ? formatDuration(work.totalDurationSec) : null,
+    work.totalDurationSec !== null && work.totalDurationSec > 0
+      ? formatDuration(work.totalDurationSec)
+      : null,
   ]
     .filter(Boolean)
     .join(" · ");

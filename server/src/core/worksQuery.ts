@@ -30,6 +30,17 @@ export function applyWorksQuery(works: WorkSummary[], params: WorksQuery): WorkS
   return seed === undefined ? { items, total } : { items, total, seed };
 }
 
+/**
+ * totalDurationSec（null許容）の比較。未知（null）は direction に関わらず必ず末尾へ寄せる。
+ * direction=1で昇順、-1で降順として扱う。
+ */
+function compareDuration(a: WorkSummary, b: WorkSummary, direction: 1 | -1): number {
+  if (a.totalDurationSec === null && b.totalDurationSec === null) return 0;
+  if (a.totalDurationSec === null) return 1;
+  if (b.totalDurationSec === null) return -1;
+  return (a.totalDurationSec - b.totalDurationSec) * direction;
+}
+
 function filterByQuery(works: WorkSummary[], q: string): WorkSummary[] {
   if (!q) return works;
   const normalizedQuery = japaneseSortKey(q);
@@ -113,11 +124,12 @@ export function sortWorkSummaries(
     case "added-desc":
       sorted.sort((a, b) => compareStrings(b.addedAt, a.addedAt) || byId(a, b));
       break;
+    // totalDurationSec が未知（null）の作品は昇順・降順どちらでも末尾に寄せる。
     case "duration-asc":
-      sorted.sort((a, b) => a.totalDurationSec - b.totalDurationSec || byId(a, b));
+      sorted.sort((a, b) => compareDuration(a, b, 1) || byId(a, b));
       break;
     case "duration-desc":
-      sorted.sort((a, b) => b.totalDurationSec - a.totalDurationSec || byId(a, b));
+      sorted.sort((a, b) => compareDuration(a, b, -1) || byId(a, b));
       break;
     case "last-played":
       sorted.sort((a, b) => {

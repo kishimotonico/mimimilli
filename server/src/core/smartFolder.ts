@@ -31,7 +31,12 @@ export function evalSmartFolderRules(
         if (!Number.isFinite(minSec)) {
           throw new Error(`スマートフォルダーの長さ条件が不正です: ${rule.values[0]}`);
         }
-        matchingIds = new Set(works.filter((w) => w.totalDurationSec >= minSec).map((w) => w.id));
+        // totalDurationSec が未知（null）の作品は「長さ条件を満たす」側に丸めず除外する。
+        matchingIds = new Set(
+          works
+            .filter((w) => w.totalDurationSec !== null && w.totalDurationSec >= minSec)
+            .map((w) => w.id),
+        );
         break;
       }
       default:

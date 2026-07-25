@@ -690,12 +690,11 @@ export class Scanner {
     // 参照先ファイルの欠損チェック
     const playlist = defaultPlaylistOf(meta);
     const missingFiles = (playlist?.tracks ?? []).filter((t) => !existsSync(join(workDir, t.file)));
-    const errorMessage =
-      missingFiles.length > 0
-        ? `参照先ファイルが見つかりません: ${missingFiles.map((t) => t.file).join(", ")}`
-        : null;
 
     // 全playlistのトラックについて解決済みdurationSecを求める（DTO・total・resume検証で共有する式）。
+    // startがファイル全体長以上（データ不正）のトラックはresolveTrackDurationSecがnullを返すため
+    // DTO契約は破らないが、可視化のため作品をerror状態にするべく別途収集する。
+    const invalidStartTracks: Array<{ file: string; title: string }> = [];
     const resolvedPlaylists: ResolvedPlaylist[] = [];
     for (const p of meta.playlists) {
       const tracks = [];
@@ -709,21 +708,32 @@ export class Scanner {
             probeCache,
           );
           checkAbort();
+          if (fileDurationSec !== null && fileDurationSec - (track.start ?? 0) <= 0) {
+            invalidStartTracks.push({ file: track.file, title: track.title });
+          }
         }
         tracks.push({ ...track, durationSec: resolveTrackDurationSec(track, fileDurationSec) });
       }
       resolvedPlaylists.push({ id: p.id, name: p.name, tracks });
     }
 
-    // 再生時間（デフォルトプレイリストの合計）。未解決（null）分は0扱いで合算する集計値のため、
-    // トラック単位のUI表示（未知はnull）とは別の扱い（是正対象は加算式の不整合であり、
-    // 集計値そのものをnullableにはしない）。
+    const errorMessage =
+      missingFiles.length > 0
+        ? `参照先ファイルが見つかりません: ${missingFiles.map((t) => t.file).join(", ")}`
+        : invalidStartTracks.length > 0
+          ? `トラックの開始位置がファイル長を超えています: ${invalidStartTracks
+              .map((t) => `${t.title}(${t.file})`)
+              .join(", ")}`
+          : null;
+
+    // 再生時間（デフォルトプレイリストの合計）。未解決（null）トラックを1件でも含む場合は
+    // 合計自体も未知として null にする（部分和を完全な総時間として保存しない）。
     const defaultResolved =
       resolvedPlaylists.find((p) => p.id === meta.defaultPlaylistId) ?? resolvedPlaylists[0];
-    const totalDurationSec = (defaultResolved?.tracks ?? []).reduce(
-      (sum, track) => sum + (track.durationSec ?? 0),
-      0,
-    );
+    const defaultTracks = defaultResolved?.tracks ?? [];
+    const totalDurationSec = defaultTracks.some((track) => track.durationSec === null)
+      ? null
+      : defaultTracks.reduce((sum, track) => sum + track.durationSec!, 0);
 
     // 既存作品の DB 固有情報を保持（移動追従時も含む）
     const existing = existingWorks.get(id);

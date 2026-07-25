@@ -66,6 +66,7 @@ test("初回スキャン: 登録・自動生成・エラー検出・duration プ
   // duration プローブ（2秒 + 3秒）
   const generated = await adapter.getWork(result.newWorkIds[0]!);
   assert.ok(generated);
+  assert.ok(generated.totalDurationSec !== null);
   assert.ok(
     Math.abs(generated.totalDurationSec - 5) < 0.05,
     `expected ~5, got ${generated.totalDurationSec}`,
@@ -390,7 +391,8 @@ test("増分スキャン: 音声 mtime/size 変更時は duration が再計算�
 
   const before = await adapter.getWork(generatedId);
   assert.ok(before);
-  const beforeDuration = before!.totalDurationSec;
+  assert.ok(before!.totalDurationSec !== null);
+  const beforeDuration = before!.totalDurationSec!;
 
   // 01_intro.wav を 2秒 → 4秒 に差し替え、合計 duration が 2秒増えるはず
   writeWav(join(root, "dlsite", "RJ900001_テスト作品", "mp3", "01_intro.wav"), 4);
@@ -400,8 +402,9 @@ test("増分スキャン: 音声 mtime/size 変更時は duration が再計算�
 
   const after = await adapter.getWork(generatedId);
   assert.ok(after);
+  assert.ok(after!.totalDurationSec !== null);
   assert.ok(
-    Math.abs(after!.totalDurationSec - (beforeDuration + 2)) < 0.05,
+    Math.abs(after!.totalDurationSec! - (beforeDuration + 2)) < 0.05,
     `expected duration +2, before=${beforeDuration}, after=${after!.totalDurationSec}`,
   );
 });
@@ -636,7 +639,7 @@ test("変更済みの複数resume作品でもprobe cache SELECTは一括取得�
   const scanner = new Scanner(db, repo, directory.path);
   await scanner.scan(root);
   for (const id of workIds) {
-    const work = repo.getWork(id)!;
+    const work = (await repo.getWork(id))!;
     const playlist = work.playlists[0]!;
     const track = playlist.tracks[0]!;
     assert.ok(repo.saveResume(id, { playlistId: playlist.id, trackId: track.id, offsetSec: 1 }));

@@ -35,7 +35,7 @@ function sampleWork(id: string): Work {
   };
 }
 
-test("foundIds 以外の作品だけが missing になる", () => {
+test("foundIds 以外の作品だけが missing になる", async () => {
   const db = openDb({ kind: "memory" });
   const repo = new WorkRepo(db);
   repo.upsertWork(sampleWork("keep-1"));
@@ -44,14 +44,14 @@ test("foundIds 以外の作品だけが missing になる", () => {
 
   repo.markMissingExcept(["keep-1", "keep-2"]);
 
-  assert.equal(repo.getWork("keep-1")?.status, "ok");
-  assert.equal(repo.getWork("keep-2")?.status, "ok");
-  assert.equal(repo.getWork("lost-1")?.status, "missing");
-  assert.equal(repo.getWork("lost-1")?.errorMessage, null);
+  assert.equal((await repo.getWork("keep-1"))?.status, "ok");
+  assert.equal((await repo.getWork("keep-2"))?.status, "ok");
+  assert.equal((await repo.getWork("lost-1"))?.status, "missing");
+  assert.equal((await repo.getWork("lost-1"))?.errorMessage, null);
   db.close();
 });
 
-test("foundIds が空なら全件 missing になる", () => {
+test("foundIds が空なら全件 missing になる", async () => {
   const db = openDb({ kind: "memory" });
   const repo = new WorkRepo(db);
   repo.upsertWork(sampleWork("w-1"));
@@ -59,12 +59,12 @@ test("foundIds が空なら全件 missing になる", () => {
 
   repo.markMissingExcept([]);
 
-  assert.equal(repo.getWork("w-1")?.status, "missing");
-  assert.equal(repo.getWork("w-2")?.status, "missing");
+  assert.equal((await repo.getWork("w-1"))?.status, "missing");
+  assert.equal((await repo.getWork("w-2"))?.status, "missing");
   db.close();
 });
 
-test("SQLiteパラメータ上限を超える大量IDでも動作し、一時テーブルを残さない", () => {
+test("SQLiteパラメータ上限を超える大量IDでも動作し、一時テーブルを残さない", async () => {
   const db = openDb({ kind: "memory" });
   const repo = new WorkRepo(db);
   repo.upsertWork(sampleWork("keep-1"));
@@ -74,8 +74,8 @@ test("SQLiteパラメータ上限を超える大量IDでも動作し、一時テ
   const manyIds = ["keep-1", ...Array.from({ length: 40_000 }, (_, i) => `seen-${i}`)];
   repo.markMissingExcept(manyIds);
 
-  assert.equal(repo.getWork("keep-1")?.status, "ok");
-  assert.equal(repo.getWork("lost-1")?.status, "missing");
+  assert.equal((await repo.getWork("keep-1"))?.status, "ok");
+  assert.equal((await repo.getWork("lost-1"))?.status, "missing");
 
   const tempTables = db.sqlite
     .query("SELECT name FROM temp.sqlite_master WHERE type = 'table'")

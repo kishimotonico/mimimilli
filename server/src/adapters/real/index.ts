@@ -407,22 +407,26 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
 
     async patchWork(id: string, patch: WorkPatch): Promise<Work | null> {
       if (patch.title === undefined && patch.tags === undefined) {
-        return repo.patchWork(id, patch);
+        const updated = repo.patchWork(id, patch);
+        if (!updated) return null;
+        return repo.getWork(id);
       }
       // user書き込みはcatalogトランザクションの外で先に確定させる。
       if (patch.bookmarked !== undefined) {
         const updated = repo.patchWork(id, { bookmarked: patch.bookmarked });
         if (!updated) return null;
       }
-      return db.transaction(() => {
+      const ok = db.transaction(() => {
         const updated = repo.patchWork(id, {
           title: patch.title,
           tags: patch.tags,
         });
-        if (!updated) return null;
+        if (!updated) return false;
         patchMetaFile(findMetaPath(updated), { title: patch.title, tags: patch.tags });
-        return updated;
+        return true;
       });
+      if (!ok) return null;
+      return repo.getWork(id);
     },
 
     async saveResume(id: string, body: ResumeBody): Promise<boolean> {
@@ -434,7 +438,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
     },
 
     async listWorkFiles(id: string): Promise<FileEntry | null> {
-      const work = repo.getWork(id);
+      const work = await repo.getWork(id);
       if (!work) return null;
       return buildFileTree(work.physicalPath);
     },
@@ -526,7 +530,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
         const descriptor = await describeCover(workId, width);
         return descriptor?.materialize() ?? null;
       }
-      const work = repo.getWork(workId);
+      const work = await repo.getWork(workId);
       if (!work) return null;
 
       const rel = relPath;
@@ -543,7 +547,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
     },
 
     async dlsiteFetch(workId: string): Promise<DlsiteFetchResult> {
-      const work = repo.getWork(workId);
+      const work = await repo.getWork(workId);
       if (!work)
         return { ok: false, kind: "not_found", message: `作品が見つかりません: ${workId}` };
       const rjCode = work.dlsite.rjCode ?? detectRjCode([basename(work.physicalPath), work.title]);
@@ -554,7 +558,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
     },
 
     async dlsiteApply(workId: string, body: DlsiteApplyBody): Promise<boolean> {
-      const work = repo.getWork(workId);
+      const work = await repo.getWork(workId);
       if (!work) return false;
 
       const patch: { title?: string; tags?: string[]; cover?: CoverColumns; urls?: Work["urls"] } =
@@ -597,7 +601,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
     },
 
     async updateDlsiteState(workId: string, patch: DlsiteStatePatch): Promise<Work | null> {
-      const work = repo.getWork(workId);
+      const work = await repo.getWork(workId);
       if (!work) return null;
       const dlsite = {
         ...work.dlsite,
@@ -606,11 +610,11 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
           ? { status: patch.skipped ? ("skipped" as const) : ("none" as const), error: null }
           : {}),
       };
-      return db.transaction(() => {
+      db.transaction(() => {
         repo.setDlsiteState(workId, dlsite);
         patchMetaFile(findMetaPath(work), { dlsite });
-        return repo.getWork(workId);
       });
+      return repo.getWork(workId);
     },
 
     async runDlsiteBulk(
@@ -653,8 +657,8 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
             };
             db.transaction(() => {
               repo.setDlsiteState(work.id, dlsite);
-              const fullWork = repo.getWork(work.id);
-              if (fullWork) patchMetaFile(findMetaPath(fullWork), { dlsite });
+              const metaLocation = repo.getWorkMetaLocation(work.id);
+              if (metaLocation) patchMetaFile(findMetaPath(metaLocation), { dlsite });
             });
             result.failed += 1;
           } else {
@@ -721,8 +725,8 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
           try {
             db.transaction(() => {
               repo.setDlsiteState(work.id, dlsite);
-              const fullWork = repo.getWork(work.id);
-              if (fullWork) patchMetaFile(findMetaPath(fullWork), { dlsite });
+              const metaLocation = repo.getWorkMetaLocation(work.id);
+              if (metaLocation) patchMetaFile(findMetaPath(metaLocation), { dlsite });
             });
           } catch (persistError) {
             console.error("DLsite失敗状態の保存に失敗しました", {
@@ -748,7 +752,10 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
 }
 
 /** 作品のメタファイルパスを返す（フォルダー形式 / 単一ファイル形式の両対応） */
-function findMetaPath(work: Work): string {
+function findMetaPath(work: {
+  physicalPath: string;
+  playlists: Array<{ tracks: Array<{ file: string }> }>;
+}): string {
   const folderMeta = join(work.physicalPath, ".meta.json");
   if (existsSync(folderMeta)) return folderMeta;
   // 単一ファイル形式: トラックの basename に対応する <basename>.meta.json を探す

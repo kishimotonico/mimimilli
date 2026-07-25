@@ -53,6 +53,7 @@ import {
   workTags,
   works,
 } from "./catalogSchema.ts";
+import { probeDurationSec } from "./probe.ts";
 import { appSettings, searchPresets, smartFolders, tagPrefixes, workStates } from "./userSchema.ts";
 
 type CatalogWorkRow = typeof works.$inferSelect;
@@ -91,7 +92,7 @@ type RawWorkListRow = {
   coverWidth: number | null;
   coverHeight: number | null;
   status: WorkSummary["status"];
-  totalDurationSec: number;
+  totalDurationSec: number | null;
   trackCount: number;
   bookmarked: number;
   lastPlayedAt: string | null;
@@ -327,10 +328,11 @@ function worksOrderSql(
       return `work_states.added_at ASC, ${idTieBreaker}`;
     case "added-desc":
       return `work_states.added_at DESC, ${idTieBreaker}`;
+    // totalDurationSec が未知（NULL）の作品は昇順・降順どちらでも末尾に寄せる。
     case "duration-asc":
-      return `works.total_duration_sec ASC, ${idTieBreaker}`;
+      return `works.total_duration_sec IS NULL ASC, works.total_duration_sec ASC, ${idTieBreaker}`;
     case "duration-desc":
-      return `works.total_duration_sec DESC, ${idTieBreaker}`;
+      return `works.total_duration_sec IS NULL ASC, works.total_duration_sec DESC, ${idTieBreaker}`;
     case "last-played":
       return `work_states.last_played_at IS NULL ASC, work_states.last_played_at DESC, ${idTieBreaker}`;
     case "id-asc":
@@ -356,14 +358,15 @@ export class WorkRepo {
   }
 
   /**
-   * end未指定トラックが参照するファイルの現在の audio_probe_cache 値を、
-   * 作品内の全該当パスを一括取得して求める（N+1回避）。ここでは probe を実行せず、
-   * 既にキャッシュされている値をそのまま読む（フレッシュネス確認はスキャン/probe実行時に行う）。
+   * end未指定トラックが参照するファイルの現在の再生時間を、作品内の全該当パスを
+   * 一括取得したprobe cache（fetchProbeCache、N+1回避）を土台に、ファイルごとに
+   * stat して size/mtime が一致しなければ probeDurationSec で再probeし最新値を返す。
+   * これによりrescan無しのファイル差し替えも読み取り時に検知できる。
    */
-  private liveFileDurationMap(
+  private async liveFileDurationMap(
     physicalPath: string,
     playlists: Array<{ tracks: Array<{ file: string; end?: number }> }>,
-  ): Map<string, number | null> {
+  ): Promise<Map<string, number | null>> {
     const paths = [
       ...new Set(
         playlists
@@ -374,13 +377,12 @@ export class WorkRepo {
     ];
     const map = new Map<string, number | null>();
     if (paths.length === 0) return map;
-    const placeholders = paths.map(() => "?").join(", ");
-    const rows = this.db.sqlite
-      .query(
-        `SELECT path, duration_sec AS durationSec FROM main.audio_probe_cache WHERE path IN (${placeholders})`,
-      )
-      .all(...paths) as Array<{ path: string; durationSec: number | null }>;
-    for (const row of rows) map.set(row.path, row.durationSec);
+    const cache = this.fetchProbeCache(paths);
+    await Promise.all(
+      paths.map(async (path) => {
+        map.set(path, await probeDurationSec(this.db.catalog, path, cache));
+      }),
+    );
     return map;
   }
 
@@ -642,6 +644,8 @@ export class WorkRepo {
           if (!Number.isFinite(minSec)) {
             throw new Error(`スマートフォルダーの長さ条件が不正です: ${rule.values[0]}`);
           }
+          // total_duration_sec が未知（NULL）の作品はSQLのNULL比較により自然に非一致となる
+          // （未知を「条件を満たす」側へ丸めない）。
           predicates.push("works.total_duration_sec >= ?");
           bindings.push(minSec);
           break;
@@ -1004,7 +1008,7 @@ export class WorkRepo {
       .all(axis) as AxisFacetItem[];
   }
 
-  getWork(id: string): Work | null {
+  async getWork(id: string): Promise<Work | null> {
     const row = this.joinedWorks("WHERE works.id = ?", id)[0];
     if (!row) return null;
     const rawPlaylists = parseWorkPlaylists(row);
@@ -1013,7 +1017,7 @@ export class WorkRepo {
       rawPlaylists,
       this.tagMap([id]).get(id) ?? [],
       this.dlsiteState(id),
-      this.liveFileDurationMap(row.physicalPath, rawPlaylists),
+      await this.liveFileDurationMap(row.physicalPath, rawPlaylists),
     );
   }
 
@@ -1032,7 +1036,17 @@ export class WorkRepo {
     );
   }
 
-  getWorkByPhysicalPath(physicalPath: string): Work | null {
+  /**
+   * .meta.json の位置解決（findMetaPath）専用の軽量取得。probe・freshness確認を伴わないため、
+   * DBトランザクション内の同期処理からも安全に呼べる。
+   */
+  getWorkMetaLocation(id: string): { physicalPath: string; playlists: Playlist[] } | null {
+    const row = this.db.catalog.select().from(works).where(eq(works.id, id)).get();
+    if (!row) return null;
+    return { physicalPath: row.physicalPath, playlists: parseWorkPlaylists(row) };
+  }
+
+  async getWorkByPhysicalPath(physicalPath: string): Promise<Work | null> {
     const row = this.joinedWorks("WHERE works.physical_path = ?", physicalPath)[0];
     if (!row) return null;
     const rawPlaylists = parseWorkPlaylists(row);
@@ -1041,7 +1055,7 @@ export class WorkRepo {
       rawPlaylists,
       this.tagMap([row.id]).get(row.id) ?? [],
       this.dlsiteState(row.id),
-      this.liveFileDurationMap(row.physicalPath, rawPlaylists),
+      await this.liveFileDurationMap(row.physicalPath, rawPlaylists),
     );
   }
 
@@ -1133,7 +1147,11 @@ export class WorkRepo {
     this.setDlsiteState(work.id, work.dlsite);
   }
 
-  /** PATCH /works/:id および DLsite 適用の DB 側。メタファイル書き戻しは呼び出し側（アダプタ）が行う */
+  /**
+   * PATCH /works/:id および DLsite 適用の DB 側。メタファイル書き戻しは呼び出し側（アダプタ）が行う。
+   * 同期のDBトランザクション内から安全に呼べるよう、probe・freshness確認を伴わない
+   * 軽量な位置情報（getWorkMetaLocation）だけを返す。呼び出し側は必要なら別途 getWork で取得し直す。
+   */
   patchWork(
     id: string,
     patch: {
@@ -1143,7 +1161,7 @@ export class WorkRepo {
       cover?: CoverColumns;
       urls?: UrlEntry[];
     },
-  ): Work | null {
+  ): { physicalPath: string; playlists: Playlist[] } | null {
     const row = this.db.catalog.select().from(works).where(eq(works.id, id)).get();
     if (!row) return null;
     const set: Partial<typeof works.$inferInsert> = {};
@@ -1170,7 +1188,7 @@ export class WorkRepo {
     if (patch.tags !== undefined) {
       this.replaceWorkTags(id, patch.tags);
     }
-    return this.getWork(id);
+    return { physicalPath: row.physicalPath, playlists: parseWorkPlaylists(row) };
   }
 
   saveResume(id: string, body: ResumeBody): boolean {

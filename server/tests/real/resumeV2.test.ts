@@ -63,7 +63,7 @@ function sampleWork(id: string): Work {
   };
 }
 
-test("v2 resumeは区間相対秒で保存され、並べ替え後もTrack IDで復元する", () => {
+test("v2 resumeは区間相対秒で保存され、並べ替え後もTrack IDで復元する", async () => {
   const db = openDb({ kind: "memory" });
   const repo = new WorkRepo(db);
   const work = sampleWork("resume-reorder");
@@ -75,7 +75,7 @@ test("v2 resumeは区間相対秒で保存され、並べ替え後もTrack IDで
     repo.saveResume(work.id, { playlistId: playlist.id, trackId: track.id, offsetSec: 15 }),
     true,
   );
-  assert.deepEqual(repo.getWork(work.id)?.resume, {
+  assert.deepEqual((await repo.getWork(work.id))?.resume, {
     playlistId: playlist.id,
     trackId: track.id,
     offsetSec: 15,
@@ -85,7 +85,7 @@ test("v2 resumeは区間相対秒で保存され、並べ替え後もTrack IDで
     ...work,
     playlists: [{ ...playlist, tracks: [playlist.tracks[1]!, playlist.tracks[0]!] }],
   });
-  assert.deepEqual(repo.getWork(work.id)?.resume, {
+  assert.deepEqual((await repo.getWork(work.id))?.resume, {
     playlistId: playlist.id,
     trackId: track.id,
     offsetSec: 15,
@@ -93,7 +93,7 @@ test("v2 resumeは区間相対秒で保存され、並べ替え後もTrack IDで
   db.close();
 });
 
-test("保存時に所属と区間を検証し、読出し時に解決不能な行だけを無効化する", () => {
+test("保存時に所属と区間を検証し、読出し時に解決不能な行だけを無効化する", async () => {
   const db = openDb({ kind: "memory" });
   const repo = new WorkRepo(db);
   const work = sampleWork("resume-invalid");
@@ -125,7 +125,7 @@ test("保存時に所属と区間を検証し、読出し時に解決不能な�
     })
     .where(eq(workStates.workId, work.id))
     .run();
-  assert.equal(repo.getWork(work.id)?.resume, null);
+  assert.equal((await repo.getWork(work.id))?.resume, null);
   assert.equal(
     db.user.select().from(workStates).where(eq(workStates.workId, work.id)).get()?.resumeTrackId,
     unresolvedTrackId,
@@ -133,7 +133,7 @@ test("保存時に所属と区間を検証し、読出し時に解決不能な�
   db.close();
 });
 
-test("resume v1をdefault Playlistとtrack.startから変換し、未解決行はpendingに残す", () => {
+test("resume v1をdefault Playlistとtrack.startから変換し、未解決行はpendingに残す", async () => {
   const db = openDb({ kind: "memory" });
   const repo = new WorkRepo(db);
   const convertible = sampleWork("resume-v1-ok");
@@ -151,19 +151,19 @@ test("resume v1をdefault Playlistとtrack.startから変換し、未解決行�
   assert.deepEqual(migrateResumeV1(db.sqlite), { converted: 1, pending: 1 });
 
   const playlist = convertible.playlists[0]!;
-  assert.deepEqual(repo.getWork(convertible.id)?.resume, {
+  assert.deepEqual((await repo.getWork(convertible.id))?.resume, {
     playlistId: playlist.id,
     trackId: playlist.tracks[1]!.id,
     offsetSec: 15,
   });
-  assert.equal(repo.getWork(discarded.id)?.resume, null);
+  assert.equal((await repo.getWork(discarded.id))?.resume, null);
   assert.deepEqual(db.user.select().from(resumeV1Pending).all(), [
     { workId: discarded.id, position: 45, trackIndex: 9 },
   ]);
   db.close();
 });
 
-test("user DB v2を再作成せずv3へ移行し、resume v1をpendingに退避する", (t) => {
+test("user DB v2を再作成せずv3へ移行し、resume v1をpendingに退避する", async (t) => {
   const directory = makeTestDirectory("resume-v1-user-db");
   t.after(directory.cleanup);
   const catalogPath = join(directory.path, "catalog.sqlite");
@@ -204,7 +204,7 @@ test("user DB v2を再作成せずv3へ移行し、resume v1をpendingに退避�
   const pending = migrated.user.select().from(resumeV1Pending).all();
   assert.deepEqual(pending, [{ workId: work.id, position: 45, trackIndex: 1 }]);
   assert.deepEqual(migrateResumeV1(migrated.sqlite), { converted: 1, pending: 0 });
-  const migratedWork = migratedRepo.getWork(work.id);
+  const migratedWork = await migratedRepo.getWork(work.id);
   const playlist = work.playlists[0]!;
   assert.equal(migratedWork?.bookmarked, true);
   assert.deepEqual(migratedWork?.resume, {
@@ -242,14 +242,42 @@ test("end省略Trackは音声ファイルを300秒から60秒へ差し替えた�
     repo.saveResume(work.id, { playlistId: playlist.id, trackId: track.id, offsetSec: 200 }),
     true,
   );
-  assert.equal(repo.getWork(work.id)?.resume?.offsetSec, 200);
+  assert.equal((await repo.getWork(work.id))?.resume?.offsetSec, 200);
 
   writeWav(cachePath, 60);
   assert.equal(await probeDurationSec(db.catalog, cachePath), 60);
-  assert.equal(repo.getWork(work.id)?.resume, null);
+  assert.equal((await repo.getWork(work.id))?.resume, null);
   assert.throws(
     () => repo.saveResume(work.id, { playlistId: playlist.id, trackId: track.id, offsetSec: 200 }),
     InvalidResumeError,
   );
+  db.close();
+});
+
+test("end省略Trackはrescan・明示probeなしでもgetWork読み取り時にファイル差し替えを検知する", async (t) => {
+  const directory = makeTestDirectory("resume-file-replacement-live-read");
+  t.after(directory.cleanup);
+  const db = openDb({ kind: "memory" });
+  const repo = new WorkRepo(db);
+  const base = sampleWork("resume-live-read-duration");
+  const playlist = base.playlists[0]!;
+  const track = { ...playlist.tracks[0]!, start: 0, end: undefined };
+  const work = {
+    ...base,
+    physicalPath: directory.path,
+    playlists: [{ ...playlist, tracks: [track] }],
+  };
+  repo.upsertWork(work);
+  const cachePath = join(work.physicalPath, track.file);
+  writeWav(cachePath, 300);
+
+  // getWorkの読み取りだけでprobe cacheが作られる（明示的なprobeDurationSec呼び出しはしない）。
+  const first = await repo.getWork(work.id);
+  assert.equal(first?.playlists[0]?.tracks[0]?.durationSec, 300);
+
+  // rescanを挟まずファイルだけ差し替える。
+  writeWav(cachePath, 60);
+  const second = await repo.getWork(work.id);
+  assert.equal(second?.playlists[0]?.tracks[0]?.durationSec, 60);
   db.close();
 });

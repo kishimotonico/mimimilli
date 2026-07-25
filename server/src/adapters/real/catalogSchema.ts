@@ -24,7 +24,8 @@ export const works = sqliteTable(
     createdAt: text("created_at"),
     status: text("status").notNull(),
     physicalPath: text("physical_path").notNull(),
-    totalDurationSec: real("total_duration_sec").notNull().default(0),
+    /** デフォルトプレイリストの合計秒数。未解決トラックを1件でも含む場合はNULL（未知。0では埋めない）。 */
+    totalDurationSec: real("total_duration_sec"),
     /** デフォルトプレイリストのトラック数。upsert時に維持する（TASK-57: 一覧でplaylists_jsonを読まないため） */
     trackCount: integer("track_count").notNull().default(0),
     /** 増分スキャンの変更検知フィンガープリント（TASK-75で値を設定する。列はTASK-57と同じv5で先行追加） */

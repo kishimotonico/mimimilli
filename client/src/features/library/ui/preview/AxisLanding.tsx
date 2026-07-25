@@ -38,7 +38,9 @@ export function AxisLanding({
                 : null;
           const meta = [
             w.circleName,
-            w.totalDurationSec > 0 ? formatDuration(w.totalDurationSec) : null,
+            w.totalDurationSec !== null && w.totalDurationSec > 0
+              ? formatDuration(w.totalDurationSec)
+              : null,
           ].filter(Boolean);
 
           return (
