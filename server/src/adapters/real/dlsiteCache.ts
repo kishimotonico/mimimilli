@@ -5,8 +5,6 @@ import { gunzipSync, gzipSync } from "node:zlib";
 import { Database } from "bun:sqlite";
 
 export const DLSITE_CACHE_REPRESENTATION = "work-html-ja-adultchecked-v1";
-export const DLSITE_CACHE_RESOURCE_KIND = "work_html";
-export const DLSITE_COVER_CACHE_RESOURCE_KIND = "cover_image";
 export const DEFAULT_DLSITE_CACHE_TTLS_MS = {
   ok: 30 * 24 * 60 * 60 * 1000,
   parse_error: 60 * 60 * 1000,
@@ -22,7 +20,6 @@ export type DlsiteFailureOutcome = "not_found" | "error";
 export type DlsiteStore = "maniax" | "pro";
 
 export interface DlsiteCacheKey {
-  resourceKind?: string;
   productCode: string;
   representation?: string;
 }
@@ -48,16 +45,6 @@ export interface DlsiteHtmlInputMetadata {
   expandedSize: number;
 }
 
-/** 診断専用。期限切れかどうかを問わずHTML本文を含む。 */
-export interface DlsiteHtmlSnapshot {
-  outcome: DlsiteHtmlOutcome;
-  fetchedAt: number;
-  expiresAt: number;
-  contentType: string | null;
-  transferSize: number | null;
-  html: string;
-}
-
 /** 通常取得の判断結果。fresh HTML / 有効な失敗記録 / miss のいずれか。 */
 export type DlsiteCacheResolution =
   | {
@@ -65,15 +52,12 @@ export type DlsiteCacheResolution =
       outcome: DlsiteHtmlOutcome;
       fetchedAt: number;
       expiresAt: number;
-      contentType: string | null;
-      transferSize: number | null;
       html: string;
     }
   | { kind: "failure"; outcome: DlsiteFailureOutcome; attemptedAt: number; expiresAt: number }
   | { kind: "miss" };
 
 type NormalizedKey = {
-  resourceKind: string;
   store: DlsiteStore;
   productCode: string;
   representation: string;
@@ -83,8 +67,6 @@ type SnapshotMetaRow = {
   outcome: DlsiteHtmlOutcome;
   content_fetched_at: number;
   content_expires_at: number;
-  content_type: string | null;
-  transfer_size: number | null;
 };
 
 type SnapshotBodyRow = {
@@ -179,10 +161,9 @@ export function normalizeDlsiteProductCode(code: string): {
 
 function normalizeKey(key: DlsiteCacheKey): NormalizedKey {
   const { productCode, store } = normalizeDlsiteProductCode(key.productCode);
-  const resourceKind = key.resourceKind ?? DLSITE_CACHE_RESOURCE_KIND;
   const representation = key.representation ?? DLSITE_CACHE_REPRESENTATION;
-  if (!resourceKind || !representation) throw new Error("キャッシュキーの名前空間は空にできません");
-  return { resourceKind, store, productCode, representation };
+  if (!representation) throw new Error("キャッシュキーの名前空間は空にできません");
+  return { store, productCode, representation };
 }
 
 /**
@@ -220,37 +201,31 @@ export class DlsiteCache {
     this.sqlite.exec("PRAGMA journal_mode = WAL");
     this.sqlite.exec(`
       CREATE TABLE IF NOT EXISTS dlsite_html_snapshots (
-        resource_kind TEXT NOT NULL,
         store TEXT NOT NULL CHECK(store IN ('maniax', 'pro')),
         product_code TEXT NOT NULL,
         representation TEXT NOT NULL,
         outcome TEXT NOT NULL CHECK(outcome IN ('ok', 'parse_error')),
         content_fetched_at INTEGER NOT NULL,
         content_expires_at INTEGER NOT NULL,
-        content_type TEXT,
-        transfer_size INTEGER,
         html_gzip BLOB NOT NULL,
         html_size INTEGER NOT NULL,
-        PRIMARY KEY (resource_kind, store, product_code, representation)
+        PRIMARY KEY (store, product_code, representation)
       );
       CREATE INDEX IF NOT EXISTS dlsite_html_snapshots_expires_at
         ON dlsite_html_snapshots(content_expires_at);
       CREATE TABLE IF NOT EXISTS dlsite_fetch_failures (
-        resource_kind TEXT NOT NULL,
         store TEXT NOT NULL CHECK(store IN ('maniax', 'pro')),
         product_code TEXT NOT NULL,
         representation TEXT NOT NULL,
         failure_kind TEXT NOT NULL CHECK(failure_kind IN ('not_found', 'error')),
         attempted_at INTEGER NOT NULL,
         failure_expires_at INTEGER NOT NULL,
-        PRIMARY KEY (resource_kind, store, product_code, representation)
+        PRIMARY KEY (store, product_code, representation)
       );
       CREATE INDEX IF NOT EXISTS dlsite_fetch_failures_expires_at
         ON dlsite_fetch_failures(failure_expires_at);
       CREATE TABLE IF NOT EXISTS dlsite_cover_entries (
         cache_key TEXT PRIMARY KEY,
-        normalized_url TEXT NOT NULL,
-        content_type TEXT,
         body BLOB NOT NULL,
         fetched_at INTEGER NOT NULL
       );
@@ -295,48 +270,32 @@ export class DlsiteCache {
       this.sqlite
         .query(
           `INSERT INTO dlsite_html_snapshots
-            (resource_kind, store, product_code, representation, outcome, content_fetched_at,
-             content_expires_at, content_type, transfer_size, html_gzip, html_size)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-           ON CONFLICT(resource_kind, store, product_code, representation) DO UPDATE SET
+            (store, product_code, representation, outcome, content_fetched_at,
+             content_expires_at, html_gzip, html_size)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(store, product_code, representation) DO UPDATE SET
              outcome = excluded.outcome, content_fetched_at = excluded.content_fetched_at,
-             content_expires_at = excluded.content_expires_at, content_type = excluded.content_type,
-             transfer_size = excluded.transfer_size, html_gzip = excluded.html_gzip,
+             content_expires_at = excluded.content_expires_at, html_gzip = excluded.html_gzip,
              html_size = excluded.html_size`,
         )
         .run(
-          key.resourceKind,
           key.store,
           key.productCode,
           key.representation,
           input.outcome,
           fetchedAt,
           expiresAt,
-          input.contentType,
-          transferSize,
           htmlGzip,
           bytes.byteLength,
         );
       this.sqlite
         .query(
           `DELETE FROM dlsite_fetch_failures
-           WHERE resource_kind = ? AND store = ? AND product_code = ? AND representation = ?`,
+           WHERE store = ? AND product_code = ? AND representation = ?`,
         )
-        .run(key.resourceKind, key.store, key.productCode, key.representation);
+        .run(key.store, key.productCode, key.representation);
     });
     write();
-  }
-
-  /** @deprecated recordSuccessの別名。dlsiteCacheCli.tsのimportコマンドから使う。 */
-  putHtml(
-    input: DlsiteCacheKey & {
-      outcome: DlsiteHtmlOutcome;
-      contentType: string;
-      html: string | Uint8Array;
-      transferSize?: number;
-    },
-  ): void {
-    this.recordSuccess(input);
   }
 
   /** HTTP失敗時に呼ぶ。既存のHTML snapshotは診断用に残したまま触らない。 */
@@ -349,59 +308,41 @@ export class DlsiteCache {
     this.sqlite
       .query(
         `INSERT INTO dlsite_fetch_failures
-          (resource_kind, store, product_code, representation, failure_kind, attempted_at, failure_expires_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT(resource_kind, store, product_code, representation) DO UPDATE SET
+          (store, product_code, representation, failure_kind, attempted_at, failure_expires_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(store, product_code, representation) DO UPDATE SET
            failure_kind = excluded.failure_kind, attempted_at = excluded.attempted_at,
            failure_expires_at = excluded.failure_expires_at`,
       )
-      .run(
-        key.resourceKind,
-        key.store,
-        key.productCode,
-        key.representation,
-        input.outcome,
-        attemptedAt,
-        expiresAt,
-      );
+      .run(key.store, key.productCode, key.representation, input.outcome, attemptedAt, expiresAt);
   }
 
   private readFailure(key: NormalizedKey): FailureRow | null {
     return this.sqlite
       .query(
         `SELECT failure_kind, attempted_at, failure_expires_at FROM dlsite_fetch_failures
-         WHERE resource_kind = ? AND store = ? AND product_code = ? AND representation = ?`,
+         WHERE store = ? AND product_code = ? AND representation = ?`,
       )
-      .get(key.resourceKind, key.store, key.productCode, key.representation) as FailureRow | null;
+      .get(key.store, key.productCode, key.representation) as FailureRow | null;
   }
 
   private readSnapshotMeta(key: NormalizedKey): SnapshotMetaRow | null {
     return this.sqlite
       .query(
-        `SELECT outcome, content_fetched_at, content_expires_at, content_type, transfer_size
+        `SELECT outcome, content_fetched_at, content_expires_at
          FROM dlsite_html_snapshots
-         WHERE resource_kind = ? AND store = ? AND product_code = ? AND representation = ?`,
+         WHERE store = ? AND product_code = ? AND representation = ?`,
       )
-      .get(
-        key.resourceKind,
-        key.store,
-        key.productCode,
-        key.representation,
-      ) as SnapshotMetaRow | null;
+      .get(key.store, key.productCode, key.representation) as SnapshotMetaRow | null;
   }
 
   private readSnapshotBody(key: NormalizedKey): SnapshotBodyRow | null {
     return this.sqlite
       .query(
         `SELECT html_gzip, html_size FROM dlsite_html_snapshots
-         WHERE resource_kind = ? AND store = ? AND product_code = ? AND representation = ?`,
+         WHERE store = ? AND product_code = ? AND representation = ?`,
       )
-      .get(
-        key.resourceKind,
-        key.store,
-        key.productCode,
-        key.representation,
-      ) as SnapshotBodyRow | null;
+      .get(key.store, key.productCode, key.representation) as SnapshotBodyRow | null;
   }
 
   private decompressHtml(row: SnapshotBodyRow): string {
@@ -444,25 +385,6 @@ export class DlsiteCache {
       outcome: meta.outcome,
       fetchedAt: meta.content_fetched_at,
       expiresAt: meta.content_expires_at,
-      contentType: meta.content_type,
-      transferSize: meta.transfer_size,
-      html: this.decompressHtml(body),
-    };
-  }
-
-  /** 診断専用。期限切れかどうかを問わずHTML snapshotを読む。通常取得の経路では使わない。 */
-  getStaleSnapshot(keyInput: DlsiteCacheKey): DlsiteHtmlSnapshot | null {
-    const key = normalizeKey(keyInput);
-    const meta = this.readSnapshotMeta(key);
-    if (!meta) return null;
-    const body = this.readSnapshotBody(key);
-    if (!body) return null;
-    return {
-      outcome: meta.outcome,
-      fetchedAt: meta.content_fetched_at,
-      expiresAt: meta.content_expires_at,
-      contentType: meta.content_type,
-      transferSize: meta.transfer_size,
       html: this.decompressHtml(body),
     };
   }
@@ -472,14 +394,11 @@ export class DlsiteCache {
     return createHash("sha256").update(normalizedUrl).digest("hex");
   }
 
-  getCover(normalizedUrl: string): { body: Uint8Array; contentType: string | null } | null {
+  getCover(normalizedUrl: string): { body: Uint8Array } | null {
     const row = this.sqlite
-      .query("SELECT body, content_type FROM dlsite_cover_entries WHERE cache_key = ?")
-      .get(DlsiteCache.coverKey(normalizedUrl)) as {
-      body: Uint8Array;
-      content_type: string | null;
-    } | null;
-    return row ? { body: new Uint8Array(row.body), contentType: row.content_type } : null;
+      .query("SELECT body FROM dlsite_cover_entries WHERE cache_key = ?")
+      .get(DlsiteCache.coverKey(normalizedUrl)) as { body: Uint8Array } | null;
+    return row ? { body: new Uint8Array(row.body) } : null;
   }
 
   putCover(normalizedUrl: string, body: Uint8Array, contentType: string | null): void {
@@ -491,12 +410,11 @@ export class DlsiteCache {
     }
     this.sqlite
       .query(
-        `INSERT INTO dlsite_cover_entries (cache_key, normalized_url, content_type, body, fetched_at)
-         VALUES (?, ?, ?, ?, ?)
-         ON CONFLICT(cache_key) DO UPDATE SET normalized_url = excluded.normalized_url,
-           content_type = excluded.content_type, body = excluded.body, fetched_at = excluded.fetched_at`,
+        `INSERT INTO dlsite_cover_entries (cache_key, body, fetched_at)
+         VALUES (?, ?, ?)
+         ON CONFLICT(cache_key) DO UPDATE SET body = excluded.body, fetched_at = excluded.fetched_at`,
       )
-      .run(DlsiteCache.coverKey(normalizedUrl), normalizedUrl, contentType, body, this.clock());
+      .run(DlsiteCache.coverKey(normalizedUrl), body, this.clock());
   }
 
   cleanupExpired(): number {

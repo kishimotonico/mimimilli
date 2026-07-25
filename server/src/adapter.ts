@@ -97,7 +97,7 @@ export interface DataAdapter {
   getSettings(): Promise<Settings>;
   updateSettings(patch: SettingsUpdate): Promise<Settings>;
   /** signal はジョブ取消用。旧来の progress callback 指定もテスト・外部利用のため受け付ける。 */
-  scan(options?: ScanOptions | ((event: ScanProgressEvent) => void)): Promise<ScanResult>;
+  scan(options?: ScanOptions): Promise<ScanResult>;
 
   // 作品
   queryWorks(params: WorksQuery): Promise<WorksPage>;

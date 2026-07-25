@@ -202,10 +202,12 @@ test("大量ディレクトリの走査中、walking フェーズの進捗イベ
   await adapter.updateSettings({ rootFolder: root });
 
   const walkingEvents: { processed: number; total: number }[] = [];
-  await adapter.scan((event) => {
-    if (event.type === "progress" && event.phase === "walking") {
-      walkingEvents.push({ processed: event.processed, total: event.total });
-    }
+  await adapter.scan({
+    onProgress: (event) => {
+      if (event.type === "progress" && event.phase === "walking") {
+        walkingEvents.push({ processed: event.processed, total: event.total });
+      }
+    },
   });
 
   // root自身 + 120個の子ディレクトリ = 121回の readdir。WALK_PROGRESS_INTERVAL(50)ごとに
@@ -472,10 +474,12 @@ test("増分スキャン: registering 進捗の processed/total はスキップ�
   await adapter.scan();
 
   const events: Array<{ processed: number; total: number }> = [];
-  await adapter.scan((event) => {
-    if (event.type === "progress" && event.phase === "registering") {
-      events.push({ processed: event.processed, total: event.total });
-    }
+  await adapter.scan({
+    onProgress: (event) => {
+      if (event.type === "progress" && event.phase === "registering") {
+        events.push({ processed: event.processed, total: event.total });
+      }
+    },
   });
 
   assert.equal(events[events.length - 1]!.processed, 2);

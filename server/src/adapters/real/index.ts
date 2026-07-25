@@ -84,7 +84,6 @@ import {
   gcThumbnailCache,
   measureCoverDimensions,
   ThumbnailCache,
-  type CoverDimensions,
   type ThumbnailCacheOptions,
   type WorkCoverEntry,
 } from "./thumbnailCache.ts";
@@ -120,8 +119,6 @@ export interface RealAdapterOptions {
   dlsiteCoverDownloader?: (coverUrl: string, workDir: string) => Promise<string>;
   /** キャッシュ統合用のカバーHTTP取得関数。 */
   dlsiteCoverFetcher?: (coverUrl: string) => Promise<DlsiteCoverResponse>;
-  /** カバー寸法の計測関数（テスト用差し替え）。省略時は Sharp 実装 */
-  coverMeasurer?: (sourceAbsolutePath: string) => Promise<CoverDimensions | null>;
   /** Worker隔離の結合テストで同期停止を作るSharedArrayBuffer。実運用では指定しない。 */
   scanWorkerTestGate?: SharedArrayBuffer;
   /** test gateを停止させる位置。省略時はscanner開始前。 */
@@ -132,17 +129,6 @@ export interface RealAdapterOptions {
 
 export interface RealAdapter extends DataAdapter {
   close(): void;
-  /**
-   * options.includeApplied: 明示refresh用。既定は通常bulk（未適用埋め）と同じfalseで、
-   * applied作品は対象外。既存呼び出し元（routes/dlsite.ts, scanJobManager.ts）は
-   * DataAdapter型越しに呼ぶため引数を渡さず、この既定のまま動く。
-   */
-  runDlsiteBulk(
-    mode: DlsiteBulkMode,
-    workIds: string[] | undefined,
-    onProgress?: (event: Extract<DlsiteBulkProgressEvent, { type: "progress" }>) => void,
-    options?: { includeApplied?: boolean },
-  ): Promise<DlsiteBulkResult>;
 }
 
 interface ScanWorkerMessage {
@@ -255,8 +241,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
     (options.database.kind === "files"
       ? dirname(dirname(options.database.catalogPath))
       : join(tmpdir(), "mimikago-memory-data"));
-  const coverMeasurer = options.coverMeasurer ?? measureCoverDimensions;
-  const scanner = new Scanner(db, repo, dataRoot, { measureCover: coverMeasurer });
+  const scanner = new Scanner(db, repo, dataRoot, { measureCover: measureCoverDimensions });
   const dlsiteRequestConfig: DlsiteRequestConfig = {
     ...DEFAULT_DLSITE_REQUEST_CONFIG,
     ...options.dlsiteRequestConfig,
@@ -494,7 +479,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
   ): Promise<CoverColumns | null> {
     const resolved = resolveWithin(workDir, join(workDir, coverImage));
     if (!resolved) return null;
-    const dimensions = await coverMeasurer(resolved);
+    const dimensions = await measureCoverDimensions(resolved);
     if (!dimensions) return null;
     return { image: coverImage, dimensions };
   }
@@ -590,12 +575,9 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       return this.getSettings();
     },
 
-    async scan(
-      scanOptions?: ScanOptions | ((event: ScanProgressEvent) => void),
-    ): Promise<ScanResult> {
+    async scan(scanOptions?: ScanOptions): Promise<ScanResult> {
       const root = requireRoot();
-      const normalized =
-        typeof scanOptions === "function" ? { onProgress: scanOptions } : (scanOptions ?? {});
+      const normalized = scanOptions ?? {};
       if (options.database?.kind === "files") {
         return runFileScanInWorker(
           {
@@ -892,9 +874,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       mode: DlsiteBulkMode,
       workIds: string[] | undefined,
       onProgress?: (event: Extract<DlsiteBulkProgressEvent, { type: "progress" }>) => void,
-      bulkOptions?: { includeApplied?: boolean },
     ): Promise<DlsiteBulkResult> {
-      const includeApplied = bulkOptions?.includeApplied ?? false;
       // 対象抽出は listSummaries で完結させる（全件 getWork の N+1 を解消。TASK-57）。
       // 以降の個別処理で完全な Work が必要な場合だけ、その作品の getWork を呼ぶ
       const summaries = repo.listSummaries();
@@ -904,11 +884,11 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
         return summaries.filter((summary) => idSet.has(summary.id));
       })();
       // 1. work単位で適用対象を選ぶ。statusは「適用が必要か」だけを表す。
-      //    skippedは常に除外。通常bulkはapplied（適用済み）も対象外、明示refreshだけ含める。
+      //    skippedとapplied（適用済み）は常に除外。
       //    HTTP再取得可否（ネットワークへ出るか）はここでは決めず、常にキャッシュTTLへ委ねる。
       const targets = requested.filter((work) => {
         if (!work.dlsite.rjCode || work.dlsite.status === "skipped") return false;
-        return includeApplied || work.dlsite.status !== "applied";
+        return work.dlsite.status !== "applied";
       });
       const result: DlsiteBulkResult = {
         fetched: 0,

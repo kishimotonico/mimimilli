@@ -112,8 +112,8 @@ test("DLsiteキャッシュ: 成功記録は既存の失敗記録を消す", (t)
   assert.equal(cache.resolve({ productCode: "RJ123456" }).kind, "html");
 });
 
-test("DLsiteキャッシュ: 失敗記録はHTML snapshotを消さず診断用に残す", (t) => {
-  const { cache, setClock } = createCache(t);
+test("DLsiteキャッシュ: 失敗記録はHTML snapshotを消さずDBに残す", (t) => {
+  const { cache, directory, setClock } = createCache(t);
   cache.recordSuccess({
     productCode: "RJ123456",
     outcome: "ok",
@@ -124,9 +124,13 @@ test("DLsiteキャッシュ: 失敗記録はHTML snapshotを消さず診断用�
   cache.recordFailure({ productCode: "RJ123456", outcome: "error" });
   const resolved = cache.resolve({ productCode: "RJ123456" });
   assert.equal(resolved.kind, "failure");
-  const stale = cache.getStaleSnapshot({ productCode: "RJ123456" });
-  assert.equal(stale?.outcome, "ok");
-  assert.equal(stale?.html, VALID_HTML);
+
+  const sqlite = new Database(join(directory.path, "dlsite-cache.sqlite"), { readonly: true });
+  const row = sqlite
+    .query("SELECT outcome FROM dlsite_html_snapshots WHERE product_code = ?")
+    .get("RJ123456") as { outcome: string } | null;
+  sqlite.close();
+  assert.equal(row?.outcome, "ok");
 });
 
 test("DLsiteキャッシュ: Content-Typeとサイズ上限で保存前に拒否する", (t) => {

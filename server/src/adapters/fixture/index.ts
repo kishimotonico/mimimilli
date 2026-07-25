@@ -22,7 +22,6 @@ import type {
   FileEntry,
   FsListing,
   ResumeBody,
-  ScanProgressEvent,
   ScanResult,
   SearchPreset,
   SearchPresetCreate,
@@ -321,11 +320,10 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
 
     // fixture には実際に走査するファイルシステムが無いため、数ステップのタイマー進行で
     // 疑似的な進捗を流す（本物のスキャンと同じイベント契約を dev/デモ環境でも確認できるように）。
-    async scan(options?: ScanOptions | ((event: ScanProgressEvent) => void)): Promise<ScanResult> {
-      const normalized = typeof options === "function" ? { onProgress: options } : (options ?? {});
-      const emit = normalized.onProgress ?? ((): void => {});
+    async scan(options?: ScanOptions): Promise<ScanResult> {
+      const emit = options?.onProgress ?? ((): void => {});
       const checkAbort = () => {
-        if (normalized.signal?.aborted)
+        if (options?.signal?.aborted)
           throw new DOMException("スキャンはキャンセルされました", "AbortError");
       };
       const pseudoSteps = 4;

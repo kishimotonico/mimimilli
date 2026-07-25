@@ -3,7 +3,9 @@
 import assert from "node:assert/strict";
 import { chmodSync, cpSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { gunzipSync } from "node:zlib";
 import { test } from "node:test";
+import { Database } from "bun:sqlite";
 import { dlsiteStatePatchSchema, type DlsiteWorkInfo } from "@mimimilli/shared";
 import {
   detectRjCode,
@@ -15,7 +17,6 @@ import {
   normalizeDlsiteCoverUrl,
   parseDlsiteHtml,
 } from "../../src/adapters/real/dlsite.ts";
-import { DlsiteCache } from "../../src/adapters/real/dlsiteCache.ts";
 import { createRealAdapter } from "../../src/adapters/real/index.ts";
 import { createApp } from "../../src/app.ts";
 import { makeSampleLibrary, makeTestDirectory } from "../helpers/sampleLibrary.ts";
@@ -806,12 +807,14 @@ test("DLsite HTMLキャッシュ: 期限切れの再取得失敗はstaleへ戻�
   assert.deepEqual(expired.ok, false);
   if (!expired.ok) assert.equal(expired.kind, "error");
 
-  // error TTL中は古いHTMLが通常取得には使われないが、診断用には引き続き読める。
-  const diagnostics = new DlsiteCache({ path: join(dir.path, "cache.sqlite"), clock: () => now });
-  t.after(() => diagnostics.close());
-  const stale = diagnostics.getStaleSnapshot({ productCode: "RJ900002" });
-  assert.equal(stale?.outcome, "ok");
-  assert.ok(stale?.html.includes("耳元ささやきの夜"));
+  // error TTL中は古いHTMLが通常取得には使われないが、DBからは消えていない。
+  const sqlite = new Database(join(dir.path, "cache.sqlite"), { readonly: true });
+  const row = sqlite
+    .query("SELECT outcome, html_gzip FROM dlsite_html_snapshots WHERE product_code = ?")
+    .get("RJ900002") as { outcome: string; html_gzip: Uint8Array } | null;
+  sqlite.close();
+  assert.equal(row?.outcome, "ok");
+  assert.ok(gunzipSync(row!.html_gzip).toString("utf8").includes("耳元ささやきの夜"));
 
   // force失敗後は本文を保持するが通常取得もstaleを使わず再取得する。
   now = 1_000;
@@ -874,18 +877,14 @@ test("DLsite bulk: 2回目はcache hitでmeta.jsonとlastAttemptAtを書き換�
   });
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
-  await adapter.runDlsiteBulk("existing", [lib.existingWorkId], undefined, {
-    includeApplied: true,
-  });
+  await adapter.runDlsiteBulk("existing", [lib.existingWorkId]);
   const before = await adapter.getWork(lib.existingWorkId);
   const metaPath = join(before!.physicalPath, ".meta.json");
   const mtimeBefore = statSync(metaPath).mtimeMs;
   const lastAttemptBefore = before!.dlsite.lastAttemptAt;
   assert.ok(lastAttemptBefore);
 
-  await adapter.runDlsiteBulk("existing", [lib.existingWorkId], undefined, {
-    includeApplied: true,
-  });
+  await adapter.runDlsiteBulk("existing", [lib.existingWorkId]);
   const after = await adapter.getWork(lib.existingWorkId);
   assert.equal(statSync(metaPath).mtimeMs, mtimeBefore);
   assert.equal(after!.dlsite.lastAttemptAt, lastAttemptBefore);

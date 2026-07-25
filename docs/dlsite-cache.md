@@ -6,10 +6,10 @@ DLsiteの作品ページとカバー画像は、実HTTPへ出る前にローカ�
 
 作品HTMLは「HTML snapshot」と「取得失敗記録」を別テーブルで持ちます。両者は独立して更新されるため、取得が失敗しても直前に成功したHTMLが消えることはありません。
 
-- `dlsite_html_snapshots`: HTTPが2xxで完了したときの記録（パースの成否は問わない）。gzip BLOBの本文、`content_type`、転送サイズを持つ
+- `dlsite_html_snapshots`: HTTPが2xxで完了したときの記録（パースの成否は問わない）。gzip BLOBの本文を持つ
 - `dlsite_fetch_failures`: HTTPが失敗した（404・5xx・通信エラー）ときの記録。本文は持たず、いつまで再試行を抑制するかだけを持つ
 
-キーは `resource_kind=work_html`、ストア（RJ は `maniax`、VJ は `pro`）、大文字化したproduct code、`work-html-ja-adultchecked-v1` です。カバー画像は正規化済みHTTPS URLのSHA-256をキーにして、非圧縮のBLOBで別テーブル（`dlsite_cover_entries`）に保存します。
+キーはストア（RJ は `maniax`、VJ は `pro`）、大文字化したproduct code、`work-html-ja-adultchecked-v1` です。カバー画像は正規化済みHTTPS URLのSHA-256をキーにして、非圧縮のBLOBで別テーブル（`dlsite_cover_entries`）に保存します。
 
 通常取得は次の優先順位で判断します。ネットワークへ出るかどうかは常にこのキャッシュ状態が決めます。
 
@@ -20,7 +20,7 @@ DLsiteの作品ページとカバー画像は、実HTTPへ出る前にローカ�
 書き込みは次のとおりです。
 
 - HTTPが2xxで完了した（パースの成否を問わない）: HTML snapshotを更新し、失敗記録があれば削除する
-- HTTPが失敗した: 失敗記録だけを更新する。既存のHTML snapshotは診断用に残したまま、通常取得には使わない
+- HTTPが失敗した: 失敗記録だけを更新する。既存のHTML snapshotは残したまま、通常取得には使わない
 - `?force=true` はキャッシュの読み取りだけを無視して必ずネットワークへ出る。書き込みは通常時と同じ規則に従うため、forceが失敗しても失敗記録は残り、次の通常取得はその失敗記録に従って抑制される
 
 HTML snapshotのoutcomeと既定TTLは次のとおりです。
