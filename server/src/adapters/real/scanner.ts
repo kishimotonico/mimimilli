@@ -626,11 +626,10 @@ export class Scanner {
       if (entry.cachedFingerprint === entry.fingerprint) continue; // スキップ対象
       const workDir = dirname(entry.metaPath);
       // 詳細DTOは全playlistを返すため、デフォルト以外も含め全playlistのトラックをprobeする。
-      // end指定済みトラックはファイル全体長が不要なためprobe対象から外す。
+      // end指定済みトラックもstart/endのファイル長超過チェックにファイル長が要るためprobe対象に含める。
       for (const playlist of entry.meta.playlists) {
         for (const track of playlist.tracks) {
           checkAbort();
-          if (track.end !== undefined) continue;
           trackPaths.push(join(workDir, track.file));
         }
       }
@@ -692,26 +691,38 @@ export class Scanner {
     const missingFiles = (playlist?.tracks ?? []).filter((t) => !existsSync(join(workDir, t.file)));
 
     // 全playlistのトラックについて解決済みdurationSecを求める（DTO・total・resume検証で共有する式）。
-    // startがファイル全体長以上（データ不正）のトラックはresolveTrackDurationSecがnullを返すため
-    // DTO契約は破らないが、可視化のため作品をerror状態にするべく別途収集する。
+    // startがファイル全体長以上（データ不正、区間長が0以下になる）のトラックはresolveTrackDurationSecが
+    // nullを返すためDTO契約は破らないが、可視化のため作品をerror状態にするべく別途収集する。
+    // end超過はコンテナメタデータとデコード実測値の数十msのズレで健全なデータでも起こりうるため判定しない。
+    // end指定トラックもstart超過チェックにファイル長が要るため（同一ファイルはfileDurationCacheで1回に集約）probeする。
     const invalidStartTracks: Array<{ file: string; title: string }> = [];
+    const fileDurationCache = new Map<string, number | null>();
     const resolvedPlaylists: ResolvedPlaylist[] = [];
     for (const p of meta.playlists) {
       const tracks = [];
       for (const track of p.tracks) {
         checkAbort();
-        let fileDurationSec: number | null = null;
-        if (track.end === undefined) {
+        let fileDurationSec: number | null;
+        if (fileDurationCache.has(track.file)) {
+          fileDurationSec = fileDurationCache.get(track.file)!;
+        } else {
           fileDurationSec = await probeDurationSec(
             this.db.catalog,
             join(workDir, track.file),
             probeCache,
           );
           checkAbort();
-          if (fileDurationSec !== null && fileDurationSec - (track.start ?? 0) <= 0) {
+          fileDurationCache.set(track.file, fileDurationSec);
+        }
+        if (fileDurationSec !== null) {
+          const startSec = track.start ?? 0;
+          if (startSec >= fileDurationSec) {
             invalidStartTracks.push({ file: track.file, title: track.title });
           }
         }
+        // end指定済みはend-startが自明値のため、データ不正の可視化は作品のerror化(status/errorMessage)
+        // のみで行い、durationSec自体は既存のresolveTrackDurationSecの式をそのまま使う
+        // （getWork読み取り時の再計算と値がずれないようにするため）。
         tracks.push({ ...track, durationSec: resolveTrackDurationSec(track, fileDurationSec) });
       }
       resolvedPlaylists.push({ id: p.id, name: p.name, tracks });

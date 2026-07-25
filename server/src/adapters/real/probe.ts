@@ -55,6 +55,10 @@ export async function probeDurationSec(
     const meta = await parseFile(filePath, { duration: true });
     duration = meta.format.duration ?? null;
   } catch (e) {
+    // ファイル記述子枯渇等のリソース起因エラーは「このファイルの計測失敗」ではないため、
+    // 未知(null)としてキャッシュに焼き付けず呼び出し元へ伝播させる。
+    const code = (e as NodeJS.ErrnoException).code;
+    if (code === "EMFILE" || code === "ENFILE") throw e;
     console.warn(`再生時間を取得できません: ${filePath}: ${(e as Error).message}`);
   }
 

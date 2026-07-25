@@ -234,6 +234,17 @@ function parseWorkPlaylists(row: Pick<WorkRow, "id" | "playlistsJson">): Playlis
   );
 }
 
+/**
+ * デフォルトプレイリストのトラックdurationSecを合算する（scannerのtotalDurationSec算出式と同一）。
+ * 未解決（null）トラックを1件でも含む場合は合計自体も未知としてnullにする。
+ */
+function sumDefaultPlaylistDuration(row: WorkRow, playlists: ResolvedPlaylist[]): number | null {
+  const defaultPlaylist = defaultPlaylistOf(row, playlists);
+  const tracks = defaultPlaylist?.tracks ?? [];
+  if (tracks.some((track) => track.durationSec === null)) return null;
+  return tracks.reduce((sum, track) => sum + track.durationSec!, 0);
+}
+
 function rowToWork(
   row: WorkRow,
   rawPlaylists: Playlist[],
@@ -260,6 +271,9 @@ function rowToWork(
     }),
   }));
   const resume = resolveResume(row, playlists);
+  // totalDurationSecはトラックのライブ解決値から都度再計算する（保存列のスキャン時点値だと
+  // ファイル差し替え後にトラック合計と矛盾するため）。保存列との同期は呼び出し側が行う。
+  const totalDurationSec = sumDefaultPlaylistDuration(row, playlists);
   return parseRecord(
     workSchema,
     {
@@ -268,7 +282,7 @@ function rowToWork(
       cover: projectCover(row.coverImage, row.coverWidth, row.coverHeight),
       status: row.status,
       physicalPath: row.physicalPath,
-      totalDurationSec: row.totalDurationSec,
+      totalDurationSec,
       addedAt: row.addedAt,
       errorMessage: row.errorMessage,
       urls: parseJsonField(row.urlsJson, "works", row.id, "urls_json"),
@@ -312,6 +326,24 @@ function chunk<T>(items: T[], size: number): T[][] {
   }
   return chunks;
 }
+
+/** ファイル記述子上限を超えないよう、同時実行数を制限して並列処理する。 */
+async function mapWithConcurrency<T>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<void>,
+): Promise<void> {
+  let cursor = 0;
+  async function worker(): Promise<void> {
+    while (cursor < items.length) {
+      const item = items[cursor++]!;
+      await fn(item);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+}
+
+const PROBE_CONCURRENCY = 8;
 
 function worksOrderSql(
   sort: WorksQuery["sort"],
@@ -378,11 +410,9 @@ export class WorkRepo {
     const map = new Map<string, number | null>();
     if (paths.length === 0) return map;
     const cache = this.fetchProbeCache(paths);
-    await Promise.all(
-      paths.map(async (path) => {
-        map.set(path, await probeDurationSec(this.db.catalog, path, cache));
-      }),
-    );
+    await mapWithConcurrency(paths, PROBE_CONCURRENCY, async (path) => {
+      map.set(path, await probeDurationSec(this.db.catalog, path, cache));
+    });
     return map;
   }
 
@@ -1012,13 +1042,28 @@ export class WorkRepo {
     const row = this.joinedWorks("WHERE works.id = ?", id)[0];
     if (!row) return null;
     const rawPlaylists = parseWorkPlaylists(row);
-    return rowToWork(
+    const work = rowToWork(
       row,
       rawPlaylists,
       this.tagMap([id]).get(id) ?? [],
       this.dlsiteState(id),
       await this.liveFileDurationMap(row.physicalPath, rawPlaylists),
     );
+    this.syncTotalDurationSec(row, work.totalDurationSec);
+    return work;
+  }
+
+  /**
+   * 一覧のソート・フィルタは works.total_duration_sec（保存列）を読むため、getWork/getWorkByPhysicalPath
+   * のライブ再計算値が保存値と乖離していたら、probe cache更新の読み取り時書き込みと同じ作法で同期する。
+   */
+  private syncTotalDurationSec(row: WorkRow, liveTotalDurationSec: number | null): void {
+    if (row.totalDurationSec === liveTotalDurationSec) return;
+    this.db.catalog
+      .update(works)
+      .set({ totalDurationSec: liveTotalDurationSec })
+      .where(eq(works.id, row.id))
+      .run();
   }
 
   /**
@@ -1050,13 +1095,15 @@ export class WorkRepo {
     const row = this.joinedWorks("WHERE works.physical_path = ?", physicalPath)[0];
     if (!row) return null;
     const rawPlaylists = parseWorkPlaylists(row);
-    return rowToWork(
+    const work = rowToWork(
       row,
       rawPlaylists,
       this.tagMap([row.id]).get(row.id) ?? [],
       this.dlsiteState(row.id),
       await this.liveFileDurationMap(row.physicalPath, rawPlaylists),
     );
+    this.syncTotalDurationSec(row, work.totalDurationSec);
+    return work;
   }
 
   /**

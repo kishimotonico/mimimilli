@@ -1,10 +1,10 @@
 ---
 id: TASK-92
 title: トラックの解決済み再生時間をDTOで提供しdurationchange後追いを撤廃する
-status: Done
+status: In Progress
 assignee: []
 created_date: '2026-07-24 15:03'
-updated_date: '2026-07-25 10:13'
+updated_date: '2026-07-25 10:26'
 labels: []
 dependencies: []
 priority: high
@@ -22,9 +22,11 @@ TASK-91と同型のデータ不足由来アンチパターン。トラック(sha
 - [x] #1 Track(またはPlaylist経由のDTO)に解決済み durationSec が含まれる。end-start、end未指定は audio_probe_cache から解決。Zod契約を更新
 - [x] #2 client がサーバー提供の durationSec を初期表示から使い、durationchange 待ちによる 0:00 フラッシュが起きない
 - [x] #3 audioEngine の durationchange 依存と durationSec=0 フォールバック/リセットが、確定データ利用に置き換わる（過度なフォールバック解消）
-- [x] #4 probe cache 未取得トラックの扱いが過度なフォールバックにならない形で明示されている。1ファイル内マルチトラック(start/end指定)も正しい残り時間になる
-- [x] #5 pnpm check・pnpm test が通り、曲送り・シークの回帰が確認されている
+- [ ] #4 probe cache 未取得トラックの扱いが過度なフォールバックにならない形で明示されている。1ファイル内マルチトラック(start/end指定)も正しい残り時間になる
+- [ ] #5 pnpm check・pnpm test が通り、曲送り・シークの回帰が確認されている
 <!-- AC:END -->
+
+
 
 
 

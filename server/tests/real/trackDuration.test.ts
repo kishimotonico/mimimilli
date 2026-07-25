@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
+import type { WorksQuery } from "@mimimilli/shared";
 import { createRealAdapter } from "../../src/adapters/real/index.ts";
 import { makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 
@@ -180,4 +181,172 @@ test("startがファイル全体長以上のトラックは作品をerror状態�
 
   // 未解決トラックを含むため合計も未知。
   assert.equal(work.totalDurationSec, null);
+});
+
+test("end指定トラックでもstartがファイル全体長を超えていれば作品をerror状態にする", async (t) => {
+  const directory = makeTestDirectory("track-duration-invalid-start-with-end");
+  t.after(directory.cleanup);
+  const root = join(directory.path, "lib");
+  const workDir = join(root, "RJ900012_end指定不正start");
+  mkdirSync(workDir, { recursive: true });
+
+  // 実ファイルは5秒。start:9, end:10 は end-start自体は正の値(1)になるため、
+  // end有無で判定を分岐していると素通りしてしまう不正区間。
+  writeWav(join(workDir, "short.wav"), 5);
+
+  const id = crypto.randomUUID();
+  const defaultPlaylistId = crypto.randomUUID();
+  writeFileSync(
+    join(workDir, ".meta.json"),
+    JSON.stringify(
+      {
+        id,
+        title: "end指定不正start",
+        tags: [],
+        defaultPlaylistId,
+        playlists: [
+          {
+            id: defaultPlaylistId,
+            name: "default",
+            tracks: [
+              {
+                id: crypto.randomUUID(),
+                title: "start超過(end指定あり)",
+                file: "short.wav",
+                start: 9,
+                end: 10,
+              },
+            ],
+          },
+        ],
+      },
+      null,
+      2,
+    ),
+  );
+
+  const adapter = createRealAdapter({ database: { kind: "memory" } });
+  await adapter.updateSettings({ rootFolder: root });
+  await adapter.scan();
+
+  const work = await adapter.getWork(id);
+  assert.ok(work);
+
+  // end指定済みはend-startが自明値のため、可視化は作品のerror化（status/errorMessage）で行う。
+  // 以前はend===undefinedの分岐内でしかstart超過を判定していなかったため、この区間は
+  // probeされずstatus "ok"のまま見過ごされていた。
+  assert.equal(work.status, "error");
+  assert.match(work.errorMessage ?? "", /開始位置がファイル長を超えています/);
+});
+
+test("endがファイル実測長をわずかに超えるだけの正常データはerrorにしない", async (t) => {
+  const directory = makeTestDirectory("track-duration-end-slightly-over");
+  t.after(directory.cleanup);
+  const root = join(directory.path, "lib");
+  const workDir = join(root, "RJ900014_end微小超過");
+  mkdirSync(workDir, { recursive: true });
+
+  // 実ファイルは5秒。コンテナのメタデータとデコード実測値には数十msのズレが出うるため、
+  // end(5.04)が実測長(5)をわずかに超えるのは正常データ。startのファイル長超過とは区別する。
+  writeWav(join(workDir, "whole.wav"), 5);
+
+  const id = crypto.randomUUID();
+  const defaultPlaylistId = crypto.randomUUID();
+  writeFileSync(
+    join(workDir, ".meta.json"),
+    JSON.stringify(
+      {
+        id,
+        title: "end微小超過",
+        tags: [],
+        defaultPlaylistId,
+        playlists: [
+          {
+            id: defaultPlaylistId,
+            name: "default",
+            tracks: [
+              { id: crypto.randomUUID(), title: "end微小超過", file: "whole.wav", end: 5.04 },
+            ],
+          },
+        ],
+      },
+      null,
+      2,
+    ),
+  );
+
+  const adapter = createRealAdapter({ database: { kind: "memory" } });
+  await adapter.updateSettings({ rootFolder: root });
+  await adapter.scan();
+
+  const work = await adapter.getWork(id);
+  assert.ok(work);
+
+  assert.equal(work.status, "ok");
+  assert.equal(work.errorMessage, null);
+
+  const track = work.playlists.find((p) => p.id === defaultPlaylistId)?.tracks[0];
+  assert.equal(track?.durationSec, 5.04);
+});
+
+test("rescan無しのファイル差し替え後、getWorkのtotalDurationSecはトラック合計と一致し保存列にも同期する", async (t) => {
+  const directory = makeTestDirectory("track-duration-total-sync");
+  t.after(directory.cleanup);
+  const root = join(directory.path, "lib");
+  const workDir = join(root, "RJ900013_総時間同期");
+  mkdirSync(workDir, { recursive: true });
+
+  // end未指定（ファイル全体を使う）トラック1本。ファイル全体長がそのままtotalDurationSecになる。
+  writeWav(join(workDir, "whole.wav"), 5);
+
+  const id = crypto.randomUUID();
+  const defaultPlaylistId = crypto.randomUUID();
+  const trackId = crypto.randomUUID();
+  writeFileSync(
+    join(workDir, ".meta.json"),
+    JSON.stringify(
+      {
+        id,
+        title: "総時間同期",
+        tags: [],
+        defaultPlaylistId,
+        playlists: [
+          {
+            id: defaultPlaylistId,
+            name: "default",
+            tracks: [{ id: trackId, title: "whole", file: "whole.wav" }],
+          },
+        ],
+      },
+      null,
+      2,
+    ),
+  );
+
+  const adapter = createRealAdapter({ database: { kind: "memory" } });
+  await adapter.updateSettings({ rootFolder: root });
+  await adapter.scan();
+
+  const beforeWork = await adapter.getWork(id);
+  assert.ok(beforeWork);
+  assert.equal(beforeWork.totalDurationSec, 5);
+
+  const baseQuery: WorksQuery = { q: "", tags: [], tagOp: "AND", sort: "added-desc" };
+  const beforePage = await adapter.queryWorks(baseQuery);
+  assert.equal(beforePage.items.find((item) => item.id === id)?.totalDurationSec, 5);
+
+  // rescanせずにファイルを差し替える（8秒に変わる＝サイズもmtimeも変わる）。
+  writeWav(join(workDir, "whole.wav"), 8);
+
+  const afterWork = await adapter.getWork(id);
+  assert.ok(afterWork);
+  const track = afterWork.playlists.find((p) => p.id === defaultPlaylistId)?.tracks[0];
+  // トラックのdurationSecはstat照合による再probeでライブに8秒へ更新される。
+  assert.equal(track?.durationSec, 8);
+  // totalDurationSecはスキャン時点の保存値(5)ではなく、トラック合計(8)と一致する。
+  assert.equal(afterWork.totalDurationSec, 8);
+
+  // 一覧のソート・フィルタが読む保存列(works.total_duration_sec)も、getWorkの読み取り時に同期される。
+  const afterPage = await adapter.queryWorks(baseQuery);
+  assert.equal(afterPage.items.find((item) => item.id === id)?.totalDurationSec, 8);
 });
