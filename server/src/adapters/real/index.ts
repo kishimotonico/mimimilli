@@ -132,6 +132,17 @@ export interface RealAdapterOptions {
 
 export interface RealAdapter extends DataAdapter {
   close(): void;
+  /**
+   * options.includeApplied: 明示refresh用。既定は通常bulk（未適用埋め）と同じfalseで、
+   * applied作品は対象外。既存呼び出し元（routes/dlsite.ts, scanJobManager.ts）は
+   * DataAdapter型越しに呼ぶため引数を渡さず、この既定のまま動く。
+   */
+  runDlsiteBulk(
+    mode: DlsiteBulkMode,
+    workIds: string[] | undefined,
+    onProgress?: (event: Extract<DlsiteBulkProgressEvent, { type: "progress" }>) => void,
+    options?: { includeApplied?: boolean },
+  ): Promise<DlsiteBulkResult>;
 }
 
 interface ScanWorkerMessage {
@@ -302,35 +313,46 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
     : dlsiteCoverFetcher;
   const scheduledDlsiteCoverDownloader = (coverUrl: string, workDir: string) =>
     dlsiteScheduler.schedule(() => dlsiteCoverDownloader(coverUrl, workDir));
-  const dlsiteFlights = new Map<string, Promise<DlsiteFetchResult>>();
+  const dlsiteFlights = new Map<string, Promise<DlsiteFetchAttempt>>();
   const dlsiteCoverFlights = new Map<
     string,
     Promise<{ body: Uint8Array; normalizedUrl: string }>
   >();
 
-  async function fetchCachedDlsite(productCode: string, force = false): Promise<DlsiteFetchResult> {
+  /** キャッシュ越しのDLsite取得結果。httpAttemptedはHTTPへ実際に出たか（cache hitならfalse）。 */
+  interface DlsiteFetchAttempt {
+    result: DlsiteFetchResult;
+    httpAttempted: boolean;
+  }
+
+  async function fetchCachedDlsiteAttempt(
+    productCode: string,
+    force = false,
+  ): Promise<DlsiteFetchAttempt> {
     // キャッシュ未設定の既存テスト注入契約は維持する。
     if (!dlsiteCache) {
       dlsiteScheduler.assertOnline();
-      return scheduledDlsiteFetcher(productCode);
+      return { result: await scheduledDlsiteFetcher(productCode), httpAttempted: true };
     }
     const key = productCode.trim().toUpperCase();
     if (!force) {
-      const cached = dlsiteCache.get({ productCode: key });
-      if (cached) {
+      const resolution = dlsiteCache.resolve({ productCode: key });
+      if (resolution.kind !== "miss") {
         options.dlsiteSchedulerDependencies?.logger?.({
           event: "dlsite_cache_hit",
           resource: "html",
           key,
         });
-        if (cached.outcome === "ok" || cached.outcome === "parse_error") {
-          if (cached.html === null) throw new Error("DLsite HTMLキャッシュ本文がありません");
-          return dlsiteParser(cached.html, key);
+        if (resolution.kind === "html") {
+          return { result: dlsiteParser(resolution.html, key), httpAttempted: false };
         }
         return {
-          ok: false,
-          kind: cached.outcome,
-          message: `DLsite取得キャッシュ: ${cached.outcome}（${key}）`,
+          result: {
+            ok: false,
+            kind: resolution.outcome,
+            message: `DLsite取得キャッシュ: ${resolution.outcome}（${key}）`,
+          },
+          httpAttempted: false,
         };
       }
     }
@@ -344,49 +366,60 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       dlsiteScheduler.assertOnline();
     } catch (error) {
       if (error instanceof DlsiteOfflineError) {
-        return { ok: false, kind: "offline", message: error.message };
+        return {
+          result: { ok: false, kind: "offline", message: error.message },
+          httpAttempted: false,
+        };
       }
       throw error;
     }
     // fresh hitはここまでに返す。networkを始める場合だけforce/normalを問わず合流する。
     const ongoing = dlsiteFlights.get(key);
     if (ongoing) return ongoing;
-    const existing = dlsiteCache.getStored({ productCode: key });
-    const request: Promise<DlsiteFetchResult> = (async (): Promise<DlsiteFetchResult> => {
+    const request: Promise<DlsiteFetchAttempt> = (async (): Promise<DlsiteFetchAttempt> => {
       try {
         const response = await scheduledDlsiteHtmlFetcher(key);
         if (response.status === 404) {
-          if (force && existing?.outcome === "ok") dlsiteCache.expire({ productCode: key });
-          else dlsiteCache.putNegative({ productCode: key, outcome: "not_found" });
-          return { ok: false, kind: "not_found", message: `DLsite作品が見つかりません（${key}）` };
+          dlsiteCache.recordFailure({ productCode: key, outcome: "not_found" });
+          return {
+            result: {
+              ok: false,
+              kind: "not_found",
+              message: `DLsite作品が見つかりません（${key}）`,
+            },
+            httpAttempted: true,
+          };
         }
         if (response.status < 200 || response.status >= 300) {
-          if (force && existing?.outcome === "ok") dlsiteCache.expire({ productCode: key });
-          else if (!existing) dlsiteCache.putNegative({ productCode: key, outcome: "error" });
+          dlsiteCache.recordFailure({ productCode: key, outcome: "error" });
           return {
-            ok: false,
-            kind: "error",
-            message: `DLsiteの取得に失敗しました（${key}: HTTP ${response.status}）`,
+            result: {
+              ok: false,
+              kind: "error",
+              message: `DLsiteの取得に失敗しました（${key}: HTTP ${response.status}）`,
+            },
+            httpAttempted: true,
           };
         }
         const parsed = dlsiteParser(response.body, key);
-        if (parsed.ok || !force) {
-          dlsiteCache.putHtml({
-            productCode: key,
-            outcome: parsed.ok ? "ok" : "parse_error",
-            contentType: response.contentType ?? "",
-            html: response.body,
-            transferSize: response.transferSize,
-          });
-        }
-        return parsed;
+        // HTTPが成功した以上、パースの成否にかかわらずsnapshotを更新し失敗記録は消す。
+        dlsiteCache.recordSuccess({
+          productCode: key,
+          outcome: parsed.ok ? "ok" : "parse_error",
+          contentType: response.contentType ?? "",
+          html: response.body,
+          transferSize: response.transferSize,
+        });
+        return { result: parsed, httpAttempted: true };
       } catch (error) {
-        if (force && existing?.outcome === "ok") dlsiteCache.expire({ productCode: key });
-        else if (!existing) dlsiteCache.putNegative({ productCode: key, outcome: "error" });
+        dlsiteCache.recordFailure({ productCode: key, outcome: "error" });
         return {
-          ok: false,
-          kind: "error",
-          message: `DLsiteとの通信に失敗しました（${key}: ${(error as Error).message}）`,
+          result: {
+            ok: false,
+            kind: "error",
+            message: `DLsiteとの通信に失敗しました（${key}: ${(error as Error).message}）`,
+          },
+          httpAttempted: true,
         };
       }
     })();
@@ -396,6 +429,10 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
     } finally {
       dlsiteFlights.delete(key);
     }
+  }
+
+  async function fetchCachedDlsite(productCode: string, force = false): Promise<DlsiteFetchResult> {
+    return (await fetchCachedDlsiteAttempt(productCode, force)).result;
   }
 
   async function cachedCover(coverUrl: string, workDir: string): Promise<string> {
@@ -855,7 +892,9 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       mode: DlsiteBulkMode,
       workIds: string[] | undefined,
       onProgress?: (event: Extract<DlsiteBulkProgressEvent, { type: "progress" }>) => void,
+      bulkOptions?: { includeApplied?: boolean },
     ): Promise<DlsiteBulkResult> {
+      const includeApplied = bulkOptions?.includeApplied ?? false;
       // 対象抽出は listSummaries で完結させる（全件 getWork の N+1 を解消。TASK-57）。
       // 以降の個別処理で完全な Work が必要な場合だけ、その作品の getWork を呼ぶ
       const summaries = repo.listSummaries();
@@ -864,21 +903,48 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
         const idSet = new Set(workIds);
         return summaries.filter((summary) => idSet.has(summary.id));
       })();
-      // statusは表示・適用状態であり、HTTP再取得可否には使わない。skippedだけは明示的な除外。
-      const targets = requested.filter(
-        (work) => work.dlsite.rjCode && work.dlsite.status !== "skipped",
-      );
+      // 1. work単位で適用対象を選ぶ。statusは「適用が必要か」だけを表す。
+      //    skippedは常に除外。通常bulkはapplied（適用済み）も対象外、明示refreshだけ含める。
+      //    HTTP再取得可否（ネットワークへ出るか）はここでは決めず、常にキャッシュTTLへ委ねる。
+      const targets = requested.filter((work) => {
+        if (!work.dlsite.rjCode || work.dlsite.status === "skipped") return false;
+        return includeApplied || work.dlsite.status !== "applied";
+      });
       const result: DlsiteBulkResult = {
         fetched: 0,
         failed: 0,
         skipped: requested.length - targets.length,
       };
 
+      // 2. RJコードを重複排除して取得する。同一作品を跨いで同じRJコードが複数あっても
+      //    HTTP・キャッシュ判定は1回で済ませる。
+      const uniqueRjCodes = [...new Set(targets.map((work) => work.dlsite.rjCode!))];
+      const attempts = new Map<string, DlsiteFetchAttempt>();
+      for (const rjCode of uniqueRjCodes) {
+        try {
+          attempts.set(rjCode, await fetchCachedDlsiteAttempt(rjCode));
+        } catch (error) {
+          if (error instanceof DlsiteOfflineError) throw error;
+          attempts.set(rjCode, {
+            result: {
+              ok: false,
+              kind: "error",
+              message: error instanceof Error ? error.message : "DLsite取得に失敗しました",
+            },
+            httpAttempted: false,
+          });
+        }
+      }
+
       for (let index = 0; index < targets.length; index++) {
         const work = targets[index]!;
-        const attemptedAt = new Date().toISOString();
+        const attempt = attempts.get(work.dlsite.rjCode!)!;
+        const fetched = attempt.result;
+        // 実HTTPを試みた時だけlastAttemptAtを進める。cache hitは「HTTPをいつ試みたか」を書き換えない。
+        const attemptedAt = attempt.httpAttempted
+          ? new Date().toISOString()
+          : work.dlsite.lastAttemptAt;
         try {
-          const fetched = await fetchCachedDlsite(work.dlsite.rjCode!);
           if (!fetched.ok) {
             if (fetched.kind === "offline") {
               result.failed += 1;
@@ -890,17 +956,25 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
               });
               continue;
             }
-            const dlsite = {
-              ...work.dlsite,
-              status: fetched.kind === "not_found" ? ("not_found" as const) : ("error" as const),
-              lastAttemptAt: attemptedAt,
-              error: fetched.message,
-            };
-            db.transaction(() => {
-              repo.setDlsiteState(work.id, dlsite);
-              const metaLocation = repo.getWorkMetaLocation(work.id);
-              if (metaLocation) patchMetaFile(findMetaPath(metaLocation), { dlsite });
-            });
+            const newStatus =
+              fetched.kind === "not_found" ? ("not_found" as const) : ("error" as const);
+            const noOp =
+              !attempt.httpAttempted &&
+              work.dlsite.status === newStatus &&
+              work.dlsite.error === fetched.message;
+            if (!noOp) {
+              const dlsite = {
+                ...work.dlsite,
+                status: newStatus,
+                lastAttemptAt: attemptedAt,
+                error: fetched.message,
+              };
+              db.transaction(() => {
+                repo.setDlsiteState(work.id, dlsite);
+                const metaLocation = repo.getWorkMetaLocation(work.id);
+                if (metaLocation) patchMetaFile(findMetaPath(metaLocation), { dlsite });
+              });
+            }
             result.failed += 1;
           } else {
             const allInfoTags = mergeDlsiteTags([], fetched.info);
@@ -908,50 +982,64 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
               mode === "new"
                 ? allInfoTags
                 : allInfoTags.filter((tag) => !work.dlsite.appliedTags.includes(tag));
-            const patch: {
-              title?: string;
-              tags?: string[];
-              cover?: CoverColumns;
-              urls?: Work["urls"];
-            } = {
-              tags: normalizeTags([...work.tags, ...applyTags]),
-            };
-            if (
-              mode === "new" ||
-              isDefaultTitle(work.title, work.physicalPath, work.dlsite.rjCode)
-            ) {
-              patch.title = fetched.info.title;
-            }
-            if (!work.urls.some((entry) => entry.url.includes("dlsite.com"))) {
-              patch.urls = [...work.urls, { label: "DLsite", url: fetched.info.url }];
-            }
-            let coverImage: string | undefined;
-            if (!work.cover && fetched.info.coverUrl) {
-              coverImage = await cachedCover(fetched.info.coverUrl, work.physicalPath);
-              // カバー計測失敗はこの作品の適用失敗として扱う（error状態へ落として次作品へ続行）。
-              const cover = await measureDownloadedCover(work.physicalPath, coverImage);
-              if (!cover) throw new Error(`カバー寸法を計測できません: ${coverImage}`);
-              patch.cover = cover;
-            }
-            const dlsite = {
-              rjCode: fetched.info.rjCode,
-              status: "applied" as const,
-              lastAttemptAt: attemptedAt,
-              error: null,
-              appliedTags: normalizeTags([...work.dlsite.appliedTags, ...allInfoTags]),
-            };
-            db.transaction(() => {
-              const updated = repo.patchWork(work.id, patch);
-              if (!updated) throw new Error(`一括取得中に作品が見つからなくなりました: ${work.id}`);
-              repo.setDlsiteState(work.id, dlsite);
-              patchMetaFile(findMetaPath(updated), {
-                title: patch.title,
-                tags: patch.tags,
-                coverImage,
-                urls: patch.urls,
-                dlsite,
+            const nextTags = normalizeTags([...work.tags, ...applyTags]);
+            const nextTitle =
+              mode === "new" || isDefaultTitle(work.title, work.physicalPath, work.dlsite.rjCode)
+                ? fetched.info.title
+                : undefined;
+            const nextUrls = !work.urls.some((entry) => entry.url.includes("dlsite.com"))
+              ? [...work.urls, { label: "DLsite", url: fetched.info.url }]
+              : undefined;
+            const coverNeeded = !work.cover && !!fetched.info.coverUrl;
+            const nextAppliedTags = normalizeTags([...work.dlsite.appliedTags, ...allInfoTags]);
+            const noOp =
+              !attempt.httpAttempted &&
+              !coverNeeded &&
+              nextUrls === undefined &&
+              (nextTitle === undefined || nextTitle === work.title) &&
+              arraysEqual(nextTags, work.tags) &&
+              arraysEqual(nextAppliedTags, work.dlsite.appliedTags) &&
+              work.dlsite.status === "applied" &&
+              work.dlsite.rjCode === fetched.info.rjCode &&
+              work.dlsite.error === null;
+            if (!noOp) {
+              const patch: {
+                title?: string;
+                tags?: string[];
+                cover?: CoverColumns;
+                urls?: Work["urls"];
+              } = { tags: nextTags };
+              if (nextTitle !== undefined) patch.title = nextTitle;
+              if (nextUrls !== undefined) patch.urls = nextUrls;
+              let coverImage: string | undefined;
+              if (coverNeeded) {
+                coverImage = await cachedCover(fetched.info.coverUrl!, work.physicalPath);
+                // カバー計測失敗はこの作品の適用失敗として扱う（error状態へ落として次作品へ続行）。
+                const cover = await measureDownloadedCover(work.physicalPath, coverImage);
+                if (!cover) throw new Error(`カバー寸法を計測できません: ${coverImage}`);
+                patch.cover = cover;
+              }
+              const dlsite = {
+                rjCode: fetched.info.rjCode,
+                status: "applied" as const,
+                lastAttemptAt: attemptedAt,
+                error: null,
+                appliedTags: nextAppliedTags,
+              };
+              db.transaction(() => {
+                const updated = repo.patchWork(work.id, patch);
+                if (!updated)
+                  throw new Error(`一括取得中に作品が見つからなくなりました: ${work.id}`);
+                repo.setDlsiteState(work.id, dlsite);
+                patchMetaFile(findMetaPath(updated), {
+                  title: patch.title,
+                  tags: patch.tags,
+                  coverImage,
+                  urls: patch.urls,
+                  dlsite,
+                });
               });
-            });
+            }
             result.fetched += 1;
           }
         } catch (error) {
@@ -1001,6 +1089,10 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       db.close();
     },
   };
+}
+
+function arraysEqual(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((value, index) => value === b[index]);
 }
 
 /** 作品のメタファイルパスを返す（フォルダー形式 / 単一ファイル形式の両対応） */

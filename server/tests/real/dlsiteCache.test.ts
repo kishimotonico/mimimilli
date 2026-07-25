@@ -33,20 +33,22 @@ function createCache(t: { after: (callback: () => void) => void }, now = 1_000) 
 
 test("DLsiteキャッシュ: hit/miss、RJ/VJ正規化、gzip BLOBを扱う", (t) => {
   const { cache, directory } = createCache(t);
-  assert.equal(cache.get({ productCode: "RJ123456" }), null);
-  cache.putHtml({
+  assert.deepEqual(cache.resolve({ productCode: "RJ123456" }), { kind: "miss" });
+  cache.recordSuccess({
     productCode: " rj123456 ",
     outcome: "ok",
     contentType: "text/html; charset=utf-8",
     html: VALID_HTML,
   });
-  const hit = cache.get({ productCode: "RJ123456" });
-  assert.equal(hit?.html, VALID_HTML);
-  assert.equal(hit?.store, "maniax");
-  assert.equal(hit?.outcome, "ok");
+  const hit = cache.resolve({ productCode: "RJ123456" });
+  assert.equal(hit.kind, "html");
+  if (hit.kind === "html") {
+    assert.equal(hit.html, VALID_HTML);
+    assert.equal(hit.outcome, "ok");
+  }
 
   const sqlite = new Database(join(directory.path, "dlsite-cache.sqlite"), { readonly: true });
-  const row = sqlite.query("SELECT html_gzip FROM dlsite_cache_entries").get() as {
+  const row = sqlite.query("SELECT html_gzip FROM dlsite_html_snapshots").get() as {
     html_gzip: Uint8Array;
   };
   sqlite.close();
@@ -57,43 +59,81 @@ test("DLsiteキャッシュ: hit/miss、RJ/VJ正規化、gzip BLOBを扱う", (t
 
 test("DLsiteキャッシュ: TTL境界とoutcome別TTLでは期限切れを返さない", (t) => {
   const { cache, setClock } = createCache(t);
-  cache.putHtml({
+  cache.recordSuccess({
     productCode: "RJ123456",
     outcome: "ok",
     contentType: "text/html",
     html: VALID_HTML,
   });
   setClock(1_099);
-  assert.equal(cache.get({ productCode: "RJ123456" })?.outcome, "ok");
+  assert.equal(cache.resolve({ productCode: "RJ123456" }).kind, "html");
   setClock(1_100);
-  assert.equal(cache.get({ productCode: "RJ123456" }), null);
+  assert.deepEqual(cache.resolve({ productCode: "RJ123456" }), { kind: "miss" });
 
   setClock(2_000);
-  cache.putHtml({
+  cache.recordSuccess({
     productCode: "RJ123457",
     outcome: "parse_error",
     contentType: "text/html",
     html: VALID_HTML,
   });
   setClock(2_019);
-  const parseError = cache.get({ productCode: "RJ123457" });
-  assert.equal(parseError?.outcome, "parse_error");
-  assert.equal(parseError?.html, VALID_HTML);
-  cache.putNegative({ productCode: "RJ123458", outcome: "not_found" });
-  cache.putNegative({ productCode: "RJ123459", outcome: "error" });
+  const parseError = cache.resolve({ productCode: "RJ123457" });
+  assert.equal(parseError.kind, "html");
+  if (parseError.kind === "html") {
+    assert.equal(parseError.outcome, "parse_error");
+    assert.equal(parseError.html, VALID_HTML);
+  }
+  cache.recordFailure({ productCode: "RJ123458", outcome: "not_found" });
+  cache.recordFailure({ productCode: "RJ123459", outcome: "error" });
   setClock(2_021);
-  assert.equal(cache.get({ productCode: "RJ123457" }), null);
-  assert.equal(cache.get({ productCode: "RJ123458" })?.outcome, "not_found");
-  assert.equal(cache.get({ productCode: "RJ123459" })?.outcome, "error");
+  assert.deepEqual(cache.resolve({ productCode: "RJ123457" }), { kind: "miss" });
+  const notFound = cache.resolve({ productCode: "RJ123458" });
+  assert.equal(notFound.kind, "failure");
+  if (notFound.kind === "failure") assert.equal(notFound.outcome, "not_found");
+  const error = cache.resolve({ productCode: "RJ123459" });
+  assert.equal(error.kind, "failure");
+  if (error.kind === "failure") assert.equal(error.outcome, "error");
   setClock(2_059);
-  assert.equal(cache.get({ productCode: "RJ123459" }), null);
+  assert.deepEqual(cache.resolve({ productCode: "RJ123459" }), { kind: "miss" });
+});
+
+test("DLsiteキャッシュ: 成功記録は既存の失敗記録を消す", (t) => {
+  const { cache, setClock } = createCache(t);
+  cache.recordFailure({ productCode: "RJ123456", outcome: "error" });
+  assert.equal(cache.resolve({ productCode: "RJ123456" }).kind, "failure");
+  setClock(1_001);
+  cache.recordSuccess({
+    productCode: "RJ123456",
+    outcome: "ok",
+    contentType: "text/html",
+    html: VALID_HTML,
+  });
+  assert.equal(cache.resolve({ productCode: "RJ123456" }).kind, "html");
+});
+
+test("DLsiteキャッシュ: 失敗記録はHTML snapshotを消さず診断用に残す", (t) => {
+  const { cache, setClock } = createCache(t);
+  cache.recordSuccess({
+    productCode: "RJ123456",
+    outcome: "ok",
+    contentType: "text/html",
+    html: VALID_HTML,
+  });
+  setClock(1_101); // ok TTL(100)超過
+  cache.recordFailure({ productCode: "RJ123456", outcome: "error" });
+  const resolved = cache.resolve({ productCode: "RJ123456" });
+  assert.equal(resolved.kind, "failure");
+  const stale = cache.getStaleSnapshot({ productCode: "RJ123456" });
+  assert.equal(stale?.outcome, "ok");
+  assert.equal(stale?.html, VALID_HTML);
 });
 
 test("DLsiteキャッシュ: Content-Typeとサイズ上限で保存前に拒否する", (t) => {
   const { cache } = createCache(t);
   assert.throws(
     () =>
-      cache.putHtml({
+      cache.recordSuccess({
         productCode: "RJ123456",
         outcome: "ok",
         contentType: "application/json",
@@ -103,7 +143,7 @@ test("DLsiteキャッシュ: Content-Typeとサイズ上限で保存前に拒否
   );
   assert.throws(
     () =>
-      cache.putHtml({
+      cache.recordSuccess({
         productCode: "RJ123456",
         outcome: "ok",
         contentType: "text/html",
@@ -111,7 +151,7 @@ test("DLsiteキャッシュ: Content-Typeとサイズ上限で保存前に拒否
       }),
     /転送サイズ/,
   );
-  assert.equal(cache.get({ productCode: "RJ123456" }), null);
+  assert.deepEqual(cache.resolve({ productCode: "RJ123456" }), { kind: "miss" });
 });
 
 test("DLsiteキャッシュ: 転送上限と展開上限を独立して検証する", () => {
@@ -132,7 +172,7 @@ test("DLsiteキャッシュ: 改ざんされた過大gzip BLOBを展開上限で
   const path = join(directory.path, "cache.sqlite");
   const cache = new DlsiteCache({ path, maxTransferBytes: 1_000, maxExpandedBytes: 64 });
   t.after(() => cache.close());
-  cache.putHtml({
+  cache.recordSuccess({
     productCode: "RJ123456",
     outcome: "ok",
     contentType: "text/html",
@@ -141,10 +181,10 @@ test("DLsiteキャッシュ: 改ざんされた過大gzip BLOBを展開上限で
 
   const sqlite = new Database(path);
   sqlite
-    .query("UPDATE dlsite_cache_entries SET html_gzip = ?, html_size = ? WHERE product_code = ?")
+    .query("UPDATE dlsite_html_snapshots SET html_gzip = ?, html_size = ? WHERE product_code = ?")
     .run(gzipSync("x".repeat(128)), 128, "RJ123456");
   sqlite.close();
-  assert.throws(() => cache.get({ productCode: "RJ123456" }), /gzip展開に失敗/);
+  assert.throws(() => cache.resolve({ productCode: "RJ123456" }), /gzip展開に失敗/);
 });
 
 test("DLsiteキャッシュ: close後に同じDBを開き直してHTMLを読める", (t) => {
@@ -152,7 +192,7 @@ test("DLsiteキャッシュ: close後に同じDBを開き直してHTMLを読め�
   t.after(directory.cleanup);
   const path = join(directory.path, "cache.sqlite");
   const first = new DlsiteCache({ path });
-  first.putHtml({
+  first.recordSuccess({
     productCode: "RJ123456",
     outcome: "ok",
     contentType: "text/html",
@@ -161,7 +201,9 @@ test("DLsiteキャッシュ: close後に同じDBを開き直してHTMLを読め�
   first.close();
   const reopened = new DlsiteCache({ path });
   t.after(() => reopened.close());
-  assert.equal(reopened.get({ productCode: "RJ123456" })?.html, VALID_HTML);
+  const hit = reopened.resolve({ productCode: "RJ123456" });
+  assert.equal(hit.kind, "html");
+  if (hit.kind === "html") assert.equal(hit.html, VALID_HTML);
 });
 
 test("DLsiteキャッシュ: fetched_atとTTLの加算が安全な整数を超えると保存しない", (t) => {
@@ -174,15 +216,15 @@ test("DLsiteキャッシュ: fetched_atとTTLの加算が安全な整数を超�
   });
   t.after(() => cache.close());
   assert.throws(
-    () => cache.putNegative({ productCode: "RJ123456", outcome: "error" }),
-    /fetched_at \+ TTL/,
+    () => cache.recordFailure({ productCode: "RJ123456", outcome: "error" }),
+    /attempted_at \+ TTL/,
   );
-  assert.equal(cache.get({ productCode: "RJ123456" }), null);
+  assert.deepEqual(cache.resolve({ productCode: "RJ123456" }), { kind: "miss" });
 });
 
 test("DLsiteキャッシュ: cleanupは期限切れだけを明示的に消し、statusはDB容量を返す", (t) => {
   const { cache, setClock } = createCache(t);
-  cache.putNegative({ productCode: "RJ123456", outcome: "error" });
+  cache.recordFailure({ productCode: "RJ123456", outcome: "error" });
   setClock(1_041);
   assert.equal(cache.cleanupExpired(), 1);
   assert.deepEqual(cache.status().entries, 0);

@@ -4,16 +4,38 @@ DLsiteの作品ページとカバー画像は、実HTTPへ出る前にローカ�
 
 ## 保存内容
 
-作品HTMLのキーは `resource_kind=work_html`、ストア（RJ は `maniax`、VJ は `pro`）、大文字化したproduct code、`work-html-ja-adultchecked-v1` です。HTML本文はgzip BLOBで保存します。カバー画像は正規化済みHTTPS URLのSHA-256をキーにして、非圧縮のBLOBで保存します。
+作品HTMLは「HTML snapshot」と「取得失敗記録」を別テーブルで持ちます。両者は独立して更新されるため、取得が失敗しても直前に成功したHTMLが消えることはありません。
 
-作品HTMLのoutcomeと既定TTLは次のとおりです。
+- `dlsite_html_snapshots`: HTTPが2xxで完了したときの記録（パースの成否は問わない）。gzip BLOBの本文、`content_type`、転送サイズを持つ
+- `dlsite_fetch_failures`: HTTPが失敗した（404・5xx・通信エラー）ときの記録。本文は持たず、いつまで再試行を抑制するかだけを持つ
+
+キーは `resource_kind=work_html`、ストア（RJ は `maniax`、VJ は `pro`）、大文字化したproduct code、`work-html-ja-adultchecked-v1` です。カバー画像は正規化済みHTTPS URLのSHA-256をキーにして、非圧縮のBLOBで別テーブル（`dlsite_cover_entries`）に保存します。
+
+通常取得は次の優先順位で判断します。ネットワークへ出るかどうかは常にこのキャッシュ状態が決めます。
+
+1. 有効な失敗記録があれば、ネットワークへ出ずその失敗を返す
+2. 失敗記録がなく、有効なHTML snapshotがあれば、それをパースして返す
+3. どちらもなければネットワークへ出る
+
+書き込みは次のとおりです。
+
+- HTTPが2xxで完了した（パースの成否を問わない）: HTML snapshotを更新し、失敗記録があれば削除する
+- HTTPが失敗した: 失敗記録だけを更新する。既存のHTML snapshotは診断用に残したまま、通常取得には使わない
+- `?force=true` はキャッシュの読み取りだけを無視して必ずネットワークへ出る。書き込みは通常時と同じ規則に従うため、forceが失敗しても失敗記録は残り、次の通常取得はその失敗記録に従って抑制される
+
+HTML snapshotのoutcomeと既定TTLは次のとおりです。
 
 | outcome       | 意味                                     | TTL   |
 | ------------- | ---------------------------------------- | ----- |
 | `ok`          | HTMLをパースできた                       | 30日  |
 | `parse_error` | HTMLは取得したが現在のパーサーで読めない | 1時間 |
-| `not_found`   | HTTP 404                                 | 3日   |
-| `error`       | 一時的なHTTP・通信障害                   | 1時間 |
+
+失敗記録のfailure_kindと既定TTLは次のとおりです。
+
+| failure_kind | 意味                   | TTL   |
+| ------------ | ---------------------- | ----- |
+| `not_found`  | HTTP 404               | 3日   |
+| `error`      | 一時的なHTTP・通信障害 | 1時間 |
 
 `MIMIKAGO_DLSITE_CACHE_TTL_OK_MS`、`MIMIKAGO_DLSITE_CACHE_TTL_PARSE_ERROR_MS`、`MIMIKAGO_DLSITE_CACHE_TTL_NOT_FOUND_MS`、`MIMIKAGO_DLSITE_CACHE_TTL_ERROR_MS` でTTLをミリ秒指定できます。HTMLの転送・展開上限は各2 MiB・8 MiBで、`MIMIKAGO_DLSITE_CACHE_MAX_TRANSFER_BYTES` と `MIMIKAGO_DLSITE_CACHE_MAX_EXPANDED_BYTES` で変えられます。値はすべて正の整数として厳格に検証します。
 
@@ -25,11 +47,15 @@ DLsiteの作品ページとカバー画像は、実HTTPへ出る前にローカ�
 pnpm --filter @mimimilli/server dlsite-cache -- import --product-code RJ123456 --file /absolute/path/work.html
 ```
 
-importは通常ファイルの `.html` だけを受け付け、symlink・gzip入力・上限超過を拒否します。実HTTPを新たに取得して試料を作ることはしません。
+importは通常ファイルの `.html` だけを受け付け、symlink・gzip入力・上限超過を拒否します。実HTTPを新たに取得して試料を作ることはしません。importはHTML snapshotだけを更新し（成功記録と同じ扱い）、失敗記録には触れません。
 
-## forceとoffline
+## 一括取得（bulk）の対象
 
-手動fetchの `?force=true` はfresh cacheを無視して再取得します。更新失敗時は既存の成功HTMLを即座に削除せず、期限切れとして扱います。
+通常の一括取得（`POST /api/dlsite/bulk`、スキャン後の自動起動）は、RJコードがあり `skipped`・`applied` ではない作品（`none` / `error` / `not_found`）だけを対象にします。`applied` 済みの作品を毎回対象にすると、キャッシュhitでも `.meta.json` の `lastAttemptAt` が書き換わり続けるためです。
+
+同じキャッシュ済みRJコードに対する2回目以降の一括取得は、適用結果に実質的な差分がなければDBにも `.meta.json` にも書き込みません。`lastAttemptAt` は実際にHTTPを試みたときだけ更新し、cache hitでは更新しません。
+
+## offline
 
 `MIMIKAGO_DLSITE_OFFLINE=true` にすると、作品HTML、カバー画像、リダイレクト先を含むDLsiteの実HTTPをすべて止めます。cache hitは通常どおり使えます。cache missとforceは `offline` エラーになり、キャッシュにも書き込みません。一括取得ではoffline由来の失敗を `work_dlsite.status=error` に保存しません。値は `true` または `false` だけです。未指定時は `false` です。
 

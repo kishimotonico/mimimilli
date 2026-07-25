@@ -17,25 +17,14 @@ export const DEFAULT_DLSITE_CACHE_MAX_TRANSFER_BYTES = 2 * 1024 * 1024;
 export const DEFAULT_DLSITE_CACHE_MAX_EXPANDED_BYTES = 8 * 1024 * 1024;
 
 export type DlsiteCacheOutcome = keyof typeof DEFAULT_DLSITE_CACHE_TTLS_MS;
+export type DlsiteHtmlOutcome = "ok" | "parse_error";
+export type DlsiteFailureOutcome = "not_found" | "error";
 export type DlsiteStore = "maniax" | "pro";
 
 export interface DlsiteCacheKey {
   resourceKind?: string;
   productCode: string;
   representation?: string;
-}
-
-export interface DlsiteCacheEntry {
-  resourceKind: string;
-  store: DlsiteStore;
-  productCode: string;
-  representation: string;
-  outcome: DlsiteCacheOutcome;
-  fetchedAt: number;
-  expiresAt: number;
-  contentType: string | null;
-  transferSize: number | null;
-  html: string | null;
 }
 
 export interface DlsiteCacheOptions {
@@ -59,18 +48,54 @@ export interface DlsiteHtmlInputMetadata {
   expandedSize: number;
 }
 
-type StoredRow = {
-  resource_kind: string;
+/** 診断専用。期限切れかどうかを問わずHTML本文を含む。 */
+export interface DlsiteHtmlSnapshot {
+  outcome: DlsiteHtmlOutcome;
+  fetchedAt: number;
+  expiresAt: number;
+  contentType: string | null;
+  transferSize: number | null;
+  html: string;
+}
+
+/** 通常取得の判断結果。fresh HTML / 有効な失敗記録 / miss のいずれか。 */
+export type DlsiteCacheResolution =
+  | {
+      kind: "html";
+      outcome: DlsiteHtmlOutcome;
+      fetchedAt: number;
+      expiresAt: number;
+      contentType: string | null;
+      transferSize: number | null;
+      html: string;
+    }
+  | { kind: "failure"; outcome: DlsiteFailureOutcome; attemptedAt: number; expiresAt: number }
+  | { kind: "miss" };
+
+type NormalizedKey = {
+  resourceKind: string;
   store: DlsiteStore;
-  product_code: string;
+  productCode: string;
   representation: string;
-  outcome: DlsiteCacheOutcome;
-  fetched_at: number;
-  expires_at: number;
+};
+
+type SnapshotMetaRow = {
+  outcome: DlsiteHtmlOutcome;
+  content_fetched_at: number;
+  content_expires_at: number;
   content_type: string | null;
   transfer_size: number | null;
-  html_gzip: Uint8Array | null;
-  html_size: number | null;
+};
+
+type SnapshotBodyRow = {
+  html_gzip: Uint8Array;
+  html_size: number;
+};
+
+type FailureRow = {
+  failure_kind: DlsiteFailureOutcome;
+  attempted_at: number;
+  failure_expires_at: number;
 };
 
 function requirePositiveSafeInteger(value: number, name: string): number {
@@ -152,12 +177,7 @@ export function normalizeDlsiteProductCode(code: string): {
   return { productCode, store: match[1] === "RJ" ? "maniax" : "pro" };
 }
 
-function normalizeKey(key: DlsiteCacheKey): {
-  resourceKind: string;
-  store: DlsiteStore;
-  productCode: string;
-  representation: string;
-} {
+function normalizeKey(key: DlsiteCacheKey): NormalizedKey {
   const { productCode, store } = normalizeDlsiteProductCode(key.productCode);
   const resourceKind = key.resourceKind ?? DLSITE_CACHE_RESOURCE_KIND;
   const representation = key.representation ?? DLSITE_CACHE_REPRESENTATION;
@@ -199,21 +219,34 @@ export class DlsiteCache {
     this.sqlite = new Database(options.path, { create: true });
     this.sqlite.exec("PRAGMA journal_mode = WAL");
     this.sqlite.exec(`
-      CREATE TABLE IF NOT EXISTS dlsite_cache_entries (
+      CREATE TABLE IF NOT EXISTS dlsite_html_snapshots (
         resource_kind TEXT NOT NULL,
         store TEXT NOT NULL CHECK(store IN ('maniax', 'pro')),
         product_code TEXT NOT NULL,
         representation TEXT NOT NULL,
-        outcome TEXT NOT NULL CHECK(outcome IN ('ok', 'parse_error', 'not_found', 'error')),
-        fetched_at INTEGER NOT NULL,
-        expires_at INTEGER NOT NULL,
+        outcome TEXT NOT NULL CHECK(outcome IN ('ok', 'parse_error')),
+        content_fetched_at INTEGER NOT NULL,
+        content_expires_at INTEGER NOT NULL,
         content_type TEXT,
         transfer_size INTEGER,
-        html_gzip BLOB,
-        html_size INTEGER,
+        html_gzip BLOB NOT NULL,
+        html_size INTEGER NOT NULL,
         PRIMARY KEY (resource_kind, store, product_code, representation)
       );
-      CREATE INDEX IF NOT EXISTS dlsite_cache_entries_expires_at ON dlsite_cache_entries(expires_at);
+      CREATE INDEX IF NOT EXISTS dlsite_html_snapshots_expires_at
+        ON dlsite_html_snapshots(content_expires_at);
+      CREATE TABLE IF NOT EXISTS dlsite_fetch_failures (
+        resource_kind TEXT NOT NULL,
+        store TEXT NOT NULL CHECK(store IN ('maniax', 'pro')),
+        product_code TEXT NOT NULL,
+        representation TEXT NOT NULL,
+        failure_kind TEXT NOT NULL CHECK(failure_kind IN ('not_found', 'error')),
+        attempted_at INTEGER NOT NULL,
+        failure_expires_at INTEGER NOT NULL,
+        PRIMARY KEY (resource_kind, store, product_code, representation)
+      );
+      CREATE INDEX IF NOT EXISTS dlsite_fetch_failures_expires_at
+        ON dlsite_fetch_failures(failure_expires_at);
       CREATE TABLE IF NOT EXISTS dlsite_cover_entries (
         cache_key TEXT PRIMARY KEY,
         normalized_url TEXT NOT NULL,
@@ -236,14 +269,16 @@ export class DlsiteCache {
     this.clock = options.clock ?? Date.now;
   }
 
-  putHtml(
+  /** HTTP成功時（2xxでパースできてもできなくても）に呼ぶ。失敗記録は消す。 */
+  recordSuccess(
     input: DlsiteCacheKey & {
-      outcome: "ok" | "parse_error";
+      outcome: DlsiteHtmlOutcome;
       contentType: string;
       html: string | Uint8Array;
       transferSize?: number;
     },
   ): void {
+    const key = normalizeKey(input);
     const bytes = typeof input.html === "string" ? Buffer.from(input.html) : input.html;
     const transferSize = input.transferSize ?? bytes.byteLength;
     validateDlsiteHtmlInput(
@@ -251,35 +286,23 @@ export class DlsiteCache {
       this.maxTransferBytes,
       this.maxExpandedBytes,
     );
-    this.putRow(input, input.contentType, bytes, transferSize);
-  }
-
-  putNegative(input: DlsiteCacheKey & { outcome: "not_found" | "error" }): void {
-    this.putRow(input, null, null, null);
-  }
-
-  private putRow(
-    input: DlsiteCacheKey & { outcome: DlsiteCacheOutcome },
-    contentType: string | null,
-    bytes: Uint8Array | null,
-    transferSize: number | null,
-  ): void {
-    const key = normalizeKey(input);
     const fetchedAt = this.clock();
     requirePositiveSafeInteger(fetchedAt, "clockの返り値");
     const expiresAt = fetchedAt + this.ttlsMs[input.outcome];
     requirePositiveSafeInteger(expiresAt, "fetched_at + TTL");
-    const htmlGzip = bytes === null ? null : gzipSync(bytes);
+    const htmlGzip = gzipSync(bytes);
     const write = this.sqlite.transaction(() => {
       this.sqlite
         .query(
-          `INSERT INTO dlsite_cache_entries
-            (resource_kind, store, product_code, representation, outcome, fetched_at, expires_at, content_type, transfer_size, html_gzip, html_size)
+          `INSERT INTO dlsite_html_snapshots
+            (resource_kind, store, product_code, representation, outcome, content_fetched_at,
+             content_expires_at, content_type, transfer_size, html_gzip, html_size)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(resource_kind, store, product_code, representation) DO UPDATE SET
-             outcome = excluded.outcome, fetched_at = excluded.fetched_at, expires_at = excluded.expires_at,
-             content_type = excluded.content_type, transfer_size = excluded.transfer_size,
-             html_gzip = excluded.html_gzip, html_size = excluded.html_size`,
+             outcome = excluded.outcome, content_fetched_at = excluded.content_fetched_at,
+             content_expires_at = excluded.content_expires_at, content_type = excluded.content_type,
+             transfer_size = excluded.transfer_size, html_gzip = excluded.html_gzip,
+             html_size = excluded.html_size`,
         )
         .run(
           key.resourceKind,
@@ -289,70 +312,158 @@ export class DlsiteCache {
           input.outcome,
           fetchedAt,
           expiresAt,
-          contentType,
+          input.contentType,
           transferSize,
           htmlGzip,
-          bytes?.byteLength ?? null,
+          bytes.byteLength,
         );
+      this.sqlite
+        .query(
+          `DELETE FROM dlsite_fetch_failures
+           WHERE resource_kind = ? AND store = ? AND product_code = ? AND representation = ?`,
+        )
+        .run(key.resourceKind, key.store, key.productCode, key.representation);
     });
     write();
   }
 
-  get(keyInput: DlsiteCacheKey): DlsiteCacheEntry | null {
-    return this.read(keyInput, false);
+  /** @deprecated recordSuccessの別名。dlsiteCacheCli.tsのimportコマンドから使う。 */
+  putHtml(
+    input: DlsiteCacheKey & {
+      outcome: DlsiteHtmlOutcome;
+      contentType: string;
+      html: string | Uint8Array;
+      transferSize?: number;
+    },
+  ): void {
+    this.recordSuccess(input);
   }
 
-  /** 期限切れ本文を診断・更新制御にだけ使う。通常取得には返さない。 */
-  getStored(keyInput: DlsiteCacheKey): DlsiteCacheEntry | null {
-    return this.read(keyInput, true);
-  }
-
-  expire(keyInput: DlsiteCacheKey): void {
-    const key = normalizeKey(keyInput);
+  /** HTTP失敗時に呼ぶ。既存のHTML snapshotは診断用に残したまま触らない。 */
+  recordFailure(input: DlsiteCacheKey & { outcome: DlsiteFailureOutcome }): void {
+    const key = normalizeKey(input);
+    const attemptedAt = this.clock();
+    requirePositiveSafeInteger(attemptedAt, "clockの返り値");
+    const expiresAt = attemptedAt + this.ttlsMs[input.outcome];
+    requirePositiveSafeInteger(expiresAt, "attempted_at + TTL");
     this.sqlite
       .query(
-        `UPDATE dlsite_cache_entries SET expires_at = 0
-         WHERE resource_kind = ? AND store = ? AND product_code = ? AND representation = ?`,
+        `INSERT INTO dlsite_fetch_failures
+          (resource_kind, store, product_code, representation, failure_kind, attempted_at, failure_expires_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(resource_kind, store, product_code, representation) DO UPDATE SET
+           failure_kind = excluded.failure_kind, attempted_at = excluded.attempted_at,
+           failure_expires_at = excluded.failure_expires_at`,
       )
-      .run(key.resourceKind, key.store, key.productCode, key.representation);
+      .run(
+        key.resourceKind,
+        key.store,
+        key.productCode,
+        key.representation,
+        input.outcome,
+        attemptedAt,
+        expiresAt,
+      );
   }
 
-  private read(keyInput: DlsiteCacheKey, includeExpired: boolean): DlsiteCacheEntry | null {
-    const key = normalizeKey(keyInput);
-    const row = this.sqlite
+  private readFailure(key: NormalizedKey): FailureRow | null {
+    return this.sqlite
       .query(
-        `SELECT resource_kind, store, product_code, representation, outcome, fetched_at, expires_at,
-                content_type, transfer_size, html_gzip, html_size
-         FROM dlsite_cache_entries
+        `SELECT failure_kind, attempted_at, failure_expires_at FROM dlsite_fetch_failures
          WHERE resource_kind = ? AND store = ? AND product_code = ? AND representation = ?`,
       )
-      .get(key.resourceKind, key.store, key.productCode, key.representation) as StoredRow | null;
-    if (!row || (!includeExpired && row.expires_at <= this.clock())) return null;
-    let html: string | null = null;
-    if (row.html_gzip !== null) {
-      let bytes: Buffer;
-      try {
-        // 展開完了後の検査ではgzip bombに対して遅い。zlib自身に出力上限を渡す。
-        bytes = gunzipSync(row.html_gzip, { maxOutputLength: this.maxExpandedBytes });
-      } catch (error) {
-        throw new Error("DLsiteキャッシュのgzip展開に失敗しました", { cause: error });
-      }
-      if (bytes.byteLength > this.maxExpandedBytes || bytes.byteLength !== row.html_size) {
-        throw new Error("DLsiteキャッシュのgzip展開サイズが不正です");
-      }
-      html = bytes.toString("utf8");
+      .get(key.resourceKind, key.store, key.productCode, key.representation) as FailureRow | null;
+  }
+
+  private readSnapshotMeta(key: NormalizedKey): SnapshotMetaRow | null {
+    return this.sqlite
+      .query(
+        `SELECT outcome, content_fetched_at, content_expires_at, content_type, transfer_size
+         FROM dlsite_html_snapshots
+         WHERE resource_kind = ? AND store = ? AND product_code = ? AND representation = ?`,
+      )
+      .get(
+        key.resourceKind,
+        key.store,
+        key.productCode,
+        key.representation,
+      ) as SnapshotMetaRow | null;
+  }
+
+  private readSnapshotBody(key: NormalizedKey): SnapshotBodyRow | null {
+    return this.sqlite
+      .query(
+        `SELECT html_gzip, html_size FROM dlsite_html_snapshots
+         WHERE resource_kind = ? AND store = ? AND product_code = ? AND representation = ?`,
+      )
+      .get(
+        key.resourceKind,
+        key.store,
+        key.productCode,
+        key.representation,
+      ) as SnapshotBodyRow | null;
+  }
+
+  private decompressHtml(row: SnapshotBodyRow): string {
+    let bytes: Buffer;
+    try {
+      // 展開完了後の検査ではgzip bombに対して遅い。zlib自身に出力上限を渡す。
+      bytes = gunzipSync(row.html_gzip, { maxOutputLength: this.maxExpandedBytes });
+    } catch (error) {
+      throw new Error("DLsiteキャッシュのgzip展開に失敗しました", { cause: error });
     }
+    if (bytes.byteLength > this.maxExpandedBytes || bytes.byteLength !== row.html_size) {
+      throw new Error("DLsiteキャッシュのgzip展開サイズが不正です");
+    }
+    return bytes.toString("utf8");
+  }
+
+  /**
+   * 通常取得の判断に使う。有効な失敗記録があればネットワークを抑制してそれを返し、
+   * なければ有効なHTML snapshotを、それもなければmissを返す。
+   * gzip本文はhit確定後にしか読まない（freshness判定だけならメタ行の読み取りで済む）。
+   */
+  resolve(keyInput: DlsiteCacheKey): DlsiteCacheResolution {
+    const key = normalizeKey(keyInput);
+    const now = this.clock();
+    const failure = this.readFailure(key);
+    if (failure && failure.failure_expires_at > now) {
+      return {
+        kind: "failure",
+        outcome: failure.failure_kind,
+        attemptedAt: failure.attempted_at,
+        expiresAt: failure.failure_expires_at,
+      };
+    }
+    const meta = this.readSnapshotMeta(key);
+    if (!meta || meta.content_expires_at <= now) return { kind: "miss" };
+    const body = this.readSnapshotBody(key);
+    if (!body) return { kind: "miss" };
     return {
-      resourceKind: row.resource_kind,
-      store: row.store,
-      productCode: row.product_code,
-      representation: row.representation,
-      outcome: row.outcome,
-      fetchedAt: row.fetched_at,
-      expiresAt: row.expires_at,
-      contentType: row.content_type,
-      transferSize: row.transfer_size,
-      html,
+      kind: "html",
+      outcome: meta.outcome,
+      fetchedAt: meta.content_fetched_at,
+      expiresAt: meta.content_expires_at,
+      contentType: meta.content_type,
+      transferSize: meta.transfer_size,
+      html: this.decompressHtml(body),
+    };
+  }
+
+  /** 診断専用。期限切れかどうかを問わずHTML snapshotを読む。通常取得の経路では使わない。 */
+  getStaleSnapshot(keyInput: DlsiteCacheKey): DlsiteHtmlSnapshot | null {
+    const key = normalizeKey(keyInput);
+    const meta = this.readSnapshotMeta(key);
+    if (!meta) return null;
+    const body = this.readSnapshotBody(key);
+    if (!body) return null;
+    return {
+      outcome: meta.outcome,
+      fetchedAt: meta.content_fetched_at,
+      expiresAt: meta.content_expires_at,
+      contentType: meta.content_type,
+      transferSize: meta.transfer_size,
+      html: this.decompressHtml(body),
     };
   }
 
@@ -389,14 +500,25 @@ export class DlsiteCache {
   }
 
   cleanupExpired(): number {
-    return this.sqlite
-      .query("DELETE FROM dlsite_cache_entries WHERE expires_at <= ?")
-      .run(this.clock()).changes;
+    const now = this.clock();
+    let deleted = 0;
+    deleted += this.sqlite
+      .query("DELETE FROM dlsite_html_snapshots WHERE content_expires_at <= ?")
+      .run(now).changes;
+    deleted += this.sqlite
+      .query("DELETE FROM dlsite_fetch_failures WHERE failure_expires_at <= ?")
+      .run(now).changes;
+    return deleted;
   }
 
   status(): { entries: number; bytes: number } {
-    const entries = (
-      this.sqlite.query("SELECT COUNT(*) AS count FROM dlsite_cache_entries").get() as {
+    const snapshots = (
+      this.sqlite.query("SELECT COUNT(*) AS count FROM dlsite_html_snapshots").get() as {
+        count: number;
+      }
+    ).count;
+    const failures = (
+      this.sqlite.query("SELECT COUNT(*) AS count FROM dlsite_fetch_failures").get() as {
         count: number;
       }
     ).count;
@@ -405,7 +527,7 @@ export class DlsiteCache {
       const path = `${this.sqlite.filename}${suffix}`;
       return total + (existsSync(path) ? statSync(path).size : 0);
     }, 0);
-    return { entries, bytes };
+    return { entries: snapshots + failures, bytes };
   }
 
   close(): void {
