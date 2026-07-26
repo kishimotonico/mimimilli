@@ -15,12 +15,15 @@ const ICON_PX: Record<IconButtonSize, number> = { sm: 14, md: 16, lg: 20 };
 
 export interface IconButtonProps extends Omit<
   ButtonHTMLAttributes<HTMLButtonElement>,
-  "aria-label"
+  "aria-label" | "title"
 > {
   icon: IconFC;
-  /** aria-label と title ツールチップの両方に使う */
+  /** 支援技術向けの名前（aria-label） */
   label: string;
+  /** ホバー時のツールチップ。省略時は label と同じ */
+  title?: string;
   size?: IconButtonSize;
+  /** トグル状態。boolean を渡したときだけ aria-pressed を出す */
   active?: boolean;
   ref?: Ref<HTMLButtonElement>;
 }
@@ -28,8 +31,9 @@ export interface IconButtonProps extends Omit<
 export default function IconButton({
   icon: Icon,
   label,
+  title,
   size = "md",
-  active = false,
+  active,
   disabled = false,
   className,
   ref,
@@ -47,8 +51,8 @@ export default function IconButton({
       ref={ref}
       type={type}
       aria-label={label}
-      title={label}
-      aria-pressed={active || undefined}
+      title={title ?? label}
+      aria-pressed={active === undefined ? undefined : active}
       disabled={disabled}
       className={cn(
         "inline-flex shrink-0 items-center justify-center rounded-2 transition-colors",

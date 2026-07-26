@@ -171,10 +171,31 @@ export const I: Record<string, IconFC> = {
       d="M3 3h5v5H3zM10 3h5v5h-5zM17 3h5v5h-5zM3 10h5v5H3zM10 10h5v5h-5zM17 10h5v5h-5zM3 17h5v5H3zM10 17h5v5h-5zM17 17h5v5h-5z"
     />
   ),
-  // グリッドの敷き詰め形式トグル（TASK-45）。等幅の正方形3つ = 1:1タイル、
-  // 幅の異なる矩形3つ（同じ範囲を占める） = 原寸ジャスティファイドを表す
-  gridUniform: (p) => <Svg {...p} d="M3 9h5v5H3zM9.5 9h5v5h-5zM16 9h5v5h-5z" />,
-  gridJustified: (p) => <Svg {...p} d="M3 9h4v5H3zM8 9h7v5H8zM16.5 9h4.5v5h-4.5z" />,
+  ratio11: ({ size = 16, className, style }) => (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className={className}
+      style={style}
+    >
+      <path d="M4 7.5 L6 9 L6 17" />
+      <path d="M3.5 17 H7.5" />
+      <circle cx="12" cy="9.5" r="1.1" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="14.5" r="1.1" fill="currentColor" stroke="none" />
+      <path d="M17 7.5 L19 9 L19 17" />
+      <path d="M16.5 17 H20.5" />
+    </svg>
+  ),
+  gridJustified: (p) => (
+    <Svg {...p} fill="currentColor" d={["M3 5h6v6H3z", "M11 5h10v6H11z", "M3 13h18v6H3z"]} />
+  ),
   sort: (p) => <Svg {...p} d={["M8 4v16M4 8l4 -4 4 4", "M16 20V4M20 16l-4 4 -4 -4"]} />,
   filter: (p) => <Svg {...p} d="M4 4h16l-6 8v6l-4 2v-8z" />,
   check: (p) => <Svg {...p} d="M5 12l4 4 10 -10" />,

@@ -104,8 +104,9 @@ export default function AddressBar({
               <div className="inline-flex items-center gap-[1px] rounded-2 bg-paper-2 p-[2px]">
                 <IconButton
                   size="sm"
-                  icon={I.gridUniform}
-                  label="1:1タイル"
+                  icon={I.ratio11}
+                  label="カバーを1対1に切り抜き、等幅で並べる"
+                  title="1:1タイル：正方形に切り抜いて等幅で並べる"
                   active={gridLayoutMode === "square"}
                   onClick={() => onGridLayoutModeChange("square")}
                   disabled={!gridControlsVisible}
@@ -113,7 +114,8 @@ export default function AddressBar({
                 <IconButton
                   size="sm"
                   icon={I.gridJustified}
-                  label="原寸（ジャスティファイド）"
+                  label="カバーの縦横比を保ち、行の右端を揃えて並べる"
+                  title="元の縦横比：比率を保って行の右端を揃える"
                   active={gridLayoutMode === "justified"}
                   onClick={() => onGridLayoutModeChange("justified")}
                   disabled={!gridControlsVisible}
@@ -121,7 +123,7 @@ export default function AddressBar({
               </div>
 
               <label className="mll-grid-size">
-                <span>{gridLayoutMode === "justified" ? "行高さ" : "タイル"}</span>
+                <span>サイズ</span>
                 <input
                   type="range"
                   min={MIN_TILE_SIZE}
@@ -129,9 +131,7 @@ export default function AddressBar({
                   step={1}
                   value={tileSize}
                   disabled={!gridControlsVisible}
-                  aria-label={
-                    gridLayoutMode === "justified" ? "グリッドの行高さ" : "グリッドのタイルサイズ"
-                  }
+                  aria-label="グリッドのサイズ"
                   onChange={(event) => onTileSizeChange(Number(event.currentTarget.value))}
                 />
                 <output>{tileSize}px</output>
