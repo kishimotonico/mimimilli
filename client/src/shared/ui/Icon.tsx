@@ -50,19 +50,15 @@ export interface IconProps {
 interface SvgProps extends IconProps {
   d: string | string[];
   fill?: string;
-  strokeWidth?: number;
   viewBox?: string;
 }
 
-function Svg({
-  d,
-  size = 16,
-  fill,
-  strokeWidth = 1.5,
-  viewBox = "0 0 24 24",
-  className,
-  style,
-}: SvgProps) {
+// 小サイズでも実効線幅が 1px 未満にならないよう viewBox 上の stroke を補正する
+function strokeWidthForSize(size: number): number {
+  return Math.max(1.5, 24 / size);
+}
+
+function Svg({ d, size = 16, fill, viewBox = "0 0 24 24", className, style }: SvgProps) {
   return (
     <svg
       width={size}
@@ -70,7 +66,7 @@ function Svg({
       viewBox={viewBox}
       fill={fill ?? "none"}
       stroke={fill ? "none" : "currentColor"}
-      strokeWidth={strokeWidth}
+      strokeWidth={strokeWidthForSize(size)}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
@@ -86,7 +82,13 @@ export type IconFC = React.FC<IconProps>;
 
 function lucideIcon(Icon: LucideIcon): IconFC {
   return ({ size = 16, className, style }) => (
-    <Icon size={size} className={className} style={style} aria-hidden="true" strokeWidth={1.5} />
+    <Icon
+      size={size}
+      className={className}
+      style={style}
+      aria-hidden="true"
+      strokeWidth={strokeWidthForSize(size)}
+    />
   );
 }
 
@@ -155,7 +157,7 @@ export const I = {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth={1.5}
+      strokeWidth={strokeWidthForSize(size)}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
