@@ -1,9 +1,10 @@
 ---
 id: TASK-101
 title: DLsiteリクエストのUser-Agentを環境変数で設定可能にする
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-26 05:14'
+updated_date: '2026-07-26 08:21'
 labels: []
 dependencies: []
 documentation:

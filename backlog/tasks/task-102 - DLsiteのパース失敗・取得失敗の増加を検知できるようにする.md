@@ -1,9 +1,10 @@
 ---
 id: TASK-102
 title: DLsiteのパース失敗・取得失敗の増加を検知できるようにする
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-26 05:14'
+updated_date: '2026-07-26 09:28'
 labels: []
 dependencies: []
 documentation:

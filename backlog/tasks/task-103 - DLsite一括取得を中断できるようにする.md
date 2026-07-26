@@ -1,9 +1,10 @@
 ---
 id: TASK-103
 title: DLsite一括取得を中断できるようにする
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-26 05:16'
+updated_date: '2026-07-26 08:15'
 labels: []
 dependencies: []
 documentation:
