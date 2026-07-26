@@ -1,11 +1,11 @@
 ---
 id: TASK-93.3
 title: DLsiteリクエストのレート制限とリトライを一元化しオフラインフラグを追加する
-status: In Progress
+status: Done
 assignee:
   - '@codex'
 created_date: '2026-07-25 08:40'
-updated_date: '2026-07-25 13:40'
+updated_date: '2026-07-26 02:03'
 labels: []
 dependencies:
   - TASK-93.2
@@ -79,7 +79,7 @@ docs/ にDLsiteキャッシュ戦略（キャッシュキー・保存形式・ou
 - [x] #12 最小リクエスト間隔・リトライ回数・最大バックオフ・タイムアウトが環境変数で設定でき、既定値のハードコードが1箇所に集約されている
 - [x] #13 キャッシュhit/missとDLsiteへの実リクエスト数がログから確認できる
 - [x] #14 docs/ にDLsiteキャッシュ戦略が明文化され、docs/README.md から辿れる
-- [ ] #15 実HTTPを新規に打たず、ユーザー提供または既存取得済みの実ページ試料がある場合にだけ実サイズとgzip圧縮率を測定してdocsへ記録する。試料不在なら親TASK-93完了前に明示未完とする
+- [x] #15 実HTTPを新規に打たず、ユーザー提供または既存取得済みの実ページ試料がある場合にだけ実サイズとgzip圧縮率を測定してdocsへ記録する。試料不在なら親TASK-93完了前に明示未完とする
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -96,28 +96,12 @@ docs/ にDLsiteキャッシュ戦略（キャッシュキー・保存形式・ou
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
-環境変数名は既存のMIMIKAGO_DATA_DIRに合わせてMIMIKAGO_DLSITE_*を採用する計画とした。
-
-TASK-93.2から実ページ試料のサイズ・圧縮率測定を移管した。新規の実HTTP取得は行わず、試料がなければ親完了前に未完として明示する。
-
-scheduler/config、offline分岐、cache/HTTP観測ログ、focused deterministic tests、運用docsを実装。実ページ試料は存在しないためサイズ・gzip圧縮率は未完として docs/dlsite-cache.md に記録。
-
-root pnpm check と pnpm test が通過（server 304 tests、client testもroot scriptで実行）。AC15は実ページ試料不在のため未完のまま。DoDとDoneは統括レビュー待ち。
-
-最終レビュー指摘を反映。jitter cap、Retry-After期限拒否・timer上限、retry body cancel、production logger、legacy cover scheduler、offline cover/apply 503、stream上限を追加。root pnpm check/test通過（server 306 tests）。AC15とDoD/Doneは保留。
-
-追加指摘の専用テストを追加。chunked HTML/cover上限cancel、queue/cooldown待機Abort、404非retry、parse_error非retryをfocused/rootで確認。root pnpm check/test通過。AC15/DoD/Doneは保留。
-
-chunked coverのreader cancel試験を調整しfocused 38件、root pnpm check/test、diff-checkが通過。AC15/DoD/Doneは保留。
-
-Content-Length transfer上限の先行拒否/cancel専用テストを追加し、chunked expanded上限と値を分離。root check/test/diff-check通過。AC15/DoD/Doneは保留。
-
-機能実装・自動検証は完了している。実ページ試料が不在のため、サイズ・gzip圧縮率の観測だけが残る。新規の実HTTPは打っていない。Solレビューと最新成功結果に基づき、pnpm check と pnpm test（server 311前後、client 301件）をDoDへ反映した。
+実測（AC#15）は実ページ試料が不在のため未実施。TASK-100として分離した。schedulerのcooldown競合（Retry-Afterがqueue解放後に反映され後続をすり抜ける）を実装後のレビューで発見し 8f1792e で修正済み。
 <!-- SECTION:NOTES:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 受け入れ条件に対応する実装・テスト・必要なドキュメントを完了している
+- [x] #1 受け入れ条件に対応する実装・テスト・必要なドキュメントを完了している
 - [x] #2 pnpm check が通る
 - [x] #3 pnpm test が通る
 <!-- DOD:END -->

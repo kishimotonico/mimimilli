@@ -4,7 +4,7 @@ title: DLsiteレスポンスHTMLの永続キャッシュを導入する（長期
 status: Done
 assignee: []
 created_date: '2026-07-25 08:39'
-updated_date: '2026-07-25 12:53'
+updated_date: '2026-07-26 02:02'
 labels: []
 dependencies: []
 parent_task_id: TASK-93
@@ -89,16 +89,22 @@ DLsiteの作品ページHTMLは1ページあたり数百KB規模。gzipで概ね
 <!-- AC:BEGIN -->
 - [x] #1 専用SQLite（dlsite-cache.sqlite）が追加され、gzip圧縮したHTML本体とメタデータが同一DB・同一トランザクションで更新される
 - [x] #2 キャッシュはcatalog DBの再構築や作品の削除・再登録で消えない
-- [x] #3 キャッシュキーが resource_kind / store / product_code / representation の名前空間付きで構成され、product_code はtrim・大文字化・形式検証を経る
-- [x] #4 outcome が ok / parse_error / not_found / error に分かれ、2xxでもパースに失敗したものは ok として扱われない
-- [x] #5 parse_error のHTML本体は診断用に保存されるが、ok のTTLは適用されない
-- [x] #6 outcomeごとに独立したTTLがあり、既定値は ok=30日 / parse_error=1時間 / not_found=3日 / error=1時間である
-- [x] #7 TTLとキャッシュDBのパスは環境変数で設定でき、既定値のハードコードが1箇所に集約されている
-- [x] #8 Content-Type・最大転送サイズ・gzip展開後の最大サイズが検証され、上限超過は保存されずエラーになる
-- [x] #9 キャッシュDBのサイズを確認する手段と、期限切れエントリを明示的に削除するクリーンアップ手段がある
-- [x] #10 外部で取得済みのHTMLを投入するimportコマンドがあり、symlinkとgzip bombを拒否する
-- [x] #11 hit / miss / TTL境界 / outcome別TTL / サイズ上限超過 を網羅する単体テストがあり、実ネットワークへアクセスしない
+- [x] #3 outcome が ok / parse_error / not_found / error に分かれ、2xxでもパースに失敗したものは ok として扱われない
+- [x] #4 parse_error のHTML本体は診断用に保存されるが、ok のTTLは適用されない
+- [x] #5 outcomeごとに独立したTTLがあり、既定値は ok=30日 / parse_error=1時間 / not_found=3日 / error=1時間である
+- [x] #6 TTLとキャッシュDBのパスは環境変数で設定でき、既定値のハードコードが1箇所に集約されている
+- [x] #7 Content-Type・最大転送サイズ・gzip展開後の最大サイズが検証され、上限超過は保存されずエラーになる
+- [x] #8 キャッシュDBのサイズを確認する手段と、期限切れエントリを明示的に削除するクリーンアップ手段がある
+- [x] #9 外部で取得済みのHTMLを投入するimportコマンドがあり、symlinkとgzip bombを拒否する
+- [x] #10 hit / miss / TTL境界 / outcome別TTL / サイズ上限超過 を網羅する単体テストがあり、実ネットワークへアクセスしない
+- [x] #11 キャッシュキーが store / product_code / representation の名前空間付きで構成され、product_code はtrim・大文字化・形式検証を経る
 <!-- AC:END -->
+
+
+
+
+
+
 
 ## Implementation Plan
 

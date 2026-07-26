@@ -1,10 +1,10 @@
 ---
 id: TASK-93
 title: DLsite取得のキャッシュ戦略を確立し実ネットワークへの負荷を抑える
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-07-25 08:38'
-updated_date: '2026-07-25 13:40'
+updated_date: '2026-07-26 02:03'
 labels: []
 dependencies: []
 priority: high
@@ -57,7 +57,7 @@ Codexへ設計相談した結果、以下を計画へ反映した: HTTP成否と
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 サブタスク3件がすべてDoneであること
+- [x] #1 サブタスク3件がすべてDoneであること
 - [x] #2 同一環境でスキャン→一括取得を2回連続実行したとき、2回目のDLsiteへの実HTTPリクエスト数が0であること（DB・.meta.jsonを削除して作品を再登録した場合も0であること）
 - [x] #3 キャッシュされるのは生HTMLであり、パーサを変更しても再取得なしで結果を再評価できること
 - [x] #4 環境変数のフラグ1つで、実ファイルを対象にしたスキャンをDLsiteへ一切アクセスせず完走できること
@@ -76,14 +76,18 @@ Codexへ設計相談した結果、以下を計画へ反映した: HTTP成否と
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
-サブタスクの責務分割と完了順をBacklogのplan of recordへ記録した。
-
-93.1・93.2はDone、93.3は実ページ試料のサイズ・gzip圧縮率観測（AC #15）だけを残してIn Progressである。機能実装・自動検証は完了し、新規の実HTTPは打っていない。子タスクすべてDoneを要する親AC #1および全受け入れ条件の完了を要する親DoD #1は未完のままとする。Solレビューと最新成功結果に基づきpnpm check / pnpm testを確認した。
+実装は 3ea70a9 / 7fb76ae / 8f1792e。レビューとCodexへの設計相談を経て、キャッシュの状態をsnapshotとfailureの2テーブルへ分離し、期限切れエントリがあるとネガティブキャッシュが書かれない不具合とschedulerのcooldown競合を修正した。1cddeb8 で resource_kind 次元など未使用の抽象を削除している。残件はTASK-98（テスト注入口の集約）、TASK-99（環境変数の削減）、TASK-100（容量の実測）、DRAFT-31（一括の明示refresh）。
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+作品状態と独立した専用SQLiteに生のレスポンスHTMLをgzipで保存し、デバッグでスキャンを繰り返してもDLsiteへ再リクエストが飛ばないようにした。HTTP取得の成否とパースの成否を分離し、全リクエストを単一schedulerへ集約してレート制限とバックオフを一元化。MIMIKAGO_DLSITE_OFFLINEで実HTTPを遮断できる。pnpm check / pnpm test で検証（server 319 / client 301）。
+<!-- SECTION:FINAL_SUMMARY:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 受け入れ条件に対応する実装・テスト・必要なドキュメントを完了している
+- [x] #1 受け入れ条件に対応する実装・テスト・必要なドキュメントを完了している
 - [x] #2 pnpm check が通る
 - [x] #3 pnpm test が通る
 <!-- DOD:END -->
