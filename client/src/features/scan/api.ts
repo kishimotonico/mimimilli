@@ -5,9 +5,15 @@ import { API_BASE, ApiRequestError, ApiResponseSchemaError } from "../../shared/
 import {
   scanConflictResponseSchema,
   scanJobSnapshotSchema,
+  scanLastResultResponseSchema,
   startScanResponseSchema,
   type ScanJobSnapshot,
+  type ScanLastResultResponse,
 } from "@mimimilli/shared";
+
+export const SCAN_QUERY_KEYS = {
+  last: () => ["scan", "last"] as const,
+} as const;
 
 export type { ScanResult } from "./model";
 
@@ -63,4 +69,13 @@ export async function cancelScan(id: string): Promise<ScanJobSnapshot> {
   if (!res.ok)
     throw new ApiRequestError(res.status, "request_failed", `DELETE /scan/${id}: ${res.status}`);
   return parse(res, scanJobSnapshotSchema, "DELETE", `/scan/${id}`);
+}
+
+/** サーバー起動後に一度でも完了したスキャンの結果（TASK-56）。一度も完了していなければnull。 */
+export async function getLastScanResult(): Promise<ScanLastResultResponse | null> {
+  const res = await fetch(`${API_BASE}/scan/last`);
+  if (res.status === 204) return null;
+  if (!res.ok)
+    throw new ApiRequestError(res.status, "request_failed", `GET /scan/last: ${res.status}`);
+  return parse(res, scanLastResultResponseSchema, "GET", "/scan/last");
 }

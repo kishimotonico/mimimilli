@@ -64,6 +64,11 @@ export function scanRoute(
     return job ? c.json(job) : c.body(null, 204);
   });
 
+  app.get("/scan/last", (c) => {
+    const last = jobs.getLastCompleted();
+    return last ? c.json(last) : c.body(null, 204);
+  });
+
   app.get("/scan/:id", (c) => {
     const job = jobs.get(c.req.param("id"));
     return job

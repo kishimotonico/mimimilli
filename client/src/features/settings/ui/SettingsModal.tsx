@@ -19,7 +19,8 @@ interface SettingsModalProps {
   scanProgressLabel?: string | null;
   dlsiteBulk: DlsiteBulkProps;
   onClose: () => void;
-  onScan: () => void;
+  /** TopBarのスキャンボタンと同じくスキャンモーダルを開く（即時実行はしない、TASK-56） */
+  onOpenScan: () => void;
   onChangeFolder: (path: string) => void;
   onExport: () => void;
 }
@@ -31,7 +32,7 @@ export default function SettingsModal({
   scanProgressLabel = null,
   dlsiteBulk,
   onClose,
-  onScan,
+  onOpenScan,
   onChangeFolder,
   onExport,
 }: SettingsModalProps) {
@@ -299,8 +300,7 @@ export default function SettingsModal({
               最終スキャン: {formatDate(lastScanTime)}
             </span>
             <button
-              onClick={onScan}
-              disabled={scanning}
+              onClick={onOpenScan}
               style={{
                 height: 34,
                 padding: "0 14px",
@@ -311,15 +311,14 @@ export default function SettingsModal({
                 fontSize: 12,
                 fontWeight: 600,
                 border: "none",
-                cursor: scanning ? "not-allowed" : "pointer",
+                cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
                 gap: 6,
-                opacity: scanning ? 0.6 : 1,
               }}
             >
               <I.refresh size={12} className={scanning ? "animate-spin" : undefined} />
-              {scanning ? (scanProgressLabel ?? "スキャン中...") : "フルスキャン"}
+              {scanning ? (scanProgressLabel ?? "スキャン中...") : "スキャン"}
             </button>
           </div>
         </div>

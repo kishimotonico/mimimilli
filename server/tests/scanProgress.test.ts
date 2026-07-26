@@ -59,6 +59,19 @@ test("active jobは409でsnapshotを返し、終了後はactiveが204になる",
   assert.equal((await app.request("/api/scan/active")).status, 204);
 });
 
+test("GET /scan/last は一度も完了していなければ204、完了後はディスク永続化なしで結果を返す", async () => {
+  const app = createApp(createFixtureAdapter({ scenario: "new-work" }));
+  assert.equal((await app.request("/api/scan/last")).status, 204);
+
+  const { id } = await start(app);
+  await waitForTerminal(app, id);
+  const last = await app.request("/api/scan/last");
+  assert.equal(last.status, 200);
+  const body = await last.json();
+  assert.deepEqual(body.result.newWorkIds, ["RJ501011"]);
+  assert.equal(typeof body.finishedAt, "string");
+});
+
 test("job scoped SSEはprogressとterminalをseq付きで配信し、Last-Event-IDをreplayする", async () => {
   const app = createApp(createFixtureAdapter({ scenario: "new-work" }));
   const { id } = await start(app);

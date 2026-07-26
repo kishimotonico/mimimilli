@@ -8,8 +8,8 @@ interface TopBarProps {
   mode?: "library" | "files";
   searchQuery: string;
   onSearchChange: (q: string) => void;
-  onScan?: () => void;
-  onCancelScan?: () => void;
+  /** スキャンボタン押下時。即時実行はせずスキャンモーダルを開く（TASK-56） */
+  onOpenScan?: () => void;
   onSettings?: () => void;
   isPlaying?: boolean;
   playingTrack?: string;
@@ -35,14 +35,15 @@ interface TopBarProps {
   onStartDlsiteBulk?: () => void;
   /** 直近のスキャン結果（通知ベルのサマリ表示用、TASK-44） */
   scanResult?: ScanResult | null;
+  /** 通知ベルの直近スキャン結果クリックでスキャンモーダルの結果表示を開く（TASK-56） */
+  onOpenScanResult?: () => void;
 }
 
 export default function TopBar({
   mode = "library",
   searchQuery,
   onSearchChange,
-  onScan,
-  onCancelScan,
+  onOpenScan,
   onSettings,
   isPlaying = false,
   playingTrack,
@@ -57,6 +58,7 @@ export default function TopBar({
   dlsiteBulkProgress = null,
   onStartDlsiteBulk = () => {},
   scanResult = null,
+  onOpenScanResult = () => {},
 }: TopBarProps) {
   const placeholder =
     mode === "files"
@@ -135,13 +137,9 @@ export default function TopBar({
         size="md"
         icon={I.refresh}
         label={scanning ? (scanProgressLabel ?? "スキャン中...") : "スキャン"}
-        onClick={onScan}
-        disabled={scanning}
+        onClick={onOpenScan}
         className={scanning ? "animate-spin" : undefined}
       />
-      {scanning && onCancelScan && (
-        <IconButton size="sm" icon={I.x} label="スキャンを中止" onClick={onCancelScan} />
-      )}
       {dlsiteBulkActive && (
         <span className="font-mono text-[10.5px] text-ink-3" aria-live="polite">
           {dlsiteBulkProgress
@@ -159,6 +157,7 @@ export default function TopBar({
         dlsiteBulkProgress={dlsiteBulkProgress}
         onStartDlsiteBulk={onStartDlsiteBulk}
         scanResult={scanResult}
+        onOpenScanResult={onOpenScanResult}
       />
       <IconButton size="md" icon={I.cog} label="設定" onClick={onSettings} />
     </header>

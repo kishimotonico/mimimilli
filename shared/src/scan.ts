@@ -78,6 +78,13 @@ export const scanConflictResponseSchema = z.object({
 });
 export type ScanConflictResponse = z.infer<typeof scanConflictResponseSchema>;
 
+/** GET /scan/last の返却値。サーバー起動後に一度でも完了したスキャンの結果を保持する（ディスク永続化はしない）。 */
+export const scanLastResultResponseSchema = z.object({
+  result: scanResultSchema,
+  finishedAt: z.string(),
+});
+export type ScanLastResultResponse = z.infer<typeof scanLastResultResponseSchema>;
+
 /** `seq` はジョブ内で単調増加する。reset は履歴が切り詰められた再接続時の完全状態である。 */
 export const scanJobEventSchema = z.discriminatedUnion("type", [
   z.object({

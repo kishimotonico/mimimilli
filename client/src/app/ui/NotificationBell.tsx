@@ -18,6 +18,8 @@ export interface NotificationBellProps {
   dlsiteBulkProgress: { processed: number; total: number } | null;
   onStartDlsiteBulk: () => void;
   scanResult: ScanResult | null;
+  /** 直近のスキャン結果クリックでスキャンモーダルの結果表示を開く（TASK-56） */
+  onOpenScanResult: () => void;
 }
 
 export default function NotificationBell({
@@ -30,6 +32,7 @@ export default function NotificationBell({
   dlsiteBulkProgress,
   onStartDlsiteBulk,
   scanResult,
+  onOpenScanResult,
 }: NotificationBellProps) {
   const [isOpen, setIsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -133,7 +136,14 @@ export default function NotificationBell({
                 </div>
               )}
               {scanResult && (
-                <div className="px-3.5 py-2.5">
+                <button
+                  type="button"
+                  className="block w-full px-3.5 py-2.5 text-left hover:bg-paper-2 focus-visible:outline focus-visible:-outline-offset-2 focus-visible:outline-2 focus-visible:outline-acc"
+                  onClick={() => {
+                    setIsOpen(false);
+                    onOpenScanResult();
+                  }}
+                >
                   <p className="mb-1.5 font-sans text-[11px] font-medium text-ink-1">
                     直近のスキャン結果
                   </p>
@@ -143,7 +153,7 @@ export default function NotificationBell({
                     <ScanStat label="エラー" value={scanResult.errors} />
                     <ScanStat label="行方不明" value={scanResult.missing} />
                   </dl>
-                </div>
+                </button>
               )}
             </div>
           )}

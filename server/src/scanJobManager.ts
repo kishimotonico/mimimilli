@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type {
   ScanJobEvent,
   ScanJobSnapshot,
+  ScanLastResultResponse,
   ScanProgressEvent,
   ScanResult,
 } from "@mimimilli/shared";
@@ -33,6 +34,8 @@ export class ScanJobManager {
   private readonly terminalLimit: number;
   private readonly jobs = new Map<string, Job>();
   private activeId: string | null = null;
+  // terminal job はpruneTerminalで消えるため、前回結果はディスク永続化せずここにだけ保持する（TASK-56）。
+  private lastCompleted: ScanLastResultResponse | null = null;
 
   constructor(adapter: DataAdapter, historyLimit = 128, terminalLimit = 16) {
     this.adapter = adapter;
@@ -81,6 +84,10 @@ export class ScanJobManager {
   getActive(): ScanJobSnapshot | null {
     if (!this.activeId) return null;
     return this.get(this.activeId);
+  }
+
+  getLastCompleted(): ScanLastResultResponse | null {
+    return this.lastCompleted ? structuredClone(this.lastCompleted) : null;
   }
 
   cancel(id: string): ScanJobSnapshot | null {
@@ -171,6 +178,7 @@ export class ScanJobManager {
     job.snapshot.status = "completed";
     job.snapshot.result = result;
     job.snapshot.finishedAt = new Date().toISOString();
+    this.lastCompleted = { result, finishedAt: job.snapshot.finishedAt };
     this.emit(job, { type: "completed", seq: 0, result });
     this.deactivate(job);
     this.pruneTerminal();

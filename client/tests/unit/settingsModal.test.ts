@@ -21,7 +21,7 @@ beforeEach(() => {
   } as Response);
 });
 
-function renderModal(onClose = vi.fn()) {
+function renderModal(onClose = vi.fn(), onOpenScan = vi.fn()) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -35,13 +35,13 @@ function renderModal(onClose = vi.fn()) {
         scanning: false,
         dlsiteBulk: { active: false, progress: null, onStart: vi.fn() },
         onClose,
-        onScan: vi.fn(),
+        onOpenScan,
         onChangeFolder: vi.fn(),
         onExport: vi.fn(),
       }),
     ),
   );
-  return { onClose };
+  return { onClose, onOpenScan };
 }
 
 function dispatchCancel(dialog: HTMLElement) {
@@ -83,5 +83,11 @@ describe("SettingsModal", () => {
     const { onClose } = renderModal();
     fireEvent.click(screen.getByText("ルートフォルダー"));
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("スキャンボタンは即時実行せずonOpenScanを呼ぶ（TASK-56: スキャンモーダルへ経路を統一）", () => {
+    const { onOpenScan } = renderModal();
+    fireEvent.click(screen.getByRole("button", { name: "スキャン" }));
+    expect(onOpenScan).toHaveBeenCalledTimes(1);
   });
 });

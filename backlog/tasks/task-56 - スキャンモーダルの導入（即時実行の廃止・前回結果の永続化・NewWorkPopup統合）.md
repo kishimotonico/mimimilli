@@ -1,10 +1,11 @@
 ---
 id: TASK-56
 title: スキャンモーダルの導入（即時実行の廃止・前回結果表示・NewWorkPopup統合）
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@sonnet'
 created_date: '2026-07-19 01:50'
-updated_date: '2026-07-19 02:33'
+updated_date: '2026-07-26 05:25'
 labels: []
 dependencies: []
 ordinal: 53000
@@ -30,12 +31,24 @@ TopBarのスキャンボタンは現在押した瞬間に POST /api/scan が走�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 スキャンボタン押下でスキャンは開始されず、スキャンモーダルが開く
-- [ ] #2 モーダル内からスキャンを開始でき、実行中はフェーズ別進捗が表示される
-- [ ] #3 スキャン完了時、モーダルが開いていれば結果（統計・新規作品リストとタイトル編集・RJ未検出導線）が表示される
-- [ ] #4 実行中にモーダルを閉じてもスキャンは継続し、TopBarに進捗が出る。再度ボタンを押すと実行中の表示に復帰する
-- [ ] #5 NewWorkPopup が削除され、完了時にフォーカスを奪う自動ポップアップが発生しない
-- [ ] #6 通知ベルの直近スキャン結果クリックでスキャンモーダルの結果表示が開く
-- [ ] #7 pnpm check と pnpm test が通る
-- [ ] #8 モーダルの開始前状態に最終スキャン日時（lastScanTime）が表示され、サーバー起動後に一度でもスキャンしていれば前回結果のサマリも表示される（ページをリロードしても消えない）
+- [x] #1 スキャンボタン押下でスキャンは開始されず、スキャンモーダルが開く
+- [x] #2 モーダル内からスキャンを開始でき、実行中はフェーズ別進捗が表示される
+- [x] #3 スキャン完了時、モーダルが開いていれば結果（統計・新規作品リストとタイトル編集・RJ未検出導線）が表示される
+- [x] #4 実行中にモーダルを閉じてもスキャンは継続し、TopBarに進捗が出る。再度ボタンを押すと実行中の表示に復帰する
+- [x] #5 NewWorkPopup が削除され、完了時にフォーカスを奪う自動ポップアップが発生しない
+- [x] #6 通知ベルの直近スキャン結果クリックでスキャンモーダルの結果表示が開く
+- [x] #7 pnpm check と pnpm test が通る
+- [x] #8 モーダルの開始前状態に最終スキャン日時（lastScanTime）が表示され、サーバー起動後に一度でもスキャンしていれば前回結果のサマリも表示される（ページをリロードしても消えない）
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+実装: 3面統合ScanModal(idle/summary+running)を新設しNewWorkPopupを廃止。server: GET /api/scan/last を追加しScanJobManagerがterminalLimit剪定に影響されないlastCompletedを保持(ディスク永続化なし)。client: TopBarはonOpenScanのみを持ちscanning中も常にモーダルを開閉できるように変更、NotificationBellの直近スキャン結果をクリック可能にしonOpenScanResultで同じモーダルを開く。App.tsxはlastScanQueryでGET /scan/lastをフェッチし、完了時はqueryClient.setQueryDataで即時反映(前回結果のローカルstateを廃止)。pnpm check / pnpm test 全通過(server 320 pass, client 303 pass)。agent-browserで開始前/実行中/完了後の3面と、バックグラウンド継続・再オープン・自動ポップアップ非発生を目視確認。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+TopBarのスキャンボタンをモーダル起動に変更し、NewWorkPopupをScanModalへ統合した。ScanModalは開始前/実行中/完了後を1つの面(idle/summary + running)として実装し、実行中に閉じてもスキャンはバックグラウンド継続、再度ボタンを押すと実行中表示に復帰する。前回結果はディスク永続化せず、server側ScanJobManagerが保持するlastCompletedをGET /api/scan/lastで公開し、リロード後も最終スキャン日時・結果サマリを表示する。通知ベルの直近スキャン結果はクリックでScanModalを開く導線にした。pnpm check・pnpm testともに全通過(server 320件、client 303件)。agent-browserで実機動作を確認済み。
+<!-- SECTION:FINAL_SUMMARY:END -->
