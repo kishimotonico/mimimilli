@@ -43,7 +43,7 @@ function Svg({
 
 export type IconFC = React.FC<IconProps>;
 
-export const I: Record<string, IconFC> = {
+export const I = {
   search: (p) => <Svg {...p} d={["M11 19a8 8 0 1 1 0 -16 8 8 0 0 1 0 16Z", "M21 21l-4.3-4.3"]} />,
   play: (p) => <Svg {...p} fill="currentColor" d="M7 4.5v15l12-7.5z" />,
   pause: (p) => <Svg {...p} fill="currentColor" d="M6.5 4h3.5v16H6.5zM14 4h3.5v16H14z" />,
@@ -220,4 +220,6 @@ export const I: Record<string, IconFC> = {
     />
   ),
   swapLR: (p) => <Svg {...p} d={["M4 8h13", "M14 4l3 4 -3 4", "M20 16H7", "M10 12l-3 4 3 4"]} />,
-};
+} as const satisfies Record<string, IconFC>;
+
+export type IconName = keyof typeof I;

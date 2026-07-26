@@ -1,4 +1,3 @@
-import React from "react";
 import { I } from "../../../shared/ui/Icon";
 import { formatFileSize } from "../../../shared/lib/format";
 import { classifyFile, FILE_KIND_ICON, FILE_KIND_ROW_CLASS, type FsEntry } from "../model/types";
@@ -15,8 +14,6 @@ interface FileRowProps {
   onActivate: () => void;
 }
 
-const IconSet = I as Record<string, (p: { size?: number }) => React.ReactElement>;
-
 export default function FileRow({
   entry,
   isFocused,
@@ -26,7 +23,7 @@ export default function FileRow({
   onActivate,
 }: FileRowProps) {
   const kind = classifyFile(entry);
-  const Ic = IconSet[FILE_KIND_ICON[kind]] ?? I.file;
+  const Ic = I[FILE_KIND_ICON[kind]];
   const isWorkFolder = entry.isDir && !!entry.workId;
   const display = getWorkFolderDisplay(entry.name, isWorkFolder ? entry.workId : null);
 

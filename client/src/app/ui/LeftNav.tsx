@@ -1,5 +1,4 @@
-import React from "react";
-import { I } from "../../shared/ui/Icon";
+import { I, type IconName } from "../../shared/ui/Icon";
 
 interface LeftNavProps {
   mode?: "library" | "files";
@@ -7,10 +6,8 @@ interface LeftNavProps {
   playingCount?: number;
 }
 
-const IconSet = I as Record<string, (p: { size?: number }) => React.ReactElement>;
-
 interface SurfaceItem {
-  icon: string;
+  icon: IconName;
   label: string;
   badge?: number;
 }
@@ -52,7 +49,7 @@ export default function LeftNav({
 
       <div className="mle-side__group">
         {SURFACES.map((s) => {
-          const Ic = IconSet[s.icon] ?? I.folder;
+          const Ic = I[s.icon];
           const badge = s.label === "再生中" ? playingCount : s.badge;
           return (
             <button

@@ -1,11 +1,11 @@
 import type { SmartFolder, TagPrefix } from "@mimimilli/shared";
 import type { AxisId } from "../model/types";
-import { I } from "../../../shared/ui/Icon";
+import { I, type IconName } from "../../../shared/ui/Icon";
 
 interface AxisRow {
   id: AxisId;
   name: string;
-  icon: string;
+  icon: IconName;
   count?: number | string;
   badge?: number;
   isAction?: boolean;
@@ -22,7 +22,7 @@ const VIEW_AXES: AxisRow[] = [
 
 // 初期 seed の prefix に対する見慣れたアイコン。未知の prefix は folder に落ちる
 // （アイコンは prefix 定義に持たせていない表示上の便宜）
-const PREFIX_ICONS: Record<string, string> = {
+const PREFIX_ICONS: Record<string, IconName> = {
   cv: "user",
   サークル: "folder",
   シリーズ: "bookmark",
@@ -62,8 +62,7 @@ function AxisRowItem({
   isActive: boolean;
   onSelect: () => void;
 }) {
-  const Ic =
-    (I as Record<string, (p: { size?: number }) => React.ReactElement>)[ax.icon] ?? I.folder;
+  const Ic = I[ax.icon];
   return (
     <button type="button" className={`mll-axis ${isActive ? "is-on" : ""}`} onClick={onSelect}>
       <span className="ic">

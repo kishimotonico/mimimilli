@@ -2,6 +2,8 @@
 // 物理ファイルシステムのブラウズ（/api/fs）を前提に、種別判定とパス操作の pure functions を提供する。
 // React / API に依存しない（テスト容易性のため）。
 
+import type { IconName } from "../../../shared/ui/Icon";
+
 // ── /api/fs レスポンス型 ──────────────────────────────────────
 // API 契約に属する型は @mimimilli/shared を正典として re-export する。
 
@@ -60,7 +62,7 @@ export function classifyFile(entry: Classifiable): FileKind {
 }
 
 /** 種別 → Icon キー（shared/ui/Icon の I[...] に対応） */
-export const FILE_KIND_ICON: Record<FileKind, string> = {
+export const FILE_KIND_ICON: Record<FileKind, IconName> = {
   dir: "folder",
   audio: "audio",
   image: "image",

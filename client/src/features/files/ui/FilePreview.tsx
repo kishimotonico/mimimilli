@@ -14,8 +14,6 @@ import {
   type FileKind,
 } from "../model/types";
 
-const IconSet = I as Record<string, (p: { size?: number }) => React.ReactElement>;
-
 interface FilePreviewProps {
   /** 選択中エントリ（ファイル or dir）。null ならプレビューなし */
   entry: FsEntry | null;
@@ -78,7 +76,7 @@ export default function FilePreview({
             {breakdown.length > 0 && (
               <div className="mle-fprev__chips">
                 {breakdown.map(({ kind: k, count }) => {
-                  const Ic = IconSet[FILE_KIND_ICON[k]] ?? I.file;
+                  const Ic = I[FILE_KIND_ICON[k]];
                   return (
                     <span key={k} className="mle-fprev__chip">
                       <Ic size={12} />
@@ -187,7 +185,7 @@ function Hero({
   entry: FsEntry;
   isWorkFolder: boolean;
 }) {
-  const Ic = IconSet[FILE_KIND_ICON[kind]] ?? I.file;
+  const Ic = I[FILE_KIND_ICON[kind]];
   const display = getWorkFolderDisplay(entry.name, isWorkFolder ? entry.workId : null);
   return (
     <div className={`mle-fprev__hero is-${kind}`}>
