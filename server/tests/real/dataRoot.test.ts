@@ -5,8 +5,8 @@ import { test } from "node:test";
 import { resolveDataPaths, resolveLegacyDbPath } from "../../src/adapters/real/dataRoot.ts";
 import { makeTestDirectory } from "../helpers/sampleLibrary.ts";
 
-test("MIMIKAGO_DATA_DIRを絶対化し、DBとcacheを用途別に配置する", () => {
-  const paths = resolveDataPaths({ MIMIKAGO_DATA_DIR: "./custom-data" }, "linux", "/home/test");
+test("MIMIMILLI_DATA_DIRを絶対化し、DBとcacheを用途別に配置する", () => {
+  const paths = resolveDataPaths({ MIMIMILLI_DATA_DIR: "./custom-data" }, "linux", "/home/test");
   assert.ok(paths.root.endsWith("/custom-data"));
   assert.equal(paths.catalogDb, `${paths.root}/db/catalog.sqlite`);
   assert.equal(paths.userDb, `${paths.root}/db/user.sqlite`);
@@ -17,7 +17,7 @@ test("MIMIKAGO_DATA_DIRを絶対化し、DBとcacheを用途別に配置する",
 test("Linux既定はXDG_DATA_HOME、Windows既定はLOCALAPPDATAを使う", () => {
   assert.equal(
     resolveDataPaths({ XDG_DATA_HOME: "/xdg" }, "linux", "/home/test").root,
-    "/xdg/mimikago",
+    "/xdg/mimimilli",
   );
   assert.equal(
     resolveDataPaths(
@@ -25,7 +25,7 @@ test("Linux既定はXDG_DATA_HOME、Windows既定はLOCALAPPDATAを使う", () =
       "win32",
       "C:\\Users\\test",
     ).root,
-    "C:\\Users\\test\\AppData\\Local\\Mimikago",
+    "C:\\Users\\test\\AppData\\Local\\Mimimilli",
   );
 });
 

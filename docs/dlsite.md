@@ -63,7 +63,7 @@ https://www.dlsite.com/pro/work/=/product_id/VJ000000.html
 
 ## キャッシュ
 
-DLsiteの作品HTMLとカバー画像は、専用のSQLiteキャッシュ（`DlsiteCache`、`dlsiteCache.ts`）を経由してから実HTTPへ出る。既定のDBはデータルート配下の `db/dlsite-cache.sqlite`。`MIMIKAGO_DLSITE_CACHE_DB` に絶対パスを指定すると置き換えられる。
+DLsiteの作品HTMLとカバー画像は、専用のSQLiteキャッシュ（`DlsiteCache`、`dlsiteCache.ts`）を経由してから実HTTPへ出る。既定のDBはデータルート配下の `db/dlsite-cache.sqlite`。`MIMIMILLI_DLSITE_CACHE_DB` に絶対パスを指定すると置き換えられる。
 
 作品HTMLは生のHTMLをgzip圧縮してBLOBで保存する。パース結果ではなく生HTMLを持つのは、パーサーを直したときに実HTTPを再度飛ばさず既存HTMLで検証できるようにするため。
 
@@ -85,21 +85,21 @@ failure_kind（失敗記録側）と既定TTL。
 | `not_found`  | HTTP 404               | 3日   |
 | `error`      | 一時的なHTTP・通信障害 | 1時間 |
 
-TTLは `MIMIKAGO_DLSITE_CACHE_TTL_OK_MS` / `_PARSE_ERROR_MS` / `_NOT_FOUND_MS` / `_ERROR_MS` でミリ秒指定できる。通常取得の判断順序は、有効な失敗記録があればそれを返し（ネットワークへ出ない）、なければ有効なHTML snapshotをパースして返し、どちらもなければネットワークへ出る。`?force=true` はキャッシュの読み取りだけを無視して必ずネットワークへ出るが、書き込みは通常時と同じ規則に従う。
+TTLは `MIMIMILLI_DLSITE_CACHE_TTL_OK_MS` / `_PARSE_ERROR_MS` / `_NOT_FOUND_MS` / `_ERROR_MS` でミリ秒指定できる。通常取得の判断順序は、有効な失敗記録があればそれを返し（ネットワークへ出ない）、なければ有効なHTML snapshotをパースして返し、どちらもなければネットワークへ出る。`?force=true` はキャッシュの読み取りだけを無視して必ずネットワークへ出るが、書き込みは通常時と同じ規則に従う。
 
-HTMLの転送・展開サイズには上限があり（既定2 MiB / 8 MiB、`MIMIKAGO_DLSITE_CACHE_MAX_TRANSFER_BYTES` / `_MAX_EXPANDED_BYTES`）、gzip展開時にも `zlib` の `maxOutputLength` で同じ上限を渡してgzip bombを防ぐ。
+HTMLの転送・展開サイズには上限があり（既定2 MiB / 8 MiB、`MIMIMILLI_DLSITE_CACHE_MAX_TRANSFER_BYTES` / `_MAX_EXPANDED_BYTES`）、gzip展開時にも `zlib` の `maxOutputLength` で同じ上限を渡してgzip bombを防ぐ。
 
 一括取得は同じキャッシュ済みRJコードに対して2回目以降HTTPに出なくても、適用結果に実質差分がなければDBにも `.meta.json` にも書き込まない。`lastAttemptAt` は実際にHTTPを試みたときだけ更新し、cache hitでは更新しない。
 
 ## レート制限とリトライ
 
-作品HTML、カバー画像、カバーのリダイレクト先はすべて単一の `DlsiteScheduler`（`dlsiteScheduler.ts`）を経由する。実HTTPの開始時刻は `MIMIKAGO_DLSITE_REQUEST_INTERVAL_MS`（既定1000ms）以上離す。直列キューで管理しているため、複数リクエストが同時に飛ぶことはない。
+作品HTML、カバー画像、カバーのリダイレクト先はすべて単一の `DlsiteScheduler`（`dlsiteScheduler.ts`）を経由する。実HTTPの開始時刻は `MIMIMILLI_DLSITE_REQUEST_INTERVAL_MS`（既定1000ms）以上離す。直列キューで管理しているため、複数リクエストが同時に飛ぶことはない。
 
-429、5xx、通信エラーは指数バックオフとjitterで再試行する。再試行回数は `MIMIKAGO_DLSITE_RETRY_COUNT`（既定3）、最大backoffは `MIMIKAGO_DLSITE_MAX_BACKOFF_MS`（既定30000ms）、リクエスト全体の期限は `MIMIKAGO_DLSITE_TIMEOUT_MS`（既定60000ms）。429と503の `Retry-After`ヘッダー（秒指定・HTTP-date指定の両方に対応）は共有cooldownとして後続のすべてのリクエストに適用する。404とパース失敗は一時的な障害ではないため再試行しない。
+429、5xx、通信エラーは指数バックオフとjitterで再試行する。再試行回数は `MIMIMILLI_DLSITE_RETRY_COUNT`（既定3）、最大backoffは `MIMIMILLI_DLSITE_MAX_BACKOFF_MS`（既定30000ms）、リクエスト全体の期限は `MIMIMILLI_DLSITE_TIMEOUT_MS`（既定60000ms）。429と503の `Retry-After`ヘッダー（秒指定・HTTP-date指定の両方に対応）は共有cooldownとして後続のすべてのリクエストに適用する。404とパース失敗は一時的な障害ではないため再試行しない。
 
 ## オフラインフラグ
 
-`MIMIKAGO_DLSITE_OFFLINE=true` は、作品HTML・カバー画像・カバーのリダイレクト先を含むDLsiteへの実HTTPをすべて止める。ネットワーク環境がない場所での動作確認や、意図せず実サイトへアクセスしたくないデバッグ用途のフラグ。
+`MIMIMILLI_DLSITE_OFFLINE=true` は、作品HTML・カバー画像・カバーのリダイレクト先を含むDLsiteへの実HTTPをすべて止める。ネットワーク環境がない場所での動作確認や、意図せず実サイトへアクセスしたくないデバッグ用途のフラグ。
 
 有効時、キャッシュのhitは通常どおり使える。missとforceは明示的な `offline` エラー（`DlsiteOfflineError`）になり、キャッシュにも `work.dlsite.status` にも書き込まない。オフラインで試しただけの結果を本物の取得失敗として残さないための挙動。値は `true` または `false` のみで、未指定時は `false`。
 
@@ -114,20 +114,20 @@ HTMLの転送・展開サイズには上限があり（既定2 MiB / 8 MiB、`MI
 
 環境変数と既定値の一覧。
 
-| 環境変数                                   | 既定値                                    | 内容                           |
-| ------------------------------------------ | ----------------------------------------- | ------------------------------ |
-| `MIMIKAGO_DLSITE_CACHE_DB`                 | データルート配下 `db/dlsite-cache.sqlite` | キャッシュDBの絶対パス         |
-| `MIMIKAGO_DLSITE_CACHE_TTL_OK_MS`          | 30日                                      | `ok` snapshotのTTL             |
-| `MIMIKAGO_DLSITE_CACHE_TTL_PARSE_ERROR_MS` | 1時間                                     | `parse_error` snapshotのTTL    |
-| `MIMIKAGO_DLSITE_CACHE_TTL_NOT_FOUND_MS`   | 3日                                       | `not_found` 失敗記録のTTL      |
-| `MIMIKAGO_DLSITE_CACHE_TTL_ERROR_MS`       | 1時間                                     | `error` 失敗記録のTTL          |
-| `MIMIKAGO_DLSITE_CACHE_MAX_TRANSFER_BYTES` | 2 MiB                                     | HTML・カバーの転送サイズ上限   |
-| `MIMIKAGO_DLSITE_CACHE_MAX_EXPANDED_BYTES` | 8 MiB                                     | HTML展開後サイズ上限           |
-| `MIMIKAGO_DLSITE_OFFLINE`                  | `false`                                   | 実HTTPをすべて止める           |
-| `MIMIKAGO_DLSITE_REQUEST_INTERVAL_MS`      | 1000ms                                    | 実HTTP開始時刻の最小間隔       |
-| `MIMIKAGO_DLSITE_RETRY_COUNT`              | 3                                         | 429/5xx/通信エラーの再試行回数 |
-| `MIMIKAGO_DLSITE_MAX_BACKOFF_MS`           | 30000ms                                   | 再試行backoffの上限            |
-| `MIMIKAGO_DLSITE_TIMEOUT_MS`               | 60000ms                                   | 1リクエスト全体の期限          |
+| 環境変数                                    | 既定値                                    | 内容                           |
+| ------------------------------------------- | ----------------------------------------- | ------------------------------ |
+| `MIMIMILLI_DLSITE_CACHE_DB`                 | データルート配下 `db/dlsite-cache.sqlite` | キャッシュDBの絶対パス         |
+| `MIMIMILLI_DLSITE_CACHE_TTL_OK_MS`          | 30日                                      | `ok` snapshotのTTL             |
+| `MIMIMILLI_DLSITE_CACHE_TTL_PARSE_ERROR_MS` | 1時間                                     | `parse_error` snapshotのTTL    |
+| `MIMIMILLI_DLSITE_CACHE_TTL_NOT_FOUND_MS`   | 3日                                       | `not_found` 失敗記録のTTL      |
+| `MIMIMILLI_DLSITE_CACHE_TTL_ERROR_MS`       | 1時間                                     | `error` 失敗記録のTTL          |
+| `MIMIMILLI_DLSITE_CACHE_MAX_TRANSFER_BYTES` | 2 MiB                                     | HTML・カバーの転送サイズ上限   |
+| `MIMIMILLI_DLSITE_CACHE_MAX_EXPANDED_BYTES` | 8 MiB                                     | HTML展開後サイズ上限           |
+| `MIMIMILLI_DLSITE_OFFLINE`                  | `false`                                   | 実HTTPをすべて止める           |
+| `MIMIMILLI_DLSITE_REQUEST_INTERVAL_MS`      | 1000ms                                    | 実HTTP開始時刻の最小間隔       |
+| `MIMIMILLI_DLSITE_RETRY_COUNT`              | 3                                         | 429/5xx/通信エラーの再試行回数 |
+| `MIMIMILLI_DLSITE_MAX_BACKOFF_MS`           | 30000ms                                   | 再試行backoffの上限            |
+| `MIMIMILLI_DLSITE_TIMEOUT_MS`               | 60000ms                                   | 1リクエスト全体の期限          |
 
 値はすべて厳格に検証する（真偽値は `true`/`false` のみ、数値は正の整数のみ）。曖昧な指定はフォールバックせずエラーにする。
 

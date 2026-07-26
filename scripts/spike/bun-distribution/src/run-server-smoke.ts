@@ -9,7 +9,7 @@ rmSync(dataDirectory, { force: true, recursive: true });
 async function startServer(): Promise<ReturnType<typeof Bun.spawn>> {
   const child = Bun.spawn([process.execPath, join(import.meta.dir, "compiled-server.ts")], {
     cwd: root,
-    env: { ...Bun.env, MIMIKAGO_DATA_DIR: dataDirectory, PORT: port },
+    env: { ...Bun.env, MIMIMILLI_DATA_DIR: dataDirectory, PORT: port },
     stderr: "inherit",
     stdout: "inherit",
   });

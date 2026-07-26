@@ -224,8 +224,8 @@ test("DLsite request設定: booleanと数値環境変数を厳格に読む", () 
     maxBackoffMs: 30_000,
     timeoutMs: 60_000,
   });
-  assert.equal(resolveDlsiteRequestConfig({ MIMIKAGO_DLSITE_OFFLINE: "true" }).offline, true);
-  assert.throws(() => resolveDlsiteRequestConfig({ MIMIKAGO_DLSITE_OFFLINE: "1" }));
-  assert.throws(() => resolveDlsiteRequestConfig({ MIMIKAGO_DLSITE_RETRY_COUNT: "-1" }));
-  assert.throws(() => resolveDlsiteRequestConfig({ MIMIKAGO_DLSITE_TIMEOUT_MS: "2147483648" }));
+  assert.equal(resolveDlsiteRequestConfig({ MIMIMILLI_DLSITE_OFFLINE: "true" }).offline, true);
+  assert.throws(() => resolveDlsiteRequestConfig({ MIMIMILLI_DLSITE_OFFLINE: "1" }));
+  assert.throws(() => resolveDlsiteRequestConfig({ MIMIMILLI_DLSITE_RETRY_COUNT: "-1" }));
+  assert.throws(() => resolveDlsiteRequestConfig({ MIMIMILLI_DLSITE_TIMEOUT_MS: "2147483648" }));
 });

@@ -45,31 +45,31 @@ export function resolveDlsiteRequestConfig(
 ): DlsiteRequestConfig {
   return {
     offline: parseBoolean(
-      "MIMIKAGO_DLSITE_OFFLINE",
-      env.MIMIKAGO_DLSITE_OFFLINE,
+      "MIMIMILLI_DLSITE_OFFLINE",
+      env.MIMIMILLI_DLSITE_OFFLINE,
       DEFAULT_DLSITE_REQUEST_CONFIG.offline,
     ),
     requestIntervalMs: parseInteger(
-      "MIMIKAGO_DLSITE_REQUEST_INTERVAL_MS",
-      env.MIMIKAGO_DLSITE_REQUEST_INTERVAL_MS,
+      "MIMIMILLI_DLSITE_REQUEST_INTERVAL_MS",
+      env.MIMIMILLI_DLSITE_REQUEST_INTERVAL_MS,
       DEFAULT_DLSITE_REQUEST_CONFIG.requestIntervalMs,
       0,
     ),
     retryCount: parseInteger(
-      "MIMIKAGO_DLSITE_RETRY_COUNT",
-      env.MIMIKAGO_DLSITE_RETRY_COUNT,
+      "MIMIMILLI_DLSITE_RETRY_COUNT",
+      env.MIMIMILLI_DLSITE_RETRY_COUNT,
       DEFAULT_DLSITE_REQUEST_CONFIG.retryCount,
       0,
     ),
     maxBackoffMs: parseInteger(
-      "MIMIKAGO_DLSITE_MAX_BACKOFF_MS",
-      env.MIMIKAGO_DLSITE_MAX_BACKOFF_MS,
+      "MIMIMILLI_DLSITE_MAX_BACKOFF_MS",
+      env.MIMIMILLI_DLSITE_MAX_BACKOFF_MS,
       DEFAULT_DLSITE_REQUEST_CONFIG.maxBackoffMs,
       0,
     ),
     timeoutMs: parseInteger(
-      "MIMIKAGO_DLSITE_TIMEOUT_MS",
-      env.MIMIKAGO_DLSITE_TIMEOUT_MS,
+      "MIMIMILLI_DLSITE_TIMEOUT_MS",
+      env.MIMIMILLI_DLSITE_TIMEOUT_MS,
       DEFAULT_DLSITE_REQUEST_CONFIG.timeoutMs,
       1,
     ),

@@ -24,12 +24,12 @@ bun run build:windows
 PowerShellでコピー先へ移動してから実行します。データはexeの隣ではなく、一時ディレクトリに明示的に分離します。
 
 ```powershell
-$DataDir = Join-Path $env:TEMP "mimikago-bun-spike"
-$env:MIMIKAGO_DATA_DIR = $DataDir
+$DataDir = Join-Path $env:TEMP "mimimilli-bun-spike"
+$env:MIMIMILLI_DATA_DIR = $DataDir
 $env:PORT = "1370"
 Remove-Item -Recurse -Force $DataDir -ErrorAction SilentlyContinue
 
-$Server = Start-Process -FilePath ".\mimikago-bun-sqlite.exe" -PassThru
+$Server = Start-Process -FilePath ".\mimimilli-bun-sqlite.exe" -PassThru
 Start-Sleep -Seconds 1
 Invoke-RestMethod "http://127.0.0.1:1370/health"
 Invoke-RestMethod "http://127.0.0.1:1370/values/windows" `
@@ -39,7 +39,7 @@ Invoke-RestMethod "http://127.0.0.1:1370/values/windows" `
 Stop-Process -Id $Server.Id
 Wait-Process -Id $Server.Id -ErrorAction SilentlyContinue
 
-$Server = Start-Process -FilePath ".\mimikago-bun-sqlite.exe" -PassThru
+$Server = Start-Process -FilePath ".\mimimilli-bun-sqlite.exe" -PassThru
 Start-Sleep -Seconds 1
 $Health = Invoke-RestMethod "http://127.0.0.1:1370/health"
 $Value = Invoke-RestMethod "http://127.0.0.1:1370/values/windows"
@@ -56,7 +56,7 @@ Stop-Process -Id $Server.Id
 - 2回目の `/values/windows` が `value: persisted`
 - `$DataDir\spike.sqlite` が存在し、exeの隣にDBが作られていない
 
-`MIMIKAGO_DATA_DIR` を指定しない確認も行う場合、DBの既定位置は `$env:LOCALAPPDATA\Mimikago\spike.sqlite` です。確認後のDBは利用者の判断で削除してください。
+`MIMIMILLI_DATA_DIR` を指定しない確認も行う場合、DBの既定位置は `$env:LOCALAPPDATA\Mimimilli\spike.sqlite` です。確認後のDBは利用者の判断で削除してください。
 
 ## 切り分けprobe
 

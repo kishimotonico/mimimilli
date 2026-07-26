@@ -256,11 +256,11 @@ export function openDb(location: DbLocation): Db {
   const memoryId = crypto.randomUUID();
   const catalogPath =
     location.kind === "memory"
-      ? `file:mimikago-catalog-${memoryId}?mode=memory&cache=shared`
+      ? `file:mimimilli-catalog-${memoryId}?mode=memory&cache=shared`
       : location.catalogPath;
   const userPath =
     location.kind === "memory"
-      ? `file:mimikago-user-${memoryId}?mode=memory&cache=shared`
+      ? `file:mimimilli-user-${memoryId}?mode=memory&cache=shared`
       : location.userPath;
   let catalogOpened = openVersionedDatabase(
     catalogPath,

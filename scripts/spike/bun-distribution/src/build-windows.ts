@@ -9,7 +9,7 @@ mkdirSync(outputDirectory, { recursive: true });
 const builds = [
   {
     entrypoint: join(import.meta.dir, "compiled-server.ts"),
-    name: "mimikago-bun-sqlite.exe",
+    name: "mimimilli-bun-sqlite.exe",
     required: true,
   },
   {

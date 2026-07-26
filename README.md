@@ -76,7 +76,7 @@ pnpm dev:fixture:errors
 pnpm dev:real
 # => http://api.mimi.localhost:1355
 # => http://mimi.localhost:1355
-# データルートは MIMIKAGO_DATA_DIR で上書き可
+# データルートは MIMIMILLI_DATA_DIR で上書き可
 ```
 
 サーバーとフロントを別々に起動する場合は、次のコマンドを使う。
@@ -97,7 +97,7 @@ real サーバーと client は portless から動的ポートを割り当てら
 client は `portless get api.mimi` で同じ worktree の API URLを解決するため、複数の worktree でも接続先が混ざらない。
 
 real アダプタを使う場合、初回起動後に UI からルートフォルダーを設定する。
-DBはデータルートの `db/catalog.sqlite` と `db/user.sqlite` に作る。既定のデータルートはLinuxが `${XDG_DATA_HOME:-$HOME/.local/share}/mimikago`、Windowsが `%LOCALAPPDATA%\Mimikago`。`MIMIKAGO_DATA_DIR` には相対パスも指定でき、起動時に絶対パスへ解決する。
+DBはデータルートの `db/catalog.sqlite` と `db/user.sqlite` に作る。既定のデータルートはLinuxが `${XDG_DATA_HOME:-$HOME/.local/share}/mimimilli`、Windowsが `%LOCALAPPDATA%\Mimimilli`。`MIMIMILLI_DATA_DIR` には相対パスも指定でき、起動時に絶対パスへ解決する。
 
 ### 検証
 
@@ -174,7 +174,7 @@ mimimilli/
 │   └── package.json
 ├── server/                  # HTTP API サーバー (Hono + Bun / TypeScript)
 │   └── src/
-│       ├── index.ts         # エントリポイント (env: PORT/MIMIMILLI_ADAPTER/MIMIKAGO_DATA_DIR/MIMIMILLI_MOCK_SCENARIO)
+│       ├── index.ts         # エントリポイント (env: PORT/MIMIMILLI_ADAPTER/MIMIMILLI_DATA_DIR/MIMIMILLI_MOCK_SCENARIO)
 │       ├── app.ts           # createApp（アダプタ注入）
 │       ├── adapter.ts       # DataAdapter インターフェース
 │       ├── adapters/

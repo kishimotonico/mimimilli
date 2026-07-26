@@ -237,21 +237,21 @@ test("DLsiteキャッシュ: cleanupは期限切れだけを明示的に消し�
 
 test("DLsiteキャッシュ設定: 環境変数を厳格に解釈する", () => {
   const config = resolveDlsiteCacheConfig("/tmp/default.sqlite", {
-    MIMIKAGO_DLSITE_CACHE_DB: "/tmp/override.sqlite",
-    MIMIKAGO_DLSITE_CACHE_TTL_OK_MS: "42",
+    MIMIMILLI_DLSITE_CACHE_DB: "/tmp/override.sqlite",
+    MIMIMILLI_DLSITE_CACHE_TTL_OK_MS: "42",
   });
   assert.equal(config.path, "/tmp/override.sqlite");
   assert.equal(config.ttlsMs.ok, 42);
   assert.equal(config.ttlsMs.error, DEFAULT_DLSITE_CACHE_TTLS_MS.error);
   assert.throws(
     () =>
-      resolveDlsiteCacheConfig("/tmp/default.sqlite", { MIMIKAGO_DLSITE_CACHE_TTL_OK_MS: "1.5" }),
+      resolveDlsiteCacheConfig("/tmp/default.sqlite", { MIMIMILLI_DLSITE_CACHE_TTL_OK_MS: "1.5" }),
     /整数/,
   );
   assert.throws(
     () =>
       resolveDlsiteCacheConfig("/tmp/default.sqlite", {
-        MIMIKAGO_DLSITE_CACHE_DB: "relative.sqlite",
+        MIMIMILLI_DLSITE_CACHE_DB: "relative.sqlite",
       }),
     /絶対パス/,
   );
@@ -263,7 +263,7 @@ test("DLsiteキャッシュCLI: status、import、cleanupと同一キー上書�
   const cachePath = join(directory.path, "cache.sqlite");
   const htmlPath = join(directory.path, "work.html");
   writeFileSync(htmlPath, VALID_HTML);
-  const env = { MIMIKAGO_DATA_DIR: directory.path, MIMIKAGO_DLSITE_CACHE_DB: cachePath };
+  const env = { MIMIMILLI_DATA_DIR: directory.path, MIMIMILLI_DLSITE_CACHE_DB: cachePath };
   let now = 10_000;
   const overrides = {
     clock: () => now,
@@ -308,8 +308,8 @@ test("DLsiteキャッシュCLI: symlinkを拒否し、magic byteでgzip入力を
   symlinkSync(source, symlink);
   writeFileSync(gzip, gzipSync(VALID_HTML));
   const env = {
-    MIMIKAGO_DATA_DIR: directory.path,
-    MIMIKAGO_DLSITE_CACHE_DB: join(directory.path, "cache.sqlite"),
+    MIMIMILLI_DATA_DIR: directory.path,
+    MIMIMILLI_DLSITE_CACHE_DB: join(directory.path, "cache.sqlite"),
   };
   assert.throws(
     () => runDlsiteCacheCli(["import", "--product-code", "RJ123456", "--file", symlink], env),
@@ -328,9 +328,9 @@ test("DLsiteキャッシュCLI: gzip展開サイズが上限を超えると拒�
   const gzip = join(directory.path, "huge.html");
   writeFileSync(gzip, gzipSync("x".repeat(1_000)));
   const env = {
-    MIMIKAGO_DATA_DIR: directory.path,
-    MIMIKAGO_DLSITE_CACHE_DB: join(directory.path, "cache.sqlite"),
-    MIMIKAGO_DLSITE_CACHE_MAX_EXPANDED_BYTES: "100",
+    MIMIMILLI_DATA_DIR: directory.path,
+    MIMIMILLI_DLSITE_CACHE_DB: join(directory.path, "cache.sqlite"),
+    MIMIMILLI_DLSITE_CACHE_MAX_EXPANDED_BYTES: "100",
   };
   assert.throws(
     () => runDlsiteCacheCli(["import", "--product-code", "RJ123456", "--file", gzip], env),
@@ -352,8 +352,8 @@ test("DLsiteキャッシュCLI: ディレクトリを一括importし、成功・
   writeFileSync(join(nested, "RJ000001.html"), VALID_HTML); // 非再帰なので対象外
 
   const env = {
-    MIMIKAGO_DATA_DIR: directory.path,
-    MIMIKAGO_DLSITE_CACHE_DB: join(directory.path, "cache.sqlite"),
+    MIMIMILLI_DATA_DIR: directory.path,
+    MIMIMILLI_DLSITE_CACHE_DB: join(directory.path, "cache.sqlite"),
   };
   const result = JSON.parse(runDlsiteCacheCli(["import", "--dir", sourceDir], env)) as {
     succeeded: number;

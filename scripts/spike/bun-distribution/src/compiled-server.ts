@@ -5,18 +5,18 @@ import { Database } from "bun:sqlite";
 import { Hono } from "hono";
 
 function resolveDataDirectory(): string {
-  const override = process.env.MIMIKAGO_DATA_DIR;
+  const override = process.env.MIMIMILLI_DATA_DIR;
   if (override) {
     return isAbsolute(override) ? override : resolve(override);
   }
   if (process.platform === "win32") {
     const localAppData = process.env.LOCALAPPDATA;
     if (!localAppData) {
-      throw new Error("LOCALAPPDATA is required when MIMIKAGO_DATA_DIR is not set");
+      throw new Error("LOCALAPPDATA is required when MIMIMILLI_DATA_DIR is not set");
     }
-    return join(localAppData, "Mimikago");
+    return join(localAppData, "Mimimilli");
   }
-  return join(process.env.XDG_DATA_HOME ?? join(homedir(), ".local", "share"), "mimikago");
+  return join(process.env.XDG_DATA_HOME ?? join(homedir(), ".local", "share"), "mimimilli");
 }
 
 const dataDirectory = resolveDataDirectory();
@@ -61,7 +61,7 @@ app.get("/values/:key", (context) => {
 
 const port = Number(process.env.PORT ?? "1370");
 const server = Bun.serve({ fetch: app.fetch, hostname: "127.0.0.1", port });
-console.log(`mimikago Bun spike listening on ${server.url} (data: ${dataDirectory})`);
+console.log(`mimimilli Bun spike listening on ${server.url} (data: ${dataDirectory})`);
 
 function shutdown(): void {
   server.stop();

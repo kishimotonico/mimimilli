@@ -108,42 +108,42 @@ export function resolveDlsiteCacheConfig(
   defaultPath: string,
   env: NodeJS.ProcessEnv = process.env,
 ): DlsiteCacheConfig {
-  const configuredPath = env.MIMIKAGO_DLSITE_CACHE_DB;
+  const configuredPath = env.MIMIMILLI_DLSITE_CACHE_DB;
   if (configuredPath !== undefined && (!configuredPath || !isAbsolute(configuredPath))) {
-    throw new Error("MIMIKAGO_DLSITE_CACHE_DB は空でない絶対パスで指定してください");
+    throw new Error("MIMIMILLI_DLSITE_CACHE_DB は空でない絶対パスで指定してください");
   }
   return {
     path: configuredPath ?? defaultPath,
     ttlsMs: {
       ok: envPositiveInteger(
         env,
-        "MIMIKAGO_DLSITE_CACHE_TTL_OK_MS",
+        "MIMIMILLI_DLSITE_CACHE_TTL_OK_MS",
         DEFAULT_DLSITE_CACHE_TTLS_MS.ok,
       ),
       parse_error: envPositiveInteger(
         env,
-        "MIMIKAGO_DLSITE_CACHE_TTL_PARSE_ERROR_MS",
+        "MIMIMILLI_DLSITE_CACHE_TTL_PARSE_ERROR_MS",
         DEFAULT_DLSITE_CACHE_TTLS_MS.parse_error,
       ),
       not_found: envPositiveInteger(
         env,
-        "MIMIKAGO_DLSITE_CACHE_TTL_NOT_FOUND_MS",
+        "MIMIMILLI_DLSITE_CACHE_TTL_NOT_FOUND_MS",
         DEFAULT_DLSITE_CACHE_TTLS_MS.not_found,
       ),
       error: envPositiveInteger(
         env,
-        "MIMIKAGO_DLSITE_CACHE_TTL_ERROR_MS",
+        "MIMIMILLI_DLSITE_CACHE_TTL_ERROR_MS",
         DEFAULT_DLSITE_CACHE_TTLS_MS.error,
       ),
     },
     maxTransferBytes: envPositiveInteger(
       env,
-      "MIMIKAGO_DLSITE_CACHE_MAX_TRANSFER_BYTES",
+      "MIMIMILLI_DLSITE_CACHE_MAX_TRANSFER_BYTES",
       DEFAULT_DLSITE_CACHE_MAX_TRANSFER_BYTES,
     ),
     maxExpandedBytes: envPositiveInteger(
       env,
-      "MIMIKAGO_DLSITE_CACHE_MAX_EXPANDED_BYTES",
+      "MIMIMILLI_DLSITE_CACHE_MAX_EXPANDED_BYTES",
       DEFAULT_DLSITE_CACHE_MAX_EXPANDED_BYTES,
     ),
   };

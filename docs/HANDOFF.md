@@ -7,7 +7,7 @@ mimimilli の現状と進行中の作業を、後続のエージェント／セ�
 
 DLsite/FANZA 等からダウンロードした音声作品（ASMR・ボイスドラマ等）をローカルで管理・再生する常駐 Web アプリ。タグ／分類軸ベースの検索と、物理フォルダー（ファイラー）の両モードを持つ。`.meta.json` を Source of Truth、SQLite を検索キャッシュとする。
 
-名前は3つ使い分けている。アプリ・パッケージ名は `mimimilli`（2026-07-03 に旧名から改名）、リポジトリ／ディレクトリ名は旧名の `mimikago` のまま、portless のサービス名は短い URL を保つため `mimi`。データルートの環境変数 `MIMIKAGO_DATA_DIR` も旧名を維持している。いずれも意図的なので揃えようとしないこと。
+名前は3つ使い分けている。アプリ・パッケージ名は `mimimilli`（2026-07-03 に旧名から改名）、リポジトリ／ディレクトリ名は旧名の `mimikago` のまま、portless のサービス名は短い URL を保つため `mimi`。いずれも意図的なので揃えようとしないこと。
 
 アーキテクチャは [docs/ARCHITECTURE.md](ARCHITECTURE.md)、決定の経緯は [ADR-0001](adr/0001-typescript-api-server.md) / [ADR-0002](adr/0002-mock-as-fixture-adapter.md)。要件は [docs/requirements-v4.md](requirements-v4.md)。ドキュメント全体の地図は [docs/README.md](README.md)、未完了タスクは Backlog.md CLI（`pnpm backlog task list --plain`）。
 
@@ -47,7 +47,7 @@ pnpm dev:fixture:errors
 
 # real アダプタ（実SQLite + 実FS）
 pnpm dev:real          # API サーバー + client を並行起動
-pnpm dev:real:server   # API サーバーのみ => http://api.mimi.localhost:1355（Bun。データルートはMIMIKAGO_DATA_DIRで上書き可）
+pnpm dev:real:server   # API サーバーのみ => http://api.mimi.localhost:1355（Bun。データルートはMIMIMILLI_DATA_DIRで上書き可）
 pnpm dev:real:client   # client のみ。同じworktreeのapi.mimiへ向けて起動
 pnpm smoke:real        # 固定のサンプル音声で real 経路を手動スモーク
 

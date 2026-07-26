@@ -234,13 +234,13 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
   const db: Db = openDb(options.database);
   const dlsiteCache = options.dlsiteCache ? new DlsiteCache(options.dlsiteCache) : undefined;
   const repo = new WorkRepo(db);
-  const thumbnailCacheDir = options.thumbnailCacheDir ?? join(tmpdir(), "mimikago-memory-cache");
+  const thumbnailCacheDir = options.thumbnailCacheDir ?? join(tmpdir(), "mimimilli-memory-cache");
   const thumbnailCache = new ThumbnailCache(options.thumbnailCache);
   const dataRoot =
     options.dataRoot ??
     (options.database.kind === "files"
       ? dirname(dirname(options.database.catalogPath))
-      : join(tmpdir(), "mimikago-memory-data"));
+      : join(tmpdir(), "mimimilli-memory-data"));
   const scanner = new Scanner(db, repo, dataRoot, { measureCover: measureCoverDimensions });
   const dlsiteRequestConfig: DlsiteRequestConfig = {
     ...DEFAULT_DLSITE_REQUEST_CONFIG,

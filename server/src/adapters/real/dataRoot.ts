@@ -42,16 +42,16 @@ export function resolveDataPaths(
 ): DataPaths {
   const path = platform === "win32" ? win32 : posix;
   let root: string;
-  if (env.MIMIKAGO_DATA_DIR) {
-    root = path.resolve(env.MIMIKAGO_DATA_DIR);
+  if (env.MIMIMILLI_DATA_DIR) {
+    root = path.resolve(env.MIMIMILLI_DATA_DIR);
   } else if (platform === "win32") {
     if (!env.LOCALAPPDATA) {
-      throw new Error("LOCALAPPDATAが未設定のためMimikagoのデータルートを決定できません");
+      throw new Error("LOCALAPPDATAが未設定のためMimimilliのデータルートを決定できません");
     }
-    root = path.join(env.LOCALAPPDATA, "Mimikago");
+    root = path.join(env.LOCALAPPDATA, "Mimimilli");
   } else {
     const base = env.XDG_DATA_HOME || path.join(userHome, ".local", "share");
-    root = path.join(path.isAbsolute(base) ? base : path.resolve(base), "mimikago");
+    root = path.join(path.isAbsolute(base) ? base : path.resolve(base), "mimimilli");
   }
 
   root = path.resolve(root);
