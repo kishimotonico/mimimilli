@@ -5,7 +5,7 @@ import { evaluateParseErrorAlert } from "@mimimilli/shared";
 test("evaluateParseErrorAlert: 件数・割合の両方を満たすときだけ true", () => {
   assert.equal(evaluateParseErrorAlert(0, 0), false);
   assert.equal(evaluateParseErrorAlert(1, 0), false);
-  assert.equal(evaluateParseErrorAlert(2, 1), false);
+  assert.equal(evaluateParseErrorAlert(2, 10), false);
   assert.equal(evaluateParseErrorAlert(3, 13), false);
   assert.equal(evaluateParseErrorAlert(3, 12), true);
   assert.equal(evaluateParseErrorAlert(3, 0), true);
@@ -13,7 +13,14 @@ test("evaluateParseErrorAlert: 件数・割合の両方を満たすときだけ 
   assert.equal(evaluateParseErrorAlert(4, 1), true);
 });
 
-test("evaluateParseErrorAlert: not_found は分母に入れない（httpErrorCount のみ）", () => {
-  assert.equal(evaluateParseErrorAlert(3, 7), true);
+test("evaluateParseErrorAlert: 大量成功・少数パース失敗ではアラートしない", () => {
+  assert.equal(evaluateParseErrorAlert(3, 997), false);
+  assert.equal(evaluateParseErrorAlert(3, 994), false);
+  assert.equal(evaluateParseErrorAlert(3, 12), true);
+});
+
+test("evaluateParseErrorAlert: HTTPエラーは分母に含めない", () => {
+  // パース失敗3・成功12 → 20% でアラート。HTTP失敗が多くても変わらない想定は呼び出し側の責務
+  assert.equal(evaluateParseErrorAlert(3, 12), true);
   assert.equal(evaluateParseErrorAlert(2, 10), false);
 });

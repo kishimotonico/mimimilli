@@ -187,9 +187,9 @@ gzip入力かどうかは拡張子ではなくheaderのmagic byte（`0x1f 0x8b`�
 `parseErrorAlert` の判定（`evaluateParseErrorAlert`、定数は `shared/src/dlsite.ts`）。
 
 - `parseErrorCount >= 3`
-- かつ `(parseErrorCount + httpErrorCount) >= 3`（`httpErrorCount` は `error` かつ `errorKind` が `parse_error` 以外）
-- かつ `parseErrorCount / (parseErrorCount + httpErrorCount) >= 0.2`
-- `not_found` は分母に含めない
+- かつ `parseErrorCount / (parseErrorCount + parseSuccessCount) >= 0.2`
+- 分母の `parseSuccessCount` は `status === applied`（パース成功して適用済みの作品数）
+- `not_found`・HTTPエラー（`error` かつ `errorKind !== parse_error`）はパース未到達のため分母に含めない
 
 通知ベルのバッジは `parseErrorAlert` が true のときだけ `parseErrorCount` を加算する。パース失敗一覧は `GET /dlsite/notifications/parse-failed`（各行に `rjCode` 付き）。取得失敗一覧（`fetch-failed`）からは `parse_error` を除外する。
 

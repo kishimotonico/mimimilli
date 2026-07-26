@@ -50,12 +50,15 @@ export function isDlsiteFetchFailed(state: DlsiteState): boolean {
 export const DLSITE_PARSE_ERROR_ALERT_MIN_COUNT = 3;
 export const DLSITE_PARSE_ERROR_ALERT_MIN_RATIO = 0.2;
 
-/** 分母は parse_error + HTTP error（not_found は含めない） */
-export function evaluateParseErrorAlert(parseErrorCount: number, httpErrorCount: number): boolean {
-  const attempted = parseErrorCount + httpErrorCount;
+/** 分母はパース成功 + パース失敗（HTTPエラー・not_found はパース未到達のため含めない） */
+export function evaluateParseErrorAlert(
+  parseErrorCount: number,
+  parseSuccessCount: number,
+): boolean {
+  const attempted = parseErrorCount + parseSuccessCount;
   return (
     parseErrorCount >= DLSITE_PARSE_ERROR_ALERT_MIN_COUNT &&
-    attempted >= DLSITE_PARSE_ERROR_ALERT_MIN_COUNT &&
+    attempted > 0 &&
     parseErrorCount / attempted >= DLSITE_PARSE_ERROR_ALERT_MIN_RATIO
   );
 }

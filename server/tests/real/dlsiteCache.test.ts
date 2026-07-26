@@ -98,6 +98,19 @@ test("DLsiteキャッシュ: TTL境界とoutcome別TTLでは期限切れを返�
   assert.deepEqual(cache.resolve({ productCode: "RJ123459" }), { kind: "miss" });
 });
 
+test("DLsiteキャッシュ: exportHtmlはTTL切れでもsnapshotを読み出す", (t) => {
+  const { cache, setClock } = createCache(t);
+  cache.recordSuccess({
+    productCode: "RJ123456",
+    outcome: "parse_error",
+    contentType: "text/html",
+    html: VALID_HTML,
+  });
+  setClock(1_021);
+  assert.deepEqual(cache.resolve({ productCode: "RJ123456" }), { kind: "miss" });
+  assert.equal(cache.exportHtml({ productCode: "RJ123456" }), VALID_HTML);
+});
+
 test("DLsiteキャッシュ: 成功記録は既存の失敗記録を消す", (t) => {
   const { cache, setClock } = createCache(t);
   cache.recordFailure({ productCode: "RJ123456", outcome: "error" });
@@ -316,7 +329,7 @@ test("DLsiteキャッシュCLI: exportで有効なHTML snapshotを書き出す",
   assert.equal(readFileSync(out, "utf8"), VALID_HTML);
 });
 
-test("DLsiteキャッシュCLI: exportは未存在・TTL切れ・不正product codeで失敗する", (t) => {
+test("DLsiteキャッシュCLI: exportは未存在・不正product codeで失敗する", (t) => {
   const directory = makeTestDirectory("dlsite-cache-cli-export-fail");
   t.after(directory.cleanup);
   const env = {
@@ -326,13 +339,21 @@ test("DLsiteキャッシュCLI: exportは未存在・TTL切れ・不正product c
   const out = join(directory.path, "exported.html");
   assert.throws(
     () => runDlsiteCacheCli(["export", "--product-code", "RJ123456", "--file", out], env),
-    /有効なHTML snapshotがありません/,
+    /HTML snapshotがありません/,
   );
   assert.throws(
     () => runDlsiteCacheCli(["export", "--product-code", "INVALID", "--file", out], env),
     /形式が不正/,
   );
+});
 
+test("DLsiteキャッシュCLI: exportはTTL切れのsnapshotでも読み出せる", (t) => {
+  const directory = makeTestDirectory("dlsite-cache-cli-export-expired");
+  t.after(directory.cleanup);
+  const env = {
+    MIMIMILLI_DATA_DIR: directory.path,
+    MIMIMILLI_DLSITE_CACHE_DB: join(directory.path, "cache.sqlite"),
+  };
   const source = join(directory.path, "work.html");
   writeFileSync(source, VALID_HTML);
   let now = 10_000;
@@ -342,11 +363,14 @@ test("DLsiteキャッシュCLI: exportは未存在・TTL切れ・不正product c
   };
   runDlsiteCacheCli(["import", "--product-code", "RJ123456", "--file", source], env, overrides);
   now += 10;
-  assert.throws(
-    () =>
+  const out = join(directory.path, "exported.html");
+  assert.deepEqual(
+    JSON.parse(
       runDlsiteCacheCli(["export", "--product-code", "RJ123456", "--file", out], env, overrides),
-    /有効なHTML snapshotがありません/,
+    ),
+    { productCode: "RJ123456", bytes: Buffer.byteLength(VALID_HTML, "utf8") },
   );
+  assert.equal(readFileSync(out, "utf8"), VALID_HTML);
 });
 
 test("DLsiteキャッシュCLI: symlinkを拒否し、magic byteでgzip入力を受け入れる", (t) => {

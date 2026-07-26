@@ -846,9 +846,8 @@ export class WorkRepo {
             SUM(CASE WHEN json_extract(work_dlsite.state_json, '$.status') = 'error'
                       AND json_extract(work_dlsite.state_json, '$.errorKind') = 'parse_error'
                      THEN 1 ELSE 0 END) AS parseErrorCount,
-            SUM(CASE WHEN json_extract(work_dlsite.state_json, '$.status') = 'error'
-                      AND COALESCE(json_extract(work_dlsite.state_json, '$.errorKind'), '') != 'parse_error'
-                     THEN 1 ELSE 0 END) AS httpErrorCount,
+            SUM(CASE WHEN json_extract(work_dlsite.state_json, '$.status') = 'applied'
+                     THEN 1 ELSE 0 END) AS parseSuccessCount,
             SUM(CASE WHEN json_extract(work_dlsite.state_json, '$.rjCode') IS NOT NULL
                            AND json_extract(work_dlsite.state_json, '$.status') = 'none'
                      THEN 1 ELSE 0 END) AS unlinkedCount
@@ -860,16 +859,16 @@ export class WorkRepo {
       rjCodeMissingCount: number | null;
       fetchFailedCount: number | null;
       parseErrorCount: number | null;
-      httpErrorCount: number | null;
+      parseSuccessCount: number | null;
       unlinkedCount: number | null;
     };
     const parseErrorCount = row.parseErrorCount ?? 0;
-    const httpErrorCount = row.httpErrorCount ?? 0;
+    const parseSuccessCount = row.parseSuccessCount ?? 0;
     return {
       rjCodeMissingCount: row.rjCodeMissingCount ?? 0,
       fetchFailedCount: row.fetchFailedCount ?? 0,
       parseErrorCount,
-      parseErrorAlert: evaluateParseErrorAlert(parseErrorCount, httpErrorCount),
+      parseErrorAlert: evaluateParseErrorAlert(parseErrorCount, parseSuccessCount),
       unlinkedCount: row.unlinkedCount ?? 0,
     };
   }

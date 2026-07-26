@@ -50,6 +50,7 @@ export default function ScanModal({
   onOpenRjCodeMissing,
 }: ScanModalProps) {
   const [newWorks, setNewWorks] = useState<Work[]>([]);
+  const [newWorksError, setNewWorksError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const titleInputRef = useRef<HTMLInputElement | null>(null);
@@ -95,16 +96,28 @@ export default function ScanModal({
   });
 
   const newWorkIds = lastResult?.newWorkIds ?? [];
+  const newWorkIdsKey = newWorkIds.join(",");
   useEffect(() => {
-    if (newWorkIds.length === 0) {
-      setNewWorks([]);
-      return;
-    }
+    setNewWorks([]);
+    setNewWorksError(null);
+    if (newWorkIds.length === 0) return;
+
+    let cancelled = false;
     Promise.all(newWorkIds.map((id) => getWork(id)))
-      .then(setNewWorks)
-      .catch(() => {});
+      .then((works) => {
+        if (!cancelled) setNewWorks(works);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setNewWorks([]);
+          setNewWorksError("新規作品の読み込みに失敗しました");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- newWorkIds は配列参照が毎回変わるため内容で比較する
-  }, [newWorkIds.join(",")]);
+  }, [newWorkIdsKey]);
 
   useEffect(() => {
     if (!editingId) return;
@@ -190,7 +203,7 @@ export default function ScanModal({
           </AnimatePresence>
 
           <AnimatePresence initial={false}>
-            {newWorks.length > 0 && (
+            {(newWorks.length > 0 || newWorksError) && (
               <motion.div
                 key="new-works"
                 layout
@@ -203,21 +216,25 @@ export default function ScanModal({
                 <p className="font-sans text-[10.5px] font-semibold tracking-[0.06em] text-ink-3 uppercase">
                   新規検出した作品
                 </p>
-                <ul className="flex max-h-[220px] list-none flex-col gap-1 overflow-y-auto p-0">
-                  {newWorks.map((work) => (
-                    <li key={work.id}>
-                      <NewWorkRow
-                        work={work}
-                        editing={editingId === work.id}
-                        editTitle={editTitle}
-                        titleInputRef={titleInputRef}
-                        onStartEdit={() => handleStartEdit(work)}
-                        onChangeEditTitle={setEditTitle}
-                        onSaveTitle={() => handleSaveTitle(work.id)}
-                      />
-                    </li>
-                  ))}
-                </ul>
+                {newWorksError ? (
+                  <p className="font-jp text-[12px] text-[var(--r-coral)]">{newWorksError}</p>
+                ) : (
+                  <ul className="flex max-h-[220px] list-none flex-col gap-1 overflow-y-auto p-0">
+                    {newWorks.map((work) => (
+                      <li key={work.id}>
+                        <NewWorkRow
+                          work={work}
+                          editing={editingId === work.id}
+                          editTitle={editTitle}
+                          titleInputRef={titleInputRef}
+                          onStartEdit={() => handleStartEdit(work)}
+                          onChangeEditTitle={setEditTitle}
+                          onSaveTitle={() => handleSaveTitle(work.id)}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </motion.div>
             )}
           </AnimatePresence>

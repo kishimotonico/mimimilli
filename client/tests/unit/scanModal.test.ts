@@ -212,4 +212,79 @@ describe("ScanModal", () => {
     );
     expect(registeredValue.parentElement?.className).not.toContain("bg-[color-mix");
   }, 6000);
+
+  it("newWorkIdsが変わったら一覧をクリアし、取得失敗時は古い一覧を残さない", async () => {
+    const workA: Work = { ...work, id: "work-a", title: "作品A" };
+    const workB: Work = { ...work, id: "work-b", title: "作品B" };
+    const getWorkSpy = vi.spyOn(workApi, "getWork");
+    getWorkSpy.mockResolvedValueOnce(workA);
+
+    const { rerender } = renderModal({
+      lastResult: { ...scanResult, newWorkIds: [workA.id] },
+    });
+    await waitFor(() => screen.getByText(workA.title));
+
+    getWorkSpy.mockRejectedValueOnce(new Error("fetch failed"));
+    rerender(
+      createElement(ScanModal, {
+        scanning: false,
+        progress: null,
+        lastResult: { ...scanResult, newWorkIds: [workB.id] },
+        lastScanTime: null,
+        libraryTotal: 11,
+        onStart: vi.fn(),
+        onCancel: vi.fn(),
+        onClose: vi.fn(),
+        onOpenRjCodeMissing: vi.fn(),
+      }),
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText("新規作品の読み込みに失敗しました")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText(workA.title)).toBeNull();
+  });
+
+  it("遅延した前回リクエストは新しいnewWorkIdsの結果を上書きしない", async () => {
+    const workA: Work = { ...work, id: "work-a", title: "作品A" };
+    const workB: Work = { ...work, id: "work-b", title: "作品B" };
+    let resolveA: (value: Work) => void = () => {};
+    let resolveB: (value: Work) => void = () => {};
+    const getWorkSpy = vi.spyOn(workApi, "getWork");
+    getWorkSpy.mockImplementation((id) => {
+      if (id === workA.id) {
+        return new Promise<Work>((resolve) => {
+          resolveA = resolve;
+        });
+      }
+      return new Promise<Work>((resolve) => {
+        resolveB = resolve;
+      });
+    });
+
+    const { rerender } = renderModal({
+      lastResult: { ...scanResult, newWorkIds: [workA.id] },
+    });
+
+    rerender(
+      createElement(ScanModal, {
+        scanning: false,
+        progress: null,
+        lastResult: { ...scanResult, newWorkIds: [workB.id] },
+        lastScanTime: null,
+        libraryTotal: 11,
+        onStart: vi.fn(),
+        onCancel: vi.fn(),
+        onClose: vi.fn(),
+        onOpenRjCodeMissing: vi.fn(),
+      }),
+    );
+
+    resolveB(workB);
+    await waitFor(() => screen.getByText(workB.title));
+
+    resolveA(workA);
+    await waitFor(() => expect(screen.queryByText(workA.title)).toBeNull());
+    expect(screen.getByText(workB.title)).toBeInTheDocument();
+  });
 });

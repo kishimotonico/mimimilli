@@ -367,14 +367,14 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
 
     async getDlsiteNotificationSummary(): Promise<DlsiteNotificationSummary> {
       const parseErrorCount = state.works.filter((work) => isDlsiteParseFailed(work.dlsite)).length;
-      const httpErrorCount = state.works.filter(
-        (work) => work.dlsite.status === "error" && work.dlsite.errorKind !== "parse_error",
+      const parseSuccessCount = state.works.filter(
+        (work) => work.dlsite.status === "applied",
       ).length;
       return {
         rjCodeMissingCount: state.works.filter((work) => isRjCodeMissing(work.dlsite)).length,
         fetchFailedCount: state.works.filter((work) => isDlsiteFetchFailed(work.dlsite)).length,
         parseErrorCount,
-        parseErrorAlert: evaluateParseErrorAlert(parseErrorCount, httpErrorCount),
+        parseErrorAlert: evaluateParseErrorAlert(parseErrorCount, parseSuccessCount),
         unlinkedCount: state.works.filter((work) => isDlsiteUnlinked(work.dlsite)).length,
       };
     },
