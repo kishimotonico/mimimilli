@@ -1,4 +1,45 @@
 import React from "react";
+import type { LucideIcon } from "lucide-react";
+import {
+  ArrowDownUp,
+  ArrowLeft,
+  ArrowRight,
+  Bell,
+  Bookmark,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Cog,
+  Download,
+  Ellipsis,
+  ExternalLink,
+  File,
+  FileText,
+  FileType,
+  Filter,
+  Folder,
+  FolderOpen,
+  Grid3x3,
+  Heart,
+  Image,
+  Info,
+  LayoutGrid,
+  List,
+  Locate,
+  Maximize,
+  Minimize,
+  Music,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Search,
+  Star,
+  TriangleAlert,
+  User,
+  Video,
+  Volume2,
+  X,
+} from "lucide-react";
 
 export interface IconProps {
   size?: number;
@@ -43,8 +84,28 @@ function Svg({
 
 export type IconFC = React.FC<IconProps>;
 
+function lucideIcon(Icon: LucideIcon): IconFC {
+  return ({ size = 16, className, style }) => (
+    <Icon size={size} className={className} style={style} aria-hidden="true" strokeWidth={1.5} />
+  );
+}
+
+function lucideIconFilled(Icon: LucideIcon): IconFC {
+  return ({ size = 16, className, style }) => (
+    <Icon
+      size={size}
+      className={className}
+      style={style}
+      aria-hidden="true"
+      strokeWidth={1.5}
+      fill="currentColor"
+      stroke="currentColor"
+    />
+  );
+}
+
 export const I = {
-  search: (p) => <Svg {...p} d={["M11 19a8 8 0 1 1 0 -16 8 8 0 0 1 0 16Z", "M21 21l-4.3-4.3"]} />,
+  search: lucideIcon(Search),
   play: (p) => <Svg {...p} fill="currentColor" d="M7 4.5v15l12-7.5z" />,
   pause: (p) => <Svg {...p} fill="currentColor" d="M6.5 4h3.5v16H6.5zM14 4h3.5v16H14z" />,
   prev: (p) => <Svg {...p} fill="currentColor" d="M6 4h2v16H6zM20 4L9 12l11 8z" />,
@@ -61,116 +122,32 @@ export const I = {
       ]}
     />
   ),
-  volume: (p) => (
-    <Svg {...p} d={["M11 4L6 8H3v8h3l5 4z", "M15 9.5a3 3 0 0 1 0 5", "M18 6.5a7 7 0 0 1 0 11"]} />
-  ),
-  fs: (p) => <Svg {...p} d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />,
-  ext: (p) => (
-    <Svg
-      {...p}
-      d={[
-        "M14 4h6v6",
-        "M20 4l-8 8",
-        "M19 13v5a2 2 0 0 1 -2 2H6a2 2 0 0 1 -2 -2V7a2 2 0 0 1 2 -2h5",
-      ]}
-    />
-  ),
-  folder: (p) => (
-    <Svg
-      {...p}
-      d="M3 7v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2 -2V9a2 2 0 0 0 -2 -2h-7l-2 -2H5a2 2 0 0 0 -2 2z"
-    />
-  ),
-  folderO: (p) => (
-    <Svg
-      {...p}
-      d={[
-        "M3 7v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2 -2v-7",
-        "M21 9V8a1 1 0 0 0 -1 -1h-7l-2 -2H5a2 2 0 0 0 -2 2v3",
-      ]}
-    />
-  ),
-  file: (p) => (
-    <Svg {...p} d={["M14 3H6a2 2 0 0 0 -2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2V9z", "M14 3v6h6"]} />
-  ),
-  image: (p) => (
-    <Svg
-      {...p}
-      d={[
-        "M3 5h18v14H3z",
-        "M3 16l5 -5 4 4 3 -3 6 6",
-        "M8 11a1.5 1.5 0 1 1 0 -3 1.5 1.5 0 0 1 0 3z",
-      ]}
-    />
-  ),
-  audio: (p) => (
-    <Svg {...p} d={["M9 17V6l11 -3v11", "M9 17a3 3 0 1 1 -3 -3", "M20 14a3 3 0 1 1 -3 -3"]} />
-  ),
-  video: (p) => (
-    <Svg {...p} d={["M3 6h12a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1H3z", "M16 10l5 -3v10l-5 -3z"]} />
-  ),
-  text: (p) => <Svg {...p} d={["M5 4h11l3 3v13a1 1 0 0 1 -1 1H5z", "M8 11h7M8 14h7M8 17h5"]} />,
-  pdf: (p) => (
-    <Svg
-      {...p}
-      d={["M5 4h10l4 4v12a1 1 0 0 1 -1 1H5z", "M14 4v4h4", "M8 13v4M8 13h1.2a1 1 0 1 1 0 2H8"]}
-    />
-  ),
-  chev: (p) => <Svg {...p} d="M9 6l6 6 -6 6" />,
-  chevD: (p) => <Svg {...p} d="M6 9l6 6 6 -6" />,
-  arrowL: (p) => <Svg {...p} d="M14 5l-7 7 7 7" />,
-  arrowR: (p) => <Svg {...p} d="M10 5l7 7 -7 7" />,
-  more: (p) => (
-    <Svg
-      {...p}
-      fill="currentColor"
-      d="M5 11a1.2 1.2 0 1 1 0 2.4 1.2 1.2 0 0 1 0 -2.4zM12 11a1.2 1.2 0 1 1 0 2.4 1.2 1.2 0 0 1 0 -2.4zM19 11a1.2 1.2 0 1 1 0 2.4 1.2 1.2 0 0 1 0 -2.4z"
-    />
-  ),
-  download: (p) => <Svg {...p} d={["M12 4v12", "M7 11l5 5 5 -5", "M5 20h14"]} />,
-  star: (p) => (
-    <Svg
-      {...p}
-      d="M12 3l2.7 5.7 6.3 .9 -4.5 4.4 1.1 6.2 -5.6 -3 -5.6 3 1.1 -6.2 -4.5 -4.4 6.3 -.9z"
-    />
-  ),
-  starF: (p) => (
-    <Svg
-      {...p}
-      fill="currentColor"
-      d="M12 3l2.7 5.7 6.3 .9 -4.5 4.4 1.1 6.2 -5.6 -3 -5.6 3 1.1 -6.2 -4.5 -4.4 6.3 -.9z"
-    />
-  ),
-  cog: (p) => (
-    <Svg
-      {...p}
-      d={[
-        "M12 15a3 3 0 1 0 0 -6 3 3 0 0 0 0 6Z",
-        "M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1 .1a2 2 0 1 1 -2.8 2.8l-.1 -.1a1.7 1.7 0 0 0 -1.8 -.3 1.7 1.7 0 0 0 -1 1.5V21a2 2 0 1 1 -4 0v-.1a1.7 1.7 0 0 0 -1 -1.5 1.7 1.7 0 0 0 -1.8 .3l-.1 .1a2 2 0 1 1 -2.8 -2.8l.1 -.1a1.7 1.7 0 0 0 .3 -1.8 1.7 1.7 0 0 0 -1.5 -1H3a2 2 0 1 1 0 -4h.1a1.7 1.7 0 0 0 1.5 -1 1.7 1.7 0 0 0 -.3 -1.8l-.1 -.1a2 2 0 1 1 2.8 -2.8l.1 .1a1.7 1.7 0 0 0 1.8 .3H9a1.7 1.7 0 0 0 1 -1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8 -.3l.1 -.1a2 2 0 1 1 2.8 2.8l-.1 .1a1.7 1.7 0 0 0 -.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0 -1.5 1Z",
-      ]}
-    />
-  ),
-  refresh: (p) => (
-    <Svg
-      {...p}
-      d={[
-        "M21 12a9 9 0 0 1 -15 6.7L3 16",
-        "M3 12a9 9 0 0 1 15 -6.7L21 8",
-        "M21 4v4h-4",
-        "M3 20v-4h4",
-      ]}
-    />
-  ),
-  edit: (p) => <Svg {...p} d={["M4 20h4l11 -11a2.8 2.8 0 0 0 -4 -4L4 16z", "M13.5 6.5l4 4"]} />,
-  add: (p) => <Svg {...p} d={["M12 5v14", "M5 12h14"]} />,
-  list: (p) => <Svg {...p} d={["M8 6h13M8 12h13M8 18h13", "M3 6h.01M3 12h.01M3 18h.01"]} />,
-  grid: (p) => <Svg {...p} d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" />,
-  gridS: (p) => (
-    <Svg
-      {...p}
-      d="M3 3h5v5H3zM10 3h5v5h-5zM17 3h5v5h-5zM3 10h5v5H3zM10 10h5v5h-5zM17 10h5v5h-5zM3 17h5v5H3zM10 17h5v5h-5zM17 17h5v5h-5z"
-    />
-  ),
+  volume: lucideIcon(Volume2),
+  fs: lucideIcon(Maximize),
+  ext: lucideIcon(ExternalLink),
+  folder: lucideIcon(Folder),
+  folderO: lucideIcon(FolderOpen),
+  file: lucideIcon(File),
+  image: lucideIcon(Image),
+  audio: lucideIcon(Music),
+  video: lucideIcon(Video),
+  text: lucideIcon(FileText),
+  pdf: lucideIcon(FileType),
+  chev: lucideIcon(ChevronRight),
+  chevD: lucideIcon(ChevronDown),
+  arrowL: lucideIcon(ArrowLeft),
+  arrowR: lucideIcon(ArrowRight),
+  more: lucideIcon(Ellipsis),
+  download: lucideIcon(Download),
+  star: lucideIcon(Star),
+  starF: lucideIconFilled(Star),
+  cog: lucideIcon(Cog),
+  refresh: lucideIcon(RefreshCw),
+  edit: lucideIcon(Pencil),
+  add: lucideIcon(Plus),
+  list: lucideIcon(List),
+  grid: lucideIcon(LayoutGrid),
+  gridS: lucideIcon(Grid3x3),
   ratio11: ({ size = 16, className, style }) => (
     <svg
       width={size}
@@ -196,29 +173,18 @@ export const I = {
   gridJustified: (p) => (
     <Svg {...p} fill="currentColor" d={["M3 5h6v6H3z", "M11 5h10v6H11z", "M3 13h18v6H3z"]} />
   ),
-  sort: (p) => <Svg {...p} d={["M8 4v16M4 8l4 -4 4 4", "M16 20V4M20 16l-4 4 -4 -4"]} />,
-  filter: (p) => <Svg {...p} d="M4 4h16l-6 8v6l-4 2v-8z" />,
-  check: (p) => <Svg {...p} d="M5 12l4 4 10 -10" />,
-  x: (p) => <Svg {...p} d="M6 6l12 12M18 6L6 18" />,
-  err: (p) => <Svg {...p} d={["M12 4l10 17H2z", "M12 10v5", "M12 18v0"]} />,
-  info: (p) => (
-    <Svg {...p} d={["M12 20a8 8 0 1 1 0 -16 8 8 0 0 1 0 16Z", "M12 8.5h.01", "M11 12h1v4h1"]} />
-  ),
-  heart: (p) => (
-    <Svg {...p} d="M12 20s-7 -4.3 -7 -10a4 4 0 0 1 7 -2.7A4 4 0 0 1 19 10c0 5.7 -7 10 -7 10z" />
-  ),
-  bell: (p) => (
-    <Svg {...p} d={["M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3 -2 3 -9", "M10 21a2 2 0 0 0 4 0"]} />
-  ),
-  user: (p) => <Svg {...p} d={["M4 21a8 8 0 0 1 16 0", "M12 12a4 4 0 1 0 0 -8 4 4 0 0 0 0 8z"]} />,
-  bookmark: (p) => <Svg {...p} d="M6 4h12v17l-6 -4 -6 4z" />,
-  minimize: (p) => <Svg {...p} d={["M9 4v5H4", "M15 4v5h5", "M4 15h5v5", "M20 15h-5v5"]} />,
-  locate: (p) => (
-    <Svg
-      {...p}
-      d={["M12 20a8 8 0 1 1 0 -16 8 8 0 0 1 0 16Z", "M12 2v2", "M12 20v2", "M2 12h2", "M20 12h2"]}
-    />
-  ),
+  sort: lucideIcon(ArrowDownUp),
+  filter: lucideIcon(Filter),
+  check: lucideIcon(Check),
+  x: lucideIcon(X),
+  err: lucideIcon(TriangleAlert),
+  info: lucideIcon(Info),
+  heart: lucideIcon(Heart),
+  bell: lucideIcon(Bell),
+  user: lucideIcon(User),
+  bookmark: lucideIcon(Bookmark),
+  minimize: lucideIcon(Minimize),
+  locate: lucideIcon(Locate),
   swapLR: (p) => <Svg {...p} d={["M4 8h13", "M14 4l3 4 -3 4", "M20 16H7", "M10 12l-3 4 3 4"]} />,
 } as const satisfies Record<string, IconFC>;
 
