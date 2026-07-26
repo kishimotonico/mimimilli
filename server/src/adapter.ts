@@ -159,6 +159,9 @@ export interface DataAdapter {
   runDlsiteBulk(
     mode: DlsiteBulkMode,
     workIds: string[] | undefined,
-    onProgress?: (event: Extract<DlsiteBulkProgressEvent, { type: "progress" }>) => void,
+    options?: {
+      signal?: AbortSignal;
+      onProgress?: (event: Extract<DlsiteBulkProgressEvent, { type: "progress" }>) => void;
+    },
   ): Promise<DlsiteBulkResult>;
 }

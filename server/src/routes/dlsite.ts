@@ -3,12 +3,18 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import {
   dlsiteApplyBodySchema,
+  dlsiteBulkCancelResponseSchema,
   dlsiteNotificationQuerySchema,
   dlsiteStatePatchSchema,
 } from "@mimimilli/shared";
 import type { DataAdapter } from "../adapter.ts";
 import { apiError, invalidRequest, notFound } from "../lib/httpError.ts";
-import { enqueueDlsiteJob, isDlsiteJobInProgress, subscribeToDlsite } from "./dlsiteProgress.ts";
+import {
+  enqueueDlsiteJob,
+  isDlsiteJobInProgress,
+  subscribeToDlsite,
+  cancelDlsiteJob,
+} from "./dlsiteProgress.ts";
 import { DlsiteOfflineError } from "../adapters/real/dlsiteScheduler.ts";
 
 export function dlsiteRoute(adapter: DataAdapter): Hono {
@@ -73,6 +79,11 @@ export function dlsiteRoute(adapter: DataAdapter): Hono {
     return c.json({ started: true }, 202);
   });
 
+  app.delete("/dlsite/bulk", (c) => {
+    if (!cancelDlsiteJob()) notFound("実行中のDLsite一括取得がありません");
+    return c.json(dlsiteBulkCancelResponseSchema.parse({ cancelling: true }));
+  });
+
   app.get("/dlsite/events", (c) =>
     streamSSE(c, async (stream) => {
       let resolveDone!: () => void;
@@ -86,7 +97,8 @@ export function dlsiteRoute(adapter: DataAdapter): Hono {
       };
       const listener = (event: import("@mimimilli/shared").DlsiteBulkProgressEvent) => {
         const written = send(event);
-        if (event.type !== "progress") void written.then(resolveDone);
+        if (event.type !== "progress" && event.type !== "cancelling")
+          void written.then(resolveDone);
       };
       const subscription = subscribeToDlsite(listener);
       for (const event of subscription.replay) await send(event);

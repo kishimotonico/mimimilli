@@ -122,6 +122,13 @@ export async function patchParsed<T>(
   return parseResponse(schema, "PATCH", path, await res.json());
 }
 
+/** shared契約のスキーマでレスポンスを検証する DELETE */
+export async function deleteParsed<T>(schema: z.ZodType<T>, path: string): Promise<T> {
+  const res = await fetch(API_BASE + path, { method: "DELETE" });
+  if (!res.ok) return throwApiError("DELETE", path, res);
+  return parseResponse(schema, "DELETE", path, await res.json());
+}
+
 /** レスポンスボディを持たない DELETE。成功時のステータスも204であることを検証する */
 export async function deleteVoid(path: string): Promise<void> {
   const res = await fetch(API_BASE + path, { method: "DELETE" });

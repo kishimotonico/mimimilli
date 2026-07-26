@@ -683,7 +683,10 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
     async runDlsiteBulk(
       mode: DlsiteBulkMode,
       workIds: string[] | undefined,
-      onProgress?: (event: Extract<DlsiteBulkProgressEvent, { type: "progress" }>) => void,
+      options?: {
+        signal?: AbortSignal;
+        onProgress?: (event: Extract<DlsiteBulkProgressEvent, { type: "progress" }>) => void;
+      },
     ): Promise<DlsiteBulkResult> {
       const requested = workIds
         ? state.works.filter((work) => workIds.includes(work.id))
@@ -692,7 +695,13 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
         (work) =>
           work.dlsite.rjCode && (work.dlsite.status === "none" || work.dlsite.status === "error"),
       );
+      const result: DlsiteBulkResult = {
+        fetched: 0,
+        failed: 0,
+        skipped: requested.length - targets.length,
+      };
       for (let index = 0; index < targets.length; index++) {
+        if (options?.signal?.aborted) return result;
         const work = targets[index]!;
         const fetchedTags = normalizeTags([
           "サークル/fixtureサークル",
@@ -712,18 +721,15 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
           error: null,
           appliedTags: normalizeTags([...work.dlsite.appliedTags, ...fetchedTags]),
         };
-        onProgress?.({
+        result.fetched += 1;
+        options?.onProgress?.({
           type: "progress",
           processed: index + 1,
           total: targets.length,
           workId: work.id,
         });
       }
-      return {
-        fetched: targets.length,
-        failed: 0,
-        skipped: requested.length - targets.length,
-      };
+      return result;
     },
   };
 }

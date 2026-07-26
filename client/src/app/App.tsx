@@ -230,6 +230,9 @@ export default function App() {
   const handleCancelScan = useCallback(() => {
     void scanJob.cancel().catch(() => {});
   }, [scanJob]);
+  const handleCancelDlsiteBulk = useCallback(() => {
+    void dlsiteBulk.cancel().catch(() => {});
+  }, [dlsiteBulk]);
   // TopBarのスキャンボタンは即時実行せずモーダルを開く（TASK-56）。実行中なら実行中の表示に復帰する。
   const handleOpenScanModal = useCallback(() => setShowScanModal(true), []);
 
@@ -345,7 +348,9 @@ export default function App() {
           dlsiteUnlinkedCount={dlsiteUnlinked.count}
           dlsiteBulkActive={dlsiteBulk.active}
           dlsiteBulkProgress={dlsiteBulk.progress}
+          dlsiteBulkCancelling={dlsiteBulk.cancelling}
           onStartDlsiteBulk={dlsiteBulk.start}
+          onCancelDlsiteBulk={handleCancelDlsiteBulk}
           scanResult={lastScanResult}
           onOpenScanResult={handleOpenScanModal}
         />
@@ -493,9 +498,11 @@ export default function App() {
           <Toast
             message={
               scanJob.error ??
-              (dlsiteBulk.result
-                ? `DLsite一括取得: 取得 ${dlsiteBulk.result.fetched}件・失敗 ${dlsiteBulk.result.failed}件`
-                : dlsiteBulk.error)
+              (dlsiteBulk.cancelledResult
+                ? `DLsite一括取得を中断しました（取得 ${dlsiteBulk.cancelledResult.fetched}件・失敗 ${dlsiteBulk.cancelledResult.failed}件）`
+                : dlsiteBulk.result
+                  ? `DLsite一括取得: 取得 ${dlsiteBulk.result.fetched}件・失敗 ${dlsiteBulk.result.failed}件`
+                  : dlsiteBulk.error)
             }
             onDismiss={scanJob.error ? scanJob.clearError : dlsiteBulk.dismiss}
           />

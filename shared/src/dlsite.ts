@@ -106,7 +106,15 @@ export const dlsiteBulkProgressEventSchema = z.discriminatedUnion("type", [
     total: z.number().int().nonnegative(),
     workId: z.string(),
   }),
+  z.object({ type: z.literal("cancelling") }),
   z.object({ type: z.literal("complete"), result: dlsiteBulkResultSchema }),
+  z.object({ type: z.literal("cancelled"), result: dlsiteBulkResultSchema }),
   z.object({ type: z.literal("error"), message: z.string() }),
 ]);
 export type DlsiteBulkProgressEvent = z.infer<typeof dlsiteBulkProgressEventSchema>;
+
+/** DELETE /api/dlsite/bulk のレスポンス */
+export const dlsiteBulkCancelResponseSchema = z.object({
+  cancelling: z.literal(true),
+});
+export type DlsiteBulkCancelResponse = z.infer<typeof dlsiteBulkCancelResponseSchema>;

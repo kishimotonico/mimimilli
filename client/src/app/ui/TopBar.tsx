@@ -2,7 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import type { ScanResult } from "@mimimilli/shared";
 import { I } from "../../shared/ui/Icon";
 import IconButton from "../../shared/ui/IconButton";
+import { AnimatePresence, motion } from "motion/react";
 import NotificationBell from "./NotificationBell";
+
+const FADE = { duration: 0.15 };
 
 interface TopBarProps {
   mode?: "library" | "files";
@@ -33,6 +36,10 @@ interface TopBarProps {
   dlsiteBulkProgress?: { processed: number; total: number } | null;
   /** 通知ベルから一括取得を起動する */
   onStartDlsiteBulk?: () => void;
+  /** DLsite一括取得を中止する */
+  onCancelDlsiteBulk?: () => void;
+  /** DLsite一括取得の中止を要求済みか */
+  dlsiteBulkCancelling?: boolean;
   /** 直近のスキャン結果（通知ベルのサマリ表示用、TASK-44） */
   scanResult?: ScanResult | null;
   /** 通知ベルの直近スキャン結果クリックでスキャンモーダルの結果表示を開く（TASK-56） */
@@ -57,6 +64,8 @@ export default function TopBar({
   dlsiteBulkActive = false,
   dlsiteBulkProgress = null,
   onStartDlsiteBulk = () => {},
+  onCancelDlsiteBulk = () => {},
+  dlsiteBulkCancelling = false,
   scanResult = null,
   onOpenScanResult = () => {},
 }: TopBarProps) {
@@ -141,11 +150,30 @@ export default function TopBar({
         className={scanning ? "animate-spin" : undefined}
       />
       {dlsiteBulkActive && (
-        <span className="font-mono text-[10.5px] text-ink-3" aria-live="polite">
-          {dlsiteBulkProgress
-            ? `DLsite取得中 (${dlsiteBulkProgress.processed}/${dlsiteBulkProgress.total})`
-            : "DLsite取得中..."}
-        </span>
+        <>
+          <span className="font-mono text-[10.5px] text-ink-3" aria-live="polite">
+            {dlsiteBulkProgress
+              ? `DLsite取得中 (${dlsiteBulkProgress.processed}/${dlsiteBulkProgress.total})`
+              : "DLsite取得中..."}
+          </span>
+          <AnimatePresence mode="wait" initial={false}>
+            {!dlsiteBulkCancelling && (
+              <motion.button
+                type="button"
+                key="cancel-dlsite-bulk"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={FADE}
+                onClick={onCancelDlsiteBulk}
+                className="inline-flex h-7 items-center justify-center gap-1 rounded-[6px] border border-[color-mix(in_oklch,var(--r-coral)_45%,transparent)] bg-[color-mix(in_oklch,var(--r-coral)_10%,transparent)] px-2.5 font-sans text-[11px] font-medium text-ink-0 transition-colors hover:bg-[color-mix(in_oklch,var(--r-coral)_16%,transparent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
+              >
+                <I.x size={11} />
+                中止
+              </motion.button>
+            )}
+          </AnimatePresence>
+        </>
       )}
       <NotificationBell
         rjCodeMissingCount={rjCodeMissingCount}

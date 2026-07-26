@@ -1169,3 +1169,55 @@ test("一括取得: 失敗状態のメタ書き戻しが例外を投げても後
   const succeeded = await adapter.getWork(scan.newWorkIds[0]!);
   assert.equal(succeeded?.dlsite.status, "applied");
 });
+
+test("一括取得: 中断後の再実行で処理済み作品はHTTPしない", async (t) => {
+  const lib = makeSampleLibrary();
+  const dir = makeTestDirectory("dlsite-bulk-cancel-resume");
+  t.after(lib.cleanup);
+  t.after(dir.cleanup);
+  const duplicateDir = join(lib.root, "dlsite", "RJ900002_複製");
+  cpSync(join(lib.root, "dlsite", "RJ900002_既存メタ"), duplicateDir, { recursive: true });
+  const duplicateMetaPath = join(duplicateDir, ".meta.json");
+  const duplicateMeta = JSON.parse(readFileSync(duplicateMetaPath, "utf-8")) as { id: string };
+  duplicateMeta.id = "22222222-2222-4222-8222-222222222222";
+  writeFileSync(duplicateMetaPath, JSON.stringify(duplicateMeta, null, 2));
+
+  let httpCalls = 0;
+  const controller = new AbortController();
+  const adapter = createRealAdapter({
+    database: { kind: "memory" },
+    dlsiteRequestIntervalMs: 0,
+    dlsiteCache: { path: join(dir.path, "dlsite-cache.sqlite") },
+    dlsiteHtmlFetcher: async () => {
+      httpCalls += 1;
+      return { status: 200, contentType: "text/html", body: SAMPLE_HTML };
+    },
+    dlsiteParser: (html, code) => {
+      const parsed = parseDlsiteHtml(html, code);
+      if (!parsed.ok) return parsed;
+      return { ok: true, info: { ...parsed.info, coverUrl: null } };
+    },
+  });
+  await adapter.updateSettings({ rootFolder: lib.root });
+  await adapter.scan();
+  const duplicateId = "22222222-2222-4222-8222-222222222222";
+  const ids = [lib.existingWorkId, duplicateId];
+
+  const partial = await adapter.runDlsiteBulk("existing", ids, {
+    signal: controller.signal,
+    onProgress: (event) => {
+      if (event.processed === 1) controller.abort();
+    },
+  });
+  assert.deepEqual(partial, { fetched: 1, failed: 0, skipped: 0 });
+  assert.equal(httpCalls, 1);
+  const interrupted = await Promise.all(ids.map((id) => adapter.getWork(id)));
+  assert.equal(interrupted.filter((work) => work?.dlsite.status === "applied").length, 1);
+
+  const resumed = await adapter.runDlsiteBulk("existing", ids);
+  assert.deepEqual(resumed, { fetched: 1, failed: 0, skipped: 1 });
+  assert.equal(httpCalls, 1);
+  const completed = await Promise.all(ids.map((id) => adapter.getWork(id)));
+  assert.ok(completed.every((work) => work?.dlsite.status === "applied"));
+  adapter.close();
+});

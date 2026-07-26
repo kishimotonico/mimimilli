@@ -204,6 +204,109 @@ test("DLsite scheduler: queue待機とcooldown待機のAbortはtransportを増�
   );
 });
 
+test("DLsite scheduler: scheduleの間隔待機中もAbortで即時に返す", async () => {
+  const time = fakeTime();
+  let operations = 0;
+  const scheduler = new DlsiteScheduler(
+    { ...config, requestIntervalMs: 5_000 },
+    {
+      now: time.now,
+      sleep: time.sleep,
+      transport: async () => new Response(null, { status: 200 }),
+    },
+  );
+  await scheduler.schedule(async () => {
+    operations += 1;
+    return "first";
+  });
+  const controller = new AbortController();
+  const pending = scheduler.schedule(async () => {
+    operations += 1;
+    return "second";
+  }, controller.signal);
+  controller.abort();
+  await assert.rejects(
+    pending,
+    (error: unknown) => error instanceof DOMException && error.name === "AbortError",
+  );
+  assert.equal(operations, 1);
+});
+
+test("DLsite scheduler: HTTP待機中のAbortはtimeoutSignal経由で打ち切る", async () => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  let transportReady!: () => void;
+  const started = new Promise<void>((resolve) => (transportReady = resolve));
+  const controller = new AbortController();
+  let transportCalls = 0;
+  const scheduler = new DlsiteScheduler(
+    { ...config, requestIntervalMs: 0, timeoutMs: 60_000 },
+    {
+      transport: async (_input, init) => {
+        transportCalls += 1;
+        transportReady();
+        const aborted = new Promise<never>((_resolve, reject) => {
+          init?.signal?.addEventListener(
+            "abort",
+            () => reject(new DOMException("DLsiteリクエストはキャンセルされました", "AbortError")),
+            { once: true },
+          );
+        });
+        await Promise.race([gate, aborted]);
+        return new Response(null, { status: 200 });
+      },
+    },
+  );
+  const pending = scheduler.fetch("https://www.dlsite.com/a", { signal: controller.signal });
+  await started;
+  assert.equal(transportCalls, 1);
+  controller.abort();
+  await assert.rejects(
+    pending,
+    (error: unknown) => error instanceof DOMException && error.name === "AbortError",
+  );
+  release();
+});
+
+test("DLsite scheduler: リトライのバックオフ待機中もAbortで即時に返す", async () => {
+  let releaseSleep!: () => void;
+  const sleepGate = new Promise<void>((resolve) => (releaseSleep = resolve));
+  let backoffEntered!: () => void;
+  const backoffStarted = new Promise<void>((resolve) => (backoffEntered = resolve));
+  let transportCalls = 0;
+  const controller = new AbortController();
+  const scheduler = new DlsiteScheduler(
+    { ...config, requestIntervalMs: 0, retryCount: 2 },
+    {
+      random: () => 0.5,
+      sleep: async (_ms, signal) => {
+        backoffEntered();
+        const aborted = new Promise<never>((_resolve, reject) => {
+          signal?.addEventListener(
+            "abort",
+            () => reject(new DOMException("DLsiteリクエストはキャンセルされました", "AbortError")),
+            { once: true },
+          );
+        });
+        await Promise.race([sleepGate, aborted]);
+      },
+      transport: async () => {
+        transportCalls += 1;
+        return new Response(null, { status: 500 });
+      },
+    },
+  );
+  const pending = scheduler.fetch("https://www.dlsite.com/a", { signal: controller.signal });
+  await backoffStarted;
+  assert.equal(transportCalls, 1);
+  controller.abort();
+  await assert.rejects(
+    pending,
+    (error: unknown) => error instanceof DOMException && error.name === "AbortError",
+  );
+  releaseSleep();
+});
+
 test("DLsite scheduler: 404はretryしない", async () => {
   let calls = 0;
   const scheduler = new DlsiteScheduler(config, {

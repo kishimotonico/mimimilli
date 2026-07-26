@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  cancelDlsiteJob,
   enqueueDlsiteJob,
   resetDlsiteProgressStateForTest,
   startDlsiteJob,
@@ -25,13 +26,72 @@ test("DLsiteジョブは進捗を購読者へ配信し、完了を再接続時�
   ]);
 });
 
+test("実行中のDLsite一括取得はcancelで打ち切り、cancelledを配信する", async () => {
+  resetDlsiteProgressStateForTest();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  const adapter = {
+    async runDlsiteBulk(
+      _mode: string,
+      _workIds: string[] | undefined,
+      options?: { signal?: AbortSignal },
+    ) {
+      await gate;
+      const result = { fetched: 2, failed: 1, skipped: 0 };
+      if (options?.signal?.aborted) return result;
+      return result;
+    },
+  } as unknown as DataAdapter;
+
+  enqueueDlsiteJob(adapter, "existing", undefined);
+  await new Promise((resolve) => setImmediate(resolve));
+  const events: Array<{ type: string; result?: { fetched: number } }> = [];
+  const subscription = subscribeToDlsite((event) => events.push(event));
+  assert.equal(cancelDlsiteJob(), true);
+  release();
+  while (events.at(-1)?.type !== "cancelled") await new Promise((resolve) => setImmediate(resolve));
+  subscription.unsubscribe();
+  assert.deepEqual(
+    events.map((event) => event.type),
+    ["cancelling", "cancelled"],
+  );
+  assert.deepEqual(events.at(-1)?.result, { fetched: 2, failed: 1, skipped: 0 });
+});
+
+test("中止時はキューに積まれた未実行ジョブを破棄する", async () => {
+  resetDlsiteProgressStateForTest();
+  const calls: string[] = [];
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  const adapter = {
+    async runDlsiteBulk(mode: string) {
+      calls.push(mode);
+      if (calls.length === 1) await gate;
+      return { fetched: 0, failed: 0, skipped: 0 };
+    },
+  } as unknown as DataAdapter;
+
+  enqueueDlsiteJob(adapter, "existing", undefined);
+  enqueueDlsiteJob(adapter, "new", ["queued-work"]);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(cancelDlsiteJob(), true);
+  release();
+  while (calls.length < 1) await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(calls, ["existing"]);
+});
+
 test("実行中に追加された自動取得をFIFOで後続実行する", async () => {
   resetDlsiteProgressStateForTest();
   const calls: Array<{ mode: string; workIds: string[] | undefined }> = [];
   let releaseFirst!: () => void;
   const firstGate = new Promise<void>((resolve) => (releaseFirst = resolve));
   const adapter = {
-    async runDlsiteBulk(mode: string, workIds: string[] | undefined) {
+    async runDlsiteBulk(
+      mode: string,
+      workIds: string[] | undefined,
+      _options?: { signal?: AbortSignal },
+    ) {
       calls.push({ mode, workIds });
       if (calls.length === 1) await firstGate;
       return { fetched: 1, failed: 0, skipped: 0 };

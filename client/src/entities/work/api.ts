@@ -2,13 +2,21 @@
 // ファイル一覧・DLsite メタデータ）を扱う。
 // 依存方向: shared/api/http と自 entity の model のみを参照する。
 
-import { API_BASE, getParsed, patchParsed, postParsed, postVoid } from "../../shared/api/http";
+import {
+  API_BASE,
+  getParsed,
+  patchParsed,
+  postParsed,
+  postVoid,
+  deleteParsed,
+} from "../../shared/api/http";
 import {
   workSchema,
   worksPageSchema,
   tagListSchema,
   dlsiteWorkInfoSchema,
   dlsiteBulkStartResponseSchema,
+  dlsiteBulkCancelResponseSchema,
   fileEntrySchema,
   type Work,
   type WorksPage,
@@ -105,4 +113,8 @@ export async function updateDlsiteState(workId: string, body: DlsiteStatePatch):
 
 export async function startDlsiteBulk(): Promise<void> {
   await postParsed(dlsiteBulkStartResponseSchema, "/dlsite/bulk");
+}
+
+export async function cancelDlsiteBulk(): Promise<void> {
+  await deleteParsed(dlsiteBulkCancelResponseSchema, "/dlsite/bulk");
 }

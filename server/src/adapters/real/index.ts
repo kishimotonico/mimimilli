@@ -270,10 +270,10 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       ));
   const dlsiteHtmlFetcher =
     options.dlsiteHtmlFetcher ??
-    ((productCode: string) =>
+    ((productCode: string, signal?: AbortSignal) =>
       fetchDlsiteHtml(
         productCode,
-        dlsiteScheduler.fetch.bind(dlsiteScheduler),
+        (input, init) => dlsiteScheduler.fetch(input, { ...init, signal }),
         dlsiteHtmlTransferBytes,
         dlsiteHtmlExpandedBytes,
       ));
@@ -281,23 +281,29 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
   const dlsiteCoverDownloader = options.dlsiteCoverDownloader ?? downloadCover;
   const dlsiteCoverFetcher =
     options.dlsiteCoverFetcher ??
-    ((coverUrl: string) =>
+    ((coverUrl: string, signal?: AbortSignal) =>
       fetchDlsiteCover(
         coverUrl,
-        dlsiteScheduler.fetch.bind(dlsiteScheduler),
+        (input, init) => dlsiteScheduler.fetch(input, { ...init, signal }),
         dlsiteCoverMaximumBytes,
       ));
   const scheduledDlsiteFetcher = options.dlsiteFetcher
-    ? (rjCode: string) => dlsiteScheduler.schedule(() => dlsiteFetcher(rjCode))
+    ? (rjCode: string, signal?: AbortSignal) =>
+        dlsiteScheduler.schedule(() => dlsiteFetcher(rjCode), signal)
     : dlsiteFetcher;
   const scheduledDlsiteHtmlFetcher = options.dlsiteHtmlFetcher
-    ? (productCode: string) => dlsiteScheduler.schedule(() => dlsiteHtmlFetcher(productCode))
+    ? (productCode: string, signal?: AbortSignal) =>
+        dlsiteScheduler.schedule(() => dlsiteHtmlFetcher(productCode), signal)
     : dlsiteHtmlFetcher;
   const scheduledDlsiteCoverFetcher = options.dlsiteCoverFetcher
-    ? (coverUrl: string) => dlsiteScheduler.schedule(() => dlsiteCoverFetcher(coverUrl))
+    ? (coverUrl: string, signal?: AbortSignal) =>
+        dlsiteScheduler.schedule(() => dlsiteCoverFetcher(coverUrl), signal)
     : dlsiteCoverFetcher;
-  const scheduledDlsiteCoverDownloader = (coverUrl: string, workDir: string) =>
-    dlsiteScheduler.schedule(() => dlsiteCoverDownloader(coverUrl, workDir));
+  const scheduledDlsiteCoverDownloader = (
+    coverUrl: string,
+    workDir: string,
+    signal?: AbortSignal,
+  ) => dlsiteScheduler.schedule(() => dlsiteCoverDownloader(coverUrl, workDir), signal);
   const dlsiteFlights = new Map<string, Promise<DlsiteFetchAttempt>>();
   const dlsiteCoverFlights = new Map<
     string,
@@ -313,13 +319,17 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
   async function fetchCachedDlsiteAttempt(
     productCode: string,
     force = false,
+    signal?: AbortSignal,
   ): Promise<DlsiteFetchAttempt> {
     // キャッシュ未設定の既存テスト注入契約は維持する。
     if (!dlsiteCache) {
       dlsiteScheduler.assertOnline();
-      return { result: await scheduledDlsiteFetcher(productCode), httpAttempted: true };
+      return { result: await scheduledDlsiteFetcher(productCode, signal), httpAttempted: true };
     }
     const key = productCode.trim().toUpperCase();
+    if (signal?.aborted) {
+      throw new DOMException("DLsite一括取得はキャンセルされました", "AbortError");
+    }
     if (!force) {
       const resolution = dlsiteCache.resolve({ productCode: key });
       if (resolution.kind !== "miss") {
@@ -363,7 +373,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
     if (ongoing) return ongoing;
     const request: Promise<DlsiteFetchAttempt> = (async (): Promise<DlsiteFetchAttempt> => {
       try {
-        const response = await scheduledDlsiteHtmlFetcher(key);
+        const response = await scheduledDlsiteHtmlFetcher(key, signal);
         if (response.status === 404) {
           dlsiteCache.recordFailure({ productCode: key, outcome: "not_found" });
           return {
@@ -397,6 +407,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
         });
         return { result: parsed, httpAttempted: true };
       } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") throw error;
         dlsiteCache.recordFailure({ productCode: key, outcome: "error" });
         return {
           result: {
@@ -420,10 +431,14 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
     return (await fetchCachedDlsiteAttempt(productCode, force)).result;
   }
 
-  async function cachedCover(coverUrl: string, workDir: string): Promise<string> {
+  async function cachedCover(
+    coverUrl: string,
+    workDir: string,
+    signal?: AbortSignal,
+  ): Promise<string> {
     if (!dlsiteCache) {
       dlsiteScheduler.assertOnline();
-      return scheduledDlsiteCoverDownloader(coverUrl, workDir);
+      return scheduledDlsiteCoverDownloader(coverUrl, workDir, signal);
     }
     const normalizedUrl = normalizeDlsiteCoverUrl(coverUrl);
     const key = `cover:${createHash("sha256").update(normalizedUrl).digest("hex")}`;
@@ -445,7 +460,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
           key: normalizedUrl,
         });
         dlsiteScheduler.assertOnline();
-        const fetched = await scheduledDlsiteCoverFetcher(normalizedUrl);
+        const fetched = await scheduledDlsiteCoverFetcher(normalizedUrl, signal);
         const finalUrl = normalizeDlsiteCoverUrl(fetched.finalUrl);
         dlsiteCache.putCover(finalUrl, fetched.body, fetched.contentType);
         // リダイレクトがあっても、要求した正規化URLでも次回hitさせる。
@@ -873,62 +888,166 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
     async runDlsiteBulk(
       mode: DlsiteBulkMode,
       workIds: string[] | undefined,
-      onProgress?: (event: Extract<DlsiteBulkProgressEvent, { type: "progress" }>) => void,
+      options?: {
+        signal?: AbortSignal;
+        onProgress?: (event: Extract<DlsiteBulkProgressEvent, { type: "progress" }>) => void;
+      },
     ): Promise<DlsiteBulkResult> {
-      // 対象抽出は listSummaries で完結させる（全件 getWork の N+1 を解消。TASK-57）。
-      // 以降の個別処理で完全な Work が必要な場合だけ、その作品の getWork を呼ぶ
-      const summaries = repo.listSummaries();
-      const requested = (() => {
-        if (!workIds) return summaries;
-        const idSet = new Set(workIds);
-        return summaries.filter((summary) => idSet.has(summary.id));
-      })();
-      // 1. work単位で適用対象を選ぶ。statusは「適用が必要か」だけを表す。
-      //    skippedとapplied（適用済み）は常に除外。
-      //    HTTP再取得可否（ネットワークへ出るか）はここでは決めず、常にキャッシュTTLへ委ねる。
-      const targets = requested.filter((work) => {
-        if (!work.dlsite.rjCode || work.dlsite.status === "skipped") return false;
-        return work.dlsite.status !== "applied";
-      });
-      const result: DlsiteBulkResult = {
-        fetched: 0,
-        failed: 0,
-        skipped: requested.length - targets.length,
-      };
+      const signal = options?.signal;
+      const isAborted = (): boolean => signal?.aborted === true;
+      const result: DlsiteBulkResult = { fetched: 0, failed: 0, skipped: 0 };
+      try {
+        // 対象抽出は listSummaries で完結させる（全件 getWork の N+1 を解消。TASK-57）。
+        // 以降の個別処理で完全な Work が必要な場合だけ、その作品の getWork を呼ぶ
+        const summaries = repo.listSummaries();
+        const requested = (() => {
+          if (!workIds) return summaries;
+          const idSet = new Set(workIds);
+          return summaries.filter((summary) => idSet.has(summary.id));
+        })();
+        // 1. work単位で適用対象を選ぶ。statusは「適用が必要か」だけを表す。
+        //    skippedとapplied（適用済み）は常に除外。
+        //    HTTP再取得可否（ネットワークへ出るか）はここでは決めず、常にキャッシュTTLへ委ねる。
+        const targets = requested.filter((work) => {
+          if (!work.dlsite.rjCode || work.dlsite.status === "skipped") return false;
+          return work.dlsite.status !== "applied";
+        });
+        result.skipped = requested.length - targets.length;
 
-      // 2. RJコードを重複排除して取得する。同一作品を跨いで同じRJコードが複数あっても
-      //    HTTP・キャッシュ判定は1回で済ませる。
-      const uniqueRjCodes = [...new Set(targets.map((work) => work.dlsite.rjCode!))];
-      const attempts = new Map<string, DlsiteFetchAttempt>();
-      for (const rjCode of uniqueRjCodes) {
-        try {
-          attempts.set(rjCode, await fetchCachedDlsiteAttempt(rjCode));
-        } catch (error) {
-          if (error instanceof DlsiteOfflineError) throw error;
-          attempts.set(rjCode, {
-            result: {
-              ok: false,
-              kind: "error",
-              message: error instanceof Error ? error.message : "DLsite取得に失敗しました",
-            },
-            httpAttempted: false,
-          });
+        // 2. RJコードを重複排除して取得する。同一作品を跨いで同じRJコードが複数あっても
+        //    HTTP・キャッシュ判定は1回で済ませる。
+        const uniqueRjCodes = [...new Set(targets.map((work) => work.dlsite.rjCode!))];
+        const attempts = new Map<string, DlsiteFetchAttempt>();
+        for (const rjCode of uniqueRjCodes) {
+          if (isAborted()) return result;
+          try {
+            attempts.set(rjCode, await fetchCachedDlsiteAttempt(rjCode, false, signal));
+          } catch (error) {
+            if (error instanceof DlsiteOfflineError) throw error;
+            if (error instanceof DOMException && error.name === "AbortError") return result;
+            attempts.set(rjCode, {
+              result: {
+                ok: false,
+                kind: "error",
+                message: error instanceof Error ? error.message : "DLsite取得に失敗しました",
+              },
+              httpAttempted: false,
+            });
+          }
         }
-      }
 
-      for (let index = 0; index < targets.length; index++) {
-        const work = targets[index]!;
-        const attempt = attempts.get(work.dlsite.rjCode!)!;
-        const fetched = attempt.result;
-        // 実HTTPを試みた時だけlastAttemptAtを進める。cache hitは「HTTPをいつ試みたか」を書き換えない。
-        const attemptedAt = attempt.httpAttempted
-          ? new Date().toISOString()
-          : work.dlsite.lastAttemptAt;
-        try {
-          if (!fetched.ok) {
-            if (fetched.kind === "offline") {
+        for (let index = 0; index < targets.length; index++) {
+          if (isAborted()) return result;
+          const work = targets[index]!;
+          const attempt = attempts.get(work.dlsite.rjCode!)!;
+          const fetched = attempt.result;
+          // 実HTTPを試みた時だけlastAttemptAtを進める。cache hitは「HTTPをいつ試みたか」を書き換えない。
+          const attemptedAt = attempt.httpAttempted
+            ? new Date().toISOString()
+            : work.dlsite.lastAttemptAt;
+          try {
+            if (!fetched.ok) {
+              if (fetched.kind === "offline") {
+                result.failed += 1;
+                options?.onProgress?.({
+                  type: "progress",
+                  processed: index + 1,
+                  total: targets.length,
+                  workId: work.id,
+                });
+                continue;
+              }
+              const newStatus =
+                fetched.kind === "not_found" ? ("not_found" as const) : ("error" as const);
+              const noOp =
+                !attempt.httpAttempted &&
+                work.dlsite.status === newStatus &&
+                work.dlsite.error === fetched.message;
+              if (!noOp) {
+                const dlsite = {
+                  ...work.dlsite,
+                  status: newStatus,
+                  lastAttemptAt: attemptedAt,
+                  error: fetched.message,
+                };
+                db.transaction(() => {
+                  repo.setDlsiteState(work.id, dlsite);
+                  const metaLocation = repo.getWorkMetaLocation(work.id);
+                  if (metaLocation) patchMetaFile(findMetaPath(metaLocation), { dlsite });
+                });
+              }
               result.failed += 1;
-              onProgress?.({
+            } else {
+              const allInfoTags = mergeDlsiteTags([], fetched.info);
+              const applyTags =
+                mode === "new"
+                  ? allInfoTags
+                  : allInfoTags.filter((tag) => !work.dlsite.appliedTags.includes(tag));
+              const nextTags = normalizeTags([...work.tags, ...applyTags]);
+              const nextTitle =
+                mode === "new" || isDefaultTitle(work.title, work.physicalPath, work.dlsite.rjCode)
+                  ? fetched.info.title
+                  : undefined;
+              const nextUrls = !work.urls.some((entry) => entry.url.includes("dlsite.com"))
+                ? [...work.urls, { label: "DLsite", url: fetched.info.url }]
+                : undefined;
+              const coverNeeded = !work.cover && !!fetched.info.coverUrl;
+              const nextAppliedTags = normalizeTags([...work.dlsite.appliedTags, ...allInfoTags]);
+              const noOp =
+                !attempt.httpAttempted &&
+                !coverNeeded &&
+                nextUrls === undefined &&
+                (nextTitle === undefined || nextTitle === work.title) &&
+                arraysEqual(nextTags, work.tags) &&
+                arraysEqual(nextAppliedTags, work.dlsite.appliedTags) &&
+                work.dlsite.status === "applied" &&
+                work.dlsite.rjCode === fetched.info.rjCode &&
+                work.dlsite.error === null;
+              if (!noOp) {
+                const patch: {
+                  title?: string;
+                  tags?: string[];
+                  cover?: CoverColumns;
+                  urls?: Work["urls"];
+                } = { tags: nextTags };
+                if (nextTitle !== undefined) patch.title = nextTitle;
+                if (nextUrls !== undefined) patch.urls = nextUrls;
+                let coverImage: string | undefined;
+                if (coverNeeded) {
+                  coverImage = await cachedCover(fetched.info.coverUrl!, work.physicalPath, signal);
+                  // カバー計測失敗はこの作品の適用失敗として扱う（error状態へ落として次作品へ続行）。
+                  const cover = await measureDownloadedCover(work.physicalPath, coverImage);
+                  if (!cover) throw new Error(`カバー寸法を計測できません: ${coverImage}`);
+                  patch.cover = cover;
+                }
+                const dlsite = {
+                  rjCode: fetched.info.rjCode,
+                  status: "applied" as const,
+                  lastAttemptAt: attemptedAt,
+                  error: null,
+                  appliedTags: nextAppliedTags,
+                };
+                db.transaction(() => {
+                  const updated = repo.patchWork(work.id, patch);
+                  if (!updated)
+                    throw new Error(`一括取得中に作品が見つからなくなりました: ${work.id}`);
+                  repo.setDlsiteState(work.id, dlsite);
+                  patchMetaFile(findMetaPath(updated), {
+                    title: patch.title,
+                    tags: patch.tags,
+                    coverImage,
+                    urls: patch.urls,
+                    dlsite,
+                  });
+                });
+              }
+              result.fetched += 1;
+            }
+          } catch (error) {
+            if (error instanceof DOMException && error.name === "AbortError") return result;
+            if (error instanceof DlsiteOfflineError) {
+              result.failed += 1;
+              options?.onProgress?.({
                 type: "progress",
                 processed: index + 1,
                 total: targets.length,
@@ -936,133 +1055,42 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
               });
               continue;
             }
-            const newStatus =
-              fetched.kind === "not_found" ? ("not_found" as const) : ("error" as const);
-            const noOp =
-              !attempt.httpAttempted &&
-              work.dlsite.status === newStatus &&
-              work.dlsite.error === fetched.message;
-            if (!noOp) {
-              const dlsite = {
-                ...work.dlsite,
-                status: newStatus,
-                lastAttemptAt: attemptedAt,
-                error: fetched.message,
-              };
+            const dlsite = {
+              ...work.dlsite,
+              status: "error" as const,
+              lastAttemptAt: attemptedAt,
+              error: error instanceof Error ? error.message : "DLsite情報の適用に失敗しました",
+            };
+            // 失敗状態の永続化自体が失敗しても（メタ書き込み不能等）ジョブは中断しない。
+            // failed への加算と進捗通知は必ず行い、次の作品へ続行する
+            try {
               db.transaction(() => {
                 repo.setDlsiteState(work.id, dlsite);
                 const metaLocation = repo.getWorkMetaLocation(work.id);
                 if (metaLocation) patchMetaFile(findMetaPath(metaLocation), { dlsite });
               });
-            }
-            result.failed += 1;
-          } else {
-            const allInfoTags = mergeDlsiteTags([], fetched.info);
-            const applyTags =
-              mode === "new"
-                ? allInfoTags
-                : allInfoTags.filter((tag) => !work.dlsite.appliedTags.includes(tag));
-            const nextTags = normalizeTags([...work.tags, ...applyTags]);
-            const nextTitle =
-              mode === "new" || isDefaultTitle(work.title, work.physicalPath, work.dlsite.rjCode)
-                ? fetched.info.title
-                : undefined;
-            const nextUrls = !work.urls.some((entry) => entry.url.includes("dlsite.com"))
-              ? [...work.urls, { label: "DLsite", url: fetched.info.url }]
-              : undefined;
-            const coverNeeded = !work.cover && !!fetched.info.coverUrl;
-            const nextAppliedTags = normalizeTags([...work.dlsite.appliedTags, ...allInfoTags]);
-            const noOp =
-              !attempt.httpAttempted &&
-              !coverNeeded &&
-              nextUrls === undefined &&
-              (nextTitle === undefined || nextTitle === work.title) &&
-              arraysEqual(nextTags, work.tags) &&
-              arraysEqual(nextAppliedTags, work.dlsite.appliedTags) &&
-              work.dlsite.status === "applied" &&
-              work.dlsite.rjCode === fetched.info.rjCode &&
-              work.dlsite.error === null;
-            if (!noOp) {
-              const patch: {
-                title?: string;
-                tags?: string[];
-                cover?: CoverColumns;
-                urls?: Work["urls"];
-              } = { tags: nextTags };
-              if (nextTitle !== undefined) patch.title = nextTitle;
-              if (nextUrls !== undefined) patch.urls = nextUrls;
-              let coverImage: string | undefined;
-              if (coverNeeded) {
-                coverImage = await cachedCover(fetched.info.coverUrl!, work.physicalPath);
-                // カバー計測失敗はこの作品の適用失敗として扱う（error状態へ落として次作品へ続行）。
-                const cover = await measureDownloadedCover(work.physicalPath, coverImage);
-                if (!cover) throw new Error(`カバー寸法を計測できません: ${coverImage}`);
-                patch.cover = cover;
-              }
-              const dlsite = {
-                rjCode: fetched.info.rjCode,
-                status: "applied" as const,
-                lastAttemptAt: attemptedAt,
-                error: null,
-                appliedTags: nextAppliedTags,
-              };
-              db.transaction(() => {
-                const updated = repo.patchWork(work.id, patch);
-                if (!updated)
-                  throw new Error(`一括取得中に作品が見つからなくなりました: ${work.id}`);
-                repo.setDlsiteState(work.id, dlsite);
-                patchMetaFile(findMetaPath(updated), {
-                  title: patch.title,
-                  tags: patch.tags,
-                  coverImage,
-                  urls: patch.urls,
-                  dlsite,
-                });
+            } catch (persistError) {
+              console.error("DLsite失敗状態の保存に失敗しました", {
+                workId: work.id,
+                persistError,
               });
             }
-            result.fetched += 1;
-          }
-        } catch (error) {
-          if (error instanceof DlsiteOfflineError) {
             result.failed += 1;
-            onProgress?.({
-              type: "progress",
-              processed: index + 1,
-              total: targets.length,
-              workId: work.id,
-            });
-            continue;
           }
-          const dlsite = {
-            ...work.dlsite,
-            status: "error" as const,
-            lastAttemptAt: attemptedAt,
-            error: error instanceof Error ? error.message : "DLsite情報の適用に失敗しました",
-          };
-          // 失敗状態の永続化自体が失敗しても（メタ書き込み不能等）ジョブは中断しない。
-          // failed への加算と進捗通知は必ず行い、次の作品へ続行する
-          try {
-            db.transaction(() => {
-              repo.setDlsiteState(work.id, dlsite);
-              const metaLocation = repo.getWorkMetaLocation(work.id);
-              if (metaLocation) patchMetaFile(findMetaPath(metaLocation), { dlsite });
-            });
-          } catch (persistError) {
-            console.error("DLsite失敗状態の保存に失敗しました", {
-              workId: work.id,
-              persistError,
-            });
-          }
-          result.failed += 1;
+          options?.onProgress?.({
+            type: "progress",
+            processed: index + 1,
+            total: targets.length,
+            workId: work.id,
+          });
         }
-        onProgress?.({
-          type: "progress",
-          processed: index + 1,
-          total: targets.length,
-          workId: work.id,
-        });
+        return result;
+      } catch (error) {
+        if (isAborted() || (error instanceof DOMException && error.name === "AbortError")) {
+          return result;
+        }
+        throw error;
       }
-      return result;
     },
     close(): void {
       dlsiteCache?.close();
