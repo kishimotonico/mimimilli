@@ -65,6 +65,15 @@ backdropクリックの共通処理は `client/src/shared/ui/useDialogModal.ts` 
 - 操作不能な要素は `cursor: not-allowed` にする
 - 長時間ループするアニメーション（パルス等）は reduced motion 対応を原則とする
 
+## アイコン
+
+アイコンは `client/src/shared/ui/Icon.tsx` の `I` レジストリに集約する。呼び出し側は必ず `I.xxx` 経由で参照し、`lucide-react` を直接importしない。ライブラリ選定の経緯は [ADR-0009](adr/0009-icon-library-lucide.md)。
+
+- 一般的な意匠で足りるアイコンは `lucide-react` から取得して `I` に登録する。製品固有の意匠（`ratio11`・`gridJustified`・`loopOne`・`swapLR`・プレイヤー系の塗り表現など、一般カタログに対応がないもの）は自作を維持し、同じ `I` に追加する
+- stroke幅（1.5）・`currentColor`・`aria-hidden="true"` はアダプタ層（`Icon.tsx`）で固定する。呼び出し側やベンダー固有propsをこれらの値に触れさせない
+- サイズは `IconButton` のサイズ契約（`sm`/`md`/`lg` = 箱26/30/38px、アイコン14/16/20px）に従う。呼び出し側で独自の数値を散らさない
+- SVGは装飾（`aria-hidden`）とし、意味は `IconButton` 側の `aria-label` が担う。名前を持たないアイコン単体での使用を避ける
+
 ## モバイルレイアウト
 
 方針の正は [ADR-0006](adr/0006-mobile-ui-strategy.md)。要点のみ:
