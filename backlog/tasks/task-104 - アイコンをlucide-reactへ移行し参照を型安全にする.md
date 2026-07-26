@@ -1,9 +1,10 @@
 ---
 id: TASK-104
 title: アイコンをlucide-reactへ移行し参照を型安全にする
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-26 13:48'
+updated_date: '2026-07-26 15:41'
 labels: []
 dependencies: []
 ordinal: 105000
@@ -17,13 +18,19 @@ ordinal: 105000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 一般アイコンが lucide-react 由来のコンポーネントで描画される
-- [ ] #2 製品固有アイコン(ratio11・gridJustified・loopOne・swapLR・プレイヤー系)は自作のまま残る
-- [ ] #3 I のキーが型で確定し、存在しないキーの参照が typecheck で失敗する
-- [ ] #4 ?? I.folder / ?? I.file による暗黙フォールバックが存在しない
-- [ ] #5 呼び出し側から lucide-react を直接 import している箇所がない
-- [ ] #6 9px・10px・12px・13px でのアイコン視認性に現状からの退行がない
+- [x] #1 一般アイコンが lucide-react 由来のコンポーネントで描画される
+- [x] #2 製品固有アイコン(ratio11・gridJustified・loopOne・swapLR・プレイヤー系)は自作のまま残る
+- [x] #3 I のキーが型で確定し、存在しないキーの参照が typecheck で失敗する
+- [x] #4 ?? I.folder / ?? I.file による暗黙フォールバックが存在しない
+- [x] #5 呼び出し側から lucide-react を直接 import している箇所がない
+- [x] #6 9px・10px・12px・13px でのアイコン視認性に現状からの退行がない
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+サブタスク3件完了。visual test 6件すべて通過。9〜13pxの視認性はcanvasラスタライザで移行前後を比較し退行なしを確認。派生タスクとして TASK-105(線幅補正、完了)・TASK-106(noUncheckedIndexedAccess、完了)・TASK-108(フォント自前ホスト、未着手)。
+<!-- SECTION:NOTES:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->

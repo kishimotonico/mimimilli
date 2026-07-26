@@ -1,9 +1,11 @@
 ---
 id: TASK-104.2
 title: アイコン規約をドキュメント化しADRを追加する
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@sonnet'
 created_date: '2026-07-26 13:48'
+updated_date: '2026-07-26 13:58'
 labels: []
 dependencies: []
 parent_task_id: TASK-104
@@ -18,8 +20,14 @@ docs/design-system.md にアイコンの規約を追記し、アイコンライ�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 docs/design-system.md にアイコン規約の節がある
-- [ ] #2 アイコンライブラリ選定のADRが docs/adr/ に追加されている
-- [ ] #3 ADRに却下した候補とその理由が記録されている
-- [ ] #4 docs/README.md からADRを辿れる
+- [x] #1 docs/design-system.md にアイコン規約の節がある
+- [x] #2 アイコンライブラリ選定のADRが docs/adr/ に追加されている
+- [x] #3 ADRに却下した候補とその理由が記録されている
+- [x] #4 docs/README.md からADRを辿れる
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Sonnetが執筆、統括担当がレビューしてコミット。docs/adr/README.md は索引ではなく執筆ガイドのため更新不要と判断。ADR番号は作成直前に確認して0009に採番(衝突なし)。
+<!-- SECTION:NOTES:END -->
