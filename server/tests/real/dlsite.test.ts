@@ -17,6 +17,10 @@ import {
   normalizeDlsiteCoverUrl,
   parseDlsiteHtml,
 } from "../../src/adapters/real/dlsite.ts";
+import {
+  DEFAULT_DLSITE_REQUEST_CONFIG,
+  DEFAULT_DLSITE_USER_AGENT,
+} from "../../src/adapters/real/dlsiteConfig.ts";
 import { createRealAdapter } from "../../src/adapters/real/index.ts";
 import { createApp } from "../../src/app.ts";
 import { makeSampleLibrary, makeTestDirectory } from "../helpers/sampleLibrary.ts";
@@ -78,6 +82,44 @@ test("fetchDlsiteInfo: HTTP 404 / 通信エラーを分類する", async () => {
   });
   assert.equal(networkError.ok, false);
   if (!networkError.ok) assert.equal(networkError.kind, "error");
+});
+
+test("fetchDlsiteHtml / fetchDlsiteCover: User-Agentを指定・既定値で切り替える", async () => {
+  const customUa = "custom-test-agent/1.0";
+  const jpegBody = () =>
+    new Response(new Uint8Array([0xff, 0xd8]), {
+      status: 200,
+      headers: { "content-type": "image/jpeg" },
+    });
+
+  await fetchDlsiteHtml(
+    "RJ000001",
+    async (_url, init) => {
+      assert.equal(new Headers(init?.headers).get("User-Agent"), customUa);
+      return new Response("<html></html>", { status: 200 });
+    },
+    Number.MAX_SAFE_INTEGER,
+    Number.MAX_SAFE_INTEGER,
+    customUa,
+  );
+  await fetchDlsiteCover(
+    "https://img.dlsite.jp/a.jpg",
+    async (_url, init) => {
+      assert.equal(new Headers(init?.headers).get("User-Agent"), customUa);
+      return jpegBody();
+    },
+    Number.MAX_SAFE_INTEGER,
+    customUa,
+  );
+
+  await fetchDlsiteHtml("RJ000001", async (_url, init) => {
+    assert.equal(new Headers(init?.headers).get("User-Agent"), DEFAULT_DLSITE_USER_AGENT);
+    return new Response("<html></html>", { status: 200 });
+  });
+  await fetchDlsiteCover("https://img.dlsite.jp/a.jpg", async (_url, init) => {
+    assert.equal(new Headers(init?.headers).get("User-Agent"), DEFAULT_DLSITE_USER_AGENT);
+    return jpegBody();
+  });
 });
 
 test("detectRjCode: フォルダー名優先・大文字化・桁数", () => {
@@ -385,6 +427,7 @@ test("DLsite offline: miss/forceはHTTPもcache書き込みもせず、bulk stat
     database: { kind: "memory" },
     dlsiteCache: cache,
     dlsiteRequestConfig: {
+      ...DEFAULT_DLSITE_REQUEST_CONFIG,
       offline: true,
       requestIntervalMs: 0,
       retryCount: 0,
@@ -441,6 +484,7 @@ test("DLsite offline: miss/forceはHTTPもcache書き込みもせず、bulk stat
     database: { kind: "memory" },
     dlsiteCache: cache,
     dlsiteRequestConfig: {
+      ...DEFAULT_DLSITE_REQUEST_CONFIG,
       offline: false,
       requestIntervalMs: 0,
       retryCount: 0,
@@ -462,6 +506,7 @@ test("DLsite offline: miss/forceはHTTPもcache書き込みもせず、bulk stat
     database: { kind: "memory" },
     dlsiteCache: cache,
     dlsiteRequestConfig: {
+      ...DEFAULT_DLSITE_REQUEST_CONFIG,
       offline: true,
       requestIntervalMs: 0,
       retryCount: 0,
@@ -522,6 +567,7 @@ test("DLsite HTMLキャッシュ: parse_errorは同じHTTPをretryしない", as
     database: { kind: "memory" },
     dlsiteCache: { path: join(dir.path, "cache.sqlite") },
     dlsiteRequestConfig: {
+      ...DEFAULT_DLSITE_REQUEST_CONFIG,
       offline: false,
       requestIntervalMs: 0,
       retryCount: 3,

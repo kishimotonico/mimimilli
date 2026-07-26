@@ -6,8 +6,7 @@ import { join } from "node:path";
 import { load } from "cheerio";
 import { normalizeTags } from "@mimimilli/shared";
 import type { DlsiteFetchResult, DlsiteWorkInfo } from "@mimimilli/shared";
-
-const USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) mimimilli/0.1";
+import { DEFAULT_DLSITE_USER_AGENT } from "./dlsiteConfig.ts";
 type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 export interface DlsiteHtmlResponse {
@@ -127,12 +126,13 @@ export async function fetchDlsiteInfo(
   fetchImpl: FetchLike = fetch,
   transferMax = Number.MAX_SAFE_INTEGER,
   expandedMax = Number.MAX_SAFE_INTEGER,
+  userAgent = DEFAULT_DLSITE_USER_AGENT,
 ): Promise<DlsiteFetchResult> {
   try {
     const res = await fetchImpl(dlsiteWorkUrl(rjCode), {
       headers: {
         Cookie: "adultchecked=1",
-        "User-Agent": USER_AGENT,
+        "User-Agent": userAgent,
         "Accept-Language": "ja",
       },
       redirect: "follow",
@@ -171,9 +171,10 @@ export async function fetchDlsiteHtml(
   fetchImpl: FetchLike = fetch,
   transferMax = Number.MAX_SAFE_INTEGER,
   expandedMax = Number.MAX_SAFE_INTEGER,
+  userAgent = DEFAULT_DLSITE_USER_AGENT,
 ): Promise<DlsiteHtmlResponse> {
   const res = await fetchImpl(dlsiteWorkUrl(rjCode), {
-    headers: { Cookie: "adultchecked=1", "User-Agent": USER_AGENT, "Accept-Language": "ja" },
+    headers: { Cookie: "adultchecked=1", "User-Agent": userAgent, "Accept-Language": "ja" },
     redirect: "follow",
   });
   const read = await readLimitedBody(res, transferMax, expandedMax);
@@ -204,13 +205,14 @@ export async function fetchDlsiteCover(
   coverUrl: string,
   fetchImpl: FetchLike = fetch,
   maximumBytes = Number.MAX_SAFE_INTEGER,
+  userAgent = DEFAULT_DLSITE_USER_AGENT,
 ): Promise<DlsiteCoverResponse> {
   let currentUrl = normalizeDlsiteCoverUrl(coverUrl);
   let res: Response | undefined;
   for (let redirects = 0; redirects <= 5; redirects += 1) {
     const previous = res;
     res = await fetchImpl(currentUrl, {
-      headers: { "User-Agent": USER_AGENT },
+      headers: { "User-Agent": userAgent },
       redirect: "manual",
     });
     await previous?.body?.cancel();
@@ -243,8 +245,12 @@ export function mergeDlsiteTags(existing: string[], info: DlsiteWorkInfo): strin
 }
 
 /** カバー画像をダウンロードして作品フォルダーへ保存し、ファイル名を返す */
-export async function downloadCover(coverUrl: string, workDir: string): Promise<string> {
-  const cover = await fetchDlsiteCover(coverUrl);
+export async function downloadCover(
+  coverUrl: string,
+  workDir: string,
+  userAgent = DEFAULT_DLSITE_USER_AGENT,
+): Promise<string> {
+  const cover = await fetchDlsiteCover(coverUrl, fetch, Number.MAX_SAFE_INTEGER, userAgent);
   const ext = (new URL(cover.finalUrl).pathname.split(".").pop() ?? "jpg").toLowerCase();
   const fileName = `dlsite_cover.${ext}`;
   writeFileSync(join(workDir, fileName), cover.body);

@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { resolveDlsiteRequestConfig } from "../../src/adapters/real/dlsiteConfig.ts";
+import {
+  resolveDlsiteRequestConfig,
+  DEFAULT_DLSITE_USER_AGENT,
+} from "../../src/adapters/real/dlsiteConfig.ts";
 import { DlsiteOfflineError, DlsiteScheduler } from "../../src/adapters/real/dlsiteScheduler.ts";
 
 function fakeTime(initial = 0) {
@@ -22,6 +25,7 @@ const config = {
   retryCount: 2,
   maxBackoffMs: 1_000,
   timeoutMs: 10_000,
+  userAgent: DEFAULT_DLSITE_USER_AGENT,
 };
 
 test("DLsite scheduler: 実HTTP開始時刻の間隔、retry、request counterを一元化する", async () => {
@@ -326,9 +330,19 @@ test("DLsite request設定: booleanと数値環境変数を厳格に読む", () 
     retryCount: 3,
     maxBackoffMs: 30_000,
     timeoutMs: 60_000,
+    userAgent: DEFAULT_DLSITE_USER_AGENT,
   });
   assert.equal(resolveDlsiteRequestConfig({ MIMIMILLI_DLSITE_OFFLINE: "true" }).offline, true);
   assert.throws(() => resolveDlsiteRequestConfig({ MIMIMILLI_DLSITE_OFFLINE: "1" }));
   assert.throws(() => resolveDlsiteRequestConfig({ MIMIMILLI_DLSITE_RETRY_COUNT: "-1" }));
   assert.throws(() => resolveDlsiteRequestConfig({ MIMIMILLI_DLSITE_TIMEOUT_MS: "2147483648" }));
+});
+
+test("DLsite request設定: MIMIMILLI_DLSITE_USER_AGENTでUser-Agentを上書きする", () => {
+  const custom = "custom-agent/2.0 (+mailto:me@example.com)";
+  assert.equal(
+    resolveDlsiteRequestConfig({ MIMIMILLI_DLSITE_USER_AGENT: custom }).userAgent,
+    custom,
+  );
+  assert.throws(() => resolveDlsiteRequestConfig({ MIMIMILLI_DLSITE_USER_AGENT: "" }));
 });

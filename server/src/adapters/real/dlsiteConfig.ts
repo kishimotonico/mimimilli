@@ -1,9 +1,12 @@
+export const DEFAULT_DLSITE_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) mimimilli/0.1";
+
 export interface DlsiteRequestConfig {
   offline: boolean;
   requestIntervalMs: number;
   retryCount: number;
   maxBackoffMs: number;
   timeoutMs: number;
+  userAgent: string;
 }
 
 export const DEFAULT_DLSITE_REQUEST_CONFIG: DlsiteRequestConfig = {
@@ -12,6 +15,7 @@ export const DEFAULT_DLSITE_REQUEST_CONFIG: DlsiteRequestConfig = {
   retryCount: 3,
   maxBackoffMs: 30_000,
   timeoutMs: 60_000,
+  userAgent: DEFAULT_DLSITE_USER_AGENT,
 };
 export const MAX_DLSITE_TIMER_MS = 2_147_483_647;
 
@@ -20,6 +24,12 @@ function parseBoolean(name: string, value: string | undefined, fallback: boolean
   if (value === "true") return true;
   if (value === "false") return false;
   throw new Error(`${name} は true または false で指定してください`);
+}
+
+function parseNonEmptyString(name: string, value: string | undefined, fallback: string): string {
+  if (value === undefined) return fallback;
+  if (value.length === 0) throw new Error(`${name} は空にできません`);
+  return value;
 }
 
 function parseInteger(
@@ -72,6 +82,11 @@ export function resolveDlsiteRequestConfig(
       env.MIMIMILLI_DLSITE_TIMEOUT_MS,
       DEFAULT_DLSITE_REQUEST_CONFIG.timeoutMs,
       1,
+    ),
+    userAgent: parseNonEmptyString(
+      "MIMIMILLI_DLSITE_USER_AGENT",
+      env.MIMIMILLI_DLSITE_USER_AGENT,
+      DEFAULT_DLSITE_USER_AGENT,
     ),
   };
 }

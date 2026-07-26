@@ -114,22 +114,23 @@ HTMLの転送・展開サイズには上限があり（既定2 MiB / 8 MiB、`MI
 
 環境変数と既定値の一覧。
 
-| 環境変数                                    | 既定値                                    | 内容                           |
-| ------------------------------------------- | ----------------------------------------- | ------------------------------ |
-| `MIMIMILLI_DLSITE_CACHE_DB`                 | データルート配下 `db/dlsite-cache.sqlite` | キャッシュDBの絶対パス         |
-| `MIMIMILLI_DLSITE_CACHE_TTL_OK_MS`          | 30日                                      | `ok` snapshotのTTL             |
-| `MIMIMILLI_DLSITE_CACHE_TTL_PARSE_ERROR_MS` | 1時間                                     | `parse_error` snapshotのTTL    |
-| `MIMIMILLI_DLSITE_CACHE_TTL_NOT_FOUND_MS`   | 3日                                       | `not_found` 失敗記録のTTL      |
-| `MIMIMILLI_DLSITE_CACHE_TTL_ERROR_MS`       | 1時間                                     | `error` 失敗記録のTTL          |
-| `MIMIMILLI_DLSITE_CACHE_MAX_TRANSFER_BYTES` | 2 MiB                                     | HTML・カバーの転送サイズ上限   |
-| `MIMIMILLI_DLSITE_CACHE_MAX_EXPANDED_BYTES` | 8 MiB                                     | HTML展開後サイズ上限           |
-| `MIMIMILLI_DLSITE_OFFLINE`                  | `false`                                   | 実HTTPをすべて止める           |
-| `MIMIMILLI_DLSITE_REQUEST_INTERVAL_MS`      | 1000ms                                    | 実HTTP開始時刻の最小間隔       |
-| `MIMIMILLI_DLSITE_RETRY_COUNT`              | 3                                         | 429/5xx/通信エラーの再試行回数 |
-| `MIMIMILLI_DLSITE_MAX_BACKOFF_MS`           | 30000ms                                   | 再試行backoffの上限            |
-| `MIMIMILLI_DLSITE_TIMEOUT_MS`               | 60000ms                                   | 1リクエスト全体の期限          |
+| 環境変数                                    | 既定値                                                    | 内容                           |
+| ------------------------------------------- | --------------------------------------------------------- | ------------------------------ |
+| `MIMIMILLI_DLSITE_CACHE_DB`                 | データルート配下 `db/dlsite-cache.sqlite`                 | キャッシュDBの絶対パス         |
+| `MIMIMILLI_DLSITE_CACHE_TTL_OK_MS`          | 30日                                                      | `ok` snapshotのTTL             |
+| `MIMIMILLI_DLSITE_CACHE_TTL_PARSE_ERROR_MS` | 1時間                                                     | `parse_error` snapshotのTTL    |
+| `MIMIMILLI_DLSITE_CACHE_TTL_NOT_FOUND_MS`   | 3日                                                       | `not_found` 失敗記録のTTL      |
+| `MIMIMILLI_DLSITE_CACHE_TTL_ERROR_MS`       | 1時間                                                     | `error` 失敗記録のTTL          |
+| `MIMIMILLI_DLSITE_CACHE_MAX_TRANSFER_BYTES` | 2 MiB                                                     | HTML・カバーの転送サイズ上限   |
+| `MIMIMILLI_DLSITE_CACHE_MAX_EXPANDED_BYTES` | 8 MiB                                                     | HTML展開後サイズ上限           |
+| `MIMIMILLI_DLSITE_OFFLINE`                  | `false`                                                   | 実HTTPをすべて止める           |
+| `MIMIMILLI_DLSITE_REQUEST_INTERVAL_MS`      | 1000ms                                                    | 実HTTP開始時刻の最小間隔       |
+| `MIMIMILLI_DLSITE_RETRY_COUNT`              | 3                                                         | 429/5xx/通信エラーの再試行回数 |
+| `MIMIMILLI_DLSITE_MAX_BACKOFF_MS`           | 30000ms                                                   | 再試行backoffの上限            |
+| `MIMIMILLI_DLSITE_TIMEOUT_MS`               | 60000ms                                                   | 1リクエスト全体の期限          |
+| `MIMIMILLI_DLSITE_USER_AGENT`               | `Mozilla/5.0 (Windows NT 10.0; Win64; x64) mimimilli/0.1` | 実HTTPのUser-Agent             |
 
-値はすべて厳格に検証する（真偽値は `true`/`false` のみ、数値は正の整数のみ）。曖昧な指定はフォールバックせずエラーにする。
+値はすべて厳格に検証する（真偽値は `true`/`false` のみ、数値は正の整数のみ、User-Agentは空文字不可）。曖昧な指定はフォールバックせずエラーにする。
 
 ## 運用手順
 

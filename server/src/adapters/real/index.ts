@@ -259,6 +259,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
     options.dlsiteCache?.maxExpandedBytes ?? DEFAULT_DLSITE_CACHE_MAX_EXPANDED_BYTES;
   const dlsiteCoverMaximumBytes =
     options.dlsiteCache?.maxTransferBytes ?? DEFAULT_DLSITE_CACHE_MAX_TRANSFER_BYTES;
+  const dlsiteUserAgent = dlsiteRequestConfig.userAgent;
   const dlsiteFetcher =
     options.dlsiteFetcher ??
     ((rjCode: string) =>
@@ -267,6 +268,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
         dlsiteScheduler.fetch.bind(dlsiteScheduler),
         dlsiteHtmlTransferBytes,
         dlsiteHtmlExpandedBytes,
+        dlsiteUserAgent,
       ));
   const dlsiteHtmlFetcher =
     options.dlsiteHtmlFetcher ??
@@ -276,9 +278,12 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
         (input, init) => dlsiteScheduler.fetch(input, { ...init, signal }),
         dlsiteHtmlTransferBytes,
         dlsiteHtmlExpandedBytes,
+        dlsiteUserAgent,
       ));
   const dlsiteParser = options.dlsiteParser ?? parseDlsiteHtml;
-  const dlsiteCoverDownloader = options.dlsiteCoverDownloader ?? downloadCover;
+  const dlsiteCoverDownloader =
+    options.dlsiteCoverDownloader ??
+    ((coverUrl: string, workDir: string) => downloadCover(coverUrl, workDir, dlsiteUserAgent));
   const dlsiteCoverFetcher =
     options.dlsiteCoverFetcher ??
     ((coverUrl: string, signal?: AbortSignal) =>
@@ -286,6 +291,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
         coverUrl,
         (input, init) => dlsiteScheduler.fetch(input, { ...init, signal }),
         dlsiteCoverMaximumBytes,
+        dlsiteUserAgent,
       ));
   const scheduledDlsiteFetcher = options.dlsiteFetcher
     ? (rjCode: string, signal?: AbortSignal) =>
