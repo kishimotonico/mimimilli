@@ -59,6 +59,7 @@ function renderModal(overrides: Partial<Parameters<typeof ScanModal>[0]> = {}) {
       progress: null,
       lastResult: scanResult,
       lastScanTime: null,
+      libraryTotal: 11,
       onStart: vi.fn(),
       onCancel: vi.fn(),
       onClose: vi.fn(),
@@ -123,7 +124,7 @@ describe("ScanModal", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it("実行中はフェーズ別進捗と中止ボタンを表示し、閉じてもonCancelは呼ばれない", () => {
+  it("実行中はフェーズと進捗を表示し、直前の統計は残したまま中止ボタンを表示する", () => {
     const onCancel = vi.fn();
     const onClose = vi.fn();
     renderModal({
@@ -136,8 +137,12 @@ describe("ScanModal", () => {
     expect(screen.getByRole("dialog", { name: "スキャン" })).toBeInTheDocument();
     expect(screen.getByText("作品を登録中")).toBeInTheDocument();
     expect(screen.getByText("3/12")).toBeInTheDocument();
+    // 実行中も統計バッジは直前の値のまま表示され続ける（画面が切り替わったように見せない）
+    expect(screen.getByText(String(scanResult.registered))).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "閉じる（バックグラウンドで継続）" }));
+    // 閉じるは常設のヘッダーアイコンで、バックグラウンド継続の案内文だけが実行中に出る
+    expect(screen.getByText("閉じてもバックグラウンドで続行します")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "閉じる" }));
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onCancel).not.toHaveBeenCalled();
 
@@ -145,12 +150,66 @@ describe("ScanModal", () => {
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
-  it("前回結果が無ければ未実行の案内とスキャン開始ボタンを表示する", () => {
+  it("前回結果が無ければ統計は未計測（—）のままスキャン開始ボタンを表示する", () => {
     const onStart = vi.fn();
     renderModal({ lastResult: null, onStart });
 
-    expect(screen.getByText("まだスキャンを実行していません")).toBeInTheDocument();
+    // 「今回のスキャン」の4枠は未計測、ライブラリ全体の件数は別枠で表示される
+    expect(screen.getAllByText("—")).toHaveLength(4);
+    expect(screen.getByText("ライブラリ全体")).toBeInTheDocument();
+    expect(screen.getByText("11")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /スキャン開始/ }));
     expect(onStart).toHaveBeenCalledTimes(1);
   });
+
+  it("蔵書が0件でも「今回のスキャン」が全て0とライブラリ全体の0件は別枠で区別される", () => {
+    renderModal({
+      lastResult: { ...scanResult, registered: 0, newlyGenerated: 0, newWorkIds: [] },
+      libraryTotal: 0,
+    });
+
+    expect(screen.getByText("ライブラリ全体")).toBeInTheDocument();
+    // ライブラリ全体の0件と「今回のスキャン」の登録済み0件が同じ「0」でも別要素として存在する
+    expect(screen.getAllByText("0").length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("実行中から完了への遷移を見ていたときだけ、完了サインと変化した統計の強調が一時的に出る", async () => {
+    const before: ScanResult = { ...scanResult, registered: 5, newlyGenerated: 0 };
+    const after: ScanResult = { ...scanResult, registered: 6, newlyGenerated: 1 };
+    const { rerender } = renderModal({
+      scanning: true,
+      progress: { phase: "registering", processed: 1, total: 1 },
+      lastResult: before,
+    });
+
+    rerender(
+      createElement(ScanModal, {
+        scanning: false,
+        progress: null,
+        lastResult: after,
+        lastScanTime: "2026-01-01T00:00:00.000Z",
+        libraryTotal: 11,
+        onStart: vi.fn(),
+        onCancel: vi.fn(),
+        onClose: vi.fn(),
+        onOpenRjCodeMissing: vi.fn(),
+      }),
+    );
+
+    // AnimatePresence(mode="wait")のexit→enterはrequestAnimationFrame駆動のため実時間で待つ
+    await waitFor(() => expect(screen.getByText("完了しました")).toBeInTheDocument());
+    // 変化した「登録済み」の値は強調用の背景クラスが付く
+    const registeredValue = screen.getByText("6");
+    expect(registeredValue.parentElement?.className).toContain("bg-[color-mix");
+
+    // レイアウトは動かさず、時間経過で最終スキャン表示と通常の枠色に自然に戻る
+    await waitFor(
+      () => {
+        expect(screen.queryByText("完了しました")).toBeNull();
+        expect(screen.getByText(/最終スキャン/)).toBeInTheDocument();
+      },
+      { timeout: 4000 },
+    );
+    expect(registeredValue.parentElement?.className).not.toContain("bg-[color-mix");
+  }, 6000);
 });

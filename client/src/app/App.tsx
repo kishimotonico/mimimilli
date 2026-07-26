@@ -31,7 +31,7 @@ import DlsiteFetchFailedModal from "../features/library/ui/DlsiteFetchFailedModa
 import Toast from "../shared/ui/Toast";
 import type { Work, WorkListItem } from "@mimimilli/shared";
 import { getWork } from "../entities/work/api";
-import { exportLibrary } from "../features/library/api";
+import { exportLibrary, searchWorks } from "../features/library/api";
 import { formatScanProgressLabel } from "../features/scan/model";
 import { useScanJob } from "../features/scan/useScanJob";
 import { getLastScanResult, SCAN_QUERY_KEYS } from "../features/scan/api";
@@ -118,6 +118,13 @@ export default function App() {
     queryFn: getLastScanResult,
   });
   const lastScanResult = lastScanQuery.data?.result ?? null;
+
+  // ライブラリ総件数（サイドバーの「ライブラリ N 件」と同じ既存クエリキーを共有する）。
+  // スキャンモーダルで統計バッジが全て0でも蔵書自体は0件ではないことを示すために使う。
+  const libraryTotalQuery = useQuery({
+    queryKey: WORK_QUERY_KEYS.total(),
+    queryFn: () => searchWorks({ limit: 1 }).then((page) => page.total),
+  });
 
   const handleScanTerminal = useCallback(
     (job: import("@mimimilli/shared").ScanJobSnapshot) => {
@@ -461,6 +468,7 @@ export default function App() {
               progress={scanProgress}
               lastResult={lastScanResult}
               lastScanTime={settings?.lastScanTime ?? null}
+              libraryTotal={libraryTotalQuery.data ?? null}
               onStart={handleScan}
               onCancel={handleCancelScan}
               onClose={() => setShowScanModal(false)}

@@ -1,16 +1,23 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { getDefaultPlaylistTrackCount, type ScanResult, type Work } from "@mimimilli/shared";
 import { getWork, patchWork } from "../../../entities/work/api";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
+import { cn } from "../../../shared/lib/cn";
 import { I } from "../../../shared/ui/Icon";
-import { SCAN_PHASE_ORDER, scanPhaseLabel, type ScanProgress } from "../model";
+import IconButton from "../../../shared/ui/IconButton";
+import { scanPhaseLabel, type ScanProgress } from "../model";
 
 interface ScanModalProps {
   scanning: boolean;
   progress: ScanProgress | null;
-  /** サーバー起動後に一度でも完了していれば入る、前回スキャン結果（ディスク永続化はしない） */
+  /** サーバー起動後に一度でも完了していれば入る、前回スキャン結果（ディスク永続化はしない）。
+   *  実行中も直前の値をそのまま表示し続け、完了と同時に値だけ更新される。 */
   lastResult: ScanResult | null;
   lastScanTime: string | null;
+  /** ライブラリ全体の登録件数（サイドバーと同じ集計）。今回の変化が全て0でも
+   *  蔵書自体が空でないことを示すために「今回のスキャン」統計とは別枠で表示する。 */
+  libraryTotal: number | null;
   onStart: () => void;
   onCancel: () => void;
   onClose: () => void;
@@ -18,18 +25,14 @@ interface ScanModalProps {
   onOpenRjCodeMissing: () => void;
 }
 
-const C = {
-  bgSurface: "var(--paper-1)",
-  bgInput: "var(--paper-2)",
-  textPrimary: "var(--ink-0)",
-  textSecondary: "var(--ink-2)",
-  textDisabled: "var(--ink-4)",
-  accent: "var(--acc)",
-  accentDim: "var(--acc-soft)",
-  error: "var(--r-coral)",
-  warning: "var(--r-mustard)",
-  success: "var(--r-leaf)",
-};
+type StatKey = keyof Pick<ScanResult, "registered" | "newlyGenerated" | "errors" | "missing">;
+const STAT_KEYS: StatKey[] = ["registered", "newlyGenerated", "errors", "missing"];
+
+const FADE = { duration: 0.15 };
+/** 完了サインの表示時間。派手にしないため短めに留める。 */
+const COMPLETION_HINT_MS = 2400;
+/** 変化したバッジの強調が消えるまでの時間（バッジ側のtransition-colorsで滑らかに戻す）。 */
+const BADGE_HIGHLIGHT_MS = 1000;
 
 function formatDate(iso: string | null): string {
   return iso ? new Date(iso).toLocaleString("ja-JP") : "未実行";
@@ -40,6 +43,7 @@ export default function ScanModal({
   progress,
   lastResult,
   lastScanTime,
+  libraryTotal,
   onStart,
   onCancel,
   onClose,
@@ -49,6 +53,34 @@ export default function ScanModal({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const titleInputRef = useRef<HTMLInputElement | null>(null);
+
+  // 実行中→完了の遷移を自分で見ていたときだけ、控えめな完了サインを一時的に出す
+  // （レイアウトは動かさず、ステータス行のテキストと変化した統計バッジの色だけを使う）。
+  const [justCompleted, setJustCompleted] = useState(false);
+  const [changedKeys, setChangedKeys] = useState<ReadonlySet<StatKey>>(new Set());
+  const wasScanningRef = useRef(scanning);
+  const resultBeforeRunRef = useRef(lastResult);
+  useEffect(() => {
+    const wasScanning = wasScanningRef.current;
+    wasScanningRef.current = scanning;
+    if (!wasScanning && scanning) {
+      resultBeforeRunRef.current = lastResult;
+      return;
+    }
+    if (!(wasScanning && !scanning)) return;
+    const before = resultBeforeRunRef.current;
+    const changed = new Set<StatKey>(
+      STAT_KEYS.filter((key) => (before?.[key] ?? 0) !== (lastResult?.[key] ?? 0)),
+    );
+    setChangedKeys(changed);
+    setJustCompleted(true);
+    const hintTimer = setTimeout(() => setJustCompleted(false), COMPLETION_HINT_MS);
+    const badgeTimer = setTimeout(() => setChangedKeys(new Set()), BADGE_HIGHLIGHT_MS);
+    return () => {
+      clearTimeout(hintTimer);
+      clearTimeout(badgeTimer);
+    };
+  }, [scanning, lastResult]);
 
   // Escapeはタイトル編集中ならそちらだけをキャンセルし、モーダル自体は閉じない。
   // 実行中でもEscape/背景クリックで閉じられるが、スキャン自体はバックグラウンドで継続する（TASK-56）。
@@ -98,344 +130,329 @@ export default function ScanModal({
     // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- backdropクリックで閉じる。EscapeはonCancel（useDialogModal）で処理する。
     <dialog
       ref={dialogRef}
-      aria-label="スキャン"
+      aria-labelledby="scan-modal-title"
       onCancel={handleCancel}
       onClick={(e) => handleBackdropClick(e, onClose)}
-      className="backdrop:bg-[oklch(0%_0_0_/_0.55)]"
-      style={{
-        background: C.bgSurface,
-        border: "1px solid var(--line)",
-        borderRadius: 10,
-        padding: 22,
-        margin: "auto",
-        width: 520,
-        maxWidth: "min(90vw, calc(100vw - 32px))",
-        maxHeight: "min(80vh, calc(100vh - 32px))",
-        color: C.textPrimary,
-        display: "flex",
-        flexDirection: "column",
-        fontFamily: "var(--font-jp)",
-      }}
+      className="m-auto w-[min(460px,calc(100vw-32px))] overflow-hidden rounded-[12px] border border-line-soft bg-paper-1 p-0 font-jp text-ink-0 shadow-pop backdrop:bg-[oklch(20%_0.020_70_/_0.3)]"
     >
-      <h2 style={{ margin: "0 0 16px", fontSize: 18, fontWeight: 700, textAlign: "center" }}>
-        {scanning ? "スキャン中" : "スキャン"}
-      </h2>
+      <div className="flex max-h-[min(80vh,calc(100vh-32px))] min-h-0 flex-col overflow-hidden">
+        <header className="flex shrink-0 items-center gap-2 border-b border-line-soft px-[18px] py-[14px]">
+          <I.refresh size={14} className={cn("text-ink-3", scanning && "animate-spin")} />
+          <h2 id="scan-modal-title" className="flex-1 font-sans text-[14px] font-semibold">
+            スキャン
+          </h2>
+          <IconButton icon={I.x} label="閉じる" size="sm" onClick={onClose} />
+        </header>
 
-      {scanning ? (
-        <ScanRunningFace progress={progress} onCancel={onCancel} />
-      ) : (
-        <ScanSummaryFace
-          lastResult={lastResult}
-          lastScanTime={lastScanTime}
-          newWorks={newWorks}
-          editingId={editingId}
-          editTitle={editTitle}
-          titleInputRef={titleInputRef}
-          onStart={onStart}
-          onOpenRjCodeMissing={onOpenRjCodeMissing}
-          onStartEdit={handleStartEdit}
-          onChangeEditTitle={setEditTitle}
-          onSaveTitle={handleSaveTitle}
-        />
-      )}
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-[18px] py-4">
+          <StatusRow
+            scanning={scanning}
+            progress={progress}
+            lastScanTime={lastScanTime}
+            justCompleted={justCompleted}
+          />
 
-      <button
-        onClick={onClose}
-        style={{
-          background: scanning ? C.bgInput : C.accent,
-          border: "none",
-          borderRadius: 6,
-          color: scanning ? C.textPrimary : "var(--paper-1)",
-          cursor: "pointer",
-          padding: "10px 28px",
-          fontSize: 14,
-          fontWeight: 600,
-          alignSelf: "center",
-          marginTop: 16,
-        }}
-      >
-        {scanning ? "閉じる（バックグラウンドで継続）" : "閉じる"}
-      </button>
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="font-jp text-[11.5px] text-ink-2">ライブラリ全体</span>
+            <span className="font-mono text-[13px] font-semibold text-ink-0 tabular-nums">
+              {libraryTotal ?? "—"}
+              <span className="ml-1 font-jp text-[10px] font-normal text-ink-3">件</span>
+            </span>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <p className="font-sans text-[9.5px] font-semibold tracking-[0.06em] text-ink-3 uppercase">
+              今回のスキャン
+            </p>
+            <StatsGrid result={lastResult} changedKeys={changedKeys} />
+          </div>
+
+          <AnimatePresence initial={false}>
+            {lastResult && lastResult.rjCodeMissingCount > 0 && (
+              <motion.button
+                type="button"
+                key="rj-missing"
+                layout
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={FADE}
+                onClick={onOpenRjCodeMissing}
+                className="flex items-center gap-2 overflow-hidden rounded-[6px] border border-[color-mix(in_oklch,var(--r-mustard)_35%,transparent)] bg-[color-mix(in_oklch,var(--r-mustard)_10%,transparent)] px-3 py-2 text-left hover:bg-[color-mix(in_oklch,var(--r-mustard)_16%,transparent)]"
+              >
+                <I.err size={13} className="shrink-0 text-[var(--r-mustard)]" />
+                <span className="flex-1 font-jp text-[12px] text-ink-0">
+                  RJコード未検出の作品が{lastResult.rjCodeMissingCount}件あります
+                </span>
+                <I.chev size={12} className="shrink-0 text-ink-3" />
+              </motion.button>
+            )}
+          </AnimatePresence>
+
+          <AnimatePresence initial={false}>
+            {newWorks.length > 0 && (
+              <motion.div
+                key="new-works"
+                layout
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={FADE}
+                className="flex min-h-0 flex-col gap-1.5 overflow-hidden"
+              >
+                <p className="font-sans text-[10.5px] font-semibold tracking-[0.06em] text-ink-3 uppercase">
+                  新規検出した作品
+                </p>
+                <ul className="flex max-h-[220px] list-none flex-col gap-1 overflow-y-auto p-0">
+                  {newWorks.map((work) => (
+                    <li key={work.id}>
+                      <NewWorkRow
+                        work={work}
+                        editing={editingId === work.id}
+                        editTitle={editTitle}
+                        titleInputRef={titleInputRef}
+                        onStartEdit={() => handleStartEdit(work)}
+                        onChangeEditTitle={setEditTitle}
+                        onSaveTitle={() => handleSaveTitle(work.id)}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-line-soft px-[18px] py-3">
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.span
+              key={scanning ? "bg-hint" : "idle-hint"}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={FADE}
+              className="font-jp text-[11px] text-ink-3"
+            >
+              {scanning ? "閉じてもバックグラウンドで続行します" : ""}
+            </motion.span>
+          </AnimatePresence>
+          <AnimatePresence mode="wait" initial={false}>
+            {scanning ? (
+              <motion.button
+                type="button"
+                key="cancel"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={FADE}
+                onClick={onCancel}
+                className="inline-flex h-9 min-w-[128px] items-center justify-center gap-1.5 rounded-[6px] border border-[color-mix(in_oklch,var(--r-coral)_45%,transparent)] bg-[color-mix(in_oklch,var(--r-coral)_10%,transparent)] px-4 font-sans text-[12.5px] font-medium text-ink-0 transition-colors hover:bg-[color-mix(in_oklch,var(--r-coral)_16%,transparent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
+              >
+                <I.x size={12} />
+                スキャンを中止
+              </motion.button>
+            ) : (
+              <motion.button
+                type="button"
+                key="start"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={FADE}
+                onClick={onStart}
+                className="inline-flex h-9 min-w-[128px] items-center justify-center gap-1.5 rounded-[6px] bg-ink-0 px-4 font-sans text-[12.5px] font-semibold text-paper-1 transition-colors hover:bg-acc focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
+              >
+                <I.refresh size={12} />
+                スキャン開始
+              </motion.button>
+            )}
+          </AnimatePresence>
+        </footer>
+      </div>
     </dialog>
   );
 }
 
-function ScanRunningFace({
+/** 「最終スキャン: 日時」⇄「実行中のフェーズと進捗」⇄「完了しました」を同じ行の位置で入れ替える。
+ *  完了サインは justCompleted の間だけ一時的に挟まり、その後は最終スキャン日時に戻る。 */
+function StatusRow({
+  scanning,
   progress,
-  onCancel,
+  lastScanTime,
+  justCompleted,
 }: {
+  scanning: boolean;
   progress: ScanProgress | null;
-  onCancel: () => void;
+  lastScanTime: string | null;
+  justCompleted: boolean;
 }) {
-  const currentIndex = progress ? SCAN_PHASE_ORDER.indexOf(progress.phase) : -1;
+  const pct =
+    progress && progress.total > 0
+      ? Math.min(100, Math.round((progress.processed / progress.total) * 100))
+      : null;
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        {SCAN_PHASE_ORDER.map((phase, index) => {
-          const isCurrent = index === currentIndex;
-          const isDone = currentIndex >= 0 && index < currentIndex;
-          return (
-            <div
-              key={phase}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "6px 10px",
-                borderRadius: 6,
-                background: isCurrent ? C.accentDim : "transparent",
-                color: isDone ? C.textSecondary : isCurrent ? C.textPrimary : C.textDisabled,
-                fontSize: 12.5,
-              }}
-            >
-              {isDone ? (
-                <I.check size={13} style={{ color: C.success, flexShrink: 0 }} />
-              ) : (
-                <span
-                  aria-hidden="true"
-                  style={{
-                    width: 13,
-                    height: 13,
-                    flexShrink: 0,
-                    borderRadius: "50%",
-                    border: `1.5px solid ${isCurrent ? C.accent : "var(--line)"}`,
-                    background: isCurrent ? C.accent : "transparent",
-                  }}
-                />
-              )}
-              <span style={{ flex: 1 }}>{scanPhaseLabel(phase)}</span>
-              {isCurrent && progress && progress.total > 0 && (
-                <span style={{ fontFamily: "var(--font-mono)", fontSize: 11 }}>
-                  {progress.processed}/{progress.total}
-                </span>
-              )}
+    <div className="flex min-h-[20px] flex-col gap-1.5">
+      <AnimatePresence mode="wait" initial={false}>
+        {scanning ? (
+          <motion.div
+            key="running"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={FADE}
+            className="flex flex-col gap-1.5"
+          >
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="font-sans text-[13px] font-medium text-ink-0">
+                {progress ? scanPhaseLabel(progress.phase) : "準備中"}
+              </span>
+              <span className="font-mono text-[11px] text-ink-2 tabular-nums">
+                {progress && progress.total > 0 ? `${progress.processed}/${progress.total}` : "…"}
+              </span>
             </div>
-          );
-        })}
-      </div>
-      <button
-        type="button"
-        onClick={onCancel}
-        style={{
-          alignSelf: "center",
-          padding: "8px 16px",
-          borderRadius: 6,
-          border: `1px solid ${C.error}`,
-          background: "color-mix(in oklch, var(--r-coral) 12%, transparent)",
-          color: C.textPrimary,
-          fontSize: 12,
-          cursor: "pointer",
-        }}
-      >
-        スキャンを中止
-      </button>
+            <div className="h-[3px] overflow-hidden rounded-full bg-paper-2">
+              <div
+                className={cn(
+                  "h-full rounded-full bg-acc transition-[width] duration-300 ease-out",
+                  pct === null && "w-1/3 animate-pulse",
+                )}
+                style={pct !== null ? { width: `${pct}%` } : undefined}
+              />
+            </div>
+          </motion.div>
+        ) : justCompleted ? (
+          <motion.div
+            key="completed"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={FADE}
+            className="flex items-center gap-1.5"
+          >
+            <I.check size={12} className="text-[var(--r-leaf)]" />
+            <span className="font-sans text-[13px] font-medium text-ink-0">完了しました</span>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="idle"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={FADE}
+          >
+            <span className="font-mono text-[11px] text-ink-2">
+              最終スキャン: {formatDate(lastScanTime)}
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
-function ScanSummaryFace({
-  lastResult,
-  lastScanTime,
-  newWorks,
-  editingId,
+const STAT_TILES: Array<{
+  key: StatKey;
+  label: string;
+  tone: (value: number) => string;
+}> = [
+  { key: "registered", label: "登録済み", tone: () => "text-ink-0" },
+  { key: "newlyGenerated", label: "新規検出", tone: () => "text-ink-0" },
+  { key: "errors", label: "エラー", tone: (v) => (v > 0 ? "text-[var(--r-coral)]" : "text-ink-3") },
+  {
+    key: "missing",
+    label: "行方不明",
+    tone: (v) => (v > 0 ? "text-[var(--r-mustard)]" : "text-ink-3"),
+  },
+];
+
+/** 常に4枠を表示し、値だけが更新される（実行中も直前の値のまま）。
+ *  changedKeys に含まれる枠は、直前のスキャンで値が変わったことを示す短い強調を出す。 */
+function StatsGrid({
+  result,
+  changedKeys,
+}: {
+  result: ScanResult | null;
+  changedKeys: ReadonlySet<StatKey>;
+}) {
+  return (
+    <div className="grid grid-cols-4 gap-2">
+      {STAT_TILES.map(({ key, label, tone }) => {
+        const value = result?.[key] ?? null;
+        const highlighted = changedKeys.has(key);
+        return (
+          <div
+            key={key}
+            className={cn(
+              "flex flex-col gap-0.5 rounded-[6px] border px-2.5 py-2 transition-colors duration-700",
+              highlighted
+                ? "border-[color-mix(in_oklch,var(--acc)_45%,transparent)] bg-[color-mix(in_oklch,var(--acc)_12%,transparent)]"
+                : "border-line-soft bg-paper-0",
+            )}
+          >
+            <span
+              className={cn(
+                "font-mono text-[16px] leading-none font-semibold tabular-nums",
+                value === null ? "text-ink-4" : tone(value),
+              )}
+            >
+              {value ?? "—"}
+            </span>
+            <span className="font-jp text-[10px] text-ink-3">{label}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function NewWorkRow({
+  work,
+  editing,
   editTitle,
   titleInputRef,
-  onStart,
-  onOpenRjCodeMissing,
   onStartEdit,
   onChangeEditTitle,
   onSaveTitle,
 }: {
-  lastResult: ScanResult | null;
-  lastScanTime: string | null;
-  newWorks: Work[];
-  editingId: string | null;
+  work: Work;
+  editing: boolean;
   editTitle: string;
-  titleInputRef: React.RefObject<HTMLInputElement | null>;
-  onStart: () => void;
-  onOpenRjCodeMissing: () => void;
-  onStartEdit: (work: Work) => void;
+  titleInputRef: RefObject<HTMLInputElement | null>;
+  onStartEdit: () => void;
   onChangeEditTitle: (title: string) => void;
-  onSaveTitle: (workId: string) => void;
+  onSaveTitle: () => void;
 }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <div
-        style={{
-          textAlign: "center",
-          fontSize: 11,
-          color: C.textSecondary,
-          marginBottom: 12,
-        }}
-      >
-        最終スキャン: {formatDate(lastScanTime)}
-      </div>
-
-      {lastResult ? (
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 12,
-            marginBottom: 16,
-            justifyContent: "center",
+    <div className="flex items-center gap-2 rounded-[6px] border border-line-soft bg-paper-0 px-2.5 py-1.5">
+      <span className="shrink-0 rounded-pill bg-[color-mix(in_oklch,var(--r-leaf)_16%,transparent)] px-1.5 py-0.5 font-sans text-[9.5px] font-semibold text-[var(--r-leaf)]">
+        NEW
+      </span>
+      {editing ? (
+        <input
+          ref={titleInputRef}
+          value={editTitle}
+          onChange={(e) => onChangeEditTitle(e.target.value)}
+          onBlur={onSaveTitle}
+          onKeyDown={(e) => {
+            // Escapeのキャンセルは dialog の onCancel（useDialogModal）に一元化する
+            if (e.key === "Enter") onSaveTitle();
           }}
-        >
-          <StatBadge label="登録済み" value={lastResult.registered} color={C.accent} />
-          <StatBadge label="新規検出" value={lastResult.newlyGenerated} color={C.success} />
-          {lastResult.errors > 0 && (
-            <StatBadge label="エラー" value={lastResult.errors} color={C.error} />
-          )}
-          {lastResult.missing > 0 && (
-            <StatBadge label="行方不明" value={lastResult.missing} color={C.warning} />
-          )}
-          {lastResult.rjCodeMissingCount > 0 && (
-            <StatBadge label="RJ未検出" value={lastResult.rjCodeMissingCount} color={C.warning} />
-          )}
-        </div>
+          className="min-w-0 flex-1 rounded-[4px] border border-acc bg-paper-2 px-2 py-0.5 font-jp text-[12.5px] text-ink-0 outline-none"
+        />
       ) : (
-        <p
-          style={{
-            textAlign: "center",
-            fontSize: 12.5,
-            color: C.textDisabled,
-            marginBottom: 16,
-          }}
-        >
-          まだスキャンを実行していません
-        </p>
-      )}
-
-      {lastResult && lastResult.rjCodeMissingCount > 0 && (
         <button
           type="button"
-          onClick={onOpenRjCodeMissing}
-          style={{
-            alignSelf: "center",
-            marginBottom: 16,
-            padding: "8px 16px",
-            borderRadius: 6,
-            border: `1px solid ${C.warning}`,
-            background: "color-mix(in oklch, var(--r-mustard) 12%, transparent)",
-            color: C.textPrimary,
-            fontSize: 12,
-            cursor: "pointer",
-          }}
+          onClick={onStartEdit}
+          title="クリックしてタイトルを編集"
+          className="min-w-0 flex-1 truncate text-left font-jp text-[12.5px] text-ink-0"
         >
-          RJコード未検出の作品を確認する（{lastResult.rjCodeMissingCount}件）
+          {work.title}
         </button>
       )}
-
-      {newWorks.length > 0 && (
-        <>
-          <div style={{ color: C.textSecondary, fontSize: 12, marginBottom: 8 }}>
-            新規検出された作品（タイトルをクリックして編集できます）:
-          </div>
-          <div style={{ flex: 1, overflowY: "auto", marginBottom: 16, maxHeight: 260 }}>
-            {newWorks.map((work) => (
-              <div
-                key={work.id}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  padding: "6px 8px",
-                  borderRadius: 4,
-                  background: C.accentDim,
-                  marginBottom: 4,
-                }}
-              >
-                <span style={{ color: C.success, fontSize: 11, flexShrink: 0 }}>NEW</span>
-                {editingId === work.id ? (
-                  <input
-                    ref={titleInputRef}
-                    value={editTitle}
-                    onChange={(e) => onChangeEditTitle(e.target.value)}
-                    onBlur={() => onSaveTitle(work.id)}
-                    onKeyDown={(e) => {
-                      // Escapeのキャンセルは dialog の onCancel（useDialogModal）に一元化する
-                      if (e.key === "Enter") onSaveTitle(work.id);
-                    }}
-                    style={{
-                      flex: 1,
-                      background: C.bgInput,
-                      border: `1px solid ${C.accent}`,
-                      borderRadius: 4,
-                      padding: "3px 8px",
-                      fontSize: 13,
-                      color: C.textPrimary,
-                      outline: "none",
-                    }}
-                  />
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => onStartEdit(work)}
-                    style={{
-                      flex: 1,
-                      fontSize: 13,
-                      cursor: "pointer",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                      background: "none",
-                      border: "none",
-                      color: "inherit",
-                      padding: 0,
-                      textAlign: "left",
-                    }}
-                    title="クリックしてタイトルを編集"
-                  >
-                    {work.title}
-                  </button>
-                )}
-                <span style={{ color: C.textDisabled, fontSize: 11, flexShrink: 0 }}>
-                  {getDefaultPlaylistTrackCount(work)} tracks
-                </span>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-
-      <button
-        type="button"
-        onClick={onStart}
-        style={{
-          alignSelf: "center",
-          background: C.accent,
-          border: "none",
-          borderRadius: 6,
-          color: "var(--paper-1)",
-          cursor: "pointer",
-          padding: "10px 28px",
-          fontSize: 14,
-          fontWeight: 600,
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-        }}
-      >
-        <I.refresh size={13} />
-        スキャン開始
-      </button>
-    </div>
-  );
-}
-
-function StatBadge({ label, value, color }: { label: string; value: number; color: string }) {
-  return (
-    <div
-      style={{
-        textAlign: "center",
-        padding: "6px 14px",
-        borderRadius: 6,
-        background: `color-mix(in oklch, ${color} 12%, transparent)`,
-        border: `1px solid color-mix(in oklch, ${color} 28%, transparent)`,
-      }}
-    >
-      <div style={{ fontSize: 20, fontWeight: 700, color }}>{value}</div>
-      <div style={{ fontSize: 11, color: C.textSecondary }}>{label}</div>
+      <span className="shrink-0 font-mono text-[10.5px] text-ink-4">
+        {getDefaultPlaylistTrackCount(work)} tracks
+      </span>
     </div>
   );
 }
