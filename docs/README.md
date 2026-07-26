@@ -11,7 +11,7 @@ mimimilli のドキュメント一覧と、どれが「現行の正」かの地�
 | [ARCHITECTURE.md](ARCHITECTURE.md)       | 現在の構造・境界・データフロー                                                                    |
 | [adr/](adr/README.md)                    | 設計判断の記録（いつ書くかの基準・一覧は adr/README.md）                                          |
 | [requirements-v4.md](requirements-v4.md) | 機能・UX 要件                                                                                     |
-| [dlsite-cache.md](dlsite-cache.md)       | DLsiteのキャッシュ、offline、レート制限、再試行と運用手順                                         |
+| [dlsite.md](dlsite.md)                   | DLsite連携（取得・タグ変換・キャッシュ・レート制限・運用手順）                                    |
 
 API 契約の正典はドキュメントではなく **`shared/src/`（Zod スキーマ）**。HANDOFF の API 表は概観にすぎない。
 
