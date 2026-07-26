@@ -9,5 +9,6 @@ export function shouldLoadMore(
 ): boolean {
   if (virtualItems.length === 0) return false;
   const lastItem = virtualItems[virtualItems.length - 1];
+  if (!lastItem) return false;
   return lastItem.index >= count - 1 - overscan;
 }

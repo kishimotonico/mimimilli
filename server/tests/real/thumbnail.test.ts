@@ -60,15 +60,19 @@ test("カバーサムネイル: 2回目のリクエストは再生成されな�
   await app.request(`/api/media/cover/${work.id}?w=256`);
   const filesBefore = readdirSync(cacheDir);
   assert.equal(filesBefore.length, 1);
-  const mtimeBefore = statSync(join(cacheDir, filesBefore[0])).mtimeMs;
+  const cacheFileBefore = filesBefore[0];
+  assert.ok(cacheFileBefore);
+  const mtimeBefore = statSync(join(cacheDir, cacheFileBefore)).mtimeMs;
 
   await new Promise((r) => setTimeout(r, 20));
   await app.request(`/api/media/cover/${work.id}?w=256`);
   const filesAfter = readdirSync(cacheDir);
 
   assert.equal(filesAfter.length, 1);
-  assert.equal(filesAfter[0], filesBefore[0]);
-  assert.equal(statSync(join(cacheDir, filesAfter[0])).mtimeMs, mtimeBefore);
+  const cacheFileAfter = filesAfter[0];
+  assert.ok(cacheFileAfter);
+  assert.equal(cacheFileAfter, cacheFileBefore);
+  assert.equal(statSync(join(cacheDir, cacheFileAfter)).mtimeMs, mtimeBefore);
 });
 
 test("カバーサムネイル: ETag一致なら生成前に304を返し、bodyを返さない", async (t) => {
@@ -147,7 +151,11 @@ test("カバーサムネイル: 元カバー更新（mtime変化）で別キャ�
 
   const before = await app.request(`/api/media/cover/${work.id}?w=256`);
   const statsBefore = await sharp(Buffer.from(await before.arrayBuffer())).stats();
-  assert.ok(statsBefore.channels[0].mean > statsBefore.channels[2].mean); // 赤が優勢
+  const redChannel = statsBefore.channels[0];
+  const blueChannel = statsBefore.channels[2];
+  assert.ok(redChannel);
+  assert.ok(blueChannel);
+  assert.ok(redChannel.mean > blueChannel.mean); // 赤が優勢
   assert.equal(readdirSync(cacheDir).length, 1);
 
   await new Promise((r) => setTimeout(r, 20));
@@ -155,7 +163,11 @@ test("カバーサムネイル: 元カバー更新（mtime変化）で別キャ�
 
   const after = await app.request(`/api/media/cover/${work.id}?w=256`);
   const statsAfter = await sharp(Buffer.from(await after.arrayBuffer())).stats();
-  assert.ok(statsAfter.channels[2].mean > statsAfter.channels[0].mean); // 更新後は青が優勢
+  const redChannelAfter = statsAfter.channels[0];
+  const blueChannelAfter = statsAfter.channels[2];
+  assert.ok(redChannelAfter);
+  assert.ok(blueChannelAfter);
+  assert.ok(blueChannelAfter.mean > redChannelAfter.mean); // 更新後は青が優勢
 
   // mtime が変わった旧カバーのキャッシュは消さない設計のため、キャッシュファイルは2つになる
   assert.equal(readdirSync(cacheDir).length, 2);

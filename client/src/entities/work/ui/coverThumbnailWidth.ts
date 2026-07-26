@@ -8,8 +8,7 @@ export function selectFixedCoverThumbnailWidth(
   devicePixelRatio: number,
 ): ThumbnailWidth {
   const target = displaySize * Math.max(1, devicePixelRatio);
-  return (
-    THUMBNAIL_WIDTHS.find((width) => width >= target) ??
-    THUMBNAIL_WIDTHS[THUMBNAIL_WIDTHS.length - 1]
-  );
+  const fallback = THUMBNAIL_WIDTHS[THUMBNAIL_WIDTHS.length - 1];
+  if (fallback === undefined) throw new Error("THUMBNAIL_WIDTHS must not be empty");
+  return THUMBNAIL_WIDTHS.find((width) => width >= target) ?? fallback;
 }

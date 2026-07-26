@@ -47,7 +47,11 @@ function TagValueChip({ value }: { value: string }) {
 
 function RuleValue({ rule }: { rule: SmartFolderRule }) {
   if (rule.field === "長さ") {
-    return <span className="val">{formatRuleDuration(rule.values[0])}</span>;
+    const durationValue = rule.values[0];
+    if (durationValue === undefined) {
+      throw new Error("長さルールに値がありません");
+    }
+    return <span className="val">{formatRuleDuration(durationValue)}</span>;
   }
 
   return (

@@ -24,7 +24,11 @@ export function sortTagsForDisplay(tags: string[], tagPrefixes: TagPrefix[]): st
     if (prefixIndex === undefined) {
       unknownPrefixTags.push(tag);
     } else {
-      definedPrefixTags[prefixIndex].push(tag);
+      const bucket = definedPrefixTags[prefixIndex];
+      if (bucket === undefined) {
+        throw new Error(`internal: prefix bucket missing for ${parsed.prefix}`);
+      }
+      bucket.push(tag);
     }
   }
 

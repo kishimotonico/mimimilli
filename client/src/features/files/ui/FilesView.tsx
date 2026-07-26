@@ -82,10 +82,8 @@ export default function FilesView({
     [playingWorkId, playingRelPath],
   );
 
-  const cwdTitle =
-    nav.relPath.length > 0 ? nav.relPath[nav.relPath.length - 1] : rootLabel(rootFolder);
-  const parentName =
-    nav.relPath.length >= 2 ? nav.relPath[nav.relPath.length - 2] : rootLabel(rootFolder);
+  const cwdTitle = nav.relPath.slice(-1)[0] ?? rootLabel(rootFolder);
+  const parentName = nav.relPath.slice(-2, -1)[0] ?? rootLabel(rootFolder);
 
   // ── プレビュー対象 ────────────────────────────────────────
   // ファイル選択中はそのファイル、それ以外はカレント dir 自身。

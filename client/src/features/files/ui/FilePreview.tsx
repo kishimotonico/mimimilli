@@ -43,6 +43,7 @@ export default function FilePreview({
       ? `${FILE_KIND_LABEL[kind]} · 物理`
       : "プレビュー";
   const audioFiles = isDir ? (folderEntries ?? []).filter((e) => classifyFile(e) === "audio") : [];
+  const firstAudioFile = audioFiles[0];
   const breakdown = isDir && folderEntries ? summarizeKinds(folderEntries) : [];
   const isWorkFolder = isDir && !!entry?.workId;
 
@@ -99,13 +100,13 @@ export default function FilePreview({
                 </Button>
               </div>
             )}
-            {isDir && audioFiles.length > 0 && (
+            {isDir && firstAudioFile && (
               <div className="mle-fprev__actions">
                 <Button
                   variant="primary"
                   icon={I.play}
-                  onClick={() => onPlay(audioFiles[0])}
-                  disabled={!audioFiles[0].workId}
+                  onClick={() => onPlay(firstAudioFile)}
+                  disabled={!firstAudioFile.workId}
                 >
                   先頭の音声を再生
                 </Button>

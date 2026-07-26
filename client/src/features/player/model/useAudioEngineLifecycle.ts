@@ -145,6 +145,8 @@ export function useAudioEngineLifecycle({
     if (currentTrackIndex < 0 || currentTrackIndex >= tracks.length || !currentWork) return;
 
     const track = tracks[currentTrackIndex];
+    if (!track) return;
+
     const workId = currentWork.id;
     const assetUrl = getAudioUrl(workId, track.file);
 

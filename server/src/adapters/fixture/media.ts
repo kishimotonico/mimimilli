@@ -33,7 +33,8 @@ export function synthesizeSilentWav(durationSec: number): MediaLocation {
 
       for (let i = 0; i < length; i++) {
         const pos = start + i;
-        out[i] = pos < WAV_HEADER_SIZE ? header[pos] : SILENCE_BYTE;
+        const headerByte = pos < WAV_HEADER_SIZE ? header[pos] : undefined;
+        out[i] = headerByte ?? SILENCE_BYTE;
       }
 
       return out;
@@ -93,7 +94,9 @@ function colorForWorkId(workId: string): string {
   for (let i = 0; i < workId.length; i++) {
     hash = (hash * 31 + workId.charCodeAt(i)) >>> 0;
   }
-  return SVG_BACKGROUND_COLORS[hash % SVG_BACKGROUND_COLORS.length];
+  const color = SVG_BACKGROUND_COLORS[hash % SVG_BACKGROUND_COLORS.length];
+  if (!color) throw new Error("SVG_BACKGROUND_COLORS must not be empty");
+  return color;
 }
 
 /** タイトル先頭1文字＋作品IDから決まる背景色で、簡易カバー画像SVGを合成する。

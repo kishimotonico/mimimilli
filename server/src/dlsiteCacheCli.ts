@@ -98,7 +98,13 @@ function deriveProductCodeFromFileName(name: string): string {
       `ファイル名からproduct codeを決定できません（<RJ|VJ番号>.html または .html.gz にしてください）: ${name}`,
     );
   }
-  return normalizeDlsiteProductCode(match[1]).productCode;
+  const code = match[1];
+  if (!code) {
+    throw new Error(
+      `ファイル名からproduct codeを決定できません（<RJ|VJ番号>.html または .html.gz にしてください）: ${name}`,
+    );
+  }
+  return normalizeDlsiteProductCode(code).productCode;
 }
 
 function importDirectory(
@@ -150,14 +156,19 @@ export function runDlsiteCacheCli(
       args[0] === "--product-code" &&
       args[2] === "--file"
     ) {
-      const productCode = normalizeDlsiteProductCode(args[1]).productCode;
+      const productCodeArg = args[1];
+      const fileArg = args[3];
+      if (productCodeArg === undefined || fileArg === undefined) throw new Error(USAGE);
+      const productCode = normalizeDlsiteProductCode(productCodeArg).productCode;
       const html = cache.exportHtml({ productCode });
-      writeFileSync(args[3], html, "utf8");
+      writeFileSync(fileArg, html, "utf8");
       return JSON.stringify({ productCode, bytes: Buffer.byteLength(html, "utf8") });
     }
     if (command === "import" && args.length === 2 && args[0] === "--dir") {
+      const dirArg = args[1];
+      if (dirArg === undefined) throw new Error(USAGE);
       const result = importDirectory(
-        args[1],
+        dirArg,
         cache,
         config.maxTransferBytes,
         config.maxExpandedBytes,
@@ -174,8 +185,11 @@ export function runDlsiteCacheCli(
       args[0] === "--product-code" &&
       args[2] === "--file"
     ) {
-      const productCode = normalizeDlsiteProductCode(args[1]).productCode;
-      const bytes = readImportFile(args[3], config.maxTransferBytes, config.maxExpandedBytes);
+      const productCodeArg = args[1];
+      const fileArg = args[3];
+      if (productCodeArg === undefined || fileArg === undefined) throw new Error(USAGE);
+      const productCode = normalizeDlsiteProductCode(productCodeArg).productCode;
+      const bytes = readImportFile(fileArg, config.maxTransferBytes, config.maxExpandedBytes);
       const { outcome } = importOne(cache, productCode, bytes);
       return JSON.stringify({ productCode, outcome });
     }

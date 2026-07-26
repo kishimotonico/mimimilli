@@ -14,7 +14,7 @@ export function getWorkFolderDisplay(
   if (!RJ_CODE.test(workId)) return { badge: "作品", name };
 
   const titleMatch = name.match(new RegExp(`^${workId}[\\s_＿・-]+(.+)$`));
-  const title = titleMatch?.[1].trim();
+  const title = titleMatch?.[1]?.trim();
 
   if (!title && name.startsWith(workId)) {
     return { badge: "作品", name };

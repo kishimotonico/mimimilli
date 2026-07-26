@@ -69,10 +69,9 @@ export function computeJustifiedLayout(
     let rowHeight: number;
     if (stretch) {
       rowHeight = (containerWidth - gapsWidth) / rowRatioSum;
-    } else if (rowHeights.length > 0) {
-      rowHeight = rowHeights[rowHeights.length - 1];
     } else {
-      rowHeight = targetRowHeight;
+      const previousRowHeight = rowHeights[rowHeights.length - 1];
+      rowHeight = previousRowHeight ?? targetRowHeight;
     }
 
     const rowIndex = rowHeights.length;

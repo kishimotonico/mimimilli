@@ -24,7 +24,9 @@ export default function CoverPlaceholder({
   borderRadius = 4,
 }: CoverPlaceholderProps) {
   const h = hashId(id);
-  const { bg, fg } = RISO_COLORS[h % RISO_COLORS.length];
+  const color = RISO_COLORS[h % RISO_COLORS.length];
+  if (!color) throw new Error("RISO_COLORS must not be empty");
+  const { bg, fg } = color;
   const char = title.replace(/[【】\s]/g, "").slice(0, 1) || "?";
 
   return (

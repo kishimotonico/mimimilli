@@ -130,7 +130,14 @@ function migrateLegacyUserData(legacyPath: string, user: Database): void {
         .query(
           "SELECT id, added_at, bookmarked, last_played_at, resume_position, resume_track_index FROM works",
         )
-        .all() as Array<Record<string, string | number | null>>) {
+        .all() as Array<{
+        id: string | number | null;
+        added_at: string | number | null;
+        bookmarked: string | number | null;
+        last_played_at: string | number | null;
+        resume_position: string | number | null;
+        resume_track_index: string | number | null;
+      }>) {
         insertState.run(row.id, row.added_at, row.bookmarked, row.last_played_at);
         if (typeof row.resume_position === "number" && row.resume_position > 0) {
           insertResumeV1.run(row.id, row.resume_position, row.resume_track_index);
@@ -157,7 +164,17 @@ function migrateLegacyUserData(legacyPath: string, user: Database): void {
           `INSERT INTO ${table} (${columns}) VALUES (${placeholders}) ` +
             `ON CONFLICT(id) DO UPDATE SET ${updates}`,
         );
-        for (const row of rows) statement.run(...names.map((name) => row[name]));
+        for (const row of rows) {
+          statement.run(
+            ...names.map((name) => {
+              const value = row[name];
+              if (value === undefined) {
+                throw new Error(`Legacy migration: column "${name}" missing in ${table}`);
+              }
+              return value;
+            }),
+          );
+        }
       }
 
       const insertSetting = user.query(
