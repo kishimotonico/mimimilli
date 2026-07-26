@@ -1,4 +1,4 @@
-// 原寸（ジャスティファイド）グリッドの行組みアルゴリズム（TASK-45）。
+// ジャスティファイドグリッドの行組みアルゴリズム。
 // 「行の目標高さに向かって貪欲にアイテムを敷き詰め、行が目標幅に達したら
 // 実際の行幅にぴったり合うよう高さを微調整する」という Flickr の
 // justified-layout 相当の手法を簡略化したもの。
@@ -66,10 +66,14 @@ export function computeJustifiedLayout(
     if (row.length === 0) return;
 
     const gapsWidth = gap * (row.length - 1);
-    // stretch: 行幅ぴったりに高さを微調整する（通常行、および目標高さのままでも
-    // 行幅を満たす／超える最終行）。それ以外（目標高さのままでは行幅に届かない
-    // 最終行）は無理に伸ばさず目標高さのまま左寄せで終える。
-    const rowHeight = stretch ? (containerWidth - gapsWidth) / rowRatioSum : targetRowHeight;
+    let rowHeight: number;
+    if (stretch) {
+      rowHeight = (containerWidth - gapsWidth) / rowRatioSum;
+    } else if (rowHeights.length > 0) {
+      rowHeight = rowHeights[rowHeights.length - 1];
+    } else {
+      rowHeight = targetRowHeight;
+    }
 
     const rowIndex = rowHeights.length;
     let x = 0;

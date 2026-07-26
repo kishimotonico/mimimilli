@@ -40,8 +40,7 @@ describe("justified grid layout", () => {
     expect(layout.tiles[0].width).toBeCloseTo(layout.tiles[1].width, 5);
   });
 
-  it("keeps the trailing incomplete row at the target height, left-aligned (not stretched)", () => {
-    // 目標高さのままだと行幅を満たせない1枚だけの最終行
+  it("uses targetRowHeight when the only row is incomplete", () => {
     const items = [{ id: "solo", aspectRatio: 1 }];
     const layout = computeJustifiedLayout(items, {
       containerWidth: 1000,
@@ -51,6 +50,29 @@ describe("justified grid layout", () => {
 
     expect(layout.rowHeights).toEqual([176]);
     expect(layout.tiles[0].width).toBeCloseTo(176, 5);
+  });
+
+  it("matches the trailing row height to the previous row", () => {
+    const items = [
+      { id: "a", aspectRatio: 1 },
+      { id: "b", aspectRatio: 1 },
+      { id: "c", aspectRatio: 1 },
+      { id: "d", aspectRatio: 1 },
+    ];
+    const layout = computeJustifiedLayout(items, {
+      containerWidth: 300,
+      targetRowHeight: 100,
+      gap: 10,
+    });
+
+    expect(layout.rowHeights).toHaveLength(2);
+    expect(layout.rowHeights[1]).toBeCloseTo(layout.rowHeights[0], 5);
+
+    const lastTile = layout.tiles.find((tile) => tile.id === "d");
+    expect(lastTile).toBeDefined();
+    if (lastTile) {
+      expect(lastTile.width).toBeCloseTo(layout.rowHeights[1], 5);
+    }
   });
 
   it("packs items into multiple rows and assigns increasing rowIndex", () => {
@@ -118,9 +140,10 @@ describe("justified grid layout", () => {
       gap: 10,
     });
 
-    // 最終行・未充足なので伸縮なし: 幅100固定、gap10
+    // 1行のみ・未充足行なので targetRowHeight を採用。2枚とも幅は rowHeight に等しい
+    const rowHeight = layout.rowHeights[0];
     const [a, b] = layout.tiles;
-    expect(a.centerX).toBeCloseTo(50, 5);
-    expect(b.centerX).toBeCloseTo(100 + 10 + 50, 5);
+    expect(a.centerX).toBeCloseTo(rowHeight / 2, 5);
+    expect(b.centerX).toBeCloseTo(rowHeight + 10 + rowHeight / 2, 5);
   });
 });
