@@ -26,9 +26,19 @@ export function dlsiteRoute(adapter: DataAdapter): Hono {
 
   app.get("/dlsite/notifications/:kind", async (c) => {
     const kind = c.req.param("kind");
-    if (kind !== "rj-missing" && kind !== "fetch-failed") notFound("通知種別が見つかりません");
+    if (kind !== "rj-missing" && kind !== "fetch-failed" && kind !== "parse-failed") {
+      notFound("通知種別が見つかりません");
+    }
     const parsed = dlsiteNotificationQuerySchema.safeParse(c.req.query());
     if (!parsed.success) invalidRequest("DLsite通知のクエリパラメータが不正です");
+    if (kind === "parse-failed") {
+      return c.json(
+        await adapter.queryDlsiteParseFailedNotifications({
+          page: parsed.data.page ?? 1,
+          limit: parsed.data.limit ?? 200,
+        }),
+      );
+    }
     return c.json(
       await adapter.queryDlsiteNotifications(kind, {
         page: parsed.data.page ?? 1,

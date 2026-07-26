@@ -54,10 +54,14 @@ test("DLsite通知は通常works一覧と別契約で集計・ページングす
   const summary = (await summaryResponse.json()) as {
     rjCodeMissingCount: number;
     fetchFailedCount: number;
+    parseErrorCount: number;
+    parseErrorAlert: boolean;
     unlinkedCount: number;
   };
   assert.ok(summary.rjCodeMissingCount >= 0);
   assert.ok(summary.fetchFailedCount >= 0);
+  assert.ok(summary.parseErrorCount >= 0);
+  assert.equal(typeof summary.parseErrorAlert, "boolean");
   assert.ok(summary.unlinkedCount >= 0);
 
   const listResponse = await app.request("/api/dlsite/notifications/rj-missing?page=1&limit=1");
@@ -103,6 +107,64 @@ test("201件超の通知はfixtureとrealで集計・ページングの欠落や
       assert.equal(ids.length, realFirst.total, `${kind}: 末尾ページが欠落しています`);
       assert.ok(realSecond.items.length > 0, `${kind}: 201件目以降が取得されていません`);
     }
+  } finally {
+    db.close();
+  }
+});
+
+test("DLsite通知: parse_error は fetch-failed と分離して集計する", async () => {
+  const db = openDb({ kind: "memory" });
+  const repo = new WorkRepo(db);
+  try {
+    const parseFailed: WorkSummary = {
+      id: "parse-1",
+      title: "パース失敗",
+      cover: null,
+      status: "ok" as const,
+      physicalPath: "/library/parse",
+      totalDurationSec: 0,
+      addedAt: "2026-07-26T00:00:00.000Z",
+      errorMessage: null,
+      urls: [],
+      tags: [],
+      trackCount: 0,
+      bookmarked: false,
+      lastPlayedAt: null,
+      dlsite: {
+        rjCode: "RJ111111",
+        status: "error" as const,
+        lastAttemptAt: null,
+        error: "parse",
+        errorKind: "parse_error" as const,
+        appliedTags: [],
+      },
+    };
+    const httpFailed: WorkSummary = {
+      ...parseFailed,
+      id: "http-1",
+      title: "HTTP失敗",
+      dlsite: {
+        rjCode: "RJ222222",
+        status: "error" as const,
+        lastAttemptAt: null,
+        error: "http",
+        errorKind: "error" as const,
+        appliedTags: [],
+      },
+    };
+    repo.upsertWork(asWork(parseFailed));
+    repo.upsertWork(asWork(httpFailed));
+    assert.deepEqual(repo.getDlsiteNotificationSummary(), {
+      rjCodeMissingCount: 0,
+      fetchFailedCount: 1,
+      parseErrorCount: 1,
+      parseErrorAlert: false,
+      unlinkedCount: 0,
+    });
+    assert.deepEqual(repo.queryDlsiteParseFailedNotifications({ page: 1, limit: 10 }), {
+      items: [{ id: "parse-1", title: "パース失敗", status: "error", rjCode: "RJ111111" }],
+      total: 1,
+    });
   } finally {
     db.close();
   }

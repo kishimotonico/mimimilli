@@ -28,6 +28,12 @@ interface TopBarProps {
   dlsiteFetchFailedCount?: number;
   /** 通知ベルからDLsite取得失敗一覧を開く */
   onOpenDlsiteFetchFailed?: () => void;
+  /** パース失敗アラートが発火しているか */
+  dlsiteParseErrorAlert?: boolean;
+  /** パース失敗の作品数 */
+  dlsiteParseErrorCount?: number;
+  /** 通知ベルからパース失敗一覧を開く */
+  onOpenDlsiteParseFailed?: () => void;
   /** DLsite未連携（RJコードはあるが未取得）の作品数（TASK-44） */
   dlsiteUnlinkedCount?: number;
   /** DLsite一括取得（mode: "existing"）が実行中か */
@@ -60,6 +66,9 @@ export default function TopBar({
   onOpenRjCodeMissing = () => {},
   dlsiteFetchFailedCount = 0,
   onOpenDlsiteFetchFailed = () => {},
+  dlsiteParseErrorAlert = false,
+  dlsiteParseErrorCount = 0,
+  onOpenDlsiteParseFailed = () => {},
   dlsiteUnlinkedCount = 0,
   dlsiteBulkActive = false,
   dlsiteBulkProgress = null,
@@ -180,6 +189,9 @@ export default function TopBar({
         onOpenRjCodeMissing={onOpenRjCodeMissing}
         dlsiteFetchFailedCount={dlsiteFetchFailedCount}
         onOpenDlsiteFetchFailed={onOpenDlsiteFetchFailed}
+        dlsiteParseErrorAlert={dlsiteParseErrorAlert}
+        dlsiteParseErrorCount={dlsiteParseErrorCount}
+        onOpenDlsiteParseFailed={onOpenDlsiteParseFailed}
         dlsiteUnlinkedCount={dlsiteUnlinkedCount}
         dlsiteBulkActive={dlsiteBulkActive}
         dlsiteBulkProgress={dlsiteBulkProgress}

@@ -4,6 +4,7 @@ import { asc, eq } from "drizzle-orm";
 import {
   dlsiteStateSchema,
   emptyDlsiteState,
+  evaluateParseErrorAlert,
   normalizeTag,
   normalizeTags,
   parseTag,
@@ -21,6 +22,7 @@ import type {
   DlsiteNotificationPage,
   DlsiteNotificationQuery,
   DlsiteNotificationSummary,
+  DlsiteParseFailedNotificationPage,
   Playlist,
   ResolvedPlaylist,
   ResumeBody,
@@ -837,8 +839,16 @@ export class WorkRepo {
             SUM(CASE WHEN json_extract(work_dlsite.state_json, '$.rjCode') IS NULL
                            AND COALESCE(json_extract(work_dlsite.state_json, '$.status'), 'none') != 'skipped'
                      THEN 1 ELSE 0 END) AS rjCodeMissingCount,
-            SUM(CASE WHEN json_extract(work_dlsite.state_json, '$.status') IN ('error', 'not_found')
+            SUM(CASE WHEN json_extract(work_dlsite.state_json, '$.status') = 'not_found'
+                      OR (json_extract(work_dlsite.state_json, '$.status') = 'error'
+                          AND COALESCE(json_extract(work_dlsite.state_json, '$.errorKind'), '') != 'parse_error')
                      THEN 1 ELSE 0 END) AS fetchFailedCount,
+            SUM(CASE WHEN json_extract(work_dlsite.state_json, '$.status') = 'error'
+                      AND json_extract(work_dlsite.state_json, '$.errorKind') = 'parse_error'
+                     THEN 1 ELSE 0 END) AS parseErrorCount,
+            SUM(CASE WHEN json_extract(work_dlsite.state_json, '$.status') = 'error'
+                      AND COALESCE(json_extract(work_dlsite.state_json, '$.errorKind'), '') != 'parse_error'
+                     THEN 1 ELSE 0 END) AS httpErrorCount,
             SUM(CASE WHEN json_extract(work_dlsite.state_json, '$.rjCode') IS NOT NULL
                            AND json_extract(work_dlsite.state_json, '$.status') = 'none'
                      THEN 1 ELSE 0 END) AS unlinkedCount
@@ -849,11 +859,17 @@ export class WorkRepo {
       .get() as {
       rjCodeMissingCount: number | null;
       fetchFailedCount: number | null;
+      parseErrorCount: number | null;
+      httpErrorCount: number | null;
       unlinkedCount: number | null;
     };
+    const parseErrorCount = row.parseErrorCount ?? 0;
+    const httpErrorCount = row.httpErrorCount ?? 0;
     return {
       rjCodeMissingCount: row.rjCodeMissingCount ?? 0,
       fetchFailedCount: row.fetchFailedCount ?? 0,
+      parseErrorCount,
+      parseErrorAlert: evaluateParseErrorAlert(parseErrorCount, httpErrorCount),
       unlinkedCount: row.unlinkedCount ?? 0,
     };
   }
@@ -867,7 +883,9 @@ export class WorkRepo {
       kind === "rj-missing"
         ? `json_extract(work_dlsite.state_json, '$.rjCode') IS NULL
            AND COALESCE(json_extract(work_dlsite.state_json, '$.status'), 'none') != 'skipped'`
-        : `json_extract(work_dlsite.state_json, '$.status') IN ('error', 'not_found')`;
+        : `(json_extract(work_dlsite.state_json, '$.status') = 'not_found'
+            OR (json_extract(work_dlsite.state_json, '$.status') = 'error'
+                AND COALESCE(json_extract(work_dlsite.state_json, '$.errorKind'), '') != 'parse_error'))`;
     const count = this.db.sqlite
       .query(
         `SELECT COUNT(*) AS total
@@ -890,6 +908,39 @@ export class WorkRepo {
       id: string;
       title: string;
       status: "none" | "applied" | "not_found" | "error" | "skipped";
+    }>;
+    return { items: rows, total: count.total };
+  }
+
+  queryDlsiteParseFailedNotifications(
+    query: Required<DlsiteNotificationQuery>,
+  ): DlsiteParseFailedNotificationPage {
+    const condition = `json_extract(work_dlsite.state_json, '$.status') = 'error'
+      AND json_extract(work_dlsite.state_json, '$.errorKind') = 'parse_error'`;
+    const count = this.db.sqlite
+      .query(
+        `SELECT COUNT(*) AS total
+         FROM main.works AS works
+         LEFT JOIN main.work_dlsite AS work_dlsite ON work_dlsite.work_id = works.id
+         WHERE ${condition}`,
+      )
+      .get() as { total: number };
+    const rows = this.db.sqlite
+      .query(
+        `SELECT works.id AS id, works.title AS title,
+                json_extract(work_dlsite.state_json, '$.rjCode') AS rjCode,
+                COALESCE(json_extract(work_dlsite.state_json, '$.status'), 'none') AS status
+         FROM main.works AS works
+         LEFT JOIN main.work_dlsite AS work_dlsite ON work_dlsite.work_id = works.id
+         WHERE ${condition}
+         ORDER BY works.title_sort_key COLLATE BINARY ASC, works.id COLLATE BINARY ASC
+         LIMIT ? OFFSET ?`,
+      )
+      .all(query.limit, (query.page - 1) * query.limit) as Array<{
+      id: string;
+      title: string;
+      rjCode: string;
+      status: "error";
     }>;
     return { items: rows, total: count.total };
   }

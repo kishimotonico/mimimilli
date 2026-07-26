@@ -244,6 +244,8 @@ test("realのDLsite通知集計とページは状態別に一覧契約を返す"
     assert.deepEqual(repo.getDlsiteNotificationSummary(), {
       rjCodeMissingCount: 1,
       fetchFailedCount: 1,
+      parseErrorCount: 0,
+      parseErrorAlert: false,
       unlinkedCount: 1,
     });
     assert.deepEqual(repo.queryDlsiteNotifications("rj-missing", { page: 1, limit: 10 }), {

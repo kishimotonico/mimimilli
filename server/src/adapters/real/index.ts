@@ -16,6 +16,7 @@ import type {
   DlsiteNotificationPage,
   DlsiteNotificationQuery,
   DlsiteNotificationSummary,
+  DlsiteParseFailedNotificationPage,
   DlsiteStatePatch,
   FileEntry,
   FsListing,
@@ -411,6 +412,13 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
           html: response.body,
           transferSize: response.transferSize,
         });
+        if (!parsed.ok && parsed.kind === "parse_error") {
+          options.dlsiteSchedulerDependencies?.logger?.({
+            event: "dlsite_parse_error",
+            productCode: key,
+            httpAttempted: true,
+          });
+        }
         return { result: parsed, httpAttempted: true };
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") throw error;
@@ -675,6 +683,12 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       return repo.queryDlsiteNotifications(kind, query);
     },
 
+    async queryDlsiteParseFailedNotifications(
+      query: Required<DlsiteNotificationQuery>,
+    ): Promise<DlsiteParseFailedNotificationPage> {
+      return repo.queryDlsiteParseFailedNotifications(query);
+    },
+
     async getWork(id: string): Promise<Work | null> {
       return repo.getWork(id);
     },
@@ -860,6 +874,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
           status: "applied" as const,
           lastAttemptAt: new Date().toISOString(),
           error: null,
+          errorKind: null,
           appliedTags: normalizeTags([...work.dlsite.appliedTags, ...applyTags]),
         };
         repo.setDlsiteState(workId, dlsite);
@@ -881,7 +896,11 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
         ...work.dlsite,
         ...(patch.rjCode !== undefined ? { rjCode: patch.rjCode } : {}),
         ...(patch.skipped !== undefined
-          ? { status: patch.skipped ? ("skipped" as const) : ("none" as const), error: null }
+          ? {
+              status: patch.skipped ? ("skipped" as const) : ("none" as const),
+              error: null,
+              errorKind: null,
+            }
           : {}),
       };
       db.transaction(() => {
@@ -901,7 +920,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
     ): Promise<DlsiteBulkResult> {
       const signal = options?.signal;
       const isAborted = (): boolean => signal?.aborted === true;
-      const result: DlsiteBulkResult = { fetched: 0, failed: 0, skipped: 0 };
+      const result: DlsiteBulkResult = { fetched: 0, failed: 0, parseErrors: 0, skipped: 0 };
       try {
         // 対象抽出は listSummaries で完結させる（全件 getWork の N+1 を解消。TASK-57）。
         // 以降の個別処理で完全な Work が必要な場合だけ、その作品の getWork を呼ぶ
@@ -965,16 +984,24 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
               }
               const newStatus =
                 fetched.kind === "not_found" ? ("not_found" as const) : ("error" as const);
+              const newErrorKind =
+                fetched.kind === "not_found" ||
+                fetched.kind === "parse_error" ||
+                fetched.kind === "error"
+                  ? fetched.kind
+                  : null;
               const noOp =
                 !attempt.httpAttempted &&
                 work.dlsite.status === newStatus &&
-                work.dlsite.error === fetched.message;
+                work.dlsite.error === fetched.message &&
+                work.dlsite.errorKind === newErrorKind;
               if (!noOp) {
                 const dlsite = {
                   ...work.dlsite,
                   status: newStatus,
                   lastAttemptAt: attemptedAt,
                   error: fetched.message,
+                  errorKind: newErrorKind,
                 };
                 db.transaction(() => {
                   repo.setDlsiteState(work.id, dlsite);
@@ -983,6 +1010,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
                 });
               }
               result.failed += 1;
+              if (fetched.kind === "parse_error") result.parseErrors += 1;
             } else {
               const allInfoTags = mergeDlsiteTags([], fetched.info);
               const applyTags =
@@ -1008,7 +1036,8 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
                 arraysEqual(nextAppliedTags, work.dlsite.appliedTags) &&
                 work.dlsite.status === "applied" &&
                 work.dlsite.rjCode === fetched.info.rjCode &&
-                work.dlsite.error === null;
+                work.dlsite.error === null &&
+                work.dlsite.errorKind === null;
               if (!noOp) {
                 const patch: {
                   title?: string;
@@ -1031,6 +1060,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
                   status: "applied" as const,
                   lastAttemptAt: attemptedAt,
                   error: null,
+                  errorKind: null,
                   appliedTags: nextAppliedTags,
                 };
                 db.transaction(() => {
@@ -1066,6 +1096,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
               status: "error" as const,
               lastAttemptAt: attemptedAt,
               error: error instanceof Error ? error.message : "DLsite情報の適用に失敗しました",
+              errorKind: "error" as const,
             };
             // 失敗状態の永続化自体が失敗しても（メタ書き込み不能等）ジョブは中断しない。
             // failed への加算と進捗通知は必ず行い、次の作品へ続行する

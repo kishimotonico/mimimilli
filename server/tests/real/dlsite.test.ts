@@ -452,6 +452,7 @@ test("DLsite offline: miss/forceはHTTPもcache書き込みもせず、bulk stat
     fetched: 0,
     failed: 1,
     skipped: 0,
+    parseErrors: 0,
   });
   assert.equal((await offline.getWork(lib.existingWorkId))?.dlsite.status, "none");
   const applyResponse = await createApp(offline).request(
@@ -588,6 +589,74 @@ test("DLsite HTMLキャッシュ: parse_errorは同じHTTPをretryしない", as
   adapter.close();
 });
 
+test("DLsite: parse_errorは実HTTP時だけdlsite_parse_errorをログする", async (t) => {
+  const lib = makeSampleLibrary();
+  const dir = makeTestDirectory("dlsite-parse-error-log");
+  t.after(lib.cleanup);
+  t.after(dir.cleanup);
+  const logs: Array<Record<string, unknown>> = [];
+  const adapter = createRealAdapter({
+    database: { kind: "memory" },
+    dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+    dlsiteRequestConfig: {
+      ...DEFAULT_DLSITE_REQUEST_CONFIG,
+      offline: false,
+      requestIntervalMs: 0,
+      retryCount: 0,
+      maxBackoffMs: 0,
+      timeoutMs: 1_000,
+    },
+    dlsiteSchedulerDependencies: { logger: (event) => logs.push(event) },
+    dlsiteHtmlFetcher: async () => ({
+      status: 200,
+      contentType: "text/html",
+      body: "<html></html>",
+    }),
+  });
+  await adapter.updateSettings({ rootFolder: lib.root });
+  await adapter.scan();
+  const first = await adapter.dlsiteFetch(lib.existingWorkId);
+  assert.equal(first.ok, false);
+  assert.equal(logs.filter((event) => event.event === "dlsite_parse_error").length, 1);
+  logs.length = 0;
+  const second = await adapter.dlsiteFetch(lib.existingWorkId);
+  assert.equal(second.ok, false);
+  assert.equal(logs.filter((event) => event.event === "dlsite_parse_error").length, 0);
+  adapter.close();
+});
+
+test("一括取得: parse_error を errorKind と parseErrors で記録する", async (t) => {
+  const lib = makeSampleLibrary();
+  const dir = makeTestDirectory("dlsite-bulk-parse-error");
+  t.after(lib.cleanup);
+  t.after(dir.cleanup);
+  const adapter = createRealAdapter({
+    database: { kind: "memory" },
+    dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+    dlsiteRequestConfig: {
+      ...DEFAULT_DLSITE_REQUEST_CONFIG,
+      offline: false,
+      requestIntervalMs: 0,
+      retryCount: 0,
+      maxBackoffMs: 0,
+      timeoutMs: 1_000,
+    },
+    dlsiteHtmlFetcher: async () => ({
+      status: 200,
+      contentType: "text/html",
+      body: "<html></html>",
+    }),
+  });
+  await adapter.updateSettings({ rootFolder: lib.root });
+  await adapter.scan();
+  const result = await adapter.runDlsiteBulk("existing", [lib.existingWorkId]);
+  assert.deepEqual(result, { fetched: 0, failed: 1, parseErrors: 1, skipped: 0 });
+  const work = await adapter.getWork(lib.existingWorkId);
+  assert.equal(work?.dlsite.status, "error");
+  assert.equal(work?.dlsite.errorKind, "parse_error");
+  adapter.close();
+});
+
 test("DLsite HTMLキャッシュ: cache missのforceとnormalは同じHTTPへ合流する", async (t) => {
   const lib = makeSampleLibrary();
   const dir = makeTestDirectory("dlsite-force-flight");
@@ -690,6 +759,7 @@ test("DLsite bulk: 同一RJコードは同じ実行・別実行・adapter再オ�
     fetched: 2,
     failed: 0,
     skipped: 0,
+    parseErrors: 0,
   });
   assert.equal(httpCalls, 1);
   await first.runDlsiteBulk("existing", ids);
@@ -824,6 +894,7 @@ test("DLsite HTMLキャッシュ: fresh DBで.meta.jsonを削除して同じ作�
     fetched: 1,
     failed: 0,
     skipped: 0,
+    parseErrors: 0,
   });
   assert.equal(htmlHttpCalls, 1);
   second.close();
@@ -1134,7 +1205,7 @@ test("DLsite bulk: カバー取得もcache transportを通る", async (t) => {
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
   const result = await adapter.runDlsiteBulk("existing", [lib.existingWorkId]);
-  assert.deepEqual(result, { fetched: 1, failed: 0, skipped: 0 });
+  assert.deepEqual(result, { fetched: 1, failed: 0, parseErrors: 0, skipped: 0 });
   assert.equal(coverCalls, 1);
   adapter.close();
 });
@@ -1168,7 +1239,7 @@ test("一括取得: カバー取得失敗を作品のerrorへ記録し、後続�
 
   const result = await adapter.runDlsiteBulk("existing", undefined);
 
-  assert.deepEqual(result, { fetched: 1, failed: 1, skipped: 0 });
+  assert.deepEqual(result, { fetched: 1, failed: 1, parseErrors: 0, skipped: 0 });
   assert.equal(downloads, 1);
   const failed = await adapter.getWork(lib.existingWorkId);
   assert.equal(failed?.dlsite.status, "error");
@@ -1211,7 +1282,7 @@ test("一括取得: 失敗状態のメタ書き戻しが例外を投げても後
   const result = await adapter.runDlsiteBulk("existing", undefined);
 
   // 保存に失敗した作品も failed に数え、後続作品は処理される（ジョブは中断しない）
-  assert.deepEqual(result, { fetched: 1, failed: 1, skipped: 0 });
+  assert.deepEqual(result, { fetched: 1, failed: 1, parseErrors: 0, skipped: 0 });
   const succeeded = await adapter.getWork(scan.newWorkIds[0]!);
   assert.equal(succeeded?.dlsite.status, "applied");
 });
@@ -1255,13 +1326,13 @@ test("一括取得: 中断後の再実行で処理済み作品はHTTPしない",
       if (event.processed === 1) controller.abort();
     },
   });
-  assert.deepEqual(partial, { fetched: 1, failed: 0, skipped: 0 });
+  assert.deepEqual(partial, { fetched: 1, failed: 0, parseErrors: 0, skipped: 0 });
   assert.equal(httpCalls, 1);
   const interrupted = await Promise.all(ids.map((id) => adapter.getWork(id)));
   assert.equal(interrupted.filter((work) => work?.dlsite.status === "applied").length, 1);
 
   const resumed = await adapter.runDlsiteBulk("existing", ids);
-  assert.deepEqual(resumed, { fetched: 1, failed: 0, skipped: 1 });
+  assert.deepEqual(resumed, { fetched: 1, failed: 0, parseErrors: 0, skipped: 1 });
   assert.equal(httpCalls, 1);
   const completed = await Promise.all(ids.map((id) => adapter.getWork(id)));
   assert.ok(completed.every((work) => work?.dlsite.status === "applied"));

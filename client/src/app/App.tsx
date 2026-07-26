@@ -28,8 +28,9 @@ import SettingsModal from "../features/settings/ui/SettingsModal";
 import ScanModal from "../features/scan/ui/ScanModal";
 import RjCodeMissingModal from "../features/library/ui/RjCodeMissingModal";
 import DlsiteFetchFailedModal from "../features/library/ui/DlsiteFetchFailedModal";
+import DlsiteParseFailedModal from "../features/library/ui/DlsiteParseFailedModal";
 import Toast from "../shared/ui/Toast";
-import type { Work, WorkListItem } from "@mimimilli/shared";
+import type { DlsiteBulkResult, Work, WorkListItem } from "@mimimilli/shared";
 import { getWork } from "../entities/work/api";
 import { exportLibrary, searchWorks } from "../features/library/api";
 import { formatScanProgressLabel } from "../features/scan/model";
@@ -38,6 +39,7 @@ import { getLastScanResult, SCAN_QUERY_KEYS } from "../features/scan/api";
 import { useDlsiteBulk } from "./model/useDlsiteBulk";
 import { useRjCodeMissingWorks } from "../features/library/model/dlsiteMissingRjCode";
 import { useDlsiteFetchFailedWorks } from "../features/library/model/dlsiteFetchFailed";
+import { useDlsiteParseFailedWorks } from "../features/library/model/dlsiteParseFailed";
 import { useDlsiteUnlinkedCount } from "../features/library/model/dlsiteUnlinked";
 import { getSettings, setRootFolder } from "../features/settings/api";
 import { parseNavigationUrl, type AppMode } from "../features/navigation/model/navigationUrl";
@@ -67,6 +69,7 @@ export default function App() {
   const [isCompletingSetup, setIsCompletingSetup] = useState(false);
   const [showRjCodeMissing, setShowRjCodeMissing] = useState(false);
   const [showDlsiteFetchFailed, setShowDlsiteFetchFailed] = useState(false);
+  const [showDlsiteParseFailed, setShowDlsiteParseFailed] = useState(false);
 
   const isPlaying = player.state.currentTrackIndex >= 0 && player.state.currentWork !== null;
   const isPlaybackActive = player.state.isPlaying;
@@ -109,6 +112,7 @@ export default function App() {
   const dlsiteBulk = useDlsiteBulk();
   const dlsiteRjMissing = useRjCodeMissingWorks();
   const dlsiteFetchFailed = useDlsiteFetchFailedWorks();
+  const dlsiteParseFailed = useDlsiteParseFailedWorks();
   const dlsiteUnlinked = useDlsiteUnlinkedCount();
 
   // 前回スキャン結果（ディスク永続化なし、TASK-56）。サーバー起動後に一度でも完了していれば
@@ -345,6 +349,9 @@ export default function App() {
           onOpenRjCodeMissing={() => setShowRjCodeMissing(true)}
           dlsiteFetchFailedCount={dlsiteFetchFailed.count}
           onOpenDlsiteFetchFailed={() => setShowDlsiteFetchFailed(true)}
+          dlsiteParseErrorAlert={dlsiteParseFailed.alert}
+          dlsiteParseErrorCount={dlsiteParseFailed.count}
+          onOpenDlsiteParseFailed={() => setShowDlsiteParseFailed(true)}
           dlsiteUnlinkedCount={dlsiteUnlinked.count}
           dlsiteBulkActive={dlsiteBulk.active}
           dlsiteBulkProgress={dlsiteBulk.progress}
@@ -495,13 +502,19 @@ export default function App() {
               onOpenWork={handleOpenWorkFromNotification}
             />
           )}
+          {showDlsiteParseFailed && (
+            <DlsiteParseFailedModal
+              onClose={() => setShowDlsiteParseFailed(false)}
+              onOpenWork={handleOpenWorkFromNotification}
+            />
+          )}
           <Toast
             message={
               scanJob.error ??
               (dlsiteBulk.cancelledResult
-                ? `DLsite一括取得を中断しました（取得 ${dlsiteBulk.cancelledResult.fetched}件・失敗 ${dlsiteBulk.cancelledResult.failed}件）`
+                ? `DLsite一括取得を中断しました（${formatDlsiteBulkResult(dlsiteBulk.cancelledResult)}）`
                 : dlsiteBulk.result
-                  ? `DLsite一括取得: 取得 ${dlsiteBulk.result.fetched}件・失敗 ${dlsiteBulk.result.failed}件`
+                  ? `DLsite一括取得: ${formatDlsiteBulkResult(dlsiteBulk.result)}`
                   : dlsiteBulk.error)
             }
             onDismiss={scanJob.error ? scanJob.clearError : dlsiteBulk.dismiss}
@@ -510,4 +523,9 @@ export default function App() {
       }
     />
   );
+}
+
+function formatDlsiteBulkResult(result: DlsiteBulkResult): string {
+  const base = `取得 ${result.fetched}件・失敗 ${result.failed}件`;
+  return result.parseErrors > 0 ? `${base}（うちパース ${result.parseErrors}件）` : base;
 }

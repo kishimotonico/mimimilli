@@ -22,8 +22,10 @@ import {
   type WorksPage,
   dlsiteNotificationPageSchema,
   dlsiteNotificationSummarySchema,
+  dlsiteParseFailedNotificationPageSchema,
   type DlsiteNotificationPage,
   type DlsiteNotificationSummary,
+  type DlsiteParseFailedNotificationPage,
   type WorkPatch,
   type FileEntry,
   type DlsiteWorkInfo,
@@ -57,6 +59,20 @@ export async function queryDlsiteNotifications(
 ): Promise<DlsiteNotificationPage> {
   const query = new URLSearchParams({ page: String(params.page), limit: String(params.limit) });
   return getParsed(dlsiteNotificationPageSchema, `/dlsite/notifications/${kind}?${query}`);
+}
+
+export async function queryDlsiteParseFailedNotifications(params: {
+  page: number;
+  limit: number;
+}): Promise<DlsiteParseFailedNotificationPage> {
+  const query = new URLSearchParams({
+    page: String(params.page),
+    limit: String(params.limit),
+  });
+  return getParsed(
+    dlsiteParseFailedNotificationPageSchema,
+    `/dlsite/notifications/parse-failed?${query}`,
+  );
 }
 
 export async function patchWork(workId: string, body: WorkPatch): Promise<Work> {

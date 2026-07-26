@@ -147,6 +147,7 @@ test("work_dlsite 行がない作品は emptyDlsiteState() になる", () => {
     status: "none",
     lastAttemptAt: null,
     error: null,
+    errorKind: null,
     appliedTags: [],
   });
   db.close();

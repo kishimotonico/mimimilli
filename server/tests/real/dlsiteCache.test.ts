@@ -298,6 +298,57 @@ test("DLsiteキャッシュCLI: status、import、cleanupと同一キー上書�
   assert.equal(JSON.parse(runDlsiteCacheCli(["cleanup"], env, overrides)).deleted, 1);
 });
 
+test("DLsiteキャッシュCLI: exportで有効なHTML snapshotを書き出す", (t) => {
+  const directory = makeTestDirectory("dlsite-cache-cli-export");
+  t.after(directory.cleanup);
+  const env = {
+    MIMIMILLI_DATA_DIR: directory.path,
+    MIMIMILLI_DLSITE_CACHE_DB: join(directory.path, "cache.sqlite"),
+  };
+  const source = join(directory.path, "work.html");
+  writeFileSync(source, VALID_HTML);
+  runDlsiteCacheCli(["import", "--product-code", "RJ123456", "--file", source], env);
+  const out = join(directory.path, "exported.html");
+  assert.deepEqual(
+    JSON.parse(runDlsiteCacheCli(["export", "--product-code", "RJ123456", "--file", out], env)),
+    { productCode: "RJ123456", bytes: Buffer.byteLength(VALID_HTML, "utf8") },
+  );
+  assert.equal(readFileSync(out, "utf8"), VALID_HTML);
+});
+
+test("DLsiteキャッシュCLI: exportは未存在・TTL切れ・不正product codeで失敗する", (t) => {
+  const directory = makeTestDirectory("dlsite-cache-cli-export-fail");
+  t.after(directory.cleanup);
+  const env = {
+    MIMIMILLI_DATA_DIR: directory.path,
+    MIMIMILLI_DLSITE_CACHE_DB: join(directory.path, "cache.sqlite"),
+  };
+  const out = join(directory.path, "exported.html");
+  assert.throws(
+    () => runDlsiteCacheCli(["export", "--product-code", "RJ123456", "--file", out], env),
+    /有効なHTML snapshotがありません/,
+  );
+  assert.throws(
+    () => runDlsiteCacheCli(["export", "--product-code", "INVALID", "--file", out], env),
+    /形式が不正/,
+  );
+
+  const source = join(directory.path, "work.html");
+  writeFileSync(source, VALID_HTML);
+  let now = 10_000;
+  const overrides = {
+    clock: () => now,
+    ttlsMs: { ok: 10, parse_error: 10, not_found: 10, error: 10 },
+  };
+  runDlsiteCacheCli(["import", "--product-code", "RJ123456", "--file", source], env, overrides);
+  now += 10;
+  assert.throws(
+    () =>
+      runDlsiteCacheCli(["export", "--product-code", "RJ123456", "--file", out], env, overrides),
+    /有効なHTML snapshotがありません/,
+  );
+});
+
 test("DLsiteキャッシュCLI: symlinkを拒否し、magic byteでgzip入力を受け入れる", (t) => {
   const directory = makeTestDirectory("dlsite-cache-cli-input");
   t.after(directory.cleanup);

@@ -2,7 +2,9 @@
 // 開発・ビジュアルテスト用（ADR-0002）。core/ の pure 関数を使って全メソッドを実装する。
 import {
   DEFAULT_TAG_PREFIXES,
+  evaluateParseErrorAlert,
   isDlsiteFetchFailed,
+  isDlsiteParseFailed,
   isDlsiteUnlinked,
   isRjCodeMissing,
   normalizeTags,
@@ -18,6 +20,7 @@ import type {
   DlsiteNotificationPage,
   DlsiteNotificationQuery,
   DlsiteNotificationSummary,
+  DlsiteParseFailedNotificationPage,
   DlsiteStatePatch,
   FileEntry,
   FsListing,
@@ -363,9 +366,15 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
     },
 
     async getDlsiteNotificationSummary(): Promise<DlsiteNotificationSummary> {
+      const parseErrorCount = state.works.filter((work) => isDlsiteParseFailed(work.dlsite)).length;
+      const httpErrorCount = state.works.filter(
+        (work) => work.dlsite.status === "error" && work.dlsite.errorKind !== "parse_error",
+      ).length;
       return {
         rjCodeMissingCount: state.works.filter((work) => isRjCodeMissing(work.dlsite)).length,
         fetchFailedCount: state.works.filter((work) => isDlsiteFetchFailed(work.dlsite)).length,
+        parseErrorCount,
+        parseErrorAlert: evaluateParseErrorAlert(parseErrorCount, httpErrorCount),
         unlinkedCount: state.works.filter((work) => isDlsiteUnlinked(work.dlsite)).length,
       };
     },
@@ -384,6 +393,24 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
           id: work.id,
           title: work.title,
           status: work.dlsite.status,
+        })),
+        total: matches.length,
+      };
+    },
+
+    async queryDlsiteParseFailedNotifications(
+      query: Required<DlsiteNotificationQuery>,
+    ): Promise<DlsiteParseFailedNotificationPage> {
+      const matches = state.works
+        .filter((work) => isDlsiteParseFailed(work.dlsite))
+        .sort((a, b) => compareJapaneseSortKeys(a.title, b.title) || compareUtf8Bytes(a.id, b.id));
+      const start = (query.page - 1) * query.limit;
+      return {
+        items: matches.slice(start, start + query.limit).map((work) => ({
+          id: work.id,
+          title: work.title,
+          status: work.dlsite.status,
+          rjCode: work.dlsite.rjCode!,
         })),
         total: matches.length,
       };
@@ -664,6 +691,7 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
         status: "applied",
         lastAttemptAt: new Date().toISOString(),
         error: null,
+        errorKind: null,
         appliedTags: normalizeTags([...work.dlsite.appliedTags, ...applyTags]),
       };
       return true;
@@ -698,6 +726,7 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
       const result: DlsiteBulkResult = {
         fetched: 0,
         failed: 0,
+        parseErrors: 0,
         skipped: requested.length - targets.length,
       };
       for (let index = 0; index < targets.length; index++) {
@@ -719,6 +748,7 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
           status: "applied",
           lastAttemptAt: new Date().toISOString(),
           error: null,
+          errorKind: null,
           appliedTags: normalizeTags([...work.dlsite.appliedTags, ...fetchedTags]),
         };
         result.fetched += 1;

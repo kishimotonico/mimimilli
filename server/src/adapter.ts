@@ -9,6 +9,7 @@ import type {
   DlsiteNotificationPage,
   DlsiteNotificationQuery,
   DlsiteNotificationSummary,
+  DlsiteParseFailedNotificationPage,
   DlsiteFetchResult,
   DlsiteBulkMode,
   DlsiteBulkProgressEvent,
@@ -106,6 +107,9 @@ export interface DataAdapter {
     kind: "rj-missing" | "fetch-failed",
     query: Required<DlsiteNotificationQuery>,
   ): Promise<DlsiteNotificationPage>;
+  queryDlsiteParseFailedNotifications(
+    query: Required<DlsiteNotificationQuery>,
+  ): Promise<DlsiteParseFailedNotificationPage>;
   getWork(id: string): Promise<Work | null>;
   /** 更新後の Work を返す。存在しなければ null */
   patchWork(id: string, patch: WorkPatch): Promise<Work | null>;

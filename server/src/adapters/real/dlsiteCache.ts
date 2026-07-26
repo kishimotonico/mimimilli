@@ -417,6 +417,15 @@ export class DlsiteCache {
       .run(DlsiteCache.coverKey(normalizedUrl), body, this.clock());
   }
 
+  /** 有効な HTML snapshot をファイルへ書き出す（診断用）。 */
+  exportHtml(keyInput: DlsiteCacheKey): string {
+    const resolution = this.resolve(keyInput);
+    if (resolution.kind !== "html") {
+      throw new Error("DLsiteキャッシュに有効なHTML snapshotがありません");
+    }
+    return resolution.html;
+  }
+
   cleanupExpired(): number {
     const now = this.clock();
     let deleted = 0;

@@ -8,6 +8,6 @@ export const WORK_QUERY_KEYS = {
   facets: (axis: string) => ["axisFacets", axis] as const,
   dlsiteNotifications: () => ["dlsiteNotifications"] as const,
   dlsiteNotificationSummary: () => ["dlsiteNotifications", "summary"] as const,
-  dlsiteNotificationList: (kind: "rj-missing" | "fetch-failed") =>
+  dlsiteNotificationList: (kind: "rj-missing" | "fetch-failed" | "parse-failed") =>
     ["dlsiteNotifications", kind] as const,
 } as const;

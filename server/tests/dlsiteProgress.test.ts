@@ -15,14 +15,14 @@ test("DLsiteジョブは進捗を購読者へ配信し、完了を再接続時�
   const job = startDlsiteJob();
   const subscription = subscribeToDlsite((event) => received.push(event.type));
   job.emit({ type: "progress", processed: 1, total: 2, workId: "work-1" });
-  job.emit({ type: "complete", result: { fetched: 1, failed: 1, skipped: 0 } });
+  job.emit({ type: "complete", result: { fetched: 1, failed: 1, parseErrors: 0, skipped: 0 } });
   job.finish();
   subscription.unsubscribe();
   assert.deepEqual(received, ["progress", "complete"]);
 
   const replay = subscribeToDlsite(() => {});
   assert.deepEqual(replay.replay, [
-    { type: "complete", result: { fetched: 1, failed: 1, skipped: 0 } },
+    { type: "complete", result: { fetched: 1, failed: 1, parseErrors: 0, skipped: 0 } },
   ]);
 });
 
@@ -37,7 +37,7 @@ test("実行中のDLsite一括取得はcancelで打ち切り、cancelledを配�
       options?: { signal?: AbortSignal },
     ) {
       await gate;
-      const result = { fetched: 2, failed: 1, skipped: 0 };
+      const result = { fetched: 2, failed: 1, parseErrors: 0, skipped: 0 };
       if (options?.signal?.aborted) return result;
       return result;
     },
@@ -55,7 +55,7 @@ test("実行中のDLsite一括取得はcancelで打ち切り、cancelledを配�
     events.map((event) => event.type),
     ["cancelling", "cancelled"],
   );
-  assert.deepEqual(events.at(-1)?.result, { fetched: 2, failed: 1, skipped: 0 });
+  assert.deepEqual(events.at(-1)?.result, { fetched: 2, failed: 1, parseErrors: 0, skipped: 0 });
 });
 
 test("中止時はキューに積まれた未実行ジョブを破棄する", async () => {
@@ -67,7 +67,7 @@ test("中止時はキューに積まれた未実行ジョブを破棄する", as
     async runDlsiteBulk(mode: string) {
       calls.push(mode);
       if (calls.length === 1) await gate;
-      return { fetched: 0, failed: 0, skipped: 0 };
+      return { fetched: 0, failed: 0, parseErrors: 0, skipped: 0 };
     },
   } as unknown as DataAdapter;
 
@@ -94,7 +94,7 @@ test("実行中に追加された自動取得をFIFOで後続実行する", asyn
     ) {
       calls.push({ mode, workIds });
       if (calls.length === 1) await firstGate;
-      return { fetched: 1, failed: 0, skipped: 0 };
+      return { fetched: 1, failed: 0, parseErrors: 0, skipped: 0 };
     },
   } as unknown as DataAdapter;
 

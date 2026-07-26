@@ -52,7 +52,7 @@ https://www.dlsite.com/pro/work/=/product_id/VJ000000.html
 | `none`      | 初期状態。RJコード未検出の作品も、RJコードはあるが取得・適用をまだ試みていない作品もここに入る |
 | `applied`   | 直近の適用が成功した                                                                           |
 | `not_found` | 直近の取得でHTTP 404が返った                                                                   |
-| `error`     | 直近の取得または適用が失敗した                                                                 |
+| `error`     | 直近の取得または適用が失敗した（`errorKind` で HTTP エラーと `parse_error` を区別）            |
 | `skipped`   | ユーザーが明示的にこの作品を対象から外した                                                     |
 
 `none`・`error`・`not_found` の作品は一括取得の対象になり、`applied` と `skipped` は対象から外れる（`runDlsiteBulk` 冒頭のフィルタ）。適用に成功すると `applied` に、失敗すると `error` か `not_found` に遷移する。`skipped` は `PATCH /dlsite/:id` でユーザーが操作したときだけ遷移し、一括取得では変化しない。
@@ -154,6 +154,12 @@ pnpm --filter @mimimilli/server dlsite-cache -- cleanup
 pnpm --filter @mimimilli/server dlsite-cache -- import --product-code RJ000000 --file /absolute/path/work.html
 ```
 
+キャッシュ済みHTMLを取り出す（パース失敗の原因調査用）。
+
+```sh
+pnpm --filter @mimimilli/server dlsite-cache -- export --product-code RJ000000 --file /absolute/path/work.html
+```
+
 ディレクトリ一括import（非再帰。サブディレクトリは対象外）。
 
 ```sh
@@ -164,14 +170,39 @@ pnpm --filter @mimimilli/server dlsite-cache -- import --dir /absolute/path/to/b
 
 gzip入力かどうかは拡張子ではなくheaderのmagic byte（`0x1f 0x8b`）で判定し、該当すれば自動で展開して取り込む（`.html` 拡張子のgzipファイルも展開できる）。importはsymlinkと上限超過を拒否し、実HTTPで新たに試料を取得することはしない。importはHTML snapshotだけを更新し（成功記録と同じ扱い）、失敗記録には触れない。ディレクトリimportは1件の失敗で全体を止めず、成功・失敗の件数と失敗したファイル名・理由をJSONで返す。
 
-強制的に再取得したい場合は、`POST /dlsite/:id/fetch?force=true` でキャッシュの読み取りだけを無視する。クライアント（`client/src/entities/work/api.ts`）はforceを付けずに呼ぶため、UIからは到達できない。現状は手で叩くときだけの手段。キャッシュの行自体を消したい場合は、キャッシュDB（SQLite）を直接操作するか、TTLが切れるのを待って `cleanup` する。
+強制的に再取得したい場合は、`POST /dlsite/:id/fetch?force=true` でキャッシュの読み取りだけを無視する。クライアント（`client/src/entities/work/api.ts`）はforceを付けずに呼ぶため、UIからは到達できない。現状は手で叩くときだけの手段。キャッシュの行自体を消したい場合は、TTLが切れるのを待って `cleanup` する。
+
+## 通知とパース失敗の検知
+
+通知ベル（`GET /dlsite/notifications`）は作品カタログの `work.dlsite` を集計する。`errorKind` は一括取得で失敗を記録したときだけ更新され、手動プレビュー（`POST /dlsite/:id/fetch`）では変わらない。
+
+サマリーの主なフィールド。
+
+| フィールド         | 意味                                                                     |
+| ------------------ | ------------------------------------------------------------------------ |
+| `fetchFailedCount` | `status` が `not_found`、または `error` かつ `errorKind !== parse_error` |
+| `parseErrorCount`  | `status === error` かつ `errorKind === parse_error`                      |
+| `parseErrorAlert`  | パース失敗が構造変更レベルで増えたとみなす警告（下記しきい値）           |
+
+`parseErrorAlert` の判定（`evaluateParseErrorAlert`、定数は `shared/src/dlsite.ts`）。
+
+- `parseErrorCount >= 3`
+- かつ `(parseErrorCount + httpErrorCount) >= 3`（`httpErrorCount` は `error` かつ `errorKind` が `parse_error` 以外）
+- かつ `parseErrorCount / (parseErrorCount + httpErrorCount) >= 0.2`
+- `not_found` は分母に含めない
+
+通知ベルのバッジは `parseErrorAlert` が true のときだけ `parseErrorCount` を加算する。パース失敗一覧は `GET /dlsite/notifications/parse-failed`（各行に `rjCode` 付き）。取得失敗一覧（`fetch-failed`）からは `parse_error` を除外する。
+
+一括取得の完了結果（SSE `complete` / `cancelled`）には `parseErrors`（そのジョブで `parse_error` になった作品数）が含まれる。
+
+実HTTPで `parse_error` が確定したとき、サーバーは構造化ログ `dlsite_parse_error`（`productCode`・`httpAttempted`）を出力する。
 
 ## HTTPエンドポイント
 
 `server/src/routes/dlsite.ts` と `dlsiteProgress.ts` に実装がある。
 
-- `GET /dlsite/notifications` — RJコード未検出・取得失敗の件数サマリー
-- `GET /dlsite/notifications/:kind` — `rj-missing` または `fetch-failed` の該当作品一覧（ページング）
+- `GET /dlsite/notifications` — RJコード未検出・取得失敗・パース失敗の件数サマリー（`parseErrorAlert` 含む）
+- `GET /dlsite/notifications/:kind` — `rj-missing` / `fetch-failed` / `parse-failed` の該当作品一覧（ページング。`parse-failed` のみ `rjCode` 付き）
 - `POST /dlsite/:id/fetch` — 1作品分の取得プレビュー。`?force=true` でキャッシュを無視
 - `POST /dlsite/:id/apply` — プレビュー結果のうち選択した項目を適用
 - `PATCH /dlsite/:id` — RJコードの手動設定、または `skipped` の切り替え

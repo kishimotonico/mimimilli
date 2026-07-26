@@ -13,6 +13,9 @@ export interface NotificationBellProps {
   onOpenRjCodeMissing: () => void;
   dlsiteFetchFailedCount: number;
   onOpenDlsiteFetchFailed: () => void;
+  dlsiteParseErrorAlert: boolean;
+  dlsiteParseErrorCount: number;
+  onOpenDlsiteParseFailed: () => void;
   dlsiteUnlinkedCount: number;
   dlsiteBulkActive: boolean;
   dlsiteBulkProgress: { processed: number; total: number } | null;
@@ -27,6 +30,9 @@ export default function NotificationBell({
   onOpenRjCodeMissing,
   dlsiteFetchFailedCount,
   onOpenDlsiteFetchFailed,
+  dlsiteParseErrorAlert,
+  dlsiteParseErrorCount,
+  onOpenDlsiteParseFailed,
   dlsiteUnlinkedCount,
   dlsiteBulkActive,
   dlsiteBulkProgress,
@@ -37,10 +43,17 @@ export default function NotificationBell({
   const [isOpen, setIsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
-  const badgeCount = rjCodeMissingCount + dlsiteFetchFailedCount;
+  const badgeCount =
+    rjCodeMissingCount +
+    dlsiteFetchFailedCount +
+    (dlsiteParseErrorAlert ? dlsiteParseErrorCount : 0);
   const showUnlinkedRow = dlsiteUnlinkedCount > 0 || dlsiteBulkActive;
   const isEmpty =
-    rjCodeMissingCount === 0 && dlsiteFetchFailedCount === 0 && !showUnlinkedRow && !scanResult;
+    rjCodeMissingCount === 0 &&
+    dlsiteFetchFailedCount === 0 &&
+    !dlsiteParseErrorAlert &&
+    !showUnlinkedRow &&
+    !scanResult;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -108,6 +121,17 @@ export default function NotificationBell({
                   }}
                 />
               )}
+              {dlsiteParseErrorAlert && (
+                <NotifRow
+                  label="DLsiteパース失敗"
+                  count={dlsiteParseErrorCount}
+                  accent="mustard"
+                  onClick={() => {
+                    setIsOpen(false);
+                    onOpenDlsiteParseFailed();
+                  }}
+                />
+              )}
               {dlsiteFetchFailedCount > 0 && (
                 <NotifRow
                   label="DLsite取得失敗"
@@ -167,11 +191,14 @@ function NotifRow({
   label,
   count,
   onClick,
+  accent = "coral",
 }: {
   label: string;
   count: number;
   onClick: () => void;
+  accent?: "coral" | "mustard";
 }) {
+  const iconColor = accent === "mustard" ? "var(--r-mustard)" : "var(--r-coral)";
   return (
     <button
       type="button"
@@ -180,7 +207,7 @@ function NotifRow({
       onClick={onClick}
     >
       <span className="flex items-center gap-1.5 text-[12px] text-ink-0">
-        <I.err size={13} className="text-[var(--r-coral)]" />
+        <I.err size={13} style={{ color: iconColor }} />
         {label}
       </span>
       <span className="flex items-center gap-1 font-mono text-[11px] text-ink-2">

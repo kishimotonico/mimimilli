@@ -60,6 +60,7 @@ test("初回スキャン: 登録・自動生成・エラー検出・duration プ
     status: "none",
     lastAttemptAt: null,
     error: null,
+    errorKind: null,
     appliedTags: [],
   });
 

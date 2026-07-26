@@ -8,6 +8,7 @@
 // （このテストに手動転記した期待値）を突き合わせる。スキーマにフィールドが増減すればどちらかの
 // 一致が崩れて失敗するため、fingerprint.ts側の更新漏れをこのテストが検知する。
 import assert from "node:assert/strict";
+import { join } from "node:path";
 import { test } from "node:test";
 import {
   dlsiteStateSchema,
@@ -16,6 +17,8 @@ import {
   trackSchema,
   urlEntrySchema,
 } from "@mimimilli/shared";
+import { computeFingerprint, computeRawFingerprint } from "../../src/adapters/real/fingerprint.ts";
+import { makeTestDirectory } from "../helpers/sampleLibrary.ts";
 
 function keysOf(schema: { shape: Record<string, unknown> }): string[] {
   return Object.keys(schema.shape).sort();
@@ -46,9 +49,9 @@ test("metaFileSchemaのキー集合とfingerprintのnormalizeMetaContent対象�
 });
 
 test("dlsiteStateSchemaのキー集合とfingerprintが対象にするdlsiteサブセットが一致する", () => {
-  // lastAttemptAt は機械的に変動するため対象外（fingerprint.ts冒頭コメント参照）
-  const excluded = new Set(["lastAttemptAt"]);
-  const expectedTracked = ["rjCode", "status", "error", "appliedTags"].sort();
+  // lastAttemptAt / errorKind は機械的に変動しうる、またはサーバー付随情報のため対象外
+  const excluded = new Set(["lastAttemptAt", "errorKind"]);
+  const expectedTracked = ["appliedTags", "error", "rjCode", "status"].sort();
 
   const schemaKeys = keysOf(dlsiteStateSchema).filter((key) => !excluded.has(key));
   assert.deepEqual(
@@ -63,4 +66,42 @@ test("playlistSchema/trackSchema/urlEntrySchemaのキー集合はfingerprintが�
   assert.deepEqual(keysOf(playlistSchema), ["id", "name", "tracks"]);
   assert.deepEqual(keysOf(trackSchema), ["end", "file", "id", "start", "title"].sort());
   assert.deepEqual(keysOf(urlEntrySchema), ["label", "url"]);
+});
+
+test("errorKindを追加してもfingerprintは変わらない", (t) => {
+  const directory = makeTestDirectory("fingerprint-errorKind");
+  t.after(directory.cleanup);
+  const metaPath = join(directory.path, ".meta.json");
+  const legacyRaw = {
+    id: "00000000-0000-4000-8000-000000000001",
+    title: "テスト作品",
+    tags: [],
+    playlists: [],
+    defaultPlaylistId: null,
+    urls: [],
+    coverImage: null,
+    dlsite: {
+      rjCode: "RJ123456",
+      status: "none",
+      lastAttemptAt: null,
+      error: null,
+      appliedTags: [],
+    },
+  };
+  const withErrorKindRaw = {
+    ...legacyRaw,
+    dlsite: { ...legacyRaw.dlsite, errorKind: "parse_error" },
+  };
+  const legacyFp = computeRawFingerprint(metaPath, legacyRaw);
+  const withErrorKindFp = computeRawFingerprint(metaPath, withErrorKindRaw);
+  assert.ok(legacyFp);
+  assert.ok(withErrorKindFp);
+  assert.equal(legacyFp.fingerprint, withErrorKindFp.fingerprint);
+
+  const legacyMeta = metaFileSchema.parse(legacyRaw);
+  const withErrorKindMeta = metaFileSchema.parse(withErrorKindRaw);
+  assert.equal(
+    computeFingerprint(metaPath, legacyMeta),
+    computeFingerprint(metaPath, withErrorKindMeta),
+  );
 });

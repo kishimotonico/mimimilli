@@ -1,4 +1,12 @@
-import { closeSync, constants, fstatSync, openSync, readFileSync, readdirSync } from "node:fs";
+import {
+  closeSync,
+  constants,
+  fstatSync,
+  openSync,
+  readFileSync,
+  readdirSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
 import { parseDlsiteHtml } from "./adapters/real/dlsite.ts";
@@ -120,6 +128,7 @@ function importDirectory(
 
 const USAGE =
   "usage: dlsite-cache <status|cleanup" +
+  "|export --product-code <RJ|VJ> --file <path.html>" +
   "|import --product-code <RJ|VJ> --file <path.html[.gz]>" +
   "|import --dir <path>>";
 
@@ -135,6 +144,17 @@ export function runDlsiteCacheCli(
     if (command === "status" && args.length === 0) return JSON.stringify(cache.status());
     if (command === "cleanup" && args.length === 0)
       return JSON.stringify({ deleted: cache.cleanupExpired() });
+    if (
+      command === "export" &&
+      args.length === 4 &&
+      args[0] === "--product-code" &&
+      args[2] === "--file"
+    ) {
+      const productCode = normalizeDlsiteProductCode(args[1]).productCode;
+      const html = cache.exportHtml({ productCode });
+      writeFileSync(args[3], html, "utf8");
+      return JSON.stringify({ productCode, bytes: Buffer.byteLength(html, "utf8") });
+    }
     if (command === "import" && args.length === 2 && args[0] === "--dir") {
       const result = importDirectory(
         args[1],

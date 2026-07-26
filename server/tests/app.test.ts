@@ -80,7 +80,7 @@ test("DELETE /api/dlsite/bulk は実行中ジョブの取消を要求し、終�
   adapter.runDlsiteBulk = async (_mode, _workIds, options) => {
     await gate;
     options?.signal?.throwIfAborted();
-    return { fetched: 0, failed: 0, skipped: 0 };
+    return { fetched: 0, failed: 0, parseErrors: 0, skipped: 0 };
   };
   const app = createApp(adapter);
   const start = await app.request("/api/dlsite/bulk", { method: "POST" });

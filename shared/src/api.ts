@@ -50,6 +50,8 @@ export type SmartFolderWorksQuery = z.infer<typeof smartFolderWorksQuerySchema>;
 export const dlsiteNotificationSummarySchema = z.object({
   rjCodeMissingCount: z.number().int().nonnegative(),
   fetchFailedCount: z.number().int().nonnegative(),
+  parseErrorCount: z.number().int().nonnegative(),
+  parseErrorAlert: z.boolean(),
   unlinkedCount: z.number().int().nonnegative(),
 });
 export type DlsiteNotificationSummary = z.infer<typeof dlsiteNotificationSummarySchema>;
@@ -62,11 +64,27 @@ export const dlsiteNotificationItemSchema = z.object({
 });
 export type DlsiteNotificationItem = z.infer<typeof dlsiteNotificationItemSchema>;
 
+/** パース失敗モーダルの行DTO（RJコード付き）。 */
+export const dlsiteParseFailedNotificationItemSchema = dlsiteNotificationItemSchema.extend({
+  rjCode: z.string(),
+});
+export type DlsiteParseFailedNotificationItem = z.infer<
+  typeof dlsiteParseFailedNotificationItemSchema
+>;
+
 export const dlsiteNotificationPageSchema = z.object({
   items: z.array(dlsiteNotificationItemSchema),
   total: z.number().int().nonnegative(),
 });
 export type DlsiteNotificationPage = z.infer<typeof dlsiteNotificationPageSchema>;
+
+export const dlsiteParseFailedNotificationPageSchema = z.object({
+  items: z.array(dlsiteParseFailedNotificationItemSchema),
+  total: z.number().int().nonnegative(),
+});
+export type DlsiteParseFailedNotificationPage = z.infer<
+  typeof dlsiteParseFailedNotificationPageSchema
+>;
 
 export const dlsiteNotificationQuerySchema = z.object({
   page: z.coerce.number().int().min(1).optional(),

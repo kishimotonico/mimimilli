@@ -20,6 +20,9 @@ function renderBell(overrides: Partial<Parameters<typeof NotificationBell>[0]> =
     onOpenRjCodeMissing: vi.fn(),
     dlsiteFetchFailedCount: 0,
     onOpenDlsiteFetchFailed: vi.fn(),
+    dlsiteParseErrorAlert: false,
+    dlsiteParseErrorCount: 0,
+    onOpenDlsiteParseFailed: vi.fn(),
     dlsiteUnlinkedCount: 0,
     dlsiteBulkActive: false,
     dlsiteBulkProgress: null,
@@ -88,6 +91,22 @@ describe("NotificationBell", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: /DLsite取得失敗/ }));
 
     expect(props.onOpenDlsiteFetchFailed).toHaveBeenCalledTimes(1);
+  });
+
+  it("パース失敗アラート時だけバッジにパース失敗件数を加算する", () => {
+    renderBell({
+      dlsiteParseErrorAlert: true,
+      dlsiteParseErrorCount: 4,
+      rjCodeMissingCount: 1,
+    });
+    expect(screen.getByText("5")).toBeInTheDocument();
+  });
+
+  it("パース失敗アラートの行クリックでコールバックを呼ぶ", () => {
+    const props = renderBell({ dlsiteParseErrorAlert: true, dlsiteParseErrorCount: 3 });
+    fireEvent.click(screen.getByRole("button", { name: /通知/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /DLsiteパース失敗/ }));
+    expect(props.onOpenDlsiteParseFailed).toHaveBeenCalledTimes(1);
   });
 
   it("DLsite未連携: 件数がある場合はまとめて取得ボタンを表示し、押すとコールバックを呼ぶ", () => {

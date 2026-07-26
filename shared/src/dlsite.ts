@@ -4,17 +4,28 @@ import { z } from "zod";
 export const dlsiteStatusSchema = z.enum(["none", "applied", "not_found", "error", "skipped"]);
 export type DlsiteStatus = z.infer<typeof dlsiteStatusSchema>;
 
+export const dlsiteFetchErrorKindSchema = z.enum(["not_found", "parse_error", "offline", "error"]);
+export type DlsiteFetchErrorKind = z.infer<typeof dlsiteFetchErrorKindSchema>;
+
 export const dlsiteStateSchema = z.object({
   rjCode: z.string().nullable(),
   status: dlsiteStatusSchema,
   lastAttemptAt: z.iso.datetime({ offset: true }).nullable(),
   error: z.string().nullable(),
+  errorKind: dlsiteFetchErrorKindSchema.nullable().optional(),
   appliedTags: z.array(z.string()),
 });
 export type DlsiteState = z.infer<typeof dlsiteStateSchema>;
 
 export function emptyDlsiteState(): DlsiteState {
-  return { rjCode: null, status: "none", lastAttemptAt: null, error: null, appliedTags: [] };
+  return {
+    rjCode: null,
+    status: "none",
+    lastAttemptAt: null,
+    error: null,
+    errorKind: null,
+    appliedTags: [],
+  };
 }
 
 /** RJコードが未検出のまま放置されている作品か（ユーザーが明示的にスキップした作品は除く）。
@@ -23,10 +34,30 @@ export function isRjCodeMissing(state: DlsiteState): boolean {
   return state.rjCode === null && state.status !== "skipped";
 }
 
-/** DLsite取得が失敗したまま残っている（RJコードはあるが取得できなかった）作品か。
- *  作品詳細の警告表示・通知ベル（TASK-44）の判定基準の正典 */
+/** DLsiteのHTMLパースに失敗したまま残っている作品か */
+export function isDlsiteParseFailed(state: DlsiteState): boolean {
+  return state.status === "error" && state.errorKind === "parse_error";
+}
+
+/** DLsite取得が失敗したまま残っている（HTTP 404・通信エラー等。parse_error は除く）作品か */
 export function isDlsiteFetchFailed(state: DlsiteState): boolean {
-  return state.status === "error" || state.status === "not_found";
+  return (
+    state.status === "not_found" || (state.status === "error" && state.errorKind !== "parse_error")
+  );
+}
+
+/** パース失敗が構造変更レベルで増えたかのしきい値（件数・割合の下限） */
+export const DLSITE_PARSE_ERROR_ALERT_MIN_COUNT = 3;
+export const DLSITE_PARSE_ERROR_ALERT_MIN_RATIO = 0.2;
+
+/** 分母は parse_error + HTTP error（not_found は含めない） */
+export function evaluateParseErrorAlert(parseErrorCount: number, httpErrorCount: number): boolean {
+  const attempted = parseErrorCount + httpErrorCount;
+  return (
+    parseErrorCount >= DLSITE_PARSE_ERROR_ALERT_MIN_COUNT &&
+    attempted >= DLSITE_PARSE_ERROR_ALERT_MIN_COUNT &&
+    parseErrorCount / attempted >= DLSITE_PARSE_ERROR_ALERT_MIN_RATIO
+  );
 }
 
 /** DLsite未連携（RJコードは判明しているが取得を一度も試みていない）作品か。
@@ -47,9 +78,6 @@ export const dlsiteWorkInfoSchema = z.object({
   url: z.string(),
 });
 export type DlsiteWorkInfo = z.infer<typeof dlsiteWorkInfoSchema>;
-
-export const dlsiteFetchErrorKindSchema = z.enum(["not_found", "parse_error", "offline", "error"]);
-export type DlsiteFetchErrorKind = z.infer<typeof dlsiteFetchErrorKindSchema>;
 
 export const dlsiteFetchResultSchema = z.discriminatedUnion("ok", [
   z.object({ ok: z.literal(true), info: dlsiteWorkInfoSchema }),
@@ -95,6 +123,7 @@ export type DlsiteBulkStartResponse = z.infer<typeof dlsiteBulkStartResponseSche
 export const dlsiteBulkResultSchema = z.object({
   fetched: z.number().int().nonnegative(),
   failed: z.number().int().nonnegative(),
+  parseErrors: z.number().int().nonnegative(),
   skipped: z.number().int().nonnegative(),
 });
 export type DlsiteBulkResult = z.infer<typeof dlsiteBulkResultSchema>;

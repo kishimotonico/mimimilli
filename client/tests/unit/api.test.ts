@@ -234,7 +234,13 @@ describe("work api", () => {
   });
 
   it("getDlsiteNotificationSummary fetches the dedicated endpoint", async () => {
-    const summary = { rjCodeMissingCount: 2, fetchFailedCount: 1, unlinkedCount: 3 };
+    const summary = {
+      rjCodeMissingCount: 2,
+      fetchFailedCount: 1,
+      parseErrorCount: 0,
+      parseErrorAlert: false,
+      unlinkedCount: 3,
+    };
     mockFetch.mockResolvedValue(makeResponse(summary));
     await expect(workApi.getDlsiteNotificationSummary()).resolves.toEqual(summary);
     expect(mockFetch).toHaveBeenCalledWith("/api/dlsite/notifications");
