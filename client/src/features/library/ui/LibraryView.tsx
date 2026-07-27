@@ -1,11 +1,12 @@
 import { useCallback, useMemo, useState } from "react";
+import { useAtomValue } from "jotai";
 import {
   getDefaultPlaylistTrackCount,
   toWorkListItem,
   type Work,
   type WorkListItem,
 } from "@mimimilli/shared";
-import type { GridLayoutMode, ViewMode } from "../model/types";
+import { libraryViewModeAtom } from "../model/atoms";
 import { useLibraryView } from "../model/useLibraryNavigation";
 import { useLibraryQueries, useSmartFolderMutation } from "../model/useLibraryQueries";
 import {
@@ -36,10 +37,6 @@ interface LibraryViewProps {
   isPlaybackActive?: boolean;
   onPlay: (work: WorkListItem, trackIndex: number) => void;
   onResume: (work: Work) => void;
-  viewMode: ViewMode;
-  tileSize: number;
-  onTileSizeChange: (size: number) => void;
-  gridLayoutMode: GridLayoutMode;
 }
 
 export default function LibraryView({
@@ -50,11 +47,8 @@ export default function LibraryView({
   isPlaybackActive,
   onPlay,
   onResume,
-  viewMode,
-  tileSize,
-  onTileSizeChange,
-  gridLayoutMode,
 }: LibraryViewProps) {
+  const viewMode = useAtomValue(libraryViewModeAtom);
   const nav = useLibraryView();
   const [smartFolderEditor, setSmartFolderEditor] = useState<SmartFolderEditorState>(
     closedSmartFolderEditorState,
@@ -179,15 +173,12 @@ export default function LibraryView({
           worksQueryKey={worksQueryKey}
           selectedWorkId={nav.selectedWorkId}
           searchQuery={searchQuery}
-          tileSize={tileSize}
-          gridLayoutMode={gridLayoutMode}
           isLoading={isLoading}
           isError={isError}
           hasNextPage={hasNextPage}
           worksTotal={worksTotal}
           isFetchingNextPage={isFetchingNextPage}
           onLoadMore={fetchNextPage}
-          onTileSizeChange={onTileSizeChange}
           onWorkSelect={nav.selectWork}
           onWorkPlay={(work) => onPlay(work, 0)}
           onDrillBack={nav.drillBack}

@@ -1,51 +1,44 @@
 import { useEffect, useRef, useState } from "react";
+import { useAtom } from "jotai";
 import type { SortId } from "@mimimilli/shared";
-import { SORT_OPTIONS, type GridLayoutMode } from "../../features/library/model/types";
+import { SORT_OPTIONS } from "../../features/library/model/types";
+import { libraryViewModeAtom } from "../../features/library/model/atoms";
+import LibraryGridControls from "../../features/library/ui/LibraryGridControls";
 import { I } from "../../shared/ui/Icon";
 import IconButton from "../../shared/ui/IconButton";
-import { MAX_TILE_SIZE, MIN_TILE_SIZE } from "../../features/library/model/gridSizing";
 
 interface AddressBarProps {
+  mode: "library" | "files";
   path: string[];
   onNavigate?: (index: number) => void;
   onBack?: () => void;
   onForward?: () => void;
   canBack?: boolean;
   canForward?: boolean;
-  viewMode?: "column" | "list" | "grid";
-  onViewChange?: (v: "column" | "list" | "grid") => void;
-  availableViewModes?: readonly ("column" | "list" | "grid")[];
-  tileSize?: number;
-  onTileSizeChange?: (size: number) => void;
-  gridLayoutMode?: GridLayoutMode;
-  onGridLayoutModeChange?: (mode: GridLayoutMode) => void;
   showSort?: boolean;
   sort?: SortId;
   onSortChange?: (sort: SortId) => void;
 }
 
 export default function AddressBar({
+  mode,
   path,
   onNavigate,
   onBack,
   onForward,
   canBack = false,
   canForward = false,
-  viewMode = "column",
-  onViewChange,
-  availableViewModes = ["column"],
-  tileSize,
-  onTileSizeChange,
-  gridLayoutMode,
-  onGridLayoutModeChange,
   showSort = false,
   sort,
   onSortChange,
 }: AddressBarProps) {
+  const [libraryViewMode, setLibraryViewMode] = useAtom(libraryViewModeAtom);
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
   const currentSortLabel = SORT_OPTIONS.find((opt) => opt.id === sort)?.label;
-  const gridControlsVisible = viewMode === "grid";
+  const viewMode = mode === "library" ? libraryViewMode : "column";
+  const availableViewModes: readonly ("column" | "list" | "grid")[] =
+    mode === "library" ? ["list", "grid"] : ["column"];
 
   useEffect(() => {
     if (!sortMenuOpen) return;
@@ -92,53 +85,7 @@ export default function AddressBar({
         ))}
       </div>
 
-      {gridLayoutMode !== undefined &&
-        onGridLayoutModeChange &&
-        tileSize !== undefined &&
-        onTileSizeChange && (
-          <div
-            className={`mle-grid-controls ${gridControlsVisible ? "is-visible" : ""}`}
-            aria-hidden={!gridControlsVisible}
-          >
-            <div className="mle-grid-controls__inner">
-              <div className="inline-flex items-center gap-[1px] rounded-2 bg-paper-2 p-[2px]">
-                <IconButton
-                  size="sm"
-                  icon={I.ratio11}
-                  label="カバーを1対1に切り抜き、等幅で並べる"
-                  title="1:1タイル：正方形に切り抜いて等幅で並べる"
-                  active={gridLayoutMode === "square"}
-                  onClick={() => onGridLayoutModeChange("square")}
-                  disabled={!gridControlsVisible}
-                />
-                <IconButton
-                  size="sm"
-                  icon={I.gridJustified}
-                  label="カバーの縦横比を保ち、行の右端を揃えて並べる"
-                  title="元の縦横比：比率を保って行の右端を揃える"
-                  active={gridLayoutMode === "justified"}
-                  onClick={() => onGridLayoutModeChange("justified")}
-                  disabled={!gridControlsVisible}
-                />
-              </div>
-
-              <label className="mll-grid-size">
-                <span>サイズ</span>
-                <input
-                  type="range"
-                  min={MIN_TILE_SIZE}
-                  max={MAX_TILE_SIZE}
-                  step={1}
-                  value={tileSize}
-                  disabled={!gridControlsVisible}
-                  aria-label="グリッドのサイズ"
-                  onChange={(event) => onTileSizeChange(Number(event.currentTarget.value))}
-                />
-                <output>{tileSize}px</output>
-              </label>
-            </div>
-          </div>
-        )}
+      {mode === "library" && <LibraryGridControls />}
 
       <div className="inline-flex items-center gap-[1px] rounded-2 bg-paper-2 p-[2px]">
         <IconButton
@@ -146,7 +93,6 @@ export default function AddressBar({
           icon={I.gridS}
           label="カラム"
           active={viewMode === "column"}
-          onClick={() => onViewChange?.("column")}
           disabled={!availableViewModes.includes("column")}
         />
         <IconButton
@@ -154,7 +100,7 @@ export default function AddressBar({
           icon={I.list}
           label="リスト"
           active={viewMode === "list"}
-          onClick={() => onViewChange?.("list")}
+          onClick={() => setLibraryViewMode("list")}
           disabled={!availableViewModes.includes("list")}
         />
         <IconButton
@@ -162,7 +108,7 @@ export default function AddressBar({
           icon={I.grid}
           label="グリッド"
           active={viewMode === "grid"}
-          onClick={() => onViewChange?.("grid")}
+          onClick={() => setLibraryViewMode("grid")}
           disabled={!availableViewModes.includes("grid")}
         />
       </div>

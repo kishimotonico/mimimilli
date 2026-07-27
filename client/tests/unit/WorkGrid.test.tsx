@@ -1,9 +1,14 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { Provider } from "jotai";
+import { Provider, createStore } from "jotai";
 import type { WorkListItem } from "@mimimilli/shared";
 import WorkGrid from "../../src/features/library/ui/WorkGrid";
+import {
+  libraryGridLayoutModeAtom,
+  libraryTileSizeAtom,
+} from "../../src/features/library/model/atoms";
+import type { GridLayoutMode } from "../../src/features/library/model/types";
 import { clearResizeObservers, flushAllResizeObservers, mockElementSize } from "./setup";
 
 function createWorks(count: number): WorkListItem[] {
@@ -20,32 +25,53 @@ function createWorks(count: number): WorkListItem[] {
   }));
 }
 
-function renderWorkGrid(props: Partial<React.ComponentProps<typeof WorkGrid>> = {}) {
-  return render(
-    <Provider>
-      <WorkGrid
-        axis="all"
-        drillValue={null}
-        works={createWorks(100)}
-        worksQueryKey="key-1"
-        selectedWorkId={null}
-        searchQuery=""
-        tileSize={160}
-        gridLayoutMode="square"
-        isLoading={false}
-        isError={false}
-        hasNextPage={false}
-        onTileSizeChange={vi.fn()}
-        onWorkSelect={vi.fn()}
-        onWorkPlay={vi.fn()}
-        onDrillBack={vi.fn()}
-        onClearSearch={vi.fn()}
-        inspector={null}
-        onInspectorClose={vi.fn()}
-        {...props}
-      />
-    </Provider>,
+interface RenderWorkGridOptions {
+  props?: Partial<React.ComponentProps<typeof WorkGrid>>;
+  tileSize?: number;
+  gridLayoutMode?: GridLayoutMode;
+}
+
+function workGridElement(props: Partial<React.ComponentProps<typeof WorkGrid>>) {
+  return (
+    <WorkGrid
+      axis="all"
+      drillValue={null}
+      works={createWorks(100)}
+      worksQueryKey="key-1"
+      selectedWorkId={null}
+      searchQuery=""
+      isLoading={false}
+      isError={false}
+      hasNextPage={false}
+      onWorkSelect={vi.fn()}
+      onWorkPlay={vi.fn()}
+      onDrillBack={vi.fn()}
+      onClearSearch={vi.fn()}
+      inspector={null}
+      onInspectorClose={vi.fn()}
+      {...props}
+    />
   );
+}
+
+function renderWorkGrid({
+  props = {},
+  tileSize = 160,
+  gridLayoutMode = "square",
+}: RenderWorkGridOptions = {}) {
+  const store = createStore();
+  store.set(libraryTileSizeAtom, tileSize);
+  store.set(libraryGridLayoutModeAtom, gridLayoutMode);
+
+  const result = render(<Provider store={store}>{workGridElement(props)}</Provider>);
+
+  return {
+    ...result,
+    store,
+    // 同じ store を保ったまま props だけ差し替える（atom の値をリセットしない）
+    rerenderWorkGrid: (nextProps: Partial<React.ComponentProps<typeof WorkGrid>>) =>
+      result.rerender(<Provider store={store}>{workGridElement(nextProps)}</Provider>),
+  };
 }
 
 describe("WorkGrid virtual scrolling", () => {
@@ -68,7 +94,7 @@ describe("WorkGrid virtual scrolling", () => {
   });
 
   it("renders far fewer tiles than total works for 10,000 items", async () => {
-    renderWorkGrid({ works: createWorks(10_000) });
+    renderWorkGrid({ props: { works: createWorks(10_000) } });
     await act(() => flushAllResizeObservers({ width: 800, height: 600 }));
 
     const tiles = screen.queryAllByRole("button", { name: /を選択/ });
@@ -80,7 +106,7 @@ describe("WorkGrid virtual scrolling", () => {
   });
 
   it("renders far fewer tiles than total works for 1,000 items", async () => {
-    renderWorkGrid({ works: createWorks(1_000) });
+    renderWorkGrid({ props: { works: createWorks(1_000) } });
     await act(() => flushAllResizeObservers({ width: 800, height: 600 }));
 
     const tiles = screen.queryAllByRole("button", { name: /を選択/ });
@@ -90,7 +116,7 @@ describe("WorkGrid virtual scrolling", () => {
   });
 
   it("moves focus to the next row with ArrowDown based on calculated column count", async () => {
-    renderWorkGrid({ works: createWorks(100) });
+    renderWorkGrid({ props: { works: createWorks(100) } });
     await act(() => flushAllResizeObservers({ width: 800, height: 600 }));
 
     const tiles = screen.queryAllByRole("button", { name: /を選択/ });
@@ -108,35 +134,12 @@ describe("WorkGrid virtual scrolling", () => {
 
   it("resets scroll position when worksQueryKey changes", async () => {
     const scrollToSpy = vi.spyOn(Element.prototype, "scrollTo").mockImplementation(() => {});
-    const { rerender } = renderWorkGrid();
+    const { rerenderWorkGrid } = renderWorkGrid();
     await act(() => flushAllResizeObservers({ width: 800, height: 600 }));
 
     const callsBefore = scrollToSpy.mock.calls.length;
 
-    rerender(
-      <Provider>
-        <WorkGrid
-          axis="all"
-          drillValue={null}
-          works={createWorks(100)}
-          worksQueryKey="key-2"
-          selectedWorkId={null}
-          searchQuery=""
-          tileSize={160}
-          gridLayoutMode="square"
-          isLoading={false}
-          isError={false}
-          hasNextPage={false}
-          onTileSizeChange={vi.fn()}
-          onWorkSelect={vi.fn()}
-          onWorkPlay={vi.fn()}
-          onDrillBack={vi.fn()}
-          onClearSearch={vi.fn()}
-          inspector={null}
-          onInspectorClose={vi.fn()}
-        />
-      </Provider>,
-    );
+    rerenderWorkGrid({ worksQueryKey: "key-2" });
 
     expect(scrollToSpy.mock.calls.length).toBeGreaterThan(callsBefore);
     scrollToSpy.mockRestore();
@@ -145,9 +148,11 @@ describe("WorkGrid virtual scrolling", () => {
   it("calls onLoadMore when scrolled near the end", async () => {
     const onLoadMore = vi.fn();
     const { container } = renderWorkGrid({
-      works: createWorks(1_000),
-      hasNextPage: true,
-      onLoadMore,
+      props: {
+        works: createWorks(1_000),
+        hasNextPage: true,
+        onLoadMore,
+      },
     });
     await act(() => flushAllResizeObservers({ width: 800, height: 600 }));
 
@@ -164,7 +169,7 @@ describe("WorkGrid virtual scrolling", () => {
   });
 
   it("preserves aria-label, aria-pressed, and button structure on tiles", async () => {
-    renderWorkGrid({ works: createWorks(10) });
+    renderWorkGrid({ props: { works: createWorks(10) } });
     await act(() => flushAllResizeObservers({ width: 800, height: 600 }));
 
     const tile = screen.queryAllByRole("button", { name: /を選択/ })[0];
@@ -174,7 +179,10 @@ describe("WorkGrid virtual scrolling", () => {
   });
 
   it("renders far fewer tiles in justified mode", async () => {
-    renderWorkGrid({ works: createWorks(1_000), gridLayoutMode: "justified" });
+    renderWorkGrid({
+      props: { works: createWorks(1_000) },
+      gridLayoutMode: "justified",
+    });
     await act(async () => {
       await new Promise((r) => setTimeout(r, 0));
       flushAllResizeObservers({ width: 800, height: 600 });

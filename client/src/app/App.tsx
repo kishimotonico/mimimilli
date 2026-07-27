@@ -4,7 +4,7 @@
 // - レイアウトは AppShell に委譲
 
 import { useState, useCallback, useRef } from "react";
-import { useAtom, useAtomValue } from "jotai";
+import { useAtomValue } from "jotai";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { usePlayer } from "../features/player/model/usePlayer";
 import { playerUiModeAtom } from "../features/player/model/atoms";
@@ -44,21 +44,12 @@ import { useDlsiteUnlinkedCount } from "../features/library/model/dlsiteUnlinked
 import { getSettings, setRootFolder } from "../features/settings/api";
 import { parseNavigationUrl, type AppMode } from "../features/navigation/model/navigationUrl";
 import { useNavigationHistory } from "../features/navigation/model/useNavigationHistory";
-import {
-  libraryGridLayoutModeAtom,
-  libraryTileSizeAtom,
-  libraryViewModeAtom,
-} from "../features/library/model/atoms";
-import { clampTileSize } from "../features/library/model/gridSizing";
 
 export default function App() {
   const player = usePlayer();
   const libraryNav = useLibraryView();
   const queryClient = useQueryClient();
   const playRequestIdRef = useRef(0);
-  const [libraryViewMode, setLibraryViewMode] = useAtom(libraryViewModeAtom);
-  const [libraryTileSize, setLibraryTileSize] = useAtom(libraryTileSizeAtom);
-  const [libraryGridLayoutMode, setLibraryGridLayoutMode] = useAtom(libraryGridLayoutModeAtom);
 
   const [mode, setMode] = useState<AppMode>(
     () => parseNavigationUrl(window.location.href).state.mode,
@@ -364,6 +355,7 @@ export default function App() {
       }
       addressBar={
         <AddressBar
+          mode={mode}
           path={mode === "files" ? filesNav.addressPath : libraryNav.addressPath}
           onNavigate={mode === "files" ? filesNav.goToSegment : libraryNav.goToSegment}
           onBack={navigationHistory.back}
@@ -373,15 +365,6 @@ export default function App() {
           showSort={mode === "library"}
           sort={libraryNav.sort}
           onSortChange={libraryNav.setSort}
-          viewMode={mode === "library" ? libraryViewMode : "column"}
-          availableViewModes={mode === "library" ? ["list", "grid"] : ["column"]}
-          onViewChange={(viewMode) => {
-            if (mode === "library" && viewMode !== "column") setLibraryViewMode(viewMode);
-          }}
-          tileSize={mode === "library" ? clampTileSize(libraryTileSize) : undefined}
-          onTileSizeChange={mode === "library" ? setLibraryTileSize : undefined}
-          gridLayoutMode={mode === "library" ? libraryGridLayoutMode : undefined}
-          onGridLayoutModeChange={mode === "library" ? setLibraryGridLayoutMode : undefined}
         />
       }
       leftNav={
@@ -409,10 +392,6 @@ export default function App() {
             isPlaybackActive={isPlaybackActive}
             onPlay={handlePlay}
             onResume={handleResume}
-            viewMode={libraryViewMode}
-            tileSize={clampTileSize(libraryTileSize)}
-            onTileSizeChange={setLibraryTileSize}
-            gridLayoutMode={libraryGridLayoutMode}
           />
         )
       }
