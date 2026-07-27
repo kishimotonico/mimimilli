@@ -1,12 +1,8 @@
 // library feature のナビゲーション state フック。
-// Jotai atom をラップし、setAxis・drillInto・drillBack・toggleTag などの
-// ハイレベルな操作を提供する。
-// atom が feature 外の Provider スコープにあるため、兄弟コンポーネントでも
-// 同じ state を参照できる（例: AddressBar が addressPath を購読）。
+// Jotai atom の読み取りと write-only action atom を束ね、
+// setAxis・drillInto・toggleTag などのハイレベル操作を提供する。
 
-import { useAtom, useAtomValue, useSetAtom } from "jotai";
-import { useCallback } from "react";
-import { requestNavigationHistoryCommitAtom } from "../../navigation/model/navigationHistoryAtoms";
+import { useAtomValue, useSetAtom } from "jotai";
 import type { AxisId, SortId } from "../model/types";
 import {
   activeAxisAtom,
@@ -16,6 +12,16 @@ import {
   sortAtom,
   addressPathAtom,
 } from "./atoms";
+import {
+  clearLibraryTagsAtom,
+  drillBackAtom,
+  drillIntoAtom,
+  goToLibrarySegmentAtom,
+  selectLibraryWorkAtom,
+  setLibraryAxisAtom,
+  setLibrarySortAtom,
+  toggleLibraryTagAtom,
+} from "./libraryNavigationActions";
 
 export interface LibraryViewState {
   activeAxis: AxisId;
@@ -38,85 +44,21 @@ export interface LibraryViewActions {
 }
 
 export function useLibraryView(): LibraryViewState & LibraryViewActions {
-  const [activeAxis, setActiveAxis] = useAtom(activeAxisAtom);
-  const [drillValue, setDrillValue] = useAtom(drillValueAtom);
-  const [selectedTags, setSelectedTags] = useAtom(selectedTagsAtom);
-  const [selectedWorkId, setSelectedWorkId] = useAtom(selectedWorkIdAtom);
-  const [sort, setSort_] = useAtom(sortAtom);
+  const activeAxis = useAtomValue(activeAxisAtom);
+  const drillValue = useAtomValue(drillValueAtom);
+  const selectedTags = useAtomValue(selectedTagsAtom);
+  const selectedWorkId = useAtomValue(selectedWorkIdAtom);
+  const sort = useAtomValue(sortAtom);
   const addressPath = useAtomValue(addressPathAtom);
-  const requestCommit = useSetAtom(requestNavigationHistoryCommitAtom);
 
-  const setAxis = useCallback(
-    (axis: AxisId) => {
-      requestCommit("push");
-      setActiveAxis(axis);
-      setDrillValue(null);
-      setSelectedTags([]);
-      setSelectedWorkId(null);
-    },
-    [requestCommit, setActiveAxis, setDrillValue, setSelectedTags, setSelectedWorkId],
-  );
-
-  const drillInto = useCallback(
-    (value: string) => {
-      requestCommit("push");
-      setDrillValue(value);
-      setSelectedTags([]);
-      setSelectedWorkId(null);
-    },
-    [requestCommit, setDrillValue, setSelectedTags, setSelectedWorkId],
-  );
-
-  const drillBack = useCallback(() => {
-    requestCommit("push");
-    setDrillValue(null);
-    setSelectedWorkId(null);
-  }, [requestCommit, setDrillValue, setSelectedWorkId]);
-
-  const toggleTag = useCallback(
-    (tag: string) => {
-      requestCommit("push");
-      setSelectedTags((prev) =>
-        prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
-      );
-      setSelectedWorkId(null);
-    },
-    [requestCommit, setSelectedTags, setSelectedWorkId],
-  );
-
-  const clearTags = useCallback(() => {
-    requestCommit("push");
-    setSelectedTags([]);
-    setSelectedWorkId(null);
-  }, [requestCommit, setSelectedTags, setSelectedWorkId]);
-
-  const selectWork = useCallback(
-    (id: string | null) => {
-      // 詳細パネルの開閉は同一ビュー内の選択なので履歴を増やさない。
-      requestCommit("replace");
-      setSelectedWorkId(id);
-    },
-    [requestCommit, setSelectedWorkId],
-  );
-
-  const setSort = useCallback(
-    (s: SortId) => {
-      requestCommit("replace");
-      setSort_(s);
-    },
-    [requestCommit, setSort_],
-  );
-
-  const goToSegment = useCallback(
-    (index: number) => {
-      if (index <= 0) {
-        if (activeAxis !== "all") setAxis("all");
-        return;
-      }
-      if (index === 1 && drillValue !== null) drillBack();
-    },
-    [activeAxis, drillBack, drillValue, setAxis],
-  );
+  const setAxis = useSetAtom(setLibraryAxisAtom);
+  const drillInto = useSetAtom(drillIntoAtom);
+  const drillBack = useSetAtom(drillBackAtom);
+  const toggleTag = useSetAtom(toggleLibraryTagAtom);
+  const clearTags = useSetAtom(clearLibraryTagsAtom);
+  const selectWork = useSetAtom(selectLibraryWorkAtom);
+  const setSort = useSetAtom(setLibrarySortAtom);
+  const goToSegment = useSetAtom(goToLibrarySegmentAtom);
 
   return {
     activeAxis,

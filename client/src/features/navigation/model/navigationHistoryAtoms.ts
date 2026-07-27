@@ -14,3 +14,13 @@ export const requestNavigationHistoryCommitAtom = atom(
     set(navigationHistoryCommitAtom, { kind, revision: current.revision + 1 });
   },
 );
+
+export interface NavigationHistoryState {
+  canBack: boolean;
+  canForward: boolean;
+}
+
+export const navigationHistoryStateAtom = atom<NavigationHistoryState>({
+  canBack: false,
+  canForward: false,
+});

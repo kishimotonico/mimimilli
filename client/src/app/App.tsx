@@ -4,11 +4,10 @@
 // - レイアウトは AppShell に委譲
 
 import { useState, useCallback, useRef } from "react";
-import { useAtomValue } from "jotai";
+import { useAtomValue, useSetAtom } from "jotai";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { usePlayer } from "../features/player/model/usePlayer";
 import { playerUiModeAtom } from "../features/player/model/atoms";
-import { useLibraryView } from "../features/library/model/useLibraryNavigation";
 import { useGlobalShortcuts } from "./model/useGlobalShortcuts";
 import AppShell from "./AppShell";
 import TopBar from "./ui/TopBar";
@@ -19,7 +18,6 @@ import { WORK_QUERY_KEYS } from "../entities/work/queryKeys";
 import { SMART_FOLDER_QUERY_KEYS } from "../entities/smart-folder/queryKeys";
 import { SETTINGS_QUERY_KEYS } from "../entities/settings/queryKeys";
 import FilesView from "../features/files/ui/FilesView";
-import { useFilesNavigation } from "../features/files/model/useFilesNavigation";
 import type { FsEntry } from "../features/files/model/types";
 import PlayerDock from "../features/player/ui/PlayerDock";
 import FullScreenPlayer from "../features/player/ui/FullScreenPlayer";
@@ -41,19 +39,24 @@ import { useRjCodeMissingWorks } from "../features/library/model/dlsiteMissingRj
 import { useDlsiteFetchFailedWorks } from "../features/library/model/dlsiteFetchFailed";
 import { useDlsiteParseFailedWorks } from "../features/library/model/dlsiteParseFailed";
 import { useDlsiteUnlinkedCount } from "../features/library/model/dlsiteUnlinked";
-import { getSettings, setRootFolder } from "../features/settings/api";
-import { parseNavigationUrl, type AppMode } from "../features/navigation/model/navigationUrl";
-import { useNavigationHistory } from "../features/navigation/model/useNavigationHistory";
+import { setRootFolder } from "../features/settings/api";
+import { useSettingsQuery } from "../features/settings/useSettingsQuery";
+import { appModeAtom, setAppModeAtom } from "../features/navigation/model/navigationAtoms";
+import {
+  selectLibraryWorkAtom,
+  setLibraryAxisAtom,
+} from "../features/library/model/libraryNavigationActions";
+import NavigationHistorySync from "../features/navigation/ui/NavigationHistorySync";
 
 export default function App() {
   const player = usePlayer();
-  const libraryNav = useLibraryView();
   const queryClient = useQueryClient();
   const playRequestIdRef = useRef(0);
+  const mode = useAtomValue(appModeAtom);
+  const setAppMode = useSetAtom(setAppModeAtom);
+  const setLibraryAxis = useSetAtom(setLibraryAxisAtom);
+  const selectLibraryWork = useSetAtom(selectLibraryWorkAtom);
 
-  const [mode, setMode] = useState<AppMode>(
-    () => parseNavigationUrl(window.location.href).state.mode,
-  );
   const [searchQuery, setSearchQuery] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [showScanModal, setShowScanModal] = useState(false);
@@ -76,11 +79,7 @@ export default function App() {
   });
 
   // ── Settings ─────────────────────────────────────────────
-  const settingsQuery = useQuery({
-    queryKey: SETTINGS_QUERY_KEYS.all(),
-    queryFn: getSettings,
-    retry: 1,
-  });
+  const settingsQuery = useSettingsQuery();
   const settings = settingsQuery.data;
   const isSetupDone: boolean | null = settingsQuery.isPending
     ? null
@@ -90,14 +89,8 @@ export default function App() {
         ? false
         : false;
 
-  // ファイルモードのナビゲーション（フックは早期 return 前に呼ぶ）。
+  // ファイルモードのルートパス（FilesView に渡す）。
   const rootFolder = settings?.rootFolder ?? "/";
-  const filesNav = useFilesNavigation(rootFolder);
-  const navigationHistory = useNavigationHistory({
-    mode,
-    setMode,
-    rootFolder: settings?.rootFolder ?? null,
-  });
 
   // ── DLsite一括取得（設定モーダル・TopBar共有、TASK-41） ────────
   const dlsiteBulk = useDlsiteBulk();
@@ -214,10 +207,10 @@ export default function App() {
   const handleShowPlayingWork = useCallback(() => {
     const workId = player.state.currentWork?.id;
     if (!workId) return;
-    navigationHistory.setMode("library");
-    libraryNav.setAxis("all");
-    libraryNav.selectWork(workId);
-  }, [player.state.currentWork, navigationHistory, libraryNav]);
+    setAppMode("library");
+    setLibraryAxis("all");
+    selectLibraryWork(workId);
+  }, [player.state.currentWork, selectLibraryWork, setAppMode, setLibraryAxis]);
 
   const handleScan = useCallback(() => {
     void scanJob.start().catch(() => {});
@@ -238,11 +231,11 @@ export default function App() {
       setShowRjCodeMissing(false);
       setShowDlsiteFetchFailed(false);
       setShowScanModal(false);
-      navigationHistory.setMode("library");
-      libraryNav.setAxis("all");
-      libraryNav.selectWork(workId);
+      setAppMode("library");
+      setLibraryAxis("all");
+      selectLibraryWork(workId);
     },
-    [navigationHistory, libraryNav],
+    [selectLibraryWork, setAppMode, setLibraryAxis],
   );
 
   // スキャン進捗のリアルタイム表示（TASK-20）。TopBar / SettingsModal / SetupScreen で共有する。
@@ -353,27 +346,8 @@ export default function App() {
           onOpenScanResult={handleOpenScanModal}
         />
       }
-      addressBar={
-        <AddressBar
-          mode={mode}
-          path={mode === "files" ? filesNav.addressPath : libraryNav.addressPath}
-          onNavigate={mode === "files" ? filesNav.goToSegment : libraryNav.goToSegment}
-          onBack={navigationHistory.back}
-          onForward={navigationHistory.forward}
-          canBack={navigationHistory.canBack}
-          canForward={navigationHistory.canForward}
-          showSort={mode === "library"}
-          sort={libraryNav.sort}
-          onSortChange={libraryNav.setSort}
-        />
-      }
-      leftNav={
-        <LeftNav
-          mode={mode}
-          onModeChange={navigationHistory.setMode}
-          playingCount={isPlaying ? 1 : 0}
-        />
-      }
+      addressBar={<AddressBar />}
+      leftNav={<LeftNav playingCount={isPlaying ? 1 : 0} />}
       body={
         mode === "files" ? (
           <FilesView
@@ -433,6 +407,7 @@ export default function App() {
       }
       overlays={
         <>
+          <NavigationHistorySync />
           {showSettings && (
             <SettingsModal
               rootFolder={settings?.rootFolder ?? null}

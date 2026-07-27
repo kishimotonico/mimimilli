@@ -1,6 +1,7 @@
 // files feature の client/UI state。
 // 物理FSの現在地（ルート相対 segments）と選択中エントリを Jotai atom で管理する。
-// ルート絶対パスは settings 由来（server state）のためここには置かず、フック側で結合する。
+// ルート絶対パスは settings 由来（server state）のためここには置かず、
+// フックや UI コンポーネント側で結合する。操作は filesNavigationActions の write-only atom へ委譲。
 
 import { atom } from "jotai";
 
