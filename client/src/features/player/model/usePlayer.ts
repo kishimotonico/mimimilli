@@ -2,27 +2,24 @@
 // audioEngine（低レベル Audio 操作）と Jotai atoms（state）を橋渡しする。
 //
 // 高頻度更新（currentTime / duration）は atoms から直接 subscribe せず useSetAtom で書くだけ。
-// → App.tsx が player を使っても timeupdate による re-render が起きない。
-// → BarContent / PopupContent / FullScreenPlayer だけが playerCurrentTimeAtom を subscribe する。
+// → leaf UI だけが playerCurrentTimeAtom を subscribe する。
+//
+// core state は usePlayerState / leaf コンポーネントでのみ購読する。
+// ランタイム（エンジン・コマンド処理）は usePlayerRuntime を <PlayerRuntime /> 内でだけ呼ぶ。
 
-import { useRef, useCallback, useMemo, useEffect } from "react";
-import { useAtom, useSetAtom } from "jotai";
+import { useCallback, useEffect, useMemo } from "react";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useQueryClient } from "@tanstack/react-query";
 import type { WorkListItem, Work } from "../../../entities/work/model";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { useMediaSession } from "./useMediaSession";
 import { toAudioAbsoluteTime, getTrackDurationSec, type PlaybackTrack } from "./trackTime";
 import { playerCoreAtom, playerCurrentTimeAtom, playerDurationAtom } from "./atoms";
-import type { PlayerRuntimeRefs } from "./playerRuntime";
+import { usePlayerRuntimeContext } from "./PlayerRuntimeProvider";
 import { useAudioEngineLifecycle } from "./useAudioEngineLifecycle";
 import { useResumePersistenceController } from "./useResumePersistence";
 import { formatTime, formatDuration, formatFileSize } from "../../../shared/lib/format";
-import {
-  PlayerController,
-  toPlayerCoreState,
-  type PlaybackItem,
-  type PlayerCoreState,
-} from "./playerController";
+import { toPlayerCoreState, type PlaybackItem, type PlayerCoreState } from "./playerController";
 
 // ── 後方互換 re-export ─────────────────────────────────────────
 export { formatTime, formatDuration, formatFileSize };
@@ -35,125 +32,19 @@ export type { PlayerCoreState };
  */
 export type PlayerState = PlayerCoreState;
 
-export function usePlayer() {
-  const queryClient = useQueryClient();
-  const [coreState, setCoreState] = useAtom(playerCoreAtom);
-  const setCurrentTime = useSetAtom(playerCurrentTimeAtom); // subscribe しない
-  const setDuration = useSetAtom(playerDurationAtom); // subscribe しない
-  const controllerRef = useRef<PlayerController | null>(null);
-  if (controllerRef.current === null) controllerRef.current = new PlayerController();
-  const controller = controllerRef.current;
+export function usePlayerState(): PlayerCoreState {
+  return useAtomValue(playerCoreAtom);
+}
 
-  const coreStateRef = useRef(coreState);
-  coreStateRef.current = coreState;
-  const engineRef = useRef<PlayerRuntimeRefs["engine"]["current"]>(null);
-  const loadedTrackRef = useRef<PlayerRuntimeRefs["loadedTrack"]["current"]>(null);
-  const trackEndedRef = useRef(false);
-  const updateMediaSessionPositionRef = useRef<(position?: number) => void>(() => {});
-  const filesModeFileDurationSecRef = useRef<number | null>(null);
-
-  const runtimeRefs = useMemo<PlayerRuntimeRefs>(
-    () => ({
-      coreState: coreStateRef,
-      engine: engineRef,
-      loadedTrack: loadedTrackRef,
-      trackEnded: trackEndedRef,
-      updateMediaSessionPosition: updateMediaSessionPositionRef,
-      filesModeFileDurationSec: filesModeFileDurationSecRef,
-    }),
-    [],
-  );
-
-  useEffect(
-    () =>
-      controller.subscribeState((state) => {
-        setCoreState(toPlayerCoreState(state));
-        setCurrentTime(state.positionSec);
-        setDuration(state.durationSec);
-      }),
-    [controller, setCoreState, setCurrentTime, setDuration],
-  );
-
+export function usePlayerActions() {
   const {
-    pendingResumeRef,
-    consumePendingResume,
-    enqueueResumeSave,
-    saveCurrentResume,
-    loadResume,
-  } = useResumePersistenceController({
-    refs: runtimeRefs,
-  });
-  const resetResumeCache = useCallback(
-    (workId: string, playlistId: string, trackId: string) => {
-      queryClient.setQueryData<Work>(WORK_QUERY_KEYS.detail(workId), (cachedWork) =>
-        cachedWork ? { ...cachedWork, resume: { playlistId, trackId, offsetSec: 0 } } : cachedWork,
-      );
-    },
-    [queryClient],
-  );
-  const { getCurrentPlaybackContext } = useAudioEngineLifecycle({
-    coreState,
-    refs: runtimeRefs,
     controller,
-    consumePendingResume,
-  });
-
-  useEffect(() => {
-    return controller.subscribeCommands((command) => {
-      const engine = engineRef.current;
-      switch (command.type) {
-        case "playAudio":
-          engine?.play();
-          break;
-        case "pauseAudio":
-          engine?.pause();
-          break;
-        case "seekAudio": {
-          const loaded = loadedTrackRef.current;
-          if (!engine || !loaded) break;
-          const duration = getTrackDurationSec(loaded.track, filesModeFileDurationSecRef.current);
-          engine.seek(toAudioAbsoluteTime(command.positionSec, loaded.track, duration));
-          setCurrentTime(command.positionSec);
-          updateMediaSessionPositionRef.current(command.positionSec);
-          break;
-        }
-        case "setAudioVolume":
-          engine?.setVolume(command.volume);
-          break;
-        case "setAudioPlaybackRate":
-          engine?.setPlaybackRate(command.playbackRate);
-          break;
-        case "setAudioChannelSwap":
-          engine?.setChannelSwap(command.enabled);
-          break;
-        case "persistResume":
-          saveCurrentResume();
-          break;
-        case "workCompleted": {
-          const firstTrack = command.item.tracks[0];
-          if (command.item.playlistId === null || !firstTrack) break;
-          enqueueResumeSave(command.item.work.id, {
-            playlistId: command.item.playlistId,
-            trackId: firstTrack.id,
-            offsetSec: 0,
-          });
-          resetResumeCache(command.item.work.id, command.item.playlistId, firstTrack.id);
-          break;
-        }
-        case "loadTrack":
-        case "playbackQueueEnded":
-          break;
-      }
-    });
-  }, [controller, enqueueResumeSave, resetResumeCache, saveCurrentResume, setCurrentTime]);
-
-  useEffect(() => {
-    if (controller.getState().status !== "playing") return;
-    const intervalId = setInterval(() => controller.dispatch({ type: "persistTick" }), 5000);
-    return () => clearInterval(intervalId);
-  }, [controller, coreState.isPlaying, coreState.currentTrackIndex]);
-
-  // ── アクション ────────────────────────────────────────────
+    lastVolumeRef,
+    pendingResumeRef,
+    runtimeRefs,
+    getCurrentPlaybackContextRef,
+    loadResumeRef,
+  } = usePlayerRuntimeContext();
 
   const startPlayback = useCallback(
     (
@@ -190,11 +81,13 @@ export function usePlayer() {
 
   const playWithResume = useCallback(
     (work: Work) => {
+      const loadResume = loadResumeRef.current;
+      if (!loadResume) return;
       const resume = loadResume(work);
       if (!resume) return;
       startPlayback(work, resume.tracks, resume.trackIndex, resume.playlistId, resume.positionSec);
     },
-    [loadResume, startPlayback],
+    [loadResumeRef, startPlayback],
   );
 
   const togglePlay = useCallback(() => {
@@ -212,23 +105,24 @@ export function usePlayer() {
   const stop = useCallback(() => {
     pendingResumeRef.current = null;
     controller.dispatch({ type: "stopRequested" });
-    loadedTrackRef.current = null;
-  }, [controller, pendingResumeRef]);
+    runtimeRefs.loadedTrack.current = null;
+  }, [controller, pendingResumeRef, runtimeRefs.loadedTrack]);
 
   const seek = useCallback(
     (time: number) => {
-      if (!getCurrentPlaybackContext()) return;
+      if (!getCurrentPlaybackContextRef.current()) return;
       controller.dispatch({ type: "seekRequested", positionSec: time });
     },
-    [controller, getCurrentPlaybackContext],
+    [controller, getCurrentPlaybackContextRef],
   );
+
   const seekRelative = useCallback(
     (delta: number) => {
-      const context = getCurrentPlaybackContext();
+      const context = getCurrentPlaybackContextRef.current();
       if (!context) return;
       controller.dispatch({ type: "seekRequested", positionSec: context.currentTime + delta });
     },
-    [controller, getCurrentPlaybackContext],
+    [controller, getCurrentPlaybackContextRef],
   );
 
   const setVolume = useCallback(
@@ -238,8 +132,6 @@ export function usePlayer() {
     [controller],
   );
 
-  // ミュート前の音量を覚えておき、解除時に復元する。
-  const lastVolumeRef = useRef(coreState.volume || 75);
   const toggleMute = useCallback(() => {
     const volume = controller.getState().volume;
     if (volume > 0) {
@@ -249,7 +141,7 @@ export function usePlayer() {
       const restored = lastVolumeRef.current || 75;
       controller.dispatch({ type: "volumeChanged", volume: restored });
     }
-  }, [controller]);
+  }, [controller, lastVolumeRef]);
 
   const setLoop = useCallback(
     (loop: boolean) => {
@@ -296,15 +188,170 @@ export function usePlayer() {
 
   const setABPoint = useCallback(
     (point: "a" | "b") => {
-      const time = getCurrentPlaybackContext()?.currentTime ?? 0;
+      const time = getCurrentPlaybackContextRef.current()?.currentTime ?? 0;
       controller.dispatch({ type: "abPointSet", point, positionSec: time });
     },
-    [controller, getCurrentPlaybackContext],
+    [controller, getCurrentPlaybackContextRef],
   );
 
   const clearABRepeat = useCallback(() => {
     controller.dispatch({ type: "abCleared" });
   }, [controller]);
+
+  return useMemo(
+    () => ({
+      play,
+      playWithResume,
+      togglePlay,
+      stop,
+      seek,
+      seekRelative,
+      setVolume,
+      toggleMute,
+      setLoop,
+      nextTrack,
+      prevTrack,
+      setTrackIndex,
+      setShowFullPlayer,
+      setPlaybackRate,
+      setChannelSwap,
+      setABPoint,
+      clearABRepeat,
+      resume,
+      pause,
+    }),
+    [
+      play,
+      playWithResume,
+      togglePlay,
+      stop,
+      seek,
+      seekRelative,
+      setVolume,
+      toggleMute,
+      setLoop,
+      nextTrack,
+      prevTrack,
+      setTrackIndex,
+      setShowFullPlayer,
+      setPlaybackRate,
+      setChannelSwap,
+      setABPoint,
+      clearABRepeat,
+      resume,
+      pause,
+    ],
+  );
+}
+
+export function usePlayerRuntime() {
+  const queryClient = useQueryClient();
+  const { controller, pendingResumeRef, runtimeRefs, getCurrentPlaybackContextRef, loadResumeRef } =
+    usePlayerRuntimeContext();
+  const [coreState, setCoreState] = useAtom(playerCoreAtom);
+  const setCurrentTime = useSetAtom(playerCurrentTimeAtom);
+  const setDuration = useSetAtom(playerDurationAtom);
+
+  runtimeRefs.coreState.current = coreState;
+
+  useEffect(
+    () =>
+      controller.subscribeState((state) => {
+        setCoreState(toPlayerCoreState(state));
+        setCurrentTime(state.positionSec);
+        setDuration(state.durationSec);
+      }),
+    [controller, setCoreState, setCurrentTime, setDuration],
+  );
+
+  const { consumePendingResume, enqueueResumeSave, saveCurrentResume, loadResume } =
+    useResumePersistenceController({
+      refs: runtimeRefs,
+      pendingResumeRef,
+    });
+  loadResumeRef.current = loadResume;
+
+  const resetResumeCache = useCallback(
+    (workId: string, playlistId: string, trackId: string) => {
+      queryClient.setQueryData<Work>(WORK_QUERY_KEYS.detail(workId), (cachedWork) =>
+        cachedWork ? { ...cachedWork, resume: { playlistId, trackId, offsetSec: 0 } } : cachedWork,
+      );
+    },
+    [queryClient],
+  );
+
+  const { getCurrentPlaybackContext } = useAudioEngineLifecycle({
+    coreState,
+    refs: runtimeRefs,
+    controller,
+    consumePendingResume,
+  });
+  getCurrentPlaybackContextRef.current = getCurrentPlaybackContext;
+
+  useEffect(() => {
+    return controller.subscribeCommands((command) => {
+      const engine = runtimeRefs.engine.current;
+      switch (command.type) {
+        case "playAudio":
+          engine?.play();
+          break;
+        case "pauseAudio":
+          engine?.pause();
+          break;
+        case "seekAudio": {
+          const loaded = runtimeRefs.loadedTrack.current;
+          if (!engine || !loaded) break;
+          const duration = getTrackDurationSec(
+            loaded.track,
+            runtimeRefs.filesModeFileDurationSec.current,
+          );
+          engine.seek(toAudioAbsoluteTime(command.positionSec, loaded.track, duration));
+          setCurrentTime(command.positionSec);
+          runtimeRefs.updateMediaSessionPosition.current(command.positionSec);
+          break;
+        }
+        case "setAudioVolume":
+          engine?.setVolume(command.volume);
+          break;
+        case "setAudioPlaybackRate":
+          engine?.setPlaybackRate(command.playbackRate);
+          break;
+        case "setAudioChannelSwap":
+          engine?.setChannelSwap(command.enabled);
+          break;
+        case "persistResume":
+          saveCurrentResume();
+          break;
+        case "workCompleted": {
+          const firstTrack = command.item.tracks[0];
+          if (command.item.playlistId === null || !firstTrack) break;
+          enqueueResumeSave(command.item.work.id, {
+            playlistId: command.item.playlistId,
+            trackId: firstTrack.id,
+            offsetSec: 0,
+          });
+          resetResumeCache(command.item.work.id, command.item.playlistId, firstTrack.id);
+          break;
+        }
+        case "loadTrack":
+        case "playbackQueueEnded":
+          break;
+      }
+    });
+  }, [
+    controller,
+    enqueueResumeSave,
+    resetResumeCache,
+    runtimeRefs,
+    saveCurrentResume,
+    setCurrentTime,
+  ]);
+
+  useEffect(() => {
+    if (controller.getState().status !== "playing") return;
+    const intervalId = setInterval(() => controller.dispatch({ type: "persistTick" }), 5000);
+    return () => clearInterval(intervalId);
+  }, [controller, coreState.isPlaying, coreState.currentTrackIndex]);
 
   const getMediaSessionPosition = useCallback(() => {
     const context = getCurrentPlaybackContext();
@@ -312,10 +359,11 @@ export function usePlayer() {
     return {
       duration: context.trackDuration,
       position: context.currentTime,
-      playbackRate: coreStateRef.current.playbackRate,
+      playbackRate: runtimeRefs.coreState.current.playbackRate,
     };
-  }, [getCurrentPlaybackContext]);
+  }, [getCurrentPlaybackContext, runtimeRefs.coreState]);
 
+  const actions = usePlayerActions();
   const updateMediaSessionPosition = useMediaSession({
     currentWork: coreState.currentWork,
     currentTrack: coreState.tracks[coreState.currentTrackIndex] ?? null,
@@ -324,33 +372,12 @@ export function usePlayer() {
     isPlaying: coreState.isPlaying,
     playbackRate: coreState.playbackRate,
     getPosition: getMediaSessionPosition,
-    onPlay: resume,
-    onPause: pause,
-    onPreviousTrack: prevTrack,
-    onNextTrack: nextTrack,
-    onSeek: seek,
-    onSeekRelative: seekRelative,
+    onPlay: actions.resume,
+    onPause: actions.pause,
+    onPreviousTrack: actions.prevTrack,
+    onNextTrack: actions.nextTrack,
+    onSeek: actions.seek,
+    onSeekRelative: actions.seekRelative,
   });
-  updateMediaSessionPositionRef.current = updateMediaSessionPosition;
-
-  return {
-    state: coreState,
-    play,
-    playWithResume,
-    togglePlay,
-    stop,
-    seek,
-    seekRelative,
-    setVolume,
-    toggleMute,
-    setLoop,
-    nextTrack,
-    prevTrack,
-    setTrackIndex,
-    setShowFullPlayer,
-    setPlaybackRate,
-    setChannelSwap,
-    setABPoint,
-    clearABRepeat,
-  };
+  runtimeRefs.updateMediaSessionPosition.current = updateMediaSessionPosition;
 }

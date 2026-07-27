@@ -10,6 +10,11 @@ import { useAtomValue } from "jotai";
 import { browseFs } from "../api";
 import { useFilesNavigation } from "../model/useFilesNavigation";
 import { filesDirectionAtom } from "../model/atoms";
+import {
+  playerIsPlaybackActiveAtom,
+  playingTrackRelPathAtom,
+  playingWorkIdAtom,
+} from "../../player/model/atoms";
 import { rootLabel, type FsEntry } from "../model/types";
 import { FILE_SYSTEM_QUERY_KEYS } from "../../../entities/file-system/queryKeys";
 import FileColumn from "./FileColumn";
@@ -49,23 +54,15 @@ const colVariants = {
 
 interface FilesViewProps {
   rootFolder: string;
-  /** 再生中の作品 ID */
-  playingWorkId?: string;
-  /** 再生中トラックの作品相対パス（= FsEntry.workRelPath と突合） */
-  playingRelPath?: string | null;
-  isPlaybackActive?: boolean;
   onPlayFile: (entry: FsEntry) => void;
 }
 
-export default function FilesView({
-  rootFolder,
-  playingWorkId,
-  playingRelPath,
-  isPlaybackActive,
-  onPlayFile,
-}: FilesViewProps) {
+export default function FilesView({ rootFolder, onPlayFile }: FilesViewProps) {
   const nav = useFilesNavigation(rootFolder);
   const direction = useAtomValue(filesDirectionAtom);
+  const playingWorkId = useAtomValue(playingWorkIdAtom);
+  const playingRelPath = useAtomValue(playingTrackRelPathAtom);
+  const isPlaybackActive = useAtomValue(playerIsPlaybackActiveAtom);
 
   const cwdQuery = useQuery({
     queryKey: FILE_SYSTEM_QUERY_KEYS.directory(nav.cwd),

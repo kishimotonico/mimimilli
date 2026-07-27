@@ -1,10 +1,7 @@
 import { useAtomValue, useSetAtom } from "jotai";
 import { appModeAtom, setAppModeAtom } from "../../features/navigation/model/navigationAtoms";
+import { playerIsActiveAtom } from "../../features/player/model/atoms";
 import { I, type IconName } from "../../shared/ui/Icon";
-
-interface LeftNavProps {
-  playingCount?: number;
-}
 
 interface SurfaceItem {
   icon: IconName;
@@ -19,9 +16,10 @@ const SURFACES: SurfaceItem[] = [
   { icon: "bookmark", label: "ピン留め" },
 ];
 
-export default function LeftNav({ playingCount = 0 }: LeftNavProps) {
+export default function LeftNav() {
   const mode = useAtomValue(appModeAtom);
   const setAppMode = useSetAtom(setAppModeAtom);
+  const playingCount = useAtomValue(playerIsActiveAtom) ? 1 : 0;
 
   return (
     <nav className="mle-side" aria-label="メインナビゲーション">

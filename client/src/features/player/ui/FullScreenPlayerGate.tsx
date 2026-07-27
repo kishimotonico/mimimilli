@@ -1,0 +1,30 @@
+import { useAtomValue } from "jotai";
+import { playerIsActiveAtom } from "../model/atoms";
+import { usePlayerActions, usePlayerState } from "../model/usePlayer";
+import FullScreenPlayer from "./FullScreenPlayer";
+
+export default function FullScreenPlayerGate() {
+  const state = usePlayerState();
+  const actions = usePlayerActions();
+  const isActive = useAtomValue(playerIsActiveAtom);
+
+  if (!isActive || !state.showFullPlayer) return null;
+
+  return (
+    <FullScreenPlayer
+      state={state}
+      onTogglePlay={actions.togglePlay}
+      onSeek={actions.seek}
+      onSeekRelative={actions.seekRelative}
+      onSetVolume={actions.setVolume}
+      onSetLoop={actions.setLoop}
+      onNext={actions.nextTrack}
+      onPrev={actions.prevTrack}
+      onSelectTrack={actions.setTrackIndex}
+      onClose={() => actions.setShowFullPlayer(false)}
+      onSetChannelSwap={actions.setChannelSwap}
+      onSetABPoint={actions.setABPoint}
+      onClearABRepeat={actions.clearABRepeat}
+    />
+  );
+}

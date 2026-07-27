@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import type { ScanResult } from "@mimimilli/shared";
 import { I } from "../../shared/ui/Icon";
 import IconButton from "../../shared/ui/IconButton";
+import { useAtomValue } from "jotai";
 import { AnimatePresence, motion } from "motion/react";
+import { playerIsActiveAtom, playingTrackTitleAtom } from "../../features/player/model/atoms";
 import NotificationBell from "./NotificationBell";
 
 const FADE = { duration: 0.15 };
@@ -14,8 +16,6 @@ interface TopBarProps {
   /** スキャンボタン押下時。即時実行はせずスキャンモーダルを開く（TASK-56） */
   onOpenScan?: () => void;
   onSettings?: () => void;
-  isPlaying?: boolean;
-  playingTrack?: string;
   /** スキャン実行中かどうか（TASK-20: SSE進捗表示） */
   scanning?: boolean;
   /** scanning 中の進捗ラベル（例: "作品を登録中 (3/12)"）。null は「進捗未受信」を表す */
@@ -58,8 +58,6 @@ export default function TopBar({
   onSearchChange,
   onOpenScan,
   onSettings,
-  isPlaying = false,
-  playingTrack,
   scanning = false,
   scanProgressLabel = null,
   rjCodeMissingCount = 0,
@@ -78,6 +76,9 @@ export default function TopBar({
   scanResult = null,
   onOpenScanResult = () => {},
 }: TopBarProps) {
+  const isPlaying = useAtomValue(playerIsActiveAtom);
+  const playingTrack = useAtomValue(playingTrackTitleAtom);
+
   const placeholder =
     mode === "files"
       ? "このフォルダー内を検索（ファイル名 · 拡張子 ...）"

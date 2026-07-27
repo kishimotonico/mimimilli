@@ -1,6 +1,7 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Provider as JotaiProvider } from "jotai";
 import { lazy, Suspense, type ReactNode } from "react";
+import { PlayerRuntimeProvider } from "../features/player/model/PlayerRuntimeProvider";
 import { queryClient } from "../shared/api/queryClient";
 
 interface ProvidersProps {
@@ -39,13 +40,15 @@ export default function Providers({ children }: ProvidersProps) {
   return (
     <QueryClientProvider client={queryClient}>
       <JotaiProvider>
-        {children}
-        {ReactQueryDevtools && (
-          <Suspense fallback={null}>
-            {/* 既定の bottom-right だとプレイヤーのバー/ポップアップと重なるため左下に配置する */}
-            <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-left" />
-          </Suspense>
-        )}
+        <PlayerRuntimeProvider>
+          {children}
+          {ReactQueryDevtools && (
+            <Suspense fallback={null}>
+              {/* 既定の bottom-right だとプレイヤーのバー/ポップアップと重なるため左下に配置する */}
+              <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-left" />
+            </Suspense>
+          )}
+        </PlayerRuntimeProvider>
       </JotaiProvider>
     </QueryClientProvider>
   );

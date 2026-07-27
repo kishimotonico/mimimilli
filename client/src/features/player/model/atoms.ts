@@ -2,10 +2,10 @@
 //
 // 設計方針（issue参照）:
 //   - playerCoreAtom: isPlaying / currentWork / tracks 等の低頻度 state
-//     → App.tsx や LeftNav など広い範囲が subscribe してもコストが低い
+//     → PlayerDock など state 全体が必要な leaf で subscribe する
+//   - 派生 atom: TopBar / LeftNav など一部の値だけ必要な購読者向け
 //   - playerCurrentTimeAtom / playerDurationAtom: timeupdate ごとに更新される高頻度 state
 //     → BarContent / PopupContent / FullScreenPlayer のみが subscribe する
-//     → App.tsx は subscribe しないため、再生中に不要な re-render が起きない
 //
 // currentTime / duration は PlayerState の型には残さず、atom からのみ読む。
 
@@ -18,6 +18,41 @@ export { PLAYER_CORE_INITIAL, type PlayerCoreState } from "./playerController";
 /** 低頻度更新の player core state */
 export const playerCoreAtom = atom<PlayerCoreState>(PLAYER_CORE_INITIAL);
 
+export const playerIsActiveAtom = atom((get) => {
+  const state = get(playerCoreAtom);
+  return state.currentTrackIndex >= 0 && state.currentWork !== null;
+});
+
+export const playerIsPlaybackActiveAtom = atom((get) => get(playerCoreAtom).isPlaying);
+
+export const playingWorkIdAtom = atom((get) => get(playerCoreAtom).currentWork?.id);
+
+export const playingTrackIndexAtom = atom((get) => get(playerCoreAtom).currentTrackIndex);
+
+export const playingTrackTitleAtom = atom((get) => {
+  const state = get(playerCoreAtom);
+  if (state.currentTrackIndex < 0 || state.currentWork === null) return undefined;
+  return state.tracks[state.currentTrackIndex]?.title;
+});
+
+export const playingTrackRelPathAtom = atom((get) => {
+  const state = get(playerCoreAtom);
+  if (state.currentTrackIndex < 0) return null;
+  return state.tracks[state.currentTrackIndex]?.file ?? null;
+});
+
+export type PlayerUiMode = "bar" | "popup";
+
+/**
+ * 画面下張り付きバー / 右下ポップアップのどちらを使っていたか。
+ * localStorage に永続化し、次回再生時に復元する（issue参照）。
+ */
+export const playerUiModeAtom = atomWithStorage<PlayerUiMode>("mimimilli:playerUiMode", "bar");
+
+export const dockedBarActiveAtom = atom(
+  (get) => get(playerIsActiveAtom) && get(playerUiModeAtom) === "bar",
+);
+
 /**
  * 高頻度更新の audio 再生時刻（秒）。
  * BarContent / PopupContent / FullScreenPlayer のみ subscribe すること。
@@ -29,11 +64,3 @@ export const playerCurrentTimeAtom = atom(0);
  * BarContent / PopupContent / FullScreenPlayer のみ subscribe すること。
  */
 export const playerDurationAtom = atom<number | null>(0);
-
-export type PlayerUiMode = "bar" | "popup";
-
-/**
- * 画面下張り付きバー / 右下ポップアップのどちらを使っていたか。
- * localStorage に永続化し、次回再生時に復元する（issue参照）。
- */
-export const playerUiModeAtom = atomWithStorage<PlayerUiMode>("mimimilli:playerUiMode", "bar");

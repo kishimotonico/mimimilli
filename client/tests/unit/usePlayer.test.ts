@@ -3,7 +3,12 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore, useAtomValue } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { usePlayer } from "../../src/features/player/model/usePlayer";
+import { PlayerRuntimeProvider } from "../../src/features/player/model/PlayerRuntimeProvider";
+import {
+  usePlayerActions,
+  usePlayerRuntime,
+  usePlayerState,
+} from "../../src/features/player/model/usePlayer";
 import { playerCurrentTimeAtom, playerDurationAtom } from "../../src/features/player/model/atoms";
 import { saveResumePosition } from "../../src/features/player/api";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
@@ -58,17 +63,31 @@ function makeWrapper({
     const tree = createElement(
       QueryClientProvider,
       { client: queryClient },
-      createElement(JotaiProvider, { store }, children),
+      createElement(
+        JotaiProvider,
+        { store },
+        createElement(
+          PlayerRuntimeProvider,
+          null,
+          createElement(PlayerRuntimeHarness, null, children),
+        ),
+      ),
     );
     return strict ? createElement(StrictMode, null, tree) : tree;
   };
 }
 
+function PlayerRuntimeHarness({ children }: { children: ReactNode }) {
+  usePlayerRuntime();
+  return children;
+}
+
 function usePlayerWithClock() {
-  const player = usePlayer();
+  const player = usePlayerActions();
+  const state = usePlayerState();
   const currentTime = useAtomValue(playerCurrentTimeAtom);
   const duration = useAtomValue(playerDurationAtom);
-  return { player, currentTime, duration };
+  return { player: { ...player, state }, currentTime, duration };
 }
 
 const track: Track = {
@@ -388,5 +407,20 @@ describe("usePlayer adapters", () => {
       offsetSec: 42,
     });
     expect(result.current.player.state.currentWork).toBeNull();
+  });
+
+  it("toggleMuteでミュート前の音量を復元する", async () => {
+    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
+    act(() => result.current.player.play(work, [track], 0, playlistId));
+    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
+
+    act(() => result.current.player.setVolume(50));
+    await waitFor(() => expect(result.current.player.state.volume).toBe(50));
+
+    act(() => result.current.player.toggleMute());
+    await waitFor(() => expect(result.current.player.state.volume).toBe(0));
+
+    act(() => result.current.player.toggleMute());
+    await waitFor(() => expect(result.current.player.state.volume).toBe(50));
   });
 });

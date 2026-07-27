@@ -7,6 +7,11 @@ import {
   type WorkListItem,
 } from "@mimimilli/shared";
 import { libraryViewModeAtom } from "../model/atoms";
+import {
+  playerIsPlaybackActiveAtom,
+  playingTrackIndexAtom,
+  playingWorkIdAtom,
+} from "../../player/model/atoms";
 import { useLibraryView } from "../model/useLibraryNavigation";
 import { useLibraryQueries, useSmartFolderMutation } from "../model/useLibraryQueries";
 import {
@@ -32,9 +37,6 @@ import SmartFolderEditorModal from "./SmartFolderEditorModal";
 interface LibraryViewProps {
   searchQuery: string;
   onSearchChange: (q: string) => void;
-  playingWorkId?: string;
-  playingTrackIndex?: number;
-  isPlaybackActive?: boolean;
   onPlay: (work: WorkListItem, trackIndex: number) => void;
   onResume: (work: Work) => void;
 }
@@ -42,13 +44,13 @@ interface LibraryViewProps {
 export default function LibraryView({
   searchQuery,
   onSearchChange,
-  playingWorkId,
-  playingTrackIndex,
-  isPlaybackActive,
   onPlay,
   onResume,
 }: LibraryViewProps) {
   const viewMode = useAtomValue(libraryViewModeAtom);
+  const playingWorkId = useAtomValue(playingWorkIdAtom);
+  const playingTrackIndex = useAtomValue(playingTrackIndexAtom);
+  const isPlaybackActive = useAtomValue(playerIsPlaybackActiveAtom);
   const nav = useLibraryView();
   const [smartFolderEditor, setSmartFolderEditor] = useState<SmartFolderEditorState>(
     closedSmartFolderEditorState,

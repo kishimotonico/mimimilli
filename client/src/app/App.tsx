@@ -1,14 +1,14 @@
 // App: アプリ全体のオーケストレーション。
 // - 設定・スキャン・フォルダー変更を TanStack Query で管理
-// - player フックを保持し、library / player UI に props を流す
+// - 再生開始は usePlayerActions のみ利用（state は leaf で購読）
 // - レイアウトは AppShell に委譲
 
 import { useState, useCallback, useRef } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { usePlayer } from "../features/player/model/usePlayer";
-import { playerUiModeAtom } from "../features/player/model/atoms";
-import { useGlobalShortcuts } from "./model/useGlobalShortcuts";
+import { usePlayerActions } from "../features/player/model/usePlayer";
+import PlayerRuntime from "../features/player/ui/PlayerRuntime";
+import FullScreenPlayerGate from "../features/player/ui/FullScreenPlayerGate";
 import AppShell from "./AppShell";
 import TopBar from "./ui/TopBar";
 import LeftNav from "./ui/LeftNav";
@@ -20,7 +20,6 @@ import { SETTINGS_QUERY_KEYS } from "../entities/settings/queryKeys";
 import FilesView from "../features/files/ui/FilesView";
 import type { FsEntry } from "../features/files/model/types";
 import PlayerDock from "../features/player/ui/PlayerDock";
-import FullScreenPlayer from "../features/player/ui/FullScreenPlayer";
 import SetupScreen from "../features/setup/ui/SetupScreen";
 import SettingsModal from "../features/settings/ui/SettingsModal";
 import ScanModal from "../features/scan/ui/ScanModal";
@@ -49,7 +48,7 @@ import {
 import NavigationHistorySync from "../features/navigation/ui/NavigationHistorySync";
 
 export default function App() {
-  const player = usePlayer();
+  const player = usePlayerActions();
   const queryClient = useQueryClient();
   const playRequestIdRef = useRef(0);
   const mode = useAtomValue(appModeAtom);
@@ -64,19 +63,6 @@ export default function App() {
   const [showRjCodeMissing, setShowRjCodeMissing] = useState(false);
   const [showDlsiteFetchFailed, setShowDlsiteFetchFailed] = useState(false);
   const [showDlsiteParseFailed, setShowDlsiteParseFailed] = useState(false);
-
-  const isPlaying = player.state.currentTrackIndex >= 0 && player.state.currentWork !== null;
-  const isPlaybackActive = player.state.isPlaying;
-  // バー表示中のみコンテンツ側に padding-bottom を確保する（ポップアップは小さく被りが少ないため対象外）
-  const uiMode = useAtomValue(playerUiModeAtom);
-  const dockedBarActive = isPlaying && uiMode === "bar";
-
-  // ── キーボードショートカット ───────────────────────────────
-  useGlobalShortcuts({
-    onTogglePlay: player.togglePlay,
-    onSeekRelative: player.seekRelative,
-    isActive: isPlaying,
-  });
 
   // ── Settings ─────────────────────────────────────────────
   const settingsQuery = useSettingsQuery();
@@ -202,16 +188,6 @@ export default function App() {
     [player, queryClient],
   );
 
-  // 再生中の作品をライブラリ「すべての作品」上で選択状態にして表示する。
-  // ファイル欠損等で登録から外れた作品の場合、該当なしになるが実害はない。
-  const handleShowPlayingWork = useCallback(() => {
-    const workId = player.state.currentWork?.id;
-    if (!workId) return;
-    setAppMode("library");
-    setLibraryAxis("all");
-    selectLibraryWork(workId);
-  }, [player.state.currentWork, selectLibraryWork, setAppMode, setLibraryAxis]);
-
   const handleScan = useCallback(() => {
     void scanJob.start().catch(() => {});
   }, [scanJob]);
@@ -312,12 +288,8 @@ export default function App() {
     );
   }
 
-  const currentTrack = isPlaying ? player.state.tracks[player.state.currentTrackIndex] : null;
-  const playingRelPath = currentTrack?.file ?? null;
-
   return (
     <AppShell
-      dockedBarActive={dockedBarActive}
       topBar={
         <TopBar
           mode={mode}
@@ -325,8 +297,6 @@ export default function App() {
           onSearchChange={setSearchQuery}
           onOpenScan={handleOpenScanModal}
           onSettings={() => setShowSettings(true)}
-          isPlaying={isPlaying}
-          playingTrack={currentTrack?.title}
           scanning={scanJob.scanning}
           scanProgressLabel={scanProgressLabel}
           rjCodeMissingCount={dlsiteRjMissing.count}
@@ -347,66 +317,24 @@ export default function App() {
         />
       }
       addressBar={<AddressBar />}
-      leftNav={<LeftNav playingCount={isPlaying ? 1 : 0} />}
+      leftNav={<LeftNav />}
       body={
         mode === "files" ? (
-          <FilesView
-            rootFolder={rootFolder}
-            playingWorkId={player.state.currentWork?.id}
-            playingRelPath={playingRelPath}
-            isPlaybackActive={isPlaybackActive}
-            onPlayFile={handlePlayFile}
-          />
+          <FilesView rootFolder={rootFolder} onPlayFile={handlePlayFile} />
         ) : (
           <LibraryView
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
-            playingWorkId={player.state.currentWork?.id}
-            playingTrackIndex={player.state.currentTrackIndex}
-            isPlaybackActive={isPlaybackActive}
             onPlay={handlePlay}
             onResume={handleResume}
           />
         )
       }
-      transportBar={
-        <PlayerDock
-          isPlaying={isPlaying}
-          state={player.state}
-          onTogglePlay={player.togglePlay}
-          onSeek={player.seek}
-          onSeekRelative={player.seekRelative}
-          onSetVolume={player.setVolume}
-          onToggleMute={player.toggleMute}
-          onSetLoop={player.setLoop}
-          onSetPlaybackRate={player.setPlaybackRate}
-          onNext={player.nextTrack}
-          onPrev={player.prevTrack}
-          onExpandFullScreen={() => player.setShowFullPlayer(true)}
-          onShowPlayingWork={handleShowPlayingWork}
-        />
-      }
-      fullScreenPlayer={
-        isPlaying && player.state.showFullPlayer ? (
-          <FullScreenPlayer
-            state={player.state}
-            onTogglePlay={player.togglePlay}
-            onSeek={player.seek}
-            onSeekRelative={player.seekRelative}
-            onSetVolume={player.setVolume}
-            onSetLoop={player.setLoop}
-            onNext={player.nextTrack}
-            onPrev={player.prevTrack}
-            onSelectTrack={player.setTrackIndex}
-            onClose={() => player.setShowFullPlayer(false)}
-            onSetChannelSwap={player.setChannelSwap}
-            onSetABPoint={player.setABPoint}
-            onClearABRepeat={player.clearABRepeat}
-          />
-        ) : undefined
-      }
+      transportBar={<PlayerDock />}
+      fullScreenPlayer={<FullScreenPlayerGate />}
       overlays={
         <>
+          <PlayerRuntime />
           <NavigationHistorySync />
           {showSettings && (
             <SettingsModal

@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { saveResumePosition } from "../../src/features/player/api";
 import { useResumePersistenceController } from "../../src/features/player/model/useResumePersistence";
+import type { PendingResume } from "../../src/features/player/model/playerRuntime";
 import type { Track, Work } from "../../src/entities/work/model";
 
 vi.mock("../../src/features/player/api", () => ({
@@ -14,6 +15,8 @@ const track: Track = {
   title: "Track",
   file: "track.wav",
 };
+
+const pendingResumeRef = { current: null as PendingResume | null };
 
 function refs() {
   return {
@@ -44,7 +47,9 @@ describe("resume persistence port", () => {
       playlists: [{ id: playlistId, name: "default", tracks: [track] }],
       resume: { playlistId, trackId: track.id, offsetSec: 15 },
     } as Work;
-    const { result } = renderHook(() => useResumePersistenceController({ refs: refs() }));
+    const { result } = renderHook(() =>
+      useResumePersistenceController({ refs: refs(), pendingResumeRef }),
+    );
 
     expect(result.current.loadResume(work)).toEqual({
       playlistId,
@@ -61,7 +66,9 @@ describe("resume persistence port", () => {
       playlists: [{ id: playlistId, name: "default", tracks: [track] }],
       resume: { playlistId, trackId: "missing-track", offsetSec: 15 },
     } as Work;
-    const { result } = renderHook(() => useResumePersistenceController({ refs: refs() }));
+    const { result } = renderHook(() =>
+      useResumePersistenceController({ refs: refs(), pendingResumeRef }),
+    );
 
     expect(result.current.loadResume(work)).toEqual({
       playlistId,
@@ -81,7 +88,9 @@ describe("resume persistence port", () => {
           }),
       )
       .mockResolvedValueOnce(undefined);
-    const { result } = renderHook(() => useResumePersistenceController({ refs: refs() }));
+    const { result } = renderHook(() =>
+      useResumePersistenceController({ refs: refs(), pendingResumeRef }),
+    );
 
     act(() => {
       result.current.saveCurrentResume(75);
