@@ -1,11 +1,9 @@
-import { useEffect, useRef, useState } from "react";
-import type { ScanResult } from "@mimimilli/shared";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { I } from "../../shared/ui/Icon";
 import IconButton from "../../shared/ui/IconButton";
 import { useAtomValue } from "jotai";
 import { AnimatePresence, motion } from "motion/react";
 import { playerIsActiveAtom, playingTrackTitleAtom } from "../../features/player/model/atoms";
-import NotificationBell from "./NotificationBell";
 
 const FADE = { duration: 0.15 };
 
@@ -20,36 +18,15 @@ interface TopBarProps {
   scanning?: boolean;
   /** scanning 中の進捗ラベル（例: "作品を登録中 (3/12)"）。null は「進捗未受信」を表す */
   scanProgressLabel?: string | null;
-  /** RJコード未検出の作品数（0件ならバッジを出さない、TASK-41） */
-  rjCodeMissingCount?: number;
-  /** 通知ベルからRJコード未検出一覧を開く */
-  onOpenRjCodeMissing?: () => void;
-  /** DLsite取得失敗（error/not_found）の作品数（TASK-44） */
-  dlsiteFetchFailedCount?: number;
-  /** 通知ベルからDLsite取得失敗一覧を開く */
-  onOpenDlsiteFetchFailed?: () => void;
-  /** パース失敗アラートが発火しているか */
-  dlsiteParseErrorAlert?: boolean;
-  /** パース失敗の作品数 */
-  dlsiteParseErrorCount?: number;
-  /** 通知ベルからパース失敗一覧を開く */
-  onOpenDlsiteParseFailed?: () => void;
-  /** DLsite未連携（RJコードはあるが未取得）の作品数（TASK-44） */
-  dlsiteUnlinkedCount?: number;
+  notificationBell: ReactNode;
   /** DLsite一括取得（mode: "existing"）が実行中か */
   dlsiteBulkActive?: boolean;
   /** dlsiteBulkActive 中の進捗（例: "3/12"）。null は進捗未受信 */
   dlsiteBulkProgress?: { processed: number; total: number } | null;
-  /** 通知ベルから一括取得を起動する */
-  onStartDlsiteBulk?: () => void;
   /** DLsite一括取得を中止する */
   onCancelDlsiteBulk?: () => void;
   /** DLsite一括取得の中止を要求済みか */
   dlsiteBulkCancelling?: boolean;
-  /** 直近のスキャン結果（通知ベルのサマリ表示用、TASK-44） */
-  scanResult?: ScanResult | null;
-  /** 通知ベルの直近スキャン結果クリックでスキャンモーダルの結果表示を開く（TASK-56） */
-  onOpenScanResult?: () => void;
 }
 
 export default function TopBar({
@@ -60,21 +37,11 @@ export default function TopBar({
   onSettings,
   scanning = false,
   scanProgressLabel = null,
-  rjCodeMissingCount = 0,
-  onOpenRjCodeMissing = () => {},
-  dlsiteFetchFailedCount = 0,
-  onOpenDlsiteFetchFailed = () => {},
-  dlsiteParseErrorAlert = false,
-  dlsiteParseErrorCount = 0,
-  onOpenDlsiteParseFailed = () => {},
-  dlsiteUnlinkedCount = 0,
+  notificationBell,
   dlsiteBulkActive = false,
   dlsiteBulkProgress = null,
-  onStartDlsiteBulk = () => {},
   onCancelDlsiteBulk = () => {},
   dlsiteBulkCancelling = false,
-  scanResult = null,
-  onOpenScanResult = () => {},
 }: TopBarProps) {
   const isPlaying = useAtomValue(playerIsActiveAtom);
   const playingTrack = useAtomValue(playingTrackTitleAtom);
@@ -185,21 +152,7 @@ export default function TopBar({
           </AnimatePresence>
         </>
       )}
-      <NotificationBell
-        rjCodeMissingCount={rjCodeMissingCount}
-        onOpenRjCodeMissing={onOpenRjCodeMissing}
-        dlsiteFetchFailedCount={dlsiteFetchFailedCount}
-        onOpenDlsiteFetchFailed={onOpenDlsiteFetchFailed}
-        dlsiteParseErrorAlert={dlsiteParseErrorAlert}
-        dlsiteParseErrorCount={dlsiteParseErrorCount}
-        onOpenDlsiteParseFailed={onOpenDlsiteParseFailed}
-        dlsiteUnlinkedCount={dlsiteUnlinkedCount}
-        dlsiteBulkActive={dlsiteBulkActive}
-        dlsiteBulkProgress={dlsiteBulkProgress}
-        onStartDlsiteBulk={onStartDlsiteBulk}
-        scanResult={scanResult}
-        onOpenScanResult={onOpenScanResult}
-      />
+      {notificationBell}
       <IconButton size="md" icon={I.cog} label="設定" onClick={onSettings} />
     </header>
   );

@@ -13,6 +13,7 @@ import AppShell from "./AppShell";
 import TopBar from "./ui/TopBar";
 import LeftNav from "./ui/LeftNav";
 import AddressBar from "./ui/AddressBar";
+import NotificationBell from "./ui/NotificationBell";
 import LibraryView from "../features/library/ui/LibraryView";
 import { WORK_QUERY_KEYS } from "../entities/work/queryKeys";
 import { SMART_FOLDER_QUERY_KEYS } from "../entities/smart-folder/queryKeys";
@@ -23,9 +24,7 @@ import PlayerDock from "../features/player/ui/PlayerDock";
 import SetupScreen from "../features/setup/ui/SetupScreen";
 import SettingsModal from "../features/settings/ui/SettingsModal";
 import ScanModal from "../features/scan/ui/ScanModal";
-import RjCodeMissingModal from "../features/library/ui/RjCodeMissingModal";
-import DlsiteFetchFailedModal from "../features/library/ui/DlsiteFetchFailedModal";
-import DlsiteParseFailedModal from "../features/library/ui/DlsiteParseFailedModal";
+import DlsiteNotificationModals from "../features/library/ui/DlsiteNotificationModals";
 import Toast from "../shared/ui/Toast";
 import type { DlsiteBulkResult, Work, WorkListItem } from "@mimimilli/shared";
 import { getWork } from "../entities/work/api";
@@ -34,17 +33,10 @@ import { formatScanProgressLabel } from "../features/scan/model";
 import { useScanJob } from "../features/scan/useScanJob";
 import { getLastScanResult, SCAN_QUERY_KEYS } from "../features/scan/api";
 import { useDlsiteBulk } from "./model/useDlsiteBulk";
-import { useRjCodeMissingWorks } from "../features/library/model/dlsiteMissingRjCode";
-import { useDlsiteFetchFailedWorks } from "../features/library/model/dlsiteFetchFailed";
-import { useDlsiteParseFailedWorks } from "../features/library/model/dlsiteParseFailed";
-import { useDlsiteUnlinkedCount } from "../features/library/model/dlsiteUnlinked";
+import { openDlsiteNotificationModalAtom } from "../features/library/model/dlsiteNotificationAtoms";
 import { setRootFolder } from "../features/settings/api";
 import { useSettingsQuery } from "../features/settings/useSettingsQuery";
-import { appModeAtom, setAppModeAtom } from "../features/navigation/model/navigationAtoms";
-import {
-  selectLibraryWorkAtom,
-  setLibraryAxisAtom,
-} from "../features/library/model/libraryNavigationActions";
+import { appModeAtom } from "../features/navigation/model/navigationAtoms";
 import NavigationHistorySync from "../features/navigation/ui/NavigationHistorySync";
 
 export default function App() {
@@ -52,17 +44,12 @@ export default function App() {
   const queryClient = useQueryClient();
   const playRequestIdRef = useRef(0);
   const mode = useAtomValue(appModeAtom);
-  const setAppMode = useSetAtom(setAppModeAtom);
-  const setLibraryAxis = useSetAtom(setLibraryAxisAtom);
-  const selectLibraryWork = useSetAtom(selectLibraryWorkAtom);
+  const openDlsiteNotificationModal = useSetAtom(openDlsiteNotificationModalAtom);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [showScanModal, setShowScanModal] = useState(false);
   const [isCompletingSetup, setIsCompletingSetup] = useState(false);
-  const [showRjCodeMissing, setShowRjCodeMissing] = useState(false);
-  const [showDlsiteFetchFailed, setShowDlsiteFetchFailed] = useState(false);
-  const [showDlsiteParseFailed, setShowDlsiteParseFailed] = useState(false);
 
   // ── Settings ─────────────────────────────────────────────
   const settingsQuery = useSettingsQuery();
@@ -80,10 +67,6 @@ export default function App() {
 
   // ── DLsite一括取得（設定モーダル・TopBar共有、TASK-41） ────────
   const dlsiteBulk = useDlsiteBulk();
-  const dlsiteRjMissing = useRjCodeMissingWorks();
-  const dlsiteFetchFailed = useDlsiteFetchFailedWorks();
-  const dlsiteParseFailed = useDlsiteParseFailedWorks();
-  const dlsiteUnlinked = useDlsiteUnlinkedCount();
 
   // 前回スキャン結果（ディスク永続化なし、TASK-56）。サーバー起動後に一度でも完了していれば
   // GET /api/scan/last から取得でき、リロードをまたいでスキャンモーダル・通知ベルに表示できる。
@@ -200,20 +183,6 @@ export default function App() {
   // TopBarのスキャンボタンは即時実行せずモーダルを開く（TASK-56）。実行中なら実行中の表示に復帰する。
   const handleOpenScanModal = useCallback(() => setShowScanModal(true), []);
 
-  // 通知ベルの一覧（RJコード未検出・DLsite取得失敗）から作品を選び、
-  // 作品詳細（DlsitePanel）へ遷移する。
-  const handleOpenWorkFromNotification = useCallback(
-    (workId: string) => {
-      setShowRjCodeMissing(false);
-      setShowDlsiteFetchFailed(false);
-      setShowScanModal(false);
-      setAppMode("library");
-      setLibraryAxis("all");
-      selectLibraryWork(workId);
-    },
-    [selectLibraryWork, setAppMode, setLibraryAxis],
-  );
-
   // スキャン進捗のリアルタイム表示（TASK-20）。TopBar / SettingsModal / SetupScreen で共有する。
   const scanProgress = scanJob.job?.progress ?? null;
   const scanProgressLabel = formatScanProgressLabel(scanProgress);
@@ -299,21 +268,19 @@ export default function App() {
           onSettings={() => setShowSettings(true)}
           scanning={scanJob.scanning}
           scanProgressLabel={scanProgressLabel}
-          rjCodeMissingCount={dlsiteRjMissing.count}
-          onOpenRjCodeMissing={() => setShowRjCodeMissing(true)}
-          dlsiteFetchFailedCount={dlsiteFetchFailed.count}
-          onOpenDlsiteFetchFailed={() => setShowDlsiteFetchFailed(true)}
-          dlsiteParseErrorAlert={dlsiteParseFailed.alert}
-          dlsiteParseErrorCount={dlsiteParseFailed.count}
-          onOpenDlsiteParseFailed={() => setShowDlsiteParseFailed(true)}
-          dlsiteUnlinkedCount={dlsiteUnlinked.count}
+          notificationBell={
+            <NotificationBell
+              dlsiteBulkActive={dlsiteBulk.active}
+              dlsiteBulkProgress={dlsiteBulk.progress}
+              onStartDlsiteBulk={dlsiteBulk.start}
+              scanResult={lastScanResult}
+              onOpenScanResult={handleOpenScanModal}
+            />
+          }
           dlsiteBulkActive={dlsiteBulk.active}
           dlsiteBulkProgress={dlsiteBulk.progress}
           dlsiteBulkCancelling={dlsiteBulk.cancelling}
-          onStartDlsiteBulk={dlsiteBulk.start}
           onCancelDlsiteBulk={handleCancelDlsiteBulk}
-          scanResult={lastScanResult}
-          onOpenScanResult={handleOpenScanModal}
         />
       }
       addressBar={<AddressBar />}
@@ -368,28 +335,11 @@ export default function App() {
               onClose={() => setShowScanModal(false)}
               onOpenRjCodeMissing={() => {
                 setShowScanModal(false);
-                setShowRjCodeMissing(true);
+                openDlsiteNotificationModal("rj-missing");
               }}
             />
           )}
-          {showRjCodeMissing && (
-            <RjCodeMissingModal
-              onClose={() => setShowRjCodeMissing(false)}
-              onOpenWork={handleOpenWorkFromNotification}
-            />
-          )}
-          {showDlsiteFetchFailed && (
-            <DlsiteFetchFailedModal
-              onClose={() => setShowDlsiteFetchFailed(false)}
-              onOpenWork={handleOpenWorkFromNotification}
-            />
-          )}
-          {showDlsiteParseFailed && (
-            <DlsiteParseFailedModal
-              onClose={() => setShowDlsiteParseFailed(false)}
-              onOpenWork={handleOpenWorkFromNotification}
-            />
-          )}
+          <DlsiteNotificationModals onBeforeNavigateToWork={() => setShowScanModal(false)} />
           <Toast
             message={
               scanJob.error ??

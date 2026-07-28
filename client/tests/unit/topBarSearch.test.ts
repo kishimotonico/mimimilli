@@ -8,7 +8,13 @@ import TopBar from "../../src/app/ui/TopBar";
 const PLACEHOLDER = /ライブラリを検索/;
 
 function renderTopBar(searchQuery: string, onSearchChange = vi.fn()) {
-  render(createElement(TopBar, { searchQuery, onSearchChange }));
+  render(
+    createElement(TopBar, {
+      searchQuery,
+      onSearchChange,
+      notificationBell: createElement("span", { "aria-label": "通知" }),
+    }),
+  );
   return onSearchChange;
 }
 
@@ -50,10 +56,22 @@ describe("TopBar の検索入力", () => {
 
   it("親の値が外部要因で変わったとき表示が追従する", () => {
     const onSearchChange = vi.fn();
-    const { rerender } = render(createElement(TopBar, { searchQuery: "", onSearchChange }));
+    const { rerender } = render(
+      createElement(TopBar, {
+        searchQuery: "",
+        onSearchChange,
+        notificationBell: createElement("span", { "aria-label": "通知" }),
+      }),
+    );
     const input = screen.getByPlaceholderText(PLACEHOLDER);
 
-    rerender(createElement(TopBar, { searchQuery: "復元された語", onSearchChange }));
+    rerender(
+      createElement(TopBar, {
+        searchQuery: "復元された語",
+        onSearchChange,
+        notificationBell: createElement("span", { "aria-label": "通知" }),
+      }),
+    );
     expect(input).toHaveValue("復元された語");
   });
 });

@@ -3,20 +3,15 @@
 // AddressBar の並び替えメニュー（.mle-sortmenu）と同じ「position:relative + absolute」の
 // 素朴な実装に倣う（work-preview専用の useAnchoredPopover は左寄せクランプ前提でここには合わない）。
 import { useEffect, useRef, useState } from "react";
+import { useSetAtom } from "jotai";
 import type { ScanResult } from "@mimimilli/shared";
+import { openDlsiteNotificationModalAtom } from "../../features/library/model/dlsiteNotificationAtoms";
+import { useDlsiteNotificationSummary } from "../../features/library/model/useDlsiteNotificationSummary";
 import Button from "../../shared/ui/Button";
 import { I } from "../../shared/ui/Icon";
 import IconButton from "../../shared/ui/IconButton";
 
 export interface NotificationBellProps {
-  rjCodeMissingCount: number;
-  onOpenRjCodeMissing: () => void;
-  dlsiteFetchFailedCount: number;
-  onOpenDlsiteFetchFailed: () => void;
-  dlsiteParseErrorAlert: boolean;
-  dlsiteParseErrorCount: number;
-  onOpenDlsiteParseFailed: () => void;
-  dlsiteUnlinkedCount: number;
   dlsiteBulkActive: boolean;
   dlsiteBulkProgress: { processed: number; total: number } | null;
   onStartDlsiteBulk: () => void;
@@ -26,20 +21,20 @@ export interface NotificationBellProps {
 }
 
 export default function NotificationBell({
-  rjCodeMissingCount,
-  onOpenRjCodeMissing,
-  dlsiteFetchFailedCount,
-  onOpenDlsiteFetchFailed,
-  dlsiteParseErrorAlert,
-  dlsiteParseErrorCount,
-  onOpenDlsiteParseFailed,
-  dlsiteUnlinkedCount,
   dlsiteBulkActive,
   dlsiteBulkProgress,
   onStartDlsiteBulk,
   scanResult,
   onOpenScanResult,
 }: NotificationBellProps) {
+  const {
+    rjCodeMissingCount,
+    fetchFailedCount: dlsiteFetchFailedCount,
+    parseErrorAlert: dlsiteParseErrorAlert,
+    parseErrorCount: dlsiteParseErrorCount,
+    unlinkedCount: dlsiteUnlinkedCount,
+  } = useDlsiteNotificationSummary();
+  const openNotificationModal = useSetAtom(openDlsiteNotificationModalAtom);
   const [isOpen, setIsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -117,7 +112,7 @@ export default function NotificationBell({
                   count={rjCodeMissingCount}
                   onClick={() => {
                     setIsOpen(false);
-                    onOpenRjCodeMissing();
+                    openNotificationModal("rj-missing");
                   }}
                 />
               )}
@@ -128,7 +123,7 @@ export default function NotificationBell({
                   accent="mustard"
                   onClick={() => {
                     setIsOpen(false);
-                    onOpenDlsiteParseFailed();
+                    openNotificationModal("parse-failed");
                   }}
                 />
               )}
@@ -138,7 +133,7 @@ export default function NotificationBell({
                   count={dlsiteFetchFailedCount}
                   onClick={() => {
                     setIsOpen(false);
-                    onOpenDlsiteFetchFailed();
+                    openNotificationModal("fetch-failed");
                   }}
                 />
               )}
