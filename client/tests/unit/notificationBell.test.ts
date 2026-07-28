@@ -1,13 +1,11 @@
 // 通知ベルパネル（TASK-44）の開閉・バッジ件数・各セクションの表示条件のテスト。
 import { createElement } from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import type { ScanResult } from "@mimimilli/shared";
 import NotificationBell from "../../src/app/ui/NotificationBell";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
-import { dlsiteNotificationModalAtom } from "../../src/features/library/model/dlsiteNotificationAtoms";
 
 const scanResult: ScanResult = {
   registered: 12,
@@ -37,7 +35,6 @@ function renderBell(
     ...summaryDefaults,
     ...summaryOverrides,
   });
-  const store = createStore();
 
   const props = {
     dlsiteBulkActive: false,
@@ -45,6 +42,7 @@ function renderBell(
     onStartDlsiteBulk: vi.fn(),
     scanResult: null,
     onOpenScanResult: vi.fn(),
+    onOpenNotificationModal: vi.fn(),
     ...bellOverrides,
   };
 
@@ -52,10 +50,10 @@ function renderBell(
     createElement(
       QueryClientProvider,
       { client: queryClient },
-      createElement(JotaiProvider, { store }, createElement(NotificationBell, props)),
+      createElement(NotificationBell, props),
     ),
   );
-  return { props, store, queryClient };
+  return { props, queryClient };
 }
 
 describe("NotificationBell", () => {
@@ -100,21 +98,21 @@ describe("NotificationBell", () => {
     expect(screen.queryByRole("menu", { name: "通知" })).toBeNull();
   });
 
-  it("RJコード未検出の行クリックでモーダルatomを開き、パネルを閉じる", () => {
-    const { store } = renderBell({ rjCodeMissingCount: 3 });
+  it("RJコード未検出の行クリックで通知モーダルを開き、パネルを閉じる", () => {
+    const { props } = renderBell({ rjCodeMissingCount: 3 });
     fireEvent.click(screen.getByRole("button", { name: /通知/ }));
     fireEvent.click(screen.getByRole("menuitem", { name: /RJコード未検出/ }));
 
-    expect(store.get(dlsiteNotificationModalAtom)).toBe("rj-missing");
+    expect(props.onOpenNotificationModal).toHaveBeenCalledWith("rj-missing");
     expect(screen.queryByRole("menu", { name: "通知" })).toBeNull();
   });
 
-  it("DLsite取得失敗の行クリックでモーダルatomを開く", () => {
-    const { store } = renderBell({ fetchFailedCount: 2 });
+  it("DLsite取得失敗の行クリックで通知モーダルを開く", () => {
+    const { props } = renderBell({ fetchFailedCount: 2 });
     fireEvent.click(screen.getByRole("button", { name: /通知/ }));
     fireEvent.click(screen.getByRole("menuitem", { name: /DLsite取得失敗/ }));
 
-    expect(store.get(dlsiteNotificationModalAtom)).toBe("fetch-failed");
+    expect(props.onOpenNotificationModal).toHaveBeenCalledWith("fetch-failed");
   });
 
   it("パース失敗アラート時だけバッジにパース失敗件数を加算する", () => {
@@ -126,11 +124,11 @@ describe("NotificationBell", () => {
     expect(screen.getByText("5")).toBeInTheDocument();
   });
 
-  it("パース失敗アラートの行クリックでモーダルatomを開く", () => {
-    const { store } = renderBell({ parseErrorAlert: true, parseErrorCount: 3 });
+  it("パース失敗アラートの行クリックで通知モーダルを開く", () => {
+    const { props } = renderBell({ parseErrorAlert: true, parseErrorCount: 3 });
     fireEvent.click(screen.getByRole("button", { name: /通知/ }));
     fireEvent.click(screen.getByRole("menuitem", { name: /DLsiteパース失敗/ }));
-    expect(store.get(dlsiteNotificationModalAtom)).toBe("parse-failed");
+    expect(props.onOpenNotificationModal).toHaveBeenCalledWith("parse-failed");
   });
 
   it("DLsite未連携: 件数がある場合はまとめて取得ボタンを表示し、押すとコールバックを呼ぶ", () => {

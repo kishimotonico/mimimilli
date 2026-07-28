@@ -47,6 +47,7 @@ function AppLikeRoot() {
         onStartDlsiteBulk={() => {}}
         scanResult={null}
         onOpenScanResult={() => {}}
+        onOpenNotificationModal={() => {}}
       />
     </AppShellLike>
   );
@@ -147,6 +148,7 @@ describe("App notification subscriptions", () => {
             onStartDlsiteBulk={() => {}}
             scanResult={null}
             onOpenScanResult={() => {}}
+            onOpenNotificationModal={() => {}}
           />
         </SubscribingAppShellLike>
       );

@@ -4,7 +4,7 @@
 // - レイアウトは AppShell に委譲
 
 import { useState, useCallback, useRef } from "react";
-import { useAtomValue, useSetAtom } from "jotai";
+import { useAtomValue } from "jotai";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { usePlayerActions } from "../features/player/model/usePlayer";
 import PlayerRuntime from "../features/player/ui/PlayerRuntime";
@@ -26,6 +26,7 @@ import SettingsModal from "../features/settings/ui/SettingsModal";
 import ScanModal from "../features/scan/ui/ScanModal";
 import DlsiteNotificationModals from "../features/library/ui/DlsiteNotificationModals";
 import Toast from "../shared/ui/Toast";
+import type { ActiveModal } from "./model/activeModal";
 import type { DlsiteBulkResult, Work, WorkListItem } from "@mimimilli/shared";
 import { getWork } from "../entities/work/api";
 import { exportLibrary, searchWorks } from "../features/library/api";
@@ -33,7 +34,6 @@ import { formatScanProgressLabel } from "../features/scan/model";
 import { useScanJob } from "../features/scan/useScanJob";
 import { getLastScanResult, SCAN_QUERY_KEYS } from "../features/scan/api";
 import { useDlsiteBulk } from "./model/useDlsiteBulk";
-import { openDlsiteNotificationModalAtom } from "../features/library/model/dlsiteNotificationAtoms";
 import { setRootFolder } from "../features/settings/api";
 import { useSettingsQuery } from "../features/settings/useSettingsQuery";
 import { appModeAtom } from "../features/navigation/model/navigationAtoms";
@@ -44,11 +44,9 @@ export default function App() {
   const queryClient = useQueryClient();
   const playRequestIdRef = useRef(0);
   const mode = useAtomValue(appModeAtom);
-  const openDlsiteNotificationModal = useSetAtom(openDlsiteNotificationModalAtom);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [showSettings, setShowSettings] = useState(false);
-  const [showScanModal, setShowScanModal] = useState(false);
+  const [activeModal, setActiveModal] = useState<ActiveModal>(null);
   const [isCompletingSetup, setIsCompletingSetup] = useState(false);
 
   // ── Settings ─────────────────────────────────────────────
@@ -181,7 +179,8 @@ export default function App() {
     void dlsiteBulk.cancel().catch(() => {});
   }, [dlsiteBulk]);
   // TopBarのスキャンボタンは即時実行せずモーダルを開く（TASK-56）。実行中なら実行中の表示に復帰する。
-  const handleOpenScanModal = useCallback(() => setShowScanModal(true), []);
+  const handleOpenScanModal = useCallback(() => setActiveModal("scan"), []);
+  const handleCloseModal = useCallback(() => setActiveModal(null), []);
 
   // スキャン進捗のリアルタイム表示（TASK-20）。TopBar / SettingsModal / SetupScreen で共有する。
   const scanProgress = scanJob.job?.progress ?? null;
@@ -265,7 +264,7 @@ export default function App() {
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onOpenScan={handleOpenScanModal}
-          onSettings={() => setShowSettings(true)}
+          onSettings={() => setActiveModal("settings")}
           scanning={scanJob.scanning}
           scanProgressLabel={scanProgressLabel}
           notificationBell={
@@ -275,6 +274,7 @@ export default function App() {
               onStartDlsiteBulk={dlsiteBulk.start}
               scanResult={lastScanResult}
               onOpenScanResult={handleOpenScanModal}
+              onOpenNotificationModal={setActiveModal}
             />
           }
           dlsiteBulkActive={dlsiteBulk.active}
@@ -303,7 +303,7 @@ export default function App() {
         <>
           <PlayerRuntime />
           <NavigationHistorySync />
-          {showSettings && (
+          {activeModal === "settings" && (
             <SettingsModal
               rootFolder={settings?.rootFolder ?? null}
               lastScanTime={settings?.lastScanTime ?? null}
@@ -314,16 +314,13 @@ export default function App() {
                 progress: dlsiteBulk.progress,
                 onStart: dlsiteBulk.start,
               }}
-              onClose={() => setShowSettings(false)}
-              onOpenScan={() => {
-                setShowSettings(false);
-                setShowScanModal(true);
-              }}
+              onClose={handleCloseModal}
+              onOpenScan={() => setActiveModal("scan")}
               onChangeFolder={handleChangeFolder}
               onExport={handleExport}
             />
           )}
-          {showScanModal && (
+          {activeModal === "scan" && (
             <ScanModal
               scanning={scanJob.scanning}
               progress={scanProgress}
@@ -332,14 +329,11 @@ export default function App() {
               libraryTotal={libraryTotalQuery.data ?? null}
               onStart={handleScan}
               onCancel={handleCancelScan}
-              onClose={() => setShowScanModal(false)}
-              onOpenRjCodeMissing={() => {
-                setShowScanModal(false);
-                openDlsiteNotificationModal("rj-missing");
-              }}
+              onClose={handleCloseModal}
+              onOpenRjCodeMissing={() => setActiveModal("rj-missing")}
             />
           )}
-          <DlsiteNotificationModals onBeforeNavigateToWork={() => setShowScanModal(false)} />
+          <DlsiteNotificationModals activeModal={activeModal} onClose={handleCloseModal} />
           <Toast
             message={
               scanJob.error ??

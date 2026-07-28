@@ -1,48 +1,44 @@
 import { useCallback } from "react";
-import { useAtomValue, useSetAtom } from "jotai";
+import { useSetAtom } from "jotai";
+import type { ActiveModal } from "../../../app/model/activeModal";
+import { isDlsiteNotificationModal } from "../../../app/model/activeModal";
 import { setAppModeAtom } from "../../navigation/model/navigationAtoms";
-import {
-  closeDlsiteNotificationModalAtom,
-  dlsiteNotificationModalAtom,
-} from "../model/dlsiteNotificationAtoms";
 import { selectLibraryWorkAtom, setLibraryAxisAtom } from "../model/libraryNavigationActions";
 import DlsiteFetchFailedModal from "./DlsiteFetchFailedModal";
 import DlsiteParseFailedModal from "./DlsiteParseFailedModal";
 import RjCodeMissingModal from "./RjCodeMissingModal";
 
 interface DlsiteNotificationModalsProps {
-  /** 作品詳細へ遷移する直前に呼ぶ（スキャンモーダルを閉じる等） */
-  onBeforeNavigateToWork?: () => void;
+  activeModal: ActiveModal;
+  onClose: () => void;
 }
 
 export default function DlsiteNotificationModals({
-  onBeforeNavigateToWork,
+  activeModal,
+  onClose,
 }: DlsiteNotificationModalsProps) {
-  const modal = useAtomValue(dlsiteNotificationModalAtom);
-  const closeModal = useSetAtom(closeDlsiteNotificationModalAtom);
   const setAppMode = useSetAtom(setAppModeAtom);
   const setLibraryAxis = useSetAtom(setLibraryAxisAtom);
   const selectLibraryWork = useSetAtom(selectLibraryWorkAtom);
 
   const handleOpenWork = useCallback(
     (workId: string) => {
-      closeModal();
-      onBeforeNavigateToWork?.();
+      onClose();
       setAppMode("library");
       setLibraryAxis("all");
       selectLibraryWork(workId);
     },
-    [closeModal, onBeforeNavigateToWork, selectLibraryWork, setAppMode, setLibraryAxis],
+    [onClose, selectLibraryWork, setAppMode, setLibraryAxis],
   );
 
-  if (modal === null) return null;
+  if (!isDlsiteNotificationModal(activeModal)) return null;
 
-  switch (modal) {
+  switch (activeModal) {
     case "rj-missing":
-      return <RjCodeMissingModal onClose={closeModal} onOpenWork={handleOpenWork} />;
+      return <RjCodeMissingModal onClose={onClose} onOpenWork={handleOpenWork} />;
     case "fetch-failed":
-      return <DlsiteFetchFailedModal onClose={closeModal} onOpenWork={handleOpenWork} />;
+      return <DlsiteFetchFailedModal onClose={onClose} onOpenWork={handleOpenWork} />;
     case "parse-failed":
-      return <DlsiteParseFailedModal onClose={closeModal} onOpenWork={handleOpenWork} />;
+      return <DlsiteParseFailedModal onClose={onClose} onOpenWork={handleOpenWork} />;
   }
 }
