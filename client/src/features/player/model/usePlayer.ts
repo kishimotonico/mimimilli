@@ -7,7 +7,7 @@
 // core state は usePlayerState / leaf コンポーネントでのみ購読する。
 // ランタイム（エンジン・コマンド処理）は usePlayerRuntime を <PlayerRuntime /> 内でだけ呼ぶ。
 
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useQueryClient } from "@tanstack/react-query";
 import type { WorkListItem, Work } from "../../../entities/work/model";
@@ -19,7 +19,12 @@ import { usePlayerRuntimeContext } from "./PlayerRuntimeProvider";
 import { useAudioEngineLifecycle } from "./useAudioEngineLifecycle";
 import { useResumePersistenceController } from "./useResumePersistence";
 import { formatTime, formatDuration, formatFileSize } from "../../../shared/lib/format";
-import { toPlayerCoreState, type PlaybackItem, type PlayerCoreState } from "./playerController";
+import {
+  isPlayerCoreStateEqual,
+  toPlayerCoreState,
+  type PlaybackItem,
+  type PlayerCoreState,
+} from "./playerController";
 
 // ── 後方互換 re-export ─────────────────────────────────────────
 export { formatTime, formatDuration, formatFileSize };
@@ -251,13 +256,18 @@ export function usePlayerRuntime() {
   const [coreState, setCoreState] = useAtom(playerCoreAtom);
   const setCurrentTime = useSetAtom(playerCurrentTimeAtom);
   const setDuration = useSetAtom(playerDurationAtom);
+  const lastCoreStateRef = useRef(coreState);
 
   runtimeRefs.coreState.current = coreState;
 
   useEffect(
     () =>
       controller.subscribeState((state) => {
-        setCoreState(toPlayerCoreState(state));
+        const nextCoreState = toPlayerCoreState(state);
+        if (!isPlayerCoreStateEqual(lastCoreStateRef.current, nextCoreState)) {
+          lastCoreStateRef.current = nextCoreState;
+          setCoreState(nextCoreState);
+        }
         setCurrentTime(state.positionSec);
         setDuration(state.durationSec);
       }),

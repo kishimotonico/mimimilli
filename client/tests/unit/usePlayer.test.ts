@@ -1,4 +1,4 @@
-import { StrictMode, createElement, useMemo, type ReactNode } from "react";
+import { StrictMode, createElement, type ReactNode } from "react";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore, useAtomValue } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -9,7 +9,11 @@ import {
   usePlayerRuntime,
   usePlayerState,
 } from "../../src/features/player/model/usePlayer";
-import { playerCurrentTimeAtom, playerDurationAtom } from "../../src/features/player/model/atoms";
+import {
+  playerCurrentTimeAtom,
+  playerDurationAtom,
+  playerCoreAtom,
+} from "../../src/features/player/model/atoms";
 import { saveResumePosition } from "../../src/features/player/api";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import type { ResolvedTrack, Track, Work, WorkSummary } from "../../src/entities/work/model";
@@ -57,9 +61,13 @@ function latestAudio() {
 function makeWrapper({
   strict = false,
   queryClient = new QueryClient(),
-}: { strict?: boolean; queryClient?: QueryClient } = {}) {
+  store = createStore(),
+}: {
+  strict?: boolean;
+  queryClient?: QueryClient;
+  store?: ReturnType<typeof createStore>;
+} = {}) {
   return function Wrapper({ children }: { children: ReactNode }) {
-    const store = useMemo(() => createStore(), []);
     const tree = createElement(
       QueryClientProvider,
       { client: queryClient },
@@ -422,5 +430,28 @@ describe("usePlayer adapters", () => {
 
     act(() => result.current.player.toggleMute());
     await waitFor(() => expect(result.current.player.state.volume).toBe(50));
+  });
+
+  it("timeupdate では core atom の参照を維持しつつ currentTime を更新する", async () => {
+    const store = createStore();
+    const { result } = renderHook(() => usePlayerWithClock(), {
+      wrapper: makeWrapper({ store }),
+    });
+
+    act(() => result.current.player.play(work, [track]));
+    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
+
+    const coreBefore = store.get(playerCoreAtom);
+    act(() => {
+      latestAudio().currentTime = 12;
+      latestAudio().dispatchEvent(new Event("timeupdate"));
+    });
+
+    expect(store.get(playerCurrentTimeAtom)).toBe(12);
+    expect(store.get(playerCoreAtom)).toBe(coreBefore);
+
+    act(() => result.current.player.setVolume(30));
+    await waitFor(() => expect(store.get(playerCoreAtom).volume).toBe(30));
+    expect(store.get(playerCoreAtom)).not.toBe(coreBefore);
   });
 });

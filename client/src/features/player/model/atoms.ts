@@ -1,7 +1,8 @@
 // player feature の Jotai atoms。
 //
 // 設計方針（issue参照）:
-//   - playerCoreAtom: isPlaying / currentWork / tracks 等の低頻度 state
+//   - playerCoreAtom: position を除く core フィールド（isPlaying / currentWork / tracks 等）
+//     usePlayerRuntime の投影で意味的同一なら参照を維持するため timeupdate では更新されない
 //     → PlayerDock など state 全体が必要な leaf で subscribe する
 //   - 派生 atom: TopBar / LeftNav など一部の値だけ必要な購読者向け
 //   - playerCurrentTimeAtom / playerDurationAtom: timeupdate ごとに更新される高頻度 state
@@ -15,7 +16,7 @@ import { PLAYER_CORE_INITIAL, type PlayerCoreState } from "./playerController";
 
 export { PLAYER_CORE_INITIAL, type PlayerCoreState } from "./playerController";
 
-/** 低頻度更新の player core state */
+/** position を除く player core state（timeupdate では参照を維持） */
 export const playerCoreAtom = atom<PlayerCoreState>(PLAYER_CORE_INITIAL);
 
 export const playerIsActiveAtom = atom((get) => {
@@ -31,7 +32,7 @@ export const playingTrackIndexAtom = atom((get) => get(playerCoreAtom).currentTr
 
 export const playingTrackTitleAtom = atom((get) => {
   const state = get(playerCoreAtom);
-  if (state.currentTrackIndex < 0 || state.currentWork === null) return undefined;
+  if (state.currentTrackIndex < 0) return undefined;
   return state.tracks[state.currentTrackIndex]?.title;
 });
 
