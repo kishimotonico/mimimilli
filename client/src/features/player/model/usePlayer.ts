@@ -7,7 +7,7 @@
 // core state は usePlayerState / leaf コンポーネントでのみ購読する。
 // ランタイム（エンジン・コマンド処理）は usePlayerRuntime を <PlayerRuntime /> 内でだけ呼ぶ。
 
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useQueryClient } from "@tanstack/react-query";
 import type { WorkListItem, Work } from "../../../entities/work/model";
@@ -42,14 +42,8 @@ export function usePlayerState(): PlayerCoreState {
 }
 
 export function usePlayerActions() {
-  const {
-    controller,
-    lastVolumeRef,
-    pendingResumeRef,
-    runtimeRefs,
-    getCurrentPlaybackContextRef,
-    loadResumeRef,
-  } = usePlayerRuntimeContext();
+  const { controller, lastVolumeRef, pendingResumeRef, runtimeRefs, capabilitiesRegistry } =
+    usePlayerRuntimeContext();
 
   const startPlayback = useCallback(
     (
@@ -86,13 +80,12 @@ export function usePlayerActions() {
 
   const playWithResume = useCallback(
     (work: Work) => {
-      const loadResume = loadResumeRef.current;
-      if (!loadResume) return;
+      const { loadResume } = capabilitiesRegistry.require();
       const resume = loadResume(work);
       if (!resume) return;
       startPlayback(work, resume.tracks, resume.trackIndex, resume.playlistId, resume.positionSec);
     },
-    [loadResumeRef, startPlayback],
+    [capabilitiesRegistry, startPlayback],
   );
 
   const togglePlay = useCallback(() => {
@@ -115,19 +108,21 @@ export function usePlayerActions() {
 
   const seek = useCallback(
     (time: number) => {
-      if (!getCurrentPlaybackContextRef.current()) return;
+      const { getCurrentPlaybackContext } = capabilitiesRegistry.require();
+      if (!getCurrentPlaybackContext()) return;
       controller.dispatch({ type: "seekRequested", positionSec: time });
     },
-    [controller, getCurrentPlaybackContextRef],
+    [controller, capabilitiesRegistry],
   );
 
   const seekRelative = useCallback(
     (delta: number) => {
-      const context = getCurrentPlaybackContextRef.current();
+      const { getCurrentPlaybackContext } = capabilitiesRegistry.require();
+      const context = getCurrentPlaybackContext();
       if (!context) return;
       controller.dispatch({ type: "seekRequested", positionSec: context.currentTime + delta });
     },
-    [controller, getCurrentPlaybackContextRef],
+    [controller, capabilitiesRegistry],
   );
 
   const setVolume = useCallback(
@@ -193,10 +188,11 @@ export function usePlayerActions() {
 
   const setABPoint = useCallback(
     (point: "a" | "b") => {
-      const time = getCurrentPlaybackContextRef.current()?.currentTime ?? 0;
+      const { getCurrentPlaybackContext } = capabilitiesRegistry.require();
+      const time = getCurrentPlaybackContext()?.currentTime ?? 0;
       controller.dispatch({ type: "abPointSet", point, positionSec: time });
     },
-    [controller, getCurrentPlaybackContextRef],
+    [controller, capabilitiesRegistry],
   );
 
   const clearABRepeat = useCallback(() => {
@@ -251,14 +247,16 @@ export function usePlayerActions() {
 
 export function usePlayerRuntime() {
   const queryClient = useQueryClient();
-  const { controller, pendingResumeRef, runtimeRefs, getCurrentPlaybackContextRef, loadResumeRef } =
+  const { controller, pendingResumeRef, runtimeRefs, capabilitiesRegistry } =
     usePlayerRuntimeContext();
   const [coreState, setCoreState] = useAtom(playerCoreAtom);
   const setCurrentTime = useSetAtom(playerCurrentTimeAtom);
   const setDuration = useSetAtom(playerDurationAtom);
   const lastCoreStateRef = useRef(coreState);
 
-  runtimeRefs.coreState.current = coreState;
+  useLayoutEffect(() => {
+    runtimeRefs.coreState.current = coreState;
+  }, [runtimeRefs.coreState, coreState]);
 
   useEffect(
     () =>
@@ -279,7 +277,6 @@ export function usePlayerRuntime() {
       refs: runtimeRefs,
       pendingResumeRef,
     });
-  loadResumeRef.current = loadResume;
 
   const resetResumeCache = useCallback(
     (workId: string, playlistId: string, trackId: string) => {
@@ -296,7 +293,13 @@ export function usePlayerRuntime() {
     controller,
     consumePendingResume,
   });
-  getCurrentPlaybackContextRef.current = getCurrentPlaybackContext;
+
+  useLayoutEffect(() => {
+    return capabilitiesRegistry.register({
+      loadResume,
+      getCurrentPlaybackContext,
+    });
+  }, [capabilitiesRegistry, loadResume, getCurrentPlaybackContext]);
 
   useEffect(() => {
     return controller.subscribeCommands((command) => {
@@ -389,5 +392,7 @@ export function usePlayerRuntime() {
     onSeek: actions.seek,
     onSeekRelative: actions.seekRelative,
   });
-  runtimeRefs.updateMediaSessionPosition.current = updateMediaSessionPosition;
+  useLayoutEffect(() => {
+    runtimeRefs.updateMediaSessionPosition.current = updateMediaSessionPosition;
+  }, [runtimeRefs.updateMediaSessionPosition, updateMediaSessionPosition]);
 }

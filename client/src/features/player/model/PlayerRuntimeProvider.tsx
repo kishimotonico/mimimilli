@@ -2,12 +2,9 @@ import { createContext, useContext, useMemo, useRef, type ReactNode } from "reac
 import type { Work } from "../../../entities/work/model";
 import { PLAYER_CORE_INITIAL } from "./atoms";
 import { PlayerController } from "./playerController";
-import type {
-  MutableRef,
-  PendingResume,
-  PlaybackContext,
-  PlayerRuntimeRefs,
-} from "./playerRuntime";
+import { createPlayerRuntimeCapabilitiesRegistry } from "./playerRuntimeCapabilities";
+import type { PlayerRuntimeCapabilitiesRegistry } from "./playerRuntimeCapabilities";
+import type { MutableRef, PendingResume, PlayerRuntimeRefs } from "./playerRuntime";
 import type { PlaybackTrack } from "./trackTime";
 
 export interface LoadedResumePlayback {
@@ -24,8 +21,7 @@ export interface PlayerRuntimeContextValue {
   lastVolumeRef: MutableRef<number>;
   pendingResumeRef: MutableRef<PendingResume | null>;
   runtimeRefs: PlayerRuntimeRefs;
-  getCurrentPlaybackContextRef: MutableRef<() => PlaybackContext | null>;
-  loadResumeRef: MutableRef<LoadResume | null>;
+  capabilitiesRegistry: PlayerRuntimeCapabilitiesRegistry;
 }
 
 const PlayerRuntimeContext = createContext<PlayerRuntimeContextValue | null>(null);
@@ -43,8 +39,11 @@ export function PlayerRuntimeProvider({ children }: { children: ReactNode }) {
   const filesModeFileDurationSecRef = useRef<number | null>(null);
   const lastVolumeRef = useRef(75);
   const pendingResumeRef = useRef<PendingResume | null>(null);
-  const getCurrentPlaybackContextRef = useRef<() => PlaybackContext | null>(() => null);
-  const loadResumeRef = useRef<LoadResume | null>(null);
+  const capabilitiesRegistryRef = useRef<PlayerRuntimeCapabilitiesRegistry | null>(null);
+  if (capabilitiesRegistryRef.current === null) {
+    capabilitiesRegistryRef.current = createPlayerRuntimeCapabilitiesRegistry();
+  }
+  const capabilitiesRegistry = capabilitiesRegistryRef.current;
 
   const runtimeRefs = useMemo<PlayerRuntimeRefs>(
     () => ({
@@ -64,10 +63,9 @@ export function PlayerRuntimeProvider({ children }: { children: ReactNode }) {
       lastVolumeRef,
       pendingResumeRef,
       runtimeRefs,
-      getCurrentPlaybackContextRef,
-      loadResumeRef,
+      capabilitiesRegistry,
     }),
-    [controller, runtimeRefs],
+    [controller, runtimeRefs, capabilitiesRegistry],
   );
 
   return <PlayerRuntimeContext.Provider value={value}>{children}</PlayerRuntimeContext.Provider>;

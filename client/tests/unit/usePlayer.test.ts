@@ -1,9 +1,10 @@
-import { StrictMode, createElement, type ReactNode } from "react";
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { StrictMode, createElement, useState, type ReactNode } from "react";
+import { act, render, renderHook, waitFor } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore, useAtomValue } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PlayerRuntimeProvider } from "../../src/features/player/model/PlayerRuntimeProvider";
+import { NOT_REGISTERED_ERROR } from "../../src/features/player/model/playerRuntimeCapabilities";
 import {
   usePlayerActions,
   usePlayerRuntime,
@@ -62,24 +63,19 @@ function makeWrapper({
   strict = false,
   queryClient = new QueryClient(),
   store = createStore(),
+  withRuntime = true,
 }: {
   strict?: boolean;
   queryClient?: QueryClient;
   store?: ReturnType<typeof createStore>;
+  withRuntime?: boolean;
 } = {}) {
   return function Wrapper({ children }: { children: ReactNode }) {
+    const inner = withRuntime ? createElement(PlayerRuntimeHarness, null, children) : children;
     const tree = createElement(
       QueryClientProvider,
       { client: queryClient },
-      createElement(
-        JotaiProvider,
-        { store },
-        createElement(
-          PlayerRuntimeProvider,
-          null,
-          createElement(PlayerRuntimeHarness, null, children),
-        ),
-      ),
+      createElement(JotaiProvider, { store }, createElement(PlayerRuntimeProvider, null, inner)),
     );
     return strict ? createElement(StrictMode, null, tree) : tree;
   };
@@ -138,6 +134,79 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("usePlayer adapters", () => {
+  it("PlayerRuntime 未マウント時は playWithResume / seek が throw する", () => {
+    const { result } = renderHook(() => usePlayerActions(), {
+      wrapper: makeWrapper({ withRuntime: false }),
+    });
+
+    expect(() => result.current.playWithResume(work as Work)).toThrow(NOT_REGISTERED_ERROR);
+    expect(() => result.current.seek(10)).toThrow(NOT_REGISTERED_ERROR);
+  });
+
+  it("PlayerRuntime ありで再生対象がないときは playWithResume / seek が no-op する", () => {
+    const workWithoutResume: Work = {
+      ...work,
+      defaultPlaylistId: playlistId,
+      createdAt: null,
+      playlists: [{ id: playlistId, name: "default", tracks: [track] }],
+      resume: null,
+    };
+    const { result } = renderHook(() => usePlayerActions(), { wrapper: makeWrapper() });
+
+    expect(() => result.current.playWithResume(workWithoutResume)).not.toThrow();
+    expect(() => result.current.seek(10)).not.toThrow();
+  });
+
+  it("StrictMode 下でも capabilities 登録が解除されない", () => {
+    const { result } = renderHook(() => usePlayerActions(), {
+      wrapper: makeWrapper({ strict: true }),
+    });
+
+    expect(() => result.current.seek(10)).not.toThrow(NOT_REGISTERED_ERROR);
+  });
+
+  it("PlayerRuntime アンマウントで capabilities 登録が解除される", () => {
+    let actions: ReturnType<typeof usePlayerActions> | undefined;
+    let hideRuntime: (() => void) | undefined;
+    const queryClient = new QueryClient();
+
+    function RuntimeMount() {
+      usePlayerRuntime();
+      return null;
+    }
+
+    function ActionsHost() {
+      actions = usePlayerActions();
+      return null;
+    }
+
+    function TestRoot() {
+      const [showRuntime, setShowRuntime] = useState(true);
+      hideRuntime = () => setShowRuntime(false);
+      return createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(
+          JotaiProvider,
+          null,
+          createElement(
+            PlayerRuntimeProvider,
+            null,
+            showRuntime ? createElement(RuntimeMount) : null,
+            createElement(ActionsHost),
+          ),
+        ),
+      );
+    }
+
+    render(createElement(TestRoot));
+
+    expect(() => actions!.seek(10)).not.toThrow(NOT_REGISTERED_ERROR);
+
+    act(() => hideRuntime?.());
+    expect(() => actions!.seek(10)).toThrow(NOT_REGISTERED_ERROR);
+  });
+
   it("StrictModeのeffect再実行後もControllerへHTMLAudioイベントを渡す", async () => {
     const { result } = renderHook(() => usePlayerWithClock(), {
       wrapper: makeWrapper({ strict: true }),
