@@ -1,95 +1,48 @@
 // App: アプリ全体のオーケストレーション。
 // - 設定・スキャン・フォルダー変更を TanStack Query で管理
-// - player フックを保持し、library / player UI に props を流す
+// - 再生開始は usePlayerActions のみ利用（state は leaf で購読）
 // - レイアウトは AppShell に委譲
 
 import { useState, useCallback, useRef } from "react";
-import { useAtom, useAtomValue } from "jotai";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { usePlayer } from "../features/player/model/usePlayer";
-import { playerUiModeAtom } from "../features/player/model/atoms";
-import { useLibraryView } from "../features/library/model/useLibraryNavigation";
-import { useGlobalShortcuts } from "./model/useGlobalShortcuts";
+import { usePlayerActions } from "../features/player/model/usePlayerActions";
+import PlayerRuntime from "../features/player/ui/PlayerRuntime";
+import FullScreenPlayerGate from "../features/player/ui/FullScreenPlayerGate";
 import AppShell from "./AppShell";
+import AppBody from "./AppBody";
 import TopBar from "./ui/TopBar";
 import LeftNav from "./ui/LeftNav";
 import AddressBar from "./ui/AddressBar";
-import LibraryView from "../features/library/ui/LibraryView";
+import NotificationBell from "./ui/NotificationBell";
 import { WORK_QUERY_KEYS } from "../entities/work/queryKeys";
-import { SMART_FOLDER_QUERY_KEYS } from "../entities/smart-folder/queryKeys";
 import { SETTINGS_QUERY_KEYS } from "../entities/settings/queryKeys";
-import FilesView from "../features/files/ui/FilesView";
-import { useFilesNavigation } from "../features/files/model/useFilesNavigation";
 import type { FsEntry } from "../features/files/model/types";
 import PlayerDock from "../features/player/ui/PlayerDock";
-import FullScreenPlayer from "../features/player/ui/FullScreenPlayer";
 import SetupScreen from "../features/setup/ui/SetupScreen";
 import SettingsModal from "../features/settings/ui/SettingsModal";
 import ScanModal from "../features/scan/ui/ScanModal";
-import RjCodeMissingModal from "../features/library/ui/RjCodeMissingModal";
-import DlsiteFetchFailedModal from "../features/library/ui/DlsiteFetchFailedModal";
-import DlsiteParseFailedModal from "../features/library/ui/DlsiteParseFailedModal";
-import Toast from "../shared/ui/Toast";
-import type { DlsiteBulkResult, Work, WorkListItem } from "@mimimilli/shared";
+import DlsiteNotificationModals from "../features/library/ui/DlsiteNotificationModals";
+import GlobalToast from "./ui/GlobalToast";
+import type { ActiveModal } from "./model/activeModal";
+import type { Work, WorkListItem } from "@mimimilli/shared";
 import { getWork } from "../entities/work/api";
 import { exportLibrary, searchWorks } from "../features/library/api";
-import { formatScanProgressLabel } from "../features/scan/model";
-import { useScanJob } from "../features/scan/useScanJob";
 import { getLastScanResult, SCAN_QUERY_KEYS } from "../features/scan/api";
-import { useDlsiteBulk } from "./model/useDlsiteBulk";
-import { useRjCodeMissingWorks } from "../features/library/model/dlsiteMissingRjCode";
-import { useDlsiteFetchFailedWorks } from "../features/library/model/dlsiteFetchFailed";
-import { useDlsiteParseFailedWorks } from "../features/library/model/dlsiteParseFailed";
-import { useDlsiteUnlinkedCount } from "../features/library/model/dlsiteUnlinked";
-import { getSettings, setRootFolder } from "../features/settings/api";
-import { parseNavigationUrl, type AppMode } from "../features/navigation/model/navigationUrl";
-import { useNavigationHistory } from "../features/navigation/model/useNavigationHistory";
-import {
-  libraryGridLayoutModeAtom,
-  libraryTileSizeAtom,
-  libraryViewModeAtom,
-} from "../features/library/model/atoms";
-import { clampTileSize } from "../features/library/model/gridSizing";
+import { useScanActions } from "../features/scan/model/useScanActions";
+import { setRootFolder } from "../features/settings/api";
+import { useSettingsQuery } from "../features/settings/useSettingsQuery";
+import NavigationHistorySync from "../features/navigation/ui/NavigationHistorySync";
 
 export default function App() {
-  const player = usePlayer();
-  const libraryNav = useLibraryView();
+  const player = usePlayerActions();
+  const scanActions = useScanActions();
   const queryClient = useQueryClient();
   const playRequestIdRef = useRef(0);
-  const [libraryViewMode, setLibraryViewMode] = useAtom(libraryViewModeAtom);
-  const [libraryTileSize, setLibraryTileSize] = useAtom(libraryTileSizeAtom);
-  const [libraryGridLayoutMode, setLibraryGridLayoutMode] = useAtom(libraryGridLayoutModeAtom);
 
-  const [mode, setMode] = useState<AppMode>(
-    () => parseNavigationUrl(window.location.href).state.mode,
-  );
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showSettings, setShowSettings] = useState(false);
-  const [showScanModal, setShowScanModal] = useState(false);
-  const [isCompletingSetup, setIsCompletingSetup] = useState(false);
-  const [showRjCodeMissing, setShowRjCodeMissing] = useState(false);
-  const [showDlsiteFetchFailed, setShowDlsiteFetchFailed] = useState(false);
-  const [showDlsiteParseFailed, setShowDlsiteParseFailed] = useState(false);
-
-  const isPlaying = player.state.currentTrackIndex >= 0 && player.state.currentWork !== null;
-  const isPlaybackActive = player.state.isPlaying;
-  // バー表示中のみコンテンツ側に padding-bottom を確保する（ポップアップは小さく被りが少ないため対象外）
-  const uiMode = useAtomValue(playerUiModeAtom);
-  const dockedBarActive = isPlaying && uiMode === "bar";
-
-  // ── キーボードショートカット ───────────────────────────────
-  useGlobalShortcuts({
-    onTogglePlay: player.togglePlay,
-    onSeekRelative: player.seekRelative,
-    isActive: isPlaying,
-  });
+  const [activeModal, setActiveModal] = useState<ActiveModal>(null);
 
   // ── Settings ─────────────────────────────────────────────
-  const settingsQuery = useQuery({
-    queryKey: SETTINGS_QUERY_KEYS.all(),
-    queryFn: getSettings,
-    retry: 1,
-  });
+  const settingsQuery = useSettingsQuery();
   const settings = settingsQuery.data;
   const isSetupDone: boolean | null = settingsQuery.isPending
     ? null
@@ -99,21 +52,8 @@ export default function App() {
         ? false
         : false;
 
-  // ファイルモードのナビゲーション（フックは早期 return 前に呼ぶ）。
+  // ファイルモードのルートパス（FilesView に渡す）。
   const rootFolder = settings?.rootFolder ?? "/";
-  const filesNav = useFilesNavigation(rootFolder);
-  const navigationHistory = useNavigationHistory({
-    mode,
-    setMode,
-    rootFolder: settings?.rootFolder ?? null,
-  });
-
-  // ── DLsite一括取得（設定モーダル・TopBar共有、TASK-41） ────────
-  const dlsiteBulk = useDlsiteBulk();
-  const dlsiteRjMissing = useRjCodeMissingWorks();
-  const dlsiteFetchFailed = useDlsiteFetchFailedWorks();
-  const dlsiteParseFailed = useDlsiteParseFailedWorks();
-  const dlsiteUnlinked = useDlsiteUnlinkedCount();
 
   // 前回スキャン結果（ディスク永続化なし、TASK-56）。サーバー起動後に一度でも完了していれば
   // GET /api/scan/last から取得でき、リロードをまたいでスキャンモーダル・通知ベルに表示できる。
@@ -129,25 +69,6 @@ export default function App() {
     queryKey: WORK_QUERY_KEYS.total(),
     queryFn: () => searchWorks({ limit: 1 }).then((page) => page.total),
   });
-
-  const handleScanTerminal = useCallback(
-    (job: import("@mimimilli/shared").ScanJobSnapshot) => {
-      setIsCompletingSetup(false);
-      if (job.status !== "completed" || !job.result || !job.finishedAt) return;
-      const result = job.result;
-      queryClient.setQueryData(SCAN_QUERY_KEYS.last(), { result, finishedAt: job.finishedAt });
-      queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.all() });
-      queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.dlsiteNotifications() });
-      queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.allFacets() });
-      queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.allWorks() });
-      queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() });
-      // スキャンで新規作品が見つかった場合、サーバーは自動でDLsite一括取得ジョブを
-      // キューイングする（server/src/routes/scan.ts）。ここではAPIを呼ばずSSEに相乗りするだけ。
-      if (result.newWorkIds.length > 0) dlsiteBulk.attach();
-    },
-    [dlsiteBulk, queryClient],
-  );
-  const scanJob = useScanJob({ onTerminal: handleScanTerminal });
 
   // ── Change folder mutation ────────────────────────────────
   const changeFolderMutation = useMutation({
@@ -218,62 +139,20 @@ export default function App() {
     [player, queryClient],
   );
 
-  // 再生中の作品をライブラリ「すべての作品」上で選択状態にして表示する。
-  // ファイル欠損等で登録から外れた作品の場合、該当なしになるが実害はない。
-  const handleShowPlayingWork = useCallback(() => {
-    const workId = player.state.currentWork?.id;
-    if (!workId) return;
-    navigationHistory.setMode("library");
-    libraryNav.setAxis("all");
-    libraryNav.selectWork(workId);
-  }, [player.state.currentWork, navigationHistory, libraryNav]);
-
-  const handleScan = useCallback(() => {
-    void scanJob.start().catch(() => {});
-  }, [scanJob]);
-  const handleCancelScan = useCallback(() => {
-    void scanJob.cancel().catch(() => {});
-  }, [scanJob]);
-  const handleCancelDlsiteBulk = useCallback(() => {
-    void dlsiteBulk.cancel().catch(() => {});
-  }, [dlsiteBulk]);
   // TopBarのスキャンボタンは即時実行せずモーダルを開く（TASK-56）。実行中なら実行中の表示に復帰する。
-  const handleOpenScanModal = useCallback(() => setShowScanModal(true), []);
-
-  // 通知ベルの一覧（RJコード未検出・DLsite取得失敗）から作品を選び、
-  // 作品詳細（DlsitePanel）へ遷移する。
-  const handleOpenWorkFromNotification = useCallback(
-    (workId: string) => {
-      setShowRjCodeMissing(false);
-      setShowDlsiteFetchFailed(false);
-      setShowScanModal(false);
-      navigationHistory.setMode("library");
-      libraryNav.setAxis("all");
-      libraryNav.selectWork(workId);
-    },
-    [navigationHistory, libraryNav],
-  );
-
-  // スキャン進捗のリアルタイム表示（TASK-20）。TopBar / SettingsModal / SetupScreen で共有する。
-  const scanProgress = scanJob.job?.progress ?? null;
-  const scanProgressLabel = formatScanProgressLabel(scanProgress);
+  const handleOpenScanModal = useCallback(() => setActiveModal("scan"), []);
+  const handleCloseModal = useCallback(() => setActiveModal(null), []);
 
   const handleSetupComplete = useCallback(
     async (path: string) => {
-      setIsCompletingSetup(true);
-      try {
-        await setRootFolder(path);
-        queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() });
-        await scanJob.start();
-        queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), (prev: typeof settings) =>
-          prev ? { ...prev, rootFolder: path } : prev,
-        );
-      } catch (error) {
-        setIsCompletingSetup(false);
-        console.error("初回スキャンの開始に失敗しました", error);
-      }
+      await setRootFolder(path);
+      queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() });
+      await scanActions.start();
+      queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), (prev: typeof settings) =>
+        prev ? { ...prev, rootFolder: path } : prev,
+      );
     },
-    [queryClient, scanJob],
+    [queryClient, scanActions],
   );
 
   const handleChangeFolder = useCallback(
@@ -317,215 +196,63 @@ export default function App() {
   }
 
   if (!isSetupDone) {
-    return (
-      <SetupScreen
-        onComplete={handleSetupComplete}
-        onCancelScan={handleCancelScan}
-        scanning={isCompletingSetup || scanJob.scanning}
-        scanProgressLabel={scanProgressLabel}
-        scanError={scanJob.error}
-      />
-    );
+    return <SetupScreen onComplete={handleSetupComplete} />;
   }
-
-  const currentTrack = isPlaying ? player.state.tracks[player.state.currentTrackIndex] : null;
-  const playingRelPath = currentTrack?.file ?? null;
 
   return (
     <AppShell
-      dockedBarActive={dockedBarActive}
       topBar={
         <TopBar
-          mode={mode}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
           onOpenScan={handleOpenScanModal}
-          onSettings={() => setShowSettings(true)}
-          isPlaying={isPlaying}
-          playingTrack={currentTrack?.title}
-          scanning={scanJob.scanning}
-          scanProgressLabel={scanProgressLabel}
-          rjCodeMissingCount={dlsiteRjMissing.count}
-          onOpenRjCodeMissing={() => setShowRjCodeMissing(true)}
-          dlsiteFetchFailedCount={dlsiteFetchFailed.count}
-          onOpenDlsiteFetchFailed={() => setShowDlsiteFetchFailed(true)}
-          dlsiteParseErrorAlert={dlsiteParseFailed.alert}
-          dlsiteParseErrorCount={dlsiteParseFailed.count}
-          onOpenDlsiteParseFailed={() => setShowDlsiteParseFailed(true)}
-          dlsiteUnlinkedCount={dlsiteUnlinked.count}
-          dlsiteBulkActive={dlsiteBulk.active}
-          dlsiteBulkProgress={dlsiteBulk.progress}
-          dlsiteBulkCancelling={dlsiteBulk.cancelling}
-          onStartDlsiteBulk={dlsiteBulk.start}
-          onCancelDlsiteBulk={handleCancelDlsiteBulk}
-          scanResult={lastScanResult}
-          onOpenScanResult={handleOpenScanModal}
+          onSettings={() => setActiveModal("settings")}
+          notificationBell={
+            <NotificationBell
+              scanResult={lastScanResult}
+              onOpenScanResult={handleOpenScanModal}
+              onOpenNotificationModal={setActiveModal}
+            />
+          }
         />
       }
-      addressBar={
-        <AddressBar
-          path={mode === "files" ? filesNav.addressPath : libraryNav.addressPath}
-          onNavigate={mode === "files" ? filesNav.goToSegment : libraryNav.goToSegment}
-          onBack={navigationHistory.back}
-          onForward={navigationHistory.forward}
-          canBack={navigationHistory.canBack}
-          canForward={navigationHistory.canForward}
-          showSort={mode === "library"}
-          sort={libraryNav.sort}
-          onSortChange={libraryNav.setSort}
-          viewMode={mode === "library" ? libraryViewMode : "column"}
-          availableViewModes={mode === "library" ? ["list", "grid"] : ["column"]}
-          onViewChange={(viewMode) => {
-            if (mode === "library" && viewMode !== "column") setLibraryViewMode(viewMode);
-          }}
-          tileSize={mode === "library" ? clampTileSize(libraryTileSize) : undefined}
-          onTileSizeChange={mode === "library" ? setLibraryTileSize : undefined}
-          gridLayoutMode={mode === "library" ? libraryGridLayoutMode : undefined}
-          onGridLayoutModeChange={mode === "library" ? setLibraryGridLayoutMode : undefined}
-        />
-      }
-      leftNav={
-        <LeftNav
-          mode={mode}
-          onModeChange={navigationHistory.setMode}
-          playingCount={isPlaying ? 1 : 0}
-        />
-      }
+      addressBar={<AddressBar />}
+      leftNav={<LeftNav />}
       body={
-        mode === "files" ? (
-          <FilesView
-            rootFolder={rootFolder}
-            playingWorkId={player.state.currentWork?.id}
-            playingRelPath={playingRelPath}
-            isPlaybackActive={isPlaybackActive}
-            onPlayFile={handlePlayFile}
-          />
-        ) : (
-          <LibraryView
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            playingWorkId={player.state.currentWork?.id}
-            playingTrackIndex={player.state.currentTrackIndex}
-            isPlaybackActive={isPlaybackActive}
-            onPlay={handlePlay}
-            onResume={handleResume}
-            viewMode={libraryViewMode}
-            tileSize={clampTileSize(libraryTileSize)}
-            onTileSizeChange={setLibraryTileSize}
-            gridLayoutMode={libraryGridLayoutMode}
-          />
-        )
-      }
-      transportBar={
-        <PlayerDock
-          isPlaying={isPlaying}
-          state={player.state}
-          onTogglePlay={player.togglePlay}
-          onSeek={player.seek}
-          onSeekRelative={player.seekRelative}
-          onSetVolume={player.setVolume}
-          onToggleMute={player.toggleMute}
-          onSetLoop={player.setLoop}
-          onSetPlaybackRate={player.setPlaybackRate}
-          onNext={player.nextTrack}
-          onPrev={player.prevTrack}
-          onExpandFullScreen={() => player.setShowFullPlayer(true)}
-          onShowPlayingWork={handleShowPlayingWork}
+        <AppBody
+          rootFolder={rootFolder}
+          onPlayFile={handlePlayFile}
+          onPlay={handlePlay}
+          onResume={handleResume}
         />
       }
-      fullScreenPlayer={
-        isPlaying && player.state.showFullPlayer ? (
-          <FullScreenPlayer
-            state={player.state}
-            onTogglePlay={player.togglePlay}
-            onSeek={player.seek}
-            onSeekRelative={player.seekRelative}
-            onSetVolume={player.setVolume}
-            onSetLoop={player.setLoop}
-            onNext={player.nextTrack}
-            onPrev={player.prevTrack}
-            onSelectTrack={player.setTrackIndex}
-            onClose={() => player.setShowFullPlayer(false)}
-            onSetChannelSwap={player.setChannelSwap}
-            onSetABPoint={player.setABPoint}
-            onClearABRepeat={player.clearABRepeat}
-          />
-        ) : undefined
-      }
+      transportBar={<PlayerDock />}
+      fullScreenPlayer={<FullScreenPlayerGate />}
       overlays={
         <>
-          {showSettings && (
+          <PlayerRuntime />
+          <NavigationHistorySync />
+          {activeModal === "settings" && (
             <SettingsModal
               rootFolder={settings?.rootFolder ?? null}
               lastScanTime={settings?.lastScanTime ?? null}
-              scanning={scanJob.scanning}
-              scanProgressLabel={scanProgressLabel}
-              dlsiteBulk={{
-                active: dlsiteBulk.active,
-                progress: dlsiteBulk.progress,
-                onStart: dlsiteBulk.start,
-              }}
-              onClose={() => setShowSettings(false)}
-              onOpenScan={() => {
-                setShowSettings(false);
-                setShowScanModal(true);
-              }}
+              onClose={handleCloseModal}
+              onOpenScan={() => setActiveModal("scan")}
               onChangeFolder={handleChangeFolder}
               onExport={handleExport}
             />
           )}
-          {showScanModal && (
+          {activeModal === "scan" && (
             <ScanModal
-              scanning={scanJob.scanning}
-              progress={scanProgress}
               lastResult={lastScanResult}
               lastScanTime={settings?.lastScanTime ?? null}
               libraryTotal={libraryTotalQuery.data ?? null}
-              onStart={handleScan}
-              onCancel={handleCancelScan}
-              onClose={() => setShowScanModal(false)}
-              onOpenRjCodeMissing={() => {
-                setShowScanModal(false);
-                setShowRjCodeMissing(true);
-              }}
+              onClose={handleCloseModal}
+              onOpenRjCodeMissing={() => setActiveModal("rj-missing")}
             />
           )}
-          {showRjCodeMissing && (
-            <RjCodeMissingModal
-              onClose={() => setShowRjCodeMissing(false)}
-              onOpenWork={handleOpenWorkFromNotification}
-            />
-          )}
-          {showDlsiteFetchFailed && (
-            <DlsiteFetchFailedModal
-              onClose={() => setShowDlsiteFetchFailed(false)}
-              onOpenWork={handleOpenWorkFromNotification}
-            />
-          )}
-          {showDlsiteParseFailed && (
-            <DlsiteParseFailedModal
-              onClose={() => setShowDlsiteParseFailed(false)}
-              onOpenWork={handleOpenWorkFromNotification}
-            />
-          )}
-          <Toast
-            message={
-              scanJob.error ??
-              (dlsiteBulk.cancelledResult
-                ? `DLsite一括取得を中断しました（${formatDlsiteBulkResult(dlsiteBulk.cancelledResult)}）`
-                : dlsiteBulk.result
-                  ? `DLsite一括取得: ${formatDlsiteBulkResult(dlsiteBulk.result)}`
-                  : dlsiteBulk.error)
-            }
-            onDismiss={scanJob.error ? scanJob.clearError : dlsiteBulk.dismiss}
-          />
+          <DlsiteNotificationModals activeModal={activeModal} onClose={handleCloseModal} />
+          <GlobalToast />
         </>
       }
     />
   );
-}
-
-function formatDlsiteBulkResult(result: DlsiteBulkResult): string {
-  const base = `取得 ${result.fetched}件・失敗 ${result.failed}件`;
-  return result.parseErrors > 0 ? `${base}（うちパース ${result.parseErrors}件）` : base;
 }

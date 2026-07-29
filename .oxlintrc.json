@@ -14,5 +14,30 @@
     "react": {
       "version": "19.1.0"
     }
-  }
+  },
+  "overrides": [
+    {
+      "files": ["client/src/app/App.tsx"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "jotai",
+                "importNames": ["useAtom", "useAtomValue"],
+                "message": "App.tsx は Jotai の read API を import しない"
+              }
+            ],
+            "patterns": [
+              {
+                "group": ["**/features/**/model/atoms", "**/features/**/model/*Atoms"],
+                "message": "App.tsx は atom/state モジュールを import しない"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
 }

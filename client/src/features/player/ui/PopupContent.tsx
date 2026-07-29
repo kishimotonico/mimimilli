@@ -3,7 +3,7 @@
 
 import { useAtomValue } from "jotai";
 import { useEffect, useRef, useState } from "react";
-import type { PlayerState } from "../model/usePlayer";
+import type { PlayerState } from "../model/usePlayerState";
 import { playerCurrentTimeAtom, playerDurationAtom } from "../model/atoms";
 import { useSeekDrag } from "./useSeekDrag";
 import { formatPlaybackError } from "./formatPlaybackError";

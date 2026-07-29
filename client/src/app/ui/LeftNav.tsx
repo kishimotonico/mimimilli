@@ -1,10 +1,7 @@
+import { useAtomValue, useSetAtom } from "jotai";
+import { appModeAtom, setAppModeAtom } from "../../features/navigation/model/navigationAtoms";
+import { playerIsActiveAtom } from "../../features/player/model/atoms";
 import { I, type IconName } from "../../shared/ui/Icon";
-
-interface LeftNavProps {
-  mode?: "library" | "files";
-  onModeChange?: (mode: "library" | "files") => void;
-  playingCount?: number;
-}
 
 interface SurfaceItem {
   icon: IconName;
@@ -19,17 +16,17 @@ const SURFACES: SurfaceItem[] = [
   { icon: "bookmark", label: "ピン留め" },
 ];
 
-export default function LeftNav({
-  mode = "library",
-  onModeChange,
-  playingCount = 0,
-}: LeftNavProps) {
+export default function LeftNav() {
+  const mode = useAtomValue(appModeAtom);
+  const setAppMode = useSetAtom(setAppModeAtom);
+  const playingCount = useAtomValue(playerIsActiveAtom) ? 1 : 0;
+
   return (
     <nav className="mle-side" aria-label="メインナビゲーション">
       <div className="mle-side__group is-mode">
         <button
           className={`mle-side__btn ${mode === "files" ? "is-on" : ""}`}
-          onClick={() => onModeChange?.("files")}
+          onClick={() => setAppMode("files")}
           title="ファイル"
           aria-label="ファイル"
           aria-pressed={mode === "files"}
@@ -38,7 +35,7 @@ export default function LeftNav({
         </button>
         <button
           className={`mle-side__btn ${mode === "library" ? "is-on" : ""}`}
-          onClick={() => onModeChange?.("library")}
+          onClick={() => setAppMode("library")}
           title="ライブラリ"
           aria-label="ライブラリ"
           aria-pressed={mode === "library"}

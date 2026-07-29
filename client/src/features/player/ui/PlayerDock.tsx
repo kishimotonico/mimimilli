@@ -6,41 +6,40 @@
 //   カバー画像が歪む・再生ボタンが飛来して見えるなど不自然になるため採用しない）
 // - どちらを使っていたかは playerUiModeAtom（localStorage）で記憶・復元する
 
-import { useAtom } from "jotai";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { AnimatePresence, motion } from "motion/react";
-import { useState } from "react";
-import { playerUiModeAtom } from "../model/atoms";
-import type { PlayerState } from "../model/usePlayer";
+import { useCallback, useState } from "react";
+import {
+  selectLibraryWorkAtom,
+  setLibraryAxisAtom,
+} from "../../library/model/libraryNavigationActions";
+import { setAppModeAtom } from "../../navigation/model/navigationAtoms";
+import { playerIsActiveAtom, playerUiModeAtom } from "../model/atoms";
+import { usePlayerActions } from "../model/usePlayerActions";
+import { usePlayerState } from "../model/usePlayerState";
 import BarContent from "./BarContent";
 import PopupContent from "./PopupContent";
-
-interface PlayerDockProps {
-  isPlaying: boolean;
-  state: PlayerState;
-  onTogglePlay: () => void;
-  onSeek: (t: number) => void;
-  onSeekRelative: (deltaSec: number) => void;
-  onSetVolume: (v: number) => void;
-  onToggleMute: () => void;
-  onSetLoop: (l: boolean) => void;
-  onSetPlaybackRate: (r: number) => void;
-  onNext: () => void;
-  onPrev: () => void;
-  onExpandFullScreen: () => void;
-  onShowPlayingWork: () => void;
-}
 
 const DOCK_SLIDE_TRANSITION = { type: "spring" as const, stiffness: 420, damping: 32, mass: 0.9 };
 const DOCK_SWITCH_TRANSITION = { type: "tween" as const, duration: 0.18, ease: "easeOut" as const };
 
-export default function PlayerDock({
-  isPlaying,
-  state,
-  onExpandFullScreen,
-  ...actions
-}: PlayerDockProps) {
+export default function PlayerDock() {
+  const state = usePlayerState();
+  const actions = usePlayerActions();
+  const isPlaying = useAtomValue(playerIsActiveAtom);
   const [uiMode, setUiMode] = useAtom(playerUiModeAtom);
   const [switchingUiMode, setSwitchingUiMode] = useState(false);
+  const setAppMode = useSetAtom(setAppModeAtom);
+  const setLibraryAxis = useSetAtom(setLibraryAxisAtom);
+  const selectLibraryWork = useSetAtom(selectLibraryWorkAtom);
+
+  const handleShowPlayingWork = useCallback(() => {
+    const workId = state.currentWork?.id;
+    if (!workId) return;
+    setAppMode("library");
+    setLibraryAxis("all");
+    selectLibraryWork(workId);
+  }, [selectLibraryWork, setAppMode, setLibraryAxis, state.currentWork]);
 
   const switchUiMode = (nextMode: "bar" | "popup") => {
     setSwitchingUiMode(true);
@@ -60,10 +59,10 @@ export default function PlayerDock({
         >
           <BarContent
             state={state}
-            onTogglePlay={actions.onTogglePlay}
-            onNext={actions.onNext}
-            onPrev={actions.onPrev}
-            onSeek={actions.onSeek}
+            onTogglePlay={actions.togglePlay}
+            onNext={actions.nextTrack}
+            onPrev={actions.prevTrack}
+            onSeek={actions.seek}
             onSwitchToPopup={() => switchUiMode("popup")}
           />
         </motion.div>
@@ -80,18 +79,18 @@ export default function PlayerDock({
         >
           <PopupContent
             state={state}
-            onTogglePlay={actions.onTogglePlay}
-            onSeek={actions.onSeek}
-            onSeekRelative={actions.onSeekRelative}
-            onSetVolume={actions.onSetVolume}
-            onToggleMute={actions.onToggleMute}
-            onSetLoop={actions.onSetLoop}
-            onSetPlaybackRate={actions.onSetPlaybackRate}
-            onNext={actions.onNext}
-            onPrev={actions.onPrev}
+            onTogglePlay={actions.togglePlay}
+            onSeek={actions.seek}
+            onSeekRelative={actions.seekRelative}
+            onSetVolume={actions.setVolume}
+            onToggleMute={actions.toggleMute}
+            onSetLoop={actions.setLoop}
+            onSetPlaybackRate={actions.setPlaybackRate}
+            onNext={actions.nextTrack}
+            onPrev={actions.prevTrack}
             onFold={() => switchUiMode("bar")}
-            onExpandFullScreen={onExpandFullScreen}
-            onShowPlayingWork={actions.onShowPlayingWork}
+            onExpandFullScreen={() => actions.setShowFullPlayer(true)}
+            onShowPlayingWork={handleShowPlayingWork}
           />
         </motion.div>
       )}

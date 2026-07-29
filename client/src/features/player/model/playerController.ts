@@ -56,7 +56,51 @@ export const PLAYER_CONTROLLER_INITIAL: PlayerControllerState = {
   playbackError: null,
 };
 
+const EMPTY_TRACKS: PlaybackTrack[] = [];
+
 export const PLAYER_CORE_INITIAL: PlayerCoreState = toPlayerCoreState(PLAYER_CONTROLLER_INITIAL);
+
+type PlayerCoreComparators = {
+  [K in keyof PlayerCoreState]: (a: PlayerCoreState[K], b: PlayerCoreState[K]) => boolean;
+};
+
+function areTracksEqual(a: PlaybackTrack[], b: PlaybackTrack[]): boolean {
+  if (a === b) return true;
+  return a.length === 0 && b.length === 0;
+}
+
+function areAbRepeatEqual(a: PlayerCoreState["abRepeat"], b: PlayerCoreState["abRepeat"]): boolean {
+  return a.a === b.a && a.b === b.b;
+}
+
+function arePlaybackErrorsEqual(a: AudioEngineError | null, b: AudioEngineError | null): boolean {
+  if (a === b) return true;
+  if (a === null || b === null) return false;
+  return a.source === b.source && a.name === b.name && a.code === b.code && a.message === b.message;
+}
+
+const playerCoreComparators = {
+  isPlaying: Object.is,
+  currentTrackIndex: Object.is,
+  currentPlaylistId: Object.is,
+  currentWork: Object.is,
+  tracks: areTracksEqual,
+  volume: Object.is,
+  loop: Object.is,
+  showFullPlayer: Object.is,
+  playbackRate: Object.is,
+  channelSwap: Object.is,
+  abRepeat: areAbRepeatEqual,
+  playbackError: arePlaybackErrorsEqual,
+} satisfies PlayerCoreComparators;
+
+/** positionSec / durationSec を除く core 投影の意味的同一性。 */
+export function isPlayerCoreStateEqual(prev: PlayerCoreState, next: PlayerCoreState): boolean {
+  for (const key of Object.keys(playerCoreComparators) as (keyof PlayerCoreState)[]) {
+    if (!playerCoreComparators[key](prev[key], next[key])) return false;
+  }
+  return true;
+}
 
 export type PlayerControllerInput =
   | { type: "startRequested"; item: PlaybackItem; positionSec?: number }
@@ -293,7 +337,7 @@ export function toPlayerCoreState(state: PlayerControllerState): PlayerCoreState
     currentTrackIndex: state.item?.trackIndex ?? -1,
     currentPlaylistId: state.item?.playlistId ?? null,
     currentWork: state.item?.work ?? null,
-    tracks: state.item?.tracks ?? [],
+    tracks: state.item?.tracks ?? EMPTY_TRACKS,
     volume: state.volume,
     loop: state.loop,
     showFullPlayer: state.showFullPlayer,

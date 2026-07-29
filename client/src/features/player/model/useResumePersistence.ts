@@ -12,10 +12,13 @@ import type { LoadedTrack, MutableRef, PendingResume, PlayerRuntimeRefs } from "
 
 interface UseResumePersistenceOptions {
   refs: Pick<PlayerRuntimeRefs, "engine" | "loadedTrack" | "trackEnded">;
+  pendingResumeRef: MutableRef<PendingResume | null>;
 }
 
-export function useResumePersistenceController({ refs }: UseResumePersistenceOptions) {
-  const pendingResumeRef = useRef<PendingResume | null>(null);
+export function useResumePersistenceController({
+  refs,
+  pendingResumeRef,
+}: UseResumePersistenceOptions) {
   const savePromiseRef = useRef<Promise<void> | null>(null);
 
   const enqueueResumeSave = useCallback((workId: string, resume: ResumeBody) => {
@@ -67,34 +70,37 @@ export function useResumePersistenceController({ refs }: UseResumePersistenceOpt
       pendingResumeRef.current = null;
       return getTrackStart(track) + pending.offsetSec;
     },
-    [],
+    [pendingResumeRef],
   );
 
-  const loadResume = useCallback((work: Work) => {
-    const defaultPlaylist =
-      work.playlists.find((candidate) => candidate.id === work.defaultPlaylistId) ??
-      work.playlists[0];
-    const persisted = work.resume;
-    const persistedPlaylist = persisted
-      ? work.playlists.find((candidate) => candidate.id === persisted.playlistId)
-      : undefined;
-    const persistedTrackIndex =
-      persisted && persistedPlaylist
-        ? persistedPlaylist.tracks.findIndex((candidate) => candidate.id === persisted.trackId)
-        : -1;
-    const hasValidResume =
-      persisted !== null && persistedPlaylist !== undefined && persistedTrackIndex >= 0;
-    const playlist = hasValidResume ? persistedPlaylist : defaultPlaylist;
-    if (!playlist || playlist.tracks.length === 0) return null;
+  const loadResume = useCallback(
+    (work: Work) => {
+      const defaultPlaylist =
+        work.playlists.find((candidate) => candidate.id === work.defaultPlaylistId) ??
+        work.playlists[0];
+      const persisted = work.resume;
+      const persistedPlaylist = persisted
+        ? work.playlists.find((candidate) => candidate.id === persisted.playlistId)
+        : undefined;
+      const persistedTrackIndex =
+        persisted && persistedPlaylist
+          ? persistedPlaylist.tracks.findIndex((candidate) => candidate.id === persisted.trackId)
+          : -1;
+      const hasValidResume =
+        persisted !== null && persistedPlaylist !== undefined && persistedTrackIndex >= 0;
+      const playlist = hasValidResume ? persistedPlaylist : defaultPlaylist;
+      if (!playlist || playlist.tracks.length === 0) return null;
 
-    const trackIndex = hasValidResume ? persistedTrackIndex : 0;
-    const positionSec = hasValidResume ? persisted.offsetSec : 0;
-    pendingResumeRef.current = hasValidResume ? { workId: work.id, ...persisted } : null;
-    return { playlistId: playlist.id, tracks: playlist.tracks, trackIndex, positionSec };
-  }, []);
+      const trackIndex = hasValidResume ? persistedTrackIndex : 0;
+      const positionSec = hasValidResume ? persisted.offsetSec : 0;
+      pendingResumeRef.current = hasValidResume ? { workId: work.id, ...persisted } : null;
+      return { playlistId: playlist.id, tracks: playlist.tracks, trackIndex, positionSec };
+    },
+    [pendingResumeRef],
+  );
 
   return {
-    pendingResumeRef: pendingResumeRef as MutableRef<PendingResume | null>,
+    pendingResumeRef,
     consumePendingResume,
     enqueueResumeSave,
     saveCurrentResume,

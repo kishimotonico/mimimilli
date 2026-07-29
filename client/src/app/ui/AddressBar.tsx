@@ -1,144 +1,28 @@
-import { useEffect, useRef, useState } from "react";
-import type { SortId } from "@mimimilli/shared";
-import { SORT_OPTIONS, type GridLayoutMode } from "../../features/library/model/types";
+import { useAtom, useAtomValue } from "jotai";
+import { appModeAtom } from "../../features/navigation/model/navigationAtoms";
+import { libraryViewModeAtom } from "../../features/library/model/atoms";
+import LibraryGridControls from "../../features/library/ui/LibraryGridControls";
+import LibraryBreadcrumbs from "../../features/library/ui/LibraryBreadcrumbs";
+import LibrarySortMenu from "../../features/library/ui/LibrarySortMenu";
+import FilesBreadcrumbs from "../../features/files/ui/FilesBreadcrumbs";
+import NavigationHistoryButtons from "./NavigationHistoryButtons";
 import { I } from "../../shared/ui/Icon";
 import IconButton from "../../shared/ui/IconButton";
-import { MAX_TILE_SIZE, MIN_TILE_SIZE } from "../../features/library/model/gridSizing";
 
-interface AddressBarProps {
-  path: string[];
-  onNavigate?: (index: number) => void;
-  onBack?: () => void;
-  onForward?: () => void;
-  canBack?: boolean;
-  canForward?: boolean;
-  viewMode?: "column" | "list" | "grid";
-  onViewChange?: (v: "column" | "list" | "grid") => void;
-  availableViewModes?: readonly ("column" | "list" | "grid")[];
-  tileSize?: number;
-  onTileSizeChange?: (size: number) => void;
-  gridLayoutMode?: GridLayoutMode;
-  onGridLayoutModeChange?: (mode: GridLayoutMode) => void;
-  showSort?: boolean;
-  sort?: SortId;
-  onSortChange?: (sort: SortId) => void;
-}
-
-export default function AddressBar({
-  path,
-  onNavigate,
-  onBack,
-  onForward,
-  canBack = false,
-  canForward = false,
-  viewMode = "column",
-  onViewChange,
-  availableViewModes = ["column"],
-  tileSize,
-  onTileSizeChange,
-  gridLayoutMode,
-  onGridLayoutModeChange,
-  showSort = false,
-  sort,
-  onSortChange,
-}: AddressBarProps) {
-  const [sortMenuOpen, setSortMenuOpen] = useState(false);
-  const sortRef = useRef<HTMLDivElement>(null);
-  const currentSortLabel = SORT_OPTIONS.find((opt) => opt.id === sort)?.label;
-  const gridControlsVisible = viewMode === "grid";
-
-  useEffect(() => {
-    if (!sortMenuOpen) return;
-
-    const handlePointerDown = (e: PointerEvent) => {
-      if (sortRef.current && !sortRef.current.contains(e.target as Node)) {
-        setSortMenuOpen(false);
-      }
-    };
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setSortMenuOpen(false);
-    };
-
-    window.addEventListener("pointerdown", handlePointerDown);
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("pointerdown", handlePointerDown);
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [sortMenuOpen]);
+export default function AddressBar() {
+  const mode = useAtomValue(appModeAtom);
+  const [libraryViewMode, setLibraryViewMode] = useAtom(libraryViewModeAtom);
+  const viewMode = mode === "library" ? libraryViewMode : "column";
+  const availableViewModes: readonly ("column" | "list" | "grid")[] =
+    mode === "library" ? ["list", "grid"] : ["column"];
 
   return (
     <div className="mle-addr is-lib">
-      <IconButton size="sm" icon={I.arrowL} label="戻る" onClick={onBack} disabled={!canBack} />
-      <IconButton
-        size="sm"
-        icon={I.arrowR}
-        label="進む"
-        onClick={onForward}
-        disabled={!canForward}
-      />
+      <NavigationHistoryButtons />
 
-      <div className="mle-crumbs">
-        {path.map((seg, i) => (
-          <span key={i} style={{ display: "contents" }}>
-            {i > 0 && <span className="mle-crumbs__sep">/</span>}
-            <button
-              className={`mle-crumbs__seg ${i === path.length - 1 ? "is-last" : ""}`}
-              onClick={() => onNavigate?.(i)}
-            >
-              {seg}
-            </button>
-          </span>
-        ))}
-      </div>
+      {mode === "library" ? <LibraryBreadcrumbs /> : <FilesBreadcrumbs />}
 
-      {gridLayoutMode !== undefined &&
-        onGridLayoutModeChange &&
-        tileSize !== undefined &&
-        onTileSizeChange && (
-          <div
-            className={`mle-grid-controls ${gridControlsVisible ? "is-visible" : ""}`}
-            aria-hidden={!gridControlsVisible}
-          >
-            <div className="mle-grid-controls__inner">
-              <div className="inline-flex items-center gap-[1px] rounded-2 bg-paper-2 p-[2px]">
-                <IconButton
-                  size="sm"
-                  icon={I.ratio11}
-                  label="カバーを1対1に切り抜き、等幅で並べる"
-                  title="1:1タイル：正方形に切り抜いて等幅で並べる"
-                  active={gridLayoutMode === "square"}
-                  onClick={() => onGridLayoutModeChange("square")}
-                  disabled={!gridControlsVisible}
-                />
-                <IconButton
-                  size="sm"
-                  icon={I.gridJustified}
-                  label="カバーの縦横比を保ち、行の右端を揃えて並べる"
-                  title="元の縦横比：比率を保って行の右端を揃える"
-                  active={gridLayoutMode === "justified"}
-                  onClick={() => onGridLayoutModeChange("justified")}
-                  disabled={!gridControlsVisible}
-                />
-              </div>
-
-              <label className="mll-grid-size">
-                <span>サイズ</span>
-                <input
-                  type="range"
-                  min={MIN_TILE_SIZE}
-                  max={MAX_TILE_SIZE}
-                  step={1}
-                  value={tileSize}
-                  disabled={!gridControlsVisible}
-                  aria-label="グリッドのサイズ"
-                  onChange={(event) => onTileSizeChange(Number(event.currentTarget.value))}
-                />
-                <output>{tileSize}px</output>
-              </label>
-            </div>
-          </div>
-        )}
+      {mode === "library" && <LibraryGridControls />}
 
       <div className="inline-flex items-center gap-[1px] rounded-2 bg-paper-2 p-[2px]">
         <IconButton
@@ -146,7 +30,6 @@ export default function AddressBar({
           icon={I.gridS}
           label="カラム"
           active={viewMode === "column"}
-          onClick={() => onViewChange?.("column")}
           disabled={!availableViewModes.includes("column")}
         />
         <IconButton
@@ -154,7 +37,7 @@ export default function AddressBar({
           icon={I.list}
           label="リスト"
           active={viewMode === "list"}
-          onClick={() => onViewChange?.("list")}
+          onClick={() => setLibraryViewMode("list")}
           disabled={!availableViewModes.includes("list")}
         />
         <IconButton
@@ -162,45 +45,12 @@ export default function AddressBar({
           icon={I.grid}
           label="グリッド"
           active={viewMode === "grid"}
-          onClick={() => onViewChange?.("grid")}
+          onClick={() => setLibraryViewMode("grid")}
           disabled={!availableViewModes.includes("grid")}
         />
       </div>
 
-      {showSort && (
-        <div className="mle-sortmenu" ref={sortRef}>
-          <IconButton
-            size="sm"
-            icon={I.sort}
-            label="並び替え"
-            title={currentSortLabel ? `並び替え: ${currentSortLabel}` : "並び替え"}
-            active={sortMenuOpen}
-            aria-haspopup="menu"
-            aria-expanded={sortMenuOpen}
-            onClick={() => setSortMenuOpen((v) => !v)}
-          />
-          {sortMenuOpen && (
-            <div className="mle-sortmenu__pop" role="menu" aria-label="並び替え">
-              {SORT_OPTIONS.map((opt) => (
-                <button
-                  key={opt.id}
-                  type="button"
-                  role="menuitemradio"
-                  aria-checked={sort === opt.id}
-                  className={`mle-sortmenu__item ${sort === opt.id ? "is-checked" : ""}`}
-                  onClick={() => {
-                    onSortChange?.(opt.id);
-                    setSortMenuOpen(false);
-                  }}
-                >
-                  <span className="check">{sort === opt.id && <I.check size={14} />}</span>
-                  <span className="label">{opt.label}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      {mode === "library" && <LibrarySortMenu />}
       <IconButton size="sm" icon={I.more} label="その他" />
     </div>
   );

@@ -13,14 +13,12 @@ import {
   filesSelectedPathAtom,
 } from "../../files/model/atoms";
 import { joinPath, relSegments } from "../../files/model/types";
-import {
-  navigationHistoryCommitAtom,
-  requestNavigationHistoryCommitAtom,
-} from "./navigationHistoryAtoms";
+import { useRootFolder } from "../../settings/useSettingsQuery";
+import { appModeAtom } from "./navigationAtoms";
+import { navigationHistoryCommitAtom, navigationHistoryStateAtom } from "./navigationHistoryAtoms";
 import {
   parseNavigationUrl,
   serializeNavigationUrl,
-  type AppMode,
   type NavigationParseResult,
   type NavigationUrlState,
 } from "./navigationUrl";
@@ -30,12 +28,6 @@ const MAX_INDEX_KEY = "mimimilli.navigation.maxIndex";
 
 interface HistoryMarker {
   index: number;
-}
-
-interface UseNavigationHistoryOptions {
-  mode: AppMode;
-  setMode: (mode: AppMode) => void;
-  rootFolder: string | null;
 }
 
 function readMarker(state: unknown): HistoryMarker | null {
@@ -67,7 +59,16 @@ function warnForInvalidUrl(result: NavigationParseResult): void {
   }
 }
 
-export function useNavigationHistory({ mode, setMode, rootFolder }: UseNavigationHistoryOptions) {
+export function navigationHistoryBack(): void {
+  window.history.back();
+}
+
+export function navigationHistoryForward(): void {
+  window.history.forward();
+}
+
+export function useNavigationHistory(): void {
+  const mode = useAtomValue(appModeAtom);
   const activeAxis = useAtomValue(activeAxisAtom);
   const drillValue = useAtomValue(drillValueAtom);
   const selectedTags = useAtomValue(selectedTagsAtom);
@@ -77,6 +78,7 @@ export function useNavigationHistory({ mode, setMode, rootFolder }: UseNavigatio
   const filesSelectedPath = useAtomValue(filesSelectedPathAtom);
   const commit = useAtomValue(navigationHistoryCommitAtom);
 
+  const setMode = useSetAtom(appModeAtom);
   const setActiveAxis = useSetAtom(activeAxisAtom);
   const setDrillValue = useSetAtom(drillValueAtom);
   const setSelectedTags = useSetAtom(selectedTagsAtom);
@@ -85,7 +87,9 @@ export function useNavigationHistory({ mode, setMode, rootFolder }: UseNavigatio
   const setFilesRelPath = useSetAtom(filesRelPathAtom);
   const setFilesSelectedPath = useSetAtom(filesSelectedPathAtom);
   const setFilesDirection = useSetAtom(filesDirectionAtom);
-  const requestCommit = useSetAtom(requestNavigationHistoryCommitAtom);
+  const setNavigationHistoryState = useSetAtom(navigationHistoryStateAtom);
+
+  const rootFolder = useRootFolder();
 
   const rootFolderRef = useRef(rootFolder);
   rootFolderRef.current = rootFolder;
@@ -94,8 +98,15 @@ export function useNavigationHistory({ mode, setMode, rootFolder }: UseNavigatio
   const pendingFileSelectionRef = useRef<string[] | null>(null);
   const initializedRef = useRef(false);
   const [ready, setReady] = useState(false);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [maxIndex, setMaxIndex] = useState(0);
+
+  // 履歴インデックスは ref が唯一の保持先。派生の可否だけを atom へ公開する
+  // （state を持って effect で atom へ写すと余分なレンダーが1往復増える）。
+  const publishHistoryState = useCallback(() => {
+    setNavigationHistoryState({
+      canBack: currentIndexRef.current > 0,
+      canForward: currentIndexRef.current < maxIndexRef.current,
+    });
+  }, [setNavigationHistoryState]);
 
   const applyParsedState = useCallback(
     (result: NavigationParseResult, fileDirection: 1 | -1 = 1) => {
@@ -144,8 +155,7 @@ export function useNavigationHistory({ mode, setMode, rootFolder }: UseNavigatio
 
       currentIndexRef.current = index;
       maxIndexRef.current = knownMax;
-      setCurrentIndex(index);
-      setMaxIndex(knownMax);
+      publishHistoryState();
       writeMaxIndex(knownMax);
       history.replaceState(
         stateWithMarker(index),
@@ -166,8 +176,7 @@ export function useNavigationHistory({ mode, setMode, rootFolder }: UseNavigatio
 
       currentIndexRef.current = nextIndex;
       maxIndexRef.current = nextMax;
-      setCurrentIndex(nextIndex);
-      setMaxIndex(nextMax);
+      publishHistoryState();
       writeMaxIndex(nextMax);
       if (!nextMarker || nextParsed.canonicalUrl !== nextCurrentUrl) {
         history.replaceState(stateWithMarker(nextIndex), "", nextParsed.canonicalUrl);
@@ -177,7 +186,7 @@ export function useNavigationHistory({ mode, setMode, rootFolder }: UseNavigatio
 
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
-  }, [applyParsedState]);
+  }, [applyParsedState, publishHistoryState]);
 
   useEffect(() => {
     if (!rootFolder || pendingFileSelectionRef.current === null) return;
@@ -221,8 +230,7 @@ export function useNavigationHistory({ mode, setMode, rootFolder }: UseNavigatio
       const nextIndex = currentIndexRef.current + 1;
       currentIndexRef.current = nextIndex;
       maxIndexRef.current = nextIndex;
-      setCurrentIndex(nextIndex);
-      setMaxIndex(nextIndex);
+      publishHistoryState();
       writeMaxIndex(nextIndex);
       history.pushState(stateWithMarker(nextIndex), "", nextUrl);
       return;
@@ -237,30 +245,11 @@ export function useNavigationHistory({ mode, setMode, rootFolder }: UseNavigatio
     filesRelPath,
     filesSelectedPath,
     mode,
+    publishHistoryState,
     ready,
     rootFolder,
     selectedTags,
     selectedWorkId,
     sort,
   ]);
-
-  const navigateMode = useCallback(
-    (nextMode: AppMode) => {
-      if (nextMode === mode) return;
-      requestCommit("push");
-      setMode(nextMode);
-    },
-    [mode, requestCommit, setMode],
-  );
-
-  const back = useCallback(() => window.history.back(), []);
-  const forward = useCallback(() => window.history.forward(), []);
-
-  return {
-    canBack: currentIndex > 0,
-    canForward: currentIndex < maxIndex,
-    back,
-    forward,
-    setMode: navigateMode,
-  };
 }

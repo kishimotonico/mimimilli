@@ -1,87 +1,41 @@
-import { useEffect, useRef, useState } from "react";
-import type { ScanResult } from "@mimimilli/shared";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { I } from "../../shared/ui/Icon";
 import IconButton from "../../shared/ui/IconButton";
+import { useAtom, useAtomValue } from "jotai";
 import { AnimatePresence, motion } from "motion/react";
-import NotificationBell from "./NotificationBell";
+import {
+  dlsiteBulkActiveAtom,
+  dlsiteBulkCancellingAtom,
+  dlsiteBulkProgressAtom,
+} from "../../features/dlsite/model/atoms";
+import { useDlsiteBulkActions } from "../../features/dlsite/model/useDlsiteBulkActions";
+import { librarySearchQueryAtom } from "../../features/library/model/atoms";
+import { appModeAtom } from "../../features/navigation/model/navigationAtoms";
+import { playerIsActiveAtom, playingTrackTitleAtom } from "../../features/player/model/atoms";
+import { scanningAtom, scanProgressLabelAtom } from "../../features/scan/model/atoms";
 
 const FADE = { duration: 0.15 };
 
 interface TopBarProps {
-  mode?: "library" | "files";
-  searchQuery: string;
-  onSearchChange: (q: string) => void;
   /** スキャンボタン押下時。即時実行はせずスキャンモーダルを開く（TASK-56） */
   onOpenScan?: () => void;
   onSettings?: () => void;
-  isPlaying?: boolean;
-  playingTrack?: string;
-  /** スキャン実行中かどうか（TASK-20: SSE進捗表示） */
-  scanning?: boolean;
-  /** scanning 中の進捗ラベル（例: "作品を登録中 (3/12)"）。null は「進捗未受信」を表す */
-  scanProgressLabel?: string | null;
-  /** RJコード未検出の作品数（0件ならバッジを出さない、TASK-41） */
-  rjCodeMissingCount?: number;
-  /** 通知ベルからRJコード未検出一覧を開く */
-  onOpenRjCodeMissing?: () => void;
-  /** DLsite取得失敗（error/not_found）の作品数（TASK-44） */
-  dlsiteFetchFailedCount?: number;
-  /** 通知ベルからDLsite取得失敗一覧を開く */
-  onOpenDlsiteFetchFailed?: () => void;
-  /** パース失敗アラートが発火しているか */
-  dlsiteParseErrorAlert?: boolean;
-  /** パース失敗の作品数 */
-  dlsiteParseErrorCount?: number;
-  /** 通知ベルからパース失敗一覧を開く */
-  onOpenDlsiteParseFailed?: () => void;
-  /** DLsite未連携（RJコードはあるが未取得）の作品数（TASK-44） */
-  dlsiteUnlinkedCount?: number;
-  /** DLsite一括取得（mode: "existing"）が実行中か */
-  dlsiteBulkActive?: boolean;
-  /** dlsiteBulkActive 中の進捗（例: "3/12"）。null は進捗未受信 */
-  dlsiteBulkProgress?: { processed: number; total: number } | null;
-  /** 通知ベルから一括取得を起動する */
-  onStartDlsiteBulk?: () => void;
-  /** DLsite一括取得を中止する */
-  onCancelDlsiteBulk?: () => void;
-  /** DLsite一括取得の中止を要求済みか */
-  dlsiteBulkCancelling?: boolean;
-  /** 直近のスキャン結果（通知ベルのサマリ表示用、TASK-44） */
-  scanResult?: ScanResult | null;
-  /** 通知ベルの直近スキャン結果クリックでスキャンモーダルの結果表示を開く（TASK-56） */
-  onOpenScanResult?: () => void;
+  notificationBell: ReactNode;
 }
 
-export default function TopBar({
-  mode = "library",
-  searchQuery,
-  onSearchChange,
-  onOpenScan,
-  onSettings,
-  isPlaying = false,
-  playingTrack,
-  scanning = false,
-  scanProgressLabel = null,
-  rjCodeMissingCount = 0,
-  onOpenRjCodeMissing = () => {},
-  dlsiteFetchFailedCount = 0,
-  onOpenDlsiteFetchFailed = () => {},
-  dlsiteParseErrorAlert = false,
-  dlsiteParseErrorCount = 0,
-  onOpenDlsiteParseFailed = () => {},
-  dlsiteUnlinkedCount = 0,
-  dlsiteBulkActive = false,
-  dlsiteBulkProgress = null,
-  onStartDlsiteBulk = () => {},
-  onCancelDlsiteBulk = () => {},
-  dlsiteBulkCancelling = false,
-  scanResult = null,
-  onOpenScanResult = () => {},
-}: TopBarProps) {
-  const placeholder =
-    mode === "files"
-      ? "このフォルダー内を検索（ファイル名 · 拡張子 ...）"
-      : "ライブラリを検索（タイトル · CV · タグ · RJ ...）";
+export default function TopBar({ onOpenScan, onSettings, notificationBell }: TopBarProps) {
+  const scanning = useAtomValue(scanningAtom);
+  const scanProgressLabel = useAtomValue(scanProgressLabelAtom);
+  const dlsiteBulkActive = useAtomValue(dlsiteBulkActiveAtom);
+  const dlsiteBulkProgress = useAtomValue(dlsiteBulkProgressAtom);
+  const dlsiteBulkCancelling = useAtomValue(dlsiteBulkCancellingAtom);
+  const { cancel: onCancelDlsiteBulk } = useDlsiteBulkActions();
+  const mode = useAtomValue(appModeAtom);
+  const [searchQuery, onSearchChange] = useAtom(librarySearchQueryAtom);
+  const isPlaying = useAtomValue(playerIsActiveAtom);
+  const playingTrack = useAtomValue(playingTrackTitleAtom);
+
+  const placeholder = "ライブラリを検索（タイトル · CV · タグ · RJ ...）";
 
   // 検索入力はローカル draft を即時表示し、親への通知は IME composition 中は保留する
   // （composition 中間文字列でのリクエスト乱発を防ぐ。TASK-61）
@@ -114,37 +68,39 @@ export default function TopBar({
 
       <div className="mll-bar__spacer" />
 
-      <div className="mll-bar__search">
-        <I.search size={13} />
-        <input
-          value={draft}
-          onChange={(e) => {
-            setDraft(e.target.value);
-            if (!composingRef.current) onSearchChange(e.target.value);
-          }}
-          onCompositionStart={() => {
-            composingRef.current = true;
-          }}
-          onCompositionEnd={(e) => {
-            composingRef.current = false;
-            onSearchChange(e.currentTarget.value);
-          }}
-          placeholder={placeholder}
-        />
-        {draft ? (
-          <IconButton
-            size="sm"
-            icon={I.x}
-            label="検索をクリア"
-            onClick={() => {
-              setDraft("");
-              onSearchChange("");
+      {mode !== "files" && (
+        <div className="mll-bar__search">
+          <I.search size={13} />
+          <input
+            value={draft}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              if (!composingRef.current) onSearchChange(e.target.value);
             }}
+            onCompositionStart={() => {
+              composingRef.current = true;
+            }}
+            onCompositionEnd={(e) => {
+              composingRef.current = false;
+              onSearchChange(e.currentTarget.value);
+            }}
+            placeholder={placeholder}
           />
-        ) : (
-          <span className="kbd">⌘K</span>
-        )}
-      </div>
+          {draft ? (
+            <IconButton
+              size="sm"
+              icon={I.x}
+              label="検索をクリア"
+              onClick={() => {
+                setDraft("");
+                onSearchChange("");
+              }}
+            />
+          ) : (
+            <span className="kbd">⌘K</span>
+          )}
+        </div>
+      )}
 
       {scanning && (
         <span className="font-mono text-[10.5px] text-ink-3" aria-live="polite">
@@ -174,7 +130,7 @@ export default function TopBar({
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={FADE}
-                onClick={onCancelDlsiteBulk}
+                onClick={() => void onCancelDlsiteBulk().catch(() => {})}
                 className="inline-flex h-7 items-center justify-center gap-1 rounded-[6px] border border-[color-mix(in_oklch,var(--r-coral)_45%,transparent)] bg-[color-mix(in_oklch,var(--r-coral)_10%,transparent)] px-2.5 font-sans text-[11px] font-medium text-ink-0 transition-colors hover:bg-[color-mix(in_oklch,var(--r-coral)_16%,transparent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
               >
                 <I.x size={11} />
@@ -184,21 +140,7 @@ export default function TopBar({
           </AnimatePresence>
         </>
       )}
-      <NotificationBell
-        rjCodeMissingCount={rjCodeMissingCount}
-        onOpenRjCodeMissing={onOpenRjCodeMissing}
-        dlsiteFetchFailedCount={dlsiteFetchFailedCount}
-        onOpenDlsiteFetchFailed={onOpenDlsiteFetchFailed}
-        dlsiteParseErrorAlert={dlsiteParseErrorAlert}
-        dlsiteParseErrorCount={dlsiteParseErrorCount}
-        onOpenDlsiteParseFailed={onOpenDlsiteParseFailed}
-        dlsiteUnlinkedCount={dlsiteUnlinkedCount}
-        dlsiteBulkActive={dlsiteBulkActive}
-        dlsiteBulkProgress={dlsiteBulkProgress}
-        onStartDlsiteBulk={onStartDlsiteBulk}
-        scanResult={scanResult}
-        onOpenScanResult={onOpenScanResult}
-      />
+      {notificationBell}
       <IconButton size="md" icon={I.cog} label="設定" onClick={onSettings} />
     </header>
   );

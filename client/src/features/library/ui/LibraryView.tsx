@@ -1,11 +1,17 @@
 import { useCallback, useMemo, useState } from "react";
+import { useAtomValue, useSetAtom } from "jotai";
 import {
   getDefaultPlaylistTrackCount,
   toWorkListItem,
   type Work,
   type WorkListItem,
 } from "@mimimilli/shared";
-import type { GridLayoutMode, ViewMode } from "../model/types";
+import { librarySearchQueryAtom, libraryViewModeAtom } from "../model/atoms";
+import {
+  playerIsPlaybackActiveAtom,
+  playingTrackIndexAtom,
+  playingWorkIdAtom,
+} from "../../player/model/atoms";
 import { useLibraryView } from "../model/useLibraryNavigation";
 import { useLibraryQueries, useSmartFolderMutation } from "../model/useLibraryQueries";
 import {
@@ -29,32 +35,17 @@ import WorkGridInspector from "./WorkGridInspector";
 import SmartFolderEditorModal from "./SmartFolderEditorModal";
 
 interface LibraryViewProps {
-  searchQuery: string;
-  onSearchChange: (q: string) => void;
-  playingWorkId?: string;
-  playingTrackIndex?: number;
-  isPlaybackActive?: boolean;
   onPlay: (work: WorkListItem, trackIndex: number) => void;
   onResume: (work: Work) => void;
-  viewMode: ViewMode;
-  tileSize: number;
-  onTileSizeChange: (size: number) => void;
-  gridLayoutMode: GridLayoutMode;
 }
 
-export default function LibraryView({
-  searchQuery,
-  onSearchChange,
-  playingWorkId,
-  playingTrackIndex,
-  isPlaybackActive,
-  onPlay,
-  onResume,
-  viewMode,
-  tileSize,
-  onTileSizeChange,
-  gridLayoutMode,
-}: LibraryViewProps) {
+export default function LibraryView({ onPlay, onResume }: LibraryViewProps) {
+  const searchQuery = useAtomValue(librarySearchQueryAtom);
+  const setSearchQuery = useSetAtom(librarySearchQueryAtom);
+  const viewMode = useAtomValue(libraryViewModeAtom);
+  const playingWorkId = useAtomValue(playingWorkIdAtom);
+  const playingTrackIndex = useAtomValue(playingTrackIndexAtom);
+  const isPlaybackActive = useAtomValue(playerIsPlaybackActiveAtom);
   const nav = useLibraryView();
   const [smartFolderEditor, setSmartFolderEditor] = useState<SmartFolderEditorState>(
     closedSmartFolderEditorState,
@@ -179,19 +170,16 @@ export default function LibraryView({
           worksQueryKey={worksQueryKey}
           selectedWorkId={nav.selectedWorkId}
           searchQuery={searchQuery}
-          tileSize={tileSize}
-          gridLayoutMode={gridLayoutMode}
           isLoading={isLoading}
           isError={isError}
           hasNextPage={hasNextPage}
           worksTotal={worksTotal}
           isFetchingNextPage={isFetchingNextPage}
           onLoadMore={fetchNextPage}
-          onTileSizeChange={onTileSizeChange}
           onWorkSelect={nav.selectWork}
           onWorkPlay={(work) => onPlay(work, 0)}
           onDrillBack={nav.drillBack}
-          onClearSearch={() => onSearchChange("")}
+          onClearSearch={() => setSearchQuery("")}
           onInspectorClose={() => nav.selectWork(null)}
           inspector={
             nav.selectedWorkId ? (
@@ -242,7 +230,7 @@ export default function LibraryView({
           onDrillSelect={nav.drillInto}
           onDrillBack={nav.drillBack}
           onTagToggle={nav.toggleTag}
-          onClearSearch={() => onSearchChange("")}
+          onClearSearch={() => setSearchQuery("")}
         />
       )}
 

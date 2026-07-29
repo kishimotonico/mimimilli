@@ -1,0 +1,36 @@
+// スキャンジョブの Jotai atoms。
+// SSE 購読は ScanRuntime が単一所有者。表示側は必要な atom だけ subscribe する。
+
+import { atom } from "jotai";
+import type { ScanJobSnapshot } from "@mimimilli/shared";
+import { formatScanProgressLabel } from "../model";
+import type { ScanProgress } from "../model";
+
+export const scanJobAtom = atom<ScanJobSnapshot | null>(null);
+
+function isTerminal(job: ScanJobSnapshot): boolean {
+  return job.status === "completed" || job.status === "failed" || job.status === "cancelled";
+}
+
+export const scanningAtom = atom((get) => {
+  const job = get(scanJobAtom);
+  return job !== null && !isTerminal(job);
+});
+
+export const scanProgressAtom = atom<ScanProgress | null>((get) => {
+  const job = get(scanJobAtom);
+  return job?.progress ?? null;
+});
+
+export const scanProgressLabelAtom = atom((get) => formatScanProgressLabel(get(scanProgressAtom)));
+
+export const scanErrorAtom = atom<string | null>(null);
+
+export interface ScanActions {
+  start: () => Promise<void>;
+  cancel: () => Promise<void>;
+  clearError: () => void;
+}
+
+/** ScanRuntime がマウント時に登録する操作群。未配線時は null */
+export const scanActionsAtom = atom<ScanActions | null>(null);

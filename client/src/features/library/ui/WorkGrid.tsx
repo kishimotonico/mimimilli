@@ -7,10 +7,10 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
-import { useAtomValue } from "jotai";
+import { useAtom, useAtomValue } from "jotai";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import type { AxisId, GridLayoutMode } from "../model/types";
-import { tagPrefixesAtom } from "../model/atoms";
+import type { AxisId } from "../model/types";
+import { libraryGridLayoutModeAtom, libraryTileSizeAtom, tagPrefixesAtom } from "../model/atoms";
 import type { WorkListItem } from "@mimimilli/shared";
 import CoverImg from "../../../entities/work/ui/CoverImg";
 import Button from "../../../shared/ui/Button";
@@ -44,8 +44,6 @@ interface WorkGridProps {
   worksQueryKey: string;
   selectedWorkId: string | null;
   searchQuery: string;
-  tileSize: number;
-  gridLayoutMode: GridLayoutMode;
   isLoading: boolean;
   isError: boolean;
   /** 次ページがあるか（追加読み込みボタンの表示判定。TASK-73） */
@@ -54,7 +52,6 @@ interface WorkGridProps {
   worksTotal?: number;
   isFetchingNextPage?: boolean;
   onLoadMore?: () => void;
-  onTileSizeChange: (size: number) => void;
   onWorkSelect: (id: string) => void;
   onWorkPlay: (work: WorkListItem) => void;
   onDrillBack: () => void;
@@ -100,15 +97,12 @@ export default function WorkGrid({
   worksQueryKey,
   selectedWorkId,
   searchQuery,
-  tileSize,
-  gridLayoutMode,
   isLoading,
   isError,
   hasNextPage = false,
   worksTotal,
   isFetchingNextPage = false,
   onLoadMore,
-  onTileSizeChange,
   onWorkSelect,
   onWorkPlay,
   onDrillBack,
@@ -117,6 +111,8 @@ export default function WorkGrid({
   onInspectorClose,
 }: WorkGridProps) {
   const tagPrefixes = useAtomValue(tagPrefixesAtom);
+  const [tileSize, setTileSize] = useAtom(libraryTileSizeAtom);
+  const gridLayoutMode = useAtomValue(libraryGridLayoutModeAtom);
   const safeTileSize = clampTileSize(tileSize);
   const isDrilled = drillValue !== null;
   const paneRef = useRef<HTMLElement>(null);
@@ -253,12 +249,12 @@ export default function WorkGrid({
     const handleWheel = (event: WheelEvent) => {
       if (!event.ctrlKey) return;
       event.preventDefault();
-      onTileSizeChange(clampTileSize(safeTileSize - event.deltaY * 0.1));
+      setTileSize(clampTileSize(safeTileSize - event.deltaY * 0.1));
     };
 
     pane.addEventListener("wheel", handleWheel, { passive: false });
     return () => pane.removeEventListener("wheel", handleWheel);
-  }, [onTileSizeChange, safeTileSize]);
+  }, [setTileSize, safeTileSize]);
 
   useEffect(() => {
     if (!isInspectorOpen) return;

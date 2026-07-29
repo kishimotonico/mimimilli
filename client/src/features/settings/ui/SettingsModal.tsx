@@ -1,23 +1,15 @@
+import { useAtomValue } from "jotai";
 import { useEffect, useRef, useState } from "react";
 import { I } from "../../../shared/ui/Icon";
+import { dlsiteBulkActiveAtom, dlsiteBulkProgressAtom } from "../../dlsite/model/atoms";
+import { useDlsiteBulkActions } from "../../dlsite/model/useDlsiteBulkActions";
+import { scanningAtom, scanProgressLabelAtom } from "../../scan/model/atoms";
 import TagPrefixSettings from "./TagPrefixSettings";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
-
-/** TopBarと状態を共有するため、DLsite一括取得の進捗はAppが保持するuseDlsiteBulkから
- *  propsとして受け取る（Toastの表示もApp側に一元化し、二重表示を避ける）。 */
-interface DlsiteBulkProps {
-  active: boolean;
-  progress: { processed: number; total: number } | null;
-  onStart: () => void;
-}
 
 interface SettingsModalProps {
   rootFolder: string | null;
   lastScanTime: string | null;
-  scanning: boolean;
-  /** scanning 中の進捗ラベル（例: "作品を登録中 (3/12)"）。TASK-20: SSEで受信した進捗 */
-  scanProgressLabel?: string | null;
-  dlsiteBulk: DlsiteBulkProps;
   onClose: () => void;
   /** TopBarのスキャンボタンと同じくスキャンモーダルを開く（即時実行はしない、TASK-56） */
   onOpenScan: () => void;
@@ -28,14 +20,16 @@ interface SettingsModalProps {
 export default function SettingsModal({
   rootFolder,
   lastScanTime,
-  scanning,
-  scanProgressLabel = null,
-  dlsiteBulk,
   onClose,
   onOpenScan,
   onChangeFolder,
   onExport,
 }: SettingsModalProps) {
+  const scanning = useAtomValue(scanningAtom);
+  const scanProgressLabel = useAtomValue(scanProgressLabelAtom);
+  const dlsiteBulkActive = useAtomValue(dlsiteBulkActiveAtom);
+  const dlsiteBulkProgress = useAtomValue(dlsiteBulkProgressAtom);
+  const { start: onStartDlsiteBulk } = useDlsiteBulkActions();
   const [isEditingFolder, setIsEditingFolder] = useState(false);
   const [folderDraft, setFolderDraft] = useState(rootFolder ?? "");
   const folderInputRef = useRef<HTMLInputElement | null>(null);
@@ -338,8 +332,8 @@ export default function SettingsModal({
           </span>
           <button
             type="button"
-            disabled={dlsiteBulk.active}
-            onClick={dlsiteBulk.onStart}
+            disabled={dlsiteBulkActive}
+            onClick={() => void onStartDlsiteBulk()}
             style={{
               alignSelf: "flex-start",
               height: 34,
@@ -350,11 +344,11 @@ export default function SettingsModal({
               color: "var(--ink-1)",
               fontFamily: "var(--font-sans)",
               fontSize: 12,
-              cursor: dlsiteBulk.active ? "not-allowed" : "pointer",
+              cursor: dlsiteBulkActive ? "not-allowed" : "pointer",
             }}
           >
-            {dlsiteBulk.active
-              ? `取得中${dlsiteBulk.progress ? ` (${dlsiteBulk.progress.processed}/${dlsiteBulk.progress.total})` : "..."}`
+            {dlsiteBulkActive
+              ? `取得中${dlsiteBulkProgress ? ` (${dlsiteBulkProgress.processed}/${dlsiteBulkProgress.total})` : "..."}`
               : "未連携をまとめて取得"}
           </button>
         </div>

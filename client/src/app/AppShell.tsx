@@ -5,11 +5,11 @@
 // position: fixed のオーバーレイとして自身の見た目を管理するため、
 // グリッド行には含めない（PlayerDock 参照）。
 
+import { useAtomValue } from "jotai";
 import type { ReactNode } from "react";
+import { dockedBarActiveAtom } from "../features/player/model/atoms";
 
 interface AppShellProps {
-  /** 画面下張り付きバー表示中か（コンテンツの padding-bottom 確保に使用） */
-  dockedBarActive: boolean;
   topBar: ReactNode;
   addressBar: ReactNode;
   leftNav: ReactNode;
@@ -23,7 +23,6 @@ interface AppShellProps {
 }
 
 export default function AppShell({
-  dockedBarActive,
   topBar,
   addressBar,
   leftNav,
@@ -32,6 +31,8 @@ export default function AppShell({
   fullScreenPlayer,
   overlays,
 }: AppShellProps) {
+  const dockedBarActive = useAtomValue(dockedBarActiveAtom);
+
   return (
     <div className={`mle-app ${dockedBarActive ? "has-docked-bar" : ""}`}>
       <div className="mle-frame is-lib">

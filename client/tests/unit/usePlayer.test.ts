@@ -1,10 +1,18 @@
-import { StrictMode, createElement, useMemo, type ReactNode } from "react";
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { StrictMode, createElement, useState, type ReactNode } from "react";
+import { act, render, renderHook, waitFor } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore, useAtomValue } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { usePlayer } from "../../src/features/player/model/usePlayer";
-import { playerCurrentTimeAtom, playerDurationAtom } from "../../src/features/player/model/atoms";
+import { PlayerRuntimeProvider } from "../../src/features/player/model/PlayerRuntimeProvider";
+import { NOT_REGISTERED_ERROR } from "../../src/features/player/model/playerRuntimeCapabilities";
+import { usePlayerRuntime } from "../../src/features/player/model/usePlayer";
+import { usePlayerActions } from "../../src/features/player/model/usePlayerActions";
+import { usePlayerState } from "../../src/features/player/model/usePlayerState";
+import {
+  playerCurrentTimeAtom,
+  playerDurationAtom,
+  playerCoreAtom,
+} from "../../src/features/player/model/atoms";
 import { saveResumePosition } from "../../src/features/player/api";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import type { ResolvedTrack, Track, Work, WorkSummary } from "../../src/entities/work/model";
@@ -52,23 +60,36 @@ function latestAudio() {
 function makeWrapper({
   strict = false,
   queryClient = new QueryClient(),
-}: { strict?: boolean; queryClient?: QueryClient } = {}) {
+  store = createStore(),
+  withRuntime = true,
+}: {
+  strict?: boolean;
+  queryClient?: QueryClient;
+  store?: ReturnType<typeof createStore>;
+  withRuntime?: boolean;
+} = {}) {
   return function Wrapper({ children }: { children: ReactNode }) {
-    const store = useMemo(() => createStore(), []);
+    const inner = withRuntime ? createElement(PlayerRuntimeHarness, null, children) : children;
     const tree = createElement(
       QueryClientProvider,
       { client: queryClient },
-      createElement(JotaiProvider, { store }, children),
+      createElement(JotaiProvider, { store }, createElement(PlayerRuntimeProvider, null, inner)),
     );
     return strict ? createElement(StrictMode, null, tree) : tree;
   };
 }
 
+function PlayerRuntimeHarness({ children }: { children: ReactNode }) {
+  usePlayerRuntime();
+  return children;
+}
+
 function usePlayerWithClock() {
-  const player = usePlayer();
+  const player = usePlayerActions();
+  const state = usePlayerState();
   const currentTime = useAtomValue(playerCurrentTimeAtom);
   const duration = useAtomValue(playerDurationAtom);
-  return { player, currentTime, duration };
+  return { player: { ...player, state }, currentTime, duration };
 }
 
 const track: Track = {
@@ -111,6 +132,79 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("usePlayer adapters", () => {
+  it("PlayerRuntime 未マウント時は playWithResume / seek が throw する", () => {
+    const { result } = renderHook(() => usePlayerActions(), {
+      wrapper: makeWrapper({ withRuntime: false }),
+    });
+
+    expect(() => result.current.playWithResume(work as Work)).toThrow(NOT_REGISTERED_ERROR);
+    expect(() => result.current.seek(10)).toThrow(NOT_REGISTERED_ERROR);
+  });
+
+  it("PlayerRuntime ありで再生対象がないときは playWithResume / seek が no-op する", () => {
+    const workWithoutResume: Work = {
+      ...work,
+      defaultPlaylistId: playlistId,
+      createdAt: null,
+      playlists: [{ id: playlistId, name: "default", tracks: [track] }],
+      resume: null,
+    };
+    const { result } = renderHook(() => usePlayerActions(), { wrapper: makeWrapper() });
+
+    expect(() => result.current.playWithResume(workWithoutResume)).not.toThrow();
+    expect(() => result.current.seek(10)).not.toThrow();
+  });
+
+  it("StrictMode 下でも capabilities 登録が解除されない", () => {
+    const { result } = renderHook(() => usePlayerActions(), {
+      wrapper: makeWrapper({ strict: true }),
+    });
+
+    expect(() => result.current.seek(10)).not.toThrow(NOT_REGISTERED_ERROR);
+  });
+
+  it("PlayerRuntime アンマウントで capabilities 登録が解除される", () => {
+    let actions: ReturnType<typeof usePlayerActions> | undefined;
+    let hideRuntime: (() => void) | undefined;
+    const queryClient = new QueryClient();
+
+    function RuntimeMount() {
+      usePlayerRuntime();
+      return null;
+    }
+
+    function ActionsHost() {
+      actions = usePlayerActions();
+      return null;
+    }
+
+    function TestRoot() {
+      const [showRuntime, setShowRuntime] = useState(true);
+      hideRuntime = () => setShowRuntime(false);
+      return createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(
+          JotaiProvider,
+          null,
+          createElement(
+            PlayerRuntimeProvider,
+            null,
+            showRuntime ? createElement(RuntimeMount) : null,
+            createElement(ActionsHost),
+          ),
+        ),
+      );
+    }
+
+    render(createElement(TestRoot));
+
+    expect(() => actions!.seek(10)).not.toThrow(NOT_REGISTERED_ERROR);
+
+    act(() => hideRuntime?.());
+    expect(() => actions!.seek(10)).toThrow(NOT_REGISTERED_ERROR);
+  });
+
   it("StrictModeのeffect再実行後もControllerへHTMLAudioイベントを渡す", async () => {
     const { result } = renderHook(() => usePlayerWithClock(), {
       wrapper: makeWrapper({ strict: true }),
@@ -388,5 +482,43 @@ describe("usePlayer adapters", () => {
       offsetSec: 42,
     });
     expect(result.current.player.state.currentWork).toBeNull();
+  });
+
+  it("toggleMuteでミュート前の音量を復元する", async () => {
+    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
+    act(() => result.current.player.play(work, [track], 0, playlistId));
+    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
+
+    act(() => result.current.player.setVolume(50));
+    await waitFor(() => expect(result.current.player.state.volume).toBe(50));
+
+    act(() => result.current.player.toggleMute());
+    await waitFor(() => expect(result.current.player.state.volume).toBe(0));
+
+    act(() => result.current.player.toggleMute());
+    await waitFor(() => expect(result.current.player.state.volume).toBe(50));
+  });
+
+  it("timeupdate では core atom の参照を維持しつつ currentTime を更新する", async () => {
+    const store = createStore();
+    const { result } = renderHook(() => usePlayerWithClock(), {
+      wrapper: makeWrapper({ store }),
+    });
+
+    act(() => result.current.player.play(work, [track]));
+    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
+
+    const coreBefore = store.get(playerCoreAtom);
+    act(() => {
+      latestAudio().currentTime = 12;
+      latestAudio().dispatchEvent(new Event("timeupdate"));
+    });
+
+    expect(store.get(playerCurrentTimeAtom)).toBe(12);
+    expect(store.get(playerCoreAtom)).toBe(coreBefore);
+
+    act(() => result.current.player.setVolume(30));
+    await waitFor(() => expect(store.get(playerCoreAtom).volume).toBe(30));
+    expect(store.get(playerCoreAtom)).not.toBe(coreBefore);
   });
 });
