@@ -4,6 +4,7 @@ title: AppのQuery購読をScanModal/NotificationBellへ降ろし残る再レン
 status: To Do
 assignee: []
 created_date: '2026-07-29 18:02'
+updated_date: '2026-07-29 18:27'
 labels: []
 dependencies: []
 priority: medium
@@ -38,3 +39,13 @@ App.tsx が保持する libraryTotalQuery が、TASK-123 までで塞いだは�
 - [ ] #4 lastScanQuery が NotificationBell / ScanModal へ降り、App から参照されていない
 - [ ] #5 スキャンモーダルの統計表示・通知ベルの直近スキャン結果表示が従来どおり動作する
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+着手順（2026-07-30 の方針レビューで決定）: TASK-110 → TASK-111 → TASK-124 → TASK-125。
+
+本タスクは確立したばかりの「App はランタイム状態を購読しない」という不変条件の回復だが、現在の実害は余計な再描画に留まるため、正しさに直結する TASK-110（一時停止中に音が出る）と TASK-111（保存失敗を成功と表示）より後で問題ない。
+
+注意: TASK-111 と本タスクはどちらも ScanModal.tsx を触るため、並行実装は避けること。TASK-110 は独立しているので、並行化するなら「110」と「111 → 124 → 125」の2系列に分けるのが自然。
+<!-- SECTION:NOTES:END -->

@@ -4,6 +4,7 @@ title: レビューで見つかったアクセシビリティ不備をまとめ�
 status: To Do
 assignee: []
 created_date: '2026-07-27 01:58'
+updated_date: '2026-07-29 18:26'
 labels:
   - client
   - a11y
@@ -33,3 +34,32 @@ ordinal: 126000
 - [ ] #4 WorkGrid のタイルのラベルと実際の操作（選択・再生）が一致している
 - [ ] #5 FullScreenPlayer のトラックリストが安定した key を使っている
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+【2026-07-30 の棚卸しで確認した現存箇所】
+
+AC に挙がっている項目はすべて master に現存することをコードで確認済み。
+
+- シークバー: FullScreenPlayer.tsx:134-159 は onPointerDown/Move/Up のみで role="slider" / aria-valuenow / onKeyDown なし。useSeekDrag は PopupContent.tsx / BarContent.tsx / FullScreenPlayer.tsx の3箇所で共有されているので、共通化して直す
+- タグ行: ContentColumn.tsx:186-199 の button に aria-pressed / role="checkbox" なし
+- タグ解除ボタン: ContentColumn.tsx:168 の button はアイコンのみで accessible name なし
+- SettingsModal 閉じるボタン: SettingsModal.tsx:109-124 はアイコンのみで aria-label なし
+- WorkGrid: WorkGrid.tsx:350 の aria-label は「〜を選択」だが、onKeyDown の Enter（356-359行）は onWorkPlay を呼ぶ
+- FullScreenPlayer トラックリスト: FullScreenPlayer.tsx:315 が key={i}
+
+【AC #4（WorkGrid）は実装前に期待動作を決めること】
+
+ラベルを「再生」に変えるだけでは、今度はクリック（選択）と食い違う。現状はクリック=選択、Enter=再生。Enter を click と同じ「選択」に揃えたうえで、キーボードからの再生手段を別に定義するのが自然だが、いずれにせよ click / Space / Enter / double click それぞれの期待動作を決めてから実装すること。
+
+また client/tests/unit/WorkGrid.test.tsx が name: /を選択/ でタイルを取得している（100, 112, 122, 175 行）。ラベルを変更する場合はテストの同時更新が必要。
+
+【AC #5（key={i}）の位置づけ】
+
+これは a11y の不備ではなく React の要素同一性に関する品質問題。本タスクに含めたままでよいが、タスク名が「アクセシビリティ不備」なので厳密には範囲外。並べ替えや増減で実害を再現できないなら、切り出して別タスクにする判断もありうる。
+
+【回帰テスト】
+
+各修正には回帰テストを付けること。特に WorkGrid は既存テストが現在のラベルを明示的に期待しているため、操作仕様とテストを同時に更新する必要がある。
+<!-- SECTION:NOTES:END -->

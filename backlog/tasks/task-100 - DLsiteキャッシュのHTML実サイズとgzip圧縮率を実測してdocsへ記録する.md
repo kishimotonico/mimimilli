@@ -4,6 +4,7 @@ title: DLsiteキャッシュのHTML実サイズとgzip圧縮率を実測してdo
 status: To Do
 assignee: []
 created_date: '2026-07-26 02:02'
+updated_date: '2026-07-29 18:26'
 labels: []
 dependencies: []
 priority: low
@@ -47,3 +48,27 @@ TASK-93.1 の計画時に「HTMLの実サイズとgzip圧縮率を実測し、�
 - [ ] #4 実測のために新規の大量リクエストをDLsiteへ送っていない
 - [ ] #5 転送上限2MiB・展開上限8MiBが実態と乖離していないか確認し、必要なら既定値を見直している
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+【2026-07-30 の棚卸しで判明した記述の陳腐化】
+
+- 参照先の docs/dlsite-cache.md は docs/dlsite.md へ統合済み。AC #3 の対象も docs/dlsite.md に読み替えること
+- 現行の CLI は pnpm --filter @mimimilli/server dlsite-cache -- import --dir <path>
+- status() が返す entries は HTML snapshot だけでなく failure も含む。件数あたりのサイズを出すときに failure を分母へ入れるかどうかで数字が変わる
+- bytes は SQLite 本体に加えて WAL / SHM を含む。計測時にどこまでを容量とみなすかを決めること
+- 転送上限 2MiB / 展開上限 8MiB は server/src/adapters/real/dlsiteCache.ts:14-15 に現存
+
+【計測条件を先に決めること】
+
+結果を再現可能にするため、着手時に次を決めてから測る。条件が決まっていないと「実測値」が一度きりの数字になり、AC #1/#2 を満たしたことにならない。
+
+- 試料数（何件のキャッシュで測るか）
+- failure エントリを集計に含めるか
+- 測定用 DB を新規に作るか既存を使うか
+- 平均・中央値・最大値のどれを記録するか
+- 圧縮率の定義（非圧縮サイズ / gzip 後サイズ の比か、その逆か）
+
+なお AC #4 のとおり、実測のために DLsite へ新規の大量リクエストを送らないこと。既存キャッシュを試料にする。
+<!-- SECTION:NOTES:END -->
