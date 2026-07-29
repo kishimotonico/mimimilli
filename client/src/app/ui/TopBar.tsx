@@ -3,9 +3,16 @@ import { I } from "../../shared/ui/Icon";
 import IconButton from "../../shared/ui/IconButton";
 import { useAtom, useAtomValue } from "jotai";
 import { AnimatePresence, motion } from "motion/react";
+import {
+  dlsiteBulkActiveAtom,
+  dlsiteBulkCancellingAtom,
+  dlsiteBulkProgressAtom,
+} from "../../features/dlsite/model/atoms";
+import { useDlsiteBulkActions } from "../../features/dlsite/model/useDlsiteBulkActions";
 import { librarySearchQueryAtom } from "../../features/library/model/atoms";
 import { appModeAtom } from "../../features/navigation/model/navigationAtoms";
 import { playerIsActiveAtom, playingTrackTitleAtom } from "../../features/player/model/atoms";
+import { scanningAtom, scanProgressLabelAtom } from "../../features/scan/model/atoms";
 
 const FADE = { duration: 0.15 };
 
@@ -13,32 +20,16 @@ interface TopBarProps {
   /** スキャンボタン押下時。即時実行はせずスキャンモーダルを開く（TASK-56） */
   onOpenScan?: () => void;
   onSettings?: () => void;
-  /** スキャン実行中かどうか（TASK-20: SSE進捗表示） */
-  scanning?: boolean;
-  /** scanning 中の進捗ラベル（例: "作品を登録中 (3/12)"）。null は「進捗未受信」を表す */
-  scanProgressLabel?: string | null;
   notificationBell: ReactNode;
-  /** DLsite一括取得（mode: "existing"）が実行中か */
-  dlsiteBulkActive?: boolean;
-  /** dlsiteBulkActive 中の進捗（例: "3/12"）。null は進捗未受信 */
-  dlsiteBulkProgress?: { processed: number; total: number } | null;
-  /** DLsite一括取得を中止する */
-  onCancelDlsiteBulk?: () => void;
-  /** DLsite一括取得の中止を要求済みか */
-  dlsiteBulkCancelling?: boolean;
 }
 
-export default function TopBar({
-  onOpenScan,
-  onSettings,
-  scanning = false,
-  scanProgressLabel = null,
-  notificationBell,
-  dlsiteBulkActive = false,
-  dlsiteBulkProgress = null,
-  onCancelDlsiteBulk = () => {},
-  dlsiteBulkCancelling = false,
-}: TopBarProps) {
+export default function TopBar({ onOpenScan, onSettings, notificationBell }: TopBarProps) {
+  const scanning = useAtomValue(scanningAtom);
+  const scanProgressLabel = useAtomValue(scanProgressLabelAtom);
+  const dlsiteBulkActive = useAtomValue(dlsiteBulkActiveAtom);
+  const dlsiteBulkProgress = useAtomValue(dlsiteBulkProgressAtom);
+  const dlsiteBulkCancelling = useAtomValue(dlsiteBulkCancellingAtom);
+  const { cancel: onCancelDlsiteBulk } = useDlsiteBulkActions();
   const mode = useAtomValue(appModeAtom);
   const [searchQuery, onSearchChange] = useAtom(librarySearchQueryAtom);
   const isPlaying = useAtomValue(playerIsActiveAtom);
@@ -139,7 +130,7 @@ export default function TopBar({
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={FADE}
-                onClick={onCancelDlsiteBulk}
+                onClick={() => void onCancelDlsiteBulk().catch(() => {})}
                 className="inline-flex h-7 items-center justify-center gap-1 rounded-[6px] border border-[color-mix(in_oklch,var(--r-coral)_45%,transparent)] bg-[color-mix(in_oklch,var(--r-coral)_10%,transparent)] px-2.5 font-sans text-[11px] font-medium text-ink-0 transition-colors hover:bg-[color-mix(in_oklch,var(--r-coral)_16%,transparent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
               >
                 <I.x size={11} />

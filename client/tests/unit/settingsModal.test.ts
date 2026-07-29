@@ -1,12 +1,13 @@
 // SettingsModal のEsc/backdrop挙動（TASK-29: ネイティブdialogへの統合）のコンポーネントテスト。
 // jsdom は <dialog> の showModal/close を実装していないため、テスト対象に必要な分だけ差し替える。
 // TagPrefixSettings が react-query を使うため QueryClientProvider で包む。
-// DLsite一括取得の状態はTASK-41でApp側へ持ち上げたため、SettingsModalへはpropsで渡す。
 import { createElement } from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
+import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import SettingsModal from "../../src/features/settings/ui/SettingsModal";
+import { dlsiteBulkActionsAtom } from "../../src/features/dlsite/model/atoms";
 
 beforeEach(() => {
   HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) {
@@ -25,20 +26,29 @@ function renderModal(onClose = vi.fn(), onOpenScan = vi.fn()) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
+  const store = createStore();
+  store.set(dlsiteBulkActionsAtom, {
+    start: vi.fn(),
+    attach: vi.fn(),
+    cancel: vi.fn(),
+    dismiss: vi.fn(),
+  });
   render(
     createElement(
       QueryClientProvider,
       { client: queryClient },
-      createElement(SettingsModal, {
-        rootFolder: "/audio",
-        lastScanTime: null,
-        scanning: false,
-        dlsiteBulk: { active: false, progress: null, onStart: vi.fn() },
-        onClose,
-        onOpenScan,
-        onChangeFolder: vi.fn(),
-        onExport: vi.fn(),
-      }),
+      createElement(
+        JotaiProvider,
+        { store },
+        createElement(SettingsModal, {
+          rootFolder: "/audio",
+          lastScanTime: null,
+          onClose,
+          onOpenScan,
+          onChangeFolder: vi.fn(),
+          onExport: vi.fn(),
+        }),
+      ),
     ),
   );
   return { onClose, onOpenScan };

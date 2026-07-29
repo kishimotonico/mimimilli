@@ -2,18 +2,18 @@
 // 集約する通知ベルパネル（TASK-44）。開閉・外側クリック/Escapeでの閉じ方は
 // AddressBar の並び替えメニュー（.mle-sortmenu）と同じ「position:relative + absolute」の
 // 素朴な実装に倣う（work-preview専用の useAnchoredPopover は左寄せクランプ前提でここには合わない）。
+import { useAtomValue } from "jotai";
 import { useEffect, useRef, useState } from "react";
 import type { ScanResult } from "@mimimilli/shared";
 import type { DlsiteNotificationModalKind } from "../model/activeModal";
+import { dlsiteBulkActiveAtom, dlsiteBulkProgressAtom } from "../../features/dlsite/model/atoms";
+import { useDlsiteBulkActions } from "../../features/dlsite/model/useDlsiteBulkActions";
 import { useDlsiteNotificationSummary } from "../../features/library/model/useDlsiteNotificationSummary";
 import Button from "../../shared/ui/Button";
 import { I } from "../../shared/ui/Icon";
 import IconButton from "../../shared/ui/IconButton";
 
 export interface NotificationBellProps {
-  dlsiteBulkActive: boolean;
-  dlsiteBulkProgress: { processed: number; total: number } | null;
-  onStartDlsiteBulk: () => void;
   scanResult: ScanResult | null;
   /** 直近のスキャン結果クリックでスキャンモーダルの結果表示を開く（TASK-56） */
   onOpenScanResult: () => void;
@@ -21,13 +21,13 @@ export interface NotificationBellProps {
 }
 
 export default function NotificationBell({
-  dlsiteBulkActive,
-  dlsiteBulkProgress,
-  onStartDlsiteBulk,
   scanResult,
   onOpenScanResult,
   onOpenNotificationModal,
 }: NotificationBellProps) {
+  const dlsiteBulkActive = useAtomValue(dlsiteBulkActiveAtom);
+  const dlsiteBulkProgress = useAtomValue(dlsiteBulkProgressAtom);
+  const { start: onStartDlsiteBulk } = useDlsiteBulkActions();
   const {
     rjCodeMissingCount,
     fetchFailedCount: dlsiteFetchFailedCount,

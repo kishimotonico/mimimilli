@@ -1,11 +1,13 @@
 // ScanModal のEsc/backdrop挙動（TASK-56: NewWorkPopupの統合先）のコンポーネントテスト。
 // jsdom は <dialog> の showModal/close を実装していないため、テスト対象に必要な分だけ差し替える。
 import { createElement } from "react";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import { Provider as JotaiProvider, createStore } from "jotai";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ScanResult, Work } from "@mimimilli/shared";
+import type { ScanJobSnapshot, ScanResult, Work } from "@mimimilli/shared";
 import ScanModal from "../../src/features/scan/ui/ScanModal";
 import * as workApi from "../../src/entities/work/api";
+import { scanActionsAtom, scanJobAtom } from "../../src/features/scan/model/atoms";
 
 beforeEach(() => {
   HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) {
@@ -52,21 +54,61 @@ function dispatchCancel(dialog: HTMLElement) {
   return fireEvent(dialog, new Event("cancel", { cancelable: true, bubbles: true }));
 }
 
-function renderModal(overrides: Partial<Parameters<typeof ScanModal>[0]> = {}) {
-  return render(
-    createElement(ScanModal, {
-      scanning: false,
-      progress: null,
-      lastResult: scanResult,
-      lastScanTime: null,
-      libraryTotal: 11,
-      onStart: vi.fn(),
-      onCancel: vi.fn(),
-      onClose: vi.fn(),
-      onOpenRjCodeMissing: vi.fn(),
-      ...overrides,
-    }),
+function createRunningJob(
+  progress: ScanJobSnapshot["progress"] = { phase: "registering", processed: 3, total: 12 },
+): ScanJobSnapshot {
+  return {
+    id: "job-1",
+    status: "running",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    startedAt: "2026-01-01T00:00:00.000Z",
+    finishedAt: null,
+    progress,
+    result: null,
+    error: null,
+  };
+}
+
+function renderModal(
+  overrides: Partial<Parameters<typeof ScanModal>[0]> = {},
+  scanState: { job?: ScanJobSnapshot | null } = {},
+) {
+  const store = createStore();
+  const onStart = vi.fn();
+  const onCancel = vi.fn();
+  store.set(scanActionsAtom, {
+    start: onStart.mockResolvedValue(undefined),
+    cancel: onCancel.mockResolvedValue(undefined),
+    clearError: vi.fn(),
+  });
+  if (scanState.job !== undefined) {
+    store.set(scanJobAtom, scanState.job);
+  }
+
+  const modalProps = {
+    lastResult: scanResult,
+    lastScanTime: null,
+    libraryTotal: 11,
+    onClose: vi.fn(),
+    onOpenRjCodeMissing: vi.fn(),
+    ...overrides,
+  };
+
+  const view = render(
+    createElement(JotaiProvider, { store }, createElement(ScanModal, modalProps)),
   );
+
+  const rerenderModal = (newOverrides: Partial<Parameters<typeof ScanModal>[0]> = {}) => {
+    view.rerender(
+      createElement(
+        JotaiProvider,
+        { store },
+        createElement(ScanModal, { ...modalProps, ...newOverrides }),
+      ),
+    );
+  };
+
+  return { ...view, store, onStart, onCancel, rerenderModal };
 }
 
 describe("ScanModal", () => {
@@ -125,14 +167,13 @@ describe("ScanModal", () => {
   });
 
   it("実行中はフェーズと進捗を表示し、直前の統計は残したまま中止ボタンを表示する", () => {
-    const onCancel = vi.fn();
     const onClose = vi.fn();
-    renderModal({
-      scanning: true,
-      progress: { phase: "registering", processed: 3, total: 12 },
-      onCancel,
-      onClose,
-    });
+    const { onCancel } = renderModal(
+      { onClose },
+      {
+        job: createRunningJob({ phase: "registering", processed: 3, total: 12 }),
+      },
+    );
 
     expect(screen.getByRole("dialog", { name: "スキャン" })).toBeInTheDocument();
     expect(screen.getByText("作品を登録中")).toBeInTheDocument();
@@ -151,8 +192,7 @@ describe("ScanModal", () => {
   });
 
   it("前回結果が無ければ統計は未計測（—）のままスキャン開始ボタンを表示する", () => {
-    const onStart = vi.fn();
-    renderModal({ lastResult: null, onStart });
+    const { onStart } = renderModal({ lastResult: null });
 
     // 「今回のスキャン」の4枠は未計測、ライブラリ全体の件数は別枠で表示される
     expect(screen.getAllByText("—")).toHaveLength(4);
@@ -176,25 +216,15 @@ describe("ScanModal", () => {
   it("実行中から完了への遷移を見ていたときだけ、完了サインと変化した統計の強調が一時的に出る", async () => {
     const before: ScanResult = { ...scanResult, registered: 5, newlyGenerated: 0 };
     const after: ScanResult = { ...scanResult, registered: 6, newlyGenerated: 1 };
-    const { rerender } = renderModal({
-      scanning: true,
-      progress: { phase: "registering", processed: 1, total: 1 },
-      lastResult: before,
-    });
-
-    rerender(
-      createElement(ScanModal, {
-        scanning: false,
-        progress: null,
-        lastResult: after,
-        lastScanTime: "2026-01-01T00:00:00.000Z",
-        libraryTotal: 11,
-        onStart: vi.fn(),
-        onCancel: vi.fn(),
-        onClose: vi.fn(),
-        onOpenRjCodeMissing: vi.fn(),
-      }),
+    const { store, rerenderModal } = renderModal(
+      { lastResult: before },
+      { job: createRunningJob({ phase: "registering", processed: 1, total: 1 }) },
     );
+
+    act(() => {
+      store.set(scanJobAtom, null);
+      rerenderModal({ lastResult: after, lastScanTime: "2026-01-01T00:00:00.000Z" });
+    });
 
     // AnimatePresence(mode="wait")のexit→enterはrequestAnimationFrame駆動のため実時間で待つ
     await waitFor(() => expect(screen.getByText("完了しました")).toBeInTheDocument());
@@ -219,25 +249,13 @@ describe("ScanModal", () => {
     const getWorkSpy = vi.spyOn(workApi, "getWork");
     getWorkSpy.mockResolvedValueOnce(workA);
 
-    const { rerender } = renderModal({
+    const { rerenderModal } = renderModal({
       lastResult: { ...scanResult, newWorkIds: [workA.id] },
     });
     await waitFor(() => screen.getByText(workA.title));
 
     getWorkSpy.mockRejectedValueOnce(new Error("fetch failed"));
-    rerender(
-      createElement(ScanModal, {
-        scanning: false,
-        progress: null,
-        lastResult: { ...scanResult, newWorkIds: [workB.id] },
-        lastScanTime: null,
-        libraryTotal: 11,
-        onStart: vi.fn(),
-        onCancel: vi.fn(),
-        onClose: vi.fn(),
-        onOpenRjCodeMissing: vi.fn(),
-      }),
-    );
+    rerenderModal({ lastResult: { ...scanResult, newWorkIds: [workB.id] } });
 
     await waitFor(() =>
       expect(screen.getByText("新規作品の読み込みに失敗しました")).toBeInTheDocument(),
@@ -262,23 +280,11 @@ describe("ScanModal", () => {
       });
     });
 
-    const { rerender } = renderModal({
+    const { rerenderModal } = renderModal({
       lastResult: { ...scanResult, newWorkIds: [workA.id] },
     });
 
-    rerender(
-      createElement(ScanModal, {
-        scanning: false,
-        progress: null,
-        lastResult: { ...scanResult, newWorkIds: [workB.id] },
-        lastScanTime: null,
-        libraryTotal: 11,
-        onStart: vi.fn(),
-        onCancel: vi.fn(),
-        onClose: vi.fn(),
-        onOpenRjCodeMissing: vi.fn(),
-      }),
-    );
+    rerenderModal({ lastResult: { ...scanResult, newWorkIds: [workB.id] } });
 
     resolveB(workB);
     await waitFor(() => screen.getByText(workB.title));

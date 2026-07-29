@@ -1,33 +1,43 @@
+import { useAtomValue } from "jotai";
 import { useEffect, useRef, useState } from "react";
 import { I } from "../../../shared/ui/Icon";
+import { scanningAtom, scanErrorAtom, scanProgressLabelAtom } from "../../scan/model/atoms";
+import { useScanActions } from "../../scan/model/useScanActions";
 
 interface SetupScreenProps {
-  onComplete: (path: string) => void;
-  onCancelScan?: () => void;
-  scanning: boolean;
-  /** scanning 中の進捗ラベル（例: "作品を登録中 (3/12)"）。TASK-20: SSEで受信した進捗 */
-  scanProgressLabel?: string | null;
-  scanError?: string | null;
+  onComplete: (path: string) => Promise<void>;
 }
 
-export default function SetupScreen({
-  onComplete,
-  onCancelScan,
-  scanning,
-  scanProgressLabel = null,
-  scanError = null,
-}: SetupScreenProps) {
+export default function SetupScreen({ onComplete }: SetupScreenProps) {
+  const scanningFromJob = useAtomValue(scanningAtom);
+  const scanProgressLabel = useAtomValue(scanProgressLabelAtom);
+  const scanError = useAtomValue(scanErrorAtom);
+  const { cancel } = useScanActions();
   const [path, setPath] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [setupError, setSetupError] = useState<string | null>(null);
   const pathInputRef = useRef<HTMLInputElement | null>(null);
+  const scanning = isSubmitting || scanningFromJob;
+  const alertMessage = scanError ?? setupError;
 
   useEffect(() => {
     if (scanning) return;
     pathInputRef.current?.focus({ preventScroll: true });
   }, [scanning]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (path.trim()) onComplete(path.trim());
+    if (!path.trim() || scanning) return;
+    setSetupError(null);
+    setIsSubmitting(true);
+    try {
+      await onComplete(path.trim());
+    } catch (error) {
+      console.error("初回スキャンの開始に失敗しました", error);
+      setSetupError(error instanceof Error ? error.message : "初回セットアップに失敗しました");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -105,7 +115,7 @@ export default function SetupScreen({
         </div>
 
         <form
-          onSubmit={handleSubmit}
+          onSubmit={(e) => void handleSubmit(e)}
           style={{ width: "100%", display: "flex", flexDirection: "column", gap: 12 }}
         >
           <div
@@ -168,10 +178,10 @@ export default function SetupScreen({
               </>
             )}
           </button>
-          {scanning && onCancelScan && (
+          {scanning && (
             <button
               type="button"
-              onClick={onCancelScan}
+              onClick={() => void cancel().catch(() => {})}
               style={{
                 height: 36,
                 borderRadius: 8,
@@ -187,9 +197,9 @@ export default function SetupScreen({
               スキャンを中止
             </button>
           )}
-          {scanError && (
+          {alertMessage && (
             <p role="alert" style={{ margin: 0, color: "var(--danger)", fontSize: 12 }}>
-              {scanError}
+              {alertMessage}
             </p>
           )}
         </form>

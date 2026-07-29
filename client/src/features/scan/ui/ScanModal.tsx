@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
+import { useAtomValue } from "jotai";
 import { AnimatePresence, motion } from "motion/react";
 import { getDefaultPlaylistTrackCount, type ScanResult, type Work } from "@mimimilli/shared";
 import { getWork, patchWork } from "../../../entities/work/api";
@@ -7,10 +8,10 @@ import { cn } from "../../../shared/lib/cn";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
 import { scanPhaseLabel, type ScanProgress } from "../model";
+import { scanningAtom, scanProgressAtom } from "../model/atoms";
+import { useScanActions } from "../model/useScanActions";
 
 interface ScanModalProps {
-  scanning: boolean;
-  progress: ScanProgress | null;
   /** サーバー起動後に一度でも完了していれば入る、前回スキャン結果（ディスク永続化はしない）。
    *  実行中も直前の値をそのまま表示し続け、完了と同時に値だけ更新される。 */
   lastResult: ScanResult | null;
@@ -18,8 +19,6 @@ interface ScanModalProps {
   /** ライブラリ全体の登録件数（サイドバーと同じ集計）。今回の変化が全て0でも
    *  蔵書自体が空でないことを示すために「今回のスキャン」統計とは別枠で表示する。 */
   libraryTotal: number | null;
-  onStart: () => void;
-  onCancel: () => void;
   onClose: () => void;
   /** RJコード未検出の作品一覧を開く（結果にrjCodeMissingCount > 0のときのみ表示） */
   onOpenRjCodeMissing: () => void;
@@ -39,16 +38,15 @@ function formatDate(iso: string | null): string {
 }
 
 export default function ScanModal({
-  scanning,
-  progress,
   lastResult,
   lastScanTime,
   libraryTotal,
-  onStart,
-  onCancel,
   onClose,
   onOpenRjCodeMissing,
 }: ScanModalProps) {
+  const scanning = useAtomValue(scanningAtom);
+  const progress = useAtomValue(scanProgressAtom);
+  const { start, cancel } = useScanActions();
   const [newWorks, setNewWorks] = useState<Work[]>([]);
   const [newWorksError, setNewWorksError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -262,7 +260,7 @@ export default function ScanModal({
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={FADE}
-                onClick={onCancel}
+                onClick={() => void cancel().catch(() => {})}
                 className="inline-flex h-9 min-w-[128px] items-center justify-center gap-1.5 rounded-[6px] border border-[color-mix(in_oklch,var(--r-coral)_45%,transparent)] bg-[color-mix(in_oklch,var(--r-coral)_10%,transparent)] px-4 font-sans text-[12.5px] font-medium text-ink-0 transition-colors hover:bg-[color-mix(in_oklch,var(--r-coral)_16%,transparent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
               >
                 <I.x size={12} />
@@ -276,7 +274,7 @@ export default function ScanModal({
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={FADE}
-                onClick={onStart}
+                onClick={() => void start().catch(() => {})}
                 className="inline-flex h-9 min-w-[128px] items-center justify-center gap-1.5 rounded-[6px] bg-ink-0 px-4 font-sans text-[12.5px] font-semibold text-paper-1 transition-colors hover:bg-acc focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
               >
                 <I.refresh size={12} />

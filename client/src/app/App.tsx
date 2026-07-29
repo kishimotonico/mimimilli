@@ -15,7 +15,6 @@ import LeftNav from "./ui/LeftNav";
 import AddressBar from "./ui/AddressBar";
 import NotificationBell from "./ui/NotificationBell";
 import { WORK_QUERY_KEYS } from "../entities/work/queryKeys";
-import { SMART_FOLDER_QUERY_KEYS } from "../entities/smart-folder/queryKeys";
 import { SETTINGS_QUERY_KEYS } from "../entities/settings/queryKeys";
 import type { FsEntry } from "../features/files/model/types";
 import PlayerDock from "../features/player/ui/PlayerDock";
@@ -23,26 +22,24 @@ import SetupScreen from "../features/setup/ui/SetupScreen";
 import SettingsModal from "../features/settings/ui/SettingsModal";
 import ScanModal from "../features/scan/ui/ScanModal";
 import DlsiteNotificationModals from "../features/library/ui/DlsiteNotificationModals";
-import Toast from "../shared/ui/Toast";
+import GlobalToast from "./ui/GlobalToast";
 import type { ActiveModal } from "./model/activeModal";
-import type { DlsiteBulkResult, Work, WorkListItem } from "@mimimilli/shared";
+import type { Work, WorkListItem } from "@mimimilli/shared";
 import { getWork } from "../entities/work/api";
 import { exportLibrary, searchWorks } from "../features/library/api";
-import { formatScanProgressLabel } from "../features/scan/model";
-import { useScanJob } from "../features/scan/useScanJob";
 import { getLastScanResult, SCAN_QUERY_KEYS } from "../features/scan/api";
-import { useDlsiteBulk } from "./model/useDlsiteBulk";
+import { useScanActions } from "../features/scan/model/useScanActions";
 import { setRootFolder } from "../features/settings/api";
 import { useSettingsQuery } from "../features/settings/useSettingsQuery";
 import NavigationHistorySync from "../features/navigation/ui/NavigationHistorySync";
 
 export default function App() {
   const player = usePlayerActions();
+  const scanActions = useScanActions();
   const queryClient = useQueryClient();
   const playRequestIdRef = useRef(0);
 
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
-  const [isCompletingSetup, setIsCompletingSetup] = useState(false);
 
   // ── Settings ─────────────────────────────────────────────
   const settingsQuery = useSettingsQuery();
@@ -58,9 +55,6 @@ export default function App() {
   // ファイルモードのルートパス（FilesView に渡す）。
   const rootFolder = settings?.rootFolder ?? "/";
 
-  // ── DLsite一括取得（設定モーダル・TopBar共有、TASK-41） ────────
-  const dlsiteBulk = useDlsiteBulk();
-
   // 前回スキャン結果（ディスク永続化なし、TASK-56）。サーバー起動後に一度でも完了していれば
   // GET /api/scan/last から取得でき、リロードをまたいでスキャンモーダル・通知ベルに表示できる。
   const lastScanQuery = useQuery({
@@ -75,25 +69,6 @@ export default function App() {
     queryKey: WORK_QUERY_KEYS.total(),
     queryFn: () => searchWorks({ limit: 1 }).then((page) => page.total),
   });
-
-  const handleScanTerminal = useCallback(
-    (job: import("@mimimilli/shared").ScanJobSnapshot) => {
-      setIsCompletingSetup(false);
-      if (job.status !== "completed" || !job.result || !job.finishedAt) return;
-      const result = job.result;
-      queryClient.setQueryData(SCAN_QUERY_KEYS.last(), { result, finishedAt: job.finishedAt });
-      queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.all() });
-      queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.dlsiteNotifications() });
-      queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.allFacets() });
-      queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.allWorks() });
-      queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() });
-      // スキャンで新規作品が見つかった場合、サーバーは自動でDLsite一括取得ジョブを
-      // キューイングする（server/src/routes/scan.ts）。ここではAPIを呼ばずSSEに相乗りするだけ。
-      if (result.newWorkIds.length > 0) dlsiteBulk.attach();
-    },
-    [dlsiteBulk, queryClient],
-  );
-  const scanJob = useScanJob({ onTerminal: handleScanTerminal });
 
   // ── Change folder mutation ────────────────────────────────
   const changeFolderMutation = useMutation({
@@ -164,39 +139,20 @@ export default function App() {
     [player, queryClient],
   );
 
-  const handleScan = useCallback(() => {
-    void scanJob.start().catch(() => {});
-  }, [scanJob]);
-  const handleCancelScan = useCallback(() => {
-    void scanJob.cancel().catch(() => {});
-  }, [scanJob]);
-  const handleCancelDlsiteBulk = useCallback(() => {
-    void dlsiteBulk.cancel().catch(() => {});
-  }, [dlsiteBulk]);
   // TopBarのスキャンボタンは即時実行せずモーダルを開く（TASK-56）。実行中なら実行中の表示に復帰する。
   const handleOpenScanModal = useCallback(() => setActiveModal("scan"), []);
   const handleCloseModal = useCallback(() => setActiveModal(null), []);
 
-  // スキャン進捗のリアルタイム表示（TASK-20）。TopBar / SettingsModal / SetupScreen で共有する。
-  const scanProgress = scanJob.job?.progress ?? null;
-  const scanProgressLabel = formatScanProgressLabel(scanProgress);
-
   const handleSetupComplete = useCallback(
     async (path: string) => {
-      setIsCompletingSetup(true);
-      try {
-        await setRootFolder(path);
-        queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() });
-        await scanJob.start();
-        queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), (prev: typeof settings) =>
-          prev ? { ...prev, rootFolder: path } : prev,
-        );
-      } catch (error) {
-        setIsCompletingSetup(false);
-        console.error("初回スキャンの開始に失敗しました", error);
-      }
+      await setRootFolder(path);
+      queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() });
+      await scanActions.start();
+      queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), (prev: typeof settings) =>
+        prev ? { ...prev, rootFolder: path } : prev,
+      );
     },
-    [queryClient, scanJob],
+    [queryClient, scanActions],
   );
 
   const handleChangeFolder = useCallback(
@@ -240,15 +196,7 @@ export default function App() {
   }
 
   if (!isSetupDone) {
-    return (
-      <SetupScreen
-        onComplete={handleSetupComplete}
-        onCancelScan={handleCancelScan}
-        scanning={isCompletingSetup || scanJob.scanning}
-        scanProgressLabel={scanProgressLabel}
-        scanError={scanJob.error}
-      />
-    );
+    return <SetupScreen onComplete={handleSetupComplete} />;
   }
 
   return (
@@ -257,22 +205,13 @@ export default function App() {
         <TopBar
           onOpenScan={handleOpenScanModal}
           onSettings={() => setActiveModal("settings")}
-          scanning={scanJob.scanning}
-          scanProgressLabel={scanProgressLabel}
           notificationBell={
             <NotificationBell
-              dlsiteBulkActive={dlsiteBulk.active}
-              dlsiteBulkProgress={dlsiteBulk.progress}
-              onStartDlsiteBulk={dlsiteBulk.start}
               scanResult={lastScanResult}
               onOpenScanResult={handleOpenScanModal}
               onOpenNotificationModal={setActiveModal}
             />
           }
-          dlsiteBulkActive={dlsiteBulk.active}
-          dlsiteBulkProgress={dlsiteBulk.progress}
-          dlsiteBulkCancelling={dlsiteBulk.cancelling}
-          onCancelDlsiteBulk={handleCancelDlsiteBulk}
         />
       }
       addressBar={<AddressBar />}
@@ -295,13 +234,6 @@ export default function App() {
             <SettingsModal
               rootFolder={settings?.rootFolder ?? null}
               lastScanTime={settings?.lastScanTime ?? null}
-              scanning={scanJob.scanning}
-              scanProgressLabel={scanProgressLabel}
-              dlsiteBulk={{
-                active: dlsiteBulk.active,
-                progress: dlsiteBulk.progress,
-                onStart: dlsiteBulk.start,
-              }}
               onClose={handleCloseModal}
               onOpenScan={() => setActiveModal("scan")}
               onChangeFolder={handleChangeFolder}
@@ -310,36 +242,17 @@ export default function App() {
           )}
           {activeModal === "scan" && (
             <ScanModal
-              scanning={scanJob.scanning}
-              progress={scanProgress}
               lastResult={lastScanResult}
               lastScanTime={settings?.lastScanTime ?? null}
               libraryTotal={libraryTotalQuery.data ?? null}
-              onStart={handleScan}
-              onCancel={handleCancelScan}
               onClose={handleCloseModal}
               onOpenRjCodeMissing={() => setActiveModal("rj-missing")}
             />
           )}
           <DlsiteNotificationModals activeModal={activeModal} onClose={handleCloseModal} />
-          <Toast
-            message={
-              scanJob.error ??
-              (dlsiteBulk.cancelledResult
-                ? `DLsite一括取得を中断しました（${formatDlsiteBulkResult(dlsiteBulk.cancelledResult)}）`
-                : dlsiteBulk.result
-                  ? `DLsite一括取得: ${formatDlsiteBulkResult(dlsiteBulk.result)}`
-                  : dlsiteBulk.error)
-            }
-            onDismiss={scanJob.error ? scanJob.clearError : dlsiteBulk.dismiss}
-          />
+          <GlobalToast />
         </>
       }
     />
   );
-}
-
-function formatDlsiteBulkResult(result: DlsiteBulkResult): string {
-  const base = `取得 ${result.fetched}件・失敗 ${result.failed}件`;
-  return result.parseErrors > 0 ? `${base}（うちパース ${result.parseErrors}件）` : base;
 }

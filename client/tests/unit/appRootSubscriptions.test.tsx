@@ -4,9 +4,13 @@ import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "../../src/app/App";
+import DlsiteBulkRuntime from "../../src/features/dlsite/ui/DlsiteBulkRuntime";
+import ScanRuntime from "../../src/features/scan/ui/ScanRuntime";
 import { PlayerRuntimeProvider } from "../../src/features/player/model/PlayerRuntimeProvider";
+import { dlsiteBulkProgressAtom } from "../../src/features/dlsite/model/atoms";
 import { librarySearchQueryAtom } from "../../src/features/library/model/atoms";
 import { playerCoreAtom } from "../../src/features/player/model/atoms";
+import { scanJobAtom } from "../../src/features/scan/model/atoms";
 import { PLAYER_CORE_INITIAL } from "../../src/features/player/model/playerController";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
@@ -34,23 +38,6 @@ const scanJobStub = {
 
 vi.mock("../../src/features/scan/useScanJob", () => ({
   useScanJob: () => scanJobStub,
-}));
-
-const dlsiteBulkStub = {
-  active: false,
-  cancelling: false,
-  progress: null,
-  result: null,
-  cancelledResult: null,
-  error: null,
-  start: vi.fn(),
-  attach: vi.fn(),
-  cancel: vi.fn(),
-  dismiss: vi.fn(),
-};
-
-vi.mock("../../src/app/model/useDlsiteBulk", () => ({
-  useDlsiteBulk: () => dlsiteBulkStub,
 }));
 
 const summaryDefaults = {
@@ -138,7 +125,13 @@ function renderApp() {
       createElement(
         JotaiProvider,
         { store: jotaiStore },
-        createElement(PlayerRuntimeProvider, null, children),
+        createElement(
+          PlayerRuntimeProvider,
+          null,
+          createElement(DlsiteBulkRuntime),
+          createElement(ScanRuntime),
+          children,
+        ),
       ),
     );
   }
@@ -263,6 +256,51 @@ describe("App root subscriptions", () => {
 
       act(() => {
         store.set(librarySearchQueryAtom, "asmr");
+      });
+
+      expect(appShellCallCount).toBe(baseline);
+    });
+  });
+
+  describe("scan job progress", () => {
+    const runningJob = (
+      progress: NonNullable<import("@mimimilli/shared").ScanJobSnapshot["progress"]>,
+    ) => ({
+      id: "job-1",
+      status: "running" as const,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      startedAt: "2026-01-01T00:00:00.000Z",
+      finishedAt: null,
+      progress,
+      result: null,
+      error: null,
+    });
+
+    it("スキャン進捗の更新で App が再レンダリングされない", async () => {
+      const { store } = renderApp();
+      const baseline = await waitForAppShellBaseline();
+
+      act(() => {
+        store.set(scanJobAtom, runningJob({ phase: "walking", processed: 1, total: 10 }));
+      });
+      act(() => {
+        store.set(scanJobAtom, runningJob({ phase: "registering", processed: 5, total: 10 }));
+      });
+
+      expect(appShellCallCount).toBe(baseline);
+    });
+  });
+
+  describe("dlsite bulk progress", () => {
+    it("DLsite 一括取得の進捗更新で App が再レンダリングされない", async () => {
+      const { store } = renderApp();
+      const baseline = await waitForAppShellBaseline();
+
+      act(() => {
+        store.set(dlsiteBulkProgressAtom, { processed: 1, total: 10 });
+      });
+      act(() => {
+        store.set(dlsiteBulkProgressAtom, { processed: 7, total: 10 });
       });
 
       expect(appShellCallCount).toBe(baseline);
