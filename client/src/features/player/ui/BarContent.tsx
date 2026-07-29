@@ -2,12 +2,9 @@
 // カバー + トラック名/作品名 + 前/再生/次。シークバーは要素全体の下辺を使う。
 // シークバー・再生操作を除く領域のクリックでポップアップへ切り替わる。
 
-import { useAtomValue } from "jotai";
 import type { PlayerState } from "../model/usePlayerState";
-import { playerCurrentTimeAtom, playerDurationAtom } from "../model/atoms";
-import { useSeekDrag } from "./useSeekDrag";
+import BarSeekStrip from "./BarSeekStrip";
 import { formatPlaybackError } from "./formatPlaybackError";
-import { formatTime } from "../../../shared/lib/format";
 import CoverImg from "../../../entities/work/ui/CoverImg";
 import { selectFixedCoverThumbnailWidth } from "../../../entities/work/ui/coverThumbnailWidth";
 import { I } from "../../../shared/ui/Icon";
@@ -29,15 +26,9 @@ export default function BarContent({
   onSeek,
   onSwitchToPopup,
 }: BarContentProps) {
-  // currentTime / duration は高頻度 atom から直接読む（App.tsx を re-render させない）
-  const currentTime = useAtomValue(playerCurrentTimeAtom);
-  const duration = useAtomValue(playerDurationAtom);
   const { currentWork, isPlaying, tracks, currentTrackIndex, playbackError } = state;
   const track = tracks[currentTrackIndex] ?? null;
-  const pct = duration !== null && duration > 0 ? (currentTime / duration) * 100 : 0;
   const formattedError = playbackError ? formatPlaybackError(playbackError) : null;
-
-  const seek = useSeekDrag({ duration, onSeek });
 
   return (
     <>
@@ -121,23 +112,7 @@ export default function BarContent({
         </span>
       </div>
 
-      <div
-        ref={seek.trackRef}
-        className={`mle-bar1__seek ${seek.dragging ? "is-dragging" : ""}`}
-        onPointerDown={seek.onPointerDown}
-        onPointerMove={seek.onPointerMove}
-        onPointerUp={seek.onPointerUp}
-        onPointerLeave={seek.onPointerLeave}
-      >
-        <div className="mle-bar1__seek-track">
-          <div className="mle-bar1__seek-fill" style={{ width: `${Math.min(100, pct)}%` }} />
-        </div>
-        {seek.hoverRatio !== null && duration !== null && duration > 0 && (
-          <div className="mle-bar1__seek-tooltip" style={{ left: `${seek.hoverRatio * 100}%` }}>
-            {formatTime(seek.hoverTime ?? 0)}
-          </div>
-        )}
-      </div>
+      <BarSeekStrip onSeek={onSeek} />
     </>
   );
 }

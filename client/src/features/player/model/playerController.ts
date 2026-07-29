@@ -64,6 +64,7 @@ type PlayerCoreComparators = {
   [K in keyof PlayerCoreState]: (a: PlayerCoreState[K], b: PlayerCoreState[K]) => boolean;
 };
 
+// 保守的な契約: 参照が異なる非空配列は要素を見ずに false 扱いにする（tracks を毎回組み立て直すコードが入ると常に不一致判定になる）。
 function areTracksEqual(a: PlaybackTrack[], b: PlaybackTrack[]): boolean {
   if (a === b) return true;
   return a.length === 0 && b.length === 0;

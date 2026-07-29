@@ -1,8 +1,6 @@
 import { useLayoutEffect, useRef } from "react";
-import { useAtomValue } from "jotai";
 import type { PlayerState } from "../model/usePlayerState";
-import { playerCurrentTimeAtom, playerDurationAtom } from "../model/atoms";
-import { useSeekDrag } from "./useSeekDrag";
+import FullScreenScrub from "./FullScreenScrub";
 import { formatTime } from "../../../shared/lib/format";
 import CoverImg from "../../../entities/work/ui/CoverImg";
 import { selectFixedCoverThumbnailWidth } from "../../../entities/work/ui/coverThumbnailWidth";
@@ -48,18 +46,9 @@ export default function FullScreenPlayer({
 }: FullScreenPlayerProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-  // currentTime / duration は高頻度 atom から直接読む（App.tsx を re-render させない）
-  const currentTime = useAtomValue(playerCurrentTimeAtom);
-  const duration = useAtomValue(playerDurationAtom);
   const { currentWork, isPlaying, volume, loop, tracks, currentTrackIndex, channelSwap, abRepeat } =
     state;
   const track = tracks[currentTrackIndex] ?? null;
-  const pct = duration !== null && duration > 0 ? (currentTime / duration) * 100 : 0;
-  const seek = useSeekDrag({ duration, onSeek });
-  const abStartPct =
-    duration !== null && duration > 0 && abRepeat.a !== null ? (abRepeat.a / duration) * 100 : null;
-  const abEndPct =
-    duration !== null && duration > 0 && abRepeat.b !== null ? (abRepeat.b / duration) * 100 : null;
   // リピートが実際に成立する条件（usePlayer 側のループ発動条件と同じ a < b）
   const hasABRepeat = abRepeat.a !== null && abRepeat.b !== null && abRepeat.a < abRepeat.b;
 
@@ -130,45 +119,7 @@ export default function FullScreenPlayer({
             </h1>
 
             {/* Scrub */}
-            <div className="mt-3.5">
-              <div
-                ref={seek.trackRef}
-                className={cn(
-                  "mle-fullscreen__seek relative flex h-[18px] cursor-pointer items-center",
-                  seek.dragging && "is-dragging",
-                )}
-                onPointerDown={seek.onPointerDown}
-                onPointerMove={seek.onPointerMove}
-                onPointerUp={seek.onPointerUp}
-                onPointerLeave={seek.onPointerLeave}
-              >
-                <div className="relative h-1 w-full rounded-[2px] bg-paper-3">
-                  {abStartPct !== null && (
-                    <div
-                      className="absolute bottom-0 top-0 rounded-[2px] bg-acc-soft"
-                      style={{
-                        left: `${abStartPct}%`,
-                        width: `${Math.max(0, (abEndPct ?? 100) - abStartPct)}%`,
-                      }}
-                    />
-                  )}
-                  <div
-                    className="absolute bottom-0 left-0 top-0 rounded-[2px] bg-ink-0"
-                    style={{ width: `${Math.min(100, pct)}%` }}
-                  />
-                </div>
-                {seek.hoverRatio !== null && duration !== null && duration > 0 && (
-                  <div className="mle-seek-tooltip" style={{ left: `${seek.hoverRatio * 100}%` }}>
-                    {formatTime(seek.hoverTime ?? 0)}
-                  </div>
-                )}
-              </div>
-              <div className="flex items-center gap-2.5 pt-1 font-mono text-xs text-ink-2">
-                <span className="text-ink-0">{formatTime(currentTime)}</span>
-                <div className="flex-1" />
-                <span>{duration !== null ? formatTime(duration) : "--:--"}</span>
-              </div>
-            </div>
+            <FullScreenScrub onSeek={onSeek} abRepeat={abRepeat} />
 
             {/* Controls */}
             <div className="flex items-center gap-3.5 pt-2">

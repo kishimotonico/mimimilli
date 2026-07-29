@@ -1,13 +1,10 @@
 // 右下ポップアップの中身。日常操作（音量・トラック移動・ループ・再生速度）を厳選して置く。
 // channelSwap / abRepeat 等のニッチ機能は置かない（全画面側の役割）。
 
-import { useAtomValue } from "jotai";
 import { useEffect, useRef, useState } from "react";
 import type { PlayerState } from "../model/usePlayerState";
-import { playerCurrentTimeAtom, playerDurationAtom } from "../model/atoms";
-import { useSeekDrag } from "./useSeekDrag";
+import PopupSeek from "./PopupSeek";
 import { formatPlaybackError } from "./formatPlaybackError";
-import { formatTime } from "../../../shared/lib/format";
 import CoverImg from "../../../entities/work/ui/CoverImg";
 import { selectFixedCoverThumbnailWidth } from "../../../entities/work/ui/coverThumbnailWidth";
 import { I } from "../../../shared/ui/Icon";
@@ -57,9 +54,6 @@ export default function PopupContent({
   onExpandFullScreen,
   onShowPlayingWork,
 }: PopupContentProps) {
-  // currentTime / duration は高頻度 atom から直接読む（App.tsx を re-render させない）
-  const currentTime = useAtomValue(playerCurrentTimeAtom);
-  const duration = useAtomValue(playerDurationAtom);
   const {
     currentWork,
     isPlaying,
@@ -71,12 +65,10 @@ export default function PopupContent({
     playbackError,
   } = state;
   const track = tracks[currentTrackIndex] ?? null;
-  const pct = duration !== null && duration > 0 ? (currentTime / duration) * 100 : 0;
   const formattedError = playbackError ? formatPlaybackError(playbackError) : null;
   const [rateMenuOpen, setRateMenuOpen] = useState(false);
   const rateMenuRef = useRef<HTMLDivElement>(null);
 
-  const seek = useSeekDrag({ duration, onSeek });
   const rateLabel = RATE_LABELS[playbackRate] ?? `${playbackRate.toFixed(2)}x`;
 
   useEffect(() => {
@@ -198,23 +190,7 @@ export default function PopupContent({
         )}
       </div>
 
-      <div
-        ref={seek.trackRef}
-        className="mle-popup__seek"
-        onPointerDown={seek.onPointerDown}
-        onPointerMove={seek.onPointerMove}
-        onPointerUp={seek.onPointerUp}
-        onPointerLeave={seek.onPointerLeave}
-      >
-        <div className="mle-popup__seek-track">
-          <div className="mle-popup__seek-fill" style={{ width: `${Math.min(100, pct)}%` }} />
-          <div className="mle-popup__seek-thumb" style={{ left: `${Math.min(100, pct)}%` }} />
-        </div>
-      </div>
-      <div className="mle-popup__time-row">
-        <span>{formatTime(currentTime)}</span>
-        <span>{duration !== null ? formatTime(duration) : "--:--"}</span>
-      </div>
+      <PopupSeek onSeek={onSeek} />
 
       <div className="mle-popup__controls">
         <button className="mle-popup__tbtn" title="前のトラック" onClick={onPrev}>

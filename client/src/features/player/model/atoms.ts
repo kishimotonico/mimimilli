@@ -6,7 +6,8 @@
 //     → PlayerDock など state 全体が必要な leaf で subscribe する
 //   - 派生 atom: TopBar / LeftNav など一部の値だけ必要な購読者向け
 //   - playerCurrentTimeAtom / playerDurationAtom: timeupdate ごとに更新される高頻度 state
-//     → BarContent / PopupContent / FullScreenPlayer のみが subscribe する
+//     → usePlaybackProgress hook 経由で BarSeekStrip / PopupSeek / FullScreenScrub の
+//       3 leaf のみが subscribe する（親の BarContent / PopupContent / FullScreenPlayer は購読しない）
 //
 // currentTime / duration は PlayerState の型には残さず、atom からのみ読む。
 
