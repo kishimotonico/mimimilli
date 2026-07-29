@@ -15,7 +15,8 @@ import {
 } from "../../library/model/libraryNavigationActions";
 import { setAppModeAtom } from "../../navigation/model/navigationAtoms";
 import { playerIsActiveAtom, playerUiModeAtom } from "../model/atoms";
-import { usePlayerActions, usePlayerState } from "../model/usePlayer";
+import { usePlayerActions } from "../model/usePlayerActions";
+import { usePlayerState } from "../model/usePlayerState";
 import BarContent from "./BarContent";
 import PopupContent from "./PopupContent";
 

@@ -3,7 +3,7 @@
 // シークバー・再生操作を除く領域のクリックでポップアップへ切り替わる。
 
 import { useAtomValue } from "jotai";
-import type { PlayerState } from "../model/usePlayer";
+import type { PlayerState } from "../model/usePlayerState";
 import { playerCurrentTimeAtom, playerDurationAtom } from "../model/atoms";
 import { useSeekDrag } from "./useSeekDrag";
 import { formatPlaybackError } from "./formatPlaybackError";

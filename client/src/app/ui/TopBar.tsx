@@ -1,16 +1,15 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { I } from "../../shared/ui/Icon";
 import IconButton from "../../shared/ui/IconButton";
-import { useAtomValue } from "jotai";
+import { useAtom, useAtomValue } from "jotai";
 import { AnimatePresence, motion } from "motion/react";
+import { librarySearchQueryAtom } from "../../features/library/model/atoms";
+import { appModeAtom } from "../../features/navigation/model/navigationAtoms";
 import { playerIsActiveAtom, playingTrackTitleAtom } from "../../features/player/model/atoms";
 
 const FADE = { duration: 0.15 };
 
 interface TopBarProps {
-  mode?: "library" | "files";
-  searchQuery: string;
-  onSearchChange: (q: string) => void;
   /** スキャンボタン押下時。即時実行はせずスキャンモーダルを開く（TASK-56） */
   onOpenScan?: () => void;
   onSettings?: () => void;
@@ -30,9 +29,6 @@ interface TopBarProps {
 }
 
 export default function TopBar({
-  mode = "library",
-  searchQuery,
-  onSearchChange,
   onOpenScan,
   onSettings,
   scanning = false,
@@ -43,13 +39,12 @@ export default function TopBar({
   onCancelDlsiteBulk = () => {},
   dlsiteBulkCancelling = false,
 }: TopBarProps) {
+  const mode = useAtomValue(appModeAtom);
+  const [searchQuery, onSearchChange] = useAtom(librarySearchQueryAtom);
   const isPlaying = useAtomValue(playerIsActiveAtom);
   const playingTrack = useAtomValue(playingTrackTitleAtom);
 
-  const placeholder =
-    mode === "files"
-      ? "このフォルダー内を検索（ファイル名 · 拡張子 ...）"
-      : "ライブラリを検索（タイトル · CV · タグ · RJ ...）";
+  const placeholder = "ライブラリを検索（タイトル · CV · タグ · RJ ...）";
 
   // 検索入力はローカル draft を即時表示し、親への通知は IME composition 中は保留する
   // （composition 中間文字列でのリクエスト乱発を防ぐ。TASK-61）
@@ -82,37 +77,39 @@ export default function TopBar({
 
       <div className="mll-bar__spacer" />
 
-      <div className="mll-bar__search">
-        <I.search size={13} />
-        <input
-          value={draft}
-          onChange={(e) => {
-            setDraft(e.target.value);
-            if (!composingRef.current) onSearchChange(e.target.value);
-          }}
-          onCompositionStart={() => {
-            composingRef.current = true;
-          }}
-          onCompositionEnd={(e) => {
-            composingRef.current = false;
-            onSearchChange(e.currentTarget.value);
-          }}
-          placeholder={placeholder}
-        />
-        {draft ? (
-          <IconButton
-            size="sm"
-            icon={I.x}
-            label="検索をクリア"
-            onClick={() => {
-              setDraft("");
-              onSearchChange("");
+      {mode !== "files" && (
+        <div className="mll-bar__search">
+          <I.search size={13} />
+          <input
+            value={draft}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              if (!composingRef.current) onSearchChange(e.target.value);
             }}
+            onCompositionStart={() => {
+              composingRef.current = true;
+            }}
+            onCompositionEnd={(e) => {
+              composingRef.current = false;
+              onSearchChange(e.currentTarget.value);
+            }}
+            placeholder={placeholder}
           />
-        ) : (
-          <span className="kbd">⌘K</span>
-        )}
-      </div>
+          {draft ? (
+            <IconButton
+              size="sm"
+              icon={I.x}
+              label="検索をクリア"
+              onClick={() => {
+                setDraft("");
+                onSearchChange("");
+              }}
+            />
+          ) : (
+            <span className="kbd">⌘K</span>
+          )}
+        </div>
+      )}
 
       {scanning && (
         <span className="font-mono text-[10.5px] text-ink-3" aria-live="polite">

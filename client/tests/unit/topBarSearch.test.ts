@@ -1,77 +1,73 @@
 // TASK-61: 検索入力の IME composition 対応とクリア動作の検証。
 
-import { createElement } from "react";
+import { act, createElement } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { Provider as JotaiProvider, createStore } from "jotai";
+import { describe, expect, it } from "vitest";
 import TopBar from "../../src/app/ui/TopBar";
+import { librarySearchQueryAtom } from "../../src/features/library/model/atoms";
+import { appModeAtom } from "../../src/features/navigation/model/navigationAtoms";
 
 const PLACEHOLDER = /ライブラリを検索/;
 
-function renderTopBar(searchQuery: string, onSearchChange = vi.fn()) {
+function renderTopBar(initialQuery = "") {
+  const store = createStore();
+  store.set(appModeAtom, "library");
+  store.set(librarySearchQueryAtom, initialQuery);
+
   render(
-    createElement(TopBar, {
-      searchQuery,
-      onSearchChange,
-      notificationBell: createElement("span", { "aria-label": "通知" }),
-    }),
+    createElement(
+      JotaiProvider,
+      { store },
+      createElement(TopBar, {
+        notificationBell: createElement("span", { "aria-label": "通知" }),
+      }),
+    ),
   );
-  return onSearchChange;
+  return store;
 }
 
 describe("TopBar の検索入力", () => {
-  it("通常入力は即時表示され親へも即時通知される", () => {
-    const onSearchChange = renderTopBar("");
+  it("通常入力は即時表示され atom へも即時反映される", () => {
+    const store = renderTopBar("");
     const input = screen.getByPlaceholderText(PLACEHOLDER);
 
     fireEvent.change(input, { target: { value: "asmr" } });
     expect(input).toHaveValue("asmr");
-    expect(onSearchChange).toHaveBeenCalledWith("asmr");
+    expect(store.get(librarySearchQueryAtom)).toBe("asmr");
   });
 
-  it("IME composition 中は親へ通知せず表示だけ更新し、確定時に通知する", () => {
-    const onSearchChange = renderTopBar("");
+  it("IME composition 中は atom へ反映せず表示だけ更新し、確定時に反映する", () => {
+    const store = renderTopBar("");
     const input = screen.getByPlaceholderText(PLACEHOLDER);
 
     fireEvent.compositionStart(input);
     fireEvent.change(input, { target: { value: "あ" } });
     fireEvent.change(input, { target: { value: "あい" } });
-    // composition 中間文字列では親へ通知しない（表示は追従する）
-    expect(onSearchChange).not.toHaveBeenCalled();
+    expect(store.get(librarySearchQueryAtom)).toBe("");
     expect(input).toHaveValue("あい");
 
     fireEvent.compositionEnd(input);
-    expect(onSearchChange).toHaveBeenCalledTimes(1);
-    expect(onSearchChange).toHaveBeenCalledWith("あい");
+    expect(store.get(librarySearchQueryAtom)).toBe("あい");
   });
 
-  it("クリアボタンで表示・親通知ともに即時空になる", () => {
-    const onSearchChange = renderTopBar("asmr");
+  it("クリアボタンで表示・atom ともに即時空になる", () => {
+    const store = renderTopBar("asmr");
     const input = screen.getByPlaceholderText(PLACEHOLDER);
     expect(input).toHaveValue("asmr");
 
     fireEvent.click(screen.getByRole("button", { name: "検索をクリア" }));
-    expect(onSearchChange).toHaveBeenCalledWith("");
+    expect(store.get(librarySearchQueryAtom)).toBe("");
     expect(input).toHaveValue("");
   });
 
-  it("親の値が外部要因で変わったとき表示が追従する", () => {
-    const onSearchChange = vi.fn();
-    const { rerender } = render(
-      createElement(TopBar, {
-        searchQuery: "",
-        onSearchChange,
-        notificationBell: createElement("span", { "aria-label": "通知" }),
-      }),
-    );
+  it("atom の値が外部要因で変わったとき表示が追従する", () => {
+    const store = renderTopBar("");
     const input = screen.getByPlaceholderText(PLACEHOLDER);
 
-    rerender(
-      createElement(TopBar, {
-        searchQuery: "復元された語",
-        onSearchChange,
-        notificationBell: createElement("span", { "aria-label": "通知" }),
-      }),
-    );
+    act(() => {
+      store.set(librarySearchQueryAtom, "復元された語");
+    });
     expect(input).toHaveValue("復元された語");
   });
 });

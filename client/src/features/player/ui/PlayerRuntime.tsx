@@ -1,7 +1,8 @@
 import { useAtomValue } from "jotai";
 import { useGlobalShortcuts } from "../../../app/model/useGlobalShortcuts";
 import { playerIsActiveAtom } from "../model/atoms";
-import { usePlayerActions, usePlayerRuntime } from "../model/usePlayer";
+import { usePlayerActions } from "../model/usePlayerActions";
+import { usePlayerRuntime } from "../model/usePlayer";
 
 export default function PlayerRuntime() {
   usePlayerRuntime();

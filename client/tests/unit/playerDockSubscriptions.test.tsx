@@ -4,7 +4,8 @@ import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PlayerRuntimeProvider } from "../../src/features/player/model/PlayerRuntimeProvider";
-import { usePlayerActions, usePlayerState } from "../../src/features/player/model/usePlayer";
+import { usePlayerActions } from "../../src/features/player/model/usePlayerActions";
+import { usePlayerState } from "../../src/features/player/model/usePlayerState";
 import PlayerRuntime from "../../src/features/player/ui/PlayerRuntime";
 import type { Track, WorkSummary } from "../../src/entities/work/model";
 

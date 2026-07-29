@@ -1,6 +1,7 @@
 import { useAtomValue } from "jotai";
 import { playerIsActiveAtom } from "../model/atoms";
-import { usePlayerActions, usePlayerState } from "../model/usePlayer";
+import { usePlayerActions } from "../model/usePlayerActions";
+import { usePlayerState } from "../model/usePlayerState";
 import FullScreenPlayer from "./FullScreenPlayer";
 
 export default function FullScreenPlayerGate() {

@@ -1,10 +1,10 @@
 ---
 id: TASK-122
 title: Appの検索・モード購読をリーフ化しOxlintで境界を固定する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-28 16:26'
-updated_date: '2026-07-28 16:27'
+updated_date: '2026-07-29 16:01'
 labels: []
 dependencies:
   - TASK-121
@@ -36,12 +36,12 @@ Oxlint 制約について:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 検索入力・IME確定・clear で App が再レンダリングされない
-- [ ] #2 App.tsx から Jotai の read API と atom/state モジュールを import できない（lintで落ちる）
-- [ ] #3 App から必要な action API は許可されている
-- [ ] #4 state と action が同じモジュールに混在している箇所が分割されている
-- [ ] #5 library / files 往復時の検索語ライフサイクルが仕様どおり
-- [ ] #6 files モードの検索導線が整理されている
+- [x] #1 検索入力・IME確定・clear で App が再レンダリングされない
+- [x] #2 App.tsx から Jotai の read API と atom/state モジュールを import できない（lintで落ちる）
+- [x] #3 App から必要な action API は許可されている
+- [x] #4 state と action が同じモジュールに混在している箇所が分割されている
+- [x] #5 library / files 往復時の検索語ライフサイクルが仕様どおり
+- [x] #6 files モードの検索導線が整理されている
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -55,3 +55,26 @@ Oxlint 制約について:
 6. activeModal は App ローカルのまま（TASK-109.5 の結論を維持）
 7. テスト: 検索操作で App が再レンダリングされないことの回帰テスト、Oxlint 制約が実際に違反を検出することの確認
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+searchQuery を App の useState から library の librarySearchQueryAtom へ移し、TopBar が read/write、LibraryView が read する形にした。URL・localStorage には保存せず、モード切替を跨いでは保持する。
+
+AppBody.tsx を新設して appModeAtom の購読と body の出し分けを App から降ろした。TopBar が必要とする mode も TopBar 自身が購読する。
+
+usePlayerState.ts / usePlayerActions.ts へモジュール分割し、呼び出し側（PlayerDock / BarContent / PopupContent / FullScreenPlayer / FullScreenPlayerGate / PlayerRuntime）を追従させた。互換 re-export シムは作っていない。
+
+files モードでは検索欄を隠すようにした（FilesView が検索値を使っておらず files 検索は未実装のため。仕様の穴としてレビューで発見された）。
+
+.oxlintrc.json に App.tsx 向けの overrides + no-restricted-imports を追加。jotai の useAtom / useAtomValue と、features/**/model/atoms・*Atoms パターンの import を禁止する。
+
+陽性対照の差し替え: appRootSubscriptions.test.tsx の陽性対照は appModeAtom 更新だったが、App が appModeAtom を購読しなくなったため settings クエリ更新へ差し替えた。App が実際に購読しているものに追随させないと対照が成立しない。
+
+検証:
+- pnpm check 通過、pnpm test 通過（server 340 / client 329）
+- ビジュアルテスト 6/6、スナップショット差分なし
+- Oxlint 制約の実効性を委譲元でプローブ確認: jotai の useAtomValue import で「'useAtomValue' import from 'jotai' is restricted」、atom モジュール import で「import is restricted from being used by a pattern」。いずれも狙いどおり検出。プローブは撤去済み
+- 検出力確認: App.tsx に librarySearchQueryAtom の購読を戻すと検索テストが expected 2 to be 1 で失敗。陽性対照も settings 購読を外すプローブで expected 1 to be greater than 1 で失敗し、生存を確認
+- ブラウザ実機: 検索の絞り込み・IME 変換中に検索が走らないこと（変換中11件のまま、確定後0件）・clear・0件表示、モード切替を跨いだ検索語保持とリロードで消えること、files モードで検索欄非表示、プレイヤー全操作、バー⇄ポップアップと has-docked-bar、通知ベル・設定・スキャンモーダル、ライブラリ軸切替と作品選択を確認。コンソールのアプリ起因 error/warn は 0 件
+<!-- SECTION:NOTES:END -->

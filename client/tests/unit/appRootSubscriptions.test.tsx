@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "../../src/app/App";
 import { PlayerRuntimeProvider } from "../../src/features/player/model/PlayerRuntimeProvider";
-import { appModeAtom } from "../../src/features/navigation/model/navigationAtoms";
+import { librarySearchQueryAtom } from "../../src/features/library/model/atoms";
 import { playerCoreAtom } from "../../src/features/player/model/atoms";
 import { PLAYER_CORE_INITIAL } from "../../src/features/player/model/playerController";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
@@ -173,16 +173,21 @@ beforeEach(() => {
 describe("App root subscriptions", () => {
   describe("購読検知（陽性対照）", () => {
     it("App が購読している state の更新では再レンダリングされる", async () => {
-      const { store } = renderApp();
+      const { queryClient } = renderApp();
       const baseline = await waitForAppShellBaseline();
 
-      const currentMode = store.get(appModeAtom);
-      const nextMode = currentMode === "library" ? "files" : "library";
-
-      act(() => {
-        store.set(appModeAtom, nextMode);
+      await act(async () => {
+        queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), {
+          rootFolder: "/changed-root",
+          lastScanTime: null,
+        });
       });
 
+      await waitFor(() =>
+        expect(queryClient.getQueryData(SETTINGS_QUERY_KEYS.all())?.rootFolder).toBe(
+          "/changed-root",
+        ),
+      );
       expect(appShellCallCount).toBeGreaterThan(baseline);
     });
   });
@@ -247,6 +252,19 @@ describe("App root subscriptions", () => {
           queryClient.getQueryData(WORK_QUERY_KEYS.dlsiteNotificationSummary())?.rjCodeMissingCount,
         ).toBe(5),
       );
+      expect(appShellCallCount).toBe(baseline);
+    });
+  });
+
+  describe("library search query", () => {
+    it("検索語の更新で App が再レンダリングされない", async () => {
+      const { store } = renderApp();
+      const baseline = await waitForAppShellBaseline();
+
+      act(() => {
+        store.set(librarySearchQueryAtom, "asmr");
+      });
+
       expect(appShellCallCount).toBe(baseline);
     });
   });

@@ -4,21 +4,19 @@
 // - レイアウトは AppShell に委譲
 
 import { useState, useCallback, useRef } from "react";
-import { useAtomValue } from "jotai";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { usePlayerActions } from "../features/player/model/usePlayer";
+import { usePlayerActions } from "../features/player/model/usePlayerActions";
 import PlayerRuntime from "../features/player/ui/PlayerRuntime";
 import FullScreenPlayerGate from "../features/player/ui/FullScreenPlayerGate";
 import AppShell from "./AppShell";
+import AppBody from "./AppBody";
 import TopBar from "./ui/TopBar";
 import LeftNav from "./ui/LeftNav";
 import AddressBar from "./ui/AddressBar";
 import NotificationBell from "./ui/NotificationBell";
-import LibraryView from "../features/library/ui/LibraryView";
 import { WORK_QUERY_KEYS } from "../entities/work/queryKeys";
 import { SMART_FOLDER_QUERY_KEYS } from "../entities/smart-folder/queryKeys";
 import { SETTINGS_QUERY_KEYS } from "../entities/settings/queryKeys";
-import FilesView from "../features/files/ui/FilesView";
 import type { FsEntry } from "../features/files/model/types";
 import PlayerDock from "../features/player/ui/PlayerDock";
 import SetupScreen from "../features/setup/ui/SetupScreen";
@@ -36,16 +34,13 @@ import { getLastScanResult, SCAN_QUERY_KEYS } from "../features/scan/api";
 import { useDlsiteBulk } from "./model/useDlsiteBulk";
 import { setRootFolder } from "../features/settings/api";
 import { useSettingsQuery } from "../features/settings/useSettingsQuery";
-import { appModeAtom } from "../features/navigation/model/navigationAtoms";
 import NavigationHistorySync from "../features/navigation/ui/NavigationHistorySync";
 
 export default function App() {
   const player = usePlayerActions();
   const queryClient = useQueryClient();
   const playRequestIdRef = useRef(0);
-  const mode = useAtomValue(appModeAtom);
 
-  const [searchQuery, setSearchQuery] = useState("");
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
   const [isCompletingSetup, setIsCompletingSetup] = useState(false);
 
@@ -260,9 +255,6 @@ export default function App() {
     <AppShell
       topBar={
         <TopBar
-          mode={mode}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
           onOpenScan={handleOpenScanModal}
           onSettings={() => setActiveModal("settings")}
           scanning={scanJob.scanning}
@@ -286,16 +278,12 @@ export default function App() {
       addressBar={<AddressBar />}
       leftNav={<LeftNav />}
       body={
-        mode === "files" ? (
-          <FilesView rootFolder={rootFolder} onPlayFile={handlePlayFile} />
-        ) : (
-          <LibraryView
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            onPlay={handlePlay}
-            onResume={handleResume}
-          />
-        )
+        <AppBody
+          rootFolder={rootFolder}
+          onPlayFile={handlePlayFile}
+          onPlay={handlePlay}
+          onResume={handleResume}
+        />
       }
       transportBar={<PlayerDock />}
       fullScreenPlayer={<FullScreenPlayerGate />}

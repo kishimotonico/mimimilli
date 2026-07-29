@@ -1,12 +1,12 @@
 import { useCallback, useMemo, useState } from "react";
-import { useAtomValue } from "jotai";
+import { useAtomValue, useSetAtom } from "jotai";
 import {
   getDefaultPlaylistTrackCount,
   toWorkListItem,
   type Work,
   type WorkListItem,
 } from "@mimimilli/shared";
-import { libraryViewModeAtom } from "../model/atoms";
+import { librarySearchQueryAtom, libraryViewModeAtom } from "../model/atoms";
 import {
   playerIsPlaybackActiveAtom,
   playingTrackIndexAtom,
@@ -35,18 +35,13 @@ import WorkGridInspector from "./WorkGridInspector";
 import SmartFolderEditorModal from "./SmartFolderEditorModal";
 
 interface LibraryViewProps {
-  searchQuery: string;
-  onSearchChange: (q: string) => void;
   onPlay: (work: WorkListItem, trackIndex: number) => void;
   onResume: (work: Work) => void;
 }
 
-export default function LibraryView({
-  searchQuery,
-  onSearchChange,
-  onPlay,
-  onResume,
-}: LibraryViewProps) {
+export default function LibraryView({ onPlay, onResume }: LibraryViewProps) {
+  const searchQuery = useAtomValue(librarySearchQueryAtom);
+  const setSearchQuery = useSetAtom(librarySearchQueryAtom);
   const viewMode = useAtomValue(libraryViewModeAtom);
   const playingWorkId = useAtomValue(playingWorkIdAtom);
   const playingTrackIndex = useAtomValue(playingTrackIndexAtom);
@@ -184,7 +179,7 @@ export default function LibraryView({
           onWorkSelect={nav.selectWork}
           onWorkPlay={(work) => onPlay(work, 0)}
           onDrillBack={nav.drillBack}
-          onClearSearch={() => onSearchChange("")}
+          onClearSearch={() => setSearchQuery("")}
           onInspectorClose={() => nav.selectWork(null)}
           inspector={
             nav.selectedWorkId ? (
@@ -235,7 +230,7 @@ export default function LibraryView({
           onDrillSelect={nav.drillInto}
           onDrillBack={nav.drillBack}
           onTagToggle={nav.toggleTag}
-          onClearSearch={() => onSearchChange("")}
+          onClearSearch={() => setSearchQuery("")}
         />
       )}
 

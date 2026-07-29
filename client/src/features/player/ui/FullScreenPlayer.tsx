@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef } from "react";
 import { useAtomValue } from "jotai";
-import type { PlayerState } from "../model/usePlayer";
+import type { PlayerState } from "../model/usePlayerState";
 import { playerCurrentTimeAtom, playerDurationAtom } from "../model/atoms";
 import { useSeekDrag } from "./useSeekDrag";
 import { formatTime } from "../../../shared/lib/format";
