@@ -45,6 +45,7 @@ import {
 import { migrateMetaIds } from "./metaIdMigration.ts";
 import { excludeDescendantPaths, isPathWithin, toPortableRelativePath } from "./paths.ts";
 import { probeDurationSec, type ProbeCacheEntry } from "./probe.ts";
+import { createProgressThrottle } from "./progressThrottle.ts";
 import { measureCoverDimensions, type CoverDimensions } from "./thumbnailCache.ts";
 import type { CoverColumns, ScanWorkState, WorkRepo } from "./workRepo.ts";
 
@@ -70,6 +71,10 @@ interface WalkResult {
 /** walking フェーズの進捗を emit する間隔（ディレクトリ数）。頻繁すぎる emit を避けつつ、
  *  大規模ライブラリでも SSE の heartbeat・接続処理がイベントループを取り戻せる粒度にする */
 const WALK_PROGRESS_INTERVAL = 50;
+
+/** registering / generating フェーズの progress emit 間隔（ミリ秒）。件数ベースにすると
+ *  1件あたりの処理時間の分散が大きく、遅い区間で進捗表示が長時間固まって見えるため時間ベースにする */
+const PROGRESS_MIN_INTERVAL_MS = 200;
 
 /**
  * ディレクトリ木を非同期に走査する。fs/promises の readdir は都度 I/O を挟むため、
@@ -410,6 +415,7 @@ export class Scanner {
 
     // 1-c. 実際の登録処理。fingerprint 一致作品はスキップし、それ以外は probe cache を使って処理する。
     const batch = new UpsertBatch(this.db, this.repo, this.upsertBatchSize, checkAbort);
+    const registeringThrottle = createProgressThrottle(PROGRESS_MIN_INTERVAL_MS);
     for (let i = 0; i < prepared.length; i++) {
       checkAbort();
       const entry = prepared[i]!;
@@ -463,12 +469,10 @@ export class Scanner {
           throw e;
         }
       }
-      emit({
-        type: "progress",
-        phase: "registering",
-        processed: i + 1,
-        total: tree.metaPaths.length,
-      });
+      const processed = i + 1;
+      if (registeringThrottle(processed, tree.metaPaths.length)) {
+        emit({ type: "progress", phase: "registering", processed, total: tree.metaPaths.length });
+      }
     }
     checkAbort();
     batch.flush();
@@ -487,6 +491,7 @@ export class Scanner {
 
     emit({ type: "progress", phase: "generating", processed: 0, total: roots.length });
     const generated: Array<{ id: string; prepared: PreparedMeta }> = [];
+    const generatingThrottle = createProgressThrottle(PROGRESS_MIN_INTERVAL_MS);
     for (let i = 0; i < roots.length; i++) {
       checkAbort();
       const workDir = roots[i]!;
@@ -497,7 +502,10 @@ export class Scanner {
         console.warn(`メタファイルの自動生成に失敗: ${workDir}: ${(e as Error).message}`);
         result.errors += 1;
       }
-      emit({ type: "progress", phase: "generating", processed: i + 1, total: roots.length });
+      const processed = i + 1;
+      if (generatingThrottle(processed, roots.length)) {
+        emit({ type: "progress", phase: "generating", processed, total: roots.length });
+      }
     }
     // 自動生成分もまとめてcacheを読む。cache hit時を含め、track単位のSELECTを発生させない。
     const generatedProbeCache = this.buildProbeCache(
