@@ -1,6 +1,6 @@
 import { act, createElement, useMemo, type ReactNode } from "react";
 import { render, waitFor } from "@testing-library/react";
-import { Provider as JotaiProvider, createStore } from "jotai";
+import { Provider as JotaiProvider, createStore, useAtomValue } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "../../src/app/App";
@@ -18,6 +18,7 @@ import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
 import type { WorkSummary } from "../../src/entities/work/model";
 
 let appShellCallCount = 0;
+let jotaiProbeRenderCount = 0;
 
 vi.mock("../../src/app/AppShell", () => ({
   default: vi.fn(() => {
@@ -25,6 +26,14 @@ vi.mock("../../src/app/AppShell", () => ({
     return null;
   }),
 }));
+
+// D: App配下のJotai購読が実際に渡された store に繋がっていることの陽性対照プローブ。
+// これが無いと、下の陰性対照（store.set で再描画されないこと）は store が別物でも空振りで通ってしまう。
+function JotaiSubscriptionProbe() {
+  useAtomValue(playerCoreAtom);
+  jotaiProbeRenderCount += 1;
+  return null;
+}
 
 const scanJobStub = {
   job: null,
@@ -130,6 +139,7 @@ function renderApp() {
           null,
           createElement(DlsiteBulkRuntime),
           createElement(ScanRuntime),
+          createElement(JotaiSubscriptionProbe),
           children,
         ),
       ),
@@ -161,10 +171,25 @@ function playingCoreState() {
 
 beforeEach(() => {
   appShellCallCount = 0;
+  jotaiProbeRenderCount = 0;
 });
 
 describe("App root subscriptions", () => {
-  describe("購読検知（陽性対照）", () => {
+  describe("購読検知（陽性対照・Jotai経路）", () => {
+    it("App配下のJotai購読プローブはstore.setで再描画される", async () => {
+      const { store } = renderApp();
+      await waitForAppShellBaseline();
+      const baseline = jotaiProbeRenderCount;
+
+      act(() => {
+        store.set(playerCoreAtom, playingCoreState());
+      });
+
+      expect(jotaiProbeRenderCount).toBeGreaterThan(baseline);
+    });
+  });
+
+  describe("購読検知（陽性対照・Queryルート）", () => {
     it("App が購読している state の更新では再レンダリングされる", async () => {
       const { queryClient } = renderApp();
       const baseline = await waitForAppShellBaseline();

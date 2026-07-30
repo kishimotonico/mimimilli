@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useSetAtom } from "jotai";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import type { ScanJobSnapshot } from "@mimimilli/shared";
 import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
 import { SETTINGS_QUERY_KEYS } from "../../../entities/settings/queryKeys";
@@ -34,7 +34,9 @@ export default function ScanRuntime() {
 
   const scanJob = useScanJob({ onTerminal: handleScanTerminal });
   const scanJobRef = useRef(scanJob);
-  scanJobRef.current = scanJob;
+  useLayoutEffect(() => {
+    scanJobRef.current = scanJob;
+  }, [scanJob]);
 
   useEffect(() => {
     setJob(scanJob.job);

@@ -17,7 +17,7 @@
   },
   "overrides": [
     {
-      "files": ["client/src/app/App.tsx"],
+      "files": ["**/App.tsx"],
       "rules": {
         "no-restricted-imports": [
           "error",
@@ -31,8 +31,14 @@
             ],
             "patterns": [
               {
-                "group": ["**/features/**/model/atoms", "**/features/**/model/*Atoms"],
-                "message": "App.tsx は atom/state モジュールを import しない"
+                "group": [
+                  "**/features/**/model/**",
+                  "!**/features/player/model/usePlayerActions",
+                  "!**/features/scan/model/useScanActions",
+                  "!**/features/dlsite/model/useDlsiteBulkActions",
+                  "!**/features/files/model/types"
+                ],
+                "message": "App.tsx は features/*/model 配下を import しない（action フック・型モジュールのみ許可）"
               }
             ]
           }

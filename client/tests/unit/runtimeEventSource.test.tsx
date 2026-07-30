@@ -179,6 +179,43 @@ describe("ScanRuntime EventSource ownership", () => {
   });
 });
 
+describe("Runtime間連携: ScanRuntime → DlsiteBulkRuntime", () => {
+  it("newWorkIds を含む完了イベントで dlsiteBulk.attach が一度だけ成立する", async () => {
+    const scanResultWithNewWorks = { ...scanResult, newWorkIds: ["work-1"] };
+    const completedWithNewWorks: ScanJobSnapshot = {
+      ...completedJob,
+      result: scanResultWithNewWorks,
+    };
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith("/scan/active")) return response(running);
+        if (url.endsWith("/scan/job-1")) return response(completedWithNewWorks);
+        return response(null, 204);
+      }),
+    );
+
+    // 実際の Provider 構成で ScanRuntime と DlsiteBulkRuntime を同じ store 上に描画する。
+    const { store } = renderRuntime([
+      createElement(ScanRuntime, { key: "scan" }),
+      createElement(DlsiteBulkRuntime, { key: "dlsite" }),
+    ]);
+
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    const scanSource = FakeEventSource.instances[0]!;
+    const completed = { type: "completed" as const, seq: 1, result: scanResultWithNewWorks };
+    dispatchScan(scanSource, completed);
+    dispatchScan(scanSource, completed);
+
+    // attach() → dlsiteBulkActiveAtom が true になり、DlsiteBulkRuntime が EventSource を1つだけ開く。
+    await waitFor(() => expect(store.get(dlsiteBulkActiveAtom)).toBe(true));
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(2));
+    expect(FakeEventSource.instances[1]!.url).toBe("/api/dlsite/events");
+  });
+});
+
 describe("DlsiteBulkRuntime EventSource ownership", () => {
   it("active 時に EventSource を1つだけ生成する", async () => {
     vi.stubGlobal(
