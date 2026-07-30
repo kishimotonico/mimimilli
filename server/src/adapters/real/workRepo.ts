@@ -1179,15 +1179,10 @@ export class WorkRepo {
   }
 
   /**
-   * scan からの登録。タグも置き換える。
-   * カバー列は options.cover（.meta.json のファイル名＋計測寸法）を正とし、省略時は work.cover から導く。
-   * options.cover は「画像あり・寸法null（計測失敗）」も表現でき、work.cover では表せない状態を書ける。
+   * scan バッチの user DB 書き込み。work_states を冪等作成する（onConflictDoNothing）。
+   * catalog より先にコミットする前提（ADR-0008）。
    */
-  upsertWork(
-    work: Work,
-    options: { metaPath: string; fingerprint?: string; cover?: CoverColumns },
-  ): void {
-    // 2DBをまたぐ原子性には依存せず、user状態を先に冪等作成してからcatalogを書く。
+  upsertWorkUserState(work: Work): void {
     this.db.user
       .insert(workStates)
       .values({
@@ -1201,11 +1196,20 @@ export class WorkRepo {
       })
       .onConflictDoNothing()
       .run();
-    // track_count はデフォルトプレイリストのトラック数（一覧がplaylists_jsonを読まないためここで維持。TASK-57）
+  }
+
+  /**
+   * scan バッチの catalog DB 書き込み。タグも置き換える。
+   * カバー列は options.cover（.meta.json のファイル名＋計測寸法）を正とし、省略時は work.cover から導く。
+   */
+  upsertWorkCatalog(
+    work: Work,
+    options: { metaPath: string; fingerprint?: string; cover?: CoverColumns },
+  ): void {
     const trackCount =
       defaultPlaylistOf({ id: work.id, defaultPlaylistId: work.defaultPlaylistId }, work.playlists)
         ?.tracks.length ?? 0;
-    const cover = options?.cover ?? coverColumnsFromCover(work.cover);
+    const cover = options.cover ?? coverColumnsFromCover(work.cover);
     const values: typeof works.$inferInsert = {
       id: work.id,
       title: work.title,
@@ -1220,10 +1224,9 @@ export class WorkRepo {
       metaPath: options.metaPath,
       totalDurationSec: work.totalDurationSec,
       trackCount,
-      fingerprint: options?.fingerprint ?? null,
+      fingerprint: options.fingerprint ?? null,
       errorMessage: work.errorMessage,
       urlsJson: JSON.stringify(work.urls),
-      // durationSec は派生値のため正本（playlists_json）には書かず、読み取り時に動的解決する。
       playlistsJson: JSON.stringify(
         work.playlists.map((playlist) => ({
           id: playlist.id,
@@ -1268,6 +1271,17 @@ export class WorkRepo {
     }
     this.replaceWorkTags(work.id, work.tags);
     this.setDlsiteState(work.id, work.dlsite);
+  }
+
+  /**
+   * scan からの登録（user + catalog を逐次実行）。テスト・seed 用。
+   */
+  upsertWork(
+    work: Work,
+    options: { metaPath: string; fingerprint?: string; cover?: CoverColumns },
+  ): void {
+    this.upsertWorkUserState(work);
+    this.upsertWorkCatalog(work, options);
   }
 
   /**

@@ -282,8 +282,8 @@ interface UpsertItem {
   metaPath: string;
 }
 
-/** upsertWork の呼び出しを一定件数ごとに catalog トランザクションでまとめる（TASK-75）。
- *  バッチ途中で失敗すればトランザクションがロールバックされ、不整合な status を残さない。 */
+/** upsertWork の呼び出しを一定件数ごとに user・catalog 各DBのトランザクションでまとめる（TASK-75, TASK-159）。
+ *  user を先にコミットしてから catalog を書く（ADR-0008）。2DBは別ファイルのため集合としては原子的ではない。 */
 class UpsertBatch {
   private queue: UpsertItem[] = [];
   private readonly db: Db;
@@ -310,10 +310,17 @@ class UpsertBatch {
     this.checkAbort();
     if (this.queue.length === 0) return;
     const items = this.queue;
+    this.db.userTransaction(() => {
+      for (const item of items) {
+        this.checkAbort();
+        this.repo.upsertWorkUserState(item.work);
+      }
+    });
+    this.checkAbort();
     this.db.transaction(() => {
       for (const item of items) {
         this.checkAbort();
-        this.repo.upsertWork(item.work, {
+        this.repo.upsertWorkCatalog(item.work, {
           metaPath: item.metaPath,
           fingerprint: item.fingerprint,
           cover: item.cover,
