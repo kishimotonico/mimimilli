@@ -350,6 +350,7 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
         skipped: 0,
         // fixture のカバーは合成SVGで計測失敗が起きないため0固定
         coverErrors: 0,
+        unreadablePaths: [],
       };
     },
 

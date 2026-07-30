@@ -65,6 +65,17 @@ interface WalkResult {
   metaDirs: Set<string>;
   /** 音声ファイルが直接存在するディレクトリ */
   audioDirs: Set<string>;
+  /** readdir に失敗したサブツリーのディレクトリパス（ルート失敗は例外） */
+  unreadablePaths: string[];
+}
+
+/** ルートフォルダーの readdir 失敗。スキャン全体をエラー終了させ missing 更新を防ぐ。 */
+export class ScanRootUnreadableError extends Error {
+  constructor(root: string, cause: unknown) {
+    const detail = cause instanceof Error ? cause.message : String(cause);
+    super(`ルートフォルダーを読み取れません: ${root}: ${detail}`);
+    this.name = "ScanRootUnreadableError";
+  }
 }
 
 /** walking フェーズの進捗を emit する間隔（ディレクトリ数）。頻繁すぎる emit を避けつつ、
@@ -97,7 +108,12 @@ async function walk(
   signal?: AbortSignal,
   abortToken?: Int32Array,
 ): Promise<WalkResult> {
-  const result: WalkResult = { metaPaths: [], metaDirs: new Set(), audioDirs: new Set() };
+  const result: WalkResult = {
+    metaPaths: [],
+    metaDirs: new Set(),
+    audioDirs: new Set(),
+    unreadablePaths: [],
+  };
   const stack = [root];
   let visited = 0;
   while (stack.length > 0) {
@@ -107,7 +123,9 @@ async function walk(
     try {
       entries = await readdir(dir, { withFileTypes: true });
     } catch (e) {
+      if (dir === root) throw new ScanRootUnreadableError(root, e);
       console.warn(`ディレクトリを読めません: ${dir}: ${(e as Error).message}`);
+      result.unreadablePaths.push(dir);
       continue;
     }
     for (const entry of entries) {
@@ -185,7 +203,8 @@ function findCoverImage(dir: string): string | null {
   let entries;
   try {
     entries = readdirSync(dir, { withFileTypes: true });
-  } catch {
+  } catch (e) {
+    console.warn(`ディレクトリを読めません: ${dir}: ${(e as Error).message}`);
     return null;
   }
   const images = entries
@@ -207,7 +226,8 @@ function collectAudioRecursive(dir: string): string[] {
     let entries;
     try {
       entries = readdirSync(cur, { withFileTypes: true });
-    } catch {
+    } catch (e) {
+      console.warn(`ディレクトリを読めません: ${cur}: ${(e as Error).message}`);
       continue;
     }
     for (const e of entries) {
@@ -537,6 +557,16 @@ export class Scanner {
     emit({ type: "progress", phase: "finalizing", processed: 0, total: 1 });
     normalized.beforeFinalize?.();
     checkAbort();
+    if (tree.unreadablePaths.length > 0) {
+      result.unreadablePaths = tree.unreadablePaths;
+      console.warn(`読み取れなかったディレクトリ: ${tree.unreadablePaths.join(", ")}`);
+      for (const [id, state] of existingWorks) {
+        if (seenIds.has(id)) continue;
+        if (tree.unreadablePaths.some((prefix) => isPathWithin(prefix, state.physicalPath))) {
+          seenIds.add(id);
+        }
+      }
+    }
     this.repo.markMissingExcept([...seenIds]);
     result.missing = this.repo.countByStatus("missing");
     result.rjCodeMissingCount = this.repo

@@ -14,6 +14,8 @@ export const scanResultSchema = z.object({
   skipped: z.number().int().nonnegative(),
   /** カバー画像はあるが寸法を計測できなかった作品数（errors とは別枠。次回スキャンで再試行） */
   coverErrors: z.number().int().nonnegative(),
+  /** 走査中に読み取れなかったサブツリーのディレクトリパス。ルート失敗時はスキャン自体がエラーになる */
+  unreadablePaths: z.array(z.string()).optional(),
 });
 export type ScanResult = z.infer<typeof scanResultSchema>;
 
