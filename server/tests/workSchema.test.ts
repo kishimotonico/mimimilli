@@ -55,6 +55,26 @@ test("Playlist ID・Track IDとdefaultPlaylistIdの不変条件を検証する",
   );
 });
 
+test("dlsite.errorKindが無い旧metaはパースできerrorKindはnullになる", () => {
+  const meta = {
+    ...validMeta(),
+    dlsite: {
+      rjCode: "RJ123456",
+      status: "none" as const,
+      lastAttemptAt: null,
+      error: null,
+      appliedTags: [],
+    },
+  };
+  const parsed = metaFileSchema.parse(meta);
+  assert.equal(parsed.dlsite.errorKind, null);
+});
+
+test("dlsiteキー自体が無い旧metaはパースできerrorKindはnullになる", () => {
+  const parsed = metaFileSchema.parse(validMeta());
+  assert.equal(parsed.dlsite.errorKind, null);
+});
+
 test("同名Playlistは異なるIDなら許容する", () => {
   const meta = validMeta();
   meta.playlists.push({

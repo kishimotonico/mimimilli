@@ -263,6 +263,7 @@ export const SEED_WORKS: WorkSummary[] = RAW_SEED_WORKS.map((work, index) => ({
           status: "applied",
           lastAttemptAt: "2026-06-10T12:00:00.000Z",
           error: null,
+          errorKind: null,
           appliedTags: work.tags.filter((tag) => /^(?:cv|genre|サークル)\//.test(tag)),
         }
       : index === 2

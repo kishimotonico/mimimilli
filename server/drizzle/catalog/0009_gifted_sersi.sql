@@ -1,0 +1,1 @@
+ALTER TABLE `works` ADD `meta_path` text NOT NULL;

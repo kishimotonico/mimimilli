@@ -8,6 +8,7 @@ import { openDb } from "../../src/adapters/real/db.ts";
 import { probeDurationSec } from "../../src/adapters/real/probe.ts";
 import { workStates } from "../../src/adapters/real/userSchema.ts";
 import { WorkRepo } from "../../src/adapters/real/workRepo.ts";
+import { upsertTestWork } from "../helpers/workTestUtils.ts";
 import { makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 
 function sampleWork(id: string): Work {
@@ -57,6 +58,7 @@ function sampleWork(id: string): Work {
       status: "none",
       lastAttemptAt: null,
       error: null,
+      errorKind: null,
       appliedTags: [],
     },
   };
@@ -66,7 +68,7 @@ test("v2 resumeは区間相対秒で保存され、並べ替え後もTrack IDで
   const db = openDb({ kind: "memory" });
   const repo = new WorkRepo(db);
   const work = sampleWork("resume-reorder");
-  repo.upsertWork(work);
+  upsertTestWork(repo, work);
   const playlist = work.playlists[0]!;
   const track = playlist.tracks[1]!;
 
@@ -80,7 +82,7 @@ test("v2 resumeは区間相対秒で保存され、並べ替え後もTrack IDで
     offsetSec: 15,
   });
 
-  repo.upsertWork({
+  upsertTestWork(repo, {
     ...work,
     playlists: [{ ...playlist, tracks: [playlist.tracks[1]!, playlist.tracks[0]!] }],
   });
@@ -96,7 +98,7 @@ test("保存時に所属と区間を検証し、読出し時に解決不能な�
   const db = openDb({ kind: "memory" });
   const repo = new WorkRepo(db);
   const work = sampleWork("resume-invalid");
-  repo.upsertWork(work);
+  upsertTestWork(repo, work);
   const playlist = work.playlists[0]!;
   const track = playlist.tracks[1]!;
 
@@ -145,7 +147,7 @@ test("end省略Trackは音声ファイルを300秒から60秒へ差し替えた�
     physicalPath: directory.path,
     playlists: [{ ...playlist, tracks: [track] }],
   };
-  repo.upsertWork(work);
+  upsertTestWork(repo, work);
   const cachePath = join(work.physicalPath, track.file);
   writeWav(cachePath, 300);
   assert.equal(await probeDurationSec(db.catalog, cachePath, new Map()), 300);
@@ -179,7 +181,7 @@ test("end省略Trackはrescan・明示probeなしでもgetWork読み取り時に
     physicalPath: directory.path,
     playlists: [{ ...playlist, tracks: [track] }],
   };
-  repo.upsertWork(work);
+  upsertTestWork(repo, work);
   const cachePath = join(work.physicalPath, track.file);
   writeWav(cachePath, 300);
 

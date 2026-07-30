@@ -24,6 +24,8 @@ export const works = sqliteTable(
     createdAt: text("created_at"),
     status: text("status").notNull(),
     physicalPath: text("physical_path").notNull(),
+    /** スキャン時に確定したメタファイルの絶対パス（書き戻し先の正本） */
+    metaPath: text("meta_path").notNull(),
     /** デフォルトプレイリストの合計秒数。未解決トラックを1件でも含む場合はNULL（未知。0では埋めない）。 */
     totalDurationSec: real("total_duration_sec"),
     /** デフォルトプレイリストのトラック数。upsert時に維持する（TASK-57: 一覧でplaylists_jsonを読まないため） */

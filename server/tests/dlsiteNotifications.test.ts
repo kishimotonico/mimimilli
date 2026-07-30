@@ -6,6 +6,7 @@ import { createApp } from "../src/app.ts";
 import { openDb } from "../src/adapters/real/db.ts";
 import { createRealAdapter } from "../src/adapters/real/index.ts";
 import { WorkRepo } from "../src/adapters/real/workRepo.ts";
+import { upsertTestWork } from "./helpers/workTestUtils.ts";
 import { makeSampleLibrary } from "./helpers/sampleLibrary.ts";
 
 function notificationWorks(count: number): WorkSummary[] {
@@ -31,6 +32,7 @@ function notificationWorks(count: number): WorkSummary[] {
             status: "error" as const,
             lastAttemptAt: null,
             error: "failed",
+            errorKind: null,
             appliedTags: [],
           },
   }));
@@ -90,7 +92,7 @@ test("201件超の通知はfixtureとrealで集計・ページングの欠落や
   const db = openDb({ kind: "memory" });
   const repo = new WorkRepo(db);
   try {
-    for (const work of works) repo.upsertWork(asWork(work));
+    for (const work of works) upsertTestWork(repo, asWork(work));
     const fixtureSummary = await fixture.getDlsiteNotificationSummary();
     const realSummary = repo.getDlsiteNotificationSummary();
     assert.deepEqual(realSummary, fixtureSummary);
@@ -152,8 +154,8 @@ test("DLsite通知: parse_error は fetch-failed と分離して集計する", a
         appliedTags: [],
       },
     };
-    repo.upsertWork(asWork(parseFailed));
-    repo.upsertWork(asWork(httpFailed));
+    upsertTestWork(repo, asWork(parseFailed));
+    upsertTestWork(repo, asWork(httpFailed));
     assert.deepEqual(repo.getDlsiteNotificationSummary(), {
       rjCodeMissingCount: 0,
       fetchFailedCount: 1,

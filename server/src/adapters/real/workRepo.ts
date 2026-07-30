@@ -1129,13 +1129,16 @@ export class WorkRepo {
   }
 
   /**
-   * .meta.json の位置解決（findMetaPath）専用の軽量取得。probe・freshness確認を伴わないため、
+   * メタファイル書き戻し先の軽量取得。probe・freshness確認を伴わないため、
    * DBトランザクション内の同期処理からも安全に呼べる。
    */
-  getWorkMetaLocation(id: string): { physicalPath: string; playlists: Playlist[] } | null {
-    const row = this.db.catalog.select().from(works).where(eq(works.id, id)).get();
-    if (!row) return null;
-    return { physicalPath: row.physicalPath, playlists: parseWorkPlaylists(row) };
+  getWorkMetaPath(id: string): string | null {
+    const row = this.db.catalog
+      .select({ metaPath: works.metaPath })
+      .from(works)
+      .where(eq(works.id, id))
+      .get();
+    return row?.metaPath ?? null;
   }
 
   async getWorkByPhysicalPath(physicalPath: string): Promise<Work | null> {
@@ -1158,7 +1161,10 @@ export class WorkRepo {
    * カバー列は options.cover（.meta.json のファイル名＋計測寸法）を正とし、省略時は work.cover から導く。
    * options.cover は「画像あり・寸法null（計測失敗）」も表現でき、work.cover では表せない状態を書ける。
    */
-  upsertWork(work: Work, options?: { fingerprint?: string; cover?: CoverColumns }): void {
+  upsertWork(
+    work: Work,
+    options: { metaPath: string; fingerprint?: string; cover?: CoverColumns },
+  ): void {
     // 2DBをまたぐ原子性には依存せず、user状態を先に冪等作成してからcatalogを書く。
     this.db.user
       .insert(workStates)
@@ -1189,6 +1195,7 @@ export class WorkRepo {
       createdAt: work.createdAt,
       status: work.status,
       physicalPath: work.physicalPath,
+      metaPath: options.metaPath,
       totalDurationSec: work.totalDurationSec,
       trackCount,
       fingerprint: options?.fingerprint ?? null,
@@ -1244,7 +1251,7 @@ export class WorkRepo {
   /**
    * PATCH /works/:id および DLsite 適用の DB 側。メタファイル書き戻しは呼び出し側（アダプタ）が行う。
    * 同期のDBトランザクション内から安全に呼べるよう、probe・freshness確認を伴わない
-   * 軽量な位置情報（getWorkMetaLocation）だけを返す。呼び出し側は必要なら別途 getWork で取得し直す。
+   * 軽量なメタパス（getWorkMetaPath）だけを返す。呼び出し側は必要なら別途 getWork で取得し直す。
    */
   patchWork(
     id: string,
@@ -1255,7 +1262,7 @@ export class WorkRepo {
       cover?: CoverColumns;
       urls?: UrlEntry[];
     },
-  ): { physicalPath: string; playlists: Playlist[] } | null {
+  ): { metaPath: string } | null {
     const row = this.db.catalog.select().from(works).where(eq(works.id, id)).get();
     if (!row) return null;
     const set: Partial<typeof works.$inferInsert> = {};
@@ -1282,7 +1289,7 @@ export class WorkRepo {
     if (patch.tags !== undefined) {
       this.replaceWorkTags(id, patch.tags);
     }
-    return { physicalPath: row.physicalPath, playlists: parseWorkPlaylists(row) };
+    return { metaPath: row.metaPath };
   }
 
   saveResume(id: string, body: ResumeBody): boolean {
@@ -1350,11 +1357,11 @@ export class WorkRepo {
     return r !== undefined;
   }
 
-  markWorkError(id: string, physicalPath: string, errorMessage: string): boolean {
+  markWorkError(id: string, physicalPath: string, metaPath: string, errorMessage: string): boolean {
     return (
       this.db.catalog
         .update(works)
-        .set({ status: "error", physicalPath, errorMessage })
+        .set({ status: "error", physicalPath, metaPath, errorMessage })
         .where(eq(works.id, id))
         .returning({ id: works.id })
         .get() !== undefined

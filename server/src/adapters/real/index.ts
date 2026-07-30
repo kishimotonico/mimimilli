@@ -1,6 +1,6 @@
 // real アダプタ: SQLite（キャッシュ）+ 実ファイルシステム + `.meta.json`（Source of Truth）。
 // 作品検索・件数・ページングはcatalog接続からuser DBをATTACH JOINしてSQLで実行する。
-import { existsSync, realpathSync, writeFileSync } from "node:fs";
+import { realpathSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -701,7 +701,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
           tags: patch.tags,
         });
         if (!updated) return false;
-        patchMetaFile(findMetaPath(updated), { title: patch.title, tags: patch.tags });
+        patchMetaFile(updated.metaPath, { title: patch.title, tags: patch.tags });
         return true;
       });
       if (!ok) return null;
@@ -854,7 +854,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
           appliedTags: normalizeTags([...work.dlsite.appliedTags, ...applyTags]),
         };
         repo.setDlsiteState(workId, dlsite);
-        patchMetaFile(findMetaPath(updated), {
+        patchMetaFile(updated.metaPath, {
           title: patch.title,
           tags: patch.tags,
           coverImage,
@@ -881,7 +881,9 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       };
       db.transaction(() => {
         repo.setDlsiteState(workId, dlsite);
-        patchMetaFile(findMetaPath(work), { dlsite });
+        const metaPath = repo.getWorkMetaPath(workId);
+        if (!metaPath) throw new Error(`作品のメタパスが見つかりません: ${workId}`);
+        patchMetaFile(metaPath, { dlsite });
       });
       return repo.getWork(workId);
     },
@@ -981,8 +983,8 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
                 };
                 db.transaction(() => {
                   repo.setDlsiteState(work.id, dlsite);
-                  const metaLocation = repo.getWorkMetaLocation(work.id);
-                  if (metaLocation) patchMetaFile(findMetaPath(metaLocation), { dlsite });
+                  const metaPath = repo.getWorkMetaPath(work.id);
+                  if (metaPath) patchMetaFile(metaPath, { dlsite });
                 });
               }
               result.failed += 1;
@@ -1044,7 +1046,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
                   if (!updated)
                     throw new Error(`一括取得中に作品が見つからなくなりました: ${work.id}`);
                   repo.setDlsiteState(work.id, dlsite);
-                  patchMetaFile(findMetaPath(updated), {
+                  patchMetaFile(updated.metaPath, {
                     title: patch.title,
                     tags: patch.tags,
                     coverImage,
@@ -1079,8 +1081,8 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
             try {
               db.transaction(() => {
                 repo.setDlsiteState(work.id, dlsite);
-                const metaLocation = repo.getWorkMetaLocation(work.id);
-                if (metaLocation) patchMetaFile(findMetaPath(metaLocation), { dlsite });
+                const metaPath = repo.getWorkMetaPath(work.id);
+                if (metaPath) patchMetaFile(metaPath, { dlsite });
               });
             } catch (persistError) {
               console.error("DLsite失敗状態の保存に失敗しました", {
@@ -1114,21 +1116,4 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
 
 function arraysEqual(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((value, index) => value === b[index]);
-}
-
-/** 作品のメタファイルパスを返す（フォルダー形式 / 単一ファイル形式の両対応） */
-function findMetaPath(work: {
-  physicalPath: string;
-  playlists: Array<{ tracks: Array<{ file: string }> }>;
-}): string {
-  const folderMeta = join(work.physicalPath, ".meta.json");
-  if (existsSync(folderMeta)) return folderMeta;
-  // 単一ファイル形式: トラックの basename に対応する <basename>.meta.json を探す
-  const firstTrack = work.playlists[0]?.tracks[0]?.file;
-  if (firstTrack) {
-    const base = firstTrack.replace(/\.[^.]+$/, "");
-    const singleMeta = join(work.physicalPath, `${base}.meta.json`);
-    if (existsSync(singleMeta)) return singleMeta;
-  }
-  return folderMeta;
 }

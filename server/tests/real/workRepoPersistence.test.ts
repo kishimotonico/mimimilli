@@ -5,6 +5,7 @@ import type { Work } from "@mimimilli/shared";
 import { openDb } from "../../src/adapters/real/db.ts";
 import { works } from "../../src/adapters/real/catalogSchema.ts";
 import { PersistentDataError, WorkRepo } from "../../src/adapters/real/workRepo.ts";
+import { upsertTestWork } from "../helpers/workTestUtils.ts";
 import { smartFolders } from "../../src/adapters/real/userSchema.ts";
 
 function sampleWork(id: string): Work {
@@ -44,6 +45,7 @@ function sampleWork(id: string): Work {
       status: "none",
       lastAttemptAt: null,
       error: null,
+      errorKind: null,
       appliedTags: [],
     },
   };
@@ -72,7 +74,7 @@ test("works.status が不正なら作品IDとフィールド名を含むエラ�
   const db = openDb({ kind: "memory" });
   const repo = new WorkRepo(db);
   const work = sampleWork("work-bad-status");
-  repo.upsertWork(work);
+  upsertTestWork(repo, work);
   db.catalog.update(works).set({ status: "unknown" }).where(eq(works.id, work.id)).run();
 
   assertPersistentDataError(
@@ -85,7 +87,7 @@ test("works.playlists_json が不正なら作品IDとフィールド名を含む
   const db = openDb({ kind: "memory" });
   const repo = new WorkRepo(db);
   const work = sampleWork("work-bad-playlists");
-  repo.upsertWork(work);
+  upsertTestWork(repo, work);
   db.catalog
     .update(works)
     .set({ playlistsJson: '[{"name":"default","tracks":"broken"}]' })
@@ -102,7 +104,7 @@ test("壊れたJSON構文は作品IDとSQLite列名を含むエラーになる",
   const db = openDb({ kind: "memory" });
   const repo = new WorkRepo(db);
   const work = sampleWork("work-bad-json");
-  repo.upsertWork(work);
+  upsertTestWork(repo, work);
   db.catalog.update(works).set({ playlistsJson: "[{" }).where(eq(works.id, work.id)).run();
 
   await assertPersistentDataErrorAsync(

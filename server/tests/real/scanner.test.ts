@@ -94,6 +94,7 @@ test("DLsite状態: メタ未定義はnone扱いで検出コードを書き戻�
     status: "error",
     lastAttemptAt: "2026-07-12T00:00:00.000Z",
     error: "一時的な取得失敗",
+    errorKind: null,
     appliedTags: ["genre/耳かき"],
   };
   writeFileSync(metaPath, JSON.stringify(meta, null, 2));

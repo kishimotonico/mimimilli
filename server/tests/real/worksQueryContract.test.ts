@@ -11,6 +11,7 @@ import {
   type WorkSummary,
 } from "@mimimilli/shared";
 import { WorkRepo } from "../../src/adapters/real/workRepo.ts";
+import { upsertTestWork } from "../helpers/workTestUtils.ts";
 import { openDb } from "../../src/adapters/real/db.ts";
 import { buildAxisFacets } from "../../src/core/axisFacets.ts";
 import { evalSmartFolder } from "../../src/core/smartFolder.ts";
@@ -108,7 +109,7 @@ test("core参照実装とreal SQLは固定例・生成クエリで同値", () =>
   const db = openDb({ kind: "memory" });
   const repo = new WorkRepo(db);
   try {
-    for (const item of dataset) repo.upsertWork(fullWork(item));
+    for (const item of dataset) upsertTestWork(repo, fullWork(item));
     db.sqlite
       .query(`
         INSERT INTO user.work_states
@@ -180,7 +181,7 @@ test("realのrandomはseedを発行し、同じseedの次要求でページ順�
   const db = openDb({ kind: "memory" });
   const repo = new WorkRepo(db);
   try {
-    for (const item of dataset) repo.upsertWork(fullWork(item));
+    for (const item of dataset) upsertTestWork(repo, fullWork(item));
     const first = repo.queryWorks(baseQuery({ sort: "random", page: 2, limit: 8 }));
     assert.notEqual(first.seed, undefined);
     const repeated = repo.queryWorks(
@@ -203,7 +204,7 @@ test("複数サークルタグのcircleNameはsharedとrealでUTF-8 BINARY順の
     tags: ["サークル/和風", "circle/Zeta", "circle/Alpha", "ASMR"],
   };
   try {
-    repo.upsertWork(fullWork(item));
+    upsertTestWork(repo, fullWork(item));
     const page = repo.queryWorks(baseQuery({ page: 1, limit: 1 }));
     assert.equal(toWorkListItem(item).circleName, "Alpha");
     assert.equal(page.items[0]?.circleName, toWorkListItem(item).circleName);
@@ -224,6 +225,7 @@ test("realのDLsite通知集計とページは状態別に一覧契約を返す"
         status: "error",
         lastAttemptAt: null,
         error: "failed",
+        errorKind: null,
         appliedTags: [],
       },
     });
@@ -234,12 +236,13 @@ test("realのDLsite通知集計とページは状態別に一覧契約を返す"
         status: "none",
         lastAttemptAt: null,
         error: null,
+        errorKind: null,
         appliedTags: [],
       },
     });
-    repo.upsertWork(missing);
-    repo.upsertWork(failed);
-    repo.upsertWork(unlinked);
+    upsertTestWork(repo, missing);
+    upsertTestWork(repo, failed);
+    upsertTestWork(repo, unlinked);
 
     assert.deepEqual(repo.getDlsiteNotificationSummary(), {
       rjCodeMissingCount: 1,
@@ -265,7 +268,7 @@ test("core参照実装とreal SQLのファセット値・件数・順序が同�
   const db = openDb({ kind: "memory" });
   const repo = new WorkRepo(db);
   try {
-    for (const item of dataset) repo.upsertWork(fullWork(item));
+    for (const item of dataset) upsertTestWork(repo, fullWork(item));
     for (const axis of ["tag", "year", "cv", "気分", "シリーズ", "e\u0301x", "unknown"]) {
       assert.deepEqual(repo.getAxisFacets(axis), buildAxisFacets(axis, dataset), axis);
     }
@@ -317,7 +320,7 @@ test("スマートフォルダーのSQL候補絞り込み(第1段)とcore純粋�
   const db = openDb({ kind: "memory" });
   const repo = new WorkRepo(db);
   try {
-    for (const item of dataset) repo.upsertWork(fullWork(item));
+    for (const item of dataset) upsertTestWork(repo, fullWork(item));
 
     const tagRule = (values: string[], conjunction: SmartFolderRule["conjunction"] = "WHERE") =>
       ({ conjunction, field: "タグ", operator: "∋", values }) as SmartFolderRule;
@@ -402,7 +405,7 @@ test("スマートフォルダー候補IDが900件を超えてもlistSummaries�
     // （TASK-85）。候補IDがちょうどその境界をまたぐ件数になるデータセットで、分割・再結合が
     // 欠落や重複なく行われることを直接検証する。
     const largeDataset = Array.from({ length: 950 }, (_, index) => summary(index));
-    for (const item of largeDataset) repo.upsertWork(fullWork(item));
+    for (const item of largeDataset) upsertTestWork(repo, fullWork(item));
 
     const rule: SmartFolderRule = {
       conjunction: "WHERE",
@@ -442,7 +445,7 @@ test("tag軸はprefixタグを数えず、自由タグが無ければ空にな�
     tags: item.tags.filter((tag) => tag.includes("/")),
   }));
   try {
-    for (const item of annotatedOnly) repo.upsertWork(fullWork(item));
+    for (const item of annotatedOnly) upsertTestWork(repo, fullWork(item));
 
     assert.deepEqual(repo.getAxisFacets("tag"), buildAxisFacets("tag", annotatedOnly));
     assert.deepEqual(repo.getAxisFacets("tag"), []);

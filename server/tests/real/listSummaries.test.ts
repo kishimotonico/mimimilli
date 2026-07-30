@@ -6,6 +6,7 @@ import type { ResolvedPlaylist, Work } from "@mimimilli/shared";
 import { openDb, type Db } from "../../src/adapters/real/db.ts";
 import { workDlsite } from "../../src/adapters/real/catalogSchema.ts";
 import { WorkRepo } from "../../src/adapters/real/workRepo.ts";
+import { upsertTestWork } from "../helpers/workTestUtils.ts";
 import { eq } from "drizzle-orm";
 
 function makePlaylist(trackCount: number, id = crypto.randomUUID()): ResolvedPlaylist {
@@ -43,7 +44,14 @@ function sampleWork(
     bookmarked: false,
     lastPlayedAt: null,
     resume: null,
-    dlsite: { rjCode: null, status: "none", lastAttemptAt: null, error: null, appliedTags: [] },
+    dlsite: {
+      rjCode: null,
+      status: "none",
+      lastAttemptAt: null,
+      error: null,
+      errorKind: null,
+      appliedTags: [],
+    },
   };
 }
 
@@ -58,7 +66,7 @@ test("track_count はデフォルトプレイリスト指定ありなら指定PL
   const repo = new WorkRepo(db);
   const first = makePlaylist(3);
   const second = makePlaylist(1);
-  repo.upsertWork(sampleWork("w-1", [first, second], second.id));
+  upsertTestWork(repo, sampleWork("w-1", [first, second], second.id));
   assert.equal(trackCountOf(repo, "w-1"), 1);
   db.close();
 });
@@ -66,7 +74,7 @@ test("track_count はデフォルトプレイリスト指定ありなら指定PL
 test("track_count はデフォルトプレイリスト指定なしなら先頭PLのトラック数", () => {
   const db = openDb({ kind: "memory" });
   const repo = new WorkRepo(db);
-  repo.upsertWork(sampleWork("w-1", [makePlaylist(3), makePlaylist(1)], null));
+  upsertTestWork(repo, sampleWork("w-1", [makePlaylist(3), makePlaylist(1)], null));
   assert.equal(trackCountOf(repo, "w-1"), 3);
   db.close();
 });
@@ -74,7 +82,7 @@ test("track_count はデフォルトプレイリスト指定なしなら先頭PL
 test("track_count はプレイリストなしなら0", () => {
   const db = openDb({ kind: "memory" });
   const repo = new WorkRepo(db);
-  repo.upsertWork(sampleWork("w-1", [], null));
+  upsertTestWork(repo, sampleWork("w-1", [], null));
   assert.equal(trackCountOf(repo, "w-1"), 0);
   db.close();
 });
@@ -83,10 +91,10 @@ test("track_count は update でも再計算される", () => {
   const db = openDb({ kind: "memory" });
   const repo = new WorkRepo(db);
   const work = sampleWork("w-1", [makePlaylist(2)], null);
-  repo.upsertWork(work);
+  upsertTestWork(repo, work);
   assert.equal(trackCountOf(repo, "w-1"), 2);
 
-  repo.upsertWork({ ...work, playlists: [makePlaylist(5)] });
+  upsertTestWork(repo, { ...work, playlists: [makePlaylist(5)] });
   assert.equal(trackCountOf(repo, "w-1"), 5);
   db.close();
 });
@@ -110,12 +118,12 @@ test("listSummaries の SQL 発行数は作品数に依存しない", () => {
     return count;
   };
 
-  repo.upsertWork(sampleWork("w-1", [makePlaylist(1)], null));
+  upsertTestWork(repo, sampleWork("w-1", [makePlaylist(1)], null));
   const n1 = countQueries();
   assert.ok(n1 > 0, "計測対象のクエリが発行されていません");
 
   for (let i = 2; i <= 100; i++) {
-    repo.upsertWork(sampleWork(`w-${i}`, [makePlaylist(1)], null));
+    upsertTestWork(repo, sampleWork(`w-${i}`, [makePlaylist(1)], null));
   }
   const n100 = countQueries();
   assert.equal(n100, n1, `SQL 発行数が作品数に比例しています (N=1: ${n1}, N=100: ${n100})`);
@@ -125,7 +133,7 @@ test("listSummaries の SQL 発行数は作品数に依存しない", () => {
 test("listSummaries は playlists_json を読まない（壊れたplaylists_jsonでも一覧を返せる）", () => {
   const db = openDb({ kind: "memory" });
   const repo = new WorkRepo(db);
-  repo.upsertWork(sampleWork("w-1", [makePlaylist(2)], null));
+  upsertTestWork(repo, sampleWork("w-1", [makePlaylist(2)], null));
   // playlists_json を直接壊す。listSummaries が読まないなら影響を受けないはず
   db.sqlite.run("UPDATE main.works SET playlists_json = '[{' WHERE id = 'w-1'");
 
@@ -138,7 +146,7 @@ test("listSummaries は playlists_json を読まない（壊れたplaylists_json
 test("work_dlsite 行がない作品は emptyDlsiteState() になる", () => {
   const db = openDb({ kind: "memory" });
   const repo = new WorkRepo(db);
-  repo.upsertWork(sampleWork("w-1", [makePlaylist(1)], null));
+  upsertTestWork(repo, sampleWork("w-1", [makePlaylist(1)], null));
   db.catalog.delete(workDlsite).where(eq(workDlsite.workId, "w-1")).run();
 
   const summary = repo.listSummaries().find((s) => s.id === "w-1");

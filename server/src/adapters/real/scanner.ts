@@ -279,6 +279,7 @@ interface UpsertItem {
   work: Work;
   fingerprint: string;
   cover: CoverColumns;
+  metaPath: string;
 }
 
 /** upsertWork の呼び出しを一定件数ごとに catalog トランザクションでまとめる（TASK-75）。
@@ -297,8 +298,8 @@ class UpsertBatch {
     this.checkAbort = checkAbort;
   }
 
-  add(work: Work, fingerprint: string, cover: CoverColumns): void {
-    this.queue.push({ work, fingerprint, cover });
+  add(work: Work, fingerprint: string, cover: CoverColumns, metaPath: string): void {
+    this.queue.push({ work, fingerprint, cover, metaPath });
     if (this.queue.length >= this.limit) {
       this.checkAbort();
       this.flush();
@@ -312,7 +313,11 @@ class UpsertBatch {
     this.db.transaction(() => {
       for (const item of items) {
         this.checkAbort();
-        this.repo.upsertWork(item.work, { fingerprint: item.fingerprint, cover: item.cover });
+        this.repo.upsertWork(item.work, {
+          metaPath: item.metaPath,
+          fingerprint: item.fingerprint,
+          cover: item.cover,
+        });
       }
     });
     this.queue = [];
@@ -689,7 +694,7 @@ export class Scanner {
         : null;
     const existing = existingById ?? existingByPhysicalPath.get(workDir) ?? null;
     if (existing) {
-      this.repo.markWorkError(existing.id, workDir, error.message);
+      this.repo.markWorkError(existing.id, workDir, metaPath, error.message);
       seenIds.add(existing.id);
     }
     result.errors += 1;
@@ -827,7 +832,7 @@ export class Scanner {
       dlsite,
     };
     checkAbort();
-    batch.add(work, finalFingerprint, cover);
+    batch.add(work, finalFingerprint, cover, metaPath);
     return id;
   }
 

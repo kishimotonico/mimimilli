@@ -5,6 +5,7 @@ import { test } from "node:test";
 import type { Work } from "@mimimilli/shared";
 import { openDb } from "../../src/adapters/real/db.ts";
 import { WorkRepo } from "../../src/adapters/real/workRepo.ts";
+import { upsertTestWork } from "../helpers/workTestUtils.ts";
 
 function sampleWork(id: string): Work {
   const playlistId = crypto.randomUUID();
@@ -31,16 +32,23 @@ function sampleWork(id: string): Work {
     bookmarked: false,
     lastPlayedAt: null,
     resume: null,
-    dlsite: { rjCode: null, status: "none", lastAttemptAt: null, error: null, appliedTags: [] },
+    dlsite: {
+      rjCode: null,
+      status: "none",
+      lastAttemptAt: null,
+      error: null,
+      errorKind: null,
+      appliedTags: [],
+    },
   };
 }
 
 test("foundIds 以外の作品だけが missing になる", async () => {
   const db = openDb({ kind: "memory" });
   const repo = new WorkRepo(db);
-  repo.upsertWork(sampleWork("keep-1"));
-  repo.upsertWork(sampleWork("keep-2"));
-  repo.upsertWork(sampleWork("lost-1"));
+  upsertTestWork(repo, sampleWork("keep-1"));
+  upsertTestWork(repo, sampleWork("keep-2"));
+  upsertTestWork(repo, sampleWork("lost-1"));
 
   repo.markMissingExcept(["keep-1", "keep-2"]);
 
@@ -54,8 +62,8 @@ test("foundIds 以外の作品だけが missing になる", async () => {
 test("foundIds が空なら全件 missing になる", async () => {
   const db = openDb({ kind: "memory" });
   const repo = new WorkRepo(db);
-  repo.upsertWork(sampleWork("w-1"));
-  repo.upsertWork(sampleWork("w-2"));
+  upsertTestWork(repo, sampleWork("w-1"));
+  upsertTestWork(repo, sampleWork("w-2"));
 
   repo.markMissingExcept([]);
 
@@ -67,8 +75,8 @@ test("foundIds が空なら全件 missing になる", async () => {
 test("SQLiteパラメータ上限を超える大量IDでも動作し、一時テーブルを残さない", async () => {
   const db = openDb({ kind: "memory" });
   const repo = new WorkRepo(db);
-  repo.upsertWork(sampleWork("keep-1"));
-  repo.upsertWork(sampleWork("lost-1"));
+  upsertTestWork(repo, sampleWork("keep-1"));
+  upsertTestWork(repo, sampleWork("lost-1"));
 
   // SQLite のパラメータ上限（32766）を超える seen ID 数
   const manyIds = ["keep-1", ...Array.from({ length: 40_000 }, (_, i) => `seen-${i}`)];
