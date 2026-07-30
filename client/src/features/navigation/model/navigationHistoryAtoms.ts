@@ -20,9 +20,7 @@ export const requestNavigationHistoryCommitAtom = atom(
   null,
   (get, set, kind: NavigationHistoryCommit) => {
     const current = get(navigationHistoryCommitAtom);
-    const nextKind = current.pending
-      ? mergeNavigationHistoryCommitKind(current.kind, kind)
-      : kind;
+    const nextKind = current.pending ? mergeNavigationHistoryCommitKind(current.kind, kind) : kind;
     set(navigationHistoryCommitAtom, {
       kind: nextKind,
       revision: current.revision + 1,

@@ -77,7 +77,9 @@ describe("ConfirmDialog", () => {
 
   it("パネル内側のクリックでは閉じない", () => {
     const { onCancel } = renderConfirmDialog();
-    fireEvent.click(screen.getByText("「cv/水瀬なずな」は保護された分類のタグです。削除しますか？"));
+    fireEvent.click(
+      screen.getByText("「cv/水瀬なずな」は保護された分類のタグです。削除しますか？"),
+    );
     expect(onCancel).not.toHaveBeenCalled();
   });
 });

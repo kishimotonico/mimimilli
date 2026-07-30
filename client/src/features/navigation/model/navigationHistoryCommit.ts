@@ -12,9 +12,6 @@ export function mergeNavigationHistoryCommitKind(
   return current === "push" || incoming === "push" ? "push" : "replace";
 }
 
-export function requestNavigationHistoryCommit(
-  set: Setter,
-  kind: NavigationHistoryCommit,
-): void {
+export function requestNavigationHistoryCommit(set: Setter, kind: NavigationHistoryCommit): void {
   set(requestNavigationHistoryCommitAtom, kind);
 }
