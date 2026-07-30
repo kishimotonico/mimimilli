@@ -1,7 +1,13 @@
 // scan feature の API。ライブラリのスキャン実行。
 // 依存方向: shared/api/http と自 feature の model のみを参照する。
 
-import { API_BASE, ApiRequestError, ApiResponseSchemaError } from "../../shared/api/http";
+import {
+  ApiRequestError,
+  deleteParsed,
+  getParsed,
+  postParsed,
+  type StatusHandler,
+} from "../../shared/api/http";
 import {
   scanConflictResponseSchema,
   scanJobSnapshotSchema,
@@ -26,56 +32,33 @@ export class ScanAlreadyActiveError extends ApiRequestError {
   }
 }
 
-async function parse<T>(
-  res: Response,
-  schema: { safeParse(value: unknown): { success: boolean; data?: T } },
-  method: string,
-  path: string,
-): Promise<T> {
-  const body = await res.json().catch(() => null);
-  const parsed = schema.safeParse(body);
-  if (parsed.success) return parsed.data!;
-  throw new ApiResponseSchemaError(method, path, []);
-}
-
-export async function startScan(): Promise<ScanJobSnapshot> {
-  const res = await fetch(`${API_BASE}/scan`, { method: "POST" });
-  if (res.status === 409) {
-    const body = await res.json().catch(() => null);
+const scanConflictHandler: Partial<Record<number, StatusHandler>> = {
+  409: (_res, body) => {
     const conflict = scanConflictResponseSchema.safeParse(body);
     if (conflict.success) throw new ScanAlreadyActiveError(conflict.data.active);
-  }
-  if (!res.ok) throw new ApiRequestError(res.status, "request_failed", `POST /scan: ${res.status}`);
-  return (await parse(res, startScanResponseSchema, "POST", "/scan")).job;
+  },
+};
+
+export async function startScan(): Promise<ScanJobSnapshot> {
+  const { job } = await postParsed(startScanResponseSchema, "/scan", undefined, {
+    onStatus: scanConflictHandler,
+  });
+  return job;
 }
 
 export async function getActiveScan(): Promise<ScanJobSnapshot | null> {
-  const res = await fetch(`${API_BASE}/scan/active`);
-  if (res.status === 204) return null;
-  if (!res.ok)
-    throw new ApiRequestError(res.status, "request_failed", `GET /scan/active: ${res.status}`);
-  return parse(res, scanJobSnapshotSchema, "GET", "/scan/active");
+  return getParsed(scanJobSnapshotSchema, "/scan/active", { noContentAsNull: true });
 }
 
 export async function getScanJob(id: string): Promise<ScanJobSnapshot> {
-  const res = await fetch(`${API_BASE}/scan/${encodeURIComponent(id)}`);
-  if (!res.ok)
-    throw new ApiRequestError(res.status, "request_failed", `GET /scan/${id}: ${res.status}`);
-  return parse(res, scanJobSnapshotSchema, "GET", `/scan/${id}`);
+  return getParsed(scanJobSnapshotSchema, `/scan/${encodeURIComponent(id)}`);
 }
 
 export async function cancelScan(id: string): Promise<ScanJobSnapshot> {
-  const res = await fetch(`${API_BASE}/scan/${encodeURIComponent(id)}`, { method: "DELETE" });
-  if (!res.ok)
-    throw new ApiRequestError(res.status, "request_failed", `DELETE /scan/${id}: ${res.status}`);
-  return parse(res, scanJobSnapshotSchema, "DELETE", `/scan/${id}`);
+  return deleteParsed(scanJobSnapshotSchema, `/scan/${encodeURIComponent(id)}`);
 }
 
 /** サーバー起動後に一度でも完了したスキャンの結果（TASK-56）。一度も完了していなければnull。 */
 export async function getLastScanResult(): Promise<ScanLastResultResponse | null> {
-  const res = await fetch(`${API_BASE}/scan/last`);
-  if (res.status === 204) return null;
-  if (!res.ok)
-    throw new ApiRequestError(res.status, "request_failed", `GET /scan/last: ${res.status}`);
-  return parse(res, scanLastResultResponseSchema, "GET", "/scan/last");
+  return getParsed(scanLastResultResponseSchema, "/scan/last", { noContentAsNull: true });
 }

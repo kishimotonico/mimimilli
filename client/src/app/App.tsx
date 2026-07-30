@@ -69,10 +69,10 @@ export default function App() {
       if (work.status !== "ok") return;
       const requestId = ++playRequestIdRef.current;
       try {
-        const cached = queryClient.getQueryData<Awaited<ReturnType<typeof getWork>>>(
-          WORK_QUERY_KEYS.detail(work.id),
-        );
-        const fullWork = cached ?? (await getWork(work.id));
+        const fullWork = await queryClient.ensureQueryData({
+          queryKey: WORK_QUERY_KEYS.detail(work.id),
+          queryFn: () => getWork(work.id),
+        });
         if (requestId !== playRequestIdRef.current) return;
         const playlist =
           fullWork.playlists.find((p) => p.id === fullWork.defaultPlaylistId) ??
@@ -104,10 +104,10 @@ export default function App() {
       if (!entry.workId || !entry.workRelPath) return;
       const requestId = ++playRequestIdRef.current;
       try {
-        const cached = queryClient.getQueryData<Awaited<ReturnType<typeof getWork>>>(
-          WORK_QUERY_KEYS.detail(entry.workId),
-        );
-        const fullWork = cached ?? (await getWork(entry.workId));
+        const fullWork = await queryClient.ensureQueryData({
+          queryKey: WORK_QUERY_KEYS.detail(entry.workId),
+          queryFn: () => getWork(entry.workId!),
+        });
         if (requestId !== playRequestIdRef.current) return;
         // ファイル欠損・メタ読み込みエラーの作品配下のファイルは再生できない。
         if (fullWork.status !== "ok") return;

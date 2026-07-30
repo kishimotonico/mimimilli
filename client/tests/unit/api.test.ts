@@ -134,6 +134,67 @@ describe("scan api", () => {
     );
     expect(result).toEqual(mockResult.job);
   });
+
+  it("startScan: 409はScanAlreadyActiveErrorとしてactive jobを保持する", async () => {
+    const active = {
+      id: "job-1",
+      status: "running" as const,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      startedAt: "2026-01-01T00:00:00.000Z",
+      finishedAt: null,
+      progress: null,
+      result: null,
+      error: null,
+    };
+    mockFetch.mockResolvedValue(
+      makeResponse({ error: { code: "conflict", message: "already active" }, active }, 409),
+    );
+    await expect(scanApi.startScan()).rejects.toMatchObject({
+      status: 409,
+      code: "conflict",
+      active,
+    });
+  });
+
+  it("startScan: 500はサーバーのcode/messageをApiRequestErrorとして保持する", async () => {
+    mockFetch.mockResolvedValue(
+      makeResponse({ error: { code: "internal", message: "start failed" } }, 500),
+    );
+    await expect(scanApi.startScan()).rejects.toMatchObject({
+      status: 500,
+      code: "internal",
+      message: "start failed",
+    });
+  });
+
+  it("getActiveScan: 204はnullを返す", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 204,
+      json: () => Promise.reject(new Error("no body")),
+    } as Response);
+    await expect(scanApi.getActiveScan()).resolves.toBeNull();
+  });
+
+  it("getLastScanResult: 204はnullを返す", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 204,
+      json: () => Promise.reject(new Error("no body")),
+    } as Response);
+    await expect(scanApi.getLastScanResult()).resolves.toBeNull();
+  });
+
+  it("getScanJob: 404はサーバーのcode/messageをApiRequestErrorとして保持する", async () => {
+    mockFetch.mockResolvedValue(
+      makeResponse({ error: { code: "not_found", message: "evicted" } }, 404),
+    );
+    await expect(scanApi.getScanJob("job-1")).rejects.toMatchObject({
+      status: 404,
+      code: "not_found",
+      message: "evicted",
+    });
+  });
 });
 
 describe("work api", () => {

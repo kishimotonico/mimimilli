@@ -284,20 +284,20 @@ describe("useScanJob", () => {
     const source = FakeEventSource.instances.at(-1)!;
     act(() => source.onerror?.(new Event("error")));
     await waitFor(() => expect(hook.result.current.job).toBeNull());
-    expect(hook.result.current.error).toMatch(/404/);
+    expect(hook.result.current.error).toBe("evicted");
     expect(source.closed).toBe(true);
 
     mode = "start500";
     await act(async () => {
       await hook.result.current.start().catch(() => {});
     });
-    expect(hook.result.current.error).toMatch(/500/);
+    expect(hook.result.current.error).toBe("start failed");
 
     mode = "cancel500";
     act(() => hook.result.current.attach(running));
     await act(async () => {
       await hook.result.current.cancel().catch(() => {});
     });
-    expect(hook.result.current.error).toMatch(/500/);
+    expect(hook.result.current.error).toBe("cancel failed");
   });
 });
