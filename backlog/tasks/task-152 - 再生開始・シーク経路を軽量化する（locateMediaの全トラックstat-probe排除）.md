@@ -1,11 +1,11 @@
 ---
 id: TASK-152
 title: 再生開始・シーク経路を軽量化する（locateMediaの全トラックstat/probe排除）
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-07-30 17:52'
-updated_date: '2026-07-30 18:12'
+updated_date: '2026-07-30 18:19'
 labels: []
 dependencies: []
 priority: high
@@ -20,9 +20,9 @@ locateMedia()（server/src/adapters/real/index.ts:791付近）がgetWork()を呼
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 再生開始・シーク時のメディア解決が、対象トラックのphysical_path/status等の必要最小情報のみを取得する専用経路になっている（作品全トラックのstat・probe・DB更新が発生しない）
-- [ ] #2 既存の再生・シーク挙動（Range/206含む）が退行しない（既存テストと必要な追加テストが通る）
-- [ ] #3 pnpm check と pnpm test が通る
+- [x] #1 再生開始・シーク時のメディア解決が、対象トラックのphysical_path/status等の必要最小情報のみを取得する専用経路になっている（作品全トラックのstat・probe・DB更新が発生しない）
+- [x] #2 既存の再生・シーク挙動（Range/206含む）が退行しない（既存テストと必要な追加テストが通る）
+- [x] #3 pnpm check と pnpm test が通る
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -33,3 +33,15 @@ locateMedia()（server/src/adapters/real/index.ts:791付近）がgetWork()を呼
 3. 退行テスト+解決経路のクエリ・stat回数を検証するテスト
 実装Cursor委譲、Codexレビュー実施
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Codexレビュー: 指摘なし（404挙動維持・副作用排除・テスト妥当を確認）。ベンチのメディア解決はシード架空パスのため効果はクエリ観測テスト（getWork/fetchProbeCache呼び出し0回）で担保。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+locateMediaをrepo.getWork()依存からgetMediaRoot()（physical_pathのみのSELECT）へ分離。再生・シーク時の全トラックstat・probe・duration更新を排除。呼び出し観測テストを追加しserver 358テスト・pnpm check通過、Codexレビュー指摘なし。実装Cursor委譲。
+<!-- SECTION:FINAL_SUMMARY:END -->

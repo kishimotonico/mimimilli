@@ -1,5 +1,5 @@
 // works / tags / smart_folders / app_settings の CRUD、検索、行⇄ドメイン変換。
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { asc, eq } from "drizzle-orm";
 import {
   dlsiteStateSchema,
@@ -53,6 +53,7 @@ import {
   workTags,
   works,
 } from "./catalogSchema.ts";
+import { likeDescendantsPrefix, likeStrictDescendantPrefixSql } from "./paths.ts";
 import { probeDurationSec } from "./probe.ts";
 import { appSettings, smartFolders, tagPrefixes, workStates } from "./userSchema.ts";
 
@@ -645,6 +646,29 @@ export class WorkRepo {
         this.parseDlsiteStateJson(row.id, rawRow.dlsiteStateJson),
       );
     });
+  }
+
+  /**
+   * GET /api/fs の作品対応付け専用。id/physical_path のみ返し、タグ・DLsite 復元を行わない。
+   * directoryPath と祖先・子孫関係にある作品だけを SQL で絞り込む（OS ネイティブ区切り境界付き LIKE）。
+   * 並び順は listSummaries() と同じく rowid 昇順（重複 physical_path の先勝ちを一致させる）。
+   */
+  listFsWorkRefs(directoryPath: string): Array<{ id: string; physicalPath: string }> {
+    const descendantPrefix = likeDescendantsPrefix(directoryPath);
+    return this.db.sqlite
+      .query(
+        `SELECT works.id AS id, works.physical_path AS physicalPath
+         FROM main.works
+         INNER JOIN user.work_states ON work_states.work_id = works.id
+         WHERE works.physical_path = ?
+            OR ? LIKE ${likeStrictDescendantPrefixSql("works.physical_path")}
+            OR works.physical_path LIKE ?
+         ORDER BY works.rowid ASC`,
+      )
+      .all(directoryPath, directoryPath, sep, sep, descendantPrefix) as Array<{
+      id: string;
+      physicalPath: string;
+    }>;
   }
 
   /**

@@ -24,6 +24,25 @@ export function isPathWithin(
   );
 }
 
+/**
+ * path の直下・子孫を表す SQL LIKE 接頭辞（path 自身は含まない）。
+ * 末尾が既に区切り文字のときは重ねない。
+ */
+export function likeDescendantsPrefix(
+  path: string,
+  operations: Pick<PathOperations, "sep"> = nativePathOperations,
+): string {
+  return (path.endsWith(operations.sep) ? path : path + operations.sep) + "%";
+}
+
+/**
+ * columnExpr を祖先パスとみなしたとき、その直下・子孫にマッチする LIKE パターン式（SQL）。
+ * sep はバインドパラメータ2つ（substr 比較と連結で同一値）を要求する。
+ */
+export function likeStrictDescendantPrefixSql(columnExpr: string): string {
+  return `(CASE WHEN substr(${columnExpr}, -1, 1) = ? THEN ${columnExpr} || '%' ELSE ${columnExpr} || ? || '%' END)`;
+}
+
 /** base 配下の target を API 用の `/` 区切り相対パスへ変換する。 */
 export function toPortableRelativePath(base: string, target: string): string {
   if (!isPathWithin(base, target)) {

@@ -784,7 +784,11 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
     // ── 物理ファイルシステム ───────────────────────────────────
     async browseFs(path?: string): Promise<FsListing | null> {
       const root = requireRoot();
-      return browseFs(root, repo.listSummaries(), path);
+      const realRoot = resolveWithin(root, root);
+      if (realRoot === null) return null;
+      const target = resolveWithin(root, path ?? root);
+      if (target === null) return null;
+      return browseFs(realRoot, repo.listFsWorkRefs(target), target);
     },
 
     // ── メディア・DLsite ──────────────────────────────────────
