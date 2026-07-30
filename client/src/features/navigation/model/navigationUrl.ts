@@ -1,3 +1,4 @@
+import { isFacetAxis, isViewAxis } from "../../library/model/axisDefinitions";
 import type { AxisId, SortId } from "../../library/model/types";
 
 export type AppMode = "library" | "files";
@@ -37,7 +38,6 @@ export const DEFAULT_LIBRARY_URL_STATE: LibraryUrlState = {
 
 // ビュー軸（ドリル不可）。それ以外のセグメントは tag / smart-* を除きファセット軸
 // （year または任意の prefix 軸）として受理する（ADR-0005: 軸IDの動的化）
-const VIEW_AXES = new Set<string>(["all", "recent", "added", "fav", "unplayed", "missing"]);
 const SORTS = new Set<SortId>([
   "added-desc",
   "added-asc",
@@ -84,7 +84,7 @@ function isSafeRelativeSegment(value: string): boolean {
 }
 
 function parseAxis(value: string): AxisId | null {
-  if (VIEW_AXES.has(value) || value === "tag") return value;
+  if (isViewAxis(value as AxisId) || value === "tag") return value;
   if (value.startsWith("smart-")) {
     return value.length > "smart-".length ? value : null;
   }
@@ -94,7 +94,7 @@ function parseAxis(value: string): AxisId | null {
 
 /** ドリル（/library/:axis/:value）できるのはファセット軸のみ */
 function isDrillableAxis(axis: AxisId): boolean {
-  return !VIEW_AXES.has(axis) && axis !== "tag" && !axis.startsWith("smart-");
+  return isFacetAxis(axis);
 }
 
 function uniqueNonEmpty(values: string[]): string[] {

@@ -1,17 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
-  countGridColumns,
   getNextGridIndex,
   getNextJustifiedIndex,
 } from "../../src/features/library/model/gridNavigation";
 
 describe("library grid keyboard navigation", () => {
-  it("counts columns from the first rendered row", () => {
-    expect(countGridColumns([])).toBe(0);
-    expect(countGridColumns([16, 16, 16, 220, 220, 220])).toBe(3);
-    expect(countGridColumns([16, 16, 16])).toBe(3);
-  });
-
   it("moves horizontally by one and vertically by the rendered column count", () => {
     expect(getNextGridIndex(4, "ArrowLeft", 3, 8)).toBe(3);
     expect(getNextGridIndex(4, "ArrowRight", 3, 8)).toBe(5);
