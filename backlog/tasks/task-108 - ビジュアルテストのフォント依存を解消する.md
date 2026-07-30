@@ -1,9 +1,11 @@
 ---
 id: TASK-108
 title: ビジュアルテストのフォント依存を解消する
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-07-26 15:13'
+updated_date: '2026-07-30 21:44'
 labels: []
 dependencies: []
 ordinal: 112000
@@ -22,3 +24,12 @@ client/index.html が Geist・IBM Plex Sans JP・JetBrains Mono を Google Fonts
 - [ ] #3 ビジュアルテストを連続2回実行してスナップショット差分が出ない
 - [ ] #4 client/index.html に fonts.googleapis.com / fonts.gstatic.com への参照が残っていない
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Geist/IBM Plex Sans JP/JetBrains Monoのwoff2を同梱しself-host化
+2. index.htmlの外部参照削除
+3. ビジュアルテスト2連続実行で決定性確認
+実装Cursor委譲
+<!-- SECTION:PLAN:END -->

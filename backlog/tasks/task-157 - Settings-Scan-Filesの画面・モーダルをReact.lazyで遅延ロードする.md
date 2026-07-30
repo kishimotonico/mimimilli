@@ -1,11 +1,11 @@
 ---
 id: TASK-157
 title: Settings/Scan/Filesの画面・モーダルをReact.lazyで遅延ロードする
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-07-30 17:53'
-updated_date: '2026-07-30 21:31'
+updated_date: '2026-07-30 21:43'
 labels: []
 dependencies: []
 priority: medium
@@ -20,10 +20,10 @@ clientの本番バンドルは単一チャンク（コード分割ゼロ）。sr
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 SettingsModal・ScanModal・FilesViewが別チャンクに分割され、初回ロードのメインチャンクに含まれない
-- [ ] #2 遅延ロード境界でUIのちらつき・操作不能時間が体感で発生しない（フォールバックの扱いが設計されている）
-- [ ] #3 ビジュアルテストが通る
-- [ ] #4 pnpm check と pnpm test が通る
+- [x] #1 SettingsModal・ScanModal・FilesViewが別チャンクに分割され、初回ロードのメインチャンクに含まれない
+- [x] #2 遅延ロード境界でUIのちらつき・操作不能時間が体感で発生しない（フォールバックの扱いが設計されている）
+- [x] #3 ビジュアルテストが通る
+- [x] #4 pnpm check と pnpm test が通る
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -34,3 +34,9 @@ clientの本番バンドルは単一チャンク（コード分割ゼロ）。sr
 3. ビジュアルテスト
 実装Cursor委譲
 <!-- SECTION:PLAN:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+SettingsModal/ScanModal/FilesViewをlazy+Suspense(fallback null)で分割。メインチャンク560→534KB(gzip -5.9KB)、3チャンク各8-11KB。モーダルはshowModal()表示のためちらつきなし判断。415テスト・ビジュアル6/6・pnpm check通過。実装Cursor委譲。
+<!-- SECTION:FINAL_SUMMARY:END -->
