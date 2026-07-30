@@ -109,7 +109,8 @@ function fixtureApiPlugin(): Plugin {
       });
 
       server.middlewares.use((req, res, next) => {
-        if (!req.url?.startsWith("/api/")) {
+        const pathname = req.url ? new URL(req.url, "http://localhost").pathname : undefined;
+        if (pathname !== "/api" && !pathname?.startsWith("/api/")) {
           next();
           return;
         }

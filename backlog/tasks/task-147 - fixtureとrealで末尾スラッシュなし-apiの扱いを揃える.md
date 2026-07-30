@@ -1,9 +1,11 @@
 ---
 id: TASK-147
 title: fixtureとrealで末尾スラッシュなし/apiの扱いを揃える
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-07-30 12:34'
+updated_date: '2026-07-30 16:33'
 labels: []
 dependencies: []
 priority: low
@@ -25,6 +27,25 @@ ordinal: 157000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 fixture開発サーバーで /api および /api?x=1 がSPA fallbackに落ちずAPI側で処理される
-- [ ] #2 pnpm check が通る
+- [x] #1 fixture開発サーバーで /api および /api?x=1 がSPA fallbackに落ちずAPI側で処理される
+- [x] #2 pnpm check が通る
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. vite fixtureミドルウェアの/api判定をpathname解析でrealプロキシと揃える
+2. pnpm --filter client check
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Cursor(composer-2.5)で実装。pathname解析でクエリ付き/apiも正しくAPI側へ。client check通過（fmtズレは並行TASK-138の作業中ファイルのみ）。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+fixture用ミドルウェアの/api判定をpathname解析にしてrealプロキシと挙動を揃えた。
+<!-- SECTION:FINAL_SUMMARY:END -->
