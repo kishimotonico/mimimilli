@@ -1,9 +1,11 @@
 ---
 id: TASK-160
 title: findWorkRootの祖先走査をインデックス化しO(audioDirs×metaDirs)を解消する
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-07-30 17:54'
+updated_date: '2026-07-30 18:54'
 labels: []
 dependencies: []
 priority: medium
@@ -22,3 +24,12 @@ server/src/adapters/real/scanner.ts:167付近のfindWorkRoot()が、各audio dir
 - [ ] #2 作品ルート判定の結果が変更前と同一（既存スキャンテスト+境界ケースのテストが通る）
 - [ ] #3 pnpm check と pnpm test が通る
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. walk時に親子インデックス・配下meta有無を構築
+2. findWorkRootをインデックス参照へ
+3. 境界ケーステスト
+実装Cursor委譲
+<!-- SECTION:PLAN:END -->

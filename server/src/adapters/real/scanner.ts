@@ -18,7 +18,7 @@
 //   - シンボリックリンクのディレクトリは辿らない（循環防止）
 import { existsSync, readdirSync } from "node:fs";
 import { readdir } from "node:fs/promises";
-import { basename, dirname, extname, join } from "node:path";
+import { basename, dirname, extname, join, resolve } from "node:path";
 import type {
   Cover,
   MetaFile,
@@ -59,6 +59,12 @@ function naturalCompare(a: string, b: string): number {
   return a.localeCompare(b, "ja", { numeric: true, sensitivity: "base" });
 }
 
+/** walk 時に収集するディレクトリの直下情報（findWorkRoot の readdirSync 代替） */
+interface DirEntryInfo {
+  subdirCount: number;
+  hasImage: boolean;
+}
+
 interface WalkResult {
   metaPaths: string[];
   /** メタファイル（いずれかの形式）が直接存在するディレクトリ */
@@ -67,6 +73,10 @@ interface WalkResult {
   audioDirs: Set<string>;
   /** readdir に失敗したサブツリーのディレクトリパス（ルート失敗は例外） */
   unreadablePaths: string[];
+  /** 走査済みディレクトリの直下サブフォルダー数・画像有無 */
+  dirIndex: Map<string, DirEntryInfo>;
+  /** 自身または配下にメタディレクトリがあるパス（findWorkRoot の swallowsMeta 判定用） */
+  dirsWithMetaInSubtree: Set<string>;
 }
 
 /** ルートフォルダーの readdir 失敗。スキャン全体をエラー終了させ missing 更新を防ぐ。 */
@@ -102,7 +112,7 @@ function throwIfAborted(signal?: AbortSignal, abortToken?: Int32Array): void {
     throw new ScanCancelledError();
 }
 
-async function walk(
+export async function walk(
   root: string,
   onDirVisited?: (visited: number) => void,
   signal?: AbortSignal,
@@ -113,6 +123,8 @@ async function walk(
     metaDirs: new Set(),
     audioDirs: new Set(),
     unreadablePaths: [],
+    dirIndex: new Map(),
+    dirsWithMetaInSubtree: new Set(),
   };
   const stack = [root];
   let visited = 0;
@@ -128,21 +140,28 @@ async function walk(
       result.unreadablePaths.push(dir);
       continue;
     }
+    let subdirCount = 0;
+    let hasImage = false;
     for (const entry of entries) {
       throwIfAborted(signal, abortToken);
       const full = join(dir, entry.name);
       if (entry.isDirectory()) {
+        subdirCount += 1;
         stack.push(full);
       } else if (entry.isFile()) {
         if (isMetaFileName(entry.name)) {
           result.metaPaths.push(full);
           result.metaDirs.add(dir);
+          markDirsWithMetaInSubtree(dir, root, result.dirsWithMetaInSubtree);
         } else if (AUDIO_EXTENSIONS.has(extOf(entry.name))) {
           result.audioDirs.add(dir);
+        } else if (IMAGE_EXTENSIONS.has(extOf(entry.name))) {
+          hasImage = true;
         }
       }
       // シンボリックリンクは辿らない（循環防止）
     }
+    result.dirIndex.set(dir, { subdirCount, hasImage });
     visited += 1;
     if (visited % WALK_PROGRESS_INTERVAL === 0) {
       onDirVisited?.(visited);
@@ -150,6 +169,20 @@ async function walk(
   }
   result.metaPaths.sort(naturalCompare);
   return result;
+}
+
+/** メタディレクトリからルートまでの祖先を dirsWithMetaInSubtree に登録する */
+function markDirsWithMetaInSubtree(
+  metaDir: string,
+  root: string,
+  dirsWithMetaInSubtree: Set<string>,
+): void {
+  let cur = metaDir;
+  while (isPathWithin(root, cur)) {
+    dirsWithMetaInSubtree.add(cur);
+    if (cur === root) break;
+    cur = dirname(cur);
+  }
 }
 
 /** dir またはルートまでの祖先にメタファイルがあるか */
@@ -163,34 +196,27 @@ function isCoveredByMeta(dir: string, root: string, metaDirs: Set<string>): bool
   return false;
 }
 
-/** 音声ディレクトリから作品ルートを推定する（保守的に昇格） */
-function findWorkRoot(audioDir: string, root: string, metaDirs: Set<string>): string {
+/** 音声ディレクトリから作品ルートを推定する（保守的に昇格。walk インデックス参照）。
+ *  walk 時点のディレクトリスナップショットで判定する（walk 後の FS 変更は反映しない）。 */
+export function findWorkRoot(
+  audioDir: string,
+  root: string,
+  dirsWithMetaInSubtree: Set<string>,
+  dirIndex: Map<string, DirEntryInfo>,
+): string {
   let cur = audioDir;
   while (true) {
     const parent = dirname(cur);
     if (cur === root || parent === cur || !isPathWithin(root, parent) || parent === root) break;
 
     // 親の下に既存メタ作品があるなら昇格しない（登録済み作品を飲み込まない）
-    let swallowsMeta = false;
-    for (const metaDir of metaDirs) {
-      if (isPathWithin(parent, metaDir)) {
-        swallowsMeta = true;
-        break;
-      }
-    }
-    if (swallowsMeta) break;
+    if (dirsWithMetaInSubtree.has(parent)) break;
 
-    let entries;
-    try {
-      entries = readdirSync(parent, { withFileTypes: true });
-    } catch {
-      break;
-    }
-    const subdirCount = entries.filter((e) => e.isDirectory()).length;
-    const hasImage = entries.some((e) => e.isFile() && IMAGE_EXTENSIONS.has(extOf(e.name)));
+    const info = dirIndex.get(parent);
+    if (!info) break;
 
     // カバー画像同梱の典型構成（RJxxxx/cover.jpg + mp3/…）か、単一サブフォルダーのラッパーのみ昇格
-    if (hasImage || subdirCount === 1) {
+    if (info.hasImage || info.subdirCount === 1) {
       cur = parent;
     } else {
       break;
@@ -382,6 +408,7 @@ export class Scanner {
   }
 
   async scan(root: string, options?: ScanOptions): Promise<ScanResult> {
+    root = resolve(root);
     const normalized = options ?? {};
     const emit = normalized.onProgress ?? ((): void => {});
     const signal = normalized.signal;
@@ -512,7 +539,7 @@ export class Scanner {
       if (isCoveredByMeta(audioDir, root, tree.metaDirs)) continue;
       // ルート直下に直接置かれた音声（単一ファイル形式）は自動生成の対象外（要件 v4 §3.5）
       if (audioDir === root) continue;
-      workRoots.add(findWorkRoot(audioDir, root, tree.metaDirs));
+      workRoots.add(findWorkRoot(audioDir, root, tree.dirsWithMetaInSubtree, tree.dirIndex));
     }
     // 祖先が同時に検出された場合は祖先側に統合する（深さ昇順+採用済み祖先Setで線形化。TASK-62）
     const roots = excludeDescendantPaths(workRoots).sort(naturalCompare);
