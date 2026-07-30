@@ -1,10 +1,10 @@
 ---
 id: TASK-92
 title: トラックの解決済み再生時間をDTOで提供しdurationchange後追いを撤廃する
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-07-24 15:03'
-updated_date: '2026-07-25 10:26'
+updated_date: '2026-07-30 10:33'
 labels: []
 dependencies: []
 priority: high
@@ -22,13 +22,9 @@ TASK-91と同型のデータ不足由来アンチパターン。トラック(sha
 - [x] #1 Track(またはPlaylist経由のDTO)に解決済み durationSec が含まれる。end-start、end未指定は audio_probe_cache から解決。Zod契約を更新
 - [x] #2 client がサーバー提供の durationSec を初期表示から使い、durationchange 待ちによる 0:00 フラッシュが起きない
 - [x] #3 audioEngine の durationchange 依存と durationSec=0 フォールバック/リセットが、確定データ利用に置き換わる（過度なフォールバック解消）
-- [ ] #4 probe cache 未取得トラックの扱いが過度なフォールバックにならない形で明示されている。1ファイル内マルチトラック(start/end指定)も正しい残り時間になる
-- [ ] #5 pnpm check・pnpm test が通り、曲送り・シークの回帰が確認されている
+- [x] #4 probe cache 未取得トラックの扱いが過度なフォールバックにならない形で明示されている。1ファイル内マルチトラック(start/end指定)も正しい残り時間になる
+- [x] #5 pnpm check・pnpm test が通り、曲送り・シークの回帰が確認されている
 <!-- AC:END -->
-
-
-
-
 
 ## Implementation Notes
 
@@ -68,4 +64,12 @@ getWork は end未指定トラックの参照ファイルパスを作品内一�
 client の Files/登録トラック判別が `"durationSec" in track` の構造チェック(trackTime.ts isResolvedTrack)。
 zod検証済みDTOなので実行時は安全だが、登録トラック側で durationSec が欠落すると黙って旧 durationchange 経路へ退行する形。
 Filesモード側に明示タグを持たせる案は保留中。
+
+2026-07-30 検証担当による残り検証完了、AC#4/#5 とも合格。Implementation Notes の「残: 実機検証・Codex敵対的レビュー反映」は実態より古く、敵対的レビュー反映は 0c09eac / 721cca1（2026-07-25）で完了済みだった（end<=start はスキーマで構造的拒否、start>=fileDurationSec は scanner で error 化、end の数十msズレは許容、いずれも回帰テストあり）。AC#4: null 経路は shared の resolveTrackDurationSec から client の --:-- 表示・シーク無効まで一貫して 0 埋めなし、解決式は server/shared/client で同一、TASK-110/126/128 後も onDurationChange の Files モード専用ガードは健在。AC#5: 実機（real adapter）で区間トラック作品と複数ファイル作品の曲送りを rAF 15ms サンプリングで観測し、切替直後から総時間が確定表示で 0:00 フラッシュなし、シークも正常。pnpm check / pnpm test（server 344 / client 360）全通過。軽微な既知事項: トラック一覧（formatDuration の Math.round）とプレイヤー時刻表示（formatTime の floor）で丸めが異なり、同一トラックが 7:28 / 7:27 と1秒ズレて見える表示のみの不一致がある（データは同一値）。
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+トラックの解決済み durationSec を DTO（resolvedTrackSchema）で提供し、client の durationchange 後追いと 0 フォールバックを撤廃。正本スキーマとAPI DTO を分離し、end 未指定は audio_probe_cache から動的解決（派生列は廃止）。未知は null として --:-- 表示・シーク無効の明示的未知にする。曲送り時の 0:00 フラッシュは実機観測（rAF 15ms サンプリング）で消失を確認。境界値（end<=start / start>=ファイル長 / 数十msズレ）は敵対的レビュー反映済みで回帰テストあり。
+<!-- SECTION:FINAL_SUMMARY:END -->
