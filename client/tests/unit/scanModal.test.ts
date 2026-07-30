@@ -3,7 +3,7 @@
 import { createElement } from "react";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ScanJobSnapshot, ScanResult, Work } from "@mimimilli/shared";
 import ScanModal from "../../src/features/scan/ui/ScanModal";
 import * as workApi from "../../src/entities/work/api";
@@ -16,6 +16,10 @@ beforeEach(() => {
   HTMLDialogElement.prototype.close = vi.fn(function (this: HTMLDialogElement) {
     this.open = false;
   });
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 const work: Work = {
@@ -292,5 +296,54 @@ describe("ScanModal", () => {
     resolveA(workA);
     await waitFor(() => expect(screen.queryByText(workA.title)).toBeNull());
     expect(screen.getByText(workB.title)).toBeInTheDocument();
+  });
+
+  it("タイトル保存に失敗したときエラーを表示し、ローカル表示は更新されない", async () => {
+    vi.spyOn(workApi, "getWork").mockResolvedValue(work);
+    vi.spyOn(workApi, "patchWork").mockRejectedValue(new Error("network error"));
+    renderModal();
+
+    await waitFor(() => screen.getByText(work.title));
+    fireEvent.click(screen.getByText(work.title));
+    const input = screen.getByDisplayValue(work.title);
+    fireEvent.change(input, { target: { value: "新しいタイトル" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    await waitFor(() =>
+      expect(screen.getByText("タイトルの保存に失敗しました")).toBeInTheDocument(),
+    );
+    // 失敗時はローカルの表示名を更新せず、入力欄は編集状態のまま残る（再試行可能）
+    expect(screen.getByDisplayValue("新しいタイトル")).toBeInTheDocument();
+    expect(screen.queryByText(work.title)).toBeNull();
+  });
+
+  it("タイトル保存に成功したとき表示名が更新され編集モードが閉じる", async () => {
+    vi.spyOn(workApi, "getWork").mockResolvedValue(work);
+    vi.spyOn(workApi, "patchWork").mockResolvedValue({ ...work, title: "新しいタイトル" });
+    renderModal();
+
+    await waitFor(() => screen.getByText(work.title));
+    fireEvent.click(screen.getByText(work.title));
+    const input = screen.getByDisplayValue(work.title);
+    fireEvent.change(input, { target: { value: "新しいタイトル" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    await waitFor(() => expect(screen.getByText("新しいタイトル")).toBeInTheDocument());
+    expect(screen.queryByDisplayValue("新しいタイトル")).toBeNull();
+  });
+
+  it("空文字・空白のみのタイトルは保存されず編集モードだけ閉じる", async () => {
+    vi.spyOn(workApi, "getWork").mockResolvedValue(work);
+    const patchSpy = vi.spyOn(workApi, "patchWork");
+    renderModal();
+
+    await waitFor(() => screen.getByText(work.title));
+    fireEvent.click(screen.getByText(work.title));
+    const input = screen.getByDisplayValue(work.title);
+    fireEvent.change(input, { target: { value: "   " } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(patchSpy).not.toHaveBeenCalled();
+    expect(screen.getByText(work.title)).toBeInTheDocument();
   });
 });

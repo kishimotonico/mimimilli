@@ -51,6 +51,8 @@ export default function ScanModal({
   const [newWorksError, setNewWorksError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
 
   // 実行中→完了の遷移を自分で見ていたときだけ、控えめな完了サインを一時的に出す
@@ -87,6 +89,7 @@ export default function ScanModal({
     onClose: () => {
       if (editingId) {
         setEditingId(null);
+        setEditError(null);
         return;
       }
       onClose();
@@ -125,16 +128,28 @@ export default function ScanModal({
   const handleStartEdit = (work: Work) => {
     setEditingId(work.id);
     setEditTitle(work.title);
+    setEditError(null);
   };
 
   const handleSaveTitle = async (workId: string) => {
-    if (editTitle.trim()) {
-      await patchWork(workId, { title: editTitle.trim() }).catch(() => {});
-      setNewWorks((prev) =>
-        prev.map((w) => (w.id === workId ? { ...w, title: editTitle.trim() } : w)),
-      );
+    if (editSaving) return;
+    const trimmed = editTitle.trim();
+    if (!trimmed) {
+      setEditingId(null);
+      setEditError(null);
+      return;
     }
-    setEditingId(null);
+    setEditSaving(true);
+    setEditError(null);
+    try {
+      await patchWork(workId, { title: trimmed });
+      setNewWorks((prev) => prev.map((w) => (w.id === workId ? { ...w, title: trimmed } : w)));
+      setEditingId(null);
+    } catch {
+      setEditError("タイトルの保存に失敗しました");
+    } finally {
+      setEditSaving(false);
+    }
   };
 
   return (
@@ -224,6 +239,8 @@ export default function ScanModal({
                           work={work}
                           editing={editingId === work.id}
                           editTitle={editTitle}
+                          editSaving={editingId === work.id && editSaving}
+                          editError={editingId === work.id ? editError : null}
                           titleInputRef={titleInputRef}
                           onStartEdit={() => handleStartEdit(work)}
                           onChangeEditTitle={setEditTitle}
@@ -425,6 +442,8 @@ function NewWorkRow({
   work,
   editing,
   editTitle,
+  editSaving,
+  editError,
   titleInputRef,
   onStartEdit,
   onChangeEditTitle,
@@ -433,41 +452,54 @@ function NewWorkRow({
   work: Work;
   editing: boolean;
   editTitle: string;
+  editSaving: boolean;
+  editError: string | null;
   titleInputRef: RefObject<HTMLInputElement | null>;
   onStartEdit: () => void;
   onChangeEditTitle: (title: string) => void;
   onSaveTitle: () => void;
 }) {
   return (
-    <div className="flex items-center gap-2 rounded-[6px] border border-line-soft bg-paper-0 px-2.5 py-1.5">
-      <span className="shrink-0 rounded-pill bg-[color-mix(in_oklch,var(--r-leaf)_16%,transparent)] px-1.5 py-0.5 font-sans text-[9.5px] font-semibold text-[var(--r-leaf)]">
-        NEW
-      </span>
-      {editing ? (
-        <input
-          ref={titleInputRef}
-          value={editTitle}
-          onChange={(e) => onChangeEditTitle(e.target.value)}
-          onBlur={onSaveTitle}
-          onKeyDown={(e) => {
-            // Escapeのキャンセルは dialog の onCancel（useDialogModal）に一元化する
-            if (e.key === "Enter") onSaveTitle();
-          }}
-          className="min-w-0 flex-1 rounded-[4px] border border-acc bg-paper-2 px-2 py-0.5 font-jp text-[12.5px] text-ink-0 outline-none"
-        />
-      ) : (
-        <button
-          type="button"
-          onClick={onStartEdit}
-          title="クリックしてタイトルを編集"
-          className="min-w-0 flex-1 truncate text-left font-jp text-[12.5px] text-ink-0"
-        >
-          {work.title}
-        </button>
+    <div className="flex flex-col gap-1 rounded-[6px] border border-line-soft bg-paper-0 px-2.5 py-1.5">
+      <div className="flex items-center gap-2">
+        <span className="shrink-0 rounded-pill bg-[color-mix(in_oklch,var(--r-leaf)_16%,transparent)] px-1.5 py-0.5 font-sans text-[9.5px] font-semibold text-[var(--r-leaf)]">
+          NEW
+        </span>
+        {editing ? (
+          <input
+            ref={titleInputRef}
+            value={editTitle}
+            disabled={editSaving}
+            onChange={(e) => onChangeEditTitle(e.target.value)}
+            onBlur={onSaveTitle}
+            onKeyDown={(e) => {
+              // Escapeのキャンセルは dialog の onCancel（useDialogModal）に一元化する
+              if (e.key === "Enter") onSaveTitle();
+            }}
+            className={cn(
+              "min-w-0 flex-1 rounded-[4px] border bg-paper-2 px-2 py-0.5 font-jp text-[12.5px] text-ink-0 outline-none disabled:opacity-60",
+              editError ? "border-[var(--r-coral)]" : "border-acc",
+            )}
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={onStartEdit}
+            title="クリックしてタイトルを編集"
+            className="min-w-0 flex-1 truncate text-left font-jp text-[12.5px] text-ink-0"
+          >
+            {work.title}
+          </button>
+        )}
+        <span className="shrink-0 font-mono text-[10.5px] text-ink-4">
+          {editSaving ? "保存中…" : `${getDefaultPlaylistTrackCount(work)} tracks`}
+        </span>
+      </div>
+      {editError && (
+        <span role="alert" className="font-jp text-[10.5px] text-[var(--r-coral)]">
+          {editError}
+        </span>
       )}
-      <span className="shrink-0 font-mono text-[10.5px] text-ink-4">
-        {getDefaultPlaylistTrackCount(work)} tracks
-      </span>
     </div>
   );
 }
