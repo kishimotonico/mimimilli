@@ -32,6 +32,11 @@ class FakeAudio extends EventTarget {
   readonly srcAssignments: string[] = [];
   volume = 1;
 
+  // 実ブラウザの HTMLMediaElement 仕様に合わせる: play()/pause() は paused の実際の遷移
+  // (true<->false) がある時だけ play/pause イベントを発火する。既に再生中の状態から play() を
+  // 呼んでも何も起きない（TASK-128: 区間トラックの reuse 経路で明示選択時にこれを踏む）。
+  paused = true;
+
   get src() {
     return this.value;
   }
@@ -39,16 +44,26 @@ class FakeAudio extends EventTarget {
   set src(value: string) {
     this.value = value;
     this.srcAssignments.push(value);
-    // 実ブラウザの HTMLMediaElement は src 再代入で再生位置がリセットされる。
+    // 実ブラウザの HTMLMediaElement は src 再代入（resource selection algorithm）で
+    // 再生位置がリセットされ、pause イベントを発火せずに paused が true に戻る。
     this.currentTime = 0;
+    this.paused = true;
   }
 
   play = vi.fn(() => {
-    this.dispatchEvent(new Event("play"));
+    if (this.paused) {
+      this.paused = false;
+      this.dispatchEvent(new Event("play"));
+    }
     return Promise.resolve();
   });
 
-  pause = vi.fn(() => this.dispatchEvent(new Event("pause")));
+  pause = vi.fn(() => {
+    if (!this.paused) {
+      this.paused = true;
+      this.dispatchEvent(new Event("pause"));
+    }
+  });
 }
 
 const audioInstances: FakeAudio[] = [];
@@ -499,6 +514,45 @@ describe("usePlayer adapters", () => {
     expect(result.current.player.state.currentTrackIndex).toBe(1);
   });
 
+  it("再生中の区間トラックを明示選択してもstatusがloadingに固着せずplayingへ収束する（TASK-128）", async () => {
+    vi.useFakeTimers();
+    try {
+      const tracks: ResolvedTrack[] = [
+        { ...track, start: 0, end: 30, durationSec: 30 },
+        {
+          id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+          title: "Track 2",
+          file: track.file,
+          start: 30,
+          end: 60,
+          durationSec: 30,
+        },
+      ];
+      const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
+      act(() => result.current.player.play(work, tracks, 0, playlistId));
+      expect(latestAudio().play).toHaveBeenCalled();
+      latestAudio().duration = 60;
+      expect(result.current.player.state.status).toBe("playing");
+
+      // 再生中（audio要素はpaused=falseのまま）に、同一ファイル内の別区間を明示選択する。
+      act(() => result.current.player.setTrackIndex(1));
+
+      expect(result.current.player.state.currentTrackIndex).toBe(1);
+      // 実ブラウザは既に再生中の要素へ play() を呼んでも play イベントを再発火しないため、
+      // ここで status が "loading" に固着しないことが本バグの再現ポイント。
+      expect(result.current.player.state.status).toBe("playing");
+
+      // status固着が直っていれば、persistTick（5秒間隔のresume保存）も止まらない。
+      vi.mocked(saveResumePosition).mockClear();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+      expect(saveResumePosition).toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("再生中に同一作品・同一トラックへ再度「最初から再生」すると先頭へシークする", async () => {
     const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
     act(() => result.current.player.play(work, [track], 0, playlistId));
@@ -559,7 +613,12 @@ describe("usePlayer adapters", () => {
   // 実機のレンダー分離を模倣する。
   function deferPlayEventToMicrotask(audio: FakeAudio) {
     audio.play = vi.fn(() => {
-      queueMicrotask(() => audio.dispatchEvent(new Event("play")));
+      if (audio.paused) {
+        queueMicrotask(() => {
+          audio.paused = false;
+          audio.dispatchEvent(new Event("play"));
+        });
+      }
       return Promise.resolve();
     });
   }

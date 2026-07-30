@@ -44,6 +44,8 @@ export interface AudioEngine {
   resumeAudioContext: () => void;
   getCurrentTime: () => number;
   getDuration: () => number;
+  /** 既に再生中（play()を呼んでもplayイベントが再発火しない）かどうか。 */
+  isPlaying: () => boolean;
   destroy: () => void;
 }
 
@@ -235,6 +237,7 @@ export function createAudioEngine(
 
     getCurrentTime: () => audio.currentTime,
     getDuration: () => audio.duration || 0,
+    isPlaying: () => !audio.paused,
 
     destroy() {
       audio.pause();
