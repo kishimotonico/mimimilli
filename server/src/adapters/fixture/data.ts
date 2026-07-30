@@ -1,7 +1,7 @@
 // fixture アダプタ用の自己完結シードデータ。
 // client/mocks からは import せず、本ファイル内で完結させる。
 import { emptyDlsiteState } from "@mimimilli/shared";
-import type { SearchPreset, SmartFolder, WorkSummary } from "@mimimilli/shared";
+import type { SmartFolder, WorkSummary } from "@mimimilli/shared";
 
 /** シードとなる作品データ（約10件）。
  *  - サークル/cv/シリーズ/カテゴリの annotated タグとフラットタグを混在させる
@@ -482,9 +482,3 @@ export function createSeedSmartFolders(now: string): SmartFolder[] {
     },
   ];
 }
-
-/** 検索プリセットのシード（2件） */
-export const SEED_PRESETS: SearchPreset[] = [
-  { id: 1, name: "ASMR全般", query: "", tagFilters: ["カテゴリ/ASMR"], sortId: "added-desc" },
-  { id: 2, name: "水瀬なずな", query: "", tagFilters: ["cv/水瀬なずな"], sortId: "added-desc" },
-];

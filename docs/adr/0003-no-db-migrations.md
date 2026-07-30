@@ -6,7 +6,7 @@
 
 ## 文脈
 
-SQLite（`server/src/adapters/real/db.ts` / `schema.ts`）は `.meta.json`（Source of Truth）から再スキャンで再構築できる検索キャッシュだが、`.meta.json` には持たない DB 固有情報（`app_settings`・`search_presets`・`smart_folders`、および `works` テーブルの `bookmarked`・`last_played_at`・`resume_position`・`resume_track_index`）も同居している。
+SQLite（`server/src/adapters/real/db.ts` / `schema.ts`）は `.meta.json`（Source of Truth）から再スキャンで再構築できる検索キャッシュだが、`.meta.json` には持たない DB 固有情報（`app_settings`・`smart_folders`、および `works` テーブルの `bookmarked`・`last_played_at`・`resume_position`・`resume_track_index`）も同居している。
 
 ## 決定
 

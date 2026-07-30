@@ -8,7 +8,7 @@ import * as catalogSchema from "./catalogSchema.ts";
 import * as userSchema from "./userSchema.ts";
 
 const CATALOG_SCHEMA_VERSION = 6;
-const USER_SCHEMA_VERSION = 4;
+const USER_SCHEMA_VERSION = 5;
 const SQLITE_URI_FLAGS =
   constants.SQLITE_OPEN_READWRITE | constants.SQLITE_OPEN_CREATE | constants.SQLITE_OPEN_URI;
 const CATALOG_MIGRATIONS = fileURLToPath(new URL("../../../drizzle/catalog", import.meta.url));

@@ -27,14 +27,6 @@ export const appSettings = sqliteTable("app_settings", {
   value: text("value"),
 });
 
-export const searchPresets = sqliteTable("search_presets", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  name: text("name").notNull(),
-  query: text("query").notNull(),
-  tagFiltersJson: text("tag_filters_json").notNull(),
-  sortId: text("sort_id").notNull(),
-});
-
 export const smartFolders = sqliteTable("smart_folders", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),

@@ -20,8 +20,6 @@ import type {
   ResumeBody,
   ScanProgressEvent,
   ScanResult,
-  SearchPreset,
-  SearchPresetCreate,
   Settings,
   SettingsUpdate,
   SmartFolder,
@@ -119,7 +117,7 @@ export interface DataAdapter {
   listTags(): Promise<string[]>;
   exportLibrary(): Promise<string>;
 
-  // 分類軸・タグ prefix 定義・スマートフォルダー・プリセット
+  // 分類軸・タグ prefix 定義・スマートフォルダー
   /** axis は "tag" / "year" / 任意の prefix 文字列（正規形・小文字）（ADR-0005） */
   getAxisFacets(axis: string): Promise<AxisFacetItem[]>;
   listTagPrefixes(): Promise<TagPrefix[]>;
@@ -136,9 +134,6 @@ export interface DataAdapter {
     id: string,
     query: { page: number; limit: number; seed?: number },
   ): Promise<WorksPage | null>;
-  listPresets(): Promise<SearchPreset[]>;
-  createPreset(input: SearchPresetCreate): Promise<SearchPreset>;
-  deletePreset(id: number): Promise<boolean>;
 
   // 物理ファイルシステム（Filesモード）
   /** path 省略時はルートフォルダー。ルート配下でない・存在しない場合は null */

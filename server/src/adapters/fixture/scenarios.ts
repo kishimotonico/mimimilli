@@ -1,7 +1,7 @@
 // fixture アダプタのシナリオ（ADR-0002 / client/mocks/scenarios.ts からの移植）。
 // 開発サーバー・Playwright ビジュアルテストでのデータ切替に使う。
-import type { SearchPreset, SmartFolder, WorkSummary } from "@mimimilli/shared";
-import { createSeedSmartFolders, SEED_PRESETS, SEED_WORKS } from "./data.ts";
+import type { SmartFolder, WorkSummary } from "@mimimilli/shared";
+import { createSeedSmartFolders, SEED_WORKS } from "./data.ts";
 
 export type FixtureScenarioId = "default" | "empty" | "new-work" | "errors";
 
@@ -10,7 +10,6 @@ const SCENARIO_IDS: readonly FixtureScenarioId[] = ["default", "empty", "new-wor
 export interface FixtureScenario {
   id: FixtureScenarioId;
   works: WorkSummary[];
-  presets: SearchPreset[];
   smartFolders: SmartFolder[];
   rootFolder: string | null;
   lastScanTime: string;
@@ -20,10 +19,6 @@ export interface FixtureScenario {
 
 function cloneWorks(works: WorkSummary[]): WorkSummary[] {
   return works.map((w) => ({ ...w, urls: w.urls.map((u) => ({ ...u })), tags: [...w.tags] }));
-}
-
-function clonePresets(presets: SearchPreset[]): SearchPreset[] {
-  return presets.map((p) => ({ ...p, tagFilters: [...p.tagFilters] }));
 }
 
 function cloneSmartFolders(folders: SmartFolder[]): SmartFolder[] {
@@ -53,7 +48,6 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
     return {
       id,
       works: [],
-      presets: [],
       smartFolders: [],
       rootFolder: "/library/empty-library",
       lastScanTime: now,
@@ -65,7 +59,6 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
     return {
       id,
       works: cloneWorks(SEED_WORKS),
-      presets: clonePresets(SEED_PRESETS),
       smartFolders: cloneSmartFolders(smartFolders),
       rootFolder: "/library",
       lastScanTime: now,
@@ -77,7 +70,6 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
     return {
       id,
       works: cloneWorks(SEED_WORKS.filter((w) => w.status !== "ok")),
-      presets: [],
       smartFolders: [],
       rootFolder: "/library/error-library",
       lastScanTime: now,
@@ -88,7 +80,6 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
   return {
     id: "default",
     works: cloneWorks(SEED_WORKS),
-    presets: clonePresets(SEED_PRESETS),
     smartFolders: cloneSmartFolders(smartFolders),
     rootFolder: "/library",
     lastScanTime: now,

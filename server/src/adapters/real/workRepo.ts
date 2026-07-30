@@ -1,4 +1,4 @@
-// works / tags / smart_folders / search_presets / app_settings の CRUD、検索、行⇄ドメイン変換。
+// works / tags / smart_folders / app_settings の CRUD、検索、行⇄ドメイン変換。
 import { join } from "node:path";
 import { asc, eq } from "drizzle-orm";
 import {
@@ -10,7 +10,6 @@ import {
   parseTag,
   playlistSchema,
   resolveTrackDurationSec,
-  searchPresetSchema,
   smartFolderSchema,
   workSchema,
   workSummarySchema,
@@ -26,8 +25,6 @@ import type {
   Playlist,
   ResolvedPlaylist,
   ResumeBody,
-  SearchPreset,
-  SearchPresetCreate,
   SmartFolder,
   SmartFolderCreate,
   SmartFolderRule,
@@ -56,7 +53,7 @@ import {
   works,
 } from "./catalogSchema.ts";
 import { probeDurationSec } from "./probe.ts";
-import { appSettings, searchPresets, smartFolders, tagPrefixes, workStates } from "./userSchema.ts";
+import { appSettings, smartFolders, tagPrefixes, workStates } from "./userSchema.ts";
 
 type CatalogWorkRow = typeof works.$inferSelect;
 type WorkRow = CatalogWorkRow & typeof workStates.$inferSelect & { resumeResolved: boolean };
@@ -1578,66 +1575,6 @@ export class WorkRepo {
         .delete(smartFolders)
         .where(eq(smartFolders.id, id))
         .returning({ id: smartFolders.id })
-        .get() !== undefined
-    );
-  }
-
-  // ── 検索プリセット ─────────────────────────────────────────
-
-  listPresets(): SearchPreset[] {
-    return this.db.user
-      .select()
-      .from(searchPresets)
-      .orderBy(asc(searchPresets.id))
-      .all()
-      .map((r) =>
-        parseRecord(
-          searchPresetSchema,
-          {
-            id: r.id,
-            name: r.name,
-            query: r.query,
-            tagFilters: parseJsonField(
-              r.tagFiltersJson,
-              "search_presets",
-              r.id,
-              "tag_filters_json",
-            ),
-            sortId: r.sortId,
-          },
-          "search_presets",
-          r.id,
-        ),
-      );
-  }
-
-  createPreset(input: SearchPresetCreate): SearchPreset {
-    const r = this.db.user
-      .insert(searchPresets)
-      .values({
-        name: input.name,
-        query: input.query,
-        tagFiltersJson: JSON.stringify(input.tagFilters),
-        sortId: input.sortId,
-      })
-      .returning({ id: searchPresets.id })
-      .get();
-    if (!r) throw new Error("検索プリセットを保存できませんでした");
-    return {
-      id: r.id,
-      name: input.name,
-      query: input.query,
-      tagFilters: input.tagFilters,
-      sortId: input.sortId,
-    };
-  }
-
-  deletePreset(id: number): boolean {
-    return (
-      this.db.user
-        .delete(searchPresets)
-        .where(eq(searchPresets.id, id))
-        .returning({ id: searchPresets.id })
         .get() !== undefined
     );
   }

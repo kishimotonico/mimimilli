@@ -26,8 +26,6 @@ import type {
   FsListing,
   ResumeBody,
   ScanResult,
-  SearchPreset,
-  SearchPresetCreate,
   Settings,
   SettingsUpdate,
   SmartFolder,
@@ -86,8 +84,6 @@ interface FixtureState {
   works: WorkSummary[];
   tagPrefixes: TagPrefix[];
   smartFolders: SmartFolder[];
-  presets: SearchPreset[];
-  nextPresetId: number;
   nextSmartFolderId: number;
   /** 作品ごとのレジューム位置 */
   resumes: Map<string, ResumeBody>;
@@ -112,7 +108,6 @@ export interface FixtureAdapterOptions {
 function createInitialState(options: FixtureAdapterOptions): FixtureState {
   const now = new Date().toISOString();
   const scenario = createFixtureScenario(options.scenario, now);
-  const maxPresetId = scenario.presets.reduce((max, p) => Math.max(max, p.id), 0);
   const maxSmartFolderNum = scenario.smartFolders.reduce((max, sf) => {
     const m = /^sf-(\d+)$/.exec(sf.id);
     return m ? Math.max(max, Number(m[1])) : max;
@@ -123,8 +118,6 @@ function createInitialState(options: FixtureAdapterOptions): FixtureState {
     works: options.works ?? scenario.works,
     tagPrefixes: DEFAULT_TAG_PREFIXES.map((def) => ({ ...def })),
     smartFolders: scenario.smartFolders,
-    presets: scenario.presets,
-    nextPresetId: maxPresetId + 1,
     nextSmartFolderId: maxSmartFolderNum + 1,
     resumes: new Map(),
     playbackIds: new Map(),
@@ -543,28 +536,6 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
       const folder = state.smartFolders.find((f) => f.id === id);
       if (!folder) return null;
       return toListPage(evalSmartFolder(folder, state.works, query));
-    },
-
-    async listPresets(): Promise<SearchPreset[]> {
-      return state.presets;
-    },
-
-    async createPreset(input: SearchPresetCreate): Promise<SearchPreset> {
-      const preset: SearchPreset = {
-        id: state.nextPresetId++,
-        name: input.name,
-        query: input.query,
-        tagFilters: input.tagFilters,
-        sortId: input.sortId,
-      };
-      state.presets.push(preset);
-      return preset;
-    },
-
-    async deletePreset(id: number): Promise<boolean> {
-      const before = state.presets.length;
-      state.presets = state.presets.filter((p) => p.id !== id);
-      return state.presets.length < before;
     },
 
     // ── 物理ファイルシステム（Filesモード） ────────────────────

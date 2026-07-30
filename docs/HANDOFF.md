@@ -73,7 +73,7 @@ MIMIMILLI_ADAPTER=fixture PORT=18099 pnpm --filter @mimimilli/server start
 | GET          | `/scan/last`                                                          | サーバー起動後に一度でも完了した直近スキャンの結果（`finishedAt` 付き）。なければ204（メモリのみ保持）                    |
 | GET          | `/scan/:id`                                                           | ジョブスナップショット。なければ404                                                                                       |
 | DELETE       | `/scan/:id`                                                           | キャンセル（`status` → `cancelling`）。なければ404                                                                        |
-| GET          | `/scan/:id/events`                                                    | ジョブ進捗のSSE（`reset`/`state`/`progress`/`completed`/`failed`/`cancelled`・15秒`ping`）。`Last-Event-ID` 対応      |
+| GET          | `/scan/:id/events`                                                    | ジョブ進捗のSSE（`reset`/`state`/`progress`/`completed`/`failed`/`cancelled`・15秒`ping`）。`Last-Event-ID` 対応          |
 | GET          | `/works`                                                              | **ページングエンベロープ `{ items, total }`**（page/limit省略時は page=1, limit=200）                                     |
 | GET          | `/works/:id`                                                          | 完全な Work（playlists・defaultPlaylistId・resume 含む）                                                                  |
 | PATCH        | `/works/:id`                                                          | `{ title?, tags?, bookmarked? }` を統合（旧 PUT tags/title・POST bookmark を廃止）                                        |
@@ -96,7 +96,6 @@ MIMIMILLI_ADAPTER=fixture PORT=18099 pnpm --filter @mimimilli/server start
 | GET/POST     | `/smart-folders`                                                      |                                                                                                                           |
 | PUT/DELETE   | `/smart-folders/:id`                                                  |                                                                                                                           |
 | GET          | `/smart-folders/:id/works`                                            | スマートフォルダー評価結果                                                                                                |
-| GET/POST     | `/presets`、DELETE `/presets/:id`                                     | 検索プリセット                                                                                                            |
 | GET          | `/fs`                                                                 | 物理FSブラウズ（Filesモード）                                                                                             |
 | GET          | `/media/cover/:id`、`/media/audio/:id/:path`、`/media/file/:id/:path` | audio は Range(206) 対応。cover は `?w=128\|256\|512` でサムネイル（realはwebp化+ディスクキャッシュ、fixtureのSVGは原寸） |
 

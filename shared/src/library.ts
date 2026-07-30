@@ -98,22 +98,3 @@ export const smartFolderUpdateSchema = z.object({
   sort: sortIdSchema.optional(),
 });
 export type SmartFolderUpdate = z.infer<typeof smartFolderUpdateSchema>;
-
-// ── 検索プリセット ────────────────────────────────────────────
-
-export const searchPresetSchema = z.object({
-  id: z.number().int(),
-  name: z.string(),
-  query: z.string(),
-  tagFilters: z.array(z.string()),
-  sortId: sortIdSchema,
-});
-export type SearchPreset = z.infer<typeof searchPresetSchema>;
-
-export const searchPresetCreateSchema = z.object({
-  name: z.string().min(1),
-  query: z.string().default(""),
-  tagFilters: z.array(z.string()).default([]),
-  sortId: sortIdSchema.default("added-desc"),
-});
-export type SearchPresetCreate = z.infer<typeof searchPresetCreateSchema>;

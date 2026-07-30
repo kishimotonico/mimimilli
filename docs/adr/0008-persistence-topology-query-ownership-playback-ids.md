@@ -44,7 +44,6 @@ DBを分ける主目的は、catalog再構築がuserデータに触れる経路�
 | `app_settings`      | `key`, `value`のうち`root_folder`                                                       | user           | ユーザーが選んだライブラリルート                                   |
 | `app_settings`      | `key`, `value`のうち`tag_prefixes_seeded`                                               | user           | 初期値を再投入してユーザーの削除を取り消さないため保持             |
 | `app_settings`      | `key`, `value`のうち`last_scan_time`                                                    | 派生キャッシュ | 最後に完了したスキャンから再生成する運用情報                       |
-| `search_presets`    | `id`, `name`, `query`, `tag_filters_json`, `sort_id`                                    | user           | ユーザーが保存した検索条件                                         |
 | `smart_folders`     | `id`, `name`, `rules_json`, `sort`, `created_at`                                        | user           | ユーザーが作成したフォルダー定義                                   |
 | `audio_probe_cache` | `path`, `size`, `mtime_ms`, `duration_sec`                                              | 派生キャッシュ | 音声ファイルを再プローブして回復                                   |
 

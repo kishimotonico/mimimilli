@@ -1,9 +1,9 @@
 // library feature のドメイン型。
-// API 契約に属する型（SortId, AxisFacetItem, SmartFolder, SearchPreset）は
+// API 契約に属する型（SortId, AxisFacetItem, SmartFolder）は
 // @mimimilli/shared を正典として re-export する。
 // Work / WorkSummary など work entity の型は entities/work/model から import する。
 
-export type { SortId, AxisFacetItem, SmartFolder, SearchPreset } from "@mimimilli/shared";
+export type { SortId, AxisFacetItem, SmartFolder } from "@mimimilli/shared";
 import type { SortId } from "@mimimilli/shared";
 
 // ── ソート ───────────────────────────────────────────────────

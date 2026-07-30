@@ -1,9 +1,11 @@
 ---
 id: TASK-150
 title: 検索プリセット機能をサーバー実装ごと削除する
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-07-30 15:28'
+updated_date: '2026-07-30 15:48'
 labels: []
 dependencies:
   - TASK-130
@@ -31,7 +33,30 @@ ordinal: 160000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 presets のルート・adapter・スキーマ・テーブル・fixture・shared型・client再エクスポートが削除され、rg で search_preset / SearchPreset / listPresets のヒットがない
-- [ ] #2 HANDOFFのAPI表から presets 行が消えている
-- [ ] #3 pnpm check・pnpm test が通る
+- [x] #1 presets のルート・adapter・スキーマ・テーブル・fixture・shared型・client再エクスポートが削除され、rg で search_preset / SearchPreset / listPresets のヒットがない
+- [x] #2 HANDOFFのAPI表から presets 行が消えている
+- [x] #3 pnpm check・pnpm test が通る
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. routes/presets.tsとapp.tsのマウント削除
+2. adapter.ts・real(workRepo/userSchema)・fixture(index/data/scenarios)のプリセット実装削除、drizzle再生成
+3. shared/src/library.tsのsearchPresetSchema系とclientの死んだ再エクスポート削除
+4. 関連テストの該当アサーション除去
+5. HANDOFFのAPI表からpresets行削除
+6. pnpm check + pnpm test
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Cursor(composer-2.5)で実装。USER_SCHEMA_VERSIONを5へbumpし、drizzle/userに0004(DROP search_presets)を追加。ADR-0003/0008のsearch_presets言及も現在の状態に合わせて削除（テーブル自体が消えたため）。shared/server check + test:server 338件を統括側でも再実行、rgで参照残存ゼロを確認。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+検索プリセット機能をルート・DataAdapter・real/fixture実装・search_presetsテーブル・sharedスキーマ・clientの死んだ型再エクスポートごと削除（-225行）。HANDOFFのAPI表とADRの該当言及も更新。
+<!-- SECTION:FINAL_SUMMARY:END -->

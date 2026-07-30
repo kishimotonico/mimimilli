@@ -5,7 +5,7 @@ import type { Work } from "@mimimilli/shared";
 import { openDb } from "../../src/adapters/real/db.ts";
 import { works } from "../../src/adapters/real/catalogSchema.ts";
 import { PersistentDataError, WorkRepo } from "../../src/adapters/real/workRepo.ts";
-import { searchPresets, smartFolders } from "../../src/adapters/real/userSchema.ts";
+import { smartFolders } from "../../src/adapters/real/userSchema.ts";
 
 function sampleWork(id: string): Work {
   const playlistId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -111,7 +111,7 @@ test("壊れたJSON構文は作品IDとSQLite列名を含むエラーになる",
   );
 });
 
-test("smart folderとsearch presetのsortも復元時に検証する", () => {
+test("smart folderのsortも復元時に検証する", () => {
   const db = openDb({ kind: "memory" });
   const repo = new WorkRepo(db);
   db.user
@@ -124,19 +124,9 @@ test("smart folderとsearch presetのsortも復元時に検証する", () => {
       createdAt: "2026-07-19T00:00:00.000Z",
     })
     .run();
-  db.user
-    .insert(searchPresets)
-    .values({
-      name: "不正sort",
-      query: "",
-      tagFiltersJson: "[]",
-      sortId: "unknown",
-    })
-    .run();
 
   assertPersistentDataError(
     () => repo.listSmartFolders(),
     /smart_folders レコード "sf-bad-sort".*sort:/,
   );
-  assertPersistentDataError(() => repo.listPresets(), /search_presets レコード "1".*sortId:/);
 });

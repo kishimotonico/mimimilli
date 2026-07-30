@@ -23,8 +23,6 @@ import type {
   ResumeBody,
   ScanProgressEvent,
   ScanResult,
-  SearchPreset,
-  SearchPresetCreate,
   Settings,
   SettingsUpdate,
   SmartFolder,
@@ -782,16 +780,6 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       return page.seed === undefined
         ? { items: page.items.map(toWorkListItem), total: page.total }
         : { items: page.items.map(toWorkListItem), total: page.total, seed: page.seed };
-    },
-
-    async listPresets(): Promise<SearchPreset[]> {
-      return repo.listPresets();
-    },
-    async createPreset(input: SearchPresetCreate): Promise<SearchPreset> {
-      return repo.createPreset(input);
-    },
-    async deletePreset(id: number): Promise<boolean> {
-      return repo.deletePreset(id);
     },
 
     // ── 物理ファイルシステム ───────────────────────────────────

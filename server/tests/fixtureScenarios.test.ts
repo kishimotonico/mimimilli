@@ -43,16 +43,13 @@ test("new-work: スキャン結果に新規作品IDが含まれる", async () =>
   assert.ok(ids.includes("RJ501011"));
 });
 
-test("empty: 作品・プリセット・スマートフォルダーが0件", async () => {
+test("empty: 作品・スマートフォルダーが0件", async () => {
   const app = buildApp("empty");
 
   const worksRes = await app.request("/api/works");
   const worksBody = await worksRes.json();
   assert.equal(worksBody.total, 0);
   assert.deepEqual(worksBody.items, []);
-
-  const presetsRes = await app.request("/api/presets");
-  assert.deepEqual(await presetsRes.json(), []);
 
   const smartFoldersRes = await app.request("/api/smart-folders");
   assert.deepEqual(await smartFoldersRes.json(), []);

@@ -39,12 +39,6 @@ test("catalog削除後の再スキャンでもuser状態を保持し、ATTACH JO
       protected: false,
     }),
   );
-  await adapter.createPreset({
-    name: "保持プリセット",
-    query: "耳かき",
-    tagFilters: ["気分/静か"],
-    sortId: "title-asc",
-  });
   await adapter.createSmartFolder({ name: "保持フォルダー", rules: [], sort: "added-desc" });
   adapter.close();
 
@@ -107,7 +101,6 @@ test("catalog削除後の再スキャンでもuser状態を保持し、ATTACH JO
   });
   assert.ok(after.lastPlayedAt);
   assert.ok((await rebuilt.listTagPrefixes()).some((prefix) => prefix.prefix === "気分"));
-  assert.equal((await rebuilt.listPresets())[0]?.name, "保持プリセット");
   assert.equal((await rebuilt.listSmartFolders())[0]?.name, "保持フォルダー");
   rebuilt.close();
 });
