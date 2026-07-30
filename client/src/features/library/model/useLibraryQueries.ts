@@ -28,6 +28,11 @@ import { tagPrefixesAtom } from "./atoms";
 import { buildWorksParams, getFacetAxisForQuery } from "./libraryPresentation";
 import { useDebouncedValue } from "../../../shared/lib/useDebouncedValue";
 import { getWorkPatchInvalidationTargets } from "./workPatchInvalidation";
+import {
+  patchWorkInQueryCache,
+  staleInactiveListCaches,
+  workToListItem,
+} from "./workPatchListCache";
 import { isSmartAxis, getSmartFolderId } from "./axisDefinitions";
 import type { LibraryViewState } from "./useLibraryNavigation";
 
@@ -181,14 +186,32 @@ export function useLibraryQueries(nav: LibraryViewState, searchQuery: string) {
     mutationFn: ({ workId, body }: { workId: string; body: WorkPatch }) => patchWork(workId, body),
     onSuccess: async (updatedWork, { workId, body }) => {
       queryClient.setQueryData(WORK_QUERY_KEYS.detail(workId), updatedWork);
-      const targets = getWorkPatchInvalidationTargets(body);
+      const targets = getWorkPatchInvalidationTargets(body, {
+        activeAxis: nav.activeAxis,
+        sort: nav.sort,
+        searchQuery: debouncedSearchQuery,
+        selectedTags: nav.selectedTags,
+        drillValue: nav.drillValue,
+      });
+      const listItem = workToListItem(updatedWork);
+      const onSmartAxis = isSmartAxis(nav.activeAxis);
+      const activeListQueryKey = onSmartAxis
+        ? SMART_FOLDER_QUERY_KEYS.works(getSmartFolderId(nav.activeAxis))
+        : worksParams !== null
+          ? WORK_QUERY_KEYS.list(worksParams)
+          : null;
+
+      if (targets.patchActiveListCache && activeListQueryKey !== null) {
+        patchWorkInQueryCache(queryClient, activeListQueryKey, workId, listItem);
+      }
+
       await Promise.all([
-        targets.works ? queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.all() }) : null,
+        targets.staleInactiveListCaches ? staleInactiveListCaches(queryClient) : null,
+        targets.resetActiveWorksList && activeListQueryKey !== null
+          ? queryClient.resetQueries({ queryKey: activeListQueryKey, exact: true })
+          : null,
         targets.facets
           ? queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.allFacets() })
-          : null,
-        targets.smartFolderWorks
-          ? queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.allWorks() })
           : null,
         targets.tags ? queryClient.invalidateQueries({ queryKey: TAG_QUERY_KEYS.all() }) : null,
       ]);

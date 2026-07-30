@@ -1,9 +1,11 @@
 ---
 id: TASK-153
 title: 作品PATCH時のworks無限クエリ全ページ再フェッチを廃止する
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-07-30 17:53'
+updated_date: '2026-07-30 19:06'
 labels: []
 dependencies: []
 priority: high
@@ -23,3 +25,12 @@ client/src/features/library/model/useLibraryQueries.ts:184-194のpatchWorkMutati
 - [ ] #3 総件数（total）が不必要に無効化されない
 - [ ] #4 pnpm check と pnpm test が通る（挙動の退行テストを追加）
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. PATCH内容ごとの影響分類（DTO差し替えのみ/所属・順序再評価要）を設計
+2. 一覧infinite queryをsetQueryData直接更新へ、限定invalidateの棚分け
+3. 退行テスト
+実装Cursor委譲、Codexレビュー実施
+<!-- SECTION:PLAN:END -->
