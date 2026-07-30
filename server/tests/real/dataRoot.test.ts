@@ -1,9 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
 import { test } from "node:test";
-import { resolveDataPaths, resolveLegacyDbPath } from "../../src/adapters/real/dataRoot.ts";
-import { makeTestDirectory } from "../helpers/sampleLibrary.ts";
+import { resolveDataPaths } from "../../src/adapters/real/dataRoot.ts";
 
 test("MIMIMILLI_DATA_DIRを絶対化し、DBとcacheを用途別に配置する", () => {
   const paths = resolveDataPaths({ MIMIMILLI_DATA_DIR: "./custom-data" }, "linux", "/home/test");
@@ -27,18 +24,4 @@ test("Linux既定はXDG_DATA_HOME、Windows既定はLOCALAPPDATAを使う", () =
     ).root,
     "C:\\Users\\test\\AppData\\Local\\Mimimilli",
   );
-});
-
-test("MIMIMILLI_DBの明示パスがなければ、既定の旧DBへフォールバックしない", (t) => {
-  const directory = makeTestDirectory("legacy-path");
-  t.after(directory.cleanup);
-  const defaultPath = join(directory.path, "data", "mimimilli.db");
-  mkdirSync(join(directory.path, "data"));
-  writeFileSync(defaultPath, "default candidate");
-
-  assert.throws(
-    () => resolveLegacyDbPath({ MIMIMILLI_DB: "missing-explicit.sqlite" }, directory.path, "linux"),
-    /MIMIMILLI_DBで指定された旧単一DBが存在しません:.*missing-explicit\.sqlite/,
-  );
-  assert.equal(resolveLegacyDbPath({}, directory.path, "linux"), defaultPath);
 });

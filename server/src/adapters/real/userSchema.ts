@@ -1,11 +1,5 @@
 import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
-/** user DB自体の移行状態。アプリ設定と寿命・用途を混在させない。 */
-export const persistenceMeta = sqliteTable("persistence_meta", {
-  key: text("key").primaryKey(),
-  value: text("value").notNull(),
-});
-
 /** Work UUID に紐づく、再スキャンでは復元できない状態。DB間外部キーは置かない。 */
 export const workStates = sqliteTable("work_states", {
   workId: text("work_id").primaryKey(),
@@ -15,13 +9,6 @@ export const workStates = sqliteTable("work_states", {
   resumePlaylistId: text("resume_playlist_id"),
   resumeTrackId: text("resume_track_id"),
   resumeOffsetSec: real("resume_offset_sec"),
-});
-
-/** v1からv2への変換時だけ使う一時データ。変換後は行を残さない。 */
-export const resumeV1Pending = sqliteTable("resume_v1_pending", {
-  workId: text("work_id").primaryKey(),
-  position: real("position").notNull(),
-  trackIndex: integer("track_index").notNull(),
 });
 
 /** タグ prefix 定義。id は表示順（登録順）の安定化用で、APIのキーは prefix。 */

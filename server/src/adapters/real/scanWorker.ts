@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import type { ScanProgressEvent, ScanResult } from "@mimimilli/shared";
-import { migrateResumeV1, openDb, type Db, type DbLocation } from "./db.ts";
+import { openDb, type Db, type DbLocation } from "./db.ts";
 import { resolveWithin } from "./paths.ts";
 import { Scanner } from "./scanner.ts";
 import { gcThumbnailCache, type WorkCoverEntry } from "./thumbnailCache.ts";
@@ -61,39 +61,31 @@ async function run(input: WorkerInput): Promise<void> {
     if (cancelled(token)) {
       terminal = { type: "cancelled" };
     } else {
-      // resume移行開始前に必ずcancel tokenを確認する。
-      migrateResumeV1(db.sqlite, () => {
-        if (cancelled(token)) throw new Error("スキャンはキャンセルされました");
-      });
+      const covers: WorkCoverEntry[] = [];
+      for (const work of repo.listSummaries()) {
+        if (cancelled(token)) break;
+        if (!work.cover) continue;
+        const absolutePath = resolveWithin(
+          work.physicalPath,
+          join(work.physicalPath, work.cover.image),
+        );
+        if (absolutePath) {
+          covers.push({ workId: work.id, coverAbsolutePath: absolutePath });
+        }
+      }
       if (cancelled(token)) {
         terminal = { type: "cancelled" };
       } else {
-        const covers: WorkCoverEntry[] = [];
-        for (const work of repo.listSummaries()) {
-          if (cancelled(token)) break;
-          if (!work.cover) continue;
-          const absolutePath = resolveWithin(
-            work.physicalPath,
-            join(work.physicalPath, work.cover.image),
-          );
-          if (absolutePath) {
-            covers.push({ workId: work.id, coverAbsolutePath: absolutePath });
-          }
-        }
+        await gcThumbnailCache(input.thumbnailCacheDir, covers, {
+          throwIfCancelled: () => {
+            if (cancelled(token)) throw new Error("スキャンはキャンセルされました");
+          },
+        });
         if (cancelled(token)) {
           terminal = { type: "cancelled" };
         } else {
-          await gcThumbnailCache(input.thumbnailCacheDir, covers, {
-            throwIfCancelled: () => {
-              if (cancelled(token)) throw new Error("スキャンはキャンセルされました");
-            },
-          });
-          if (cancelled(token)) {
-            terminal = { type: "cancelled" };
-          } else {
-            repo.setScanState("last_scan_time", new Date().toISOString());
-            terminal = { type: "completed", result };
-          }
+          repo.setScanState("last_scan_time", new Date().toISOString());
+          terminal = { type: "completed", result };
         }
       }
     }

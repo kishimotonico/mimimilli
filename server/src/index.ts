@@ -8,7 +8,6 @@
 //   MIMIMILLI_DLSITE_REQUEST_INTERVAL_MS / MIMIMILLI_DLSITE_RETRY_COUNT /
 //   MIMIMILLI_DLSITE_MAX_BACKOFF_MS / MIMIMILLI_DLSITE_TIMEOUT_MS /
 //   MIMIMILLI_DLSITE_USER_AGENT … DLsite実HTTPの制御設定
-//   MIMIMILLI_DB            … 旧単一DBの明示パス（初回移行専用）
 //   MIMIMILLI_THUMBNAIL_CACHE_DIR … カバーサムネイルのキャッシュ置き場
 //                                   （デフォルト ./data/cache/thumbnails）
 //   MIMIMILLI_MOCK_SCENARIO … fixture アダプタのデータシナリオ
@@ -16,7 +15,7 @@
 import { resolve } from "node:path";
 import { createApp } from "./app.ts";
 import { createFixtureAdapter } from "./adapters/fixture/index.ts";
-import { resolveDataPaths, resolveLegacyDbPath } from "./adapters/real/dataRoot.ts";
+import { resolveDataPaths } from "./adapters/real/dataRoot.ts";
 import { resolveDlsiteCacheConfig } from "./adapters/real/dlsiteCache.ts";
 import { resolveDlsiteRequestConfig } from "./adapters/real/dlsiteConfig.ts";
 import { createRealAdapter } from "./adapters/real/index.ts";
@@ -31,13 +30,11 @@ function createAdapter(): DataAdapter {
       return createFixtureAdapter({ scenario: process.env.MIMIMILLI_MOCK_SCENARIO });
     case "real": {
       const paths = resolveDataPaths();
-      const legacyPath = resolveLegacyDbPath();
       return createRealAdapter({
         database: {
           kind: "files",
           catalogPath: paths.catalogDb,
           userPath: paths.userDb,
-          legacyPath: legacyPath ?? undefined,
         },
         dataRoot: paths.root,
         dlsiteCache: resolveDlsiteCacheConfig(paths.dlsiteCacheDb),

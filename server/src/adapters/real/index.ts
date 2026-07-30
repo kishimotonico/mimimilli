@@ -51,7 +51,7 @@ import type { ScanOptions } from "../../adapter.ts";
 import { isDefaultTitle } from "../../core/dlsiteTitle.ts";
 import { buildTagPrefixCandidates } from "../../core/tagPrefixCandidates.ts";
 import { evalSmartFolder } from "../../core/smartFolder.ts";
-import { migrateResumeV1, openDb, type Db, type DbLocation } from "./db.ts";
+import { openDb, type Db, type DbLocation } from "./db.ts";
 import {
   detectRjCode,
   downloadCover,
@@ -613,9 +613,6 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
             ...options.database,
             catalogPath: resolve(options.database.catalogPath),
             userPath: resolve(options.database.userPath),
-            legacyPath: options.database.legacyPath
-              ? resolve(options.database.legacyPath)
-              : undefined,
           },
           resolve(root),
           resolve(dataRoot),
@@ -632,10 +629,6 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
           throw new DOMException("スキャンはキャンセルされました", "AbortError");
         }
       };
-      checkAbort();
-      // v1 resumeはcatalogのPlaylist/Track関係が揃ってから変換する。
-      // 未解決行はpendingに残るため、次回スキャン後にも同じ処理で再試行される。
-      migrateResumeV1(db.sqlite, checkAbort);
       checkAbort();
 
       // 全作品を走査した直後の自然なタイミングでサムネイルキャッシュをGCする（TASK-26）

@@ -1,11 +1,11 @@
 ---
 id: TASK-130
 title: 旧単一DB取り込み機構（persistence_meta系）を削除する
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-07-30 12:28'
-updated_date: '2026-07-30 15:37'
+updated_date: '2026-07-30 15:43'
 labels: []
 dependencies: []
 priority: medium
@@ -29,9 +29,9 @@ TASK-78（2026-07-19、単一DB→catalog/user 2DB分離）の一度きりの移
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 persistence_meta・resume_v1_pending テーブル、migrateLegacyUserData・migrateResumeV1・resolveLegacyDbPath・MIMIMILLI_DB、スキャン後の再試行フックが削除されている
-- [ ] #2 legacyDbMigration.test.ts が削除され、resume系テストからv1変換ケースが除去され、pnpm check・pnpm test:server が通る
-- [ ] #3 user DB再作成後の通常スキャン・resume保存/復元が動作する
+- [x] #1 persistence_meta・resume_v1_pending テーブル、migrateLegacyUserData・migrateResumeV1・resolveLegacyDbPath・MIMIMILLI_DB、スキャン後の再試行フックが削除されている
+- [x] #2 legacyDbMigration.test.ts が削除され、resume系テストからv1変換ケースが除去され、pnpm check・pnpm test:server が通る
+- [x] #3 user DB再作成後の通常スキャン・resume保存/復元が動作する
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -44,3 +44,15 @@ TASK-78（2026-07-19、単一DB→catalog/user 2DB分離）の一度きりの移
 5. legacyDbMigration.test.ts削除、resumeV2.test.tsからv1変換ケース除去
 6. pnpm check + pnpm test:server
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Cursor(composer-2.5)で実装。USER_SCHEMA_VERSIONを3→4にbump（既存v3 user DBは再作成）し、drizzle履歴には0003のDROP migrationを追加。server check(tsc)とtest:server 338件を統括側でも再実行し通過。rgでMIMIMILLI_DB/persistence_meta/resume_v1系の残存参照ゼロを確認。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+旧単一DB取り込み（migrateLegacyUserData/persistence_meta/MIMIMILLI_DB/resolveLegacyDbPath）とresume v1変換（resume_v1_pending/migrateResumeV1/スキャン後再試行フック）を全削除。legacyDbMigration.test.ts削除、resumeV2.test.tsのv1ケース除去。差分は+37/-621行。
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -1,4 +1,3 @@
-import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { posix, win32 } from "node:path";
 
@@ -8,30 +7,6 @@ export interface DataPaths {
   userDb: string;
   dlsiteCacheDb: string;
   thumbnailCache: string;
-}
-
-/**
- * 旧単一DBの候補を決める。MIMIMILLI_DBが明示されている場合は、そのパスだけを使う。
- */
-export function resolveLegacyDbPath(
-  env: NodeJS.ProcessEnv = process.env,
-  cwd: string = process.cwd(),
-  platform: NodeJS.Platform = process.platform,
-): string | undefined {
-  const path = platform === "win32" ? win32 : posix;
-  if (env.MIMIMILLI_DB !== undefined) {
-    if (env.MIMIMILLI_DB.length === 0) {
-      throw new Error("MIMIMILLI_DBが空です。旧単一DBのパスを指定してください");
-    }
-    const configured = path.resolve(cwd, env.MIMIMILLI_DB);
-    if (!existsSync(configured)) {
-      throw new Error(`MIMIMILLI_DBで指定された旧単一DBが存在しません: ${configured}`);
-    }
-    return configured;
-  }
-
-  const defaultPath = path.resolve(cwd, "data", "mimimilli.db");
-  return existsSync(defaultPath) ? defaultPath : undefined;
 }
 
 /** ADR-0007に従ったユーザーデータ配置を返す。 */
