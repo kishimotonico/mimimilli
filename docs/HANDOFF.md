@@ -68,9 +68,13 @@ MIMIMILLI_ADAPTER=fixture PORT=18099 pnpm --filter @mimimilli/server start
 | メソッド     | パス                                                                  | 備考                                                                                                                      |
 | ------------ | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | GET / PUT    | `/settings`                                                           |                                                                                                                           |
-| POST         | `/scan`                                                               | 同期実行（完了までブロックし ScanResult を返す）。実行中の二重POSTは409                                                   |
-| GET          | `/scan/events`                                                        | スキャン進捗のSSE（progress/complete/error。再接続挙動は routes/scan.ts 冒頭）                                            |
-| GET          | `/works`                                                              | **ページングエンベロープ `{ items, total }`**（page/limit省略時は全件）                                                   |
+| POST         | `/scan`                                                               | 202 で `{ job }` を即返す（`Location: /api/scan/:id`）。実行中の二重POSTは409（`active` 付き）                            |
+| GET          | `/scan/active`                                                        | 実行中ジョブのスナップショット。なければ204                                                                               |
+| GET          | `/scan/last`                                                          | サーバー起動後に一度でも完了した直近スキャンの結果（`finishedAt` 付き）。なければ204（メモリのみ保持）                    |
+| GET          | `/scan/:id`                                                           | ジョブスナップショット。なければ404                                                                                       |
+| DELETE       | `/scan/:id`                                                           | キャンセル（`status` → `cancelling`）。なければ404                                                                        |
+| GET          | `/scan/:id/events`                                                    | ジョブ進捗のSSE（`reset`/`state`/`progress`/`completed`/`failed`/`cancelled`・15秒`ping`）。`Last-Event-ID` 対応      |
+| GET          | `/works`                                                              | **ページングエンベロープ `{ items, total }`**（page/limit省略時は page=1, limit=200）                                     |
 | GET          | `/works/:id`                                                          | 完全な Work（playlists・defaultPlaylistId・resume 含む）                                                                  |
 | PATCH        | `/works/:id`                                                          | `{ title?, tags?, bookmarked? }` を統合（旧 PUT tags/title・POST bookmark を廃止）                                        |
 | POST         | `/works/:id/resume`                                                   | `{ playlistId, trackId, offsetSec }`（`shared/src/work.ts` の `resumeSchema`。高頻度のため PATCH と分離）                 |
