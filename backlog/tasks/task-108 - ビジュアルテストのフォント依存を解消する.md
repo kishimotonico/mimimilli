@@ -1,11 +1,11 @@
 ---
 id: TASK-108
 title: ビジュアルテストのフォント依存を解消する
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-07-26 15:13'
-updated_date: '2026-07-30 21:44'
+updated_date: '2026-07-30 21:56'
 labels: []
 dependencies: []
 ordinal: 112000
@@ -19,10 +19,10 @@ client/index.html が Geist・IBM Plex Sans JP・JetBrains Mono を Google Fonts
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 アプリの起動時に Google Fonts へのネットワークリクエストが発生しない
-- [ ] #2 フォントファイルがリポジトリまたはビルド成果物に含まれ、オフラインで同じ描画になる
-- [ ] #3 ビジュアルテストを連続2回実行してスナップショット差分が出ない
-- [ ] #4 client/index.html に fonts.googleapis.com / fonts.gstatic.com への参照が残っていない
+- [x] #1 アプリの起動時に Google Fonts へのネットワークリクエストが発生しない
+- [x] #2 フォントファイルがリポジトリまたはビルド成果物に含まれ、オフラインで同じ描画になる
+- [x] #3 ビジュアルテストを連続2回実行してスナップショット差分が出ない
+- [x] #4 client/index.html に fonts.googleapis.com / fonts.gstatic.com への参照が残っていない
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -33,3 +33,9 @@ client/index.html が Geist・IBM Plex Sans JP・JetBrains Mono を Google Fonts
 3. ビジュアルテスト2連続実行で決定性確認
 実装Cursor委譲
 <!-- SECTION:PLAN:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+@fontsource（geist/ibm-plex-sans-jp/jetbrains-mono 各5.3.0）でself-host化。index.htmlのGoogle Fonts参照を全除去、dist内grepで外部参照0確認。スナップショット更新不要で連続実行の差分なし（決定性確保）。415テスト・ビジュアル6/6×複数回・pnpm check通過。実装Cursor委譲。
+<!-- SECTION:FINAL_SUMMARY:END -->
