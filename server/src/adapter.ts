@@ -63,7 +63,7 @@ export type MediaLocation =
       read: (start: number, end: number) => Uint8Array;
     };
 
-export type MediaKind = "cover" | "audio" | "file";
+export type MediaKind = "audio" | "file";
 
 /**
  * カバーの条件付きGETを、実体の生成・読み込みより先に判定するための情報。
@@ -95,7 +95,7 @@ export interface DataAdapter {
   // 設定・スキャン
   getSettings(): Promise<Settings>;
   updateSettings(patch: SettingsUpdate): Promise<Settings>;
-  /** signal はジョブ取消用。旧来の progress callback 指定もテスト・外部利用のため受け付ける。 */
+  /** signal はジョブ取消用。 */
   scan(options?: ScanOptions): Promise<ScanResult>;
 
   // 作品
@@ -140,15 +140,8 @@ export interface DataAdapter {
   browseFs(path?: string): Promise<FsListing | null>;
 
   // メディア・DLsite
-  /** 実体が無い（fixture 等）場合は null → ルートが 404 を返す。
-   *  width は kind === "cover" のときのみ意味を持つ（サムネイル幅、既に許可値へ正規化済み）。
-   *  fixture 等ラスタライズ元を持たないアダプタは無視してよい */
-  locateMedia(
-    kind: MediaKind,
-    workId: string,
-    relPath?: string,
-    width?: number,
-  ): Promise<MediaLocation | null>;
+  /** 実体が無い（fixture 等）場合は null → ルートが 404 を返す。カバーは describeCover を使う。 */
+  locateMedia(kind: MediaKind, workId: string, relPath?: string): Promise<MediaLocation | null>;
   /** カバー専用の軽量な事前確認。音声・通常ファイルの契約は locateMedia のまま維持する。 */
   describeCover(workId: string, width?: number): Promise<CoverDescriptor | null>;
   /** force=true はキャッシュを無視して明示的に再取得する。 */

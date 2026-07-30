@@ -790,15 +790,10 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
 
     // ── メディア・DLsite ──────────────────────────────────────
     async locateMedia(
-      kind: MediaKind,
+      _kind: MediaKind,
       workId: string,
       relPath?: string,
-      width?: number,
     ): Promise<MediaLocation | null> {
-      if (kind === "cover") {
-        const descriptor = await describeCover(workId, width);
-        return descriptor?.materialize() ?? null;
-      }
       const work = await repo.getWork(workId);
       if (!work) return null;
 

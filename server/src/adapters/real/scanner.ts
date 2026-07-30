@@ -24,7 +24,6 @@ import type {
   MetaFile,
   Playlist,
   ResolvedPlaylist,
-  ScanProgressEvent,
   ScanResult,
   Track,
   Work,
@@ -350,11 +349,8 @@ export class Scanner {
     this.measureCover = options?.measureCover ?? measureCoverDimensions;
   }
 
-  async scan(
-    root: string,
-    options?: ScanOptions | ((event: ScanProgressEvent) => void),
-  ): Promise<ScanResult> {
-    const normalized = typeof options === "function" ? { onProgress: options } : (options ?? {});
+  async scan(root: string, options?: ScanOptions): Promise<ScanResult> {
+    const normalized = options ?? {};
     const emit = normalized.onProgress ?? ((): void => {});
     const signal = normalized.signal;
     const abortToken = normalized.abortToken;
@@ -673,7 +669,7 @@ export class Scanner {
   private async registerMetaFile(
     prepared: PreparedMeta,
     seenIds: Set<string>,
-    probeCache: Map<string, ProbeCacheEntry> | undefined,
+    probeCache: Map<string, ProbeCacheEntry>,
     batch: UpsertBatch,
     existingWorks: Map<string, ScanWorkState>,
     result: ScanResult,

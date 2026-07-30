@@ -1,9 +1,11 @@
 ---
 id: TASK-135
 title: デッドコードと到達不能な互換分岐をまとめて削除する
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-07-30 12:31'
+updated_date: '2026-07-30 15:52'
 labels: []
 dependencies: []
 priority: medium
@@ -23,7 +25,29 @@ ordinal: 145000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 上記4点が削除され、locateMediaの契約がaudio/file専用になっている
-- [ ] #2 probeのcache引数が必須化され、関連テストが更新されている
-- [ ] #3 pnpm check・pnpm test が通る
+- [x] #1 上記4点が削除され、locateMediaの契約がaudio/file専用になっている
+- [x] #2 probeのcache引数が必須化され、関連テストが更新されている
+- [x] #3 pnpm check・pnpm test が通る
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. client queryWorks削除
+2. locateMediaのcover契約縮小とreal/fixtureの到達不能分岐削除
+3. probeのcache必須化とテスト更新
+4. Scanner.scan()の関数渡し分岐とadapter.tsの旧コメント削除、scanProgress.test.tsのモック掃除
+5. pnpm check + pnpm test
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Cursor(composer-2.5)で実装。locateMediaのwidth引数（cover専用だった）も契約から除去。server check + test:server 338件 + client tscを統括側でも再実行し通過。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+queryWorks(client)・locateMediaのcover経路(契約+real/fixture分岐)・probeのcache省略フォールバック・Scanner.scan()の関数渡し互換分岐を削除（+14/-63行）。
+<!-- SECTION:FINAL_SUMMARY:END -->

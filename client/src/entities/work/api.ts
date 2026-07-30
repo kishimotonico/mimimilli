@@ -12,14 +12,12 @@ import {
 } from "../../shared/api/http";
 import {
   workSchema,
-  worksPageSchema,
   tagListSchema,
   dlsiteWorkInfoSchema,
   dlsiteBulkStartResponseSchema,
   dlsiteBulkCancelResponseSchema,
   fileEntrySchema,
   type Work,
-  type WorksPage,
   dlsiteNotificationPageSchema,
   dlsiteNotificationSummarySchema,
   dlsiteParseFailedNotificationPageSchema,
@@ -37,16 +35,6 @@ import {
 /** GET /works/:id は存在しない場合404を返す契約。呼び出し側はnull分岐でなくエラー（TanStack QueryのisError等）で扱う */
 export async function getWork(id: string): Promise<Work> {
   return getParsed(workSchema, `/works/${encodeURIComponent(id)}`);
-}
-
-/** WorksPage をそのまま返す（{ items, total }）。page/limit 省略時は items に全件が入る */
-export async function queryWorks(params: Record<string, string | number>): Promise<WorksPage> {
-  const p = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    p.set(key, String(value));
-  }
-  const q = p.toString();
-  return getParsed(worksPageSchema, `/works${q ? `?${q}` : ""}`);
 }
 
 export async function getDlsiteNotificationSummary(): Promise<DlsiteNotificationSummary> {

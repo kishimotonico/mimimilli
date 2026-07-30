@@ -148,7 +148,7 @@ test("end省略Trackは音声ファイルを300秒から60秒へ差し替えた�
   repo.upsertWork(work);
   const cachePath = join(work.physicalPath, track.file);
   writeWav(cachePath, 300);
-  assert.equal(await probeDurationSec(db.catalog, cachePath), 300);
+  assert.equal(await probeDurationSec(db.catalog, cachePath, new Map()), 300);
 
   assert.equal(
     repo.saveResume(work.id, { playlistId: playlist.id, trackId: track.id, offsetSec: 200 }),
@@ -157,7 +157,7 @@ test("end省略Trackは音声ファイルを300秒から60秒へ差し替えた�
   assert.equal((await repo.getWork(work.id))?.resume?.offsetSec, 200);
 
   writeWav(cachePath, 60);
-  assert.equal(await probeDurationSec(db.catalog, cachePath), 60);
+  assert.equal(await probeDurationSec(db.catalog, cachePath, new Map()), 60);
   assert.equal((await repo.getWork(work.id))?.resume, null);
   assert.throws(
     () => repo.saveResume(work.id, { playlistId: playlist.id, trackId: track.id, offsetSec: 200 }),

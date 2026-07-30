@@ -574,17 +574,9 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
       kind: MediaKind,
       workId: string,
       relPath?: string,
-      // カバーは SVG（ベクタ）合成のためリサイズ不要。width 指定は無視して原寸のまま返す
-      _width?: number,
     ): Promise<MediaLocation | null> {
       const work = state.works.find((w) => w.id === workId);
       if (!work) return null;
-
-      if (kind === "cover") {
-        // real アダプタと同様、cover 未設定なら 404（クライアント側で placeholder 表示）
-        if (!work.cover) return null;
-        return synthesizeCoverSvg(work);
-      }
 
       if (!relPath) return null;
 

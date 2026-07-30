@@ -175,7 +175,7 @@ test("reset IDで即再接続すると古い履歴を再送せず、以後のliv
   const adapter: DataAdapter = {
     ...fixture,
     scan: (options) => {
-      const onProgress = typeof options === "function" ? options : options?.onProgress;
+      const onProgress = options?.onProgress;
       resolveEmitProgress((processed) =>
         onProgress?.({
           type: "progress",
