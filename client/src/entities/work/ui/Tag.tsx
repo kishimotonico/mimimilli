@@ -1,5 +1,6 @@
 import type { TagPrefix } from "@mimimilli/shared";
 import { parseTag } from "../model";
+import { tagPrefixColorToCss } from "../tagPrefixColor";
 import { cn } from "../../../shared/lib/cn";
 import { I } from "../../../shared/ui/Icon";
 
@@ -103,7 +104,7 @@ export default function Tag({
   }
 
   const catLabel = definition?.label ?? parsed.prefix.toUpperCase().slice(0, 4);
-  const valueStyle = { color: definition?.color ?? "var(--cat-color)" };
+  const valueStyle = { color: tagPrefixColorToCss(definition?.color) };
 
   const content = (
     <>

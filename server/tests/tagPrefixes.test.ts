@@ -9,6 +9,7 @@ import {
   normalizeTag,
   normalizeTags,
   tagEquals,
+  tagPrefixCreateSchema,
   tagPrefixNameSchema,
 } from "@mimimilli/shared";
 import type { WorkSummary } from "@mimimilli/shared";
@@ -81,6 +82,28 @@ test("tagPrefixNameSchema: 予約軸ID・スラッシュ・smart- を拒否す�
   assert.ok(!tagPrefixNameSchema.safeParse("a/b").success);
   assert.ok(!tagPrefixNameSchema.safeParse("smart-x").success);
   assert.equal(tagPrefixNameSchema.parse(" 気分 "), "気分");
+});
+
+test("tagPrefixCreateSchema: color は semantic key のみ受け付け、旧 CSS 変数文字列は拒否する", () => {
+  assert.ok(
+    tagPrefixCreateSchema.safeParse({ prefix: "気分", label: "気分", color: "cv" }).success,
+  );
+  assert.ok(
+    tagPrefixCreateSchema.safeParse({ prefix: "気分", label: "気分", color: null }).success,
+  );
+  assert.ok(
+    !tagPrefixCreateSchema.safeParse({
+      prefix: "気分",
+      label: "気分",
+      color: "var(--cv-color)",
+    }).success,
+  );
+});
+
+test("DEFAULT_TAG_PREFIXES: color は CSS 変数文字列ではなく semantic key", () => {
+  for (const def of DEFAULT_TAG_PREFIXES) {
+    assert.ok(def.color === null || !def.color.startsWith("var("), def.prefix);
+  }
 });
 
 // ── ファセット集計（動的 prefix 軸）──────────────────────────

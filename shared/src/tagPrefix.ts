@@ -30,12 +30,17 @@ export const tagPrefixNameSchema = z
     message: "smart- で始まる prefix は使えません",
   });
 
+/** タグ prefix の表示色キー。client が tokens.css の CSS 変数へ解決する */
+export const TAG_PREFIX_COLOR_KEYS = ["cv", "circle", "series", "cat"] as const;
+export const tagPrefixColorKeySchema = z.enum(TAG_PREFIX_COLOR_KEYS);
+export type TagPrefixColorKey = z.infer<typeof tagPrefixColorKeySchema>;
+
 export const tagPrefixSchema = z.object({
   /** 正規形（小文字）。軸IDとしてもそのまま使う */
   prefix: z.string(),
   label: z.string(),
-  /** 表示色（デザイントークン名 or CSSカラー）。null はデフォルト表示 */
-  color: z.string().nullable(),
+  /** 表示色の semantic key。null は client 側のデフォルト表示 */
+  color: tagPrefixColorKeySchema.nullable(),
   showAsAxis: z.boolean(),
   /** true のとき、この prefix に属するタグの削除・編集時に確認を挟む（ソフトガード） */
   protected: z.boolean(),
@@ -46,7 +51,7 @@ export const tagPrefixListSchema = z.array(tagPrefixSchema);
 export const tagPrefixCreateSchema = z.object({
   prefix: tagPrefixNameSchema,
   label: z.string().trim().min(1),
-  color: z.string().nullable().default(null),
+  color: tagPrefixColorKeySchema.nullable().default(null),
   showAsAxis: z.boolean().default(true),
   protected: z.boolean().default(false),
 });
@@ -55,7 +60,7 @@ export type TagPrefixCreate = z.infer<typeof tagPrefixCreateSchema>;
 export const tagPrefixUpdateSchema = z
   .object({
     label: z.string().trim().min(1).optional(),
-    color: z.string().nullable().optional(),
+    color: tagPrefixColorKeySchema.nullable().optional(),
     showAsAxis: z.boolean().optional(),
     protected: z.boolean().optional(),
   })
@@ -78,34 +83,34 @@ export const tagPrefixCandidateListSchema = z.array(tagPrefixCandidateSchema);
 
 /** 初回起動時に seed する prefix 定義。投入後の変更・削除はユーザーの自由
  *  （seed 済みフラグで管理し、全削除しても再投入しない）。
- *  color はクライアントのデザイントークン（styles/tokens.css）への参照 */
+ *  color は client が CSS 変数へ解決する semantic key */
 export const DEFAULT_TAG_PREFIXES: TagPrefix[] = [
-  { prefix: "cv", label: "CV", color: "var(--cv-color)", showAsAxis: true, protected: true },
+  { prefix: "cv", label: "CV", color: "cv", showAsAxis: true, protected: true },
   {
     prefix: "サークル",
     label: "サークル",
-    color: "var(--circle-color)",
+    color: "circle",
     showAsAxis: true,
     protected: true,
   },
   {
     prefix: "シリーズ",
     label: "シリーズ",
-    color: "var(--series-color)",
+    color: "series",
     showAsAxis: true,
     protected: false,
   },
   {
     prefix: "カテゴリ",
     label: "カテゴリ",
-    color: "var(--cat-color)",
+    color: "cat",
     showAsAxis: true,
     protected: false,
   },
   {
     prefix: "genre",
     label: "ジャンル",
-    color: "var(--cat-color)",
+    color: "cat",
     showAsAxis: false,
     protected: false,
   },

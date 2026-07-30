@@ -11,6 +11,7 @@ import {
   playlistSchema,
   resolveTrackDurationSec,
   smartFolderSchema,
+  tagPrefixSchema,
   workSchema,
   workSummarySchema,
 } from "@mimimilli/shared";
@@ -1390,25 +1391,27 @@ export class WorkRepo {
       .from(tagPrefixes)
       .orderBy(asc(tagPrefixes.id))
       .all()
-      .map((r) => ({
-        prefix: r.prefix,
-        label: r.label,
-        color: r.color,
-        showAsAxis: r.showAsAxis,
-        protected: r.protected,
-      }));
+      .map((r) =>
+        tagPrefixSchema.parse({
+          prefix: r.prefix,
+          label: r.label,
+          color: r.color,
+          showAsAxis: r.showAsAxis,
+          protected: r.protected,
+        }),
+      );
   }
 
   getTagPrefix(prefix: string): TagPrefix | null {
     const r = this.db.user.select().from(tagPrefixes).where(eq(tagPrefixes.prefix, prefix)).get();
     if (!r) return null;
-    return {
+    return tagPrefixSchema.parse({
       prefix: r.prefix,
       label: r.label,
       color: r.color,
       showAsAxis: r.showAsAxis,
       protected: r.protected,
-    };
+    });
   }
 
   /** 既に存在する prefix なら null（呼び出し側で 409 にする） */
