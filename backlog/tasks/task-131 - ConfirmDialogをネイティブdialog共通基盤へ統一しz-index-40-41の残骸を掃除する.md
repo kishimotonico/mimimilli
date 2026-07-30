@@ -1,9 +1,11 @@
 ---
 id: TASK-131
 title: ConfirmDialogをネイティブdialog共通基盤へ統一しz-index 40/41の残骸を掃除する
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-07-30 12:28'
+updated_date: '2026-07-30 15:53'
 labels: []
 dependencies: []
 priority: medium
@@ -25,7 +27,29 @@ client/src/shared/ui/ConfirmDialog.tsx が旧世代のモーダル実装（手�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 ConfirmDialogがuseDialogModal（ネイティブdialog）で実装され、手書きz-index・手動Escape・手動backdrop処理が削除されている
-- [ ] #2 ConfirmDialog.tsx:2 と shell.css:1965 のz-index 40/41言及が削除・修正されている
-- [ ] #3 保護タグ削除の確認フロー（WorkEditDialog内から開閉・確認・キャンセル）が動作し、pnpm check・pnpm test が通る
+- [x] #1 ConfirmDialogがuseDialogModal（ネイティブdialog）で実装され、手書きz-index・手動Escape・手動backdrop処理が削除されている
+- [x] #2 ConfirmDialog.tsx:2 と shell.css:1965 のz-index 40/41言及が削除・修正されている
+- [x] #3 保護タグ削除の確認フロー（WorkEditDialog内から開閉・確認・キャンセル）が動作し、pnpm check・pnpm test が通る
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. ConfirmDialogをuseDialogModal（ネイティブdialog）実装へ置き換え
+2. z-index 40/41・手動Escape・手動backdrop処理を削除
+3. ConfirmDialog.tsx:2とshell.css:1965のstaleコメント掃除
+4. WorkEditDialog内ネストでの開閉・確認・キャンセル動作をテスト/検証
+5. pnpm --filter client check + pnpm test:client
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Cursor(composer-2.5)で実装。インラインstyleはTailwindユーティリティへ変換し見た目は現状踏襲。ネストdialog（WorkEditDialog内）はネイティブ挙動で問題なし。client check + test:client 381件（ConfirmDialogテスト6件新規）を統括側でも再実行し通過。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+ConfirmDialogをuseDialogModal+ネイティブdialogへ統一し、手書きz-index 40/41・手動Escape・手動backdropを削除。staleコメント2箇所（ConfirmDialog.tsx・shell.css:1965）も掃除。
+<!-- SECTION:FINAL_SUMMARY:END -->
