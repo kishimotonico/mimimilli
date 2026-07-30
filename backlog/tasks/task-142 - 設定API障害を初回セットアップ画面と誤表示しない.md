@@ -1,11 +1,11 @@
 ---
 id: TASK-142
 title: 設定API障害を初回セットアップ画面と誤表示しない
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-07-30 12:33'
-updated_date: '2026-07-30 15:37'
+updated_date: '2026-07-30 15:41'
 labels: []
 dependencies: []
 priority: high
@@ -29,9 +29,9 @@ ordinal: 152000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 設定APIが失敗した場合、セットアップ画面ではなく再試行導線付きのエラー表示になる
-- [ ] #2 rootFolder未設定（正常なセットアップ未完了）の挙動は現状と同じ
-- [ ] #3 pnpm check・pnpm test が通る
+- [x] #1 設定APIが失敗した場合、セットアップ画面ではなく再試行導線付きのエラー表示になる
+- [x] #2 rootFolder未設定（正常なセットアップ未完了）の挙動は現状と同じ
+- [x] #3 pnpm check・pnpm test が通る
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -42,3 +42,15 @@ ordinal: 152000
 3. rootFolder未設定時の挙動は現状維持
 4. テスト追加、pnpm check + pnpm test:client
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Cursor(composer-2.5)で実装。判別ロジックをresolveAppStartupState純関数に切り出しユニットテスト追加。client check(tsc+oxlint)とtest:client 365件を統括側でも再実行し通過。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+起動時の設定取得をloading/error/setup-required/readyの4状態で判別するresolveAppStartupStateを追加し、エラー時は再試行ボタン付きStartupErrorScreenを表示するようApp.tsxを変更。rootFolder未設定の挙動は不変。
+<!-- SECTION:FINAL_SUMMARY:END -->

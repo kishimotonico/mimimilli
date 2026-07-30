@@ -18,7 +18,9 @@ import { WORK_QUERY_KEYS } from "../entities/work/queryKeys";
 import { SETTINGS_QUERY_KEYS } from "../entities/settings/queryKeys";
 import type { FsEntry } from "../features/files/model/types";
 import PlayerDock from "../features/player/ui/PlayerDock";
+import { resolveAppStartupState } from "./model/resolveAppStartupState";
 import SetupScreen from "../features/setup/ui/SetupScreen";
+import StartupErrorScreen from "./ui/StartupErrorScreen";
 import SettingsModal from "../features/settings/ui/SettingsModal";
 import ScanModal from "../features/scan/ui/ScanModal";
 import DlsiteNotificationModals from "../features/library/ui/DlsiteNotificationModals";
@@ -43,13 +45,11 @@ export default function App() {
   // ── Settings ─────────────────────────────────────────────
   const settingsQuery = useSettingsQuery();
   const settings = settingsQuery.data;
-  const isSetupDone: boolean | null = settingsQuery.isPending
-    ? null
-    : settings?.rootFolder != null
-      ? true
-      : settingsQuery.isError
-        ? false
-        : false;
+  const startupState = resolveAppStartupState({
+    isPending: settingsQuery.isPending,
+    isError: settingsQuery.isError,
+    data: settings,
+  });
 
   // ファイルモードのルートパス（FilesView に渡す）。
   const rootFolder = settings?.rootFolder ?? "/";
@@ -159,8 +159,7 @@ export default function App() {
     }
   }, []);
 
-  // ── ローディング ──────────────────────────────────────────
-  if (isSetupDone === null) {
+  if (startupState === "loading") {
     return (
       <div
         style={{
@@ -179,7 +178,19 @@ export default function App() {
     );
   }
 
-  if (!isSetupDone) {
+  if (startupState === "error") {
+    return (
+      <StartupErrorScreen
+        error={settingsQuery.error}
+        onRetry={() => {
+          void settingsQuery.refetch();
+        }}
+        isRetrying={settingsQuery.isFetching}
+      />
+    );
+  }
+
+  if (startupState === "setup-required") {
     return <SetupScreen onComplete={handleSetupComplete} />;
   }
 
