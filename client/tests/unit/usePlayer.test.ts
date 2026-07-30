@@ -552,6 +552,72 @@ describe("usePlayer adapters", () => {
     expect(result.current.player.state.currentWork).toBeNull();
   });
 
+  // 実ブラウザではHTMLMediaElementのplay()呼び出しからplayイベント発火まで非同期の間が空き、
+  // status: "loading" のレンダーとstatus: "playing" のレンダーが別コミットになる。
+  // FakeAudioの既定実装はplay()呼び出しと同期的にイベントを発火するため、この間隔を再現できず
+  // loading→playingが1レンダーに畳み込まれてバグを検出できない。play発火をマイクロタスクへ遅延させ、
+  // 実機のレンダー分離を模倣する。
+  function deferPlayEventToMicrotask(audio: FakeAudio) {
+    audio.play = vi.fn(() => {
+      queueMicrotask(() => audio.dispatchEvent(new Event("play")));
+      return Promise.resolve();
+    });
+  }
+
+  it("初回再生の開始直後（一時停止/再開なし）からpersistTickの5秒間隔が動作する", async () => {
+    vi.useFakeTimers();
+    try {
+      const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
+      deferPlayEventToMicrotask(latestAudio());
+
+      act(() => result.current.player.play(work, [track], 0, playlistId));
+      expect(result.current.player.state.status).toBe("loading");
+
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(result.current.player.state.status).toBe("playing");
+      vi.mocked(saveResumePosition).mockClear();
+
+      latestAudio().currentTime = 10;
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+      expect(saveResumePosition).toHaveBeenCalledWith(work.id, {
+        playlistId,
+        trackId: track.id,
+        offsetSec: 10,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("一時停止中はpersistTickの定期実行が止まる", async () => {
+    vi.useFakeTimers();
+    try {
+      const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
+      deferPlayEventToMicrotask(latestAudio());
+
+      act(() => result.current.player.play(work, [track], 0, playlistId));
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(result.current.player.state.status).toBe("playing");
+
+      act(() => result.current.player.pause());
+      expect(result.current.player.state.status).toBe("paused");
+      vi.mocked(saveResumePosition).mockClear();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10000);
+      });
+      expect(saveResumePosition).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("toggleMuteでミュート前の音量を復元する", async () => {
     const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
     act(() => result.current.player.play(work, [track], 0, playlistId));

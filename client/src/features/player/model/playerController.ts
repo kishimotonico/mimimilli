@@ -28,7 +28,10 @@ export interface PlayerControllerState {
 }
 
 export interface PlayerCoreState {
+  /** UI 表示用。"loading" も再生中扱いに含む（play/pause アイコン切替等）。status の値そのものが必要な処理では代わりに `status` を見ること。 */
   isPlaying: boolean;
+  /** status をそのまま反映する派生値。isPlaying とは異なり loading を "再生中" に丸めない。 */
+  status: PlaybackStatus;
   currentTrackIndex: number;
   currentPlaylistId: string | null;
   currentWork: WorkListItem | Work | null;
@@ -82,6 +85,7 @@ function arePlaybackErrorsEqual(a: AudioEngineError | null, b: AudioEngineError 
 
 const playerCoreComparators = {
   isPlaying: Object.is,
+  status: Object.is,
   currentTrackIndex: Object.is,
   currentPlaylistId: Object.is,
   currentWork: Object.is,
@@ -350,6 +354,7 @@ export function reducePlayer(
 export function toPlayerCoreState(state: PlayerControllerState): PlayerCoreState {
   return {
     isPlaying: state.status === "playing" || state.status === "loading",
+    status: state.status,
     currentTrackIndex: state.item?.trackIndex ?? -1,
     currentPlaylistId: state.item?.playlistId ?? null,
     currentWork: state.item?.work ?? null,

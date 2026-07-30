@@ -142,10 +142,11 @@ export function usePlayerRuntime() {
   ]);
 
   useEffect(() => {
-    if (controller.getState().status !== "playing") return;
+    // ガードと依存配列は同じ coreState.status を見る。isPlaying は loading も含むため使わない。
+    if (coreState.status !== "playing") return;
     const intervalId = setInterval(() => controller.dispatch({ type: "persistTick" }), 5000);
     return () => clearInterval(intervalId);
-  }, [controller, coreState.isPlaying, coreState.currentTrackIndex]);
+  }, [controller, coreState.status]);
 
   const getMediaSessionPosition = useCallback(() => {
     const context = getCurrentPlaybackContext();
