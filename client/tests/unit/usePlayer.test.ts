@@ -553,6 +553,43 @@ describe("usePlayer adapters", () => {
     }
   });
 
+  it("異なるファイルへのトラック切替後に前トラックのplay拒否でerrorにならない", async () => {
+    const tracks: ResolvedTrack[] = [
+      {
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        title: "Track A",
+        file: "audio/track-a.wav",
+        durationSec: 30,
+      },
+      {
+        id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        title: "Track B",
+        file: "audio/track-b.wav",
+        durationSec: 30,
+      },
+    ];
+    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
+
+    let rejectFirstPlay: (reason?: unknown) => void = () => {};
+    latestAudio().play.mockReturnValueOnce(
+      new Promise<void>((_, reject) => {
+        rejectFirstPlay = reject;
+      }),
+    );
+
+    act(() => result.current.player.play(work, tracks, 0, playlistId));
+    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
+
+    act(() => result.current.player.nextTrack());
+    await waitFor(() => expect(latestAudio().srcAssignments).toHaveLength(2));
+
+    rejectFirstPlay(new DOMException("Aborted", "AbortError"));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(result.current.player.state.status).not.toBe("error");
+    expect(result.current.player.state.playbackError).toBeNull();
+  });
+
   it("再生中に同一作品・同一トラックへ再度「最初から再生」すると先頭へシークする", async () => {
     const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
     act(() => result.current.player.play(work, [track], 0, playlistId));

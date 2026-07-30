@@ -95,4 +95,54 @@ describe("HTMLAudio adapter contract", () => {
       }),
     );
   });
+
+  it("load切替後に古いplay()のrejectをonErrorへ渡さない", async () => {
+    const events = callbacks();
+    const engine = createAudioEngine(75, events);
+    let rejectFirstPlay: (reason?: unknown) => void = () => {};
+    audio.play.mockReturnValueOnce(
+      new Promise<void>((_, reject) => {
+        rejectFirstPlay = reject;
+      }),
+    );
+
+    engine.load("/audio/a.wav", { playbackRate: 1, autoplay: true });
+    expect(audio.play).toHaveBeenCalledOnce();
+
+    engine.load("/audio/b.wav", { playbackRate: 1, autoplay: true });
+    expect(audio.play).toHaveBeenCalledTimes(2);
+
+    rejectFirstPlay(new DOMException("Aborted", "AbortError"));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(events.onError).not.toHaveBeenCalled();
+  });
+
+  it("load切替で中断された旧media errorをonErrorへ渡さない", () => {
+    const events = callbacks();
+    const engine = createAudioEngine(75, events);
+
+    engine.load("/audio/a.wav", { playbackRate: 1, autoplay: false });
+    engine.load("/audio/b.wav", { playbackRate: 1, autoplay: false });
+
+    audio.error = { code: 1, message: "aborted" } as MediaError;
+    audio.dispatchEvent(new Event("error"));
+
+    expect(events.onError).not.toHaveBeenCalled();
+  });
+
+  it("現行loadのmedia errorをonErrorへ渡す", () => {
+    const events = callbacks();
+    const engine = createAudioEngine(75, events);
+
+    engine.load("/audio/a.wav", { playbackRate: 1, autoplay: false });
+    audio.error = { code: 4, message: "unsupported" } as MediaError;
+    audio.dispatchEvent(new Event("error"));
+
+    expect(events.onError).toHaveBeenCalledWith({
+      source: "media",
+      code: 4,
+      message: "unsupported",
+    });
+  });
 });

@@ -340,9 +340,13 @@ export function reducePlayer(
       return { state: { ...state, status: "ended" }, commands };
     }
     case "audioFailed":
+      // engine 世代防御のセーフティネット: 再生対象がない／既に終了した項目への遅延失敗は無視する。
+      if (!state.item || state.status === "idle" || state.status === "ended") {
+        return { state, commands: [] };
+      }
       return {
         state: { ...state, status: "error", playbackError: input.error },
-        commands: state.item ? [{ type: "persistResume", reason: "error" }] : [],
+        commands: [{ type: "persistResume", reason: "error" }],
       };
     case "persistTick":
       return state.status === "playing" && state.item

@@ -63,20 +63,27 @@ export function createAudioEngine(
   let mergerNode: ChannelMergerNode | null = null;
   let channelSwapEnabled = false;
 
+  // load/play の世代トークン。トラック切替後に古い play() Promise や media error が届いても無視する。
+  let loadGeneration = 0;
+  let playToken = 0;
+  let loadErrorCleanup: (() => void) | null = null;
+
+  function invalidatePendingPlay() {
+    playToken++;
+  }
+
   // イベントリスナーを登録
   const onPlay = () => callbacks.onPlay();
   const onPause = () => callbacks.onPause();
   const onTimeUpdate = () => callbacks.onTimeUpdate(audio.currentTime);
   const onDurationChange = () => callbacks.onDurationChange(audio.duration || 0);
   const onEnded = () => callbacks.onEnded(false); // ループ判定はフック側
-  const onError = () => callbacks.onError(toMediaError(audio.error));
 
   audio.addEventListener("play", onPlay);
   audio.addEventListener("pause", onPause);
   audio.addEventListener("timeupdate", onTimeUpdate);
   audio.addEventListener("durationchange", onDurationChange);
   audio.addEventListener("ended", onEnded);
-  audio.addEventListener("error", onError);
 
   function toPlayError(error: unknown): AudioEngineError {
     if (error instanceof Error) {
@@ -127,7 +134,11 @@ export function createAudioEngine(
   }
 
   function playAudio() {
-    audio.play().catch((error: unknown) => callbacks.onError(toPlayError(error)));
+    const token = ++playToken;
+    audio.play().catch((error: unknown) => {
+      if (token !== playToken) return;
+      callbacks.onError(toPlayError(error));
+    });
   }
 
   function resumeAudioContext() {
@@ -162,6 +173,20 @@ export function createAudioEngine(
 
   return {
     load(url, opts) {
+      loadErrorCleanup?.();
+      invalidatePendingPlay();
+      const loadGen = ++loadGeneration;
+
+      const onLoadError = () => {
+        if (loadGen !== loadGeneration) return;
+        const mediaError = audio.error;
+        // トラック切替で旧 src の読み込みが中断されたときの MEDIA_ERR_ABORTED は無視する。
+        if (mediaError?.code === 1) return;
+        callbacks.onError(toMediaError(mediaError));
+      };
+      audio.addEventListener("error", onLoadError);
+      loadErrorCleanup = () => audio.removeEventListener("error", onLoadError);
+
       audio.src = url;
       audio.playbackRate = opts.playbackRate;
 
@@ -190,6 +215,8 @@ export function createAudioEngine(
 
       return () => {
         cleaned = true;
+        loadErrorCleanup?.();
+        loadErrorCleanup = null;
         audio.removeEventListener("loadedmetadata", seekAfterMetadata);
         audio.removeEventListener("canplay", seekAfterMetadata);
       };
@@ -240,6 +267,9 @@ export function createAudioEngine(
     isPlaying: () => !audio.paused,
 
     destroy() {
+      loadErrorCleanup?.();
+      loadErrorCleanup = null;
+      invalidatePendingPlay();
       audio.pause();
       audio.src = "";
       audio.removeEventListener("play", onPlay);
@@ -247,7 +277,6 @@ export function createAudioEngine(
       audio.removeEventListener("timeupdate", onTimeUpdate);
       audio.removeEventListener("durationchange", onDurationChange);
       audio.removeEventListener("ended", onEnded);
-      audio.removeEventListener("error", onError);
       audioCtx?.close().catch(() => {});
       // channelSwapEnabled は GC に任せる
       void channelSwapEnabled;

@@ -181,4 +181,13 @@ describe("PlayerController scenarios", () => {
     expect(result.state.playbackError).toEqual(error);
     expect(result.commands).toEqual([{ type: "persistResume", reason: "error" }]);
   });
+
+  it("idle状態への遅延audioFailedは無視する", () => {
+    const error = { source: "play" as const, name: "AbortError", message: "Aborted" };
+    const result = scenario([{ type: "audioFailed", error }]);
+
+    expect(result.state.status).toBe("idle");
+    expect(result.state.playbackError).toBeNull();
+    expect(result.commands).toEqual([]);
+  });
 });
