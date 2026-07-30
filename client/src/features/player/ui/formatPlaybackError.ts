@@ -1,4 +1,4 @@
-// 再生エラーの表示用フォーマット。BarContent / PopupContent 共通。
+// 再生エラーの表示用フォーマット。PlaybackErrorNotice 経由で Bar / Popup / 全画面で共通利用。
 
 import type { AudioEngineError } from "../model/audioEngine";
 

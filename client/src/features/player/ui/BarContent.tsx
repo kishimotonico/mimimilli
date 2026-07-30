@@ -4,7 +4,7 @@
 
 import type { PlayerState } from "../model/usePlayerState";
 import BarSeekStrip from "./BarSeekStrip";
-import { formatPlaybackError } from "./formatPlaybackError";
+import PlaybackErrorNotice from "./PlaybackErrorNotice";
 import CoverImg from "../../../entities/work/ui/CoverImg";
 import { selectFixedCoverThumbnailWidth } from "../../../entities/work/ui/coverThumbnailWidth";
 import { I } from "../../../shared/ui/Icon";
@@ -28,7 +28,6 @@ export default function BarContent({
 }: BarContentProps) {
   const { currentWork, isPlaying, tracks, currentTrackIndex, playbackError } = state;
   const track = tracks[currentTrackIndex] ?? null;
-  const formattedError = playbackError ? formatPlaybackError(playbackError) : null;
 
   return (
     <>
@@ -57,11 +56,8 @@ export default function BarContent({
           <span className="mle-bar1__track" title={track?.title ?? ""}>
             {track?.title ?? "—"}
           </span>
-          {formattedError ? (
-            <output className="mle-bar1__error" title={formattedError.details}>
-              <I.err size={11} />
-              {formattedError.label}
-            </output>
+          {playbackError ? (
+            <PlaybackErrorNotice error={playbackError} className="mle-bar1__error" />
           ) : (
             <span className="mle-bar1__work" title={currentWork?.title ?? ""}>
               {currentWork?.title ?? ""}

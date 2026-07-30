@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import FullScreenPlayer from "../../src/features/player/ui/FullScreenPlayer";
 import { PLAYER_CORE_INITIAL, type PlayerCoreState } from "../../src/features/player/model/atoms";
+import type { AudioEngineError } from "../../src/features/player/model/audioEngine";
 import type { Track, WorkSummary } from "../../src/entities/work/model";
 
 beforeEach(() => {
@@ -134,5 +135,24 @@ describe("FullScreenPlayer: A-Bリピート（TASK-11）", () => {
     renderPlayer({ abRepeat: { a: 10, b: null } });
     expect(screen.getByRole("button", { name: "A-Bリピートを解除" })).toBeInTheDocument();
     expect(screen.queryByText("リピート中")).toBeNull();
+  });
+});
+
+describe("FullScreenPlayer: 再生エラー表示（TASK-139）", () => {
+  const playbackError: AudioEngineError = {
+    source: "media",
+    name: "NotSupportedError",
+    code: 4,
+    message: "MEDIA_ELEMENT_ERROR: Format error",
+  };
+
+  it("playbackError があるときフォーマット済みメッセージを表示する", () => {
+    renderPlayer({ playbackError });
+    expect(screen.getByText("この音声形式またはURLは再生できません")).toBeInTheDocument();
+  });
+
+  it("playbackError がないときエラー表示は出ない", () => {
+    renderPlayer({ playbackError: null });
+    expect(screen.queryByText("この音声形式またはURLは再生できません")).toBeNull();
   });
 });

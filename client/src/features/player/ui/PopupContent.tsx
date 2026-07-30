@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { PlayerState } from "../model/usePlayerState";
 import PopupSeek from "./PopupSeek";
-import { formatPlaybackError } from "./formatPlaybackError";
+import PlaybackErrorNotice from "./PlaybackErrorNotice";
 import CoverImg from "../../../entities/work/ui/CoverImg";
 import { selectFixedCoverThumbnailWidth } from "../../../entities/work/ui/coverThumbnailWidth";
 import { I } from "../../../shared/ui/Icon";
@@ -65,7 +65,6 @@ export default function PopupContent({
     playbackError,
   } = state;
   const track = tracks[currentTrackIndex] ?? null;
-  const formattedError = playbackError ? formatPlaybackError(playbackError) : null;
   const [rateMenuOpen, setRateMenuOpen] = useState(false);
   const rateMenuRef = useRef<HTMLDivElement>(null);
 
@@ -178,11 +177,8 @@ export default function PopupContent({
         <div className="mle-popup__track" title={track?.title ?? ""}>
           {track?.title ?? "—"}
         </div>
-        {formattedError ? (
-          <output className="mle-popup__error" title={formattedError.details}>
-            <I.err size={11} />
-            {formattedError.label}
-          </output>
+        {playbackError ? (
+          <PlaybackErrorNotice error={playbackError} className="mle-popup__error" />
         ) : (
           <div className="mle-popup__work" title={currentWork?.title ?? ""}>
             {currentWork?.title ?? ""}

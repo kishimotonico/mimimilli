@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef } from "react";
 import type { PlayerState } from "../model/usePlayerState";
 import FullScreenScrub from "./FullScreenScrub";
+import PlaybackErrorNotice from "./PlaybackErrorNotice";
 import { formatTime } from "../../../shared/lib/format";
 import CoverImg from "../../../entities/work/ui/CoverImg";
 import { selectFixedCoverThumbnailWidth } from "../../../entities/work/ui/coverThumbnailWidth";
@@ -46,8 +47,17 @@ export default function FullScreenPlayer({
 }: FullScreenPlayerProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const { currentWork, isPlaying, volume, loop, tracks, currentTrackIndex, channelSwap, abRepeat } =
-    state;
+  const {
+    currentWork,
+    isPlaying,
+    volume,
+    loop,
+    tracks,
+    currentTrackIndex,
+    channelSwap,
+    abRepeat,
+    playbackError,
+  } = state;
   const track = tracks[currentTrackIndex] ?? null;
   // リピートが実際に成立する条件（usePlayer 側のループ発動条件と同じ a < b）
   const hasABRepeat = abRepeat.a !== null && abRepeat.b !== null && abRepeat.a < abRepeat.b;
@@ -117,6 +127,11 @@ export default function FullScreenPlayer({
             <h1 className="m-0 text-balance font-jp text-[38px] font-semibold leading-[1.15] tracking-[-0.01em] text-ink-0">
               {track?.title ?? "—"}
             </h1>
+
+            <PlaybackErrorNotice
+              error={playbackError}
+              className="inline-flex min-w-0 max-w-full items-center gap-1 font-jp text-[10.5px] text-[var(--r-coral)]"
+            />
 
             {/* Scrub */}
             <FullScreenScrub onSeek={onSeek} abRepeat={abRepeat} />
