@@ -1,11 +1,11 @@
 ---
 id: TASK-158
 title: SQLite接続にbusy_timeoutを設定し並行書き込み時の操作失敗を防ぐ
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-07-30 17:54'
-updated_date: '2026-07-30 18:06'
+updated_date: '2026-07-30 18:12'
 labels: []
 dependencies: []
 priority: high
@@ -20,9 +20,9 @@ server/src/adapters/real/db.ts:43付近の接続初期化にbusy_timeoutが未�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 全SQLite接続（catalog/user、メイン/Worker）にbusy_timeoutが設定されている（値の根拠をコメントまたはタスクに記録）
-- [ ] #2 スキャン実行中の書き込み系ユーザー操作が即時SQLITE_BUSYで失敗しないことをテストで確認する
-- [ ] #3 pnpm check と pnpm test が通る
+- [x] #1 全SQLite接続（catalog/user、メイン/Worker）にbusy_timeoutが設定されている（値の根拠をコメントまたはタスクに記録）
+- [x] #2 スキャン実行中の書き込み系ユーザー操作が即時SQLITE_BUSYで失敗しないことをテストで確認する
+- [x] #3 pnpm check と pnpm test が通る
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -32,3 +32,9 @@ server/src/adapters/real/db.ts:43付近の接続初期化にbusy_timeoutが未�
 2. スキャン並行書き込み時にSQLITE_BUSY即時失敗しないテスト追加
 実装はCursor委譲
 <!-- SECTION:PLAN:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+sqliteConnection.tsにSQLITE_BUSY_TIMEOUT_MS=5000の共有ヘルパーを追加し、openDb（catalog/user/Worker/bench経由含む）とDlsiteCacheの全接続に適用。別接続がBEGIN IMMEDIATEでロック保持中でも待機して書き込み成功するテストを追加。server 357テスト・pnpm check全通過。実装Cursor委譲。
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -144,6 +144,11 @@ export interface CoverLocationRow {
   coverImage: string | null;
 }
 
+/** メディア配信のパス解決に必要な列だけを取得する軽量行。 */
+export interface MediaRootRow {
+  physicalPath: string;
+}
+
 const RECENT_VIEW_WINDOW_DAYS = 30;
 
 export class PersistentDataError extends Error {
@@ -1106,6 +1111,18 @@ export class WorkRepo {
            FROM main.works WHERE id = ?`,
         )
         .get(id) as CoverLocationRow | undefined) ?? null
+    );
+  }
+
+  /** メディア配信のパス解決専用。playlists復元・probe・duration再計算を伴わない。 */
+  getMediaRoot(id: string): MediaRootRow | null {
+    return (
+      (this.db.sqlite
+        .query(
+          `SELECT physical_path AS physicalPath
+           FROM main.works WHERE id = ?`,
+        )
+        .get(id) as MediaRootRow | undefined) ?? null
     );
   }
 

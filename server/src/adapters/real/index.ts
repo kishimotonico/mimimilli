@@ -793,13 +793,13 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       workId: string,
       relPath?: string,
     ): Promise<MediaLocation | null> {
-      const work = await repo.getWork(workId);
-      if (!work) return null;
+      const root = repo.getMediaRoot(workId);
+      if (!root) return null;
 
       const rel = relPath;
       if (!rel) return null;
 
-      const resolved = resolveWithin(work.physicalPath, join(work.physicalPath, rel));
+      const resolved = resolveWithin(root.physicalPath, join(root.physicalPath, rel));
       if (!resolved) return null;
 
       return { type: "file", absolutePath: resolved, mime: mimeOf(resolved) };
