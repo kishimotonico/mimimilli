@@ -114,6 +114,38 @@ export const dlsiteStatePatchSchema = z
   .refine((patch) => patch.rjCode !== undefined || patch.skipped !== undefined);
 export type DlsiteStatePatch = z.infer<typeof dlsiteStatePatchSchema>;
 
+/** updateDlsiteState の状態遷移（real/fixture 共通）。
+ *  RJコードが変わったときだけ旧コード由来の取得結果を捨てて未取得に戻す。
+ *  skipped 指定時は従来どおり status/error/errorKind を上書きする（rjCode 変更より後に適用）。 */
+export function applyDlsiteStatePatch(current: DlsiteState, patch: DlsiteStatePatch): DlsiteState {
+  let next: DlsiteState = { ...current };
+
+  if (patch.rjCode !== undefined) {
+    next.rjCode = patch.rjCode;
+    if (patch.rjCode !== current.rjCode) {
+      next = {
+        ...next,
+        status: "none",
+        lastAttemptAt: null,
+        error: null,
+        errorKind: null,
+        appliedTags: [],
+      };
+    }
+  }
+
+  if (patch.skipped !== undefined) {
+    next = {
+      ...next,
+      status: patch.skipped ? "skipped" : "none",
+      error: null,
+      errorKind: null,
+    };
+  }
+
+  return next;
+}
+
 export const dlsiteBulkModeSchema = z.enum(["new", "existing"]);
 export type DlsiteBulkMode = z.infer<typeof dlsiteBulkModeSchema>;
 

@@ -1,6 +1,7 @@
 // fixture アダプタ: インメモリの seed データを使う DataAdapter 実装。
 // 開発・ビジュアルテスト用（ADR-0002）。core/ の pure 関数を使って全メソッドを実装する。
 import {
+  applyDlsiteStatePatch,
   DEFAULT_TAG_PREFIXES,
   evaluateParseErrorAlert,
   isDlsiteFetchFailed,
@@ -656,11 +657,7 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
     async updateDlsiteState(workId: string, patch: DlsiteStatePatch): Promise<Work | null> {
       const work = state.works.find((candidate) => candidate.id === workId);
       if (!work) return null;
-      if (patch.rjCode !== undefined) work.dlsite.rjCode = patch.rjCode;
-      if (patch.skipped !== undefined) {
-        work.dlsite.status = patch.skipped ? "skipped" : "none";
-        work.dlsite.error = null;
-      }
+      work.dlsite = applyDlsiteStatePatch(work.dlsite, patch);
       return buildFullWork(work, state.resumes, state.playbackIds);
     },
 

@@ -88,3 +88,26 @@ test("fixtureのDLsite取得は保存済みRJコードの修正を反映する",
   assert.equal(result.info.title, "（fixture）RJ7654321");
   assert.match(result.info.url, /RJ7654321\.html$/);
 });
+
+test("fixture: RJコード変更で旧状態をリセットし一括取得対象に戻す", async () => {
+  const adapter = createFixtureAdapter();
+  const workId = "RJ501001";
+  const before = await adapter.getWork(workId);
+  assert.equal(before?.dlsite.status, "applied");
+  assert.ok((before?.dlsite.appliedTags.length ?? 0) > 0);
+
+  const unchanged = await adapter.updateDlsiteState(workId, { rjCode: "RJ501001" });
+  assert.equal(unchanged?.dlsite.status, "applied");
+  assert.deepEqual(unchanged?.dlsite.appliedTags, before?.dlsite.appliedTags);
+
+  const updated = await adapter.updateDlsiteState(workId, { rjCode: "RJ7654321" });
+  assert.equal(updated?.dlsite.rjCode, "RJ7654321");
+  assert.equal(updated?.dlsite.status, "none");
+  assert.equal(updated?.dlsite.error, null);
+  assert.equal(updated?.dlsite.errorKind, null);
+  assert.deepEqual(updated?.dlsite.appliedTags, []);
+
+  const bulk = await adapter.runDlsiteBulk("existing", [workId]);
+  assert.equal(bulk.fetched, 1);
+  assert.equal(bulk.skipped, 0);
+});

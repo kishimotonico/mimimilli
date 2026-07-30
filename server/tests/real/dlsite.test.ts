@@ -252,6 +252,59 @@ test("updateDlsiteState: RJコード修正とskipped切替をメタへ保存す�
   assert.equal(enabled?.dlsite.status, "none");
 });
 
+test("updateDlsiteState: RJコード変更で旧状態をリセットし一括取得対象に戻す", async (t) => {
+  const lib = makeSampleLibrary();
+  t.after(lib.cleanup);
+  const adapter = createRealAdapter({
+    database: { kind: "memory" },
+    dlsiteRequestIntervalMs: 0,
+    dlsiteFetcher: async (rjCode) => ({
+      ok: true,
+      info: {
+        rjCode,
+        title: `取得 ${rjCode}`,
+        circle: null,
+        cvs: [],
+        genreTags: ["新着"],
+        coverUrl: null,
+        url: `https://www.dlsite.com/maniax/work/=/product_id/${rjCode}.html`,
+      },
+    }),
+  });
+  await adapter.updateSettings({ rootFolder: lib.root });
+  await adapter.scan();
+
+  const before = await adapter.getWork(lib.existingWorkId);
+  const metaPath = join(before!.physicalPath, ".meta.json");
+  const meta = JSON.parse(readFileSync(metaPath, "utf-8"));
+  meta.dlsite = {
+    rjCode: "RJ900002",
+    status: "applied",
+    lastAttemptAt: "2026-06-10T12:00:00.000Z",
+    error: null,
+    errorKind: null,
+    appliedTags: ["genre/旧タグ"],
+  };
+  writeFileSync(metaPath, JSON.stringify(meta, null, 2));
+  await adapter.scan();
+
+  const unchanged = await adapter.updateDlsiteState(lib.existingWorkId, { rjCode: "RJ900002" });
+  assert.equal(unchanged?.dlsite.status, "applied");
+  assert.deepEqual(unchanged?.dlsite.appliedTags, ["genre/旧タグ"]);
+
+  const updated = await adapter.updateDlsiteState(lib.existingWorkId, { rjCode: "RJ888888" });
+  assert.equal(updated?.dlsite.rjCode, "RJ888888");
+  assert.equal(updated?.dlsite.status, "none");
+  assert.equal(updated?.dlsite.error, null);
+  assert.equal(updated?.dlsite.errorKind, null);
+  assert.deepEqual(updated?.dlsite.appliedTags, []);
+
+  const bulk = await adapter.runDlsiteBulk("existing", [lib.existingWorkId]);
+  assert.equal(bulk.fetched, 1);
+  assert.equal(bulk.skipped, 0);
+  adapter.close();
+});
+
 test("dlsiteFetch: 存在しない作品はnot_found", async (t) => {
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);

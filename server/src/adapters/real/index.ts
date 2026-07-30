@@ -5,7 +5,12 @@ import { createHash } from "node:crypto";
 import { stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
-import { DEFAULT_TAG_PREFIXES, normalizeTags, toWorkListItem } from "@mimimilli/shared";
+import {
+  applyDlsiteStatePatch,
+  DEFAULT_TAG_PREFIXES,
+  normalizeTags,
+  toWorkListItem,
+} from "@mimimilli/shared";
 import type {
   AxisFacetItem,
   DlsiteApplyBody,
@@ -862,17 +867,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
     async updateDlsiteState(workId: string, patch: DlsiteStatePatch): Promise<Work | null> {
       const work = await repo.getWork(workId);
       if (!work) return null;
-      const dlsite = {
-        ...work.dlsite,
-        ...(patch.rjCode !== undefined ? { rjCode: patch.rjCode } : {}),
-        ...(patch.skipped !== undefined
-          ? {
-              status: patch.skipped ? ("skipped" as const) : ("none" as const),
-              error: null,
-              errorKind: null,
-            }
-          : {}),
-      };
+      const dlsite = applyDlsiteStatePatch(work.dlsite, patch);
       db.transaction(() => {
         repo.setDlsiteState(workId, dlsite);
         const metaPath = repo.getWorkMetaPath(workId);
