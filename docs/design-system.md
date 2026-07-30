@@ -78,7 +78,7 @@ backdropクリックの共通処理は `client/src/shared/ui/useDialogModal.ts` 
 
 方針の正は [ADR-0006](adr/0006-mobile-ui-strategy.md)。要点のみ:
 
-- ブレークポイントは 768px の単一分岐（`tokens.css` のトークンが正）。768px以下は `AppShell` でなく `MobileShell`（ボトムタブ＋ミニプレイヤー）に切り替える
+- ブレークポイントは 768px の単一分岐（`tokens.css` のトークンが正）。768px以下は `AppShell` でなく `MobileShell`（ボトムタブ＋ミニプレイヤー）に切り替える設計（[ADR-0006](adr/0006-mobile-ui-strategy.md) 承認済み、`MobileShell` 自体は未実装）
 - デスクトップ側コンポーネントに `md:` ユーティリティを散らして畳まない。操作系が異なるものはモバイル用ビューを別コンポーネントとして持つ
 - スマホには管理系UI（タグ編集・スマートフォルダー編集・スキャン・設定）を持ち込まない。書き込みは「お気に入り」「あとで整理」タグのトグルのみ
 

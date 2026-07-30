@@ -1,13 +1,12 @@
 # 引き継ぎドキュメント
 
 mimimilli の現状と進行中の作業を、後続のエージェント／セッションが把握するための資料。
-最終更新: 2026-07-19。
 
 ## このアプリは何か
 
 DLsite/FANZA 等からダウンロードした音声作品（ASMR・ボイスドラマ等）をローカルで管理・再生する常駐 Web アプリ。タグ／分類軸ベースの検索と、物理フォルダー（ファイラー）の両モードを持つ。`.meta.json` を Source of Truth、SQLite を検索キャッシュとする。
 
-名前は3つ使い分けている。アプリ・パッケージ名は `mimimilli`（2026-07-03 に旧名から改名）、リポジトリ／ディレクトリ名は旧名の `mimikago` のまま、portless のサービス名は短い URL を保つため `mimi`。いずれも意図的なので揃えようとしないこと。
+名前は3つ使い分けている。アプリ・パッケージ名は `mimimilli`、リポジトリ／ディレクトリ名は旧名の `mimikago` のまま、portless のサービス名は短い URL を保つため `mimi`。いずれも意図的なので揃えようとしないこと。
 
 アーキテクチャは [docs/ARCHITECTURE.md](ARCHITECTURE.md)、決定の経緯は [ADR-0001](adr/0001-typescript-api-server.md) / [ADR-0002](adr/0002-mock-as-fixture-adapter.md)。要件は [docs/requirements-v4.md](requirements-v4.md)。ドキュメント全体の地図は [docs/README.md](README.md)、未完了タスクは Backlog.md CLI（`pnpm backlog task list --plain`）。
 
@@ -19,7 +18,7 @@ DLsite/FANZA 等からダウンロードした音声作品（ASMR・ボイスド
 
 ### dev サーバーへの server/src 自動反映
 
-fixture API は `ssrLoadModule` 経由の遅延読み込みで、`server/src`・`shared/src` の変更は watcher がモジュールグラフを無効化し**次の `/api` リクエストで自動反映される**（手動再起動は不要）。client 側（`src/`）は通常の HMR。仕組みの詳細は `client/vite.config.ts` の `fixtureApiPlugin` を参照。
+fixture API は `ssrLoadModule` 経由の遅延読み込みで、`server/src`・`shared/src` の変更は watcher がモジュールグラフを無効化し**次の `/api` リクエストで自動反映される**（手動再起動は不要）。client 側（`src/`）は通常の HMR。ただし `shared/src` に新しい export を追加すると画面が白くなることがあり、その場合は dev サーバーの再起動が要る。仕組みの詳細は `client/vite.config.ts` の `fixtureApiPlugin` を参照。
 
 ### CSS レイヤー
 
@@ -60,6 +59,7 @@ MIMIMILLI_ADAPTER=fixture PORT=18099 pnpm --filter @mimimilli/server start
 - スナップショットは**必ず Playwright で生成**する（agent-browser で撮った画像はレンダリングが違い、CI 比較で落ちる）
 - パネル等の**要素単位**で `toHaveScreenshot` する。`fullPage` は半透明オーバーレイ越しの背景差分が許容差分に薄まり**偽パス**になる（scan結果ダイアログで実際に踏んだ。`role=dialog` 要素を撮る形に修正済み）
 - 共有 fixture 状態に依存するため直列実行が前提（`playwright.config.ts`: workers:1 / fullyParallel:false / retries:2 / maxDiffPixels:1200。比率指定はレイアウト回帰を素通りさせた実績があり使わない）
+- Codex のサンドボックスは Playwright（Chromium 起動・vite listen）が EPERM で動かないことがあるので、Codex に実装を委譲した場合もスナップショット生成は別の環境で行う
 
 ## API 契約 v2（現行エンドポイント）
 
@@ -80,6 +80,8 @@ MIMIMILLI_ADAPTER=fixture PORT=18099 pnpm --filter @mimimilli/server start
 | PATCH        | `/dlsite/:id`                                                         | RJコード修正・skipped切替                                                                                                 |
 | POST         | `/dlsite/bulk`                                                        | none/error作品の一括取得ジョブを開始                                                                                      |
 | GET          | `/dlsite/events`                                                      | 一括取得ジョブの進捗SSE                                                                                                   |
+| GET          | `/dlsite/notifications`                                               | RJコード未検出・取得失敗・パース失敗の件数サマリー                                                                        |
+| GET          | `/dlsite/notifications/:kind`                                         | `rj-missing` / `fetch-failed` / `parse-failed` の該当作品一覧（詳細は docs/dlsite.md）                                    |
 | GET          | `/works/:id/files`                                                    | 物理ファイルツリー                                                                                                        |
 | GET          | `/tags`                                                               | フラット/構造化タグの一覧                                                                                                 |
 | GET/POST     | `/tag-prefixes`                                                       | prefix定義の一覧・追加                                                                                                    |
@@ -115,34 +117,31 @@ MIMIMILLI_ADAPTER=fixture PORT=18099 pnpm --filter @mimimilli/server start
 - **TanStack Query**: サーバー状態。キーは `client/src/entities/<ドメイン>/queryKeys.ts` のファクトリで一元管理する（`WORK_QUERY_KEYS` / `TAG_QUERY_KEYS` / `SMART_FOLDER_QUERY_KEYS` / `SETTINGS_QUERY_KEYS` / `FILE_SYSTEM_QUERY_KEYS`）。広域 invalidate 用のプレフィックスキーも各ファクトリが持つ
 - **URL同期**: `features/navigation/`（`navigationUrl.ts` codec + `useNavigationHistory.ts` の history 同期層）。モード・軸・ドリル・タグ・選択作品・ソート・ファイルパスを URL に双方向同期。ナビ操作は `push`、選択/ソート等の軽微変更は `replace`。`requestNavigationHistoryCommitAtom` を各操作（useLibraryNavigation / useFilesNavigation / LeftNav の setMode）が叩いて push/replace を宣言する。AddressBar の戻る/進む・パンくずも本物
 - **共通UIコンポーネント**: `client/src/shared/ui/` の `Button` / `IconButton` / `TagCombobox` を使う（CSSクラス直付けボタンは廃止済み。LeftNav と円形トランスポートだけ固有意匠のため例外）
+- `App.tsx` はランタイム状態も TanStack Query も購読しない。`libraryTotalQuery` / `lastScanQuery` のような画面固有の購読は、それを使う消費者（`ScanModal` / `NotificationBell`）が自分で行う。この境界は `.oxlintrc.json` の `**/App.tsx` override で機械的に強制されており、`features/**/model/**` の import は deny-by-default（`usePlayerActions` 等の action フックだけ否定 glob で許可）
 
 ## プレイヤーのアーキテクチャ
 
 `client/src/features/player/`。UIは「画面下バー + 右下ポップアップ + 全画面」の3層構成（バー⇄ポップアップは `PlayerDock.tsx` が AnimatePresence で切替）。
 
-状態遷移は TASK-82 で `PlayerController` 状態機械に集約した。model 層の分担:
+状態遷移は `PlayerController` 状態機械に集約している。model 層の分担:
 
-- `model/playerController.ts`: 再生状態の正。`PlayerControllerState`（status: idle/loading/playing/paused/ended/error、`PlaybackItem`、position/duration、volume/loop/playbackRate/channelSwap/abRepeat 等）と、入力→遷移+コマンドの純粋な `reducePlayer`、それを駆動する `PlayerController` クラス。聴了（トラック終端到達）もここのドメインイベントとして扱う
+- `model/playerController.ts`: 再生状態の正。`PlayerControllerState`（`status`: idle/loading/playing/paused/ended/error、`PlaybackItem`、position/duration、volume/loop/playbackRate/channelSwap/abRepeat 等）と、入力→遷移+コマンドの純粋な `reducePlayer`、それを駆動する `PlayerController` クラス。聴了（トラック終端到達）もここのドメインイベントとして扱う。トラック切替は `withTrackIndex` が再生意図を決める: `intent: "preserve"`（次へ・前へ・自動送り）は現在の再生状態を維持し、`intent: "explicit"`（明示選択）は常に再生を開始する。実ロードへは `loadTrack` コマンド（autoplayフラグ付き）で配線する
 - `model/playerRuntime.ts`: controller と React の間で共有する参照型（`PlayerRuntimeRefs` / `LoadedTrack` / `PendingResume` 等）
 - `model/atoms.ts`:
   - `playerCoreAtom`（低頻度 state。`toPlayerCoreState` で controller state から導出）
   - `playerCurrentTimeAtom` / `playerDurationAtom`（**高頻度**。timeupdate 毎に更新。`usePlaybackProgress` を介して **BarSeekStrip / PopupSeek / FullScreenScrub の3 leaf だけが subscribe**する。親コンポーネント（BarContent / PopupContent / FullScreenPlayer）や App.tsx は subscribe しないので再生中に上位が再レンダリングされない — この分離は**維持必須**）
   - `playerUiModeAtom`（bar⇄popup。localStorage 永続）
 - `model/audioEngine.ts`: 低レベル。`new Audio()`（DOM外）。load/play/pause/seek/setVolume/setPlaybackRate/setChannelSwap、timeupdate/durationchange/ended コールバック
-- `model/useAudioEngineLifecycle.ts`: エンジンの生成・イベント購読・last-played 送信
+- `model/useAudioEngineLifecycle.ts`: エンジンの生成・イベント購読・last-played 送信。同一アセットを再利用する経路（再生中のトラックへ戻る等）では `<audio>` の `play()` がすでに再生中だとイベントを発火しないため、`audioPlaying` を代理で dispatch して状態機械を同期させる
 - `model/useResumePersistence.ts`: resume v2（playlistId/trackId/offsetSec）の保存・復元ポート
 - `model/useMediaSession.ts`: OS のメディアキー・通知（Media Session API）連携
 - `model/trackTime.ts`: トラック区間（start/duration）とファイル絶対時間の相互変換の純関数
-- `model/usePlayer.ts`: 上記を束ねて UI へ公開する React フック。`play` / `togglePlay` / `seek` / `seekRelative` / `setVolume` / `setLoop` / `nextTrack` / `prevTrack` / `setTrackIndex` / `setShowFullPlayer` / `playWithResume` / `setPlaybackRate` / `setChannelSwap`（L⇄R入替）/ `setABPoint`・`clearABRepeat`（A-Bリピート。a < b のときだけ成立、B→A の順で設定すると自動で入れ替え）
+- `model/usePlayer.ts`: 上記を束ねて UI へ公開する React フック。`play` / `togglePlay` / `seek` / `seekRelative` / `setVolume` / `setLoop` / `nextTrack` / `prevTrack` / `setTrackIndex` / `setShowFullPlayer` / `playWithResume` / `setPlaybackRate` / `setChannelSwap`（L⇄R入替）/ `setABPoint`・`clearABRepeat`（A-Bリピート。a < b のときだけ成立、B→A の順で設定すると自動で入れ替え）。レジュームの定期保存は `persistTick`（5秒間隔、`status === "playing"` のときだけ実際に保存する）
 - `ui/PlayerDock.tsx`: バー⇄ポップアップの外枠・層切替
 - `ui/BarContent.tsx`（画面下バー）: カバー / トラック名 / 再生切替 + バー下辺に貼り付くシークバー（時間表示なし）。バークリックでポップアップへ
 - `ui/PopupContent.tsx`（右下ポップアップ）: 大カバー / シーク / 前・次・ループ / ±10秒 / 倍速 / 音量 / 再生中の作品へジャンプ / 全画面展開
 - `ui/FullScreenPlayer.tsx`: 全画面。トラックリスト・シーク・音量・ループ。ネイティブ `<dialog>` + `showModal()` の完全モーダル（フォーカストラップ・Esc はブラウザ標準に委譲）
 - `ui/useSeekDrag.ts`: シーク操作の共通フック（バー・ポップアップ・全画面で共用）
-
-### プレイヤーの残課題
-
-backlog の `player` ラベルのタスクを参照（`pnpm backlog task list --labels player --plain`）。
 
 ### ⚠ 自動検証の限界（音声）
 
@@ -154,15 +153,4 @@ Git・実装方針・デバッグ方法・タスク管理の共通ルールは [
 
 - コミットはユーザー指示があるまでしない（監督がレビュー後にまとめる）
 - デザイントークンの正は `client/src/styles/tokens.css`（規約は [docs/design-system.md](design-system.md)）
-
-## ドキュメントの現状
-
-ドキュメントの地図（現行の正典・規約・削除済みの区分）は [docs/README.md](README.md) が正。旧 Rust 時代の名残（旧実装・旧提案書）は棚卸しで解消済みで、削除済みドキュメントの一覧も docs/README.md にある。
-
-現行の正は本 HANDOFF と [docs/ARCHITECTURE.md](ARCHITECTURE.md)、`shared/src/`（契約）、`server/src/`（実装）。
-
-本書は「現在の状態」だけを記述する方針で、時系列の経緯（いつ何をやったか）は Git 履歴と backlog のタスクが持つ（2026-07-06 以前の記録は [docs/issues/](issues/README.md) アーカイブ、凍結済み）。
-
-## 実装を委譲する場合
-
-実装・調査・デバッグは Codex（`codex exec --json -s workspace-write`、thread_id を控えて resume で反復）か Sonnet サブエージェントに委譲し、**監督側が差分レビュー・テスト・実機確認してからコミット**する運用。Codex のサンドボックスは Playwright（Chromium 起動・vite listen）が EPERM で動かないことがあるので、**スナップショット生成は監督側の環境で行う**。
+- ドキュメント全体の地図・正典/削除済みの区分は [docs/README.md](README.md) を参照
