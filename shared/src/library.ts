@@ -92,9 +92,13 @@ export const smartFolderCreateSchema = z.object({
 });
 export type SmartFolderCreate = z.infer<typeof smartFolderCreateSchema>;
 
-export const smartFolderUpdateSchema = z.object({
-  name: z.string().min(1).optional(),
-  rules: z.array(smartFolderRuleSchema).optional(),
-  sort: sortIdSchema.optional(),
-});
+export const smartFolderUpdateSchema = z
+  .object({
+    name: z.string().min(1).optional(),
+    rules: z.array(smartFolderRuleSchema).optional(),
+    sort: sortIdSchema.optional(),
+  })
+  .refine(
+    (patch) => patch.name !== undefined || patch.rules !== undefined || patch.sort !== undefined,
+  );
 export type SmartFolderUpdate = z.infer<typeof smartFolderUpdateSchema>;

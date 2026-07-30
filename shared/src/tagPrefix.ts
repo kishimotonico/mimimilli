@@ -52,12 +52,20 @@ export const tagPrefixCreateSchema = z.object({
 });
 export type TagPrefixCreate = z.infer<typeof tagPrefixCreateSchema>;
 
-export const tagPrefixUpdateSchema = z.object({
-  label: z.string().trim().min(1).optional(),
-  color: z.string().nullable().optional(),
-  showAsAxis: z.boolean().optional(),
-  protected: z.boolean().optional(),
-});
+export const tagPrefixUpdateSchema = z
+  .object({
+    label: z.string().trim().min(1).optional(),
+    color: z.string().nullable().optional(),
+    showAsAxis: z.boolean().optional(),
+    protected: z.boolean().optional(),
+  })
+  .refine(
+    (patch) =>
+      patch.label !== undefined ||
+      patch.color !== undefined ||
+      patch.showAsAxis !== undefined ||
+      patch.protected !== undefined,
+  );
 export type TagPrefixUpdate = z.infer<typeof tagPrefixUpdateSchema>;
 
 /** データ中に存在するが未登録の prefix（設定UIのサジェスト用） */

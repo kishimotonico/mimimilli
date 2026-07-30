@@ -24,7 +24,10 @@ export const worksQuerySchema = z.object({
   page: z.coerce.number().int().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(500).optional(),
 });
-export type WorksQuery = z.infer<typeof worksQuerySchema>;
+/** HTTP クエリの入力型（.default 付きフィールドは省略可能） */
+export type WorksQueryInput = z.input<typeof worksQuerySchema>;
+/** パース後の正規化済みクエリ（サーバー adapter が受け取る型） */
+export type WorksQuery = z.output<typeof worksQuerySchema>;
 
 /** ページングエンベロープ。total は検索・フィルター後・ページング前の件数。
  *  サーバーは page/limit 未指定でもデフォルト（page=1, limit=WORKS_DEFAULT_PAGE_SIZE）でページングする */
@@ -86,12 +89,17 @@ export const tagListSchema = z.array(z.string());
 // ── 作品の部分更新（PATCH /api/works/:id）────────────────────
 // 旧 PUT /works/:id/tags・PUT /works/:id/title・POST /works/:id/bookmark を統合。
 
-export const workPatchSchema = z.object({
-  title: z.string().min(1).optional(),
-  /** タグは契約の入口で正規形へ寄せる（ADR-0005 決定5。prefix 小文字化・trim・重複排除） */
-  tags: z.array(z.string()).transform(normalizeTags).optional(),
-  bookmarked: z.boolean().optional(),
-});
+export const workPatchSchema = z
+  .object({
+    title: z.string().min(1).optional(),
+    /** タグは契約の入口で正規形へ寄せる（ADR-0005 決定5。prefix 小文字化・trim・重複排除） */
+    tags: z.array(z.string()).transform(normalizeTags).optional(),
+    bookmarked: z.boolean().optional(),
+  })
+  .refine(
+    (patch) =>
+      patch.title !== undefined || patch.tags !== undefined || patch.bookmarked !== undefined,
+  );
 export type WorkPatch = z.infer<typeof workPatchSchema>;
 
 /** POST /api/works/:id/resume（高頻度更新のため PATCH と分離） */

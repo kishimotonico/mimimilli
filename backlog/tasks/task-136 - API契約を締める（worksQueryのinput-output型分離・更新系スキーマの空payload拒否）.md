@@ -1,9 +1,11 @@
 ---
 id: TASK-136
 title: API契約を締める（worksQueryのinput/output型分離・更新系スキーマの空payload拒否）
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-07-30 12:31'
+updated_date: '2026-07-30 16:31'
 labels: []
 dependencies: []
 priority: low
@@ -21,7 +23,27 @@ shared契約の細部の締め直し2点（検証済み）。
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 sharedがworksQueryのinput/output型を公開し、clientの手書きWorksQueryParamsが削除されている
-- [ ] #2 更新系3スキーマが空payloadを400で拒否し、テストがある
-- [ ] #3 pnpm check・pnpm test が通る
+- [x] #1 sharedがworksQueryのinput/output型を公開し、clientの手書きWorksQueryParamsが削除されている
+- [x] #2 更新系3スキーマが空payloadを400で拒否し、テストがある
+- [x] #3 pnpm check・pnpm test が通る
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. worksQueryのz.input/z.output型を別名公開しclientの手書き型を削除
+2. 更新系3スキーマに最低1フィールドのrefine追加+テスト
+3. pnpm check + pnpm test
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Cursor(composer-2.5)で実装。WorksQueryInput(z.input)/WorksQuery(z.output)を公開しclientの手書き型を削除（互換aliasは@deprecated付きで一時残置）。更新系3スキーマへ最低1フィールドrefine追加、updatePayloadContract.test.tsで400を固定。全体check+test:server 353件+test:client 392件通過。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+worksQueryのinput/output型を分離してclient手書き型を廃止し、更新系スキーマの空payloadを契約として拒否。
+<!-- SECTION:FINAL_SUMMARY:END -->

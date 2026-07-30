@@ -17,32 +17,21 @@ import {
   type SmartFolder,
   type SmartFolderCreate,
   type SmartFolderUpdate,
-  type SortId,
   type TagPrefix,
   type TagPrefixCandidate,
   type TagPrefixCreate,
   type TagPrefixUpdate,
-  type ViewId,
   type WorksPage,
+  type WorksQueryInput,
 } from "@mimimilli/shared";
 
 // ── 作品検索（GET /api/works）────────────────────────────────
 
-export interface WorksQueryParams {
-  q?: string;
-  tags?: string[];
-  tagOp?: "AND" | "OR";
-  axis?: FacetAxisId;
-  axisValue?: string;
-  view?: ViewId;
-  sort?: SortId;
-  seed?: number;
-  page?: number;
-  limit?: number;
-}
+// 並行作業中の libraryPresentation 向け。shared の WorksQueryInput へのエイリアス。
+export type WorksQueryParams = WorksQueryInput;
 
 export async function searchWorks(
-  params: WorksQueryParams,
+  params: WorksQueryInput,
   options?: { signal?: AbortSignal },
 ): Promise<WorksPage> {
   const p = new URLSearchParams();
