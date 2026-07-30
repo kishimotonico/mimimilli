@@ -393,7 +393,7 @@ describe("usePlayer adapters", () => {
     });
   });
 
-  it("作品聴了コマンドをresume v2の先頭リセットとQuery cacheへ接続する", async () => {
+  it("作品聴了コマンドをレジュームの先頭リセットとQuery cacheへ接続する", async () => {
     const resumableWork: Work = {
       ...work,
       defaultPlaylistId: playlistId,
@@ -601,7 +601,7 @@ describe("usePlayer adapters", () => {
     await waitFor(() => expect(latestAudio().currentTime).toBe(0));
   });
 
-  it("resume v2の区間相対offsetをHTMLAudioの絶対時刻へ復元する", async () => {
+  it("レジュームの区間相対offsetをHTMLAudioの絶対時刻へ復元する", async () => {
     const segment: Track = { ...track, start: 30, end: 90 };
     const resumableWork: Work = {
       ...work,

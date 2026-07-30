@@ -61,7 +61,7 @@ MIMIMILLI_ADAPTER=fixture PORT=18099 pnpm --filter @mimimilli/server start
 - 共有 fixture 状態に依存するため直列実行が前提（`playwright.config.ts`: workers:1 / fullyParallel:false / retries:2 / maxDiffPixels:1200。比率指定はレイアウト回帰を素通りさせた実績があり使わない）
 - Codex のサンドボックスは Playwright（Chromium 起動・vite listen）が EPERM で動かないことがあるので、Codex に実装を委譲した場合もスナップショット生成は別の環境で行う
 
-## API 契約 v2（現行エンドポイント）
+## API 契約（現行エンドポイント）
 
 すべて `/api` 配下。リクエスト/レスポンスは `shared/src/*.ts` の Zod スキーマが正典。エラーは `{ error: { code, message } }`（`apiErrorSchema`）。**下表はあくまで概観で、エンドポイントを追加・変更したときに更新漏れしうる。実装時は必ず `shared/src/` を直接確認すること。**
 
@@ -136,7 +136,7 @@ MIMIMILLI_ADAPTER=fixture PORT=18099 pnpm --filter @mimimilli/server start
   - `playerUiModeAtom`（bar⇄popup。localStorage 永続）
 - `model/audioEngine.ts`: 低レベル。`new Audio()`（DOM外）。load/play/pause/seek/setVolume/setPlaybackRate/setChannelSwap、timeupdate/durationchange/ended コールバック
 - `model/useAudioEngineLifecycle.ts`: エンジンの生成・イベント購読・last-played 送信。同一アセットを再利用する経路（再生中のトラックへ戻る等）では `<audio>` の `play()` がすでに再生中だとイベントを発火しないため、`audioPlaying` を代理で dispatch して状態機械を同期させる
-- `model/useResumePersistence.ts`: resume v2（playlistId/trackId/offsetSec）の保存・復元ポート
+- `model/useResumePersistence.ts`: レジューム（playlistId/trackId/offsetSec）の保存・復元ポート
 - `model/useMediaSession.ts`: OS のメディアキー・通知（Media Session API）連携
 - `model/trackTime.ts`: トラック区間（start/duration）とファイル絶対時間の相互変換の純関数
 - `model/usePlayer.ts`: 上記を束ねて UI へ公開する React フック。`play` / `togglePlay` / `seek` / `seekRelative` / `setVolume` / `setLoop` / `nextTrack` / `prevTrack` / `setTrackIndex` / `setShowFullPlayer` / `playWithResume` / `setPlaybackRate` / `setChannelSwap`（L⇄R入替）/ `setABPoint`・`clearABRepeat`（A-Bリピート。a < b のときだけ成立、B→A の順で設定すると自動で入れ替え）。レジュームの定期保存は `persistTick`（5秒間隔、`status === "playing"` のときだけ実際に保存する）

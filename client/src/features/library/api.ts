@@ -1,4 +1,4 @@
-// library feature の API。作品検索（v2）、分類軸ファセット、スマートフォルダー、
+// library feature の API。作品検索、分類軸ファセット、スマートフォルダー、
 // ライブラリのエクスポート。
 // 依存方向: shared/api/http、entities/work（戻り値の WorkSummary）、自 feature の model を参照する。
 

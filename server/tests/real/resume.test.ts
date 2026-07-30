@@ -64,7 +64,7 @@ function sampleWork(id: string): Work {
   };
 }
 
-test("v2 resumeは区間相対秒で保存され、並べ替え後もTrack IDで復元する", async () => {
+test("レジュームは区間相対秒で保存され、並べ替え後もTrack IDで復元する", async () => {
   const db = openDb({ kind: "memory" });
   const repo = new WorkRepo(db);
   const work = sampleWork("resume-reorder");

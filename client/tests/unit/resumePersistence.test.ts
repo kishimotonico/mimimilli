@@ -40,7 +40,7 @@ beforeEach(() => {
 });
 
 describe("resume persistence port", () => {
-  it("resume v2をController向けのtrack indexと相対位置へ解決する", () => {
+  it("レジュームをController向けのtrack indexと相対位置へ解決する", () => {
     const work = {
       id: "work-1",
       defaultPlaylistId: playlistId,

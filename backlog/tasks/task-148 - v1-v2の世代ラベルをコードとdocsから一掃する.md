@@ -1,9 +1,11 @@
 ---
 id: TASK-148
 title: v1/v2の世代ラベルをコードとdocsから一掃する
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-07-30 13:00'
+updated_date: '2026-07-30 16:39'
 labels: []
 dependencies:
   - TASK-130
@@ -27,6 +29,27 @@ ordinal: 158000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 コード・docs（アーカイブ除く）に世代ラベルとしての v1/v2 表記が残っていない（rg で確認。文書の版数・外部固有名は除く）
-- [ ] #2 pnpm check・pnpm test が通る
+- [x] #1 コード・docs（アーカイブ除く）に世代ラベルとしての v1/v2 表記が残っていない（rg で確認。文書の版数・外部固有名は除く）
+- [x] #2 pnpm check・pnpm test が通る
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. rg "v1|v2" 全域確認
+2. HANDOFF「API 契約 v2」節題・resume v2表記、sharedコメント、useResumePersistenceコメントを修正
+3. resumeV2.test.tsをresume.test.tsへリネーム
+4. pnpm check + pnpm test
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Cursor(composer-2.5)で実装。ETag・DLsiteキャッシュのフォーマット版数（mimimilli-cover-v1等）は世代ラベルではなく表現バージョンなので意図的に残置。ADR・issuesアーカイブは対象外。全体check+test:server 355件+test:client 396件通過。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+HANDOFF・README・shared/clientコメントからv1/v2世代ラベルを一掃し、resumeV2.test.tsをresume.test.tsへリネーム。
+<!-- SECTION:FINAL_SUMMARY:END -->

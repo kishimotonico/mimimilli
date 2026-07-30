@@ -182,7 +182,7 @@ mimimilli/
 │       │   └── real/        # SQLite(Drizzle) + 実FS: scanner / dlsite / meta / workRepo ほか
 │       ├── core/            # ドメインロジック (worksQuery / axisFacets / smartFolder)
 │       └── routes/          # HTTP ルート定義
-├── shared/                  # Zod スキーマ正典（API 契約 v2、client/server 共有）
+├── shared/                  # Zod スキーマ正典（API 契約、client/server 共有）
 ├── backlog/                 # タスク管理（Backlog.md CLI。`pnpm backlog` で操作、直接編集禁止）
 └── docs/                    # 設計ドキュメント（地図は docs/README.md）
     ├── HANDOFF.md           # 開発の現状・引き継ぎ
