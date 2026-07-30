@@ -133,7 +133,7 @@ export type PlayerControllerCommand =
   | { type: "playAudio" }
   | { type: "pauseAudio" }
   | { type: "seekAudio"; positionSec: number }
-  | { type: "loadTrack"; item: PlaybackItem; positionSec?: number }
+  | { type: "loadTrack"; item: PlaybackItem; positionSec?: number; autoplay: boolean }
   | { type: "setAudioVolume"; volume: number }
   | { type: "setAudioPlaybackRate"; playbackRate: number }
   | { type: "setAudioChannelSwap"; enabled: boolean }
@@ -152,7 +152,18 @@ function selectedTrackDurationSec(item: PlaybackItem, trackIndex: number): numbe
   return track && isResolvedTrack(track) ? track.durationSec : null;
 }
 
-function withTrackIndex(state: PlayerControllerState, trackIndex: number): PlayerTransition {
+/**
+ * トラック切替の再生意図（Spotify型）。
+ * - "preserve": 次へ/前へ等の送り操作。遷移前の再生状態を維持する（一時停止中なら一時停止のまま）。
+ * - "explicit": トラックリストからの明示選択。聴く意図の表明とみなし、一時停止中でも再生を開始する。
+ */
+type TrackChangeIntent = "preserve" | "explicit";
+
+function withTrackIndex(
+  state: PlayerControllerState,
+  trackIndex: number,
+  intent: TrackChangeIntent,
+): PlayerTransition {
   const item = state.item;
   if (
     !item ||
@@ -163,9 +174,13 @@ function withTrackIndex(state: PlayerControllerState, trackIndex: number): Playe
     return { state, commands: [] };
   }
   const nextItem = { ...item, trackIndex };
+  const wasPlaying = state.status === "playing" || state.status === "loading";
+  const autoplay = intent === "explicit" || wasPlaying;
+  const nextStatus = intent === "explicit" ? "loading" : state.status;
   return {
     state: {
       ...state,
+      status: nextStatus,
       item: nextItem,
       positionSec: 0,
       durationSec: selectedTrackDurationSec(item, trackIndex),
@@ -174,7 +189,7 @@ function withTrackIndex(state: PlayerControllerState, trackIndex: number): Playe
     },
     commands: [
       { type: "persistResume", reason: "track-change" },
-      { type: "loadTrack", item: nextItem },
+      { type: "loadTrack", item: nextItem, autoplay },
     ],
   };
 }
@@ -197,7 +212,7 @@ export function reducePlayer(
         },
         commands: [
           ...(state.item ? ([{ type: "persistResume", reason: "track-change" }] as const) : []),
-          { type: "loadTrack", item: input.item, positionSec: input.positionSec },
+          { type: "loadTrack", item: input.item, positionSec: input.positionSec, autoplay: true },
         ],
       };
     case "playRequested":
@@ -244,11 +259,11 @@ export function reducePlayer(
         positionSec: state.positionSec + input.deltaSec,
       });
     case "nextRequested":
-      return withTrackIndex(state, (state.item?.trackIndex ?? -1) + 1);
+      return withTrackIndex(state, (state.item?.trackIndex ?? -1) + 1, "preserve");
     case "previousRequested":
-      return withTrackIndex(state, (state.item?.trackIndex ?? 0) - 1);
+      return withTrackIndex(state, (state.item?.trackIndex ?? 0) - 1, "preserve");
     case "trackSelected":
-      return withTrackIndex(state, input.trackIndex);
+      return withTrackIndex(state, input.trackIndex, "explicit");
     case "volumeChanged": {
       const volume = Math.max(0, Math.min(100, input.volume));
       return {
@@ -314,7 +329,7 @@ export function reducePlayer(
         };
       }
       if (item.trackIndex < item.tracks.length - 1) {
-        return withTrackIndex(state, item.trackIndex + 1);
+        return withTrackIndex(state, item.trackIndex + 1, "preserve");
       }
       const commands: PlayerControllerCommand[] = [{ type: "playbackQueueEnded", item }];
       if (item.completionScope === "work") commands.push({ type: "workCompleted", item });

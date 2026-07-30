@@ -39,6 +39,8 @@ class FakeAudio extends EventTarget {
   set src(value: string) {
     this.value = value;
     this.srcAssignments.push(value);
+    // 実ブラウザの HTMLMediaElement は src 再代入で再生位置がリセットされる。
+    this.currentTime = 0;
   }
 
   play = vi.fn(() => {
@@ -440,6 +442,72 @@ describe("usePlayer adapters", () => {
     expect(latestAudio().srcAssignments).toHaveLength(1);
     expect(result.current.currentTime).toBe(0);
     expect(result.current.duration).toBe(30);
+  });
+
+  it("一時停止中に次のトラックへ切り替えても再生が再開しない（同一ファイルの区間切替）", async () => {
+    const tracks: ResolvedTrack[] = [
+      { ...track, start: 0, end: 30, durationSec: 30 },
+      {
+        id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        title: "Track 2",
+        file: track.file,
+        start: 30,
+        end: 60,
+        durationSec: 30,
+      },
+    ];
+    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
+    act(() => result.current.player.play(work, tracks, 0, playlistId));
+    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
+    latestAudio().duration = 60;
+
+    act(() => result.current.player.togglePlay());
+    expect(result.current.player.state.isPlaying).toBe(false);
+    latestAudio().play.mockClear();
+
+    act(() => result.current.player.nextTrack());
+    await waitFor(() => expect(result.current.player.state.currentTrackIndex).toBe(1));
+
+    expect(result.current.player.state.isPlaying).toBe(false);
+    expect(latestAudio().play).not.toHaveBeenCalled();
+  });
+
+  it("一時停止中でもトラックリストからの明示選択では再生が開始される", async () => {
+    const tracks: ResolvedTrack[] = [
+      { ...track, start: 0, end: 30, durationSec: 30 },
+      {
+        id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        title: "Track 2",
+        file: track.file,
+        start: 30,
+        end: 60,
+        durationSec: 30,
+      },
+    ];
+    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
+    act(() => result.current.player.play(work, tracks, 0, playlistId));
+    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
+    latestAudio().duration = 60;
+
+    act(() => result.current.player.togglePlay());
+    expect(result.current.player.state.isPlaying).toBe(false);
+    latestAudio().play.mockClear();
+
+    act(() => result.current.player.setTrackIndex(1));
+
+    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
+    expect(result.current.player.state.currentTrackIndex).toBe(1);
+  });
+
+  it("再生中に同一作品・同一トラックへ再度「最初から再生」すると先頭へシークする", async () => {
+    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
+    act(() => result.current.player.play(work, [track], 0, playlistId));
+    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
+    latestAudio().currentTime = 42;
+
+    act(() => result.current.player.play(work, [track], 0, playlistId));
+
+    await waitFor(() => expect(latestAudio().currentTime).toBe(0));
   });
 
   it("resume v2の区間相対offsetをHTMLAudioの絶対時刻へ復元する", async () => {

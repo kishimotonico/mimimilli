@@ -21,13 +21,17 @@ export interface AudioEngineError {
 }
 
 export interface AudioEngine {
-  /** トラックを読み込み再生開始する。pendingSeekSec > 0 のとき metadata 取得後にシークする。 */
+  /**
+   * トラックを読み込む。pendingSeekSec > 0 のとき metadata 取得後にシークする。
+   * 再生するかどうかは autoplay が決める（controller の状態機械が宣言する再生意図）。
+   */
   load: (
     url: string,
     opts: {
       playbackRate: number;
       startSec?: number;
       pendingSeekSec?: number;
+      autoplay: boolean;
     },
   ) => () => void; // クリーンアップ関数を返す
   play: () => void;
@@ -180,7 +184,7 @@ export function createAudioEngine(
       }
 
       resumeAudioContext();
-      playAudio();
+      if (opts.autoplay) playAudio();
 
       return () => {
         cleaned = true;

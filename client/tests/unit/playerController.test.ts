@@ -131,6 +131,45 @@ describe("PlayerController scenarios", () => {
     expect(result.commands.map((command) => command.type)).toEqual(["persistResume", "loadTrack"]);
   });
 
+  it("一時停止中に次のトラックへ切り替えても一時停止のままで、再生を再開しない", () => {
+    const result = scenario([
+      { type: "startRequested", item: item() },
+      { type: "audioPlaying" },
+      { type: "audioPaused" },
+      { type: "nextRequested" },
+    ]);
+
+    expect(result.state.status).toBe("paused");
+    expect(result.state.item?.trackIndex).toBe(1);
+    const loadTrack = result.commands.find((command) => command.type === "loadTrack");
+    expect(loadTrack).toMatchObject({ autoplay: false });
+  });
+
+  it("再生中に次のトラックへ切り替えた場合は再生を継続する", () => {
+    const result = scenario([
+      { type: "startRequested", item: item() },
+      { type: "audioPlaying" },
+      { type: "nextRequested" },
+    ]);
+
+    expect(result.state.status).toBe("playing");
+    const loadTrack = result.commands.find((command) => command.type === "loadTrack");
+    expect(loadTrack).toMatchObject({ autoplay: true });
+  });
+
+  it("一時停止中でもトラックリストからの明示選択では再生を開始する", () => {
+    const result = scenario([
+      { type: "startRequested", item: item() },
+      { type: "audioPlaying" },
+      { type: "audioPaused" },
+      { type: "trackSelected", trackIndex: 1 },
+    ]);
+
+    expect(result.state.status).toBe("loading");
+    const loadTrack = result.commands.find((command) => command.type === "loadTrack");
+    expect(loadTrack).toMatchObject({ autoplay: true });
+  });
+
   it("Audioエラーをerror状態にして直近位置の保存を指示する", () => {
     const error = { source: "media" as const, code: 4, message: "unsupported" };
     const result = scenario([

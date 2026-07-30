@@ -66,8 +66,7 @@ export function usePlayerRuntime() {
     [queryClient],
   );
 
-  const { getCurrentPlaybackContext } = useAudioEngineLifecycle({
-    coreState,
+  const { getCurrentPlaybackContext, loadTrack } = useAudioEngineLifecycle({
     refs: runtimeRefs,
     controller,
     consumePendingResume,
@@ -126,6 +125,8 @@ export function usePlayerRuntime() {
           break;
         }
         case "loadTrack":
+          loadTrack(command.item, command.autoplay);
+          break;
         case "playbackQueueEnded":
           break;
       }
@@ -133,6 +134,7 @@ export function usePlayerRuntime() {
   }, [
     controller,
     enqueueResumeSave,
+    loadTrack,
     resetResumeCache,
     runtimeRefs,
     saveCurrentResume,

@@ -10,11 +10,9 @@ import {
   toTrackRelativeTime,
 } from "./trackTime";
 import type { LoadedTrack, PlaybackContext, PlayerRuntimeRefs } from "./playerRuntime";
-import type { PlayerCoreState } from "./atoms";
-import type { PlayerController } from "./playerController";
+import type { PlaybackItem, PlayerController } from "./playerController";
 
 interface UseAudioEngineLifecycleOptions {
-  coreState: PlayerCoreState;
   refs: PlayerRuntimeRefs;
   controller: PlayerController;
   consumePendingResume: (
@@ -25,7 +23,6 @@ interface UseAudioEngineLifecycleOptions {
 }
 
 export function useAudioEngineLifecycle({
-  coreState,
   refs,
   controller,
   consumePendingResume,
@@ -52,6 +49,7 @@ export function useAudioEngineLifecycle({
 
   useEffect(() => {
     const engineRef = refs.engine;
+    const loadCleanupRef = refs.loadCleanup;
 
     const finishCurrentTrack = (virtualEnd: boolean) => {
       if (refs.trackEnded.current) return;
@@ -132,81 +130,89 @@ export function useAudioEngineLifecycle({
       if (engineRef.current === engine) {
         engineRef.current = null;
       }
+      loadCleanupRef.current?.();
+      loadCleanupRef.current = null;
       engine.destroy();
     };
   }, [getCurrentPlaybackContext, controller, refs]);
 
-  // トラック変更時に音源を読み込み、同じ音源ならロードせず区間だけを切り替える。
-  useEffect(() => {
-    const engine = refs.engine.current;
-    if (!engine) return;
+  // loadTrack コマンドを実ロード/シークへ接続する。再生するかどうかは controller が決めた
+  // autoplay に従う（無条件 playAudio() のような命令的副作用で状態機械を上書きしない）。
+  const loadTrack = useCallback(
+    (item: PlaybackItem, autoplay: boolean) => {
+      const engine = refs.engine.current;
+      if (!engine) return;
 
-    const { currentTrackIndex, currentPlaylistId, tracks, currentWork } = coreState;
-    if (currentTrackIndex < 0 || currentTrackIndex >= tracks.length || !currentWork) return;
+      const { trackIndex: currentTrackIndex, playlistId: currentPlaylistId, tracks } = item;
+      const currentWork = item.work;
+      if (currentTrackIndex < 0 || currentTrackIndex >= tracks.length) return;
 
-    const track = tracks[currentTrackIndex];
-    if (!track) return;
+      const track = tracks[currentTrackIndex];
+      if (!track) return;
 
-    const workId = currentWork.id;
-    const assetUrl = getAudioUrl(workId, track.file);
+      const workId = currentWork.id;
+      const assetUrl = getAudioUrl(workId, track.file);
 
-    const previousTrack = refs.loadedTrack.current;
-    const switchedTrack =
-      previousTrack !== null &&
-      (previousTrack.workId !== workId ||
-        previousTrack.playlistId !== currentPlaylistId ||
-        previousTrack.track.id !== track.id);
-    const pendingSeekSec = consumePendingResume(workId, currentPlaylistId, track);
-    const reusesLoadedAsset =
-      switchedTrack && previousTrack.workId === workId && previousTrack.assetUrl === assetUrl;
+      const previousTrack = refs.loadedTrack.current;
+      const switchedTrack =
+        previousTrack !== null &&
+        (previousTrack.workId !== workId ||
+          previousTrack.playlistId !== currentPlaylistId ||
+          previousTrack.track.id !== track.id);
+      const pendingSeekSec = consumePendingResume(workId, currentPlaylistId, track);
+      const reusesLoadedAsset =
+        switchedTrack && previousTrack.workId === workId && previousTrack.assetUrl === assetUrl;
 
-    refs.loadedTrack.current = {
-      workId,
-      playlistId: currentPlaylistId,
-      trackIndex: currentTrackIndex,
-      track,
-      assetUrl,
-    };
-    refs.trackEnded.current = false;
-    if (!reusesLoadedAsset) {
-      refs.filesModeFileDurationSec.current = null;
-    } else if (!isResolvedTrack(track) && refs.filesModeFileDurationSec.current === null) {
-      // 登録トラック→同一音源のFilesモード即席トラックへの切り替え。再ロードもdurationchangeも
-      // 発生しないため、既にロード済みのengineが持つファイル全体長を直接引き継ぐ。
-      const engineDurationSec = engine.getDuration();
-      refs.filesModeFileDurationSec.current = engineDurationSec > 0 ? engineDurationSec : null;
-    }
-
-    if (reusesLoadedAsset) {
-      const seekSec = pendingSeekSec ?? getTrackStart(track);
-      const trackDuration = getTrackDurationSec(track, refs.filesModeFileDurationSec.current);
-      engine.seek(seekSec);
-      const relativeTime = toTrackRelativeTime(seekSec, track, trackDuration);
-      controller.dispatch({ type: "audioTimeUpdated", positionSec: relativeTime });
-      refs.updateMediaSessionPosition.current(relativeTime);
-
-      if (coreState.isPlaying) {
-        engine.play();
+      refs.loadedTrack.current = {
+        workId,
+        playlistId: currentPlaylistId,
+        trackIndex: currentTrackIndex,
+        track,
+        assetUrl,
+      };
+      refs.trackEnded.current = false;
+      if (!reusesLoadedAsset) {
+        refs.filesModeFileDurationSec.current = null;
+      } else if (!isResolvedTrack(track) && refs.filesModeFileDurationSec.current === null) {
+        // 登録トラック→同一音源のFilesモード即席トラックへの切り替え。再ロードもdurationchangeも
+        // 発生しないため、既にロード済みのengineが持つファイル全体長を直接引き継ぐ。
+        const engineDurationSec = engine.getDuration();
+        refs.filesModeFileDurationSec.current = engineDurationSec > 0 ? engineDurationSec : null;
       }
 
+      if (reusesLoadedAsset) {
+        const seekSec = pendingSeekSec ?? getTrackStart(track);
+        const trackDuration = getTrackDurationSec(track, refs.filesModeFileDurationSec.current);
+        engine.seek(seekSec);
+        const relativeTime = toTrackRelativeTime(seekSec, track, trackDuration);
+        controller.dispatch({ type: "audioTimeUpdated", positionSec: relativeTime });
+        refs.updateMediaSessionPosition.current(relativeTime);
+
+        if (autoplay) {
+          engine.play();
+        }
+
+        updateLastPlayed(workId).catch(() => {});
+        return;
+      }
+
+      // durationSec は startRequested/trackSelected で選択時点の DTO 値が既に反映済み。
+      // 位置だけ 0 へ戻す（登録トラックは正確な durationSec、Files モードは durationchange を待つ）。
+      controller.dispatch({ type: "audioTimeUpdated", positionSec: 0 });
+
+      refs.loadCleanup.current?.();
+      refs.loadCleanup.current = engine.load(assetUrl, {
+        playbackRate: refs.coreState.current.playbackRate,
+        startSec:
+          pendingSeekSec === undefined && track.start !== undefined ? track.start : undefined,
+        pendingSeekSec,
+        autoplay,
+      });
+
       updateLastPlayed(workId).catch(() => {});
-      return;
-    }
+    },
+    [refs, controller, consumePendingResume],
+  );
 
-    // durationSec は startRequested/trackSelected で選択時点の DTO 値が既に反映済み。
-    // 位置だけ 0 へ戻す（登録トラックは正確な durationSec、Files モードは durationchange を待つ）。
-    controller.dispatch({ type: "audioTimeUpdated", positionSec: 0 });
-
-    const cleanup = engine.load(assetUrl, {
-      playbackRate: coreState.playbackRate,
-      startSec: pendingSeekSec === undefined && track.start !== undefined ? track.start : undefined,
-      pendingSeekSec,
-    });
-
-    updateLastPlayed(workId).catch(() => {});
-    return cleanup;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [coreState.currentTrackIndex, coreState.tracks, coreState.currentWork]);
-
-  return { getCurrentPlaybackContext };
+  return { getCurrentPlaybackContext, loadTrack };
 }

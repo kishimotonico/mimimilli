@@ -36,4 +36,6 @@ export interface PlayerRuntimeRefs {
   updateMediaSessionPosition: MutableRef<(position?: number) => void>;
   /** Files モード即席トラックの durationchange 由来ファイル全体長。登録トラックでは未使用。 */
   filesModeFileDurationSec: MutableRef<number | null>;
+  /** 直近の engine.load() が返したクリーンアップ関数。次のロード前・engine破棄時に呼ぶ。 */
+  loadCleanup: MutableRef<(() => void) | null>;
 }

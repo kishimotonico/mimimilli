@@ -46,13 +46,23 @@ describe("HTMLAudio adapter contract", () => {
     const events = callbacks();
     const engine = createAudioEngine(75, events);
 
-    engine.load("/audio/work-1/voice.wav", { playbackRate: 1.25, startSec: 30 });
+    engine.load("/audio/work-1/voice.wav", { playbackRate: 1.25, startSec: 30, autoplay: true });
 
     expect(audio.src).toBe("/audio/work-1/voice.wav");
     expect(audio.volume).toBe(0.75);
     expect(audio.playbackRate).toBe(1.25);
     expect(audio.currentTime).toBe(30);
     expect(audio.play).toHaveBeenCalledOnce();
+  });
+
+  it("autoplay:falseならloadしても再生しない", () => {
+    const events = callbacks();
+    const engine = createAudioEngine(75, events);
+
+    engine.load("/audio/work-1/voice.wav", { playbackRate: 1, startSec: 30, autoplay: false });
+
+    expect(audio.currentTime).toBe(30);
+    expect(audio.play).not.toHaveBeenCalled();
   });
 
   it("HTMLAudioの時刻・長さ・終了イベントをcallbackへ渡す", () => {

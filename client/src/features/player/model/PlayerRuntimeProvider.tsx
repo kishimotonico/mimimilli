@@ -37,6 +37,7 @@ export function PlayerRuntimeProvider({ children }: { children: ReactNode }) {
   const trackEndedRef = useRef(false);
   const updateMediaSessionPositionRef = useRef<(position?: number) => void>(() => {});
   const filesModeFileDurationSecRef = useRef<number | null>(null);
+  const loadCleanupRef = useRef<(() => void) | null>(null);
   const lastVolumeRef = useRef(75);
   const pendingResumeRef = useRef<PendingResume | null>(null);
   const capabilitiesRegistryRef = useRef<PlayerRuntimeCapabilitiesRegistry | null>(null);
@@ -53,6 +54,7 @@ export function PlayerRuntimeProvider({ children }: { children: ReactNode }) {
       trackEnded: trackEndedRef,
       updateMediaSessionPosition: updateMediaSessionPositionRef,
       filesModeFileDurationSec: filesModeFileDurationSecRef,
+      loadCleanup: loadCleanupRef,
     }),
     [],
   );
