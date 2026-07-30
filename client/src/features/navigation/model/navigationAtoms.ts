@@ -1,7 +1,7 @@
 import { atom } from "jotai";
 import { atomWithLazy } from "jotai/utils";
+import { requestNavigationHistoryCommit } from "./navigationHistoryCommit";
 import { parseNavigationUrl, type AppMode } from "./navigationUrl";
-import { requestNavigationHistoryCommitAtom } from "./navigationHistoryAtoms";
 
 // 初期モードは現在のURLから決める（初回描画で誤ったビューをマウントしないため）。
 // atomWithLazy はストアごとの初回読み取り時に評価するので、モジュール読み込み時に
@@ -12,6 +12,6 @@ export const appModeAtom = atomWithLazy<AppMode>(
 
 export const setAppModeAtom = atom(null, (get, set, nextMode: AppMode) => {
   if (nextMode === get(appModeAtom)) return;
-  set(requestNavigationHistoryCommitAtom, "push");
+  requestNavigationHistoryCommit(set, "push");
   set(appModeAtom, nextMode);
 });

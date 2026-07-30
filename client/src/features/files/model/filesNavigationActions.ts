@@ -1,5 +1,5 @@
 import { atom } from "jotai";
-import { requestNavigationHistoryCommitAtom } from "../../navigation/model/navigationHistoryAtoms";
+import { requestNavigationHistoryCommit } from "../../navigation/model/navigationHistoryCommit";
 import { filesDirectionAtom, filesRelPathAtom, filesSelectedPathAtom } from "./atoms";
 import { joinPath, relSegments } from "./types";
 
@@ -11,7 +11,7 @@ export const openFilesDirAtom = atom(
       console.warn(`[navigation] root 外のディレクトリを拒否しました: ${absPath}`);
       return;
     }
-    set(requestNavigationHistoryCommitAtom, "push");
+    requestNavigationHistoryCommit(set, "push");
     set(filesDirectionAtom, 1);
     set(filesRelPathAtom, nextRelPath);
     set(filesSelectedPathAtom, absPath);
@@ -26,7 +26,7 @@ export const selectFilesEntryAtom = atom(
       console.warn(`[navigation] root 外のファイルを拒否しました: ${absPath}`);
       return;
     }
-    set(requestNavigationHistoryCommitAtom, "replace");
+    requestNavigationHistoryCommit(set, "replace");
     set(filesSelectedPathAtom, absPath);
   },
 );
@@ -35,7 +35,7 @@ export const goToFilesSegmentAtom = atom(null, (get, set, index: number) => {
   const relPath = get(filesRelPathAtom);
   const selectedPath = get(filesSelectedPathAtom);
   if (index === relPath.length && selectedPath === null) return;
-  set(requestNavigationHistoryCommitAtom, "push");
+  requestNavigationHistoryCommit(set, "push");
   set(filesDirectionAtom, -1);
   set(filesRelPathAtom, relPath.slice(0, index));
   set(filesSelectedPathAtom, null);
@@ -44,7 +44,7 @@ export const goToFilesSegmentAtom = atom(null, (get, set, index: number) => {
 export const goUpFilesAtom = atom(null, (get, set) => {
   const relPath = get(filesRelPathAtom);
   if (relPath.length === 0) return;
-  set(requestNavigationHistoryCommitAtom, "push");
+  requestNavigationHistoryCommit(set, "push");
   set(filesDirectionAtom, -1);
   set(filesRelPathAtom, relPath.slice(0, -1));
   set(filesSelectedPathAtom, null);

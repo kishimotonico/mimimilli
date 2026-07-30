@@ -1,5 +1,5 @@
 import { atom } from "jotai";
-import { requestNavigationHistoryCommitAtom } from "../../navigation/model/navigationHistoryAtoms";
+import { requestNavigationHistoryCommit } from "../../navigation/model/navigationHistoryCommit";
 import type { AxisId, SortId } from "./types";
 import {
   activeAxisAtom,
@@ -10,7 +10,7 @@ import {
 } from "./atoms";
 
 export const setLibraryAxisAtom = atom(null, (_get, set, axis: AxisId) => {
-  set(requestNavigationHistoryCommitAtom, "push");
+  requestNavigationHistoryCommit(set, "push");
   set(activeAxisAtom, axis);
   set(drillValueAtom, null);
   set(selectedTagsAtom, []);
@@ -18,38 +18,38 @@ export const setLibraryAxisAtom = atom(null, (_get, set, axis: AxisId) => {
 });
 
 export const drillIntoAtom = atom(null, (_get, set, value: string) => {
-  set(requestNavigationHistoryCommitAtom, "push");
+  requestNavigationHistoryCommit(set, "push");
   set(drillValueAtom, value);
   set(selectedTagsAtom, []);
   set(selectedWorkIdAtom, null);
 });
 
 export const drillBackAtom = atom(null, (_get, set) => {
-  set(requestNavigationHistoryCommitAtom, "push");
+  requestNavigationHistoryCommit(set, "push");
   set(drillValueAtom, null);
   set(selectedWorkIdAtom, null);
 });
 
 export const toggleLibraryTagAtom = atom(null, (get, set, tag: string) => {
-  set(requestNavigationHistoryCommitAtom, "push");
+  requestNavigationHistoryCommit(set, "push");
   const prev = get(selectedTagsAtom);
   set(selectedTagsAtom, prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]);
   set(selectedWorkIdAtom, null);
 });
 
 export const clearLibraryTagsAtom = atom(null, (_get, set) => {
-  set(requestNavigationHistoryCommitAtom, "push");
+  requestNavigationHistoryCommit(set, "push");
   set(selectedTagsAtom, []);
   set(selectedWorkIdAtom, null);
 });
 
 export const selectLibraryWorkAtom = atom(null, (_get, set, id: string | null) => {
-  set(requestNavigationHistoryCommitAtom, "replace");
+  requestNavigationHistoryCommit(set, "replace");
   set(selectedWorkIdAtom, id);
 });
 
 export const setLibrarySortAtom = atom(null, (_get, set, sort: SortId) => {
-  set(requestNavigationHistoryCommitAtom, "replace");
+  requestNavigationHistoryCommit(set, "replace");
   set(sortAtom, sort);
 });
 

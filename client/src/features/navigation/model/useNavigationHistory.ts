@@ -15,7 +15,11 @@ import {
 import { joinPath, relSegments } from "../../files/model/types";
 import { useRootFolder } from "../../settings/useSettingsQuery";
 import { appModeAtom } from "./navigationAtoms";
-import { navigationHistoryCommitAtom, navigationHistoryStateAtom } from "./navigationHistoryAtoms";
+import {
+  consumeNavigationHistoryCommitAtom,
+  navigationHistoryCommitAtom,
+  navigationHistoryStateAtom,
+} from "./navigationHistoryAtoms";
 import {
   parseNavigationUrl,
   serializeNavigationUrl,
@@ -88,6 +92,7 @@ export function useNavigationHistory(): void {
   const setFilesSelectedPath = useSetAtom(filesSelectedPathAtom);
   const setFilesDirection = useSetAtom(filesDirectionAtom);
   const setNavigationHistoryState = useSetAtom(navigationHistoryStateAtom);
+  const consumeNavigationHistoryCommit = useSetAtom(consumeNavigationHistoryCommitAtom);
 
   const rootFolder = useRootFolder();
 
@@ -224,7 +229,10 @@ export function useNavigationHistory(): void {
 
     const nextUrl = serializeNavigationUrl(state);
     const currentUrl = `${window.location.pathname}${window.location.search}`;
-    if (nextUrl === currentUrl) return;
+    if (nextUrl === currentUrl) {
+      consumeNavigationHistoryCommit();
+      return;
+    }
 
     if (commit.kind === "push") {
       const nextIndex = currentIndexRef.current + 1;
@@ -233,14 +241,18 @@ export function useNavigationHistory(): void {
       publishHistoryState();
       writeMaxIndex(nextIndex);
       history.pushState(stateWithMarker(nextIndex), "", nextUrl);
+      consumeNavigationHistoryCommit();
       return;
     }
 
     history.replaceState(stateWithMarker(currentIndexRef.current), "", nextUrl);
+    consumeNavigationHistoryCommit();
   }, [
     activeAxis,
     commit.kind,
+    commit.pending,
     commit.revision,
+    consumeNavigationHistoryCommit,
     drillValue,
     filesRelPath,
     filesSelectedPath,
