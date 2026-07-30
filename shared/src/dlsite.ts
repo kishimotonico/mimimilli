@@ -12,7 +12,7 @@ export const dlsiteStateSchema = z.object({
   status: dlsiteStatusSchema,
   lastAttemptAt: z.iso.datetime({ offset: true }).nullable(),
   error: z.string().nullable(),
-  errorKind: dlsiteFetchErrorKindSchema.nullable().optional(),
+  errorKind: dlsiteFetchErrorKindSchema.nullable().default(null),
   appliedTags: z.array(z.string()),
 });
 export type DlsiteState = z.infer<typeof dlsiteStateSchema>;

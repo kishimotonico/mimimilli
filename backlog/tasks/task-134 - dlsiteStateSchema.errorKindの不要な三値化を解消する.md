@@ -1,9 +1,11 @@
 ---
 id: TASK-134
 title: dlsiteStateSchema.errorKindの不要な三値化を解消する
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-07-30 12:29'
+updated_date: '2026-07-30 16:16'
 labels: []
 dependencies: []
 priority: low
@@ -20,7 +22,27 @@ shared/src/dlsite.ts:15 の errorKind が dlsiteFetchErrorKindSchema.nullable().
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 errorKind が .nullable().default(null) となり、型が DlsiteFetchErrorKind | null になっている
-- [ ] #2 errorKindフィールドを持たない既存 .meta.json のパースが通ることをテストで確認している
-- [ ] #3 pnpm check・pnpm test が通る
+- [x] #1 errorKind が .nullable().default(null) となり、型が DlsiteFetchErrorKind | null になっている
+- [x] #2 errorKindフィールドを持たない既存 .meta.json のパースが通ることをテストで確認している
+- [x] #3 pnpm check・pnpm test が通る
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. errorKindを.nullable().default(null)へ変更
+2. errorKind欠落の旧.meta.jsonパーステスト追加
+3. pnpm check + pnpm test
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Cursor(composer-2.5)で実装+1回差し戻し（scanner.test.ts期待値の更新漏れ）。zod v4の.default(null)がキー欠落に適用されることをworkSchema.test.tsの2テストで固定。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+errorKindを.nullable().default(null)化し型からundefinedを除去。errorKind欠落・dlsiteキー欠落の旧metaのパース互換をテストで固定。
+<!-- SECTION:FINAL_SUMMARY:END -->
