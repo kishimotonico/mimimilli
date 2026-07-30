@@ -13,10 +13,10 @@ import type {
   DlsiteBulkProgressEvent,
   DlsiteBulkResult,
   DlsiteFetchResult,
+  DlsiteNotificationKind,
   DlsiteNotificationPage,
   DlsiteNotificationQuery,
   DlsiteNotificationSummary,
-  DlsiteParseFailedNotificationPage,
   DlsiteStatePatch,
   FileEntry,
   FsListing,
@@ -668,16 +668,10 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
     },
 
     async queryDlsiteNotifications(
-      kind: "rj-missing" | "fetch-failed",
+      kind: DlsiteNotificationKind,
       query: Required<DlsiteNotificationQuery>,
     ): Promise<DlsiteNotificationPage> {
       return repo.queryDlsiteNotifications(kind, query);
-    },
-
-    async queryDlsiteParseFailedNotifications(
-      query: Required<DlsiteNotificationQuery>,
-    ): Promise<DlsiteParseFailedNotificationPage> {
-      return repo.queryDlsiteParseFailedNotifications(query);
     },
 
     async getWork(id: string): Promise<Work | null> {

@@ -18,10 +18,10 @@ import type {
   AxisFacetItem,
   Cover,
   DlsiteState,
+  DlsiteNotificationKind,
   DlsiteNotificationPage,
   DlsiteNotificationQuery,
   DlsiteNotificationSummary,
-  DlsiteParseFailedNotificationPage,
   Playlist,
   ResolvedPlaylist,
   ResumeBody,
@@ -870,49 +870,29 @@ export class WorkRepo {
     };
   }
 
-  /** RJ未検出・取得失敗モーダルのページ。物理パス等を返さない専用DTO。 */
+  /** DLsite通知モーダルのページ。物理パス等を返さない専用DTO。 */
   queryDlsiteNotifications(
-    kind: "rj-missing" | "fetch-failed",
+    kind: DlsiteNotificationKind,
     query: Required<DlsiteNotificationQuery>,
   ): DlsiteNotificationPage {
-    const condition =
-      kind === "rj-missing"
-        ? `json_extract(work_dlsite.state_json, '$.rjCode') IS NULL
-           AND COALESCE(json_extract(work_dlsite.state_json, '$.status'), 'none') != 'skipped'`
-        : `(json_extract(work_dlsite.state_json, '$.status') = 'not_found'
+    const condition = (() => {
+      switch (kind) {
+        case "rj-missing":
+          return `json_extract(work_dlsite.state_json, '$.rjCode') IS NULL
+           AND COALESCE(json_extract(work_dlsite.state_json, '$.status'), 'none') != 'skipped'`;
+        case "fetch-failed":
+          return `(json_extract(work_dlsite.state_json, '$.status') = 'not_found'
             OR (json_extract(work_dlsite.state_json, '$.status') = 'error'
                 AND COALESCE(json_extract(work_dlsite.state_json, '$.errorKind'), '') != 'parse_error'))`;
-    const count = this.db.sqlite
-      .query(
-        `SELECT COUNT(*) AS total
-         FROM main.works AS works
-         LEFT JOIN main.work_dlsite AS work_dlsite ON work_dlsite.work_id = works.id
-         WHERE ${condition}`,
-      )
-      .get() as { total: number };
-    const rows = this.db.sqlite
-      .query(
-        `SELECT works.id AS id, works.title AS title,
-                COALESCE(json_extract(work_dlsite.state_json, '$.status'), 'none') AS status
-         FROM main.works AS works
-         LEFT JOIN main.work_dlsite AS work_dlsite ON work_dlsite.work_id = works.id
-         WHERE ${condition}
-         ORDER BY works.title_sort_key COLLATE BINARY ASC, works.id COLLATE BINARY ASC
-         LIMIT ? OFFSET ?`,
-      )
-      .all(query.limit, (query.page - 1) * query.limit) as Array<{
-      id: string;
-      title: string;
-      status: "none" | "applied" | "not_found" | "error" | "skipped";
-    }>;
-    return { items: rows, total: count.total };
-  }
-
-  queryDlsiteParseFailedNotifications(
-    query: Required<DlsiteNotificationQuery>,
-  ): DlsiteParseFailedNotificationPage {
-    const condition = `json_extract(work_dlsite.state_json, '$.status') = 'error'
+        case "parse-failed":
+          return `json_extract(work_dlsite.state_json, '$.status') = 'error'
       AND json_extract(work_dlsite.state_json, '$.errorKind') = 'parse_error'`;
+      }
+    })();
+    const rjCodeSelect =
+      kind === "parse-failed"
+        ? `json_extract(work_dlsite.state_json, '$.rjCode') AS rjCode`
+        : `NULL AS rjCode`;
     const count = this.db.sqlite
       .query(
         `SELECT COUNT(*) AS total
@@ -924,7 +904,7 @@ export class WorkRepo {
     const rows = this.db.sqlite
       .query(
         `SELECT works.id AS id, works.title AS title,
-                json_extract(work_dlsite.state_json, '$.rjCode') AS rjCode,
+                ${rjCodeSelect},
                 COALESCE(json_extract(work_dlsite.state_json, '$.status'), 'none') AS status
          FROM main.works AS works
          LEFT JOIN main.work_dlsite AS work_dlsite ON work_dlsite.work_id = works.id
@@ -935,8 +915,8 @@ export class WorkRepo {
       .all(query.limit, (query.page - 1) * query.limit) as Array<{
       id: string;
       title: string;
-      rjCode: string;
-      status: "error";
+      rjCode: string | null;
+      status: "none" | "applied" | "not_found" | "error" | "skipped";
     }>;
     return { items: rows, total: count.total };
   }

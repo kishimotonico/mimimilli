@@ -20,10 +20,9 @@ import {
   type Work,
   dlsiteNotificationPageSchema,
   dlsiteNotificationSummarySchema,
-  dlsiteParseFailedNotificationPageSchema,
+  type DlsiteNotificationKind,
   type DlsiteNotificationPage,
   type DlsiteNotificationSummary,
-  type DlsiteParseFailedNotificationPage,
   type WorkPatch,
   type FileEntry,
   type DlsiteWorkInfo,
@@ -42,7 +41,7 @@ export async function getDlsiteNotificationSummary(): Promise<DlsiteNotification
 }
 
 export async function queryDlsiteNotifications(
-  kind: "rj-missing" | "fetch-failed",
+  kind: DlsiteNotificationKind,
   params: { page: number; limit: number },
 ): Promise<DlsiteNotificationPage> {
   const query = new URLSearchParams({ page: String(params.page), limit: String(params.limit) });
@@ -52,15 +51,8 @@ export async function queryDlsiteNotifications(
 export async function queryDlsiteParseFailedNotifications(params: {
   page: number;
   limit: number;
-}): Promise<DlsiteParseFailedNotificationPage> {
-  const query = new URLSearchParams({
-    page: String(params.page),
-    limit: String(params.limit),
-  });
-  return getParsed(
-    dlsiteParseFailedNotificationPageSchema,
-    `/dlsite/notifications/parse-failed?${query}`,
-  );
+}): Promise<DlsiteNotificationPage> {
+  return queryDlsiteNotifications("parse-failed", params);
 }
 
 export async function patchWork(workId: string, body: WorkPatch): Promise<Work> {

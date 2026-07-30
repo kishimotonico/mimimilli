@@ -56,35 +56,23 @@ export const dlsiteNotificationSummarySchema = z.object({
 });
 export type DlsiteNotificationSummary = z.infer<typeof dlsiteNotificationSummarySchema>;
 
-/** RJ未検出・取得失敗モーダルの最小行DTO。 */
+export const dlsiteNotificationKindSchema = z.enum(["rj-missing", "fetch-failed", "parse-failed"]);
+export type DlsiteNotificationKind = z.infer<typeof dlsiteNotificationKindSchema>;
+
+/** DLsite通知モーダルの最小行DTO。parse-failed 以外は rjCode は null。 */
 export const dlsiteNotificationItemSchema = z.object({
   id: z.string(),
   title: z.string(),
   status: dlsiteStatusSchema,
+  rjCode: z.string().nullable(),
 });
 export type DlsiteNotificationItem = z.infer<typeof dlsiteNotificationItemSchema>;
-
-/** パース失敗モーダルの行DTO（RJコード付き）。 */
-export const dlsiteParseFailedNotificationItemSchema = dlsiteNotificationItemSchema.extend({
-  rjCode: z.string(),
-});
-export type DlsiteParseFailedNotificationItem = z.infer<
-  typeof dlsiteParseFailedNotificationItemSchema
->;
 
 export const dlsiteNotificationPageSchema = z.object({
   items: z.array(dlsiteNotificationItemSchema),
   total: z.number().int().nonnegative(),
 });
 export type DlsiteNotificationPage = z.infer<typeof dlsiteNotificationPageSchema>;
-
-export const dlsiteParseFailedNotificationPageSchema = z.object({
-  items: z.array(dlsiteParseFailedNotificationItemSchema),
-  total: z.number().int().nonnegative(),
-});
-export type DlsiteParseFailedNotificationPage = z.infer<
-  typeof dlsiteParseFailedNotificationPageSchema
->;
 
 export const dlsiteNotificationQuerySchema = z.object({
   page: z.coerce.number().int().min(1).optional(),

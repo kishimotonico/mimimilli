@@ -17,10 +17,10 @@ import type {
   DlsiteBulkProgressEvent,
   DlsiteBulkResult,
   DlsiteFetchResult,
+  DlsiteNotificationKind,
   DlsiteNotificationPage,
   DlsiteNotificationQuery,
   DlsiteNotificationSummary,
-  DlsiteParseFailedNotificationPage,
   DlsiteStatePatch,
   FileEntry,
   FsListing,
@@ -374,10 +374,19 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
     },
 
     async queryDlsiteNotifications(
-      kind: "rj-missing" | "fetch-failed",
+      kind: DlsiteNotificationKind,
       query: Required<DlsiteNotificationQuery>,
     ): Promise<DlsiteNotificationPage> {
-      const predicate = kind === "rj-missing" ? isRjCodeMissing : isDlsiteFetchFailed;
+      const predicate = (() => {
+        switch (kind) {
+          case "rj-missing":
+            return isRjCodeMissing;
+          case "fetch-failed":
+            return isDlsiteFetchFailed;
+          case "parse-failed":
+            return isDlsiteParseFailed;
+        }
+      })();
       const matches = state.works
         .filter((work) => predicate(work.dlsite))
         .sort((a, b) => compareJapaneseSortKeys(a.title, b.title) || compareUtf8Bytes(a.id, b.id));
@@ -387,24 +396,7 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
           id: work.id,
           title: work.title,
           status: work.dlsite.status,
-        })),
-        total: matches.length,
-      };
-    },
-
-    async queryDlsiteParseFailedNotifications(
-      query: Required<DlsiteNotificationQuery>,
-    ): Promise<DlsiteParseFailedNotificationPage> {
-      const matches = state.works
-        .filter((work) => isDlsiteParseFailed(work.dlsite))
-        .sort((a, b) => compareJapaneseSortKeys(a.title, b.title) || compareUtf8Bytes(a.id, b.id));
-      const start = (query.page - 1) * query.limit;
-      return {
-        items: matches.slice(start, start + query.limit).map((work) => ({
-          id: work.id,
-          title: work.title,
-          status: work.dlsite.status,
-          rjCode: work.dlsite.rjCode!,
+          rjCode: kind === "parse-failed" ? work.dlsite.rjCode : null,
         })),
         total: matches.length,
       };

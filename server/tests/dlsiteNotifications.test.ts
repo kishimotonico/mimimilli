@@ -74,7 +74,7 @@ test("DLsite通知は通常works一覧と別契約で集計・ページングす
   };
   assert.ok(list.total >= list.items.length);
   for (const item of list.items) {
-    assert.deepEqual(Object.keys(item).sort(), ["id", "status", "title"]);
+    assert.deepEqual(Object.keys(item).sort(), ["id", "rjCode", "status", "title"]);
   }
 });
 
@@ -163,7 +163,7 @@ test("DLsite通知: parse_error は fetch-failed と分離して集計する", a
       parseErrorAlert: false,
       unlinkedCount: 0,
     });
-    assert.deepEqual(repo.queryDlsiteParseFailedNotifications({ page: 1, limit: 10 }), {
+    assert.deepEqual(repo.queryDlsiteNotifications("parse-failed", { page: 1, limit: 10 }), {
       items: [{ id: "parse-1", title: "パース失敗", status: "error", rjCode: "RJ111111" }],
       total: 1,
     });

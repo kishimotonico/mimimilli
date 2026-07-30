@@ -6,10 +6,10 @@ import { createHash } from "node:crypto";
 import type {
   AxisFacetItem,
   DlsiteApplyBody,
+  DlsiteNotificationKind,
   DlsiteNotificationPage,
   DlsiteNotificationQuery,
   DlsiteNotificationSummary,
-  DlsiteParseFailedNotificationPage,
   DlsiteFetchResult,
   DlsiteBulkMode,
   DlsiteBulkProgressEvent,
@@ -102,12 +102,9 @@ export interface DataAdapter {
   queryWorks(params: WorksQuery): Promise<WorksPage>;
   getDlsiteNotificationSummary(): Promise<DlsiteNotificationSummary>;
   queryDlsiteNotifications(
-    kind: "rj-missing" | "fetch-failed",
+    kind: DlsiteNotificationKind,
     query: Required<DlsiteNotificationQuery>,
   ): Promise<DlsiteNotificationPage>;
-  queryDlsiteParseFailedNotifications(
-    query: Required<DlsiteNotificationQuery>,
-  ): Promise<DlsiteParseFailedNotificationPage>;
   getWork(id: string): Promise<Work | null>;
   /** 更新後の Work を返す。存在しなければ null */
   patchWork(id: string, patch: WorkPatch): Promise<Work | null>;

@@ -252,11 +252,11 @@ test("realのDLsite通知集計とページは状態別に一覧契約を返す"
       unlinkedCount: 1,
     });
     assert.deepEqual(repo.queryDlsiteNotifications("rj-missing", { page: 1, limit: 10 }), {
-      items: [{ id: missing.id, title: missing.title, status: "none" }],
+      items: [{ id: missing.id, title: missing.title, status: "none", rjCode: null }],
       total: 1,
     });
     assert.deepEqual(repo.queryDlsiteNotifications("fetch-failed", { page: 1, limit: 10 }), {
-      items: [{ id: failed.id, title: failed.title, status: "error" }],
+      items: [{ id: failed.id, title: failed.title, status: "error", rjCode: null }],
       total: 1,
     });
   } finally {

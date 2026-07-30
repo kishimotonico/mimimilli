@@ -1,9 +1,11 @@
 ---
 id: TASK-149
 title: DLsite通知3種の契約をdiscriminated unionに統合する（shared/server側）
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-07-30 13:08'
+updated_date: '2026-07-30 16:21'
 labels: []
 dependencies: []
 priority: medium
@@ -30,7 +32,29 @@ TASK-132（クライアントの3モーダル・3フック共通化）のサー�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 通知アイテム・ページのスキーマとDataAdapterメソッドが1系統に統合され、ルートのkind特別分岐が消えている
-- [ ] #2 3種の通知一覧・件数が現状と同じ内容を返す（real・fixture、テストあり）
-- [ ] #3 pnpm check・pnpm test が通る
+- [x] #1 通知アイテム・ページのスキーマとDataAdapterメソッドが1系統に統合され、ルートのkind特別分岐が消えている
+- [x] #2 3種の通知一覧・件数が現状と同じ内容を返す（real・fixture、テストあり）
+- [x] #3 pnpm check・pnpm test が通る
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. sharedの通知スキーマをkind付き単一契約へ統合（rjCodeはnullable常設）
+2. DataAdapterメソッド1本化、routeのparse-failed分岐削除
+3. real/fixtureのクエリ関数を1本へ
+4. client側fetch層の型追随（最小）
+5. pnpm check + pnpm test
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Cursor(composer-2.5)で実装。kind enum + rjCode nullable常設の単一スキーマへ統合し、DataAdapterメソッド・real/fixtureクエリ・routeの分岐を1本化。全体check + test:server 344件 + test:client 389件通過。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+DLsite通知3種の契約をdiscriminated union相当（kind引数+単一スキーマ）に統合。TASK-132（client側の重複解消）の前提が整った。
+<!-- SECTION:FINAL_SUMMARY:END -->
