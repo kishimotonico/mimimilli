@@ -1,9 +1,11 @@
 ---
 id: TASK-157
 title: Settings/Scan/Filesの画面・モーダルをReact.lazyで遅延ロードする
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-07-30 17:53'
+updated_date: '2026-07-30 21:31'
 labels: []
 dependencies: []
 priority: medium
@@ -23,3 +25,12 @@ clientの本番バンドルは単一チャンク（コード分割ゼロ）。sr
 - [ ] #3 ビジュアルテストが通る
 - [ ] #4 pnpm check と pnpm test が通る
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. SettingsModal/ScanModal/FilesViewをReact.lazy化（Devtoolsの既存パターン踏襲）
+2. チャンク分割の確認とフォールバック設計
+3. ビジュアルテスト
+実装Cursor委譲
+<!-- SECTION:PLAN:END -->
