@@ -60,7 +60,7 @@ backdropクリックの共通処理は `client/src/shared/ui/useDialogModal.ts` 
 
 ## Motion / cursor
 
-- 構造的なモーション（要素の出入り・スライド等）は `motion/react` を使う
+- 構造的なモーション（要素の出入り・スライド等）は CSS トランジション + `usePresence` / `Presence`（`client/src/shared/ui/`）で実装する。既知の有限状態は `Presence` を並置し、動的リストの退出は省略して入場のみ CSS アニメーションとする
 - hover は短い transition のみで十分。派手な演出は避ける
 - 操作不能な要素は `cursor: not-allowed` にする
 - 長時間ループするアニメーション（パルス等）は reduced motion 対応を原則とする

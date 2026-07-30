@@ -1,9 +1,11 @@
 ---
 id: TASK-156
 title: motion依存を削除しCSSトランジションへ置き換える
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-07-30 17:53'
+updated_date: '2026-07-30 19:33'
 labels: []
 dependencies: []
 priority: high
@@ -24,3 +26,12 @@ framer-motion系（motion-dom+framer-motion+motion-utils）が推定gzip 47KB（
 - [ ] #4 本番ビルドのgzipサイズ削減量を実測してタスクに記録する
 - [ ] #5 pnpm check と pnpm test が通る
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. motion 6ファイルの使用箇所をCSSトランジション+マウント制御へ置換（ScanModalのlayout含む）
+2. package.jsonからmotion削除
+3. ビジュアルテスト・バンドル実測
+実装Cursor委譲、ビジュアル検証あり
+<!-- SECTION:PLAN:END -->

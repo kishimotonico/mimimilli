@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { useAtomValue } from "jotai";
 import { useQuery } from "@tanstack/react-query";
-import { AnimatePresence, motion } from "motion/react";
 import { getDefaultPlaylistTrackCount, type ScanResult, type Work } from "@mimimilli/shared";
 import { getWork, patchWork } from "../../../entities/work/api";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { searchWorks } from "../../library/api";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
+import Presence from "../../../shared/ui/Presence";
 import { cn } from "../../../shared/lib/cn";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
@@ -25,7 +25,6 @@ interface ScanModalProps {
 type StatKey = keyof Pick<ScanResult, "registered" | "newlyGenerated" | "errors" | "missing">;
 const STAT_KEYS: StatKey[] = ["registered", "newlyGenerated", "errors", "missing"];
 
-const FADE = { duration: 0.15 };
 /** 完了サインの表示時間。派手にしないため短めに留める。 */
 const COMPLETION_HINT_MS = 2400;
 /** 変化したバッジの強調が消えるまでの時間（バッジ側のtransition-colorsで滑らかに戻す）。 */
@@ -92,6 +91,9 @@ export default function ScanModal({ lastScanTime, onClose, onOpenRjCodeMissing }
       clearTimeout(badgeTimer);
     };
   }, [scanning, lastResult]);
+
+  const wasScanning = wasScanningRef.current;
+  const justStoppedScanning = wasScanning && !scanning;
 
   // Escapeはタイトル編集中ならそちらだけをキャンセルし、モーダル自体は閉じない。
   // 実行中でもEscape/背景クリックで閉じられるが、スキャン自体はバックグラウンドで継続する（TASK-56）。
@@ -185,7 +187,7 @@ export default function ScanModal({ lastScanTime, onClose, onOpenRjCodeMissing }
             scanning={scanning}
             progress={progress}
             lastScanTime={lastScanTime}
-            justCompleted={justCompleted}
+            showCompletedHint={justCompleted || justStoppedScanning}
           />
 
           <div className="flex items-baseline justify-between gap-2">
@@ -203,112 +205,87 @@ export default function ScanModal({ lastScanTime, onClose, onOpenRjCodeMissing }
             <StatsGrid result={lastResult} changedKeys={changedKeys} />
           </div>
 
-          <AnimatePresence initial={false}>
-            {lastResult && lastResult.rjCodeMissingCount > 0 && (
-              <motion.button
-                type="button"
-                key="rj-missing"
-                layout
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={FADE}
-                onClick={onOpenRjCodeMissing}
-                className="flex items-center gap-2 overflow-hidden rounded-[6px] border border-[color-mix(in_oklch,var(--r-mustard)_35%,transparent)] bg-[color-mix(in_oklch,var(--r-mustard)_10%,transparent)] px-3 py-2 text-left hover:bg-[color-mix(in_oklch,var(--r-mustard)_16%,transparent)]"
-              >
-                <I.err size={13} className="shrink-0 text-[var(--r-mustard)]" />
-                <span className="flex-1 font-jp text-[12px] text-ink-0">
-                  RJコード未検出の作品が{lastResult.rjCodeMissingCount}件あります
-                </span>
-                <I.chev size={12} className="shrink-0 text-ink-3" />
-              </motion.button>
-            )}
-          </AnimatePresence>
+          <Presence
+            show={!!lastResult && lastResult.rjCodeMissingCount > 0}
+            variant="collapse"
+            skipInitial
+          >
+            <button
+              type="button"
+              onClick={onOpenRjCodeMissing}
+              className="flex w-full items-center gap-2 overflow-hidden rounded-[6px] border border-[color-mix(in_oklch,var(--r-mustard)_35%,transparent)] bg-[color-mix(in_oklch,var(--r-mustard)_10%,transparent)] px-3 py-2 text-left hover:bg-[color-mix(in_oklch,var(--r-mustard)_16%,transparent)]"
+            >
+              <I.err size={13} className="shrink-0 text-[var(--r-mustard)]" />
+              <span className="flex-1 font-jp text-[12px] text-ink-0">
+                RJコード未検出の作品が{lastResult?.rjCodeMissingCount ?? 0}件あります
+              </span>
+              <I.chev size={12} className="shrink-0 text-ink-3" />
+            </button>
+          </Presence>
 
-          <AnimatePresence initial={false}>
-            {(newWorks.length > 0 || newWorksError) && (
-              <motion.div
-                key="new-works"
-                layout
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={FADE}
-                className="flex min-h-0 flex-col gap-1.5 overflow-hidden"
-              >
-                <p className="font-sans text-[10.5px] font-semibold tracking-[0.06em] text-ink-3 uppercase">
-                  新規検出した作品
-                </p>
-                {newWorksError ? (
-                  <p className="font-jp text-[12px] text-[var(--r-coral)]">{newWorksError}</p>
-                ) : (
-                  <ul className="flex max-h-[220px] list-none flex-col gap-1 overflow-y-auto p-0">
-                    {newWorks.map((work) => (
-                      <li key={work.id}>
-                        <NewWorkRow
-                          work={work}
-                          editing={editingId === work.id}
-                          editTitle={editTitle}
-                          editSaving={editingId === work.id && editSaving}
-                          editError={editingId === work.id ? editError : null}
-                          titleInputRef={titleInputRef}
-                          onStartEdit={() => handleStartEdit(work)}
-                          onChangeEditTitle={setEditTitle}
-                          onSaveTitle={() => handleSaveTitle(work.id)}
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </motion.div>
+          <Presence show={newWorks.length > 0 || !!newWorksError} variant="collapse" skipInitial>
+            <p className="font-sans text-[10.5px] font-semibold tracking-[0.06em] text-ink-3 uppercase">
+              新規検出した作品
+            </p>
+            {newWorksError ? (
+              <p className="font-jp text-[12px] text-[var(--r-coral)]">{newWorksError}</p>
+            ) : (
+              <ul className="flex max-h-[220px] list-none flex-col gap-1 overflow-y-auto p-0">
+                {newWorks.map((work) => (
+                  <li key={work.id}>
+                    <NewWorkRow
+                      work={work}
+                      editing={editingId === work.id}
+                      editTitle={editTitle}
+                      editSaving={editingId === work.id && editSaving}
+                      editError={editingId === work.id ? editError : null}
+                      titleInputRef={titleInputRef}
+                      onStartEdit={() => handleStartEdit(work)}
+                      onChangeEditTitle={setEditTitle}
+                      onSaveTitle={() => handleSaveTitle(work.id)}
+                    />
+                  </li>
+                ))}
+              </ul>
             )}
-          </AnimatePresence>
+          </Presence>
         </div>
 
-        <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-line-soft px-[18px] py-3">
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.span
-              key={scanning ? "bg-hint" : "idle-hint"}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={FADE}
-              className="font-jp text-[11px] text-ink-3"
+        <footer className="relative flex shrink-0 items-center justify-between gap-3 border-t border-line-soft px-[18px] py-3">
+          <Presence
+            show={scanning}
+            variant="fade"
+            skipInitial
+            className="font-jp text-[11px] text-ink-3"
+          >
+            閉じてもバックグラウンドで続行します
+          </Presence>
+          <div className="relative shrink-0">
+            <Presence
+              show={scanning}
+              as="button"
+              type="button"
+              variant="fade"
+              skipInitial
+              onClick={() => void cancel().catch(() => {})}
+              className="inline-flex h-9 min-w-[128px] items-center justify-center gap-1.5 rounded-[6px] border border-[color-mix(in_oklch,var(--r-coral)_45%,transparent)] bg-[color-mix(in_oklch,var(--r-coral)_10%,transparent)] px-4 font-sans text-[12.5px] font-medium text-ink-0 transition-colors hover:bg-[color-mix(in_oklch,var(--r-coral)_16%,transparent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
             >
-              {scanning ? "閉じてもバックグラウンドで続行します" : ""}
-            </motion.span>
-          </AnimatePresence>
-          <AnimatePresence mode="wait" initial={false}>
-            {scanning ? (
-              <motion.button
-                type="button"
-                key="cancel"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={FADE}
-                onClick={() => void cancel().catch(() => {})}
-                className="inline-flex h-9 min-w-[128px] items-center justify-center gap-1.5 rounded-[6px] border border-[color-mix(in_oklch,var(--r-coral)_45%,transparent)] bg-[color-mix(in_oklch,var(--r-coral)_10%,transparent)] px-4 font-sans text-[12.5px] font-medium text-ink-0 transition-colors hover:bg-[color-mix(in_oklch,var(--r-coral)_16%,transparent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
-              >
-                <I.x size={12} />
-                スキャンを中止
-              </motion.button>
-            ) : (
-              <motion.button
-                type="button"
-                key="start"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={FADE}
-                onClick={() => void start().catch(() => {})}
-                className="inline-flex h-9 min-w-[128px] items-center justify-center gap-1.5 rounded-[6px] bg-ink-0 px-4 font-sans text-[12.5px] font-semibold text-paper-1 transition-colors hover:bg-acc focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
-              >
-                <I.refresh size={12} />
-                スキャン開始
-              </motion.button>
-            )}
-          </AnimatePresence>
+              <I.x size={12} />
+              スキャンを中止
+            </Presence>
+            <Presence
+              show={!scanning}
+              as="button"
+              type="button"
+              variant="fade"
+              skipInitial
+              onClick={() => void start().catch(() => {})}
+              className="inline-flex h-9 min-w-[128px] items-center justify-center gap-1.5 rounded-[6px] bg-ink-0 px-4 font-sans text-[12.5px] font-semibold text-paper-1 transition-colors hover:bg-acc focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
+            >
+              <I.refresh size={12} />
+              スキャン開始
+            </Presence>
+          </div>
         </footer>
       </div>
     </dialog>
@@ -321,12 +298,12 @@ function StatusRow({
   scanning,
   progress,
   lastScanTime,
-  justCompleted,
+  showCompletedHint,
 }: {
   scanning: boolean;
   progress: ScanProgress | null;
   lastScanTime: string | null;
-  justCompleted: boolean;
+  showCompletedHint: boolean;
 }) {
   const pct =
     progress && progress.total > 0
@@ -334,61 +311,40 @@ function StatusRow({
       : null;
 
   return (
-    <div className="flex min-h-[20px] flex-col gap-1.5">
-      <AnimatePresence mode="wait" initial={false}>
-        {scanning ? (
-          <motion.div
-            key="running"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={FADE}
-            className="flex flex-col gap-1.5"
-          >
-            <div className="flex items-baseline justify-between gap-2">
-              <span className="font-sans text-[13px] font-medium text-ink-0">
-                {progress ? scanPhaseLabel(progress.phase) : "準備中"}
-              </span>
-              <span className="font-mono text-[11px] text-ink-2 tabular-nums">
-                {progress && progress.total > 0 ? `${progress.processed}/${progress.total}` : "…"}
-              </span>
-            </div>
-            <div className="h-[3px] overflow-hidden rounded-full bg-paper-2">
-              <div
-                className={cn(
-                  "h-full rounded-full bg-acc transition-[width] duration-300 ease-out",
-                  pct === null && "w-1/3 animate-pulse",
-                )}
-                style={pct !== null ? { width: `${pct}%` } : undefined}
-              />
-            </div>
-          </motion.div>
-        ) : justCompleted ? (
-          <motion.div
-            key="completed"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={FADE}
-            className="flex items-center gap-1.5"
-          >
-            <I.check size={12} className="text-[var(--r-leaf)]" />
-            <span className="font-sans text-[13px] font-medium text-ink-0">完了しました</span>
-          </motion.div>
-        ) : (
-          <motion.div
-            key="idle"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={FADE}
-          >
-            <span className="font-mono text-[11px] text-ink-2">
-              最終スキャン: {formatDate(lastScanTime)}
-            </span>
-          </motion.div>
-        )}
-      </AnimatePresence>
+    <div className="relative flex min-h-[20px] flex-col gap-1.5">
+      <Presence show={scanning} variant="fade" skipInitial className="flex flex-col gap-1.5">
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="font-sans text-[13px] font-medium text-ink-0">
+            {progress ? scanPhaseLabel(progress.phase) : "準備中"}
+          </span>
+          <span className="font-mono text-[11px] text-ink-2 tabular-nums">
+            {progress && progress.total > 0 ? `${progress.processed}/${progress.total}` : "…"}
+          </span>
+        </div>
+        <div className="h-[3px] overflow-hidden rounded-full bg-paper-2">
+          <div
+            className={cn(
+              "h-full rounded-full bg-acc transition-[width] duration-300 ease-out",
+              pct === null && "w-1/3 animate-pulse",
+            )}
+            style={pct !== null ? { width: `${pct}%` } : undefined}
+          />
+        </div>
+      </Presence>
+      <Presence
+        show={!scanning && showCompletedHint}
+        variant="fade"
+        skipInitial
+        className="flex items-center gap-1.5"
+      >
+        <I.check size={12} className="text-[var(--r-leaf)]" />
+        <span className="font-sans text-[13px] font-medium text-ink-0">完了しました</span>
+      </Presence>
+      <Presence show={!scanning && !showCompletedHint} variant="fade" skipInitial>
+        <span className="font-mono text-[11px] text-ink-2">
+          最終スキャン: {formatDate(lastScanTime)}
+        </span>
+      </Presence>
     </div>
   );
 }

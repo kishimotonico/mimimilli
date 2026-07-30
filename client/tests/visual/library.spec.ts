@@ -131,6 +131,10 @@ test("scan result dialog", async ({ page }, testInfo) => {
   await expect(dialog.getByText("新規検出した作品")).toBeVisible({ timeout: 15_000 });
   // new-work シナリオの RJ501011。スキャン直後の DLsite 一括取得でタイトルが fixture 名に置き換わる。
   await expect(dialog.getByRole("button", { name: /RJ501011/ })).toBeVisible();
+  await expect(dialog.getByText("完了しました")).toBeVisible({ timeout: 15_000 });
+  await expect(dialog.getByRole("button", { name: "スキャン開始" })).toBeVisible({
+    timeout: 15_000,
+  });
 
   // fullPage 撮影だと半透明オーバーレイ越しの背景差分が閾値未満に圧縮され、
   // ダイアログ内容の変化を maxDiffPixelRatio が薄めて検出できない（偽パス）。
