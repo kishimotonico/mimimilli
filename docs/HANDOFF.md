@@ -126,7 +126,7 @@ MIMIMILLI_ADAPTER=fixture PORT=18099 pnpm --filter @mimimilli/server start
 - `model/playerRuntime.ts`: controller と React の間で共有する参照型（`PlayerRuntimeRefs` / `LoadedTrack` / `PendingResume` 等）
 - `model/atoms.ts`:
   - `playerCoreAtom`（低頻度 state。`toPlayerCoreState` で controller state から導出）
-  - `playerCurrentTimeAtom` / `playerDurationAtom`（**高頻度**。timeupdate 毎に更新。**BarContent / PopupContent / FullScreenPlayer だけが subscribe**する。App.tsx は subscribe しないので再生中に App が再レンダリングされない — この分離は**維持必須**）
+  - `playerCurrentTimeAtom` / `playerDurationAtom`（**高頻度**。timeupdate 毎に更新。`usePlaybackProgress` を介して **BarSeekStrip / PopupSeek / FullScreenScrub の3 leaf だけが subscribe**する。親コンポーネント（BarContent / PopupContent / FullScreenPlayer）や App.tsx は subscribe しないので再生中に上位が再レンダリングされない — この分離は**維持必須**）
   - `playerUiModeAtom`（bar⇄popup。localStorage 永続）
 - `model/audioEngine.ts`: 低レベル。`new Audio()`（DOM外）。load/play/pause/seek/setVolume/setPlaybackRate/setChannelSwap、timeupdate/durationchange/ended コールバック
 - `model/useAudioEngineLifecycle.ts`: エンジンの生成・イベント購読・last-played 送信

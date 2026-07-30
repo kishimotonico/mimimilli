@@ -57,12 +57,12 @@ export const dockedBarActiveAtom = atom(
 
 /**
  * 高頻度更新の audio 再生時刻（秒）。
- * BarContent / PopupContent / FullScreenPlayer のみ subscribe すること。
+ * usePlaybackProgress 経由で BarSeekStrip / PopupSeek / FullScreenScrub のみ subscribe すること。
  */
 export const playerCurrentTimeAtom = atom(0);
 
 /**
  * 高頻度更新の audio 総時間（秒）。
- * BarContent / PopupContent / FullScreenPlayer のみ subscribe すること。
+ * usePlaybackProgress 経由で BarSeekStrip / PopupSeek / FullScreenScrub のみ subscribe すること。
  */
 export const playerDurationAtom = atom<number | null>(0);
