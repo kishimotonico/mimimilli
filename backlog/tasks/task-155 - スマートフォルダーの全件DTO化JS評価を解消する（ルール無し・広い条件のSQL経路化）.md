@@ -1,9 +1,11 @@
 ---
 id: TASK-155
 title: スマートフォルダーの全件DTO化+JS評価を解消する（ルール無し・広い条件のSQL経路化）
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-07-30 17:53'
+updated_date: '2026-07-30 18:35'
 labels: []
 dependencies: []
 priority: high
@@ -23,3 +25,12 @@ workRepo.ts:645付近・server/src/adapters/real/index.ts:774-782付近。タグ
 - [ ] #3 スマートフォルダーの表示結果・並び順が変更前と同一（既存の契約テスト+必要な追加テストが通る）
 - [ ] #4 pnpm check と pnpm test が通る
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. ルール無しスマートフォルダーをqueryWorksのSQLソート/ページング経路へ
+2. ルール有りは候補IDに限定したDTO化へ（全件listSummaries排除）
+3. 契約テスト・ベンチ再計測
+実装Cursor委譲、Codexレビュー実施
+<!-- SECTION:PLAN:END -->

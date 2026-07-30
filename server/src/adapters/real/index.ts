@@ -5,12 +5,7 @@ import { createHash } from "node:crypto";
 import { stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
-import {
-  applyDlsiteStatePatch,
-  DEFAULT_TAG_PREFIXES,
-  normalizeTags,
-  toWorkListItem,
-} from "@mimimilli/shared";
+import { applyDlsiteStatePatch, DEFAULT_TAG_PREFIXES, normalizeTags } from "@mimimilli/shared";
 import type {
   AxisFacetItem,
   DlsiteApplyBody,
@@ -53,7 +48,6 @@ import {
 import type { ScanOptions } from "../../adapter.ts";
 import { isDefaultTitle } from "../../core/dlsiteTitle.ts";
 import { buildTagPrefixCandidates } from "../../core/tagPrefixCandidates.ts";
-import { evalSmartFolder } from "../../core/smartFolder.ts";
 import { openDb, type Db, type DbLocation } from "./db.ts";
 import {
   detectRjCode,
@@ -93,6 +87,7 @@ import {
 } from "./thumbnailCache.ts";
 import type { CoverColumns } from "./workRepo.ts";
 import { WorkRepo } from "./workRepo.ts";
+import { querySmartFolderWorks } from "./smartFolderWorks.ts";
 
 const KEY_ROOT_FOLDER = "root_folder";
 const KEY_LAST_SCAN_TIME = "last_scan_time";
@@ -771,14 +766,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
     ): Promise<WorksPage | null> {
       const folder = repo.getSmartFolder(id);
       if (!folder) return null;
-      // ADR-0008: SQLでルール一致の候補IDへ絞り込んでから（第1段）、その候補だけを
-      // WorkSummary化して純粋関数の最終評価・ソート・ページングへ渡す（第2段）。
-      const candidateIds = repo.resolveSmartFolderCandidateIds(folder.rules);
-      const works = repo.listSummaries(candidateIds === null ? undefined : [...candidateIds]);
-      const page = evalSmartFolder(folder, works, query);
-      return page.seed === undefined
-        ? { items: page.items.map(toWorkListItem), total: page.total }
-        : { items: page.items.map(toWorkListItem), total: page.total, seed: page.seed };
+      return querySmartFolderWorks(repo, folder, query);
     },
 
     // ── 物理ファイルシステム ───────────────────────────────────

@@ -11,6 +11,7 @@ import {
   type WorkSummary,
 } from "@mimimilli/shared";
 import { WorkRepo } from "../../src/adapters/real/workRepo.ts";
+import { querySmartFolderWorks } from "../../src/adapters/real/smartFolderWorks.ts";
 import { upsertTestWork } from "../helpers/workTestUtils.ts";
 import { openDb } from "../../src/adapters/real/db.ts";
 import { buildAxisFacets } from "../../src/core/axisFacets.ts";
@@ -281,20 +282,6 @@ test("core参照実装とreal SQLのファセット値・件数・順序が同�
   }
 });
 
-// server/src/adapters/real/index.ts の evalSmartFolder ハンドラと同じ2段構成（ADR-0008）。
-// resolveSmartFolderCandidateIds でSQLへ落とせるルールから候補IDを絞り込み、
-// その候補だけを listSummaries で取得してから core の純粋関数へ渡す。
-function realEvalSmartFolder(
-  repo: WorkRepo,
-  rules: SmartFolderRule[],
-  sort: WorksQuery["sort"],
-  query: { page: number; limit: number; seed?: number },
-) {
-  const candidateIds = repo.resolveSmartFolderCandidateIds(rules);
-  const works = repo.listSummaries(candidateIds === null ? undefined : [...candidateIds]);
-  return evalSmartFolder({ rules, sort }, works, query);
-}
-
 function assertSmartFolderEquivalent(
   repo: WorkRepo,
   rules: SmartFolderRule[],
@@ -302,7 +289,7 @@ function assertSmartFolderEquivalent(
   query: { page: number; limit: number; seed?: number },
 ): void {
   const fixture = evalSmartFolder({ rules, sort }, dataset, query);
-  const real = realEvalSmartFolder(repo, rules, sort, query);
+  const real = querySmartFolderWorks(repo, { rules, sort }, query);
   assert.deepEqual(
     real.items.map((work) => work.id),
     fixture.items.map((work) => work.id),
@@ -328,7 +315,7 @@ test("スマートフォルダーのSQL候補絞り込み(第1段)とcore純粋�
       ({ conjunction, field: "長さ", operator: "≥", values: [String(minSec)] }) as SmartFolderRule;
 
     const fixedCases: Array<{ rules: SmartFolderRule[]; sort: WorksQuery["sort"] }> = [
-      { rules: [], sort: "added-desc" }, // ルールなし = SQLで絞り込めず全件が候補
+      { rules: [], sort: "added-desc" }, // ルールなし = queryWorks の SQL ソート/ページング経路
       { rules: [tagRule(["ASMR", "cv/水瀬なずな"])], sort: "title-asc" },
       { rules: [tagRule(["存在しないタグ"])], sort: "added-desc" },
       { rules: [lengthRule(1200)], sort: "duration-desc" },
