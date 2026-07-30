@@ -5,6 +5,7 @@ import { constants, Database } from "bun:sqlite";
 import { drizzle, type BunSQLiteDatabase } from "drizzle-orm/bun-sqlite";
 import { migrate } from "drizzle-orm/bun-sqlite/migrator";
 import * as catalogSchema from "./catalogSchema.ts";
+import { applySqliteBusyTimeout } from "./sqliteConnection.ts";
 import * as userSchema from "./userSchema.ts";
 
 const CATALOG_SCHEMA_VERSION = 7;
@@ -70,6 +71,7 @@ function openVersionedDatabase(
 
   sqlite.exec("PRAGMA journal_mode = WAL");
   sqlite.exec("PRAGMA foreign_keys = ON");
+  applySqliteBusyTimeout(sqlite);
   const db = drizzle(sqlite);
   migrate(db, { migrationsFolder });
   sqlite.exec(`PRAGMA user_version = ${version}`);

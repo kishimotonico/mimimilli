@@ -3,6 +3,7 @@ import { dirname, isAbsolute } from "node:path";
 import { createHash } from "node:crypto";
 import { gunzipSync, gzipSync } from "node:zlib";
 import { Database } from "bun:sqlite";
+import { applySqliteBusyTimeout } from "./sqliteConnection.ts";
 
 export const DLSITE_CACHE_REPRESENTATION = "work-html-ja-adultchecked-v1";
 export const DEFAULT_DLSITE_CACHE_TTLS_MS = {
@@ -199,6 +200,7 @@ export class DlsiteCache {
     mkdirSync(dirname(options.path), { recursive: true });
     this.sqlite = new Database(options.path, { create: true });
     this.sqlite.exec("PRAGMA journal_mode = WAL");
+    applySqliteBusyTimeout(this.sqlite);
     this.sqlite.exec(`
       CREATE TABLE IF NOT EXISTS dlsite_html_snapshots (
         store TEXT NOT NULL CHECK(store IN ('maniax', 'pro')),

@@ -1,9 +1,11 @@
 ---
 id: TASK-158
 title: SQLite接続にbusy_timeoutを設定し並行書き込み時の操作失敗を防ぐ
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-07-30 17:54'
+updated_date: '2026-07-30 18:06'
 labels: []
 dependencies: []
 priority: high
@@ -22,3 +24,11 @@ server/src/adapters/real/db.ts:43付近の接続初期化にbusy_timeoutが未�
 - [ ] #2 スキャン実行中の書き込み系ユーザー操作が即時SQLITE_BUSYで失敗しないことをテストで確認する
 - [ ] #3 pnpm check と pnpm test が通る
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. db.tsの接続初期化（メイン/Worker、catalog/user）にbusy_timeout PRAGMA追加
+2. スキャン並行書き込み時にSQLITE_BUSY即時失敗しないテスト追加
+実装はCursor委譲
+<!-- SECTION:PLAN:END -->
