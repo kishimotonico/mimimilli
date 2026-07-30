@@ -4,7 +4,7 @@ title: DLsite一括取得のSSE購読を堅牢化する（接続エラー・POST
 status: To Do
 assignee: []
 created_date: '2026-07-27 01:57'
-updated_date: '2026-07-29 17:26'
+updated_date: '2026-07-30 12:35'
 labels:
   - client
   - dlsite
@@ -44,3 +44,12 @@ ordinal: 121000
 - [ ] #3 SSE 接続はジョブ開始 POST の成功後に開始される
 - [ ] #4 不正なイベント（JSON不正・schema不一致）を受け取った場合に無言で無視されず、状態が固着しない
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-07-30 全体レビューからの補足（Codexレビュー指摘。前提の再確認に使う）:
+- routes/dlsite.ts:98 のSSE Promise chainは writeSSE reject時に done が未解決になりうる。unsubscribe も finally でない（書き込み・abort・terminalの終了処理を try/finally へ集約する方向）
+- 実行中ジョブへの再接続契約がない: サーバーは routes/dlsiteProgress.ts:64 で実行状態を保持するが、client/src/features/dlsite/model/atoms.ts:7 の揮発atomがactiveのときだけ接続するため、リロード後は進捗・取消・terminal replayへ戻れない。active job取得+snapshot+job-scoped SSEの契約化を検討
+- client/src/features/scan/useScanJob.ts:131 と DlsiteBulkRuntime.tsx:94 はSSEイベントのparse失敗をイベント単位で無視しており、terminalイベントが壊れるとactive状態が残る（不正イベント対応の具体箇所）
+<!-- SECTION:NOTES:END -->

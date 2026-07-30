@@ -4,7 +4,7 @@ title: 計測結果を判別可能な結果型で表しUIの未知表現を統�
 status: To Do
 assignee: []
 created_date: '2026-07-25 10:27'
-updated_date: '2026-07-25 11:01'
+updated_date: '2026-07-30 12:35'
 labels: []
 dependencies: []
 ordinal: 95000
@@ -55,4 +55,6 @@ probe・scanner・DTO・client が同じ型で計測結果を受け渡す。こ�
 TASK-91（カバー寸法のデータ化）、TASK-92（トラック再生時間のDTO化）
 
 - **client の Files/登録トラック判別が構造チェック**: client/src/features/player/model/trackTime.ts の `isResolvedTrack` が `"durationSec" in track` でFilesモードの即席Trackと登録トラック(ResolvedTrack)を判別している。zod検証済みDTOなので実行時は安全だが、登録トラック側でdurationSecが欠落すると黙って旧durationchange経路へ退行する形。Filesモード側に明示タグ(source: "files" 等)を持たせる案があり、結果型を入れるならあわせて判断する。2回目のCodexレビューでは指摘されなかった（実害は現時点で確認されていない）。
+
+2026-07-30 全体レビューからの補足（Codexレビュー指摘#14、方向性はこのタスクと同じ）: server/src/adapter.ts:160・adapters/real/index.ts:848・routes/works.ts:71 で boolean/null が「不存在」と「処理障害」を兼用し、カバー計測失敗やFS読取失敗が404へ変換されうる。判別可能な結果型（not_found / invalid_media / io_error 等のResult union）を境界に入れる際の対象箇所として参照。
 <!-- SECTION:NOTES:END -->
