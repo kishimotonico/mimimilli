@@ -4,7 +4,7 @@
 // - レイアウトは AppShell に委譲
 
 import { useState, useCallback, useRef } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { usePlayerActions } from "../features/player/model/usePlayerActions";
 import PlayerRuntime from "../features/player/ui/PlayerRuntime";
 import FullScreenPlayerGate from "../features/player/ui/FullScreenPlayerGate";
@@ -26,8 +26,7 @@ import GlobalToast from "./ui/GlobalToast";
 import type { ActiveModal } from "./model/activeModal";
 import type { Work, WorkListItem } from "@mimimilli/shared";
 import { getWork } from "../entities/work/api";
-import { exportLibrary, searchWorks } from "../features/library/api";
-import { getLastScanResult, SCAN_QUERY_KEYS } from "../features/scan/api";
+import { exportLibrary } from "../features/library/api";
 import { useScanActions } from "../features/scan/model/useScanActions";
 import { setRootFolder } from "../features/settings/api";
 import { useSettingsQuery } from "../features/settings/useSettingsQuery";
@@ -54,21 +53,6 @@ export default function App() {
 
   // ファイルモードのルートパス（FilesView に渡す）。
   const rootFolder = settings?.rootFolder ?? "/";
-
-  // 前回スキャン結果（ディスク永続化なし、TASK-56）。サーバー起動後に一度でも完了していれば
-  // GET /api/scan/last から取得でき、リロードをまたいでスキャンモーダル・通知ベルに表示できる。
-  const lastScanQuery = useQuery({
-    queryKey: SCAN_QUERY_KEYS.last(),
-    queryFn: getLastScanResult,
-  });
-  const lastScanResult = lastScanQuery.data?.result ?? null;
-
-  // ライブラリ総件数（サイドバーの「ライブラリ N 件」と同じ既存クエリキーを共有する）。
-  // スキャンモーダルで統計バッジが全て0でも蔵書自体は0件ではないことを示すために使う。
-  const libraryTotalQuery = useQuery({
-    queryKey: WORK_QUERY_KEYS.total(),
-    queryFn: () => searchWorks({ limit: 1 }).then((page) => page.total),
-  });
 
   // ── Change folder mutation ────────────────────────────────
   const changeFolderMutation = useMutation({
@@ -207,7 +191,6 @@ export default function App() {
           onSettings={() => setActiveModal("settings")}
           notificationBell={
             <NotificationBell
-              scanResult={lastScanResult}
               onOpenScanResult={handleOpenScanModal}
               onOpenNotificationModal={setActiveModal}
             />
@@ -242,9 +225,7 @@ export default function App() {
           )}
           {activeModal === "scan" && (
             <ScanModal
-              lastResult={lastScanResult}
               lastScanTime={settings?.lastScanTime ?? null}
-              libraryTotal={libraryTotalQuery.data ?? null}
               onClose={handleCloseModal}
               onOpenRjCodeMissing={() => setActiveModal("rj-missing")}
             />

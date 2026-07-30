@@ -3,11 +3,14 @@
 import { createElement } from "react";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ScanJobSnapshot, ScanResult, Work } from "@mimimilli/shared";
 import ScanModal from "../../src/features/scan/ui/ScanModal";
 import * as workApi from "../../src/entities/work/api";
 import { scanActionsAtom, scanJobAtom } from "../../src/features/scan/model/atoms";
+import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
+import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 
 beforeEach(() => {
   HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) {
@@ -73,8 +76,36 @@ function createRunningJob(
   };
 }
 
+type ModalOverrides = Partial<Parameters<typeof ScanModal>[0]> & {
+  /** ScanModal 自身が SCAN_QUERY_KEYS.last() を購読する（TASK-124）ため、query cache 経由で渡す */
+  lastResult?: ScanResult | null;
+  /** ScanModal 自身が WORK_QUERY_KEYS.total() を購読する（TASK-124）ため、query cache 経由で渡す */
+  libraryTotal?: number | null;
+};
+
+function createTestQueryClient() {
+  return new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
+  });
+}
+
+function seedScanQueries(
+  queryClient: QueryClient,
+  { lastResult, libraryTotal }: { lastResult?: ScanResult | null; libraryTotal?: number | null },
+) {
+  if (lastResult !== undefined) {
+    queryClient.setQueryData(
+      SCAN_QUERY_KEYS.last(),
+      lastResult ? { result: lastResult, finishedAt: "2026-01-01T00:00:00.000Z" } : null,
+    );
+  }
+  if (libraryTotal !== undefined) {
+    queryClient.setQueryData(WORK_QUERY_KEYS.total(), libraryTotal);
+  }
+}
+
 function renderModal(
-  overrides: Partial<Parameters<typeof ScanModal>[0]> = {},
+  overrides: ModalOverrides = {},
   scanState: { job?: ScanJobSnapshot | null } = {},
 ) {
   const store = createStore();
@@ -89,30 +120,45 @@ function renderModal(
     store.set(scanJobAtom, scanState.job);
   }
 
+  const { lastResult, libraryTotal, ...rest } = overrides;
+  const queryClient = createTestQueryClient();
+  seedScanQueries(queryClient, {
+    lastResult: lastResult !== undefined ? lastResult : scanResult,
+    libraryTotal: libraryTotal !== undefined ? libraryTotal : 11,
+  });
+
   const modalProps = {
-    lastResult: scanResult,
     lastScanTime: null,
-    libraryTotal: 11,
     onClose: vi.fn(),
     onOpenRjCodeMissing: vi.fn(),
-    ...overrides,
+    ...rest,
   };
 
   const view = render(
-    createElement(JotaiProvider, { store }, createElement(ScanModal, modalProps)),
+    createElement(
+      QueryClientProvider,
+      { client: queryClient },
+      createElement(JotaiProvider, { store }, createElement(ScanModal, modalProps)),
+    ),
   );
 
-  const rerenderModal = (newOverrides: Partial<Parameters<typeof ScanModal>[0]> = {}) => {
+  const rerenderModal = (newOverrides: ModalOverrides = {}) => {
+    const { lastResult: newLastResult, libraryTotal: newLibraryTotal, ...newRest } = newOverrides;
+    seedScanQueries(queryClient, { lastResult: newLastResult, libraryTotal: newLibraryTotal });
     view.rerender(
       createElement(
-        JotaiProvider,
-        { store },
-        createElement(ScanModal, { ...modalProps, ...newOverrides }),
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(
+          JotaiProvider,
+          { store },
+          createElement(ScanModal, { ...modalProps, ...newRest }),
+        ),
       ),
     );
   };
 
-  return { ...view, store, onStart, onCancel, rerenderModal };
+  return { ...view, store, onStart, onCancel, rerenderModal, queryClient };
 }
 
 describe("ScanModal", () => {

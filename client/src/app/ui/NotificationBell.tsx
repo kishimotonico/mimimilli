@@ -4,30 +4,35 @@
 // 素朴な実装に倣う（work-preview専用の useAnchoredPopover は左寄せクランプ前提でここには合わない）。
 import { useAtomValue } from "jotai";
 import { useEffect, useRef, useState } from "react";
-import type { ScanResult } from "@mimimilli/shared";
+import { useQuery } from "@tanstack/react-query";
 import type { DlsiteNotificationModalKind } from "../model/activeModal";
 import { dlsiteBulkActiveAtom, dlsiteBulkProgressAtom } from "../../features/dlsite/model/atoms";
 import { useDlsiteBulkActions } from "../../features/dlsite/model/useDlsiteBulkActions";
 import { useDlsiteNotificationSummary } from "../../features/library/model/useDlsiteNotificationSummary";
+import { getLastScanResult, SCAN_QUERY_KEYS } from "../../features/scan/api";
 import Button from "../../shared/ui/Button";
 import { I } from "../../shared/ui/Icon";
 import IconButton from "../../shared/ui/IconButton";
 
 export interface NotificationBellProps {
-  scanResult: ScanResult | null;
   /** 直近のスキャン結果クリックでスキャンモーダルの結果表示を開く（TASK-56） */
   onOpenScanResult: () => void;
   onOpenNotificationModal: (kind: DlsiteNotificationModalKind) => void;
 }
 
 export default function NotificationBell({
-  scanResult,
   onOpenScanResult,
   onOpenNotificationModal,
 }: NotificationBellProps) {
   const dlsiteBulkActive = useAtomValue(dlsiteBulkActiveAtom);
   const dlsiteBulkProgress = useAtomValue(dlsiteBulkProgressAtom);
   const { start: onStartDlsiteBulk } = useDlsiteBulkActions();
+  // 前回スキャン結果（ディスク永続化なし、TASK-56）。App から降ろした購読（TASK-124）。
+  const lastScanQuery = useQuery({
+    queryKey: SCAN_QUERY_KEYS.last(),
+    queryFn: getLastScanResult,
+  });
+  const scanResult = lastScanQuery.data?.result ?? null;
   const {
     rjCodeMissingCount,
     fetchFailedCount: dlsiteFetchFailedCount,

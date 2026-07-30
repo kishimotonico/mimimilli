@@ -291,6 +291,48 @@ describe("App root subscriptions", () => {
     });
   });
 
+  describe("library total / last scan query", () => {
+    // TASK-124: libraryTotalQuery / lastScanQuery を ScanModal・NotificationBell へ降ろした後の退行テスト。
+    // trackedProps が空の観測者は無条件通知にフォールバックする（TanStack Query v5）ため、
+    // App がこれらの query を直接持つと fetchStatus 等の変化だけでも再レンダリングされてしまう。
+    it("ライブラリ総件数クエリの更新で App が再レンダリングされない", async () => {
+      const { queryClient } = renderApp();
+      const baseline = await waitForAppShellBaseline();
+
+      await act(async () => {
+        queryClient.setQueryData(WORK_QUERY_KEYS.total(), 42);
+      });
+
+      await waitFor(() => expect(queryClient.getQueryData(WORK_QUERY_KEYS.total())).toBe(42));
+      expect(appShellCallCount).toBe(baseline);
+    });
+
+    it("直近スキャン結果クエリの更新で App が再レンダリングされない", async () => {
+      const { queryClient } = renderApp();
+      const baseline = await waitForAppShellBaseline();
+
+      const nextResult = {
+        result: {
+          registered: 1,
+          newlyGenerated: 1,
+          errors: 0,
+          missing: 0,
+          newWorkIds: [],
+          rjCodeMissingCount: 0,
+        },
+        finishedAt: "2026-01-02T00:00:00.000Z",
+      };
+      await act(async () => {
+        queryClient.setQueryData(SCAN_QUERY_KEYS.last(), nextResult);
+      });
+
+      await waitFor(() =>
+        expect(queryClient.getQueryData(SCAN_QUERY_KEYS.last())).toEqual(nextResult),
+      );
+      expect(appShellCallCount).toBe(baseline);
+    });
+  });
+
   describe("dlsite bulk progress", () => {
     it("DLsite 一括取得の進捗更新で App が再レンダリングされない", async () => {
       const { store } = renderApp();

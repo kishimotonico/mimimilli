@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { useAtomValue } from "jotai";
+import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
 import { getDefaultPlaylistTrackCount, type ScanResult, type Work } from "@mimimilli/shared";
 import { getWork, patchWork } from "../../../entities/work/api";
+import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
+import { searchWorks } from "../../library/api";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
 import { cn } from "../../../shared/lib/cn";
 import { I } from "../../../shared/ui/Icon";
@@ -10,15 +13,10 @@ import IconButton from "../../../shared/ui/IconButton";
 import { scanPhaseLabel, type ScanProgress } from "../model";
 import { scanningAtom, scanProgressAtom } from "../model/atoms";
 import { useScanActions } from "../model/useScanActions";
+import { getLastScanResult, SCAN_QUERY_KEYS } from "../api";
 
 interface ScanModalProps {
-  /** サーバー起動後に一度でも完了していれば入る、前回スキャン結果（ディスク永続化はしない）。
-   *  実行中も直前の値をそのまま表示し続け、完了と同時に値だけ更新される。 */
-  lastResult: ScanResult | null;
   lastScanTime: string | null;
-  /** ライブラリ全体の登録件数（サイドバーと同じ集計）。今回の変化が全て0でも
-   *  蔵書自体が空でないことを示すために「今回のスキャン」統計とは別枠で表示する。 */
-  libraryTotal: number | null;
   onClose: () => void;
   /** RJコード未検出の作品一覧を開く（結果にrjCodeMissingCount > 0のときのみ表示） */
   onOpenRjCodeMissing: () => void;
@@ -37,16 +35,28 @@ function formatDate(iso: string | null): string {
   return iso ? new Date(iso).toLocaleString("ja-JP") : "未実行";
 }
 
-export default function ScanModal({
-  lastResult,
-  lastScanTime,
-  libraryTotal,
-  onClose,
-  onOpenRjCodeMissing,
-}: ScanModalProps) {
+export default function ScanModal({ lastScanTime, onClose, onOpenRjCodeMissing }: ScanModalProps) {
   const scanning = useAtomValue(scanningAtom);
   const progress = useAtomValue(scanProgressAtom);
   const { start, cancel } = useScanActions();
+
+  // 前回スキャン結果（ディスク永続化なし、TASK-56）。サーバー起動後に一度でも完了していれば
+  // GET /api/scan/last から取得でき、リロードをまたいでスキャンモーダルに表示できる。
+  // App から降ろした購読（TASK-124）: 唯一の消費者であるここで直接持つ。
+  const lastScanQuery = useQuery({
+    queryKey: SCAN_QUERY_KEYS.last(),
+    queryFn: getLastScanResult,
+  });
+  const lastResult = lastScanQuery.data?.result ?? null;
+
+  // ライブラリ総件数（サイドバーの「ライブラリ N 件」と同じ既存クエリキーを共有する）。
+  // スキャンモーダルで統計バッジが全て0でも蔵書自体は0件ではないことを示すために使う。
+  // App から降ろした購読（TASK-124）。
+  const libraryTotalQuery = useQuery({
+    queryKey: WORK_QUERY_KEYS.total(),
+    queryFn: () => searchWorks({ limit: 1 }).then((page) => page.total),
+  });
+  const libraryTotal = libraryTotalQuery.data ?? null;
   const [newWorks, setNewWorks] = useState<Work[]>([]);
   const [newWorksError, setNewWorksError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);

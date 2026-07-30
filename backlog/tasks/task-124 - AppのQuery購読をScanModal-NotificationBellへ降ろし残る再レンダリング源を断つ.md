@@ -1,10 +1,10 @@
 ---
 id: TASK-124
 title: AppのQuery購読をScanModal/NotificationBellへ降ろし残る再レンダリング源を断つ
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-29 18:02'
-updated_date: '2026-07-29 18:27'
+updated_date: '2026-07-30 07:22'
 labels: []
 dependencies: []
 priority: medium
@@ -33,11 +33,11 @@ App.tsx が保持する libraryTotalQuery が、TASK-123 までで塞いだは�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 ファイル→ライブラリ切替（staleTime 経過後）で App が再レンダリングされない（実測で確認）
-- [ ] #2 スキャン実行中に App が再レンダリングされない（実測で確認）
-- [ ] #3 libraryTotalQuery が ScanModal へ降り、App から参照されていない
-- [ ] #4 lastScanQuery が NotificationBell / ScanModal へ降り、App から参照されていない
-- [ ] #5 スキャンモーダルの統計表示・通知ベルの直近スキャン結果表示が従来どおり動作する
+- [x] #1 ファイル→ライブラリ切替（staleTime 経過後）で App が再レンダリングされない（実測で確認）
+- [x] #2 スキャン実行中に App が再レンダリングされない（実測で確認）
+- [x] #3 libraryTotalQuery が ScanModal へ降り、App から参照されていない
+- [x] #4 lastScanQuery が NotificationBell / ScanModal へ降り、App から参照されていない
+- [x] #5 スキャンモーダルの統計表示・通知ベルの直近スキャン結果表示が従来どおり動作する
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -48,4 +48,33 @@ App.tsx が保持する libraryTotalQuery が、TASK-123 までで塞いだは�
 本タスクは確立したばかりの「App はランタイム状態を購読しない」という不変条件の回復だが、現在の実害は余計な再描画に留まるため、正しさに直結する TASK-110（一時停止中に音が出る）と TASK-111（保存失敗を成功と表示）より後で問題ない。
 
 注意: TASK-111 と本タスクはどちらも ScanModal.tsx を触るため、並行実装は避けること。TASK-110 は独立しているので、並行化するなら「110」と「111 → 124 → 125」の2系列に分けるのが自然。
+
+実装完了（AC#1/#2の実測確認は検証担当が対応）。
+
+変更内容:
+- App.tsx: libraryTotalQuery（WORK_QUERY_KEYS.total）と lastScanQuery（SCAN_QUERY_KEYS.last）を削除。NotificationBell/ScanModalへのprops（scanResult/lastResult/libraryTotal）受け渡しをやめた
+- ScanModal.tsx: 唯一の消費者としてlibraryTotalQuery・lastScanQueryを自身でuseQuery。propsからlastResult/libraryTotalを削除しlastScanTimeのみ受け取る
+- NotificationBell.tsx: lastScanQueryを自身でuseQuery。propsからscanResultを削除
+
+設計判断:
+- useLibraryQueries.ts:129-132のlibraryTotalQuery（LibraryView用）はそのまま維持。ScanModal側は別のuseQuery呼び出しだが同一queryKeyのため、TanStack Queryのキャッシュは共有される（フェッチは重複しない）。各コンポーネントが自分の必要なプロパティ（.data）に実際にアクセスするため、trackedPropsが空にならずApp側で起きていたfetchStatus等の変化での無条件通知は起きない
+- 重複購読自体（App/LibraryViewで同一キーを2箇所購読）は今回のAC範囲外（App側の購読を無くすことが本旨）のため未変更。TASK-125側の課題とは別軸
+
+テスト:
+- pnpm check（typecheck/lint/fmt）全通過
+- pnpm test 全通過（server 344件・client 348件）
+- notificationBell.test.ts / scanModal.test.ts をQueryClientProviderでラップし、props経由だったlastResult/libraryTotal/scanResultをqueryClient.setQueryDataでシードする形に書き換え
+- appRootSubscriptions.test.tsxに退行テスト2件追加（WORK_QUERY_KEYS.total() / SCAN_QUERY_KEYS.last() の更新でAppが再レンダリングされないこと）
+
+残る懸念:
+- AC#1/#2の実測（ファイル→ライブラリ切替・スキャン中の非再レンダリング）は検証担当のagent-browser実測待ち
+- TASK-111直後のScanModal.tsx（handleSaveTitle周り）とは競合なし、最新masterから作業
+
+検証担当による実測完了（console.count 一時計装、react renders 計測不使用、StrictMode により生カウントは論理回数の2倍）。AC#1: ファイル→36秒待機→ライブラリ切替で App 0回（修正前実測2回→0回）。陽性対照: 設定モーダル開閉で論理1回の増加を確認。AC#2: 実ライブラリ11件への再スキャンで論理1回のみ。残る1回は ScanRuntime のスキャン完了時 SETTINGS_QUERY_KEYS invalidate → App が JSX で実際に使用する settingsQuery.data の lastScanTime 変化による正当な再レンダリングで、本タスクの真因（tracked-props 空フォールバック）とは別経路・スコープ外と判断（libraryTotalQuery / lastScanQuery の参照は App からゼロを rg で確認済み）。破壊テスト: App.tsx へ旧実装相当（トップレベル useQuery・.data アクセスなし）を一時復元すると追加退行テスト2件が expected 2 to be 1 で失敗することを確認し、完全復元。ScanModal / NotificationBell の useQuery は .data のみアクセスで trackedProps 空の再発なし、条件付きマウント構造も維持。機能維持（モーダル統計・ベルの直近スキャン表示）もブラウザ確認。pnpm check / pnpm test（server 344 / client 348）全通過。
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+App.tsx が保持していた libraryTotalQuery / lastScanQuery を唯一の消費者である ScanModal / NotificationBell へ降ろし、TanStack Query v5 の trackedProps 空観測者への無条件通知で App 全体が再レンダリングされる経路を断った。実測でモード切替（staleTime 経過後）の App 再レンダリングが2回→0回、スキャン中は正当な settings 更新由来の1回のみになったことを確認。退行テスト2件を appRootSubscriptions.test.tsx へ追加し、破壊テストで実効性を確認済み。
+<!-- SECTION:FINAL_SUMMARY:END -->

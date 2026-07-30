@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { ScanResult } from "@mimimilli/shared";
 import NotificationBell from "../../src/app/ui/NotificationBell";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
+import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
 import {
   dlsiteBulkActionsAtom,
   dlsiteBulkActiveAtom,
@@ -37,6 +38,7 @@ function renderBell(
     active?: boolean;
     progress?: { processed: number; total: number } | null;
   },
+  scanResultOverride?: ScanResult | null,
 ) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -45,6 +47,13 @@ function renderBell(
     ...summaryDefaults,
     ...summaryOverrides,
   });
+  // App から降ろした購読（TASK-124）: NotificationBell 自身が SCAN_QUERY_KEYS.last() を持つ
+  queryClient.setQueryData(
+    SCAN_QUERY_KEYS.last(),
+    scanResultOverride
+      ? { result: scanResultOverride, finishedAt: "2026-01-01T00:00:00.000Z" }
+      : null,
+  );
 
   const store = createStore();
   const onStartDlsiteBulk = vi.fn();
@@ -62,7 +71,6 @@ function renderBell(
   }
 
   const props = {
-    scanResult: null,
     onOpenScanResult: vi.fn(),
     onOpenNotificationModal: vi.fn(),
     ...bellOverrides,
@@ -177,7 +185,7 @@ describe("NotificationBell", () => {
   });
 
   it("scanResultがあれば直近のスキャン結果サマリを表示する", () => {
-    renderBell({}, { scanResult });
+    renderBell({}, {}, undefined, scanResult);
     fireEvent.click(screen.getByRole("button", { name: /通知/ }));
     expect(screen.getByText("直近のスキャン結果")).toBeInTheDocument();
     expect(screen.getByText("12")).toBeInTheDocument();
