@@ -9,23 +9,32 @@ import {
   readFileSync,
   renameSync,
   rmSync,
+  statSync,
   utimesSync,
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
-import { createRealAdapter } from "../../src/adapters/real/index.ts";
+import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { openDb, type Db } from "../../src/adapters/real/db.ts";
 import { Scanner } from "../../src/adapters/real/scanner.ts";
+import { audioProbeCache } from "../../src/adapters/real/catalogSchema.ts";
 import { WorkRepo } from "../../src/adapters/real/workRepo.ts";
 import { makeSampleLibrary, makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 
 async function setup(t: TestContext) {
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
-  const adapter = createRealAdapter({ database: { kind: "memory" } });
+  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
   await adapter.updateSettings({ rootFolder: lib.root });
   return { ...lib, adapter };
+}
+
+function countWorkStates(db: Db): number {
+  const row = db.sqlite.query("SELECT COUNT(*) AS total FROM user.work_states").get() as {
+    total: number;
+  };
+  return row.total;
 }
 
 test("初回スキャン: 登録・自動生成・エラー検出・duration プローブ", async (t) => {
@@ -160,7 +169,7 @@ test("UUID 重複: 後に検出された方が再採番されメタファイル�
       }),
     );
   }
-  const adapter = createRealAdapter({ database: { kind: "memory" } });
+  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
   await adapter.updateSettings({ rootFolder: root });
   const result = await adapter.scan();
 
@@ -200,7 +209,7 @@ test("大量ディレクトリの走査中、walking フェーズの進捗イベ
   for (let i = 0; i < dirCount; i++) {
     mkdirSync(join(root, `dir-${i}`), { recursive: true });
   }
-  const adapter = createRealAdapter({ database: { kind: "memory" } });
+  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
   await adapter.updateSettings({ rootFolder: root });
 
   const walkingEvents: { processed: number; total: number }[] = [];
@@ -255,9 +264,9 @@ test("増分スキャン: 完全未変更の作品は2回目以降スキップ�
   assert.equal(first.newlyGenerated, 1);
 
   const second = await adapter.scan();
-  assert.equal(second.registered, 0);
+  assert.equal(second.registered, 1); // error状態の既存メタは毎回再評価（TASK-95）
   assert.equal(second.newlyGenerated, 0);
-  assert.equal(second.skipped, 2); // 既存メタ + 自動生成メタ
+  assert.equal(second.skipped, 1); // 正常な自動生成メタのみスキップ
   assert.equal(second.missing, 0);
   assert.equal(second.errors, 0);
 });
@@ -275,7 +284,7 @@ test("増分スキャン: スキップした作品もPlaylist/Trackとresumeを�
   );
 
   const second = await adapter.scan();
-  assert.equal(second.skipped, 2);
+  assert.equal(second.skipped, 1);
   assert.deepEqual((await adapter.getWork(workId))?.resume, {
     playlistId: playlist.id,
     trackId: track.id,
@@ -292,7 +301,7 @@ test("増分スキャン: 除外対象のcreatedAtが不正でも完全未変更
   writeFileSync(metaPath, JSON.stringify(meta, null, 2));
 
   const second = await adapter.scan();
-  assert.equal(second.skipped, 2);
+  assert.equal(second.skipped, 1);
   assert.equal(second.errors, 0);
 });
 
@@ -342,13 +351,19 @@ test("増分スキャン: playlists/tracks/urlsの未知キーはfingerprintか�
   meta.createdAt = "invalid timestamp";
   writeFileSync(metaPath, JSON.stringify(meta, null, 2));
 
-  let upsertCount = 0;
-  const originalUpsert = repo.upsertWork.bind(repo);
+  let catalogUpsertCount = 0;
+  let userUpsertCount = 0;
+  const originalCatalogUpsert = repo.upsertWorkCatalog.bind(repo);
+  const originalUserUpsert = repo.upsertWorkUserState.bind(repo);
   let probeCacheQueryCount = 0;
   const originalQuery = db.sqlite.query.bind(db.sqlite);
-  repo.upsertWork = (work, options) => {
-    upsertCount += 1;
-    originalUpsert(work, options);
+  repo.upsertWorkCatalog = (work, options) => {
+    catalogUpsertCount += 1;
+    originalCatalogUpsert(work, options);
+  };
+  repo.upsertWorkUserState = (work) => {
+    userUpsertCount += 1;
+    originalUserUpsert(work);
   };
   db.sqlite.query = ((sql: string, ...params: unknown[]) => {
     if (typeof sql === "string" && sql.includes("audio_probe_cache")) probeCacheQueryCount += 1;
@@ -362,10 +377,12 @@ test("増分スキャン: playlists/tracks/urlsの未知キーはfingerprintか�
     assert.equal(second.registered, 0);
     assert.equal(second.errors, 0);
   } finally {
-    repo.upsertWork = originalUpsert;
+    repo.upsertWorkCatalog = originalCatalogUpsert;
+    repo.upsertWorkUserState = originalUserUpsert;
     db.sqlite.query = originalQuery;
   }
-  assert.equal(upsertCount, 0);
+  assert.equal(catalogUpsertCount, 0);
+  assert.equal(userUpsertCount, 0);
   assert.equal(probeCacheQueryCount, 0);
 });
 
@@ -380,7 +397,7 @@ test("増分スキャン: 音声削除時は fingerprint 不一致で再処理�
   rmSync(join(root, "dlsite", "RJ900001_テスト作品", "mp3", "01_intro.wav"));
 
   const second = await adapter.scan();
-  assert.equal(second.skipped, 1); // 既存メタ作品は未変更のままスキップ
+  assert.equal(second.skipped, 0);
   assert.equal(second.missing, 0);
 
   const after = await adapter.getWork(generatedId);
@@ -402,7 +419,7 @@ test("増分スキャン: 音声 mtime/size 変更時は duration が再計算�
   writeWav(join(root, "dlsite", "RJ900001_テスト作品", "mp3", "01_intro.wav"), 4);
 
   const second = await adapter.scan();
-  assert.equal(second.skipped, 1); // 既存メタ作品は未変更のままスキップ
+  assert.equal(second.skipped, 0);
 
   const after = await adapter.getWork(generatedId);
   assert.ok(after);
@@ -420,8 +437,8 @@ test("増分スキャン: 音声のmtimeだけが変わっても再処理する"
   utimesSync(audioPath, new Date(), new Date(Date.now() + 2_000));
 
   const second = await adapter.scan();
-  assert.equal(second.skipped, 1);
-  assert.equal(second.registered, 1);
+  assert.equal(second.skipped, 0);
+  assert.equal(second.registered, 2);
 });
 
 test("増分スキャン: カバー画像の更新でも再処理する", async (t) => {
@@ -431,8 +448,8 @@ test("増分スキャン: カバー画像の更新でも再処理する", async 
   writeFileSync(coverPath, "updated cover image");
 
   const second = await adapter.scan();
-  assert.equal(second.skipped, 1);
-  assert.equal(second.registered, 1);
+  assert.equal(second.skipped, 0);
+  assert.equal(second.registered, 2);
 });
 
 test("カバー計測失敗: 画像が読めない場合は寸法NULLでcoverErrorsに計上され、DTOはcover:nullになる", async (t) => {
@@ -445,10 +462,12 @@ test("カバー計測失敗: 画像が読めない場合は寸法NULLでcoverErr
   const generated = await adapter.getWork(first.newWorkIds[0]!);
   // 画像はあるが計測失敗＝表示可能なカバー無しとしてnull投影する（0/1で埋めない）
   assert.equal(generated!.cover, null);
+  assert.equal(generated!.coverKind, "unmeasured");
+  assert.equal(generated!.coverImage, "cover.jpg");
 
   // 寸法が欠損したままなのでearly skipは許可されず、次回スキャンでも再試行される
   const second = await adapter.scan();
-  assert.equal(second.skipped, 1); // 既存メタ（RJ900002）のみスキップ
+  assert.equal(second.skipped, 0);
   assert.equal(second.coverErrors, 1);
 });
 
@@ -493,6 +512,88 @@ test("増分スキャン: registering 進捗の processed/total はスキップ�
   }
 });
 
+test("増分スキャン: error状態の作品はfingerprint一致でも再評価される", async (t) => {
+  const { adapter, existingWorkId, root } = await setup(t);
+  await adapter.scan();
+  const before = await adapter.getWork(existingWorkId);
+  assert.equal(before?.status, "error");
+
+  writeWav(join(root, "dlsite", "RJ900002_既存メタ", "missing.wav"), 1);
+
+  const second = await adapter.scan();
+  assert.equal(second.skipped, 1);
+
+  const after = await adapter.getWork(existingWorkId);
+  assert.equal(after?.status, "ok");
+  assert.equal(after?.errorMessage, null);
+});
+
+test("強制フルスキャン: fingerprint一致作品も含め全件再処理する", async (t) => {
+  const { adapter } = await setup(t);
+  await adapter.scan();
+
+  const second = await adapter.scan({ full: true });
+  assert.equal(second.skipped, 0);
+  assert.equal(second.registered, 2);
+});
+
+test("error作品の再評価時はprobe cacheをバイパスし誤durationから回復する", async (t) => {
+  const directory = makeTestDirectory("probe-cache-bypass-error");
+  t.after(directory.cleanup);
+  const root = join(directory.path, "lib");
+  const workDir = join(root, "work");
+  const workId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const playlistId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const trackId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+  mkdirSync(workDir, { recursive: true });
+  const audioPath = join(workDir, "track.wav");
+  writeWav(audioPath, 10);
+  writeFileSync(
+    join(workDir, ".meta.json"),
+    JSON.stringify({
+      id: workId,
+      title: "probe-cache-bypass",
+      playlists: [
+        {
+          id: playlistId,
+          name: "default",
+          tracks: [{ id: trackId, title: "track", file: "track.wav", start: 5 }],
+        },
+      ],
+      defaultPlaylistId: playlistId,
+    }),
+  );
+
+  const db = openDb({ kind: "memory" });
+  t.after(() => db.close());
+  const repo = new WorkRepo(db);
+  const scanner = new Scanner(db, repo, directory.path);
+
+  const stat = statSync(audioPath);
+  db.catalog
+    .insert(audioProbeCache)
+    .values({
+      path: audioPath,
+      size: stat.size,
+      mtimeMs: Math.floor(stat.mtimeMs),
+      durationSec: 1,
+    })
+    .run();
+
+  const first = await scanner.scan(root);
+  assert.equal(first.registered, 1);
+  const work = await repo.getWork(workId);
+  assert.ok(work);
+  assert.equal(work!.status, "error");
+  assert.match(work!.errorMessage ?? "", /開始位置がファイル長を超えています/);
+
+  const second = await scanner.scan(root);
+  assert.equal(second.registered, 1);
+  const recovered = await repo.getWork(workId);
+  assert.equal(recovered!.status, "ok");
+  assert.equal(recovered!.errorMessage, null);
+});
+
 test("増分スキャン: 2回目に検出したduplicate UUIDもID移行後に別作品として登録する", async (t) => {
   const { adapter, root } = await setup(t);
   await adapter.scan();
@@ -526,8 +627,8 @@ test("増分スキャン: 2回目に検出したduplicate UUIDもID移行後に�
   writeFileSync(join(duplicateDir, ".meta.json"), JSON.stringify(source, null, 2));
 
   const second = await adapter.scan();
-  assert.equal(second.registered, 1);
-  assert.equal(second.skipped, 2);
+  assert.equal(second.registered, 2);
+  assert.equal(second.skipped, 1);
   const copiedMeta = JSON.parse(readFileSync(join(duplicateDir, ".meta.json"), "utf-8"));
   assert.notEqual(copiedMeta.id, source.id);
   assert.equal(
@@ -695,18 +796,29 @@ test("upsertWork はバッチトランザクションで処理され件数上限
   const repo = new WorkRepo(db);
   const scanner = new Scanner(db, repo, directory.path, { upsertBatchSize: 2 });
 
-  let transactionCount = 0;
-  const originalTransaction = db.transaction;
+  let catalogTransactionCount = 0;
+  let userTransactionCount = 0;
+  const originalCatalogTransaction = db.transaction;
+  const originalUserTransaction = db.userTransaction;
   db.transaction = <T>(callback: () => T): T => {
-    transactionCount += 1;
-    return originalTransaction(callback);
+    catalogTransactionCount += 1;
+    return originalCatalogTransaction(callback);
+  };
+  db.userTransaction = <T>(callback: () => T): T => {
+    userTransactionCount += 1;
+    return originalUserTransaction(callback);
   };
 
   await scanner.scan(root);
 
   assert.ok(
-    transactionCount >= 3,
-    `バッチトランザクションが分割されること: expected >=3, got ${transactionCount}`,
+    catalogTransactionCount >= 3,
+    `catalogバッチトランザクションが分割されること: expected >=3, got ${catalogTransactionCount}`,
+  );
+  assert.equal(
+    userTransactionCount,
+    catalogTransactionCount,
+    "userとcatalogのバッチトランザクション回数は一致する",
   );
   assert.equal(repo.countByStatus("ok"), workCount);
 });
@@ -720,7 +832,7 @@ test("upsertBatchSizeは有限の正整数だけを受け付ける", (t) => {
   }
 });
 
-test("バッチ途中のcatalog書込失敗はロールバックされ、再スキャンできる", async (t) => {
+test("バッチ途中のcatalog書込失敗はcatalogのみロールバックされ、再スキャンできる", async (t) => {
   const directory = makeTestDirectory("batch-rollback");
   t.after(directory.cleanup);
   const root = join(directory.path, "lib");
@@ -742,20 +854,69 @@ test("バッチ途中のcatalog書込失敗はロールバックされ、再ス�
   t.after(() => db.close());
   const repo = new WorkRepo(db);
   const scanner = new Scanner(db, repo, directory.path, { upsertBatchSize: 2 });
-  const originalUpsert = repo.upsertWork.bind(repo);
+  const originalCatalogUpsert = repo.upsertWorkCatalog.bind(repo);
   let calls = 0;
-  repo.upsertWork = (work, options) => {
-    originalUpsert(work, options);
+  repo.upsertWorkCatalog = (work, options) => {
     calls += 1;
     if (calls === 2) throw new Error("injected catalog write failure");
+    originalCatalogUpsert(work, options);
   };
   try {
     await assert.rejects(scanner.scan(root), /injected catalog write failure/);
   } finally {
-    repo.upsertWork = originalUpsert;
+    repo.upsertWorkCatalog = originalCatalogUpsert;
   }
   assert.equal(repo.countByStatus("ok"), 0);
+  assert.equal(countWorkStates(db), 2, "user先コミット済みのためwork_statesは孤児として残る");
 
   await scanner.scan(root);
   assert.equal(repo.countByStatus("ok"), 2);
+  assert.equal(countWorkStates(db), 2);
+});
+
+test("user先コミット後のcatalog失敗はuser孤児を残すがopenDbは拒否せず再スキャンで収束する", async (t) => {
+  const directory = makeTestDirectory("user-orphan-recovery");
+  t.after(directory.cleanup);
+  const catalogPath = join(directory.path, "catalog.sqlite");
+  const userPath = join(directory.path, "user.sqlite");
+  const root = join(directory.path, "lib");
+  for (let index = 0; index < 2; index++) {
+    const workDir = join(root, `work-${index}`);
+    mkdirSync(workDir, { recursive: true });
+    writeWav(join(workDir, "track.wav"), 1);
+    writeFileSync(
+      join(workDir, ".meta.json"),
+      JSON.stringify(
+        metaWithSingleTrack(
+          `44444444-4444-4444-8444-${String(index).padStart(12, "0")}`,
+          `work-${index}`,
+        ),
+      ),
+    );
+  }
+  const db = openDb({ kind: "files", catalogPath, userPath });
+  const repo = new WorkRepo(db);
+  const scanner = new Scanner(db, repo, directory.path, { upsertBatchSize: 2 });
+  const originalCatalogUpsert = repo.upsertWorkCatalog.bind(repo);
+  let calls = 0;
+  repo.upsertWorkCatalog = (work, options) => {
+    calls += 1;
+    if (calls === 2) throw new Error("injected catalog write failure");
+    originalCatalogUpsert(work, options);
+  };
+  await assert.rejects(scanner.scan(root), /injected catalog write failure/);
+  db.close();
+
+  const reopened = openDb({ kind: "files", catalogPath, userPath });
+  t.after(() => reopened.close());
+  const reopenedRepo = new WorkRepo(reopened);
+  assert.equal(reopenedRepo.countByStatus("ok"), 0);
+  assert.equal(countWorkStates(reopened), 2, "catalogに無いwork_states孤児は許容される");
+
+  const recoveredScanner = new Scanner(reopened, reopenedRepo, directory.path, {
+    upsertBatchSize: 2,
+  });
+  await recoveredScanner.scan(root);
+  assert.equal(reopenedRepo.countByStatus("ok"), 2);
+  assert.equal(countWorkStates(reopened), 2);
 });

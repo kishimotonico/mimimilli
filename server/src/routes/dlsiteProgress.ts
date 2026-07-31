@@ -1,4 +1,8 @@
-import type { DlsiteBulkMode, DlsiteBulkProgressEvent } from "@mimimilli/shared";
+import type {
+  DlsiteBulkMode,
+  DlsiteBulkProgressEvent,
+  DlsiteBulkSnapshot,
+} from "@mimimilli/shared";
 import type { DataAdapter } from "../adapter.ts";
 
 type Listener = (event: DlsiteBulkProgressEvent) => void;
@@ -25,6 +29,24 @@ let processingQueue = false;
 
 export function isDlsiteJobInProgress(): boolean {
   return currentJob !== null;
+}
+
+export function getDlsiteBulkSnapshot(): DlsiteBulkSnapshot | null {
+  const job = currentJob;
+  if (job) {
+    const progress = job.lastProgress
+      ? { processed: job.lastProgress.processed, total: job.lastProgress.total }
+      : null;
+    return { status: job.cancelling ? "cancelling" : "running", progress };
+  }
+  if (!lastTerminal) return null;
+  if (lastTerminal.type === "complete") {
+    return { status: "complete", result: lastTerminal.result };
+  }
+  if (lastTerminal.type === "cancelled") {
+    return { status: "cancelled", result: lastTerminal.result };
+  }
+  return { status: "error", message: lastTerminal.message };
 }
 
 export function startDlsiteJob(): ActiveJob {

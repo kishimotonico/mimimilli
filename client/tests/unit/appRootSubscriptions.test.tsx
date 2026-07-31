@@ -79,12 +79,14 @@ const tracks = [
     title: "Track 1",
     file: "audio/track-1.wav",
     durationSec: 60,
+    durationKind: "resolved",
   },
   {
     id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
     title: "Track 2",
     file: "audio/track-2.wav",
     durationSec: 60,
+    durationKind: "resolved",
   },
 ] as const;
 

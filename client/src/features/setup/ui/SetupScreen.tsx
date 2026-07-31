@@ -198,7 +198,11 @@ export default function SetupScreen({ onComplete }: SetupScreenProps) {
             </button>
           )}
           {alertMessage && (
-            <p role="alert" style={{ margin: 0, color: "var(--danger)", fontSize: 12 }}>
+            <p
+              role="alert"
+              className="mll-selectable"
+              style={{ margin: 0, color: "var(--danger)", fontSize: 12 }}
+            >
               {alertMessage}
             </p>
           )}

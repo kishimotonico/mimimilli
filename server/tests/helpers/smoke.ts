@@ -1,12 +1,12 @@
 // real アダプタの手動スモーク（node tests/helpers/smoke.ts で実行）。
 // 一時ライブラリを生成し、設定 → スキャン → 検索 → fs → メディア（Range）まで一気に確認する。
 import { createApp } from "../../src/app.ts";
-import { createRealAdapter } from "../../src/adapters/real/index.ts";
+import { createTestRealAdapter } from "./realAdapter.ts";
 import { makeSampleLibrary } from "./sampleLibrary.ts";
 
 const { root, cleanup } = makeSampleLibrary();
 process.once("exit", cleanup);
-const adapter = createRealAdapter({ database: { kind: "memory" } });
+const adapter = createTestRealAdapter({ database: { kind: "memory" } });
 const app = createApp(adapter);
 
 async function json(path: string, init?: RequestInit) {

@@ -161,6 +161,8 @@ describe("usePlayer adapters", () => {
   it("PlayerRuntime ありで再生対象がないときは playWithResume / seek が no-op する", () => {
     const workWithoutResume: Work = {
       ...work,
+      coverKind: "none",
+      coverImage: null,
       defaultPlaylistId: playlistId,
       createdAt: null,
       playlists: [{ id: playlistId, name: "default", tracks: [track] }],
@@ -396,6 +398,8 @@ describe("usePlayer adapters", () => {
   it("作品聴了コマンドをレジュームの先頭リセットとQuery cacheへ接続する", async () => {
     const resumableWork: Work = {
       ...work,
+      coverKind: "none",
+      coverImage: null,
       defaultPlaylistId: playlistId,
       createdAt: null,
       playlists: [{ id: playlistId, name: "default", tracks: [track] }],
@@ -436,7 +440,7 @@ describe("usePlayer adapters", () => {
 
   it("同一ファイルのトラック切替では再ロードせず区間先頭へシークする", async () => {
     const tracks: ResolvedTrack[] = [
-      { ...track, start: 0, end: 30, durationSec: 30 },
+      { ...track, start: 0, end: 30, durationSec: 30, durationKind: "resolved" },
       {
         id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
         title: "Track 2",
@@ -444,6 +448,7 @@ describe("usePlayer adapters", () => {
         start: 30,
         end: 60,
         durationSec: 30,
+        durationKind: "resolved",
       },
     ];
     const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
@@ -461,7 +466,7 @@ describe("usePlayer adapters", () => {
 
   it("一時停止中に次のトラックへ切り替えても再生が再開しない（同一ファイルの区間切替）", async () => {
     const tracks: ResolvedTrack[] = [
-      { ...track, start: 0, end: 30, durationSec: 30 },
+      { ...track, start: 0, end: 30, durationSec: 30, durationKind: "resolved" },
       {
         id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
         title: "Track 2",
@@ -469,6 +474,7 @@ describe("usePlayer adapters", () => {
         start: 30,
         end: 60,
         durationSec: 30,
+        durationKind: "resolved",
       },
     ];
     const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
@@ -489,7 +495,7 @@ describe("usePlayer adapters", () => {
 
   it("一時停止中でもトラックリストからの明示選択では再生が開始される", async () => {
     const tracks: ResolvedTrack[] = [
-      { ...track, start: 0, end: 30, durationSec: 30 },
+      { ...track, start: 0, end: 30, durationSec: 30, durationKind: "resolved" },
       {
         id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
         title: "Track 2",
@@ -497,6 +503,7 @@ describe("usePlayer adapters", () => {
         start: 30,
         end: 60,
         durationSec: 30,
+        durationKind: "resolved",
       },
     ];
     const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
@@ -518,7 +525,7 @@ describe("usePlayer adapters", () => {
     vi.useFakeTimers();
     try {
       const tracks: ResolvedTrack[] = [
-        { ...track, start: 0, end: 30, durationSec: 30 },
+        { ...track, start: 0, end: 30, durationSec: 30, durationKind: "resolved" },
         {
           id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
           title: "Track 2",
@@ -526,6 +533,7 @@ describe("usePlayer adapters", () => {
           start: 30,
           end: 60,
           durationSec: 30,
+          durationKind: "resolved",
         },
       ];
       const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
@@ -560,12 +568,14 @@ describe("usePlayer adapters", () => {
         title: "Track A",
         file: "audio/track-a.wav",
         durationSec: 30,
+        durationKind: "resolved",
       },
       {
         id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
         title: "Track B",
         file: "audio/track-b.wav",
         durationSec: 30,
+        durationKind: "resolved",
       },
     ];
     const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
@@ -605,6 +615,8 @@ describe("usePlayer adapters", () => {
     const segment: Track = { ...track, start: 30, end: 90 };
     const resumableWork: Work = {
       ...work,
+      coverKind: "none",
+      coverImage: null,
       defaultPlaylistId: playlistId,
       createdAt: null,
       playlists: [{ id: playlistId, name: "default", tracks: [segment] }],

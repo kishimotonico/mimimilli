@@ -23,7 +23,11 @@ export function getTrackDurationSec(
   filesModeFileDurationSec: number | null,
 ): number | null {
   if (isResolvedTrack(track)) return track.durationSec;
-  return resolveTrackDurationSec(track, filesModeFileDurationSec);
+  const probe =
+    filesModeFileDurationSec === null
+      ? ({ kind: "unprobed" } as const)
+      : { kind: "resolved" as const, durationSec: filesModeFileDurationSec };
+  return resolveTrackDurationSec(track, probe);
 }
 
 /** HTML Audio の絶対時刻を、UI が扱うトラック相対時刻へ変換する。trackDurationSec が null なら上限クランプなし。 */

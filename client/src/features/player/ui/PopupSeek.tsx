@@ -2,7 +2,7 @@
 
 import { usePlaybackProgress } from "../model/usePlaybackProgress";
 import { useSeekDrag } from "./useSeekDrag";
-import { formatTime } from "../../../shared/lib/format";
+import { formatTime, formatDuration } from "../../../shared/lib/format";
 
 interface PopupSeekProps {
   onSeek: (t: number) => void;
@@ -10,12 +10,13 @@ interface PopupSeekProps {
 
 export default function PopupSeek({ onSeek }: PopupSeekProps) {
   const { currentTime, duration, pct } = usePlaybackProgress();
-  const seek = useSeekDrag({ duration, onSeek });
+  const seek = useSeekDrag({ duration, currentTime, onSeek });
 
   return (
     <>
       <div
         ref={seek.trackRef}
+        {...seek.sliderProps}
         className="mle-popup__seek"
         onPointerDown={seek.onPointerDown}
         onPointerMove={seek.onPointerMove}
@@ -28,8 +29,8 @@ export default function PopupSeek({ onSeek }: PopupSeekProps) {
         </div>
       </div>
       <div className="mle-popup__time-row">
-        <span>{formatTime(currentTime)}</span>
-        <span>{duration !== null ? formatTime(duration) : "--:--"}</span>
+        <span>{formatTime(currentTime) ?? "0:00"}</span>
+        <span>{duration !== null ? (formatDuration(duration) ?? "--:--") : "--:--"}</span>
       </div>
     </>
   );

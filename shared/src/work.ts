@@ -1,6 +1,14 @@
 // work ドメインのスキーマ。client/src/entities/work/model.ts の型を契約として固定したもの。
 import { z } from "zod";
+import { coverKindSchema } from "./cover.ts";
 import { dlsiteStateSchema } from "./dlsite.ts";
+import { trackDurationKindSchema } from "./duration.ts";
+import {
+  isInvalidTrackStart,
+  resolveTrackDuration,
+  trackDurationSecOrNull,
+  type ProbeDurationResult,
+} from "./duration.ts";
 import { compareUtf8Bytes } from "./library.ts";
 
 export const urlEntrySchema = z.object({
@@ -46,12 +54,32 @@ export type Playlist = z.infer<typeof playlistSchema>;
 
 /**
  * API DTO 用の解決済みトラック。durationSec はトラック区間の相対長（秒）で、
- * end 省略時はファイル全体長から解決する。計測不能（プローブ未取得・失敗・ファイル欠損）は
- * 0 で埋めず、明示的に null（未知）とする。
+ * end 省略時はファイル全体長から解決する。durationKind が resolved 以外のときは
+ * durationSec は null（0 で埋めない）。UI は durationKind で未計測と計測失敗を区別する。
  */
 export const resolvedTrackSchema = trackBaseSchema
-  .extend({ durationSec: z.number().finite().positive().nullable() })
-  .superRefine(refineTrackEndAfterStart);
+  .extend({
+    durationSec: z.number().finite().positive().nullable(),
+    durationKind: trackDurationKindSchema,
+  })
+  .superRefine((track, ctx) => {
+    refineTrackEndAfterStart(track, ctx);
+    if (track.durationKind === "resolved") {
+      if (track.durationSec === null) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["durationSec"],
+          message: "durationKind が resolved のとき durationSec は必須です",
+        });
+      }
+    } else if (track.durationSec !== null) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["durationSec"],
+        message: "durationKind が resolved 以外のとき durationSec は null である必要があります",
+      });
+    }
+  });
 export type ResolvedTrack = z.infer<typeof resolvedTrackSchema>;
 
 export const resolvedPlaylistSchema = z.object({
@@ -63,22 +91,18 @@ export type ResolvedPlaylist = z.infer<typeof resolvedPlaylistSchema>;
 
 /**
  * トラックの解決済み再生時間（秒）を求める共通式。start/end は絶対ファイル時刻、
- * 戻り値は相対長。end 省略時は fileDurationSec（ファイル全体長）から導く。
- * fileDurationSec が null（未計測・計測失敗）、または start がファイル全体長以上
- * （データ不正。ファイル差し替え等で起こりうる）の場合は、resolvedTrackSchema の
- * .positive() 契約を破らないよう解決不能として null を返す（0/負の値をDTOへ流さない）。
- * データ不正の可視化（作品のerror化）はスキャン側の責務。
+ * 戻り値は相対長。probe はファイル全体長のプローブ結果。
+ * 解決不能の場合は null（0/負の値をDTOへ流さない）。
+ * 不正 start の判定は isInvalidTrackStart に集約する。
  */
 export function resolveTrackDurationSec(
   track: Pick<Track, "start" | "end">,
-  fileDurationSec: number | null,
+  probe: ProbeDurationResult,
 ): number | null {
-  const startSec = track.start ?? 0;
-  if (track.end !== undefined) return track.end - startSec;
-  if (fileDurationSec === null) return null;
-  const durationSec = fileDurationSec - startSec;
-  return durationSec > 0 ? durationSec : null;
+  return trackDurationSecOrNull(resolveTrackDuration(track, probe));
 }
+
+export { isInvalidTrackStart, resolveTrackDuration };
 
 /** 作品の再開位置。offsetSec はトラック区間先頭からの相対秒。 */
 export const resumeSchema = z.object({
@@ -207,17 +231,76 @@ export function refinePlaylistCollection(
   }
 }
 
+export function refineWorkCoverFields(
+  work: Pick<Work, "cover" | "coverKind" | "coverImage">,
+  ctx: z.RefinementCtx,
+): void {
+  switch (work.coverKind) {
+    case "none":
+      if (work.cover !== null) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["cover"],
+          message: "coverKind が none のとき cover は null である必要があります",
+        });
+      }
+      if (work.coverImage !== null) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["coverImage"],
+          message: "coverKind が none のとき coverImage は null である必要があります",
+        });
+      }
+      break;
+    case "unmeasured":
+      if (work.cover !== null) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["cover"],
+          message: "coverKind が unmeasured のとき cover は null である必要があります",
+        });
+      }
+      if (work.coverImage === null) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["coverImage"],
+          message: "coverKind が unmeasured のとき coverImage は必須です",
+        });
+      }
+      break;
+    case "measured":
+      if (work.cover === null) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["cover"],
+          message: "coverKind が measured のとき cover は必須です",
+        });
+      } else if (work.coverImage !== work.cover.image) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["coverImage"],
+          message:
+            "coverKind が measured のとき coverImage は cover.image と一致する必要があります",
+        });
+      }
+      break;
+  }
+}
+
 export const workSchema = workSummarySchema
   .omit({ trackCount: true })
   .extend({
+    coverKind: coverKindSchema,
+    coverImage: z.string().nullable(),
     defaultPlaylistId: uuidV4Schema.nullable(),
     createdAt: z.string().nullable(),
     playlists: z.array(resolvedPlaylistSchema),
     resume: resumeSchema.nullable(),
   })
-  .superRefine((work, ctx) =>
-    refinePlaylistCollection(work.playlists, work.defaultPlaylistId, ctx),
-  );
+  .superRefine((work, ctx) => {
+    refinePlaylistCollection(work.playlists, work.defaultPlaylistId, ctx);
+    refineWorkCoverFields(work, ctx);
+  });
 export type Work = z.infer<typeof workSchema>;
 
 /** 詳細作品から一覧と同じデフォルトプレイリスト基準のトラック数を求める。 */

@@ -6,6 +6,7 @@ import { I } from "../../../../shared/ui/Icon";
 import { useDialogModal } from "../../../../shared/ui/useDialogModal";
 import { STATUS_LABEL } from "./DlsiteEditor";
 import { formatDate, formatDateTime, formatDuration } from "./format";
+import { formatCoverInfoLabel } from "../../../../shared/lib/coverLabel";
 
 const STATUS_TEXT: Record<Work["status"], string> = {
   ok: "登録済み",
@@ -65,7 +66,7 @@ export function WorkInfoDialog({
           </h2>
           <IconButton icon={I.x} label="閉じる" size="sm" onClick={onClose} />
         </header>
-        <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-[18px] py-4">
+        <div className="mll-selectable flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-[18px] py-4">
           <section aria-labelledby="work-info-basic-title" className="flex flex-col gap-1">
             <h3
               id="work-info-basic-title"
@@ -95,11 +96,11 @@ export function WorkInfoDialog({
               </InfoRow>
               <InfoRow label="トラック・時間">
                 {trackCount > 0
-                  ? `${trackCount} トラック · ${work.totalDurationSec !== null ? formatDuration(work.totalDurationSec) : "--:--"}`
+                  ? `${trackCount} トラック · ${work.totalDurationSec !== null ? (formatDuration(work.totalDurationSec) ?? "--:--") : "--:--"}`
                   : "なし"}
               </InfoRow>
               <InfoRow label="プレイリスト">{playlistLabel}</InfoRow>
-              <InfoRow label="カバー画像">{work.cover ? "あり" : "なし"}</InfoRow>
+              <InfoRow label="カバー画像">{formatCoverInfoLabel(work.coverKind)}</InfoRow>
               <InfoRow label="物理パス">
                 <span className="break-all font-mono text-[11px]">{work.physicalPath}</span>
               </InfoRow>

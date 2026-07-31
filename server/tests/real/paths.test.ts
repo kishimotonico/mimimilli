@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { posix, win32 } from "node:path";
 import { test } from "node:test";
-import { excludeDescendantPaths, isPathWithin } from "../../src/adapters/real/paths.ts";
+import {
+  excludeDescendantPaths,
+  isPathWithin,
+  likeDescendantsPrefix,
+  likeStrictDescendantPrefixSql,
+} from "../../src/adapters/real/paths.ts";
+import { openDb } from "../../src/adapters/real/db.ts";
 
 test("POSIX パスは名前の前方一致ではなくディレクトリ境界で判定する", () => {
   assert.equal(isPathWithin("/library", "/library", posix), true);
@@ -14,6 +20,42 @@ test("Windows パスの親子関係をバックスラッシュ境界で判定す
   assert.equal(isPathWithin("C:\\library", "C:\\library\\genre\\work", win32), true);
   assert.equal(isPathWithin("C:\\library", "C:\\library-other\\work", win32), false);
   assert.equal(isPathWithin("C:\\library", "D:\\library\\work", win32), false);
+});
+
+test("LIKE 子孫接頭辞は区切り文字を重ねず、Windows 形式でも境界を保つ", () => {
+  assert.equal(likeDescendantsPrefix("/library", posix), "/library/%");
+  assert.equal(likeDescendantsPrefix("/library/", posix), "/library/%");
+  assert.equal(likeDescendantsPrefix("C:\\library", win32), "C:\\library\\%");
+  assert.equal(likeDescendantsPrefix("C:\\library\\", win32), "C:\\library\\%");
+  assert.equal(likeDescendantsPrefix("D:\\", win32), "D:\\%");
+});
+
+test("祖先 LIKE 接頭辞 SQL は Windows 区切りでも子孫判定できる", () => {
+  const db = openDb({ kind: "memory" });
+  const ancestor = "C:\\library";
+  const row = db.sqlite
+    .query(
+      `SELECT
+         ? LIKE ${likeStrictDescendantPrefixSql("?")} AS isDescendant,
+         ? NOT LIKE ${likeStrictDescendantPrefixSql("?")} AS isNotPrefix`,
+    )
+    .get(
+      "C:\\library\\work",
+      ancestor,
+      win32.sep,
+      ancestor,
+      ancestor,
+      win32.sep,
+      "C:\\library-other\\work",
+      ancestor,
+      win32.sep,
+      ancestor,
+      ancestor,
+      win32.sep,
+    ) as { isDescendant: number; isNotPrefix: number };
+  assert.equal(row.isDescendant, 1);
+  assert.equal(row.isNotPrefix, 1);
+  db.close();
 });
 
 // ── excludeDescendantPaths（TASK-62: 祖先除外の線形化） ─────────

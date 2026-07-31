@@ -12,6 +12,7 @@ interface WorkerInput {
   dataRoot: string;
   thumbnailCacheDir: string;
   abortBuffer: SharedArrayBuffer;
+  full?: boolean;
   testGate?: SharedArrayBuffer;
   testGateStage: "before-scan" | "before-finalize";
 }
@@ -54,6 +55,7 @@ async function run(input: WorkerInput): Promise<void> {
     const repo = new WorkRepo(db);
     const scanner = new Scanner(db, repo, input.dataRoot);
     const result = await scanner.scan(input.root, {
+      full: input.full ?? false,
       abortToken: token,
       onProgress: (progress: ScanProgressEvent) => post({ type: "progress", progress }),
       beforeFinalize: input.testGateStage === "before-finalize" ? waitAtTestGate : undefined,

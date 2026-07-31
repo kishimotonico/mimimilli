@@ -1,10 +1,11 @@
 ---
 id: TASK-107
 title: UIのテキスト選択を既定で無効化しコピーが必要な箇所だけ選択可能にする
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-07-26 14:45'
-updated_date: '2026-07-26 15:25'
+updated_date: '2026-07-31 01:26'
 labels: []
 dependencies: []
 documentation:
@@ -62,10 +63,31 @@ WorkRow / WorkGrid / ContentColumn / DrillHeader / FileRow / AxisLanding の行�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 アプリ内のUIテキスト（ボタンラベル、ツールバー、ナビゲーション、見出し、件数バッジ等）がドラッグしても選択されない
-- [ ] #2 input / select では従来どおり入力・テキスト選択・IME変換ができる
-- [ ] #3 物理パス・RJコード・エラーメッセージ・CLI例文・ルートフォルダーパス・作品情報ダイアログの内容は選択してコピーできる
-- [ ] #4 初回セットアップ画面にも同じ既定が適用される
-- [ ] #5 グリッドのサイズスライダーのラベル上からドラッグしても範囲選択や禁止カーソルが発生せず、スライダーを操作できる
-- [ ] #6 一覧・グリッド・ファイル一覧のクリックおよびダブルクリック再生が従来どおり動作する
+- [x] #1 アプリ内のUIテキスト（ボタンラベル、ツールバー、ナビゲーション、見出し、件数バッジ等）がドラッグしても選択されない
+- [x] #2 input / select では従来どおり入力・テキスト選択・IME変換ができる
+- [x] #3 物理パス・RJコード・エラーメッセージ・CLI例文・ルートフォルダーパス・作品情報ダイアログの内容は選択してコピーできる
+- [x] #4 初回セットアップ画面にも同じ既定が適用される
+- [x] #5 グリッドのサイズスライダーのラベル上からドラッグしても範囲選択や禁止カーソルが発生せず、スライダーを操作できる
+- [x] #6 一覧・グリッド・ファイル一覧のクリックおよびダブルクリック再生が従来どおり動作する
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. UIシャーシをuser-select:none既定に反転
+2. コピーされうるテキストだけ選択可能へ戻す
+3. スライダー不具合の解消確認
+実装Cursor委譲
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+実機確認: body user-select=none / input=text（セットアップ画面）。選択可能へ戻した箇所はパス・RJコード・CLI例文・エラー系・作品情報ダイアログ等11箇所。design-system.mdに規約追記。CSSのみの変更でCodexレビューは省略と判断。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+body既定user-select:none+input/textarea/selectはtext、.mll-selectableユーティリティと既存クラスへの付与でコピー需要箇所のみ選択可能化。437テスト・ビジュアル6/6・実機確認済み。実装Cursor委譲。
+<!-- SECTION:FINAL_SUMMARY:END -->

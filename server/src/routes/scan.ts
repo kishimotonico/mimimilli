@@ -2,11 +2,14 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import {
   scanConflictResponseSchema,
+  startScanRequestSchema,
   startScanResponseSchema,
   type ScanJobEvent,
   type ScanJobStatus,
 } from "@mimimilli/shared";
 import { ActiveScanConflictError, ScanJobManager } from "../scanJobManager.ts";
+import { invalidRequest } from "../lib/httpError.ts";
+import { readOptionalJsonBody } from "../lib/jsonBody.ts";
 
 /** SSE 接続を生かし続けるための ping 間隔（ms）。walking フェーズ等、進捗が長く無音になり得るため */
 const HEARTBEAT_INTERVAL_MS = 15000;
@@ -41,9 +44,14 @@ export function scanRoute(
 ): Hono {
   const app = new Hono();
 
-  app.post("/scan", (c) => {
+  app.post("/scan", async (c) => {
+    const body = await readOptionalJsonBody(c, "スキャンのリクエスト内容が不正です");
+    const parsed = startScanRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      invalidRequest("スキャンのリクエスト内容が不正です");
+    }
     try {
-      const job = jobs.start();
+      const job = jobs.start({ full: parsed.data.full });
       return c.json(startScanResponseSchema.parse({ job }), 202, {
         Location: `/api/scan/${job.id}`,
       });

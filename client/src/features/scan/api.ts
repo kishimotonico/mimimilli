@@ -8,10 +8,12 @@ import {
   postParsed,
   type StatusHandler,
 } from "../../shared/api/http";
+import type { StartScanRequest } from "@mimimilli/shared";
 import {
   scanConflictResponseSchema,
   scanJobSnapshotSchema,
   scanLastResultResponseSchema,
+  startScanRequestSchema,
   startScanResponseSchema,
   type ScanJobSnapshot,
   type ScanLastResultResponse,
@@ -22,6 +24,7 @@ export const SCAN_QUERY_KEYS = {
 } as const;
 
 export type { ScanResult } from "./model";
+export type { StartScanRequest };
 
 export class ScanAlreadyActiveError extends ApiRequestError {
   readonly active: ScanJobSnapshot;
@@ -39,10 +42,16 @@ const scanConflictHandler: Partial<Record<number, StatusHandler>> = {
   },
 };
 
-export async function startScan(): Promise<ScanJobSnapshot> {
-  const { job } = await postParsed(startScanResponseSchema, "/scan", undefined, {
-    onStatus: scanConflictHandler,
-  });
+export async function startScan(options?: StartScanRequest): Promise<ScanJobSnapshot> {
+  const body = startScanRequestSchema.parse(options ?? {});
+  const { job } = await postParsed(
+    startScanResponseSchema,
+    "/scan",
+    body.full === undefined ? undefined : body,
+    {
+      onStatus: scanConflictHandler,
+    },
+  );
   return job;
 }
 

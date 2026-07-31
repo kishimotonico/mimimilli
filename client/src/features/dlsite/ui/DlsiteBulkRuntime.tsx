@@ -1,13 +1,18 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useAtomValue, useSetAtom } from "jotai";
-import { useCallback, useEffect, useMemo } from "react";
-import { dlsiteBulkProgressEventSchema } from "@mimimilli/shared";
-import { cancelDlsiteBulk, startDlsiteBulk } from "../../../entities/work/api";
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import {
+  dlsiteBulkProgressEventSchema,
+  type DlsiteBulkProgressEvent,
+  type DlsiteBulkSnapshot,
+} from "@mimimilli/shared";
+import { cancelDlsiteBulk, getDlsiteBulkStatus, startDlsiteBulk } from "../../../entities/work/api";
 import { API_BASE } from "../../../shared/api/http";
 import { getDlsiteInvalidationKeys } from "../../library/model/dlsiteInvalidation";
 import {
   dlsiteBulkActionsAtom,
   dlsiteBulkActiveAtom,
+  dlsiteBulkStartingAtom,
   dlsiteBulkCancelledResultAtom,
   dlsiteBulkCancellingAtom,
   dlsiteBulkErrorAtom,
@@ -16,10 +21,20 @@ import {
   type DlsiteBulkActions,
 } from "../model/atoms";
 
+type TerminalEvent = Extract<DlsiteBulkProgressEvent, { type: "complete" | "cancelled" | "error" }>;
+
+function terminalFromSnapshot(snapshot: DlsiteBulkSnapshot): TerminalEvent | null {
+  if (snapshot.status === "complete") return { type: "complete", result: snapshot.result };
+  if (snapshot.status === "cancelled") return { type: "cancelled", result: snapshot.result };
+  if (snapshot.status === "error") return { type: "error", message: snapshot.message };
+  return null;
+}
+
 export default function DlsiteBulkRuntime() {
   const queryClient = useQueryClient();
   const active = useAtomValue(dlsiteBulkActiveAtom);
   const setActive = useSetAtom(dlsiteBulkActiveAtom);
+  const setStarting = useSetAtom(dlsiteBulkStartingAtom);
   const setCancelling = useSetAtom(dlsiteBulkCancellingAtom);
   const setProgress = useSetAtom(dlsiteBulkProgressAtom);
   const setResult = useSetAtom(dlsiteBulkResultAtom);
@@ -41,17 +56,25 @@ export default function DlsiteBulkRuntime() {
     setCancelling(false);
   }, [setCancelledResult, setCancelling, setError, setProgress, setResult]);
 
+  const startingRef = useRef(false);
+
   const start = useCallback(async () => {
+    if (startingRef.current) return;
+    startingRef.current = true;
+    setStarting(true);
     resetTerminalState();
-    setActive(true);
     try {
       await startDlsiteBulk();
+      setActive(true);
     } catch (cause) {
       setActive(false);
       setCancelling(false);
       setError(cause instanceof Error ? cause.message : "一括取得を開始できませんでした");
+    } finally {
+      startingRef.current = false;
+      setStarting(false);
     }
-  }, [resetTerminalState, setActive, setCancelling, setError]);
+  }, [resetTerminalState, setActive, setCancelling, setError, setStarting]);
 
   const attach = useCallback(() => {
     resetTerminalState();
@@ -88,49 +111,124 @@ export default function DlsiteBulkRuntime() {
   useEffect(() => {
     if (!active) return;
 
+    let disposed = false;
     let terminalHandled = false;
+    let generation = 0;
     const source = new EventSource(`${API_BASE}/dlsite/events`);
 
-    const handle = (event: MessageEvent<string>) => {
+    const detach = (): void => {
+      if (disposed) return;
+      setActive(false);
+      setCancelling(false);
+      source.close();
+    };
+
+    const fail = (message: string): void => {
+      if (disposed || terminalHandled) return;
+      terminalHandled = true;
+      setError(message);
+      detach();
+    };
+
+    const applyTerminal = (event: TerminalEvent): void => {
+      if (disposed || terminalHandled) return;
+      terminalHandled = true;
+      if (event.type === "complete") {
+        setResult(event.result);
+      } else if (event.type === "cancelled") {
+        setCancelledResult(event.result);
+      } else {
+        setError(event.message);
+      }
+      detach();
+      invalidateDlsiteQueries();
+    };
+
+    const applySnapshot = (snapshot: DlsiteBulkSnapshot): void => {
+      if (snapshot.status === "running" || snapshot.status === "cancelling") {
+        if (snapshot.status === "cancelling") setCancelling(true);
+        if (snapshot.progress) setProgress(snapshot.progress);
+        return;
+      }
+      const terminal = terminalFromSnapshot(snapshot);
+      if (terminal) applyTerminal(terminal);
+    };
+
+    const handle = (event: MessageEvent<string>): void => {
+      generation += 1;
       let json: unknown;
       try {
         json = JSON.parse(event.data);
-      } catch (cause) {
-        console.error("DLsite進捗イベントのJSON解析に失敗しました", cause);
+      } catch {
+        fail("DLsite進捗イベントの解析に失敗しました");
         return;
       }
       const parsed = dlsiteBulkProgressEventSchema.safeParse(json);
-      if (!parsed.success) return;
+      if (!parsed.success) {
+        fail("DLsite進捗イベントの形式が不正です");
+        return;
+      }
       if (parsed.data.type === "progress") {
         setProgress({ processed: parsed.data.processed, total: parsed.data.total });
       } else if (parsed.data.type === "cancelling") {
         setCancelling(true);
       } else {
-        if (terminalHandled) return;
-        terminalHandled = true;
-        if (parsed.data.type === "complete") {
-          setResult(parsed.data.result);
-        } else if (parsed.data.type === "cancelled") {
-          setCancelledResult(parsed.data.result);
-        } else {
-          setError(parsed.data.message);
-        }
-        setActive(false);
-        setCancelling(false);
-        source.close();
-        invalidateDlsiteQueries();
+        applyTerminal(parsed.data);
       }
     };
 
-    source.addEventListener("progress", handle as EventListener);
-    source.addEventListener("cancelling", handle as EventListener);
-    source.addEventListener("complete", handle as EventListener);
-    source.addEventListener("cancelled", handle as EventListener);
+    const refresh = (): void => {
+      if (disposed || terminalHandled) return;
+      const pollGeneration = ++generation;
+      void getDlsiteBulkStatus()
+        .then((snapshot) => {
+          if (disposed || terminalHandled || pollGeneration !== generation) return;
+          if (!snapshot) {
+            if (source.readyState === EventSource.CLOSED) {
+              fail("DLsite一括取得の接続が切断されました");
+            }
+            return;
+          }
+          if (
+            source.readyState === EventSource.CLOSED &&
+            (snapshot.status === "running" || snapshot.status === "cancelling")
+          ) {
+            fail("DLsite一括取得の接続が切断されました");
+            return;
+          }
+          applySnapshot(snapshot);
+        })
+        .catch((cause: unknown) => {
+          if (disposed || terminalHandled || pollGeneration !== generation) return;
+          if (source.readyState === EventSource.CLOSED) {
+            fail(
+              cause instanceof Error ? cause.message : "DLsite一括取得の状態を取得できませんでした",
+            );
+          }
+        });
+    };
+
+    const onNamedEvent = (event: Event): void => {
+      if (event instanceof MessageEvent && typeof event.data === "string") {
+        handle(event);
+      }
+    };
+
+    for (const type of ["progress", "cancelling", "complete", "cancelled"] as const) {
+      source.addEventListener(type, onNamedEvent);
+    }
     source.addEventListener("error", (event) => {
-      if (event instanceof MessageEvent) handle(event);
+      if (event instanceof MessageEvent && typeof event.data === "string") {
+        handle(event);
+        return;
+      }
+      refresh();
     });
 
-    return () => source.close();
+    return () => {
+      disposed = true;
+      source.close();
+    };
   }, [
     active,
     invalidateDlsiteQueries,

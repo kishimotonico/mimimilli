@@ -1,7 +1,8 @@
 // works / tags / smart_folders / app_settings の CRUD、検索、行⇄ドメイン変換。
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { asc, eq } from "drizzle-orm";
 import {
+  coverFieldsFromColumns,
   dlsiteStateSchema,
   emptyDlsiteState,
   evaluateParseErrorAlert,
@@ -9,21 +10,24 @@ import {
   normalizeTags,
   parseTag,
   playlistSchema,
+  probeResultFromCache,
+  resolveTrackDuration,
   resolveTrackDurationSec,
   smartFolderSchema,
   tagPrefixSchema,
+  toTrackDurationFields,
   workSchema,
   workSummarySchema,
 } from "@mimimilli/shared";
 import type {
   AxisFacetItem,
-  Cover,
   DlsiteState,
   DlsiteNotificationKind,
   DlsiteNotificationPage,
   DlsiteNotificationQuery,
   DlsiteNotificationSummary,
   Playlist,
+  ProbeDurationResult,
   ResolvedPlaylist,
   ResumeBody,
   SmartFolder,
@@ -53,6 +57,7 @@ import {
   workTags,
   works,
 } from "./catalogSchema.ts";
+import { likeDescendantsPrefix, likeStrictDescendantPrefixSql } from "./paths.ts";
 import { probeDurationSec } from "./probe.ts";
 import { appSettings, smartFolders, tagPrefixes, workStates } from "./userSchema.ts";
 
@@ -105,6 +110,7 @@ type RawWorkListRow = {
  */
 export interface ScanWorkState {
   fingerprint: string | null;
+  status: Work["status"];
   physicalPath: string;
   addedAt: string;
   bookmarked: boolean;
@@ -114,27 +120,20 @@ export interface ScanWorkState {
   cover: CoverColumns;
 }
 
-/**
- * DBのカバー3列（cover_image / cover_width / cover_height）の生表現。
+/** DBのカバー3列（cover_image / cover_width / cover_height）の生表現。
  * image は .meta.json 由来のファイル名、dimensions は計測成功時のみ。
- * image あり・dimensions null は「カバーはあるが寸法を計測できていない」状態を表す。
- */
+ * image あり・dimensions null は「カバーはあるが寸法を計測できていない」状態を表す。 */
 export interface CoverColumns {
   image: string | null;
   dimensions: { width: number; height: number } | null;
 }
 
-/** DBのカバー列を公開DTOの cover へ投影する。画像かつ両寸法が揃うときだけ表示可能とみなす。 */
-function projectCover(image: string | null, width: number | null, height: number | null): Cover {
-  if (image === null || width === null || height === null) return null;
-  return { image, dimensions: { width, height } };
-}
-
-/** ドメインの cover から書き込み列を導く。upsertWork に明示指定が無いときの既定。 */
-function coverColumnsFromCover(cover: Cover): CoverColumns {
-  return cover === null
-    ? { image: null, dimensions: null }
-    : { image: cover.image, dimensions: cover.dimensions };
+/** ドメインの cover / coverImage から書き込み列を導く。upsertWork に明示指定が無いときの既定。 */
+function coverColumnsFromWork(work: Pick<Work, "cover" | "coverImage">): CoverColumns {
+  return {
+    image: work.coverImage,
+    dimensions: work.cover?.dimensions ?? null,
+  };
 }
 
 /** カバー配信の事前確認に必要な列だけを取得する軽量行。 */
@@ -142,6 +141,11 @@ export interface CoverLocationRow {
   id: string;
   physicalPath: string;
   coverImage: string | null;
+}
+
+/** メディア配信のパス解決に必要な列だけを取得する軽量行。 */
+export interface MediaRootRow {
+  physicalPath: string;
 }
 
 const RECENT_VIEW_WINDOW_DAYS = 30;
@@ -207,7 +211,7 @@ function rowToSummary(row: SummaryRow, tagNames: string[], dlsite: DlsiteState):
     {
       id: row.id,
       title: row.title,
-      cover: projectCover(row.coverImage, row.coverWidth, row.coverHeight),
+      cover: coverFieldsFromColumns(row.coverImage, row.coverWidth, row.coverHeight).cover,
       status: row.status,
       physicalPath: row.physicalPath,
       totalDurationSec: row.totalDurationSec,
@@ -250,36 +254,33 @@ function rowToWork(
   rawPlaylists: Playlist[],
   tagNames: string[],
   dlsite: DlsiteState,
-  liveFileDurations: Map<string, number | null>,
+  liveFileProbes: Map<string, ProbeDurationResult>,
 ): Work {
   // end指定済みトラックは自明値（end-start）で合成する。
   // end未指定トラックはファイル置換をrescan無しで検知できるよう、audio_probe_cacheの
-  // 現在値を作品内全ファイルパス一括取得（liveFileDurations）で都度解決する。
+  // 現在値を作品内全ファイルパス一括取得（liveFileProbes）で都度解決する。
   // playlists_json（正本）には派生値を書かない。
   const playlists: ResolvedPlaylist[] = rawPlaylists.map((playlist) => ({
     id: playlist.id,
     name: playlist.name,
     tracks: playlist.tracks.map((track) => {
-      const durationSec =
-        track.end !== undefined
-          ? track.end - (track.start ?? 0)
-          : resolveTrackDurationSec(
-              track,
-              liveFileDurations.get(join(row.physicalPath, track.file)) ?? null,
-            );
-      return { ...track, durationSec };
+      const probe = liveFileProbes.get(join(row.physicalPath, track.file)) ?? { kind: "unprobed" };
+      return { ...track, ...toTrackDurationFields(resolveTrackDuration(track, probe)) };
     }),
   }));
   const resume = resolveResume(row, playlists);
   // totalDurationSecはトラックのライブ解決値から都度再計算する（保存列のスキャン時点値だと
   // ファイル差し替え後にトラック合計と矛盾するため）。保存列との同期は呼び出し側が行う。
   const totalDurationSec = sumDefaultPlaylistDuration(row, playlists);
+  const coverFields = coverFieldsFromColumns(row.coverImage, row.coverWidth, row.coverHeight);
   return parseRecord(
     workSchema,
     {
       id: row.id,
       title: row.title,
-      cover: projectCover(row.coverImage, row.coverWidth, row.coverHeight),
+      cover: coverFields.cover,
+      coverKind: coverFields.coverKind,
+      coverImage: coverFields.coverImage,
       status: row.status,
       physicalPath: row.physicalPath,
       totalDurationSec,
@@ -390,24 +391,19 @@ export class WorkRepo {
   }
 
   /**
-   * end未指定トラックが参照するファイルの現在の再生時間を、作品内の全該当パスを
+   * トラックが参照するファイルの現在のプローブ結果を、作品内の全該当パスを
    * 一括取得したprobe cache（fetchProbeCache、N+1回避）を土台に、ファイルごとに
    * stat して size/mtime が一致しなければ probeDurationSec で再probeし最新値を返す。
-   * これによりrescan無しのファイル差し替えも読み取り時に検知できる。
+   * end 指定トラックの不正 start 判定にもファイル長が要るため、全トラックファイルを対象にする。
    */
-  private async liveFileDurationMap(
+  private async liveFileProbeMap(
     physicalPath: string,
-    playlists: Array<{ tracks: Array<{ file: string; end?: number }> }>,
-  ): Promise<Map<string, number | null>> {
+    playlists: Array<{ tracks: Array<{ file: string }> }>,
+  ): Promise<Map<string, ProbeDurationResult>> {
     const paths = [
-      ...new Set(
-        playlists
-          .flatMap((p) => p.tracks)
-          .filter((t) => t.end === undefined)
-          .map((t) => join(physicalPath, t.file)),
-      ),
+      ...new Set(playlists.flatMap((p) => p.tracks).map((t) => join(physicalPath, t.file))),
     ];
-    const map = new Map<string, number | null>();
+    const map = new Map<string, ProbeDurationResult>();
     if (paths.length === 0) return map;
     const cache = this.fetchProbeCache(paths);
     await mapWithConcurrency(paths, PROBE_CONCURRENCY, async (path) => {
@@ -643,8 +639,31 @@ export class WorkRepo {
   }
 
   /**
+   * GET /api/fs の作品対応付け専用。id/physical_path のみ返し、タグ・DLsite 復元を行わない。
+   * directoryPath と祖先・子孫関係にある作品だけを SQL で絞り込む（OS ネイティブ区切り境界付き LIKE）。
+   * 並び順は listSummaries() と同じく rowid 昇順（重複 physical_path の先勝ちを一致させる）。
+   */
+  listFsWorkRefs(directoryPath: string): Array<{ id: string; physicalPath: string }> {
+    const descendantPrefix = likeDescendantsPrefix(directoryPath);
+    return this.db.sqlite
+      .query(
+        `SELECT works.id AS id, works.physical_path AS physicalPath
+         FROM main.works
+         INNER JOIN user.work_states ON work_states.work_id = works.id
+         WHERE works.physical_path = ?
+            OR ? LIKE ${likeStrictDescendantPrefixSql("works.physical_path")}
+            OR works.physical_path LIKE ?
+         ORDER BY works.rowid ASC`,
+      )
+      .all(directoryPath, directoryPath, sep, sep, descendantPrefix) as Array<{
+      id: string;
+      physicalPath: string;
+    }>;
+  }
+
+  /**
    * スマートフォルダー評価の第1段（ADR-0008）。SQLへ落とせるルール条件で候補IDへ絞り込む。
-   * ルールなしはSQLで絞り込めないため null を返し、呼び出し側は全件を使う。
+   * ルールなしは null（呼び出し側は queryWorks 相当の SQL ソート/ページング経路を使う）。
    * ルールがある場合は各ルールに一致するIDの和集合を返す（AND/OR/AND NOTの畳み込みは行わない）。
    * WHERE始端のリセットやAND NOTでの除外があっても、最終結果は必ずどこかのルールの一致集合に
    * 含まれるため、和集合は安全な上界になる。畳み込み・最終フィルタ・ソート・ページングは
@@ -814,7 +833,7 @@ export class WorkRepo {
       const items = rows.map((row) => ({
         id: row.id,
         title: row.title,
-        cover: projectCover(row.coverImage, row.coverWidth, row.coverHeight),
+        cover: coverFieldsFromColumns(row.coverImage, row.coverWidth, row.coverHeight).cover,
         status: row.status,
         totalDurationSec: row.totalDurationSec,
         trackCount: row.trackCount,
@@ -933,6 +952,7 @@ export class WorkRepo {
           SELECT
             works.id AS id,
             works.fingerprint AS fingerprint,
+            works.status AS status,
             works.physical_path AS physicalPath,
             works.cover_image AS coverImage,
             works.cover_width AS coverWidth,
@@ -950,6 +970,7 @@ export class WorkRepo {
       .all() as Array<{
       id: string;
       fingerprint: string | null;
+      status: Work["status"];
       physicalPath: string;
       coverImage: string | null;
       coverWidth: number | null;
@@ -965,6 +986,7 @@ export class WorkRepo {
     for (const row of rows) {
       map.set(row.id, {
         fingerprint: row.fingerprint,
+        status: row.status,
         physicalPath: row.physicalPath,
         addedAt: row.addedAt,
         bookmarked: row.bookmarked !== 0,
@@ -1075,7 +1097,7 @@ export class WorkRepo {
       rawPlaylists,
       this.tagMap([id]).get(id) ?? [],
       this.dlsiteState(id),
-      await this.liveFileDurationMap(row.physicalPath, rawPlaylists),
+      await this.liveFileProbeMap(row.physicalPath, rawPlaylists),
     );
     this.syncTotalDurationSec(row, work.totalDurationSec);
     return work;
@@ -1109,6 +1131,18 @@ export class WorkRepo {
     );
   }
 
+  /** メディア配信のパス解決専用。playlists復元・probe・duration再計算を伴わない。 */
+  getMediaRoot(id: string): MediaRootRow | null {
+    return (
+      (this.db.sqlite
+        .query(
+          `SELECT physical_path AS physicalPath
+           FROM main.works WHERE id = ?`,
+        )
+        .get(id) as MediaRootRow | undefined) ?? null
+    );
+  }
+
   /**
    * メタファイル書き戻し先の軽量取得。probe・freshness確認を伴わないため、
    * DBトランザクション内の同期処理からも安全に呼べる。
@@ -1131,22 +1165,17 @@ export class WorkRepo {
       rawPlaylists,
       this.tagMap([row.id]).get(row.id) ?? [],
       this.dlsiteState(row.id),
-      await this.liveFileDurationMap(row.physicalPath, rawPlaylists),
+      await this.liveFileProbeMap(row.physicalPath, rawPlaylists),
     );
     this.syncTotalDurationSec(row, work.totalDurationSec);
     return work;
   }
 
   /**
-   * scan からの登録。タグも置き換える。
-   * カバー列は options.cover（.meta.json のファイル名＋計測寸法）を正とし、省略時は work.cover から導く。
-   * options.cover は「画像あり・寸法null（計測失敗）」も表現でき、work.cover では表せない状態を書ける。
+   * scan バッチの user DB 書き込み。work_states を冪等作成する（onConflictDoNothing）。
+   * catalog より先にコミットする前提（ADR-0008）。
    */
-  upsertWork(
-    work: Work,
-    options: { metaPath: string; fingerprint?: string; cover?: CoverColumns },
-  ): void {
-    // 2DBをまたぐ原子性には依存せず、user状態を先に冪等作成してからcatalogを書く。
+  upsertWorkUserState(work: Work): void {
     this.db.user
       .insert(workStates)
       .values({
@@ -1160,11 +1189,20 @@ export class WorkRepo {
       })
       .onConflictDoNothing()
       .run();
-    // track_count はデフォルトプレイリストのトラック数（一覧がplaylists_jsonを読まないためここで維持。TASK-57）
+  }
+
+  /**
+   * scan バッチの catalog DB 書き込み。タグも置き換える。
+   * カバー列は options.cover（.meta.json のファイル名＋計測寸法）を正とし、省略時は work.cover から導く。
+   */
+  upsertWorkCatalog(
+    work: Work,
+    options: { metaPath: string; fingerprint?: string; cover?: CoverColumns },
+  ): void {
     const trackCount =
       defaultPlaylistOf({ id: work.id, defaultPlaylistId: work.defaultPlaylistId }, work.playlists)
         ?.tracks.length ?? 0;
-    const cover = options?.cover ?? coverColumnsFromCover(work.cover);
+    const cover = options.cover ?? coverColumnsFromWork(work);
     const values: typeof works.$inferInsert = {
       id: work.id,
       title: work.title,
@@ -1179,15 +1217,16 @@ export class WorkRepo {
       metaPath: options.metaPath,
       totalDurationSec: work.totalDurationSec,
       trackCount,
-      fingerprint: options?.fingerprint ?? null,
+      fingerprint: options.fingerprint ?? null,
       errorMessage: work.errorMessage,
       urlsJson: JSON.stringify(work.urls),
-      // durationSec は派生値のため正本（playlists_json）には書かず、読み取り時に動的解決する。
       playlistsJson: JSON.stringify(
         work.playlists.map((playlist) => ({
           id: playlist.id,
           name: playlist.name,
-          tracks: playlist.tracks.map(({ durationSec: _durationSec, ...track }) => track),
+          tracks: playlist.tracks.map(
+            ({ durationSec: _durationSec, durationKind: _durationKind, ...track }) => track,
+          ),
         })),
       ),
     };
@@ -1227,6 +1266,17 @@ export class WorkRepo {
     }
     this.replaceWorkTags(work.id, work.tags);
     this.setDlsiteState(work.id, work.dlsite);
+  }
+
+  /**
+   * scan からの登録（user + catalog を逐次実行）。テスト・seed 用。
+   */
+  upsertWork(
+    work: Work,
+    options: { metaPath: string; fingerprint?: string; cover?: CoverColumns },
+  ): void {
+    this.upsertWorkUserState(work);
+    this.upsertWorkCatalog(work, options);
   }
 
   /**
@@ -1297,17 +1347,17 @@ export class WorkRepo {
       throw new InvalidResumeError("resumeのPlaylistまたはTrackが作品に属していません");
     }
     // end指定済みは自明値（end-start）、未指定はaudio_probe_cacheの現在値から解決する。
-    const durationSec =
-      track.end !== null
-        ? track.end - (track.start ?? 0)
-        : resolveTrackDurationSec(
-            { start: track.start ?? undefined },
-            this.db.catalog
-              .select({ durationSec: audioProbeCache.durationSec })
-              .from(audioProbeCache)
-              .where(eq(audioProbeCache.path, join(track.physicalPath, track.file)))
-              .get()?.durationSec ?? null,
-          );
+    const cacheRow = this.db.catalog
+      .select({ durationSec: audioProbeCache.durationSec })
+      .from(audioProbeCache)
+      .where(eq(audioProbeCache.path, join(track.physicalPath, track.file)))
+      .get();
+    const probe =
+      track.end !== null ? ({ kind: "unprobed" } as const) : probeResultFromCache(cacheRow);
+    const durationSec = resolveTrackDurationSec(
+      { start: track.start ?? undefined, end: track.end ?? undefined },
+      probe,
+    );
     // durationSec が未知（プローブ未取得・失敗）の場合は上限が分からないため検証をスキップする。
     if (body.offsetSec < 0 || (durationSec !== null && body.offsetSec > durationSec)) {
       throw new InvalidResumeError("resumeのoffsetSecがトラック区間外です");

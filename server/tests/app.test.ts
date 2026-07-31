@@ -59,6 +59,38 @@ test("POST /api/dlsite/:id/fetch は取得分類をHTTPエラーコードへ反�
   }
 });
 
+test("GET /api/dlsite/bulk は実行中・終了後の状態を返し、未実行時は204", async () => {
+  resetDlsiteProgressStateForTest();
+  const app = buildApp();
+  const idle = await app.request("/api/dlsite/bulk");
+  assert.equal(idle.status, 204);
+
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  const adapter = createFixtureAdapter();
+  adapter.runDlsiteBulk = async (_mode, _workIds, options) => {
+    await gate;
+    options?.signal?.throwIfAborted();
+    return { fetched: 0, failed: 0, parseErrors: 0, skipped: 0 };
+  };
+  const gatedApp = createApp(adapter);
+
+  const start = await gatedApp.request("/api/dlsite/bulk", { method: "POST" });
+  assert.equal(start.status, 202);
+  await new Promise((resolve) => setImmediate(resolve));
+  const running = await gatedApp.request("/api/dlsite/bulk");
+  assert.equal(running.status, 200);
+  const runningBody = await running.json();
+  assert.equal(runningBody.status, "running");
+
+  release();
+  await new Promise((resolve) => setImmediate(resolve));
+  const completed = await gatedApp.request("/api/dlsite/bulk");
+  assert.equal(completed.status, 200);
+  const completedBody = await completed.json();
+  assert.equal(completedBody.status, "complete");
+});
+
 test("DLsite一括取得は202で開始し、SSEに進捗と完了件数を配信する", async () => {
   resetDlsiteProgressStateForTest();
   const app = buildApp();

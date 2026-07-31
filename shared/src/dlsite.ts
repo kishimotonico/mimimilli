@@ -182,3 +182,24 @@ export const dlsiteBulkCancelResponseSchema = z.object({
   cancelling: z.literal(true),
 });
 export type DlsiteBulkCancelResponse = z.infer<typeof dlsiteBulkCancelResponseSchema>;
+
+const dlsiteBulkProgressSnapshotSchema = z.object({
+  processed: z.number().int().nonnegative(),
+  total: z.number().int().nonnegative(),
+});
+
+/** GET /api/dlsite/bulk のジョブ状態（実行中・直近の終了結果）。未実行・終了後クリア時は 204 */
+export const dlsiteBulkSnapshotSchema = z.discriminatedUnion("status", [
+  z.object({
+    status: z.literal("running"),
+    progress: dlsiteBulkProgressSnapshotSchema.nullable(),
+  }),
+  z.object({
+    status: z.literal("cancelling"),
+    progress: dlsiteBulkProgressSnapshotSchema.nullable(),
+  }),
+  z.object({ status: z.literal("complete"), result: dlsiteBulkResultSchema }),
+  z.object({ status: z.literal("cancelled"), result: dlsiteBulkResultSchema }),
+  z.object({ status: z.literal("error"), message: z.string() }),
+]);
+export type DlsiteBulkSnapshot = z.infer<typeof dlsiteBulkSnapshotSchema>;

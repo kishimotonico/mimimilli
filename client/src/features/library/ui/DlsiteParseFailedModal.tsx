@@ -37,13 +37,15 @@ export default function DlsiteParseFailedModal({
         >
           <span className="min-w-0 flex-1">
             <span className="block w-full truncate text-[12px]">{work.title}</span>
-            <span className="mt-0.5 block font-mono text-[10.5px] text-ink-3">{work.rjCode}</span>
+            <span className="mll-selectable mt-0.5 block font-mono text-[10.5px] text-ink-3">
+              {work.rjCode}
+            </span>
           </span>
         </button>
       )}
       footer={
         <footer className="flex shrink-0 flex-col gap-2 border-t border-line-soft px-[18px] py-3">
-          <p className="font-mono text-[10px] leading-relaxed text-ink-3">
+          <p className="mll-selectable font-mono text-[10px] leading-relaxed text-ink-3">
             pnpm --filter @mimimilli/server dlsite-cache -- export --product-code RJ000000 --file
             ./work.html
           </p>

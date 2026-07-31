@@ -36,6 +36,8 @@ import type {
 } from "@mimimilli/shared";
 
 export interface ScanOptions {
+  /** true のとき fingerprint に関係なく全作品を再処理する（TASK-95） */
+  full?: boolean;
   signal?: AbortSignal;
   onProgress?: (event: ScanProgressEvent) => void;
   /** Worker 内の同期処理にも到達する取消トークン。adapter 内部だけで設定する。 */

@@ -15,6 +15,7 @@ import {
   dlsiteInfoTags,
   unappliedDlsiteTags,
 } from "../../model/dlsitePreview";
+import { formatCoverEditLabel } from "../../../../shared/lib/coverLabel";
 
 export const STATUS_LABEL = {
   none: "未連携",
@@ -86,7 +87,7 @@ function DlsiteApplyDialog({
           </h2>
           <IconButton icon={I.x} label="閉じる" size="sm" disabled={busy} onClick={close} />
         </header>
-        <div className="min-h-0 flex-1 overflow-y-auto px-[18px] py-3 text-[11px]">
+        <div className="mll-selectable min-h-0 flex-1 overflow-y-auto px-[18px] py-3 text-[11px]">
           <label className="grid grid-cols-[18px_60px_minmax(0,1fr)_18px_minmax(0,1fr)] items-center gap-1.5 border-b border-line-soft py-2">
             <input
               type="checkbox"
@@ -106,7 +107,7 @@ function DlsiteApplyDialog({
               onChange={(event) => onApplyCoverChange(event.target.checked)}
             />
             <span>カバー</span>
-            <span className="min-w-0 break-words text-ink-2">{work.cover?.image ?? "未設定"}</span>
+            <span className="min-w-0 break-words text-ink-2">{formatCoverEditLabel(work)}</span>
             <span className="text-ink-3">→</span>
             <span>{info.coverUrl ? "DLsite画像" : "画像なし"}</span>
           </label>

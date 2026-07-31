@@ -3,7 +3,7 @@
 // - 再生開始は usePlayerActions のみ利用（state は leaf で購読）
 // - レイアウトは AppShell に委譲
 
-import { useState, useCallback, useRef } from "react";
+import { lazy, Suspense, useState, useCallback, useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { usePlayerActions } from "../features/player/model/usePlayerActions";
 import PlayerRuntime from "../features/player/ui/PlayerRuntime";
@@ -21,8 +21,6 @@ import PlayerDock from "../features/player/ui/PlayerDock";
 import { resolveAppStartupState } from "./model/resolveAppStartupState";
 import SetupScreen from "../features/setup/ui/SetupScreen";
 import StartupErrorScreen from "./ui/StartupErrorScreen";
-import SettingsModal from "../features/settings/ui/SettingsModal";
-import ScanModal from "../features/scan/ui/ScanModal";
 import DlsiteNotificationModals from "../features/library/ui/DlsiteNotificationModals";
 import GlobalToast from "./ui/GlobalToast";
 import type { ActiveModal } from "./model/activeModal";
@@ -33,6 +31,9 @@ import { useScanActions } from "../features/scan/model/useScanActions";
 import { setRootFolder } from "../features/settings/api";
 import { useSettingsQuery } from "../features/settings/useSettingsQuery";
 import NavigationHistorySync from "../features/navigation/ui/NavigationHistorySync";
+
+const SettingsModal = lazy(() => import("../features/settings/ui/SettingsModal"));
+const ScanModal = lazy(() => import("../features/scan/ui/ScanModal"));
 
 export default function App() {
   const player = usePlayerActions();
@@ -225,21 +226,25 @@ export default function App() {
           <PlayerRuntime />
           <NavigationHistorySync />
           {activeModal === "settings" && (
-            <SettingsModal
-              rootFolder={settings?.rootFolder ?? null}
-              lastScanTime={settings?.lastScanTime ?? null}
-              onClose={handleCloseModal}
-              onOpenScan={() => setActiveModal("scan")}
-              onChangeFolder={handleChangeFolder}
-              onExport={handleExport}
-            />
+            <Suspense fallback={null}>
+              <SettingsModal
+                rootFolder={settings?.rootFolder ?? null}
+                lastScanTime={settings?.lastScanTime ?? null}
+                onClose={handleCloseModal}
+                onOpenScan={() => setActiveModal("scan")}
+                onChangeFolder={handleChangeFolder}
+                onExport={handleExport}
+              />
+            </Suspense>
           )}
           {activeModal === "scan" && (
-            <ScanModal
-              lastScanTime={settings?.lastScanTime ?? null}
-              onClose={handleCloseModal}
-              onOpenRjCodeMissing={() => setActiveModal("rj-missing")}
-            />
+            <Suspense fallback={null}>
+              <ScanModal
+                lastScanTime={settings?.lastScanTime ?? null}
+                onClose={handleCloseModal}
+                onOpenRjCodeMissing={() => setActiveModal("rj-missing")}
+              />
+            </Suspense>
           )}
           <DlsiteNotificationModals activeModal={activeModal} onClose={handleCloseModal} />
           <GlobalToast />

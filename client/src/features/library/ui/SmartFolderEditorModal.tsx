@@ -346,7 +346,7 @@ export default function SmartFolderEditorModal({
           {saveError && (
             <div
               role="alert"
-              className="rounded-[6px] border border-[var(--r-coral)] bg-paper-0 px-3 py-2 text-[11px] text-[var(--r-coral)]"
+              className="mll-selectable rounded-[6px] border border-[var(--r-coral)] bg-paper-0 px-3 py-2 text-[11px] text-[var(--r-coral)]"
             >
               {saveError}
             </div>

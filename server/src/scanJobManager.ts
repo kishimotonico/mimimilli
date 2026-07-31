@@ -17,6 +17,7 @@ interface Job {
   listeners: Set<Listener>;
   history: ScanJobEvent[];
   nextSeq: number;
+  full: boolean;
 }
 
 export class ActiveScanConflictError extends Error {
@@ -43,9 +44,10 @@ export class ScanJobManager {
     this.terminalLimit = terminalLimit;
   }
 
-  start(): ScanJobSnapshot {
+  start(options?: { full?: boolean }): ScanJobSnapshot {
     const active = this.getActive();
     if (active) throw new ActiveScanConflictError(active);
+    const full = options?.full ?? false;
     const snapshot: ScanJobSnapshot = {
       id: randomUUID(),
       status: "queued",
@@ -62,6 +64,7 @@ export class ScanJobManager {
       listeners: new Set(),
       history: [],
       nextSeq: 1,
+      full,
     };
     this.jobs.set(snapshot.id, job);
     this.activeId = snapshot.id;
@@ -143,6 +146,7 @@ export class ScanJobManager {
     this.emit(job, { type: "state", seq: 0, snapshot: this.copy(job.snapshot) });
     try {
       const result = await this.adapter.scan({
+        full: job.full,
         signal: job.controller.signal,
         onProgress: (event) => this.progress(job, event),
       });

@@ -2,7 +2,7 @@
 // SSE 購読は ScanRuntime が単一所有者。表示側は必要な atom だけ subscribe する。
 
 import { atom } from "jotai";
-import type { ScanJobSnapshot } from "@mimimilli/shared";
+import type { ScanJobSnapshot, StartScanRequest } from "@mimimilli/shared";
 import { formatScanProgressLabel } from "../model";
 import type { ScanProgress } from "../model";
 
@@ -27,7 +27,7 @@ export const scanProgressLabelAtom = atom((get) => formatScanProgressLabel(get(s
 export const scanErrorAtom = atom<string | null>(null);
 
 export interface ScanActions {
-  start: () => Promise<void>;
+  start: (options?: StartScanRequest) => Promise<void>;
   cancel: () => Promise<void>;
   clearError: () => void;
 }

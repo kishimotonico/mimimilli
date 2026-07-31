@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import type { ScanJobSnapshot, WorksPage } from "@mimimilli/shared";
-import { createRealAdapter } from "../../src/adapters/real/index.ts";
+import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { createApp } from "../../src/app.ts";
 import { makeSampleLibrary } from "../helpers/sampleLibrary.ts";
 
@@ -30,7 +30,7 @@ test("file scan Workerの同期停止中もworks/Range mediaへ応答し、cance
   };
   const thumbnailCacheDir = join(library.baseDir, "data", "thumbnails");
 
-  const seed = createRealAdapter({
+  const seed = createTestRealAdapter({
     database,
     dataRoot: join(library.baseDir, "data"),
     thumbnailCacheDir,
@@ -46,7 +46,7 @@ test("file scan Workerの同期停止中もworks/Range mediaへ応答し、cance
   const workerReady = new Promise<void>((resolve) => {
     ready = resolve;
   });
-  const adapter = createRealAdapter({
+  const adapter = createTestRealAdapter({
     database,
     dataRoot: join(library.baseDir, "data"),
     thumbnailCacheDir,
@@ -113,4 +113,27 @@ test("file scan Workerの同期停止中もworks/Range mediaへ応答し、cance
   assert.equal(restartedResponse.status, 202);
   const restarted = (await restartedResponse.json()) as { job: ScanJobSnapshot };
   assert.equal((await waitForTerminal(app, restarted.job.id)).status, "completed");
+});
+
+test("file scan Workerはfull:trueをscannerへ伝播し全件再処理する", async (t) => {
+  const library = makeSampleLibrary();
+  t.after(library.cleanup);
+  const database = {
+    kind: "files" as const,
+    catalogPath: join(library.baseDir, "data", "db", "catalog.sqlite"),
+    userPath: join(library.baseDir, "data", "db", "user.sqlite"),
+  };
+  const thumbnailCacheDir = join(library.baseDir, "data", "thumbnails");
+  const adapter = createTestRealAdapter({
+    database,
+    dataRoot: join(library.baseDir, "data"),
+    thumbnailCacheDir,
+  });
+  t.after(() => adapter.close());
+  await adapter.updateSettings({ rootFolder: library.root });
+  await adapter.scan();
+
+  const second = await adapter.scan({ full: true });
+  assert.equal(second.skipped, 0);
+  assert.equal(second.registered, 2);
 });

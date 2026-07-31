@@ -23,7 +23,7 @@ export default function StartupErrorScreen({
     <div className="flex h-screen w-full items-center justify-center bg-paper-0">
       <div className="flex max-w-md flex-col items-center gap-4 px-6 text-center font-jp">
         <h1 className="text-[15px] font-medium text-ink-0">起動できませんでした</h1>
-        <p className="text-[13px] text-ink-2" role="alert">
+        <p className="mll-selectable text-[13px] text-ink-2" role="alert">
           {message}
         </p>
         <Button variant="primary" onClick={onRetry} disabled={isRetrying}>

@@ -3,26 +3,61 @@ import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { test, type TestContext } from "node:test";
-import type { FsListing, WorkSummary, WorksPage } from "@mimimilli/shared";
+import type { FsListing, Work, WorksPage } from "@mimimilli/shared";
 import type { Hono } from "hono";
-import { createRealAdapter } from "../../src/adapters/real/index.ts";
+import { createTestRealAdapter } from "../helpers/realAdapter.ts";
+import type { FsWorkRef } from "../../src/adapters/real/fsBrowse.ts";
 import { buildWorkPathIndex, findOwnerWork } from "../../src/adapters/real/fsBrowse.ts";
+import { openDb, type Db } from "../../src/adapters/real/db.ts";
+import { WorkRepo } from "../../src/adapters/real/workRepo.ts";
 import { createApp } from "../../src/app.ts";
 import { makeSampleLibrary, writeWav } from "../helpers/sampleLibrary.ts";
+import { upsertTestWork } from "../helpers/workTestUtils.ts";
+
+function sampleWork(id: string, physicalPath: string): Work {
+  return {
+    id,
+    title: id,
+    cover: null,
+    coverKind: "none",
+    coverImage: null,
+    status: "ok",
+    physicalPath,
+    totalDurationSec: 1,
+    addedAt: "2026-07-19T00:00:00.000Z",
+    errorMessage: null,
+    urls: [],
+    tags: [],
+    defaultPlaylistId: null,
+    createdAt: null,
+    playlists: [],
+    bookmarked: false,
+    lastPlayedAt: null,
+    resume: null,
+    dlsite: {
+      rjCode: null,
+      status: "none",
+      lastAttemptAt: null,
+      error: null,
+      errorKind: null,
+      appliedTags: [],
+    },
+  };
+}
 
 async function setup(t: TestContext, prepare?: (root: string) => void) {
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
   prepare?.(lib.root);
-  const adapter = createRealAdapter({ database: { kind: "memory" } });
+  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
   const app = createApp(adapter);
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
   return { app, root: resolve(lib.root), existingWorkId: lib.existingWorkId };
 }
 
-function workAt(id: string, physicalPath: string): WorkSummary {
-  return { id, physicalPath } as WorkSummary;
+function workAt(id: string, physicalPath: string): FsWorkRef {
+  return { id, physicalPath };
 }
 
 class LookupCountingMap<K, V> extends Map<K, V> {
@@ -124,4 +159,90 @@ test("物理パス索引は境界・重複・未登録を保ち、所有者探�
   const owner = findOwnerWork("/library", "/library/registered/deep/file.wav", countingIndex);
   assert.equal(owner?.id, "owner");
   assert.equal(countingIndex.getCalls, 3);
+});
+
+test("listFsWorkRefs は対象ディレクトリと祖先・子孫の作品だけを返す", () => {
+  const db = openDb({ kind: "memory" });
+  const repo = new WorkRepo(db);
+
+  const base = "/library/dlsite";
+  upsertTestWork(repo, sampleWork("w-root", `${base}/RJ900001`));
+  upsertTestWork(repo, sampleWork("w-nested", `${base}/RJ900001/nested`));
+  upsertTestWork(repo, sampleWork("w-other", `${base}/RJ900002`));
+
+  const atNested = repo.listFsWorkRefs(`${base}/RJ900001/nested`);
+  assert.deepEqual(atNested.map((w) => w.id).sort(), ["w-nested", "w-root"], "子孫と祖先のみ");
+
+  const atSibling = repo.listFsWorkRefs(`${base}/RJ900002`);
+  assert.deepEqual(
+    atSibling.map((w) => w.id),
+    ["w-other"],
+  );
+
+  const unrelated = repo.listFsWorkRefs("/elsewhere");
+  assert.equal(unrelated.length, 0);
+
+  db.close();
+});
+
+test("listFsWorkRefs は末尾区切りでも子孫を取りこぼさない", () => {
+  const db = openDb({ kind: "memory" });
+  const repo = new WorkRepo(db);
+
+  upsertTestWork(repo, sampleWork("w-under-lib", "/library/work"));
+  assert.deepEqual(
+    repo.listFsWorkRefs("/library/").map((w) => w.id),
+    ["w-under-lib"],
+  );
+
+  const base = "/library/dlsite";
+  upsertTestWork(repo, sampleWork("w-root", `${base}/RJ900001`));
+  upsertTestWork(repo, sampleWork("w-nested", `${base}/RJ900001/nested`));
+  assert.deepEqual(
+    repo
+      .listFsWorkRefs(`${base}/RJ900001/`)
+      .map((w) => w.id)
+      .sort(),
+    ["w-nested", "w-root"],
+  );
+
+  db.close();
+});
+
+test("listFsWorkRefs の physical_path 重複時の先勝ちは listSummaries と同じ", () => {
+  const db = openDb({ kind: "memory" });
+  const repo = new WorkRepo(db);
+  const physicalPath = "/library/duplicate";
+
+  upsertTestWork(repo, sampleWork("w-first", physicalPath));
+  upsertTestWork(repo, sampleWork("w-second", physicalPath));
+
+  const expectedId = repo.listSummaries().find((s) => s.physicalPath === physicalPath)?.id;
+  assert.ok(expectedId, "listSummaries に重複 physical_path の作品があること");
+
+  const indexed = buildWorkPathIndex(repo.listFsWorkRefs(physicalPath));
+  assert.equal(indexed.get(physicalPath)?.id, expectedId);
+
+  db.close();
+});
+
+test("listFsWorkRefs は listSummaries より軽量（タグ取得なし・SQL 1本）", () => {
+  const db = openDb({ kind: "memory" });
+  const repo = new WorkRepo(db);
+  for (let i = 0; i < 5; i++) {
+    upsertTestWork(repo, sampleWork(`w-${i}`, `/library/w-${i}`));
+  }
+
+  let queryCount = 0;
+  const original = db.sqlite.query.bind(db.sqlite);
+  db.sqlite.query = ((sql: string) => {
+    queryCount += 1;
+    return original(sql);
+  }) as Db["sqlite"]["query"];
+
+  const refs = repo.listFsWorkRefs("/library/w-0");
+  assert.equal(refs.length, 1);
+  assert.equal(queryCount, 1);
+
+  db.close();
 });

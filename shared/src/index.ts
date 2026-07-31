@@ -1,6 +1,8 @@
 // @mimimilli/shared — API 契約の正典（docs/ARCHITECTURE.md）。
 // client / server / fixture アダプタはすべてここの型・スキーマを参照する。
 export * from "./work.ts";
+export * from "./cover.ts";
+export * from "./duration.ts";
 export * from "./meta.ts";
 export * from "./library.ts";
 export * from "./tagPrefix.ts";

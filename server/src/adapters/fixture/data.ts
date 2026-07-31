@@ -1,7 +1,37 @@
 // fixture アダプタ用の自己完結シードデータ。
 // client/mocks からは import せず、本ファイル内で完結させる。
-import { emptyDlsiteState } from "@mimimilli/shared";
-import type { SmartFolder, WorkSummary } from "@mimimilli/shared";
+import { coverFieldsFromColumns, emptyDlsiteState } from "@mimimilli/shared";
+import type { Cover, SmartFolder, WorkSummary } from "@mimimilli/shared";
+
+/** fixture 内部のカバー列（real の cover_image / cover_width / cover_height に相当） */
+export interface FixtureCoverColumns {
+  image: string | null;
+  dimensions: { width: number; height: number } | null;
+}
+
+/** シード作品のカバー列。表示用 cover とは別に保持し unmeasured 等を表現する */
+export const SEED_COVER_COLUMNS: Partial<Record<string, FixtureCoverColumns>> = {
+  RJ501003: { image: "cover.jpg", dimensions: null },
+};
+
+/** WorkSummary の cover からカバー列を導出する（契約テスト用 works 差し替え向け） */
+export function fixtureCoverColumnsForWork(
+  work: Pick<WorkSummary, "id" | "cover">,
+): FixtureCoverColumns {
+  const explicit = SEED_COVER_COLUMNS[work.id];
+  if (explicit) return explicit;
+  if (work.cover === null) return { image: null, dimensions: null };
+  return { image: work.cover.image, dimensions: work.cover.dimensions };
+}
+
+/** カバー列から一覧・表示用 cover を投影する */
+export function fixtureCoverFromColumns(columns: FixtureCoverColumns): Cover {
+  return coverFieldsFromColumns(
+    columns.image,
+    columns.dimensions?.width ?? null,
+    columns.dimensions?.height ?? null,
+  ).cover;
+}
 
 /** シードとなる作品データ（約10件）。
  *  - サークル/cv/シリーズ/カテゴリの annotated タグとフラットタグを混在させる
@@ -254,29 +284,34 @@ const RAW_SEED_WORKS: Omit<WorkSummary, "dlsite">[] = [
   },
 ];
 
-export const SEED_WORKS: WorkSummary[] = RAW_SEED_WORKS.map((work, index) => ({
-  ...work,
-  dlsite:
-    index === 0
-      ? {
-          rjCode: work.id,
-          status: "applied",
-          lastAttemptAt: "2026-06-10T12:00:00.000Z",
-          error: null,
-          errorKind: null,
-          appliedTags: work.tags.filter((tag) => /^(?:cv|genre|サークル)\//.test(tag)),
-        }
-      : index === 2
+export const SEED_WORKS: WorkSummary[] = RAW_SEED_WORKS.map((work, index) => {
+  const columns = fixtureCoverColumnsForWork(work);
+  const cover = fixtureCoverFromColumns(columns);
+  return {
+    ...work,
+    cover,
+    dlsite:
+      index === 0
         ? {
-            ...emptyDlsiteState(),
             rjCode: work.id,
-            status: "not_found",
-            error: "作品が見つかりません",
+            status: "applied",
+            lastAttemptAt: "2026-06-10T12:00:00.000Z",
+            error: null,
+            errorKind: null,
+            appliedTags: work.tags.filter((tag) => /^(?:cv|genre|サークル)\//.test(tag)),
           }
-        : index === 6
-          ? { ...emptyDlsiteState(), rjCode: work.id, status: "skipped" }
-          : { ...emptyDlsiteState(), rjCode: /^RJ\d+$/i.test(work.id) ? work.id : null },
-}));
+        : index === 2
+          ? {
+              ...emptyDlsiteState(),
+              rjCode: work.id,
+              status: "not_found",
+              error: "作品が見つかりません",
+            }
+          : index === 6
+            ? { ...emptyDlsiteState(), rjCode: work.id, status: "skipped" }
+            : { ...emptyDlsiteState(), rjCode: /^RJ\d+$/i.test(work.id) ? work.id : null },
+  };
+});
 
 /** 各作品のトラック名（収録曲名）。trackCount に満たない分は呼び出し側で `Track N` を補う */
 export const SEED_TRACK_NAMES: Record<string, string[]> = {
@@ -389,12 +424,12 @@ const fsDir = (name: string, children: FsNode[]): FsNode => ({
 });
 
 /** 作品配下のファイルツリーを構築する（GET /works/:id/files でも /fs でも使う）。
- *  音声トラック・カバー画像・特典イラストなどの典型的な構成を生成する。 */
-export function buildWorkFileTree(work: WorkSummary): FsNode[] {
+ *  coverImage は表示用 cover が null（unmeasured）でもファイル実体がある場合に指定する。 */
+export function buildWorkFileTree(work: WorkSummary, coverImage: string | null): FsNode[] {
   const children: FsNode[] = [];
 
-  if (work.cover) {
-    children.push(fsFile(work.cover.image, "image", 420 * 1024));
+  if (coverImage) {
+    children.push(fsFile(coverImage, "image", 420 * 1024));
   }
 
   for (let i = 0; i < work.trackCount; i++) {
@@ -415,7 +450,7 @@ export function buildWorkFileTree(work: WorkSummary): FsNode[] {
 }
 
 /** 作品フォルダーノードを構築する（workId 付き dir。配下は buildWorkFileTree を相対パス付きで展開） */
-function fsWorkFolder(work: WorkSummary): FsNode {
+function fsWorkFolder(work: WorkSummary, coverImage: string | null): FsNode {
   const folderName = work.physicalPath.split("/").filter(Boolean).pop() ?? work.id;
 
   function annotate(nodes: FsNode[]): FsNode[] {
@@ -434,12 +469,15 @@ function fsWorkFolder(work: WorkSummary): FsNode {
     fileType: "dir",
     workId: work.id,
     workRelPath: null,
-    children: annotate(buildWorkFileTree(work)),
+    children: annotate(buildWorkFileTree(work, coverImage)),
   };
 }
 
 /** /fs のルートツリーを構築する。works はその時点の最新状態を渡す */
-export function buildFsRoot(works: WorkSummary[]): FsNode {
+export function buildFsRoot(
+  works: WorkSummary[],
+  coverColumns: ReadonlyMap<string, FixtureCoverColumns>,
+): FsNode {
   const byCircle = new Map<string, WorkSummary[]>();
   for (const work of works) {
     const circleTag = work.tags.find((t) => t.startsWith("サークル/"));
@@ -454,7 +492,9 @@ export function buildFsRoot(works: WorkSummary[]): FsNode {
     .map(([circle, circleWorks]) =>
       fsDir(
         circle,
-        circleWorks.map((w) => fsWorkFolder(w)),
+        circleWorks.map((w) =>
+          fsWorkFolder(w, coverColumns.get(w.id)?.image ?? fixtureCoverColumnsForWork(w).image),
+        ),
       ),
     );
 

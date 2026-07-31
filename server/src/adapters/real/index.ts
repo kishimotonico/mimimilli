@@ -5,12 +5,7 @@ import { createHash } from "node:crypto";
 import { stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
-import {
-  applyDlsiteStatePatch,
-  DEFAULT_TAG_PREFIXES,
-  normalizeTags,
-  toWorkListItem,
-} from "@mimimilli/shared";
+import { applyDlsiteStatePatch, DEFAULT_TAG_PREFIXES, normalizeTags } from "@mimimilli/shared";
 import type {
   AxisFacetItem,
   DlsiteApplyBody,
@@ -53,19 +48,14 @@ import {
 import type { ScanOptions } from "../../adapter.ts";
 import { isDefaultTitle } from "../../core/dlsiteTitle.ts";
 import { buildTagPrefixCandidates } from "../../core/tagPrefixCandidates.ts";
-import { evalSmartFolder } from "../../core/smartFolder.ts";
 import { openDb, type Db, type DbLocation } from "./db.ts";
 import {
   detectRjCode,
-  downloadCover,
   fetchDlsiteCover,
   fetchDlsiteHtml,
-  fetchDlsiteInfo,
   mergeDlsiteTags,
   normalizeDlsiteCoverUrl,
   parseDlsiteHtml,
-  type DlsiteCoverResponse,
-  type DlsiteHtmlResponse,
 } from "./dlsite.ts";
 import {
   DEFAULT_DLSITE_CACHE_MAX_EXPANDED_BYTES,
@@ -93,6 +83,7 @@ import {
 } from "./thumbnailCache.ts";
 import type { CoverColumns } from "./workRepo.ts";
 import { WorkRepo } from "./workRepo.ts";
+import { querySmartFolderWorks } from "./smartFolderWorks.ts";
 
 const KEY_ROOT_FOLDER = "root_folder";
 const KEY_LAST_SCAN_TIME = "last_scan_time";
@@ -105,24 +96,12 @@ export interface RealAdapterOptions {
   thumbnailCache?: ThumbnailCacheOptions;
   /** manifestとバックアップを保存するデータルート。 */
   dataRoot?: string;
-  /** @deprecated dlsiteRequestConfig.requestIntervalMs を使う。既存テスト互換用。 */
-  dlsiteRequestIntervalMs?: number;
   /** DLsiteの実HTTP設定。環境変数の解決はserver/src/index.tsだけで行う。 */
   dlsiteRequestConfig?: DlsiteRequestConfig;
   /** schedulerのtransport/clock/sleep/random/logger注入。実ネットワークなしの試験用。 */
   dlsiteSchedulerDependencies?: DlsiteSchedulerDependencies;
-  /** DLsiteレスポンスキャッシュ。TASK-93.1ではDBを開くだけで、live取得経路の利用はTASK-93.2で行う。 */
-  dlsiteCache?: DlsiteCacheOptions;
-  /** テスト用の取得関数差し替え。省略時は実DLsite取得 */
-  dlsiteFetcher?: (rjCode: string) => Promise<DlsiteFetchResult>;
-  /** キャッシュ統合用の生HTML取得関数。テストでは実ネットワークを使わずここを注入する。 */
-  dlsiteHtmlFetcher?: (productCode: string) => Promise<DlsiteHtmlResponse>;
-  /** HTMLパーサの差し替え（cache hit時も毎回呼ばれることの検証用）。 */
-  dlsiteParser?: (html: string, productCode: string) => DlsiteFetchResult;
-  /** テスト用のカバーダウンロード関数差し替え */
-  dlsiteCoverDownloader?: (coverUrl: string, workDir: string) => Promise<string>;
-  /** キャッシュ統合用のカバーHTTP取得関数。 */
-  dlsiteCoverFetcher?: (coverUrl: string) => Promise<DlsiteCoverResponse>;
+  /** DLsiteレスポンスキャッシュ。 */
+  dlsiteCache: DlsiteCacheOptions;
   /** Worker隔離の結合テストで同期停止を作るSharedArrayBuffer。実運用では指定しない。 */
   scanWorkerTestGate?: SharedArrayBuffer;
   /** test gateを停止させる位置。省略時はscanner開始前。 */
@@ -227,6 +206,7 @@ async function runFileScanInWorker(
         dataRoot,
         thumbnailCacheDir,
         abortBuffer,
+        full: options.full ?? false,
         testGate,
         testGateStage,
       },
@@ -236,7 +216,7 @@ async function runFileScanInWorker(
 
 export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
   const db: Db = openDb(options.database);
-  const dlsiteCache = options.dlsiteCache ? new DlsiteCache(options.dlsiteCache) : undefined;
+  const dlsiteCache = new DlsiteCache(options.dlsiteCache);
   const repo = new WorkRepo(db);
   const thumbnailCacheDir = options.thumbnailCacheDir ?? join(tmpdir(), "mimimilli-memory-cache");
   const thumbnailCache = new ThumbnailCache(options.thumbnailCache);
@@ -249,71 +229,33 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
   const dlsiteRequestConfig: DlsiteRequestConfig = {
     ...DEFAULT_DLSITE_REQUEST_CONFIG,
     ...options.dlsiteRequestConfig,
-    ...(options.dlsiteRequestIntervalMs === undefined
-      ? {}
-      : { requestIntervalMs: options.dlsiteRequestIntervalMs }),
   };
   const dlsiteScheduler = new DlsiteScheduler(
     dlsiteRequestConfig,
     options.dlsiteSchedulerDependencies,
   );
   const dlsiteHtmlTransferBytes =
-    options.dlsiteCache?.maxTransferBytes ?? DEFAULT_DLSITE_CACHE_MAX_TRANSFER_BYTES;
+    options.dlsiteCache.maxTransferBytes ?? DEFAULT_DLSITE_CACHE_MAX_TRANSFER_BYTES;
   const dlsiteHtmlExpandedBytes =
-    options.dlsiteCache?.maxExpandedBytes ?? DEFAULT_DLSITE_CACHE_MAX_EXPANDED_BYTES;
+    options.dlsiteCache.maxExpandedBytes ?? DEFAULT_DLSITE_CACHE_MAX_EXPANDED_BYTES;
   const dlsiteCoverMaximumBytes =
-    options.dlsiteCache?.maxTransferBytes ?? DEFAULT_DLSITE_CACHE_MAX_TRANSFER_BYTES;
+    options.dlsiteCache.maxTransferBytes ?? DEFAULT_DLSITE_CACHE_MAX_TRANSFER_BYTES;
   const dlsiteUserAgent = dlsiteRequestConfig.userAgent;
-  const dlsiteFetcher =
-    options.dlsiteFetcher ??
-    ((rjCode: string) =>
-      fetchDlsiteInfo(
-        rjCode,
-        dlsiteScheduler.fetch.bind(dlsiteScheduler),
-        dlsiteHtmlTransferBytes,
-        dlsiteHtmlExpandedBytes,
-        dlsiteUserAgent,
-      ));
-  const dlsiteHtmlFetcher =
-    options.dlsiteHtmlFetcher ??
-    ((productCode: string, signal?: AbortSignal) =>
-      fetchDlsiteHtml(
-        productCode,
-        (input, init) => dlsiteScheduler.fetch(input, { ...init, signal }),
-        dlsiteHtmlTransferBytes,
-        dlsiteHtmlExpandedBytes,
-        dlsiteUserAgent,
-      ));
-  const dlsiteParser = options.dlsiteParser ?? parseDlsiteHtml;
-  const dlsiteCoverDownloader =
-    options.dlsiteCoverDownloader ??
-    ((coverUrl: string, workDir: string) => downloadCover(coverUrl, workDir, dlsiteUserAgent));
-  const dlsiteCoverFetcher =
-    options.dlsiteCoverFetcher ??
-    ((coverUrl: string, signal?: AbortSignal) =>
-      fetchDlsiteCover(
-        coverUrl,
-        (input, init) => dlsiteScheduler.fetch(input, { ...init, signal }),
-        dlsiteCoverMaximumBytes,
-        dlsiteUserAgent,
-      ));
-  const scheduledDlsiteFetcher = options.dlsiteFetcher
-    ? (rjCode: string, signal?: AbortSignal) =>
-        dlsiteScheduler.schedule(() => dlsiteFetcher(rjCode), signal)
-    : dlsiteFetcher;
-  const scheduledDlsiteHtmlFetcher = options.dlsiteHtmlFetcher
-    ? (productCode: string, signal?: AbortSignal) =>
-        dlsiteScheduler.schedule(() => dlsiteHtmlFetcher(productCode), signal)
-    : dlsiteHtmlFetcher;
-  const scheduledDlsiteCoverFetcher = options.dlsiteCoverFetcher
-    ? (coverUrl: string, signal?: AbortSignal) =>
-        dlsiteScheduler.schedule(() => dlsiteCoverFetcher(coverUrl), signal)
-    : dlsiteCoverFetcher;
-  const scheduledDlsiteCoverDownloader = (
-    coverUrl: string,
-    workDir: string,
-    signal?: AbortSignal,
-  ) => dlsiteScheduler.schedule(() => dlsiteCoverDownloader(coverUrl, workDir), signal);
+  const dlsiteHtmlFetcher = (productCode: string, signal?: AbortSignal) =>
+    fetchDlsiteHtml(
+      productCode,
+      (input, init) => dlsiteScheduler.fetch(input, { ...init, signal }),
+      dlsiteHtmlTransferBytes,
+      dlsiteHtmlExpandedBytes,
+      dlsiteUserAgent,
+    );
+  const dlsiteCoverFetcher = (coverUrl: string, signal?: AbortSignal) =>
+    fetchDlsiteCover(
+      coverUrl,
+      (input, init) => dlsiteScheduler.fetch(input, { ...init, signal }),
+      dlsiteCoverMaximumBytes,
+      dlsiteUserAgent,
+    );
   const dlsiteFlights = new Map<string, Promise<DlsiteFetchAttempt>>();
   const dlsiteCoverFlights = new Map<
     string,
@@ -331,11 +273,6 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
     force = false,
     signal?: AbortSignal,
   ): Promise<DlsiteFetchAttempt> {
-    // キャッシュ未設定の既存テスト注入契約は維持する。
-    if (!dlsiteCache) {
-      dlsiteScheduler.assertOnline();
-      return { result: await scheduledDlsiteFetcher(productCode, signal), httpAttempted: true };
-    }
     const key = productCode.trim().toUpperCase();
     if (signal?.aborted) {
       throw new DOMException("DLsite一括取得はキャンセルされました", "AbortError");
@@ -349,7 +286,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
           key,
         });
         if (resolution.kind === "html") {
-          return { result: dlsiteParser(resolution.html, key), httpAttempted: false };
+          return { result: parseDlsiteHtml(resolution.html, key), httpAttempted: false };
         }
         return {
           result: {
@@ -383,7 +320,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
     if (ongoing) return ongoing;
     const request: Promise<DlsiteFetchAttempt> = (async (): Promise<DlsiteFetchAttempt> => {
       try {
-        const response = await scheduledDlsiteHtmlFetcher(key, signal);
+        const response = await dlsiteHtmlFetcher(key, signal);
         if (response.status === 404) {
           dlsiteCache.recordFailure({ productCode: key, outcome: "not_found" });
           return {
@@ -406,7 +343,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
             httpAttempted: true,
           };
         }
-        const parsed = dlsiteParser(response.body, key);
+        const parsed = parseDlsiteHtml(response.body, key);
         // HTTPが成功した以上、パースの成否にかかわらずsnapshotを更新し失敗記録は消す。
         dlsiteCache.recordSuccess({
           productCode: key,
@@ -453,10 +390,6 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
     workDir: string,
     signal?: AbortSignal,
   ): Promise<string> {
-    if (!dlsiteCache) {
-      dlsiteScheduler.assertOnline();
-      return scheduledDlsiteCoverDownloader(coverUrl, workDir, signal);
-    }
     const normalizedUrl = normalizeDlsiteCoverUrl(coverUrl);
     const key = `cover:${createHash("sha256").update(normalizedUrl).digest("hex")}`;
     let request = dlsiteCoverFlights.get(key);
@@ -477,7 +410,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
           key: normalizedUrl,
         });
         dlsiteScheduler.assertOnline();
-        const fetched = await scheduledDlsiteCoverFetcher(normalizedUrl, signal);
+        const fetched = await dlsiteCoverFetcher(normalizedUrl, signal);
         const finalUrl = normalizeDlsiteCoverUrl(fetched.finalUrl);
         dlsiteCache.putCover(finalUrl, fetched.body, fetched.contentType);
         // リダイレクトがあっても、要求した正規化URLでも次回hitさせる。
@@ -771,20 +704,17 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
     ): Promise<WorksPage | null> {
       const folder = repo.getSmartFolder(id);
       if (!folder) return null;
-      // ADR-0008: SQLでルール一致の候補IDへ絞り込んでから（第1段）、その候補だけを
-      // WorkSummary化して純粋関数の最終評価・ソート・ページングへ渡す（第2段）。
-      const candidateIds = repo.resolveSmartFolderCandidateIds(folder.rules);
-      const works = repo.listSummaries(candidateIds === null ? undefined : [...candidateIds]);
-      const page = evalSmartFolder(folder, works, query);
-      return page.seed === undefined
-        ? { items: page.items.map(toWorkListItem), total: page.total }
-        : { items: page.items.map(toWorkListItem), total: page.total, seed: page.seed };
+      return querySmartFolderWorks(repo, folder, query);
     },
 
     // ── 物理ファイルシステム ───────────────────────────────────
     async browseFs(path?: string): Promise<FsListing | null> {
       const root = requireRoot();
-      return browseFs(root, repo.listSummaries(), path);
+      const realRoot = resolveWithin(root, root);
+      if (realRoot === null) return null;
+      const target = resolveWithin(root, path ?? root);
+      if (target === null) return null;
+      return browseFs(realRoot, repo.listFsWorkRefs(target), target);
     },
 
     // ── メディア・DLsite ──────────────────────────────────────
@@ -793,13 +723,13 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       workId: string,
       relPath?: string,
     ): Promise<MediaLocation | null> {
-      const work = await repo.getWork(workId);
-      if (!work) return null;
+      const root = repo.getMediaRoot(workId);
+      if (!root) return null;
 
       const rel = relPath;
       if (!rel) return null;
 
-      const resolved = resolveWithin(work.physicalPath, join(work.physicalPath, rel));
+      const resolved = resolveWithin(root.physicalPath, join(root.physicalPath, rel));
       if (!resolved) return null;
 
       return { type: "file", absolutePath: resolved, mime: mimeOf(resolved) };
@@ -1097,7 +1027,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       }
     },
     close(): void {
-      dlsiteCache?.close();
+      dlsiteCache.close();
       db.close();
     },
   };

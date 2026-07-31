@@ -18,7 +18,7 @@
 //   - シンボリックリンクのディレクトリは辿らない（循環防止）
 import { existsSync, readdirSync } from "node:fs";
 import { readdir } from "node:fs/promises";
-import { basename, dirname, extname, join } from "node:path";
+import { basename, dirname, extname, join, resolve } from "node:path";
 import type {
   Cover,
   MetaFile,
@@ -28,7 +28,14 @@ import type {
   Track,
   Work,
 } from "@mimimilli/shared";
-import { emptyDlsiteState, isRjCodeMissing, resolveTrackDurationSec } from "@mimimilli/shared";
+import {
+  coverFieldsFromColumns,
+  emptyDlsiteState,
+  isRjCodeMissing,
+  isInvalidTrackStart,
+  resolveTrackDuration,
+  toTrackDurationFields,
+} from "@mimimilli/shared";
 import type { Db } from "./db.ts";
 import type { ScanOptions } from "../../adapter.ts";
 import { detectRjCode } from "./dlsite.ts";
@@ -59,6 +66,12 @@ function naturalCompare(a: string, b: string): number {
   return a.localeCompare(b, "ja", { numeric: true, sensitivity: "base" });
 }
 
+/** walk 時に収集するディレクトリの直下情報（findWorkRoot の readdirSync 代替） */
+interface DirEntryInfo {
+  subdirCount: number;
+  hasImage: boolean;
+}
+
 interface WalkResult {
   metaPaths: string[];
   /** メタファイル（いずれかの形式）が直接存在するディレクトリ */
@@ -67,6 +80,10 @@ interface WalkResult {
   audioDirs: Set<string>;
   /** readdir に失敗したサブツリーのディレクトリパス（ルート失敗は例外） */
   unreadablePaths: string[];
+  /** 走査済みディレクトリの直下サブフォルダー数・画像有無 */
+  dirIndex: Map<string, DirEntryInfo>;
+  /** 自身または配下にメタディレクトリがあるパス（findWorkRoot の swallowsMeta 判定用） */
+  dirsWithMetaInSubtree: Set<string>;
 }
 
 /** ルートフォルダーの readdir 失敗。スキャン全体をエラー終了させ missing 更新を防ぐ。 */
@@ -102,7 +119,7 @@ function throwIfAborted(signal?: AbortSignal, abortToken?: Int32Array): void {
     throw new ScanCancelledError();
 }
 
-async function walk(
+export async function walk(
   root: string,
   onDirVisited?: (visited: number) => void,
   signal?: AbortSignal,
@@ -113,6 +130,8 @@ async function walk(
     metaDirs: new Set(),
     audioDirs: new Set(),
     unreadablePaths: [],
+    dirIndex: new Map(),
+    dirsWithMetaInSubtree: new Set(),
   };
   const stack = [root];
   let visited = 0;
@@ -128,21 +147,28 @@ async function walk(
       result.unreadablePaths.push(dir);
       continue;
     }
+    let subdirCount = 0;
+    let hasImage = false;
     for (const entry of entries) {
       throwIfAborted(signal, abortToken);
       const full = join(dir, entry.name);
       if (entry.isDirectory()) {
+        subdirCount += 1;
         stack.push(full);
       } else if (entry.isFile()) {
         if (isMetaFileName(entry.name)) {
           result.metaPaths.push(full);
           result.metaDirs.add(dir);
+          markDirsWithMetaInSubtree(dir, root, result.dirsWithMetaInSubtree);
         } else if (AUDIO_EXTENSIONS.has(extOf(entry.name))) {
           result.audioDirs.add(dir);
+        } else if (IMAGE_EXTENSIONS.has(extOf(entry.name))) {
+          hasImage = true;
         }
       }
       // シンボリックリンクは辿らない（循環防止）
     }
+    result.dirIndex.set(dir, { subdirCount, hasImage });
     visited += 1;
     if (visited % WALK_PROGRESS_INTERVAL === 0) {
       onDirVisited?.(visited);
@@ -150,6 +176,20 @@ async function walk(
   }
   result.metaPaths.sort(naturalCompare);
   return result;
+}
+
+/** メタディレクトリからルートまでの祖先を dirsWithMetaInSubtree に登録する */
+function markDirsWithMetaInSubtree(
+  metaDir: string,
+  root: string,
+  dirsWithMetaInSubtree: Set<string>,
+): void {
+  let cur = metaDir;
+  while (isPathWithin(root, cur)) {
+    dirsWithMetaInSubtree.add(cur);
+    if (cur === root) break;
+    cur = dirname(cur);
+  }
 }
 
 /** dir またはルートまでの祖先にメタファイルがあるか */
@@ -163,34 +203,27 @@ function isCoveredByMeta(dir: string, root: string, metaDirs: Set<string>): bool
   return false;
 }
 
-/** 音声ディレクトリから作品ルートを推定する（保守的に昇格） */
-function findWorkRoot(audioDir: string, root: string, metaDirs: Set<string>): string {
+/** 音声ディレクトリから作品ルートを推定する（保守的に昇格。walk インデックス参照）。
+ *  walk 時点のディレクトリスナップショットで判定する（walk 後の FS 変更は反映しない）。 */
+export function findWorkRoot(
+  audioDir: string,
+  root: string,
+  dirsWithMetaInSubtree: Set<string>,
+  dirIndex: Map<string, DirEntryInfo>,
+): string {
   let cur = audioDir;
   while (true) {
     const parent = dirname(cur);
     if (cur === root || parent === cur || !isPathWithin(root, parent) || parent === root) break;
 
     // 親の下に既存メタ作品があるなら昇格しない（登録済み作品を飲み込まない）
-    let swallowsMeta = false;
-    for (const metaDir of metaDirs) {
-      if (isPathWithin(parent, metaDir)) {
-        swallowsMeta = true;
-        break;
-      }
-    }
-    if (swallowsMeta) break;
+    if (dirsWithMetaInSubtree.has(parent)) break;
 
-    let entries;
-    try {
-      entries = readdirSync(parent, { withFileTypes: true });
-    } catch {
-      break;
-    }
-    const subdirCount = entries.filter((e) => e.isDirectory()).length;
-    const hasImage = entries.some((e) => e.isFile() && IMAGE_EXTENSIONS.has(extOf(e.name)));
+    const info = dirIndex.get(parent);
+    if (!info) break;
 
     // カバー画像同梱の典型構成（RJxxxx/cover.jpg + mp3/…）か、単一サブフォルダーのラッパーのみ昇格
-    if (hasImage || subdirCount === 1) {
+    if (info.hasImage || info.subdirCount === 1) {
       cur = parent;
     } else {
       break;
@@ -282,8 +315,8 @@ interface UpsertItem {
   metaPath: string;
 }
 
-/** upsertWork の呼び出しを一定件数ごとに catalog トランザクションでまとめる（TASK-75）。
- *  バッチ途中で失敗すればトランザクションがロールバックされ、不整合な status を残さない。 */
+/** upsertWork の呼び出しを一定件数ごとに user・catalog 各DBのトランザクションでまとめる（TASK-75, TASK-159）。
+ *  user を先にコミットしてから catalog を書く（ADR-0008）。2DBは別ファイルのため集合としては原子的ではない。 */
 class UpsertBatch {
   private queue: UpsertItem[] = [];
   private readonly db: Db;
@@ -310,10 +343,17 @@ class UpsertBatch {
     this.checkAbort();
     if (this.queue.length === 0) return;
     const items = this.queue;
+    this.db.userTransaction(() => {
+      for (const item of items) {
+        this.checkAbort();
+        this.repo.upsertWorkUserState(item.work);
+      }
+    });
+    this.checkAbort();
     this.db.transaction(() => {
       for (const item of items) {
         this.checkAbort();
-        this.repo.upsertWork(item.work, {
+        this.repo.upsertWorkCatalog(item.work, {
           metaPath: item.metaPath,
           fingerprint: item.fingerprint,
           cover: item.cover,
@@ -330,6 +370,8 @@ interface PreparedMeta {
   meta: MetaFile;
   fingerprint: string;
   cachedFingerprint: string | undefined;
+  /** DB上の前回スキャン時の status。error は fingerprint スキップの対象外（TASK-95）。 */
+  cachedStatus: Work["status"] | undefined;
   /** カバー欠損判定（DBの寸法充足状況）。false ならfingerprint一致でも再処理が必要。 */
   coverSatisfied: boolean;
 }
@@ -347,6 +389,19 @@ interface PreparedSkip {
 }
 
 type PreparedEntry = PreparedMeta | PreparedError | PreparedSkip;
+
+/** fingerprint 一致かつカバー充足のとき増分スキャンでスキップできるか（TASK-95）。 */
+function canSkipIncremental(
+  full: boolean,
+  cachedFingerprint: string | undefined,
+  fingerprint: string,
+  coverSatisfied: boolean,
+  cachedStatus: Work["status"] | undefined,
+): boolean {
+  if (full) return false;
+  if (cachedStatus === "error") return false;
+  return cachedFingerprint === fingerprint && coverSatisfied;
+}
 
 export interface ScannerOptions {
   /** upsertWork をバッチ化する件数上限。テスト用に変更可 */
@@ -375,7 +430,9 @@ export class Scanner {
   }
 
   async scan(root: string, options?: ScanOptions): Promise<ScanResult> {
+    root = resolve(root);
     const normalized = options ?? {};
+    const full = normalized.full ?? false;
     const emit = normalized.onProgress ?? ((): void => {});
     const signal = normalized.signal;
     const abortToken = normalized.abortToken;
@@ -428,11 +485,11 @@ export class Scanner {
 
     // 1-a. メタを読み込み、fingerprint を計算する前処理パス。
     //      この時点では DB 書き込みやプローブは行わない。重複検出は後段の registerMetaFile で行う。
-    const prepared = this.prepareMetaEntries(tree.metaPaths, existingWorks, checkAbort);
+    const prepared = this.prepareMetaEntries(tree.metaPaths, existingWorks, full, checkAbort);
 
     // 1-b. fingerprint が不一致の作品だけのトラックパスを収集し、probe cache を一括取得する。
     //      これによりトラックごとの個別 SELECT が発生しなくなる（TASK-75）。
-    const probeCache = this.buildProbeCache(prepared, checkAbort);
+    const probeCache = this.buildProbeCache(prepared, full, checkAbort);
 
     // 1-c. 実際の登録処理。fingerprint 一致作品はスキップし、それ以外は probe cache を使って処理する。
     const batch = new UpsertBatch(this.db, this.repo, this.upsertBatchSize, checkAbort);
@@ -468,6 +525,7 @@ export class Scanner {
             batch,
             existingWorks,
             result,
+            full,
             checkAbort,
           );
           if (outcome === "skipped") {
@@ -505,7 +563,7 @@ export class Scanner {
       if (isCoveredByMeta(audioDir, root, tree.metaDirs)) continue;
       // ルート直下に直接置かれた音声（単一ファイル形式）は自動生成の対象外（要件 v4 §3.5）
       if (audioDir === root) continue;
-      workRoots.add(findWorkRoot(audioDir, root, tree.metaDirs));
+      workRoots.add(findWorkRoot(audioDir, root, tree.dirsWithMetaInSubtree, tree.dirIndex));
     }
     // 祖先が同時に検出された場合は祖先側に統合する（深さ昇順+採用済み祖先Setで線形化。TASK-62）
     const roots = excludeDescendantPaths(workRoots).sort(naturalCompare);
@@ -531,6 +589,7 @@ export class Scanner {
     // 自動生成分もまとめてcacheを読む。cache hit時を含め、track単位のSELECTを発生させない。
     const generatedProbeCache = this.buildProbeCache(
       generated.map((entry) => entry.prepared),
+      full,
       checkAbort,
     );
     for (const entry of generated) {
@@ -543,6 +602,7 @@ export class Scanner {
           batch,
           existingWorks,
           result,
+          full,
           checkAbort,
         );
         result.newlyGenerated += 1;
@@ -585,6 +645,7 @@ export class Scanner {
   private prepareMetaEntries(
     metaPaths: string[],
     existingWorks: Map<string, ScanWorkState>,
+    full: boolean,
     checkAbort: () => void = () => {},
   ): PreparedEntry[] {
     const prepared: PreparedEntry[] = [];
@@ -596,14 +657,21 @@ export class Scanner {
         const rawFingerprint = computeRawFingerprint(metaPath, raw);
         if (rawFingerprint) {
           const state = existingWorks.get(rawFingerprint.id);
-          const fingerprintMatch = state?.fingerprint === rawFingerprint.fingerprint;
           // カバー欠損を早期skipより前に判定する。skip許可は「メタ無カバー&DB無カバー」
           // または「メタ有カバー&DB両正寸法」のみ。それ以外はカバー再計測のため再登録する。
           const coverSatisfied =
             rawFingerprint.coverImage === null
               ? state?.cover.image == null
               : state?.cover.dimensions != null;
-          if (fingerprintMatch && coverSatisfied) {
+          if (
+            canSkipIncremental(
+              full,
+              state?.fingerprint ?? undefined,
+              rawFingerprint.fingerprint,
+              coverSatisfied,
+              state?.status,
+            )
+          ) {
             prepared.push({ kind: "skip", metaPath, id: rawFingerprint.id });
             continue;
           }
@@ -623,6 +691,7 @@ export class Scanner {
           meta,
           fingerprint,
           cachedFingerprint,
+          cachedStatus: state?.status,
           coverSatisfied,
         });
       } catch (e) {
@@ -647,6 +716,7 @@ export class Scanner {
       meta,
       fingerprint,
       cachedFingerprint: undefined,
+      cachedStatus: undefined,
       // 自動生成直後のメタにはまだDB行が無く、coverSatisfiedの意味を持たない
       // （cachedFingerprintがundefinedのため下のcachedFingerprint===fingerprint判定で必ずfalseになる）
       coverSatisfied: false,
@@ -656,13 +726,26 @@ export class Scanner {
   /** fingerprint が不一致の作品のトラックパスから probe cache を一括取得する */
   private buildProbeCache(
     prepared: PreparedEntry[],
+    full: boolean,
     checkAbort: () => void = () => {},
   ): Map<string, ProbeCacheEntry> {
+    if (full) return new Map();
     const trackPaths: string[] = [];
     for (const entry of prepared) {
       checkAbort();
       if (entry.kind !== "ok") continue;
-      if (entry.cachedFingerprint === entry.fingerprint) continue; // スキップ対象
+      if (
+        canSkipIncremental(
+          full,
+          entry.cachedFingerprint,
+          entry.fingerprint,
+          entry.coverSatisfied,
+          entry.cachedStatus,
+        )
+      )
+        continue;
+      // error 作品は再評価時に cache を使わず再 probe する（TASK-95）。
+      if (entry.cachedStatus === "error") continue;
       const workDir = dirname(entry.metaPath);
       // 詳細DTOは全playlistを返すため、デフォルト以外も含め全playlistのトラックをprobeする。
       // end指定済みトラックもstart/endのファイル長超過チェックにファイル長が要るためprobe対象に含める。
@@ -708,9 +791,11 @@ export class Scanner {
     batch: UpsertBatch,
     existingWorks: Map<string, ScanWorkState>,
     result: ScanResult,
+    full: boolean,
     checkAbort: () => void = () => {},
   ): Promise<"skipped" | string> {
-    const { metaPath, meta, fingerprint, cachedFingerprint, coverSatisfied } = prepared;
+    const { metaPath, meta, fingerprint, cachedFingerprint, cachedStatus, coverSatisfied } =
+      prepared;
     const workDir = dirname(metaPath);
     const id = meta.id;
 
@@ -721,9 +806,12 @@ export class Scanner {
     seenIds.add(id);
 
     // fingerprint 一致かつカバー寸法も充足済みなら完全未変更として、プローブ・upsertWork を省略する
-    if (cachedFingerprint === fingerprint && coverSatisfied) {
+    if (canSkipIncremental(full, cachedFingerprint, fingerprint, coverSatisfied, cachedStatus)) {
       return "skipped";
     }
+
+    const probeCacheForWork =
+      full || cachedStatus === "error" ? new Map<string, ProbeCacheEntry>() : probeCache;
 
     // 参照先ファイルの欠損チェック
     const playlist = defaultPlaylistOf(meta);
@@ -735,34 +823,28 @@ export class Scanner {
     // end超過はコンテナメタデータとデコード実測値の数十msのズレで健全なデータでも起こりうるため判定しない。
     // end指定トラックもstart超過チェックにファイル長が要るため（同一ファイルはfileDurationCacheで1回に集約）probeする。
     const invalidStartTracks: Array<{ file: string; title: string }> = [];
-    const fileDurationCache = new Map<string, number | null>();
+    const fileProbeCache = new Map<string, Awaited<ReturnType<typeof probeDurationSec>>>();
     const resolvedPlaylists: ResolvedPlaylist[] = [];
     for (const p of meta.playlists) {
       const tracks = [];
       for (const track of p.tracks) {
         checkAbort();
-        let fileDurationSec: number | null;
-        if (fileDurationCache.has(track.file)) {
-          fileDurationSec = fileDurationCache.get(track.file)!;
+        let probe;
+        if (fileProbeCache.has(track.file)) {
+          probe = fileProbeCache.get(track.file)!;
         } else {
-          fileDurationSec = await probeDurationSec(
+          probe = await probeDurationSec(
             this.db.catalog,
             join(workDir, track.file),
-            probeCache,
+            probeCacheForWork,
           );
           checkAbort();
-          fileDurationCache.set(track.file, fileDurationSec);
+          fileProbeCache.set(track.file, probe);
         }
-        if (fileDurationSec !== null) {
-          const startSec = track.start ?? 0;
-          if (startSec >= fileDurationSec) {
-            invalidStartTracks.push({ file: track.file, title: track.title });
-          }
+        if (probe.kind === "resolved" && isInvalidTrackStart(track, probe.durationSec)) {
+          invalidStartTracks.push({ file: track.file, title: track.title });
         }
-        // end指定済みはend-startが自明値のため、データ不正の可視化は作品のerror化(status/errorMessage)
-        // のみで行い、durationSec自体は既存のresolveTrackDurationSecの式をそのまま使う
-        // （getWork読み取り時の再計算と値がずれないようにするため）。
-        tracks.push({ ...track, durationSec: resolveTrackDurationSec(track, fileDurationSec) });
+        tracks.push({ ...track, ...toTrackDurationFields(resolveTrackDuration(track, probe)) });
       }
       resolvedPlaylists.push({ id: p.id, name: p.name, tracks });
     }
@@ -809,6 +891,11 @@ export class Scanner {
       cover.image !== null && cover.dimensions !== null
         ? { image: cover.image, dimensions: cover.dimensions }
         : null;
+    const { coverKind, coverImage } = coverFieldsFromColumns(
+      cover.image,
+      cover.dimensions?.width ?? null,
+      cover.dimensions?.height ?? null,
+    );
 
     // メタへの書き戻し（RJコード等）があった場合、保存する fingerprint は書き戻し後の内容に合わせる
     const finalFingerprint = computeFingerprint(metaPath, { ...meta, dlsite });
@@ -816,6 +903,8 @@ export class Scanner {
       id,
       title: meta.title,
       cover: workCover,
+      coverKind,
+      coverImage,
       defaultPlaylistId: meta.defaultPlaylistId,
       createdAt: meta.createdAt ?? null,
       status: errorMessage ? "error" : "ok",

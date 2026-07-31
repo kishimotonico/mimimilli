@@ -4,8 +4,14 @@
 // 「physical_path が祖先である作品」のうち最も深いものに紐づけ、workRelPath を付与する。
 import { readdirSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
-import type { FsEntry, FsListing, WorkSummary } from "@mimimilli/shared";
-import { isPathWithin, resolveWithin, toPortableRelativePath } from "./paths.ts";
+import type { FsEntry, FsListing } from "@mimimilli/shared";
+import { isPathWithin, toPortableRelativePath } from "./paths.ts";
+
+/** GET /api/fs の作品対応付けに必要な最小投影。 */
+export interface FsWorkRef {
+  id: string;
+  physicalPath: string;
+}
 
 function extOf(name: string): string {
   const i = name.lastIndexOf(".");
@@ -13,8 +19,8 @@ function extOf(name: string): string {
 }
 
 /** 物理パスで作品を引ける索引。重複時は従来の Array.find と同じく先勝ちにする。 */
-export function buildWorkPathIndex(works: readonly WorkSummary[]): Map<string, WorkSummary> {
-  const byPhysicalPath = new Map<string, WorkSummary>();
+export function buildWorkPathIndex(works: readonly FsWorkRef[]): Map<string, FsWorkRef> {
+  const byPhysicalPath = new Map<string, FsWorkRef>();
   for (const work of works) {
     if (!byPhysicalPath.has(work.physicalPath)) {
       byPhysicalPath.set(work.physicalPath, work);
@@ -30,8 +36,8 @@ export function buildWorkPathIndex(works: readonly WorkSummary[]): Map<string, W
 export function findOwnerWork(
   root: string,
   path: string,
-  worksByPhysicalPath: ReadonlyMap<string, WorkSummary>,
-): WorkSummary | null {
+  worksByPhysicalPath: ReadonlyMap<string, FsWorkRef>,
+): FsWorkRef | null {
   let current = path;
   while (isPathWithin(root, current)) {
     const owner = worksByPhysicalPath.get(current);
@@ -42,10 +48,7 @@ export function findOwnerWork(
   return null;
 }
 
-export function browseFs(root: string, works: WorkSummary[], path?: string): FsListing | null {
-  const target = resolveWithin(root, path ?? root);
-  if (target === null) return null;
-
+export function browseFs(root: string, works: FsWorkRef[], target: string): FsListing | null {
   const worksByPhysicalPath = buildWorkPathIndex(works);
 
   let entries;
@@ -55,7 +58,7 @@ export function browseFs(root: string, works: WorkSummary[], path?: string): FsL
     return null; // ファイルパスが指定された等
   }
 
-  const realRoot = resolveWithin(root, root)!;
+  const realRoot = root;
   const dirWork = worksByPhysicalPath.get(target) ?? null;
 
   const fsEntries: FsEntry[] = [];

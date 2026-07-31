@@ -71,6 +71,12 @@ export const scanJobSnapshotSchema = z.object({
 });
 export type ScanJobSnapshot = z.infer<typeof scanJobSnapshotSchema>;
 
+/** POST /scan のリクエストボディ。省略時は増分スキャン（fingerprint 一致作品はスキップ）。 */
+export const startScanRequestSchema = z.object({
+  full: z.boolean().optional(),
+});
+export type StartScanRequest = z.infer<typeof startScanRequestSchema>;
+
 export const startScanResponseSchema = z.object({ job: scanJobSnapshotSchema });
 export type StartScanResponse = z.infer<typeof startScanResponseSchema>;
 

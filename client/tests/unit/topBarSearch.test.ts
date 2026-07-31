@@ -3,7 +3,7 @@
 import { act, createElement } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import TopBar from "../../src/app/ui/TopBar";
 import { librarySearchQueryAtom } from "../../src/features/library/model/atoms";
 import { appModeAtom } from "../../src/features/navigation/model/navigationAtoms";
@@ -20,6 +20,8 @@ function renderTopBar(initialQuery = "") {
       JotaiProvider,
       { store },
       createElement(TopBar, {
+        onOpenScan: vi.fn(),
+        onSettings: vi.fn(),
         notificationBell: createElement("span", { "aria-label": "通知" }),
       }),
     ),

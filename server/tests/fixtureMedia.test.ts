@@ -8,6 +8,8 @@ function buildApp() {
   return createApp(createFixtureAdapter());
 }
 
+const FIXTURE_UNMEASURED_ID = "RJ501003";
+
 test("カバー画像: coverImage ありの作品は 200 + image/svg+xml", async () => {
   const app = buildApp();
 
@@ -64,10 +66,10 @@ test("カバー画像: fixtureのETagは作品とrepresentationごとに決ま�
   assert.equal(response.status, 200);
 });
 
-test("カバー画像: coverImage なしの作品は 404", async () => {
+test("カバー画像: 表示可能カバーなし（unmeasured 含む）は 404", async () => {
   const app = buildApp();
 
-  // RJ501003 は coverImage: null
+  // RJ501003 は coverImage あり・寸法未計測（表示用 cover は null）
   const res = await app.request("/api/media/cover/RJ501003");
   assert.equal(res.status, 404);
 });
@@ -161,6 +163,13 @@ test("音声配信: トラックを持たない作品は 404", async () => {
   // RJ501009 は trackCount: 0
   const res = await app.request("/api/media/audio/RJ501009/track01.mp3");
   assert.equal(res.status, 404);
+});
+
+test("ファイル配信: unmeasured 作品でもカバーファイル実体は配信できる", async () => {
+  const app = buildApp();
+  const res = await app.request(`/api/media/file/${FIXTURE_UNMEASURED_ID}/cover.jpg`);
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get("content-type"), "image/svg+xml");
 });
 
 test("ファイル配信: 特典フォルダー配下の画像は SVG プレースホルダー、テキストは固定文言", async () => {

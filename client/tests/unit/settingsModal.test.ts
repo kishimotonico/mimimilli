@@ -100,4 +100,14 @@ describe("SettingsModal", () => {
     fireEvent.click(screen.getByRole("button", { name: "スキャン" }));
     expect(onOpenScan).toHaveBeenCalledTimes(1);
   });
+
+  it("閲覧モードのルートフォルダーパスは選択可能クラスを持つ", () => {
+    renderModal();
+    expect(screen.getByText("/audio")).toHaveClass("mll-selectable");
+  });
+
+  it("ヘッダーの閉じるボタンに accessible name がある", () => {
+    renderModal();
+    expect(screen.getAllByRole("button", { name: "閉じる" }).length).toBeGreaterThanOrEqual(1);
+  });
 });

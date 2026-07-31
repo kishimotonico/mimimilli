@@ -29,6 +29,8 @@ const work: Work = {
   id: "work-1",
   title: "新規作品",
   cover: null,
+  coverKind: "none",
+  coverImage: null,
   status: "ok",
   physicalPath: "/audio/work-1",
   totalDurationSec: 120,
@@ -276,7 +278,7 @@ describe("ScanModal", () => {
       rerenderModal({ lastResult: after, lastScanTime: "2026-01-01T00:00:00.000Z" });
     });
 
-    // AnimatePresence(mode="wait")のexit→enterはrequestAnimationFrame駆動のため実時間で待つ
+    // Presence の exit→enter は CSS トランジション駆動のため実時間で待つ
     await waitFor(() => expect(screen.getByText("完了しました")).toBeInTheDocument());
     // 変化した「登録済み」の値は強調用の背景クラスが付く
     const registeredValue = screen.getByText("6");

@@ -6,6 +6,7 @@ import * as settingsApi from "../../src/features/settings/api";
 import * as scanApi from "../../src/features/scan/api";
 import {
   emptyDlsiteState,
+  coverFieldsFromCover,
   type Work,
   type WorkListItem,
   type WorkSummary,
@@ -59,9 +60,12 @@ function makeWorkListItem(overrides: Partial<WorkListItem> = {}): WorkListItem {
 
 function makeWork(overrides: Partial<Work> = {}): Work {
   const { trackCount: _trackCount, ...summary } = makeWorkSummary();
+  const { coverKind, coverImage } = coverFieldsFromCover(summary.cover);
   const playlistId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
   return {
     ...summary,
+    coverKind,
+    coverImage,
     defaultPlaylistId: playlistId,
     createdAt: null,
     playlists: [
@@ -74,6 +78,7 @@ function makeWork(overrides: Partial<Work> = {}): Work {
             title: "track1",
             file: "track1.mp3",
             durationSec: 120,
+            durationKind: "resolved",
           },
         ],
       },
@@ -133,6 +138,30 @@ describe("scan api", () => {
       expect.objectContaining({ method: "POST" }),
     );
     expect(result).toEqual(mockResult.job);
+  });
+
+  it("startScan: full:true はJSONボディを送る", async () => {
+    const mockResult = {
+      job: {
+        id: "job-2",
+        status: "running",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        startedAt: "2026-01-01T00:00:00.000Z",
+        finishedAt: null,
+        progress: null,
+        result: null,
+        error: null,
+      },
+    };
+    mockFetch.mockResolvedValue(makeResponse(mockResult, 202));
+    await scanApi.startScan({ full: true });
+    expect(mockFetch).toHaveBeenCalledWith(
+      "/api/scan",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ full: true }),
+      }),
+    );
   });
 
   it("startScan: 409はScanAlreadyActiveErrorとしてactive jobを保持する", async () => {

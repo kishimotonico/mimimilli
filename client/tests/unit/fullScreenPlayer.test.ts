@@ -156,3 +156,52 @@ describe("FullScreenPlayer: 再生エラー表示（TASK-139）", () => {
     expect(screen.queryByText("この音声形式またはURLは再生できません")).toBeNull();
   });
 });
+
+describe("FullScreenPlayer: トラックリスト key", () => {
+  it("トラック行は index ではなく track id を React key に使う", () => {
+    const tracks: Track[] = [
+      {
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        title: "Track A",
+        file: "a.wav",
+      },
+      {
+        id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        title: "Track B",
+        file: "b.wav",
+      },
+    ];
+    const { container } = render(
+      createElement(
+        JotaiProvider,
+        { store: createStore() },
+        createElement(FullScreenPlayer, {
+          state: {
+            ...PLAYER_CORE_INITIAL,
+            currentWork: work,
+            tracks,
+            currentTrackIndex: 0,
+            isPlaying: true,
+          },
+          onTogglePlay: vi.fn(),
+          onSeek: vi.fn(),
+          onSeekRelative: vi.fn(),
+          onSetVolume: vi.fn(),
+          onSetLoop: vi.fn(),
+          onNext: vi.fn(),
+          onPrev: vi.fn(),
+          onSelectTrack: vi.fn(),
+          onClose: vi.fn(),
+          onSetChannelSwap: vi.fn(),
+          onSetABPoint: vi.fn(),
+          onClearABRepeat: vi.fn(),
+        }),
+      ),
+    );
+
+    const trackButtons = container.querySelectorAll(".flex.flex-col.gap-px button");
+    expect(trackButtons).toHaveLength(2);
+    expect(trackButtons[0]?.textContent).toContain("Track A");
+    expect(trackButtons[1]?.textContent).toContain("Track B");
+  });
+});

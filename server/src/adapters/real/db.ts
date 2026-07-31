@@ -5,6 +5,7 @@ import { constants, Database } from "bun:sqlite";
 import { drizzle, type BunSQLiteDatabase } from "drizzle-orm/bun-sqlite";
 import { migrate } from "drizzle-orm/bun-sqlite/migrator";
 import * as catalogSchema from "./catalogSchema.ts";
+import { applySqliteBusyTimeout } from "./sqliteConnection.ts";
 import * as userSchema from "./userSchema.ts";
 
 const CATALOG_SCHEMA_VERSION = 7;
@@ -30,7 +31,10 @@ export interface Db {
   user: UserDb;
   /** ATTACH済みのcatalog接続。DB間JOINと診断用に使う。 */
   sqlite: Database;
+  /** catalog DB（main）上のトランザクション。ATTACH先のuserは含まない。 */
   transaction<T>(callback: () => T): T;
+  /** user DB 接続上のトランザクション。catalogとは別ファイルのため原子性は共有されない。 */
+  userTransaction<T>(callback: () => T): T;
   close(): void;
 }
 
@@ -70,6 +74,7 @@ function openVersionedDatabase(
 
   sqlite.exec("PRAGMA journal_mode = WAL");
   sqlite.exec("PRAGMA foreign_keys = ON");
+  applySqliteBusyTimeout(sqlite);
   const db = drizzle(sqlite);
   migrate(db, { migrationsFolder });
   sqlite.exec(`PRAGMA user_version = ${version}`);
@@ -130,6 +135,7 @@ export function openDb(location: DbLocation): Db {
     user,
     sqlite: catalogOpened.sqlite,
     transaction: (callback) => catalog.transaction(callback),
+    userTransaction: (callback) => user.transaction(callback),
     close(): void {
       catalogOpened.sqlite.close();
       userOpened.sqlite.close();

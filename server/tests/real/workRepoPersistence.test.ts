@@ -5,7 +5,7 @@ import type { Work } from "@mimimilli/shared";
 import { openDb } from "../../src/adapters/real/db.ts";
 import { works } from "../../src/adapters/real/catalogSchema.ts";
 import { PersistentDataError, WorkRepo } from "../../src/adapters/real/workRepo.ts";
-import { upsertTestWork } from "../helpers/workTestUtils.ts";
+import { upsertTestWork, resolvedDuration } from "../helpers/workTestUtils.ts";
 import { smartFolders } from "../../src/adapters/real/userSchema.ts";
 
 function sampleWork(id: string): Work {
@@ -14,6 +14,8 @@ function sampleWork(id: string): Work {
     id,
     title: "永続データ検証用",
     cover: null,
+    coverKind: "none",
+    coverImage: null,
     status: "ok",
     physicalPath: `/library/${id}`,
     totalDurationSec: 10,
@@ -32,7 +34,7 @@ function sampleWork(id: string): Work {
             id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
             title: "track",
             file: "track.wav",
-            durationSec: 60,
+            ...resolvedDuration(60),
           },
         ],
       },

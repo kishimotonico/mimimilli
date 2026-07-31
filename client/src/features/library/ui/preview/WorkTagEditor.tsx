@@ -1,5 +1,4 @@
 import { useRef, useState } from "react";
-import { useAtomValue } from "jotai";
 import { normalizeTag, parseTag } from "@mimimilli/shared";
 import type { Work, WorkPatch } from "@mimimilli/shared";
 import { sortTagsForDisplay } from "../../../../entities/work/sortTagsForDisplay";
@@ -9,7 +8,7 @@ import ConfirmDialog from "../../../../shared/ui/ConfirmDialog";
 import IconButton from "../../../../shared/ui/IconButton";
 import TagCombobox from "../../../../shared/ui/TagCombobox";
 import Toast from "../../../../shared/ui/Toast";
-import { tagPrefixesAtom } from "../../model/atoms";
+import { useTagPrefixes } from "../../model/useTagPrefixes";
 import { useAnchoredPopover } from "./useAnchoredPopover";
 import { useWorkTagEditor } from "./useWorkTagEditor";
 
@@ -41,7 +40,7 @@ export function WorkTagEditor({
   const [isTagPopoverOpen, setIsTagPopoverOpen] = useState(false);
   const [areAllTagsVisible, setAreAllTagsVisible] = useState(false);
   const tagEditorRef = useRef<HTMLDivElement | null>(null);
-  const tagPrefixes = useAtomValue(tagPrefixesAtom);
+  const { tagPrefixes } = useTagPrefixes();
 
   const {
     tags,

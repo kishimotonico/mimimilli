@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { test, type TestContext } from "node:test";
 import sharp from "sharp";
 import type { WorksPage } from "@mimimilli/shared";
-import { createRealAdapter } from "../../src/adapters/real/index.ts";
+import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { createApp } from "../../src/app.ts";
 import { makeSampleLibrary } from "../helpers/sampleLibrary.ts";
 
@@ -28,7 +28,10 @@ async function setup(t: TestContext) {
   const coverPath = join(lib.root, "dlsite", "RJ900001_テスト作品", "cover.jpg");
   await writeCoverJpeg(coverPath, 800, { r: 255, g: 0, b: 0 });
 
-  const adapter = createRealAdapter({ database: { kind: "memory" }, thumbnailCacheDir: cacheDir });
+  const adapter = createTestRealAdapter({
+    database: { kind: "memory" },
+    thumbnailCacheDir: cacheDir,
+  });
   const app = createApp(adapter);
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();

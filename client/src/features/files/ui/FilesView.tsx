@@ -5,7 +5,6 @@
 
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AnimatePresence, motion } from "motion/react";
 import { useAtomValue } from "jotai";
 import { browseFs } from "../api";
 import { useFilesNavigation } from "../model/useFilesNavigation";
@@ -17,40 +16,10 @@ import {
 } from "../../player/model/atoms";
 import { rootLabel, type FsEntry } from "../model/types";
 import { FILE_SYSTEM_QUERY_KEYS } from "../../../entities/file-system/queryKeys";
+import Presence from "../../../shared/ui/Presence";
 import FileColumn from "./FileColumn";
 import FilePreview from "./FilePreview";
 import StackEdge from "./StackEdge";
-
-// transformOrigin は左端（=スタック側）。子へ潜るとき、出ていくカラムは
-// 横方向に潰れながら左へ寄り、背表紙へ収束する。遡上時は背表紙から開き直す。
-const colVariants = {
-  enter: (dir: number) =>
-    dir >= 0
-      ? { x: "60%", opacity: 0, scaleX: 1, scaleY: 1 }
-      : { x: "-8%", opacity: 0, scaleX: 0.28, scaleY: 0.94 },
-  center: {
-    x: "0%",
-    opacity: 1,
-    scaleX: 1,
-    scaleY: 1,
-    transition: { type: "spring" as const, stiffness: 460, damping: 38, mass: 0.8 },
-  },
-  exit: (dir: number) =>
-    dir >= 0
-      ? {
-          x: "-6%",
-          opacity: 0,
-          scaleX: 0.05,
-          scaleY: 0.86,
-          transition: { duration: 0.4, ease: [0.55, 0, 0.35, 1] as const },
-        }
-      : {
-          x: "75%",
-          opacity: 0,
-          scaleX: 0.92,
-          transition: { duration: 0.26, ease: [0.4, 0, 0.2, 1] as const },
-        },
-};
 
 interface FilesViewProps {
   rootFolder: string;
@@ -105,42 +74,37 @@ export default function FilesView({ rootFolder, onPlayFile }: FilesViewProps) {
 
   return (
     <>
-      <AnimatePresence initial={false}>
-        {hasAncestors && (
-          <StackEdge
-            key="stack"
-            parentName={parentName}
-            depth={nav.relPath.length}
-            onUp={nav.goUp}
-          />
-        )}
-      </AnimatePresence>
+      <Presence
+        show={hasAncestors}
+        as="button"
+        type="button"
+        variant="colstack-width"
+        skipInitial
+        className="mle-colstack"
+        title={`1つ上の階層（${parentName}）へ戻る`}
+        onClick={nav.goUp}
+      >
+        <StackEdge parentName={parentName} depth={nav.relPath.length} />
+      </Presence>
 
       <div className="mle-filestage">
-        <AnimatePresence custom={direction} initial={false}>
-          <motion.div
-            key={nav.cwd}
-            className="mle-col mle-filestage__col"
-            custom={direction}
-            variants={colVariants}
-            initial="enter"
-            animate="center"
-            exit="exit"
-            style={{ transformOrigin: "left center" }}
-          >
-            <FileColumn
-              title={cwdTitle}
-              entries={cwdEntries}
-              selectedPath={nav.selectedPath}
-              matchPlaying={matchPlaying}
-              isPlaybackActive={isPlaybackActive}
-              onOpenDir={nav.openDir}
-              onSelectFile={nav.selectFile}
-              onPlayFile={onPlayFile}
-              isLoading={cwdQuery.isPending}
-            />
-          </motion.div>
-        </AnimatePresence>
+        <div
+          key={nav.cwd}
+          data-dir={direction >= 0 ? "forward" : "back"}
+          className="mle-col mle-filestage__col ml-file-col-enter"
+        >
+          <FileColumn
+            title={cwdTitle}
+            entries={cwdEntries}
+            selectedPath={nav.selectedPath}
+            matchPlaying={matchPlaying}
+            isPlaybackActive={isPlaybackActive}
+            onOpenDir={nav.openDir}
+            onSelectFile={nav.selectFile}
+            onPlayFile={onPlayFile}
+            isLoading={cwdQuery.isPending}
+          />
+        </div>
       </div>
 
       <FilePreview

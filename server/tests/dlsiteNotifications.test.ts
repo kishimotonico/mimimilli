@@ -1,10 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { emptyDlsiteState, type Work, type WorkSummary } from "@mimimilli/shared";
+import {
+  emptyDlsiteState,
+  coverFieldsFromCover,
+  type Work,
+  type WorkSummary,
+} from "@mimimilli/shared";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { createApp } from "../src/app.ts";
 import { openDb } from "../src/adapters/real/db.ts";
-import { createRealAdapter } from "../src/adapters/real/index.ts";
+import { createTestRealAdapter } from "./helpers/realAdapter.ts";
 import { WorkRepo } from "../src/adapters/real/workRepo.ts";
 import { upsertTestWork } from "./helpers/workTestUtils.ts";
 import { makeSampleLibrary } from "./helpers/sampleLibrary.ts";
@@ -40,8 +45,11 @@ function notificationWorks(count: number): WorkSummary[] {
 
 function asWork(summary: WorkSummary): Work {
   const { trackCount: _trackCount, ...work } = summary;
+  const { coverKind, coverImage } = coverFieldsFromCover(summary.cover);
   return {
     ...work,
+    coverKind,
+    coverImage,
     defaultPlaylistId: null,
     createdAt: null,
     playlists: [],
@@ -174,7 +182,10 @@ test("DLsite通知: parse_error は fetch-failed と分離して集計する", a
 
 test("real adapter経由のHTTP一覧もWorkListItemの許可キーだけを返す", async () => {
   const library = makeSampleLibrary();
-  const adapter = createRealAdapter({ database: { kind: "memory" }, dataRoot: library.baseDir });
+  const adapter = createTestRealAdapter({
+    database: { kind: "memory" },
+    dataRoot: library.baseDir,
+  });
   try {
     await adapter.updateSettings({ rootFolder: library.root });
     await adapter.scan();

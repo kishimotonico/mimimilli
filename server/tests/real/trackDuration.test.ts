@@ -6,7 +6,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import type { WorksQuery } from "@mimimilli/shared";
-import { createRealAdapter } from "../../src/adapters/real/index.ts";
+import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 
 test("durationSec: end-start / end有start無 / start有end無 / 両無 / 同一ファイル複数区間 / デフォルト外playlist / probe失敗", async (t) => {
@@ -69,7 +69,7 @@ test("durationSec: end-start / end有start無 / start有end無 / 両無 / 同一
     ),
   );
 
-  const adapter = createRealAdapter({ database: { kind: "memory" } });
+  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
   await adapter.updateSettings({ rootFolder: root });
   await adapter.scan();
 
@@ -88,8 +88,9 @@ test("durationSec: end-start / end有start無 / start有end無 / 両無 / 同一
   assert.equal(startOnly?.durationSec, 2);
   // 両無: ファイル全体長そのもの
   assert.equal(wholeFile?.durationSec, 5);
-  // probe失敗（ファイル欠損）: 0埋めせず null
+  // probe失敗（ファイル欠損）: 0埋めせず null、durationKind は missing
   assert.equal(probeFailed?.durationSec, null);
+  assert.equal(probeFailed?.durationKind, "missing");
 
   // デフォルト外playlistも全playlistのprobe対象としてdurationSecが解決されている
   const extraPlaylist = work.playlists.find((p) => p.id === extraPlaylistId);
@@ -164,7 +165,7 @@ test("startがファイル全体長以上のトラックは作品をerror状態�
     ),
   );
 
-  const adapter = createRealAdapter({ database: { kind: "memory" } });
+  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
   await adapter.updateSettings({ rootFolder: root });
   await adapter.scan();
 
@@ -177,7 +178,9 @@ test("startがファイル全体長以上のトラックは作品をerror状態�
 
   const tracks = work.playlists.find((p) => p.id === defaultPlaylistId)?.tracks;
   assert.equal(tracks?.[0]?.durationSec, null);
+  assert.equal(tracks?.[0]?.durationKind, "invalid-start");
   assert.equal(tracks?.[1]?.durationSec, null);
+  assert.equal(tracks?.[1]?.durationKind, "invalid-start");
 
   // 未解決トラックを含むため合計も未知。
   assert.equal(work.totalDurationSec, null);
@@ -225,7 +228,7 @@ test("end指定トラックでもstartがファイル全体長を超えていれ
     ),
   );
 
-  const adapter = createRealAdapter({ database: { kind: "memory" } });
+  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
   await adapter.updateSettings({ rootFolder: root });
   await adapter.scan();
 
@@ -237,6 +240,9 @@ test("end指定トラックでもstartがファイル全体長を超えていれ
   // probeされずstatus "ok"のまま見過ごされていた。
   assert.equal(work.status, "error");
   assert.match(work.errorMessage ?? "", /開始位置がファイル長を超えています/);
+  const track = work.playlists.find((p) => p.id === defaultPlaylistId)?.tracks[0];
+  assert.equal(track?.durationSec, null);
+  assert.equal(track?.durationKind, "invalid-start");
 });
 
 test("endがファイル実測長をわずかに超えるだけの正常データはerrorにしない", async (t) => {
@@ -275,7 +281,7 @@ test("endがファイル実測長をわずかに超えるだけの正常デー�
     ),
   );
 
-  const adapter = createRealAdapter({ database: { kind: "memory" } });
+  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
   await adapter.updateSettings({ rootFolder: root });
   await adapter.scan();
 
@@ -323,7 +329,7 @@ test("rescan無しのファイル差し替え後、getWorkのtotalDurationSecは
     ),
   );
 
-  const adapter = createRealAdapter({ database: { kind: "memory" } });
+  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
   await adapter.updateSettings({ rootFolder: root });
   await adapter.scan();
 

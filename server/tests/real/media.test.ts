@@ -1,19 +1,20 @@
 // メディア配信（/api/media/*）の結合テスト: ストリーミング・Range・パストラバーサル遮断。
 import assert from "node:assert/strict";
-import { writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
 import type { WorksPage } from "@mimimilli/shared";
-import { createRealAdapter } from "../../src/adapters/real/index.ts";
+import { createTestRealAdapter } from "../helpers/realAdapter.ts";
+import { WorkRepo } from "../../src/adapters/real/workRepo.ts";
 import { createApp } from "../../src/app.ts";
-import { makeSampleLibrary } from "../helpers/sampleLibrary.ts";
+import { makeSampleLibrary, makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 
 async function setup(t: TestContext) {
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
   // ルート直下（作品フォルダー外）に「秘密ファイル」を置き、トラバーサルの検証に使う
   writeFileSync(join(lib.root, "secret.txt"), "library-secret");
-  const adapter = createRealAdapter({ database: { kind: "memory" } });
+  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
   const app = createApp(adapter);
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
@@ -62,4 +63,72 @@ test("カバー画像: coverImage あり 200 / なし 404 / 作品なし 404", a
 
   assert.equal((await app.request(`/api/media/cover/${existing.id}`)).status, 404);
   assert.equal((await app.request("/api/media/cover/no-such-work")).status, 404);
+});
+
+test("メディア解決: getWork・probe cache問い合わせを伴わない", async (t) => {
+  const directory = makeTestDirectory("media-locate-lightweight");
+  t.after(directory.cleanup);
+  const root = join(directory.path, "lib");
+  const workDir = join(root, "RJ900020_多トラック");
+  mkdirSync(workDir, { recursive: true });
+
+  const workId = crypto.randomUUID();
+  const playlistId = crypto.randomUUID();
+  const tracks = Array.from({ length: 30 }, (_, index) => {
+    const file = `track-${String(index).padStart(2, "0")}.wav`;
+    writeWav(join(workDir, file), 1);
+    return { id: crypto.randomUUID(), title: `track ${index}`, file };
+  });
+  writeFileSync(
+    join(workDir, ".meta.json"),
+    JSON.stringify(
+      {
+        id: workId,
+        title: "多トラック作品",
+        tags: [],
+        defaultPlaylistId: playlistId,
+        playlists: [{ id: playlistId, name: "default", tracks }],
+      },
+      null,
+      2,
+    ),
+  );
+
+  const originalGetWork = WorkRepo.prototype.getWork;
+  const originalFetchProbeCache = WorkRepo.prototype.fetchProbeCache;
+  let getWorkCalls = 0;
+  let fetchProbeCacheCalls = 0;
+  WorkRepo.prototype.getWork = async function (...args) {
+    getWorkCalls += 1;
+    return originalGetWork.apply(this, args);
+  };
+  WorkRepo.prototype.fetchProbeCache = function (...args) {
+    fetchProbeCacheCalls += 1;
+    return originalFetchProbeCache.apply(this, args);
+  };
+
+  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
+  const app = createApp(adapter);
+  await adapter.updateSettings({ rootFolder: root });
+  await adapter.scan();
+
+  try {
+    getWorkCalls = 0;
+    fetchProbeCacheCalls = 0;
+
+    const audio = await app.request(`/api/media/audio/${workId}/track-00.wav`);
+    assert.equal(audio.status, 200);
+
+    const file = await app.request(`/api/media/file/${workId}/track-29.wav`);
+    assert.equal(file.status, 200);
+
+    const missing = await app.request(`/api/media/file/${workId}/no-such.wav`);
+    assert.equal(missing.status, 404);
+
+    assert.equal(getWorkCalls, 0, "locateMedia must not call getWork");
+    assert.equal(fetchProbeCacheCalls, 0, "locateMedia must not fetch probe cache");
+  } finally {
+    WorkRepo.prototype.getWork = originalGetWork;
+    WorkRepo.prototype.fetchProbeCache = originalFetchProbeCache;
+  }
 });

@@ -3,7 +3,7 @@
 
 import { usePlaybackProgress } from "../model/usePlaybackProgress";
 import { useSeekDrag } from "./useSeekDrag";
-import { formatTime } from "../../../shared/lib/format";
+import { formatTime, formatDuration } from "../../../shared/lib/format";
 import { cn } from "../../../shared/lib/cn";
 import type { PlayerState } from "../model/usePlayerState";
 
@@ -14,7 +14,7 @@ interface FullScreenScrubProps {
 
 export default function FullScreenScrub({ onSeek, abRepeat }: FullScreenScrubProps) {
   const { currentTime, duration, pct } = usePlaybackProgress();
-  const seek = useSeekDrag({ duration, onSeek });
+  const seek = useSeekDrag({ duration, currentTime, onSeek });
   const abStartPct =
     duration !== null && duration > 0 && abRepeat.a !== null ? (abRepeat.a / duration) * 100 : null;
   const abEndPct =
@@ -24,6 +24,7 @@ export default function FullScreenScrub({ onSeek, abRepeat }: FullScreenScrubPro
     <div className="mt-3.5">
       <div
         ref={seek.trackRef}
+        {...seek.sliderProps}
         className={cn(
           "mle-fullscreen__seek relative flex h-[18px] cursor-pointer items-center",
           seek.dragging && "is-dragging",
@@ -55,9 +56,9 @@ export default function FullScreenScrub({ onSeek, abRepeat }: FullScreenScrubPro
         )}
       </div>
       <div className="flex items-center gap-2.5 pt-1 font-mono text-xs text-ink-2">
-        <span className="text-ink-0">{formatTime(currentTime)}</span>
+        <span className="text-ink-0">{formatTime(currentTime) ?? "0:00"}</span>
         <div className="flex-1" />
-        <span>{duration !== null ? formatTime(duration) : "--:--"}</span>
+        <span>{duration !== null ? (formatDuration(duration) ?? "--:--") : "--:--"}</span>
       </div>
     </div>
   );

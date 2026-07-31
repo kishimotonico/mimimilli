@@ -3,7 +3,7 @@ import { existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { Database } from "bun:sqlite";
-import { createRealAdapter } from "../../src/adapters/real/index.ts";
+import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { makeSampleLibrary } from "../helpers/sampleLibrary.ts";
 
 test("catalog削除後の再スキャンでもuser状態を保持し、ATTACH JOINで作品を読める", async (t) => {
@@ -13,7 +13,7 @@ test("catalog削除後の再スキャンでもuser状態を保持し、ATTACH JO
   const userPath = join(library.baseDir, "data", "db", "user.sqlite");
   const database = { kind: "files" as const, catalogPath, userPath };
 
-  const adapter = createRealAdapter({ database });
+  const adapter = createTestRealAdapter({ database });
   await adapter.updateSettings({ rootFolder: library.root });
   await adapter.scan();
   const before = await adapter.getWork(library.existingWorkId);
@@ -86,7 +86,7 @@ test("catalog削除後の再スキャンでもuser状態を保持し、ATTACH JO
   catalog.close();
 
   rmSync(catalogPath);
-  const rebuilt = createRealAdapter({ database });
+  const rebuilt = createTestRealAdapter({ database });
   assert.deepEqual(await rebuilt.getSettings(), { rootFolder: library.root, lastScanTime: null });
   await rebuilt.scan();
 

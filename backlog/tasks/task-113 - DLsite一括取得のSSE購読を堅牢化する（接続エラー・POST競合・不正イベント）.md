@@ -1,10 +1,11 @@
 ---
 id: TASK-113
 title: DLsite一括取得のSSE購読を堅牢化する（接続エラー・POST競合・不正イベント）
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-07-27 01:57'
-updated_date: '2026-07-30 12:35'
+updated_date: '2026-07-31 00:34'
 labels:
   - client
   - dlsite
@@ -39,11 +40,20 @@ ordinal: 121000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 SSE の接続が確定的に失敗したとき active が解除され、エラーが利用者に伝わる
-- [ ] #2 一時的な切断では自動再接続され、進捗表示が継続する
-- [ ] #3 SSE 接続はジョブ開始 POST の成功後に開始される
-- [ ] #4 不正なイベント（JSON不正・schema不一致）を受け取った場合に無言で無視されず、状態が固着しない
+- [x] #1 SSE の接続が確定的に失敗したとき active が解除され、エラーが利用者に伝わる
+- [x] #2 一時的な切断では自動再接続され、進捗表示が継続する
+- [x] #3 SSE 接続はジョブ開始 POST の成功後に開始される
+- [x] #4 不正なイベント（JSON不正・schema不一致）を受け取った場合に無言で無視されず、状態が固着しない
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. SSE接続エラーの再接続中/確定失敗の区別（jobId status照会）
+2. POST完了後にSSE接続開始へ
+3. 不正イベントの扱い堅牢化
+実装Cursor委譲、Codexレビュー実施
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 
@@ -52,4 +62,12 @@ ordinal: 121000
 - routes/dlsite.ts:98 のSSE Promise chainは writeSSE reject時に done が未解決になりうる。unsubscribe も finally でない（書き込み・abort・terminalの終了処理を try/finally へ集約する方向）
 - 実行中ジョブへの再接続契約がない: サーバーは routes/dlsiteProgress.ts:64 で実行状態を保持するが、client/src/features/dlsite/model/atoms.ts:7 の揮発atomがactiveのときだけ接続するため、リロード後は進捗・取消・terminal replayへ戻れない。active job取得+snapshot+job-scoped SSEの契約化を検討
 - client/src/features/scan/useScanJob.ts:131 と DlsiteBulkRuntime.tsx:94 はSSEイベントのparse失敗をイベント単位で無視しており、terminalイベントが壊れるとactive状態が残る（不正イベント対応の具体箇所）
+
+Codexレビュー3巡（P1×2+P2×3）: ネイティブError/カスタムerrorイベントの厳密区別、status照会の世代管理、多重POSTガード、error二重照会の1本化、CLOSED+running時の確定失敗化。GET /api/dlsite/bulk（snapshot契約）を新設。スキャン側SSEの不正イベント無言無視はTASK-162として起票済み。
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+SSE接続エラーをstatus照会+readyStateで一時切断/確定失敗に区別、POST成功後にactive化、不正イベントはエラー表示+解除。世代管理・多重実行ガード付き。server 382/client 424テスト・pnpm check通過。実装Cursor委譲、Codexレビュー3巡対応。
+<!-- SECTION:FINAL_SUMMARY:END -->

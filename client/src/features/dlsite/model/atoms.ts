@@ -6,6 +6,9 @@ import type { DlsiteBulkResult } from "@mimimilli/shared";
 
 export const dlsiteBulkActiveAtom = atom(false);
 
+/** POST /dlsite/bulk の応答待ち。active になる前の多重開始を防ぐ */
+export const dlsiteBulkStartingAtom = atom(false);
+
 export const dlsiteBulkCancellingAtom = atom(false);
 
 export const dlsiteBulkProgressAtom = atom<{ processed: number; total: number } | null>(null);

@@ -1,18 +1,23 @@
-import { useAtomValue } from "jotai";
 import { I } from "../../../shared/ui/Icon";
-import { tagPrefixesAtom } from "../model/atoms";
 import { getAxisLabel } from "../model/axisDefinitions";
 import type { AxisId } from "../model/types";
+import type { TagPrefix } from "@mimimilli/shared";
 
 interface DrillHeaderProps {
   axisLabel: AxisId;
   value: string;
   count?: number;
+  tagPrefixes: TagPrefix[];
   onBack: () => void;
 }
 
-export default function DrillHeader({ axisLabel, value, count, onBack }: DrillHeaderProps) {
-  const tagPrefixes = useAtomValue(tagPrefixesAtom);
+export default function DrillHeader({
+  axisLabel,
+  value,
+  count,
+  tagPrefixes,
+  onBack,
+}: DrillHeaderProps) {
   const label = getAxisLabel(axisLabel, tagPrefixes);
   return (
     <div className="mle-drill">

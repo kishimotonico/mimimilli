@@ -1,10 +1,11 @@
 ---
 id: TASK-118
 title: レビューで見つかったアクセシビリティ不備をまとめて解消する
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-07-27 01:58'
-updated_date: '2026-07-29 18:26'
+updated_date: '2026-07-31 02:03'
 labels:
   - client
   - a11y
@@ -28,12 +29,20 @@ ordinal: 126000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 シークバーがキーボード（矢印キー）で操作でき、role と aria-valuenow が付いている（バー・ポップアップ・フルスクリーンで共通）
-- [ ] #2 タグ行の選択状態が支援技術に伝わる
-- [ ] #3 タグ解除ボタンと SettingsModal の閉じるボタンに accessible name がある
-- [ ] #4 WorkGrid のタイルのラベルと実際の操作（選択・再生）が一致している
-- [ ] #5 FullScreenPlayer のトラックリストが安定した key を使っている
+- [x] #1 シークバーがキーボード（矢印キー）で操作でき、role と aria-valuenow が付いている（バー・ポップアップ・フルスクリーンで共通）
+- [x] #2 タグ行の選択状態が支援技術に伝わる
+- [x] #3 タグ解除ボタンと SettingsModal の閉じるボタンに accessible name がある
+- [x] #4 WorkGrid のタイルのラベルと実際の操作（選択・再生）が一致している
+- [x] #5 FullScreenPlayer のトラックリストが安定した key を使っている
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. シークバーのslider role+キーボード操作（useSeekDrag共通化）
+2. タグ行aria-pressed・各closeボタンのaccessible name・WorkGridラベル整合・key修正
+実装Cursor委譲
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 
@@ -62,4 +71,12 @@ AC に挙がっている項目はすべて master に現存することをコー
 【回帰テスト】
 
 各修正には回帰テストを付けること。特に WorkGrid は既存テストが現在のラベルを明示的に期待しているため、操作仕様とテストを同時に更新する必要がある。
+
+useSeekDragにsliderProps（WAI-ARIA sliderパターン、±5秒/Home/End）を集約し3シークバーへ適用。Codexレビュー1件（グローバルショートカットとの二重シーク）はstopPropagationで対応、二重シーク防止テスト追加。
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+シークバーのキーボード操作+ARIA、タグ行aria-pressed、accessible name×2、WorkGridラベル整合、key安定化。server 385/client 448テスト・ビジュアル6/6・pnpm check通過。実装Cursor委譲、Codexレビュー1件対応。
+<!-- SECTION:FINAL_SUMMARY:END -->

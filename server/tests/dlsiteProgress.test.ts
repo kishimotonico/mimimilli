@@ -3,11 +3,31 @@ import { test } from "node:test";
 import {
   cancelDlsiteJob,
   enqueueDlsiteJob,
+  getDlsiteBulkSnapshot,
   resetDlsiteProgressStateForTest,
   startDlsiteJob,
   subscribeToDlsite,
 } from "../src/routes/dlsiteProgress.ts";
 import type { DataAdapter } from "../src/adapter.ts";
+
+test("getDlsiteBulkSnapshot は実行中・終了後の状態を返す", () => {
+  resetDlsiteProgressStateForTest();
+  assert.equal(getDlsiteBulkSnapshot(), null);
+
+  const job = startDlsiteJob();
+  job.emit({ type: "progress", processed: 2, total: 5, workId: "work-1" });
+  assert.deepEqual(getDlsiteBulkSnapshot(), {
+    status: "running",
+    progress: { processed: 2, total: 5 },
+  });
+
+  job.emit({ type: "complete", result: { fetched: 1, failed: 0, parseErrors: 0, skipped: 0 } });
+  job.finish();
+  assert.deepEqual(getDlsiteBulkSnapshot(), {
+    status: "complete",
+    result: { fetched: 1, failed: 0, parseErrors: 0, skipped: 0 },
+  });
+});
 
 test("DLsiteジョブは進捗を購読者へ配信し、完了を再接続時にreplayする", () => {
   resetDlsiteProgressStateForTest();

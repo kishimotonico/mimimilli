@@ -1,9 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useAtomValue } from "jotai";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import type { WorkListItem, AxisFacetItem } from "@mimimilli/shared";
+import type { WorkListItem, AxisFacetItem, TagPrefix } from "@mimimilli/shared";
 import type { AxisId } from "../model/types";
-import { tagPrefixesAtom } from "../model/atoms";
 import { getAxisLabel, isFacetAxis, isSmartAxis } from "../model/axisDefinitions";
 import { buildEmptyWorksMessage } from "../model/emptyWorks";
 import { shouldLoadMore } from "../model/virtualScroll";
@@ -21,6 +19,7 @@ interface ContentColumnProps {
   /** 検索・軸・ソート・タグ・ドリル変更を検知してスクロール位置をリセットする key */
   worksQueryKey: string;
   facetItems: AxisFacetItem[];
+  tagPrefixes: TagPrefix[];
   selectedWorkId: string | null;
   selectedTags: string[];
   searchQuery: string;
@@ -48,14 +47,200 @@ const LIST_PADDING_START = 4;
 const LIST_PADDING_END_BASE = 4;
 const LIST_DOCKED_BAR_EXTRA = 8;
 
-export default function ContentColumn({
+function useResetListScrollOnQueryKeyChange(
+  worksQueryKey: string,
+  listRef: React.RefObject<HTMLDivElement | null>,
+) {
+  const prevWorksQueryKeyRef = useRef(worksQueryKey);
+  useEffect(() => {
+    if (prevWorksQueryKeyRef.current === worksQueryKey) return;
+    prevWorksQueryKeyRef.current = worksQueryKey;
+    if (listRef.current) listRef.current.scrollTop = 0;
+  }, [worksQueryKey, listRef]);
+}
+
+interface TagAxisContentProps {
+  facetItems: AxisFacetItem[];
+  selectedTags: string[];
+  worksCount: number;
+  worksQueryKey: string;
+  isLoading?: boolean;
+  isError?: boolean;
+  onTagToggle: (tag: string) => void;
+}
+
+function TagAxisContent({
+  facetItems,
+  selectedTags,
+  worksCount,
+  worksQueryKey,
+  isLoading,
+  isError,
+  onTagToggle,
+}: TagAxisContentProps) {
+  const listRef = useRef<HTMLDivElement>(null);
+  useResetListScrollOnQueryKeyChange(worksQueryKey, listRef);
+  return (
+    <div className="mle-col is-content">
+      <div className="mle-col__hd">
+        <span>タグ</span>
+        <span className="count">{facetItems.length} 件</span>
+      </div>
+      {selectedTags.length > 0 && (
+        <div className="mll-tagband">
+          <span className="mll-tagband__lbl">AND</span>
+          {selectedTags.map((t, i) => (
+            <React.Fragment key={t}>
+              {i > 0 && <span className="mll-tagband__and">AND</span>}
+              <span className="mll-tagband__chip">
+                {t}
+                <button
+                  type="button"
+                  className="x"
+                  aria-label={`${t}を解除`}
+                  onClick={() => onTagToggle(t)}
+                >
+                  <I.x size={9} />
+                </button>
+              </span>
+            </React.Fragment>
+          ))}
+          <span className="mll-tagband__count">{worksCount} 件</span>
+        </div>
+      )}
+      <div ref={listRef} className="mle-col__list">
+        {isLoading ? (
+          <CollectionStatus variant="list" kind="loading" />
+        ) : isError ? (
+          <CollectionStatus variant="list" kind="error" />
+        ) : facetItems.length === 0 ? (
+          <CollectionStatus variant="list" kind="empty" message="タグがありません" />
+        ) : (
+          facetItems.map((item) => (
+            <button
+              type="button"
+              key={item.value}
+              className={`mll-tagrow ${selectedTags.includes(item.value) ? "is-checked" : ""}`}
+              aria-pressed={selectedTags.includes(item.value)}
+              onClick={() => onTagToggle(item.value)}
+            >
+              <div className="check">
+                {selectedTags.includes(item.value) && (
+                  <I.x size={9} style={{ transform: "rotate(45deg)" }} />
+                )}
+              </div>
+              <span className="nm">{item.value}</span>
+              <span className="count">{item.count}</span>
+            </button>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface FacetAxisContentProps {
+  axis: AxisId;
+  tagPrefixes: TagPrefix[];
+  facetItems: AxisFacetItem[];
+  worksQueryKey: string;
+  isLoading?: boolean;
+  isError?: boolean;
+  onDrillSelect: (value: string) => void;
+}
+
+function FacetAxisContent({
+  axis,
+  tagPrefixes,
+  facetItems,
+  worksQueryKey,
+  isLoading,
+  isError,
+  onDrillSelect,
+}: FacetAxisContentProps) {
+  const listRef = useRef<HTMLDivElement>(null);
+  useResetListScrollOnQueryKeyChange(worksQueryKey, listRef);
+  return (
+    <div className="mle-col is-content">
+      <div className="mle-col__hd">
+        <span>{getAxisLabel(axis, tagPrefixes)}</span>
+        <span className="count">{facetItems.length} 件</span>
+      </div>
+      <div ref={listRef} className="mle-col__list">
+        {isLoading ? (
+          <CollectionStatus variant="list" kind="loading" />
+        ) : isError ? (
+          <CollectionStatus variant="list" kind="error" />
+        ) : facetItems.length === 0 ? (
+          <CollectionStatus variant="list" kind="empty" message="項目がありません" />
+        ) : (
+          facetItems.map((item) => (
+            <button
+              type="button"
+              key={item.value}
+              className="mll-erow"
+              onClick={() => onDrillSelect(item.value)}
+            >
+              <span className="ic">
+                {axis === "cv" ? (
+                  <span
+                    style={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: "50%",
+                      background: "var(--paper-3)",
+                      display: "grid",
+                      placeItems: "center",
+                      fontSize: 10,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {item.value.slice(0, 1)}
+                  </span>
+                ) : (
+                  <I.folder size={13} />
+                )}
+              </span>
+              <span className="nm">{item.value}</span>
+              <span className="count">{item.count}</span>
+            </button>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface WorksListContentProps {
+  axis: AxisId;
+  drillValue: string | null;
+  works: WorkListItem[];
+  facetItems: AxisFacetItem[];
+  worksQueryKey: string;
+  tagPrefixes: TagPrefix[];
+  selectedWorkId: string | null;
+  searchQuery: string;
+  playingWorkId?: string;
+  isPlaybackActive?: boolean;
+  isLoading?: boolean;
+  isError?: boolean;
+  hasNextPage?: boolean;
+  worksTotal?: number;
+  isFetchingNextPage?: boolean;
+  onLoadMore?: () => void;
+  onWorkSelect: (id: string) => void;
+  onDrillBack: () => void;
+  onClearSearch: () => void;
+}
+
+function WorksListContent({
   axis,
   drillValue,
   works,
-  worksQueryKey,
   facetItems,
+  worksQueryKey,
+  tagPrefixes,
   selectedWorkId,
-  selectedTags,
   searchQuery,
   playingWorkId,
   isPlaybackActive,
@@ -66,12 +251,10 @@ export default function ContentColumn({
   isFetchingNextPage = false,
   onLoadMore,
   onWorkSelect,
-  onDrillSelect,
   onDrillBack,
-  onTagToggle,
   onClearSearch,
-}: ContentColumnProps) {
-  const tagPrefixes = useAtomValue(tagPrefixesAtom);
+}: WorksListContentProps) {
+  const showDrill = isFacetAxis(axis) && drillValue;
   const hd = drillValue
     ? `${works.length} 件`
     : facetItems.length > 0
@@ -81,7 +264,6 @@ export default function ContentColumn({
   const listRef = useRef<HTMLDivElement>(null);
   const [paddingEnd, setPaddingEnd] = useState(LIST_PADDING_END_BASE);
 
-  // ドッキングバー表示状態を検知してスクロール終端の余白を調整する。
   useEffect(() => {
     const app = listRef.current?.closest(".mle-app");
     if (!app) return;
@@ -98,9 +280,6 @@ export default function ContentColumn({
     return () => observer.disconnect();
   }, []);
 
-  // WorkRow の高さは .mll-wrow の block-size で 42px に固定されている。
-  // measureElement も estimateSize と同値を返し、行ごとの高さずれを防ぐ（TASK-59）。
-  // （デフォルトの measureElement は jsdom で offsetHeight=0 を返し無限ループになる）
   const measureElement = useCallback(() => WORK_ROW_ESTIMATE_SIZE, []);
 
   const virtualizer = useVirtualizer({
@@ -114,8 +293,6 @@ export default function ContentColumn({
     measureElement,
   });
 
-  // 検索・軸・ソート・タグ・ドリル変更時にスクロール位置をリセット（AC#3）。
-  // virtualizer 自体の再作成（リサイズ等）ではリセットしない。
   const prevWorksQueryKeyRef = useRef(worksQueryKey);
   useEffect(() => {
     if (prevWorksQueryKeyRef.current === worksQueryKey) return;
@@ -123,7 +300,6 @@ export default function ContentColumn({
     virtualizer.scrollToIndex(0);
   }, [virtualizer, worksQueryKey]);
 
-  // 末尾近傍の仮想行が表示されたら次ページを自動取得（AC#2）。
   const virtualItems = virtualizer.getVirtualItems();
   useEffect(() => {
     if (!hasNextPage || isFetchingNextPage || !onLoadMore) return;
@@ -149,117 +325,6 @@ export default function ContentColumn({
     [works, selectedWorkId, playingWorkId, isPlaybackActive, onWorkSelect],
   );
 
-  // ── Tag axis: show tag list with checkboxes ───────────────
-  if (axis === "tag" && !drillValue) {
-    return (
-      <div className="mle-col is-content">
-        <div className="mle-col__hd">
-          <span>タグ</span>
-          <span className="count">{facetItems.length} 件</span>
-        </div>
-        {selectedTags.length > 0 && (
-          <div className="mll-tagband">
-            <span className="mll-tagband__lbl">AND</span>
-            {selectedTags.map((t, i) => (
-              <React.Fragment key={t}>
-                {i > 0 && <span className="mll-tagband__and">AND</span>}
-                <span className="mll-tagband__chip">
-                  {t}
-                  <button className="x" onClick={() => onTagToggle(t)}>
-                    <I.x size={9} />
-                  </button>
-                </span>
-              </React.Fragment>
-            ))}
-            <span className="mll-tagband__count">{works.length} 件</span>
-          </div>
-        )}
-        <div ref={listRef} className="mle-col__list">
-          {isLoading ? (
-            <CollectionStatus variant="list" kind="loading" />
-          ) : isError ? (
-            <CollectionStatus variant="list" kind="error" />
-          ) : facetItems.length === 0 ? (
-            <CollectionStatus variant="list" kind="empty" message="タグがありません" />
-          ) : (
-            facetItems.map((item) => (
-              <button
-                type="button"
-                key={item.value}
-                className={`mll-tagrow ${selectedTags.includes(item.value) ? "is-checked" : ""}`}
-                onClick={() => onTagToggle(item.value)}
-              >
-                <div className="check">
-                  {selectedTags.includes(item.value) && (
-                    <I.x size={9} style={{ transform: "rotate(45deg)" }} />
-                  )}
-                </div>
-                <span className="nm">{item.value}</span>
-                <span className="count">{item.count}</span>
-              </button>
-            ))
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // ── Facet axis, no drill: show facet value list ──────────
-  if (isFacetAxis(axis) && !drillValue) {
-    return (
-      <div className="mle-col is-content">
-        <div className="mle-col__hd">
-          <span>{getAxisLabel(axis, tagPrefixes)}</span>
-          <span className="count">{facetItems.length} 件</span>
-        </div>
-        <div ref={listRef} className="mle-col__list">
-          {isLoading ? (
-            <CollectionStatus variant="list" kind="loading" />
-          ) : isError ? (
-            <CollectionStatus variant="list" kind="error" />
-          ) : facetItems.length === 0 ? (
-            <CollectionStatus variant="list" kind="empty" message="項目がありません" />
-          ) : (
-            facetItems.map((item) => (
-              <button
-                type="button"
-                key={item.value}
-                className="mll-erow"
-                onClick={() => onDrillSelect(item.value)}
-              >
-                <span className="ic">
-                  {axis === "cv" ? (
-                    <span
-                      style={{
-                        width: 22,
-                        height: 22,
-                        borderRadius: "50%",
-                        background: "var(--paper-3)",
-                        display: "grid",
-                        placeItems: "center",
-                        fontSize: 10,
-                        fontWeight: 600,
-                      }}
-                    >
-                      {item.value.slice(0, 1)}
-                    </span>
-                  ) : (
-                    <I.folder size={13} />
-                  )}
-                </span>
-                <span className="nm">{item.value}</span>
-                <span className="count">{item.count}</span>
-              </button>
-            ))
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // ── View / drill / smart: show work list ─────────────────
-  const showDrill = isFacetAxis(axis) && drillValue;
-
   return (
     <div className="mle-col is-content">
       {showDrill ? (
@@ -267,6 +332,7 @@ export default function ContentColumn({
           axisLabel={axis}
           value={drillValue!}
           count={works.length}
+          tagPrefixes={tagPrefixes}
           onBack={onDrillBack}
         />
       ) : (
@@ -334,5 +400,82 @@ export default function ContentColumn({
         )}
       </div>
     </div>
+  );
+}
+
+export default function ContentColumn({
+  axis,
+  drillValue,
+  works,
+  worksQueryKey,
+  facetItems,
+  tagPrefixes,
+  selectedWorkId,
+  selectedTags,
+  searchQuery,
+  playingWorkId,
+  isPlaybackActive,
+  isLoading,
+  isError,
+  hasNextPage = false,
+  worksTotal,
+  isFetchingNextPage = false,
+  onLoadMore,
+  onWorkSelect,
+  onDrillSelect,
+  onDrillBack,
+  onTagToggle,
+  onClearSearch,
+}: ContentColumnProps) {
+  if (axis === "tag" && !drillValue) {
+    return (
+      <TagAxisContent
+        facetItems={facetItems}
+        selectedTags={selectedTags}
+        worksCount={works.length}
+        worksQueryKey={worksQueryKey}
+        isLoading={isLoading}
+        isError={isError}
+        onTagToggle={onTagToggle}
+      />
+    );
+  }
+
+  if (isFacetAxis(axis) && !drillValue) {
+    return (
+      <FacetAxisContent
+        axis={axis}
+        tagPrefixes={tagPrefixes}
+        facetItems={facetItems}
+        worksQueryKey={worksQueryKey}
+        isLoading={isLoading}
+        isError={isError}
+        onDrillSelect={onDrillSelect}
+      />
+    );
+  }
+
+  return (
+    <WorksListContent
+      axis={axis}
+      drillValue={drillValue}
+      works={works}
+      facetItems={facetItems}
+      worksQueryKey={worksQueryKey}
+      tagPrefixes={tagPrefixes}
+      selectedWorkId={selectedWorkId}
+      searchQuery={searchQuery}
+      playingWorkId={playingWorkId}
+      isPlaybackActive={isPlaybackActive}
+      isLoading={isLoading}
+      isError={isError}
+      hasNextPage={hasNextPage}
+      worksTotal={worksTotal}
+      isFetchingNextPage={isFetchingNextPage}
+      onLoadMore={onLoadMore}
+      onWorkSelect={onWorkSelect}
+      onDrillBack={onDrillBack}
+      onClearSearch={onClearSearch}
+    />
   );
 }

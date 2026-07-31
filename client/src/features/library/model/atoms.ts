@@ -25,12 +25,6 @@ export const selectedTagsAtom = atom<string[]>([]);
 export const selectedWorkIdAtom = atom<string | null>(null);
 export const sortAtom = atom<SortId>("added-desc");
 
-// ── タグ prefix 定義（ADR-0005）───────────────────────────────
-// GET /tag-prefixes の内容を useLibraryQueries が同期する。軸ラベル・タグチップの
-// 表示（label / color / protected）はここから引く。
-
-export const tagPrefixesAtom = atom<TagPrefix[]>([]);
-
 // URLには含めない表示設定。ブラウザーを再起動しても直前の見た目を復元する。
 export const libraryViewModeAtom = atomWithStorage<ViewMode>("mimimilli:libraryViewMode", "list");
 export const libraryTileSizeAtom = atomWithStorage<number>("mimimilli:libraryTileSize", 176);
@@ -40,9 +34,9 @@ export const libraryGridLayoutModeAtom = atomWithStorage<GridLayoutMode>(
   "square",
 );
 
-// ── 派生: アドレスバーパス ────────────────────────────────────
+// ── アドレスバーパス（純粋計算）────────────────────────────────
 
-function buildAddressPath(
+export function buildLibraryAddressPath(
   axis: AxisId,
   drillValue: string | null,
   tagPrefixes: TagPrefix[],
@@ -51,7 +45,3 @@ function buildAddressPath(
   const base = ["ライブラリ", getAxisLabel(axis, tagPrefixes)];
   return drillValue ? [...base, drillValue] : base;
 }
-
-export const addressPathAtom = atom<string[]>((get) => {
-  return buildAddressPath(get(activeAxisAtom), get(drillValueAtom), get(tagPrefixesAtom));
-});
