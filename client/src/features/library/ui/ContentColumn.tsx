@@ -1,9 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useAtomValue } from "jotai";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import type { WorkListItem, AxisFacetItem } from "@mimimilli/shared";
+import type { WorkListItem, AxisFacetItem, TagPrefix } from "@mimimilli/shared";
 import type { AxisId } from "../model/types";
-import { tagPrefixesAtom } from "../model/atoms";
 import { getAxisLabel, isFacetAxis, isSmartAxis } from "../model/axisDefinitions";
 import { buildEmptyWorksMessage } from "../model/emptyWorks";
 import { shouldLoadMore } from "../model/virtualScroll";
@@ -21,6 +19,7 @@ interface ContentColumnProps {
   /** 検索・軸・ソート・タグ・ドリル変更を検知してスクロール位置をリセットする key */
   worksQueryKey: string;
   facetItems: AxisFacetItem[];
+  tagPrefixes: TagPrefix[];
   selectedWorkId: string | null;
   selectedTags: string[];
   searchQuery: string;
@@ -54,6 +53,7 @@ export default function ContentColumn({
   works,
   worksQueryKey,
   facetItems,
+  tagPrefixes,
   selectedWorkId,
   selectedTags,
   searchQuery,
@@ -71,7 +71,6 @@ export default function ContentColumn({
   onTagToggle,
   onClearSearch,
 }: ContentColumnProps) {
-  const tagPrefixes = useAtomValue(tagPrefixesAtom);
   const hd = drillValue
     ? `${works.length} 件`
     : facetItems.length > 0
@@ -267,6 +266,7 @@ export default function ContentColumn({
           axisLabel={axis}
           value={drillValue!}
           count={works.length}
+          tagPrefixes={tagPrefixes}
           onBack={onDrillBack}
         />
       ) : (

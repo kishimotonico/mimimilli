@@ -10,7 +10,6 @@ import {
   selectedTagsAtom,
   selectedWorkIdAtom,
   sortAtom,
-  addressPathAtom,
 } from "./atoms";
 import {
   clearLibraryTagsAtom,
@@ -29,7 +28,6 @@ export interface LibraryViewState {
   selectedTags: string[];
   selectedWorkId: string | null;
   sort: SortId;
-  addressPath: string[];
 }
 
 export interface LibraryViewActions {
@@ -49,7 +47,6 @@ export function useLibraryView(): LibraryViewState & LibraryViewActions {
   const selectedTags = useAtomValue(selectedTagsAtom);
   const selectedWorkId = useAtomValue(selectedWorkIdAtom);
   const sort = useAtomValue(sortAtom);
-  const addressPath = useAtomValue(addressPathAtom);
 
   const setAxis = useSetAtom(setLibraryAxisAtom);
   const drillInto = useSetAtom(drillIntoAtom);
@@ -66,7 +63,6 @@ export function useLibraryView(): LibraryViewState & LibraryViewActions {
     selectedTags,
     selectedWorkId,
     sort,
-    addressPath,
     setAxis,
     drillInto,
     drillBack,

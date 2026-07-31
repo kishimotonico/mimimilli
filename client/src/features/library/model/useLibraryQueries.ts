@@ -2,9 +2,7 @@
 // LibraryView.tsx にあった6系統の query と2つの mutation をここへ移し、
 // コンポーネント側は返された view model を配線するだけにする。
 
-import { useEffect } from "react";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useSetAtom } from "jotai";
 import {
   WORKS_DEFAULT_PAGE_SIZE,
   type SmartFolder,
@@ -18,14 +16,13 @@ import {
   createSmartFolder,
   updateSmartFolder,
   evalSmartFolder,
-  listTagPrefixes,
 } from "../api";
 import { getAllTags, getWork, patchWork } from "../../../entities/work/api";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
 import { TAG_QUERY_KEYS } from "../../../entities/tag/queryKeys";
-import { tagPrefixesAtom } from "./atoms";
 import { buildWorksParams, getFacetAxisForQuery } from "./libraryPresentation";
+import { useTagPrefixes } from "./useTagPrefixes";
 import { useDebouncedValue } from "../../../shared/lib/useDebouncedValue";
 import { getWorkPatchInvalidationTargets } from "./workPatchInvalidation";
 import {
@@ -165,18 +162,7 @@ export function useLibraryQueries(nav: LibraryViewState, searchQuery: string) {
     queryFn: getAllTags,
   });
 
-  // ── タグ prefix 定義（ADR-0005）──────────────────────────
-  // 軸レール・タグチップ表示・保護判定の元データ。atom へ同期し、
-  // query を持たない場所（アドレスバー等の派生 atom）からも参照できるようにする。
-  const tagPrefixesQuery = useQuery({
-    queryKey: TAG_QUERY_KEYS.prefixes(),
-    queryFn: listTagPrefixes,
-  });
-  const setTagPrefixes = useSetAtom(tagPrefixesAtom);
-  const tagPrefixes = tagPrefixesQuery.data ?? [];
-  useEffect(() => {
-    if (tagPrefixesQuery.data) setTagPrefixes(tagPrefixesQuery.data);
-  }, [tagPrefixesQuery.data, setTagPrefixes]);
+  const { tagPrefixes } = useTagPrefixes();
 
   // ── 作品PATCH mutation ────────────────────────────────────
   // 変更フィールドに応じて再取得範囲を絞る（getWorkPatchInvalidationTargets 参照）。

@@ -1,9 +1,11 @@
 ---
 id: TASK-116
 title: tagPrefixesのQuery→atom同期を廃止し参照経路を1本にする
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-07-27 01:58'
+updated_date: '2026-07-31 01:28'
 labels:
   - client
   - refactor
@@ -33,3 +35,11 @@ useLibraryQueries.ts:170-174 が tagPrefixesQuery.data を useEffect で tagPref
 - [ ] #3 軸ラベル・タグチップの表示（label / color / protected）とアドレスバーのパス表示が従来どおり
 - [ ] #4 タグprefix定義の変更（設定画面）が各表示に従来どおり反映される
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. tagPrefixesAtomへのuseEffectコピー廃止、TanStack Queryへ一本化
+2. addressPathAtom等のatom依存箇所の再設計
+実装Cursor委譲、Codexレビュー実施
+<!-- SECTION:PLAN:END -->

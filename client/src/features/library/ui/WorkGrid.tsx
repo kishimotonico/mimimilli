@@ -10,8 +10,8 @@ import {
 import { useAtom, useAtomValue } from "jotai";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { AxisId } from "../model/types";
-import { libraryGridLayoutModeAtom, libraryTileSizeAtom, tagPrefixesAtom } from "../model/atoms";
-import type { WorkListItem } from "@mimimilli/shared";
+import { libraryGridLayoutModeAtom, libraryTileSizeAtom } from "../model/atoms";
+import type { TagPrefix, WorkListItem } from "@mimimilli/shared";
 import CoverImg from "../../../entities/work/ui/CoverImg";
 import Button from "../../../shared/ui/Button";
 import { I } from "../../../shared/ui/Icon";
@@ -40,6 +40,7 @@ interface WorkGridProps {
   axis: AxisId;
   drillValue: string | null;
   works: WorkListItem[];
+  tagPrefixes: TagPrefix[];
   /** 検索・軸・ソート・タグ・ドリル変更を検知してスクロール位置をリセットする key */
   worksQueryKey: string;
   selectedWorkId: string | null;
@@ -94,6 +95,7 @@ export default function WorkGrid({
   axis,
   drillValue,
   works,
+  tagPrefixes,
   worksQueryKey,
   selectedWorkId,
   searchQuery,
@@ -110,7 +112,6 @@ export default function WorkGrid({
   inspector,
   onInspectorClose,
 }: WorkGridProps) {
-  const tagPrefixes = useAtomValue(tagPrefixesAtom);
   const [tileSize, setTileSize] = useAtom(libraryTileSizeAtom);
   const gridLayoutMode = useAtomValue(libraryGridLayoutModeAtom);
   const safeTileSize = clampTileSize(tileSize);
@@ -430,6 +431,7 @@ export default function WorkGrid({
           axisLabel={axis}
           value={drillValue}
           count={works.length}
+          tagPrefixes={tagPrefixes}
           onBack={onDrillBack}
         />
       ) : (

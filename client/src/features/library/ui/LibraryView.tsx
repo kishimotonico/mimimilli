@@ -167,6 +167,7 @@ export default function LibraryView({ onPlay, onResume }: LibraryViewProps) {
           axis={nav.activeAxis}
           drillValue={nav.drillValue}
           works={works}
+          tagPrefixes={tagPrefixes}
           worksQueryKey={worksQueryKey}
           selectedWorkId={nav.selectedWorkId}
           searchQuery={searchQuery}
@@ -215,6 +216,7 @@ export default function LibraryView({ onPlay, onResume }: LibraryViewProps) {
           works={works}
           worksQueryKey={worksQueryKey}
           facetItems={facetItems}
+          tagPrefixes={tagPrefixes}
           selectedWorkId={nav.selectedWorkId}
           selectedTags={nav.selectedTags}
           searchQuery={searchQuery}

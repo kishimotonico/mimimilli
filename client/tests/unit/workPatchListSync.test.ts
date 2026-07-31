@@ -22,7 +22,6 @@ const baseNav: LibraryViewState = {
   selectedTags: [],
   selectedWorkId: "p1-w1",
   sort: "added-desc",
-  addressPath: [],
 };
 
 function jsonResponse(data: unknown): Response {
