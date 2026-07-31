@@ -6,15 +6,17 @@ import { getAxisLabel, isFacetAxis, isSmartAxis } from "../model/axisDefinitions
 import { buildEmptyWorksMessage } from "../model/emptyWorks";
 import { shouldLoadMore } from "../model/virtualScroll";
 import WorkRow from "./WorkRow";
-import DrillHeader from "./DrillHeader";
 import CollectionStatus from "./CollectionStatus";
 import LoadMore from "./LoadMore";
 import { I } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
 
+// ドリル済みファセット軸は showGrid（libraryPresentation.ts）が常に横取りして
+// 全幅グリッドへ合流するため、ContentColumn にはファセット軸のドリル状態が
+// 渡らない（構造的に到達不能）。ドリル表示・戻る導線は WorkGrid 側が担う。
+
 interface ContentColumnProps {
   axis: AxisId;
-  drillValue: string | null;
   works: WorkListItem[];
   /** 検索・軸・ソート・タグ・ドリル変更を検知してスクロール位置をリセットする key */
   worksQueryKey: string;
@@ -35,7 +37,6 @@ interface ContentColumnProps {
   onLoadMore?: () => void;
   onWorkSelect: (id: string) => void;
   onDrillSelect: (value: string) => void;
-  onDrillBack: () => void;
   onTagToggle: (tag: string) => void;
   onClearSearch: () => void;
 }
@@ -213,7 +214,6 @@ function FacetAxisContent({
 
 interface WorksListContentProps {
   axis: AxisId;
-  drillValue: string | null;
   works: WorkListItem[];
   facetItems: AxisFacetItem[];
   worksQueryKey: string;
@@ -229,13 +229,11 @@ interface WorksListContentProps {
   isFetchingNextPage?: boolean;
   onLoadMore?: () => void;
   onWorkSelect: (id: string) => void;
-  onDrillBack: () => void;
   onClearSearch: () => void;
 }
 
 function WorksListContent({
   axis,
-  drillValue,
   works,
   facetItems,
   worksQueryKey,
@@ -251,15 +249,9 @@ function WorksListContent({
   isFetchingNextPage = false,
   onLoadMore,
   onWorkSelect,
-  onDrillBack,
   onClearSearch,
 }: WorksListContentProps) {
-  const showDrill = isFacetAxis(axis) && drillValue;
-  const hd = drillValue
-    ? `${works.length} 件`
-    : facetItems.length > 0
-      ? `${facetItems.length} 件`
-      : `${works.length} 件`;
+  const hd = facetItems.length > 0 ? `${facetItems.length} 件` : `${works.length} 件`;
 
   const listRef = useRef<HTMLDivElement>(null);
   const [paddingEnd, setPaddingEnd] = useState(LIST_PADDING_END_BASE);
@@ -327,20 +319,10 @@ function WorksListContent({
 
   return (
     <div className="mle-col is-content">
-      {showDrill ? (
-        <DrillHeader
-          axisLabel={axis}
-          value={drillValue!}
-          count={works.length}
-          tagPrefixes={tagPrefixes}
-          onBack={onDrillBack}
-        />
-      ) : (
-        <div className="mle-col__hd">
-          <span>{isSmartAxis(axis) ? "スマートフォルダー" : "作品"}</span>
-          <span className="count">{hd}</span>
-        </div>
-      )}
+      <div className="mle-col__hd">
+        <span>{isSmartAxis(axis) ? "スマートフォルダー" : "作品"}</span>
+        <span className="count">{hd}</span>
+      </div>
       <div ref={listRef} className="mle-col__list">
         {isLoading ? (
           <CollectionStatus variant="list" kind="loading" />
@@ -350,12 +332,7 @@ function WorksListContent({
           <CollectionStatus
             variant="list"
             kind="empty"
-            message={buildEmptyWorksMessage(
-              searchQuery,
-              showDrill ? axis : null,
-              drillValue,
-              tagPrefixes,
-            )}
+            message={buildEmptyWorksMessage(searchQuery, null, null, tagPrefixes)}
             action={
               searchQuery ? (
                 <Button variant="ghost" icon={I.x} onClick={onClearSearch}>
@@ -405,7 +382,6 @@ function WorksListContent({
 
 export default function ContentColumn({
   axis,
-  drillValue,
   works,
   worksQueryKey,
   facetItems,
@@ -423,11 +399,10 @@ export default function ContentColumn({
   onLoadMore,
   onWorkSelect,
   onDrillSelect,
-  onDrillBack,
   onTagToggle,
   onClearSearch,
 }: ContentColumnProps) {
-  if (axis === "tag" && !drillValue) {
+  if (axis === "tag") {
     return (
       <TagAxisContent
         facetItems={facetItems}
@@ -441,7 +416,7 @@ export default function ContentColumn({
     );
   }
 
-  if (isFacetAxis(axis) && !drillValue) {
+  if (isFacetAxis(axis)) {
     return (
       <FacetAxisContent
         axis={axis}
@@ -458,7 +433,6 @@ export default function ContentColumn({
   return (
     <WorksListContent
       axis={axis}
-      drillValue={drillValue}
       works={works}
       facetItems={facetItems}
       worksQueryKey={worksQueryKey}
@@ -474,7 +448,6 @@ export default function ContentColumn({
       isFetchingNextPage={isFetchingNextPage}
       onLoadMore={onLoadMore}
       onWorkSelect={onWorkSelect}
-      onDrillBack={onDrillBack}
       onClearSearch={onClearSearch}
     />
   );

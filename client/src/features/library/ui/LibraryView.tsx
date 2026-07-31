@@ -222,7 +222,6 @@ export default function LibraryView({ onPlay, onResume }: LibraryViewProps) {
       ) : (
         <ContentColumn
           axis={nav.activeAxis}
-          drillValue={nav.drillValue}
           works={works}
           worksQueryKey={worksQueryKey}
           facetItems={facetItems}
@@ -240,7 +239,6 @@ export default function LibraryView({ onPlay, onResume }: LibraryViewProps) {
           onLoadMore={fetchNextPage}
           onWorkSelect={nav.selectWork}
           onDrillSelect={nav.drillInto}
-          onDrillBack={nav.drillBack}
           onTagToggle={nav.toggleTag}
           onClearSearch={() => setSearchQuery("")}
         />

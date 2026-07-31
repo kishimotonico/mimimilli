@@ -24,7 +24,6 @@ function renderContentColumn(props: Partial<React.ComponentProps<typeof ContentC
     <Provider>
       <ContentColumn
         axis="all"
-        drillValue={null}
         works={createWorks(100)}
         worksQueryKey="key-1"
         facetItems={[]}
@@ -40,7 +39,6 @@ function renderContentColumn(props: Partial<React.ComponentProps<typeof ContentC
         onLoadMore={vi.fn()}
         onWorkSelect={vi.fn()}
         onDrillSelect={vi.fn()}
-        onDrillBack={vi.fn()}
         onTagToggle={vi.fn()}
         onClearSearch={vi.fn()}
         {...props}
@@ -133,7 +131,6 @@ describe("ContentColumn virtual scrolling", () => {
       <Provider>
         <ContentColumn
           axis="all"
-          drillValue={null}
           works={createWorks(100)}
           worksQueryKey="key-2"
           facetItems={[]}
@@ -149,7 +146,6 @@ describe("ContentColumn virtual scrolling", () => {
           onLoadMore={vi.fn()}
           onWorkSelect={vi.fn()}
           onDrillSelect={vi.fn()}
-          onDrillBack={vi.fn()}
           onTagToggle={vi.fn()}
           onClearSearch={vi.fn()}
         />
@@ -212,7 +208,6 @@ describe("ContentColumn list scroll reset", () => {
       <Provider>
         <ContentColumn
           axis="tag"
-          drillValue={null}
           works={createWorks(100)}
           worksQueryKey="key-2"
           facetItems={facetItems}
@@ -228,7 +223,6 @@ describe("ContentColumn list scroll reset", () => {
           onLoadMore={vi.fn()}
           onWorkSelect={vi.fn()}
           onDrillSelect={vi.fn()}
-          onDrillBack={vi.fn()}
           onTagToggle={vi.fn()}
           onClearSearch={vi.fn()}
         />
@@ -253,7 +247,6 @@ describe("ContentColumn list scroll reset", () => {
       <Provider>
         <ContentColumn
           axis="circle"
-          drillValue={null}
           works={createWorks(100)}
           worksQueryKey="key-2"
           facetItems={facetItems}
@@ -269,7 +262,6 @@ describe("ContentColumn list scroll reset", () => {
           onLoadMore={vi.fn()}
           onWorkSelect={vi.fn()}
           onDrillSelect={vi.fn()}
-          onDrillBack={vi.fn()}
           onTagToggle={vi.fn()}
           onClearSearch={vi.fn()}
         />
