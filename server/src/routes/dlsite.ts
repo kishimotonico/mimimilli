@@ -11,6 +11,7 @@ import type { DataAdapter } from "../adapter.ts";
 import { apiError, invalidRequest, notFound } from "../lib/httpError.ts";
 import {
   enqueueDlsiteJob,
+  getDlsiteBulkSnapshot,
   isDlsiteJobInProgress,
   subscribeToDlsite,
   cancelDlsiteJob,
@@ -73,6 +74,11 @@ export function dlsiteRoute(adapter: DataAdapter): Hono {
     const work = await adapter.updateDlsiteState(c.req.param("id"), parsed.data);
     if (!work) notFound(`作品が見つかりません: ${c.req.param("id")}`);
     return c.json(work);
+  });
+
+  app.get("/dlsite/bulk", (c) => {
+    const snapshot = getDlsiteBulkSnapshot();
+    return snapshot ? c.json(snapshot) : c.body(null, 204);
   });
 
   app.post("/dlsite/bulk", async (c) => {

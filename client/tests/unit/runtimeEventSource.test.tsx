@@ -7,12 +7,24 @@ import type { ScanJobEvent, ScanJobSnapshot } from "@mimimilli/shared";
 import DlsiteBulkRuntime from "../../src/features/dlsite/ui/DlsiteBulkRuntime";
 import ScanRuntime from "../../src/features/scan/ui/ScanRuntime";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
-import { dlsiteBulkActiveAtom, dlsiteBulkResultAtom } from "../../src/features/dlsite/model/atoms";
+import {
+  dlsiteBulkActiveAtom,
+  dlsiteBulkActionsAtom,
+  dlsiteBulkErrorAtom,
+  dlsiteBulkProgressAtom,
+  dlsiteBulkStartingAtom,
+  dlsiteBulkResultAtom,
+} from "../../src/features/dlsite/model/atoms";
 
 class FakeEventSource extends EventTarget {
+  static readonly CONNECTING = 0;
+  static readonly OPEN = 1;
+  static readonly CLOSED = 2;
+
   static instances: FakeEventSource[] = [];
   readonly url: string;
   closed = false;
+  readyState = FakeEventSource.OPEN;
   onerror: ((event: Event) => void) | null = null;
 
   constructor(url: string) {
@@ -23,10 +35,19 @@ class FakeEventSource extends EventTarget {
 
   close(): void {
     this.closed = true;
+    this.readyState = FakeEventSource.CLOSED;
   }
 
   addEventListener(type: string, listener: EventListenerOrEventListenerObject): void {
     super.addEventListener(type, listener);
+  }
+
+  dispatchEvent(event: Event): boolean {
+    const handled = super.dispatchEvent(event);
+    if (event.type === "error" && this.onerror) {
+      this.onerror(event);
+    }
+    return handled;
   }
 }
 
@@ -275,5 +296,247 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
 
     unmount();
     expect(source.closed).toBe(true);
+  });
+
+  it("start は POST 成功後にのみ EventSource を開く", async () => {
+    let resolvePost!: () => void;
+    const postGate = new Promise<void>((resolve) => {
+      resolvePost = resolve;
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.endsWith("/dlsite/bulk") && init?.method === "POST") {
+          await postGate;
+          return response({ started: true }, 202);
+        }
+        return response(null, 204);
+      }),
+    );
+
+    const { store } = renderRuntime(createElement(DlsiteBulkRuntime));
+    await waitFor(() => expect(store.get(dlsiteBulkActionsAtom)).not.toBeNull());
+    const startPromise = act(async () => {
+      await store.get(dlsiteBulkActionsAtom)!.start();
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(FakeEventSource.instances).toHaveLength(0);
+
+    resolvePost();
+    await startPromise;
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    expect(store.get(dlsiteBulkActiveAtom)).toBe(true);
+  });
+
+  it("接続が CLOSED かつジョブなしのとき active を解除してエラーを表示する", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) =>
+        String(input).endsWith("/dlsite/bulk") ? response(null, 204) : response({ ok: true }),
+      ),
+    );
+
+    const { store } = renderRuntime(createElement(DlsiteBulkRuntime));
+    act(() => {
+      store.set(dlsiteBulkActiveAtom, true);
+    });
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    const source = FakeEventSource.instances[0]!;
+    source.readyState = FakeEventSource.CLOSED;
+    act(() => {
+      source.dispatchEvent(new Event("error"));
+    });
+
+    await waitFor(() => expect(store.get(dlsiteBulkActiveAtom)).toBe(false));
+    expect(store.get(dlsiteBulkErrorAtom)).toBe("DLsite一括取得の接続が切断されました");
+  });
+
+  it("start の多重呼び出しで POST は1回だけ", async () => {
+    let resolvePost!: () => void;
+    const postGate = new Promise<void>((resolve) => {
+      resolvePost = resolve;
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/dlsite/bulk") && init?.method === "POST") {
+        await postGate;
+        return response({ started: true }, 202);
+      }
+      return response(null, 204);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { store } = renderRuntime(createElement(DlsiteBulkRuntime));
+    await waitFor(() => expect(store.get(dlsiteBulkActionsAtom)).not.toBeNull());
+    act(() => {
+      void store.get(dlsiteBulkActionsAtom)!.start();
+      void store.get(dlsiteBulkActionsAtom)!.start();
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(
+      fetchMock.mock.calls.filter(
+        ([input, init]) => String(input).endsWith("/dlsite/bulk") && init?.method === "POST",
+      ),
+    ).toHaveLength(1);
+    expect(store.get(dlsiteBulkStartingAtom)).toBe(true);
+
+    resolvePost();
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(store.get(dlsiteBulkStartingAtom)).toBe(false);
+  });
+
+  it("ネイティブ error で status 照会は1回だけ走る", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith("/dlsite/bulk") && init?.method !== "POST") {
+        return response({ status: "running", progress: { processed: 1, total: 5 } });
+      }
+      return response({ ok: true });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { store } = renderRuntime(createElement(DlsiteBulkRuntime));
+    act(() => {
+      store.set(dlsiteBulkActiveAtom, true);
+    });
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    const source = FakeEventSource.instances[0]!;
+    source.readyState = FakeEventSource.CONNECTING;
+    act(() => {
+      source.dispatchEvent(new Event("error"));
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(
+      fetchMock.mock.calls.filter(
+        ([input, init]) => String(input).endsWith("/dlsite/bulk") && init?.method !== "POST",
+      ),
+    ).toHaveLength(1);
+    expect(store.get(dlsiteBulkActiveAtom)).toBe(true);
+  });
+
+  it("CLOSED かつジョブ実行中の status 照会で active を解除する", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) =>
+        String(input).endsWith("/dlsite/bulk")
+          ? response({ status: "running", progress: { processed: 1, total: 5 } })
+          : response({ ok: true }),
+      ),
+    );
+
+    const { store } = renderRuntime(createElement(DlsiteBulkRuntime));
+    act(() => {
+      store.set(dlsiteBulkActiveAtom, true);
+    });
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    const source = FakeEventSource.instances[0]!;
+    source.readyState = FakeEventSource.CLOSED;
+    act(() => {
+      source.dispatchEvent(new Event("error"));
+    });
+
+    await waitFor(() => expect(store.get(dlsiteBulkActiveAtom)).toBe(false));
+    expect(store.get(dlsiteBulkErrorAtom)).toBe("DLsite一括取得の接続が切断されました");
+  });
+
+  it("一時切断中は error リスナー経由のネイティブ Event でも active を維持する", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) =>
+        String(input).endsWith("/dlsite/bulk")
+          ? response({ status: "running", progress: { processed: 1, total: 5 } })
+          : response({ ok: true }),
+      ),
+    );
+
+    const { store } = renderRuntime(createElement(DlsiteBulkRuntime));
+    act(() => {
+      store.set(dlsiteBulkActiveAtom, true);
+    });
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    const source = FakeEventSource.instances[0]!;
+    source.readyState = FakeEventSource.CONNECTING;
+    act(() => {
+      source.dispatchEvent(new Event("error"));
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(store.get(dlsiteBulkActiveAtom)).toBe(true);
+    expect(store.get(dlsiteBulkErrorAtom)).toBeNull();
+    expect(source.closed).toBe(false);
+  });
+
+  it("遅延した status 照会の古い terminal が SSE 進捗で無効化される", async () => {
+    let resolveStatus!: (value: Response) => void;
+    const delayedStatus = new Promise<Response>((resolve) => {
+      resolveStatus = resolve;
+    });
+    const staleResult = { fetched: 99, failed: 0, parseErrors: 0, skipped: 0 };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        if (String(input).endsWith("/dlsite/bulk")) return delayedStatus;
+        return response({ ok: true });
+      }),
+    );
+
+    const { store } = renderRuntime(createElement(DlsiteBulkRuntime));
+    act(() => {
+      store.set(dlsiteBulkActiveAtom, true);
+    });
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    const source = FakeEventSource.instances[0]!;
+    source.readyState = FakeEventSource.CONNECTING;
+    act(() => {
+      source.dispatchEvent(new Event("error"));
+    });
+    dispatchDlsite(source, "progress", {
+      type: "progress",
+      processed: 3,
+      total: 5,
+      workId: "work-1",
+    });
+    resolveStatus(response({ status: "complete", result: staleResult }));
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(store.get(dlsiteBulkActiveAtom)).toBe(true);
+    expect(store.get(dlsiteBulkProgressAtom)).toEqual({ processed: 3, total: 5 });
+    expect(store.get(dlsiteBulkResultAtom)).toBeNull();
+  });
+
+  it("不正な terminal イベントで active が固着しない", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => response({ ok: true })),
+    );
+
+    const { store } = renderRuntime(createElement(DlsiteBulkRuntime));
+    act(() => {
+      store.set(dlsiteBulkActiveAtom, true);
+    });
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    const source = FakeEventSource.instances[0]!;
+    dispatchDlsite(source, "complete", { type: "complete", result: "invalid" });
+
+    await waitFor(() => expect(store.get(dlsiteBulkActiveAtom)).toBe(false));
+    expect(store.get(dlsiteBulkErrorAtom)).toBe("DLsite進捗イベントの形式が不正です");
+    expect(store.get(dlsiteBulkResultAtom)).toBeNull();
   });
 });

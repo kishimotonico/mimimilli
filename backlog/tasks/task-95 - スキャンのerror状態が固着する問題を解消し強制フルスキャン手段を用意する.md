@@ -1,11 +1,11 @@
 ---
 id: TASK-95
 title: スキャンのerror状態が固着する問題を解消し強制フルスキャン手段を用意する
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-07-25 11:01'
-updated_date: '2026-07-30 23:52'
+updated_date: '2026-07-31 00:14'
 labels: []
 dependencies: []
 ordinal: 96000
@@ -19,11 +19,11 @@ ordinal: 96000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 ファイル側の状態に起因するスキャンエラー（ファイル欠損・トラック区間の不正・probe失敗）が、原因を解消した後の再スキャンで解消される
-- [ ] #2 error状態の作品は、.meta.jsonのfingerprintが変わっていなくても再評価される
-- [ ] #3 UIから強制フルスキャンを実行でき、全作品がfingerprintに関係なく再処理される
-- [ ] #4 増分スキャンの速度上の利点が維持されている（正常な作品を毎回フル再処理しない）
-- [ ] #5 上記が自動テストで検証されている（error作品が原因解消後の再スキャンでokに戻る、強制フルスキャンで全件再処理される）
+- [x] #1 ファイル側の状態に起因するスキャンエラー（ファイル欠損・トラック区間の不正・probe失敗）が、原因を解消した後の再スキャンで解消される
+- [x] #2 error状態の作品は、.meta.jsonのfingerprintが変わっていなくても再評価される
+- [x] #3 UIから強制フルスキャンを実行でき、全作品がfingerprintに関係なく再処理される
+- [x] #4 増分スキャンの速度上の利点が維持されている（正常な作品を毎回フル再処理しない）
+- [x] #5 上記が自動テストで検証されている（error作品が原因解消後の再スキャンでokに戻る、強制フルスキャンで全件再処理される）
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -34,3 +34,15 @@ ordinal: 96000
 3. error→ok回復・全件再処理のテスト
 実装Cursor委譲、Codexレビュー実施
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Codexレビュー3件対応: file-backed worker経路へのfull伝播（P1、本番専用経路の抜け）、error/full時のprobe cacheバイパス（誤duration再利用の固着防止）、POST /scanのbody検証（省略のみ許可・不正payload 400）。ビジュアルスナップショット更新（フルスキャンボタン追加）。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+増分スキップ条件をcanSkipIncremental()へ集約しerror作品を毎回再評価、POST /api/scan {full:true}で強制フルスキャン（shared契約→worker→UI）。error回復・worker経由full・body検証のテスト追加。server 380/client 416テスト・ビジュアル6/6・pnpm check通過。実装Cursor委譲、Codexレビュー3件対応。
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -1,7 +1,11 @@
 import { useAtomValue } from "jotai";
 import { useEffect, useRef, useState } from "react";
 import { I } from "../../../shared/ui/Icon";
-import { dlsiteBulkActiveAtom, dlsiteBulkProgressAtom } from "../../dlsite/model/atoms";
+import {
+  dlsiteBulkActiveAtom,
+  dlsiteBulkProgressAtom,
+  dlsiteBulkStartingAtom,
+} from "../../dlsite/model/atoms";
 import { useDlsiteBulkActions } from "../../dlsite/model/useDlsiteBulkActions";
 import { scanningAtom, scanProgressLabelAtom } from "../../scan/model/atoms";
 import TagPrefixSettings from "./TagPrefixSettings";
@@ -28,7 +32,9 @@ export default function SettingsModal({
   const scanning = useAtomValue(scanningAtom);
   const scanProgressLabel = useAtomValue(scanProgressLabelAtom);
   const dlsiteBulkActive = useAtomValue(dlsiteBulkActiveAtom);
+  const dlsiteBulkStarting = useAtomValue(dlsiteBulkStartingAtom);
   const dlsiteBulkProgress = useAtomValue(dlsiteBulkProgressAtom);
+  const dlsiteBulkBusy = dlsiteBulkActive || dlsiteBulkStarting;
   const { start: onStartDlsiteBulk } = useDlsiteBulkActions();
   const [isEditingFolder, setIsEditingFolder] = useState(false);
   const [folderDraft, setFolderDraft] = useState(rootFolder ?? "");
@@ -332,7 +338,7 @@ export default function SettingsModal({
           </span>
           <button
             type="button"
-            disabled={dlsiteBulkActive}
+            disabled={dlsiteBulkBusy}
             onClick={() => void onStartDlsiteBulk()}
             style={{
               alignSelf: "flex-start",
@@ -344,7 +350,7 @@ export default function SettingsModal({
               color: "var(--ink-1)",
               fontFamily: "var(--font-sans)",
               fontSize: 12,
-              cursor: dlsiteBulkActive ? "not-allowed" : "pointer",
+              cursor: dlsiteBulkBusy ? "not-allowed" : "pointer",
             }}
           >
             {dlsiteBulkActive

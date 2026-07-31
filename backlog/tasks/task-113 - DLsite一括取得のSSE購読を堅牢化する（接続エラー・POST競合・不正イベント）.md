@@ -1,10 +1,11 @@
 ---
 id: TASK-113
 title: DLsite一括取得のSSE購読を堅牢化する（接続エラー・POST競合・不正イベント）
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-07-27 01:57'
-updated_date: '2026-07-30 12:35'
+updated_date: '2026-07-31 00:14'
 labels:
   - client
   - dlsite
@@ -44,6 +45,15 @@ ordinal: 121000
 - [ ] #3 SSE 接続はジョブ開始 POST の成功後に開始される
 - [ ] #4 不正なイベント（JSON不正・schema不一致）を受け取った場合に無言で無視されず、状態が固着しない
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. SSE接続エラーの再接続中/確定失敗の区別（jobId status照会）
+2. POST完了後にSSE接続開始へ
+3. 不正イベントの扱い堅牢化
+実装Cursor委譲、Codexレビュー実施
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 

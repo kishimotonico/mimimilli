@@ -6,7 +6,11 @@ import { useAtomValue } from "jotai";
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { DlsiteNotificationModalKind } from "../model/activeModal";
-import { dlsiteBulkActiveAtom, dlsiteBulkProgressAtom } from "../../features/dlsite/model/atoms";
+import {
+  dlsiteBulkActiveAtom,
+  dlsiteBulkProgressAtom,
+  dlsiteBulkStartingAtom,
+} from "../../features/dlsite/model/atoms";
 import { useDlsiteBulkActions } from "../../features/dlsite/model/useDlsiteBulkActions";
 import { useDlsiteNotificationSummary } from "../../features/library/model/useDlsiteNotificationSummary";
 import { getLastScanResult, SCAN_QUERY_KEYS } from "../../features/scan/api";
@@ -25,6 +29,7 @@ export default function NotificationBell({
   onOpenNotificationModal,
 }: NotificationBellProps) {
   const dlsiteBulkActive = useAtomValue(dlsiteBulkActiveAtom);
+  const dlsiteBulkStarting = useAtomValue(dlsiteBulkStartingAtom);
   const dlsiteBulkProgress = useAtomValue(dlsiteBulkProgressAtom);
   const { start: onStartDlsiteBulk } = useDlsiteBulkActions();
   // 前回スキャン結果（ディスク永続化なし、TASK-56）。App から降ろした購読（TASK-124）。
@@ -154,7 +159,11 @@ export default function NotificationBell({
                         : `${dlsiteUnlinkedCount}件`}
                     </p>
                   </div>
-                  <Button variant="primary" disabled={dlsiteBulkActive} onClick={onStartDlsiteBulk}>
+                  <Button
+                    variant="primary"
+                    disabled={dlsiteBulkActive || dlsiteBulkStarting}
+                    onClick={onStartDlsiteBulk}
+                  >
                     まとめて取得
                   </Button>
                 </div>

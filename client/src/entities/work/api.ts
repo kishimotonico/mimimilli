@@ -16,6 +16,8 @@ import {
   dlsiteWorkInfoSchema,
   dlsiteBulkStartResponseSchema,
   dlsiteBulkCancelResponseSchema,
+  dlsiteBulkSnapshotSchema,
+  type DlsiteBulkSnapshot,
   fileEntrySchema,
   type Work,
   dlsiteNotificationPageSchema,
@@ -109,6 +111,10 @@ export async function updateDlsiteState(workId: string, body: DlsiteStatePatch):
 
 export async function startDlsiteBulk(): Promise<void> {
   await postParsed(dlsiteBulkStartResponseSchema, "/dlsite/bulk");
+}
+
+export async function getDlsiteBulkStatus(): Promise<DlsiteBulkSnapshot | null> {
+  return getParsed(dlsiteBulkSnapshotSchema, "/dlsite/bulk", { noContentAsNull: true });
 }
 
 export async function cancelDlsiteBulk(): Promise<void> {
