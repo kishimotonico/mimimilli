@@ -348,7 +348,7 @@ export default function WorkGrid({
           type="button"
           className={`mll-grid-tile ${work.id === selectedWorkId ? "is-on" : ""}`}
           data-flat-index={flatIndex}
-          aria-label={`${work.title}を選択`}
+          aria-label={`${work.title}を選択、Enterで再生`}
           aria-pressed={work.id === selectedWorkId}
           style={tileWidth !== undefined ? { width: tileWidth } : undefined}
           onClick={() => onWorkSelect(work.id)}

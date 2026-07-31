@@ -10,12 +10,13 @@ interface PopupSeekProps {
 
 export default function PopupSeek({ onSeek }: PopupSeekProps) {
   const { currentTime, duration, pct } = usePlaybackProgress();
-  const seek = useSeekDrag({ duration, onSeek });
+  const seek = useSeekDrag({ duration, currentTime, onSeek });
 
   return (
     <>
       <div
         ref={seek.trackRef}
+        {...seek.sliderProps}
         className="mle-popup__seek"
         onPointerDown={seek.onPointerDown}
         onPointerMove={seek.onPointerMove}

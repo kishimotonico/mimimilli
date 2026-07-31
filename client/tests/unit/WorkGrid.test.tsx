@@ -97,7 +97,7 @@ describe("WorkGrid virtual scrolling", () => {
     renderWorkGrid({ props: { works: createWorks(10_000) } });
     await act(() => flushAllResizeObservers({ width: 800, height: 600 }));
 
-    const tiles = screen.queryAllByRole("button", { name: /を選択/ });
+    const tiles = screen.queryAllByRole("button", { name: /を選択、Enterで再生/ });
     expect(tiles.length).toBeGreaterThan(0);
     expect(tiles.length).toBeLessThan(10_000);
     // containerWidth=800, tileSize=160 → columnCount≈5, rowHeight≈207, viewport≈600,
@@ -109,7 +109,7 @@ describe("WorkGrid virtual scrolling", () => {
     renderWorkGrid({ props: { works: createWorks(1_000) } });
     await act(() => flushAllResizeObservers({ width: 800, height: 600 }));
 
-    const tiles = screen.queryAllByRole("button", { name: /を選択/ });
+    const tiles = screen.queryAllByRole("button", { name: /を選択、Enterで再生/ });
     expect(tiles.length).toBeGreaterThan(0);
     expect(tiles.length).toBeLessThan(1_000);
     expect(tiles.length).toBeLessThan(200);
@@ -119,7 +119,7 @@ describe("WorkGrid virtual scrolling", () => {
     renderWorkGrid({ props: { works: createWorks(100) } });
     await act(() => flushAllResizeObservers({ width: 800, height: 600 }));
 
-    const tiles = screen.queryAllByRole("button", { name: /を選択/ });
+    const tiles = screen.queryAllByRole("button", { name: /を選択、Enterで再生/ });
     tiles[0].focus();
     expect(document.activeElement).toBe(tiles[0]);
 
@@ -172,8 +172,8 @@ describe("WorkGrid virtual scrolling", () => {
     renderWorkGrid({ props: { works: createWorks(10) } });
     await act(() => flushAllResizeObservers({ width: 800, height: 600 }));
 
-    const tile = screen.queryAllByRole("button", { name: /を選択/ })[0];
-    expect(tile).toHaveAttribute("aria-label", "作品 0を選択");
+    const tile = screen.queryAllByRole("button", { name: /を選択、Enterで再生/ })[0];
+    expect(tile).toHaveAttribute("aria-label", "作品 0を選択、Enterで再生");
     expect(tile).toHaveAttribute("aria-pressed", "false");
     expect(tile).toHaveAttribute("data-flat-index", "0");
   });
@@ -188,7 +188,7 @@ describe("WorkGrid virtual scrolling", () => {
       flushAllResizeObservers({ width: 800, height: 600 });
     });
 
-    const tiles = screen.queryAllByRole("button", { name: /を選択/ });
+    const tiles = screen.queryAllByRole("button", { name: /を選択、Enterで再生/ });
     expect(tiles.length).toBeGreaterThan(0);
     expect(tiles.length).toBeLessThan(1_000);
     expect(tiles.length).toBeLessThan(200);

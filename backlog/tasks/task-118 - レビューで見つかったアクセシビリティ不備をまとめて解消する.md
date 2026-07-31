@@ -1,10 +1,11 @@
 ---
 id: TASK-118
 title: レビューで見つかったアクセシビリティ不備をまとめて解消する
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-07-27 01:58'
-updated_date: '2026-07-29 18:26'
+updated_date: '2026-07-31 01:44'
 labels:
   - client
   - a11y
@@ -34,6 +35,14 @@ ordinal: 126000
 - [ ] #4 WorkGrid のタイルのラベルと実際の操作（選択・再生）が一致している
 - [ ] #5 FullScreenPlayer のトラックリストが安定した key を使っている
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. シークバーのslider role+キーボード操作（useSeekDrag共通化）
+2. タグ行aria-pressed・各closeボタンのaccessible name・WorkGridラベル整合・key修正
+実装Cursor委譲
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 

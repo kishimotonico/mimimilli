@@ -278,7 +278,7 @@ export default function FullScreenPlayer({
             return (
               <button
                 type="button"
-                key={i}
+                key={t.id}
                 onClick={() => onSelectTrack(i)}
                 className={cn(
                   "grid cursor-pointer grid-cols-[24px_1fr_44px] items-center gap-2 rounded px-2 py-[7px]",

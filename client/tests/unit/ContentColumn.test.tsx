@@ -158,3 +158,30 @@ describe("ContentColumn virtual scrolling", () => {
     scrollToSpy.mockRestore();
   });
 });
+
+describe("ContentColumn tag axis accessibility", () => {
+  it("exposes tag selection state with aria-pressed", () => {
+    const { container } = renderContentColumn({
+      axis: "tag",
+      facetItems: [
+        { value: "tag-a", count: 1 },
+        { value: "tag-b", count: 2 },
+      ],
+      selectedTags: ["tag-a"],
+    });
+
+    const tagRows = container.querySelectorAll(".mll-tagrow");
+    expect(tagRows[0]).toHaveAttribute("aria-pressed", "true");
+    expect(tagRows[1]).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("gives selected tag remove buttons an accessible name", () => {
+    renderContentColumn({
+      axis: "tag",
+      facetItems: [{ value: "tag-a", count: 1 }],
+      selectedTags: ["tag-a"],
+    });
+
+    expect(screen.getByRole("button", { name: "tag-aを解除" })).toBeInTheDocument();
+  });
+});

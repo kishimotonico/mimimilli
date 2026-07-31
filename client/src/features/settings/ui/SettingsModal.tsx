@@ -113,6 +113,8 @@ export default function SettingsModal({
           設定
         </span>
         <button
+          type="button"
+          aria-label="閉じる"
           onClick={onClose}
           style={{
             width: 26,

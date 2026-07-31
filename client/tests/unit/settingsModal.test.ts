@@ -105,4 +105,9 @@ describe("SettingsModal", () => {
     renderModal();
     expect(screen.getByText("/audio")).toHaveClass("mll-selectable");
   });
+
+  it("ヘッダーの閉じるボタンに accessible name がある", () => {
+    renderModal();
+    expect(screen.getAllByRole("button", { name: "閉じる" }).length).toBeGreaterThanOrEqual(1);
+  });
 });

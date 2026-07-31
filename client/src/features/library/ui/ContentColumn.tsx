@@ -164,7 +164,12 @@ export default function ContentColumn({
                 {i > 0 && <span className="mll-tagband__and">AND</span>}
                 <span className="mll-tagband__chip">
                   {t}
-                  <button className="x" onClick={() => onTagToggle(t)}>
+                  <button
+                    type="button"
+                    className="x"
+                    aria-label={`${t}を解除`}
+                    onClick={() => onTagToggle(t)}
+                  >
                     <I.x size={9} />
                   </button>
                 </span>
@@ -186,6 +191,7 @@ export default function ContentColumn({
                 type="button"
                 key={item.value}
                 className={`mll-tagrow ${selectedTags.includes(item.value) ? "is-checked" : ""}`}
+                aria-pressed={selectedTags.includes(item.value)}
                 onClick={() => onTagToggle(item.value)}
               >
                 <div className="check">

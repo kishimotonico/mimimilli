@@ -9,12 +9,13 @@ interface BarSeekStripProps {
 }
 
 export default function BarSeekStrip({ onSeek }: BarSeekStripProps) {
-  const { duration, pct } = usePlaybackProgress();
-  const seek = useSeekDrag({ duration, onSeek });
+  const { currentTime, duration, pct } = usePlaybackProgress();
+  const seek = useSeekDrag({ duration, currentTime, onSeek });
 
   return (
     <div
       ref={seek.trackRef}
+      {...seek.sliderProps}
       className={`mle-bar1__seek ${seek.dragging ? "is-dragging" : ""}`}
       onPointerDown={seek.onPointerDown}
       onPointerMove={seek.onPointerMove}
