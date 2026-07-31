@@ -6,7 +6,6 @@ interface AxisRow {
   id: AxisId;
   name: string;
   icon: IconName;
-  count?: number | string;
   badge?: number;
   isAction?: boolean;
 }
@@ -44,8 +43,6 @@ function buildFacetAxisRows(tagPrefixes: TagPrefix[]): AxisRow[] {
 
 interface AxisColumnProps {
   activeAxis: AxisId;
-  viewCounts?: Partial<Record<string, number>>;
-  facetCounts?: Partial<Record<string, number>>;
   tagPrefixes: TagPrefix[];
   smartFolders: SmartFolder[];
   totalCount?: number;
@@ -70,7 +67,6 @@ function AxisRowItem({
       </span>
       <span className="nm">{ax.name}</span>
       {ax.badge != null && <span className="badge">{ax.badge}</span>}
-      {ax.count != null && <span className="count">{ax.count}</span>}
       {!ax.isAction && (
         <span className="chev">
           <I.chev size={11} />
@@ -82,8 +78,6 @@ function AxisRowItem({
 
 export default function AxisColumn({
   activeAxis,
-  viewCounts = {},
-  facetCounts = {},
   tagPrefixes,
   smartFolders,
   totalCount,
@@ -103,7 +97,7 @@ export default function AxisColumn({
           {VIEW_AXES.map((ax) => (
             <AxisRowItem
               key={ax.id}
-              ax={{ ...ax, count: viewCounts[ax.id] }}
+              ax={ax}
               isActive={activeAxis === ax.id}
               onSelect={() => onSelectAxis(ax.id)}
             />
@@ -115,7 +109,7 @@ export default function AxisColumn({
           {facetAxisRows.map((ax) => (
             <AxisRowItem
               key={ax.id}
-              ax={{ ...ax, count: facetCounts[ax.id] }}
+              ax={ax}
               isActive={activeAxis === ax.id}
               onSelect={() => onSelectAxis(ax.id)}
             />

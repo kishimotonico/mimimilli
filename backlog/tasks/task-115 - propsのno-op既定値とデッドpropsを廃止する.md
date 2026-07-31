@@ -1,10 +1,11 @@
 ---
 id: TASK-115
 title: propsのno-op既定値とデッドpropsを廃止する
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-07-27 01:58'
-updated_date: '2026-07-29 17:26'
+updated_date: '2026-07-31 01:26'
 labels:
   - client
   - refactor
@@ -36,3 +37,11 @@ ordinal: 123000
 - [x] #3 LeftNav の playingCount の扱いが決まっている（required 化・自身で購読・現状維持のいずれか、理由をノートに記録）
 - [ ] #4 ツールバー・左ナビの表示と操作が両モードで従来どおり動作する
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. AxisColumnのデッドprops削除
+2. TopBarのoptional propsをrequired化
+実装Cursor委譲（小規模）
+<!-- SECTION:PLAN:END -->

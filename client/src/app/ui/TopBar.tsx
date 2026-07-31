@@ -16,8 +16,8 @@ import { scanningAtom, scanProgressLabelAtom } from "../../features/scan/model/a
 
 interface TopBarProps {
   /** スキャンボタン押下時。即時実行はせずスキャンモーダルを開く（TASK-56） */
-  onOpenScan?: () => void;
-  onSettings?: () => void;
+  onOpenScan: () => void;
+  onSettings: () => void;
   notificationBell: ReactNode;
 }
 
