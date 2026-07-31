@@ -98,6 +98,19 @@ describe("computeWorksListVisibility", () => {
     });
   });
 
+  it("a drilled facet axis always shows the grid, even when viewMode is list", () => {
+    expect(computeWorksListVisibility("circle", "月白製作所", "list")).toEqual({
+      showsWorksList: true,
+      canShowWorksGrid: true,
+      showGrid: true,
+    });
+  });
+
+  it("non-facet axes still respect the list/grid viewMode preference", () => {
+    expect(computeWorksListVisibility("all", null, "list").showGrid).toBe(false);
+    expect(computeWorksListVisibility("all", null, "grid").showGrid).toBe(true);
+  });
+
   it("tag axis cannot show the grid (checkbox list only)", () => {
     expect(computeWorksListVisibility("tag", null, "grid").canShowWorksGrid).toBe(false);
   });

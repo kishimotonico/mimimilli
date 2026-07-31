@@ -71,7 +71,11 @@ export function computeWorksListVisibility(
     isSmartAxis(activeAxis) ||
     (!isFacetAxis(activeAxis) && activeAxis !== "tag") ||
     (isFacetAxis(activeAxis) && drillValue !== null);
-  const showGrid = viewMode === "grid" && canShowWorksGrid;
+  // ドリル済みファセット軸（例: CV→藤田茜）は、300px固定リスト＋巨大な空プレビュー
+  // という体験を避けるため、viewMode（list/grid の永続選好）にかかわらず常に
+  // 全幅グリッドへ合流させる。ドリルを抜ければ元の選好に戻る（viewMode 自体は書き換えない）。
+  const isDrilledFacet = isFacetAxis(activeAxis) && drillValue !== null;
+  const showGrid = canShowWorksGrid && (isDrilledFacet || viewMode === "grid");
   return { showsWorksList, canShowWorksGrid, showGrid };
 }
 

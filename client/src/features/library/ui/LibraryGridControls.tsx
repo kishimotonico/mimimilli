@@ -19,18 +19,13 @@ export default function LibraryGridControls() {
   const [gridLayoutMode, setGridLayoutMode] = useAtom(libraryGridLayoutModeAtom);
   const [tileSize, setTileSize] = useAtom(libraryTileSizeAtom);
   const [gridInspectorOpen, setGridInspectorOpen] = useAtom(gridInspectorOpenAtom);
-  const gridControlsVisible = viewMode === "grid";
-  // ファセット一覧表示中（canShowWorksGrid=false）は WorkGrid 自体が描画されないため、
-  // グリッド系コントロールはすべて disabled にする（死にコントロール防止）。
-  const { canShowWorksGrid } = computeWorksListVisibility(activeAxis, drillValue, viewMode);
-  const gridControlsEnabled = gridControlsVisible && canShowWorksGrid;
+  // WorkGrid が実際に描画されているか（ドリル済みファセット軸は viewMode に
+  // かかわらず全幅グリッドへ合流するため、viewMode 単体では判定できない）。
+  const { showGrid } = computeWorksListVisibility(activeAxis, drillValue, viewMode);
   const safeTileSize = clampTileSize(tileSize);
 
   return (
-    <div
-      className={`mle-grid-controls ${gridControlsVisible ? "is-visible" : ""}`}
-      aria-hidden={!gridControlsVisible}
-    >
+    <div className={`mle-grid-controls ${showGrid ? "is-visible" : ""}`} aria-hidden={!showGrid}>
       <div className="mle-grid-controls__inner">
         <div className="inline-flex items-center gap-[1px] rounded-2 bg-paper-2 p-[2px]">
           <IconButton
@@ -40,7 +35,7 @@ export default function LibraryGridControls() {
             title="1:1タイル：正方形に切り抜いて等幅で並べる"
             active={gridLayoutMode === "square"}
             onClick={() => setGridLayoutMode("square")}
-            disabled={!gridControlsEnabled}
+            disabled={!showGrid}
           />
           <IconButton
             size="sm"
@@ -49,7 +44,7 @@ export default function LibraryGridControls() {
             title="元の縦横比：比率を保って行の右端を揃える"
             active={gridLayoutMode === "justified"}
             onClick={() => setGridLayoutMode("justified")}
-            disabled={!gridControlsEnabled}
+            disabled={!showGrid}
           />
         </div>
 
@@ -61,7 +56,7 @@ export default function LibraryGridControls() {
             max={MAX_TILE_SIZE}
             step={1}
             value={safeTileSize}
-            disabled={!gridControlsEnabled}
+            disabled={!showGrid}
             aria-label="グリッドのサイズ"
             onChange={(event) => setTileSize(Number(event.currentTarget.value))}
           />
@@ -75,7 +70,7 @@ export default function LibraryGridControls() {
           title="詳細パネル"
           active={gridInspectorOpen}
           onClick={() => setGridInspectorOpen((open) => !open)}
-          disabled={!gridControlsEnabled}
+          disabled={!showGrid}
         />
       </div>
     </div>
