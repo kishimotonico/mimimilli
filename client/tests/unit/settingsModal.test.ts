@@ -100,4 +100,9 @@ describe("SettingsModal", () => {
     fireEvent.click(screen.getByRole("button", { name: "スキャン" }));
     expect(onOpenScan).toHaveBeenCalledTimes(1);
   });
+
+  it("閲覧モードのルートフォルダーパスは選択可能クラスを持つ", () => {
+    renderModal();
+    expect(screen.getByText("/audio")).toHaveClass("mll-selectable");
+  });
 });

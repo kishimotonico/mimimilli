@@ -7,6 +7,14 @@
    カスケードレイヤーの規則（unlayered が常に layered に勝つ）でユーティリティの色指定を
    問答無用で潰してしまう。base レイヤーに収めて utilities より弱くする。 */
 @layer base {
+  body {
+    user-select: none;
+  }
+  input,
+  textarea,
+  select {
+    user-select: text;
+  }
   .mle-app,
   .mle-app * {
     font-family: var(--font-jp);
@@ -57,6 +65,15 @@
    theme, base, components, utilities）。同一レイヤー内の優先順位はこれまで通り
    ソース順・詳細度に従うため、ここから先の内部的なカスケード関係は変えていない。 */
 @layer components {
+  .mll-selectable,
+  .mle-prv__warn-text,
+  .mle-prv__warn-path,
+  .mle-prv__edit-error,
+  .mle-fprev__path,
+  .mle-fprev__v {
+    user-select: text;
+  }
+
   /* ── Frame grid ───────────────────────────────────────────── */
 
   /* 再生UI（PlayerDock）は position: fixed のオーバーレイなのでグリッド行を持たない。

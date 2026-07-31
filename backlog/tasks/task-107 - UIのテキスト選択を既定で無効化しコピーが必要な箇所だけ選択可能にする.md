@@ -1,10 +1,11 @@
 ---
 id: TASK-107
 title: UIのテキスト選択を既定で無効化しコピーが必要な箇所だけ選択可能にする
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-07-26 14:45'
-updated_date: '2026-07-26 15:25'
+updated_date: '2026-07-31 01:12'
 labels: []
 dependencies: []
 documentation:
@@ -69,3 +70,12 @@ WorkRow / WorkGrid / ContentColumn / DrillHeader / FileRow / AxisLanding の行�
 - [ ] #5 グリッドのサイズスライダーのラベル上からドラッグしても範囲選択や禁止カーソルが発生せず、スライダーを操作できる
 - [ ] #6 一覧・グリッド・ファイル一覧のクリックおよびダブルクリック再生が従来どおり動作する
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. UIシャーシをuser-select:none既定に反転
+2. コピーされうるテキストだけ選択可能へ戻す
+3. スライダー不具合の解消確認
+実装Cursor委譲
+<!-- SECTION:PLAN:END -->

@@ -1,11 +1,11 @@
 ---
 id: TASK-96
 title: カバー編集UIが計測失敗を「未設定」と誤表示する問題を解消する
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-07-25 11:01'
-updated_date: '2026-07-31 00:50'
+updated_date: '2026-07-31 01:12'
 labels: []
 dependencies: []
 ordinal: 97000
@@ -19,10 +19,10 @@ TASK-91でカバー契約を cover: {image, dimensions} | null に統合した�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 カバー画像ファイルが存在するが寸法計測に失敗した作品で、編集UIが「未設定」と表示しない
-- [ ] #2 編集UIが『カバーなし』『カバーあり（計測失敗）』『カバーあり（計測済み）』を区別して提示する
-- [ ] #3 表示用のcover契約は『表示可能なカバーが無い』を一律nullに投影する現在の設計を壊していない
-- [ ] #4 上記が自動テストで検証されている
+- [x] #1 カバー画像ファイルが存在するが寸法計測に失敗した作品で、編集UIが「未設定」と表示しない
+- [x] #2 編集UIが『カバーなし』『カバーあり（計測失敗）』『カバーあり（計測済み）』を区別して提示する
+- [x] #3 表示用のcover契約は『表示可能なカバーが無い』を一律nullに投影する現在の設計を壊していない
+- [x] #4 上記が自動テストで検証されている
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -32,3 +32,15 @@ TASK-91でカバー契約を cover: {image, dimensions} | null に統合した�
 2. DlsiteEditorの表示を区別対応
 実装Cursor委譲、Codexレビュー実施
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+coverKind(none/unmeasured/measured)+coverImageを詳細Work DTOへ追加（TASK-94のdurationKindと同型設計、Zodで整合強制）。Codexレビュー1件（fixtureがunmeasured非表現）はFixtureCoverColumns導入+同値テストで対応。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+shared/cover.tsのcoverKind導出で「カバーなし/あり計測失敗/あり計測済み」を区別、編集UIは「（計測できません）」表示。表示用cover:null設計は維持。server 385/client 435テスト・ビジュアル6/6・pnpm check通過。実装Cursor委譲、Codexレビュー1件対応。
+<!-- SECTION:FINAL_SUMMARY:END -->

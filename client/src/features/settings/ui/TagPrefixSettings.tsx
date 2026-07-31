@@ -316,7 +316,11 @@ export default function TagPrefixSettings() {
       )}
 
       {error && (
-        <p role="alert" style={{ margin: 0, fontSize: 11, color: "var(--r-coral)" }}>
+        <p
+          role="alert"
+          className="mll-selectable"
+          style={{ margin: 0, fontSize: 11, color: "var(--r-coral)" }}
+        >
           {error}
         </p>
       )}

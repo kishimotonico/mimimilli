@@ -65,6 +65,12 @@ backdropクリックの共通処理は `client/src/shared/ui/useDialogModal.ts` 
 - 操作不能な要素は `cursor: not-allowed` にする
 - 長時間ループするアニメーション（パルス等）は reduced motion 対応を原則とする
 
+## テキスト選択
+
+UI 全体は `shell.css` の `@layer base` で `body { user-select: none }` を既定とする（初回セットアップ画面・`document.body` へポータルするダイアログも含む）。`input` / `textarea` / `select` は同レイヤーで `user-select: text` を明示し、入力・IME・フィールド内選択を維持する。
+
+コピー需要のあるテキスト（物理パス、RJコード、エラーメッセージ、CLI 例文、ルートフォルダーパス、作品情報ダイアログ本文など）は `.mll-selectable` を付与するか、既存のパス・警告・エラー用クラス（`.mle-prv__warn-path` / `.mle-fprev__path` 等、`shell.css` の `@layer components`）で `user-select: text` に戻す。一覧・グリッド・ファイル行のラベルは操作と競合するため選択可能に戻さない。
+
 ## アイコン
 
 アイコンは `client/src/shared/ui/Icon.tsx` の `I` レジストリに集約する。呼び出し側は必ず `I.xxx` 経由で参照し、`lucide-react` を直接importしない。ライブラリ選定の経緯は [ADR-0009](adr/0009-icon-library-lucide.md)。

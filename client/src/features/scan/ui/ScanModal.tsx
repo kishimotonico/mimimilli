@@ -474,7 +474,7 @@ function NewWorkRow({
         </span>
       </div>
       {editError && (
-        <span role="alert" className="font-jp text-[10.5px] text-[var(--r-coral)]">
+        <span role="alert" className="mll-selectable font-jp text-[10.5px] text-[var(--r-coral)]">
           {editError}
         </span>
       )}

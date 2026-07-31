@@ -240,6 +240,7 @@ export default function SettingsModal({
               >
                 <I.folder size={13} style={{ color: "var(--ink-3)", flexShrink: 0 }} />
                 <span
+                  className="mll-selectable"
                   style={{
                     fontFamily: "var(--font-mono)",
                     fontSize: 11,

@@ -87,7 +87,7 @@ function DlsiteApplyDialog({
           </h2>
           <IconButton icon={I.x} label="閉じる" size="sm" disabled={busy} onClick={close} />
         </header>
-        <div className="min-h-0 flex-1 overflow-y-auto px-[18px] py-3 text-[11px]">
+        <div className="mll-selectable min-h-0 flex-1 overflow-y-auto px-[18px] py-3 text-[11px]">
           <label className="grid grid-cols-[18px_60px_minmax(0,1fr)_18px_minmax(0,1fr)] items-center gap-1.5 border-b border-line-soft py-2">
             <input
               type="checkbox"
