@@ -135,6 +135,30 @@ describe("scan api", () => {
     expect(result).toEqual(mockResult.job);
   });
 
+  it("startScan: full:true はJSONボディを送る", async () => {
+    const mockResult = {
+      job: {
+        id: "job-2",
+        status: "running",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        startedAt: "2026-01-01T00:00:00.000Z",
+        finishedAt: null,
+        progress: null,
+        result: null,
+        error: null,
+      },
+    };
+    mockFetch.mockResolvedValue(makeResponse(mockResult, 202));
+    await scanApi.startScan({ full: true });
+    expect(mockFetch).toHaveBeenCalledWith(
+      "/api/scan",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ full: true }),
+      }),
+    );
+  });
+
   it("startScan: 409はScanAlreadyActiveErrorとしてactive jobを保持する", async () => {
     const active = {
       id: "job-1",

@@ -222,6 +222,7 @@ async function runFileScanInWorker(
         dataRoot,
         thumbnailCacheDir,
         abortBuffer,
+        full: options.full ?? false,
         testGate,
         testGateStage,
       },

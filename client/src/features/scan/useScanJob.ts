@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { scanJobEventSchema, type ScanJobSnapshot } from "@mimimilli/shared";
+import { scanJobEventSchema, type ScanJobSnapshot, type StartScanRequest } from "@mimimilli/shared";
 import { API_BASE, ApiRequestError, ApiResponseSchemaError } from "../../shared/api/http";
 import { cancelScan, getActiveScan, getScanJob, ScanAlreadyActiveError, startScan } from "./api";
 
@@ -197,21 +197,24 @@ export function useScanJob(options: UseScanJobOptions = {}) {
     };
   }, [attach]);
 
-  const start = useCallback(async (): Promise<ScanJobSnapshot> => {
-    setError(null);
-    try {
-      const next = await startScan();
-      attach(next);
-      return next;
-    } catch (cause) {
-      if (cause instanceof ScanAlreadyActiveError) {
-        attach(cause.active);
-        return cause.active;
+  const start = useCallback(
+    async (options?: StartScanRequest): Promise<ScanJobSnapshot> => {
+      setError(null);
+      try {
+        const next = await startScan(options);
+        attach(next);
+        return next;
+      } catch (cause) {
+        if (cause instanceof ScanAlreadyActiveError) {
+          attach(cause.active);
+          return cause.active;
+        }
+        setError(errorMessage(cause));
+        throw cause;
       }
-      setError(errorMessage(cause));
-      throw cause;
-    }
-  }, [attach]);
+    },
+    [attach],
+  );
 
   const cancel = useCallback(async (): Promise<ScanJobSnapshot | null> => {
     if (!job) return null;

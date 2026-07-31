@@ -1,3 +1,4 @@
+import type { StartScanRequest } from "@mimimilli/shared";
 import { useStore } from "jotai";
 import { useMemo } from "react";
 import { scanActionsAtom } from "./atoms";
@@ -16,7 +17,7 @@ export function useScanActions() {
 
   return useMemo(
     () => ({
-      start: () => requireActions(store).start(),
+      start: (options?: StartScanRequest) => requireActions(store).start(options),
       cancel: () => requireActions(store).cancel(),
       clearError: () => requireActions(store).clearError(),
     }),

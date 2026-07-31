@@ -260,7 +260,7 @@ export default function ScanModal({ lastScanTime, onClose, onOpenRjCodeMissing }
           >
             閉じてもバックグラウンドで続行します
           </Presence>
-          <div className="relative shrink-0">
+          <div className="relative flex shrink-0 items-center gap-2">
             <Presence
               show={scanning}
               as="button"
@@ -272,6 +272,18 @@ export default function ScanModal({ lastScanTime, onClose, onOpenRjCodeMissing }
             >
               <I.x size={12} />
               スキャンを中止
+            </Presence>
+            <Presence
+              show={!scanning}
+              as="button"
+              type="button"
+              variant="fade"
+              skipInitial
+              onClick={() => void start({ full: true }).catch(() => {})}
+              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[6px] border border-line-soft bg-paper-0 px-3 font-sans text-[12px] font-medium text-ink-1 transition-colors hover:bg-paper-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
+            >
+              <I.refresh size={12} />
+              フルスキャン
             </Presence>
             <Presence
               show={!scanning}

@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-07-26 15:13'
-updated_date: '2026-07-30 21:56'
+updated_date: '2026-07-30 22:03'
 labels: []
 dependencies: []
 ordinal: 112000
@@ -33,6 +33,12 @@ client/index.html が Geist・IBM Plex Sans JP・JetBrains Mono を Google Fonts
 3. ビジュアルテスト2連続実行で決定性確認
 実装Cursor委譲
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+追加修正: Viteが4KB未満のサブセットwoff2 62個をCSSへbase64インライン化しCSSが660KB/gzip310KBに膨張していたため、build.assetsInlineLimit:0で無効化。CSS 402KB/gzip115KB(-63%)へ。unicode-range分割の遅延取得も回復。
+<!-- SECTION:NOTES:END -->
 
 ## Final Summary
 

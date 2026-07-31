@@ -363,6 +363,8 @@ interface PreparedMeta {
   meta: MetaFile;
   fingerprint: string;
   cachedFingerprint: string | undefined;
+  /** DB上の前回スキャン時の status。error は fingerprint スキップの対象外（TASK-95）。 */
+  cachedStatus: Work["status"] | undefined;
   /** カバー欠損判定（DBの寸法充足状況）。false ならfingerprint一致でも再処理が必要。 */
   coverSatisfied: boolean;
 }
@@ -380,6 +382,19 @@ interface PreparedSkip {
 }
 
 type PreparedEntry = PreparedMeta | PreparedError | PreparedSkip;
+
+/** fingerprint 一致かつカバー充足のとき増分スキャンでスキップできるか（TASK-95）。 */
+function canSkipIncremental(
+  full: boolean,
+  cachedFingerprint: string | undefined,
+  fingerprint: string,
+  coverSatisfied: boolean,
+  cachedStatus: Work["status"] | undefined,
+): boolean {
+  if (full) return false;
+  if (cachedStatus === "error") return false;
+  return cachedFingerprint === fingerprint && coverSatisfied;
+}
 
 export interface ScannerOptions {
   /** upsertWork をバッチ化する件数上限。テスト用に変更可 */
@@ -410,6 +425,7 @@ export class Scanner {
   async scan(root: string, options?: ScanOptions): Promise<ScanResult> {
     root = resolve(root);
     const normalized = options ?? {};
+    const full = normalized.full ?? false;
     const emit = normalized.onProgress ?? ((): void => {});
     const signal = normalized.signal;
     const abortToken = normalized.abortToken;
@@ -462,11 +478,11 @@ export class Scanner {
 
     // 1-a. メタを読み込み、fingerprint を計算する前処理パス。
     //      この時点では DB 書き込みやプローブは行わない。重複検出は後段の registerMetaFile で行う。
-    const prepared = this.prepareMetaEntries(tree.metaPaths, existingWorks, checkAbort);
+    const prepared = this.prepareMetaEntries(tree.metaPaths, existingWorks, full, checkAbort);
 
     // 1-b. fingerprint が不一致の作品だけのトラックパスを収集し、probe cache を一括取得する。
     //      これによりトラックごとの個別 SELECT が発生しなくなる（TASK-75）。
-    const probeCache = this.buildProbeCache(prepared, checkAbort);
+    const probeCache = this.buildProbeCache(prepared, full, checkAbort);
 
     // 1-c. 実際の登録処理。fingerprint 一致作品はスキップし、それ以外は probe cache を使って処理する。
     const batch = new UpsertBatch(this.db, this.repo, this.upsertBatchSize, checkAbort);
@@ -502,6 +518,7 @@ export class Scanner {
             batch,
             existingWorks,
             result,
+            full,
             checkAbort,
           );
           if (outcome === "skipped") {
@@ -565,6 +582,7 @@ export class Scanner {
     // 自動生成分もまとめてcacheを読む。cache hit時を含め、track単位のSELECTを発生させない。
     const generatedProbeCache = this.buildProbeCache(
       generated.map((entry) => entry.prepared),
+      full,
       checkAbort,
     );
     for (const entry of generated) {
@@ -577,6 +595,7 @@ export class Scanner {
           batch,
           existingWorks,
           result,
+          full,
           checkAbort,
         );
         result.newlyGenerated += 1;
@@ -619,6 +638,7 @@ export class Scanner {
   private prepareMetaEntries(
     metaPaths: string[],
     existingWorks: Map<string, ScanWorkState>,
+    full: boolean,
     checkAbort: () => void = () => {},
   ): PreparedEntry[] {
     const prepared: PreparedEntry[] = [];
@@ -630,14 +650,21 @@ export class Scanner {
         const rawFingerprint = computeRawFingerprint(metaPath, raw);
         if (rawFingerprint) {
           const state = existingWorks.get(rawFingerprint.id);
-          const fingerprintMatch = state?.fingerprint === rawFingerprint.fingerprint;
           // カバー欠損を早期skipより前に判定する。skip許可は「メタ無カバー&DB無カバー」
           // または「メタ有カバー&DB両正寸法」のみ。それ以外はカバー再計測のため再登録する。
           const coverSatisfied =
             rawFingerprint.coverImage === null
               ? state?.cover.image == null
               : state?.cover.dimensions != null;
-          if (fingerprintMatch && coverSatisfied) {
+          if (
+            canSkipIncremental(
+              full,
+              state?.fingerprint ?? undefined,
+              rawFingerprint.fingerprint,
+              coverSatisfied,
+              state?.status,
+            )
+          ) {
             prepared.push({ kind: "skip", metaPath, id: rawFingerprint.id });
             continue;
           }
@@ -657,6 +684,7 @@ export class Scanner {
           meta,
           fingerprint,
           cachedFingerprint,
+          cachedStatus: state?.status,
           coverSatisfied,
         });
       } catch (e) {
@@ -681,6 +709,7 @@ export class Scanner {
       meta,
       fingerprint,
       cachedFingerprint: undefined,
+      cachedStatus: undefined,
       // 自動生成直後のメタにはまだDB行が無く、coverSatisfiedの意味を持たない
       // （cachedFingerprintがundefinedのため下のcachedFingerprint===fingerprint判定で必ずfalseになる）
       coverSatisfied: false,
@@ -690,13 +719,26 @@ export class Scanner {
   /** fingerprint が不一致の作品のトラックパスから probe cache を一括取得する */
   private buildProbeCache(
     prepared: PreparedEntry[],
+    full: boolean,
     checkAbort: () => void = () => {},
   ): Map<string, ProbeCacheEntry> {
+    if (full) return new Map();
     const trackPaths: string[] = [];
     for (const entry of prepared) {
       checkAbort();
       if (entry.kind !== "ok") continue;
-      if (entry.cachedFingerprint === entry.fingerprint) continue; // スキップ対象
+      if (
+        canSkipIncremental(
+          full,
+          entry.cachedFingerprint,
+          entry.fingerprint,
+          entry.coverSatisfied,
+          entry.cachedStatus,
+        )
+      )
+        continue;
+      // error 作品は再評価時に cache を使わず再 probe する（TASK-95）。
+      if (entry.cachedStatus === "error") continue;
       const workDir = dirname(entry.metaPath);
       // 詳細DTOは全playlistを返すため、デフォルト以外も含め全playlistのトラックをprobeする。
       // end指定済みトラックもstart/endのファイル長超過チェックにファイル長が要るためprobe対象に含める。
@@ -742,9 +784,11 @@ export class Scanner {
     batch: UpsertBatch,
     existingWorks: Map<string, ScanWorkState>,
     result: ScanResult,
+    full: boolean,
     checkAbort: () => void = () => {},
   ): Promise<"skipped" | string> {
-    const { metaPath, meta, fingerprint, cachedFingerprint, coverSatisfied } = prepared;
+    const { metaPath, meta, fingerprint, cachedFingerprint, cachedStatus, coverSatisfied } =
+      prepared;
     const workDir = dirname(metaPath);
     const id = meta.id;
 
@@ -755,9 +799,12 @@ export class Scanner {
     seenIds.add(id);
 
     // fingerprint 一致かつカバー寸法も充足済みなら完全未変更として、プローブ・upsertWork を省略する
-    if (cachedFingerprint === fingerprint && coverSatisfied) {
+    if (canSkipIncremental(full, cachedFingerprint, fingerprint, coverSatisfied, cachedStatus)) {
       return "skipped";
     }
+
+    const probeCacheForWork =
+      full || cachedStatus === "error" ? new Map<string, ProbeCacheEntry>() : probeCache;
 
     // 参照先ファイルの欠損チェック
     const playlist = defaultPlaylistOf(meta);
@@ -782,7 +829,7 @@ export class Scanner {
           fileDurationSec = await probeDurationSec(
             this.db.catalog,
             join(workDir, track.file),
-            probeCache,
+            probeCacheForWork,
           );
           checkAbort();
           fileDurationCache.set(track.file, fileDurationSec);

@@ -106,6 +106,7 @@ type RawWorkListRow = {
  */
 export interface ScanWorkState {
   fingerprint: string | null;
+  status: Work["status"];
   physicalPath: string;
   addedAt: string;
   bookmarked: boolean;
@@ -962,6 +963,7 @@ export class WorkRepo {
           SELECT
             works.id AS id,
             works.fingerprint AS fingerprint,
+            works.status AS status,
             works.physical_path AS physicalPath,
             works.cover_image AS coverImage,
             works.cover_width AS coverWidth,
@@ -979,6 +981,7 @@ export class WorkRepo {
       .all() as Array<{
       id: string;
       fingerprint: string | null;
+      status: Work["status"];
       physicalPath: string;
       coverImage: string | null;
       coverWidth: number | null;
@@ -994,6 +997,7 @@ export class WorkRepo {
     for (const row of rows) {
       map.set(row.id, {
         fingerprint: row.fingerprint,
+        status: row.status,
         physicalPath: row.physicalPath,
         addedAt: row.addedAt,
         bookmarked: row.bookmarked !== 0,

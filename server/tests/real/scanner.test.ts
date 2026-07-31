@@ -9,6 +9,7 @@ import {
   readFileSync,
   renameSync,
   rmSync,
+  statSync,
   utimesSync,
   writeFileSync,
 } from "node:fs";
@@ -17,6 +18,7 @@ import { test, type TestContext } from "node:test";
 import { createRealAdapter } from "../../src/adapters/real/index.ts";
 import { openDb, type Db } from "../../src/adapters/real/db.ts";
 import { Scanner } from "../../src/adapters/real/scanner.ts";
+import { audioProbeCache } from "../../src/adapters/real/catalogSchema.ts";
 import { WorkRepo } from "../../src/adapters/real/workRepo.ts";
 import { makeSampleLibrary, makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 
@@ -262,9 +264,9 @@ test("増分スキャン: 完全未変更の作品は2回目以降スキップ�
   assert.equal(first.newlyGenerated, 1);
 
   const second = await adapter.scan();
-  assert.equal(second.registered, 0);
+  assert.equal(second.registered, 1); // error状態の既存メタは毎回再評価（TASK-95）
   assert.equal(second.newlyGenerated, 0);
-  assert.equal(second.skipped, 2); // 既存メタ + 自動生成メタ
+  assert.equal(second.skipped, 1); // 正常な自動生成メタのみスキップ
   assert.equal(second.missing, 0);
   assert.equal(second.errors, 0);
 });
@@ -282,7 +284,7 @@ test("増分スキャン: スキップした作品もPlaylist/Trackとresumeを�
   );
 
   const second = await adapter.scan();
-  assert.equal(second.skipped, 2);
+  assert.equal(second.skipped, 1);
   assert.deepEqual((await adapter.getWork(workId))?.resume, {
     playlistId: playlist.id,
     trackId: track.id,
@@ -299,7 +301,7 @@ test("増分スキャン: 除外対象のcreatedAtが不正でも完全未変更
   writeFileSync(metaPath, JSON.stringify(meta, null, 2));
 
   const second = await adapter.scan();
-  assert.equal(second.skipped, 2);
+  assert.equal(second.skipped, 1);
   assert.equal(second.errors, 0);
 });
 
@@ -395,7 +397,7 @@ test("増分スキャン: 音声削除時は fingerprint 不一致で再処理�
   rmSync(join(root, "dlsite", "RJ900001_テスト作品", "mp3", "01_intro.wav"));
 
   const second = await adapter.scan();
-  assert.equal(second.skipped, 1); // 既存メタ作品は未変更のままスキップ
+  assert.equal(second.skipped, 0);
   assert.equal(second.missing, 0);
 
   const after = await adapter.getWork(generatedId);
@@ -417,7 +419,7 @@ test("増分スキャン: 音声 mtime/size 変更時は duration が再計算�
   writeWav(join(root, "dlsite", "RJ900001_テスト作品", "mp3", "01_intro.wav"), 4);
 
   const second = await adapter.scan();
-  assert.equal(second.skipped, 1); // 既存メタ作品は未変更のままスキップ
+  assert.equal(second.skipped, 0);
 
   const after = await adapter.getWork(generatedId);
   assert.ok(after);
@@ -435,8 +437,8 @@ test("増分スキャン: 音声のmtimeだけが変わっても再処理する"
   utimesSync(audioPath, new Date(), new Date(Date.now() + 2_000));
 
   const second = await adapter.scan();
-  assert.equal(second.skipped, 1);
-  assert.equal(second.registered, 1);
+  assert.equal(second.skipped, 0);
+  assert.equal(second.registered, 2);
 });
 
 test("増分スキャン: カバー画像の更新でも再処理する", async (t) => {
@@ -446,8 +448,8 @@ test("増分スキャン: カバー画像の更新でも再処理する", async 
   writeFileSync(coverPath, "updated cover image");
 
   const second = await adapter.scan();
-  assert.equal(second.skipped, 1);
-  assert.equal(second.registered, 1);
+  assert.equal(second.skipped, 0);
+  assert.equal(second.registered, 2);
 });
 
 test("カバー計測失敗: 画像が読めない場合は寸法NULLでcoverErrorsに計上され、DTOはcover:nullになる", async (t) => {
@@ -463,7 +465,7 @@ test("カバー計測失敗: 画像が読めない場合は寸法NULLでcoverErr
 
   // 寸法が欠損したままなのでearly skipは許可されず、次回スキャンでも再試行される
   const second = await adapter.scan();
-  assert.equal(second.skipped, 1); // 既存メタ（RJ900002）のみスキップ
+  assert.equal(second.skipped, 0);
   assert.equal(second.coverErrors, 1);
 });
 
@@ -508,6 +510,88 @@ test("増分スキャン: registering 進捗の processed/total はスキップ�
   }
 });
 
+test("増分スキャン: error状態の作品はfingerprint一致でも再評価される", async (t) => {
+  const { adapter, existingWorkId, root } = await setup(t);
+  await adapter.scan();
+  const before = await adapter.getWork(existingWorkId);
+  assert.equal(before?.status, "error");
+
+  writeWav(join(root, "dlsite", "RJ900002_既存メタ", "missing.wav"), 1);
+
+  const second = await adapter.scan();
+  assert.equal(second.skipped, 1);
+
+  const after = await adapter.getWork(existingWorkId);
+  assert.equal(after?.status, "ok");
+  assert.equal(after?.errorMessage, null);
+});
+
+test("強制フルスキャン: fingerprint一致作品も含め全件再処理する", async (t) => {
+  const { adapter } = await setup(t);
+  await adapter.scan();
+
+  const second = await adapter.scan({ full: true });
+  assert.equal(second.skipped, 0);
+  assert.equal(second.registered, 2);
+});
+
+test("error作品の再評価時はprobe cacheをバイパスし誤durationから回復する", async (t) => {
+  const directory = makeTestDirectory("probe-cache-bypass-error");
+  t.after(directory.cleanup);
+  const root = join(directory.path, "lib");
+  const workDir = join(root, "work");
+  const workId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const playlistId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const trackId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+  mkdirSync(workDir, { recursive: true });
+  const audioPath = join(workDir, "track.wav");
+  writeWav(audioPath, 10);
+  writeFileSync(
+    join(workDir, ".meta.json"),
+    JSON.stringify({
+      id: workId,
+      title: "probe-cache-bypass",
+      playlists: [
+        {
+          id: playlistId,
+          name: "default",
+          tracks: [{ id: trackId, title: "track", file: "track.wav", start: 5 }],
+        },
+      ],
+      defaultPlaylistId: playlistId,
+    }),
+  );
+
+  const db = openDb({ kind: "memory" });
+  t.after(() => db.close());
+  const repo = new WorkRepo(db);
+  const scanner = new Scanner(db, repo, directory.path);
+
+  const stat = statSync(audioPath);
+  db.catalog
+    .insert(audioProbeCache)
+    .values({
+      path: audioPath,
+      size: stat.size,
+      mtimeMs: Math.floor(stat.mtimeMs),
+      durationSec: 1,
+    })
+    .run();
+
+  const first = await scanner.scan(root);
+  assert.equal(first.registered, 1);
+  const work = await repo.getWork(workId);
+  assert.ok(work);
+  assert.equal(work!.status, "error");
+  assert.match(work!.errorMessage ?? "", /開始位置がファイル長を超えています/);
+
+  const second = await scanner.scan(root);
+  assert.equal(second.registered, 1);
+  const recovered = await repo.getWork(workId);
+  assert.equal(recovered!.status, "ok");
+  assert.equal(recovered!.errorMessage, null);
+});
+
 test("増分スキャン: 2回目に検出したduplicate UUIDもID移行後に別作品として登録する", async (t) => {
   const { adapter, root } = await setup(t);
   await adapter.scan();
@@ -541,8 +625,8 @@ test("増分スキャン: 2回目に検出したduplicate UUIDもID移行後に�
   writeFileSync(join(duplicateDir, ".meta.json"), JSON.stringify(source, null, 2));
 
   const second = await adapter.scan();
-  assert.equal(second.registered, 1);
-  assert.equal(second.skipped, 2);
+  assert.equal(second.registered, 2);
+  assert.equal(second.skipped, 1);
   const copiedMeta = JSON.parse(readFileSync(join(duplicateDir, ".meta.json"), "utf-8"));
   assert.notEqual(copiedMeta.id, source.id);
   assert.equal(

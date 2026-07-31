@@ -1,9 +1,11 @@
 ---
 id: TASK-95
 title: スキャンのerror状態が固着する問題を解消し強制フルスキャン手段を用意する
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-07-25 11:01'
+updated_date: '2026-07-30 23:52'
 labels: []
 dependencies: []
 ordinal: 96000
@@ -23,3 +25,12 @@ ordinal: 96000
 - [ ] #4 増分スキャンの速度上の利点が維持されている（正常な作品を毎回フル再処理しない）
 - [ ] #5 上記が自動テストで検証されている（error作品が原因解消後の再スキャンでokに戻る、強制フルスキャンで全件再処理される）
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. error状態の作品はfingerprint一致でもスキップしない再評価ロジック
+2. 強制フルスキャン（API+UI）の追加
+3. error→ok回復・全件再処理のテスト
+実装Cursor委譲、Codexレビュー実施
+<!-- SECTION:PLAN:END -->

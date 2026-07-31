@@ -40,6 +40,63 @@ async function waitForTerminal(
   throw new Error("scan job did not finish");
 }
 
+test("POST /scan はbody省略で202を返し、full:trueも受け付ける", async () => {
+  const app = createApp(createFixtureAdapter({ scenario: "new-work" }));
+  const noBody = await app.request("/api/scan", { method: "POST" });
+  assert.equal(noBody.status, 202);
+  await waitForTerminal(app, (await noBody.json()).job.id);
+
+  const full = await app.request("/api/scan", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ full: true }),
+  });
+  assert.equal(full.status, 202);
+  await waitForTerminal(app, (await full.json()).job.id);
+});
+
+test("POST /scan は不正なbodyを400で拒否する", async () => {
+  const app = createApp(createFixtureAdapter());
+  const res = await app.request("/api/scan", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ full: "yes" }),
+  });
+  assert.equal(res.status, 400);
+  assert.equal((await res.json()).error.code, "invalid_request");
+});
+
+test("POST /scan は壊れたJSON・null・非JSON bodyを400で拒否する", async () => {
+  const app = createApp(createFixtureAdapter());
+  const broken = await app.request("/api/scan", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "{broken",
+  });
+  assert.equal(broken.status, 400);
+  assert.equal((await broken.json()).error.code, "invalid_request");
+
+  const nullBody = await app.request("/api/scan", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "null",
+  });
+  assert.equal(nullBody.status, 400);
+
+  const plain = await app.request("/api/scan", {
+    method: "POST",
+    headers: { "Content-Type": "text/plain" },
+    body: "not-json",
+  });
+  assert.equal(plain.status, 400);
+
+  const empty = await app.request("/api/scan", {
+    method: "POST",
+    headers: { "Content-Length": "0" },
+  });
+  assert.equal(empty.status, 202);
+});
+
 test("POST /scan は202とLocationを即時返し、完了状態はjobから取得できる", async () => {
   const app = createApp(createFixtureAdapter({ scenario: "new-work" }));
   const { id, location } = await start(app);

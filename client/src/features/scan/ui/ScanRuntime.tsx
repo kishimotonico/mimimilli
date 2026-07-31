@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useSetAtom } from "jotai";
 import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
-import type { ScanJobSnapshot } from "@mimimilli/shared";
+import type { ScanJobSnapshot, StartScanRequest } from "@mimimilli/shared";
 import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
 import { SETTINGS_QUERY_KEYS } from "../../../entities/settings/queryKeys";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
@@ -47,8 +47,8 @@ export default function ScanRuntime() {
   }, [scanJob.error, setError]);
 
   const actionsRef = useRef<ScanActions>({
-    start: async () => {
-      await scanJobRef.current.start();
+    start: async (options?: StartScanRequest) => {
+      await scanJobRef.current.start(options);
     },
     cancel: async () => {
       await scanJobRef.current.cancel();
