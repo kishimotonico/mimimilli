@@ -1859,7 +1859,9 @@
 
   .mll-related {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    /* 目標タイル幅はグリッドモードのデフォルト(176px)前後に揃え、コンテナ幅
+       (.mle-prv__body の container: work-detail)に応じて列数を自動調整する。 */
+    grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
     gap: 10px;
   }
   .mll-related__card {
