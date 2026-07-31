@@ -1,20 +1,18 @@
 import type { Work, WorkPatch } from "@mimimilli/shared";
 import IconButton from "../../../shared/ui/IconButton";
 import { I } from "../../../shared/ui/Icon";
+import type { CollectionStatsDisplay } from "../model/libraryPresentation";
+import { CollectionPlaceholder } from "./preview/CollectionPlaceholder";
 import { WorkDetail } from "./preview/WorkDetail";
 
-interface CollectionSummary {
-  label: string;
-  count: number;
-}
-
 interface WorkGridInspectorProps {
-  /** 作品が選択されているか。false のときは summary を表示する */
+  /** 作品が選択されているか。false のときは未選択プレースホルダーを表示する */
   hasSelection: boolean;
   work: Work | null;
   isLoading: boolean;
   isError: boolean;
-  summary: CollectionSummary;
+  /** 未選択時に表示する、表示中コレクションの統計 */
+  collectionStats: CollectionStatsDisplay;
   playingTrackIndex: number | null;
   isPlaybackActive?: boolean;
   tagSuggestions: string[];
@@ -30,7 +28,7 @@ export default function WorkGridInspector({
   work,
   isLoading,
   isError,
-  summary,
+  collectionStats,
   playingTrackIndex,
   isPlaybackActive,
   tagSuggestions,
@@ -47,13 +45,7 @@ export default function WorkGridInspector({
         <IconButton icon={I.x} label="パネルを閉じる" size="sm" onClick={onClose} />
       </div>
       {!hasSelection ? (
-        <div className="mll-grid-inspector__summary">
-          <span className="mll-grid-inspector__summary-count">{summary.count} 件</span>
-          <span className="mll-grid-inspector__summary-label">{summary.label}</span>
-          <span className="mll-grid-inspector__summary-hint">
-            作品を選択するとここに詳細が表示されます
-          </span>
-        </div>
+        <CollectionPlaceholder message="作品を選択してください" stats={collectionStats} />
       ) : work ? (
         <WorkDetail
           key={work.id}

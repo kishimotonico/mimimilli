@@ -15,6 +15,7 @@ import {
 import { useLibraryView } from "../model/useLibraryNavigation";
 import { useLibraryQueries, useSmartFolderMutation } from "../model/useLibraryQueries";
 import {
+  computeCollectionStatsDisplay,
   computeIsNoResultsDueToFilter,
   computePreviewMode,
   computeWorksListVisibility,
@@ -67,9 +68,14 @@ export default function LibraryView({ onPlay, onResume }: LibraryViewProps) {
     patchWorkMutation,
     hasNextPage,
     worksTotal,
+    worksStats,
     isFetchingNextPage,
     fetchNextPage,
   } = useLibraryQueries(nav, searchQuery);
+
+  // 未選択プレースホルダー（グリッド詳細パネル / リストのプレビュー空表示）の統計。
+  // 現在表示中の works クエリと同じ絞り込みに一致させる。
+  const collectionStats = computeCollectionStatsDisplay(isLoading, isError, worksTotal, worksStats);
 
   const saveSmartFolderMutation = useSmartFolderMutation({
     onSaved: (savedFolder, wasNew) => {
@@ -193,11 +199,7 @@ export default function LibraryView({ onPlay, onResume }: LibraryViewProps) {
                 work={selectedWork}
                 isLoading={workDetailQuery.isPending}
                 isError={workDetailQuery.isError}
-                summary={{
-                  label:
-                    nav.drillValue ?? (isSmartAxis(nav.activeAxis) ? "スマートフォルダー" : "作品"),
-                  count: works.length,
-                }}
+                collectionStats={collectionStats}
                 playingTrackIndex={
                   selectedWork && playingWorkId === selectedWork.id
                     ? (playingTrackIndex ?? null)
@@ -248,6 +250,7 @@ export default function LibraryView({ onPlay, onResume }: LibraryViewProps) {
         <PreviewPane
           mode={previewMode}
           showNoResultsHint={isNoResultsDueToFilter}
+          emptyStats={collectionStats}
           axisLandingPresentation={getAxisLandingPresentation(
             nav.activeAxis,
             isAxisFilterApplied,

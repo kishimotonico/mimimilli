@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildWorksParams,
+  computeCollectionStatsDisplay,
   computeIsNoResultsDueToFilter,
   computePreviewMode,
   computeWorksListVisibility,
@@ -179,5 +180,38 @@ describe("computePreviewMode", () => {
         selectedTags: [],
       }),
     ).toBe("smart-folder");
+  });
+});
+
+describe("computeCollectionStatsDisplay", () => {
+  it("isError なら loading/未取得より優先して error を返す", () => {
+    expect(
+      computeCollectionStatsDisplay(true, true, 10, { trackCount: 5, durationSec: 100 }),
+    ).toEqual({
+      status: "error",
+    });
+  });
+
+  it("isLoading 中は loading を返す", () => {
+    expect(computeCollectionStatsDisplay(true, false, undefined, undefined)).toEqual({
+      status: "loading",
+    });
+  });
+
+  it("total/stats が未到着（undefined）でも loading 扱いにする（雑にフォールバックしない）", () => {
+    expect(
+      computeCollectionStatsDisplay(false, false, undefined, { trackCount: 0, durationSec: 0 }),
+    ).toEqual({
+      status: "loading",
+    });
+    expect(computeCollectionStatsDisplay(false, false, 0, undefined)).toEqual({
+      status: "loading",
+    });
+  });
+
+  it("すべて揃っていれば ready で件数・トラック数・再生時間を渡す", () => {
+    expect(
+      computeCollectionStatsDisplay(false, false, 11, { trackCount: 87, durationSec: 45296 }),
+    ).toEqual({ status: "ready", count: 11, trackCount: 87, durationSec: 45296 });
   });
 });

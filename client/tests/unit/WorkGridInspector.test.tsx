@@ -40,7 +40,7 @@ function renderInspector(props: Partial<React.ComponentProps<typeof WorkGridInsp
       work={null}
       isLoading={false}
       isError={false}
-      summary={{ label: "作品", count: 0 }}
+      collectionStats={{ status: "loading" }}
       playingTrackIndex={null}
       tagSuggestions={[]}
       isPatching={false}
@@ -54,13 +54,29 @@ function renderInspector(props: Partial<React.ComponentProps<typeof WorkGridInsp
 }
 
 describe("WorkGridInspector", () => {
-  it("未選択時はコレクション概要を表示し、WorkDetail は描画しない", () => {
-    renderInspector({ hasSelection: false, summary: { label: "サークル一覧", count: 42 } });
+  it("未選択時はコレクション概要（統計含む）を表示し、WorkDetail は描画しない", () => {
+    renderInspector({
+      hasSelection: false,
+      collectionStats: { status: "ready", count: 42, trackCount: 87, durationSec: 45296 },
+    });
 
-    expect(screen.getByText("42 件")).toBeTruthy();
-    expect(screen.getByText("サークル一覧")).toBeTruthy();
-    expect(screen.getByText("作品を選択するとここに詳細が表示されます")).toBeTruthy();
+    expect(screen.getByText("作品を選択してください")).toBeTruthy();
+    expect(screen.getByText(/42作品/)).toBeTruthy();
+    expect(screen.getByText(/87トラック/)).toBeTruthy();
     expect(screen.queryByTestId("work-detail")).toBeNull();
+  });
+
+  it("未選択時、統計がloadingなら統計行を出さない", () => {
+    renderInspector({ hasSelection: false, collectionStats: { status: "loading" } });
+
+    expect(screen.getByText("作品を選択してください")).toBeTruthy();
+    expect(screen.queryByText(/作品 ·/)).toBeNull();
+  });
+
+  it("未選択時、統計取得がエラーなら案内を出す", () => {
+    renderInspector({ hasSelection: false, collectionStats: { status: "error" } });
+
+    expect(screen.getByText("統計の取得に失敗しました")).toBeTruthy();
   });
 
   it("選択中で work 取得済みなら WorkDetail を表示する", () => {

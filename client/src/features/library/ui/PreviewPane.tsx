@@ -1,8 +1,8 @@
 import type { Work, WorkListItem, WorkPatch, SmartFolder } from "@mimimilli/shared";
 import type { AxisLandingPresentation } from "../model/axisLandingPresentation";
-import type { PreviewMode } from "../model/libraryPresentation";
+import type { CollectionStatsDisplay, PreviewMode } from "../model/libraryPresentation";
 import { AxisLanding } from "./preview/AxisLanding";
-import { EmptyPreview } from "./preview/EmptyPreview";
+import { CollectionPlaceholder } from "./preview/CollectionPlaceholder";
 import { SmartFolderView } from "./preview/SmartFolderView";
 import { WorkDetail } from "./preview/WorkDetail";
 
@@ -11,6 +11,8 @@ import { WorkDetail } from "./preview/WorkDetail";
 interface PreviewPaneProps {
   mode: PreviewMode;
   showNoResultsHint: boolean;
+  /** mode==="empty" かつ showNoResultsHint===false のときに表示する統計 */
+  emptyStats: CollectionStatsDisplay;
   axisLandingPresentation: AxisLandingPresentation;
   selectedWork: Work | null;
   smartFolder: SmartFolder | null;
@@ -32,6 +34,7 @@ interface PreviewPaneProps {
 export default function PreviewPane({
   mode,
   showNoResultsHint,
+  emptyStats,
   axisLandingPresentation,
   selectedWork,
   smartFolder,
@@ -92,7 +95,13 @@ export default function PreviewPane({
           onEdit={() => onEditSmartFolder(smartFolder)}
         />
       )}
-      {mode === "empty" && <EmptyPreview showNoResultsHint={showNoResultsHint} />}
+      {mode === "empty" && (
+        <CollectionPlaceholder
+          message={showNoResultsHint ? "作品が見つかりません" : "作品を選択してください"}
+          hint={showNoResultsHint ? "検索条件を変えてみてください" : undefined}
+          stats={showNoResultsHint ? undefined : emptyStats}
+        />
+      )}
     </div>
   );
 }
