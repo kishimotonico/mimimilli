@@ -1,9 +1,11 @@
 ---
 id: TASK-114
 title: ContentColumnを軸モードごとに分割する
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-07-27 01:57'
+updated_date: '2026-07-31 02:14'
 labels:
   - client
   - refactor
@@ -31,3 +33,11 @@ ContentColumn.tsx（338行 / 21 props）が、タグ軸UI・ファセット軸UI
 - [ ] #2 タグ軸・ファセット軸の表示時に作品一覧用の virtualizer が生成されない
 - [ ] #3 3モードそれぞれの表示・選択・ドリルダウン・追加読み込みが従来どおり動作する
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. ContentColumnをタグ/ファセット/作品一覧の内部コンポーネント+判別ユニオンへ分割
+2. virtualizerは作品一覧のみ生成
+実装Cursor委譲、Codexレビュー実施
+<!-- SECTION:PLAN:END -->

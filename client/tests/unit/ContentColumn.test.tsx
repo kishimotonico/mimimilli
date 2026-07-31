@@ -28,6 +28,7 @@ function renderContentColumn(props: Partial<React.ComponentProps<typeof ContentC
         works={createWorks(100)}
         worksQueryKey="key-1"
         facetItems={[]}
+        tagPrefixes={[]}
         selectedWorkId={null}
         selectedTags={[]}
         searchQuery=""
@@ -136,6 +137,7 @@ describe("ContentColumn virtual scrolling", () => {
           works={createWorks(100)}
           worksQueryKey="key-2"
           facetItems={[]}
+          tagPrefixes={[]}
           selectedWorkId={null}
           selectedTags={[]}
           searchQuery=""
@@ -156,6 +158,125 @@ describe("ContentColumn virtual scrolling", () => {
 
     expect(scrollToSpy.mock.calls.length).toBeGreaterThan(callsBefore);
     scrollToSpy.mockRestore();
+  });
+});
+
+describe("ContentColumn virtualizer isolation", () => {
+  it("renders all tag rows without virtualizing", () => {
+    const facetItems = Array.from({ length: 200 }, (_, i) => ({
+      value: `tag-${i}`,
+      count: i,
+    }));
+    const { container } = renderContentColumn({
+      axis: "tag",
+      facetItems,
+      works: createWorks(10_000),
+    });
+
+    expect(container.querySelectorAll(".mll-tagrow").length).toBe(200);
+  });
+
+  it("renders all facet rows without virtualizing", () => {
+    const facetItems = Array.from({ length: 200 }, (_, i) => ({
+      value: `circle-${i}`,
+      count: i,
+    }));
+    const { container } = renderContentColumn({
+      axis: "circle",
+      facetItems,
+      works: createWorks(10_000),
+    });
+
+    expect(container.querySelectorAll(".mll-erow").length).toBe(200);
+  });
+});
+
+describe("ContentColumn list scroll reset", () => {
+  const facetItems = Array.from({ length: 50 }, (_, i) => ({
+    value: `item-${i}`,
+    count: i,
+  }));
+
+  it("resets tag axis scroll position when worksQueryKey changes", () => {
+    const { container, rerender } = renderContentColumn({
+      axis: "tag",
+      facetItems,
+    });
+    const listEl = container.querySelector(".mle-col__list");
+    if (!(listEl instanceof HTMLElement)) throw new Error("list element not found");
+
+    listEl.scrollTop = 500;
+    expect(listEl.scrollTop).toBe(500);
+
+    rerender(
+      <Provider>
+        <ContentColumn
+          axis="tag"
+          drillValue={null}
+          works={createWorks(100)}
+          worksQueryKey="key-2"
+          facetItems={facetItems}
+          tagPrefixes={[]}
+          selectedWorkId={null}
+          selectedTags={[]}
+          searchQuery=""
+          playingWorkId={undefined}
+          isPlaybackActive={false}
+          isLoading={false}
+          isError={false}
+          hasNextPage={false}
+          onLoadMore={vi.fn()}
+          onWorkSelect={vi.fn()}
+          onDrillSelect={vi.fn()}
+          onDrillBack={vi.fn()}
+          onTagToggle={vi.fn()}
+          onClearSearch={vi.fn()}
+        />
+      </Provider>,
+    );
+
+    expect(listEl.scrollTop).toBe(0);
+  });
+
+  it("resets facet axis scroll position when worksQueryKey changes", () => {
+    const { container, rerender } = renderContentColumn({
+      axis: "circle",
+      facetItems,
+    });
+    const listEl = container.querySelector(".mle-col__list");
+    if (!(listEl instanceof HTMLElement)) throw new Error("list element not found");
+
+    listEl.scrollTop = 500;
+    expect(listEl.scrollTop).toBe(500);
+
+    rerender(
+      <Provider>
+        <ContentColumn
+          axis="circle"
+          drillValue={null}
+          works={createWorks(100)}
+          worksQueryKey="key-2"
+          facetItems={facetItems}
+          tagPrefixes={[]}
+          selectedWorkId={null}
+          selectedTags={[]}
+          searchQuery=""
+          playingWorkId={undefined}
+          isPlaybackActive={false}
+          isLoading={false}
+          isError={false}
+          hasNextPage={false}
+          onLoadMore={vi.fn()}
+          onWorkSelect={vi.fn()}
+          onDrillSelect={vi.fn()}
+          onDrillBack={vi.fn()}
+          onTagToggle={vi.fn()}
+          onClearSearch={vi.fn()}
+        />
+      </Provider>,
+    );
+
+    expect(listEl.scrollTop).toBe(0);
   });
 });
 
