@@ -6,7 +6,7 @@ import type { ResolvedPlaylist, Work } from "@mimimilli/shared";
 import { openDb, type Db } from "../../src/adapters/real/db.ts";
 import { workDlsite } from "../../src/adapters/real/catalogSchema.ts";
 import { WorkRepo } from "../../src/adapters/real/workRepo.ts";
-import { upsertTestWork } from "../helpers/workTestUtils.ts";
+import { upsertTestWork, resolvedDuration } from "../helpers/workTestUtils.ts";
 import { eq } from "drizzle-orm";
 
 function makePlaylist(trackCount: number, id = crypto.randomUUID()): ResolvedPlaylist {
@@ -17,7 +17,7 @@ function makePlaylist(trackCount: number, id = crypto.randomUUID()): ResolvedPla
       id: crypto.randomUUID(),
       title: `track-${i + 1}`,
       file: `track-${i + 1}.wav`,
-      durationSec: 60,
+      ...resolvedDuration(60),
     })),
   };
 }

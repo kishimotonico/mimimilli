@@ -2,7 +2,7 @@
 
 import { usePlaybackProgress } from "../model/usePlaybackProgress";
 import { useSeekDrag } from "./useSeekDrag";
-import { formatTime } from "../../../shared/lib/format";
+import { formatTime, formatDuration } from "../../../shared/lib/format";
 
 interface PopupSeekProps {
   onSeek: (t: number) => void;
@@ -28,8 +28,8 @@ export default function PopupSeek({ onSeek }: PopupSeekProps) {
         </div>
       </div>
       <div className="mle-popup__time-row">
-        <span>{formatTime(currentTime)}</span>
-        <span>{duration !== null ? formatTime(duration) : "--:--"}</span>
+        <span>{formatTime(currentTime) ?? "0:00"}</span>
+        <span>{duration !== null ? (formatDuration(duration) ?? "--:--") : "--:--"}</span>
       </div>
     </>
   );

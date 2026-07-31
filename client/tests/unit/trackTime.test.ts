@@ -59,19 +59,19 @@ describe("trackTime", () => {
   });
 
   it("durationSec を持つ ResolvedTrack は登録トラックと判定する", () => {
-    const resolved: ResolvedTrack = { ...segment, durationSec: 60 };
+    const resolved: ResolvedTrack = { ...segment, durationSec: 60, durationKind: "resolved" };
     expect(isResolvedTrack(resolved)).toBe(true);
     expect(isResolvedTrack(segment)).toBe(false);
   });
 
   it("登録トラックは filesModeFileDurationSec を無視し DTO の durationSec をそのまま使う", () => {
-    const resolved: ResolvedTrack = { ...segment, durationSec: 60 };
+    const resolved: ResolvedTrack = { ...segment, durationSec: 60, durationKind: "resolved" };
     expect(getTrackDurationSec(resolved, null)).toBe(60);
     expect(getTrackDurationSec(resolved, 9999)).toBe(60);
   });
 
   it("登録トラックの durationSec が null（計測不能）なら未知のまま", () => {
-    const resolved: ResolvedTrack = { ...segment, durationSec: null };
+    const resolved: ResolvedTrack = { ...segment, durationSec: null, durationKind: "unsupported" };
     expect(getTrackDurationSec(resolved, 120)).toBeNull();
   });
 });

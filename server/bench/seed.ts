@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
   emptyDlsiteState,
+  toTrackDurationFieldsFromSec,
   WORKS_DEFAULT_PAGE_SIZE,
   type DlsiteState,
   type Work,
@@ -106,15 +107,18 @@ function buildWork(index: number, libRoot: string, rng: () => number): Work {
   const defaultPlaylistId = childUuid(index, 0);
   const bonusPlaylistId = childUuid(index, 1);
   const trackCount = intBetween(rng, 8, 12);
-  const defaultTracks = Array.from({ length: trackCount }, (_, trackIndex) => ({
-    id: childUuid(index, 100 + trackIndex),
-    title: `トラック${trackIndex + 1}`,
-    file:
-      trackIndex < 8
-        ? `mp3/${String(trackIndex + 1).padStart(2, "0")}_part.wav`
-        : "bonus/extra.wav",
-    durationSec: intBetween(rng, 60, 600),
-  }));
+  const defaultTracks = Array.from({ length: trackCount }, (_, trackIndex) => {
+    const durationSec = intBetween(rng, 60, 600);
+    return {
+      id: childUuid(index, 100 + trackIndex),
+      title: `トラック${trackIndex + 1}`,
+      file:
+        trackIndex < 8
+          ? `mp3/${String(trackIndex + 1).padStart(2, "0")}_part.wav`
+          : "bonus/extra.wav",
+      ...toTrackDurationFieldsFromSec(durationSec),
+    };
+  });
   const bookmarked = rng() < 0.15;
   const hasPlayed = rng() < 0.35;
   const addedAt = isoDaysAgo(rng, intBetween(rng, 0, 900));
@@ -151,7 +155,7 @@ function buildWork(index: number, libRoot: string, rng: () => number): Work {
             id: childUuid(index, 200),
             title: "おまけ",
             file: "bonus/omake.wav",
-            durationSec: 120,
+            ...toTrackDurationFieldsFromSec(120),
           },
         ],
       },

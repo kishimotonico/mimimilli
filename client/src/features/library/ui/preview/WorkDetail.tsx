@@ -42,7 +42,7 @@ export function WorkDetail({
     ? (resumePlaylist?.tracks.find((candidate) => candidate.id === work.resume?.trackId) ?? null)
     : null;
   const hasResume = work.resume !== null && work.resume.offsetSec > 0 && resumeTrack !== null;
-  const resumeTime = formatTime(work.resume?.offsetSec ?? 0);
+  const resumeTime = formatTime(work.resume?.offsetSec ?? 0) ?? "0:00";
 
   // 閲覧ビューに残るタグ編集とブックマーク更新は同じエラー表示スロットを共有する。
   const [editError, setEditError] = useState<string | null>(null);
@@ -86,7 +86,9 @@ export function WorkDetail({
               {tracks.length > 0 && <span>{tracks.length} トラック</span>}
               <span className="dot">·</span>
               <span>
-                {work.totalDurationSec !== null ? formatDuration(work.totalDurationSec) : "--:--"}
+                {work.totalDurationSec !== null
+                  ? (formatDuration(work.totalDurationSec) ?? "--:--")
+                  : "--:--"}
               </span>
             </div>
           )}

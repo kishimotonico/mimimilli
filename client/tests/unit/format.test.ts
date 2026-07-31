@@ -7,14 +7,21 @@ describe("formatTime", () => {
     [45, "0:45"],
     [125, "2:05"],
     [3661, "1:01:01"],
-    [Number.NaN, "0:00"],
-    [Number.POSITIVE_INFINITY, "0:00"],
   ])("%s秒を%sにする", (seconds, expected) => {
     expect(formatTime(seconds)).toBe(expected);
   });
 
-  it("formatDurationも同じ時刻表現を使う", () => {
+  it.each([Number.NaN, Number.POSITIVE_INFINITY])("%sはnullを返す", (seconds) => {
+    expect(formatTime(seconds)).toBeNull();
+  });
+
+  it("formatDurationは総時間表示用に四捨五入する", () => {
     expect(formatDuration(90)).toBe("1:30");
+    expect(formatDuration(906.6)).toBe("15:07");
+  });
+
+  it("formatDurationも非有限値はnull", () => {
+    expect(formatDuration(Number.NaN)).toBeNull();
   });
 });
 

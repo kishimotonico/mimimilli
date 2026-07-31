@@ -74,6 +74,7 @@ function makeWork(overrides: Partial<Work> = {}): Work {
             title: "track1",
             file: "track1.mp3",
             durationSec: 120,
+            durationKind: "resolved",
           },
         ],
       },

@@ -28,7 +28,13 @@ import type {
   Track,
   Work,
 } from "@mimimilli/shared";
-import { emptyDlsiteState, isRjCodeMissing, resolveTrackDurationSec } from "@mimimilli/shared";
+import {
+  emptyDlsiteState,
+  isRjCodeMissing,
+  isInvalidTrackStart,
+  resolveTrackDuration,
+  toTrackDurationFields,
+} from "@mimimilli/shared";
 import type { Db } from "./db.ts";
 import type { ScanOptions } from "../../adapter.ts";
 import { detectRjCode } from "./dlsite.ts";
@@ -816,34 +822,28 @@ export class Scanner {
     // end超過はコンテナメタデータとデコード実測値の数十msのズレで健全なデータでも起こりうるため判定しない。
     // end指定トラックもstart超過チェックにファイル長が要るため（同一ファイルはfileDurationCacheで1回に集約）probeする。
     const invalidStartTracks: Array<{ file: string; title: string }> = [];
-    const fileDurationCache = new Map<string, number | null>();
+    const fileProbeCache = new Map<string, Awaited<ReturnType<typeof probeDurationSec>>>();
     const resolvedPlaylists: ResolvedPlaylist[] = [];
     for (const p of meta.playlists) {
       const tracks = [];
       for (const track of p.tracks) {
         checkAbort();
-        let fileDurationSec: number | null;
-        if (fileDurationCache.has(track.file)) {
-          fileDurationSec = fileDurationCache.get(track.file)!;
+        let probe;
+        if (fileProbeCache.has(track.file)) {
+          probe = fileProbeCache.get(track.file)!;
         } else {
-          fileDurationSec = await probeDurationSec(
+          probe = await probeDurationSec(
             this.db.catalog,
             join(workDir, track.file),
             probeCacheForWork,
           );
           checkAbort();
-          fileDurationCache.set(track.file, fileDurationSec);
+          fileProbeCache.set(track.file, probe);
         }
-        if (fileDurationSec !== null) {
-          const startSec = track.start ?? 0;
-          if (startSec >= fileDurationSec) {
-            invalidStartTracks.push({ file: track.file, title: track.title });
-          }
+        if (probe.kind === "resolved" && isInvalidTrackStart(track, probe.durationSec)) {
+          invalidStartTracks.push({ file: track.file, title: track.title });
         }
-        // end指定済みはend-startが自明値のため、データ不正の可視化は作品のerror化(status/errorMessage)
-        // のみで行い、durationSec自体は既存のresolveTrackDurationSecの式をそのまま使う
-        // （getWork読み取り時の再計算と値がずれないようにするため）。
-        tracks.push({ ...track, durationSec: resolveTrackDurationSec(track, fileDurationSec) });
+        tracks.push({ ...track, ...toTrackDurationFields(resolveTrackDuration(track, probe)) });
       }
       resolvedPlaylists.push({ id: p.id, name: p.name, tracks });
     }

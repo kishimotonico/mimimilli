@@ -24,7 +24,7 @@ export default function WorkRow({
     work.circleName,
     work.trackCount > 0 ? `${work.trackCount}tr` : null,
     work.totalDurationSec !== null && work.totalDurationSec > 0
-      ? formatDuration(work.totalDurationSec)
+      ? (formatDuration(work.totalDurationSec) ?? null)
       : null,
   ]
     .filter(Boolean)

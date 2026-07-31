@@ -1,10 +1,11 @@
 ---
 id: TASK-94
 title: 計測結果を判別可能な結果型で表しUIの未知表現を統一する
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-07-25 10:27'
-updated_date: '2026-07-30 12:35'
+updated_date: '2026-07-31 00:34'
 labels: []
 dependencies: []
 ordinal: 95000
@@ -25,6 +26,15 @@ TASK-91/92と同型の『未知を暗黙の値で埋める』残渣を根本か�
 - [ ] #5 同一のdurationSecがトラック一覧とプレイヤーで同じ文字列に整形される（丸め方が統一されている）
 - [ ] #6 pnpm checkとpnpm testが通り、既存の再生・シーク・曲送りに回帰がない
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. shared/に判別可能な計測結果型を導入（解決済み/未計測/解析失敗/欠損/データ不正）
+2. 不正start判定をshared 1箇所へ集約
+3. formatTime/丸めの統一、UIの未計測/失敗の区別表示
+実装Cursor委譲、Codexレビュー実施
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 

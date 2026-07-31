@@ -7,7 +7,7 @@ import { openDb } from "../../src/adapters/real/db.ts";
 import { SQLITE_BUSY_TIMEOUT_MS } from "../../src/adapters/real/sqliteConnection.ts";
 import { WorkRepo } from "../../src/adapters/real/workRepo.ts";
 import { makeTestDirectory } from "../helpers/sampleLibrary.ts";
-import { upsertTestWork } from "../helpers/workTestUtils.ts";
+import { upsertTestWork, resolvedDuration } from "../helpers/workTestUtils.ts";
 import type { BusyTimeoutWriteInput } from "./busyTimeoutWriteWorker.ts";
 
 const WORK_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -37,7 +37,7 @@ function sampleWork(): Work {
             id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
             title: "track",
             file: "track.wav",
-            durationSec: 60,
+            ...resolvedDuration(60),
           },
         ],
       },

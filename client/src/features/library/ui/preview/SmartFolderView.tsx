@@ -20,7 +20,7 @@ const TAG_PREFIX_LABEL: Record<string, string> = {
 };
 
 function formatRuleDuration(value: string): string {
-  return formatDuration(Number(value));
+  return formatDuration(Number(value)) ?? "--:--";
 }
 
 function TagValueChip({ value }: { value: string }) {

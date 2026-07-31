@@ -80,6 +80,7 @@ function makeWorkDetail(id: string, title = `作品 ${id}`): Work {
             title: "track",
             file: "track.mp3",
             durationSec: 60,
+            durationKind: "resolved",
           },
         ],
       },

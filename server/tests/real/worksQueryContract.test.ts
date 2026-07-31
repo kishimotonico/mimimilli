@@ -12,7 +12,7 @@ import {
 } from "@mimimilli/shared";
 import { WorkRepo } from "../../src/adapters/real/workRepo.ts";
 import { querySmartFolderWorks } from "../../src/adapters/real/smartFolderWorks.ts";
-import { upsertTestWork } from "../helpers/workTestUtils.ts";
+import { upsertTestWork, resolvedDuration } from "../helpers/workTestUtils.ts";
 import { openDb } from "../../src/adapters/real/db.ts";
 import { buildAxisFacets } from "../../src/core/axisFacets.ts";
 import { evalSmartFolder } from "../../src/core/smartFolder.ts";
@@ -79,7 +79,7 @@ function fullWork(item: WorkSummary): Work {
                 id: crypto.randomUUID(),
                 title: `track-${index}`,
                 file: `track-${index}.wav`,
-                durationSec: 60,
+                ...resolvedDuration(60),
               })),
             },
           ]

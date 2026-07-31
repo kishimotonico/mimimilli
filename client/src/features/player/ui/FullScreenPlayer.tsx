@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef } from "react";
 import type { PlayerState } from "../model/usePlayerState";
 import FullScreenScrub from "./FullScreenScrub";
 import PlaybackErrorNotice from "./PlaybackErrorNotice";
-import { formatTime } from "../../../shared/lib/format";
+import { formatTime, formatDuration } from "../../../shared/lib/format";
 import CoverImg from "../../../entities/work/ui/CoverImg";
 import { selectFixedCoverThumbnailWidth } from "../../../entities/work/ui/coverThumbnailWidth";
 import { I } from "../../../shared/ui/Icon";
@@ -299,7 +299,7 @@ export default function FullScreenPlayer({
                   {t.title}
                 </span>
                 <span className="text-right font-mono text-[10.5px] text-ink-3">
-                  {t.end != null && t.start != null ? formatTime(Math.round(t.end - t.start)) : ""}
+                  {t.end != null && t.start != null ? (formatDuration(t.end - t.start) ?? "") : ""}
                 </span>
               </button>
             );

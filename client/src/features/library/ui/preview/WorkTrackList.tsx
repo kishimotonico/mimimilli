@@ -1,6 +1,7 @@
 import type { ResolvedTrack } from "@mimimilli/shared";
 import { I } from "../../../../shared/ui/Icon";
-import { formatDuration, formatTime } from "../../../../shared/lib/format";
+import { formatTime } from "../../../../shared/lib/format";
+import { formatTrackDuration, trackDurationAriaLabel } from "../../../../shared/lib/trackDuration";
 import { cn } from "../../../../shared/lib/cn";
 
 interface WorkTrackListProps {
@@ -57,12 +58,12 @@ export function WorkTrackList({
               <span className="name">
                 <span className="title">{tr.title}</span>
                 {hasResume && resumeTrackId === tr.id && (
-                  <span className="resume">再開 {formatTime(resumeOffsetSec)}</span>
+                  <span className="resume">再開 {formatTime(resumeOffsetSec) ?? "--:--"}</span>
                 )}
               </span>
-              {tr.durationSec !== null && (
-                <span className="dur">{formatDuration(Math.round(tr.durationSec))}</span>
-              )}
+              <span className="dur" aria-label={trackDurationAriaLabel(tr.durationKind)}>
+                {formatTrackDuration(tr)}
+              </span>
               <div className="src">
                 {isNowPlaying ? (
                   <span

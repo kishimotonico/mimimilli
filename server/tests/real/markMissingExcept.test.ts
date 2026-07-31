@@ -5,7 +5,7 @@ import { test } from "node:test";
 import type { Work } from "@mimimilli/shared";
 import { openDb } from "../../src/adapters/real/db.ts";
 import { WorkRepo } from "../../src/adapters/real/workRepo.ts";
-import { upsertTestWork } from "../helpers/workTestUtils.ts";
+import { upsertTestWork, resolvedDuration } from "../helpers/workTestUtils.ts";
 
 function sampleWork(id: string): Work {
   const playlistId = crypto.randomUUID();
@@ -26,7 +26,9 @@ function sampleWork(id: string): Work {
       {
         id: playlistId,
         name: "default",
-        tracks: [{ id: crypto.randomUUID(), title: "track", file: "track.wav", durationSec: 60 }],
+        tracks: [
+          { id: crypto.randomUUID(), title: "track", file: "track.wav", ...resolvedDuration(60) },
+        ],
       },
     ],
     bookmarked: false,

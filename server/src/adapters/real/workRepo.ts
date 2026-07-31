@@ -9,9 +9,12 @@ import {
   normalizeTags,
   parseTag,
   playlistSchema,
+  probeResultFromCache,
+  resolveTrackDuration,
   resolveTrackDurationSec,
   smartFolderSchema,
   tagPrefixSchema,
+  toTrackDurationFields,
   workSchema,
   workSummarySchema,
 } from "@mimimilli/shared";
@@ -24,6 +27,7 @@ import type {
   DlsiteNotificationQuery,
   DlsiteNotificationSummary,
   Playlist,
+  ProbeDurationResult,
   ResolvedPlaylist,
   ResumeBody,
   SmartFolder,
@@ -257,24 +261,18 @@ function rowToWork(
   rawPlaylists: Playlist[],
   tagNames: string[],
   dlsite: DlsiteState,
-  liveFileDurations: Map<string, number | null>,
+  liveFileProbes: Map<string, ProbeDurationResult>,
 ): Work {
   // end指定済みトラックは自明値（end-start）で合成する。
   // end未指定トラックはファイル置換をrescan無しで検知できるよう、audio_probe_cacheの
-  // 現在値を作品内全ファイルパス一括取得（liveFileDurations）で都度解決する。
+  // 現在値を作品内全ファイルパス一括取得（liveFileProbes）で都度解決する。
   // playlists_json（正本）には派生値を書かない。
   const playlists: ResolvedPlaylist[] = rawPlaylists.map((playlist) => ({
     id: playlist.id,
     name: playlist.name,
     tracks: playlist.tracks.map((track) => {
-      const durationSec =
-        track.end !== undefined
-          ? track.end - (track.start ?? 0)
-          : resolveTrackDurationSec(
-              track,
-              liveFileDurations.get(join(row.physicalPath, track.file)) ?? null,
-            );
-      return { ...track, durationSec };
+      const probe = liveFileProbes.get(join(row.physicalPath, track.file)) ?? { kind: "unprobed" };
+      return { ...track, ...toTrackDurationFields(resolveTrackDuration(track, probe)) };
     }),
   }));
   const resume = resolveResume(row, playlists);
@@ -397,24 +395,19 @@ export class WorkRepo {
   }
 
   /**
-   * end未指定トラックが参照するファイルの現在の再生時間を、作品内の全該当パスを
+   * トラックが参照するファイルの現在のプローブ結果を、作品内の全該当パスを
    * 一括取得したprobe cache（fetchProbeCache、N+1回避）を土台に、ファイルごとに
    * stat して size/mtime が一致しなければ probeDurationSec で再probeし最新値を返す。
-   * これによりrescan無しのファイル差し替えも読み取り時に検知できる。
+   * end 指定トラックの不正 start 判定にもファイル長が要るため、全トラックファイルを対象にする。
    */
-  private async liveFileDurationMap(
+  private async liveFileProbeMap(
     physicalPath: string,
-    playlists: Array<{ tracks: Array<{ file: string; end?: number }> }>,
-  ): Promise<Map<string, number | null>> {
+    playlists: Array<{ tracks: Array<{ file: string }> }>,
+  ): Promise<Map<string, ProbeDurationResult>> {
     const paths = [
-      ...new Set(
-        playlists
-          .flatMap((p) => p.tracks)
-          .filter((t) => t.end === undefined)
-          .map((t) => join(physicalPath, t.file)),
-      ),
+      ...new Set(playlists.flatMap((p) => p.tracks).map((t) => join(physicalPath, t.file))),
     ];
-    const map = new Map<string, number | null>();
+    const map = new Map<string, ProbeDurationResult>();
     if (paths.length === 0) return map;
     const cache = this.fetchProbeCache(paths);
     await mapWithConcurrency(paths, PROBE_CONCURRENCY, async (path) => {
@@ -1108,7 +1101,7 @@ export class WorkRepo {
       rawPlaylists,
       this.tagMap([id]).get(id) ?? [],
       this.dlsiteState(id),
-      await this.liveFileDurationMap(row.physicalPath, rawPlaylists),
+      await this.liveFileProbeMap(row.physicalPath, rawPlaylists),
     );
     this.syncTotalDurationSec(row, work.totalDurationSec);
     return work;
@@ -1176,7 +1169,7 @@ export class WorkRepo {
       rawPlaylists,
       this.tagMap([row.id]).get(row.id) ?? [],
       this.dlsiteState(row.id),
-      await this.liveFileDurationMap(row.physicalPath, rawPlaylists),
+      await this.liveFileProbeMap(row.physicalPath, rawPlaylists),
     );
     this.syncTotalDurationSec(row, work.totalDurationSec);
     return work;
@@ -1235,7 +1228,9 @@ export class WorkRepo {
         work.playlists.map((playlist) => ({
           id: playlist.id,
           name: playlist.name,
-          tracks: playlist.tracks.map(({ durationSec: _durationSec, ...track }) => track),
+          tracks: playlist.tracks.map(
+            ({ durationSec: _durationSec, durationKind: _durationKind, ...track }) => track,
+          ),
         })),
       ),
     };
@@ -1356,17 +1351,17 @@ export class WorkRepo {
       throw new InvalidResumeError("resumeのPlaylistまたはTrackが作品に属していません");
     }
     // end指定済みは自明値（end-start）、未指定はaudio_probe_cacheの現在値から解決する。
-    const durationSec =
-      track.end !== null
-        ? track.end - (track.start ?? 0)
-        : resolveTrackDurationSec(
-            { start: track.start ?? undefined },
-            this.db.catalog
-              .select({ durationSec: audioProbeCache.durationSec })
-              .from(audioProbeCache)
-              .where(eq(audioProbeCache.path, join(track.physicalPath, track.file)))
-              .get()?.durationSec ?? null,
-          );
+    const cacheRow = this.db.catalog
+      .select({ durationSec: audioProbeCache.durationSec })
+      .from(audioProbeCache)
+      .where(eq(audioProbeCache.path, join(track.physicalPath, track.file)))
+      .get();
+    const probe =
+      track.end !== null ? ({ kind: "unprobed" } as const) : probeResultFromCache(cacheRow);
+    const durationSec = resolveTrackDurationSec(
+      { start: track.start ?? undefined, end: track.end ?? undefined },
+      probe,
+    );
     // durationSec が未知（プローブ未取得・失敗）の場合は上限が分からないため検証をスキップする。
     if (body.offsetSec < 0 || (durationSec !== null && body.offsetSec > durationSec)) {
       throw new InvalidResumeError("resumeのoffsetSecがトラック区間外です");

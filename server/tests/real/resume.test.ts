@@ -8,7 +8,7 @@ import { openDb } from "../../src/adapters/real/db.ts";
 import { probeDurationSec } from "../../src/adapters/real/probe.ts";
 import { workStates } from "../../src/adapters/real/userSchema.ts";
 import { WorkRepo } from "../../src/adapters/real/workRepo.ts";
-import { upsertTestWork } from "../helpers/workTestUtils.ts";
+import { upsertTestWork, resolvedDuration } from "../helpers/workTestUtils.ts";
 import { makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 
 function sampleWork(id: string): Work {
@@ -37,7 +37,7 @@ function sampleWork(id: string): Work {
             file: "shared.wav",
             start: 0,
             end: 30,
-            durationSec: 30,
+            ...resolvedDuration(30),
           },
           {
             id: crypto.randomUUID(),
@@ -45,7 +45,7 @@ function sampleWork(id: string): Work {
             file: "shared.wav",
             start: 30,
             end: 90,
-            durationSec: 60,
+            ...resolvedDuration(60),
           },
         ],
       },
@@ -150,7 +150,10 @@ test("end省略Trackは音声ファイルを300秒から60秒へ差し替えた�
   upsertTestWork(repo, work);
   const cachePath = join(work.physicalPath, track.file);
   writeWav(cachePath, 300);
-  assert.equal(await probeDurationSec(db.catalog, cachePath, new Map()), 300);
+  assert.deepEqual(await probeDurationSec(db.catalog, cachePath, new Map()), {
+    kind: "resolved",
+    durationSec: 300,
+  });
 
   assert.equal(
     repo.saveResume(work.id, { playlistId: playlist.id, trackId: track.id, offsetSec: 200 }),
@@ -159,7 +162,10 @@ test("end省略Trackは音声ファイルを300秒から60秒へ差し替えた�
   assert.equal((await repo.getWork(work.id))?.resume?.offsetSec, 200);
 
   writeWav(cachePath, 60);
-  assert.equal(await probeDurationSec(db.catalog, cachePath, new Map()), 60);
+  assert.deepEqual(await probeDurationSec(db.catalog, cachePath, new Map()), {
+    kind: "resolved",
+    durationSec: 60,
+  });
   assert.equal((await repo.getWork(work.id))?.resume, null);
   assert.throws(
     () => repo.saveResume(work.id, { playlistId: playlist.id, trackId: track.id, offsetSec: 200 }),

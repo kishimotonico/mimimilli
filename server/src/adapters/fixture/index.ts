@@ -10,6 +10,7 @@ import {
   isRjCodeMissing,
   normalizeTags,
   toWorkListItem,
+  toTrackDurationFieldsFromSec,
 } from "@mimimilli/shared";
 import type {
   AxisFacetItem,
@@ -179,7 +180,7 @@ function buildFullWork(
           file: track.file,
           start: track.start,
           end: track.end,
-          durationSec: track.durationSec,
+          ...toTrackDurationFieldsFromSec(track.durationSec),
         })),
       }))
     : ids.playlists.length > 0
@@ -187,15 +188,18 @@ function buildFullWork(
           {
             id: ids.playlists[0]!.id,
             name: "default",
-            tracks: Array.from({ length: summary.trackCount }, (_, i) => ({
-              id: ids.playlists[0]!.trackIds[i]!,
-              title: namedTracks?.[i] ?? `Track ${i + 1}`,
-              file: `track${String(i + 1).padStart(2, "0")}.mp3`,
-              durationSec:
+            tracks: Array.from({ length: summary.trackCount }, (_, i) => {
+              const durationSec =
                 summary.totalDurationSec !== null && summary.totalDurationSec > 0
                   ? splitDurationSec(summary.totalDurationSec, summary.trackCount, i)
-                  : null,
-            })),
+                  : null;
+              return {
+                id: ids.playlists[0]!.trackIds[i]!,
+                title: namedTracks?.[i] ?? `Track ${i + 1}`,
+                file: `track${String(i + 1).padStart(2, "0")}.mp3`,
+                ...toTrackDurationFieldsFromSec(durationSec),
+              };
+            }),
           },
         ]
       : [];
