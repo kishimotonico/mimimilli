@@ -9,7 +9,7 @@ import {
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { createApp } from "../src/app.ts";
 import { openDb } from "../src/adapters/real/db.ts";
-import { createRealAdapter } from "../src/adapters/real/index.ts";
+import { createTestRealAdapter } from "./helpers/realAdapter.ts";
 import { WorkRepo } from "../src/adapters/real/workRepo.ts";
 import { upsertTestWork } from "./helpers/workTestUtils.ts";
 import { makeSampleLibrary } from "./helpers/sampleLibrary.ts";
@@ -182,7 +182,10 @@ test("DLsite通知: parse_error は fetch-failed と分離して集計する", a
 
 test("real adapter経由のHTTP一覧もWorkListItemの許可キーだけを返す", async () => {
   const library = makeSampleLibrary();
-  const adapter = createRealAdapter({ database: { kind: "memory" }, dataRoot: library.baseDir });
+  const adapter = createTestRealAdapter({
+    database: { kind: "memory" },
+    dataRoot: library.baseDir,
+  });
   try {
     await adapter.updateSettings({ rootFolder: library.root });
     await adapter.scan();

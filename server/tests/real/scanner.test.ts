@@ -15,7 +15,7 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
-import { createRealAdapter } from "../../src/adapters/real/index.ts";
+import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { openDb, type Db } from "../../src/adapters/real/db.ts";
 import { Scanner } from "../../src/adapters/real/scanner.ts";
 import { audioProbeCache } from "../../src/adapters/real/catalogSchema.ts";
@@ -25,7 +25,7 @@ import { makeSampleLibrary, makeTestDirectory, writeWav } from "../helpers/sampl
 async function setup(t: TestContext) {
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
-  const adapter = createRealAdapter({ database: { kind: "memory" } });
+  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
   await adapter.updateSettings({ rootFolder: lib.root });
   return { ...lib, adapter };
 }
@@ -169,7 +169,7 @@ test("UUID 重複: 後に検出された方が再採番されメタファイル�
       }),
     );
   }
-  const adapter = createRealAdapter({ database: { kind: "memory" } });
+  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
   await adapter.updateSettings({ rootFolder: root });
   const result = await adapter.scan();
 
@@ -209,7 +209,7 @@ test("大量ディレクトリの走査中、walking フェーズの進捗イベ
   for (let i = 0; i < dirCount; i++) {
     mkdirSync(join(root, `dir-${i}`), { recursive: true });
   }
-  const adapter = createRealAdapter({ database: { kind: "memory" } });
+  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
   await adapter.updateSettings({ rootFolder: root });
 
   const walkingEvents: { processed: number; total: number }[] = [];

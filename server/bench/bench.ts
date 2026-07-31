@@ -82,6 +82,7 @@ async function main(): Promise<void> {
     database: { kind: "files", catalogPath: manifest.catalogDb, userPath: manifest.userDb },
     dataRoot: dirname(manifest.catalogDb),
     thumbnailCacheDir: join(dataDir, "cache", "thumbnails"),
+    dlsiteCache: { path: join(dataDir, "db", "dlsite-cache.sqlite") },
   });
   const app = createApp(adapter);
 

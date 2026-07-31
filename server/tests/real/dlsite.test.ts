@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { chmodSync, cpSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { gunzipSync } from "node:zlib";
+import { gunzipSync, gzipSync } from "node:zlib";
 import { test } from "node:test";
 import { Database } from "bun:sqlite";
 import { dlsiteStatePatchSchema, type DlsiteWorkInfo } from "@mimimilli/shared";
@@ -23,7 +23,22 @@ import {
 } from "../../src/adapters/real/dlsiteConfig.ts";
 import { createRealAdapter } from "../../src/adapters/real/index.ts";
 import { createApp } from "../../src/app.ts";
+import {
+  htmlResponse,
+  jpegResponse,
+  mockDlsiteTransport,
+  sampleWorkHtml,
+} from "../helpers/dlsiteTransport.ts";
+import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { makeSampleLibrary, makeTestDirectory } from "../helpers/sampleLibrary.ts";
+
+const FAST_DLSITE_REQUEST_CONFIG = {
+  ...DEFAULT_DLSITE_REQUEST_CONFIG,
+  requestIntervalMs: 0,
+  retryCount: 0,
+  maxBackoffMs: 0,
+  timeoutMs: 1_000,
+};
 
 const SAMPLE_HTML = `
 <html><body>
@@ -186,7 +201,7 @@ test("mergeDlsiteTags: prefix 変換と重複排除", () => {
 test("dlsiteApply: タグマージとメタ書き戻し（カバー DL なし）", async (t) => {
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
-  const adapter = createRealAdapter({ database: { kind: "memory" } });
+  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
 
@@ -235,7 +250,7 @@ test("dlsiteApply: タグマージとメタ書き戻し（カバー DL なし）
 test("updateDlsiteState: RJコード修正とskipped切替をメタへ保存する", async (t) => {
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
-  const adapter = createRealAdapter({ database: { kind: "memory" } });
+  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
 
@@ -255,20 +270,11 @@ test("updateDlsiteState: RJコード修正とskipped切替をメタへ保存す�
 test("updateDlsiteState: RJコード変更で旧状態をリセットし一括取得対象に戻す", async (t) => {
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
-  const adapter = createRealAdapter({
+  const adapter = createTestRealAdapter({
     database: { kind: "memory" },
-    dlsiteRequestIntervalMs: 0,
-    dlsiteFetcher: async (rjCode) => ({
-      ok: true,
-      info: {
-        rjCode,
-        title: `取得 ${rjCode}`,
-        circle: null,
-        cvs: [],
-        genreTags: ["新着"],
-        coverUrl: null,
-        url: `https://www.dlsite.com/maniax/work/=/product_id/${rjCode}.html`,
-      },
+    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+    dlsiteSchedulerDependencies: mockDlsiteTransport({
+      html: (code) => htmlResponse(sampleWorkHtml(code, { title: `取得 ${code}`, cover: false })),
     }),
   });
   await adapter.updateSettings({ rootFolder: lib.root });
@@ -308,7 +314,7 @@ test("updateDlsiteState: RJコード変更で旧状態をリセットし一括�
 test("dlsiteFetch: 存在しない作品はnot_found", async (t) => {
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
-  const adapter = createRealAdapter({ database: { kind: "memory" } });
+  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
   // 既存メタ作品はフォルダー名 RJ900002… なので、タイトル・パスとも RJ なしに変更してから検証
@@ -322,24 +328,23 @@ test("一括取得: 編集済みタイトルは保持しフォルダー名のま
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
   const calls: number[] = [];
-  const adapter = createRealAdapter({
+  const adapter = createTestRealAdapter({
     database: { kind: "memory" },
-    dlsiteRequestIntervalMs: 40,
-    dlsiteFetcher: async (rjCode) => {
-      calls.push(Date.now());
-      return {
-        ok: true,
-        info: {
-          rjCode,
-          title: `DLsite取得タイトル ${rjCode}`,
-          circle: null,
-          cvs: [],
-          genreTags: ["削除済み", "新着"],
-          coverUrl: null,
-          url: `https://www.dlsite.com/maniax/work/=/product_id/${rjCode}.html`,
-        },
-      };
-    },
+    dlsiteRequestConfig: { ...FAST_DLSITE_REQUEST_CONFIG, requestIntervalMs: 40 },
+    dlsiteSchedulerDependencies: mockDlsiteTransport({
+      html: (code) => {
+        calls.push(Date.now());
+        return htmlResponse(
+          sampleWorkHtml(code, {
+            title: `DLsite取得タイトル ${code}`,
+            genres: ["削除済み", "新着"],
+            circle: null,
+            cvs: false,
+            cover: false,
+          }),
+        );
+      },
+    }),
   });
   await adapter.updateSettings({ rootFolder: lib.root });
   const scan = await adapter.scan();
@@ -382,16 +387,18 @@ test("一括取得: skippedとappliedを対象外にし、not_foundはキャッ�
   let now = 1_000;
   const adapter = createRealAdapter({
     database: { kind: "memory" },
-    dlsiteRequestIntervalMs: 0,
+    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
     dlsiteCache: {
       path: join(dir.path, "cache.sqlite"),
       ttlsMs: { not_found: 30 },
       clock: () => now,
     },
-    dlsiteHtmlFetcher: async () => {
-      calls += 1;
-      return { status: 404, contentType: "text/html", body: "<html>404</html>" };
-    },
+    dlsiteSchedulerDependencies: mockDlsiteTransport({
+      html: () => {
+        calls += 1;
+        return htmlResponse("<html>404</html>", 404);
+      },
+    }),
   });
   await adapter.updateSettings({ rootFolder: lib.root });
   const scan = await adapter.scan();
@@ -448,11 +455,13 @@ test("DLsite HTMLキャッシュ: 手動fetchはhitでHTTPせず、single-flight
   const adapter = createRealAdapter({
     database: { kind: "memory" },
     dlsiteCache: { path: join(dir.path, "dlsite-cache.sqlite") },
-    dlsiteHtmlFetcher: async () => {
-      calls += 1;
-      if (calls === 1) await pending;
-      return { status: 200, contentType: "text/html", body: SAMPLE_HTML };
-    },
+    dlsiteSchedulerDependencies: mockDlsiteTransport({
+      html: async () => {
+        calls += 1;
+        if (calls === 1) await pending;
+        return htmlResponse(SAMPLE_HTML);
+      },
+    }),
   });
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
@@ -487,10 +496,12 @@ test("DLsite offline: miss/forceはHTTPもcache書き込みもせず、bulk stat
       maxBackoffMs: 0,
       timeoutMs: 1_000,
     },
-    dlsiteHtmlFetcher: async () => {
-      calls += 1;
-      return { status: 200, contentType: "text/html", body: SAMPLE_HTML };
-    },
+    dlsiteSchedulerDependencies: mockDlsiteTransport({
+      html: () => {
+        calls += 1;
+        return htmlResponse(SAMPLE_HTML);
+      },
+    }),
   });
   await offline.updateSettings({ rootFolder: lib.root });
   await offline.scan();
@@ -545,10 +556,12 @@ test("DLsite offline: miss/forceはHTTPもcache書き込みもせず、bulk stat
       maxBackoffMs: 0,
       timeoutMs: 1_000,
     },
-    dlsiteHtmlFetcher: async () => {
-      calls += 1;
-      return { status: 200, contentType: "text/html", body: SAMPLE_HTML };
-    },
+    dlsiteSchedulerDependencies: mockDlsiteTransport({
+      html: () => {
+        calls += 1;
+        return htmlResponse(SAMPLE_HTML);
+      },
+    }),
   });
   await online.updateSettings({ rootFolder: lib.root });
   await online.scan();
@@ -567,10 +580,12 @@ test("DLsite offline: miss/forceはHTTPもcache書き込みもせず、bulk stat
       maxBackoffMs: 0,
       timeoutMs: 1_000,
     },
-    dlsiteHtmlFetcher: async () => {
-      calls += 1;
-      return { status: 200, contentType: "text/html", body: SAMPLE_HTML };
-    },
+    dlsiteSchedulerDependencies: mockDlsiteTransport({
+      html: () => {
+        calls += 1;
+        return htmlResponse(SAMPLE_HTML);
+      },
+    }),
   });
   await cachedOffline.updateSettings({ rootFolder: lib.root });
   await cachedOffline.scan();
@@ -579,35 +594,46 @@ test("DLsite offline: miss/forceはHTTPもcache書き込みもせず、bulk stat
   cachedOffline.close();
 });
 
-test("DLsite HTMLキャッシュ: hitでも注入parserを毎回呼ぶ", async (t) => {
+test("DLsite HTMLキャッシュ: hitでも保存HTMLを毎回パースする", async (t) => {
   const lib = makeSampleLibrary();
   const dir = makeTestDirectory("dlsite-parser-cache");
   t.after(lib.cleanup);
   t.after(dir.cleanup);
   let httpCalls = 0;
-  let parserCalls = 0;
   const adapter = createRealAdapter({
     database: { kind: "memory" },
+    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
     dlsiteCache: { path: join(dir.path, "cache.sqlite") },
-    dlsiteHtmlFetcher: async () => {
-      httpCalls += 1;
-      return { status: 200, contentType: "text/html", body: SAMPLE_HTML };
-    },
-    dlsiteParser: (html, code) => {
-      parserCalls += 1;
-      const parsed = parseDlsiteHtml(html, code);
-      if (!parsed.ok) return parsed;
-      return { ok: true, info: { ...parsed.info, title: `parser-${parserCalls}` } };
-    },
+    dlsiteSchedulerDependencies: mockDlsiteTransport({
+      html: () => {
+        httpCalls += 1;
+        return htmlResponse(SAMPLE_HTML);
+      },
+    }),
   });
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
   const first = await adapter.dlsiteFetch(lib.existingWorkId);
+  assert.equal(httpCalls, 1);
+  assert.equal(first.ok && first.info.title, "耳元ささやきの夜");
+
+  const sqlite = new Database(join(dir.path, "cache.sqlite"));
+  const row = sqlite
+    .query("SELECT html_gzip FROM dlsite_html_snapshots WHERE product_code = ?")
+    .get("RJ900002") as { html_gzip: Uint8Array } | null;
+  assert.ok(row);
+  const updatedHtml = SAMPLE_HTML.replace("耳元ささやきの夜", "キャッシュ差し替えタイトル");
+  const updatedBytes = Buffer.from(updatedHtml);
+  const updatedGzip = gzipSync(updatedBytes);
+  sqlite.run(
+    "UPDATE dlsite_html_snapshots SET html_gzip = ?, html_size = ? WHERE product_code = ?",
+    [updatedGzip, updatedBytes.byteLength, "RJ900002"],
+  );
+  sqlite.close();
+
   const second = await adapter.dlsiteFetch(lib.existingWorkId);
   assert.equal(httpCalls, 1);
-  assert.equal(parserCalls, 2);
-  assert.equal(first.ok && first.info.title, "parser-1");
-  assert.equal(second.ok && second.info.title, "parser-2");
+  assert.equal(second.ok && second.info.title, "キャッシュ差し替えタイトル");
   adapter.close();
 });
 
@@ -628,10 +654,12 @@ test("DLsite HTMLキャッシュ: parse_errorは同じHTTPをretryしない", as
       maxBackoffMs: 1,
       timeoutMs: 1_000,
     },
-    dlsiteHtmlFetcher: async () => {
-      calls += 1;
-      return { status: 200, contentType: "text/html", body: "<html></html>" };
-    },
+    dlsiteSchedulerDependencies: mockDlsiteTransport({
+      html: () => {
+        calls += 1;
+        return htmlResponse("<html></html>");
+      },
+    }),
   });
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
@@ -659,12 +687,12 @@ test("DLsite: parse_errorは実HTTP時だけdlsite_parse_errorをログする", 
       maxBackoffMs: 0,
       timeoutMs: 1_000,
     },
-    dlsiteSchedulerDependencies: { logger: (event) => logs.push(event) },
-    dlsiteHtmlFetcher: async () => ({
-      status: 200,
-      contentType: "text/html",
-      body: "<html></html>",
-    }),
+    dlsiteSchedulerDependencies: {
+      logger: (event) => logs.push(event),
+      ...mockDlsiteTransport({
+        html: () => htmlResponse("<html></html>"),
+      }),
+    },
   });
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
@@ -694,10 +722,8 @@ test("一括取得: parse_error を errorKind と parseErrors で記録する", 
       maxBackoffMs: 0,
       timeoutMs: 1_000,
     },
-    dlsiteHtmlFetcher: async () => ({
-      status: 200,
-      contentType: "text/html",
-      body: "<html></html>",
+    dlsiteSchedulerDependencies: mockDlsiteTransport({
+      html: () => htmlResponse("<html></html>"),
     }),
   });
   await adapter.updateSettings({ rootFolder: lib.root });
@@ -720,12 +746,15 @@ test("DLsite HTMLキャッシュ: cache missのforceとnormalは同じHTTPへ合
   const pending = new Promise<void>((resolve) => (release = resolve));
   const adapter = createRealAdapter({
     database: { kind: "memory" },
+    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
     dlsiteCache: { path: join(dir.path, "cache.sqlite") },
-    dlsiteHtmlFetcher: async () => {
-      calls += 1;
-      await pending;
-      return { status: 200, contentType: "text/html", body: SAMPLE_HTML };
-    },
+    dlsiteSchedulerDependencies: mockDlsiteTransport({
+      html: async () => {
+        calls += 1;
+        await pending;
+        return htmlResponse(SAMPLE_HTML);
+      },
+    }),
   });
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
@@ -744,20 +773,23 @@ test("DLsite bulk: 2回目はHTML cache hitでHTTPしない", async (t) => {
   t.after(lib.cleanup);
   t.after(dir.cleanup);
   let httpCalls = 0;
+  let coverCalls = 0;
+  const coverBody = new Uint8Array(
+    readFileSync(join(lib.root, "dlsite", "RJ900001_テスト作品", "cover.jpg")),
+  );
   const adapter = createRealAdapter({
     database: { kind: "memory" },
-    dlsiteRequestIntervalMs: 0,
+    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
     dlsiteCache: { path: join(dir.path, "cache.sqlite") },
-    dlsiteHtmlFetcher: async () => {
-      httpCalls += 1;
-      return { status: 200, contentType: "text/html", body: SAMPLE_HTML };
-    },
-    dlsiteCoverFetcher: async (url) => ({
-      contentType: "image/jpeg",
-      body: new Uint8Array(
-        readFileSync(join(lib.root, "dlsite", "RJ900001_テスト作品", "cover.jpg")),
-      ),
-      finalUrl: url,
+    dlsiteSchedulerDependencies: mockDlsiteTransport({
+      html: () => {
+        httpCalls += 1;
+        return htmlResponse(SAMPLE_HTML);
+      },
+      cover: () => {
+        coverCalls += 1;
+        return jpegResponse(coverBody);
+      },
     }),
   });
   await adapter.updateSettings({ rootFolder: lib.root });
@@ -790,17 +822,14 @@ test("DLsite bulk: 同一RJコードは同じ実行・別実行・adapter再オ�
   const makeAdapter = () =>
     createRealAdapter({
       database,
-      dlsiteRequestIntervalMs: 0,
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
       dlsiteCache: { path: cachePath },
-      dlsiteHtmlFetcher: async () => {
-        httpCalls += 1;
-        return { status: 200, contentType: "text/html", body: SAMPLE_HTML };
-      },
-      dlsiteParser: (html, code) => {
-        const parsed = parseDlsiteHtml(html, code);
-        if (!parsed.ok) return parsed;
-        return { ok: true, info: { ...parsed.info, coverUrl: null } };
-      },
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: () => {
+          httpCalls += 1;
+          return htmlResponse(sampleWorkHtml("RJ900002", { cover: false }));
+        },
+      }),
     });
 
   const first = makeAdapter();
@@ -844,10 +873,12 @@ test("DLsiteカバー: キャッシュから各作品フォルダーへコピー
     createRealAdapter({
       database,
       dlsiteCache: { path: cachePath },
-      dlsiteCoverFetcher: async (url) => {
-        coverHttpCalls += 1;
-        return { contentType: "image/jpeg", body: coverBody, finalUrl: url };
-      },
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        cover: () => {
+          coverHttpCalls += 1;
+          return jpegResponse(coverBody);
+        },
+      }),
     });
   const info: DlsiteWorkInfo = {
     rjCode: "RJ900002",
@@ -906,17 +937,14 @@ test("DLsite HTMLキャッシュ: fresh DBで.meta.jsonを削除して同じ作�
   const makeAdapter = (database: { kind: "files"; catalogPath: string; userPath: string }) =>
     createRealAdapter({
       database,
-      dlsiteRequestIntervalMs: 0,
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
       dlsiteCache: { path: cachePath },
-      dlsiteHtmlFetcher: async () => {
-        htmlHttpCalls += 1;
-        return { status: 200, contentType: "text/html", body: SAMPLE_HTML };
-      },
-      dlsiteParser: (html, code) => {
-        const parsed = parseDlsiteHtml(html, code);
-        if (!parsed.ok) return parsed;
-        return { ok: true, info: { ...parsed.info, coverUrl: null } };
-      },
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: () => {
+          htmlHttpCalls += 1;
+          return htmlResponse(sampleWorkHtml("RJ900002", { cover: false }));
+        },
+      }),
     });
   const firstDb = {
     kind: "files" as const,
@@ -962,11 +990,14 @@ test("DLsite HTMLキャッシュ: 期限切れの再取得失敗はstaleへ戻�
   let fail = false;
   const adapter = createRealAdapter({
     database: { kind: "memory" },
+    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
     dlsiteCache: { path: join(dir.path, "cache.sqlite"), ttlsMs: { ok: 1 }, clock: () => now },
-    dlsiteHtmlFetcher: async () => {
-      if (fail) throw new Error("transport failed");
-      return { status: 200, contentType: "text/html", body: SAMPLE_HTML };
-    },
+    dlsiteSchedulerDependencies: mockDlsiteTransport({
+      html: () => {
+        if (fail) throw new Error("transport failed");
+        return htmlResponse(SAMPLE_HTML);
+      },
+    }),
   });
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
@@ -1002,12 +1033,15 @@ test("DLsite HTMLキャッシュ: forceが失敗しても次回の通常取得�
   let succeed = true;
   const adapter = createRealAdapter({
     database: { kind: "memory" },
+    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
     dlsiteCache: { path: join(dir.path, "cache.sqlite") },
-    dlsiteHtmlFetcher: async () => {
-      calls += 1;
-      if (succeed) return { status: 200, contentType: "text/html", body: SAMPLE_HTML };
-      return { status: 500, contentType: "text/html", body: "<html>error</html>" };
-    },
+    dlsiteSchedulerDependencies: mockDlsiteTransport({
+      html: () => {
+        calls += 1;
+        if (succeed) return htmlResponse(SAMPLE_HTML);
+        return htmlResponse("<html>error</html>", 500);
+      },
+    }),
   });
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
@@ -1035,15 +1069,11 @@ test("DLsite bulk: 2回目はcache hitでmeta.jsonとlastAttemptAtを書き換�
   t.after(dir.cleanup);
   const adapter = createRealAdapter({
     database: { kind: "memory" },
-    dlsiteRequestIntervalMs: 0,
+    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
     dlsiteCache: { path: join(dir.path, "cache.sqlite") },
-    dlsiteHtmlFetcher: async () => ({ status: 200, contentType: "text/html", body: SAMPLE_HTML }),
-    // coverUrlをnullにしてカバーDLを避け、HTML cache no-op判定だけを検証する。
-    dlsiteParser: (html, code) => {
-      const parsed = parseDlsiteHtml(html, code);
-      if (!parsed.ok) return parsed;
-      return { ok: true, info: { ...parsed.info, coverUrl: null } };
-    },
+    dlsiteSchedulerDependencies: mockDlsiteTransport({
+      html: () => htmlResponse(sampleWorkHtml("RJ900002", { cover: false })),
+    }),
   });
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
@@ -1072,11 +1102,14 @@ test("DLsiteカバー: 同じURLを2作品へ同時適用してもHTTPは1回で
   );
   const adapter = createRealAdapter({
     database: { kind: "memory" },
+    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
     dlsiteCache: { path: join(dir.path, "cache.sqlite") },
-    dlsiteCoverFetcher: async (url) => {
-      coverCalls += 1;
-      return { contentType: "image/jpeg", body: coverBody, finalUrl: url };
-    },
+    dlsiteSchedulerDependencies: mockDlsiteTransport({
+      cover: () => {
+        coverCalls += 1;
+        return jpegResponse(coverBody);
+      },
+    }),
   });
   await adapter.updateSettings({ rootFolder: lib.root });
   const scan = await adapter.scan();
@@ -1186,28 +1219,25 @@ test("DLsite HTML: Content-Lengthがtransfer上限を超える場合は本文読
   assert.equal(cancelled, true);
 });
 
-test("DLsite apply: カバーはcache transportを通り、注入downloaderを迂回しない", async (t) => {
+test("DLsite apply: カバーはcache transportを通る", async (t) => {
   const lib = makeSampleLibrary();
   const dir = makeTestDirectory("dlsite-apply-cover-cache");
   t.after(lib.cleanup);
   t.after(dir.cleanup);
   let coverCalls = 0;
+  const coverBody = new Uint8Array(
+    readFileSync(join(lib.root, "dlsite", "RJ900001_テスト作品", "cover.jpg")),
+  );
   const adapter = createRealAdapter({
     database: { kind: "memory" },
+    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
     dlsiteCache: { path: join(dir.path, "cache.sqlite") },
-    dlsiteCoverDownloader: async () => {
-      throw new Error("legacy downloader must not be called");
-    },
-    dlsiteCoverFetcher: async (url) => {
-      coverCalls += 1;
-      return {
-        contentType: "image/jpeg",
-        body: new Uint8Array(
-          readFileSync(join(lib.root, "dlsite", "RJ900001_テスト作品", "cover.jpg")),
-        ),
-        finalUrl: url,
-      };
-    },
+    dlsiteSchedulerDependencies: mockDlsiteTransport({
+      cover: () => {
+        coverCalls += 1;
+        return jpegResponse(coverBody);
+      },
+    }),
   });
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
@@ -1236,24 +1266,20 @@ test("DLsite bulk: カバー取得もcache transportを通る", async (t) => {
   t.after(lib.cleanup);
   t.after(dir.cleanup);
   let coverCalls = 0;
+  const coverBody = new Uint8Array(
+    readFileSync(join(lib.root, "dlsite", "RJ900001_テスト作品", "cover.jpg")),
+  );
   const adapter = createRealAdapter({
     database: { kind: "memory" },
-    dlsiteRequestIntervalMs: 0,
+    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
     dlsiteCache: { path: join(dir.path, "cache.sqlite") },
-    dlsiteHtmlFetcher: async () => ({ status: 200, contentType: "text/html", body: SAMPLE_HTML }),
-    dlsiteCoverDownloader: async () => {
-      throw new Error("legacy downloader must not be called");
-    },
-    dlsiteCoverFetcher: async (url) => {
-      coverCalls += 1;
-      return {
-        contentType: "image/jpeg",
-        body: new Uint8Array(
-          readFileSync(join(lib.root, "dlsite", "RJ900001_テスト作品", "cover.jpg")),
-        ),
-        finalUrl: url,
-      };
-    },
+    dlsiteSchedulerDependencies: mockDlsiteTransport({
+      html: () => htmlResponse(SAMPLE_HTML),
+      cover: () => {
+        coverCalls += 1;
+        return jpegResponse(coverBody);
+      },
+    }),
   });
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
@@ -1265,27 +1291,22 @@ test("DLsite bulk: カバー取得もcache transportを通る", async (t) => {
 
 test("一括取得: カバー取得失敗を作品のerrorへ記録し、後続作品を処理する", async (t) => {
   const lib = makeSampleLibrary();
+  const dir = makeTestDirectory("dlsite-bulk-cover-failure");
   t.after(lib.cleanup);
-  let downloads = 0;
+  t.after(dir.cleanup);
+  let coverCalls = 0;
   const adapter = createRealAdapter({
     database: { kind: "memory" },
-    dlsiteRequestIntervalMs: 0,
-    dlsiteFetcher: async (rjCode) => ({
-      ok: true,
-      info: {
-        rjCode,
-        title: `取得済み ${rjCode}`,
-        circle: null,
-        cvs: [],
-        genreTags: ["テスト"],
-        coverUrl: "https://example.test/cover.jpg",
-        url: `https://www.dlsite.com/maniax/work/=/product_id/${rjCode}.html`,
+    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+    dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+    dlsiteSchedulerDependencies: mockDlsiteTransport({
+      html: (code) =>
+        htmlResponse(sampleWorkHtml(code, { title: `取得済み ${code}`, genres: ["テスト"] })),
+      cover: () => {
+        coverCalls += 1;
+        throw new Error("カバー取得失敗");
       },
     }),
-    dlsiteCoverDownloader: async () => {
-      downloads += 1;
-      throw new Error("カバー取得失敗");
-    },
   });
   await adapter.updateSettings({ rootFolder: lib.root });
   const scan = await adapter.scan();
@@ -1293,38 +1314,36 @@ test("一括取得: カバー取得失敗を作品のerrorへ記録し、後続�
   const result = await adapter.runDlsiteBulk("existing", undefined);
 
   assert.deepEqual(result, { fetched: 1, failed: 1, parseErrors: 0, skipped: 0 });
-  assert.equal(downloads, 1);
+  assert.equal(coverCalls, 1);
   const failed = await adapter.getWork(lib.existingWorkId);
   assert.equal(failed?.dlsite.status, "error");
   assert.equal(failed?.dlsite.error, "カバー取得失敗");
   assert.ok(failed?.dlsite.lastAttemptAt);
   const succeeded = await adapter.getWork(scan.newWorkIds[0]!);
   assert.equal(succeeded?.dlsite.status, "applied");
+  adapter.close();
 });
 
 test("一括取得: 失敗状態のメタ書き戻しが例外を投げても後続作品を処理する", async (t) => {
   const lib = makeSampleLibrary();
+  const dir = makeTestDirectory("dlsite-bulk-meta-write-failure");
   t.after(lib.cleanup);
+  t.after(dir.cleanup);
+  const coverBody = new Uint8Array(
+    readFileSync(join(lib.root, "dlsite", "RJ900001_テスト作品", "cover.jpg")),
+  );
   const adapter = createRealAdapter({
     database: { kind: "memory" },
-    dlsiteRequestIntervalMs: 0,
-    dlsiteFetcher: async (rjCode) => ({
-      ok: true,
-      info: {
-        rjCode,
-        title: `取得済み ${rjCode}`,
-        circle: null,
-        cvs: [],
-        genreTags: ["テスト"],
-        coverUrl: "https://example.test/cover.jpg",
-        url: `https://www.dlsite.com/maniax/work/=/product_id/${rjCode}.html`,
+    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+    dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+    dlsiteSchedulerDependencies: mockDlsiteTransport({
+      html: (code) =>
+        htmlResponse(sampleWorkHtml(code, { title: `取得済み ${code}`, genres: ["テスト"] })),
+      cover: (url) => {
+        if (url.includes("RJ900002")) throw new Error("カバー取得失敗");
+        return jpegResponse(coverBody);
       },
     }),
-    // 1作品目: カバーDL失敗で catch へ → メタが読み取り専用のため失敗状態の保存も失敗する
-    dlsiteCoverDownloader: async (_url, workDir) => {
-      if (workDir.includes("RJ900002")) throw new Error("カバー取得失敗");
-      return "dlsite_cover.jpg";
-    },
   });
   await adapter.updateSettings({ rootFolder: lib.root });
   const scan = await adapter.scan();
@@ -1338,6 +1357,7 @@ test("一括取得: 失敗状態のメタ書き戻しが例外を投げても後
   assert.deepEqual(result, { fetched: 1, failed: 1, parseErrors: 0, skipped: 0 });
   const succeeded = await adapter.getWork(scan.newWorkIds[0]!);
   assert.equal(succeeded?.dlsite.status, "applied");
+  adapter.close();
 });
 
 test("一括取得: 中断後の再実行で処理済み作品はHTTPしない", async (t) => {
@@ -1356,17 +1376,14 @@ test("一括取得: 中断後の再実行で処理済み作品はHTTPしない",
   const controller = new AbortController();
   const adapter = createRealAdapter({
     database: { kind: "memory" },
-    dlsiteRequestIntervalMs: 0,
+    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
     dlsiteCache: { path: join(dir.path, "dlsite-cache.sqlite") },
-    dlsiteHtmlFetcher: async () => {
-      httpCalls += 1;
-      return { status: 200, contentType: "text/html", body: SAMPLE_HTML };
-    },
-    dlsiteParser: (html, code) => {
-      const parsed = parseDlsiteHtml(html, code);
-      if (!parsed.ok) return parsed;
-      return { ok: true, info: { ...parsed.info, coverUrl: null } };
-    },
+    dlsiteSchedulerDependencies: mockDlsiteTransport({
+      html: () => {
+        httpCalls += 1;
+        return htmlResponse(sampleWorkHtml("RJ900002", { cover: false }));
+      },
+    }),
   });
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();

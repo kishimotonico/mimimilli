@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { chmodSync, mkdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
-import { createRealAdapter } from "../../src/adapters/real/index.ts";
+import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { openDb } from "../../src/adapters/real/db.ts";
 import { Scanner } from "../../src/adapters/real/scanner.ts";
 import { WorkRepo } from "../../src/adapters/real/workRepo.ts";
@@ -49,7 +49,7 @@ test("ルート読取失敗: スキャンがエラー終了し missing 更新さ
   writeWav(join(workDir, "track.wav"), 1);
   writeFileSync(join(workDir, ".meta.json"), JSON.stringify(metaWithSingleTrack(workId, "work")));
 
-  const adapter = createRealAdapter({ database: { kind: "memory" } });
+  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
   await adapter.updateSettings({ rootFolder: root });
   await adapter.scan();
 

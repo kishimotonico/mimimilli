@@ -4,7 +4,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
 import type { WorksPage } from "@mimimilli/shared";
-import { createRealAdapter } from "../../src/adapters/real/index.ts";
+import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { WorkRepo } from "../../src/adapters/real/workRepo.ts";
 import { createApp } from "../../src/app.ts";
 import { makeSampleLibrary, makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
@@ -14,7 +14,7 @@ async function setup(t: TestContext) {
   t.after(lib.cleanup);
   // ルート直下（作品フォルダー外）に「秘密ファイル」を置き、トラバーサルの検証に使う
   writeFileSync(join(lib.root, "secret.txt"), "library-secret");
-  const adapter = createRealAdapter({ database: { kind: "memory" } });
+  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
   const app = createApp(adapter);
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
@@ -107,7 +107,7 @@ test("メディア解決: getWork・probe cache問い合わせを伴わない", 
     return originalFetchProbeCache.apply(this, args);
   };
 
-  const adapter = createRealAdapter({ database: { kind: "memory" } });
+  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
   const app = createApp(adapter);
   await adapter.updateSettings({ rootFolder: root });
   await adapter.scan();

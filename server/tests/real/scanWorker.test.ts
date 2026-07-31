@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import type { ScanJobSnapshot, WorksPage } from "@mimimilli/shared";
-import { createRealAdapter } from "../../src/adapters/real/index.ts";
+import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { createApp } from "../../src/app.ts";
 import { makeSampleLibrary } from "../helpers/sampleLibrary.ts";
 
@@ -30,7 +30,7 @@ test("file scan Workerの同期停止中もworks/Range mediaへ応答し、cance
   };
   const thumbnailCacheDir = join(library.baseDir, "data", "thumbnails");
 
-  const seed = createRealAdapter({
+  const seed = createTestRealAdapter({
     database,
     dataRoot: join(library.baseDir, "data"),
     thumbnailCacheDir,
@@ -46,7 +46,7 @@ test("file scan Workerの同期停止中もworks/Range mediaへ応答し、cance
   const workerReady = new Promise<void>((resolve) => {
     ready = resolve;
   });
-  const adapter = createRealAdapter({
+  const adapter = createTestRealAdapter({
     database,
     dataRoot: join(library.baseDir, "data"),
     thumbnailCacheDir,
@@ -124,7 +124,7 @@ test("file scan Workerはfull:trueをscannerへ伝播し全件再処理する", 
     userPath: join(library.baseDir, "data", "db", "user.sqlite"),
   };
   const thumbnailCacheDir = join(library.baseDir, "data", "thumbnails");
-  const adapter = createRealAdapter({
+  const adapter = createTestRealAdapter({
     database,
     dataRoot: join(library.baseDir, "data"),
     thumbnailCacheDir,

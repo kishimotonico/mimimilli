@@ -1,9 +1,11 @@
 ---
 id: TASK-98
 title: DLsiteのテスト用注入口をschedulerのtransport1点へ集約する
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-07-25 23:34'
+updated_date: '2026-07-31 02:04'
 labels: []
 dependencies: []
 priority: medium
@@ -50,3 +52,12 @@ HTTPレイヤー1点、つまり `DlsiteScheduler` の `transport` 注入だけ�
 - [ ] #4 dlsite.test.ts が scheduler の transport 注入ベースで書かれ、実ネットワークへアクセスしない
 - [ ] #5 既存のDLsite関連テストのカバレッジが実質的に落ちていない（検証していた挙動が引き続き検証されている）
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. DlsiteScheduler transport注入1点化、6注入口と死コード分岐の削除
+2. dlsiteCache必須化
+3. dlsite.test.tsのtransportベース書き換え
+実装Cursor委譲、Codexレビュー実施
+<!-- SECTION:PLAN:END -->

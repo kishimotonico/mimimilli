@@ -5,7 +5,7 @@ import { join, resolve } from "node:path";
 import { test, type TestContext } from "node:test";
 import type { FsListing, Work, WorksPage } from "@mimimilli/shared";
 import type { Hono } from "hono";
-import { createRealAdapter } from "../../src/adapters/real/index.ts";
+import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import type { FsWorkRef } from "../../src/adapters/real/fsBrowse.ts";
 import { buildWorkPathIndex, findOwnerWork } from "../../src/adapters/real/fsBrowse.ts";
 import { openDb, type Db } from "../../src/adapters/real/db.ts";
@@ -49,7 +49,7 @@ async function setup(t: TestContext, prepare?: (root: string) => void) {
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
   prepare?.(lib.root);
-  const adapter = createRealAdapter({ database: { kind: "memory" } });
+  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
   const app = createApp(adapter);
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();

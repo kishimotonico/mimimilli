@@ -6,7 +6,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import type { WorksQuery } from "@mimimilli/shared";
-import { createRealAdapter } from "../../src/adapters/real/index.ts";
+import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 
 test("durationSec: end-start / end有start無 / start有end無 / 両無 / 同一ファイル複数区間 / デフォルト外playlist / probe失敗", async (t) => {
@@ -69,7 +69,7 @@ test("durationSec: end-start / end有start無 / start有end無 / 両無 / 同一
     ),
   );
 
-  const adapter = createRealAdapter({ database: { kind: "memory" } });
+  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
   await adapter.updateSettings({ rootFolder: root });
   await adapter.scan();
 
@@ -165,7 +165,7 @@ test("startがファイル全体長以上のトラックは作品をerror状態�
     ),
   );
 
-  const adapter = createRealAdapter({ database: { kind: "memory" } });
+  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
   await adapter.updateSettings({ rootFolder: root });
   await adapter.scan();
 
@@ -228,7 +228,7 @@ test("end指定トラックでもstartがファイル全体長を超えていれ
     ),
   );
 
-  const adapter = createRealAdapter({ database: { kind: "memory" } });
+  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
   await adapter.updateSettings({ rootFolder: root });
   await adapter.scan();
 
@@ -281,7 +281,7 @@ test("endがファイル実測長をわずかに超えるだけの正常デー�
     ),
   );
 
-  const adapter = createRealAdapter({ database: { kind: "memory" } });
+  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
   await adapter.updateSettings({ rootFolder: root });
   await adapter.scan();
 
@@ -329,7 +329,7 @@ test("rescan無しのファイル差し替え後、getWorkのtotalDurationSecは
     ),
   );
 
-  const adapter = createRealAdapter({ database: { kind: "memory" } });
+  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
   await adapter.updateSettings({ rootFolder: root });
   await adapter.scan();
 
