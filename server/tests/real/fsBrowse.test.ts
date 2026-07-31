@@ -19,6 +19,8 @@ function sampleWork(id: string, physicalPath: string): Work {
     id,
     title: id,
     cover: null,
+    coverKind: "none",
+    coverImage: null,
     status: "ok",
     physicalPath,
     totalDurationSec: 1,

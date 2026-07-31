@@ -29,6 +29,7 @@ import type {
   Work,
 } from "@mimimilli/shared";
 import {
+  coverFieldsFromColumns,
   emptyDlsiteState,
   isRjCodeMissing,
   isInvalidTrackStart,
@@ -890,6 +891,11 @@ export class Scanner {
       cover.image !== null && cover.dimensions !== null
         ? { image: cover.image, dimensions: cover.dimensions }
         : null;
+    const { coverKind, coverImage } = coverFieldsFromColumns(
+      cover.image,
+      cover.dimensions?.width ?? null,
+      cover.dimensions?.height ?? null,
+    );
 
     // メタへの書き戻し（RJコード等）があった場合、保存する fingerprint は書き戻し後の内容に合わせる
     const finalFingerprint = computeFingerprint(metaPath, { ...meta, dlsite });
@@ -897,6 +903,8 @@ export class Scanner {
       id,
       title: meta.title,
       cover: workCover,
+      coverKind,
+      coverImage,
       defaultPlaylistId: meta.defaultPlaylistId,
       createdAt: meta.createdAt ?? null,
       status: errorMessage ? "error" : "ok",

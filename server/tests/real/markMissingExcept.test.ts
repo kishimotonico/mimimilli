@@ -13,6 +13,8 @@ function sampleWork(id: string): Work {
     id,
     title: `作品 ${id}`,
     cover: null,
+    coverKind: "none",
+    coverImage: null,
     status: "ok",
     physicalPath: `/library/${id}`,
     totalDurationSec: 10,

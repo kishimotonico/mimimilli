@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { emptyDlsiteState, type Work, type WorkSummary } from "@mimimilli/shared";
+import {
+  emptyDlsiteState,
+  coverFieldsFromCover,
+  type Work,
+  type WorkSummary,
+} from "@mimimilli/shared";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { createApp } from "../src/app.ts";
 import { openDb } from "../src/adapters/real/db.ts";
@@ -40,8 +45,11 @@ function notificationWorks(count: number): WorkSummary[] {
 
 function asWork(summary: WorkSummary): Work {
   const { trackCount: _trackCount, ...work } = summary;
+  const { coverKind, coverImage } = coverFieldsFromCover(summary.cover);
   return {
     ...work,
+    coverKind,
+    coverImage,
     defaultPlaylistId: null,
     createdAt: null,
     playlists: [],

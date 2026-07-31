@@ -161,6 +161,8 @@ describe("usePlayer adapters", () => {
   it("PlayerRuntime ありで再生対象がないときは playWithResume / seek が no-op する", () => {
     const workWithoutResume: Work = {
       ...work,
+      coverKind: "none",
+      coverImage: null,
       defaultPlaylistId: playlistId,
       createdAt: null,
       playlists: [{ id: playlistId, name: "default", tracks: [track] }],
@@ -396,6 +398,8 @@ describe("usePlayer adapters", () => {
   it("作品聴了コマンドをレジュームの先頭リセットとQuery cacheへ接続する", async () => {
     const resumableWork: Work = {
       ...work,
+      coverKind: "none",
+      coverImage: null,
       defaultPlaylistId: playlistId,
       createdAt: null,
       playlists: [{ id: playlistId, name: "default", tracks: [track] }],
@@ -611,6 +615,8 @@ describe("usePlayer adapters", () => {
     const segment: Track = { ...track, start: 30, end: 90 };
     const resumableWork: Work = {
       ...work,
+      coverKind: "none",
+      coverImage: null,
       defaultPlaylistId: playlistId,
       createdAt: null,
       playlists: [{ id: playlistId, name: "default", tracks: [segment] }],

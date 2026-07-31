@@ -462,6 +462,8 @@ test("カバー計測失敗: 画像が読めない場合は寸法NULLでcoverErr
   const generated = await adapter.getWork(first.newWorkIds[0]!);
   // 画像はあるが計測失敗＝表示可能なカバー無しとしてnull投影する（0/1で埋めない）
   assert.equal(generated!.cover, null);
+  assert.equal(generated!.coverKind, "unmeasured");
+  assert.equal(generated!.coverImage, "cover.jpg");
 
   // 寸法が欠損したままなのでearly skipは許可されず、次回スキャンでも再試行される
   const second = await adapter.scan();

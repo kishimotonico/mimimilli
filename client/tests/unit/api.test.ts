@@ -6,6 +6,7 @@ import * as settingsApi from "../../src/features/settings/api";
 import * as scanApi from "../../src/features/scan/api";
 import {
   emptyDlsiteState,
+  coverFieldsFromCover,
   type Work,
   type WorkListItem,
   type WorkSummary,
@@ -59,9 +60,12 @@ function makeWorkListItem(overrides: Partial<WorkListItem> = {}): WorkListItem {
 
 function makeWork(overrides: Partial<Work> = {}): Work {
   const { trackCount: _trackCount, ...summary } = makeWorkSummary();
+  const { coverKind, coverImage } = coverFieldsFromCover(summary.cover);
   const playlistId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
   return {
     ...summary,
+    coverKind,
+    coverImage,
     defaultPlaylistId: playlistId,
     createdAt: null,
     playlists: [

@@ -14,6 +14,8 @@ function sampleWork(id: string): Work {
     id,
     title: "永続データ検証用",
     cover: null,
+    coverKind: "none",
+    coverImage: null,
     status: "ok",
     physicalPath: `/library/${id}`,
     totalDurationSec: 10,

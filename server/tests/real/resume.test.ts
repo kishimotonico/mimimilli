@@ -17,6 +17,8 @@ function sampleWork(id: string): Work {
     id,
     title: id,
     cover: null,
+    coverKind: "none",
+    coverImage: null,
     status: "ok",
     physicalPath: `/library/${id}`,
     totalDurationSec: 90,

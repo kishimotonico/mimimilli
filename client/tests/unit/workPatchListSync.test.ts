@@ -58,6 +58,8 @@ function makeWorkDetail(id: string, title = `作品 ${id}`): Work {
     id,
     title,
     cover: null,
+    coverKind: "none",
+    coverImage: null,
     status: "ok",
     physicalPath: `/lib/${id}`,
     totalDurationSec: 60,

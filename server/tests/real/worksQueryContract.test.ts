@@ -5,6 +5,7 @@ import {
   normalizeTags,
   sortIdSchema,
   toWorkListItem,
+  coverFieldsFromCover,
   type SmartFolderRule,
   type Work,
   type WorksQuery,
@@ -64,9 +65,12 @@ function summary(index: number): WorkSummary {
 
 function fullWork(item: WorkSummary): Work {
   const { trackCount, ...rest } = item;
+  const { coverKind, coverImage } = coverFieldsFromCover(item.cover);
   const playlistId = trackCount > 0 ? crypto.randomUUID() : null;
   return {
     ...rest,
+    coverKind,
+    coverImage,
     defaultPlaylistId: playlistId,
     createdAt: item.addedAt,
     playlists:

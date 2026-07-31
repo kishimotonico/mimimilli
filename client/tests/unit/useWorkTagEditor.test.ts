@@ -13,6 +13,8 @@ function makeWork(tags: string[]): Work {
     id: "work-1",
     title: "作品1",
     cover: null,
+    coverKind: "none",
+    coverImage: null,
     status: "ok",
     physicalPath: "/works/work-1",
     totalDurationSec: 120,

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emptyDlsiteState } from "@mimimilli/shared";
-import type { DlsiteWorkInfo, Work } from "@mimimilli/shared";
+import { emptyDlsiteState, type DlsiteWorkInfo, type Work } from "@mimimilli/shared";
 import {
   buildDlsiteApplyBody,
   dlsiteInfoTags,
@@ -21,6 +20,8 @@ const work = {
   id: "work-1",
   title: "現在タイトル",
   cover: null,
+  coverKind: "none",
+  coverImage: null,
   status: "ok",
   physicalPath: "/lib/work-1",
   totalDurationSec: 0,

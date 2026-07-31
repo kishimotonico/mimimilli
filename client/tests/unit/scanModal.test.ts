@@ -29,6 +29,8 @@ const work: Work = {
   id: "work-1",
   title: "新規作品",
   cover: null,
+  coverKind: "none",
+  coverImage: null,
   status: "ok",
   physicalPath: "/audio/work-1",
   totalDurationSec: 120,

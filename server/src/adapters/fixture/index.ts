@@ -11,6 +11,7 @@ import {
   normalizeTags,
   toWorkListItem,
   toTrackDurationFieldsFromSec,
+  coverFieldsFromColumns,
 } from "@mimimilli/shared";
 import type {
   AxisFacetItem,
@@ -62,8 +63,11 @@ import { applyWorksQuery } from "../../core/worksQuery.ts";
 import {
   buildFsRoot,
   buildWorkFileTree,
+  fixtureCoverColumnsForWork,
+  fixtureCoverFromColumns,
   SEED_PLAYLIST_SPECS,
   SEED_TRACK_NAMES,
+  type FixtureCoverColumns,
   type FsNode,
 } from "./data.ts";
 import {
@@ -84,6 +88,8 @@ interface FixtureState {
   rootFolder: string | null;
   lastScanTime: string | null;
   works: WorkSummary[];
+  /** 編集用カバー列（表示用 cover と独立。unmeasured を表現する） */
+  coverColumns: Map<string, FixtureCoverColumns>;
   tagPrefixes: TagPrefix[];
   smartFolders: SmartFolder[];
   nextSmartFolderId: number;
@@ -114,10 +120,16 @@ function createInitialState(options: FixtureAdapterOptions): FixtureState {
     const m = /^sf-(\d+)$/.exec(sf.id);
     return m ? Math.max(max, Number(m[1])) : max;
   }, 0);
+  const works = options.works ?? scenario.works;
+  const coverColumns = new Map<string, FixtureCoverColumns>();
+  for (const work of works) {
+    coverColumns.set(work.id, fixtureCoverColumnsForWork(work));
+  }
   return {
     rootFolder: scenario.rootFolder,
     lastScanTime: scenario.lastScanTime,
-    works: options.works ?? scenario.works,
+    works,
+    coverColumns,
     tagPrefixes: DEFAULT_TAG_PREFIXES.map((def) => ({ ...def })),
     smartFolders: scenario.smartFolders,
     nextSmartFolderId: maxSmartFolderNum + 1,
@@ -161,8 +173,17 @@ function ensurePlaybackIds(
 /** WorkSummary から完全形 Work を構築する。
  *  SEED_PLAYLIST_SPECS で明示指定された作品はそれをそのまま解決済みplaylistsにし、
  *  未指定の作品は trackCount からファイル全体トラック（durationSecはtotalDurationSecの等分）を自動生成する。 */
+function coverColumnsOf(state: FixtureState, workId: string): FixtureCoverColumns {
+  return state.coverColumns.get(workId) ?? { image: null, dimensions: null };
+}
+
+function buildFullWorkFromState(state: FixtureState, work: WorkSummary): Work {
+  return buildFullWork(work, coverColumnsOf(state, work.id), state.resumes, state.playbackIds);
+}
+
 function buildFullWork(
   summary: WorkSummary,
+  coverColumns: FixtureCoverColumns,
   resumes: Map<string, ResumeBody>,
   playbackIds: Map<string, PlaybackIds>,
 ): Work {
@@ -206,9 +227,17 @@ function buildFullWork(
 
   const { trackCount: _trackCount, ...rest } = summary;
   const resume = resumes.get(summary.id);
+  const { cover, coverKind, coverImage } = coverFieldsFromColumns(
+    coverColumns.image,
+    coverColumns.dimensions?.width ?? null,
+    coverColumns.dimensions?.height ?? null,
+  );
 
   return {
     ...rest,
+    cover,
+    coverKind,
+    coverImage,
     defaultPlaylistId: playlists[0]?.id ?? null,
     createdAt: summary.addedAt,
     playlists,
@@ -226,8 +255,8 @@ function findTrackByFile(work: Work, relPath: string): ResolvedTrack | undefined
 }
 
 /** 作品の FileEntry ツリー（ルートは作品フォルダー自体。path は相対パスで `""` がルート直下を示す） */
-function buildWorkFileEntryTree(work: WorkSummary): FileEntry {
-  const children = buildWorkFileTree(work);
+function buildWorkFileEntryTree(work: WorkSummary, coverColumns: FixtureCoverColumns): FileEntry {
+  const children = buildWorkFileTree(work, coverColumns.image);
 
   function convert(nodes: FsNode[], basePath: string): FileEntry[] {
     return nodes.map((n): FileEntry => {
@@ -267,11 +296,15 @@ function normalizeFsPath(path: string): string {
 
 /** 作品配下のファイルツリーから相対パス（"特典/台本.pdf" 等）でノードを探す。
  *  存在しない・ディレクトリの場合は null */
-function findWorkFile(work: WorkSummary, relPath: string): FsNode | null {
+function findWorkFile(
+  work: WorkSummary,
+  coverColumns: FixtureCoverColumns,
+  relPath: string,
+): FsNode | null {
   const segments = relPath.split("/").filter(Boolean);
   if (segments.length === 0) return null;
 
-  let nodes = buildWorkFileTree(work);
+  let nodes = buildWorkFileTree(work, coverColumns.image);
   for (let i = 0; i < segments.length; i++) {
     const seg = segments[i];
     const node = nodes.find((n) => n.name === seg);
@@ -409,7 +442,7 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
 
     async getWork(id: string): Promise<Work | null> {
       const work = state.works.find((w) => w.id === id);
-      return work ? buildFullWork(work, state.resumes, state.playbackIds) : null;
+      return work ? buildFullWorkFromState(state, work) : null;
     },
 
     async patchWork(id: string, patch: WorkPatch): Promise<Work | null> {
@@ -418,13 +451,13 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
       if (patch.title !== undefined) work.title = patch.title;
       if (patch.tags !== undefined) work.tags = normalizeTags(patch.tags);
       if (patch.bookmarked !== undefined) work.bookmarked = patch.bookmarked;
-      return buildFullWork(work, state.resumes, state.playbackIds);
+      return buildFullWorkFromState(state, work);
     },
 
     async saveResume(id: string, body: ResumeBody): Promise<boolean> {
       const work = state.works.find((w) => w.id === id);
       if (!work) return false;
-      const fullWork = buildFullWork(work, state.resumes, state.playbackIds);
+      const fullWork = buildFullWorkFromState(state, work);
       const playlist = fullWork.playlists.find((candidate) => candidate.id === body.playlistId);
       const track = playlist?.tracks.find((candidate) => candidate.id === body.trackId);
       if (!track) {
@@ -446,7 +479,7 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
 
     async listWorkFiles(id: string): Promise<FileEntry | null> {
       const work = state.works.find((w) => w.id === id);
-      return work ? buildWorkFileEntryTree(work) : null;
+      return work ? buildWorkFileEntryTree(work, coverColumnsOf(state, work.id)) : null;
     },
 
     async listTags(): Promise<string[]> {
@@ -541,7 +574,7 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
       const rootAbs = normalizeFsPath(state.rootFolder ?? "/library");
       const target = path ? normalizeFsPath(path) : rootAbs;
 
-      const root = buildFsRoot(state.works);
+      const root = buildFsRoot(state.works, state.coverColumns);
       const dir = resolveFsNode(root, rootAbs, target);
       if (!dir) return null;
 
@@ -579,7 +612,7 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
       if (!relPath) return null;
 
       if (kind === "audio") {
-        const fullWork = buildFullWork(work, state.resumes, state.playbackIds);
+        const fullWork = buildFullWorkFromState(state, work);
         const track = findTrackByFile(fullWork, relPath);
         if (!track) return null;
 
@@ -589,7 +622,7 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
       }
 
       // kind === "file": 作品配下に実在するパスのみ応答する
-      const node = findWorkFile(work, relPath);
+      const node = findWorkFile(work, coverColumnsOf(state, work.id), relPath);
       if (!node) return null;
 
       if (isImagePath(relPath)) return synthesizeFilePlaceholderSvg(relPath);
@@ -641,11 +674,13 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
       const applyTags = normalizeTags(body.applyTags);
       work.tags = normalizeTags([...work.tags, ...applyTags]);
       if (body.applyCover && body.info.coverUrl) {
-        // fixture には実画像が無いため、既存寸法を引き継ぐか無ければ正方形で確定させる
-        work.cover = {
+        const dimensions = work.cover?.dimensions ?? { width: 900, height: 900 };
+        const columns: FixtureCoverColumns = {
           image: body.info.coverUrl,
-          dimensions: work.cover?.dimensions ?? { width: 900, height: 900 },
+          dimensions,
         };
+        state.coverColumns.set(workId, columns);
+        work.cover = fixtureCoverFromColumns(columns);
       }
       work.dlsite = {
         rjCode: body.info.rjCode,
@@ -662,7 +697,7 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
       const work = state.works.find((candidate) => candidate.id === workId);
       if (!work) return null;
       work.dlsite = applyDlsiteStatePatch(work.dlsite, patch);
-      return buildFullWork(work, state.resumes, state.playbackIds);
+      return buildFullWorkFromState(state, work);
     },
 
     async runDlsiteBulk(

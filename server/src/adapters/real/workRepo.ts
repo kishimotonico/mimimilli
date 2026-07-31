@@ -2,6 +2,7 @@
 import { join, sep } from "node:path";
 import { asc, eq } from "drizzle-orm";
 import {
+  coverFieldsFromColumns,
   dlsiteStateSchema,
   emptyDlsiteState,
   evaluateParseErrorAlert,
@@ -20,7 +21,6 @@ import {
 } from "@mimimilli/shared";
 import type {
   AxisFacetItem,
-  Cover,
   DlsiteState,
   DlsiteNotificationKind,
   DlsiteNotificationPage,
@@ -120,27 +120,20 @@ export interface ScanWorkState {
   cover: CoverColumns;
 }
 
-/**
- * DBのカバー3列（cover_image / cover_width / cover_height）の生表現。
+/** DBのカバー3列（cover_image / cover_width / cover_height）の生表現。
  * image は .meta.json 由来のファイル名、dimensions は計測成功時のみ。
- * image あり・dimensions null は「カバーはあるが寸法を計測できていない」状態を表す。
- */
+ * image あり・dimensions null は「カバーはあるが寸法を計測できていない」状態を表す。 */
 export interface CoverColumns {
   image: string | null;
   dimensions: { width: number; height: number } | null;
 }
 
-/** DBのカバー列を公開DTOの cover へ投影する。画像かつ両寸法が揃うときだけ表示可能とみなす。 */
-function projectCover(image: string | null, width: number | null, height: number | null): Cover {
-  if (image === null || width === null || height === null) return null;
-  return { image, dimensions: { width, height } };
-}
-
-/** ドメインの cover から書き込み列を導く。upsertWork に明示指定が無いときの既定。 */
-function coverColumnsFromCover(cover: Cover): CoverColumns {
-  return cover === null
-    ? { image: null, dimensions: null }
-    : { image: cover.image, dimensions: cover.dimensions };
+/** ドメインの cover / coverImage から書き込み列を導く。upsertWork に明示指定が無いときの既定。 */
+function coverColumnsFromWork(work: Pick<Work, "cover" | "coverImage">): CoverColumns {
+  return {
+    image: work.coverImage,
+    dimensions: work.cover?.dimensions ?? null,
+  };
 }
 
 /** カバー配信の事前確認に必要な列だけを取得する軽量行。 */
@@ -218,7 +211,7 @@ function rowToSummary(row: SummaryRow, tagNames: string[], dlsite: DlsiteState):
     {
       id: row.id,
       title: row.title,
-      cover: projectCover(row.coverImage, row.coverWidth, row.coverHeight),
+      cover: coverFieldsFromColumns(row.coverImage, row.coverWidth, row.coverHeight).cover,
       status: row.status,
       physicalPath: row.physicalPath,
       totalDurationSec: row.totalDurationSec,
@@ -279,12 +272,15 @@ function rowToWork(
   // totalDurationSecはトラックのライブ解決値から都度再計算する（保存列のスキャン時点値だと
   // ファイル差し替え後にトラック合計と矛盾するため）。保存列との同期は呼び出し側が行う。
   const totalDurationSec = sumDefaultPlaylistDuration(row, playlists);
+  const coverFields = coverFieldsFromColumns(row.coverImage, row.coverWidth, row.coverHeight);
   return parseRecord(
     workSchema,
     {
       id: row.id,
       title: row.title,
-      cover: projectCover(row.coverImage, row.coverWidth, row.coverHeight),
+      cover: coverFields.cover,
+      coverKind: coverFields.coverKind,
+      coverImage: coverFields.coverImage,
       status: row.status,
       physicalPath: row.physicalPath,
       totalDurationSec,
@@ -837,7 +833,7 @@ export class WorkRepo {
       const items = rows.map((row) => ({
         id: row.id,
         title: row.title,
-        cover: projectCover(row.coverImage, row.coverWidth, row.coverHeight),
+        cover: coverFieldsFromColumns(row.coverImage, row.coverWidth, row.coverHeight).cover,
         status: row.status,
         totalDurationSec: row.totalDurationSec,
         trackCount: row.trackCount,
@@ -1206,7 +1202,7 @@ export class WorkRepo {
     const trackCount =
       defaultPlaylistOf({ id: work.id, defaultPlaylistId: work.defaultPlaylistId }, work.playlists)
         ?.tracks.length ?? 0;
-    const cover = options.cover ?? coverColumnsFromCover(work.cover);
+    const cover = options.cover ?? coverColumnsFromWork(work);
     const values: typeof works.$inferInsert = {
       id: work.id,
       title: work.title,

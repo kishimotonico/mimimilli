@@ -15,6 +15,7 @@ import {
   dlsiteInfoTags,
   unappliedDlsiteTags,
 } from "../../model/dlsitePreview";
+import { formatCoverEditLabel } from "../../../../shared/lib/coverLabel";
 
 export const STATUS_LABEL = {
   none: "未連携",
@@ -106,7 +107,7 @@ function DlsiteApplyDialog({
               onChange={(event) => onApplyCoverChange(event.target.checked)}
             />
             <span>カバー</span>
-            <span className="min-w-0 break-words text-ink-2">{work.cover?.image ?? "未設定"}</span>
+            <span className="min-w-0 break-words text-ink-2">{formatCoverEditLabel(work)}</span>
             <span className="text-ink-3">→</span>
             <span>{info.coverUrl ? "DLsite画像" : "画像なし"}</span>
           </label>

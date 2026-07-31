@@ -1,5 +1,6 @@
 // work ドメインのスキーマ。client/src/entities/work/model.ts の型を契約として固定したもの。
 import { z } from "zod";
+import { coverKindSchema } from "./cover.ts";
 import { dlsiteStateSchema } from "./dlsite.ts";
 import { trackDurationKindSchema } from "./duration.ts";
 import {
@@ -230,17 +231,76 @@ export function refinePlaylistCollection(
   }
 }
 
+export function refineWorkCoverFields(
+  work: Pick<Work, "cover" | "coverKind" | "coverImage">,
+  ctx: z.RefinementCtx,
+): void {
+  switch (work.coverKind) {
+    case "none":
+      if (work.cover !== null) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["cover"],
+          message: "coverKind が none のとき cover は null である必要があります",
+        });
+      }
+      if (work.coverImage !== null) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["coverImage"],
+          message: "coverKind が none のとき coverImage は null である必要があります",
+        });
+      }
+      break;
+    case "unmeasured":
+      if (work.cover !== null) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["cover"],
+          message: "coverKind が unmeasured のとき cover は null である必要があります",
+        });
+      }
+      if (work.coverImage === null) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["coverImage"],
+          message: "coverKind が unmeasured のとき coverImage は必須です",
+        });
+      }
+      break;
+    case "measured":
+      if (work.cover === null) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["cover"],
+          message: "coverKind が measured のとき cover は必須です",
+        });
+      } else if (work.coverImage !== work.cover.image) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["coverImage"],
+          message:
+            "coverKind が measured のとき coverImage は cover.image と一致する必要があります",
+        });
+      }
+      break;
+  }
+}
+
 export const workSchema = workSummarySchema
   .omit({ trackCount: true })
   .extend({
+    coverKind: coverKindSchema,
+    coverImage: z.string().nullable(),
     defaultPlaylistId: uuidV4Schema.nullable(),
     createdAt: z.string().nullable(),
     playlists: z.array(resolvedPlaylistSchema),
     resume: resumeSchema.nullable(),
   })
-  .superRefine((work, ctx) =>
-    refinePlaylistCollection(work.playlists, work.defaultPlaylistId, ctx),
-  );
+  .superRefine((work, ctx) => {
+    refinePlaylistCollection(work.playlists, work.defaultPlaylistId, ctx);
+    refineWorkCoverFields(work, ctx);
+  });
 export type Work = z.infer<typeof workSchema>;
 
 /** 詳細作品から一覧と同じデフォルトプレイリスト基準のトラック数を求める。 */

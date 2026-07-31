@@ -1,9 +1,11 @@
 ---
 id: TASK-96
 title: カバー編集UIが計測失敗を「未設定」と誤表示する問題を解消する
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-07-25 11:01'
+updated_date: '2026-07-31 00:50'
 labels: []
 dependencies: []
 ordinal: 97000
@@ -22,3 +24,11 @@ TASK-91でカバー契約を cover: {image, dimensions} | null に統合した�
 - [ ] #3 表示用のcover契約は『表示可能なカバーが無い』を一律nullに投影する現在の設計を壊していない
 - [ ] #4 上記が自動テストで検証されている
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. 編集用契約にカバーファイル有無・計測失敗の別を追加（TASK-94の結果型と同型設計）
+2. DlsiteEditorの表示を区別対応
+実装Cursor委譲、Codexレビュー実施
+<!-- SECTION:PLAN:END -->

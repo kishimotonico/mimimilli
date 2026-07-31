@@ -1,11 +1,11 @@
 ---
 id: TASK-94
 title: 計測結果を判別可能な結果型で表しUIの未知表現を統一する
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-07-25 10:27'
-updated_date: '2026-07-31 00:34'
+updated_date: '2026-07-31 00:50'
 labels: []
 dependencies: []
 ordinal: 95000
@@ -19,12 +19,12 @@ TASK-91/92と同型の『未知を暗黙の値で埋める』残渣を根本か�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 計測結果が判別可能な結果型で表現され、少なくとも『解決済み』『未計測』『解析失敗・非対応』『ファイル欠損』『データ不正(start>=ファイル長)』を呼び出し側が区別できる
-- [ ] #2 不正startの判定ロジックが1箇所に集約され、scannerとshared双方に同じ条件が重複実装されていない
-- [ ] #3 UIが『未計測』と『計測失敗』を区別して提示し、いずれも0:00と表示しない
-- [ ] #4 formatTime/formatDurationが未知(NaN・Infinity)を0:00へ潰さず、呼び出し側が未知を明示的に扱える
-- [ ] #5 同一のdurationSecがトラック一覧とプレイヤーで同じ文字列に整形される（丸め方が統一されている）
-- [ ] #6 pnpm checkとpnpm testが通り、既存の再生・シーク・曲送りに回帰がない
+- [x] #1 計測結果が判別可能な結果型で表現され、少なくとも『解決済み』『未計測』『解析失敗・非対応』『ファイル欠損』『データ不正(start>=ファイル長)』を呼び出し側が区別できる
+- [x] #2 不正startの判定ロジックが1箇所に集約され、scannerとshared双方に同じ条件が重複実装されていない
+- [x] #3 UIが『未計測』と『計測失敗』を区別して提示し、いずれも0:00と表示しない
+- [x] #4 formatTime/formatDurationが未知(NaN・Infinity)を0:00へ潰さず、呼び出し側が未知を明示的に扱える
+- [x] #5 同一のdurationSecがトラック一覧とプレイヤーで同じ文字列に整形される（丸め方が統一されている）
+- [x] #6 pnpm checkとpnpm testが通り、既存の再生・シーク・曲送りに回帰がない
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -67,4 +67,12 @@ TASK-91（カバー寸法のデータ化）、TASK-92（トラック再生時間
 - **client の Files/登録トラック判別が構造チェック**: client/src/features/player/model/trackTime.ts の `isResolvedTrack` が `"durationSec" in track` でFilesモードの即席Trackと登録トラック(ResolvedTrack)を判別している。zod検証済みDTOなので実行時は安全だが、登録トラック側でdurationSecが欠落すると黙って旧durationchange経路へ退行する形。Filesモード側に明示タグ(source: "files" 等)を持たせる案があり、結果型を入れるならあわせて判断する。2回目のCodexレビューでは指摘されなかった（実害は現時点で確認されていない）。
 
 2026-07-30 全体レビューからの補足（Codexレビュー指摘#14、方向性はこのタスクと同じ）: server/src/adapter.ts:160・adapters/real/index.ts:848・routes/works.ts:71 で boolean/null が「不存在」と「処理障害」を兼用し、カバー計測失敗やFS読取失敗が404へ変換されうる。判別可能な結果型（not_found / invalid_media / io_error 等のResult union）を境界に入れる際の対象箇所として参照。
+
+Codexレビュー指摘なし。丸めは総時間=四捨五入/経過時刻=切り捨てで統一（906.6秒が両画面15:07に）。getWorkの全ファイルprobe化は再生経路がTASK-152でgetWork非依存のため影響限定。
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+shared/duration.tsにProbeDurationResult/TrackDurationResult（5値）とisInvalidTrackStart一元化を導入、DTOへdurationKind追加（Zodで整合強制）。formatTime/formatDurationはNaN/Infinityでnull返却、UIは未計測--:--/失敗—を区別。429+382テスト・ビジュアル6/6・pnpm check通過。実装Cursor委譲、Codexレビュー指摘なし。
+<!-- SECTION:FINAL_SUMMARY:END -->

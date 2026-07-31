@@ -128,6 +128,8 @@ function buildWork(index: number, libRoot: string, rng: () => number): Work {
     id: workId(index),
     title,
     cover: null,
+    coverKind: "none",
+    coverImage: null,
     status: rng() < 0.02 ? "missing" : "ok",
     physicalPath,
     totalDurationSec,

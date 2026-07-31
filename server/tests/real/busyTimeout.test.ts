@@ -19,6 +19,8 @@ function sampleWork(): Work {
     id: WORK_ID,
     title: "busy_timeout検証",
     cover: null,
+    coverKind: "none",
+    coverImage: null,
     status: "ok",
     physicalPath: "/library/busy-timeout",
     totalDurationSec: 10,
