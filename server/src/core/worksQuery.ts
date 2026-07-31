@@ -1,6 +1,12 @@
 // 作品検索（GET /api/works）の純粋関数。
 import { parseTag, tagEquals } from "@mimimilli/shared";
-import type { SortId, WorksPage, WorksQuery, WorkSummary } from "@mimimilli/shared";
+import type {
+  CollectionStats,
+  SortId,
+  WorksPage,
+  WorksQuery,
+  WorkSummary,
+} from "@mimimilli/shared";
 import {
   compareJapaneseSortKeys,
   compareUtf8Bytes,
@@ -12,6 +18,18 @@ const RECENT_VIEW_WINDOW_DAYS = 30;
 
 /** 検索・フィルター・ソート中だけ使う内部ページ型。公開前にWorkListItemへ投影する。 */
 export type WorkSummaryPage = Omit<WorksPage, "items"> & { items: WorkSummary[] };
+
+/** フィルター後・ページング前の集合からコレクション統計を求める。
+ *  totalDurationSec が未知（null）の作品は合計から除外する。 */
+export function computeCollectionStats(works: WorkSummary[]): CollectionStats {
+  let trackCount = 0;
+  let durationSec = 0;
+  for (const work of works) {
+    trackCount += work.trackCount;
+    if (work.totalDurationSec !== null) durationSec += work.totalDurationSec;
+  }
+  return { trackCount, durationSec };
+}
 
 /** WorkSummary[] にクエリ（検索・フィルタ・ソート・ページング）を適用する */
 export function applyWorksQuery(works: WorkSummary[], params: WorksQuery): WorkSummaryPage {
@@ -25,9 +43,10 @@ export function applyWorksQuery(works: WorkSummary[], params: WorksQuery): WorkS
   results = sortWorkSummaries(results, params.sort, seed);
 
   const total = results.length;
+  const stats = computeCollectionStats(results);
   const items = paginate(results, params.page, params.limit);
 
-  return seed === undefined ? { items, total } : { items, total, seed };
+  return seed === undefined ? { items, total, stats } : { items, total, stats, seed };
 }
 
 /**

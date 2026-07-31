@@ -795,9 +795,17 @@ export class WorkRepo {
     `;
     const whereSql = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
     return this.db.transaction(() => {
-      const countRow = this.db.sqlite
-        .query(`SELECT COUNT(*) AS total ${fromSql} ${whereSql}`)
-        .get(...bindings) as { total: number };
+      // 件数と統計（トラック数・再生時間の合計）を同じ絞り込み集合から一度に求める。
+      // SUM は NULL（total_duration_sec 未知）を自動的に除外して合計する。
+      const statsRow = this.db.sqlite
+        .query(`
+          SELECT
+            COUNT(*) AS total,
+            COALESCE(SUM(works.track_count), 0) AS trackCount,
+            COALESCE(SUM(works.total_duration_sec), 0) AS durationSec
+          ${fromSql} ${whereSql}
+        `)
+        .get(...bindings) as { total: number; trackCount: number; durationSec: number };
 
       const orderBindings: number[] = [];
       const orderSql = worksOrderSql(params.sort, seed, orderBindings);
@@ -841,9 +849,10 @@ export class WorkRepo {
         lastPlayedAt: row.lastPlayedAt,
         circleName: circleNames.get(row.id) ?? null,
       }));
+      const stats = { trackCount: statsRow.trackCount, durationSec: statsRow.durationSec };
       return seed === undefined
-        ? { items, total: countRow.total }
-        : { items, total: countRow.total, seed };
+        ? { items, total: statsRow.total, stats }
+        : { items, total: statsRow.total, stats, seed };
     });
   }
 

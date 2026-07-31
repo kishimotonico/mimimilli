@@ -107,6 +107,7 @@ function assertQueryEquivalent(repo: WorkRepo, query: WorksQuery): void {
     `ordered IDs: ${JSON.stringify(query)}`,
   );
   assert.equal(real.total, fixture.total, `total: ${JSON.stringify(query)}`);
+  assert.deepEqual(real.stats, fixture.stats, `stats: ${JSON.stringify(query)}`);
   assert.equal(real.seed, fixture.seed, `seed: ${JSON.stringify(query)}`);
 }
 
@@ -303,6 +304,11 @@ function assertSmartFolderEquivalent(
     real.total,
     fixture.total,
     `smart folder total: ${JSON.stringify({ rules, query })}`,
+  );
+  assert.deepEqual(
+    real.stats,
+    fixture.stats,
+    `smart folder stats: ${JSON.stringify({ rules, query })}`,
   );
   assert.equal(real.seed, fixture.seed, `smart folder seed: ${JSON.stringify({ rules, query })}`);
 }

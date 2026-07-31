@@ -135,3 +135,20 @@ test("保存済み sort を評価結果へ適用する", () => {
   );
   assert.equal(result.total, 4);
 });
+
+test("stats: ルール適用後（ページング前）の集合から集計する", () => {
+  const statsWorks: WorkSummary[] = [
+    work({ id: "RJ001", tags: ["ASMR"], totalDurationSec: 1800, trackCount: 3 }),
+    work({ id: "RJ002", tags: ["ASMR"], totalDurationSec: 3600, trackCount: 2 }),
+    work({ id: "RJ003", tags: ["催眠"], totalDurationSec: 5400, trackCount: 1 }),
+  ];
+  const rules: SmartFolderRule[] = [
+    { conjunction: "WHERE", field: "タグ", operator: "∋", values: ["ASMR"] },
+  ];
+  const result = evalSmartFolder({ rules, sort: "added-desc" }, statsWorks, {
+    page: 1,
+    limit: 1,
+  });
+  assert.equal(result.items.length, 1, "ページングでitemsは絞られている");
+  assert.deepEqual(result.stats, { trackCount: 5, durationSec: 5400 });
+});

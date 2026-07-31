@@ -343,7 +343,11 @@ describe("library api", () => {
   });
 
   it("searchWorks fetches /api/works and returns the WorksPage envelope", async () => {
-    const mockPage = { items: [makeWorkListItem({ id: "work-1" })], total: 1 };
+    const mockPage = {
+      items: [makeWorkListItem({ id: "work-1" })],
+      total: 1,
+      stats: { trackCount: 0, durationSec: 0 },
+    };
     mockFetch.mockResolvedValue(makeResponse(mockPage));
     const result = await libraryApi.searchWorks({ q: "test", tags: ["tag,one", "tag2"] });
     expect(mockFetch).toHaveBeenCalledWith("/api/works?q=test&tags=tag%2Cone&tags=tag2");
@@ -351,7 +355,11 @@ describe("library api", () => {
   });
 
   it("searchWorks supports limit/page for the library total count", async () => {
-    const mockPage = { items: [makeWorkListItem({ id: "work-1" })], total: 42 };
+    const mockPage = {
+      items: [makeWorkListItem({ id: "work-1" })],
+      total: 42,
+      stats: { trackCount: 0, durationSec: 0 },
+    };
     mockFetch.mockResolvedValue(makeResponse(mockPage));
     const result = await libraryApi.searchWorks({ limit: 1 });
     expect(mockFetch).toHaveBeenCalledWith("/api/works?limit=1");
@@ -365,6 +373,7 @@ describe("library api", () => {
         makeResponse({
           items: [makeWorkListItem({ id: "work-1" }), makeWorkListItem({ id: "work-3" })],
           total: 4,
+          stats: { trackCount: 0, durationSec: 0 },
           seed,
         }),
       )
@@ -372,6 +381,7 @@ describe("library api", () => {
         makeResponse({
           items: [makeWorkListItem({ id: "work-4" }), makeWorkListItem({ id: "work-2" })],
           total: 4,
+          stats: { trackCount: 0, durationSec: 0 },
           seed,
         }),
       );
@@ -406,7 +416,11 @@ describe("library api", () => {
   });
 
   it("evalSmartFolder fetches /api/smart-folders/:id/works", async () => {
-    const mockPage = { items: [makeWorkListItem({ id: "work-1" })], total: 1 };
+    const mockPage = {
+      items: [makeWorkListItem({ id: "work-1" })],
+      total: 1,
+      stats: { trackCount: 0, durationSec: 0 },
+    };
     mockFetch.mockResolvedValue(makeResponse(mockPage));
     const result = await libraryApi.evalSmartFolder("sf-1", { page: 1, limit: 200 });
     expect(mockFetch).toHaveBeenCalledWith("/api/smart-folders/sf-1/works?page=1&limit=200");
@@ -458,7 +472,20 @@ describe("レスポンス検証（getParsed等）", () => {
   });
 
   it("searchWorks: 契約に適合しないitemsは検証エラーになる", async () => {
-    mockFetch.mockResolvedValue(makeResponse({ items: [{ id: "work-1" }], total: 1 }));
+    mockFetch.mockResolvedValue(
+      makeResponse({
+        items: [{ id: "work-1" }],
+        total: 1,
+        stats: { trackCount: 0, durationSec: 0 },
+      }),
+    );
+    await expect(libraryApi.searchWorks({})).rejects.toThrow(/GET \/works/);
+  });
+
+  it("searchWorks: statsが欠落したレスポンスは検証エラーになる", async () => {
+    mockFetch.mockResolvedValue(
+      makeResponse({ items: [makeWorkListItem({ id: "work-1" })], total: 1 }),
+    );
     await expect(libraryApi.searchWorks({})).rejects.toThrow(/GET \/works/);
   });
 

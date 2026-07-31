@@ -34,7 +34,10 @@ function urlOf(input: RequestInfo | URL): string {
 function createFetchMock() {
   return vi.fn((input: RequestInfo | URL, _init?: RequestInit) => {
     const url = urlOf(input);
-    if (url.startsWith("/api/works")) return Promise.resolve(jsonResponse({ items: [], total: 0 }));
+    if (url.startsWith("/api/works"))
+      return Promise.resolve(
+        jsonResponse({ items: [], total: 0, stats: { trackCount: 0, durationSec: 0 } }),
+      );
     if (url.startsWith("/api/tag-prefixes")) return Promise.resolve(jsonResponse([]));
     if (url.startsWith("/api/tags")) return Promise.resolve(jsonResponse([]));
     if (url.startsWith("/api/smart-folders")) return Promise.resolve(jsonResponse([]));
@@ -131,7 +134,9 @@ describe("古い検索リクエストの中断", () => {
         });
       }
       if (url.startsWith("/api/works"))
-        return Promise.resolve(jsonResponse({ items: [], total: 0 }));
+        return Promise.resolve(
+          jsonResponse({ items: [], total: 0, stats: { trackCount: 0, durationSec: 0 } }),
+        );
       if (url.startsWith("/api/tag-prefixes")) return Promise.resolve(jsonResponse([]));
       if (url.startsWith("/api/tags")) return Promise.resolve(jsonResponse([]));
       if (url.startsWith("/api/smart-folders")) return Promise.resolve(jsonResponse([]));

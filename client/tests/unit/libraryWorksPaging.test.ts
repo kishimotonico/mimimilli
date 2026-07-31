@@ -62,9 +62,15 @@ function createFetchMock(options: { total?: number; randomSeed?: number } = {}) 
       const items: WorkListItem[] = Array.from({ length: count }, (_, i) =>
         makeWork(`p${page}-w${i + 1}`),
       );
-      const body: { items: WorkListItem[]; total: number; seed?: number } = {
+      const body: {
+        items: WorkListItem[];
+        total: number;
+        stats: { trackCount: number; durationSec: number };
+        seed?: number;
+      } = {
         items,
         total,
+        stats: { trackCount: 0, durationSec: 0 },
       };
       if (page === 1 && sort === "random" && randomSeed !== undefined) {
         body.seed = randomSeed;
