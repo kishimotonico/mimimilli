@@ -48,7 +48,7 @@ function workGridElement(props: Partial<React.ComponentProps<typeof WorkGrid>>) 
       onDrillBack={vi.fn()}
       onClearSearch={vi.fn()}
       inspector={null}
-      onInspectorClose={vi.fn()}
+      onDeselect={vi.fn()}
       {...props}
     />
   );

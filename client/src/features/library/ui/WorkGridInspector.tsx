@@ -3,10 +3,18 @@ import IconButton from "../../../shared/ui/IconButton";
 import { I } from "../../../shared/ui/Icon";
 import { WorkDetail } from "./preview/WorkDetail";
 
+interface CollectionSummary {
+  label: string;
+  count: number;
+}
+
 interface WorkGridInspectorProps {
+  /** 作品が選択されているか。false のときは summary を表示する */
+  hasSelection: boolean;
   work: Work | null;
   isLoading: boolean;
   isError: boolean;
+  summary: CollectionSummary;
   playingTrackIndex: number | null;
   isPlaybackActive?: boolean;
   tagSuggestions: string[];
@@ -18,9 +26,11 @@ interface WorkGridInspectorProps {
 }
 
 export default function WorkGridInspector({
+  hasSelection,
   work,
   isLoading,
   isError,
+  summary,
   playingTrackIndex,
   isPlaybackActive,
   tagSuggestions,
@@ -34,9 +44,17 @@ export default function WorkGridInspector({
     <aside className="mll-grid-inspector" aria-label="作品インスペクタ">
       <div className="mll-grid-inspector__hd">
         <span className="label">詳細</span>
-        <IconButton icon={I.x} label="インスペクタを閉じる" size="sm" onClick={onClose} />
+        <IconButton icon={I.x} label="パネルを閉じる" size="sm" onClick={onClose} />
       </div>
-      {work ? (
+      {!hasSelection ? (
+        <div className="mll-grid-inspector__summary">
+          <span className="mll-grid-inspector__summary-count">{summary.count} 件</span>
+          <span className="mll-grid-inspector__summary-label">{summary.label}</span>
+          <span className="mll-grid-inspector__summary-hint">
+            作品を選択するとここに詳細が表示されます
+          </span>
+        </div>
+      ) : work ? (
         <WorkDetail
           key={work.id}
           work={work}

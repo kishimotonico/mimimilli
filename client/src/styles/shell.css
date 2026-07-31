@@ -530,8 +530,15 @@
     border-right: 1px solid var(--line-soft);
     position: relative;
   }
+  .mll-grid-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    overflow: hidden;
+  }
   .mll-grid-scroll {
     flex: 1;
+    min-width: 0;
     min-height: 0;
     overflow: hidden auto;
     /* 水平paddingはここに。.mll-grid側だと絶対配置の仮想化行に効かない。
@@ -577,9 +584,6 @@
     align-items: start;
     width: 100%;
     content-visibility: auto;
-  }
-  .mll-grid-pane.is-inspector-open .mll-grid-scroll {
-    padding-right: calc(var(--grid-inspector-width) + 16px);
   }
   /* ドッキングバー下余白は JS 側 GRID_DOCKED_BAR_EXTRA（paddingEnd）に一本化 */
   .mll-grid-empty {
@@ -669,9 +673,7 @@
     white-space: nowrap;
   }
   .mll-grid-inspector {
-    position: absolute;
-    inset: 0 0 0 auto;
-    z-index: 20;
+    flex: 0 0 var(--grid-inspector-width);
     width: var(--grid-inspector-width);
     min-width: 0;
     display: flex;
@@ -680,7 +682,6 @@
     overflow: hidden;
     background: var(--paper-1);
     border-left: 1px solid var(--line);
-    box-shadow: -14px 0 28px -22px oklch(20% 0.02 70 / 0.45);
   }
   .mll-grid-inspector__hd {
     display: flex;
@@ -707,6 +708,30 @@
     color: var(--ink-3);
     font-size: 12px;
     text-align: center;
+  }
+  .mll-grid-inspector__summary {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 24px;
+    text-align: center;
+  }
+  .mll-grid-inspector__summary-count {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--ink-0);
+  }
+  .mll-grid-inspector__summary-label {
+    font-size: 12px;
+    color: var(--ink-2);
+  }
+  .mll-grid-inspector__summary-hint {
+    margin-top: 12px;
+    color: var(--ink-3);
+    font-size: 11.5px;
   }
   /* ── File rows (mle-row — File Explorer mode) ─────────────── */
 

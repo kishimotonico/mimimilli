@@ -1,12 +1,12 @@
 import { useCallback, useMemo, useState } from "react";
-import { useAtomValue, useSetAtom } from "jotai";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import {
   getDefaultPlaylistTrackCount,
   toWorkListItem,
   type Work,
   type WorkListItem,
 } from "@mimimilli/shared";
-import { librarySearchQueryAtom, libraryViewModeAtom } from "../model/atoms";
+import { gridInspectorOpenAtom, librarySearchQueryAtom, libraryViewModeAtom } from "../model/atoms";
 import {
   playerIsPlaybackActiveAtom,
   playingTrackIndexAtom,
@@ -46,6 +46,7 @@ export default function LibraryView({ onPlay, onResume }: LibraryViewProps) {
   const playingWorkId = useAtomValue(playingWorkIdAtom);
   const playingTrackIndex = useAtomValue(playingTrackIndexAtom);
   const isPlaybackActive = useAtomValue(playerIsPlaybackActiveAtom);
+  const [gridInspectorOpen, setGridInspectorOpen] = useAtom(gridInspectorOpenAtom);
   const nav = useLibraryView();
   const [smartFolderEditor, setSmartFolderEditor] = useState<SmartFolderEditorState>(
     closedSmartFolderEditorState,
@@ -177,17 +178,26 @@ export default function LibraryView({ onPlay, onResume }: LibraryViewProps) {
           worksTotal={worksTotal}
           isFetchingNextPage={isFetchingNextPage}
           onLoadMore={fetchNextPage}
-          onWorkSelect={nav.selectWork}
+          onWorkSelect={(id) => {
+            nav.selectWork(id);
+            setGridInspectorOpen(true);
+          }}
           onWorkPlay={(work) => onPlay(work, 0)}
           onDrillBack={nav.drillBack}
           onClearSearch={() => setSearchQuery("")}
-          onInspectorClose={() => nav.selectWork(null)}
+          onDeselect={() => nav.selectWork(null)}
           inspector={
-            nav.selectedWorkId ? (
+            gridInspectorOpen ? (
               <WorkGridInspector
+                hasSelection={nav.selectedWorkId !== null}
                 work={selectedWork}
                 isLoading={workDetailQuery.isPending}
                 isError={workDetailQuery.isError}
+                summary={{
+                  label:
+                    nav.drillValue ?? (isSmartAxis(nav.activeAxis) ? "スマートフォルダー" : "作品"),
+                  count: works.length,
+                }}
                 playingTrackIndex={
                   selectedWork && playingWorkId === selectedWork.id
                     ? (playingTrackIndex ?? null)
@@ -196,7 +206,7 @@ export default function LibraryView({ onPlay, onResume }: LibraryViewProps) {
                 isPlaybackActive={isPlaybackActive}
                 tagSuggestions={tagSuggestions}
                 isPatching={patchWorkMutation.isPending}
-                onClose={() => nav.selectWork(null)}
+                onClose={() => setGridInspectorOpen(false)}
                 onPlay={handlePlay}
                 onResume={handleResume}
                 onPatchWork={(body) => {

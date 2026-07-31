@@ -2,6 +2,7 @@ import { useAtom, useAtomValue } from "jotai";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
 import {
+  gridInspectorOpenAtom,
   libraryGridLayoutModeAtom,
   libraryTileSizeAtom,
   libraryViewModeAtom,
@@ -12,7 +13,9 @@ export default function LibraryGridControls() {
   const viewMode = useAtomValue(libraryViewModeAtom);
   const [gridLayoutMode, setGridLayoutMode] = useAtom(libraryGridLayoutModeAtom);
   const [tileSize, setTileSize] = useAtom(libraryTileSizeAtom);
+  const [gridInspectorOpen, setGridInspectorOpen] = useAtom(gridInspectorOpenAtom);
   const gridControlsVisible = viewMode === "grid";
+  const gridControlsEnabled = gridControlsVisible;
   const safeTileSize = clampTileSize(tileSize);
 
   return (
@@ -29,7 +32,7 @@ export default function LibraryGridControls() {
             title="1:1タイル：正方形に切り抜いて等幅で並べる"
             active={gridLayoutMode === "square"}
             onClick={() => setGridLayoutMode("square")}
-            disabled={!gridControlsVisible}
+            disabled={!gridControlsEnabled}
           />
           <IconButton
             size="sm"
@@ -38,7 +41,7 @@ export default function LibraryGridControls() {
             title="元の縦横比：比率を保って行の右端を揃える"
             active={gridLayoutMode === "justified"}
             onClick={() => setGridLayoutMode("justified")}
-            disabled={!gridControlsVisible}
+            disabled={!gridControlsEnabled}
           />
         </div>
 
@@ -50,12 +53,22 @@ export default function LibraryGridControls() {
             max={MAX_TILE_SIZE}
             step={1}
             value={safeTileSize}
-            disabled={!gridControlsVisible}
+            disabled={!gridControlsEnabled}
             aria-label="グリッドのサイズ"
             onChange={(event) => setTileSize(Number(event.currentTarget.value))}
           />
           <output>{safeTileSize}px</output>
         </label>
+
+        <IconButton
+          size="sm"
+          icon={I.panelR}
+          label="詳細パネルの表示切り替え"
+          title="詳細パネル"
+          active={gridInspectorOpen}
+          onClick={() => setGridInspectorOpen((open) => !open)}
+          disabled={!gridControlsEnabled}
+        />
       </div>
     </div>
   );
