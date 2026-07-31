@@ -24,7 +24,7 @@ test("GET /api/works は複数の tags を配列で受け、タグ内のカン�
   let receivedTags: string[] | undefined;
   adapter.queryWorks = async (query) => {
     receivedTags = query.tags;
-    return { items: [], total: 0 };
+    return { items: [], total: 0, stats: { trackCount: 0, durationSec: 0 } };
   };
 
   const app = createApp(adapter);

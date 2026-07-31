@@ -223,6 +223,35 @@ test("ページング: page か limit の片方のみ指定された場合は全
   assert.equal(result.items.length, 3);
 });
 
+// ── stats: コレクション統計（軸・ドリル・検索・タグの絞り込みに一致させる） ──
+
+test("stats: 絞り込み後・ページング前の集合から trackCount/durationSec を合算する", () => {
+  const result = applyWorksQuery(WORKS, baseQuery({ q: "ASMR" }));
+  // RJ001(trackCount=3, dur=1800) + RJ002(trackCount=2, dur=3600)
+  assert.deepEqual(result.stats, { trackCount: 5, durationSec: 5400 });
+});
+
+test("stats: page/limit で切り出しても全件（絞り込み後）の合計を返す", () => {
+  const result = applyWorksQuery(WORKS, baseQuery({ sort: "id-asc", page: 1, limit: 1 }));
+  assert.equal(result.items.length, 1);
+  assert.deepEqual(result.stats, { trackCount: 6, durationSec: 10800 });
+});
+
+test("stats: totalDurationSec が未知（null）の作品は合計から除外する", () => {
+  const worksWithUnknownDuration: WorkSummary[] = [
+    ...WORKS,
+    {
+      ...WORKS[0]!,
+      id: "RJ004",
+      totalDurationSec: null,
+      trackCount: 10,
+    },
+  ];
+  const result = applyWorksQuery(worksWithUnknownDuration, baseQuery());
+  assert.equal(result.stats.trackCount, 3 + 2 + 1 + 10);
+  assert.equal(result.stats.durationSec, 1800 + 3600 + 5400);
+});
+
 // ── TASK-73: ページング前後の集合一致（重複・欠落なし） ──────────
 
 const MANY_WORKS: WorkSummary[] = Array.from({ length: 10 }, (_, index) => ({

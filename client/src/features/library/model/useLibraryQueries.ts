@@ -126,6 +126,11 @@ export function useLibraryQueries(nav: LibraryViewState, searchQuery: string) {
   const worksTotal = isSmartAxis(nav.activeAxis)
     ? smartWorksQuery.data?.pages[smartWorksQuery.data.pages.length - 1]?.total
     : (worksQuery.data?.pages[worksQuery.data.pages.length - 1]?.total ?? undefined);
+  // stats（トラック数・再生時間の合計）は絞り込み後・ページング前の集合に対する値なので
+  // どのページのレスポンスでも同じ。worksTotal と同じく最新ページから取り出す。
+  const worksStats = isSmartAxis(nav.activeAxis)
+    ? smartWorksQuery.data?.pages[smartWorksQuery.data.pages.length - 1]?.stats
+    : worksQuery.data?.pages[worksQuery.data.pages.length - 1]?.stats;
 
   // ── ライブラリ総件数 ──────────────────────────────────────
   const libraryTotalQuery = useQuery({
@@ -214,6 +219,7 @@ export function useLibraryQueries(nav: LibraryViewState, searchQuery: string) {
     isError,
     hasNextPage,
     worksTotal,
+    worksStats,
     isFetchingNextPage,
     fetchNextPage,
     libraryTotal: libraryTotalQuery.data,

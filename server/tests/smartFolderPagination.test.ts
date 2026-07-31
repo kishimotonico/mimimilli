@@ -55,8 +55,13 @@ function buildAppWithManyWorks(count = 210) {
     if (id !== folder.id) return null;
     const page = evalSmartFolder(folder, manyWorks, query);
     return page.seed === undefined
-      ? { items: page.items.map(toWorkListItem), total: page.total }
-      : { items: page.items.map(toWorkListItem), total: page.total, seed: page.seed };
+      ? { items: page.items.map(toWorkListItem), total: page.total, stats: page.stats }
+      : {
+          items: page.items.map(toWorkListItem),
+          total: page.total,
+          stats: page.stats,
+          seed: page.seed,
+        };
   };
   adapter.listSmartFolders = async () => [folder];
   return createApp(adapter);
@@ -103,8 +108,13 @@ test("randomソートは発行されたseedを次ページへ送ると重複・�
     if (id !== folder.id) return null;
     const page = evalSmartFolder(folder, manyWorks, query);
     return page.seed === undefined
-      ? { items: page.items.map(toWorkListItem), total: page.total }
-      : { items: page.items.map(toWorkListItem), total: page.total, seed: page.seed };
+      ? { items: page.items.map(toWorkListItem), total: page.total, stats: page.stats }
+      : {
+          items: page.items.map(toWorkListItem),
+          total: page.total,
+          stats: page.stats,
+          seed: page.seed,
+        };
   };
   adapter.listSmartFolders = async () => [folder];
   const app = createApp(adapter);
@@ -132,8 +142,13 @@ test("スマートフォルダー固有の sort が維持される", async () =>
     if (id !== folder.id) return null;
     const page = evalSmartFolder(folder, manyWorks, query);
     return page.seed === undefined
-      ? { items: page.items.map(toWorkListItem), total: page.total }
-      : { items: page.items.map(toWorkListItem), total: page.total, seed: page.seed };
+      ? { items: page.items.map(toWorkListItem), total: page.total, stats: page.stats }
+      : {
+          items: page.items.map(toWorkListItem),
+          total: page.total,
+          stats: page.stats,
+          seed: page.seed,
+        };
   };
   adapter.listSmartFolders = async () => [folder];
   const appSorted = createApp(adapter);

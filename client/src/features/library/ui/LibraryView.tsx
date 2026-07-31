@@ -1,12 +1,12 @@
 import { useCallback, useMemo, useState } from "react";
-import { useAtomValue, useSetAtom } from "jotai";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import {
   getDefaultPlaylistTrackCount,
   toWorkListItem,
   type Work,
   type WorkListItem,
 } from "@mimimilli/shared";
-import { librarySearchQueryAtom, libraryViewModeAtom } from "../model/atoms";
+import { gridInspectorOpenAtom, librarySearchQueryAtom, libraryViewModeAtom } from "../model/atoms";
 import {
   playerIsPlaybackActiveAtom,
   playingTrackIndexAtom,
@@ -15,6 +15,7 @@ import {
 import { useLibraryView } from "../model/useLibraryNavigation";
 import { useLibraryQueries, useSmartFolderMutation } from "../model/useLibraryQueries";
 import {
+  computeCollectionStatsDisplay,
   computeIsNoResultsDueToFilter,
   computePreviewMode,
   computeWorksListVisibility,
@@ -46,6 +47,7 @@ export default function LibraryView({ onPlay, onResume }: LibraryViewProps) {
   const playingWorkId = useAtomValue(playingWorkIdAtom);
   const playingTrackIndex = useAtomValue(playingTrackIndexAtom);
   const isPlaybackActive = useAtomValue(playerIsPlaybackActiveAtom);
+  const [gridInspectorOpen, setGridInspectorOpen] = useAtom(gridInspectorOpenAtom);
   const nav = useLibraryView();
   const [smartFolderEditor, setSmartFolderEditor] = useState<SmartFolderEditorState>(
     closedSmartFolderEditorState,
@@ -66,9 +68,14 @@ export default function LibraryView({ onPlay, onResume }: LibraryViewProps) {
     patchWorkMutation,
     hasNextPage,
     worksTotal,
+    worksStats,
     isFetchingNextPage,
     fetchNextPage,
   } = useLibraryQueries(nav, searchQuery);
+
+  // 未選択プレースホルダー（グリッド詳細パネル / リストのプレビュー空表示）の統計。
+  // 現在表示中の works クエリと同じ絞り込みに一致させる。
+  const collectionStats = computeCollectionStatsDisplay(isLoading, isError, worksTotal, worksStats);
 
   const saveSmartFolderMutation = useSmartFolderMutation({
     onSaved: (savedFolder, wasNew) => {
@@ -177,17 +184,22 @@ export default function LibraryView({ onPlay, onResume }: LibraryViewProps) {
           worksTotal={worksTotal}
           isFetchingNextPage={isFetchingNextPage}
           onLoadMore={fetchNextPage}
-          onWorkSelect={nav.selectWork}
+          onWorkSelect={(id) => {
+            nav.selectWork(id);
+            setGridInspectorOpen(true);
+          }}
           onWorkPlay={(work) => onPlay(work, 0)}
           onDrillBack={nav.drillBack}
           onClearSearch={() => setSearchQuery("")}
-          onInspectorClose={() => nav.selectWork(null)}
+          onDeselect={() => nav.selectWork(null)}
           inspector={
-            nav.selectedWorkId ? (
+            gridInspectorOpen ? (
               <WorkGridInspector
+                hasSelection={nav.selectedWorkId !== null}
                 work={selectedWork}
                 isLoading={workDetailQuery.isPending}
                 isError={workDetailQuery.isError}
+                collectionStats={collectionStats}
                 playingTrackIndex={
                   selectedWork && playingWorkId === selectedWork.id
                     ? (playingTrackIndex ?? null)
@@ -196,7 +208,7 @@ export default function LibraryView({ onPlay, onResume }: LibraryViewProps) {
                 isPlaybackActive={isPlaybackActive}
                 tagSuggestions={tagSuggestions}
                 isPatching={patchWorkMutation.isPending}
-                onClose={() => nav.selectWork(null)}
+                onClose={() => setGridInspectorOpen(false)}
                 onPlay={handlePlay}
                 onResume={handleResume}
                 onPatchWork={(body) => {
@@ -212,7 +224,6 @@ export default function LibraryView({ onPlay, onResume }: LibraryViewProps) {
       ) : (
         <ContentColumn
           axis={nav.activeAxis}
-          drillValue={nav.drillValue}
           works={works}
           worksQueryKey={worksQueryKey}
           facetItems={facetItems}
@@ -230,7 +241,6 @@ export default function LibraryView({ onPlay, onResume }: LibraryViewProps) {
           onLoadMore={fetchNextPage}
           onWorkSelect={nav.selectWork}
           onDrillSelect={nav.drillInto}
-          onDrillBack={nav.drillBack}
           onTagToggle={nav.toggleTag}
           onClearSearch={() => setSearchQuery("")}
         />
@@ -240,6 +250,7 @@ export default function LibraryView({ onPlay, onResume }: LibraryViewProps) {
         <PreviewPane
           mode={previewMode}
           showNoResultsHint={isNoResultsDueToFilter}
+          emptyStats={collectionStats}
           axisLandingPresentation={getAxisLandingPresentation(
             nav.activeAxis,
             isAxisFilterApplied,

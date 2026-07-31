@@ -4,6 +4,7 @@ import type { AxisId, SortId } from "./types";
 import {
   activeAxisAtom,
   drillValueAtom,
+  gridInspectorOpenAtom,
   selectedTagsAtom,
   selectedWorkIdAtom,
   sortAtom,
@@ -15,6 +16,7 @@ export const setLibraryAxisAtom = atom(null, (_get, set, axis: AxisId) => {
   set(drillValueAtom, null);
   set(selectedTagsAtom, []);
   set(selectedWorkIdAtom, null);
+  set(gridInspectorOpenAtom, false);
 });
 
 export const drillIntoAtom = atom(null, (_get, set, value: string) => {
@@ -22,12 +24,14 @@ export const drillIntoAtom = atom(null, (_get, set, value: string) => {
   set(drillValueAtom, value);
   set(selectedTagsAtom, []);
   set(selectedWorkIdAtom, null);
+  set(gridInspectorOpenAtom, false);
 });
 
 export const drillBackAtom = atom(null, (_get, set) => {
   requestNavigationHistoryCommit(set, "push");
   set(drillValueAtom, null);
   set(selectedWorkIdAtom, null);
+  set(gridInspectorOpenAtom, false);
 });
 
 export const toggleLibraryTagAtom = atom(null, (get, set, tag: string) => {
@@ -35,12 +39,14 @@ export const toggleLibraryTagAtom = atom(null, (get, set, tag: string) => {
   const prev = get(selectedTagsAtom);
   set(selectedTagsAtom, prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]);
   set(selectedWorkIdAtom, null);
+  set(gridInspectorOpenAtom, false);
 });
 
 export const clearLibraryTagsAtom = atom(null, (_get, set) => {
   requestNavigationHistoryCommit(set, "push");
   set(selectedTagsAtom, []);
   set(selectedWorkIdAtom, null);
+  set(gridInspectorOpenAtom, false);
 });
 
 export const selectLibraryWorkAtom = atom(null, (_get, set, id: string | null) => {

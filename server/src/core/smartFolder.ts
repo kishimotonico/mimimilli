@@ -3,7 +3,7 @@
 import type { SmartFolder, SmartFolderRule, WorkSummary } from "@mimimilli/shared";
 import type { WorkSummaryPage } from "./worksQuery.ts";
 import { tagEquals } from "@mimimilli/shared";
-import { createRandomSeed, sortWorkSummaries } from "./worksQuery.ts";
+import { computeCollectionStats, createRandomSeed, sortWorkSummaries } from "./worksQuery.ts";
 
 /** rules を順に適用し、works をフィルタリングして返す */
 export function evalSmartFolderRules(
@@ -68,8 +68,9 @@ export function evalSmartFolder(
   const matched = sortWorkSummaries(evalSmartFolderRules(folder.rules, works), folder.sort, seed);
 
   const total = matched.length;
+  const stats = computeCollectionStats(matched);
   const start = (query.page - 1) * query.limit;
   const items = matched.slice(start, start + query.limit);
 
-  return seed === undefined ? { items, total } : { items, total, seed };
+  return seed === undefined ? { items, total, stats } : { items, total, stats, seed };
 }

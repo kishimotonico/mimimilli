@@ -41,8 +41,13 @@ function buildAppWithManyWorks(count = 210) {
   adapter.queryWorks = async (query) => {
     const page = applyWorksQuery(manyWorks, query);
     return page.seed === undefined
-      ? { items: page.items.map(toWorkListItem), total: page.total }
-      : { items: page.items.map(toWorkListItem), total: page.total, seed: page.seed };
+      ? { items: page.items.map(toWorkListItem), total: page.total, stats: page.stats }
+      : {
+          items: page.items.map(toWorkListItem),
+          total: page.total,
+          stats: page.stats,
+          seed: page.seed,
+        };
   };
   return createApp(adapter);
 }

@@ -58,7 +58,8 @@ interface WorkGridProps {
   onDrillBack: () => void;
   onClearSearch: () => void;
   inspector: ReactNode | null;
-  onInspectorClose: () => void;
+  /** Esc・グリッド背景クリック時の選択解除（パネル自体の開閉は行わない） */
+  onDeselect: () => void;
 }
 
 const GRID_ARROW_KEYS = new Set<GridArrowKey>(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"]);
@@ -110,7 +111,7 @@ export default function WorkGrid({
   onDrillBack,
   onClearSearch,
   inspector,
-  onInspectorClose,
+  onDeselect,
 }: WorkGridProps) {
   const [tileSize, setTileSize] = useAtom(libraryTileSizeAtom);
   const gridLayoutMode = useAtomValue(libraryGridLayoutModeAtom);
@@ -272,12 +273,12 @@ export default function WorkGrid({
         return;
       }
 
-      onInspectorClose();
+      onDeselect();
     };
 
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [isInspectorOpen, onInspectorClose]);
+  }, [isInspectorOpen, onDeselect]);
 
   useEffect(() => {
     if (!isInspectorOpen) return;
@@ -287,12 +288,12 @@ export default function WorkGrid({
     const handleGridBackgroundClick = (event: MouseEvent) => {
       const target = event.target;
       if (target instanceof Element && target.closest(".mll-grid-tile")) return;
-      onInspectorClose();
+      onDeselect();
     };
 
     scroll.addEventListener("click", handleGridBackgroundClick);
     return () => scroll.removeEventListener("click", handleGridBackgroundClick);
-  }, [isInspectorOpen, onInspectorClose]);
+  }, [isInspectorOpen, onDeselect]);
 
   // 2次元キーボードナビ（TASK-45）。DOM 計測（querySelectorAll）をやめ、
   // レイアウト計算済みの columnCount / justifiedLayout.tiles から次インデックスを求める。
@@ -421,11 +422,7 @@ export default function WorkGrid({
   );
 
   return (
-    <section
-      ref={paneRef}
-      className={`mll-grid-pane ${isInspectorOpen ? "is-inspector-open" : ""}`}
-      aria-label="作品グリッド"
-    >
+    <section ref={paneRef} className="mll-grid-pane" aria-label="作品グリッド">
       {isDrilled ? (
         <DrillHeader
           axisLabel={axis}
@@ -440,75 +437,77 @@ export default function WorkGrid({
           <span className="count">{works.length} 件</span>
         </div>
       )}
-      <div ref={scrollRef} className="mll-grid-scroll">
-        {isLoading ? (
-          <CollectionStatus variant="grid" kind="loading" />
-        ) : isError ? (
-          <CollectionStatus variant="grid" kind="error" />
-        ) : works.length === 0 ? (
-          <CollectionStatus
-            variant="grid"
-            kind="empty"
-            message={buildEmptyWorksMessage(
-              searchQuery,
-              isDrilled && isFacetAxis(axis) ? axis : null,
-              drillValue,
-              tagPrefixes,
-            )}
-            action={
-              searchQuery ? (
-                <Button variant="ghost" icon={I.x} onClick={onClearSearch}>
-                  検索をクリア
-                </Button>
-              ) : undefined
-            }
-          />
-        ) : (
-          <div
-            ref={setGridEl}
-            className={`mll-grid ${gridLayoutMode === "justified" ? "mll-grid--justified" : ""}`}
-            style={
-              {
-                position: "relative",
-                width: "100%",
-                height: `${virtualizer.getTotalSize()}px`,
-                "--tile-size": `${safeTileSize}px`,
-                "--grid-row-gap": `${GRID_ROW_GAP}px`,
-                "--grid-col-gap": `${GRID_COLUMN_GAP}px`,
-                "--tile-chrome-h": `${GRID_TILE_CHROME_HEIGHT}px`,
-              } as CSSProperties
-            }
-          >
-            {virtualizer.getVirtualItems().map((virtualRow) => (
-              <div
-                key={virtualRow.key}
-                data-index={virtualRow.index}
-                ref={virtualizer.measureElement}
-                style={
-                  {
-                    position: "absolute",
-                    top: 0,
-                    left: 0,
-                    width: "100%",
-                    transform: `translateY(${virtualRow.start}px)`,
-                  } as CSSProperties
-                }
-              >
-                {renderRow(virtualRow.index)}
-              </div>
-            ))}
-          </div>
-        )}
-        {hasNextPage && onLoadMore && (
-          <LoadMore
-            loadedCount={works.length}
-            totalCount={worksTotal}
-            isFetching={isFetchingNextPage}
-            onLoadMore={onLoadMore}
-          />
-        )}
+      <div className="mll-grid-body">
+        <div ref={scrollRef} className="mll-grid-scroll">
+          {isLoading ? (
+            <CollectionStatus variant="grid" kind="loading" />
+          ) : isError ? (
+            <CollectionStatus variant="grid" kind="error" />
+          ) : works.length === 0 ? (
+            <CollectionStatus
+              variant="grid"
+              kind="empty"
+              message={buildEmptyWorksMessage(
+                searchQuery,
+                isDrilled && isFacetAxis(axis) ? axis : null,
+                drillValue,
+                tagPrefixes,
+              )}
+              action={
+                searchQuery ? (
+                  <Button variant="ghost" icon={I.x} onClick={onClearSearch}>
+                    検索をクリア
+                  </Button>
+                ) : undefined
+              }
+            />
+          ) : (
+            <div
+              ref={setGridEl}
+              className={`mll-grid ${gridLayoutMode === "justified" ? "mll-grid--justified" : ""}`}
+              style={
+                {
+                  position: "relative",
+                  width: "100%",
+                  height: `${virtualizer.getTotalSize()}px`,
+                  "--tile-size": `${safeTileSize}px`,
+                  "--grid-row-gap": `${GRID_ROW_GAP}px`,
+                  "--grid-col-gap": `${GRID_COLUMN_GAP}px`,
+                  "--tile-chrome-h": `${GRID_TILE_CHROME_HEIGHT}px`,
+                } as CSSProperties
+              }
+            >
+              {virtualizer.getVirtualItems().map((virtualRow) => (
+                <div
+                  key={virtualRow.key}
+                  data-index={virtualRow.index}
+                  ref={virtualizer.measureElement}
+                  style={
+                    {
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      width: "100%",
+                      transform: `translateY(${virtualRow.start}px)`,
+                    } as CSSProperties
+                  }
+                >
+                  {renderRow(virtualRow.index)}
+                </div>
+              ))}
+            </div>
+          )}
+          {hasNextPage && onLoadMore && (
+            <LoadMore
+              loadedCount={works.length}
+              totalCount={worksTotal}
+              isFetching={isFetchingNextPage}
+              onLoadMore={onLoadMore}
+            />
+          )}
+        </div>
+        {inspector}
       </div>
-      {inspector}
     </section>
   );
 }

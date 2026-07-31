@@ -29,11 +29,20 @@ export type WorksQueryInput = z.input<typeof worksQuerySchema>;
 /** パース後の正規化済みクエリ（サーバー adapter が受け取る型） */
 export type WorksQuery = z.output<typeof worksQuerySchema>;
 
+/** 検索・フィルター後・ページング前の集合に対する集計。件数は total 側で持つため含まない。
+ *  durationSec は totalDurationSec が未知（null）の作品を除いた合計。 */
+export const collectionStatsSchema = z.object({
+  trackCount: z.number().int().nonnegative(),
+  durationSec: z.number().nonnegative(),
+});
+export type CollectionStats = z.infer<typeof collectionStatsSchema>;
+
 /** ページングエンベロープ。total は検索・フィルター後・ページング前の件数。
  *  サーバーは page/limit 未指定でもデフォルト（page=1, limit=WORKS_DEFAULT_PAGE_SIZE）でページングする */
 export const worksPageSchema = z.object({
   items: z.array(workListItemSchema),
   total: z.number().int().nonnegative(),
+  stats: collectionStatsSchema,
   seed: z.number().int().min(0).max(0x7fffffff).optional(),
 });
 export type WorksPage = z.infer<typeof worksPageSchema>;

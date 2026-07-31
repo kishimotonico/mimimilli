@@ -2,7 +2,7 @@
 // query 結果と Jotai state を組み合わせて「何を表示するか」を決める部分を、
 // コンポーネントの配線から切り離してテスト可能にする。
 
-import type { FacetAxisId } from "@mimimilli/shared";
+import type { CollectionStats, FacetAxisId } from "@mimimilli/shared";
 import type { WorksQueryParams } from "../api";
 import type { AxisId, SortId, ViewMode } from "./types";
 import { isFacetAxis, isSmartAxis, isViewAxis } from "./axisDefinitions";
@@ -71,7 +71,11 @@ export function computeWorksListVisibility(
     isSmartAxis(activeAxis) ||
     (!isFacetAxis(activeAxis) && activeAxis !== "tag") ||
     (isFacetAxis(activeAxis) && drillValue !== null);
-  const showGrid = viewMode === "grid" && canShowWorksGrid;
+  // ドリル済みファセット軸（例: CV→藤田茜）は、300px固定リスト＋巨大な空プレビュー
+  // という体験を避けるため、viewMode（list/grid の永続選好）にかかわらず常に
+  // 全幅グリッドへ合流させる。ドリルを抜ければ元の選好に戻る（viewMode 自体は書き換えない）。
+  const isDrilledFacet = isFacetAxis(activeAxis) && drillValue !== null;
+  const showGrid = canShowWorksGrid && (isDrilledFacet || viewMode === "grid");
   return { showsWorksList, canShowWorksGrid, showGrid };
 }
 
@@ -91,6 +95,33 @@ export function computeIsNoResultsDueToFilter(
     worksCount === 0 &&
     (Boolean(searchQuery) || (isFacetAxis(activeAxis) && drillValue !== null))
   );
+}
+
+// ── 未選択プレースホルダーの統計表示 ────────────────────────────
+
+/** 未選択プレースホルダー（CollectionPlaceholder）に渡す統計の表示状態。
+ *  loading 中は行自体を出さず、error は隠さず案内する（雑にフォールバックしない）。 */
+export type CollectionStatsDisplay =
+  | { status: "loading" }
+  | { status: "error" }
+  | { status: "ready"; count: number; trackCount: number; durationSec: number };
+
+export function computeCollectionStatsDisplay(
+  isLoading: boolean,
+  isError: boolean,
+  worksTotal: number | undefined,
+  worksStats: CollectionStats | undefined,
+): CollectionStatsDisplay {
+  if (isError) return { status: "error" };
+  if (isLoading || worksTotal === undefined || worksStats === undefined) {
+    return { status: "loading" };
+  }
+  return {
+    status: "ready",
+    count: worksTotal,
+    trackCount: worksStats.trackCount,
+    durationSec: worksStats.durationSec,
+  };
 }
 
 export interface PreviewModeInput {

@@ -111,7 +111,9 @@ function createFetchMock(total = WORKS_DEFAULT_PAGE_SIZE + 50) {
           if (!worksById.has(id)) worksById.set(id, makeWorkListItem(id));
           return worksById.get(id)!;
         });
-        return Promise.resolve(jsonResponse({ items, total }));
+        return Promise.resolve(
+          jsonResponse({ items, total, stats: { trackCount: 0, durationSec: 0 } }),
+        );
       }
 
       const workIdMatch = path.match(/^\/api\/works\/([^/]+)$/);

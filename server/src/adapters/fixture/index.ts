@@ -59,7 +59,7 @@ import { buildAxisFacets } from "../../core/axisFacets.ts";
 import { buildTagPrefixCandidates } from "../../core/tagPrefixCandidates.ts";
 import { evalSmartFolder } from "../../core/smartFolder.ts";
 import { compareJapaneseSortKeys, compareUtf8Bytes } from "../../core/japaneseSortKey.ts";
-import { applyWorksQuery } from "../../core/worksQuery.ts";
+import { applyWorksQuery, type WorkSummaryPage } from "../../core/worksQuery.ts";
 import {
   buildFsRoot,
   buildWorkFileTree,
@@ -100,10 +100,15 @@ interface FixtureState {
   scanNewWorkIds: string[];
 }
 
-function toListPage(page: { items: WorkSummary[]; total: number; seed?: number }): WorksPage {
+function toListPage(page: WorkSummaryPage): WorksPage {
   return page.seed === undefined
-    ? { items: page.items.map(toWorkListItem), total: page.total }
-    : { items: page.items.map(toWorkListItem), total: page.total, seed: page.seed };
+    ? { items: page.items.map(toWorkListItem), total: page.total, stats: page.stats }
+    : {
+        items: page.items.map(toWorkListItem),
+        total: page.total,
+        stats: page.stats,
+        seed: page.seed,
+      };
 }
 
 export interface FixtureAdapterOptions {
