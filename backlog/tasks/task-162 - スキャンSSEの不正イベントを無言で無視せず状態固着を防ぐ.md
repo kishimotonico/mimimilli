@@ -1,9 +1,11 @@
 ---
 id: TASK-162
 title: スキャンSSEの不正イベントを無言で無視せず状態固着を防ぐ
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-07-31 00:19'
+updated_date: '2026-07-31 02:35'
 labels: []
 dependencies: []
 priority: medium
@@ -22,3 +24,10 @@ TASK-113（DLsite側SSE堅牢化）の調査で発見した残存問題。useSca
 - [ ] #2 既存の正常系・再接続挙動が退行しない（テストで担保）
 - [ ] #3 pnpm check と pnpm test が通る
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+DLsite側（TASK-113）で確立した「不正イベントはエラー表示+状態解除」パターンをuseScanJobへ横展開
+実装Cursor委譲
+<!-- SECTION:PLAN:END -->

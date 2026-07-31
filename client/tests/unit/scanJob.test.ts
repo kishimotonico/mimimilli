@@ -300,4 +300,46 @@ describe("useScanJob", () => {
     });
     expect(hook.result.current.error).toBe("cancel failed");
   });
+
+  it("不正なJSONイベントでscanningが固着せずerrorを表示する", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) =>
+        String(input).endsWith("/scan/active") ? response(running) : response(running),
+      ),
+    );
+    const hook = renderHook(() => useScanJob());
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    const source = FakeEventSource.instances[0]!;
+    act(() => {
+      source.dispatchEvent(new MessageEvent("completed", { data: "not-json" }));
+    });
+    await waitFor(() => expect(hook.result.current.job).toBeNull());
+    expect(hook.result.current.scanning).toBe(false);
+    expect(hook.result.current.error).toBe("スキャン進捗イベントの解析に失敗しました");
+    expect(source.closed).toBe(true);
+  });
+
+  it("不正なterminalイベントでscanningが固着せずerrorを表示する", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) =>
+        String(input).endsWith("/scan/active") ? response(running) : response(running),
+      ),
+    );
+    const hook = renderHook(() => useScanJob());
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    const source = FakeEventSource.instances[0]!;
+    act(() => {
+      source.dispatchEvent(
+        new MessageEvent("completed", {
+          data: JSON.stringify({ type: "completed", result: "invalid" }),
+        }),
+      );
+    });
+    await waitFor(() => expect(hook.result.current.job).toBeNull());
+    expect(hook.result.current.scanning).toBe(false);
+    expect(hook.result.current.error).toBe("スキャン進捗イベントの形式が不正です");
+    expect(source.closed).toBe(true);
+  });
 });

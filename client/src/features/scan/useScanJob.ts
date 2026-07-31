@@ -107,6 +107,10 @@ export function useScanJob(options: UseScanJobOptions = {}) {
 
       const source = new EventSource(`${API_BASE}/scan/${encodeURIComponent(initial.id)}/events`);
       sourceRef.current = source;
+      const fail = (message: string): void => {
+        detachWithError(generation, initial.id, source, new Error(message));
+      };
+
       const refresh = (): void => {
         if (!owns(generation, initial.id)) return;
         void getScanJob(initial.id)
@@ -134,10 +138,14 @@ export function useScanJob(options: UseScanJobOptions = {}) {
           try {
             payload = JSON.parse((raw as MessageEvent<string>).data);
           } catch {
+            fail("スキャン進捗イベントの解析に失敗しました");
             return;
           }
           const parsed = scanJobEventSchema.safeParse(payload);
-          if (!parsed.success) return;
+          if (!parsed.success) {
+            fail("スキャン進捗イベントの形式が不正です");
+            return;
+          }
           const event = parsed.data;
           if (event.type === "reset" || event.type === "state") {
             applyOwned(generation, initial.id, source, event.snapshot);
