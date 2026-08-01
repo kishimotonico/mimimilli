@@ -1,6 +1,7 @@
 import type { SmartFolder, TagPrefix } from "@mimimilli/shared";
 import type { AxisId } from "../model/types";
 import { I, type IconName } from "../../../shared/ui/Icon";
+import Button from "../../../shared/ui/Button";
 
 interface AxisRow {
   id: AxisId;
@@ -46,8 +47,12 @@ interface AxisColumnProps {
   tagPrefixes: TagPrefix[];
   smartFolders: SmartFolder[];
   totalCount?: number;
+  /** 分類軸の元になる GET /tag-prefixes の取得失敗。無言でCV/サークル等の行が
+   *  消えるのを防ぎ、分類軸グループにエラー行を出す */
+  isTagPrefixesError?: boolean;
   onSelectAxis: (axis: AxisId) => void;
   onNewSmartFolder?: () => void;
+  onRetryTagPrefixes?: () => void;
 }
 
 function AxisRowItem({
@@ -61,7 +66,12 @@ function AxisRowItem({
 }) {
   const Ic = I[ax.icon];
   return (
-    <button type="button" className={`mll-axis ${isActive ? "is-on" : ""}`} onClick={onSelect}>
+    <button
+      type="button"
+      className={`mll-axis ${isActive ? "is-on" : ""}`}
+      aria-current={isActive ? "true" : undefined}
+      onClick={onSelect}
+    >
       <span className="ic">
         <Ic size={14} />
       </span>
@@ -81,8 +91,10 @@ export default function AxisColumn({
   tagPrefixes,
   smartFolders,
   totalCount,
+  isTagPrefixesError,
   onSelectAxis,
   onNewSmartFolder,
+  onRetryTagPrefixes,
 }: AxisColumnProps) {
   const facetAxisRows = buildFacetAxisRows(tagPrefixes);
   return (
@@ -106,6 +118,17 @@ export default function AxisColumn({
 
         <div className="mll-axisgroup">
           <div className="mll-axisgroup__hd">分類軸</div>
+          {isTagPrefixesError && (
+            // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- <output> はフォーム計算結果向けの意味を持つため、分類軸の読み込み失敗通知には role="status" を使う
+            <div className="mll-axis-error" role="status" aria-live="polite">
+              <span>分類軸の取得に失敗しました</span>
+              {onRetryTagPrefixes && (
+                <Button variant="ghost" icon={I.refresh} onClick={onRetryTagPrefixes}>
+                  再試行
+                </Button>
+              )}
+            </div>
+          )}
           {facetAxisRows.map((ax) => (
             <AxisRowItem
               key={ax.id}
