@@ -64,3 +64,13 @@ CV・サークルを含め、作品の属性をデータモデルの専用カラ
 - `facetAxisSchema` の enum 廃止は API 契約・URL 同期（`navigationUrl.ts`）・軸レール UI に波及する。既存6軸相当を初期設定として投入すれば利用上の互換は保てる。なお `year`（追加日）はタグ由来でない組み込み軸として分類軸グループに残し、ドリル絞り込みを `addedAt` の年照合に統一した（従来は集計が `addedAt` 由来・ドリルがタグ照合という不整合があり、常に0件になっていた）
 - prefix 定義の保存場所（DB か、ポータビリティを重視してルートフォルダー直下の設定ファイルか）は要件決めタスクで確定する
 - 全タグが編集可能になるため、誤操作に対する安全性は保護フラグ（確認ダイアログ）に依存する
+
+## 追記（2026-07-31）: タグ軸（"tag"）は flat・annotated 全タグを集計する
+
+当初実装（`buildAxisFacets` / `shared/src/library.ts` の軸コメント）は `tag` を「フラットタグのみを集計する軸」として実装していた。実運用ではほぼ全タグが `prefix/値` 形式（annotated）になり、`tag` 軸が恒常的に0件になる問題を生んだため、この整理を改める。`buildAxisFacets`（`server/src/core/axisFacets.ts`）と real アダプタの SQL（`workRepo.ts`）を、axis `"tag"` では flat・annotated を問わず全タグを集計するよう変更する。
+
+- 集計値（`AxisFacetItem.value`）は完全なタグ文字列（例: `"cv/藤田茜"`）を保持する。既存の AND 絞り込み（`tags`/`tagOp=AND` パラメータ）はタグの完全一致で動くため、そのまま機能する
+- 表示側（`ContentColumn.tsx`）は `parseTag` で prefix を取り出し、`TagPrefix` の label/color を使って prefix グループ見出し付きのチェックボックス一覧にする。表示順序はフラットタグ→登録済み prefix（定義順）→未登録 prefix
+- `cv` 等の個別 prefix 軸（単一ドリル）とは役割が異なる: `tag` 軸はチェックボックスの複数選択 AND 絞り込みを prefix 横断で行うための面であり、両者は併存する
+
+これにより「タグ」軸が実データで意味を持つ操作面になる。ADR本文中・`shared/src/library.ts` 等コード中の「`tag`: フラットタグ軸」という記述はこの追記で上書きされたものとして読む。

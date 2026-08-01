@@ -121,12 +121,15 @@ test("buildAxisFacets: 任意の prefix 軸を集計できる（prefix の大小
   ]);
 });
 
-test("buildAxisFacets: tag 軸はフラットタグのみ、year 軸は addedAt 由来", () => {
+test("buildAxisFacets: tag 軸は flat・annotated 双方を集計し、year 軸は addedAt 由来", () => {
   const works = [
     summaryWith("W1", ["cv/x", "ASMR"], "2025-06-01T00:00:00.000Z"),
     summaryWith("W2", ["ASMR"], "2026-01-01T00:00:00.000Z"),
   ];
-  assert.deepEqual(buildAxisFacets("tag", works), [{ value: "ASMR", count: 2 }]);
+  assert.deepEqual(buildAxisFacets("tag", works), [
+    { value: "ASMR", count: 2 },
+    { value: "cv/x", count: 1 },
+  ]);
   assert.deepEqual(
     buildAxisFacets("year", works)
       .map((i) => i.value)

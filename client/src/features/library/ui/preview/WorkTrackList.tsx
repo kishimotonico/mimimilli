@@ -56,7 +56,9 @@ export function WorkTrackList({
             >
               <span className="num">{String(i + 1).padStart(2, "0")}</span>
               <span className="name">
-                <span className="title">{tr.title}</span>
+                <span className="title" title={tr.title}>
+                  {tr.title}
+                </span>
                 {hasResume && resumeTrackId === tr.id && (
                   <span className="resume">再開 {formatTime(resumeOffsetSec) ?? "--:--"}</span>
                 )}
