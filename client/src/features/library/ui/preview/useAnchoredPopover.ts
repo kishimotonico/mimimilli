@@ -2,6 +2,9 @@ import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "re
 
 const POPOVER_MARGIN = 8;
 
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 export interface PopoverLayout {
   left: number;
   width: number;
@@ -32,6 +35,68 @@ function getClampedPopoverLayout(anchor: HTMLElement, preferredWidth: number): P
   return { left, width, containerWidth: containerRect?.width ?? window.innerWidth };
 }
 
+export interface UsePopoverDismissalOptions {
+  isOpen: boolean;
+  /** ポップオーバー外へのポインター押下時に呼ぶ */
+  onOutsideClick: () => void;
+  /** Escapeキー押下時に呼ぶ（outsideClickと副作用が異なる場合に個別指定できる） */
+  onEscape: () => void;
+  /**
+   * outside-click判定の境界に使う要素。未指定なら anchorRef 自身を使う。
+   * タグ追加ポップオーバーのように、トリガーボタン＋浮遊/フル幅どちらの表示も含めて
+   * 境界としたい場合に、呼び出し側で別途 ref を用意して渡す。
+   */
+  boundaryRef?: RefObject<HTMLElement | null>;
+  /**
+   * トリガー要素（またはそれを含む祖先）の ref。ポップオーバーを閉じた際、
+   * フォーカスが BODY へ落ちていたらこの要素内の最初のフォーカス可能要素へ戻す。
+   */
+  anchorRef: RefObject<HTMLElement | null>;
+}
+
+/**
+ * ポップオーバー/メニュー共通の「外側クリック/Escapeで閉じる」＋「閉じたときにトリガーへ
+ * フォーカスを戻す」を扱うフック。通知ポップオーバー（NotificationBell）はトリガーが
+ * ネイティブbuttonでクリック後もフォーカスが残るため無自覚に動いていたが、
+ * ポップオーバー内へフォーカスが移った状態で閉じる（Escape・項目選択）とBODYへ落ちる欠陥があった。
+ */
+export function usePopoverDismissal({
+  isOpen,
+  onOutsideClick,
+  onEscape,
+  boundaryRef,
+  anchorRef,
+}: UsePopoverDismissalOptions): void {
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const closeOnOutsidePointerDown = (event: PointerEvent) => {
+      const boundary = boundaryRef?.current ?? anchorRef.current;
+      if (boundary && event.target instanceof Node && !boundary.contains(event.target)) {
+        onOutsideClick();
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onEscape();
+    };
+
+    document.addEventListener("pointerdown", closeOnOutsidePointerDown);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePointerDown);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [isOpen, onOutsideClick, onEscape, boundaryRef, anchorRef]);
+
+  const wasOpenRef = useRef(isOpen);
+  useEffect(() => {
+    if (wasOpenRef.current && !isOpen && document.activeElement === document.body) {
+      anchorRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)?.focus();
+    }
+    wasOpenRef.current = isOpen;
+  }, [isOpen, anchorRef]);
+}
+
 export interface UseAnchoredPopoverOptions {
   isOpen: boolean;
   preferredWidth: number;
@@ -54,8 +119,9 @@ export interface UseAnchoredPopoverResult {
 }
 
 /**
- * アンカー要素基準で展開するポップオーバーの「配置クランプ＋外側クリック/Escapeで閉じる」を
- * 共通化するフック。タグ追加ポップオーバーとアクション（その他）ポップオーバーの両方が使う。
+ * アンカー要素基準で展開するポップオーバーの「配置クランプ＋外側クリック/Escapeで閉じる＋
+ * 閉じたときのフォーカス復帰」を共通化するフック。タグ追加ポップオーバーとアクション
+ * （その他）ポップオーバーの両方が使う。
  */
 export function useAnchoredPopover({
   isOpen,
@@ -71,26 +137,7 @@ export function useAnchoredPopover({
     containerWidth: preferredWidth,
   });
 
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const closeOnOutsidePointerDown = (event: PointerEvent) => {
-      const boundary = boundaryRef?.current ?? anchorRef.current;
-      if (boundary && event.target instanceof Node && !boundary.contains(event.target)) {
-        onOutsideClick();
-      }
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onEscape();
-    };
-
-    document.addEventListener("pointerdown", closeOnOutsidePointerDown);
-    document.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.removeEventListener("pointerdown", closeOnOutsidePointerDown);
-      document.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [isOpen, onOutsideClick, onEscape, boundaryRef]);
+  usePopoverDismissal({ isOpen, onOutsideClick, onEscape, boundaryRef, anchorRef });
 
   useLayoutEffect(() => {
     if (!isOpen) return;

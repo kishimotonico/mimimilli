@@ -56,6 +56,47 @@ describe("LibrarySortMenu", () => {
     expect(screen.queryByRole("menu", { name: "並び替え" })).not.toBeInTheDocument();
   });
 
+  it("開くと現在の並び順の項目に初期フォーカスする", () => {
+    renderSortMenu({ sort: "title-asc" });
+    fireEvent.click(screen.getByRole("button", { name: "並び替え" }));
+
+    expect(screen.getByRole("menuitemradio", { name: /タイトル（A→Z）/ })).toHaveFocus();
+  });
+
+  it("ArrowDown/ArrowUpで項目間をフォーカス移動できる", () => {
+    renderSortMenu({ sort: "added-desc" });
+    fireEvent.click(screen.getByRole("button", { name: "並び替え" }));
+
+    const menu = screen.getByRole("menu", { name: "並び替え" });
+    const items = screen.getAllByRole("menuitemradio");
+    expect(items[0]).toHaveFocus();
+
+    fireEvent.keyDown(menu, { key: "ArrowDown" });
+    expect(items[1]).toHaveFocus();
+
+    fireEvent.keyDown(menu, { key: "ArrowUp" });
+    expect(items[0]).toHaveFocus();
+
+    // 先頭で ArrowUp すると末尾へ巡回する
+    fireEvent.keyDown(menu, { key: "ArrowUp" });
+    expect(items[items.length - 1]).toHaveFocus();
+  });
+
+  it("項目選択後、Escapeで閉じた後の両方でトリガーへフォーカスが戻る", () => {
+    renderSortMenu({ sort: "added-desc" });
+    const button = screen.getByRole("button", { name: "並び替え" });
+
+    fireEvent.click(button);
+    fireEvent.click(screen.getByRole("menuitemradio", { name: /タイトル（A→Z）/ }));
+    expect(screen.queryByRole("menu", { name: "並び替え" })).not.toBeInTheDocument();
+    expect(button).toHaveFocus();
+
+    fireEvent.click(button);
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("menu", { name: "並び替え" })).not.toBeInTheDocument();
+    expect(button).toHaveFocus();
+  });
+
   it("スマートフォルダー軸ではソートメニューを無効化し、フォルダー定義のソートを表示する", () => {
     renderSortMenu({
       axis: "smart-sf-1",

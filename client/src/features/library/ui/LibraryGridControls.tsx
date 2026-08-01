@@ -54,7 +54,7 @@ export default function LibraryGridControls() {
             type="range"
             min={MIN_TILE_SIZE}
             max={MAX_TILE_SIZE}
-            step={1}
+            step={8}
             value={safeTileSize}
             disabled={!showGrid}
             aria-label="グリッドのサイズ"

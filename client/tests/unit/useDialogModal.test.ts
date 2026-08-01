@@ -105,6 +105,43 @@ describe("useDialogModal", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("末尾要素からTabするとBODYへ落とさず先頭要素へ循環する", () => {
+    function FocusTrapDialog({ onClose }: { onClose: () => void }) {
+      const { dialogRef } = useDialogModal({ onClose });
+      return createElement(
+        "dialog",
+        { ref: dialogRef, "data-testid": "dialog" },
+        createElement("button", { "data-testid": "first" }, "first"),
+        createElement("button", { "data-testid": "last" }, "last"),
+      );
+    }
+    const { getByTestId } = render(createElement(FocusTrapDialog, { onClose: vi.fn() }));
+    const last = getByTestId("last");
+    last.focus();
+
+    const event = fireEvent.keyDown(last, { key: "Tab", bubbles: true, cancelable: true });
+    expect(event).toBe(false); // preventDefault された
+    expect(document.activeElement).toBe(getByTestId("first"));
+  });
+
+  it("先頭要素からShift+TabするとBODYへ落とさず末尾要素へ循環する", () => {
+    function FocusTrapDialog({ onClose }: { onClose: () => void }) {
+      const { dialogRef } = useDialogModal({ onClose });
+      return createElement(
+        "dialog",
+        { ref: dialogRef, "data-testid": "dialog" },
+        createElement("button", { "data-testid": "first" }, "first"),
+        createElement("button", { "data-testid": "last" }, "last"),
+      );
+    }
+    const { getByTestId } = render(createElement(FocusTrapDialog, { onClose: vi.fn() }));
+    const first = getByTestId("first");
+    first.focus();
+
+    fireEvent.keyDown(first, { key: "Tab", shiftKey: true, bubbles: true, cancelable: true });
+    expect(document.activeElement).toBe(getByTestId("last"));
+  });
+
   it("shouldClose が false を返すときはbackdropクリックでも閉じない", () => {
     const onClose = vi.fn();
     function ShouldNotClose() {
