@@ -3,6 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import {
   activeAxisAtom,
   drillValueAtom,
+  librarySearchQueryAtom,
   selectedTagsAtom,
   selectedWorkIdAtom,
   sortAtom,
@@ -78,6 +79,7 @@ export function useNavigationHistory(): void {
   const selectedTags = useAtomValue(selectedTagsAtom);
   const selectedWorkId = useAtomValue(selectedWorkIdAtom);
   const sort = useAtomValue(sortAtom);
+  const searchQuery = useAtomValue(librarySearchQueryAtom);
   const filesRelPath = useAtomValue(filesRelPathAtom);
   const filesSelectedPath = useAtomValue(filesSelectedPathAtom);
   const commit = useAtomValue(navigationHistoryCommitAtom);
@@ -88,6 +90,7 @@ export function useNavigationHistory(): void {
   const setSelectedTags = useSetAtom(selectedTagsAtom);
   const setSelectedWorkId = useSetAtom(selectedWorkIdAtom);
   const setSort = useSetAtom(sortAtom);
+  const setSearchQuery = useSetAtom(librarySearchQueryAtom);
   const setFilesRelPath = useSetAtom(filesRelPathAtom);
   const setFilesSelectedPath = useSetAtom(filesSelectedPathAtom);
   const setFilesDirection = useSetAtom(filesDirectionAtom);
@@ -125,6 +128,7 @@ export function useNavigationHistory(): void {
         setSelectedTags(state.library.selectedTags);
         setSelectedWorkId(state.library.selectedWorkId);
         setSort(state.library.sort);
+        setSearchQuery(state.library.q ?? "");
         return;
       }
 
@@ -143,6 +147,7 @@ export function useNavigationHistory(): void {
       setFilesRelPath,
       setFilesSelectedPath,
       setMode,
+      setSearchQuery,
       setSelectedTags,
       setSelectedWorkId,
       setSort,
@@ -205,7 +210,7 @@ export function useNavigationHistory(): void {
     if (mode === "library") {
       state = {
         mode,
-        library: { activeAxis, drillValue, selectedTags, selectedWorkId, sort },
+        library: { activeAxis, drillValue, selectedTags, selectedWorkId, sort, q: searchQuery },
       };
     } else {
       if (!rootFolder) return;
@@ -260,6 +265,7 @@ export function useNavigationHistory(): void {
     publishHistoryState,
     ready,
     rootFolder,
+    searchQuery,
     selectedTags,
     selectedWorkId,
     sort,

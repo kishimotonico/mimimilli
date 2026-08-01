@@ -52,6 +52,7 @@ export default function AddressBar() {
           active={mode === "library" && !showGrid}
           onClick={() => setLibraryViewMode("list")}
           disabled={!availableViewModes.includes("list") || isDrilledFacet}
+          title={mode !== "library" ? "ファイルモードはカラム表示のみ" : undefined}
         />
         <IconButton
           size="sm"
@@ -60,11 +61,12 @@ export default function AddressBar() {
           active={mode === "library" && showGrid}
           onClick={() => setLibraryViewMode("grid")}
           disabled={!availableViewModes.includes("grid")}
+          title={mode !== "library" ? "ファイルモードはカラム表示のみ" : undefined}
         />
       </div>
 
       {mode === "library" && <LibrarySortMenu />}
-      <IconButton size="sm" icon={I.more} label="その他" />
+      <IconButton size="sm" icon={I.more} label="その他" disabled title="近日実装" />
     </div>
   );
 }

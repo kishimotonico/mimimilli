@@ -134,6 +134,25 @@ describe("navigation URL codec", () => {
     ]);
   });
 
+  it("round-trips a search query via q=", () => {
+    const state: NavigationUrlState = {
+      mode: "library",
+      library: { ...DEFAULT_LIBRARY_URL_STATE, q: "耳かき ASMR" },
+    };
+
+    const url = serializeNavigationUrl(state);
+    expect(url).toBe("/library/all?q=%E8%80%B3%E3%81%8B%E3%81%8D+ASMR");
+    expect(parseNavigationUrl(url)).toMatchObject({ state, warnings: [] });
+  });
+
+  it("omits q from the URL when empty", () => {
+    const url = serializeNavigationUrl({
+      mode: "library",
+      library: { ...DEFAULT_LIBRARY_URL_STATE, q: "" },
+    });
+    expect(url).toBe("/library/all");
+  });
+
   it("warns and restores the default sort for an invalid value", () => {
     const result = parseNavigationUrl("/library/all?sort=nope");
 

@@ -9,6 +9,8 @@ export interface LibraryUrlState {
   selectedTags: string[];
   selectedWorkId: string | null;
   sort: SortId;
+  /** 検索キーワード。空文字はURLに出さない。省略時は復元経路未対応の呼び出し元向けに空扱い */
+  q?: string;
 }
 
 export interface FilesUrlState {
@@ -34,6 +36,7 @@ export const DEFAULT_LIBRARY_URL_STATE: LibraryUrlState = {
   selectedTags: [],
   selectedWorkId: null,
   sort: DEFAULT_SORT,
+  q: "",
 };
 
 // ビュー軸（ドリル不可）。それ以外のセグメントは tag / smart-* を除きファセット軸
@@ -158,10 +161,11 @@ export function parseNavigationUrl(input: string | URL): NavigationParseResult {
     if (sortValue && sort === DEFAULT_SORT && sortValue !== DEFAULT_SORT) {
       warnings.push(`存在しない sort を既定値へ戻しました: ${sortValue}`);
     }
+    const q = url.searchParams.get("q") ?? "";
 
     const state: NavigationUrlState = {
       mode: "library",
-      library: { activeAxis: axis, drillValue, selectedTags, selectedWorkId, sort },
+      library: { activeAxis: axis, drillValue, selectedTags, selectedWorkId, sort, q },
     };
     return { state, canonicalUrl: serializeNavigationUrl(state), warnings };
   }
@@ -191,7 +195,7 @@ export function serializeNavigationUrl(state: NavigationUrlState): string {
   const params = new URLSearchParams();
 
   if (state.mode === "library") {
-    const { activeAxis, drillValue, selectedTags, selectedWorkId, sort } = state.library;
+    const { activeAxis, drillValue, selectedTags, selectedWorkId, sort, q } = state.library;
     let pathname = `/library/${encodeURIComponent(activeAxis)}`;
     if (drillValue !== null) pathname += `/${encodeURIComponent(drillValue)}`;
     if (activeAxis === "tag") {
@@ -199,6 +203,7 @@ export function serializeNavigationUrl(state: NavigationUrlState): string {
     }
     if (selectedWorkId) params.set("work", selectedWorkId);
     if (sort !== DEFAULT_SORT) params.set("sort", sort);
+    if (q) params.set("q", q);
     const search = params.toString();
     return search ? `${pathname}?${search}` : pathname;
   }
