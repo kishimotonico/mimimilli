@@ -88,6 +88,7 @@ import { WorkRepo } from "./workRepo.ts";
 import {
   buildWorkRegisterPreview,
   createWorkFromFolder,
+  unregisterWork,
   WorkRegisterError,
 } from "./workRegister.ts";
 import { querySmartFolderWorks } from "./smartFolderWorks.ts";
@@ -645,6 +646,10 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
         if (error instanceof WorkRegisterError) throw error;
         throw error;
       }
+    },
+
+    async deleteWork(id: string): Promise<boolean> {
+      return unregisterWork(repo, id);
     },
 
     async patchWork(id: string, patch: WorkPatch): Promise<Work | null> {

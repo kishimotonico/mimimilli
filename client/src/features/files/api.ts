@@ -10,7 +10,7 @@ import {
   type WorkCreateBody,
   type WorkRegisterPreview,
 } from "@mimimilli/shared";
-import { API_BASE, getParsed, postParsed } from "../../shared/api/http";
+import { API_BASE, getParsed, postParsed, deleteVoid } from "../../shared/api/http";
 import { fsListingSchema, type FsListing } from "@mimimilli/shared";
 
 /** 物理ディレクトリを1階層ぶん列挙する。path 省略でルートフォルダー */
@@ -28,6 +28,11 @@ export async function getWorkRegisterPreview(path: string): Promise<WorkRegister
 /** フォルダーを作品として登録する */
 export async function createWork(body: WorkCreateBody): Promise<Work> {
   return postParsed(workCreateResponseSchema, "/works", body);
+}
+
+/** 作品登録を解除する（DB・メタファイルのみ。物理ファイルは残す） */
+export async function deleteWork(workId: string): Promise<void> {
+  await deleteVoid(`/works/${encodeURIComponent(workId)}`);
 }
 
 /** 作品未登録時の DLsite メタ取得（RJ/VJコード指定） */

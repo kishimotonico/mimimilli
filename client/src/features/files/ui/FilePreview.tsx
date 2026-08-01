@@ -7,7 +7,7 @@ import ConfirmDialog from "../../../shared/ui/ConfirmDialog";
 import { formatFileSize } from "../../../shared/lib/format";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { FILE_SYSTEM_QUERY_KEYS } from "../../../entities/file-system/queryKeys";
-import { createWork, getWorkRegisterPreview } from "../api";
+import { createWork, deleteWork, getWorkRegisterPreview } from "../api";
 import { getFileUrl } from "../api";
 import { getWorkFolderDisplay } from "../model/workFolderDisplay";
 import RegisterWorkDialog from "./RegisterWorkDialog";
@@ -46,7 +46,9 @@ export default function FilePreview({
   const [registerPreview, setRegisterPreview] = useState<WorkRegisterPreview | null>(null);
   const [showRegisterDialog, setShowRegisterDialog] = useState(false);
   const [quickMergeConfirm, setQuickMergeConfirm] = useState<WorkRegisterPreview | null>(null);
+  const [showUnregisterConfirm, setShowUnregisterConfirm] = useState(false);
   const [registerBusy, setRegisterBusy] = useState(false);
+  const [unregisterBusy, setUnregisterBusy] = useState(false);
   const [registerError, setRegisterError] = useState<string | null>(null);
 
   const kind = entry ? classifyFile(entry) : null;
@@ -74,6 +76,21 @@ export default function FilePreview({
     await queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.all() });
     onWorkRegistered?.();
   }, [entry, onWorkRegistered, queryClient]);
+
+  const handleUnregister = async () => {
+    if (!entry?.workId) return;
+    setUnregisterBusy(true);
+    setRegisterError(null);
+    try {
+      await deleteWork(entry.workId);
+      setShowUnregisterConfirm(false);
+      await invalidateAfterRegister();
+    } catch (cause) {
+      setRegisterError(cause instanceof Error ? cause.message : "作品登録の解除に失敗しました");
+    } finally {
+      setUnregisterBusy(false);
+    }
+  };
 
   const openRegisterDialog = async () => {
     if (!entry) return;
@@ -209,6 +226,20 @@ export default function FilePreview({
                 </Button>
               </div>
             )}
+            {isWorkFolder && entry.workId && (
+              <div className="mle-fprev__actions">
+                <Button
+                  variant="ghost"
+                  disabled={unregisterBusy}
+                  onClick={() => {
+                    setRegisterError(null);
+                    setShowUnregisterConfirm(true);
+                  }}
+                >
+                  作品登録を解除
+                </Button>
+              </div>
+            )}
             {registerError && (
               <p className="m-0 text-[11px] text-[var(--r-coral)]">{registerError}</p>
             )}
@@ -246,6 +277,16 @@ export default function FilePreview({
           confirmLabel="統合して登録"
           onConfirm={() => quickRegister(quickMergeConfirm)}
           onCancel={() => setQuickMergeConfirm(null)}
+        />
+      )}
+
+      {showUnregisterConfirm && (
+        <ConfirmDialog
+          title="作品登録を解除"
+          message="このフォルダーの作品データ（再生履歴・タグを含む）と mimimilli.json を削除します。音声ファイルなどの物理ファイルは削除されません。"
+          confirmLabel="解除する"
+          onConfirm={() => void handleUnregister()}
+          onCancel={() => setShowUnregisterConfirm(false)}
         />
       )}
     </div>

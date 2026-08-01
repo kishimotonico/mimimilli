@@ -554,6 +554,13 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
       return buildFullWorkFromState(state, work);
     },
 
+    async deleteWork(id: string): Promise<boolean> {
+      const index = state.works.findIndex((w) => w.id === id);
+      if (index === -1) return false;
+      state.works.splice(index, 1);
+      return true;
+    },
+
     async patchWork(id: string, patch: WorkPatch): Promise<Work | null> {
       const work = state.works.find((w) => w.id === id);
       if (!work) return null;

@@ -1,10 +1,11 @@
 ---
 id: TASK-165
 title: ファイルモードから作品登録を解除できるようにする
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-08-01 18:02'
-updated_date: '2026-08-01 18:40'
+updated_date: '2026-08-01 19:47'
 labels: []
 dependencies:
   - TASK-164
@@ -29,6 +30,15 @@ ordinal: 175000
 - [ ] #3 解除操作の前後で音声等の物理ファイルが一切変更・削除されない
 - [ ] #4 解除後、同じフォルダは未登録フォルダとしてファイルモードに表示される
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. 作品削除API: mimimilli.jsonとDB作品データ（履歴・タグ含む）を削除、物理ファイル不変（TASK-164の子作品解除ロジックと共通化）
+2. ファイルモードの登録済みフォルダに「作品登録を解除」アクション＋破壊的操作の確認ダイアログ（消える内容を明示）
+3. 解除後は未登録フォルダとして表示
+4. 実装はCursor(composer-2.5)へ委譲、Sonnet検証担当が自動テスト+実機確認（検証用の残存作品をUIから解除して片付ける）
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 
