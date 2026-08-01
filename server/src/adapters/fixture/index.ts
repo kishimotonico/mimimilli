@@ -343,6 +343,32 @@ function resolveFsNode(root: FsNode, rootAbs: string, target: string): FsNode | 
   return cur;
 }
 
+/** ファイルまたはディレクトリを解決する（browseFs はディレクトリ専用） */
+function resolveFsPath(root: FsNode, rootAbs: string, target: string): FsNode | null {
+  if (target === rootAbs) return root;
+  if (!target.startsWith(`${rootAbs}/`)) return null;
+  const segments = target
+    .slice(rootAbs.length + 1)
+    .split("/")
+    .filter(Boolean);
+  let cur = root;
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i]!;
+    const next = cur.children.find((c) => c.name === seg);
+    if (!next) return null;
+    if (i === segments.length - 1) return next;
+    if (!next.isDir) return null;
+    cur = next;
+  }
+  return null;
+}
+
+function isAudioFileType(fileType: string): boolean {
+  return ["mp3", "m4a", "aac", "wav", "ogg", "flac", "webm", "opus"].includes(
+    fileType.toLowerCase(),
+  );
+}
+
 export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataAdapter {
   const state = createInitialState(options);
 
@@ -606,6 +632,15 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
     // ── メディア・DLsite ────────────────────────────────────
     // fixture アダプタには実体ファイルが無いため、再生・シーク・カバー表示が
     // 成立するようメモリ上でコンテンツを合成する（synthetic MediaLocation）。
+    async locateFsAudio(absolutePath: string): Promise<MediaLocation | null> {
+      const rootAbs = normalizeFsPath(state.rootFolder ?? "/library");
+      const target = normalizeFsPath(absolutePath);
+      const root = buildFsRoot(state.works, state.coverColumns);
+      const node = resolveFsPath(root, rootAbs, target);
+      if (!node || node.isDir || !isAudioFileType(node.fileType)) return null;
+      return synthesizeSilentWav(DEFAULT_TRACK_DURATION_SEC);
+    },
+
     async locateMedia(
       kind: MediaKind,
       workId: string,

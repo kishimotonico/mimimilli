@@ -1,10 +1,11 @@
 ---
 id: TASK-163
 title: ファイルモードで未登録音声ファイルを再生できるようにする
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-08-01 18:01'
-updated_date: '2026-08-01 18:44'
+updated_date: '2026-08-01 19:17'
 labels: []
 dependencies:
   - TASK-167
@@ -33,6 +34,16 @@ ordinal: 173000
 - [ ] #4 ファイルモードからの再生ではresumeがPOSTされず、再生履歴・最近再生にも記録されない
 - [ ] #5 スキャンルート外のパスを指定した場合、ストリーミングAPIが拒否する
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. スキャンルート配下の音声をパス指定でストリーミングするAPIを追加（shared契約含む、ルート外拒否をテストで担保）
+2. プレイヤーにwork非依存のファイル再生経路を追加。ファイルモードからの再生は常にファイル再生（App.tsxの即席トラック再生を置き換え）
+3. 表示はジェネリック（音符アイコン・ファイル名・実測duration）、同一フォルダ内連続再生（サブフォルダに下りない）
+4. resume/履歴/最近再生に記録しない（playlistId===nullガードと整合）
+5. 実装はCursor(composer-2.5)へ委譲、pnpm check/test通過後にSonnet検証担当がagent-browserで実機確認
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 

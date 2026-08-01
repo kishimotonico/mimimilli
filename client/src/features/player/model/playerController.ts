@@ -5,8 +5,10 @@ import { isResolvedTrack, type PlaybackTrack } from "./trackTime";
 export type PlaybackStatus = "idle" | "loading" | "playing" | "paused" | "ended" | "error";
 export type PlaybackCompletionScope = "queue" | "work";
 
+export type PlaybackSource = { kind: "work"; work: WorkListItem | Work } | { kind: "file" };
+
 export interface PlaybackItem {
-  work: WorkListItem | Work;
+  source: PlaybackSource;
   playlistId: string | null;
   tracks: PlaybackTrack[];
   trackIndex: number;
@@ -35,6 +37,8 @@ export interface PlayerCoreState {
   currentTrackIndex: number;
   currentPlaylistId: string | null;
   currentWork: WorkListItem | Work | null;
+  /** ファイルモードからの work 非依存再生 */
+  isFilePlayback: boolean;
   tracks: PlaybackTrack[];
   volume: number;
   loop: boolean;
@@ -89,6 +93,7 @@ const playerCoreComparators = {
   currentTrackIndex: Object.is,
   currentPlaylistId: Object.is,
   currentWork: Object.is,
+  isFilePlayback: Object.is,
   tracks: areTracksEqual,
   volume: Object.is,
   loop: Object.is,
@@ -361,7 +366,8 @@ export function toPlayerCoreState(state: PlayerControllerState): PlayerCoreState
     status: state.status,
     currentTrackIndex: state.item?.trackIndex ?? -1,
     currentPlaylistId: state.item?.playlistId ?? null,
-    currentWork: state.item?.work ?? null,
+    currentWork: state.item?.source.kind === "work" ? state.item.source.work : null,
+    isFilePlayback: state.item?.source.kind === "file",
     tracks: state.item?.tracks ?? EMPTY_TRACKS,
     volume: state.volume,
     loop: state.loop,

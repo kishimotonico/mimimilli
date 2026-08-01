@@ -139,6 +139,8 @@ export interface DataAdapter {
   browseFs(path?: string): Promise<FsListing | null>;
 
   // メディア・DLsite
+  /** スキャンルート配下の絶対物理パスから音声を解決する。ルート外・非音声・不存在は null */
+  locateFsAudio(absolutePath: string): Promise<MediaLocation | null>;
   /** 実体が無い（fixture 等）場合は null → ルートが 404 を返す。カバーは describeCover を使う。 */
   locateMedia(kind: MediaKind, workId: string, relPath?: string): Promise<MediaLocation | null>;
   /** カバー専用の軽量な事前確認。音声・通常ファイルの契約は locateMedia のまま維持する。 */

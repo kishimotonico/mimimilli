@@ -41,7 +41,7 @@ export function useResumePersistenceController({
       const position = absolutePosition ?? refs.engine.current?.getCurrentTime();
       if (position === undefined) return;
 
-      if (loadedTrack.playlistId === null) return;
+      if (loadedTrack.playlistId === null || !loadedTrack.workId) return;
       const trackDuration = isResolvedTrack(loadedTrack.track)
         ? loadedTrack.track.durationSec
         : Number.POSITIVE_INFINITY;

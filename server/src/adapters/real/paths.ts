@@ -161,3 +161,11 @@ export function mimeOf(path: string): string {
   const ext = path.split(".").pop()?.toLowerCase() ?? "";
   return MIME_BY_EXT[ext] ?? "application/octet-stream";
 }
+
+const AUDIO_EXTENSIONS = new Set(["mp3", "m4a", "aac", "wav", "ogg", "flac", "webm", "opus"]);
+
+/** 音声ファイル拡張子かどうか（ドットなし小文字） */
+export function isAudioPath(path: string): boolean {
+  const ext = path.split(".").pop()?.toLowerCase() ?? "";
+  return AUDIO_EXTENSIONS.has(ext);
+}

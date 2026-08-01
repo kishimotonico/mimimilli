@@ -15,7 +15,7 @@ interface FileColumnProps {
   isPlaybackActive?: boolean;
   onOpenDir: (absPath: string) => void;
   onSelectFile: (absPath: string) => void;
-  onPlayFile: (entry: FsEntry) => void;
+  onPlayFile: (entry: FsEntry, folderEntries: FsEntry[]) => void;
   isLoading?: boolean;
   /** フォルダー一覧取得の失敗。無言で「空のフォルダー」にせず区別する */
   isError?: boolean;
@@ -72,7 +72,7 @@ export default function FileColumn({
                   entry.isDir ? onOpenDir(entry.path) : onSelectFile(entry.path);
                 const onActivate = () => {
                   if (entry.isDir) onOpenDir(entry.path);
-                  else if (classifyFile(entry) === "audio") onPlayFile(entry);
+                  else if (classifyFile(entry) === "audio") onPlayFile(entry, entries);
                   else onSelectFile(entry.path);
                 };
                 return (

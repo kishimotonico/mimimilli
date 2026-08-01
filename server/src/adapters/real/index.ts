@@ -72,7 +72,7 @@ import {
 import { browseFs } from "./fsBrowse.ts";
 import { buildFileTree } from "./fileTree.ts";
 import { patchMetaFile } from "./meta.ts";
-import { mimeOf, resolveWithin } from "./paths.ts";
+import { mimeOf, isAudioPath, resolveWithin } from "./paths.ts";
 import { Scanner } from "./scanner.ts";
 import {
   gcThumbnailCache,
@@ -718,6 +718,19 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
     },
 
     // ── メディア・DLsite ──────────────────────────────────────
+    async locateFsAudio(absolutePath: string): Promise<MediaLocation | null> {
+      const root = requireRoot();
+      const resolved = resolveWithin(root, absolutePath);
+      if (!resolved || !isAudioPath(resolved)) return null;
+      try {
+        const stats = await stat(resolved);
+        if (!stats.isFile()) return null;
+      } catch {
+        return null;
+      }
+      return { type: "file", absolutePath: resolved, mime: mimeOf(resolved) };
+    },
+
     async locateMedia(
       _kind: MediaKind,
       workId: string,

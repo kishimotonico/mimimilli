@@ -15,6 +15,7 @@ interface MediaSessionPosition {
 
 interface UseMediaSessionOptions {
   currentWork: WorkListItem | Work | null;
+  isFilePlayback: boolean;
   currentTrack: PlaybackTrack | null;
   currentTrackIndex: number;
   trackCount: number;
@@ -54,6 +55,7 @@ function trySetActionHandler(
 
 export function useMediaSession({
   currentWork,
+  isFilePlayback,
   currentTrack,
   currentTrackIndex,
   trackCount,
@@ -68,7 +70,7 @@ export function useMediaSession({
   onSeekRelative,
 }: UseMediaSessionOptions): (position?: number) => void {
   const mediaSession = useMemo(getSupportedMediaSession, []);
-  const isActive = currentWork !== null && currentTrack !== null;
+  const isActive = (currentWork !== null || isFilePlayback) && currentTrack !== null;
   const hasPreviousTrack = currentTrackIndex > 0;
   const hasNextTrack = currentTrackIndex >= 0 && currentTrackIndex < trackCount - 1;
 
@@ -102,18 +104,21 @@ export function useMediaSession({
   useEffect(() => {
     if (!mediaSession) return;
 
-    if (!currentWork || !currentTrack) {
+    if (!currentTrack || (!currentWork && !isFilePlayback)) {
       mediaSession.metadata = null;
       return;
     }
 
     mediaSession.metadata = new MediaMetadata({
       title: currentTrack.title,
-      artist: getCircleName(currentWork) ?? "",
-      album: currentWork.title,
-      artwork: currentWork.cover ? [{ src: getCoverImageUrl(currentWork.id, ARTWORK_WIDTH) }] : [],
+      artist: isFilePlayback ? "" : (getCircleName(currentWork!) ?? ""),
+      album: isFilePlayback ? "" : currentWork!.title,
+      artwork:
+        !isFilePlayback && currentWork?.cover
+          ? [{ src: getCoverImageUrl(currentWork.id, ARTWORK_WIDTH) }]
+          : [],
     });
-  }, [currentTrack, currentWork, mediaSession]);
+  }, [currentTrack, currentWork, isFilePlayback, mediaSession]);
 
   useEffect(() => {
     if (!mediaSession) return;
@@ -175,9 +180,18 @@ export function useMediaSession({
   useEffect(() => {
     if (!mediaSession) return;
 
-    mediaSession.playbackState = currentWork ? (isPlaying ? "playing" : "paused") : "none";
+    mediaSession.playbackState =
+      currentWork || isFilePlayback ? (isPlaying ? "playing" : "paused") : "none";
     updatePositionState();
-  }, [currentTrackIndex, currentWork, isPlaying, mediaSession, playbackRate, updatePositionState]);
+  }, [
+    currentTrackIndex,
+    currentWork,
+    isFilePlayback,
+    isPlaying,
+    mediaSession,
+    playbackRate,
+    updatePositionState,
+  ]);
 
   useEffect(
     () => () => {

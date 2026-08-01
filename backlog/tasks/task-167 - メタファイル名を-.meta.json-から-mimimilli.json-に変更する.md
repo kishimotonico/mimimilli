@@ -1,11 +1,11 @@
 ---
 id: TASK-167
 title: メタファイル名を .meta.json から mimimilli.json に変更する
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-01 18:44'
-updated_date: '2026-08-01 19:05'
+updated_date: '2026-08-01 19:17'
 labels: []
 dependencies: []
 priority: high
@@ -33,10 +33,10 @@ ordinal: 177000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 新規スキャンでフォルダに mimimilli.json が生成される
-- [ ] #2 既存の .meta.json を含むフォルダをスキャンすると mimimilli.json へ自動リネームされ、作品の登録状態（履歴・タグ含む）が維持される
-- [ ] #3 *.meta.json（単一ファイル形式の変種）の新名での扱いが決まり、タスク内の方針に沿って統一的に実装されている
-- [ ] #4 リポジトリ内（server/client/shared/docs）に .meta.json を参照するコードが残らない（テスト・docsのメタ仕様記述を含む）
+- [x] #1 新規スキャンでフォルダに mimimilli.json が生成される
+- [x] #2 既存の .meta.json を含むフォルダをスキャンすると mimimilli.json へ自動リネームされ、作品の登録状態（履歴・タグ含む）が維持される
+- [x] #3 *.meta.json（単一ファイル形式の変種）の新名での扱いが決まり、タスク内の方針に沿って統一的に実装されている
+- [x] #4 リポジトリ内（server/client/shared/docs）に .meta.json を参照するコードが残らない（テスト・docsのメタ仕様記述を含む）
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -49,3 +49,15 @@ ordinal: 177000
 5. docs: requirements-v4.md / ARCHITECTURE.md は新名へ書き換え。ADR 0010 を新規作成して名称変更を記録し、旧ADR(0001,0003,0005,0008)には現在形の記述にのみ注記
 6. pnpm check / pnpm test で確認。実装は Cursor (composer-2.5) へ委譲
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Cursor(composer-2.5)実装+Sonnet検証で完了。pnpm check/test全通過(server394/client597)。衝突時(新名既存)は新名側を正として登録、旧ファイル放置+warn。ADR-0010追加。コミット3645f26
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+メタファイル名を.meta.json→mimimilli.jsonへ変更。単一ファイル形式は*.mimimilli.jsonへ統一（要件v4の正式仕様のため機能維持）。旧名はスキャン時に一回きり自動リネーム移行し恒久フォールバックなし。移行・単一ファイル・衝突の3シナリオをテストで固定。docs/ADR更新済み。検証担当の再検証でマージ可判定
+<!-- SECTION:FINAL_SUMMARY:END -->

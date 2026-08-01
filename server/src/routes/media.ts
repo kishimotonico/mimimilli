@@ -7,7 +7,7 @@ import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { Readable } from "node:stream";
 import { Hono } from "hono";
-import { coverQuerySchema, normalizeThumbnailWidth } from "@mimimilli/shared";
+import { coverQuerySchema, fsAudioQuerySchema, normalizeThumbnailWidth } from "@mimimilli/shared";
 import type { CoverDescriptor, DataAdapter, MediaLocation } from "../adapter.ts";
 import { invalidRequest, notFound } from "../lib/httpError.ts";
 
@@ -29,6 +29,14 @@ export function mediaRoute(adapter: DataAdapter): Hono {
     }
     const location = await descriptor.materialize();
     return streamWhole(location, cacheHeaders);
+  });
+
+  app.get("/media/fs-audio", async (c) => {
+    const parsed = fsAudioQuerySchema.safeParse(c.req.query());
+    if (!parsed.success) invalidRequest(`不正なクエリパラメータです: ${parsed.error.message}`);
+    const location = await adapter.locateFsAudio(parsed.data.path);
+    if (!location) notFound(`音声ファイルが見つかりません: ${parsed.data.path}`);
+    return streamWithRange(location, c.req.header("Range"));
   });
 
   app.get("/media/audio/:id/:path{.+}", async (c) => {

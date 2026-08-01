@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import type { PlayerState } from "../model/usePlayerState";
 import PopupSeek from "./PopupSeek";
 import PlaybackErrorNotice from "./PlaybackErrorNotice";
-import CoverImg from "../../../entities/work/ui/CoverImg";
+import PlaybackArtwork from "./PlaybackArtwork";
 import { selectFixedCoverThumbnailWidth } from "../../../entities/work/ui/coverThumbnailWidth";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
@@ -56,6 +56,7 @@ export default function PopupContent({
 }: PopupContentProps) {
   const {
     currentWork,
+    isFilePlayback,
     isPlaying,
     tracks,
     currentTrackIndex,
@@ -93,12 +94,15 @@ export default function PopupContent({
   return (
     <>
       <div className="mle-popup__head">
-        <IconButton
-          size="sm"
-          icon={I.locate}
-          label="再生中の作品を表示"
-          onClick={onShowPlayingWork}
-        />
+        {!isFilePlayback && (
+          <IconButton
+            size="sm"
+            icon={I.locate}
+            label="再生中の作品を表示"
+            onClick={onShowPlayingWork}
+          />
+        )}
+        {isFilePlayback && <div />}
         <div className="mle-popup__head-actions">
           <IconButton size="sm" icon={I.chevD} label="バーへ戻る" onClick={onFold} />
           <IconButton size="sm" icon={I.fs} label="全画面プレイヤー" onClick={onExpandFullScreen} />
@@ -107,14 +111,12 @@ export default function PopupContent({
 
       <div className="mle-popup__cover-wrap">
         <div className="mle-popup__cover">
-          {currentWork && (
-            <CoverImg
-              id={currentWork.id}
-              title={currentWork.title}
-              cover={currentWork.cover}
+          {(currentWork || isFilePlayback) && (
+            <PlaybackArtwork
+              state={state}
+              size={308}
               radius={8}
               fit="fill"
-              // ポップアップ幅336px・padding 14px 両側からカバーは最大308px（低ビューポート時は縮小）
               requestWidth={selectFixedCoverThumbnailWidth(308, window.devicePixelRatio)}
             />
           )}
@@ -180,8 +182,8 @@ export default function PopupContent({
         {playbackError ? (
           <PlaybackErrorNotice error={playbackError} className="mle-popup__error" />
         ) : (
-          <div className="mle-popup__work" title={currentWork?.title ?? ""}>
-            {currentWork?.title ?? ""}
+          <div className="mle-popup__work" title={isFilePlayback ? "" : (currentWork?.title ?? "")}>
+            {isFilePlayback ? "ファイル" : (currentWork?.title ?? "")}
           </div>
         )}
       </div>

@@ -34,8 +34,8 @@ export default function FilePreview({
 }: FilePreviewProps) {
   const kind = entry ? classifyFile(entry) : null;
   const isDir = kind === "dir";
-  const canServe = !!entry && !!entry.workId && !!entry.workRelPath;
-  const showImage = kind === "image" && canServe;
+  const canServeWorkFile = !!entry && !!entry.workId && !!entry.workRelPath;
+  const showImage = kind === "image" && canServeWorkFile;
 
   const label = isDir
     ? "フォルダー · 物理"
@@ -94,7 +94,6 @@ export default function FilePreview({
                   variant="primary"
                   icon={isPlayingEntry ? I.audio : I.play}
                   onClick={() => onPlay(entry)}
-                  disabled={!canServe}
                 >
                   {isPlayingEntry ? "再生中" : "このファイルを再生"}
                 </Button>
@@ -102,12 +101,7 @@ export default function FilePreview({
             )}
             {isDir && firstAudioFile && (
               <div className="mle-fprev__actions">
-                <Button
-                  variant="primary"
-                  icon={I.play}
-                  onClick={() => onPlay(firstAudioFile)}
-                  disabled={!firstAudioFile.workId}
-                >
+                <Button variant="primary" icon={I.play} onClick={() => onPlay(firstAudioFile)}>
                   先頭の音声を再生
                 </Button>
               </div>
@@ -115,17 +109,14 @@ export default function FilePreview({
 
             <MetaGrid rows={metaRows(entry, kind!, isDir, isWorkFolder)} />
 
-            {!isDir && !canServe && kind !== "other" && (
-              <p className="mle-fprev__note">
-                このファイルは登録作品の外にあるため、プレビュー / 再生はできません。
-              </p>
-            )}
-            {!isDir && canServe && (kind === "pdf" || kind === "text" || kind === "video") && (
-              <p className="mle-fprev__note">
-                {kind === "video" ? "動画" : kind === "pdf" ? "PDF" : "テキスト"}
-                の埋め込みプレビューは未対応です。
-              </p>
-            )}
+            {!isDir &&
+              canServeWorkFile &&
+              (kind === "pdf" || kind === "text" || kind === "video") && (
+                <p className="mle-fprev__note">
+                  {kind === "video" ? "動画" : kind === "pdf" ? "PDF" : "テキスト"}
+                  の埋め込みプレビューは未対応です。
+                </p>
+              )}
           </div>
         )}
       </div>

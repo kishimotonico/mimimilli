@@ -27,3 +27,9 @@ export const fsListingSchema = z.object({
   entries: z.array(fsEntrySchema),
 });
 export type FsListing = z.infer<typeof fsListingSchema>;
+
+/** GET /api/media/fs-audio のクエリ。path はスキャンルート配下の絶対物理パス */
+export const fsAudioQuerySchema = z.object({
+  path: z.string().min(1),
+});
+export type FsAudioQuery = z.infer<typeof fsAudioQuerySchema>;
