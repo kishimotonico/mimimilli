@@ -132,6 +132,60 @@ describe("WorkGrid virtual scrolling", () => {
     });
   });
 
+  it("矢印キーでのフォーカス移動は選択も追従させる", async () => {
+    const onWorkSelect = vi.fn();
+    renderWorkGrid({ props: { works: createWorks(100), onWorkSelect } });
+    await act(() => flushAllResizeObservers({ width: 800, height: 600 }));
+
+    const tiles = screen.queryAllByRole("button", { name: /を選択、Enterで再生/ });
+    tiles[0].focus();
+
+    await userEvent.keyboard("{ArrowDown}");
+
+    await waitFor(() => {
+      expect(onWorkSelect).toHaveBeenCalledWith("work-5");
+    });
+  });
+
+  it("Enterでフォーカス項目を再生する", async () => {
+    const onWorkPlay = vi.fn();
+    renderWorkGrid({ props: { works: createWorks(10), onWorkPlay } });
+    await act(() => flushAllResizeObservers({ width: 800, height: 600 }));
+
+    const tiles = screen.queryAllByRole("button", { name: /を選択、Enterで再生/ });
+    tiles[2].focus();
+
+    await userEvent.keyboard("{Enter}");
+
+    expect(onWorkPlay).toHaveBeenCalledWith(expect.objectContaining({ id: "work-2" }));
+  });
+
+  it("再生中の作品タイルに再生インジケーターを表示する", async () => {
+    renderWorkGrid({
+      props: {
+        works: createWorks(10),
+        playingWorkId: "work-3",
+        isPlaybackActive: true,
+      },
+    });
+    await act(() => flushAllResizeObservers({ width: 800, height: 600 }));
+
+    expect(screen.getByLabelText("再生中")).toBeInTheDocument();
+  });
+
+  it("一時停止中は再生インジケーターのアクセシブル名が切り替わる", async () => {
+    renderWorkGrid({
+      props: {
+        works: createWorks(10),
+        playingWorkId: "work-3",
+        isPlaybackActive: false,
+      },
+    });
+    await act(() => flushAllResizeObservers({ width: 800, height: 600 }));
+
+    expect(screen.getByLabelText("一時停止中")).toBeInTheDocument();
+  });
+
   it("resets scroll position when worksQueryKey changes", async () => {
     const scrollToSpy = vi.spyOn(Element.prototype, "scrollTo").mockImplementation(() => {});
     const { rerenderWorkGrid } = renderWorkGrid();
@@ -192,5 +246,26 @@ describe("WorkGrid virtual scrolling", () => {
     expect(tiles.length).toBeGreaterThan(0);
     expect(tiles.length).toBeLessThan(1_000);
     expect(tiles.length).toBeLessThan(200);
+  });
+});
+
+describe("WorkGrid error/empty states", () => {
+  afterEach(() => {
+    cleanup();
+    clearResizeObservers();
+  });
+
+  it("isError のとき再試行ボタンをクリックすると onRetryWorks を呼ぶ", async () => {
+    const onRetryWorks = vi.fn();
+    const user = userEvent.setup();
+    renderWorkGrid({ props: { isError: true, works: [], onRetryWorks } });
+
+    await user.click(screen.getByRole("button", { name: "再試行" }));
+    expect(onRetryWorks).toHaveBeenCalledTimes(1);
+  });
+
+  it("お気に入りビューが0件のとき文脈付きの案内を1行添える", () => {
+    renderWorkGrid({ props: { axis: "fav", works: [] } });
+    expect(screen.getByText("作品詳細の☆ボタンでお気に入りに追加できます")).toBeTruthy();
   });
 });

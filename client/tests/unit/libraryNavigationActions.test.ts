@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import { createStore } from "jotai";
 import { gridInspectorOpenAtom, selectedWorkIdAtom } from "../../src/features/library/model/atoms";
 import {
+  consumeNavigationHistoryCommitAtom,
+  navigationHistoryCommitAtom,
+} from "../../src/features/navigation/model/navigationHistoryAtoms";
+import {
   clearLibraryTagsAtom,
   drillBackAtom,
   drillIntoAtom,
@@ -71,5 +75,36 @@ describe("ナビゲーション操作でグリッド詳細パネルを閉じる"
     store.set(selectLibraryWorkAtom, null);
     expect(store.get(gridInspectorOpenAtom)).toBe(true);
     expect(store.get(selectedWorkIdAtom)).toBeNull();
+  });
+});
+
+describe("selectLibraryWorkAtom の履歴コミット種別", () => {
+  it("未選択→選択は push（戻るでドリル済み・未選択に戻れるように）", () => {
+    const store = createStore();
+    expect(store.get(selectedWorkIdAtom)).toBeNull();
+
+    store.set(selectLibraryWorkAtom, "work-1");
+
+    expect(store.get(navigationHistoryCommitAtom).kind).toBe("push");
+  });
+
+  it("選択→別作品への切替は replace", () => {
+    const store = createStore();
+    store.set(selectLibraryWorkAtom, "work-1");
+    store.set(consumeNavigationHistoryCommitAtom);
+
+    store.set(selectLibraryWorkAtom, "work-2");
+
+    expect(store.get(navigationHistoryCommitAtom).kind).toBe("replace");
+  });
+
+  it("選択→解除は replace", () => {
+    const store = createStore();
+    store.set(selectLibraryWorkAtom, "work-1");
+    store.set(consumeNavigationHistoryCommitAtom);
+
+    store.set(selectLibraryWorkAtom, null);
+
+    expect(store.get(navigationHistoryCommitAtom).kind).toBe("replace");
   });
 });

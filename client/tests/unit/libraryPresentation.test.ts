@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ApiRequestError } from "../../src/shared/api/http";
 import {
   buildWorksParams,
   computeCollectionStatsDisplay,
@@ -6,6 +7,8 @@ import {
   computePreviewMode,
   computeWorksListVisibility,
   getFacetAxisForQuery,
+  shouldClearSelectionOnFilterMiss,
+  shouldClearSelectionOnWorkNotFound,
 } from "../../src/features/library/model/libraryPresentation";
 
 describe("buildWorksParams", () => {
@@ -119,13 +122,33 @@ describe("computeWorksListVisibility", () => {
 
 describe("computeIsNoResultsDueToFilter", () => {
   it("is false when the axis is just naturally empty (no search/drill)", () => {
-    expect(computeIsNoResultsDueToFilter(true, 0, "", "fav", null)).toBe(false);
+    expect(computeIsNoResultsDueToFilter(true, 0, "", "fav", null, false, false)).toBe(false);
   });
-  it("is true when a search query narrows to zero results", () => {
-    expect(computeIsNoResultsDueToFilter(true, 0, "存在しない語", "all", null)).toBe(true);
+  it("is true when a search query narrows to zero results (query settled: not loading/error)", () => {
+    expect(computeIsNoResultsDueToFilter(true, 0, "存在しない語", "all", null, false, false)).toBe(
+      true,
+    );
   });
   it("is true when a facet drill narrows to zero results", () => {
-    expect(computeIsNoResultsDueToFilter(true, 0, "", "circle", "存在しないサークル")).toBe(true);
+    expect(
+      computeIsNoResultsDueToFilter(true, 0, "", "circle", "存在しないサークル", false, false),
+    ).toBe(true);
+  });
+  it("is false while the debounced query is still loading, even though works is temporarily empty", () => {
+    expect(computeIsNoResultsDueToFilter(true, 0, "存在しない語", "all", null, true, false)).toBe(
+      false,
+    );
+  });
+  it("is true once the query resolves successfully after loading", () => {
+    // 同じパラメータでisWorksLoadingがfalseに変われば（クエリ確定後）通常どおり判定する
+    expect(computeIsNoResultsDueToFilter(true, 0, "存在しない語", "all", null, false, false)).toBe(
+      true,
+    );
+  });
+  it("is false when the works query errored (0件が確定した結果ではないため)", () => {
+    expect(computeIsNoResultsDueToFilter(true, 0, "存在しない語", "all", null, false, true)).toBe(
+      false,
+    );
   });
 });
 
@@ -135,7 +158,6 @@ describe("computePreviewMode", () => {
       computePreviewMode({
         isNoResultsDueToFilter: true,
         selectedWorkId: "w1",
-        hasSelectedWork: true,
         activeAxis: "all",
         drillValue: null,
         selectedTags: [],
@@ -148,8 +170,21 @@ describe("computePreviewMode", () => {
       computePreviewMode({
         isNoResultsDueToFilter: false,
         selectedWorkId: "w1",
-        hasSelectedWork: true,
         activeAxis: "all",
+        drillValue: null,
+        selectedTags: [],
+      }),
+    ).toBe("work");
+  });
+
+  it("stays in work mode while the selected work is still loading (no flicker to axis-landing/etc.)", () => {
+    // selectedWorkIdが立っていればwork詳細データの有無に関わらずworkモードを維持する。
+    // 読み込み中/エラーの出し分けはコンポーネント側（PreviewPane/WorkGridInspector）が担う。
+    expect(
+      computePreviewMode({
+        isNoResultsDueToFilter: false,
+        selectedWorkId: "w1",
+        activeAxis: "circle",
         drillValue: null,
         selectedTags: [],
       }),
@@ -161,7 +196,6 @@ describe("computePreviewMode", () => {
       computePreviewMode({
         isNoResultsDueToFilter: false,
         selectedWorkId: null,
-        hasSelectedWork: false,
         activeAxis: "circle",
         drillValue: null,
         selectedTags: [],
@@ -174,12 +208,50 @@ describe("computePreviewMode", () => {
       computePreviewMode({
         isNoResultsDueToFilter: false,
         selectedWorkId: null,
-        hasSelectedWork: false,
         activeAxis: "smart-abc",
         drillValue: null,
         selectedTags: [],
       }),
     ).toBe("smart-folder");
+  });
+});
+
+describe("shouldClearSelectionOnFilterMiss", () => {
+  it("絞り込みで0件かつ選択中の作品があれば解除すべき", () => {
+    expect(shouldClearSelectionOnFilterMiss(true, "w1")).toBe(true);
+  });
+  it("絞り込みで0件でも選択が無ければ何もしない", () => {
+    expect(shouldClearSelectionOnFilterMiss(true, null)).toBe(false);
+  });
+  it("絞り込みが原因の0件でなければ選択を維持する", () => {
+    expect(shouldClearSelectionOnFilterMiss(false, "w1")).toBe(false);
+  });
+});
+
+describe("shouldClearSelectionOnWorkNotFound", () => {
+  it("404エラーなら選択解除すべき", () => {
+    expect(
+      shouldClearSelectionOnWorkNotFound("w1", new ApiRequestError(404, "not_found", "not found")),
+    ).toBe(true);
+  });
+  it("404以外のエラー（5xx等）では選択を維持する", () => {
+    expect(
+      shouldClearSelectionOnWorkNotFound(
+        "w1",
+        new ApiRequestError(500, "internal_error", "server error"),
+      ),
+    ).toBe(false);
+  });
+  it("ApiRequestErrorでない一般的なエラー（ネットワーク断等）では選択を維持する", () => {
+    expect(shouldClearSelectionOnWorkNotFound("w1", new Error("network error"))).toBe(false);
+  });
+  it("エラーが無ければ何もしない", () => {
+    expect(shouldClearSelectionOnWorkNotFound("w1", null)).toBe(false);
+  });
+  it("選択自体が無ければ何もしない", () => {
+    expect(
+      shouldClearSelectionOnWorkNotFound(null, new ApiRequestError(404, "not_found", "not found")),
+    ).toBe(false);
   });
 });
 
