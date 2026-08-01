@@ -42,11 +42,16 @@ export default function DlsiteBulkRuntime() {
   const setError = useSetAtom(dlsiteBulkErrorAtom);
   const setActions = useSetAtom(dlsiteBulkActionsAtom);
 
-  const invalidateDlsiteQueries = useCallback(() => {
-    void Promise.all(
-      getDlsiteInvalidationKeys().map((queryKey) => queryClient.invalidateQueries({ queryKey })),
-    );
-  }, [queryClient]);
+  const invalidateDlsiteQueries = useCallback(
+    (workIds?: string[]) => {
+      void Promise.all(
+        getDlsiteInvalidationKeys(workIds).map((queryKey) =>
+          queryClient.invalidateQueries({ queryKey }),
+        ),
+      );
+    },
+    [queryClient],
+  );
 
   const resetTerminalState = useCallback(() => {
     setResult(null);
@@ -57,6 +62,11 @@ export default function DlsiteBulkRuntime() {
   }, [setCancelledResult, setCancelling, setError, setProgress, setResult]);
 
   const startingRef = useRef(false);
+  // start()自身がジョブを開始した直後にSSE購読するときだけ、進捗イベントを
+  // 最初から取りこぼさず全て捕捉できると確信できる。attach()は既に走っている
+  // かもしれないジョブへ後から繋ぐため、この確信が持てない
+  // （invalidateDlsiteQueriesの選択的無効化に使うupdatedWorkIdsの信頼性に関わる）。
+  const freshStartRef = useRef(false);
 
   const start = useCallback(async () => {
     if (startingRef.current) return;
@@ -64,6 +74,7 @@ export default function DlsiteBulkRuntime() {
     setStarting(true);
     resetTerminalState();
     try {
+      freshStartRef.current = true;
       await startDlsiteBulk();
       setActive(true);
     } catch (cause) {
@@ -77,6 +88,7 @@ export default function DlsiteBulkRuntime() {
   }, [resetTerminalState, setActive, setCancelling, setError, setStarting]);
 
   const attach = useCallback(() => {
+    freshStartRef.current = false;
     resetTerminalState();
     setActive(true);
   }, [resetTerminalState, setActive]);
@@ -115,6 +127,14 @@ export default function DlsiteBulkRuntime() {
     let terminalHandled = false;
     let generation = 0;
     const source = new EventSource(`${API_BASE}/dlsite/events`);
+    // progressイベントのworkIdを集め、完了時にskippedでない（実際に処理対象だった）
+    // 作品の詳細キャッシュだけを選択的に無効化する（getDlsiteInvalidationKeys参照）。
+    // SSE切断→再接続、またはattach()での後乗り（開始直後からの購読と確信できない）
+    // でprogressイベントを取りこぼした可能性がある場合はmissedProgressを立て、
+    // 安全側に倒して全作品を無効化する。
+    const updatedWorkIds = new Set<string>();
+    let missedProgress = !freshStartRef.current;
+    freshStartRef.current = false;
 
     const detach = (): void => {
       if (disposed) return;
@@ -141,7 +161,7 @@ export default function DlsiteBulkRuntime() {
         setError(event.message);
       }
       detach();
-      invalidateDlsiteQueries();
+      invalidateDlsiteQueries(missedProgress ? undefined : [...updatedWorkIds]);
     };
 
     const applySnapshot = (snapshot: DlsiteBulkSnapshot): void => {
@@ -170,6 +190,7 @@ export default function DlsiteBulkRuntime() {
       }
       if (parsed.data.type === "progress") {
         setProgress({ processed: parsed.data.processed, total: parsed.data.total });
+        updatedWorkIds.add(parsed.data.workId);
       } else if (parsed.data.type === "cancelling") {
         setCancelling(true);
       } else {
@@ -179,6 +200,10 @@ export default function DlsiteBulkRuntime() {
 
     const refresh = (): void => {
       if (disposed || terminalHandled) return;
+      // SSE切断からの再接続経路。この間に配信されたはずのprogressイベント
+      // （workId）を取りこぼした可能性があるため、以降の完了判定は安全側
+      // （全作品無効化）に倒す。
+      missedProgress = true;
       const pollGeneration = ++generation;
       void getDlsiteBulkStatus()
         .then((snapshot) => {
