@@ -18,12 +18,13 @@ import {
 afterEach(cleanup);
 
 function renderAddressBar(options?: {
+  mode?: "library" | "files";
   activeAxis?: string;
   drillValue?: string | null;
   libraryViewMode?: "list" | "grid";
 }) {
   const store = createStore();
-  store.set(appModeAtom, "library");
+  store.set(appModeAtom, options?.mode ?? "library");
   store.set(activeAxisAtom, (options?.activeAxis ?? "all") as never);
   store.set(drillValueAtom, options?.drillValue ?? null);
   store.set(libraryViewModeAtom, options?.libraryViewMode ?? "list");
@@ -71,5 +72,25 @@ describe("AddressBar のビュー切替ボタン", () => {
     });
 
     expect(screen.getByLabelText("リスト")).toBeEnabled();
+  });
+
+  it("ファイルモードではリスト/グリッドに理由を示す title が付く", () => {
+    renderAddressBar({ mode: "files" });
+
+    expect(screen.getByLabelText("リスト")).toHaveAttribute(
+      "title",
+      "ファイルモードはカラム表示のみ",
+    );
+    expect(screen.getByLabelText("グリッド")).toHaveAttribute(
+      "title",
+      "ファイルモードはカラム表示のみ",
+    );
+  });
+
+  it("「その他」ボタンは未実装のため disabled で title が付く", () => {
+    renderAddressBar();
+
+    expect(screen.getByLabelText("その他")).toBeDisabled();
+    expect(screen.getByLabelText("その他")).toHaveAttribute("title", "近日実装");
   });
 });

@@ -1,4 +1,6 @@
 // 画面下張り付きバーのシークストリップ leaf。currentTime/duration を自前で購読し、親を再レンダリングさせない。
+// 経過/総時間のテキストは表示しない（バーの縦幅を圧迫するため撤去。TASK参照:
+// 詳しい時間はポップアップ展開で確認する）。ホバー時のツールチップでシーク先の時間だけ出す。
 
 import { usePlaybackProgress } from "../model/usePlaybackProgress";
 import { useSeekDrag } from "./useSeekDrag";

@@ -36,6 +36,19 @@ const titles = [
   "",
 ];
 
+// RJ/VJコード検索の同値検証用。3件おきにRJコード、7件おきにVJコードを割り当てる
+// （残りはemptyDlsiteStateのまま = rjCodeなし。core⇔real双方で「rjCodeなし作品は
+// コード検索にヒットしない」経路も混在させる）。
+function dlsiteStateFor(index: number): WorkSummary["dlsite"] {
+  if (index % 3 === 0) {
+    return { ...emptyDlsiteState(), rjCode: `RJ${String(1000000 + index).padStart(8, "0")}` };
+  }
+  if (index % 7 === 0) {
+    return { ...emptyDlsiteState(), rjCode: `VJ${String(20000 + index).padStart(6, "0")}` };
+  }
+  return emptyDlsiteState();
+}
+
 function summary(index: number): WorkSummary {
   const id = `work-${String(index).padStart(3, "0")}`;
   const tagSets = [
@@ -59,7 +72,7 @@ function summary(index: number): WorkSummary {
     trackCount: (index % 3) + 1,
     bookmarked: index % 2 === 0,
     lastPlayedAt: index % 4 === 0 ? "2026-06-01T00:00:00.000Z" : index % 4 === 1 ? null : old,
-    dlsite: emptyDlsiteState(),
+    dlsite: dlsiteStateFor(index),
   };
 }
 
@@ -128,6 +141,14 @@ test("core参照実装とreal SQLは固定例・生成クエリで同値", () =>
       baseQuery({ q: "ＡＳＭＲ" }),
       baseQuery({ q: "カタカナ" }),
       baseQuery({ q: "éCOLE" }),
+      baseQuery({ q: "RJ01000003" }),
+      baseQuery({ q: "rj01000003" }),
+      baseQuery({ q: "01000003" }),
+      baseQuery({ q: "VJ020007" }),
+      baseQuery({ q: "vj020007" }),
+      baseQuery({ q: "020007" }),
+      baseQuery({ q: "RJ" }),
+      baseQuery({ q: "VJ" }),
       baseQuery({ tags: ["CV/水瀬なずな", "ASMR"], tagOp: "AND" }),
       baseQuery({ tags: ["催眠", "添い寝"], tagOp: "OR" }),
       baseQuery({ axis: "cv", axisValue: "水瀬なずな" }),
@@ -155,7 +176,21 @@ test("core参照実装とreal SQLは固定例・生成クエリで同値", () =>
       state ^= state + Math.imul(state ^ (state >>> 7), state | 61);
       return (state ^ (state >>> 14)) >>> 0;
     };
-    const queryTerms = ["", "asmr", "カタカナ", "かたかな", "É", "催眠", "不存在"];
+    const queryTerms = [
+      "",
+      "asmr",
+      "カタカナ",
+      "かたかな",
+      "É",
+      "催眠",
+      "不存在",
+      "RJ01000003",
+      "01000003",
+      "vj020007",
+      "020007",
+      "RJ",
+      "rj9999999",
+    ];
     const tagFilters = [[], ["ASMR"], ["cv/水瀬なずな"], ["催眠", "添い寝"]];
     const views = [undefined, "all", "recent", "added", "fav", "unplayed", "missing"] as const;
     for (let index = 0; index < 120; index++) {
@@ -434,7 +469,7 @@ test("スマートフォルダー候補IDが900件を超えてもlistSummaries�
   }
 });
 
-test("tag軸はprefixタグを数えず、自由タグが無ければ空になる", () => {
+test("tag軸はprefixタグも自由タグも数える（ADR-0005 追記）", () => {
   const db = openDb({ kind: "memory" });
   const repo = new WorkRepo(db);
   const annotatedOnly = dataset.map((item) => ({
@@ -445,7 +480,7 @@ test("tag軸はprefixタグを数えず、自由タグが無ければ空にな�
     for (const item of annotatedOnly) upsertTestWork(repo, fullWork(item));
 
     assert.deepEqual(repo.getAxisFacets("tag"), buildAxisFacets("tag", annotatedOnly));
-    assert.deepEqual(repo.getAxisFacets("tag"), []);
+    assert.notDeepEqual(repo.getAxisFacets("tag"), []);
     assert.notDeepEqual(repo.getAxisFacets("cv"), []);
   } finally {
     db.close();

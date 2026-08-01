@@ -12,9 +12,16 @@ interface AppBodyProps {
   onPlayFile: (entry: FsEntry) => void;
   onPlay: (work: WorkListItem, trackIndex: number) => void;
   onResume: (work: Work) => void;
+  onTogglePlay: () => void;
 }
 
-export default function AppBody({ rootFolder, onPlayFile, onPlay, onResume }: AppBodyProps) {
+export default function AppBody({
+  rootFolder,
+  onPlayFile,
+  onPlay,
+  onResume,
+  onTogglePlay,
+}: AppBodyProps) {
   const mode = useAtomValue(appModeAtom);
 
   if (mode === "files") {
@@ -25,5 +32,5 @@ export default function AppBody({ rootFolder, onPlayFile, onPlay, onResume }: Ap
     );
   }
 
-  return <LibraryView onPlay={onPlay} onResume={onResume} />;
+  return <LibraryView onPlay={onPlay} onResume={onResume} onTogglePlay={onTogglePlay} />;
 }

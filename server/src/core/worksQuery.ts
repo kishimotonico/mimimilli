@@ -60,14 +60,29 @@ function compareDuration(a: WorkSummary, b: WorkSummary, direction: 1 | -1): num
   return (a.totalDurationSec - b.totalDurationSec) * direction;
 }
 
+// RJ/VJコード比較用の正規化。大文字小文字と "RJ"/"VJ" 接頭辞の有無を無視して比較する
+// （DLsite商品コードはRJ=同人、VJ=商業/美少女ゲームの2種類。shared/dlsite.tsのrjCode
+// フィールドは両方を同じ形式 `^(RJ|VJ)\d{6,8}$` で保持する）。
+// real側のSQL実装（workRepo.ts queryWorks）と同じ正規化仕様に揃える。
+export function normalizeRjCode(value: string): string {
+  return value
+    .trim()
+    .toUpperCase()
+    .replace(/^(RJ|VJ)/, "");
+}
+
 function filterByQuery(works: WorkSummary[], q: string): WorkSummary[] {
   if (!q) return works;
   const normalizedQuery = japaneseSortKey(q);
-  return works.filter(
-    (work) =>
-      japaneseSortKey(work.title).includes(normalizedQuery) ||
-      work.tags.some((tag) => japaneseSortKey(tag).includes(normalizedQuery)),
-  );
+  const rjQuery = normalizeRjCode(q);
+  return works.filter((work) => {
+    if (japaneseSortKey(work.title).includes(normalizedQuery)) return true;
+    if (work.tags.some((tag) => japaneseSortKey(tag).includes(normalizedQuery))) return true;
+    if (rjQuery && work.dlsite.rjCode && normalizeRjCode(work.dlsite.rjCode).includes(rjQuery)) {
+      return true;
+    }
+    return false;
+  });
 }
 
 // タグ絞り込みは完全一致（ADR-0005 決定6。prefix は大文字小文字を無視、値は区別）

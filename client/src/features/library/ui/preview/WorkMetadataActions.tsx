@@ -1,7 +1,6 @@
 import { useState } from "react";
-import type { Track, Work, WorkPatch } from "@mimimilli/shared";
+import type { Work, WorkPatch } from "@mimimilli/shared";
 import { I } from "../../../../shared/ui/Icon";
-import Button from "../../../../shared/ui/Button";
 import IconButton from "../../../../shared/ui/IconButton";
 import { useAnchoredPopover } from "./useAnchoredPopover";
 
@@ -9,12 +8,6 @@ const ACTION_POPOVER_WIDTH = 240;
 
 interface WorkMetadataActionsProps {
   work: Work;
-  onPlay: (trackIndex: number) => void;
-  onResume: () => void;
-  hasResume: boolean;
-  isPlayable: boolean;
-  resumeTrack: Track | null;
-  resumeTime: string;
   isPatching: boolean;
   onPatchWork: (body: WorkPatch) => Promise<Work>;
   onError: (message: string | null) => void;
@@ -24,12 +17,6 @@ interface WorkMetadataActionsProps {
 
 export function WorkMetadataActions({
   work,
-  onPlay,
-  onResume,
-  hasResume,
-  isPlayable,
-  resumeTrack,
-  resumeTime,
   isPatching,
   onPatchWork,
   onError,
@@ -69,31 +56,6 @@ export function WorkMetadataActions({
 
   return (
     <div className="mle-prv__actions">
-      {hasResume && isPlayable ? (
-        <>
-          <Button
-            variant="primary"
-            icon={I.play}
-            title={resumeTrack ? `${resumeTrack.title} · ${resumeTime} から再開` : undefined}
-            onClick={onResume}
-          >
-            続きから {resumeTime}
-          </Button>
-          <IconButton icon={I.refresh} label="最初から再生" size="sm" onClick={() => onPlay(0)} />
-        </>
-      ) : (
-        <Button
-          variant="primary"
-          icon={I.play}
-          disabled={!isPlayable}
-          aria-disabled={!isPlayable}
-          onClick={() => {
-            if (isPlayable) onPlay(0);
-          }}
-        >
-          最初から再生
-        </Button>
-      )}
       <IconButton
         icon={I.heart}
         label={work.bookmarked ? "ブックマークを解除" : "ブックマークに追加"}

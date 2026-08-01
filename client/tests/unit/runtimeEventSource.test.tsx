@@ -332,6 +332,97 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
     expect(store.get(dlsiteBulkActiveAtom)).toBe(true);
   });
 
+  it("start()から購読を開始した場合、完了時は処理対象workIdの詳細キャッシュだけを無効化する（skippedを含む全作品は無効化しない）", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input).endsWith("/dlsite/bulk") && init?.method === "POST") {
+          return response({ started: true }, 202);
+        }
+        return response({ ok: true });
+      }),
+    );
+
+    const { store, queryClient } = renderRuntime(createElement(DlsiteBulkRuntime));
+    await waitFor(() => expect(store.get(dlsiteBulkActionsAtom)).not.toBeNull());
+    await act(async () => {
+      await store.get(dlsiteBulkActionsAtom)!.start();
+    });
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    const source = FakeEventSource.instances[0]!;
+
+    dispatchDlsite(source, "progress", {
+      type: "progress",
+      processed: 1,
+      total: 2,
+      workId: "work-1",
+    });
+    dispatchDlsite(source, "progress", {
+      type: "progress",
+      processed: 2,
+      total: 2,
+      workId: "work-2",
+    });
+
+    const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries");
+    dispatchDlsite(source, "complete", {
+      type: "complete",
+      result: { fetched: 2, failed: 0, parseErrors: 0, skipped: 3 },
+    });
+
+    await waitFor(() => expect(invalidateQueries).toHaveBeenCalled());
+    const invalidatedKeys = invalidateQueries.mock.calls.map((call) => call[0]!.queryKey);
+    expect(invalidatedKeys).toContainEqual(["work", "work-1"]);
+    expect(invalidatedKeys).toContainEqual(["work", "work-2"]);
+    // skippedだった（progressイベントが来なかった）作品を含む全作品プレフィックスは含めない
+    expect(invalidatedKeys).not.toContainEqual(["work"]);
+  });
+
+  it("start()後にSSEが切断→再接続した場合、progressの取りこぼしがあり得るため完了時は全作品を無効化する", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input).endsWith("/dlsite/bulk") && init?.method === "POST") {
+          return response({ started: true }, 202);
+        }
+        return response({ ok: true });
+      }),
+    );
+
+    const { store, queryClient } = renderRuntime(createElement(DlsiteBulkRuntime));
+    await waitFor(() => expect(store.get(dlsiteBulkActionsAtom)).not.toBeNull());
+    await act(async () => {
+      await store.get(dlsiteBulkActionsAtom)!.start();
+    });
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    const source = FakeEventSource.instances[0]!;
+
+    dispatchDlsite(source, "progress", {
+      type: "progress",
+      processed: 1,
+      total: 2,
+      workId: "work-1",
+    });
+    // ネイティブerror（再接続）: この間のprogressイベントを取りこぼした可能性がある
+    source.readyState = FakeEventSource.CONNECTING;
+    act(() => {
+      source.dispatchEvent(new Event("error"));
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries");
+    dispatchDlsite(source, "complete", {
+      type: "complete",
+      result: { fetched: 2, failed: 0, parseErrors: 0, skipped: 0 },
+    });
+
+    await waitFor(() => expect(invalidateQueries).toHaveBeenCalled());
+    const invalidatedKeys = invalidateQueries.mock.calls.map((call) => call[0]!.queryKey);
+    expect(invalidatedKeys).toContainEqual(["work"]);
+  });
+
   it("接続が CLOSED かつジョブなしのとき active を解除してエラーを表示する", async () => {
     vi.stubGlobal(
       "fetch",

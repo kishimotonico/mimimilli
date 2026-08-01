@@ -7,6 +7,7 @@ import {
   WORKS_DEFAULT_PAGE_SIZE,
   type SmartFolder,
   type SmartFolderCreate,
+  type Work,
   type WorkPatch,
 } from "@mimimilli/shared";
 import {
@@ -24,7 +25,7 @@ import { TAG_QUERY_KEYS } from "../../../entities/tag/queryKeys";
 import { buildWorksParams, getFacetAxisForQuery } from "./libraryPresentation";
 import { useTagPrefixes } from "./useTagPrefixes";
 import { useDebouncedValue } from "../../../shared/lib/useDebouncedValue";
-import { getWorkPatchInvalidationTargets } from "./workPatchInvalidation";
+import { getWorkPatchInvalidationTargets, mergeWorkPatchResponse } from "./workPatchInvalidation";
 import {
   patchWorkInQueryCache,
   staleInactiveListCaches,
@@ -167,16 +168,29 @@ export function useLibraryQueries(nav: LibraryViewState, searchQuery: string) {
     queryFn: getAllTags,
   });
 
-  const { tagPrefixes } = useTagPrefixes();
+  const {
+    tagPrefixes,
+    isError: isTagPrefixesError,
+    refetch: refetchTagPrefixes,
+  } = useTagPrefixes();
+
+  // 作品一覧の再試行（isError 時のリトライ導線用）。表示中の軸に応じて実クエリを切り替える。
+  const refetchWorks = isSmartAxis(nav.activeAxis) ? smartWorksQuery.refetch : worksQuery.refetch;
 
   // ── 作品PATCH mutation ────────────────────────────────────
   // 変更フィールドに応じて再取得範囲を絞る（getWorkPatchInvalidationTargets 参照）。
   // 詳細は返却された updatedWork を正として setQueryData するのみで invalidate はしない
   // （直前まで invalidate も併用しており二重再取得になっていた）。
+  // ただし detail キャッシュは丸ごと置き換えず mergeWorkPatchResponse で body が
+  // 実際に指定したフィールドだけを取り込む（resume が高頻度更新のため PATCH と
+  // 別エンドポイントに分離されている契約を守り、無関係なPATCHで再生位置の
+  // 表示が予告なく飛ぶのを防ぐ。詳細は mergeWorkPatchResponse のコメント参照）。
   const patchWorkMutation = useMutation({
     mutationFn: ({ workId, body }: { workId: string; body: WorkPatch }) => patchWork(workId, body),
     onSuccess: async (updatedWork, { workId, body }) => {
-      queryClient.setQueryData(WORK_QUERY_KEYS.detail(workId), updatedWork);
+      queryClient.setQueryData<Work>(WORK_QUERY_KEYS.detail(workId), (prev) =>
+        mergeWorkPatchResponse(prev, body, updatedWork),
+      );
       const targets = getWorkPatchInvalidationTargets(body, {
         activeAxis: nav.activeAxis,
         sort: nav.sort,
@@ -222,13 +236,22 @@ export function useLibraryQueries(nav: LibraryViewState, searchQuery: string) {
     worksStats,
     isFetchingNextPage,
     fetchNextPage,
+    refetchWorks,
     libraryTotal: libraryTotalQuery.data,
     facetItems: facetQuery.data ?? [],
+    // facetQuery は works クエリと別系統。作品一覧の isLoading/isError をタグ・ファセット軸の
+    // 見出し／本文に流用すると、軸切替時に片方だけ先に解決して見出しと本文が食い違う
+    // （R2: 直前軸の件数見出し固着調査で判明）ため、facetQuery 自身の状態を別出しする
+    isFacetLoading: facetQuery.isLoading,
+    isFacetError: facetQuery.isError,
+    refetchFacets: facetQuery.refetch,
     smartFolders,
     selectedWork,
     workDetailQuery,
     tagSuggestions: tagsQuery.data ?? [],
     tagPrefixes,
+    isTagPrefixesError,
+    refetchTagPrefixes,
     patchWorkMutation,
   };
 }

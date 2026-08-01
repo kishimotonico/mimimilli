@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
 import { useQuery } from "@tanstack/react-query";
 import type { SortId } from "@mimimilli/shared";
@@ -10,6 +11,7 @@ import { listSmartFolders } from "../api";
 import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
+import { usePopoverDismissal } from "./preview/useAnchoredPopover";
 
 const SMART_FOLDER_SORT_TOOLTIP = "並び順はスマートフォルダーの設定に従います";
 
@@ -51,25 +53,34 @@ export default function LibrarySortMenu() {
     if (disabled && sortMenuOpen) setSortMenuOpen(false);
   }, [disabled, sortMenuOpen]);
 
+  usePopoverDismissal({
+    isOpen: sortMenuOpen && !disabled,
+    onOutsideClick: () => setSortMenuOpen(false),
+    onEscape: () => setSortMenuOpen(false),
+    anchorRef: sortRef,
+  });
+
+  // role=menu の期待どおり、開いたら現在値（無ければ先頭）へ初期フォーカスする。
   useEffect(() => {
     if (!sortMenuOpen || disabled) return;
-
-    const handlePointerDown = (e: PointerEvent) => {
-      if (sortRef.current && !sortRef.current.contains(e.target as Node)) {
-        setSortMenuOpen(false);
-      }
-    };
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setSortMenuOpen(false);
-    };
-
-    window.addEventListener("pointerdown", handlePointerDown);
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("pointerdown", handlePointerDown);
-      window.removeEventListener("keydown", handleKeyDown);
-    };
+    const items = sortRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]');
+    if (!items || items.length === 0) return;
+    const checked = Array.from(items).find((item) => item.getAttribute("aria-checked") === "true");
+    (checked ?? items[0])?.focus();
   }, [sortMenuOpen, disabled]);
+
+  const handleMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+    event.preventDefault();
+    const items = Array.from(
+      event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'),
+    );
+    if (items.length === 0) return;
+    const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
+    const delta = event.key === "ArrowDown" ? 1 : -1;
+    const nextIndex = (currentIndex + delta + items.length) % items.length;
+    items[nextIndex]?.focus();
+  };
 
   return (
     <div className="mle-sortmenu" ref={sortRef}>
@@ -87,7 +98,13 @@ export default function LibrarySortMenu() {
         }}
       />
       {sortMenuOpen && !disabled && (
-        <div className="mle-sortmenu__pop" role="menu" aria-label="並び替え">
+        <div
+          className="mle-sortmenu__pop"
+          role="menu"
+          aria-label="並び替え"
+          tabIndex={-1}
+          onKeyDown={handleMenuKeyDown}
+        >
           {SORT_OPTIONS.map((opt) => (
             <button
               key={opt.id}

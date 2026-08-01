@@ -41,6 +41,7 @@ function renderBar(currentTrackIndex: number) {
     onPrev: vi.fn(),
     onSeek: vi.fn(),
     onSwitchToPopup: vi.fn(),
+    onSetVolume: vi.fn(),
   };
 
   render(
@@ -85,5 +86,47 @@ describe("BarContent", () => {
     expect(onPrev).toHaveBeenCalledTimes(1);
     expect(onNext).not.toHaveBeenCalled();
     expect(onSwitchToPopup).not.toHaveBeenCalled();
+  });
+
+  it("展開ボタンはアクセシブル名を持ち、クリックでポップアップへ切り替わる", () => {
+    const { onSwitchToPopup } = renderBar(0);
+    const expandButton = screen.getByRole("button", { name: "バーを展開" });
+
+    fireEvent.click(expandButton);
+
+    expect(onSwitchToPopup).toHaveBeenCalledTimes(1);
+  });
+
+  it("音量ボタンはデフォルトで単体表示され、クリックするとスライダーのポップオーバーが開く", () => {
+    renderBar(0);
+    const volumeButton = screen.getByRole("button", { name: "音量 75%" });
+
+    expect(screen.queryByRole("slider", { name: "音量" })).toBeNull();
+
+    fireEvent.click(volumeButton);
+
+    expect(screen.getByRole("slider", { name: "音量" })).toBeTruthy();
+  });
+
+  it("音量スライダーを操作すると onSetVolume が呼ばれる", () => {
+    const { onSetVolume } = renderBar(0);
+    const volumeButton = screen.getByRole("button", { name: "音量 75%" });
+    fireEvent.click(volumeButton);
+
+    const slider = screen.getByRole("slider", { name: "音量" });
+    fireEvent.change(slider, { target: { value: "40" } });
+
+    expect(onSetVolume).toHaveBeenCalledWith(40);
+  });
+
+  it("Escapeキーで音量ポップオーバーを閉じる", () => {
+    renderBar(0);
+    const volumeButton = screen.getByRole("button", { name: "音量 75%" });
+    fireEvent.click(volumeButton);
+    expect(screen.getByRole("slider", { name: "音量" })).toBeTruthy();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(screen.queryByRole("slider", { name: "音量" })).toBeNull();
   });
 });

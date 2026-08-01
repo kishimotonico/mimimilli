@@ -15,6 +15,7 @@ import type { TagPrefix, WorkListItem } from "@mimimilli/shared";
 import CoverImg from "../../../entities/work/ui/CoverImg";
 import Button from "../../../shared/ui/Button";
 import { I } from "../../../shared/ui/Icon";
+import { cn } from "../../../shared/lib/cn";
 import {
   GRID_COLUMN_GAP,
   GRID_ROW_GAP,
@@ -30,7 +31,7 @@ import {
 } from "../model/gridNavigation";
 import { computeJustifiedLayout, type JustifiedLayout } from "../model/justifiedLayout";
 import { shouldLoadMore } from "../model/virtualScroll";
-import { buildEmptyWorksMessage } from "../model/emptyWorks";
+import { buildEmptyWorksHint, buildEmptyWorksMessage } from "../model/emptyWorks";
 import { isFacetAxis, isSmartAxis } from "../model/axisDefinitions";
 import CollectionStatus from "./CollectionStatus";
 import DrillHeader from "./DrillHeader";
@@ -45,6 +46,8 @@ interface WorkGridProps {
   worksQueryKey: string;
   selectedWorkId: string | null;
   searchQuery: string;
+  playingWorkId?: string | null;
+  isPlaybackActive?: boolean;
   isLoading: boolean;
   isError: boolean;
   /** 次ページがあるか（追加読み込みボタンの表示判定。TASK-73） */
@@ -60,6 +63,8 @@ interface WorkGridProps {
   inspector: ReactNode | null;
   /** Esc・グリッド背景クリック時の選択解除（パネル自体の開閉は行わない） */
   onDeselect: () => void;
+  /** 作品一覧取得の再試行（isError 時） */
+  onRetryWorks?: () => void;
 }
 
 const GRID_ARROW_KEYS = new Set<GridArrowKey>(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"]);
@@ -100,6 +105,8 @@ export default function WorkGrid({
   worksQueryKey,
   selectedWorkId,
   searchQuery,
+  playingWorkId = null,
+  isPlaybackActive = false,
   isLoading,
   isError,
   hasNextPage = false,
@@ -112,6 +119,7 @@ export default function WorkGrid({
   onClearSearch,
   inspector,
   onDeselect,
+  onRetryWorks,
 }: WorkGridProps) {
   const [tileSize, setTileSize] = useAtom(libraryTileSizeAtom);
   const gridLayoutMode = useAtomValue(libraryGridLayoutModeAtom);
@@ -313,6 +321,9 @@ export default function WorkGrid({
           : Math.floor(nextIndex / columnCount);
       if (rowIndex === undefined || rowIndex < 0) return;
 
+      const nextWork = works[nextIndex];
+      if (nextWork) onWorkSelect(nextWork.id);
+
       virtualizer.scrollToIndex(rowIndex, { align: "auto" });
 
       let attempts = 0;
@@ -328,7 +339,7 @@ export default function WorkGrid({
       };
       requestAnimationFrame(tryFocus);
     },
-    [gridEl, gridLayoutMode, justifiedLayout, columnCount, works.length, virtualizer],
+    [gridEl, gridLayoutMode, justifiedLayout, columnCount, works, onWorkSelect, virtualizer],
   );
 
   const renderTile = useCallback(
@@ -342,6 +353,7 @@ export default function WorkGrid({
         tileWidth ?? safeTileSize,
         window.devicePixelRatio,
       );
+      const isPlaying = work.id === playingWorkId;
 
       return (
         <button
@@ -378,13 +390,41 @@ export default function WorkGrid({
               requestWidth={requestWidth}
               loading="lazy"
             />
+            {isPlaying && (
+              <span
+                className="mll-grid-tile__now inline-flex items-center gap-[1px]"
+                aria-label={isPlaybackActive ? "再生中" : "一時停止中"}
+                title={isPlaybackActive ? "再生中" : "一時停止中"}
+              >
+                {[6, 10, 8].map((height, i) => (
+                  <span
+                    key={height}
+                    aria-hidden="true"
+                    className={cn(
+                      "block w-[2px] origin-bottom rounded-[1px] bg-current motion-reduce:animate-none",
+                      isPlaybackActive &&
+                        "motion-safe:animate-[mll-eq-bar_840ms_ease-in-out_infinite]",
+                    )}
+                    style={{ height, animationDelay: `${i * 120}ms` }}
+                  />
+                ))}
+              </span>
+            )}
           </span>
           <span className="mll-grid-tile__title">{work.title}</span>
           <span className="mll-grid-tile__circle">{work.circleName ?? "サークル不明"}</span>
         </button>
       );
     },
-    [selectedWorkId, safeTileSize, onWorkSelect, onWorkPlay, moveTileFocus],
+    [
+      selectedWorkId,
+      safeTileSize,
+      playingWorkId,
+      isPlaybackActive,
+      onWorkSelect,
+      onWorkPlay,
+      moveTileFocus,
+    ],
   );
 
   const renderRow = useCallback(
@@ -442,7 +482,7 @@ export default function WorkGrid({
           {isLoading ? (
             <CollectionStatus variant="grid" kind="loading" />
           ) : isError ? (
-            <CollectionStatus variant="grid" kind="error" />
+            <CollectionStatus variant="grid" kind="error" onRetry={onRetryWorks} />
           ) : works.length === 0 ? (
             <CollectionStatus
               variant="grid"
@@ -452,6 +492,10 @@ export default function WorkGrid({
                 isDrilled && isFacetAxis(axis) ? axis : null,
                 drillValue,
                 tagPrefixes,
+              )}
+              hint={buildEmptyWorksHint(
+                axis,
+                Boolean(searchQuery) || (isDrilled && isFacetAxis(axis)),
               )}
               action={
                 searchQuery ? (

@@ -3,6 +3,7 @@
 // コンポーネントの配線から切り離してテスト可能にする。
 
 import type { CollectionStats, FacetAxisId } from "@mimimilli/shared";
+import { ApiRequestError } from "../../../shared/api/http";
 import type { WorksQueryParams } from "../api";
 import type { AxisId, SortId, ViewMode } from "./types";
 import { isFacetAxis, isSmartAxis, isViewAxis } from "./axisDefinitions";
@@ -82,6 +83,12 @@ export function computeWorksListVisibility(
 /**
  * 検索語や軸ドリルの絞り込みが原因で作品一覧が0件になっているかどうか。
  * fav/unplayed 等が本来的に0件のケースとは区別し、原因表示が必要な場合だけ案内する。
+ *
+ * 検索デバウンス後に queryKey が変わった直後は、新クエリが確定するまで
+ * works が一時的に空配列になる（isLoading中）。この間を「絞り込みで0件」と
+ * 誤判定すると、選択中の作品が実際は結果に含まれる場合でも選択解除が
+ * 先走ってしまうため、クエリが loading/error 中は false に倒す
+ * （worksCount===0 という結果を信頼できるのは、クエリが成功して確定した後だけ）。
  */
 export function computeIsNoResultsDueToFilter(
   showsWorksList: boolean,
@@ -89,9 +96,13 @@ export function computeIsNoResultsDueToFilter(
   searchQuery: string,
   activeAxis: AxisId,
   drillValue: string | null,
+  isWorksLoading: boolean,
+  isWorksError: boolean,
 ): boolean {
   return (
     showsWorksList &&
+    !isWorksLoading &&
+    !isWorksError &&
     worksCount === 0 &&
     (Boolean(searchQuery) || (isFacetAxis(activeAxis) && drillValue !== null))
   );
@@ -105,6 +116,32 @@ export type CollectionStatsDisplay =
   | { status: "loading" }
   | { status: "error" }
   | { status: "ready"; count: number; trackCount: number; durationSec: number };
+
+/**
+ * 検索語やドリルの絞り込みで作品一覧が0件になったとき、選択中の作品がその
+ * 絞り込み結果に含まれない古い選択のまま残っていないかを判定する。
+ * true の場合は選択を解除すべき。
+ */
+export function shouldClearSelectionOnFilterMiss(
+  isNoResultsDueToFilter: boolean,
+  selectedWorkId: string | null,
+): boolean {
+  return isNoResultsDueToFilter && selectedWorkId !== null;
+}
+
+/**
+ * 選択中の作品詳細（GET /works/:id）取得エラーのうち、404（作品が既に存在しない。
+ * 削除済み作品などをwork=パラメータで開いた場合）だけを「選択解除・URLクリーンアップ
+ * すべきエラー」として判定する。ネットワーク断や5xx等の一時的な失敗まで選択解除すると、
+ * 再試行すれば見られるはずの作品が勝手に選択解除されてしまうため、それ以外のエラーは
+ * 選択を維持し、パネル側でエラー表示・再試行を出す。
+ */
+export function shouldClearSelectionOnWorkNotFound(
+  selectedWorkId: string | null,
+  error: unknown,
+): boolean {
+  return selectedWorkId !== null && error instanceof ApiRequestError && error.status === 404;
+}
 
 export function computeCollectionStatsDisplay(
   isLoading: boolean,
@@ -127,7 +164,6 @@ export function computeCollectionStatsDisplay(
 export interface PreviewModeInput {
   isNoResultsDueToFilter: boolean;
   selectedWorkId: string | null;
-  hasSelectedWork: boolean;
   activeAxis: AxisId;
   drillValue: string | null;
   selectedTags: string[];
@@ -135,17 +171,13 @@ export interface PreviewModeInput {
 
 // previewMode: UI state + server state を組み合わせてコンポーネントで計算する
 // （derived atom にしない — 0件時は選択中の作品が一覧に存在しないため、古い詳細を出さず案内を優先する）
+// selectedWorkId があれば読み込み中・エラーの間も "work" モードに留める（詳細データの
+// 有無はコンポーネント側でloading/error/読み込み済みを出し分ける。ここで弾くと、
+// 読み込み中に一瞬 axis-landing 等へ切り替わってちらつく）。
 export function computePreviewMode(input: PreviewModeInput): PreviewMode {
-  const {
-    isNoResultsDueToFilter,
-    selectedWorkId,
-    hasSelectedWork,
-    activeAxis,
-    drillValue,
-    selectedTags,
-  } = input;
+  const { isNoResultsDueToFilter, selectedWorkId, activeAxis, drillValue, selectedTags } = input;
   if (isNoResultsDueToFilter) return "empty";
-  if (selectedWorkId && hasSelectedWork) return "work";
+  if (selectedWorkId) return "work";
   if (isSmartAxis(activeAxis)) return "smart-folder";
   if (isFacetAxis(activeAxis) && !drillValue) return "axis-landing";
   if (activeAxis === "tag" && selectedTags.length > 0) return "axis-landing";

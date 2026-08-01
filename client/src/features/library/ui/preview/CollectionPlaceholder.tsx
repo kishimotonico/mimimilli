@@ -20,31 +20,43 @@ export function CollectionPlaceholder({ message, hint, stats }: CollectionPlaceh
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        flexDirection: "column",
-        gap: 12,
-        color: "var(--ink-4)",
-        textAlign: "center",
         padding: "0 16px",
       }}
     >
-      <I.gridS size={28} />
-      <span style={{ fontSize: 12 }}>{message}</span>
-      {hint && <span style={{ fontSize: 11 }}>{hint}</span>}
-      {stats?.status === "error" && (
-        <span style={{ fontSize: 10.5, color: "var(--ink-3)" }}>統計の取得に失敗しました</span>
-      )}
-      {stats?.status === "ready" && (
-        <span
-          style={{
-            fontFamily: "var(--font-mono)",
-            fontSize: 10.5,
-            color: "var(--ink-3)",
-          }}
-        >
-          {stats.count}作品 · {stats.trackCount}トラック ·{" "}
-          {formatDuration(stats.durationSec) ?? "0:00"}
-        </span>
-      )}
+      {/* 広いビューポートで案内文だけが間延びしないよう、内容は maxWidth で頭打ちにする */}
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 12,
+          maxWidth: 320,
+          padding: "28px 24px",
+          borderRadius: "var(--r-3)",
+          background: "var(--paper-2)",
+          color: "var(--ink-4)",
+          textAlign: "center",
+        }}
+      >
+        <I.gridS size={28} />
+        <span style={{ fontSize: 12 }}>{message}</span>
+        {hint && <span style={{ fontSize: 11 }}>{hint}</span>}
+        {stats?.status === "error" && (
+          <span style={{ fontSize: 10.5, color: "var(--ink-3)" }}>統計の取得に失敗しました</span>
+        )}
+        {stats?.status === "ready" && (
+          <span
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: 10.5,
+              color: "var(--ink-3)",
+            }}
+          >
+            {stats.count}作品 · {stats.trackCount}トラック ·{" "}
+            {formatDuration(stats.durationSec) ?? "0:00"}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

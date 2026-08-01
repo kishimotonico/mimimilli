@@ -47,6 +47,8 @@ function renderInspector(props: Partial<React.ComponentProps<typeof WorkGridInsp
       onClose={vi.fn()}
       onPlay={vi.fn()}
       onResume={vi.fn()}
+      onTogglePlay={vi.fn()}
+      onTagClick={vi.fn()}
       onPatchWork={vi.fn()}
       {...props}
     />,
@@ -92,10 +94,21 @@ describe("WorkGridInspector", () => {
     expect(screen.getByText("読み込み中...")).toBeTruthy();
   });
 
-  it("選択中でエラーならエラー文言を表示する", () => {
-    renderInspector({ hasSelection: true, work: null, isError: true });
+  it("選択中でエラーならエラー文言と再試行ボタンを表示する", () => {
+    const onRetry = vi.fn();
+    renderInspector({ hasSelection: true, work: null, isError: true, onRetry });
 
-    expect(screen.getByText("詳細の読み込みに失敗しました")).toBeTruthy();
+    expect(screen.getByText("読み込みに失敗しました")).toBeTruthy();
+    expect(screen.getByText("再試行")).toBeTruthy();
+  });
+
+  it("再試行ボタンで onRetry を呼ぶ", async () => {
+    const onRetry = vi.fn();
+    renderInspector({ hasSelection: true, work: null, isError: true, onRetry });
+
+    await userEvent.click(screen.getByText("再試行"));
+
+    expect(onRetry).toHaveBeenCalledOnce();
   });
 
   it("閉じるボタンで onClose を呼ぶ", async () => {

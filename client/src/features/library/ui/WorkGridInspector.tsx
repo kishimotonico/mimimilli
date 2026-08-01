@@ -2,6 +2,7 @@ import type { Work, WorkPatch } from "@mimimilli/shared";
 import IconButton from "../../../shared/ui/IconButton";
 import { I } from "../../../shared/ui/Icon";
 import type { CollectionStatsDisplay } from "../model/libraryPresentation";
+import CollectionStatus from "./CollectionStatus";
 import { CollectionPlaceholder } from "./preview/CollectionPlaceholder";
 import { WorkDetail } from "./preview/WorkDetail";
 
@@ -11,6 +12,9 @@ interface WorkGridInspectorProps {
   work: Work | null;
   isLoading: boolean;
   isError: boolean;
+  /** 詳細取得の再試行（isError時。404は呼び出し元で選択解除されるため、ここに来る
+   *  isError=trueは404以外の一時的な失敗のみ） */
+  onRetry?: () => void;
   /** 未選択時に表示する、表示中コレクションの統計 */
   collectionStats: CollectionStatsDisplay;
   playingTrackIndex: number | null;
@@ -20,6 +24,8 @@ interface WorkGridInspectorProps {
   onClose: () => void;
   onPlay: (trackIndex: number) => void;
   onResume: () => void;
+  onTogglePlay: () => void;
+  onTagClick: (tag: string) => void;
   onPatchWork: (body: WorkPatch) => Promise<Work>;
 }
 
@@ -28,6 +34,7 @@ export default function WorkGridInspector({
   work,
   isLoading,
   isError,
+  onRetry,
   collectionStats,
   playingTrackIndex,
   isPlaybackActive,
@@ -36,6 +43,8 @@ export default function WorkGridInspector({
   onClose,
   onPlay,
   onResume,
+  onTogglePlay,
+  onTagClick,
   onPatchWork,
 }: WorkGridInspectorProps) {
   return (
@@ -52,16 +61,18 @@ export default function WorkGridInspector({
           work={work}
           onPlay={onPlay}
           onResume={onResume}
+          onTogglePlay={onTogglePlay}
           playingTrackIndex={playingTrackIndex}
           isPlaybackActive={isPlaybackActive}
           tagSuggestions={tagSuggestions}
           isPatching={isPatching}
           onPatchWork={onPatchWork}
+          onTagClick={onTagClick}
         />
+      ) : isLoading ? (
+        <CollectionStatus variant="list" kind="loading" />
       ) : (
-        <div className="mll-grid-inspector__status">
-          {isError ? "詳細の読み込みに失敗しました" : isLoading ? "読み込み中..." : null}
-        </div>
+        isError && <CollectionStatus variant="list" kind="error" onRetry={onRetry} />
       )}
     </aside>
   );

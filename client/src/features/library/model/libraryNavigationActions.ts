@@ -49,8 +49,11 @@ export const clearLibraryTagsAtom = atom(null, (_get, set) => {
   set(gridInspectorOpenAtom, false);
 });
 
-export const selectLibraryWorkAtom = atom(null, (_get, set, id: string | null) => {
-  requestNavigationHistoryCommit(set, "replace");
+// 未選択→選択は push（戻るでドリル済み・未選択に戻れるように）、
+// 選択→別作品への切替・選択→解除は replace（切替のたびに履歴が積まれないように）。
+export const selectLibraryWorkAtom = atom(null, (get, set, id: string | null) => {
+  const wasUnselected = get(selectedWorkIdAtom) === null;
+  requestNavigationHistoryCommit(set, wasUnselected && id !== null ? "push" : "replace");
   set(selectedWorkIdAtom, id);
 });
 

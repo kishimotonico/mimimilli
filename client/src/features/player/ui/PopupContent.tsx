@@ -118,7 +118,7 @@ export default function PopupContent({
               requestWidth={selectFixedCoverThumbnailWidth(308, window.devicePixelRatio)}
             />
           )}
-          {/* ±10秒: カバーへのホバー時のみ表示 */}
+          {/* ±10秒: 常時薄く表示し、ホバーで強調する */}
           {!rateMenuOpen && (
             <>
               <button

@@ -45,6 +45,7 @@ import type {
 } from "@mimimilli/shared";
 import { z } from "zod";
 import { japaneseSortKey } from "../../core/japaneseSortKey.ts";
+import { normalizeRjCode } from "../../core/worksQuery.ts";
 import { InvalidResumeError } from "../../adapter.ts";
 import type { Db } from "./db.ts";
 import {
@@ -718,6 +719,28 @@ export class WorkRepo {
 
     if (params.q) {
       const key = japaneseSortKey(params.q);
+      // core の normalizeRjCode と同じ仕様（大文字化 + RJ/VJ接頭辞除去）で正規化した
+      // クエリ側キー。格納側（query_dlsite.state_json の rjCode）も同じ規則でSQL側の
+      // CASE式で正規化してから instr 比較し、core⇔real の挙動を一致させる。
+      // 正規化後が空文字（クエリが "RJ"/"VJ" のみ等）の場合、instr(X, '') は常に
+      // 真になってしまいSQLite特有の挙動でcoreと乖離するため、その場合は
+      // rjCode節ごと除外する（coreの `if (rjQuery && ...)` と同じ判定）。
+      const rjKey = normalizeRjCode(params.q);
+      const rjCondition = rjKey
+        ? ` OR EXISTS (
+          SELECT 1
+          FROM main.work_dlsite AS query_dlsite
+          WHERE query_dlsite.work_id = works.id
+            AND instr(
+              CASE
+                WHEN substr(UPPER(json_extract(query_dlsite.state_json, '$.rjCode')), 1, 2) IN ('RJ', 'VJ')
+                THEN substr(UPPER(json_extract(query_dlsite.state_json, '$.rjCode')), 3)
+                ELSE UPPER(json_extract(query_dlsite.state_json, '$.rjCode'))
+              END,
+              ?
+            ) > 0
+        )`
+        : "";
       conditions.push(`(
         instr(works.title_sort_key, ?) > 0 OR EXISTS (
           SELECT 1
@@ -725,9 +748,10 @@ export class WorkRepo {
           INNER JOIN main.tags AS query_tags ON query_tags.id = query_work_tags.tag_id
           WHERE query_work_tags.work_id = works.id
             AND instr(query_tags.search_key, ?) > 0
-        )
+        )${rjCondition}
       )`);
       bindings.push(key, key);
+      if (rjKey) bindings.push(rjKey);
     }
 
     const normalizedTags = params.tags.map(normalizeTag);
@@ -1069,6 +1093,9 @@ export class WorkRepo {
     }
 
     if (axis === "tag") {
+      // タグ軸は flat・annotated を問わず全タグを集計する（ADR-0005 追記: prefixグループ見出し表示）。
+      // value は完全なタグ文字列なので、tie-break は facet_sort_key（値のみ）ではなく
+      // search_key（完全なタグ名の日本語ソートキー）を使う
       return this.db.sqlite
         .query(`
           SELECT tags.name AS value, COUNT(*) AS count
@@ -1076,9 +1103,8 @@ export class WorkRepo {
           INNER JOIN user.work_states AS work_states ON work_states.work_id = works.id
           INNER JOIN main.work_tags AS work_tags ON work_tags.work_id = works.id
           INNER JOIN main.tags AS tags ON tags.id = work_tags.tag_id
-          WHERE instr(tags.name, '/') = 0
           GROUP BY tags.name
-          ORDER BY count DESC, tags.facet_sort_key COLLATE BINARY ASC, value COLLATE BINARY ASC
+          ORDER BY count DESC, tags.search_key COLLATE BINARY ASC, value COLLATE BINARY ASC
         `)
         .all() as AxisFacetItem[];
     }

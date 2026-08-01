@@ -87,6 +87,48 @@ test("q: タグの部分一致でもヒットする", () => {
   );
 });
 
+test("q: dlsite.rjCode の部分一致でもヒットする（大文字小文字・RJ接頭辞は無視）", () => {
+  const worksWithRj: WorkSummary[] = WORKS.map((work) =>
+    work.id === "RJ002" ? { ...work, dlsite: { ...work.dlsite, rjCode: "RJ01234567" } } : work,
+  );
+
+  assert.deepEqual(
+    applyWorksQuery(worksWithRj, baseQuery({ q: "RJ01234567" })).items.map((w) => w.id),
+    ["RJ002"],
+  );
+  assert.deepEqual(
+    applyWorksQuery(worksWithRj, baseQuery({ q: "rj01234567" })).items.map((w) => w.id),
+    ["RJ002"],
+  );
+  assert.deepEqual(
+    applyWorksQuery(worksWithRj, baseQuery({ q: "01234567" })).items.map((w) => w.id),
+    ["RJ002"],
+  );
+  assert.deepEqual(
+    applyWorksQuery(worksWithRj, baseQuery({ q: "234567" })).items.map((w) => w.id),
+    ["RJ002"],
+  );
+});
+
+test("q: dlsite.rjCode がVJコードでも部分一致でヒットする（大文字小文字・VJ接頭辞は無視）", () => {
+  const worksWithVj: WorkSummary[] = WORKS.map((work) =>
+    work.id === "RJ003" ? { ...work, dlsite: { ...work.dlsite, rjCode: "VJ014780" } } : work,
+  );
+
+  assert.deepEqual(
+    applyWorksQuery(worksWithVj, baseQuery({ q: "VJ014780" })).items.map((w) => w.id),
+    ["RJ003"],
+  );
+  assert.deepEqual(
+    applyWorksQuery(worksWithVj, baseQuery({ q: "vj014780" })).items.map((w) => w.id),
+    ["RJ003"],
+  );
+  assert.deepEqual(
+    applyWorksQuery(worksWithVj, baseQuery({ q: "014780" })).items.map((w) => w.id),
+    ["RJ003"],
+  );
+});
+
 test("tags: AND は全タグにマッチする作品のみ返す", () => {
   const result = applyWorksQuery(
     WORKS,

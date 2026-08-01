@@ -68,6 +68,7 @@ export default function PlayerDock() {
           onPrev={actions.prevTrack}
           onSeek={actions.seek}
           onSwitchToPopup={() => switchUiMode("popup")}
+          onSetVolume={actions.setVolume}
         />
       </Presence>
       <Presence

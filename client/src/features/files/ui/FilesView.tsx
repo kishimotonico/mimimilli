@@ -103,6 +103,8 @@ export default function FilesView({ rootFolder, onPlayFile }: FilesViewProps) {
             onSelectFile={nav.selectFile}
             onPlayFile={onPlayFile}
             isLoading={cwdQuery.isPending}
+            isError={cwdQuery.isError}
+            onRetry={() => cwdQuery.refetch()}
           />
         </div>
       </div>

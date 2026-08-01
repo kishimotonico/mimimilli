@@ -39,11 +39,29 @@ export default function TopBar({ onOpenScan, onSettings, notificationBell }: Top
   // （composition 中間文字列でのリクエスト乱発を防ぐ。TASK-61）
   const [draft, setDraft] = useState(searchQuery);
   const composingRef = useRef(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // クリアボタンやナビゲーション復元など、親側の値が外部要因で変わったときは draft を追従させる
   useEffect(() => {
     setDraft(searchQuery);
   }, [searchQuery]);
+
+  // ⌘K / Ctrl+K で検索ボックスへフォーカスする。テキスト入力中は横取りしない。
+  useEffect(() => {
+    if (mode === "files") return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== "k" || !(e.metaKey || e.ctrlKey)) return;
+      const target = e.target as HTMLElement | null;
+      const isEditable =
+        target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.isContentEditable;
+      if (isEditable && target !== searchInputRef.current) return;
+      e.preventDefault();
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [mode]);
 
   return (
     <header className="mll-bar">
@@ -70,6 +88,7 @@ export default function TopBar({ onOpenScan, onSettings, notificationBell }: Top
         <div className="mll-bar__search">
           <I.search size={13} />
           <input
+            ref={searchInputRef}
             value={draft}
             onChange={(e) => {
               setDraft(e.target.value);

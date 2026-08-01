@@ -1,6 +1,7 @@
 import type { Work, WorkListItem, WorkPatch, SmartFolder } from "@mimimilli/shared";
 import type { AxisLandingPresentation } from "../model/axisLandingPresentation";
 import type { CollectionStatsDisplay, PreviewMode } from "../model/libraryPresentation";
+import CollectionStatus from "./CollectionStatus";
 import { AxisLanding } from "./preview/AxisLanding";
 import { CollectionPlaceholder } from "./preview/CollectionPlaceholder";
 import { SmartFolderView } from "./preview/SmartFolderView";
@@ -15,6 +16,11 @@ interface PreviewPaneProps {
   emptyStats: CollectionStatsDisplay;
   axisLandingPresentation: AxisLandingPresentation;
   selectedWork: Work | null;
+  /** mode==="work"だがselectedWorkがまだ無いとき（読み込み中/404以外のエラー）の状態。
+   *  404は呼び出し元で選択解除されるため、isSelectedWorkError=trueはそれ以外の一時的な失敗のみ */
+  isSelectedWorkLoading: boolean;
+  isSelectedWorkError: boolean;
+  onRetrySelectedWork?: () => void;
   smartFolder: SmartFolder | null;
   axisWorks: WorkListItem[];
   axisTotal?: number;
@@ -24,7 +30,9 @@ interface PreviewPaneProps {
   isPlaybackActive?: boolean;
   onPlay: (trackIndex: number) => void;
   onResume: () => void;
+  onTogglePlay: () => void;
   onSelectWork: (id: string) => void;
+  onTagClick: (tag: string) => void;
   tagSuggestions: string[];
   isPatching: boolean;
   onPatchWork: (body: WorkPatch) => Promise<Work>;
@@ -37,6 +45,9 @@ export default function PreviewPane({
   emptyStats,
   axisLandingPresentation,
   selectedWork,
+  isSelectedWorkLoading,
+  isSelectedWorkError,
+  onRetrySelectedWork,
   smartFolder,
   axisWorks,
   axisTotal,
@@ -46,7 +57,9 @@ export default function PreviewPane({
   isPlaybackActive,
   onPlay,
   onResume,
+  onTogglePlay,
   onSelectWork,
+  onTagClick,
   tagSuggestions,
   isPatching,
   onPatchWork,
@@ -66,19 +79,28 @@ export default function PreviewPane({
       <div className="mle-prv__hd">
         <span className="label">{title}</span>
       </div>
-      {mode === "work" && selectedWork && (
-        <WorkDetail
-          key={selectedWork.id}
-          work={selectedWork}
-          onPlay={onPlay}
-          onResume={onResume}
-          playingTrackIndex={playingTrackIndex}
-          isPlaybackActive={isPlaybackActive}
-          tagSuggestions={tagSuggestions}
-          isPatching={isPatching}
-          onPatchWork={onPatchWork}
-        />
-      )}
+      {mode === "work" &&
+        (selectedWork ? (
+          <WorkDetail
+            key={selectedWork.id}
+            work={selectedWork}
+            onPlay={onPlay}
+            onResume={onResume}
+            onTogglePlay={onTogglePlay}
+            playingTrackIndex={playingTrackIndex}
+            isPlaybackActive={isPlaybackActive}
+            tagSuggestions={tagSuggestions}
+            isPatching={isPatching}
+            onPatchWork={onPatchWork}
+            onTagClick={onTagClick}
+          />
+        ) : isSelectedWorkLoading ? (
+          <CollectionStatus variant="list" kind="loading" />
+        ) : (
+          isSelectedWorkError && (
+            <CollectionStatus variant="list" kind="error" onRetry={onRetrySelectedWork} />
+          )
+        ))}
       {mode === "axis-landing" && (
         <AxisLanding
           presentation={axisLandingPresentation}

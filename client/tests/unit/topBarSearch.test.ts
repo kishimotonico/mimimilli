@@ -72,4 +72,26 @@ describe("TopBar の検索入力", () => {
     });
     expect(input).toHaveValue("復元された語");
   });
+
+  it("⌘K で検索ボックスへフォーカスする", () => {
+    renderTopBar("");
+    const input = screen.getByPlaceholderText(PLACEHOLDER) as HTMLInputElement;
+    input.blur();
+    expect(document.activeElement).not.toBe(input);
+
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+    expect(document.activeElement).toBe(input);
+  });
+
+  it("他のテキスト入力にフォーカス中の⌘Kは横取りしない", () => {
+    renderTopBar("");
+    const other = document.createElement("input");
+    document.body.appendChild(other);
+    other.focus();
+
+    fireEvent.keyDown(other, { key: "k", ctrlKey: true });
+    expect(document.activeElement).toBe(other);
+
+    document.body.removeChild(other);
+  });
 });

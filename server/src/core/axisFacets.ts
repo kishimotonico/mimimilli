@@ -1,5 +1,6 @@
 // 分類軸のファセット集計（GET /api/axes/:axis）の純粋関数。
-// 軸ID は "tag"（フラットタグ）・"year"（追加日の年）・任意の prefix 文字列（ADR-0005）。
+// 軸ID は "tag"（全タグ。flat・annotated 双方）・"year"（追加日の年）・
+// 任意の prefix 文字列（ADR-0005 追記）。
 import { parseTag } from "@mimimilli/shared";
 import type { AxisFacetItem, WorkSummary } from "@mimimilli/shared";
 import { compareJapaneseSortKeys, compareUtf8Bytes } from "./japaneseSortKey.ts";
@@ -11,8 +12,10 @@ export function buildAxisFacets(axis: string, works: WorkSummary[]): AxisFacetIt
 
   for (const work of works) {
     if (axis === "tag") {
+      // タグ軸は flat・annotated を問わず全タグを集計する（prefix グループ見出し付き表示用）。
+      // value は完全なタグ文字列（例: "cv/藤田茜"）を保持し、AND 絞り込みへそのまま使える
       for (const tag of work.tags) {
-        if (parseTag(tag).kind === "flat") counts.set(tag, (counts.get(tag) ?? 0) + 1);
+        counts.set(tag, (counts.get(tag) ?? 0) + 1);
       }
     } else if (axis === "year") {
       const year = work.addedAt.slice(0, 4);

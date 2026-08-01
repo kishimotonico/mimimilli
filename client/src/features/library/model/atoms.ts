@@ -14,7 +14,7 @@ import type {
 } from "../../../features/library/model/types";
 import { getAxisLabel } from "./axisDefinitions";
 
-// ライブラリ検索語。URL・localStorage には保存しない。モード切替中も保持する。
+// ライブラリ検索語。URLの q= パラメータへ同期する（useNavigationHistory）。localStorage には保存しない。
 export const librarySearchQueryAtom = atom("");
 
 // ── ナビゲーション state ──────────────────────────────────────

@@ -217,6 +217,7 @@ export default function App() {
           onPlayFile={handlePlayFile}
           onPlay={handlePlay}
           onResume={handleResume}
+          onTogglePlay={player.togglePlay}
         />
       }
       transportBar={<PlayerDock />}

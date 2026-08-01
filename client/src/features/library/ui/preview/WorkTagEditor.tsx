@@ -25,8 +25,12 @@ interface WorkTagEditorProps {
   isPatching: boolean;
   onPatchWork: (body: WorkPatch) => Promise<Work>;
   onError: (message: string | null) => void;
-  /** 編集ダイアログなど、折りたたむ必要がない場所では全タグを表示する。 */
+  /** 編集ダイアログなど、折りたたむ必要がない場所では全タグを表示する。
+   *  この場合は編集ダイアログ自体が明示的な編集操作なので削除ボタンは常時表示のまま。 */
   expanded?: boolean;
+  /** タグチップクリック時のハンドラ（タグ軸への絞り込み遷移）。expanded=true の
+   *  編集ダイアログ内では使わない（そこはタグクリックで遷移させない） */
+  onTagClick?: (tag: string) => void;
 }
 
 export function WorkTagEditor({
@@ -36,9 +40,14 @@ export function WorkTagEditor({
   onPatchWork,
   onError,
   expanded = false,
+  onTagClick,
 }: WorkTagEditorProps) {
   const [isTagPopoverOpen, setIsTagPopoverOpen] = useState(false);
   const [areAllTagsVisible, setAreAllTagsVisible] = useState(false);
+  // 削除✕ボタンは誤操作防止のため既定で非表示（追加の2段階フローと対称にする）。
+  // expanded（編集ダイアログ）はそれ自体が明示的な編集操作のため常に編集中扱い
+  const [isEditMode, setIsEditMode] = useState(false);
+  const showRemoveButtons = expanded || isEditMode;
   const tagEditorRef = useRef<HTMLDivElement | null>(null);
   const { tagPrefixes } = useTagPrefixes();
 
@@ -107,7 +116,13 @@ export function WorkTagEditor({
                 definition={definitionOf(tag)}
                 pending={isPending}
                 failed={isFailed}
-                onRemove={isBlocked ? undefined : () => void requestRemoveTag(tag)}
+                onRemove={
+                  showRemoveButtons && !isBlocked ? () => void requestRemoveTag(tag) : undefined
+                }
+                onClick={!showRemoveButtons && onTagClick ? () => onTagClick(tag) : undefined}
+                ariaLabel={
+                  !showRemoveButtons && onTagClick ? `タグ「${tag}」で絞り込む` : undefined
+                }
               />
             );
           })}
@@ -119,12 +134,21 @@ export function WorkTagEditor({
             />
           )}
           <div ref={tagEditorRef} className="contents">
+            {!expanded && (
+              <IconButton
+                icon={I.edit}
+                label={isEditMode ? "タグ編集を終了" : "タグを編集"}
+                size="xs"
+                active={isEditMode}
+                onClick={() => setIsEditMode((v) => !v)}
+              />
+            )}
             <div ref={tagPopoverAnchorRef} className="relative inline-flex">
               <IconButton
                 icon={I.add}
                 label="タグを追加"
-                size="sm"
-                className="h-5 w-5 rounded-1 bg-paper-2 text-ink-2 hover:bg-paper-3 hover:text-ink-0"
+                size="xs"
+                className="bg-paper-2 text-ink-2 hover:bg-paper-3 hover:text-ink-0"
                 disabled={isTagSaving || isPatching}
                 onClick={() => {
                   onError(null);

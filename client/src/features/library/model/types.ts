@@ -32,7 +32,7 @@ export type GridLayoutMode = "square" | "justified";
 // ── 軸 ───────────────────────────────────────────────────────
 // ADR-0005: 軸IDは固定 enum ではなく文字列。
 //   - ビュー: all / recent / added / fav / unplayed / missing
-//   - 組み込み軸: "tag"（フラットタグ）・"year"（追加日）
+//   - 組み込み軸: "tag"（全タグ。flat・annotated 双方。ADR-0005 追記）・"year"（追加日）
 //   - スマートフォルダー: "smart-<id>"
 //   - それ以外: 登録済み prefix そのもの（例: "cv", "サークル"。正規形＝小文字）
 // 判定は axisDefinitions.ts の isViewAxis / isFacetAxis / isSmartAxis を使う。
