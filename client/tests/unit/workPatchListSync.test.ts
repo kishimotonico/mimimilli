@@ -174,10 +174,12 @@ function renderUseLibraryQueries(nav: LibraryViewState, options?: { queryClient?
 
 describe("作品 PATCH 後の一覧キャッシュ同期", () => {
   let fetchMock: ReturnType<typeof vi.fn>;
+  let detailsById: Map<string, Work>;
 
   beforeEach(() => {
     const mock = createFetchMock();
     fetchMock = mock.fetchMock;
+    detailsById = mock.detailsById;
     vi.stubGlobal("fetch", fetchMock);
   });
 
@@ -217,6 +219,36 @@ describe("作品 PATCH 後の一覧キャッシュ同期", () => {
     );
     expect(activeInfinite?.getObserversCount()).toBeGreaterThan(0);
     expect(activeInfinite?.isStale()).toBe(false);
+  });
+
+  it("ブックマークPATCH後もresumeはサーバーの最新値へ差し替わらずキャッシュ側を維持する（resumeはPATCHと別経路のため）", async () => {
+    const { result } = renderUseLibraryQueries(baseNav);
+
+    await waitFor(() => expect(result.current.selectedWork).not.toBeNull());
+    expect(result.current.selectedWork?.resume).toBeNull();
+
+    // 実際の再生中は POST /works/:id/resume の周期保存でサーバー側 resume だけが
+    // 進む（クライアントキャッシュへは同期されない）。ここではその状況を、
+    // 次回PATCHレスポンスに含まれる detailsById の resume を直接書き換えて模す。
+    const driftedResume = {
+      playlistId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      trackId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      offsetSec: 5025,
+    };
+    const currentDetail = detailsById.get("p1-w1") ?? makeWorkDetail("p1-w1");
+    detailsById.set("p1-w1", { ...currentDetail, resume: driftedResume });
+
+    await act(async () => {
+      await result.current.patchWorkMutation.mutateAsync({
+        workId: "p1-w1",
+        body: { bookmarked: true },
+      });
+    });
+
+    await waitFor(() => expect(result.current.selectedWork?.bookmarked).toBe(true));
+    // bookmarked（PATCHが実際に指定したフィールド）は反映されるが、PATCHが
+    // 触れていない resume はドリフトを取り込まずクライアントキャッシュの値を維持する
+    expect(result.current.selectedWork?.resume).toBeNull();
   });
 
   it("ブックマーク解除（all ビュー）では非表示 fav キャッシュが stale 化されネットワークは発火しない", async () => {
