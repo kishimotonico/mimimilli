@@ -30,7 +30,9 @@ import type {
   TagPrefixCreate,
   TagPrefixUpdate,
   Work,
+  WorkCreateBody,
   WorkPatch,
+  WorkRegisterPreview,
   WorksPage,
   WorksQuery,
 } from "@mimimilli/shared";
@@ -102,6 +104,8 @@ export interface DataAdapter {
 
   // 作品
   queryWorks(params: WorksQuery): Promise<WorksPage>;
+  getWorkRegisterPreview(path: string): Promise<WorkRegisterPreview | null>;
+  createWork(body: WorkCreateBody): Promise<Work | null>;
   getDlsiteNotificationSummary(): Promise<DlsiteNotificationSummary>;
   queryDlsiteNotifications(
     kind: DlsiteNotificationKind,
@@ -147,6 +151,8 @@ export interface DataAdapter {
   describeCover(workId: string, width?: number): Promise<CoverDescriptor | null>;
   /** force=true はキャッシュを無視して明示的に再取得する。 */
   dlsiteFetch(workId: string, force?: boolean): Promise<DlsiteFetchResult>;
+  /** 作品未登録時のプレビュー用。RJ/VJコードを直接指定して取得する。 */
+  dlsiteFetchByCode(rjCode: string, force?: boolean): Promise<DlsiteFetchResult>;
   dlsiteApply(workId: string, body: DlsiteApplyBody): Promise<boolean>;
   updateDlsiteState(workId: string, patch: DlsiteStatePatch): Promise<Work | null>;
   runDlsiteBulk(

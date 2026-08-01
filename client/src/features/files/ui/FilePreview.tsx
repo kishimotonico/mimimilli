@@ -1,10 +1,17 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import React from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { I } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
+import ConfirmDialog from "../../../shared/ui/ConfirmDialog";
 import { formatFileSize } from "../../../shared/lib/format";
+import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
+import { FILE_SYSTEM_QUERY_KEYS } from "../../../entities/file-system/queryKeys";
+import { createWork, getWorkRegisterPreview } from "../api";
 import { getFileUrl } from "../api";
 import { getWorkFolderDisplay } from "../model/workFolderDisplay";
+import RegisterWorkDialog from "./RegisterWorkDialog";
+import type { WorkRegisterPreview } from "@mimimilli/shared";
 import {
   classifyFile,
   summarizeKinds,
@@ -23,6 +30,8 @@ interface FilePreviewProps {
   depth: number;
   isPlayingEntry: boolean;
   onPlay: (entry: FsEntry) => void;
+  /** 作品登録完了後にファイル一覧を再取得する */
+  onWorkRegistered?: () => void;
 }
 
 export default function FilePreview({
@@ -31,7 +40,15 @@ export default function FilePreview({
   depth,
   isPlayingEntry,
   onPlay,
+  onWorkRegistered,
 }: FilePreviewProps) {
+  const queryClient = useQueryClient();
+  const [registerPreview, setRegisterPreview] = useState<WorkRegisterPreview | null>(null);
+  const [showRegisterDialog, setShowRegisterDialog] = useState(false);
+  const [quickMergeConfirm, setQuickMergeConfirm] = useState<WorkRegisterPreview | null>(null);
+  const [registerBusy, setRegisterBusy] = useState(false);
+  const [registerError, setRegisterError] = useState<string | null>(null);
+
   const kind = entry ? classifyFile(entry) : null;
   const isDir = kind === "dir";
   const canServeWorkFile = !!entry && !!entry.workId && !!entry.workRelPath;
@@ -46,6 +63,77 @@ export default function FilePreview({
   const firstAudioFile = audioFiles[0];
   const breakdown = isDir && folderEntries ? summarizeKinds(folderEntries) : [];
   const isWorkFolder = isDir && !!entry?.workId;
+  const canRegisterFolder = isDir && entry && !entry.workId;
+
+  const invalidateAfterRegister = useCallback(async () => {
+    if (entry) {
+      await queryClient.invalidateQueries({
+        queryKey: FILE_SYSTEM_QUERY_KEYS.directory(entry.path),
+      });
+    }
+    await queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.all() });
+    onWorkRegistered?.();
+  }, [entry, onWorkRegistered, queryClient]);
+
+  const openRegisterDialog = async () => {
+    if (!entry) return;
+    setRegisterError(null);
+    setRegisterBusy(true);
+    try {
+      const preview = await getWorkRegisterPreview(entry.path);
+      if (preview.alreadyRegistered) {
+        setRegisterError("このフォルダーは既に登録済みです");
+        return;
+      }
+      setRegisterPreview(preview);
+      setShowRegisterDialog(true);
+    } catch (cause) {
+      setRegisterError(cause instanceof Error ? cause.message : "登録情報の取得に失敗しました");
+    } finally {
+      setRegisterBusy(false);
+    }
+  };
+
+  const quickRegister = async (preview: WorkRegisterPreview) => {
+    if (!entry) return;
+    setRegisterBusy(true);
+    setRegisterError(null);
+    try {
+      await createWork({
+        path: entry.path,
+        title: preview.suggestedTitle,
+        mergeDescendantWorks: preview.descendantWorkCount > 0,
+      });
+      setQuickMergeConfirm(null);
+      await invalidateAfterRegister();
+    } catch (cause) {
+      setRegisterError(cause instanceof Error ? cause.message : "作品の登録に失敗しました");
+    } finally {
+      setRegisterBusy(false);
+    }
+  };
+
+  const handleQuickRegister = async () => {
+    if (!entry) return;
+    setRegisterError(null);
+    setRegisterBusy(true);
+    try {
+      const preview = await getWorkRegisterPreview(entry.path);
+      if (preview.alreadyRegistered) {
+        setRegisterError("このフォルダーは既に登録済みです");
+        return;
+      }
+      if (preview.descendantWorkCount > 0) {
+        setQuickMergeConfirm(preview);
+        return;
+      }
+      await quickRegister(preview);
+    } catch (cause) {
+      setRegisterError(cause instanceof Error ? cause.message : "登録情報の取得に失敗しました");
+    } finally {
+      setRegisterBusy(false);
+    }
+  };
 
   return (
     <div className="mle-prv is-files">
@@ -106,6 +194,24 @@ export default function FilePreview({
                 </Button>
               </div>
             )}
+            {canRegisterFolder && (
+              <div className="mle-fprev__actions">
+                <Button
+                  variant="primary"
+                  icon={I.add}
+                  disabled={registerBusy}
+                  onClick={openRegisterDialog}
+                >
+                  このフォルダを作品として登録
+                </Button>
+                <Button variant="ghost" disabled={registerBusy} onClick={handleQuickRegister}>
+                  そのまま登録
+                </Button>
+              </div>
+            )}
+            {registerError && (
+              <p className="m-0 text-[11px] text-[var(--r-coral)]">{registerError}</p>
+            )}
 
             <MetaGrid rows={metaRows(entry, kind!, isDir, isWorkFolder)} />
 
@@ -120,6 +226,28 @@ export default function FilePreview({
           </div>
         )}
       </div>
+
+      {showRegisterDialog && registerPreview && entry && (
+        <RegisterWorkDialog
+          folderPath={entry.path}
+          preview={registerPreview}
+          onRegistered={invalidateAfterRegister}
+          onClose={() => {
+            setShowRegisterDialog(false);
+            setRegisterPreview(null);
+          }}
+        />
+      )}
+
+      {quickMergeConfirm && (
+        <ConfirmDialog
+          title="登録済み作品の統合"
+          message={`登録済み作品 ${quickMergeConfirm.descendantWorkCount} 件を解除して統合します。子作品の履歴・タグは引き継がれません。`}
+          confirmLabel="統合して登録"
+          onConfirm={() => quickRegister(quickMergeConfirm)}
+          onCancel={() => setQuickMergeConfirm(null)}
+        />
+      )}
     </div>
   );
 }

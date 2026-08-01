@@ -1,10 +1,11 @@
 ---
 id: TASK-164
 title: ファイルモードからフォルダを作品として登録できるようにする
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-08-01 18:02'
-updated_date: '2026-08-01 18:40'
+updated_date: '2026-08-01 19:31'
 labels: []
 dependencies:
   - TASK-163
@@ -32,6 +33,16 @@ ordinal: 174000
 - [ ] #4 配下に登録済み子作品があるフォルダを登録しようとすると、解除される子作品数が明示され、承認後に子の登録がまとめて解除されてから親が登録される
 - [ ] #5 登録操作の前後で物理ファイル（音声・画像等）が一切移動・リネームされない
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. 作品作成API: 指定フォルダにmimimilli.jsonを生成しDB登録（generateMetaForFolder流用、ルート外拒否）
+2. ファイルモードに「このフォルダを作品として登録」アクション＋確認ダイアログ（タイトル事前入力・編集可、RJコード検出時はDLsite取得可、即決ボタン併設）
+3. 配下の登録済み子作品はN件明示→承認で一括解除→親登録（履歴・タグ引継ぎなし）
+4. 物理ファイルの移動・リネームなし（テストで担保）
+5. 実装はCursor(composer-2.5)へ委譲、Sonnet検証担当が自動テスト+agent-browser実機確認
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 

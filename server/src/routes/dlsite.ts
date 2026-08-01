@@ -4,6 +4,7 @@ import { streamSSE } from "hono/streaming";
 import {
   dlsiteApplyBodySchema,
   dlsiteBulkCancelResponseSchema,
+  dlsiteFetchByCodeBodySchema,
   dlsiteNotificationQuerySchema,
   dlsiteStatePatchSchema,
 } from "@mimimilli/shared";
@@ -38,6 +39,21 @@ export function dlsiteRoute(adapter: DataAdapter): Hono {
         limit: parsed.data.limit ?? 200,
       }),
     );
+  });
+
+  app.post("/dlsite/fetch-by-code", async (c) => {
+    const body = await c.req.json().catch(() => null);
+    const parsed = dlsiteFetchByCodeBodySchema.safeParse(body);
+    if (!parsed.success) {
+      invalidRequest(parsed.error.issues[0]?.message ?? "RJ/VJコードが不正です");
+    }
+    const forceValue = c.req.query("force");
+    if (forceValue !== undefined && forceValue !== "true" && forceValue !== "false") {
+      invalidRequest("force は true または false で指定してください");
+    }
+    const result = await adapter.dlsiteFetchByCode(parsed.data.rjCode, forceValue === "true");
+    if (!result.ok) throw apiError(result.kind, result.message);
+    return c.json(result.info);
   });
 
   app.post("/dlsite/:id/fetch", async (c) => {

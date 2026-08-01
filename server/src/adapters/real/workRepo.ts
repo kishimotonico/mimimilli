@@ -662,6 +662,27 @@ export class WorkRepo {
     }>;
   }
 
+  /** 指定フォルダー配下（自身を除く）の登録済み作品。手動登録時の子作品統合用。 */
+  listDescendantWorkRefs(
+    parentPath: string,
+  ): Array<{ id: string; physicalPath: string; metaPath: string }> {
+    const descendantPrefix = likeDescendantsPrefix(parentPath);
+    return this.db.sqlite
+      .query(
+        `SELECT works.id AS id, works.physical_path AS physicalPath, works.meta_path AS metaPath
+         FROM main.works
+         INNER JOIN user.work_states ON work_states.work_id = works.id
+         WHERE works.physical_path != ?
+           AND works.physical_path LIKE ?
+         ORDER BY works.rowid ASC`,
+      )
+      .all(parentPath, descendantPrefix) as Array<{
+      id: string;
+      physicalPath: string;
+      metaPath: string;
+    }>;
+  }
+
   /**
    * スマートフォルダー評価の第1段（ADR-0008）。SQLへ落とせるルール条件で候補IDへ絞り込む。
    * ルールなしは null（呼び出し側は queryWorks 相当の SQL ソート/ページング経路を使う）。
@@ -1204,6 +1225,31 @@ export class WorkRepo {
     );
     this.syncTotalDurationSec(row, work.totalDurationSec);
     return work;
+  }
+
+  /** 物理パス一致の有無だけを同期的に確認する（probe なし）。 */
+  getWorkByPhysicalPathSync(physicalPath: string): { id: string } | null {
+    const row = this.db.catalog
+      .select({ id: works.id })
+      .from(works)
+      .where(eq(works.physicalPath, physicalPath))
+      .get();
+    return row ?? null;
+  }
+
+  /** 作品を DB から削除する。メタファイルの削除は呼び出し側が行う。 */
+  deleteWork(id: string): { metaPath: string } | null {
+    const row = this.db.catalog
+      .select({ id: works.id, metaPath: works.metaPath })
+      .from(works)
+      .where(eq(works.id, id))
+      .get();
+    if (!row) return null;
+    this.db.catalog.delete(workTags).where(eq(workTags.workId, id)).run();
+    this.db.catalog.delete(workDlsite).where(eq(workDlsite.workId, id)).run();
+    this.db.catalog.delete(works).where(eq(works.id, id)).run();
+    this.db.user.delete(workStates).where(eq(workStates.workId, id)).run();
+    return { metaPath: row.metaPath };
   }
 
   /**

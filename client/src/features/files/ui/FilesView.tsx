@@ -134,6 +134,7 @@ export default function FilesView({ rootFolder }: FilesViewProps) {
         depth={nav.addressPath.length}
         isPlayingEntry={matchPlaying(previewEntry)}
         onPlay={(entry) => handlePlayFile(entry, folderEntries ?? cwdEntries)}
+        onWorkRegistered={() => cwdQuery.refetch()}
       />
     </>
   );

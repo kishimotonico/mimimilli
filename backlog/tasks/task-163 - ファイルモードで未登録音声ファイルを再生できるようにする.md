@@ -1,11 +1,11 @@
 ---
 id: TASK-163
 title: ファイルモードで未登録音声ファイルを再生できるようにする
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-01 18:01'
-updated_date: '2026-08-01 19:17'
+updated_date: '2026-08-01 19:30'
 labels: []
 dependencies:
   - TASK-167
@@ -28,11 +28,11 @@ ordinal: 173000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 未登録フォルダの音声ファイルをファイルモードからクリックして再生できる
-- [ ] #2 再生終了で同一フォルダ内の次の音声ファイル（表示順）へ自動的に進む。サブフォルダには下りない
-- [ ] #3 登録済み作品配下のファイルをファイルモードから再生してもプレイヤーに作品カバー画像が表示されず、ジェネリック表示になる
-- [ ] #4 ファイルモードからの再生ではresumeがPOSTされず、再生履歴・最近再生にも記録されない
-- [ ] #5 スキャンルート外のパスを指定した場合、ストリーミングAPIが拒否する
+- [x] #1 未登録フォルダの音声ファイルをファイルモードからクリックして再生できる
+- [x] #2 再生終了で同一フォルダ内の次の音声ファイル（表示順）へ自動的に進む。サブフォルダには下りない
+- [x] #3 登録済み作品配下のファイルをファイルモードから再生してもプレイヤーに作品カバー画像が表示されず、ジェネリック表示になる
+- [x] #4 ファイルモードからの再生ではresumeがPOSTされず、再生履歴・最近再生にも記録されない
+- [x] #5 スキャンルート外のパスを指定した場合、ストリーミングAPIが拒否する
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -56,4 +56,12 @@ ordinal: 173000
 - duration実測はclient/src/features/player/model/trackTime.ts:8-31の仕組みが流用可
 - fsブラウズAPI: server/src/routes/fs.ts、エントリのworkId/workRelPath付与はserver/src/adapters/real/fsBrowse.ts:36-49
 - 環境メモ: 開発サーバーはdev:realで起動している場合がある（実DB。fixtureと挙動が違う点に注意）
+
+Cursor実装+Sonnet検証(agent-browser実機)で完了。pnpm check/test全通過(server398/client601)。実機でAC1-4確認、curl/テストでAC5確認。軽微指摘: symlink経由脱出の明示テストなし(resolveWithinのrealpath解決で理論上防御済み)。検証用一時フォルダ data/mimimilli-root/_verify163_unregistered/ が権限拒否で削除できず残存、ユーザーへ報告要。コミット728fcb7
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+work非依存のファイル再生を追加。GET /api/media/fs-audio(ルート配下限定・Range対応)、PlaybackSource {kind:file}導入でファイルモードからの再生は常にファイル再生化、ジェネリック表示・フォルダ内連続再生・resume/履歴非記録。自動テスト+実機検証で全AC合格
+<!-- SECTION:FINAL_SUMMARY:END -->

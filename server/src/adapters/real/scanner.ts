@@ -26,6 +26,7 @@ import type {
   ResolvedPlaylist,
   ScanResult,
   Track,
+  UrlEntry,
   Work,
 } from "@mimimilli/shared";
 import {
@@ -924,6 +925,58 @@ export class Scanner {
     checkAbort();
     batch.add(work, finalFingerprint, cover, metaPath);
     return id;
+  }
+
+  /** 手動登録: 指定フォルダーへ mimimilli.json を生成し DB に登録する */
+  async registerFolderWork(
+    workDir: string,
+    options: {
+      title: string;
+      tags?: string[];
+      urls?: UrlEntry[];
+      coverImage?: string | null;
+      dlsite?: MetaFile["dlsite"];
+    },
+  ): Promise<Work> {
+    const metaPath = join(workDir, META_FILE_NAME);
+    if (existsSync(metaPath)) {
+      throw new Error("このフォルダーには既にメタファイルがあります");
+    }
+
+    const tracks = buildDefaultTracks(workDir);
+    const playlistId = tracks.length > 0 ? crypto.randomUUID() : null;
+    const meta: MetaFile = {
+      id: crypto.randomUUID(),
+      title: options.title,
+      urls: options.urls ?? [],
+      tags: options.tags ?? [],
+      coverImage: options.coverImage !== undefined ? options.coverImage : findCoverImage(workDir),
+      playlists: playlistId ? [{ id: playlistId, name: "default", tracks }] : [],
+      defaultPlaylistId: playlistId,
+      createdAt: new Date().toISOString(),
+      dlsite: options.dlsite ?? emptyDlsiteState(),
+    };
+    writeMetaFile(metaPath, meta);
+
+    const prepared = this.prepareSingleMeta(metaPath);
+    const existingWorks = this.repo.getScanWorkMap();
+    const batch = new UpsertBatch(this.db, this.repo, this.upsertBatchSize, () => {});
+    const scanResult: Pick<ScanResult, "coverErrors"> = { coverErrors: 0 };
+    const seenIds = new Set<string>();
+    await this.registerMetaFile(
+      prepared,
+      seenIds,
+      new Map(),
+      batch,
+      existingWorks,
+      scanResult as ScanResult,
+      true,
+    );
+    batch.flush();
+
+    const work = await this.repo.getWork(meta.id);
+    if (!work) throw new Error("登録した作品の取得に失敗しました");
+    return work;
   }
 
   /** 音声フォルダーへメタファイルを自動生成する（要件 v4 §3.5。あくまで下書き） */

@@ -1,14 +1,17 @@
 // 作品関連: GET/PATCH /works, /works/:id/resume, /works/:id/last-played, /works/:id/files,
-//          GET /tags, POST /export
+//          GET /tags, POST /export, POST /works, GET /works/register-preview
 import { Hono } from "hono";
 import {
   resumeBodySchema,
   WORKS_DEFAULT_PAGE_SIZE,
+  workCreateBodySchema,
   workPatchSchema,
+  workRegisterPreviewQuerySchema,
   worksQuerySchema,
 } from "@mimimilli/shared";
 import { InvalidResumeError, type DataAdapter } from "../adapter.ts";
-import { invalidRequest, notFound } from "../lib/httpError.ts";
+import { WorkRegisterError } from "../adapters/real/workRegister.ts";
+import { conflict, invalidRequest, notFound } from "../lib/httpError.ts";
 
 export function worksRoute(adapter: DataAdapter): Hono {
   const app = new Hono();
@@ -29,6 +32,32 @@ export function worksRoute(adapter: DataAdapter): Hono {
       limit: parsed.data.limit ?? WORKS_DEFAULT_PAGE_SIZE,
     });
     return c.json(page);
+  });
+
+  app.get("/works/register-preview", async (c) => {
+    const parsed = workRegisterPreviewQuerySchema.safeParse(c.req.query());
+    if (!parsed.success) invalidRequest("register-preview のクエリパラメータが不正です");
+    const preview = await adapter.getWorkRegisterPreview(parsed.data.path);
+    if (!preview) notFound("指定されたパスは存在しないか、ルート配下ではありません");
+    return c.json(preview);
+  });
+
+  app.post("/works", async (c) => {
+    const body = await c.req.json().catch(() => null);
+    const parsed = workCreateBodySchema.safeParse(body);
+    if (!parsed.success) invalidRequest("作品の登録内容が不正です");
+    try {
+      const work = await adapter.createWork(parsed.data);
+      if (!work) notFound("指定されたパスは存在しないか、ルート配下ではありません");
+      return c.json(work, 201);
+    } catch (error) {
+      if (error instanceof WorkRegisterError) {
+        if (error.code === "already_registered") conflict(error.message);
+        if (error.code === "descendants_require_merge") conflict(error.message);
+        if (error.code === "not_configured") notFound(error.message);
+      }
+      throw error;
+    }
   });
 
   app.get("/works/:id", async (c) => {

@@ -1,6 +1,6 @@
 // real アダプタ: SQLite（キャッシュ）+ 実ファイルシステム + `mimimilli.json`（Source of Truth）。
 // 作品検索・件数・ページングはcatalog接続からuser DBをATTACH JOINしてSQLで実行する。
-import { realpathSync, writeFileSync } from "node:fs";
+import { realpathSync, statSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -33,7 +33,9 @@ import type {
   TagPrefixCreate,
   TagPrefixUpdate,
   Work,
+  WorkCreateBody,
   WorkPatch,
+  WorkRegisterPreview,
   WorksPage,
   WorksQuery,
 } from "@mimimilli/shared";
@@ -83,6 +85,11 @@ import {
 } from "./thumbnailCache.ts";
 import type { CoverColumns } from "./workRepo.ts";
 import { WorkRepo } from "./workRepo.ts";
+import {
+  buildWorkRegisterPreview,
+  createWorkFromFolder,
+  WorkRegisterError,
+} from "./workRegister.ts";
 import { querySmartFolderWorks } from "./smartFolderWorks.ts";
 
 const KEY_ROOT_FOLDER = "root_folder";
@@ -616,6 +623,30 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       return repo.getWork(id);
     },
 
+    async getWorkRegisterPreview(path: string): Promise<WorkRegisterPreview | null> {
+      const root = requireRoot();
+      const workDir = resolveWithin(root, path);
+      if (!workDir) return null;
+      try {
+        if (!statSync(workDir).isDirectory()) return null;
+      } catch {
+        return null;
+      }
+      return buildWorkRegisterPreview(repo, workDir);
+    },
+
+    async createWork(body: WorkCreateBody): Promise<Work | null> {
+      const root = requireRoot();
+      try {
+        return await createWorkFromFolder(repo, scanner, root, body, (coverUrl, workDir) =>
+          cachedCover(coverUrl, workDir),
+        );
+      } catch (error) {
+        if (error instanceof WorkRegisterError) throw error;
+        throw error;
+      }
+    },
+
     async patchWork(id: string, patch: WorkPatch): Promise<Work | null> {
       if (patch.title === undefined && patch.tags === undefined) {
         const updated = repo.patchWork(id, patch);
@@ -760,6 +791,10 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       if (!rjCode) {
         return { ok: false, kind: "not_found", message: "RJコードが検出されていません" };
       }
+      return fetchCachedDlsite(rjCode, force);
+    },
+
+    async dlsiteFetchByCode(rjCode: string, force = false): Promise<DlsiteFetchResult> {
       return fetchCachedDlsite(rjCode, force);
     },
 
