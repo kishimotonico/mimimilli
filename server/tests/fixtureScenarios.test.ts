@@ -75,6 +75,12 @@ test("不明なシナリオIDはエラーになる（黙って default にフォ
   );
 });
 
+test("register-preview: ルート境界の前方一致だけでは配下扱いしない", async () => {
+  const app = buildApp();
+  const res = await app.request("/api/works/register-preview?path=/library2/foo");
+  assert.equal(res.status, 404);
+});
+
 test("fixtureのDLsite取得は保存済みRJコードの修正を反映する", async () => {
   const adapter = createFixtureAdapter();
   const workId = "RJ501001";

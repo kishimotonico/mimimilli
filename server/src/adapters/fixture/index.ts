@@ -1,5 +1,6 @@
 // fixture アダプタ: インメモリの seed データを使う DataAdapter 実装。
 // 開発・ビジュアルテスト用（ADR-0002）。core/ の pure 関数を使って全メソッドを実装する。
+import { posix } from "node:path";
 import {
   applyDlsiteStatePatch,
   DEFAULT_TAG_PREFIXES,
@@ -81,6 +82,7 @@ import {
   synthesizeSilentWav,
 } from "./media.ts";
 import { createFixtureScenario } from "./scenarios.ts";
+import { isPathWithin } from "../real/paths.ts";
 import { WorkRegisterError } from "../real/workRegister.ts";
 
 /** 作品1件ぶんの安定したplaylist/track ID（呼び出しをまたいで同一IDを保つ） */
@@ -483,7 +485,7 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
     async getWorkRegisterPreview(path: string): Promise<WorkRegisterPreview | null> {
       const rootAbs = normalizeFsPath(state.rootFolder ?? "/library");
       const workDir = normalizeFsPath(path);
-      if (!workDir.startsWith(rootAbs) || workDir.length < rootAbs.length) return null;
+      if (!isPathWithin(rootAbs, workDir, posix)) return null;
       const folderName = workDir.split("/").filter(Boolean).pop() ?? workDir;
       const descendants = state.works.filter(
         (work) => work.physicalPath.startsWith(`${workDir}/`) && work.physicalPath !== workDir,
