@@ -4,7 +4,7 @@ title: LogTapeのBun compileスパイク検証
 status: In Progress
 assignee: []
 created_date: '2026-08-02 06:58'
-updated_date: '2026-08-02 13:30'
+updated_date: '2026-08-02 13:48'
 labels: []
 dependencies: []
 priority: high
@@ -69,4 +69,7 @@ console.log("done: " + logPath);
 4. bun build --compile --outfile spike-bin.exe spike.ts && .\spike-bin.exe → 同様に30行ならOK(logsフォルダはexeと同じ場所に必要)
 5. 結果をこのタスクに報告してAC#3をチェック
 WSL検証時の注意: compile後はimport.meta.dirが/$bunfsになるためexe基準のパス解決が必要(上記スクリプトは対応済み)。バッファ既定のままprocess.exitすると欠落するためawait dispose()必須
+
+Windows検証用スパイクをリポジトリに追加: scripts/spike/logtape-file-sink/（手順はWINDOWS-SMOKE.md。別PCでpull→bun install→手順どおり。WSLでは通常実行・compile・Windowsクロスコンパイルまで動作確認済み）。前のノートの手作業手順はこれで置き換え。
+後始末の手はず（AC#3合格の確認後に実施）: ①scripts/spike/logtape-file-sink/ を削除 ②役目を終えているscripts/spike/bun-distribution/（TASK-70実証、結論はADR-0007記録済み）も同時に削除し、ADR-0007のスパイク参照2箇所（5行目・40行目）をGit履歴ポインタ（cad3f6c→正: cad3c6f）へ差し替える
 <!-- SECTION:NOTES:END -->
