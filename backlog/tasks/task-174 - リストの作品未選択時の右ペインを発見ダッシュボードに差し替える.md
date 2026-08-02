@@ -1,11 +1,11 @@
 ---
 id: TASK-174
 title: リストの作品未選択時の右ペインを発見ダッシュボードに差し替える
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-02 16:12'
-updated_date: '2026-08-02 16:20'
+updated_date: '2026-08-02 16:36'
 labels:
   - client
   - feature
@@ -39,10 +39,24 @@ DRAFT-8を要件確定してタスク化（2026-08-03、統括判断）。
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 作品未選択・非検索時の右ペインに最近追加/最近再生/ランダムの3セクションがmll-relatedカードで表示される
-- [ ] #2 再生履歴が無い場合、最近再生セクションが非表示になる
-- [ ] #3 シャッフルボタンでランダムピックが引き直される
-- [ ] #4 カードクリックで作品が選択され詳細が表示される
-- [ ] #5 検索0件時は従来の『作品が見つかりません』表示が維持される
-- [ ] #6 pnpm checkとpnpm testが全パスする
+- [x] #1 作品未選択・非検索時の右ペインに最近追加/最近再生/ランダムの3セクションがmll-relatedカードで表示される
+- [x] #2 再生履歴が無い場合、最近再生セクションが非表示になる
+- [x] #3 シャッフルボタンでランダムピックが引き直される
+- [x] #4 カードクリックで作品が選択され詳細が表示される
+- [x] #5 検索0件時は従来の『作品が見つかりません』表示が維持される
+- [x] #6 pnpm checkとpnpm testが全パスする
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+【2026-08-03 実装完了】Sonnetサブエージェントへ委譲、統括レビュー・Cursorによるagent-browser実機検証済み（全項目OK、consoleエラーなし）。DiscoveryDashboard.tsx新設、PreviewPaneのempty分岐で差し替え。データ取得はfeatures/library/api.tsのsearchWorks再利用、セクションごとにuseQuery購読（TASK-124方針）。シャッフルはI.refresh流用（Shuffleアイコンはlucide未追加のため）。単体テスト6件追加。
+
+補足: fixtureデータ（RJ501001〜の連番ID）ではstableRandomSortKeyのhex回転がIDの末尾差しか動かさないため、seedを変えてもランダムピックの並びがほぼ変わらない。実運用のUUID v4では正常にシャッフルされる。fixture固有の見え方でTASK-174のバグではない。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+リスト未選択時の右ペインを発見ダッシュボード（最近追加・最近再生・ランダムピック各6件、mll-relatedカード意匠）へ差し替え。最近再生は履歴0件で非表示、ランダムはシャッフルボタン付き、検索0件時は従来表示を維持。pnpm check・pnpm test（server 445/client 611）全パス、ブラウザ実機検証OK。
+<!-- SECTION:FINAL_SUMMARY:END -->

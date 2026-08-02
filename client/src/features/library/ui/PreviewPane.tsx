@@ -4,6 +4,7 @@ import type { CollectionStatsDisplay, PreviewMode } from "../model/libraryPresen
 import CollectionStatus from "./CollectionStatus";
 import { AxisLanding } from "./preview/AxisLanding";
 import { CollectionPlaceholder } from "./preview/CollectionPlaceholder";
+import { DiscoveryDashboard } from "./preview/DiscoveryDashboard";
 import { SmartFolderView } from "./preview/SmartFolderView";
 import { WorkDetail } from "./preview/WorkDetail";
 
@@ -117,13 +118,15 @@ export default function PreviewPane({
           onEdit={() => onEditSmartFolder(smartFolder)}
         />
       )}
-      {mode === "empty" && (
-        <CollectionPlaceholder
-          message={showNoResultsHint ? "作品が見つかりません" : "作品を選択してください"}
-          hint={showNoResultsHint ? "検索条件を変えてみてください" : undefined}
-          stats={showNoResultsHint ? undefined : emptyStats}
-        />
-      )}
+      {mode === "empty" &&
+        (showNoResultsHint ? (
+          <CollectionPlaceholder
+            message="作品が見つかりません"
+            hint="検索条件を変えてみてください"
+          />
+        ) : (
+          <DiscoveryDashboard stats={emptyStats} onSelectWork={onSelectWork} />
+        ))}
     </div>
   );
 }
