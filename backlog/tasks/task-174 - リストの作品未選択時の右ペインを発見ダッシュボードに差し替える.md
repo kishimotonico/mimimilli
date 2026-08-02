@@ -1,9 +1,11 @@
 ---
 id: TASK-174
 title: リストの作品未選択時の右ペインを発見ダッシュボードに差し替える
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-08-02 16:12'
+updated_date: '2026-08-02 16:20'
 labels:
   - client
   - feature

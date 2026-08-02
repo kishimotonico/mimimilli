@@ -1,10 +1,11 @@
 ---
 id: TASK-97
 title: metaIdMigrationのクラッシュセーフ機構を要件相当まで簡素化する
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-07-25 23:34'
-updated_date: '2026-07-29 18:25'
+updated_date: '2026-08-02 16:23'
 labels: []
 dependencies: []
 priority: medium
@@ -61,11 +62,45 @@ TASK-89 が指摘している正確性の問題（同一バイト長・同一 mt
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 署名キャッシュのスキャン時間短縮効果を、事前に定めた条件（cold/warm・ライブラリ規模・試行回数・中央値）で計測し、結果を実装メモに記録している
-- [ ] #2 manifest・バックアップ・checkpoint・署名キャッシュそれぞれについて、ADR-0008 の要求と計測結果を踏まえた存廃の判断と根拠が記録されている
-- [ ] #3 ADR-0008 の要求を変更する場合、ADR 側の更新が行われている
-- [ ] #4 不要と判断した機構が削除され、存置と判断した機構は残っている
-- [ ] #5 重複UUIDの検出と再採番、ユーザーへの通知が従来どおり動作する
-- [ ] #6 既存の manifest ファイルが残っていてもスキャンが失敗しない
-- [ ] #7 TASK-89 の扱い（実装する / superseded として閉じる）が判断結果として記録されている
+- [x] #1 署名キャッシュのスキャン時間短縮効果を、事前に定めた条件（cold/warm・ライブラリ規模・試行回数・中央値）で計測し、結果を実装メモに記録している
+- [x] #2 manifest・バックアップ・checkpoint・署名キャッシュそれぞれについて、ADR-0008 の要求と計測結果を踏まえた存廃の判断と根拠が記録されている
+- [x] #3 ADR-0008 の要求を変更する場合、ADR 側の更新が行われている
+- [x] #4 不要と判断した機構が削除され、存置と判断した機構は残っている
+- [x] #5 重複UUIDの検出と再採番、ユーザーへの通知が従来どおり動作する
+- [x] #6 既存の manifest ファイルが残っていてもスキャンが失敗しない
+- [x] #7 TASK-89 の扱い（実装する / superseded として閉じる）が判断結果として記録されている
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+【2026-08-03 計測結果と存廃判断（統括）】
+
+■ 計測（server/bench/benchMetaIdMigration.ts、bench:migrate。WSL2/Bun、warmup1+7試行の中央値）
+| 規模 | cold | warm-sig（キャッシュあり） | warm-nosig（キャッシュ廃止相当） |
+| 5,000 | 315ms | 49ms | 112ms |
+| 30,000 | 1,969ms | 327ms | 780ms |
+署名キャッシュの節約は完了済みライブラリの再スキャンで 5kで約63ms、30kで約453ms（約58%削減）。規模に対してほぼ線形。warm系はOSページキャッシュが温まった状態での比較（既知の限界）。
+
+■ 機構ごとの判断
+- manifest先行採番: 存置。ADR-0008の保全要件そのもの
+- .bakバックアップ（ensureBackup）: 存置。同上
+- 外部編集保護（ハッシュ照合）: 存置。同上
+- checkpointコールバック: 存置。スキャンキャンセルの応答性のための機構でコストは無視できる。ADR-0008の要求外だが削る利益がない
+- VerifiedIdSignature署名キャッシュ: 廃止。根拠は次の3点
+  (1) 効果が小さい。現実規模（数千件）で約63ms/スキャン、ストレス規模30kでも約0.45秒。スキャン全体の音声stat/probe・DB書込に対して知覚不能
+  (2) 構造的矛盾。size/mtime判定の正確性の穴（TASK-89指摘: 同一バイト長・mtime復元で検知漏れ）を塞ぐには本文readが必要で、塞ぐとキャッシュの利益（read省略）の大半が消える
+  (3) 簡素化の利益。manifestスキーマからverifiedIdSignaturesが消え、fast path中のmanifest再書き込みも消える
+
+■ ADR-0008との整合
+ADR-0008は署名キャッシュを要求していない（TASK-86由来の性能最適化）。廃止はADRの保全要件に抵触しないためADR更新不要（AC#3該当なし）。
+
+■ TASK-89の扱い
+廃止判断に伴いsupersededで閉じる（AC#7）。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+計測ゲートとして実施。bench:migrate（新設）で署名キャッシュ効果を計測（5k: 63ms節約、30k: 453ms節約/スキャン）。判断: 署名キャッシュのみ廃止、manifest先行採番・バックアップ・外部編集保護・checkpointはADR-0008の要件どおり存置（ADR更新不要）。旧manifest互換の回帰テスト追加、重複検出・再採番テストは維持。TASK-89はsupersededで閉じた。server 445テスト全パス。
+<!-- SECTION:FINAL_SUMMARY:END -->
