@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-01 18:02'
-updated_date: '2026-08-01 19:47'
+updated_date: '2026-08-02 03:03'
 labels: []
 dependencies:
   - TASK-163
@@ -54,7 +54,9 @@ ordinal: 174000
 - DLsite取得の既存経路: client/src/features/library/ui/preview/DlsiteEditor.tsx（単一作品の再取得）が参考になる
 - 環境メモ: 開発サーバーはdev:realで起動している場合がある（実DB。fixtureと挙動が違う点に注意）
 
-Cursor実装+Sonnet検証(実機)で完了。pnpm check/test全通過(server404/client601)。実機でAC1-4確認、SHA256テストでAC5担保。再登録409テストも差し戻しで追加。検証中の発見: フルスキャンの自動登録が手動登録UXと衝突しうる→DRAFT-46に整理。検証用フォルダ/作品(_verify163/_verify164系)が実データルートに残存、TASK-165検証で解除予定
+Cursor実装+Sonnet検証(実機)で完了。pnpm check/test全通過。実機でAC1-4確認、SHA256テストでAC5担保。再登録409テストも差し戻しで追加。検証中の発見: フルスキャンの自動登録が手動登録UXと衝突しうる→DRAFT-46に整理
+
+仕様変更(2026-08-02ユーザー判断): 「そのまま登録」即決フローはわかりづらいため廃止（AC#2は無効）。登録はダイアログ経由に一本化。あわせてCodexレビュー指摘（LIKEエスケープ・子解除の遅延・fixture境界）とUI修正（ダイアログボタン視認性・解除直後の再登録409・情報と操作の分離）、登録フォームのタイトル・タグ・DLsite一本化を対応
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
