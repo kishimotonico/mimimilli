@@ -443,8 +443,12 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
     }
   }
 
-  async function fetchCachedDlsite(productCode: string, force = false): Promise<DlsiteFetchResult> {
-    return (await fetchCachedDlsiteAttempt(productCode, force)).result;
+  async function fetchCachedDlsite(
+    productCode: string,
+    force = false,
+    signal?: AbortSignal,
+  ): Promise<DlsiteFetchResult> {
+    return (await fetchCachedDlsiteAttempt(productCode, force, signal)).result;
   }
 
   async function cachedCover(
@@ -846,7 +850,11 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       return describeCover(workId, width);
     },
 
-    async dlsiteFetch(workId: string, force = false): Promise<DlsiteFetchResult> {
+    async dlsiteFetch(
+      workId: string,
+      force = false,
+      options?: { signal?: AbortSignal },
+    ): Promise<DlsiteFetchResult> {
       const work = await repo.getWork(workId);
       if (!work)
         return { ok: false, kind: "not_found", message: `作品が見つかりません: ${workId}` };
@@ -854,14 +862,22 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       if (!rjCode) {
         return { ok: false, kind: "not_found", message: "RJコードが検出されていません" };
       }
-      return fetchCachedDlsite(rjCode, force);
+      return fetchCachedDlsite(rjCode, force, options?.signal);
     },
 
-    async dlsiteFetchByCode(rjCode: string, force = false): Promise<DlsiteFetchResult> {
-      return fetchCachedDlsite(rjCode, force);
+    async dlsiteFetchByCode(
+      rjCode: string,
+      force = false,
+      options?: { signal?: AbortSignal },
+    ): Promise<DlsiteFetchResult> {
+      return fetchCachedDlsite(rjCode, force, options?.signal);
     },
 
-    async dlsiteApply(workId: string, body: DlsiteApplyBody): Promise<boolean> {
+    async dlsiteApply(
+      workId: string,
+      body: DlsiteApplyBody,
+      options?: { signal?: AbortSignal },
+    ): Promise<boolean> {
       const work = await repo.getWork(workId);
       if (!work) return false;
 
@@ -875,7 +891,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       }
       let coverImage: string | undefined;
       if (body.applyCover && body.info.coverUrl) {
-        coverImage = await cachedCover(body.info.coverUrl, work.physicalPath);
+        coverImage = await cachedCover(body.info.coverUrl, work.physicalPath, options?.signal);
         // カバー計測に失敗したら適用自体を失敗として返す（寸法欠損のまま確定させない）。
         const cover = await measureDownloadedCover(work.physicalPath, coverImage);
         if (!cover) return false;

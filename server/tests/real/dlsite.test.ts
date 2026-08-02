@@ -1504,3 +1504,79 @@ test("一括取得: 中断後の再実行で処理済み作品はHTTPしない",
   assert.ok(completed.every((work) => work?.dlsite.status === "applied"));
   adapter.close();
 });
+
+test("dlsiteFetch: request signalがscheduler.fetchまで伝播する", async (t) => {
+  const lib = makeSampleLibrary();
+  const dir = makeTestDirectory("dlsite-signal-propagation");
+  t.after(lib.cleanup);
+  t.after(dir.cleanup);
+  let receivedSignal: AbortSignal | null | undefined;
+  const adapter = createRealAdapter({
+    database: { kind: "memory" },
+    dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+    dlsiteSchedulerDependencies: mockDlsiteTransport({
+      html: (code, _url, init) => {
+        receivedSignal = init?.signal;
+        return htmlResponse(sampleWorkHtml(code));
+      },
+    }),
+  });
+  await adapter.updateSettings({ rootFolder: lib.root });
+  await adapter.scan();
+  const controller = new AbortController();
+  const result = await adapter.dlsiteFetch(lib.existingWorkId, false, {
+    signal: controller.signal,
+  });
+  assert.equal(result.ok, true);
+  assert.ok(receivedSignal);
+  assert.equal(receivedSignal.aborted, false);
+  controller.abort();
+  assert.equal(receivedSignal.aborted, true);
+  adapter.close();
+});
+
+test("dlsiteFetch: abortでDLsite HTTP取得が中断される", async (t) => {
+  const lib = makeSampleLibrary();
+  const dir = makeTestDirectory("dlsite-signal-abort");
+  t.after(lib.cleanup);
+  t.after(dir.cleanup);
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  let transportCalls = 0;
+  let transportReady!: () => void;
+  const started = new Promise<void>((resolve) => (transportReady = resolve));
+  const adapter = createRealAdapter({
+    database: { kind: "memory" },
+    dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+    dlsiteSchedulerDependencies: mockDlsiteTransport({
+      html: async (_code, _url, init) => {
+        transportCalls += 1;
+        transportReady();
+        const aborted = new Promise<never>((_resolve, reject) => {
+          init?.signal?.addEventListener(
+            "abort",
+            () => reject(new DOMException("DLsiteリクエストはキャンセルされました", "AbortError")),
+            { once: true },
+          );
+        });
+        await Promise.race([gate, aborted]);
+        return htmlResponse(SAMPLE_HTML);
+      },
+    }),
+  });
+  await adapter.updateSettings({ rootFolder: lib.root });
+  await adapter.scan();
+  const controller = new AbortController();
+  const pending = adapter.dlsiteFetch(lib.existingWorkId, false, { signal: controller.signal });
+  await started;
+  assert.equal(transportCalls, 1);
+  controller.abort();
+  await assert.rejects(
+    pending,
+    (error: unknown) => error instanceof DOMException && error.name === "AbortError",
+  );
+  release();
+  adapter.close();
+});

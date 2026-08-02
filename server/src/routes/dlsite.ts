@@ -10,6 +10,7 @@ import {
 } from "@mimimilli/shared";
 import type { DataAdapter } from "../adapter.ts";
 import { apiError, invalidRequest, notFound } from "../lib/httpError.ts";
+import { getCategoryLogger } from "../lib/logger.ts";
 import {
   enqueueDlsiteJob,
   getDlsiteBulkSnapshot,
@@ -18,6 +19,12 @@ import {
   cancelDlsiteJob,
 } from "./dlsiteProgress.ts";
 import { DlsiteOfflineError } from "../adapters/real/dlsiteScheduler.ts";
+
+const dlsiteLogger = getCategoryLogger("dlsite");
+
+function isClientAbort(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
+}
 
 export function dlsiteRoute(adapter: DataAdapter): Hono {
   const app = new Hono();
@@ -51,9 +58,21 @@ export function dlsiteRoute(adapter: DataAdapter): Hono {
     if (forceValue !== undefined && forceValue !== "true" && forceValue !== "false") {
       invalidRequest("force は true または false で指定してください");
     }
-    const result = await adapter.dlsiteFetchByCode(parsed.data.rjCode, forceValue === "true");
-    if (!result.ok) throw apiError(result.kind, result.message);
-    return c.json(result.info);
+    try {
+      const result = await adapter.dlsiteFetchByCode(parsed.data.rjCode, forceValue === "true", {
+        signal: c.req.raw.signal,
+      });
+      if (!result.ok) throw apiError(result.kind, result.message);
+      return c.json(result.info);
+    } catch (error) {
+      if (isClientAbort(error)) {
+        dlsiteLogger.info("クライアント切断によりDLsite取得を中断しました", {
+          rjCode: parsed.data.rjCode,
+        });
+        return;
+      }
+      throw error;
+    }
   });
 
   app.post("/dlsite/:id/fetch", async (c) => {
@@ -61,9 +80,20 @@ export function dlsiteRoute(adapter: DataAdapter): Hono {
     if (forceValue !== undefined && forceValue !== "true" && forceValue !== "false") {
       invalidRequest("force は true または false で指定してください");
     }
-    const result = await adapter.dlsiteFetch(c.req.param("id"), forceValue === "true");
-    if (!result.ok) throw apiError(result.kind, result.message);
-    return c.json(result.info);
+    const workId = c.req.param("id");
+    try {
+      const result = await adapter.dlsiteFetch(workId, forceValue === "true", {
+        signal: c.req.raw.signal,
+      });
+      if (!result.ok) throw apiError(result.kind, result.message);
+      return c.json(result.info);
+    } catch (error) {
+      if (isClientAbort(error)) {
+        dlsiteLogger.info("クライアント切断によりDLsite取得を中断しました", { workId });
+        return;
+      }
+      throw error;
+    }
   });
 
   app.post("/dlsite/:id/apply", async (c) => {
@@ -72,14 +102,19 @@ export function dlsiteRoute(adapter: DataAdapter): Hono {
     if (!parsed.success) {
       invalidRequest("DLsite適用内容が不正です");
     }
+    const workId = c.req.param("id");
     let ok: boolean;
     try {
-      ok = await adapter.dlsiteApply(c.req.param("id"), parsed.data);
+      ok = await adapter.dlsiteApply(workId, parsed.data, { signal: c.req.raw.signal });
     } catch (error) {
+      if (isClientAbort(error)) {
+        dlsiteLogger.info("クライアント切断によりDLsite適用を中断しました", { workId });
+        return;
+      }
       if (error instanceof DlsiteOfflineError) throw apiError("offline", error.message);
       throw error;
     }
-    if (!ok) notFound(`作品が見つかりません: ${c.req.param("id")}`);
+    if (!ok) notFound(`作品が見つかりません: ${workId}`);
     return c.body(null, 204);
   });
 

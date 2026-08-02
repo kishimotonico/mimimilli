@@ -60,6 +60,8 @@ function createAdapter(): DataAdapter {
 }
 
 const port = Number(process.env.PORT ?? 8080);
+/** DLsite同期fetchの総期限(60s)+余裕。Bun既定の10sアイドル制限を上書きする。 */
+const SERVER_IDLE_TIMEOUT_SECONDS = 90;
 const adapter = createAdapter();
 const app = createApp(adapter);
 
@@ -67,6 +69,7 @@ const server = Bun.serve({
   fetch: app.fetch,
   hostname: "127.0.0.1",
   port,
+  idleTimeout: SERVER_IDLE_TIMEOUT_SECONDS,
 });
 
 const serverLogger = getCategoryLogger("server");
