@@ -123,6 +123,7 @@ export const workRegisterPreviewSchema = z.object({
   detectedRjCode: z.string().nullable(),
   descendantWorkCount: z.number().int().nonnegative(),
   alreadyRegistered: z.boolean(),
+  orphanedMeta: z.boolean(),
 });
 export type WorkRegisterPreview = z.infer<typeof workRegisterPreviewSchema>;
 

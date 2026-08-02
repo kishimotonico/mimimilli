@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { test, type TestContext } from "node:test";
 import { META_FILE_NAME, type FsListing, type Work } from "@mimimilli/shared";
 import { createApp } from "../../src/app.ts";
+import { openDb } from "../../src/adapters/real/db.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { folderMetaPath } from "../helpers/workTestUtils.ts";
 import { makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
@@ -206,4 +207,83 @@ test("DELETE /works/:id: メタ削除に失敗した場合はDB上の作品デ�
   assert.ok(existsSync(metaPath));
 
   chmodSync(folder, 0o755);
+});
+
+test("DELETE /works/:id: DBのmeta_pathが古い場合でもid一致のmimimilli.jsonを削除する", async (t) => {
+  const directory = makeTestDirectory("work-unregister-stale-meta-path");
+  t.after(directory.cleanup);
+  const catalogPath = join(directory.path, "catalog.db");
+  const userPath = join(directory.path, "user.db");
+  const root = join(directory.path, "lib");
+  const folder = join(root, "RJ900021_stale_meta");
+  mkdirSync(folder, { recursive: true });
+  writeWav(join(folder, "track.wav"), 2);
+
+  const adapter = createTestRealAdapter({
+    database: { kind: "files", catalogPath, userPath },
+  });
+  const app = createApp(adapter);
+  await adapter.updateSettings({ rootFolder: root });
+
+  const createRes = await app.request("/api/works", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: folder, title: "古いmeta_pathテスト" }),
+  });
+  assert.equal(createRes.status, 201);
+  const work = (await createRes.json()) as Work;
+  const actualMetaPath = folderMetaPath(folder);
+  assert.ok(existsSync(actualMetaPath));
+
+  const staleMetaPath = join(folder, ".meta.json");
+  const db = openDb({ kind: "files", catalogPath, userPath });
+  db.sqlite.run("UPDATE main.works SET meta_path = ? WHERE id = ?", [staleMetaPath, work.id]);
+  db.close();
+
+  const res = await app.request(`/api/works/${work.id}`, { method: "DELETE" });
+  assert.equal(res.status, 204);
+  assert.ok(!existsSync(actualMetaPath));
+});
+
+test("DELETE /works/:id: id不一致のmimimilli.jsonは削除しない", async (t) => {
+  const directory = makeTestDirectory("work-unregister-meta-id-mismatch");
+  t.after(directory.cleanup);
+  const catalogPath = join(directory.path, "catalog.db");
+  const userPath = join(directory.path, "user.db");
+  const root = join(directory.path, "lib");
+  const folder = join(root, "RJ900022_meta_mismatch");
+  mkdirSync(folder, { recursive: true });
+  writeWav(join(folder, "track.wav"), 2);
+
+  const adapter = createTestRealAdapter({
+    database: { kind: "files", catalogPath, userPath },
+  });
+  const app = createApp(adapter);
+  await adapter.updateSettings({ rootFolder: root });
+
+  const createRes = await app.request("/api/works", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: folder, title: "id不一致テスト" }),
+  });
+  assert.equal(createRes.status, 201);
+  const work = (await createRes.json()) as Work;
+  const actualMetaPath = folderMetaPath(folder);
+  assert.ok(existsSync(actualMetaPath));
+
+  const otherId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+  const meta = JSON.parse(readFileSync(actualMetaPath, "utf-8")) as { id: string };
+  meta.id = otherId;
+  writeFileSync(actualMetaPath, JSON.stringify(meta, null, 2));
+
+  const staleMetaPath = join(folder, ".meta.json");
+  const db = openDb({ kind: "files", catalogPath, userPath });
+  db.sqlite.run("UPDATE main.works SET meta_path = ? WHERE id = ?", [staleMetaPath, work.id]);
+  db.close();
+
+  const res = await app.request(`/api/works/${work.id}`, { method: "DELETE" });
+  assert.equal(res.status, 204);
+  assert.ok(existsSync(actualMetaPath));
+  const remaining = JSON.parse(readFileSync(actualMetaPath, "utf-8")) as { id: string };
+  assert.equal(remaining.id, otherId);
 });

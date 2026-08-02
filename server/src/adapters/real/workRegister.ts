@@ -1,20 +1,30 @@
 // ファイルモードからの手動作品登録。メタファイル生成と子作品の登録解除のみ行い、物理ファイルは移動しない。
 import { existsSync, statSync, unlinkSync } from "node:fs";
-import { basename } from "node:path";
-import type { DlsiteApplyBody, Work, WorkCreateBody, WorkRegisterPreview } from "@mimimilli/shared";
+import { basename, join } from "node:path";
+import type {
+  DlsiteApplyBody,
+  MetaFile,
+  Work,
+  WorkCreateBody,
+  WorkRegisterPreview,
+} from "@mimimilli/shared";
 import { emptyDlsiteState, normalizeTags } from "@mimimilli/shared";
 import { detectRjCode } from "./dlsite.ts";
-import { META_FILE_NAME } from "./meta.ts";
+import { META_FILE_NAME, MetaParseError, readMetaFile, readMetaFileRaw } from "./meta.ts";
 import { resolveWithin } from "./paths.ts";
 import type { Scanner } from "./scanner.ts";
 import type { WorkRepo } from "./workRepo.ts";
 
 export class WorkRegisterError extends Error {
-  readonly code: "already_registered" | "descendants_require_merge" | "not_configured";
+  readonly code:
+    | "already_registered"
+    | "descendants_require_merge"
+    | "not_configured"
+    | "invalid_meta";
   readonly descendantCount?: number;
 
   constructor(
-    code: "already_registered" | "descendants_require_merge" | "not_configured",
+    code: "already_registered" | "descendants_require_merge" | "not_configured" | "invalid_meta",
     message: string,
     descendantCount?: number,
   ) {
@@ -37,23 +47,84 @@ export function deleteMetaFileOnly(metaPath: string): void {
   if (existsSync(metaPath)) unlinkSync(metaPath);
 }
 
+function folderMetaPathOf(physicalPath: string): string {
+  return join(physicalPath, META_FILE_NAME);
+}
+
+function metaFileIdMatches(metaPath: string, workId: string): boolean {
+  try {
+    const raw = readMetaFileRaw(metaPath);
+    return (
+      typeof raw === "object" &&
+      raw !== null &&
+      "id" in raw &&
+      typeof raw.id === "string" &&
+      raw.id === workId
+    );
+  } catch {
+    return false;
+  }
+}
+
+/** 登録解除時に削除するメタファイルパスを解決する。 */
+function resolveMetaPathToDelete(
+  workId: string,
+  recordedMetaPath: string,
+  physicalPath: string,
+): string | null {
+  if (existsSync(recordedMetaPath)) {
+    return recordedMetaPath;
+  }
+
+  const folderMeta = folderMetaPathOf(physicalPath);
+  if (existsSync(folderMeta) && metaFileIdMatches(folderMeta, workId)) {
+    return folderMeta;
+  }
+
+  return null;
+}
+
 export function unregisterWork(repo: WorkRepo, workId: string): boolean {
   const target = repo.getWorkDeleteTarget(workId);
   if (!target) return false;
-  deleteMetaFileOnly(target.metaPath);
+
+  const mediaRoot = repo.getMediaRoot(workId);
+  if (mediaRoot) {
+    const metaPathToDelete = resolveMetaPathToDelete(
+      workId,
+      target.metaPath,
+      mediaRoot.physicalPath,
+    );
+    if (metaPathToDelete) deleteMetaFileOnly(metaPathToDelete);
+  } else {
+    deleteMetaFileOnly(target.metaPath);
+  }
+
   return repo.deleteWork(workId) !== null;
 }
 
 export function buildWorkRegisterPreview(repo: WorkRepo, workDir: string): WorkRegisterPreview {
   const folderName = basename(workDir);
   const descendants = repo.listDescendantWorkRefs(workDir);
+  const metaPath = `${workDir}/${META_FILE_NAME}`;
+  const dbWork = repo.getWorkByPhysicalPathSync(workDir);
+  const orphanedMeta = existsSync(metaPath) && dbWork === null;
+
+  let suggestedTitle = folderName;
+  if (orphanedMeta) {
+    try {
+      suggestedTitle = readMetaFile(metaPath).title;
+    } catch {
+      // メタ不正は preview では隠蔽せずフォルダ名へフォールバック。POST で invalid_meta を返す。
+    }
+  }
+
   return {
-    suggestedTitle: folderName,
+    suggestedTitle,
     detectedRjCode: detectRjCode([folderName]),
     descendantWorkCount: descendants.length,
-    alreadyRegistered:
-      existsSync(`${workDir}/${META_FILE_NAME}`) ||
-      repo.getWorkByPhysicalPathSync(workDir) !== null,
+    alreadyRegistered: dbWork !== null,
+    orphanedMeta,
   };
 }
 
@@ -80,7 +151,9 @@ export async function createWorkFromFolder(
     );
   }
 
-  if (existsSync(`${workDir}/${META_FILE_NAME}`) || repo.getWorkByPhysicalPathSync(workDir)) {
+  const metaPath = `${workDir}/${META_FILE_NAME}`;
+  const dbWork = repo.getWorkByPhysicalPathSync(workDir);
+  if (dbWork !== null) {
     throw new WorkRegisterError(
       "already_registered",
       "このフォルダーは既に作品として登録されています",
@@ -94,6 +167,51 @@ export async function createWorkFromFolder(
       `配下に登録済み作品が${descendants.length}件あります。統合するには mergeDescendantWorks を指定してください`,
       descendants.length,
     );
+  }
+
+  for (const child of descendants) {
+    if (!unregisterWork(repo, child.id)) {
+      throw new Error(`子作品の登録解除に失敗しました: ${child.id}`);
+    }
+  }
+
+  const orphanedMeta = existsSync(metaPath);
+  if (orphanedMeta) {
+    let meta: MetaFile;
+    try {
+      meta = readMetaFile(metaPath);
+    } catch (error) {
+      if (error instanceof MetaParseError) {
+        throw new WorkRegisterError("invalid_meta", "メタファイルが不正なため復元できません");
+      }
+      throw error;
+    }
+
+    const metaPatch: {
+      title?: string;
+      tags?: string[];
+      urls?: Work["urls"];
+      coverImage?: string | null;
+      dlsite?: Work["dlsite"];
+    } = {};
+
+    if (body.title !== meta.title) metaPatch.title = body.title;
+
+    if (body.dlsite) {
+      const applied = await buildMetaFromDlsiteApply(
+        body.dlsite,
+        workDir,
+        body.title,
+        applyDlsiteCover,
+      );
+      metaPatch.title = applied.title;
+      metaPatch.tags = applied.tags;
+      metaPatch.urls = applied.urls;
+      if (applied.coverImage !== undefined) metaPatch.coverImage = applied.coverImage;
+      metaPatch.dlsite = applied.dlsite;
+    }
+
+    return scanner.restoreFolderWork(workDir, metaPatch);
   }
 
   let title = body.title;
@@ -117,12 +235,6 @@ export async function createWorkFromFolder(
   } else {
     const detectedRjCode = detectRjCode([basename(workDir), title]);
     if (detectedRjCode) dlsite = { ...emptyDlsiteState(), rjCode: detectedRjCode };
-  }
-
-  for (const child of descendants) {
-    if (!unregisterWork(repo, child.id)) {
-      throw new Error(`子作品の登録解除に失敗しました: ${child.id}`);
-    }
   }
 
   return scanner.registerFolderWork(workDir, {

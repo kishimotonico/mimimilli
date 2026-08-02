@@ -120,6 +120,12 @@ export default function RegisterWorkDialog({
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-[18px] py-3 text-[12px]">
+          {preview.orphanedMeta && (
+            <p className="mb-3 rounded-[6px] border border-line-soft bg-paper-0 px-3 py-2 text-[11px] leading-[1.6] text-ink-1">
+              このフォルダーには以前の登録情報が残っています。内容を引き継いで復元します。
+            </p>
+          )}
+
           {preview.descendantWorkCount > 0 && (
             <p className="mb-3 rounded-[6px] border border-[color-mix(in_oklch,var(--r-coral)_35%,transparent)] bg-[color-mix(in_oklch,var(--r-coral)_8%,transparent)] px-3 py-2 text-[11px] leading-[1.6] text-ink-1">
               登録済み作品 <b>{preview.descendantWorkCount}</b> 件を解除して統合します。

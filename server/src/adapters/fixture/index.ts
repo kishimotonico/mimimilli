@@ -496,6 +496,7 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
         detectedRjCode: rjMatch ? rjMatch[0]!.toUpperCase() : null,
         descendantWorkCount: descendants.length,
         alreadyRegistered: state.works.some((work) => work.physicalPath === workDir),
+        orphanedMeta: false,
       };
     },
 

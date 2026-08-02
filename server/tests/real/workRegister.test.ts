@@ -4,8 +4,9 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
-import { META_FILE_NAME } from "@mimimilli/shared";
+import { META_FILE_NAME, emptyDlsiteState } from "@mimimilli/shared";
 import { createApp } from "../../src/app.ts";
+import { writeMetaFile } from "../../src/adapters/real/meta.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { folderMetaPath } from "../helpers/workTestUtils.ts";
 import { makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
@@ -246,4 +247,66 @@ test("POST /works: DLsiteカバー適用失敗時は子作品を削除しない"
 
   const child = await app.request(`/api/works/${childWork.id}`);
   assert.equal(child.status, 200);
+});
+
+function writeOrphanedMeta(folder: string, id: string, title: string): void {
+  writeMetaFile(join(folder, META_FILE_NAME), {
+    id,
+    title,
+    urls: [],
+    tags: ["orphaned-tag"],
+    coverImage: null,
+    playlists: [],
+    defaultPlaylistId: null,
+    createdAt: new Date().toISOString(),
+    dlsite: emptyDlsiteState(),
+  });
+}
+
+test("GET /works/register-preview: 孤立メタは orphanedMeta とメタの title を返す", async (t) => {
+  const { app, parent } = await setupPlainLibrary(t);
+  const orphanedId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  writeOrphanedMeta(parent, orphanedId, "孤立メタのタイトル");
+
+  const res = await app.request(`/api/works/register-preview?path=${encodeURIComponent(parent)}`);
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.orphanedMeta, true);
+  assert.equal(body.alreadyRegistered, false);
+  assert.equal(body.suggestedTitle, "孤立メタのタイトル");
+});
+
+test("POST /works: 孤立メタを復元登録し id を保持する", async (t) => {
+  const { app, parent } = await setupPlainLibrary(t);
+  const orphanedId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  writeOrphanedMeta(parent, orphanedId, "復元前タイトル");
+
+  const res = await app.request("/api/works", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: parent, title: "復元後タイトル" }),
+  });
+  assert.equal(res.status, 201);
+  const body = await res.json();
+  assert.equal(body.id, orphanedId);
+  assert.equal(body.title, "復元後タイトル");
+  assert.equal(body.physicalPath, parent);
+
+  const get = await app.request(`/api/works/${orphanedId}`);
+  assert.equal(get.status, 200);
+});
+
+test("POST /works: 壊れた孤立メタは invalid_meta エラー", async (t) => {
+  const { app, parent } = await setupPlainLibrary(t);
+  writeFileSync(join(parent, META_FILE_NAME), '{"id":"not-uuid","title":""}');
+
+  const res = await app.request("/api/works", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: parent, title: "復元試行" }),
+  });
+  assert.equal(res.status, 409);
+  const body = await res.json();
+  assert.equal(body.error.code, "conflict");
+  assert.match(body.error.message, /メタファイルが不正なため復元できません/);
 });

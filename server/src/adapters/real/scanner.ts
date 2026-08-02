@@ -979,6 +979,56 @@ export class Scanner {
     return work;
   }
 
+  /** 孤立メタの復元: 既存 mimimilli.json を保持し DB へ再登録する */
+  async restoreFolderWork(
+    workDir: string,
+    patch: {
+      title?: string;
+      tags?: string[];
+      urls?: UrlEntry[];
+      coverImage?: string | null;
+      dlsite?: MetaFile["dlsite"];
+    },
+  ): Promise<Work> {
+    const metaPath = join(workDir, META_FILE_NAME);
+    if (!existsSync(metaPath)) {
+      throw new Error("復元対象のメタファイルがありません");
+    }
+
+    const metaBefore = readMetaFile(metaPath);
+    const metaId = metaBefore.id;
+
+    const metaPatch: typeof patch = {};
+    if (patch.title !== undefined) metaPatch.title = patch.title;
+    if (patch.tags !== undefined) metaPatch.tags = patch.tags;
+    if (patch.urls !== undefined) metaPatch.urls = patch.urls;
+    if (patch.coverImage !== undefined) metaPatch.coverImage = patch.coverImage;
+    if (patch.dlsite !== undefined) metaPatch.dlsite = patch.dlsite;
+    if (Object.keys(metaPatch).length > 0) {
+      patchMetaFile(metaPath, metaPatch);
+    }
+
+    const prepared = this.prepareSingleMeta(metaPath);
+    const existingWorks = this.repo.getScanWorkMap();
+    const batch = new UpsertBatch(this.db, this.repo, this.upsertBatchSize, () => {});
+    const scanResult: Pick<ScanResult, "coverErrors"> = { coverErrors: 0 };
+    const seenIds = new Set<string>();
+    await this.registerMetaFile(
+      prepared,
+      seenIds,
+      new Map(),
+      batch,
+      existingWorks,
+      scanResult as ScanResult,
+      true,
+    );
+    batch.flush();
+
+    const work = await this.repo.getWork(metaId);
+    if (!work) throw new Error("復元した作品の取得に失敗しました");
+    return work;
+  }
+
   /** 音声フォルダーへメタファイルを自動生成する（要件 v4 §3.5。あくまで下書き） */
   private generateMetaForFolder(workDir: string): string {
     const id = crypto.randomUUID();
