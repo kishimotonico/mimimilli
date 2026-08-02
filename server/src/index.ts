@@ -18,11 +18,21 @@ import { createFixtureAdapter } from "./adapters/fixture/index.ts";
 import { resolveDataPaths } from "./adapters/real/dataRoot.ts";
 import { resolveDlsiteCacheConfig } from "./adapters/real/dlsiteCache.ts";
 import { resolveDlsiteRequestConfig } from "./adapters/real/dlsiteConfig.ts";
-import { createRealAdapter } from "./adapters/real/index.ts";
+import { createRealAdapter, type RealAdapter } from "./adapters/real/index.ts";
 import type { DataAdapter } from "./adapter.ts";
+import {
+  createDlsiteEventLogger,
+  dispose,
+  formatError,
+  getCategoryLogger,
+  initLogger,
+} from "./lib/logger.ts";
 
 const adapterKind = process.env.MIMIMILLI_ADAPTER ?? "real";
-const dlsiteLogger = (event: Record<string, unknown>) => console.info(JSON.stringify(event));
+
+initLogger(adapterKind === "real" ? { logDir: resolveDataPaths().logDir } : {});
+
+const serverLogger = getCategoryLogger("server");
 
 function createAdapter(): DataAdapter {
   switch (adapterKind) {
@@ -36,10 +46,11 @@ function createAdapter(): DataAdapter {
           catalogPath: paths.catalogDb,
           userPath: paths.userDb,
         },
+        dbBackupDir: paths.backupDir,
         dataRoot: paths.root,
         dlsiteCache: resolveDlsiteCacheConfig(paths.dlsiteCacheDb),
         dlsiteRequestConfig: resolveDlsiteRequestConfig(),
-        dlsiteSchedulerDependencies: { logger: dlsiteLogger },
+        dlsiteSchedulerDependencies: { logger: createDlsiteEventLogger() },
         thumbnailCacheDir: process.env.MIMIMILLI_THUMBNAIL_CACHE_DIR
           ? resolve(process.env.MIMIMILLI_THUMBNAIL_CACHE_DIR)
           : paths.thumbnailCache,
@@ -50,15 +61,78 @@ function createAdapter(): DataAdapter {
   }
 }
 
+function isRealAdapter(value: DataAdapter): value is RealAdapter {
+  return "close" in value && typeof value.close === "function";
+}
+
+let shuttingDown = false;
+
+async function shutdown(exitCode: number, reason: string, error?: unknown): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  try {
+    if (error) {
+      serverLogger.fatal(reason, formatError(error));
+    } else {
+      serverLogger.info(reason);
+    }
+  } catch (logError) {
+    console.error(logError);
+  }
+
+  try {
+    if (adapter && isRealAdapter(adapter)) adapter.close();
+  } catch (closeError) {
+    console.error(closeError);
+  }
+
+  try {
+    if (server) server.stop();
+  } catch (stopError) {
+    console.error(stopError);
+  }
+
+  try {
+    await dispose();
+  } catch (disposeError) {
+    console.error(disposeError);
+  }
+
+  process.exit(exitCode);
+}
+
+process.on("uncaughtException", (error) => {
+  void shutdown(1, "未捕捉例外で終了します", error);
+});
+
+process.on("unhandledRejection", (reason) => {
+  void shutdown(1, "未処理のPromise拒否で終了します", reason);
+});
+
+process.on("SIGINT", () => {
+  void shutdown(0, "SIGINTを受信して終了します");
+});
+
+process.on("SIGTERM", () => {
+  void shutdown(0, "SIGTERMを受信して終了します");
+});
+
 const port = Number(process.env.PORT ?? 8080);
-const adapter = createAdapter();
+/** DLsite同期fetchの総期限(60s)+余裕。Bun既定の10sアイドル制限を上書きする。 */
+const SERVER_IDLE_TIMEOUT_SECONDS = 90;
+let adapter: DataAdapter | undefined;
+let server: ReturnType<typeof Bun.serve> | undefined;
+
+adapter = createAdapter();
 const app = createApp(adapter);
 
-const server = Bun.serve({
+server = Bun.serve({
   fetch: app.fetch,
   hostname: "127.0.0.1",
   port,
+  idleTimeout: SERVER_IDLE_TIMEOUT_SECONDS,
 });
-console.log(
-  `mimimilli server listening on http://localhost:${server.port} (adapter: ${adapterKind})`,
+
+serverLogger.info(
+  `サーバーを起動しました: http://localhost:${server.port} (adapter: ${adapterKind})`,
 );

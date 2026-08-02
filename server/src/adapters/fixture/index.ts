@@ -773,7 +773,11 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
       };
     },
 
-    async dlsiteFetch(workId: string): Promise<DlsiteFetchResult> {
+    async dlsiteFetch(
+      workId: string,
+      _force?: boolean,
+      _options?: { signal?: AbortSignal },
+    ): Promise<DlsiteFetchResult> {
       const work = state.works.find((candidate) => candidate.id === workId);
       if (!work)
         return { ok: false, kind: "not_found", message: `作品が見つかりません: ${workId}` };
@@ -784,7 +788,11 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
       return this.dlsiteFetchByCode(rjCode);
     },
 
-    async dlsiteFetchByCode(rjCode: string): Promise<DlsiteFetchResult> {
+    async dlsiteFetchByCode(
+      rjCode: string,
+      _force?: boolean,
+      _options?: { signal?: AbortSignal },
+    ): Promise<DlsiteFetchResult> {
       return {
         ok: true,
         info: {
@@ -799,7 +807,11 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
       };
     },
 
-    async dlsiteApply(workId: string, body: DlsiteApplyBody): Promise<boolean> {
+    async dlsiteApply(
+      workId: string,
+      body: DlsiteApplyBody,
+      _options?: { signal?: AbortSignal },
+    ): Promise<boolean> {
       const work = state.works.find((w) => w.id === workId);
       if (!work) return false;
       if (body.applyTitle) work.title = body.info.title;

@@ -97,7 +97,7 @@ real サーバーと client は portless から動的ポートを割り当てら
 client は `portless get api.mimi` で同じ worktree の API URLを解決するため、複数の worktree でも接続先が混ざらない。
 
 real アダプタを使う場合、初回起動後に UI からルートフォルダーを設定する。
-DBはデータルートの `db/catalog.sqlite` と `db/user.sqlite` に作る。既定のデータルートはLinuxが `${XDG_DATA_HOME:-$HOME/.local/share}/mimimilli`、Windowsが `%LOCALAPPDATA%\Mimimilli`。`MIMIMILLI_DATA_DIR` には相対パスも指定でき、起動時に絶対パスへ解決する。
+DBはデータルートの `db/catalog.sqlite` と `db/user.sqlite` に作る。既定のデータルートはLinuxが `${XDG_DATA_HOME:-$HOME/.local/share}/mimimilli`、Windowsが `%LOCALAPPDATA%\mimimilli`。`MIMIMILLI_DATA_DIR` には相対パスも指定でき、起動時に絶対パスへ解決する。
 
 ### 検証
 

@@ -28,6 +28,35 @@ const config = {
   userAgent: DEFAULT_DLSITE_USER_AGENT,
 };
 
+test("DLsite scheduler: HTTPログにstatus・duration・呼び出し元コンテキストを含める", async () => {
+  const time = fakeTime();
+  const events: Record<string, unknown>[] = [];
+  const scheduler = new DlsiteScheduler(config, {
+    now: time.now,
+    sleep: time.sleep,
+    random: () => 0.5,
+    logger: (event) => events.push(event),
+    transport: async () => new Response(null, { status: 500 }),
+  });
+
+  const response = await scheduler.fetch(
+    "https://www.dlsite.com/maniax/work/=/product_id/RJ123456.html",
+    {},
+    { productCode: "RJ123456", resource: "html" },
+  );
+  assert.equal(response.status, 500);
+  const requests = events.filter((event) => event.event === "dlsite_http_request");
+  assert.equal(requests.length, 3);
+  assert.equal(requests[0]?.status, 500);
+  assert.equal(requests[0]?.productCode, "RJ123456");
+  assert.equal(requests[0]?.resource, "html");
+  assert.equal(typeof requests[0]?.durationMs, "number");
+  const retries = events.filter((event) => event.event === "dlsite_http_retry");
+  assert.equal(retries.length, 2);
+  assert.equal(retries[0]?.status, 500);
+  assert.equal(retries[0]?.productCode, "RJ123456");
+});
+
 test("DLsite scheduler: 実HTTP開始時刻の間隔、retry、request counterを一元化する", async () => {
   const time = fakeTime();
   const starts: number[] = [];

@@ -7,6 +7,9 @@ import type { ProbeDurationResult } from "@mimimilli/shared";
 import { probeResultFromCache } from "@mimimilli/shared";
 import { audioProbeCache } from "./catalogSchema.ts";
 import type { CatalogDb } from "./db.ts";
+import { getCategoryLogger } from "../../lib/logger.ts";
+
+const scanLogger = getCategoryLogger("scan");
 
 export interface ProbeCacheEntry {
   size: number;
@@ -48,7 +51,10 @@ export async function probeDurationSec(
     // 未知としてキャッシュに焼き付けず呼び出し元へ伝播させる。
     const code = (e as NodeJS.ErrnoException).code;
     if (code === "EMFILE" || code === "ENFILE") throw e;
-    console.warn(`再生時間を取得できません: ${filePath}: ${(e as Error).message}`);
+    scanLogger.warn(`再生時間を取得できません: ${filePath}`, {
+      path: filePath,
+      error: (e as Error).message,
+    });
   }
 
   const values = {

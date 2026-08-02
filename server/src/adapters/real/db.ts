@@ -1,10 +1,17 @@
-import { mkdirSync, rmSync } from "node:fs";
-import { dirname, isAbsolute } from "node:path";
+import { mkdirSync } from "node:fs";
+import { dirname, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { constants, Database } from "bun:sqlite";
 import { drizzle, type BunSQLiteDatabase } from "drizzle-orm/bun-sqlite";
 import { migrate } from "drizzle-orm/bun-sqlite/migrator";
 import * as catalogSchema from "./catalogSchema.ts";
+import {
+  copyDatabaseToBackup,
+  hasPendingMigrations,
+  moveDatabaseToBackup,
+  purgeOldBackups,
+  type DbBackupKind,
+} from "./dbBackup.ts";
 import { applySqliteBusyTimeout } from "./sqliteConnection.ts";
 import * as userSchema from "./userSchema.ts";
 
@@ -26,6 +33,11 @@ export type DbLocation =
       userPath: string;
     };
 
+export interface DbOpenOptions {
+  /** 省略時は catalogPath の親の親（dataRoot）配下の backup/ を使う。 */
+  backupDir?: string;
+}
+
 export interface Db {
   catalog: CatalogDb;
   user: UserDb;
@@ -38,10 +50,9 @@ export interface Db {
   close(): void;
 }
 
-function removeDatabaseFiles(path: string): void {
-  for (const suffix of ["", "-wal", "-shm"]) {
-    rmSync(`${path}${suffix}`, { force: true });
-  }
+interface VersionedDatabaseContext {
+  backupDir: string;
+  kind: DbBackupKind;
 }
 
 function openVersionedDatabase(
@@ -49,6 +60,7 @@ function openVersionedDatabase(
   version: number,
   migrationsFolder: string,
   migratableVersions: readonly number[] = [],
+  context?: VersionedDatabaseContext,
 ): { sqlite: Database; recreated: boolean } {
   const isMemory = path.startsWith("file:") && path.includes("mode=memory");
   if (!isMemory) mkdirSync(dirname(path), { recursive: true });
@@ -67,7 +79,10 @@ function openVersionedDatabase(
       );
     }
     sqlite.close();
-    removeDatabaseFiles(path);
+    if (!context) {
+      throw new Error("ファイルDBのスキーマ不一致時にはバックアップ先が必要です");
+    }
+    moveDatabaseToBackup(path, context.backupDir, context.kind, "version-mismatch");
     sqlite = new Database(path, { create: true });
     recreated = true;
   }
@@ -75,14 +90,20 @@ function openVersionedDatabase(
   sqlite.exec("PRAGMA journal_mode = WAL");
   sqlite.exec("PRAGMA foreign_keys = ON");
   applySqliteBusyTimeout(sqlite);
+  if (!isMemory && !recreated && context && hasPendingMigrations(sqlite, migrationsFolder)) {
+    copyDatabaseToBackup(path, context.backupDir, context.kind);
+  }
   const db = drizzle(sqlite);
   migrate(db, { migrationsFolder });
+  if (!isMemory && context) {
+    purgeOldBackups(context.backupDir, context.kind);
+  }
   sqlite.exec(`PRAGMA user_version = ${version}`);
   return { sqlite, recreated };
 }
 
 /** catalogをmainとして開き、user DBを `user` という名前でATTACHする。 */
-export function openDb(location: DbLocation): Db {
+export function openDb(location: DbLocation, options?: DbOpenOptions): Db {
   if (
     location.kind === "files" &&
     (!isAbsolute(location.catalogPath) || !isAbsolute(location.userPath))
@@ -98,16 +119,37 @@ export function openDb(location: DbLocation): Db {
     location.kind === "memory"
       ? `file:mimimilli-user-${memoryId}?mode=memory&cache=shared`
       : location.userPath;
+  const backupDir =
+    location.kind === "files"
+      ? (options?.backupDir ?? join(dirname(dirname(location.catalogPath)), "backup"))
+      : undefined;
+  const catalogContext =
+    backupDir === undefined ? undefined : { backupDir, kind: "catalog" as const };
+  const userContext = backupDir === undefined ? undefined : { backupDir, kind: "user" as const };
   let catalogOpened = openVersionedDatabase(
     catalogPath,
     CATALOG_SCHEMA_VERSION,
     CATALOG_MIGRATIONS,
+    [],
+    catalogContext,
   );
-  const userOpened = openVersionedDatabase(userPath, USER_SCHEMA_VERSION, USER_MIGRATIONS);
-  if (location.kind === "files" && userOpened.recreated && !catalogOpened.recreated) {
+  const userOpened = openVersionedDatabase(
+    userPath,
+    USER_SCHEMA_VERSION,
+    USER_MIGRATIONS,
+    [],
+    userContext,
+  );
+  if (location.kind === "files" && userOpened.recreated && !catalogOpened.recreated && backupDir) {
     catalogOpened.sqlite.close();
-    removeDatabaseFiles(catalogPath);
-    catalogOpened = openVersionedDatabase(catalogPath, CATALOG_SCHEMA_VERSION, CATALOG_MIGRATIONS);
+    moveDatabaseToBackup(catalogPath, backupDir, "catalog", "catalog-user-asymmetry");
+    catalogOpened = openVersionedDatabase(
+      catalogPath,
+      CATALOG_SCHEMA_VERSION,
+      CATALOG_MIGRATIONS,
+      [],
+      catalogContext,
+    );
   }
   try {
     catalogOpened.sqlite.run("ATTACH DATABASE ? AS user", [userPath]);

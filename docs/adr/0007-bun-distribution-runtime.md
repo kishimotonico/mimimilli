@@ -2,7 +2,7 @@
 
 - ステータス: 承認
 - 日付: 2026-07-19
-- 関連: backlog TASK-70、DRAFT-27（DB分離）、DRAFT-1（配布）、[Bun配布スパイク](../../scripts/spike/bun-distribution/README.md)
+- 関連: backlog TASK-70、DRAFT-27（DB分離）、DRAFT-1（配布）。実証スパイクは役目を終え削除済み（Git履歴 `cad3c6f` の `scripts/spike/bun-distribution/` 参照）
 
 ## 文脈
 
@@ -37,5 +37,5 @@ Linuxでは `${XDG_DATA_HOME:-$HOME/.local/share}/mimikago` を使う。相対�
 - Bun配布経路ではDB adapterと起動entryの変更が必要になる。既存server本体への反映はTASK-70の範囲外
 - `better-sqlite3` のcompile成功を互換性の根拠にできない。Bunの対応状況が変わっても、採用変更には同じ永続化smokeを通す
 - 配布物は当面zip単位となり、単一exeという見た目は諦める。ユーザーデータは配布物の更新・移動・削除から保護される
-- Windows実機で本命exeの2回起動を確認する。手順は [WINDOWS-SMOKE.md](../../scripts/spike/bun-distribution/WINDOWS-SMOKE.md) に置く
+- Windows実機での本命exeの起動・DB再オープン確認は未実施。配布build実装時（DRAFT-1）に確認する。当時の手順はGit履歴 `cad3c6f` の `scripts/spike/bun-distribution/WINDOWS-SMOKE.md` にある
 - sharpの外部ロード方式は配布build実装時の検証項目として残る。外部ロードに失敗した場合は明示的な起動・処理エラーにする

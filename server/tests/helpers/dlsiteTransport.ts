@@ -44,14 +44,24 @@ export function mockDlsiteTransport(
   options: MockDlsiteTransportOptions,
 ): DlsiteSchedulerDependencies {
   return {
-    transport: async (input, init) => {
-      const url = requestUrl(input);
-      if (options.handler) return options.handler(url, init);
-      const code = productCodeFromRequest(input);
-      if (code && options.html) return options.html(code, url, init);
-      const coverUrl = coverUrlFromRequest(input);
-      if (coverUrl && options.cover) return options.cover(coverUrl, init);
-      return new Response("not found", { status: 404 });
+    transport: (input, init) => {
+      try {
+        const url = requestUrl(input);
+        let result: Response | Promise<Response>;
+        if (options.handler) result = options.handler(url, init);
+        else {
+          const code = productCodeFromRequest(input);
+          if (code && options.html) result = options.html(code, url, init);
+          else {
+            const coverUrl = coverUrlFromRequest(input);
+            if (coverUrl && options.cover) result = options.cover(coverUrl, init);
+            else result = new Response("not found", { status: 404 });
+          }
+        }
+        return result instanceof Promise ? result : Promise.resolve(result);
+      } catch (error) {
+        return Promise.reject(error);
+      }
     },
   };
 }

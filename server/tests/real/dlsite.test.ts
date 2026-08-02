@@ -13,6 +13,7 @@ import {
   fetchDlsiteHtml,
   dlsiteWorkUrl,
   fetchDlsiteInfo,
+  listDlsiteMissingFields,
   mergeDlsiteTags,
   normalizeDlsiteCoverUrl,
   parseDlsiteHtml,
@@ -82,6 +83,101 @@ test("parseDlsiteHtml: タイトルが空のHTMLはparse_error", () => {
     kind: "parse_error",
     message: "DLsite作品ページのタイトルを取得できませんでした（RJ000001）",
   });
+});
+
+test("listDlsiteMissingFields: 任意フィールドの欠落を検出する", () => {
+  assert.deepEqual(
+    listDlsiteMissingFields({
+      rjCode: "RJ900001",
+      title: "タイトル",
+      circle: null,
+      cvs: [],
+      genreTags: [],
+      coverUrl: null,
+      url: "",
+    }),
+    ["circle", "cvs", "genreTags", "coverUrl"],
+  );
+  assert.deepEqual(
+    listDlsiteMissingFields({
+      rjCode: "RJ900001",
+      title: "タイトル",
+      circle: "夜想曲",
+      cvs: ["cv"],
+      genreTags: ["genre"],
+      coverUrl: "https://img.dlsite.jp/a.jpg",
+      url: "",
+    }),
+    [],
+  );
+});
+
+test("DLsite: パース成功時の欠落フィールドをwarnイベントとして記録する", async (t) => {
+  const lib = makeSampleLibrary();
+  const dir = makeTestDirectory("dlsite-parse-missing-fields");
+  t.after(lib.cleanup);
+  t.after(dir.cleanup);
+  const logs: Array<Record<string, unknown>> = [];
+  const adapter = createRealAdapter({
+    database: { kind: "memory" },
+    dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+    dlsiteSchedulerDependencies: {
+      logger: (event) => logs.push(event),
+      ...mockDlsiteTransport({
+        html: () => htmlResponse('<html><body><h1 id="work_name">タイトルのみ</h1></body></html>'),
+      }),
+    },
+  });
+  await adapter.updateSettings({ rootFolder: lib.root });
+  await adapter.scan();
+  const result = await adapter.dlsiteFetch(lib.existingWorkId);
+  assert.equal(result.ok, true);
+  const missing = logs.filter((event) => event.event === "dlsite_parse_fields_missing");
+  assert.equal(missing.length, 1);
+  assert.deepEqual(missing[0]?.missingFields, ["circle", "cvs", "genreTags", "coverUrl"]);
+  assert.equal(missing[0]?.productCode, "RJ900002");
+  adapter.close();
+});
+
+test("DLsite: キャッシュ判定ログに理由を含める", async (t) => {
+  const lib = makeSampleLibrary();
+  const dir = makeTestDirectory("dlsite-cache-reason-log");
+  t.after(lib.cleanup);
+  t.after(dir.cleanup);
+  let now = 1_000;
+  const logs: Array<Record<string, unknown>> = [];
+  const adapter = createRealAdapter({
+    database: { kind: "memory" },
+    dlsiteCache: { path: join(dir.path, "cache.sqlite"), ttlsMs: { ok: 10 }, clock: () => now },
+    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+    dlsiteSchedulerDependencies: {
+      logger: (event) => logs.push(event),
+      ...mockDlsiteTransport({ html: () => htmlResponse(SAMPLE_HTML) }),
+    },
+  });
+  await adapter.updateSettings({ rootFolder: lib.root });
+  await adapter.scan();
+  await adapter.dlsiteFetch(lib.existingWorkId);
+  const firstMiss = logs.find((event) => event.event === "dlsite_cache_miss");
+  assert.equal(firstMiss?.reason, "not_cached");
+
+  logs.length = 0;
+  await adapter.dlsiteFetch(lib.existingWorkId);
+  const cacheHit = logs.find((event) => event.event === "dlsite_cache_hit");
+  assert.equal(cacheHit?.reason, "ttl_valid");
+
+  now += 11;
+  logs.length = 0;
+  await adapter.dlsiteFetch(lib.existingWorkId);
+  const expiredMiss = logs.find((event) => event.event === "dlsite_cache_miss");
+  assert.equal(expiredMiss?.reason, "ttl_expired");
+
+  logs.length = 0;
+  await adapter.dlsiteFetch(lib.existingWorkId, true);
+  const forceMiss = logs.find((event) => event.event === "dlsite_cache_miss");
+  assert.equal(forceMiss?.reason, "force_refresh");
+  adapter.close();
 });
 
 test("fetchDlsiteInfo: HTTP 404 / 通信エラーを分類する", async () => {
@@ -767,6 +863,119 @@ test("DLsite HTMLキャッシュ: cache missのforceとnormalは同じHTTPへ合
   adapter.close();
 });
 
+test("DLsite HTMLキャッシュ: 相乗り中の先着abortはその呼び出し元だけ失敗し他方は完了できる", async (t) => {
+  const lib = makeSampleLibrary();
+  const dir = makeTestDirectory("dlsite-flight-abort-first");
+  t.after(lib.cleanup);
+  t.after(dir.cleanup);
+  let release!: () => void;
+  const pending = new Promise<void>((resolve) => (release = resolve));
+  let started!: () => void;
+  const gate = new Promise<void>((resolve) => (started = resolve));
+  const adapter = createRealAdapter({
+    database: { kind: "memory" },
+    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+    dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+    dlsiteSchedulerDependencies: mockDlsiteTransport({
+      html: async () => {
+        started();
+        await pending;
+        return htmlResponse(SAMPLE_HTML);
+      },
+    }),
+  });
+  await adapter.updateSettings({ rootFolder: lib.root });
+  await adapter.scan();
+  const controllerA = new AbortController();
+  const promiseA = adapter.dlsiteFetch(lib.existingWorkId, true, { signal: controllerA.signal });
+  const promiseB = adapter.dlsiteFetch(lib.existingWorkId);
+  await gate;
+  controllerA.abort();
+  await assert.rejects(
+    promiseA,
+    (error: unknown) => error instanceof DOMException && error.name === "AbortError",
+  );
+  release();
+  assert.equal((await promiseB).ok, true);
+  adapter.close();
+});
+
+test("DLsite HTMLキャッシュ: 相乗り中の後着abortはその呼び出し元だけ失敗し先着は完了できる", async (t) => {
+  const lib = makeSampleLibrary();
+  const dir = makeTestDirectory("dlsite-flight-abort-second");
+  t.after(lib.cleanup);
+  t.after(dir.cleanup);
+  let release!: () => void;
+  const pending = new Promise<void>((resolve) => (release = resolve));
+  let started!: () => void;
+  const gate = new Promise<void>((resolve) => (started = resolve));
+  const adapter = createRealAdapter({
+    database: { kind: "memory" },
+    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+    dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+    dlsiteSchedulerDependencies: mockDlsiteTransport({
+      html: async () => {
+        started();
+        await pending;
+        return htmlResponse(SAMPLE_HTML);
+      },
+    }),
+  });
+  await adapter.updateSettings({ rootFolder: lib.root });
+  await adapter.scan();
+  const controllerB = new AbortController();
+  const promiseA = adapter.dlsiteFetch(lib.existingWorkId, true);
+  const promiseB = adapter.dlsiteFetch(lib.existingWorkId, false, { signal: controllerB.signal });
+  await gate;
+  controllerB.abort();
+  await assert.rejects(
+    promiseB,
+    (error: unknown) => error instanceof DOMException && error.name === "AbortError",
+  );
+  release();
+  assert.equal((await promiseA).ok, true);
+  adapter.close();
+});
+
+test("dlsiteApply: abort済みsignalではDB・メタを更新しない", async (t) => {
+  const lib = makeSampleLibrary();
+  t.after(lib.cleanup);
+  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
+  await adapter.updateSettings({ rootFolder: lib.root });
+  await adapter.scan();
+  const before = await adapter.getWork(lib.existingWorkId);
+  const metaPath = join(before!.physicalPath, "mimimilli.json");
+  const controller = new AbortController();
+  controller.abort();
+  const info: DlsiteWorkInfo = {
+    rjCode: "RJ900002",
+    title: "abort後に適用されないタイトル",
+    circle: null,
+    cvs: [],
+    genreTags: [],
+    coverUrl: null,
+    url: "https://www.dlsite.com/maniax/work/=/product_id/RJ900002.html",
+  };
+  await assert.rejects(
+    adapter.dlsiteApply(
+      lib.existingWorkId,
+      {
+        info,
+        applyTitle: true,
+        applyTags: [],
+        applyCover: false,
+      },
+      { signal: controller.signal },
+    ),
+    (error: unknown) => error instanceof DOMException && error.name === "AbortError",
+  );
+  const after = await adapter.getWork(lib.existingWorkId);
+  assert.equal(after?.title, before?.title);
+  const meta = JSON.parse(readFileSync(metaPath, "utf-8")) as { title: string };
+  assert.equal(meta.title, before?.title);
+  adapter.close();
+});
+
 test("DLsite bulk: 2回目はHTML cache hitでHTTPしない", async (t) => {
   const lib = makeSampleLibrary();
   const dir = makeTestDirectory("dlsite-bulk-html-cache");
@@ -1304,7 +1513,7 @@ test("一括取得: カバー取得失敗を作品のerrorへ記録し、後続�
         htmlResponse(sampleWorkHtml(code, { title: `取得済み ${code}`, genres: ["テスト"] })),
       cover: () => {
         coverCalls += 1;
-        throw new Error("カバー取得失敗");
+        return Promise.reject(new Error("カバー取得失敗"));
       },
     }),
   });
@@ -1340,7 +1549,7 @@ test("一括取得: 失敗状態のメタ書き戻しが例外を投げても後
       html: (code) =>
         htmlResponse(sampleWorkHtml(code, { title: `取得済み ${code}`, genres: ["テスト"] })),
       cover: (url) => {
-        if (url.includes("RJ900002")) throw new Error("カバー取得失敗");
+        if (url.includes("RJ900002")) return Promise.reject(new Error("カバー取得失敗"));
         return jpegResponse(coverBody);
       },
     }),
@@ -1406,5 +1615,87 @@ test("一括取得: 中断後の再実行で処理済み作品はHTTPしない",
   assert.equal(httpCalls, 1);
   const completed = await Promise.all(ids.map((id) => adapter.getWork(id)));
   assert.ok(completed.every((work) => work?.dlsite.status === "applied"));
+  adapter.close();
+});
+
+test("dlsiteFetch: request signalがscheduler.fetchまで伝播する", async (t) => {
+  const lib = makeSampleLibrary();
+  const dir = makeTestDirectory("dlsite-signal-propagation");
+  t.after(lib.cleanup);
+  t.after(dir.cleanup);
+  let receivedSignal: AbortSignal | null | undefined;
+  const adapter = createRealAdapter({
+    database: { kind: "memory" },
+    dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+    dlsiteSchedulerDependencies: mockDlsiteTransport({
+      html: (code, _url, init) => {
+        receivedSignal = init?.signal;
+        return htmlResponse(sampleWorkHtml(code));
+      },
+    }),
+  });
+  await adapter.updateSettings({ rootFolder: lib.root });
+  await adapter.scan();
+  const controller = new AbortController();
+  const result = await adapter.dlsiteFetch(lib.existingWorkId, false, {
+    signal: controller.signal,
+  });
+  assert.equal(result.ok, true);
+  assert.ok(receivedSignal);
+  assert.equal(receivedSignal.aborted, false);
+  controller.abort();
+  assert.equal(receivedSignal.aborted, true);
+  adapter.close();
+});
+
+test("dlsiteFetch: abortでDLsite HTTP取得が中断される", async (t) => {
+  const lib = makeSampleLibrary();
+  const dir = makeTestDirectory("dlsite-signal-abort");
+  t.after(lib.cleanup);
+  t.after(dir.cleanup);
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  let transportCalls = 0;
+  let transportReady!: () => void;
+  const started = new Promise<void>((resolve) => (transportReady = resolve));
+  const adapter = createRealAdapter({
+    database: { kind: "memory" },
+    dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+    dlsiteSchedulerDependencies: mockDlsiteTransport({
+      html: async (_code, _url, init) => {
+        transportCalls += 1;
+        transportReady();
+        await new Promise<void>((resolve, reject) => {
+          const signal = init?.signal;
+          if (signal?.aborted) {
+            reject(new DOMException("DLsiteリクエストはキャンセルされました", "AbortError"));
+            return;
+          }
+          const onAbort = () =>
+            reject(new DOMException("DLsiteリクエストはキャンセルされました", "AbortError"));
+          if (signal) signal.addEventListener("abort", onAbort, { once: true });
+          gate.then(() => {
+            if (signal) signal.removeEventListener("abort", onAbort);
+            resolve();
+          });
+        });
+        return htmlResponse(SAMPLE_HTML);
+      },
+    }),
+  });
+  await adapter.updateSettings({ rootFolder: lib.root });
+  await adapter.scan();
+  const controller = new AbortController();
+  const pending = adapter.dlsiteFetch(lib.existingWorkId, false, { signal: controller.signal });
+  await started;
+  assert.equal(transportCalls, 1);
+  controller.abort();
+  await assert.rejects(
+    pending,
+    (error: unknown) => error instanceof DOMException && error.name === "AbortError",
+  );
+  release();
   adapter.close();
 });
