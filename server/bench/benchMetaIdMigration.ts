@@ -12,7 +12,7 @@ const WARMUP = 1;
 const TRIALS = 7;
 const DEFAULT_COUNTS = [5000, 30000] as const;
 
-type Variant = "cold" | "warm-sig" | "warm-nosig";
+type Variant = "cold" | "warm";
 
 interface BenchRow {
   count: number;
@@ -32,7 +32,6 @@ interface BenchContext {
 interface MigrationManifestSnapshot {
   raw: string;
   libraryCompleted: boolean;
-  hasSignatures: boolean;
 }
 
 function workUuid(index: number): string {
@@ -106,28 +105,19 @@ function clearManifest(ctx: BenchContext): void {
 
 function readManifestSnapshot(ctx: BenchContext): MigrationManifestSnapshot {
   const raw = readFileSync(ctx.manifestPath, "utf-8");
-  const parsed = JSON.parse(raw) as {
-    libraryCompleted?: boolean;
-    verifiedIdSignatures?: Record<string, unknown>;
-  };
+  const parsed = JSON.parse(raw) as { libraryCompleted?: boolean };
   return {
     raw,
     libraryCompleted: parsed.libraryCompleted === true,
-    hasSignatures: Object.keys(parsed.verifiedIdSignatures ?? {}).length > 0,
   };
 }
 
 function restoreManifestToPath(
   manifestFilePath: string,
   snapshot: MigrationManifestSnapshot,
-  clearSignatures: boolean,
 ): void {
-  const parsed = JSON.parse(snapshot.raw) as Record<string, unknown>;
-  if (clearSignatures) {
-    parsed.verifiedIdSignatures = {};
-  }
   mkdirSync(dirname(manifestFilePath), { recursive: true });
-  writeFileSync(manifestFilePath, `${JSON.stringify(parsed, null, 2)}\n`, "utf-8");
+  writeFileSync(manifestFilePath, snapshot.raw, "utf-8");
 }
 
 function runMigration(ctx: BenchContext): void {
@@ -151,11 +141,7 @@ function measureVariant(
     if (!warmSnapshot) {
       throw new Error(`${variant}: warm manifest snapshot is missing`);
     }
-    restoreManifestToPath(
-      ctx.manifestPath,
-      warmSnapshot,
-      variant === "warm-nosig",
-    );
+    restoreManifestToPath(ctx.manifestPath, warmSnapshot);
   };
 
   prepare();
@@ -185,8 +171,8 @@ function establishWarmSnapshot(ctx: BenchContext): MigrationManifestSnapshot {
     throw new Error("warm baseline migration failed");
   }
   const snapshot = readManifestSnapshot(ctx);
-  if (!snapshot.libraryCompleted || !snapshot.hasSignatures) {
-    throw new Error("warm baseline manifest is not libraryCompleted with signatures");
+  if (!snapshot.libraryCompleted) {
+    throw new Error("warm baseline manifest is not libraryCompleted");
   }
   return snapshot;
 }
@@ -234,11 +220,8 @@ function benchCount(count: number, seed: number, outDir: string): BenchRow[] {
   rows.push({ count, variant: "cold", ...cold });
 
   const warmSnapshot = establishWarmSnapshot(ctx);
-  const warmSig = measureVariant(ctx, "warm-sig", warmSnapshot);
-  rows.push({ count, variant: "warm-sig", ...warmSig });
-
-  const warmNoSig = measureVariant(ctx, "warm-nosig", warmSnapshot);
-  rows.push({ count, variant: "warm-nosig", ...warmNoSig });
+  const warm = measureVariant(ctx, "warm", warmSnapshot);
+  rows.push({ count, variant: "warm", ...warm });
 
   const payload = {
     generatedAt: new Date().toISOString(),
@@ -250,7 +233,10 @@ function benchCount(count: number, seed: number, outDir: string): BenchRow[] {
     dataRoot,
     rows,
   };
-  writeFileSync(join(outDir, `bench-migrate-${count}.json`), `${JSON.stringify(payload, null, 2)}\n`);
+  writeFileSync(
+    join(outDir, `bench-migrate-${count}.json`),
+    `${JSON.stringify(payload, null, 2)}\n`,
+  );
 
   return rows;
 }
@@ -275,16 +261,17 @@ function main(): void {
     outDir,
     rows: allRows,
   };
-  writeFileSync(join(outDir, "bench-migrate-results.json"), `${JSON.stringify(combined, null, 2)}\n`);
+  writeFileSync(
+    join(outDir, "bench-migrate-results.json"),
+    `${JSON.stringify(combined, null, 2)}\n`,
+  );
 
-  console.log("# metaIdMigration VerifiedIdSignature benchmark\n");
+  console.log("# metaIdMigration benchmark\n");
   console.log(`Generated: ${combined.generatedAt}`);
   console.log(`Seed: ${seed}, warmup: ${WARMUP}, trials: ${TRIALS}`);
   console.log(`JSON: ${outDir}\n`);
   console.log(formatMarkdownTable(allRows));
-  console.log(
-    "\n注: warm 系は同一プロセス内で FS/OS ページキャッシュが温まった状態。cold との差分は参考値。",
-  );
+  console.log("\n注: warm は libraryCompleted=true の再実行。cold との差分は参考値。");
 }
 
 main();

@@ -19,9 +19,9 @@ pnpm --filter @mimimilli/server bench:run -- --data-dir /tmp/mimimilli-bench --o
 
 オプション: `--warmup 3`（既定）、`--iterations 20`（既定）。
 
-## metaIdMigration 署名キャッシュ計測
+## metaIdMigration 計測
 
-`VerifiedIdSignature`（size/mtimeMs 一致時の read+parse 省略）の効果を計測する。
+`libraryCompleted=true` 時の fast path（`hasCompleteUniqueIds`）の効果を計測する。
 
 ```bash
 # 既定: count=5000 と 30000 を順に計測
@@ -31,4 +31,4 @@ pnpm --filter @mimimilli/server bench:migrate
 pnpm --filter @mimimilli/server bench:migrate -- --count 5000 --seed 42
 ```
 
-各規模で `cold` / `warm-sig` / `warm-nosig` の3変種を、warmup 1回 + 試行 7回で計測する。結果はコンソール（Markdown表）と一時ディレクトリ内の JSON に出力される。
+各規模で `cold` / `warm` の2変種を、warmup 1回 + 試行 7回で計測する。warm は `libraryCompleted=true` の manifest を復元した再実行。結果はコンソール（Markdown表）と一時ディレクトリ内の JSON に出力される。
