@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
+import { useSetAtom } from "jotai";
 import { useQueryClient } from "@tanstack/react-query";
+import { errorToastAtom } from "../../../app/model/errorToastAtom";
 import { I } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
 import ConfirmDialog from "../../../shared/ui/ConfirmDialog";
@@ -45,12 +47,12 @@ export default function FilePreview({
   onWorkRegistered,
 }: FilePreviewProps) {
   const queryClient = useQueryClient();
+  const setErrorToast = useSetAtom(errorToastAtom);
   const [registerPreview, setRegisterPreview] = useState<WorkRegisterPreview | null>(null);
   const [showRegisterDialog, setShowRegisterDialog] = useState(false);
   const [showUnregisterConfirm, setShowUnregisterConfirm] = useState(false);
   const [registerBusy, setRegisterBusy] = useState(false);
   const [unregisterBusy, setUnregisterBusy] = useState(false);
-  const [registerError, setRegisterError] = useState<string | null>(null);
 
   const kind = entry ? classifyFile(entry) : null;
   const isDir = kind === "dir";
@@ -85,13 +87,13 @@ export default function FilePreview({
   const handleUnregister = async () => {
     if (!entry?.workId) return;
     setUnregisterBusy(true);
-    setRegisterError(null);
+    setErrorToast(null);
     try {
       await deleteWork(entry.workId);
       setShowUnregisterConfirm(false);
       await refreshFsState();
     } catch (cause) {
-      setRegisterError(cause instanceof Error ? cause.message : "作品登録の解除に失敗しました");
+      setErrorToast(cause instanceof Error ? cause.message : "作品登録の解除に失敗しました");
     } finally {
       setUnregisterBusy(false);
     }
@@ -99,18 +101,19 @@ export default function FilePreview({
 
   const openRegisterDialog = async () => {
     if (!entry) return;
-    setRegisterError(null);
+    setErrorToast(null);
     setRegisterBusy(true);
     try {
       const preview = await getWorkRegisterPreview(entry.path);
       if (preview.alreadyRegistered) {
-        setRegisterError("このフォルダーは既に登録済みです");
+        setErrorToast("このフォルダーは既に作品として登録されています");
+        await refreshFsState();
         return;
       }
       setRegisterPreview(preview);
       setShowRegisterDialog(true);
     } catch (cause) {
-      setRegisterError(cause instanceof Error ? cause.message : "登録情報の取得に失敗しました");
+      setErrorToast(cause instanceof Error ? cause.message : "登録情報の取得に失敗しました");
     } finally {
       setRegisterBusy(false);
     }
@@ -133,14 +136,14 @@ export default function FilePreview({
 
   const workActions = canRegisterFolder ? (
     <Button variant="primary" icon={I.add} disabled={registerBusy} onClick={openRegisterDialog}>
-      このフォルダを作品として登録
+      このフォルダーを作品として登録
     </Button>
   ) : isWorkFolder && entry?.workId ? (
     <Button
       variant="ghost"
       disabled={unregisterBusy}
       onClick={() => {
-        setRegisterError(null);
+        setErrorToast(null);
         setShowUnregisterConfirm(true);
       }}
     >
@@ -197,10 +200,6 @@ export default function FilePreview({
                 {workActions}
               </div>
             )}
-
-            {registerError && (
-              <p className="m-0 text-[11px] text-[var(--r-coral)]">{registerError}</p>
-            )}
           </div>
         )}
       </div>
@@ -220,7 +219,7 @@ export default function FilePreview({
       {showUnregisterConfirm && (
         <ConfirmDialog
           title="作品登録を解除"
-          message="このフォルダーの作品データ（再生履歴・タグを含む）と mimimilli.json を削除します。音声ファイルなどの物理ファイルは削除されません。"
+          message="このフォルダーの作品データ（再生履歴・タグを含む）と管理ファイル（mimimilli.json）を削除します。音声などの物理ファイルは削除されません。"
           confirmLabel="解除する"
           onConfirm={() => void handleUnregister()}
           onCancel={() => setShowUnregisterConfirm(false)}

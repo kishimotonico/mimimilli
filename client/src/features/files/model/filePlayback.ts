@@ -2,7 +2,7 @@ import type { Track } from "@mimimilli/shared";
 import type { FsEntry } from "./types";
 import { classifyFile, sortEntries } from "./types";
 
-/** 同一フォルダ内の音声ファイルを表示順でキュー化する */
+/** 同一フォルダー内の音声ファイルを表示順でキュー化する */
 export function buildFolderAudioQueue(
   folderEntries: FsEntry[],
   startEntry: FsEntry,

@@ -114,7 +114,7 @@ export default function RegisterWorkDialog({
             id="register-work-title"
             className="min-w-0 flex-1 font-sans text-[14px] font-semibold"
           >
-            このフォルダを作品として登録
+            このフォルダーを作品として登録
           </h2>
           <IconButton icon={I.x} label="閉じる" size="sm" disabled={busy} onClick={close} />
         </header>
