@@ -1,7 +1,15 @@
 // ファイルモードからの手動作品登録 API の結合テスト。
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
 import { META_FILE_NAME, emptyDlsiteState } from "@mimimilli/shared";
@@ -81,6 +89,42 @@ async function setupLibraryWithChild(t: TestContext) {
   const childWork = await childRes.json();
 
   return { app, root, parent, child, sibling, childWork };
+}
+
+async function setupLibraryWithTwoChildren(t: TestContext) {
+  const directory = makeTestDirectory("work-register-two-children");
+  t.after(directory.cleanup);
+  const root = join(directory.path, "lib");
+  const parent = join(root, "RJ900010_parent");
+  const childA = join(parent, "RJ900011_child_a");
+  const childB = join(parent, "RJ900012_child_b");
+  mkdirSync(join(childA, "tracks"), { recursive: true });
+  mkdirSync(join(childB, "tracks"), { recursive: true });
+  writeWav(join(parent, "intro.wav"), 1);
+  writeWav(join(childA, "tracks", "01.wav"), 2);
+  writeWav(join(childB, "tracks", "01.wav"), 2);
+
+  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
+  const app = createApp(adapter);
+  await adapter.updateSettings({ rootFolder: root });
+
+  const childARes = await app.request("/api/works", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: childA, title: "子作品A" }),
+  });
+  assert.equal(childARes.status, 201);
+  const childAWork = await childARes.json();
+
+  const childBRes = await app.request("/api/works", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: childB, title: "子作品B" }),
+  });
+  assert.equal(childBRes.status, 201);
+  const childBWork = await childBRes.json();
+
+  return { adapter, app, parent, childA, childB, childAWork, childBWork };
 }
 
 test("POST /works: 未登録フォルダーを作品として登録できる", async (t) => {
@@ -506,4 +550,100 @@ test("POST /works: ID衝突復元時もスキーマ外フィールドを保持�
   assert.equal(restoredMeta.playlists[0]?.tracks[0]?.customTrackField, "track-extra");
   assert.notEqual(restoredMeta.playlists[0]?.id, playlistId);
   assert.notEqual(restoredMeta.playlists[0]?.tracks[0]?.id, trackId);
+});
+
+test("POST /works: 1番目の子のメタ削除が失敗しても2番目の子は解除されエラーに残存IDが含まれる", async (t) => {
+  const { adapter, parent, childA, childB, childAWork, childBWork } =
+    await setupLibraryWithTwoChildren(t);
+
+  chmodSync(childA, 0o555);
+  t.after(() => {
+    chmodSync(childA, 0o755);
+  });
+
+  await assert.rejects(
+    () =>
+      adapter.createWork({
+        path: parent,
+        title: "親に統合",
+        tags: [],
+        mergeDescendantWorks: true,
+      }),
+    (error: Error) => {
+      assert.match(error.message, /残存した子作品ID/);
+      assert.ok(error.message.includes(childAWork.id));
+      return true;
+    },
+  );
+
+  const childAWorkAfter = await adapter.getWork(childAWork.id);
+  assert.ok(childAWorkAfter);
+
+  const childBWorkAfter = await adapter.getWork(childBWork.id);
+  assert.equal(childBWorkAfter, null);
+  assert.ok(!existsSync(folderMetaPath(childB)));
+
+  const preview = await adapter.getWorkRegisterPreview(parent);
+  assert.equal(preview?.alreadyRegistered, true);
+});
+
+test("POST /works: ID衝突復元時も defaultPlaylist キーを保持する", async (t) => {
+  const { app, root, sibling } = await setupLibraryWithChild(t);
+
+  const siblingRes = await app.request("/api/works", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: sibling, title: "既存作品" }),
+  });
+  assert.equal(siblingRes.status, 201);
+  const existingWork = await siblingRes.json();
+
+  const orphanDir = join(root, "RJ900015_orphan_default_playlist");
+  mkdirSync(orphanDir, { recursive: true });
+  writeWav(join(orphanDir, "track.wav"), 2);
+  const playlistId = "11111111-1111-4111-8111-111111111111";
+  const trackId = "22222222-2222-4222-8222-222222222222";
+  writeFileSync(
+    join(orphanDir, META_FILE_NAME),
+    JSON.stringify(
+      {
+        id: existingWork.id,
+        title: "孤立メタ作品",
+        urls: [],
+        tags: [],
+        coverImage: null,
+        playlists: [
+          {
+            id: playlistId,
+            name: "default",
+            tracks: [{ id: trackId, title: "t", file: "track.wav", start: 0 }],
+          },
+        ],
+        defaultPlaylist: "default",
+        defaultPlaylistId: playlistId,
+        createdAt: new Date().toISOString(),
+        dlsite: emptyDlsiteState(),
+      },
+      null,
+      2,
+    ) + "\n",
+  );
+
+  const res = await app.request("/api/works", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: orphanDir, title: "復元後タイトル" }),
+  });
+  assert.equal(res.status, 201);
+  const restored = await res.json();
+  assert.notEqual(restored.id, existingWork.id);
+
+  const restoredMeta = JSON.parse(readFileSync(join(orphanDir, META_FILE_NAME), "utf-8")) as {
+    id: string;
+    defaultPlaylist: string;
+    defaultPlaylistId: string;
+  };
+  assert.equal(restoredMeta.id, restored.id);
+  assert.equal(restoredMeta.defaultPlaylist, "default");
+  assert.notEqual(restoredMeta.defaultPlaylistId, playlistId);
 });

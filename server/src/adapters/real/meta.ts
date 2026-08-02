@@ -145,7 +145,6 @@ export function reassignMetaIdsOnDbCollision(
       }
     }
     raw.defaultPlaylistId = newDefaultPlaylistId;
-    if ("defaultPlaylist" in raw) delete raw.defaultPlaylist;
   }
 
   const parsed = metaFileSchema.safeParse(raw);

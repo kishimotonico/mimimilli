@@ -106,7 +106,11 @@ export function unregisterWork(repo: WorkRepo, workId: string): boolean {
 function unregisterDescendantWorks(repo: WorkRepo, descendants: Array<{ id: string }>): void {
   const remaining: string[] = [];
   for (const child of descendants) {
-    if (!unregisterWork(repo, child.id)) {
+    try {
+      if (!unregisterWork(repo, child.id)) {
+        remaining.push(child.id);
+      }
+    } catch {
       remaining.push(child.id);
     }
   }
