@@ -51,7 +51,9 @@ export function buildWorkRegisterPreview(repo: WorkRepo, workDir: string): WorkR
     suggestedTitle: folderName,
     detectedRjCode: detectRjCode([folderName]),
     descendantWorkCount: descendants.length,
-    alreadyRegistered: repo.getWorkByPhysicalPathSync(workDir) !== null,
+    alreadyRegistered:
+      existsSync(`${workDir}/${META_FILE_NAME}`) ||
+      repo.getWorkByPhysicalPathSync(workDir) !== null,
   };
 }
 

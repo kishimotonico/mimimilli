@@ -163,6 +163,31 @@ test("DELETE /works/:id: 解除前後で音声等の物理ファイルは変更�
   assert.ok(existsSync(join(folder, "readme.txt")));
 });
 
+test("DELETE /works/:id: 解除後に同じフォルダーを再登録できる", async (t) => {
+  const { app, folder, work } = await setupRegisteredWork(t);
+
+  const delRes = await app.request(`/api/works/${work.id}`, { method: "DELETE" });
+  assert.equal(delRes.status, 204);
+
+  const previewRes = await app.request(
+    `/api/works/register-preview?path=${encodeURIComponent(folder)}`,
+  );
+  assert.equal(previewRes.status, 200);
+  const preview = await previewRes.json();
+  assert.equal(preview.alreadyRegistered, false);
+
+  const reRegRes = await app.request("/api/works", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: folder, title: "再登録作品" }),
+  });
+  assert.equal(reRegRes.status, 201);
+  const reRegBody = await reRegRes.json();
+  assert.equal(reRegBody.title, "再登録作品");
+  assert.equal(reRegBody.physicalPath, folder);
+  assert.ok(existsSync(folderMetaPath(folder)));
+});
+
 test("DELETE /works/:id: メタ削除に失敗した場合はDB上の作品データを保持する", async (t) => {
   const { app, folder, work } = await setupRegisteredWork(t);
   const metaPath = folderMetaPath(folder);
