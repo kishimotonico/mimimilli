@@ -56,7 +56,7 @@ Stop-Process -Id $Server.Id
 - 2回目の `/values/windows` が `value: persisted`
 - `$DataDir\spike.sqlite` が存在し、exeの隣にDBが作られていない
 
-`MIMIMILLI_DATA_DIR` を指定しない確認も行う場合、DBの既定位置は `$env:LOCALAPPDATA\Mimimilli\spike.sqlite` です。確認後のDBは利用者の判断で削除してください。
+`MIMIMILLI_DATA_DIR` を指定しない確認も行う場合、DBの既定位置は `$env:LOCALAPPDATA\mimimilli\spike.sqlite` です。確認後のDBは利用者の判断で削除してください。
 
 ## 切り分けprobe
 

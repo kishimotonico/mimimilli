@@ -49,7 +49,7 @@ pnpm workspace のモノレポで、`client/` / `server/` / `shared/` の3パッ
 - catalog接続をmainとしてuser DBを `user` でATTACHし、作品とuser状態をJOINして読む。DB間外部キーとcascade deleteは使わない
 - UI からの編集は `mimimilli.json` へ即時書き戻す
 - スキーマの正本は `catalogSchema.ts` / `userSchema.ts` のDrizzle定義。`pnpm --filter @mimimilli/server db:generate` で生成したSQLを起動時に適用する。開発中は `user_version` 不一致のDBを再作成し、配布開始後のuser migration基盤は別途整備する
-- データルートはADR-0007に従い、Linuxでは `${XDG_DATA_HOME:-$HOME/.local/share}/mimimilli`、Windowsでは `%LOCALAPPDATA%\Mimimilli`。`MIMIMILLI_DATA_DIR` で上書きできる
+- データルートはADR-0007に従い、Linuxでは `${XDG_DATA_HOME:-$HOME/.local/share}/mimimilli`、Windowsでは `%LOCALAPPDATA%\mimimilli`。`MIMIMILLI_DATA_DIR` で上書きできる
 
 ## 主要データフロー
 

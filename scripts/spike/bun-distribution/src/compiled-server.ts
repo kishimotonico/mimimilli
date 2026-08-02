@@ -14,7 +14,7 @@ function resolveDataDirectory(): string {
     if (!localAppData) {
       throw new Error("LOCALAPPDATA is required when MIMIMILLI_DATA_DIR is not set");
     }
-    return join(localAppData, "Mimimilli");
+    return join(localAppData, "mimimilli");
   }
   return join(process.env.XDG_DATA_HOME ?? join(homedir(), ".local", "share"), "mimimilli");
 }

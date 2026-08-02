@@ -24,6 +24,6 @@ test("Linux既定はXDG_DATA_HOME、Windows既定はLOCALAPPDATAを使う", () =
       "win32",
       "C:\\Users\\test",
     ).root,
-    "C:\\Users\\test\\AppData\\Local\\Mimimilli",
+    "C:\\Users\\test\\AppData\\Local\\mimimilli",
   );
 });

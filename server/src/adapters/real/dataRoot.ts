@@ -25,7 +25,7 @@ export function resolveDataPaths(
     if (!env.LOCALAPPDATA) {
       throw new Error("LOCALAPPDATAが未設定のためMimimilliのデータルートを決定できません");
     }
-    root = path.join(env.LOCALAPPDATA, "Mimimilli");
+    root = path.join(env.LOCALAPPDATA, "mimimilli");
   } else {
     const base = env.XDG_DATA_HOME || path.join(userHome, ".local", "share");
     root = path.join(path.isAbsolute(base) ? base : path.resolve(base), "mimimilli");

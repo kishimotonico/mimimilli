@@ -4,7 +4,7 @@ title: LogTapeのBun compileスパイク検証
 status: In Progress
 assignee: []
 created_date: '2026-08-02 06:58'
-updated_date: '2026-08-02 07:05'
+updated_date: '2026-08-02 13:30'
 labels: []
 dependencies: []
 priority: high
@@ -46,4 +46,27 @@ WSL側検証完了(Cursor委譲、Bun 1.3.14 / LogTape 2.3.0)。結果: 条件�
 - 注意4: 初回configure()でmeta loggerのinfo案内が出る。本番はレベル調整
 - 別cwd実行は絶対パス指定なら問題なし
 成果物: scratchpad/logtape-spike/(src/spike.ts, run-tests.sh, results.txt)。Windowsネイティブ検証(AC#3)は未実施、ユーザーに依頼中
+
+Windowsネイティブ検証(AC#3)の自己完結手順(別PC用。この開発環境はSSH越しのため実機検証は別PCで行う):
+1. 任意の作業フォルダで: mkdir logtape-spike && cd logtape-spike && bun init -y && bun add @logtape/logtape @logtape/file
+2. spike.ts を作成:
+---
+import { join } from "node:path";
+import { configure, getLogger, dispose } from "@logtape/logtape";
+import { getFileSink, jsonLinesFormatter } from "@logtape/file";
+const root = process.argv[0].includes("bun") ? import.meta.dir : join(process.argv[0], "..");
+const logPath = join(root, "logs", "test.jsonl");
+await configure({
+  sinks: { file: getFileSink(logPath, { formatter: jsonLinesFormatter }) },
+  loggers: [{ category: "spike", sinks: ["file"], lowestLevel: "debug" }],
+});
+const log = getLogger("spike");
+for (let i = 0; i < 30; i++) log.info(`[${i}] 日本語ログの書き込みテスト`, { workId: `RJ${100000 + i}`, seq: i });
+await dispose();
+console.log("done: " + logPath);
+---
+3. mkdir logs して bun run spike.ts → logs/test.jsonl に30行(1行1JSON・日本語が化けない)ならOK
+4. bun build --compile --outfile spike-bin.exe spike.ts && .\spike-bin.exe → 同様に30行ならOK(logsフォルダはexeと同じ場所に必要)
+5. 結果をこのタスクに報告してAC#3をチェック
+WSL検証時の注意: compile後はimport.meta.dirが/$bunfsになるためexe基準のパス解決が必要(上記スクリプトは対応済み)。バッファ既定のままprocess.exitすると欠落するためawait dispose()必須
 <!-- SECTION:NOTES:END -->
