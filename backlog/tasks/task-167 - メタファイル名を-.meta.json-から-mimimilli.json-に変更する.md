@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-01 18:44'
-updated_date: '2026-08-01 19:17'
+updated_date: '2026-08-02 00:28'
 labels: []
 dependencies: []
 priority: high
@@ -54,6 +54,8 @@ ordinal: 177000
 
 <!-- SECTION:NOTES:BEGIN -->
 Cursor(composer-2.5)実装+Sonnet検証で完了。pnpm check/test全通過(server394/client597)。衝突時(新名既存)は新名側を正として登録、旧ファイル放置+warn。ADR-0010追加。コミット3645f26
+
+方針変更(2026-08-02ユーザー判断): スキャン時の自動リネーム移行を撤去。移行は手動mv運用（コマンド例はADR-0010とコミットメッセージに記載）。移行関数・テスト3件削除、check/test全通過(server406/client601)。コミット参照: git log
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
