@@ -1,9 +1,11 @@
 ---
 id: TASK-119
 title: モーダルの閉じ経路（Escape・×・背景クリック）で挙動が食い違う問題を揃える
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-07-27 01:59'
+updated_date: '2026-08-02 16:06'
 labels:
   - client
   - ux
@@ -30,3 +32,17 @@ useDialogModal.ts のコメントに「各モーダルの既存backdrop挙動を
 - [ ] #2 編集中の閉じ操作の扱いが ScanModal / SettingsModal で統一されている
 - [ ] #3 useDialogModal に経路ごとの挙動差を許すためのAPIが残っていない
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+【2026-08-03 統括判断: 編集中の閉じ操作の扱い】3経路（Escape・×・背景クリック）すべてを「編集中なら編集のみキャンセルしてモーダルは開いたまま。非編集時はモーダルを閉じる」に統一する（レイヤーを1枚ずつ剥がすprogressive dismissal）。
+
+根拠:
+- Escapeが最前面のレイヤーから閉じるのは確立した慣例で、インライン編集を1レイヤーとみなす現行Escape挙動は妥当。これを基準に他2経路を揃える
+- 「常に閉じて編集破棄」への統一は×・背景クリックが入力中テキストを黙って破壊する経路になり、安全性で劣る
+- 確認ダイアログへの統一は1行のインライン編集（タイトル・フォルダーパス）に対して過剰で、閉じ操作の大半に摩擦を足す
+- 統一案の最悪ケースは「×を2回押す」だけで実害がなく、挙動が予測可能
+
+useDialogModal APIはonClose 1本に統一し、backdrop専用のonBackdropClose引数を廃止する（AC#3対応）。
+<!-- SECTION:NOTES:END -->
