@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  DEFAULT_DLSITE_REQUEST_CONFIG,
   resolveDlsiteRequestConfig,
   DEFAULT_DLSITE_USER_AGENT,
 } from "../../src/adapters/real/dlsiteConfig.ts";
@@ -353,25 +354,11 @@ test("DLsite scheduler: 404はretryしない", async () => {
 });
 
 test("DLsite request設定: booleanと数値環境変数を厳格に読む", () => {
-  assert.deepEqual(resolveDlsiteRequestConfig({}), {
-    offline: false,
-    requestIntervalMs: 1_000,
-    retryCount: 3,
-    maxBackoffMs: 30_000,
-    timeoutMs: 60_000,
-    userAgent: DEFAULT_DLSITE_USER_AGENT,
-  });
+  assert.deepEqual(resolveDlsiteRequestConfig({}), DEFAULT_DLSITE_REQUEST_CONFIG);
   assert.equal(resolveDlsiteRequestConfig({ MIMIMILLI_DLSITE_OFFLINE: "true" }).offline, true);
   assert.throws(() => resolveDlsiteRequestConfig({ MIMIMILLI_DLSITE_OFFLINE: "1" }));
-  assert.throws(() => resolveDlsiteRequestConfig({ MIMIMILLI_DLSITE_RETRY_COUNT: "-1" }));
-  assert.throws(() => resolveDlsiteRequestConfig({ MIMIMILLI_DLSITE_TIMEOUT_MS: "2147483648" }));
-});
-
-test("DLsite request設定: MIMIMILLI_DLSITE_USER_AGENTでUser-Agentを上書きする", () => {
-  const custom = "custom-agent/2.0 (+mailto:me@example.com)";
-  assert.equal(
-    resolveDlsiteRequestConfig({ MIMIMILLI_DLSITE_USER_AGENT: custom }).userAgent,
-    custom,
+  assert.throws(() => resolveDlsiteRequestConfig({ MIMIMILLI_DLSITE_REQUEST_INTERVAL_MS: "-1" }));
+  assert.throws(() =>
+    resolveDlsiteRequestConfig({ MIMIMILLI_DLSITE_REQUEST_INTERVAL_MS: "2147483648" }),
   );
-  assert.throws(() => resolveDlsiteRequestConfig({ MIMIMILLI_DLSITE_USER_AGENT: "" }));
 });

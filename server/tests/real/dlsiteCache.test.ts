@@ -5,6 +5,8 @@ import { gzipSync } from "node:zlib";
 import { Database } from "bun:sqlite";
 import { test } from "node:test";
 import {
+  DEFAULT_DLSITE_CACHE_MAX_EXPANDED_BYTES,
+  DEFAULT_DLSITE_CACHE_MAX_TRANSFER_BYTES,
   DEFAULT_DLSITE_CACHE_TTLS_MS,
   DlsiteCache,
   normalizeDlsiteProductCode,
@@ -272,16 +274,11 @@ test("DLsiteキャッシュ: cleanupは期限切れだけを明示的に消し�
 test("DLsiteキャッシュ設定: 環境変数を厳格に解釈する", () => {
   const config = resolveDlsiteCacheConfig("/tmp/default.sqlite", {
     MIMIMILLI_DLSITE_CACHE_DB: "/tmp/override.sqlite",
-    MIMIMILLI_DLSITE_CACHE_TTL_OK_MS: "42",
   });
   assert.equal(config.path, "/tmp/override.sqlite");
-  assert.equal(config.ttlsMs.ok, 42);
-  assert.equal(config.ttlsMs.error, DEFAULT_DLSITE_CACHE_TTLS_MS.error);
-  assert.throws(
-    () =>
-      resolveDlsiteCacheConfig("/tmp/default.sqlite", { MIMIMILLI_DLSITE_CACHE_TTL_OK_MS: "1.5" }),
-    /整数/,
-  );
+  assert.deepEqual(config.ttlsMs, DEFAULT_DLSITE_CACHE_TTLS_MS);
+  assert.equal(config.maxTransferBytes, DEFAULT_DLSITE_CACHE_MAX_TRANSFER_BYTES);
+  assert.equal(config.maxExpandedBytes, DEFAULT_DLSITE_CACHE_MAX_EXPANDED_BYTES);
   assert.throws(
     () =>
       resolveDlsiteCacheConfig("/tmp/default.sqlite", {
@@ -426,10 +423,12 @@ test("DLsiteキャッシュCLI: gzip展開サイズが上限を超えると拒�
   const env = {
     MIMIMILLI_DATA_DIR: directory.path,
     MIMIMILLI_DLSITE_CACHE_DB: join(directory.path, "cache.sqlite"),
-    MIMIMILLI_DLSITE_CACHE_MAX_EXPANDED_BYTES: "100",
   };
   assert.throws(
-    () => runDlsiteCacheCli(["import", "--product-code", "RJ123456", "--file", gzip], env),
+    () =>
+      runDlsiteCacheCli(["import", "--product-code", "RJ123456", "--file", gzip], env, {
+        maxExpandedBytes: 100,
+      }),
     /展開サイズ|展開に失敗/,
   );
 });

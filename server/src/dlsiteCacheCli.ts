@@ -19,7 +19,7 @@ import {
 import { resolveDataPaths } from "./adapters/real/dataRoot.ts";
 
 const GZIP_MAGIC = Buffer.from([0x1f, 0x8b]);
-// ディレクトリimportの命名規約: <RJ|VJ番号>.html または <RJ|VJ番号>.html.gz（docs/dlsite-cache.md参照）
+// ディレクトリimportの命名規約: <RJ|VJ番号>.html または <RJ|VJ番号>.html.gz（docs/dlsite.md参照）
 const IMPORT_FILE_EXTENSION_PATTERN = /\.html(\.gz)?$/i;
 const IMPORT_FILE_NAME_PATTERN = /^([A-Za-z]{2}\d{6,8})\.html(\.gz)?$/i;
 
@@ -141,7 +141,10 @@ const USAGE =
 export function runDlsiteCacheCli(
   argv: string[],
   env: NodeJS.ProcessEnv = process.env,
-  overrides: Pick<DlsiteCacheOptions, "clock" | "ttlsMs"> = {},
+  overrides: Pick<
+    DlsiteCacheOptions,
+    "clock" | "ttlsMs" | "maxTransferBytes" | "maxExpandedBytes"
+  > = {},
 ): string {
   const config = resolveDlsiteCacheConfig(resolveDataPaths(env).dlsiteCacheDb, env);
   const cache = new DlsiteCache({ ...config, ...overrides });

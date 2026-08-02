@@ -1,10 +1,11 @@
 ---
 id: TASK-99
 title: DLsiteの環境変数を運用で実際に触るものだけに絞る
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-07-25 23:34'
-updated_date: '2026-07-29 18:26'
+updated_date: '2026-08-02 16:09'
 labels: []
 dependencies: []
 priority: low
@@ -46,10 +47,22 @@ MIMIMILLI_DLSITE_CACHE_DB / _CACHE_MAX_EXPANDED_BYTES / _CACHE_MAX_TRANSFER_BYTE
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 残す環境変数が名前で確定し、それ以外は定数化されている
-- [ ] #2 _USER_AGENT を残すか削るかの判断と理由が記録されている（TASK-101 の意図との関係を含む）
-- [ ] #3 TTLの既定値と outcome 4分類の挙動が変わっていない
-- [ ] #4 定数化した設定について、パース関数とバリデーションとエラーメッセージが削除されている
-- [ ] #5 docs/dlsite.md から削除した環境変数の記述が落ちている
-- [ ] #6 server/src/dlsiteCacheCli.ts:22 の古い docs/dlsite-cache.md 参照が修正されている
+- [x] #1 残す環境変数が名前で確定し、それ以外は定数化されている
+- [x] #2 _USER_AGENT を残すか削るかの判断と理由が記録されている（TASK-101 の意図との関係を含む）
+- [x] #3 TTLの既定値と outcome 4分類の挙動が変わっていない
+- [x] #4 定数化した設定について、パース関数とバリデーションとエラーメッセージが削除されている
+- [x] #5 docs/dlsite.md から削除した環境変数の記述が落ちている
+- [x] #6 server/src/dlsiteCacheCli.ts:22 の古い docs/dlsite-cache.md 参照が修正されている
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+【2026-08-03 実装完了・AC#2の判断】_USER_AGENT は削除で確定。TASK-101はUAを実ブラウザ相当へ寄せることが本質で、環境変数化は付随手段だった。単一ユーザー運用でUAを外から差し替える運用実態がなく、変更が必要になったら定数 DEFAULT_DLSITE_USER_AGENT（dlsiteConfig.ts）を書き換えれば足りる。TASK-101の成果（UA文字列そのもの）は定数として維持されている。テストの注入はCLIの overrides 引数（maxExpandedBytes等）に置き換え、TTL既定値とoutcome4分類の挙動は不変。Cursor(composer-2.5)へ委譲、統括レビュー済み。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+DLsite環境変数を _CACHE_DB/_OFFLINE/_REQUEST_INTERVAL_MS の3つに絞り、残り10個（TTL4種・転送/展開上限・retry/backoff/timeout/UA）を既定値そのままの定数へ置換。パース関数・バリデーション・該当テスト・docs/dlsite.mdの一覧を整理し、dlsiteCacheCliの古いdocs参照を修正。pnpm check・pnpm test（server 444/client 603）全パス。
+<!-- SECTION:FINAL_SUMMARY:END -->
