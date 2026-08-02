@@ -1,11 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { useQuery } from "@tanstack/react-query";
+import { normalizeTag, parseTag } from "@mimimilli/shared";
 import type { DlsiteApplyBody, DlsiteWorkInfo, WorkRegisterPreview } from "@mimimilli/shared";
 import { ApiRequestError } from "../../../shared/api/http";
 import Button from "../../../shared/ui/Button";
 import IconButton from "../../../shared/ui/IconButton";
 import { I } from "../../../shared/ui/Icon";
+import TagCombobox from "../../../shared/ui/TagCombobox";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
+import { getAllTags } from "../../../entities/work/api";
+import { TAG_QUERY_KEYS } from "../../../entities/tag/queryKeys";
+import { buildTagsWithAdded, buildTagsWithRemoved } from "../../../entities/work/editableTags";
+import Tag from "../../../entities/work/ui/Tag";
+import { useTagPrefixes } from "../../library/model/useTagPrefixes";
 import { buildDlsiteApplyBody, dlsiteInfoTags } from "../../library/model/dlsitePreview";
 import { createWork, fetchDlsiteInfoByCode } from "../api";
 
@@ -33,69 +41,104 @@ export default function RegisterWorkDialog({
   onClose,
 }: RegisterWorkDialogProps) {
   const [title, setTitle] = useState(preview.suggestedTitle);
+  const [tags, setTags] = useState<string[]>(preview.tags);
+  const [isTagInputOpen, setIsTagInputOpen] = useState(false);
   const [rjCode, setRjCode] = useState(preview.detectedRjCode ?? "");
   const [dlsiteInfo, setDlsiteInfo] = useState<DlsiteWorkInfo | null>(null);
-  const [applyTitle, setApplyTitle] = useState(true);
   const [applyCover, setApplyCover] = useState(true);
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [dlsiteBusy, setDlsiteBusy] = useState(false);
+  const [dlsiteError, setDlsiteError] = useState<string | null>(null);
+  const [submitBusy, setSubmitBusy] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const tagsQuery = useQuery({ queryKey: TAG_QUERY_KEYS.all(), queryFn: getAllTags });
+  const tagSuggestions = tagsQuery.data ?? [];
+  const { tagPrefixes } = useTagPrefixes();
+
+  const fetchDlsite = async (code: string) => {
+    const trimmed = code.trim();
+    if (!trimmed) {
+      setDlsiteError("RJ/VJコードを入力してください");
+      return;
+    }
+    setDlsiteBusy(true);
+    setDlsiteError(null);
+    try {
+      const info = await fetchDlsiteInfoByCode(trimmed);
+      setDlsiteInfo(info);
+      setTitle(info.title);
+      setTags((prev) => Array.from(new Set([...prev, ...dlsiteInfoTags(info)])));
+      setApplyCover(Boolean(info.coverUrl));
+    } catch (cause) {
+      setDlsiteError(dlsiteErrorMessage(cause));
+    } finally {
+      setDlsiteBusy(false);
+    }
+  };
 
   useEffect(() => {
     setTitle(preview.suggestedTitle);
+    setTags(preview.tags);
+    setIsTagInputOpen(false);
     setRjCode(preview.detectedRjCode ?? "");
     setDlsiteInfo(null);
-    setSelectedTags([]);
-    setError(null);
+    setApplyCover(true);
+    setDlsiteError(null);
+    setSubmitError(null);
+
+    if (preview.detectedRjCode && !preview.orphanedMeta) {
+      void fetchDlsite(preview.detectedRjCode);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 開いた瞬間の自動取得はフォルダー・プレビュー単位で1回だけ行う
   }, [folderPath, preview]);
 
   const close = () => {
-    if (!busy) onClose();
+    if (!submitBusy) onClose();
   };
   const { dialogRef, handleCancel, handleBackdropClick } = useDialogModal({ onClose: close });
 
-  const allInfoTags = useMemo(() => (dlsiteInfo ? dlsiteInfoTags(dlsiteInfo) : []), [dlsiteInfo]);
-
-  const fetchDlsite = async () => {
-    const code = rjCode.trim();
-    if (!code) {
-      setError("RJ/VJコードを入力してください");
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      const info = await fetchDlsiteInfoByCode(code);
-      setDlsiteInfo(info);
-      setApplyTitle(info.title !== title);
-      setApplyCover(Boolean(info.coverUrl));
-      setSelectedTags(dlsiteInfoTags(info));
-    } catch (cause) {
-      setError(dlsiteErrorMessage(cause));
-    } finally {
-      setBusy(false);
-    }
+  const definitionOf = (tag: string) => {
+    const parsed = parseTag(tag);
+    if (parsed.kind !== "annotated") return null;
+    return tagPrefixes.find((p) => p.prefix === parsed.prefix) ?? null;
   };
 
+  const addTag = (tag: string) => {
+    const next = buildTagsWithAdded(tags, tag);
+    if (next) setTags(next);
+    setIsTagInputOpen(false);
+  };
+  const removeTag = (tag: string) => setTags(buildTagsWithRemoved(tags, tag));
+
+  const dlsiteAppliedTags = useMemo(
+    () => (dlsiteInfo ? dlsiteInfoTags(dlsiteInfo).filter((tag) => tags.includes(tag)) : []),
+    [dlsiteInfo, tags],
+  );
+
   const register = async () => {
-    setBusy(true);
-    setError(null);
+    setSubmitBusy(true);
+    setSubmitError(null);
     try {
       const dlsite: DlsiteApplyBody | undefined = dlsiteInfo
-        ? buildDlsiteApplyBody(dlsiteInfo, { applyTitle, applyCover, applyTags: selectedTags })
+        ? buildDlsiteApplyBody(dlsiteInfo, {
+            applyTitle: false,
+            applyCover,
+            applyTags: dlsiteAppliedTags,
+          })
         : undefined;
       await createWork({
         path: folderPath,
         title: title.trim(),
+        tags,
         mergeDescendantWorks: preview.descendantWorkCount > 0,
         dlsite,
       });
       onRegistered();
       onClose();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "作品の登録に失敗しました");
+      setSubmitError(cause instanceof Error ? cause.message : "作品の登録に失敗しました");
     } finally {
-      setBusy(false);
+      setSubmitBusy(false);
     }
   };
 
@@ -105,7 +148,7 @@ export default function RegisterWorkDialog({
       ref={dialogRef}
       aria-labelledby="register-work-title"
       onCancel={handleCancel}
-      onClick={(event) => handleBackdropClick(event, close, () => !busy)}
+      onClick={(event) => handleBackdropClick(event, close, () => !submitBusy)}
       className="m-auto w-[min(520px,calc(100vw-32px))] overflow-hidden rounded-[12px] border border-line-soft bg-paper-1 p-0 font-jp text-ink-0 shadow-pop backdrop:bg-[oklch(20%_0.020_70_/_0.3)]"
     >
       <div className="flex max-h-[calc(100vh-48px)] min-h-0 flex-col overflow-hidden">
@@ -116,7 +159,7 @@ export default function RegisterWorkDialog({
           >
             このフォルダーを作品として登録
           </h2>
-          <IconButton icon={I.x} label="閉じる" size="sm" disabled={busy} onClick={close} />
+          <IconButton icon={I.x} label="閉じる" size="sm" disabled={submitBusy} onClick={close} />
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-[18px] py-3 text-[12px]">
@@ -133,82 +176,115 @@ export default function RegisterWorkDialog({
             </p>
           )}
 
-          <label className="mb-3 flex flex-col gap-1">
-            <span className="font-sans text-[11px] font-medium text-ink-2">タイトル</span>
-            <input
-              className={inputClass}
-              value={title}
-              disabled={busy}
-              onChange={(event) => setTitle(event.target.value)}
-            />
-          </label>
-
           <div className="mb-3 flex flex-col gap-2 rounded-[8px] border border-line-soft p-3">
             <span className="font-sans text-[11px] font-medium text-ink-2">DLsite連携（任意）</span>
             <div className="flex gap-2">
               <input
                 className={`${inputClass} font-mono text-[11px]`}
                 value={rjCode}
-                disabled={busy}
+                disabled={submitBusy || dlsiteBusy}
                 placeholder="RJ123456"
                 onChange={(event) => setRjCode(event.target.value)}
               />
-              <Button variant="ghost" disabled={busy} onClick={fetchDlsite}>
-                取得
+              <Button
+                variant="ghost"
+                disabled={submitBusy || dlsiteBusy}
+                onClick={() => void fetchDlsite(rjCode)}
+              >
+                {dlsiteBusy ? <I.refresh size={12} className="motion-safe:animate-spin" /> : "取得"}
               </Button>
             </div>
-            {dlsiteInfo && (
-              <div className="mt-1 flex flex-col gap-1.5 text-[11px]">
-                <label className="flex items-center gap-1.5">
-                  <input
-                    type="checkbox"
-                    checked={applyTitle}
-                    onChange={(event) => setApplyTitle(event.target.checked)}
-                  />
-                  タイトルを適用: {dlsiteInfo.title}
-                </label>
-                <label className="flex items-center gap-1.5">
-                  <input
-                    type="checkbox"
-                    checked={applyCover}
-                    disabled={!dlsiteInfo.coverUrl}
-                    onChange={(event) => setApplyCover(event.target.checked)}
-                  />
-                  カバー画像を適用
-                </label>
-                {allInfoTags.length > 0 && (
-                  <fieldset className="m-0 border-none p-0">
-                    <legend className="mb-1 font-sans font-medium">タグ</legend>
-                    {allInfoTags.map((tag) => (
-                      <label key={tag} className="flex items-center gap-1.5">
-                        <input
-                          type="checkbox"
-                          checked={selectedTags.includes(tag)}
-                          onChange={(event) =>
-                            setSelectedTags((prev) =>
-                              event.target.checked
-                                ? [...prev, tag]
-                                : prev.filter((entry) => entry !== tag),
-                            )
-                          }
-                        />
-                        {tag}
-                      </label>
-                    ))}
-                  </fieldset>
-                )}
-              </div>
-            )}
+            {dlsiteError && <p className="m-0 text-[11px] text-[var(--r-coral)]">{dlsiteError}</p>}
+
+            <div className="flex items-center gap-2.5">
+              {dlsiteInfo?.coverUrl ? (
+                <img
+                  src={dlsiteInfo.coverUrl}
+                  alt=""
+                  className="h-[104px] w-[104px] shrink-0 rounded-[6px] border border-line-soft object-cover"
+                />
+              ) : (
+                <div className="flex h-[104px] w-[104px] shrink-0 flex-col items-center justify-center gap-1 rounded-[6px] border border-line-soft bg-paper-0 text-ink-4">
+                  <I.image size={20} />
+                  <span className="font-sans text-[10px]">なし</span>
+                </div>
+              )}
+              <label
+                className={`flex items-center gap-1.5 text-[11px] ${dlsiteInfo?.coverUrl ? "text-ink-1" : "text-ink-4"}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={Boolean(dlsiteInfo?.coverUrl) && applyCover}
+                  disabled={!dlsiteInfo?.coverUrl}
+                  onChange={(event) => setApplyCover(event.target.checked)}
+                />
+                カバー画像を適用
+              </label>
+            </div>
           </div>
 
-          {error && <p className="m-0 text-[11px] text-[var(--r-coral)]">{error}</p>}
+          <label className="mb-3 flex flex-col gap-1">
+            <span className="flex items-center gap-1.5 font-sans text-[11px] font-medium text-ink-2">
+              タイトル
+              {dlsiteBusy && (
+                <I.refresh size={11} className="text-ink-3 motion-safe:animate-spin" />
+              )}
+            </span>
+            <input
+              className={inputClass}
+              value={title}
+              disabled={submitBusy}
+              onChange={(event) => setTitle(event.target.value)}
+            />
+          </label>
+
+          <div className="mb-3 flex flex-col gap-1">
+            <span className="font-sans text-[11px] font-medium text-ink-2">タグ</span>
+            <div className="flex flex-wrap items-start gap-1.5">
+              {tags.map((tag) => (
+                <Tag
+                  key={tag}
+                  tag={tag}
+                  definition={definitionOf(tag)}
+                  onRemove={submitBusy ? undefined : () => removeTag(tag)}
+                />
+              ))}
+              {isTagInputOpen ? (
+                <TagCombobox
+                  focusOnMount
+                  suggestions={tagSuggestions}
+                  excludeTags={tags}
+                  disabled={submitBusy}
+                  canCreate={(tag) => normalizeTag(tag).length > 0}
+                  width={180}
+                  onSelect={addTag}
+                  onCancel={() => setIsTagInputOpen(false)}
+                />
+              ) : (
+                <IconButton
+                  icon={I.add}
+                  label="タグを追加"
+                  size="xs"
+                  className="bg-paper-2 text-ink-2 hover:bg-paper-3 hover:text-ink-0"
+                  disabled={submitBusy}
+                  onClick={() => setIsTagInputOpen(true)}
+                />
+              )}
+            </div>
+          </div>
+
+          {submitError && <p className="m-0 text-[11px] text-[var(--r-coral)]">{submitError}</p>}
         </div>
 
         <footer className="flex shrink-0 justify-end gap-2 border-t border-line-soft px-[18px] py-3">
-          <Button variant="ghost" disabled={busy} onClick={close}>
+          <Button variant="ghost" disabled={submitBusy} onClick={close}>
             キャンセル
           </Button>
-          <Button variant="primary" disabled={busy || title.trim().length === 0} onClick={register}>
+          <Button
+            variant="primary"
+            disabled={submitBusy || title.trim().length === 0}
+            onClick={() => void register()}
+          >
             登録
           </Button>
         </footer>

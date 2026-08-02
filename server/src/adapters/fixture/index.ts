@@ -493,6 +493,7 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
       const rjMatch = folderName.match(/RJ\d{6,8}/i);
       return {
         suggestedTitle: folderName,
+        tags: [],
         detectedRjCode: rjMatch ? rjMatch[0]!.toUpperCase() : null,
         descendantWorkCount: descendants.length,
         alreadyRegistered: state.works.some((work) => work.physicalPath === workDir),
@@ -524,8 +525,7 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
       const applyTags = body.dlsite ? normalizeTags(body.dlsite.applyTags) : [];
       const work: WorkSummary = {
         id: crypto.randomUUID(),
-        title:
-          body.dlsite?.applyTitle && body.dlsite.info.title ? body.dlsite.info.title : body.title,
+        title: body.title,
         cover: null,
         status: "ok",
         physicalPath: workDir,
@@ -537,7 +537,7 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
           body.dlsite?.info.url && body.dlsite.info.url.length > 0
             ? [{ label: "DLsite", url: body.dlsite.info.url }]
             : [],
-        tags: applyTags,
+        tags: body.tags,
         bookmarked: false,
         lastPlayedAt: null,
         dlsite: body.dlsite

@@ -120,6 +120,8 @@ export type WorkRegisterPreviewQuery = z.infer<typeof workRegisterPreviewQuerySc
 
 export const workRegisterPreviewSchema = z.object({
   suggestedTitle: z.string(),
+  /** 孤立メタ復元時のみメタのタグを返す。通常登録時は常に空配列 */
+  tags: z.array(z.string()),
   detectedRjCode: z.string().nullable(),
   descendantWorkCount: z.number().int().nonnegative(),
   alreadyRegistered: z.boolean(),
@@ -130,6 +132,8 @@ export type WorkRegisterPreview = z.infer<typeof workRegisterPreviewSchema>;
 export const workCreateBodySchema = z.object({
   path: z.string().min(1),
   title: z.string().min(1),
+  /** タグは契約の入口で正規形へ寄せる（ADR-0005 決定5） */
+  tags: z.array(z.string()).default([]).transform(normalizeTags),
   mergeDescendantWorks: z.boolean().default(false),
   dlsite: dlsiteApplyBodySchema.optional(),
 });

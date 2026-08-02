@@ -111,9 +111,12 @@ export function buildWorkRegisterPreview(repo: WorkRepo, workDir: string): WorkR
   const orphanedMeta = existsSync(metaPath) && dbWork === null;
 
   let suggestedTitle = folderName;
+  let tags: string[] = [];
   if (orphanedMeta) {
     try {
-      suggestedTitle = readMetaFile(metaPath).title;
+      const meta = readMetaFile(metaPath);
+      suggestedTitle = meta.title;
+      tags = meta.tags;
     } catch {
       // メタ不正は preview では隠蔽せずフォルダ名へフォールバック。POST で invalid_meta を返す。
     }
@@ -121,6 +124,7 @@ export function buildWorkRegisterPreview(repo: WorkRepo, workDir: string): WorkR
 
   return {
     suggestedTitle,
+    tags,
     detectedRjCode: detectRjCode([folderName]),
     descendantWorkCount: descendants.length,
     alreadyRegistered: dbWork !== null,
@@ -128,9 +132,8 @@ export function buildWorkRegisterPreview(repo: WorkRepo, workDir: string): WorkR
   };
 }
 
-export interface RegisterFolderMetaInput {
-  title: string;
-  tags: string[];
+/** DLsite適用結果のうち、フォーム由来の title/tags を上書きしない部分だけを表す */
+interface DlsiteAppliedMeta {
   urls: Work["urls"];
   coverImage?: string | null;
   dlsite: Work["dlsite"];
@@ -196,16 +199,10 @@ export async function createWorkFromFolder(
     } = {};
 
     if (body.title !== meta.title) metaPatch.title = body.title;
+    metaPatch.tags = normalizeTags(body.tags);
 
     if (body.dlsite) {
-      const applied = await buildMetaFromDlsiteApply(
-        body.dlsite,
-        workDir,
-        body.title,
-        applyDlsiteCover,
-      );
-      metaPatch.title = applied.title;
-      metaPatch.tags = applied.tags;
+      const applied = await buildMetaFromDlsiteApply(body.dlsite, workDir, applyDlsiteCover);
       metaPatch.urls = applied.urls;
       if (applied.coverImage !== undefined) metaPatch.coverImage = applied.coverImage;
       metaPatch.dlsite = applied.dlsite;
@@ -214,21 +211,14 @@ export async function createWorkFromFolder(
     return scanner.restoreFolderWork(workDir, metaPatch);
   }
 
-  let title = body.title;
-  let tags: string[] = [];
+  const title = body.title;
+  const tags = normalizeTags(body.tags);
   let urls: Work["urls"] = [];
   let coverImage: string | null | undefined;
   let dlsite = emptyDlsiteState();
 
   if (body.dlsite) {
-    const applied = await buildMetaFromDlsiteApply(
-      body.dlsite,
-      workDir,
-      body.title,
-      applyDlsiteCover,
-    );
-    title = applied.title;
-    tags = applied.tags;
+    const applied = await buildMetaFromDlsiteApply(body.dlsite, workDir, applyDlsiteCover);
     urls = applied.urls;
     coverImage = applied.coverImage;
     dlsite = applied.dlsite;
@@ -249,9 +239,8 @@ export async function createWorkFromFolder(
 async function buildMetaFromDlsiteApply(
   body: DlsiteApplyBody,
   workDir: string,
-  fallbackTitle: string,
   applyDlsiteCover?: (coverUrl: string, workDir: string) => Promise<string | null>,
-): Promise<RegisterFolderMetaInput & { dlsite: Work["dlsite"] }> {
+): Promise<DlsiteAppliedMeta> {
   const applyTags = normalizeTags(body.applyTags);
   let coverImage: string | null | undefined;
   if (body.applyCover && body.info.coverUrl) {
@@ -265,8 +254,6 @@ async function buildMetaFromDlsiteApply(
   }
 
   return {
-    title: body.applyTitle && body.info.title ? body.info.title : fallbackTitle,
-    tags: applyTags,
     urls: body.info.url ? [{ label: "DLsite", url: body.info.url }] : [],
     coverImage,
     dlsite: {

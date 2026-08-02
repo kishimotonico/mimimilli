@@ -211,6 +211,19 @@ test("POST /works: 登録前後で音声等の物理ファイルは変更され�
   assert.ok(existsSync(join(folder, META_FILE_NAME)));
 });
 
+test("POST /works: フォームで入力したタグを登録する", async (t) => {
+  const { app, parent } = await setupPlainLibrary(t);
+
+  const res = await app.request("/api/works", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: parent, title: "タグ付き作品", tags: ["voice", "ASMR"] }),
+  });
+  assert.equal(res.status, 201);
+  const body = await res.json();
+  assert.deepEqual(body.tags, ["voice", "ASMR"]);
+});
+
 test("GET /works/register-preview: RJコードをフォルダ名から検出する", async (t) => {
   const { app, sibling } = await setupLibraryWithChild(t);
   const res = await app.request(`/api/works/register-preview?path=${encodeURIComponent(sibling)}`);
@@ -294,6 +307,37 @@ test("POST /works: 孤立メタを復元登録し id を保持する", async (t)
 
   const get = await app.request(`/api/works/${orphanedId}`);
   assert.equal(get.status, 200);
+});
+
+test("GET /works/register-preview: 孤立メタの tags を返す", async (t) => {
+  const { app, parent } = await setupPlainLibrary(t);
+  const orphanedId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+  writeOrphanedMeta(parent, orphanedId, "復元前タイトル");
+
+  const res = await app.request(`/api/works/register-preview?path=${encodeURIComponent(parent)}`);
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.deepEqual(body.tags, ["orphaned-tag"]);
+});
+
+test("POST /works: 孤立メタ復元時、フォームで編集したタグを反映する", async (t) => {
+  const { app, parent } = await setupPlainLibrary(t);
+  const orphanedId = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+  writeOrphanedMeta(parent, orphanedId, "復元前タイトル");
+
+  const res = await app.request("/api/works", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: parent, title: "復元後タイトル", tags: ["new-tag"] }),
+  });
+  assert.equal(res.status, 201);
+  const body = await res.json();
+  assert.equal(body.id, orphanedId);
+  assert.deepEqual(body.tags, ["new-tag"]);
+
+  const get = await app.request(`/api/works/${orphanedId}`);
+  assert.equal(get.status, 200);
+  assert.deepEqual((await get.json()).tags, ["new-tag"]);
 });
 
 test("POST /works: 壊れた孤立メタは invalid_meta エラー", async (t) => {
