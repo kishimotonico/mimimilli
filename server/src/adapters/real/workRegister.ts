@@ -104,10 +104,16 @@ export function unregisterWork(repo: WorkRepo, workId: string): boolean {
 }
 
 function unregisterDescendantWorks(repo: WorkRepo, descendants: Array<{ id: string }>): void {
+  const remaining: string[] = [];
   for (const child of descendants) {
     if (!unregisterWork(repo, child.id)) {
-      throw new Error(`子作品の登録解除に失敗しました: ${child.id}`);
+      remaining.push(child.id);
     }
+  }
+  if (remaining.length > 0) {
+    throw new Error(
+      `親作品の登録は完了しましたが、子作品の登録解除に失敗しました。残存した子作品ID: ${remaining.join(", ")}`,
+    );
   }
 }
 
@@ -210,8 +216,9 @@ export async function createWorkFromFolder(
       metaPatch.dlsite = applied.dlsite;
     }
 
+    const work = await scanner.restoreFolderWork(workDir, metaPatch);
     unregisterDescendantWorks(repo, descendants);
-    return scanner.restoreFolderWork(workDir, metaPatch);
+    return work;
   }
 
   const title = body.title;
@@ -230,14 +237,15 @@ export async function createWorkFromFolder(
     if (detectedRjCode) dlsite = { ...emptyDlsiteState(), rjCode: detectedRjCode };
   }
 
-  unregisterDescendantWorks(repo, descendants);
-  return scanner.registerFolderWork(workDir, {
+  const work = await scanner.registerFolderWork(workDir, {
     title,
     tags,
     urls,
     coverImage,
     dlsite,
   });
+  unregisterDescendantWorks(repo, descendants);
+  return work;
 }
 
 async function buildMetaFromDlsiteApply(

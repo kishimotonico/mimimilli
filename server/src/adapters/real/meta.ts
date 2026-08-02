@@ -97,6 +97,70 @@ export function patchMetaFile(
   writeJsonAtomic(metaPath, raw);
 }
 
+type JsonObject = Record<string, unknown>;
+
+function playlistsOfRaw(raw: JsonObject): JsonObject[] | null {
+  if (!Array.isArray(raw.playlists)) return null;
+  return raw.playlists.filter(
+    (playlist): playlist is JsonObject => typeof playlist === "object" && playlist !== null,
+  );
+}
+
+/**
+ * DB上の別パス作品とIDが衝突する場合、生JSONの id（work/playlist/track）だけを新UUIDへ再採番する。
+ * スキーマ外のユーザー定義フィールドは保持する。
+ */
+export function reassignMetaIdsOnDbCollision(
+  metaPath: string,
+  shouldReassign: (workId: string) => boolean,
+): string {
+  const raw = JSON.parse(readFileSync(metaPath, "utf-8")) as JsonObject;
+  if (typeof raw.id !== "string") {
+    throw new MetaParseError(metaPath, "id が不正です");
+  }
+  if (!shouldReassign(raw.id)) {
+    return raw.id;
+  }
+
+  const oldDefaultPlaylistId =
+    typeof raw.defaultPlaylistId === "string" ? raw.defaultPlaylistId : null;
+  raw.id = crypto.randomUUID();
+
+  const playlists = playlistsOfRaw(raw);
+  if (playlists) {
+    let newDefaultPlaylistId: string | null = null;
+    for (const playlist of playlists) {
+      const oldPlaylistId = typeof playlist.id === "string" ? playlist.id : null;
+      playlist.id = crypto.randomUUID();
+      if (oldPlaylistId !== null && oldPlaylistId === oldDefaultPlaylistId) {
+        newDefaultPlaylistId = playlist.id as string;
+      }
+      const tracks = playlist.tracks;
+      if (Array.isArray(tracks)) {
+        for (const track of tracks) {
+          if (typeof track === "object" && track !== null) {
+            (track as JsonObject).id = crypto.randomUUID();
+          }
+        }
+      }
+    }
+    raw.defaultPlaylistId = newDefaultPlaylistId;
+    if ("defaultPlaylist" in raw) delete raw.defaultPlaylist;
+  }
+
+  const parsed = metaFileSchema.safeParse(raw);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    throw new MetaParseError(
+      metaPath,
+      `${issue?.path.join(".") ?? ""} ${issue?.message ?? "不明"}`,
+      typeof raw.id === "string" ? raw.id : null,
+    );
+  }
+  writeJsonAtomic(metaPath, raw);
+  return raw.id as string;
+}
+
 /** メタファイルのパスから作品ディレクトリを返す（どちらの形式でも親ディレクトリ） */
 export function workDirOf(metaPath: string): string {
   return dirname(metaPath);

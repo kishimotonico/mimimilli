@@ -48,6 +48,7 @@ import {
   patchMetaFile,
   readMetaFile,
   readMetaFileRaw,
+  reassignMetaIdsOnDbCollision,
   writeMetaFile,
 } from "./meta.ts";
 import { migrateMetaIds } from "./metaIdMigration.ts";
@@ -927,38 +928,6 @@ export class Scanner {
     return id;
   }
 
-  /** 孤立メタ復元時、DB上の別パス作品とIDが衝突する場合は新UUIDへ再採番する（スキャンと同様） */
-  private reassignMetaIdsOnDbCollision(metaPath: string, workDir: string): string {
-    const meta = readMetaFile(metaPath);
-    const existing = this.repo.getScanWorkMap().get(meta.id);
-    if (!existing || existing.physicalPath === workDir) {
-      return meta.id;
-    }
-
-    const newId = crypto.randomUUID();
-    const playlists = meta.playlists.map((playlist) => ({
-      ...playlist,
-      id: crypto.randomUUID(),
-      tracks: playlist.tracks.map((track) => ({
-        ...track,
-        id: crypto.randomUUID(),
-      })),
-    }));
-    let defaultPlaylistId: string | null = null;
-    if (meta.defaultPlaylistId) {
-      const index = meta.playlists.findIndex((playlist) => playlist.id === meta.defaultPlaylistId);
-      if (index >= 0) defaultPlaylistId = playlists[index]!.id;
-    }
-
-    writeMetaFile(metaPath, {
-      ...meta,
-      id: newId,
-      playlists,
-      defaultPlaylistId,
-    });
-    return newId;
-  }
-
   /** 手動登録: 指定フォルダーへ mimimilli.json を生成し DB に登録する */
   async registerFolderWork(
     workDir: string,
@@ -1037,7 +1006,10 @@ export class Scanner {
       patchMetaFile(metaPath, metaPatch);
     }
 
-    const workId = this.reassignMetaIdsOnDbCollision(metaPath, workDir);
+    const workId = reassignMetaIdsOnDbCollision(metaPath, (id) => {
+      const existing = this.repo.getScanWorkMap().get(id);
+      return existing !== undefined && existing.physicalPath !== workDir;
+    });
     const prepared = this.prepareSingleMeta(metaPath);
     const existingWorks = this.repo.getScanWorkMap();
     const batch = new UpsertBatch(this.db, this.repo, this.upsertBatchSize, () => {});

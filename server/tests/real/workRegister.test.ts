@@ -430,3 +430,80 @@ test("POST /works: 別パスの既存作品と同一IDの孤立メタを復元�
   };
   assert.equal(restoredMeta.id, restored.id);
 });
+
+test("POST /works: ID衝突復元時もスキーマ外フィールドを保持する", async (t) => {
+  const { app, root, sibling } = await setupLibraryWithChild(t);
+
+  const siblingRes = await app.request("/api/works", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: sibling, title: "既存作品" }),
+  });
+  assert.equal(siblingRes.status, 201);
+  const existingWork = await siblingRes.json();
+
+  const orphanDir = join(root, "RJ900014_orphan_extra");
+  mkdirSync(orphanDir, { recursive: true });
+  writeWav(join(orphanDir, "track.wav"), 2);
+  const playlistId = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+  const trackId = "ffffffff-ffff-4fff-8fff-ffffffffffff";
+  writeFileSync(
+    join(orphanDir, META_FILE_NAME),
+    JSON.stringify(
+      {
+        id: existingWork.id,
+        title: "孤立メタ作品",
+        urls: [],
+        tags: [],
+        coverImage: null,
+        playlists: [
+          {
+            id: playlistId,
+            name: "default",
+            customPlaylistField: "playlist-extra",
+            tracks: [
+              {
+                id: trackId,
+                title: "t",
+                file: "track.wav",
+                start: 0,
+                customTrackField: "track-extra",
+              },
+            ],
+          },
+        ],
+        defaultPlaylistId: playlistId,
+        createdAt: new Date().toISOString(),
+        dlsite: emptyDlsiteState(),
+        customTopLevel: "top-extra",
+      },
+      null,
+      2,
+    ) + "\n",
+  );
+
+  const res = await app.request("/api/works", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: orphanDir, title: "復元後タイトル" }),
+  });
+  assert.equal(res.status, 201);
+  const restored = await res.json();
+  assert.notEqual(restored.id, existingWork.id);
+
+  const restoredMeta = JSON.parse(readFileSync(join(orphanDir, META_FILE_NAME), "utf-8")) as {
+    id: string;
+    customTopLevel: string;
+    playlists: Array<{
+      id: string;
+      customPlaylistField: string;
+      tracks: Array<{ id: string; customTrackField: string }>;
+    }>;
+  };
+  assert.equal(restoredMeta.id, restored.id);
+  assert.equal(restoredMeta.customTopLevel, "top-extra");
+  assert.equal(restoredMeta.playlists[0]?.customPlaylistField, "playlist-extra");
+  assert.equal(restoredMeta.playlists[0]?.tracks[0]?.customTrackField, "track-extra");
+  assert.notEqual(restoredMeta.playlists[0]?.id, playlistId);
+  assert.notEqual(restoredMeta.playlists[0]?.tracks[0]?.id, trackId);
+});
