@@ -13,6 +13,7 @@ import {
   fetchDlsiteHtml,
   dlsiteWorkUrl,
   fetchDlsiteInfo,
+  listDlsiteMissingFields,
   mergeDlsiteTags,
   normalizeDlsiteCoverUrl,
   parseDlsiteHtml,
@@ -82,6 +83,101 @@ test("parseDlsiteHtml: タイトルが空のHTMLはparse_error", () => {
     kind: "parse_error",
     message: "DLsite作品ページのタイトルを取得できませんでした（RJ000001）",
   });
+});
+
+test("listDlsiteMissingFields: 任意フィールドの欠落を検出する", () => {
+  assert.deepEqual(
+    listDlsiteMissingFields({
+      rjCode: "RJ900001",
+      title: "タイトル",
+      circle: null,
+      cvs: [],
+      genreTags: [],
+      coverUrl: null,
+      url: "",
+    }),
+    ["circle", "cvs", "genreTags", "coverUrl"],
+  );
+  assert.deepEqual(
+    listDlsiteMissingFields({
+      rjCode: "RJ900001",
+      title: "タイトル",
+      circle: "夜想曲",
+      cvs: ["cv"],
+      genreTags: ["genre"],
+      coverUrl: "https://img.dlsite.jp/a.jpg",
+      url: "",
+    }),
+    [],
+  );
+});
+
+test("DLsite: パース成功時の欠落フィールドをwarnイベントとして記録する", async (t) => {
+  const lib = makeSampleLibrary();
+  const dir = makeTestDirectory("dlsite-parse-missing-fields");
+  t.after(lib.cleanup);
+  t.after(dir.cleanup);
+  const logs: Array<Record<string, unknown>> = [];
+  const adapter = createRealAdapter({
+    database: { kind: "memory" },
+    dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+    dlsiteSchedulerDependencies: {
+      logger: (event) => logs.push(event),
+      ...mockDlsiteTransport({
+        html: () => htmlResponse('<html><body><h1 id="work_name">タイトルのみ</h1></body></html>'),
+      }),
+    },
+  });
+  await adapter.updateSettings({ rootFolder: lib.root });
+  await adapter.scan();
+  const result = await adapter.dlsiteFetch(lib.existingWorkId);
+  assert.equal(result.ok, true);
+  const missing = logs.filter((event) => event.event === "dlsite_parse_fields_missing");
+  assert.equal(missing.length, 1);
+  assert.deepEqual(missing[0]?.missingFields, ["circle", "cvs", "genreTags", "coverUrl"]);
+  assert.equal(missing[0]?.productCode, "RJ900002");
+  adapter.close();
+});
+
+test("DLsite: キャッシュ判定ログに理由を含める", async (t) => {
+  const lib = makeSampleLibrary();
+  const dir = makeTestDirectory("dlsite-cache-reason-log");
+  t.after(lib.cleanup);
+  t.after(dir.cleanup);
+  let now = 1_000;
+  const logs: Array<Record<string, unknown>> = [];
+  const adapter = createRealAdapter({
+    database: { kind: "memory" },
+    dlsiteCache: { path: join(dir.path, "cache.sqlite"), ttlsMs: { ok: 10 }, clock: () => now },
+    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+    dlsiteSchedulerDependencies: {
+      logger: (event) => logs.push(event),
+      ...mockDlsiteTransport({ html: () => htmlResponse(SAMPLE_HTML) }),
+    },
+  });
+  await adapter.updateSettings({ rootFolder: lib.root });
+  await adapter.scan();
+  await adapter.dlsiteFetch(lib.existingWorkId);
+  const firstMiss = logs.find((event) => event.event === "dlsite_cache_miss");
+  assert.equal(firstMiss?.reason, "not_cached");
+
+  logs.length = 0;
+  await adapter.dlsiteFetch(lib.existingWorkId);
+  const cacheHit = logs.find((event) => event.event === "dlsite_cache_hit");
+  assert.equal(cacheHit?.reason, "ttl_valid");
+
+  now += 11;
+  logs.length = 0;
+  await adapter.dlsiteFetch(lib.existingWorkId);
+  const expiredMiss = logs.find((event) => event.event === "dlsite_cache_miss");
+  assert.equal(expiredMiss?.reason, "ttl_expired");
+
+  logs.length = 0;
+  await adapter.dlsiteFetch(lib.existingWorkId, true);
+  const forceMiss = logs.find((event) => event.event === "dlsite_cache_miss");
+  assert.equal(forceMiss?.reason, "force_refresh");
+  adapter.close();
 });
 
 test("fetchDlsiteInfo: HTTP 404 / 通信エラーを分類する", async () => {

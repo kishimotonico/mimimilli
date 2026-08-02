@@ -138,26 +138,50 @@ export function initLogger(options: InitLoggerOptions = {}): void {
   configured = true;
 }
 
-const DLSITE_EVENT_MESSAGES: Record<string, string> = {
-  dlsite_cache_hit: "DLsiteキャッシュヒット",
-  dlsite_cache_miss: "DLsiteキャッシュミス",
-  dlsite_parse_error: "DLsite HTMLのパースに失敗",
-  dlsite_http_retry: "DLsite HTTPリトライ",
-  dlsite_http_request: "DLsite HTTPリクエスト",
-};
+type DlsiteEventLevel = "debug" | "info" | "warning" | "error";
+
+function resolveDlsiteEvent(event: Record<string, unknown>): {
+  level: DlsiteEventLevel;
+  message: string;
+  context: Record<string, unknown>;
+} {
+  const { event: name, ...context } = event;
+  const eventName = typeof name === "string" ? name : "unknown";
+  switch (eventName) {
+    case "dlsite_cache_hit":
+      return { level: "debug", message: "DLsiteキャッシュヒット", context };
+    case "dlsite_cache_miss":
+      return { level: "debug", message: "DLsiteキャッシュミス", context };
+    case "dlsite_parse_error":
+      return { level: "warning", message: "DLsite HTMLのパースに失敗しました", context };
+    case "dlsite_parse_fields_missing":
+      return {
+        level: "warning",
+        message: "DLsite作品情報に欠落フィールドがあります",
+        context,
+      };
+    case "dlsite_http_retry":
+      return { level: "info", message: "DLsite HTTPリトライ", context };
+    case "dlsite_http_request":
+      return { level: "info", message: "DLsite HTTPリクエスト完了", context };
+    default:
+      return {
+        level: "debug",
+        message: "DLsiteイベント",
+        context: { ...context, event: eventName },
+      };
+  }
+}
 
 /** dlsiteScheduler / realアダプタ向けのイベントロガー。 */
 export function createDlsiteEventLogger(): (event: Record<string, unknown>) => void {
   const logger = getCategoryLogger("dlsite");
   return (event) => {
-    const { event: name, ...context } = event;
-    const message =
-      typeof name === "string" && name in DLSITE_EVENT_MESSAGES
-        ? DLSITE_EVENT_MESSAGES[name]!
-        : "DLsiteイベント";
-    const level =
-      name === "dlsite_parse_error" ? "warn" : name === "dlsite_http_retry" ? "info" : "debug";
-    logger[level](message, context);
+    const { level, message, context } = resolveDlsiteEvent(event);
+    if (level === "warning") logger.warn(message, context);
+    else if (level === "error") logger.error(message, context);
+    else if (level === "info") logger.info(message, context);
+    else logger.debug(message, context);
   };
 }
 

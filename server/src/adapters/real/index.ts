@@ -55,6 +55,7 @@ import {
   detectRjCode,
   fetchDlsiteCover,
   fetchDlsiteHtml,
+  listDlsiteMissingFields,
   mergeDlsiteTags,
   normalizeDlsiteCoverUrl,
   parseDlsiteHtml,
@@ -69,6 +70,7 @@ import { DEFAULT_DLSITE_REQUEST_CONFIG, type DlsiteRequestConfig } from "./dlsit
 import {
   DlsiteOfflineError,
   DlsiteScheduler,
+  type DlsiteHttpLogContext,
   type DlsiteSchedulerDependencies,
 } from "./dlsiteScheduler.ts";
 import { browseFs } from "./fsBrowse.ts";
@@ -258,10 +260,43 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
   const dlsiteCoverMaximumBytes =
     options.dlsiteCache.maxTransferBytes ?? DEFAULT_DLSITE_CACHE_MAX_TRANSFER_BYTES;
   const dlsiteUserAgent = dlsiteRequestConfig.userAgent;
+  const logDlsiteEvent = (event: Record<string, unknown>) => {
+    options.dlsiteSchedulerDependencies?.logger?.(event);
+  };
+  const logDlsiteParseResult = (
+    productCode: string,
+    parsed: DlsiteFetchResult,
+    httpAttempted: boolean,
+  ) => {
+    if (!parsed.ok) {
+      if (parsed.kind === "parse_error" && httpAttempted) {
+        logDlsiteEvent({
+          event: "dlsite_parse_error",
+          productCode,
+          httpAttempted,
+          message: parsed.message,
+        });
+      }
+      return;
+    }
+    const missingFields = listDlsiteMissingFields(parsed.info);
+    if (missingFields.length > 0) {
+      logDlsiteEvent({
+        event: "dlsite_parse_fields_missing",
+        productCode,
+        missingFields,
+        httpAttempted,
+      });
+    }
+  };
   const dlsiteHtmlFetcher = (productCode: string, signal?: AbortSignal) =>
     fetchDlsiteHtml(
       productCode,
-      (input, init) => dlsiteScheduler.fetch(input, { ...init, signal }),
+      (input, init) =>
+        dlsiteScheduler.fetch(input, { ...init, signal }, {
+          productCode,
+          resource: "html",
+        } satisfies DlsiteHttpLogContext),
       dlsiteHtmlTransferBytes,
       dlsiteHtmlExpandedBytes,
       dlsiteUserAgent,
@@ -269,7 +304,11 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
   const dlsiteCoverFetcher = (coverUrl: string, signal?: AbortSignal) =>
     fetchDlsiteCover(
       coverUrl,
-      (input, init) => dlsiteScheduler.fetch(input, { ...init, signal }),
+      (input, init) =>
+        dlsiteScheduler.fetch(input, { ...init, signal }, {
+          coverUrl,
+          resource: "cover",
+        } satisfies DlsiteHttpLogContext),
       dlsiteCoverMaximumBytes,
       dlsiteUserAgent,
     );
@@ -297,13 +336,18 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
     if (!force) {
       const resolution = dlsiteCache.resolve({ productCode: key });
       if (resolution.kind !== "miss") {
-        options.dlsiteSchedulerDependencies?.logger?.({
+        const cacheReason = resolution.kind === "failure" ? "failure_ttl_valid" : "ttl_valid";
+        logDlsiteEvent({
           event: "dlsite_cache_hit",
           resource: "html",
           key,
+          reason: cacheReason,
+          outcome: resolution.outcome,
         });
         if (resolution.kind === "html") {
-          return { result: parseDlsiteHtml(resolution.html, key), httpAttempted: false };
+          const parsed = parseDlsiteHtml(resolution.html, key);
+          logDlsiteParseResult(key, parsed, false);
+          return { result: parsed, httpAttempted: false };
         }
         return {
           result: {
@@ -314,13 +358,20 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
           httpAttempted: false,
         };
       }
+      logDlsiteEvent({
+        event: "dlsite_cache_miss",
+        resource: "html",
+        key,
+        reason: resolution.reason,
+      });
+    } else {
+      logDlsiteEvent({
+        event: "dlsite_cache_miss",
+        resource: "html",
+        key,
+        reason: "force_refresh",
+      });
     }
-    options.dlsiteSchedulerDependencies?.logger?.({
-      event: "dlsite_cache_miss",
-      resource: "html",
-      key,
-      force,
-    });
     try {
       dlsiteScheduler.assertOnline();
     } catch (error) {
@@ -369,13 +420,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
           html: response.body,
           transferSize: response.transferSize,
         });
-        if (!parsed.ok && parsed.kind === "parse_error") {
-          options.dlsiteSchedulerDependencies?.logger?.({
-            event: "dlsite_parse_error",
-            productCode: key,
-            httpAttempted: true,
-          });
-        }
+        logDlsiteParseResult(key, parsed, true);
         return { result: parsed, httpAttempted: true };
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") throw error;
@@ -414,17 +459,19 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       request = (async () => {
         const cached = dlsiteCache.getCover(normalizedUrl);
         if (cached) {
-          options.dlsiteSchedulerDependencies?.logger?.({
+          logDlsiteEvent({
             event: "dlsite_cache_hit",
             resource: "cover",
             key: normalizedUrl,
+            reason: "cached",
           });
           return { body: cached.body, normalizedUrl };
         }
-        options.dlsiteSchedulerDependencies?.logger?.({
+        logDlsiteEvent({
           event: "dlsite_cache_miss",
           resource: "cover",
           key: normalizedUrl,
+          reason: "not_cached",
         });
         dlsiteScheduler.assertOnline();
         const fetched = await dlsiteCoverFetcher(normalizedUrl, signal);
@@ -882,6 +929,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       const signal = options?.signal;
       const isAborted = (): boolean => signal?.aborted === true;
       const result: DlsiteBulkResult = { fetched: 0, failed: 0, parseErrors: 0, skipped: 0 };
+      const bulkStartedAt = Date.now();
       try {
         // 対象抽出は listSummaries で完結させる（全件 getWork の N+1 を解消。TASK-57）。
         // 以降の個別処理で完全な Work が必要な場合だけ、その作品の getWork を呼ぶ
@@ -899,13 +947,23 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
           return work.dlsite.status !== "applied";
         });
         result.skipped = requested.length - targets.length;
-
-        // 2. RJコードを重複排除して取得する。同一作品を跨いで同じRJコードが複数あっても
-        //    HTTP・キャッシュ判定は1回で済ませる。
         const uniqueRjCodes = [...new Set(targets.map((work) => work.dlsite.rjCode!))];
+        dlsiteLogger.info("DLsite一括取得を開始しました", {
+          mode,
+          targetCount: targets.length,
+          uniqueRjCodeCount: uniqueRjCodes.length,
+          skipped: result.skipped,
+        });
         const attempts = new Map<string, DlsiteFetchAttempt>();
         for (const rjCode of uniqueRjCodes) {
-          if (isAborted()) return result;
+          if (isAborted()) {
+            dlsiteLogger.info("DLsite一括取得を中断しました", {
+              mode,
+              durationMs: Date.now() - bulkStartedAt,
+              ...result,
+            });
+            return result;
+          }
           try {
             attempts.set(rjCode, await fetchCachedDlsiteAttempt(rjCode, false, signal));
           } catch (error) {
@@ -923,7 +981,14 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
         }
 
         for (let index = 0; index < targets.length; index++) {
-          if (isAborted()) return result;
+          if (isAborted()) {
+            dlsiteLogger.info("DLsite一括取得を中断しました", {
+              mode,
+              durationMs: Date.now() - bulkStartedAt,
+              ...result,
+            });
+            return result;
+          }
           const work = targets[index]!;
           const attempt = attempts.get(work.dlsite.rjCode!)!;
           const fetched = attempt.result;
@@ -942,6 +1007,18 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
                   workId: work.id,
                 });
                 continue;
+              }
+              const logContext = {
+                workId: work.id,
+                rjCode: work.dlsite.rjCode,
+                errorKind: fetched.kind,
+                message: fetched.message,
+                httpAttempted: attempt.httpAttempted,
+              };
+              if (fetched.kind === "parse_error") {
+                dlsiteLogger.warn("DLsite一括取得: 作品のパースに失敗しました", logContext);
+              } else {
+                dlsiteLogger.warn("DLsite一括取得: 作品の取得に失敗しました", logContext);
               }
               const newStatus =
                 fetched.kind === "not_found" ? ("not_found" as const) : ("error" as const);
@@ -1041,7 +1118,14 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
               result.fetched += 1;
             }
           } catch (error) {
-            if (error instanceof DOMException && error.name === "AbortError") return result;
+            if (error instanceof DOMException && error.name === "AbortError") {
+              dlsiteLogger.info("DLsite一括取得を中断しました", {
+                mode,
+                durationMs: Date.now() - bulkStartedAt,
+                ...result,
+              });
+              return result;
+            }
             if (error instanceof DlsiteOfflineError) {
               result.failed += 1;
               options?.onProgress?.({
@@ -1052,6 +1136,11 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
               });
               continue;
             }
+            dlsiteLogger.error("DLsite一括取得: 作品の適用に失敗しました", {
+              workId: work.id,
+              rjCode: work.dlsite.rjCode,
+              message: error instanceof Error ? error.message : String(error),
+            });
             const dlsite = {
               ...work.dlsite,
               status: "error" as const,
@@ -1083,9 +1172,19 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
             workId: work.id,
           });
         }
+        dlsiteLogger.info("DLsite一括取得を完了しました", {
+          mode,
+          durationMs: Date.now() - bulkStartedAt,
+          ...result,
+        });
         return result;
       } catch (error) {
         if (isAborted() || (error instanceof DOMException && error.name === "AbortError")) {
+          dlsiteLogger.info("DLsite一括取得を中断しました", {
+            mode,
+            durationMs: Date.now() - bulkStartedAt,
+            ...result,
+          });
           return result;
         }
         throw error;

@@ -33,7 +33,10 @@ function createCache(t: { after: (callback: () => void) => void }, now = 1_000) 
 
 test("DLsiteキャッシュ: hit/miss、RJ/VJ正規化、gzip BLOBを扱う", (t) => {
   const { cache, directory } = createCache(t);
-  assert.deepEqual(cache.resolve({ productCode: "RJ123456" }), { kind: "miss" });
+  assert.deepEqual(cache.resolve({ productCode: "RJ123456" }), {
+    kind: "miss",
+    reason: "not_cached",
+  });
   cache.recordSuccess({
     productCode: " rj123456 ",
     outcome: "ok",
@@ -68,7 +71,10 @@ test("DLsiteキャッシュ: TTL境界とoutcome別TTLでは期限切れを返�
   setClock(1_099);
   assert.equal(cache.resolve({ productCode: "RJ123456" }).kind, "html");
   setClock(1_100);
-  assert.deepEqual(cache.resolve({ productCode: "RJ123456" }), { kind: "miss" });
+  assert.deepEqual(cache.resolve({ productCode: "RJ123456" }), {
+    kind: "miss",
+    reason: "ttl_expired",
+  });
 
   setClock(2_000);
   cache.recordSuccess({
@@ -87,7 +93,10 @@ test("DLsiteキャッシュ: TTL境界とoutcome別TTLでは期限切れを返�
   cache.recordFailure({ productCode: "RJ123458", outcome: "not_found" });
   cache.recordFailure({ productCode: "RJ123459", outcome: "error" });
   setClock(2_021);
-  assert.deepEqual(cache.resolve({ productCode: "RJ123457" }), { kind: "miss" });
+  assert.deepEqual(cache.resolve({ productCode: "RJ123457" }), {
+    kind: "miss",
+    reason: "ttl_expired",
+  });
   const notFound = cache.resolve({ productCode: "RJ123458" });
   assert.equal(notFound.kind, "failure");
   if (notFound.kind === "failure") assert.equal(notFound.outcome, "not_found");
@@ -95,7 +104,10 @@ test("DLsiteキャッシュ: TTL境界とoutcome別TTLでは期限切れを返�
   assert.equal(error.kind, "failure");
   if (error.kind === "failure") assert.equal(error.outcome, "error");
   setClock(2_059);
-  assert.deepEqual(cache.resolve({ productCode: "RJ123459" }), { kind: "miss" });
+  assert.deepEqual(cache.resolve({ productCode: "RJ123459" }), {
+    kind: "miss",
+    reason: "not_cached",
+  });
 });
 
 test("DLsiteキャッシュ: exportHtmlはTTL切れでもsnapshotを読み出す", (t) => {
@@ -107,7 +119,10 @@ test("DLsiteキャッシュ: exportHtmlはTTL切れでもsnapshotを読み出す
     html: VALID_HTML,
   });
   setClock(1_021);
-  assert.deepEqual(cache.resolve({ productCode: "RJ123456" }), { kind: "miss" });
+  assert.deepEqual(cache.resolve({ productCode: "RJ123456" }), {
+    kind: "miss",
+    reason: "ttl_expired",
+  });
   assert.equal(cache.exportHtml({ productCode: "RJ123456" }), VALID_HTML);
 });
 
@@ -168,7 +183,10 @@ test("DLsiteキャッシュ: Content-Typeとサイズ上限で保存前に拒否
       }),
     /転送サイズ/,
   );
-  assert.deepEqual(cache.resolve({ productCode: "RJ123456" }), { kind: "miss" });
+  assert.deepEqual(cache.resolve({ productCode: "RJ123456" }), {
+    kind: "miss",
+    reason: "not_cached",
+  });
 });
 
 test("DLsiteキャッシュ: 転送上限と展開上限を独立して検証する", () => {
@@ -236,7 +254,10 @@ test("DLsiteキャッシュ: fetched_atとTTLの加算が安全な整数を超�
     () => cache.recordFailure({ productCode: "RJ123456", outcome: "error" }),
     /attempted_at \+ TTL/,
   );
-  assert.deepEqual(cache.resolve({ productCode: "RJ123456" }), { kind: "miss" });
+  assert.deepEqual(cache.resolve({ productCode: "RJ123456" }), {
+    kind: "miss",
+    reason: "not_cached",
+  });
 });
 
 test("DLsiteキャッシュ: cleanupは期限切れだけを明示的に消し、statusはDB容量を返す", (t) => {

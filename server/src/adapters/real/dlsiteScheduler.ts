@@ -5,12 +5,22 @@ export type DlsiteTransport = (
   init?: RequestInit,
 ) => Promise<Response>;
 
+/** fetch呼び出し元がHTTPログへ載せる識別情報。schedulerはproduct codeを解釈しない。 */
+export interface DlsiteHttpLogContext {
+  productCode?: string;
+  coverUrl?: string;
+  resource?: string;
+  workId?: string;
+}
+
+export type DlsiteSchedulerLogger = (event: Record<string, unknown>) => void;
+
 export interface DlsiteSchedulerDependencies {
   transport?: DlsiteTransport;
   now?: () => number;
   sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
   random?: () => number;
-  logger?: (event: Record<string, unknown>) => void;
+  logger?: DlsiteSchedulerLogger;
 }
 
 export class DlsiteOfflineError extends Error {
@@ -22,6 +32,12 @@ export class DlsiteOfflineError extends Error {
 
 function abortError(): DOMException {
   return new DOMException("DLsiteリクエストはキャンセルされました", "AbortError");
+}
+
+function requestUrl(input: string | URL | Request): string {
+  if (typeof input === "string") return input;
+  if (input instanceof URL) return input.href;
+  return input.url;
 }
 
 function defaultSleep(ms: number, signal?: AbortSignal): Promise<void> {
@@ -77,7 +93,7 @@ export class DlsiteScheduler {
   private readonly now: () => number;
   private readonly sleep: (ms: number, signal?: AbortSignal) => Promise<void>;
   private readonly random: () => number;
-  private readonly logger: (event: Record<string, unknown>) => void;
+  private readonly logger: DlsiteSchedulerLogger;
   private nextStartAt = 0;
   private cooldownUntil = 0;
   private queue = Promise.resolve();
@@ -96,16 +112,35 @@ export class DlsiteScheduler {
     if (this.config.offline) throw new DlsiteOfflineError();
   }
 
-  async fetch(input: string | URL | Request, init: RequestInit = {}): Promise<Response> {
+  async fetch(
+    input: string | URL | Request,
+    init: RequestInit = {},
+    logContext: DlsiteHttpLogContext = {},
+  ): Promise<Response> {
     this.assertOnline();
     const deadline = this.deadline();
+    const url = requestUrl(input);
     let retry = 0;
+    let lastStatus: number | undefined;
+    let lastErrorKind: string | undefined;
     while (true) {
       const signal = this.timeoutSignal(init.signal, deadline);
       try {
         const response = await this.start(
           async () => {
+            const startedAt = this.now();
             const response = await this.transport(input, { ...init, signal });
+            const durationMs = this.now() - startedAt;
+            lastStatus = response.status;
+            lastErrorKind = undefined;
+            this.logger({
+              event: "dlsite_http_request",
+              count: this.requestCount,
+              status: response.status,
+              durationMs,
+              url,
+              ...logContext,
+            });
             // cooldownの反映はqueue解放前に行う。解放後だと後続がqueue待機から
             // 抜けた直後に古いcooldownUntilで待機時間を計算してしまう。
             if (response.status === 429 || response.status === 503) {
@@ -124,6 +159,7 @@ export class DlsiteScheduler {
       } catch (error) {
         if (init.signal?.aborted || (error instanceof DOMException && error.name === "AbortError"))
           throw error;
+        lastErrorKind = error instanceof Error ? error.name : "unknown";
         if (this.now() >= deadline || retry >= this.config.retryCount) throw error;
       }
       retry += 1;
@@ -131,7 +167,15 @@ export class DlsiteScheduler {
       const delay = Math.min(this.config.maxBackoffMs, Math.floor(base * (0.5 + this.random())));
       if (this.addDelay(delay) > deadline)
         throw new Error("DLsiteリクエストの総期限を超過しました");
-      this.logger({ event: "dlsite_http_retry", retry, delayMs: delay });
+      this.logger({
+        event: "dlsite_http_retry",
+        retry,
+        delayMs: delay,
+        status: lastStatus,
+        errorKind: lastErrorKind,
+        url,
+        ...logContext,
+      });
       await this.sleep(delay, init.signal ?? undefined);
     }
   }
@@ -180,7 +224,6 @@ export class DlsiteScheduler {
       const startedAt = this.now();
       this.nextStartAt = startedAt + this.config.requestIntervalMs;
       this.requestCount += 1;
-      this.logger({ event: "dlsite_http_request", count: this.requestCount });
       return await operation();
     } finally {
       release();

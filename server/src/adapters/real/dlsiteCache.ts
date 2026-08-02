@@ -56,7 +56,9 @@ export type DlsiteCacheResolution =
       html: string;
     }
   | { kind: "failure"; outcome: DlsiteFailureOutcome; attemptedAt: number; expiresAt: number }
-  | { kind: "miss" };
+  | { kind: "miss"; reason: DlsiteCacheMissReason };
+
+export type DlsiteCacheMissReason = "not_cached" | "ttl_expired" | "snapshot_body_missing";
 
 type NormalizedKey = {
   store: DlsiteStore;
@@ -379,9 +381,10 @@ export class DlsiteCache {
       };
     }
     const meta = this.readSnapshotMeta(key);
-    if (!meta || meta.content_expires_at <= now) return { kind: "miss" };
+    if (!meta) return { kind: "miss", reason: "not_cached" };
+    if (meta.content_expires_at <= now) return { kind: "miss", reason: "ttl_expired" };
     const body = this.readSnapshotBody(key);
-    if (!body) return { kind: "miss" };
+    if (!body) return { kind: "miss", reason: "snapshot_body_missing" };
     return {
       kind: "html",
       outcome: meta.outcome,

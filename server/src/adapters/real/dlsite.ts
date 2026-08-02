@@ -77,6 +77,19 @@ export function detectRjCode(candidates: string[]): string | null {
   return null;
 }
 
+export const DLSITE_OPTIONAL_FIELDS = ["circle", "cvs", "genreTags", "coverUrl"] as const;
+export type DlsiteOptionalField = (typeof DLSITE_OPTIONAL_FIELDS)[number];
+
+/** パース成功時に取得できなかった任意フィールド名を返す（pure）。 */
+export function listDlsiteMissingFields(info: DlsiteWorkInfo): DlsiteOptionalField[] {
+  const missing: DlsiteOptionalField[] = [];
+  if (!info.circle) missing.push("circle");
+  if (info.cvs.length === 0) missing.push("cvs");
+  if (info.genreTags.length === 0) missing.push("genreTags");
+  if (!info.coverUrl) missing.push("coverUrl");
+  return missing;
+}
+
 /** DLsite 作品ページの HTML から作品情報を抽出する（pure） */
 export function parseDlsiteHtml(html: string, rjCode: string): DlsiteFetchResult {
   const $ = load(html);
