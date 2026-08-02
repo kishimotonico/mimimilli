@@ -1,10 +1,10 @@
 ---
 id: TASK-168
 title: LogTapeのBun compileスパイク検証
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-08-02 06:58'
-updated_date: '2026-08-02 13:48'
+updated_date: '2026-08-02 13:54'
 labels: []
 dependencies: []
 priority: high
@@ -21,8 +21,8 @@ ordinal: 178000
 <!-- AC:BEGIN -->
 - [x] #1 compileした単一バイナリでfile sinkがJSONLファイルに書き込める
 - [x] #2 正常終了およびCtrl+C時にバッファがflushされログが失われない
-- [ ] #3 Windowsネイティブでも同スパイクが動作する（WSLと両方で確認）
-- [ ] #4 結果（合否と根拠）をタスクノートに記録し、不合格時はpino切替の方針を明記する
+- [x] #3 Windowsネイティブでも同スパイクが動作する（WSLと両方で確認）
+- [x] #4 結果（合否と根拠）をタスクノートに記録し、不合格時はpino切替の方針を明記する
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -72,4 +72,12 @@ WSL検証時の注意: compile後はimport.meta.dirが/$bunfsになるためexe�
 
 Windows検証用スパイクをリポジトリに追加: scripts/spike/logtape-file-sink/（手順はWINDOWS-SMOKE.md。別PCでpull→bun install→手順どおり。WSLでは通常実行・compile・Windowsクロスコンパイルまで動作確認済み）。前のノートの手作業手順はこれで置き換え。
 後始末の手はず（AC#3合格の確認後に実施）: ①scripts/spike/logtape-file-sink/ を削除 ②役目を終えているscripts/spike/bun-distribution/（TASK-70実証、結論はADR-0007記録済み）も同時に削除し、ADR-0007のスパイク参照2箇所（5行目・40行目）をGit履歴ポインタ（cad3f6c→正: cad3c6f）へ差し替える
+
+Windowsネイティブ検証結果(別PC、C:\projects\mimimilli): bun runでの通常実行は合格(30行・1行1JSON・日本語無化け・文脈フィールド正常)。compile exeはスパイク自身のパス解決バグ(argv[0]がWindowsでは仮想FS B:/~BUN側になる)で起動時にEPERMとなったが、これはLogTape/file sinkの問題ではなく、LogTape到達前の失敗。ユーザー判断により『LogTapeがWindowsでJSONLを書ける』という検証目的は達成とし、スパイク修正は不要で終了。compile版のexe相対パス解決が将来必要になったらprocess.execPath基準にすること(本体はLOCALAPPDATA由来の絶対パスでexe相対解決を使わないため影響なし)
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+LogTapeのBun compile検証: WSLで単一バイナリのJSONL書き込み・flush・パス挙動を実証(条件付き合格)、Windowsネイティブはbun run実行で書き込みを実証し目的達成。採用条件クリア
+<!-- SECTION:FINAL_SUMMARY:END -->
