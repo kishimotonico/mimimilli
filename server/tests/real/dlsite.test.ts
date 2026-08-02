@@ -229,7 +229,7 @@ test("dlsiteApply: タグマージとメタ書き戻し（カバー DL なし）
   // 既存タグの重複なし
   assert.equal(work?.tags.filter((t) => t === "cv/水瀬なずな").length, 1);
 
-  const meta = JSON.parse(readFileSync(join(work!.physicalPath, ".meta.json"), "utf-8")) as {
+  const meta = JSON.parse(readFileSync(join(work!.physicalPath, "mimimilli.json"), "utf-8")) as {
     title: string;
     tags: string[];
     urls: { label: string; url: string }[];
@@ -260,7 +260,7 @@ test("updateDlsiteState: RJコード修正とskipped切替をメタへ保存す�
   });
   assert.equal(skipped?.dlsite.rjCode, "RJ1234567");
   assert.equal(skipped?.dlsite.status, "skipped");
-  const meta = JSON.parse(readFileSync(join(skipped!.physicalPath, ".meta.json"), "utf-8"));
+  const meta = JSON.parse(readFileSync(join(skipped!.physicalPath, "mimimilli.json"), "utf-8"));
   assert.deepEqual(meta.dlsite, skipped?.dlsite);
 
   const enabled = await adapter.updateDlsiteState(lib.existingWorkId, { skipped: false });
@@ -281,7 +281,7 @@ test("updateDlsiteState: RJコード変更で旧状態をリセットし一括�
   await adapter.scan();
 
   const before = await adapter.getWork(lib.existingWorkId);
-  const metaPath = join(before!.physicalPath, ".meta.json");
+  const metaPath = join(before!.physicalPath, "mimimilli.json");
   const meta = JSON.parse(readFileSync(metaPath, "utf-8"));
   meta.dlsite = {
     rjCode: "RJ900002",
@@ -349,7 +349,7 @@ test("一括取得: 編集済みタイトルは保持しフォルダー名のま
   await adapter.updateSettings({ rootFolder: lib.root });
   const scan = await adapter.scan();
   const beforeExisting = await adapter.getWork(lib.existingWorkId);
-  const metaPath = join(beforeExisting!.physicalPath, ".meta.json");
+  const metaPath = join(beforeExisting!.physicalPath, "mimimilli.json");
   const meta = JSON.parse(readFileSync(metaPath, "utf-8"));
   meta.dlsite = {
     rjCode: "RJ900002",
@@ -813,7 +813,7 @@ test("DLsite bulk: 同一RJコードは同じ実行・別実行・adapter再オ�
   const cachePath = join(dir.path, "db", "dlsite-cache.sqlite");
   const duplicateDir = join(lib.root, "dlsite", "RJ900002_複製");
   cpSync(join(lib.root, "dlsite", "RJ900002_既存メタ"), duplicateDir, { recursive: true });
-  const duplicateMetaPath = join(duplicateDir, ".meta.json");
+  const duplicateMetaPath = join(duplicateDir, "mimimilli.json");
   const duplicateMeta = JSON.parse(readFileSync(duplicateMetaPath, "utf-8")) as { id: string };
   duplicateMeta.id = "22222222-2222-4222-8222-222222222222";
   writeFileSync(duplicateMetaPath, JSON.stringify(duplicateMeta, null, 2));
@@ -927,7 +927,7 @@ test("DLsiteカバー: キャッシュから各作品フォルダーへコピー
   reregistered.close();
 });
 
-test("DLsite HTMLキャッシュ: fresh DBで.meta.jsonを削除して同じ作品を再登録してもHTTPしない", async (t) => {
+test("DLsite HTMLキャッシュ: fresh DBでmimimilli.jsonを削除して同じ作品を再登録してもHTTPしない", async (t) => {
   const lib = makeSampleLibrary();
   const dir = makeTestDirectory("dlsite-html-reregister");
   t.after(lib.cleanup);
@@ -958,7 +958,7 @@ test("DLsite HTMLキャッシュ: fresh DBで.meta.jsonを削除して同じ作�
   assert.equal(htmlHttpCalls, 1);
   first.close();
 
-  rmSync(join(lib.root, "dlsite", "RJ900002_既存メタ", ".meta.json"));
+  rmSync(join(lib.root, "dlsite", "RJ900002_既存メタ", "mimimilli.json"));
   const secondDb = {
     kind: "files" as const,
     catalogPath: join(dir.path, "second", "catalog.sqlite"),
@@ -1079,7 +1079,7 @@ test("DLsite bulk: 2回目はcache hitでmeta.jsonとlastAttemptAtを書き換�
   await adapter.scan();
   await adapter.runDlsiteBulk("existing", [lib.existingWorkId]);
   const before = await adapter.getWork(lib.existingWorkId);
-  const metaPath = join(before!.physicalPath, ".meta.json");
+  const metaPath = join(before!.physicalPath, "mimimilli.json");
   const mtimeBefore = statSync(metaPath).mtimeMs;
   const lastAttemptBefore = before!.dlsite.lastAttemptAt;
   assert.ok(lastAttemptBefore);
@@ -1348,7 +1348,7 @@ test("一括取得: 失敗状態のメタ書き戻しが例外を投げても後
   await adapter.updateSettings({ rootFolder: lib.root });
   const scan = await adapter.scan();
 
-  const failedMetaPath = join(lib.root, "dlsite", "RJ900002_既存メタ", ".meta.json");
+  const failedMetaPath = join(lib.root, "dlsite", "RJ900002_既存メタ", "mimimilli.json");
   chmodSync(failedMetaPath, 0o444);
 
   const result = await adapter.runDlsiteBulk("existing", undefined);
@@ -1367,7 +1367,7 @@ test("一括取得: 中断後の再実行で処理済み作品はHTTPしない",
   t.after(dir.cleanup);
   const duplicateDir = join(lib.root, "dlsite", "RJ900002_複製");
   cpSync(join(lib.root, "dlsite", "RJ900002_既存メタ"), duplicateDir, { recursive: true });
-  const duplicateMetaPath = join(duplicateDir, ".meta.json");
+  const duplicateMetaPath = join(duplicateDir, "mimimilli.json");
   const duplicateMeta = JSON.parse(readFileSync(duplicateMetaPath, "utf-8")) as { id: string };
   duplicateMeta.id = "22222222-2222-4222-8222-222222222222";
   writeFileSync(duplicateMetaPath, JSON.stringify(duplicateMeta, null, 2));

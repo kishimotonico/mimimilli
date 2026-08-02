@@ -195,7 +195,7 @@ async function main(): Promise<void> {
     for (let index = 0; index < count; index++) {
       const work = buildWork(index, libRoot, rng);
       if (index === 0) firstWork = work;
-      repo.upsertWork(work, { metaPath: join(work.physicalPath, ".meta.json") });
+      repo.upsertWork(work, { metaPath: join(work.physicalPath, "mimimilli.json") });
       if ((index + 1) % 1000 === 0 || index + 1 === count) {
         process.stdout.write(`\r${index + 1}/${count} works`);
       }

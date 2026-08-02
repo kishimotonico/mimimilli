@@ -1,4 +1,4 @@
-// real アダプタ: SQLite（キャッシュ）+ 実ファイルシステム + `.meta.json`（Source of Truth）。
+// real アダプタ: SQLite（キャッシュ）+ 実ファイルシステム + `mimimilli.json`（Source of Truth）。
 // 作品検索・件数・ページングはcatalog接続からuser DBをATTACH JOINしてSQLで実行する。
 import { realpathSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";

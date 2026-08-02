@@ -6,7 +6,7 @@
 
 ## 文脈
 
-現行SQLiteは、`.meta.json`とファイル走査から戻せる作品カタログ、プローブ結果のキャッシュ、設定・ブックマーク・再生状態を1ファイルに置いている。現在の開発フェーズでは、ユーザーの保存データを含む破壊的変更を許容しており、スキーマ世代が合わないDBは再作成できる。一方、配布を始めて作者以外のユーザーのデータを預かる段階では、userデータを保ったまま更新する仕組みが必要になる。
+現行SQLiteは、`.meta.json`（メタファイル名は [ADR-0010](0010-meta-file-rename-mimimilli-json.md) により `mimimilli.json` へ変更）とファイル走査から戻せる作品カタログ、プローブ結果のキャッシュ、設定・ブックマーク・再生状態を1ファイルに置いている。現在の開発フェーズでは、ユーザーの保存データを含む破壊的変更を許容しており、スキーマ世代が合わないDBは再作成できる。一方、配布を始めて作者以外のユーザーのデータを預かる段階では、userデータを保ったまま更新する仕組みが必要になる。
 
 DBを分ける主目的は、catalog再構築がuserデータに触れる経路を物理的に無くし、再構築処理を単純にすることである。開発中にuser DBを再作成できることとは分けて考える。
 
@@ -22,30 +22,30 @@ DBを分ける主目的は、catalog再構築がuserデータに触れる経路�
 
 分類は列の値を失ったときの回復元で決める。
 
-- catalog: `.meta.json`またはファイル走査から再構築できる
+- catalog: `.meta.json`（現行は `mimimilli.json`。[ADR-0010](0010-meta-file-rename-mimimilli-json.md)）またはファイル走査から再構築できる
 - user: DBが正本であり、再スキャンでは同じ値に戻らない
 - 派生キャッシュ: catalogまたはファイルから計算し直せる。失っても意味上のデータは失わない
 
 現行`schema.ts`と`db.ts`の全テーブル・全列を次のように分類する。複数列を記した行も、列名を省略していない。
 
-| 現行テーブル        | 現行列                                                                                  | 分類           | 回復元・扱い                                                       |
-| ------------------- | --------------------------------------------------------------------------------------- | -------------- | ------------------------------------------------------------------ |
-| `works`             | `id`                                                                                    | catalog        | `.meta.json.id`。Workの安定ID                                      |
-| `works`             | `title`, `cover_image`, `default_playlist`, `created_at`, `urls_json`, `playlists_json` | catalog        | `.meta.json`                                                       |
-| `works`             | `status`, `physical_path`, `error_message`                                              | catalog        | ファイル走査とメタ検証の結果                                       |
-| `works`             | `total_duration_sec`                                                                    | 派生キャッシュ | プレイリスト区間と音声プローブから再計算                           |
-| `works`             | `added_at`                                                                              | user           | 初回登録日時。再構築で現在時刻へ変えてはならない                   |
-| `works`             | `bookmarked`, `last_played_at`                                                          | user           | ユーザー操作と再生履歴                                             |
-| `works`             | `resume_position`, `resume_track_index`                                                 | user           | resume v1。移行後はresume v2へ置換                                 |
-| `tags`              | `id`, `name`                                                                            | catalog        | 正規化した`.meta.json.tags`から再構築。`id`はDB内の代理キー        |
-| `work_tags`         | `work_id`, `tag_id`                                                                     | catalog        | Workと再構築済みTagの関係                                          |
-| `work_dlsite`       | `work_id`, `state_json`                                                                 | catalog        | 現行実装は全更新経路で`dlsite`を`.meta.json`にも書くため再構築可能 |
-| `tag_prefixes`      | `id`, `prefix`, `label`, `color`, `show_as_axis`, `protected`                           | user           | ユーザーが編集する分類軸定義。`id`は表示順も保持する               |
-| `app_settings`      | `key`, `value`のうち`root_folder`                                                       | user           | ユーザーが選んだライブラリルート                                   |
-| `app_settings`      | `key`, `value`のうち`tag_prefixes_seeded`                                               | user           | 初期値を再投入してユーザーの削除を取り消さないため保持             |
-| `app_settings`      | `key`, `value`のうち`last_scan_time`                                                    | 派生キャッシュ | 最後に完了したスキャンから再生成する運用情報                       |
-| `smart_folders`     | `id`, `name`, `rules_json`, `sort`, `created_at`                                        | user           | ユーザーが作成したフォルダー定義                                   |
-| `audio_probe_cache` | `path`, `size`, `mtime_ms`, `duration_sec`                                              | 派生キャッシュ | 音声ファイルを再プローブして回復                                   |
+| 現行テーブル        | 現行列                                                                                  | 分類           | 回復元・扱い                                                                                                                                       |
+| ------------------- | --------------------------------------------------------------------------------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `works`             | `id`                                                                                    | catalog        | `.meta.json.id`（現行は `mimimilli.json`。[ADR-0010](0010-meta-file-rename-mimimilli-json.md)）。Workの安定ID                                      |
+| `works`             | `title`, `cover_image`, `default_playlist`, `created_at`, `urls_json`, `playlists_json` | catalog        | `.meta.json`（現行は `mimimilli.json`）                                                                                                            |
+| `works`             | `status`, `physical_path`, `error_message`                                              | catalog        | ファイル走査とメタ検証の結果                                                                                                                       |
+| `works`             | `total_duration_sec`                                                                    | 派生キャッシュ | プレイリスト区間と音声プローブから再計算                                                                                                           |
+| `works`             | `added_at`                                                                              | user           | 初回登録日時。再構築で現在時刻へ変えてはならない                                                                                                   |
+| `works`             | `bookmarked`, `last_played_at`                                                          | user           | ユーザー操作と再生履歴                                                                                                                             |
+| `works`             | `resume_position`, `resume_track_index`                                                 | user           | resume v1。移行後はresume v2へ置換                                                                                                                 |
+| `tags`              | `id`, `name`                                                                            | catalog        | 正規化した`.meta.json.tags`から再構築。`id`はDB内の代理キー                                                                                        |
+| `work_tags`         | `work_id`, `tag_id`                                                                     | catalog        | Workと再構築済みTagの関係                                                                                                                          |
+| `work_dlsite`       | `work_id`, `state_json`                                                                 | catalog        | 現行実装は全更新経路で`dlsite`を`.meta.json`（現行は `mimimilli.json`。[ADR-0010](0010-meta-file-rename-mimimilli-json.md)）にも書くため再構築可能 |
+| `tag_prefixes`      | `id`, `prefix`, `label`, `color`, `show_as_axis`, `protected`                           | user           | ユーザーが編集する分類軸定義。`id`は表示順も保持する                                                                                               |
+| `app_settings`      | `key`, `value`のうち`root_folder`                                                       | user           | ユーザーが選んだライブラリルート                                                                                                                   |
+| `app_settings`      | `key`, `value`のうち`tag_prefixes_seeded`                                               | user           | 初期値を再投入してユーザーの削除を取り消さないため保持                                                                                             |
+| `app_settings`      | `key`, `value`のうち`last_scan_time`                                                    | 派生キャッシュ | 最後に完了したスキャンから再生成する運用情報                                                                                                       |
+| `smart_folders`     | `id`, `name`, `rules_json`, `sort`, `created_at`                                        | user           | ユーザーが作成したフォルダー定義                                                                                                                   |
+| `audio_probe_cache` | `path`, `size`, `mtime_ms`, `duration_sec`                                              | 派生キャッシュ | 音声ファイルを再プローブして回復                                                                                                                   |
 
 今後`app_settings`へキーを追加するときは、キーごとにuserか派生キャッシュかを宣言する。寿命の異なる値を未分類のまま汎用KVへ追加しない。
 
@@ -62,7 +62,7 @@ DBを分ける主目的は、catalog再構築がuserデータに触れる経路�
 
 catalog接続を`main`として開き、user DBを`user`スキーマ名で`ATTACH`する。作品一覧は`main`の作品・タグと`user`の作品状態を同じSQL文でJOINする。`addedAt`を含むuser側の作品状態は、作品をcatalogへ登録する前に冪等なINSERTで作る。起動時の整合性検査で、catalogに存在するのにuser状態がないWorkを検出した場合は、一覧から黙って除外したり現在時刻を補ったりせず、診断可能な整合性エラーとして止める。
 
-PlaylistとTrackは`.meta.json`の入れ子構造を正本としつつ、IDと所属関係をcatalog DBの関係表にも展開する。この関係表はcatalogであり、再スキャンで作り直せる。resume v2はuser DBで`work_id`を主キーとし、`playlist_id`、`track_id`、`offset_sec`を保持する。
+PlaylistとTrackは`.meta.json`（現行は `mimimilli.json`。[ADR-0010](0010-meta-file-rename-mimimilli-json.md)）の入れ子構造を正本としつつ、IDと所属関係をcatalog DBの関係表にも展開する。この関係表はcatalogであり、再スキャンで作り直せる。resume v2はuser DBで`work_id`を主キーとし、`playlist_id`、`track_id`、`offset_sec`を保持する。
 
 user DBにはcatalog DBを参照する外部キーを作らない。catalogの削除や再作成からuser状態を切り離し、`ON DELETE CASCADE`も使わない。通常スキャンでは見つからないWorkのcatalog行を`missing`にするため、検索の`missing`表示は維持できる。catalog DBをファイルごと再構築してmissing中のcatalog行がなくなっても、user状態は孤児として残す。同じWork UUIDが再び現れたときにその状態を再接続する。
 
@@ -115,7 +115,7 @@ SQLへ直接移せない規則は、catalog DBにcoreと同じ関数で作った
 
 Work、Playlist、Trackはそれぞれ不透明なUUIDを持つ。
 
-- Work IDは既存の`.meta.json.id`を継続して使う
+- Work IDは既存の`.meta.json.id`（現行は `mimimilli.json`。[ADR-0010](0010-meta-file-rename-mimimilli-json.md)）を継続して使う
 - Playlistへ`id`、Trackへ`id`を追加し、新規採番は`crypto.randomUUID()`によるUUID v4とする
 - IDをパス、タイトル、配列index、ファイル名から導出しない。並べ替え、改名、移動、区間変更ではIDを変えない
 - 各種類のIDはライブラリ全体で一意とする
@@ -188,7 +188,7 @@ migration markerとmanifestに各工程の完了状態を記録し、途中停�
 - catalogとuserをまたぐWALトランザクションへ原子性を期待できないため、書き込み所有者の分離と冪等な回復処理が必要になる
 - fixtureとcore純粋関数は残るが、realの本番検索経路では参照実装になる。SQLとの一致は契約テストで保証する
 - 日本語向けソートキーの規則を変える場合は、coreのキー生成関数を差し替えてcatalogを再スキャンすればよい。user DBのmigrationは不要である
-- `.meta.json`のID移行は時間とバックアップ領域を使う。代わりに、プレイリスト編集後もresumeが配列indexへ誤接続しなくなる
+- `.meta.json`（現行は `mimimilli.json`。[ADR-0010](0010-meta-file-rename-mimimilli-json.md)）のID移行は時間とバックアップ領域を使う。代わりに、プレイリスト編集後もresumeが配列indexへ誤接続しなくなる
 - missing中のWorkとcatalog再構築でuser状態を削除しないため、user DBにはcatalogに存在しない行が正常に残る
 - メタへアクセスできない旧missing Workは、新しいcatalogのmissing一覧から一時的に消える。同じWork UUIDのメタが戻ればuser状態を再接続し、ID付与後に一覧へ戻る
 - CAS/revisionは同期要件と一緒に決める。resume v2の導入だけでは競合制御を増やさない

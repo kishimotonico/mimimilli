@@ -2,12 +2,12 @@
 //
 // フロー（要件 v4 §8 / HANDOFF.md）:
 //   1. 全作品を「行方不明」にマーク
-//   2. ルート以下を走査し、メタファイル（.meta.json / *.meta.json）を登録
+//   2. ルート以下を走査し、メタファイル（mimimilli.json / *.mimimilli.json）を登録
 //      - ID で突合し、移動・リネームに追従（DB の既存情報を保持）
 //      - 同一 UUID の重複は後に検出された方を再採番してメタファイルへ書き戻す
 //      - 参照先音声の欠損は status "error" + errorMessage
 //      - 再生時間は music-metadata でプローブし SQLite にキャッシュ
-//   3. メタファイルのない音声フォルダーへ .meta.json を自動生成（下書き）
+//   3. メタファイルのない音声フォルダーへ mimimilli.json を自動生成（下書き）
 //   4. missing のまま残った作品 = 物理パス消失
 //
 // Rust 版からの意図的な変更:
@@ -42,6 +42,7 @@ import { detectRjCode } from "./dlsite.ts";
 import { computeFingerprint, computeRawFingerprint } from "./fingerprint.ts";
 import {
   isMetaFileName,
+  META_FILE_NAME,
   MetaParseError,
   patchMetaFile,
   readMetaFile,
@@ -576,7 +577,7 @@ export class Scanner {
       const workDir = roots[i]!;
       try {
         const id = this.generateMetaForFolder(workDir);
-        generated.push({ id, prepared: this.prepareSingleMeta(join(workDir, ".meta.json")) });
+        generated.push({ id, prepared: this.prepareSingleMeta(join(workDir, META_FILE_NAME)) });
       } catch (e) {
         console.warn(`メタファイルの自動生成に失敗: ${workDir}: ${(e as Error).message}`);
         result.errors += 1;
@@ -941,7 +942,7 @@ export class Scanner {
       createdAt: new Date().toISOString(),
       dlsite: emptyDlsiteState(),
     };
-    writeMetaFile(join(workDir, ".meta.json"), meta);
+    writeMetaFile(join(workDir, META_FILE_NAME), meta);
     return id;
   }
 }

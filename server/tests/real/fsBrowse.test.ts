@@ -103,13 +103,17 @@ test("作品ディレクトリには workId、作品配下のファイルには 
   assert.ok((file?.size ?? 0) > 0);
 });
 
-test("listing 自身の workId と parent、.meta.json の非表示", async (t) => {
+test("listing 自身の workId と parent、mimimilli.json の非表示", async (t) => {
   const { app, root, existingWorkId } = await setup(t);
 
   const workListing = await listing(app, join(root, "dlsite", "RJ900002_既存メタ"));
   assert.equal(workListing.workId, existingWorkId);
   assert.equal(workListing.parent, join(root, "dlsite"));
-  assert.ok(!workListing.entries.some((e) => e.name.endsWith(".meta.json")));
+  assert.ok(
+    !workListing.entries.some(
+      (e) => e.name === "mimimilli.json" || e.name.endsWith(".mimimilli.json"),
+    ),
+  );
 
   const rootListing = await listing(app);
   assert.equal(rootListing.parent, null);
@@ -122,7 +126,7 @@ test("ネストした作品ルートではファイルを最も深い作品へ�
     mkdirSync(nested, { recursive: true });
     writeWav(join(nested, "nested.wav"), 1);
     writeFileSync(
-      join(nested, ".meta.json"),
+      join(nested, "mimimilli.json"),
       JSON.stringify({
         id: nestedId,
         title: "ネストした作品",

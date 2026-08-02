@@ -29,7 +29,7 @@ pnpm workspace のモノレポで、`client/` / `server/` / `shared/` の3パッ
 
 - `client/`: feature-first 構成（`app` → `features` → `entities` → `shared`）の React SPA
 - `server/`: `routes/`（HTTP層）・`core/`（ドメイン層）・`adapters/`（データ層）
-- `shared/`: API 契約（Zod スキーマ + 型）と `.meta.json` スキーマの正典。`client` / `server` / fixture アダプタが同じ型を参照する
+- `shared/`: API 契約（Zod スキーマ + 型）と `mimimilli.json` スキーマの正典。`client` / `server` / fixture アダプタが同じ型を参照する
 
 ## サーバー内部の境界
 
@@ -44,10 +44,10 @@ pnpm workspace のモノレポで、`client/` / `server/` / `shared/` の3パッ
 
 ## データモデルと永続化
 
-- `.meta.json` が Source of Truth。タイトル・タグ・分類軸情報などの作品メタデータはここに保持する
+- `mimimilli.json` が Source of Truth。タイトル・タグ・分類軸情報などの作品メタデータはここに保持する
 - SQLiteは `bun:sqlite` + Drizzleを使い、`catalog.sqlite` と `user.sqlite` に分ける。catalogには作品メタ・走査状態・派生キャッシュ、userには設定・プリセット・スマートフォルダー・ブックマーク・レジューム・最終再生を置く
 - catalog接続をmainとしてuser DBを `user` でATTACHし、作品とuser状態をJOINして読む。DB間外部キーとcascade deleteは使わない
-- UI からの編集は `.meta.json` へ即時書き戻す
+- UI からの編集は `mimimilli.json` へ即時書き戻す
 - スキーマの正本は `catalogSchema.ts` / `userSchema.ts` のDrizzle定義。`pnpm --filter @mimimilli/server db:generate` で生成したSQLを起動時に適用する。開発中は `user_version` 不一致のDBを再作成し、配布開始後のuser migration基盤は別途整備する
 - データルートはADR-0007に従い、Linuxでは `${XDG_DATA_HOME:-$HOME/.local/share}/mimimilli`、Windowsでは `%LOCALAPPDATA%\Mimimilli`。`MIMIMILLI_DATA_DIR` で上書きできる
 

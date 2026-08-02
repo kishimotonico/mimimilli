@@ -47,7 +47,10 @@ test("ルート読取失敗: スキャンがエラー終了し missing 更新さ
   const workId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
   mkdirSync(workDir, { recursive: true });
   writeWav(join(workDir, "track.wav"), 1);
-  writeFileSync(join(workDir, ".meta.json"), JSON.stringify(metaWithSingleTrack(workId, "work")));
+  writeFileSync(
+    join(workDir, "mimimilli.json"),
+    JSON.stringify(metaWithSingleTrack(workId, "work")),
+  );
 
   const adapter = createTestRealAdapter({ database: { kind: "memory" } });
   await adapter.updateSettings({ rootFolder: root });
@@ -81,7 +84,7 @@ test("サブツリー読取失敗: 配下の既存作品は missing 化されず
   ] as const) {
     mkdirSync(dir, { recursive: true });
     writeWav(join(dir, "track.wav"), 1);
-    writeFileSync(join(dir, ".meta.json"), JSON.stringify(metaWithSingleTrack(id, title)));
+    writeFileSync(join(dir, "mimimilli.json"), JSON.stringify(metaWithSingleTrack(id, title)));
   }
 
   const db = openDb({ kind: "memory" });
@@ -122,7 +125,7 @@ test("サブツリー読取失敗: 読取可能な削除作品は引き続き mi
   ] as const) {
     mkdirSync(dir, { recursive: true });
     writeWav(join(dir, "track.wav"), 1);
-    writeFileSync(join(dir, ".meta.json"), JSON.stringify(metaWithSingleTrack(id, title)));
+    writeFileSync(join(dir, "mimimilli.json"), JSON.stringify(metaWithSingleTrack(id, title)));
   }
 
   const db = openDb({ kind: "memory" });

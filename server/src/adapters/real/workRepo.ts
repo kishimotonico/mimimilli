@@ -122,7 +122,7 @@ export interface ScanWorkState {
 }
 
 /** DBのカバー3列（cover_image / cover_width / cover_height）の生表現。
- * image は .meta.json 由来のファイル名、dimensions は計測成功時のみ。
+ * image は mimimilli.json 由来のファイル名、dimensions は計測成功時のみ。
  * image あり・dimensions null は「カバーはあるが寸法を計測できていない」状態を表す。 */
 export interface CoverColumns {
   image: string | null;
@@ -1228,7 +1228,7 @@ export class WorkRepo {
 
   /**
    * scan バッチの catalog DB 書き込み。タグも置き換える。
-   * カバー列は options.cover（.meta.json のファイル名＋計測寸法）を正とし、省略時は work.cover から導く。
+   * カバー列は options.cover（mimimilli.json のファイル名＋計測寸法）を正とし、省略時は work.cover から導く。
    */
   upsertWorkCatalog(
     work: Work,

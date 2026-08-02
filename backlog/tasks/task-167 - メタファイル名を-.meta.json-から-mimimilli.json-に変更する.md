@@ -1,9 +1,11 @@
 ---
 id: TASK-167
 title: メタファイル名を .meta.json から mimimilli.json に変更する
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-08-01 18:44'
+updated_date: '2026-08-01 19:05'
 labels: []
 dependencies: []
 priority: high
@@ -36,3 +38,14 @@ ordinal: 177000
 - [ ] #3 *.meta.json（単一ファイル形式の変種）の新名での扱いが決まり、タスク内の方針に沿って統一的に実装されている
 - [ ] #4 リポジトリ内（server/client/shared/docs）に .meta.json を参照するコードが残らない（テスト・docsのメタ仕様記述を含む）
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. メタ名定数を mimimilli.json へ変更（META_SUFFIX/isMetaFileName の再設計: name === 'mimimilli.json' または endsWith('.mimimilli.json')）
+2. 単一ファイル形式は廃止せず *.mimimilli.json へ統一（要件v4 §で正式仕様のため機能維持）
+3. スキャン時に旧 .meta.json / *.meta.json を検出したら新名へ自動リネームして移行（恒久フォールバックは残さない）
+4. fsBrowse の表示除外・shared/meta.ts・work.ts・テストヘルパー/テストを新名へ更新
+5. docs: requirements-v4.md / ARCHITECTURE.md は新名へ書き換え。ADR 0010 を新規作成して名称変更を記録し、旧ADR(0001,0003,0005,0008)には現在形の記述にのみ注記
+6. pnpm check / pnpm test で確認。実装は Cursor (composer-2.5) へ委譲
+<!-- SECTION:PLAN:END -->

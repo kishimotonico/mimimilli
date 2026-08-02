@@ -8,9 +8,9 @@ export function resolvedDuration(durationSec: number | null) {
   return toTrackDurationFieldsFromSec(durationSec);
 }
 
-/** フォルダー形式作品のテスト用メタパス（physicalPath 直下の .meta.json） */
+/** フォルダー形式作品のテスト用メタパス（physicalPath 直下の mimimilli.json） */
 export function folderMetaPath(physicalPath: string): string {
-  return join(physicalPath, ".meta.json");
+  return join(physicalPath, "mimimilli.json");
 }
 
 export function upsertTestWork(repo: WorkRepo, work: Work, metaPath?: string): void {

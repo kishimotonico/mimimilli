@@ -1,7 +1,7 @@
 // real アダプタのスキャナー結合テスト。
 // サンプルライブラリ構成（tests/helpers/sampleLibrary.ts）:
 //   dlsite/RJ900001_テスト作品/ … メタなし（mp3/ に 2秒+3秒 の WAV、cover.jpg）→ 自動生成対象
-//   dlsite/RJ900002_既存メタ/   … .meta.json あり、トラック1本欠損 → status "error"
+//   dlsite/RJ900002_既存メタ/   … mimimilli.json あり、トラック1本欠損 → status "error"
 import assert from "node:assert/strict";
 import {
   existsSync,
@@ -46,8 +46,8 @@ test("初回スキャン: 登録・自動生成・エラー検出・duration プ
   assert.equal(result.newWorkIds.length, 1);
   assert.equal(result.missing, 0);
 
-  // 自動生成された .meta.json が物理的に存在し、作品ルートは mp3/ ではなく RJ900001 になる
-  const generatedMeta = join(root, "dlsite", "RJ900001_テスト作品", ".meta.json");
+  // 自動生成された mimimilli.json が物理的に存在し、作品ルートは mp3/ ではなく RJ900001 になる
+  const generatedMeta = join(root, "dlsite", "RJ900001_テスト作品", "mimimilli.json");
   assert.ok(existsSync(generatedMeta));
   const meta = JSON.parse(readFileSync(generatedMeta, "utf-8"));
   assert.equal(meta.coverImage, "cover.jpg");
@@ -96,7 +96,7 @@ test("初回スキャン: 登録・自動生成・エラー検出・duration プ
 test("DLsite状態: メタ未定義はnone扱いで検出コードを書き戻し、再スキャンでDBへ復元する", async (t) => {
   const { adapter, existingWorkId, root } = await setup(t);
   await adapter.scan();
-  const metaPath = join(root, "dlsite", "RJ900002_既存メタ", ".meta.json");
+  const metaPath = join(root, "dlsite", "RJ900002_既存メタ", "mimimilli.json");
   const meta = JSON.parse(readFileSync(metaPath, "utf-8"));
   meta.dlsite = {
     rjCode: "RJ7654321",
@@ -154,7 +154,7 @@ test("UUID 重複: 後に検出された方が再採番されメタファイル�
     mkdirSync(join(root, name), { recursive: true });
     writeWav(join(root, name, "track.wav"), 1);
     writeFileSync(
-      join(root, name, ".meta.json"),
+      join(root, name, "mimimilli.json"),
       JSON.stringify({
         id,
         title: name,
@@ -174,8 +174,8 @@ test("UUID 重複: 後に検出された方が再採番されメタファイル�
   const result = await adapter.scan();
 
   assert.equal(result.registered, 2);
-  const metaA = JSON.parse(readFileSync(join(root, "work-a", ".meta.json"), "utf-8"));
-  const metaB = JSON.parse(readFileSync(join(root, "work-b", ".meta.json"), "utf-8"));
+  const metaA = JSON.parse(readFileSync(join(root, "work-a", "mimimilli.json"), "utf-8"));
+  const metaB = JSON.parse(readFileSync(join(root, "work-b", "mimimilli.json"), "utf-8"));
   assert.equal(metaA.id, id); // 正規化パス順の先頭が所有する
   assert.equal(metaA.playlists[0].id, playlistId);
   assert.equal(metaA.playlists[0].tracks[0].id, trackId);
@@ -192,7 +192,7 @@ test("メタ不正: 壊れた JSON は errors にカウントされスキャン�
   const brokenDir = join(root, "broken-work");
   mkdirSync(brokenDir, { recursive: true });
   writeWav(join(brokenDir, "track.wav"), 1);
-  writeFileSync(join(brokenDir, ".meta.json"), "{ これは JSON ではない");
+  writeFileSync(join(brokenDir, "mimimilli.json"), "{ これは JSON ではない");
 
   const result = await adapter.scan();
   assert.equal(result.errors, 1);
@@ -242,7 +242,7 @@ test("大量ディレクトリの走査中、walking フェーズの進捗イベ
 test("登録済み作品のメタが壊れた場合は missing ではなく error にする", async (t) => {
   const { adapter, existingWorkId, root } = await setup(t);
   await adapter.scan();
-  const metaPath = join(root, "dlsite", "RJ900002_既存メタ", ".meta.json");
+  const metaPath = join(root, "dlsite", "RJ900002_既存メタ", "mimimilli.json");
   writeFileSync(metaPath, "{ broken");
 
   const result = await adapter.scan();
@@ -295,7 +295,7 @@ test("増分スキャン: スキップした作品もPlaylist/Trackとresumeを�
 test("増分スキャン: 除外対象のcreatedAtが不正でも完全未変更ならschema検証を省略する", async (t) => {
   const { adapter, root } = await setup(t);
   await adapter.scan();
-  const metaPath = join(root, "dlsite", "RJ900001_テスト作品", ".meta.json");
+  const metaPath = join(root, "dlsite", "RJ900001_テスト作品", "mimimilli.json");
   const meta = JSON.parse(readFileSync(metaPath, "utf-8")) as Record<string, unknown>;
   meta.createdAt = "これはISO日時ではない";
   writeFileSync(metaPath, JSON.stringify(meta, null, 2));
@@ -316,7 +316,7 @@ test("増分スキャン: playlists/tracks/urlsの未知キーはfingerprintか�
   mkdirSync(workDir, { recursive: true });
   writeWav(join(workDir, "track.wav"), 1);
   writeFileSync(
-    join(workDir, ".meta.json"),
+    join(workDir, "mimimilli.json"),
     JSON.stringify({
       id: workId,
       title: "unknown fields",
@@ -346,7 +346,7 @@ test("増分スキャン: playlists/tracks/urlsの未知キーはfingerprintか�
   await scanner.scan(root);
 
   // createdAtはfingerprint対象外かつ不正値なので、ここでZodを通るとerrorになる。
-  const metaPath = join(workDir, ".meta.json");
+  const metaPath = join(workDir, "mimimilli.json");
   const meta = JSON.parse(readFileSync(metaPath, "utf-8")) as Record<string, unknown>;
   meta.createdAt = "invalid timestamp";
   writeFileSync(metaPath, JSON.stringify(meta, null, 2));
@@ -549,7 +549,7 @@ test("error作品の再評価時はprobe cacheをバイパスし誤durationか�
   const audioPath = join(workDir, "track.wav");
   writeWav(audioPath, 10);
   writeFileSync(
-    join(workDir, ".meta.json"),
+    join(workDir, "mimimilli.json"),
     JSON.stringify({
       id: workId,
       title: "probe-cache-bypass",
@@ -601,7 +601,7 @@ test("増分スキャン: 2回目に検出したduplicate UUIDもID移行後に�
   const duplicateDir = join(root, "duplicate-work");
   mkdirSync(duplicateDir, { recursive: true });
   writeWav(join(duplicateDir, "track.wav"), 1);
-  const source = JSON.parse(readFileSync(join(sourceDir, ".meta.json"), "utf-8")) as Record<
+  const source = JSON.parse(readFileSync(join(sourceDir, "mimimilli.json"), "utf-8")) as Record<
     string,
     unknown
   >;
@@ -624,12 +624,12 @@ test("増分スキャン: 2回目に検出したduplicate UUIDもID移行後に�
     },
   ];
   source.defaultPlaylistId = (source.playlists as Array<Record<string, unknown>>)[0]!.id;
-  writeFileSync(join(duplicateDir, ".meta.json"), JSON.stringify(source, null, 2));
+  writeFileSync(join(duplicateDir, "mimimilli.json"), JSON.stringify(source, null, 2));
 
   const second = await adapter.scan();
   assert.equal(second.registered, 2);
   assert.equal(second.skipped, 1);
-  const copiedMeta = JSON.parse(readFileSync(join(duplicateDir, ".meta.json"), "utf-8"));
+  const copiedMeta = JSON.parse(readFileSync(join(duplicateDir, "mimimilli.json"), "utf-8"));
   assert.notEqual(copiedMeta.id, source.id);
   assert.equal(
     (await adapter.queryWorks({ q: "", tags: [], tagOp: "AND", sort: "id-asc" })).total,
@@ -662,7 +662,7 @@ test("probe cache は一括取得され作品数に比例しない", async (t) =
     mkdirSync(workDir, { recursive: true });
     writeWav(join(workDir, "track.wav"), 1);
     writeFileSync(
-      join(workDir, ".meta.json"),
+      join(workDir, "mimimilli.json"),
       JSON.stringify(
         metaWithSingleTrack(`00000000-0000-4000-8000-${String(i).padStart(12, "0")}`, `work-${i}`),
         null,
@@ -736,7 +736,7 @@ test("変更済みの複数resume作品でもprobe cache SELECTは一括取得�
     mkdirSync(workDir, { recursive: true });
     writeWav(join(workDir, "track.wav"), 2);
     writeFileSync(
-      join(workDir, ".meta.json"),
+      join(workDir, "mimimilli.json"),
       JSON.stringify(metaWithSingleTrack(id, `work-${index}`)),
     );
   }
@@ -750,7 +750,7 @@ test("変更済みの複数resume作品でもprobe cache SELECTは一括取得�
     const playlist = work.playlists[0]!;
     const track = playlist.tracks[0]!;
     assert.ok(repo.saveResume(id, { playlistId: playlist.id, trackId: track.id, offsetSec: 1 }));
-    const metaPath = join(root, work.title, ".meta.json");
+    const metaPath = join(root, work.title, "mimimilli.json");
     const meta = JSON.parse(readFileSync(metaPath, "utf-8")) as Record<string, unknown>;
     meta.title = `${work.title} updated`;
     writeFileSync(metaPath, JSON.stringify(meta, null, 2));
@@ -782,7 +782,7 @@ test("upsertWork はバッチトランザクションで処理され件数上限
     mkdirSync(workDir, { recursive: true });
     writeWav(join(workDir, "track.wav"), 1);
     writeFileSync(
-      join(workDir, ".meta.json"),
+      join(workDir, "mimimilli.json"),
       JSON.stringify(
         metaWithSingleTrack(`11111111-1111-4111-8111-${String(i).padStart(12, "0")}`, `work-${i}`),
         null,
@@ -841,7 +841,7 @@ test("バッチ途中のcatalog書込失敗はcatalogのみロールバックさ
     mkdirSync(workDir, { recursive: true });
     writeWav(join(workDir, "track.wav"), 1);
     writeFileSync(
-      join(workDir, ".meta.json"),
+      join(workDir, "mimimilli.json"),
       JSON.stringify(
         metaWithSingleTrack(
           `33333333-3333-4333-8333-${String(index).padStart(12, "0")}`,
@@ -885,7 +885,7 @@ test("user先コミット後のcatalog失敗はuser孤児を残すがopenDbは�
     mkdirSync(workDir, { recursive: true });
     writeWav(join(workDir, "track.wav"), 1);
     writeFileSync(
-      join(workDir, ".meta.json"),
+      join(workDir, "mimimilli.json"),
       JSON.stringify(
         metaWithSingleTrack(
           `44444444-4444-4444-8444-${String(index).padStart(12, "0")}`,

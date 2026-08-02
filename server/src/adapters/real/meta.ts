@@ -1,15 +1,16 @@
-// `.meta.json`（Source of Truth）の読み書き。
+// `mimimilli.json`（Source of Truth）の読み書き。
 // 書き込みは tmp ファイル + rename のアトミック更新。部分更新（書き戻し）は
 // 生 JSON を直接編集し、スキーマが知らないユーザー定義フィールドを保持する。
 import { readFileSync, renameSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
-import { metaFileSchema, type MetaFile } from "@mimimilli/shared";
+import { META_FILE_NAME, metaFileSchema, type MetaFile } from "@mimimilli/shared";
 
-export const META_SUFFIX = ".meta.json";
+export { META_FILE_NAME };
+export const META_SUFFIX = ".mimimilli.json";
 
-/** ファイル名がメタファイルか（フォルダー形式 ".meta.json" / 単一ファイル形式 "xxx.meta.json"） */
+/** ファイル名がメタファイルか（フォルダー形式 / 単一ファイル形式 `xxx.mimimilli.json`） */
 export function isMetaFileName(name: string): boolean {
-  return name === META_SUFFIX || (name.endsWith(META_SUFFIX) && name !== META_SUFFIX);
+  return name === META_FILE_NAME || name.endsWith(META_SUFFIX);
 }
 
 export class MetaParseError extends Error {
