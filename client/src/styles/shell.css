@@ -69,8 +69,7 @@
   .mle-prv__warn-text,
   .mle-prv__warn-path,
   .mle-prv__edit-error,
-  .mle-fprev__path,
-  .mle-fprev__v {
+  .mle-fprev__path {
     user-select: text;
   }
 
@@ -2841,57 +2840,22 @@
     word-break: break-all;
     margin-top: 3px;
   }
-  .mle-fprev__chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-  .mle-fprev__chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    height: 24px;
-    padding: 0 9px;
-    border-radius: var(--r-pill);
-    background: var(--paper-2);
-    color: var(--ink-1);
+  .mle-fprev__meta {
     font-family: var(--font-sans);
-    font-size: 11px;
-    font-weight: 500;
+    font-size: 11.5px;
+    color: var(--ink-2);
+    margin-top: 6px;
+    line-height: 1.4;
   }
-  .mle-fprev__chip b {
-    font-family: var(--font-mono);
-    color: var(--ink-0);
-    font-weight: 600;
+  .mle-fprev__caption {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
   }
   .mle-fprev__actions {
     display: flex;
     gap: 6px;
     flex-wrap: wrap;
-  }
-  .mle-fprev__grid {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 6px 14px;
-    padding: 12px 14px;
-    background: var(--paper-0);
-    border: 1px solid var(--line-soft);
-    border-radius: var(--r-2);
-  }
-  .mle-fprev__k {
-    font-family: var(--font-sans);
-    font-size: 10px;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--ink-3);
-    font-weight: 600;
-    white-space: nowrap;
-  }
-  .mle-fprev__v {
-    font-family: var(--font-mono);
-    font-size: 11px;
-    color: var(--ink-1);
-    word-break: break-all;
   }
   .mle-fprev__note {
     font-size: 11.5px;

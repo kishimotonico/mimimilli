@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from "react";
-import React from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { I } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
@@ -7,7 +6,7 @@ import ConfirmDialog from "../../../shared/ui/ConfirmDialog";
 import { formatFileSize } from "../../../shared/lib/format";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { FILE_SYSTEM_QUERY_KEYS } from "../../../entities/file-system/queryKeys";
-import { createWork, deleteWork, getWorkRegisterPreview } from "../api";
+import { deleteWork, getWorkRegisterPreview } from "../api";
 import { getFileUrl } from "../api";
 import { getWorkFolderDisplay } from "../model/workFolderDisplay";
 import RegisterWorkDialog from "./RegisterWorkDialog";
@@ -28,16 +27,19 @@ interface FilePreviewProps {
   folderEntries: FsEntry[] | null;
   /** 物理階層の深さ（パンくず段数） */
   depth: number;
+  /** 現在開いているディレクトリ（FS キャッシュ無効化用） */
+  browsePath: string;
   isPlayingEntry: boolean;
   onPlay: (entry: FsEntry) => void;
-  /** 作品登録完了後にファイル一覧を再取得する */
-  onWorkRegistered?: () => void;
+  /** 作品登録・解除後にファイル一覧を再取得する */
+  onWorkRegistered?: () => void | Promise<unknown>;
 }
 
 export default function FilePreview({
   entry,
   folderEntries,
   depth,
+  browsePath,
   isPlayingEntry,
   onPlay,
   onWorkRegistered,
@@ -45,7 +47,6 @@ export default function FilePreview({
   const queryClient = useQueryClient();
   const [registerPreview, setRegisterPreview] = useState<WorkRegisterPreview | null>(null);
   const [showRegisterDialog, setShowRegisterDialog] = useState(false);
-  const [quickMergeConfirm, setQuickMergeConfirm] = useState<WorkRegisterPreview | null>(null);
   const [showUnregisterConfirm, setShowUnregisterConfirm] = useState(false);
   const [registerBusy, setRegisterBusy] = useState(false);
   const [unregisterBusy, setUnregisterBusy] = useState(false);
@@ -67,15 +68,19 @@ export default function FilePreview({
   const isWorkFolder = isDir && !!entry?.workId;
   const canRegisterFolder = isDir && entry && !entry.workId;
 
-  const invalidateAfterRegister = useCallback(async () => {
-    if (entry) {
-      await queryClient.invalidateQueries({
-        queryKey: FILE_SYSTEM_QUERY_KEYS.directory(entry.path),
-      });
-    }
+  const refreshFsState = useCallback(async () => {
+    const paths = new Set<string>();
+    if (entry) paths.add(entry.path);
+    if (browsePath) paths.add(browsePath);
+    await Promise.all(
+      [...paths].map((path) =>
+        queryClient.invalidateQueries({ queryKey: FILE_SYSTEM_QUERY_KEYS.directory(path) }),
+      ),
+    );
+    await queryClient.invalidateQueries({ queryKey: ["fs"] });
     await queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.all() });
-    onWorkRegistered?.();
-  }, [entry, onWorkRegistered, queryClient]);
+    await onWorkRegistered?.();
+  }, [browsePath, entry, onWorkRegistered, queryClient]);
 
   const handleUnregister = async () => {
     if (!entry?.workId) return;
@@ -84,7 +89,7 @@ export default function FilePreview({
     try {
       await deleteWork(entry.workId);
       setShowUnregisterConfirm(false);
-      await invalidateAfterRegister();
+      await refreshFsState();
     } catch (cause) {
       setRegisterError(cause instanceof Error ? cause.message : "作品登録の解除に失敗しました");
     } finally {
@@ -111,46 +116,39 @@ export default function FilePreview({
     }
   };
 
-  const quickRegister = async (preview: WorkRegisterPreview) => {
-    if (!entry) return;
-    setRegisterBusy(true);
-    setRegisterError(null);
-    try {
-      await createWork({
-        path: entry.path,
-        title: preview.suggestedTitle,
-        mergeDescendantWorks: preview.descendantWorkCount > 0,
-      });
-      setQuickMergeConfirm(null);
-      await invalidateAfterRegister();
-    } catch (cause) {
-      setRegisterError(cause instanceof Error ? cause.message : "作品の登録に失敗しました");
-    } finally {
-      setRegisterBusy(false);
-    }
-  };
+  const playActions =
+    kind === "audio" ? (
+      <Button
+        variant="primary"
+        icon={isPlayingEntry ? I.audio : I.play}
+        onClick={() => onPlay(entry!)}
+      >
+        {isPlayingEntry ? "再生中" : "このファイルを再生"}
+      </Button>
+    ) : isDir && firstAudioFile ? (
+      <Button variant="primary" icon={I.play} onClick={() => onPlay(firstAudioFile)}>
+        先頭の音声を再生
+      </Button>
+    ) : null;
 
-  const handleQuickRegister = async () => {
-    if (!entry) return;
-    setRegisterError(null);
-    setRegisterBusy(true);
-    try {
-      const preview = await getWorkRegisterPreview(entry.path);
-      if (preview.alreadyRegistered) {
-        setRegisterError("このフォルダーは既に登録済みです");
-        return;
-      }
-      if (preview.descendantWorkCount > 0) {
-        setQuickMergeConfirm(preview);
-        return;
-      }
-      await quickRegister(preview);
-    } catch (cause) {
-      setRegisterError(cause instanceof Error ? cause.message : "登録情報の取得に失敗しました");
-    } finally {
-      setRegisterBusy(false);
-    }
-  };
+  const workActions = canRegisterFolder ? (
+    <Button variant="primary" icon={I.add} disabled={registerBusy} onClick={openRegisterDialog}>
+      このフォルダを作品として登録
+    </Button>
+  ) : isWorkFolder && entry?.workId ? (
+    <Button
+      variant="ghost"
+      disabled={unregisterBusy}
+      onClick={() => {
+        setRegisterError(null);
+        setShowUnregisterConfirm(true);
+      }}
+    >
+      作品登録を解除
+    </Button>
+  ) : null;
+
+  const hasActions = playActions != null || workActions != null;
 
   return (
     <div className="mle-prv is-files">
@@ -172,79 +170,17 @@ export default function FilePreview({
               <ImageMedia
                 workId={entry.workId!}
                 relPath={entry.workRelPath!}
-                name={entry.name}
+                entry={entry}
                 kind={kind!}
               />
             ) : (
-              <Hero kind={kind!} entry={entry} isWorkFolder={isWorkFolder} />
+              <Hero
+                kind={kind!}
+                entry={entry}
+                isWorkFolder={isWorkFolder}
+                breakdown={isDir ? breakdown : undefined}
+              />
             )}
-
-            {breakdown.length > 0 && (
-              <div className="mle-fprev__chips">
-                {breakdown.map(({ kind: k, count }) => {
-                  const Ic = I[FILE_KIND_ICON[k]];
-                  return (
-                    <span key={k} className="mle-fprev__chip">
-                      <Ic size={12} />
-                      {FILE_KIND_LABEL[k]} <b>{count}</b>
-                    </span>
-                  );
-                })}
-              </div>
-            )}
-
-            {kind === "audio" && (
-              <div className="mle-fprev__actions">
-                <Button
-                  variant="primary"
-                  icon={isPlayingEntry ? I.audio : I.play}
-                  onClick={() => onPlay(entry)}
-                >
-                  {isPlayingEntry ? "再生中" : "このファイルを再生"}
-                </Button>
-              </div>
-            )}
-            {isDir && firstAudioFile && (
-              <div className="mle-fprev__actions">
-                <Button variant="primary" icon={I.play} onClick={() => onPlay(firstAudioFile)}>
-                  先頭の音声を再生
-                </Button>
-              </div>
-            )}
-            {canRegisterFolder && (
-              <div className="mle-fprev__actions">
-                <Button
-                  variant="primary"
-                  icon={I.add}
-                  disabled={registerBusy}
-                  onClick={openRegisterDialog}
-                >
-                  このフォルダを作品として登録
-                </Button>
-                <Button variant="ghost" disabled={registerBusy} onClick={handleQuickRegister}>
-                  そのまま登録
-                </Button>
-              </div>
-            )}
-            {isWorkFolder && entry.workId && (
-              <div className="mle-fprev__actions">
-                <Button
-                  variant="ghost"
-                  disabled={unregisterBusy}
-                  onClick={() => {
-                    setRegisterError(null);
-                    setShowUnregisterConfirm(true);
-                  }}
-                >
-                  作品登録を解除
-                </Button>
-              </div>
-            )}
-            {registerError && (
-              <p className="m-0 text-[11px] text-[var(--r-coral)]">{registerError}</p>
-            )}
-
-            <MetaGrid rows={metaRows(entry, kind!, isDir, isWorkFolder)} />
 
             {!isDir &&
               canServeWorkFile &&
@@ -254,6 +190,17 @@ export default function FilePreview({
                   の埋め込みプレビューは未対応です。
                 </p>
               )}
+
+            {hasActions && (
+              <div className="mle-fprev__actions">
+                {playActions}
+                {workActions}
+              </div>
+            )}
+
+            {registerError && (
+              <p className="m-0 text-[11px] text-[var(--r-coral)]">{registerError}</p>
+            )}
           </div>
         )}
       </div>
@@ -262,21 +209,11 @@ export default function FilePreview({
         <RegisterWorkDialog
           folderPath={entry.path}
           preview={registerPreview}
-          onRegistered={invalidateAfterRegister}
+          onRegistered={refreshFsState}
           onClose={() => {
             setShowRegisterDialog(false);
             setRegisterPreview(null);
           }}
-        />
-      )}
-
-      {quickMergeConfirm && (
-        <ConfirmDialog
-          title="登録済み作品の統合"
-          message={`登録済み作品 ${quickMergeConfirm.descendantWorkCount} 件を解除して統合します。子作品の履歴・タグは引き継がれません。`}
-          confirmLabel="統合して登録"
-          onConfirm={() => quickRegister(quickMergeConfirm)}
-          onCancel={() => setQuickMergeConfirm(null)}
         />
       )}
 
@@ -293,24 +230,8 @@ export default function FilePreview({
   );
 }
 
-function metaRows(
-  entry: FsEntry,
-  kind: FileKind,
-  isDir: boolean,
-  isWorkFolder: boolean,
-): [string, string][] {
-  if (isDir) {
-    return [
-      ["項目数", `${entry.childCount} 件`],
-      ["種類", isWorkFolder ? "登録作品フォルダー" : "フォルダー"],
-      ["パス", entry.path],
-    ];
-  }
-  return [
-    ["種類", FILE_KIND_LABEL[kind]],
-    ["サイズ", formatFileSize(entry.size)],
-    ["パス", entry.path],
-  ];
+function formatBreakdownLine(breakdown: { kind: FileKind; count: number }[]): string {
+  return breakdown.map(({ kind: k, count }) => `${FILE_KIND_LABEL[k]} ${count}`).join(" ・ ");
 }
 
 // ── 空 ────────────────────────────────────────────────────────
@@ -341,13 +262,21 @@ function Hero({
   kind,
   entry,
   isWorkFolder,
+  breakdown,
 }: {
   kind: FileKind;
   entry: FsEntry;
   isWorkFolder: boolean;
+  breakdown?: { kind: FileKind; count: number }[];
 }) {
   const Ic = I[FILE_KIND_ICON[kind]];
   const display = getWorkFolderDisplay(entry.name, isWorkFolder ? entry.workId : null);
+  const metaLine =
+    breakdown && breakdown.length > 0
+      ? formatBreakdownLine(breakdown)
+      : kind !== "dir"
+        ? formatFileSize(entry.size)
+        : null;
   return (
     <div className={`mle-fprev__hero is-${kind}`}>
       <span className="ic">
@@ -359,6 +288,7 @@ function Hero({
           {display.name}
         </div>
         <div className="mle-fprev__path">{entry.path}</div>
+        {metaLine && <div className="mle-fprev__meta">{metaLine}</div>}
       </div>
     </div>
   );
@@ -369,12 +299,12 @@ function Hero({
 function ImageMedia({
   workId,
   relPath,
-  name,
+  entry,
   kind,
 }: {
   workId: string;
   relPath: string;
-  name: string;
+  entry: FsEntry;
   kind: FileKind;
 }) {
   const [errored, setErrored] = useState(false);
@@ -387,35 +317,27 @@ function ImageMedia({
           <I.image size={28} />
         </span>
         <div className="bd">
-          <div className="mle-fprev__name">{name}</div>
+          <div className="mle-fprev__name">{entry.name}</div>
           <div className="mle-fprev__path">プレビューを読み込めませんでした</div>
         </div>
       </div>
     );
   }
   return (
-    <div className="mle-fprev__media">
-      <img
-        className="mle-fprev__img"
-        src={getFileUrl(workId, relPath)}
-        alt={name}
-        onError={() => setErrored(true)}
-      />
-    </div>
-  );
-}
-
-// ── メタ情報グリッド ──────────────────────────────────────────
-
-function MetaGrid({ rows }: { rows: [string, string][] }) {
-  return (
-    <div className="mle-fprev__grid">
-      {rows.map(([k, v]) => (
-        <React.Fragment key={k}>
-          <span className="mle-fprev__k">{k}</span>
-          <span className="mle-fprev__v">{v}</span>
-        </React.Fragment>
-      ))}
-    </div>
+    <>
+      <div className="mle-fprev__media">
+        <img
+          className="mle-fprev__img"
+          src={getFileUrl(workId, relPath)}
+          alt={entry.name}
+          onError={() => setErrored(true)}
+        />
+      </div>
+      <div className="mle-fprev__caption">
+        <div className="mle-fprev__name">{entry.name}</div>
+        <div className="mle-fprev__path">{entry.path}</div>
+        <div className="mle-fprev__meta">{formatFileSize(entry.size)}</div>
+      </div>
+    </>
   );
 }
