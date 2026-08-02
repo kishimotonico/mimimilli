@@ -92,6 +92,10 @@ import {
   WorkRegisterError,
 } from "./workRegister.ts";
 import { querySmartFolderWorks } from "./smartFolderWorks.ts";
+import { getCategoryLogger } from "../../lib/logger.ts";
+
+const dlsiteLogger = getCategoryLogger("dlsite");
+const scanLogger = getCategoryLogger("scan");
 
 const KEY_ROOT_FOLDER = "root_folder";
 const KEY_LAST_SCAN_TIME = "last_scan_time";
@@ -593,9 +597,11 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       });
       checkAbort();
       if (gcResult.deleted > 0 || gcResult.skippedWorks > 0) {
-        console.warn(
-          `サムネイルキャッシュGC: 削除${gcResult.deleted}件 / 保持${gcResult.kept}件 / カバー未解決でスキップ${gcResult.skippedWorks}件`,
-        );
+        scanLogger.warn("サムネイルキャッシュGCを実行しました", {
+          deleted: gcResult.deleted,
+          kept: gcResult.kept,
+          skippedWorks: gcResult.skippedWorks,
+        });
       }
 
       checkAbort();
@@ -1057,9 +1063,10 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
                 if (metaPath) patchMetaFile(metaPath, { dlsite });
               });
             } catch (persistError) {
-              console.error("DLsite失敗状態の保存に失敗しました", {
+              dlsiteLogger.error("DLsite失敗状態の保存に失敗しました", {
                 workId: work.id,
-                persistError,
+                persistError:
+                  persistError instanceof Error ? persistError.message : String(persistError),
               });
             }
             result.failed += 1;

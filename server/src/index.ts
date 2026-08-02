@@ -18,11 +18,19 @@ import { createFixtureAdapter } from "./adapters/fixture/index.ts";
 import { resolveDataPaths } from "./adapters/real/dataRoot.ts";
 import { resolveDlsiteCacheConfig } from "./adapters/real/dlsiteCache.ts";
 import { resolveDlsiteRequestConfig } from "./adapters/real/dlsiteConfig.ts";
-import { createRealAdapter } from "./adapters/real/index.ts";
+import { createRealAdapter, type RealAdapter } from "./adapters/real/index.ts";
 import type { DataAdapter } from "./adapter.ts";
+import {
+  createDlsiteEventLogger,
+  dispose,
+  formatError,
+  getCategoryLogger,
+  initLogger,
+} from "./lib/logger.ts";
 
 const adapterKind = process.env.MIMIMILLI_ADAPTER ?? "real";
-const dlsiteLogger = (event: Record<string, unknown>) => console.info(JSON.stringify(event));
+
+initLogger(adapterKind === "real" ? { logDir: resolveDataPaths().logDir } : {});
 
 function createAdapter(): DataAdapter {
   switch (adapterKind) {
@@ -39,7 +47,7 @@ function createAdapter(): DataAdapter {
         dataRoot: paths.root,
         dlsiteCache: resolveDlsiteCacheConfig(paths.dlsiteCacheDb),
         dlsiteRequestConfig: resolveDlsiteRequestConfig(),
-        dlsiteSchedulerDependencies: { logger: dlsiteLogger },
+        dlsiteSchedulerDependencies: { logger: createDlsiteEventLogger() },
         thumbnailCacheDir: process.env.MIMIMILLI_THUMBNAIL_CACHE_DIR
           ? resolve(process.env.MIMIMILLI_THUMBNAIL_CACHE_DIR)
           : paths.thumbnailCache,
@@ -59,6 +67,49 @@ const server = Bun.serve({
   hostname: "127.0.0.1",
   port,
 });
-console.log(
-  `mimimilli server listening on http://localhost:${server.port} (adapter: ${adapterKind})`,
+
+const serverLogger = getCategoryLogger("server");
+serverLogger.info(
+  `サーバーを起動しました: http://localhost:${server.port} (adapter: ${adapterKind})`,
 );
+
+let shuttingDown = false;
+
+async function shutdown(exitCode: number, reason: string, error?: unknown): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  try {
+    if (error) {
+      serverLogger.fatal(reason, formatError(error));
+    } else {
+      serverLogger.info(reason);
+    }
+    if (isRealAdapter(adapter)) adapter.close();
+    server.stop();
+    await dispose();
+  } catch (shutdownError) {
+    console.error(shutdownError);
+  } finally {
+    process.exit(exitCode);
+  }
+}
+
+function isRealAdapter(value: DataAdapter): value is RealAdapter {
+  return "close" in value && typeof value.close === "function";
+}
+
+process.on("uncaughtException", (error) => {
+  void shutdown(1, "未捕捉例外で終了します", error);
+});
+
+process.on("unhandledRejection", (reason) => {
+  void shutdown(1, "未処理のPromise拒否で終了します", reason);
+});
+
+process.on("SIGINT", () => {
+  void shutdown(0, "SIGINTを受信して終了します");
+});
+
+process.on("SIGTERM", () => {
+  void shutdown(0, "SIGTERMを受信して終了します");
+});

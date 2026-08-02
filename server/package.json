@@ -20,6 +20,8 @@
     "db:generate": "drizzle-kit generate --config drizzle.catalog.config.ts && drizzle-kit generate --config drizzle.user.config.ts"
   },
   "dependencies": {
+    "@logtape/file": "^2.3.0",
+    "@logtape/logtape": "^2.3.0",
     "@mimimilli/shared": "workspace:*",
     "cheerio": "^1.2.0",
     "drizzle-orm": "^0.45.2",

@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ApiError } from "@mimimilli/shared";
 import { NotConfiguredError, type DataAdapter } from "./adapter.ts";
+import { formatError, getCategoryLogger } from "./lib/logger.ts";
 import { axesRoute } from "./routes/axes.ts";
 import { dlsiteRoute } from "./routes/dlsite.ts";
 import { fsRoute } from "./routes/fs.ts";
@@ -17,6 +18,7 @@ import { worksRoute } from "./routes/works.ts";
 
 export function createApp(adapter: DataAdapter): Hono {
   const app = new Hono();
+  const httpLogger = getCategoryLogger("http");
 
   const api = new Hono();
   const scanJobs = new ScanJobManager(adapter);
@@ -47,7 +49,7 @@ export function createApp(adapter: DataAdapter): Hono {
       const body: ApiError = { error: { code: "conflict", message: err.message } };
       return c.json(body, 409);
     }
-    console.error(err);
+    httpLogger.error("リクエスト処理中にエラーが発生しました", formatError(err));
     const body: ApiError = {
       error: { code: "internal", message: "サーバー内部エラーが発生しました" },
     };

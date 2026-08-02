@@ -9,6 +9,7 @@ test("MIMIMILLI_DATA_DIRを絶対化し、DBとcacheを用途別に配置する"
   assert.equal(paths.userDb, `${paths.root}/db/user.sqlite`);
   assert.equal(paths.dlsiteCacheDb, `${paths.root}/db/dlsite-cache.sqlite`);
   assert.equal(paths.thumbnailCache, `${paths.root}/cache/thumbnails`);
+  assert.equal(paths.logDir, `${paths.root}/log`);
 });
 
 test("Linux既定はXDG_DATA_HOME、Windows既定はLOCALAPPDATAを使う", () => {

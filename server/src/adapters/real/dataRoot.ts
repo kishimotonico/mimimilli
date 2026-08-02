@@ -7,6 +7,7 @@ export interface DataPaths {
   userDb: string;
   dlsiteCacheDb: string;
   thumbnailCache: string;
+  logDir: string;
 }
 
 /** ADR-0007に従ったユーザーデータ配置を返す。 */
@@ -36,5 +37,6 @@ export function resolveDataPaths(
     userDb: path.join(root, "db", "user.sqlite"),
     dlsiteCacheDb: path.join(root, "db", "dlsite-cache.sqlite"),
     thumbnailCache: path.join(root, "cache", "thumbnails"),
+    logDir: path.join(root, "log"),
   };
 }

@@ -57,6 +57,9 @@ import { probeDurationSec, type ProbeCacheEntry } from "./probe.ts";
 import { createProgressThrottle } from "./progressThrottle.ts";
 import { measureCoverDimensions, type CoverDimensions } from "./thumbnailCache.ts";
 import type { CoverColumns, ScanWorkState, WorkRepo } from "./workRepo.ts";
+import { getCategoryLogger } from "../../lib/logger.ts";
+
+const scanLogger = getCategoryLogger("scan");
 
 const AUDIO_EXTENSIONS = new Set(["mp3", "m4a", "aac", "wav", "ogg", "flac", "webm", "opus"]);
 const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "gif", "bmp", "webp"]);
@@ -146,7 +149,10 @@ export async function walk(
       entries = await readdir(dir, { withFileTypes: true });
     } catch (e) {
       if (dir === root) throw new ScanRootUnreadableError(root, e);
-      console.warn(`ディレクトリを読めません: ${dir}: ${(e as Error).message}`);
+      scanLogger.warn(`ディレクトリを読めません: ${dir}`, {
+        path: dir,
+        error: (e as Error).message,
+      });
       result.unreadablePaths.push(dir);
       continue;
     }
@@ -240,7 +246,7 @@ function findCoverImage(dir: string): string | null {
   try {
     entries = readdirSync(dir, { withFileTypes: true });
   } catch (e) {
-    console.warn(`ディレクトリを読めません: ${dir}: ${(e as Error).message}`);
+    scanLogger.warn(`ディレクトリを読めません: ${dir}`, { path: dir, error: (e as Error).message });
     return null;
   }
   const images = entries
@@ -263,7 +269,10 @@ function collectAudioRecursive(dir: string): string[] {
     try {
       entries = readdirSync(cur, { withFileTypes: true });
     } catch (e) {
-      console.warn(`ディレクトリを読めません: ${cur}: ${(e as Error).message}`);
+      scanLogger.warn(`ディレクトリを読めません: ${cur}`, {
+        path: cur,
+        error: (e as Error).message,
+      });
       continue;
     }
     for (const e of entries) {
@@ -471,9 +480,9 @@ export class Scanner {
       throwIfCancelled: checkAbort,
     });
     if (migration.externallyModified.length > 0) {
-      console.warn(
-        `Playlist/Track ID移行: 外部編集を検出したため上書きしませんでした: ${migration.externallyModified.join(", ")}`,
-      );
+      scanLogger.warn("Playlist/Track ID移行: 外部編集を検出したため上書きしませんでした", {
+        paths: migration.externallyModified,
+      });
     }
     // 変更のない作品のPlaylist/Track関係は再生位置の解決にも使う。全削除してから
     // スキップすると関係だけ失われるため、変更作品のupsert時だけ置き換える。
@@ -581,7 +590,10 @@ export class Scanner {
         const id = this.generateMetaForFolder(workDir);
         generated.push({ id, prepared: this.prepareSingleMeta(join(workDir, META_FILE_NAME)) });
       } catch (e) {
-        console.warn(`メタファイルの自動生成に失敗: ${workDir}: ${(e as Error).message}`);
+        scanLogger.warn(`メタファイルの自動生成に失敗: ${workDir}`, {
+          path: workDir,
+          error: (e as Error).message,
+        });
         result.errors += 1;
       }
       const processed = i + 1;
@@ -612,9 +624,10 @@ export class Scanner {
         result.newWorkIds.push(entry.id);
       } catch (e) {
         if (!(e instanceof MetaParseError)) throw e;
-        console.warn(
-          `メタファイルの自動生成に失敗: ${dirname(entry.prepared.metaPath)}: ${(e as Error).message}`,
-        );
+        scanLogger.warn(`メタファイルの自動生成に失敗: ${dirname(entry.prepared.metaPath)}`, {
+          path: dirname(entry.prepared.metaPath),
+          error: (e as Error).message,
+        });
         result.errors += 1;
       }
     }
@@ -627,7 +640,9 @@ export class Scanner {
     checkAbort();
     if (tree.unreadablePaths.length > 0) {
       result.unreadablePaths = tree.unreadablePaths;
-      console.warn(`読み取れなかったディレクトリ: ${tree.unreadablePaths.join(", ")}`);
+      scanLogger.warn("読み取れなかったディレクトリがあります", {
+        paths: tree.unreadablePaths,
+      });
       for (const [id, state] of existingWorks) {
         if (seenIds.has(id)) continue;
         if (tree.unreadablePaths.some((prefix) => isPathWithin(prefix, state.physicalPath))) {
@@ -770,7 +785,7 @@ export class Scanner {
     existingWorks: Map<string, ScanWorkState>,
     existingByPhysicalPath: Map<string, { id: string; state: ScanWorkState }>,
   ): void {
-    console.warn(error.message);
+    scanLogger.warn(error.message, { metaPath });
     const workDir = dirname(metaPath);
     const existingById =
       error.candidateId && !seenIds.has(error.candidateId)
