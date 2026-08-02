@@ -162,3 +162,23 @@ test("DELETE /works/:id: 解除前後で音声等の物理ファイルは変更�
   assert.ok(existsSync(join(folder, "track.wav")));
   assert.ok(existsSync(join(folder, "readme.txt")));
 });
+
+test("DELETE /works/:id: メタ削除に失敗した場合はDB上の作品データを保持する", async (t) => {
+  const { app, folder, work } = await setupRegisteredWork(t);
+  const metaPath = folderMetaPath(folder);
+  assert.ok(existsSync(metaPath));
+
+  const { chmodSync } = await import("node:fs");
+  chmodSync(folder, 0o555);
+
+  const res = await app.request(`/api/works/${work.id}`, { method: "DELETE" });
+  assert.notEqual(res.status, 204);
+
+  const stillThere = await app.request(`/api/works/${work.id}`);
+  assert.equal(stillThere.status, 200);
+  const body = await stillThere.json();
+  assert.equal(body.id, work.id);
+  assert.ok(existsSync(metaPath));
+
+  chmodSync(folder, 0o755);
+});

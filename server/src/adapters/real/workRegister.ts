@@ -38,10 +38,10 @@ export function deleteMetaFileOnly(metaPath: string): void {
 }
 
 export function unregisterWork(repo: WorkRepo, workId: string): boolean {
-  const removed = repo.deleteWork(workId);
-  if (!removed) return false;
-  deleteMetaFileOnly(removed.metaPath);
-  return true;
+  const target = repo.getWorkDeleteTarget(workId);
+  if (!target) return false;
+  deleteMetaFileOnly(target.metaPath);
+  return repo.deleteWork(workId) !== null;
 }
 
 export function buildWorkRegisterPreview(repo: WorkRepo, workDir: string): WorkRegisterPreview {
@@ -94,12 +94,6 @@ export async function createWorkFromFolder(
     );
   }
 
-  for (const child of descendants) {
-    if (!unregisterWork(repo, child.id)) {
-      throw new Error(`子作品の登録解除に失敗しました: ${child.id}`);
-    }
-  }
-
   let title = body.title;
   let tags: string[] = [];
   let urls: Work["urls"] = [];
@@ -121,6 +115,12 @@ export async function createWorkFromFolder(
   } else {
     const detectedRjCode = detectRjCode([basename(workDir), title]);
     if (detectedRjCode) dlsite = { ...emptyDlsiteState(), rjCode: detectedRjCode };
+  }
+
+  for (const child of descendants) {
+    if (!unregisterWork(repo, child.id)) {
+      throw new Error(`子作品の登録解除に失敗しました: ${child.id}`);
+    }
   }
 
   return scanner.registerFolderWork(workDir, {

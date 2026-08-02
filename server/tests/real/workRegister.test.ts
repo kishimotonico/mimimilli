@@ -218,3 +218,32 @@ test("GET /works/register-preview: RJコードをフォルダ名から検出す�
   assert.equal(body.detectedRjCode, "RJ900012");
   assert.equal(body.suggestedTitle, "RJ900012_sibling");
 });
+
+test("POST /works: DLsiteカバー適用失敗時は子作品を削除しない", async (t) => {
+  const { app, parent, childWork } = await setupLibraryWithChild(t);
+
+  const res = await app.request("/api/works", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      path: parent,
+      title: "親に統合",
+      mergeDescendantWorks: true,
+      dlsite: {
+        info: {
+          rjCode: "RJ900010",
+          title: "DLsiteタイトル",
+          coverUrl: "https://invalid.example.test/cover.jpg",
+          url: "https://www.dlsite.com/maniax/work/=/product_id/RJ900010.html",
+        },
+        applyTitle: false,
+        applyTags: [],
+        applyCover: true,
+      },
+    }),
+  });
+  assert.notEqual(res.status, 201);
+
+  const child = await app.request(`/api/works/${childWork.id}`);
+  assert.equal(child.status, 200);
+});

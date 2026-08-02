@@ -1242,12 +1242,17 @@ export class WorkRepo {
   }
 
   /** 作品を DB から削除する。メタファイルの削除は呼び出し側が行う。 */
-  deleteWork(id: string): { metaPath: string } | null {
+  getWorkDeleteTarget(id: string): { metaPath: string } | null {
     const row = this.db.catalog
       .select({ id: works.id, metaPath: works.metaPath })
       .from(works)
       .where(eq(works.id, id))
       .get();
+    return row ? { metaPath: row.metaPath } : null;
+  }
+
+  deleteWork(id: string): { metaPath: string } | null {
+    const row = this.getWorkDeleteTarget(id);
     if (!row) return null;
     this.db.catalog.delete(workTags).where(eq(workTags.workId, id)).run();
     this.db.catalog.delete(workDlsite).where(eq(workDlsite.workId, id)).run();
