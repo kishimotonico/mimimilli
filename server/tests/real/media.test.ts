@@ -80,7 +80,7 @@ test("メディア解決: getWork・probe cache問い合わせを伴わない", 
     return { id: crypto.randomUUID(), title: `track ${index}`, file };
   });
   writeFileSync(
-    join(workDir, ".meta.json"),
+    join(workDir, "mimimilli.json"),
     JSON.stringify(
       {
         id: workId,

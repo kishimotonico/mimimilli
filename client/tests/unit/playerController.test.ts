@@ -31,7 +31,7 @@ const tracks: Track[] = [
 
 function item(completionScope: PlaybackItem["completionScope"] = "work"): PlaybackItem {
   return {
-    work,
+    source: { kind: "work", work },
     playlistId: completionScope === "work" ? "playlist-1" : null,
     tracks,
     trackIndex: 0,
@@ -86,7 +86,13 @@ describe("PlayerController scenarios", () => {
   });
 
   it("Filesの単発再生では作品聴了を通知しない", () => {
-    const fileItem = { ...item("queue"), tracks: [tracks[0]!], trackIndex: 0 };
+    const fileItem: PlaybackItem = {
+      source: { kind: "file" },
+      playlistId: null,
+      tracks: [tracks[0]!],
+      trackIndex: 0,
+      completionScope: "queue",
+    };
     const controller = new PlayerController();
     const commands: string[] = [];
     controller.subscribeCommands((command) => commands.push(command.type));

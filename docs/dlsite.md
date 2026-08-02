@@ -89,7 +89,7 @@ TTLは `MIMIMILLI_DLSITE_CACHE_TTL_OK_MS` / `_PARSE_ERROR_MS` / `_NOT_FOUND_MS` 
 
 HTMLの転送・展開サイズには上限があり（既定2 MiB / 8 MiB、`MIMIMILLI_DLSITE_CACHE_MAX_TRANSFER_BYTES` / `_MAX_EXPANDED_BYTES`）、gzip展開時にも `zlib` の `maxOutputLength` で同じ上限を渡してgzip bombを防ぐ。
 
-一括取得は同じキャッシュ済みRJコードに対して2回目以降HTTPに出なくても、適用結果に実質差分がなければDBにも `.meta.json` にも書き込まない。`lastAttemptAt` は実際にHTTPを試みたときだけ更新し、cache hitでは更新しない。
+一括取得は同じキャッシュ済みRJコードに対して2回目以降HTTPに出なくても、適用結果に実質差分がなければDBにも `mimimilli.json` にも書き込まない。`lastAttemptAt` は実際にHTTPを試みたときだけ更新し、cache hitでは更新しない。
 
 ## レート制限とリトライ
 

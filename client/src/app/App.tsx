@@ -16,7 +16,6 @@ import AddressBar from "./ui/AddressBar";
 import NotificationBell from "./ui/NotificationBell";
 import { WORK_QUERY_KEYS } from "../entities/work/queryKeys";
 import { SETTINGS_QUERY_KEYS } from "../entities/settings/queryKeys";
-import type { FsEntry } from "../features/files/model/types";
 import PlayerDock from "../features/player/ui/PlayerDock";
 import { resolveAppStartupState } from "./model/resolveAppStartupState";
 import SetupScreen from "../features/setup/ui/SetupScreen";
@@ -96,32 +95,6 @@ export default function App() {
       player.playWithResume(work);
     },
     [player],
-  );
-
-  // ファイルモード: 作品配下の音声ファイルを単一トラックとして常駐プレイヤーで再生する。
-  // 作品の外にあるファイル（workId/workRelPath なし）は既存メディア配信で扱えないため再生しない。
-  const handlePlayFile = useCallback(
-    async (entry: FsEntry) => {
-      if (!entry.workId || !entry.workRelPath) return;
-      const requestId = ++playRequestIdRef.current;
-      try {
-        const fullWork = await queryClient.ensureQueryData({
-          queryKey: WORK_QUERY_KEYS.detail(entry.workId),
-          queryFn: () => getWork(entry.workId!),
-        });
-        if (requestId !== playRequestIdRef.current) return;
-        // ファイル欠損・メタ読み込みエラーの作品配下のファイルは再生できない。
-        if (fullWork.status !== "ok") return;
-        player.play(
-          fullWork,
-          [{ id: crypto.randomUUID(), title: entry.name, file: entry.workRelPath }],
-          0,
-        );
-      } catch (err) {
-        console.error("ファイルの再生に失敗しました", err);
-      }
-    },
-    [player, queryClient],
   );
 
   // TopBarのスキャンボタンは即時実行せずモーダルを開く（TASK-56）。実行中なら実行中の表示に復帰する。
@@ -214,7 +187,6 @@ export default function App() {
       body={
         <AppBody
           rootFolder={rootFolder}
-          onPlayFile={handlePlayFile}
           onPlay={handlePlay}
           onResume={handleResume}
           onTogglePlay={player.togglePlay}

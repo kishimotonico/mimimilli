@@ -49,7 +49,7 @@ export default function ConfirmDialog({
           <button
             type="button"
             onClick={onConfirm}
-            className="h-8 cursor-pointer rounded-[6px] border-none bg-r-coral px-[14px] font-sans text-[12px] font-semibold text-paper-1"
+            className="h-8 cursor-pointer rounded-[6px] border border-[color-mix(in_oklch,var(--r-coral)_45%,transparent)] bg-[var(--r-coral)] px-[14px] font-sans text-[12px] font-semibold text-paper-1 transition-colors hover:brightness-[0.92]"
           >
             {confirmLabel}
           </button>

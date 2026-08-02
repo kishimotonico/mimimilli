@@ -1,0 +1,65 @@
+---
+id: TASK-167
+title: メタファイル名を .meta.json から mimimilli.json に変更する
+status: Done
+assignee:
+  - '@claude'
+created_date: '2026-08-01 18:44'
+updated_date: '2026-08-02 00:28'
+labels: []
+dependencies: []
+priority: high
+ordinal: 177000
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+出典: メタファイル名の検討 2026-08-02（本会話でユーザー合意）。メタファイル名.meta.jsonは出自が分からず一般名詞すぎて衝突・検索性に難がある。Windowsではドットファイルが隠れないため先頭ドットの意味も薄い。ユーザー決定: ブランド名を冠したmimimilli.json（ドットなし）へ変更する。ファイルモード改修（TASK-163〜165）でメタの手動生成・削除を作る前に実施する。
+
+要件:
+- スキャナーの検出対象をmimimilli.jsonに変更する。新規生成も同名にする
+- 既存の.meta.jsonはスキャン時に検出したらmimimilli.jsonへ自動リネームして移行する（メタファイルはアプリ管理物なのでリネームしてよい。音声等ユーザーのファイルは不変）。恒久的な旧名読み取りフォールバックは残さない
+- *.meta.json（プレフィックス付き変種、単一ファイル形式のメタ）の現仕様を確認し、新名でどう扱うか（廃止 or *.mimimilli.json）をタスク内で決めて統一する
+- docs（requirements-v4.mdのメタ仕様記述等）を新名に更新する
+
+現状のコード側事実（調査済み、2026-08-02）:
+- メタ定数: server/src/adapters/real/meta.ts:8 の META_SUFFIX = ".meta.json"。同ファイルのisMetaFileName（:11-13）がフォルダー形式".meta.json"と単一ファイル形式"xxx.meta.json"の両方を判定している
+- 新規生成: server/src/adapters/real/scanner.ts:944（generateMetaForFolder内）でjoin(workDir, ".meta.json")を書き込み
+- 検出・登録: scanner.ts:579付近でprepareSingleMeta(join(workDir, ".meta.json"))
+- 表示除外: server/src/adapters/real/fsBrowse.ts:85でentry.name.endsWith(".meta.json")のファイルをファイルツリー表示から隠している
+- .meta.jsonという文字列はdocs/requirements-v4.md、docs/ARCHITECTURE.md、docs/adr/0001,0003,0005,0008、shared/src/meta.ts、shared/src/work.ts、server配下の多数のテストヘルパー・テストに広く出現する
+<!-- SECTION:DESCRIPTION:END -->
+
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [x] #1 新規スキャンでフォルダに mimimilli.json が生成される
+- [x] #2 既存の .meta.json を含むフォルダをスキャンすると mimimilli.json へ自動リネームされ、作品の登録状態（履歴・タグ含む）が維持される
+- [x] #3 *.meta.json（単一ファイル形式の変種）の新名での扱いが決まり、タスク内の方針に沿って統一的に実装されている
+- [x] #4 リポジトリ内（server/client/shared/docs）に .meta.json を参照するコードが残らない（テスト・docsのメタ仕様記述を含む）
+<!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. メタ名定数を mimimilli.json へ変更（META_SUFFIX/isMetaFileName の再設計: name === 'mimimilli.json' または endsWith('.mimimilli.json')）
+2. 単一ファイル形式は廃止せず *.mimimilli.json へ統一（要件v4 §で正式仕様のため機能維持）
+3. スキャン時に旧 .meta.json / *.meta.json を検出したら新名へ自動リネームして移行（恒久フォールバックは残さない）
+4. fsBrowse の表示除外・shared/meta.ts・work.ts・テストヘルパー/テストを新名へ更新
+5. docs: requirements-v4.md / ARCHITECTURE.md は新名へ書き換え。ADR 0010 を新規作成して名称変更を記録し、旧ADR(0001,0003,0005,0008)には現在形の記述にのみ注記
+6. pnpm check / pnpm test で確認。実装は Cursor (composer-2.5) へ委譲
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Cursor(composer-2.5)実装+Sonnet検証で完了。pnpm check/test全通過(server394/client597)。衝突時(新名既存)は新名側を正として登録、旧ファイル放置+warn。ADR-0010追加。コミット3645f26
+
+方針変更(2026-08-02ユーザー判断): スキャン時の自動リネーム移行を撤去。移行は手動mv運用（コマンド例はADR-0010とコミットメッセージに記載）。移行関数・テスト3件削除、check/test全通過(server406/client601)。コミット参照: git log
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+メタファイル名を.meta.json→mimimilli.jsonへ変更。単一ファイル形式は*.mimimilli.jsonへ統一（要件v4の正式仕様のため機能維持）。旧名はスキャン時に一回きり自動リネーム移行し恒久フォールバックなし。移行・単一ファイル・衝突の3シナリオをテストで固定。docs/ADR更新済み。検証担当の再検証でマージ可判定
+<!-- SECTION:FINAL_SUMMARY:END -->

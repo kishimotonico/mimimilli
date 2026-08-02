@@ -1,8 +1,8 @@
 // エンドポイント横断の契約: 作品検索クエリ、ページングエンベロープ、部分更新、エラー形式。
 import { z } from "zod";
 import { facetAxisIdSchema, sortIdSchema, viewIdSchema } from "./library.ts";
-import { normalizeTags, resumeSchema, workListItemSchema } from "./work.ts";
-import { dlsiteStatusSchema } from "./dlsite.ts";
+import { normalizeTags, resumeSchema, workListItemSchema, workSchema } from "./work.ts";
+import { dlsiteApplyBodySchema, dlsiteStatusSchema } from "./dlsite.ts";
 
 // ── 作品検索（GET /api/works）────────────────────────────────
 
@@ -110,6 +110,47 @@ export const workPatchSchema = z
       patch.title !== undefined || patch.tags !== undefined || patch.bookmarked !== undefined,
   );
 export type WorkPatch = z.infer<typeof workPatchSchema>;
+
+// ── 作品の手動登録（POST /api/works, GET /api/works/register-preview）────
+
+export const workRegisterPreviewQuerySchema = z.object({
+  path: z.string().min(1),
+});
+export type WorkRegisterPreviewQuery = z.infer<typeof workRegisterPreviewQuerySchema>;
+
+export const workRegisterPreviewSchema = z.object({
+  suggestedTitle: z.string(),
+  /** 孤立メタ復元時のみメタのタグを返す。通常登録時は常に空配列 */
+  tags: z.array(z.string()),
+  detectedRjCode: z.string().nullable(),
+  descendantWorkCount: z.number().int().nonnegative(),
+  alreadyRegistered: z.boolean(),
+  orphanedMeta: z.boolean(),
+});
+export type WorkRegisterPreview = z.infer<typeof workRegisterPreviewSchema>;
+
+export const workCreateBodySchema = z.object({
+  path: z.string().min(1),
+  title: z.string().min(1),
+  /** タグは契約の入口で正規形へ寄せる（ADR-0005 決定5） */
+  tags: z.array(z.string()).default([]).transform(normalizeTags),
+  mergeDescendantWorks: z.boolean().default(false),
+  dlsite: dlsiteApplyBodySchema.optional(),
+});
+export type WorkCreateBody = z.infer<typeof workCreateBodySchema>;
+
+export const dlsiteFetchByCodeBodySchema = z.object({
+  rjCode: z
+    .string()
+    .trim()
+    .regex(/^(RJ|VJ)\d{6,8}$/i, "RJ/VJコードはRJまたはVJに続く6〜8桁で入力してください")
+    .transform((value) => value.toUpperCase()),
+});
+export type DlsiteFetchByCodeBody = z.infer<typeof dlsiteFetchByCodeBodySchema>;
+
+/** POST /api/works のレスポンス */
+export const workCreateResponseSchema = workSchema;
+export type WorkCreateResponse = z.infer<typeof workCreateResponseSchema>;
 
 /** POST /api/works/:id/resume（高頻度更新のため PATCH と分離） */
 export const resumeBodySchema = resumeSchema;

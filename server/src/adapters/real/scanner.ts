@@ -2,12 +2,12 @@
 //
 // フロー（要件 v4 §8 / HANDOFF.md）:
 //   1. 全作品を「行方不明」にマーク
-//   2. ルート以下を走査し、メタファイル（.meta.json / *.meta.json）を登録
+//   2. ルート以下を走査し、メタファイル（mimimilli.json / *.mimimilli.json）を登録
 //      - ID で突合し、移動・リネームに追従（DB の既存情報を保持）
 //      - 同一 UUID の重複は後に検出された方を再採番してメタファイルへ書き戻す
 //      - 参照先音声の欠損は status "error" + errorMessage
 //      - 再生時間は music-metadata でプローブし SQLite にキャッシュ
-//   3. メタファイルのない音声フォルダーへ .meta.json を自動生成（下書き）
+//   3. メタファイルのない音声フォルダーへ mimimilli.json を自動生成（下書き）
 //   4. missing のまま残った作品 = 物理パス消失
 //
 // Rust 版からの意図的な変更:
@@ -26,6 +26,7 @@ import type {
   ResolvedPlaylist,
   ScanResult,
   Track,
+  UrlEntry,
   Work,
 } from "@mimimilli/shared";
 import {
@@ -42,10 +43,12 @@ import { detectRjCode } from "./dlsite.ts";
 import { computeFingerprint, computeRawFingerprint } from "./fingerprint.ts";
 import {
   isMetaFileName,
+  META_FILE_NAME,
   MetaParseError,
   patchMetaFile,
   readMetaFile,
   readMetaFileRaw,
+  reassignMetaIdsOnDbCollision,
   writeMetaFile,
 } from "./meta.ts";
 import { migrateMetaIds } from "./metaIdMigration.ts";
@@ -576,7 +579,7 @@ export class Scanner {
       const workDir = roots[i]!;
       try {
         const id = this.generateMetaForFolder(workDir);
-        generated.push({ id, prepared: this.prepareSingleMeta(join(workDir, ".meta.json")) });
+        generated.push({ id, prepared: this.prepareSingleMeta(join(workDir, META_FILE_NAME)) });
       } catch (e) {
         console.warn(`メタファイルの自動生成に失敗: ${workDir}: ${(e as Error).message}`);
         result.errors += 1;
@@ -925,6 +928,109 @@ export class Scanner {
     return id;
   }
 
+  /** 手動登録: 指定フォルダーへ mimimilli.json を生成し DB に登録する */
+  async registerFolderWork(
+    workDir: string,
+    options: {
+      title: string;
+      tags?: string[];
+      urls?: UrlEntry[];
+      coverImage?: string | null;
+      dlsite?: MetaFile["dlsite"];
+    },
+  ): Promise<Work> {
+    const metaPath = join(workDir, META_FILE_NAME);
+    if (existsSync(metaPath)) {
+      throw new Error("このフォルダーには既にメタファイルがあります");
+    }
+
+    const tracks = buildDefaultTracks(workDir);
+    const playlistId = tracks.length > 0 ? crypto.randomUUID() : null;
+    const meta: MetaFile = {
+      id: crypto.randomUUID(),
+      title: options.title,
+      urls: options.urls ?? [],
+      tags: options.tags ?? [],
+      coverImage: options.coverImage !== undefined ? options.coverImage : findCoverImage(workDir),
+      playlists: playlistId ? [{ id: playlistId, name: "default", tracks }] : [],
+      defaultPlaylistId: playlistId,
+      createdAt: new Date().toISOString(),
+      dlsite: options.dlsite ?? emptyDlsiteState(),
+    };
+    writeMetaFile(metaPath, meta);
+
+    const prepared = this.prepareSingleMeta(metaPath);
+    const existingWorks = this.repo.getScanWorkMap();
+    const batch = new UpsertBatch(this.db, this.repo, this.upsertBatchSize, () => {});
+    const scanResult: Pick<ScanResult, "coverErrors"> = { coverErrors: 0 };
+    const seenIds = new Set<string>();
+    await this.registerMetaFile(
+      prepared,
+      seenIds,
+      new Map(),
+      batch,
+      existingWorks,
+      scanResult as ScanResult,
+      true,
+    );
+    batch.flush();
+
+    const work = await this.repo.getWork(meta.id);
+    if (!work) throw new Error("登録した作品の取得に失敗しました");
+    return work;
+  }
+
+  /** 孤立メタの復元: 既存 mimimilli.json を保持し DB へ再登録する */
+  async restoreFolderWork(
+    workDir: string,
+    patch: {
+      title?: string;
+      tags?: string[];
+      urls?: UrlEntry[];
+      coverImage?: string | null;
+      dlsite?: MetaFile["dlsite"];
+    },
+  ): Promise<Work> {
+    const metaPath = join(workDir, META_FILE_NAME);
+    if (!existsSync(metaPath)) {
+      throw new Error("復元対象のメタファイルがありません");
+    }
+
+    const metaPatch: typeof patch = {};
+    if (patch.title !== undefined) metaPatch.title = patch.title;
+    if (patch.tags !== undefined) metaPatch.tags = patch.tags;
+    if (patch.urls !== undefined) metaPatch.urls = patch.urls;
+    if (patch.coverImage !== undefined) metaPatch.coverImage = patch.coverImage;
+    if (patch.dlsite !== undefined) metaPatch.dlsite = patch.dlsite;
+    if (Object.keys(metaPatch).length > 0) {
+      patchMetaFile(metaPath, metaPatch);
+    }
+
+    const workId = reassignMetaIdsOnDbCollision(metaPath, (id) => {
+      const existing = this.repo.getScanWorkMap().get(id);
+      return existing !== undefined && existing.physicalPath !== workDir;
+    });
+    const prepared = this.prepareSingleMeta(metaPath);
+    const existingWorks = this.repo.getScanWorkMap();
+    const batch = new UpsertBatch(this.db, this.repo, this.upsertBatchSize, () => {});
+    const scanResult: Pick<ScanResult, "coverErrors"> = { coverErrors: 0 };
+    const seenIds = new Set<string>();
+    await this.registerMetaFile(
+      prepared,
+      seenIds,
+      new Map(),
+      batch,
+      existingWorks,
+      scanResult as ScanResult,
+      true,
+    );
+    batch.flush();
+
+    const work = await this.repo.getWork(workId);
+    if (!work) throw new Error("復元した作品の取得に失敗しました");
+    return work;
+  }
+
   /** 音声フォルダーへメタファイルを自動生成する（要件 v4 §3.5。あくまで下書き） */
   private generateMetaForFolder(workDir: string): string {
     const id = crypto.randomUUID();
@@ -941,7 +1047,7 @@ export class Scanner {
       createdAt: new Date().toISOString(),
       dlsite: emptyDlsiteState(),
     };
-    writeMetaFile(join(workDir, ".meta.json"), meta);
+    writeMetaFile(join(workDir, META_FILE_NAME), meta);
     return id;
   }
 }

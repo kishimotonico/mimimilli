@@ -20,7 +20,7 @@ export type UrlEntry = z.infer<typeof urlEntrySchema>;
 /** トラック = 「指定ファイルの指定区間を再生する」。start/end 省略時はファイル全体 */
 const uuidV4Schema = z.uuid({ version: "v4" });
 
-/** start/endはファイル内の絶対時刻（秒）。トラックの正本表現で、.meta.json にもこの形で保存する */
+/** start/endはファイル内の絶対時刻（秒）。トラックの正本表現で、mimimilli.json にもこの形で保存する */
 const trackBaseSchema = z.object({
   id: uuidV4Schema,
   title: z.string(),

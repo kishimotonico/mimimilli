@@ -1,4 +1,4 @@
-import { useAtomValue } from "jotai";
+import { useAtomValue, useSetAtom } from "jotai";
 import Toast from "../../shared/ui/Toast";
 import { formatDlsiteBulkResult } from "../../features/dlsite/model/formatDlsiteBulkResult";
 import {
@@ -7,11 +7,14 @@ import {
   dlsiteBulkResultAtom,
 } from "../../features/dlsite/model/atoms";
 import { useDlsiteBulkActions } from "../../features/dlsite/model/useDlsiteBulkActions";
+import { errorToastAtom } from "../model/errorToastAtom";
 import { scanErrorAtom } from "../../features/scan/model/atoms";
 import { useScanActions } from "../../features/scan/model/useScanActions";
 
 export default function GlobalToast() {
   const scanError = useAtomValue(scanErrorAtom);
+  const errorToast = useAtomValue(errorToastAtom);
+  const setErrorToast = useSetAtom(errorToastAtom);
   const dlsiteResult = useAtomValue(dlsiteBulkResultAtom);
   const dlsiteCancelledResult = useAtomValue(dlsiteBulkCancelledResultAtom);
   const dlsiteError = useAtomValue(dlsiteBulkErrorAtom);
@@ -20,6 +23,10 @@ export default function GlobalToast() {
 
   if (scanError) {
     return <Toast message={scanError} onDismiss={clearScanError} />;
+  }
+
+  if (errorToast) {
+    return <Toast message={errorToast} onDismiss={() => setErrorToast(null)} />;
   }
 
   const message = dlsiteCancelledResult

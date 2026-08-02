@@ -79,6 +79,7 @@ describe("useMediaSession", () => {
     renderHook(() =>
       useMediaSession({
         currentWork: work,
+        isFilePlayback: false,
         currentTrack: track,
         currentTrackIndex: 0,
         trackCount: 2,
@@ -122,6 +123,7 @@ describe("useMediaSession", () => {
       ({ currentTrackIndex }) =>
         useMediaSession({
           currentWork: makeWork(),
+          isFilePlayback: false,
           currentTrack: track,
           currentTrackIndex,
           trackCount: 2,
@@ -163,6 +165,7 @@ describe("useMediaSession", () => {
       ({ active }) =>
         useMediaSession({
           currentWork: active ? makeWork() : null,
+          isFilePlayback: false,
           currentTrack: active ? track : null,
           currentTrackIndex: active ? 0 : -1,
           trackCount: active ? 2 : 0,
@@ -202,6 +205,7 @@ describe("useMediaSession", () => {
     const { unmount } = renderHook(() =>
       useMediaSession({
         currentWork: makeWork(),
+        isFilePlayback: false,
         currentTrack: track,
         currentTrackIndex: 0,
         trackCount: 2,
@@ -229,6 +233,7 @@ describe("useMediaSession", () => {
     const { result } = renderHook(() =>
       useMediaSession({
         currentWork: makeWork(),
+        isFilePlayback: false,
         currentTrack: track,
         currentTrackIndex: 0,
         trackCount: 2,

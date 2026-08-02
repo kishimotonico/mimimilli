@@ -29,7 +29,7 @@ test("manifest先行採番: 書換え前に停止しても再実行で同じID�
   const root = join(directory.path, "library");
   const dataRoot = join(directory.path, "data");
   const workDir = join(root, "work");
-  const metaPath = join(workDir, ".meta.json");
+  const metaPath = join(workDir, "mimimilli.json");
   mkdirSync(workDir, { recursive: true });
   writeLegacyMeta(metaPath);
   const original = readFileSync(metaPath, "utf-8");
@@ -78,7 +78,7 @@ test("manifest先行採番: 書換え前に停止しても再実行で同じID�
   const backupHashes = readdirSync(join(operationRoot, "backup"));
   assert.equal(backupHashes.length, 1);
   assert.equal(
-    existsSync(join(operationRoot, "backup", backupHashes[0]!, "work", ".meta.json")),
+    existsSync(join(operationRoot, "backup", backupHashes[0]!, "work", "mimimilli.json")),
     true,
   );
 });
@@ -89,7 +89,7 @@ test("manifest作成後に外部編集されたメタは上書きしない", (t)
   const root = join(directory.path, "library");
   const dataRoot = join(directory.path, "data");
   const workDir = join(root, "work");
-  const metaPath = join(workDir, ".meta.json");
+  const metaPath = join(workDir, "mimimilli.json");
   mkdirSync(workDir, { recursive: true });
   writeLegacyMeta(metaPath);
   migrateMetaIds({ root, metaPaths: [metaPath], dataRoot, maxWrites: 0 });
@@ -98,9 +98,9 @@ test("manifest作成後に外部編集されたメタは上書きしない", (t)
   writeFileSync(metaPath, edited);
   const result = migrateMetaIds({ root, metaPaths: [metaPath], dataRoot });
 
-  assert.deepEqual(result.externallyModified, ["work/.meta.json"]);
+  assert.deepEqual(result.externallyModified, ["work/mimimilli.json"]);
   assert.equal(readFileSync(metaPath, "utf-8"), edited);
-  assert.equal(existsSync(join(workDir, ".meta.json")), true);
+  assert.equal(existsSync(join(workDir, "mimimilli.json")), true);
 });
 
 test("rename直前に外部編集されたメタは再ハッシュで検出して上書きしない", (t) => {
@@ -109,7 +109,7 @@ test("rename直前に外部編集されたメタは再ハッシュで検出し�
   const root = join(directory.path, "library");
   const dataRoot = join(directory.path, "data");
   const workDir = join(root, "work");
-  const metaPath = join(workDir, ".meta.json");
+  const metaPath = join(workDir, "mimimilli.json");
   mkdirSync(workDir, { recursive: true });
   writeLegacyMeta(metaPath);
 
@@ -124,7 +124,7 @@ test("rename直前に外部編集されたメタは再ハッシュで検出し�
   });
 
   assert.equal(result.migrated, 0);
-  assert.deepEqual(result.externallyModified, ["work/.meta.json"]);
+  assert.deepEqual(result.externallyModified, ["work/mimimilli.json"]);
   assert.match(readFileSync(metaPath, "utf-8"), /rename直前の外部編集/);
 });
 
@@ -137,7 +137,7 @@ test("正規化パスの安定順でPlaylist/Track IDの最初の所有者を決
   const trackId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
   const paths = ["work-a", "work-b"].map((name, index) => {
     const workDir = join(root, name);
-    const metaPath = join(workDir, ".meta.json");
+    const metaPath = join(workDir, "mimimilli.json");
     mkdirSync(workDir, { recursive: true });
     writeFileSync(
       metaPath,
@@ -177,7 +177,7 @@ test("旧メタの同名PlaylistをID付きへ移行して厳格スキーマで�
   const root = join(directory.path, "library");
   const dataRoot = join(directory.path, "data");
   const workDir = join(root, "work");
-  const metaPath = join(workDir, ".meta.json");
+  const metaPath = join(workDir, "mimimilli.json");
   mkdirSync(workDir, { recursive: true });
   writeFileSync(
     metaPath,
@@ -213,7 +213,7 @@ test("完了済みライブラリでは変更のないメタの本文を読み�
   const dataRoot = join(directory.path, "data");
   const paths = ["work-a", "work-b"].map((name, index) => {
     const workDir = join(root, name);
-    const metaPath = join(workDir, ".meta.json");
+    const metaPath = join(workDir, "mimimilli.json");
     mkdirSync(workDir, { recursive: true });
     writeLegacyMeta(metaPath, index === 0 ? "作品A" : "作品B");
     return metaPath;
@@ -258,7 +258,7 @@ test("キャッシュ済み作品と外部編集で重複IDになった作品が
   const dataRoot = join(directory.path, "data");
   const paths = ["work-a", "work-b"].map((name, index) => {
     const workDir = join(root, name);
-    const metaPath = join(workDir, ".meta.json");
+    const metaPath = join(workDir, "mimimilli.json");
     mkdirSync(workDir, { recursive: true });
     writeLegacyMeta(metaPath, index === 0 ? "作品A" : "作品B");
     return metaPath;
@@ -319,7 +319,7 @@ test("Windowsではmanifestの相対パスキーをケース非区別で照合�
   const root = join(directory.path, "library");
   const dataRoot = join(directory.path, "data");
   const workDir = join(root, "Work");
-  const metaPath = join(workDir, ".meta.json");
+  const metaPath = join(workDir, "mimimilli.json");
   mkdirSync(workDir, { recursive: true });
   writeLegacyMeta(metaPath);
   migrateMetaIds({ root, metaPaths: [metaPath], dataRoot, maxWrites: 0, platform: "win32" });
@@ -328,7 +328,7 @@ test("Windowsではmanifestの相対パスキーをケース非区別で照合�
   const operationRoot = join(migrationsRoot, readdirSync(migrationsRoot)[0]!);
   const manifestPath = join(operationRoot, "manifest.json");
   const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
-  manifest.operations[0].relativePath = "WORK/.META.JSON";
+  manifest.operations[0].relativePath = "WORK/MIMIMILLI.JSON";
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 
   const result = migrateMetaIds({ root, metaPaths: [metaPath], dataRoot, platform: "win32" });

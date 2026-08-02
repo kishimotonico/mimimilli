@@ -2,6 +2,7 @@
 import { readdirSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
 import type { FileEntry } from "@mimimilli/shared";
+import { isMetaFileName } from "./meta.ts";
 
 function extOf(name: string): string {
   const i = name.lastIndexOf(".");
@@ -18,7 +19,7 @@ export function buildFileTree(dirPath: string): FileEntry | null {
 
   const children: FileEntry[] = [];
   for (const entry of entries) {
-    if (entry.name.startsWith(".")) continue; // .meta.json 等の管理ファイルは隠す
+    if (isMetaFileName(entry.name) || entry.name.startsWith(".")) continue;
     const full = join(dirPath, entry.name);
     if (entry.isDirectory()) {
       const child = buildFileTree(full);

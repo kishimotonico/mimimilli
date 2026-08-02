@@ -76,8 +76,8 @@ test("findWorkRoot: カバー同梱で mp3/ から作品ルートへ昇格", asy
   const scanner = new Scanner(db, new WorkRepo(db), directory.path);
   const result = await scanner.scan(root);
   assert.equal(result.newlyGenerated, 1);
-  assert.ok(existsSync(join(work, ".meta.json")));
-  assert.ok(!existsSync(join(work, "mp3", ".meta.json")));
+  assert.ok(existsSync(join(work, "mimimilli.json")));
+  assert.ok(!existsSync(join(work, "mp3", "mimimilli.json")));
 });
 
 test("findWorkRoot: 単一サブフォルダーラッパーで昇格", async (t) => {
@@ -95,7 +95,7 @@ test("findWorkRoot: 単一サブフォルダーラッパーで昇格", async (t)
   const scanner = new Scanner(db, new WorkRepo(db), directory.path);
   const result = await scanner.scan(root);
   assert.equal(result.newlyGenerated, 1);
-  assert.ok(existsSync(join(outer, ".meta.json")));
+  assert.ok(existsSync(join(outer, "mimimilli.json")));
 });
 
 test("findWorkRoot: 複数サブフォルダーではジャンルフォルダーへ昇格しない", async (t) => {
@@ -113,8 +113,8 @@ test("findWorkRoot: 複数サブフォルダーではジャンルフォルダー
   const scanner = new Scanner(db, new WorkRepo(db), directory.path);
   const result = await scanner.scan(root);
   assert.equal(result.newlyGenerated, 1);
-  assert.ok(existsSync(join(genre, "album-a", ".meta.json")));
-  assert.ok(!existsSync(join(genre, ".meta.json")));
+  assert.ok(existsSync(join(genre, "album-a", "mimimilli.json")));
+  assert.ok(!existsSync(join(genre, "mimimilli.json")));
 });
 
 test("findWorkRoot: 兄弟メタ作品があれば親へ昇格しない", async (t) => {
@@ -129,7 +129,7 @@ test("findWorkRoot: 兄弟メタ作品があれば親へ昇格しない", async 
   writeWav(join(existing, "track.wav"), 1);
   writeWav(join(uncovered, "track.wav"), 1);
   writeFileSync(
-    join(existing, ".meta.json"),
+    join(existing, "mimimilli.json"),
     JSON.stringify({
       id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       title: "existing",
@@ -157,8 +157,8 @@ test("findWorkRoot: 兄弟メタ作品があれば親へ昇格しない", async 
   const result = await scanner.scan(root);
   assert.equal(result.registered, 1);
   assert.equal(result.newlyGenerated, 1);
-  assert.ok(existsSync(join(uncovered, ".meta.json")));
-  assert.ok(!existsSync(join(parent, ".meta.json")));
+  assert.ok(existsSync(join(uncovered, "mimimilli.json")));
+  assert.ok(!existsSync(join(parent, "mimimilli.json")));
 });
 
 test("findWorkRoot: 深い単一サブフォルダー連鎖はルート直下まで昇格", async (t) => {
@@ -175,8 +175,8 @@ test("findWorkRoot: 深い単一サブフォルダー連鎖はルート直下ま
   const scanner = new Scanner(db, new WorkRepo(db), directory.path);
   const result = await scanner.scan(root);
   assert.equal(result.newlyGenerated, 1);
-  assert.ok(existsSync(join(root, "a", ".meta.json")));
-  assert.ok(!existsSync(join(work, ".meta.json")));
+  assert.ok(existsSync(join(root, "a", "mimimilli.json")));
+  assert.ok(!existsSync(join(work, "mimimilli.json")));
 });
 
 test("findWorkRoot: メタ無しaudioのみ・audio無しmetaは自動生成しない", async (t) => {
@@ -186,7 +186,7 @@ test("findWorkRoot: メタ無しaudioのみ・audio無しmetaは自動生成し�
   const metaOnly = join(root, "meta-only");
   mkdirSync(metaOnly, { recursive: true });
   writeFileSync(
-    join(metaOnly, ".meta.json"),
+    join(metaOnly, "mimimilli.json"),
     JSON.stringify({
       id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
       title: "meta only",
@@ -216,7 +216,7 @@ test("findWorkRoot: 多数のメタ作品でもインデックス参照で等価
     mkdirSync(workDir, { recursive: true });
     writeWav(join(workDir, "track.wav"), 1);
     writeFileSync(
-      join(workDir, ".meta.json"),
+      join(workDir, "mimimilli.json"),
       JSON.stringify({
         id: `eeeeeeee-eeee-4eee-8eee-${String(i).padStart(12, "0")}`,
         title: `work-${i}`,
@@ -257,10 +257,10 @@ test("findWorkRoot: 非正規化root（末尾スラッシュ・./）でも旧実
   const scanner = new Scanner(db, new WorkRepo(db), directory.path);
   const resultTrailing = await scanner.scan(`${root}/`);
   assert.equal(resultTrailing.newlyGenerated, 1);
-  assert.ok(existsSync(join(work, ".meta.json")));
+  assert.ok(existsSync(join(work, "mimimilli.json")));
 
-  rmSync(join(work, ".meta.json"));
+  rmSync(join(work, "mimimilli.json"));
   const resultDot = await scanner.scan(join(directory.path, "./lib"));
   assert.equal(resultDot.newlyGenerated, 1);
-  assert.ok(existsSync(join(work, ".meta.json")));
+  assert.ok(existsSync(join(work, "mimimilli.json")));
 });

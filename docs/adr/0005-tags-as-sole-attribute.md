@@ -8,7 +8,7 @@
 
 本アプリでは CV・サークルといったほぼ必須の属性も、`お気に入りA` や `year/2025` のようなユーザー独自の属性も、すべて同じ「タグ」で管理・検索する（requirements-v4.md §4.2）。CV が複数いる作品も組み合わせで検索でき、属性の表現をシステムでなくユーザーが主体的に決められることが狙い。
 
-データモデルはこの思想どおりタグ一元（`WorkSummary.tags: string[]`、`.meta.json` の `tags`）になっている一方、実装には思想からズレた特別扱いが散在していた。
+データモデルはこの思想どおりタグ一元（`WorkSummary.tags: string[]`、`.meta.json` の `tags`。メタファイル名は [ADR-0010](0010-meta-file-rename-mimimilli-json.md) により `mimimilli.json` へ変更）になっている一方、実装には思想からズレた特別扱いが散在していた。
 
 - 分類軸が `circle / cv / series / cat / tag / year` のハードコード enum（`shared/src/library.ts` の `facetAxisSchema`）で、ユーザー定義 prefix は軸になれない
 - 編集 UI が構造化タグ（`prefix/値` 形式）を一律編集不可にしており、DLsite 自動取得の誤りをユーザーが直せない

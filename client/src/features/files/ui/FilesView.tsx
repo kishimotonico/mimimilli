@@ -3,14 +3,18 @@
 // 左の受動スタックへ吸い込まれ（exit アニメ）、子のカラムが右からスライドインする。
 // 階層を遡るのはパンくず（アドレスバー）のみ。再生エンジンは Library と共通・常駐。
 
-import { useMemo } from "react";
+import { useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAtomValue } from "jotai";
 import { browseFs } from "../api";
 import { useFilesNavigation } from "../model/useFilesNavigation";
 import { filesDirectionAtom } from "../model/atoms";
+import { buildFolderAudioQueue } from "../model/filePlayback";
+import { classifyFile } from "../model/types";
+import { usePlayerActions } from "../../player/model/usePlayerActions";
 import {
   playerIsPlaybackActiveAtom,
+  playingFsPathAtom,
   playingTrackRelPathAtom,
   playingWorkIdAtom,
 } from "../../player/model/atoms";
@@ -23,14 +27,15 @@ import StackEdge from "./StackEdge";
 
 interface FilesViewProps {
   rootFolder: string;
-  onPlayFile: (entry: FsEntry) => void;
 }
 
-export default function FilesView({ rootFolder, onPlayFile }: FilesViewProps) {
+export default function FilesView({ rootFolder }: FilesViewProps) {
+  const player = usePlayerActions();
   const nav = useFilesNavigation(rootFolder);
   const direction = useAtomValue(filesDirectionAtom);
   const playingWorkId = useAtomValue(playingWorkIdAtom);
   const playingRelPath = useAtomValue(playingTrackRelPathAtom);
+  const playingFsPath = useAtomValue(playingFsPathAtom);
   const isPlaybackActive = useAtomValue(playerIsPlaybackActiveAtom);
 
   const cwdQuery = useQuery({
@@ -39,13 +44,27 @@ export default function FilesView({ rootFolder, onPlayFile }: FilesViewProps) {
   });
   const cwdEntries = cwdQuery.data?.entries ?? [];
 
+  const handlePlayFile = useCallback(
+    (entry: FsEntry, folderEntries: FsEntry[]) => {
+      if (classifyFile(entry) !== "audio") return;
+      const { tracks, trackIndex } = buildFolderAudioQueue(folderEntries, entry);
+      if (tracks.length === 0) return;
+      player.playFile(tracks, trackIndex);
+    },
+    [player],
+  );
+
   const matchPlaying = useMemo(
-    () => (entry: FsEntry) =>
-      !!playingWorkId &&
-      entry.workId === playingWorkId &&
-      entry.workRelPath != null &&
-      entry.workRelPath === playingRelPath,
-    [playingWorkId, playingRelPath],
+    () => (entry: FsEntry) => {
+      if (playingFsPath) return entry.path === playingFsPath;
+      return (
+        !!playingWorkId &&
+        entry.workId === playingWorkId &&
+        entry.workRelPath != null &&
+        entry.workRelPath === playingRelPath
+      );
+    },
+    [playingFsPath, playingWorkId, playingRelPath],
   );
 
   const cwdTitle = nav.relPath.slice(-1)[0] ?? rootLabel(rootFolder);
@@ -101,7 +120,7 @@ export default function FilesView({ rootFolder, onPlayFile }: FilesViewProps) {
             isPlaybackActive={isPlaybackActive}
             onOpenDir={nav.openDir}
             onSelectFile={nav.selectFile}
-            onPlayFile={onPlayFile}
+            onPlayFile={(entry) => handlePlayFile(entry, cwdEntries)}
             isLoading={cwdQuery.isPending}
             isError={cwdQuery.isError}
             onRetry={() => cwdQuery.refetch()}
@@ -113,8 +132,10 @@ export default function FilesView({ rootFolder, onPlayFile }: FilesViewProps) {
         entry={previewEntry}
         folderEntries={folderEntries}
         depth={nav.addressPath.length}
+        browsePath={nav.cwd}
         isPlayingEntry={matchPlaying(previewEntry)}
-        onPlay={onPlayFile}
+        onPlay={(entry) => handlePlayFile(entry, folderEntries ?? cwdEntries)}
+        onWorkRegistered={() => cwdQuery.refetch()}
       />
     </>
   );

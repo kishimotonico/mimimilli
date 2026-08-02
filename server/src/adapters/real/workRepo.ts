@@ -58,7 +58,11 @@ import {
   workTags,
   works,
 } from "./catalogSchema.ts";
-import { likeDescendantsPrefix, likeStrictDescendantPrefixSql } from "./paths.ts";
+import {
+  likeDescendantsPrefix,
+  likeStrictDescendantPrefixSql,
+  SQL_LIKE_ESCAPE_CLAUSE,
+} from "./paths.ts";
 import { probeDurationSec } from "./probe.ts";
 import { appSettings, smartFolders, tagPrefixes, workStates } from "./userSchema.ts";
 
@@ -122,7 +126,7 @@ export interface ScanWorkState {
 }
 
 /** DBのカバー3列（cover_image / cover_width / cover_height）の生表現。
- * image は .meta.json 由来のファイル名、dimensions は計測成功時のみ。
+ * image は mimimilli.json 由来のファイル名、dimensions は計測成功時のみ。
  * image あり・dimensions null は「カバーはあるが寸法を計測できていない」状態を表す。 */
 export interface CoverColumns {
   image: string | null;
@@ -652,13 +656,34 @@ export class WorkRepo {
          FROM main.works
          INNER JOIN user.work_states ON work_states.work_id = works.id
          WHERE works.physical_path = ?
-            OR ? LIKE ${likeStrictDescendantPrefixSql("works.physical_path")}
-            OR works.physical_path LIKE ?
+            OR ? LIKE ${likeStrictDescendantPrefixSql("works.physical_path")}${SQL_LIKE_ESCAPE_CLAUSE}
+            OR works.physical_path LIKE ?${SQL_LIKE_ESCAPE_CLAUSE}
          ORDER BY works.rowid ASC`,
       )
       .all(directoryPath, directoryPath, sep, sep, descendantPrefix) as Array<{
       id: string;
       physicalPath: string;
+    }>;
+  }
+
+  /** 指定フォルダー配下（自身を除く）の登録済み作品。手動登録時の子作品統合用。 */
+  listDescendantWorkRefs(
+    parentPath: string,
+  ): Array<{ id: string; physicalPath: string; metaPath: string }> {
+    const descendantPrefix = likeDescendantsPrefix(parentPath);
+    return this.db.sqlite
+      .query(
+        `SELECT works.id AS id, works.physical_path AS physicalPath, works.meta_path AS metaPath
+         FROM main.works
+         INNER JOIN user.work_states ON work_states.work_id = works.id
+         WHERE works.physical_path != ?
+           AND works.physical_path LIKE ?${SQL_LIKE_ESCAPE_CLAUSE}
+         ORDER BY works.rowid ASC`,
+      )
+      .all(parentPath, descendantPrefix) as Array<{
+      id: string;
+      physicalPath: string;
+      metaPath: string;
     }>;
   }
 
@@ -1206,6 +1231,36 @@ export class WorkRepo {
     return work;
   }
 
+  /** 物理パス一致の有無だけを同期的に確認する（probe なし）。 */
+  getWorkByPhysicalPathSync(physicalPath: string): { id: string } | null {
+    const row = this.db.catalog
+      .select({ id: works.id })
+      .from(works)
+      .where(eq(works.physicalPath, physicalPath))
+      .get();
+    return row ?? null;
+  }
+
+  /** 作品を DB から削除する。メタファイルの削除は呼び出し側が行う。 */
+  getWorkDeleteTarget(id: string): { metaPath: string } | null {
+    const row = this.db.catalog
+      .select({ id: works.id, metaPath: works.metaPath })
+      .from(works)
+      .where(eq(works.id, id))
+      .get();
+    return row ? { metaPath: row.metaPath } : null;
+  }
+
+  deleteWork(id: string): { metaPath: string } | null {
+    const row = this.getWorkDeleteTarget(id);
+    if (!row) return null;
+    this.db.catalog.delete(workTags).where(eq(workTags.workId, id)).run();
+    this.db.catalog.delete(workDlsite).where(eq(workDlsite.workId, id)).run();
+    this.db.catalog.delete(works).where(eq(works.id, id)).run();
+    this.db.user.delete(workStates).where(eq(workStates.workId, id)).run();
+    return { metaPath: row.metaPath };
+  }
+
   /**
    * scan バッチの user DB 書き込み。work_states を冪等作成する（onConflictDoNothing）。
    * catalog より先にコミットする前提（ADR-0008）。
@@ -1228,7 +1283,7 @@ export class WorkRepo {
 
   /**
    * scan バッチの catalog DB 書き込み。タグも置き換える。
-   * カバー列は options.cover（.meta.json のファイル名＋計測寸法）を正とし、省略時は work.cover から導く。
+   * カバー列は options.cover（mimimilli.json のファイル名＋計測寸法）を正とし、省略時は work.cover から導く。
    */
   upsertWorkCatalog(
     work: Work,

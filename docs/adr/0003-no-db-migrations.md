@@ -6,7 +6,7 @@
 
 ## 文脈
 
-SQLite（`server/src/adapters/real/db.ts` / `schema.ts`）は `.meta.json`（Source of Truth）から再スキャンで再構築できる検索キャッシュだが、`.meta.json` には持たない DB 固有情報（`app_settings`・`smart_folders`、および `works` テーブルの `bookmarked`・`last_played_at`・`resume_position`・`resume_track_index`）も同居している。
+SQLite（`server/src/adapters/real/db.ts` / `schema.ts`）は `.meta.json`（Source of Truth。メタファイル名は [ADR-0010](0010-meta-file-rename-mimimilli-json.md) により `mimimilli.json` へ変更）から再スキャンで再構築できる検索キャッシュだが、`.meta.json` には持たない DB 固有情報（`app_settings`・`smart_folders`、および `works` テーブルの `bookmarked`・`last_played_at`・`resume_position`・`resume_track_index`）も同居している。
 
 ## 決定
 
@@ -19,5 +19,5 @@ SQLite（`server/src/adapters/real/db.ts` / `schema.ts`）は `.meta.json`（Sou
 ## 帰結
 
 - マイグレーションの実装・テストのコストがゼロになる
-- スキーマ変更のたびに DB 固有情報（設定・プリセット・スマートフォルダー・ブックマーク・レジューム・最終再生日時）が失われる。再スキャンで戻るのは `.meta.json` 由来の情報のみ
+- スキーマ変更のたびに DB 固有情報（設定・プリセット・スマートフォルダー・ブックマーク・レジューム・最終再生日時）が失われる。再スキャンで戻るのは `.meta.json`（現行は `mimimilli.json`。[ADR-0010](0010-meta-file-rename-mimimilli-json.md)）由来の情報のみ
 - DB 固有情報が増えて損失の影響が無視できなくなったら、本 ADR を見直してエクスポート/インポートや実マイグレーションの導入を検討する

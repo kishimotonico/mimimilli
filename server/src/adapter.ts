@@ -30,7 +30,9 @@ import type {
   TagPrefixCreate,
   TagPrefixUpdate,
   Work,
+  WorkCreateBody,
   WorkPatch,
+  WorkRegisterPreview,
   WorksPage,
   WorksQuery,
 } from "@mimimilli/shared";
@@ -102,6 +104,10 @@ export interface DataAdapter {
 
   // 作品
   queryWorks(params: WorksQuery): Promise<WorksPage>;
+  getWorkRegisterPreview(path: string): Promise<WorkRegisterPreview | null>;
+  createWork(body: WorkCreateBody): Promise<Work | null>;
+  /** 作品を DB とメタファイルから削除する。物理ファイルは触らない。存在しなければ false */
+  deleteWork(id: string): Promise<boolean>;
   getDlsiteNotificationSummary(): Promise<DlsiteNotificationSummary>;
   queryDlsiteNotifications(
     kind: DlsiteNotificationKind,
@@ -139,12 +145,16 @@ export interface DataAdapter {
   browseFs(path?: string): Promise<FsListing | null>;
 
   // メディア・DLsite
+  /** スキャンルート配下の絶対物理パスから音声を解決する。ルート外・非音声・不存在は null */
+  locateFsAudio(absolutePath: string): Promise<MediaLocation | null>;
   /** 実体が無い（fixture 等）場合は null → ルートが 404 を返す。カバーは describeCover を使う。 */
   locateMedia(kind: MediaKind, workId: string, relPath?: string): Promise<MediaLocation | null>;
   /** カバー専用の軽量な事前確認。音声・通常ファイルの契約は locateMedia のまま維持する。 */
   describeCover(workId: string, width?: number): Promise<CoverDescriptor | null>;
   /** force=true はキャッシュを無視して明示的に再取得する。 */
   dlsiteFetch(workId: string, force?: boolean): Promise<DlsiteFetchResult>;
+  /** 作品未登録時のプレビュー用。RJ/VJコードを直接指定して取得する。 */
+  dlsiteFetchByCode(rjCode: string, force?: boolean): Promise<DlsiteFetchResult>;
   dlsiteApply(workId: string, body: DlsiteApplyBody): Promise<boolean>;
   updateDlsiteState(workId: string, patch: DlsiteStatePatch): Promise<Work | null>;
   runDlsiteBulk(

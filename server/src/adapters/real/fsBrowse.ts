@@ -5,6 +5,7 @@
 import { readdirSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { FsEntry, FsListing } from "@mimimilli/shared";
+import { isMetaFileName } from "./meta.ts";
 import { isPathWithin, toPortableRelativePath } from "./paths.ts";
 
 /** GET /api/fs の作品対応付けに必要な最小投影。 */
@@ -82,7 +83,7 @@ export function browseFs(root: string, works: FsWorkRef[], target: string): FsLi
         workRelPath: null,
       });
     } else if (entry.isFile()) {
-      if (entry.name.endsWith(".meta.json") || entry.name.startsWith(".")) continue; // 管理ファイルは隠す
+      if (isMetaFileName(entry.name) || entry.name.startsWith(".")) continue; // 管理ファイルは隠す
       let size = 0;
       try {
         size = statSync(full).size;

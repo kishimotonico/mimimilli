@@ -26,7 +26,7 @@ test("durationSec: end-start / end有start無 / start有end無 / 両無 / 同一
   const defaultPlaylistId = crypto.randomUUID();
   const extraPlaylistId = crypto.randomUUID();
   writeFileSync(
-    join(workDir, ".meta.json"),
+    join(workDir, "mimimilli.json"),
     JSON.stringify(
       {
         id,
@@ -142,7 +142,7 @@ test("startがファイル全体長以上のトラックは作品をerror状態�
   const id = crypto.randomUUID();
   const defaultPlaylistId = crypto.randomUUID();
   writeFileSync(
-    join(workDir, ".meta.json"),
+    join(workDir, "mimimilli.json"),
     JSON.stringify(
       {
         id,
@@ -200,7 +200,7 @@ test("end指定トラックでもstartがファイル全体長を超えていれ
   const id = crypto.randomUUID();
   const defaultPlaylistId = crypto.randomUUID();
   writeFileSync(
-    join(workDir, ".meta.json"),
+    join(workDir, "mimimilli.json"),
     JSON.stringify(
       {
         id,
@@ -259,7 +259,7 @@ test("endがファイル実測長をわずかに超えるだけの正常デー�
   const id = crypto.randomUUID();
   const defaultPlaylistId = crypto.randomUUID();
   writeFileSync(
-    join(workDir, ".meta.json"),
+    join(workDir, "mimimilli.json"),
     JSON.stringify(
       {
         id,
@@ -309,7 +309,7 @@ test("rescan無しのファイル差し替え後、getWorkのtotalDurationSecは
   const defaultPlaylistId = crypto.randomUUID();
   const trackId = crypto.randomUUID();
   writeFileSync(
-    join(workDir, ".meta.json"),
+    join(workDir, "mimimilli.json"),
     JSON.stringify(
       {
         id,

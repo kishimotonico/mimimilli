@@ -71,7 +71,7 @@ test("playlistSchema/trackSchema/urlEntrySchemaのキー集合はfingerprintが�
 test("errorKindを追加してもfingerprintは変わらない", (t) => {
   const directory = makeTestDirectory("fingerprint-errorKind");
   t.after(directory.cleanup);
-  const metaPath = join(directory.path, ".meta.json");
+  const metaPath = join(directory.path, "mimimilli.json");
   const legacyRaw = {
     id: "00000000-0000-4000-8000-000000000001",
     title: "テスト作品",

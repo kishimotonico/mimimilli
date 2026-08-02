@@ -114,14 +114,15 @@ export function usePlayerRuntime() {
           saveCurrentResume();
           break;
         case "workCompleted": {
+          if (command.item.source.kind !== "work") break;
           const firstTrack = command.item.tracks[0];
           if (command.item.playlistId === null || !firstTrack) break;
-          enqueueResumeSave(command.item.work.id, {
+          enqueueResumeSave(command.item.source.work.id, {
             playlistId: command.item.playlistId,
             trackId: firstTrack.id,
             offsetSec: 0,
           });
-          resetResumeCache(command.item.work.id, command.item.playlistId, firstTrack.id);
+          resetResumeCache(command.item.source.work.id, command.item.playlistId, firstTrack.id);
           break;
         }
         case "loadTrack":
@@ -161,6 +162,7 @@ export function usePlayerRuntime() {
   const actions = usePlayerActions();
   const updateMediaSessionPosition = useMediaSession({
     currentWork: coreState.currentWork,
+    isFilePlayback: coreState.isFilePlayback,
     currentTrack: coreState.tracks[coreState.currentTrackIndex] ?? null,
     currentTrackIndex: coreState.currentTrackIndex,
     trackCount: coreState.tracks.length,

@@ -1,8 +1,10 @@
 // fixture アダプタ: インメモリの seed データを使う DataAdapter 実装。
 // 開発・ビジュアルテスト用（ADR-0002）。core/ の pure 関数を使って全メソッドを実装する。
+import { posix } from "node:path";
 import {
   applyDlsiteStatePatch,
   DEFAULT_TAG_PREFIXES,
+  emptyDlsiteState,
   evaluateParseErrorAlert,
   isDlsiteFetchFailed,
   isDlsiteParseFailed,
@@ -41,7 +43,9 @@ import type {
   ResolvedPlaylist,
   ResolvedTrack,
   Work,
+  WorkCreateBody,
   WorkPatch,
+  WorkRegisterPreview,
   WorksPage,
   WorksQuery,
   WorkSummary,
@@ -78,6 +82,8 @@ import {
   synthesizeSilentWav,
 } from "./media.ts";
 import { createFixtureScenario } from "./scenarios.ts";
+import { isPathWithin } from "../real/paths.ts";
+import { WorkRegisterError } from "../real/workRegister.ts";
 
 /** 作品1件ぶんの安定したplaylist/track ID（呼び出しをまたいで同一IDを保つ） */
 interface PlaybackIds {
@@ -343,6 +349,32 @@ function resolveFsNode(root: FsNode, rootAbs: string, target: string): FsNode | 
   return cur;
 }
 
+/** ファイルまたはディレクトリを解決する（browseFs はディレクトリ専用） */
+function resolveFsPath(root: FsNode, rootAbs: string, target: string): FsNode | null {
+  if (target === rootAbs) return root;
+  if (!target.startsWith(`${rootAbs}/`)) return null;
+  const segments = target
+    .slice(rootAbs.length + 1)
+    .split("/")
+    .filter(Boolean);
+  let cur = root;
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i]!;
+    const next = cur.children.find((c) => c.name === seg);
+    if (!next) return null;
+    if (i === segments.length - 1) return next;
+    if (!next.isDir) return null;
+    cur = next;
+  }
+  return null;
+}
+
+function isAudioFileType(fileType: string): boolean {
+  return ["mp3", "m4a", "aac", "wav", "ogg", "flac", "webm", "opus"].includes(
+    fileType.toLowerCase(),
+  );
+}
+
 export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataAdapter {
   const state = createInitialState(options);
 
@@ -448,6 +480,88 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
     async getWork(id: string): Promise<Work | null> {
       const work = state.works.find((w) => w.id === id);
       return work ? buildFullWorkFromState(state, work) : null;
+    },
+
+    async getWorkRegisterPreview(path: string): Promise<WorkRegisterPreview | null> {
+      const rootAbs = normalizeFsPath(state.rootFolder ?? "/library");
+      const workDir = normalizeFsPath(path);
+      if (!isPathWithin(rootAbs, workDir, posix)) return null;
+      const folderName = workDir.split("/").filter(Boolean).pop() ?? workDir;
+      const descendants = state.works.filter(
+        (work) => work.physicalPath.startsWith(`${workDir}/`) && work.physicalPath !== workDir,
+      );
+      const rjMatch = folderName.match(/RJ\d{6,8}/i);
+      return {
+        suggestedTitle: folderName,
+        tags: [],
+        detectedRjCode: rjMatch ? rjMatch[0]!.toUpperCase() : null,
+        descendantWorkCount: descendants.length,
+        alreadyRegistered: state.works.some((work) => work.physicalPath === workDir),
+        orphanedMeta: false,
+      };
+    },
+
+    async createWork(body: WorkCreateBody): Promise<Work | null> {
+      const preview = await this.getWorkRegisterPreview(body.path);
+      if (!preview) return null;
+      if (preview.alreadyRegistered) {
+        throw new WorkRegisterError(
+          "already_registered",
+          "このフォルダーは既に作品として登録されています",
+        );
+      }
+      if (preview.descendantWorkCount > 0 && !body.mergeDescendantWorks) {
+        throw new WorkRegisterError(
+          "descendants_require_merge",
+          `配下に登録済み作品が${preview.descendantWorkCount}件あります`,
+          preview.descendantWorkCount,
+        );
+      }
+      const workDir = normalizeFsPath(body.path);
+      state.works = state.works.filter(
+        (work) => !(work.physicalPath.startsWith(`${workDir}/`) && work.physicalPath !== workDir),
+      );
+      const now = new Date().toISOString();
+      const applyTags = body.dlsite ? normalizeTags(body.dlsite.applyTags) : [];
+      const work: WorkSummary = {
+        id: crypto.randomUUID(),
+        title: body.title,
+        cover: null,
+        status: "ok",
+        physicalPath: workDir,
+        totalDurationSec: 0,
+        trackCount: 0,
+        addedAt: now,
+        errorMessage: null,
+        urls:
+          body.dlsite?.info.url && body.dlsite.info.url.length > 0
+            ? [{ label: "DLsite", url: body.dlsite.info.url }]
+            : [],
+        tags: body.tags,
+        bookmarked: false,
+        lastPlayedAt: null,
+        dlsite: body.dlsite
+          ? {
+              rjCode: body.dlsite.info.rjCode,
+              status: "applied",
+              lastAttemptAt: now,
+              error: null,
+              errorKind: null,
+              appliedTags: applyTags,
+            }
+          : preview.detectedRjCode
+            ? { ...emptyDlsiteState(), rjCode: preview.detectedRjCode }
+            : emptyDlsiteState(),
+      };
+      state.works.push(work);
+      return buildFullWorkFromState(state, work);
+    },
+
+    async deleteWork(id: string): Promise<boolean> {
+      const index = state.works.findIndex((w) => w.id === id);
+      if (index === -1) return false;
+      state.works.splice(index, 1);
+      return true;
     },
 
     async patchWork(id: string, patch: WorkPatch): Promise<Work | null> {
@@ -606,6 +720,15 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
     // ── メディア・DLsite ────────────────────────────────────
     // fixture アダプタには実体ファイルが無いため、再生・シーク・カバー表示が
     // 成立するようメモリ上でコンテンツを合成する（synthetic MediaLocation）。
+    async locateFsAudio(absolutePath: string): Promise<MediaLocation | null> {
+      const rootAbs = normalizeFsPath(state.rootFolder ?? "/library");
+      const target = normalizeFsPath(absolutePath);
+      const root = buildFsRoot(state.works, state.coverColumns);
+      const node = resolveFsPath(root, rootAbs, target);
+      if (!node || node.isDir || !isAudioFileType(node.fileType)) return null;
+      return synthesizeSilentWav(DEFAULT_TRACK_DURATION_SEC);
+    },
+
     async locateMedia(
       kind: MediaKind,
       workId: string,
@@ -658,6 +781,10 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
       if (!rjCode) {
         return { ok: false, kind: "not_found", message: "RJコードが検出されていません" };
       }
+      return this.dlsiteFetchByCode(rjCode);
+    },
+
+    async dlsiteFetchByCode(rjCode: string): Promise<DlsiteFetchResult> {
       return {
         ok: true,
         info: {

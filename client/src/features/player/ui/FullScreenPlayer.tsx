@@ -2,8 +2,8 @@ import { useLayoutEffect, useRef } from "react";
 import type { PlayerState } from "../model/usePlayerState";
 import FullScreenScrub from "./FullScreenScrub";
 import PlaybackErrorNotice from "./PlaybackErrorNotice";
+import PlaybackArtwork from "./PlaybackArtwork";
 import { formatTime, formatDuration } from "../../../shared/lib/format";
-import CoverImg from "../../../entities/work/ui/CoverImg";
 import { selectFixedCoverThumbnailWidth } from "../../../entities/work/ui/coverThumbnailWidth";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
@@ -49,6 +49,7 @@ export default function FullScreenPlayer({
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const {
     currentWork,
+    isFilePlayback,
     isPlaying,
     volume,
     loop,
@@ -80,7 +81,7 @@ export default function FullScreenPlayer({
     };
   }, []);
 
-  if (!currentWork) return null;
+  if (!currentWork && !isFilePlayback) return null;
 
   return (
     <dialog
@@ -104,16 +105,16 @@ export default function FullScreenPlayer({
             onClick={onClose}
           />
           <div className="flex-1" />
-          <span className="font-mono text-[11px] text-ink-3">{currentWork.title}</span>
+          <span className="font-mono text-[11px] text-ink-3">
+            {isFilePlayback ? "ファイル" : currentWork!.title}
+          </span>
         </div>
 
         {/* Stage: cover + metadata */}
         <div className="grid min-h-0 flex-1 grid-cols-[320px_1fr] items-center gap-12">
           <div className="h-[320px] w-[320px] overflow-hidden rounded-[10px] shadow-[var(--shadow-cover),0_30px_60px_-16px_oklch(20%_0.020_70/0.25)]">
-            <CoverImg
-              id={currentWork.id}
-              title={currentWork.title}
-              cover={currentWork.cover}
+            <PlaybackArtwork
+              state={state}
               size={320}
               radius={10}
               requestWidth={selectFixedCoverThumbnailWidth(320, window.devicePixelRatio)}
@@ -122,7 +123,7 @@ export default function FullScreenPlayer({
 
           <div className="flex min-w-0 flex-col gap-2.5">
             <div className="font-sans text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-3">
-              {currentWork.title}
+              {isFilePlayback ? "ファイル" : currentWork!.title}
             </div>
             <h1 className="m-0 text-balance font-jp text-[38px] font-semibold leading-[1.15] tracking-[-0.01em] text-ink-0">
               {track?.title ?? "—"}

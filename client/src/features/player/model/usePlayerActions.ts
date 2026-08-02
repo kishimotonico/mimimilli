@@ -17,7 +17,7 @@ export function usePlayerActions() {
       positionSec?: number,
     ) => {
       const item: PlaybackItem = {
-        work,
+        source: { kind: "work", work },
         playlistId,
         tracks,
         trackIndex,
@@ -39,6 +39,21 @@ export function usePlayerActions() {
       startPlayback(work, tracks, trackIndex, playlistId);
     },
     [pendingResumeRef, startPlayback],
+  );
+
+  const playFile = useCallback(
+    (tracks: PlaybackTrack[], trackIndex: number = 0) => {
+      pendingResumeRef.current = null;
+      const item: PlaybackItem = {
+        source: { kind: "file" },
+        playlistId: null,
+        tracks,
+        trackIndex,
+        completionScope: "queue",
+      };
+      controller.dispatch({ type: "startRequested", item });
+    },
+    [controller, pendingResumeRef],
   );
 
   const playWithResume = useCallback(
@@ -165,6 +180,7 @@ export function usePlayerActions() {
   return useMemo(
     () => ({
       play,
+      playFile,
       playWithResume,
       togglePlay,
       stop,
@@ -186,6 +202,7 @@ export function usePlayerActions() {
     }),
     [
       play,
+      playFile,
       playWithResume,
       togglePlay,
       stop,

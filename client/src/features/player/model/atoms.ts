@@ -22,7 +22,7 @@ export const playerCoreAtom = atom<PlayerCoreState>(PLAYER_CORE_INITIAL);
 
 export const playerIsActiveAtom = atom((get) => {
   const state = get(playerCoreAtom);
-  return state.currentTrackIndex >= 0 && state.currentWork !== null;
+  return state.currentTrackIndex >= 0 && (state.currentWork !== null || state.isFilePlayback);
 });
 
 export const playerIsPlaybackActiveAtom = atom((get) => get(playerCoreAtom).isPlaying);
@@ -37,9 +37,15 @@ export const playingTrackTitleAtom = atom((get) => {
   return state.tracks[state.currentTrackIndex]?.title;
 });
 
+export const playingFsPathAtom = atom((get) => {
+  const state = get(playerCoreAtom);
+  if (!state.isFilePlayback || state.currentTrackIndex < 0) return null;
+  return state.tracks[state.currentTrackIndex]?.file ?? null;
+});
+
 export const playingTrackRelPathAtom = atom((get) => {
   const state = get(playerCoreAtom);
-  if (state.currentTrackIndex < 0) return null;
+  if (state.isFilePlayback || state.currentTrackIndex < 0) return null;
   return state.tracks[state.currentTrackIndex]?.file ?? null;
 });
 

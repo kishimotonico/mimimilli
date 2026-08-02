@@ -61,7 +61,7 @@ export function makeTestDirectory(name: string): TestDirectory {
 /**
  * サンプルライブラリをテスト専用の一時ディレクトリに作る。
  * - dlsite/RJ900001_テスト作品/  … メタなし（自動生成対象）。mp3/ サブフォルダー + cover.jpg
- * - dlsite/RJ900002_既存メタ/    … .meta.json あり。トラック1本欠損（status: error になる）
+ * - dlsite/RJ900002_既存メタ/    … mimimilli.json あり。トラック1本欠損（status: error になる）
  */
 export function makeSampleLibrary(): SampleLibrary {
   const directory = makeTestDirectory("sample-library");
@@ -80,7 +80,7 @@ export function makeSampleLibrary(): SampleLibrary {
 
   const existingWorkId = "11111111-1111-4111-8111-111111111111";
   writeFileSync(
-    join(work2, ".meta.json"),
+    join(work2, "mimimilli.json"),
     JSON.stringify(
       {
         id: existingWorkId,

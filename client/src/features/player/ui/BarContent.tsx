@@ -6,8 +6,7 @@ import type { PlayerState } from "../model/usePlayerState";
 import BarSeekStrip from "./BarSeekStrip";
 import BarVolumePopover from "./BarVolumePopover";
 import PlaybackErrorNotice from "./PlaybackErrorNotice";
-import CoverImg from "../../../entities/work/ui/CoverImg";
-import { selectFixedCoverThumbnailWidth } from "../../../entities/work/ui/coverThumbnailWidth";
+import PlaybackArtwork from "./PlaybackArtwork";
 import { I } from "../../../shared/ui/Icon";
 
 interface BarContentProps {
@@ -29,7 +28,15 @@ export default function BarContent({
   onSwitchToPopup,
   onSetVolume,
 }: BarContentProps) {
-  const { currentWork, isPlaying, tracks, currentTrackIndex, playbackError, volume } = state;
+  const {
+    currentWork,
+    isFilePlayback,
+    isPlaying,
+    tracks,
+    currentTrackIndex,
+    playbackError,
+    volume,
+  } = state;
   const track = tracks[currentTrackIndex] ?? null;
 
   return (
@@ -43,15 +50,8 @@ export default function BarContent({
         }}
       >
         <div className="mle-bar1__cover">
-          {currentWork && (
-            <CoverImg
-              id={currentWork.id}
-              title={currentWork.title}
-              cover={currentWork.cover}
-              size={52}
-              radius={6}
-              requestWidth={selectFixedCoverThumbnailWidth(52, window.devicePixelRatio)}
-            />
+          {(currentWork || isFilePlayback) && (
+            <PlaybackArtwork state={state} size={52} radius={6} />
           )}
         </div>
 
@@ -62,8 +62,11 @@ export default function BarContent({
           {playbackError ? (
             <PlaybackErrorNotice error={playbackError} className="mle-bar1__error" />
           ) : (
-            <span className="mle-bar1__work" title={currentWork?.title ?? ""}>
-              {currentWork?.title ?? ""}
+            <span
+              className="mle-bar1__work"
+              title={isFilePlayback ? "" : (currentWork?.title ?? "")}
+            >
+              {isFilePlayback ? "ファイル" : (currentWork?.title ?? "")}
             </span>
           )}
         </div>

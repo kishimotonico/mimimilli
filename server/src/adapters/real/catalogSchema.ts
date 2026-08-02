@@ -9,7 +9,7 @@ import {
 } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 
-/** `.meta.json` とファイル走査から再構築できる作品カタログ。 */
+/** `mimimilli.json` とファイル走査から再構築できる作品カタログ。 */
 export const works = sqliteTable(
   "works",
   {

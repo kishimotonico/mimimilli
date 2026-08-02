@@ -1,4 +1,4 @@
-// `.meta.json` 書き戻し（要件 v4 §3.1: DB 編集とメタファイル更新を同一操作内で行う）のテスト。
+// mimimilli.json 書き戻し（要件 v4 §3.1: DB 編集とメタファイル更新を同一操作内で行う）のテスト。
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -11,7 +11,7 @@ async function setup(t: TestContext) {
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
   // スキーマ外のユーザー定義フィールドを仕込む
-  const metaPath = join(lib.root, "dlsite", "RJ900002_既存メタ", ".meta.json");
+  const metaPath = join(lib.root, "dlsite", "RJ900002_既存メタ", "mimimilli.json");
   const raw = JSON.parse(readFileSync(metaPath, "utf-8"));
   raw.myNote = "ユーザーの手書きメモ";
   writeFileSync(metaPath, JSON.stringify(raw, null, 2));
@@ -70,7 +70,7 @@ test("メタ書き戻し失敗時は DB の title / tags もロールバック�
   assert.deepEqual(after?.tags, before?.tags);
 });
 
-test("単一ファイル形式作品の patch が同居する .meta.json を書き換えない", async (t) => {
+test("単一ファイル形式作品の patch が同居する mimimilli.json を書き換えない", async (t) => {
   const dir = makeTestDirectory("coexisting-meta");
   t.after(dir.cleanup);
   const sharedDir = join(dir.path, "shared");
@@ -86,7 +86,7 @@ test("単一ファイル形式作品の patch が同居する .meta.json を書�
   writeWav(join(sharedDir, "folder-track.wav"), 1);
   writeWav(join(sharedDir, "foo.wav"), 2);
 
-  const folderMetaPath = join(sharedDir, ".meta.json");
+  const folderMetaPath = join(sharedDir, "mimimilli.json");
   writeFileSync(
     folderMetaPath,
     JSON.stringify(
@@ -110,7 +110,7 @@ test("単一ファイル形式作品の patch が同居する .meta.json を書�
     ),
   );
 
-  const singleMetaPath = join(sharedDir, "foo.meta.json");
+  const singleMetaPath = join(sharedDir, "foo.mimimilli.json");
   writeFileSync(
     singleMetaPath,
     JSON.stringify(

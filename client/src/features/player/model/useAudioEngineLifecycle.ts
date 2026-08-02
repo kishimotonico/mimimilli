@@ -1,5 +1,6 @@
 import { useCallback, useEffect } from "react";
 import { getAudioUrl } from "../../../entities/work/api";
+import { getFsAudioUrl } from "../../files/api";
 import { updateLastPlayed } from "../api";
 import { createAudioEngine } from "./audioEngine";
 import {
@@ -60,9 +61,11 @@ export function useAudioEngineLifecycle({
       const nextTrack = loadedTrack ? state.tracks[loadedTrack.trackIndex + 1] : undefined;
       const continuesSameAsset =
         loadedTrack !== null &&
-        state.currentWork?.id === loadedTrack.workId &&
         nextTrack !== undefined &&
-        getAudioUrl(loadedTrack.workId, nextTrack.file) === loadedTrack.assetUrl;
+        (loadedTrack.source === "file"
+          ? loadedTrack.fsPath === nextTrack.file
+          : state.currentWork?.id === loadedTrack.workId &&
+            getAudioUrl(loadedTrack.workId!, nextTrack.file) === loadedTrack.assetUrl);
       // 区間トラックではファイル自体の再生が続くため、継続できない境界では明示的に止める。
       if (virtualEnd && !continuesSameAsset) engineRef.current?.pause();
       controller.dispatch({ type: "audioEnded" });
@@ -143,28 +146,35 @@ export function useAudioEngineLifecycle({
       const engine = refs.engine.current;
       if (!engine) return;
 
-      const { trackIndex: currentTrackIndex, playlistId: currentPlaylistId, tracks } = item;
-      const currentWork = item.work;
+      const { trackIndex: currentTrackIndex, playlistId: currentPlaylistId, tracks, source } = item;
       if (currentTrackIndex < 0 || currentTrackIndex >= tracks.length) return;
 
       const track = tracks[currentTrackIndex];
       if (!track) return;
 
-      const workId = currentWork.id;
-      const assetUrl = getAudioUrl(workId, track.file);
+      const isFileSource = source.kind === "file";
+      const workId = source.kind === "work" ? source.work.id : null;
+      const assetUrl = isFileSource ? getFsAudioUrl(track.file) : getAudioUrl(workId!, track.file);
 
       const previousTrack = refs.loadedTrack.current;
       const switchedTrack =
         previousTrack !== null &&
-        (previousTrack.workId !== workId ||
+        (previousTrack.source !== source.kind ||
+          previousTrack.workId !== workId ||
           previousTrack.playlistId !== currentPlaylistId ||
           previousTrack.track.id !== track.id);
-      const pendingSeekSec = consumePendingResume(workId, currentPlaylistId, track);
+      const pendingSeekSec =
+        workId !== null ? consumePendingResume(workId, currentPlaylistId, track) : undefined;
       const reusesLoadedAsset =
-        switchedTrack && previousTrack.workId === workId && previousTrack.assetUrl === assetUrl;
+        switchedTrack &&
+        previousTrack.source === source.kind &&
+        previousTrack.workId === workId &&
+        previousTrack.assetUrl === assetUrl;
 
       refs.loadedTrack.current = {
+        source: source.kind,
         workId,
+        fsPath: isFileSource ? track.file : null,
         playlistId: currentPlaylistId,
         trackIndex: currentTrackIndex,
         track,
@@ -197,7 +207,7 @@ export function useAudioEngineLifecycle({
           if (wasAlreadyPlaying) controller.dispatch({ type: "audioPlaying" });
         }
 
-        updateLastPlayed(workId).catch(() => {});
+        if (workId) updateLastPlayed(workId).catch(() => {});
         return;
       }
 
@@ -214,7 +224,7 @@ export function useAudioEngineLifecycle({
         autoplay,
       });
 
-      updateLastPlayed(workId).catch(() => {});
+      if (workId) updateLastPlayed(workId).catch(() => {});
     },
     [refs, controller, consumePendingResume],
   );

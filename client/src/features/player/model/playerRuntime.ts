@@ -1,5 +1,6 @@
 import type { AudioEngine } from "./audioEngine";
 import type { PlayerCoreState } from "./atoms";
+import type { PlaybackSource } from "./playerController";
 import type { PlaybackTrack } from "./trackTime";
 
 export interface MutableRef<T> {
@@ -14,7 +15,9 @@ export interface PendingResume {
 }
 
 export interface LoadedTrack {
-  workId: string;
+  source: PlaybackSource["kind"];
+  workId: string | null;
+  fsPath: string | null;
   playlistId: string | null;
   trackIndex: number;
   track: PlaybackTrack;
