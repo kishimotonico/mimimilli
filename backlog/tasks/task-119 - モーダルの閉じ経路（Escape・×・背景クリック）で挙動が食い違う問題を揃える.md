@@ -1,11 +1,11 @@
 ---
 id: TASK-119
 title: モーダルの閉じ経路（Escape・×・背景クリック）で挙動が食い違う問題を揃える
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-07-27 01:59'
-updated_date: '2026-08-02 16:06'
+updated_date: '2026-08-02 16:14'
 labels:
   - client
   - ux
@@ -28,9 +28,9 @@ useDialogModal.ts のコメントに「各モーダルの既存backdrop挙動を
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Escape・×ボタン・背景クリックのいずれでも同じ挙動になる
-- [ ] #2 編集中の閉じ操作の扱いが ScanModal / SettingsModal で統一されている
-- [ ] #3 useDialogModal に経路ごとの挙動差を許すためのAPIが残っていない
+- [x] #1 Escape・×ボタン・背景クリックのいずれでも同じ挙動になる
+- [x] #2 編集中の閉じ操作の扱いが ScanModal / SettingsModal で統一されている
+- [x] #3 useDialogModal に経路ごとの挙動差を許すためのAPIが残っていない
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -45,4 +45,12 @@ useDialogModal.ts のコメントに「各モーダルの既存backdrop挙動を
 - 統一案の最悪ケースは「×を2回押す」だけで実害がなく、挙動が予測可能
 
 useDialogModal APIはonClose 1本に統一し、backdrop専用のonBackdropClose引数を廃止する（AC#3対応）。
+
+【2026-08-03 実装完了】3経路をonClose 1本（progressive dismissal）へ統一。handleBackdropClickのonBackdropClose引数を廃止し、shouldCloseは経路共通の条件（保存中ガード）としてonClose内へ移設（RegisterWorkDialog/SmartFolderEditorModalは保存中ガードをonCloseに内包し、Escapeにも同じガードが効くようになった）。ScanModal/SettingsModalに×・背景クリックの編集中回帰テストを追加。Cursor(composer-2.5)へ委譲、統括レビュー済み。
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Escape・×・背景クリックを「編集中は編集のみキャンセル、非編集時はモーダルを閉じる」へ統一。useDialogModalのAPIをonClose 1本に整理し、利用側8モーダルを追従。回帰テスト4件追加。pnpm check・pnpm test（605+444）全パス。
+<!-- SECTION:FINAL_SUMMARY:END -->

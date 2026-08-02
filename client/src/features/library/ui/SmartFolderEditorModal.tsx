@@ -122,7 +122,7 @@ export default function SmartFolderEditorModal({
       ref={dialogRef}
       aria-labelledby="smart-folder-editor-title"
       onCancel={handleCancel}
-      onClick={(e) => handleBackdropClick(e, onClose, () => !isSaving)}
+      onClick={(e) => handleBackdropClick(e)}
       className="m-auto w-[min(720px,calc(100vw-32px))] overflow-hidden rounded-[12px] border border-line-soft bg-paper-1 p-0 font-jp shadow-pop backdrop:bg-[oklch(20%_0.020_70_/_0.3)]"
     >
       <form

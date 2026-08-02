@@ -78,7 +78,7 @@ describe("SettingsModal", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("backdropクリックは編集中でも問答無用でモーダルを閉じる（既存挙動を維持）", () => {
+  it("backdropクリックは編集中は編集フォームだけを閉じ、モーダルは閉じない", () => {
     const { onClose } = renderModal();
     fireEvent.click(screen.getByRole("button", { name: "変更" }));
     expect(screen.getByLabelText("ルートフォルダーのパス")).toBeInTheDocument();
@@ -86,7 +86,20 @@ describe("SettingsModal", () => {
     const dialog = screen.getByRole("dialog", { name: "設定" });
     fireEvent.click(dialog);
 
-    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText("ルートフォルダーのパス")).toBeNull();
+  });
+
+  it("ルートフォルダー編集中の×ボタンは編集フォームだけを閉じ、モーダルは閉じない", () => {
+    const { onClose } = renderModal();
+    fireEvent.click(screen.getByRole("button", { name: "変更" }));
+    expect(screen.getByLabelText("ルートフォルダーのパス")).toBeInTheDocument();
+
+    const closeButtons = screen.getAllByRole("button", { name: "閉じる" });
+    fireEvent.click(closeButtons[0]!);
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText("ルートフォルダーのパス")).toBeNull();
   });
 
   it("パネル内側のクリックでは閉じない", () => {

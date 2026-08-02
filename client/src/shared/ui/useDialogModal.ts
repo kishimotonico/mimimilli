@@ -6,9 +6,8 @@ const FOCUSABLE_SELECTOR =
 
 interface UseDialogModalOptions {
   /**
-   * Escape（dialogのcancelイベント）で呼ぶ処理。編集中フォームがあればそちらだけを
-   * 閉じるなど、内側の状態を優先する分岐はここに書く（例: SettingsModal）。
-   * backdropクリックの挙動は各モーダルの現状維持のため handleBackdropClick に別途渡す。
+   * モーダルを閉じる（または内側の編集を先にキャンセルする）処理。
+   * Escape・×・背景クリックはすべてここに委譲する。
    */
   onClose: () => void;
   /** マウント時にフォーカスする要素。省略時は dialog 自身にフォーカスする。 */
@@ -67,8 +66,7 @@ export function useDialogModal({ onClose, initialFocusRef }: UseDialogModalOptio
   }, []);
 
   const handleCancel = (event: SyntheticEvent<HTMLDialogElement>) => {
-    // ブラウザ既定のクローズ動作を止め、呼び出し側の onClose に委譲する
-    // （呼び出し側は内側の編集状態を先に閉じる分岐を持てる）。
+    // ブラウザ既定のクローズ動作を止め、呼び出し側の onClose に委譲する。
     event.preventDefault();
     // ネイティブのcancelは最前面のdialogにしか発火しないが、Reactの合成イベントは
     // Reactツリーを伝播するため、ポータルで重ねた親dialogのonCancelにも届いてしまう。
@@ -80,16 +78,13 @@ export function useDialogModal({ onClose, initialFocusRef }: UseDialogModalOptio
   /**
    * <dialog> のbackdropクリックは e.target === dialog自身として届く
    * （dialog は幅がcontentにfitするため、backdrop領域のクリックはdialog要素にヒットする）。
-   * onBackdropClose は呼び出し側のEscape分岐（onClose）と揃えるとは限らないため、
-   * 各モーダルの既存backdrop挙動をそのまま渡す（例: SettingsModalは編集中でも問答無用で閉じる）。
-   * shouldClose で保存中などの条件を差し込める。
+   * shouldClose で保存中などの条件を差し込める（省略時は常に閉じる）。
    */
   const handleBackdropClick = (
     event: ReactMouseEvent<HTMLDialogElement>,
-    onBackdropClose: () => void,
     shouldClose: () => boolean = () => true,
   ) => {
-    if (event.target === dialogRef.current && shouldClose()) onBackdropClose();
+    if (event.target === dialogRef.current && shouldClose()) onClose();
   };
 
   return { dialogRef, handleCancel, handleBackdropClick };

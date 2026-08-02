@@ -95,18 +95,17 @@ export default function ScanModal({ lastScanTime, onClose, onOpenRjCodeMissing }
   const wasScanning = wasScanningRef.current;
   const justStoppedScanning = wasScanning && !scanning;
 
-  // Escapeはタイトル編集中ならそちらだけをキャンセルし、モーダル自体は閉じない。
-  // 実行中でもEscape/背景クリックで閉じられるが、スキャン自体はバックグラウンドで継続する（TASK-56）。
-  const { dialogRef, handleCancel, handleBackdropClick } = useDialogModal({
-    onClose: () => {
-      if (editingId) {
-        setEditingId(null);
-        setEditError(null);
-        return;
-      }
-      onClose();
-    },
-  });
+  // タイトル編集中は編集だけをキャンセルし、モーダル自体は閉じない。
+  // 実行中でも閉じられるが、スキャン自体はバックグラウンドで継続する（TASK-56）。
+  const dismiss = () => {
+    if (editingId) {
+      setEditingId(null);
+      setEditError(null);
+      return;
+    }
+    onClose();
+  };
+  const { dialogRef, handleCancel, handleBackdropClick } = useDialogModal({ onClose: dismiss });
 
   const newWorkIds = lastResult?.newWorkIds ?? [];
   const newWorkIdsKey = newWorkIds.join(",");
@@ -170,7 +169,7 @@ export default function ScanModal({ lastScanTime, onClose, onOpenRjCodeMissing }
       ref={dialogRef}
       aria-labelledby="scan-modal-title"
       onCancel={handleCancel}
-      onClick={(e) => handleBackdropClick(e, onClose)}
+      onClick={handleBackdropClick}
       className="m-auto w-[min(460px,calc(100vw-32px))] overflow-hidden rounded-[12px] border border-line-soft bg-paper-1 p-0 font-jp text-ink-0 shadow-pop backdrop:bg-[oklch(20%_0.020_70_/_0.3)]"
     >
       <div className="flex max-h-[min(80vh,calc(100vh-32px))] min-h-0 flex-col overflow-hidden">
@@ -179,7 +178,7 @@ export default function ScanModal({ lastScanTime, onClose, onOpenRjCodeMissing }
           <h2 id="scan-modal-title" className="flex-1 font-sans text-[14px] font-semibold">
             スキャン
           </h2>
-          <IconButton icon={I.x} label="閉じる" size="sm" onClick={onClose} />
+          <IconButton icon={I.x} label="閉じる" size="sm" onClick={dismiss} />
         </header>
 
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-[18px] py-4">

@@ -148,7 +148,7 @@ export default function RegisterWorkDialog({
       ref={dialogRef}
       aria-labelledby="register-work-title"
       onCancel={handleCancel}
-      onClick={(event) => handleBackdropClick(event, close, () => !submitBusy)}
+      onClick={(event) => handleBackdropClick(event)}
       className="m-auto w-[min(520px,calc(100vw-32px))] overflow-hidden rounded-[12px] border border-line-soft bg-paper-1 p-0 font-jp text-ink-0 shadow-pop backdrop:bg-[oklch(20%_0.020_70_/_0.3)]"
     >
       <div className="flex max-h-[calc(100vh-48px)] min-h-0 flex-col overflow-hidden">
