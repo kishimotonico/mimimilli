@@ -234,7 +234,8 @@ test("GET /works/register-preview: RJコードをフォルダ名から検出す�
 });
 
 test("POST /works: DLsiteカバー適用失敗時は子作品を削除しない", async (t) => {
-  const { app, parent, childWork } = await setupLibraryWithChild(t);
+  const { app, parent, child, childWork } = await setupLibraryWithChild(t);
+  assert.ok(existsSync(folderMetaPath(child)));
 
   const res = await app.request("/api/works", {
     method: "POST",
@@ -258,8 +259,11 @@ test("POST /works: DLsiteカバー適用失敗時は子作品を削除しない"
   });
   assert.notEqual(res.status, 201);
 
-  const child = await app.request(`/api/works/${childWork.id}`);
-  assert.equal(child.status, 200);
+  const childRes = await app.request(`/api/works/${childWork.id}`);
+  assert.equal(childRes.status, 200);
+  const childBody = await childRes.json();
+  assert.equal(childBody.physicalPath, child);
+  assert.ok(existsSync(folderMetaPath(child)));
 });
 
 function writeOrphanedMeta(folder: string, id: string, title: string): void {
@@ -353,4 +357,76 @@ test("POST /works: 壊れた孤立メタは invalid_meta エラー", async (t) =
   const body = await res.json();
   assert.equal(body.error.code, "conflict");
   assert.match(body.error.message, /メタファイルが不正なため復元できません/);
+});
+
+test("POST /works: 孤立メタが不正でも mergeDescendantWorks 時は子作品を削除しない", async (t) => {
+  const { app, parent, child, childWork } = await setupLibraryWithChild(t);
+  writeFileSync(join(parent, META_FILE_NAME), '{"id":"not-uuid","title":""}');
+  assert.ok(existsSync(folderMetaPath(child)));
+
+  const res = await app.request("/api/works", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      path: parent,
+      title: "親に統合",
+      mergeDescendantWorks: true,
+    }),
+  });
+  assert.equal(res.status, 409);
+  const body = await res.json();
+  assert.equal(body.error.code, "conflict");
+  assert.match(body.error.message, /メタファイルが不正なため復元できません/);
+
+  const childRes = await app.request(`/api/works/${childWork.id}`);
+  assert.equal(childRes.status, 200);
+  const childBody = await childRes.json();
+  assert.equal(childBody.physicalPath, child);
+  assert.ok(existsSync(folderMetaPath(child)));
+});
+
+test("POST /works: 別パスの既存作品と同一IDの孤立メタを復元すると新IDで登録し既存作品は不変", async (t) => {
+  const { app, root, sibling } = await setupLibraryWithChild(t);
+
+  const siblingRes = await app.request("/api/works", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: sibling, title: "既存作品" }),
+  });
+  assert.equal(siblingRes.status, 201);
+  const existingWork = await siblingRes.json();
+
+  const lastPlayedRes = await app.request(`/api/works/${existingWork.id}/last-played`, {
+    method: "POST",
+  });
+  assert.equal(lastPlayedRes.status, 204);
+  const beforeExisting = await (await app.request(`/api/works/${existingWork.id}`)).json();
+  assert.ok(beforeExisting.lastPlayedAt);
+
+  const orphanDir = join(root, "RJ900013_orphan");
+  mkdirSync(orphanDir, { recursive: true });
+  writeWav(join(orphanDir, "track.wav"), 2);
+  writeOrphanedMeta(orphanDir, existingWork.id, "孤立メタ作品");
+
+  const res = await app.request("/api/works", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: orphanDir, title: "復元後タイトル" }),
+  });
+  assert.equal(res.status, 201);
+  const restored = await res.json();
+  assert.notEqual(restored.id, existingWork.id);
+  assert.equal(restored.physicalPath, orphanDir);
+  assert.equal(restored.title, "復元後タイトル");
+
+  const afterExisting = await (await app.request(`/api/works/${existingWork.id}`)).json();
+  assert.equal(afterExisting.id, existingWork.id);
+  assert.equal(afterExisting.physicalPath, sibling);
+  assert.equal(afterExisting.title, "既存作品");
+  assert.equal(afterExisting.lastPlayedAt, beforeExisting.lastPlayedAt);
+
+  const restoredMeta = JSON.parse(readFileSync(join(orphanDir, META_FILE_NAME), "utf-8")) as {
+    id: string;
+  };
+  assert.equal(restoredMeta.id, restored.id);
 });
