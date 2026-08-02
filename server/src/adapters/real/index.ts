@@ -108,6 +108,8 @@ export interface RealAdapterOptions {
   thumbnailCache?: ThumbnailCacheOptions;
   /** manifestとバックアップを保存するデータルート。 */
   dataRoot?: string;
+  /** DBバックアップ退避先。ファイルDBの通常起動ではデータルート配下を渡す。 */
+  dbBackupDir?: string;
   /** DLsiteの実HTTP設定。環境変数の解決はserver/src/index.tsだけで行う。 */
   dlsiteRequestConfig?: DlsiteRequestConfig;
   /** schedulerのtransport/clock/sleep/random/logger注入。実ネットワークなしの試験用。 */
@@ -227,7 +229,10 @@ async function runFileScanInWorker(
 }
 
 export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
-  const db: Db = openDb(options.database);
+  const db: Db = openDb(
+    options.database,
+    options.dbBackupDir === undefined ? undefined : { backupDir: options.dbBackupDir },
+  );
   const dlsiteCache = new DlsiteCache(options.dlsiteCache);
   const repo = new WorkRepo(db);
   const thumbnailCacheDir = options.thumbnailCacheDir ?? join(tmpdir(), "mimimilli-memory-cache");

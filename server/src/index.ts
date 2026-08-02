@@ -44,6 +44,7 @@ function createAdapter(): DataAdapter {
           catalogPath: paths.catalogDb,
           userPath: paths.userDb,
         },
+        dbBackupDir: paths.backupDir,
         dataRoot: paths.root,
         dlsiteCache: resolveDlsiteCacheConfig(paths.dlsiteCacheDb),
         dlsiteRequestConfig: resolveDlsiteRequestConfig(),
