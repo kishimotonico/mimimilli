@@ -18,3 +18,17 @@ pnpm --filter @mimimilli/server bench:run -- --data-dir /tmp/mimimilli-bench --o
 `--out-dir` を bench:run で省略すると `--data-dir` と同じ場所に `bench-baseline.md` と `bench-results.json` を書きます。
 
 オプション: `--warmup 3`（既定）、`--iterations 20`（既定）。
+
+## metaIdMigration 署名キャッシュ計測
+
+`VerifiedIdSignature`（size/mtimeMs 一致時の read+parse 省略）の効果を計測する。
+
+```bash
+# 既定: count=5000 と 30000 を順に計測
+pnpm --filter @mimimilli/server bench:migrate
+
+# 規模・seed を指定
+pnpm --filter @mimimilli/server bench:migrate -- --count 5000 --seed 42
+```
+
+各規模で `cold` / `warm-sig` / `warm-nosig` の3変種を、warmup 1回 + 試行 7回で計測する。結果はコンソール（Markdown表）と一時ディレクトリ内の JSON に出力される。

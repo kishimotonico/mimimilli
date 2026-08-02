@@ -17,6 +17,7 @@
     "smoke:real": "bun tests/helpers/smoke.ts",
     "bench:seed": "bun bench/seed.ts",
     "bench:run": "bun bench/bench.ts",
+    "bench:migrate": "bun bench/benchMetaIdMigration.ts",
     "db:generate": "drizzle-kit generate --config drizzle.catalog.config.ts && drizzle-kit generate --config drizzle.user.config.ts"
   },
   "dependencies": {
