@@ -58,7 +58,11 @@ import {
   workTags,
   works,
 } from "./catalogSchema.ts";
-import { likeDescendantsPrefix, likeStrictDescendantPrefixSql } from "./paths.ts";
+import {
+  likeDescendantsPrefix,
+  likeStrictDescendantPrefixSql,
+  SQL_LIKE_ESCAPE_CLAUSE,
+} from "./paths.ts";
 import { probeDurationSec } from "./probe.ts";
 import { appSettings, smartFolders, tagPrefixes, workStates } from "./userSchema.ts";
 
@@ -652,8 +656,8 @@ export class WorkRepo {
          FROM main.works
          INNER JOIN user.work_states ON work_states.work_id = works.id
          WHERE works.physical_path = ?
-            OR ? LIKE ${likeStrictDescendantPrefixSql("works.physical_path")}
-            OR works.physical_path LIKE ?
+            OR ? LIKE ${likeStrictDescendantPrefixSql("works.physical_path")}${SQL_LIKE_ESCAPE_CLAUSE}
+            OR works.physical_path LIKE ?${SQL_LIKE_ESCAPE_CLAUSE}
          ORDER BY works.rowid ASC`,
       )
       .all(directoryPath, directoryPath, sep, sep, descendantPrefix) as Array<{
@@ -673,7 +677,7 @@ export class WorkRepo {
          FROM main.works
          INNER JOIN user.work_states ON work_states.work_id = works.id
          WHERE works.physical_path != ?
-           AND works.physical_path LIKE ?
+           AND works.physical_path LIKE ?${SQL_LIKE_ESCAPE_CLAUSE}
          ORDER BY works.rowid ASC`,
       )
       .all(parentPath, descendantPrefix) as Array<{

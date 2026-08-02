@@ -6,6 +6,7 @@ import {
   isPathWithin,
   likeDescendantsPrefix,
   likeStrictDescendantPrefixSql,
+  SQL_LIKE_ESCAPE_CLAUSE,
 } from "../../src/adapters/real/paths.ts";
 import { openDb } from "../../src/adapters/real/db.ts";
 
@@ -25,6 +26,7 @@ test("Windows パスの親子関係をバックスラッシュ境界で判定す
 test("LIKE 子孫接頭辞は区切り文字を重ねず、Windows 形式でも境界を保つ", () => {
   assert.equal(likeDescendantsPrefix("/library", posix), "/library/%");
   assert.equal(likeDescendantsPrefix("/library/", posix), "/library/%");
+  assert.equal(likeDescendantsPrefix("/library/A_B", posix), "/library/A!_B/%");
   assert.equal(likeDescendantsPrefix("C:\\library", win32), "C:\\library\\%");
   assert.equal(likeDescendantsPrefix("C:\\library\\", win32), "C:\\library\\%");
   assert.equal(likeDescendantsPrefix("D:\\", win32), "D:\\%");
@@ -36,8 +38,8 @@ test("祖先 LIKE 接頭辞 SQL は Windows 区切りでも子孫判定できる
   const row = db.sqlite
     .query(
       `SELECT
-         ? LIKE ${likeStrictDescendantPrefixSql("?")} AS isDescendant,
-         ? NOT LIKE ${likeStrictDescendantPrefixSql("?")} AS isNotPrefix`,
+         ? LIKE ${likeStrictDescendantPrefixSql("?")}${SQL_LIKE_ESCAPE_CLAUSE} AS isDescendant,
+         ? NOT LIKE ${likeStrictDescendantPrefixSql("?")}${SQL_LIKE_ESCAPE_CLAUSE} AS isNotPrefix`,
     )
     .get(
       "C:\\library\\work",

@@ -11,6 +11,30 @@ export interface PathOperations {
 
 const nativePathOperations: PathOperations = { isAbsolute, relative, sep };
 
+/** SQLite LIKE の ESCAPE 文字（`ESCAPE '!'` とセットで使う。パス区切り `\` と衝突しない） */
+export const LIKE_ESCAPE_CHAR = "!";
+
+/** LIKE パターン内のリテラルとして扱う文字列へエスケープする（末尾の `%` ワイルドカードは別途付与） */
+export function escapeLikeLiteral(value: string): string {
+  const esc = LIKE_ESCAPE_CHAR;
+  return value
+    .replaceAll(esc, esc + esc)
+    .replaceAll("%", esc + "%")
+    .replaceAll("_", esc + "_");
+}
+
+/** `LIKE ... ESCAPE '!'` 句。workRepo の physical_path 照合で共通利用 */
+export const SQL_LIKE_ESCAPE_CLAUSE = ` ESCAPE '${LIKE_ESCAPE_CHAR}'`;
+
+/** SQL 式の列値を LIKE パターン用にエスケープする */
+export function escapeLikeLiteralSql(columnExpr: string): string {
+  const esc = LIKE_ESCAPE_CHAR;
+  const doubled = esc + esc;
+  const escapedPercent = esc + "%";
+  const escapedUnderscore = esc + "_";
+  return `replace(replace(replace(${columnExpr}, '${esc}', '${doubled}'), '%', '${escapedPercent}'), '_', '${escapedUnderscore}')`;
+}
+
 /** target が base 自身または配下かを、パス区切り文字を含む境界で判定する。 */
 export function isPathWithin(
   base: string,
@@ -32,7 +56,8 @@ export function likeDescendantsPrefix(
   path: string,
   operations: Pick<PathOperations, "sep"> = nativePathOperations,
 ): string {
-  return (path.endsWith(operations.sep) ? path : path + operations.sep) + "%";
+  const prefix = path.endsWith(operations.sep) ? path : path + operations.sep;
+  return escapeLikeLiteral(prefix) + "%";
 }
 
 /**
@@ -40,7 +65,8 @@ export function likeDescendantsPrefix(
  * sep はバインドパラメータ2つ（substr 比較と連結で同一値）を要求する。
  */
 export function likeStrictDescendantPrefixSql(columnExpr: string): string {
-  return `(CASE WHEN substr(${columnExpr}, -1, 1) = ? THEN ${columnExpr} || '%' ELSE ${columnExpr} || ? || '%' END)`;
+  const escaped = escapeLikeLiteralSql(columnExpr);
+  return `(CASE WHEN substr(${columnExpr}, -1, 1) = ? THEN ${escaped} || '%' ELSE ${escaped} || ? || '%' END)`;
 }
 
 /** base 配下の target を API 用の `/` 区切り相対パスへ変換する。 */
