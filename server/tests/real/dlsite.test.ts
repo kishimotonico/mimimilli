@@ -863,6 +863,119 @@ test("DLsite HTMLキャッシュ: cache missのforceとnormalは同じHTTPへ合
   adapter.close();
 });
 
+test("DLsite HTMLキャッシュ: 相乗り中の先着abortはその呼び出し元だけ失敗し他方は完了できる", async (t) => {
+  const lib = makeSampleLibrary();
+  const dir = makeTestDirectory("dlsite-flight-abort-first");
+  t.after(lib.cleanup);
+  t.after(dir.cleanup);
+  let release!: () => void;
+  const pending = new Promise<void>((resolve) => (release = resolve));
+  let started!: () => void;
+  const gate = new Promise<void>((resolve) => (started = resolve));
+  const adapter = createRealAdapter({
+    database: { kind: "memory" },
+    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+    dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+    dlsiteSchedulerDependencies: mockDlsiteTransport({
+      html: async () => {
+        started();
+        await pending;
+        return htmlResponse(SAMPLE_HTML);
+      },
+    }),
+  });
+  await adapter.updateSettings({ rootFolder: lib.root });
+  await adapter.scan();
+  const controllerA = new AbortController();
+  const promiseA = adapter.dlsiteFetch(lib.existingWorkId, true, { signal: controllerA.signal });
+  const promiseB = adapter.dlsiteFetch(lib.existingWorkId);
+  await gate;
+  controllerA.abort();
+  await assert.rejects(
+    promiseA,
+    (error: unknown) => error instanceof DOMException && error.name === "AbortError",
+  );
+  release();
+  assert.equal((await promiseB).ok, true);
+  adapter.close();
+});
+
+test("DLsite HTMLキャッシュ: 相乗り中の後着abortはその呼び出し元だけ失敗し先着は完了できる", async (t) => {
+  const lib = makeSampleLibrary();
+  const dir = makeTestDirectory("dlsite-flight-abort-second");
+  t.after(lib.cleanup);
+  t.after(dir.cleanup);
+  let release!: () => void;
+  const pending = new Promise<void>((resolve) => (release = resolve));
+  let started!: () => void;
+  const gate = new Promise<void>((resolve) => (started = resolve));
+  const adapter = createRealAdapter({
+    database: { kind: "memory" },
+    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+    dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+    dlsiteSchedulerDependencies: mockDlsiteTransport({
+      html: async () => {
+        started();
+        await pending;
+        return htmlResponse(SAMPLE_HTML);
+      },
+    }),
+  });
+  await adapter.updateSettings({ rootFolder: lib.root });
+  await adapter.scan();
+  const controllerB = new AbortController();
+  const promiseA = adapter.dlsiteFetch(lib.existingWorkId, true);
+  const promiseB = adapter.dlsiteFetch(lib.existingWorkId, false, { signal: controllerB.signal });
+  await gate;
+  controllerB.abort();
+  await assert.rejects(
+    promiseB,
+    (error: unknown) => error instanceof DOMException && error.name === "AbortError",
+  );
+  release();
+  assert.equal((await promiseA).ok, true);
+  adapter.close();
+});
+
+test("dlsiteApply: abort済みsignalではDB・メタを更新しない", async (t) => {
+  const lib = makeSampleLibrary();
+  t.after(lib.cleanup);
+  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
+  await adapter.updateSettings({ rootFolder: lib.root });
+  await adapter.scan();
+  const before = await adapter.getWork(lib.existingWorkId);
+  const metaPath = join(before!.physicalPath, "mimimilli.json");
+  const controller = new AbortController();
+  controller.abort();
+  const info: DlsiteWorkInfo = {
+    rjCode: "RJ900002",
+    title: "abort後に適用されないタイトル",
+    circle: null,
+    cvs: [],
+    genreTags: [],
+    coverUrl: null,
+    url: "https://www.dlsite.com/maniax/work/=/product_id/RJ900002.html",
+  };
+  await assert.rejects(
+    adapter.dlsiteApply(
+      lib.existingWorkId,
+      {
+        info,
+        applyTitle: true,
+        applyTags: [],
+        applyCover: false,
+      },
+      { signal: controller.signal },
+    ),
+    (error: unknown) => error instanceof DOMException && error.name === "AbortError",
+  );
+  const after = await adapter.getWork(lib.existingWorkId);
+  assert.equal(after?.title, before?.title);
+  const meta = JSON.parse(readFileSync(metaPath, "utf-8")) as { title: string };
+  assert.equal(meta.title, before?.title);
+  adapter.close();
+});
+
 test("DLsite bulk: 2回目はHTML cache hitでHTTPしない", async (t) => {
   const lib = makeSampleLibrary();
   const dir = makeTestDirectory("dlsite-bulk-html-cache");
@@ -1400,7 +1513,7 @@ test("一括取得: カバー取得失敗を作品のerrorへ記録し、後続�
         htmlResponse(sampleWorkHtml(code, { title: `取得済み ${code}`, genres: ["テスト"] })),
       cover: () => {
         coverCalls += 1;
-        throw new Error("カバー取得失敗");
+        return Promise.reject(new Error("カバー取得失敗"));
       },
     }),
   });
@@ -1436,7 +1549,7 @@ test("一括取得: 失敗状態のメタ書き戻しが例外を投げても後
       html: (code) =>
         htmlResponse(sampleWorkHtml(code, { title: `取得済み ${code}`, genres: ["テスト"] })),
       cover: (url) => {
-        if (url.includes("RJ900002")) throw new Error("カバー取得失敗");
+        if (url.includes("RJ900002")) return Promise.reject(new Error("カバー取得失敗"));
         return jpegResponse(coverBody);
       },
     }),
@@ -1554,14 +1667,20 @@ test("dlsiteFetch: abortでDLsite HTTP取得が中断される", async (t) => {
       html: async (_code, _url, init) => {
         transportCalls += 1;
         transportReady();
-        const aborted = new Promise<never>((_resolve, reject) => {
-          init?.signal?.addEventListener(
-            "abort",
-            () => reject(new DOMException("DLsiteリクエストはキャンセルされました", "AbortError")),
-            { once: true },
-          );
+        await new Promise<void>((resolve, reject) => {
+          const signal = init?.signal;
+          if (signal?.aborted) {
+            reject(new DOMException("DLsiteリクエストはキャンセルされました", "AbortError"));
+            return;
+          }
+          const onAbort = () =>
+            reject(new DOMException("DLsiteリクエストはキャンセルされました", "AbortError"));
+          if (signal) signal.addEventListener("abort", onAbort, { once: true });
+          gate.then(() => {
+            if (signal) signal.removeEventListener("abort", onAbort);
+            resolve();
+          });
         });
-        await Promise.race([gate, aborted]);
         return htmlResponse(SAMPLE_HTML);
       },
     }),

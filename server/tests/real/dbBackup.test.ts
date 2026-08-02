@@ -63,6 +63,27 @@ test("copyDatabaseToBackupは元DBを残してコピーする", (t) => {
   assert.equal(readFileSync(backupPath!, "utf-8"), "user");
 });
 
+test("copyDatabaseToBackupは同一タイムスタンプで衝突した場合に上書きせず連番サフィックスを付ける", (t) => {
+  const directory = makeTestDirectory("db-backup-collision");
+  t.after(directory.cleanup);
+  const dbPath = join(directory.path, "db", "user.sqlite");
+  mkdirSync(join(directory.path, "db"), { recursive: true });
+  writeFileSync(dbPath, "user-v1");
+  const backupDir = join(directory.path, "backup");
+  const fixedDate = new Date("2026-01-01T00:00:00.123Z");
+
+  const first = copyDatabaseToBackup(dbPath, backupDir, "user", fixedDate);
+  writeFileSync(dbPath, "user-v2");
+  const second = copyDatabaseToBackup(dbPath, backupDir, "user", fixedDate);
+
+  assert.ok(first);
+  assert.ok(second);
+  assert.notEqual(first, second);
+  assert.equal(readFileSync(first!, "utf-8"), "user-v1");
+  assert.equal(readFileSync(second!, "utf-8"), "user-v2");
+  assert.match(second!, /-1\.sqlite$/);
+});
+
 test("purgeOldBackupsはpre-migrationのみN世代を超えた分を削除する", (t) => {
   const directory = makeTestDirectory("db-backup-purge");
   t.after(directory.cleanup);

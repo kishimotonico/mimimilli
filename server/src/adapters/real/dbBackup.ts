@@ -21,11 +21,28 @@ const dbLogger = getCategoryLogger("db");
 const PRE_MIGRATION_SUFFIX = "-pre-migration.sqlite";
 
 function formatBackupTimestamp(date = new Date()): string {
-  return date.toISOString().slice(0, 19).replace(/:/g, "-");
+  return date.toISOString().slice(0, 23).replace(/:/g, "-").replace(".", "-");
 }
 
 function backupFileName(kind: DbBackupKind, reason: DbBackupReason, date = new Date()): string {
   return `${kind}-${formatBackupTimestamp(date)}-${reason}.sqlite`;
+}
+
+/** 既存バックアップと衝突しないパスを返す（上書きはしない）。 */
+function resolveUniqueBackupPath(
+  backupDir: string,
+  kind: DbBackupKind,
+  reason: DbBackupReason,
+  date = new Date(),
+): string {
+  const baseName = backupFileName(kind, reason, date);
+  let candidate = join(backupDir, baseName);
+  if (!existsSync(candidate)) return candidate;
+  const stem = baseName.slice(0, -".sqlite".length);
+  for (let suffix = 1; ; suffix += 1) {
+    candidate = join(backupDir, `${stem}-${suffix}.sqlite`);
+    if (!existsSync(candidate)) return candidate;
+  }
 }
 
 const DB_FILE_SUFFIXES = ["", "-wal", "-shm"] as const;
@@ -99,9 +116,10 @@ export function moveDatabaseToBackup(
   backupDir: string,
   kind: DbBackupKind,
   reason: DbBackupReason,
+  date = new Date(),
 ): string {
   mkdirSync(backupDir, { recursive: true });
-  const backupPath = join(backupDir, backupFileName(kind, reason));
+  const backupPath = resolveUniqueBackupPath(backupDir, kind, reason, date);
   if (!transferDatabaseFiles(dbPath, backupPath, "move")) {
     throw new Error(`バックアップ対象のDBファイルが見つかりません: ${dbPath}`);
   }
@@ -119,10 +137,11 @@ export function copyDatabaseToBackup(
   dbPath: string,
   backupDir: string,
   kind: DbBackupKind,
+  date = new Date(),
 ): string | null {
   if (!existsSync(dbPath)) return null;
   mkdirSync(backupDir, { recursive: true });
-  const backupPath = join(backupDir, backupFileName(kind, "pre-migration"));
+  const backupPath = resolveUniqueBackupPath(backupDir, kind, "pre-migration", date);
   if (!transferDatabaseFiles(dbPath, backupPath, "copy")) {
     return null;
   }

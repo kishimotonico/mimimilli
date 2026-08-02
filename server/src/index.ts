@@ -32,6 +32,8 @@ const adapterKind = process.env.MIMIMILLI_ADAPTER ?? "real";
 
 initLogger(adapterKind === "real" ? { logDir: resolveDataPaths().logDir } : {});
 
+const serverLogger = getCategoryLogger("server");
+
 function createAdapter(): DataAdapter {
   switch (adapterKind) {
     case "fixture":
@@ -59,23 +61,9 @@ function createAdapter(): DataAdapter {
   }
 }
 
-const port = Number(process.env.PORT ?? 8080);
-/** DLsite同期fetchの総期限(60s)+余裕。Bun既定の10sアイドル制限を上書きする。 */
-const SERVER_IDLE_TIMEOUT_SECONDS = 90;
-const adapter = createAdapter();
-const app = createApp(adapter);
-
-const server = Bun.serve({
-  fetch: app.fetch,
-  hostname: "127.0.0.1",
-  port,
-  idleTimeout: SERVER_IDLE_TIMEOUT_SECONDS,
-});
-
-const serverLogger = getCategoryLogger("server");
-serverLogger.info(
-  `サーバーを起動しました: http://localhost:${server.port} (adapter: ${adapterKind})`,
-);
+function isRealAdapter(value: DataAdapter): value is RealAdapter {
+  return "close" in value && typeof value.close === "function";
+}
 
 let shuttingDown = false;
 
@@ -88,18 +76,29 @@ async function shutdown(exitCode: number, reason: string, error?: unknown): Prom
     } else {
       serverLogger.info(reason);
     }
-    if (isRealAdapter(adapter)) adapter.close();
-    server.stop();
-    await dispose();
-  } catch (shutdownError) {
-    console.error(shutdownError);
-  } finally {
-    process.exit(exitCode);
+  } catch (logError) {
+    console.error(logError);
   }
-}
 
-function isRealAdapter(value: DataAdapter): value is RealAdapter {
-  return "close" in value && typeof value.close === "function";
+  try {
+    if (adapter && isRealAdapter(adapter)) adapter.close();
+  } catch (closeError) {
+    console.error(closeError);
+  }
+
+  try {
+    if (server) server.stop();
+  } catch (stopError) {
+    console.error(stopError);
+  }
+
+  try {
+    await dispose();
+  } catch (disposeError) {
+    console.error(disposeError);
+  }
+
+  process.exit(exitCode);
 }
 
 process.on("uncaughtException", (error) => {
@@ -117,3 +116,23 @@ process.on("SIGINT", () => {
 process.on("SIGTERM", () => {
   void shutdown(0, "SIGTERMを受信して終了します");
 });
+
+const port = Number(process.env.PORT ?? 8080);
+/** DLsite同期fetchの総期限(60s)+余裕。Bun既定の10sアイドル制限を上書きする。 */
+const SERVER_IDLE_TIMEOUT_SECONDS = 90;
+let adapter: DataAdapter | undefined;
+let server: ReturnType<typeof Bun.serve> | undefined;
+
+adapter = createAdapter();
+const app = createApp(adapter);
+
+server = Bun.serve({
+  fetch: app.fetch,
+  hostname: "127.0.0.1",
+  port,
+  idleTimeout: SERVER_IDLE_TIMEOUT_SECONDS,
+});
+
+serverLogger.info(
+  `サーバーを起動しました: http://localhost:${server.port} (adapter: ${adapterKind})`,
+);

@@ -94,6 +94,7 @@ import {
   WorkRegisterError,
 } from "./workRegister.ts";
 import { querySmartFolderWorks } from "./smartFolderWorks.ts";
+import { SharedFlightPool, throwIfAborted } from "./sharedFlight.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
 
 const dlsiteLogger = getCategoryLogger("dlsite");
@@ -312,11 +313,8 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       dlsiteCoverMaximumBytes,
       dlsiteUserAgent,
     );
-  const dlsiteFlights = new Map<string, Promise<DlsiteFetchAttempt>>();
-  const dlsiteCoverFlights = new Map<
-    string,
-    Promise<{ body: Uint8Array; normalizedUrl: string }>
-  >();
+  const dlsiteFlightPool = new SharedFlightPool<DlsiteFetchAttempt>();
+  const dlsiteCoverFlightPool = new SharedFlightPool<{ body: Uint8Array; normalizedUrl: string }>();
 
   /** キャッシュ越しのDLsite取得結果。httpAttemptedはHTTPへ実際に出たか（cache hitならfalse）。 */
   interface DlsiteFetchAttempt {
@@ -330,9 +328,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
     signal?: AbortSignal,
   ): Promise<DlsiteFetchAttempt> {
     const key = productCode.trim().toUpperCase();
-    if (signal?.aborted) {
-      throw new DOMException("DLsite一括取得はキャンセルされました", "AbortError");
-    }
+    throwIfAborted(signal, "DLsite一括取得はキャンセルされました");
     if (!force) {
       const resolution = dlsiteCache.resolve({ productCode: key });
       if (resolution.kind !== "miss") {
@@ -384,11 +380,9 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       throw error;
     }
     // fresh hitはここまでに返す。networkを始める場合だけforce/normalを問わず合流する。
-    const ongoing = dlsiteFlights.get(key);
-    if (ongoing) return ongoing;
-    const request: Promise<DlsiteFetchAttempt> = (async (): Promise<DlsiteFetchAttempt> => {
+    return dlsiteFlightPool.run(key, signal, async (flightSignal) => {
       try {
-        const response = await dlsiteHtmlFetcher(key, signal);
+        const response = await dlsiteHtmlFetcher(key, flightSignal);
         if (response.status === 404) {
           dlsiteCache.recordFailure({ productCode: key, outcome: "not_found" });
           return {
@@ -434,13 +428,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
           httpAttempted: true,
         };
       }
-    })();
-    dlsiteFlights.set(key, request);
-    try {
-      return await request;
-    } finally {
-      dlsiteFlights.delete(key);
-    }
+    });
   }
 
   async function fetchCachedDlsite(
@@ -456,20 +444,40 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
     workDir: string,
     signal?: AbortSignal,
   ): Promise<string> {
+    throwIfAborted(signal, "DLsite一括取得はキャンセルされました");
     const normalizedUrl = normalizeDlsiteCoverUrl(coverUrl);
     const key = `cover:${createHash("sha256").update(normalizedUrl).digest("hex")}`;
-    let request = dlsiteCoverFlights.get(key);
-    if (!request) {
-      request = (async () => {
-        const cached = dlsiteCache.getCover(normalizedUrl);
-        if (cached) {
+    const cached = dlsiteCache.getCover(normalizedUrl);
+    if (cached) {
+      logDlsiteEvent({
+        event: "dlsite_cache_hit",
+        resource: "cover",
+        key: normalizedUrl,
+        reason: "cached",
+      });
+      throwIfAborted(signal, "DLsite一括取得はキャンセルされました");
+      const extension = (new URL(normalizedUrl).pathname.split(".").pop() ?? "jpg").toLowerCase();
+      const fileName = `dlsite_cover.${extension}`;
+      writeFileSync(join(workDir, fileName), cached.body);
+      return fileName;
+    }
+    try {
+      dlsiteScheduler.assertOnline();
+    } catch (error) {
+      if (error instanceof DlsiteOfflineError) throw error;
+      throw error;
+    }
+    try {
+      const image = await dlsiteCoverFlightPool.run(key, signal, (flightSignal) => {
+        const cachedInFlight = dlsiteCache.getCover(normalizedUrl);
+        if (cachedInFlight) {
           logDlsiteEvent({
             event: "dlsite_cache_hit",
             resource: "cover",
             key: normalizedUrl,
             reason: "cached",
           });
-          return { body: cached.body, normalizedUrl };
+          return Promise.resolve({ body: cachedInFlight.body, normalizedUrl });
         }
         logDlsiteEvent({
           event: "dlsite_cache_miss",
@@ -477,20 +485,16 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
           key: normalizedUrl,
           reason: "not_cached",
         });
-        dlsiteScheduler.assertOnline();
-        const fetched = await dlsiteCoverFetcher(normalizedUrl, signal);
-        const finalUrl = normalizeDlsiteCoverUrl(fetched.finalUrl);
-        dlsiteCache.putCover(finalUrl, fetched.body, fetched.contentType);
-        // リダイレクトがあっても、要求した正規化URLでも次回hitさせる。
-        if (finalUrl !== normalizedUrl) {
-          dlsiteCache.putCover(normalizedUrl, fetched.body, fetched.contentType);
-        }
-        return { body: fetched.body, normalizedUrl: finalUrl };
-      })();
-      dlsiteCoverFlights.set(key, request);
-    }
-    try {
-      const image = await request;
+        return dlsiteCoverFetcher(normalizedUrl, flightSignal).then((fetched) => {
+          const finalUrl = normalizeDlsiteCoverUrl(fetched.finalUrl);
+          dlsiteCache.putCover(finalUrl, fetched.body, fetched.contentType);
+          if (finalUrl !== normalizedUrl) {
+            dlsiteCache.putCover(normalizedUrl, fetched.body, fetched.contentType);
+          }
+          return { body: fetched.body, normalizedUrl: finalUrl };
+        });
+      });
+      throwIfAborted(signal, "DLsite一括取得はキャンセルされました");
       const extension = (
         new URL(image.normalizedUrl).pathname.split(".").pop() ?? "jpg"
       ).toLowerCase();
@@ -498,7 +502,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       writeFileSync(join(workDir, fileName), image.body);
       return fileName;
     } finally {
-      if (dlsiteCoverFlights.get(key) === request) dlsiteCoverFlights.delete(key);
+      await dlsiteScheduler.drain();
     }
   }
 
@@ -878,6 +882,8 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       body: DlsiteApplyBody,
       options?: { signal?: AbortSignal },
     ): Promise<boolean> {
+      const signal = options?.signal;
+      throwIfAborted(signal, "DLsite一括取得はキャンセルされました");
       const work = await repo.getWork(workId);
       if (!work) return false;
 
@@ -891,12 +897,16 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       }
       let coverImage: string | undefined;
       if (body.applyCover && body.info.coverUrl) {
-        coverImage = await cachedCover(body.info.coverUrl, work.physicalPath, options?.signal);
+        coverImage = await cachedCover(body.info.coverUrl, work.physicalPath, signal);
+        throwIfAborted(signal, "DLsite一括取得はキャンセルされました");
         // カバー計測に失敗したら適用自体を失敗として返す（寸法欠損のまま確定させない）。
         const cover = await measureDownloadedCover(work.physicalPath, coverImage);
         if (!cover) return false;
+        throwIfAborted(signal, "DLsite一括取得はキャンセルされました");
         patch.cover = cover;
       }
+
+      throwIfAborted(signal, "DLsite一括取得はキャンセルされました");
 
       return db.transaction(() => {
         const updated = repo.patchWork(workId, patch);
@@ -1140,6 +1150,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
                 durationMs: Date.now() - bulkStartedAt,
                 ...result,
               });
+              await dlsiteScheduler.drain();
               return result;
             }
             if (error instanceof DlsiteOfflineError) {
@@ -1193,6 +1204,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
           durationMs: Date.now() - bulkStartedAt,
           ...result,
         });
+        await dlsiteScheduler.drain();
         return result;
       } catch (error) {
         if (isAborted() || (error instanceof DOMException && error.name === "AbortError")) {

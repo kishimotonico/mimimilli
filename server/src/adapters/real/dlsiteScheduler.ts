@@ -126,33 +126,37 @@ export class DlsiteScheduler {
     while (true) {
       const signal = this.timeoutSignal(init.signal, deadline);
       try {
+        const startedAt = this.now();
         const response = await this.start(
-          async () => {
-            const startedAt = this.now();
-            const response = await this.transport(input, { ...init, signal });
-            const durationMs = this.now() - startedAt;
-            lastStatus = response.status;
-            lastErrorKind = undefined;
-            this.logger({
-              event: "dlsite_http_request",
-              count: this.requestCount,
-              status: response.status,
-              durationMs,
-              url,
-              ...logContext,
-            });
-            // cooldownの反映はqueue解放前に行う。解放後だと後続がqueue待機から
-            // 抜けた直後に古いcooldownUntilで待機時間を計算してしまう。
-            if (response.status === 429 || response.status === 503) {
-              const delay = retryAfterMs(response.headers.get("retry-after"), this.now());
-              if (delay !== null)
-                this.cooldownUntil = Math.max(this.cooldownUntil, this.addDelay(delay));
+          () => {
+            try {
+              const result = this.transport(input, { ...init, signal });
+              return result instanceof Promise ? result : Promise.resolve(result);
+            } catch (error) {
+              return Promise.reject(error);
             }
-            return response;
           },
           signal,
           deadline,
         );
+        const durationMs = this.now() - startedAt;
+        lastStatus = response.status;
+        lastErrorKind = undefined;
+        this.logger({
+          event: "dlsite_http_request",
+          count: this.requestCount,
+          status: response.status,
+          durationMs,
+          url,
+          ...logContext,
+        });
+        // cooldownの反映はqueue解放前に行う。解放後だと後続がqueue待機から
+        // 抜けた直後に古いcooldownUntilで待機時間を計算してしまう。
+        if (response.status === 429 || response.status === 503) {
+          const delay = retryAfterMs(response.headers.get("retry-after"), this.now());
+          if (delay !== null)
+            this.cooldownUntil = Math.max(this.cooldownUntil, this.addDelay(delay));
+        }
         const retryable = response.status === 429 || response.status >= 500;
         if (!retryable || retry >= this.config.retryCount) return response;
         await response.body?.cancel();
@@ -184,6 +188,11 @@ export class DlsiteScheduler {
   async schedule<T>(operation: () => Promise<T>, signal?: AbortSignal): Promise<T> {
     this.assertOnline();
     return this.start(operation, signal);
+  }
+
+  /** キューに積まれたDLsite HTTP操作の完了を待つ（in-flightの後始末用）。 */
+  async drain(): Promise<void> {
+    await this.queue;
   }
 
   private timeoutSignal(signal: AbortSignal | null | undefined, deadline: number): AbortSignal {
@@ -224,7 +233,11 @@ export class DlsiteScheduler {
       const startedAt = this.now();
       this.nextStartAt = startedAt + this.config.requestIntervalMs;
       this.requestCount += 1;
-      return await operation();
+      const opResult = operation();
+      const opPromise = opResult instanceof Promise ? opResult : Promise.resolve(opResult);
+      // transport が返した reject を必ず観測する（購読者離脱後の unhandled 防止）
+      void opPromise.catch(() => undefined);
+      return await opPromise;
     } finally {
       release();
     }
