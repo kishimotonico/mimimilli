@@ -1,9 +1,4 @@
-import {
-  parseTag,
-  type SmartFolder,
-  type SmartFolderRule,
-  type WorkListItem,
-} from "@mimimilli/shared";
+import { parseTag, type SmartFolder, type SmartFolderRule } from "@mimimilli/shared";
 import { I } from "../../../../shared/ui/Icon";
 import Button from "../../../../shared/ui/Button";
 import { formatDuration } from "./format";
@@ -68,12 +63,10 @@ function RuleValue({ rule }: { rule: SmartFolderRule }) {
 
 export function SmartFolderView({
   sf,
-  works,
   total,
   onEdit,
 }: {
   sf: SmartFolder;
-  works: WorkListItem[];
   total?: number;
   onEdit: () => void;
 }) {
@@ -106,7 +99,11 @@ export function SmartFolderView({
         </div>
         <div className="mll-smart__ft">
           <span className="hits">
-            <b>{total ?? works.length}</b> 件マッチ
+            {total != null ? (
+              <>
+                <b>{total}</b> 件マッチ
+              </>
+            ) : null}
           </span>
           <span className="right">
             <Button variant="ghost" icon={I.cog} onClick={onEdit}>

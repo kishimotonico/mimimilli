@@ -380,14 +380,14 @@ export default function WorkGrid({
         <DrillHeader
           axisLabel={axis}
           value={drillValue}
-          count={works.length}
+          count={worksTotal}
           tagPrefixes={tagPrefixes}
           onBack={onDrillBack}
         />
       ) : (
         <div className="mle-col__hd">
           <span>{isSmartAxis(axis) ? "スマートフォルダー" : "作品"}</span>
-          <span className="count">{works.length} 件</span>
+          {worksTotal != null && <span className="count">{worksTotal} 件</span>}
         </div>
       )}
       <div className="mll-grid-body">

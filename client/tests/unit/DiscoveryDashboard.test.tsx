@@ -198,7 +198,6 @@ describe("PreviewPane の empty モード", () => {
     isSelectedWorkError: false,
     smartFolder: null,
     axisWorks: [],
-    smartFolderWorks: [],
     playingTrackIndex: null,
     onPlay: noop,
     onResume: noop,

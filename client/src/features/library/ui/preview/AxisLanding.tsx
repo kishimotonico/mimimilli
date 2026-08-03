@@ -21,7 +21,7 @@ export function AxisLanding({
       <div className="mle-sect">
         <span>{presentation.sectionTitle}</span>
         <div className="mle-sect__rule" />
-        <span className="count">{total ?? works.length} 件</span>
+        {total != null && <span className="count">{total} 件</span>}
       </div>
       {presentation.instruction && (
         <p style={{ fontSize: 12, color: "var(--ink-2)", marginBottom: 16 }}>

@@ -315,7 +315,6 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
           smartFolder={activeSmartFolder}
           axisWorks={works}
           axisTotal={worksTotal}
-          smartFolderWorks={works}
           smartFolderTotal={worksTotal}
           playingTrackIndex={
             selectedWork && playingWorkId === selectedWork.id ? (playingTrackIndex ?? null) : null
