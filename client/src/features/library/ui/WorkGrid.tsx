@@ -49,6 +49,8 @@ interface WorkGridProps {
   isPlaybackActive?: boolean;
   isLoading: boolean;
   isError: boolean;
+  /** 遷移中は直前の一覧を薄く表示する。 */
+  isPending?: boolean;
   /** 次ページがあるか（追加読み込みボタンの表示判定。TASK-73） */
   hasNextPage?: boolean;
   /** サーバー側の総件数（残件数の表示用） */
@@ -106,6 +108,7 @@ export default function WorkGrid({
   isPlaybackActive = false,
   isLoading,
   isError,
+  isPending = false,
   hasNextPage = false,
   worksTotal,
   isFetchingNextPage = false,
@@ -380,7 +383,11 @@ export default function WorkGrid({
   };
 
   return (
-    <section ref={paneRef} className="mll-grid-pane" aria-label="作品グリッド">
+    <section
+      ref={paneRef}
+      className={`mll-grid-pane ${isPending ? "is-pending" : ""}`}
+      aria-label="作品グリッド"
+    >
       {isDrilled ? (
         <DrillHeader
           axisLabel={axis}

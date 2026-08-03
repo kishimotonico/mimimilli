@@ -32,6 +32,7 @@ interface ContentColumnProps {
   isPlaybackActive?: boolean;
   isLoading?: boolean;
   isError?: boolean;
+  isPending?: boolean;
   /** タグ軸・ファセット軸一覧（facetItems）自体の取得状態。作品一覧の isLoading/isError とは
    *  別のクエリ（GET /axes/:axis）のため区別する（R2: 軸切替時の見出し固着調査） */
   isFacetLoading?: boolean;
@@ -317,6 +318,7 @@ interface WorksListContentProps {
   isPlaybackActive?: boolean;
   isLoading?: boolean;
   isError?: boolean;
+  isPending?: boolean;
   hasNextPage?: boolean;
   worksTotal?: number;
   isFetchingNextPage?: boolean;
@@ -337,6 +339,7 @@ function WorksListContent({
   isPlaybackActive,
   isLoading,
   isError,
+  isPending = false,
   hasNextPage = false,
   worksTotal,
   isFetchingNextPage = false,
@@ -410,7 +413,7 @@ function WorksListContent({
   );
 
   return (
-    <div className="mle-col is-content">
+    <div className={`mle-col is-content ${isPending ? "is-pending" : ""}`}>
       <div className="mle-col__hd">
         <span>{isSmartAxis(axis) ? "スマートフォルダー" : "作品"}</span>
         {worksTotal != null && <span className="count">{worksTotal} 件</span>}
@@ -486,6 +489,7 @@ export default function ContentColumn({
   isPlaybackActive,
   isLoading,
   isError,
+  isPending,
   isFacetLoading,
   isFacetError,
   isTagPrefixesError,
@@ -546,6 +550,7 @@ export default function ContentColumn({
       isPlaybackActive={isPlaybackActive}
       isLoading={isLoading}
       isError={isError}
+      isPending={isPending}
       hasNextPage={hasNextPage}
       worksTotal={worksTotal}
       isFetchingNextPage={isFetchingNextPage}

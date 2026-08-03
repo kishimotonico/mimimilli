@@ -465,6 +465,11 @@
   .mle-col.is-content {
     width: 300px;
   }
+  .mle-col.is-content.is-pending,
+  .mll-grid-pane.is-pending {
+    opacity: 0.55;
+    transition: opacity 150ms ease;
+  }
   .mle-col.is-axis .mle-col__list {
     gap: 0;
     padding: 4px 0;
