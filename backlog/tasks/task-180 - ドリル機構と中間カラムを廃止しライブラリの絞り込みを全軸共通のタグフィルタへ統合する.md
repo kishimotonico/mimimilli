@@ -4,6 +4,7 @@ title: ドリル機構と中間カラムを廃止しライブラリの絞り込�
 status: To Do
 assignee: []
 created_date: '2026-08-03 14:45'
+updated_date: '2026-08-03 14:50'
 labels: []
 dependencies:
   - TASK-179
@@ -27,6 +28,10 @@ ADR-0012 / DRAFT-50 のフェーズ2。再設計の中核。ナビゲーショ�
 本タスクの結果面は暫定でよい: 軸を選んだだけの状態の値一覧は、既存の FacetAxisContent / TagAxisContent 相当の素朴な一覧を全幅で出せば足りる。本実装は TASK-181 が担当する。オーバーレイ類も TASK-182 の担当で本タスクには含めない。
 
 WorkGrid の inspector（gridInspectorOpenAtom）と PreviewPane の関係も整理する。レイアウトが固定される以上、作品選択時のプレビューは list/grid で共通の1つにまとめ、二重系を残さない。
+
+受け入れ条件 #7（プレビューの list/grid 単一実装化・グリッド専用インスペクタの二重系解消）は、他の項目と違って独立して切り離せる。実装が膨らんで1PRに収まらないと判断したら、#7 だけ TASK-183 へ後送してよい（その場合はタスクの実装ノートに理由を記録すること）。
+
+year 軸のフィルタは URL 上 tags=year/2024 形式の擬似タグとして表現し、フィルタ解釈層で組み込み軸（addedAt の年照合）として解決する。組み込み軸専用のクエリパラメータは設けない（ADR-0012 §2）。
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
@@ -37,8 +42,8 @@ WorkGrid の inspector（gridInspectorOpenAtom）と PreviewPane の関係も整
 - [ ] #4 cv 軸の値とサークル軸の値を同時に選択でき、AND で絞り込まれた作品一覧が出る
 - [ ] #5 選択中のフィルタが軸を問わず結果面上部の同一のチップ列に並び、×で個別解除・「すべてクリア」で一括解除できる
 - [ ] #6 軸を切り替えても選択中のフィルタが維持される
-- [ ] #7 URL に drillValue セグメントが存在せず、全軸で tags= クエリによりフィルタが復元される
-- [ ] #8 作品選択時のプレビューが list/grid で共通の単一実装になっており、グリッド専用インスペクタとの二重系が残っていない
-- [ ] #9 libraryPresentation.test.ts / libraryNavigationActions.test.ts / navigationUrl.test.ts が新仕様に更新されて通る
-- [ ] #10 pnpm check と pnpm test が通り、ビジュアルテストのスナップショットが更新されている
+- [ ] #7 作品選択時のプレビューが list/grid で共通の単一実装になっており、グリッド専用インスペクタとの二重系が残っていない
+- [ ] #8 libraryPresentation.test.ts / libraryNavigationActions.test.ts / navigationUrl.test.ts が新仕様に更新されて通る
+- [ ] #9 pnpm check と pnpm test が通り、ビジュアルテストのスナップショットが更新されている
+- [ ] #10 URL に drillValue セグメントが存在せず、全軸で tags= クエリによりフィルタが復元される。year 軸のような組み込み軸も tags=year/2024 形式の擬似タグとして同じ経路に載り、フィルタ解釈層で組み込み軸として解決される
 <!-- AC:END -->
