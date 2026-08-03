@@ -1,12 +1,4 @@
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  renameSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { basename, dirname, join, relative } from "node:path";
 import { metaFileSchema } from "@mimimilli/shared";
@@ -26,24 +18,11 @@ interface MigrationOperation extends IdAssignment {
   completed: boolean;
 }
 
-/** hasCompleteUniqueIds が一度確認した内容の軽量な再現用シグネチャ（TASK-86）。
- *  size/mtimeMsが前回確認時から変わっていなければ、メタ本文を読まずにこのIDで
- *  重複判定へ参加させる。 */
-interface VerifiedIdSignature {
-  size: number;
-  mtimeMs: number;
-  workId: string;
-  playlistIds: string[];
-  trackIds: string[];
-}
-
 interface MigrationManifest {
   version: 1;
   libraryRoot: string;
   libraryCompleted: boolean;
   operations: MigrationOperation[];
-  /** パス（platform依存の pathKey）ごとの VerifiedIdSignature。旧manifestには存在しない。 */
-  verifiedIdSignatures?: Record<string, VerifiedIdSignature>;
 }
 
 export interface MetaIdMigrationOptions {
@@ -58,8 +37,6 @@ export interface MetaIdMigrationOptions {
   beforeFinalHashCheck?: (metaPath: string) => void;
   /** メタ本文のSHA-256計算回数を観測するテスト専用フック。 */
   onMetaHash?: () => void;
-  /** hasCompleteUniqueIdsがsize/mtimeMsキャッシュを外して本文を読み直した回数を観測するテスト専用フック（TASK-86）。 */
-  onIdSignatureMiss?: () => void;
   /** WorkerのSharedArrayBufferを含む、同期処理中のキャンセル確認。throwして中断する。 */
   throwIfCancelled?: () => void;
 }
@@ -180,73 +157,25 @@ function completeAssignmentOf(raw: JsonObject, playlists: JsonObject[]): IdAssig
   return assignmentOf(raw, playlists);
 }
 
-interface HasCompleteUniqueIdsResult {
-  ok: boolean;
-  /** verifiedIdSignatures が更新され、manifest永続化が必要かどうか。 */
-  signaturesChanged: boolean;
-}
-
-function statSizeAndMtime(path: string): { size: number; mtimeMs: number } | null {
-  try {
-    const stat = statSync(path);
-    return { size: stat.size, mtimeMs: stat.mtimeMs };
-  } catch {
-    return null;
-  }
-}
-
-/**
- * 完了済みライブラリの高速経路。IDの存在と重複だけを確認する。
- *
- * size/mtimeMs が前回のフルチェック時から変わっていないメタは、本文の
- * readFileSync+JSON.parse を省略し、manifest に記録済みの workId/playlistIds/trackIds を
- * そのまま重複判定に使う（TASK-86）。内容が変わっていない以上、IDも変わりようがない
- * ため検知漏れにはならない。size/mtimeMsどちらかでも変化したパスは、これまで通り
- * 本文を読んで完全に再検証する。
- */
+/** 完了済みライブラリの高速経路。各メタを読み込み、IDの存在と重複だけを確認する。 */
 function hasCompleteUniqueIds(
   paths: string[],
   root: string,
   platform: NodeJS.Platform,
   operationsByPath: Map<string, MigrationOperation[]>,
-  manifest: MigrationManifest,
   checkpoint: () => void = () => {},
-  onIdSignatureMiss: () => void = () => {},
-): HasCompleteUniqueIdsResult {
-  const previousSignatures = manifest.verifiedIdSignatures ?? {};
-  const nextSignatures: Record<string, VerifiedIdSignature> = {};
+): boolean {
   const workIds = new Set<string>();
   const playlistIds = new Set<string>();
   const trackIds = new Set<string>();
-  let recomputedAny = false;
-  const fail = (): HasCompleteUniqueIdsResult => ({ ok: false, signaturesChanged: false });
 
   for (const path of paths) {
     checkpoint();
     const key = pathKey(portableRelative(root, path), platform);
-    const stat = statSizeAndMtime(path);
-    if (!stat) return fail();
-    const cached = previousSignatures[key];
-    if (cached && cached.size === stat.size && cached.mtimeMs === stat.mtimeMs) {
-      if (
-        workIds.has(cached.workId) ||
-        cached.playlistIds.some((id) => playlistIds.has(id)) ||
-        cached.trackIds.some((id) => trackIds.has(id))
-      ) {
-        return fail();
-      }
-      workIds.add(cached.workId);
-      for (const id of cached.playlistIds) playlistIds.add(id);
-      for (const id of cached.trackIds) trackIds.add(id);
-      nextSignatures[key] = cached;
-      continue;
-    }
-
-    onIdSignatureMiss();
     const raw = parseObject(readFileSync(path, "utf-8"));
     checkpoint();
     const playlists = raw ? playlistsOf(raw) : null;
-    if (!raw || !playlists || typeof raw.id !== "string" || workIds.has(raw.id)) return fail();
+    if (!raw || !playlists || typeof raw.id !== "string" || workIds.has(raw.id)) return false;
     const operations = operationsByPath.get(key);
     let latestCompletedOperation: MigrationOperation | undefined;
     for (let index = (operations?.length ?? 0) - 1; index >= 0; index--) {
@@ -260,14 +189,12 @@ function hasCompleteUniqueIds(
       latestCompletedOperation?.originalAssignment &&
       idsMatchAssignment(raw, playlists, latestCompletedOperation.originalAssignment)
     ) {
-      return fail();
+      return false;
     }
     workIds.add(raw.id);
-    if ("defaultPlaylist" in raw) return fail();
-    if (raw.defaultPlaylistId !== null && typeof raw.defaultPlaylistId !== "string") return fail();
+    if ("defaultPlaylist" in raw) return false;
+    if (raw.defaultPlaylistId !== null && typeof raw.defaultPlaylistId !== "string") return false;
     let hasDefaultPlaylist = raw.defaultPlaylistId === null;
-    const playlistIdList: string[] = [];
-    const trackIdList: string[] = [];
     for (const playlist of playlists) {
       checkpoint();
       if (
@@ -275,10 +202,9 @@ function hasCompleteUniqueIds(
         !UUID_V4_PATTERN.test(playlist.id) ||
         playlistIds.has(playlist.id)
       ) {
-        return fail();
+        return false;
       }
       playlistIds.add(playlist.id);
-      playlistIdList.push(playlist.id);
       if (playlist.id === raw.defaultPlaylistId) hasDefaultPlaylist = true;
       for (const track of playlist.tracks as JsonObject[]) {
         checkpoint();
@@ -287,27 +213,15 @@ function hasCompleteUniqueIds(
           !UUID_V4_PATTERN.test(track.id) ||
           trackIds.has(track.id)
         ) {
-          return fail();
+          return false;
         }
         trackIds.add(track.id);
-        trackIdList.push(track.id);
       }
     }
-    if (!hasDefaultPlaylist) return fail();
-    nextSignatures[key] = {
-      size: stat.size,
-      mtimeMs: stat.mtimeMs,
-      workId: raw.id,
-      playlistIds: playlistIdList,
-      trackIds: trackIdList,
-    };
-    recomputedAny = true;
+    if (!hasDefaultPlaylist) return false;
   }
 
-  const signaturesChanged =
-    recomputedAny || Object.keys(nextSignatures).length !== Object.keys(previousSignatures).length;
-  manifest.verifiedIdSignatures = nextSignatures;
-  return { ok: true, signaturesChanged };
+  return true;
 }
 
 function assignmentOf(raw: JsonObject, playlists: JsonObject[]): IdAssignment {
@@ -414,20 +328,7 @@ export function migrateMetaIds(options: MetaIdMigrationOptions): MetaIdMigration
     ),
   );
   if (manifest.libraryCompleted) {
-    const fastCheck = hasCompleteUniqueIds(
-      paths,
-      options.root,
-      platform,
-      operationsByPath,
-      manifest,
-      checkpoint,
-      options.onIdSignatureMiss,
-    );
-    if (fastCheck.signaturesChanged) {
-      checkpoint();
-      writeJsonAtomic(manifestPath, manifest, checkpoint);
-    }
-    if (fastCheck.ok) {
+    if (hasCompleteUniqueIds(paths, options.root, platform, operationsByPath, checkpoint)) {
       checkpoint();
       return { migrated: 0, alreadyMigrated: 0, externallyModified: [] };
     }
@@ -671,17 +572,13 @@ export function migrateMetaIds(options: MetaIdMigrationOptions): MetaIdMigration
     manifest.operations.every((operation) => operation.completed);
   let canMarkLibraryCompleted = false;
   if (migrationFullyApplied) {
-    const finalCheck = hasCompleteUniqueIds(
+    canMarkLibraryCompleted = hasCompleteUniqueIds(
       paths,
       options.root,
       platform,
       operationsByPath,
-      manifest,
       checkpoint,
-      options.onIdSignatureMiss,
     );
-    canMarkLibraryCompleted = finalCheck.ok;
-    if (finalCheck.signaturesChanged) manifestChanged = true;
   }
   if (manifest.libraryCompleted !== canMarkLibraryCompleted) {
     manifest.libraryCompleted = canMarkLibraryCompleted;

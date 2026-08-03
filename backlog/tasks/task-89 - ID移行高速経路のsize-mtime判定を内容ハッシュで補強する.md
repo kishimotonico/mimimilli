@@ -1,10 +1,10 @@
 ---
 id: TASK-89
 title: ID移行高速経路のsize/mtime判定を内容ハッシュで補強する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-24 13:17'
-updated_date: '2026-07-29 18:26'
+updated_date: '2026-08-02 16:23'
 labels: []
 dependencies: []
 priority: medium
@@ -43,4 +43,12 @@ AC #3 は「全件 read+parse を避ける高速経路の性能上の意図（TA
 【参照の安定性】
 
 行番号は補助情報とし、VerifiedIdSignature / hasCompleteUniqueIds などの識別子を主参照にすること（長期間 To Do に留まるタスクのため）。
+
+【2026-08-03 superseded】TASK-97の計測ゲートで署名キャッシュ（VerifiedIdSignature）自体の廃止が決定・実装された（feat/backlog-batch-20260803ブランチ）。本タスクが補強しようとしていた機構が存在しなくなったため実装しない。size/mtime偽陰性の懸念は、常時read+parse検証への変更により根本的に解消済み。
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+superseded by TASK-97: 署名キャッシュ廃止により対象機構が消滅。
+<!-- SECTION:FINAL_SUMMARY:END -->

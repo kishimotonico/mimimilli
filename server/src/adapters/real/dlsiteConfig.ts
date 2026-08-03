@@ -26,12 +26,6 @@ function parseBoolean(name: string, value: string | undefined, fallback: boolean
   throw new Error(`${name} は true または false で指定してください`);
 }
 
-function parseNonEmptyString(name: string, value: string | undefined, fallback: string): string {
-  if (value === undefined) return fallback;
-  if (value.length === 0) throw new Error(`${name} は空にできません`);
-  return value;
-}
-
 function parseInteger(
   name: string,
   value: string | undefined,
@@ -54,6 +48,7 @@ export function resolveDlsiteRequestConfig(
   env: Record<string, string | undefined> = process.env,
 ): DlsiteRequestConfig {
   return {
+    ...DEFAULT_DLSITE_REQUEST_CONFIG,
     offline: parseBoolean(
       "MIMIMILLI_DLSITE_OFFLINE",
       env.MIMIMILLI_DLSITE_OFFLINE,
@@ -64,29 +59,6 @@ export function resolveDlsiteRequestConfig(
       env.MIMIMILLI_DLSITE_REQUEST_INTERVAL_MS,
       DEFAULT_DLSITE_REQUEST_CONFIG.requestIntervalMs,
       0,
-    ),
-    retryCount: parseInteger(
-      "MIMIMILLI_DLSITE_RETRY_COUNT",
-      env.MIMIMILLI_DLSITE_RETRY_COUNT,
-      DEFAULT_DLSITE_REQUEST_CONFIG.retryCount,
-      0,
-    ),
-    maxBackoffMs: parseInteger(
-      "MIMIMILLI_DLSITE_MAX_BACKOFF_MS",
-      env.MIMIMILLI_DLSITE_MAX_BACKOFF_MS,
-      DEFAULT_DLSITE_REQUEST_CONFIG.maxBackoffMs,
-      0,
-    ),
-    timeoutMs: parseInteger(
-      "MIMIMILLI_DLSITE_TIMEOUT_MS",
-      env.MIMIMILLI_DLSITE_TIMEOUT_MS,
-      DEFAULT_DLSITE_REQUEST_CONFIG.timeoutMs,
-      1,
-    ),
-    userAgent: parseNonEmptyString(
-      "MIMIMILLI_DLSITE_USER_AGENT",
-      env.MIMIMILLI_DLSITE_USER_AGENT,
-      DEFAULT_DLSITE_USER_AGENT,
     ),
   };
 }

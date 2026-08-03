@@ -97,15 +97,6 @@ function requireNonNegativeSafeInteger(value: number, name: string): number {
   return value;
 }
 
-function envPositiveInteger(env: NodeJS.ProcessEnv, name: string, fallback: number): number {
-  const value = env[name];
-  if (value === undefined) return fallback;
-  if (!/^[1-9]\d*$/.test(value)) {
-    throw new Error(`${name} は1以上の整数（ミリ秒またはバイト）で指定してください`);
-  }
-  return requirePositiveSafeInteger(Number(value), name);
-}
-
 /** 環境変数を曖昧に解釈せず、DLsiteキャッシュの設定を組み立てる。 */
 export function resolveDlsiteCacheConfig(
   defaultPath: string,
@@ -117,38 +108,9 @@ export function resolveDlsiteCacheConfig(
   }
   return {
     path: configuredPath ?? defaultPath,
-    ttlsMs: {
-      ok: envPositiveInteger(
-        env,
-        "MIMIMILLI_DLSITE_CACHE_TTL_OK_MS",
-        DEFAULT_DLSITE_CACHE_TTLS_MS.ok,
-      ),
-      parse_error: envPositiveInteger(
-        env,
-        "MIMIMILLI_DLSITE_CACHE_TTL_PARSE_ERROR_MS",
-        DEFAULT_DLSITE_CACHE_TTLS_MS.parse_error,
-      ),
-      not_found: envPositiveInteger(
-        env,
-        "MIMIMILLI_DLSITE_CACHE_TTL_NOT_FOUND_MS",
-        DEFAULT_DLSITE_CACHE_TTLS_MS.not_found,
-      ),
-      error: envPositiveInteger(
-        env,
-        "MIMIMILLI_DLSITE_CACHE_TTL_ERROR_MS",
-        DEFAULT_DLSITE_CACHE_TTLS_MS.error,
-      ),
-    },
-    maxTransferBytes: envPositiveInteger(
-      env,
-      "MIMIMILLI_DLSITE_CACHE_MAX_TRANSFER_BYTES",
-      DEFAULT_DLSITE_CACHE_MAX_TRANSFER_BYTES,
-    ),
-    maxExpandedBytes: envPositiveInteger(
-      env,
-      "MIMIMILLI_DLSITE_CACHE_MAX_EXPANDED_BYTES",
-      DEFAULT_DLSITE_CACHE_MAX_EXPANDED_BYTES,
-    ),
+    ttlsMs: { ...DEFAULT_DLSITE_CACHE_TTLS_MS },
+    maxTransferBytes: DEFAULT_DLSITE_CACHE_MAX_TRANSFER_BYTES,
+    maxExpandedBytes: DEFAULT_DLSITE_CACHE_MAX_EXPANDED_BYTES,
   };
 }
 

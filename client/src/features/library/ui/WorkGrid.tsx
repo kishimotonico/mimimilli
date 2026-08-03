@@ -12,17 +12,14 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import type { AxisId } from "../model/types";
 import { libraryGridLayoutModeAtom, libraryTileSizeAtom } from "../model/atoms";
 import type { TagPrefix, WorkListItem } from "@mimimilli/shared";
-import CoverImg from "../../../entities/work/ui/CoverImg";
 import Button from "../../../shared/ui/Button";
 import { I } from "../../../shared/ui/Icon";
-import { cn } from "../../../shared/lib/cn";
 import {
   GRID_COLUMN_GAP,
   GRID_ROW_GAP,
   GRID_TILE_CHROME_HEIGHT,
   clampTileSize,
   computeGridColumnCount,
-  selectCoverThumbnailWidth,
 } from "../model/gridSizing";
 import {
   getNextGridIndex,
@@ -36,6 +33,7 @@ import { isFacetAxis, isSmartAxis } from "../model/axisDefinitions";
 import CollectionStatus from "./CollectionStatus";
 import DrillHeader from "./DrillHeader";
 import LoadMore from "./LoadMore";
+import WorkGridRow from "./WorkGridRow";
 
 interface WorkGridProps {
   axis: AxisId;
@@ -66,8 +64,6 @@ interface WorkGridProps {
   /** 作品一覧取得の再試行（isError 時） */
   onRetryWorks?: () => void;
 }
-
-const GRID_ARROW_KEYS = new Set<GridArrowKey>(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"]);
 
 interface JustifiedRowGroup {
   rowIndex: number;
@@ -342,124 +338,41 @@ export default function WorkGrid({
     [gridEl, gridLayoutMode, justifiedLayout, columnCount, works, onWorkSelect, virtualizer],
   );
 
-  const renderTile = useCallback(
-    (
-      work: WorkListItem,
-      flatIndex: number,
-      tileWidth: number | undefined,
-      coverHeight: number | undefined,
-    ) => {
-      const requestWidth = selectCoverThumbnailWidth(
-        tileWidth ?? safeTileSize,
-        window.devicePixelRatio,
-      );
-      const isPlaying = work.id === playingWorkId;
+  const rowTileProps = {
+    selectedWorkId,
+    playingWorkId,
+    isPlaybackActive,
+    safeTileSize,
+    onWorkSelect,
+    onWorkPlay,
+    onTileArrowKey: moveTileFocus,
+  };
 
+  const renderVirtualRow = (rowIndex: number) => {
+    if (gridLayoutMode === "justified" && justifiedLayout) {
+      const row = justifiedRows[rowIndex];
+      if (!row) return null;
       return (
-        <button
-          key={work.id}
-          type="button"
-          className={`mll-grid-tile ${work.id === selectedWorkId ? "is-on" : ""}`}
-          data-flat-index={flatIndex}
-          aria-label={`${work.title}を選択、Enterで再生`}
-          aria-pressed={work.id === selectedWorkId}
-          style={tileWidth !== undefined ? { width: tileWidth } : undefined}
-          onClick={() => onWorkSelect(work.id)}
-          onDoubleClick={() => onWorkPlay(work)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              onWorkPlay(work);
-              return;
-            }
-            if (!GRID_ARROW_KEYS.has(event.key as GridArrowKey)) return;
-            event.preventDefault();
-            moveTileFocus(flatIndex, event.key as GridArrowKey);
-          }}
-        >
-          <span
-            className="mll-grid-tile__cover"
-            style={coverHeight !== undefined ? { height: coverHeight } : undefined}
-          >
-            <CoverImg
-              id={work.id}
-              title={work.title}
-              cover={work.cover}
-              fit="fill"
-              radius={6}
-              requestWidth={requestWidth}
-              loading="lazy"
-            />
-            {isPlaying && (
-              <span
-                className="mll-grid-tile__now inline-flex items-center gap-[1px]"
-                aria-label={isPlaybackActive ? "再生中" : "一時停止中"}
-                title={isPlaybackActive ? "再生中" : "一時停止中"}
-              >
-                {[6, 10, 8].map((height, i) => (
-                  <span
-                    key={height}
-                    aria-hidden="true"
-                    className={cn(
-                      "block w-[2px] origin-bottom rounded-[1px] bg-current motion-reduce:animate-none",
-                      isPlaybackActive &&
-                        "motion-safe:animate-[mll-eq-bar_840ms_ease-in-out_infinite]",
-                    )}
-                    style={{ height, animationDelay: `${i * 120}ms` }}
-                  />
-                ))}
-              </span>
-            )}
-          </span>
-          <span className="mll-grid-tile__title">{work.title}</span>
-          <span className="mll-grid-tile__circle">{work.circleName ?? "サークル不明"}</span>
-        </button>
+        <WorkGridRow
+          mode="justified"
+          rowHeight={row.height}
+          entries={row.entries}
+          {...rowTileProps}
+        />
       );
-    },
-    [
-      selectedWorkId,
-      safeTileSize,
-      playingWorkId,
-      isPlaybackActive,
-      onWorkSelect,
-      onWorkPlay,
-      moveTileFocus,
-    ],
-  );
+    }
 
-  const renderRow = useCallback(
-    (rowIndex: number) => {
-      if (gridLayoutMode === "justified" && justifiedLayout) {
-        const row = justifiedRows[rowIndex];
-        if (!row) return null;
-        return (
-          <div className="mll-grid-row">
-            {row.entries.map((entry) =>
-              renderTile(entry.work, entry.flatIndex, entry.width, row.height),
-            )}
-          </div>
-        );
-      }
-
-      const start = rowIndex * columnCount;
-      const rowWorks = works.slice(start, start + columnCount);
-      return (
-        <div
-          className="mll-grid-row mll-grid-row--square"
-          style={
-            {
-              display: "grid",
-              gridTemplateColumns: `repeat(${columnCount}, 1fr)`,
-              gap: `var(--grid-col-gap)`,
-            } as CSSProperties
-          }
-        >
-          {rowWorks.map((work, i) => renderTile(work, start + i, undefined, undefined))}
-        </div>
-      );
-    },
-    [gridLayoutMode, justifiedLayout, justifiedRows, columnCount, works, renderTile],
-  );
+    const start = rowIndex * columnCount;
+    return (
+      <WorkGridRow
+        mode="square"
+        columnCount={columnCount}
+        works={works.slice(start, start + columnCount)}
+        startIndex={start}
+        {...rowTileProps}
+      />
+    );
+  };
 
   return (
     <section ref={paneRef} className="mll-grid-pane" aria-label="作品グリッド">
@@ -536,7 +449,7 @@ export default function WorkGrid({
                     } as CSSProperties
                   }
                 >
-                  {renderRow(virtualRow.index)}
+                  {renderVirtualRow(virtualRow.index)}
                 </div>
               ))}
             </div>

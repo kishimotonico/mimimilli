@@ -5,9 +5,7 @@
 //   MIMIMILLI_DATA_DIR       … DB・cache等のデータルート上書き
 //   MIMIMILLI_DLSITE_CACHE_DB … DLsiteレスポンスキャッシュDBの絶対パス上書き
 //   MIMIMILLI_DLSITE_OFFLINE … trueならDLsiteの実HTTPを遮断（既定 false）
-//   MIMIMILLI_DLSITE_REQUEST_INTERVAL_MS / MIMIMILLI_DLSITE_RETRY_COUNT /
-//   MIMIMILLI_DLSITE_MAX_BACKOFF_MS / MIMIMILLI_DLSITE_TIMEOUT_MS /
-//   MIMIMILLI_DLSITE_USER_AGENT … DLsite実HTTPの制御設定
+//   MIMIMILLI_DLSITE_REQUEST_INTERVAL_MS … DLsite実HTTPの開始間隔（既定 1000ms）
 //   MIMIMILLI_THUMBNAIL_CACHE_DIR … カバーサムネイルのキャッシュ置き場
 //                                   （デフォルト ./data/cache/thumbnails）
 //   MIMIMILLI_MOCK_SCENARIO … fixture アダプタのデータシナリオ

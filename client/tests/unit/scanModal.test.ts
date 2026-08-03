@@ -194,7 +194,7 @@ describe("ScanModal", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("backdropクリックは編集中でも問答無用でモーダルを閉じる（既存挙動を維持）", async () => {
+  it("backdropクリックは編集中は編集だけをキャンセルし、モーダルは閉じない", async () => {
     vi.spyOn(workApi, "getWork").mockResolvedValue(work);
     const onClose = vi.fn();
     renderModal({ onClose });
@@ -206,7 +206,25 @@ describe("ScanModal", () => {
     const dialog = screen.getByRole("dialog", { name: "スキャン" });
     fireEvent.click(dialog);
 
-    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.queryByDisplayValue(work.title)).toBeNull();
+    expect(screen.getByText(work.title)).toBeInTheDocument();
+  });
+
+  it("タイトル編集中の×ボタンは編集だけをキャンセルし、モーダルは閉じない", async () => {
+    vi.spyOn(workApi, "getWork").mockResolvedValue(work);
+    const onClose = vi.fn();
+    renderModal({ onClose });
+
+    await waitFor(() => screen.getByText(work.title));
+    fireEvent.click(screen.getByText(work.title));
+    expect(screen.getByDisplayValue(work.title)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "閉じる" }));
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.queryByDisplayValue(work.title)).toBeNull();
+    expect(screen.getByText(work.title)).toBeInTheDocument();
   });
 
   it("パネル内側のクリックではモーダルを閉じない", () => {

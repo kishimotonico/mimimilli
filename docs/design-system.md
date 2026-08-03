@@ -53,10 +53,10 @@
 top layer によって最前面に重なる（TASK-29）。開閉ライフサイクル・Escapeキャンセル・
 backdropクリックの共通処理は `client/src/shared/ui/useDialogModal.ts` に集約している。
 フォーカストラップと「多重モーダル時は最前面のEscだけが効く」挙動は top layer の
-ブラウザ標準実装に任せる。backdropクリックで閉じるかどうかはモーダルごとに異なり
-（設定モーダル・スキャン結果ポップアップは編集中でも問答無用で閉じる、スマートフォルダー
-エディタは保存中は閉じない）、`useDialogModal` の `handleBackdropClick` に渡す
-コールバックで差分を吸収する。
+ブラウザ標準実装に任せる。Escape・×ボタン・backdropクリックの閉じ方は progressive
+dismissal に統一しており、3経路とも `useDialogModal` の `onClose` 1本に集約する。
+編集中は内側の編集だけをキャンセルしてモーダルは開いたまま、非編集時は閉じる。
+保存中に閉じない等の条件は各モーダルが `onClose` 内で判断する。
 
 ## Motion / cursor
 

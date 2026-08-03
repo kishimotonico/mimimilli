@@ -4,7 +4,7 @@ title: DLsiteキャッシュのHTML実サイズとgzip圧縮率を実測してdo
 status: To Do
 assignee: []
 created_date: '2026-07-26 02:02'
-updated_date: '2026-07-29 18:26'
+updated_date: '2026-08-02 16:04'
 labels: []
 dependencies: []
 priority: low
@@ -71,4 +71,6 @@ TASK-93.1 の計画時に「HTMLの実サイズとgzip圧縮率を実測し、�
 - 圧縮率の定義（非圧縮サイズ / gzip 後サイズ の比か、その逆か）
 
 なお AC #4 のとおり、実測のために DLsite へ新規の大量リクエストを送らないこと。既存キャッシュを試料にする。
+
+【2026-08-03 スキップ判断】実測に必要な実キャッシュデータが不足しているため着手見送り。WSLデータルート(~/.local/share/mimimilli/db/dlsite-cache.sqlite)を確認したところ dlsite_html_snapshots は4件のみ（failures 0件）。平均・分布・圧縮率を統計として出せる試料数ではなく、AC#4により新規大量リクエストでの試料収集も不可。通常利用でキャッシュが数百件規模まで溜まった時点で再着手する。
 <!-- SECTION:NOTES:END -->

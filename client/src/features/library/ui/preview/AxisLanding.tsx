@@ -62,6 +62,7 @@ export function AxisLanding({
                 {statusLabel && (
                   <span className="mll-related__status" title={statusLabel}>
                     <I.err size={12} />
+                    <span className="sr-only">{statusLabel}</span>
                   </span>
                 )}
               </div>

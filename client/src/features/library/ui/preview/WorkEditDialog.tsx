@@ -56,7 +56,7 @@ export function WorkEditDialog({
       ref={dialogRef}
       aria-labelledby="work-edit-title"
       onCancel={handleCancel}
-      onClick={(event) => handleBackdropClick(event, onClose)}
+      onClick={(event) => handleBackdropClick(event)}
       className="m-auto w-[min(640px,calc(100vw-32px))] overflow-hidden rounded-[12px] border border-line-soft bg-paper-1 p-0 font-jp text-ink-0 shadow-pop backdrop:bg-[oklch(20%_0.020_70_/_0.3)]"
     >
       <div className="flex max-h-[calc(100vh-32px)] min-h-0 flex-col overflow-hidden">

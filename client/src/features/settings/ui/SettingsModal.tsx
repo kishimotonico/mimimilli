@@ -40,16 +40,14 @@ export default function SettingsModal({
   const [folderDraft, setFolderDraft] = useState(rootFolder ?? "");
   const folderInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Escapeは編集中フォームがあればそちらだけを閉じ、モーダル自体は閉じない
-  const { dialogRef, handleCancel, handleBackdropClick } = useDialogModal({
-    onClose: () => {
-      if (isEditingFolder) {
-        setIsEditingFolder(false);
-        return;
-      }
-      onClose();
-    },
-  });
+  const dismiss = () => {
+    if (isEditingFolder) {
+      setIsEditingFolder(false);
+      return;
+    }
+    onClose();
+  };
+  const { dialogRef, handleCancel, handleBackdropClick } = useDialogModal({ onClose: dismiss });
 
   useEffect(() => {
     if (isEditingFolder) folderInputRef.current?.focus({ preventScroll: true });
@@ -75,7 +73,7 @@ export default function SettingsModal({
       ref={dialogRef}
       aria-label="設定"
       onCancel={handleCancel}
-      onClick={(e) => handleBackdropClick(e, onClose)}
+      onClick={handleBackdropClick}
       className="backdrop:bg-[oklch(20%_0.020_70_/_0.3)]"
       style={{
         width: 440,
@@ -115,7 +113,7 @@ export default function SettingsModal({
         <button
           type="button"
           aria-label="閉じる"
-          onClick={onClose}
+          onClick={dismiss}
           style={{
             width: 26,
             height: 26,

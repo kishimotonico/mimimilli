@@ -37,7 +37,7 @@ function TestDialog({
       ref: dialogRef,
       "data-testid": "dialog",
       onCancel: handleCancel,
-      onClick: (e: React.MouseEvent<HTMLDialogElement>) => handleBackdropClick(e, onClose),
+      onClick: (e: React.MouseEvent<HTMLDialogElement>) => handleBackdropClick(e),
     },
     createElement("input", { ref: inputRef, "data-testid": "input" }),
     createElement("div", { "data-testid": "content" }, "content"),
@@ -149,8 +149,7 @@ describe("useDialogModal", () => {
       return createElement("dialog", {
         ref: dialogRef,
         "data-testid": "dialog",
-        onClick: (e: React.MouseEvent<HTMLDialogElement>) =>
-          handleBackdropClick(e, onClose, () => false),
+        onClick: (e: React.MouseEvent<HTMLDialogElement>) => handleBackdropClick(e, () => false),
       });
     }
     const { getByTestId } = render(createElement(ShouldNotClose));

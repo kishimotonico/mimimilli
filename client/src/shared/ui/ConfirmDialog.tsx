@@ -31,7 +31,7 @@ export default function ConfirmDialog({
       aria-modal="true"
       aria-label={title}
       onCancel={handleCancel}
-      onClick={(event) => handleBackdropClick(event, onCancel)}
+      onClick={(event) => handleBackdropClick(event)}
       className="m-auto w-[360px] overflow-hidden rounded-[12px] border border-line-soft bg-paper-1 p-[18px_18px_14px] font-jp text-ink-0 shadow-pop backdrop:bg-[oklch(20%_0.020_70_/_0.3)]"
     >
       <div className="flex flex-col gap-2.5">
