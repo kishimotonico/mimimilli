@@ -1,6 +1,6 @@
 // work ドメインのスキーマ。client/src/entities/work/model.ts の型を契約として固定したもの。
 import { z } from "zod";
-import { coverKindSchema } from "./cover.ts";
+import { coverKindSchema, coverSchema } from "./cover.ts";
 import { dlsiteStateSchema } from "./dlsite.ts";
 import { trackDurationKindSchema } from "./duration.ts";
 import {
@@ -115,21 +115,7 @@ export type Resume = z.infer<typeof resumeSchema>;
 export const workStatusSchema = z.enum(["ok", "missing", "error"]);
 export type WorkStatus = z.infer<typeof workStatusSchema>;
 
-/**
- * 表示可能なカバー画像。image は作品ルート相対のファイル名、dimensions は EXIF 回転適用後の
- * 表示ピクセル寸法（単位 px）。カバー未設定・計測失敗はいずれも null に投影する
- * （「表示可能なカバーが無い」を意味し、UI は正方形プレースホルダで表す）。
- */
-export const coverSchema = z
-  .object({
-    image: z.string(),
-    dimensions: z.object({
-      width: z.number().int().positive(),
-      height: z.number().int().positive(),
-    }),
-  })
-  .nullable();
-export type Cover = z.infer<typeof coverSchema>;
+export type { Cover } from "./cover.ts";
 
 export const workSummarySchema = z.object({
   id: z.string(),

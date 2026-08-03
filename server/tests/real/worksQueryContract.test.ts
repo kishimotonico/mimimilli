@@ -313,9 +313,10 @@ test("core参照実装とreal SQLのファセット値・件数・順序が同�
     for (const axis of ["tag", "year", "cv", "気分", "シリーズ", "e\u0301x", "unknown"]) {
       assert.deepEqual(repo.getAxisFacets(axis), buildAxisFacets(axis, dataset), axis);
     }
+    const exDurationSec = dataset.reduce((sum, work) => sum + (work.totalDurationSec ?? 0), 0);
     assert.deepEqual(repo.getAxisFacets("e\u0301x"), [
-      { value: "Ａlpha", count: dataset.length },
-      { value: "Ｂeta", count: dataset.length },
+      { value: "Ａlpha", count: dataset.length, durationSec: exDurationSec, covers: [] },
+      { value: "Ｂeta", count: dataset.length, durationSec: exDurationSec, covers: [] },
     ]);
   } finally {
     db.close();

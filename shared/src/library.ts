@@ -1,5 +1,6 @@
 // ライブラリ（検索・分類軸・スマートフォルダー・検索プリセット）の契約。
 import { z } from "zod";
+import { coverValueSchema } from "./cover.ts";
 
 const utf8Encoder = new TextEncoder();
 
@@ -52,6 +53,10 @@ export type FacetAxisId = string;
 export const axisFacetItemSchema = z.object({
   value: z.string(),
   count: z.number().int().nonnegative(),
+  /** その値に属する全作品の再生時間合計（秒）。totalDurationSec が未知（null）の作品は合算から除く */
+  durationSec: z.number().nonnegative(),
+  /** 代表カバー。追加日時の新しい順で最大4件、cover未設定の作品は含まない */
+  covers: z.array(coverValueSchema).max(4),
 });
 export type AxisFacetItem = z.infer<typeof axisFacetItemSchema>;
 export const axisFacetListSchema = z.array(axisFacetItemSchema);

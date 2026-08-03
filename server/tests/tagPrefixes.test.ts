@@ -116,8 +116,8 @@ test("buildAxisFacets: 任意の prefix 軸を集計できる（prefix の大小
   ];
   const items = buildAxisFacets("気分", works);
   assert.deepEqual(items, [
-    { value: "作業用", count: 2 },
-    { value: "睡眠用", count: 2 },
+    { value: "作業用", count: 2, durationSec: 0, covers: [] },
+    { value: "睡眠用", count: 2, durationSec: 0, covers: [] },
   ]);
 });
 
@@ -127,14 +127,43 @@ test("buildAxisFacets: tag 軸は flat・annotated 双方を集計し、year 軸
     summaryWith("W2", ["ASMR"], "2026-01-01T00:00:00.000Z"),
   ];
   assert.deepEqual(buildAxisFacets("tag", works), [
-    { value: "ASMR", count: 2 },
-    { value: "cv/x", count: 1 },
+    { value: "ASMR", count: 2, durationSec: 0, covers: [] },
+    { value: "cv/x", count: 1, durationSec: 0, covers: [] },
   ]);
   assert.deepEqual(
     buildAxisFacets("year", works)
       .map((i) => i.value)
       .sort(),
     ["2025", "2026"],
+  );
+});
+
+test("buildAxisFacets: durationSecは同じ値に属する作品の合計、durationSec未知(null)は合算から除く", () => {
+  const works = [
+    { ...summaryWith("W1", ["気分/睡眠用"]), totalDurationSec: 600 },
+    { ...summaryWith("W2", ["気分/睡眠用"]), totalDurationSec: 1200 },
+    { ...summaryWith("W3", ["気分/睡眠用"]), totalDurationSec: null },
+  ];
+  assert.deepEqual(
+    buildAxisFacets("気分", works).map(({ value, durationSec }) => ({ value, durationSec })),
+    [{ value: "睡眠用", durationSec: 1800 }],
+  );
+});
+
+test("buildAxisFacets: coversは追加日時の新しい順で最大4件、cover未設定の作品は含まない", () => {
+  const cover = (n: number) => ({ image: `cover-${n}.jpg`, dimensions: { width: n, height: n } });
+  const works = [
+    { ...summaryWith("W1", ["気分/睡眠用"], "2026-01-01T00:00:00.000Z"), cover: cover(1) },
+    { ...summaryWith("W2", ["気分/睡眠用"], "2026-01-03T00:00:00.000Z"), cover: cover(2) },
+    { ...summaryWith("W3", ["気分/睡眠用"], "2026-01-02T00:00:00.000Z"), cover: null },
+    { ...summaryWith("W4", ["気分/睡眠用"], "2026-01-05T00:00:00.000Z"), cover: cover(4) },
+    { ...summaryWith("W5", ["気分/睡眠用"], "2026-01-04T00:00:00.000Z"), cover: cover(5) },
+    { ...summaryWith("W6", ["気分/睡眠用"], "2026-01-06T00:00:00.000Z"), cover: cover(6) },
+  ];
+  const [item] = buildAxisFacets("気分", works);
+  assert.deepEqual(
+    item?.covers.map((c) => c.image),
+    ["cover-6.jpg", "cover-4.jpg", "cover-5.jpg", "cover-2.jpg"],
   );
 });
 

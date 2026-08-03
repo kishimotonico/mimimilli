@@ -153,6 +153,14 @@ export interface MediaRootRow {
   physicalPath: string;
 }
 
+/** getAxisFacets の集計クエリが返す生の行。covers は JSON 文字列のまま持つ。 */
+interface AxisFacetRow {
+  value: string;
+  count: number;
+  durationSec: number;
+  coversJson: string;
+}
+
 const RECENT_VIEW_WINDOW_DAYS = 30;
 
 export class PersistentDataError extends Error {
@@ -1103,49 +1111,117 @@ export class WorkRepo {
     return map;
   }
 
+  /**
+   * base CTE（value・work_id・addedAt・duration・cover・tie-break用sort_key を1行1作品で持つ）を
+   * 受け取り、件数・総時間・代表カバー（追加日時降順で最大4件）を1クエリで集計するSQLへ組み立てる。
+   * 代表カバーの選定は ROW_NUMBER ウィンドウ関数、コラージュへの詰め込みは json_group_array で行い、
+   * 値の数に対してN+1にならないようにする。
+   */
+  private static axisFacetSql(baseSelect: string): string {
+    return `
+      WITH base AS (${baseSelect}),
+      ranked_covers AS (
+        SELECT value, cover_image, cover_width, cover_height,
+               ROW_NUMBER() OVER (PARTITION BY value ORDER BY added_at DESC, work_id ASC) AS rn
+        FROM base
+        WHERE cover_image IS NOT NULL AND cover_width IS NOT NULL AND cover_height IS NOT NULL
+      ),
+      covers_agg AS (
+        SELECT value,
+               json_group_array(
+                 json_object(
+                   'image', cover_image,
+                   'dimensions', json_object('width', cover_width, 'height', cover_height)
+                 )
+                 ORDER BY rn
+               ) AS covers_json
+        FROM ranked_covers
+        WHERE rn <= 4
+        GROUP BY value
+      )
+      SELECT
+        base.value AS value,
+        COUNT(*) AS count,
+        COALESCE(SUM(base.duration_sec), 0) AS durationSec,
+        COALESCE(covers_agg.covers_json, '[]') AS coversJson
+      FROM base
+      LEFT JOIN covers_agg ON covers_agg.value = base.value
+      GROUP BY base.value
+      ORDER BY count DESC, base.sort_key COLLATE BINARY ASC, base.value COLLATE BINARY ASC
+    `;
+  }
+
   /** 作品全件のロードをせず、SQLのGROUP BYで軸ファセットを集計する。 */
   getAxisFacets(axis: string): AxisFacetItem[] {
-    if (axis === "year") {
-      return this.db.sqlite
-        .query(`
-          SELECT substr(work_states.added_at, 1, 4) AS value, COUNT(*) AS count
-          FROM main.works
-          INNER JOIN user.work_states AS work_states ON work_states.work_id = works.id
-          GROUP BY value
-          ORDER BY count DESC, value COLLATE BINARY ASC
-        `)
-        .all() as AxisFacetItem[];
-    }
+    let rows: AxisFacetRow[];
 
-    if (axis === "tag") {
+    if (axis === "year") {
+      rows = this.db.sqlite
+        .query(
+          WorkRepo.axisFacetSql(`
+            SELECT substr(work_states.added_at, 1, 4) AS value,
+                   works.id AS work_id,
+                   work_states.added_at AS added_at,
+                   works.total_duration_sec AS duration_sec,
+                   works.cover_image AS cover_image,
+                   works.cover_width AS cover_width,
+                   works.cover_height AS cover_height,
+                   substr(work_states.added_at, 1, 4) AS sort_key
+            FROM main.works
+            INNER JOIN user.work_states AS work_states ON work_states.work_id = works.id
+          `),
+        )
+        .all() as AxisFacetRow[];
+    } else if (axis === "tag") {
       // タグ軸は flat・annotated を問わず全タグを集計する（ADR-0005 追記: prefixグループ見出し表示）。
       // value は完全なタグ文字列なので、tie-break は facet_sort_key（値のみ）ではなく
       // search_key（完全なタグ名の日本語ソートキー）を使う
-      return this.db.sqlite
-        .query(`
-          SELECT tags.name AS value, COUNT(*) AS count
-          FROM main.works
-          INNER JOIN user.work_states AS work_states ON work_states.work_id = works.id
-          INNER JOIN main.work_tags AS work_tags ON work_tags.work_id = works.id
-          INNER JOIN main.tags AS tags ON tags.id = work_tags.tag_id
-          GROUP BY tags.name
-          ORDER BY count DESC, tags.search_key COLLATE BINARY ASC, value COLLATE BINARY ASC
-        `)
-        .all() as AxisFacetItem[];
+      rows = this.db.sqlite
+        .query(
+          WorkRepo.axisFacetSql(`
+            SELECT tags.name AS value,
+                   works.id AS work_id,
+                   work_states.added_at AS added_at,
+                   works.total_duration_sec AS duration_sec,
+                   works.cover_image AS cover_image,
+                   works.cover_width AS cover_width,
+                   works.cover_height AS cover_height,
+                   tags.search_key AS sort_key
+            FROM main.works
+            INNER JOIN user.work_states AS work_states ON work_states.work_id = works.id
+            INNER JOIN main.work_tags AS work_tags ON work_tags.work_id = works.id
+            INNER JOIN main.tags AS tags ON tags.id = work_tags.tag_id
+          `),
+        )
+        .all() as AxisFacetRow[];
+    } else {
+      rows = this.db.sqlite
+        .query(
+          WorkRepo.axisFacetSql(`
+            SELECT substr(tags.name, instr(tags.name, '/') + 1) AS value,
+                   works.id AS work_id,
+                   work_states.added_at AS added_at,
+                   works.total_duration_sec AS duration_sec,
+                   works.cover_image AS cover_image,
+                   works.cover_width AS cover_width,
+                   works.cover_height AS cover_height,
+                   tags.facet_sort_key AS sort_key
+            FROM main.works
+            INNER JOIN user.work_states AS work_states ON work_states.work_id = works.id
+            INNER JOIN main.work_tags AS work_tags ON work_tags.work_id = works.id
+            INNER JOIN main.tags AS tags ON tags.id = work_tags.tag_id
+            WHERE substr(tags.name, 1, instr(tags.name, '/') - 1) = ?
+          `),
+        )
+        .all(axis) as AxisFacetRow[];
     }
 
-    return this.db.sqlite
-      .query(`
-        SELECT substr(tags.name, instr(tags.name, '/') + 1) AS value, COUNT(*) AS count
-        FROM main.works
-        INNER JOIN user.work_states AS work_states ON work_states.work_id = works.id
-        INNER JOIN main.work_tags AS work_tags ON work_tags.work_id = works.id
-        INNER JOIN main.tags AS tags ON tags.id = work_tags.tag_id
-        WHERE substr(tags.name, 1, instr(tags.name, '/') - 1) = ?
-        GROUP BY value
-        ORDER BY count DESC, tags.facet_sort_key COLLATE BINARY ASC, value COLLATE BINARY ASC
-      `)
-      .all(axis) as AxisFacetItem[];
+    return rows.map((row) => ({
+      value: row.value,
+      count: row.count,
+      durationSec: row.durationSec,
+      covers: JSON.parse(row.coversJson) as AxisFacetItem["covers"],
+    }));
   }
 
   async getWork(id: string): Promise<Work | null> {

@@ -5,33 +5,53 @@ import { parseTag } from "@mimimilli/shared";
 import type { AxisFacetItem, WorkSummary } from "@mimimilli/shared";
 import { compareJapaneseSortKeys, compareUtf8Bytes } from "./japaneseSortKey.ts";
 
-/** 指定された分類軸について、works から値ごとの件数を集計し count 降順で返す。
+/** 代表カバーとして残す最大件数（値一覧の2×2コラージュ用、ADR-0012 §5） */
+const MAX_COVERS = 4;
+
+/** 指定された分類軸について、works から値ごとの件数・総時間・代表カバーを集計し count 降順で返す。
  *  axis は正規形（小文字）を前提とする */
 export function buildAxisFacets(axis: string, works: WorkSummary[]): AxisFacetItem[] {
-  const counts = new Map<string, number>();
+  const membersByValue = new Map<string, WorkSummary[]>();
+
+  const addMember = (value: string, work: WorkSummary) => {
+    const members = membersByValue.get(value);
+    if (members) {
+      members.push(work);
+    } else {
+      membersByValue.set(value, [work]);
+    }
+  };
 
   for (const work of works) {
     if (axis === "tag") {
       // タグ軸は flat・annotated を問わず全タグを集計する（prefix グループ見出し付き表示用）。
       // value は完全なタグ文字列（例: "cv/藤田茜"）を保持し、AND 絞り込みへそのまま使える
       for (const tag of work.tags) {
-        counts.set(tag, (counts.get(tag) ?? 0) + 1);
+        addMember(tag, work);
       }
     } else if (axis === "year") {
-      const year = work.addedAt.slice(0, 4);
-      counts.set(year, (counts.get(year) ?? 0) + 1);
+      addMember(work.addedAt.slice(0, 4), work);
     } else {
       for (const tag of work.tags) {
         const parsed = parseTag(tag);
         if (parsed.kind === "annotated" && parsed.prefix === axis) {
-          counts.set(parsed.value, (counts.get(parsed.value) ?? 0) + 1);
+          addMember(parsed.value, work);
         }
       }
     }
   }
 
-  return [...counts.entries()]
-    .map(([value, count]) => ({ value, count }))
+  return [...membersByValue.entries()]
+    .map(([value, members]) => ({
+      value,
+      count: members.length,
+      durationSec: members.reduce((sum, work) => sum + (work.totalDurationSec ?? 0), 0),
+      covers: [...members]
+        .sort((a, b) => compareUtf8Bytes(b.addedAt, a.addedAt))
+        .map((work) => work.cover)
+        .filter((cover) => cover !== null)
+        .slice(0, MAX_COVERS),
+    }))
     .sort(
       (a, b) =>
         b.count - a.count ||
