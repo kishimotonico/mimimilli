@@ -93,6 +93,18 @@ describe("WorkGrid virtual scrolling", () => {
     clearResizeObservers();
   });
 
+  it("マウント直後（ResizeObserver発火前）でも layout effect の同期測定で列数が確定する", () => {
+    // ResizeObserver のコールバックをまだ一度も flush していない状態で列数（columnCount）を検証する。
+    // containerWidth が 0 のままだと columnCount=1 に落ちて空白同然のレイアウトになるため、
+    // useLayoutEffect による getBoundingClientRect() 同期測定で正しい列数が出ることを確認する。
+    const { container } = renderWorkGrid({ props: { works: createWorks(100) } });
+
+    const row = container.querySelector(".mll-grid-row--square");
+    expect(row).not.toBeNull();
+    // containerWidth=800, tileSize=160 → columnCount≈5
+    expect((row as HTMLElement).style.gridTemplateColumns).toBe("repeat(5, 1fr)");
+  });
+
   it("renders far fewer tiles than total works for 10,000 items", async () => {
     renderWorkGrid({ props: { works: createWorks(10_000) } });
     await act(() => flushAllResizeObservers({ width: 800, height: 600 }));

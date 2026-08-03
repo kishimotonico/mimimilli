@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -133,8 +134,12 @@ export default function WorkGrid({
   const [containerWidth, setContainerWidth] = useState(0);
   const [paddingEnd, setPaddingEnd] = useState(GRID_PADDING_END_BASE);
 
-  useEffect(() => {
+  // layout effect でマウント直後に同期測定してから初回ペイントさせる。
+  // ResizeObserver のコールバックはブラウザが非同期にスケジュールするため、
+  // それだけに頼るとマウント直後の1フレームが containerWidth=0 のまま描画され空白になる。
+  useLayoutEffect(() => {
     if (!gridEl) return;
+    setContainerWidth(gridEl.getBoundingClientRect().width);
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (entry) setContainerWidth(entry.contentRect.width);
