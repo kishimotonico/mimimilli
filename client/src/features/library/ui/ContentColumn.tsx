@@ -32,6 +32,7 @@ interface ContentColumnProps {
   isPlaybackActive?: boolean;
   isLoading?: boolean;
   isError?: boolean;
+  isPending?: boolean;
   /** タグ軸・ファセット軸一覧（facetItems）自体の取得状態。作品一覧の isLoading/isError とは
    *  別のクエリ（GET /axes/:axis）のため区別する（R2: 軸切替時の見出し固着調査） */
   isFacetLoading?: boolean;
@@ -80,7 +81,7 @@ interface TagAxisContentProps {
   facetItems: AxisFacetItem[];
   tagPrefixes: TagPrefix[];
   selectedTags: string[];
-  worksCount: number;
+  worksTotal?: number;
   worksQueryKey: string;
   /** タグ軸ファセット自体の取得状態（作品一覧の isLoading/isError とは別系統） */
   isFacetLoading?: boolean;
@@ -95,7 +96,7 @@ function TagAxisContent({
   facetItems,
   tagPrefixes,
   selectedTags,
-  worksCount,
+  worksTotal,
   worksQueryKey,
   isFacetLoading,
   isFacetError,
@@ -114,7 +115,7 @@ function TagAxisContent({
     <div className="mle-col is-content">
       <div className="mle-col__hd">
         <span>タグ</span>
-        <span className="count">{facetItems.length} 件</span>
+        {!isFacetLoading && <span className="count">{facetItems.length} 件</span>}
       </div>
       {selectedTags.length > 0 && (
         <div className="mll-tagband">
@@ -135,7 +136,7 @@ function TagAxisContent({
               </span>
             </React.Fragment>
           ))}
-          <span className="mll-tagband__count">{worksCount} 件</span>
+          {worksTotal != null && <span className="mll-tagband__count">{worksTotal} 件</span>}
         </div>
       )}
       <div ref={listRef} className="mle-col__list">
@@ -240,7 +241,7 @@ function FacetAxisContent({
     <div className="mle-col is-content">
       <div className="mle-col__hd">
         <span>{getAxisLabel(axis, tagPrefixes)}</span>
-        <span className="count">{facetItems.length} 件</span>
+        {!isFacetLoading && <span className="count">{facetItems.length} 件</span>}
       </div>
       <div ref={listRef} className="mle-col__list">
         {isFacetLoading ? (
@@ -309,7 +310,6 @@ function FacetAxisContent({
 interface WorksListContentProps {
   axis: AxisId;
   works: WorkListItem[];
-  facetItems: AxisFacetItem[];
   worksQueryKey: string;
   tagPrefixes: TagPrefix[];
   selectedWorkId: string | null;
@@ -318,6 +318,7 @@ interface WorksListContentProps {
   isPlaybackActive?: boolean;
   isLoading?: boolean;
   isError?: boolean;
+  isPending?: boolean;
   hasNextPage?: boolean;
   worksTotal?: number;
   isFetchingNextPage?: boolean;
@@ -330,7 +331,6 @@ interface WorksListContentProps {
 function WorksListContent({
   axis,
   works,
-  facetItems,
   worksQueryKey,
   tagPrefixes,
   selectedWorkId,
@@ -339,6 +339,7 @@ function WorksListContent({
   isPlaybackActive,
   isLoading,
   isError,
+  isPending = false,
   hasNextPage = false,
   worksTotal,
   isFetchingNextPage = false,
@@ -347,8 +348,6 @@ function WorksListContent({
   onClearSearch,
   onRetryWorks,
 }: WorksListContentProps) {
-  const hd = facetItems.length > 0 ? `${facetItems.length} 件` : `${works.length} 件`;
-
   const listRef = useRef<HTMLDivElement>(null);
   const [paddingEnd, setPaddingEnd] = useState(LIST_PADDING_END_BASE);
 
@@ -414,10 +413,10 @@ function WorksListContent({
   );
 
   return (
-    <div className="mle-col is-content">
+    <div className={`mle-col is-content ${isPending ? "is-pending" : ""}`}>
       <div className="mle-col__hd">
         <span>{isSmartAxis(axis) ? "スマートフォルダー" : "作品"}</span>
-        <span className="count">{hd}</span>
+        {worksTotal != null && <span className="count">{worksTotal} 件</span>}
       </div>
       <div ref={listRef} className="mle-col__list">
         {isLoading ? (
@@ -490,6 +489,7 @@ export default function ContentColumn({
   isPlaybackActive,
   isLoading,
   isError,
+  isPending,
   isFacetLoading,
   isFacetError,
   isTagPrefixesError,
@@ -511,7 +511,7 @@ export default function ContentColumn({
         facetItems={facetItems}
         tagPrefixes={tagPrefixes}
         selectedTags={selectedTags}
-        worksCount={works.length}
+        worksTotal={worksTotal}
         worksQueryKey={worksQueryKey}
         isFacetLoading={isFacetLoading}
         isFacetError={isFacetError}
@@ -542,7 +542,6 @@ export default function ContentColumn({
     <WorksListContent
       axis={axis}
       works={works}
-      facetItems={facetItems}
       worksQueryKey={worksQueryKey}
       tagPrefixes={tagPrefixes}
       selectedWorkId={selectedWorkId}
@@ -551,6 +550,7 @@ export default function ContentColumn({
       isPlaybackActive={isPlaybackActive}
       isLoading={isLoading}
       isError={isError}
+      isPending={isPending}
       hasNextPage={hasNextPage}
       worksTotal={worksTotal}
       isFetchingNextPage={isFetchingNextPage}

@@ -8,6 +8,7 @@ import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, afterEach } from "vitest";
 import AddressBar from "../../src/app/ui/AddressBar";
+import { LibraryNavigationProvider } from "../../src/features/library/ui/LibraryNavigationProvider";
 import { appModeAtom } from "../../src/features/navigation/model/navigationAtoms";
 import {
   activeAxisAtom,
@@ -35,7 +36,11 @@ function renderAddressBar(options?: {
     createElement(
       QueryClientProvider,
       { client: queryClient },
-      createElement(JotaiProvider, { store }, createElement(AddressBar)),
+      createElement(
+        JotaiProvider,
+        { store },
+        createElement(LibraryNavigationProvider, null, createElement(AddressBar)),
+      ),
     ),
   );
 

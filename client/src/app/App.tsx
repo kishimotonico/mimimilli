@@ -21,6 +21,7 @@ import { resolveAppStartupState } from "./model/resolveAppStartupState";
 import SetupScreen from "../features/setup/ui/SetupScreen";
 import StartupErrorScreen from "./ui/StartupErrorScreen";
 import DlsiteNotificationModals from "../features/library/ui/DlsiteNotificationModals";
+import { LibraryNavigationProvider } from "../features/library/ui/LibraryNavigationProvider";
 import GlobalToast from "./ui/GlobalToast";
 import type { ActiveModal } from "./model/activeModal";
 import type { Work, WorkListItem } from "@mimimilli/shared";
@@ -169,60 +170,62 @@ export default function App() {
   }
 
   return (
-    <AppShell
-      topBar={
-        <TopBar
-          onOpenScan={handleOpenScanModal}
-          onSettings={() => setActiveModal("settings")}
-          notificationBell={
-            <NotificationBell
-              onOpenScanResult={handleOpenScanModal}
-              onOpenNotificationModal={setActiveModal}
-            />
-          }
-        />
-      }
-      addressBar={<AddressBar />}
-      leftNav={<LeftNav />}
-      body={
-        <AppBody
-          rootFolder={rootFolder}
-          onPlay={handlePlay}
-          onResume={handleResume}
-          onTogglePlay={player.togglePlay}
-        />
-      }
-      transportBar={<PlayerDock />}
-      fullScreenPlayer={<FullScreenPlayerGate />}
-      overlays={
-        <>
-          <PlayerRuntime />
-          <NavigationHistorySync />
-          {activeModal === "settings" && (
-            <Suspense fallback={null}>
-              <SettingsModal
-                rootFolder={settings?.rootFolder ?? null}
-                lastScanTime={settings?.lastScanTime ?? null}
-                onClose={handleCloseModal}
-                onOpenScan={() => setActiveModal("scan")}
-                onChangeFolder={handleChangeFolder}
-                onExport={handleExport}
+    <LibraryNavigationProvider>
+      <AppShell
+        topBar={
+          <TopBar
+            onOpenScan={handleOpenScanModal}
+            onSettings={() => setActiveModal("settings")}
+            notificationBell={
+              <NotificationBell
+                onOpenScanResult={handleOpenScanModal}
+                onOpenNotificationModal={setActiveModal}
               />
-            </Suspense>
-          )}
-          {activeModal === "scan" && (
-            <Suspense fallback={null}>
-              <ScanModal
-                lastScanTime={settings?.lastScanTime ?? null}
-                onClose={handleCloseModal}
-                onOpenRjCodeMissing={() => setActiveModal("rj-missing")}
-              />
-            </Suspense>
-          )}
-          <DlsiteNotificationModals activeModal={activeModal} onClose={handleCloseModal} />
-          <GlobalToast />
-        </>
-      }
-    />
+            }
+          />
+        }
+        addressBar={<AddressBar />}
+        leftNav={<LeftNav />}
+        body={
+          <AppBody
+            rootFolder={rootFolder}
+            onPlay={handlePlay}
+            onResume={handleResume}
+            onTogglePlay={player.togglePlay}
+          />
+        }
+        transportBar={<PlayerDock />}
+        fullScreenPlayer={<FullScreenPlayerGate />}
+        overlays={
+          <>
+            <PlayerRuntime />
+            <NavigationHistorySync />
+            {activeModal === "settings" && (
+              <Suspense fallback={null}>
+                <SettingsModal
+                  rootFolder={settings?.rootFolder ?? null}
+                  lastScanTime={settings?.lastScanTime ?? null}
+                  onClose={handleCloseModal}
+                  onOpenScan={() => setActiveModal("scan")}
+                  onChangeFolder={handleChangeFolder}
+                  onExport={handleExport}
+                />
+              </Suspense>
+            )}
+            {activeModal === "scan" && (
+              <Suspense fallback={null}>
+                <ScanModal
+                  lastScanTime={settings?.lastScanTime ?? null}
+                  onClose={handleCloseModal}
+                  onOpenRjCodeMissing={() => setActiveModal("rj-missing")}
+                />
+              </Suspense>
+            )}
+            <DlsiteNotificationModals activeModal={activeModal} onClose={handleCloseModal} />
+            <GlobalToast />
+          </>
+        }
+      />
+    </LibraryNavigationProvider>
   );
 }

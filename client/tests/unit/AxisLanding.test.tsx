@@ -1,7 +1,3 @@
-// TASK-88: axis-landing プレビューのページング200件頭打ち対策。
-// /works はページングエンベロープの total を返す（WORKS_DEFAULT_PAGE_SIZE=200 上限）ため、
-// 件数表示は読み込み済み works.length ではなく total を優先する（smartFolderView と同じ設計）。
-
 import { describe, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach } from "vitest";
@@ -31,7 +27,7 @@ const presentation = {
 };
 
 describe("AxisLanding の件数表示", () => {
-  it("total が渡されたとき、works.length ではなく total を表示する（200件頭打ち対策）", () => {
+  it("total が渡されたとき、works.length ではなく total を表示する", () => {
     render(
       <AxisLanding
         presentation={presentation}
@@ -45,11 +41,19 @@ describe("AxisLanding の件数表示", () => {
     expect(screen.queryByText("200 件")).toBeNull();
   });
 
-  it("total が未指定のときは works.length にフォールバックする", () => {
+  it("total が未確定のときは件数テキストを描画しない", () => {
     render(
       <AxisLanding presentation={presentation} works={createWorks(12)} onSelectWork={() => {}} />,
     );
 
-    expect(screen.getByText("12 件")).toBeTruthy();
+    expect(screen.queryByText(/\d+ 件/)).toBeNull();
+  });
+
+  it("total が 0 のときは 0 件と表示する", () => {
+    render(
+      <AxisLanding presentation={presentation} works={[]} total={0} onSelectWork={() => {}} />,
+    );
+
+    expect(screen.getByText("0 件")).toBeTruthy();
   });
 });

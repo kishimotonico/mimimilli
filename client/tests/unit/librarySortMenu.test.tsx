@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
 import type { SmartFolder } from "@mimimilli/shared";
 import LibrarySortMenu from "../../src/features/library/ui/LibrarySortMenu";
+import { LibraryNavigationProvider } from "../../src/features/library/ui/LibraryNavigationProvider";
 import { activeAxisAtom, sortAtom } from "../../src/features/library/model/atoms";
 import { SMART_FOLDER_QUERY_KEYS } from "../../src/entities/smart-folder/queryKeys";
 
@@ -33,7 +34,11 @@ function renderSortMenu(options?: { axis?: string; sort?: string; smartFolders?:
     createElement(
       QueryClientProvider,
       { client: queryClient },
-      createElement(JotaiProvider, { store }, createElement(LibrarySortMenu)),
+      createElement(
+        JotaiProvider,
+        { store },
+        createElement(LibraryNavigationProvider, null, createElement(LibrarySortMenu)),
+      ),
     ),
   );
 

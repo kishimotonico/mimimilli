@@ -1,12 +1,12 @@
 // TASK doc-4 R2: 分類軸切替時に件数見出しが直前の軸の値のまま固着するという報告
 // （CV→タグで「タグ 8 件」のまま本文「タグがありません」）の機序を、
-// useLibraryQueries が返す facetItems の実際の再レンダリング系列を記録して検証する。
+// useLibrarySupportingQueries が返す facetItems の実際の再レンダリング系列を記録して検証する。
 import { createElement, type ReactNode } from "react";
 import { act, render, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useLibraryQueries } from "../../src/features/library/model/useLibraryQueries";
+import { useLibrarySupportingQueries } from "../../src/features/library/model/useLibraryQueries";
 import type { LibraryViewState } from "../../src/features/library/model/useLibraryNavigation";
 
 function jsonResponse(data: unknown): Response {
@@ -71,7 +71,7 @@ describe("分類軸切替時の facetItems 系列（R2 機序調査）", () => {
     const history: Array<{ axis: string; facetItemsLength: number }> = [];
 
     function Probe({ nav }: { nav: LibraryViewState }) {
-      const { facetItems } = useLibraryQueries(nav, "");
+      const { facetItems } = useLibrarySupportingQueries(nav);
       history.push({ axis: nav.activeAxis, facetItemsLength: facetItems.length });
       return null;
     }
@@ -101,9 +101,7 @@ describe("分類軸切替時の facetItems 系列（R2 機序調査）", () => {
       expect(history.some((h) => h.axis === "tag" && h.facetItemsLength === 0)).toBe(true),
     );
 
-    // 実測: axis が "tag" に切り替わったどの描画でも facetItems が直前軸(cv=8件)の値を
-    // 引きずっていないか。React Query v5 はクエリキー変更時に data を即 undefined へ戻す
-    // ため（placeholderData/keepPreviousData 未指定）、混入は起きないはず。
+    // ファセットは作品結果とは独立したクエリなので、タグ軸描画にCV軸の項目を混在させない。
     const staleTagRenders = history.filter((h) => h.axis === "tag" && h.facetItemsLength === 8);
     expect(staleTagRenders).toEqual([]);
   });

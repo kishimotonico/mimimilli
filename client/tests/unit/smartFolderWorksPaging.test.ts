@@ -1,14 +1,14 @@
 // TASK-74: スマートフォルダー軸の作品一覧ページ蓄積（追加読み込み）の検証。
-// useLibraryQueries の smartWorksQuery を useInfiniteQuery 化し、
+// useSuspenseSmartLibraryWorks の useSuspenseInfiniteQuery により、
 // page=1 取得後に fetchNextPage() で page=2 が連結され、random ソート時は seed が引き継がれる。
 
-import { createElement, type ReactNode } from "react";
+import { createElement, Suspense, type ReactNode } from "react";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WORKS_DEFAULT_PAGE_SIZE } from "@mimimilli/shared";
-import { useLibraryQueries } from "../../src/features/library/model/useLibraryQueries";
+import { useSuspenseSmartLibraryWorks } from "../../src/features/library/model/useLibraryQueries";
 import type { LibraryViewState } from "../../src/features/library/model/useLibraryNavigation";
 import type { WorkListItem } from "@mimimilli/shared";
 
@@ -107,7 +107,7 @@ function smartFolderCallUrls(fetchMock: ReturnType<typeof createFetchMock>): str
     .filter((u) => u.startsWith(`/api/smart-folders/${SMART_FOLDER_ID}/works`));
 }
 
-function renderUseLibraryQueries(nav: LibraryViewState, initialQuery = "") {
+function renderWorks(nav: LibraryViewState, initialQuery = "") {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -115,9 +115,13 @@ function renderUseLibraryQueries(nav: LibraryViewState, initialQuery = "") {
     createElement(
       QueryClientProvider,
       { client: queryClient },
-      createElement(JotaiProvider, { store: createStore() }, children),
+      createElement(
+        JotaiProvider,
+        { store: createStore() },
+        createElement(Suspense, { fallback: null }, children),
+      ),
     );
-  return renderHook(({ q }: { q: string }) => useLibraryQueries(nav, q), {
+  return renderHook(() => useSuspenseSmartLibraryWorks(nav), {
     wrapper,
     initialProps: { q: initialQuery },
   });
@@ -140,7 +144,7 @@ describe("スマートフォルダー軸のページング", () => {
     fetchMock = createFetchMock({ total });
     vi.stubGlobal("fetch", fetchMock);
 
-    const { result } = renderUseLibraryQueries(baseNav);
+    const { result } = renderWorks(baseNav);
 
     await waitFor(() => expect(result.current.works).toHaveLength(WORKS_DEFAULT_PAGE_SIZE));
     expect(smartFolderCallUrls(fetchMock).some((u) => u.includes("page=1"))).toBe(true);
@@ -166,7 +170,7 @@ describe("スマートフォルダー軸のページング", () => {
     fetchMock = createFetchMock({ total });
     vi.stubGlobal("fetch", fetchMock);
 
-    const { result } = renderUseLibraryQueries(baseNav);
+    const { result } = renderWorks(baseNav);
 
     await waitFor(() => expect(result.current.works).toHaveLength(WORKS_DEFAULT_PAGE_SIZE));
     expect(result.current.hasNextPage).toBe(true);
@@ -187,7 +191,7 @@ describe("スマートフォルダー軸のページング", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const { result } = renderUseLibraryQueries(baseNav);
+    const { result } = renderWorks(baseNav);
 
     await waitFor(() => expect(result.current.works).toHaveLength(WORKS_DEFAULT_PAGE_SIZE));
 

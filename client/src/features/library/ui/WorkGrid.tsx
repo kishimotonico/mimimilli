@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -48,6 +49,8 @@ interface WorkGridProps {
   isPlaybackActive?: boolean;
   isLoading: boolean;
   isError: boolean;
+  /** 遷移中は直前の一覧を薄く表示する。 */
+  isPending?: boolean;
   /** 次ページがあるか（追加読み込みボタンの表示判定。TASK-73） */
   hasNextPage?: boolean;
   /** サーバー側の総件数（残件数の表示用） */
@@ -105,6 +108,7 @@ export default function WorkGrid({
   isPlaybackActive = false,
   isLoading,
   isError,
+  isPending = false,
   hasNextPage = false,
   worksTotal,
   isFetchingNextPage = false,
@@ -133,8 +137,12 @@ export default function WorkGrid({
   const [containerWidth, setContainerWidth] = useState(0);
   const [paddingEnd, setPaddingEnd] = useState(GRID_PADDING_END_BASE);
 
-  useEffect(() => {
+  // layout effect でマウント直後に同期測定してから初回ペイントさせる。
+  // ResizeObserver のコールバックはブラウザが非同期にスケジュールするため、
+  // それだけに頼るとマウント直後の1フレームが containerWidth=0 のまま描画され空白になる。
+  useLayoutEffect(() => {
     if (!gridEl) return;
+    setContainerWidth(gridEl.getBoundingClientRect().width);
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (entry) setContainerWidth(entry.contentRect.width);
@@ -375,19 +383,23 @@ export default function WorkGrid({
   };
 
   return (
-    <section ref={paneRef} className="mll-grid-pane" aria-label="作品グリッド">
+    <section
+      ref={paneRef}
+      className={`mll-grid-pane ${isPending ? "is-pending" : ""}`}
+      aria-label="作品グリッド"
+    >
       {isDrilled ? (
         <DrillHeader
           axisLabel={axis}
           value={drillValue}
-          count={works.length}
+          count={worksTotal}
           tagPrefixes={tagPrefixes}
           onBack={onDrillBack}
         />
       ) : (
         <div className="mle-col__hd">
           <span>{isSmartAxis(axis) ? "スマートフォルダー" : "作品"}</span>
-          <span className="count">{works.length} 件</span>
+          {worksTotal != null && <span className="count">{worksTotal} 件</span>}
         </div>
       )}
       <div className="mll-grid-body">

@@ -3,7 +3,8 @@ import { useSetAtom } from "jotai";
 import type { ActiveModal } from "../../../app/model/activeModal";
 import { isDlsiteNotificationModal } from "../../../app/model/activeModal";
 import { setAppModeAtom } from "../../navigation/model/navigationAtoms";
-import { selectLibraryWorkAtom, setLibraryAxisAtom } from "../model/libraryNavigationActions";
+import { selectLibraryWorkAtom } from "../model/libraryNavigationActions";
+import { useLibraryNavigation } from "../model/useLibraryNavigation";
 import DlsiteFetchFailedModal from "./DlsiteFetchFailedModal";
 import DlsiteParseFailedModal from "./DlsiteParseFailedModal";
 import RjCodeMissingModal from "./RjCodeMissingModal";
@@ -18,7 +19,7 @@ export default function DlsiteNotificationModals({
   onClose,
 }: DlsiteNotificationModalsProps) {
   const setAppMode = useSetAtom(setAppModeAtom);
-  const setLibraryAxis = useSetAtom(setLibraryAxisAtom);
+  const { setAxis: setLibraryAxis } = useLibraryNavigation();
   const selectLibraryWork = useSetAtom(selectLibraryWorkAtom);
 
   const handleOpenWork = useCallback(

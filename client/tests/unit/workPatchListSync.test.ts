@@ -1,7 +1,7 @@
 // TASK-153: PATCH 後の一覧キャッシュ同期（3層設計）。
 // アクティブ一覧は直接更新または reset、非表示キャッシュは stale 化のみ。
 
-import { createElement, type ReactNode } from "react";
+import { createElement, Suspense, type ReactNode } from "react";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Provider as JotaiProvider, createStore } from "jotai";
@@ -13,7 +13,11 @@ import {
   type WorkListItem,
 } from "@mimimilli/shared";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
-import { useLibraryQueries } from "../../src/features/library/model/useLibraryQueries";
+import {
+  useLibraryPatchWorkMutation,
+  useLibrarySupportingQueries,
+  useSuspenseNormalLibraryWorks,
+} from "../../src/features/library/model/useLibraryQueries";
 import type { LibraryViewState } from "../../src/features/library/model/useLibraryNavigation";
 
 const baseNav: LibraryViewState = {
@@ -156,7 +160,7 @@ function worksCallUrls(fetchMock: ReturnType<typeof vi.fn>): string[] {
   return fetchMock.mock.calls.map(([input]) => urlOf(input)).filter((u) => isWorksListUrl(u));
 }
 
-function renderUseLibraryQueries(nav: LibraryViewState, options?: { queryClient?: QueryClient }) {
+function renderLibraryHooks(nav: LibraryViewState, options?: { queryClient?: QueryClient }) {
   const queryClient =
     options?.queryClient ??
     new QueryClient({
@@ -166,9 +170,21 @@ function renderUseLibraryQueries(nav: LibraryViewState, options?: { queryClient?
     createElement(
       QueryClientProvider,
       { client: queryClient },
-      createElement(JotaiProvider, { store: createStore() }, children),
+      createElement(
+        JotaiProvider,
+        { store: createStore() },
+        createElement(Suspense, { fallback: null }, children),
+      ),
     );
-  const hook = renderHook(() => useLibraryQueries(nav, ""), { wrapper });
+  const hook = renderHook(
+    () => {
+      const works = useSuspenseNormalLibraryWorks(nav, "");
+      const supporting = useLibrarySupportingQueries(nav);
+      const patchWorkMutation = useLibraryPatchWorkMutation(nav, "");
+      return { ...works, ...supporting, patchWorkMutation };
+    },
+    { wrapper },
+  );
   return { ...hook, queryClient };
 }
 
@@ -188,7 +204,7 @@ describe("作品 PATCH 後の一覧キャッシュ同期", () => {
   });
 
   it("タイトル変更（影響しない条件）ではアクティブ一覧のみ更新し再フェッチしない", async () => {
-    const { result, queryClient } = renderUseLibraryQueries(baseNav);
+    const { result, queryClient } = renderLibraryHooks(baseNav);
 
     await waitFor(() => expect(result.current.works).toHaveLength(WORKS_DEFAULT_PAGE_SIZE));
 
@@ -222,7 +238,7 @@ describe("作品 PATCH 後の一覧キャッシュ同期", () => {
   });
 
   it("ブックマークPATCH後もresumeはサーバーの最新値へ差し替わらずキャッシュ側を維持する（resumeはPATCHと別経路のため）", async () => {
-    const { result } = renderUseLibraryQueries(baseNav);
+    const { result } = renderLibraryHooks(baseNav);
 
     await waitFor(() => expect(result.current.selectedWork).not.toBeNull());
     expect(result.current.selectedWork?.resume).toBeNull();
@@ -263,7 +279,7 @@ describe("作品 PATCH 後の一覧キャッシュ同期", () => {
       pageParams: [{ page: 1, seed: undefined }],
     });
 
-    const { result } = renderUseLibraryQueries(baseNav, { queryClient });
+    const { result } = renderLibraryHooks(baseNav, { queryClient });
 
     await waitFor(() => expect(result.current.works).toHaveLength(WORKS_DEFAULT_PAGE_SIZE));
 
@@ -302,7 +318,7 @@ describe("作品 PATCH 後の一覧キャッシュ同期", () => {
     });
 
     const nav: LibraryViewState = { ...baseNav, activeAxis: "fav" };
-    const { result } = renderUseLibraryQueries(nav, { queryClient });
+    const { result } = renderLibraryHooks(nav, { queryClient });
 
     await waitFor(() => expect(result.current.works).toHaveLength(WORKS_DEFAULT_PAGE_SIZE));
 

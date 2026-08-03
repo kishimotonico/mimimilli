@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import PlayerDock from "../../src/features/player/ui/PlayerDock";
+import { LibraryNavigationProvider } from "../../src/features/library/ui/LibraryNavigationProvider";
 import { playerCoreAtom, playerUiModeAtom } from "../../src/features/player/model/atoms";
 import { PLAYER_CORE_INITIAL } from "../../src/features/player/model/playerController";
 import Presence from "../../src/shared/ui/Presence";
@@ -69,7 +70,9 @@ function renderPlayerDock(uiMode: "bar" | "popup" = "bar") {
   store.set(playerUiModeAtom, uiMode);
   return render(
     <JotaiProvider store={store}>
-      <PlayerDock />
+      <LibraryNavigationProvider>
+        <PlayerDock />
+      </LibraryNavigationProvider>
     </JotaiProvider>,
   );
 }

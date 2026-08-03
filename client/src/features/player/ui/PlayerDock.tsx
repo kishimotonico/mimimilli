@@ -8,10 +8,8 @@ import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useCallback, useState } from "react";
 import { cn } from "../../../shared/lib/cn";
 import Presence from "../../../shared/ui/Presence";
-import {
-  selectLibraryWorkAtom,
-  setLibraryAxisAtom,
-} from "../../library/model/libraryNavigationActions";
+import { selectLibraryWorkAtom } from "../../library/model/libraryNavigationActions";
+import { useLibraryNavigation } from "../../library/model/useLibraryNavigation";
 import { setAppModeAtom } from "../../navigation/model/navigationAtoms";
 import { playerIsActiveAtom, playerUiModeAtom } from "../model/atoms";
 import { usePlayerActions } from "../model/usePlayerActions";
@@ -28,7 +26,7 @@ export default function PlayerDock() {
   const [uiMode, setUiMode] = useAtom(playerUiModeAtom);
   const [switchingUiMode, setSwitchingUiMode] = useState(false);
   const setAppMode = useSetAtom(setAppModeAtom);
-  const setLibraryAxis = useSetAtom(setLibraryAxisAtom);
+  const { setAxis: setLibraryAxis } = useLibraryNavigation();
   const selectLibraryWork = useSetAtom(selectLibraryWorkAtom);
 
   const handleShowPlayingWork = useCallback(() => {

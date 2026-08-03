@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
-import { useAtomValue, useSetAtom } from "jotai";
+import { useAtomValue } from "jotai";
 import { useQuery } from "@tanstack/react-query";
 import type { SortId } from "@mimimilli/shared";
 import { SORT_OPTIONS } from "../model/types";
 import { activeAxisAtom, sortAtom } from "../model/atoms";
-import { setLibrarySortAtom } from "../model/libraryNavigationActions";
+import { useLibraryNavigation } from "../model/useLibraryNavigation";
 import { isSmartAxis, getSmartFolderId } from "../model/axisDefinitions";
 import { listSmartFolders } from "../api";
 import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
@@ -22,7 +22,7 @@ function getSortLabel(sortId: SortId): string | undefined {
 export default function LibrarySortMenu() {
   const activeAxis = useAtomValue(activeAxisAtom);
   const sort = useAtomValue(sortAtom);
-  const setSort = useSetAtom(setLibrarySortAtom);
+  const { setSort } = useLibraryNavigation();
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
 

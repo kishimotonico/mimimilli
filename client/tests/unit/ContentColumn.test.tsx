@@ -408,3 +408,42 @@ describe("ContentColumn エラー・空状態の再試行導線", () => {
     expect(screen.getByText("作品詳細の☆ボタンでお気に入りに追加できます")).toBeTruthy();
   });
 });
+
+describe("ContentColumn の件数表示", () => {
+  it("タグ軸で isFacetLoading のときはファセット件数を描画しない", () => {
+    const { container } = renderContentColumn({
+      axis: "tag",
+      facetItems: [{ value: "ASMR", count: 5 }],
+      isFacetLoading: true,
+    });
+    expect(container.querySelector(".mle-col__hd .count")).toBeNull();
+  });
+
+  it("ファセット軸で isFacetLoading のときはファセット件数を描画しない", () => {
+    const { container } = renderContentColumn({
+      axis: "circle",
+      facetItems: [{ value: "夜想曲", count: 3 }],
+      isFacetLoading: true,
+    });
+    expect(container.querySelector(".mle-col__hd .count")).toBeNull();
+  });
+
+  it("作品一覧で worksTotal が未確定のときは件数テキストを描画しない", () => {
+    const { container } = renderContentColumn({ axis: "all", works: createWorks(12) });
+    expect(container.querySelector(".mle-col__hd .count")).toBeNull();
+  });
+
+  it("作品一覧で worksTotal が 0 のときは 0 件と表示する", () => {
+    const { container } = renderContentColumn({ axis: "fav", works: [], worksTotal: 0 });
+    expect(container.querySelector(".mle-col__hd .count")?.textContent).toBe("0 件");
+  });
+
+  it("作品一覧で worksTotal が渡されたとき、works.length ではなく worksTotal を表示する", () => {
+    const { container } = renderContentColumn({
+      axis: "all",
+      works: createWorks(50),
+      worksTotal: 120,
+    });
+    expect(container.querySelector(".mle-col__hd .count")?.textContent).toBe("120 件");
+  });
+});

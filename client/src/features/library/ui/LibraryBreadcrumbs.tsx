@@ -1,7 +1,7 @@
-import { useAtomValue, useSetAtom } from "jotai";
+import { useAtomValue } from "jotai";
 import Breadcrumbs from "../../../app/ui/Breadcrumbs";
 import { activeAxisAtom, drillValueAtom, buildLibraryAddressPath } from "../model/atoms";
-import { goToLibrarySegmentAtom } from "../model/libraryNavigationActions";
+import { useLibraryNavigation } from "../model/useLibraryNavigation";
 import { useTagPrefixes } from "../model/useTagPrefixes";
 
 export default function LibraryBreadcrumbs() {
@@ -9,7 +9,7 @@ export default function LibraryBreadcrumbs() {
   const drillValue = useAtomValue(drillValueAtom);
   const { tagPrefixes } = useTagPrefixes();
   const path = buildLibraryAddressPath(activeAxis, drillValue, tagPrefixes);
-  const goToSegment = useSetAtom(goToLibrarySegmentAtom);
+  const { goToSegment } = useLibraryNavigation();
 
   return <Breadcrumbs path={path} onNavigate={goToSegment} />;
 }
