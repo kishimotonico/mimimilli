@@ -35,7 +35,7 @@ export default function AxisQuickOverlay({
   onClose,
   panelHandlers,
 }: AxisQuickOverlayProps) {
-  const facetQuery = useAxisFacetsQuery(isOpen ? (axis as FacetAxisId) : null);
+  const facetQuery = useAxisFacetsQuery(isOpen ? (axis as FacetAxisId) : null, selectedTags);
   const panelRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
 

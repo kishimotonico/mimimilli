@@ -167,6 +167,41 @@ test("buildAxisFacets: coversは追加日時の新しい順で最大4件、cover
   );
 });
 
+test("buildAxisFacets: filter を渡すと AND 条件として絞り込んだ集合から集計する（TASK-187）", () => {
+  const works = [
+    summaryWith("W1", ["cv/藤田茜", "ASMR"]),
+    summaryWith("W2", ["cv/霧島レイ", "ASMR"]),
+    summaryWith("W3", ["cv/霧島レイ", "催眠"]),
+  ];
+  // ASMR タグで絞り込むと霧島レイの1件（W3）は集計対象から外れる
+  assert.deepEqual(buildAxisFacets("cv", works, { tags: ["ASMR"], tagOp: "AND" }), [
+    { value: "藤田茜", count: 1, durationSec: 0, covers: [] },
+    { value: "霧島レイ", count: 1, durationSec: 0, covers: [] },
+  ]);
+});
+
+test("buildAxisFacets: filter の axis=year も追加のAND条件として適用する", () => {
+  const works = [
+    summaryWith("W1", ["cv/藤田茜"], "2024-06-01T00:00:00.000Z"),
+    summaryWith("W2", ["cv/藤田茜"], "2025-06-01T00:00:00.000Z"),
+    summaryWith("W3", ["cv/霧島レイ"], "2025-06-01T00:00:00.000Z"),
+  ];
+  assert.deepEqual(buildAxisFacets("cv", works, { axis: "year", axisValue: "2025" }), [
+    { value: "藤田茜", count: 1, durationSec: 0, covers: [] },
+    { value: "霧島レイ", count: 1, durationSec: 0, covers: [] },
+  ]);
+});
+
+test("buildAxisFacets: filterで0件になった値は一覧から除外される", () => {
+  const works = [summaryWith("W1", ["cv/藤田茜", "催眠"])];
+  assert.deepEqual(buildAxisFacets("cv", works, { tags: ["ASMR"], tagOp: "AND" }), []);
+});
+
+test("buildAxisFacets: filterが無ければ従来どおり無絞り込みで集計する（回帰確認）", () => {
+  const works = [summaryWith("W1", ["cv/藤田茜"]), summaryWith("W2", ["cv/霧島レイ"])];
+  assert.deepEqual(buildAxisFacets("cv", works), buildAxisFacets("cv", works, {}));
+});
+
 // ── 候補サジェスト ────────────────────────────────────────────
 
 test("buildTagPrefixCandidates: 未登録 prefix のみを件数降順で返す", () => {

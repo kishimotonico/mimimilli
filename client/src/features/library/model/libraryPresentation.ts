@@ -187,6 +187,19 @@ export function getFacetAxisForQuery(activeAxis: AxisId): FacetAxisId | null {
 }
 
 /**
+ * 軸ファセット取得API（GET /axes/:axis）へ渡す絞り込み。自軸除外カウント（TASK-187）:
+ * 軸Xの値一覧の件数・総時間・代表カバーは、現在のフィルタから軸X由来のフィルタ
+ * （axisOfFilterTag(tag) === axis のもの）を除いた集合に対して集計する。同軸を乗り換える
+ * ときの表示件数が、置き換え後（TASK-182: 通常クリックは置き換え既定）の実結果と一致し、
+ * 他軸フィルタによる0件だらけの空振りも防げる。「選択中の値は特別に残す」という例外は
+ * 自軸除外なら不要（選択中の値自身も他軸フィルタだけを適用した普通の件数で残る）。
+ */
+export function buildAxisFacetFilterParams(axis: AxisId, selectedTags: string[]): TagFilterParams {
+  const otherAxisTags = selectedTags.filter((tag) => axisOfFilterTag(tag) !== axis);
+  return buildTagFilterParams(otherAxisTags);
+}
+
+/**
  * 検索語やタグフィルタが原因で作品一覧が0件になっているかどうか。
  * fav/unplayed 等が本来的に0件のケースとは区別し、原因表示が必要な場合だけ案内する。
  *

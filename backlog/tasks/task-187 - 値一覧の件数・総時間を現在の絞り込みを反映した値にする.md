@@ -1,10 +1,11 @@
 ---
 id: TASK-187
 title: 値一覧の件数・総時間を現在の絞り込みを反映した値にする
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - impl-184
 created_date: '2026-08-04 12:23'
-updated_date: '2026-08-04 12:26'
+updated_date: '2026-08-04 13:38'
 labels: []
 dependencies: []
 priority: medium
@@ -37,13 +38,32 @@ ordinal: 197000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 フィルタが変わるとクエリキーが変わり、キャッシュが正しく分離される
-- [ ] #2 real と fixture の両アダプタが同一の契約で動き、契約テストが通る
-- [ ] #3 1000値規模でフィルタ有無それぞれの応答時間を実測し、タスクの実装ノートに記録している
-- [ ] #4 pnpm check と pnpm test が通る
-- [ ] #5 軸Xの値一覧の件数・総時間は、現在のフィルタから軸X由来のフィルタを除外した集合に対して集計される（自軸除外カウント）
-- [ ] #6 同軸の値を乗り換えるとき、表示される件数が置き換え後の実際の結果件数と一致する
-- [ ] #7 他軸のフィルタ（サークル・year 等）は適用されたまま集計される
-- [ ] #8 代表カバーも同じ自軸除外後の集合から選ばれる
-- [ ] #9 自軸除外後に0件になる値は一覧から除外される
+- [x] #1 フィルタが変わるとクエリキーが変わり、キャッシュが正しく分離される
+- [x] #2 real と fixture の両アダプタが同一の契約で動き、契約テストが通る
+- [x] #3 1000値規模でフィルタ有無それぞれの応答時間を実測し、タスクの実装ノートに記録している
+- [x] #4 pnpm check と pnpm test が通る
+- [x] #5 軸Xの値一覧の件数・総時間は、現在のフィルタから軸X由来のフィルタを除外した集合に対して集計される（自軸除外カウント）
+- [x] #6 同軸の値を乗り換えるとき、表示される件数が置き換え後の実際の結果件数と一致する
+- [x] #7 他軸のフィルタ（サークル・year 等）は適用されたまま集計される
+- [x] #8 代表カバーも同じ自軸除外後の集合から選ばれる
+- [x] #9 自軸除外後に0件になる値は一覧から除外される
 <!-- AC:END -->
+
+
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+実装: 自軸除外カウント方式（統括判断・レビュー反映版）。shared に axisFacetsQuerySchema（tags/tagOp/axis/axisValue）を追加し、GET /axes/:axis がこれを受ける。core/axisFacets.ts の buildAxisFacets(axis, works, filter?) が filterByTags/filterByAxis（worksQuery.ts、TASK-185で export 済み）で集計対象を先に絞り込む。real側は workRepo.ts に queryWorks と共通の WorkRepo.tagAxisConditions(tags, tagOp, axis, axisValue) を切り出し、getAxisFacets の3分岐（year/tag/prefix）すべてにEXISTS述語を追加。自軸除外（selectedTagsからaxisOfFilterTag(tag)===axisのものを除く）はclient側のbuildAxisFacetFilterParams（libraryPresentation.ts）が担い、サーバーは渡されたtags/axisをそのままAND条件として使うだけ（サーバーは「自軸」を知らない）。
+
+クエリキー: WORK_QUERY_KEYS.facets(axis, filterParams) にfilterParamsを含め、useAxisFacetsQuery（AxisValueList本体・クイックオーバーレイ・チップドロップダウンが共有するフック）経由で自動的にキャッシュ分離される。
+
+実測（1000値規模、TASK-178と同じ形状: distinctなcv値1000×5件/値=works 5000件、covers付与3分の2）。WorkRepo.getAxisFacets を10回計測（in-memory SQLite、ローカル環境）:
+- フィルタ無し（従来と同一クエリ形状、ベースライン）: min 8.19ms / avg 8.96ms / max 11.03ms
+- tags AND 1件のEXISTS追加: min 9.76ms / avg 10.13ms / max 10.56ms
+- axis=year（addedAtのsubstr比較、EXISTS無し）: min 6.50ms / avg 6.80ms / max 7.22ms
+- tags AND + axis=year 併用: min 9.24ms / avg 9.63ms / max 10.06ms
+再実行でも同水準を確認（8.37/9.10/11.44、9.77/10.37/10.99、6.12/6.51/7.54、9.20/9.79/10.28）。フィルタ追加によるオーバーヘッドは+1〜2ms程度で、1000値規模でも実用上問題ない水準。ベンチスクリプトはTASK-178と同じ方針でリポジトリに残していない（一時ファイル）。
+
+契約テスト: server/tests/real/worksQueryContract.test.ts に「軸ファセットの絞り込み...もreal SQLとcoreが同値」を追加し、tag/year/cv/サークル/気分/シリーズ の6軸 × 6種のfilter組み合わせでreal⇔fixture(core)の同値を確認。server/tests/tagPrefixes.test.ts に buildAxisFacets のfilter単体テスト（AND絞り込み・axis=year・0件除外・filter省略時の回帰確認）を追加。server/tests/app.test.ts にルートレベルのクエリパース（tags配列・tagOp・axis・axisValue のadapterへの受け渡し、省略時の既定値）を追加。client側は libraryPresentation.test.ts に buildAxisFacetFilterParams の単体テスト、api.test.ts に getAxisFacets のクエリ組み立てテスト、新規 useAxisFacetsQuery.test.ts に自軸除外・クエリキー分離（フィルタ変更で再フェッチ）のフック統合テストを追加。
+<!-- SECTION:NOTES:END -->

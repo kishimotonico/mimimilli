@@ -47,6 +47,7 @@ import { z } from "zod";
 import { japaneseSortKey } from "../../core/japaneseSortKey.ts";
 import { normalizeRjCode } from "../../core/worksQuery.ts";
 import { InvalidResumeError } from "../../adapter.ts";
+import type { AxisFacetsFilter } from "../../adapter.ts";
 import type { Db } from "./db.ts";
 import {
   audioProbeCache,
@@ -744,6 +745,65 @@ export class WorkRepo {
     return new Set(rows.map((row) => row.id));
   }
 
+  /**
+   * タグ AND/OR・組み込み軸（year等）の絞り込み条件を EXISTS 述語として組み立てる。
+   * queryWorks（GET /works・スマートフォルダー評価）と getAxisFacets（GET /axes/:axis、
+   * TASK-187 の自軸除外カウント）で同じ絞り込み意味論を共有するための共通実装。
+   * works.id / work_states.added_at を参照するため、呼び出し元の FROM 句は
+   * main.works と user.work_states（エイリアス work_states）を JOIN 済みである前提。
+   */
+  private static tagAxisConditions(
+    tags: string[],
+    tagOp: "AND" | "OR",
+    axis: string | undefined,
+    axisValue: string | undefined,
+  ): { conditions: string[]; bindings: Array<string | number> } {
+    const conditions: string[] = [];
+    const bindings: Array<string | number> = [];
+
+    const normalizedTags = tags.map(normalizeTag);
+    if (normalizedTags.length > 0) {
+      if (tagOp === "AND") {
+        for (const tag of normalizedTags) {
+          conditions.push(`EXISTS (
+            SELECT 1
+            FROM main.work_tags AS filter_work_tags
+            INNER JOIN main.tags AS filter_tags ON filter_tags.id = filter_work_tags.tag_id
+            WHERE filter_work_tags.work_id = works.id AND filter_tags.name = ?
+          )`);
+          bindings.push(tag);
+        }
+      } else {
+        const placeholders = normalizedTags.map(() => "?").join(", ");
+        conditions.push(`EXISTS (
+          SELECT 1
+          FROM main.work_tags AS filter_work_tags
+          INNER JOIN main.tags AS filter_tags ON filter_tags.id = filter_work_tags.tag_id
+          WHERE filter_work_tags.work_id = works.id
+            AND filter_tags.name IN (${placeholders})
+        )`);
+        bindings.push(...normalizedTags);
+      }
+    }
+
+    if (axis && axisValue) {
+      if (axis === "year") {
+        conditions.push("substr(work_states.added_at, 1, 4) = ?");
+        bindings.push(axisValue);
+      } else {
+        conditions.push(`EXISTS (
+          SELECT 1
+          FROM main.work_tags AS axis_work_tags
+          INNER JOIN main.tags AS axis_tags ON axis_tags.id = axis_work_tags.tag_id
+          WHERE axis_work_tags.work_id = works.id AND axis_tags.name = ?
+        )`);
+        bindings.push(`${axis}/${axisValue}`);
+      }
+    }
+
+    return { conditions, bindings };
+  }
+
   /** ADR-0008: ATTACH JOINした同じ絞り込み集合から件数とページを求める。 */
   queryWorks(params: WorksQuery): WorksPage {
     const seed = params.sort === "random" ? (params.seed ?? randomSeed()) : undefined;
@@ -787,45 +847,14 @@ export class WorkRepo {
       if (rjKey) bindings.push(rjKey);
     }
 
-    const normalizedTags = params.tags.map(normalizeTag);
-    if (normalizedTags.length > 0) {
-      if (params.tagOp === "AND") {
-        for (const tag of normalizedTags) {
-          conditions.push(`EXISTS (
-            SELECT 1
-            FROM main.work_tags AS filter_work_tags
-            INNER JOIN main.tags AS filter_tags ON filter_tags.id = filter_work_tags.tag_id
-            WHERE filter_work_tags.work_id = works.id AND filter_tags.name = ?
-          )`);
-          bindings.push(tag);
-        }
-      } else {
-        const placeholders = normalizedTags.map(() => "?").join(", ");
-        conditions.push(`EXISTS (
-          SELECT 1
-          FROM main.work_tags AS filter_work_tags
-          INNER JOIN main.tags AS filter_tags ON filter_tags.id = filter_work_tags.tag_id
-          WHERE filter_work_tags.work_id = works.id
-            AND filter_tags.name IN (${placeholders})
-        )`);
-        bindings.push(...normalizedTags);
-      }
-    }
-
-    if (params.axis && params.axisValue) {
-      if (params.axis === "year") {
-        conditions.push("substr(work_states.added_at, 1, 4) = ?");
-        bindings.push(params.axisValue);
-      } else {
-        conditions.push(`EXISTS (
-          SELECT 1
-          FROM main.work_tags AS axis_work_tags
-          INNER JOIN main.tags AS axis_tags ON axis_tags.id = axis_work_tags.tag_id
-          WHERE axis_work_tags.work_id = works.id AND axis_tags.name = ?
-        )`);
-        bindings.push(`${params.axis}/${params.axisValue}`);
-      }
-    }
+    const tagAxis = WorkRepo.tagAxisConditions(
+      params.tags,
+      params.tagOp,
+      params.axis,
+      params.axisValue,
+    );
+    conditions.push(...tagAxis.conditions);
+    bindings.push(...tagAxis.bindings);
 
     switch (params.view) {
       case "recent":
@@ -1152,8 +1181,20 @@ export class WorkRepo {
     `;
   }
 
-  /** 作品全件のロードをせず、SQLのGROUP BYで軸ファセットを集計する。 */
-  getAxisFacets(axis: string): AxisFacetItem[] {
+  /** 作品全件のロードをせず、SQLのGROUP BYで軸ファセットを集計する。
+   *  filter が渡された場合、集計対象を先に絞り込む（自軸除外カウント、TASK-187。
+   *  自軸由来のフィルタを除いた集合を渡すのは呼び出し側の責務）。0件になった値は
+   *  GROUP BY の結果に現れないため、自然に一覧から除外される。 */
+  getAxisFacets(axis: string, filter: AxisFacetsFilter = {}): AxisFacetItem[] {
+    const tagAxis = WorkRepo.tagAxisConditions(
+      filter.tags ?? [],
+      filter.tagOp ?? "AND",
+      filter.axis,
+      filter.axisValue,
+    );
+    const filterWhere =
+      tagAxis.conditions.length > 0 ? `WHERE ${tagAxis.conditions.join(" AND ")}` : "";
+
     let rows: AxisFacetRow[];
 
     if (axis === "year") {
@@ -1170,9 +1211,10 @@ export class WorkRepo {
                    substr(work_states.added_at, 1, 4) AS sort_key
             FROM main.works
             INNER JOIN user.work_states AS work_states ON work_states.work_id = works.id
+            ${filterWhere}
           `),
         )
-        .all() as AxisFacetRow[];
+        .all(...tagAxis.bindings) as AxisFacetRow[];
     } else if (axis === "tag") {
       // タグ軸は flat・annotated を問わず全タグを集計する（ADR-0005 追記: prefixグループ見出し表示）。
       // value は完全なタグ文字列なので、tie-break は facet_sort_key（値のみ）ではなく
@@ -1192,10 +1234,15 @@ export class WorkRepo {
             INNER JOIN user.work_states AS work_states ON work_states.work_id = works.id
             INNER JOIN main.work_tags AS work_tags ON work_tags.work_id = works.id
             INNER JOIN main.tags AS tags ON tags.id = work_tags.tag_id
+            ${filterWhere}
           `),
         )
-        .all() as AxisFacetRow[];
+        .all(...tagAxis.bindings) as AxisFacetRow[];
     } else {
+      const prefixConditions = [
+        "substr(tags.name, 1, instr(tags.name, '/') - 1) = ?",
+        ...tagAxis.conditions,
+      ];
       rows = this.db.sqlite
         .query(
           WorkRepo.axisFacetSql(`
@@ -1211,10 +1258,10 @@ export class WorkRepo {
             INNER JOIN user.work_states AS work_states ON work_states.work_id = works.id
             INNER JOIN main.work_tags AS work_tags ON work_tags.work_id = works.id
             INNER JOIN main.tags AS tags ON tags.id = work_tags.tag_id
-            WHERE substr(tags.name, 1, instr(tags.name, '/') - 1) = ?
+            WHERE ${prefixConditions.join(" AND ")}
           `),
         )
-        .all(axis) as AxisFacetRow[];
+        .all(axis, ...tagAxis.bindings) as AxisFacetRow[];
     }
 
     return rows.map((row) => ({

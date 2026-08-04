@@ -51,8 +51,25 @@ export async function searchWorks(
 
 // ── 分類軸ファセット ───────────────────────────────────────────
 
-export async function getAxisFacets(axis: FacetAxisId): Promise<AxisFacetItem[]> {
-  return getParsed(axisFacetListSchema, `/axes/${encodeURIComponent(axis)}`);
+/** 自軸除外後のフィルタ（TASK-187）。フォルダー評価API同様 tags/tagOp/axis/axisValue を渡す */
+export interface AxisFacetsParams {
+  tags?: string[];
+  tagOp?: "AND" | "OR";
+  axis?: string;
+  axisValue?: string;
+}
+
+export async function getAxisFacets(
+  axis: FacetAxisId,
+  filter: AxisFacetsParams = {},
+): Promise<AxisFacetItem[]> {
+  const p = new URLSearchParams();
+  for (const tag of filter.tags ?? []) p.append("tags", tag);
+  if (filter.tagOp) p.set("tagOp", filter.tagOp);
+  if (filter.axis) p.set("axis", filter.axis);
+  if (filter.axisValue) p.set("axisValue", filter.axisValue);
+  const q = p.toString();
+  return getParsed(axisFacetListSchema, `/axes/${encodeURIComponent(axis)}${q ? `?${q}` : ""}`);
 }
 
 // ── タグ prefix 定義（ADR-0005）──────────────────────────────

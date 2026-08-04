@@ -61,6 +61,17 @@ export const smartFolderWorksQuerySchema = worksQuerySchema.pick({
 });
 export type SmartFolderWorksQuery = z.infer<typeof smartFolderWorksQuerySchema>;
 
+/** GET /api/axes/:axis のクエリパラメータ。値一覧の件数・総時間・代表カバーは、渡された
+ *  tags/axis による絞り込み後の集合から集計する（自軸除外カウント、TASK-187）。
+ *  自軸由来のフィルタを除外した集合を渡すのは呼び出し側（client）の責務 */
+export const axisFacetsQuerySchema = worksQuerySchema.pick({
+  tags: true,
+  tagOp: true,
+  axis: true,
+  axisValue: true,
+});
+export type AxisFacetsQuery = z.infer<typeof axisFacetsQuerySchema>;
+
 // ── DLsite 通知 ─────────────────────────────────────────────
 
 /** 通知ベルが表示するDLsite状態の集計。通常の作品一覧とは独立して取得する。 */

@@ -60,6 +60,15 @@ export interface SmartFolderEvalQuery {
   axisValue?: string;
 }
 
+/** GET /axes/:axis のクエリ。tags/axis は集計対象の絞り込み（AND 条件）。
+ *  自軸由来のフィルタを除外した集合を渡すのは呼び出し側（client）の責務（TASK-187） */
+export interface AxisFacetsFilter {
+  tags?: string[];
+  tagOp?: "AND" | "OR";
+  axis?: string;
+  axisValue?: string;
+}
+
 /** 前提条件（ルートフォルダー未設定等）を満たしていない操作。HTTP では 409 conflict */
 export class NotConfiguredError extends Error {}
 
@@ -136,7 +145,7 @@ export interface DataAdapter {
 
   // 分類軸・タグ prefix 定義・スマートフォルダー
   /** axis は "tag" / "year" / 任意の prefix 文字列（正規形・小文字）（ADR-0005） */
-  getAxisFacets(axis: string): Promise<AxisFacetItem[]>;
+  getAxisFacets(axis: string, filter?: AxisFacetsFilter): Promise<AxisFacetItem[]>;
   listTagPrefixes(): Promise<TagPrefix[]>;
   /** 既存の prefix と重複する場合は null（ルートが 409 を返す） */
   createTagPrefix(input: TagPrefixCreate): Promise<TagPrefix | null>;

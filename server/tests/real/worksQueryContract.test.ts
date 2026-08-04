@@ -323,6 +323,39 @@ test("core参照実装とreal SQLのファセット値・件数・順序が同�
   }
 });
 
+test("軸ファセットの絞り込み（自軸除外カウント用フィルタ）もreal SQLとcoreが同値（TASK-187）", () => {
+  const db = openDb({ kind: "memory" });
+  const repo = new WorkRepo(db);
+  try {
+    for (const item of dataset) upsertTestWork(repo, fullWork(item));
+    const filters: Array<{
+      tags?: string[];
+      tagOp?: "AND" | "OR";
+      axis?: string;
+      axisValue?: string;
+    }> = [
+      { tags: ["ASMR"], tagOp: "AND" },
+      { tags: ["ASMR", "催眠"], tagOp: "OR" },
+      { tags: ["asmr", "cv/水瀬なずな"], tagOp: "AND" },
+      { axis: "year", axisValue: recent.slice(0, 4) },
+      { tags: ["ASMR"], tagOp: "AND", axis: "year", axisValue: recent.slice(0, 4) },
+      // 該当作品が無い絞り込みは0件で一覧が空になるはず（除外の同値確認）
+      { tags: ["存在しないタグ"], tagOp: "AND" },
+    ];
+    for (const axis of ["tag", "year", "cv", "サークル", "気分", "シリーズ"]) {
+      for (const filter of filters) {
+        assert.deepEqual(
+          repo.getAxisFacets(axis, filter),
+          buildAxisFacets(axis, dataset, filter),
+          `${axis}: ${JSON.stringify(filter)}`,
+        );
+      }
+    }
+  } finally {
+    db.close();
+  }
+});
+
 function assertSmartFolderEquivalent(
   repo: WorkRepo,
   rules: SmartFolderRule[],

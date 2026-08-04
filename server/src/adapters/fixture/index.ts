@@ -53,6 +53,7 @@ import type {
 import {
   createCoverValidators,
   InvalidResumeError,
+  type AxisFacetsFilter,
   type CoverDescriptor,
   type DataAdapter,
   type MediaKind,
@@ -611,8 +612,8 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
     },
 
     // ── 分類軸・タグ prefix 定義・スマートフォルダー・プリセット ──
-    async getAxisFacets(axis: string): Promise<AxisFacetItem[]> {
-      return buildAxisFacets(axis, state.works);
+    async getAxisFacets(axis: string, filter?: AxisFacetsFilter): Promise<AxisFacetItem[]> {
+      return buildAxisFacets(axis, state.works, filter);
     },
 
     async listTagPrefixes(): Promise<TagPrefix[]> {

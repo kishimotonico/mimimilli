@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ApiRequestError } from "../../src/shared/api/http";
 import {
+  buildAxisFacetFilterParams,
   buildBuiltinAxisTag,
   buildFilterTag,
   buildSmartFolderFilterParams,
@@ -341,5 +342,50 @@ describe("computeCollectionStatsDisplay", () => {
     expect(
       computeCollectionStatsDisplay(false, false, 11, { trackCount: 87, durationSec: 45296 }),
     ).toEqual({ status: "ready", count: 11, trackCount: 87, durationSec: 45296 });
+  });
+});
+
+describe("buildAxisFacetFilterParams（自軸除外カウント、TASK-187）", () => {
+  it("軸Xの値一覧では、軸X由来の実タグを除外してから残りをtags/tagOpへ渡す", () => {
+    // cv 軸を見ているときは cv/* を除外し、他軸（サークル）のフィルタは残す
+    expect(buildAxisFacetFilterParams("cv", ["cv/藤田茜", "サークル/月白製作所"])).toEqual({
+      tags: ["サークル/月白製作所"],
+      tagOp: "AND",
+    });
+  });
+
+  it("フラットタグは tag 軸由来として扱う", () => {
+    expect(buildAxisFacetFilterParams("tag", ["ASMR", "cv/藤田茜"])).toEqual({
+      tags: ["cv/藤田茜"],
+      tagOp: "AND",
+    });
+    expect(buildAxisFacetFilterParams("cv", ["ASMR", "cv/藤田茜"])).toEqual({
+      tags: ["ASMR"],
+      tagOp: "AND",
+    });
+  });
+
+  it("year 軸を見ているときは @year 擬似タグを除外し、他のフィルタは axis/axisValue へ残す", () => {
+    expect(buildAxisFacetFilterParams("year", ["@year/2024", "cv/藤田茜"])).toEqual({
+      tags: ["cv/藤田茜"],
+      tagOp: "AND",
+    });
+  });
+
+  it("他軸を見ているときは year 擬似タグを axis/axisValue として残す", () => {
+    expect(buildAxisFacetFilterParams("cv", ["@year/2024", "サークル/月白製作所"])).toEqual({
+      tags: ["サークル/月白製作所"],
+      tagOp: "AND",
+      axis: "year",
+      axisValue: "2024",
+    });
+  });
+
+  it("軸由来のフィルタしか無ければ空オブジェクトを返す（自軸除外後は無フィルタ集計）", () => {
+    expect(buildAxisFacetFilterParams("cv", ["cv/藤田茜", "cv/霧島レイ"])).toEqual({});
+  });
+
+  it("フィルタが無ければ空オブジェクトを返す", () => {
+    expect(buildAxisFacetFilterParams("cv", [])).toEqual({});
   });
 });

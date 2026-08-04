@@ -160,7 +160,7 @@ export function useLibrarySupportingQueries(nav: LibraryViewState) {
     queryFn: () => searchWorks({ limit: 1 }),
   });
   const facetAxis = getFacetAxisForQuery(nav.activeAxis);
-  const facetQuery = useAxisFacetsQuery(facetAxis);
+  const facetQuery = useAxisFacetsQuery(facetAxis, nav.selectedTags);
   const smartFoldersQuery = useQuery({
     queryKey: SMART_FOLDER_QUERY_KEYS.all(),
     queryFn: listSmartFolders,
