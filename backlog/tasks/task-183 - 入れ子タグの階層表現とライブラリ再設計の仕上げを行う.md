@@ -1,11 +1,11 @@
 ---
 id: TASK-183
 title: 入れ子タグの階層表現とライブラリ再設計の仕上げを行う
-status: In Progress
+status: Done
 assignee:
   - impl-182
 created_date: '2026-08-03 14:46'
-updated_date: '2026-08-04 15:17'
+updated_date: '2026-08-04 15:37'
 labels: []
 dependencies:
   - TASK-182
