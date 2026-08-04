@@ -24,6 +24,18 @@ describe("buildWorksParams", () => {
     ).toBeNull();
   });
 
+  it("returns null for the home axis (dashboard has its own queries)", () => {
+    expect(
+      buildWorksParams({
+        activeAxis: "home",
+        sort: "added-desc",
+        searchQuery: "",
+        selectedTags: [],
+        drillValue: null,
+      }),
+    ).toBeNull();
+  });
+
   it("sets tags/tagOp only on the tag axis with a selection", () => {
     const params = buildWorksParams({
       activeAxis: "tag",
@@ -118,6 +130,14 @@ describe("computeWorksListVisibility", () => {
   it("tag axis cannot show the grid (checkbox list only)", () => {
     expect(computeWorksListVisibility("tag", null, "grid").canShowWorksGrid).toBe(false);
   });
+
+  it("home axis shows neither the works list nor the grid (dedicated dashboard view)", () => {
+    expect(computeWorksListVisibility("home", null, "grid")).toEqual({
+      showsWorksList: false,
+      canShowWorksGrid: false,
+      showGrid: false,
+    });
+  });
 });
 
 describe("computeIsNoResultsDueToFilter", () => {
@@ -159,7 +179,6 @@ describe("computePreviewMode", () => {
         isNoResultsDueToFilter: true,
         selectedWorkId: "w1",
         activeAxis: "all",
-        drillValue: null,
         selectedTags: [],
       }),
     ).toBe("empty");
@@ -171,13 +190,12 @@ describe("computePreviewMode", () => {
         isNoResultsDueToFilter: false,
         selectedWorkId: "w1",
         activeAxis: "all",
-        drillValue: null,
         selectedTags: [],
       }),
     ).toBe("work");
   });
 
-  it("stays in work mode while the selected work is still loading (no flicker to axis-landing/etc.)", () => {
+  it("stays in work mode while the selected work is still loading (no flicker to home/etc.)", () => {
     // selectedWorkIdが立っていればwork詳細データの有無に関わらずworkモードを維持する。
     // 読み込み中/エラーの出し分けはコンポーネント側（PreviewPane/WorkGridInspector）が担う。
     expect(
@@ -185,22 +203,20 @@ describe("computePreviewMode", () => {
         isNoResultsDueToFilter: false,
         selectedWorkId: "w1",
         activeAxis: "circle",
-        drillValue: null,
         selectedTags: [],
       }),
     ).toBe("work");
   });
 
-  it("shows axis landing for an undrilled facet axis", () => {
+  it("shows empty for an undrilled facet axis (placeholder role dropped in phase 1, ADR-0012 §4)", () => {
     expect(
       computePreviewMode({
         isNoResultsDueToFilter: false,
         selectedWorkId: null,
         activeAxis: "circle",
-        drillValue: null,
         selectedTags: [],
       }),
-    ).toBe("axis-landing");
+    ).toBe("empty");
   });
 
   it("shows smart-folder for smart axes", () => {
@@ -209,10 +225,42 @@ describe("computePreviewMode", () => {
         isNoResultsDueToFilter: false,
         selectedWorkId: null,
         activeAxis: "smart-abc",
-        drillValue: null,
         selectedTags: [],
       }),
     ).toBe("smart-folder");
+  });
+
+  it("shows home for the home axis regardless of tag/drill state", () => {
+    expect(
+      computePreviewMode({
+        isNoResultsDueToFilter: false,
+        selectedWorkId: null,
+        activeAxis: "home",
+        selectedTags: [],
+      }),
+    ).toBe("home");
+  });
+
+  it("shows work over home when a work is selected while browsing home", () => {
+    expect(
+      computePreviewMode({
+        isNoResultsDueToFilter: false,
+        selectedWorkId: "w1",
+        activeAxis: "home",
+        selectedTags: [],
+      }),
+    ).toBe("work");
+  });
+
+  it("shows tag-results when the tag axis has selected tags", () => {
+    expect(
+      computePreviewMode({
+        isNoResultsDueToFilter: false,
+        selectedWorkId: null,
+        activeAxis: "tag",
+        selectedTags: ["ASMR"],
+      }),
+    ).toBe("tag-results");
   });
 });
 

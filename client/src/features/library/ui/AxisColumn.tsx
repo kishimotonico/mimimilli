@@ -11,6 +11,8 @@ interface AxisRow {
   isAction?: boolean;
 }
 
+const HOME_AXIS: AxisRow = { id: "home", name: "ホーム", icon: "home" };
+
 const VIEW_AXES: AxisRow[] = [
   { id: "all", name: "すべての作品", icon: "gridS" },
   { id: "recent", name: "最近再生", icon: "refresh" },
@@ -104,6 +106,14 @@ export default function AxisColumn({
         {totalCount != null && <span className="count">{totalCount} 件</span>}
       </div>
       <div className="mle-col__list">
+        <div className="mll-axisgroup">
+          <AxisRowItem
+            ax={HOME_AXIS}
+            isActive={activeAxis === "home"}
+            onSelect={() => onSelectAxis("home")}
+          />
+        </div>
+
         <div className="mll-axisgroup">
           <div className="mll-axisgroup__hd">ビュー</div>
           {VIEW_AXES.map((ax) => (

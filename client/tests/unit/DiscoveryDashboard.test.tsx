@@ -179,7 +179,7 @@ const asyncNoop = async () => {
   throw new Error("not used in this test");
 };
 
-describe("PreviewPane の empty モード", () => {
+describe("PreviewPane のホームビュー（ADR-0012 §4）", () => {
   let fetchMock: ReturnType<typeof createFetchMock>;
 
   beforeEach(() => {
@@ -192,7 +192,6 @@ describe("PreviewPane の empty モード", () => {
   });
 
   const basePreviewPaneProps = {
-    axisLandingPresentation: { panelTitle: "概要", sectionTitle: "サークル", instruction: null },
     selectedWork: null,
     isSelectedWorkLoading: false,
     isSelectedWorkError: false,
@@ -219,7 +218,7 @@ describe("PreviewPane の empty モード", () => {
           ...basePreviewPaneProps,
           mode: "empty",
           showNoResultsHint: true,
-          emptyStats: { status: "ready", count: 0, trackCount: 0, durationSec: 0 },
+          homeStats: { status: "ready", count: 0, trackCount: 0, durationSec: 0 },
         }),
       ),
     );
@@ -229,7 +228,7 @@ describe("PreviewPane の empty モード", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("未選択かつ検索結果ありのときは発見ダッシュボードの3セクションを表示する", async () => {
+  it("軸選択・タグ絞り込みと無関係のプレースホルダーな empty はダッシュボードを出さない", async () => {
     render(
       createElement(
         Wrapper,
@@ -238,7 +237,26 @@ describe("PreviewPane の empty モード", () => {
           ...basePreviewPaneProps,
           mode: "empty",
           showNoResultsHint: false,
-          emptyStats: { status: "ready", count: 3, trackCount: 5, durationSec: 600 },
+          homeStats: { status: "ready", count: 3, trackCount: 5, durationSec: 600 },
+        }),
+      ),
+    );
+
+    expect(screen.getByText("作品を選択してください")).toBeTruthy();
+    expect(screen.queryByText("最近追加")).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("mode='home' では発見ダッシュボードの3セクションを結果面に表示する", async () => {
+    render(
+      createElement(
+        Wrapper,
+        null,
+        createElement(PreviewPane, {
+          ...basePreviewPaneProps,
+          mode: "home",
+          showNoResultsHint: false,
+          homeStats: { status: "ready", count: 3, trackCount: 5, durationSec: 600 },
         }),
       ),
     );
@@ -248,5 +266,6 @@ describe("PreviewPane の empty モード", () => {
       expect(screen.getByText("最近再生")).toBeTruthy();
       expect(screen.getByText("ランダムピック")).toBeTruthy();
     });
+    expect(screen.getByText(/3作品/)).toBeTruthy();
   });
 });

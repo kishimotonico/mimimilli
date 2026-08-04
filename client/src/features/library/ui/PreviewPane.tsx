@@ -1,11 +1,10 @@
 import type { Work, WorkListItem, WorkPatch, SmartFolder } from "@mimimilli/shared";
-import type { AxisLandingPresentation } from "../model/axisLandingPresentation";
 import type { CollectionStatsDisplay, PreviewMode } from "../model/libraryPresentation";
 import CollectionStatus from "./CollectionStatus";
-import { AxisLanding } from "./preview/AxisLanding";
 import { CollectionPlaceholder } from "./preview/CollectionPlaceholder";
 import { DiscoveryDashboard } from "./preview/DiscoveryDashboard";
 import { SmartFolderView } from "./preview/SmartFolderView";
+import { WorkCardGrid } from "./preview/WorkCard";
 import { WorkDetail } from "./preview/WorkDetail";
 
 // ── Main ──────────────────────────────────────────────────────
@@ -13,9 +12,8 @@ import { WorkDetail } from "./preview/WorkDetail";
 interface PreviewPaneProps {
   mode: PreviewMode;
   showNoResultsHint: boolean;
-  /** mode==="empty" かつ showNoResultsHint===false のときに表示する統計 */
-  emptyStats: CollectionStatsDisplay;
-  axisLandingPresentation: AxisLandingPresentation;
+  /** mode==="home" のときに表示するライブラリ全体の統計 */
+  homeStats: CollectionStatsDisplay;
   selectedWork: Work | null;
   /** mode==="work"だがselectedWorkがまだ無いとき（読み込み中/404以外のエラー）の状態。
    *  404は呼び出し元で選択解除されるため、isSelectedWorkError=trueはそれ以外の一時的な失敗のみ */
@@ -42,8 +40,7 @@ interface PreviewPaneProps {
 export default function PreviewPane({
   mode,
   showNoResultsHint,
-  emptyStats,
-  axisLandingPresentation,
+  homeStats,
   selectedWork,
   isSelectedWorkLoading,
   isSelectedWorkError,
@@ -69,9 +66,11 @@ export default function PreviewPane({
       ? "詳細"
       : mode === "smart-folder"
         ? "スマートフォルダー"
-        : mode === "axis-landing"
-          ? axisLandingPresentation.panelTitle
-          : "プレビュー";
+        : mode === "home"
+          ? "ホーム"
+          : mode === "tag-results"
+            ? "絞り込み結果"
+            : "プレビュー";
 
   return (
     <div className="mle-prv">
@@ -100,13 +99,16 @@ export default function PreviewPane({
             <CollectionStatus variant="list" kind="error" onRetry={onRetrySelectedWork} />
           )
         ))}
-      {mode === "axis-landing" && (
-        <AxisLanding
-          presentation={axisLandingPresentation}
-          works={axisWorks}
-          total={axisTotal}
-          onSelectWork={onSelectWork}
-        />
+      {mode === "home" && <DiscoveryDashboard stats={homeStats} onSelectWork={onSelectWork} />}
+      {mode === "tag-results" && (
+        <div className="mle-prv__body">
+          <div className="mle-sect">
+            <span>タグの結果</span>
+            <div className="mle-sect__rule" />
+            {axisTotal != null && <span className="count">{axisTotal} 件</span>}
+          </div>
+          <WorkCardGrid works={axisWorks} onSelectWork={onSelectWork} />
+        </div>
       )}
       {mode === "smart-folder" && smartFolder && (
         <SmartFolderView
@@ -122,7 +124,7 @@ export default function PreviewPane({
             hint="検索条件を変えてみてください"
           />
         ) : (
-          <DiscoveryDashboard stats={emptyStats} onSelectWork={onSelectWork} />
+          <CollectionPlaceholder message="作品を選択してください" />
         ))}
     </div>
   );

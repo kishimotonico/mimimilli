@@ -402,7 +402,7 @@ describe("library api", () => {
   });
 
   it("getAxisFacets fetches /api/axes/:axis", async () => {
-    const mockFacets = [{ value: "cv/水瀬なずな", count: 3 }];
+    const mockFacets = [{ value: "cv/水瀬なずな", count: 3, durationSec: 1200, covers: [] }];
     mockFetch.mockResolvedValue(makeResponse(mockFacets));
     const result = await libraryApi.getAxisFacets("cv");
     expect(mockFetch).toHaveBeenCalledWith("/api/axes/cv");

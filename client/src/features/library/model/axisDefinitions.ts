@@ -23,6 +23,7 @@ const VIEW_AXIS_LABELS: Record<string, string> = {
 const BUILTIN_AXIS_LABELS: Record<string, string> = {
   tag: "タグ",
   year: "追加日",
+  home: "ホーム",
 };
 
 export const VIEW_AXES = new Set<string>(VIEW_AXIS_IDS);
@@ -35,9 +36,14 @@ export function isSmartAxis(axis: AxisId): boolean {
   return axis.startsWith("smart-");
 }
 
-/** ファセット軸 = ビュー・タグ軸・スマート軸以外のすべて（year と任意の prefix 軸） */
+/** ホームビュー（ADR-0012 §4）。軸の選択状態やタグ絞り込みと無関係な発見ダッシュボード */
+export function isHomeAxis(axis: AxisId): boolean {
+  return axis === "home";
+}
+
+/** ファセット軸 = ビュー・タグ軸・ホーム・スマート軸以外のすべて（year と任意の prefix 軸） */
 export function isFacetAxis(axis: AxisId): boolean {
-  return !isViewAxis(axis) && axis !== "tag" && !isSmartAxis(axis);
+  return !isViewAxis(axis) && axis !== "tag" && !isHomeAxis(axis) && !isSmartAxis(axis);
 }
 
 /** スマートフォルダー軸の ID から `smart-` プレフィックスを外す */

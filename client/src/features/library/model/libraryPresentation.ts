@@ -6,9 +6,9 @@ import type { CollectionStats, FacetAxisId } from "@mimimilli/shared";
 import { ApiRequestError } from "../../../shared/api/http";
 import type { WorksQueryParams } from "../api";
 import type { AxisId, SortId, ViewMode } from "./types";
-import { isFacetAxis, isSmartAxis, isViewAxis } from "./axisDefinitions";
+import { isFacetAxis, isHomeAxis, isSmartAxis, isViewAxis } from "./axisDefinitions";
 
-export type PreviewMode = "work" | "axis-landing" | "smart-folder" | "empty";
+export type PreviewMode = "work" | "home" | "tag-results" | "smart-folder" | "empty";
 
 // ── works query のパラメータ ──────────────────────────────────
 
@@ -20,10 +20,11 @@ export interface WorksParamsInput {
   drillValue: string | null;
 }
 
-/** スマートフォルダー軸は別 query（evalSmartFolder）で取得するため、通常の works query は発行しない */
+/** スマートフォルダー軸は別 query（evalSmartFolder）で取得するため、通常の works query は発行しない。
+ *  ホーム軸は軸の絞り込みと無関係な発見ダッシュボードのため、works query 自体を発行しない */
 export function buildWorksParams(input: WorksParamsInput): WorksQueryParams | null {
   const { activeAxis, sort, searchQuery, selectedTags, drillValue } = input;
-  if (isSmartAxis(activeAxis)) return null;
+  if (isSmartAxis(activeAxis) || isHomeAxis(activeAxis)) return null;
 
   const p: WorksQueryParams = { sort };
   if (searchQuery) p.q = searchQuery;
@@ -67,10 +68,12 @@ export function computeWorksListVisibility(
   viewMode: ViewMode,
 ): WorksListVisibility {
   const showsWorksList =
-    !isSmartAxis(activeAxis) && (!isFacetAxis(activeAxis) || drillValue !== null);
+    !isSmartAxis(activeAxis) &&
+    !isHomeAxis(activeAxis) &&
+    (!isFacetAxis(activeAxis) || drillValue !== null);
   const canShowWorksGrid =
     isSmartAxis(activeAxis) ||
-    (!isFacetAxis(activeAxis) && activeAxis !== "tag") ||
+    (!isFacetAxis(activeAxis) && activeAxis !== "tag" && !isHomeAxis(activeAxis)) ||
     (isFacetAxis(activeAxis) && drillValue !== null);
   // ドリル済みファセット軸（例: CV→藤田茜）は、300px固定リスト＋巨大な空プレビュー
   // という体験を避けるため、viewMode（list/grid の永続選好）にかかわらず常に
@@ -165,7 +168,6 @@ export interface PreviewModeInput {
   isNoResultsDueToFilter: boolean;
   selectedWorkId: string | null;
   activeAxis: AxisId;
-  drillValue: string | null;
   selectedTags: string[];
 }
 
@@ -173,13 +175,13 @@ export interface PreviewModeInput {
 // （derived atom にしない — 0件時は選択中の作品が一覧に存在しないため、古い詳細を出さず案内を優先する）
 // selectedWorkId があれば読み込み中・エラーの間も "work" モードに留める（詳細データの
 // 有無はコンポーネント側でloading/error/読み込み済みを出し分ける。ここで弾くと、
-// 読み込み中に一瞬 axis-landing 等へ切り替わってちらつく）。
+// 読み込み中に一瞬 home 等へ切り替わってちらつく）。
 export function computePreviewMode(input: PreviewModeInput): PreviewMode {
-  const { isNoResultsDueToFilter, selectedWorkId, activeAxis, drillValue, selectedTags } = input;
+  const { isNoResultsDueToFilter, selectedWorkId, activeAxis, selectedTags } = input;
   if (isNoResultsDueToFilter) return "empty";
   if (selectedWorkId) return "work";
+  if (isHomeAxis(activeAxis)) return "home";
   if (isSmartAxis(activeAxis)) return "smart-folder";
-  if (isFacetAxis(activeAxis) && !drillValue) return "axis-landing";
-  if (activeAxis === "tag" && selectedTags.length > 0) return "axis-landing";
+  if (activeAxis === "tag" && selectedTags.length > 0) return "tag-results";
   return "empty";
 }

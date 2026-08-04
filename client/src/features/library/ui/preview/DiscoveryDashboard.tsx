@@ -5,62 +5,17 @@ import type { WorksPage } from "@mimimilli/shared";
 import type { CollectionStatsDisplay } from "../../model/libraryPresentation";
 import { searchWorks } from "../../api";
 import { WORK_QUERY_KEYS } from "../../../../entities/work/queryKeys";
-import CoverImg from "../../../../entities/work/ui/CoverImg";
-import { selectFixedCoverThumbnailWidth } from "../../../../entities/work/ui/coverThumbnailWidth";
 import { I } from "../../../../shared/ui/Icon";
 import IconButton from "../../../../shared/ui/IconButton";
 import CollectionStatus from "../CollectionStatus";
 import { formatDuration } from "./format";
+import { WorkCardGrid } from "./WorkCard";
 
 const SECTION_LIMIT = 6;
 const RANDOM_SEED_MAX = 0x7fffffff;
 
 function randomSeed(): number {
   return Math.floor(Math.random() * RANDOM_SEED_MAX);
-}
-
-function DiscoveryCard({
-  work,
-  onSelectWork,
-}: {
-  work: WorksPage["items"][number];
-  onSelectWork: (id: string) => void;
-}) {
-  const statusLabel =
-    work.status === "missing"
-      ? "ファイル欠損"
-      : work.status === "error"
-        ? "メタ読み込みエラー"
-        : null;
-  const meta = [
-    work.circleName,
-    work.totalDurationSec !== null && work.totalDurationSec > 0
-      ? formatDuration(work.totalDurationSec)
-      : null,
-  ].filter(Boolean);
-
-  return (
-    <button type="button" className="mll-related__card" onClick={() => onSelectWork(work.id)}>
-      <div className="mll-related__cover">
-        <CoverImg
-          id={work.id}
-          title={work.title}
-          cover={work.cover}
-          size={80}
-          radius={6}
-          requestWidth={selectFixedCoverThumbnailWidth(80, window.devicePixelRatio)}
-        />
-        {statusLabel && (
-          <span className="mll-related__status" title={statusLabel}>
-            <I.err size={12} />
-            <span className="sr-only">{statusLabel}</span>
-          </span>
-        )}
-      </div>
-      <div className="mll-related__title">{work.title}</div>
-      {meta.length > 0 && <div className="mll-related__meta">{meta.join(" · ")}</div>}
-    </button>
-  );
 }
 
 function DiscoverySection({
@@ -98,11 +53,7 @@ function DiscoverySection({
       ) : query.data.items.length === 0 ? (
         <CollectionStatus variant="grid" kind="empty" message={emptyMessage} />
       ) : (
-        <div className="mll-related">
-          {query.data.items.map((w) => (
-            <DiscoveryCard key={w.id} work={w} onSelectWork={onSelectWork} />
-          ))}
-        </div>
+        <WorkCardGrid works={query.data.items} onSelectWork={onSelectWork} />
       )}
     </div>
   );

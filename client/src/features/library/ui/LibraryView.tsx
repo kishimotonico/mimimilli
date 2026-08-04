@@ -26,14 +26,13 @@ import {
   shouldClearSelectionOnFilterMiss,
   shouldClearSelectionOnWorkNotFound,
 } from "../model/libraryPresentation";
-import { isSmartAxis, getSmartFolderId } from "../model/axisDefinitions";
+import { isHomeAxis, isSmartAxis, getSmartFolderId } from "../model/axisDefinitions";
 import {
   type SmartFolderEditorState,
   closedSmartFolderEditorState,
   createSmartFolderEditorState,
   editSmartFolderEditorState,
 } from "../model/smartFolderEditor";
-import { getAxisLandingPresentation } from "../model/axisLandingPresentation";
 import AxisColumn from "./AxisColumn";
 import ContentColumn from "./ContentColumn";
 import PreviewPane from "./PreviewPane";
@@ -65,6 +64,7 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
 
   const {
     libraryTotal,
+    homeStats,
     facetItems,
     isFacetLoading,
     isFacetError,
@@ -96,15 +96,15 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
   });
 
   // ── 表示導出（純粋計算は model/libraryPresentation に集約） ──
+  const isHome = isHomeAxis(nav.activeAxis);
   const { showGrid } = computeWorksListVisibility(nav.activeAxis, nav.drillValue, viewMode);
   const previewMode = computePreviewMode({
-    isNoResultsDueToFilter,
+    // ホームは works query を発行しないため、他軸から持ち越した0件判定を無視する
+    isNoResultsDueToFilter: isHome ? false : isNoResultsDueToFilter,
     selectedWorkId: nav.selectedWorkId,
     activeAxis: nav.activeAxis,
-    drillValue: nav.drillValue,
     selectedTags: nav.selectedTags,
   });
-  const isAxisFilterApplied = nav.activeAxis === "tag" && nav.selectedTags.length > 0;
 
   // 検索・ドリルの絞り込みで作品一覧が0件になったら、含まれなくなった選択中の
   // 作品詳細が残らないよう選択を解除する。
@@ -175,161 +175,196 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
         }}
       />
 
-      <LibraryWorksBoundary
-        nav={nav}
-        searchQuery={debouncedSearchQuery}
-        viewMode={viewMode}
-        isPending={nav.isPending}
-        onNoResultsChange={setIsNoResultsDueToFilter}
-      >
-        {(result, isPending) => {
-          const worksQueryKey = JSON.stringify({
-            axis: nav.activeAxis,
-            params: result.worksParams,
-          });
-          const collectionStats = computeCollectionStatsDisplay(
-            false,
-            false,
-            result.worksTotal,
-            result.worksStats,
-          );
-          return (
-            <>
-              {showGrid ? (
-                <WorkGrid
-                  axis={nav.activeAxis}
-                  drillValue={nav.drillValue}
-                  works={result.works}
-                  tagPrefixes={tagPrefixes}
-                  worksQueryKey={worksQueryKey}
-                  selectedWorkId={nav.selectedWorkId}
-                  searchQuery={searchQuery}
-                  playingWorkId={playingWorkId}
-                  isPlaybackActive={isPlaybackActive}
-                  isLoading={false}
-                  isError={false}
-                  onRetryWorks={result.refetchWorks}
-                  hasNextPage={result.hasNextPage}
-                  worksTotal={result.worksTotal}
-                  isFetchingNextPage={result.isFetchingNextPage}
-                  onLoadMore={() => void result.fetchNextPage()}
-                  isPending={isPending}
-                  onWorkSelect={nav.selectWork}
-                  onWorkPlay={(work) => onPlay(work, 0)}
-                  onDrillBack={nav.drillBack}
-                  onClearSearch={() => setSearchQuery("")}
-                  onDeselect={() => nav.selectWork(null)}
-                  inspector={
-                    gridInspectorOpen ? (
-                      <WorkGridInspector
-                        hasSelection={nav.selectedWorkId !== null}
-                        work={selectedWork}
-                        isLoading={workDetailQuery.isPending}
-                        isError={workDetailQuery.isError}
-                        onRetry={workDetailQuery.refetch}
-                        collectionStats={collectionStats}
-                        playingTrackIndex={
-                          selectedWork && playingWorkId === selectedWork.id
-                            ? (playingTrackIndex ?? null)
-                            : null
-                        }
-                        isPlaybackActive={isPlaybackActive}
-                        tagSuggestions={tagSuggestions}
-                        isPatching={patchWorkMutation.isPending}
-                        onClose={() => setGridInspectorOpen(false)}
-                        onPlay={handlePlay}
-                        onResume={handleResume}
-                        onTogglePlay={onTogglePlay}
-                        onTagClick={handleTagClick}
-                        onPatchWork={(body) => {
-                          if (!selectedWork) {
-                            return Promise.reject(new Error("更新対象の作品が選択されていません"));
+      {isHome ? (
+        <PreviewPane
+          mode={previewMode}
+          showNoResultsHint={false}
+          homeStats={homeStats}
+          selectedWork={selectedWork}
+          isSelectedWorkLoading={workDetailQuery.isPending}
+          isSelectedWorkError={workDetailQuery.isError}
+          onRetrySelectedWork={workDetailQuery.refetch}
+          smartFolder={null}
+          axisWorks={[]}
+          playingTrackIndex={
+            selectedWork && playingWorkId === selectedWork.id ? (playingTrackIndex ?? null) : null
+          }
+          isPlaybackActive={isPlaybackActive}
+          onPlay={handlePlay}
+          onResume={handleResume}
+          onTogglePlay={onTogglePlay}
+          onSelectWork={nav.selectWork}
+          onTagClick={handleTagClick}
+          tagSuggestions={tagSuggestions}
+          isPatching={patchWorkMutation.isPending}
+          onPatchWork={(body) => {
+            if (!selectedWork) {
+              return Promise.reject(new Error("更新対象の作品が選択されていません"));
+            }
+            return patchWorkMutation.mutateAsync({ workId: selectedWork.id, body });
+          }}
+          onEditSmartFolder={(folder) => {
+            saveSmartFolderMutation.reset();
+            setSmartFolderEditor(editSmartFolderEditorState(folder));
+          }}
+        />
+      ) : (
+        <LibraryWorksBoundary
+          nav={nav}
+          searchQuery={debouncedSearchQuery}
+          viewMode={viewMode}
+          isPending={nav.isPending}
+          onNoResultsChange={setIsNoResultsDueToFilter}
+        >
+          {(result, isPending) => {
+            const worksQueryKey = JSON.stringify({
+              axis: nav.activeAxis,
+              params: result.worksParams,
+            });
+            const collectionStats = computeCollectionStatsDisplay(
+              false,
+              false,
+              result.worksTotal,
+              result.worksStats,
+            );
+            return (
+              <>
+                {showGrid ? (
+                  <WorkGrid
+                    axis={nav.activeAxis}
+                    drillValue={nav.drillValue}
+                    works={result.works}
+                    tagPrefixes={tagPrefixes}
+                    worksQueryKey={worksQueryKey}
+                    selectedWorkId={nav.selectedWorkId}
+                    searchQuery={searchQuery}
+                    playingWorkId={playingWorkId}
+                    isPlaybackActive={isPlaybackActive}
+                    isLoading={false}
+                    isError={false}
+                    onRetryWorks={result.refetchWorks}
+                    hasNextPage={result.hasNextPage}
+                    worksTotal={result.worksTotal}
+                    isFetchingNextPage={result.isFetchingNextPage}
+                    onLoadMore={() => void result.fetchNextPage()}
+                    isPending={isPending}
+                    onWorkSelect={nav.selectWork}
+                    onWorkPlay={(work) => onPlay(work, 0)}
+                    onDrillBack={nav.drillBack}
+                    onClearSearch={() => setSearchQuery("")}
+                    onDeselect={() => nav.selectWork(null)}
+                    inspector={
+                      gridInspectorOpen ? (
+                        <WorkGridInspector
+                          hasSelection={nav.selectedWorkId !== null}
+                          work={selectedWork}
+                          isLoading={workDetailQuery.isPending}
+                          isError={workDetailQuery.isError}
+                          onRetry={workDetailQuery.refetch}
+                          collectionStats={collectionStats}
+                          playingTrackIndex={
+                            selectedWork && playingWorkId === selectedWork.id
+                              ? (playingTrackIndex ?? null)
+                              : null
                           }
-                          return patchWorkMutation.mutateAsync({ workId: selectedWork.id, body });
-                        }}
-                      />
-                    ) : null
-                  }
-                />
-              ) : (
-                <ContentColumn
-                  axis={nav.activeAxis}
-                  works={result.works}
-                  worksQueryKey={worksQueryKey}
-                  facetItems={facetItems}
-                  tagPrefixes={tagPrefixes}
-                  selectedWorkId={nav.selectedWorkId}
-                  selectedTags={nav.selectedTags}
-                  searchQuery={searchQuery}
-                  playingWorkId={playingWorkId}
-                  isPlaybackActive={isPlaybackActive}
-                  isLoading={false}
-                  isError={false}
-                  isPending={isPending}
-                  isFacetLoading={isFacetLoading}
-                  isFacetError={isFacetError}
-                  isTagPrefixesError={isTagPrefixesError}
-                  hasNextPage={result.hasNextPage}
-                  worksTotal={result.worksTotal}
-                  isFetchingNextPage={result.isFetchingNextPage}
-                  onLoadMore={() => void result.fetchNextPage()}
-                  onWorkSelect={nav.selectWork}
-                  onDrillSelect={nav.drillInto}
-                  onTagToggle={nav.toggleTag}
-                  onClearSearch={() => setSearchQuery("")}
-                  onRetryWorks={result.refetchWorks}
-                  onRetryFacets={refetchFacets}
-                  onRetryTagPrefixes={refetchTagPrefixes}
-                />
-              )}
-
-              {!showGrid && (
-                <PreviewPane
-                  mode={previewMode}
-                  showNoResultsHint={isNoResultsDueToFilter}
-                  emptyStats={collectionStats}
-                  axisLandingPresentation={getAxisLandingPresentation(
-                    nav.activeAxis,
-                    isAxisFilterApplied,
-                    tagPrefixes,
-                  )}
-                  selectedWork={selectedWork}
-                  isSelectedWorkLoading={workDetailQuery.isPending}
-                  isSelectedWorkError={workDetailQuery.isError}
-                  onRetrySelectedWork={workDetailQuery.refetch}
-                  smartFolder={activeSmartFolder}
-                  axisWorks={result.works}
-                  axisTotal={result.worksTotal}
-                  smartFolderTotal={result.worksTotal}
-                  playingTrackIndex={
-                    selectedWork && playingWorkId === selectedWork.id
-                      ? (playingTrackIndex ?? null)
-                      : null
-                  }
-                  isPlaybackActive={isPlaybackActive}
-                  onPlay={handlePlay}
-                  onResume={handleResume}
-                  onTogglePlay={onTogglePlay}
-                  onSelectWork={nav.selectWork}
-                  onTagClick={handleTagClick}
-                  tagSuggestions={tagSuggestions}
-                  isPatching={patchWorkMutation.isPending}
-                  onPatchWork={(body) => {
-                    if (!selectedWork) {
-                      return Promise.reject(new Error("更新対象の作品が選択されていません"));
+                          isPlaybackActive={isPlaybackActive}
+                          tagSuggestions={tagSuggestions}
+                          isPatching={patchWorkMutation.isPending}
+                          onClose={() => setGridInspectorOpen(false)}
+                          onPlay={handlePlay}
+                          onResume={handleResume}
+                          onTogglePlay={onTogglePlay}
+                          onTagClick={handleTagClick}
+                          onPatchWork={(body) => {
+                            if (!selectedWork) {
+                              return Promise.reject(
+                                new Error("更新対象の作品が選択されていません"),
+                              );
+                            }
+                            return patchWorkMutation.mutateAsync({
+                              workId: selectedWork.id,
+                              body,
+                            });
+                          }}
+                        />
+                      ) : null
                     }
-                    return patchWorkMutation.mutateAsync({ workId: selectedWork.id, body });
-                  }}
-                  onEditSmartFolder={(folder) => {
-                    saveSmartFolderMutation.reset();
-                    setSmartFolderEditor(editSmartFolderEditorState(folder));
-                  }}
-                />
-              )}
-            </>
-          );
-        }}
-      </LibraryWorksBoundary>
+                  />
+                ) : (
+                  <ContentColumn
+                    axis={nav.activeAxis}
+                    works={result.works}
+                    worksQueryKey={worksQueryKey}
+                    facetItems={facetItems}
+                    tagPrefixes={tagPrefixes}
+                    selectedWorkId={nav.selectedWorkId}
+                    selectedTags={nav.selectedTags}
+                    searchQuery={searchQuery}
+                    playingWorkId={playingWorkId}
+                    isPlaybackActive={isPlaybackActive}
+                    isLoading={false}
+                    isError={false}
+                    isPending={isPending}
+                    isFacetLoading={isFacetLoading}
+                    isFacetError={isFacetError}
+                    isTagPrefixesError={isTagPrefixesError}
+                    hasNextPage={result.hasNextPage}
+                    worksTotal={result.worksTotal}
+                    isFetchingNextPage={result.isFetchingNextPage}
+                    onLoadMore={() => void result.fetchNextPage()}
+                    onWorkSelect={nav.selectWork}
+                    onDrillSelect={nav.drillInto}
+                    onTagToggle={nav.toggleTag}
+                    onClearSearch={() => setSearchQuery("")}
+                    onRetryWorks={result.refetchWorks}
+                    onRetryFacets={refetchFacets}
+                    onRetryTagPrefixes={refetchTagPrefixes}
+                  />
+                )}
+
+                {!showGrid && (
+                  <PreviewPane
+                    mode={previewMode}
+                    showNoResultsHint={isNoResultsDueToFilter}
+                    homeStats={homeStats}
+                    selectedWork={selectedWork}
+                    isSelectedWorkLoading={workDetailQuery.isPending}
+                    isSelectedWorkError={workDetailQuery.isError}
+                    onRetrySelectedWork={workDetailQuery.refetch}
+                    smartFolder={activeSmartFolder}
+                    axisWorks={result.works}
+                    axisTotal={result.worksTotal}
+                    smartFolderTotal={result.worksTotal}
+                    playingTrackIndex={
+                      selectedWork && playingWorkId === selectedWork.id
+                        ? (playingTrackIndex ?? null)
+                        : null
+                    }
+                    isPlaybackActive={isPlaybackActive}
+                    onPlay={handlePlay}
+                    onResume={handleResume}
+                    onTogglePlay={onTogglePlay}
+                    onSelectWork={nav.selectWork}
+                    onTagClick={handleTagClick}
+                    tagSuggestions={tagSuggestions}
+                    isPatching={patchWorkMutation.isPending}
+                    onPatchWork={(body) => {
+                      if (!selectedWork) {
+                        return Promise.reject(new Error("更新対象の作品が選択されていません"));
+                      }
+                      return patchWorkMutation.mutateAsync({ workId: selectedWork.id, body });
+                    }}
+                    onEditSmartFolder={(folder) => {
+                      saveSmartFolderMutation.reset();
+                      setSmartFolderEditor(editSmartFolderEditorState(folder));
+                    }}
+                  />
+                )}
+              </>
+            );
+          }}
+        </LibraryWorksBoundary>
+      )}
 
       {smartFolderEditor.status !== "closed" && (
         <SmartFolderEditorModal

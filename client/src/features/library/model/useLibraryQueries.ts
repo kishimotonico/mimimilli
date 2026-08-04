@@ -28,7 +28,11 @@ import { getAllTags, getWork, patchWork } from "../../../entities/work/api";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
 import { TAG_QUERY_KEYS } from "../../../entities/tag/queryKeys";
-import { buildWorksParams, getFacetAxisForQuery } from "./libraryPresentation";
+import {
+  buildWorksParams,
+  computeCollectionStatsDisplay,
+  getFacetAxisForQuery,
+} from "./libraryPresentation";
 import { useTagPrefixes } from "./useTagPrefixes";
 import { useDebouncedValue } from "../../../shared/lib/useDebouncedValue";
 import { getWorkPatchInvalidationTargets, mergeWorkPatchResponse } from "./workPatchInvalidation";
@@ -139,9 +143,10 @@ function toSuspenseWorksResult(
  * このフックは一覧を取得しない。
  */
 export function useLibrarySupportingQueries(nav: LibraryViewState) {
-  const libraryTotalQuery = useQuery({
+  // limit:1 の全件検索。件数バッジ（libraryTotal）とホームビューの統計表示を兼ねる。
+  const libraryStatsQuery = useQuery({
     queryKey: WORK_QUERY_KEYS.total(),
-    queryFn: () => searchWorks({ limit: 1 }).then((page) => page.total),
+    queryFn: () => searchWorks({ limit: 1 }),
   });
   const facetAxis = getFacetAxisForQuery(nav.activeAxis, nav.drillValue);
   const facetQuery = useQuery({
@@ -166,7 +171,13 @@ export function useLibrarySupportingQueries(nav: LibraryViewState) {
   } = useTagPrefixes();
 
   return {
-    libraryTotal: libraryTotalQuery.data,
+    libraryTotal: libraryStatsQuery.data?.total,
+    homeStats: computeCollectionStatsDisplay(
+      libraryStatsQuery.isLoading,
+      libraryStatsQuery.isError,
+      libraryStatsQuery.data?.total,
+      libraryStatsQuery.data?.stats,
+    ),
     facetItems: facetQuery.data ?? [],
     isFacetLoading: facetQuery.isLoading,
     isFacetError: facetQuery.isError,
