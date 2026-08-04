@@ -48,6 +48,18 @@ export interface ScanOptions {
   beforeFinalize?: () => void;
 }
 
+/** GET /smart-folders/:id/works のクエリ。tags/axis はフォルダーのルールに対する
+ *  追加の AND 条件として適用する（TASK-185）。ソートはフォルダー自身が持つため含まない */
+export interface SmartFolderEvalQuery {
+  page: number;
+  limit: number;
+  seed?: number;
+  tags?: string[];
+  tagOp?: "AND" | "OR";
+  axis?: string;
+  axisValue?: string;
+}
+
 /** 前提条件（ルートフォルダー未設定等）を満たしていない操作。HTTP では 409 conflict */
 export class NotConfiguredError extends Error {}
 
@@ -135,10 +147,7 @@ export interface DataAdapter {
   createSmartFolder(input: SmartFolderCreate): Promise<SmartFolder>;
   updateSmartFolder(id: string, input: SmartFolderUpdate): Promise<SmartFolder | null>;
   deleteSmartFolder(id: string): Promise<boolean>;
-  evalSmartFolder(
-    id: string,
-    query: { page: number; limit: number; seed?: number },
-  ): Promise<WorksPage | null>;
+  evalSmartFolder(id: string, query: SmartFolderEvalQuery): Promise<WorksPage | null>;
 
   // 物理ファイルシステム（Filesモード）
   /** path 省略時はルートフォルダー。ルート配下でない・存在しない場合は null */

@@ -3,7 +3,13 @@
 import type { SmartFolder, SmartFolderRule, WorkSummary } from "@mimimilli/shared";
 import type { WorkSummaryPage } from "./worksQuery.ts";
 import { tagEquals } from "@mimimilli/shared";
-import { computeCollectionStats, createRandomSeed, sortWorkSummaries } from "./worksQuery.ts";
+import {
+  computeCollectionStats,
+  createRandomSeed,
+  filterByAxis,
+  filterByTags,
+  sortWorkSummaries,
+} from "./worksQuery.ts";
 
 /** rules を順に適用し、works をフィルタリングして返す */
 export function evalSmartFolderRules(
@@ -58,14 +64,26 @@ export function evalSmartFolderRules(
 }
 
 /** 保存済みルールと sort を一体で評価し、ページングエンベロープを返す。
+ *  tags/axis はルールに対する追加の AND 条件として適用する（ADR-0012、TASK-185）。
  *  total はソート後・ページング前の評価結果件数。random ソート時は seed を発行・継承する。 */
 export function evalSmartFolder(
   folder: Pick<SmartFolder, "rules" | "sort">,
   works: WorkSummary[],
-  query: { page: number; limit: number; seed?: number },
+  query: {
+    page: number;
+    limit: number;
+    seed?: number;
+    tags?: string[];
+    tagOp?: "AND" | "OR";
+    axis?: string;
+    axisValue?: string;
+  },
 ): WorkSummaryPage {
   const seed = folder.sort === "random" ? (query.seed ?? createRandomSeed()) : undefined;
-  const matched = sortWorkSummaries(evalSmartFolderRules(folder.rules, works), folder.sort, seed);
+  let matched = evalSmartFolderRules(folder.rules, works);
+  matched = filterByTags(matched, query.tags ?? [], query.tagOp ?? "AND");
+  matched = filterByAxis(matched, query.axis, query.axisValue);
+  matched = sortWorkSummaries(matched, folder.sort, seed);
 
   const total = matched.length;
   const stats = computeCollectionStats(matched);

@@ -327,7 +327,15 @@ function assertSmartFolderEquivalent(
   repo: WorkRepo,
   rules: SmartFolderRule[],
   sort: WorksQuery["sort"],
-  query: { page: number; limit: number; seed?: number },
+  query: {
+    page: number;
+    limit: number;
+    seed?: number;
+    tags?: string[];
+    tagOp?: "AND" | "OR";
+    axis?: string;
+    axisValue?: string;
+  },
 ): void {
   const fixture = evalSmartFolder({ rules, sort }, dataset, query);
   const real = querySmartFolderWorks(repo, { rules, sort }, query);
@@ -391,6 +399,34 @@ test("スマートフォルダーのSQL候補絞り込み(第1段)とcore純粋�
       page: 1,
       limit: 6,
       seed: 42,
+    });
+
+    // 保持中フィルタ（tags/axis）はルールに対する追加のAND条件（TASK-185）。
+    // ルールなし（第1段のSQL高速経路）・ルールあり（第2段のcore純粋関数経路）の両方で
+    // real⇔fixtureが同値になることを確認する。
+    assertSmartFolderEquivalent(repo, [], "added-desc", {
+      page: 1,
+      limit: 7,
+      tags: ["ASMR"],
+      tagOp: "AND",
+    });
+    assertSmartFolderEquivalent(repo, [], "added-desc", {
+      page: 1,
+      limit: 7,
+      axis: "year",
+      axisValue: recent.slice(0, 4),
+    });
+    assertSmartFolderEquivalent(repo, [lengthRule(0)], "title-asc", {
+      page: 1,
+      limit: 7,
+      tags: ["cv/水瀬なずな"],
+      tagOp: "AND",
+    });
+    assertSmartFolderEquivalent(repo, [tagRule(["ASMR", "催眠"])], "duration-desc", {
+      page: 1,
+      limit: 7,
+      axis: "year",
+      axisValue: recent.slice(0, 4),
     });
 
     let state = 0x1234abcd;

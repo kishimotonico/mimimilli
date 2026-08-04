@@ -136,6 +136,49 @@ test("保存済み sort を評価結果へ適用する", () => {
   assert.equal(result.total, 4);
 });
 
+test("保持中フィルタ: tags はフォルダーのルールに対する追加のAND条件として適用する（TASK-185）", () => {
+  const rules: SmartFolderRule[] = [
+    { conjunction: "WHERE", field: "長さ", operator: "≥", values: ["3600"] },
+  ];
+  // ルール一致は RJ001/RJ003/RJ004。さらに ASMR タグの AND を重ねると RJ001 だけになる
+  const result = evalSmartFolder({ rules, sort: "added-desc" }, WORKS, {
+    page: 1,
+    limit: 100,
+    tags: ["ASMR"],
+    tagOp: "AND",
+  });
+  assert.deepEqual(
+    result.items.map((w) => w.id),
+    ["RJ001"],
+  );
+  assert.equal(result.total, 1);
+});
+
+test("保持中フィルタ: axis=year（組み込み軸）もルールに対する追加のAND条件として適用する", () => {
+  const yearWorks: WorkSummary[] = [
+    work({ id: "RJ010", tags: ["ASMR"], addedAt: "2024-05-01T00:00:00.000Z" }),
+    work({ id: "RJ011", tags: ["ASMR"], addedAt: "2025-05-01T00:00:00.000Z" }),
+  ];
+  const result = evalSmartFolder({ rules: [], sort: "added-desc" }, yearWorks, {
+    page: 1,
+    limit: 100,
+    axis: "year",
+    axisValue: "2025",
+  });
+  assert.deepEqual(
+    result.items.map((w) => w.id),
+    ["RJ011"],
+  );
+});
+
+test("保持中フィルタが無ければルール適用結果をそのまま返す（回帰確認）", () => {
+  const rules: SmartFolderRule[] = [
+    { conjunction: "WHERE", field: "タグ", operator: "∋", values: ["ASMR"] },
+  ];
+  const result = evalSmartFolder({ rules, sort: "added-desc" }, WORKS, { page: 1, limit: 100 });
+  assert.deepEqual(result.items.map((w) => w.id).sort(), ["RJ001", "RJ002"]);
+});
+
 test("stats: ルール適用後（ページング前）の集合から集計する", () => {
   const statsWorks: WorkSummary[] = [
     work({ id: "RJ001", tags: ["ASMR"], totalDurationSec: 1800, trackCount: 3 }),

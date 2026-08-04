@@ -2,7 +2,7 @@
 // query 結果と Jotai state を組み合わせて「何を表示するか」を決める部分を、
 // コンポーネントの配線から切り離してテスト可能にする。
 
-import type { CollectionStats, FacetAxisId } from "@mimimilli/shared";
+import { parseTag, type CollectionStats, type FacetAxisId } from "@mimimilli/shared";
 import { ApiRequestError } from "../../../shared/api/http";
 import type { WorksQueryParams } from "../api";
 import type { AxisId, SortId, ViewMode } from "./types";
@@ -98,6 +98,35 @@ export function buildFilterTag(axis: AxisId, value: string): string {
   return `${axis}/${value}`;
 }
 
+// ── 軸レール・チップの入口共通「置き換え既定」（ADR-0012 §7・TASK-182） ─────
+
+/** タグの「同じ軸/グループ」判定キー。クイックオーバーレイ・チップドロップダウン・
+ *  結果面の値タイル/行のクリック（置き換え既定）が、置き換え対象を絞るのに使う。
+ *  組み込み軸（擬似タグ）は軸ごと、facet 軸由来の実タグ（prefix付き）は prefix ごと、
+ *  フラットタグは1グループにまとめる（tag 軸の値一覧が同じグルーピングで表示するため）。 */
+export function tagFilterGroupKey(tag: string): string {
+  const builtin = parseBuiltinAxisTag(tag);
+  if (builtin) return `@${builtin.axis}`;
+  const parsed = parseTag(tag);
+  return parsed.kind === "flat" ? "" : parsed.prefix;
+}
+
+/** タグ文字列が属する軸ID。チップの兄弟値ドロップダウンで問い合わせる facet 軸を
+ *  決めるのに使う。フラットタグは "tag" 軸（値一覧に全フラットタグが並ぶ）を返す。 */
+export function axisOfFilterTag(tag: string): AxisId {
+  const builtin = parseBuiltinAxisTag(tag);
+  if (builtin) return builtin.axis;
+  const parsed = parseTag(tag);
+  return parsed.kind === "flat" ? "tag" : parsed.prefix;
+}
+
+/** 置き換え選択の計算（純粋関数）。同じ tagFilterGroupKey のタグを外してから追加する。
+ *  replaceLibraryTagAtom / replaceLibraryTagAndShowWorksAtom が共有する（TASK-182）。 */
+export function computeReplacedTags(prev: string[], tag: string): string[] {
+  const group = tagFilterGroupKey(tag);
+  return [...prev.filter((t) => tagFilterGroupKey(t) !== group), tag];
+}
+
 // ── works query のパラメータ ──────────────────────────────────
 
 export interface WorksParamsInput {
@@ -107,28 +136,49 @@ export interface WorksParamsInput {
   selectedTags: string[];
 }
 
+/** selectedTagsAtom から実タグ AND 条件・組み込み軸フィルタを取り出し、works query の
+ *  フィールドへ変換する。通常の works query（buildWorksParams）とスマートフォルダー評価
+ *  （buildSmartFolderFilterParams）で共通のロジック。 */
+export interface TagFilterParams {
+  tags?: string[];
+  tagOp?: "AND";
+  axis?: "year";
+  axisValue?: string;
+}
+
+function buildTagFilterParams(selectedTags: string[]): TagFilterParams {
+  const { tags, yearValue } = splitSelectedTags(selectedTags);
+  const params: TagFilterParams = {};
+  if (tags.length > 0) {
+    params.tags = tags;
+    params.tagOp = "AND";
+  }
+  if (yearValue !== null) {
+    params.axis = "year";
+    params.axisValue = yearValue;
+  }
+  return params;
+}
+
 /** works 種の結果面（ビュー軸・スマートフォルダー軸）以外は works query を発行しない。
  *  スマートフォルダーは別 query（evalSmartFolder）で取得する。 */
 export function buildWorksParams(input: WorksParamsInput): WorksQueryParams | null {
   const { activeAxis, sort, searchQuery, selectedTags } = input;
   if (computeResultsPaneKind(activeAxis) !== "works" || isSmartAxis(activeAxis)) return null;
 
-  const p: WorksQueryParams = { sort };
+  const p: WorksQueryParams = { sort, ...buildTagFilterParams(selectedTags) };
   if (searchQuery) p.q = searchQuery;
   if (isViewAxis(activeAxis) && activeAxis !== "all") {
     p.view = activeAxis as WorksQueryParams["view"];
   }
-
-  const { tags, yearValue } = splitSelectedTags(selectedTags);
-  if (tags.length > 0) {
-    p.tags = tags;
-    p.tagOp = "AND";
-  }
-  if (yearValue !== null) {
-    p.axis = "year";
-    p.axisValue = yearValue;
-  }
   return p;
+}
+
+/** スマートフォルダー評価API（GET /smart-folders/:id/works）へ渡す追加フィルタ。
+ *  フォルダーのルールに対する追加の AND 条件として適用される（ADR-0012、TASK-185）。
+ *  フィルタが無ければキーを持たない空オブジェクトを返す（クエリキーの安定のため）。 */
+export function buildSmartFolderFilterParams(selectedTags: string[]): TagFilterParams {
+  return buildTagFilterParams(selectedTags);
 }
 
 /** ファセット一覧（GET /axes/:axis）を取得すべき軸。value-list 種の結果面のみ */

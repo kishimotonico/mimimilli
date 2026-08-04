@@ -18,7 +18,6 @@ import {
 } from "@mimimilli/shared";
 import {
   searchWorks,
-  getAxisFacets,
   listSmartFolders,
   createSmartFolder,
   updateSmartFolder,
@@ -29,11 +28,13 @@ import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
 import { TAG_QUERY_KEYS } from "../../../entities/tag/queryKeys";
 import {
+  buildSmartFolderFilterParams,
   buildWorksParams,
   computeCollectionStatsDisplay,
   getFacetAxisForQuery,
 } from "./libraryPresentation";
 import { useTagPrefixes } from "./useTagPrefixes";
+import { useAxisFacetsQuery } from "./useAxisFacetsQuery";
 import { useDebouncedValue } from "../../../shared/lib/useDebouncedValue";
 import { getWorkPatchInvalidationTargets, mergeWorkPatchResponse } from "./workPatchInvalidation";
 import {
@@ -97,21 +98,32 @@ export function useLibraryDebouncedSearchQuery(searchQuery: string) {
   return useDebouncedValue(searchQuery, SEARCH_DEBOUNCE_MS, searchQuery === "");
 }
 
-/** Suspense 境界配下でのみ使うスマートフォルダー作品一覧。 */
+/** Suspense 境界配下でのみ使うスマートフォルダー作品一覧。
+ *  保持中のタグ/組み込み軸フィルタをフォルダーのルールへの追加 AND として渡す（TASK-185）。 */
 export function useSuspenseSmartLibraryWorks(nav: LibraryViewState) {
   const smartAxisId = getSmartFolderId(nav.activeAxis);
+  const filterParams = buildSmartFolderFilterParams(nav.selectedTags);
   const query = useSuspenseInfiniteQuery({
-    queryKey: SMART_FOLDER_QUERY_KEYS.works(smartAxisId),
+    queryKey: SMART_FOLDER_QUERY_KEYS.works(smartAxisId, filterParams),
     queryFn: ({ pageParam, signal }) =>
       evalSmartFolder(
         smartAxisId,
-        { page: pageParam.page, limit: WORKS_DEFAULT_PAGE_SIZE, seed: pageParam.seed },
+        {
+          ...filterParams,
+          page: pageParam.page,
+          limit: WORKS_DEFAULT_PAGE_SIZE,
+          seed: pageParam.seed,
+        },
         { signal },
       ),
     initialPageParam: { page: 1, seed: undefined } as WorksPageParam,
     getNextPageParam: getNextWorksPageParam,
   });
-  return toSuspenseWorksResult(query, { smartFolderId: smartAxisId, sort: nav.sort });
+  return toSuspenseWorksResult(query, {
+    smartFolderId: smartAxisId,
+    sort: nav.sort,
+    ...filterParams,
+  });
 }
 
 function toSuspenseWorksResult(
@@ -148,11 +160,7 @@ export function useLibrarySupportingQueries(nav: LibraryViewState) {
     queryFn: () => searchWorks({ limit: 1 }),
   });
   const facetAxis = getFacetAxisForQuery(nav.activeAxis);
-  const facetQuery = useQuery({
-    queryKey: WORK_QUERY_KEYS.facets(facetAxis ?? ""),
-    queryFn: () => getAxisFacets(facetAxis!),
-    enabled: facetAxis !== null,
-  });
+  const facetQuery = useAxisFacetsQuery(facetAxis);
   const smartFoldersQuery = useQuery({
     queryKey: SMART_FOLDER_QUERY_KEYS.all(),
     queryFn: listSmartFolders,
@@ -218,7 +226,10 @@ export function useLibraryPatchWorkMutation(nav: LibraryViewState, searchQuery: 
         selectedTags: nav.selectedTags,
       });
       const activeListQueryKey = isSmartAxis(nav.activeAxis)
-        ? SMART_FOLDER_QUERY_KEYS.works(getSmartFolderId(nav.activeAxis))
+        ? SMART_FOLDER_QUERY_KEYS.works(
+            getSmartFolderId(nav.activeAxis),
+            buildSmartFolderFilterParams(nav.selectedTags),
+          )
         : worksParams !== null
           ? WORK_QUERY_KEYS.list(worksParams)
           : null;

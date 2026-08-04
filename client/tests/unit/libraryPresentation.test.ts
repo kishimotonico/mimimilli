@@ -3,6 +3,7 @@ import { ApiRequestError } from "../../src/shared/api/http";
 import {
   buildBuiltinAxisTag,
   buildFilterTag,
+  buildSmartFolderFilterParams,
   buildWorksParams,
   computeCollectionStatsDisplay,
   computeIsNoResultsDueToFilter,
@@ -209,6 +210,32 @@ describe("buildWorksParams", () => {
         selectedTags: ["year/2025"],
       }),
     ).toEqual({ sort: "added-desc", tags: ["year/2025"], tagOp: "AND" });
+  });
+});
+
+describe("buildSmartFolderFilterParams（スマートフォルダー評価APIへの追加AND条件、TASK-185）", () => {
+  it("フィルタが無ければキーの無い空オブジェクトを返す（クエリキーの安定のため）", () => {
+    expect(buildSmartFolderFilterParams([])).toEqual({});
+  });
+  it("実タグは tags/tagOp として渡す", () => {
+    expect(buildSmartFolderFilterParams(["cv/藤田茜", "サークル/月白製作所"])).toEqual({
+      tags: ["cv/藤田茜", "サークル/月白製作所"],
+      tagOp: "AND",
+    });
+  });
+  it("year 擬似タグは axis/axisValue として渡す", () => {
+    expect(buildSmartFolderFilterParams(["@year/2024"])).toEqual({
+      axis: "year",
+      axisValue: "2024",
+    });
+  });
+  it("実タグとyear擬似タグを同時に渡せる", () => {
+    expect(buildSmartFolderFilterParams(["cv/藤田茜", "@year/2024"])).toEqual({
+      tags: ["cv/藤田茜"],
+      tagOp: "AND",
+      axis: "year",
+      axisValue: "2024",
+    });
   });
 });
 

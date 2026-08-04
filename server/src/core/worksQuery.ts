@@ -86,7 +86,11 @@ function filterByQuery(works: WorkSummary[], q: string): WorkSummary[] {
 }
 
 // タグ絞り込みは完全一致（ADR-0005 決定6。prefix は大文字小文字を無視、値は区別）
-function filterByTags(works: WorkSummary[], tags: string[], tagOp: "AND" | "OR"): WorkSummary[] {
+export function filterByTags(
+  works: WorkSummary[],
+  tags: string[],
+  tagOp: "AND" | "OR",
+): WorkSummary[] {
   if (tags.length === 0) return works;
   if (tagOp === "AND") {
     return works.filter((work) =>
@@ -99,7 +103,7 @@ function filterByTags(works: WorkSummary[], tags: string[], tagOp: "AND" | "OR")
 }
 
 // 軸ドリル。"year" は addedAt の年、それ以外は prefix 軸としてタグの完全一致（ADR-0005）
-function filterByAxis(
+export function filterByAxis(
   works: WorkSummary[],
   axis: WorksQuery["axis"],
   axisValue: WorksQuery["axisValue"],

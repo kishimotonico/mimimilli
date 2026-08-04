@@ -95,12 +95,27 @@ export async function deleteSmartFolder(id: string): Promise<void> {
   await deleteVoid(`/smart-folders/${encodeURIComponent(id)}`);
 }
 
+/** tags/axis はフォルダーのルールに対する追加の AND 条件（ADR-0012、TASK-185） */
+export interface SmartFolderWorksParams {
+  page: number;
+  limit: number;
+  seed?: number;
+  tags?: string[];
+  tagOp?: "AND" | "OR";
+  axis?: string;
+  axisValue?: string;
+}
+
 export async function evalSmartFolder(
   id: string,
-  params: { page: number; limit: number; seed?: number },
+  params: SmartFolderWorksParams,
   options?: { signal?: AbortSignal },
 ): Promise<WorksPage> {
   const p = new URLSearchParams();
+  for (const tag of params.tags ?? []) p.append("tags", tag);
+  if (params.tagOp) p.set("tagOp", params.tagOp);
+  if (params.axis) p.set("axis", params.axis);
+  if (params.axisValue) p.set("axisValue", params.axisValue);
   if (params.seed !== undefined) p.set("seed", String(params.seed));
   p.set("page", String(params.page));
   p.set("limit", String(params.limit));

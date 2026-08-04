@@ -46,6 +46,7 @@ import {
   type DataAdapter,
   type MediaKind,
   type MediaLocation,
+  type SmartFolderEvalQuery,
 } from "../../adapter.ts";
 import type { ScanOptions } from "../../adapter.ts";
 import { isDefaultTitle } from "../../core/dlsiteTitle.ts";
@@ -800,10 +801,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
     async deleteSmartFolder(id: string): Promise<boolean> {
       return repo.deleteSmartFolder(id);
     },
-    async evalSmartFolder(
-      id: string,
-      query: { page: number; limit: number; seed?: number },
-    ): Promise<WorksPage | null> {
+    async evalSmartFolder(id: string, query: SmartFolderEvalQuery): Promise<WorksPage | null> {
       const folder = repo.getSmartFolder(id);
       if (!folder) return null;
       return querySmartFolderWorks(repo, folder, query);

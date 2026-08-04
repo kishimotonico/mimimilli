@@ -1,18 +1,22 @@
 import { toWorkListItem, type SmartFolder, type WorksPage } from "@mimimilli/shared";
 import { evalSmartFolder } from "../../core/smartFolder.ts";
+import type { SmartFolderEvalQuery } from "../../adapter.ts";
 import type { WorkRepo } from "./workRepo.ts";
 
-/** GET /api/smart-folders/:id/works の real 評価経路（ADR-0008）。 */
+/** GET /api/smart-folders/:id/works の real 評価経路（ADR-0008）。
+ *  tags/axis はフォルダーのルールに対する追加の AND 条件として適用する（TASK-185）。 */
 export function querySmartFolderWorks(
   repo: WorkRepo,
   folder: Pick<SmartFolder, "rules" | "sort">,
-  query: { page: number; limit: number; seed?: number },
+  query: SmartFolderEvalQuery,
 ): WorksPage {
   if (folder.rules.length === 0) {
     return repo.queryWorks({
       q: "",
-      tags: [],
-      tagOp: "AND",
+      tags: query.tags ?? [],
+      tagOp: query.tagOp ?? "AND",
+      axis: query.axis,
+      axisValue: query.axisValue,
       sort: folder.sort,
       page: query.page,
       limit: query.limit,

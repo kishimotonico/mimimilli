@@ -48,8 +48,13 @@ export const worksPageSchema = z.object({
 export type WorksPage = z.infer<typeof worksPageSchema>;
 
 /** GET /api/smart-folders/:id/works のクエリパラメータ。
- *  ソートはフォルダー自身が保持するため、page/limit/seed のみを受け取る */
+ *  ソートはフォルダー自身が保持するため含まない。tags/axis はフォルダーのルールに対する
+ *  追加の AND 条件として適用する（ADR-0012、TASK-185） */
 export const smartFolderWorksQuerySchema = worksQuerySchema.pick({
+  tags: true,
+  tagOp: true,
+  axis: true,
+  axisValue: true,
   page: true,
   limit: true,
   seed: true,

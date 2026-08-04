@@ -57,6 +57,7 @@ import {
   type DataAdapter,
   type MediaKind,
   type MediaLocation,
+  type SmartFolderEvalQuery,
 } from "../../adapter.ts";
 import type { ScanOptions } from "../../adapter.ts";
 import { buildAxisFacets } from "../../core/axisFacets.ts";
@@ -679,10 +680,7 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
       return state.smartFolders.length < before;
     },
 
-    async evalSmartFolder(
-      id: string,
-      query: { page: number; limit: number; seed?: number },
-    ): Promise<WorksPage | null> {
+    async evalSmartFolder(id: string, query: SmartFolderEvalQuery): Promise<WorksPage | null> {
       const folder = state.smartFolders.find((f) => f.id === id);
       if (!folder) return null;
       return toListPage(evalSmartFolder(folder, state.works, query));

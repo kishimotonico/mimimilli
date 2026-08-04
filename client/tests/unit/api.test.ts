@@ -427,6 +427,23 @@ describe("library api", () => {
     expect(result).toEqual(mockPage);
   });
 
+  it("evalSmartFolder は tags/axis（保持中フィルタ）もクエリへ渡す（TASK-185）", async () => {
+    mockFetch.mockResolvedValue(
+      makeResponse({ items: [], total: 0, stats: { trackCount: 0, durationSec: 0 } }),
+    );
+    await libraryApi.evalSmartFolder("sf-1", {
+      page: 1,
+      limit: 200,
+      tags: ["cv/藤田茜", "ASMR"],
+      tagOp: "AND",
+      axis: "year",
+      axisValue: "2024",
+    });
+    expect(mockFetch).toHaveBeenCalledWith(
+      "/api/smart-folders/sf-1/works?tags=cv%2F%E8%97%A4%E7%94%B0%E8%8C%9C&tags=ASMR&tagOp=AND&axis=year&axisValue=2024&page=1&limit=200",
+    );
+  });
+
   it("exportLibrary POSTs to /api/export and returns data string", async () => {
     mockFetch.mockResolvedValue(makeResponse({ data: '{"version":1}' }));
     const result = await libraryApi.exportLibrary();
