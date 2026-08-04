@@ -9,9 +9,11 @@ import {
   consumeNavigationHistoryCommitAtom,
   navigationHistoryCommitAtom,
 } from "../../src/features/navigation/model/navigationHistoryAtoms";
+import { activeAxisAtom } from "../../src/features/library/model/atoms";
 import {
   clearLibraryTagsAtom,
   selectLibraryWorkAtom,
+  selectSoleLibraryTagAtom,
   setLibraryAxisAtom,
   toggleLibraryTagAtom,
 } from "../../src/features/library/model/libraryNavigationActions";
@@ -89,6 +91,59 @@ describe("toggleLibraryTagAtom は全軸共通のタグフィルタへの追加�
     store.set(toggleLibraryTagAtom, "cv/藤田茜");
 
     expect(store.get(selectedTagsAtom)).toEqual(["サークル/月白製作所"]);
+  });
+});
+
+describe("toggleLibraryTagAtom: year は単一選択（別の年を選ぶと前の選択を置き換える）", () => {
+  it("別の年を追加すると前の年の選択を取り除いてから追加する", () => {
+    const store = createStore();
+    store.set(selectedTagsAtom, ["cv/藤田茜", "@year/2023"]);
+
+    store.set(toggleLibraryTagAtom, "@year/2024");
+
+    expect(store.get(selectedTagsAtom)).toEqual(["cv/藤田茜", "@year/2024"]);
+  });
+
+  it("同じ年をもう一度選ぶとトグルとして解除する", () => {
+    const store = createStore();
+    store.set(selectedTagsAtom, ["@year/2024"]);
+
+    store.set(toggleLibraryTagAtom, "@year/2024");
+
+    expect(store.get(selectedTagsAtom)).toEqual([]);
+  });
+
+  it("実タグ year/2025（予約文字なし）は単一選択の対象にならず通常のタグとして共存する", () => {
+    const store = createStore();
+    store.set(selectedTagsAtom, ["year/2025"]);
+
+    store.set(toggleLibraryTagAtom, "@year/2024");
+
+    expect(store.get(selectedTagsAtom)).toEqual(["year/2025", "@year/2024"]);
+  });
+});
+
+describe("selectSoleLibraryTagAtom: 作品詳細のタグクリックはタグ軸へ切り替えつつそのタグだけを選択する", () => {
+  it("既存の絞り込み・軸が何であってもそのタグだけを選択した状態になる", () => {
+    const store = createStore();
+    store.set(activeAxisAtom, "circle");
+    store.set(selectedTagsAtom, ["cv/藤田茜", "サークル/月白製作所"]);
+
+    store.set(selectSoleLibraryTagAtom, "genre/ASMR");
+
+    expect(store.get(activeAxisAtom)).toBe("tag");
+    expect(store.get(selectedTagsAtom)).toEqual(["genre/ASMR"]);
+  });
+
+  it("選択中の作品とグリッド詳細パネルをクリアする", () => {
+    const store = createStore();
+    store.set(selectedWorkIdAtom, "work-1");
+    store.set(gridInspectorOpenAtom, true);
+
+    store.set(selectSoleLibraryTagAtom, "genre/ASMR");
+
+    expect(store.get(selectedWorkIdAtom)).toBeNull();
+    expect(store.get(gridInspectorOpenAtom)).toBe(false);
   });
 });
 

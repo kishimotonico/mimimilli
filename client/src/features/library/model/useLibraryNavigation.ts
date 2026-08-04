@@ -10,6 +10,7 @@ import {
   clearLibraryTagsAtom,
   goToLibrarySegmentAtom,
   selectLibraryWorkAtom,
+  selectSoleLibraryTagAtom,
   setLibraryAxisAtom,
   setLibrarySortAtom,
   toggleLibraryTagAtom,
@@ -25,6 +26,7 @@ export interface LibraryViewState {
 export interface LibraryViewActions {
   setAxis: (axis: AxisId) => void;
   toggleTag: (tag: string) => void;
+  selectSoleTag: (tag: string) => void;
   clearTags: () => void;
   selectWork: (id: string | null) => void;
   setSort: (sort: SortId) => void;
@@ -41,6 +43,7 @@ export function useLibraryView(): LibraryViewState & LibraryViewActions {
 
   const setAxis = useSetAtom(setLibraryAxisAtom);
   const toggleTag = useSetAtom(toggleLibraryTagAtom);
+  const selectSoleTag = useSetAtom(selectSoleLibraryTagAtom);
   const clearTags = useSetAtom(clearLibraryTagsAtom);
   const selectWork = useSetAtom(selectLibraryWorkAtom);
   const setSort = useSetAtom(setLibrarySortAtom);
@@ -61,6 +64,7 @@ export function useLibraryView(): LibraryViewState & LibraryViewActions {
     sort,
     setAxis: transition(setAxis),
     toggleTag: transition(toggleTag),
+    selectSoleTag: transition(selectSoleTag),
     clearTags: () =>
       startTransition(() => {
         clearTags();

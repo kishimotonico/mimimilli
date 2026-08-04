@@ -1,9 +1,11 @@
 ---
 id: TASK-184
 title: 組み込み軸の擬似タグを予約文字で分離し実タグとの衝突を解消する
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - impl-184
 created_date: '2026-08-04 11:36'
+updated_date: '2026-08-04 11:48'
 labels: []
 dependencies: []
 priority: high
@@ -29,11 +31,11 @@ LibraryView.tsx の handleTagClick は setAxis("tag") → toggleTag(tag) の2段
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 実タグが @ で始まることを shared のタグ検証が拒否し、その単体テストがある
-- [ ] #2 組み込み軸 year のフィルタが URL 上 tags=@year/2024 として表現され、復元できる
-- [ ] #3 実タグ year/2025 を選択したとき、addedAt の年照合ではなくタグ完全一致で絞り込まれる
-- [ ] #4 year 軸は同時に1値のみ選択でき、別の年を選ぶと前の選択が置き換わる。チップ表示と実際の絞り込みが常に一致する
-- [ ] #5 作品詳細のタグをクリックすると、既存の絞り込みが何であってもそのタグだけを選択した状態になる
-- [ ] #6 上記4点の振る舞いが libraryPresentation.test.ts / libraryNavigationActions.test.ts / navigationUrl.test.ts で検証されている
+- [x] #1 実タグが @ で始まることを shared のタグ検証が拒否し、その単体テストがある
+- [x] #2 組み込み軸 year のフィルタが URL 上 tags=@year/2024 として表現され、復元できる
+- [x] #3 実タグ year/2025 を選択したとき、addedAt の年照合ではなくタグ完全一致で絞り込まれる
+- [x] #4 year 軸は同時に1値のみ選択でき、別の年を選ぶと前の選択が置き換わる。チップ表示と実際の絞り込みが常に一致する
+- [x] #5 作品詳細のタグをクリックすると、既存の絞り込みが何であってもそのタグだけを選択した状態になる
+- [x] #6 上記4点の振る舞いが libraryPresentation.test.ts / libraryNavigationActions.test.ts / navigationUrl.test.ts で検証されている
 - [ ] #7 pnpm check と pnpm test が通る
 <!-- AC:END -->

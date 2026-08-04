@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { metaFileSchema, trackSchema } from "@mimimilli/shared";
+import { metaFileSchema, tagSchema, trackSchema } from "@mimimilli/shared";
 
 const PLAYLIST_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const TRACK_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -73,6 +73,12 @@ test("dlsite.errorKindが無い旧metaはパースできerrorKindはnullにな�
 test("dlsiteキー自体が無い旧metaはパースできerrorKindはnullになる", () => {
   const parsed = metaFileSchema.parse(validMeta());
   assert.equal(parsed.dlsite.errorKind, null);
+});
+
+test("タグは予約文字@始まりを拒否する", () => {
+  assert.equal(tagSchema.safeParse("@year/2024").success, false);
+  assert.equal(tagSchema.safeParse("year/2025").success, true);
+  assert.equal(tagSchema.safeParse("cv/藤田茜").success, true);
 });
 
 test("同名Playlistは異なるIDなら許容する", () => {

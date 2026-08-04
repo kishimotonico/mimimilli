@@ -147,14 +147,13 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
     if (selectedWork) onResume(selectedWork);
   }, [selectedWork, onResume]);
 
-  // タグチップクリック → タグ軸へ遷移し、そのタグだけを選択した AND 絞り込み状態にする
+  // タグチップクリック → タグ軸へ遷移し、そのタグだけを選択した絞り込み状態にする
   const handleTagClick = useCallback(
     (tag: string) => {
-      nav.setAxis("tag");
-      nav.toggleTag(tag);
+      nav.selectSoleTag(tag);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- nav は毎レンダー新規オブジェクトのため参照する値だけに依存を絞る
-    [nav.setAxis, nav.toggleTag],
+    [nav.selectSoleTag],
   );
 
   const handleEditSmartFolder = useCallback(() => {

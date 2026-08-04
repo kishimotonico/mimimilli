@@ -375,3 +375,11 @@ export function normalizeTags(tags: string[]): string[] {
 export function tagEquals(a: string, b: string): boolean {
   return normalizeTag(a) === normalizeTag(b);
 }
+
+/** 組み込み軸の擬似タグ専用の予約文字（ADR-0012 §2）。実タグでの使用は禁止する */
+export const RESERVED_TAG_PREFIX = "@";
+
+/** 実タグの書き込み検証。先頭の "@" は組み込み軸の擬似タグ（例: "@year/2024"）と衝突するため拒否する */
+export const tagSchema = z.string().refine((tag) => !tag.startsWith(RESERVED_TAG_PREFIX), {
+  message: `タグを予約文字 "${RESERVED_TAG_PREFIX}" から始めることはできません`,
+});

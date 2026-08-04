@@ -8,9 +8,38 @@ import type { WorksQueryParams } from "../api";
 import type { AxisId, SortId, ViewMode } from "./types";
 import { isFacetAxis, isHomeAxis, isSmartAxis, isViewAxis } from "./axisDefinitions";
 
-/** year 軸は URL 上 "year/2024" 形式の擬似タグとして selectedTagsAtom に載る
- *  （ADR-0012 §2）。組み込み軸専用のクエリパラメータは設けない。 */
-const YEAR_TAG_PREFIX = "year/";
+// ── 組み込み軸の擬似タグ（ADR-0012 §2） ──────────────────────────
+// year のようなタグ由来でない組み込み軸も、フィルタとしては selectedTagsAtom に
+// "@軸/値" 形式の擬似タグとして載る。先頭の "@" は組み込み軸専用の予約文字で、
+// 実タグ（例: 実タグ "year/2025"）との衝突を型と検証で閉じる。
+// 組み込み軸専用のクエリパラメータは設けない。
+
+const BUILTIN_AXIS_TAG_PREFIX = "@";
+
+/** タグ由来でない組み込み軸（year のみ。addedAt の年照合）。実タグと衝突するため擬似タグ化する。
+ *  異なる2値のANDは常に0件になるため、複数選択も許さない（新しい値が前の選択を置き換える）。 */
+export function isBuiltinPseudoTagAxis(axis: string): boolean {
+  return axis === "year";
+}
+
+/** 組み込み軸の値選択を擬似タグ文字列に組み立てる */
+export function buildBuiltinAxisTag(axis: AxisId, value: string): string {
+  return `${BUILTIN_AXIS_TAG_PREFIX}${axis}/${value}`;
+}
+
+export interface ParsedBuiltinAxisTag {
+  axis: string;
+  value: string;
+}
+
+/** 擬似タグ文字列を軸と値に分解する。擬似タグでなければ null */
+export function parseBuiltinAxisTag(tag: string): ParsedBuiltinAxisTag | null {
+  if (!tag.startsWith(BUILTIN_AXIS_TAG_PREFIX)) return null;
+  const rest = tag.slice(BUILTIN_AXIS_TAG_PREFIX.length);
+  const slashIndex = rest.indexOf("/");
+  if (slashIndex <= 0 || slashIndex === rest.length - 1) return null;
+  return { axis: rest.slice(0, slashIndex), value: rest.slice(slashIndex + 1) };
+}
 
 // ── 結果面の種類（ADR-0012: ナビゲーション状態・表示設定・絞り込み状態の分離） ──
 
@@ -48,10 +77,12 @@ export function splitSelectedTags(selectedTags: string[]): SplitSelectedTags {
   let yearValue: string | null = null;
   const tags: string[] = [];
   for (const tag of selectedTags) {
-    if (tag.startsWith(YEAR_TAG_PREFIX)) {
-      if (yearValue === null) yearValue = tag.slice(YEAR_TAG_PREFIX.length);
+    const builtin = parseBuiltinAxisTag(tag);
+    if (builtin?.axis === "year") {
+      if (yearValue === null) yearValue = builtin.value;
       continue;
     }
+    if (builtin) continue; // 未知の組み込み軸擬似タグは実タグとして解釈しない
     tags.push(tag);
   }
   return { tags, yearValue };
@@ -59,9 +90,12 @@ export function splitSelectedTags(selectedTags: string[]): SplitSelectedTags {
 
 /** facet/tag 軸の値一覧で1項目を選んだときに selectedTagsAtom へ追加する完全なタグ文字列を組み立てる。
  *  tag 軸は AxisFacetItem.value が既に完全なタグ文字列（ADR-0005 追記）、
- *  それ以外の facet 軸（year 含む）は "軸/値" の擬似タグとして表現する。 */
+ *  year のようなタグ由来でない組み込み軸は擬似タグ、それ以外の facet 軸
+ *  （prefix 定義に基づく実タグ由来の軸）は "軸/値" の実タグとして表現する。 */
 export function buildFilterTag(axis: AxisId, value: string): string {
-  return axis === "tag" ? value : `${axis}/${value}`;
+  if (axis === "tag") return value;
+  if (isBuiltinPseudoTagAxis(axis)) return buildBuiltinAxisTag(axis, value);
+  return `${axis}/${value}`;
 }
 
 // ── works query のパラメータ ──────────────────────────────────

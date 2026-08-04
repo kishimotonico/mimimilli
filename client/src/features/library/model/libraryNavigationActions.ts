@@ -1,6 +1,7 @@
 import { atom } from "jotai";
 import { requestNavigationHistoryCommit } from "../../navigation/model/navigationHistoryCommit";
 import type { AxisId, SortId } from "./types";
+import { isBuiltinPseudoTagAxis, parseBuiltinAxisTag } from "./libraryPresentation";
 import {
   activeAxisAtom,
   gridInspectorOpenAtom,
@@ -19,11 +20,35 @@ export const setLibraryAxisAtom = atom(null, (_get, set, axis: AxisId) => {
 });
 
 // 軸の値選択（facet/tag 問わず）はすべて同じタグフィルタへの追加・解除として扱う
-// （ADR-0012 §2）。
+// （ADR-0012 §2）。year のような単一選択の組み込み軸は、追加時に同じ軸の既存選択を
+// 取り除いてから追加することで「新しい値が前の選択を置き換える」挙動にする。
 export const toggleLibraryTagAtom = atom(null, (get, set, tag: string) => {
   requestNavigationHistoryCommit(set, "push");
   const prev = get(selectedTagsAtom);
-  set(selectedTagsAtom, prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]);
+  if (prev.includes(tag)) {
+    set(
+      selectedTagsAtom,
+      prev.filter((t) => t !== tag),
+    );
+  } else {
+    const builtin = parseBuiltinAxisTag(tag);
+    const base =
+      builtin && isBuiltinPseudoTagAxis(builtin.axis)
+        ? prev.filter((t) => parseBuiltinAxisTag(t)?.axis !== builtin.axis)
+        : prev;
+    set(selectedTagsAtom, [...base, tag]);
+  }
+  set(selectedWorkIdAtom, null);
+  set(gridInspectorOpenAtom, false);
+});
+
+// 作品詳細のタグクリック用: 軸を tag に切り替えつつ絞り込みをそのタグだけに置き換える
+// 単一のアクション（ADR-0012 §2）。setAxis → toggleTag の2段呼び出しは、既存の絞り込みへの
+// 追加になってしまう（TASK-184）ほか、履歴コミットの二重化も招くため使わない。
+export const selectSoleLibraryTagAtom = atom(null, (_get, set, tag: string) => {
+  requestNavigationHistoryCommit(set, "push");
+  set(activeAxisAtom, "tag");
+  set(selectedTagsAtom, [tag]);
   set(selectedWorkIdAtom, null);
   set(gridInspectorOpenAtom, false);
 });

@@ -52,14 +52,25 @@ describe("navigation URL codec", () => {
     expect(parseNavigationUrl(url)).toMatchObject({ state, warnings: [] });
   });
 
-  it("round-trips a year pseudo-tag filter (ADR-0012 §2)", () => {
+  it("round-trips a year pseudo-tag filter as the reserved @ form (ADR-0012 §2)", () => {
     const state: NavigationUrlState = {
       mode: "library",
-      library: { ...DEFAULT_LIBRARY_URL_STATE, activeAxis: "year", selectedTags: ["year/2024"] },
+      library: { ...DEFAULT_LIBRARY_URL_STATE, activeAxis: "year", selectedTags: ["@year/2024"] },
     };
 
     const url = serializeNavigationUrl(state);
-    expect(url).toBe("/library/year?tags=year%2F2024");
+    expect(url).toBe("/library/year?tags=%40year%2F2024");
+    expect(parseNavigationUrl(url)).toMatchObject({ state, warnings: [] });
+  });
+
+  it("round-trips a real tag literally named year/2025 distinctly from the pseudo-tag form", () => {
+    const state: NavigationUrlState = {
+      mode: "library",
+      library: { ...DEFAULT_LIBRARY_URL_STATE, activeAxis: "tag", selectedTags: ["year/2025"] },
+    };
+
+    const url = serializeNavigationUrl(state);
+    expect(url).toBe("/library/tag?tags=year%2F2025");
     expect(parseNavigationUrl(url)).toMatchObject({ state, warnings: [] });
   });
 
