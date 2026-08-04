@@ -4,17 +4,21 @@ import type { FacetAxisId } from "@mimimilli/shared";
 import type { AxisId } from "../model/types";
 import { useAxisFacetsQuery } from "../model/useAxisFacetsQuery";
 import { buildFilterTag } from "../model/libraryPresentation";
-import { useAnchoredPopover } from "./preview/useAnchoredPopover";
 import type { HoverIntentHandlers } from "../../../shared/lib/useHoverIntent";
 import AxisValueQuickList from "./AxisValueQuickList";
 
-// 軸レール行のクイックオーバーレイ（ADR-0012 §7）。ホバー約200ms・
-// フォーカス中の ArrowRight で開く。軸レールの列は overflow: hidden auto で
-// クリップされるため、document.body へポータルし fixed 位置で表示する。
+// 軸レール行のクイックオーバーレイ（ADR-0012 §7）。ホバー約200ms・フォーカス中の
+// ArrowRight で開く。軸行の右向き矢印・ArrowRightキーの操作方向と揃えて右側に出す。
+// 軸レールは画面左端に固定されているため、デスクトップ幅で右に余白が無いケースは
+// 実質発生せず、左右の反転フォールバックは設けない（モバイル幅は ADR-0006 の別設計）。
+// 上下方向だけ、軸行を基準に画面外へはみ出さないようクランプする。
+// 軸レールの列は overflow: hidden auto でクリップされるため、document.body へ
+// ポータルし fixed 位置で表示する。
 
 const OVERLAY_WIDTH = 280;
 const OVERLAY_MAX_HEIGHT = 360;
 const OVERLAY_GAP = 6;
+const VIEWPORT_MARGIN = 8;
 
 interface AxisQuickOverlayProps {
   axis: AxisId;
@@ -38,18 +42,6 @@ export default function AxisQuickOverlay({
   const facetQuery = useAxisFacetsQuery(isOpen ? (axis as FacetAxisId) : null, selectedTags);
   const panelRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
-
-  // 位置クランプ（横方向）だけ useAnchoredPopover に委ねる。ポータル先（document.body）が
-  // anchorEl（軸レール行、.mle-app 配下）と別DOM系統になるため、外側クリック/Escape判定は
-  // anchorEl とパネル両方を境界にした独自ロジックを下で使う（onOutsideClick/onEscapeは使わない）。
-  const { anchorRef, layout } = useAnchoredPopover({
-    isOpen,
-    preferredWidth: OVERLAY_WIDTH,
-    onOutsideClick: () => {},
-    onEscape: () => {},
-    getContainer: (el) => el.closest(".mle-app"),
-  });
-  anchorRef.current = anchorEl as HTMLDivElement | null;
 
   // 閉じるときにフォーカスがパネル内（検索欄など）にあれば軸行へ戻す（AC#4）。
   // ホバーだけで閉じる場合はフォーカス移動と無関係のため奪わない。
@@ -87,14 +79,15 @@ export default function AxisQuickOverlay({
     }
     const rect = anchorEl.getBoundingClientRect();
     const estimatedHeight = Math.min(OVERLAY_MAX_HEIGHT, panelRef.current?.offsetHeight ?? 240);
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const top =
-      spaceBelow >= estimatedHeight + OVERLAY_GAP || rect.top < estimatedHeight
-        ? rect.bottom + OVERLAY_GAP
-        : Math.max(8, rect.top - estimatedHeight - OVERLAY_GAP);
-    setPosition({ left: rect.left + layout.left, top });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- layout の値変化（left/width）のみで十分
-  }, [isOpen, anchorEl, layout.left, layout.width]);
+    // 軸行の上端に合わせるのが既定。画面外へはみ出す分だけ上下方向にクランプする
+    // （左右の反転フォールバックは設けない）。
+    const maxTop = Math.max(
+      VIEWPORT_MARGIN,
+      window.innerHeight - estimatedHeight - VIEWPORT_MARGIN,
+    );
+    const top = Math.min(Math.max(rect.top, VIEWPORT_MARGIN), maxTop);
+    setPosition({ left: rect.right + OVERLAY_GAP, top });
+  }, [isOpen, anchorEl]);
 
   if (!isOpen || !anchorEl || position === null) return null;
 
@@ -102,7 +95,7 @@ export default function AxisQuickOverlay({
     <div
       ref={panelRef}
       className="mll-qoverlay mll-qoverlay--fixed"
-      style={{ left: position.left, top: position.top, width: layout.width }}
+      style={{ left: position.left, top: position.top, width: OVERLAY_WIDTH }}
       {...panelHandlers}
     >
       <AxisValueQuickList

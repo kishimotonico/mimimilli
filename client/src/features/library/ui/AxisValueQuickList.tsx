@@ -77,14 +77,19 @@ export default function AxisValueQuickList({
 }: AxisValueQuickListProps) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<AxisValueSortState>(DEFAULT_AXIS_VALUE_SORT);
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const sortToggleRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     searchRef.current?.focus();
     setQuery("");
     setSort(DEFAULT_AXIS_VALUE_SORT);
+    setSortMenuOpen(false);
   }, [axis]);
+
+  const currentSortLabel = AXIS_VALUE_SORT_OPTIONS.find((opt) => opt.id === sort.key)?.label ?? "";
 
   const filtered = filterAxisValueItems(items, query);
   const rows =
@@ -184,21 +189,43 @@ export default function AxisValueQuickList({
           placeholder={`${getAxisLabel(axis)}を検索`}
           aria-label={`${getAxisLabel(axis)}の値を検索`}
         />
+        <button
+          ref={sortToggleRef}
+          type="button"
+          className={`mll-qlist__sorttoggle ${sortMenuOpen ? "is-open" : ""}`}
+          aria-haspopup="true"
+          aria-expanded={sortMenuOpen}
+          aria-label={`並び替え: ${currentSortLabel}`}
+          title={`並び替え: ${currentSortLabel}`}
+          onClick={() => setSortMenuOpen((open) => !open)}
+        >
+          <I.sort size={12} />
+        </button>
       </div>
-      {/* oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- ソート切替はボタン列で表現する */}
-      <div className="mll-qlist__sort" role="group" aria-label="並び替え">
-        {AXIS_VALUE_SORT_OPTIONS.map((opt) => (
-          <button
-            key={opt.id}
-            type="button"
-            className={`mll-qlist__sortbtn ${sort.key === opt.id ? "is-active" : ""}`}
-            aria-pressed={sort.key === opt.id}
-            onClick={() => setSort(selectAxisValueSortKey(sort, opt.id))}
-          >
-            {opt.label}
-          </button>
-        ))}
-      </div>
+      {sortMenuOpen && (
+        // 統括判断: 入れ子の浮遊レイヤーは作らず、パネル内にインライン展開する
+        // （フォーカス管理・Escapeの二重化を避けるため）。
+        // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- ソート切替はボタン列で表現する
+        <div className="mll-qlist__sort" role="group" aria-label="並び替え">
+          {AXIS_VALUE_SORT_OPTIONS.map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              className={`mll-qlist__sortbtn ${sort.key === opt.id ? "is-active" : ""}`}
+              aria-pressed={sort.key === opt.id}
+              onClick={() => {
+                setSort(selectAxisValueSortKey(sort, opt.id));
+                setSortMenuOpen(false);
+                // 選択したボタンはこの直後に畳まれてDOMから消えるため、フォーカスが
+                // bodyへ落ちる前にトグルボタンへ移しておく。
+                sortToggleRef.current?.focus();
+              }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
       {hint && <div className="mll-qlist__hint">{hint}</div>}
       {isLoading ? (
         <div className="mll-qlist__status">読み込み中…</div>

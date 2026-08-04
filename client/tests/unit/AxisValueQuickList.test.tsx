@@ -90,7 +90,9 @@ describe("AxisValueQuickList のキーボード移動", () => {
     });
     await flushVirtualizer();
 
-    // 既定ソートは件数（フラット）。名前順に切り替えて階層表示（見出し行あり）にする。
+    // 既定ソートは件数（フラット）。ソートはアイコンボタンからインライン展開し、
+    // 名前順に切り替えて階層表示（見出し行あり）にする。
+    await user.click(screen.getByRole("button", { name: /^並び替え/ }));
     await user.click(screen.getByRole("button", { name: "名前" }));
     await flushVirtualizer();
 
@@ -128,6 +130,53 @@ describe("AxisValueQuickList のキーボード移動", () => {
     });
     // 先頭からArrowUpするとラップして末尾（最小件数）の行へ移る。
     expect(document.activeElement?.textContent).toContain("値0000");
+    sizeMock.restore();
+  });
+});
+
+describe("AxisValueQuickList のソート（アイコンボタン＋インライン展開）", () => {
+  it("既定では折りたたまれており、アイコンボタンで開閉する", async () => {
+    const sizeMock = mockElementSize(260, 260);
+    const user = userEvent.setup();
+    renderQuickList({ items: makeItems(5) });
+    await flushVirtualizer();
+
+    expect(screen.queryByRole("group", { name: "並び替え" })).toBeNull();
+
+    const toggle = screen.getByRole("button", { name: /^並び替え/ });
+    await user.click(toggle);
+    expect(screen.getByRole("group", { name: "並び替え" })).toBeTruthy();
+
+    await user.click(toggle);
+    expect(screen.queryByRole("group", { name: "並び替え" })).toBeNull();
+    sizeMock.restore();
+  });
+
+  it("並び替えを選ぶとトグルボタンへフォーカスが戻る（bodyへ落ちない）", async () => {
+    const sizeMock = mockElementSize(260, 260);
+    const user = userEvent.setup();
+    renderQuickList({ items: makeItems(5) });
+    await flushVirtualizer();
+
+    const toggle = screen.getByRole("button", { name: /^並び替え/ });
+    await user.click(toggle);
+    await user.click(screen.getByRole("button", { name: "名前" }));
+
+    expect(document.activeElement).toBe(toggle);
+    expect(document.activeElement).not.toBe(document.body);
+    sizeMock.restore();
+  });
+
+  it("並び替えを選ぶとインライン展開が閉じる", async () => {
+    const sizeMock = mockElementSize(260, 260);
+    const user = userEvent.setup();
+    renderQuickList({ items: makeItems(5) });
+    await flushVirtualizer();
+
+    await user.click(screen.getByRole("button", { name: /^並び替え/ }));
+    await user.click(screen.getByRole("button", { name: "名前" }));
+
+    expect(screen.queryByRole("group", { name: "並び替え" })).toBeNull();
     sizeMock.restore();
   });
 });

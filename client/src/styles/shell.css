@@ -1565,9 +1565,35 @@
   .mll-qlist__search input {
     flex: 1;
     min-width: 0;
+    padding: 0;
+    border: 0;
+    outline: 0;
+    font: inherit;
     font-size: 12px;
     color: var(--ink-0);
     background: transparent;
+  }
+  /* オーバーレイは document.body へポータルされ .mle-app の外に出るため、
+     UAリセット（.mle-app input { border:0; outline:0 }）が効かず既定の太い枠が
+     見えてしまう。ここで明示的にリセットし、フォーカスリングだけ改めて与える。 */
+  .mll-qlist__search input:focus-visible {
+    outline: 2px solid var(--acc);
+    outline-offset: 1px;
+    border-radius: 2px;
+  }
+  .mll-qlist__sorttoggle {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    color: var(--ink-3);
+  }
+  .mll-qlist__sorttoggle:hover,
+  .mll-qlist__sorttoggle.is-open {
+    color: var(--ink-0);
+    background: var(--paper-2);
   }
   .mll-qlist__sort {
     display: flex;
