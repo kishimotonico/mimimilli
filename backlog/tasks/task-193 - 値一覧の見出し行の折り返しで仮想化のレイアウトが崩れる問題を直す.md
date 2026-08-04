@@ -1,11 +1,11 @@
 ---
 id: TASK-193
 title: 値一覧の見出し行の折り返しで仮想化のレイアウトが崩れる問題を直す
-status: In Progress
+status: Done
 assignee:
   - impl-182
 created_date: '2026-08-04 16:41'
-updated_date: '2026-08-04 17:16'
+updated_date: '2026-08-04 17:17'
 labels: []
 dependencies:
   - TASK-191

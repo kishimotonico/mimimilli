@@ -1,11 +1,11 @@
 ---
 id: TASK-192
 title: クイックオーバーレイの値リストを仮想化し数千件で破綻しないようにする
-status: In Progress
+status: Done
 assignee:
   - impl-182
 created_date: '2026-08-04 16:10'
-updated_date: '2026-08-04 16:30'
+updated_date: '2026-08-04 17:17'
 labels: []
 dependencies: []
 priority: high
