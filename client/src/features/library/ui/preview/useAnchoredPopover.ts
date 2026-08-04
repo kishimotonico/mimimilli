@@ -12,17 +12,22 @@ export interface PopoverLayout {
   containerWidth: number;
 }
 
-function anchorContainer(anchor: HTMLElement | null): HTMLElement | null {
-  return (anchor?.closest(".mle-prv__meta") ??
-    anchor?.closest(".mle-prv__body") ??
-    null) as HTMLElement | null;
-}
+/** クランプ対象コンテナの決定関数。呼び出し側が渡さない場合の既定は
+ *  work-preview の `.mle-prv__meta` / `.mle-prv__body`（従来どおり）。 */
+export type PopoverContainerResolver = (anchor: HTMLElement) => HTMLElement | null;
 
-function getClampedPopoverLayout(anchor: HTMLElement, preferredWidth: number): PopoverLayout {
+const defaultContainerResolver: PopoverContainerResolver = (anchor) =>
+  (anchor.closest(".mle-prv__meta") ??
+    anchor.closest(".mle-prv__body") ??
+    null) as HTMLElement | null;
+
+function getClampedPopoverLayout(
+  anchor: HTMLElement,
+  preferredWidth: number,
+  getContainer: PopoverContainerResolver,
+): PopoverLayout {
   const anchorRect = anchor.getBoundingClientRect();
-  // タグ・アクション行が実際に収まる列は `.mle-prv__meta`（カバー画像列を含まない）。
-  // 無ければ `.mle-prv__body` 全体にフォールバックする。
-  const container = anchorContainer(anchor);
+  const container = getContainer(anchor);
   const containerRect = container?.getBoundingClientRect();
   const visibleLeft = (containerRect?.left ?? 0) + POPOVER_MARGIN;
   const visibleRight = (containerRect?.right ?? window.innerWidth) - POPOVER_MARGIN;
@@ -110,6 +115,12 @@ export interface UseAnchoredPopoverOptions {
    * 境界としたい場合に、呼び出し側で別途 ref を用意して渡す。
    */
   boundaryRef?: RefObject<HTMLElement | null>;
+  /**
+   * クランプ対象コンテナを差し替える。既定は `.mle-prv__meta` / `.mle-prv__body`。
+   * work-preview の外（軸レールのクイックオーバーレイなど）で使う場合、
+   * `.mle-app` 全体のようなコンテナを渡す。
+   */
+  getContainer?: PopoverContainerResolver;
 }
 
 export interface UseAnchoredPopoverResult {
@@ -129,6 +140,7 @@ export function useAnchoredPopover({
   onOutsideClick,
   onEscape,
   boundaryRef,
+  getContainer = defaultContainerResolver,
 }: UseAnchoredPopoverOptions): UseAnchoredPopoverResult {
   const anchorRef = useRef<HTMLDivElement | null>(null);
   const [layout, setLayout] = useState<PopoverLayout>({
@@ -146,7 +158,7 @@ export function useAnchoredPopover({
       const anchor = anchorRef.current;
       if (!anchor) return;
 
-      const nextLayout = getClampedPopoverLayout(anchor, preferredWidth);
+      const nextLayout = getClampedPopoverLayout(anchor, preferredWidth, getContainer);
 
       setLayout((current) =>
         current.left === nextLayout.left && current.width === nextLayout.width
@@ -156,7 +168,7 @@ export function useAnchoredPopover({
     };
 
     updateLayout();
-    const container = anchorContainer(anchorRef.current);
+    const container = anchorRef.current ? getContainer(anchorRef.current) : null;
     const resizeObserver = container ? new ResizeObserver(updateLayout) : null;
     if (container) resizeObserver?.observe(container);
     window.addEventListener("resize", updateLayout);
@@ -167,7 +179,7 @@ export function useAnchoredPopover({
       window.removeEventListener("resize", updateLayout);
       window.removeEventListener("scroll", updateLayout, true);
     };
-  }, [isOpen, preferredWidth]);
+  }, [isOpen, preferredWidth, getContainer]);
 
   return { anchorRef, layout };
 }

@@ -209,7 +209,9 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
         <div className="mll-results">
           <div className="mll-results__content">
             <FilterChipBand
+              tagPrefixes={tagPrefixes}
               selectedTags={nav.selectedTags}
+              onReplace={nav.replaceTagAndShowWorks}
               onToggle={nav.toggleTag}
               onClearAll={nav.clearTags}
             />
@@ -221,6 +223,7 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
               isFacetLoading={isFacetLoading}
               isFacetError={isFacetError}
               isTagPrefixesError={isTagPrefixesError}
+              onReplace={nav.replaceTag}
               onToggle={nav.toggleTag}
               onRetryFacets={refetchFacets}
               onRetryTagPrefixes={refetchTagPrefixes}
@@ -257,7 +260,9 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
               <div className="mll-results">
                 <div className="mll-results__content">
                   <FilterChipBand
+                    tagPrefixes={tagPrefixes}
                     selectedTags={nav.selectedTags}
+                    onReplace={nav.replaceTagAndShowWorks}
                     onToggle={nav.toggleTag}
                     onClearAll={nav.clearTags}
                   />

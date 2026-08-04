@@ -8,9 +8,10 @@ import {
   clampTileSize,
   computeGridColumnCount,
 } from "../model/gridSizing";
-import type { IconName } from "../../../shared/ui/Icon";
+import { I, type IconName } from "../../../shared/ui/Icon";
 import { selectFixedCoverThumbnailWidth } from "../../../entities/work/ui/coverThumbnailWidth";
 import CoverCollage from "./CoverCollage";
+import IconButton from "../../../shared/ui/IconButton";
 
 // 値一覧の grid 表示（ADR-0012 §5）。代表カバー2×2コラージュ＋名前＋件数バッジのタイル。
 // 列数・タイルサイズの計算は作品グリッド（WorkGrid）と同じ gridSizing を共有する。
@@ -25,7 +26,10 @@ interface AxisValueGridProps {
   isSelected: (item: AxisFacetItem) => boolean;
   fallbackIcon: IconName;
   resetKey: string;
-  onToggle: (item: AxisFacetItem) => void;
+  /** クリック（既定=置き換え）・Ctrl/Cmd+クリック（AND追加）（ADR-0012 §7） */
+  onSelect: (item: AxisFacetItem, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
+  /** ホバー/フォーカス時に出る＋ボタン（常にAND追加） */
+  onAdd: (item: AxisFacetItem) => void;
 }
 
 export default function AxisValueGrid({
@@ -34,7 +38,8 @@ export default function AxisValueGrid({
   isSelected,
   fallbackIcon,
   resetKey,
-  onToggle,
+  onSelect,
+  onAdd,
 }: AxisValueGridProps) {
   const safeTileSize = clampTileSize(tileSize);
   // コラージュはタイルを2×2に分割するので、各セルの要求サムネイル幅はタイル幅の半分を基準にする
@@ -128,21 +133,34 @@ export default function AxisValueGrid({
                 }
               >
                 {rowItems.map((item) => (
-                  <button
+                  <div
                     key={item.value}
-                    type="button"
                     className={`mll-vtile ${isSelected(item) ? "is-on" : ""}`}
-                    aria-pressed={isSelected(item)}
-                    onClick={() => onToggle(item)}
+                    // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- クリック領域(選択)とAND追加ボタンを両方内包するため<option>にはできない
+                    role="option"
+                    aria-selected={isSelected(item)}
                   >
-                    <CoverCollage
-                      covers={item.covers}
-                      fallbackIcon={fallbackIcon}
-                      requestWidth={collageRequestWidth}
+                    <button
+                      type="button"
+                      className="mll-vtile__main"
+                      onClick={(e) => onSelect(item, { ctrlKey: e.ctrlKey, metaKey: e.metaKey })}
+                    >
+                      <CoverCollage
+                        covers={item.covers}
+                        fallbackIcon={fallbackIcon}
+                        requestWidth={collageRequestWidth}
+                      />
+                      <span className="mll-vtile__nm">{item.value}</span>
+                      <span className="mll-vtile__badge">{item.count} 件</span>
+                    </button>
+                    <IconButton
+                      icon={I.add}
+                      label={`${item.value}をAND追加`}
+                      size="xs"
+                      className="mll-vtile__add"
+                      onClick={() => onAdd(item)}
                     />
-                    <span className="mll-vtile__nm">{item.value}</span>
-                    <span className="mll-vtile__badge">{item.count} 件</span>
-                  </button>
+                  </div>
                 ))}
               </div>
             );

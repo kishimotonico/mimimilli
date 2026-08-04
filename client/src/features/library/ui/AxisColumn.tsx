@@ -1,6 +1,10 @@
+import { useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { SmartFolder, TagPrefix } from "@mimimilli/shared";
 import type { AxisId } from "../model/types";
-import { getAxisIcon } from "../model/axisDefinitions";
+import { buildFacetAxisRows, isFacetAxis } from "../model/axisDefinitions";
+import { useLibraryNavigation } from "../model/useLibraryNavigation";
+import { useHoverIntent, type HoverIntentHandlers } from "../../../shared/lib/useHoverIntent";
+import AxisQuickOverlay from "./AxisQuickOverlay";
 import { I, type IconName } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
 
@@ -23,18 +27,6 @@ const VIEW_AXES: AxisRow[] = [
   { id: "missing", name: "ファイル欠損", icon: "err" },
 ];
 
-/** 分類軸の行 = 軸表示ONの prefix 定義（定義順）＋ 組み込みの tag / year（ADR-0005） */
-function buildFacetAxisRows(tagPrefixes: TagPrefix[]): AxisRow[] {
-  const prefixRows = tagPrefixes
-    .filter((p) => p.showAsAxis)
-    .map((p) => ({ id: p.prefix, name: p.label, icon: getAxisIcon(p.prefix) }));
-  return [
-    ...prefixRows,
-    { id: "tag", name: "タグ", icon: getAxisIcon("tag") },
-    { id: "year", name: "追加日", icon: getAxisIcon("year") },
-  ];
-}
-
 interface AxisColumnProps {
   activeAxis: AxisId;
   tagPrefixes: TagPrefix[];
@@ -48,22 +40,63 @@ interface AxisColumnProps {
   onRetryTagPrefixes?: () => void;
 }
 
+/** 開いている（または開こうとしている）クイックオーバーレイの状態。
+ *  panelHandlers はトリガー行を開いた useHoverIntent インスタンスのものをそのまま
+ *  オーバーレイパネル側へ渡す。同じタイマーを共有するため、行↔パネル間の移動で
+ *  閉じない（ADR-0012 §7・AC#2）。 */
+interface QuickOverlayState {
+  axis: AxisId;
+  anchorEl: HTMLElement;
+  panelHandlers: HoverIntentHandlers;
+}
+
 function AxisRowItem({
   ax,
   isActive,
+  hasQuickOverlay,
+  isOverlayOpen,
   onSelect,
+  onRequestOverlayOpen,
+  onRequestOverlayClose,
 }: {
   ax: AxisRow;
   isActive: boolean;
+  hasQuickOverlay: boolean;
+  isOverlayOpen: boolean;
   onSelect: () => void;
+  onRequestOverlayOpen: (
+    axis: AxisId,
+    el: HTMLElement | null,
+    panelHandlers: HoverIntentHandlers,
+  ) => void;
+  onRequestOverlayClose: () => void;
 }) {
+  const rowRef = useRef<HTMLButtonElement>(null);
+  const { trigger, panel } = useHoverIntent({
+    onOpen: () => onRequestOverlayOpen(ax.id, rowRef.current, panel),
+    onClose: onRequestOverlayClose,
+  });
+
+  const handleKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
+    if (!hasQuickOverlay || isOverlayOpen) return;
+    if (event.key === "ArrowRight") {
+      event.preventDefault();
+      onRequestOverlayOpen(ax.id, rowRef.current, panel);
+    }
+  };
+
   const Ic = I[ax.icon];
   return (
     <button
+      ref={rowRef}
       type="button"
       className={`mll-axis ${isActive ? "is-on" : ""}`}
       aria-current={isActive ? "true" : undefined}
+      aria-haspopup={hasQuickOverlay ? "listbox" : undefined}
+      aria-expanded={hasQuickOverlay ? isOverlayOpen : undefined}
       onClick={onSelect}
+      onKeyDown={handleKeyDown}
+      {...(hasQuickOverlay ? trigger : undefined)}
     >
       <span className="ic">
         <Ic size={14} />
@@ -90,6 +123,45 @@ export default function AxisColumn({
   onRetryTagPrefixes,
 }: AxisColumnProps) {
   const facetAxisRows = buildFacetAxisRows(tagPrefixes);
+  const nav = useLibraryNavigation();
+  const [overlay, setOverlay] = useState<QuickOverlayState | null>(null);
+
+  const requestOverlayOpen = (
+    axis: AxisId,
+    el: HTMLElement | null,
+    panelHandlers: HoverIntentHandlers,
+  ) => {
+    if (!el) return;
+    setOverlay({ axis, anchorEl: el, panelHandlers });
+  };
+  const requestOverlayClose = () => setOverlay(null);
+
+  // クイックオーバーレイの選択は既定=置き換え、Ctrl/Cmd+クリックで AND 追加へ反転する（ADR-0012 §7）。
+  // 置き換えは結果面を作品一覧へ遷移させ、AND追加は現在の結果面に留まる（ADR-0012 §8）。
+  const handleSelectValue = (tag: string, opts: { ctrlKey: boolean; metaKey: boolean }) => {
+    if (opts.ctrlKey || opts.metaKey) nav.toggleTag(tag);
+    else nav.replaceTagAndShowWorks(tag);
+  };
+
+  const renderRow = (ax: AxisRow) => {
+    const hasQuickOverlay = isFacetAxis(ax.id) || ax.id === "tag";
+    return (
+      <AxisRowItem
+        key={ax.id}
+        ax={ax}
+        isActive={activeAxis === ax.id}
+        hasQuickOverlay={hasQuickOverlay}
+        isOverlayOpen={overlay?.axis === ax.id}
+        onSelect={() => {
+          requestOverlayClose();
+          onSelectAxis(ax.id);
+        }}
+        onRequestOverlayOpen={requestOverlayOpen}
+        onRequestOverlayClose={requestOverlayClose}
+      />
+    );
+  };
+
   return (
     <div className="mle-col is-axis">
       <div className="mle-col__hd">
@@ -97,24 +169,11 @@ export default function AxisColumn({
         {totalCount != null && <span className="count">{totalCount} 件</span>}
       </div>
       <div className="mle-col__list">
-        <div className="mll-axisgroup">
-          <AxisRowItem
-            ax={HOME_AXIS}
-            isActive={activeAxis === "home"}
-            onSelect={() => onSelectAxis("home")}
-          />
-        </div>
+        <div className="mll-axisgroup">{renderRow(HOME_AXIS)}</div>
 
         <div className="mll-axisgroup">
           <div className="mll-axisgroup__hd">ビュー</div>
-          {VIEW_AXES.map((ax) => (
-            <AxisRowItem
-              key={ax.id}
-              ax={ax}
-              isActive={activeAxis === ax.id}
-              onSelect={() => onSelectAxis(ax.id)}
-            />
-          ))}
+          {VIEW_AXES.map(renderRow)}
         </div>
 
         <div className="mll-axisgroup">
@@ -130,26 +189,14 @@ export default function AxisColumn({
               )}
             </div>
           )}
-          {facetAxisRows.map((ax) => (
-            <AxisRowItem
-              key={ax.id}
-              ax={ax}
-              isActive={activeAxis === ax.id}
-              onSelect={() => onSelectAxis(ax.id)}
-            />
-          ))}
+          {facetAxisRows.map(renderRow)}
         </div>
 
         <div className="mll-axisgroup">
           <div className="mll-axisgroup__hd">スマートフォルダー</div>
-          {smartFolders.map((sf) => (
-            <AxisRowItem
-              key={sf.id}
-              ax={{ id: `smart-${sf.id}` as AxisId, name: sf.name, icon: "gridS" }}
-              isActive={activeAxis === `smart-${sf.id}`}
-              onSelect={() => onSelectAxis(`smart-${sf.id}` as AxisId)}
-            />
-          ))}
+          {smartFolders.map((sf) =>
+            renderRow({ id: `smart-${sf.id}` as AxisId, name: sf.name, icon: "gridS" }),
+          )}
           <button type="button" className="mll-axis is-action" onClick={onNewSmartFolder}>
             <span className="ic">
               <I.add size={14} />
@@ -158,6 +205,18 @@ export default function AxisColumn({
           </button>
         </div>
       </div>
+
+      {overlay && (
+        <AxisQuickOverlay
+          axis={overlay.axis}
+          anchorEl={overlay.anchorEl}
+          isOpen
+          selectedTags={nav.selectedTags}
+          onSelectValue={handleSelectValue}
+          onClose={requestOverlayClose}
+          panelHandlers={overlay.panelHandlers}
+        />
+      )}
     </div>
   );
 }

@@ -111,7 +111,7 @@ test("tag filter chips and cross-axis AND filtering", async ({ page }) => {
 
   await expect(page.locator(".mll-tagband .mll-tagband__chip")).toHaveText(["癒し系"]);
   await expect(page.locator(".mll-vrow", { hasText: "癒し系" })).toHaveAttribute(
-    "aria-pressed",
+    "aria-selected",
     "true",
   );
 

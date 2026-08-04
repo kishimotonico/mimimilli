@@ -87,3 +87,23 @@ export function getAxisIcon(axis: AxisId): IconName {
   if (isSmartAxis(axis)) return "gridS";
   return BUILTIN_AXIS_ICONS[axis] ?? PREFIX_ICONS[axis] ?? "folder";
 }
+
+export interface FacetAxisRow {
+  id: AxisId;
+  name: string;
+  icon: IconName;
+}
+
+/** 分類軸の行 = 軸表示ONの prefix 定義（定義順）＋ 組み込みの tag / year（ADR-0005）。
+ *  軸レール（AxisColumn）と「＋絞り込み」の軸選択ステージ（TASK-182、FilterChipAddButton）
+ *  が共有する。 */
+export function buildFacetAxisRows(tagPrefixes: TagPrefix[]): FacetAxisRow[] {
+  const prefixRows = tagPrefixes
+    .filter((p) => p.showAsAxis)
+    .map((p) => ({ id: p.prefix, name: p.label, icon: getAxisIcon(p.prefix) }));
+  return [
+    ...prefixRows,
+    { id: "tag", name: "タグ", icon: getAxisIcon("tag") },
+    { id: "year", name: "追加日", icon: getAxisIcon("year") },
+  ];
+}

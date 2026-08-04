@@ -26,6 +26,9 @@ interface AxisValueListProps {
   isFacetLoading?: boolean;
   isFacetError?: boolean;
   isTagPrefixesError?: boolean;
+  /** 既定=置き換え（クリック。ADR-0012 §7） */
+  onReplace: (tag: string) => void;
+  /** AND追加（Ctrl/Cmd+クリック・ホバー時の＋ボタン） */
   onToggle: (tag: string) => void;
   onRetryFacets?: () => void;
   onRetryTagPrefixes?: () => void;
@@ -39,6 +42,7 @@ export default function AxisValueList({
   isFacetLoading,
   isFacetError,
   isTagPrefixesError,
+  onReplace,
   onToggle,
   onRetryFacets,
   onRetryTagPrefixes,
@@ -61,7 +65,13 @@ export default function AxisValueList({
 
   const isSelected = (item: AxisFacetItem) =>
     selectedTags.includes(buildFilterTag(axis, item.value));
-  const handleToggle = (item: AxisFacetItem) => onToggle(buildFilterTag(axis, item.value));
+  // クリック＝置き換え、Ctrl/Cmd+クリック＝AND追加（ADR-0012 §7）。ホバー時の＋ボタンは常にAND追加。
+  const handleSelect = (item: AxisFacetItem, opts: { ctrlKey: boolean; metaKey: boolean }) => {
+    const tag = buildFilterTag(axis, item.value);
+    if (opts.ctrlKey || opts.metaKey) onToggle(tag);
+    else onReplace(tag);
+  };
+  const handleAdd = (item: AxisFacetItem) => onToggle(buildFilterTag(axis, item.value));
 
   const showSearchMiss = facetItems.length > 0 && sorted.length === 0;
 
@@ -147,7 +157,8 @@ export default function AxisValueList({
                 isSelected={isSelected}
                 fallbackIcon={fallbackIcon}
                 resetKey={resetKey}
-                onToggle={handleToggle}
+                onSelect={handleSelect}
+                onAdd={handleAdd}
               />
             ) : (
               <AxisValueRows
@@ -157,7 +168,8 @@ export default function AxisValueList({
                 isSelected={isSelected}
                 fallbackIcon={fallbackIcon}
                 resetKey={resetKey}
-                onToggle={handleToggle}
+                onSelect={handleSelect}
+                onAdd={handleAdd}
               />
             )}
           </>

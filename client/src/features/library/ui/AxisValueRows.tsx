@@ -7,6 +7,7 @@ import { formatDuration } from "../../../shared/lib/format";
 import { I } from "../../../shared/ui/Icon";
 import { selectFixedCoverThumbnailWidth } from "../../../entities/work/ui/coverThumbnailWidth";
 import CoverCollage from "./CoverCollage";
+import IconButton from "../../../shared/ui/IconButton";
 import type { IconName } from "../../../shared/ui/Icon";
 
 const ROW_COLLAGE_SIZE = 32;
@@ -27,7 +28,10 @@ interface AxisValueRowsProps {
   fallbackIcon: IconName;
   /** 軸・並び順・検索語が変わったらスクロール位置をリセットするための key */
   resetKey: string;
-  onToggle: (item: AxisFacetItem) => void;
+  /** クリック（既定=置き換え）・Ctrl/Cmd+クリック（AND追加）（ADR-0012 §7） */
+  onSelect: (item: AxisFacetItem, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
+  /** ホバー/フォーカス時に出る＋ボタン（常にAND追加） */
+  onAdd: (item: AxisFacetItem) => void;
 }
 
 function SortHeaderButton({
@@ -70,7 +74,8 @@ export default function AxisValueRows({
   isSelected,
   fallbackIcon,
   resetKey,
-  onToggle,
+  onSelect,
+  onAdd,
 }: AxisValueRowsProps) {
   const listRef = useRef<HTMLDivElement>(null);
   // コラージュは32pxを2×2に分割するので、各セルの要求サムネイル幅は半分の16pxを基準にする
@@ -132,24 +137,37 @@ export default function AxisValueRows({
                   transform: `translateY(${virtualRow.start}px)`,
                 }}
               >
-                <button
-                  type="button"
+                <div
                   className={`mll-vrow ${isSelected(item) ? "is-on" : ""}`}
-                  aria-pressed={isSelected(item)}
-                  onClick={() => onToggle(item)}
+                  // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- クリック領域(選択)とAND追加ボタンを両方内包するため<option>にはできない
+                  role="option"
+                  aria-selected={isSelected(item)}
                 >
-                  <CoverCollage
-                    covers={item.covers}
-                    size={ROW_COLLAGE_SIZE}
-                    fallbackIcon={fallbackIcon}
-                    requestWidth={collageRequestWidth}
+                  <button
+                    type="button"
+                    className="mll-vrow__main"
+                    onClick={(e) => onSelect(item, { ctrlKey: e.ctrlKey, metaKey: e.metaKey })}
+                  >
+                    <CoverCollage
+                      covers={item.covers}
+                      size={ROW_COLLAGE_SIZE}
+                      fallbackIcon={fallbackIcon}
+                      requestWidth={collageRequestWidth}
+                    />
+                    <span className="mll-vrow__nm">{item.value}</span>
+                    <span className="mll-vrow__count">{item.count}</span>
+                    <span className="mll-vrow__dur">
+                      {formatDuration(item.durationSec) ?? "0:00"}
+                    </span>
+                  </button>
+                  <IconButton
+                    icon={I.add}
+                    label={`${item.value}をAND追加`}
+                    size="xs"
+                    className="mll-vrow__add"
+                    onClick={() => onAdd(item)}
                   />
-                  <span className="mll-vrow__nm">{item.value}</span>
-                  <span className="mll-vrow__count">{item.count}</span>
-                  <span className="mll-vrow__dur">
-                    {formatDuration(item.durationSec) ?? "0:00"}
-                  </span>
-                </button>
+                </div>
               </div>
             );
           })}

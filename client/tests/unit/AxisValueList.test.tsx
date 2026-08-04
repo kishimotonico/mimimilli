@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import type { AxisFacetItem } from "@mimimilli/shared";
@@ -29,6 +29,7 @@ function renderAxisValueList(
         facetItems={[]}
         tagPrefixes={[]}
         selectedTags={[]}
+        onReplace={vi.fn()}
         onToggle={vi.fn()}
         {...props}
       />
@@ -52,7 +53,7 @@ describe("AxisValueList list 表示（ADR-0012 §5）", () => {
     });
     await flushVirtualizer();
 
-    const row = screen.getByRole("button", { name: /藤田茜/ });
+    const row = screen.getByRole("option", { name: /藤田茜/ });
     expect(within(row).getByText("藤田茜")).toBeTruthy();
     expect(within(row).getByText("5")).toBeTruthy();
     expect(within(row).getByText("2:05")).toBeTruthy();
@@ -129,14 +130,47 @@ describe("AxisValueList list 表示（ADR-0012 §5）", () => {
     sizeMock.restore();
   });
 
-  it("選択中の値をクリックすると完全なタグ文字列で onToggle を呼ぶ", async () => {
+  it("値をクリックすると完全なタグ文字列で onReplace を呼ぶ（既定=置き換え、ADR-0012 §7）", async () => {
+    const sizeMock = mockElementSize(600, 600);
+    const onReplace = vi.fn();
+    const user = userEvent.setup();
+    renderAxisValueList({ axis: "cv", facetItems: [makeItem({ value: "藤田茜" })], onReplace });
+    await flushVirtualizer();
+
+    const row = screen.getByRole("option", { name: /藤田茜/ });
+    await user.click(row.querySelector(".mll-vrow__main") as HTMLElement);
+    expect(onReplace).toHaveBeenCalledWith("cv/藤田茜");
+    sizeMock.restore();
+  });
+
+  it("Ctrl+クリックはAND追加（onToggle）へ反転する（ADR-0012 §7）", async () => {
+    const sizeMock = mockElementSize(600, 600);
+    const onToggle = vi.fn();
+    const onReplace = vi.fn();
+    renderAxisValueList({
+      axis: "cv",
+      facetItems: [makeItem({ value: "藤田茜" })],
+      onToggle,
+      onReplace,
+    });
+    await flushVirtualizer();
+
+    const row = screen.getByRole("option", { name: /藤田茜/ });
+    fireEvent.click(row.querySelector(".mll-vrow__main") as HTMLElement, { ctrlKey: true });
+    expect(onToggle).toHaveBeenCalledWith("cv/藤田茜");
+    expect(onReplace).not.toHaveBeenCalled();
+    sizeMock.restore();
+  });
+
+  it("ホバー時の＋ボタンは常にAND追加（onToggle）を呼ぶ", async () => {
     const sizeMock = mockElementSize(600, 600);
     const onToggle = vi.fn();
     const user = userEvent.setup();
     renderAxisValueList({ axis: "cv", facetItems: [makeItem({ value: "藤田茜" })], onToggle });
     await flushVirtualizer();
 
-    await user.click(screen.getByRole("button", { name: /藤田茜/ }));
+    const row = screen.getByRole("option", { name: /藤田茜/ });
+    await user.click(row.querySelector(".mll-vrow__add") as HTMLElement);
     expect(onToggle).toHaveBeenCalledWith("cv/藤田茜");
     sizeMock.restore();
   });
@@ -160,7 +194,7 @@ describe("AxisValueList grid 表示", () => {
     renderAxisValueList({ facetItems: [makeItem({ value: "藤田茜", count: 5 })] }, "grid");
     await flushVirtualizer();
 
-    const tile = screen.getByRole("button", { name: /藤田茜/ });
+    const tile = screen.getByRole("option", { name: /藤田茜/ });
     expect(within(tile).getByText("藤田茜")).toBeTruthy();
     expect(within(tile).getByText("5 件")).toBeTruthy();
     expect(tile.querySelector(".mll-collage")).toBeTruthy();
@@ -179,6 +213,7 @@ describe("AxisValueList grid 表示", () => {
           facetItems={[makeItem()]}
           tagPrefixes={[]}
           selectedTags={[]}
+          onReplace={vi.fn()}
           onToggle={vi.fn()}
         />
       </JotaiProvider>,
@@ -200,15 +235,15 @@ describe("AxisValueList コンテキスト検索（ADR-0012 §6）", () => {
     });
     await flushVirtualizer();
 
-    expect(screen.getByRole("button", { name: /藤田茜/ })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /夜想曲サークル/ })).toBeTruthy();
+    expect(screen.getByRole("option", { name: /藤田茜/ })).toBeTruthy();
+    expect(screen.getByRole("option", { name: /夜想曲サークル/ })).toBeTruthy();
 
     const input = screen.getByPlaceholderText("値を絞り込み");
     await user.type(input, "藤田");
     await flushVirtualizer();
 
-    expect(screen.getByRole("button", { name: /藤田茜/ })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: /夜想曲サークル/ })).toBeNull();
+    expect(screen.getByRole("option", { name: /藤田茜/ })).toBeTruthy();
+    expect(screen.queryByRole("option", { name: /夜想曲サークル/ })).toBeNull();
     sizeMock.restore();
   });
 
@@ -224,6 +259,7 @@ describe("AxisValueList コンテキスト検索（ADR-0012 §6）", () => {
           facetItems={[makeItem({ value: "藤田茜" })]}
           tagPrefixes={[]}
           selectedTags={[]}
+          onReplace={vi.fn()}
           onToggle={vi.fn()}
         />
       </JotaiProvider>,
@@ -241,6 +277,7 @@ describe("AxisValueList コンテキスト検索（ADR-0012 §6）", () => {
           facetItems={[makeItem({ value: "夜想曲" })]}
           tagPrefixes={[]}
           selectedTags={[]}
+          onReplace={vi.fn()}
           onToggle={vi.fn()}
         />
       </JotaiProvider>,
