@@ -181,6 +181,39 @@ test("GET /api/axes/:axis にスラッシュ入りの軸を渡すと400", async 
   assert.equal(body.error.code, "invalid_request");
 });
 
+test("GET /api/axes/:axis は tags/tagOp/axis/axisValue を絞り込みとしてadapterへ渡す（TASK-187）", async () => {
+  const adapter = createFixtureAdapter();
+  let receivedFilter: unknown;
+  adapter.getAxisFacets = async (_axis, filter) => {
+    receivedFilter = filter;
+    return [];
+  };
+  const app = createApp(adapter);
+  const res = await app.request(
+    "/api/axes/cv?tags=ASMR&tags=%E5%82%AC%E7%9C%A0&tagOp=OR&axis=year&axisValue=2024",
+  );
+  assert.equal(res.status, 200);
+  assert.deepEqual(receivedFilter, {
+    tags: ["ASMR", "催眠"],
+    tagOp: "OR",
+    axis: "year",
+    axisValue: "2024",
+  });
+});
+
+test("GET /api/axes/:axis はクエリ省略時、空配列相当のフィルタをadapterへ渡す", async () => {
+  const adapter = createFixtureAdapter();
+  let receivedFilter: unknown;
+  adapter.getAxisFacets = async (_axis, filter) => {
+    receivedFilter = filter;
+    return [];
+  };
+  const app = createApp(adapter);
+  const res = await app.request("/api/axes/cv");
+  assert.equal(res.status, 200);
+  assert.deepEqual(receivedFilter, { tags: [], tagOp: "AND" });
+});
+
 test("GET /api/fs はルートの listing を返す", async () => {
   const app = buildApp();
   const res = await app.request("/api/fs");

@@ -42,6 +42,7 @@ import type {
 import {
   createCoverValidators,
   NotConfiguredError,
+  type AxisFacetsFilter,
   type CoverDescriptor,
   type DataAdapter,
   type MediaKind,
@@ -766,8 +767,8 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
     },
 
     // ── 分類軸・タグ prefix 定義・スマートフォルダー・プリセット ──
-    async getAxisFacets(axis: string): Promise<AxisFacetItem[]> {
-      return repo.getAxisFacets(axis);
+    async getAxisFacets(axis: string, filter?: AxisFacetsFilter): Promise<AxisFacetItem[]> {
+      return repo.getAxisFacets(axis, filter);
     },
 
     async listTagPrefixes(): Promise<TagPrefix[]> {

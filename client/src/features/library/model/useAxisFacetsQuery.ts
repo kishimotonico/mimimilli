@@ -6,11 +6,15 @@ import { useQuery } from "@tanstack/react-query";
 import type { FacetAxisId } from "@mimimilli/shared";
 import { getAxisFacets } from "../api";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
+import { buildAxisFacetFilterParams } from "./libraryPresentation";
 
-export function useAxisFacetsQuery(axis: FacetAxisId | null) {
+// selectedTags は自軸除外カウント（TASK-187）の入力。省略時（[]）は無フィルタ集計になる
+// （呼び出し側が保持中のフィルタを意図的に渡さない場面は無い想定だが、型上は必須にしない）。
+export function useAxisFacetsQuery(axis: FacetAxisId | null, selectedTags: string[] = []) {
+  const filterParams = axis !== null ? buildAxisFacetFilterParams(axis, selectedTags) : {};
   return useQuery({
-    queryKey: WORK_QUERY_KEYS.facets(axis ?? ""),
-    queryFn: () => getAxisFacets(axis!),
+    queryKey: WORK_QUERY_KEYS.facets(axis ?? "", filterParams),
+    queryFn: () => getAxisFacets(axis!, filterParams),
     enabled: axis !== null,
   });
 }

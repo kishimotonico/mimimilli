@@ -175,7 +175,7 @@ export function useLibrarySupportingQueries(nav: LibraryViewState) {
   // 件数バッジ（libraryTotal）とホームビューの統計表示を兼ねる。
   const libraryStatsQuery = useQuery(libraryTotalQueryOptions);
   const facetAxis = getFacetAxisForQuery(nav.activeAxis);
-  const facetQuery = useAxisFacetsQuery(facetAxis);
+  const facetQuery = useAxisFacetsQuery(facetAxis, nav.selectedTags);
   const smartFoldersQuery = useQuery({
     queryKey: SMART_FOLDER_QUERY_KEYS.all(),
     queryFn: listSmartFolders,

@@ -409,6 +409,25 @@ describe("library api", () => {
     expect(result).toEqual(mockFacets);
   });
 
+  it("getAxisFacets は自軸除外後のフィルタ（tags/tagOp/axis/axisValue）をクエリへ渡す（TASK-187）", async () => {
+    mockFetch.mockResolvedValue(makeResponse([]));
+    await libraryApi.getAxisFacets("cv", {
+      tags: ["サークル/月白製作所"],
+      tagOp: "AND",
+      axis: "year",
+      axisValue: "2024",
+    });
+    expect(mockFetch).toHaveBeenCalledWith(
+      "/api/axes/cv?tags=%E3%82%B5%E3%83%BC%E3%82%AF%E3%83%AB%2F%E6%9C%88%E7%99%BD%E8%A3%BD%E4%BD%9C%E6%89%80&tagOp=AND&axis=year&axisValue=2024",
+    );
+  });
+
+  it("getAxisFacets はフィルタ省略時クエリ無しでフェッチする", async () => {
+    mockFetch.mockResolvedValue(makeResponse([]));
+    await libraryApi.getAxisFacets("cv", {});
+    expect(mockFetch).toHaveBeenCalledWith("/api/axes/cv");
+  });
+
   it("listSmartFolders fetches /api/smart-folders", async () => {
     mockFetch.mockResolvedValue(makeResponse([]));
     await libraryApi.listSmartFolders();

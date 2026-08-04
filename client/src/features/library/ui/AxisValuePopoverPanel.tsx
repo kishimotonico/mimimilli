@@ -26,7 +26,7 @@ export default function AxisValuePopoverPanel({
   onClose,
   hint,
 }: AxisValuePopoverPanelProps) {
-  const facetQuery = useAxisFacetsQuery(axis as FacetAxisId);
+  const facetQuery = useAxisFacetsQuery(axis as FacetAxisId, selectedTags);
 
   return (
     <div
