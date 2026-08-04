@@ -92,7 +92,8 @@ export function mockElementSize(width = 800, height = 600): { restore: () => voi
   const isScrollTarget = (el: HTMLElement) =>
     el.classList?.contains("mll-grid") ||
     el.classList?.contains("mll-grid-scroll") ||
-    el.classList?.contains("mle-col__list");
+    el.classList?.contains("mle-col__list") ||
+    el.classList?.contains("mll-qlist__body");
 
   Object.defineProperty(HTMLElement.prototype, "offsetWidth", {
     configurable: true,
