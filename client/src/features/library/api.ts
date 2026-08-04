@@ -51,7 +51,7 @@ export async function searchWorks(
 
 // ── 分類軸ファセット ───────────────────────────────────────────
 
-/** 自軸除外後のフィルタ（TASK-187）。フォルダー評価API同様 tags/tagOp/axis/axisValue を渡す */
+/** 自軸除外後のフィルタ。フォルダー評価API同様 tags/tagOp/axis/axisValue を渡す */
 export interface AxisFacetsParams {
   tags?: string[];
   tagOp?: "AND" | "OR";
@@ -112,7 +112,7 @@ export async function deleteSmartFolder(id: string): Promise<void> {
   await deleteVoid(`/smart-folders/${encodeURIComponent(id)}`);
 }
 
-/** tags/axis はフォルダーのルールに対する追加の AND 条件（ADR-0012、TASK-185） */
+/** tags/axis はフォルダーのルールに対する追加の AND 条件（ADR-0012） */
 export interface SmartFolderWorksParams {
   page: number;
   limit: number;

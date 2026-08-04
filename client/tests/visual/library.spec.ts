@@ -106,7 +106,7 @@ test("tag filter chips and cross-axis AND filtering", async ({ page }) => {
 
   // タグ軸 → 「癒し系」を選択（ADR-0012: 選択は全軸共通のタグフィルタへ）。
   // 値一覧の通常クリックは置き換え選択のため、選択と同時に結果面が作品一覧へ
-  // 遷移する（ADR-0012 §8、TASK-186）。
+  // 遷移する（ADR-0012 §8）。
   await page.locator(".mll-axis", { hasText: "タグ" }).click();
   await page.locator(".mll-vrow", { hasText: "癒し系" }).click();
 
@@ -124,6 +124,62 @@ test("tag filter chips and cross-axis AND filtering", async ({ page }) => {
 
   // パネル要素のみを撮影し、チップ列＋作品一覧の導線を回帰対象にする。
   await expect(results).toHaveScreenshot("tag-filter-result-list.png");
+});
+
+test("axis value list - grid", async ({ page }) => {
+  await openApp(page);
+
+  await page.locator(".mll-axis", { hasText: "CV" }).click();
+  await page.getByRole("button", { name: "グリッド" }).click();
+
+  const valueList = page.locator(".mle-col.is-axis-values");
+  await expect(valueList.locator(".mll-vtile").first()).toBeVisible();
+
+  await expect(valueList).toHaveScreenshot("axis-value-list-grid.png");
+});
+
+test("axis value list - list（入れ子タグの階層表示）", async ({ page }) => {
+  await openApp(page);
+
+  await page.locator(".mll-axis", { hasText: "タグ" }).click();
+  // 既定は件数ソート。名前順に切り替えると入れ子タグがインデント＋見出し行で並ぶ
+  // （ADR-0012 §5、axisValueHierarchy.ts）。
+  await page.locator(".mll-vlist-hd__sort", { hasText: "名前" }).click();
+
+  const valueList = page.locator(".mle-col.is-axis-values");
+  await expect(valueList.locator(".mll-vrow-heading").first()).toBeVisible();
+
+  await expect(valueList).toHaveScreenshot("axis-value-list-hierarchy.png");
+});
+
+test("chip band compound filtering（軸をまたいだAND絞り込み）", async ({ page }) => {
+  await openApp(page);
+
+  // CV軸で1件選ぶ（既定=置き換え）。結果面は作品一覧へ遷移する（ADR-0012 §8）。
+  await page.locator(".mll-axis", { hasText: "CV" }).click();
+  await page.locator(".mll-vrow", { hasText: "霧島レイ" }).click();
+  await expect(page.locator(".mll-tagband .mll-tagband__chip")).toHaveText(["cv/霧島レイ"]);
+
+  // 続けてサークル軸から1件をAND追加する（ホバー時の＋ボタン）。
+  await page.locator(".mll-axis", { hasText: "サークル" }).click();
+  const circleRow = page.locator(".mll-vrow", { hasText: "月白製作所" });
+  await circleRow.hover();
+  await circleRow.getByRole("button", { name: /をAND追加$/ }).click();
+
+  await expect(page.locator(".mll-tagband .mll-tagband__chip")).toHaveText([
+    "cv/霧島レイ",
+    "サークル/月白製作所",
+  ]);
+
+  // AND追加は現在地（サークルの値一覧）に留まる。作品一覧で結果を確認する。
+  await page.locator(".mll-axis", { hasText: "すべての作品" }).click();
+  await expect(page.locator(".mll-tagband .mll-tagband__chip")).toHaveText([
+    "cv/霧島レイ",
+    "サークル/月白製作所",
+  ]);
+
+  const results = page.locator(".mll-results");
+  await expect(results).toHaveScreenshot("chip-band-compound-filter.png");
 });
 
 test("scan result dialog", async ({ page }, testInfo) => {

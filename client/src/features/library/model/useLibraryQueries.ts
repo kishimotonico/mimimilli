@@ -117,7 +117,7 @@ export function useLibraryDebouncedSearchQuery(searchQuery: string) {
 }
 
 /** Suspense 境界配下でのみ使うスマートフォルダー作品一覧。
- *  保持中のタグ/組み込み軸フィルタをフォルダーのルールへの追加 AND として渡す（TASK-185）。 */
+ *  保持中のタグ/組み込み軸フィルタをフォルダーのルールへの追加 AND として渡す（ADR-0012）。 */
 export function useSuspenseSmartLibraryWorks(nav: LibraryViewState) {
   const smartAxisId = getSmartFolderId(nav.activeAxis);
   const filterParams = buildSmartFolderFilterParams(nav.selectedTags);

@@ -5,7 +5,7 @@ import { buildFilterTag } from "../model/libraryPresentation";
 import type { PopoverLayout } from "./preview/useAnchoredPopover";
 import AxisValueQuickList from "./AxisValueQuickList";
 
-// チップの兄弟値ドロップダウン・「＋絞り込み」の値ステージ（TASK-182）が共有する
+// チップの兄弟値ドロップダウン・「＋絞り込み」の値ステージが共有する
 // 非ポータル版のポップオーバー本体。呼び出し側の `.mll-tagband` / チップは overflow を
 // クリップしないため、軸レールのクイックオーバーレイ（AxisQuickOverlay）と違いポータル不要。
 

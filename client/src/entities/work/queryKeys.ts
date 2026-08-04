@@ -5,7 +5,7 @@ export const WORK_QUERY_KEYS = {
   allDetails: () => ["work"] as const,
   detail: (id: string) => ["work", id] as const,
   allFacets: () => ["axisFacets"] as const,
-  // filterParams: 自軸除外後の絞り込み（TASK-187）。フィルタが変われば別クエリとして
+  // filterParams: 自軸除外後の絞り込み。フィルタが変われば別クエリとして
   // キャッシュを分離する
   facets: (axis: string, filterParams: object = {}) => ["axisFacets", axis, filterParams] as const,
   dlsiteNotifications: () => ["dlsiteNotifications"] as const,

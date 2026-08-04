@@ -3,7 +3,6 @@ import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
 import {
   activeAxisAtom,
-  gridInspectorOpenAtom,
   libraryGridLayoutModeAtom,
   libraryTileSizeAtom,
   libraryViewModeAtom,
@@ -16,7 +15,6 @@ export default function LibraryGridControls() {
   const activeAxis = useAtomValue(activeAxisAtom);
   const [gridLayoutMode, setGridLayoutMode] = useAtom(libraryGridLayoutModeAtom);
   const [tileSize, setTileSize] = useAtom(libraryTileSizeAtom);
-  const [gridInspectorOpen, setGridInspectorOpen] = useAtom(gridInspectorOpenAtom);
   // WorkGrid が実際に描画されているか。list/grid の決定は libraryViewModeAtom のみに
   // 依存する（ADR-0012 §3。強制グリッドの上書きは廃止済み）。
   const showGrid = isWorksGridActive(activeAxis, viewMode);
@@ -60,16 +58,6 @@ export default function LibraryGridControls() {
           />
           <output>{safeTileSize}px</output>
         </label>
-
-        <IconButton
-          size="sm"
-          icon={I.panelR}
-          label="詳細パネルの表示切り替え"
-          title="詳細パネル"
-          active={gridInspectorOpen}
-          onClick={() => setGridInspectorOpen((open) => !open)}
-          disabled={!showGrid}
-        />
       </div>
     </div>
   );

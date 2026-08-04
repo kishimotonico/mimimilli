@@ -214,7 +214,7 @@ describe("buildWorksParams", () => {
   });
 });
 
-describe("buildSmartFolderFilterParams（スマートフォルダー評価APIへの追加AND条件、TASK-185）", () => {
+describe("buildSmartFolderFilterParams（スマートフォルダー評価APIへの追加AND条件）", () => {
   it("フィルタが無ければキーの無い空オブジェクトを返す（クエリキーの安定のため）", () => {
     expect(buildSmartFolderFilterParams([])).toEqual({});
   });
@@ -345,7 +345,7 @@ describe("computeCollectionStatsDisplay", () => {
   });
 });
 
-describe("buildAxisFacetFilterParams（自軸除外カウント、TASK-187）", () => {
+describe("buildAxisFacetFilterParams（自軸除外カウント）", () => {
   it("軸Xの値一覧では、軸X由来の実タグを除外してから残りをtags/tagOpへ渡す", () => {
     // cv 軸を見ているときは cv/* を除外し、他軸（サークル）のフィルタは残す
     expect(buildAxisFacetFilterParams("cv", ["cv/藤田茜", "サークル/月白製作所"])).toEqual({

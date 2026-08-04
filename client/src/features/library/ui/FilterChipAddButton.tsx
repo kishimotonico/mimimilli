@@ -9,7 +9,7 @@ import { I } from "../../../shared/ui/Icon";
 const POPOVER_WIDTH = 240;
 const AND_ADD_HINT = "AND追加されます";
 
-// チップ列の「＋絞り込み」（ADR-0012 §2、TASK-182）。軸→値の2段オーバーレイ。
+// チップ列の「＋絞り込み」（ADR-0012 §2）。軸→値の2段オーバーレイ。
 // 既定は AND 追加（ヒント表示つき）、Ctrl/Cmd+クリックで置き換えへ反転する。
 
 interface FilterChipAddButtonProps {

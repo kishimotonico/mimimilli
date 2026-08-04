@@ -95,7 +95,7 @@ export interface FacetAxisRow {
 }
 
 /** 分類軸の行 = 軸表示ONの prefix 定義（定義順）＋ 組み込みの tag / year（ADR-0005）。
- *  軸レール（AxisColumn）と「＋絞り込み」の軸選択ステージ（TASK-182、FilterChipAddButton）
+ *  軸レール（AxisColumn）と「＋絞り込み」の軸選択ステージ（FilterChipAddButton）
  *  が共有する。 */
 export function buildFacetAxisRows(tagPrefixes: TagPrefix[]): FacetAxisRow[] {
   const prefixRows = tagPrefixes

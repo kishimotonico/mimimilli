@@ -37,8 +37,8 @@ interface WorkListPaneProps {
   onLoadMore?: () => void;
   onWorkSelect: (id: string) => void;
   onClearSearch: () => void;
-  /** スマートフォルダー軸のときだけ渡すルール表示・編集導線（TASK-180: 固定レイアウトのため
-   *  プレビュー側ではなく結果面ヘッダー直下に置く） */
+  /** スマートフォルダー軸のときだけ渡すルール表示・編集導線（プレビュー側ではなく
+   *  結果面ヘッダー直下に置く） */
   smartFolderBanner?: ReactNode;
 }
 

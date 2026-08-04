@@ -3,7 +3,7 @@ import { getCoverImageUrl } from "../../../entities/work/api";
 import { I, type IconName } from "../../../shared/ui/Icon";
 
 // 値一覧の代表カバー 2×2 コラージュ（ADR-0012 §5）。grid タイル・list 行（32px）の両方で使う
-// 共有部品（TASK-182 のオーバーレイからも再利用できるよう独立させる）。
+// grid タイル・list 行・軸レールのオーバーレイが共有する部品。
 
 interface CoverCollageProps {
   covers: AxisFacetItem["covers"];

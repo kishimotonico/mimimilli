@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createStore } from "jotai";
-import {
-  gridInspectorOpenAtom,
-  selectedWorkIdAtom,
-  selectedTagsAtom,
-} from "../../src/features/library/model/atoms";
+import { selectedWorkIdAtom, selectedTagsAtom } from "../../src/features/library/model/atoms";
 import {
   consumeNavigationHistoryCommitAtom,
   navigationHistoryCommitAtom,
@@ -19,48 +15,31 @@ import {
   toggleLibraryTagAtom,
 } from "../../src/features/library/model/libraryNavigationActions";
 
-// TASK: 軸切替・タグ操作でグリッド詳細パネルの開閉stateが引き継がれると、
-// 別軸で「未選択パネルが開いた状態」の WorkGrid がマウントされ、
-// グリッド幅が意図せずジャンプする（ちらつきの原因）。ナビゲーション系アクションは
-// パネルを必ず閉じることを確認する。
-
-describe("ナビゲーション操作でグリッド詳細パネルを閉じる", () => {
-  it("setLibraryAxisAtom はパネルを閉じる", () => {
+describe("ナビゲーション操作は選択中の作品をクリアする", () => {
+  it("setLibraryAxisAtom は選択中の作品をクリアする", () => {
     const store = createStore();
-    store.set(gridInspectorOpenAtom, true);
+    store.set(selectedWorkIdAtom, "work-1");
 
     store.set(setLibraryAxisAtom, "circle");
 
-    expect(store.get(gridInspectorOpenAtom)).toBe(false);
+    expect(store.get(selectedWorkIdAtom)).toBeNull();
   });
 
-  it("toggleLibraryTagAtom はパネルを閉じる", () => {
+  it("toggleLibraryTagAtom は選択中の作品をクリアする", () => {
     const store = createStore();
-    store.set(gridInspectorOpenAtom, true);
+    store.set(selectedWorkIdAtom, "work-1");
 
     store.set(toggleLibraryTagAtom, "ASMR");
 
-    expect(store.get(gridInspectorOpenAtom)).toBe(false);
+    expect(store.get(selectedWorkIdAtom)).toBeNull();
   });
 
-  it("clearLibraryTagsAtom はパネルを閉じる", () => {
+  it("clearLibraryTagsAtom は選択中の作品をクリアする", () => {
     const store = createStore();
-    store.set(gridInspectorOpenAtom, true);
+    store.set(selectedWorkIdAtom, "work-1");
 
     store.set(clearLibraryTagsAtom);
 
-    expect(store.get(gridInspectorOpenAtom)).toBe(false);
-  });
-
-  it("selectLibraryWorkAtom（作品選択・解除）はパネルの開閉stateに触れない", () => {
-    const store = createStore();
-    store.set(gridInspectorOpenAtom, true);
-
-    store.set(selectLibraryWorkAtom, "work-1");
-    expect(store.get(gridInspectorOpenAtom)).toBe(true);
-
-    store.set(selectLibraryWorkAtom, null);
-    expect(store.get(gridInspectorOpenAtom)).toBe(true);
     expect(store.get(selectedWorkIdAtom)).toBeNull();
   });
 });
@@ -136,19 +115,17 @@ describe("selectSoleLibraryTagAtom: 作品詳細のタグクリックはタグ�
     expect(store.get(selectedTagsAtom)).toEqual(["genre/ASMR"]);
   });
 
-  it("選択中の作品とグリッド詳細パネルをクリアする", () => {
+  it("選択中の作品をクリアする", () => {
     const store = createStore();
     store.set(selectedWorkIdAtom, "work-1");
-    store.set(gridInspectorOpenAtom, true);
 
     store.set(selectSoleLibraryTagAtom, "genre/ASMR");
 
     expect(store.get(selectedWorkIdAtom)).toBeNull();
-    expect(store.get(gridInspectorOpenAtom)).toBe(false);
   });
 });
 
-describe("置き換え選択は作品一覧へ進み、AND追加は現在地に留まる（ADR-0012 §7・§8、TASK-182・TASK-186）", () => {
+describe("置き換え選択は作品一覧へ進み、AND追加は現在地に留まる（ADR-0012 §7・§8）", () => {
   it("replaceLibraryTagAtom: 値一覧の軸から選ぶと結果面が作品一覧（all）へ切り替わる", () => {
     const store = createStore();
     store.set(activeAxisAtom, "cv");

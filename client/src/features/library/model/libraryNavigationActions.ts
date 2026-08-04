@@ -7,13 +7,7 @@ import {
   isBuiltinPseudoTagAxis,
   parseBuiltinAxisTag,
 } from "./libraryPresentation";
-import {
-  activeAxisAtom,
-  gridInspectorOpenAtom,
-  selectedTagsAtom,
-  selectedWorkIdAtom,
-  sortAtom,
-} from "./atoms";
+import { activeAxisAtom, selectedTagsAtom, selectedWorkIdAtom, sortAtom } from "./atoms";
 
 // 軸は値をブラウズするためのビューであり、選択状態を持たない（ADR-0012 §1）。
 // 軸を切り替えても選択中のフィルタ（selectedTagsAtom）は維持する。
@@ -21,7 +15,6 @@ export const setLibraryAxisAtom = atom(null, (_get, set, axis: AxisId) => {
   requestNavigationHistoryCommit(set, "push");
   set(activeAxisAtom, axis);
   set(selectedWorkIdAtom, null);
-  set(gridInspectorOpenAtom, false);
 });
 
 // 軸の値選択（facet/tag 問わず）はすべて同じタグフィルタへの追加・解除として扱う
@@ -44,27 +37,25 @@ export const toggleLibraryTagAtom = atom(null, (get, set, tag: string) => {
     set(selectedTagsAtom, [...base, tag]);
   }
   set(selectedWorkIdAtom, null);
-  set(gridInspectorOpenAtom, false);
 });
 
 // 作品詳細のタグクリック用: 軸を tag に切り替えつつ絞り込みをそのタグだけに置き換える
 // 単一のアクション（ADR-0012 §2）。setAxis → toggleTag の2段呼び出しは、既存の絞り込みへの
-// 追加になってしまう（TASK-184）ほか、履歴コミットの二重化も招くため使わない。
+// 追加になってしまうほか、履歴コミットの二重化も招くため使わない。
 export const selectSoleLibraryTagAtom = atom(null, (_get, set, tag: string) => {
   requestNavigationHistoryCommit(set, "push");
   set(activeAxisAtom, "tag");
   set(selectedTagsAtom, [tag]);
   set(selectedWorkIdAtom, null);
-  set(gridInspectorOpenAtom, false);
 });
 
-// 全入口共通の「既定=置き換え」操作（ADR-0012 §7・§8、TASK-182・TASK-186）。同じ
-// tagFilterGroupKey のタグを外してから追加し、結果面を作品一覧へ進める。置き換えは
-// 「見たいものが変わった」を表すため、結果面が値一覧/ホームのままなら作品一覧（all）へ
-// 切り替える。既に作品一覧（ビュー軸・スマートフォルダー軸）ならそのまま維持する。
-// 軸レールのクイックオーバーレイ・チップの兄弟値ドロップダウン・値一覧の値タイル/行
-// クリックが使う、入口を問わない単一の規則。AND追加（Ctrl+クリック・ホバー時の＋ボタン等、
-// 「絞り込みを積んでいる途中」を表す）は現在地に留まる toggleLibraryTagAtom を使う。
+// 全入口共通の「既定=置き換え」操作（ADR-0012 §7・§8）。同じ tagFilterGroupKey のタグを
+// 外してから追加し、結果面を作品一覧へ進める。置き換えは「見たいものが変わった」を表す
+// ため、結果面が値一覧/ホームのままなら作品一覧（all）へ切り替える。既に作品一覧
+// （ビュー軸・スマートフォルダー軸）ならそのまま維持する。軸レールのクイックオーバーレイ・
+// チップの兄弟値ドロップダウン・値一覧の値タイル/行クリックが使う、入口を問わない単一の
+// 規則。AND追加（Ctrl+クリック・ホバー時の＋ボタン等、「絞り込みを積んでいる途中」を表す）
+// は現在地に留まる toggleLibraryTagAtom を使う。
 export const replaceLibraryTagAtom = atom(null, (get, set, tag: string) => {
   requestNavigationHistoryCommit(set, "push");
   const prev = get(selectedTagsAtom);
@@ -73,14 +64,12 @@ export const replaceLibraryTagAtom = atom(null, (get, set, tag: string) => {
     set(activeAxisAtom, "all");
   }
   set(selectedWorkIdAtom, null);
-  set(gridInspectorOpenAtom, false);
 });
 
 export const clearLibraryTagsAtom = atom(null, (_get, set) => {
   requestNavigationHistoryCommit(set, "push");
   set(selectedTagsAtom, []);
   set(selectedWorkIdAtom, null);
-  set(gridInspectorOpenAtom, false);
 });
 
 // 未選択→選択は push（戻るでドリル済み・未選択に戻れるように）、

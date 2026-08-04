@@ -58,8 +58,7 @@ interface WorkGridProps {
   onWorkSelect: (id: string) => void;
   onWorkPlay: (work: WorkListItem) => void;
   onClearSearch: () => void;
-  inspector: ReactNode | null;
-  /** Esc・グリッド背景クリック時の選択解除(パネル自体の開閉は行わない) */
+  /** Esc・グリッド背景クリック時の選択解除 */
   onDeselect: () => void;
   /** 作品一覧取得の再試行（isError 時） */
   onRetryWorks?: () => void;
@@ -115,7 +114,6 @@ export default function WorkGrid({
   onWorkSelect,
   onWorkPlay,
   onClearSearch,
-  inspector,
   onDeselect,
   onRetryWorks,
   smartFolderBanner,
@@ -125,7 +123,8 @@ export default function WorkGrid({
   const safeTileSize = clampTileSize(tileSize);
   const paneRef = useRef<HTMLElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const isInspectorOpen = inspector !== null;
+  // 作品選択中かどうか。Escape・グリッド背景クリックでの選択解除を有効にする条件に使う。
+  const isWorkSelected = selectedWorkId !== null;
 
   // .mll-grid のコンテンツ幅（padding除く）。1:1タイルの列数計算・ジャスティファイドの
   // 行幅計算の両方で使う。ref にコールバックを使うのは、works の読み込み前後で
@@ -269,7 +268,7 @@ export default function WorkGrid({
   }, [setTileSize, safeTileSize]);
 
   useEffect(() => {
-    if (!isInspectorOpen) return;
+    if (!isWorkSelected) return;
 
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || event.defaultPrevented) return;
@@ -288,10 +287,10 @@ export default function WorkGrid({
 
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [isInspectorOpen, onDeselect]);
+  }, [isWorkSelected, onDeselect]);
 
   useEffect(() => {
-    if (!isInspectorOpen) return;
+    if (!isWorkSelected) return;
     const scroll = scrollRef.current;
     if (!scroll) return;
 
@@ -303,7 +302,7 @@ export default function WorkGrid({
 
     scroll.addEventListener("click", handleGridBackgroundClick);
     return () => scroll.removeEventListener("click", handleGridBackgroundClick);
-  }, [isInspectorOpen, onDeselect]);
+  }, [isWorkSelected, onDeselect]);
 
   // 2次元キーボードナビ（TASK-45）。DOM 計測（querySelectorAll）をやめ、
   // レイアウト計算済みの columnCount / justifiedLayout.tiles から次インデックスを求める。
@@ -456,7 +455,6 @@ export default function WorkGrid({
             />
           )}
         </div>
-        {inspector}
       </div>
     </section>
   );

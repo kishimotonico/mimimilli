@@ -27,7 +27,7 @@ export function buildBuiltinAxisTag(axis: AxisId, value: string): string {
   return `${BUILTIN_AXIS_TAG_PREFIX}${axis}/${value}`;
 }
 
-export interface ParsedBuiltinAxisTag {
+interface ParsedBuiltinAxisTag {
   axis: string;
   value: string;
 }
@@ -43,13 +43,13 @@ export function parseBuiltinAxisTag(tag: string): ParsedBuiltinAxisTag | null {
 
 // ── 結果面の種類（ADR-0012: ナビゲーション状態・表示設定・絞り込み状態の分離） ──
 
-export type ResultsPaneKind = "home" | "value-list" | "works";
+type ResultsPaneKind = "home" | "value-list" | "works";
 
 /**
  * 軸だけから決まる結果面の種類。絞り込み状態（selectedTags）や表示設定（viewMode）には
  * 依存しない — 軸は値をブラウズするためのビューであり、選択状態を持たない（ADR-0012 §1）。
  *   - home: 発見ダッシュボード
- *   - value-list: facet 軸・タグ軸の値一覧（本タスクでは素朴な一覧、TASK-181 で本実装）
+ *   - value-list: facet 軸・タグ軸の値一覧
  *   - works: 作品一覧（ビュー軸・スマートフォルダー軸）
  */
 export function computeResultsPaneKind(axis: AxisId): ResultsPaneKind {
@@ -66,7 +66,7 @@ export function isWorksGridActive(axis: AxisId, viewMode: ViewMode): boolean {
 
 // ── 選択中フィルタ（selectedTagsAtom）の解釈 ────────────────────
 
-export interface SplitSelectedTags {
+interface SplitSelectedTags {
   /** 実タグとして work.tags と完全一致させるもの */
   tags: string[];
   /** year 軸から選ばれた addedAt の年（複数選択は仕様上 AND が常に0件になるため先頭のみ採用） */
@@ -98,7 +98,7 @@ export function buildFilterTag(axis: AxisId, value: string): string {
   return `${axis}/${value}`;
 }
 
-// ── 軸レール・チップの入口共通「置き換え既定」（ADR-0012 §7・TASK-182） ─────
+// ── 軸レール・チップの入口共通「置き換え既定」（ADR-0012 §7） ─────────────
 
 /** タグの「同じ軸/グループ」判定キー。クイックオーバーレイ・チップドロップダウン・
  *  結果面の値タイル/行のクリック（置き換え既定）が、置き換え対象を絞るのに使う。
@@ -121,7 +121,7 @@ export function axisOfFilterTag(tag: string): AxisId {
 }
 
 /** 置き換え選択の計算（純粋関数）。同じ tagFilterGroupKey のタグを外してから追加する。
- *  replaceLibraryTagAtom が使う（TASK-182・TASK-186、ADR-0012 §7・§8）。 */
+ *  replaceLibraryTagAtom が使う（ADR-0012 §7・§8）。 */
 export function computeReplacedTags(prev: string[], tag: string): string[] {
   const group = tagFilterGroupKey(tag);
   return [...prev.filter((t) => tagFilterGroupKey(t) !== group), tag];
@@ -129,7 +129,7 @@ export function computeReplacedTags(prev: string[], tag: string): string[] {
 
 // ── works query のパラメータ ──────────────────────────────────
 
-export interface WorksParamsInput {
+interface WorksParamsInput {
   activeAxis: AxisId;
   sort: SortId;
   searchQuery: string;
@@ -139,7 +139,7 @@ export interface WorksParamsInput {
 /** selectedTagsAtom から実タグ AND 条件・組み込み軸フィルタを取り出し、works query の
  *  フィールドへ変換する。通常の works query（buildWorksParams）とスマートフォルダー評価
  *  （buildSmartFolderFilterParams）で共通のロジック。 */
-export interface TagFilterParams {
+interface TagFilterParams {
   tags?: string[];
   tagOp?: "AND";
   axis?: "year";
@@ -175,7 +175,7 @@ export function buildWorksParams(input: WorksParamsInput): WorksQueryParams | nu
 }
 
 /** スマートフォルダー評価API（GET /smart-folders/:id/works）へ渡す追加フィルタ。
- *  フォルダーのルールに対する追加の AND 条件として適用される（ADR-0012、TASK-185）。
+ *  フォルダーのルールに対する追加の AND 条件として適用される（ADR-0012）。
  *  フィルタが無ければキーを持たない空オブジェクトを返す（クエリキーの安定のため）。 */
 export function buildSmartFolderFilterParams(selectedTags: string[]): TagFilterParams {
   return buildTagFilterParams(selectedTags);
@@ -187,10 +187,10 @@ export function getFacetAxisForQuery(activeAxis: AxisId): FacetAxisId | null {
 }
 
 /**
- * 軸ファセット取得API（GET /axes/:axis）へ渡す絞り込み。自軸除外カウント（TASK-187）:
+ * 軸ファセット取得API（GET /axes/:axis）へ渡す絞り込み。自軸除外カウント:
  * 軸Xの値一覧の件数・総時間・代表カバーは、現在のフィルタから軸X由来のフィルタ
  * （axisOfFilterTag(tag) === axis のもの）を除いた集合に対して集計する。同軸を乗り換える
- * ときの表示件数が、置き換え後（TASK-182: 通常クリックは置き換え既定）の実結果と一致し、
+ * ときの表示件数が、置き換え後（通常クリックは置き換え既定）の実結果と一致し、
  * 他軸フィルタによる0件だらけの空振りも防げる。「選択中の値は特別に残す」という例外は
  * 自軸除外なら不要（選択中の値自身も他軸フィルタだけを適用した普通の件数で残る）。
  */

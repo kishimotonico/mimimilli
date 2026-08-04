@@ -1,4 +1,4 @@
-// TASK-174: リストの作品未選択時、右ペインを発見ダッシュボード（最近追加/最近再生/ランダムピック）に差し替える。
+// リストの作品未選択時、右ペインを発見ダッシュボード（最近追加/最近再生/ランダムピック）に差し替える。
 
 import { createElement, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

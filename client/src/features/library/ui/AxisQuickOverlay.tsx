@@ -8,7 +8,7 @@ import { useAnchoredPopover } from "./preview/useAnchoredPopover";
 import type { HoverIntentHandlers } from "../../../shared/lib/useHoverIntent";
 import AxisValueQuickList from "./AxisValueQuickList";
 
-// 軸レール行のクイックオーバーレイ（ADR-0012 §7、TASK-182）。ホバー約200ms・
+// 軸レール行のクイックオーバーレイ（ADR-0012 §7）。ホバー約200ms・
 // フォーカス中の ArrowRight で開く。軸レールの列は overflow: hidden auto で
 // クリップされるため、document.body へポータルし fixed 位置で表示する。
 

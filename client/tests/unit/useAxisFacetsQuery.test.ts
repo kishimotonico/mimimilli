@@ -1,4 +1,4 @@
-// TASK-187: 軸ファセット取得（GET /axes/:axis）が自軸除外後のフィルタをクエリへ渡し、
+// 軸ファセット取得（GET /axes/:axis）が自軸除外後のフィルタをクエリへ渡し、
 // フィルタが変わるとクエリキーが変わって再フェッチされる（キャッシュ分離）ことを検証する。
 
 import { createElement, type ReactNode } from "react";
@@ -47,7 +47,7 @@ function renderFacets(axis: string | null, selectedTags: string[]) {
   );
 }
 
-describe("useAxisFacetsQuery の自軸除外フィルタ適用（TASK-187）", () => {
+describe("useAxisFacetsQuery の自軸除外フィルタ適用", () => {
   let fetchMock: ReturnType<typeof createFetchMock>;
 
   beforeEach(() => {

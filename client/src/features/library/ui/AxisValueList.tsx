@@ -6,6 +6,7 @@ import { getAxisIcon, getAxisLabel } from "../model/axisDefinitions";
 import { buildFilterTag } from "../model/libraryPresentation";
 import { filterAxisValueItems } from "../model/axisValueFilter";
 import { sortAxisValueItems } from "../model/axisValueSort";
+import { buildAxisValueHierarchy, flattenAxisValueRows } from "../model/axisValueHierarchy";
 import { axisValueSortAtom, libraryTileSizeAtom, libraryViewModeAtom } from "../model/atoms";
 import CollectionStatus from "./CollectionStatus";
 import AxisValueRows from "./AxisValueRows";
@@ -13,10 +14,10 @@ import AxisValueGrid from "./AxisValueGrid";
 import { I } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
 
-// 軸の値一覧の本実装（ADR-0012 §5、TASK-181）。grid/list はユーザーの libraryViewModeAtom に
+// 軸の値一覧の本実装（ADR-0012 §5）。grid/list はユーザーの libraryViewModeAtom に
 // 従い、値のソートは axisValueSortAtom（ソートメニュー・list列見出しの二重入口・単一state。
-// ADR-0012 帰結）。入れ子タグの階層表現は TASK-183 の担当のため、タグ軸も含め全軸フルパスの
-// 平坦表示にする。
+// ADR-0012 帰結）。入れ子タグ（スラッシュ複数）は名前順ソートのときだけ階層表示にし、
+// 件数・総時間ソートではフルパスの平坦表示にフォールバックする（axisValueHierarchy.ts）。
 
 interface AxisValueListProps {
   axis: AxisId;
@@ -59,7 +60,10 @@ export default function AxisValueList({
   }, [axis]);
 
   const filtered = filterAxisValueItems(facetItems, contextQuery);
-  const sorted = sortAxisValueItems(filtered, sort);
+  const rows =
+    sort.key === "name"
+      ? buildAxisValueHierarchy(filtered, sort.direction)
+      : flattenAxisValueRows(sortAxisValueItems(filtered, sort));
   const fallbackIcon = getAxisIcon(axis);
   const resetKey = `${axis}:${sort.key}:${sort.direction}:${contextQuery}`;
 
@@ -73,7 +77,7 @@ export default function AxisValueList({
   };
   const handleAdd = (item: AxisFacetItem) => onToggle(buildFilterTag(axis, item.value));
 
-  const showSearchMiss = facetItems.length > 0 && sorted.length === 0;
+  const showSearchMiss = facetItems.length > 0 && filtered.length === 0;
 
   return (
     <div className={`mle-col is-results is-axis-values ${viewMode === "grid" ? "is-grid" : ""}`}>
@@ -152,7 +156,7 @@ export default function AxisValueList({
               />
             ) : viewMode === "grid" ? (
               <AxisValueGrid
-                items={sorted}
+                rows={rows}
                 tileSize={tileSize}
                 isSelected={isSelected}
                 fallbackIcon={fallbackIcon}
@@ -162,7 +166,7 @@ export default function AxisValueList({
               />
             ) : (
               <AxisValueRows
-                items={sorted}
+                rows={rows}
                 sort={sort}
                 onSortChange={setSort}
                 isSelected={isSelected}

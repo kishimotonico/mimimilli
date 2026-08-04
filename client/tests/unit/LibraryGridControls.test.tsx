@@ -5,7 +5,7 @@ import { Provider, createStore } from "jotai";
 import LibraryGridControls from "../../src/features/library/ui/LibraryGridControls";
 import {
   activeAxisAtom,
-  gridInspectorOpenAtom,
+  libraryGridLayoutModeAtom,
   libraryViewModeAtom,
 } from "../../src/features/library/model/atoms";
 
@@ -19,20 +19,26 @@ function renderControls(store: ReturnType<typeof createStore>) {
   );
 }
 
-describe("LibraryGridControls の詳細パネルトグル", () => {
-  it("グリッドモードかつ描画可能な軸ではトグルが有効で、クリックで gridInspectorOpenAtom を反転する", async () => {
+describe("LibraryGridControls", () => {
+  it("グリッドモードかつ作品グリッドが描画可能な軸では敷き詰め形式トグルが有効", () => {
     const store = createStore();
     store.set(libraryViewModeAtom, "grid");
     store.set(activeAxisAtom, "all");
     renderControls(store);
 
-    const toggle = screen.getByLabelText("詳細パネルの表示切り替え");
-    expect(toggle).toBeEnabled();
-    expect(store.get(gridInspectorOpenAtom)).toBe(false);
+    expect(screen.getByLabelText("カバーを1対1に切り抜き、等幅で並べる")).toBeEnabled();
+    expect(screen.getByLabelText("カバーの縦横比を保ち、行の右端を揃えて並べる")).toBeEnabled();
+  });
 
-    await userEvent.click(toggle);
+  it("敷き詰め形式トグルのクリックで libraryGridLayoutModeAtom を切り替える", async () => {
+    const store = createStore();
+    store.set(libraryViewModeAtom, "grid");
+    store.set(activeAxisAtom, "all");
+    renderControls(store);
 
-    expect(store.get(gridInspectorOpenAtom)).toBe(true);
+    await userEvent.click(screen.getByLabelText("カバーの縦横比を保ち、行の右端を揃えて並べる"));
+
+    expect(store.get(libraryGridLayoutModeAtom)).toBe("justified");
   });
 
   it("値一覧表示中（作品グリッドが描画されない facet 軸）ではトグルが disabled になる", () => {
@@ -41,7 +47,7 @@ describe("LibraryGridControls の詳細パネルトグル", () => {
     store.set(activeAxisAtom, "circle");
     renderControls(store);
 
-    expect(screen.getByLabelText("詳細パネルの表示切り替え")).toBeDisabled();
+    expect(screen.getByLabelText("カバーを1対1に切り抜き、等幅で並べる")).toBeDisabled();
   });
 
   it("リストモードではトグルが disabled になる", () => {
@@ -50,6 +56,6 @@ describe("LibraryGridControls の詳細パネルトグル", () => {
     store.set(activeAxisAtom, "all");
     renderControls(store);
 
-    expect(screen.getByLabelText("詳細パネルの表示切り替え")).toBeDisabled();
+    expect(screen.getByLabelText("カバーを1対1に切り抜き、等幅で並べる")).toBeDisabled();
   });
 });

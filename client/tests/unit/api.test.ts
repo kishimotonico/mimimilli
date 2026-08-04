@@ -409,7 +409,7 @@ describe("library api", () => {
     expect(result).toEqual(mockFacets);
   });
 
-  it("getAxisFacets は自軸除外後のフィルタ（tags/tagOp/axis/axisValue）をクエリへ渡す（TASK-187）", async () => {
+  it("getAxisFacets は自軸除外後のフィルタ（tags/tagOp/axis/axisValue）をクエリへ渡す", async () => {
     mockFetch.mockResolvedValue(makeResponse([]));
     await libraryApi.getAxisFacets("cv", {
       tags: ["サークル/月白製作所"],
@@ -446,7 +446,7 @@ describe("library api", () => {
     expect(result).toEqual(mockPage);
   });
 
-  it("evalSmartFolder は tags/axis（保持中フィルタ）もクエリへ渡す（TASK-185）", async () => {
+  it("evalSmartFolder は tags/axis（保持中フィルタ）もクエリへ渡す", async () => {
     mockFetch.mockResolvedValue(
       makeResponse({ items: [], total: 0, stats: { trackCount: 0, durationSec: 0 } }),
     );

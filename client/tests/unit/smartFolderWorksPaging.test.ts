@@ -204,7 +204,7 @@ describe("スマートフォルダー軸のページング", () => {
   });
 });
 
-describe("スマートフォルダー軸への保持中フィルタの適用（TASK-185）", () => {
+describe("スマートフォルダー軸への保持中フィルタの適用", () => {
   let fetchMock: ReturnType<typeof createFetchMock>;
 
   beforeEach(() => {

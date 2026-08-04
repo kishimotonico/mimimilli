@@ -9,13 +9,17 @@ import {
   sortAxisValueItems,
   type AxisValueSortState,
 } from "../model/axisValueSort";
+import { buildAxisValueHierarchy, flattenAxisValueRows } from "../model/axisValueHierarchy";
 import type { AxisId } from "../model/types";
 import { I } from "../../../shared/ui/Icon";
 
 // 軸レールのクイックオーバーレイ・「＋絞り込み」・チップの兄弟値ドロップダウン
-// （TASK-182）が共有する簡易値リスト。データ取得・フィルタ・ソートは TASK-181 の値一覧
-// （AxisValueList / axisValueFilter / axisValueSort）と同じロジックを使い回し、描画だけを
-// 簡易化する（コラージュ・仮想化はしない。ADR-0012 §7）。
+// が共有する簡易値リスト。データ取得・フィルタ・ソートは値一覧本体
+// （AxisValueList / axisValueFilter / axisValueSort / axisValueHierarchy）と同じロジックを
+// 使い回し、描画だけを簡易化する（コラージュ・仮想化はしない。ADR-0012 §7）。
+// 入れ子タグは名前順ソート時のみインデント表示にする（値一覧と同じ規則）。
+
+const INDENT_PER_DEPTH = 12;
 
 interface AxisValueQuickListProps {
   axis: AxisId;
@@ -54,7 +58,10 @@ export default function AxisValueQuickList({
   }, [axis]);
 
   const filtered = filterAxisValueItems(items, query);
-  const sorted = sortAxisValueItems(filtered, sort);
+  const rows =
+    sort.key === "name"
+      ? buildAxisValueHierarchy(filtered, sort.direction)
+      : flattenAxisValueRows(sortAxisValueItems(filtered, sort));
 
   const handleListKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Escape") {
@@ -125,30 +132,40 @@ export default function AxisValueQuickList({
         ))}
       </div>
       {hint && <div className="mll-qlist__hint">{hint}</div>}
-      {/* oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- AxisValueList（TASK-181）と同じボタン一覧の表現を使う */}
+      {/* oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- 値一覧と同じボタン一覧の表現を使う */}
       <div ref={listRef} className="mll-qlist__body" role="listbox" aria-label={getAxisLabel(axis)}>
         {isLoading ? (
           <div className="mll-qlist__status">読み込み中…</div>
         ) : isError ? (
           <div className="mll-qlist__status">取得に失敗しました</div>
-        ) : sorted.length === 0 ? (
+        ) : rows.length === 0 ? (
           <div className="mll-qlist__status">{emptyLabel}</div>
         ) : (
-          sorted.map((item) => {
-            const on = isSelected(item.value);
+          rows.map((row) => {
+            const indent = row.depth * INDENT_PER_DEPTH;
+            if (row.kind === "heading") {
+              return (
+                <div key={row.path} className="mll-qlist__heading" style={{ paddingLeft: indent }}>
+                  {row.label}
+                </div>
+              );
+            }
+            const on = isSelected(row.item.value);
             return (
               <button
-                key={item.value}
+                key={row.path}
                 type="button"
                 data-quicklist-item
-                // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- AxisValueList（TASK-181）と同じボタン一覧の表現を使う
+                // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- 値一覧と同じボタン一覧の表現を使う
                 role="option"
                 aria-selected={on}
                 className={`mll-qlist__item ${on ? "is-on" : ""}`}
-                onClick={(e) => onSelect(item, { ctrlKey: e.ctrlKey, metaKey: e.metaKey })}
+                style={{ paddingLeft: 8 + indent }}
+                title={row.depth > 0 ? row.item.value : undefined}
+                onClick={(e) => onSelect(row.item, { ctrlKey: e.ctrlKey, metaKey: e.metaKey })}
               >
-                <span className="nm">{item.value}</span>
-                <span className="count">{item.count}</span>
+                <span className="nm">{row.label}</span>
+                <span className="count">{row.item.count}</span>
               </button>
             );
           })

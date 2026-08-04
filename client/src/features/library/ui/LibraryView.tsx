@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
-import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import { useAtomValue, useSetAtom } from "jotai";
 import {
   getDefaultPlaylistTrackCount,
   toWorkListItem,
   type Work,
   type WorkListItem,
 } from "@mimimilli/shared";
-import { gridInspectorOpenAtom, librarySearchQueryAtom, libraryViewModeAtom } from "../model/atoms";
+import { librarySearchQueryAtom, libraryViewModeAtom } from "../model/atoms";
 import {
   playerIsPlaybackActiveAtom,
   playingTrackIndexAtom,
@@ -20,7 +20,6 @@ import {
   useSmartFolderMutation,
 } from "../model/useLibraryQueries";
 import {
-  computeCollectionStatsDisplay,
   computeResultsPaneKind,
   isWorksGridActive,
   shouldClearSelectionOnFilterMiss,
@@ -38,7 +37,6 @@ import AxisValueList from "./AxisValueList";
 import FilterChipBand from "./FilterChipBand";
 import PreviewPane from "./PreviewPane";
 import WorkGrid from "./WorkGrid";
-import WorkGridInspector from "./WorkGridInspector";
 import WorkListPane from "./WorkListPane";
 import SmartFolderEditorModal from "./SmartFolderEditorModal";
 import { SmartFolderView } from "./preview/SmartFolderView";
@@ -60,7 +58,6 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
   const playingWorkId = useAtomValue(playingWorkIdAtom);
   const playingTrackIndex = useAtomValue(playingTrackIndexAtom);
   const isPlaybackActive = useAtomValue(playerIsPlaybackActiveAtom);
-  const [gridInspectorOpen, setGridInspectorOpen] = useAtom(gridInspectorOpenAtom);
   const nav = useLibraryNavigation();
   const [smartFolderEditor, setSmartFolderEditor] = useState<SmartFolderEditorState>(
     closedSmartFolderEditorState,
@@ -116,7 +113,7 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
   // 存在しない work= パラメータ（削除済み作品など）で開いた場合、404を確認したら
   // 選択を解除してURLをクリーンアップする。404以外（ネットワーク断・5xx等の一時的な
   // 失敗）では選択を維持し、パネル側でエラー表示・再試行を出す（workDetailQuery.isPending/
-  // isError はワークグリッドインスペクタ／PreviewPaneへそのまま渡す）。
+  // isError は PreviewPane へそのまま渡す）。
   useEffect(() => {
     if (shouldClearSelectionOnWorkNotFound(nav.selectedWorkId, workDetailQuery.error)) {
       nav.selectWork(null);
@@ -243,12 +240,6 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
               axis: nav.activeAxis,
               params: result.worksParams,
             });
-            const collectionStats = computeCollectionStatsDisplay(
-              false,
-              false,
-              result.worksTotal,
-              result.worksStats,
-            );
             const smartFolderBanner = activeSmartFolder ? (
               <SmartFolderView
                 sf={activeSmartFolder}
@@ -289,42 +280,6 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
                       onClearSearch={() => setSearchQuery("")}
                       onDeselect={() => nav.selectWork(null)}
                       smartFolderBanner={smartFolderBanner}
-                      inspector={
-                        gridInspectorOpen ? (
-                          <WorkGridInspector
-                            hasSelection={nav.selectedWorkId !== null}
-                            work={selectedWork}
-                            isLoading={workDetailQuery.isPending}
-                            isError={workDetailQuery.isError}
-                            onRetry={workDetailQuery.refetch}
-                            collectionStats={collectionStats}
-                            playingTrackIndex={
-                              selectedWork && playingWorkId === selectedWork.id
-                                ? (playingTrackIndex ?? null)
-                                : null
-                            }
-                            isPlaybackActive={isPlaybackActive}
-                            tagSuggestions={tagSuggestions}
-                            isPatching={patchWorkMutation.isPending}
-                            onClose={() => setGridInspectorOpen(false)}
-                            onPlay={handlePlay}
-                            onResume={handleResume}
-                            onTogglePlay={onTogglePlay}
-                            onTagClick={handleTagClick}
-                            onPatchWork={(body) => {
-                              if (!selectedWork) {
-                                return Promise.reject(
-                                  new Error("更新対象の作品が選択されていません"),
-                                );
-                              }
-                              return patchWorkMutation.mutateAsync({
-                                workId: selectedWork.id,
-                                body,
-                              });
-                            }}
-                          />
-                        ) : null
-                      }
                     />
                   ) : (
                     <WorkListPane

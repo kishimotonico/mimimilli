@@ -38,8 +38,6 @@ export const libraryGridLayoutModeAtom = atomWithStorage<GridLayoutMode>(
   "mimimilli:libraryGridLayoutMode",
   "square",
 );
-// グリッド詳細パネルの開閉。作品の選択・解除とは独立させ、パネル自体の開閉のみを持つ。
-export const gridInspectorOpenAtom = atomWithStorage<boolean>("mimimilli:gridInspectorOpen", false);
 
 // ── アドレスバーパス（純粋計算）────────────────────────────────
 
