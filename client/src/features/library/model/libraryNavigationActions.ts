@@ -58,23 +58,14 @@ export const selectSoleLibraryTagAtom = atom(null, (_get, set, tag: string) => {
   set(gridInspectorOpenAtom, false);
 });
 
-// 全入口共通の「既定=置き換え」操作（ADR-0012 §7、TASK-182）。同じ tagFilterGroupKey の
-// タグを外してから追加する。値一覧の値タイル/行クリックが使う（結果面は現在の値一覧のまま。
-// 値一覧側を作品一覧へ遷移させる対応はTASK-186）。AND追加（Ctrl+クリック等）は
-// toggleLibraryTagAtom を使う。
+// 全入口共通の「既定=置き換え」操作（ADR-0012 §7・§8、TASK-182・TASK-186）。同じ
+// tagFilterGroupKey のタグを外してから追加し、結果面を作品一覧へ進める。置き換えは
+// 「見たいものが変わった」を表すため、結果面が値一覧/ホームのままなら作品一覧（all）へ
+// 切り替える。既に作品一覧（ビュー軸・スマートフォルダー軸）ならそのまま維持する。
+// 軸レールのクイックオーバーレイ・チップの兄弟値ドロップダウン・値一覧の値タイル/行
+// クリックが使う、入口を問わない単一の規則。AND追加（Ctrl+クリック・ホバー時の＋ボタン等、
+// 「絞り込みを積んでいる途中」を表す）は現在地に留まる toggleLibraryTagAtom を使う。
 export const replaceLibraryTagAtom = atom(null, (get, set, tag: string) => {
-  requestNavigationHistoryCommit(set, "push");
-  const prev = get(selectedTagsAtom);
-  set(selectedTagsAtom, computeReplacedTags(prev, tag));
-  set(selectedWorkIdAtom, null);
-  set(gridInspectorOpenAtom, false);
-});
-
-// 置き換え選択＋作品一覧へ遷移（ADR-0012 §8）。軸レールのクイックオーバーレイ・
-// チップの兄弟値ドロップダウンの既定（置き換え）選択が使う。「置き換えは見たいものが
-// 変わった」を表すため、結果面が値一覧/ホームのままなら作品一覧（all）へ切り替える。
-// 既に作品一覧（ビュー軸・スマートフォルダー軸）ならそのまま維持する。
-export const replaceLibraryTagAndShowWorksAtom = atom(null, (get, set, tag: string) => {
   requestNavigationHistoryCommit(set, "push");
   const prev = get(selectedTagsAtom);
   set(selectedTagsAtom, computeReplacedTags(prev, tag));

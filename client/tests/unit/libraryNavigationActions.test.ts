@@ -12,6 +12,7 @@ import {
 import { activeAxisAtom } from "../../src/features/library/model/atoms";
 import {
   clearLibraryTagsAtom,
+  replaceLibraryTagAtom,
   selectLibraryWorkAtom,
   selectSoleLibraryTagAtom,
   setLibraryAxisAtom,
@@ -144,6 +145,65 @@ describe("selectSoleLibraryTagAtom: 作品詳細のタグクリックはタグ�
 
     expect(store.get(selectedWorkIdAtom)).toBeNull();
     expect(store.get(gridInspectorOpenAtom)).toBe(false);
+  });
+});
+
+describe("置き換え選択は作品一覧へ進み、AND追加は現在地に留まる（ADR-0012 §7・§8、TASK-182・TASK-186）", () => {
+  it("replaceLibraryTagAtom: 値一覧の軸から選ぶと結果面が作品一覧（all）へ切り替わる", () => {
+    const store = createStore();
+    store.set(activeAxisAtom, "cv");
+
+    store.set(replaceLibraryTagAtom, "cv/藤田茜");
+
+    expect(store.get(activeAxisAtom)).toBe("all");
+    expect(store.get(selectedTagsAtom)).toEqual(["cv/藤田茜"]);
+  });
+
+  it("replaceLibraryTagAtom: ホーム軸から選んでも作品一覧（all）へ切り替わる", () => {
+    const store = createStore();
+    store.set(activeAxisAtom, "home");
+
+    store.set(replaceLibraryTagAtom, "cv/藤田茜");
+
+    expect(store.get(activeAxisAtom)).toBe("all");
+  });
+
+  it("replaceLibraryTagAtom: 既に作品一覧（ビュー軸）ならそのまま維持する", () => {
+    const store = createStore();
+    store.set(activeAxisAtom, "recent");
+
+    store.set(replaceLibraryTagAtom, "cv/藤田茜");
+
+    expect(store.get(activeAxisAtom)).toBe("recent");
+  });
+
+  it("replaceLibraryTagAtom: 既に作品一覧（スマートフォルダー軸）ならそのまま維持する", () => {
+    const store = createStore();
+    store.set(activeAxisAtom, "smart-1");
+
+    store.set(replaceLibraryTagAtom, "cv/藤田茜");
+
+    expect(store.get(activeAxisAtom)).toBe("smart-1");
+  });
+
+  it("replaceLibraryTagAtom: 同じ軸グループの既存選択を外してから追加する（置き換え）", () => {
+    const store = createStore();
+    store.set(activeAxisAtom, "cv");
+    store.set(selectedTagsAtom, ["cv/藤田茜", "サークル/月白製作所"]);
+
+    store.set(replaceLibraryTagAtom, "cv/霧島レイ");
+
+    expect(store.get(selectedTagsAtom)).toEqual(["サークル/月白製作所", "cv/霧島レイ"]);
+  });
+
+  it("toggleLibraryTagAtom（AND追加）は軸を変えない", () => {
+    const store = createStore();
+    store.set(activeAxisAtom, "cv");
+
+    store.set(toggleLibraryTagAtom, "cv/藤田茜");
+
+    expect(store.get(activeAxisAtom)).toBe("cv");
+    expect(store.get(selectedTagsAtom)).toEqual(["cv/藤田茜"]);
   });
 });
 

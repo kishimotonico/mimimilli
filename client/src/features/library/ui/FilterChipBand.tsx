@@ -13,7 +13,7 @@ import { I } from "../../../shared/ui/Icon";
 // 置き換え、Ctrl/Cmd+クリックで AND 追加へ反転する。「＋絞り込み」は常に表示し、
 // フィルタが無い状態からでも最初の1件を追加できる。
 // 置き換え選択は結果面を作品一覧へ遷移させ、AND追加は現在の結果面に留まる（ADR-0012 §8）。
-// onReplace には遷移込みのアクション（replaceTagAndShowWorks）を渡す。
+// onReplace には遷移込みのアクション（replaceTag、ADR-0012 §8）を渡す。
 
 interface FilterChipBandProps {
   tagPrefixes: TagPrefix[];

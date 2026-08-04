@@ -140,7 +140,7 @@ export default function AxisColumn({
   // 置き換えは結果面を作品一覧へ遷移させ、AND追加は現在の結果面に留まる（ADR-0012 §8）。
   const handleSelectValue = (tag: string, opts: { ctrlKey: boolean; metaKey: boolean }) => {
     if (opts.ctrlKey || opts.metaKey) nav.toggleTag(tag);
-    else nav.replaceTagAndShowWorks(tag);
+    else nav.replaceTag(tag);
   };
 
   const renderRow = (ax: AxisRow) => {

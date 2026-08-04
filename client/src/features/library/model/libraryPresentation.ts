@@ -121,7 +121,7 @@ export function axisOfFilterTag(tag: string): AxisId {
 }
 
 /** 置き換え選択の計算（純粋関数）。同じ tagFilterGroupKey のタグを外してから追加する。
- *  replaceLibraryTagAtom / replaceLibraryTagAndShowWorksAtom が共有する（TASK-182）。 */
+ *  replaceLibraryTagAtom が使う（TASK-182・TASK-186、ADR-0012 §7・§8）。 */
 export function computeReplacedTags(prev: string[], tag: string): string[] {
   const group = tagFilterGroupKey(tag);
   return [...prev.filter((t) => tagFilterGroupKey(t) !== group), tag];

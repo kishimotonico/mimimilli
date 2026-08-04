@@ -211,7 +211,7 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
             <FilterChipBand
               tagPrefixes={tagPrefixes}
               selectedTags={nav.selectedTags}
-              onReplace={nav.replaceTagAndShowWorks}
+              onReplace={nav.replaceTag}
               onToggle={nav.toggleTag}
               onClearAll={nav.clearTags}
             />
@@ -262,7 +262,7 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
                   <FilterChipBand
                     tagPrefixes={tagPrefixes}
                     selectedTags={nav.selectedTags}
-                    onReplace={nav.replaceTagAndShowWorks}
+                    onReplace={nav.replaceTag}
                     onToggle={nav.toggleTag}
                     onClearAll={nav.clearTags}
                   />

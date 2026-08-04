@@ -105,22 +105,21 @@ test("tag filter chips and cross-axis AND filtering", async ({ page }) => {
   await openApp(page);
 
   // タグ軸 → 「癒し系」を選択（ADR-0012: 選択は全軸共通のタグフィルタへ）。
-  // 軸は値をブラウズするビューのままで、チップ列に選択中フィルタが積み上がる。
+  // 値一覧の通常クリックは置き換え選択のため、選択と同時に結果面が作品一覧へ
+  // 遷移する（ADR-0012 §8、TASK-186）。
   await page.locator(".mll-axis", { hasText: "タグ" }).click();
   await page.locator(".mll-vrow", { hasText: "癒し系" }).click();
 
   await expect(page.locator(".mll-tagband .mll-tagband__chip")).toHaveText(["癒し系"]);
-  await expect(page.locator(".mll-vrow", { hasText: "癒し系" })).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
 
   const results = page.locator(".mll-results");
 
-  // 軸を切り替えても選択中のフィルタは維持され（AC#6）、作品一覧を表示する軸では
-  // そのままAND絞り込みされた作品一覧がチップ列の下に出る（AC#3・#4）。
-  await page.locator(".mll-axis", { hasText: "すべての作品" }).click();
-  await expect(page.locator(".mll-tagband .mll-tagband__chip")).toHaveText(["癒し系"]);
+  // 軸レールは自動的に「すべての作品」がアクティブになり、AND絞り込みされた
+  // 作品一覧がチップ列の下に出る。
+  await expect(page.locator(".mll-axis", { hasText: "すべての作品" })).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
   await expect(results.locator(".mle-col.is-results")).toBeVisible();
 
   // パネル要素のみを撮影し、チップ列＋作品一覧の導線を回帰対象にする。

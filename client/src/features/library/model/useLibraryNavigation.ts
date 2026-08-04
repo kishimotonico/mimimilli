@@ -9,7 +9,6 @@ import { activeAxisAtom, selectedTagsAtom, selectedWorkIdAtom, sortAtom } from "
 import {
   clearLibraryTagsAtom,
   goToLibrarySegmentAtom,
-  replaceLibraryTagAndShowWorksAtom,
   replaceLibraryTagAtom,
   selectLibraryWorkAtom,
   selectSoleLibraryTagAtom,
@@ -28,12 +27,9 @@ export interface LibraryViewState {
 export interface LibraryViewActions {
   setAxis: (axis: AxisId) => void;
   toggleTag: (tag: string) => void;
-  /** 既定=置き換え操作（ADR-0012 §7）。同じ tagFilterGroupKey の選択を外してから追加する。
-   *  結果面の遷移はしない（値一覧の値タイル/行が使う。TASK-186で作品一覧遷移対応予定） */
+  /** 既定=置き換え操作（ADR-0012 §7・§8）。同じ tagFilterGroupKey の選択を外してから追加し、
+   *  結果面を作品一覧へ進める（既に作品一覧ならそのまま）。全入口共通の単一の規則 */
   replaceTag: (tag: string) => void;
-  /** 置き換え＋作品一覧へ遷移（ADR-0012 §8）。軸レールのクイックオーバーレイ・
-   *  チップの兄弟値ドロップダウンが使う */
-  replaceTagAndShowWorks: (tag: string) => void;
   selectSoleTag: (tag: string) => void;
   clearTags: () => void;
   selectWork: (id: string | null) => void;
@@ -52,7 +48,6 @@ export function useLibraryView(): LibraryViewState & LibraryViewActions {
   const setAxis = useSetAtom(setLibraryAxisAtom);
   const toggleTag = useSetAtom(toggleLibraryTagAtom);
   const replaceTag = useSetAtom(replaceLibraryTagAtom);
-  const replaceTagAndShowWorks = useSetAtom(replaceLibraryTagAndShowWorksAtom);
   const selectSoleTag = useSetAtom(selectSoleLibraryTagAtom);
   const clearTags = useSetAtom(clearLibraryTagsAtom);
   const selectWork = useSetAtom(selectLibraryWorkAtom);
@@ -75,7 +70,6 @@ export function useLibraryView(): LibraryViewState & LibraryViewActions {
     setAxis: transition(setAxis),
     toggleTag: transition(toggleTag),
     replaceTag: transition(replaceTag),
-    replaceTagAndShowWorks: transition(replaceTagAndShowWorks),
     selectSoleTag: transition(selectSoleTag),
     clearTags: () =>
       startTransition(() => {
