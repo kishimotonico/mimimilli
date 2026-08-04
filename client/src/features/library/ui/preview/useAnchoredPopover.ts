@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 
 const POPOVER_MARGIN = 8;
+const RIGHT_PLACEMENT_GAP = 6;
 
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -10,6 +11,12 @@ export interface PopoverLayout {
   width: number;
   /** 展開先コンテナの実幅。狭幅判定など呼び出し側の追加ロジックに使う */
   containerWidth: number;
+  /**
+   * placement:"right" のときだけ使う、ビューポート絶対座標の上端（position:fixed 前提）。
+   * placement:"below"（既定）では呼び出し側が CSS の `top: calc(100% + Npx)` で
+   * アンカー直下に配置するため未使用。
+   */
+  top?: number;
 }
 
 /** クランプ対象コンテナの決定関数。呼び出し側が渡さない場合の既定は
@@ -21,7 +28,12 @@ const defaultContainerResolver: PopoverContainerResolver = (anchor) =>
     anchor.closest(".mle-prv__body") ??
     null) as HTMLElement | null;
 
-function getClampedPopoverLayout(
+/** 既定 "below": アンカー直下、横方向だけクランプする（非ポータルの相対配置向け）。
+ *  "right": アンカーの右隣に固定配置し、上下方向をコンテナ内へクランプする
+ *  （document.body へポータルする position:fixed のフライアウト向け）。 */
+export type PopoverPlacement = "below" | "right";
+
+function getBelowPlacementLayout(
   anchor: HTMLElement,
   preferredWidth: number,
   getContainer: PopoverContainerResolver,
@@ -38,6 +50,31 @@ function getClampedPopoverLayout(
   const left = maxLeft < minLeft ? minLeft : Math.min(Math.max(0, minLeft), maxLeft);
 
   return { left, width, containerWidth: containerRect?.width ?? window.innerWidth };
+}
+
+/** panel が未マウント（実高さ不明）のときは高さ0として扱う。ResizeObserver が実サイズを
+ *  観測し次第すぐに再計算されるため、`?? 定数` のような暫定値は使わない。 */
+function getRightPlacementLayout(
+  anchor: HTMLElement,
+  panel: HTMLElement | null,
+  preferredWidth: number,
+  getContainer: PopoverContainerResolver,
+): PopoverLayout {
+  const anchorRect = anchor.getBoundingClientRect();
+  const container = getContainer(anchor);
+  const containerRect = container?.getBoundingClientRect();
+  const containerTop = (containerRect?.top ?? 0) + POPOVER_MARGIN;
+  const containerBottom = (containerRect?.bottom ?? window.innerHeight) - POPOVER_MARGIN;
+  const panelHeight = panel?.offsetHeight ?? 0;
+  const maxTop = Math.max(containerTop, containerBottom - panelHeight);
+  const top = Math.min(Math.max(anchorRect.top, containerTop), maxTop);
+
+  return {
+    left: anchorRect.right + RIGHT_PLACEMENT_GAP,
+    top,
+    width: preferredWidth,
+    containerWidth: containerRect?.width ?? window.innerWidth,
+  };
 }
 
 export interface UsePopoverDismissalOptions {
@@ -121,18 +158,25 @@ export interface UseAnchoredPopoverOptions {
    * `.mle-app` 全体のようなコンテナを渡す。
    */
   getContainer?: PopoverContainerResolver;
+  /** 既定 "below"。"right" はアンカー右隣＋上下クランプ（ポータル+fixed 前提）。 */
+  placement?: PopoverPlacement;
 }
 
 export interface UseAnchoredPopoverResult {
   /** ポップオーバーのトリガー要素に付ける ref。位置計算の基準になる */
   anchorRef: RefObject<HTMLDivElement | null>;
+  /**
+   * placement:"right" のときにポップオーバー本体（パネル）に付ける ref。
+   * ResizeObserver で実サイズを観測し、上下クランプへ反映する。
+   */
+  panelRef: RefObject<HTMLDivElement | null>;
   layout: PopoverLayout;
 }
 
 /**
  * アンカー要素基準で展開するポップオーバーの「配置クランプ＋外側クリック/Escapeで閉じる＋
- * 閉じたときのフォーカス復帰」を共通化するフック。タグ追加ポップオーバーとアクション
- * （その他）ポップオーバーの両方が使う。
+ * 閉じたときのフォーカス復帰」を共通化するフック。タグ追加ポップオーバー・アクション
+ * （その他）ポップオーバー・軸レールのクイックオーバーレイが使う。
  */
 export function useAnchoredPopover({
   isOpen,
@@ -141,8 +185,10 @@ export function useAnchoredPopover({
   onEscape,
   boundaryRef,
   getContainer = defaultContainerResolver,
+  placement = "below",
 }: UseAnchoredPopoverOptions): UseAnchoredPopoverResult {
   const anchorRef = useRef<HTMLDivElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
   const [layout, setLayout] = useState<PopoverLayout>({
     left: 0,
     width: preferredWidth,
@@ -158,10 +204,15 @@ export function useAnchoredPopover({
       const anchor = anchorRef.current;
       if (!anchor) return;
 
-      const nextLayout = getClampedPopoverLayout(anchor, preferredWidth, getContainer);
+      const nextLayout =
+        placement === "right"
+          ? getRightPlacementLayout(anchor, panelRef.current, preferredWidth, getContainer)
+          : getBelowPlacementLayout(anchor, preferredWidth, getContainer);
 
       setLayout((current) =>
-        current.left === nextLayout.left && current.width === nextLayout.width
+        current.left === nextLayout.left &&
+        current.width === nextLayout.width &&
+        current.top === nextLayout.top
           ? current
           : nextLayout,
       );
@@ -169,17 +220,22 @@ export function useAnchoredPopover({
 
     updateLayout();
     const container = anchorRef.current ? getContainer(anchorRef.current) : null;
-    const resizeObserver = container ? new ResizeObserver(updateLayout) : null;
-    if (container) resizeObserver?.observe(container);
+    const resizeObserver = new ResizeObserver(updateLayout);
+    if (container) resizeObserver.observe(container);
+    // "right" 配置はパネル自身の実高さで上下クランプするため、パネルの実サイズ変化にも
+    // 追従する（値の読み込み完了・検索での絞り込み・ソート展開など）。ref は呼び出し側の
+    // JSX で同じレンダーの中でパネル要素に付くため、このレイアウトエフェクトの実行時点で
+    // 既に panelRef.current は設定済み。
+    if (placement === "right" && panelRef.current) resizeObserver.observe(panelRef.current);
     window.addEventListener("resize", updateLayout);
     window.addEventListener("scroll", updateLayout, true);
 
     return () => {
-      resizeObserver?.disconnect();
+      resizeObserver.disconnect();
       window.removeEventListener("resize", updateLayout);
       window.removeEventListener("scroll", updateLayout, true);
     };
-  }, [isOpen, preferredWidth, getContainer]);
+  }, [isOpen, preferredWidth, getContainer, placement]);
 
-  return { anchorRef, layout };
+  return { anchorRef, panelRef, layout };
 }

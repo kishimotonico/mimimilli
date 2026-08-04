@@ -1,11 +1,11 @@
 ---
 id: TASK-195
 title: クイックオーバーレイの垂直クランプが効かず画面外へはみ出す問題を直す
-status: In Progress
+status: Done
 assignee:
   - impl-182
 created_date: '2026-08-04 17:34'
-updated_date: '2026-08-04 17:35'
+updated_date: '2026-08-04 18:42'
 labels: []
 dependencies: []
 priority: high
@@ -49,11 +49,11 @@ TASK-191 で右側表示にする際、AxisQuickOverlay は useAnchoredPopover �
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 軸レールの最下部付近の行で開いても、オーバーレイが画面外へはみ出さず全項目が見える
-- [ ] #2 値が多い軸でオーバーレイの高さが上限に達しても画面内に収まる
-- [ ] #3 キーボードの下方向移動でフォーカス中の項目が常に画面内に見えている
-- [ ] #4 位置決めが useAnchoredPopover に一本化され、AxisQuickOverlay に独自の位置計算が残っていない
-- [ ] #5 パネルの実サイズが変化したとき（値の読み込み完了・検索での絞り込み・ソート展開）に位置が追従する
-- [ ] #6 useAnchoredPopover の既存利用箇所（ソートメニュー・タグエディタ・メタデータ操作・通知ベル・チップの兄弟値ドロップダウン）が壊れていない
-- [ ] #7 pnpm check と pnpm test が通る
+- [x] #1 軸レールの最下部付近の行で開いても、オーバーレイが画面外へはみ出さず全項目が見える
+- [x] #2 値が多い軸でオーバーレイの高さが上限に達しても画面内に収まる
+- [x] #3 キーボードの下方向移動でフォーカス中の項目が常に画面内に見えている
+- [x] #4 位置決めが useAnchoredPopover に一本化され、AxisQuickOverlay に独自の位置計算が残っていない
+- [x] #5 パネルの実サイズが変化したとき（値の読み込み完了・検索での絞り込み・ソート展開）に位置が追従する
+- [x] #6 useAnchoredPopover の既存利用箇所（ソートメニュー・タグエディタ・メタデータ操作・通知ベル・チップの兄弟値ドロップダウン）が壊れていない
+- [x] #7 pnpm check と pnpm test が通る
 <!-- AC:END -->
