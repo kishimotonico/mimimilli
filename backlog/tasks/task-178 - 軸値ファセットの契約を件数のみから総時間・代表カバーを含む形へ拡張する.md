@@ -1,11 +1,11 @@
 ---
 id: TASK-178
 title: 軸値ファセットの契約を件数のみから総時間・代表カバーを含む形へ拡張する
-status: In Progress
+status: Done
 assignee:
   - impl-178
 created_date: '2026-08-03 14:44'
-updated_date: '2026-08-03 15:00'
+updated_date: '2026-08-04 12:15'
 labels: []
 dependencies: []
 priority: high

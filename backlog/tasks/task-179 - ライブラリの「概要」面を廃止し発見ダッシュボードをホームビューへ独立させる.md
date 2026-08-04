@@ -1,11 +1,11 @@
 ---
 id: TASK-179
 title: ライブラリの「概要」面を廃止し発見ダッシュボードをホームビューへ独立させる
-status: In Progress
+status: Done
 assignee:
   - impl-179
 created_date: '2026-08-03 14:44'
-updated_date: '2026-08-04 10:32'
+updated_date: '2026-08-04 12:15'
 labels: []
 dependencies: []
 priority: high

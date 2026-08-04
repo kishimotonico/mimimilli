@@ -1,11 +1,11 @@
 ---
 id: TASK-181
 title: 軸の値一覧を結果面の本実装（grid/list・列ソート）として作る
-status: In Progress
+status: Done
 assignee:
   - impl-181
 created_date: '2026-08-03 14:45'
-updated_date: '2026-08-04 12:09'
+updated_date: '2026-08-04 12:15'
 labels: []
 dependencies:
   - TASK-178
