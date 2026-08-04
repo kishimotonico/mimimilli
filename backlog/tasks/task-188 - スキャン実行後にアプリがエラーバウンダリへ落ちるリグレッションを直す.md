@@ -1,9 +1,11 @@
 ---
 id: TASK-188
 title: スキャン実行後にアプリがエラーバウンダリへ落ちるリグレッションを直す
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - impl-184
 created_date: '2026-08-04 13:41'
+updated_date: '2026-08-04 13:43'
 labels: []
 dependencies: []
 priority: high

@@ -1,11 +1,11 @@
 ---
 id: TASK-186
 title: 値一覧で値を選んだら結果面を作品一覧へ遷移させる
-status: In Progress
+status: Done
 assignee:
   - impl-182
 created_date: '2026-08-04 12:23'
-updated_date: '2026-08-04 14:14'
+updated_date: '2026-08-04 14:15'
 labels: []
 dependencies: []
 priority: high

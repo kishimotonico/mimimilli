@@ -1,11 +1,11 @@
 ---
 id: TASK-182
 title: 軸レールのクイックオーバーレイと＋絞り込み・チップドロップダウンを実装する
-status: In Progress
+status: Done
 assignee:
   - '@impl'
 created_date: '2026-08-03 14:46'
-updated_date: '2026-08-04 13:10'
+updated_date: '2026-08-04 14:15'
 labels: []
 dependencies:
   - TASK-181

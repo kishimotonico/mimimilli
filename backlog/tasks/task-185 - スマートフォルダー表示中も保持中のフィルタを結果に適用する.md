@@ -1,11 +1,11 @@
 ---
 id: TASK-185
 title: スマートフォルダー表示中も保持中のフィルタを結果に適用する
-status: In Progress
+status: Done
 assignee:
   - impl-184
 created_date: '2026-08-04 11:36'
-updated_date: '2026-08-04 12:56'
+updated_date: '2026-08-04 14:15'
 labels: []
 dependencies:
   - TASK-184

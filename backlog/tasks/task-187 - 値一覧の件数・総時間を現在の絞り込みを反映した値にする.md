@@ -1,10 +1,10 @@
 ---
 id: TASK-187
 title: 値一覧の件数・総時間を現在の絞り込みを反映した値にする
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-04 12:23'
-updated_date: '2026-08-04 12:26'
+updated_date: '2026-08-04 14:15'
 labels: []
 dependencies: []
 priority: medium
