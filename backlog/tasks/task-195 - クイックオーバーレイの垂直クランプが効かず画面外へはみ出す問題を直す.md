@@ -1,9 +1,11 @@
 ---
 id: TASK-195
 title: クイックオーバーレイの垂直クランプが効かず画面外へはみ出す問題を直す
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - impl-182
 created_date: '2026-08-04 17:34'
+updated_date: '2026-08-04 17:35'
 labels: []
 dependencies: []
 priority: high
