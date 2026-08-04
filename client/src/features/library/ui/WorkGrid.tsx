@@ -12,7 +12,7 @@ import { useAtom, useAtomValue } from "jotai";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { AxisId } from "../model/types";
 import { libraryGridLayoutModeAtom, libraryTileSizeAtom } from "../model/atoms";
-import type { TagPrefix, WorkListItem } from "@mimimilli/shared";
+import type { WorkListItem } from "@mimimilli/shared";
 import Button from "../../../shared/ui/Button";
 import { I } from "../../../shared/ui/Icon";
 import {
@@ -30,21 +30,19 @@ import {
 import { computeJustifiedLayout, type JustifiedLayout } from "../model/justifiedLayout";
 import { shouldLoadMore } from "../model/virtualScroll";
 import { buildEmptyWorksHint, buildEmptyWorksMessage } from "../model/emptyWorks";
-import { isFacetAxis, isSmartAxis } from "../model/axisDefinitions";
+import { isSmartAxis } from "../model/axisDefinitions";
 import CollectionStatus from "./CollectionStatus";
-import DrillHeader from "./DrillHeader";
 import LoadMore from "./LoadMore";
 import WorkGridRow from "./WorkGridRow";
 
 interface WorkGridProps {
   axis: AxisId;
-  drillValue: string | null;
   works: WorkListItem[];
-  tagPrefixes: TagPrefix[];
-  /** 検索・軸・ソート・タグ・ドリル変更を検知してスクロール位置をリセットする key */
+  /** 検索・軸・ソート・タグ変更を検知してスクロール位置をリセットする key */
   worksQueryKey: string;
   selectedWorkId: string | null;
   searchQuery: string;
+  hasSelectedTags: boolean;
   playingWorkId?: string | null;
   isPlaybackActive?: boolean;
   isLoading: boolean;
@@ -59,13 +57,15 @@ interface WorkGridProps {
   onLoadMore?: () => void;
   onWorkSelect: (id: string) => void;
   onWorkPlay: (work: WorkListItem) => void;
-  onDrillBack: () => void;
   onClearSearch: () => void;
   inspector: ReactNode | null;
-  /** Esc・グリッド背景クリック時の選択解除（パネル自体の開閉は行わない） */
+  /** Esc・グリッド背景クリック時の選択解除(パネル自体の開閉は行わない) */
   onDeselect: () => void;
   /** 作品一覧取得の再試行（isError 時） */
   onRetryWorks?: () => void;
+  /** スマートフォルダー軸のときだけ渡すルール表示・編集導線（結果面ヘッダー直下に置く。
+   *  ADR-0012 §3 のレイアウト固定により、プレビュー側ではなく結果面自体が持つ） */
+  smartFolderBanner?: ReactNode;
 }
 
 interface JustifiedRowGroup {
@@ -98,12 +98,11 @@ const GRID_DOCKED_BAR_EXTRA = 28;
 
 export default function WorkGrid({
   axis,
-  drillValue,
   works,
-  tagPrefixes,
   worksQueryKey,
   selectedWorkId,
   searchQuery,
+  hasSelectedTags,
   playingWorkId = null,
   isPlaybackActive = false,
   isLoading,
@@ -115,16 +114,15 @@ export default function WorkGrid({
   onLoadMore,
   onWorkSelect,
   onWorkPlay,
-  onDrillBack,
   onClearSearch,
   inspector,
   onDeselect,
   onRetryWorks,
+  smartFolderBanner,
 }: WorkGridProps) {
   const [tileSize, setTileSize] = useAtom(libraryTileSizeAtom);
   const gridLayoutMode = useAtomValue(libraryGridLayoutModeAtom);
   const safeTileSize = clampTileSize(tileSize);
-  const isDrilled = drillValue !== null;
   const paneRef = useRef<HTMLElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const isInspectorOpen = inspector !== null;
@@ -388,20 +386,11 @@ export default function WorkGrid({
       className={`mll-grid-pane ${isPending ? "is-pending" : ""}`}
       aria-label="作品グリッド"
     >
-      {isDrilled ? (
-        <DrillHeader
-          axisLabel={axis}
-          value={drillValue}
-          count={worksTotal}
-          tagPrefixes={tagPrefixes}
-          onBack={onDrillBack}
-        />
-      ) : (
-        <div className="mle-col__hd">
-          <span>{isSmartAxis(axis) ? "スマートフォルダー" : "作品"}</span>
-          {worksTotal != null && <span className="count">{worksTotal} 件</span>}
-        </div>
-      )}
+      <div className="mle-col__hd">
+        <span>{isSmartAxis(axis) ? "スマートフォルダー" : "作品"}</span>
+        {worksTotal != null && <span className="count">{worksTotal} 件</span>}
+      </div>
+      {smartFolderBanner}
       <div className="mll-grid-body">
         <div ref={scrollRef} className="mll-grid-scroll">
           {isLoading ? (
@@ -412,16 +401,8 @@ export default function WorkGrid({
             <CollectionStatus
               variant="grid"
               kind="empty"
-              message={buildEmptyWorksMessage(
-                searchQuery,
-                isDrilled && isFacetAxis(axis) ? axis : null,
-                drillValue,
-                tagPrefixes,
-              )}
-              hint={buildEmptyWorksHint(
-                axis,
-                Boolean(searchQuery) || (isDrilled && isFacetAxis(axis)),
-              )}
+              message={buildEmptyWorksMessage(searchQuery, hasSelectedTags)}
+              hint={buildEmptyWorksHint(axis, Boolean(searchQuery) || hasSelectedTags)}
               action={
                 searchQuery ? (
                   <Button variant="ghost" icon={I.x} onClick={onClearSearch}>

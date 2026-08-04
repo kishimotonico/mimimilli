@@ -5,17 +5,9 @@
 import { createContext, createElement, useContext, useTransition, type ReactNode } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
 import type { AxisId, SortId } from "../model/types";
-import {
-  activeAxisAtom,
-  drillValueAtom,
-  selectedTagsAtom,
-  selectedWorkIdAtom,
-  sortAtom,
-} from "./atoms";
+import { activeAxisAtom, selectedTagsAtom, selectedWorkIdAtom, sortAtom } from "./atoms";
 import {
   clearLibraryTagsAtom,
-  drillBackAtom,
-  drillIntoAtom,
   goToLibrarySegmentAtom,
   selectLibraryWorkAtom,
   setLibraryAxisAtom,
@@ -25,7 +17,6 @@ import {
 
 export interface LibraryViewState {
   activeAxis: AxisId;
-  drillValue: string | null;
   selectedTags: string[];
   selectedWorkId: string | null;
   sort: SortId;
@@ -33,8 +24,6 @@ export interface LibraryViewState {
 
 export interface LibraryViewActions {
   setAxis: (axis: AxisId) => void;
-  drillInto: (value: string) => void;
-  drillBack: () => void;
   toggleTag: (tag: string) => void;
   clearTags: () => void;
   selectWork: (id: string | null) => void;
@@ -45,15 +34,12 @@ export interface LibraryViewActions {
 
 export function useLibraryView(): LibraryViewState & LibraryViewActions {
   const activeAxis = useAtomValue(activeAxisAtom);
-  const drillValue = useAtomValue(drillValueAtom);
   const selectedTags = useAtomValue(selectedTagsAtom);
   const selectedWorkId = useAtomValue(selectedWorkIdAtom);
   const sort = useAtomValue(sortAtom);
   const [isPending, startTransition] = useTransition();
 
   const setAxis = useSetAtom(setLibraryAxisAtom);
-  const drillInto = useSetAtom(drillIntoAtom);
-  const drillBack = useSetAtom(drillBackAtom);
   const toggleTag = useSetAtom(toggleLibraryTagAtom);
   const clearTags = useSetAtom(clearLibraryTagsAtom);
   const selectWork = useSetAtom(selectLibraryWorkAtom);
@@ -70,16 +56,10 @@ export function useLibraryView(): LibraryViewState & LibraryViewActions {
 
   return {
     activeAxis,
-    drillValue,
     selectedTags,
     selectedWorkId,
     sort,
     setAxis: transition(setAxis),
-    drillInto: transition(drillInto),
-    drillBack: () =>
-      startTransition(() => {
-        drillBack();
-      }),
     toggleTag: transition(toggleTag),
     clearTags: () =>
       startTransition(() => {

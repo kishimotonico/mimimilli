@@ -466,9 +466,44 @@
     width: 300px;
   }
   .mle-col.is-content.is-pending,
+  .mle-col.is-results.is-pending,
   .mll-grid-pane.is-pending {
     opacity: 0.55;
     transition: opacity 150ms ease;
+  }
+  /* 結果面（値一覧・作品一覧）はレイアウト固定で常に全幅（ADR-0012 §3）。
+     作品選択時のみ .mll-results__preview がスライドインする。 */
+  .mll-results {
+    position: relative;
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    overflow: hidden;
+  }
+  .mll-results__content {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .mle-col.is-results {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+    border-right: none;
+  }
+  .mll-results__preview {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 420px;
+    max-width: 90%;
+    display: flex;
+    box-shadow: var(--shadow-pop);
+    border-left: 1px solid var(--line-soft);
   }
   .mle-col.is-axis .mle-col__list {
     gap: 0;
@@ -1204,6 +1239,19 @@
     font-family: var(--font-mono);
     font-size: 10.5px;
     color: var(--ink-2);
+  }
+  .mll-tagband__clear {
+    margin-left: auto;
+    font-family: var(--font-sans);
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--ink-2);
+    padding: 3px 6px;
+    border-radius: var(--r-1);
+  }
+  .mll-tagband__clear:hover {
+    color: var(--ink-0);
+    background: var(--paper-2);
   }
 
   .mll-taggroup + .mll-taggroup {
@@ -2991,6 +3039,16 @@
   .ml-presence-colstack[data-phase="shown"] {
     width: 46px;
     opacity: 1;
+  }
+
+  /* 作品選択時のプレビューのスライドイン（ADR-0012 §3）。colstack-width と同じ
+     パターンで、絶対配置した .mll-results__preview を右から出し入れする。 */
+  .ml-presence-preview {
+    transform: translateX(100%);
+    transition: transform 220ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .ml-presence-preview[data-phase="shown"] {
+    transform: translateX(0);
   }
 
   .mle-colstack__edges[data-pulse="enter"] {

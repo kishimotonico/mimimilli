@@ -1,12 +1,7 @@
 import { useAtom, useAtomValue } from "jotai";
 import { appModeAtom } from "../../features/navigation/model/navigationAtoms";
-import {
-  activeAxisAtom,
-  drillValueAtom,
-  libraryViewModeAtom,
-} from "../../features/library/model/atoms";
-import { isFacetAxis } from "../../features/library/model/axisDefinitions";
-import { computeWorksListVisibility } from "../../features/library/model/libraryPresentation";
+import { activeAxisAtom, libraryViewModeAtom } from "../../features/library/model/atoms";
+import { isWorksGridActive } from "../../features/library/model/libraryPresentation";
 import LibraryGridControls from "../../features/library/ui/LibraryGridControls";
 import LibraryBreadcrumbs from "../../features/library/ui/LibraryBreadcrumbs";
 import LibrarySortMenu from "../../features/library/ui/LibrarySortMenu";
@@ -18,16 +13,14 @@ import IconButton from "../../shared/ui/IconButton";
 export default function AddressBar() {
   const mode = useAtomValue(appModeAtom);
   const activeAxis = useAtomValue(activeAxisAtom);
-  const drillValue = useAtomValue(drillValueAtom);
   const [libraryViewMode, setLibraryViewMode] = useAtom(libraryViewModeAtom);
   const availableViewModes: readonly ("column" | "list" | "grid")[] =
     mode === "library" ? ["list", "grid"] : ["column"];
 
-  // ドリル済みファセット軸は viewMode にかかわらず常に全幅グリッドへ合流する
-  // （libraryPresentation.ts）。ボタンの active 表示もその実態（showGrid）に
-  // 合わせ、リストボタンは押しても何も変わらないため disabled にする。
-  const { showGrid } = computeWorksListVisibility(activeAxis, drillValue, libraryViewMode);
-  const isDrilledFacet = isFacetAxis(activeAxis) && drillValue !== null;
+  // list/grid の決定は libraryViewModeAtom のみに依存する（ADR-0012 §3）。
+  // 強制グリッドの上書きは廃止済みで、ここでは「grid が実際に描画されているか」だけを
+  // isWorksGridActive の単一実装から読む。
+  const showGrid = isWorksGridActive(activeAxis, libraryViewMode);
 
   return (
     <div className="mle-addr is-lib">
@@ -51,7 +44,7 @@ export default function AddressBar() {
           label="リスト"
           active={mode === "library" && !showGrid}
           onClick={() => setLibraryViewMode("list")}
-          disabled={!availableViewModes.includes("list") || isDrilledFacet}
+          disabled={!availableViewModes.includes("list")}
           title={mode !== "library" ? "ファイルモードはカラム表示のみ" : undefined}
         />
         <IconButton

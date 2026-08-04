@@ -1,15 +1,76 @@
 import { describe, expect, it } from "vitest";
 import { ApiRequestError } from "../../src/shared/api/http";
 import {
+  buildFilterTag,
   buildWorksParams,
   computeCollectionStatsDisplay,
   computeIsNoResultsDueToFilter,
-  computePreviewMode,
-  computeWorksListVisibility,
+  computeResultsPaneKind,
   getFacetAxisForQuery,
+  isWorksGridActive,
   shouldClearSelectionOnFilterMiss,
   shouldClearSelectionOnWorkNotFound,
+  splitSelectedTags,
 } from "../../src/features/library/model/libraryPresentation";
+
+describe("computeResultsPaneKind", () => {
+  it("home 軸は home", () => {
+    expect(computeResultsPaneKind("home")).toBe("home");
+  });
+  it("facet 軸（prefix・year）は value-list", () => {
+    expect(computeResultsPaneKind("circle")).toBe("value-list");
+    expect(computeResultsPaneKind("year")).toBe("value-list");
+  });
+  it("tag 軸は value-list", () => {
+    expect(computeResultsPaneKind("tag")).toBe("value-list");
+  });
+  it("ビュー軸・スマートフォルダー軸は works", () => {
+    expect(computeResultsPaneKind("all")).toBe("works");
+    expect(computeResultsPaneKind("fav")).toBe("works");
+    expect(computeResultsPaneKind("smart-abc")).toBe("works");
+  });
+});
+
+describe("isWorksGridActive", () => {
+  it("works 種の結果面は viewMode のみに従う（強制グリッドは廃止済み）", () => {
+    expect(isWorksGridActive("all", "list")).toBe(false);
+    expect(isWorksGridActive("all", "grid")).toBe(true);
+    expect(isWorksGridActive("smart-abc", "grid")).toBe(true);
+  });
+  it("value-list・home 種の結果面はグリッド概念を持たない", () => {
+    expect(isWorksGridActive("circle", "grid")).toBe(false);
+    expect(isWorksGridActive("tag", "grid")).toBe(false);
+    expect(isWorksGridActive("home", "grid")).toBe(false);
+  });
+});
+
+describe("splitSelectedTags", () => {
+  it("year 擬似タグを yearValue へ、それ以外は tags へ振り分ける", () => {
+    expect(splitSelectedTags(["cv/藤田茜", "year/2024", "サークル/月白製作所"])).toEqual({
+      tags: ["cv/藤田茜", "サークル/月白製作所"],
+      yearValue: "2024",
+    });
+  });
+  it("year 擬似タグが無ければ yearValue は null", () => {
+    expect(splitSelectedTags(["ASMR"])).toEqual({ tags: ["ASMR"], yearValue: null });
+  });
+  it("year 擬似タグが複数あっても先頭だけを採用する（AND は常に0件になるため）", () => {
+    expect(splitSelectedTags(["year/2023", "year/2024"])).toEqual({
+      tags: [],
+      yearValue: "2023",
+    });
+  });
+});
+
+describe("buildFilterTag", () => {
+  it("tag 軸はそのまま返す（値が既に完全なタグ文字列のため）", () => {
+    expect(buildFilterTag("tag", "cv/藤田茜")).toBe("cv/藤田茜");
+  });
+  it("それ以外の facet 軸は 軸/値 の擬似タグを組み立てる", () => {
+    expect(buildFilterTag("cv", "藤田茜")).toBe("cv/藤田茜");
+    expect(buildFilterTag("year", "2024")).toBe("year/2024");
+  });
+});
 
 describe("buildWorksParams", () => {
   it("returns null for smart folder axes (handled by a separate query)", () => {
@@ -19,7 +80,6 @@ describe("buildWorksParams", () => {
         sort: "added-desc",
         searchQuery: "",
         selectedTags: [],
-        drillValue: null,
       }),
     ).toBeNull();
   });
@@ -31,20 +91,27 @@ describe("buildWorksParams", () => {
         sort: "added-desc",
         searchQuery: "",
         selectedTags: [],
-        drillValue: null,
       }),
     ).toBeNull();
   });
 
-  it("sets tags/tagOp only on the tag axis with a selection", () => {
-    const params = buildWorksParams({
-      activeAxis: "tag",
-      sort: "added-desc",
-      searchQuery: "",
-      selectedTags: ["ASMR", "癒し系"],
-      drillValue: null,
-    });
-    expect(params).toEqual({ sort: "added-desc", tags: ["ASMR", "癒し系"], tagOp: "AND" });
+  it("returns null for value-list axes (facet/tag axes never show a works list)", () => {
+    expect(
+      buildWorksParams({
+        activeAxis: "tag",
+        sort: "added-desc",
+        searchQuery: "",
+        selectedTags: ["ASMR"],
+      }),
+    ).toBeNull();
+    expect(
+      buildWorksParams({
+        activeAxis: "circle",
+        sort: "added-desc",
+        searchQuery: "",
+        selectedTags: [],
+      }),
+    ).toBeNull();
   });
 
   it("sets view for non-all view axes but not for all", () => {
@@ -54,7 +121,6 @@ describe("buildWorksParams", () => {
         sort: "added-desc",
         searchQuery: "",
         selectedTags: [],
-        drillValue: null,
       }),
     ).toEqual({ sort: "added-desc", view: "fav" });
     expect(
@@ -63,204 +129,84 @@ describe("buildWorksParams", () => {
         sort: "added-desc",
         searchQuery: "",
         selectedTags: [],
-        drillValue: null,
       }),
     ).toEqual({ sort: "added-desc" });
   });
 
-  it("sets axis/axisValue when a facet axis is drilled", () => {
+  it("sets tags/tagOp when a view axis has selected tags (ADR-0012: filters apply across all axes)", () => {
     expect(
       buildWorksParams({
-        activeAxis: "circle",
+        activeAxis: "all",
         sort: "added-desc",
         searchQuery: "",
-        selectedTags: [],
-        drillValue: "月白製作所",
+        selectedTags: ["cv/藤田茜", "サークル/月白製作所"],
       }),
-    ).toEqual({ sort: "added-desc", axis: "circle", axisValue: "月白製作所" });
+    ).toEqual({
+      sort: "added-desc",
+      tags: ["cv/藤田茜", "サークル/月白製作所"],
+      tagOp: "AND",
+    });
+  });
+
+  it("resolves a year pseudo-tag as the built-in axis/axisValue query (ADR-0012 §2)", () => {
+    expect(
+      buildWorksParams({
+        activeAxis: "all",
+        sort: "added-desc",
+        searchQuery: "",
+        selectedTags: ["year/2024"],
+      }),
+    ).toEqual({ sort: "added-desc", axis: "year", axisValue: "2024" });
+  });
+
+  it("combines a real tag filter and a year pseudo-tag filter together", () => {
+    expect(
+      buildWorksParams({
+        activeAxis: "all",
+        sort: "added-desc",
+        searchQuery: "",
+        selectedTags: ["cv/藤田茜", "year/2024"],
+      }),
+    ).toEqual({
+      sort: "added-desc",
+      tags: ["cv/藤田茜"],
+      tagOp: "AND",
+      axis: "year",
+      axisValue: "2024",
+    });
   });
 });
 
 describe("getFacetAxisForQuery", () => {
-  it("returns the facet axis before drilling", () => {
-    expect(getFacetAxisForQuery("circle", null)).toBe("circle");
+  it("returns the axis for value-list axes (facet/tag)", () => {
+    expect(getFacetAxisForQuery("circle")).toBe("circle");
+    expect(getFacetAxisForQuery("tag")).toBe("tag");
   });
-  it("returns null once drilled (works query takes over)", () => {
-    expect(getFacetAxisForQuery("circle", "月白製作所")).toBeNull();
-  });
-  it("returns the tag axis regardless of drill state", () => {
-    expect(getFacetAxisForQuery("tag", null)).toBe("tag");
-  });
-  it("returns null for view/smart axes", () => {
-    expect(getFacetAxisForQuery("all", null)).toBeNull();
-    expect(getFacetAxisForQuery("smart-abc", null)).toBeNull();
-  });
-});
-
-describe("computeWorksListVisibility", () => {
-  it("facet axis without a drill shows neither list nor grid", () => {
-    expect(computeWorksListVisibility("circle", null, "list")).toEqual({
-      showsWorksList: false,
-      canShowWorksGrid: false,
-      showGrid: false,
-    });
-  });
-
-  it("facet axis with a drill shows the works list/grid", () => {
-    expect(computeWorksListVisibility("circle", "月白製作所", "grid")).toEqual({
-      showsWorksList: true,
-      canShowWorksGrid: true,
-      showGrid: true,
-    });
-  });
-
-  it("a drilled facet axis always shows the grid, even when viewMode is list", () => {
-    expect(computeWorksListVisibility("circle", "月白製作所", "list")).toEqual({
-      showsWorksList: true,
-      canShowWorksGrid: true,
-      showGrid: true,
-    });
-  });
-
-  it("non-facet axes still respect the list/grid viewMode preference", () => {
-    expect(computeWorksListVisibility("all", null, "list").showGrid).toBe(false);
-    expect(computeWorksListVisibility("all", null, "grid").showGrid).toBe(true);
-  });
-
-  it("tag axis cannot show the grid (checkbox list only)", () => {
-    expect(computeWorksListVisibility("tag", null, "grid").canShowWorksGrid).toBe(false);
-  });
-
-  it("home axis shows neither the works list nor the grid (dedicated dashboard view)", () => {
-    expect(computeWorksListVisibility("home", null, "grid")).toEqual({
-      showsWorksList: false,
-      canShowWorksGrid: false,
-      showGrid: false,
-    });
+  it("returns null for view/smart/home axes", () => {
+    expect(getFacetAxisForQuery("all")).toBeNull();
+    expect(getFacetAxisForQuery("smart-abc")).toBeNull();
+    expect(getFacetAxisForQuery("home")).toBeNull();
   });
 });
 
 describe("computeIsNoResultsDueToFilter", () => {
-  it("is false when the axis is just naturally empty (no search/drill)", () => {
-    expect(computeIsNoResultsDueToFilter(true, 0, "", "fav", null, false, false)).toBe(false);
+  it("is false when the axis is just naturally empty (no search/filter)", () => {
+    expect(computeIsNoResultsDueToFilter(true, 0, "", [], false, false)).toBe(false);
   });
   it("is true when a search query narrows to zero results (query settled: not loading/error)", () => {
-    expect(computeIsNoResultsDueToFilter(true, 0, "存在しない語", "all", null, false, false)).toBe(
-      true,
-    );
+    expect(computeIsNoResultsDueToFilter(true, 0, "存在しない語", [], false, false)).toBe(true);
   });
-  it("is true when a facet drill narrows to zero results", () => {
-    expect(
-      computeIsNoResultsDueToFilter(true, 0, "", "circle", "存在しないサークル", false, false),
-    ).toBe(true);
+  it("is true when a selected tag filter narrows to zero results", () => {
+    expect(computeIsNoResultsDueToFilter(true, 0, "", ["存在しないタグ"], false, false)).toBe(true);
   });
   it("is false while the debounced query is still loading, even though works is temporarily empty", () => {
-    expect(computeIsNoResultsDueToFilter(true, 0, "存在しない語", "all", null, true, false)).toBe(
-      false,
-    );
-  });
-  it("is true once the query resolves successfully after loading", () => {
-    // 同じパラメータでisWorksLoadingがfalseに変われば（クエリ確定後）通常どおり判定する
-    expect(computeIsNoResultsDueToFilter(true, 0, "存在しない語", "all", null, false, false)).toBe(
-      true,
-    );
+    expect(computeIsNoResultsDueToFilter(true, 0, "存在しない語", [], true, false)).toBe(false);
   });
   it("is false when the works query errored (0件が確定した結果ではないため)", () => {
-    expect(computeIsNoResultsDueToFilter(true, 0, "存在しない語", "all", null, false, true)).toBe(
-      false,
-    );
+    expect(computeIsNoResultsDueToFilter(true, 0, "存在しない語", [], false, true)).toBe(false);
   });
-});
-
-describe("computePreviewMode", () => {
-  it("prioritizes the no-results message over a stale selected work", () => {
-    expect(
-      computePreviewMode({
-        isNoResultsDueToFilter: true,
-        selectedWorkId: "w1",
-        activeAxis: "all",
-        selectedTags: [],
-      }),
-    ).toBe("empty");
-  });
-
-  it("shows work detail once selected and loaded", () => {
-    expect(
-      computePreviewMode({
-        isNoResultsDueToFilter: false,
-        selectedWorkId: "w1",
-        activeAxis: "all",
-        selectedTags: [],
-      }),
-    ).toBe("work");
-  });
-
-  it("stays in work mode while the selected work is still loading (no flicker to home/etc.)", () => {
-    // selectedWorkIdが立っていればwork詳細データの有無に関わらずworkモードを維持する。
-    // 読み込み中/エラーの出し分けはコンポーネント側（PreviewPane/WorkGridInspector）が担う。
-    expect(
-      computePreviewMode({
-        isNoResultsDueToFilter: false,
-        selectedWorkId: "w1",
-        activeAxis: "circle",
-        selectedTags: [],
-      }),
-    ).toBe("work");
-  });
-
-  it("shows empty for an undrilled facet axis (placeholder role dropped in phase 1, ADR-0012 §4)", () => {
-    expect(
-      computePreviewMode({
-        isNoResultsDueToFilter: false,
-        selectedWorkId: null,
-        activeAxis: "circle",
-        selectedTags: [],
-      }),
-    ).toBe("empty");
-  });
-
-  it("shows smart-folder for smart axes", () => {
-    expect(
-      computePreviewMode({
-        isNoResultsDueToFilter: false,
-        selectedWorkId: null,
-        activeAxis: "smart-abc",
-        selectedTags: [],
-      }),
-    ).toBe("smart-folder");
-  });
-
-  it("shows home for the home axis regardless of tag/drill state", () => {
-    expect(
-      computePreviewMode({
-        isNoResultsDueToFilter: false,
-        selectedWorkId: null,
-        activeAxis: "home",
-        selectedTags: [],
-      }),
-    ).toBe("home");
-  });
-
-  it("shows work over home when a work is selected while browsing home", () => {
-    expect(
-      computePreviewMode({
-        isNoResultsDueToFilter: false,
-        selectedWorkId: "w1",
-        activeAxis: "home",
-        selectedTags: [],
-      }),
-    ).toBe("work");
-  });
-
-  it("shows tag-results when the tag axis has selected tags", () => {
-    expect(
-      computePreviewMode({
-        isNoResultsDueToFilter: false,
-        selectedWorkId: null,
-        activeAxis: "tag",
-        selectedTags: ["ASMR"],
-      }),
-    ).toBe("tag-results");
+  it("is false when the pane isn't a works pane", () => {
+    expect(computeIsNoResultsDueToFilter(false, 0, "存在しない語", [], false, false)).toBe(false);
   });
 });
 

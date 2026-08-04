@@ -179,6 +179,11 @@ const asyncNoop = async () => {
   throw new Error("not used in this test");
 };
 
+// ADR-0012 §3: 結果面のプレースホルダー（未選択・0件）表示は WorkGrid/WorkListPane
+// 自身の CollectionStatus が担い、PreviewPane はもう「empty」モードを持たない
+// （作品選択時にだけスライドインするため）。PreviewPane は "work" と home 軸専用の
+// "home" だけを扱う。
+
 describe("PreviewPane のホームビュー（ADR-0012 §4）", () => {
   let fetchMock: ReturnType<typeof createFetchMock>;
 
@@ -195,8 +200,6 @@ describe("PreviewPane のホームビュー（ADR-0012 §4）", () => {
     selectedWork: null,
     isSelectedWorkLoading: false,
     isSelectedWorkError: false,
-    smartFolder: null,
-    axisWorks: [],
     playingTrackIndex: null,
     onPlay: noop,
     onResume: noop,
@@ -206,46 +209,7 @@ describe("PreviewPane のホームビュー（ADR-0012 §4）", () => {
     tagSuggestions: [],
     isPatching: false,
     onPatchWork: asyncNoop,
-    onEditSmartFolder: noop,
   };
-
-  it("検索0件時は従来どおりCollectionPlaceholderを表示する（発見ダッシュボードは出さない）", async () => {
-    render(
-      createElement(
-        Wrapper,
-        null,
-        createElement(PreviewPane, {
-          ...basePreviewPaneProps,
-          mode: "empty",
-          showNoResultsHint: true,
-          homeStats: { status: "ready", count: 0, trackCount: 0, durationSec: 0 },
-        }),
-      ),
-    );
-
-    expect(screen.getByText("作品が見つかりません")).toBeTruthy();
-    expect(screen.queryByText("最近追加")).toBeNull();
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it("軸選択・タグ絞り込みと無関係のプレースホルダーな empty はダッシュボードを出さない", async () => {
-    render(
-      createElement(
-        Wrapper,
-        null,
-        createElement(PreviewPane, {
-          ...basePreviewPaneProps,
-          mode: "empty",
-          showNoResultsHint: false,
-          homeStats: { status: "ready", count: 3, trackCount: 5, durationSec: 600 },
-        }),
-      ),
-    );
-
-    expect(screen.getByText("作品を選択してください")).toBeTruthy();
-    expect(screen.queryByText("最近追加")).toBeNull();
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
 
   it("mode='home' では発見ダッシュボードの3セクションを結果面に表示する", async () => {
     render(
@@ -255,7 +219,6 @@ describe("PreviewPane のホームビュー（ADR-0012 §4）", () => {
         createElement(PreviewPane, {
           ...basePreviewPaneProps,
           mode: "home",
-          showNoResultsHint: false,
           homeStats: { status: "ready", count: 3, trackCount: 5, durationSec: 600 },
         }),
       ),

@@ -101,21 +101,30 @@ test("work detail panel - tag editing", async ({ page }) => {
   await expect(panel).toHaveScreenshot("work-detail-tag-editing.png");
 });
 
-test("tag filter result grid", async ({ page }) => {
+test("tag filter chips and cross-axis AND filtering", async ({ page }) => {
   await openApp(page);
 
-  // タグ軸 → 「癒し系」を選択（AND絞り込み）。プレビューに結果グリッドが出る。
+  // タグ軸 → 「癒し系」を選択（ADR-0012: 選択は全軸共通のタグフィルタへ）。
+  // 軸は値をブラウズするビューのままで、チップ列に選択中フィルタが積み上がる。
   await page.locator(".mll-axis", { hasText: "タグ" }).click();
   await page.locator(".mll-tagrow", { hasText: "癒し系" }).click();
 
-  const panel = page.locator(".mle-prv");
-  await expect(panel.locator(".mll-related__card").first()).toBeVisible();
-  await expect(panel.locator(".mle-prv__hd .label")).toHaveText("絞り込み結果");
-  await expect(panel.getByText("タグの結果", { exact: true })).toBeVisible();
-  await expect(panel.getByText("左の列から絞り込みを選択してください")).toHaveCount(0);
+  await expect(page.locator(".mll-tagband .mll-tagband__chip")).toHaveText(["癒し系"]);
+  await expect(page.locator(".mll-tagrow", { hasText: "癒し系" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
 
-  // パネル要素のみを撮影し、結果グリッドの導線（カード）を回帰対象にする。
-  await expect(panel).toHaveScreenshot("tag-filter-result-grid.png");
+  const results = page.locator(".mll-results");
+
+  // 軸を切り替えても選択中のフィルタは維持され（AC#6）、作品一覧を表示する軸では
+  // そのままAND絞り込みされた作品一覧がチップ列の下に出る（AC#3・#4）。
+  await page.locator(".mll-axis", { hasText: "すべての作品" }).click();
+  await expect(page.locator(".mll-tagband .mll-tagband__chip")).toHaveText(["癒し系"]);
+  await expect(results.locator(".mle-col.is-results")).toBeVisible();
+
+  // パネル要素のみを撮影し、チップ列＋作品一覧の導線を回帰対象にする。
+  await expect(results).toHaveScreenshot("tag-filter-result-list.png");
 });
 
 test("scan result dialog", async ({ page }, testInfo) => {

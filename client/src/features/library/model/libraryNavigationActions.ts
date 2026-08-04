@@ -3,37 +3,23 @@ import { requestNavigationHistoryCommit } from "../../navigation/model/navigatio
 import type { AxisId, SortId } from "./types";
 import {
   activeAxisAtom,
-  drillValueAtom,
   gridInspectorOpenAtom,
   selectedTagsAtom,
   selectedWorkIdAtom,
   sortAtom,
 } from "./atoms";
 
+// 軸は値をブラウズするためのビューであり、選択状態を持たない（ADR-0012 §1）。
+// 軸を切り替えても選択中のフィルタ（selectedTagsAtom）は維持する。
 export const setLibraryAxisAtom = atom(null, (_get, set, axis: AxisId) => {
   requestNavigationHistoryCommit(set, "push");
   set(activeAxisAtom, axis);
-  set(drillValueAtom, null);
-  set(selectedTagsAtom, []);
   set(selectedWorkIdAtom, null);
   set(gridInspectorOpenAtom, false);
 });
 
-export const drillIntoAtom = atom(null, (_get, set, value: string) => {
-  requestNavigationHistoryCommit(set, "push");
-  set(drillValueAtom, value);
-  set(selectedTagsAtom, []);
-  set(selectedWorkIdAtom, null);
-  set(gridInspectorOpenAtom, false);
-});
-
-export const drillBackAtom = atom(null, (_get, set) => {
-  requestNavigationHistoryCommit(set, "push");
-  set(drillValueAtom, null);
-  set(selectedWorkIdAtom, null);
-  set(gridInspectorOpenAtom, false);
-});
-
+// 軸の値選択（facet/tag 問わず）はすべて同じタグフィルタへの追加・解除として扱う
+// （ADR-0012 §2）。
 export const toggleLibraryTagAtom = atom(null, (get, set, tag: string) => {
   requestNavigationHistoryCommit(set, "push");
   const prev = get(selectedTagsAtom);
@@ -64,10 +50,5 @@ export const setLibrarySortAtom = atom(null, (_get, set, sort: SortId) => {
 
 export const goToLibrarySegmentAtom = atom(null, (get, set, index: number) => {
   const activeAxis = get(activeAxisAtom);
-  const drillValue = get(drillValueAtom);
-  if (index <= 0) {
-    if (activeAxis !== "all") set(setLibraryAxisAtom, "all");
-    return;
-  }
-  if (index === 1 && drillValue !== null) set(drillBackAtom);
+  if (index <= 0 && activeAxis !== "all") set(setLibraryAxisAtom, "all");
 });

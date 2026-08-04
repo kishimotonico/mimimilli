@@ -35,17 +35,16 @@ function workGridElement(props: Partial<React.ComponentProps<typeof WorkGrid>>) 
   return (
     <WorkGrid
       axis="all"
-      drillValue={null}
       works={createWorks(100)}
       worksQueryKey="key-1"
       selectedWorkId={null}
       searchQuery=""
+      hasSelectedTags={false}
       isLoading={false}
       isError={false}
       hasNextPage={false}
       onWorkSelect={vi.fn()}
       onWorkPlay={vi.fn()}
-      onDrillBack={vi.fn()}
       onClearSearch={vi.fn()}
       inspector={null}
       onDeselect={vi.fn()}

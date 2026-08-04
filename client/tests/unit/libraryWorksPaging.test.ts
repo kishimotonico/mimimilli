@@ -14,7 +14,6 @@ import type { WorkListItem } from "@mimimilli/shared";
 
 const baseNav: LibraryViewState = {
   activeAxis: "all",
-  drillValue: null,
   selectedTags: [],
   selectedWorkId: null,
   sort: "added-desc",

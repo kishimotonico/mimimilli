@@ -5,7 +5,6 @@ import { Provider, createStore } from "jotai";
 import LibraryGridControls from "../../src/features/library/ui/LibraryGridControls";
 import {
   activeAxisAtom,
-  drillValueAtom,
   gridInspectorOpenAtom,
   libraryViewModeAtom,
 } from "../../src/features/library/model/atoms";
@@ -36,11 +35,10 @@ describe("LibraryGridControls の詳細パネルトグル", () => {
     expect(store.get(gridInspectorOpenAtom)).toBe(true);
   });
 
-  it("ファセット一覧表示中（WorkGrid が描画されない軸）ではトグルが disabled になる", () => {
+  it("値一覧表示中（作品グリッドが描画されない facet 軸）ではトグルが disabled になる", () => {
     const store = createStore();
     store.set(libraryViewModeAtom, "grid");
     store.set(activeAxisAtom, "circle");
-    store.set(drillValueAtom, null);
     renderControls(store);
 
     expect(screen.getByLabelText("詳細パネルの表示切り替え")).toBeDisabled();
@@ -53,15 +51,5 @@ describe("LibraryGridControls の詳細パネルトグル", () => {
     renderControls(store);
 
     expect(screen.getByLabelText("詳細パネルの表示切り替え")).toBeDisabled();
-  });
-
-  it("ドリル済みファセット軸は viewMode=list でも全幅グリッドへ合流し、トグルが有効になる", () => {
-    const store = createStore();
-    store.set(libraryViewModeAtom, "list");
-    store.set(activeAxisAtom, "circle");
-    store.set(drillValueAtom, "月白製作所");
-    renderControls(store);
-
-    expect(screen.getByLabelText("詳細パネルの表示切り替え")).toBeEnabled();
   });
 });

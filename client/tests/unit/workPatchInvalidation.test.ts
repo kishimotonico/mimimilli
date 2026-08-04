@@ -12,7 +12,6 @@ const baseCtx: LibraryListContext = {
   sort: "added-desc",
   searchQuery: "",
   selectedTags: [],
-  drillValue: null,
 };
 
 describe("getWorkPatchInvalidationTargets", () => {
@@ -78,7 +77,7 @@ describe("getWorkPatchInvalidationTargets", () => {
     });
   });
 
-  it("タグ変更（タグフィルタ中）はアクティブ reset", () => {
+  it("タグ変更（tag 軸の値一覧を表示中。作品一覧を持たないためアクティブ一覧には影響しない）", () => {
     expect(
       getWorkPatchInvalidationTargets(
         { tags: ["ASMR"] },
@@ -87,17 +86,17 @@ describe("getWorkPatchInvalidationTargets", () => {
     ).toEqual({
       facets: true,
       tags: true,
-      resetActiveWorksList: true,
-      patchActiveListCache: false,
+      resetActiveWorksList: false,
+      patchActiveListCache: true,
       staleInactiveListCaches: true,
     });
   });
 
-  it("タグ変更（ファセットドリル中）はアクティブ reset", () => {
+  it("タグ変更（facet 軸で値を選択中）はアクティブ reset", () => {
     expect(
       getWorkPatchInvalidationTargets(
         { tags: ["cv/水瀬なずな"] },
-        { ...baseCtx, activeAxis: "cv", drillValue: "水瀬なずな" },
+        { ...baseCtx, activeAxis: "all", selectedTags: ["cv/水瀬なずな"] },
       ),
     ).toEqual({
       facets: true,

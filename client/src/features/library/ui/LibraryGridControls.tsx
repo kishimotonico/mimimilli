@@ -3,25 +3,23 @@ import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
 import {
   activeAxisAtom,
-  drillValueAtom,
   gridInspectorOpenAtom,
   libraryGridLayoutModeAtom,
   libraryTileSizeAtom,
   libraryViewModeAtom,
 } from "../model/atoms";
 import { clampTileSize, MAX_TILE_SIZE, MIN_TILE_SIZE } from "../model/gridSizing";
-import { computeWorksListVisibility } from "../model/libraryPresentation";
+import { isWorksGridActive } from "../model/libraryPresentation";
 
 export default function LibraryGridControls() {
   const viewMode = useAtomValue(libraryViewModeAtom);
   const activeAxis = useAtomValue(activeAxisAtom);
-  const drillValue = useAtomValue(drillValueAtom);
   const [gridLayoutMode, setGridLayoutMode] = useAtom(libraryGridLayoutModeAtom);
   const [tileSize, setTileSize] = useAtom(libraryTileSizeAtom);
   const [gridInspectorOpen, setGridInspectorOpen] = useAtom(gridInspectorOpenAtom);
-  // WorkGrid が実際に描画されているか（ドリル済みファセット軸は viewMode に
-  // かかわらず全幅グリッドへ合流するため、viewMode 単体では判定できない）。
-  const { showGrid } = computeWorksListVisibility(activeAxis, drillValue, viewMode);
+  // WorkGrid が実際に描画されているか。list/grid の決定は libraryViewModeAtom のみに
+  // 依存する（ADR-0012 §3。強制グリッドの上書きは廃止済み）。
+  const showGrid = isWorksGridActive(activeAxis, viewMode);
   const safeTileSize = clampTileSize(tileSize);
 
   return (

@@ -24,7 +24,6 @@ function urlOf(input: RequestInfo | URL): string {
 
 const baseNav: LibraryViewState = {
   activeAxis: "cv",
-  drillValue: null,
   selectedTags: [],
   selectedWorkId: null,
   sort: "added-desc",

@@ -70,7 +70,6 @@ export function useSuspenseNormalLibraryWorks(nav: LibraryViewState, searchQuery
     sort: nav.sort,
     searchQuery,
     selectedTags: nav.selectedTags,
-    drillValue: nav.drillValue,
   });
   // 呼び出し側は通常軸だけをマウントする。スマート軸は専用の子コンポーネントが担当する。
   const normalWorksParams = worksParams!;
@@ -148,7 +147,7 @@ export function useLibrarySupportingQueries(nav: LibraryViewState) {
     queryKey: WORK_QUERY_KEYS.total(),
     queryFn: () => searchWorks({ limit: 1 }),
   });
-  const facetAxis = getFacetAxisForQuery(nav.activeAxis, nav.drillValue);
+  const facetAxis = getFacetAxisForQuery(nav.activeAxis);
   const facetQuery = useQuery({
     queryKey: WORK_QUERY_KEYS.facets(facetAxis ?? ""),
     queryFn: () => getAxisFacets(facetAxis!),
@@ -204,7 +203,6 @@ export function useLibraryPatchWorkMutation(nav: LibraryViewState, searchQuery: 
     sort: nav.sort,
     searchQuery: debouncedSearchQuery,
     selectedTags: nav.selectedTags,
-    drillValue: nav.drillValue,
   });
 
   return useMutation({
@@ -218,7 +216,6 @@ export function useLibraryPatchWorkMutation(nav: LibraryViewState, searchQuery: 
         sort: nav.sort,
         searchQuery: debouncedSearchQuery,
         selectedTags: nav.selectedTags,
-        drillValue: nav.drillValue,
       });
       const activeListQueryKey = isSmartAxis(nav.activeAxis)
         ? SMART_FOLDER_QUERY_KEYS.works(getSmartFolderId(nav.activeAxis))

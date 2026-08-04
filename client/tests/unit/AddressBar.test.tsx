@@ -1,33 +1,28 @@
-// ドリル済みファセット軸は viewMode にかかわらず常に全幅グリッドへ合流する
-// （libraryPresentation.ts）。リストボタンを押しても表示は変わらないため、
-// ドリル中はリストボタンを disabled にし、active 表示は showGrid の実態に揃える。
+// list/grid の決定は libraryViewModeAtom のみに依存する（ADR-0012 §3）。
+// ドリル機構の廃止に伴い、facet/tag 軸を選んでいても強制グリッドにはならない
+// （その軸は値一覧を表示するだけで作品グリッド自体を描画しないため、単に
+// グリッドボタンが「効かない」状態になる）。
 
 import { createElement } from "react";
-import { act, render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, afterEach } from "vitest";
 import AddressBar from "../../src/app/ui/AddressBar";
 import { LibraryNavigationProvider } from "../../src/features/library/ui/LibraryNavigationProvider";
 import { appModeAtom } from "../../src/features/navigation/model/navigationAtoms";
-import {
-  activeAxisAtom,
-  drillValueAtom,
-  libraryViewModeAtom,
-} from "../../src/features/library/model/atoms";
+import { activeAxisAtom, libraryViewModeAtom } from "../../src/features/library/model/atoms";
 
 afterEach(cleanup);
 
 function renderAddressBar(options?: {
   mode?: "library" | "files";
   activeAxis?: string;
-  drillValue?: string | null;
   libraryViewMode?: "list" | "grid";
 }) {
   const store = createStore();
   store.set(appModeAtom, options?.mode ?? "library");
   store.set(activeAxisAtom, (options?.activeAxis ?? "all") as never);
-  store.set(drillValueAtom, options?.drillValue ?? null);
   store.set(libraryViewModeAtom, options?.libraryViewMode ?? "list");
 
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -48,35 +43,23 @@ function renderAddressBar(options?: {
 }
 
 describe("AddressBar のビュー切替ボタン", () => {
-  it("通常軸ではリストボタンが有効で、選好どおり active になる", () => {
-    renderAddressBar({ activeAxis: "all", drillValue: null, libraryViewMode: "list" });
+  it("作品一覧を表示する軸ではリスト/グリッドが選好どおり active になる", () => {
+    renderAddressBar({ activeAxis: "all", libraryViewMode: "list" });
 
     expect(screen.getByLabelText("リスト")).toBeEnabled();
     expect(screen.getByLabelText("リスト")).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByLabelText("グリッド")).toHaveAttribute("aria-pressed", "false");
-  });
 
-  it("ドリル済みファセット軸では viewMode=list でもリストボタンが disabled になり、グリッドボタンが active になる", () => {
-    renderAddressBar({ activeAxis: "circle", drillValue: "月白製作所", libraryViewMode: "list" });
-
-    expect(screen.getByLabelText("リスト")).toBeDisabled();
-    expect(screen.getByLabelText("リスト")).toHaveAttribute("aria-pressed", "false");
+    cleanup();
+    renderAddressBar({ activeAxis: "all", libraryViewMode: "grid" });
     expect(screen.getByLabelText("グリッド")).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("ドリルを抜けるとリストボタンが再び有効になる", () => {
-    const { store } = renderAddressBar({
-      activeAxis: "circle",
-      drillValue: "月白製作所",
-      libraryViewMode: "list",
-    });
-    expect(screen.getByLabelText("リスト")).toBeDisabled();
+  it("facet 軸（値一覧）では viewMode=grid でも強制グリッドにならない（値一覧はグリッド概念を持たない）", () => {
+    renderAddressBar({ activeAxis: "circle", libraryViewMode: "grid" });
 
-    act(() => {
-      store.set(drillValueAtom, null);
-    });
-
-    expect(screen.getByLabelText("リスト")).toBeEnabled();
+    // circle は value-list 種の結果面のため、isWorksGridActive は常に false になる
+    expect(screen.getByLabelText("グリッド")).toHaveAttribute("aria-pressed", "false");
   });
 
   it("ファイルモードではリスト/グリッドに理由を示す title が付く", () => {

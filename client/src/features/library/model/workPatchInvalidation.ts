@@ -4,14 +4,14 @@
 
 import type { Work, WorkPatch } from "@mimimilli/shared";
 import type { SortId } from "./types";
-import { isFacetAxis, isSmartAxis } from "./axisDefinitions";
+import { isSmartAxis } from "./axisDefinitions";
+import { computeResultsPaneKind } from "./libraryPresentation";
 
 export interface LibraryListContext {
   activeAxis: string;
   sort: SortId;
   searchQuery: string;
   selectedTags: string[];
-  drillValue: string | null;
 }
 
 export interface WorkPatchInvalidationTargets {
@@ -30,8 +30,8 @@ export interface WorkPatchInvalidationTargets {
 function tagsChangeAffectsActiveList(ctx: LibraryListContext): boolean {
   if (isSmartAxis(ctx.activeAxis)) return true;
   if (ctx.searchQuery.length > 0) return true;
-  if (ctx.activeAxis === "tag" && ctx.selectedTags.length > 0) return true;
-  if (isFacetAxis(ctx.activeAxis) && ctx.drillValue && ctx.activeAxis !== "year") return true;
+  if (computeResultsPaneKind(ctx.activeAxis) === "works" && ctx.selectedTags.length > 0)
+    return true;
   return false;
 }
 

@@ -16,7 +16,6 @@ const SMART_FOLDER_ID = "sf-1";
 
 const baseNav: LibraryViewState = {
   activeAxis: `smart-${SMART_FOLDER_ID}`,
-  drillValue: null,
   selectedTags: [],
   selectedWorkId: null,
   sort: "added-desc",

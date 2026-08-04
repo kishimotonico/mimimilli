@@ -7,13 +7,13 @@ import {
 } from "../../src/features/navigation/model/navigationUrl";
 
 describe("navigation URL codec", () => {
-  it("round-trips a Japanese library drill with work and sort", () => {
+  it("round-trips a Japanese library axis with a tag filter, work, and sort", () => {
     const state: NavigationUrlState = {
       mode: "library",
       library: {
         ...DEFAULT_LIBRARY_URL_STATE,
         activeAxis: "cv",
-        drillValue: "水瀬なずな",
+        selectedTags: ["cv/水瀬なずな"],
         selectedWorkId: "RJ01234567",
         sort: "title-asc",
       },
@@ -21,7 +21,7 @@ describe("navigation URL codec", () => {
 
     const url = serializeNavigationUrl(state);
     expect(url).toBe(
-      "/library/cv/%E6%B0%B4%E7%80%AC%E3%81%AA%E3%81%9A%E3%81%AA?work=RJ01234567&sort=title-asc",
+      "/library/cv?tags=cv%2F%E6%B0%B4%E7%80%AC%E3%81%AA%E3%81%9A%E3%81%AA&work=RJ01234567&sort=title-asc",
     );
     expect(parseNavigationUrl(url)).toMatchObject({ state, warnings: [] });
   });
@@ -41,13 +41,32 @@ describe("navigation URL codec", () => {
     expect(parseNavigationUrl(url)).toMatchObject({ state, warnings: [] });
   });
 
+  it("carries a tag filter over even on a view axis (ADR-0012: filters apply across all axes)", () => {
+    const state: NavigationUrlState = {
+      mode: "library",
+      library: { ...DEFAULT_LIBRARY_URL_STATE, activeAxis: "all", selectedTags: ["ASMR"] },
+    };
+
+    const url = serializeNavigationUrl(state);
+    expect(url).toBe("/library/all?tags=ASMR");
+    expect(parseNavigationUrl(url)).toMatchObject({ state, warnings: [] });
+  });
+
+  it("round-trips a year pseudo-tag filter (ADR-0012 §2)", () => {
+    const state: NavigationUrlState = {
+      mode: "library",
+      library: { ...DEFAULT_LIBRARY_URL_STATE, activeAxis: "year", selectedTags: ["year/2024"] },
+    };
+
+    const url = serializeNavigationUrl(state);
+    expect(url).toBe("/library/year?tags=year%2F2024");
+    expect(parseNavigationUrl(url)).toMatchObject({ state, warnings: [] });
+  });
+
   it("round-trips smart folder IDs", () => {
     const state: NavigationUrlState = {
       mode: "library",
-      library: {
-        ...DEFAULT_LIBRARY_URL_STATE,
-        activeAxis: "smart-sleep-long",
-      },
+      library: { ...DEFAULT_LIBRARY_URL_STATE, activeAxis: "smart-sleep-long" },
     };
 
     expect(parseNavigationUrl(serializeNavigationUrl(state))).toMatchObject({
@@ -81,14 +100,10 @@ describe("navigation URL codec", () => {
 
   it("accepts arbitrary prefix segments as facet axes (lowercased)", () => {
     // ADR-0005: 予約ID以外のセグメントは prefix 軸として受理する
-    const result = parseNavigationUrl("/library/%E6%B0%97%E5%88%86/%E7%9D%A1%E7%9C%A0%E7%94%A8");
+    const result = parseNavigationUrl("/library/%E6%B0%97%E5%88%86");
     expect(result.state).toEqual({
       mode: "library",
-      library: {
-        ...DEFAULT_LIBRARY_URL_STATE,
-        activeAxis: "気分",
-        drillValue: "睡眠用",
-      },
+      library: { ...DEFAULT_LIBRARY_URL_STATE, activeAxis: "気分" },
     });
     expect(result.warnings).toEqual([]);
 
@@ -107,7 +122,7 @@ describe("navigation URL codec", () => {
     expect(result.warnings).toEqual(["存在しないライブラリ軸を拒否しました: smart-"]);
   });
 
-  it("rejects drill values on non-drillable axes (view / tag)", () => {
+  it("rejects a drillValue-style third path segment (drill segment abolished, ADR-0012 §2)", () => {
     const result = parseNavigationUrl("/library/fav/value");
     expect(result.state).toEqual({
       mode: "library",

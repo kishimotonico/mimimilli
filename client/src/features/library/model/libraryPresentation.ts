@@ -8,7 +8,61 @@ import type { WorksQueryParams } from "../api";
 import type { AxisId, SortId, ViewMode } from "./types";
 import { isFacetAxis, isHomeAxis, isSmartAxis, isViewAxis } from "./axisDefinitions";
 
-export type PreviewMode = "work" | "home" | "tag-results" | "smart-folder" | "empty";
+/** year 軸は URL 上 "year/2024" 形式の擬似タグとして selectedTagsAtom に載る
+ *  （ADR-0012 §2）。組み込み軸専用のクエリパラメータは設けない。 */
+const YEAR_TAG_PREFIX = "year/";
+
+// ── 結果面の種類（ADR-0012: ナビゲーション状態・表示設定・絞り込み状態の分離） ──
+
+export type ResultsPaneKind = "home" | "value-list" | "works";
+
+/**
+ * 軸だけから決まる結果面の種類。絞り込み状態（selectedTags）や表示設定（viewMode）には
+ * 依存しない — 軸は値をブラウズするためのビューであり、選択状態を持たない（ADR-0012 §1）。
+ *   - home: 発見ダッシュボード
+ *   - value-list: facet 軸・タグ軸の値一覧（本タスクでは素朴な一覧、TASK-181 で本実装）
+ *   - works: 作品一覧（ビュー軸・スマートフォルダー軸）
+ */
+export function computeResultsPaneKind(axis: AxisId): ResultsPaneKind {
+  if (isHomeAxis(axis)) return "home";
+  if (isFacetAxis(axis) || axis === "tag") return "value-list";
+  return "works";
+}
+
+/** グリッド／リストの決定は libraryViewModeAtom のみに依存する（ADR-0012 §3）。
+ *  works 以外の結果面（value-list・home）はグリッド概念を持たない。 */
+export function isWorksGridActive(axis: AxisId, viewMode: ViewMode): boolean {
+  return computeResultsPaneKind(axis) === "works" && viewMode === "grid";
+}
+
+// ── 選択中フィルタ（selectedTagsAtom）の解釈 ────────────────────
+
+export interface SplitSelectedTags {
+  /** 実タグとして work.tags と完全一致させるもの */
+  tags: string[];
+  /** year 軸から選ばれた addedAt の年（複数選択は仕様上 AND が常に0件になるため先頭のみ採用） */
+  yearValue: string | null;
+}
+
+export function splitSelectedTags(selectedTags: string[]): SplitSelectedTags {
+  let yearValue: string | null = null;
+  const tags: string[] = [];
+  for (const tag of selectedTags) {
+    if (tag.startsWith(YEAR_TAG_PREFIX)) {
+      if (yearValue === null) yearValue = tag.slice(YEAR_TAG_PREFIX.length);
+      continue;
+    }
+    tags.push(tag);
+  }
+  return { tags, yearValue };
+}
+
+/** facet/tag 軸の値一覧で1項目を選んだときに selectedTagsAtom へ追加する完全なタグ文字列を組み立てる。
+ *  tag 軸は AxisFacetItem.value が既に完全なタグ文字列（ADR-0005 追記）、
+ *  それ以外の facet 軸（year 含む）は "軸/値" の擬似タグとして表現する。 */
+export function buildFilterTag(axis: AxisId, value: string): string {
+  return axis === "tag" ? value : `${axis}/${value}`;
+}
 
 // ── works query のパラメータ ──────────────────────────────────
 
@@ -17,74 +71,39 @@ export interface WorksParamsInput {
   sort: SortId;
   searchQuery: string;
   selectedTags: string[];
-  drillValue: string | null;
 }
 
-/** スマートフォルダー軸は別 query（evalSmartFolder）で取得するため、通常の works query は発行しない。
- *  ホーム軸は軸の絞り込みと無関係な発見ダッシュボードのため、works query 自体を発行しない */
+/** works 種の結果面（ビュー軸・スマートフォルダー軸）以外は works query を発行しない。
+ *  スマートフォルダーは別 query（evalSmartFolder）で取得する。 */
 export function buildWorksParams(input: WorksParamsInput): WorksQueryParams | null {
-  const { activeAxis, sort, searchQuery, selectedTags, drillValue } = input;
-  if (isSmartAxis(activeAxis) || isHomeAxis(activeAxis)) return null;
+  const { activeAxis, sort, searchQuery, selectedTags } = input;
+  if (computeResultsPaneKind(activeAxis) !== "works" || isSmartAxis(activeAxis)) return null;
 
   const p: WorksQueryParams = { sort };
   if (searchQuery) p.q = searchQuery;
-  if (activeAxis === "tag" && selectedTags.length > 0) {
-    p.tags = selectedTags;
-    p.tagOp = "AND";
-  }
   if (isViewAxis(activeAxis) && activeAxis !== "all") {
     p.view = activeAxis as WorksQueryParams["view"];
   }
-  if (isFacetAxis(activeAxis) && drillValue) {
-    p.axis = activeAxis as WorksQueryParams["axis"];
-    p.axisValue = drillValue;
+
+  const { tags, yearValue } = splitSelectedTags(selectedTags);
+  if (tags.length > 0) {
+    p.tags = tags;
+    p.tagOp = "AND";
+  }
+  if (yearValue !== null) {
+    p.axis = "year";
+    p.axisValue = yearValue;
   }
   return p;
 }
 
-/** ファセット一覧（GET /axes/:axis）を取得すべき軸。ドリル済み・タグ以外の軸では null */
-export function getFacetAxisForQuery(
-  activeAxis: AxisId,
-  drillValue: string | null,
-): FacetAxisId | null {
-  if ((isFacetAxis(activeAxis) && !drillValue) || activeAxis === "tag") {
-    return activeAxis as FacetAxisId;
-  }
-  return null;
-}
-
-// ── 中央/プレビュー カラムの表示分岐 ──────────────────────────
-
-export interface WorksListVisibility {
-  /** 中央カラムが作品リストを表示する状態（非ファセット軸、またはドリル済み） */
-  showsWorksList: boolean;
-  canShowWorksGrid: boolean;
-  showGrid: boolean;
-}
-
-export function computeWorksListVisibility(
-  activeAxis: AxisId,
-  drillValue: string | null,
-  viewMode: ViewMode,
-): WorksListVisibility {
-  const showsWorksList =
-    !isSmartAxis(activeAxis) &&
-    !isHomeAxis(activeAxis) &&
-    (!isFacetAxis(activeAxis) || drillValue !== null);
-  const canShowWorksGrid =
-    isSmartAxis(activeAxis) ||
-    (!isFacetAxis(activeAxis) && activeAxis !== "tag" && !isHomeAxis(activeAxis)) ||
-    (isFacetAxis(activeAxis) && drillValue !== null);
-  // ドリル済みファセット軸（例: CV→藤田茜）は、300px固定リスト＋巨大な空プレビュー
-  // という体験を避けるため、viewMode（list/grid の永続選好）にかかわらず常に
-  // 全幅グリッドへ合流させる。ドリルを抜ければ元の選好に戻る（viewMode 自体は書き換えない）。
-  const isDrilledFacet = isFacetAxis(activeAxis) && drillValue !== null;
-  const showGrid = canShowWorksGrid && (isDrilledFacet || viewMode === "grid");
-  return { showsWorksList, canShowWorksGrid, showGrid };
+/** ファセット一覧（GET /axes/:axis）を取得すべき軸。value-list 種の結果面のみ */
+export function getFacetAxisForQuery(activeAxis: AxisId): FacetAxisId | null {
+  return computeResultsPaneKind(activeAxis) === "value-list" ? (activeAxis as FacetAxisId) : null;
 }
 
 /**
- * 検索語や軸ドリルの絞り込みが原因で作品一覧が0件になっているかどうか。
+ * 検索語やタグフィルタが原因で作品一覧が0件になっているかどうか。
  * fav/unplayed 等が本来的に0件のケースとは区別し、原因表示が必要な場合だけ案内する。
  *
  * 検索デバウンス後に queryKey が変わった直後は、新クエリが確定するまで
@@ -94,20 +113,19 @@ export function computeWorksListVisibility(
  * （worksCount===0 という結果を信頼できるのは、クエリが成功して確定した後だけ）。
  */
 export function computeIsNoResultsDueToFilter(
-  showsWorksList: boolean,
+  isWorksPane: boolean,
   worksCount: number,
   searchQuery: string,
-  activeAxis: AxisId,
-  drillValue: string | null,
+  selectedTags: string[],
   isWorksLoading: boolean,
   isWorksError: boolean,
 ): boolean {
   return (
-    showsWorksList &&
+    isWorksPane &&
     !isWorksLoading &&
     !isWorksError &&
     worksCount === 0 &&
-    (Boolean(searchQuery) || (isFacetAxis(activeAxis) && drillValue !== null))
+    (Boolean(searchQuery) || selectedTags.length > 0)
   );
 }
 
@@ -121,7 +139,7 @@ export type CollectionStatsDisplay =
   | { status: "ready"; count: number; trackCount: number; durationSec: number };
 
 /**
- * 検索語やドリルの絞り込みで作品一覧が0件になったとき、選択中の作品がその
+ * 検索語やタグフィルタの絞り込みで作品一覧が0件になったとき、選択中の作品がその
  * 絞り込み結果に含まれない古い選択のまま残っていないかを判定する。
  * true の場合は選択を解除すべき。
  */
@@ -162,26 +180,4 @@ export function computeCollectionStatsDisplay(
     trackCount: worksStats.trackCount,
     durationSec: worksStats.durationSec,
   };
-}
-
-export interface PreviewModeInput {
-  isNoResultsDueToFilter: boolean;
-  selectedWorkId: string | null;
-  activeAxis: AxisId;
-  selectedTags: string[];
-}
-
-// previewMode: UI state + server state を組み合わせてコンポーネントで計算する
-// （derived atom にしない — 0件時は選択中の作品が一覧に存在しないため、古い詳細を出さず案内を優先する）
-// selectedWorkId があれば読み込み中・エラーの間も "work" モードに留める（詳細データの
-// 有無はコンポーネント側でloading/error/読み込み済みを出し分ける。ここで弾くと、
-// 読み込み中に一瞬 home 等へ切り替わってちらつく）。
-export function computePreviewMode(input: PreviewModeInput): PreviewMode {
-  const { isNoResultsDueToFilter, selectedWorkId, activeAxis, selectedTags } = input;
-  if (isNoResultsDueToFilter) return "empty";
-  if (selectedWorkId) return "work";
-  if (isHomeAxis(activeAxis)) return "home";
-  if (isSmartAxis(activeAxis)) return "smart-folder";
-  if (activeAxis === "tag" && selectedTags.length > 0) return "tag-results";
-  return "empty";
 }

@@ -20,7 +20,8 @@ export const librarySearchQueryAtom = atom("");
 // ── ナビゲーション state ──────────────────────────────────────
 
 export const activeAxisAtom = atom<AxisId>("all");
-export const drillValueAtom = atom<string | null>(null);
+// 軸の値選択（facet/tag 問わず）はすべてここへ入る（ADR-0012 §2）。
+// year 軸のような組み込み軸は "year/2024" 形式の擬似タグとして同じ配列に載る。
 export const selectedTagsAtom = atom<string[]>([]);
 export const selectedWorkIdAtom = atom<string | null>(null);
 export const sortAtom = atom<SortId>("added-desc");
@@ -38,12 +39,9 @@ export const gridInspectorOpenAtom = atomWithStorage<boolean>("mimimilli:gridIns
 
 // ── アドレスバーパス（純粋計算）────────────────────────────────
 
-export function buildLibraryAddressPath(
-  axis: AxisId,
-  drillValue: string | null,
-  tagPrefixes: TagPrefix[],
-): string[] {
+// パンくずは「ライブラリ > 軸名」までを表す。絞り込みはチップ列だけが表現する
+// （ADR-0012 §2・帰結）。
+export function buildLibraryAddressPath(axis: AxisId, tagPrefixes: TagPrefix[]): string[] {
   if (axis === "all") return ["ライブラリ"];
-  const base = ["ライブラリ", getAxisLabel(axis, tagPrefixes)];
-  return drillValue ? [...base, drillValue] : base;
+  return ["ライブラリ", getAxisLabel(axis, tagPrefixes)];
 }
