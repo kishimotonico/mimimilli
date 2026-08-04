@@ -15,8 +15,14 @@
   select {
     user-select: text;
   }
-  .mle-app,
-  .mle-app * {
+  /* body 直下（#root の .mle-app と、createPortal で document.body へ出るポータル要素の
+     どちらも）にフォント・UAリセットを効かせる。.mle-app にだけスコープすると、ポータル
+     先の要素は打ち消しCSSが無い限りブラウザ既定のフォント・枠が出てしまう
+     （新しくポータルを追加するたび個別対処が要る状態になっていた）。body の子は
+     #root（= .mle-app）とポータル要素しかないため、スコープをここへ引き上げれば
+     新規ポータルにも自動で適用される。 */
+  body,
+  body * {
     font-family: var(--font-jp);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -33,7 +39,7 @@
   }
   /* text-align: inherit は UA 既定の center を打ち消す。行系UI（mll-axis / mll-wrow / mle-row 等）を
      a11y 対応で div→button 化しても左寄せレイアウトが崩れないようにする。 */
-  .mle-app button {
+  body button {
     font: inherit;
     color: inherit;
     background: transparent;
@@ -42,7 +48,7 @@
     padding: 0;
     text-align: inherit;
   }
-  .mle-app input {
+  body input {
     font: inherit;
     color: inherit;
     background: transparent;
@@ -50,12 +56,12 @@
     outline: 0;
     padding: 0;
   }
-  .mle-app a {
+  body a {
     color: inherit;
     text-decoration: none;
   }
-  .mle-app ul,
-  .mle-app ol {
+  body ul,
+  body ol {
     list-style: none;
   }
 }
@@ -1571,16 +1577,10 @@
     flex: 1;
     min-width: 0;
     padding: 0;
-    border: 0;
-    outline: 0;
-    font: inherit;
     font-size: 12px;
     color: var(--ink-0);
     background: transparent;
   }
-  /* オーバーレイは document.body へポータルされ .mle-app の外に出るため、
-     UAリセット（.mle-app input { border:0; outline:0 }）が効かず既定の太い枠が
-     見えてしまう。ここで明示的にリセットし、フォーカスリングだけ改めて与える。 */
   .mll-qlist__search input:focus-visible {
     outline: 2px solid var(--acc);
     outline-offset: 1px;

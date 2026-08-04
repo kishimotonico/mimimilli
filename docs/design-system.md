@@ -34,6 +34,8 @@
 
 `shell.css` は全規則がカスケードレイヤー内にある。UA要素のリセット（`button` / `input` / `a` / `ul` / `ol` 等）は `@layer base`、`mle-`/`mll-` のコンポーネント規則は `@layer components` に置く。Tailwind v4 のレイヤー順（`theme, base, components, utilities`）により、`@layer utilities`（Tailwindユーティリティ）が `components` より強く効くため、tsx側で `mle-`/`mll-` クラスと Tailwind ユーティリティを併用すると、ユーティリティ側で局所的に上書きできる。レイヤー外に素のセレクタを書くと、レイヤーの規則（unlayered が常に layered に勝つ）で utilities を問答無用で潰してしまうため、セレクタを足すときは必ずどちらかのレイヤー内に置く。
 
+フォント指定とUA要素のリセット（`@layer base` の `button` / `input` / `a` / `ul` / `ol`）は `body` セレクタでスコープする（`.mle-app` ではない）。アプリの DOM は `body` 直下に `#root`（= `.mle-app`）と、`createPortal(..., document.body)` で出すポータル要素しかないため、`body` にスコープしておけば新しくポータルを追加しても個別に打ち消しCSSを書く必要がない。ポータルを新規に追加するときはこの前提を壊さないこと（ラッパー要素にあえて別のフォント・リセットを指定したい場合を除き、何もしなくてよい）。
+
 ## Overlay / z-index の現在の階層
 
 実装調査済みの値（正は実装）。

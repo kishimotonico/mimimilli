@@ -1,11 +1,11 @@
 ---
 id: TASK-194
 title: ポータルで描画される要素がアプリのスタイルリセットから外れる問題を直す
-status: In Progress
+status: Done
 assignee:
   - impl-182
 created_date: '2026-08-04 16:55'
-updated_date: '2026-08-04 18:49'
+updated_date: '2026-08-04 19:49'
 labels: []
 dependencies: []
 priority: medium
@@ -52,5 +52,5 @@ TASK-191 で AxisQuickOverlay に入れた個別対処も、基盤側で解決�
 - [x] #2 RegisterWorkDialog と DlsiteEditor で、ブラウザ既定のフォントや枠が出ていないことを実機で確認している
 - [x] #3 TASK-191 で AxisQuickOverlay に入れた個別の打ち消しCSSが不要になり取り除かれている
 - [x] #4 新しくポータルを追加する際に個別対処が要らない仕組みになっており、その方法が docs/design-system.md に記載されている
-- [ ] #5 pnpm check と pnpm test が通る
+- [x] #5 pnpm check と pnpm test が通る
 <!-- AC:END -->
