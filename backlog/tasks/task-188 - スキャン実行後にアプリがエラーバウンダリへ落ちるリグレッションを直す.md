@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - impl-184
 created_date: '2026-08-04 13:41'
-updated_date: '2026-08-04 13:43'
+updated_date: '2026-08-04 14:27'
 labels: []
 dependencies: []
 priority: high
@@ -33,10 +33,10 @@ TASK-179 の差分に scan 関連ファイルの直接変更はないが、libra
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 スキャン結果ダイアログを開いてもエラーバウンダリに落ちず、正常に表示される
-- [ ] #2 コンソールに Objects are not valid as a React child のエラーが出ない
-- [ ] #3 ビジュアルテスト scan result dialog が通る
-- [ ] #4 クエリ結果オブジェクトを誤って JSX の子として渡していた箇所が特定され、型で再発しない形に直っている
-- [ ] #5 同種の描画事故を単体テストで検知できるようにテストが追加されている
-- [ ] #6 pnpm check と pnpm test が通る
+- [x] #1 スキャン結果ダイアログを開いてもエラーバウンダリに落ちず、正常に表示される
+- [x] #2 コンソールに Objects are not valid as a React child のエラーが出ない
+- [x] #3 ビジュアルテスト scan result dialog が通る
+- [x] #4 クエリ結果オブジェクトを誤って JSX の子として渡していた箇所が特定され、型で再発しない形に直っている
+- [x] #5 同種の描画事故を単体テストで検知できるようにテストが追加されている
+- [x] #6 pnpm check と pnpm test が通る
 <!-- AC:END -->

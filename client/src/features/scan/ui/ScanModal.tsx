@@ -3,8 +3,7 @@ import { useAtomValue } from "jotai";
 import { useQuery } from "@tanstack/react-query";
 import { getDefaultPlaylistTrackCount, type ScanResult, type Work } from "@mimimilli/shared";
 import { getWork, patchWork } from "../../../entities/work/api";
-import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
-import { searchWorks } from "../../library/api";
+import { libraryTotalQueryOptions } from "../../library/model/useLibraryQueries";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
 import Presence from "../../../shared/ui/Presence";
 import { cn } from "../../../shared/lib/cn";
@@ -50,12 +49,10 @@ export default function ScanModal({ lastScanTime, onClose, onOpenRjCodeMissing }
 
   // ライブラリ総件数（サイドバーの「ライブラリ N 件」と同じ既存クエリキーを共有する）。
   // スキャンモーダルで統計バッジが全て0でも蔵書自体は0件ではないことを示すために使う。
-  // App から降ろした購読（TASK-124）。
-  const libraryTotalQuery = useQuery({
-    queryKey: WORK_QUERY_KEYS.total(),
-    queryFn: () => searchWorks({ limit: 1 }).then((page) => page.total),
-  });
-  const libraryTotal = libraryTotalQuery.data ?? null;
+  // App から降ろした購読（TASK-124）。queryKey/queryFn は libraryTotalQueryOptions を
+  // 共有し、同じキーに違う形のデータを期待する食い違い（TASK-188）を型で防ぐ。
+  const libraryTotalQuery = useQuery(libraryTotalQueryOptions);
+  const libraryTotal = libraryTotalQuery.data?.total ?? null;
   const [newWorks, setNewWorks] = useState<Work[]>([]);
   const [newWorksError, setNewWorksError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);

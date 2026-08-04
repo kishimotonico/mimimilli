@@ -3,6 +3,7 @@
 // コンポーネント側は返された view model を配線するだけにする。
 
 import {
+  queryOptions,
   useMutation,
   useQuery,
   useQueryClient,
@@ -47,6 +48,23 @@ import type { LibraryViewState } from "./useLibraryNavigation";
 
 /** 検索クエリのデバウンス時間（TASK-61）。1文字ごとの全件検索発行を間引く */
 const SEARCH_DEBOUNCE_MS = 250;
+
+/**
+ * limit:1 の全件検索（ライブラリ総件数・統計）。queryKey/queryFn/型を1箇所にまとめ、
+ * 呼び出し側（本フック・ScanModal）が個別に useQuery({queryKey, queryFn}) を書かないようにする。
+ *
+ * 同じ queryKey を持つ useQuery が呼び出し側ごとに違う queryFn（違う戻り値の形）を持つと、
+ * React Query は queryKey が同一かどうかしか見ないため、先に解決した方の形が cache を占有し、
+ * 後から subscribe した側は自分の queryFn の戻り値ではなく cache の値をそのまま .data として
+ * 受け取る（TASK-188: ScanModal 側が number を、こちら側が WorksPage 全体を期待していて
+ * 衝突し、WorksPage オブジェクトを JSX の子として描画してクラッシュした）。
+ * queryOptions() で定義を共有すれば、両者の .data の型が常に一致し、この種の食い違いは
+ * 型チェックの時点で検知できる。
+ */
+export const libraryTotalQueryOptions = queryOptions({
+  queryKey: WORK_QUERY_KEYS.total(),
+  queryFn: () => searchWorks({ limit: 1 }),
+});
 
 /** 追加読み込みのページ指定。randomソートのseedを次ページへ引き継ぐ（TASK-73） */
 interface WorksPageParam {
@@ -154,11 +172,8 @@ function toSuspenseWorksResult(
  * このフックは一覧を取得しない。
  */
 export function useLibrarySupportingQueries(nav: LibraryViewState) {
-  // limit:1 の全件検索。件数バッジ（libraryTotal）とホームビューの統計表示を兼ねる。
-  const libraryStatsQuery = useQuery({
-    queryKey: WORK_QUERY_KEYS.total(),
-    queryFn: () => searchWorks({ limit: 1 }),
-  });
+  // 件数バッジ（libraryTotal）とホームビューの統計表示を兼ねる。
+  const libraryStatsQuery = useQuery(libraryTotalQueryOptions);
   const facetAxis = getFacetAxisForQuery(nav.activeAxis);
   const facetQuery = useAxisFacetsQuery(facetAxis);
   const smartFoldersQuery = useQuery({
