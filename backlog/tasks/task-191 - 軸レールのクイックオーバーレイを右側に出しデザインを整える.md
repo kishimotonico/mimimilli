@@ -1,10 +1,11 @@
 ---
 id: TASK-191
 title: 軸レールのクイックオーバーレイを右側に出しデザインを整える
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - impl-182
 created_date: '2026-08-04 16:10'
-updated_date: '2026-08-04 16:12'
+updated_date: '2026-08-04 16:35'
 labels: []
 dependencies: []
 priority: high
