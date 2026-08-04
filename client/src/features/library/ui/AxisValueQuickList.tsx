@@ -1,10 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type KeyboardEvent as ReactKeyboardEvent,
-} from "react";
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { AxisFacetItem } from "@mimimilli/shared";
 import { getAxisLabel } from "../model/axisDefinitions";
@@ -97,7 +91,8 @@ export default function AxisValueQuickList({
       ? buildAxisValueHierarchy(filtered, sort.direction)
       : flattenAxisValueRows(sortAxisValueItems(filtered, sort));
 
-  const measureElement = useCallback(() => ROW_ESTIMATE_SIZE, []);
+  // 行はすべて固定高さ（見出し・値行とも1行に収まるよう nowrap+ellipsis で折り返しを禁止済み）。
+  // DOM実測（measureElement + ref配線）はせず、estimateSize の定数をそのまま採用する。
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => listRef.current,
@@ -106,23 +101,26 @@ export default function AxisValueQuickList({
     gap: 1,
     paddingStart: LIST_PADDING,
     paddingEnd: LIST_PADDING,
-    measureElement,
   });
 
   const resetKey = `${axis}:${sort.key}:${sort.direction}:${query}`;
   const prevResetKeyRef = useRef(resetKey);
+  // items（facet データ本体）の参照も見る。選択中タグの変化などで同じ軸・ソート・検索語の
+  // まま中身だけ変わることがあり、resetKey の文字列比較だけでは検知できないため。
+  const prevItemsRef = useRef(items);
   // キーボード移動中の「現在位置」を自前で追跡する（rows のインデックス、未選択は-1）。
   // document.activeElement から逆算すると、フォーカス確定（下記のダブルrAF）より速く
   // 次のキー入力が来た場合に取りこぼす（キーリピート等）。scrollToIndex/focus の実際の
   // 完了を待たず、常にこの ref を正として次の移動先を決める。
   const activeIndexRef = useRef(-1);
   useEffect(() => {
-    if (prevResetKeyRef.current === resetKey) return;
+    if (prevResetKeyRef.current === resetKey && prevItemsRef.current === items) return;
     prevResetKeyRef.current = resetKey;
+    prevItemsRef.current = items;
     activeIndexRef.current = -1;
     virtualizer.scrollToIndex(0);
     if (listRef.current) listRef.current.scrollTop = 0;
-  }, [resetKey, virtualizer]);
+  }, [resetKey, items, virtualizer]);
 
   // 仮想化中は範囲外の行がDOMに無いため、scrollToIndexで画面内へ入れてから
   // レイアウト確定後（ダブルrAF）にフォーカスする。
@@ -258,7 +256,6 @@ export default function AxisValueQuickList({
                 <div
                   key={virtualRow.key}
                   data-index={virtualRow.index}
-                  ref={virtualizer.measureElement}
                   style={{
                     position: "absolute",
                     top: 0,

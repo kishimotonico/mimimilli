@@ -51,14 +51,9 @@ describe("AxisValueQuickList の仮想化", () => {
     sizeMock.restore();
   });
 
-  it("スクロールコンテナに max-height によるクリップがある（パネル内スクロール）", async () => {
-    const sizeMock = mockElementSize(260, 260);
-    renderQuickList({ items: makeItems(2000) });
-    await flushVirtualizer();
-
-    expect(document.querySelector(".mll-qlist__body")).toBeTruthy();
-    sizeMock.restore();
-  });
+  // パネル内スクロール（max-height + overflow-y）はCSSクリップの検証であり、
+  // レイアウト計算をしないjsdomでは実効性のあるアサーションにできない。
+  // ブラウザでの実機確認（agent-browser）で担保する。
 });
 
 describe("AxisValueQuickList のキーボード移動", () => {
@@ -130,6 +125,61 @@ describe("AxisValueQuickList のキーボード移動", () => {
     });
     // 先頭からArrowUpするとラップして末尾（最小件数）の行へ移る。
     expect(document.activeElement?.textContent).toContain("値0000");
+    sizeMock.restore();
+  });
+
+  it("位置未確定の状態からのArrowUpは末尾の値行へ着地する", async () => {
+    const sizeMock = mockElementSize(260, 260);
+    const user = userEvent.setup();
+    renderQuickList({ items: makeItems(3) });
+    await flushVirtualizer();
+
+    const input = screen.getByPlaceholderText("cvを検索");
+    input.focus();
+    await user.keyboard("{ArrowUp}");
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+
+    // 件数降順の既定ソート: 値0002 > 値0001 > 値0000。末尾は最小件数の値0000。
+    expect(document.activeElement?.textContent).toContain("値0000");
+    sizeMock.restore();
+  });
+
+  it("items が変わると activeIndexRef がリセットされ、次の移動は先頭から始まる", async () => {
+    const sizeMock = mockElementSize(260, 260);
+    const user = userEvent.setup();
+    const { rerender } = renderQuickList({ items: makeItems(3) });
+    await flushVirtualizer();
+
+    const input = screen.getByPlaceholderText("cvを検索");
+    input.focus();
+    await user.keyboard("{ArrowDown}");
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(document.activeElement?.textContent).toContain("値0002");
+
+    // 同じ axis・ソート・検索語のまま items の中身だけ変わる（選択中タグの変化等を想定）。
+    rerender(
+      <AxisValueQuickList
+        axis="cv"
+        items={makeItems(3).map((item) => ({ ...item, value: `別${item.value}` }))}
+        isSelected={() => false}
+        onSelect={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+    await flushVirtualizer();
+    input.focus();
+    await user.keyboard("{ArrowDown}");
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+
+    // activeIndexRef がリセットされていれば、新しいitemsの先頭（別値0002）から始まる。
+    // リセットされていなければ古いインデックス基準でずれた項目になる。
+    expect(document.activeElement?.textContent).toContain("別値0002");
     sizeMock.restore();
   });
 });

@@ -1434,11 +1434,16 @@
     block-size: 42px;
     box-sizing: border-box;
     padding-right: 4px;
+    overflow: hidden;
     font-family: var(--font-sans);
     font-size: 10.5px;
     font-weight: 600;
     letter-spacing: 0.03em;
     color: var(--ink-3);
+    /* 値行（.mll-vrow__nm）と同じく折り返さない。仮想化が行高を固定値で見積もっているため、
+       折り返すと translateY の計算がずれて以降の行が重なる。 */
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
   .mll-vrow__nm {
     min-width: 0;
@@ -1665,11 +1670,15 @@
   /* 入れ子タグの選択不可の見出し行（名前順ソート時のみ。値一覧の .mll-vrow-heading と対）。 */
   .mll-qlist__heading {
     padding: 6px 8px;
+    overflow: hidden;
     font-family: var(--font-sans);
     font-size: 10px;
     font-weight: 600;
     letter-spacing: 0.03em;
     color: var(--ink-3);
+    /* .mll-qlist__item .nm と同じく折り返さない（仮想化の固定行高見積もりが崩れるため）。 */
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
   .mll-qlist__status {
     padding: 16px 8px;
