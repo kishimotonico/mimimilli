@@ -1,17 +1,22 @@
-import React, { useEffect, useMemo, useRef } from "react";
-import { parseTag } from "@mimimilli/shared";
+import { useEffect, useState } from "react";
+import { useAtom, useAtomValue } from "jotai";
 import type { AxisFacetItem, TagPrefix } from "@mimimilli/shared";
 import type { AxisId } from "../model/types";
-import { getAxisLabel } from "../model/axisDefinitions";
+import { getAxisIcon, getAxisLabel } from "../model/axisDefinitions";
 import { buildFilterTag } from "../model/libraryPresentation";
-import { groupTagFacetItems } from "../model/tagAxisGrouping";
+import { filterAxisValueItems } from "../model/axisValueFilter";
+import { sortAxisValueItems } from "../model/axisValueSort";
+import { axisValueSortAtom, libraryTileSizeAtom, libraryViewModeAtom } from "../model/atoms";
 import CollectionStatus from "./CollectionStatus";
+import AxisValueRows from "./AxisValueRows";
+import AxisValueGrid from "./AxisValueGrid";
 import { I } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
 
-// facet 軸・タグ軸の値一覧（ADR-0012 §1・§2）。軸は値をブラウズするためのビューであり、
-// 選択状態を持たない。値の選択はすべて selectedTagsAtom への追加として扱う。
-// 本タスクでは素朴な一覧のみ（grid/list・列ソート・仮想化・階層表現は TASK-181/183）。
+// 軸の値一覧の本実装（ADR-0012 §5、TASK-181）。grid/list はユーザーの libraryViewModeAtom に
+// 従い、値のソートは axisValueSortAtom（ソートメニュー・list列見出しの二重入口・単一state。
+// ADR-0012 帰結）。入れ子タグの階層表現は TASK-183 の担当のため、タグ軸も含め全軸フルパスの
+// 平坦表示にする。
 
 interface AxisValueListProps {
   axis: AxisId;
@@ -26,18 +31,6 @@ interface AxisValueListProps {
   onRetryTagPrefixes?: () => void;
 }
 
-function useResetListScrollOnAxisChange(
-  axis: AxisId,
-  listRef: React.RefObject<HTMLDivElement | null>,
-) {
-  const prevAxisRef = useRef(axis);
-  useEffect(() => {
-    if (prevAxisRef.current === axis) return;
-    prevAxisRef.current = axis;
-    if (listRef.current) listRef.current.scrollTop = 0;
-  }, [axis, listRef]);
-}
-
 export default function AxisValueList({
   axis,
   facetItems,
@@ -50,26 +43,61 @@ export default function AxisValueList({
   onRetryFacets,
   onRetryTagPrefixes,
 }: AxisValueListProps) {
-  const listRef = useRef<HTMLDivElement>(null);
-  useResetListScrollOnAxisChange(axis, listRef);
-  const isTagAxis = axis === "tag";
-  const groups = useMemo(
-    () => (isTagAxis ? groupTagFacetItems(facetItems, tagPrefixes) : null),
-    [isTagAxis, facetItems, tagPrefixes],
-  );
+  const viewMode = useAtomValue(libraryViewModeAtom);
+  const tileSize = useAtomValue(libraryTileSizeAtom);
+  const [sort, setSort] = useAtom(axisValueSortAtom);
+
+  // コンテキスト検索（ADR-0012 §6）: 表示中の値に対するクライアント側の絞り込み。
+  // librarySearchQueryAtom（全体検索・URL の q=）とは別 state で、URL には載せず軸切り替えでリセットする。
+  const [contextQuery, setContextQuery] = useState("");
+  useEffect(() => {
+    setContextQuery("");
+  }, [axis]);
+
+  const filtered = filterAxisValueItems(facetItems, contextQuery);
+  const sorted = sortAxisValueItems(filtered, sort);
+  const fallbackIcon = getAxisIcon(axis);
+  const resetKey = `${axis}:${sort.key}:${sort.direction}:${contextQuery}`;
+
+  const isSelected = (item: AxisFacetItem) =>
+    selectedTags.includes(buildFilterTag(axis, item.value));
+  const handleToggle = (item: AxisFacetItem) => onToggle(buildFilterTag(axis, item.value));
+
+  const showSearchMiss = facetItems.length > 0 && sorted.length === 0;
 
   return (
-    <div className="mle-col is-results is-axis-values">
+    <div className={`mle-col is-results is-axis-values ${viewMode === "grid" ? "is-grid" : ""}`}>
       <div className="mle-col__hd">
         <span>{getAxisLabel(axis, tagPrefixes)}</span>
         {!isFacetLoading && <span className="count">{facetItems.length} 件</span>}
       </div>
-      <div ref={listRef} className="mle-col__list">
+
+      <div className="mll-vsearch">
+        <I.search size={13} />
+        <input
+          type="text"
+          value={contextQuery}
+          onChange={(e) => setContextQuery(e.target.value)}
+          placeholder="値を絞り込み"
+          aria-label={`${getAxisLabel(axis, tagPrefixes)}の値を絞り込み`}
+        />
+        {contextQuery && (
+          <Button variant="ghost" icon={I.x} onClick={() => setContextQuery("")}>
+            クリア
+          </Button>
+        )}
+      </div>
+
+      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
         {isFacetLoading ? (
-          <CollectionStatus variant="list" kind="loading" />
+          <CollectionStatus variant={viewMode === "grid" ? "grid" : "list"} kind="loading" />
         ) : isFacetError && facetItems.length === 0 ? (
           // キャッシュが無い＝初回取得失敗のときだけ一覧全体をエラー画面に置き換える。
-          <CollectionStatus variant="list" kind="error" onRetry={onRetryFacets} />
+          <CollectionStatus
+            variant={viewMode === "grid" ? "grid" : "list"}
+            kind="error"
+            onRetry={onRetryFacets}
+          />
         ) : (
           <>
             {isFacetError && (
@@ -83,7 +111,7 @@ export default function AxisValueList({
                 )}
               </div>
             )}
-            {isTagAxis &&
+            {axis === "tag" &&
               isTagPrefixesError && (
                 // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- role="status"で非ブロッキング通知にする
                 <div className="mll-axis-error" role="status" aria-live="polite">
@@ -96,66 +124,45 @@ export default function AxisValueList({
                 </div>
               )}
             {facetItems.length === 0 ? (
-              <CollectionStatus variant="list" kind="empty" message="項目がありません" />
-            ) : groups ? (
-              groups.map((group) => (
-                <div key={group.key || "__flat__"} className="mll-taggroup">
-                  <div className="mll-axisgroup__hd">{group.label}</div>
-                  {group.items.map((item) => (
-                    <AxisValueRow
-                      key={item.value}
-                      label={parseTag(item.value).value}
-                      count={item.count}
-                      checked={selectedTags.includes(item.value)}
-                      onToggle={() => onToggle(item.value)}
-                    />
-                  ))}
-                </div>
-              ))
+              <CollectionStatus
+                variant={viewMode === "grid" ? "grid" : "list"}
+                kind="empty"
+                message="項目がありません"
+              />
+            ) : showSearchMiss ? (
+              <CollectionStatus
+                variant={viewMode === "grid" ? "grid" : "list"}
+                kind="empty"
+                message="該当する値がありません"
+                action={
+                  <Button variant="ghost" icon={I.x} onClick={() => setContextQuery("")}>
+                    絞り込みをクリア
+                  </Button>
+                }
+              />
+            ) : viewMode === "grid" ? (
+              <AxisValueGrid
+                items={sorted}
+                tileSize={tileSize}
+                isSelected={isSelected}
+                fallbackIcon={fallbackIcon}
+                resetKey={resetKey}
+                onToggle={handleToggle}
+              />
             ) : (
-              facetItems.map((item) => {
-                const tag = buildFilterTag(axis, item.value);
-                return (
-                  <AxisValueRow
-                    key={item.value}
-                    label={item.value}
-                    count={item.count}
-                    checked={selectedTags.includes(tag)}
-                    onToggle={() => onToggle(tag)}
-                  />
-                );
-              })
+              <AxisValueRows
+                items={sorted}
+                sort={sort}
+                onSortChange={setSort}
+                isSelected={isSelected}
+                fallbackIcon={fallbackIcon}
+                resetKey={resetKey}
+                onToggle={handleToggle}
+              />
             )}
           </>
         )}
       </div>
     </div>
-  );
-}
-
-function AxisValueRow({
-  label,
-  count,
-  checked,
-  onToggle,
-}: {
-  label: string;
-  count: number;
-  checked: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className={`mll-tagrow ${checked ? "is-checked" : ""}`}
-      aria-pressed={checked}
-      onClick={onToggle}
-    >
-      <div className="check">
-        {checked && <I.x size={9} style={{ transform: "rotate(45deg)" }} />}
-      </div>
-      <span className="nm">{label}</span>
-      <span className="count">{count}</span>
-    </button>
   );
 }

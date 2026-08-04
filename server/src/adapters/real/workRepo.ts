@@ -1121,7 +1121,7 @@ export class WorkRepo {
     return `
       WITH base AS (${baseSelect}),
       ranked_covers AS (
-        SELECT value, cover_image, cover_width, cover_height,
+        SELECT value, work_id, cover_image, cover_width, cover_height,
                ROW_NUMBER() OVER (PARTITION BY value ORDER BY added_at DESC, work_id ASC) AS rn
         FROM base
         WHERE cover_image IS NOT NULL AND cover_width IS NOT NULL AND cover_height IS NOT NULL
@@ -1130,6 +1130,7 @@ export class WorkRepo {
         SELECT value,
                json_group_array(
                  json_object(
+                   'workId', work_id,
                    'image', cover_image,
                    'dimensions', json_object('width', cover_width, 'height', cover_height)
                  )

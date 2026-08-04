@@ -13,6 +13,7 @@ import type {
   ViewMode,
 } from "../../../features/library/model/types";
 import { getAxisLabel } from "./axisDefinitions";
+import { DEFAULT_AXIS_VALUE_SORT, type AxisValueSortState } from "./axisValueSort";
 
 // ライブラリ検索語。URLの q= パラメータへ同期する（useNavigationHistory）。localStorage には保存しない。
 export const librarySearchQueryAtom = atom("");
@@ -25,6 +26,9 @@ export const activeAxisAtom = atom<AxisId>("all");
 export const selectedTagsAtom = atom<string[]>([]);
 export const selectedWorkIdAtom = atom<string | null>(null);
 export const sortAtom = atom<SortId>("added-desc");
+// 値一覧のソート状態。sortAtom（作品一覧）とは別に保持する（ADR-0012 帰結）。
+// ソートメニューと list の列見出しクリックは同一のこの state への別入口。
+export const axisValueSortAtom = atom<AxisValueSortState>(DEFAULT_AXIS_VALUE_SORT);
 
 // URLには含めない表示設定。ブラウザーを再起動しても直前の見た目を復元する。
 export const libraryViewModeAtom = atomWithStorage<ViewMode>("mimimilli:libraryViewMode", "list");

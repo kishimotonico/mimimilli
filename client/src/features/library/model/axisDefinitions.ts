@@ -6,6 +6,7 @@
 
 import type { TagPrefix } from "@mimimilli/shared";
 import type { AxisId } from "./types";
+import type { IconName } from "../../../shared/ui/Icon";
 
 // 軸レールの単純ビュー（GET /works の view パラメータに対応）
 const VIEW_AXIS_IDS = ["all", "recent", "added", "fav", "unplayed", "missing"] as const;
@@ -57,4 +58,32 @@ export function getAxisLabel(axis: AxisId, tagPrefixes: TagPrefix[] = []): strin
   const builtin = VIEW_AXIS_LABELS[axis] ?? BUILTIN_AXIS_LABELS[axis];
   if (builtin) return builtin;
   return tagPrefixes.find((p) => p.prefix === axis)?.label ?? axis;
+}
+
+// 初期 seed の prefix に対する見慣れたアイコン。未知の prefix は folder に落ちる
+// （アイコンは prefix 定義に持たせていない表示上の便宜）
+const PREFIX_ICONS: Record<string, IconName> = {
+  cv: "user",
+  サークル: "folder",
+  シリーズ: "bookmark",
+  カテゴリ: "list",
+  genre: "list",
+};
+
+const BUILTIN_AXIS_ICONS: Record<string, IconName> = {
+  home: "home",
+  tag: "filter",
+  year: "refresh",
+  all: "gridS",
+  recent: "refresh",
+  added: "add",
+  fav: "star",
+  unplayed: "audio",
+  missing: "err",
+};
+
+/** 軸の代表アイコン。値一覧で代表カバーが0件の値のプレースホルダーにも使う（AxisValueList）。 */
+export function getAxisIcon(axis: AxisId): IconName {
+  if (isSmartAxis(axis)) return "gridS";
+  return BUILTIN_AXIS_ICONS[axis] ?? PREFIX_ICONS[axis] ?? "folder";
 }

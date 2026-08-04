@@ -107,10 +107,10 @@ test("tag filter chips and cross-axis AND filtering", async ({ page }) => {
   // タグ軸 → 「癒し系」を選択（ADR-0012: 選択は全軸共通のタグフィルタへ）。
   // 軸は値をブラウズするビューのままで、チップ列に選択中フィルタが積み上がる。
   await page.locator(".mll-axis", { hasText: "タグ" }).click();
-  await page.locator(".mll-tagrow", { hasText: "癒し系" }).click();
+  await page.locator(".mll-vrow", { hasText: "癒し系" }).click();
 
   await expect(page.locator(".mll-tagband .mll-tagband__chip")).toHaveText(["癒し系"]);
-  await expect(page.locator(".mll-tagrow", { hasText: "癒し系" })).toHaveAttribute(
+  await expect(page.locator(".mll-vrow", { hasText: "癒し系" })).toHaveAttribute(
     "aria-pressed",
     "true",
   );

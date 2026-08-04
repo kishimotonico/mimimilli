@@ -1,5 +1,6 @@
 import type { SmartFolder, TagPrefix } from "@mimimilli/shared";
 import type { AxisId } from "../model/types";
+import { getAxisIcon } from "../model/axisDefinitions";
 import { I, type IconName } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
 
@@ -22,25 +23,15 @@ const VIEW_AXES: AxisRow[] = [
   { id: "missing", name: "ファイル欠損", icon: "err" },
 ];
 
-// 初期 seed の prefix に対する見慣れたアイコン。未知の prefix は folder に落ちる
-// （アイコンは prefix 定義に持たせていない表示上の便宜）
-const PREFIX_ICONS: Record<string, IconName> = {
-  cv: "user",
-  サークル: "folder",
-  シリーズ: "bookmark",
-  カテゴリ: "list",
-  genre: "list",
-};
-
 /** 分類軸の行 = 軸表示ONの prefix 定義（定義順）＋ 組み込みの tag / year（ADR-0005） */
 function buildFacetAxisRows(tagPrefixes: TagPrefix[]): AxisRow[] {
   const prefixRows = tagPrefixes
     .filter((p) => p.showAsAxis)
-    .map((p) => ({ id: p.prefix, name: p.label, icon: PREFIX_ICONS[p.prefix] ?? "folder" }));
+    .map((p) => ({ id: p.prefix, name: p.label, icon: getAxisIcon(p.prefix) }));
   return [
     ...prefixRows,
-    { id: "tag", name: "タグ", icon: "filter" },
-    { id: "year", name: "追加日", icon: "refresh" },
+    { id: "tag", name: "タグ", icon: getAxisIcon("tag") },
+    { id: "year", name: "追加日", icon: getAxisIcon("year") },
   ];
 }
 

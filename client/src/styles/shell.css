@@ -1303,6 +1303,171 @@
     font-size: 10px;
     color: var(--ink-3);
   }
+  /* ── Cover collage (2×2, 値一覧の代表カバー。TASK-181) ───────── */
+
+  .mll-collage {
+    position: relative;
+    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 1px;
+    overflow: hidden;
+    background: var(--paper-3);
+    box-shadow:
+      0 1px 0 0 oklch(100% 0 0 / 0.5) inset,
+      0 2px 6px -3px oklch(20% 0.02 70 / 0.2);
+  }
+  .mll-collage__cell {
+    background: var(--paper-2);
+    overflow: hidden;
+  }
+  .mll-collage__cell img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .mll-collage--empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--paper-2);
+    color: var(--ink-3);
+  }
+
+  /* ── Axis value list（TASK-181） ──────────────────────────── */
+
+  .mll-vsearch {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--line-soft);
+    background: var(--paper-1);
+  }
+  .mll-vsearch input {
+    flex: 1;
+    min-width: 0;
+    font-size: 12px;
+    color: var(--ink-0);
+    background: transparent;
+  }
+  .mll-vsearch input::placeholder {
+    color: var(--ink-3);
+  }
+
+  .mll-vlist-hd {
+    display: grid;
+    grid-template-columns: 32px 1fr 72px 88px;
+    gap: 8px;
+    align-items: center;
+    padding: 4px 6px 4px 4px;
+  }
+  .mll-vlist-hd__sort {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 3px;
+    font-family: var(--font-sans);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--ink-3);
+    padding: 2px 4px;
+    border-radius: 3px;
+  }
+  .mll-vlist-hd__sort:first-of-type {
+    justify-content: flex-start;
+  }
+  .mll-vlist-hd__sort:hover {
+    color: var(--ink-1);
+    background: var(--paper-2);
+  }
+  .mll-vlist-hd__sort.is-active {
+    color: var(--ink-0);
+  }
+  .mll-vlist-hd__sort .chev {
+    display: inline-flex;
+  }
+  .mll-vlist-hd__sort .chev.is-asc {
+    transform: rotate(180deg);
+  }
+
+  .mll-vrow {
+    display: grid;
+    grid-template-columns: 32px 1fr 72px 88px;
+    gap: 8px;
+    align-items: center;
+    block-size: 42px;
+    box-sizing: border-box;
+    padding: 5px 6px 5px 4px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--ink-1);
+  }
+  .mll-vrow:hover {
+    background: var(--paper-2);
+  }
+  .mll-vrow.is-on {
+    background: var(--paper-4);
+    color: var(--ink-0);
+  }
+  .mll-vrow__nm {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--ink-0);
+    font-weight: 500;
+  }
+  .mll-vrow__count,
+  .mll-vrow__dur {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--ink-2);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .mll-vtile {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 5px;
+    border-radius: var(--r-2);
+    color: var(--ink-1);
+    cursor: pointer;
+  }
+  .mll-vtile:hover {
+    background: var(--paper-2);
+  }
+  .mll-vtile .mll-collage {
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 6px;
+  }
+  .mll-vtile__nm {
+    display: -webkit-box;
+    min-height: 2.1em;
+    margin: 8px 2px 0;
+    overflow: hidden;
+    color: var(--ink-0);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.35;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  .mll-vtile__badge {
+    margin: 3px 2px 0;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--ink-3);
+  }
+
   /* ── Drill header ─────────────────────────────────────────── */
 
   .mle-drill {
