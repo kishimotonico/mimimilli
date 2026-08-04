@@ -1,9 +1,11 @@
 ---
 id: TASK-194
 title: ポータルで描画される要素がアプリのスタイルリセットから外れる問題を直す
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - impl-182
 created_date: '2026-08-04 16:55'
+updated_date: '2026-08-04 18:49'
 labels: []
 dependencies: []
 priority: medium
@@ -46,9 +48,9 @@ TASK-191 で AxisQuickOverlay に入れた個別対処も、基盤側で解決�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 ポータルで document.body 直下へ描画される要素にも、アプリのフォント指定とフォーム要素・ボタンのリセットが適用される
-- [ ] #2 RegisterWorkDialog と DlsiteEditor で、ブラウザ既定のフォントや枠が出ていないことを実機で確認している
-- [ ] #3 TASK-191 で AxisQuickOverlay に入れた個別の打ち消しCSSが不要になり取り除かれている
-- [ ] #4 新しくポータルを追加する際に個別対処が要らない仕組みになっており、その方法が docs/design-system.md に記載されている
+- [x] #1 ポータルで document.body 直下へ描画される要素にも、アプリのフォント指定とフォーム要素・ボタンのリセットが適用される
+- [x] #2 RegisterWorkDialog と DlsiteEditor で、ブラウザ既定のフォントや枠が出ていないことを実機で確認している
+- [x] #3 TASK-191 で AxisQuickOverlay に入れた個別の打ち消しCSSが不要になり取り除かれている
+- [x] #4 新しくポータルを追加する際に個別対処が要らない仕組みになっており、その方法が docs/design-system.md に記載されている
 - [ ] #5 pnpm check と pnpm test が通る
 <!-- AC:END -->
