@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - impl-182
 created_date: '2026-08-05 14:52'
-updated_date: '2026-08-05 14:53'
+updated_date: '2026-08-05 15:00'
 labels: []
 dependencies: []
 priority: high
@@ -38,9 +38,9 @@ shared/src/work.ts の tagSchema は、まさにこのトリックを警戒し�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 先頭に空白を挟んだ擬似タグ（例: 半角スペース + @year/2024）が warnings へ積まれ、実タグ経路へ流れない
-- [ ] #2 擬似タグかどうかの判定が正規化後の値に対して行われ、tagSchema と同じ考え方に揃っている
-- [ ] #3 上記が単体テストで検証されている
-- [ ] #4 HTTP 境界でも同じ入力が 400 になる（refineTagWarnings 経由で自動的に効くことの確認）
+- [x] #1 先頭に空白を挟んだ擬似タグ（例: 半角スペース + @year/2024）が warnings へ積まれ、実タグ経路へ流れない
+- [x] #2 擬似タグかどうかの判定が正規化後の値に対して行われ、tagSchema と同じ考え方に揃っている
+- [x] #3 上記が単体テストで検証されている
+- [x] #4 HTTP 境界でも同じ入力が 400 になる（refineTagWarnings 経由で自動的に効くことの確認）
 - [ ] #5 pnpm check と pnpm test と pnpm test:visual が通る
 <!-- AC:END -->
