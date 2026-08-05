@@ -4,6 +4,7 @@ title: ライブラリ再設計で残った軽微な重複とデッドコード�
 status: To Do
 assignee: []
 created_date: '2026-08-05 10:57'
+updated_date: '2026-08-05 12:59'
 labels: []
 dependencies: []
 priority: medium
@@ -34,6 +35,10 @@ WorkListPane が MutationObserver で .mle-app の has-docked-bar クラスを�
 AxisQuickOverlay は共通フックに空のコールバックを渡し、外側クリック・Escape・フォーカス復帰を独自実装している。ポータル先が別 DOM 系統になるため anchor と panel の両方を境界として扱う必要があり、独自実装自体には正当な理由がある。ただし共通フック側が複数境界を扱えるようにすれば、この独自実装は不要になり保守しやすくなる。
 
 TASK-195 で位置決めを共有フックへ一本化したのと同じ方向の整理である。
+
+## 優先度の補足（2026-08-05 レビュー）
+
+項目2（リスト末尾余白）は、JS側（4+8=12px）とCSS側（12px）が同一要素 .mle-col__list へ二重適用されており、実際に合計24pxの余白が付いている可能性が高いとの調査報告がある。単なる重複実装ではなく実害を伴う疑いがあるため、本タスク内では優先して確認・対処すること。
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
