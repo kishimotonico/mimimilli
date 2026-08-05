@@ -19,6 +19,11 @@ test("parseBuiltinAxisTag: 軸や値が欠けた不正な形は null", () => {
   assert.equal(parseBuiltinAxisTag("@/2024"), null);
 });
 
+test("parseBuiltinAxisTag: 判定は正規化後の値に対して行われ、先頭に空白を挟んだ入力も擬似タグとして認識する（TASK-202）", () => {
+  assert.deepEqual(parseBuiltinAxisTag(" @year/2024"), { axis: "year", value: "2024" });
+  assert.deepEqual(parseBuiltinAxisTag("  @Year/2024"), { axis: "year", value: "2024" });
+});
+
 test("splitSelectedTags: year 擬似タグを yearValue へ、それ以外は tags へ振り分ける", () => {
   const result = splitSelectedTags(["cv/藤田茜", "@year/2024", "サークル/月白製作所"]);
   assert.deepEqual(result.tags, ["cv/藤田茜", "サークル/月白製作所"]);
@@ -84,13 +89,11 @@ test("splitSelectedTags: 4桁の数字でない year 値は警告付きで拒否
   }
 });
 
-test("splitSelectedTags: 先頭に空白を挟んだ擬似タグは正規化しても救済せず、警告付きで拒否する（TASK-202）", () => {
+test("splitSelectedTags: 先頭に空白を挟んだ擬似タグも正規化後の値で判定され、無警告でyearValueへ採用される（TASK-202）", () => {
   const result = splitSelectedTags([" @year/2024", "cv/藤田茜"]);
   assert.deepEqual(result.tags, ["cv/藤田茜"]);
-  assert.equal(result.yearValue, null);
-  assert.equal(result.warnings.length, 1);
-  assert.match(result.warnings[0]!, /予約文字混じりの不正な入力/);
-  assert.match(result.warnings[0]!, /@year\/2024/);
+  assert.equal(result.yearValue, "2024");
+  assert.deepEqual(result.warnings, []);
 });
 
 test("splitSelectedTags: 予約文字を含まない入力は正規化後の値がそのまま実タグとして採用される", () => {

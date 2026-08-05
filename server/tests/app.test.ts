@@ -50,12 +50,10 @@ test("GET /api/works は正しい @year/2024 擬似タグを受理する", async
   assert.equal(res.status, 200);
 });
 
-test("GET /api/works は先頭に空白を挟んだ擬似タグを400で拒否する（TASK-202）", async () => {
+test("GET /api/works は先頭に空白を挟んだ擬似タグも正規化後の値で判定し受理する（TASK-202）", async () => {
   const app = buildApp();
   const res = await app.request(`/api/works?tags=${encodeURIComponent(" @year/2024")}`);
-  assert.equal(res.status, 400);
-  const body = await res.json();
-  assert.equal(body.error.code, "invalid_request");
+  assert.equal(res.status, 200);
 });
 
 test("GET /api/works/:id 存在しないIDは404 + apiErrorSchema形式", async () => {

@@ -1,17 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { ApiRequestError } from "../../src/shared/api/http";
 import {
+  axisOfFilterTag,
   buildAxisFacetFilterParams,
   buildFilterTag,
   buildSmartFolderFilterParams,
   buildWorksParams,
   computeCollectionStatsDisplay,
   computeIsNoResultsDueToFilter,
+  computeReplacedTags,
   computeResultsPaneKind,
   getFacetAxisForQuery,
   isGridViewActive,
   shouldClearSelectionOnFilterMiss,
   shouldClearSelectionOnWorkNotFound,
+  tagFilterGroupKey,
 } from "../../src/features/library/model/libraryPresentation";
 
 describe("computeResultsPaneKind", () => {
@@ -55,6 +58,20 @@ describe("buildFilterTag", () => {
   });
   it("year（タグ由来でない組み込み軸）は @軸/値 の擬似タグを組み立てる", () => {
     expect(buildFilterTag("year", "2024")).toBe("@year/2024");
+  });
+});
+
+describe("tagFilterGroupKey / axisOfFilterTag（TASK-202: 先頭に空白を挟んだ擬似タグも正規化後の値で判定される）", () => {
+  it("year擬似タグは軸ごとにグループ化・軸特定される", () => {
+    expect(tagFilterGroupKey("@year/2024")).toBe("@year");
+    expect(axisOfFilterTag("@year/2024")).toBe("year");
+  });
+  it("先頭に空白を挟んだ擬似タグも同じ結果になる（正規化前の生文字列では素通りしていた）", () => {
+    expect(tagFilterGroupKey(" @year/2024")).toBe("@year");
+    expect(axisOfFilterTag(" @year/2024")).toBe("year");
+  });
+  it("computeReplacedTags: 先頭空白の有無に関わらず同じyear擬似タグとして置き換えられる（グループ判定のみ正規化、渡した値自体は素通し）", () => {
+    expect(computeReplacedTags(["@year/2023"], " @year/2024")).toEqual([" @year/2024"]);
   });
 });
 

@@ -5,7 +5,7 @@ status: Done
 assignee:
   - impl-182
 created_date: '2026-08-05 14:52'
-updated_date: '2026-08-05 15:04'
+updated_date: '2026-08-05 15:18'
 labels: []
 dependencies: []
 priority: high
@@ -38,9 +38,10 @@ shared/src/work.ts の tagSchema は、まさにこのトリックを警戒し�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [x] #1 先頭に空白を挟んだ擬似タグ（例: 半角スペース + @year/2024）が warnings へ積まれ、実タグ経路へ流れない
-- [x] #2 擬似タグかどうかの判定が正規化後の値に対して行われ、tagSchema と同じ考え方に揃っている
-- [x] #3 上記が単体テストで検証されている
-- [x] #4 HTTP 境界でも同じ入力が 400 になる（refineTagWarnings 経由で自動的に効くことの確認）
-- [x] #5 pnpm check と pnpm test と pnpm test:visual が通る
+- [x] #1 擬似タグかどうかの判定が正規化後の値に対して行われ、tagSchema と同じ考え方に揃っている
+- [x] #2 上記が単体テストで検証されている
+- [x] #3 pnpm check と pnpm test と pnpm test:visual が通る
+- [x] #4 先頭に空白を挟んだ擬似タグ（例: 半角スペース + @year/2024）が正規化されて有効な擬似タグとして扱われ、実タグ経路へ流れない
+- [x] #5 正規化後に予約文字で始まるが擬似タグとして解釈できない入力（@year・@/2024 等）は warnings へ積まれ、HTTP 境界で 400 になる
+- [x] #6 tagFilterGroupKey と axisOfFilterTag も同じ正規化の恩恵を受け、空白の有無で結果が変わらない
 <!-- AC:END -->
