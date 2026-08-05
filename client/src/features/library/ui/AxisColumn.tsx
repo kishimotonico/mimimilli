@@ -2,7 +2,6 @@ import { useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "reac
 import type { NormalizedTag, SmartFolder, TagPrefix } from "@mimimilli/shared";
 import type { AxisId } from "../model/types";
 import { buildFacetAxisRows, isFacetAxis } from "../model/axisDefinitions";
-import { useLibraryNavigation } from "../model/useLibraryNavigation";
 import { useHoverIntent, type HoverIntentHandlers } from "../../../shared/lib/useHoverIntent";
 import AxisQuickOverlay from "./AxisQuickOverlay";
 import { I, type IconName } from "../../../shared/ui/Icon";
@@ -32,10 +31,13 @@ interface AxisColumnProps {
   tagPrefixes: TagPrefix[];
   smartFolders: SmartFolder[];
   totalCount?: number;
+  selectedTags: NormalizedTag[];
   /** 分類軸の元になる GET /tag-prefixes の取得失敗。無言でCV/サークル等の行が
    *  消えるのを防ぎ、分類軸グループにエラー行を出す */
   isTagPrefixesError?: boolean;
   onSelectAxis: (axis: AxisId) => void;
+  onToggleTag: (tag: NormalizedTag) => void;
+  onReplaceTag: (tag: NormalizedTag) => void;
   onNewSmartFolder?: () => void;
   onRetryTagPrefixes?: () => void;
 }
@@ -117,13 +119,15 @@ export default function AxisColumn({
   tagPrefixes,
   smartFolders,
   totalCount,
+  selectedTags,
   isTagPrefixesError,
   onSelectAxis,
+  onToggleTag,
+  onReplaceTag,
   onNewSmartFolder,
   onRetryTagPrefixes,
 }: AxisColumnProps) {
   const facetAxisRows = buildFacetAxisRows(tagPrefixes);
-  const nav = useLibraryNavigation();
   const [overlay, setOverlay] = useState<QuickOverlayState | null>(null);
 
   const requestOverlayOpen = (
@@ -139,8 +143,8 @@ export default function AxisColumn({
   // クイックオーバーレイの選択は既定=置き換え、Ctrl/Cmd+クリックで AND 追加へ反転する（ADR-0012 §7）。
   // 置き換えは結果面を作品一覧へ遷移させ、AND追加は現在の結果面に留まる（ADR-0012 §8）。
   const handleSelectValue = (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => {
-    if (opts.ctrlKey || opts.metaKey) nav.toggleTag(tag);
-    else nav.replaceTag(tag);
+    if (opts.ctrlKey || opts.metaKey) onToggleTag(tag);
+    else onReplaceTag(tag);
   };
 
   const renderRow = (ax: AxisRow) => {
@@ -211,7 +215,7 @@ export default function AxisColumn({
           axis={overlay.axis}
           anchorEl={overlay.anchorEl}
           isOpen
-          selectedTags={nav.selectedTags}
+          selectedTags={selectedTags}
           onSelectValue={handleSelectValue}
           onClose={requestOverlayClose}
           panelHandlers={overlay.panelHandlers}

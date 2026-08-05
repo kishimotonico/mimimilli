@@ -1,4 +1,12 @@
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 
 const POPOVER_MARGIN = 8;
 const RIGHT_PLACEMENT_GAP = 6;
@@ -32,6 +40,9 @@ const defaultContainerResolver: PopoverContainerResolver = (anchor) =>
  *  "right": アンカーの右隣に固定配置し、上下方向をコンテナ内へクランプする
  *  （document.body へポータルする position:fixed のフライアウト向け）。 */
 export type PopoverPlacement = "below" | "right";
+
+/** 閉じた経路（document リスナーか UI からの直接呼び出しか） */
+export type PopoverCloseReason = "escape" | "outside" | "direct";
 
 function getBelowPlacementLayout(
   anchor: HTMLElement,
@@ -79,10 +90,8 @@ function getRightPlacementLayout(
 
 export interface UsePopoverDismissalOptions {
   isOpen: boolean;
-  /** ポップオーバー外へのポインター押下時に呼ぶ */
-  onOutsideClick: () => void;
-  /** Escapeキー押下時に呼ぶ（outsideClickと副作用が異なる場合に個別指定できる） */
-  onEscape: () => void;
+  /** 閉じるときに呼ぶ（フォーカス復帰の後） */
+  onClose: (reason: PopoverCloseReason) => void;
   /**
    * outside-click判定の境界に使う要素。未指定なら anchorRef 自身を使う。
    * タグ追加ポップオーバーのように、トリガーボタン＋浮遊/フル幅どちらの表示も含めて
@@ -90,10 +99,60 @@ export interface UsePopoverDismissalOptions {
    */
   boundaryRef?: RefObject<HTMLElement | null>;
   /**
+   * 外側クリック判定に含める追加の境界要素（ポータル先のパネルなど）。
+   * anchor / boundaryRef とあわせて、いずれかに含まれるクリックは閉じない。
+   */
+  additionalBoundaryRefs?: RefObject<HTMLElement | null>[];
+  /**
    * トリガー要素（またはそれを含む祖先）の ref。ポップオーバーを閉じた際、
    * フォーカスが BODY へ落ちていたらこの要素内の最初のフォーカス可能要素へ戻す。
    */
   anchorRef: RefObject<HTMLElement | null>;
+}
+
+export interface UsePopoverDismissalResult {
+  /** すべての閉じ経路はこの関数を通す */
+  close: (reason?: PopoverCloseReason) => void;
+}
+
+function isInsideBoundaries(
+  target: Node,
+  anchorRef: RefObject<HTMLElement | null>,
+  boundaryRef: RefObject<HTMLElement | null> | undefined,
+  additionalBoundaryRefs: RefObject<HTMLElement | null>[] | undefined,
+): boolean {
+  const primary = boundaryRef?.current ?? anchorRef.current;
+  const boundaries = [primary, ...(additionalBoundaryRefs?.map((r) => r.current) ?? [])].filter(
+    Boolean,
+  ) as HTMLElement[];
+  return boundaries.some((el) => el.contains(target));
+}
+
+function shouldRefocusPopoverAnchor(
+  anchorRef: RefObject<HTMLElement | null>,
+  boundaryRef: RefObject<HTMLElement | null> | undefined,
+  additionalBoundaryRefs: RefObject<HTMLElement | null>[] | undefined,
+): boolean {
+  const active = document.activeElement;
+  if (active === document.body) return true;
+  if (!(active instanceof Node)) return false;
+  return isInsideBoundaries(active, anchorRef, boundaryRef, additionalBoundaryRefs);
+}
+
+function refocusPopoverAnchor(anchorRef: RefObject<HTMLElement | null>): void {
+  const anchor = anchorRef.current;
+  if (!anchor) return;
+  if (anchor.matches(FOCUSABLE_SELECTOR)) anchor.focus();
+  else anchor.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)?.focus();
+}
+
+function refocusPopoverAnchorIfNeeded(
+  anchorRef: RefObject<HTMLElement | null>,
+  boundaryRef: RefObject<HTMLElement | null> | undefined,
+  additionalBoundaryRefs: RefObject<HTMLElement | null>[] | undefined,
+): void {
+  if (!shouldRefocusPopoverAnchor(anchorRef, boundaryRef, additionalBoundaryRefs)) return;
+  refocusPopoverAnchor(anchorRef);
 }
 
 /**
@@ -104,22 +163,42 @@ export interface UsePopoverDismissalOptions {
  */
 export function usePopoverDismissal({
   isOpen,
-  onOutsideClick,
-  onEscape,
+  onClose,
   boundaryRef,
+  additionalBoundaryRefs,
   anchorRef,
-}: UsePopoverDismissalOptions): void {
+}: UsePopoverDismissalOptions): UsePopoverDismissalResult {
+  const isOpenRef = useRef(isOpen);
+  isOpenRef.current = isOpen;
+  const closeInFlightRef = useRef(false);
+
+  useEffect(() => {
+    if (isOpen) closeInFlightRef.current = false;
+  }, [isOpen]);
+
+  const close = useCallback(
+    (reason: PopoverCloseReason = "direct") => {
+      if (!isOpenRef.current || closeInFlightRef.current) return;
+      closeInFlightRef.current = true;
+      refocusPopoverAnchorIfNeeded(anchorRef, boundaryRef, additionalBoundaryRefs);
+      onClose(reason);
+    },
+    [onClose, boundaryRef, additionalBoundaryRefs, anchorRef],
+  );
+
   useEffect(() => {
     if (!isOpen) return;
 
     const closeOnOutsidePointerDown = (event: PointerEvent) => {
-      const boundary = boundaryRef?.current ?? anchorRef.current;
-      if (boundary && event.target instanceof Node && !boundary.contains(event.target)) {
-        onOutsideClick();
+      if (
+        event.target instanceof Node &&
+        !isInsideBoundaries(event.target, anchorRef, boundaryRef, additionalBoundaryRefs)
+      ) {
+        close("outside");
       }
     };
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onEscape();
+      if (event.key === "Escape") close("escape");
     };
 
     document.addEventListener("pointerdown", closeOnOutsidePointerDown);
@@ -128,30 +207,24 @@ export function usePopoverDismissal({
       document.removeEventListener("pointerdown", closeOnOutsidePointerDown);
       document.removeEventListener("keydown", closeOnEscape);
     };
-  }, [isOpen, onOutsideClick, onEscape, boundaryRef, anchorRef]);
+  }, [isOpen, close, boundaryRef, additionalBoundaryRefs, anchorRef]);
 
-  const wasOpenRef = useRef(isOpen);
-  useEffect(() => {
-    if (wasOpenRef.current && !isOpen && document.activeElement === document.body) {
-      anchorRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)?.focus();
-    }
-    wasOpenRef.current = isOpen;
-  }, [isOpen, anchorRef]);
+  return { close };
 }
 
 export interface UseAnchoredPopoverOptions {
   isOpen: boolean;
   preferredWidth: number;
-  /** ポップオーバー外へのポインター押下時に呼ぶ */
-  onOutsideClick: () => void;
-  /** Escapeキー押下時に呼ぶ（outsideClickと副作用が異なる場合に個別指定できる） */
-  onEscape: () => void;
+  /** 閉じるときに呼ぶ（フォーカス復帰の後） */
+  onClose: (reason: PopoverCloseReason) => void;
   /**
    * outside-click判定の境界に使う要素。未指定なら anchorRef 自身を使う。
    * タグ追加ポップオーバーのように、トリガーボタン＋浮遊/フル幅どちらの表示も含めて
    * 境界としたい場合に、呼び出し側で別途 ref を用意して渡す。
    */
   boundaryRef?: RefObject<HTMLElement | null>;
+  /** 外側クリック判定に含める追加の境界要素（ポータル先のパネルなど） */
+  additionalBoundaryRefs?: RefObject<HTMLElement | null>[];
   /**
    * クランプ対象コンテナを差し替える。既定は `.mle-prv__meta` / `.mle-prv__body`。
    * work-preview の外（軸レールのクイックオーバーレイなど）で使う場合、
@@ -171,6 +244,8 @@ export interface UseAnchoredPopoverResult {
    */
   panelRef: RefObject<HTMLDivElement | null>;
   layout: PopoverLayout;
+  /** すべての閉じ経路はこの関数を通す */
+  close: (reason?: PopoverCloseReason) => void;
 }
 
 /**
@@ -181,21 +256,34 @@ export interface UseAnchoredPopoverResult {
 export function useAnchoredPopover({
   isOpen,
   preferredWidth,
-  onOutsideClick,
-  onEscape,
+  onClose,
   boundaryRef,
+  additionalBoundaryRefs,
   getContainer = defaultContainerResolver,
   placement = "below",
 }: UseAnchoredPopoverOptions): UseAnchoredPopoverResult {
   const anchorRef = useRef<HTMLDivElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
+  const dismissalBoundaryRefs = useMemo(
+    () =>
+      placement === "right"
+        ? [...(additionalBoundaryRefs ?? []), panelRef]
+        : additionalBoundaryRefs,
+    [placement, additionalBoundaryRefs],
+  );
   const [layout, setLayout] = useState<PopoverLayout>({
     left: 0,
     width: preferredWidth,
     containerWidth: preferredWidth,
   });
 
-  usePopoverDismissal({ isOpen, onOutsideClick, onEscape, boundaryRef, anchorRef });
+  const { close } = usePopoverDismissal({
+    isOpen,
+    onClose,
+    boundaryRef,
+    additionalBoundaryRefs: dismissalBoundaryRefs,
+    anchorRef,
+  });
 
   useLayoutEffect(() => {
     if (!isOpen) return;
@@ -237,5 +325,5 @@ export function useAnchoredPopover({
     };
   }, [isOpen, preferredWidth, getContainer, placement]);
 
-  return { anchorRef, panelRef, layout };
+  return { anchorRef, panelRef, layout, close };
 }

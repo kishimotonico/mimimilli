@@ -40,18 +40,16 @@ function FilterChip({
   onRemove: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const close = () => setOpen(false);
-  const { anchorRef, layout } = useAnchoredPopover({
+  const { anchorRef, layout, close } = useAnchoredPopover({
     isOpen: open,
     preferredWidth: 220,
-    onOutsideClick: close,
-    onEscape: close,
+    onClose: () => setOpen(false),
   });
   const axis = axisOfFilterTag(tag);
 
   return (
     <span ref={anchorRef} className="mll-tagband__chip relative">
-      <button type="button" className="lbl" onClick={() => setOpen((v) => !v)}>
+      <button type="button" className="lbl" onClick={() => (open ? close() : setOpen(true))}>
         {tag}
       </button>
       <button
@@ -75,7 +73,7 @@ function FilterChip({
             else onReplace(nextTag);
             close();
           }}
-          onClose={close}
+          close={close}
         />
       )}
     </span>

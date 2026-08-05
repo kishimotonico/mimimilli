@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, type ReactNode } from "react";
+import { useAtomValue } from "jotai";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { WorkListItem } from "@mimimilli/shared";
 import type { AxisId } from "../model/types";
@@ -10,13 +11,14 @@ import CollectionStatus from "./CollectionStatus";
 import LoadMore from "./LoadMore";
 import { I } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
+import { dockedBarActiveAtom } from "../../player/model/atoms";
 
 // 作品一覧のリスト表示（list/grid のうち list）。ADR-0012 §3 によりレイアウトを固定し、
 // 常に結果面全幅で表示する（旧 ContentColumn の300px固定・中間カラム役割は廃止）。
 
 /** WorkRow の概算高さ（padding 上下 10px + カバー 32px） */
 const WORK_ROW_ESTIMATE_SIZE = 42;
-/** .mle-col__list の padding（has-docked-bar 時は padding-bottom が広がる） */
+/** .mle-col__list の padding（has-docked-bar 時は virtualizer paddingEnd で末尾余白を確保） */
 const LIST_PADDING_START = 4;
 const LIST_PADDING_END_BASE = 4;
 const LIST_DOCKED_BAR_EXTRA = 8;
@@ -61,23 +63,10 @@ export default function WorkListPane({
   smartFolderBanner,
 }: WorkListPaneProps) {
   const listRef = useRef<HTMLDivElement>(null);
-  const [paddingEnd, setPaddingEnd] = useState(LIST_PADDING_END_BASE);
-
-  useEffect(() => {
-    const app = listRef.current?.closest(".mle-app");
-    if (!app) return;
-    const update = () => {
-      setPaddingEnd(
-        app.classList.contains("has-docked-bar")
-          ? LIST_PADDING_END_BASE + LIST_DOCKED_BAR_EXTRA
-          : LIST_PADDING_END_BASE,
-      );
-    };
-    const observer = new MutationObserver(update);
-    observer.observe(app, { attributes: true, attributeFilter: ["class"] });
-    update();
-    return () => observer.disconnect();
-  }, []);
+  const dockedBarActive = useAtomValue(dockedBarActiveAtom);
+  const paddingEnd = dockedBarActive
+    ? LIST_PADDING_END_BASE + LIST_DOCKED_BAR_EXTRA
+    : LIST_PADDING_END_BASE;
 
   const measureElement = useCallback(() => WORK_ROW_ESTIMATE_SIZE, []);
 
@@ -152,6 +141,7 @@ export default function WorkListPane({
               position: "relative",
               width: "100%",
               height: virtualizer.getTotalSize(),
+              flexShrink: 0,
             }}
           >
             {virtualizer.getVirtualItems().map((virtualRow) => (

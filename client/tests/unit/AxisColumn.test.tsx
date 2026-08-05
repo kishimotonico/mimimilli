@@ -3,7 +3,6 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { TagPrefix } from "@mimimilli/shared";
 import AxisColumn from "../../src/features/library/ui/AxisColumn";
-import { LibraryNavigationProvider } from "../../src/features/library/ui/LibraryNavigationProvider";
 
 afterEach(cleanup);
 
@@ -11,11 +10,18 @@ const PREFIXES: TagPrefix[] = [
   { prefix: "cv", label: "CV", color: "cv", showAsAxis: true, protected: true },
 ];
 
-function renderAxisColumn(props: React.ComponentProps<typeof AxisColumn>) {
+function renderAxisColumn(props: Partial<React.ComponentProps<typeof AxisColumn>>) {
   return render(
-    <LibraryNavigationProvider>
-      <AxisColumn {...props} />
-    </LibraryNavigationProvider>,
+    <AxisColumn
+      activeAxis="all"
+      tagPrefixes={[]}
+      smartFolders={[]}
+      onSelectAxis={vi.fn()}
+      selectedTags={[]}
+      onToggleTag={vi.fn()}
+      onReplaceTag={vi.fn()}
+      {...props}
+    />,
   );
 }
 
@@ -23,9 +29,6 @@ describe("AxisColumn", () => {
   it("選択中のビュー項目に aria-current を付与する", () => {
     renderAxisColumn({
       activeAxis: "fav",
-      tagPrefixes: [],
-      smartFolders: [],
-      onSelectAxis: vi.fn(),
     });
 
     expect(screen.getByRole("button", { name: /お気に入り/ })).toHaveAttribute(
@@ -39,11 +42,7 @@ describe("AxisColumn", () => {
 
   it("tagPrefixes 取得失敗時、CV等のprefix軸が無言で消えず分類軸グループにエラー行を出す", () => {
     renderAxisColumn({
-      activeAxis: "all",
-      tagPrefixes: [],
-      smartFolders: [],
       isTagPrefixesError: true,
-      onSelectAxis: vi.fn(),
     });
 
     expect(screen.getByText("分類軸の取得に失敗しました")).toBeTruthy();
@@ -54,11 +53,7 @@ describe("AxisColumn", () => {
   it("エラー行の再試行ボタンをクリックすると onRetryTagPrefixes を呼ぶ", async () => {
     const onRetry = vi.fn();
     renderAxisColumn({
-      activeAxis: "all",
-      tagPrefixes: [],
-      smartFolders: [],
       isTagPrefixesError: true,
-      onSelectAxis: vi.fn(),
       onRetryTagPrefixes: onRetry,
     });
 
@@ -68,10 +63,7 @@ describe("AxisColumn", () => {
 
   it("tagPrefixes 取得成功時はエラー行を出さず、prefix軸を表示する", () => {
     renderAxisColumn({
-      activeAxis: "all",
       tagPrefixes: PREFIXES,
-      smartFolders: [],
-      onSelectAxis: vi.fn(),
     });
 
     expect(screen.queryByText("分類軸の取得に失敗しました")).toBeNull();

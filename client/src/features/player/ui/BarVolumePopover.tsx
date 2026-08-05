@@ -18,10 +18,9 @@ export default function BarVolumePopover({ volume, onSetVolume }: BarVolumePopov
   const rootRef = useRef<HTMLDivElement>(null);
   const sliderRef = useRef<HTMLInputElement>(null);
 
-  usePopoverDismissal({
+  const { close } = usePopoverDismissal({
     isOpen,
-    onOutsideClick: () => setIsOpen(false),
-    onEscape: () => setIsOpen(false),
+    onClose: () => setIsOpen(false),
     anchorRef: rootRef,
   });
 
@@ -41,7 +40,8 @@ export default function BarVolumePopover({ volume, onSetVolume }: BarVolumePopov
         aria-expanded={isOpen}
         onClick={(e) => {
           e.stopPropagation();
-          setIsOpen((open) => !open);
+          if (isOpen) close();
+          else setIsOpen(true);
         }}
       >
         <I.volume size={16} />

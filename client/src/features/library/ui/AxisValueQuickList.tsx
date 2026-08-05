@@ -41,7 +41,8 @@ interface AxisValueQuickListProps {
   onSelect: (item: AxisFacetItem, event: { ctrlKey: boolean; metaKey: boolean }) => void;
   /** 既定動作の説明（例:「クリックで置き換え」「AND追加されます」） */
   hint?: string;
-  onClose: () => void;
+  /** useAnchoredPopover / usePopoverDismissal が返す close をそのまま渡す */
+  close: () => void;
   emptyLabel?: string;
 }
 
@@ -66,7 +67,7 @@ export default function AxisValueQuickList({
   isSelected,
   onSelect,
   hint,
-  onClose,
+  close,
   emptyLabel = "項目がありません",
 }: AxisValueQuickListProps) {
   const [query, setQuery] = useState("");
@@ -139,8 +140,7 @@ export default function AxisValueQuickList({
   const handleListKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Escape") {
       event.preventDefault();
-      event.stopPropagation();
-      onClose();
+      close();
       return;
     }
     if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
@@ -157,8 +157,7 @@ export default function AxisValueQuickList({
   const handleSearchKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Escape") {
       event.preventDefault();
-      event.stopPropagation();
-      onClose();
+      close();
       return;
     }
     if (event.key === "ArrowDown") {
@@ -247,7 +246,14 @@ export default function AxisValueQuickList({
             }
           }}
         >
-          <div style={{ position: "relative", width: "100%", height: virtualizer.getTotalSize() }}>
+          <div
+            style={{
+              position: "relative",
+              width: "100%",
+              height: virtualizer.getTotalSize(),
+              flexShrink: 0,
+            }}
+          >
             {virtualizer.getVirtualItems().map((virtualRow) => {
               const row = rows[virtualRow.index];
               if (!row) return null;

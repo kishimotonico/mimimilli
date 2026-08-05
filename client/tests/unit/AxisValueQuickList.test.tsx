@@ -33,7 +33,7 @@ function renderQuickList(props: Partial<React.ComponentProps<typeof AxisValueQui
       items={[]}
       isSelected={() => false}
       onSelect={vi.fn()}
-      onClose={vi.fn()}
+      close={vi.fn()}
       {...props}
     />,
   );
