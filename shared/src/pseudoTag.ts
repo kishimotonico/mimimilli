@@ -45,6 +45,9 @@ export interface SplitSelectedTagsResult {
  * 選択中タグ（selectedTagsAtom・URLの tags=・HTTPクエリの tags=）を実タグと組み込み軸の
  * 擬似タグへ分解する共通入口。client（URL復元）・server（HTTPスキーマの境界検証・フィルタ
  * 解釈）が同じ実装を使う。不正な入力は黙って無視・素通りさせず warnings へ積んで拒否する:
+ *   - 正規化して初めて "@" 始まりになる入力（例: 先頭に空白を挟んだ " @year/2024"）。
+ *     予約文字は自前のコードだけが生成するため、正規化前から "@" 始まりでない入力は
+ *     壊れた入力として拒否し、直して受け入れることはしない
  *   - "@" で始まるが擬似タグとして解釈できない形（@year・@year/・@/2024 等）
  *   - 未知の組み込み軸の擬似タグ
  *   - 4桁の数字でない year 値（@year/banana 等）
@@ -59,8 +62,19 @@ export function splitSelectedTags(selectedTags: string[]): SplitSelectedTagsResu
   const warnings: string[] = [];
 
   for (const rawTag of selectedTags) {
-    if (rawTag.startsWith(RESERVED_TAG_PREFIX)) {
-      const builtin = parseBuiltinAxisTag(rawTag);
+    // 予約プレフィックス判定は tagSchema と同様、必ず正規化後の値に対して行う。生文字列判定だと
+    // 先頭に空白を挟んだ " @year/2024" が素通りし、下の実タグ分岐で normalizeTag が
+    // "@year/2024" へ正規化した値を無警告で実タグとして積んでしまう。
+    const normalized = normalizeTag(rawTag);
+    if (normalized.startsWith(RESERVED_TAG_PREFIX)) {
+      // 予約文字は自前のコードだけが生成するため、正規化前から "@" 始まりでない入力
+      // （先頭に空白を挟む等）は壊れた入力として拒否する。正規化すれば有効な擬似タグに
+      // 「直る」場合でも黙って修復しない（不正を隠蔽しない方針と一貫させる）。
+      if (!rawTag.startsWith(RESERVED_TAG_PREFIX)) {
+        warnings.push(`予約文字混じりの不正な入力を拒否しました: ${rawTag}`);
+        continue;
+      }
+      const builtin = parseBuiltinAxisTag(normalized);
       if (!builtin) {
         warnings.push(`擬似タグとして解釈できない入力を拒否しました: ${rawTag}`);
         continue;
@@ -80,7 +94,6 @@ export function splitSelectedTags(selectedTags: string[]): SplitSelectedTagsResu
       yearValue = builtin.value;
       continue;
     }
-    const normalized = normalizeTag(rawTag);
     if (!normalized) {
       warnings.push(`正規化後に空になるタグを拒否しました: ${rawTag}`);
       continue;

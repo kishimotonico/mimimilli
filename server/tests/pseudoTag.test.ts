@@ -62,13 +62,17 @@ test("splitSelectedTags: 正規化後に空になるタグは警告付きで拒�
 });
 
 test("splitSelectedTags: 擬似タグとして解釈できない @ 始まりの入力は警告付きで拒否し、実タグへ流さない（TASK-201）", () => {
+  // "@year/" は normalizeTag が annotated タグの値が空（"@year" + 空値）とみなし正規化後に
+  // 空文字列を返すため、拒否理由は「正規化後に空になるタグ」側になる。いずれの理由でも
+  // tags へは積まれず実タグへ素通りしないことが本題。
   for (const badTag of ["@year", "@year/", "@/2024"]) {
     const result = splitSelectedTags([badTag, "cv/藤田茜"]);
     assert.deepEqual(result.tags, ["cv/藤田茜"], badTag);
     assert.equal(result.yearValue, null, badTag);
     assert.equal(result.warnings.length, 1, badTag);
-    assert.match(result.warnings[0]!, /擬似タグとして解釈できない/, badTag);
   }
+  assert.match(splitSelectedTags(["@year"]).warnings[0]!, /擬似タグとして解釈できない/);
+  assert.match(splitSelectedTags(["@/2024"]).warnings[0]!, /擬似タグとして解釈できない/);
 });
 
 test("splitSelectedTags: 4桁の数字でない year 値は警告付きで拒否する（TASK-201）", () => {
@@ -78,4 +82,19 @@ test("splitSelectedTags: 4桁の数字でない year 値は警告付きで拒否
     assert.equal(result.yearValue, null, badTag);
     assert.equal(result.warnings.length, 1, badTag);
   }
+});
+
+test("splitSelectedTags: 先頭に空白を挟んだ擬似タグは正規化しても救済せず、警告付きで拒否する（TASK-202）", () => {
+  const result = splitSelectedTags([" @year/2024", "cv/藤田茜"]);
+  assert.deepEqual(result.tags, ["cv/藤田茜"]);
+  assert.equal(result.yearValue, null);
+  assert.equal(result.warnings.length, 1);
+  assert.match(result.warnings[0]!, /予約文字混じりの不正な入力/);
+  assert.match(result.warnings[0]!, /@year\/2024/);
+});
+
+test("splitSelectedTags: 予約文字を含まない入力は正規化後の値がそのまま実タグとして採用される", () => {
+  const result = splitSelectedTags([" CV/藤田茜 "]);
+  assert.deepEqual(result.tags, ["cv/藤田茜"]);
+  assert.deepEqual(result.warnings, []);
 });

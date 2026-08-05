@@ -1,11 +1,11 @@
 ---
 id: TASK-202
 title: splitSelectedTagsの擬似タグ判定を正規化後の値に揃える
-status: In Progress
+status: Done
 assignee:
   - impl-182
 created_date: '2026-08-05 14:52'
-updated_date: '2026-08-05 15:00'
+updated_date: '2026-08-05 15:04'
 labels: []
 dependencies: []
 priority: high
@@ -42,5 +42,5 @@ shared/src/work.ts の tagSchema は、まさにこのトリックを警戒し�
 - [x] #2 擬似タグかどうかの判定が正規化後の値に対して行われ、tagSchema と同じ考え方に揃っている
 - [x] #3 上記が単体テストで検証されている
 - [x] #4 HTTP 境界でも同じ入力が 400 になる（refineTagWarnings 経由で自動的に効くことの確認）
-- [ ] #5 pnpm check と pnpm test と pnpm test:visual が通る
+- [x] #5 pnpm check と pnpm test と pnpm test:visual が通る
 <!-- AC:END -->
