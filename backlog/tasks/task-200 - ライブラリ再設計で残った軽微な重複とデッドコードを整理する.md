@@ -1,51 +1,52 @@
 ---
 id: TASK-200
-title: ライブラリ再設計で残った軽微な重複とデッドコードを整理する
+title: オーバーレイのdismissal二重実装と余白の二重適用を解消する
 status: To Do
 assignee: []
 created_date: '2026-08-05 10:57'
-updated_date: '2026-08-05 12:59'
+updated_date: '2026-08-05 17:49'
 labels: []
 dependencies: []
-priority: medium
+priority: high
 ordinal: 210000
 ---
 
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Codex による2回目のマージ前レビュー（2026-08-05）の改善推奨。いずれも動作に影響しない整理で、マージのブロッカーではない。
+ライブラリ再設計のレビューで見つかった構造上の重複・責務の不統一・デッドコードを解消する。
 
-## 1. onPatchWork の重複と到達不能な分岐（LibraryView.tsx）
+当初「軽微な整理」として起票したが、内容を見直したところ実害の疑いを含むものと、既に必須と判断した修正と同じ性質のものが混ざっていた。分類を改める。
 
-同じ実装の onPatchWork コールバックが2箇所（198行目付近と330行目付近）にある。また selectedWork 未選択時の Promise.reject は、現在の描画経路では到達不能。1つにまとめ、到達不能な分岐を削除する。
+## 1. useAnchoredPopover の dismissal ロジックが二重実装（最優先）
 
-## 2. リスト末尾余白の二重実装（WorkListPane.tsx / shell.css）
+AxisQuickOverlay は共有フック useAnchoredPopover に空のコールバックを渡し、外側クリック・Escape・フォーカス復帰を独自実装している。ポータル先が別 DOM 系統になり anchor と panel の両方を境界として扱う必要がある、というのが理由。
 
-WorkListPane が MutationObserver で .mle-app の has-docked-bar クラスを監視して仮想リストの paddingEnd を増やす一方、shell.css の .mle-app.has-docked-bar .mle-col__list にも padding-bottom が入っている。同じ目的の余白が JS と CSS の2箇所にある。
+TASK-195 では「位置決めの実装を2つ持たない」ことを理由に、同じ AxisQuickOverlay の自前位置計算を共有フックへ一本化させた。dismissal も同じ性質の重複であり、片方だけ必須としたのは判断の不整合である。
 
-まず本当に二重適用になっているか（対象要素が同一か）を確認し、二重なら片方を正にする。JS 側を残すなら CSS を削り、CSS 側で足りるなら MutationObserver ごと削除するのが望ましい。
+共有フック側が複数の境界要素を扱えるようにし、独自実装を解消する。
 
-## 3. AxisColumn の props と hook の混在（AxisColumn.tsx）
+## 2. リスト末尾余白の二重適用（実害の疑いあり）
 
-軸の状態は props で受けるのに、タグの状態と操作だけ useLibraryNavigation() から直接取得している。presentational component に寄せてタグ操作も props で注入するか、すべて hook から取得する container に寄せるか、どちらかに統一する。
+WorkListPane が MutationObserver で .mle-app の has-docked-bar を監視して仮想リストの paddingEnd を増やす（4+8=12px）一方、shell.css の .mle-app.has-docked-bar .mle-col__list にも padding-bottom: 12px がある。同一要素へ二重適用されて合計24pxになっている疑いがあるとの調査報告がある。
 
-## 4. useAnchoredPopover が複数境界を扱えない（AxisQuickOverlay.tsx）
+まず実際に二重適用されているかを確認し、二重なら片方を正にする。JS 側を残すなら CSS を削り、CSS で足りるなら MutationObserver ごと削除する。
 
-AxisQuickOverlay は共通フックに空のコールバックを渡し、外側クリック・Escape・フォーカス復帰を独自実装している。ポータル先が別 DOM 系統になるため anchor と panel の両方を境界として扱う必要があり、独自実装自体には正当な理由がある。ただし共通フック側が複数境界を扱えるようにすれば、この独自実装は不要になり保守しやすくなる。
+## 3. onPatchWork の重複と到達不能な分岐
 
-TASK-195 で位置決めを共有フックへ一本化したのと同じ方向の整理である。
+LibraryView.tsx に同じ実装の onPatchWork コールバックが2箇所ある。また selectedWork 未選択時の Promise.reject は現在の描画経路では到達不能。1つにまとめ、到達不能な分岐を削除する。
 
-## 優先度の補足（2026-08-05 レビュー）
+## 4. AxisColumn の props と hook の混在
 
-項目2（リスト末尾余白）は、JS側（4+8=12px）とCSS側（12px）が同一要素 .mle-col__list へ二重適用されており、実際に合計24pxの余白が付いている可能性が高いとの調査報告がある。単なる重複実装ではなく実害を伴う疑いがあるため、本タスク内では優先して確認・対処すること。
+軸の状態は props で受けるのに、タグの状態と操作だけ useLibraryNavigation() から直接取得している。同じコンポーネント内で契約が二系統になっており、後から読む人が依存を追えない。presentational component に寄せてタグ操作も props で注入するか、すべて hook から取得する container に寄せるか、どちらかに統一する。
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 onPatchWork の重複が解消され、到達不能な分岐が削除されている
-- [ ] #2 リスト末尾余白の実装が JS か CSS のどちらか一方に統一されている（二重でなかった場合はその旨を記録する）
-- [ ] #3 AxisColumn の状態取得方法が props か hook のどちらかに統一されている
-- [ ] #4 useAnchoredPopover が複数の境界要素を扱えるようになり、AxisQuickOverlay の独自実装が不要になっている
-- [ ] #5 pnpm check と pnpm test と pnpm test:visual が通る
+- [ ] #1 useAnchoredPopover が複数の境界要素（anchor と portal 先の panel）を扱えるようになり、AxisQuickOverlay の独自 dismissal 実装が解消されている
+- [ ] #2 共有フックの既存利用箇所（ソートメニュー・タグエディタ・メタデータ操作・通知ベル・チップの兄弟値ドロップダウン）が壊れていない
+- [ ] #3 リスト末尾余白が二重適用されているかを確認し、二重なら片方に統一されている（二重でなかった場合はその旨を記録する）
+- [ ] #4 onPatchWork の重複が解消され、到達不能な分岐が削除されている
+- [ ] #5 AxisColumn の状態取得方法が props か hook のどちらかに統一されている
+- [ ] #6 pnpm check と pnpm test と pnpm test:visual が通る
 <!-- AC:END -->
