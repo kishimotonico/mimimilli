@@ -1,11 +1,11 @@
 ---
 id: TASK-203
 title: タグの正規化済み不変条件を型で表明する
-status: In Progress
+status: Done
 assignee:
   - impl-182
 created_date: '2026-08-05 14:58'
-updated_date: '2026-08-05 18:08'
+updated_date: '2026-08-05 18:25'
 labels: []
 dependencies: []
 priority: high
