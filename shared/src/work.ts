@@ -9,7 +9,7 @@ import {
   trackDurationSecOrNull,
   type ProbeDurationResult,
 } from "./duration.ts";
-import { compareUtf8Bytes } from "./library.ts";
+import { compareUtf8Bytes } from "./text.ts";
 
 export const urlEntrySchema = z.object({
   label: z.string(),
@@ -379,11 +379,18 @@ export function tagEquals(a: string, b: string): boolean {
 /** 組み込み軸の擬似タグ専用の予約文字（ADR-0012 §2）。実タグでの使用は禁止する */
 export const RESERVED_TAG_PREFIX = "@";
 
-/** 実タグの書き込み検証。先頭の "@" は組み込み軸の擬似タグ（例: "@year/2024"）と衝突するため拒否する。
- *  normalizeTag した後の値で判定する（生文字列のままだと、先頭に空白を挟んだ "  @year/2024" が
- *  検証をすり抜けて normalizeTags 後に予約プレフィックスへ化ける）。 */
+/** 実タグの書き込み検証。判定はすべて normalizeTag した後の値に対して行う（生文字列のままだと、
+ *  先頭に空白を挟んだ "  @year/2024" が検証をすり抜けて normalizeTags 後に予約プレフィックスへ
+ *  化ける）。
+ *  - 正規化後に空になるタグ（空文字・prefix/値のどちらかが空白のみ）は拒否する。normalizeTags は
+ *    このスキーマを通らない直接呼び出し向けの防御的なフィルタとして空タグを黙って除くが、
+ *    書き込み経路の入口はここで弾き、隠蔽しない
+ *  - 先頭の "@" は組み込み軸の擬似タグ（例: "@year/2024"）と衝突するため拒否する */
 export const tagSchema = z
   .string()
+  .refine((tag) => normalizeTag(tag).length > 0, {
+    message: "空になるタグは登録できません",
+  })
   .refine((tag) => !normalizeTag(tag).startsWith(RESERVED_TAG_PREFIX), {
     message: `タグを予約文字 "${RESERVED_TAG_PREFIX}" から始めることはできません`,
   });

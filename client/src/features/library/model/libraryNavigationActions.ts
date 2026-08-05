@@ -1,12 +1,8 @@
 import { atom } from "jotai";
+import { isBuiltinPseudoTagAxis, parseBuiltinAxisTag } from "@mimimilli/shared";
 import { requestNavigationHistoryCommit } from "../../navigation/model/navigationHistoryCommit";
 import type { AxisId, SortId } from "./types";
-import {
-  computeReplacedTags,
-  computeResultsPaneKind,
-  isBuiltinPseudoTagAxis,
-  parseBuiltinAxisTag,
-} from "./libraryPresentation";
+import { computeReplacedTags, computeResultsPaneKind } from "./libraryPresentation";
 import { activeAxisAtom, selectedTagsAtom, selectedWorkIdAtom, sortAtom } from "./atoms";
 
 // 軸は値をブラウズするためのビューであり、選択状態を持たない（ADR-0012 §1）。

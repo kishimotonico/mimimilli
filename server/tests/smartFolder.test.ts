@@ -114,6 +114,16 @@ test("未知の field/operator のルールは契約で拒否する", () => {
   assert.equal(parsed.success, false);
 });
 
+test("タグ ∋ ルールの values は tagSchema による検証を通り、予約文字 @ 始まりの擬似タグを注入できない", () => {
+  const parsed = smartFolderRuleSchema.safeParse({
+    conjunction: "WHERE",
+    field: "タグ",
+    operator: "∋",
+    values: ["@year/2024"],
+  });
+  assert.equal(parsed.success, false);
+});
+
 test("DB に不正ルールが混入しても評価時に黙って無視しない", () => {
   const invalidRules = [
     { conjunction: "WHERE", field: "不明な軸", operator: "=", values: ["x"] },

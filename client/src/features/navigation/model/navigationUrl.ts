@@ -1,3 +1,4 @@
+import { buildBuiltinAxisTag, splitSelectedTags } from "@mimimilli/shared";
 import { isViewAxis } from "../../library/model/axisDefinitions";
 import type { AxisId, SortId } from "../../library/model/types";
 
@@ -99,6 +100,16 @@ function uniqueNonEmpty(values: string[]): string[] {
   return [...new Set(values.filter((value) => value.length > 0))];
 }
 
+/** URLの tags= を検証する。UI操作は擬似タグの単一選択・既知軸を常に強制するが、
+ *  URLは直接編集され得るため、ここで同じ制約を検証する（ADR-0012 §2）。
+ *  未知の組み込み軸・複数の year 擬似タグ・正規化後に空になるタグは黙って残さず、
+ *  警告付きで拒否・正規化する（splitSelectedTags の検証を shared から流用する）。 */
+function parseAndValidateSelectedTags(rawValues: string[], warnings: string[]): string[] {
+  const { tags, yearValue, warnings: splitWarnings } = splitSelectedTags(uniqueNonEmpty(rawValues));
+  for (const warning of splitWarnings) warnings.push(`選択タグを検証しました: ${warning}`);
+  return yearValue !== null ? [...tags, buildBuiltinAxisTag("year", yearValue)] : tags;
+}
+
 function parseSelectedRelPath(value: string, warnings: string[]): string[] | null {
   if (!value || value.startsWith("/") || value.startsWith("\\") || /^[A-Za-z]:/.test(value)) {
     warnings.push(`root 相対でない選択パスを拒否しました: ${value}`);
@@ -143,7 +154,7 @@ export function parseNavigationUrl(input: string | URL): NavigationParseResult {
       return defaultResult(warnings);
     }
 
-    const selectedTags = uniqueNonEmpty(url.searchParams.getAll("tags"));
+    const selectedTags = parseAndValidateSelectedTags(url.searchParams.getAll("tags"), warnings);
 
     const selectedWorkId = url.searchParams.get("work") || null;
     const sortValue = url.searchParams.get("sort");

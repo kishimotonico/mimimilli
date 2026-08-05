@@ -179,6 +179,30 @@ describe("navigation URL codec", () => {
     expect(url).toBe("/library/all");
   });
 
+  it("rejects an unknown builtin-axis pseudo-tag with a warning instead of leaving a dead chip (ADR-0012 §2)", () => {
+    const result = parseNavigationUrl(
+      "/library/all?tags=%40unknown%2F2024&tags=cv%2F%E8%97%A4%E7%94%B0%E8%8C%9C",
+    );
+
+    expect(result.state).toEqual({
+      mode: "library",
+      library: { ...DEFAULT_LIBRARY_URL_STATE, activeAxis: "all", selectedTags: ["cv/藤田茜"] },
+    });
+    expect(result.warnings[0]).toContain("選択タグを検証しました");
+    expect(result.warnings[0]).toContain("@unknown/2024");
+  });
+
+  it("normalizes multiple year pseudo-tags to the first one with a warning, matching the single-selection UI constraint", () => {
+    const result = parseNavigationUrl("/library/year?tags=%40year%2F2023&tags=%40year%2F2024");
+
+    expect(result.state).toEqual({
+      mode: "library",
+      library: { ...DEFAULT_LIBRARY_URL_STATE, activeAxis: "year", selectedTags: ["@year/2023"] },
+    });
+    expect(result.warnings[0]).toContain("選択タグを検証しました");
+    expect(result.warnings[0]).toContain("@year/2024");
+  });
+
   it("warns and restores the default sort for an invalid value", () => {
     const result = parseNavigationUrl("/library/all?sort=nope");
 

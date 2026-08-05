@@ -1,20 +1,9 @@
 // ライブラリ（検索・分類軸・スマートフォルダー・検索プリセット）の契約。
 import { z } from "zod";
 import { coverValueSchema } from "./cover.ts";
+import { tagSchema } from "./work.ts";
 
-const utf8Encoder = new TextEncoder();
-
-/** SQLiteのBINARY照合と同じUTF-8バイト順で文字列を比較する。 */
-export function compareUtf8Bytes(a: string, b: string): number {
-  const aBytes = utf8Encoder.encode(a);
-  const bBytes = utf8Encoder.encode(b);
-  const length = Math.min(aBytes.length, bBytes.length);
-  for (let index = 0; index < length; index++) {
-    const difference = aBytes[index]! - bBytes[index]!;
-    if (difference !== 0) return difference;
-  }
-  return aBytes.length - bBytes.length;
-}
+export { compareUtf8Bytes } from "./text.ts";
 
 // ── ソート ───────────────────────────────────────────────────
 
@@ -75,7 +64,7 @@ export const smartFolderRuleSchema = z.discriminatedUnion("field", [
     conjunction: smartFolderConjunctionSchema,
     field: z.literal("タグ"),
     operator: z.literal("∋"),
-    values: z.array(z.string().min(1)).min(1),
+    values: z.array(tagSchema).min(1),
   }),
   z.object({
     conjunction: z.enum(["WHERE", "AND", "OR"]),

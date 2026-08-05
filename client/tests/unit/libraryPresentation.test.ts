@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { ApiRequestError } from "../../src/shared/api/http";
 import {
   buildAxisFacetFilterParams,
-  buildBuiltinAxisTag,
   buildFilterTag,
   buildSmartFolderFilterParams,
   buildWorksParams,
@@ -11,10 +10,8 @@ import {
   computeResultsPaneKind,
   getFacetAxisForQuery,
   isGridViewActive,
-  parseBuiltinAxisTag,
   shouldClearSelectionOnFilterMiss,
   shouldClearSelectionOnWorkNotFound,
-  splitSelectedTags,
 } from "../../src/features/library/model/libraryPresentation";
 
 describe("computeResultsPaneKind", () => {
@@ -49,27 +46,6 @@ describe("isGridViewActive", () => {
   });
 });
 
-describe("splitSelectedTags", () => {
-  it("year 擬似タグ（@year/…）を yearValue へ、それ以外は tags へ振り分ける", () => {
-    expect(splitSelectedTags(["cv/藤田茜", "@year/2024", "サークル/月白製作所"])).toEqual({
-      tags: ["cv/藤田茜", "サークル/月白製作所"],
-      yearValue: "2024",
-    });
-  });
-  it("year 擬似タグが無ければ yearValue は null", () => {
-    expect(splitSelectedTags(["ASMR"])).toEqual({ tags: ["ASMR"], yearValue: null });
-  });
-  it("year 擬似タグが複数あっても先頭だけを採用する（AND は常に0件になるため）", () => {
-    expect(splitSelectedTags(["@year/2023", "@year/2024"])).toEqual({
-      tags: [],
-      yearValue: "2023",
-    });
-  });
-  it("実タグ year/2025（予約文字 @ が無い）は addedAt の年照合ではなくタグ完全一致で絞り込まれる", () => {
-    expect(splitSelectedTags(["year/2025"])).toEqual({ tags: ["year/2025"], yearValue: null });
-  });
-});
-
 describe("buildFilterTag", () => {
   it("tag 軸はそのまま返す（値が既に完全なタグ文字列のため）", () => {
     expect(buildFilterTag("tag", "cv/藤田茜")).toBe("cv/藤田茜");
@@ -79,23 +55,6 @@ describe("buildFilterTag", () => {
   });
   it("year（タグ由来でない組み込み軸）は @軸/値 の擬似タグを組み立てる", () => {
     expect(buildFilterTag("year", "2024")).toBe("@year/2024");
-  });
-});
-
-describe("buildBuiltinAxisTag / parseBuiltinAxisTag", () => {
-  it("組み立てた擬似タグを分解すると軸と値が復元できる", () => {
-    const tag = buildBuiltinAxisTag("year", "2024");
-    expect(tag).toBe("@year/2024");
-    expect(parseBuiltinAxisTag(tag)).toEqual({ axis: "year", value: "2024" });
-  });
-  it("予約文字 @ で始まらない文字列は擬似タグとして解釈しない", () => {
-    expect(parseBuiltinAxisTag("year/2025")).toBeNull();
-    expect(parseBuiltinAxisTag("cv/藤田茜")).toBeNull();
-  });
-  it("軸や値が欠けた不正な形は null", () => {
-    expect(parseBuiltinAxisTag("@year")).toBeNull();
-    expect(parseBuiltinAxisTag("@year/")).toBeNull();
-    expect(parseBuiltinAxisTag("@/2024")).toBeNull();
   });
 });
 

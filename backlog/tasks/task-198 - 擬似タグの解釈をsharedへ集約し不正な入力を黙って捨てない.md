@@ -1,9 +1,11 @@
 ---
 id: TASK-198
 title: 擬似タグの解釈をsharedへ集約し不正な入力を黙って捨てない
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - impl-182
 created_date: '2026-08-05 10:57'
+updated_date: '2026-08-05 11:50'
 labels: []
 dependencies: []
 priority: high
@@ -43,11 +45,11 @@ normalizeTags は空文字や cv/（値が空白のみ）といった不正な�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 擬似タグの構築・解析・検証が shared に集約され、client と server が同じ実装を使う
-- [ ] #2 URL に未知の組み込み軸の擬似タグが含まれるとき、警告付きで拒否され、効かないチップが残らない
-- [ ] #3 URL に複数の year 擬似タグが含まれるとき、警告付きで正規化され、チップ表示と実際の絞り込みが一致する
-- [ ] #4 splitSelectedTags から条件を黙って捨てる分岐が無くなっている
-- [ ] #5 smartFolderRuleSchema のタグ値が tagSchema による検証を通る
-- [ ] #6 正規化後に空になるタグが黙って削除されず、エラーとして扱われる
-- [ ] #7 pnpm check と pnpm test と pnpm test:visual が通る
+- [x] #1 擬似タグの構築・解析・検証が shared に集約され、client と server が同じ実装を使う
+- [x] #2 URL に未知の組み込み軸の擬似タグが含まれるとき、警告付きで拒否され、効かないチップが残らない
+- [x] #3 URL に複数の year 擬似タグが含まれるとき、警告付きで正規化され、チップ表示と実際の絞り込みが一致する
+- [x] #4 splitSelectedTags から条件を黙って捨てる分岐が無くなっている
+- [x] #5 smartFolderRuleSchema のタグ値が tagSchema による検証を通る
+- [x] #6 正規化後に空になるタグが黙って削除されず、エラーとして扱われる
+- [x] #7 pnpm check と pnpm test と pnpm test:visual が通る
 <!-- AC:END -->

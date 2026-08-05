@@ -90,6 +90,14 @@ test("予約文字の検証は正規化後の値に対して行われ、先頭�
   assert.equal(tagSchema.safeParse(" @foo").success, false);
 });
 
+test("正規化後に空になるタグは黙って削除されず拒否される", () => {
+  assert.equal(tagSchema.safeParse("").success, false);
+  assert.equal(tagSchema.safeParse("   ").success, false);
+  // annotated だが値が空白のみ（normalizeTag は prefix/値のどちらかが空なら空文字列を返す）。
+  assert.equal(tagSchema.safeParse("cv/   ").success, false);
+  assert.equal(tagSchema.safeParse("cv/藤田茜").success, true);
+});
+
 test("metaFileSchema.tags でも予約文字の検証が効き、先頭空白では回避できない", () => {
   const withReservedTag = { ...validMeta(), tags: ["cv/藤田茜", " @year/2024"] };
   assert.equal(metaFileSchema.safeParse(withReservedTag).success, false);
