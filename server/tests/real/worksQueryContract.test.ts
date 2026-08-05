@@ -13,6 +13,7 @@ import {
 } from "@mimimilli/shared";
 import { WorkRepo } from "../../src/adapters/real/workRepo.ts";
 import { querySmartFolderWorks } from "../../src/adapters/real/smartFolderWorks.ts";
+import { nts } from "../helpers/tag.ts";
 import { upsertTestWork, resolvedDuration } from "../helpers/workTestUtils.ts";
 import { openDb } from "../../src/adapters/real/db.ts";
 import { buildAxisFacets } from "../../src/core/axisFacets.ts";
@@ -244,7 +245,7 @@ test("複数サークルタグのcircleNameはsharedとrealでUTF-8 BINARY順の
   const repo = new WorkRepo(db);
   const item = {
     ...dataset[0]!,
-    tags: ["サークル/和風", "circle/Zeta", "circle/Alpha", "ASMR"],
+    tags: nts(["サークル/和風", "circle/Zeta", "circle/Alpha", "ASMR"]),
   };
   try {
     upsertTestWork(repo, fullWork(item));

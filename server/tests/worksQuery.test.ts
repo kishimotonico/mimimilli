@@ -8,6 +8,7 @@ import {
 } from "@mimimilli/shared";
 import { applyWorksQuery } from "../src/core/worksQuery.ts";
 import { compareJapaneseSortKeys } from "../src/core/japaneseSortKey.ts";
+import { nts } from "./helpers/tag.ts";
 
 const NOW = new Date();
 const RECENT = new Date(NOW.getTime() - 5 * 86400000).toISOString(); // 5日前
@@ -24,7 +25,7 @@ const WORKS: WorkSummary[] = [
     addedAt: RECENT,
     errorMessage: null,
     urls: [],
-    tags: ["cv/水瀬なずな", "ASMR", "耳かき"],
+    tags: nts(["cv/水瀬なずな", "ASMR", "耳かき"]),
     trackCount: 3,
     bookmarked: true,
     lastPlayedAt: "2025-01-01T00:00:00.000Z",
@@ -40,7 +41,7 @@ const WORKS: WorkSummary[] = [
     addedAt: OLD,
     errorMessage: null,
     urls: [],
-    tags: ["cv/霧島レイ", "添い寝", "ASMR"],
+    tags: nts(["cv/霧島レイ", "添い寝", "ASMR"]),
     trackCount: 2,
     bookmarked: false,
     lastPlayedAt: null,
@@ -56,7 +57,7 @@ const WORKS: WorkSummary[] = [
     addedAt: OLD,
     errorMessage: null,
     urls: [],
-    tags: ["cv/水瀬なずな", "催眠"],
+    tags: nts(["cv/水瀬なずな", "催眠"]),
     trackCount: 1,
     bookmarked: false,
     lastPlayedAt: "2024-06-01T00:00:00.000Z",
@@ -67,7 +68,7 @@ const WORKS: WorkSummary[] = [
 function baseQuery(overrides: Partial<WorksQuery> = {}): WorksQuery {
   return {
     q: "",
-    tags: [],
+    tags: nts([]),
     tagOp: "AND",
     sort: "added-desc",
     ...overrides,
@@ -305,7 +306,7 @@ const MANY_WORKS: WorkSummary[] = Array.from({ length: 10 }, (_, index) => ({
   addedAt: new Date(Date.now() - index * 86400000).toISOString(),
   errorMessage: null,
   urls: [],
-  tags: index % 2 === 0 ? ["cv/水瀬なずな", "ASMR"] : ["cv/霧島レイ"],
+  tags: index % 2 === 0 ? nts(["cv/水瀬なずな", "ASMR"]) : nts(["cv/霧島レイ"]),
   trackCount: 1,
   bookmarked: index % 3 === 0,
   lastPlayedAt: index % 2 === 0 ? RECENT : null,

@@ -7,8 +7,11 @@ import {
   type WorkSummary,
 } from "@mimimilli/shared";
 import { evalSmartFolder, evalSmartFolderRules } from "../src/core/smartFolder.ts";
+import { nts } from "./helpers/tag.ts";
 
-function work(overrides: Partial<WorkSummary> & Pick<WorkSummary, "id">): WorkSummary {
+function work(
+  overrides: Partial<Omit<WorkSummary, "tags">> & Pick<WorkSummary, "id"> & { tags?: string[] },
+): WorkSummary {
   return {
     title: overrides.id,
     cover: null,
@@ -18,12 +21,12 @@ function work(overrides: Partial<WorkSummary> & Pick<WorkSummary, "id">): WorkSu
     addedAt: "2025-01-01T00:00:00.000Z",
     errorMessage: null,
     urls: [],
-    tags: [],
     trackCount: 0,
     bookmarked: false,
     lastPlayedAt: null,
     dlsite: emptyDlsiteState(),
     ...overrides,
+    tags: nts(overrides.tags ?? []),
   };
 }
 
@@ -36,15 +39,22 @@ const WORKS: WorkSummary[] = [
 
 test("タグ ∋: values のいずれかを含む作品にマッチする", () => {
   const rules: SmartFolderRule[] = [
-    { conjunction: "WHERE", field: "タグ", operator: "∋", values: ["ASMR", "環境音"] },
+    { conjunction: "WHERE", field: "タグ", operator: "∋", values: nts(["ASMR", "環境音"]) },
   ];
   const result = evalSmartFolderRules(rules, WORKS);
   assert.deepEqual(result.map((w) => w.id).sort(), ["RJ001", "RJ002", "RJ004"]);
 });
 
-test("タグ ∋: prefix の大文字小文字を無視してマッチする", () => {
+test("タグ ∋: prefix の大文字小文字を無視してマッチする（正規化は保存時に行われる）", () => {
+  // ルールの values は smartFolderRuleSchema を通した時点で正規化済み（prefix小文字化）に
+  // なる。CV/x を書いても保存後は cv/x として保持され、そのまま work.tags と一致する。
   const rules: SmartFolderRule[] = [
-    { conjunction: "WHERE", field: "タグ", operator: "∋", values: ["CV/x"] },
+    smartFolderRuleSchema.parse({
+      conjunction: "WHERE",
+      field: "タグ",
+      operator: "∋",
+      values: ["CV/x"],
+    }),
   ];
   const result = evalSmartFolderRules(rules, [work({ id: "RJ005", tags: ["cv/x"] })]);
   assert.deepEqual(
@@ -64,7 +74,7 @@ test("長さ ≥: totalDurationSec が閾値以上の作品にマッチする", 
 test("AND NOT: values のいずれかを含む作品を除外する", () => {
   const rules: SmartFolderRule[] = [
     { conjunction: "WHERE", field: "長さ", operator: "≥", values: ["3600"] },
-    { conjunction: "AND NOT", field: "タグ", operator: "∋", values: ["催眠"] },
+    { conjunction: "AND NOT", field: "タグ", operator: "∋", values: nts(["催眠"]) },
   ];
   const result = evalSmartFolderRules(rules, WORKS);
   assert.deepEqual(result.map((w) => w.id).sort(), ["RJ001", "RJ004"]);
@@ -73,7 +83,7 @@ test("AND NOT: values のいずれかを含む作品を除外する", () => {
 test("複合: 長さ条件とタグ条件をAND適用する", () => {
   const rules: SmartFolderRule[] = [
     { conjunction: "WHERE", field: "長さ", operator: "≥", values: ["3600"] },
-    { conjunction: "AND", field: "タグ", operator: "∋", values: ["ASMR", "環境音"] },
+    { conjunction: "AND", field: "タグ", operator: "∋", values: nts(["ASMR", "環境音"]) },
   ];
   const result = evalSmartFolderRules(rules, WORKS);
   assert.deepEqual(result.map((w) => w.id).sort(), ["RJ001", "RJ004"]);
@@ -81,7 +91,7 @@ test("複合: 長さ条件とタグ条件をAND適用する", () => {
 
 test("OR: 直前までの結果と条件に一致する作品を和集合にする", () => {
   const rules: SmartFolderRule[] = [
-    { conjunction: "WHERE", field: "タグ", operator: "∋", values: ["催眠"] },
+    { conjunction: "WHERE", field: "タグ", operator: "∋", values: nts(["催眠"]) },
     { conjunction: "OR", field: "長さ", operator: "≥", values: ["3600"] },
   ];
   const result = evalSmartFolderRules(rules, WORKS);
@@ -93,9 +103,9 @@ test("OR: 直前までの結果と条件に一致する作品を和集合にす�
 
 test("ANDとORをルール順に評価する", () => {
   const rules: SmartFolderRule[] = [
-    { conjunction: "WHERE", field: "タグ", operator: "∋", values: ["ASMR"] },
+    { conjunction: "WHERE", field: "タグ", operator: "∋", values: nts(["ASMR"]) },
     { conjunction: "AND", field: "長さ", operator: "≥", values: ["3600"] },
-    { conjunction: "OR", field: "タグ", operator: "∋", values: ["催眠"] },
+    { conjunction: "OR", field: "タグ", operator: "∋", values: nts(["催眠"]) },
   ];
   const result = evalSmartFolderRules(rules, WORKS);
   assert.deepEqual(
@@ -192,7 +202,7 @@ test("保持中フィルタ: @year/... 擬似タグ（組み込み軸）もル�
 
 test("保持中フィルタが無ければルール適用結果をそのまま返す（回帰確認）", () => {
   const rules: SmartFolderRule[] = [
-    { conjunction: "WHERE", field: "タグ", operator: "∋", values: ["ASMR"] },
+    { conjunction: "WHERE", field: "タグ", operator: "∋", values: nts(["ASMR"]) },
   ];
   const result = evalSmartFolder({ rules, sort: "added-desc" }, WORKS, { page: 1, limit: 100 });
   assert.deepEqual(result.items.map((w) => w.id).sort(), ["RJ001", "RJ002"]);
@@ -205,7 +215,7 @@ test("stats: ルール適用後（ページング前）の集合から集計す�
     work({ id: "RJ003", tags: ["催眠"], totalDurationSec: 5400, trackCount: 1 }),
   ];
   const rules: SmartFolderRule[] = [
-    { conjunction: "WHERE", field: "タグ", operator: "∋", values: ["ASMR"] },
+    { conjunction: "WHERE", field: "タグ", operator: "∋", values: nts(["ASMR"]) },
   ];
   const result = evalSmartFolder({ rules, sort: "added-desc" }, statsWorks, {
     page: 1,

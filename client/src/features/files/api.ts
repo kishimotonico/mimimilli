@@ -7,7 +7,7 @@ import {
   workRegisterPreviewSchema,
   type DlsiteWorkInfo,
   type Work,
-  type WorkCreateBody,
+  type WorkCreateBodyInput,
   type WorkRegisterPreview,
 } from "@mimimilli/shared";
 import { API_BASE, getParsed, postParsed, deleteVoid } from "../../shared/api/http";
@@ -26,7 +26,7 @@ export async function getWorkRegisterPreview(path: string): Promise<WorkRegister
 }
 
 /** フォルダーを作品として登録する */
-export async function createWork(body: WorkCreateBody): Promise<Work> {
+export async function createWork(body: WorkCreateBodyInput): Promise<Work> {
   return postParsed(workCreateResponseSchema, "/works", body);
 }
 

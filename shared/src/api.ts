@@ -138,7 +138,10 @@ export const workPatchSchema = z
     (patch) =>
       patch.title !== undefined || patch.tags !== undefined || patch.bookmarked !== undefined,
   );
-export type WorkPatch = z.infer<typeof workPatchSchema>;
+/** クライアントが送信するリクエストボディ（tags は正規化前の生 string[]） */
+export type WorkPatchInput = z.input<typeof workPatchSchema>;
+/** サーバーがパース後に扱う型（tags は正規化済み NormalizedTag[]） */
+export type WorkPatch = z.output<typeof workPatchSchema>;
 
 // ── 作品の手動登録（POST /api/works, GET /api/works/register-preview）────
 
@@ -166,7 +169,10 @@ export const workCreateBodySchema = z.object({
   mergeDescendantWorks: z.boolean().default(false),
   dlsite: dlsiteApplyBodySchema.optional(),
 });
-export type WorkCreateBody = z.infer<typeof workCreateBodySchema>;
+/** クライアントが送信するリクエストボディ（tags は正規化前の生 string[]） */
+export type WorkCreateBodyInput = z.input<typeof workCreateBodySchema>;
+/** サーバーがパース後に扱う型（tags は正規化済み NormalizedTag[]） */
+export type WorkCreateBody = z.output<typeof workCreateBodySchema>;
 
 export const dlsiteFetchByCodeBodySchema = z.object({
   rjCode: z

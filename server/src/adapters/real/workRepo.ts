@@ -6,7 +6,6 @@ import {
   dlsiteStateSchema,
   emptyDlsiteState,
   evaluateParseErrorAlert,
-  normalizeTag,
   normalizeTags,
   parseTag,
   playlistSchema,
@@ -20,6 +19,7 @@ import {
   workSchema,
   workSummarySchema,
 } from "@mimimilli/shared";
+import type { NormalizedTag } from "@mimimilli/shared";
 import type {
   AxisFacetItem,
   DlsiteState,
@@ -713,15 +713,15 @@ export class WorkRepo {
     for (const rule of rules) {
       switch (rule.field) {
         case "タグ": {
-          const normalized = rule.values.map(normalizeTag);
-          const placeholders = normalized.map(() => "?").join(", ");
+          // rule.values は smartFolderRuleSchema の transform で既に正規化済み（NormalizedTag）。
+          const placeholders = rule.values.map(() => "?").join(", ");
           predicates.push(`EXISTS (
             SELECT 1
             FROM main.work_tags AS rule_work_tags
             INNER JOIN main.tags AS rule_tags ON rule_tags.id = rule_work_tags.tag_id
             WHERE rule_work_tags.work_id = works.id AND rule_tags.name IN (${placeholders})
           )`);
-          bindings.push(...normalized);
+          bindings.push(...rule.values);
           break;
         }
         case "長さ": {
@@ -756,17 +756,16 @@ export class WorkRepo {
    * main.works と user.work_states（エイリアス work_states）を JOIN 済みである前提。
    */
   private static tagAxisConditions(
-    tags: string[],
+    tags: NormalizedTag[],
     tagOp: "AND" | "OR",
     yearValue: string | null,
   ): { conditions: string[]; bindings: Array<string | number> } {
     const conditions: string[] = [];
     const bindings: Array<string | number> = [];
 
-    const normalizedTags = tags.map(normalizeTag);
-    if (normalizedTags.length > 0) {
+    if (tags.length > 0) {
       if (tagOp === "AND") {
-        for (const tag of normalizedTags) {
+        for (const tag of tags) {
           conditions.push(`EXISTS (
             SELECT 1
             FROM main.work_tags AS filter_work_tags
@@ -776,7 +775,7 @@ export class WorkRepo {
           bindings.push(tag);
         }
       } else {
-        const placeholders = normalizedTags.map(() => "?").join(", ");
+        const placeholders = tags.map(() => "?").join(", ");
         conditions.push(`EXISTS (
           SELECT 1
           FROM main.work_tags AS filter_work_tags
@@ -784,7 +783,7 @@ export class WorkRepo {
           WHERE filter_work_tags.work_id = works.id
             AND filter_tags.name IN (${placeholders})
         )`);
-        bindings.push(...normalizedTags);
+        bindings.push(...tags);
       }
     }
 

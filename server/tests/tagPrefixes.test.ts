@@ -17,6 +17,7 @@ import { createApp } from "../src/app.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { buildAxisFacets } from "../src/core/axisFacets.ts";
 import { buildTagPrefixCandidates } from "../src/core/tagPrefixCandidates.ts";
+import { nt, nts } from "./helpers/tag.ts";
 
 function buildApp() {
   return createApp(createFixtureAdapter());
@@ -37,7 +38,7 @@ function summaryWith(
     addedAt,
     errorMessage: null,
     urls: [],
-    tags,
+    tags: nts(tags),
     trackCount: 0,
     bookmarked: false,
     lastPlayedAt: null,
@@ -69,9 +70,11 @@ test("normalizeTags: prefix または値が空の Annotated タグを除く", ()
   assert.deepEqual(normalizeTags(["cv/", "cv/   ", "  /x", "/x"]), ["/x"]);
 });
 
-test("tagEquals: prefix の大文字小文字を無視し、値は区別する", () => {
-  assert.ok(tagEquals("CV/x", "cv/x"));
-  assert.ok(!tagEquals("cv/X", "cv/x"));
+// prefix の大文字小文字を無視する処理は normalizeTag が担う（NormalizedTag はその結果）。
+// tagEquals は正規化済み同士の単純な同値判定のみを行う。
+test("tagEquals: 正規化済み同士の同値判定。値は大文字小文字を区別する", () => {
+  assert.ok(tagEquals(nt("cv/x"), nt("cv/x")));
+  assert.ok(!tagEquals(nt("cv/X"), nt("cv/x")));
 });
 
 // ── prefix 名スキーマ ─────────────────────────────────────────
@@ -108,11 +111,11 @@ test("DEFAULT_TAG_PREFIXES: color は CSS 変数文字列ではなく semantic k
 
 // ── ファセット集計（動的 prefix 軸）──────────────────────────
 
-test("buildAxisFacets: 任意の prefix 軸を集計できる（prefix の大小は無視）", () => {
+test("buildAxisFacets: 任意の prefix 軸を集計できる（別 prefix は混入しない）", () => {
   const works = [
     summaryWith("W1", ["気分/睡眠用", "ASMR"]),
     summaryWith("W2", ["気分/睡眠用", "気分/作業用"]),
-    summaryWith("W3", ["Kibun/x", "気分/作業用"]),
+    summaryWith("W3", ["kibun/x", "気分/作業用"]),
   ];
   const items = buildAxisFacets("気分", works);
   assert.deepEqual(items, [
@@ -224,16 +227,36 @@ test("buildTagPrefixCandidates: 登録できない予約 prefix と禁止形を�
 
 // ── fixture アダプタ ─────────────────────────────────────────
 
-test("fixture patchWork: タグを正規化して保存する", async () => {
-  const adapter = createFixtureAdapter();
-  const page = await adapter.queryWorks({ q: "", tags: [], tagOp: "AND", sort: "added-desc" });
-  const work = page.items[0];
-  assert.ok(work);
+// 生の（空白混じり・大文字小文字混在の）タグ文字列の正規化は、adapter.patchWork の内部
+// ではなく HTTP 境界（workPatchSchema + normalizeTags）で行う。実際にその境界を通す。
+test("PATCH /api/works/:id: タグを正規化して保存する", async () => {
+  const app = buildApp();
+  const listRes = await app.request("/api/works");
+  const { items } = await listRes.json();
+  const workId: string = items[0].id;
 
-  const updated = await adapter.patchWork(work.id, { tags: ["CV/ x ", "cv/x", "  "] });
+  const patched = await app.request(`/api/works/${workId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tags: ["CV/ x ", "cv/x"] }),
+  });
+  assert.equal(patched.status, 200);
+  const body = await patched.json();
+  assert.deepEqual(body.tags, ["cv/x"]);
+});
 
-  assert.deepEqual(updated?.tags, ["cv/x"]);
-  assert.deepEqual((await adapter.getWork(work.id))?.tags, ["cv/x"]);
+test("PATCH /api/works/:id: 正規化後に空になるタグは400で拒否する（隠蔽しない）", async () => {
+  const app = buildApp();
+  const listRes = await app.request("/api/works");
+  const { items } = await listRes.json();
+  const workId: string = items[0].id;
+
+  const patched = await app.request(`/api/works/${workId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tags: ["cv/x", "  "] }),
+  });
+  assert.equal(patched.status, 400);
 });
 
 // ── HTTP CRUD（fixture アダプタ）─────────────────────────────

@@ -13,6 +13,7 @@ import { createTestRealAdapter } from "./helpers/realAdapter.ts";
 import { WorkRepo } from "../src/adapters/real/workRepo.ts";
 import { upsertTestWork } from "./helpers/workTestUtils.ts";
 import { makeSampleLibrary } from "./helpers/sampleLibrary.ts";
+import { nts } from "./helpers/tag.ts";
 
 function notificationWorks(count: number): WorkSummary[] {
   return Array.from({ length: count }, (_, index) => ({
@@ -25,7 +26,7 @@ function notificationWorks(count: number): WorkSummary[] {
     addedAt: "2026-07-23T00:00:00.000Z",
     errorMessage: null,
     urls: [],
-    tags: index % 2 === 0 ? ["サークル/テスト"] : [],
+    tags: index % 2 === 0 ? nts(["サークル/テスト"]) : [],
     trackCount: 0,
     bookmarked: false,
     lastPlayedAt: null,

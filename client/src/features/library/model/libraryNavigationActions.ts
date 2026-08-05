@@ -1,5 +1,5 @@
 import { atom } from "jotai";
-import { isBuiltinPseudoTagAxis, parseBuiltinAxisTag } from "@mimimilli/shared";
+import { isBuiltinPseudoTagAxis, normalizeTag, parseBuiltinAxisTag } from "@mimimilli/shared";
 import { requestNavigationHistoryCommit } from "../../navigation/model/navigationHistoryCommit";
 import type { AxisId, SortId } from "./types";
 import { computeReplacedTags, computeResultsPaneKind } from "./libraryPresentation";
@@ -25,10 +25,14 @@ export const toggleLibraryTagAtom = atom(null, (get, set, tag: string) => {
       prev.filter((t) => t !== tag),
     );
   } else {
-    const builtin = parseBuiltinAxisTag(tag);
+    const normalized = normalizeTag(tag);
+    const builtin = normalized === null ? null : parseBuiltinAxisTag(normalized);
     const base =
       builtin && isBuiltinPseudoTagAxis(builtin.axis)
-        ? prev.filter((t) => parseBuiltinAxisTag(t)?.axis !== builtin.axis)
+        ? prev.filter((t) => {
+            const n = normalizeTag(t);
+            return (n === null ? null : parseBuiltinAxisTag(n))?.axis !== builtin.axis;
+          })
         : prev;
     set(selectedTagsAtom, [...base, tag]);
   }

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import type { Work, WorkPatch } from "@mimimilli/shared";
+import type { Work, WorkPatchInput } from "@mimimilli/shared";
 import Button from "../../../../shared/ui/Button";
 import IconButton from "../../../../shared/ui/IconButton";
 import { I } from "../../../../shared/ui/Icon";
@@ -12,7 +12,7 @@ interface WorkEditDialogProps {
   work: Work;
   tagSuggestions: string[];
   isPatching: boolean;
-  onPatchWork: (body: WorkPatch) => Promise<Work>;
+  onPatchWork: (body: WorkPatchInput) => Promise<Work>;
   onClose: () => void;
 }
 

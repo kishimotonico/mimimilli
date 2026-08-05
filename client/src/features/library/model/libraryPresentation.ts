@@ -5,6 +5,7 @@
 import {
   buildBuiltinAxisTag,
   isBuiltinPseudoTagAxis,
+  normalizeTag,
   parseBuiltinAxisTag,
   parseTag,
   type CollectionStats,
@@ -61,7 +62,8 @@ export function buildFilterTag(axis: AxisId, value: string): string {
  *  組み込み軸（擬似タグ）は軸ごと、facet 軸由来の実タグ（prefix付き）は prefix ごと、
  *  フラットタグは1グループにまとめる（tag 軸の値一覧が同じグルーピングで表示するため）。 */
 export function tagFilterGroupKey(tag: string): string {
-  const builtin = parseBuiltinAxisTag(tag);
+  const normalized = normalizeTag(tag);
+  const builtin = normalized === null ? null : parseBuiltinAxisTag(normalized);
   if (builtin) return `@${builtin.axis}`;
   const parsed = parseTag(tag);
   return parsed.kind === "flat" ? "" : parsed.prefix;
@@ -70,7 +72,8 @@ export function tagFilterGroupKey(tag: string): string {
 /** タグ文字列が属する軸ID。チップの兄弟値ドロップダウンで問い合わせる facet 軸を
  *  決めるのに使う。フラットタグは "tag" 軸（値一覧に全フラットタグが並ぶ）を返す。 */
 export function axisOfFilterTag(tag: string): AxisId {
-  const builtin = parseBuiltinAxisTag(tag);
+  const normalized = normalizeTag(tag);
+  const builtin = normalized === null ? null : parseBuiltinAxisTag(normalized);
   if (builtin) return builtin.axis;
   const parsed = parseTag(tag);
   return parsed.kind === "flat" ? "tag" : parsed.prefix;

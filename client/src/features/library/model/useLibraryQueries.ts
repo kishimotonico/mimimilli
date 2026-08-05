@@ -14,7 +14,7 @@ import {
   type SmartFolder,
   type SmartFolderCreate,
   type Work,
-  type WorkPatch,
+  type WorkPatchInput,
   type WorksPage,
 } from "@mimimilli/shared";
 import {
@@ -229,7 +229,8 @@ export function useLibraryPatchWorkMutation(nav: LibraryViewState, searchQuery: 
   });
 
   return useMutation({
-    mutationFn: ({ workId, body }: { workId: string; body: WorkPatch }) => patchWork(workId, body),
+    mutationFn: ({ workId, body }: { workId: string; body: WorkPatchInput }) =>
+      patchWork(workId, body),
     onSuccess: async (updatedWork, { workId, body }) => {
       queryClient.setQueryData<Work>(WORK_QUERY_KEYS.detail(workId), (prev) =>
         mergeWorkPatchResponse(prev, body, updatedWork),

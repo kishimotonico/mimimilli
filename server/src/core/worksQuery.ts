@@ -2,6 +2,7 @@
 import { splitSelectedTags, tagEquals } from "@mimimilli/shared";
 import type {
   CollectionStats,
+  NormalizedTag,
   SortId,
   WorksPage,
   WorksQuery,
@@ -89,7 +90,7 @@ function filterByQuery(works: WorkSummary[], q: string): WorkSummary[] {
 // タグ絞り込みは完全一致（ADR-0005 決定6。prefix は大文字小文字を無視、値は区別）
 export function filterByTags(
   works: WorkSummary[],
-  tags: string[],
+  tags: NormalizedTag[],
   tagOp: "AND" | "OR",
 ): WorkSummary[] {
   if (tags.length === 0) return works;
@@ -107,7 +108,10 @@ export function filterByTags(
  *  一度だけ解釈する共通入口（ADR-0012 §2）。queryWorks・evalSmartFolder・getAxisFacets が
  *  同じ実装（shared/pseudoTag.ts）を共有する。不正な入力（未知の組み込み軸・複数の year等）は
  *  splitSelectedTags が黙って落とさず除外する。 */
-export function resolveTagFilters(tags: string[]): { tags: string[]; yearValue: string | null } {
+export function resolveTagFilters(tags: string[]): {
+  tags: NormalizedTag[];
+  yearValue: string | null;
+} {
   const { tags: realTags, yearValue } = splitSelectedTags(tags);
   return { tags: realTags, yearValue };
 }

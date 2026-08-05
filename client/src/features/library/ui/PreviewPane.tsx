@@ -1,4 +1,4 @@
-import type { Work, WorkPatch } from "@mimimilli/shared";
+import type { Work, WorkPatchInput } from "@mimimilli/shared";
 import type { CollectionStatsDisplay } from "../model/libraryPresentation";
 import CollectionStatus from "./CollectionStatus";
 import { DiscoveryDashboard } from "./preview/DiscoveryDashboard";
@@ -29,7 +29,7 @@ interface PreviewPaneProps {
   onTagClick: (tag: string) => void;
   tagSuggestions: string[];
   isPatching: boolean;
-  onPatchWork: (body: WorkPatch) => Promise<Work>;
+  onPatchWork: (body: WorkPatchInput) => Promise<Work>;
 }
 
 export default function PreviewPane({

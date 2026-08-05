@@ -2,7 +2,7 @@
 // 一覧 infinite query は invalidate すると蓄積全ページが順次再フェッチされるため、
 // アクティブ一覧の直接更新/reset と非表示キャッシュの stale 化に棚分けする。
 
-import type { Work, WorkPatch } from "@mimimilli/shared";
+import type { Work, WorkPatch, WorkPatchInput } from "@mimimilli/shared";
 import type { SortId } from "./types";
 import { isSmartAxis } from "./axisDefinitions";
 import { computeResultsPaneKind } from "./libraryPresentation";
@@ -46,7 +46,7 @@ function bookmarkedChangeAffectsActiveList(ctx: LibraryListContext): boolean {
 }
 
 export function getWorkPatchInvalidationTargets(
-  body: WorkPatch,
+  body: WorkPatchInput,
   ctx: LibraryListContext,
 ): WorkPatchInvalidationTargets {
   const changesTags = body.tags !== undefined;
@@ -141,7 +141,7 @@ function assignPatchedField<K extends keyof WorkPatch & keyof Work>(
 
 export function mergeWorkPatchResponse(
   prev: Work | undefined,
-  body: WorkPatch,
+  body: WorkPatchInput,
   response: Work,
 ): Work {
   if (!prev) return response;

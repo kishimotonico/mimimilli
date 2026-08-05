@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Work, WorkPatch } from "@mimimilli/shared";
+import type { Work, WorkPatchInput } from "@mimimilli/shared";
 import { I } from "../../../../shared/ui/Icon";
 import IconButton from "../../../../shared/ui/IconButton";
 import { useAnchoredPopover } from "./useAnchoredPopover";
@@ -9,7 +9,7 @@ const ACTION_POPOVER_WIDTH = 240;
 interface WorkMetadataActionsProps {
   work: Work;
   isPatching: boolean;
-  onPatchWork: (body: WorkPatch) => Promise<Work>;
+  onPatchWork: (body: WorkPatchInput) => Promise<Work>;
   onError: (message: string | null) => void;
   onEdit: () => void;
   onShowInfo: () => void;

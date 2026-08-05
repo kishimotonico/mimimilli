@@ -3,9 +3,11 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
   emptyDlsiteState,
+  normalizeTags,
   toTrackDurationFieldsFromSec,
   WORKS_DEFAULT_PAGE_SIZE,
   type DlsiteState,
+  type NormalizedTag,
   type Work,
 } from "@mimimilli/shared";
 import { openDb } from "../src/adapters/real/db.ts";
@@ -40,7 +42,7 @@ function isoDaysAgo(rng: () => number, days: number): string {
   return date.toISOString();
 }
 
-function buildTags(rng: () => number): string[] {
+function buildTags(rng: () => number): NormalizedTag[] {
   const tags = new Set<string>();
   const count = intBetween(rng, 5, 10);
   while (tags.size < count) {
@@ -63,7 +65,7 @@ function buildTags(rng: () => number): string[] {
         break;
     }
   }
-  return [...tags];
+  return normalizeTags([...tags]);
 }
 
 function buildDlsite(rng: () => number, rjNum: number): DlsiteState {

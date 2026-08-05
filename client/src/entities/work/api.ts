@@ -25,7 +25,7 @@ import {
   type DlsiteNotificationKind,
   type DlsiteNotificationPage,
   type DlsiteNotificationSummary,
-  type WorkPatch,
+  type WorkPatchInput,
   type FileEntry,
   type DlsiteWorkInfo,
   type DlsiteApplyBody,
@@ -57,7 +57,7 @@ export async function queryDlsiteParseFailedNotifications(params: {
   return queryDlsiteNotifications("parse-failed", params);
 }
 
-export async function patchWork(workId: string, body: WorkPatch): Promise<Work> {
+export async function patchWork(workId: string, body: WorkPatchInput): Promise<Work> {
   return patchParsed(workSchema, `/works/${encodeURIComponent(workId)}`, body);
 }
 

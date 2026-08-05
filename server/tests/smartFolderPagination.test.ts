@@ -14,6 +14,7 @@ import {
 import { createApp } from "../src/app.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { evalSmartFolder } from "../src/core/smartFolder.ts";
+import { nts } from "./helpers/tag.ts";
 
 const RECENT = new Date(Date.now() - 5 * 86400000).toISOString();
 
@@ -29,7 +30,7 @@ function summary(index: number): WorkSummary {
     addedAt: RECENT,
     errorMessage: null,
     urls: [],
-    tags: ["ASMR"],
+    tags: nts(["ASMR"]),
     trackCount: 1,
     bookmarked: false,
     lastPlayedAt: null,

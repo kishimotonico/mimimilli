@@ -570,7 +570,8 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
       const work = state.works.find((w) => w.id === id);
       if (!work) return null;
       if (patch.title !== undefined) work.title = patch.title;
-      if (patch.tags !== undefined) work.tags = normalizeTags(patch.tags);
+      // patch.tags は workPatchSchema の境界で既に正規化済み（NormalizedTag[]）。
+      if (patch.tags !== undefined) work.tags = patch.tags;
       if (patch.bookmarked !== undefined) work.bookmarked = patch.bookmarked;
       return buildFullWorkFromState(state, work);
     },

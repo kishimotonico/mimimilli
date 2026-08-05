@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { normalizeTag, parseTag } from "@mimimilli/shared";
-import type { Work, WorkPatch } from "@mimimilli/shared";
+import type { Work, WorkPatchInput } from "@mimimilli/shared";
 import { sortTagsForDisplay } from "../../../../entities/work/sortTagsForDisplay";
 import Tag from "../../../../entities/work/ui/Tag";
 import { I } from "../../../../shared/ui/Icon";
@@ -23,7 +23,7 @@ interface WorkTagEditorProps {
   work: Work;
   tagSuggestions: string[];
   isPatching: boolean;
-  onPatchWork: (body: WorkPatch) => Promise<Work>;
+  onPatchWork: (body: WorkPatchInput) => Promise<Work>;
   onError: (message: string | null) => void;
   /** 編集ダイアログなど、折りたたむ必要がない場所では全タグを表示する。
    *  この場合は編集ダイアログ自体が明示的な編集操作なので削除ボタンは常時表示のまま。 */
@@ -96,7 +96,7 @@ export function WorkTagEditor({
     suggestions,
     excludeTags: tags,
     disabled: isTagSaving || isPatching,
-    canCreate: (tag: string) => normalizeTag(tag).length > 0,
+    canCreate: (tag: string) => normalizeTag(tag) !== null,
     onSelect: selectTag,
     onCancel: closeTagPopover,
   };

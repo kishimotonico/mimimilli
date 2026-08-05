@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - impl-182
 created_date: '2026-08-05 14:58'
-updated_date: '2026-08-05 15:18'
+updated_date: '2026-08-05 16:09'
 labels: []
 dependencies: []
 priority: high
@@ -52,11 +52,11 @@ AGENTS.md は「エラーは正しくハンドリングし問題を隠蔽しな�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 normalizeTag / normalizeTags の戻り値が NormalizedTag 型になっている
-- [ ] #2 正規化済みを前提とする関数が NormalizedTag を受け取り、素の string を渡すとコンパイルエラーになる
-- [ ] #3 素の string を受け取るのが境界（HTTPスキーマ・URL復元・ファイル読み込み・外部連携の入口）だけになっている
-- [ ] #4 型エラーの回避目的の as キャストが導入されていない
-- [ ] #5 型導入で洗い出された未正規化の経路がすべて塞がれている
-- [ ] #6 normalizeTags の黙った除去が廃止されているか、前提と理由がコメントに明記されている
-- [ ] #7 pnpm check と pnpm test と pnpm test:visual が通る
+- [x] #1 normalizeTag / normalizeTags の戻り値が NormalizedTag 型になっている
+- [x] #2 正規化済みを前提とする関数が NormalizedTag を受け取り、素の string を渡すとコンパイルエラーになる
+- [x] #3 素の string を受け取るのが境界（HTTPスキーマ・URL復元・ファイル読み込み・外部連携の入口）だけになっている
+- [x] #4 型エラーの回避目的の as キャストが導入されていない
+- [x] #5 型導入で洗い出された未正規化の経路がすべて塞がれている
+- [x] #6 normalizeTags の黙った除去が廃止されているか、前提と理由がコメントに明記されている
+- [x] #7 pnpm check と pnpm test と pnpm test:visual が通る
 <!-- AC:END -->
