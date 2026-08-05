@@ -5,9 +5,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   DEFAULT_TAG_PREFIXES,
+  dedupeTags,
   emptyDlsiteState,
   normalizeTag,
   normalizeTags,
+  TagNormalizationError,
   tagEquals,
   tagPrefixCreateSchema,
   tagPrefixNameSchema,
@@ -62,12 +64,17 @@ test("normalizeTag: 値にスラッシュを含む場合は最初のスラッシ
   assert.equal(normalizeTag("シリーズ/A/B"), "シリーズ/A/B");
 });
 
-test("normalizeTags: 正規化後の重複と空タグを除き、順序を保つ", () => {
-  assert.deepEqual(normalizeTags(["CV/x", "cv/x", "  ", "ASMR", "ASMR"]), ["cv/x", "ASMR"]);
+test("normalizeTags: 各要素を正規形へ寄せる（重複排除はしない）", () => {
+  assert.deepEqual(normalizeTags(["CV/x", "ASMR"]), ["cv/x", "ASMR"]);
 });
 
-test("normalizeTags: prefix または値が空の Annotated タグを除く", () => {
-  assert.deepEqual(normalizeTags(["cv/", "cv/   ", "  /x", "/x"]), ["/x"]);
+test("normalizeTags: 正規化して空になるタグは TagNormalizationError", () => {
+  assert.throws(() => normalizeTags(["  "]), TagNormalizationError);
+  assert.throws(() => normalizeTags(["cv/", "cv/   "]), TagNormalizationError);
+});
+
+test("dedupeTags: 正規化済み配列から重複を除き、順序を保つ", () => {
+  assert.deepEqual(dedupeTags(nts(["cv/x", "cv/x", "ASMR", "ASMR"])), ["cv/x", "ASMR"]);
 });
 
 // prefix の大文字小文字を無視する処理は normalizeTag が担う（NormalizedTag はその結果）。

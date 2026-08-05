@@ -1,12 +1,14 @@
-import { normalizeTags } from "@mimimilli/shared";
+import { dedupeTags, normalizeTags } from "@mimimilli/shared";
 import type { DlsiteApplyBody, DlsiteWorkInfo, NormalizedTag, Work } from "@mimimilli/shared";
 
 export function dlsiteInfoTags(info: DlsiteWorkInfo): NormalizedTag[] {
-  return normalizeTags([
-    ...(info.circle ? [`サークル/${info.circle}`] : []),
-    ...info.cvs.map((cv) => `cv/${cv}`),
-    ...info.genreTags.map((genre) => `genre/${genre}`),
-  ]);
+  return dedupeTags(
+    normalizeTags([
+      ...(info.circle ? [`サークル/${info.circle}`] : []),
+      ...info.cvs.map((cv) => `cv/${cv}`),
+      ...info.genreTags.map((genre) => `genre/${genre}`),
+    ]),
+  );
 }
 
 export function buildDlsiteApplyBody(
@@ -17,7 +19,7 @@ export function buildDlsiteApplyBody(
     info,
     applyTitle: selection.applyTitle,
     applyCover: selection.applyCover,
-    applyTags: normalizeTags(selection.applyTags),
+    applyTags: dedupeTags(normalizeTags(selection.applyTags)),
   };
 }
 

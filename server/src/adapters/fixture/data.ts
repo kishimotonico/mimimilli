@@ -1,6 +1,11 @@
 // fixture アダプタ用の自己完結シードデータ。
 // client/mocks からは import せず、本ファイル内で完結させる。
-import { coverFieldsFromColumns, emptyDlsiteState, normalizeTags } from "@mimimilli/shared";
+import {
+  coverFieldsFromColumns,
+  dedupeTags,
+  emptyDlsiteState,
+  normalizeTags,
+} from "@mimimilli/shared";
 import type { Cover, SmartFolder, WorkSummary } from "@mimimilli/shared";
 
 /** fixture 内部のカバー列（real の cover_image / cover_width / cover_height に相当） */
@@ -287,7 +292,7 @@ const RAW_SEED_WORKS: Array<Omit<WorkSummary, "dlsite" | "tags"> & { tags: strin
 export const SEED_WORKS: WorkSummary[] = RAW_SEED_WORKS.map((work, index) => {
   const columns = fixtureCoverColumnsForWork(work);
   const cover = fixtureCoverFromColumns(columns);
-  const tags = normalizeTags(work.tags);
+  const tags = dedupeTags(normalizeTags(work.tags));
   return {
     ...work,
     tags,

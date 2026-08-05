@@ -1,5 +1,5 @@
 import { useRef, useState, type FormEvent } from "react";
-import type { SmartFolder, SmartFolderCreate } from "@mimimilli/shared";
+import { normalizeTag, type SmartFolder, type SmartFolderCreate } from "@mimimilli/shared";
 import {
   addSmartFolderRule,
   changeSmartFolderRuleField,
@@ -294,6 +294,7 @@ export default function SmartFolderEditorModal({
                           width="full"
                           placeholder="タグ名を入力して追加"
                           label={`${index + 1}件目の条件に追加するタグ`}
+                          canCreate={(tag) => normalizeTag(tag) !== null}
                           onSelect={(tag) =>
                             updateRule(rule.id, (current) => {
                               if (current.field !== "タグ") return current;

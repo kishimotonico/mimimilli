@@ -1,7 +1,7 @@
 // ライブラリ（検索・分類軸・スマートフォルダー・検索プリセット）の契約。
 import { z } from "zod";
 import { coverValueSchema } from "./cover.ts";
-import { normalizeTags, tagSchema } from "./work.ts";
+import { dedupeTags, normalizeTags, tagSchema } from "./work.ts";
 
 export { compareUtf8Bytes } from "./text.ts";
 
@@ -65,7 +65,10 @@ export const smartFolderRuleSchema = z.discriminatedUnion("field", [
     field: z.literal("タグ"),
     operator: z.literal("∋"),
     // 作品側（workPatchSchema 等）と同じく正規形（prefix小文字化・trim・重複排除）で保存する
-    values: z.array(tagSchema).min(1).transform(normalizeTags),
+    values: z
+      .array(tagSchema)
+      .min(1)
+      .transform((tags) => dedupeTags(normalizeTags(tags))),
   }),
   z.object({
     conjunction: z.enum(["WHERE", "AND", "OR"]),

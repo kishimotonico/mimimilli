@@ -1,5 +1,9 @@
-import { normalizeTags } from "@mimimilli/shared";
+import { dedupeTags, normalizeTags, TagNormalizationError } from "@mimimilli/shared";
 import type { SmartFolder, SmartFolderCreate, SmartFolderRule } from "@mimimilli/shared";
+
+function invalidTagRuleError(tag: string): string {
+  return `「${tag}」は登録できないタグです`;
+}
 
 export type SmartFolderEditorConjunction = "WHERE" | "AND" | "OR" | "AND NOT";
 
@@ -139,7 +143,16 @@ export function validateSmartFolderDraft(draft: SmartFolderEditorDraft): SmartFo
   draft.rules.forEach((rule, index) => {
     const conjunction = index === 0 ? "WHERE" : rule.conjunction;
     if (rule.field === "タグ") {
-      const values = normalizeTags(rule.values);
+      let values;
+      try {
+        values = dedupeTags(normalizeTags(rule.values));
+      } catch (error) {
+        if (error instanceof TagNormalizationError) {
+          errors.ruleValues[rule.id] = invalidTagRuleError(error.tag);
+          return;
+        }
+        throw error;
+      }
       if (values.length === 0) {
         errors.ruleValues[rule.id] = "タグを1つ以上選択してください";
         return;

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { TagPrefix } from "@mimimilli/shared";
+import type { NormalizedTag, TagPrefix } from "@mimimilli/shared";
 import type { AxisId } from "../model/types";
 import { buildFacetAxisRows } from "../model/axisDefinitions";
 import { useAnchoredPopover } from "./preview/useAnchoredPopover";
@@ -14,8 +14,8 @@ const AND_ADD_HINT = "AND追加されます";
 
 interface FilterChipAddButtonProps {
   tagPrefixes: TagPrefix[];
-  selectedTags: string[];
-  onAddValue: (tag: string, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
+  selectedTags: NormalizedTag[];
+  onAddValue: (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
 }
 
 export default function FilterChipAddButton({

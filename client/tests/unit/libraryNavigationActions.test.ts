@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createStore } from "jotai";
 import { selectedWorkIdAtom, selectedTagsAtom } from "../../src/features/library/model/atoms";
+import { nt, nts } from "../helpers/tag";
 import {
   consumeNavigationHistoryCommitAtom,
   navigationHistoryCommitAtom,
@@ -29,7 +30,7 @@ describe("ナビゲーション操作は選択中の作品をクリアする", (
     const store = createStore();
     store.set(selectedWorkIdAtom, "work-1");
 
-    store.set(toggleLibraryTagAtom, "ASMR");
+    store.set(toggleLibraryTagAtom, nt("ASMR"));
 
     expect(store.get(selectedWorkIdAtom)).toBeNull();
   });
@@ -47,7 +48,7 @@ describe("ナビゲーション操作は選択中の作品をクリアする", (
 describe("軸を切り替えても選択中のフィルタは維持される（ADR-0012 §1）", () => {
   it("setLibraryAxisAtom は selectedTagsAtom に触れない", () => {
     const store = createStore();
-    store.set(selectedTagsAtom, ["cv/藤田茜"]);
+    store.set(selectedTagsAtom, nts(["cv/藤田茜"]));
 
     store.set(setLibraryAxisAtom, "サークル");
 
@@ -59,16 +60,16 @@ describe("toggleLibraryTagAtom は全軸共通のタグフィルタへの追加�
   it("未選択のタグを追加する", () => {
     const store = createStore();
 
-    store.set(toggleLibraryTagAtom, "cv/藤田茜");
+    store.set(toggleLibraryTagAtom, nt("cv/藤田茜"));
 
     expect(store.get(selectedTagsAtom)).toEqual(["cv/藤田茜"]);
   });
 
   it("選択済みのタグは解除する", () => {
     const store = createStore();
-    store.set(selectedTagsAtom, ["cv/藤田茜", "サークル/月白製作所"]);
+    store.set(selectedTagsAtom, nts(["cv/藤田茜", "サークル/月白製作所"]));
 
-    store.set(toggleLibraryTagAtom, "cv/藤田茜");
+    store.set(toggleLibraryTagAtom, nt("cv/藤田茜"));
 
     expect(store.get(selectedTagsAtom)).toEqual(["サークル/月白製作所"]);
   });
@@ -77,27 +78,27 @@ describe("toggleLibraryTagAtom は全軸共通のタグフィルタへの追加�
 describe("toggleLibraryTagAtom: year は単一選択（別の年を選ぶと前の選択を置き換える）", () => {
   it("別の年を追加すると前の年の選択を取り除いてから追加する", () => {
     const store = createStore();
-    store.set(selectedTagsAtom, ["cv/藤田茜", "@year/2023"]);
+    store.set(selectedTagsAtom, nts(["cv/藤田茜", "@year/2023"]));
 
-    store.set(toggleLibraryTagAtom, "@year/2024");
+    store.set(toggleLibraryTagAtom, nt("@year/2024"));
 
     expect(store.get(selectedTagsAtom)).toEqual(["cv/藤田茜", "@year/2024"]);
   });
 
   it("同じ年をもう一度選ぶとトグルとして解除する", () => {
     const store = createStore();
-    store.set(selectedTagsAtom, ["@year/2024"]);
+    store.set(selectedTagsAtom, nts(["@year/2024"]));
 
-    store.set(toggleLibraryTagAtom, "@year/2024");
+    store.set(toggleLibraryTagAtom, nt("@year/2024"));
 
     expect(store.get(selectedTagsAtom)).toEqual([]);
   });
 
   it("実タグ year/2025（予約文字なし）は単一選択の対象にならず通常のタグとして共存する", () => {
     const store = createStore();
-    store.set(selectedTagsAtom, ["year/2025"]);
+    store.set(selectedTagsAtom, nts(["year/2025"]));
 
-    store.set(toggleLibraryTagAtom, "@year/2024");
+    store.set(toggleLibraryTagAtom, nt("@year/2024"));
 
     expect(store.get(selectedTagsAtom)).toEqual(["year/2025", "@year/2024"]);
   });
@@ -107,9 +108,9 @@ describe("selectSoleLibraryTagAtom: 作品詳細のタグクリックはタグ�
   it("既存の絞り込み・軸が何であってもそのタグだけを選択した状態になる", () => {
     const store = createStore();
     store.set(activeAxisAtom, "circle");
-    store.set(selectedTagsAtom, ["cv/藤田茜", "サークル/月白製作所"]);
+    store.set(selectedTagsAtom, nts(["cv/藤田茜", "サークル/月白製作所"]));
 
-    store.set(selectSoleLibraryTagAtom, "genre/ASMR");
+    store.set(selectSoleLibraryTagAtom, nt("genre/ASMR"));
 
     expect(store.get(activeAxisAtom)).toBe("tag");
     expect(store.get(selectedTagsAtom)).toEqual(["genre/ASMR"]);
@@ -119,7 +120,7 @@ describe("selectSoleLibraryTagAtom: 作品詳細のタグクリックはタグ�
     const store = createStore();
     store.set(selectedWorkIdAtom, "work-1");
 
-    store.set(selectSoleLibraryTagAtom, "genre/ASMR");
+    store.set(selectSoleLibraryTagAtom, nt("genre/ASMR"));
 
     expect(store.get(selectedWorkIdAtom)).toBeNull();
   });
@@ -130,7 +131,7 @@ describe("置き換え選択は作品一覧へ進み、AND追加は現在地に�
     const store = createStore();
     store.set(activeAxisAtom, "cv");
 
-    store.set(replaceLibraryTagAtom, "cv/藤田茜");
+    store.set(replaceLibraryTagAtom, nt("cv/藤田茜"));
 
     expect(store.get(activeAxisAtom)).toBe("all");
     expect(store.get(selectedTagsAtom)).toEqual(["cv/藤田茜"]);
@@ -140,7 +141,7 @@ describe("置き換え選択は作品一覧へ進み、AND追加は現在地に�
     const store = createStore();
     store.set(activeAxisAtom, "home");
 
-    store.set(replaceLibraryTagAtom, "cv/藤田茜");
+    store.set(replaceLibraryTagAtom, nt("cv/藤田茜"));
 
     expect(store.get(activeAxisAtom)).toBe("all");
   });
@@ -149,7 +150,7 @@ describe("置き換え選択は作品一覧へ進み、AND追加は現在地に�
     const store = createStore();
     store.set(activeAxisAtom, "recent");
 
-    store.set(replaceLibraryTagAtom, "cv/藤田茜");
+    store.set(replaceLibraryTagAtom, nt("cv/藤田茜"));
 
     expect(store.get(activeAxisAtom)).toBe("recent");
   });
@@ -158,7 +159,7 @@ describe("置き換え選択は作品一覧へ進み、AND追加は現在地に�
     const store = createStore();
     store.set(activeAxisAtom, "smart-1");
 
-    store.set(replaceLibraryTagAtom, "cv/藤田茜");
+    store.set(replaceLibraryTagAtom, nt("cv/藤田茜"));
 
     expect(store.get(activeAxisAtom)).toBe("smart-1");
   });
@@ -166,9 +167,9 @@ describe("置き換え選択は作品一覧へ進み、AND追加は現在地に�
   it("replaceLibraryTagAtom: 同じ軸グループの既存選択を外してから追加する（置き換え）", () => {
     const store = createStore();
     store.set(activeAxisAtom, "cv");
-    store.set(selectedTagsAtom, ["cv/藤田茜", "サークル/月白製作所"]);
+    store.set(selectedTagsAtom, nts(["cv/藤田茜", "サークル/月白製作所"]));
 
-    store.set(replaceLibraryTagAtom, "cv/霧島レイ");
+    store.set(replaceLibraryTagAtom, nt("cv/霧島レイ"));
 
     expect(store.get(selectedTagsAtom)).toEqual(["サークル/月白製作所", "cv/霧島レイ"]);
   });
@@ -177,7 +178,7 @@ describe("置き換え選択は作品一覧へ進み、AND追加は現在地に�
     const store = createStore();
     store.set(activeAxisAtom, "cv");
 
-    store.set(toggleLibraryTagAtom, "cv/藤田茜");
+    store.set(toggleLibraryTagAtom, nt("cv/藤田茜"));
 
     expect(store.get(activeAxisAtom)).toBe("cv");
     expect(store.get(selectedTagsAtom)).toEqual(["cv/藤田茜"]);

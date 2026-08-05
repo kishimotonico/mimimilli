@@ -104,7 +104,7 @@ test("metaFileSchema.tags でも予約文字の検証が効き、先頭空白で
 
   const withNormalTags = { ...validMeta(), tags: [" CV/藤田茜 ", "cv/藤田茜"] };
   const parsed = metaFileSchema.parse(withNormalTags);
-  // normalizeTags で正規化・重複排除される。
+  // dedupeTags(normalizeTags(...)) で正規化・重複排除される。
   assert.deepEqual(parsed.tags, ["cv/藤田茜"]);
 });
 

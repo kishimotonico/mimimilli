@@ -5,7 +5,12 @@ import { createHash } from "node:crypto";
 import { stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
-import { applyDlsiteStatePatch, DEFAULT_TAG_PREFIXES, normalizeTags } from "@mimimilli/shared";
+import {
+  applyDlsiteStatePatch,
+  DEFAULT_TAG_PREFIXES,
+  dedupeTags,
+  normalizeTags,
+} from "@mimimilli/shared";
 import type {
   AxisFacetItem,
   DlsiteApplyBody,
@@ -895,7 +900,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       } = {};
       if (body.applyTitle && body.info.title) patch.title = body.info.title;
       const applyTags = normalizeTags(body.applyTags);
-      if (applyTags.length > 0) patch.tags = normalizeTags([...work.tags, ...applyTags]);
+      if (applyTags.length > 0) patch.tags = dedupeTags([...work.tags, ...applyTags]);
       if (body.info.url && !work.urls.some((entry) => entry.url.includes("dlsite.com"))) {
         patch.urls = [...work.urls, { label: "DLsite", url: body.info.url }];
       }
@@ -921,7 +926,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
           lastAttemptAt: new Date().toISOString(),
           error: null,
           errorKind: null,
-          appliedTags: normalizeTags([...work.dlsite.appliedTags, ...applyTags]),
+          appliedTags: dedupeTags([...normalizeTags(work.dlsite.appliedTags), ...applyTags]),
         };
         repo.setDlsiteState(workId, dlsite);
         patchMetaFile(updated.metaPath, {
@@ -1085,7 +1090,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
                 mode === "new"
                   ? allInfoTags
                   : allInfoTags.filter((tag) => !work.dlsite.appliedTags.includes(tag));
-              const nextTags = normalizeTags([...work.tags, ...applyTags]);
+              const nextTags = dedupeTags([...work.tags, ...applyTags]);
               const nextTitle =
                 mode === "new" || isDefaultTitle(work.title, work.physicalPath, work.dlsite.rjCode)
                   ? fetched.info.title
@@ -1094,7 +1099,10 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
                 ? [...work.urls, { label: "DLsite", url: fetched.info.url }]
                 : undefined;
               const coverNeeded = !work.cover && !!fetched.info.coverUrl;
-              const nextAppliedTags = normalizeTags([...work.dlsite.appliedTags, ...allInfoTags]);
+              const nextAppliedTags = dedupeTags([
+                ...normalizeTags(work.dlsite.appliedTags),
+                ...allInfoTags,
+              ]);
               const noOp =
                 !attempt.httpAttempted &&
                 !coverNeeded &&

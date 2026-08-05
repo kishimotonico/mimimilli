@@ -2,7 +2,7 @@
 // 一覧 infinite query は invalidate すると蓄積全ページが順次再フェッチされるため、
 // アクティブ一覧の直接更新/reset と非表示キャッシュの stale 化に棚分けする。
 
-import type { Work, WorkPatch, WorkPatchInput } from "@mimimilli/shared";
+import type { NormalizedTag, Work, WorkPatch, WorkPatchInput } from "@mimimilli/shared";
 import type { SortId } from "./types";
 import { isSmartAxis } from "./axisDefinitions";
 import { computeResultsPaneKind } from "./libraryPresentation";
@@ -11,7 +11,7 @@ export interface LibraryListContext {
   activeAxis: string;
   sort: SortId;
   searchQuery: string;
-  selectedTags: string[];
+  selectedTags: NormalizedTag[];
 }
 
 export interface WorkPatchInvalidationTargets {
