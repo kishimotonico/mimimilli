@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
-import type { FacetAxisId } from "@mimimilli/shared";
+import type { FacetAxisId, NormalizedTag } from "@mimimilli/shared";
 import type { AxisId } from "../model/types";
 import { useAxisFacetsQuery } from "../model/useAxisFacetsQuery";
 import { buildFilterTag } from "../model/libraryPresentation";
@@ -22,8 +22,8 @@ interface AxisQuickOverlayProps {
   axis: AxisId;
   anchorEl: HTMLElement | null;
   isOpen: boolean;
-  selectedTags: string[];
-  onSelectValue: (tag: string, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
+  selectedTags: NormalizedTag[];
+  onSelectValue: (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
   onClose: () => void;
   panelHandlers: HoverIntentHandlers;
 }

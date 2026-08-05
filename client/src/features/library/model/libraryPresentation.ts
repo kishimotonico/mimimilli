@@ -8,8 +8,10 @@ import {
   normalizeTag,
   parseBuiltinAxisTag,
   parseTag,
+  TagNormalizationError,
   type CollectionStats,
   type FacetAxisId,
+  type NormalizedTag,
 } from "@mimimilli/shared";
 import { ApiRequestError } from "../../../shared/api/http";
 import type { WorksQueryParams } from "../api";
@@ -49,10 +51,16 @@ export function isGridViewActive(axis: AxisId, viewMode: ViewMode): boolean {
  *  tag 軸は AxisFacetItem.value が既に完全なタグ文字列（ADR-0005 追記）、
  *  year のようなタグ由来でない組み込み軸は擬似タグ、それ以外の facet 軸
  *  （prefix 定義に基づく実タグ由来の軸）は "軸/値" の実タグとして表現する。 */
-export function buildFilterTag(axis: AxisId, value: string): string {
-  if (axis === "tag") return value;
+export function buildFilterTag(axis: AxisId, value: string): NormalizedTag {
+  if (axis === "tag") {
+    const normalized = normalizeTag(value);
+    if (normalized === null) throw new TagNormalizationError(value);
+    return normalized;
+  }
   if (isBuiltinPseudoTagAxis(axis)) return buildBuiltinAxisTag(axis, value);
-  return `${axis}/${value}`;
+  const normalized = normalizeTag(`${axis}/${value}`);
+  if (normalized === null) throw new TagNormalizationError(`${axis}/${value}`);
+  return normalized;
 }
 
 // ── 軸レール・チップの入口共通「置き換え既定」（ADR-0012 §7） ─────────────
@@ -61,9 +69,8 @@ export function buildFilterTag(axis: AxisId, value: string): string {
  *  結果面の値タイル/行のクリック（置き換え既定）が、置き換え対象を絞るのに使う。
  *  組み込み軸（擬似タグ）は軸ごと、facet 軸由来の実タグ（prefix付き）は prefix ごと、
  *  フラットタグは1グループにまとめる（tag 軸の値一覧が同じグルーピングで表示するため）。 */
-export function tagFilterGroupKey(tag: string): string {
-  const normalized = normalizeTag(tag);
-  const builtin = normalized === null ? null : parseBuiltinAxisTag(normalized);
+export function tagFilterGroupKey(tag: NormalizedTag): string {
+  const builtin = parseBuiltinAxisTag(tag);
   if (builtin) return `@${builtin.axis}`;
   const parsed = parseTag(tag);
   return parsed.kind === "flat" ? "" : parsed.prefix;
@@ -71,9 +78,8 @@ export function tagFilterGroupKey(tag: string): string {
 
 /** タグ文字列が属する軸ID。チップの兄弟値ドロップダウンで問い合わせる facet 軸を
  *  決めるのに使う。フラットタグは "tag" 軸（値一覧に全フラットタグが並ぶ）を返す。 */
-export function axisOfFilterTag(tag: string): AxisId {
-  const normalized = normalizeTag(tag);
-  const builtin = normalized === null ? null : parseBuiltinAxisTag(normalized);
+export function axisOfFilterTag(tag: NormalizedTag): AxisId {
+  const builtin = parseBuiltinAxisTag(tag);
   if (builtin) return builtin.axis;
   const parsed = parseTag(tag);
   return parsed.kind === "flat" ? "tag" : parsed.prefix;
@@ -81,7 +87,7 @@ export function axisOfFilterTag(tag: string): AxisId {
 
 /** 置き換え選択の計算（純粋関数）。同じ tagFilterGroupKey のタグを外してから追加する。
  *  replaceLibraryTagAtom が使う（ADR-0012 §7・§8）。 */
-export function computeReplacedTags(prev: string[], tag: string): string[] {
+export function computeReplacedTags(prev: NormalizedTag[], tag: NormalizedTag): NormalizedTag[] {
   const group = tagFilterGroupKey(tag);
   return [...prev.filter((t) => tagFilterGroupKey(t) !== group), tag];
 }
@@ -92,7 +98,7 @@ interface WorksParamsInput {
   activeAxis: AxisId;
   sort: SortId;
   searchQuery: string;
-  selectedTags: string[];
+  selectedTags: NormalizedTag[];
 }
 
 /** selectedTagsAtom（組み込み軸の擬似タグ混じり）を works query の tags フィールドへ変換する。
@@ -105,7 +111,7 @@ interface TagFilterParams {
   tagOp?: "AND";
 }
 
-function buildTagFilterParams(selectedTags: string[]): TagFilterParams {
+function buildTagFilterParams(selectedTags: NormalizedTag[]): TagFilterParams {
   return selectedTags.length > 0 ? { tags: selectedTags, tagOp: "AND" } : {};
 }
 
@@ -126,7 +132,7 @@ export function buildWorksParams(input: WorksParamsInput): WorksQueryParams | nu
 /** スマートフォルダー評価API（GET /smart-folders/:id/works）へ渡す追加フィルタ。
  *  フォルダーのルールに対する追加の AND 条件として適用される（ADR-0012）。
  *  フィルタが無ければキーを持たない空オブジェクトを返す（クエリキーの安定のため）。 */
-export function buildSmartFolderFilterParams(selectedTags: string[]): TagFilterParams {
+export function buildSmartFolderFilterParams(selectedTags: NormalizedTag[]): TagFilterParams {
   return buildTagFilterParams(selectedTags);
 }
 
@@ -143,7 +149,10 @@ export function getFacetAxisForQuery(activeAxis: AxisId): FacetAxisId | null {
  * 他軸フィルタによる0件だらけの空振りも防げる。「選択中の値は特別に残す」という例外は
  * 自軸除外なら不要（選択中の値自身も他軸フィルタだけを適用した普通の件数で残る）。
  */
-export function buildAxisFacetFilterParams(axis: AxisId, selectedTags: string[]): TagFilterParams {
+export function buildAxisFacetFilterParams(
+  axis: AxisId,
+  selectedTags: NormalizedTag[],
+): TagFilterParams {
   const otherAxisTags = selectedTags.filter((tag) => axisOfFilterTag(tag) !== axis);
   return buildTagFilterParams(otherAxisTags);
 }
@@ -162,7 +171,7 @@ export function computeIsNoResultsDueToFilter(
   isWorksPane: boolean,
   worksCount: number,
   searchQuery: string,
-  selectedTags: string[],
+  selectedTags: NormalizedTag[],
   isWorksLoading: boolean,
   isWorksError: boolean,
 ): boolean {

@@ -1,4 +1,4 @@
-import type { Work, WorkPatchInput } from "@mimimilli/shared";
+import type { NormalizedTag, Work, WorkPatchInput } from "@mimimilli/shared";
 import type { CollectionStatsDisplay } from "../model/libraryPresentation";
 import CollectionStatus from "./CollectionStatus";
 import { DiscoveryDashboard } from "./preview/DiscoveryDashboard";
@@ -26,7 +26,7 @@ interface PreviewPaneProps {
   onResume: () => void;
   onTogglePlay: () => void;
   onSelectWork: (id: string) => void;
-  onTagClick: (tag: string) => void;
+  onTagClick: (tag: NormalizedTag) => void;
   tagSuggestions: string[];
   isPatching: boolean;
   onPatchWork: (body: WorkPatchInput) => Promise<Work>;

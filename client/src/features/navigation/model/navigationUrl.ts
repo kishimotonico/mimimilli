@@ -1,4 +1,4 @@
-import { buildBuiltinAxisTag, splitSelectedTags } from "@mimimilli/shared";
+import { buildBuiltinAxisTag, splitSelectedTags, type NormalizedTag } from "@mimimilli/shared";
 import { isViewAxis } from "../../library/model/axisDefinitions";
 import type { AxisId, SortId } from "../../library/model/types";
 
@@ -8,7 +8,7 @@ export interface LibraryUrlState {
   activeAxis: AxisId;
   /** 全軸共通のタグフィルタ（ADR-0012 §2）。year 軸のような組み込み軸も
    *  "year/2024" 形式の擬似タグとしてここに載る */
-  selectedTags: string[];
+  selectedTags: NormalizedTag[];
   selectedWorkId: string | null;
   sort: SortId;
   /** 検索キーワード。空文字はURLに出さない。省略時は復元経路未対応の呼び出し元向けに空扱い */
@@ -104,7 +104,7 @@ function uniqueNonEmpty(values: string[]): string[] {
  *  URLは直接編集され得るため、ここで同じ制約を検証する（ADR-0012 §2）。
  *  未知の組み込み軸・複数の year 擬似タグ・正規化後に空になるタグは黙って残さず、
  *  警告付きで拒否・正規化する（splitSelectedTags の検証を shared から流用する）。 */
-function parseAndValidateSelectedTags(rawValues: string[], warnings: string[]): string[] {
+function parseAndValidateSelectedTags(rawValues: string[], warnings: string[]): NormalizedTag[] {
   const { tags, yearValue, warnings: splitWarnings } = splitSelectedTags(uniqueNonEmpty(rawValues));
   for (const warning of splitWarnings) warnings.push(`選択タグを検証しました: ${warning}`);
   return yearValue !== null ? [...tags, buildBuiltinAxisTag("year", yearValue)] : tags;

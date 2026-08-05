@@ -4,6 +4,7 @@
 
 import { createContext, createElement, useContext, useTransition, type ReactNode } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
+import type { NormalizedTag } from "@mimimilli/shared";
 import type { AxisId, SortId } from "../model/types";
 import { activeAxisAtom, selectedTagsAtom, selectedWorkIdAtom, sortAtom } from "./atoms";
 import {
@@ -19,18 +20,18 @@ import {
 
 export interface LibraryViewState {
   activeAxis: AxisId;
-  selectedTags: string[];
+  selectedTags: NormalizedTag[];
   selectedWorkId: string | null;
   sort: SortId;
 }
 
 export interface LibraryViewActions {
   setAxis: (axis: AxisId) => void;
-  toggleTag: (tag: string) => void;
+  toggleTag: (tag: NormalizedTag) => void;
   /** 既定=置き換え操作（ADR-0012 §7・§8）。同じ tagFilterGroupKey の選択を外してから追加し、
    *  結果面を作品一覧へ進める（既に作品一覧ならそのまま）。全入口共通の単一の規則 */
-  replaceTag: (tag: string) => void;
-  selectSoleTag: (tag: string) => void;
+  replaceTag: (tag: NormalizedTag) => void;
+  selectSoleTag: (tag: NormalizedTag) => void;
   clearTags: () => void;
   selectWork: (id: string | null) => void;
   setSort: (sort: SortId) => void;

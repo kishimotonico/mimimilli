@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { dlsiteStateSchema, emptyDlsiteState } from "./dlsite.ts";
 import {
+  dedupeTags,
   normalizeTags,
   playlistSchema,
   refinePlaylistCollection,
@@ -17,7 +18,10 @@ export const metaFileSchema = z
     urls: z.array(urlEntrySchema).default([]),
     // Source of Truth。API経由の書き込み（workPatchSchema/workCreateBodySchema）と同じ
     // tagSchema + normalizeTags を通す。外部からの直接編集や旧データにも予約文字契約を効かせる。
-    tags: z.array(tagSchema).default([]).transform(normalizeTags),
+    tags: z
+      .array(tagSchema)
+      .default([])
+      .transform((tags) => dedupeTags(normalizeTags(tags))),
     coverImage: z.string().nullish().default(null),
     playlists: z.array(playlistSchema).default([]),
     defaultPlaylistId: z.uuid({ version: "v4" }).nullish().default(null),

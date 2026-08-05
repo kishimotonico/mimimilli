@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { normalizeTag, parseTag } from "@mimimilli/shared";
-import type { Work, WorkPatchInput } from "@mimimilli/shared";
+import type { NormalizedTag, Work, WorkPatchInput } from "@mimimilli/shared";
 import { sortTagsForDisplay } from "../../../../entities/work/sortTagsForDisplay";
 import Tag from "../../../../entities/work/ui/Tag";
 import { I } from "../../../../shared/ui/Icon";
@@ -30,7 +30,7 @@ interface WorkTagEditorProps {
   expanded?: boolean;
   /** タグチップクリック時のハンドラ（タグ軸への絞り込み遷移）。expanded=true の
    *  編集ダイアログ内では使わない（そこはタグクリックで遷移させない） */
-  onTagClick?: (tag: string) => void;
+  onTagClick?: (tag: NormalizedTag) => void;
 }
 
 export function WorkTagEditor({

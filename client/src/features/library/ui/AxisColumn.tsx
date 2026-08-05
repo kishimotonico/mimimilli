@@ -1,5 +1,5 @@
 import { useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import type { SmartFolder, TagPrefix } from "@mimimilli/shared";
+import type { NormalizedTag, SmartFolder, TagPrefix } from "@mimimilli/shared";
 import type { AxisId } from "../model/types";
 import { buildFacetAxisRows, isFacetAxis } from "../model/axisDefinitions";
 import { useLibraryNavigation } from "../model/useLibraryNavigation";
@@ -138,7 +138,7 @@ export default function AxisColumn({
 
   // クイックオーバーレイの選択は既定=置き換え、Ctrl/Cmd+クリックで AND 追加へ反転する（ADR-0012 §7）。
   // 置き換えは結果面を作品一覧へ遷移させ、AND追加は現在の結果面に留まる（ADR-0012 §8）。
-  const handleSelectValue = (tag: string, opts: { ctrlKey: boolean; metaKey: boolean }) => {
+  const handleSelectValue = (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => {
     if (opts.ctrlKey || opts.metaKey) nav.toggleTag(tag);
     else nav.replaceTag(tag);
   };

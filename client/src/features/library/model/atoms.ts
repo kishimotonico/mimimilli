@@ -5,7 +5,7 @@
 
 import { atom } from "jotai";
 import { atomWithStorage } from "jotai/utils";
-import type { TagPrefix } from "@mimimilli/shared";
+import type { NormalizedTag, TagPrefix } from "@mimimilli/shared";
 import type {
   AxisId,
   GridLayoutMode,
@@ -23,7 +23,7 @@ export const librarySearchQueryAtom = atom("");
 export const activeAxisAtom = atom<AxisId>("all");
 // 軸の値選択（facet/tag 問わず）はすべてここへ入る（ADR-0012 §2）。
 // year 軸のような組み込み軸は "year/2024" 形式の擬似タグとして同じ配列に載る。
-export const selectedTagsAtom = atom<string[]>([]);
+export const selectedTagsAtom = atom<NormalizedTag[]>([]);
 export const selectedWorkIdAtom = atom<string | null>(null);
 export const sortAtom = atom<SortId>("added-desc");
 // 値一覧のソート状態。sortAtom（作品一覧）とは別に保持する（ADR-0012 帰結）。

@@ -11,6 +11,7 @@ import {
   isDlsiteUnlinked,
   isRjCodeMissing,
   normalizeTags,
+  dedupeTags,
   toWorkListItem,
   toTrackDurationFieldsFromSec,
   coverFieldsFromColumns,
@@ -816,7 +817,7 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
       if (!work) return false;
       if (body.applyTitle) work.title = body.info.title;
       const applyTags = normalizeTags(body.applyTags);
-      work.tags = normalizeTags([...work.tags, ...applyTags]);
+      work.tags = dedupeTags([...work.tags, ...applyTags]);
       if (body.applyCover && body.info.coverUrl) {
         const dimensions = work.cover?.dimensions ?? { width: 900, height: 900 };
         const columns: FixtureCoverColumns = {
@@ -832,7 +833,7 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
         lastAttemptAt: new Date().toISOString(),
         error: null,
         errorKind: null,
-        appliedTags: normalizeTags([...work.dlsite.appliedTags, ...applyTags]),
+        appliedTags: dedupeTags([...normalizeTags(work.dlsite.appliedTags), ...applyTags]),
       };
       return true;
     },
@@ -868,24 +869,22 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
       for (let index = 0; index < targets.length; index++) {
         if (options?.signal?.aborted) return result;
         const work = targets[index]!;
-        const fetchedTags = normalizeTags([
-          "サークル/fixtureサークル",
-          "cv/fixture CV",
-          "genre/テスト",
-        ]);
+        const fetchedTags = dedupeTags(
+          normalizeTags(["サークル/fixtureサークル", "cv/fixture CV", "genre/テスト"]),
+        );
         const applyTags =
           mode === "new"
             ? fetchedTags
             : fetchedTags.filter((tag) => !work.dlsite.appliedTags.includes(tag));
         if (mode === "new") work.title = `（fixture）${work.dlsite.rjCode}`;
-        work.tags = normalizeTags([...work.tags, ...applyTags]);
+        work.tags = dedupeTags([...work.tags, ...applyTags]);
         work.dlsite = {
           ...work.dlsite,
           status: "applied",
           lastAttemptAt: new Date().toISOString(),
           error: null,
           errorKind: null,
-          appliedTags: normalizeTags([...work.dlsite.appliedTags, ...fetchedTags]),
+          appliedTags: dedupeTags([...normalizeTags(work.dlsite.appliedTags), ...fetchedTags]),
         };
         result.fetched += 1;
         options?.onProgress?.({
