@@ -1,9 +1,11 @@
 ---
 id: TASK-202
 title: splitSelectedTagsの擬似タグ判定を正規化後の値に揃える
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - impl-182
 created_date: '2026-08-05 14:52'
+updated_date: '2026-08-05 14:53'
 labels: []
 dependencies: []
 priority: high
