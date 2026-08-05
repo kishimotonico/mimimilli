@@ -1,9 +1,10 @@
 ---
 id: TASK-204
 title: タグの正規化済み不変条件をクライアント状態層まで通す
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-05 17:50'
+updated_date: '2026-08-05 20:47'
 labels: []
 dependencies:
   - TASK-203
