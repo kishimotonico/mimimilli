@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import type { FacetAxisId } from "@mimimilli/shared";
 import type { AxisId } from "../model/types";
@@ -39,48 +38,14 @@ export default function AxisQuickOverlay({
 }: AxisQuickOverlayProps) {
   const facetQuery = useAxisFacetsQuery(isOpen ? (axis as FacetAxisId) : null, selectedTags);
 
-  // ポータル先（document.body）が anchorEl（軸レール行、.mle-app 配下）と別DOM系統になる
-  // ため、外側クリック/Escape判定は anchorEl とパネル両方を境界にした独自ロジックを下で使う
-  // （onOutsideClick/onEscapeは使わない）。位置クランプ（左右・上下）は useAnchoredPopover に
-  // 委ね、panelRef をパネル要素に付けることで実サイズ変化にも追従させる。
-  const { anchorRef, panelRef, layout } = useAnchoredPopover({
+  const { anchorRef, panelRef, layout, close } = useAnchoredPopover({
     isOpen,
     preferredWidth: OVERLAY_WIDTH,
-    onOutsideClick: () => {},
-    onEscape: () => {},
+    onClose: () => onClose(),
     getContainer: (el) => el.closest(".mle-app"),
     placement: "right",
   });
   anchorRef.current = anchorEl as HTMLDivElement | null;
-
-  // 閉じるときにフォーカスがパネル内（検索欄など）にあれば軸行へ戻す（AC#4）。
-  // ホバーだけで閉じる場合はフォーカス移動と無関係のため奪わない。
-  const closeAndMaybeRefocus = () => {
-    if (panelRef.current?.contains(document.activeElement)) {
-      anchorEl?.focus();
-    }
-    onClose();
-  };
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target;
-      if (!(target instanceof Node)) return;
-      if (anchorEl?.contains(target) || panelRef.current?.contains(target)) return;
-      onClose();
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") closeAndMaybeRefocus();
-    };
-    document.addEventListener("pointerdown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- closeAndMaybeRefocus は毎レンダー新規参照のため anchorEl/onClose だけに依存を絞る
-  }, [isOpen, anchorEl, onClose]);
 
   if (!isOpen || !anchorEl) return null;
 
@@ -104,9 +69,9 @@ export default function AxisQuickOverlay({
             ctrlKey: e.ctrlKey,
             metaKey: e.metaKey,
           });
-          closeAndMaybeRefocus();
+          close();
         }}
-        onClose={closeAndMaybeRefocus}
+        close={close}
       />
     </div>,
     document.body,

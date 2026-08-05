@@ -69,16 +69,15 @@ export default function LibrarySortMenu() {
       ? `並び替え: ${currentSortLabel}`
       : "並び替え";
 
-  useEffect(() => {
-    if (disabled && sortMenuOpen) setSortMenuOpen(false);
-  }, [disabled, sortMenuOpen]);
-
-  usePopoverDismissal({
+  const { close: closeSortMenu } = usePopoverDismissal({
     isOpen: sortMenuOpen && !disabled,
-    onOutsideClick: () => setSortMenuOpen(false),
-    onEscape: () => setSortMenuOpen(false),
+    onClose: () => setSortMenuOpen(false),
     anchorRef: sortRef,
   });
+
+  useEffect(() => {
+    if (disabled && sortMenuOpen) closeSortMenu();
+  }, [disabled, sortMenuOpen, closeSortMenu]);
 
   // role=menu の期待どおり、開いたら現在値（無ければ先頭）へ初期フォーカスする。
   useEffect(() => {
@@ -114,7 +113,10 @@ export default function LibrarySortMenu() {
         aria-haspopup={disabled ? undefined : "menu"}
         aria-expanded={disabled ? undefined : sortMenuOpen}
         onClick={() => {
-          if (!disabled) setSortMenuOpen((v) => !v);
+          if (!disabled) {
+            if (sortMenuOpen) closeSortMenu();
+            else setSortMenuOpen(true);
+          }
         }}
       />
       {sortMenuOpen && !disabled && (
@@ -135,7 +137,7 @@ export default function LibrarySortMenu() {
                   className={`mle-sortmenu__item ${axisValueSort.key === opt.id ? "is-checked" : ""}`}
                   onClick={() => {
                     setAxisValueSort(selectAxisValueSortKey(axisValueSort, opt.id));
-                    setSortMenuOpen(false);
+                    closeSortMenu();
                   }}
                 >
                   <span className="check">
@@ -153,7 +155,7 @@ export default function LibrarySortMenu() {
                   className={`mle-sortmenu__item ${sort === opt.id ? "is-checked" : ""}`}
                   onClick={() => {
                     setSort(opt.id);
-                    setSortMenuOpen(false);
+                    closeSortMenu();
                   }}
                 >
                   <span className="check">{sort === opt.id && <I.check size={14} />}</span>

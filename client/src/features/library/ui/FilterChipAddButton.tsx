@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import type { TagPrefix } from "@mimimilli/shared";
 import type { AxisId } from "../model/types";
 import { buildFacetAxisRows } from "../model/axisDefinitions";
@@ -25,17 +25,20 @@ export default function FilterChipAddButton({
 }: FilterChipAddButtonProps) {
   const [open, setOpen] = useState(false);
   const [pickedAxis, setPickedAxis] = useState<AxisId | null>(null);
+  const pickedAxisRef = useRef(pickedAxis);
+  pickedAxisRef.current = pickedAxis;
 
-  const close = () => {
-    setOpen(false);
-    setPickedAxis(null);
-  };
-
-  const { anchorRef, layout } = useAnchoredPopover({
+  const { anchorRef, layout, close } = useAnchoredPopover({
     isOpen: open,
     preferredWidth: POPOVER_WIDTH,
-    onOutsideClick: close,
-    onEscape: () => (pickedAxis !== null ? setPickedAxis(null) : close()),
+    onClose: (reason) => {
+      if (reason === "escape" && pickedAxisRef.current !== null) {
+        setPickedAxis(null);
+      } else {
+        setOpen(false);
+        setPickedAxis(null);
+      }
+    },
   });
 
   const facetAxisRows = buildFacetAxisRows(tagPrefixes);
@@ -47,7 +50,7 @@ export default function FilterChipAddButton({
         className="mll-tagband__addbtn"
         aria-haspopup="menu"
         aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => (open ? close() : setOpen(true))}
       >
         <I.add size={11} />
         絞り込み
@@ -84,7 +87,7 @@ export default function FilterChipAddButton({
             onAddValue(tag, opts);
             close();
           }}
-          onClose={close}
+          close={close}
         />
       )}
     </div>

@@ -54,11 +54,9 @@ export function WorkPlayButton(props: WorkPlayButtonProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
-  const closeMenu = () => setIsMenuOpen(false);
-  usePopoverDismissal({
+  const { close: closeMenu } = usePopoverDismissal({
     isOpen: isMenuOpen,
-    onOutsideClick: closeMenu,
-    onEscape: closeMenu,
+    onClose: () => setIsMenuOpen(false),
     anchorRef: rootRef,
   });
 

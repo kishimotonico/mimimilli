@@ -34,6 +34,7 @@ import { isSmartAxis } from "../model/axisDefinitions";
 import CollectionStatus from "./CollectionStatus";
 import LoadMore from "./LoadMore";
 import WorkGridRow from "./WorkGridRow";
+import { dockedBarActiveAtom } from "../../player/model/atoms";
 
 interface WorkGridProps {
   axis: AxisId;
@@ -132,7 +133,10 @@ export default function WorkGrid({
   // useRef + useEffect だけでは DOM 出現タイミングを取り逃すため。
   const [gridEl, setGridEl] = useState<HTMLDivElement | null>(null);
   const [containerWidth, setContainerWidth] = useState(0);
-  const [paddingEnd, setPaddingEnd] = useState(GRID_PADDING_END_BASE);
+  const dockedBarActive = useAtomValue(dockedBarActiveAtom);
+  const paddingEnd = dockedBarActive
+    ? GRID_PADDING_END_BASE + GRID_DOCKED_BAR_EXTRA
+    : GRID_PADDING_END_BASE;
 
   // layout effect でマウント直後に同期測定してから初回ペイントさせる。
   // ResizeObserver のコールバックはブラウザが非同期にスケジュールするため、
@@ -147,23 +151,6 @@ export default function WorkGrid({
     observer.observe(gridEl);
     return () => observer.disconnect();
   }, [gridEl]);
-
-  // ドッキングバー表示状態を検知してスクロール終端の余白を調整する。
-  useEffect(() => {
-    const app = paneRef.current?.closest(".mle-app");
-    if (!app) return;
-    const update = () => {
-      setPaddingEnd(
-        app.classList.contains("has-docked-bar")
-          ? GRID_PADDING_END_BASE + GRID_DOCKED_BAR_EXTRA
-          : GRID_PADDING_END_BASE,
-      );
-    };
-    const observer = new MutationObserver(update);
-    observer.observe(app, { attributes: true, attributeFilter: ["class"] });
-    update();
-    return () => observer.disconnect();
-  }, []);
 
   const justifiedLayout = useMemo<JustifiedLayout | null>(() => {
     if (gridLayoutMode !== "justified" || containerWidth <= 0 || works.length === 0) return null;

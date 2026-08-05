@@ -14,7 +14,7 @@ interface AxisValuePopoverPanelProps {
   layout: PopoverLayout;
   selectedTags: string[];
   onSelect: (tag: string, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
-  onClose: () => void;
+  close: () => void;
   hint?: string;
 }
 
@@ -23,7 +23,7 @@ export default function AxisValuePopoverPanel({
   layout,
   selectedTags,
   onSelect,
-  onClose,
+  close,
   hint,
 }: AxisValuePopoverPanelProps) {
   const facetQuery = useAxisFacetsQuery(axis as FacetAxisId, selectedTags);
@@ -42,7 +42,7 @@ export default function AxisValuePopoverPanel({
         onSelect={(item, e) =>
           onSelect(buildFilterTag(axis, item.value), { ctrlKey: e.ctrlKey, metaKey: e.metaKey })
         }
-        onClose={onClose}
+        close={close}
         hint={hint}
       />
     </div>

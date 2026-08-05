@@ -26,19 +26,19 @@ export function WorkMetadataActions({
   const [isActionPopoverOpen, setIsActionPopoverOpen] = useState(false);
   const [isBookmarkSaving, setIsBookmarkSaving] = useState(false);
 
-  const closeActionPopover = () => {
-    setIsActionPopoverOpen(false);
-  };
-  const closeActionPopoverOnEscape = () => {
-    closeActionPopover();
-    onError(null);
-  };
+  const closeActionPopover = () => setIsActionPopoverOpen(false);
 
-  const { anchorRef: actionPopoverRef, layout: actionPopoverLayout } = useAnchoredPopover({
+  const {
+    anchorRef: actionPopoverRef,
+    layout: actionPopoverLayout,
+    close,
+  } = useAnchoredPopover({
     isOpen: isActionPopoverOpen,
     preferredWidth: ACTION_POPOVER_WIDTH,
-    onOutsideClick: closeActionPopover,
-    onEscape: closeActionPopoverOnEscape,
+    onClose: (reason) => {
+      closeActionPopover();
+      if (reason === "escape") onError(null);
+    },
   });
 
   const toggleBookmark = async () => {
@@ -76,7 +76,8 @@ export function WorkMetadataActions({
           active={isActionPopoverOpen}
           onClick={() => {
             onError(null);
-            setIsActionPopoverOpen((open) => !open);
+            if (isActionPopoverOpen) close();
+            else setIsActionPopoverOpen(true);
           }}
         />
         {isActionPopoverOpen && (
@@ -93,7 +94,7 @@ export function WorkMetadataActions({
                 role="menuitem"
                 className="flex min-h-7 w-full items-center gap-2 rounded-1 px-2 font-jp text-[12px] text-ink-1 hover:bg-paper-2 hover:text-ink-0 focus:bg-paper-2 focus:outline-none"
                 onClick={() => {
-                  closeActionPopover();
+                  close();
                   onShowInfo();
                 }}
               >
@@ -111,7 +112,7 @@ export function WorkMetadataActions({
                       href={u.url}
                       target="_blank"
                       rel="noreferrer"
-                      onClick={closeActionPopover}
+                      onClick={() => close()}
                     >
                       <I.ext size={13} />
                       <span className="min-w-0 flex-1 truncate">

@@ -1,8 +1,14 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { act, cleanup, render, screen } from "@testing-library/react";
+import { Provider as JotaiProvider, createStore } from "jotai";
 import userEvent from "@testing-library/user-event";
 import type { WorkListItem } from "@mimimilli/shared";
 import WorkListPane from "../../src/features/library/ui/WorkListPane";
+import {
+  PLAYER_CORE_INITIAL,
+  playerCoreAtom,
+  playerUiModeAtom,
+} from "../../src/features/player/model/atoms";
 import { clearResizeObservers, flushAllResizeObservers, mockElementSize } from "./setup";
 
 function createWorks(count: number): WorkListItem[] {
@@ -19,23 +25,38 @@ function createWorks(count: number): WorkListItem[] {
   }));
 }
 
-function renderWorkListPane(props: Partial<React.ComponentProps<typeof WorkListPane>> = {}) {
+function renderWorkListPane(
+  props: Partial<React.ComponentProps<typeof WorkListPane>> = {},
+  options?: { dockedBarActive?: boolean },
+) {
+  const store = createStore();
+  if (options?.dockedBarActive) {
+    store.set(playerCoreAtom, {
+      ...PLAYER_CORE_INITIAL,
+      currentTrackIndex: 0,
+      currentWork: createWorks(1)[0],
+    });
+    store.set(playerUiModeAtom, "bar");
+  }
+
   return render(
-    <WorkListPane
-      axis="all"
-      works={createWorks(100)}
-      worksQueryKey="key-1"
-      selectedWorkId={null}
-      searchQuery=""
-      hasSelectedTags={false}
-      playingWorkId={undefined}
-      isPlaybackActive={false}
-      hasNextPage={false}
-      onLoadMore={vi.fn()}
-      onWorkSelect={vi.fn()}
-      onClearSearch={vi.fn()}
-      {...props}
-    />,
+    <JotaiProvider store={store}>
+      <WorkListPane
+        axis="all"
+        works={createWorks(100)}
+        worksQueryKey="key-1"
+        selectedWorkId={null}
+        searchQuery=""
+        hasSelectedTags={false}
+        playingWorkId={undefined}
+        isPlaybackActive={false}
+        hasNextPage={false}
+        onLoadMore={vi.fn()}
+        onWorkSelect={vi.fn()}
+        onClearSearch={vi.fn()}
+        {...props}
+      />
+    </JotaiProvider>,
   );
 }
 
@@ -93,7 +114,23 @@ describe("WorkListPane virtual scrolling", () => {
 
   it("resets scroll position when worksQueryKey changes", async () => {
     const scrollToSpy = vi.spyOn(Element.prototype, "scrollTo").mockImplementation(() => {});
-    const { rerender } = renderWorkListPane();
+    const store = createStore();
+    const { rerender } = render(
+      <JotaiProvider store={store}>
+        <WorkListPane
+          axis="all"
+          works={createWorks(100)}
+          worksQueryKey="key-1"
+          selectedWorkId={null}
+          searchQuery=""
+          hasSelectedTags={false}
+          hasNextPage={false}
+          onLoadMore={vi.fn()}
+          onWorkSelect={vi.fn()}
+          onClearSearch={vi.fn()}
+        />
+      </JotaiProvider>,
+    );
     await act(async () => {
       await new Promise((r) => setTimeout(r, 0));
       flushAllResizeObservers({ width: 300, height: 600 });
@@ -102,18 +139,20 @@ describe("WorkListPane virtual scrolling", () => {
     const callsBefore = scrollToSpy.mock.calls.length;
 
     rerender(
-      <WorkListPane
-        axis="all"
-        works={createWorks(100)}
-        worksQueryKey="key-2"
-        selectedWorkId={null}
-        searchQuery=""
-        hasSelectedTags={false}
-        hasNextPage={false}
-        onLoadMore={vi.fn()}
-        onWorkSelect={vi.fn()}
-        onClearSearch={vi.fn()}
-      />,
+      <JotaiProvider store={store}>
+        <WorkListPane
+          axis="all"
+          works={createWorks(100)}
+          worksQueryKey="key-2"
+          selectedWorkId={null}
+          searchQuery=""
+          hasSelectedTags={false}
+          hasNextPage={false}
+          onLoadMore={vi.fn()}
+          onWorkSelect={vi.fn()}
+          onClearSearch={vi.fn()}
+        />
+      </JotaiProvider>,
     );
 
     expect(scrollToSpy.mock.calls.length).toBeGreaterThan(callsBefore);
@@ -161,5 +200,60 @@ describe("WorkListPane の件数表示", () => {
   it("worksTotal が渡されたとき、works.length ではなく worksTotal を表示する", () => {
     renderWorkListPane({ works: createWorks(50), worksTotal: 120 });
     expect(screen.getByText("120 件")).toBeTruthy();
+  });
+});
+
+describe("WorkListPane の末尾余白（docked bar）", () => {
+  let sizeMock: { restore: () => void };
+
+  beforeEach(() => {
+    sizeMock = mockElementSize(300, 600) as unknown as { restore: () => void };
+  });
+
+  afterEach(async () => {
+    cleanup();
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    });
+    sizeMock.restore();
+    clearResizeObservers();
+  });
+
+  it("docked bar 表示時は virtualizer の paddingEnd が 12px になる", async () => {
+    const works = createWorks(1);
+    const { container: withoutDocked } = renderWorkListPane({ works });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+      flushAllResizeObservers({ width: 300, height: 600 });
+    });
+    const wrapperWithout = withoutDocked.querySelector(".mle-col__list > div");
+    if (!(wrapperWithout instanceof HTMLElement)) throw new Error("wrapper not found");
+    const heightWithout = Number.parseFloat(wrapperWithout.style.height);
+
+    const { container: withDocked } = renderWorkListPane({ works }, { dockedBarActive: true });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+      flushAllResizeObservers({ width: 300, height: 600 });
+    });
+    const wrapperWith = withDocked.querySelector(".mle-col__list > div");
+    if (!(wrapperWith instanceof HTMLElement)) throw new Error("wrapper not found");
+    const heightWith = Number.parseFloat(wrapperWith.style.height);
+
+    // jsdom は flex スクロールの scrollHeight を再現しないため、paddingEnd の差は
+    // 仮想化ラッパーの style.height（= getTotalSize）で検証する。
+    expect(heightWith - heightWithout).toBe(8);
+  });
+
+  it("仮想化ラッパーに flexShrink:0 が付与される", async () => {
+    const { container } = renderWorkListPane({ works: createWorks(5) });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+      flushAllResizeObservers({ width: 300, height: 600 });
+    });
+
+    const wrapper = container.querySelector(".mle-col__list > div");
+    if (!(wrapper instanceof HTMLElement)) throw new Error("virtualized wrapper not found");
+    expect(wrapper.style.flexShrink).toBe("0");
+    expect(Number.parseFloat(wrapper.style.height)).toBeGreaterThan(0);
   });
 });

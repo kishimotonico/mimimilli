@@ -126,7 +126,14 @@ export default function AxisValueRows({
         ))}
       </div>
       <div ref={listRef} className="mle-col__list" style={{ padding: 0 }}>
-        <div style={{ position: "relative", width: "100%", height: virtualizer.getTotalSize() }}>
+        <div
+          style={{
+            position: "relative",
+            width: "100%",
+            height: virtualizer.getTotalSize(),
+            flexShrink: 0,
+          }}
+        >
           {virtualizer.getVirtualItems().map((virtualRow) => {
             const row = rows[virtualRow.index];
             if (!row) return null;

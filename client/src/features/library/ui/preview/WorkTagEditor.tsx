@@ -68,11 +68,14 @@ export function WorkTagEditor({
   } = useWorkTagEditor({ work, tagSuggestions, tagPrefixes, isPatching, onPatchWork, onError });
 
   const closeTagPopover = () => setIsTagPopoverOpen(false);
-  const { anchorRef: tagPopoverAnchorRef, layout: tagPopoverLayout } = useAnchoredPopover({
+  const {
+    anchorRef: tagPopoverAnchorRef,
+    layout: tagPopoverLayout,
+    close,
+  } = useAnchoredPopover({
     isOpen: isTagPopoverOpen,
     preferredWidth: TAG_POPOVER_WIDTH,
-    onOutsideClick: closeTagPopover,
-    onEscape: closeTagPopover,
+    onClose: () => closeTagPopover(),
     boundaryRef: tagEditorRef,
   });
   const isNarrowTagPane = tagPopoverLayout.containerWidth < NARROW_TAG_PANE_PX;
@@ -82,7 +85,7 @@ export function WorkTagEditor({
     expanded || areAllTagsVisible ? sortedTags : sortedTags.slice(0, COLLAPSED_TAG_LIMIT);
 
   const selectTag = (tag: string) => {
-    closeTagPopover();
+    close();
     void addTag(tag);
   };
 
@@ -98,7 +101,7 @@ export function WorkTagEditor({
     disabled: isTagSaving || isPatching,
     canCreate: (tag: string) => normalizeTag(tag) !== null,
     onSelect: selectTag,
-    onCancel: closeTagPopover,
+    onCancel: close,
   };
 
   return (
@@ -152,7 +155,8 @@ export function WorkTagEditor({
                 disabled={isTagSaving || isPatching}
                 onClick={() => {
                   onError(null);
-                  setIsTagPopoverOpen((open) => !open);
+                  if (isTagPopoverOpen) close();
+                  else setIsTagPopoverOpen(true);
                 }}
               />
               {isTagPopoverOpen && !isNarrowTagPane && (

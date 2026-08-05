@@ -5,6 +5,7 @@ import {
   toWorkListItem,
   type Work,
   type WorkListItem,
+  type WorkPatchInput,
 } from "@mimimilli/shared";
 import { librarySearchQueryAtom, libraryViewModeAtom } from "../model/atoms";
 import {
@@ -153,6 +154,11 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
     [nav.selectSoleTag],
   );
 
+  const handlePatchWork = useCallback(
+    (body: WorkPatchInput) => patchWorkMutation.mutateAsync({ workId: nav.selectedWorkId!, body }),
+    [patchWorkMutation, nav.selectedWorkId],
+  );
+
   const handleEditSmartFolder = useCallback(() => {
     if (!activeSmartFolder) return;
     saveSmartFolderMutation.reset();
@@ -169,7 +175,10 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
         isTagPrefixesError={isTagPrefixesError}
         onRetryTagPrefixes={refetchTagPrefixes}
         smartFolders={smartFolders}
+        selectedTags={nav.selectedTags}
         onSelectAxis={nav.setAxis}
+        onToggleTag={nav.toggleTag}
+        onReplaceTag={nav.replaceTag}
         onNewSmartFolder={() => {
           saveSmartFolderMutation.reset();
           setSmartFolderEditor(createSmartFolderEditorState);
@@ -195,12 +204,7 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
           onTagClick={handleTagClick}
           tagSuggestions={tagSuggestions}
           isPatching={patchWorkMutation.isPending}
-          onPatchWork={(body) => {
-            if (!selectedWork) {
-              return Promise.reject(new Error("更新対象の作品が選択されていません"));
-            }
-            return patchWorkMutation.mutateAsync({ workId: selectedWork.id, body });
-          }}
+          onPatchWork={handlePatchWork}
         />
       ) : (
         <div className="mll-resultspane">
@@ -327,12 +331,7 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
                         onTagClick={handleTagClick}
                         tagSuggestions={tagSuggestions}
                         isPatching={patchWorkMutation.isPending}
-                        onPatchWork={(body) => {
-                          if (!selectedWork) {
-                            return Promise.reject(new Error("更新対象の作品が選択されていません"));
-                          }
-                          return patchWorkMutation.mutateAsync({ workId: selectedWork.id, body });
-                        }}
+                        onPatchWork={handlePatchWork}
                       />
                     </Presence>
                   </div>

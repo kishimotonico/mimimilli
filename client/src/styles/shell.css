@@ -556,11 +556,8 @@
     flex-direction: column;
     gap: 1px;
   }
-  /* バー本体との重なりは .mle-body の padding-bottom で解消済み。ここでは
-   スクロール終端の視覚的な余白だけを少し足す。 */
-  .mle-app.has-docked-bar .mle-col__list {
-    padding-bottom: 12px;
-  }
+  /* バー本体との重なりは .mle-body の padding-bottom で解消済み。リスト末尾の
+   スクロール余白は WorkListPane の virtualizer paddingEnd で確保する。 */
   .mle-col__list::-webkit-scrollbar {
     width: 6px;
   }
