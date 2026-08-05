@@ -164,7 +164,7 @@ test("保持中フィルタ: tags はフォルダーのルールに対する追�
   assert.equal(result.total, 1);
 });
 
-test("保持中フィルタ: axis=year（組み込み軸）もルールに対する追加のAND条件として適用する", () => {
+test("保持中フィルタ: @year/... 擬似タグ（組み込み軸）もルールに対する追加のAND条件として適用する", () => {
   const yearWorks: WorkSummary[] = [
     work({ id: "RJ010", tags: ["ASMR"], addedAt: "2024-05-01T00:00:00.000Z" }),
     work({ id: "RJ011", tags: ["ASMR"], addedAt: "2025-05-01T00:00:00.000Z" }),
@@ -172,8 +172,7 @@ test("保持中フィルタ: axis=year（組み込み軸）もルールに対す
   const result = evalSmartFolder({ rules: [], sort: "added-desc" }, yearWorks, {
     page: 1,
     limit: 100,
-    axis: "year",
-    axisValue: "2025",
+    tags: ["@year/2025"],
   });
   assert.deepEqual(
     result.items.map((w) => w.id),

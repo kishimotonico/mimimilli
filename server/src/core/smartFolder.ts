@@ -6,8 +6,9 @@ import { tagEquals } from "@mimimilli/shared";
 import {
   computeCollectionStats,
   createRandomSeed,
-  filterByAxis,
   filterByTags,
+  filterByYear,
+  resolveTagFilters,
   sortWorkSummaries,
 } from "./worksQuery.ts";
 
@@ -64,7 +65,8 @@ export function evalSmartFolderRules(
 }
 
 /** 保存済みルールと sort を一体で評価し、ページングエンベロープを返す。
- *  tags/axis はルールに対する追加の AND 条件として適用する（ADR-0012、TASK-185）。
+ *  tags はルールに対する追加の AND 条件として適用する（ADR-0012、TASK-185）。組み込み軸の
+ *  擬似タグ（@year/... 等）も tags に混ざり、resolveTagFilters が一度だけ解釈する（TASK-199）。
  *  total はソート後・ページング前の評価結果件数。random ソート時は seed を発行・継承する。 */
 export function evalSmartFolder(
   folder: Pick<SmartFolder, "rules" | "sort">,
@@ -75,14 +77,13 @@ export function evalSmartFolder(
     seed?: number;
     tags?: string[];
     tagOp?: "AND" | "OR";
-    axis?: string;
-    axisValue?: string;
   },
 ): WorkSummaryPage {
   const seed = folder.sort === "random" ? (query.seed ?? createRandomSeed()) : undefined;
+  const { tags, yearValue } = resolveTagFilters(query.tags ?? []);
   let matched = evalSmartFolderRules(folder.rules, works);
-  matched = filterByTags(matched, query.tags ?? [], query.tagOp ?? "AND");
-  matched = filterByAxis(matched, query.axis, query.axisValue);
+  matched = filterByTags(matched, tags, query.tagOp ?? "AND");
+  matched = filterByYear(matched, yearValue);
   matched = sortWorkSummaries(matched, folder.sort, seed);
 
   const total = matched.length;

@@ -58,8 +58,6 @@ export function smartFoldersRoute(adapter: DataAdapter): Hono {
       seed: parsed.data.seed,
       tags: parsed.data.tags,
       tagOp: parsed.data.tagOp,
-      axis: parsed.data.axis,
-      axisValue: parsed.data.axisValue,
     });
     if (!page) notFound(`スマートフォルダーが見つかりません: ${c.req.param("id")}`);
     return c.json(page);

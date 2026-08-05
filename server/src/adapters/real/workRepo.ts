@@ -14,6 +14,7 @@ import {
   resolveTrackDuration,
   resolveTrackDurationSec,
   smartFolderSchema,
+  splitSelectedTags,
   tagPrefixSchema,
   toTrackDurationFields,
   workSchema,
@@ -749,14 +750,15 @@ export class WorkRepo {
    * タグ AND/OR・組み込み軸（year等）の絞り込み条件を EXISTS 述語として組み立てる。
    * queryWorks（GET /works・スマートフォルダー評価）と getAxisFacets（GET /axes/:axis、
    * TASK-187 の自軸除外カウント）で同じ絞り込み意味論を共有するための共通実装。
+   * tags には組み込み軸の擬似タグ（"@year/2024" 等）が混ざり得るため、呼び出し側が
+   * splitSelectedTags で実タグと yearValue へ分解してから渡す（ADR-0012 §2、TASK-199）。
    * works.id / work_states.added_at を参照するため、呼び出し元の FROM 句は
    * main.works と user.work_states（エイリアス work_states）を JOIN 済みである前提。
    */
   private static tagAxisConditions(
     tags: string[],
     tagOp: "AND" | "OR",
-    axis: string | undefined,
-    axisValue: string | undefined,
+    yearValue: string | null,
   ): { conditions: string[]; bindings: Array<string | number> } {
     const conditions: string[] = [];
     const bindings: Array<string | number> = [];
@@ -786,19 +788,9 @@ export class WorkRepo {
       }
     }
 
-    if (axis && axisValue) {
-      if (axis === "year") {
-        conditions.push("substr(work_states.added_at, 1, 4) = ?");
-        bindings.push(axisValue);
-      } else {
-        conditions.push(`EXISTS (
-          SELECT 1
-          FROM main.work_tags AS axis_work_tags
-          INNER JOIN main.tags AS axis_tags ON axis_tags.id = axis_work_tags.tag_id
-          WHERE axis_work_tags.work_id = works.id AND axis_tags.name = ?
-        )`);
-        bindings.push(`${axis}/${axisValue}`);
-      }
+    if (yearValue !== null) {
+      conditions.push("substr(work_states.added_at, 1, 4) = ?");
+      bindings.push(yearValue);
     }
 
     return { conditions, bindings };
@@ -847,12 +839,8 @@ export class WorkRepo {
       if (rjKey) bindings.push(rjKey);
     }
 
-    const tagAxis = WorkRepo.tagAxisConditions(
-      params.tags,
-      params.tagOp,
-      params.axis,
-      params.axisValue,
-    );
+    const { tags: realTags, yearValue } = splitSelectedTags(params.tags);
+    const tagAxis = WorkRepo.tagAxisConditions(realTags, params.tagOp, yearValue);
     conditions.push(...tagAxis.conditions);
     bindings.push(...tagAxis.bindings);
 
@@ -1186,12 +1174,8 @@ export class WorkRepo {
    *  自軸由来のフィルタを除いた集合を渡すのは呼び出し側の責務）。0件になった値は
    *  GROUP BY の結果に現れないため、自然に一覧から除外される。 */
   getAxisFacets(axis: string, filter: AxisFacetsFilter = {}): AxisFacetItem[] {
-    const tagAxis = WorkRepo.tagAxisConditions(
-      filter.tags ?? [],
-      filter.tagOp ?? "AND",
-      filter.axis,
-      filter.axisValue,
-    );
+    const { tags: realTags, yearValue } = splitSelectedTags(filter.tags ?? []);
+    const tagAxis = WorkRepo.tagAxisConditions(realTags, filter.tagOp ?? "AND", yearValue);
     const filterWhere =
       tagAxis.conditions.length > 0 ? `WHERE ${tagAxis.conditions.join(" AND ")}` : "";
 

@@ -4,17 +4,16 @@
 import { parseTag } from "@mimimilli/shared";
 import type { AxisFacetItem, WorkSummary } from "@mimimilli/shared";
 import { compareJapaneseSortKeys, compareUtf8Bytes } from "./japaneseSortKey.ts";
-import { filterByAxis, filterByTags } from "./worksQuery.ts";
+import { filterByTags, filterByYear, resolveTagFilters } from "./worksQuery.ts";
 
 /** 代表カバーとして残す最大件数（値一覧の2×2コラージュ用、ADR-0012 §5） */
 const MAX_COVERS = 4;
 
-/** GET /axes/:axis の絞り込み。自軸由来のフィルタを除いた集合を渡すのは呼び出し側の責務（TASK-187） */
+/** GET /axes/:axis の絞り込み。組み込み軸の擬似タグ（@year/... 等）も tags に混ざる
+ *  （ADR-0012 §2、TASK-199）。自軸由来のフィルタを除いた集合を渡すのは呼び出し側の責務（TASK-187） */
 export interface AxisFacetsFilterInput {
   tags?: string[];
   tagOp?: "AND" | "OR";
-  axis?: string;
-  axisValue?: string;
 }
 
 /** 指定された分類軸について、works から値ごとの件数・総時間・代表カバーを集計し count 降順で返す。
@@ -25,12 +24,9 @@ export function buildAxisFacets(
   works: WorkSummary[],
   filter?: AxisFacetsFilterInput,
 ): AxisFacetItem[] {
+  const { tags, yearValue } = resolveTagFilters(filter?.tags ?? []);
   const filteredWorks = filter
-    ? filterByAxis(
-        filterByTags(works, filter.tags ?? [], filter.tagOp ?? "AND"),
-        filter.axis,
-        filter.axisValue,
-      )
+    ? filterByYear(filterByTags(works, tags, filter.tagOp ?? "AND"), yearValue)
     : works;
 
   const membersByValue = new Map<string, WorkSummary[]>();

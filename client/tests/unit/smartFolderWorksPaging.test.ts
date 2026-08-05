@@ -226,14 +226,14 @@ describe("スマートフォルダー軸への保持中フィルタの適用", (
     expect(urls.some((u) => u.includes("tags=cv%2F") && u.includes("tagOp=AND"))).toBe(true);
   });
 
-  it("選択中の year 擬似タグを axis/axisValue としてクエリに渡す", async () => {
+  it("選択中の year 擬似タグも tags としてクエリに渡す（サーバー側で解釈する）", async () => {
     const nav: LibraryViewState = { ...baseNav, selectedTags: ["@year/2024"] };
     const { result } = renderWorks(nav);
 
     await waitFor(() => expect(result.current.works.length).toBeGreaterThan(0));
 
     const urls = smartFolderCallUrls(fetchMock);
-    expect(urls.some((u) => u.includes("axis=year") && u.includes("axisValue=2024"))).toBe(true);
+    expect(urls.some((u) => u.includes("tags=%40year%2F2024"))).toBe(true);
   });
 
   it("フィルタが変わるとクエリキーが変わり、別クエリとしてフェッチし直す（キャッシュ分離）", async () => {

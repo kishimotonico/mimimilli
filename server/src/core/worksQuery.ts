@@ -1,5 +1,5 @@
 // 作品検索（GET /api/works）の純粋関数。
-import { parseTag, tagEquals } from "@mimimilli/shared";
+import { splitSelectedTags, tagEquals } from "@mimimilli/shared";
 import type {
   CollectionStats,
   SortId,
@@ -35,9 +35,10 @@ export function computeCollectionStats(works: WorkSummary[]): CollectionStats {
 export function applyWorksQuery(works: WorkSummary[], params: WorksQuery): WorkSummaryPage {
   let results = [...works];
 
+  const { tags, yearValue } = resolveTagFilters(params.tags);
   results = filterByQuery(results, params.q);
-  results = filterByTags(results, params.tags, params.tagOp);
-  results = filterByAxis(results, params.axis, params.axisValue);
+  results = filterByTags(results, tags, params.tagOp);
+  results = filterByYear(results, yearValue);
   results = filterByView(results, params.view);
   const seed = params.sort === "random" ? (params.seed ?? createRandomSeed()) : undefined;
   results = sortWorkSummaries(results, params.sort, seed);
@@ -102,22 +103,19 @@ export function filterByTags(
   );
 }
 
-// 軸ドリル。"year" は addedAt の年、それ以外は prefix 軸としてタグの完全一致（ADR-0005）
-export function filterByAxis(
-  works: WorkSummary[],
-  axis: WorksQuery["axis"],
-  axisValue: WorksQuery["axisValue"],
-): WorkSummary[] {
-  if (!axis || !axisValue) return works;
-  if (axis === "year") {
-    return works.filter((work) => work.addedAt.slice(0, 4) === axisValue);
-  }
-  return works.filter((work) =>
-    work.tags.some((tag) => {
-      const parsed = parseTag(tag);
-      return parsed.kind === "annotated" && parsed.prefix === axis && parsed.value === axisValue;
-    }),
-  );
+/** tags に混ざる組み込み軸の擬似タグ（"@year/2024" 等）を、実タグ AND 条件と year 値へ
+ *  一度だけ解釈する共通入口（ADR-0012 §2）。queryWorks・evalSmartFolder・getAxisFacets が
+ *  同じ実装（shared/pseudoTag.ts）を共有する。不正な入力（未知の組み込み軸・複数の year等）は
+ *  splitSelectedTags が黙って落とさず除外する。 */
+export function resolveTagFilters(tags: string[]): { tags: string[]; yearValue: string | null } {
+  const { tags: realTags, yearValue } = splitSelectedTags(tags);
+  return { tags: realTags, yearValue };
+}
+
+/** 組み込み軸 year（addedAt の年）での絞り込み。実タグとの衝突を避けるため擬似タグ経由でのみ渡る */
+export function filterByYear(works: WorkSummary[], yearValue: string | null): WorkSummary[] {
+  if (yearValue === null) return works;
+  return works.filter((work) => work.addedAt.slice(0, 4) === yearValue);
 }
 
 function filterByView(works: WorkSummary[], view: WorksQuery["view"]): WorkSummary[] {

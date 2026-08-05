@@ -181,7 +181,7 @@ test("GET /api/axes/:axis にスラッシュ入りの軸を渡すと400", async 
   assert.equal(body.error.code, "invalid_request");
 });
 
-test("GET /api/axes/:axis は tags/tagOp/axis/axisValue を絞り込みとしてadapterへ渡す（TASK-187）", async () => {
+test("GET /api/axes/:axis は tags/tagOp を絞り込みとしてadapterへ渡す。組み込み軸の擬似タグも tags に含まれる（TASK-187, TASK-199）", async () => {
   const adapter = createFixtureAdapter();
   let receivedFilter: unknown;
   adapter.getAxisFacets = async (_axis, filter) => {
@@ -190,14 +190,12 @@ test("GET /api/axes/:axis は tags/tagOp/axis/axisValue を絞り込みとして
   };
   const app = createApp(adapter);
   const res = await app.request(
-    "/api/axes/cv?tags=ASMR&tags=%E5%82%AC%E7%9C%A0&tagOp=OR&axis=year&axisValue=2024",
+    "/api/axes/cv?tags=ASMR&tags=%E5%82%AC%E7%9C%A0&tags=%40year%2F2024&tagOp=OR",
   );
   assert.equal(res.status, 200);
   assert.deepEqual(receivedFilter, {
-    tags: ["ASMR", "催眠"],
+    tags: ["ASMR", "催眠", "@year/2024"],
     tagOp: "OR",
-    axis: "year",
-    axisValue: "2024",
   });
 });
 

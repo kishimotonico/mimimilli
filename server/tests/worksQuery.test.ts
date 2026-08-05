@@ -155,25 +155,24 @@ test("tags: prefix の大文字小文字は無視して一致する", () => {
   assert.deepEqual(result.items.map((w) => w.id).sort(), ["RJ001", "RJ003"]);
 });
 
-test("axis+axisValue: prefix 軸はタグの完全一致でドリルする", () => {
-  const result = applyWorksQuery(WORKS, baseQuery({ axis: "cv", axisValue: "水瀬なずな" }));
-  assert.deepEqual(result.items.map((w) => w.id).sort(), ["RJ001", "RJ003"]);
-});
-
-test("axis+axisValue: 値の部分一致ではドリルにヒットしない", () => {
-  const result = applyWorksQuery(WORKS, baseQuery({ axis: "cv", axisValue: "水瀬" }));
-  assert.equal(result.items.length, 0);
-});
-
-test("axis+axisValue: year 軸は addedAt の年で絞り込む（タグ照合ではない）", () => {
+test("tags: @year/... 擬似タグは addedAt の年で絞り込む（タグ照合ではない、ADR-0012 §2）", () => {
   const year = RECENT.slice(0, 4);
-  const result = applyWorksQuery(WORKS, baseQuery({ axis: "year", axisValue: year }));
+  const result = applyWorksQuery(WORKS, baseQuery({ tags: [`@year/${year}`] }));
   assert.ok(result.items.length > 0);
   for (const work of result.items) {
     assert.equal(work.addedAt.slice(0, 4), year);
   }
-  const none = applyWorksQuery(WORKS, baseQuery({ axis: "year", axisValue: "1999" }));
+  const none = applyWorksQuery(WORKS, baseQuery({ tags: ["@year/1999"] }));
   assert.equal(none.items.length, 0);
+});
+
+test("tags: 実タグと @year/... 擬似タグを同時に指定すると両方AND適用される", () => {
+  const year = RECENT.slice(0, 4);
+  const result = applyWorksQuery(WORKS, baseQuery({ tags: ["cv/水瀬なずな", `@year/${year}`] }));
+  for (const work of result.items) {
+    assert.equal(work.addedAt.slice(0, 4), year);
+    assert.ok(work.tags.some((tag) => tag.toLowerCase() === "cv/水瀬なずな".toLowerCase()));
+  }
 });
 
 test("view: fav はブックマーク済みのみ", () => {
@@ -335,12 +334,12 @@ test("ページング: 全sortでページ連結が全件と一致する（重�
   }
 });
 
-test("ページング: 検索・タグAND/OR・軸・viewでもページ連結がフィルタ結果と一致する", () => {
+test("ページング: 検索・タグAND/OR・year擬似タグ・viewでもページ連結がフィルタ結果と一致する", () => {
   const cases: Array<[string, Partial<WorksQuery>]> = [
     ["検索", { q: "ASMR" }],
     ["タグAND", { tags: ["cv/水瀬なずな", "ASMR"], tagOp: "AND" }],
     ["タグOR", { tags: ["cv/水瀬なずな", "cv/霧島レイ"], tagOp: "OR" }],
-    ["軸", { axis: "cv", axisValue: "水瀬なずな" }],
+    ["year擬似タグ", { tags: [`@year/${new Date().getFullYear()}`] }],
     ["view:fav", { view: "fav" }],
     ["view:missing", { view: "missing" }],
     ["view:unplayed", { view: "unplayed" }],

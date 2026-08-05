@@ -1,9 +1,11 @@
 ---
 id: TASK-199
 title: works検索からaxis/axisValueを廃止しフィルタをタグ経路へ一本化する
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - impl-182
 created_date: '2026-08-05 10:57'
+updated_date: '2026-08-05 12:14'
 labels: []
 dependencies:
   - TASK-198
@@ -48,11 +50,11 @@ shared の契約・server・client・スマートフォルダー経路にまた�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 worksQuerySchema と adapter の型から axis / axisValue が削除されている
-- [ ] #2 組み込み軸のフィルタがサーバー側で tags 内の擬似タグとして一度だけ解釈される
-- [ ] #3 filterByAxis の到達不能だった prefix 軸分岐と、片方のみ指定時の全件フォールバックが無くなっている
-- [ ] #4 スマートフォルダー評価も同じ契約で動く
-- [ ] #5 real と fixture の同値契約テストが移行後の契約で通る
-- [ ] #6 year 軸での絞り込みが従来どおり動作することを実機で確認している
-- [ ] #7 pnpm check と pnpm test と pnpm test:visual が通る
+- [x] #1 worksQuerySchema と adapter の型から axis / axisValue が削除されている
+- [x] #2 組み込み軸のフィルタがサーバー側で tags 内の擬似タグとして一度だけ解釈される
+- [x] #3 filterByAxis の到達不能だった prefix 軸分岐と、片方のみ指定時の全件フォールバックが無くなっている
+- [x] #4 スマートフォルダー評価も同じ契約で動く
+- [x] #5 real と fixture の同値契約テストが移行後の契約で通る
+- [x] #6 year 軸での絞り込みが従来どおり動作することを実機で確認している
+- [x] #7 pnpm check と pnpm test と pnpm test:visual が通る
 <!-- AC:END -->

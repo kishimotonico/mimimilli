@@ -7,7 +7,6 @@ import {
   isBuiltinPseudoTagAxis,
   parseBuiltinAxisTag,
   parseTag,
-  splitSelectedTags,
   type CollectionStats,
   type FacetAxisId,
 } from "@mimimilli/shared";
@@ -93,28 +92,18 @@ interface WorksParamsInput {
   selectedTags: string[];
 }
 
-/** selectedTagsAtom から実タグ AND 条件・組み込み軸フィルタを取り出し、works query の
- *  フィールドへ変換する。通常の works query（buildWorksParams）とスマートフォルダー評価
- *  （buildSmartFolderFilterParams）で共通のロジック。 */
+/** selectedTagsAtom（組み込み軸の擬似タグ混じり）を works query の tags フィールドへ変換する。
+ *  通常の works query（buildWorksParams）とスマートフォルダー評価（buildSmartFolderFilterParams）
+ *  で共通のロジック。組み込み軸（year等）専用のクエリパラメータは持たない（ADR-0012 §2）。
+ *  擬似タグの解釈（実タグ／yearへの分解）はサーバー側の共通フィルタ解釈層が一度だけ行う
+ *  （shared/pseudoTag.ts、TASK-199） */
 interface TagFilterParams {
   tags?: string[];
   tagOp?: "AND";
-  axis?: "year";
-  axisValue?: string;
 }
 
 function buildTagFilterParams(selectedTags: string[]): TagFilterParams {
-  const { tags, yearValue } = splitSelectedTags(selectedTags);
-  const params: TagFilterParams = {};
-  if (tags.length > 0) {
-    params.tags = tags;
-    params.tagOp = "AND";
-  }
-  if (yearValue !== null) {
-    params.axis = "year";
-    params.axisValue = yearValue;
-  }
-  return params;
+  return selectedTags.length > 0 ? { tags: selectedTags, tagOp: "AND" } : {};
 }
 
 /** works 種の結果面（ビュー軸・スマートフォルダー軸）以外は works query を発行しない。

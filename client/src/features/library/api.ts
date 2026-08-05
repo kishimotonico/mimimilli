@@ -38,8 +38,6 @@ export async function searchWorks(
   if (params.q) p.set("q", params.q);
   for (const tag of params.tags ?? []) p.append("tags", tag);
   if (params.tagOp) p.set("tagOp", params.tagOp);
-  if (params.axis) p.set("axis", params.axis);
-  if (params.axisValue) p.set("axisValue", params.axisValue);
   if (params.view) p.set("view", params.view);
   if (params.sort) p.set("sort", params.sort);
   if (params.seed !== undefined) p.set("seed", String(params.seed));
@@ -51,12 +49,10 @@ export async function searchWorks(
 
 // ── 分類軸ファセット ───────────────────────────────────────────
 
-/** 自軸除外後のフィルタ。フォルダー評価API同様 tags/tagOp/axis/axisValue を渡す */
+/** 自軸除外後のフィルタ。フォルダー評価API同様 tags/tagOp を渡す */
 export interface AxisFacetsParams {
   tags?: string[];
   tagOp?: "AND" | "OR";
-  axis?: string;
-  axisValue?: string;
 }
 
 export async function getAxisFacets(
@@ -66,8 +62,6 @@ export async function getAxisFacets(
   const p = new URLSearchParams();
   for (const tag of filter.tags ?? []) p.append("tags", tag);
   if (filter.tagOp) p.set("tagOp", filter.tagOp);
-  if (filter.axis) p.set("axis", filter.axis);
-  if (filter.axisValue) p.set("axisValue", filter.axisValue);
   const q = p.toString();
   return getParsed(axisFacetListSchema, `/axes/${encodeURIComponent(axis)}${q ? `?${q}` : ""}`);
 }
@@ -112,15 +106,13 @@ export async function deleteSmartFolder(id: string): Promise<void> {
   await deleteVoid(`/smart-folders/${encodeURIComponent(id)}`);
 }
 
-/** tags/axis はフォルダーのルールに対する追加の AND 条件（ADR-0012） */
+/** tags はフォルダーのルールに対する追加の AND 条件（ADR-0012） */
 export interface SmartFolderWorksParams {
   page: number;
   limit: number;
   seed?: number;
   tags?: string[];
   tagOp?: "AND" | "OR";
-  axis?: string;
-  axisValue?: string;
 }
 
 export async function evalSmartFolder(
@@ -131,8 +123,6 @@ export async function evalSmartFolder(
   const p = new URLSearchParams();
   for (const tag of params.tags ?? []) p.append("tags", tag);
   if (params.tagOp) p.set("tagOp", params.tagOp);
-  if (params.axis) p.set("axis", params.axis);
-  if (params.axisValue) p.set("axisValue", params.axisValue);
   if (params.seed !== undefined) p.set("seed", String(params.seed));
   p.set("page", String(params.page));
   p.set("limit", String(params.limit));

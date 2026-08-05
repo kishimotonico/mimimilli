@@ -180,13 +180,13 @@ test("buildAxisFacets: filter を渡すと AND 条件として絞り込んだ集
   ]);
 });
 
-test("buildAxisFacets: filter の axis=year も追加のAND条件として適用する", () => {
+test("buildAxisFacets: filter の @year/... 擬似タグも追加のAND条件として適用する", () => {
   const works = [
     summaryWith("W1", ["cv/藤田茜"], "2024-06-01T00:00:00.000Z"),
     summaryWith("W2", ["cv/藤田茜"], "2025-06-01T00:00:00.000Z"),
     summaryWith("W3", ["cv/霧島レイ"], "2025-06-01T00:00:00.000Z"),
   ];
-  assert.deepEqual(buildAxisFacets("cv", works, { axis: "year", axisValue: "2025" }), [
+  assert.deepEqual(buildAxisFacets("cv", works, { tags: ["@year/2025"] }), [
     { value: "藤田茜", count: 1, durationSec: 0, covers: [] },
     { value: "霧島レイ", count: 1, durationSec: 0, covers: [] },
   ]);

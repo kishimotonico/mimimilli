@@ -4,7 +4,8 @@ import type { SmartFolderEvalQuery } from "../../adapter.ts";
 import type { WorkRepo } from "./workRepo.ts";
 
 /** GET /api/smart-folders/:id/works の real 評価経路（ADR-0008）。
- *  tags/axis はフォルダーのルールに対する追加の AND 条件として適用する（TASK-185）。 */
+ *  tags はフォルダーのルールに対する追加の AND 条件として適用する（TASK-185）。組み込み軸の
+ *  擬似タグ（@year/... 等）も tags に混ざり、repo.queryWorks 内で解釈する（TASK-199）。 */
 export function querySmartFolderWorks(
   repo: WorkRepo,
   folder: Pick<SmartFolder, "rules" | "sort">,
@@ -15,8 +16,6 @@ export function querySmartFolderWorks(
       q: "",
       tags: query.tags ?? [],
       tagOp: query.tagOp ?? "AND",
-      axis: query.axis,
-      axisValue: query.axisValue,
       sort: folder.sort,
       page: query.page,
       limit: query.limit,

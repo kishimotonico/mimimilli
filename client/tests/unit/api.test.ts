@@ -409,16 +409,14 @@ describe("library api", () => {
     expect(result).toEqual(mockFacets);
   });
 
-  it("getAxisFacets は自軸除外後のフィルタ（tags/tagOp/axis/axisValue）をクエリへ渡す", async () => {
+  it("getAxisFacets は自軸除外後のフィルタ（tags/tagOp）をクエリへ渡す。組み込み軸の擬似タグも tags に含まれる", async () => {
     mockFetch.mockResolvedValue(makeResponse([]));
     await libraryApi.getAxisFacets("cv", {
-      tags: ["サークル/月白製作所"],
+      tags: ["サークル/月白製作所", "@year/2024"],
       tagOp: "AND",
-      axis: "year",
-      axisValue: "2024",
     });
     expect(mockFetch).toHaveBeenCalledWith(
-      "/api/axes/cv?tags=%E3%82%B5%E3%83%BC%E3%82%AF%E3%83%AB%2F%E6%9C%88%E7%99%BD%E8%A3%BD%E4%BD%9C%E6%89%80&tagOp=AND&axis=year&axisValue=2024",
+      "/api/axes/cv?tags=%E3%82%B5%E3%83%BC%E3%82%AF%E3%83%AB%2F%E6%9C%88%E7%99%BD%E8%A3%BD%E4%BD%9C%E6%89%80&tags=%40year%2F2024&tagOp=AND",
     );
   });
 
@@ -446,20 +444,18 @@ describe("library api", () => {
     expect(result).toEqual(mockPage);
   });
 
-  it("evalSmartFolder は tags/axis（保持中フィルタ）もクエリへ渡す", async () => {
+  it("evalSmartFolder は tags（保持中フィルタ）もクエリへ渡す。組み込み軸の擬似タグも tags に含まれる", async () => {
     mockFetch.mockResolvedValue(
       makeResponse({ items: [], total: 0, stats: { trackCount: 0, durationSec: 0 } }),
     );
     await libraryApi.evalSmartFolder("sf-1", {
       page: 1,
       limit: 200,
-      tags: ["cv/藤田茜", "ASMR"],
+      tags: ["cv/藤田茜", "ASMR", "@year/2024"],
       tagOp: "AND",
-      axis: "year",
-      axisValue: "2024",
     });
     expect(mockFetch).toHaveBeenCalledWith(
-      "/api/smart-folders/sf-1/works?tags=cv%2F%E8%97%A4%E7%94%B0%E8%8C%9C&tags=ASMR&tagOp=AND&axis=year&axisValue=2024&page=1&limit=200",
+      "/api/smart-folders/sf-1/works?tags=cv%2F%E8%97%A4%E7%94%B0%E8%8C%9C&tags=ASMR&tags=%40year%2F2024&tagOp=AND&page=1&limit=200",
     );
   });
 

@@ -134,7 +134,7 @@ describe("buildWorksParams", () => {
     });
   });
 
-  it("resolves a year pseudo-tag as the built-in axis/axisValue query (ADR-0012 §2)", () => {
+  it("passes a year pseudo-tag through in tags as-is; the server interprets it (ADR-0012 §2, TASK-199)", () => {
     expect(
       buildWorksParams({
         activeAxis: "all",
@@ -142,10 +142,10 @@ describe("buildWorksParams", () => {
         searchQuery: "",
         selectedTags: ["@year/2024"],
       }),
-    ).toEqual({ sort: "added-desc", axis: "year", axisValue: "2024" });
+    ).toEqual({ sort: "added-desc", tags: ["@year/2024"], tagOp: "AND" });
   });
 
-  it("combines a real tag filter and a year pseudo-tag filter together", () => {
+  it("combines a real tag filter and a year pseudo-tag filter together in tags", () => {
     expect(
       buildWorksParams({
         activeAxis: "all",
@@ -155,10 +155,8 @@ describe("buildWorksParams", () => {
       }),
     ).toEqual({
       sort: "added-desc",
-      tags: ["cv/藤田茜"],
+      tags: ["cv/藤田茜", "@year/2024"],
       tagOp: "AND",
-      axis: "year",
-      axisValue: "2024",
     });
   });
 
@@ -184,18 +182,16 @@ describe("buildSmartFolderFilterParams（スマートフォルダー評価APIへ
       tagOp: "AND",
     });
   });
-  it("year 擬似タグは axis/axisValue として渡す", () => {
+  it("year 擬似タグも tags にそのまま渡す（サーバー側で解釈する、TASK-199）", () => {
     expect(buildSmartFolderFilterParams(["@year/2024"])).toEqual({
-      axis: "year",
-      axisValue: "2024",
+      tags: ["@year/2024"],
+      tagOp: "AND",
     });
   });
   it("実タグとyear擬似タグを同時に渡せる", () => {
     expect(buildSmartFolderFilterParams(["cv/藤田茜", "@year/2024"])).toEqual({
-      tags: ["cv/藤田茜"],
+      tags: ["cv/藤田茜", "@year/2024"],
       tagOp: "AND",
-      axis: "year",
-      axisValue: "2024",
     });
   });
 });
@@ -332,12 +328,10 @@ describe("buildAxisFacetFilterParams（自軸除外カウント）", () => {
     });
   });
 
-  it("他軸を見ているときは year 擬似タグを axis/axisValue として残す", () => {
+  it("他軸を見ているときは year 擬似タグも tags に残す（サーバー側で解釈する）", () => {
     expect(buildAxisFacetFilterParams("cv", ["@year/2024", "サークル/月白製作所"])).toEqual({
-      tags: ["サークル/月白製作所"],
+      tags: ["@year/2024", "サークル/月白製作所"],
       tagOp: "AND",
-      axis: "year",
-      axisValue: "2024",
     });
   });
 

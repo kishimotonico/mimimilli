@@ -48,25 +48,24 @@ export interface ScanOptions {
   beforeFinalize?: () => void;
 }
 
-/** GET /smart-folders/:id/works のクエリ。tags/axis はフォルダーのルールに対する
- *  追加の AND 条件として適用する（TASK-185）。ソートはフォルダー自身が持つため含まない */
+/** GET /smart-folders/:id/works のクエリ。tags はフォルダーのルールに対する
+ *  追加の AND 条件として適用する（TASK-185）。組み込み軸（year等）も専用パラメータを
+ *  持たず、擬似タグとして tags に混ざる（ADR-0012 §2、TASK-199）。
+ *  ソートはフォルダー自身が持つため含まない */
 export interface SmartFolderEvalQuery {
   page: number;
   limit: number;
   seed?: number;
   tags?: string[];
   tagOp?: "AND" | "OR";
-  axis?: string;
-  axisValue?: string;
 }
 
-/** GET /axes/:axis のクエリ。tags/axis は集計対象の絞り込み（AND 条件）。
- *  自軸由来のフィルタを除外した集合を渡すのは呼び出し側（client）の責務（TASK-187） */
+/** GET /axes/:axis のクエリ。tags は集計対象の絞り込み（AND 条件）、組み込み軸の擬似タグも
+ *  含む（ADR-0012 §2、TASK-199）。自軸由来のフィルタを除外した集合を渡すのは
+ *  呼び出し側（client）の責務（TASK-187） */
 export interface AxisFacetsFilter {
   tags?: string[];
   tagOp?: "AND" | "OR";
-  axis?: string;
-  axisValue?: string;
 }
 
 /** 前提条件（ルートフォルダー未設定等）を満たしていない操作。HTTP では 409 conflict */

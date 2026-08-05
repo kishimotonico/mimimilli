@@ -1,6 +1,6 @@
 // エンドポイント横断の契約: 作品検索クエリ、ページングエンベロープ、部分更新、エラー形式。
 import { z } from "zod";
-import { facetAxisIdSchema, sortIdSchema, viewIdSchema } from "./library.ts";
+import { sortIdSchema, viewIdSchema } from "./library.ts";
 import { normalizeTags, resumeSchema, tagSchema, workListItemSchema, workSchema } from "./work.ts";
 import { dlsiteApplyBodySchema, dlsiteStatusSchema } from "./dlsite.ts";
 
@@ -10,13 +10,13 @@ import { dlsiteApplyBodySchema, dlsiteStatusSchema } from "./dlsite.ts";
  *  client の追加読み込みも同じサイズでページを要求する */
 export const WORKS_DEFAULT_PAGE_SIZE = 200;
 
-/** クエリパラメータ。tags は同名パラメータを繰り返して配列で受ける */
+/** クエリパラメータ。tags は同名パラメータを繰り返して配列で受ける。組み込み軸（year等）の
+ *  フィルタも専用パラメータを持たず、"@year/2024" のような擬似タグとして tags に混ぜて送る
+ *  （ADR-0012 §2）。サーバー側の共通フィルタ解釈層（splitSelectedTags）が一度だけ解釈する。 */
 export const worksQuerySchema = z.object({
   q: z.string().default(""),
   tags: z.array(z.string()).default([]),
   tagOp: z.enum(["AND", "OR"]).default("AND"),
-  axis: facetAxisIdSchema.optional(),
-  axisValue: z.string().optional(),
   view: viewIdSchema.optional(),
   sort: sortIdSchema.default("added-desc"),
   /** randomソートの安定順序を決める。省略時はアダプタが発行してレスポンスで返す。 */
@@ -48,13 +48,11 @@ export const worksPageSchema = z.object({
 export type WorksPage = z.infer<typeof worksPageSchema>;
 
 /** GET /api/smart-folders/:id/works のクエリパラメータ。
- *  ソートはフォルダー自身が保持するため含まない。tags/axis はフォルダーのルールに対する
+ *  ソートはフォルダー自身が保持するため含まない。tags はフォルダーのルールに対する
  *  追加の AND 条件として適用する（ADR-0012、TASK-185） */
 export const smartFolderWorksQuerySchema = worksQuerySchema.pick({
   tags: true,
   tagOp: true,
-  axis: true,
-  axisValue: true,
   page: true,
   limit: true,
   seed: true,
@@ -62,13 +60,11 @@ export const smartFolderWorksQuerySchema = worksQuerySchema.pick({
 export type SmartFolderWorksQuery = z.infer<typeof smartFolderWorksQuerySchema>;
 
 /** GET /api/axes/:axis のクエリパラメータ。値一覧の件数・総時間・代表カバーは、渡された
- *  tags/axis による絞り込み後の集合から集計する（自軸除外カウント、TASK-187）。
+ *  tags による絞り込み後の集合から集計する（自軸除外カウント、TASK-187）。
  *  自軸由来のフィルタを除外した集合を渡すのは呼び出し側（client）の責務 */
 export const axisFacetsQuerySchema = worksQuerySchema.pick({
   tags: true,
   tagOp: true,
-  axis: true,
-  axisValue: true,
 });
 export type AxisFacetsQuery = z.infer<typeof axisFacetsQuerySchema>;
 
