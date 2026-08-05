@@ -1,10 +1,11 @@
 ---
 id: TASK-189
 title: ビジュアルテストの期待値と実装の不一致を解消しベースラインを再生成する
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - impl-182
 created_date: '2026-08-04 13:42'
-updated_date: '2026-08-04 19:02'
+updated_date: '2026-08-05 00:45'
 labels: []
 dependencies:
   - TASK-183
@@ -72,13 +73,13 @@ role ベースのセレクタで「画面が開く・操作が通る・コンソ
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 resume playback のテストが WorkPlayButton の実際のアクセシブル名に合わせて修正され、通る
-- [ ] #2 tag editing のテストが WorkTagEditor の編集モード仕様に合わせて修正され、通る
-- [ ] #3 全スナップショットが現在のUIで再生成され、pnpm test:visual が6件すべて通る
-- [ ] #4 ベースラインのずれを放置しないための運用方針が docs に記録されている
-- [ ] #5 ビジュアルテストが library.smoke.spec.ts（スクリーンショットなし）と library.visual.spec.ts（スクリーンショットのみ）に分割されている
-- [ ] #6 smoke 側が role ベースのセレクタで書かれ、レイアウト変更で壊れない。コンソールエラーと 4xx/5xx の検出を含む
-- [ ] #7 smoke 側にスキャンダイアログの開閉が含まれ、TASK-188 のクラッシュが再発したら検知できる
-- [ ] #8 visual 側の対象が全画面ではなく安定した範囲に絞られている
-- [ ] #9 pnpm test:visual が全件通る
+- [x] #1 resume playback のテストが WorkPlayButton の実際のアクセシブル名に合わせて修正され、通る
+- [x] #2 tag editing のテストが WorkTagEditor の編集モード仕様に合わせて修正され、通る
+- [x] #3 全スナップショットが現在のUIで再生成され、pnpm test:visual が6件すべて通る
+- [x] #4 ベースラインのずれを放置しないための運用方針が docs に記録されている
+- [x] #5 ビジュアルテストが library.smoke.spec.ts（スクリーンショットなし）と library.visual.spec.ts（スクリーンショットのみ）に分割されている
+- [x] #6 smoke 側が role ベースのセレクタで書かれ、レイアウト変更で壊れない。コンソールエラーと 4xx/5xx の検出を含む
+- [x] #7 smoke 側にスキャンダイアログの開閉が含まれ、TASK-188 のクラッシュが再発したら検知できる
+- [x] #8 visual 側の対象が全画面ではなく安定した範囲に絞られている
+- [x] #9 pnpm test:visual が全件通る
 <!-- AC:END -->
