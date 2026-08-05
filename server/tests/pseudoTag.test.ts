@@ -60,3 +60,22 @@ test("splitSelectedTags: 正規化後に空になるタグは警告付きで拒�
   assert.deepEqual(result.tags, ["cv/藤田茜"]);
   assert.equal(result.warnings.length, 1);
 });
+
+test("splitSelectedTags: 擬似タグとして解釈できない @ 始まりの入力は警告付きで拒否し、実タグへ流さない（TASK-201）", () => {
+  for (const badTag of ["@year", "@year/", "@/2024"]) {
+    const result = splitSelectedTags([badTag, "cv/藤田茜"]);
+    assert.deepEqual(result.tags, ["cv/藤田茜"], badTag);
+    assert.equal(result.yearValue, null, badTag);
+    assert.equal(result.warnings.length, 1, badTag);
+    assert.match(result.warnings[0]!, /擬似タグとして解釈できない/, badTag);
+  }
+});
+
+test("splitSelectedTags: 4桁の数字でない year 値は警告付きで拒否する（TASK-201）", () => {
+  for (const badTag of ["@year/banana", "@year/24", "@year/20245"]) {
+    const result = splitSelectedTags([badTag]);
+    assert.deepEqual(result.tags, [], badTag);
+    assert.equal(result.yearValue, null, badTag);
+    assert.equal(result.warnings.length, 1, badTag);
+  }
+});

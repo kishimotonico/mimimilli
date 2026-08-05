@@ -124,6 +124,16 @@ test("タグ ∋ ルールの values は tagSchema による検証を通り、�
   assert.equal(parsed.success, false);
 });
 
+test("タグ ∋ ルールの values は workPatchSchema と同じく正規形（trim・prefix小文字化・重複排除）で保存される（TASK-201）", () => {
+  const parsed = smartFolderRuleSchema.parse({
+    conjunction: "WHERE",
+    field: "タグ",
+    operator: "∋",
+    values: [" CV/藤田茜 ", "cv/藤田茜", "ASMR"],
+  });
+  assert.deepEqual(parsed.values, ["cv/藤田茜", "ASMR"]);
+});
+
 test("DB に不正ルールが混入しても評価時に黙って無視しない", () => {
   const invalidRules = [
     { conjunction: "WHERE", field: "不明な軸", operator: "=", values: ["x"] },

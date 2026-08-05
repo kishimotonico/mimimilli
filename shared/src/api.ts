@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { sortIdSchema, viewIdSchema } from "./library.ts";
 import { normalizeTags, resumeSchema, tagSchema, workListItemSchema, workSchema } from "./work.ts";
+import { splitSelectedTags } from "./pseudoTag.ts";
 import { dlsiteApplyBodySchema, dlsiteStatusSchema } from "./dlsite.ts";
 
 // ── 作品検索（GET /api/works）────────────────────────────────
@@ -10,10 +11,21 @@ import { dlsiteApplyBodySchema, dlsiteStatusSchema } from "./dlsite.ts";
  *  client の追加読み込みも同じサイズでページを要求する */
 export const WORKS_DEFAULT_PAGE_SIZE = 200;
 
+/** tags に対して splitSelectedTags の警告（未知の組み込み軸・4桁でないyear値・擬似タグとして
+ *  解釈できない @ 始まりの入力・正規化後に空になるタグ等）が出る場合は 400 として拒否する。
+ *  worksQuerySchema・smartFolderWorksQuerySchema・axisFacetsQuerySchema が共有する。
+ *  検証は必ず splitSelectedTags 経由にし、別系統の検証を作らない（ADR-0012 §2、TASK-201）。 */
+function refineTagWarnings(data: { tags: string[] }, ctx: z.RefinementCtx): void {
+  const { warnings } = splitSelectedTags(data.tags);
+  if (warnings.length > 0) {
+    ctx.addIssue({ code: "custom", path: ["tags"], message: warnings.join(" / ") });
+  }
+}
+
 /** クエリパラメータ。tags は同名パラメータを繰り返して配列で受ける。組み込み軸（year等）の
  *  フィルタも専用パラメータを持たず、"@year/2024" のような擬似タグとして tags に混ぜて送る
  *  （ADR-0012 §2）。サーバー側の共通フィルタ解釈層（splitSelectedTags）が一度だけ解釈する。 */
-export const worksQuerySchema = z.object({
+const worksQueryBaseSchema = z.object({
   q: z.string().default(""),
   tags: z.array(z.string()).default([]),
   tagOp: z.enum(["AND", "OR"]).default("AND"),
@@ -24,6 +36,7 @@ export const worksQuerySchema = z.object({
   page: z.coerce.number().int().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(500).optional(),
 });
+export const worksQuerySchema = worksQueryBaseSchema.superRefine(refineTagWarnings);
 /** HTTP クエリの入力型（.default 付きフィールドは省略可能） */
 export type WorksQueryInput = z.input<typeof worksQuerySchema>;
 /** パース後の正規化済みクエリ（サーバー adapter が受け取る型） */
@@ -50,22 +63,26 @@ export type WorksPage = z.infer<typeof worksPageSchema>;
 /** GET /api/smart-folders/:id/works のクエリパラメータ。
  *  ソートはフォルダー自身が保持するため含まない。tags はフォルダーのルールに対する
  *  追加の AND 条件として適用する（ADR-0012、TASK-185） */
-export const smartFolderWorksQuerySchema = worksQuerySchema.pick({
-  tags: true,
-  tagOp: true,
-  page: true,
-  limit: true,
-  seed: true,
-});
+export const smartFolderWorksQuerySchema = worksQueryBaseSchema
+  .pick({
+    tags: true,
+    tagOp: true,
+    page: true,
+    limit: true,
+    seed: true,
+  })
+  .superRefine(refineTagWarnings);
 export type SmartFolderWorksQuery = z.infer<typeof smartFolderWorksQuerySchema>;
 
 /** GET /api/axes/:axis のクエリパラメータ。値一覧の件数・総時間・代表カバーは、渡された
  *  tags による絞り込み後の集合から集計する（自軸除外カウント、TASK-187）。
  *  自軸由来のフィルタを除外した集合を渡すのは呼び出し側（client）の責務 */
-export const axisFacetsQuerySchema = worksQuerySchema.pick({
-  tags: true,
-  tagOp: true,
-});
+export const axisFacetsQuerySchema = worksQueryBaseSchema
+  .pick({
+    tags: true,
+    tagOp: true,
+  })
+  .superRefine(refineTagWarnings);
 export type AxisFacetsQuery = z.infer<typeof axisFacetsQuerySchema>;
 
 // ── DLsite 通知 ─────────────────────────────────────────────

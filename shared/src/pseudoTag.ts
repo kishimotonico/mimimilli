@@ -28,21 +28,30 @@ export function parseBuiltinAxisTag(tag: string): ParsedBuiltinAxisTag | null {
   return { axis: rest.slice(0, slashIndex), value: rest.slice(slashIndex + 1) };
 }
 
+/** year 擬似タグの値（addedAt の年）は4桁の数字のみ許容する */
+const YEAR_VALUE_PATTERN = /^\d{4}$/;
+
 export interface SplitSelectedTagsResult {
   /** 実タグとして work.tags と完全一致させるもの */
   tags: string[];
   /** year 軸から選ばれた addedAt の年（複数選択は仕様上 AND が常に0件になるため先頭のみ採用） */
   yearValue: string | null;
-  /** 拒否・正規化などで入力の一部を捨てたときの理由。呼び出し側（URL復元等）が
-   *  ログ・報告に使う。空配列なら入力はすべてそのまま採用された */
+  /** 拒否・正規化などで入力の一部を捨てたときの理由。呼び出し側（URL復元・HTTPスキーマの
+   *  境界検証等）がログ・拒否判定に使う。空配列なら入力はすべてそのまま採用された */
   warnings: string[];
 }
 
 /**
- * 選択中タグ（selectedTagsAtom・URLの tags=）を実タグと組み込み軸の擬似タグへ分解する。
- * 不正な入力（未知の組み込み軸の擬似タグ、複数の year 擬似タグ、正規化後に空になるタグ）は
- * 黙って無視せず warnings へ積んで拒否する。UI操作は常に置き換え・単一選択を強制するが、
- * URL は直接編集され得るため、ここで同じ制約を検証する（ADR-0012 §2）。
+ * 選択中タグ（selectedTagsAtom・URLの tags=・HTTPクエリの tags=）を実タグと組み込み軸の
+ * 擬似タグへ分解する共通入口。client（URL復元）・server（HTTPスキーマの境界検証・フィルタ
+ * 解釈）が同じ実装を使う。不正な入力は黙って無視・素通りさせず warnings へ積んで拒否する:
+ *   - "@" で始まるが擬似タグとして解釈できない形（@year・@year/・@/2024 等）
+ *   - 未知の組み込み軸の擬似タグ
+ *   - 4桁の数字でない year 値（@year/banana 等）
+ *   - 複数の year 擬似タグ（2件目以降）
+ *   - 正規化後に空になるタグ
+ * UI操作は常に置き換え・単一選択を強制するが、URL・HTTPクエリは直接編集され得るため、
+ * ここで同じ制約を検証する（ADR-0012 §2）。
  */
 export function splitSelectedTags(selectedTags: string[]): SplitSelectedTagsResult {
   let yearValue: string | null = null;
@@ -50,10 +59,18 @@ export function splitSelectedTags(selectedTags: string[]): SplitSelectedTagsResu
   const warnings: string[] = [];
 
   for (const rawTag of selectedTags) {
-    const builtin = parseBuiltinAxisTag(rawTag);
-    if (builtin) {
+    if (rawTag.startsWith(RESERVED_TAG_PREFIX)) {
+      const builtin = parseBuiltinAxisTag(rawTag);
+      if (!builtin) {
+        warnings.push(`擬似タグとして解釈できない入力を拒否しました: ${rawTag}`);
+        continue;
+      }
       if (!isBuiltinPseudoTagAxis(builtin.axis)) {
         warnings.push(`未知の組み込み軸の擬似タグを拒否しました: ${rawTag}`);
+        continue;
+      }
+      if (!YEAR_VALUE_PATTERN.test(builtin.value)) {
+        warnings.push(`year擬似タグの値が4桁の数字ではありません: ${rawTag}`);
         continue;
       }
       if (yearValue !== null) {

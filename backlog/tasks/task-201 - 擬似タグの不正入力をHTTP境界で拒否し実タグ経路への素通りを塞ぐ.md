@@ -1,9 +1,11 @@
 ---
 id: TASK-201
 title: 擬似タグの不正入力をHTTP境界で拒否し実タグ経路への素通りを塞ぐ
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - impl-182
 created_date: '2026-08-05 12:58'
+updated_date: '2026-08-05 13:14'
 labels: []
 dependencies: []
 priority: high
@@ -44,11 +46,11 @@ shared/src/library.ts の smartFolderRuleSchema の values を、作品側（wor
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 @year・@year/・@/2024 のような擬似タグとして解釈できない @ 始まりの文字列が warnings へ積まれ、実タグ経路へ流れない
-- [ ] #2 worksQuerySchema が splitSelectedTags の warnings を伴う入力を拒否し 400 になる
-- [ ] #3 smartFolderWorksQuerySchema と axisFacetsQuerySchema も同様に拒否する
-- [ ] #4 @year/banana のような 4桁数字でない year 値が拒否される
-- [ ] #5 検証が shared の splitSelectedTags を呼ぶ形に一本化されており、別系統の検証実装が並立していない
-- [ ] #6 smartFolderRuleSchema の values が normalizeTags で正規形保存される
-- [ ] #7 pnpm check と pnpm test と pnpm test:visual が通る
+- [x] #1 @year・@year/・@/2024 のような擬似タグとして解釈できない @ 始まりの文字列が warnings へ積まれ、実タグ経路へ流れない
+- [x] #2 worksQuerySchema が splitSelectedTags の warnings を伴う入力を拒否し 400 になる
+- [x] #3 smartFolderWorksQuerySchema と axisFacetsQuerySchema も同様に拒否する
+- [x] #4 @year/banana のような 4桁数字でない year 値が拒否される
+- [x] #5 検証が shared の splitSelectedTags を呼ぶ形に一本化されており、別系統の検証実装が並立していない
+- [x] #6 smartFolderRuleSchema の values が normalizeTags で正規形保存される
+- [x] #7 pnpm check と pnpm test と pnpm test:visual が通る
 <!-- AC:END -->

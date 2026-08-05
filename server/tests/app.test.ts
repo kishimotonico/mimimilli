@@ -34,6 +34,22 @@ test("GET /api/works は複数の tags を配列で受け、タグ内のカン�
   assert.deepEqual(receivedTags, ["tag,one", "tag2"]);
 });
 
+test("GET /api/works は擬似タグとして解釈できない @ 始まりのtagsを400で拒否する（TASK-201）", async () => {
+  const app = buildApp();
+  for (const badTag of ["@year", "@year/", "@/2024", "@year/banana", "@unknown/2024"]) {
+    const res = await app.request(`/api/works?tags=${encodeURIComponent(badTag)}`);
+    assert.equal(res.status, 400, badTag);
+    const body = await res.json();
+    assert.equal(body.error.code, "invalid_request", badTag);
+  }
+});
+
+test("GET /api/works は正しい @year/2024 擬似タグを受理する", async () => {
+  const app = buildApp();
+  const res = await app.request("/api/works?tags=%40year%2F2024");
+  assert.equal(res.status, 200);
+});
+
 test("GET /api/works/:id 存在しないIDは404 + apiErrorSchema形式", async () => {
   const app = buildApp();
   const res = await app.request("/api/works/NOT_EXIST");
@@ -210,6 +226,28 @@ test("GET /api/axes/:axis はクエリ省略時、空配列相当のフィルタ
   const res = await app.request("/api/axes/cv");
   assert.equal(res.status, 200);
   assert.deepEqual(receivedFilter, { tags: [], tagOp: "AND" });
+});
+
+test("GET /api/axes/:axis は擬似タグとして解釈できない @ 始まりのtagsを400で拒否する（TASK-201）", async () => {
+  const app = buildApp();
+  const res = await app.request("/api/axes/cv?tags=%40year%2Fbanana");
+  assert.equal(res.status, 400);
+  const body = await res.json();
+  assert.equal(body.error.code, "invalid_request");
+});
+
+test("GET /api/smart-folders/:id/works は擬似タグとして解釈できない @ 始まりのtagsを400で拒否する（TASK-201）", async () => {
+  const app = buildApp();
+  const createRes = await app.request("/api/smart-folders", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: "テスト", rules: [], sort: "added-desc" }),
+  });
+  const folder = await createRes.json();
+  const res = await app.request(`/api/smart-folders/${folder.id}/works?tags=%40year%2F`);
+  assert.equal(res.status, 400);
+  const body = await res.json();
+  assert.equal(body.error.code, "invalid_request");
 });
 
 test("GET /api/fs はルートの listing を返す", async () => {
