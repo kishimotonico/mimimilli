@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { normalizeTag, parseTag, tagEquals } from "@mimimilli/shared";
-import type { TagPrefix, Work, WorkPatchInput } from "@mimimilli/shared";
+import { parseTag, tagEquals } from "@mimimilli/shared";
+import type { NormalizedTag, TagPrefix, Work, WorkPatchInput } from "@mimimilli/shared";
 import { buildTagsWithAdded, buildTagsWithRemoved } from "../../../../entities/work/editableTags";
 
 const TAG_UNDO_TOAST_MS = 6000;
@@ -17,17 +17,17 @@ export interface UseWorkTagEditorOptions {
 }
 
 export interface UseWorkTagEditorResult {
-  tags: string[];
+  tags: NormalizedTag[];
   suggestions: string[];
   isTagSaving: boolean;
-  pendingRemoveTag: string | null;
-  failedRemoveTag: string | null;
+  pendingRemoveTag: NormalizedTag | null;
+  failedRemoveTag: NormalizedTag | null;
   /** 保護タグの削除確認待ち。ConfirmDialog の表示トリガー */
-  confirmingRemoveTag: string | null;
-  tagUndoToast: string | null;
+  confirmingRemoveTag: NormalizedTag | null;
+  tagUndoToast: NormalizedTag | null;
   addTag: (tag: string) => Promise<void>;
   /** 削除要求。保護タグなら確認待ちにし、それ以外は即削除する */
-  requestRemoveTag: (tag: string) => Promise<void>;
+  requestRemoveTag: (tag: NormalizedTag) => Promise<void>;
   confirmRemoveTag: () => Promise<void>;
   cancelRemoveTag: () => void;
   undoRemoveTag: () => Promise<void>;
@@ -48,10 +48,10 @@ export function useWorkTagEditor({
   onError,
 }: UseWorkTagEditorOptions): UseWorkTagEditorResult {
   const [isTagSaving, setIsTagSaving] = useState(false);
-  const [pendingRemoveTag, setPendingRemoveTag] = useState<string | null>(null);
-  const [failedRemoveTag, setFailedRemoveTag] = useState<string | null>(null);
-  const [confirmingRemoveTag, setConfirmingRemoveTag] = useState<string | null>(null);
-  const [tagUndoToast, setTagUndoToast] = useState<string | null>(null);
+  const [pendingRemoveTag, setPendingRemoveTag] = useState<NormalizedTag | null>(null);
+  const [failedRemoveTag, setFailedRemoveTag] = useState<NormalizedTag | null>(null);
+  const [confirmingRemoveTag, setConfirmingRemoveTag] = useState<NormalizedTag | null>(null);
+  const [tagUndoToast, setTagUndoToast] = useState<NormalizedTag | null>(null);
   const tagUndoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -60,13 +60,13 @@ export function useWorkTagEditor({
     };
   }, []);
 
-  const isProtectedTag = (tag: string): boolean => {
+  const isProtectedTag = (tag: NormalizedTag): boolean => {
     const parsed = parseTag(tag);
     if (parsed.kind !== "annotated") return false;
     return tagPrefixes.some((p) => p.prefix === parsed.prefix && p.protected);
   };
 
-  const patchTags = async (nextTags: string[]): Promise<boolean> => {
+  const patchTags = async (nextTags: NormalizedTag[]): Promise<boolean> => {
     if (isPatching || isTagSaving) return false;
     setIsTagSaving(true);
     onError(null);
@@ -87,13 +87,13 @@ export function useWorkTagEditor({
     await patchTags(nextTags);
   };
 
-  const showTagUndoToast = (tag: string) => {
+  const showTagUndoToast = (tag: NormalizedTag) => {
     if (tagUndoTimerRef.current) clearTimeout(tagUndoTimerRef.current);
     setTagUndoToast(tag);
     tagUndoTimerRef.current = setTimeout(() => setTagUndoToast(null), TAG_UNDO_TOAST_MS);
   };
 
-  const removeTag = async (tag: string) => {
+  const removeTag = async (tag: NormalizedTag) => {
     if (isPatching || isTagSaving) return;
     setPendingRemoveTag(tag);
     setFailedRemoveTag(null);
@@ -106,7 +106,7 @@ export function useWorkTagEditor({
     }
   };
 
-  const requestRemoveTag = async (tag: string) => {
+  const requestRemoveTag = async (tag: NormalizedTag) => {
     if (isPatching || isTagSaving) return;
     if (isProtectedTag(tag)) {
       setConfirmingRemoveTag(tag);
@@ -130,11 +130,9 @@ export function useWorkTagEditor({
     if (isPatching || isTagSaving) return;
     // 削除したタグだけを現在の集合へ戻す。undo待ちの間に行われた他のタグ編集は巻き戻さない。
     // 復元に失敗した場合はトーストを残して再試行可能にする（onError も呼ばれる）
-    const normalizedTag = normalizeTag(tag);
-    const restored =
-      normalizedTag === null || work.tags.some((current) => tagEquals(current, normalizedTag))
-        ? work.tags
-        : [...work.tags, normalizedTag];
+    const restored = work.tags.some((current) => tagEquals(current, tag))
+      ? work.tags
+      : [...work.tags, tag];
     const ok = await patchTags(restored);
     if (ok) {
       if (tagUndoTimerRef.current) clearTimeout(tagUndoTimerRef.current);

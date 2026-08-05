@@ -79,6 +79,25 @@ describe("smart folder editor validation", () => {
     });
   });
 
+  test("正規化後に空になるタグはバリデーションエラーを返す", () => {
+    const result = validateSmartFolderDraft({
+      name: "テスト",
+      rules: [
+        {
+          id: "rule-0",
+          conjunction: "WHERE",
+          field: "タグ",
+          operator: "∋",
+          values: ["cv/"],
+        },
+      ],
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.errors.ruleValues["rule-0"]).toBe("「cv/」は登録できないタグです");
+    }
+  });
+
   test("入力を整形し、条件間ORを含むAPI入力へ変換する", () => {
     let draft = createSmartFolderDraft();
     draft = {

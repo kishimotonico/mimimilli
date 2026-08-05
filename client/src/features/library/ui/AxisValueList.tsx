@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAtom, useAtomValue } from "jotai";
-import type { AxisFacetItem, TagPrefix } from "@mimimilli/shared";
+import type { AxisFacetItem, NormalizedTag, TagPrefix } from "@mimimilli/shared";
 import type { AxisId } from "../model/types";
 import { getAxisIcon, getAxisLabel } from "../model/axisDefinitions";
 import { buildFilterTag } from "../model/libraryPresentation";
@@ -23,14 +23,14 @@ interface AxisValueListProps {
   axis: AxisId;
   facetItems: AxisFacetItem[];
   tagPrefixes: TagPrefix[];
-  selectedTags: string[];
+  selectedTags: NormalizedTag[];
   isFacetLoading?: boolean;
   isFacetError?: boolean;
   isTagPrefixesError?: boolean;
   /** 既定=置き換え（クリック。ADR-0012 §7） */
-  onReplace: (tag: string) => void;
+  onReplace: (tag: NormalizedTag) => void;
   /** AND追加（Ctrl/Cmd+クリック・ホバー時の＋ボタン） */
-  onToggle: (tag: string) => void;
+  onToggle: (tag: NormalizedTag) => void;
   onRetryFacets?: () => void;
   onRetryTagPrefixes?: () => void;
 }

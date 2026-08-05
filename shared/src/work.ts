@@ -376,20 +376,38 @@ export function normalizeTag(tag: string): NormalizedTag | null {
   return trimmed.length > 0 ? (trimmed as NormalizedTag) : null;
 }
 
-/** 正規化しつつ重複を除く（順序は保持）。タグ書き込み経路の共通入口。
- *  正規化して空になる要素は破棄する。呼び出し元は主に DLsite 連携のタグマージ（外部データ）と、
- *  既に正規化済みの work.tags への追加で、どちらも書き込み前の最終防波堤としてここを通る。
- *  空になる要素は「取りこぼした不具合」ではなく「該当データが無かった」ことを表すため、
- *  警告なしの除去でよい（書き込みの入口である tagSchema は個々の空タグを既に拒否しており、
- *  ここまで来る空要素は tagSchema を経由しない内部マージ由来のもののみ）。 */
+/** 正規化できないタグが配列に含まれるときに投げる。normalizeTags の呼び出し元が境界で
+ *  個別に null を扱う必要がない経路向け。 */
+export class TagNormalizationError extends Error {
+  readonly tag: string;
+
+  constructor(tag: string) {
+    super(`タグを正規化できません: ${JSON.stringify(tag)}`);
+    this.name = "TagNormalizationError";
+    this.tag = tag;
+  }
+}
+
+/** 各要素を正規形へ寄せる。正規化して空になる要素は TagNormalizationError を投げる。
+ *  重複排除は行わない（dedupeTags を別途使う）。 */
 export function normalizeTags(tags: string[]): NormalizedTag[] {
-  const seen = new Set<NormalizedTag>();
   const result: NormalizedTag[] = [];
   for (const tag of tags) {
     const normalized = normalizeTag(tag);
-    if (normalized === null || seen.has(normalized)) continue;
-    seen.add(normalized);
+    if (normalized === null) throw new TagNormalizationError(tag);
     result.push(normalized);
+  }
+  return result;
+}
+
+/** 正規化済みタグ配列から重複を除く（順序は保持）。正規化とは別の関心事。 */
+export function dedupeTags(tags: Iterable<NormalizedTag>): NormalizedTag[] {
+  const seen = new Set<NormalizedTag>();
+  const result: NormalizedTag[] = [];
+  for (const tag of tags) {
+    if (seen.has(tag)) continue;
+    seen.add(tag);
+    result.push(tag);
   }
   return result;
 }

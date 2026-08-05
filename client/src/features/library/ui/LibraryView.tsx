@@ -3,6 +3,7 @@ import { useAtomValue, useSetAtom } from "jotai";
 import {
   getDefaultPlaylistTrackCount,
   toWorkListItem,
+  type NormalizedTag,
   type Work,
   type WorkListItem,
   type WorkPatchInput,
@@ -147,7 +148,7 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
 
   // タグチップクリック → タグ軸へ遷移し、そのタグだけを選択した絞り込み状態にする
   const handleTagClick = useCallback(
-    (tag: string) => {
+    (tag: NormalizedTag) => {
       nav.selectSoleTag(tag);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- nav は毎レンダー新規オブジェクトのため参照する値だけに依存を絞る

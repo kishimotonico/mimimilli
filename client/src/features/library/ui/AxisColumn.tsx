@@ -1,5 +1,5 @@
 import { useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import type { SmartFolder, TagPrefix } from "@mimimilli/shared";
+import type { NormalizedTag, SmartFolder, TagPrefix } from "@mimimilli/shared";
 import type { AxisId } from "../model/types";
 import { buildFacetAxisRows, isFacetAxis } from "../model/axisDefinitions";
 import { useHoverIntent, type HoverIntentHandlers } from "../../../shared/lib/useHoverIntent";
@@ -31,13 +31,13 @@ interface AxisColumnProps {
   tagPrefixes: TagPrefix[];
   smartFolders: SmartFolder[];
   totalCount?: number;
-  selectedTags: string[];
+  selectedTags: NormalizedTag[];
   /** 分類軸の元になる GET /tag-prefixes の取得失敗。無言でCV/サークル等の行が
    *  消えるのを防ぎ、分類軸グループにエラー行を出す */
   isTagPrefixesError?: boolean;
   onSelectAxis: (axis: AxisId) => void;
-  onToggleTag: (tag: string) => void;
-  onReplaceTag: (tag: string) => void;
+  onToggleTag: (tag: NormalizedTag) => void;
+  onReplaceTag: (tag: NormalizedTag) => void;
   onNewSmartFolder?: () => void;
   onRetryTagPrefixes?: () => void;
 }
@@ -142,7 +142,7 @@ export default function AxisColumn({
 
   // クイックオーバーレイの選択は既定=置き換え、Ctrl/Cmd+クリックで AND 追加へ反転する（ADR-0012 §7）。
   // 置き換えは結果面を作品一覧へ遷移させ、AND追加は現在の結果面に留まる（ADR-0012 §8）。
-  const handleSelectValue = (tag: string, opts: { ctrlKey: boolean; metaKey: boolean }) => {
+  const handleSelectValue = (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => {
     if (opts.ctrlKey || opts.metaKey) onToggleTag(tag);
     else onReplaceTag(tag);
   };

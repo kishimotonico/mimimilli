@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Work, WorkPatchInput } from "@mimimilli/shared";
+import type { NormalizedTag, Work, WorkPatchInput } from "@mimimilli/shared";
 import CoverImg from "../../../../entities/work/ui/CoverImg";
 import { selectFixedCoverThumbnailWidth } from "../../../../entities/work/ui/coverThumbnailWidth";
 import {
@@ -27,7 +27,7 @@ interface WorkDetailProps {
   isPatching: boolean;
   onPatchWork: (body: WorkPatchInput) => Promise<Work>;
   /** タグチップクリック時のハンドラ（タグ軸への絞り込み遷移） */
-  onTagClick: (tag: string) => void;
+  onTagClick: (tag: NormalizedTag) => void;
 }
 
 export function WorkDetail({

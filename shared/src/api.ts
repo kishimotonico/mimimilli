@@ -1,7 +1,14 @@
 // エンドポイント横断の契約: 作品検索クエリ、ページングエンベロープ、部分更新、エラー形式。
 import { z } from "zod";
 import { sortIdSchema, viewIdSchema } from "./library.ts";
-import { normalizeTags, resumeSchema, tagSchema, workListItemSchema, workSchema } from "./work.ts";
+import {
+  dedupeTags,
+  normalizeTags,
+  resumeSchema,
+  tagSchema,
+  workListItemSchema,
+  workSchema,
+} from "./work.ts";
 import { splitSelectedTags } from "./pseudoTag.ts";
 import { dlsiteApplyBodySchema, dlsiteStatusSchema } from "./dlsite.ts";
 
@@ -131,7 +138,10 @@ export const workPatchSchema = z
   .object({
     title: z.string().min(1).optional(),
     /** タグは契約の入口で正規形へ寄せる（ADR-0005 決定5。prefix 小文字化・trim・重複排除） */
-    tags: z.array(tagSchema).transform(normalizeTags).optional(),
+    tags: z
+      .array(tagSchema)
+      .transform((tags) => dedupeTags(normalizeTags(tags)))
+      .optional(),
     bookmarked: z.boolean().optional(),
   })
   .refine(
@@ -165,7 +175,10 @@ export const workCreateBodySchema = z.object({
   path: z.string().min(1),
   title: z.string().min(1),
   /** タグは契約の入口で正規形へ寄せる（ADR-0005 決定5） */
-  tags: z.array(tagSchema).default([]).transform(normalizeTags),
+  tags: z
+    .array(tagSchema)
+    .default([])
+    .transform((tags) => dedupeTags(normalizeTags(tags))),
   mergeDescendantWorks: z.boolean().default(false),
   dlsite: dlsiteApplyBodySchema.optional(),
 });

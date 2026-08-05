@@ -1,5 +1,7 @@
 // SmartFolderEditorModal のEsc/backdrop挙動（TASK-29: ネイティブdialogへの統合）のコンポーネントテスト。
 // jsdom は <dialog> の showModal/close を実装していないため、テスト対象に必要な分だけ差し替える。
+import type { ComponentProps } from "react";
+import type { SmartFolder } from "@mimimilli/shared";
 import { createElement } from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -14,7 +16,16 @@ beforeEach(() => {
   });
 });
 
-function renderModal(isSaving = false, onClose = vi.fn()) {
+function renderModal({
+  props = {},
+  isSaving = false,
+  onClose = vi.fn(),
+}: {
+  props?: Partial<ComponentProps<typeof SmartFolderEditorModal>>;
+  isSaving?: boolean;
+  onClose?: ReturnType<typeof vi.fn>;
+} = {}) {
+  const onSave = props.onSave ?? vi.fn();
   render(
     createElement(SmartFolderEditorModal, {
       folder: null,
@@ -22,10 +33,11 @@ function renderModal(isSaving = false, onClose = vi.fn()) {
       isSaving,
       saveError: null,
       onClose,
-      onSave: vi.fn(),
+      onSave,
+      ...props,
     }),
   );
-  return { onClose };
+  return { onClose, onSave };
 }
 
 function dispatchCancel(dialog: HTMLElement) {
@@ -41,7 +53,7 @@ describe("SmartFolderEditorModal", () => {
   });
 
   it("保存中はEscapeでも閉じない", () => {
-    const { onClose } = renderModal(true);
+    const { onClose } = renderModal({ isSaving: true });
     const dialog = screen.getByRole("dialog", { hidden: true });
     dispatchCancel(dialog);
     expect(onClose).not.toHaveBeenCalled();
@@ -55,7 +67,7 @@ describe("SmartFolderEditorModal", () => {
   });
 
   it("保存中はbackdropクリックでも閉じない（既存挙動を維持）", () => {
-    const { onClose } = renderModal(true);
+    const { onClose } = renderModal({ isSaving: true });
     const dialog = screen.getByRole("dialog", { hidden: true });
     fireEvent.click(dialog);
     expect(onClose).not.toHaveBeenCalled();
@@ -65,5 +77,21 @@ describe("SmartFolderEditorModal", () => {
     const { onClose } = renderModal();
     fireEvent.click(screen.getByText("条件を追加"));
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("無効なタグを含む条件で送信しても例外にならずインラインエラーを表示する", () => {
+    const folder = {
+      id: "sf-1",
+      name: "テスト",
+      rules: [{ conjunction: "WHERE", field: "タグ", operator: "∋", values: ["cv/"] }],
+      sort: "added-desc",
+      createdAt: "2026-07-10T00:00:00.000Z",
+    } satisfies SmartFolder;
+    const { onSave } = renderModal({ props: { folder } });
+
+    fireEvent.click(screen.getByRole("button", { name: "変更を保存" }));
+
+    expect(screen.getByText("「cv/」は登録できないタグです")).toBeInTheDocument();
+    expect(onSave).not.toHaveBeenCalled();
   });
 });

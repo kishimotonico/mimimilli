@@ -1,10 +1,10 @@
 ---
 id: TASK-200
 title: オーバーレイのdismissal二重実装と余白の二重適用を解消する
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-08-05 10:57'
-updated_date: '2026-08-05 17:49'
+updated_date: '2026-08-05 19:48'
 labels: []
 dependencies: []
 priority: high

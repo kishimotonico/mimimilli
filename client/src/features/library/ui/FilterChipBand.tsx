@@ -1,5 +1,5 @@
 import { Fragment, useState } from "react";
-import type { TagPrefix } from "@mimimilli/shared";
+import type { NormalizedTag, TagPrefix } from "@mimimilli/shared";
 import { axisOfFilterTag } from "../model/libraryPresentation";
 import { useAnchoredPopover } from "./preview/useAnchoredPopover";
 import AxisValuePopoverPanel from "./AxisValuePopoverPanel";
@@ -17,11 +17,11 @@ import { I } from "../../../shared/ui/Icon";
 
 interface FilterChipBandProps {
   tagPrefixes: TagPrefix[];
-  selectedTags: string[];
+  selectedTags: NormalizedTag[];
   /** 置き換え選択（結果面を作品一覧へ遷移させる。ADR-0012 §8） */
-  onReplace: (tag: string) => void;
+  onReplace: (tag: NormalizedTag) => void;
   /** AND追加（結果面はそのまま） */
-  onToggle: (tag: string) => void;
+  onToggle: (tag: NormalizedTag) => void;
   onClearAll: () => void;
 }
 
@@ -32,11 +32,11 @@ function FilterChip({
   onToggle,
   onRemove,
 }: {
-  tag: string;
+  tag: NormalizedTag;
   /** 現在選択中の全タグ（自軸以外のフィルタを兄弟値の集計へ引き継ぐため。TASK-187） */
-  selectedTags: string[];
-  onReplace: (tag: string) => void;
-  onToggle: (tag: string) => void;
+  selectedTags: NormalizedTag[];
+  onReplace: (tag: NormalizedTag) => void;
+  onToggle: (tag: NormalizedTag) => void;
   onRemove: () => void;
 }) {
   const [open, setOpen] = useState(false);
