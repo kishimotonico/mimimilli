@@ -202,145 +202,145 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
             return patchWorkMutation.mutateAsync({ workId: selectedWork.id, body });
           }}
         />
-      ) : paneKind === "value-list" ? (
-        <div className="mll-results">
-          <div className="mll-results__content">
-            <FilterChipBand
-              tagPrefixes={tagPrefixes}
-              selectedTags={nav.selectedTags}
-              onReplace={nav.replaceTag}
-              onToggle={nav.toggleTag}
-              onClearAll={nav.clearTags}
-            />
-            <AxisValueList
-              axis={nav.activeAxis}
-              facetItems={facetItems}
-              tagPrefixes={tagPrefixes}
-              selectedTags={nav.selectedTags}
-              isFacetLoading={isFacetLoading}
-              isFacetError={isFacetError}
-              isTagPrefixesError={isTagPrefixesError}
-              onReplace={nav.replaceTag}
-              onToggle={nav.toggleTag}
-              onRetryFacets={refetchFacets}
-              onRetryTagPrefixes={refetchTagPrefixes}
-            />
-          </div>
-        </div>
       ) : (
-        <LibraryWorksBoundary
-          nav={nav}
-          searchQuery={debouncedSearchQuery}
-          viewMode={viewMode}
-          isPending={nav.isPending}
-          onNoResultsChange={setIsNoResultsDueToFilter}
-        >
-          {(result, isPending) => {
-            const worksQueryKey = JSON.stringify({
-              axis: nav.activeAxis,
-              params: result.worksParams,
-            });
-            const smartFolderBanner = activeSmartFolder ? (
-              <SmartFolderView
-                sf={activeSmartFolder}
-                total={result.worksTotal}
-                onEdit={handleEditSmartFolder}
-              />
-            ) : undefined;
-            return (
-              <div className="mll-results">
-                <div className="mll-results__content">
-                  <FilterChipBand
-                    tagPrefixes={tagPrefixes}
-                    selectedTags={nav.selectedTags}
-                    onReplace={nav.replaceTag}
-                    onToggle={nav.toggleTag}
-                    onClearAll={nav.clearTags}
-                  />
-                  {showGrid ? (
-                    <WorkGrid
-                      axis={nav.activeAxis}
-                      works={result.works}
-                      worksQueryKey={worksQueryKey}
-                      selectedWorkId={nav.selectedWorkId}
-                      searchQuery={searchQuery}
-                      hasSelectedTags={nav.selectedTags.length > 0}
-                      playingWorkId={playingWorkId}
-                      isPlaybackActive={isPlaybackActive}
-                      isLoading={false}
-                      isError={false}
-                      onRetryWorks={result.refetchWorks}
-                      hasNextPage={result.hasNextPage}
-                      worksTotal={result.worksTotal}
-                      isFetchingNextPage={result.isFetchingNextPage}
-                      onLoadMore={() => void result.fetchNextPage()}
-                      isPending={isPending}
-                      onWorkSelect={nav.selectWork}
-                      onWorkPlay={(work) => onPlay(work, 0)}
-                      onClearSearch={() => setSearchQuery("")}
-                      onDeselect={() => nav.selectWork(null)}
-                      smartFolderBanner={smartFolderBanner}
-                    />
-                  ) : (
-                    <WorkListPane
-                      axis={nav.activeAxis}
-                      works={result.works}
-                      worksQueryKey={worksQueryKey}
-                      selectedWorkId={nav.selectedWorkId}
-                      searchQuery={searchQuery}
-                      hasSelectedTags={nav.selectedTags.length > 0}
-                      playingWorkId={playingWorkId}
-                      isPlaybackActive={isPlaybackActive}
-                      isPending={isPending}
-                      hasNextPage={result.hasNextPage}
-                      worksTotal={result.worksTotal}
-                      isFetchingNextPage={result.isFetchingNextPage}
-                      onLoadMore={() => void result.fetchNextPage()}
-                      onWorkSelect={nav.selectWork}
-                      onClearSearch={() => setSearchQuery("")}
-                      smartFolderBanner={smartFolderBanner}
-                    />
-                  )}
-                </div>
-
-                {/* 作品選択時のみスライドイン（ADR-0012 §3）。list/grid どちらでも同じ配線。 */}
-                <Presence
-                  show={nav.selectedWorkId !== null}
-                  variant="preview-slide"
-                  className="mll-results__preview"
-                >
-                  <PreviewPane
-                    mode="work"
-                    homeStats={homeStats}
-                    selectedWork={selectedWork}
-                    isSelectedWorkLoading={workDetailQuery.isPending}
-                    isSelectedWorkError={workDetailQuery.isError}
-                    onRetrySelectedWork={workDetailQuery.refetch}
-                    playingTrackIndex={
-                      selectedWork && playingWorkId === selectedWork.id
-                        ? (playingTrackIndex ?? null)
-                        : null
-                    }
-                    isPlaybackActive={isPlaybackActive}
-                    onPlay={handlePlay}
-                    onResume={handleResume}
-                    onTogglePlay={onTogglePlay}
-                    onSelectWork={nav.selectWork}
-                    onTagClick={handleTagClick}
-                    tagSuggestions={tagSuggestions}
-                    isPatching={patchWorkMutation.isPending}
-                    onPatchWork={(body) => {
-                      if (!selectedWork) {
-                        return Promise.reject(new Error("更新対象の作品が選択されていません"));
-                      }
-                      return patchWorkMutation.mutateAsync({ workId: selectedWork.id, body });
-                    }}
-                  />
-                </Presence>
+        <div className="mll-resultspane">
+          {/* チップ列は結果面の常設ヘッダーとして .mll-results の外に置く。
+              .mll-results 内側の作品プレビューは絶対配置でスライドインするため、
+              同じ .mll-results に同居させるとプレビューの下に隠れて操作できなくなる。 */}
+          <FilterChipBand
+            tagPrefixes={tagPrefixes}
+            selectedTags={nav.selectedTags}
+            onReplace={nav.replaceTag}
+            onToggle={nav.toggleTag}
+            onClearAll={nav.clearTags}
+          />
+          {paneKind === "value-list" ? (
+            <div className="mll-results">
+              <div className="mll-results__content">
+                <AxisValueList
+                  axis={nav.activeAxis}
+                  facetItems={facetItems}
+                  tagPrefixes={tagPrefixes}
+                  selectedTags={nav.selectedTags}
+                  isFacetLoading={isFacetLoading}
+                  isFacetError={isFacetError}
+                  isTagPrefixesError={isTagPrefixesError}
+                  onReplace={nav.replaceTag}
+                  onToggle={nav.toggleTag}
+                  onRetryFacets={refetchFacets}
+                  onRetryTagPrefixes={refetchTagPrefixes}
+                />
               </div>
-            );
-          }}
-        </LibraryWorksBoundary>
+            </div>
+          ) : (
+            <LibraryWorksBoundary
+              nav={nav}
+              searchQuery={debouncedSearchQuery}
+              viewMode={viewMode}
+              isPending={nav.isPending}
+              onNoResultsChange={setIsNoResultsDueToFilter}
+            >
+              {(result, isPending) => {
+                const worksQueryKey = JSON.stringify({
+                  axis: nav.activeAxis,
+                  params: result.worksParams,
+                });
+                const smartFolderBanner = activeSmartFolder ? (
+                  <SmartFolderView
+                    sf={activeSmartFolder}
+                    total={result.worksTotal}
+                    onEdit={handleEditSmartFolder}
+                  />
+                ) : undefined;
+                return (
+                  <div className="mll-results">
+                    <div className="mll-results__content">
+                      {showGrid ? (
+                        <WorkGrid
+                          axis={nav.activeAxis}
+                          works={result.works}
+                          worksQueryKey={worksQueryKey}
+                          selectedWorkId={nav.selectedWorkId}
+                          searchQuery={searchQuery}
+                          hasSelectedTags={nav.selectedTags.length > 0}
+                          playingWorkId={playingWorkId}
+                          isPlaybackActive={isPlaybackActive}
+                          isLoading={false}
+                          isError={false}
+                          onRetryWorks={result.refetchWorks}
+                          hasNextPage={result.hasNextPage}
+                          worksTotal={result.worksTotal}
+                          isFetchingNextPage={result.isFetchingNextPage}
+                          onLoadMore={() => void result.fetchNextPage()}
+                          isPending={isPending}
+                          onWorkSelect={nav.selectWork}
+                          onWorkPlay={(work) => onPlay(work, 0)}
+                          onClearSearch={() => setSearchQuery("")}
+                          onDeselect={() => nav.selectWork(null)}
+                          smartFolderBanner={smartFolderBanner}
+                        />
+                      ) : (
+                        <WorkListPane
+                          axis={nav.activeAxis}
+                          works={result.works}
+                          worksQueryKey={worksQueryKey}
+                          selectedWorkId={nav.selectedWorkId}
+                          searchQuery={searchQuery}
+                          hasSelectedTags={nav.selectedTags.length > 0}
+                          playingWorkId={playingWorkId}
+                          isPlaybackActive={isPlaybackActive}
+                          isPending={isPending}
+                          hasNextPage={result.hasNextPage}
+                          worksTotal={result.worksTotal}
+                          isFetchingNextPage={result.isFetchingNextPage}
+                          onLoadMore={() => void result.fetchNextPage()}
+                          onWorkSelect={nav.selectWork}
+                          onClearSearch={() => setSearchQuery("")}
+                          smartFolderBanner={smartFolderBanner}
+                        />
+                      )}
+                    </div>
+
+                    {/* 作品選択時のみスライドイン（ADR-0012 §3）。list/grid どちらでも同じ配線。 */}
+                    <Presence
+                      show={nav.selectedWorkId !== null}
+                      variant="preview-slide"
+                      className="mll-results__preview"
+                    >
+                      <PreviewPane
+                        mode="work"
+                        homeStats={homeStats}
+                        selectedWork={selectedWork}
+                        isSelectedWorkLoading={workDetailQuery.isPending}
+                        isSelectedWorkError={workDetailQuery.isError}
+                        onRetrySelectedWork={workDetailQuery.refetch}
+                        playingTrackIndex={
+                          selectedWork && playingWorkId === selectedWork.id
+                            ? (playingTrackIndex ?? null)
+                            : null
+                        }
+                        isPlaybackActive={isPlaybackActive}
+                        onPlay={handlePlay}
+                        onResume={handleResume}
+                        onTogglePlay={onTogglePlay}
+                        onSelectWork={nav.selectWork}
+                        onTagClick={handleTagClick}
+                        tagSuggestions={tagSuggestions}
+                        isPatching={patchWorkMutation.isPending}
+                        onPatchWork={(body) => {
+                          if (!selectedWork) {
+                            return Promise.reject(new Error("更新対象の作品が選択されていません"));
+                          }
+                          return patchWorkMutation.mutateAsync({ workId: selectedWork.id, body });
+                        }}
+                      />
+                    </Presence>
+                  </div>
+                );
+              }}
+            </LibraryWorksBoundary>
+          )}
+        </div>
       )}
 
       {smartFolderEditor.status !== "closed" && (

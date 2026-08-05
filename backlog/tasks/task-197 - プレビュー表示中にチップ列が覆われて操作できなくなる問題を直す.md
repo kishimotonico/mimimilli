@@ -1,9 +1,11 @@
 ---
 id: TASK-197
 title: プレビュー表示中にチップ列が覆われて操作できなくなる問題を直す
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - impl-182
 created_date: '2026-08-05 02:16'
+updated_date: '2026-08-05 06:18'
 labels: []
 dependencies: []
 priority: high
@@ -42,10 +44,10 @@ ordinal: 207000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 作品プレビューを開いた状態でも「すべてクリア」ボタンがクリックできる
-- [ ] #2 チップが多数あり右端まで伸びた状態でも、すべてのチップの × がプレビューに覆われず操作できる
-- [ ] #3 プレビュー表示中に「＋絞り込み」からフィルタを追加できる
-- [ ] #4 チップ列とプレビューが視覚的に重なって読みにくくなっていない
-- [ ] #5 z-index を新設した場合、docs/design-system.md の z-index 表に追記されている
-- [ ] #6 pnpm check と pnpm test と pnpm test:visual が通る
+- [x] #1 作品プレビューを開いた状態でも「すべてクリア」ボタンがクリックできる
+- [x] #2 チップが多数あり右端まで伸びた状態でも、すべてのチップの × がプレビューに覆われず操作できる
+- [x] #3 プレビュー表示中に「＋絞り込み」からフィルタを追加できる
+- [x] #4 チップ列とプレビューが視覚的に重なって読みにくくなっていない
+- [x] #5 z-index を新設した場合、docs/design-system.md の z-index 表に追記されている
+- [x] #6 pnpm check と pnpm test と pnpm test:visual が通る
 <!-- AC:END -->

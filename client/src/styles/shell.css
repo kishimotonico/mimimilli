@@ -473,6 +473,17 @@
     opacity: 0.55;
     transition: opacity 150ms ease;
   }
+  /* チップ列（.mll-tagband）は .mll-results の外、.mll-resultspane の通常フローに置く。
+     .mll-results 内の作品プレビューは absolute でスライドインするため、チップ列を
+     同じ .mll-results に同居させるとプレビューの下に隠れて操作できなくなる
+     （チップ列はADR-0012 §2で選択フィルタの唯一の表現）。 */
+  .mll-resultspane {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
   /* 結果面（値一覧・作品一覧）はレイアウト固定で常に全幅（ADR-0012 §3）。
      作品選択時のみ .mll-results__preview がスライドインする。 */
   .mll-results {
