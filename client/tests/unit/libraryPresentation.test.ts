@@ -10,7 +10,7 @@ import {
   computeIsNoResultsDueToFilter,
   computeResultsPaneKind,
   getFacetAxisForQuery,
-  isWorksGridActive,
+  isGridViewActive,
   parseBuiltinAxisTag,
   shouldClearSelectionOnFilterMiss,
   shouldClearSelectionOnWorkNotFound,
@@ -35,16 +35,17 @@ describe("computeResultsPaneKind", () => {
   });
 });
 
-describe("isWorksGridActive", () => {
-  it("works 種の結果面は viewMode のみに従う（強制グリッドは廃止済み）", () => {
-    expect(isWorksGridActive("all", "list")).toBe(false);
-    expect(isWorksGridActive("all", "grid")).toBe(true);
-    expect(isWorksGridActive("smart-abc", "grid")).toBe(true);
+describe("isGridViewActive", () => {
+  it("works・value-list 種の結果面は viewMode のみに従う（強制グリッドは廃止済み）", () => {
+    expect(isGridViewActive("all", "list")).toBe(false);
+    expect(isGridViewActive("all", "grid")).toBe(true);
+    expect(isGridViewActive("smart-abc", "grid")).toBe(true);
+    expect(isGridViewActive("circle", "list")).toBe(false);
+    expect(isGridViewActive("circle", "grid")).toBe(true);
+    expect(isGridViewActive("tag", "grid")).toBe(true);
   });
-  it("value-list・home 種の結果面はグリッド概念を持たない", () => {
-    expect(isWorksGridActive("circle", "grid")).toBe(false);
-    expect(isWorksGridActive("tag", "grid")).toBe(false);
-    expect(isWorksGridActive("home", "grid")).toBe(false);
+  it("home 種の結果面はグリッド概念を持たない", () => {
+    expect(isGridViewActive("home", "grid")).toBe(false);
   });
 });
 

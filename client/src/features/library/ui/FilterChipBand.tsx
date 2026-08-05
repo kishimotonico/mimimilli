@@ -27,11 +27,14 @@ interface FilterChipBandProps {
 
 function FilterChip({
   tag,
+  selectedTags,
   onReplace,
   onToggle,
   onRemove,
 }: {
   tag: string;
+  /** 現在選択中の全タグ（自軸以外のフィルタを兄弟値の集計へ引き継ぐため。TASK-187） */
+  selectedTags: string[];
   onReplace: (tag: string) => void;
   onToggle: (tag: string) => void;
   onRemove: () => void;
@@ -66,7 +69,7 @@ function FilterChip({
         <AxisValuePopoverPanel
           axis={axis}
           layout={layout}
-          selectedTags={[tag]}
+          selectedTags={selectedTags}
           onSelect={(nextTag, opts) => {
             if (opts.ctrlKey || opts.metaKey) onToggle(nextTag);
             else onReplace(nextTag);
@@ -94,6 +97,7 @@ export default function FilterChipBand({
           {i > 0 && <span className="mll-tagband__and">AND</span>}
           <FilterChip
             tag={tag}
+            selectedTags={selectedTags}
             onReplace={onReplace}
             onToggle={onToggle}
             onRemove={() => onToggle(tag)}

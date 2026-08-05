@@ -1,7 +1,7 @@
 import { useAtom, useAtomValue } from "jotai";
 import { appModeAtom } from "../../features/navigation/model/navigationAtoms";
 import { activeAxisAtom, libraryViewModeAtom } from "../../features/library/model/atoms";
-import { isWorksGridActive } from "../../features/library/model/libraryPresentation";
+import { isGridViewActive } from "../../features/library/model/libraryPresentation";
 import LibraryGridControls from "../../features/library/ui/LibraryGridControls";
 import LibraryBreadcrumbs from "../../features/library/ui/LibraryBreadcrumbs";
 import LibrarySortMenu from "../../features/library/ui/LibrarySortMenu";
@@ -19,8 +19,8 @@ export default function AddressBar() {
 
   // list/grid の決定は libraryViewModeAtom のみに依存する（ADR-0012 §3）。
   // 強制グリッドの上書きは廃止済みで、ここでは「grid が実際に描画されているか」だけを
-  // isWorksGridActive の単一実装から読む。
-  const showGrid = isWorksGridActive(activeAxis, libraryViewMode);
+  // isGridViewActive の単一実装から読む。
+  const showGrid = isGridViewActive(activeAxis, libraryViewMode);
 
   return (
     <div className="mle-addr is-lib">

@@ -7,7 +7,7 @@ import {
   useSuspenseNormalLibraryWorks,
   useSuspenseSmartLibraryWorks,
 } from "../model/useLibraryQueries";
-import { computeIsNoResultsDueToFilter, isWorksGridActive } from "../model/libraryPresentation";
+import { computeIsNoResultsDueToFilter, isGridViewActive } from "../model/libraryPresentation";
 import CollectionStatus from "./CollectionStatus";
 
 interface WorksResult {
@@ -105,7 +105,7 @@ function ResolvedWorks({
 }
 
 export default function LibraryWorksBoundary(props: Props) {
-  const variant = isWorksGridActive(props.nav.activeAxis, props.viewMode) ? "grid" : "list";
+  const variant = isGridViewActive(props.nav.activeAxis, props.viewMode) ? "grid" : "list";
   const resetKey = JSON.stringify({
     axis: props.nav.activeAxis,
     tags: props.nav.selectedTags,

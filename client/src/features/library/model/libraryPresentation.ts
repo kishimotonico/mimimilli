@@ -58,10 +58,11 @@ export function computeResultsPaneKind(axis: AxisId): ResultsPaneKind {
   return "works";
 }
 
-/** グリッド／リストの決定は libraryViewModeAtom のみに依存する（ADR-0012 §3）。
- *  works 以外の結果面（value-list・home）はグリッド概念を持たない。 */
-export function isWorksGridActive(axis: AxisId, viewMode: ViewMode): boolean {
-  return computeResultsPaneKind(axis) === "works" && viewMode === "grid";
+/** グリッド／リストの決定は libraryViewModeAtom のみに依存する（ADR-0012 §3・§5）。
+ *  works（作品一覧）・value-list（値一覧）の両方がグリッド表示に従う。home はグリッド概念を持たない。 */
+export function isGridViewActive(axis: AxisId, viewMode: ViewMode): boolean {
+  const kind = computeResultsPaneKind(axis);
+  return (kind === "works" || kind === "value-list") && viewMode === "grid";
 }
 
 // ── 選択中フィルタ（selectedTagsAtom）の解釈 ────────────────────

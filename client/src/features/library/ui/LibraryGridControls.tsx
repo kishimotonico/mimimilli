@@ -8,16 +8,19 @@ import {
   libraryViewModeAtom,
 } from "../model/atoms";
 import { clampTileSize, MAX_TILE_SIZE, MIN_TILE_SIZE } from "../model/gridSizing";
-import { isWorksGridActive } from "../model/libraryPresentation";
+import { computeResultsPaneKind, isGridViewActive } from "../model/libraryPresentation";
 
 export default function LibraryGridControls() {
   const viewMode = useAtomValue(libraryViewModeAtom);
   const activeAxis = useAtomValue(activeAxisAtom);
   const [gridLayoutMode, setGridLayoutMode] = useAtom(libraryGridLayoutModeAtom);
   const [tileSize, setTileSize] = useAtom(libraryTileSizeAtom);
-  // WorkGrid が実際に描画されているか。list/grid の決定は libraryViewModeAtom のみに
-  // 依存する（ADR-0012 §3。強制グリッドの上書きは廃止済み）。
-  const showGrid = isWorksGridActive(activeAxis, viewMode);
+  // 作品グリッド・値グリッドのどちらかが実際に描画されているか。list/grid の決定は
+  // libraryViewModeAtom のみに依存する（ADR-0012 §3・§5。強制グリッドの上書きは廃止済み）。
+  // タイルサイズは両方が共有するが、敷き詰め形式（1:1/縦横比）は作品グリッド専用
+  // （値グリッドのコラージュは常に正方形で、この設定を読まない）。
+  const showGrid = isGridViewActive(activeAxis, viewMode);
+  const isWorksGrid = computeResultsPaneKind(activeAxis) === "works" && viewMode === "grid";
   const safeTileSize = clampTileSize(tileSize);
 
   return (
@@ -31,7 +34,7 @@ export default function LibraryGridControls() {
             title="1:1タイル：正方形に切り抜いて等幅で並べる"
             active={gridLayoutMode === "square"}
             onClick={() => setGridLayoutMode("square")}
-            disabled={!showGrid}
+            disabled={!isWorksGrid}
           />
           <IconButton
             size="sm"
@@ -40,7 +43,7 @@ export default function LibraryGridControls() {
             title="元の縦横比：比率を保って行の右端を揃える"
             active={gridLayoutMode === "justified"}
             onClick={() => setGridLayoutMode("justified")}
-            disabled={!showGrid}
+            disabled={!isWorksGrid}
           />
         </div>
 

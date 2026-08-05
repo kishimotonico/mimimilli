@@ -81,6 +81,25 @@ test("タグは予約文字@始まりを拒否する", () => {
   assert.equal(tagSchema.safeParse("cv/藤田茜").success, true);
 });
 
+test("予約文字の検証は正規化後の値に対して行われ、先頭空白では回避できない", () => {
+  // normalizeTag は trim してから prefix を小文字化するため、生文字列のまま
+  // startsWith("@") を見ると先頭空白で検証をすり抜けてしまう。
+  assert.equal(tagSchema.safeParse(" @year/2024").success, false);
+  assert.equal(tagSchema.safeParse("  @Year/2024").success, false);
+  // annotated ではない（スラッシュ無し）flat タグも同様に検証する。
+  assert.equal(tagSchema.safeParse(" @foo").success, false);
+});
+
+test("metaFileSchema.tags でも予約文字の検証が効き、先頭空白では回避できない", () => {
+  const withReservedTag = { ...validMeta(), tags: ["cv/藤田茜", " @year/2024"] };
+  assert.equal(metaFileSchema.safeParse(withReservedTag).success, false);
+
+  const withNormalTags = { ...validMeta(), tags: [" CV/藤田茜 ", "cv/藤田茜"] };
+  const parsed = metaFileSchema.parse(withNormalTags);
+  // normalizeTags で正規化・重複排除される。
+  assert.deepEqual(parsed.tags, ["cv/藤田茜"]);
+});
+
 test("同名Playlistは異なるIDなら許容する", () => {
   const meta = validMeta();
   meta.playlists.push({

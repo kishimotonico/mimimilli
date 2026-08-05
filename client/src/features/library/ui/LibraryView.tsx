@@ -21,7 +21,7 @@ import {
 } from "../model/useLibraryQueries";
 import {
   computeResultsPaneKind,
-  isWorksGridActive,
+  isGridViewActive,
   shouldClearSelectionOnFilterMiss,
   shouldClearSelectionOnWorkNotFound,
 } from "../model/libraryPresentation";
@@ -99,7 +99,7 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
   // ── 表示導出（純粋計算は model/libraryPresentation に集約） ──
   const isHome = isHomeAxis(nav.activeAxis);
   const paneKind = computeResultsPaneKind(nav.activeAxis);
-  const showGrid = isWorksGridActive(nav.activeAxis, viewMode);
+  const showGrid = isGridViewActive(nav.activeAxis, viewMode);
 
   // 検索・タグフィルタの絞り込みで作品一覧が0件になったら、含まれなくなった選択中の
   // 作品詳細が残らないよう選択を解除する。

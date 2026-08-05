@@ -2,14 +2,22 @@
 // パース失敗・必須フィールド欠落は「メタファイル不正」エラーとして作品に表示する（隠蔽しない）。
 import { z } from "zod";
 import { dlsiteStateSchema, emptyDlsiteState } from "./dlsite.ts";
-import { playlistSchema, refinePlaylistCollection, urlEntrySchema } from "./work.ts";
+import {
+  normalizeTags,
+  playlistSchema,
+  refinePlaylistCollection,
+  tagSchema,
+  urlEntrySchema,
+} from "./work.ts";
 
 export const metaFileSchema = z
   .object({
     id: z.uuid(),
     title: z.string().min(1),
     urls: z.array(urlEntrySchema).default([]),
-    tags: z.array(z.string()).default([]),
+    // Source of Truth。API経由の書き込み（workPatchSchema/workCreateBodySchema）と同じ
+    // tagSchema + normalizeTags を通す。外部からの直接編集や旧データにも予約文字契約を効かせる。
+    tags: z.array(tagSchema).default([]).transform(normalizeTags),
     coverImage: z.string().nullish().default(null),
     playlists: z.array(playlistSchema).default([]),
     defaultPlaylistId: z.uuid({ version: "v4" }).nullish().default(null),

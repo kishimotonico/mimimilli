@@ -1,7 +1,6 @@
-// list/grid の決定は libraryViewModeAtom のみに依存する（ADR-0012 §3）。
-// ドリル機構の廃止に伴い、facet/tag 軸を選んでいても強制グリッドにはならない
-// （その軸は値一覧を表示するだけで作品グリッド自体を描画しないため、単に
-// グリッドボタンが「効かない」状態になる）。
+// list/grid の決定は libraryViewModeAtom のみに依存する（ADR-0012 §3・§5）。
+// 作品一覧（works）・値一覧（value-list）のどちらも同じ viewMode に従うため、
+// 軸の種類に関わらずボタンの active 状態は viewMode と一致する。
 
 import { createElement } from "react";
 import { render, screen, cleanup } from "@testing-library/react";
@@ -55,11 +54,11 @@ describe("AddressBar のビュー切替ボタン", () => {
     expect(screen.getByLabelText("グリッド")).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("facet 軸（値一覧）では viewMode=grid でも強制グリッドにならない（値一覧はグリッド概念を持たない）", () => {
+  it("facet 軸（値一覧）でも viewMode=grid ならグリッドボタンが active になる", () => {
     renderAddressBar({ activeAxis: "circle", libraryViewMode: "grid" });
 
-    // circle は value-list 種の結果面のため、isWorksGridActive は常に false になる
-    expect(screen.getByLabelText("グリッド")).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByLabelText("グリッド")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByLabelText("リスト")).toHaveAttribute("aria-pressed", "false");
   });
 
   it("ファイルモードではリスト/グリッドに理由を示す title が付く", () => {

@@ -1,9 +1,11 @@
 ---
 id: TASK-196
 title: マージ前の最終レビュー指摘を解消する
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - impl-182
 created_date: '2026-08-05 01:08'
+updated_date: '2026-08-05 01:56'
 labels: []
 dependencies: []
 priority: high
@@ -42,11 +44,11 @@ AxisValuePopoverPanel に selectedTags={[tag]}（自分自身のタグ1件のみ
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 予約文字の検証が正規化後の値に対して行われ、先頭に空白のある文字列で回避できない
-- [ ] #2 metaFileSchema.tags を含むすべての書き込み経路で予約文字の検証が効いている
-- [ ] #3 上記2点が単体テストで検証されている（空白始まりの回避を試みるケースを含む）
-- [ ] #4 値一覧をグリッド表示しているとき、アドレスバーの切替UIもグリッドを選択中として表示する
-- [ ] #5 チップの兄弟値ドロップダウンの件数・総時間・カバーが、他軸のフィルタを反映した値になる（自軸のみ除外）
-- [ ] #6 server/_bench_axisFacets_scratch.ts が削除されている
-- [ ] #7 pnpm check と pnpm test と pnpm test:visual が通る
+- [x] #1 予約文字の検証が正規化後の値に対して行われ、先頭に空白のある文字列で回避できない
+- [x] #2 metaFileSchema.tags を含むすべての書き込み経路で予約文字の検証が効いている
+- [x] #3 上記2点が単体テストで検証されている（空白始まりの回避を試みるケースを含む）
+- [x] #4 値一覧をグリッド表示しているとき、アドレスバーの切替UIもグリッドを選択中として表示する
+- [x] #5 チップの兄弟値ドロップダウンの件数・総時間・カバーが、他軸のフィルタを反映した値になる（自軸のみ除外）
+- [x] #6 server/_bench_axisFacets_scratch.ts が削除されている
+- [x] #7 pnpm check と pnpm test と pnpm test:visual が通る
 <!-- AC:END -->
