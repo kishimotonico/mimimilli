@@ -255,7 +255,7 @@ export default function RegisterWorkDialog({
                   suggestions={tagSuggestions}
                   excludeTags={tags}
                   disabled={submitBusy}
-                  canCreate={(tag) => normalizeTag(tag).length > 0}
+                  canCreate={(tag) => normalizeTag(tag) !== null}
                   width={180}
                   onSelect={addTag}
                   onCancel={() => setIsTagInputOpen(false)}

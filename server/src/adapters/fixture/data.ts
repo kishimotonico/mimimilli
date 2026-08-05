@@ -1,6 +1,6 @@
 // fixture アダプタ用の自己完結シードデータ。
 // client/mocks からは import せず、本ファイル内で完結させる。
-import { coverFieldsFromColumns, emptyDlsiteState } from "@mimimilli/shared";
+import { coverFieldsFromColumns, emptyDlsiteState, normalizeTags } from "@mimimilli/shared";
 import type { Cover, SmartFolder, WorkSummary } from "@mimimilli/shared";
 
 /** fixture 内部のカバー列（real の cover_image / cover_width / cover_height に相当） */
@@ -40,7 +40,7 @@ export function fixtureCoverFromColumns(columns: FixtureCoverColumns): Cover {
  *  - bookmarked / lastPlayedAt の有無を混在させる
  *  - trackCount は1〜20の範囲でばらつかせる
  */
-const RAW_SEED_WORKS: Omit<WorkSummary, "dlsite">[] = [
+const RAW_SEED_WORKS: Array<Omit<WorkSummary, "dlsite" | "tags"> & { tags: string[] }> = [
   {
     id: "RJ501001",
     title: "【ASMR】夜更けの図書室で囁き朗読",
@@ -287,8 +287,10 @@ const RAW_SEED_WORKS: Omit<WorkSummary, "dlsite">[] = [
 export const SEED_WORKS: WorkSummary[] = RAW_SEED_WORKS.map((work, index) => {
   const columns = fixtureCoverColumnsForWork(work);
   const cover = fixtureCoverFromColumns(columns);
+  const tags = normalizeTags(work.tags);
   return {
     ...work,
+    tags,
     cover,
     dlsite:
       index === 0
@@ -298,7 +300,7 @@ export const SEED_WORKS: WorkSummary[] = RAW_SEED_WORKS.map((work, index) => {
             lastAttemptAt: "2026-06-10T12:00:00.000Z",
             error: null,
             errorKind: null,
-            appliedTags: work.tags.filter((tag) => /^(?:cv|genre|サークル)\//.test(tag)),
+            appliedTags: tags.filter((tag) => /^(?:cv|genre|サークル)\//.test(tag)),
           }
         : index === 2
           ? {
@@ -509,7 +511,12 @@ export function createSeedSmartFolders(now: string): SmartFolder[] {
       name: "長時間 ASMR",
       rules: [
         { conjunction: "WHERE", field: "長さ", operator: "≥", values: ["3600"] },
-        { conjunction: "AND", field: "タグ", operator: "∋", values: ["カテゴリ/ASMR", "環境音"] },
+        {
+          conjunction: "AND",
+          field: "タグ",
+          operator: "∋",
+          values: normalizeTags(["カテゴリ/ASMR", "環境音"]),
+        },
       ],
       sort: "added-desc",
       createdAt: now,
@@ -517,7 +524,14 @@ export function createSeedSmartFolders(now: string): SmartFolder[] {
     {
       id: "sf-2",
       name: "水瀬なずな 全件",
-      rules: [{ conjunction: "WHERE", field: "タグ", operator: "∋", values: ["cv/水瀬なずな"] }],
+      rules: [
+        {
+          conjunction: "WHERE",
+          field: "タグ",
+          operator: "∋",
+          values: normalizeTags(["cv/水瀬なずな"]),
+        },
+      ],
       sort: "added-desc",
       createdAt: now,
     },

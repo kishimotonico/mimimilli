@@ -1,19 +1,9 @@
 // ライブラリ（検索・分類軸・スマートフォルダー・検索プリセット）の契約。
 import { z } from "zod";
+import { coverValueSchema } from "./cover.ts";
+import { normalizeTags, tagSchema } from "./work.ts";
 
-const utf8Encoder = new TextEncoder();
-
-/** SQLiteのBINARY照合と同じUTF-8バイト順で文字列を比較する。 */
-export function compareUtf8Bytes(a: string, b: string): number {
-  const aBytes = utf8Encoder.encode(a);
-  const bBytes = utf8Encoder.encode(b);
-  const length = Math.min(aBytes.length, bBytes.length);
-  for (let index = 0; index < length; index++) {
-    const difference = aBytes[index]! - bBytes[index]!;
-    if (difference !== 0) return difference;
-  }
-  return aBytes.length - bBytes.length;
-}
+export { compareUtf8Bytes } from "./text.ts";
 
 // ── ソート ───────────────────────────────────────────────────
 
@@ -49,9 +39,18 @@ export const facetAxisIdSchema = z
   .refine((s) => !s.includes("/"), { message: "軸IDにスラッシュは使えません" });
 export type FacetAxisId = string;
 
+/** 値一覧の代表カバー1件。カバー画像配信（GET /media/cover/:id）が作品単位のルートしか
+ *  持たないため、コラージュ描画に必要な workId を持たせる（coverValueSchema 単体には無い）。 */
+export const axisFacetCoverSchema = coverValueSchema.extend({ workId: z.string() });
+export type AxisFacetCover = z.infer<typeof axisFacetCoverSchema>;
+
 export const axisFacetItemSchema = z.object({
   value: z.string(),
   count: z.number().int().nonnegative(),
+  /** その値に属する全作品の再生時間合計（秒）。totalDurationSec が未知（null）の作品は合算から除く */
+  durationSec: z.number().nonnegative(),
+  /** 代表カバー。追加日時の新しい順で最大4件、cover未設定の作品は含まない */
+  covers: z.array(axisFacetCoverSchema).max(4),
 });
 export type AxisFacetItem = z.infer<typeof axisFacetItemSchema>;
 export const axisFacetListSchema = z.array(axisFacetItemSchema);
@@ -65,7 +64,8 @@ export const smartFolderRuleSchema = z.discriminatedUnion("field", [
     conjunction: smartFolderConjunctionSchema,
     field: z.literal("タグ"),
     operator: z.literal("∋"),
-    values: z.array(z.string().min(1)).min(1),
+    // 作品側（workPatchSchema 等）と同じく正規形（prefix小文字化・trim・重複排除）で保存する
+    values: z.array(tagSchema).min(1).transform(normalizeTags),
   }),
   z.object({
     conjunction: z.enum(["WHERE", "AND", "OR"]),

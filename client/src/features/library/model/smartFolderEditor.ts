@@ -1,3 +1,4 @@
+import { normalizeTags } from "@mimimilli/shared";
 import type { SmartFolder, SmartFolderCreate, SmartFolderRule } from "@mimimilli/shared";
 
 export type SmartFolderEditorConjunction = "WHERE" | "AND" | "OR" | "AND NOT";
@@ -138,7 +139,7 @@ export function validateSmartFolderDraft(draft: SmartFolderEditorDraft): SmartFo
   draft.rules.forEach((rule, index) => {
     const conjunction = index === 0 ? "WHERE" : rule.conjunction;
     if (rule.field === "タグ") {
-      const values = [...new Set(rule.values.map((value) => value.trim()).filter(Boolean))];
+      const values = normalizeTags(rule.values);
       if (values.length === 0) {
         errors.ruleValues[rule.id] = "タグを1つ以上選択してください";
         return;

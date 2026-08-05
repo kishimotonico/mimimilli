@@ -20,6 +20,7 @@ import type {
   DlsiteStatePatch,
   FileEntry,
   FsListing,
+  NormalizedTag,
   ResumeBody,
   ScanProgressEvent,
   ScanResult,
@@ -42,10 +43,12 @@ import type {
 import {
   createCoverValidators,
   NotConfiguredError,
+  type AxisFacetsFilter,
   type CoverDescriptor,
   type DataAdapter,
   type MediaKind,
   type MediaLocation,
+  type SmartFolderEvalQuery,
 } from "../../adapter.ts";
 import type { ScanOptions } from "../../adapter.ts";
 import { isDefaultTitle } from "../../core/dlsiteTitle.ts";
@@ -765,8 +768,8 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
     },
 
     // ── 分類軸・タグ prefix 定義・スマートフォルダー・プリセット ──
-    async getAxisFacets(axis: string): Promise<AxisFacetItem[]> {
-      return repo.getAxisFacets(axis);
+    async getAxisFacets(axis: string, filter?: AxisFacetsFilter): Promise<AxisFacetItem[]> {
+      return repo.getAxisFacets(axis, filter);
     },
 
     async listTagPrefixes(): Promise<TagPrefix[]> {
@@ -800,10 +803,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
     async deleteSmartFolder(id: string): Promise<boolean> {
       return repo.deleteSmartFolder(id);
     },
-    async evalSmartFolder(
-      id: string,
-      query: { page: number; limit: number; seed?: number },
-    ): Promise<WorksPage | null> {
+    async evalSmartFolder(id: string, query: SmartFolderEvalQuery): Promise<WorksPage | null> {
       const folder = repo.getSmartFolder(id);
       if (!folder) return null;
       return querySmartFolderWorks(repo, folder, query);
@@ -887,8 +887,12 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       const work = await repo.getWork(workId);
       if (!work) return false;
 
-      const patch: { title?: string; tags?: string[]; cover?: CoverColumns; urls?: Work["urls"] } =
-        {};
+      const patch: {
+        title?: string;
+        tags?: NormalizedTag[];
+        cover?: CoverColumns;
+        urls?: Work["urls"];
+      } = {};
       if (body.applyTitle && body.info.title) patch.title = body.info.title;
       const applyTags = normalizeTags(body.applyTags);
       if (applyTags.length > 0) patch.tags = normalizeTags([...work.tags, ...applyTags]);
@@ -1105,7 +1109,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
               if (!noOp) {
                 const patch: {
                   title?: string;
-                  tags?: string[];
+                  tags?: NormalizedTag[];
                   cover?: CoverColumns;
                   urls?: Work["urls"];
                 } = { tags: nextTags };

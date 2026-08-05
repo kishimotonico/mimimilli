@@ -53,10 +53,12 @@ import type {
 import {
   createCoverValidators,
   InvalidResumeError,
+  type AxisFacetsFilter,
   type CoverDescriptor,
   type DataAdapter,
   type MediaKind,
   type MediaLocation,
+  type SmartFolderEvalQuery,
 } from "../../adapter.ts";
 import type { ScanOptions } from "../../adapter.ts";
 import { buildAxisFacets } from "../../core/axisFacets.ts";
@@ -568,7 +570,8 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
       const work = state.works.find((w) => w.id === id);
       if (!work) return null;
       if (patch.title !== undefined) work.title = patch.title;
-      if (patch.tags !== undefined) work.tags = normalizeTags(patch.tags);
+      // patch.tags は workPatchSchema の境界で既に正規化済み（NormalizedTag[]）。
+      if (patch.tags !== undefined) work.tags = patch.tags;
       if (patch.bookmarked !== undefined) work.bookmarked = patch.bookmarked;
       return buildFullWorkFromState(state, work);
     },
@@ -610,8 +613,8 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
     },
 
     // ── 分類軸・タグ prefix 定義・スマートフォルダー・プリセット ──
-    async getAxisFacets(axis: string): Promise<AxisFacetItem[]> {
-      return buildAxisFacets(axis, state.works);
+    async getAxisFacets(axis: string, filter?: AxisFacetsFilter): Promise<AxisFacetItem[]> {
+      return buildAxisFacets(axis, state.works, filter);
     },
 
     async listTagPrefixes(): Promise<TagPrefix[]> {
@@ -679,10 +682,7 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
       return state.smartFolders.length < before;
     },
 
-    async evalSmartFolder(
-      id: string,
-      query: { page: number; limit: number; seed?: number },
-    ): Promise<WorksPage | null> {
+    async evalSmartFolder(id: string, query: SmartFolderEvalQuery): Promise<WorksPage | null> {
       const folder = state.smartFolders.find((f) => f.id === id);
       if (!folder) return null;
       return toListPage(evalSmartFolder(folder, state.works, query));

@@ -3,6 +3,7 @@
 // コンポーネント側は返された view model を配線するだけにする。
 
 import {
+  queryOptions,
   useMutation,
   useQuery,
   useQueryClient,
@@ -13,12 +14,11 @@ import {
   type SmartFolder,
   type SmartFolderCreate,
   type Work,
-  type WorkPatch,
+  type WorkPatchInput,
   type WorksPage,
 } from "@mimimilli/shared";
 import {
   searchWorks,
-  getAxisFacets,
   listSmartFolders,
   createSmartFolder,
   updateSmartFolder,
@@ -28,8 +28,14 @@ import { getAllTags, getWork, patchWork } from "../../../entities/work/api";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
 import { TAG_QUERY_KEYS } from "../../../entities/tag/queryKeys";
-import { buildWorksParams, getFacetAxisForQuery } from "./libraryPresentation";
+import {
+  buildSmartFolderFilterParams,
+  buildWorksParams,
+  computeCollectionStatsDisplay,
+  getFacetAxisForQuery,
+} from "./libraryPresentation";
 import { useTagPrefixes } from "./useTagPrefixes";
+import { useAxisFacetsQuery } from "./useAxisFacetsQuery";
 import { useDebouncedValue } from "../../../shared/lib/useDebouncedValue";
 import { getWorkPatchInvalidationTargets, mergeWorkPatchResponse } from "./workPatchInvalidation";
 import {
@@ -42,6 +48,23 @@ import type { LibraryViewState } from "./useLibraryNavigation";
 
 /** 検索クエリのデバウンス時間（TASK-61）。1文字ごとの全件検索発行を間引く */
 const SEARCH_DEBOUNCE_MS = 250;
+
+/**
+ * limit:1 の全件検索（ライブラリ総件数・統計）。queryKey/queryFn/型を1箇所にまとめ、
+ * 呼び出し側（本フック・ScanModal）が個別に useQuery({queryKey, queryFn}) を書かないようにする。
+ *
+ * 同じ queryKey を持つ useQuery が呼び出し側ごとに違う queryFn（違う戻り値の形）を持つと、
+ * React Query は queryKey が同一かどうかしか見ないため、先に解決した方の形が cache を占有し、
+ * 後から subscribe した側は自分の queryFn の戻り値ではなく cache の値をそのまま .data として
+ * 受け取る（TASK-188: ScanModal 側が number を、こちら側が WorksPage 全体を期待していて
+ * 衝突し、WorksPage オブジェクトを JSX の子として描画してクラッシュした）。
+ * queryOptions() で定義を共有すれば、両者の .data の型が常に一致し、この種の食い違いは
+ * 型チェックの時点で検知できる。
+ */
+export const libraryTotalQueryOptions = queryOptions({
+  queryKey: WORK_QUERY_KEYS.total(),
+  queryFn: () => searchWorks({ limit: 1 }),
+});
 
 /** 追加読み込みのページ指定。randomソートのseedを次ページへ引き継ぐ（TASK-73） */
 interface WorksPageParam {
@@ -66,7 +89,6 @@ export function useSuspenseNormalLibraryWorks(nav: LibraryViewState, searchQuery
     sort: nav.sort,
     searchQuery,
     selectedTags: nav.selectedTags,
-    drillValue: nav.drillValue,
   });
   // 呼び出し側は通常軸だけをマウントする。スマート軸は専用の子コンポーネントが担当する。
   const normalWorksParams = worksParams!;
@@ -94,21 +116,32 @@ export function useLibraryDebouncedSearchQuery(searchQuery: string) {
   return useDebouncedValue(searchQuery, SEARCH_DEBOUNCE_MS, searchQuery === "");
 }
 
-/** Suspense 境界配下でのみ使うスマートフォルダー作品一覧。 */
+/** Suspense 境界配下でのみ使うスマートフォルダー作品一覧。
+ *  保持中のタグ/組み込み軸フィルタをフォルダーのルールへの追加 AND として渡す（ADR-0012）。 */
 export function useSuspenseSmartLibraryWorks(nav: LibraryViewState) {
   const smartAxisId = getSmartFolderId(nav.activeAxis);
+  const filterParams = buildSmartFolderFilterParams(nav.selectedTags);
   const query = useSuspenseInfiniteQuery({
-    queryKey: SMART_FOLDER_QUERY_KEYS.works(smartAxisId),
+    queryKey: SMART_FOLDER_QUERY_KEYS.works(smartAxisId, filterParams),
     queryFn: ({ pageParam, signal }) =>
       evalSmartFolder(
         smartAxisId,
-        { page: pageParam.page, limit: WORKS_DEFAULT_PAGE_SIZE, seed: pageParam.seed },
+        {
+          ...filterParams,
+          page: pageParam.page,
+          limit: WORKS_DEFAULT_PAGE_SIZE,
+          seed: pageParam.seed,
+        },
         { signal },
       ),
     initialPageParam: { page: 1, seed: undefined } as WorksPageParam,
     getNextPageParam: getNextWorksPageParam,
   });
-  return toSuspenseWorksResult(query, { smartFolderId: smartAxisId, sort: nav.sort });
+  return toSuspenseWorksResult(query, {
+    smartFolderId: smartAxisId,
+    sort: nav.sort,
+    ...filterParams,
+  });
 }
 
 function toSuspenseWorksResult(
@@ -139,16 +172,10 @@ function toSuspenseWorksResult(
  * このフックは一覧を取得しない。
  */
 export function useLibrarySupportingQueries(nav: LibraryViewState) {
-  const libraryTotalQuery = useQuery({
-    queryKey: WORK_QUERY_KEYS.total(),
-    queryFn: () => searchWorks({ limit: 1 }).then((page) => page.total),
-  });
-  const facetAxis = getFacetAxisForQuery(nav.activeAxis, nav.drillValue);
-  const facetQuery = useQuery({
-    queryKey: WORK_QUERY_KEYS.facets(facetAxis ?? ""),
-    queryFn: () => getAxisFacets(facetAxis!),
-    enabled: facetAxis !== null,
-  });
+  // 件数バッジ（libraryTotal）とホームビューの統計表示を兼ねる。
+  const libraryStatsQuery = useQuery(libraryTotalQueryOptions);
+  const facetAxis = getFacetAxisForQuery(nav.activeAxis);
+  const facetQuery = useAxisFacetsQuery(facetAxis, nav.selectedTags);
   const smartFoldersQuery = useQuery({
     queryKey: SMART_FOLDER_QUERY_KEYS.all(),
     queryFn: listSmartFolders,
@@ -166,7 +193,13 @@ export function useLibrarySupportingQueries(nav: LibraryViewState) {
   } = useTagPrefixes();
 
   return {
-    libraryTotal: libraryTotalQuery.data,
+    libraryTotal: libraryStatsQuery.data?.total,
+    homeStats: computeCollectionStatsDisplay(
+      libraryStatsQuery.isLoading,
+      libraryStatsQuery.isError,
+      libraryStatsQuery.data?.total,
+      libraryStatsQuery.data?.stats,
+    ),
     facetItems: facetQuery.data ?? [],
     isFacetLoading: facetQuery.isLoading,
     isFacetError: facetQuery.isError,
@@ -193,11 +226,11 @@ export function useLibraryPatchWorkMutation(nav: LibraryViewState, searchQuery: 
     sort: nav.sort,
     searchQuery: debouncedSearchQuery,
     selectedTags: nav.selectedTags,
-    drillValue: nav.drillValue,
   });
 
   return useMutation({
-    mutationFn: ({ workId, body }: { workId: string; body: WorkPatch }) => patchWork(workId, body),
+    mutationFn: ({ workId, body }: { workId: string; body: WorkPatchInput }) =>
+      patchWork(workId, body),
     onSuccess: async (updatedWork, { workId, body }) => {
       queryClient.setQueryData<Work>(WORK_QUERY_KEYS.detail(workId), (prev) =>
         mergeWorkPatchResponse(prev, body, updatedWork),
@@ -207,10 +240,12 @@ export function useLibraryPatchWorkMutation(nav: LibraryViewState, searchQuery: 
         sort: nav.sort,
         searchQuery: debouncedSearchQuery,
         selectedTags: nav.selectedTags,
-        drillValue: nav.drillValue,
       });
       const activeListQueryKey = isSmartAxis(nav.activeAxis)
-        ? SMART_FOLDER_QUERY_KEYS.works(getSmartFolderId(nav.activeAxis))
+        ? SMART_FOLDER_QUERY_KEYS.works(
+            getSmartFolderId(nav.activeAxis),
+            buildSmartFolderFilterParams(nav.selectedTags),
+          )
         : worksParams !== null
           ? WORK_QUERY_KEYS.list(worksParams)
           : null;

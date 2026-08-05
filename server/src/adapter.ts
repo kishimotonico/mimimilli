@@ -48,6 +48,26 @@ export interface ScanOptions {
   beforeFinalize?: () => void;
 }
 
+/** GET /smart-folders/:id/works のクエリ。tags はフォルダーのルールに対する
+ *  追加の AND 条件として適用する（TASK-185）。組み込み軸（year等）も専用パラメータを
+ *  持たず、擬似タグとして tags に混ざる（ADR-0012 §2、TASK-199）。
+ *  ソートはフォルダー自身が持つため含まない */
+export interface SmartFolderEvalQuery {
+  page: number;
+  limit: number;
+  seed?: number;
+  tags?: string[];
+  tagOp?: "AND" | "OR";
+}
+
+/** GET /axes/:axis のクエリ。tags は集計対象の絞り込み（AND 条件）、組み込み軸の擬似タグも
+ *  含む（ADR-0012 §2、TASK-199）。自軸由来のフィルタを除外した集合を渡すのは
+ *  呼び出し側（client）の責務（TASK-187） */
+export interface AxisFacetsFilter {
+  tags?: string[];
+  tagOp?: "AND" | "OR";
+}
+
 /** 前提条件（ルートフォルダー未設定等）を満たしていない操作。HTTP では 409 conflict */
 export class NotConfiguredError extends Error {}
 
@@ -124,7 +144,7 @@ export interface DataAdapter {
 
   // 分類軸・タグ prefix 定義・スマートフォルダー
   /** axis は "tag" / "year" / 任意の prefix 文字列（正規形・小文字）（ADR-0005） */
-  getAxisFacets(axis: string): Promise<AxisFacetItem[]>;
+  getAxisFacets(axis: string, filter?: AxisFacetsFilter): Promise<AxisFacetItem[]>;
   listTagPrefixes(): Promise<TagPrefix[]>;
   /** 既存の prefix と重複する場合は null（ルートが 409 を返す） */
   createTagPrefix(input: TagPrefixCreate): Promise<TagPrefix | null>;
@@ -135,10 +155,7 @@ export interface DataAdapter {
   createSmartFolder(input: SmartFolderCreate): Promise<SmartFolder>;
   updateSmartFolder(id: string, input: SmartFolderUpdate): Promise<SmartFolder | null>;
   deleteSmartFolder(id: string): Promise<boolean>;
-  evalSmartFolder(
-    id: string,
-    query: { page: number; limit: number; seed?: number },
-  ): Promise<WorksPage | null>;
+  evalSmartFolder(id: string, query: SmartFolderEvalQuery): Promise<WorksPage | null>;
 
   // 物理ファイルシステム（Filesモード）
   /** path 省略時はルートフォルダー。ルート配下でない・存在しない場合は null */

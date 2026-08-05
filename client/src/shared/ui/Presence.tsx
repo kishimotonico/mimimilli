@@ -10,7 +10,8 @@ export type PresenceVariant =
   | "dock-bar-slide"
   | "dock-bar-switch"
   | "dock-popup-scale"
-  | "colstack-width";
+  | "colstack-width"
+  | "preview-slide";
 
 const VARIANT_CLASS: Record<PresenceVariant, string> = {
   fade: "ml-presence-fade",
@@ -20,6 +21,7 @@ const VARIANT_CLASS: Record<PresenceVariant, string> = {
   "dock-bar-switch": "ml-presence-dock-bar ml-presence-dock-bar--switch",
   "dock-popup-scale": "ml-presence-dock-popup",
   "colstack-width": "ml-presence-colstack",
+  "preview-slide": "ml-presence-preview",
 };
 
 export interface PresenceProps extends UsePresenceOptions {

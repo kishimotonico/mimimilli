@@ -8,6 +8,7 @@ import {
 } from "@mimimilli/shared";
 import { applyWorksQuery } from "../src/core/worksQuery.ts";
 import { compareJapaneseSortKeys } from "../src/core/japaneseSortKey.ts";
+import { nts } from "./helpers/tag.ts";
 
 const NOW = new Date();
 const RECENT = new Date(NOW.getTime() - 5 * 86400000).toISOString(); // 5日前
@@ -24,7 +25,7 @@ const WORKS: WorkSummary[] = [
     addedAt: RECENT,
     errorMessage: null,
     urls: [],
-    tags: ["cv/水瀬なずな", "ASMR", "耳かき"],
+    tags: nts(["cv/水瀬なずな", "ASMR", "耳かき"]),
     trackCount: 3,
     bookmarked: true,
     lastPlayedAt: "2025-01-01T00:00:00.000Z",
@@ -40,7 +41,7 @@ const WORKS: WorkSummary[] = [
     addedAt: OLD,
     errorMessage: null,
     urls: [],
-    tags: ["cv/霧島レイ", "添い寝", "ASMR"],
+    tags: nts(["cv/霧島レイ", "添い寝", "ASMR"]),
     trackCount: 2,
     bookmarked: false,
     lastPlayedAt: null,
@@ -56,7 +57,7 @@ const WORKS: WorkSummary[] = [
     addedAt: OLD,
     errorMessage: null,
     urls: [],
-    tags: ["cv/水瀬なずな", "催眠"],
+    tags: nts(["cv/水瀬なずな", "催眠"]),
     trackCount: 1,
     bookmarked: false,
     lastPlayedAt: "2024-06-01T00:00:00.000Z",
@@ -67,7 +68,7 @@ const WORKS: WorkSummary[] = [
 function baseQuery(overrides: Partial<WorksQuery> = {}): WorksQuery {
   return {
     q: "",
-    tags: [],
+    tags: nts([]),
     tagOp: "AND",
     sort: "added-desc",
     ...overrides,
@@ -155,25 +156,24 @@ test("tags: prefix の大文字小文字は無視して一致する", () => {
   assert.deepEqual(result.items.map((w) => w.id).sort(), ["RJ001", "RJ003"]);
 });
 
-test("axis+axisValue: prefix 軸はタグの完全一致でドリルする", () => {
-  const result = applyWorksQuery(WORKS, baseQuery({ axis: "cv", axisValue: "水瀬なずな" }));
-  assert.deepEqual(result.items.map((w) => w.id).sort(), ["RJ001", "RJ003"]);
-});
-
-test("axis+axisValue: 値の部分一致ではドリルにヒットしない", () => {
-  const result = applyWorksQuery(WORKS, baseQuery({ axis: "cv", axisValue: "水瀬" }));
-  assert.equal(result.items.length, 0);
-});
-
-test("axis+axisValue: year 軸は addedAt の年で絞り込む（タグ照合ではない）", () => {
+test("tags: @year/... 擬似タグは addedAt の年で絞り込む（タグ照合ではない、ADR-0012 §2）", () => {
   const year = RECENT.slice(0, 4);
-  const result = applyWorksQuery(WORKS, baseQuery({ axis: "year", axisValue: year }));
+  const result = applyWorksQuery(WORKS, baseQuery({ tags: [`@year/${year}`] }));
   assert.ok(result.items.length > 0);
   for (const work of result.items) {
     assert.equal(work.addedAt.slice(0, 4), year);
   }
-  const none = applyWorksQuery(WORKS, baseQuery({ axis: "year", axisValue: "1999" }));
+  const none = applyWorksQuery(WORKS, baseQuery({ tags: ["@year/1999"] }));
   assert.equal(none.items.length, 0);
+});
+
+test("tags: 実タグと @year/... 擬似タグを同時に指定すると両方AND適用される", () => {
+  const year = RECENT.slice(0, 4);
+  const result = applyWorksQuery(WORKS, baseQuery({ tags: ["cv/水瀬なずな", `@year/${year}`] }));
+  for (const work of result.items) {
+    assert.equal(work.addedAt.slice(0, 4), year);
+    assert.ok(work.tags.some((tag) => tag.toLowerCase() === "cv/水瀬なずな".toLowerCase()));
+  }
 });
 
 test("view: fav はブックマーク済みのみ", () => {
@@ -306,7 +306,7 @@ const MANY_WORKS: WorkSummary[] = Array.from({ length: 10 }, (_, index) => ({
   addedAt: new Date(Date.now() - index * 86400000).toISOString(),
   errorMessage: null,
   urls: [],
-  tags: index % 2 === 0 ? ["cv/水瀬なずな", "ASMR"] : ["cv/霧島レイ"],
+  tags: index % 2 === 0 ? nts(["cv/水瀬なずな", "ASMR"]) : nts(["cv/霧島レイ"]),
   trackCount: 1,
   bookmarked: index % 3 === 0,
   lastPlayedAt: index % 2 === 0 ? RECENT : null,
@@ -335,12 +335,12 @@ test("ページング: 全sortでページ連結が全件と一致する（重�
   }
 });
 
-test("ページング: 検索・タグAND/OR・軸・viewでもページ連結がフィルタ結果と一致する", () => {
+test("ページング: 検索・タグAND/OR・year擬似タグ・viewでもページ連結がフィルタ結果と一致する", () => {
   const cases: Array<[string, Partial<WorksQuery>]> = [
     ["検索", { q: "ASMR" }],
     ["タグAND", { tags: ["cv/水瀬なずな", "ASMR"], tagOp: "AND" }],
     ["タグOR", { tags: ["cv/水瀬なずな", "cv/霧島レイ"], tagOp: "OR" }],
-    ["軸", { axis: "cv", axisValue: "水瀬なずな" }],
+    ["year擬似タグ", { tags: [`@year/${new Date().getFullYear()}`] }],
     ["view:fav", { view: "fav" }],
     ["view:missing", { view: "missing" }],
     ["view:unplayed", { view: "unplayed" }],

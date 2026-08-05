@@ -5,7 +5,9 @@ export const WORK_QUERY_KEYS = {
   allDetails: () => ["work"] as const,
   detail: (id: string) => ["work", id] as const,
   allFacets: () => ["axisFacets"] as const,
-  facets: (axis: string) => ["axisFacets", axis] as const,
+  // filterParams: 自軸除外後の絞り込み。フィルタが変われば別クエリとして
+  // キャッシュを分離する
+  facets: (axis: string, filterParams: object = {}) => ["axisFacets", axis, filterParams] as const,
   dlsiteNotifications: () => ["dlsiteNotifications"] as const,
   dlsiteNotificationSummary: () => ["dlsiteNotifications", "summary"] as const,
   dlsiteNotificationList: (kind: "rj-missing" | "fetch-failed" | "parse-failed") =>

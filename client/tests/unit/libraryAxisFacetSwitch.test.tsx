@@ -24,7 +24,6 @@ function urlOf(input: RequestInfo | URL): string {
 
 const baseNav: LibraryViewState = {
   activeAxis: "cv",
-  drillValue: null,
   selectedTags: [],
   selectedWorkId: null,
   sort: "added-desc",
@@ -36,7 +35,14 @@ function createFetchMock() {
     const path = url.pathname;
     if (path === "/api/axes/cv") {
       return Promise.resolve(
-        jsonResponse(Array.from({ length: 8 }, (_, i) => ({ value: `cv${i}`, count: 1 }))),
+        jsonResponse(
+          Array.from({ length: 8 }, (_, i) => ({
+            value: `cv${i}`,
+            count: 1,
+            durationSec: 0,
+            covers: [],
+          })),
+        ),
       );
     }
     if (path === "/api/axes/tag") {

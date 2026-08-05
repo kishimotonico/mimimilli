@@ -1,52 +1,75 @@
 import { atom } from "jotai";
+import { isBuiltinPseudoTagAxis, normalizeTag, parseBuiltinAxisTag } from "@mimimilli/shared";
 import { requestNavigationHistoryCommit } from "../../navigation/model/navigationHistoryCommit";
 import type { AxisId, SortId } from "./types";
-import {
-  activeAxisAtom,
-  drillValueAtom,
-  gridInspectorOpenAtom,
-  selectedTagsAtom,
-  selectedWorkIdAtom,
-  sortAtom,
-} from "./atoms";
+import { computeReplacedTags, computeResultsPaneKind } from "./libraryPresentation";
+import { activeAxisAtom, selectedTagsAtom, selectedWorkIdAtom, sortAtom } from "./atoms";
 
+// 軸は値をブラウズするためのビューであり、選択状態を持たない（ADR-0012 §1）。
+// 軸を切り替えても選択中のフィルタ（selectedTagsAtom）は維持する。
 export const setLibraryAxisAtom = atom(null, (_get, set, axis: AxisId) => {
   requestNavigationHistoryCommit(set, "push");
   set(activeAxisAtom, axis);
-  set(drillValueAtom, null);
-  set(selectedTagsAtom, []);
   set(selectedWorkIdAtom, null);
-  set(gridInspectorOpenAtom, false);
 });
 
-export const drillIntoAtom = atom(null, (_get, set, value: string) => {
-  requestNavigationHistoryCommit(set, "push");
-  set(drillValueAtom, value);
-  set(selectedTagsAtom, []);
-  set(selectedWorkIdAtom, null);
-  set(gridInspectorOpenAtom, false);
-});
-
-export const drillBackAtom = atom(null, (_get, set) => {
-  requestNavigationHistoryCommit(set, "push");
-  set(drillValueAtom, null);
-  set(selectedWorkIdAtom, null);
-  set(gridInspectorOpenAtom, false);
-});
-
+// 軸の値選択（facet/tag 問わず）はすべて同じタグフィルタへの追加・解除として扱う
+// （ADR-0012 §2）。year のような単一選択の組み込み軸は、追加時に同じ軸の既存選択を
+// 取り除いてから追加することで「新しい値が前の選択を置き換える」挙動にする。
 export const toggleLibraryTagAtom = atom(null, (get, set, tag: string) => {
   requestNavigationHistoryCommit(set, "push");
   const prev = get(selectedTagsAtom);
-  set(selectedTagsAtom, prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]);
+  if (prev.includes(tag)) {
+    set(
+      selectedTagsAtom,
+      prev.filter((t) => t !== tag),
+    );
+  } else {
+    const normalized = normalizeTag(tag);
+    const builtin = normalized === null ? null : parseBuiltinAxisTag(normalized);
+    const base =
+      builtin && isBuiltinPseudoTagAxis(builtin.axis)
+        ? prev.filter((t) => {
+            const n = normalizeTag(t);
+            return (n === null ? null : parseBuiltinAxisTag(n))?.axis !== builtin.axis;
+          })
+        : prev;
+    set(selectedTagsAtom, [...base, tag]);
+  }
   set(selectedWorkIdAtom, null);
-  set(gridInspectorOpenAtom, false);
+});
+
+// 作品詳細のタグクリック用: 軸を tag に切り替えつつ絞り込みをそのタグだけに置き換える
+// 単一のアクション（ADR-0012 §2）。setAxis → toggleTag の2段呼び出しは、既存の絞り込みへの
+// 追加になってしまうほか、履歴コミットの二重化も招くため使わない。
+export const selectSoleLibraryTagAtom = atom(null, (_get, set, tag: string) => {
+  requestNavigationHistoryCommit(set, "push");
+  set(activeAxisAtom, "tag");
+  set(selectedTagsAtom, [tag]);
+  set(selectedWorkIdAtom, null);
+});
+
+// 全入口共通の「既定=置き換え」操作（ADR-0012 §7・§8）。同じ tagFilterGroupKey のタグを
+// 外してから追加し、結果面を作品一覧へ進める。置き換えは「見たいものが変わった」を表す
+// ため、結果面が値一覧/ホームのままなら作品一覧（all）へ切り替える。既に作品一覧
+// （ビュー軸・スマートフォルダー軸）ならそのまま維持する。軸レールのクイックオーバーレイ・
+// チップの兄弟値ドロップダウン・値一覧の値タイル/行クリックが使う、入口を問わない単一の
+// 規則。AND追加（Ctrl+クリック・ホバー時の＋ボタン等、「絞り込みを積んでいる途中」を表す）
+// は現在地に留まる toggleLibraryTagAtom を使う。
+export const replaceLibraryTagAtom = atom(null, (get, set, tag: string) => {
+  requestNavigationHistoryCommit(set, "push");
+  const prev = get(selectedTagsAtom);
+  set(selectedTagsAtom, computeReplacedTags(prev, tag));
+  if (computeResultsPaneKind(get(activeAxisAtom)) !== "works") {
+    set(activeAxisAtom, "all");
+  }
+  set(selectedWorkIdAtom, null);
 });
 
 export const clearLibraryTagsAtom = atom(null, (_get, set) => {
   requestNavigationHistoryCommit(set, "push");
   set(selectedTagsAtom, []);
   set(selectedWorkIdAtom, null);
-  set(gridInspectorOpenAtom, false);
 });
 
 // 未選択→選択は push（戻るでドリル済み・未選択に戻れるように）、
@@ -64,10 +87,5 @@ export const setLibrarySortAtom = atom(null, (_get, set, sort: SortId) => {
 
 export const goToLibrarySegmentAtom = atom(null, (get, set, index: number) => {
   const activeAxis = get(activeAxisAtom);
-  const drillValue = get(drillValueAtom);
-  if (index <= 0) {
-    if (activeAxis !== "all") set(setLibraryAxisAtom, "all");
-    return;
-  }
-  if (index === 1 && drillValue !== null) set(drillBackAtom);
+  if (index <= 0 && activeAxis !== "all") set(setLibraryAxisAtom, "all");
 });

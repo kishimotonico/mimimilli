@@ -14,7 +14,6 @@ import type { LibraryViewState } from "../../src/features/library/model/useLibra
 
 const nav: LibraryViewState = {
   activeAxis: "all",
-  drillValue: null,
   selectedTags: [],
   selectedWorkId: null,
   sort: "added-desc",

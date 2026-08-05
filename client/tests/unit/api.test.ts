@@ -402,11 +402,28 @@ describe("library api", () => {
   });
 
   it("getAxisFacets fetches /api/axes/:axis", async () => {
-    const mockFacets = [{ value: "cv/水瀬なずな", count: 3 }];
+    const mockFacets = [{ value: "cv/水瀬なずな", count: 3, durationSec: 1200, covers: [] }];
     mockFetch.mockResolvedValue(makeResponse(mockFacets));
     const result = await libraryApi.getAxisFacets("cv");
     expect(mockFetch).toHaveBeenCalledWith("/api/axes/cv");
     expect(result).toEqual(mockFacets);
+  });
+
+  it("getAxisFacets は自軸除外後のフィルタ（tags/tagOp）をクエリへ渡す。組み込み軸の擬似タグも tags に含まれる", async () => {
+    mockFetch.mockResolvedValue(makeResponse([]));
+    await libraryApi.getAxisFacets("cv", {
+      tags: ["サークル/月白製作所", "@year/2024"],
+      tagOp: "AND",
+    });
+    expect(mockFetch).toHaveBeenCalledWith(
+      "/api/axes/cv?tags=%E3%82%B5%E3%83%BC%E3%82%AF%E3%83%AB%2F%E6%9C%88%E7%99%BD%E8%A3%BD%E4%BD%9C%E6%89%80&tags=%40year%2F2024&tagOp=AND",
+    );
+  });
+
+  it("getAxisFacets はフィルタ省略時クエリ無しでフェッチする", async () => {
+    mockFetch.mockResolvedValue(makeResponse([]));
+    await libraryApi.getAxisFacets("cv", {});
+    expect(mockFetch).toHaveBeenCalledWith("/api/axes/cv");
   });
 
   it("listSmartFolders fetches /api/smart-folders", async () => {
@@ -425,6 +442,21 @@ describe("library api", () => {
     const result = await libraryApi.evalSmartFolder("sf-1", { page: 1, limit: 200 });
     expect(mockFetch).toHaveBeenCalledWith("/api/smart-folders/sf-1/works?page=1&limit=200");
     expect(result).toEqual(mockPage);
+  });
+
+  it("evalSmartFolder は tags（保持中フィルタ）もクエリへ渡す。組み込み軸の擬似タグも tags に含まれる", async () => {
+    mockFetch.mockResolvedValue(
+      makeResponse({ items: [], total: 0, stats: { trackCount: 0, durationSec: 0 } }),
+    );
+    await libraryApi.evalSmartFolder("sf-1", {
+      page: 1,
+      limit: 200,
+      tags: ["cv/藤田茜", "ASMR", "@year/2024"],
+      tagOp: "AND",
+    });
+    expect(mockFetch).toHaveBeenCalledWith(
+      "/api/smart-folders/sf-1/works?tags=cv%2F%E8%97%A4%E7%94%B0%E8%8C%9C&tags=ASMR&tags=%40year%2F2024&tagOp=AND&page=1&limit=200",
+    );
   });
 
   it("exportLibrary POSTs to /api/export and returns data string", async () => {

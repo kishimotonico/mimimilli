@@ -22,7 +22,6 @@ import type { LibraryViewState } from "../../src/features/library/model/useLibra
 
 const baseNav: LibraryViewState = {
   activeAxis: "all",
-  drillValue: null,
   selectedTags: [],
   selectedWorkId: "p1-w1",
   sort: "added-desc",

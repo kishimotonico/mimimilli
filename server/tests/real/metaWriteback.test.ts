@@ -6,6 +6,7 @@ import { test, type TestContext } from "node:test";
 import { emptyDlsiteState } from "@mimimilli/shared";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { makeSampleLibrary, makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
+import { nts } from "../helpers/tag.ts";
 
 async function setup(t: TestContext) {
   const lib = makeSampleLibrary();
@@ -27,7 +28,7 @@ test("patchWork の title / tags がメタファイルへ反映され、スキ�
 
   const updated = await adapter.patchWork(existingWorkId, {
     title: "改題された作品",
-    tags: ["cv/水瀬なずな", "新タグ"],
+    tags: nts(["cv/水瀬なずな", "新タグ"]),
   });
   assert.equal(updated?.title, "改題された作品");
 
@@ -60,7 +61,7 @@ test("メタ書き戻し失敗時は DB の title / tags もロールバック�
   await assert.rejects(
     adapter.patchWork(existingWorkId, {
       title: "反映されないタイトル",
-      tags: ["反映されないタグ"],
+      tags: nts(["反映されないタグ"]),
     }),
     /ENOENT/,
   );
@@ -142,7 +143,7 @@ test("単一ファイル形式作品の patch が同居する mimimilli.json を
 
   const updated = await adapter.patchWork(singleWorkId, {
     title: "単一ファイル改題",
-    tags: ["単一タグ", "追記タグ"],
+    tags: nts(["単一タグ", "追記タグ"]),
   });
   assert.equal(updated?.title, "単一ファイル改題");
   assert.equal(readFileSync(folderMetaPath, "utf-8"), folderMetaBefore);

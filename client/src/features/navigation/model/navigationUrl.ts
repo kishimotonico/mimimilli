@@ -1,11 +1,13 @@
-import { isFacetAxis, isViewAxis } from "../../library/model/axisDefinitions";
+import { buildBuiltinAxisTag, splitSelectedTags } from "@mimimilli/shared";
+import { isViewAxis } from "../../library/model/axisDefinitions";
 import type { AxisId, SortId } from "../../library/model/types";
 
 export type AppMode = "library" | "files";
 
 export interface LibraryUrlState {
   activeAxis: AxisId;
-  drillValue: string | null;
+  /** 全軸共通のタグフィルタ（ADR-0012 §2）。year 軸のような組み込み軸も
+   *  "year/2024" 形式の擬似タグとしてここに載る */
   selectedTags: string[];
   selectedWorkId: string | null;
   sort: SortId;
@@ -32,7 +34,6 @@ export const DEFAULT_SORT: SortId = "added-desc";
 
 export const DEFAULT_LIBRARY_URL_STATE: LibraryUrlState = {
   activeAxis: "all",
-  drillValue: null,
   selectedTags: [],
   selectedWorkId: null,
   sort: DEFAULT_SORT,
@@ -87,7 +88,7 @@ function isSafeRelativeSegment(value: string): boolean {
 }
 
 function parseAxis(value: string): AxisId | null {
-  if (isViewAxis(value as AxisId) || value === "tag") return value;
+  if (isViewAxis(value as AxisId) || value === "tag" || value === "home") return value;
   if (value.startsWith("smart-")) {
     return value.length > "smart-".length ? value : null;
   }
@@ -95,13 +96,18 @@ function parseAxis(value: string): AxisId | null {
   return value.toLowerCase();
 }
 
-/** ドリル（/library/:axis/:value）できるのはファセット軸のみ */
-function isDrillableAxis(axis: AxisId): boolean {
-  return isFacetAxis(axis);
-}
-
 function uniqueNonEmpty(values: string[]): string[] {
   return [...new Set(values.filter((value) => value.length > 0))];
+}
+
+/** URLの tags= を検証する。UI操作は擬似タグの単一選択・既知軸を常に強制するが、
+ *  URLは直接編集され得るため、ここで同じ制約を検証する（ADR-0012 §2）。
+ *  未知の組み込み軸・複数の year 擬似タグ・正規化後に空になるタグは黙って残さず、
+ *  警告付きで拒否・正規化する（splitSelectedTags の検証を shared から流用する）。 */
+function parseAndValidateSelectedTags(rawValues: string[], warnings: string[]): string[] {
+  const { tags, yearValue, warnings: splitWarnings } = splitSelectedTags(uniqueNonEmpty(rawValues));
+  for (const warning of splitWarnings) warnings.push(`選択タグを検証しました: ${warning}`);
+  return yearValue !== null ? [...tags, buildBuiltinAxisTag("year", yearValue)] : tags;
 }
 
 function parseSelectedRelPath(value: string, warnings: string[]): string[] | null {
@@ -143,17 +149,12 @@ export function parseNavigationUrl(input: string | URL): NavigationParseResult {
       return defaultResult(warnings);
     }
 
-    const drillValue = segments[2] ?? null;
-    if (segments.length > 3 || (drillValue !== null && !isDrillableAxis(axis))) {
+    if (segments.length > 2) {
       warnings.push(`軸の階層として不正な URL を拒否しました: ${url.pathname}`);
       return defaultResult(warnings);
     }
 
-    let selectedTags = uniqueNonEmpty(url.searchParams.getAll("tags"));
-    if (axis !== "tag" && selectedTags.length > 0) {
-      warnings.push("tag 軸以外の tags query を無視しました");
-      selectedTags = [];
-    }
+    const selectedTags = parseAndValidateSelectedTags(url.searchParams.getAll("tags"), warnings);
 
     const selectedWorkId = url.searchParams.get("work") || null;
     const sortValue = url.searchParams.get("sort");
@@ -165,7 +166,7 @@ export function parseNavigationUrl(input: string | URL): NavigationParseResult {
 
     const state: NavigationUrlState = {
       mode: "library",
-      library: { activeAxis: axis, drillValue, selectedTags, selectedWorkId, sort, q },
+      library: { activeAxis: axis, selectedTags, selectedWorkId, sort, q },
     };
     return { state, canonicalUrl: serializeNavigationUrl(state), warnings };
   }
@@ -195,12 +196,9 @@ export function serializeNavigationUrl(state: NavigationUrlState): string {
   const params = new URLSearchParams();
 
   if (state.mode === "library") {
-    const { activeAxis, drillValue, selectedTags, selectedWorkId, sort, q } = state.library;
-    let pathname = `/library/${encodeURIComponent(activeAxis)}`;
-    if (drillValue !== null) pathname += `/${encodeURIComponent(drillValue)}`;
-    if (activeAxis === "tag") {
-      for (const tag of selectedTags) params.append("tags", tag);
-    }
+    const { activeAxis, selectedTags, selectedWorkId, sort, q } = state.library;
+    const pathname = `/library/${encodeURIComponent(activeAxis)}`;
+    for (const tag of selectedTags) params.append("tags", tag);
     if (selectedWorkId) params.set("work", selectedWorkId);
     if (sort !== DEFAULT_SORT) params.set("sort", sort);
     if (q) params.set("q", q);

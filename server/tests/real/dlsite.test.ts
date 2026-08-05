@@ -320,8 +320,8 @@ test("dlsiteApply: タグマージとメタ書き戻し（カバー DL なし）
 
   const work = await adapter.getWork(lib.existingWorkId);
   assert.equal(work?.title, "DLsite から取得したタイトル");
-  assert.ok(work?.tags.includes("genre/耳かき"));
-  assert.ok(work?.tags.includes("genre/睡眠"));
+  assert.ok(work?.tags.some((t) => t === "genre/耳かき"));
+  assert.ok(work?.tags.some((t) => t === "genre/睡眠"));
   // 既存タグの重複なし
   assert.equal(work?.tags.filter((t) => t === "cv/水瀬なずな").length, 1);
 
@@ -465,8 +465,8 @@ test("一括取得: 編集済みタイトルは保持しフォルダー名のま
   // ＝ユーザー編集済みとみなし、タグの差分だけ追加してタイトルは保持する
   const existing = await adapter.getWork(lib.existingWorkId);
   assert.equal(existing?.title, beforeExisting?.title);
-  assert.ok(!existing?.tags.includes("genre/削除済み"));
-  assert.ok(existing?.tags.includes("genre/新着"));
+  assert.ok(!existing?.tags.some((t) => t === "genre/削除済み"));
+  assert.ok(existing?.tags.some((t) => t === "genre/新着"));
   assert.deepEqual(existing?.dlsite.appliedTags, ["genre/削除済み", "genre/新着"]);
 
   // スキャナー自動生成のタイトル（フォルダー名そのまま）は初期値のままとみなし、DLsite情報で更新する

@@ -1,4 +1,4 @@
-// TASK-174: リストの作品未選択時、右ペインを発見ダッシュボード（最近追加/最近再生/ランダムピック）に差し替える。
+// リストの作品未選択時、右ペインを発見ダッシュボード（最近追加/最近再生/ランダムピック）に差し替える。
 
 import { createElement, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -179,7 +179,12 @@ const asyncNoop = async () => {
   throw new Error("not used in this test");
 };
 
-describe("PreviewPane の empty モード", () => {
+// ADR-0012 §3: 結果面のプレースホルダー（未選択・0件）表示は WorkGrid/WorkListPane
+// 自身の CollectionStatus が担い、PreviewPane はもう「empty」モードを持たない
+// （作品選択時にだけスライドインするため）。PreviewPane は "work" と home 軸専用の
+// "home" だけを扱う。
+
+describe("PreviewPane のホームビュー（ADR-0012 §4）", () => {
   let fetchMock: ReturnType<typeof createFetchMock>;
 
   beforeEach(() => {
@@ -192,12 +197,9 @@ describe("PreviewPane の empty モード", () => {
   });
 
   const basePreviewPaneProps = {
-    axisLandingPresentation: { panelTitle: "概要", sectionTitle: "サークル", instruction: null },
     selectedWork: null,
     isSelectedWorkLoading: false,
     isSelectedWorkError: false,
-    smartFolder: null,
-    axisWorks: [],
     playingTrackIndex: null,
     onPlay: noop,
     onResume: noop,
@@ -207,38 +209,17 @@ describe("PreviewPane の empty モード", () => {
     tagSuggestions: [],
     isPatching: false,
     onPatchWork: asyncNoop,
-    onEditSmartFolder: noop,
   };
 
-  it("検索0件時は従来どおりCollectionPlaceholderを表示する（発見ダッシュボードは出さない）", async () => {
+  it("mode='home' では発見ダッシュボードの3セクションを結果面に表示する", async () => {
     render(
       createElement(
         Wrapper,
         null,
         createElement(PreviewPane, {
           ...basePreviewPaneProps,
-          mode: "empty",
-          showNoResultsHint: true,
-          emptyStats: { status: "ready", count: 0, trackCount: 0, durationSec: 0 },
-        }),
-      ),
-    );
-
-    expect(screen.getByText("作品が見つかりません")).toBeTruthy();
-    expect(screen.queryByText("最近追加")).toBeNull();
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it("未選択かつ検索結果ありのときは発見ダッシュボードの3セクションを表示する", async () => {
-    render(
-      createElement(
-        Wrapper,
-        null,
-        createElement(PreviewPane, {
-          ...basePreviewPaneProps,
-          mode: "empty",
-          showNoResultsHint: false,
-          emptyStats: { status: "ready", count: 3, trackCount: 5, durationSec: 600 },
+          mode: "home",
+          homeStats: { status: "ready", count: 3, trackCount: 5, durationSec: 600 },
         }),
       ),
     );
@@ -248,5 +229,6 @@ describe("PreviewPane の empty モード", () => {
       expect(screen.getByText("最近再生")).toBeTruthy();
       expect(screen.getByText("ランダムピック")).toBeTruthy();
     });
+    expect(screen.getByText(/3作品/)).toBeTruthy();
   });
 });

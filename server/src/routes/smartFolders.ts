@@ -45,7 +45,10 @@ export function smartFoldersRoute(adapter: DataAdapter): Hono {
   });
 
   app.get("/smart-folders/:id/works", async (c) => {
-    const parsed = smartFolderWorksQuerySchema.safeParse(c.req.query());
+    const parsed = smartFolderWorksQuerySchema.safeParse({
+      ...c.req.query(),
+      tags: c.req.queries("tags"),
+    });
     if (!parsed.success) {
       invalidRequest("スマートフォルダーのクエリパラメータが不正です");
     }
@@ -53,6 +56,8 @@ export function smartFoldersRoute(adapter: DataAdapter): Hono {
       page: parsed.data.page ?? 1,
       limit: parsed.data.limit ?? WORKS_DEFAULT_PAGE_SIZE,
       seed: parsed.data.seed,
+      tags: parsed.data.tags,
+      tagOp: parsed.data.tagOp,
     });
     if (!page) notFound(`スマートフォルダーが見つかりません: ${c.req.param("id")}`);
     return c.json(page);

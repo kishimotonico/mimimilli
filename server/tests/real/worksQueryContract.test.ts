@@ -13,6 +13,7 @@ import {
 } from "@mimimilli/shared";
 import { WorkRepo } from "../../src/adapters/real/workRepo.ts";
 import { querySmartFolderWorks } from "../../src/adapters/real/smartFolderWorks.ts";
+import { nts } from "../helpers/tag.ts";
 import { upsertTestWork, resolvedDuration } from "../helpers/workTestUtils.ts";
 import { openDb } from "../../src/adapters/real/db.ts";
 import { buildAxisFacets } from "../../src/core/axisFacets.ts";
@@ -151,8 +152,8 @@ test("core参照実装とreal SQLは固定例・生成クエリで同値", () =>
       baseQuery({ q: "VJ" }),
       baseQuery({ tags: ["CV/水瀬なずな", "ASMR"], tagOp: "AND" }),
       baseQuery({ tags: ["催眠", "添い寝"], tagOp: "OR" }),
-      baseQuery({ axis: "cv", axisValue: "水瀬なずな" }),
-      baseQuery({ axis: "year", axisValue: recent.slice(0, 4) }),
+      baseQuery({ tags: [`@year/${recent.slice(0, 4)}`] }),
+      baseQuery({ tags: ["ASMR", `@year/${recent.slice(0, 4)}`], tagOp: "AND" }),
       baseQuery({ view: "fav" }),
       baseQuery({ view: "recent" }),
       baseQuery({ view: "added" }),
@@ -193,19 +194,21 @@ test("core参照実装とreal SQLは固定例・生成クエリで同値", () =>
     ];
     const tagFilters = [[], ["ASMR"], ["cv/水瀬なずな"], ["催眠", "添い寝"]];
     const views = [undefined, "all", "recent", "added", "fav", "unplayed", "missing"] as const;
+    // year擬似タグ（@year/...）は実タグと混在してtagsへ渡る（ADR-0012 §2）。生成テストでも
+    // 単独・実タグとの組み合わせの両方を織り交ぜる
+    const yearPool = [recent.slice(0, 4), old.slice(0, 4), "1999"];
     for (let index = 0; index < 120; index++) {
       const sort = sortIdSchema.options[next() % sortIdSchema.options.length]!;
       const tags = tagFilters[next() % tagFilters.length]!;
-      const useAxis = next() % 4 === 0;
+      const useYearTag = next() % 4 === 0;
+      const yearTag = useYearTag ? `@year/${yearPool[next() % yearPool.length]!}` : null;
       assertQueryEquivalent(
         repo,
         baseQuery({
           q: queryTerms[next() % queryTerms.length]!,
-          tags,
+          tags: yearTag ? [...tags, yearTag] : tags,
           tagOp: next() % 2 === 0 ? "AND" : "OR",
           view: views[next() % views.length],
-          axis: useAxis ? "cv" : undefined,
-          axisValue: useAxis ? (next() % 2 === 0 ? "水瀬なずな" : "霧島レイ") : undefined,
           sort,
           seed: sort === "random" ? next() & 0x7fffffff : undefined,
           page: (next() % 8) + 1,
@@ -242,7 +245,7 @@ test("複数サークルタグのcircleNameはsharedとrealでUTF-8 BINARY順の
   const repo = new WorkRepo(db);
   const item = {
     ...dataset[0]!,
-    tags: ["サークル/和風", "circle/Zeta", "circle/Alpha", "ASMR"],
+    tags: nts(["サークル/和風", "circle/Zeta", "circle/Alpha", "ASMR"]),
   };
   try {
     upsertTestWork(repo, fullWork(item));
@@ -313,10 +316,42 @@ test("core参照実装とreal SQLのファセット値・件数・順序が同�
     for (const axis of ["tag", "year", "cv", "気分", "シリーズ", "e\u0301x", "unknown"]) {
       assert.deepEqual(repo.getAxisFacets(axis), buildAxisFacets(axis, dataset), axis);
     }
+    const exDurationSec = dataset.reduce((sum, work) => sum + (work.totalDurationSec ?? 0), 0);
     assert.deepEqual(repo.getAxisFacets("e\u0301x"), [
-      { value: "Ａlpha", count: dataset.length },
-      { value: "Ｂeta", count: dataset.length },
+      { value: "Ａlpha", count: dataset.length, durationSec: exDurationSec, covers: [] },
+      { value: "Ｂeta", count: dataset.length, durationSec: exDurationSec, covers: [] },
     ]);
+  } finally {
+    db.close();
+  }
+});
+
+test("軸ファセットの絞り込み（自軸除外カウント用フィルタ）もreal SQLとcoreが同値（TASK-187）", () => {
+  const db = openDb({ kind: "memory" });
+  const repo = new WorkRepo(db);
+  try {
+    for (const item of dataset) upsertTestWork(repo, fullWork(item));
+    const filters: Array<{
+      tags?: string[];
+      tagOp?: "AND" | "OR";
+    }> = [
+      { tags: ["ASMR"], tagOp: "AND" },
+      { tags: ["ASMR", "催眠"], tagOp: "OR" },
+      { tags: ["asmr", "cv/水瀬なずな"], tagOp: "AND" },
+      { tags: [`@year/${recent.slice(0, 4)}`] },
+      { tags: ["ASMR", `@year/${recent.slice(0, 4)}`], tagOp: "AND" },
+      // 該当作品が無い絞り込みは0件で一覧が空になるはず（除外の同値確認）
+      { tags: ["存在しないタグ"], tagOp: "AND" },
+    ];
+    for (const axis of ["tag", "year", "cv", "サークル", "気分", "シリーズ"]) {
+      for (const filter of filters) {
+        assert.deepEqual(
+          repo.getAxisFacets(axis, filter),
+          buildAxisFacets(axis, dataset, filter),
+          `${axis}: ${JSON.stringify(filter)}`,
+        );
+      }
+    }
   } finally {
     db.close();
   }
@@ -326,7 +361,13 @@ function assertSmartFolderEquivalent(
   repo: WorkRepo,
   rules: SmartFolderRule[],
   sort: WorksQuery["sort"],
-  query: { page: number; limit: number; seed?: number },
+  query: {
+    page: number;
+    limit: number;
+    seed?: number;
+    tags?: string[];
+    tagOp?: "AND" | "OR";
+  },
 ): void {
   const fixture = evalSmartFolder({ rules, sort }, dataset, query);
   const real = querySmartFolderWorks(repo, { rules, sort }, query);
@@ -390,6 +431,32 @@ test("スマートフォルダーのSQL候補絞り込み(第1段)とcore純粋�
       page: 1,
       limit: 6,
       seed: 42,
+    });
+
+    // 保持中フィルタ（tags、@year/... 擬似タグも含む）はルールに対する追加のAND条件（TASK-185）。
+    // ルールなし（第1段のSQL高速経路）・ルールあり（第2段のcore純粋関数経路）の両方で
+    // real⇔fixtureが同値になることを確認する。
+    assertSmartFolderEquivalent(repo, [], "added-desc", {
+      page: 1,
+      limit: 7,
+      tags: ["ASMR"],
+      tagOp: "AND",
+    });
+    assertSmartFolderEquivalent(repo, [], "added-desc", {
+      page: 1,
+      limit: 7,
+      tags: [`@year/${recent.slice(0, 4)}`],
+    });
+    assertSmartFolderEquivalent(repo, [lengthRule(0)], "title-asc", {
+      page: 1,
+      limit: 7,
+      tags: ["cv/水瀬なずな"],
+      tagOp: "AND",
+    });
+    assertSmartFolderEquivalent(repo, [tagRule(["ASMR", "催眠"])], "duration-desc", {
+      page: 1,
+      limit: 7,
+      tags: [`@year/${recent.slice(0, 4)}`],
     });
 
     let state = 0x1234abcd;

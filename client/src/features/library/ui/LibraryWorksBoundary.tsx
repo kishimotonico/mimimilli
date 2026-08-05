@@ -7,10 +7,7 @@ import {
   useSuspenseNormalLibraryWorks,
   useSuspenseSmartLibraryWorks,
 } from "../model/useLibraryQueries";
-import {
-  computeIsNoResultsDueToFilter,
-  computeWorksListVisibility,
-} from "../model/libraryPresentation";
+import { computeIsNoResultsDueToFilter, isGridViewActive } from "../model/libraryPresentation";
 import CollectionStatus from "./CollectionStatus";
 
 interface WorksResult {
@@ -23,6 +20,10 @@ interface WorksResult {
   fetchNextPage: () => void;
   refetchWorks: () => void;
 }
+
+// LibraryWorksBoundary は「作品一覧を表示する結果面」（ビュー軸・スマートフォルダー軸）
+// でのみ使う。facet/tag 軸の値一覧・home 軸は works query 自体を発行しないため、
+// 呼び出し側（LibraryView）でこの境界に入らない。
 
 interface Props {
   nav: LibraryViewState;
@@ -86,19 +87,16 @@ function SmartWorks(props: Props) {
 function ResolvedWorks({
   nav,
   searchQuery,
-  viewMode,
   isPending,
   onNoResultsChange,
   children,
   result,
 }: Props & { result: WorksResult }) {
-  const { showsWorksList } = computeWorksListVisibility(nav.activeAxis, nav.drillValue, viewMode);
   const isNoResults = computeIsNoResultsDueToFilter(
-    showsWorksList,
+    true,
     result.works.length,
     searchQuery,
-    nav.activeAxis,
-    nav.drillValue,
+    nav.selectedTags,
     false,
     false,
   );
@@ -107,15 +105,9 @@ function ResolvedWorks({
 }
 
 export default function LibraryWorksBoundary(props: Props) {
-  const { showGrid } = computeWorksListVisibility(
-    props.nav.activeAxis,
-    props.nav.drillValue,
-    props.viewMode,
-  );
-  const variant = showGrid ? "grid" : "list";
+  const variant = isGridViewActive(props.nav.activeAxis, props.viewMode) ? "grid" : "list";
   const resetKey = JSON.stringify({
     axis: props.nav.activeAxis,
-    drill: props.nav.drillValue,
     tags: props.nav.selectedTags,
     sort: props.nav.sort,
     search: props.searchQuery,

@@ -1,31 +1,25 @@
-import type { Work, WorkListItem, WorkPatch, SmartFolder } from "@mimimilli/shared";
-import type { AxisLandingPresentation } from "../model/axisLandingPresentation";
-import type { CollectionStatsDisplay, PreviewMode } from "../model/libraryPresentation";
+import type { Work, WorkPatchInput } from "@mimimilli/shared";
+import type { CollectionStatsDisplay } from "../model/libraryPresentation";
 import CollectionStatus from "./CollectionStatus";
-import { AxisLanding } from "./preview/AxisLanding";
-import { CollectionPlaceholder } from "./preview/CollectionPlaceholder";
 import { DiscoveryDashboard } from "./preview/DiscoveryDashboard";
-import { SmartFolderView } from "./preview/SmartFolderView";
 import { WorkDetail } from "./preview/WorkDetail";
 
-// ── Main ──────────────────────────────────────────────────────
+// 作品詳細のプレビュー。ADR-0012 §3 により、結果面は常に全幅で表示し、
+// プレビューは作品選択時にだけスライドインする（LibraryView 側で Presence を使って配線）。
+// home 軸のときだけ例外的に、軸そのものの結果面（発見ダッシュボード）として使う。
+
+export type PreviewMode = "work" | "home";
 
 interface PreviewPaneProps {
   mode: PreviewMode;
-  showNoResultsHint: boolean;
-  /** mode==="empty" かつ showNoResultsHint===false のときに表示する統計 */
-  emptyStats: CollectionStatsDisplay;
-  axisLandingPresentation: AxisLandingPresentation;
+  /** mode==="home" のときに表示するライブラリ全体の統計 */
+  homeStats: CollectionStatsDisplay;
   selectedWork: Work | null;
   /** mode==="work"だがselectedWorkがまだ無いとき（読み込み中/404以外のエラー）の状態。
    *  404は呼び出し元で選択解除されるため、isSelectedWorkError=trueはそれ以外の一時的な失敗のみ */
   isSelectedWorkLoading: boolean;
   isSelectedWorkError: boolean;
   onRetrySelectedWork?: () => void;
-  smartFolder: SmartFolder | null;
-  axisWorks: WorkListItem[];
-  axisTotal?: number;
-  smartFolderTotal?: number;
   playingTrackIndex: number | null;
   isPlaybackActive?: boolean;
   onPlay: (trackIndex: number) => void;
@@ -35,23 +29,16 @@ interface PreviewPaneProps {
   onTagClick: (tag: string) => void;
   tagSuggestions: string[];
   isPatching: boolean;
-  onPatchWork: (body: WorkPatch) => Promise<Work>;
-  onEditSmartFolder: (folder: SmartFolder) => void;
+  onPatchWork: (body: WorkPatchInput) => Promise<Work>;
 }
 
 export default function PreviewPane({
   mode,
-  showNoResultsHint,
-  emptyStats,
-  axisLandingPresentation,
+  homeStats,
   selectedWork,
   isSelectedWorkLoading,
   isSelectedWorkError,
   onRetrySelectedWork,
-  smartFolder,
-  axisWorks,
-  axisTotal,
-  smartFolderTotal,
   playingTrackIndex,
   isPlaybackActive,
   onPlay,
@@ -62,16 +49,8 @@ export default function PreviewPane({
   tagSuggestions,
   isPatching,
   onPatchWork,
-  onEditSmartFolder,
 }: PreviewPaneProps) {
-  const title =
-    mode === "work"
-      ? "詳細"
-      : mode === "smart-folder"
-        ? "スマートフォルダー"
-        : mode === "axis-landing"
-          ? axisLandingPresentation.panelTitle
-          : "プレビュー";
+  const title = mode === "work" ? "詳細" : "ホーム";
 
   return (
     <div className="mle-prv">
@@ -100,30 +79,7 @@ export default function PreviewPane({
             <CollectionStatus variant="list" kind="error" onRetry={onRetrySelectedWork} />
           )
         ))}
-      {mode === "axis-landing" && (
-        <AxisLanding
-          presentation={axisLandingPresentation}
-          works={axisWorks}
-          total={axisTotal}
-          onSelectWork={onSelectWork}
-        />
-      )}
-      {mode === "smart-folder" && smartFolder && (
-        <SmartFolderView
-          sf={smartFolder}
-          total={smartFolderTotal}
-          onEdit={() => onEditSmartFolder(smartFolder)}
-        />
-      )}
-      {mode === "empty" &&
-        (showNoResultsHint ? (
-          <CollectionPlaceholder
-            message="作品が見つかりません"
-            hint="検索条件を変えてみてください"
-          />
-        ) : (
-          <DiscoveryDashboard stats={emptyStats} onSelectWork={onSelectWork} />
-        ))}
+      {mode === "home" && <DiscoveryDashboard stats={homeStats} onSelectWork={onSelectWork} />}
     </div>
   );
 }

@@ -1,5 +1,21 @@
 import { z } from "zod";
-import type { Cover } from "./work.ts";
+
+/**
+ * 表示可能なカバー画像。image は作品ルート相対のファイル名、dimensions は EXIF 回転適用後の
+ * 表示ピクセル寸法（単位 px）。
+ */
+export const coverValueSchema = z.object({
+  image: z.string(),
+  dimensions: z.object({
+    width: z.number().int().positive(),
+    height: z.number().int().positive(),
+  }),
+});
+
+/** カバー未設定・計測失敗はいずれも null に投影する
+ * （「表示可能なカバーが無い」を意味し、UI は正方形プレースホルダで表す）。 */
+export const coverSchema = coverValueSchema.nullable();
+export type Cover = z.infer<typeof coverSchema>;
 
 /** 作品カバーのメタ・DB 境界（画像ファイル名と寸法列から導出） */
 export const coverKindSchema = z.enum(["none", "unmeasured", "measured"]);

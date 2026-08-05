@@ -13,6 +13,7 @@ import type {
   ViewMode,
 } from "../../../features/library/model/types";
 import { getAxisLabel } from "./axisDefinitions";
+import { DEFAULT_AXIS_VALUE_SORT, type AxisValueSortState } from "./axisValueSort";
 
 // ライブラリ検索語。URLの q= パラメータへ同期する（useNavigationHistory）。localStorage には保存しない。
 export const librarySearchQueryAtom = atom("");
@@ -20,10 +21,14 @@ export const librarySearchQueryAtom = atom("");
 // ── ナビゲーション state ──────────────────────────────────────
 
 export const activeAxisAtom = atom<AxisId>("all");
-export const drillValueAtom = atom<string | null>(null);
+// 軸の値選択（facet/tag 問わず）はすべてここへ入る（ADR-0012 §2）。
+// year 軸のような組み込み軸は "year/2024" 形式の擬似タグとして同じ配列に載る。
 export const selectedTagsAtom = atom<string[]>([]);
 export const selectedWorkIdAtom = atom<string | null>(null);
 export const sortAtom = atom<SortId>("added-desc");
+// 値一覧のソート状態。sortAtom（作品一覧）とは別に保持する（ADR-0012 帰結）。
+// ソートメニューと list の列見出しクリックは同一のこの state への別入口。
+export const axisValueSortAtom = atom<AxisValueSortState>(DEFAULT_AXIS_VALUE_SORT);
 
 // URLには含めない表示設定。ブラウザーを再起動しても直前の見た目を復元する。
 export const libraryViewModeAtom = atomWithStorage<ViewMode>("mimimilli:libraryViewMode", "list");
@@ -33,17 +38,12 @@ export const libraryGridLayoutModeAtom = atomWithStorage<GridLayoutMode>(
   "mimimilli:libraryGridLayoutMode",
   "square",
 );
-// グリッド詳細パネルの開閉。作品の選択・解除とは独立させ、パネル自体の開閉のみを持つ。
-export const gridInspectorOpenAtom = atomWithStorage<boolean>("mimimilli:gridInspectorOpen", false);
 
 // ── アドレスバーパス（純粋計算）────────────────────────────────
 
-export function buildLibraryAddressPath(
-  axis: AxisId,
-  drillValue: string | null,
-  tagPrefixes: TagPrefix[],
-): string[] {
+// パンくずは「ライブラリ > 軸名」までを表す。絞り込みはチップ列だけが表現する
+// （ADR-0012 §2・帰結）。
+export function buildLibraryAddressPath(axis: AxisId, tagPrefixes: TagPrefix[]): string[] {
   if (axis === "all") return ["ライブラリ"];
-  const base = ["ライブラリ", getAxisLabel(axis, tagPrefixes)];
-  return drillValue ? [...base, drillValue] : base;
+  return ["ライブラリ", getAxisLabel(axis, tagPrefixes)];
 }

@@ -1,7 +1,7 @@
 import { normalizeTags } from "@mimimilli/shared";
-import type { DlsiteApplyBody, DlsiteWorkInfo, Work } from "@mimimilli/shared";
+import type { DlsiteApplyBody, DlsiteWorkInfo, NormalizedTag, Work } from "@mimimilli/shared";
 
-export function dlsiteInfoTags(info: DlsiteWorkInfo): string[] {
+export function dlsiteInfoTags(info: DlsiteWorkInfo): NormalizedTag[] {
   return normalizeTags([
     ...(info.circle ? [`サークル/${info.circle}`] : []),
     ...info.cvs.map((cv) => `cv/${cv}`),
@@ -21,7 +21,8 @@ export function buildDlsiteApplyBody(
   };
 }
 
-export function unappliedDlsiteTags(work: Work, info: DlsiteWorkInfo): string[] {
-  const existing = new Set(normalizeTags(work.tags));
+export function unappliedDlsiteTags(work: Work, info: DlsiteWorkInfo): NormalizedTag[] {
+  // work.tags は既に正規化済み（NormalizedTag[]）。
+  const existing = new Set(work.tags);
   return dlsiteInfoTags(info).filter((tag) => !existing.has(tag));
 }

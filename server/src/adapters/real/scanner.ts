@@ -22,6 +22,7 @@ import { basename, dirname, extname, join, resolve } from "node:path";
 import type {
   Cover,
   MetaFile,
+  NormalizedTag,
   Playlist,
   ResolvedPlaylist,
   ScanResult,
@@ -948,7 +949,7 @@ export class Scanner {
     workDir: string,
     options: {
       title: string;
-      tags?: string[];
+      tags?: NormalizedTag[];
       urls?: UrlEntry[];
       coverImage?: string | null;
       dlsite?: MetaFile["dlsite"];

@@ -4,34 +4,71 @@
 import { parseTag } from "@mimimilli/shared";
 import type { AxisFacetItem, WorkSummary } from "@mimimilli/shared";
 import { compareJapaneseSortKeys, compareUtf8Bytes } from "./japaneseSortKey.ts";
+import { filterByTags, filterByYear, resolveTagFilters } from "./worksQuery.ts";
 
-/** 指定された分類軸について、works から値ごとの件数を集計し count 降順で返す。
- *  axis は正規形（小文字）を前提とする */
-export function buildAxisFacets(axis: string, works: WorkSummary[]): AxisFacetItem[] {
-  const counts = new Map<string, number>();
+/** 代表カバーとして残す最大件数（値一覧の2×2コラージュ用、ADR-0012 §5） */
+const MAX_COVERS = 4;
 
-  for (const work of works) {
+/** GET /axes/:axis の絞り込み。組み込み軸の擬似タグ（@year/... 等）も tags に混ざる
+ *  （ADR-0012 §2、TASK-199）。自軸由来のフィルタを除いた集合を渡すのは呼び出し側の責務（TASK-187） */
+export interface AxisFacetsFilterInput {
+  tags?: string[];
+  tagOp?: "AND" | "OR";
+}
+
+/** 指定された分類軸について、works から値ごとの件数・総時間・代表カバーを集計し count 降順で返す。
+ *  axis は正規形（小文字）を前提とする。filter が渡された場合、集計対象を先に絞り込む
+ *  （自軸除外カウント、TASK-187）。0件になった値は結果に含まれない（自然に除外される）。 */
+export function buildAxisFacets(
+  axis: string,
+  works: WorkSummary[],
+  filter?: AxisFacetsFilterInput,
+): AxisFacetItem[] {
+  const { tags, yearValue } = resolveTagFilters(filter?.tags ?? []);
+  const filteredWorks = filter
+    ? filterByYear(filterByTags(works, tags, filter.tagOp ?? "AND"), yearValue)
+    : works;
+
+  const membersByValue = new Map<string, WorkSummary[]>();
+
+  const addMember = (value: string, work: WorkSummary) => {
+    const members = membersByValue.get(value);
+    if (members) {
+      members.push(work);
+    } else {
+      membersByValue.set(value, [work]);
+    }
+  };
+
+  for (const work of filteredWorks) {
     if (axis === "tag") {
       // タグ軸は flat・annotated を問わず全タグを集計する（prefix グループ見出し付き表示用）。
       // value は完全なタグ文字列（例: "cv/藤田茜"）を保持し、AND 絞り込みへそのまま使える
       for (const tag of work.tags) {
-        counts.set(tag, (counts.get(tag) ?? 0) + 1);
+        addMember(tag, work);
       }
     } else if (axis === "year") {
-      const year = work.addedAt.slice(0, 4);
-      counts.set(year, (counts.get(year) ?? 0) + 1);
+      addMember(work.addedAt.slice(0, 4), work);
     } else {
       for (const tag of work.tags) {
         const parsed = parseTag(tag);
         if (parsed.kind === "annotated" && parsed.prefix === axis) {
-          counts.set(parsed.value, (counts.get(parsed.value) ?? 0) + 1);
+          addMember(parsed.value, work);
         }
       }
     }
   }
 
-  return [...counts.entries()]
-    .map(([value, count]) => ({ value, count }))
+  return [...membersByValue.entries()]
+    .map(([value, members]) => ({
+      value,
+      count: members.length,
+      durationSec: members.reduce((sum, work) => sum + (work.totalDurationSec ?? 0), 0),
+      covers: [...members]
+        .sort((a, b) => compareUtf8Bytes(b.addedAt, a.addedAt))
+        .flatMap((work) => (work.cover ? [{ ...work.cover, workId: work.id }] : []))
+        .slice(0, MAX_COVERS),
+    }))
     .sort(
       (a, b) =>
         b.count - a.count ||

@@ -11,7 +11,6 @@ import LibraryWorksBoundary from "../../src/features/library/ui/LibraryWorksBoun
 
 const baseNav: LibraryViewState = {
   activeAxis: "all",
-  drillValue: null,
   selectedTags: [],
   selectedWorkId: null,
   sort: "added-desc",

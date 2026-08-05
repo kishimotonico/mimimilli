@@ -17,6 +17,7 @@ import { createApp } from "../../src/app.ts";
 import { writeMetaFile } from "../../src/adapters/real/meta.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { folderMetaPath } from "../helpers/workTestUtils.ts";
+import { nts } from "../helpers/tag.ts";
 import { makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 
 interface FileSnapshot {
@@ -315,7 +316,7 @@ function writeOrphanedMeta(folder: string, id: string, title: string): void {
     id,
     title,
     urls: [],
-    tags: ["orphaned-tag"],
+    tags: nts(["orphaned-tag"]),
     coverImage: null,
     playlists: [],
     defaultPlaylistId: null,

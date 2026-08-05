@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { parseTag, tagEquals } from "@mimimilli/shared";
-import type { TagPrefix, Work, WorkPatch } from "@mimimilli/shared";
+import { normalizeTag, parseTag, tagEquals } from "@mimimilli/shared";
+import type { TagPrefix, Work, WorkPatchInput } from "@mimimilli/shared";
 import { buildTagsWithAdded, buildTagsWithRemoved } from "../../../../entities/work/editableTags";
 
 const TAG_UNDO_TOAST_MS = 6000;
@@ -11,7 +11,7 @@ export interface UseWorkTagEditorOptions {
   /** 保護判定（protected な prefix のタグは削除前に確認を挟む。ADR-0005） */
   tagPrefixes: TagPrefix[];
   isPatching: boolean;
-  onPatchWork: (body: WorkPatch) => Promise<Work>;
+  onPatchWork: (body: WorkPatchInput) => Promise<Work>;
   /** タグ保存の成否をタイトル編集等と共有するエラー表示へ伝える。開始時は null で呼ぶ */
   onError: (message: string | null) => void;
 }
@@ -130,9 +130,11 @@ export function useWorkTagEditor({
     if (isPatching || isTagSaving) return;
     // 削除したタグだけを現在の集合へ戻す。undo待ちの間に行われた他のタグ編集は巻き戻さない。
     // 復元に失敗した場合はトーストを残して再試行可能にする（onError も呼ばれる）
-    const restored = work.tags.some((current) => tagEquals(current, tag))
-      ? work.tags
-      : [...work.tags, tag];
+    const normalizedTag = normalizeTag(tag);
+    const restored =
+      normalizedTag === null || work.tags.some((current) => tagEquals(current, normalizedTag))
+        ? work.tags
+        : [...work.tags, normalizedTag];
     const ok = await patchTags(restored);
     if (ok) {
       if (tagUndoTimerRef.current) clearTimeout(tagUndoTimerRef.current);

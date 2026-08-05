@@ -2,7 +2,6 @@ import { useAtomValue, useSetAtom } from "jotai";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   activeAxisAtom,
-  drillValueAtom,
   librarySearchQueryAtom,
   selectedTagsAtom,
   selectedWorkIdAtom,
@@ -75,7 +74,6 @@ export function navigationHistoryForward(): void {
 export function useNavigationHistory(): void {
   const mode = useAtomValue(appModeAtom);
   const activeAxis = useAtomValue(activeAxisAtom);
-  const drillValue = useAtomValue(drillValueAtom);
   const selectedTags = useAtomValue(selectedTagsAtom);
   const selectedWorkId = useAtomValue(selectedWorkIdAtom);
   const sort = useAtomValue(sortAtom);
@@ -86,7 +84,6 @@ export function useNavigationHistory(): void {
 
   const setMode = useSetAtom(appModeAtom);
   const setActiveAxis = useSetAtom(activeAxisAtom);
-  const setDrillValue = useSetAtom(drillValueAtom);
   const setSelectedTags = useSetAtom(selectedTagsAtom);
   const setSelectedWorkId = useSetAtom(selectedWorkIdAtom);
   const setSort = useSetAtom(sortAtom);
@@ -124,7 +121,6 @@ export function useNavigationHistory(): void {
 
       if (state.mode === "library") {
         setActiveAxis(state.library.activeAxis);
-        setDrillValue(state.library.drillValue);
         setSelectedTags(state.library.selectedTags);
         setSelectedWorkId(state.library.selectedWorkId);
         setSort(state.library.sort);
@@ -142,7 +138,6 @@ export function useNavigationHistory(): void {
     },
     [
       setActiveAxis,
-      setDrillValue,
       setFilesDirection,
       setFilesRelPath,
       setFilesSelectedPath,
@@ -210,7 +205,7 @@ export function useNavigationHistory(): void {
     if (mode === "library") {
       state = {
         mode,
-        library: { activeAxis, drillValue, selectedTags, selectedWorkId, sort, q: searchQuery },
+        library: { activeAxis, selectedTags, selectedWorkId, sort, q: searchQuery },
       };
     } else {
       if (!rootFolder) return;
@@ -258,7 +253,6 @@ export function useNavigationHistory(): void {
     commit.pending,
     commit.revision,
     consumeNavigationHistoryCommit,
-    drillValue,
     filesRelPath,
     filesSelectedPath,
     mode,

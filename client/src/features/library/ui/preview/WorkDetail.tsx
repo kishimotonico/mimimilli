@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Work, WorkPatch } from "@mimimilli/shared";
+import type { Work, WorkPatchInput } from "@mimimilli/shared";
 import CoverImg from "../../../../entities/work/ui/CoverImg";
 import { selectFixedCoverThumbnailWidth } from "../../../../entities/work/ui/coverThumbnailWidth";
 import {
@@ -25,7 +25,7 @@ interface WorkDetailProps {
   isPlaybackActive?: boolean;
   tagSuggestions: string[];
   isPatching: boolean;
-  onPatchWork: (body: WorkPatch) => Promise<Work>;
+  onPatchWork: (body: WorkPatchInput) => Promise<Work>;
   /** タグチップクリック時のハンドラ（タグ軸への絞り込み遷移） */
   onTagClick: (tag: string) => void;
 }

@@ -1,7 +1,8 @@
 // エンドポイント横断の契約: 作品検索クエリ、ページングエンベロープ、部分更新、エラー形式。
 import { z } from "zod";
-import { facetAxisIdSchema, sortIdSchema, viewIdSchema } from "./library.ts";
-import { normalizeTags, resumeSchema, workListItemSchema, workSchema } from "./work.ts";
+import { sortIdSchema, viewIdSchema } from "./library.ts";
+import { normalizeTags, resumeSchema, tagSchema, workListItemSchema, workSchema } from "./work.ts";
+import { splitSelectedTags } from "./pseudoTag.ts";
 import { dlsiteApplyBodySchema, dlsiteStatusSchema } from "./dlsite.ts";
 
 // ── 作品検索（GET /api/works）────────────────────────────────
@@ -10,13 +11,24 @@ import { dlsiteApplyBodySchema, dlsiteStatusSchema } from "./dlsite.ts";
  *  client の追加読み込みも同じサイズでページを要求する */
 export const WORKS_DEFAULT_PAGE_SIZE = 200;
 
-/** クエリパラメータ。tags は同名パラメータを繰り返して配列で受ける */
-export const worksQuerySchema = z.object({
+/** tags に対して splitSelectedTags の警告（未知の組み込み軸・4桁でないyear値・擬似タグとして
+ *  解釈できない @ 始まりの入力・正規化後に空になるタグ等）が出る場合は 400 として拒否する。
+ *  worksQuerySchema・smartFolderWorksQuerySchema・axisFacetsQuerySchema が共有する。
+ *  検証は必ず splitSelectedTags 経由にし、別系統の検証を作らない（ADR-0012 §2、TASK-201）。 */
+function refineTagWarnings(data: { tags: string[] }, ctx: z.RefinementCtx): void {
+  const { warnings } = splitSelectedTags(data.tags);
+  if (warnings.length > 0) {
+    ctx.addIssue({ code: "custom", path: ["tags"], message: warnings.join(" / ") });
+  }
+}
+
+/** クエリパラメータ。tags は同名パラメータを繰り返して配列で受ける。組み込み軸（year等）の
+ *  フィルタも専用パラメータを持たず、"@year/2024" のような擬似タグとして tags に混ぜて送る
+ *  （ADR-0012 §2）。サーバー側の共通フィルタ解釈層（splitSelectedTags）が一度だけ解釈する。 */
+const worksQueryBaseSchema = z.object({
   q: z.string().default(""),
   tags: z.array(z.string()).default([]),
   tagOp: z.enum(["AND", "OR"]).default("AND"),
-  axis: facetAxisIdSchema.optional(),
-  axisValue: z.string().optional(),
   view: viewIdSchema.optional(),
   sort: sortIdSchema.default("added-desc"),
   /** randomソートの安定順序を決める。省略時はアダプタが発行してレスポンスで返す。 */
@@ -24,6 +36,7 @@ export const worksQuerySchema = z.object({
   page: z.coerce.number().int().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(500).optional(),
 });
+export const worksQuerySchema = worksQueryBaseSchema.superRefine(refineTagWarnings);
 /** HTTP クエリの入力型（.default 付きフィールドは省略可能） */
 export type WorksQueryInput = z.input<typeof worksQuerySchema>;
 /** パース後の正規化済みクエリ（サーバー adapter が受け取る型） */
@@ -48,13 +61,29 @@ export const worksPageSchema = z.object({
 export type WorksPage = z.infer<typeof worksPageSchema>;
 
 /** GET /api/smart-folders/:id/works のクエリパラメータ。
- *  ソートはフォルダー自身が保持するため、page/limit/seed のみを受け取る */
-export const smartFolderWorksQuerySchema = worksQuerySchema.pick({
-  page: true,
-  limit: true,
-  seed: true,
-});
+ *  ソートはフォルダー自身が保持するため含まない。tags はフォルダーのルールに対する
+ *  追加の AND 条件として適用する（ADR-0012、TASK-185） */
+export const smartFolderWorksQuerySchema = worksQueryBaseSchema
+  .pick({
+    tags: true,
+    tagOp: true,
+    page: true,
+    limit: true,
+    seed: true,
+  })
+  .superRefine(refineTagWarnings);
 export type SmartFolderWorksQuery = z.infer<typeof smartFolderWorksQuerySchema>;
+
+/** GET /api/axes/:axis のクエリパラメータ。値一覧の件数・総時間・代表カバーは、渡された
+ *  tags による絞り込み後の集合から集計する（自軸除外カウント、TASK-187）。
+ *  自軸由来のフィルタを除外した集合を渡すのは呼び出し側（client）の責務 */
+export const axisFacetsQuerySchema = worksQueryBaseSchema
+  .pick({
+    tags: true,
+    tagOp: true,
+  })
+  .superRefine(refineTagWarnings);
+export type AxisFacetsQuery = z.infer<typeof axisFacetsQuerySchema>;
 
 // ── DLsite 通知 ─────────────────────────────────────────────
 
@@ -102,14 +131,17 @@ export const workPatchSchema = z
   .object({
     title: z.string().min(1).optional(),
     /** タグは契約の入口で正規形へ寄せる（ADR-0005 決定5。prefix 小文字化・trim・重複排除） */
-    tags: z.array(z.string()).transform(normalizeTags).optional(),
+    tags: z.array(tagSchema).transform(normalizeTags).optional(),
     bookmarked: z.boolean().optional(),
   })
   .refine(
     (patch) =>
       patch.title !== undefined || patch.tags !== undefined || patch.bookmarked !== undefined,
   );
-export type WorkPatch = z.infer<typeof workPatchSchema>;
+/** クライアントが送信するリクエストボディ（tags は正規化前の生 string[]） */
+export type WorkPatchInput = z.input<typeof workPatchSchema>;
+/** サーバーがパース後に扱う型（tags は正規化済み NormalizedTag[]） */
+export type WorkPatch = z.output<typeof workPatchSchema>;
 
 // ── 作品の手動登録（POST /api/works, GET /api/works/register-preview）────
 
@@ -133,11 +165,14 @@ export const workCreateBodySchema = z.object({
   path: z.string().min(1),
   title: z.string().min(1),
   /** タグは契約の入口で正規形へ寄せる（ADR-0005 決定5） */
-  tags: z.array(z.string()).default([]).transform(normalizeTags),
+  tags: z.array(tagSchema).default([]).transform(normalizeTags),
   mergeDescendantWorks: z.boolean().default(false),
   dlsite: dlsiteApplyBodySchema.optional(),
 });
-export type WorkCreateBody = z.infer<typeof workCreateBodySchema>;
+/** クライアントが送信するリクエストボディ（tags は正規化前の生 string[]） */
+export type WorkCreateBodyInput = z.input<typeof workCreateBodySchema>;
+/** サーバーがパース後に扱う型（tags は正規化済み NormalizedTag[]） */
+export type WorkCreateBody = z.output<typeof workCreateBodySchema>;
 
 export const dlsiteFetchByCodeBodySchema = z.object({
   rjCode: z

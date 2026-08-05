@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { metaFileSchema, trackSchema } from "@mimimilli/shared";
+import { metaFileSchema, tagSchema, trackSchema } from "@mimimilli/shared";
 
 const PLAYLIST_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const TRACK_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -73,6 +73,39 @@ test("dlsite.errorKindが無い旧metaはパースできerrorKindはnullにな�
 test("dlsiteキー自体が無い旧metaはパースできerrorKindはnullになる", () => {
   const parsed = metaFileSchema.parse(validMeta());
   assert.equal(parsed.dlsite.errorKind, null);
+});
+
+test("タグは予約文字@始まりを拒否する", () => {
+  assert.equal(tagSchema.safeParse("@year/2024").success, false);
+  assert.equal(tagSchema.safeParse("year/2025").success, true);
+  assert.equal(tagSchema.safeParse("cv/藤田茜").success, true);
+});
+
+test("予約文字の検証は正規化後の値に対して行われ、先頭空白では回避できない", () => {
+  // normalizeTag は trim してから prefix を小文字化するため、生文字列のまま
+  // startsWith("@") を見ると先頭空白で検証をすり抜けてしまう。
+  assert.equal(tagSchema.safeParse(" @year/2024").success, false);
+  assert.equal(tagSchema.safeParse("  @Year/2024").success, false);
+  // annotated ではない（スラッシュ無し）flat タグも同様に検証する。
+  assert.equal(tagSchema.safeParse(" @foo").success, false);
+});
+
+test("正規化後に空になるタグは黙って削除されず拒否される", () => {
+  assert.equal(tagSchema.safeParse("").success, false);
+  assert.equal(tagSchema.safeParse("   ").success, false);
+  // annotated だが値が空白のみ（normalizeTag は prefix/値のどちらかが空なら空文字列を返す）。
+  assert.equal(tagSchema.safeParse("cv/   ").success, false);
+  assert.equal(tagSchema.safeParse("cv/藤田茜").success, true);
+});
+
+test("metaFileSchema.tags でも予約文字の検証が効き、先頭空白では回避できない", () => {
+  const withReservedTag = { ...validMeta(), tags: ["cv/藤田茜", " @year/2024"] };
+  assert.equal(metaFileSchema.safeParse(withReservedTag).success, false);
+
+  const withNormalTags = { ...validMeta(), tags: [" CV/藤田茜 ", "cv/藤田茜"] };
+  const parsed = metaFileSchema.parse(withNormalTags);
+  // normalizeTags で正規化・重複排除される。
+  assert.deepEqual(parsed.tags, ["cv/藤田茜"]);
 });
 
 test("同名Playlistは異なるIDなら許容する", () => {

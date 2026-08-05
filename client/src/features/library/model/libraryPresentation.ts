@@ -2,86 +2,154 @@
 // query 結果と Jotai state を組み合わせて「何を表示するか」を決める部分を、
 // コンポーネントの配線から切り離してテスト可能にする。
 
-import type { CollectionStats, FacetAxisId } from "@mimimilli/shared";
+import {
+  buildBuiltinAxisTag,
+  isBuiltinPseudoTagAxis,
+  normalizeTag,
+  parseBuiltinAxisTag,
+  parseTag,
+  type CollectionStats,
+  type FacetAxisId,
+} from "@mimimilli/shared";
 import { ApiRequestError } from "../../../shared/api/http";
 import type { WorksQueryParams } from "../api";
 import type { AxisId, SortId, ViewMode } from "./types";
-import { isFacetAxis, isSmartAxis, isViewAxis } from "./axisDefinitions";
+import { isFacetAxis, isHomeAxis, isSmartAxis, isViewAxis } from "./axisDefinitions";
 
-export type PreviewMode = "work" | "axis-landing" | "smart-folder" | "empty";
+// 組み込み軸の擬似タグ（year 等、ADR-0012 §2）の構築・解析・検証は shared/pseudoTag.ts に
+// 集約している（client・server の両方が同じ実装を使うため）。isBuiltinPseudoTagAxis /
+// buildBuiltinAxisTag / parseBuiltinAxisTag / splitSelectedTags は @mimimilli/shared から
+// 直接importする。
+
+// ── 結果面の種類（ADR-0012: ナビゲーション状態・表示設定・絞り込み状態の分離） ──
+
+type ResultsPaneKind = "home" | "value-list" | "works";
+
+/**
+ * 軸だけから決まる結果面の種類。絞り込み状態（selectedTags）や表示設定（viewMode）には
+ * 依存しない — 軸は値をブラウズするためのビューであり、選択状態を持たない（ADR-0012 §1）。
+ *   - home: 発見ダッシュボード
+ *   - value-list: facet 軸・タグ軸の値一覧
+ *   - works: 作品一覧（ビュー軸・スマートフォルダー軸）
+ */
+export function computeResultsPaneKind(axis: AxisId): ResultsPaneKind {
+  if (isHomeAxis(axis)) return "home";
+  if (isFacetAxis(axis) || axis === "tag") return "value-list";
+  return "works";
+}
+
+/** グリッド／リストの決定は libraryViewModeAtom のみに依存する（ADR-0012 §3・§5）。
+ *  works（作品一覧）・value-list（値一覧）の両方がグリッド表示に従う。home はグリッド概念を持たない。 */
+export function isGridViewActive(axis: AxisId, viewMode: ViewMode): boolean {
+  const kind = computeResultsPaneKind(axis);
+  return (kind === "works" || kind === "value-list") && viewMode === "grid";
+}
+
+/** facet/tag 軸の値一覧で1項目を選んだときに selectedTagsAtom へ追加する完全なタグ文字列を組み立てる。
+ *  tag 軸は AxisFacetItem.value が既に完全なタグ文字列（ADR-0005 追記）、
+ *  year のようなタグ由来でない組み込み軸は擬似タグ、それ以外の facet 軸
+ *  （prefix 定義に基づく実タグ由来の軸）は "軸/値" の実タグとして表現する。 */
+export function buildFilterTag(axis: AxisId, value: string): string {
+  if (axis === "tag") return value;
+  if (isBuiltinPseudoTagAxis(axis)) return buildBuiltinAxisTag(axis, value);
+  return `${axis}/${value}`;
+}
+
+// ── 軸レール・チップの入口共通「置き換え既定」（ADR-0012 §7） ─────────────
+
+/** タグの「同じ軸/グループ」判定キー。クイックオーバーレイ・チップドロップダウン・
+ *  結果面の値タイル/行のクリック（置き換え既定）が、置き換え対象を絞るのに使う。
+ *  組み込み軸（擬似タグ）は軸ごと、facet 軸由来の実タグ（prefix付き）は prefix ごと、
+ *  フラットタグは1グループにまとめる（tag 軸の値一覧が同じグルーピングで表示するため）。 */
+export function tagFilterGroupKey(tag: string): string {
+  const normalized = normalizeTag(tag);
+  const builtin = normalized === null ? null : parseBuiltinAxisTag(normalized);
+  if (builtin) return `@${builtin.axis}`;
+  const parsed = parseTag(tag);
+  return parsed.kind === "flat" ? "" : parsed.prefix;
+}
+
+/** タグ文字列が属する軸ID。チップの兄弟値ドロップダウンで問い合わせる facet 軸を
+ *  決めるのに使う。フラットタグは "tag" 軸（値一覧に全フラットタグが並ぶ）を返す。 */
+export function axisOfFilterTag(tag: string): AxisId {
+  const normalized = normalizeTag(tag);
+  const builtin = normalized === null ? null : parseBuiltinAxisTag(normalized);
+  if (builtin) return builtin.axis;
+  const parsed = parseTag(tag);
+  return parsed.kind === "flat" ? "tag" : parsed.prefix;
+}
+
+/** 置き換え選択の計算（純粋関数）。同じ tagFilterGroupKey のタグを外してから追加する。
+ *  replaceLibraryTagAtom が使う（ADR-0012 §7・§8）。 */
+export function computeReplacedTags(prev: string[], tag: string): string[] {
+  const group = tagFilterGroupKey(tag);
+  return [...prev.filter((t) => tagFilterGroupKey(t) !== group), tag];
+}
 
 // ── works query のパラメータ ──────────────────────────────────
 
-export interface WorksParamsInput {
+interface WorksParamsInput {
   activeAxis: AxisId;
   sort: SortId;
   searchQuery: string;
   selectedTags: string[];
-  drillValue: string | null;
 }
 
-/** スマートフォルダー軸は別 query（evalSmartFolder）で取得するため、通常の works query は発行しない */
-export function buildWorksParams(input: WorksParamsInput): WorksQueryParams | null {
-  const { activeAxis, sort, searchQuery, selectedTags, drillValue } = input;
-  if (isSmartAxis(activeAxis)) return null;
+/** selectedTagsAtom（組み込み軸の擬似タグ混じり）を works query の tags フィールドへ変換する。
+ *  通常の works query（buildWorksParams）とスマートフォルダー評価（buildSmartFolderFilterParams）
+ *  で共通のロジック。組み込み軸（year等）専用のクエリパラメータは持たない（ADR-0012 §2）。
+ *  擬似タグの解釈（実タグ／yearへの分解）はサーバー側の共通フィルタ解釈層が一度だけ行う
+ *  （shared/pseudoTag.ts、TASK-199） */
+interface TagFilterParams {
+  tags?: string[];
+  tagOp?: "AND";
+}
 
-  const p: WorksQueryParams = { sort };
+function buildTagFilterParams(selectedTags: string[]): TagFilterParams {
+  return selectedTags.length > 0 ? { tags: selectedTags, tagOp: "AND" } : {};
+}
+
+/** works 種の結果面（ビュー軸・スマートフォルダー軸）以外は works query を発行しない。
+ *  スマートフォルダーは別 query（evalSmartFolder）で取得する。 */
+export function buildWorksParams(input: WorksParamsInput): WorksQueryParams | null {
+  const { activeAxis, sort, searchQuery, selectedTags } = input;
+  if (computeResultsPaneKind(activeAxis) !== "works" || isSmartAxis(activeAxis)) return null;
+
+  const p: WorksQueryParams = { sort, ...buildTagFilterParams(selectedTags) };
   if (searchQuery) p.q = searchQuery;
-  if (activeAxis === "tag" && selectedTags.length > 0) {
-    p.tags = selectedTags;
-    p.tagOp = "AND";
-  }
   if (isViewAxis(activeAxis) && activeAxis !== "all") {
     p.view = activeAxis as WorksQueryParams["view"];
-  }
-  if (isFacetAxis(activeAxis) && drillValue) {
-    p.axis = activeAxis as WorksQueryParams["axis"];
-    p.axisValue = drillValue;
   }
   return p;
 }
 
-/** ファセット一覧（GET /axes/:axis）を取得すべき軸。ドリル済み・タグ以外の軸では null */
-export function getFacetAxisForQuery(
-  activeAxis: AxisId,
-  drillValue: string | null,
-): FacetAxisId | null {
-  if ((isFacetAxis(activeAxis) && !drillValue) || activeAxis === "tag") {
-    return activeAxis as FacetAxisId;
-  }
-  return null;
+/** スマートフォルダー評価API（GET /smart-folders/:id/works）へ渡す追加フィルタ。
+ *  フォルダーのルールに対する追加の AND 条件として適用される（ADR-0012）。
+ *  フィルタが無ければキーを持たない空オブジェクトを返す（クエリキーの安定のため）。 */
+export function buildSmartFolderFilterParams(selectedTags: string[]): TagFilterParams {
+  return buildTagFilterParams(selectedTags);
 }
 
-// ── 中央/プレビュー カラムの表示分岐 ──────────────────────────
-
-export interface WorksListVisibility {
-  /** 中央カラムが作品リストを表示する状態（非ファセット軸、またはドリル済み） */
-  showsWorksList: boolean;
-  canShowWorksGrid: boolean;
-  showGrid: boolean;
-}
-
-export function computeWorksListVisibility(
-  activeAxis: AxisId,
-  drillValue: string | null,
-  viewMode: ViewMode,
-): WorksListVisibility {
-  const showsWorksList =
-    !isSmartAxis(activeAxis) && (!isFacetAxis(activeAxis) || drillValue !== null);
-  const canShowWorksGrid =
-    isSmartAxis(activeAxis) ||
-    (!isFacetAxis(activeAxis) && activeAxis !== "tag") ||
-    (isFacetAxis(activeAxis) && drillValue !== null);
-  // ドリル済みファセット軸（例: CV→藤田茜）は、300px固定リスト＋巨大な空プレビュー
-  // という体験を避けるため、viewMode（list/grid の永続選好）にかかわらず常に
-  // 全幅グリッドへ合流させる。ドリルを抜ければ元の選好に戻る（viewMode 自体は書き換えない）。
-  const isDrilledFacet = isFacetAxis(activeAxis) && drillValue !== null;
-  const showGrid = canShowWorksGrid && (isDrilledFacet || viewMode === "grid");
-  return { showsWorksList, canShowWorksGrid, showGrid };
+/** ファセット一覧（GET /axes/:axis）を取得すべき軸。value-list 種の結果面のみ */
+export function getFacetAxisForQuery(activeAxis: AxisId): FacetAxisId | null {
+  return computeResultsPaneKind(activeAxis) === "value-list" ? (activeAxis as FacetAxisId) : null;
 }
 
 /**
- * 検索語や軸ドリルの絞り込みが原因で作品一覧が0件になっているかどうか。
+ * 軸ファセット取得API（GET /axes/:axis）へ渡す絞り込み。自軸除外カウント:
+ * 軸Xの値一覧の件数・総時間・代表カバーは、現在のフィルタから軸X由来のフィルタ
+ * （axisOfFilterTag(tag) === axis のもの）を除いた集合に対して集計する。同軸を乗り換える
+ * ときの表示件数が、置き換え後（通常クリックは置き換え既定）の実結果と一致し、
+ * 他軸フィルタによる0件だらけの空振りも防げる。「選択中の値は特別に残す」という例外は
+ * 自軸除外なら不要（選択中の値自身も他軸フィルタだけを適用した普通の件数で残る）。
+ */
+export function buildAxisFacetFilterParams(axis: AxisId, selectedTags: string[]): TagFilterParams {
+  const otherAxisTags = selectedTags.filter((tag) => axisOfFilterTag(tag) !== axis);
+  return buildTagFilterParams(otherAxisTags);
+}
+
+/**
+ * 検索語やタグフィルタが原因で作品一覧が0件になっているかどうか。
  * fav/unplayed 等が本来的に0件のケースとは区別し、原因表示が必要な場合だけ案内する。
  *
  * 検索デバウンス後に queryKey が変わった直後は、新クエリが確定するまで
@@ -91,20 +159,19 @@ export function computeWorksListVisibility(
  * （worksCount===0 という結果を信頼できるのは、クエリが成功して確定した後だけ）。
  */
 export function computeIsNoResultsDueToFilter(
-  showsWorksList: boolean,
+  isWorksPane: boolean,
   worksCount: number,
   searchQuery: string,
-  activeAxis: AxisId,
-  drillValue: string | null,
+  selectedTags: string[],
   isWorksLoading: boolean,
   isWorksError: boolean,
 ): boolean {
   return (
-    showsWorksList &&
+    isWorksPane &&
     !isWorksLoading &&
     !isWorksError &&
     worksCount === 0 &&
-    (Boolean(searchQuery) || (isFacetAxis(activeAxis) && drillValue !== null))
+    (Boolean(searchQuery) || selectedTags.length > 0)
   );
 }
 
@@ -118,7 +185,7 @@ export type CollectionStatsDisplay =
   | { status: "ready"; count: number; trackCount: number; durationSec: number };
 
 /**
- * 検索語やドリルの絞り込みで作品一覧が0件になったとき、選択中の作品がその
+ * 検索語やタグフィルタの絞り込みで作品一覧が0件になったとき、選択中の作品がその
  * 絞り込み結果に含まれない古い選択のまま残っていないかを判定する。
  * true の場合は選択を解除すべき。
  */
@@ -159,27 +226,4 @@ export function computeCollectionStatsDisplay(
     trackCount: worksStats.trackCount,
     durationSec: worksStats.durationSec,
   };
-}
-
-export interface PreviewModeInput {
-  isNoResultsDueToFilter: boolean;
-  selectedWorkId: string | null;
-  activeAxis: AxisId;
-  drillValue: string | null;
-  selectedTags: string[];
-}
-
-// previewMode: UI state + server state を組み合わせてコンポーネントで計算する
-// （derived atom にしない — 0件時は選択中の作品が一覧に存在しないため、古い詳細を出さず案内を優先する）
-// selectedWorkId があれば読み込み中・エラーの間も "work" モードに留める（詳細データの
-// 有無はコンポーネント側でloading/error/読み込み済みを出し分ける。ここで弾くと、
-// 読み込み中に一瞬 axis-landing 等へ切り替わってちらつく）。
-export function computePreviewMode(input: PreviewModeInput): PreviewMode {
-  const { isNoResultsDueToFilter, selectedWorkId, activeAxis, drillValue, selectedTags } = input;
-  if (isNoResultsDueToFilter) return "empty";
-  if (selectedWorkId) return "work";
-  if (isSmartAxis(activeAxis)) return "smart-folder";
-  if (isFacetAxis(activeAxis) && !drillValue) return "axis-landing";
-  if (activeAxis === "tag" && selectedTags.length > 0) return "axis-landing";
-  return "empty";
 }

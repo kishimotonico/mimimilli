@@ -16,7 +16,6 @@ const SMART_FOLDER_ID = "sf-1";
 
 const baseNav: LibraryViewState = {
   activeAxis: `smart-${SMART_FOLDER_ID}`,
-  drillValue: null,
   selectedTags: [],
   selectedWorkId: null,
   sort: "added-desc",
@@ -202,5 +201,65 @@ describe("スマートフォルダー軸のページング", () => {
     const page2Urls = smartFolderCallUrls(fetchMock).filter((u) => u.includes("page=2"));
     expect(page2Urls).toHaveLength(1);
     expect(page2Urls[0]).toContain("seed=42195");
+  });
+});
+
+describe("スマートフォルダー軸への保持中フィルタの適用", () => {
+  let fetchMock: ReturnType<typeof createFetchMock>;
+
+  beforeEach(() => {
+    fetchMock = createFetchMock({ total: 3 });
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("選択中の実タグをフォルダーのルールへの追加AND条件としてクエリに渡す", async () => {
+    const nav: LibraryViewState = { ...baseNav, selectedTags: ["cv/藤田茜"] };
+    const { result } = renderWorks(nav);
+
+    await waitFor(() => expect(result.current.works.length).toBeGreaterThan(0));
+
+    const urls = smartFolderCallUrls(fetchMock);
+    expect(urls.some((u) => u.includes("tags=cv%2F") && u.includes("tagOp=AND"))).toBe(true);
+  });
+
+  it("選択中の year 擬似タグも tags としてクエリに渡す（サーバー側で解釈する）", async () => {
+    const nav: LibraryViewState = { ...baseNav, selectedTags: ["@year/2024"] };
+    const { result } = renderWorks(nav);
+
+    await waitFor(() => expect(result.current.works.length).toBeGreaterThan(0));
+
+    const urls = smartFolderCallUrls(fetchMock);
+    expect(urls.some((u) => u.includes("tags=%40year%2F2024"))).toBe(true);
+  });
+
+  it("フィルタが変わるとクエリキーが変わり、別クエリとしてフェッチし直す（キャッシュ分離）", async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: { children: ReactNode }) =>
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(
+          JotaiProvider,
+          { store: createStore() },
+          createElement(Suspense, { fallback: null }, children),
+        ),
+      );
+
+    const { result, rerender } = renderHook(
+      (nav: LibraryViewState) => useSuspenseSmartLibraryWorks(nav),
+      { wrapper, initialProps: baseNav },
+    );
+
+    await waitFor(() => expect(result.current.works.length).toBeGreaterThan(0));
+    expect(smartFolderCallUrls(fetchMock)).toHaveLength(1);
+
+    rerender({ ...baseNav, selectedTags: ["cv/藤田茜"] });
+
+    await waitFor(() => expect(smartFolderCallUrls(fetchMock)).toHaveLength(2));
+    expect(smartFolderCallUrls(fetchMock).at(-1)).toContain("tags=cv%2F");
   });
 });

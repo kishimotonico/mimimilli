@@ -6,19 +6,19 @@ import {
   dlsiteStateSchema,
   emptyDlsiteState,
   evaluateParseErrorAlert,
-  normalizeTag,
-  normalizeTags,
   parseTag,
   playlistSchema,
   probeResultFromCache,
   resolveTrackDuration,
   resolveTrackDurationSec,
   smartFolderSchema,
+  splitSelectedTags,
   tagPrefixSchema,
   toTrackDurationFields,
   workSchema,
   workSummarySchema,
 } from "@mimimilli/shared";
+import type { NormalizedTag } from "@mimimilli/shared";
 import type {
   AxisFacetItem,
   DlsiteState,
@@ -47,6 +47,7 @@ import { z } from "zod";
 import { japaneseSortKey } from "../../core/japaneseSortKey.ts";
 import { normalizeRjCode } from "../../core/worksQuery.ts";
 import { InvalidResumeError } from "../../adapter.ts";
+import type { AxisFacetsFilter } from "../../adapter.ts";
 import type { Db } from "./db.ts";
 import {
   audioProbeCache,
@@ -151,6 +152,14 @@ export interface CoverLocationRow {
 /** メディア配信のパス解決に必要な列だけを取得する軽量行。 */
 export interface MediaRootRow {
   physicalPath: string;
+}
+
+/** getAxisFacets の集計クエリが返す生の行。covers は JSON 文字列のまま持つ。 */
+interface AxisFacetRow {
+  value: string;
+  count: number;
+  durationSec: number;
+  coversJson: string;
 }
 
 const RECENT_VIEW_WINDOW_DAYS = 30;
@@ -471,11 +480,11 @@ export class WorkRepo {
     return map;
   }
 
-  private replaceWorkTags(workId: string, tagNames: string[]): void {
+  private replaceWorkTags(workId: string, tagNames: NormalizedTag[]): void {
     this.db.catalog.delete(workTags).where(eq(workTags.workId, workId)).run();
-    // DB キャッシュには常に正規形で入れる（ADR-0005 決定5）。メタファイル側の正規化は
-    // 編集経路（PATCH / DLsite 適用）で行い、スキャン取り込みはメタを書き換えない
-    for (const name of normalizeTags(tagNames)) {
+    // DB キャッシュには常に正規形で入れる（ADR-0005 決定5）。呼び出し元が既に
+    // NormalizedTag[] を渡す契約のため、ここでの再正規化は不要
+    for (const name of tagNames) {
       const parsed = parseTag(name);
       this.db.catalog
         .insert(tags)
@@ -703,15 +712,15 @@ export class WorkRepo {
     for (const rule of rules) {
       switch (rule.field) {
         case "タグ": {
-          const normalized = rule.values.map(normalizeTag);
-          const placeholders = normalized.map(() => "?").join(", ");
+          // rule.values は smartFolderRuleSchema の transform で既に正規化済み（NormalizedTag）。
+          const placeholders = rule.values.map(() => "?").join(", ");
           predicates.push(`EXISTS (
             SELECT 1
             FROM main.work_tags AS rule_work_tags
             INNER JOIN main.tags AS rule_tags ON rule_tags.id = rule_work_tags.tag_id
             WHERE rule_work_tags.work_id = works.id AND rule_tags.name IN (${placeholders})
           )`);
-          bindings.push(...normalized);
+          bindings.push(...rule.values);
           break;
         }
         case "長さ": {
@@ -734,6 +743,55 @@ export class WorkRepo {
       .query(`SELECT works.id AS id FROM main.works WHERE ${predicates.join(" OR ")}`)
       .all(...bindings) as Array<{ id: string }>;
     return new Set(rows.map((row) => row.id));
+  }
+
+  /**
+   * タグ AND/OR・組み込み軸（year等）の絞り込み条件を EXISTS 述語として組み立てる。
+   * queryWorks（GET /works・スマートフォルダー評価）と getAxisFacets（GET /axes/:axis、
+   * TASK-187 の自軸除外カウント）で同じ絞り込み意味論を共有するための共通実装。
+   * tags には組み込み軸の擬似タグ（"@year/2024" 等）が混ざり得るため、呼び出し側が
+   * splitSelectedTags で実タグと yearValue へ分解してから渡す（ADR-0012 §2、TASK-199）。
+   * works.id / work_states.added_at を参照するため、呼び出し元の FROM 句は
+   * main.works と user.work_states（エイリアス work_states）を JOIN 済みである前提。
+   */
+  private static tagAxisConditions(
+    tags: NormalizedTag[],
+    tagOp: "AND" | "OR",
+    yearValue: string | null,
+  ): { conditions: string[]; bindings: Array<string | number> } {
+    const conditions: string[] = [];
+    const bindings: Array<string | number> = [];
+
+    if (tags.length > 0) {
+      if (tagOp === "AND") {
+        for (const tag of tags) {
+          conditions.push(`EXISTS (
+            SELECT 1
+            FROM main.work_tags AS filter_work_tags
+            INNER JOIN main.tags AS filter_tags ON filter_tags.id = filter_work_tags.tag_id
+            WHERE filter_work_tags.work_id = works.id AND filter_tags.name = ?
+          )`);
+          bindings.push(tag);
+        }
+      } else {
+        const placeholders = tags.map(() => "?").join(", ");
+        conditions.push(`EXISTS (
+          SELECT 1
+          FROM main.work_tags AS filter_work_tags
+          INNER JOIN main.tags AS filter_tags ON filter_tags.id = filter_work_tags.tag_id
+          WHERE filter_work_tags.work_id = works.id
+            AND filter_tags.name IN (${placeholders})
+        )`);
+        bindings.push(...tags);
+      }
+    }
+
+    if (yearValue !== null) {
+      conditions.push("substr(work_states.added_at, 1, 4) = ?");
+      bindings.push(yearValue);
+    }
+
+    return { conditions, bindings };
   }
 
   /** ADR-0008: ATTACH JOINした同じ絞り込み集合から件数とページを求める。 */
@@ -779,45 +837,10 @@ export class WorkRepo {
       if (rjKey) bindings.push(rjKey);
     }
 
-    const normalizedTags = params.tags.map(normalizeTag);
-    if (normalizedTags.length > 0) {
-      if (params.tagOp === "AND") {
-        for (const tag of normalizedTags) {
-          conditions.push(`EXISTS (
-            SELECT 1
-            FROM main.work_tags AS filter_work_tags
-            INNER JOIN main.tags AS filter_tags ON filter_tags.id = filter_work_tags.tag_id
-            WHERE filter_work_tags.work_id = works.id AND filter_tags.name = ?
-          )`);
-          bindings.push(tag);
-        }
-      } else {
-        const placeholders = normalizedTags.map(() => "?").join(", ");
-        conditions.push(`EXISTS (
-          SELECT 1
-          FROM main.work_tags AS filter_work_tags
-          INNER JOIN main.tags AS filter_tags ON filter_tags.id = filter_work_tags.tag_id
-          WHERE filter_work_tags.work_id = works.id
-            AND filter_tags.name IN (${placeholders})
-        )`);
-        bindings.push(...normalizedTags);
-      }
-    }
-
-    if (params.axis && params.axisValue) {
-      if (params.axis === "year") {
-        conditions.push("substr(work_states.added_at, 1, 4) = ?");
-        bindings.push(params.axisValue);
-      } else {
-        conditions.push(`EXISTS (
-          SELECT 1
-          FROM main.work_tags AS axis_work_tags
-          INNER JOIN main.tags AS axis_tags ON axis_tags.id = axis_work_tags.tag_id
-          WHERE axis_work_tags.work_id = works.id AND axis_tags.name = ?
-        )`);
-        bindings.push(`${params.axis}/${params.axisValue}`);
-      }
-    }
+    const { tags: realTags, yearValue } = splitSelectedTags(params.tags);
+    const tagAxis = WorkRepo.tagAxisConditions(realTags, params.tagOp, yearValue);
+    conditions.push(...tagAxis.conditions);
+    bindings.push(...tagAxis.bindings);
 
     switch (params.view) {
       case "recent":
@@ -1103,49 +1126,132 @@ export class WorkRepo {
     return map;
   }
 
-  /** 作品全件のロードをせず、SQLのGROUP BYで軸ファセットを集計する。 */
-  getAxisFacets(axis: string): AxisFacetItem[] {
-    if (axis === "year") {
-      return this.db.sqlite
-        .query(`
-          SELECT substr(work_states.added_at, 1, 4) AS value, COUNT(*) AS count
-          FROM main.works
-          INNER JOIN user.work_states AS work_states ON work_states.work_id = works.id
-          GROUP BY value
-          ORDER BY count DESC, value COLLATE BINARY ASC
-        `)
-        .all() as AxisFacetItem[];
-    }
+  /**
+   * base CTE（value・work_id・addedAt・duration・cover・tie-break用sort_key を1行1作品で持つ）を
+   * 受け取り、件数・総時間・代表カバー（追加日時降順で最大4件）を1クエリで集計するSQLへ組み立てる。
+   * 代表カバーの選定は ROW_NUMBER ウィンドウ関数、コラージュへの詰め込みは json_group_array で行い、
+   * 値の数に対してN+1にならないようにする。
+   */
+  private static axisFacetSql(baseSelect: string): string {
+    return `
+      WITH base AS (${baseSelect}),
+      ranked_covers AS (
+        SELECT value, work_id, cover_image, cover_width, cover_height,
+               ROW_NUMBER() OVER (PARTITION BY value ORDER BY added_at DESC, work_id ASC) AS rn
+        FROM base
+        WHERE cover_image IS NOT NULL AND cover_width IS NOT NULL AND cover_height IS NOT NULL
+      ),
+      covers_agg AS (
+        SELECT value,
+               json_group_array(
+                 json_object(
+                   'workId', work_id,
+                   'image', cover_image,
+                   'dimensions', json_object('width', cover_width, 'height', cover_height)
+                 )
+                 ORDER BY rn
+               ) AS covers_json
+        FROM ranked_covers
+        WHERE rn <= 4
+        GROUP BY value
+      )
+      SELECT
+        base.value AS value,
+        COUNT(*) AS count,
+        COALESCE(SUM(base.duration_sec), 0) AS durationSec,
+        COALESCE(covers_agg.covers_json, '[]') AS coversJson
+      FROM base
+      LEFT JOIN covers_agg ON covers_agg.value = base.value
+      GROUP BY base.value
+      ORDER BY count DESC, base.sort_key COLLATE BINARY ASC, base.value COLLATE BINARY ASC
+    `;
+  }
 
-    if (axis === "tag") {
+  /** 作品全件のロードをせず、SQLのGROUP BYで軸ファセットを集計する。
+   *  filter が渡された場合、集計対象を先に絞り込む（自軸除外カウント、TASK-187。
+   *  自軸由来のフィルタを除いた集合を渡すのは呼び出し側の責務）。0件になった値は
+   *  GROUP BY の結果に現れないため、自然に一覧から除外される。 */
+  getAxisFacets(axis: string, filter: AxisFacetsFilter = {}): AxisFacetItem[] {
+    const { tags: realTags, yearValue } = splitSelectedTags(filter.tags ?? []);
+    const tagAxis = WorkRepo.tagAxisConditions(realTags, filter.tagOp ?? "AND", yearValue);
+    const filterWhere =
+      tagAxis.conditions.length > 0 ? `WHERE ${tagAxis.conditions.join(" AND ")}` : "";
+
+    let rows: AxisFacetRow[];
+
+    if (axis === "year") {
+      rows = this.db.sqlite
+        .query(
+          WorkRepo.axisFacetSql(`
+            SELECT substr(work_states.added_at, 1, 4) AS value,
+                   works.id AS work_id,
+                   work_states.added_at AS added_at,
+                   works.total_duration_sec AS duration_sec,
+                   works.cover_image AS cover_image,
+                   works.cover_width AS cover_width,
+                   works.cover_height AS cover_height,
+                   substr(work_states.added_at, 1, 4) AS sort_key
+            FROM main.works
+            INNER JOIN user.work_states AS work_states ON work_states.work_id = works.id
+            ${filterWhere}
+          `),
+        )
+        .all(...tagAxis.bindings) as AxisFacetRow[];
+    } else if (axis === "tag") {
       // タグ軸は flat・annotated を問わず全タグを集計する（ADR-0005 追記: prefixグループ見出し表示）。
       // value は完全なタグ文字列なので、tie-break は facet_sort_key（値のみ）ではなく
       // search_key（完全なタグ名の日本語ソートキー）を使う
-      return this.db.sqlite
-        .query(`
-          SELECT tags.name AS value, COUNT(*) AS count
-          FROM main.works
-          INNER JOIN user.work_states AS work_states ON work_states.work_id = works.id
-          INNER JOIN main.work_tags AS work_tags ON work_tags.work_id = works.id
-          INNER JOIN main.tags AS tags ON tags.id = work_tags.tag_id
-          GROUP BY tags.name
-          ORDER BY count DESC, tags.search_key COLLATE BINARY ASC, value COLLATE BINARY ASC
-        `)
-        .all() as AxisFacetItem[];
+      rows = this.db.sqlite
+        .query(
+          WorkRepo.axisFacetSql(`
+            SELECT tags.name AS value,
+                   works.id AS work_id,
+                   work_states.added_at AS added_at,
+                   works.total_duration_sec AS duration_sec,
+                   works.cover_image AS cover_image,
+                   works.cover_width AS cover_width,
+                   works.cover_height AS cover_height,
+                   tags.search_key AS sort_key
+            FROM main.works
+            INNER JOIN user.work_states AS work_states ON work_states.work_id = works.id
+            INNER JOIN main.work_tags AS work_tags ON work_tags.work_id = works.id
+            INNER JOIN main.tags AS tags ON tags.id = work_tags.tag_id
+            ${filterWhere}
+          `),
+        )
+        .all(...tagAxis.bindings) as AxisFacetRow[];
+    } else {
+      const prefixConditions = [
+        "substr(tags.name, 1, instr(tags.name, '/') - 1) = ?",
+        ...tagAxis.conditions,
+      ];
+      rows = this.db.sqlite
+        .query(
+          WorkRepo.axisFacetSql(`
+            SELECT substr(tags.name, instr(tags.name, '/') + 1) AS value,
+                   works.id AS work_id,
+                   work_states.added_at AS added_at,
+                   works.total_duration_sec AS duration_sec,
+                   works.cover_image AS cover_image,
+                   works.cover_width AS cover_width,
+                   works.cover_height AS cover_height,
+                   tags.facet_sort_key AS sort_key
+            FROM main.works
+            INNER JOIN user.work_states AS work_states ON work_states.work_id = works.id
+            INNER JOIN main.work_tags AS work_tags ON work_tags.work_id = works.id
+            INNER JOIN main.tags AS tags ON tags.id = work_tags.tag_id
+            WHERE ${prefixConditions.join(" AND ")}
+          `),
+        )
+        .all(axis, ...tagAxis.bindings) as AxisFacetRow[];
     }
 
-    return this.db.sqlite
-      .query(`
-        SELECT substr(tags.name, instr(tags.name, '/') + 1) AS value, COUNT(*) AS count
-        FROM main.works
-        INNER JOIN user.work_states AS work_states ON work_states.work_id = works.id
-        INNER JOIN main.work_tags AS work_tags ON work_tags.work_id = works.id
-        INNER JOIN main.tags AS tags ON tags.id = work_tags.tag_id
-        WHERE substr(tags.name, 1, instr(tags.name, '/') - 1) = ?
-        GROUP BY value
-        ORDER BY count DESC, tags.facet_sort_key COLLATE BINARY ASC, value COLLATE BINARY ASC
-      `)
-      .all(axis) as AxisFacetItem[];
+    return rows.map((row) => ({
+      value: row.value,
+      count: row.count,
+      durationSec: row.durationSec,
+      covers: JSON.parse(row.coversJson) as AxisFacetItem["covers"],
+    }));
   }
 
   async getWork(id: string): Promise<Work | null> {
@@ -1378,7 +1484,7 @@ export class WorkRepo {
     id: string,
     patch: {
       title?: string;
-      tags?: string[];
+      tags?: NormalizedTag[];
       bookmarked?: boolean;
       cover?: CoverColumns;
       urls?: UrlEntry[];

@@ -15,8 +15,14 @@
   select {
     user-select: text;
   }
-  .mle-app,
-  .mle-app * {
+  /* body 直下（#root の .mle-app と、createPortal で document.body へ出るポータル要素の
+     どちらも）にフォント・UAリセットを効かせる。.mle-app にだけスコープすると、ポータル
+     先の要素は打ち消しCSSが無い限りブラウザ既定のフォント・枠が出てしまう
+     （新しくポータルを追加するたび個別対処が要る状態になっていた）。body の子は
+     #root（= .mle-app）とポータル要素しかないため、スコープをここへ引き上げれば
+     新規ポータルにも自動で適用される。 */
+  body,
+  body * {
     font-family: var(--font-jp);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -33,7 +39,7 @@
   }
   /* text-align: inherit は UA 既定の center を打ち消す。行系UI（mll-axis / mll-wrow / mle-row 等）を
      a11y 対応で div→button 化しても左寄せレイアウトが崩れないようにする。 */
-  .mle-app button {
+  body button {
     font: inherit;
     color: inherit;
     background: transparent;
@@ -42,7 +48,7 @@
     padding: 0;
     text-align: inherit;
   }
-  .mle-app input {
+  body input {
     font: inherit;
     color: inherit;
     background: transparent;
@@ -50,12 +56,12 @@
     outline: 0;
     padding: 0;
   }
-  .mle-app a {
+  body a {
     color: inherit;
     text-decoration: none;
   }
-  .mle-app ul,
-  .mle-app ol {
+  body ul,
+  body ol {
     list-style: none;
   }
 }
@@ -462,13 +468,55 @@
   .mle-col.is-axis {
     width: 192px;
   }
-  .mle-col.is-content {
-    width: 300px;
-  }
-  .mle-col.is-content.is-pending,
+  .mle-col.is-results.is-pending,
   .mll-grid-pane.is-pending {
     opacity: 0.55;
     transition: opacity 150ms ease;
+  }
+  /* チップ列（.mll-tagband）は .mll-results の外、.mll-resultspane の通常フローに置く。
+     .mll-results 内の作品プレビューは absolute でスライドインするため、チップ列を
+     同じ .mll-results に同居させるとプレビューの下に隠れて操作できなくなる
+     （チップ列はADR-0012 §2で選択フィルタの唯一の表現）。 */
+  .mll-resultspane {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  /* 結果面（値一覧・作品一覧）はレイアウト固定で常に全幅（ADR-0012 §3）。
+     作品選択時のみ .mll-results__preview がスライドインする。 */
+  .mll-results {
+    position: relative;
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    overflow: hidden;
+  }
+  .mll-results__content {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .mle-col.is-results {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+    border-right: none;
+  }
+  .mll-results__preview {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 420px;
+    max-width: 90%;
+    display: flex;
+    box-shadow: var(--shadow-pop);
+    border-left: 1px solid var(--line-soft);
   }
   .mle-col.is-axis .mle-col__list {
     gap: 0;
@@ -524,7 +572,6 @@
   /* ── Library grid ─────────────────────────────────────────── */
 
   .mll-grid-pane {
-    --grid-inspector-width: clamp(320px, 42%, 520px);
     flex: 1 1 0;
     min-width: 0;
     min-height: 0;
@@ -739,34 +786,6 @@
     font-size: 10px;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-  .mll-grid-inspector {
-    flex: 0 0 var(--grid-inspector-width);
-    width: var(--grid-inspector-width);
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-    overflow: hidden;
-    background: var(--paper-1);
-    border-left: 1px solid var(--line);
-  }
-  .mll-grid-inspector__hd {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    min-height: 43px;
-    padding: 8px 10px 8px 18px;
-    border-bottom: 1px solid var(--line-soft);
-    font-family: var(--font-sans);
-    font-size: 10.5px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    color: var(--ink-1);
-    text-transform: uppercase;
-  }
-  .mll-grid-inspector__hd .label {
-    flex: 1;
   }
   /* ── File rows (mle-row — File Explorer mode) ─────────────── */
 
@@ -1179,6 +1198,15 @@
     font-size: 11.5px;
     font-weight: 500;
   }
+  .mll-tagband__chip .lbl {
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mll-tagband__chip .lbl:hover {
+    text-decoration: underline;
+  }
   .mll-tagband__chip .x {
     width: 16px;
     height: 16px;
@@ -1190,6 +1218,23 @@
   .mll-tagband__chip .x:hover {
     background: var(--paper-1);
     color: var(--ink-0);
+  }
+  .mll-tagband__addbtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 22px;
+    padding: 0 8px;
+    border-radius: var(--r-pill);
+    border: 1px dashed var(--line-strong);
+    color: var(--ink-2);
+    font-family: var(--font-jp);
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .mll-tagband__addbtn:hover {
+    color: var(--ink-0);
+    background: var(--paper-2);
   }
   .mll-tagband__and {
     font-family: var(--font-mono);
@@ -1204,6 +1249,19 @@
     font-family: var(--font-mono);
     font-size: 10.5px;
     color: var(--ink-2);
+  }
+  .mll-tagband__clear {
+    margin-left: auto;
+    font-family: var(--font-sans);
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--ink-2);
+    padding: 3px 6px;
+    border-radius: var(--r-1);
+  }
+  .mll-tagband__clear:hover {
+    color: var(--ink-0);
+    background: var(--paper-2);
   }
 
   .mll-taggroup + .mll-taggroup {
@@ -1255,6 +1313,391 @@
     font-size: 10px;
     color: var(--ink-3);
   }
+  /* ── Cover collage (2×2, 値一覧の代表カバー) ───────────── */
+
+  .mll-collage {
+    position: relative;
+    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 1px;
+    overflow: hidden;
+    background: var(--paper-3);
+    box-shadow:
+      0 1px 0 0 oklch(100% 0 0 / 0.5) inset,
+      0 2px 6px -3px oklch(20% 0.02 70 / 0.2);
+  }
+  .mll-collage__cell {
+    background: var(--paper-2);
+    overflow: hidden;
+  }
+  .mll-collage__cell img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .mll-collage--empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--paper-2);
+    color: var(--ink-3);
+  }
+
+  /* ── Axis value list ───────────────────────────────────── */
+
+  .mll-vsearch {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--line-soft);
+    background: var(--paper-1);
+  }
+  .mll-vsearch input {
+    flex: 1;
+    min-width: 0;
+    font-size: 12px;
+    color: var(--ink-0);
+    background: transparent;
+  }
+  .mll-vsearch input::placeholder {
+    color: var(--ink-3);
+  }
+
+  .mll-vlist-hd {
+    display: grid;
+    grid-template-columns: 32px 1fr 72px 88px;
+    gap: 8px;
+    align-items: center;
+    padding: 4px 6px 4px 4px;
+  }
+  .mll-vlist-hd__sort {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 3px;
+    font-family: var(--font-sans);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--ink-3);
+    padding: 2px 4px;
+    border-radius: 3px;
+  }
+  .mll-vlist-hd__sort:first-of-type {
+    justify-content: flex-start;
+  }
+  .mll-vlist-hd__sort:hover {
+    color: var(--ink-1);
+    background: var(--paper-2);
+  }
+  .mll-vlist-hd__sort.is-active {
+    color: var(--ink-0);
+  }
+  .mll-vlist-hd__sort .chev {
+    display: inline-flex;
+  }
+  .mll-vlist-hd__sort .chev.is-asc {
+    transform: rotate(180deg);
+  }
+
+  .mll-vrow {
+    position: relative;
+    border-radius: 4px;
+    font-size: 12px;
+    color: var(--ink-1);
+  }
+  .mll-vrow:hover {
+    background: var(--paper-2);
+  }
+  .mll-vrow.is-on {
+    background: var(--paper-4);
+    color: var(--ink-0);
+  }
+  .mll-vrow__main {
+    display: grid;
+    grid-template-columns: 32px 1fr 72px 88px;
+    gap: 8px;
+    align-items: center;
+    width: 100%;
+    block-size: 42px;
+    box-sizing: border-box;
+    padding: 5px 30px 5px 4px;
+    cursor: pointer;
+    text-align: left;
+    color: inherit;
+  }
+  .mll-vrow__add {
+    position: absolute;
+    top: 50%;
+    right: 4px;
+    transform: translateY(-50%);
+    opacity: 0;
+    pointer-events: none;
+  }
+  .mll-vrow:hover .mll-vrow__add,
+  .mll-vrow:focus-within .mll-vrow__add {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  /* 入れ子タグの中間ノードのうち、実タグとして存在しないもの（選択不可の見出し。
+     ADR-0012 §5・統括判断）。名前順ソート時のみ axisValueHierarchy.ts が生成する。 */
+  .mll-vrow-heading {
+    display: flex;
+    align-items: center;
+    block-size: 42px;
+    box-sizing: border-box;
+    padding-right: 4px;
+    overflow: hidden;
+    font-family: var(--font-sans);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    color: var(--ink-3);
+    /* 値行（.mll-vrow__nm）と同じく折り返さない。仮想化が行高を固定値で見積もっているため、
+       折り返すと translateY の計算がずれて以降の行が重なる。 */
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .mll-vrow__nm {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--ink-0);
+    font-weight: 500;
+  }
+  .mll-vrow__count,
+  .mll-vrow__dur {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--ink-2);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .mll-vtile {
+    position: relative;
+    min-width: 0;
+    border-radius: var(--r-2);
+    color: var(--ink-1);
+  }
+  .mll-vtile:hover {
+    background: var(--paper-2);
+  }
+  .mll-vtile.is-on {
+    background: var(--paper-4);
+    color: var(--ink-0);
+  }
+  .mll-vtile__main {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 5px;
+    text-align: left;
+    color: inherit;
+    cursor: pointer;
+  }
+  .mll-vtile__add {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .mll-vtile:hover .mll-vtile__add,
+  .mll-vtile:focus-within .mll-vtile__add {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .mll-vtile .mll-collage {
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 6px;
+  }
+  /* 入れ子タグの親パス（名前順ソート時、depth>0 のタイルにのみ表示）。 */
+  .mll-vtile__breadcrumb {
+    margin: 8px 2px 0;
+    overflow: hidden;
+    color: var(--ink-3);
+    font-size: 9.5px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mll-vtile__nm {
+    display: -webkit-box;
+    min-height: 2.1em;
+    margin: 8px 2px 0;
+    overflow: hidden;
+    color: var(--ink-0);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.35;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  .mll-vtile__breadcrumb + .mll-vtile__nm {
+    margin-top: 2px;
+  }
+  .mll-vtile__badge {
+    margin: 3px 2px 0;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--ink-3);
+  }
+
+  /* ── 軸のクイックオーバーレイ・チップの値ドロップダウン ─────── */
+
+  .mll-qoverlay {
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    width: 280px;
+    max-height: 360px;
+    overflow: hidden;
+    background: var(--paper-1);
+    border: 1px solid var(--line-soft);
+    border-radius: var(--r-2);
+    box-shadow: var(--shadow-pop);
+  }
+  .mll-qoverlay--fixed {
+    position: fixed;
+  }
+  .mll-qoverlay--inline {
+    position: absolute;
+    top: calc(100% + 6px);
+  }
+  .mll-qlist {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .mll-qlist__search {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--line-soft);
+    color: var(--ink-3);
+  }
+  .mll-qlist__search input {
+    flex: 1;
+    min-width: 0;
+    padding: 0;
+    font-size: 12px;
+    color: var(--ink-0);
+    background: transparent;
+  }
+  .mll-qlist__search input:focus-visible {
+    outline: 2px solid var(--acc);
+    outline-offset: 1px;
+    border-radius: 2px;
+  }
+  .mll-qlist__sorttoggle {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    color: var(--ink-3);
+  }
+  .mll-qlist__sorttoggle:hover,
+  .mll-qlist__sorttoggle.is-open {
+    color: var(--ink-0);
+    background: var(--paper-2);
+  }
+  .mll-qlist__sort {
+    display: flex;
+    gap: 4px;
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .mll-qlist__sortbtn {
+    font-family: var(--font-sans);
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--ink-3);
+    padding: 2px 6px;
+    border-radius: 3px;
+  }
+  .mll-qlist__sortbtn:hover {
+    color: var(--ink-1);
+    background: var(--paper-2);
+  }
+  .mll-qlist__sortbtn.is-active {
+    color: var(--acc-ink);
+    background: var(--acc-soft);
+  }
+  .mll-qlist__hint {
+    padding: 5px 8px;
+    font-family: var(--font-sans);
+    font-size: 10px;
+    color: var(--ink-2);
+    background: var(--paper-2);
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .mll-qlist__body {
+    flex: 1;
+    min-height: 0;
+    max-height: 260px;
+    overflow-y: auto;
+  }
+  .mll-qlist__item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    color: var(--ink-1);
+    text-align: left;
+  }
+  .mll-qlist__item:hover {
+    background: var(--paper-2);
+  }
+  .mll-qlist__item.is-on {
+    background: var(--paper-4);
+    color: var(--ink-0);
+    font-weight: 600;
+  }
+  .mll-qlist__item .nm {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mll-qlist__item .count {
+    flex-shrink: 0;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--ink-3);
+  }
+  /* 入れ子タグの選択不可の見出し行（名前順ソート時のみ。値一覧の .mll-vrow-heading と対）。 */
+  .mll-qlist__heading {
+    padding: 6px 8px;
+    overflow: hidden;
+    font-family: var(--font-sans);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    color: var(--ink-3);
+    /* .mll-qlist__item .nm と同じく折り返さない（仮想化の固定行高見積もりが崩れるため）。 */
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .mll-qlist__status {
+    padding: 16px 8px;
+    text-align: center;
+    font-size: 11px;
+    color: var(--ink-3);
+  }
+
   /* ── Drill header ─────────────────────────────────────────── */
 
   .mle-drill {
@@ -2991,6 +3434,16 @@
   .ml-presence-colstack[data-phase="shown"] {
     width: 46px;
     opacity: 1;
+  }
+
+  /* 作品選択時のプレビューのスライドイン（ADR-0012 §3）。colstack-width と同じ
+     パターンで、絶対配置した .mll-results__preview を右から出し入れする。 */
+  .ml-presence-preview {
+    transform: translateX(100%);
+    transition: transform 220ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .ml-presence-preview[data-phase="shown"] {
+    transform: translateX(0);
   }
 
   .mle-colstack__edges[data-pulse="enter"] {

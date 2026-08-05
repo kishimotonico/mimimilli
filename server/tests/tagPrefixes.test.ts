@@ -17,6 +17,7 @@ import { createApp } from "../src/app.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { buildAxisFacets } from "../src/core/axisFacets.ts";
 import { buildTagPrefixCandidates } from "../src/core/tagPrefixCandidates.ts";
+import { nt, nts } from "./helpers/tag.ts";
 
 function buildApp() {
   return createApp(createFixtureAdapter());
@@ -37,7 +38,7 @@ function summaryWith(
     addedAt,
     errorMessage: null,
     urls: [],
-    tags,
+    tags: nts(tags),
     trackCount: 0,
     bookmarked: false,
     lastPlayedAt: null,
@@ -69,9 +70,11 @@ test("normalizeTags: prefix または値が空の Annotated タグを除く", ()
   assert.deepEqual(normalizeTags(["cv/", "cv/   ", "  /x", "/x"]), ["/x"]);
 });
 
-test("tagEquals: prefix の大文字小文字を無視し、値は区別する", () => {
-  assert.ok(tagEquals("CV/x", "cv/x"));
-  assert.ok(!tagEquals("cv/X", "cv/x"));
+// prefix の大文字小文字を無視する処理は normalizeTag が担う（NormalizedTag はその結果）。
+// tagEquals は正規化済み同士の単純な同値判定のみを行う。
+test("tagEquals: 正規化済み同士の同値判定。値は大文字小文字を区別する", () => {
+  assert.ok(tagEquals(nt("cv/x"), nt("cv/x")));
+  assert.ok(!tagEquals(nt("cv/X"), nt("cv/x")));
 });
 
 // ── prefix 名スキーマ ─────────────────────────────────────────
@@ -108,16 +111,16 @@ test("DEFAULT_TAG_PREFIXES: color は CSS 変数文字列ではなく semantic k
 
 // ── ファセット集計（動的 prefix 軸）──────────────────────────
 
-test("buildAxisFacets: 任意の prefix 軸を集計できる（prefix の大小は無視）", () => {
+test("buildAxisFacets: 任意の prefix 軸を集計できる（別 prefix は混入しない）", () => {
   const works = [
     summaryWith("W1", ["気分/睡眠用", "ASMR"]),
     summaryWith("W2", ["気分/睡眠用", "気分/作業用"]),
-    summaryWith("W3", ["Kibun/x", "気分/作業用"]),
+    summaryWith("W3", ["kibun/x", "気分/作業用"]),
   ];
   const items = buildAxisFacets("気分", works);
   assert.deepEqual(items, [
-    { value: "作業用", count: 2 },
-    { value: "睡眠用", count: 2 },
+    { value: "作業用", count: 2, durationSec: 0, covers: [] },
+    { value: "睡眠用", count: 2, durationSec: 0, covers: [] },
   ]);
 });
 
@@ -127,8 +130,8 @@ test("buildAxisFacets: tag 軸は flat・annotated 双方を集計し、year 軸
     summaryWith("W2", ["ASMR"], "2026-01-01T00:00:00.000Z"),
   ];
   assert.deepEqual(buildAxisFacets("tag", works), [
-    { value: "ASMR", count: 2 },
-    { value: "cv/x", count: 1 },
+    { value: "ASMR", count: 2, durationSec: 0, covers: [] },
+    { value: "cv/x", count: 1, durationSec: 0, covers: [] },
   ]);
   assert.deepEqual(
     buildAxisFacets("year", works)
@@ -136,6 +139,70 @@ test("buildAxisFacets: tag 軸は flat・annotated 双方を集計し、year 軸
       .sort(),
     ["2025", "2026"],
   );
+});
+
+test("buildAxisFacets: durationSecは同じ値に属する作品の合計、durationSec未知(null)は合算から除く", () => {
+  const works = [
+    { ...summaryWith("W1", ["気分/睡眠用"]), totalDurationSec: 600 },
+    { ...summaryWith("W2", ["気分/睡眠用"]), totalDurationSec: 1200 },
+    { ...summaryWith("W3", ["気分/睡眠用"]), totalDurationSec: null },
+  ];
+  assert.deepEqual(
+    buildAxisFacets("気分", works).map(({ value, durationSec }) => ({ value, durationSec })),
+    [{ value: "睡眠用", durationSec: 1800 }],
+  );
+});
+
+test("buildAxisFacets: coversは追加日時の新しい順で最大4件、cover未設定の作品は含まない", () => {
+  const cover = (n: number) => ({ image: `cover-${n}.jpg`, dimensions: { width: n, height: n } });
+  const works = [
+    { ...summaryWith("W1", ["気分/睡眠用"], "2026-01-01T00:00:00.000Z"), cover: cover(1) },
+    { ...summaryWith("W2", ["気分/睡眠用"], "2026-01-03T00:00:00.000Z"), cover: cover(2) },
+    { ...summaryWith("W3", ["気分/睡眠用"], "2026-01-02T00:00:00.000Z"), cover: null },
+    { ...summaryWith("W4", ["気分/睡眠用"], "2026-01-05T00:00:00.000Z"), cover: cover(4) },
+    { ...summaryWith("W5", ["気分/睡眠用"], "2026-01-04T00:00:00.000Z"), cover: cover(5) },
+    { ...summaryWith("W6", ["気分/睡眠用"], "2026-01-06T00:00:00.000Z"), cover: cover(6) },
+  ];
+  const [item] = buildAxisFacets("気分", works);
+  assert.deepEqual(
+    item?.covers.map((c) => c.image),
+    ["cover-6.jpg", "cover-4.jpg", "cover-5.jpg", "cover-2.jpg"],
+  );
+});
+
+test("buildAxisFacets: filter を渡すと AND 条件として絞り込んだ集合から集計する（TASK-187）", () => {
+  const works = [
+    summaryWith("W1", ["cv/藤田茜", "ASMR"]),
+    summaryWith("W2", ["cv/霧島レイ", "ASMR"]),
+    summaryWith("W3", ["cv/霧島レイ", "催眠"]),
+  ];
+  // ASMR タグで絞り込むと霧島レイの1件（W3）は集計対象から外れる
+  assert.deepEqual(buildAxisFacets("cv", works, { tags: ["ASMR"], tagOp: "AND" }), [
+    { value: "藤田茜", count: 1, durationSec: 0, covers: [] },
+    { value: "霧島レイ", count: 1, durationSec: 0, covers: [] },
+  ]);
+});
+
+test("buildAxisFacets: filter の @year/... 擬似タグも追加のAND条件として適用する", () => {
+  const works = [
+    summaryWith("W1", ["cv/藤田茜"], "2024-06-01T00:00:00.000Z"),
+    summaryWith("W2", ["cv/藤田茜"], "2025-06-01T00:00:00.000Z"),
+    summaryWith("W3", ["cv/霧島レイ"], "2025-06-01T00:00:00.000Z"),
+  ];
+  assert.deepEqual(buildAxisFacets("cv", works, { tags: ["@year/2025"] }), [
+    { value: "藤田茜", count: 1, durationSec: 0, covers: [] },
+    { value: "霧島レイ", count: 1, durationSec: 0, covers: [] },
+  ]);
+});
+
+test("buildAxisFacets: filterで0件になった値は一覧から除外される", () => {
+  const works = [summaryWith("W1", ["cv/藤田茜", "催眠"])];
+  assert.deepEqual(buildAxisFacets("cv", works, { tags: ["ASMR"], tagOp: "AND" }), []);
+});
+
+test("buildAxisFacets: filterが無ければ従来どおり無絞り込みで集計する（回帰確認）", () => {
+  const works = [summaryWith("W1", ["cv/藤田茜"]), summaryWith("W2", ["cv/霧島レイ"])];
+  assert.deepEqual(buildAxisFacets("cv", works), buildAxisFacets("cv", works, {}));
 });
 
 // ── 候補サジェスト ────────────────────────────────────────────
@@ -160,16 +227,36 @@ test("buildTagPrefixCandidates: 登録できない予約 prefix と禁止形を�
 
 // ── fixture アダプタ ─────────────────────────────────────────
 
-test("fixture patchWork: タグを正規化して保存する", async () => {
-  const adapter = createFixtureAdapter();
-  const page = await adapter.queryWorks({ q: "", tags: [], tagOp: "AND", sort: "added-desc" });
-  const work = page.items[0];
-  assert.ok(work);
+// 生の（空白混じり・大文字小文字混在の）タグ文字列の正規化は、adapter.patchWork の内部
+// ではなく HTTP 境界（workPatchSchema + normalizeTags）で行う。実際にその境界を通す。
+test("PATCH /api/works/:id: タグを正規化して保存する", async () => {
+  const app = buildApp();
+  const listRes = await app.request("/api/works");
+  const { items } = await listRes.json();
+  const workId: string = items[0].id;
 
-  const updated = await adapter.patchWork(work.id, { tags: ["CV/ x ", "cv/x", "  "] });
+  const patched = await app.request(`/api/works/${workId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tags: ["CV/ x ", "cv/x"] }),
+  });
+  assert.equal(patched.status, 200);
+  const body = await patched.json();
+  assert.deepEqual(body.tags, ["cv/x"]);
+});
 
-  assert.deepEqual(updated?.tags, ["cv/x"]);
-  assert.deepEqual((await adapter.getWork(work.id))?.tags, ["cv/x"]);
+test("PATCH /api/works/:id: 正規化後に空になるタグは400で拒否する（隠蔽しない）", async () => {
+  const app = buildApp();
+  const listRes = await app.request("/api/works");
+  const { items } = await listRes.json();
+  const workId: string = items[0].id;
+
+  const patched = await app.request(`/api/works/${workId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tags: ["cv/x", "  "] }),
+  });
+  assert.equal(patched.status, 400);
 });
 
 // ── HTTP CRUD（fixture アダプタ）─────────────────────────────

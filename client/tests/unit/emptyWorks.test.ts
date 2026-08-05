@@ -1,32 +1,25 @@
 import { describe, expect, it } from "vitest";
-import type { TagPrefix } from "@mimimilli/shared";
 import {
   buildEmptyWorksHint,
   buildEmptyWorksMessage,
 } from "../../src/features/library/model/emptyWorks";
 
-const PREFIXES: TagPrefix[] = [
-  { prefix: "サークル", label: "サークル", color: null, showAsAxis: true, protected: true },
-];
-
 describe("buildEmptyWorksMessage", () => {
   it("shows a generic message when nothing narrows the result", () => {
-    expect(buildEmptyWorksMessage("", null, null)).toBe("作品が見つかりません");
+    expect(buildEmptyWorksMessage("", false)).toBe("作品が見つかりません");
   });
 
   it("mentions the search query alone", () => {
-    expect(buildEmptyWorksMessage("癒し", null, null)).toBe("「癒し」に一致する作品はありません");
+    expect(buildEmptyWorksMessage("癒し", false)).toBe("「癒し」に一致する作品はありません");
   });
 
-  it("mentions the drill axis/value alone", () => {
-    expect(buildEmptyWorksMessage("", "サークル", "月白製作所", PREFIXES)).toBe(
-      "サークル「月白製作所」 に一致する作品はありません",
-    );
+  it("mentions the selected tag filter alone", () => {
+    expect(buildEmptyWorksMessage("", true)).toBe("選択中のフィルタに一致する作品はありません");
   });
 
-  it("combines search query and drill when both narrow the result", () => {
-    expect(buildEmptyWorksMessage("癒し", "サークル", "月白製作所", PREFIXES)).toBe(
-      "「癒し」・サークル「月白製作所」 に一致する作品はありません",
+  it("combines search query and selected tag filter when both narrow the result", () => {
+    expect(buildEmptyWorksMessage("癒し", true)).toBe(
+      "「癒し」・選択中のフィルタ に一致する作品はありません",
     );
   });
 });
@@ -42,7 +35,7 @@ describe("buildEmptyWorksHint", () => {
     );
   });
 
-  it("omits hint when the empty state is due to a filter (search/drill)", () => {
+  it("omits hint when the empty state is due to a filter (search/tags)", () => {
     expect(buildEmptyWorksHint("fav", true)).toBeUndefined();
     expect(buildEmptyWorksHint("missing", true)).toBeUndefined();
   });
