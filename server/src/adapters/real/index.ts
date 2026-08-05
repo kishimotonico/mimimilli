@@ -20,6 +20,7 @@ import type {
   DlsiteStatePatch,
   FileEntry,
   FsListing,
+  NormalizedTag,
   ResumeBody,
   ScanProgressEvent,
   ScanResult,
@@ -886,8 +887,12 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       const work = await repo.getWork(workId);
       if (!work) return false;
 
-      const patch: { title?: string; tags?: string[]; cover?: CoverColumns; urls?: Work["urls"] } =
-        {};
+      const patch: {
+        title?: string;
+        tags?: NormalizedTag[];
+        cover?: CoverColumns;
+        urls?: Work["urls"];
+      } = {};
       if (body.applyTitle && body.info.title) patch.title = body.info.title;
       const applyTags = normalizeTags(body.applyTags);
       if (applyTags.length > 0) patch.tags = normalizeTags([...work.tags, ...applyTags]);
@@ -1104,7 +1109,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
               if (!noOp) {
                 const patch: {
                   title?: string;
-                  tags?: string[];
+                  tags?: NormalizedTag[];
                   cover?: CoverColumns;
                   urls?: Work["urls"];
                 } = { tags: nextTags };

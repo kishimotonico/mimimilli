@@ -6,7 +6,6 @@ import {
   dlsiteStateSchema,
   emptyDlsiteState,
   evaluateParseErrorAlert,
-  normalizeTags,
   parseTag,
   playlistSchema,
   probeResultFromCache,
@@ -481,11 +480,11 @@ export class WorkRepo {
     return map;
   }
 
-  private replaceWorkTags(workId: string, tagNames: string[]): void {
+  private replaceWorkTags(workId: string, tagNames: NormalizedTag[]): void {
     this.db.catalog.delete(workTags).where(eq(workTags.workId, workId)).run();
-    // DB キャッシュには常に正規形で入れる（ADR-0005 決定5）。メタファイル側の正規化は
-    // 編集経路（PATCH / DLsite 適用）で行い、スキャン取り込みはメタを書き換えない
-    for (const name of normalizeTags(tagNames)) {
+    // DB キャッシュには常に正規形で入れる（ADR-0005 決定5）。呼び出し元が既に
+    // NormalizedTag[] を渡す契約のため、ここでの再正規化は不要
+    for (const name of tagNames) {
       const parsed = parseTag(name);
       this.db.catalog
         .insert(tags)
@@ -1485,7 +1484,7 @@ export class WorkRepo {
     id: string,
     patch: {
       title?: string;
-      tags?: string[];
+      tags?: NormalizedTag[];
       bookmarked?: boolean;
       cover?: CoverColumns;
       urls?: UrlEntry[];

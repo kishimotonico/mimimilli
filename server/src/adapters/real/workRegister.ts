@@ -211,7 +211,8 @@ export async function createWorkFromFolder(
     } = {};
 
     if (body.title !== meta.title) metaPatch.title = body.title;
-    metaPatch.tags = normalizeTags(body.tags);
+    // body.tags は workCreateBodySchema の境界で既に正規化済み（NormalizedTag[]）。
+    metaPatch.tags = body.tags;
 
     if (body.dlsite) {
       const applied = await buildMetaFromDlsiteApply(body.dlsite, workDir, applyDlsiteCover);
@@ -226,7 +227,8 @@ export async function createWorkFromFolder(
   }
 
   const title = body.title;
-  const tags = normalizeTags(body.tags);
+  // body.tags は workCreateBodySchema の境界で既に正規化済み（NormalizedTag[]）。
+  const tags = body.tags;
   let urls: Work["urls"] = [];
   let coverImage: string | null | undefined;
   let dlsite = emptyDlsiteState();
