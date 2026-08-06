@@ -52,4 +52,5 @@ HTTP 境界（shared/src/api.ts:25-30 の refineTagWarnings）で splitSelectedT
 - [ ] #5 型エラー回避目的の as キャストが導入されていない
 - [ ] #6 worksQueryContract のランダム生成契約テストが通り、fixture と real の同値性が保たれている
 - [ ] #7 pnpm check と pnpm test と pnpm test:visual が通る
+- [ ] #8 dlsiteApplyBodySchema.applyTags（POST /api/works/:id/dlsite/apply のボディ）も work.tags と同じ tagSchema 変換を通り、受信直後の手動 normalizeTags（real/fixture 各1箇所）が削除されている
 <!-- AC:END -->
