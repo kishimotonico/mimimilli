@@ -4,7 +4,7 @@ title: 境界で検証したタグの型をDB読み出しと内部運搬まで�
 status: In Progress
 assignee: []
 created_date: '2026-08-06 04:56'
-updated_date: '2026-08-06 05:46'
+updated_date: '2026-08-06 07:20'
 labels: []
 dependencies: []
 priority: high
@@ -56,4 +56,5 @@ HTTP 境界（shared/src/api.ts:25-30 の refineTagWarnings）で splitSelectedT
 - [ ] #9 listSummaries() を使う集約処理（エクスポート・DLsite一括取得・スキャン完了処理・ルールベースのスマートフォルダー）が、非正規タグを持つ作品が1件あっても全体停止せず、該当作品を隔離して残りの処理を続行する
 - [ ] #10 隔離された作品は黙って捨てられず、件数と対象がログに記録され、UIのある経路ではユーザーに提示される
 - [ ] #11 3万作品規模で listSummaries() の所要時間の増加が master 比で有意でない水準まで抑えられており、smart-folder-with-rules のHTTP応答が master 比で明確な悪化を示さない（bench で master と比較実測し数値を報告する）
+- [ ] #12 ユニークタグ数が数万規模（20,000・50,000）でも性能が劣化せず、キャッシュ等の内部最適化に閾値を境とした性能の崖が存在しない
 <!-- AC:END -->
