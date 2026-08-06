@@ -56,6 +56,21 @@ function makeWork(overrides: Partial<Work> = {}): Work {
   };
 }
 
+function makeWorkPatchMutationsStub() {
+  const noopMutation = {
+    isPending: false,
+    error: null,
+    reset: vi.fn(),
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+  };
+  return {
+    titleMutation: noopMutation,
+    bookmarkMutation: noopMutation,
+    tagsMutation: noopMutation,
+  };
+}
+
 function renderDetail(props: Partial<React.ComponentProps<typeof WorkDetail>> = {}) {
   return render(
     <WorkDetail
@@ -66,8 +81,7 @@ function renderDetail(props: Partial<React.ComponentProps<typeof WorkDetail>> = 
       playingTrackIndex={null}
       isPlaybackActive={false}
       tagSuggestions={[]}
-      isPatching={false}
-      onPatchWork={vi.fn()}
+      workPatchMutations={makeWorkPatchMutationsStub()}
       onTagClick={vi.fn()}
       {...props}
     />,

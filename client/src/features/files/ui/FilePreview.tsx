@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useSetAtom } from "jotai";
-import { useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { errorToastAtom } from "../../../app/model/errorToastAtom";
 import { I } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
@@ -21,6 +21,7 @@ import {
   type FsEntry,
   type FileKind,
 } from "../model/types";
+import { mutationErrorMessage } from "../../../shared/lib/mutationError";
 
 interface FilePreviewProps {
   /** 選択中エントリ（ファイル or dir）。null ならプレビューなし */
@@ -51,8 +52,47 @@ export default function FilePreview({
   const [registerPreview, setRegisterPreview] = useState<WorkRegisterPreview | null>(null);
   const [showRegisterDialog, setShowRegisterDialog] = useState(false);
   const [showUnregisterConfirm, setShowUnregisterConfirm] = useState(false);
-  const [registerBusy, setRegisterBusy] = useState(false);
-  const [unregisterBusy, setUnregisterBusy] = useState(false);
+
+  const refreshFsState = useCallback(async () => {
+    const paths = new Set<string>();
+    if (entry) paths.add(entry.path);
+    if (browsePath) paths.add(browsePath);
+    await Promise.all(
+      [...paths].map((path) =>
+        queryClient.invalidateQueries({ queryKey: FILE_SYSTEM_QUERY_KEYS.directory(path) }),
+      ),
+    );
+    await queryClient.invalidateQueries({ queryKey: ["fs"] });
+    await queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.all() });
+    await onWorkRegistered?.();
+  }, [browsePath, entry, onWorkRegistered, queryClient]);
+
+  const unregisterMutation = useMutation({
+    mutationFn: (workId: string) => deleteWork(workId),
+    onSuccess: async () => {
+      setShowUnregisterConfirm(false);
+      await refreshFsState();
+    },
+    onError: (cause) => {
+      setErrorToast(mutationErrorMessage(cause, "作品登録の解除に失敗しました"));
+    },
+  });
+
+  const registerPreviewMutation = useMutation({
+    mutationFn: (path: string) => getWorkRegisterPreview(path),
+    onSuccess: async (preview) => {
+      if (preview.alreadyRegistered) {
+        setErrorToast("このフォルダーは既に作品として登録されています");
+        await refreshFsState();
+        return;
+      }
+      setRegisterPreview(preview);
+      setShowRegisterDialog(true);
+    },
+    onError: (cause) => {
+      setErrorToast(mutationErrorMessage(cause, "登録情報の取得に失敗しました"));
+    },
+  });
 
   const kind = entry ? classifyFile(entry) : null;
   const isDir = kind === "dir";
@@ -70,55 +110,6 @@ export default function FilePreview({
   const isWorkFolder = isDir && !!entry?.workId;
   const canRegisterFolder = isDir && entry && !entry.workId;
 
-  const refreshFsState = useCallback(async () => {
-    const paths = new Set<string>();
-    if (entry) paths.add(entry.path);
-    if (browsePath) paths.add(browsePath);
-    await Promise.all(
-      [...paths].map((path) =>
-        queryClient.invalidateQueries({ queryKey: FILE_SYSTEM_QUERY_KEYS.directory(path) }),
-      ),
-    );
-    await queryClient.invalidateQueries({ queryKey: ["fs"] });
-    await queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.all() });
-    await onWorkRegistered?.();
-  }, [browsePath, entry, onWorkRegistered, queryClient]);
-
-  const handleUnregister = async () => {
-    if (!entry?.workId) return;
-    setUnregisterBusy(true);
-    setErrorToast(null);
-    try {
-      await deleteWork(entry.workId);
-      setShowUnregisterConfirm(false);
-      await refreshFsState();
-    } catch (cause) {
-      setErrorToast(cause instanceof Error ? cause.message : "作品登録の解除に失敗しました");
-    } finally {
-      setUnregisterBusy(false);
-    }
-  };
-
-  const openRegisterDialog = async () => {
-    if (!entry) return;
-    setErrorToast(null);
-    setRegisterBusy(true);
-    try {
-      const preview = await getWorkRegisterPreview(entry.path);
-      if (preview.alreadyRegistered) {
-        setErrorToast("このフォルダーは既に作品として登録されています");
-        await refreshFsState();
-        return;
-      }
-      setRegisterPreview(preview);
-      setShowRegisterDialog(true);
-    } catch (cause) {
-      setErrorToast(cause instanceof Error ? cause.message : "登録情報の取得に失敗しました");
-    } finally {
-      setRegisterBusy(false);
-    }
-  };
-
   const playActions =
     kind === "audio" ? (
       <Button
@@ -135,13 +126,21 @@ export default function FilePreview({
     ) : null;
 
   const workActions = canRegisterFolder ? (
-    <Button variant="primary" icon={I.add} disabled={registerBusy} onClick={openRegisterDialog}>
+    <Button
+      variant="primary"
+      icon={I.add}
+      disabled={registerPreviewMutation.isPending}
+      onClick={() => {
+        setErrorToast(null);
+        if (entry) registerPreviewMutation.mutate(entry.path);
+      }}
+    >
       このフォルダーを作品として登録
     </Button>
   ) : isWorkFolder && entry?.workId ? (
     <Button
       variant="ghost"
-      disabled={unregisterBusy}
+      disabled={unregisterMutation.isPending}
       onClick={() => {
         setErrorToast(null);
         setShowUnregisterConfirm(true);
@@ -221,7 +220,9 @@ export default function FilePreview({
           title="作品登録を解除"
           message="このフォルダーの作品データ（再生履歴・タグを含む）と管理ファイル（mimimilli.json）を削除します。音声などの物理ファイルは削除されません。"
           confirmLabel="解除する"
-          onConfirm={() => void handleUnregister()}
+          onConfirm={() => {
+            if (entry?.workId) unregisterMutation.mutate(entry.workId);
+          }}
           onCancel={() => setShowUnregisterConfirm(false)}
         />
       )}

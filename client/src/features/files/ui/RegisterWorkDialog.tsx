@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { normalizeTag, parseTag } from "@mimimilli/shared";
 import type { DlsiteApplyBody, DlsiteWorkInfo, WorkRegisterPreview } from "@mimimilli/shared";
 import { ApiRequestError } from "../../../shared/api/http";
@@ -15,6 +15,7 @@ import { buildTagsWithAdded, buildTagsWithRemoved } from "../../../entities/work
 import Tag from "../../../entities/work/ui/Tag";
 import { useTagPrefixes } from "../../library/model/useTagPrefixes";
 import { buildDlsiteApplyBody, dlsiteInfoTags } from "../../library/model/dlsitePreview";
+import { mutationErrorMessage } from "../../../shared/lib/mutationError";
 import { createWork, fetchDlsiteInfoByCode } from "../api";
 
 const inputClass =
@@ -46,35 +47,50 @@ export default function RegisterWorkDialog({
   const [rjCode, setRjCode] = useState(preview.detectedRjCode ?? "");
   const [dlsiteInfo, setDlsiteInfo] = useState<DlsiteWorkInfo | null>(null);
   const [applyCover, setApplyCover] = useState(true);
-  const [dlsiteBusy, setDlsiteBusy] = useState(false);
-  const [dlsiteError, setDlsiteError] = useState<string | null>(null);
-  const [submitBusy, setSubmitBusy] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const tagsQuery = useQuery({ queryKey: TAG_QUERY_KEYS.all(), queryFn: getAllTags });
   const tagSuggestions = tagsQuery.data ?? [];
   const { tagPrefixes } = useTagPrefixes();
 
-  const fetchDlsite = async (code: string) => {
-    const trimmed = code.trim();
-    if (!trimmed) {
-      setDlsiteError("RJ/VJコードを入力してください");
-      return;
-    }
-    setDlsiteBusy(true);
-    setDlsiteError(null);
-    try {
-      const info = await fetchDlsiteInfoByCode(trimmed);
+  const dlsiteMutation = useMutation({
+    mutationFn: async (code: string) => {
+      const trimmed = code.trim();
+      if (!trimmed) throw new Error("RJ/VJコードを入力してください");
+      return fetchDlsiteInfoByCode(trimmed);
+    },
+    onSuccess: (info) => {
       setDlsiteInfo(info);
       setTitle(info.title);
       setTags((prev) => Array.from(new Set([...prev, ...dlsiteInfoTags(info)])));
       setApplyCover(Boolean(info.coverUrl));
-    } catch (cause) {
-      setDlsiteError(dlsiteErrorMessage(cause));
-    } finally {
-      setDlsiteBusy(false);
-    }
-  };
+    },
+  });
+
+  const registerMutation = useMutation({
+    mutationFn: async () => {
+      const dlsiteAppliedTags = dlsiteInfo
+        ? dlsiteInfoTags(dlsiteInfo).filter((tag) => tags.includes(tag))
+        : [];
+      const dlsite: DlsiteApplyBody | undefined = dlsiteInfo
+        ? buildDlsiteApplyBody(dlsiteInfo, {
+            applyTitle: false,
+            applyCover,
+            applyTags: dlsiteAppliedTags,
+          })
+        : undefined;
+      return createWork({
+        path: folderPath,
+        title: title.trim(),
+        tags,
+        mergeDescendantWorks: preview.descendantWorkCount > 0,
+        dlsite,
+      });
+    },
+    onSuccess: () => {
+      onRegistered();
+      onClose();
+    },
+  });
 
   useEffect(() => {
     setTitle(preview.suggestedTitle);
@@ -83,14 +99,17 @@ export default function RegisterWorkDialog({
     setRjCode(preview.detectedRjCode ?? "");
     setDlsiteInfo(null);
     setApplyCover(true);
-    setDlsiteError(null);
-    setSubmitError(null);
+    dlsiteMutation.reset();
+    registerMutation.reset();
 
     if (preview.detectedRjCode && !preview.orphanedMeta) {
-      void fetchDlsite(preview.detectedRjCode);
+      dlsiteMutation.mutate(preview.detectedRjCode);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 開いた瞬間の自動取得はフォルダー・プレビュー単位で1回だけ行う
   }, [folderPath, preview]);
+
+  const submitBusy = registerMutation.isPending;
+  const dlsiteBusy = dlsiteMutation.isPending;
 
   const close = () => {
     if (!submitBusy) onClose();
@@ -110,37 +129,14 @@ export default function RegisterWorkDialog({
   };
   const removeTag = (tag: string) => setTags(buildTagsWithRemoved(tags, tag));
 
-  const dlsiteAppliedTags = useMemo(
-    () => (dlsiteInfo ? dlsiteInfoTags(dlsiteInfo).filter((tag) => tags.includes(tag)) : []),
-    [dlsiteInfo, tags],
-  );
-
-  const register = async () => {
-    setSubmitBusy(true);
-    setSubmitError(null);
-    try {
-      const dlsite: DlsiteApplyBody | undefined = dlsiteInfo
-        ? buildDlsiteApplyBody(dlsiteInfo, {
-            applyTitle: false,
-            applyCover,
-            applyTags: dlsiteAppliedTags,
-          })
-        : undefined;
-      await createWork({
-        path: folderPath,
-        title: title.trim(),
-        tags,
-        mergeDescendantWorks: preview.descendantWorkCount > 0,
-        dlsite,
-      });
-      onRegistered();
-      onClose();
-    } catch (cause) {
-      setSubmitError(cause instanceof Error ? cause.message : "作品の登録に失敗しました");
-    } finally {
-      setSubmitBusy(false);
-    }
-  };
+  const dlsiteError = dlsiteMutation.error
+    ? dlsiteMutation.error instanceof ApiRequestError
+      ? dlsiteErrorMessage(dlsiteMutation.error)
+      : mutationErrorMessage(dlsiteMutation.error, "DLsite情報の取得に失敗しました")
+    : null;
+  const submitError = registerMutation.error
+    ? mutationErrorMessage(registerMutation.error, "作品の登録に失敗しました")
+    : null;
 
   return createPortal(
     // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- backdropクリックはuseDialogModalで判定する。
@@ -189,7 +185,7 @@ export default function RegisterWorkDialog({
               <Button
                 variant="ghost"
                 disabled={submitBusy || dlsiteBusy}
-                onClick={() => void fetchDlsite(rjCode)}
+                onClick={() => dlsiteMutation.mutate(rjCode)}
               >
                 {dlsiteBusy ? <I.refresh size={12} className="motion-safe:animate-spin" /> : "取得"}
               </Button>
@@ -283,7 +279,7 @@ export default function RegisterWorkDialog({
           <Button
             variant="primary"
             disabled={submitBusy || title.trim().length === 0}
-            onClick={() => void register()}
+            onClick={() => registerMutation.mutate()}
           >
             登録
           </Button>
