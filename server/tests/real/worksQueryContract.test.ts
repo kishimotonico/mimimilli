@@ -13,7 +13,7 @@ import {
 } from "@mimimilli/shared";
 import { WorkRepo } from "../../src/adapters/real/workRepo.ts";
 import { querySmartFolderWorks } from "../../src/adapters/real/smartFolderWorks.ts";
-import { nts } from "../helpers/tag.ts";
+import { nts, tf, EMPTY_TAG_FILTERS } from "../helpers/tag.ts";
 import { upsertTestWork, resolvedDuration } from "../helpers/workTestUtils.ts";
 import { openDb } from "../../src/adapters/real/db.ts";
 import { buildAxisFacets } from "../../src/core/axisFacets.ts";
@@ -109,7 +109,7 @@ function fullWork(item: WorkSummary): Work {
 const dataset = Array.from({ length: 36 }, (_, index) => summary(index));
 
 function baseQuery(overrides: Partial<WorksQuery> = {}): WorksQuery {
-  return { q: "", tags: [], tagOp: "AND", sort: "added-desc", ...overrides };
+  return { q: "", tags: EMPTY_TAG_FILTERS, tagOp: "AND", sort: "added-desc", ...overrides };
 }
 
 function assertQueryEquivalent(repo: WorkRepo, query: WorksQuery): void {
@@ -150,10 +150,10 @@ test("core参照実装とreal SQLは固定例・生成クエリで同値", () =>
       baseQuery({ q: "020007" }),
       baseQuery({ q: "RJ" }),
       baseQuery({ q: "VJ" }),
-      baseQuery({ tags: ["CV/水瀬なずな", "ASMR"], tagOp: "AND" }),
-      baseQuery({ tags: ["催眠", "添い寝"], tagOp: "OR" }),
-      baseQuery({ tags: [`@year/${recent.slice(0, 4)}`] }),
-      baseQuery({ tags: ["ASMR", `@year/${recent.slice(0, 4)}`], tagOp: "AND" }),
+      baseQuery({ tags: tf("CV/水瀬なずな", "ASMR"), tagOp: "AND" }),
+      baseQuery({ tags: tf("催眠", "添い寝"), tagOp: "OR" }),
+      baseQuery({ tags: tf(`@year/${recent.slice(0, 4)}`) }),
+      baseQuery({ tags: tf("ASMR", `@year/${recent.slice(0, 4)}`), tagOp: "AND" }),
       baseQuery({ view: "fav" }),
       baseQuery({ view: "recent" }),
       baseQuery({ view: "added" }),
@@ -206,7 +206,7 @@ test("core参照実装とreal SQLは固定例・生成クエリで同値", () =>
         repo,
         baseQuery({
           q: queryTerms[next() % queryTerms.length]!,
-          tags: yearTag ? [...tags, yearTag] : tags,
+          tags: tf(...(yearTag ? [...tags, yearTag] : tags)),
           tagOp: next() % 2 === 0 ? "AND" : "OR",
           view: views[next() % views.length],
           sort,
@@ -332,16 +332,16 @@ test("軸ファセットの絞り込み（自軸除外カウント用フィル�
   try {
     for (const item of dataset) upsertTestWork(repo, fullWork(item));
     const filters: Array<{
-      tags?: string[];
+      tags?: import("@mimimilli/shared").TagFilters;
       tagOp?: "AND" | "OR";
     }> = [
-      { tags: ["ASMR"], tagOp: "AND" },
-      { tags: ["ASMR", "催眠"], tagOp: "OR" },
-      { tags: ["asmr", "cv/水瀬なずな"], tagOp: "AND" },
-      { tags: [`@year/${recent.slice(0, 4)}`] },
-      { tags: ["ASMR", `@year/${recent.slice(0, 4)}`], tagOp: "AND" },
+      { tags: tf("ASMR"), tagOp: "AND" },
+      { tags: tf("ASMR", "催眠"), tagOp: "OR" },
+      { tags: tf("asmr", "cv/水瀬なずな"), tagOp: "AND" },
+      { tags: tf(`@year/${recent.slice(0, 4)}`) },
+      { tags: tf("ASMR", `@year/${recent.slice(0, 4)}`), tagOp: "AND" },
       // 該当作品が無い絞り込みは0件で一覧が空になるはず（除外の同値確認）
-      { tags: ["存在しないタグ"], tagOp: "AND" },
+      { tags: tf("存在しないタグ"), tagOp: "AND" },
     ];
     for (const axis of ["tag", "year", "cv", "サークル", "気分", "シリーズ"]) {
       for (const filter of filters) {
@@ -365,7 +365,7 @@ function assertSmartFolderEquivalent(
     page: number;
     limit: number;
     seed?: number;
-    tags?: string[];
+    tags?: import("@mimimilli/shared").TagFilters;
     tagOp?: "AND" | "OR";
   },
 ): void {
@@ -439,24 +439,24 @@ test("スマートフォルダーのSQL候補絞り込み(第1段)とcore純粋�
     assertSmartFolderEquivalent(repo, [], "added-desc", {
       page: 1,
       limit: 7,
-      tags: ["ASMR"],
+      tags: tf("ASMR"),
       tagOp: "AND",
     });
     assertSmartFolderEquivalent(repo, [], "added-desc", {
       page: 1,
       limit: 7,
-      tags: [`@year/${recent.slice(0, 4)}`],
+      tags: tf(`@year/${recent.slice(0, 4)}`),
     });
     assertSmartFolderEquivalent(repo, [lengthRule(0)], "title-asc", {
       page: 1,
       limit: 7,
-      tags: ["cv/水瀬なずな"],
+      tags: tf("cv/水瀬なずな"),
       tagOp: "AND",
     });
     assertSmartFolderEquivalent(repo, [tagRule(["ASMR", "催眠"])], "duration-desc", {
       page: 1,
       limit: 7,
-      tags: [`@year/${recent.slice(0, 4)}`],
+      tags: tf(`@year/${recent.slice(0, 4)}`),
     });
 
     let state = 0x1234abcd;
@@ -521,7 +521,7 @@ test("スマートフォルダー候補IDが900件を超えてもlistSummaries�
       `候補IDがchunk境界(900件)を超えている前提が崩れている: ${candidateIds!.size}`,
     );
 
-    const works = repo.listSummaries([...candidateIds!]);
+    const works = repo.listSummaries([...candidateIds!]).summaries;
     assert.equal(works.length, candidateIds!.size, "chunk分割後も欠落・重複がない");
 
     const fixture = evalSmartFolder({ rules: [rule], sort: "id-asc" }, largeDataset, query);

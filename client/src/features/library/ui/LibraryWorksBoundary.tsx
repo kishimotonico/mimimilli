@@ -1,6 +1,6 @@
 import { Component, Suspense, useEffect, type ReactNode } from "react";
 import { QueryErrorResetBoundary } from "@tanstack/react-query";
-import type { WorkListItem } from "@mimimilli/shared";
+import type { DataIntegrityWarning, WorkListItem } from "@mimimilli/shared";
 import type { LibraryViewState } from "../model/useLibraryNavigation";
 import { isSmartAxis } from "../model/axisDefinitions";
 import {
@@ -16,6 +16,7 @@ interface WorksResult {
   hasNextPage: boolean;
   worksTotal: number | undefined;
   worksStats: { trackCount: number; durationSec: number } | undefined;
+  dataIntegrityWarning?: DataIntegrityWarning;
   isFetchingNextPage: boolean;
   fetchNextPage: () => void;
   refetchWorks: () => void;

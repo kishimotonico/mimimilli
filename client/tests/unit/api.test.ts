@@ -459,10 +459,16 @@ describe("library api", () => {
     );
   });
 
-  it("exportLibrary POSTs to /api/export and returns data string", async () => {
-    mockFetch.mockResolvedValue(makeResponse({ data: '{"version":1}' }));
+  it("exportLibrary POSTs to /api/export and returns parsed response", async () => {
+    mockFetch.mockResolvedValue(
+      makeResponse({
+        data: '{"version":1}',
+        dataIntegrityWarning: { skippedCount: 1, skippedWorkIds: ["w-1"] },
+      }),
+    );
     const result = await libraryApi.exportLibrary();
-    expect(result).toBe('{"version":1}');
+    expect(result.data).toBe('{"version":1}');
+    expect(result.dataIntegrityWarning).toEqual({ skippedCount: 1, skippedWorkIds: ["w-1"] });
   });
 });
 

@@ -9,10 +9,11 @@ import {
   applyDlsiteStatePatch,
   DEFAULT_TAG_PREFIXES,
   dedupeTags,
-  normalizeTags,
+  tagEquals,
 } from "@mimimilli/shared";
 import type {
   AxisFacetItem,
+  DataIntegrityWarning,
   DlsiteApplyBody,
   DlsiteBulkMode,
   DlsiteBulkProgressEvent,
@@ -102,6 +103,7 @@ import {
   WorkRegisterError,
 } from "./workRegister.ts";
 import { querySmartFolderWorks } from "./smartFolderWorks.ts";
+import { logDataIntegritySkips, toDataIntegrityWarning } from "./dataIntegrity.ts";
 import { SharedFlightPool, throwIfAborted } from "./sharedFlight.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
 
@@ -649,7 +651,9 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
 
       // 全作品を走査した直後の自然なタイミングでサムネイルキャッシュをGCする（TASK-26）
       const coverEntries: WorkCoverEntry[] = [];
-      for (const work of repo.listSummaries()) {
+      const { summaries, skipped } = repo.listSummaries();
+      logDataIntegritySkips(scanLogger, "scan-thumbnail-gc", skipped);
+      for (const work of summaries) {
         checkAbort();
         if (!work.cover) continue;
         const resolved = resolveWithin(
@@ -768,8 +772,25 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       return repo.listAllTagNames();
     },
 
-    async exportLibrary(): Promise<string> {
-      return JSON.stringify({ version: 1, works: repo.listSummaries() }, null, 2);
+    async exportLibrary(): Promise<{ data: string; dataIntegrityWarning?: DataIntegrityWarning }> {
+      const { summaries, skipped } = repo.listSummaries();
+      logDataIntegritySkips(scanLogger, "export", skipped);
+      const dataIntegrityWarning = toDataIntegrityWarning(skipped);
+      const payload: {
+        version: number;
+        works: typeof summaries;
+        dataIntegritySkips?: typeof skipped;
+      } = { version: 1, works: summaries };
+      if (skipped.length > 0) {
+        payload.dataIntegritySkips = skipped.map((skip) => ({
+          workId: skip.workId,
+          reason: skip.reason,
+        }));
+      }
+      return {
+        data: JSON.stringify(payload, null, 2),
+        dataIntegrityWarning,
+      };
     },
 
     // ── 分類軸・タグ prefix 定義・スマートフォルダー・プリセット ──
@@ -790,8 +811,10 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       return repo.deleteTagPrefix(prefix);
     },
     async listTagPrefixCandidates(): Promise<TagPrefixCandidate[]> {
+      const { summaries, skipped } = repo.listSummaries();
+      logDataIntegritySkips(scanLogger, "tag-prefix-candidates", skipped);
       return buildTagPrefixCandidates(
-        repo.listSummaries(),
+        summaries,
         repo.listTagPrefixes().map((p) => p.prefix),
       );
     },
@@ -899,7 +922,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
         urls?: Work["urls"];
       } = {};
       if (body.applyTitle && body.info.title) patch.title = body.info.title;
-      const applyTags = normalizeTags(body.applyTags);
+      const { applyTags } = body;
       if (applyTags.length > 0) patch.tags = dedupeTags([...work.tags, ...applyTags]);
       if (body.info.url && !work.urls.some((entry) => entry.url.includes("dlsite.com"))) {
         patch.urls = [...work.urls, { label: "DLsite", url: body.info.url }];
@@ -926,7 +949,7 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
           lastAttemptAt: new Date().toISOString(),
           error: null,
           errorKind: null,
-          appliedTags: dedupeTags([...normalizeTags(work.dlsite.appliedTags), ...applyTags]),
+          appliedTags: dedupeTags([...work.dlsite.appliedTags, ...applyTags]),
         };
         repo.setDlsiteState(workId, dlsite);
         patchMetaFile(updated.metaPath, {
@@ -968,7 +991,8 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       try {
         // 対象抽出は listSummaries で完結させる（全件 getWork の N+1 を解消。TASK-57）。
         // 以降の個別処理で完全な Work が必要な場合だけ、その作品の getWork を呼ぶ
-        const summaries = repo.listSummaries();
+        const { summaries, skipped } = repo.listSummaries();
+        logDataIntegritySkips(dlsiteLogger, "dlsite-bulk", skipped);
         const requested = (() => {
           if (!workIds) return summaries;
           const idSet = new Set(workIds);
@@ -1089,7 +1113,9 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
               const applyTags =
                 mode === "new"
                   ? allInfoTags
-                  : allInfoTags.filter((tag) => !work.dlsite.appliedTags.includes(tag));
+                  : allInfoTags.filter(
+                      (tag) => !work.dlsite.appliedTags.some((applied) => tagEquals(applied, tag)),
+                    );
               const nextTags = dedupeTags([...work.tags, ...applyTags]);
               const nextTitle =
                 mode === "new" || isDefaultTitle(work.title, work.physicalPath, work.dlsite.rjCode)
@@ -1099,17 +1125,14 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
                 ? [...work.urls, { label: "DLsite", url: fetched.info.url }]
                 : undefined;
               const coverNeeded = !work.cover && !!fetched.info.coverUrl;
-              const nextAppliedTags = dedupeTags([
-                ...normalizeTags(work.dlsite.appliedTags),
-                ...allInfoTags,
-              ]);
+              const nextAppliedTags = dedupeTags([...work.dlsite.appliedTags, ...allInfoTags]);
               const noOp =
                 !attempt.httpAttempted &&
                 !coverNeeded &&
                 nextUrls === undefined &&
                 (nextTitle === undefined || nextTitle === work.title) &&
                 arraysEqual(nextTags, work.tags) &&
-                arraysEqual(nextAppliedTags, work.dlsite.appliedTags) &&
+                tagsEqual(nextAppliedTags, work.dlsite.appliedTags) &&
                 work.dlsite.status === "applied" &&
                 work.dlsite.rjCode === fetched.info.rjCode &&
                 work.dlsite.error === null &&
@@ -1235,6 +1258,10 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       db.close();
     },
   };
+}
+
+function tagsEqual(a: readonly NormalizedTag[], b: readonly NormalizedTag[]): boolean {
+  return a.length === b.length && a.every((value, index) => tagEquals(value, b[index]!));
 }
 
 function arraysEqual(a: readonly string[], b: readonly string[]): boolean {

@@ -1,5 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { EMPTY_TAG_FILTERS } from "@mimimilli/shared";
+import { tf } from "./helpers/tag.ts";
 import { compareJapaneseSortKeys } from "../src/core/japaneseSortKey.ts";
 import { createApp } from "../src/app.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
@@ -21,7 +23,7 @@ test("GET /api/works は {items, total} を返す", async () => {
 
 test("GET /api/works は複数の tags を配列で受け、タグ内のカンマを保持する", async () => {
   const adapter = createFixtureAdapter();
-  let receivedTags: string[] | undefined;
+  let receivedTags: import("@mimimilli/shared").TagFilters | undefined;
   adapter.queryWorks = async (query) => {
     receivedTags = query.tags;
     return { items: [], total: 0, stats: { trackCount: 0, durationSec: 0 } };
@@ -31,7 +33,7 @@ test("GET /api/works は複数の tags を配列で受け、タグ内のカン�
   const res = await app.request("/api/works?tags=tag%2Cone&tags=tag2");
 
   assert.equal(res.status, 200);
-  assert.deepEqual(receivedTags, ["tag,one", "tag2"]);
+  assert.deepEqual(receivedTags, tf("tag,one", "tag2"));
 });
 
 test("GET /api/works は擬似タグとして解釈できない @ 始まりのtagsを400で拒否する（TASK-201）", async () => {
@@ -216,7 +218,7 @@ test("GET /api/axes/:axis は tags/tagOp を絞り込みとしてadapterへ渡�
   );
   assert.equal(res.status, 200);
   assert.deepEqual(receivedFilter, {
-    tags: ["ASMR", "催眠", "@year/2024"],
+    tags: tf("ASMR", "催眠", "@year/2024"),
     tagOp: "OR",
   });
 });
@@ -231,7 +233,7 @@ test("GET /api/axes/:axis はクエリ省略時、空配列相当のフィルタ
   const app = createApp(adapter);
   const res = await app.request("/api/axes/cv");
   assert.equal(res.status, 200);
-  assert.deepEqual(receivedFilter, { tags: [], tagOp: "AND" });
+  assert.deepEqual(receivedFilter, { tags: EMPTY_TAG_FILTERS, tagOp: "AND" });
 });
 
 test("GET /api/axes/:axis は擬似タグとして解釈できない @ 始まりのtagsを400で拒否する（TASK-201）", async () => {

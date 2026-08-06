@@ -2,6 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { applyDlsiteStatePatch, type DlsiteState } from "@mimimilli/shared";
+import { nts } from "./helpers/tag.ts";
 
 const appliedState: DlsiteState = {
   rjCode: "RJ1234567",
@@ -9,7 +10,7 @@ const appliedState: DlsiteState = {
   lastAttemptAt: "2026-06-10T12:00:00.000Z",
   error: null,
   errorKind: null,
-  appliedTags: ["genre/耳かき", "cv/水瀬なずな"],
+  appliedTags: nts(["genre/耳かき", "cv/水瀬なずな"]),
 };
 
 test("RJコード変更時は旧コード由来の取得結果をクリアして未取得に戻す", () => {

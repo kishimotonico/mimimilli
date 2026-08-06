@@ -10,6 +10,19 @@ import {
   type ProbeDurationResult,
 } from "./duration.ts";
 import { compareUtf8Bytes } from "./text.ts";
+import { normalizedTagArraySchema, type NormalizedTag } from "./tagNormalize.ts";
+
+export type { NormalizedTag } from "./tagNormalize.ts";
+export {
+  dedupeTags,
+  normalizeTag,
+  normalizedTagArraySchema,
+  normalizedTagInputArraySchema,
+  normalizeTags,
+  RESERVED_TAG_PREFIX,
+  tagSchema,
+  TagNormalizationError,
+} from "./tagNormalize.ts";
 
 export const urlEntrySchema = z.object({
   label: z.string(),
@@ -116,22 +129,6 @@ export const workStatusSchema = z.enum(["ok", "missing", "error"]);
 export type WorkStatus = z.infer<typeof workStatusSchema>;
 
 export type { Cover } from "./cover.ts";
-
-/**
- * normalizeTag/normalizeTags を通した後だけ得られる型（parse, don't validate）。
- * タグの同一性判定・擬似タグ判定など、正規化済みであることを前提とする処理はこの型だけを
- * 受け取り、素の string を渡すとコンパイルエラーになる。素の string を扱ってよいのは
- * 境界（HTTPスキーマ・URL復元・ファイル読み込み・外部連携の入口）だけで、境界の内側は
- * すべてこの型で受け渡す。「正規化を忘れない」という規律への依存を型で置き換える。
- */
-export type NormalizedTag = string & { readonly __normalizedTagBrand: unique symbol };
-
-/** normalizeTags を通した後の配列であることをスキーマ上で表明するヘルパー。API応答・
- *  メタファイルの読み取りなど、値が書き込み側（tagSchema + normalizeTags）を必ず経由している
- *  経路で使う。ここでは検証をやり直さない（書き込み境界での検証は tagSchema が担う）。 */
-export const normalizedTagArraySchema = z
-  .array(z.string())
-  .transform((tags) => tags as NormalizedTag[]);
 
 export const workSummarySchema = z.object({
   id: z.string(),
@@ -360,77 +357,8 @@ export function parseTag(tag: string): ParsedTag {
   return { kind: "flat", prefix: "", value: tag, raw: tag };
 }
 
-/** タグを正規形へ寄せる（ADR-0005 決定5）。正規化して空になる入力（prefix/値のどちらかが
- *  空白のみ、フラットタグが空白のみ等）は null。呼び出し側に必ず判定させ、黙って握りつぶさない。
- *  Annotated: prefix を trim + 小文字化、値を trim。フラット: 全体を trim。
- *  Annotated の prefix または値が空なら null。値の大文字小文字は保持する */
-export function normalizeTag(tag: string): NormalizedTag | null {
-  const idx = tag.indexOf("/");
-  if (idx > 0) {
-    const prefix = tag.slice(0, idx).trim().toLowerCase();
-    const value = tag.slice(idx + 1).trim();
-    if (!prefix || !value) return null;
-    return `${prefix}/${value}` as NormalizedTag;
-  }
-  const trimmed = tag.trim();
-  return trimmed.length > 0 ? (trimmed as NormalizedTag) : null;
-}
-
-/** 正規化できないタグが配列に含まれるときに投げる。normalizeTags の呼び出し元が境界で
- *  個別に null を扱う必要がない経路向け。 */
-export class TagNormalizationError extends Error {
-  readonly tag: string;
-
-  constructor(tag: string) {
-    super(`タグを正規化できません: ${JSON.stringify(tag)}`);
-    this.name = "TagNormalizationError";
-    this.tag = tag;
-  }
-}
-
-/** 各要素を正規形へ寄せる。正規化して空になる要素は TagNormalizationError を投げる。
- *  重複排除は行わない（dedupeTags を別途使う）。 */
-export function normalizeTags(tags: string[]): NormalizedTag[] {
-  const result: NormalizedTag[] = [];
-  for (const tag of tags) {
-    const normalized = normalizeTag(tag);
-    if (normalized === null) throw new TagNormalizationError(tag);
-    result.push(normalized);
-  }
-  return result;
-}
-
-/** 正規化済みタグ配列から重複を除く（順序は保持）。正規化とは別の関心事。 */
-export function dedupeTags(tags: Iterable<NormalizedTag>): NormalizedTag[] {
-  const seen = new Set<NormalizedTag>();
-  const result: NormalizedTag[] = [];
-  for (const tag of tags) {
-    if (seen.has(tag)) continue;
-    seen.add(tag);
-    result.push(tag);
-  }
-  return result;
-}
-
 /** タグの同一性判定（prefix は大文字小文字を無視、値は区別）。両者とも正規化済みが前提のため
  *  単純な文字列比較でよい（normalizeTag の再実行は不要）。 */
 export function tagEquals(a: NormalizedTag, b: NormalizedTag): boolean {
   return a === b;
 }
-
-/** 組み込み軸の擬似タグ専用の予約文字（ADR-0012 §2）。実タグでの使用は禁止する */
-export const RESERVED_TAG_PREFIX = "@";
-
-/** 実タグの書き込み検証。判定はすべて normalizeTag した後の値に対して行う（生文字列のままだと、
- *  先頭に空白を挟んだ "  @year/2024" が検証をすり抜けて normalizeTags 後に予約プレフィックスへ
- *  化ける）。
- *  - 正規化して空になるタグ（空文字・prefix/値のどちらかが空白のみ）は拒否する
- *  - 先頭の "@" は組み込み軸の擬似タグ（例: "@year/2024"）と衝突するため拒否する */
-export const tagSchema = z
-  .string()
-  .refine((tag) => normalizeTag(tag) !== null, {
-    message: "空になるタグは登録できません",
-  })
-  .refine((tag) => !(normalizeTag(tag)?.startsWith(RESERVED_TAG_PREFIX) ?? false), {
-    message: `タグを予約文字 "${RESERVED_TAG_PREFIX}" から始めることはできません`,
-  });

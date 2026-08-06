@@ -21,6 +21,7 @@ import {
   type TagPrefixCandidate,
   type TagPrefixCreate,
   type TagPrefixUpdate,
+  type ExportResponse,
   type WorksPage,
   type WorksQueryInput,
 } from "@mimimilli/shared";
@@ -136,7 +137,6 @@ export async function evalSmartFolder(
 
 // ── エクスポート ──────────────────────────────────────────────
 
-export async function exportLibrary(): Promise<string> {
-  const r = await postParsed(exportResponseSchema, "/export");
-  return r.data;
+export async function exportLibrary(): Promise<ExportResponse> {
+  return postParsed(exportResponseSchema, "/export");
 }

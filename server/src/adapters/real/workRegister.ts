@@ -8,7 +8,7 @@ import type {
   WorkCreateBody,
   WorkRegisterPreview,
 } from "@mimimilli/shared";
-import { emptyDlsiteState, normalizeTags } from "@mimimilli/shared";
+import { emptyDlsiteState } from "@mimimilli/shared";
 import { detectRjCode } from "./dlsite.ts";
 import { META_FILE_NAME, MetaParseError, readMetaFile, readMetaFileRaw } from "./meta.ts";
 import { resolveWithin } from "./paths.ts";
@@ -259,7 +259,6 @@ async function buildMetaFromDlsiteApply(
   workDir: string,
   applyDlsiteCover?: (coverUrl: string, workDir: string) => Promise<string | null>,
 ): Promise<DlsiteAppliedMeta> {
-  const applyTags = normalizeTags(body.applyTags);
   let coverImage: string | null | undefined;
   if (body.applyCover && body.info.coverUrl) {
     if (!applyDlsiteCover) {
@@ -280,7 +279,7 @@ async function buildMetaFromDlsiteApply(
       lastAttemptAt: new Date().toISOString(),
       error: null,
       errorKind: null,
-      appliedTags: applyTags,
+      appliedTags: body.applyTags,
     },
   };
 }

@@ -8,7 +8,7 @@ import {
 } from "@mimimilli/shared";
 import { applyWorksQuery } from "../src/core/worksQuery.ts";
 import { compareJapaneseSortKeys } from "../src/core/japaneseSortKey.ts";
-import { nts } from "./helpers/tag.ts";
+import { nts, tf, EMPTY_TAG_FILTERS } from "./helpers/tag.ts";
 
 const NOW = new Date();
 const RECENT = new Date(NOW.getTime() - 5 * 86400000).toISOString(); // 5日前
@@ -68,7 +68,7 @@ const WORKS: WorkSummary[] = [
 function baseQuery(overrides: Partial<WorksQuery> = {}): WorksQuery {
   return {
     q: "",
-    tags: nts([]),
+    tags: EMPTY_TAG_FILTERS,
     tagOp: "AND",
     sort: "added-desc",
     ...overrides,
@@ -133,7 +133,7 @@ test("q: dlsite.rjCode がVJコードでも部分一致でヒットする（大�
 test("tags: AND は全タグにマッチする作品のみ返す", () => {
   const result = applyWorksQuery(
     WORKS,
-    baseQuery({ tags: ["cv/水瀬なずな", "ASMR"], tagOp: "AND" }),
+    baseQuery({ tags: tf("cv/水瀬なずな", "ASMR"), tagOp: "AND" }),
   );
   assert.deepEqual(
     result.items.map((w) => w.id),
@@ -142,34 +142,34 @@ test("tags: AND は全タグにマッチする作品のみ返す", () => {
 });
 
 test("tags: OR はいずれかのタグにマッチする作品を返す", () => {
-  const result = applyWorksQuery(WORKS, baseQuery({ tags: ["催眠", "添い寝"], tagOp: "OR" }));
+  const result = applyWorksQuery(WORKS, baseQuery({ tags: tf("催眠", "添い寝"), tagOp: "OR" }));
   assert.deepEqual(result.items.map((w) => w.id).sort(), ["RJ002", "RJ003"]);
 });
 
 test("tags: 完全一致であり部分文字列ではヒットしない（ADR-0005 決定6）", () => {
-  const result = applyWorksQuery(WORKS, baseQuery({ tags: ["cv/なずな"], tagOp: "AND" }));
+  const result = applyWorksQuery(WORKS, baseQuery({ tags: tf("cv/なずな"), tagOp: "AND" }));
   assert.equal(result.items.length, 0);
 });
 
 test("tags: prefix の大文字小文字は無視して一致する", () => {
-  const result = applyWorksQuery(WORKS, baseQuery({ tags: ["CV/水瀬なずな"], tagOp: "AND" }));
+  const result = applyWorksQuery(WORKS, baseQuery({ tags: tf("CV/水瀬なずな"), tagOp: "AND" }));
   assert.deepEqual(result.items.map((w) => w.id).sort(), ["RJ001", "RJ003"]);
 });
 
 test("tags: @year/... 擬似タグは addedAt の年で絞り込む（タグ照合ではない、ADR-0012 §2）", () => {
   const year = RECENT.slice(0, 4);
-  const result = applyWorksQuery(WORKS, baseQuery({ tags: [`@year/${year}`] }));
+  const result = applyWorksQuery(WORKS, baseQuery({ tags: tf(`@year/${year}`) }));
   assert.ok(result.items.length > 0);
   for (const work of result.items) {
     assert.equal(work.addedAt.slice(0, 4), year);
   }
-  const none = applyWorksQuery(WORKS, baseQuery({ tags: ["@year/1999"] }));
+  const none = applyWorksQuery(WORKS, baseQuery({ tags: tf("@year/1999") }));
   assert.equal(none.items.length, 0);
 });
 
 test("tags: 実タグと @year/... 擬似タグを同時に指定すると両方AND適用される", () => {
   const year = RECENT.slice(0, 4);
-  const result = applyWorksQuery(WORKS, baseQuery({ tags: ["cv/水瀬なずな", `@year/${year}`] }));
+  const result = applyWorksQuery(WORKS, baseQuery({ tags: tf("cv/水瀬なずな", `@year/${year}`) }));
   for (const work of result.items) {
     assert.equal(work.addedAt.slice(0, 4), year);
     assert.ok(work.tags.some((tag) => tag.toLowerCase() === "cv/水瀬なずな".toLowerCase()));
@@ -338,9 +338,9 @@ test("ページング: 全sortでページ連結が全件と一致する（重�
 test("ページング: 検索・タグAND/OR・year擬似タグ・viewでもページ連結がフィルタ結果と一致する", () => {
   const cases: Array<[string, Partial<WorksQuery>]> = [
     ["検索", { q: "ASMR" }],
-    ["タグAND", { tags: ["cv/水瀬なずな", "ASMR"], tagOp: "AND" }],
-    ["タグOR", { tags: ["cv/水瀬なずな", "cv/霧島レイ"], tagOp: "OR" }],
-    ["year擬似タグ", { tags: [`@year/${new Date().getFullYear()}`] }],
+    ["タグAND", { tags: tf("cv/水瀬なずな", "ASMR"), tagOp: "AND" }],
+    ["タグOR", { tags: tf("cv/水瀬なずな", "cv/霧島レイ"), tagOp: "OR" }],
+    ["year擬似タグ", { tags: tf(`@year/${new Date().getFullYear()}`) }],
     ["view:fav", { view: "fav" }],
     ["view:missing", { view: "missing" }],
     ["view:unplayed", { view: "unplayed" }],

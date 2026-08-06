@@ -12,9 +12,9 @@ import {
   resolveTrackDuration,
   resolveTrackDurationSec,
   smartFolderSchema,
-  splitSelectedTags,
   tagPrefixSchema,
   toTrackDurationFields,
+  withNormalizeTagBatchCache,
   workSchema,
   workSummarySchema,
 } from "@mimimilli/shared";
@@ -169,6 +169,16 @@ export class PersistentDataError extends Error {
     super(`SQLite の ${table} レコード "${recordId}" が不正です: ${detail}`);
     this.name = "PersistentDataError";
   }
+}
+
+export interface SummaryLoadSkip {
+  workId: string;
+  reason: string;
+}
+
+export interface ListSummariesResult {
+  summaries: WorkSummary[];
+  skipped: SummaryLoadSkip[];
 }
 
 function parseJsonField(
@@ -607,10 +617,13 @@ export class WorkRepo {
    * workIds を指定すると、その集合だけを対象にする（TASK-85: スマートフォルダーの候補絞り込み後の取得用）。
    * SQLite のパラメータ上限を避けるため、一定件数ごとに分割して IN 句で取得する。
    */
-  listSummaries(workIds?: string[]): WorkSummary[] {
-    if (workIds !== undefined && workIds.length === 0) return [];
+  listSummaries(workIds?: string[]): ListSummariesResult {
+    return withNormalizeTagBatchCache(() => {
+      if (workIds !== undefined && workIds.length === 0) {
+        return { summaries: [], skipped: [] };
+      }
 
-    const baseSql = `
+      const baseSql = `
       SELECT
         works.id,
         works.title,
@@ -631,24 +644,38 @@ export class WorkRepo {
       INNER JOIN user.work_states AS work_states ON work_states.work_id = works.id
       LEFT JOIN main.work_dlsite AS work_dlsite ON work_dlsite.work_id = works.id
     `;
-    const chunkSize = 900; // SQLite パラメータ上限に余裕を持たせる
-    const rows: RawSummaryListRow[] =
-      workIds === undefined
-        ? (this.db.sqlite.query(baseSql).all() as RawSummaryListRow[])
-        : chunk(workIds, chunkSize).flatMap(
-            (idsChunk) =>
-              this.db.sqlite
-                .query(`${baseSql} WHERE works.id IN (${idsChunk.map(() => "?").join(", ")})`)
-                .all(...idsChunk) as RawSummaryListRow[],
+      const chunkSize = 900; // SQLite パラメータ上限に余裕を持たせる
+      const rows: RawSummaryListRow[] =
+        workIds === undefined
+          ? (this.db.sqlite.query(baseSql).all() as RawSummaryListRow[])
+          : chunk(workIds, chunkSize).flatMap(
+              (idsChunk) =>
+                this.db.sqlite
+                  .query(`${baseSql} WHERE works.id IN (${idsChunk.map(() => "?").join(", ")})`)
+                  .all(...idsChunk) as RawSummaryListRow[],
+            );
+      const tagsByWork = this.tagMap(workIds);
+      const summaries: WorkSummary[] = [];
+      const skipped: SummaryLoadSkip[] = [];
+      for (const rawRow of rows) {
+        try {
+          const row: SummaryRow = { ...rawRow, bookmarked: rawRow.bookmarked !== 0 };
+          summaries.push(
+            rowToSummary(
+              row,
+              tagsByWork.get(row.id) ?? [],
+              this.parseDlsiteStateJson(row.id, rawRow.dlsiteStateJson),
+            ),
           );
-    const tagsByWork = this.tagMap(workIds);
-    return rows.map((rawRow) => {
-      const row: SummaryRow = { ...rawRow, bookmarked: rawRow.bookmarked !== 0 };
-      return rowToSummary(
-        row,
-        tagsByWork.get(row.id) ?? [],
-        this.parseDlsiteStateJson(row.id, rawRow.dlsiteStateJson),
-      );
+        } catch (error) {
+          if (error instanceof PersistentDataError) {
+            skipped.push({ workId: rawRow.id, reason: error.message });
+            continue;
+          }
+          throw error;
+        }
+      }
+      return { summaries, skipped };
     });
   }
 
@@ -749,8 +776,7 @@ export class WorkRepo {
    * タグ AND/OR・組み込み軸（year等）の絞り込み条件を EXISTS 述語として組み立てる。
    * queryWorks（GET /works・スマートフォルダー評価）と getAxisFacets（GET /axes/:axis、
    * TASK-187 の自軸除外カウント）で同じ絞り込み意味論を共有するための共通実装。
-   * tags には組み込み軸の擬似タグ（"@year/2024" 等）が混ざり得るため、呼び出し側が
-   * splitSelectedTags で実タグと yearValue へ分解してから渡す（ADR-0012 §2、TASK-199）。
+   * TagFilters（HTTP 境界で構造化済み）の実タグと yearValue を受け取る（ADR-0012 §2、TASK-199）。
    * works.id / work_states.added_at を参照するため、呼び出し元の FROM 句は
    * main.works と user.work_states（エイリアス work_states）を JOIN 済みである前提。
    */
@@ -837,7 +863,7 @@ export class WorkRepo {
       if (rjKey) bindings.push(rjKey);
     }
 
-    const { tags: realTags, yearValue } = splitSelectedTags(params.tags);
+    const { tags: realTags, yearValue } = params.tags;
     const tagAxis = WorkRepo.tagAxisConditions(realTags, params.tagOp, yearValue);
     conditions.push(...tagAxis.conditions);
     bindings.push(...tagAxis.bindings);
@@ -1172,7 +1198,7 @@ export class WorkRepo {
    *  自軸由来のフィルタを除いた集合を渡すのは呼び出し側の責務）。0件になった値は
    *  GROUP BY の結果に現れないため、自然に一覧から除外される。 */
   getAxisFacets(axis: string, filter: AxisFacetsFilter = {}): AxisFacetItem[] {
-    const { tags: realTags, yearValue } = splitSelectedTags(filter.tags ?? []);
+    const { tags: realTags, yearValue } = filter.tags ?? { tags: [], yearValue: null };
     const tagAxis = WorkRepo.tagAxisConditions(realTags, filter.tagOp ?? "AND", yearValue);
     const filterWhere =
       tagAxis.conditions.length > 0 ? `WHERE ${tagAxis.conditions.join(" AND ")}` : "";

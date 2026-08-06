@@ -1,5 +1,6 @@
 // サーバー側スキャンジョブ（TASK-76）の HTTP / SSE 契約。
 import { z } from "zod";
+import { dataIntegrityWarningSchema } from "./dataIntegrity.ts";
 
 export const scanResultSchema = z.object({
   registered: z.number().int().nonnegative(),
@@ -16,6 +17,8 @@ export const scanResultSchema = z.object({
   coverErrors: z.number().int().nonnegative(),
   /** 走査中に読み取れなかったサブツリーのディレクトリパス。ルート失敗時はスキャン自体がエラーになる */
   unreadablePaths: z.array(z.string()).optional(),
+  /** finalize 時の listSummaries でタグ等の不整合により除外した作品 */
+  dataIntegrityWarning: dataIntegrityWarningSchema.optional(),
 });
 export type ScanResult = z.infer<typeof scanResultSchema>;
 

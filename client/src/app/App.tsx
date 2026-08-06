@@ -125,14 +125,19 @@ export default function App() {
 
   const handleExport = useCallback(async () => {
     try {
-      const data = await exportLibrary();
-      const blob = new Blob([data], { type: "application/json" });
+      const exported = await exportLibrary();
+      const blob = new Blob([exported.data], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = "mimimilli-export.json";
       a.click();
       URL.revokeObjectURL(url);
+      if (exported.dataIntegrityWarning) {
+        setErrorToast(
+          `${exported.dataIntegrityWarning.skippedCount}件の作品がデータ不整合のためエクスポートから除外されました`,
+        );
+      }
     } catch (err) {
       setErrorToast(mutationErrorMessage(err, "ライブラリのエクスポートに失敗しました"));
     }

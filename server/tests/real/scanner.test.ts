@@ -15,6 +15,7 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
+import { EMPTY_TAG_FILTERS } from "@mimimilli/shared";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { openDb, type Db } from "../../src/adapters/real/db.ts";
 import { Scanner } from "../../src/adapters/real/scanner.ts";
@@ -183,7 +184,12 @@ test("UUID 重複: 後に検出された方が再採番されメタファイル�
   assert.notEqual(metaB.playlists[0].id, playlistId);
   assert.notEqual(metaB.playlists[0].tracks[0].id, trackId);
   assert.equal(metaB.defaultPlaylistId, metaB.playlists[0].id);
-  const works = await adapter.queryWorks({ q: "", tags: [], tagOp: "AND", sort: "added-desc" });
+  const works = await adapter.queryWorks({
+    q: "",
+    tags: EMPTY_TAG_FILTERS,
+    tagOp: "AND",
+    sort: "added-desc",
+  });
   assert.equal(works.total, 2);
 });
 
@@ -632,7 +638,8 @@ test("増分スキャン: 2回目に検出したduplicate UUIDもID移行後に�
   const copiedMeta = JSON.parse(readFileSync(join(duplicateDir, "mimimilli.json"), "utf-8"));
   assert.notEqual(copiedMeta.id, source.id);
   assert.equal(
-    (await adapter.queryWorks({ q: "", tags: [], tagOp: "AND", sort: "id-asc" })).total,
+    (await adapter.queryWorks({ q: "", tags: EMPTY_TAG_FILTERS, tagOp: "AND", sort: "id-asc" }))
+      .total,
     3,
   );
 });

@@ -161,6 +161,7 @@ function toSuspenseWorksResult(
     hasNextPage: query.hasNextPage,
     worksTotal: lastPage?.total,
     worksStats: lastPage?.stats,
+    dataIntegrityWarning: lastPage?.dataIntegrityWarning,
     isFetchingNextPage: query.isFetchingNextPage,
     fetchNextPage: query.fetchNextPage,
     refetchWorks: query.refetch,

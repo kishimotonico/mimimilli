@@ -79,7 +79,7 @@ function buildDlsite(rng: () => number, rjNum: number): DlsiteState {
       lastAttemptAt: isoDaysAgo(rng, intBetween(rng, 1, 60)),
       error: null,
       errorKind: null,
-      appliedTags: ["genre/ASMR"],
+      appliedTags: normalizeTags(["genre/ASMR"]),
     };
   }
   if (roll < 0.92) {

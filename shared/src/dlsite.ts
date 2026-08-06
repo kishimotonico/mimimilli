@@ -1,5 +1,6 @@
 // DLsite 連携（POST /api/dlsite/:id/fetch | apply）の契約。
 import { z } from "zod";
+import { normalizedTagArraySchema, normalizedTagInputArraySchema } from "./tagNormalize.ts";
 
 export const dlsiteStatusSchema = z.enum(["none", "applied", "not_found", "error", "skipped"]);
 export type DlsiteStatus = z.infer<typeof dlsiteStatusSchema>;
@@ -13,7 +14,7 @@ export const dlsiteStateSchema = z.object({
   lastAttemptAt: z.iso.datetime({ offset: true }).nullable(),
   error: z.string().nullable(),
   errorKind: dlsiteFetchErrorKindSchema.nullable().default(null),
-  appliedTags: z.array(z.string()),
+  appliedTags: normalizedTagArraySchema.default([]),
 });
 export type DlsiteState = z.infer<typeof dlsiteStateSchema>;
 
@@ -95,10 +96,13 @@ export type DlsiteFetchResult = z.infer<typeof dlsiteFetchResultSchema>;
 export const dlsiteApplyBodySchema = z.object({
   info: dlsiteWorkInfoSchema,
   applyTitle: z.boolean(),
-  applyTags: z.array(z.string()),
+  applyTags: normalizedTagInputArraySchema,
   applyCover: z.boolean(),
 });
-export type DlsiteApplyBody = z.infer<typeof dlsiteApplyBodySchema>;
+/** クライアントが送信するリクエストボディ（applyTags は正規化前の生 string[]） */
+export type DlsiteApplyBodyInput = z.input<typeof dlsiteApplyBodySchema>;
+/** サーバーがパース後に扱う型（applyTags は正規化済み NormalizedTag[]） */
+export type DlsiteApplyBody = z.output<typeof dlsiteApplyBodySchema>;
 
 export const dlsiteStatePatchSchema = z
   .object({

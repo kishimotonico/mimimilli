@@ -1,6 +1,7 @@
 // スマートフォルダーのルール評価（GET /api/smart-folders/:id/works）の純粋関数。
 // shared スキーマが許可した field/operator のみを評価する。DB 内の不正値も黙って無視しない。
-import type { SmartFolder, SmartFolderRule, WorkSummary } from "@mimimilli/shared";
+import type { SmartFolder, SmartFolderRule, TagFilters, WorkSummary } from "@mimimilli/shared";
+import { EMPTY_TAG_FILTERS } from "@mimimilli/shared";
 import type { WorkSummaryPage } from "./worksQuery.ts";
 import { tagEquals } from "@mimimilli/shared";
 import {
@@ -8,7 +9,6 @@ import {
   createRandomSeed,
   filterByTags,
   filterByYear,
-  resolveTagFilters,
   sortWorkSummaries,
 } from "./worksQuery.ts";
 
@@ -66,7 +66,7 @@ export function evalSmartFolderRules(
 
 /** 保存済みルールと sort を一体で評価し、ページングエンベロープを返す。
  *  tags はルールに対する追加の AND 条件として適用する（ADR-0012、TASK-185）。組み込み軸の
- *  擬似タグ（@year/... 等）も tags に混ざり、resolveTagFilters が一度だけ解釈する（TASK-199）。
+ *  year 値も TagFilters 経由で渡る（TASK-199）。
  *  total はソート後・ページング前の評価結果件数。random ソート時は seed を発行・継承する。 */
 export function evalSmartFolder(
   folder: Pick<SmartFolder, "rules" | "sort">,
@@ -75,12 +75,12 @@ export function evalSmartFolder(
     page: number;
     limit: number;
     seed?: number;
-    tags?: string[];
+    tags?: TagFilters;
     tagOp?: "AND" | "OR";
   },
 ): WorkSummaryPage {
   const seed = folder.sort === "random" ? (query.seed ?? createRandomSeed()) : undefined;
-  const { tags, yearValue } = resolveTagFilters(query.tags ?? []);
+  const { tags, yearValue } = query.tags ?? EMPTY_TAG_FILTERS;
   let matched = evalSmartFolderRules(folder.rules, works);
   matched = filterByTags(matched, tags, query.tagOp ?? "AND");
   matched = filterByYear(matched, yearValue);

@@ -4,7 +4,11 @@ import { openDb, type Db, type DbLocation } from "./db.ts";
 import { resolveWithin } from "./paths.ts";
 import { Scanner } from "./scanner.ts";
 import { gcThumbnailCache, type WorkCoverEntry } from "./thumbnailCache.ts";
+import { logDataIntegritySkips } from "./dataIntegrity.ts";
 import { WorkRepo } from "./workRepo.ts";
+import { getCategoryLogger } from "../../lib/logger.ts";
+
+const scanLogger = getCategoryLogger("scan");
 
 interface WorkerInput {
   database: Extract<DbLocation, { kind: "files" }>;
@@ -64,7 +68,9 @@ async function run(input: WorkerInput): Promise<void> {
       terminal = { type: "cancelled" };
     } else {
       const covers: WorkCoverEntry[] = [];
-      for (const work of repo.listSummaries()) {
+      const { summaries, skipped } = repo.listSummaries();
+      logDataIntegritySkips(scanLogger, "scan-worker-thumbnail-gc", skipped);
+      for (const work of summaries) {
         if (cancelled(token)) break;
         if (!work.cover) continue;
         const absolutePath = resolveWithin(
