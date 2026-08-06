@@ -991,13 +991,11 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       try {
         // 対象抽出は listSummaries で完結させる（全件 getWork の N+1 を解消。TASK-57）。
         // 以降の個別処理で完全な Work が必要な場合だけ、その作品の getWork を呼ぶ
-        const { summaries, skipped } = repo.listSummaries();
+        const { summaries, skipped } = repo.listSummaries(workIds);
         logDataIntegritySkips(dlsiteLogger, "dlsite-bulk", skipped);
-        const requested = (() => {
-          if (!workIds) return summaries;
-          const idSet = new Set(workIds);
-          return summaries.filter((summary) => idSet.has(summary.id));
-        })();
+        const dataIntegrityWarning = toDataIntegrityWarning(skipped);
+        if (dataIntegrityWarning) result.dataIntegrityWarning = dataIntegrityWarning;
+        const requested = summaries;
         // 1. work単位で適用対象を選ぶ。statusは「適用が必要か」だけを表す。
         //    skippedとapplied（適用済み）は常に除外。
         //    HTTP再取得可否（ネットワークへ出るか）はここでは決めず、常にキャッシュTTLへ委ねる。

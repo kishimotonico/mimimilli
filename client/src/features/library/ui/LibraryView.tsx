@@ -15,7 +15,6 @@ import {
 } from "../../player/model/atoms";
 import { useLibraryNavigation } from "../model/useLibraryNavigation";
 import {
-  useLibraryWorkPatchMutations,
   useLibraryDebouncedSearchQuery,
   useLibrarySupportingQueries,
   useSmartFolderMutation,
@@ -80,7 +79,6 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
     refetchTagPrefixes,
     refetchFacets,
   } = useLibrarySupportingQueries(nav);
-  const workPatchMutations = useLibraryWorkPatchMutations(nav, searchQuery);
   const [isNoResultsDueToFilter, setIsNoResultsDueToFilter] = useState(false);
 
   const saveSmartFolderMutation = useSmartFolderMutation({
@@ -192,7 +190,8 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
           onSelectWork={nav.selectWork}
           onTagClick={handleTagClick}
           tagSuggestions={tagSuggestions}
-          workPatchMutations={workPatchMutations}
+          nav={nav}
+          searchQuery={searchQuery}
         />
       ) : (
         <div className="mll-resultspane">
@@ -325,7 +324,8 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
                         onSelectWork={nav.selectWork}
                         onTagClick={handleTagClick}
                         tagSuggestions={tagSuggestions}
-                        workPatchMutations={workPatchMutations}
+                        nav={nav}
+                        searchQuery={searchQuery}
                       />
                     </Presence>
                   </div>

@@ -1,5 +1,6 @@
 // DLsite 連携（POST /api/dlsite/:id/fetch | apply）の契約。
 import { z } from "zod";
+import { dataIntegrityWarningSchema } from "./dataIntegrity.ts";
 import { normalizedTagArraySchema, normalizedTagInputArraySchema } from "./tagNormalize.ts";
 
 export const dlsiteStatusSchema = z.enum(["none", "applied", "not_found", "error", "skipped"]);
@@ -163,7 +164,10 @@ export const dlsiteBulkResultSchema = z.object({
   fetched: z.number().int().nonnegative(),
   failed: z.number().int().nonnegative(),
   parseErrors: z.number().int().nonnegative(),
+  /** 一括処理の対象外だった作品数（RJ未設定・適用済み・skipped 等） */
   skipped: z.number().int().nonnegative(),
+  /** listSummaries でタグ等の不整合により除外した作品 */
+  dataIntegrityWarning: dataIntegrityWarningSchema.optional(),
 });
 export type DlsiteBulkResult = z.infer<typeof dlsiteBulkResultSchema>;
 

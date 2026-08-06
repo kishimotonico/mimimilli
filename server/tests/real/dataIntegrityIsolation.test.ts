@@ -157,6 +157,80 @@ test("スキャン finalize は壊れた作品があっても ScanResult を返�
   }
 });
 
+test("DLsite 一括取得は壊れた作品を除外し dataIntegrityWarning を返す", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "mimi-dlsite-bulk-integrity-"));
+  const db = openFileDb(dir);
+  const repo = new WorkRepo(db);
+  const { badId } = seedCorruptedPair(repo, db);
+  const adapter = createRealAdapter({
+    database: {
+      kind: "files",
+      catalogPath: join(dir, "catalog.sqlite"),
+      userPath: join(dir, "user.sqlite"),
+    },
+    dataRoot: dir,
+    dlsiteCache: { path: join(dir, "dlsite-cache.sqlite") },
+  });
+  try {
+    const result = await adapter.runDlsiteBulk("existing", undefined);
+    assert.equal(result.dataIntegrityWarning?.skippedCount, 1);
+    assert.deepEqual(result.dataIntegrityWarning?.skippedWorkIds, [badId]);
+  } finally {
+    adapter.close();
+    db.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("DLsite 一括取得: workIds に含まない壊れた作品は dataIntegrityWarning に出ない", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "mimi-dlsite-bulk-scope-"));
+  const db = openFileDb(dir);
+  const repo = new WorkRepo(db);
+  const { goodId } = seedCorruptedPair(repo, db);
+  const adapter = createRealAdapter({
+    database: {
+      kind: "files",
+      catalogPath: join(dir, "catalog.sqlite"),
+      userPath: join(dir, "user.sqlite"),
+    },
+    dataRoot: dir,
+    dlsiteCache: { path: join(dir, "dlsite-cache.sqlite") },
+  });
+  try {
+    const result = await adapter.runDlsiteBulk("existing", [goodId]);
+    assert.equal(result.dataIntegrityWarning, undefined);
+  } finally {
+    adapter.close();
+    db.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("DLsite 一括取得: workIds に含まれる壊れた作品は dataIntegrityWarning に出る", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "mimi-dlsite-bulk-scope-bad-"));
+  const db = openFileDb(dir);
+  const repo = new WorkRepo(db);
+  const { badId } = seedCorruptedPair(repo, db);
+  const adapter = createRealAdapter({
+    database: {
+      kind: "files",
+      catalogPath: join(dir, "catalog.sqlite"),
+      userPath: join(dir, "user.sqlite"),
+    },
+    dataRoot: dir,
+    dlsiteCache: { path: join(dir, "dlsite-cache.sqlite") },
+  });
+  try {
+    const result = await adapter.runDlsiteBulk("existing", [badId]);
+    assert.equal(result.dataIntegrityWarning?.skippedCount, 1);
+    assert.deepEqual(result.dataIntegrityWarning?.skippedWorkIds, [badId]);
+  } finally {
+    adapter.close();
+    db.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("HTTP smart folder は dataIntegrityWarning を返す", async () => {
   const dir = mkdtempSync(join(tmpdir(), "mimi-sf-integrity-"));
   const db = openFileDb(dir);
