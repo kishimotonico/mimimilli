@@ -293,34 +293,42 @@ describe("ScanModal", () => {
   });
 
   it("実行中から完了への遷移を見ていたときだけ、完了サインと変化した統計の強調が一時的に出る", async () => {
-    const before: ScanResult = { ...scanResult, registered: 5, newlyGenerated: 0 };
-    const after: ScanResult = { ...scanResult, registered: 6, newlyGenerated: 1 };
-    const { store, rerenderModal } = renderModal(
-      { lastResult: before },
-      { job: createRunningJob({ phase: "registering", processed: 1, total: 1 }) },
-    );
+    vi.useFakeTimers();
+    try {
+      const before: ScanResult = { ...scanResult, registered: 5, newlyGenerated: 0 };
+      const after: ScanResult = { ...scanResult, registered: 6, newlyGenerated: 1 };
+      const { store, rerenderModal } = renderModal(
+        { lastResult: before },
+        { job: createRunningJob({ phase: "registering", processed: 1, total: 1 }) },
+      );
 
-    act(() => {
-      store.set(scanJobAtom, null);
-      rerenderModal({ lastResult: after, lastScanTime: "2026-01-01T00:00:00.000Z" });
-    });
+      act(() => {
+        store.set(scanJobAtom, null);
+        rerenderModal({ lastResult: after, lastScanTime: "2026-01-01T00:00:00.000Z" });
+      });
 
-    // Presence の exit→enter は CSS トランジション駆動のため実時間で待つ
-    await waitFor(() => expect(screen.getByText("完了しました")).toBeInTheDocument());
-    // 変化した「登録済み」の値は強調用の背景クラスが付く
-    const registeredValue = screen.getByText("6");
-    expect(registeredValue.parentElement?.className).toContain("bg-[color-mix");
+      expect(screen.getByText("完了しました")).toBeInTheDocument();
+      // 変化した「登録済み」の値は強調用の背景クラスが付く
+      const registeredValue = screen.getByText("6");
+      expect(registeredValue.parentElement?.className).toContain("bg-[color-mix");
 
-    // レイアウトは動かさず、時間経過で最終スキャン表示と通常の枠色に自然に戻る
-    await waitFor(
-      () => {
-        expect(screen.queryByText("完了しました")).toBeNull();
-        expect(screen.getByText(/最終スキャン/)).toBeInTheDocument();
-      },
-      { timeout: 4000 },
-    );
-    expect(registeredValue.parentElement?.className).not.toContain("bg-[color-mix");
-  }, 6000);
+      // レイアウトは動かさず、時間経過（ScanModal の COMPLETION_HINT_MS=2400 と
+      // Presence fade の退出時間=150ms）で最終スキャン表示と通常の枠色に自然に戻る。
+      // 2回に分けて進めるのは、退出タイマー（setPhase("exit")後に登録される）が
+      // 一括advanceだと後続タイマーとして拾われないため。
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2500);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(500);
+      });
+      expect(screen.queryByText("完了しました")).toBeNull();
+      expect(screen.getByText(/最終スキャン/)).toBeInTheDocument();
+      expect(registeredValue.parentElement?.className).not.toContain("bg-[color-mix");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 
   it("newWorkIdsが変わったら一覧をクリアし、取得失敗時は古い一覧を残さない", async () => {
     const workA: Work = { ...work, id: "work-a", title: "作品A" };

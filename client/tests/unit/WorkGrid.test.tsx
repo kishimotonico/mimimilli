@@ -80,14 +80,8 @@ describe("WorkGrid virtual scrolling", () => {
     sizeMock = mockElementSize(800, 600) as unknown as { restore: () => void };
   });
 
-  afterEach(async () => {
-    // react-virtual の scroll debounce（isScrollingResetDelay=150ms）が
-    // unmountしても生き残るため、jsdom環境が生きているうちに消化してから破棄する。
-    // 消化前にunmountしないとタイマーが残り続けるため、cleanup()を先に呼ぶ。
+  afterEach(() => {
     cleanup();
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 200));
-    });
     sizeMock.restore();
     clearResizeObservers();
   });
@@ -104,18 +98,6 @@ describe("WorkGrid virtual scrolling", () => {
     expect((row as HTMLElement).style.gridTemplateColumns).toBe("repeat(5, 1fr)");
   });
 
-  it("renders far fewer tiles than total works for 10,000 items", async () => {
-    renderWorkGrid({ props: { works: createWorks(10_000) } });
-    await act(() => flushAllResizeObservers({ width: 800, height: 600 }));
-
-    const tiles = screen.queryAllByRole("button", { name: /を選択、Enterで再生/ });
-    expect(tiles.length).toBeGreaterThan(0);
-    expect(tiles.length).toBeLessThan(10_000);
-    // containerWidth=800, tileSize=160 → columnCount≈5, rowHeight≈207, viewport≈600,
-    // overscan=5 行で画面上下に最大でも 10 行程度 = 50 タイル前後が目安。
-    expect(tiles.length).toBeLessThan(200);
-  });
-
   it("renders far fewer tiles than total works for 1,000 items", async () => {
     renderWorkGrid({ props: { works: createWorks(1_000) } });
     await act(() => flushAllResizeObservers({ width: 800, height: 600 }));
@@ -123,6 +105,8 @@ describe("WorkGrid virtual scrolling", () => {
     const tiles = screen.queryAllByRole("button", { name: /を選択、Enterで再生/ });
     expect(tiles.length).toBeGreaterThan(0);
     expect(tiles.length).toBeLessThan(1_000);
+    // containerWidth=800, tileSize=160 → columnCount≈5, rowHeight≈207, viewport≈600,
+    // overscan=5 行で画面上下に最大でも 10 行程度 = 50 タイル前後が目安。
     expect(tiles.length).toBeLessThan(200);
   });
 
