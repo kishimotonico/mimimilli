@@ -1,5 +1,6 @@
-import type { NormalizedTag, Work, WorkPatchInput } from "@mimimilli/shared";
+import type { NormalizedTag, Work } from "@mimimilli/shared";
 import type { CollectionStatsDisplay } from "../model/libraryPresentation";
+import type { useLibraryWorkPatchMutations } from "../model/useLibraryQueries";
 import CollectionStatus from "./CollectionStatus";
 import { DiscoveryDashboard } from "./preview/DiscoveryDashboard";
 import { WorkDetail } from "./preview/WorkDetail";
@@ -28,8 +29,7 @@ interface PreviewPaneProps {
   onSelectWork: (id: string) => void;
   onTagClick: (tag: NormalizedTag) => void;
   tagSuggestions: string[];
-  isPatching: boolean;
-  onPatchWork: (body: WorkPatchInput) => Promise<Work>;
+  workPatchMutations: ReturnType<typeof useLibraryWorkPatchMutations>;
 }
 
 export default function PreviewPane({
@@ -47,8 +47,7 @@ export default function PreviewPane({
   onSelectWork,
   onTagClick,
   tagSuggestions,
-  isPatching,
-  onPatchWork,
+  workPatchMutations,
 }: PreviewPaneProps) {
   const title = mode === "work" ? "詳細" : "ホーム";
 
@@ -68,8 +67,7 @@ export default function PreviewPane({
             playingTrackIndex={playingTrackIndex}
             isPlaybackActive={isPlaybackActive}
             tagSuggestions={tagSuggestions}
-            isPatching={isPatching}
-            onPatchWork={onPatchWork}
+            workPatchMutations={workPatchMutations}
             onTagClick={onTagClick}
           />
         ) : isSelectedWorkLoading ? (

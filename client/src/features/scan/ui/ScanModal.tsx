@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { useAtomValue } from "jotai";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { getDefaultPlaylistTrackCount, type ScanResult, type Work } from "@mimimilli/shared";
 import { getWork, patchWork } from "../../../entities/work/api";
+import { mutationErrorMessage } from "../../../shared/lib/mutationError";
 import { libraryTotalQueryOptions } from "../../library/model/useLibraryQueries";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
 import Presence from "../../../shared/ui/Presence";
@@ -57,9 +58,18 @@ export default function ScanModal({ lastScanTime, onClose, onOpenRjCodeMissing }
   const [newWorksError, setNewWorksError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
-  const [editSaving, setEditSaving] = useState(false);
-  const [editError, setEditError] = useState<string | null>(null);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
+
+  const saveTitleMutation = useMutation({
+    mutationFn: ({ workId, title }: { workId: string; title: string }) =>
+      patchWork(workId, { title }),
+    onSuccess: (updatedWork, { workId }) => {
+      setNewWorks((prev) =>
+        prev.map((w) => (w.id === workId ? { ...w, title: updatedWork.title } : w)),
+      );
+      setEditingId(null);
+    },
+  });
 
   // 実行中→完了の遷移を自分で見ていたときだけ、控えめな完了サインを一時的に出す
   // （レイアウトは動かさず、ステータス行のテキストと変化した統計バッジの色だけを使う）。
@@ -97,7 +107,7 @@ export default function ScanModal({ lastScanTime, onClose, onOpenRjCodeMissing }
   const dismiss = () => {
     if (editingId) {
       setEditingId(null);
-      setEditError(null);
+      saveTitleMutation.reset();
       return;
     }
     onClose();
@@ -136,29 +146,24 @@ export default function ScanModal({ lastScanTime, onClose, onOpenRjCodeMissing }
   const handleStartEdit = (work: Work) => {
     setEditingId(work.id);
     setEditTitle(work.title);
-    setEditError(null);
+    saveTitleMutation.reset();
   };
 
-  const handleSaveTitle = async (workId: string) => {
-    if (editSaving) return;
+  const handleSaveTitle = (workId: string) => {
+    if (saveTitleMutation.isPending) return;
     const trimmed = editTitle.trim();
     if (!trimmed) {
       setEditingId(null);
-      setEditError(null);
+      saveTitleMutation.reset();
       return;
     }
-    setEditSaving(true);
-    setEditError(null);
-    try {
-      await patchWork(workId, { title: trimmed });
-      setNewWorks((prev) => prev.map((w) => (w.id === workId ? { ...w, title: trimmed } : w)));
-      setEditingId(null);
-    } catch {
-      setEditError("タイトルの保存に失敗しました");
-    } finally {
-      setEditSaving(false);
-    }
+    saveTitleMutation.mutate({ workId, title: trimmed });
   };
+
+  const editError = saveTitleMutation.error
+    ? mutationErrorMessage(saveTitleMutation.error, "タイトルの保存に失敗しました")
+    : null;
+  const editSaving = saveTitleMutation.isPending;
 
   return (
     // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- backdropクリックで閉じる。EscapeはonCancel（useDialogModal）で処理する。

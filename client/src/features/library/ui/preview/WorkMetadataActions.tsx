@@ -1,30 +1,27 @@
 import { useState } from "react";
-import type { Work, WorkPatchInput } from "@mimimilli/shared";
+import type { Work } from "@mimimilli/shared";
 import { I } from "../../../../shared/ui/Icon";
 import IconButton from "../../../../shared/ui/IconButton";
+import { mutationErrorMessage } from "../../../../shared/lib/mutationError";
+import type { LibraryBookmarkPatchMutation } from "../../model/workPatchMutations";
 import { useAnchoredPopover } from "./useAnchoredPopover";
 
 const ACTION_POPOVER_WIDTH = 240;
 
 interface WorkMetadataActionsProps {
   work: Work;
-  isPatching: boolean;
-  onPatchWork: (body: WorkPatchInput) => Promise<Work>;
-  onError: (message: string | null) => void;
+  bookmarkMutation: LibraryBookmarkPatchMutation;
   onEdit: () => void;
   onShowInfo: () => void;
 }
 
 export function WorkMetadataActions({
   work,
-  isPatching,
-  onPatchWork,
-  onError,
+  bookmarkMutation,
   onEdit,
   onShowInfo,
 }: WorkMetadataActionsProps) {
   const [isActionPopoverOpen, setIsActionPopoverOpen] = useState(false);
-  const [isBookmarkSaving, setIsBookmarkSaving] = useState(false);
 
   const closeActionPopover = () => setIsActionPopoverOpen(false);
 
@@ -37,22 +34,19 @@ export function WorkMetadataActions({
     preferredWidth: ACTION_POPOVER_WIDTH,
     onClose: (reason) => {
       closeActionPopover();
-      if (reason === "escape") onError(null);
+      if (reason === "escape") bookmarkMutation.reset();
     },
   });
 
-  const toggleBookmark = async () => {
-    if (isPatching) return;
-    setIsBookmarkSaving(true);
-    onError(null);
-    try {
-      await onPatchWork({ bookmarked: !work.bookmarked });
-    } catch {
-      onError("ブックマークを更新できませんでした。");
-    } finally {
-      setIsBookmarkSaving(false);
-    }
+  const toggleBookmark = () => {
+    if (bookmarkMutation.isPending) return;
+    bookmarkMutation.reset();
+    bookmarkMutation.mutate({ workId: work.id, bookmarked: !work.bookmarked });
   };
+
+  const bookmarkError = bookmarkMutation.error
+    ? mutationErrorMessage(bookmarkMutation.error, "ブックマークを更新できませんでした。")
+    : null;
 
   return (
     <div className="mle-prv__actions">
@@ -61,9 +55,9 @@ export function WorkMetadataActions({
         label={work.bookmarked ? "ブックマークを解除" : "ブックマークに追加"}
         size="sm"
         active={work.bookmarked}
-        disabled={isBookmarkSaving || isPatching}
+        disabled={bookmarkMutation.isPending}
         className={work.bookmarked ? "[&_svg]:fill-current" : undefined}
-        onClick={() => void toggleBookmark()}
+        onClick={toggleBookmark}
       />
       <IconButton icon={I.edit} label="作品を編集" size="sm" onClick={onEdit} />
       <div ref={actionPopoverRef} className="relative inline-flex">
@@ -75,7 +69,7 @@ export function WorkMetadataActions({
           aria-expanded={isActionPopoverOpen}
           active={isActionPopoverOpen}
           onClick={() => {
-            onError(null);
+            bookmarkMutation.reset();
             if (isActionPopoverOpen) close();
             else setIsActionPopoverOpen(true);
           }}
@@ -126,6 +120,11 @@ export function WorkMetadataActions({
           </div>
         )}
       </div>
+      {bookmarkError && (
+        <p className="mle-prv__edit-error" role="alert">
+          {bookmarkError}
+        </p>
+      )}
     </div>
   );
 }

@@ -4,8 +4,8 @@
 // - レイアウトは AppShell に委譲
 
 import { lazy, Suspense, useState, useCallback, useRef } from "react";
-import { useSetAtom } from "jotai";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSetAtom } from "jotai";
 import { usePlayerActions } from "../features/player/model/usePlayerActions";
 import PlayerRuntime from "../features/player/ui/PlayerRuntime";
 import FullScreenPlayerGate from "../features/player/ui/FullScreenPlayerGate";
@@ -24,11 +24,12 @@ import StartupErrorScreen from "./ui/StartupErrorScreen";
 import DlsiteNotificationModals from "../features/library/ui/DlsiteNotificationModals";
 import { LibraryNavigationProvider } from "../features/library/ui/LibraryNavigationProvider";
 import GlobalToast from "./ui/GlobalToast";
+import { errorToastAtom } from "./model/errorToastAtom";
+import { mutationErrorMessage } from "../shared/lib/mutationError";
 import type { ActiveModal } from "./model/activeModal";
 import type { Work, WorkListItem } from "@mimimilli/shared";
 import { getWork } from "../entities/work/api";
 import { exportLibrary } from "../features/library/api";
-import { errorToastAtom } from "./model/errorToastAtom";
 import { useScanActions } from "../features/scan/model/useScanActions";
 import { setRootFolder } from "../features/settings/api";
 import { useSettingsQuery } from "../features/settings/useSettingsQuery";
@@ -86,10 +87,10 @@ export default function App() {
           player.play(work, tracks, Math.min(trackIndex, tracks.length - 1), playlist!.id);
         }
       } catch (err) {
-        console.error("作品の再生に失敗しました", err);
+        setErrorToast(mutationErrorMessage(err, "作品の再生に失敗しました"));
       }
     },
-    [player, queryClient],
+    [player, queryClient, setErrorToast],
   );
 
   const handleResume = useCallback(
@@ -137,8 +138,8 @@ export default function App() {
           `${exported.dataIntegrityWarning.skippedCount}件の作品がデータ不整合のためエクスポートから除外されました`,
         );
       }
-    } catch {
-      /* ignore */
+    } catch (err) {
+      setErrorToast(mutationErrorMessage(err, "ライブラリのエクスポートに失敗しました"));
     }
   }, [setErrorToast]);
 
