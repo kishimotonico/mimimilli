@@ -1,9 +1,10 @@
 ---
 id: TASK-206
 title: サーバー更新の状態管理とエラー提示をuseMutationへ統一する
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-08-06 04:57'
+updated_date: '2026-08-06 05:01'
 labels: []
 dependencies: []
 priority: high
