@@ -4,7 +4,7 @@ title: 境界で検証したタグの型をDB読み出しと内部運搬まで�
 status: In Progress
 assignee: []
 created_date: '2026-08-06 04:56'
-updated_date: '2026-08-06 05:01'
+updated_date: '2026-08-06 05:46'
 labels: []
 dependencies: []
 priority: high
@@ -53,4 +53,7 @@ HTTP 境界（shared/src/api.ts:25-30 の refineTagWarnings）で splitSelectedT
 - [ ] #6 worksQueryContract のランダム生成契約テストが通り、fixture と real の同値性が保たれている
 - [ ] #7 pnpm check と pnpm test と pnpm test:visual が通る
 - [ ] #8 dlsiteApplyBodySchema.applyTags（POST /api/works/:id/dlsite/apply のボディ）も work.tags と同じ tagSchema 変換を通り、受信直後の手動 normalizeTags（real/fixture 各1箇所）が削除されている
+- [ ] #9 listSummaries() を使う集約処理（エクスポート・DLsite一括取得・スキャン完了処理・ルールベースのスマートフォルダー）が、非正規タグを持つ作品が1件あっても全体停止せず、該当作品を隔離して残りの処理を続行する
+- [ ] #10 隔離された作品は黙って捨てられず、件数と対象がログに記録され、UIのある経路ではユーザーに提示される
+- [ ] #11 3万作品規模で listSummaries() の所要時間の増加が master 比で有意でない水準まで抑えられており、smart-folder-with-rules のHTTP応答が master 比で明確な悪化を示さない（bench で master と比較実測し数値を報告する）
 <!-- AC:END -->
