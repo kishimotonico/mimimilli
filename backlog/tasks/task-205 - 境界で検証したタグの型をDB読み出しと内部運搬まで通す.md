@@ -1,10 +1,10 @@
 ---
 id: TASK-205
 title: 境界で検証したタグの型をDB読み出しと内部運搬まで通す
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-08-06 04:56'
-updated_date: '2026-08-06 07:20'
+updated_date: '2026-08-06 08:05'
 labels: []
 dependencies: []
 priority: high
