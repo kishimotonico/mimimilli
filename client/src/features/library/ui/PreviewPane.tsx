@@ -1,9 +1,9 @@
 import type { NormalizedTag, Work } from "@mimimilli/shared";
 import type { CollectionStatsDisplay } from "../model/libraryPresentation";
-import type { useLibraryWorkPatchMutations } from "../model/useLibraryQueries";
+import type { LibraryViewState } from "../model/useLibraryNavigation";
 import CollectionStatus from "./CollectionStatus";
 import { DiscoveryDashboard } from "./preview/DiscoveryDashboard";
-import { WorkDetail } from "./preview/WorkDetail";
+import { WorkDetailPatchScope } from "./preview/WorkDetailPatchScope";
 
 // 作品詳細のプレビュー。ADR-0012 §3 により、結果面は常に全幅で表示し、
 // プレビューは作品選択時にだけスライドインする（LibraryView 側で Presence を使って配線）。
@@ -29,7 +29,8 @@ interface PreviewPaneProps {
   onSelectWork: (id: string) => void;
   onTagClick: (tag: NormalizedTag) => void;
   tagSuggestions: string[];
-  workPatchMutations: ReturnType<typeof useLibraryWorkPatchMutations>;
+  nav: LibraryViewState;
+  searchQuery: string;
 }
 
 export default function PreviewPane({
@@ -47,7 +48,8 @@ export default function PreviewPane({
   onSelectWork,
   onTagClick,
   tagSuggestions,
-  workPatchMutations,
+  nav,
+  searchQuery,
 }: PreviewPaneProps) {
   const title = mode === "work" ? "詳細" : "ホーム";
 
@@ -58,16 +60,17 @@ export default function PreviewPane({
       </div>
       {mode === "work" &&
         (selectedWork ? (
-          <WorkDetail
+          <WorkDetailPatchScope
             key={selectedWork.id}
             work={selectedWork}
+            nav={nav}
+            searchQuery={searchQuery}
             onPlay={onPlay}
             onResume={onResume}
             onTogglePlay={onTogglePlay}
             playingTrackIndex={playingTrackIndex}
             isPlaybackActive={isPlaybackActive}
             tagSuggestions={tagSuggestions}
-            workPatchMutations={workPatchMutations}
             onTagClick={onTagClick}
           />
         ) : isSelectedWorkLoading ? (

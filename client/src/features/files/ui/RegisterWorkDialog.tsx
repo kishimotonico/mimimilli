@@ -47,17 +47,14 @@ export default function RegisterWorkDialog({
   const [rjCode, setRjCode] = useState(preview.detectedRjCode ?? "");
   const [dlsiteInfo, setDlsiteInfo] = useState<DlsiteWorkInfo | null>(null);
   const [applyCover, setApplyCover] = useState(true);
+  const [dlsiteValidationError, setDlsiteValidationError] = useState<string | null>(null);
 
   const tagsQuery = useQuery({ queryKey: TAG_QUERY_KEYS.all(), queryFn: getAllTags });
   const tagSuggestions = tagsQuery.data ?? [];
   const { tagPrefixes } = useTagPrefixes();
 
   const dlsiteMutation = useMutation({
-    mutationFn: async (code: string) => {
-      const trimmed = code.trim();
-      if (!trimmed) throw new Error("RJ/VJコードを入力してください");
-      return fetchDlsiteInfoByCode(trimmed);
-    },
+    mutationFn: (code: string) => fetchDlsiteInfoByCode(code),
     onSuccess: (info) => {
       setDlsiteInfo(info);
       setTitle(info.title);
@@ -99,6 +96,7 @@ export default function RegisterWorkDialog({
     setRjCode(preview.detectedRjCode ?? "");
     setDlsiteInfo(null);
     setApplyCover(true);
+    setDlsiteValidationError(null);
     dlsiteMutation.reset();
     registerMutation.reset();
 
@@ -129,11 +127,23 @@ export default function RegisterWorkDialog({
   };
   const removeTag = (tag: string) => setTags(buildTagsWithRemoved(tags, tag));
 
-  const dlsiteError = dlsiteMutation.error
-    ? dlsiteMutation.error instanceof ApiRequestError
-      ? dlsiteErrorMessage(dlsiteMutation.error)
-      : mutationErrorMessage(dlsiteMutation.error, "DLsite情報の取得に失敗しました")
-    : null;
+  const fetchDlsite = () => {
+    const trimmed = rjCode.trim();
+    if (!trimmed) {
+      setDlsiteValidationError("RJ/VJコードを入力してください");
+      return;
+    }
+    setDlsiteValidationError(null);
+    dlsiteMutation.mutate(trimmed);
+  };
+
+  const dlsiteError =
+    dlsiteValidationError ??
+    (dlsiteMutation.error
+      ? dlsiteMutation.error instanceof ApiRequestError
+        ? dlsiteErrorMessage(dlsiteMutation.error)
+        : mutationErrorMessage(dlsiteMutation.error, "DLsite情報の取得に失敗しました")
+      : null);
   const submitError = registerMutation.error
     ? mutationErrorMessage(registerMutation.error, "作品の登録に失敗しました")
     : null;
@@ -180,13 +190,12 @@ export default function RegisterWorkDialog({
                 value={rjCode}
                 disabled={submitBusy || dlsiteBusy}
                 placeholder="RJ123456"
-                onChange={(event) => setRjCode(event.target.value)}
+                onChange={(event) => {
+                  setRjCode(event.target.value);
+                  if (dlsiteValidationError) setDlsiteValidationError(null);
+                }}
               />
-              <Button
-                variant="ghost"
-                disabled={submitBusy || dlsiteBusy}
-                onClick={() => dlsiteMutation.mutate(rjCode)}
-              >
+              <Button variant="ghost" disabled={submitBusy || dlsiteBusy} onClick={fetchDlsite}>
                 {dlsiteBusy ? <I.refresh size={12} className="motion-safe:animate-spin" /> : "取得"}
               </Button>
             </div>
