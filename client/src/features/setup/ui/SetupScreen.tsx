@@ -33,7 +33,6 @@ export default function SetupScreen({ onComplete }: SetupScreenProps) {
     try {
       await onComplete(path.trim());
     } catch (error) {
-      console.error("初回スキャンの開始に失敗しました", error);
       setSetupError(error instanceof Error ? error.message : "初回セットアップに失敗しました");
     } finally {
       setIsSubmitting(false);

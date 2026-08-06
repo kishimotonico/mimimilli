@@ -14,7 +14,7 @@ import {
 } from "@mimimilli/shared";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import {
-  useLibraryPatchWorkMutation,
+  useLibraryWorkPatchMutations,
   useLibrarySupportingQueries,
   useSuspenseNormalLibraryWorks,
 } from "../../src/features/library/model/useLibraryQueries";
@@ -179,8 +179,8 @@ function renderLibraryHooks(nav: LibraryViewState, options?: { queryClient?: Que
     () => {
       const works = useSuspenseNormalLibraryWorks(nav, "");
       const supporting = useLibrarySupportingQueries(nav);
-      const patchWorkMutation = useLibraryPatchWorkMutation(nav, "");
-      return { ...works, ...supporting, patchWorkMutation };
+      const workPatchMutations = useLibraryWorkPatchMutations(nav, "");
+      return { ...works, ...supporting, workPatchMutations };
     },
     { wrapper },
   );
@@ -216,9 +216,9 @@ describe("作品 PATCH 後の一覧キャッシュ同期", () => {
     const worksCallsBeforePatch = worksCallUrls(fetchMock).length;
 
     await act(async () => {
-      await result.current.patchWorkMutation.mutateAsync({
+      await result.current.workPatchMutations.titleMutation.mutateAsync({
         workId: "p1-w1",
-        body: { title: "更新後タイトル" },
+        title: "更新後タイトル",
       });
     });
 
@@ -254,9 +254,9 @@ describe("作品 PATCH 後の一覧キャッシュ同期", () => {
     detailsById.set("p1-w1", { ...currentDetail, resume: driftedResume });
 
     await act(async () => {
-      await result.current.patchWorkMutation.mutateAsync({
+      await result.current.workPatchMutations.bookmarkMutation.mutateAsync({
         workId: "p1-w1",
-        body: { bookmarked: true },
+        bookmarked: true,
       });
     });
 
@@ -285,9 +285,9 @@ describe("作品 PATCH 後の一覧キャッシュ同期", () => {
     const worksCallsBeforePatch = worksCallUrls(fetchMock).length;
 
     await act(async () => {
-      await result.current.patchWorkMutation.mutateAsync({
+      await result.current.workPatchMutations.bookmarkMutation.mutateAsync({
         workId: "p1-w1",
-        body: { bookmarked: false },
+        bookmarked: false,
       });
     });
 
@@ -324,9 +324,9 @@ describe("作品 PATCH 後の一覧キャッシュ同期", () => {
     const worksCallsBeforePatch = worksCallUrls(fetchMock).length;
 
     await act(async () => {
-      await result.current.patchWorkMutation.mutateAsync({
+      await result.current.workPatchMutations.bookmarkMutation.mutateAsync({
         workId: "p1-w1",
-        body: { bookmarked: false },
+        bookmarked: false,
       });
     });
 

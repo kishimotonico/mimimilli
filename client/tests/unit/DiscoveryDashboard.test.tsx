@@ -207,8 +207,29 @@ describe("PreviewPane のホームビュー（ADR-0012 §4）", () => {
     onSelectWork: noop,
     onTagClick: noop,
     tagSuggestions: [],
-    isPatching: false,
-    onPatchWork: asyncNoop,
+    workPatchMutations: {
+      titleMutation: {
+        isPending: false,
+        error: null,
+        reset: noop,
+        mutate: noop,
+        mutateAsync: asyncNoop,
+      },
+      bookmarkMutation: {
+        isPending: false,
+        error: null,
+        reset: noop,
+        mutate: noop,
+        mutateAsync: asyncNoop,
+      },
+      tagsMutation: {
+        isPending: false,
+        error: null,
+        reset: noop,
+        mutate: noop,
+        mutateAsync: asyncNoop,
+      },
+    },
   };
 
   it("mode='home' では発見ダッシュボードの3セクションを結果面に表示する", async () => {

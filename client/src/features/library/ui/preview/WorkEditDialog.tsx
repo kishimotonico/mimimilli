@@ -1,31 +1,32 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import type { Work, WorkPatchInput } from "@mimimilli/shared";
+import type { Work } from "@mimimilli/shared";
 import Button from "../../../../shared/ui/Button";
 import IconButton from "../../../../shared/ui/IconButton";
 import { I } from "../../../../shared/ui/Icon";
 import { useDialogModal } from "../../../../shared/ui/useDialogModal";
+import type { useLibraryWorkPatchMutations } from "../../model/useLibraryQueries";
+import { mutationErrorMessage } from "../../../../shared/lib/mutationError";
 import { DlsiteEditor } from "./DlsiteEditor";
 import { WorkTagEditor } from "./WorkTagEditor";
 
 interface WorkEditDialogProps {
   work: Work;
   tagSuggestions: string[];
-  isPatching: boolean;
-  onPatchWork: (body: WorkPatchInput) => Promise<Work>;
+  workPatchMutations: Pick<
+    ReturnType<typeof useLibraryWorkPatchMutations>,
+    "titleMutation" | "tagsMutation"
+  >;
   onClose: () => void;
 }
 
 export function WorkEditDialog({
   work,
   tagSuggestions,
-  isPatching,
-  onPatchWork,
+  workPatchMutations: { titleMutation, tagsMutation },
   onClose,
 }: WorkEditDialogProps) {
   const [titleDraft, setTitleDraft] = useState(work.title);
-  const [isTitleSaving, setIsTitleSaving] = useState(false);
-  const [editError, setEditError] = useState<string | null>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const { dialogRef, handleCancel, handleBackdropClick } = useDialogModal({
     onClose,
@@ -34,21 +35,16 @@ export function WorkEditDialog({
 
   useEffect(() => setTitleDraft(work.title), [work.title]);
 
-  const saveTitle = async (event: FormEvent) => {
+  const saveTitle = (event: FormEvent) => {
     event.preventDefault();
     const title = titleDraft.trim();
-    if (!title || isPatching || isTitleSaving || title === work.title) return;
-
-    setIsTitleSaving(true);
-    setEditError(null);
-    try {
-      await onPatchWork({ title });
-    } catch {
-      setEditError("タイトルを保存できませんでした。");
-    } finally {
-      setIsTitleSaving(false);
-    }
+    if (!title || titleMutation.isPending || title === work.title) return;
+    titleMutation.mutate({ workId: work.id, title });
   };
+
+  const titleError = titleMutation.error
+    ? mutationErrorMessage(titleMutation.error, "タイトルを保存できませんでした。")
+    : null;
 
   return (
     // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- backdropクリックはuseDialogModalで判定する。
@@ -67,7 +63,7 @@ export function WorkEditDialog({
           <IconButton icon={I.x} label="閉じる" size="sm" onClick={onClose} />
         </header>
         <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-[18px] py-4">
-          <form className="flex flex-col gap-2" onSubmit={(event) => void saveTitle(event)}>
+          <form className="flex flex-col gap-2" onSubmit={saveTitle}>
             <label
               htmlFor="work-title-input"
               className="font-sans text-[11px] font-semibold text-ink-1"
@@ -81,21 +77,23 @@ export function WorkEditDialog({
                 className="h-8 min-w-0 flex-1 rounded-[6px] border border-line bg-paper-0 px-2.5 font-jp text-[12px] text-ink-0 focus:border-acc focus:outline-none focus:ring-2 focus:ring-acc-soft disabled:cursor-not-allowed disabled:text-ink-4"
                 value={titleDraft}
                 aria-invalid={titleDraft.trim().length === 0}
-                disabled={isTitleSaving}
+                disabled={titleMutation.isPending}
                 onChange={(event) => setTitleDraft(event.target.value)}
               />
               <Button
                 type="submit"
                 disabled={
-                  !titleDraft.trim() ||
-                  titleDraft.trim() === work.title ||
-                  isTitleSaving ||
-                  isPatching
+                  !titleDraft.trim() || titleDraft.trim() === work.title || titleMutation.isPending
                 }
               >
                 タイトルを保存
               </Button>
             </div>
+            {titleError && (
+              <p className="mle-prv__edit-error" role="alert">
+                {titleError}
+              </p>
+            )}
           </form>
 
           <section aria-labelledby="work-edit-tags-title" className="flex flex-col gap-2">
@@ -108,9 +106,7 @@ export function WorkEditDialog({
             <WorkTagEditor
               work={work}
               tagSuggestions={tagSuggestions}
-              isPatching={isPatching}
-              onPatchWork={onPatchWork}
-              onError={setEditError}
+              tagsMutation={tagsMutation}
               expanded
             />
           </section>
@@ -118,11 +114,6 @@ export function WorkEditDialog({
           <div className="border-t border-line-soft pt-4">
             <DlsiteEditor work={work} />
           </div>
-          {editError && (
-            <p className="mle-prv__edit-error" role="alert">
-              {editError}
-            </p>
-          )}
         </div>
         <footer className="flex shrink-0 justify-end border-t border-line-soft px-[18px] py-3">
           <Button variant="quiet" onClick={onClose}>

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { NormalizedTag, Work, WorkPatchInput } from "@mimimilli/shared";
+import type { NormalizedTag, Work } from "@mimimilli/shared";
 import CoverImg from "../../../../entities/work/ui/CoverImg";
 import { selectFixedCoverThumbnailWidth } from "../../../../entities/work/ui/coverThumbnailWidth";
 import {
@@ -8,6 +8,7 @@ import {
 } from "../../../../entities/work/resumeProgress";
 import { I } from "../../../../shared/ui/Icon";
 import { formatDuration, formatTime } from "../../../../shared/lib/format";
+import type { useLibraryWorkPatchMutations } from "../../model/useLibraryQueries";
 import { WorkMetadataActions } from "./WorkMetadataActions";
 import { WorkPlayButton } from "./WorkPlayButton";
 import { WorkStatusWarnings } from "./WorkStatusWarnings";
@@ -24,8 +25,7 @@ interface WorkDetailProps {
   playingTrackIndex: number | null;
   isPlaybackActive?: boolean;
   tagSuggestions: string[];
-  isPatching: boolean;
-  onPatchWork: (body: WorkPatchInput) => Promise<Work>;
+  workPatchMutations: ReturnType<typeof useLibraryWorkPatchMutations>;
   /** タグチップクリック時のハンドラ（タグ軸への絞り込み遷移） */
   onTagClick: (tag: NormalizedTag) => void;
 }
@@ -38,8 +38,7 @@ export function WorkDetail({
   playingTrackIndex,
   isPlaybackActive,
   tagSuggestions,
-  isPatching,
-  onPatchWork,
+  workPatchMutations,
   onTagClick,
 }: WorkDetailProps) {
   const playlist = work.playlists.find((p) => p.id === work.defaultPlaylistId) ?? work.playlists[0];
@@ -61,8 +60,6 @@ export function WorkDetail({
   const isPlaying = isLoaded && Boolean(isPlaybackActive);
   const resumeProgressRatio = hasResume ? computeResumeProgressRatio(work) : null;
 
-  // 閲覧ビューに残るタグ編集とブックマーク更新は同じエラー表示スロットを共有する。
-  const [editError, setEditError] = useState<string | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isInfoDialogOpen, setIsInfoDialogOpen] = useState(false);
   const hasKickerWarning = work.status === "missing" || work.status === "error";
@@ -143,21 +140,12 @@ export function WorkDetail({
           <WorkTagEditor
             work={work}
             tagSuggestions={tagSuggestions}
-            isPatching={isPatching}
-            onPatchWork={onPatchWork}
-            onError={setEditError}
+            tagsMutation={workPatchMutations.tagsMutation}
             onTagClick={onTagClick}
           />
-          {editError && (
-            <p className="mle-prv__edit-error" role="alert">
-              {editError}
-            </p>
-          )}
           <WorkMetadataActions
             work={work}
-            isPatching={isPatching}
-            onPatchWork={onPatchWork}
-            onError={setEditError}
+            bookmarkMutation={workPatchMutations.bookmarkMutation}
             onEdit={() => setIsEditDialogOpen(true)}
             onShowInfo={() => setIsInfoDialogOpen(true)}
           />
@@ -182,8 +170,7 @@ export function WorkDetail({
         <WorkEditDialog
           work={work}
           tagSuggestions={tagSuggestions}
-          isPatching={isPatching}
-          onPatchWork={onPatchWork}
+          workPatchMutations={workPatchMutations}
           onClose={() => setIsEditDialogOpen(false)}
         />
       )}

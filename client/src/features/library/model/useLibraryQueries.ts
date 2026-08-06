@@ -214,7 +214,7 @@ export function useLibrarySupportingQueries(nav: LibraryViewState) {
   };
 }
 
-export function useLibraryPatchWorkMutation(nav: LibraryViewState, searchQuery: string) {
+function useWorkPatchMutationContext(nav: LibraryViewState, searchQuery: string) {
   const queryClient = useQueryClient();
   const debouncedSearchQuery = useDebouncedValue(
     searchQuery,
@@ -228,45 +228,71 @@ export function useLibraryPatchWorkMutation(nav: LibraryViewState, searchQuery: 
     selectedTags: nav.selectedTags,
   });
 
-  return useMutation({
-    mutationFn: ({ workId, body }: { workId: string; body: WorkPatchInput }) =>
-      patchWork(workId, body),
-    onSuccess: async (updatedWork, { workId, body }) => {
-      queryClient.setQueryData<Work>(WORK_QUERY_KEYS.detail(workId), (prev) =>
-        mergeWorkPatchResponse(prev, body, updatedWork),
-      );
-      const targets = getWorkPatchInvalidationTargets(body, {
-        activeAxis: nav.activeAxis,
-        sort: nav.sort,
-        searchQuery: debouncedSearchQuery,
-        selectedTags: nav.selectedTags,
-      });
-      const activeListQueryKey = isSmartAxis(nav.activeAxis)
-        ? SMART_FOLDER_QUERY_KEYS.works(
-            getSmartFolderId(nav.activeAxis),
-            buildSmartFolderFilterParams(nav.selectedTags),
-          )
-        : worksParams !== null
-          ? WORK_QUERY_KEYS.list(worksParams)
-          : null;
-      if (targets.patchActiveListCache && activeListQueryKey !== null) {
-        patchWorkInQueryCache(queryClient, activeListQueryKey, workId, workToListItem(updatedWork));
-      }
-      await Promise.all([
-        targets.staleInactiveListCaches ? staleInactiveListCaches(queryClient) : null,
-        targets.resetActiveWorksList && activeListQueryKey !== null
-          ? queryClient.resetQueries({ queryKey: activeListQueryKey, exact: true })
-          : null,
-        targets.facets
-          ? queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.allFacets() })
-          : null,
-        targets.tags ? queryClient.invalidateQueries({ queryKey: TAG_QUERY_KEYS.all() }) : null,
-      ]);
-    },
-    onError: (error, { workId, body }) => {
-      console.error("作品メタデータの更新に失敗しました", { workId, body, error });
-    },
+  const applyPatchSuccess = async (
+    updatedWork: Work,
+    workId: string,
+    body: WorkPatchInput,
+  ): Promise<void> => {
+    queryClient.setQueryData<Work>(WORK_QUERY_KEYS.detail(workId), (prev) =>
+      mergeWorkPatchResponse(prev, body, updatedWork),
+    );
+    const targets = getWorkPatchInvalidationTargets(body, {
+      activeAxis: nav.activeAxis,
+      sort: nav.sort,
+      searchQuery: debouncedSearchQuery,
+      selectedTags: nav.selectedTags,
+    });
+    const activeListQueryKey = isSmartAxis(nav.activeAxis)
+      ? SMART_FOLDER_QUERY_KEYS.works(
+          getSmartFolderId(nav.activeAxis),
+          buildSmartFolderFilterParams(nav.selectedTags),
+        )
+      : worksParams !== null
+        ? WORK_QUERY_KEYS.list(worksParams)
+        : null;
+    if (targets.patchActiveListCache && activeListQueryKey !== null) {
+      patchWorkInQueryCache(queryClient, activeListQueryKey, workId, workToListItem(updatedWork));
+    }
+    await Promise.all([
+      targets.staleInactiveListCaches ? staleInactiveListCaches(queryClient) : null,
+      targets.resetActiveWorksList && activeListQueryKey !== null
+        ? queryClient.resetQueries({ queryKey: activeListQueryKey, exact: true })
+        : null,
+      targets.facets
+        ? queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.allFacets() })
+        : null,
+      targets.tags ? queryClient.invalidateQueries({ queryKey: TAG_QUERY_KEYS.all() }) : null,
+    ]);
+  };
+
+  return { applyPatchSuccess };
+}
+
+/** タイトル・ブックマーク・タグ編集を独立した mutation として提供する */
+export function useLibraryWorkPatchMutations(nav: LibraryViewState, searchQuery: string) {
+  const { applyPatchSuccess } = useWorkPatchMutationContext(nav, searchQuery);
+
+  const titleMutation = useMutation({
+    mutationFn: ({ workId, title }: { workId: string; title: string }) =>
+      patchWork(workId, { title }),
+    onSuccess: (updatedWork, { workId, title }) =>
+      applyPatchSuccess(updatedWork, workId, { title }),
   });
+
+  const bookmarkMutation = useMutation({
+    mutationFn: ({ workId, bookmarked }: { workId: string; bookmarked: boolean }) =>
+      patchWork(workId, { bookmarked }),
+    onSuccess: (updatedWork, { workId, bookmarked }) =>
+      applyPatchSuccess(updatedWork, workId, { bookmarked }),
+  });
+
+  const tagsMutation = useMutation({
+    mutationFn: ({ workId, tags }: { workId: string; tags: Work["tags"] }) =>
+      patchWork(workId, { tags }),
+    onSuccess: (updatedWork, { workId, tags }) => applyPatchSuccess(updatedWork, workId, { tags }),
+  });
+
+  return { titleMutation, bookmarkMutation, tagsMutation };
 }
 
 // ── スマートフォルダー作成・編集 mutation ─────────────────────

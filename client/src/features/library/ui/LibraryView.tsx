@@ -6,7 +6,6 @@ import {
   type NormalizedTag,
   type Work,
   type WorkListItem,
-  type WorkPatchInput,
 } from "@mimimilli/shared";
 import { librarySearchQueryAtom, libraryViewModeAtom } from "../model/atoms";
 import {
@@ -16,7 +15,7 @@ import {
 } from "../../player/model/atoms";
 import { useLibraryNavigation } from "../model/useLibraryNavigation";
 import {
-  useLibraryPatchWorkMutation,
+  useLibraryWorkPatchMutations,
   useLibraryDebouncedSearchQuery,
   useLibrarySupportingQueries,
   useSmartFolderMutation,
@@ -80,7 +79,7 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
     refetchTagPrefixes,
     refetchFacets,
   } = useLibrarySupportingQueries(nav);
-  const patchWorkMutation = useLibraryPatchWorkMutation(nav, searchQuery);
+  const workPatchMutations = useLibraryWorkPatchMutations(nav, searchQuery);
   const [isNoResultsDueToFilter, setIsNoResultsDueToFilter] = useState(false);
 
   const saveSmartFolderMutation = useSmartFolderMutation({
@@ -88,14 +87,7 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
       setSmartFolderEditor(closedSmartFolderEditorState);
       if (wasNew) nav.setAxis(`smart-${savedFolder.id}`);
     },
-    onError: (wasNew, error) => {
-      console.error(
-        wasNew
-          ? "スマートフォルダーの作成に失敗しました"
-          : "スマートフォルダーの更新に失敗しました",
-        error,
-      );
-    },
+    onError: () => {},
   });
 
   // ── 表示導出（純粋計算は model/libraryPresentation に集約） ──
@@ -155,11 +147,6 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
     [nav.selectSoleTag],
   );
 
-  const handlePatchWork = useCallback(
-    (body: WorkPatchInput) => patchWorkMutation.mutateAsync({ workId: nav.selectedWorkId!, body }),
-    [patchWorkMutation, nav.selectedWorkId],
-  );
-
   const handleEditSmartFolder = useCallback(() => {
     if (!activeSmartFolder) return;
     saveSmartFolderMutation.reset();
@@ -204,8 +191,7 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
           onSelectWork={nav.selectWork}
           onTagClick={handleTagClick}
           tagSuggestions={tagSuggestions}
-          isPatching={patchWorkMutation.isPending}
-          onPatchWork={handlePatchWork}
+          workPatchMutations={workPatchMutations}
         />
       ) : (
         <div className="mll-resultspane">
@@ -331,8 +317,7 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
                         onSelectWork={nav.selectWork}
                         onTagClick={handleTagClick}
                         tagSuggestions={tagSuggestions}
-                        isPatching={patchWorkMutation.isPending}
-                        onPatchWork={handlePatchWork}
+                        workPatchMutations={workPatchMutations}
                       />
                     </Presence>
                   </div>

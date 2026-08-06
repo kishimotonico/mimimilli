@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { parseTag, tagEquals } from "@mimimilli/shared";
-import type { NormalizedTag, TagPrefix, Work, WorkPatchInput } from "@mimimilli/shared";
+import type { NormalizedTag, TagPrefix, Work } from "@mimimilli/shared";
 import { buildTagsWithAdded, buildTagsWithRemoved } from "../../../../entities/work/editableTags";
+import type { LibraryTagsPatchMutation } from "../../model/workPatchMutations";
 
 const TAG_UNDO_TOAST_MS = 6000;
 
@@ -10,16 +11,14 @@ export interface UseWorkTagEditorOptions {
   tagSuggestions: string[];
   /** 保護判定（protected な prefix のタグは削除前に確認を挟む。ADR-0005） */
   tagPrefixes: TagPrefix[];
-  isPatching: boolean;
-  onPatchWork: (body: WorkPatchInput) => Promise<Work>;
-  /** タグ保存の成否をタイトル編集等と共有するエラー表示へ伝える。開始時は null で呼ぶ */
-  onError: (message: string | null) => void;
+  tagsMutation: LibraryTagsPatchMutation;
 }
 
 export interface UseWorkTagEditorResult {
   tags: NormalizedTag[];
   suggestions: string[];
   isTagSaving: boolean;
+  patchTagsError: LibraryTagsPatchMutation["error"];
   pendingRemoveTag: NormalizedTag | null;
   failedRemoveTag: NormalizedTag | null;
   /** 保護タグの削除確認待ち。ConfirmDialog の表示トリガー */
@@ -32,6 +31,7 @@ export interface UseWorkTagEditorResult {
   cancelRemoveTag: () => void;
   undoRemoveTag: () => Promise<void>;
   dismissTagUndoToast: () => void;
+  resetPatchTagsError: () => void;
 }
 
 /**
@@ -43,11 +43,8 @@ export function useWorkTagEditor({
   work,
   tagSuggestions,
   tagPrefixes,
-  isPatching,
-  onPatchWork,
-  onError,
+  tagsMutation,
 }: UseWorkTagEditorOptions): UseWorkTagEditorResult {
-  const [isTagSaving, setIsTagSaving] = useState(false);
   const [pendingRemoveTag, setPendingRemoveTag] = useState<NormalizedTag | null>(null);
   const [failedRemoveTag, setFailedRemoveTag] = useState<NormalizedTag | null>(null);
   const [confirmingRemoveTag, setConfirmingRemoveTag] = useState<NormalizedTag | null>(null);
@@ -67,17 +64,13 @@ export function useWorkTagEditor({
   };
 
   const patchTags = async (nextTags: NormalizedTag[]): Promise<boolean> => {
-    if (isPatching || isTagSaving) return false;
-    setIsTagSaving(true);
-    onError(null);
+    if (tagsMutation.isPending) return false;
+    tagsMutation.reset();
     try {
-      await onPatchWork({ tags: nextTags });
+      await tagsMutation.mutateAsync({ workId: work.id, tags: nextTags });
       return true;
     } catch {
-      onError("タグを保存できませんでした。");
       return false;
-    } finally {
-      setIsTagSaving(false);
     }
   };
 
@@ -94,7 +87,7 @@ export function useWorkTagEditor({
   };
 
   const removeTag = async (tag: NormalizedTag) => {
-    if (isPatching || isTagSaving) return;
+    if (tagsMutation.isPending) return;
     setPendingRemoveTag(tag);
     setFailedRemoveTag(null);
     const ok = await patchTags(buildTagsWithRemoved(work.tags, tag));
@@ -107,7 +100,7 @@ export function useWorkTagEditor({
   };
 
   const requestRemoveTag = async (tag: NormalizedTag) => {
-    if (isPatching || isTagSaving) return;
+    if (tagsMutation.isPending) return;
     if (isProtectedTag(tag)) {
       setConfirmingRemoveTag(tag);
       return;
@@ -127,9 +120,9 @@ export function useWorkTagEditor({
     const tag = tagUndoToast;
     if (!tag) return;
     // 別の保存が進行中の間は何もしない（トーストを消さず、undo要求を黙って捨てない）
-    if (isPatching || isTagSaving) return;
+    if (tagsMutation.isPending) return;
     // 削除したタグだけを現在の集合へ戻す。undo待ちの間に行われた他のタグ編集は巻き戻さない。
-    // 復元に失敗した場合はトーストを残して再試行可能にする（onError も呼ばれる）
+    // 復元に失敗した場合はトーストを残して再試行可能にする
     const restored = work.tags.some((current) => tagEquals(current, tag))
       ? work.tags
       : [...work.tags, tag];
@@ -145,7 +138,8 @@ export function useWorkTagEditor({
   return {
     tags: work.tags,
     suggestions: [...new Set(tagSuggestions)],
-    isTagSaving,
+    isTagSaving: tagsMutation.isPending,
+    patchTagsError: tagsMutation.error,
     pendingRemoveTag,
     failedRemoveTag,
     confirmingRemoveTag,
@@ -156,5 +150,6 @@ export function useWorkTagEditor({
     cancelRemoveTag,
     undoRemoveTag,
     dismissTagUndoToast,
+    resetPatchTagsError: tagsMutation.reset,
   };
 }

@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { normalizeTag, parseTag } from "@mimimilli/shared";
-import type { NormalizedTag, Work, WorkPatchInput } from "@mimimilli/shared";
+import type { NormalizedTag, Work } from "@mimimilli/shared";
 import { sortTagsForDisplay } from "../../../../entities/work/sortTagsForDisplay";
 import Tag from "../../../../entities/work/ui/Tag";
 import { I } from "../../../../shared/ui/Icon";
@@ -8,6 +8,8 @@ import ConfirmDialog from "../../../../shared/ui/ConfirmDialog";
 import IconButton from "../../../../shared/ui/IconButton";
 import TagCombobox from "../../../../shared/ui/TagCombobox";
 import Toast from "../../../../shared/ui/Toast";
+import { mutationErrorMessage } from "../../../../shared/lib/mutationError";
+import type { LibraryTagsPatchMutation } from "../../model/workPatchMutations";
 import { useTagPrefixes } from "../../model/useTagPrefixes";
 import { useAnchoredPopover } from "./useAnchoredPopover";
 import { useWorkTagEditor } from "./useWorkTagEditor";
@@ -22,9 +24,7 @@ const NARROW_TAG_PANE_PX = 320;
 interface WorkTagEditorProps {
   work: Work;
   tagSuggestions: string[];
-  isPatching: boolean;
-  onPatchWork: (body: WorkPatchInput) => Promise<Work>;
-  onError: (message: string | null) => void;
+  tagsMutation: LibraryTagsPatchMutation;
   /** 編集ダイアログなど、折りたたむ必要がない場所では全タグを表示する。
    *  この場合は編集ダイアログ自体が明示的な編集操作なので削除ボタンは常時表示のまま。 */
   expanded?: boolean;
@@ -36,9 +36,7 @@ interface WorkTagEditorProps {
 export function WorkTagEditor({
   work,
   tagSuggestions,
-  isPatching,
-  onPatchWork,
-  onError,
+  tagsMutation,
   expanded = false,
   onTagClick,
 }: WorkTagEditorProps) {
@@ -55,6 +53,7 @@ export function WorkTagEditor({
     tags,
     suggestions,
     isTagSaving,
+    patchTagsError,
     pendingRemoveTag,
     failedRemoveTag,
     confirmingRemoveTag,
@@ -65,7 +64,8 @@ export function WorkTagEditor({
     cancelRemoveTag,
     undoRemoveTag,
     dismissTagUndoToast,
-  } = useWorkTagEditor({ work, tagSuggestions, tagPrefixes, isPatching, onPatchWork, onError });
+    resetPatchTagsError,
+  } = useWorkTagEditor({ work, tagSuggestions, tagPrefixes, tagsMutation });
 
   const closeTagPopover = () => setIsTagPopoverOpen(false);
   const {
@@ -98,11 +98,15 @@ export function WorkTagEditor({
   const comboboxProps = {
     suggestions,
     excludeTags: tags,
-    disabled: isTagSaving || isPatching,
+    disabled: isTagSaving,
     canCreate: (tag: string) => normalizeTag(tag) !== null,
     onSelect: selectTag,
     onCancel: close,
   };
+
+  const patchTagsErrorMessage = patchTagsError
+    ? mutationErrorMessage(patchTagsError, "タグを保存できませんでした。")
+    : null;
 
   return (
     <>
@@ -111,7 +115,7 @@ export function WorkTagEditor({
           {visibleTags.map((tag) => {
             const isPending = pendingRemoveTag === tag;
             const isFailed = failedRemoveTag === tag;
-            const isBlocked = isPatching || (isTagSaving && !isPending);
+            const isBlocked = isTagSaving && !isPending;
             return (
               <Tag
                 key={tag}
@@ -152,9 +156,9 @@ export function WorkTagEditor({
                 label="タグを追加"
                 size="xs"
                 className="bg-paper-2 text-ink-2 hover:bg-paper-3 hover:text-ink-0"
-                disabled={isTagSaving || isPatching}
+                disabled={isTagSaving}
                 onClick={() => {
-                  onError(null);
+                  resetPatchTagsError();
                   if (isTagPopoverOpen) close();
                   else setIsTagPopoverOpen(true);
                 }}
@@ -182,6 +186,11 @@ export function WorkTagEditor({
           </div>
         </div>
       </div>
+      {patchTagsErrorMessage && (
+        <p className="mle-prv__edit-error" role="alert">
+          {patchTagsErrorMessage}
+        </p>
+      )}
       {confirmingRemoveTag && (
         <ConfirmDialog
           title="保護タグの削除"
