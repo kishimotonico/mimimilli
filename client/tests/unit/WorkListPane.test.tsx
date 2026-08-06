@@ -67,11 +67,8 @@ describe("WorkListPane virtual scrolling", () => {
     sizeMock = mockElementSize(300, 600) as unknown as { restore: () => void };
   });
 
-  afterEach(async () => {
+  afterEach(() => {
     cleanup();
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 200));
-    });
     sizeMock.restore();
     clearResizeObservers();
   });
@@ -210,11 +207,8 @@ describe("WorkListPane の末尾余白（docked bar）", () => {
     sizeMock = mockElementSize(300, 600) as unknown as { restore: () => void };
   });
 
-  afterEach(async () => {
+  afterEach(() => {
     cleanup();
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 200));
-    });
     sizeMock.restore();
     clearResizeObservers();
   });
