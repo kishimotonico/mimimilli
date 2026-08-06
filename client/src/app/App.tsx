@@ -4,6 +4,7 @@
 // - レイアウトは AppShell に委譲
 
 import { lazy, Suspense, useState, useCallback, useRef } from "react";
+import { useSetAtom } from "jotai";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { usePlayerActions } from "../features/player/model/usePlayerActions";
 import PlayerRuntime from "../features/player/ui/PlayerRuntime";
@@ -27,6 +28,7 @@ import type { ActiveModal } from "./model/activeModal";
 import type { Work, WorkListItem } from "@mimimilli/shared";
 import { getWork } from "../entities/work/api";
 import { exportLibrary } from "../features/library/api";
+import { errorToastAtom } from "./model/errorToastAtom";
 import { useScanActions } from "../features/scan/model/useScanActions";
 import { setRootFolder } from "../features/settings/api";
 import { useSettingsQuery } from "../features/settings/useSettingsQuery";
@@ -39,6 +41,7 @@ export default function App() {
   const player = usePlayerActions();
   const scanActions = useScanActions();
   const queryClient = useQueryClient();
+  const setErrorToast = useSetAtom(errorToastAtom);
   const playRequestIdRef = useRef(0);
 
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
@@ -121,18 +124,23 @@ export default function App() {
 
   const handleExport = useCallback(async () => {
     try {
-      const data = await exportLibrary();
-      const blob = new Blob([data], { type: "application/json" });
+      const exported = await exportLibrary();
+      const blob = new Blob([exported.data], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = "mimimilli-export.json";
       a.click();
       URL.revokeObjectURL(url);
+      if (exported.dataIntegrityWarning) {
+        setErrorToast(
+          `${exported.dataIntegrityWarning.skippedCount}件の作品がデータ不整合のためエクスポートから除外されました`,
+        );
+      }
     } catch {
       /* ignore */
     }
-  }, []);
+  }, [setErrorToast]);
 
   if (startupState === "loading") {
     return (

@@ -31,6 +31,7 @@ import {
   sampleWorkHtml,
 } from "../helpers/dlsiteTransport.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
+import { nts } from "../helpers/tag.ts";
 import { makeSampleLibrary, makeTestDirectory } from "../helpers/sampleLibrary.ts";
 
 const FAST_DLSITE_REQUEST_CONFIG = {
@@ -284,7 +285,7 @@ test("mergeDlsiteTags: prefix 変換と重複排除", () => {
     coverUrl: null,
     url: "",
   };
-  const merged = mergeDlsiteTags(["サークル/夜想曲", "cv/水瀬なずな", "バイノーラル"], info);
+  const merged = mergeDlsiteTags(nts(["サークル/夜想曲", "cv/水瀬なずな", "バイノーラル"]), info);
   assert.deepEqual(merged, [
     "サークル/夜想曲",
     "cv/水瀬なずな",
@@ -313,7 +314,7 @@ test("dlsiteApply: タグマージとメタ書き戻し（カバー DL なし）
   const ok = await adapter.dlsiteApply(lib.existingWorkId, {
     info,
     applyTitle: true,
-    applyTags: ["サークル/夜想曲", "cv/水瀬なずな", "genre/耳かき", "genre/睡眠"],
+    applyTags: nts(["サークル/夜想曲", "cv/水瀬なずな", "genre/耳かき", "genre/睡眠"]),
     applyCover: false,
   });
   assert.equal(ok, true);

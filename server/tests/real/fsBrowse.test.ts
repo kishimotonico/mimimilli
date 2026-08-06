@@ -221,7 +221,9 @@ test("listFsWorkRefs の physical_path 重複時の先勝ちは listSummaries �
   upsertTestWork(repo, sampleWork("w-first", physicalPath));
   upsertTestWork(repo, sampleWork("w-second", physicalPath));
 
-  const expectedId = repo.listSummaries().find((s) => s.physicalPath === physicalPath)?.id;
+  const expectedId = repo
+    .listSummaries()
+    .summaries.find((s) => s.physicalPath === physicalPath)?.id;
   assert.ok(expectedId, "listSummaries に重複 physical_path の作品があること");
 
   const indexed = buildWorkPathIndex(repo.listFsWorkRefs(physicalPath));

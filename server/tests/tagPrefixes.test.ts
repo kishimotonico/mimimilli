@@ -9,6 +9,8 @@ import {
   emptyDlsiteState,
   normalizeTag,
   normalizeTags,
+  isTagNormalized,
+  parseStoredNormalizedTags,
   TagNormalizationError,
   tagEquals,
   tagPrefixCreateSchema,
@@ -18,6 +20,7 @@ import type { WorkSummary } from "@mimimilli/shared";
 import { createApp } from "../src/app.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { buildAxisFacets } from "../src/core/axisFacets.ts";
+import { tf } from "./helpers/tag.ts";
 import { buildTagPrefixCandidates } from "../src/core/tagPrefixCandidates.ts";
 import { nt, nts } from "./helpers/tag.ts";
 
@@ -62,6 +65,24 @@ test("normalizeTag: 値の大文字小文字は保持する", () => {
 
 test("normalizeTag: 値にスラッシュを含む場合は最初のスラッシュでのみ分割する", () => {
   assert.equal(normalizeTag("シリーズ/A/B"), "シリーズ/A/B");
+});
+
+test("isTagNormalized: 正規形は true、非正規形は false", () => {
+  assert.equal(isTagNormalized("cv/水瀬なずな"), true);
+  assert.equal(isTagNormalized("ASMR"), true);
+  assert.equal(isTagNormalized(" CV/壊れ "), false);
+  assert.equal(isTagNormalized("CV/壊れ"), false);
+  assert.equal(isTagNormalized("  ASMR  "), false);
+});
+
+test("parseStoredNormalizedTags: 正規形配列は参照を保ったまま通す", () => {
+  const tags = ["cv/藤田茜", "ASMR"];
+  const parsed = parseStoredNormalizedTags(tags);
+  assert.equal(parsed.ok, true);
+  if (parsed.ok) {
+    assert.equal(parsed.value[0], tags[0]);
+    assert.equal(parsed.value[1], tags[1]);
+  }
 });
 
 test("normalizeTags: 各要素を正規形へ寄せる（重複排除はしない）", () => {
@@ -184,7 +205,7 @@ test("buildAxisFacets: filter を渡すと AND 条件として絞り込んだ集
     summaryWith("W3", ["cv/霧島レイ", "催眠"]),
   ];
   // ASMR タグで絞り込むと霧島レイの1件（W3）は集計対象から外れる
-  assert.deepEqual(buildAxisFacets("cv", works, { tags: ["ASMR"], tagOp: "AND" }), [
+  assert.deepEqual(buildAxisFacets("cv", works, { tags: tf("ASMR"), tagOp: "AND" }), [
     { value: "藤田茜", count: 1, durationSec: 0, covers: [] },
     { value: "霧島レイ", count: 1, durationSec: 0, covers: [] },
   ]);
@@ -196,7 +217,7 @@ test("buildAxisFacets: filter の @year/... 擬似タグも追加のAND条件と
     summaryWith("W2", ["cv/藤田茜"], "2025-06-01T00:00:00.000Z"),
     summaryWith("W3", ["cv/霧島レイ"], "2025-06-01T00:00:00.000Z"),
   ];
-  assert.deepEqual(buildAxisFacets("cv", works, { tags: ["@year/2025"] }), [
+  assert.deepEqual(buildAxisFacets("cv", works, { tags: tf("@year/2025") }), [
     { value: "藤田茜", count: 1, durationSec: 0, covers: [] },
     { value: "霧島レイ", count: 1, durationSec: 0, covers: [] },
   ]);
@@ -204,7 +225,7 @@ test("buildAxisFacets: filter の @year/... 擬似タグも追加のAND条件と
 
 test("buildAxisFacets: filterで0件になった値は一覧から除外される", () => {
   const works = [summaryWith("W1", ["cv/藤田茜", "催眠"])];
-  assert.deepEqual(buildAxisFacets("cv", works, { tags: ["ASMR"], tagOp: "AND" }), []);
+  assert.deepEqual(buildAxisFacets("cv", works, { tags: tf("ASMR"), tagOp: "AND" }), []);
 });
 
 test("buildAxisFacets: filterが無ければ従来どおり無絞り込みで集計する（回帰確認）", () => {
@@ -264,6 +285,91 @@ test("PATCH /api/works/:id: 正規化後に空になるタグは400で拒否す�
     body: JSON.stringify({ tags: ["cv/x", "  "] }),
   });
   assert.equal(patched.status, 400);
+});
+
+test("POST /api/dlsite/:id/apply: applyTags を正規化して保存する", async () => {
+  const app = buildApp();
+  const listRes = await app.request("/api/works");
+  const { items } = await listRes.json();
+  const workId: string = items[0].id;
+
+  const applied = await app.request(`/api/dlsite/${workId}/apply`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      info: {
+        rjCode: "RJ000001",
+        title: "テスト作品",
+        circle: null,
+        cvs: [],
+        genreTags: [],
+        coverUrl: null,
+        url: "https://www.dlsite.com/maniax/work/=/product_id/RJ000001.html",
+      },
+      applyTitle: false,
+      applyCover: false,
+      applyTags: ["Genre/ 耳かき ", "genre/耳かき"],
+    }),
+  });
+  assert.equal(applied.status, 204);
+
+  const work = await app.request(`/api/works/${workId}`);
+  const body = await work.json();
+  assert.ok(body.tags.includes("genre/耳かき"));
+});
+
+test("POST /api/dlsite/:id/apply: 正規化後に空になる applyTags は400で拒否する", async () => {
+  const app = buildApp();
+  const listRes = await app.request("/api/works");
+  const { items } = await listRes.json();
+  const workId: string = items[0].id;
+
+  const applied = await app.request(`/api/dlsite/${workId}/apply`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      info: {
+        rjCode: "RJ000001",
+        title: "テスト作品",
+        circle: null,
+        cvs: [],
+        genreTags: [],
+        coverUrl: null,
+        url: "https://www.dlsite.com/maniax/work/=/product_id/RJ000001.html",
+      },
+      applyTitle: false,
+      applyCover: false,
+      applyTags: ["genre/耳かき", "  "],
+    }),
+  });
+  assert.equal(applied.status, 400);
+});
+
+test("POST /api/dlsite/:id/apply: 予約文字 @ 始まりの applyTags は400で拒否する", async () => {
+  const app = buildApp();
+  const listRes = await app.request("/api/works");
+  const { items } = await listRes.json();
+  const workId: string = items[0].id;
+
+  const applied = await app.request(`/api/dlsite/${workId}/apply`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      info: {
+        rjCode: "RJ000001",
+        title: "テスト作品",
+        circle: null,
+        cvs: [],
+        genreTags: [],
+        coverUrl: null,
+        url: "https://www.dlsite.com/maniax/work/=/product_id/RJ000001.html",
+      },
+      applyTitle: false,
+      applyCover: false,
+      applyTags: ["@year/2024"],
+    }),
+  });
+  assert.equal(applied.status, 400);
 });
 
 // ── HTTP CRUD（fixture アダプタ）─────────────────────────────

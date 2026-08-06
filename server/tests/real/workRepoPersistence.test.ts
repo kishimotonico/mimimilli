@@ -3,13 +3,15 @@ import { test } from "node:test";
 import { eq } from "drizzle-orm";
 import type { Work } from "@mimimilli/shared";
 import { openDb } from "../../src/adapters/real/db.ts";
-import { works } from "../../src/adapters/real/catalogSchema.ts";
+import { works, tags } from "../../src/adapters/real/catalogSchema.ts";
+import { smartFolders } from "../../src/adapters/real/userSchema.ts";
 import { PersistentDataError, WorkRepo } from "../../src/adapters/real/workRepo.ts";
 import { upsertTestWork, resolvedDuration } from "../helpers/workTestUtils.ts";
-import { smartFolders } from "../../src/adapters/real/userSchema.ts";
+import { nts } from "../helpers/tag.ts";
 
 function sampleWork(id: string): Work {
-  const playlistId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const playlistId = `${id}-playlist`;
+  const trackId = `${id}-track`;
   return {
     id,
     title: "永続データ検証用",
@@ -31,7 +33,7 @@ function sampleWork(id: string): Work {
         name: "default",
         tracks: [
           {
-            id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            id: trackId,
             title: "track",
             file: "track.wav",
             ...resolvedDuration(60),
@@ -53,39 +55,35 @@ function sampleWork(id: string): Work {
   };
 }
 
-function assertPersistentDataError(action: () => unknown, expectedMessage: RegExp): void {
-  assert.throws(action, (error: unknown) => {
-    assert.ok(error instanceof PersistentDataError);
-    assert.match(error.message, expectedMessage);
-    return true;
-  });
-}
-
-async function assertPersistentDataErrorAsync(
+function assertPersistentDataErrorAsync(
   action: () => Promise<unknown>,
   expectedMessage: RegExp,
 ): Promise<void> {
-  await assert.rejects(action, (error: unknown) => {
+  return assert.rejects(action, (error: unknown) => {
     assert.ok(error instanceof PersistentDataError);
     assert.match(error.message, expectedMessage);
     return true;
   });
 }
 
-test("works.status が不正なら作品IDとフィールド名を含むエラーになる", () => {
+test("works.status が不正なら listSummaries は当該作品を隔離して続行する", () => {
   const db = openDb({ kind: "memory" });
   const repo = new WorkRepo(db);
-  const work = sampleWork("work-bad-status");
-  upsertTestWork(repo, work);
-  db.catalog.update(works).set({ status: "unknown" }).where(eq(works.id, work.id)).run();
+  const good = sampleWork("work-good-status");
+  const bad = sampleWork("work-bad-status");
+  upsertTestWork(repo, good);
+  upsertTestWork(repo, bad);
+  db.catalog.update(works).set({ status: "unknown" }).where(eq(works.id, bad.id)).run();
 
-  assertPersistentDataError(
-    () => repo.listSummaries(),
-    /works レコード "work-bad-status".*status:/,
-  );
+  const result = repo.listSummaries();
+  assert.equal(result.summaries.length, 1);
+  assert.equal(result.summaries[0]!.id, good.id);
+  assert.equal(result.skipped.length, 1);
+  assert.equal(result.skipped[0]!.workId, bad.id);
+  assert.match(result.skipped[0]!.reason, /status:/);
 });
 
-test("works.playlists_json が不正なら作品IDとフィールド名を含むエラーになる", async () => {
+test("works.playlists_json が不正なら getWork はエラーのまま", async () => {
   const db = openDb({ kind: "memory" });
   const repo = new WorkRepo(db);
   const work = sampleWork("work-bad-playlists");
@@ -102,7 +100,7 @@ test("works.playlists_json が不正なら作品IDとフィールド名を含む
   );
 });
 
-test("壊れたJSON構文は作品IDとSQLite列名を含むエラーになる", async () => {
+test("壊れたJSON構文は getWork で作品IDとSQLite列名を含むエラーになる", async () => {
   const db = openDb({ kind: "memory" });
   const repo = new WorkRepo(db);
   const work = sampleWork("work-bad-json");
@@ -113,6 +111,23 @@ test("壊れたJSON構文は作品IDとSQLite列名を含むエラーになる",
     () => repo.getWork(work.id),
     /works レコード "work-bad-json".*playlists_json: JSON パースエラー:/,
   );
+});
+
+test("tags.name が正規化されていなければ listSummaries は当該作品を隔離して続行する", () => {
+  const db = openDb({ kind: "memory" });
+  const repo = new WorkRepo(db);
+  const good = sampleWork("work-good-tags");
+  const bad = { ...sampleWork("work-bad-tags"), tags: nts(["cv/正常"]) };
+  upsertTestWork(repo, good);
+  upsertTestWork(repo, bad);
+  db.catalog.update(tags).set({ name: " CV/壊れ " }).where(eq(tags.name, "cv/正常")).run();
+
+  const result = repo.listSummaries();
+  assert.equal(result.summaries.length, 1);
+  assert.equal(result.summaries[0]!.id, good.id);
+  assert.equal(result.skipped.length, 1);
+  assert.equal(result.skipped[0]!.workId, bad.id);
+  assert.match(result.skipped[0]!.reason, /タグが正規化されていません/);
 });
 
 test("smart folderのsortも復元時に検証する", () => {
@@ -129,8 +144,12 @@ test("smart folderのsortも復元時に検証する", () => {
     })
     .run();
 
-  assertPersistentDataError(
+  assert.throws(
     () => repo.listSmartFolders(),
-    /smart_folders レコード "sf-bad-sort".*sort:/,
+    (error: unknown) => {
+      assert.ok(error instanceof PersistentDataError);
+      assert.match(error.message, /smart_folders レコード "sf-bad-sort".*sort:/);
+      return true;
+    },
   );
 });

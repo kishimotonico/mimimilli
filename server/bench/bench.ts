@@ -3,6 +3,8 @@ import { dirname, join, resolve } from "node:path";
 import { WORKS_DEFAULT_PAGE_SIZE } from "@mimimilli/shared";
 import { createApp } from "../src/app.ts";
 import { createRealAdapter } from "../src/adapters/real/index.ts";
+import { openDb } from "../src/adapters/real/db.ts";
+import { WorkRepo } from "../src/adapters/real/workRepo.ts";
 import { optionalArg, optionalIntArg, parseArgs, requireArg } from "./cli.ts";
 import type { BenchManifest } from "./manifest.ts";
 import { summarizeLatencies, type LatencyStats } from "./stats.ts";
@@ -140,8 +142,23 @@ async function main(): Promise<void> {
     },
   ];
 
+  const db = openDb({
+    kind: "files",
+    catalogPath: manifest.catalogDb,
+    userPath: manifest.userDb,
+  });
+  const repo = new WorkRepo(db);
+  const listSummariesCase = {
+    name: "list-summaries-all",
+    path: "(WorkRepo.listSummaries)",
+    run: async () => {
+      repo.listSummaries();
+      return new Response(null, { status: 200 });
+    },
+  };
+
   const results: BenchCaseResult[] = [];
-  for (const benchCase of cases) {
+  for (const benchCase of [...cases, listSummariesCase]) {
     process.stdout.write(`Benchmarking ${benchCase.name}...`);
     results.push(
       await measureCase(benchCase.name, benchCase.path, benchCase.run, warmup, iterations),
@@ -164,6 +181,7 @@ async function main(): Promise<void> {
   writeFileSync(mdPath, formatMarkdown(report));
 
   adapter.close();
+  db.close();
   console.log(`Wrote ${jsonPath}`);
   console.log(`Wrote ${mdPath}`);
 }

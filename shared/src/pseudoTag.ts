@@ -44,6 +44,20 @@ export interface SplitSelectedTagsResult {
   warnings: string[];
 }
 
+/** HTTP 境界で splitSelectedTags を通した後、core・adapter がそのまま使う構造化済みタグフィルタ */
+export type TagFilters = Pick<SplitSelectedTagsResult, "tags" | "yearValue">;
+
+export const EMPTY_TAG_FILTERS: TagFilters = { tags: [], yearValue: null };
+
+/** 境界検証済みの selectedTags を TagFilters へ変換する。warnings があるときは例外 */
+export function tagFiltersFromSelected(rawTags: string[]): TagFilters {
+  const result = splitSelectedTags(rawTags);
+  if (result.warnings.length > 0) {
+    throw new Error(result.warnings.join(" / "));
+  }
+  return { tags: result.tags, yearValue: result.yearValue };
+}
+
 /**
  * 選択中タグ（selectedTagsAtom・URLの tags=・HTTPクエリの tags=）を実タグと組み込み軸の
  * 擬似タグへ分解する共通入口。client（URL復元）・server（HTTPスキーマの境界検証・フィルタ

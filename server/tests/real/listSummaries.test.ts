@@ -58,7 +58,7 @@ function sampleWork(
 }
 
 function trackCountOf(repo: WorkRepo, id: string): number {
-  const summary = repo.listSummaries().find((s) => s.id === id);
+  const summary = repo.listSummaries().summaries.find((s) => s.id === id);
   assert.ok(summary, `listSummaries に ${id} がありません`);
   return summary.trackCount;
 }
@@ -139,7 +139,7 @@ test("listSummaries は playlists_json を読まない（壊れたplaylists_json
   // playlists_json を直接壊す。listSummaries が読まないなら影響を受けないはず
   db.sqlite.run("UPDATE main.works SET playlists_json = '[{' WHERE id = 'w-1'");
 
-  const summaries = repo.listSummaries();
+  const summaries = repo.listSummaries().summaries;
   assert.equal(summaries.length, 1);
   assert.equal(summaries[0]!.trackCount, 2);
   db.close();
@@ -151,7 +151,7 @@ test("work_dlsite 行がない作品は emptyDlsiteState() になる", () => {
   upsertTestWork(repo, sampleWork("w-1", [makePlaylist(1)], null));
   db.catalog.delete(workDlsite).where(eq(workDlsite.workId, "w-1")).run();
 
-  const summary = repo.listSummaries().find((s) => s.id === "w-1");
+  const summary = repo.listSummaries().summaries.find((s) => s.id === "w-1");
   assert.deepEqual(summary?.dlsite, {
     rjCode: null,
     status: "none",

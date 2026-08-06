@@ -5,6 +5,7 @@
 import { createHash } from "node:crypto";
 import type {
   AxisFacetItem,
+  DataIntegrityWarning,
   DlsiteApplyBody,
   DlsiteNotificationKind,
   DlsiteNotificationPage,
@@ -36,6 +37,7 @@ import type {
   WorksPage,
   WorksQuery,
 } from "@mimimilli/shared";
+import type { TagFilters } from "@mimimilli/shared";
 
 export interface ScanOptions {
   /** true のとき fingerprint に関係なく全作品を再処理する（TASK-95） */
@@ -49,22 +51,20 @@ export interface ScanOptions {
 }
 
 /** GET /smart-folders/:id/works のクエリ。tags はフォルダーのルールに対する
- *  追加の AND 条件として適用する（TASK-185）。組み込み軸（year等）も専用パラメータを
- *  持たず、擬似タグとして tags に混ざる（ADR-0012 §2、TASK-199）。
+ *  追加の AND 条件として適用する（TASK-185）。HTTP 境界で構造化済みの TagFilters を受け取る。
  *  ソートはフォルダー自身が持つため含まない */
 export interface SmartFolderEvalQuery {
   page: number;
   limit: number;
   seed?: number;
-  tags?: string[];
+  tags?: TagFilters;
   tagOp?: "AND" | "OR";
 }
 
-/** GET /axes/:axis のクエリ。tags は集計対象の絞り込み（AND 条件）、組み込み軸の擬似タグも
- *  含む（ADR-0012 §2、TASK-199）。自軸由来のフィルタを除外した集合を渡すのは
- *  呼び出し側（client）の責務（TASK-187） */
+/** GET /axes/:axis のクエリ。tags は集計対象の絞り込み（AND 条件）。自軸由来のフィルタを
+ *  除外した集合を渡すのは呼び出し側（client）の責務（TASK-187） */
 export interface AxisFacetsFilter {
-  tags?: string[];
+  tags?: TagFilters;
   tagOp?: "AND" | "OR";
 }
 
@@ -140,7 +140,7 @@ export interface DataAdapter {
   touchLastPlayed(id: string): Promise<boolean>;
   listWorkFiles(id: string): Promise<FileEntry | null>;
   listTags(): Promise<string[]>;
-  exportLibrary(): Promise<string>;
+  exportLibrary(): Promise<{ data: string; dataIntegrityWarning?: DataIntegrityWarning }>;
 
   // 分類軸・タグ prefix 定義・スマートフォルダー
   /** axis は "tag" / "year" / 任意の prefix 文字列（正規形・小文字）（ADR-0005） */

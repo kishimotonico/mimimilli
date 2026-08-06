@@ -42,6 +42,7 @@ import WorkGrid from "./WorkGrid";
 import WorkListPane from "./WorkListPane";
 import SmartFolderEditorModal from "./SmartFolderEditorModal";
 import { SmartFolderView } from "./preview/SmartFolderView";
+import { DataIntegrityWarningBanner } from "./DataIntegrityWarningBanner";
 import LibraryWorksBoundary from "./LibraryWorksBoundary";
 import Presence from "../../../shared/ui/Presence";
 
@@ -251,11 +252,18 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
                   params: result.worksParams,
                 });
                 const smartFolderBanner = activeSmartFolder ? (
-                  <SmartFolderView
-                    sf={activeSmartFolder}
-                    total={result.worksTotal}
-                    onEdit={handleEditSmartFolder}
-                  />
+                  <div className="flex flex-col gap-2">
+                    {result.dataIntegrityWarning ? (
+                      <DataIntegrityWarningBanner
+                        skippedCount={result.dataIntegrityWarning.skippedCount}
+                      />
+                    ) : null}
+                    <SmartFolderView
+                      sf={activeSmartFolder}
+                      total={result.worksTotal}
+                      onEdit={handleEditSmartFolder}
+                    />
+                  </div>
                 ) : undefined;
                 return (
                   <div className="mll-results">

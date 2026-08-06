@@ -12,6 +12,7 @@ import {
   isRjCodeMissing,
   normalizeTags,
   dedupeTags,
+  tagEquals,
   toWorkListItem,
   toTrackDurationFieldsFromSec,
   coverFieldsFromColumns,
@@ -525,7 +526,7 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
         (work) => !(work.physicalPath.startsWith(`${workDir}/`) && work.physicalPath !== workDir),
       );
       const now = new Date().toISOString();
-      const applyTags = body.dlsite ? normalizeTags(body.dlsite.applyTags) : [];
+      const applyTags = body.dlsite?.applyTags ?? [];
       const work: WorkSummary = {
         id: crypto.randomUUID(),
         title: body.title,
@@ -609,8 +610,8 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
       return [...new Set(state.works.flatMap((w) => w.tags))].sort();
     },
 
-    async exportLibrary(): Promise<string> {
-      return JSON.stringify({ version: 1, works: state.works }, null, 2);
+    async exportLibrary(): Promise<{ data: string }> {
+      return { data: JSON.stringify({ version: 1, works: state.works }, null, 2) };
     },
 
     // ── 分類軸・タグ prefix 定義・スマートフォルダー・プリセット ──
@@ -816,7 +817,7 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
       const work = state.works.find((w) => w.id === workId);
       if (!work) return false;
       if (body.applyTitle) work.title = body.info.title;
-      const applyTags = normalizeTags(body.applyTags);
+      const { applyTags } = body;
       work.tags = dedupeTags([...work.tags, ...applyTags]);
       if (body.applyCover && body.info.coverUrl) {
         const dimensions = work.cover?.dimensions ?? { width: 900, height: 900 };
@@ -833,7 +834,7 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
         lastAttemptAt: new Date().toISOString(),
         error: null,
         errorKind: null,
-        appliedTags: dedupeTags([...normalizeTags(work.dlsite.appliedTags), ...applyTags]),
+        appliedTags: dedupeTags([...work.dlsite.appliedTags, ...applyTags]),
       };
       return true;
     },
@@ -875,7 +876,9 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
         const applyTags =
           mode === "new"
             ? fetchedTags
-            : fetchedTags.filter((tag) => !work.dlsite.appliedTags.includes(tag));
+            : fetchedTags.filter(
+                (tag) => !work.dlsite.appliedTags.some((applied) => tagEquals(applied, tag)),
+              );
         if (mode === "new") work.title = `（fixture）${work.dlsite.rjCode}`;
         work.tags = dedupeTags([...work.tags, ...applyTags]);
         work.dlsite = {
@@ -884,7 +887,7 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
           lastAttemptAt: new Date().toISOString(),
           error: null,
           errorKind: null,
-          appliedTags: dedupeTags([...normalizeTags(work.dlsite.appliedTags), ...fetchedTags]),
+          appliedTags: dedupeTags([...work.dlsite.appliedTags, ...fetchedTags]),
         };
         result.fetched += 1;
         options?.onProgress?.({

@@ -108,6 +108,21 @@ test("metaFileSchema.tags でも予約文字の検証が効き、先頭空白で
   assert.deepEqual(parsed.tags, ["cv/藤田茜"]);
 });
 
+test("metaFileSchema.dlsite.appliedTags は正規化されていないタグを拒否する", () => {
+  const withBadAppliedTags = {
+    ...validMeta(),
+    dlsite: {
+      rjCode: "RJ123456",
+      status: "applied" as const,
+      lastAttemptAt: null,
+      error: null,
+      errorKind: null,
+      appliedTags: [" CV/壊れ "],
+    },
+  };
+  assert.equal(metaFileSchema.safeParse(withBadAppliedTags).success, false);
+});
+
 test("同名Playlistは異なるIDなら許容する", () => {
   const meta = validMeta();
   meta.playlists.push({

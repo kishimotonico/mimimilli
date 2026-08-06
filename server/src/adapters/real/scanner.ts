@@ -59,6 +59,7 @@ import { createProgressThrottle } from "./progressThrottle.ts";
 import { measureCoverDimensions, type CoverDimensions } from "./thumbnailCache.ts";
 import type { CoverColumns, ScanWorkState, WorkRepo } from "./workRepo.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
+import { logDataIntegritySkips, toDataIntegrityWarning } from "./dataIntegrity.ts";
 
 const scanLogger = getCategoryLogger("scan");
 
@@ -653,9 +654,11 @@ export class Scanner {
     }
     this.repo.markMissingExcept([...seenIds]);
     result.missing = this.repo.countByStatus("missing");
-    result.rjCodeMissingCount = this.repo
-      .listSummaries()
-      .filter((work) => isRjCodeMissing(work.dlsite)).length;
+    const { summaries, skipped } = this.repo.listSummaries();
+    logDataIntegritySkips(scanLogger, "scan-finalize", skipped);
+    result.rjCodeMissingCount = summaries.filter((work) => isRjCodeMissing(work.dlsite)).length;
+    const dataIntegrityWarning = toDataIntegrityWarning(skipped);
+    if (dataIntegrityWarning) result.dataIntegrityWarning = dataIntegrityWarning;
     emit({ type: "progress", phase: "finalizing", processed: 1, total: 1 });
     return result;
   }

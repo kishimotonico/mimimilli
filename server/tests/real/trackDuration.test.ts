@@ -6,6 +6,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import type { WorksQuery } from "@mimimilli/shared";
+import { EMPTY_TAG_FILTERS } from "@mimimilli/shared";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 
@@ -337,7 +338,12 @@ test("rescan無しのファイル差し替え後、getWorkのtotalDurationSecは
   assert.ok(beforeWork);
   assert.equal(beforeWork.totalDurationSec, 5);
 
-  const baseQuery: WorksQuery = { q: "", tags: [], tagOp: "AND", sort: "added-desc" };
+  const baseQuery: WorksQuery = {
+    q: "",
+    tags: EMPTY_TAG_FILTERS,
+    tagOp: "AND",
+    sort: "added-desc",
+  };
   const beforePage = await adapter.queryWorks(baseQuery);
   assert.equal(beforePage.items.find((item) => item.id === id)?.totalDurationSec, 5);
 

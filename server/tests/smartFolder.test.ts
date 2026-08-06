@@ -7,7 +7,7 @@ import {
   type WorkSummary,
 } from "@mimimilli/shared";
 import { evalSmartFolder, evalSmartFolderRules } from "../src/core/smartFolder.ts";
-import { nts } from "./helpers/tag.ts";
+import { nts, tf } from "./helpers/tag.ts";
 
 function work(
   overrides: Partial<Omit<WorkSummary, "tags">> & Pick<WorkSummary, "id"> & { tags?: string[] },
@@ -174,7 +174,7 @@ test("保持中フィルタ: tags はフォルダーのルールに対する追�
   const result = evalSmartFolder({ rules, sort: "added-desc" }, WORKS, {
     page: 1,
     limit: 100,
-    tags: ["ASMR"],
+    tags: tf("ASMR"),
     tagOp: "AND",
   });
   assert.deepEqual(
@@ -192,7 +192,7 @@ test("保持中フィルタ: @year/... 擬似タグ（組み込み軸）もル�
   const result = evalSmartFolder({ rules: [], sort: "added-desc" }, yearWorks, {
     page: 1,
     limit: 100,
-    tags: ["@year/2025"],
+    tags: tf("@year/2025"),
   });
   assert.deepEqual(
     result.items.map((w) => w.id),

@@ -2,17 +2,18 @@
 // 軸ID は "tag"（全タグ。flat・annotated 双方）・"year"（追加日の年）・
 // 任意の prefix 文字列（ADR-0005 追記）。
 import { parseTag } from "@mimimilli/shared";
-import type { AxisFacetItem, WorkSummary } from "@mimimilli/shared";
+import type { AxisFacetItem, TagFilters, WorkSummary } from "@mimimilli/shared";
+import { EMPTY_TAG_FILTERS } from "@mimimilli/shared";
 import { compareJapaneseSortKeys, compareUtf8Bytes } from "./japaneseSortKey.ts";
-import { filterByTags, filterByYear, resolveTagFilters } from "./worksQuery.ts";
+import { filterByTags, filterByYear } from "./worksQuery.ts";
 
 /** 代表カバーとして残す最大件数（値一覧の2×2コラージュ用、ADR-0012 §5） */
 const MAX_COVERS = 4;
 
-/** GET /axes/:axis の絞り込み。組み込み軸の擬似タグ（@year/... 等）も tags に混ざる
- *  （ADR-0012 §2、TASK-199）。自軸由来のフィルタを除いた集合を渡すのは呼び出し側の責務（TASK-187） */
+/** GET /axes/:axis の絞り込み。組み込み軸 year も TagFilters 経由で渡る（ADR-0012 §2、TASK-199）。
+ *  自軸由来のフィルタを除いた集合を渡すのは呼び出し側の責務（TASK-187） */
 export interface AxisFacetsFilterInput {
-  tags?: string[];
+  tags?: TagFilters;
   tagOp?: "AND" | "OR";
 }
 
@@ -24,7 +25,7 @@ export function buildAxisFacets(
   works: WorkSummary[],
   filter?: AxisFacetsFilterInput,
 ): AxisFacetItem[] {
-  const { tags, yearValue } = resolveTagFilters(filter?.tags ?? []);
+  const { tags, yearValue } = filter?.tags ?? EMPTY_TAG_FILTERS;
   const filteredWorks = filter
     ? filterByYear(filterByTags(works, tags, filter.tagOp ?? "AND"), yearValue)
     : works;

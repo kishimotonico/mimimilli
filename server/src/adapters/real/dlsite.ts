@@ -4,8 +4,13 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { load } from "cheerio";
-import { dedupeTags, normalizeTags } from "@mimimilli/shared";
-import type { DlsiteFetchResult, DlsiteWorkInfo, NormalizedTag } from "@mimimilli/shared";
+import {
+  dedupeTags,
+  normalizeTags,
+  type DlsiteFetchResult,
+  type DlsiteWorkInfo,
+  type NormalizedTag,
+} from "@mimimilli/shared";
 import { DEFAULT_DLSITE_USER_AGENT } from "./dlsiteConfig.ts";
 type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
@@ -249,12 +254,12 @@ export async function fetchDlsiteCover(
  * circle → `サークル/`, cvs → `cv/`, genreTags → `genre/`
  * 結果は正規形（ADR-0005 決定5）で返し、正規化後の重複は追加しない
  */
-export function mergeDlsiteTags(existing: string[], info: DlsiteWorkInfo): NormalizedTag[] {
+export function mergeDlsiteTags(existing: NormalizedTag[], info: DlsiteWorkInfo): NormalizedTag[] {
   const newTags: string[] = [];
   if (info.circle) newTags.push(`サークル/${info.circle}`);
   for (const cv of info.cvs) newTags.push(`cv/${cv}`);
   for (const genre of info.genreTags) newTags.push(`genre/${genre}`);
-  return dedupeTags([...normalizeTags(existing), ...normalizeTags(newTags)]);
+  return dedupeTags([...existing, ...normalizeTags(newTags)]);
 }
 
 /** カバー画像をダウンロードして作品フォルダーへ保存し、ファイル名を返す */

@@ -116,8 +116,8 @@ export function worksRoute(adapter: DataAdapter): Hono {
   });
 
   app.post("/export", async (c) => {
-    const data = await adapter.exportLibrary();
-    return c.json({ data });
+    const exported = await adapter.exportLibrary();
+    return c.json(exported);
   });
 
   return app;
