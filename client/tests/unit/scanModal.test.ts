@@ -1,5 +1,5 @@
 // ScanModal のEsc/backdrop挙動（TASK-56: NewWorkPopupの統合先）のコンポーネントテスト。
-// jsdom は <dialog> の showModal/close を実装していないため、テスト対象に必要な分だけ差し替える。
+// happy-dom は <dialog> の showModal/close を実装していないため、テスト対象に必要な分だけ差し替える。
 import { createElement } from "react";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";

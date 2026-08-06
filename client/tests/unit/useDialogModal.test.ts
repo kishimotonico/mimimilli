@@ -1,5 +1,5 @@
 // useDialogModal（TASK-29: モーダル基盤の共通化）の単体テスト。
-// jsdom は <dialog> の showModal/close を実装していないため、テストに必要な分だけ差し替える。
+// happy-dom は <dialog> の showModal/close を実装していないため、テストに必要な分だけ差し替える。
 import { createElement, useRef } from "react";
 import { render, fireEvent, cleanup } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -56,7 +56,7 @@ describe("useDialogModal", () => {
   });
 
   it("initialFocusRef がなければ dialog 自身にフォーカスする", () => {
-    // jsdom は showModal 時のブラウザ標準フォーカス委譲（dialog自身を暗黙的にfocusable化する処理）を
+    // happy-dom は showModal 時のブラウザ標準フォーカス委譲（dialog自身を暗黙的にfocusable化する処理）を
     // 実装していないため、tabIndex を明示してフックが dialog へ .focus() しているかだけを検証する。
     function TabbableDialog({ onClose }: { onClose: () => void }) {
       const { dialogRef } = useDialogModal({ onClose });

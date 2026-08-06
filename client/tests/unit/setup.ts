@@ -3,7 +3,7 @@ import "@testing-library/jest-dom";
 // global.fetch のモック（各テストで vi.mocked(fetch) を使う）
 global.fetch = vi.fn();
 
-// jsdom では Element.scrollTo / scrollIntoView が未定義のため、テスト用にスタブを置く。
+// happy-dom では Element.scrollTo / scrollIntoView が未定義のため、テスト用にスタブを置く。
 if (!Element.prototype.scrollTo) {
   Element.prototype.scrollTo = function () {};
 }
@@ -11,7 +11,7 @@ if (!Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = function () {};
 }
 
-// jsdom では Popover API が未実装のため、Toast の top layer 表示用にスタブする。
+// happy-dom では Popover API が未実装のため、Toast の top layer 表示用にスタブする。
 if (!HTMLElement.prototype.showPopover) {
   HTMLElement.prototype.showPopover = function () {};
 }
@@ -19,7 +19,7 @@ if (!HTMLElement.prototype.hidePopover) {
   HTMLElement.prototype.hidePopover = function () {};
 }
 
-// jsdom では ResizeObserver が動作しないため、テスト用に動作する mock を提供する。
+// happy-dom では ResizeObserver が動作しないため、テスト用に動作する mock を提供する。
 // observe() 時に保存したコールバックを通じて、テスト側でサイズを手動注入できる。
 class MockResizeObserver implements ResizeObserver {
   private cb: ResizeObserverCallback;

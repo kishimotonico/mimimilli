@@ -52,7 +52,7 @@ describe("AxisValueQuickList の仮想化", () => {
   });
 
   // パネル内スクロール（max-height + overflow-y）はCSSクリップの検証であり、
-  // レイアウト計算をしないjsdomでは実効性のあるアサーションにできない。
+  // レイアウト計算をしないhappy-domでは実効性のあるアサーションにできない。
   // ブラウザでの実機確認（agent-browser）で担保する。
 });
 

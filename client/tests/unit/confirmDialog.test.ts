@@ -1,5 +1,5 @@
 // ConfirmDialog の開閉・確認・キャンセル（TASK-131: ネイティブdialogへの統合）のコンポーネントテスト。
-// jsdom は <dialog> の showModal/close を実装していないため、テスト対象に必要な分だけ差し替える。
+// happy-dom は <dialog> の showModal/close を実装していないため、テスト対象に必要な分だけ差し替える。
 import { createElement } from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
