@@ -233,7 +233,7 @@ describe("WorkListPane の末尾余白（docked bar）", () => {
     if (!(wrapperWith instanceof HTMLElement)) throw new Error("wrapper not found");
     const heightWith = Number.parseFloat(wrapperWith.style.height);
 
-    // jsdom は flex スクロールの scrollHeight を再現しないため、paddingEnd の差は
+    // happy-dom は flex スクロールの scrollHeight を再現しないため、paddingEnd の差は
     // 仮想化ラッパーの style.height（= getTotalSize）で検証する。
     expect(heightWith - heightWithout).toBe(8);
   });

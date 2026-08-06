@@ -1,5 +1,5 @@
 // SettingsModal のEsc/backdrop挙動（TASK-29: ネイティブdialogへの統合）のコンポーネントテスト。
-// jsdom は <dialog> の showModal/close を実装していないため、テスト対象に必要な分だけ差し替える。
+// happy-dom は <dialog> の showModal/close を実装していないため、テスト対象に必要な分だけ差し替える。
 // TagPrefixSettings が react-query を使うため QueryClientProvider で包む。
 import { createElement } from "react";
 import { render, screen, fireEvent } from "@testing-library/react";

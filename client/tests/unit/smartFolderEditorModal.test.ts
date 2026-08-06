@@ -1,5 +1,5 @@
 // SmartFolderEditorModal のEsc/backdrop挙動（TASK-29: ネイティブdialogへの統合）のコンポーネントテスト。
-// jsdom は <dialog> の showModal/close を実装していないため、テスト対象に必要な分だけ差し替える。
+// happy-dom は <dialog> の showModal/close を実装していないため、テスト対象に必要な分だけ差し替える。
 import type { ComponentProps } from "react";
 import type { SmartFolder } from "@mimimilli/shared";
 import { createElement } from "react";

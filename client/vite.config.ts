@@ -129,7 +129,8 @@ export default defineConfig({
   plugins: [tailwindcss(), react(), !backendService && fixtureApiPlugin()].filter(Boolean),
 
   test: {
-    environment: "jsdom",
+    environment: "happy-dom",
+    pool: "threads",
     globals: true,
     include: ["tests/unit/**/*.test.ts?(x)"],
     setupFiles: "./tests/unit/setup.ts",
