@@ -1,9 +1,11 @@
 ---
 id: TASK-219
 title: clientテストの実タイマー待ちをfake timers化し重複テストを削る
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@impl-219'
 created_date: '2026-08-06 17:26'
+updated_date: '2026-08-06 17:42'
 labels: []
 dependencies: []
 priority: medium
@@ -18,8 +20,22 @@ ordinal: 229000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 WorkGrid の10,000件版仮想化テストが削除されている
-- [ ] #2 実タイマー待ちが原因で1秒を超えていたテストがfake timers化などで短縮されている（対象と前後の実測をnotesに記録）
-- [ ] #3 client全体のvitest実行時間が実測で短縮されている（目安: 25秒→20秒以下。到達できない場合は実測値と理由をnotesに記録）
-- [ ] #4 pnpm --filter @mimimilli/client test が全件通る
+- [x] #1 WorkGrid の10,000件版仮想化テストが削除されている
+- [x] #2 実タイマー待ちが原因で1秒を超えていたテストがfake timers化などで短縮されている（対象と前後の実測をnotesに記録）
+- [x] #3 client全体のvitest実行時間が実測で短縮されている（目安: 25秒→20秒以下。到達できない場合は実測値と理由をnotesに記録）
+- [x] #4 pnpm --filter @mimimilli/client test が全件通る
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+実装報告（impl-219）: 変更3ファイル（WorkGrid/WorkListPane/scanModal のテスト）。WorkGridの10,000件版仮想化テストを削除、afterEachの実時間200ms待ち（react-virtual debounce消化用）を撤去、scanModal遷移テストをfake timers化（advance 2段、Presence退出タイマーの都合）。単体実測: WorkGrid 6.49s→2.48s、scanModal 4.75s→2.31s、WorkListPane 2.97s→1.85s。全体wallは25.1s→約24s（3回: 24.21/24.99/23.53）で目安20sに未達。理由: wallの支配項はper-fileのjsdom environment初期化（集計106〜115s）とimport（48〜50s）で、今回のスコープ外。テスト702件全pass・typecheck通過・プロダクトコード無変更。
+
+レビュー（review-219）: 指摘なし。理論的リスクとしてreact-virtualのdebounceタイマー（150ms）がunmount後もキャンセルされない点が挙がったが、実測3回で影響なしと確認。fake timersはtry/finallyでuseRealTimers復元済み。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+clientテストの実タイマー待ちを解消: WorkGrid/WorkListPaneのafterEach実時間200ms待ち撤去、scanModal遷移テストのfake timers化、WorkGrid 10,000件版重複テスト削除。単体実測 WorkGrid 6.49s→2.48s / scanModal 4.75s→2.31s / WorkListPane 2.97s→1.85s。全体wallは約24sで目安20s未達（支配項はjsdom初期化とimportコストでスコープ外、notesに記録）。702テスト全pass・typecheck通過。Sonnetレビュー済み、コミット7f5ae7b。
+<!-- SECTION:FINAL_SUMMARY:END -->
