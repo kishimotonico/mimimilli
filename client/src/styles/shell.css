@@ -1440,6 +1440,9 @@
     opacity: 1;
     pointer-events: auto;
   }
+  .mll-vrow__add:hover {
+    background: var(--paper-3);
+  }
   /* 入れ子タグの中間ノードのうち、実タグとして存在しないもの（選択不可の見出し。
      ADR-0012 §5・統括判断）。名前順ソート時のみ axisValueHierarchy.ts が生成する。 */
   .mll-vrow-heading {
@@ -1510,6 +1513,9 @@
   .mll-vtile:focus-within .mll-vtile__add {
     opacity: 1;
     pointer-events: auto;
+  }
+  .mll-vtile__add:hover {
+    background: var(--paper-3);
   }
   .mll-vtile .mll-collage {
     width: 100%;
@@ -1703,6 +1709,9 @@
   .mll-qlist__row:focus-within .mll-qlist__add {
     opacity: 1;
     pointer-events: auto;
+  }
+  .mll-qlist__add:hover {
+    background: var(--paper-3);
   }
   /* 入れ子タグの選択不可の見出し行（名前順ソート時のみ。値一覧の .mll-vrow-heading と対）。 */
   .mll-qlist__heading {

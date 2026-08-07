@@ -4,6 +4,10 @@ import type { IconFC } from "./Icon";
 
 export type IconButtonSize = "xs" | "sm" | "md" | "lg";
 
+// "bare" は hover/active の背景ユーティリティを出さない。呼び出し側が親要素の
+// hover背景と衝突しない背景色をCSSで指定したい場合（AND追加ボタン等）に使う。
+export type IconButtonVariant = "default" | "bare";
+
 // 箱サイズ・角丸・アイコン描画サイズを対で固定し、呼び出し側での二重管理を無くす。
 // 角丸もサイズごとに1クラスへ含める（呼び出し側がclassNameでrounded-*を上書きする形だと、
 // cn()は単純結合でTailwindクラスの重複解決をしないため、どちらが効くかCSS生成順に
@@ -29,6 +33,7 @@ export interface IconButtonProps extends Omit<
   size?: IconButtonSize;
   /** トグル状態。boolean を渡したときだけ aria-pressed を出す */
   active?: boolean;
+  variant?: IconButtonVariant;
   ref?: Ref<HTMLButtonElement>;
 }
 
@@ -38,6 +43,7 @@ export default function IconButton({
   title,
   size = "md",
   active,
+  variant = "default",
   disabled = false,
   className,
   ref,
@@ -48,7 +54,9 @@ export default function IconButton({
     ? "cursor-not-allowed text-ink-4"
     : active
       ? "text-acc-ink bg-acc-soft"
-      : "text-ink-1 hover:bg-paper-2 active:bg-paper-3";
+      : variant === "bare"
+        ? "text-ink-1"
+        : "text-ink-1 hover:bg-paper-2 active:bg-paper-3";
 
   return (
     <button

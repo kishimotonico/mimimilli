@@ -196,6 +196,7 @@ export default function AxisValueRows({
                             icon={I.add}
                             label={`${row.item.value}をAND追加`}
                             size="xs"
+                            variant="bare"
                             className="mll-vrow__add"
                             onClick={() => onAdd(row.item)}
                           />
