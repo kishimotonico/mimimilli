@@ -1,10 +1,10 @@
 ---
 id: TASK-235
 title: 値行のlistbox/optionパターンをやめ、行内に複数操作を置ける構造にする
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-07 13:21'
-updated_date: '2026-08-07 14:05'
+updated_date: '2026-08-07 14:39'
 labels: []
 dependencies: []
 ordinal: 245000
@@ -29,3 +29,9 @@ ordinal: 245000
 - [x] #5 docs/design-system.md に値行の構造規約が記載されている
 - [x] #6 pnpm check と変更範囲のテストが通る
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+値行のrole=listbox/option構造を廃止し、選択状態を実際にフォーカスされる主選択ボタンのaria-pressedで表す形に変更（AxisValueQuickList/AxisValueRows/AxisValueGridの3箇所）。値リストはrole=group+aria-labelで名前付き集合として公開。軸トリガーの実体と異なるaria-haspopupを削除。副産物として、getAxisLabelをtagPrefixesなしで呼んでいたため検索欄と値一覧に内部IDが表示されていた実バグを修正し、誤表示に依存していたテストの期待値も正した。smokeロケータはdesign-system.mdの規約どおりrole/nameベースへ組み直し。pnpm check・unit 732件・smoke 10件全通過、Codexレビュー3回で指摘なしまで到達
+<!-- SECTION:FINAL_SUMMARY:END -->
