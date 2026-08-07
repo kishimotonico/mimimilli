@@ -1,10 +1,10 @@
 ---
 id: TASK-227
 title: 軸レールのホバーオーバーレイにセーフトライアングルを実装する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-07 08:18'
-updated_date: '2026-08-07 08:29'
+updated_date: '2026-08-07 08:38'
 labels: []
 dependencies: []
 ordinal: 237000
@@ -35,3 +35,9 @@ useHoverIntent が提供していた機能（開200ms・閉150msの遅延、poin
 - [x] #5 三角形内判定の幾何ロジックにユニットテストがある
 - [x] #6 pnpm check と変更範囲のテストが通る
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+per-rowのuseHoverIntentをグループコーディネーター型useHoverGroupCoordinator（shared/lib）へ置き換え、JSのポインタ座標×三角形内判定でセーフトライアングルを実装。三角形内では現オーバーレイのクローズ保留＋他行のopen抑止、約300ms静止で切り替え許可。幾何判定はpointInTriangleとして純関数化しテスト追加。レビュー指摘のpointermoveリスナー参照不一致リークは安定参照化で修正し退行テスト追加。pnpm check・テスト全通過、検証担当のブラウザ検証（斜め移動維持・静止切替・クリック/Escape/外側クリック/ArrowRight退行なし）OK
+<!-- SECTION:FINAL_SUMMARY:END -->
