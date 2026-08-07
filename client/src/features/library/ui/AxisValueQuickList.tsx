@@ -6,8 +6,8 @@ import { filterAxisValueItems } from "../model/axisValueFilter";
 import {
   AXIS_VALUE_SORT_OPTIONS,
   DEFAULT_AXIS_VALUE_SORT,
-  selectAxisValueSortKey,
   sortAxisValueItems,
+  toggleAxisValueSort,
   type AxisValueSortState,
 } from "../model/axisValueSort";
 import {
@@ -204,23 +204,27 @@ export default function AxisValueQuickList({
         // （フォーカス管理・Escapeの二重化を避けるため）。
         // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- ソート切替はボタン列で表現する
         <div className="mll-qlist__sort" role="group" aria-label="並び替え">
-          {AXIS_VALUE_SORT_OPTIONS.map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              className={`mll-qlist__sortbtn ${sort.key === opt.id ? "is-active" : ""}`}
-              aria-pressed={sort.key === opt.id}
-              onClick={() => {
-                setSort(selectAxisValueSortKey(sort, opt.id));
-                setSortMenuOpen(false);
-                // 選択したボタンはこの直後に畳まれてDOMから消えるため、フォーカスが
-                // bodyへ落ちる前にトグルボタンへ移しておく。
-                sortToggleRef.current?.focus();
-              }}
-            >
-              {opt.label}
-            </button>
-          ))}
+          {AXIS_VALUE_SORT_OPTIONS.map((opt) => {
+            const isActive = sort.key === opt.id;
+            const directionLabel = isActive ? (sort.direction === "asc" ? "昇順" : "降順") : null;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                className={`mll-qlist__sortbtn ${isActive ? "is-active" : ""}`}
+                aria-pressed={isActive}
+                aria-label={directionLabel ? `${opt.label}（${directionLabel}）` : opt.label}
+                onClick={() => setSort(toggleAxisValueSort(sort, opt.id))}
+              >
+                {opt.label}
+                {isActive && (
+                  <span className={`chev ${sort.direction === "asc" ? "is-asc" : ""}`}>
+                    <I.chevD size={11} />
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       )}
       {hint && <div className="mll-qlist__hint">{hint}</div>}

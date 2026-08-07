@@ -202,7 +202,21 @@ describe("AxisValueQuickList のソート（アイコンボタン＋インライ
     sizeMock.restore();
   });
 
-  it("並び替えを選ぶとトグルボタンへフォーカスが戻る（bodyへ落ちない）", async () => {
+  it("並び替えを選んでもフォーカスは押したソートキーのボタンに残る", async () => {
+    const sizeMock = mockElementSize(260, 260);
+    const user = userEvent.setup();
+    renderQuickList({ items: makeItems(5) });
+    await flushVirtualizer();
+
+    await user.click(screen.getByRole("button", { name: /^並び替え/ }));
+    await user.click(screen.getByRole("button", { name: "名前" }));
+    const nameButton = screen.getByRole("button", { name: "名前（昇順）" });
+
+    expect(document.activeElement).toBe(nameButton);
+    sizeMock.restore();
+  });
+
+  it("並び替えを選んでもインライン展開は閉じたままにならず、トグルの再クリックで閉じる", async () => {
     const sizeMock = mockElementSize(260, 260);
     const user = userEvent.setup();
     renderQuickList({ items: makeItems(5) });
@@ -212,21 +226,26 @@ describe("AxisValueQuickList のソート（アイコンボタン＋インライ
     await user.click(toggle);
     await user.click(screen.getByRole("button", { name: "名前" }));
 
-    expect(document.activeElement).toBe(toggle);
-    expect(document.activeElement).not.toBe(document.body);
+    expect(screen.getByRole("group", { name: "並び替え" })).toBeTruthy();
+
+    await user.click(toggle);
+    expect(screen.queryByRole("group", { name: "並び替え" })).toBeNull();
     sizeMock.restore();
   });
 
-  it("並び替えを選ぶとインライン展開が閉じる", async () => {
+  it("アクティブなキーを再クリックすると昇順/降順が反転し、方向が表示に反映される", async () => {
     const sizeMock = mockElementSize(260, 260);
     const user = userEvent.setup();
     renderQuickList({ items: makeItems(5) });
     await flushVirtualizer();
 
     await user.click(screen.getByRole("button", { name: /^並び替え/ }));
-    await user.click(screen.getByRole("button", { name: "名前" }));
+    const nameButton = screen.getByRole("button", { name: "名前" });
+    await user.click(nameButton);
+    expect(screen.getByRole("button", { name: "名前（昇順）" })).toBeTruthy();
 
-    expect(screen.queryByRole("group", { name: "並び替え" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "名前（昇順）" }));
+    expect(screen.getByRole("button", { name: "名前（降順）" })).toBeTruthy();
     sizeMock.restore();
   });
 });

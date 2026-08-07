@@ -1589,11 +1589,6 @@
     color: var(--ink-0);
     background: transparent;
   }
-  .mll-qlist__search input:focus-visible {
-    outline: 2px solid var(--acc);
-    outline-offset: 1px;
-    border-radius: 2px;
-  }
   .mll-qlist__sorttoggle {
     display: grid;
     place-items: center;
@@ -1615,6 +1610,9 @@
     border-bottom: 1px solid var(--line-soft);
   }
   .mll-qlist__sortbtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
     font-family: var(--font-sans);
     font-size: 10px;
     font-weight: 600;
@@ -1629,6 +1627,12 @@
   .mll-qlist__sortbtn.is-active {
     color: var(--acc-ink);
     background: var(--acc-soft);
+  }
+  .mll-qlist__sortbtn .chev {
+    display: inline-flex;
+  }
+  .mll-qlist__sortbtn .chev.is-asc {
+    transform: rotate(180deg);
   }
   .mll-qlist__hint {
     padding: 5px 8px;
@@ -1649,6 +1653,8 @@
     align-items: center;
     justify-content: space-between;
     gap: 8px;
+    width: 100%;
+    box-sizing: border-box;
     padding: 6px 8px;
     border-radius: 4px;
     font-size: 12px;
