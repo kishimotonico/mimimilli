@@ -17,6 +17,7 @@ import {
 import type { AxisId } from "../model/types";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
+import Presence from "../../../shared/ui/Presence";
 
 // 軸レールのクイックオーバーレイ・「＋絞り込み」・チップの兄弟値ドロップダウン
 // が共有する簡易値リスト。データ取得・フィルタ・ソートは値一覧本体
@@ -36,6 +37,10 @@ interface AxisValueQuickListProps {
   /** 表示用の軸ラベル。呼び出し側が tagPrefixes を解決して渡す
    *  （getAxisLabel(axis) を tagPrefixes なしで呼ぶと未登録prefixでIDがそのまま出るため） */
   axisLabel: string;
+  /** 呼び出し側の開閉状態。Presence の退出アニメーション中に isOpen=false のまま
+   *  axis が変わらず再オープンされるケース（Escapeで閉じてすぐ同じ軸を開き直す等）でも
+   *  検索欄へフォーカスし直すため、axis 単体ではなくこの値の変化も見る */
+  isOpen: boolean;
   items: AxisFacetItem[];
   isLoading?: boolean;
   isError?: boolean;
@@ -68,6 +73,7 @@ function findNextValueIndex(rows: AxisValueHierarchyRow[], from: number, delta: 
 export default function AxisValueQuickList({
   axis,
   axisLabel,
+  isOpen,
   items,
   isLoading,
   isError,
@@ -86,11 +92,15 @@ export default function AxisValueQuickList({
   const sortToggleRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
+    // 退出中（isOpen=false）は何もしない。closeDelay中に isOpen が再び true に
+    // なったときは axis が変わっていなくても改めて発火させたいので、依存配列に
+    // axis だけでなく isOpen も含める。
+    if (!isOpen) return;
     searchRef.current?.focus();
     setQuery("");
     setSort(DEFAULT_AXIS_VALUE_SORT);
     setSortMenuOpen(false);
-  }, [axis]);
+  }, [axis, isOpen]);
 
   const currentSortLabel = AXIS_VALUE_SORT_OPTIONS.find((opt) => opt.id === sort.key)?.label ?? "";
 
@@ -207,10 +217,12 @@ export default function AxisValueQuickList({
           <I.sort size={12} />
         </button>
       </div>
-      {sortMenuOpen && (
+      {
         // 統括判断: 入れ子の浮遊レイヤーは作らず、パネル内にインライン展開する
         // （フォーカス管理・Escapeの二重化を避けるため）。
-        // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- ソート切替はボタン列で表現する
+      }
+      <Presence show={sortMenuOpen} variant="collapse">
+        {/* oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- ソート切替はボタン列で表現する */}
         <div className="mll-qlist__sort" role="group" aria-label="並び替え">
           {AXIS_VALUE_SORT_OPTIONS.map((opt) => {
             const isActive = sort.key === opt.id;
@@ -234,7 +246,7 @@ export default function AxisValueQuickList({
             );
           })}
         </div>
-      )}
+      </Presence>
       {hint && <div className="mll-qlist__hint">{hint}</div>}
       {isLoading ? (
         <div className="mll-qlist__status">読み込み中…</div>

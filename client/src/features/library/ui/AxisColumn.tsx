@@ -128,6 +128,17 @@ export default function AxisColumn({
     openImmediately,
     close: closeOverlay,
   } = useHoverGroupCoordinator();
+  // AxisQuickOverlay は退出アニメーション完了までマウントを保つため、閉じたあとも
+  // axis / anchorEl は最後に開いていた値を渡し続ける（コーディネーターは閉じると
+  // 両方を null に戻すため、ここで直近値を保持する）。
+  const lastOverlayAxisRef = useRef<AxisId | null>(null);
+  const lastAnchorElRef = useRef<HTMLElement | null>(null);
+  if (overlayAxis) {
+    lastOverlayAxisRef.current = overlayAxis;
+    lastAnchorElRef.current = openAnchorEl;
+  }
+  const displayOverlayAxis = overlayAxis ?? lastOverlayAxisRef.current;
+  const displayAnchorEl = overlayAxis ? openAnchorEl : lastAnchorElRef.current;
 
   // クイックオーバーレイは既定=置き換えの入口（値選択の契約。design-system.md）。
   // 置き換えは結果面を作品一覧へ遷移させ、AND追加は現在の結果面に留まる（ADR-0012 §8）。
@@ -203,12 +214,12 @@ export default function AxisColumn({
         </div>
       </div>
 
-      {overlayAxis && (
+      {displayOverlayAxis && (
         <AxisQuickOverlay
-          axis={overlayAxis}
-          axisLabel={getAxisLabel(overlayAxis, tagPrefixes)}
-          anchorEl={openAnchorEl}
-          isOpen
+          axis={displayOverlayAxis}
+          axisLabel={getAxisLabel(displayOverlayAxis, tagPrefixes)}
+          anchorEl={displayAnchorEl}
+          isOpen={overlayAxis != null}
           selectedTags={selectedTags}
           onSelectValue={handleSelectValue}
           onAddValue={handleAddValue}

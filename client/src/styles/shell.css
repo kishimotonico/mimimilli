@@ -1569,10 +1569,12 @@
   }
   .mll-qoverlay--fixed {
     position: fixed;
+    transform-origin: left center;
   }
   .mll-qoverlay--inline {
     position: absolute;
     top: calc(100% + 6px);
+    transform-origin: top left;
   }
   .mll-qlist {
     display: flex;
@@ -3458,6 +3460,26 @@
     transition-delay: 180ms;
   }
 
+  /* transform-origin は呼び出し側のクラス（出現方向）で指定する */
+  .ml-presence-popover-scale {
+    transition:
+      transform 180ms ease-out,
+      opacity 180ms ease-out;
+  }
+  .ml-presence-popover-scale[data-phase="enter"] {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  .ml-presence-popover-scale[data-phase="exit"] {
+    opacity: 0;
+    transform: scale(0.96);
+    pointer-events: none;
+  }
+  .ml-presence-popover-scale[data-phase="shown"] {
+    opacity: 1;
+    transform: scale(1);
+  }
+
   .ml-presence-colstack {
     width: 0;
     opacity: 0;
@@ -3526,6 +3548,7 @@
     .ml-presence-collapse,
     .ml-presence-dock-bar,
     .ml-presence-dock-popup,
+    .ml-presence-popover-scale,
     .ml-presence-colstack,
     .mle-colstack__edges,
     .ml-file-col-enter,
