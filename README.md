@@ -107,8 +107,7 @@ pnpm test           # server + client のユニットテスト
 pnpm smoke:real     # 固定のサンプル音声で real 経路を手動スモーク
 pnpm test:server    # server のみ（Bunランナー、テストAPIはnode:test互換）
 pnpm test:client    # client のみ（vitest）
-pnpm test:visual    # Playwright ビジュアルリグレッション
-pnpm test:visual:update  # ビジュアルスナップショット再生成
+pnpm test:smoke     # Playwright スモークテスト（roleベースの動作確認）
 ```
 
 ## 使い方

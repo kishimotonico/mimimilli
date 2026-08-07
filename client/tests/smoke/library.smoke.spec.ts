@@ -1,8 +1,8 @@
 // スクリーンショットを撮らない役割ベースの動作確認。ここが赤いときは常に実際の不具合を
-// 意味する（見た目のズレでは落ちない）。各テストはコンソールエラーと 4xx/5xx の
-// レスポンスが出ていないことも併せて確認する。
+// 意味する（見た目のズレでは落ちない）。各テストはコンソールエラー・未捕捉例外・
+// 4xx/5xxレスポンス・ネットワークリクエスト失敗が出ていないことも併せて確認する。
 import { expect, test } from "@playwright/test";
-import { openApp, trackErrors } from "./support";
+import { assertNoErrors, expectNoHorizontalOverflow, openApp, trackErrors } from "./support";
 
 test("ライブラリシェル: 軸レール・結果面・チップ列が表示される", async ({ page }) => {
   const tracker = trackErrors(page);
@@ -12,39 +12,89 @@ test("ライブラリシェル: 軸レール・結果面・チップ列が表示
   await expect(page.locator(".mll-tagband")).toBeVisible();
   await expect(page.locator(".mll-results, .mle-col.is-results").first()).toBeVisible();
 
-  expect(tracker.consoleErrors).toEqual([]);
-  expect(tracker.failedResponses).toEqual([]);
+  assertNoErrors(tracker);
 });
 
 test("軸を選ぶと値一覧が出て、値を選ぶと作品一覧へ遷移しフィルタチップが付く", async ({ page }) => {
   const tracker = trackErrors(page);
   await openApp(page);
 
-  await page.locator(".mll-axis", { hasText: "CV" }).click();
+  await page.getByRole("button", { name: "CV" }).click();
   const valueList = page.locator(".mle-col.is-axis-values");
-  await expect(valueList.locator(".mll-vrow, .mll-vtile").first()).toBeVisible();
+  await expect(valueList.getByRole("option").first()).toBeVisible();
 
-  await page.locator(".mll-vrow", { hasText: "霧島レイ" }).click();
+  await page.getByRole("option", { name: "霧島レイ" }).click();
   await expect(page.locator(".mll-tagband .mll-tagband__chip")).toHaveText(["cv/霧島レイ"]);
-  await expect(page.locator(".mll-axis", { hasText: "すべての作品" })).toHaveAttribute(
+  await expect(page.getByRole("button", { name: "すべての作品" })).toHaveAttribute(
     "aria-current",
     "true",
   );
   await expect(page.locator(".mle-col.is-results")).toBeVisible();
 
-  expect(tracker.consoleErrors).toEqual([]);
-  expect(tracker.failedResponses).toEqual([]);
+  assertNoErrors(tracker);
 });
 
-test("作品を選ぶとプレビューが開く", async ({ page }) => {
+test("軸の値一覧をグリッド表示に切り替えられる", async ({ page }) => {
+  const tracker = trackErrors(page);
+  await openApp(page);
+
+  await page.getByRole("button", { name: "CV" }).click();
+  await page.getByRole("button", { name: "グリッド" }).click();
+
+  const valueList = page.locator(".mle-col.is-axis-values");
+  await expect(valueList.getByRole("option").first()).toBeVisible();
+
+  assertNoErrors(tracker);
+});
+
+test("タグ軸を名前順にすると入れ子タグが階層表示される", async ({ page }) => {
+  const tracker = trackErrors(page);
+  await openApp(page);
+
+  await page.getByRole("button", { name: "タグ" }).click();
+  // 既定は件数ソート。名前順に切り替えると入れ子タグがインデント＋見出し行で並ぶ
+  // （axisValueHierarchy.ts）。見出し行はrole="heading"を持たないためクラスで特定する。
+  await page.getByRole("button", { name: "名前" }).click();
+
+  const valueList = page.locator(".mle-col.is-axis-values");
+  await expect(valueList.locator(".mll-vrow-heading").first()).toBeVisible();
+
+  assertNoErrors(tracker);
+});
+
+test("軸をまたいだAND絞り込みでチップが積み上がる", async ({ page }) => {
+  const tracker = trackErrors(page);
+  await openApp(page);
+
+  await page.getByRole("button", { name: "CV" }).click();
+  await page.getByRole("option", { name: "霧島レイ" }).click();
+
+  await page.getByRole("button", { name: "サークル" }).click();
+  const circleRow = page.getByRole("option", { name: "月白製作所" });
+  await circleRow.hover();
+  await circleRow.getByRole("button", { name: /をAND追加$/ }).click();
+
+  await page.getByRole("button", { name: "すべての作品" }).click();
+  await expect(page.locator(".mll-tagband .mll-tagband__chip")).toHaveText([
+    "cv/霧島レイ",
+    "サークル/月白製作所",
+  ]);
+  await expect(page.locator(".mll-results")).toBeVisible();
+
+  assertNoErrors(tracker);
+});
+
+test("作品を選ぶとプレビューが開く（ファイル欠損の状態表示を含む）", async ({ page }) => {
   const tracker = trackErrors(page);
   await openApp(page);
 
   await page.getByText("お気に入りだった朗読劇", { exact: false }).click();
-  await expect(page.locator(".mle-prv")).toBeVisible();
 
-  expect(tracker.consoleErrors).toEqual([]);
-  expect(tracker.failedResponses).toEqual([]);
+  const panel = page.locator(".mle-prv");
+  await expect(panel).toBeVisible();
+  await expect(panel.getByText("ファイル欠損", { exact: true })).toBeVisible();
+
+  assertNoErrors(tracker);
 });
 
 test("詳細パネル: 再開ボタンが正しいアクセシブル名で表示される", async ({ page }) => {
@@ -74,8 +124,7 @@ test("詳細パネル: 再開ボタンが正しいアクセシブル名で表示
   await panel.getByRole("button", { name: "再生メニュー" }).click();
   await expect(panel.getByRole("menuitem", { name: "最初から再生" })).toBeVisible();
 
-  expect(tracker.consoleErrors).toEqual([]);
-  expect(tracker.failedResponses).toEqual([]);
+  assertNoErrors(tracker);
 });
 
 test("詳細パネル: 編集モードでのみタグ削除ボタンが現れる", async ({ page }) => {
@@ -95,8 +144,7 @@ test("詳細パネル: 編集モードでのみタグ削除ボタンが現れる
   await panel.getByRole("button", { name: "タグを追加" }).click();
   await expect(panel.getByRole("combobox", { name: "追加するタグ" })).toBeVisible();
 
-  expect(tracker.consoleErrors).toEqual([]);
-  expect(tracker.failedResponses).toEqual([]);
+  assertNoErrors(tracker);
 });
 
 test("スキャンダイアログが開いて完了し、閉じられる", async ({ page }, testInfo) => {
@@ -118,6 +166,24 @@ test("スキャンダイアログが開いて完了し、閉じられる", async
   await dialog.getByRole("button", { name: "閉じる" }).click();
   await expect(dialog).toBeHidden();
 
-  expect(tracker.consoleErrors).toEqual([]);
-  expect(tracker.failedResponses).toEqual([]);
+  assertNoErrors(tracker);
+});
+
+test("主要画面でヨコ方向スクロールが発生しない", async ({ page }) => {
+  const tracker = trackErrors(page);
+
+  // ライブラリシェル（作品一覧）
+  await openApp(page);
+  await expectNoHorizontalOverflow(page);
+
+  // 軸の値一覧（CV軸選択時は結果面が値一覧に置き換わる。ADR-0012）
+  await page.getByRole("button", { name: "CV" }).click();
+  await expectNoHorizontalOverflow(page);
+
+  // 作品プレビュー（画面遷移を跨がず独立に確認するため再度 openApp から）
+  await openApp(page);
+  await page.getByText("お気に入りだった朗読劇", { exact: false }).click();
+  await expectNoHorizontalOverflow(page);
+
+  assertNoErrors(tracker);
 });
