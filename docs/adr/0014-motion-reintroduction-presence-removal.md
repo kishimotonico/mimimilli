@@ -84,3 +84,13 @@ TASK-239 で `.mll-bar` に `position: relative` を追加して修正した（z
 一方 `engageTriangleGuard` / `onDocumentPointerMove` / `resolveAfterGuard` は `openStateRef.current` を都度動的に参照する。coordinatorのモデル上 openState は常に高々1つなので、古いクロージャが古い状態に作用する余地がそもそも無い。トークン照合は「古い参照を掴んだままの呼び出しを弾く」ための仕組みであり、参照を掴まない設計ではより強い保証になる。よってトークンを追加しない。
 
 この前提は「openStateが単一」に依存する。coordinatorを複数インスタンス化する変更を入れる場合は、document `pointermove` 側にもトークン照合が必要になる。
+
+### collapse対象の1箇所はルートにpadding/borderがあった（TASK-243）
+
+collapseの確定事項に「対象3箇所（ScanModal警告・新規作品、AxisValueQuickListソートメニュー）はいずれもルートにpadding/borderが無くこの方式で成立することを確認済み」と書いたが、**AxisValueQuickListのソートメニューについては誤り**だった。`.mll-qlist__sort` は `padding: 4px 8px` と `border-bottom: 1px solid var(--line-soft)` を持つ（`shell.css:1615-1620`）。
+
+`height: 0` へ縮めても padding と border は残り、閉じた状態で見切れる。このためTASK-243では `.mll-qlist__sort` 自体をAP境界のルートにせず、`overflow: hidden` だけを持つ無地の `motion.div` を1枚外側に置き、`.mll-qlist__sort` をその子として維持した。閉じたとき外側が子ごとクリップするため padding/border が残らない。
+
+これは原則6（既存ルート要素を直接motion化しラッパーDOMを被せない）の例外だが、次の理由で許容する。原則6の趣旨は `position: fixed` オーバーレイの座標系・stacking context破壊の防止であり、in-flowのcollapseには当てはまらない。また旧実装は `.ml-presence-collapse`（無地）→ `.ml-presence-collapse__inner`（flex/gap）→ `.mll-qlist__sort` の2段ラッパー構造で、新実装は1段なので**ラッパーは純減**している。
+
+規約としては次のとおり。**collapseを適用する際はルート要素の padding/border を必ず確認する。無ければルート自身をmotion化し、あれば `overflow: hidden` だけを持つ無地のラッパーを1枚だけ被せる。**
