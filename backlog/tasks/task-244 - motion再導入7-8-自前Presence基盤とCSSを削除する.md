@@ -112,7 +112,6 @@ shell.css:3549-3561 のreduced-motion一括無効化ブロック内に `.ml-pres
   - Toast（DLsite一括取得通知） 正常表示
   - PlayerDock bar（下部ドック、入場スライド）・popup（展開後のscale切替、シークバー等） 正常切替
   - 崩れ・見切れ・意図しないポインタイベント漏れは確認されなかった
->>>>>>> feat/task-244-motion
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
