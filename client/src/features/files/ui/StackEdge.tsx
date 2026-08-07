@@ -1,4 +1,4 @@
-// 祖先スパイン（背表紙）の中身。外側の出入りアニメーションは FilesView の Presence が担う。
+// 祖先スパイン（背表紙）の中身。外側の出入りアニメーションは FilesView の AnimatePresence が担う。
 
 import { useEffect, useState } from "react";
 import { I } from "../../../shared/ui/Icon";

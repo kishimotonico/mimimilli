@@ -6,7 +6,7 @@ import { DiscoveryDashboard } from "./preview/DiscoveryDashboard";
 import { WorkDetailPatchScope } from "./preview/WorkDetailPatchScope";
 
 // 作品詳細のプレビュー。ADR-0012 §3 により、結果面は常に全幅で表示し、
-// プレビューは作品選択時にだけスライドインする（LibraryView 側で Presence を使って配線）。
+// プレビューは作品選択時にだけスライドインする（LibraryView 側で AnimatePresence を使って配線）。
 // home 軸のときだけ例外的に、軸そのものの結果面（発見ダッシュボード）として使う。
 
 export type PreviewMode = "work" | "home";

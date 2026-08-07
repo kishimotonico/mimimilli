@@ -38,7 +38,7 @@ interface AxisValueQuickListProps {
   /** 表示用の軸ラベル。呼び出し側が tagPrefixes を解決して渡す
    *  （getAxisLabel(axis) を tagPrefixes なしで呼ぶと未登録prefixでIDがそのまま出るため） */
   axisLabel: string;
-  /** 呼び出し側の開閉状態。Presence の退出アニメーション中に isOpen=false のまま
+  /** 呼び出し側の開閉状態。AnimatePresence の退出アニメーション中に isOpen=false のまま
    *  axis が変わらず再オープンされるケース（Escapeで閉じてすぐ同じ軸を開き直す等）でも
    *  検索欄へフォーカスし直すため、axis 単体ではなくこの値の変化も見る */
   isOpen: boolean;
