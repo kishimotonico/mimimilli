@@ -1,6 +1,7 @@
 // 右下ポップアップの中身。日常操作（音量・トラック移動・ループ・再生速度）を厳選して置く。
 // channelSwap / abRepeat 等のニッチ機能は置かない（全画面側の役割）。
 
+import { useIsPresent } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import type { PlayerState } from "../model/usePlayerState";
 import PopupSeek from "./PopupSeek";
@@ -68,11 +69,12 @@ export default function PopupContent({
   const track = tracks[currentTrackIndex] ?? null;
   const [rateMenuOpen, setRateMenuOpen] = useState(false);
   const rateMenuRef = useRef<HTMLDivElement>(null);
+  const isPresent = useIsPresent();
 
   const rateLabel = RATE_LABELS[playbackRate] ?? `${playbackRate.toFixed(2)}x`;
 
   useEffect(() => {
-    if (!rateMenuOpen) return;
+    if (!rateMenuOpen || !isPresent) return;
 
     const handlePointerDown = (e: PointerEvent) => {
       if (rateMenuRef.current && !rateMenuRef.current.contains(e.target as Node)) {
@@ -89,7 +91,7 @@ export default function PopupContent({
       window.removeEventListener("pointerdown", handlePointerDown);
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [rateMenuOpen]);
+  }, [rateMenuOpen, isPresent]);
 
   return (
     <>

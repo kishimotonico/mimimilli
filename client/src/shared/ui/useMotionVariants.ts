@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import type { HTMLMotionProps } from "motion/react";
+import type { TargetAndTransition } from "motion/react";
 
 const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 
@@ -22,8 +22,6 @@ function useReducedMotion(): boolean {
   return useSyncExternalStore(subscribeReducedMotion, getReducedMotionSnapshot, () => false);
 }
 
-type MotionTarget = HTMLMotionProps<"div">["animate"];
-
 /** motion-utils の EasingDefinition と構造的に一致させた型（内部パッケージのため直接importしない）。 */
 type Ease =
   | readonly [number, number, number, number]
@@ -45,6 +43,11 @@ export interface PropertyTiming {
   ease?: Ease;
   delay?: number;
 }
+
+// `initial`/`animate` は boolean や AnimationControls も受け付けるが `exit` は
+// 受け付けない。全ビルダーはリテラルの target オブジェクトしか返さないため、
+// 三者に共通する最小の型（`exit` と同じ範囲）に統一する。
+type MotionTarget = TargetAndTransition;
 
 export interface MotionVariant {
   initial: MotionTarget;

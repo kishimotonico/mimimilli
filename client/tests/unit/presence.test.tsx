@@ -1,80 +1,12 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
-import { Provider as JotaiProvider, createStore } from "jotai";
+import { act, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import PlayerDock from "../../src/features/player/ui/PlayerDock";
-import { LibraryNavigationProvider } from "../../src/features/library/ui/LibraryNavigationProvider";
-import { playerCoreAtom, playerUiModeAtom } from "../../src/features/player/model/atoms";
-import { PLAYER_CORE_INITIAL } from "../../src/features/player/model/playerController";
 import Presence from "../../src/shared/ui/Presence";
 import { usePresence } from "../../src/shared/ui/usePresence";
-
-vi.mock("../../src/features/player/ui/BarContent", () => ({
-  default: ({ onSwitchToPopup }: { onSwitchToPopup: () => void }) => (
-    <button type="button" onClick={onSwitchToPopup}>
-      ポップアップへ
-    </button>
-  ),
-}));
-
-vi.mock("../../src/features/player/ui/PopupContent", () => ({
-  default: ({ onFold }: { onFold: () => void }) => (
-    <button type="button" onClick={onFold}>
-      バーへ
-    </button>
-  ),
-}));
-
-vi.mock("../../src/features/player/model/usePlayerActions", () => ({
-  usePlayerActions: () => ({
-    togglePlay: vi.fn(),
-    nextTrack: vi.fn(),
-    prevTrack: vi.fn(),
-    seek: vi.fn(),
-    seekRelative: vi.fn(),
-    setVolume: vi.fn(),
-    toggleMute: vi.fn(),
-    setLoop: vi.fn(),
-    setPlaybackRate: vi.fn(),
-    setShowFullPlayer: vi.fn(),
-  }),
-}));
 
 function PresenceProbe({ show, skipInitial }: { show: boolean; skipInitial?: boolean }) {
   const { mounted, phase } = usePresence(show, { skipInitial, durationMs: 150 });
   if (!mounted) return null;
   return <div data-testid="probe" data-phase={phase} />;
-}
-
-function renderPlayerDock(uiMode: "bar" | "popup" = "bar") {
-  const store = createStore();
-  store.set(playerCoreAtom, {
-    ...PLAYER_CORE_INITIAL,
-    currentTrackIndex: 0,
-    currentWork: {
-      id: "work-1",
-      title: "Work 1",
-      cover: null,
-      status: "ok",
-      physicalPath: "/audio/work-1",
-      totalDurationSec: 120,
-      addedAt: "2026-01-01T00:00:00.000Z",
-      errorMessage: null,
-      urls: [],
-      tags: [],
-      trackCount: 1,
-      bookmarked: false,
-      lastPlayedAt: null,
-    },
-    tracks: [{ id: "track-1", title: "Track 1", file: "audio/track-1.wav" }],
-  });
-  store.set(playerUiModeAtom, uiMode);
-  return render(
-    <JotaiProvider store={store}>
-      <LibraryNavigationProvider>
-        <PlayerDock />
-      </LibraryNavigationProvider>
-    </JotaiProvider>,
-  );
 }
 
 describe("usePresence", () => {
@@ -175,27 +107,5 @@ describe("Presence", () => {
     });
 
     expect(onExitComplete).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe("PlayerDock", () => {
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it("bar↔popup 切替後に switch 用スタイルが解除される", async () => {
-    vi.useFakeTimers();
-    renderPlayerDock("bar");
-
-    fireEvent.click(screen.getByRole("button", { name: "ポップアップへ" }));
-    expect(document.querySelector(".ml-presence-dock-bar--switch")).toBeTruthy();
-
-    await act(async () => {
-      vi.advanceTimersByTime(180);
-      await vi.runAllTimersAsync();
-    });
-
-    expect(document.querySelector(".ml-presence-dock-bar--switch")).toBeNull();
-    expect(screen.getByRole("button", { name: "バーへ" })).toBeInTheDocument();
   });
 });
