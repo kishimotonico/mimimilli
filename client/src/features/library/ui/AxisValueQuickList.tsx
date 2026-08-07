@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { AxisFacetItem } from "@mimimilli/shared";
-import { getAxisLabel } from "../model/axisDefinitions";
 import { filterAxisValueItems } from "../model/axisValueFilter";
 import {
   AXIS_VALUE_SORT_OPTIONS,
@@ -34,6 +33,9 @@ const LIST_PADDING = 4;
 
 interface AxisValueQuickListProps {
   axis: AxisId;
+  /** 表示用の軸ラベル。呼び出し側が tagPrefixes を解決して渡す
+   *  （getAxisLabel(axis) を tagPrefixes なしで呼ぶと未登録prefixでIDがそのまま出るため） */
+  axisLabel: string;
   items: AxisFacetItem[];
   isLoading?: boolean;
   isError?: boolean;
@@ -65,6 +67,7 @@ function findNextValueIndex(rows: AxisValueHierarchyRow[], from: number, delta: 
 
 export default function AxisValueQuickList({
   axis,
+  axisLabel,
   items,
   isLoading,
   isError,
@@ -188,8 +191,8 @@ export default function AxisValueQuickList({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleSearchKeyDown}
-          placeholder={`${getAxisLabel(axis)}を検索`}
-          aria-label={`${getAxisLabel(axis)}の値を検索`}
+          placeholder={`${axisLabel}を検索`}
+          aria-label={`${axisLabel}の値を検索`}
         />
         <button
           ref={sortToggleRef}
@@ -240,12 +243,13 @@ export default function AxisValueQuickList({
       ) : rows.length === 0 ? (
         <div className="mll-qlist__status">{emptyLabel}</div>
       ) : (
+        // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- onFocusはキーボード移動位置の追従用。フォーカスは子のボタンが受ける
         <div
           ref={listRef}
           className="mll-qlist__body"
-          // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- 値一覧と同じボタン一覧の表現を使う
-          role="listbox"
-          aria-label={getAxisLabel(axis)}
+          // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- 値ボタン集合を名前付き集合として表す。fieldset等の代替タグは適合しない
+          role="group"
+          aria-label={`${axisLabel}の値一覧`}
           onFocus={(e) => {
             // マウスクリック・Tab等、キーボード移動以外でフォーカスが動いた場合も
             // activeIndexRef を追従させる（次のキーボード移動が正しい位置から始まるように）。
@@ -287,18 +291,14 @@ export default function AxisValueQuickList({
                     (() => {
                       const on = isSelected(row.item.value);
                       return (
-                        <div
-                          className={`mll-qlist__row ${on ? "is-on" : ""}`}
-                          // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- クリック領域(選択)とAND追加ボタンを両方内包するため<option>にはできない
-                          role="option"
-                          aria-selected={on}
-                        >
+                        <div className={`mll-qlist__row ${on ? "is-on" : ""}`}>
                           <button
                             type="button"
                             data-quicklist-item
                             className={`mll-qlist__item ${on ? "is-on" : ""}`}
                             style={{ paddingLeft: 8 + indent, paddingRight: onAdd && !on ? 26 : 8 }}
                             title={row.depth > 0 ? row.item.value : undefined}
+                            aria-pressed={on}
                             onClick={(e) =>
                               onSelect(row.item, { ctrlKey: e.ctrlKey, metaKey: e.metaKey })
                             }

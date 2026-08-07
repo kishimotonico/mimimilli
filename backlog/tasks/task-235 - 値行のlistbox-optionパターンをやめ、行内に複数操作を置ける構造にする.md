@@ -4,6 +4,7 @@ title: 値行のlistbox/optionパターンをやめ、行内に複数操作を�
 status: To Do
 assignee: []
 created_date: '2026-08-07 13:21'
+updated_date: '2026-08-07 14:05'
 labels: []
 dependencies: []
 ordinal: 245000
@@ -21,10 +22,10 @@ ordinal: 245000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 値行が role=listbox / role=option を使わない構造になっている（3コンポーネントすべて）
-- [ ] #2 選択状態が実際にフォーカスされる要素（主選択ボタン）の aria-pressed で表現されている
-- [ ] #3 矢印キーでの行移動・Enter/Spaceでの選択・追加ボタンへの到達が従来どおり動作する
-- [ ] #4 role/option 関連の oxlint disable コメントが不要になり削除されている
-- [ ] #5 docs/design-system.md に値行の構造規約が記載されている
-- [ ] #6 pnpm check と変更範囲のテストが通る
+- [x] #1 値行が role=listbox / role=option を使わない構造になっている（3コンポーネントすべて）
+- [x] #2 選択状態が実際にフォーカスされる要素（主選択ボタン）の aria-pressed で表現されている
+- [x] #3 矢印キーでの行移動・Enter/Spaceでの選択・追加ボタンへの到達が従来どおり動作する
+- [x] #4 role/option 関連の oxlint disable コメントが不要になり削除されている
+- [x] #5 docs/design-system.md に値行の構造規約が記載されている
+- [x] #6 pnpm check と変更範囲のテストが通る
 <!-- AC:END -->

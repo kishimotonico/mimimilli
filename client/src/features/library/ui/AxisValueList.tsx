@@ -72,6 +72,7 @@ export default function AxisValueList({
       ? buildAxisValueHierarchy(filtered, sort.direction)
       : flattenAxisValueRows(sortAxisValueItems(filtered, sort));
   const fallbackIcon = getAxisIcon(axis);
+  const axisLabel = getAxisLabel(axis, tagPrefixes);
   const resetKey = `${axis}:${sort.key}:${sort.direction}:${contextQuery}`;
 
   const isSelected = (item: AxisFacetItem) =>
@@ -168,6 +169,7 @@ export default function AxisValueList({
               />
             ) : viewMode === "grid" ? (
               <AxisValueGrid
+                axisLabel={axisLabel}
                 rows={rows}
                 tileSize={tileSize}
                 isSelected={isSelected}
@@ -178,6 +180,7 @@ export default function AxisValueList({
               />
             ) : (
               <AxisValueRows
+                axisLabel={axisLabel}
                 rows={rows}
                 sort={sort}
                 onSortChange={setSort}

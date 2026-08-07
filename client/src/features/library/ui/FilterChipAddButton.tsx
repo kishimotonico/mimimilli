@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import type { NormalizedTag, TagPrefix } from "@mimimilli/shared";
 import type { AxisId } from "../model/types";
-import { buildFacetAxisRows } from "../model/axisDefinitions";
+import { buildFacetAxisRows, getAxisLabel } from "../model/axisDefinitions";
 import { useAnchoredPopover } from "./preview/useAnchoredPopover";
 import AxisValuePopoverPanel from "./AxisValuePopoverPanel";
 import { I } from "../../../shared/ui/Icon";
@@ -80,6 +80,7 @@ export default function FilterChipAddButton({
       {open && pickedAxis !== null && (
         <AxisValuePopoverPanel
           axis={pickedAxis}
+          axisLabel={getAxisLabel(pickedAxis, tagPrefixes)}
           layout={layout}
           selectedTags={selectedTags}
           hint={AND_ADD_HINT}

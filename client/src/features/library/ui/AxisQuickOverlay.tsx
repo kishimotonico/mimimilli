@@ -20,6 +20,7 @@ const OVERLAY_WIDTH = 280;
 
 interface AxisQuickOverlayProps {
   axis: AxisId;
+  axisLabel: string;
   anchorEl: HTMLElement | null;
   isOpen: boolean;
   selectedTags: NormalizedTag[];
@@ -33,6 +34,7 @@ interface AxisQuickOverlayProps {
 
 export default function AxisQuickOverlay({
   axis,
+  axisLabel,
   anchorEl,
   isOpen,
   selectedTags,
@@ -71,6 +73,7 @@ export default function AxisQuickOverlay({
     >
       <AxisValueQuickList
         axis={axis}
+        axisLabel={axisLabel}
         items={facetQuery.data ?? []}
         isLoading={facetQuery.isLoading}
         isError={facetQuery.isError}

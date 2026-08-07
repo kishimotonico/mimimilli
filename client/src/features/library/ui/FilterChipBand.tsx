@@ -1,5 +1,6 @@
 import { Fragment, useState } from "react";
 import type { NormalizedTag, TagPrefix } from "@mimimilli/shared";
+import { getAxisLabel } from "../model/axisDefinitions";
 import { axisOfFilterTag } from "../model/libraryPresentation";
 import { useAnchoredPopover } from "./preview/useAnchoredPopover";
 import AxisValuePopoverPanel from "./AxisValuePopoverPanel";
@@ -33,12 +34,14 @@ interface FilterChipBandProps {
 
 function FilterChip({
   tag,
+  tagPrefixes,
   selectedTags,
   onSelect,
   onAdd,
   onRemove,
 }: {
   tag: NormalizedTag;
+  tagPrefixes: TagPrefix[];
   /** 現在選択中の全タグ（自軸以外のフィルタを兄弟値の集計へ引き継ぐため。TASK-187） */
   selectedTags: NormalizedTag[];
   onSelect: (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
@@ -72,6 +75,7 @@ function FilterChip({
       {open && (
         <AxisValuePopoverPanel
           axis={axis}
+          axisLabel={getAxisLabel(axis, tagPrefixes)}
           layout={layout}
           selectedTags={selectedTags}
           onSelect={(nextTag, opts) => {
@@ -120,6 +124,7 @@ export default function FilterChipBand({
           {i > 0 && <span className="mll-tagband__and">AND</span>}
           <FilterChip
             tag={tag}
+            tagPrefixes={tagPrefixes}
             selectedTags={selectedTags}
             onSelect={handleSelectSibling}
             onAdd={handleAddSibling}

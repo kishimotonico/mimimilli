@@ -31,6 +31,7 @@ function parentPathOf(row: AxisValueValueRow): string | null {
 }
 
 interface AxisValueGridProps {
+  axisLabel: string;
   rows: AxisValueHierarchyRow[];
   tileSize: number;
   isSelected: (item: AxisFacetItem) => boolean;
@@ -43,6 +44,7 @@ interface AxisValueGridProps {
 }
 
 export default function AxisValueGrid({
+  axisLabel,
   rows,
   tileSize,
   isSelected,
@@ -109,7 +111,13 @@ export default function AxisValueGrid({
 
   return (
     <div className="mll-grid-body">
-      <div ref={scrollRef} className="mll-grid-scroll">
+      <div
+        ref={scrollRef}
+        className="mll-grid-scroll"
+        // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- 値ボタン集合を名前付き集合として表す。fieldset等の代替タグは適合しない
+        role="group"
+        aria-label={`${axisLabel}の値一覧`}
+      >
         <div
           ref={setGridEl}
           className="mll-grid"
@@ -152,17 +160,12 @@ export default function AxisValueGrid({
                   const parentPath = row.depth > 0 ? parentPathOf(row) : null;
                   const on = isSelected(row.item);
                   return (
-                    <div
-                      key={row.path}
-                      className={`mll-vtile ${on ? "is-on" : ""}`}
-                      // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- クリック領域(選択)とAND追加ボタンを両方内包するため<option>にはできない
-                      role="option"
-                      aria-selected={on}
-                    >
+                    <div key={row.path} className={`mll-vtile ${on ? "is-on" : ""}`}>
                       <button
                         type="button"
                         className="mll-vtile__main"
                         title={parentPath ? row.item.value : undefined}
+                        aria-pressed={on}
                         onClick={(e) =>
                           onSelect(row.item, { ctrlKey: e.ctrlKey, metaKey: e.metaKey })
                         }
