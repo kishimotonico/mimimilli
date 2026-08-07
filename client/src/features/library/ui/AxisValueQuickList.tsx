@@ -296,7 +296,7 @@ export default function AxisValueQuickList({
                             type="button"
                             data-quicklist-item
                             className={`mll-qlist__item ${on ? "is-on" : ""}`}
-                            style={{ paddingLeft: 8 + indent, paddingRight: onAdd && !on ? 26 : 8 }}
+                            style={{ paddingLeft: 8 + indent, paddingRight: onAdd ? 26 : 8 }}
                             title={row.depth > 0 ? row.item.value : undefined}
                             aria-pressed={on}
                             onClick={(e) =>
@@ -311,6 +311,7 @@ export default function AxisValueQuickList({
                               icon={I.add}
                               label={`${row.item.value}をAND追加`}
                               size="xs"
+                              variant="bare"
                               className="mll-qlist__add"
                               onClick={() => onAdd(row.item)}
                             />

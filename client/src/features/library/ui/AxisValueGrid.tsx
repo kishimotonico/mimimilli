@@ -184,6 +184,7 @@ export default function AxisValueGrid({
                           icon={I.add}
                           label={`${row.item.value}をAND追加`}
                           size="xs"
+                          variant="bare"
                           className="mll-vtile__add"
                           onClick={() => onAdd(row.item)}
                         />
