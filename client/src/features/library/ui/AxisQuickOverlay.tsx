@@ -1,10 +1,11 @@
 import { createPortal } from "react-dom";
+import type { RefObject } from "react";
 import type { FacetAxisId, NormalizedTag } from "@mimimilli/shared";
 import type { AxisId } from "../model/types";
 import { useAxisFacetsQuery } from "../model/useAxisFacetsQuery";
 import { buildFilterTag } from "../model/libraryPresentation";
 import { useAnchoredPopover } from "./preview/useAnchoredPopover";
-import type { HoverIntentHandlers } from "../../../shared/lib/useHoverIntent";
+import type { HoverGroupPanelHandlers } from "../../../shared/lib/useHoverGroupCoordinator";
 import AxisValueQuickList from "./AxisValueQuickList";
 
 // 軸レール行のクイックオーバーレイ（ADR-0012 §7）。ホバー約200ms・フォーカス中の
@@ -24,7 +25,8 @@ interface AxisQuickOverlayProps {
   selectedTags: NormalizedTag[];
   onSelectValue: (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
   onClose: () => void;
-  panelHandlers: HoverIntentHandlers;
+  panelHandlers: HoverGroupPanelHandlers;
+  panelElRef: RefObject<HTMLElement | null>;
 }
 
 export default function AxisQuickOverlay({
@@ -35,6 +37,7 @@ export default function AxisQuickOverlay({
   onSelectValue,
   onClose,
   panelHandlers,
+  panelElRef,
 }: AxisQuickOverlayProps) {
   const facetQuery = useAxisFacetsQuery(isOpen ? (axis as FacetAxisId) : null, selectedTags);
 
@@ -47,11 +50,16 @@ export default function AxisQuickOverlay({
   });
   anchorRef.current = anchorEl as HTMLDivElement | null;
 
+  const setPanelEl = (el: HTMLDivElement | null) => {
+    panelRef.current = el;
+    panelElRef.current = el;
+  };
+
   if (!isOpen || !anchorEl) return null;
 
   return createPortal(
     <div
-      ref={panelRef}
+      ref={setPanelEl}
       className="mll-qoverlay mll-qoverlay--fixed"
       // マウント直後、パネル実測前の1フレームだけ top が未確定（layout effect が
       // 実サイズを測ってペイント前に補正する。ちらつきは出ない）。
