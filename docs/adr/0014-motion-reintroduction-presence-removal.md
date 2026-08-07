@@ -38,7 +38,7 @@ motion を再導入し、出現・退出アニメーションの基盤を `Anima
 - **collapse**: motionが公式サポートする `height: 0 ↔ "auto"` + opacity + ルート `overflow:hidden` を使う。現行のgrid `0fr↔1fr` トリックは「CSSがheight:autoを扱えない」ことへの回避策であり廃止（gridTemplateRowsの直接アニメは公式ドキュメントに明記がなく不採用）。内側の子レイアウト（flex/flex-direction/gap）はCSS削除で失わない。対象3箇所（ScanModal警告・新規作品、AxisValueQuickListソートメニュー）はいずれもルートにpadding/borderが無くこの方式で成立することを確認済み
 - **ScanModal**: 単一スロット化はStatusRowの排他3状態のみ、方式は sync + 退出absolute（`mode="wait"` は現行の並置クロスフェードとタイミングが変わるため不使用）。警告・新規作品・フッターは同時表示の組み合わせがあるため独立AP境界のまま
 - **PlayerDock**: 現行どおり旧・新を並存させ入場側だけ180ms遅延（delayはbuilder経由）。`onExitComplete` で `switchingUiMode` 解除。rapid toggle・`onExitComplete` 一回保証は spy + fake timers の統合テストへ移管
-- **Toast**: `message=null` で即 `hidePopover()` する現行実装では退出が見えないため、`onExitComplete` まで遅延。表示世代トークンを照合し、退出中に再表示された新Toastを古いコールバックが隠さない。文言差し替えは単一スロット契約（即時反映）を維持し `key={message}` 並存はさせない
+- **Toast**: `message=null` で即 `hidePopover()` する現行実装では退出が見えないため、`onExitComplete` まで遅延。文言差し替えは単一スロット契約（即時反映）を維持し `key={message}` 並存はさせない。**表示世代トークンの照合は行わない**（TASK-239の実装時に不要と判明。理由は下記）
 - **軸切替の並存**: `useHoverGroupCoordinator` をインスタンストークン付きの所有権APIへ変更する。パネルref・`panelHandlers`・coordinator所有の document `pointermove` は現在openなownerのみに紐づけ、解除時はトークン一致を確認する
 - **reduced-motion**: `MotionConfig reducedMotion="user"` はtransform/layoutのみ抑止し**opacityアニメは止まらない**（motion.dev公式ドキュメントで確認）。よって `useMotionVariants` がreduce時に全variantの duration/delay を0にする。完了通知は「flush後に一度発火」と定義し（同一render内の同期発火は保証しない）、fake timers + spy でテストする。`matchMedia` スタブ（change listener API含む）を `tests/unit/setup.ts` に追加する
 - **`initial={false}`**: 現行 `skipInitial` は計13箇所（TopBar 1 / FilesView 1 / PlayerDock 2 / ScanModal 9）。フェーズ1で対応表を作成し各フェーズで消化する
@@ -58,3 +58,19 @@ motion を再導入し、出現・退出アニメーションの基盤を `Anima
 - `presence.test.tsx` は廃止され、検証はPlayerDock統合テスト等へ移管される
 - `docs/design-system.md` のMotion節はTASK-245で新基盤前提（MotionConfig / AP / 原則3 / layout禁止 / reduced-motion仕様）に書き換える
 - 手動値退避パターン（TASK-237で導入）は根絶され、以後「クエリ購読を開閉stateに連動させない」が規約になる
+
+## 実装時に判明した訂正
+
+### Toastの表示世代トークンは不要（TASK-239）
+
+当初「表示世代トークンを照合し、退出中に再表示された新Toastを古いコールバックが隠さない」と決めていたが、実装時にこのガードが到達不能であることが判明したため撤回した。
+
+`AnimatePresence` は子の識別に `getChildKey = (child) => child.key || ""` を使う（framer-motion 13.0.0 の `AnimatePresence/utils.mjs`）。単一スロット契約により子へ `key` を付けないため、連続する全Toastが同一キー `""` を共有する。この状態で「A表示 → null → B表示」が退出完了前に起きると、`AnimatePresence` は同一キーの再出現とみなして**Aの退出を取り消し同じスロットをBへ差し替える**。この経路では子が `exitingChildren` に積まれず `onExitComplete` が一度も発火しないため、「古いコールバックが新Toastを隠す」事故は構造的に発生しない。
+
+よって世代トークンは発火しないコールバックを守る死んだコードであり、「過度なフォールバック禁止」に照らして置かない。退出中の再表示時の見た目は「Aが退出アニメ途中でBの文言に差し替わり animate 状態へ戻る」中断クロスフェードになる。これは単一スロット契約（文言差し替えは即時反映）の帰結として受け入れる。
+
+### fade退出のabsoluteは祖先のpositionを要求する（TASK-239）
+
+`fade()` の `exitAbsolute`（既定true）が生成する `position:absolute; top:0; left:0; right:0` は、最も近い positioned ancestor を基準にする。旧CSSの `.ml-presence-fade[data-phase="exit"]`（`position:absolute; top:0; left:0; width:100%`）も同じ性質を持ちながら祖先の position を保証しておらず、`.mle-app` を含む祖先がいずれも static だったため viewport 基準になっていた。TopBarでは `.mll-bar` がページ最上段かつ全幅なので視覚的に一致し、問題が顕在化していなかった。
+
+TASK-239 で `.mll-bar` に `position: relative` を追加して修正した（z-index未指定のため新しい stacking context は生成されない）。**fade を使う各箇所で祖先が positioned かを個別に確認すること**。
