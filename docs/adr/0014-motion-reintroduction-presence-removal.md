@@ -53,11 +53,14 @@ motion を再導入し、出現・退出アニメーションの基盤を `Anima
 
 ## 帰結
 
-- バンドルは増加する（TASK-156削除時の実測で-42KB gzip相当の逆方向）。健全性・手触りを優先する明示的なトレードオフであり、実測値はTASK-245で本ADRに追記する
-- 自前Presenceとmotionの混在期間はフェーズ2〜7を連続実施して短く保つ
-- `presence.test.tsx` は廃止され、検証はPlayerDock統合テスト等へ移管される
-- `docs/design-system.md` のMotion節はTASK-245で新基盤前提（MotionConfig / AP / 原則3 / layout禁止 / reduced-motion仕様）に書き換える
-- 手動値退避パターン（TASK-237で導入）は根絶され、以後「クエリ購読を開閉stateに連動させない」が規約になる
+- バンドルは増加した。当初の予測は「TASK-156削除時の実測（gzip 211KB→169KB、-42KB）の逆方向」だったが、実測はこれを上回った。**motion@13 の tree-shaking が当時（framer-motion系）より改善しているという仮説は成り立たなかった**。健全性・手触りを優先する判断自体は変わらないが、実際のコストは予測より大きかった
+  - 移行前ベースライン（55f9206、motion/clsx/tailwind-merge いずれも未導入）: 全JS合計 189.03 kB gzip / 初期チャンク 176.05 kB gzip
+  - 移行後の最終実測（TASK-244完了後、`pnpm --filter @mimimilli/client build`）: 全JS合計 241.16 kB gzip（+52.13 kB, +27.6%） / 初期チャンク 227.70 kB gzip（+51.65 kB, +29.3%）。内訳は index（エントリ）227.70 kB、FilesView（遅延）6.40 kB、ScanModal（遅延）4.06 kB、SettingsModal（遅延）3.00 kB
+  - 増加分のうち clsx + tailwind-merge（TASK-246）由来は +9.53 kB（全JS合計・初期チャンクとも同額）で、motionの増分ではない。残り（全JS合計 +42.60 kB / 初期チャンク +42.12 kB）が motion 自体のフットプリント
+- 自前Presenceとmotionの混在期間はフェーズ2〜7を連続実施して短く保った
+- `presence.test.tsx` は廃止され、検証はPlayerDock統合テスト等へ移管された
+- `docs/design-system.md` のMotion節はTASK-245で新基盤前提（MotionConfig / AP / 原則3 / layout禁止 / reduced-motion仕様）に書き換え済み
+- 手動値退避パターン（TASK-237で導入）は根絶され、以後「クエリ購読を開閉stateに連動させない」が規約になった
 
 ## 実装時に判明した訂正
 

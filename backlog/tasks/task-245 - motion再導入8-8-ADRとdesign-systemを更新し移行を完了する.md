@@ -4,7 +4,7 @@ title: 'motion再導入(8/8): ADRとdesign-systemを更新し移行を完了す�
 status: To Do
 assignee: []
 created_date: '2026-08-07 17:01'
-updated_date: '2026-08-07 21:42'
+updated_date: '2026-08-07 21:55'
 labels: []
 dependencies:
   - TASK-244
@@ -19,10 +19,10 @@ ordinal: 255000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 docs/design-system.mdのMotion節が新基盤前提に書き換わっている
-- [ ] #2 完了時の pnpm check && pnpm test フルと pnpm --filter @mimimilli/client build の実測が記録されている
-- [ ] #3 ADR-0014の帰結にバンドル増分の実測値が追記されている
-- [ ] #4 削除済みのusePresence/Presence APIを現役として説明するコード内コメント3箇所(StackEdge.tsx:1 / PreviewPane.tsx:9 / AxisValueQuickList.tsx:41)が現行のAnimatePresence前提に更新されている
+- [x] #1 docs/design-system.mdのMotion節が新基盤前提に書き換わっている
+- [x] #2 完了時の pnpm check && pnpm test フルと pnpm --filter @mimimilli/client build の実測が記録されている
+- [x] #3 ADR-0014の帰結にバンドル増分の実測値が追記されている
+- [x] #4 削除済みのusePresence/Presence APIを現役として説明するコード内コメント3箇所(StackEdge.tsx:1 / PreviewPane.tsx:9 / AxisValueQuickList.tsx:41)が現行のAnimatePresence前提に更新されている
 <!-- AC:END -->
 
 
