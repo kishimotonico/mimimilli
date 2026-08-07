@@ -1,6 +1,14 @@
+import { createHash } from "node:crypto";
 import { defineConfig, devices } from "@playwright/test";
 
-const smokePort = 4175;
+// worktreeの絶対パスから決定的にポートを導出する。同一worktreeなら常に同じポートになるため、
+// reuseExistingServer は同一worktreeのサーバー再利用に限定され、別worktreeへ相乗りしない。
+// 予約済みの固定ポート（旧smokePort=4175、real-adapter検証用の手動起動サーバー=4177）を避けた帯域。
+const PORT_RANGE_START = 4200;
+const PORT_RANGE_SIZE = 500;
+const smokePort =
+  PORT_RANGE_START +
+  (createHash("sha256").update(process.cwd()).digest().readUInt32BE(0) % PORT_RANGE_SIZE);
 
 export default defineConfig({
   testDir: "./tests/smoke",
