@@ -4,7 +4,7 @@ title: 'motion再導入(6/8): preview・colstack・collapseをAnimatePresenceへ
 status: To Do
 assignee: []
 created_date: '2026-08-07 17:01'
-updated_date: '2026-08-07 17:16'
+updated_date: '2026-08-07 17:34'
 labels: []
 dependencies:
   - TASK-238
@@ -20,7 +20,7 @@ ordinal: 253000
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 preview退出中に作品情報が消えない(PreviewPaneのprops境界化)
-- [ ] #2 collapseの見た目・クリッピングが現行同等(複数子要素のgap含む)でgridTemplateRows直接アニメ方式になっている
-- [ ] #3 FilesViewの初回表示にアニメが走らない
-- [ ] #4 pnpm check・変更範囲のテスト・pnpm test:smoke が通る
+- [ ] #2 FilesViewの初回表示にアニメが走らない
+- [ ] #3 pnpm check・変更範囲のテスト・pnpm test:smoke が通る
+- [ ] #4 collapseの見た目・クリッピングが現行同等(複数子要素のgap含む)で、ADR-0014確定のheight:0↔auto + opacity + overflow:hidden方式になっている(gridTemplateRows直接アニメは不採用)
 <!-- AC:END -->
