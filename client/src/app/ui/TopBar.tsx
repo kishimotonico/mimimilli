@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import { I } from "../../shared/ui/Icon";
 import IconButton from "../../shared/ui/IconButton";
 import { useAtom, useAtomValue } from "jotai";
-import Presence from "../../shared/ui/Presence";
+import { useMotionVariants } from "../../shared/ui/useMotionVariants";
 import {
   dlsiteBulkActiveAtom,
   dlsiteBulkCancellingAtom,
@@ -19,6 +20,26 @@ interface TopBarProps {
   onOpenScan: () => void;
   onSettings: () => void;
   notificationBell: ReactNode;
+}
+
+function DlsiteBulkCancelButton({ onClick }: { onClick: () => void }) {
+  const { fade } = useMotionVariants();
+  const isPresent = useIsPresent();
+  const v = fade();
+  return (
+    <motion.button
+      type="button"
+      initial={v.initial}
+      animate={v.animate}
+      exit={v.exit}
+      inert={!isPresent}
+      onClick={onClick}
+      className="inline-flex h-7 items-center justify-center gap-1 rounded-[6px] border border-[color-mix(in_oklch,var(--r-coral)_45%,transparent)] bg-[color-mix(in_oklch,var(--r-coral)_10%,transparent)] px-2.5 font-sans text-[11px] font-medium text-ink-0 transition-colors hover:bg-[color-mix(in_oklch,var(--r-coral)_16%,transparent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
+    >
+      <I.x size={11} />
+      中止
+    </motion.button>
+  );
 }
 
 export default function TopBar({ onOpenScan, onSettings, notificationBell }: TopBarProps) {
@@ -138,18 +159,11 @@ export default function TopBar({ onOpenScan, onSettings, notificationBell }: Top
               ? `DLsite取得中 (${dlsiteBulkProgress.processed}/${dlsiteBulkProgress.total})`
               : "DLsite取得中..."}
           </span>
-          <Presence
-            show={!dlsiteBulkCancelling}
-            as="button"
-            type="button"
-            variant="fade"
-            skipInitial
-            onClick={() => void onCancelDlsiteBulk().catch(() => {})}
-            className="inline-flex h-7 items-center justify-center gap-1 rounded-[6px] border border-[color-mix(in_oklch,var(--r-coral)_45%,transparent)] bg-[color-mix(in_oklch,var(--r-coral)_10%,transparent)] px-2.5 font-sans text-[11px] font-medium text-ink-0 transition-colors hover:bg-[color-mix(in_oklch,var(--r-coral)_16%,transparent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
-          >
-            <I.x size={11} />
-            中止
-          </Presence>
+          <AnimatePresence initial={false}>
+            {!dlsiteBulkCancelling && (
+              <DlsiteBulkCancelButton onClick={() => void onCancelDlsiteBulk().catch(() => {})} />
+            )}
+          </AnimatePresence>
         </>
       )}
       {notificationBell}
