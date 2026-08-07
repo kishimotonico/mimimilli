@@ -9,13 +9,11 @@ import {
   buildWorksParams,
   computeCollectionStatsDisplay,
   computeIsNoResultsDueToFilter,
-  computeReplacedTags,
   computeResultsPaneKind,
   getFacetAxisForQuery,
   isGridViewActive,
   shouldClearSelectionOnFilterMiss,
   shouldClearSelectionOnWorkNotFound,
-  tagFilterGroupKey,
 } from "../../src/features/library/model/libraryPresentation";
 
 describe("computeResultsPaneKind", () => {
@@ -62,13 +60,9 @@ describe("buildFilterTag", () => {
   });
 });
 
-describe("tagFilterGroupKey / axisOfFilterTag（正規化済みタグを前提とする）", () => {
-  it("year擬似タグは軸ごとにグループ化・軸特定される", () => {
-    expect(tagFilterGroupKey(nt("@year/2024"))).toBe("@year");
+describe("axisOfFilterTag（正規化済みタグを前提とする）", () => {
+  it("year擬似タグは軸が特定される", () => {
     expect(axisOfFilterTag(nt("@year/2024"))).toBe("year");
-  });
-  it("computeReplacedTags: 同じyear擬似タググループを置き換える", () => {
-    expect(computeReplacedTags([nt("@year/2023")], nt("@year/2024"))).toEqual([nt("@year/2024")]);
   });
 });
 

@@ -164,14 +164,14 @@ describe("置き換え選択は作品一覧へ進み、AND追加は現在地に�
     expect(store.get(activeAxisAtom)).toBe("smart-1");
   });
 
-  it("replaceLibraryTagAtom: 同じ軸グループの既存選択を外してから追加する（置き換え）", () => {
+  it("replaceLibraryTagAtom: prefix・軸に関係なく既存選択を全て外して1つだけにする（完全置換）", () => {
     const store = createStore();
     store.set(activeAxisAtom, "cv");
     store.set(selectedTagsAtom, nts(["cv/藤田茜", "サークル/月白製作所"]));
 
     store.set(replaceLibraryTagAtom, nt("cv/霧島レイ"));
 
-    expect(store.get(selectedTagsAtom)).toEqual(["サークル/月白製作所", "cv/霧島レイ"]);
+    expect(store.get(selectedTagsAtom)).toEqual(["cv/霧島レイ"]);
   });
 
   it("toggleLibraryTagAtom（AND追加）は軸を変えない", () => {

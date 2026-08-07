@@ -4,6 +4,7 @@ title: タグ値の通常クリックを完全置換にする
 status: To Do
 assignee: []
 created_date: '2026-08-07 12:22'
+updated_date: '2026-08-07 12:25'
 labels: []
 dependencies: []
 ordinal: 240000
@@ -17,11 +18,11 @@ ADR-0013の決定に基づき、タグ値の通常クリックを prefix や軸�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 選択中のタグがある状態で別 prefix のタグを通常クリックすると、既存の選択が全て外れて選んだタグ1つだけになる
-- [ ] #2 同一 prefix のタグを通常クリックした場合も同様に1つだけになる
-- [ ] #3 Ctrl/Cmd+クリックでの AND 追加は従来どおり動作する
-- [ ] #4 tagFilterGroupKey と computeReplacedTags が削除され、参照が残っていない
-- [ ] #5 year 等の組み込み軸の AND 追加時の単一選択扱いが維持されている
-- [ ] #6 置き換え時の結果面遷移（ADR-0012 §8）が従来どおり動作する
-- [ ] #7 pnpm check と変更範囲のテストが通る
+- [x] #1 選択中のタグがある状態で別 prefix のタグを通常クリックすると、既存の選択が全て外れて選んだタグ1つだけになる
+- [x] #2 同一 prefix のタグを通常クリックした場合も同様に1つだけになる
+- [x] #3 Ctrl/Cmd+クリックでの AND 追加は従来どおり動作する
+- [x] #4 tagFilterGroupKey と computeReplacedTags が削除され、参照が残っていない
+- [x] #5 year 等の組み込み軸の AND 追加時の単一選択扱いが維持されている
+- [x] #6 置き換え時の結果面遷移（ADR-0012 §8）が従来どおり動作する
+- [x] #7 pnpm check と変更範囲のテストが通る
 <!-- AC:END -->

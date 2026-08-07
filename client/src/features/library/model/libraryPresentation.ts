@@ -63,18 +63,7 @@ export function buildFilterTag(axis: AxisId, value: string): NormalizedTag {
   return normalized;
 }
 
-// ── 軸レール・チップの入口共通「置き換え既定」（ADR-0012 §7） ─────────────
-
-/** タグの「同じ軸/グループ」判定キー。クイックオーバーレイ・チップドロップダウン・
- *  結果面の値タイル/行のクリック（置き換え既定）が、置き換え対象を絞るのに使う。
- *  組み込み軸（擬似タグ）は軸ごと、facet 軸由来の実タグ（prefix付き）は prefix ごと、
- *  フラットタグは1グループにまとめる（tag 軸の値一覧が同じグルーピングで表示するため）。 */
-export function tagFilterGroupKey(tag: NormalizedTag): string {
-  const builtin = parseBuiltinAxisTag(tag);
-  if (builtin) return `@${builtin.axis}`;
-  const parsed = parseTag(tag);
-  return parsed.kind === "flat" ? "" : parsed.prefix;
-}
+// ── 軸レール・チップの入口共通「置き換え既定」（ADR-0013） ─────────────
 
 /** タグ文字列が属する軸ID。チップの兄弟値ドロップダウンで問い合わせる facet 軸を
  *  決めるのに使う。フラットタグは "tag" 軸（値一覧に全フラットタグが並ぶ）を返す。 */
@@ -83,13 +72,6 @@ export function axisOfFilterTag(tag: NormalizedTag): AxisId {
   if (builtin) return builtin.axis;
   const parsed = parseTag(tag);
   return parsed.kind === "flat" ? "tag" : parsed.prefix;
-}
-
-/** 置き換え選択の計算（純粋関数）。同じ tagFilterGroupKey のタグを外してから追加する。
- *  replaceLibraryTagAtom が使う（ADR-0012 §7・§8）。 */
-export function computeReplacedTags(prev: NormalizedTag[], tag: NormalizedTag): NormalizedTag[] {
-  const group = tagFilterGroupKey(tag);
-  return [...prev.filter((t) => tagFilterGroupKey(t) !== group), tag];
 }
 
 // ── works query のパラメータ ──────────────────────────────────

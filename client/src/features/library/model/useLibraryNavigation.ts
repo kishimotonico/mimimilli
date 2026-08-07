@@ -28,8 +28,8 @@ export interface LibraryViewState {
 export interface LibraryViewActions {
   setAxis: (axis: AxisId) => void;
   toggleTag: (tag: NormalizedTag) => void;
-  /** 既定=置き換え操作（ADR-0012 §7・§8）。同じ tagFilterGroupKey の選択を外してから追加し、
-   *  結果面を作品一覧へ進める（既に作品一覧ならそのまま）。全入口共通の単一の規則 */
+  /** 既定=置き換え操作（ADR-0013）。既存選択を全て外して1つだけにし、結果面を作品一覧へ
+   *  進める（既に作品一覧ならそのまま）。全入口共通の単一の規則 */
   replaceTag: (tag: NormalizedTag) => void;
   selectSoleTag: (tag: NormalizedTag) => void;
   clearTags: () => void;
