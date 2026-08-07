@@ -74,3 +74,13 @@ motion を再導入し、出現・退出アニメーションの基盤を `Anima
 `fade()` の `exitAbsolute`（既定true）が生成する `position:absolute; top:0; left:0; right:0` は、最も近い positioned ancestor を基準にする。旧CSSの `.ml-presence-fade[data-phase="exit"]`（`position:absolute; top:0; left:0; width:100%`）も同じ性質を持ちながら祖先の position を保証しておらず、`.mle-app` を含む祖先がいずれも static だったため viewport 基準になっていた。TopBarでは `.mll-bar` がページ最上段かつ全幅なので視覚的に一致し、問題が顕在化していなかった。
 
 TASK-239 で `.mll-bar` に `position: relative` を追加して修正した（z-index未指定のため新しい stacking context は生成されない）。**fade を使う各箇所で祖先が positioned かを個別に確認すること**。
+
+### document pointermove はトークン照合ではなく動的参照で所有権を守る（TASK-240）
+
+「軸切替の並存」で「パネルref・`panelHandlers`・coordinator所有の document `pointermove` は現在openなownerのみに紐づけ、解除時はトークン一致を確認する」と決めていたが、実装では前二者のみトークン照合を行い、document `pointermove` はトークンを持たない。
+
+`useHoverGroupCoordinator` は `OpenState { key, anchorEl, token }` を単一のstateとして保持し、`commitOpen` のたびに `Symbol(key)` で新トークンを発行する。`registerPanelEl(token, el)` と `getPanelHandlers(token)` はトークン不一致の呼び出しを無視するため、退出中の旧ownerが遅れて解除を呼んでも新ownerの登録を壊さない。
+
+一方 `engageTriangleGuard` / `onDocumentPointerMove` / `resolveAfterGuard` は `openStateRef.current` を都度動的に参照する。coordinatorのモデル上 openState は常に高々1つなので、古いクロージャが古い状態に作用する余地がそもそも無い。トークン照合は「古い参照を掴んだままの呼び出しを弾く」ための仕組みであり、参照を掴まない設計ではより強い保証になる。よってトークンを追加しない。
+
+この前提は「openStateが単一」に依存する。coordinatorを複数インスタンス化する変更を入れる場合は、document `pointermove` 側にもトークン照合が必要になる。
