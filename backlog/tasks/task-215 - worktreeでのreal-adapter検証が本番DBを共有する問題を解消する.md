@@ -1,9 +1,10 @@
 ---
 id: TASK-215
 title: worktreeでのreal adapter検証が本番DBを共有する問題を解消する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-06 15:43'
+updated_date: '2026-08-07 02:14'
 labels: []
 dependencies: []
 priority: high
@@ -24,8 +25,20 @@ portless のワークツリープレフィックスにより URL は別サブド
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 worktree で dev:real を起動したとき、メイン作業ディレクトリとは別のデータディレクトリが使われる
-- [ ] #2 本番のデータディレクトリを worktree から使いたい場合は、明示的な指定が必要になっている
-- [ ] #3 メイン作業ディレクトリでの起動時の挙動が従来と変わらない
-- [ ] #4 分離の仕組みが docs に記載され、worktree で検証する際の手順が読み取れる
+- [x] #1 worktree で dev:real を起動したとき、メイン作業ディレクトリとは別のデータディレクトリが使われる
+- [x] #2 本番のデータディレクトリを worktree から使いたい場合は、明示的な指定が必要になっている
+- [x] #3 メイン作業ディレクトリでの起動時の挙動が従来と変わらない
+- [x] #4 分離の仕組みが docs に記載され、worktree で検証する際の手順が読み取れる
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+実装（impl-215）: scripts/dev-real.mjs（汎用ランチャー）を新設し、server/package.jsonのdev:realを経由化。MIMIMILLI_DATA_DIR明示時は素通し、未設定時にgit rev-parseのgit-dir/git-common-dir比較でlinked worktreeを判定し、worktreeなら本番ルート隣の mimimilli-worktrees/<worktree名> を自動設定して起動ログに明示。dataRoot.tsは無変更（アプリはgitを知らない）。実機検証でDB分離を確認（~/.local/share/mimimilli-worktrees/task-215/db/ に生成、本番側未変更）。レビュー（review-215）: 指摘なし。留意事項1件 — Windowsではspawnのshell経由でシグナルが子孫プロセスへ届かず孤児化する可能性（Node全般の既知制約、Windows実機検証時の確認項目）。pnpm check全通過。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+dev:realをnode製ランチャー（scripts/dev-real.mjs）経由にし、linked worktreeでは専用データディレクトリ（mimimilli-worktrees/<名前>）を自動使用、本番DBを使うにはMIMIMILLI_DATA_DIRの明示が必要にした。メインでの挙動は不変。HANDOFF.mdに挙動と手順を記載。実機でDB分離を確認、レビュー済み、コミット0181b95、masterへマージ済み。
+<!-- SECTION:FINAL_SUMMARY:END -->
