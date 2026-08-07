@@ -4,6 +4,7 @@
 // - レイアウトは AppShell に委譲
 
 import { lazy, Suspense, useState, useCallback, useRef } from "react";
+import { MotionConfig } from "motion/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSetAtom } from "jotai";
 import { usePlayerActions } from "../features/player/model/usePlayerActions";
@@ -145,96 +146,106 @@ export default function App() {
 
   if (startupState === "loading") {
     return (
-      <div
-        style={{
-          width: "100%",
-          height: "100vh",
-          background: "var(--paper-0)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <span style={{ fontFamily: "var(--font-jp)", fontSize: 13, color: "var(--ink-4)" }}>
-          読み込み中...
-        </span>
-      </div>
+      <MotionConfig reducedMotion="user">
+        <div
+          style={{
+            width: "100%",
+            height: "100vh",
+            background: "var(--paper-0)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <span style={{ fontFamily: "var(--font-jp)", fontSize: 13, color: "var(--ink-4)" }}>
+            読み込み中...
+          </span>
+        </div>
+      </MotionConfig>
     );
   }
 
   if (startupState === "error") {
     return (
-      <StartupErrorScreen
-        error={settingsQuery.error}
-        onRetry={() => {
-          void settingsQuery.refetch();
-        }}
-        isRetrying={settingsQuery.isFetching}
-      />
+      <MotionConfig reducedMotion="user">
+        <StartupErrorScreen
+          error={settingsQuery.error}
+          onRetry={() => {
+            void settingsQuery.refetch();
+          }}
+          isRetrying={settingsQuery.isFetching}
+        />
+      </MotionConfig>
     );
   }
 
   if (startupState === "setup-required") {
-    return <SetupScreen onComplete={handleSetupComplete} />;
+    return (
+      <MotionConfig reducedMotion="user">
+        <SetupScreen onComplete={handleSetupComplete} />
+      </MotionConfig>
+    );
   }
 
   return (
-    <LibraryNavigationProvider>
-      <AppShell
-        topBar={
-          <TopBar
-            onOpenScan={handleOpenScanModal}
-            onSettings={() => setActiveModal("settings")}
-            notificationBell={
-              <NotificationBell
-                onOpenScanResult={handleOpenScanModal}
-                onOpenNotificationModal={setActiveModal}
-              />
-            }
-          />
-        }
-        addressBar={<AddressBar />}
-        leftNav={<LeftNav />}
-        body={
-          <AppBody
-            rootFolder={rootFolder}
-            onPlay={handlePlay}
-            onResume={handleResume}
-            onTogglePlay={player.togglePlay}
-          />
-        }
-        transportBar={<PlayerDock />}
-        fullScreenPlayer={<FullScreenPlayerGate />}
-        overlays={
-          <>
-            <PlayerRuntime />
-            <NavigationHistorySync />
-            {activeModal === "settings" && (
-              <Suspense fallback={null}>
-                <SettingsModal
-                  rootFolder={settings?.rootFolder ?? null}
-                  lastScanTime={settings?.lastScanTime ?? null}
-                  onClose={handleCloseModal}
-                  onOpenScan={() => setActiveModal("scan")}
-                  onChangeFolder={handleChangeFolder}
-                  onExport={handleExport}
+    <MotionConfig reducedMotion="user">
+      <LibraryNavigationProvider>
+        <AppShell
+          topBar={
+            <TopBar
+              onOpenScan={handleOpenScanModal}
+              onSettings={() => setActiveModal("settings")}
+              notificationBell={
+                <NotificationBell
+                  onOpenScanResult={handleOpenScanModal}
+                  onOpenNotificationModal={setActiveModal}
                 />
-              </Suspense>
-            )}
-            {activeModal === "scan" && (
-              <Suspense fallback={null}>
-                <ScanModal
-                  lastScanTime={settings?.lastScanTime ?? null}
-                  onClose={handleCloseModal}
-                  onOpenRjCodeMissing={() => setActiveModal("rj-missing")}
-                />
-              </Suspense>
-            )}
-            <DlsiteNotificationModals activeModal={activeModal} onClose={handleCloseModal} />
-            <GlobalToast />
-          </>
-        }
-      />
-    </LibraryNavigationProvider>
+              }
+            />
+          }
+          addressBar={<AddressBar />}
+          leftNav={<LeftNav />}
+          body={
+            <AppBody
+              rootFolder={rootFolder}
+              onPlay={handlePlay}
+              onResume={handleResume}
+              onTogglePlay={player.togglePlay}
+            />
+          }
+          transportBar={<PlayerDock />}
+          fullScreenPlayer={<FullScreenPlayerGate />}
+          overlays={
+            <>
+              <PlayerRuntime />
+              <NavigationHistorySync />
+              {activeModal === "settings" && (
+                <Suspense fallback={null}>
+                  <SettingsModal
+                    rootFolder={settings?.rootFolder ?? null}
+                    lastScanTime={settings?.lastScanTime ?? null}
+                    onClose={handleCloseModal}
+                    onOpenScan={() => setActiveModal("scan")}
+                    onChangeFolder={handleChangeFolder}
+                    onExport={handleExport}
+                  />
+                </Suspense>
+              )}
+              {activeModal === "scan" && (
+                <Suspense fallback={null}>
+                  <ScanModal
+                    lastScanTime={settings?.lastScanTime ?? null}
+                    onClose={handleCloseModal}
+                    onOpenRjCodeMissing={() => setActiveModal("rj-missing")}
+                  />
+                </Suspense>
+              )}
+              <DlsiteNotificationModals activeModal={activeModal} onClose={handleCloseModal} />
+              <GlobalToast />
+            </>
+          }
+        />
+      </LibraryNavigationProvider>
+    </MotionConfig>
   );
 }
