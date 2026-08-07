@@ -1,9 +1,10 @@
 import { createHash } from "node:crypto";
 import { defineConfig, devices } from "@playwright/test";
 
-// worktreeの絶対パスから決定的にポートを導出する。同一worktreeなら常に同じポートになるため、
-// reuseExistingServer は同一worktreeのサーバー再利用に限定され、別worktreeへ相乗りしない。
+// worktreeの絶対パスから決定的にポートを導出する。同一worktreeなら常に同じポートになる。
 // 予約済みの固定ポート（旧smokePort=4175、real-adapter検証用の手動起動サーバー=4177）を避けた帯域。
+// reuseExistingServer は無効化しているため、ポートが衝突した場合は他のサーバーへ相乗りせず
+// 常にstrictPortの明示的な失敗になる。
 const PORT_RANGE_START = 4200;
 const PORT_RANGE_SIZE = 500;
 const smokePort =
@@ -25,7 +26,7 @@ export default defineConfig({
     // 無効化する（TASK-9）
     command: `pnpm exec cross-env MIMIMILLI_MOCK_SCENARIO=new-work VITE_DISABLE_QUERY_DEVTOOLS=1 vite --host 127.0.0.1 --port ${smokePort} --strictPort`,
     port: smokePort,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     timeout: 120_000,
     gracefulShutdown: { signal: "SIGTERM", timeout: 500 },
     stdout: "pipe",
