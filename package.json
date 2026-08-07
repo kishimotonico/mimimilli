@@ -16,8 +16,11 @@
     "lint": "oxlint --deny-warnings client server shared",
     "fmt": "oxfmt --write .",
     "fmt:check": "oxfmt --check .",
-    "check": "pnpm --filter @mimimilli/shared check && pnpm --filter @mimimilli/server check && pnpm --filter @mimimilli/client check && pnpm lint && pnpm fmt:check",
-    "test": "pnpm --filter @mimimilli/server test && pnpm --filter @mimimilli/client test",
+    "check:shared": "pnpm --filter @mimimilli/shared check",
+    "check:server": "pnpm --filter @mimimilli/server check",
+    "check:client": "pnpm --filter @mimimilli/client check",
+    "check": "run-p check:shared check:server check:client lint fmt:check",
+    "test": "run-p test:server test:client",
     "smoke:real": "pnpm --filter @mimimilli/server smoke:real",
     "test:server": "pnpm --filter @mimimilli/server test",
     "test:client": "pnpm --filter @mimimilli/client test",
@@ -26,6 +29,7 @@
   "devDependencies": {
     "backlog.md": "1.47.1",
     "cross-env": "^10.1.0",
+    "npm-run-all2": "^9.0.3",
     "oxfmt": "^0.57.0",
     "oxlint": "^1.72.0",
     "portless": "^0.15.4"

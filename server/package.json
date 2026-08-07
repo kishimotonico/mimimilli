@@ -13,7 +13,7 @@
     "start": "bun src/index.ts",
     "dlsite-cache": "bun src/dlsiteCacheCli.ts",
     "check": "tsc --noEmit",
-    "test": "bun test tests",
+    "test": "bun test tests --parallel",
     "smoke:real": "bun tests/helpers/smoke.ts",
     "bench:seed": "bun bench/seed.ts",
     "bench:run": "bun bench/bench.ts",
