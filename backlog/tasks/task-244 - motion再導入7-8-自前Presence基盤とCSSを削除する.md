@@ -4,7 +4,7 @@ title: 'motion再導入(7/8): 自前Presence基盤とCSSを削除する'
 status: To Do
 assignee: []
 created_date: '2026-08-07 17:01'
-updated_date: '2026-08-07 19:09'
+updated_date: '2026-08-07 21:20'
 labels: []
 dependencies:
   - TASK-239
@@ -32,23 +32,30 @@ ordinal: 254000
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
-## 着手前提条件（統括記録・レビュー由来）
+## 着手前提条件（充足済み・2026-08-08確認）
 
-TASK-244 は usePresence / Presence / presenceDurations.ts / presence.test.tsx を削除するが、旧Presenceの消費者は計8ファイルある（grep確認済み）:
+旧Presenceの消費者は**ゼロ**。`rg -n "usePresence|<Presence|presenceDurations" client/src/` のヒットは定義ファイル自身（usePresence.ts / Presence.tsx / presenceDurations.ts）のみ。TASK-239/240/241/242/243 で8ファイル全ての移行が完了した。
 
-TopBar.tsx / ScanModal.tsx / LibraryView.tsx / AxisQuickOverlay.tsx / AxisValueQuickList.tsx / FilterChipAddButton.tsx / AxisValuePopoverPanel.tsx / FilesView.tsx
+## 削除可（消費者ゼロを確認済み）
 
-これらが TASK-239 / 240 / 241 / 243 で全て移行済みであることが着手の前提条件。1つでも残っていると削除できない。着手時に `rg -n "usePresence|from .*Presence" client/src/` で残存0を確認すること。
+- `client/src/shared/ui/usePresence.ts` / `Presence.tsx` / `presenceDurations.ts` 本体
+- `client/tests/unit/presence.test.tsx`（TASK-242レビューで削除可と結論。失われる汎用5件はメカニズムごと消えるため問題なし。PlayerDock保証は playerDock.test.tsx / playerDockPopupListeners.test.tsx が完全カバー）
+- shell.css: `.ml-presence-collapse` / `.ml-presence-collapse__inner`（3398-3417）
+- shell.css: `.ml-presence-colstack`（3484-3495）/ `.ml-presence-preview`（3499-3501）
+- shell.css: `.ml-presence-fade` / `.ml-presence-dock-bar` / `.ml-presence-dock-popup` / `.ml-presence-popover-scale` 系（3358〜3505付近）
 
-## presence.test.tsx 削除時に失われる検証（TASK-242レビューで確定）
+## 維持必須（消すと壊れる）
 
-移管前は計6件（usePresence汎用4 + Presence汎用1 + PlayerDock固有1）。PlayerDock固有1件は playerDock.test.tsx の3件へ移管済み（上位互換）。残る汎用5件（skipInitial系3・初回不在→出現でenter・高速トグルで退出中shownに戻らない・onExitComplete一回）は**汎用メカニズム自体のテスト**であり、メカニズムごと削除されるため失うことに問題はない。PlayerDockの挙動保証は playerDock.test.tsx / playerDockPopupListeners.test.tsx が完全にカバーしている。**presence.test.tsx は削除してよい。**
+- `.mll-bar { position: relative }`（shell.css:97付近）— **TASK-239が新規追加**。fade退出のposition:absoluteが効くためのpositioned ancestor。Presence系ではない
+- `.mll-qlist__sort`（1615-1620、`display:flex; gap:4px; padding:4px 8px; border-bottom`）— TASK-243の新方式は外側の無地ラッパーがクリップする前提で、このスタイル自体は現役
+- `.mle-colstack`（1820-1828、`width:46px; overflow:hidden; border-right`）— colstackWidth variantの widthPx=46 と対応
+- `.mle-colstack__edges` / `.ml-file-col-enter` / 装飾系keyframes（barwave/EQ/skeleton等）とそれらのreduced-motion指定 — ADR明記の維持対象
 
-## shell.css 削除時の注意（TASK-239由来）
+## reduced-motion一括ブロックの扱い（注意）
 
-TASK-239 が `.mll-bar` に `position: relative` を**新規追加**している（fade退出のposition:absoluteが効くための positioned ancestor）。これはPresence系セレクタではなく必須のレイアウト修正なので、**削除リストに含めず維持すること**。
+shell.css:3549-3561 のreduced-motion一括無効化ブロック内に `.ml-presence-collapse` `.ml-presence-colstack` と、**維持対象の `.mle-colstack__edges` `.ml-file-col-enter` が同居している**。**このブロック自体は消さず、対象セレクタだけ間引くこと。**
 
-## 維持対象（ADR確定事項の再掲）
+## 実施時の注意
 
-.mle-colstack__edges / .ml-file-col-enter / 装飾系keyframes（barwave/EQ/skeleton等）とそれらのreduced-motion指定は維持。collapseはgridトリックのみ削除し子レイアウトflex/gapは維持。実施時に行番号を再確認すること。
+行番号は実施時点で必ず再確認する（先行フェーズの変更で移動している可能性がある）。セレクタ単位の削除リストを作ってから着手すること。
 <!-- SECTION:NOTES:END -->
