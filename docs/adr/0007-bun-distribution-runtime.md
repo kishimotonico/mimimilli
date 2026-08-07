@@ -28,9 +28,9 @@ clientの静的成果物も同じアプリ資産に置く。BunのHTML埋め込�
 
 ### ユーザーデータ
 
-Windowsの既定データルートを `%LOCALAPPDATA%\Mimikago` とする。catalog DB、user DB、生成cache、logはその配下に用途別に置き、exeやclient資産の配置先と分離する。開発、テスト、portable運用のため `MIMIKAGO_DATA_DIR` でルートを上書きできるようにする。
+Windowsの既定データルートを `%LOCALAPPDATA%\mimimilli` とする。catalog DB、user DB、生成cache、logはその配下に用途別に置き、exeやclient資産の配置先と分離する。開発、テスト、portable運用のため `MIMIMILLI_DATA_DIR` でルートを上書きできるようにする。
 
-Linuxでは `${XDG_DATA_HOME:-$HOME/.local/share}/mimikago` を使う。相対指定を受け付ける場合は起動時に絶対パスへ解決し、各adapterへ絶対パスを渡す。通常起動で作業ディレクトリやexeの隣へDBを作らない。
+Linuxでは `${XDG_DATA_HOME:-$HOME/.local/share}/mimimilli` を使う。相対指定を受け付ける場合は起動時に絶対パスへ解決し、各adapterへ絶対パスを渡す。通常起動で作業ディレクトリやexeの隣へDBを作らない。
 
 ## 帰結
 

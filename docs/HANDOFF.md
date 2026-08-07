@@ -36,7 +36,8 @@ pnpm test           # server (Bunランナー + node:test API) + client (vitest)
 pnpm test:server
 pnpm test:client
 pnpm test:smoke          # Playwright スモークテスト（roleベースの動作確認）
-# smokeテストの webServer は MIMIMILLI_MOCK_SCENARIO=new-work で別ポート(4175)に自前で立つ
+# smokeテストの webServer は MIMIMILLI_MOCK_SCENARIO=new-work で自前サーバーを立てる。
+# ポートはworktreeの絶対パスをsha256ハッシュ化して4200〜4699の範囲から決定的に導出するため、worktreeごとに一意になる
 
 # fixture シナリオ
 pnpm dev:fixture:new-work
@@ -51,8 +52,8 @@ pnpm smoke:real        # 固定のサンプル音声で real 経路を手動ス�
 
 # dev:real:server は scripts/dev-real.mjs 経由で起動する。git worktree add で作った
 # linked worktree から起動した場合は、本番データディレクトリを共有しないよう
-# MIMIMILLI_DATA_DIR を自動で <本番データルートの親>/mimimilli-worktrees/<worktree名> に設定する
-# （起動ログの "[dev-real] ..." 行でどのディレクトリが使われたか確認できる）。
+# MIMIMILLI_DATA_DIR を自動で <本番データルートの親>/mimimilli-worktrees/<basename>-<絶対パスsha256先頭8桁> に設定する
+# （例: task-222-88693cac。起動ログの "[dev-real] ..." 行でどのディレクトリが使われたか確認できる）。
 # メインの作業ディレクトリでは従来どおり本番データディレクトリを使う。
 # worktreeから本番データを明示的に使いたい場合は MIMIMILLI_DATA_DIR を自分で指定する（最優先される）。
 
