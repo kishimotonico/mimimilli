@@ -1,10 +1,10 @@
 ---
 id: TASK-225
 title: AGENTS.mdをスリム化する（重複削除・タスク運用ルール集約・長文行の推敲）
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-07 07:58'
-updated_date: '2026-08-07 08:03'
+updated_date: '2026-08-07 08:05'
 labels: []
 dependencies: []
 priority: medium
@@ -26,3 +26,9 @@ overlap-scan調査（2026-08-07）に基づく整理。docs側に正がある重
 - [x] #5 長文行の推敲で意味・固有ルールが失われていない（削除は重複4行のみ）
 - [x] #6 pnpm checkが通る
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+docs/issues凍結行を削除（docs/README.mdが正）、「注意事項」を「ドキュメント運用」へ改名、タスク運用3項目（backlog一元化・タスク化基準とドラフト運用・AC7項目上限）をタスク管理節のマーカーブロック外へ集約。AC7項目行はbacklog agents --update-instructionsの実測でマーカー内が標準テンプレートに丸ごと上書きされると確認したため外出しした。長文3行を意味保持で推敲し、別セッション書き戻しでtest:visualへ巻き戻った行をtest:smokeへ復元。Sonnetレビューで指摘1件（例示の欠落）を差し戻し修正済み。pnpm check全緑。
+<!-- SECTION:FINAL_SUMMARY:END -->
