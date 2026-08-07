@@ -8,6 +8,7 @@ import type { NormalizedTag } from "@mimimilli/shared";
 import type { AxisId, SortId } from "../model/types";
 import { activeAxisAtom, selectedTagsAtom, selectedWorkIdAtom, sortAtom } from "./atoms";
 import {
+  addLibraryTagAtom,
   clearLibraryTagsAtom,
   goToLibrarySegmentAtom,
   replaceLibraryTagAtom,
@@ -31,6 +32,8 @@ export interface LibraryViewActions {
   /** 既定=置き換え操作（ADR-0013）。既存選択を全て外して1つだけにし、結果面を作品一覧へ
    *  進める（既に作品一覧ならそのまま）。全入口共通の単一の規則 */
   replaceTag: (tag: NormalizedTag) => void;
+  /** 追加ボタン用の冪等なAND追加（ADR-0013）。既に選択済みなら何もしない */
+  addTag: (tag: NormalizedTag) => void;
   selectSoleTag: (tag: NormalizedTag) => void;
   clearTags: () => void;
   selectWork: (id: string | null) => void;
@@ -49,6 +52,7 @@ export function useLibraryView(): LibraryViewState & LibraryViewActions {
   const setAxis = useSetAtom(setLibraryAxisAtom);
   const toggleTag = useSetAtom(toggleLibraryTagAtom);
   const replaceTag = useSetAtom(replaceLibraryTagAtom);
+  const addTag = useSetAtom(addLibraryTagAtom);
   const selectSoleTag = useSetAtom(selectSoleLibraryTagAtom);
   const clearTags = useSetAtom(clearLibraryTagsAtom);
   const selectWork = useSetAtom(selectLibraryWorkAtom);
@@ -71,6 +75,7 @@ export function useLibraryView(): LibraryViewState & LibraryViewActions {
     setAxis: transition(setAxis),
     toggleTag: transition(toggleTag),
     replaceTag: transition(replaceTag),
+    addTag: transition(addTag),
     selectSoleTag: transition(selectSoleTag),
     clearTags: () =>
       startTransition(() => {

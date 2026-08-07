@@ -6,6 +6,7 @@ import type { AxisFacetItem } from "@mimimilli/shared";
 import AxisValueList from "../../src/features/library/ui/AxisValueList";
 import { libraryTileSizeAtom, libraryViewModeAtom } from "../../src/features/library/model/atoms";
 import { clearResizeObservers, flushAllResizeObservers, mockElementSize } from "./setup";
+import { nts } from "../helpers/tag";
 
 afterEach(() => {
   cleanup();
@@ -31,6 +32,7 @@ function renderAxisValueList(
         selectedTags={[]}
         onReplace={vi.fn()}
         onToggle={vi.fn()}
+        onAddTag={vi.fn()}
         {...props}
       />
     </JotaiProvider>,
@@ -162,16 +164,30 @@ describe("AxisValueList list 表示（ADR-0012 §5）", () => {
     sizeMock.restore();
   });
 
-  it("ホバー時の＋ボタンは常にAND追加（onToggle）を呼ぶ", async () => {
+  it("ホバー時の＋ボタンは冪等なAND追加（onAddTag）を呼ぶ", async () => {
     const sizeMock = mockElementSize(600, 600);
-    const onToggle = vi.fn();
+    const onAddTag = vi.fn();
     const user = userEvent.setup();
-    renderAxisValueList({ axis: "cv", facetItems: [makeItem({ value: "藤田茜" })], onToggle });
+    renderAxisValueList({ axis: "cv", facetItems: [makeItem({ value: "藤田茜" })], onAddTag });
     await flushVirtualizer();
 
     const row = screen.getByRole("option", { name: /藤田茜/ });
     await user.click(row.querySelector(".mll-vrow__add") as HTMLElement);
-    expect(onToggle).toHaveBeenCalledWith("cv/藤田茜");
+    expect(onAddTag).toHaveBeenCalledWith("cv/藤田茜");
+    sizeMock.restore();
+  });
+
+  it("選択済みの行には追加ボタンが表示されない（ADR-0013）", async () => {
+    const sizeMock = mockElementSize(600, 600);
+    renderAxisValueList({
+      axis: "cv",
+      facetItems: [makeItem({ value: "藤田茜" })],
+      selectedTags: nts(["cv/藤田茜"]),
+    });
+    await flushVirtualizer();
+
+    const row = screen.getByRole("option", { name: /藤田茜/ });
+    expect(row.querySelector(".mll-vrow__add")).toBeNull();
     sizeMock.restore();
   });
 
@@ -215,6 +231,7 @@ describe("AxisValueList grid 表示", () => {
           selectedTags={[]}
           onReplace={vi.fn()}
           onToggle={vi.fn()}
+          onAddTag={vi.fn()}
         />
       </JotaiProvider>,
     );
@@ -261,6 +278,7 @@ describe("AxisValueList コンテキスト検索（ADR-0012 §6）", () => {
           selectedTags={[]}
           onReplace={vi.fn()}
           onToggle={vi.fn()}
+          onAddTag={vi.fn()}
         />
       </JotaiProvider>,
     );
@@ -279,6 +297,7 @@ describe("AxisValueList コンテキスト検索（ADR-0012 §6）", () => {
           selectedTags={[]}
           onReplace={vi.fn()}
           onToggle={vi.fn()}
+          onAddTag={vi.fn()}
         />
       </JotaiProvider>,
     );

@@ -4,6 +4,7 @@ title: AND追加を冪等なaddLibraryTagAtomにし、値選択の方針を単�
 status: To Do
 assignee: []
 created_date: '2026-08-07 13:20'
+updated_date: '2026-08-07 13:37'
 labels: []
 dependencies: []
 ordinal: 244000
@@ -21,11 +22,11 @@ Codexレビューで見つかった2件をまとめて解消する。
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 追加ボタンは冪等な addLibraryTagAtom を呼び、選択済みタグを解除しない
-- [ ] #2 選択済みの行には追加ボタンが表示されない（値一覧・クイックオーバーレイの両方）
-- [ ] #3 addLibraryTagAtom が組み込み擬似タグ軸の同軸排他・履歴コミット・selectedWorkIdクリアを toggleLibraryTagAtom と同様に扱う
-- [ ] #4 各入口は既定の意図（replace | add）だけを宣言し、主クリックの意味・Ctrl反転先・追加ボタンの有無がそこから導出される
-- [ ] #5 不正な組み合わせ（AND追加既定なのに追加ボタンあり等）が型で表現できなくなっている
-- [ ] #6 docs/design-system.md の値選択の規約が新しい契約の記述に更新されている
-- [ ] #7 pnpm check と変更範囲のテストが通る
+- [x] #1 追加ボタンは冪等な addLibraryTagAtom を呼び、選択済みタグを解除しない
+- [x] #2 選択済みの行には追加ボタンが表示されない（値一覧・クイックオーバーレイの両方）
+- [x] #3 addLibraryTagAtom が組み込み擬似タグ軸の同軸排他・履歴コミット・selectedWorkIdクリアを toggleLibraryTagAtom と同様に扱う
+- [x] #4 各入口は既定の意図（replace | add）だけを宣言し、主クリックの意味・Ctrl反転先・追加ボタンの有無がそこから導出される
+- [x] #5 不正な組み合わせ（AND追加既定なのに追加ボタンあり等）が型で表現できなくなっている
+- [x] #6 docs/design-system.md の値選択の規約が新しい契約の記述に更新されている
+- [x] #7 pnpm check と変更範囲のテストが通る
 <!-- AC:END -->

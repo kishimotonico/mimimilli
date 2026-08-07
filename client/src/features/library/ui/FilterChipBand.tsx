@@ -5,6 +5,10 @@ import { useAnchoredPopover } from "./preview/useAnchoredPopover";
 import AxisValuePopoverPanel from "./AxisValuePopoverPanel";
 import FilterChipAddButton from "./FilterChipAddButton";
 import { I } from "../../../shared/ui/Icon";
+import {
+  deriveValueSelectionHandlers,
+  type ValueSelectionIntent,
+} from "../model/valueSelectionContract";
 
 // 選択中フィルタのチップ列（ADR-0012 §2）。facet 軸・タグ軸を問わず同じ見た目で並べ、
 // ×で個別解除、1件以上あるとき「すべてクリア」を表示する。旧 ContentColumn の
@@ -20,23 +24,25 @@ interface FilterChipBandProps {
   selectedTags: NormalizedTag[];
   /** 置き換え選択（結果面を作品一覧へ遷移させる。ADR-0012 §8） */
   onReplace: (tag: NormalizedTag) => void;
-  /** AND追加（結果面はそのまま） */
+  /** Ctrl/Cmd+クリックによる反転先・チップの解除に使うトグル（結果面はそのまま） */
   onToggle: (tag: NormalizedTag) => void;
+  /** 追加ボタン用の冪等なAND追加（ADR-0013） */
+  onAddTag: (tag: NormalizedTag) => void;
   onClearAll: () => void;
 }
 
 function FilterChip({
   tag,
   selectedTags,
-  onReplace,
-  onToggle,
+  onSelect,
+  onAdd,
   onRemove,
 }: {
   tag: NormalizedTag;
   /** 現在選択中の全タグ（自軸以外のフィルタを兄弟値の集計へ引き継ぐため。TASK-187） */
   selectedTags: NormalizedTag[];
-  onReplace: (tag: NormalizedTag) => void;
-  onToggle: (tag: NormalizedTag) => void;
+  onSelect: (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
+  onAdd: (tag: NormalizedTag) => void;
   onRemove: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -69,11 +75,10 @@ function FilterChip({
           layout={layout}
           selectedTags={selectedTags}
           onSelect={(nextTag, opts) => {
-            if (opts.ctrlKey || opts.metaKey) onToggle(nextTag);
-            else onReplace(nextTag);
+            onSelect(nextTag, opts);
             close();
           }}
-          onAdd={onToggle}
+          onAdd={onAdd}
           close={close}
         />
       )}
@@ -86,8 +91,27 @@ export default function FilterChipBand({
   selectedTags,
   onReplace,
   onToggle,
+  onAddTag,
   onClearAll,
 }: FilterChipBandProps) {
+  // チップの兄弟値ドロップダウンは既定=置き換えの入口、「＋絞り込み」は既定=AND追加の入口
+  // （値選択の契約。design-system.md）。
+  const siblingDropdownIntent: ValueSelectionIntent<NormalizedTag> = {
+    default: "replace",
+    onReplace,
+    onToggle,
+    onAdd: onAddTag,
+  };
+  const { onSelect: handleSelectSibling, onAddButton: handleAddSibling } =
+    deriveValueSelectionHandlers(siblingDropdownIntent);
+
+  const addFilterIntent: ValueSelectionIntent<NormalizedTag> = {
+    default: "add",
+    onAdd: onAddTag,
+    onReplace,
+  };
+  const { onSelect: handleAddFilterSelect } = deriveValueSelectionHandlers(addFilterIntent);
+
   return (
     <div className="mll-tagband">
       {selectedTags.length > 0 && <span className="mll-tagband__lbl">AND</span>}
@@ -97,8 +121,8 @@ export default function FilterChipBand({
           <FilterChip
             tag={tag}
             selectedTags={selectedTags}
-            onReplace={onReplace}
-            onToggle={onToggle}
+            onSelect={handleSelectSibling}
+            onAdd={handleAddSibling}
             onRemove={() => onToggle(tag)}
           />
         </Fragment>
@@ -106,10 +130,7 @@ export default function FilterChipBand({
       <FilterChipAddButton
         tagPrefixes={tagPrefixes}
         selectedTags={selectedTags}
-        onAddValue={(tag, opts) => {
-          if (opts.ctrlKey || opts.metaKey) onReplace(tag);
-          else onToggle(tag);
-        }}
+        onAddValue={handleAddFilterSelect}
       />
       {selectedTags.length > 0 && (
         <button type="button" className="mll-tagband__clear" onClick={onClearAll}>

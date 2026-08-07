@@ -27,6 +27,7 @@ function renderAxisColumn(props: Partial<React.ComponentProps<typeof AxisColumn>
           selectedTags={[]}
           onToggleTag={vi.fn()}
           onReplaceTag={vi.fn()}
+          onAddTag={vi.fn()}
           {...props}
         />
       </div>

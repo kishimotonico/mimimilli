@@ -269,4 +269,21 @@ describe("AxisValueQuickList の選択", () => {
     expect(onSelect.mock.calls[0][0]).toMatchObject({ value: expect.stringMatching(/^値/) });
     sizeMock.restore();
   });
+
+  it("選択済みの行には追加ボタンが表示されない（ADR-0013）", async () => {
+    const sizeMock = mockElementSize(260, 260);
+    const items = makeItems(3);
+    const selectedValue = items[0]!.value;
+    renderQuickList({ items, onAdd: vi.fn(), isSelected: (value) => value === selectedValue });
+    await flushVirtualizer();
+
+    const rows = Array.from(document.querySelectorAll("[role='option']"));
+    expect(rows.length).toBe(3);
+    const selectedRow = rows.find((row) => row.textContent?.includes(selectedValue));
+    const otherRows = rows.filter((row) => row !== selectedRow);
+    expect(selectedRow?.querySelector(".mll-qlist__add")).toBeNull();
+    expect(otherRows.length).toBe(2);
+    otherRows.forEach((row) => expect(row.querySelector(".mll-qlist__add")).toBeTruthy());
+    sizeMock.restore();
+  });
 });

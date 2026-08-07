@@ -35,6 +35,23 @@ export const toggleLibraryTagAtom = atom(null, (get, set, tag: NormalizedTag) =>
   set(selectedWorkIdAtom, null);
 });
 
+// 全入口共通の「追加ボタン」操作（ADR-0013）。冪等: 既に選択済みなら何もしない
+// （履歴コミットも走らせない）。同軸排他・履歴コミット・selectedWorkIdクリアの扱いは
+// toggleLibraryTagAtom の追加側と同じ。toggleLibraryTagAtom は解除と Ctrl/Cmd+クリックに
+// よる反転の経路として引き続き使う（既に選択済みなら Ctrl/Cmd+クリックで解除できる）。
+export const addLibraryTagAtom = atom(null, (get, set, tag: NormalizedTag) => {
+  const prev = get(selectedTagsAtom);
+  if (prev.includes(tag)) return;
+  requestNavigationHistoryCommit(set, "push");
+  const builtin = parseBuiltinAxisTag(tag);
+  const base =
+    builtin && isBuiltinPseudoTagAxis(builtin.axis)
+      ? prev.filter((t) => parseBuiltinAxisTag(t)?.axis !== builtin.axis)
+      : prev;
+  set(selectedTagsAtom, [...base, tag]);
+  set(selectedWorkIdAtom, null);
+});
+
 // 作品詳細のタグクリック用: 軸を tag に切り替えつつ絞り込みをそのタグだけに置き換える
 // 単一のアクション（ADR-0012 §2）。setAxis → toggleTag の2段呼び出しは、既存の絞り込みへの
 // 追加になってしまうほか、履歴コミットの二重化も招くため使わない。

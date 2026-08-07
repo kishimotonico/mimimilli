@@ -8,6 +8,7 @@ import {
 } from "../../src/features/navigation/model/navigationHistoryAtoms";
 import { activeAxisAtom } from "../../src/features/library/model/atoms";
 import {
+  addLibraryTagAtom,
   clearLibraryTagsAtom,
   replaceLibraryTagAtom,
   selectLibraryWorkAtom,
@@ -182,6 +183,65 @@ describe("置き換え選択は作品一覧へ進み、AND追加は現在地に�
 
     expect(store.get(activeAxisAtom)).toBe("cv");
     expect(store.get(selectedTagsAtom)).toEqual(["cv/藤田茜"]);
+  });
+});
+
+describe("addLibraryTagAtom は追加ボタン用の冪等なAND追加として働く（ADR-0013）", () => {
+  it("未選択のタグを追加する", () => {
+    const store = createStore();
+    store.set(selectedTagsAtom, nts(["サークル/月白製作所"]));
+
+    store.set(addLibraryTagAtom, nt("cv/藤田茜"));
+
+    expect(store.get(selectedTagsAtom)).toEqual(["サークル/月白製作所", "cv/藤田茜"]);
+  });
+
+  it("選択済みのタグは何もしない（解除しない）", () => {
+    const store = createStore();
+    store.set(selectedTagsAtom, nts(["cv/藤田茜", "サークル/月白製作所"]));
+
+    store.set(addLibraryTagAtom, nt("cv/藤田茜"));
+
+    expect(store.get(selectedTagsAtom)).toEqual(["cv/藤田茜", "サークル/月白製作所"]);
+  });
+
+  it("選択済みのタグを追加しても履歴コミットは走らせない", () => {
+    const store = createStore();
+    store.set(selectedTagsAtom, nts(["cv/藤田茜"]));
+    store.set(consumeNavigationHistoryCommitAtom);
+    const before = store.get(navigationHistoryCommitAtom);
+
+    store.set(addLibraryTagAtom, nt("cv/藤田茜"));
+
+    expect(store.get(navigationHistoryCommitAtom)).toEqual(before);
+  });
+
+  it("組み込み擬似タグ軸は同軸排他してから追加する（year等）", () => {
+    const store = createStore();
+    store.set(selectedTagsAtom, nts(["cv/藤田茜", "@year/2023"]));
+
+    store.set(addLibraryTagAtom, nt("@year/2024"));
+
+    expect(store.get(selectedTagsAtom)).toEqual(["cv/藤田茜", "@year/2024"]);
+  });
+
+  it("選択中の作品をクリアする", () => {
+    const store = createStore();
+    store.set(selectedWorkIdAtom, "work-1");
+
+    store.set(addLibraryTagAtom, nt("cv/藤田茜"));
+
+    expect(store.get(selectedWorkIdAtom)).toBeNull();
+  });
+
+  it("選択済みのタグを追加しても選択中の作品はクリアしない", () => {
+    const store = createStore();
+    store.set(selectedTagsAtom, nts(["cv/藤田茜"]));
+    store.set(selectedWorkIdAtom, "work-1");
+
+    store.set(addLibraryTagAtom, nt("cv/藤田茜"));
+
+    expect(store.get(selectedWorkIdAtom)).toBe("work-1");
   });
 });
 

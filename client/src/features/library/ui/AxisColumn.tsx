@@ -9,6 +9,10 @@ import {
 import AxisQuickOverlay from "./AxisQuickOverlay";
 import { I, type IconName } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
+import {
+  deriveValueSelectionHandlers,
+  type ValueSelectionIntent,
+} from "../model/valueSelectionContract";
 
 interface AxisRow {
   id: AxisId;
@@ -41,6 +45,8 @@ interface AxisColumnProps {
   onSelectAxis: (axis: AxisId) => void;
   onToggleTag: (tag: NormalizedTag) => void;
   onReplaceTag: (tag: NormalizedTag) => void;
+  /** 追加ボタン用の冪等なAND追加（ADR-0013） */
+  onAddTag: (tag: NormalizedTag) => void;
   onNewSmartFolder?: () => void;
   onRetryTagPrefixes?: () => void;
 }
@@ -109,6 +115,7 @@ export default function AxisColumn({
   onSelectAxis,
   onToggleTag,
   onReplaceTag,
+  onAddTag,
   onNewSmartFolder,
   onRetryTagPrefixes,
 }: AxisColumnProps) {
@@ -123,12 +130,16 @@ export default function AxisColumn({
     close: closeOverlay,
   } = useHoverGroupCoordinator();
 
-  // クイックオーバーレイの選択は既定=置き換え、Ctrl/Cmd+クリックで AND 追加へ反転する（ADR-0012 §7）。
+  // クイックオーバーレイは既定=置き換えの入口（値選択の契約。design-system.md）。
   // 置き換えは結果面を作品一覧へ遷移させ、AND追加は現在の結果面に留まる（ADR-0012 §8）。
-  const handleSelectValue = (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => {
-    if (opts.ctrlKey || opts.metaKey) onToggleTag(tag);
-    else onReplaceTag(tag);
+  const valueSelectionIntent: ValueSelectionIntent<NormalizedTag> = {
+    default: "replace",
+    onReplace: onReplaceTag,
+    onToggle: onToggleTag,
+    onAdd: onAddTag,
   };
+  const { onSelect: handleSelectValue, onAddButton: handleAddValue } =
+    deriveValueSelectionHandlers(valueSelectionIntent);
 
   const renderRow = (ax: AxisRow) => {
     const hasQuickOverlay = isFacetAxis(ax.id) || ax.id === "tag";
@@ -200,7 +211,7 @@ export default function AxisColumn({
           isOpen
           selectedTags={selectedTags}
           onSelectValue={handleSelectValue}
-          onAddValue={onToggleTag}
+          onAddValue={handleAddValue}
           onClose={closeOverlay}
           panelHandlers={panelHandlers}
           panelElRef={panelElRef}

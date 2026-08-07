@@ -24,7 +24,7 @@ interface AxisQuickOverlayProps {
   isOpen: boolean;
   selectedTags: NormalizedTag[];
   onSelectValue: (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
-  /** ホバー/フォーカス時の＋ボタン（常にAND追加。ADR-0013） */
+  /** ホバー/フォーカス時の＋ボタン（冪等なAND追加。ADR-0013） */
   onAddValue: (tag: NormalizedTag) => void;
   onClose: () => void;
   panelHandlers: HoverGroupPanelHandlers;
