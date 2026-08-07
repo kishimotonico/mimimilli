@@ -4,6 +4,7 @@ title: セーフトライアングルの初回ホバー取りこぼしと退化�
 status: To Do
 assignee: []
 created_date: '2026-08-07 09:26'
+updated_date: '2026-08-07 09:34'
 labels: []
 dependencies: []
 ordinal: 239000
@@ -17,9 +18,9 @@ TASK-227のCodexレビューで見つかった2件を修正する。(1) client/s
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 初回レンダー直後（再レンダーなし）の最初のホバーでもクイックオーバーレイが開く
-- [ ] #2 getTriggerHandlers がイベント発生時のトリガー要素を取得する形になっている
-- [ ] #3 isPointInTriangle が退化三角形（面積0）では判定点が同一直線上にあっても false を返す
-- [ ] #4 上記2件の退行テストが追加され、修正前のコードでは赤くなることを確認済み
-- [ ] #5 pnpm check と変更範囲のテストが通る
+- [x] #1 初回レンダー直後（再レンダーなし）の最初のホバーでもクイックオーバーレイが開く
+- [x] #2 getTriggerHandlers がイベント発生時のトリガー要素を取得する形になっている
+- [x] #3 isPointInTriangle が退化三角形（面積0）では判定点が同一直線上にあっても false を返す
+- [x] #4 上記2件の退行テストが追加され、修正前のコードでは赤くなることを確認済み
+- [x] #5 pnpm check と変更範囲のテストが通る
 <!-- AC:END -->

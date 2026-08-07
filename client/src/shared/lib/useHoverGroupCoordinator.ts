@@ -14,7 +14,7 @@ const DEFAULT_TRIANGLE_IDLE_MS = 300;
 const DEFAULT_TRIANGLE_PADDING_PX = 8;
 
 export interface HoverGroupTriggerHandlers {
-  onPointerEnter: () => void;
+  onPointerEnter: (event: ReactPointerEvent<HTMLElement>) => void;
   onPointerLeave: (event: ReactPointerEvent) => void;
 }
 
@@ -41,7 +41,10 @@ export interface UseHoverGroupCoordinatorResult {
   openAnchorEl: HTMLElement | null;
   /** パネルのDOM要素をこのrefへ代入する（セーフトライアングルの底辺の算出に使う） */
   panelElRef: React.RefObject<HTMLElement | null>;
-  getTriggerHandlers: (key: string, el: HTMLElement | null) => HoverGroupTriggerHandlers;
+  /** トリガー要素は呼び出し時（render時ではなくpointerイベント発火時）に
+   *  event.currentTarget から取得する。renderの時点ではrefがまだDOM要素を
+   *  指していない可能性があるため、要素を先渡しにしない。 */
+  getTriggerHandlers: (key: string) => HoverGroupTriggerHandlers;
   panelHandlers: HoverGroupPanelHandlers;
   /** 遅延なしで即座に開く（キーボード操作用） */
   openImmediately: (key: string, el: HTMLElement | null) => void;
@@ -190,8 +193,8 @@ export function useHoverGroupCoordinator(
     engageTriangleGuard(point, panelEl.getBoundingClientRect());
   };
 
-  const getTriggerHandlers = (key: string, el: HTMLElement | null): HoverGroupTriggerHandlers => ({
-    onPointerEnter: () => handleTriggerEnter(key, el),
+  const getTriggerHandlers = (key: string): HoverGroupTriggerHandlers => ({
+    onPointerEnter: (event) => handleTriggerEnter(key, event.currentTarget),
     onPointerLeave: (event) => handleTriggerLeave(key, { x: event.clientX, y: event.clientY }),
   });
 
