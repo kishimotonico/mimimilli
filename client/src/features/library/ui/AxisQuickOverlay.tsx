@@ -24,6 +24,8 @@ interface AxisQuickOverlayProps {
   isOpen: boolean;
   selectedTags: NormalizedTag[];
   onSelectValue: (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
+  /** ホバー/フォーカス時の＋ボタン（常にAND追加。ADR-0013） */
+  onAddValue: (tag: NormalizedTag) => void;
   onClose: () => void;
   panelHandlers: HoverGroupPanelHandlers;
   panelElRef: RefObject<HTMLElement | null>;
@@ -35,6 +37,7 @@ export default function AxisQuickOverlay({
   isOpen,
   selectedTags,
   onSelectValue,
+  onAddValue,
   onClose,
   panelHandlers,
   panelElRef,
@@ -78,6 +81,9 @@ export default function AxisQuickOverlay({
             metaKey: e.metaKey,
           });
           close();
+        }}
+        onAdd={(item) => {
+          onAddValue(buildFilterTag(axis, item.value));
         }}
         close={close}
       />

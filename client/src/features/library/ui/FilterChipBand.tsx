@@ -73,6 +73,7 @@ function FilterChip({
             else onReplace(nextTag);
             close();
           }}
+          onAdd={onToggle}
           close={close}
         />
       )}

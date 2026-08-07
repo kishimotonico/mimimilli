@@ -146,7 +146,7 @@ describe("AxisValueQuickList のキーボード移動", () => {
     sizeMock.restore();
   });
 
-  it("items が変わると activeIndexRef がリセットされ、次の移動は先頭から始まる", async () => {
+  it("items だけが変わっても activeIndexRef はリセットされず、位置を維持したまま移動する", async () => {
     const sizeMock = mockElementSize(260, 260);
     const user = userEvent.setup();
     const { rerender } = renderQuickList({ items: makeItems(3) });
@@ -160,7 +160,10 @@ describe("AxisValueQuickList のキーボード移動", () => {
     });
     expect(document.activeElement?.textContent).toContain("値0002");
 
-    // 同じ axis・ソート・検索語のまま items の中身だけ変わる（選択中タグの変化等を想定）。
+    // 同じ axis・ソート・検索語のまま items の中身だけ変わる（AND追加ボタンによる
+    // selectedTags の変化でfacetデータが再取得されるケースを想定。ADR-0013:
+    // AND追加は一覧を開いたまま連続で行えるため、ここでスクロール・キーボード位置を
+    // 先頭へ戻してはならない）。
     rerender(
       <AxisValueQuickList
         axis="cv"
@@ -177,9 +180,9 @@ describe("AxisValueQuickList のキーボード移動", () => {
       await new Promise((r) => setTimeout(r, 50));
     });
 
-    // activeIndexRef がリセットされていれば、新しいitemsの先頭（別値0002）から始まる。
-    // リセットされていなければ古いインデックス基準でずれた項目になる。
-    expect(document.activeElement?.textContent).toContain("別値0002");
+    // activeIndexRef がリセットされていなければ、直前の位置（先頭=別値0002）から
+    // 1つ進んだ別値0001に着地する。リセットされていれば先頭の別値0002に戻ってしまう。
+    expect(document.activeElement?.textContent).toContain("別値0001");
     sizeMock.restore();
   });
 });

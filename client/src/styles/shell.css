@@ -1681,6 +1681,29 @@
     font-size: 10.5px;
     color: var(--ink-3);
   }
+  .mll-qlist__row {
+    position: relative;
+    border-radius: 4px;
+  }
+  .mll-qlist__row:hover {
+    background: var(--paper-2);
+  }
+  .mll-qlist__row.is-on {
+    background: var(--paper-4);
+  }
+  .mll-qlist__add {
+    position: absolute;
+    top: 50%;
+    right: 4px;
+    transform: translateY(-50%);
+    opacity: 0;
+    pointer-events: none;
+  }
+  .mll-qlist__row:hover .mll-qlist__add,
+  .mll-qlist__row:focus-within .mll-qlist__add {
+    opacity: 1;
+    pointer-events: auto;
+  }
   /* 入れ子タグの選択不可の見出し行（名前順ソート時のみ。値一覧の .mll-vrow-heading と対）。 */
   .mll-qlist__heading {
     padding: 6px 8px;

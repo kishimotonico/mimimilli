@@ -14,6 +14,8 @@ interface AxisValuePopoverPanelProps {
   layout: PopoverLayout;
   selectedTags: NormalizedTag[];
   onSelect: (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
+  /** ホバー/フォーカス時の＋ボタン（常にAND追加）。省略時はボタンを出さない（ADR-0013） */
+  onAdd?: (tag: NormalizedTag) => void;
   close: () => void;
   hint?: string;
 }
@@ -23,6 +25,7 @@ export default function AxisValuePopoverPanel({
   layout,
   selectedTags,
   onSelect,
+  onAdd,
   close,
   hint,
 }: AxisValuePopoverPanelProps) {
@@ -42,6 +45,7 @@ export default function AxisValuePopoverPanel({
         onSelect={(item, e) =>
           onSelect(buildFilterTag(axis, item.value), { ctrlKey: e.ctrlKey, metaKey: e.metaKey })
         }
+        onAdd={onAdd ? (item) => onAdd(buildFilterTag(axis, item.value)) : undefined}
         close={close}
         hint={hint}
       />

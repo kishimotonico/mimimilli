@@ -17,6 +17,7 @@ import {
 } from "../model/axisValueHierarchy";
 import type { AxisId } from "../model/types";
 import { I } from "../../../shared/ui/Icon";
+import IconButton from "../../../shared/ui/IconButton";
 
 // 軸レールのクイックオーバーレイ・「＋絞り込み」・チップの兄弟値ドロップダウン
 // が共有する簡易値リスト。データ取得・フィルタ・ソートは値一覧本体
@@ -39,6 +40,8 @@ interface AxisValueQuickListProps {
   isSelected: (tag: string) => boolean;
   /** 値を選択したときのハンドラ。Ctrl/Cmdキーで既定動作を反転する（呼び出し側が解釈する） */
   onSelect: (item: AxisFacetItem, event: { ctrlKey: boolean; metaKey: boolean }) => void;
+  /** ホバー/フォーカス時に出る＋ボタン（常にAND追加）。省略時はボタンを出さない（ADR-0013） */
+  onAdd?: (item: AxisFacetItem) => void;
   /** 既定動作の説明（例:「クリックで置き換え」「AND追加されます」） */
   hint?: string;
   /** useAnchoredPopover / usePopoverDismissal が返す close をそのまま渡す */
@@ -66,6 +69,7 @@ export default function AxisValueQuickList({
   isError,
   isSelected,
   onSelect,
+  onAdd,
   hint,
   close,
   emptyLabel = "項目がありません",
@@ -106,22 +110,22 @@ export default function AxisValueQuickList({
 
   const resetKey = `${axis}:${sort.key}:${sort.direction}:${query}`;
   const prevResetKeyRef = useRef(resetKey);
-  // items（facet データ本体）の参照も見る。選択中タグの変化などで同じ軸・ソート・検索語の
-  // まま中身だけ変わることがあり、resetKey の文字列比較だけでは検知できないため。
-  const prevItemsRef = useRef(items);
   // キーボード移動中の「現在位置」を自前で追跡する（rows のインデックス、未選択は-1）。
   // document.activeElement から逆算すると、フォーカス確定（下記のダブルrAF）より速く
   // 次のキー入力が来た場合に取りこぼす（キーリピート等）。scrollToIndex/focus の実際の
   // 完了を待たず、常にこの ref を正として次の移動先を決める。
   const activeIndexRef = useRef(-1);
   useEffect(() => {
-    if (prevResetKeyRef.current === resetKey && prevItemsRef.current === items) return;
+    // resetKey（軸・ソート・検索語）が変わらない限りリセットしない。AND追加ボタンで
+    // selectedTags が変わると facet データが再取得され items の参照だけ変わるが、
+    // 見ている対象は変わっていないためスクロール位置・キーボード位置は維持する
+    // （ADR-0013: AND追加はオーバーレイを開いたまま連続で行える）。
+    if (prevResetKeyRef.current === resetKey) return;
     prevResetKeyRef.current = resetKey;
-    prevItemsRef.current = items;
     activeIndexRef.current = -1;
     virtualizer.scrollToIndex(0);
     if (listRef.current) listRef.current.scrollTop = 0;
-  }, [resetKey, items, virtualizer]);
+  }, [resetKey, virtualizer]);
 
   // 仮想化中は範囲外の行がDOMに無いため、scrollToIndexで画面内へ入れてから
   // レイアウト確定後（ダブルrAF）にフォーカスする。
@@ -282,22 +286,35 @@ export default function AxisValueQuickList({
                     (() => {
                       const on = isSelected(row.item.value);
                       return (
-                        <button
-                          type="button"
-                          data-quicklist-item
-                          // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- 値一覧と同じボタン一覧の表現を使う
+                        <div
+                          className={`mll-qlist__row ${on ? "is-on" : ""}`}
+                          // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- クリック領域(選択)とAND追加ボタンを両方内包するため<option>にはできない
                           role="option"
                           aria-selected={on}
-                          className={`mll-qlist__item ${on ? "is-on" : ""}`}
-                          style={{ paddingLeft: 8 + indent }}
-                          title={row.depth > 0 ? row.item.value : undefined}
-                          onClick={(e) =>
-                            onSelect(row.item, { ctrlKey: e.ctrlKey, metaKey: e.metaKey })
-                          }
                         >
-                          <span className="nm">{row.label}</span>
-                          <span className="count">{row.item.count}</span>
-                        </button>
+                          <button
+                            type="button"
+                            data-quicklist-item
+                            className={`mll-qlist__item ${on ? "is-on" : ""}`}
+                            style={{ paddingLeft: 8 + indent, paddingRight: onAdd ? 26 : 8 }}
+                            title={row.depth > 0 ? row.item.value : undefined}
+                            onClick={(e) =>
+                              onSelect(row.item, { ctrlKey: e.ctrlKey, metaKey: e.metaKey })
+                            }
+                          >
+                            <span className="nm">{row.label}</span>
+                            <span className="count">{row.item.count}</span>
+                          </button>
+                          {onAdd && (
+                            <IconButton
+                              icon={I.add}
+                              label={`${row.item.value}をAND追加`}
+                              size="xs"
+                              className="mll-qlist__add"
+                              onClick={() => onAdd(row.item)}
+                            />
+                          )}
+                        </div>
                       );
                     })()
                   )}

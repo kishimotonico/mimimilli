@@ -200,6 +200,7 @@ export default function AxisColumn({
           isOpen
           selectedTags={selectedTags}
           onSelectValue={handleSelectValue}
+          onAddValue={onToggleTag}
           onClose={closeOverlay}
           panelHandlers={panelHandlers}
           panelElRef={panelElRef}
