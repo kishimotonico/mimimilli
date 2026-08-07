@@ -71,13 +71,14 @@ describe("useHoverGroupCoordinator", () => {
       result.current.getTriggerHandlers("a").onPointerEnter({ currentTarget: elA } as never);
       vi.advanceTimersByTime(200);
     });
-    result.current.panelElRef.current = panelEl;
+    const token = result.current.ownerToken!;
+    result.current.registerPanelEl(token, panelEl);
 
     act(() => {
       result.current.getTriggerHandlers("a").onPointerLeave({ clientX: 0, clientY: 100 } as never);
     });
     act(() => {
-      result.current.panelHandlers.onPointerEnter();
+      result.current.getPanelHandlers(token).onPointerEnter();
     });
     act(() => {
       vi.advanceTimersByTime(1000);
@@ -95,7 +96,7 @@ describe("useHoverGroupCoordinator", () => {
       result.current.getTriggerHandlers("a").onPointerEnter({ currentTarget: elA } as never);
       vi.advanceTimersByTime(200);
     });
-    result.current.panelElRef.current = panelEl;
+    result.current.registerPanelEl(result.current.ownerToken!, panelEl);
     expect(result.current.openKey).toBe("a");
 
     act(() => {
@@ -128,7 +129,7 @@ describe("useHoverGroupCoordinator", () => {
       result.current.getTriggerHandlers("a").onPointerEnter({ currentTarget: elA } as never);
       vi.advanceTimersByTime(200);
     });
-    result.current.panelElRef.current = panelEl;
+    result.current.registerPanelEl(result.current.ownerToken!, panelEl);
 
     act(() => {
       result.current.getTriggerHandlers("a").onPointerLeave({ clientX: 0, clientY: 100 } as never);
@@ -160,7 +161,7 @@ describe("useHoverGroupCoordinator", () => {
       result.current.getTriggerHandlers("a").onPointerEnter({ currentTarget: elA } as never);
       vi.advanceTimersByTime(200);
     });
-    result.current.panelElRef.current = panelEl;
+    result.current.registerPanelEl(result.current.ownerToken!, panelEl);
 
     act(() => {
       result.current.getTriggerHandlers("a").onPointerLeave({ clientX: 0, clientY: 100 } as never);
@@ -183,7 +184,7 @@ describe("useHoverGroupCoordinator", () => {
       result.current.getTriggerHandlers("a").onPointerEnter({ currentTarget: elA } as never);
       vi.advanceTimersByTime(200);
     });
-    result.current.panelElRef.current = panelEl;
+    result.current.registerPanelEl(result.current.ownerToken!, panelEl);
 
     act(() => {
       // ガード活性化はここで addEventListener("pointermove", ...) を呼ぶ
@@ -205,6 +206,42 @@ describe("useHoverGroupCoordinator", () => {
 
     addSpy.mockRestore();
     removeSpy.mockRestore();
+  });
+
+  it("旧オーナーのトークンでの登録解除は新オーナーの登録を壊さない（軸A→B切替）", () => {
+    const { result } = renderHook(() => useHoverGroupCoordinator());
+    const elA = elAt({ left: 0, top: 90, bottom: 110 });
+    const elB = elAt({ left: 0, top: 130, bottom: 150 });
+    const panelElA = elAt({ left: 200, top: 50, bottom: 150 });
+    const panelElB = elAt({ left: 200, top: 50, bottom: 150 });
+
+    act(() => {
+      result.current.openImmediately("a", elA);
+    });
+    const tokenA = result.current.ownerToken!;
+    result.current.registerPanelEl(tokenA, panelElA);
+
+    act(() => {
+      result.current.openImmediately("b", elB);
+    });
+    const tokenB = result.current.ownerToken!;
+    expect(tokenB).not.toBe(tokenA);
+    result.current.registerPanelEl(tokenB, panelElB);
+
+    // 退出アニメーション中の旧Aが遅れてアンマウントし、古いトークンで null 解除を試みる。
+    result.current.registerPanelEl(tokenA, null);
+
+    // 新Bのセーフトライアングル判定にpanelElBが使われ続けることを、
+    // トリガー離脱→三角形ガードの発動経路（panelElRef参照）で間接的に確認する。
+    act(() => {
+      result.current.getTriggerHandlers("b").onPointerLeave({ clientX: 0, clientY: 100 } as never);
+    });
+    // パネル未登録扱い（150ms即closeスケジュール）になっていれば、旧Aの解除が
+    // 新Bの登録を壊してしまっている。三角形ガードが働いていれば150ms経過後もopenのまま。
+    act(() => {
+      vi.advanceTimersByTime(150);
+    });
+    expect(result.current.openKey).toBe("b");
   });
 
   it("openImmediately は遅延なしで即座に開く", () => {

@@ -1,4 +1,5 @@
 import { Fragment, useState } from "react";
+import { AnimatePresence } from "motion/react";
 import type { NormalizedTag, TagPrefix } from "@mimimilli/shared";
 import { getAxisLabel } from "../model/axisDefinitions";
 import { axisOfFilterTag } from "../model/libraryPresentation";
@@ -72,19 +73,23 @@ function FilterChip({
       >
         <I.x size={9} />
       </button>
-      <AxisValuePopoverPanel
-        axis={axis}
-        axisLabel={getAxisLabel(axis, tagPrefixes)}
-        layout={layout}
-        isOpen={open}
-        selectedTags={selectedTags}
-        onSelect={(nextTag, opts) => {
-          onSelect(nextTag, opts);
-          close();
-        }}
-        onAdd={onAdd}
-        close={close}
-      />
+      <AnimatePresence>
+        {open && (
+          <AxisValuePopoverPanel
+            key={axis}
+            axis={axis}
+            axisLabel={getAxisLabel(axis, tagPrefixes)}
+            layout={layout}
+            selectedTags={selectedTags}
+            onSelect={(nextTag, opts) => {
+              onSelect(nextTag, opts);
+              close();
+            }}
+            onAdd={onAdd}
+            close={close}
+          />
+        )}
+      </AnimatePresence>
     </span>
   );
 }
