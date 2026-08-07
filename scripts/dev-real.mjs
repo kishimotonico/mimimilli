@@ -9,6 +9,7 @@
 // アプリ本体（dataRoot.ts）は環境変数の有無しか見ない。
 //
 // 使い方: node scripts/dev-real.mjs -- <実行したいコマンド...>
+import { createHash } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
 import { homedir } from "node:os";
 import path from "node:path";
@@ -67,8 +68,9 @@ function resolveExtraEnv(env, platform) {
   }
 
   const productionRoot = resolveProductionRoot(env, platform);
-  const worktreeName = path.basename(toplevel);
-  const dataDir = path.join(path.dirname(productionRoot), "mimimilli-worktrees", worktreeName);
+  const pathHash = createHash("sha256").update(toplevel).digest("hex").slice(0, 8);
+  const dirName = `${path.basename(toplevel)}-${pathHash}`;
+  const dataDir = path.join(path.dirname(productionRoot), "mimimilli-worktrees", dirName);
   console.log(
     `[dev-real] linked worktree を検出しました（${toplevel}）。専用データディレクトリを使用します: MIMIMILLI_DATA_DIR=${dataDir}`,
   );
@@ -86,12 +88,18 @@ function main() {
     shell: process.platform === "win32",
   });
 
+  const signalHandlers = new Map();
   for (const signal of ["SIGINT", "SIGTERM"]) {
-    process.on(signal, () => child.kill(signal));
+    const handler = () => child.kill(signal);
+    signalHandlers.set(signal, handler);
+    process.on(signal, handler);
   }
 
   child.on("exit", (code, signal) => {
     if (signal) {
+      for (const [sig, handler] of signalHandlers) {
+        process.removeListener(sig, handler);
+      }
       process.kill(process.pid, signal);
       return;
     }
