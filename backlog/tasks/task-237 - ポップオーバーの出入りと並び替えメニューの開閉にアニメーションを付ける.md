@@ -1,10 +1,10 @@
 ---
 id: TASK-237
 title: ポップオーバーの出入りと並び替えメニューの開閉にアニメーションを付ける
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-07 15:10'
-updated_date: '2026-08-07 16:01'
+updated_date: '2026-08-07 16:27'
 labels: []
 dependencies: []
 ordinal: 247000
@@ -35,3 +35,9 @@ ordinal: 247000
 - [x] #6 オーバーレイの初期位置ジャンプがアニメーションで可視化されていないことを実機で確認済み
 - [x] #7 pnpm check と変更範囲のテスト、pnpm test:smoke が通る
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Presenceにpopover-scale variant（180ms、scale+opacity、transform-originは呼び出し側クラスへ委譲）を追加し、軸レールのクイックオーバーレイ・チップの兄弟値ドロップダウン・「＋絞り込み」の出入りと並び替え選択列の開閉をアニメーション化。prefers-reduced-motionの無効化リストにも追加。退出中に値が失われないよう直前値保持ref（軸・アンカー要素・選択軸・facet結果）を置き、退出中の要素はPresence側でinert化（keepInteractiveOnExitでopt-out可）。退出中の再オープンで検索欄フォーカスが戻るようisOpenを依存に追加。Codexレビュー2巡で指摘なしまで到達。pnpm check・unit25件・smoke10件全通過
+<!-- SECTION:FINAL_SUMMARY:END -->
