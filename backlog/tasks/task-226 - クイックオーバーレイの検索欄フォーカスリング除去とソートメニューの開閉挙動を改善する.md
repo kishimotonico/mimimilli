@@ -1,10 +1,10 @@
 ---
 id: TASK-226
 title: クイックオーバーレイの検索欄フォーカスリング除去とソートメニューの開閉挙動を改善する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-07 08:18'
-updated_date: '2026-08-07 08:28'
+updated_date: '2026-08-07 08:30'
 labels: []
 dependencies: []
 ordinal: 236000
@@ -26,3 +26,9 @@ ordinal: 236000
 - [x] #6 pnpm check と変更範囲のテストが通る
 - [x] #7 クイックオーバーレイの値行は文字数によらず全幅で、件数は右端揃えになる（仮想化行のwidth欠落を修正）
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+クイックオーバーレイの検索入力のフォーカスリング（outline 2px --acc）を除去しキャレットのみに。仮想化値行のbuttonがコンテンツ幅に縮む問題をwidth:100%で修正し件数を右端揃えに。並び替え選択列はキー選択後も開いたままにし、トグル再クリックで閉じる。アクティブキーと方向を表示し再クリックで昇降順反転（toggleAxisValueSort）。pnpm check・vitest 703件全通過、実機確認済み
+<!-- SECTION:FINAL_SUMMARY:END -->
