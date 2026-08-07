@@ -1,10 +1,10 @@
 ---
 id: TASK-231
 title: タグ選択ポップオーバーの値行にAND追加ボタンを置く
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-07 12:22'
-updated_date: '2026-08-07 12:31'
+updated_date: '2026-08-07 13:08'
 labels: []
 dependencies: []
 ordinal: 241000
@@ -26,3 +26,9 @@ ADR-0013の決定に基づき、置き換えが既定の値選択入口すべて
 - [x] #6 仮想化の行高とキーボード操作（矢印キーでの移動・フォーカス）に退行がない
 - [x] #7 pnpm check と変更範囲のテストが通る
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AxisValueQuickListの値行をdiv+主選択ボタン+AND追加ボタンの構造へ変え、値一覧と同じホバー表示の追加ボタンを置いた（ADR-0013）。軸レールのクイックオーバーレイとチップの兄弟値ドロップダウンに配線し、既定がAND追加の「＋絞り込み」には出さない。AND追加では一覧を閉じず、リセット条件からitemsを外してスクロール位置も維持し連続追加できるようにした。pnpm check/test全通過、実機で全項目確認済み
+<!-- SECTION:FINAL_SUMMARY:END -->

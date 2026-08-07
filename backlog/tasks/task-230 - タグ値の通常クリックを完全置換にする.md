@@ -1,10 +1,10 @@
 ---
 id: TASK-230
 title: タグ値の通常クリックを完全置換にする
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-07 12:22'
-updated_date: '2026-08-07 12:25'
+updated_date: '2026-08-07 13:08'
 labels: []
 dependencies: []
 ordinal: 240000
@@ -26,3 +26,9 @@ ADR-0013の決定に基づき、タグ値の通常クリックを prefix や軸�
 - [x] #6 置き換え時の結果面遷移（ADR-0012 §8）が従来どおり動作する
 - [x] #7 pnpm check と変更範囲のテストが通る
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+タグ値の通常クリックをprefix・軸に関係なく常に完全置換にした（ADR-0013）。tagFilterGroupKeyとcomputeReplacedTagsを削除し、replaceLibraryTagAtomは選択配列を[tag]に差し替えるだけにした。軸遷移規則・selectSoleLibraryTagAtom・AND追加経路のyear軸単一選択扱いは無変更。pnpm check/test全通過、レビュー指摘なし、実機で別prefix・同一prefixとも1つに置換されることを確認
+<!-- SECTION:FINAL_SUMMARY:END -->
