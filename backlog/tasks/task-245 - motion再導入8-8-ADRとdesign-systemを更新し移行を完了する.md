@@ -1,10 +1,10 @@
 ---
 id: TASK-245
 title: 'motion再導入(8/8): ADRとdesign-systemを更新し移行を完了する'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-07 17:01'
-updated_date: '2026-08-07 21:55'
+updated_date: '2026-08-07 21:57'
 labels: []
 dependencies:
   - TASK-244
