@@ -1,10 +1,10 @@
 ---
 id: TASK-223
 title: テスト基盤改善後のドキュメント残骸を現状に合わせて更新する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-07 07:16'
-updated_date: '2026-08-07 07:18'
+updated_date: '2026-08-07 07:22'
 labels: []
 dependencies: []
 priority: medium
@@ -24,3 +24,9 @@ pixel比較廃止→smoke一本化（TASK-221）とworktree分離（TASK-214/222
 - [x] #3 docs/HANDOFF.mdのworktreeデータディレクトリ名の記述が<basename>-<絶対パスsha256先頭8桁>形式（scripts/dev-real.mjs）と整合している
 - [x] #4 docs/adr/0007のLinuxデータディレクトリ名がmimimilli（server/src/adapters/real/dataRoot.tsの実装）に合わせて修正されている
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AGENTS.mdのtest:visual記述をtest:smokeの現行運用へ更新、docs/HANDOFF.mdのsmokeポート（4175固定→worktreeパスsha256から4200〜4699導出）とworktreeデータディレクトリ名（<basename>-<絶対パスsha256先頭8桁>）を実装に整合、docs/adr/0007のmimikago表記（MIMIKAGO_DATA_DIR・Mimikago含む）をmimimilliへ修正。実装ファイルとの突き合わせレビュー（Sonnet）で問題なし。pnpm check全緑。コミット8ec445e。
+<!-- SECTION:FINAL_SUMMARY:END -->
