@@ -1,10 +1,10 @@
 ---
 id: TASK-229
 title: セーフトライアングルの初回ホバー取りこぼしと退化三角形判定を修正する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-07 09:26'
-updated_date: '2026-08-07 09:34'
+updated_date: '2026-08-07 09:37'
 labels: []
 dependencies: []
 ordinal: 239000
@@ -24,3 +24,9 @@ TASK-227のCodexレビューで見つかった2件を修正する。(1) client/s
 - [x] #4 上記2件の退行テストが追加され、修正前のコードでは赤くなることを確認済み
 - [x] #5 pnpm check と変更範囲のテストが通る
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Codexレビュー指摘2件を修正。getTriggerHandlersの署名を(key,el)→(key)に変え、トリガー要素をpointerenter時のevent.currentTargetから取得する形にして、初回レンダーでnullのrefを閉じ込める経路を廃止。isPointInTriangleは3頂点の面積0を明示チェックして退化三角形を常にfalseに。両方の退行テストを追加し、修正前コードで赤くなることを確認済み。pnpm check・関連テスト全通過、レビュー指摘なし
+<!-- SECTION:FINAL_SUMMARY:END -->
