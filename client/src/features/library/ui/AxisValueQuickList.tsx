@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import type { AxisFacetItem } from "@mimimilli/shared";
 import { filterAxisValueItems } from "../model/axisValueFilter";
 import {
@@ -17,7 +18,7 @@ import {
 import type { AxisId } from "../model/types";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
-import Presence from "../../../shared/ui/Presence";
+import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 
 // 軸レールのクイックオーバーレイ・「＋絞り込み」・チップの兄弟値ドロップダウン
 // が共有する簡易値リスト。データ取得・フィルタ・ソートは値一覧本体
@@ -55,6 +56,54 @@ interface AxisValueQuickListProps {
   /** useAnchoredPopover / usePopoverDismissal が返す close をそのまま渡す */
   close: () => void;
   emptyLabel?: string;
+}
+
+interface SortMenuProps {
+  sort: AxisValueSortState;
+  onToggle: (id: (typeof AXIS_VALUE_SORT_OPTIONS)[number]["id"]) => void;
+}
+
+/** ソート切替メニュー。height:0↔auto の collapse で開閉する。
+ *  `.mll-qlist__sort` 自体は padding/border-bottom を持つ実要素のため、
+ *  overflow:hidden で高さをクリップする役目はこの外側の motion.div が担う。 */
+function SortMenu({ sort, onToggle }: SortMenuProps) {
+  const { collapse } = useMotionVariants();
+  const isPresent = useIsPresent();
+  const v = collapse();
+  return (
+    <motion.div
+      style={{ overflow: "hidden" }}
+      inert={!isPresent}
+      initial={v.initial}
+      animate={v.animate}
+      exit={v.exit}
+    >
+      {/* oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- ソート切替はボタン列で表現する */}
+      <div className="mll-qlist__sort" role="group" aria-label="並び替え">
+        {AXIS_VALUE_SORT_OPTIONS.map((opt) => {
+          const isActive = sort.key === opt.id;
+          const directionLabel = isActive ? (sort.direction === "asc" ? "昇順" : "降順") : null;
+          return (
+            <button
+              key={opt.id}
+              type="button"
+              className={`mll-qlist__sortbtn ${isActive ? "is-active" : ""}`}
+              aria-pressed={isActive}
+              aria-label={directionLabel ? `${opt.label}（${directionLabel}）` : opt.label}
+              onClick={() => onToggle(opt.id)}
+            >
+              {opt.label}
+              {isActive && (
+                <span className={`chev ${sort.direction === "asc" ? "is-asc" : ""}`}>
+                  <I.chevD size={11} />
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </motion.div>
+  );
 }
 
 /** 見出し行（選択不可）を飛ばして次の値行のインデックスを探す。ラップアラウンドする。 */
@@ -221,32 +270,15 @@ export default function AxisValueQuickList({
         // 統括判断: 入れ子の浮遊レイヤーは作らず、パネル内にインライン展開する
         // （フォーカス管理・Escapeの二重化を避けるため）。
       }
-      <Presence show={sortMenuOpen} variant="collapse">
-        {/* oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- ソート切替はボタン列で表現する */}
-        <div className="mll-qlist__sort" role="group" aria-label="並び替え">
-          {AXIS_VALUE_SORT_OPTIONS.map((opt) => {
-            const isActive = sort.key === opt.id;
-            const directionLabel = isActive ? (sort.direction === "asc" ? "昇順" : "降順") : null;
-            return (
-              <button
-                key={opt.id}
-                type="button"
-                className={`mll-qlist__sortbtn ${isActive ? "is-active" : ""}`}
-                aria-pressed={isActive}
-                aria-label={directionLabel ? `${opt.label}（${directionLabel}）` : opt.label}
-                onClick={() => setSort(toggleAxisValueSort(sort, opt.id))}
-              >
-                {opt.label}
-                {isActive && (
-                  <span className={`chev ${sort.direction === "asc" ? "is-asc" : ""}`}>
-                    <I.chevD size={11} />
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </Presence>
+      <AnimatePresence>
+        {sortMenuOpen && (
+          <SortMenu
+            key="sort-menu"
+            sort={sort}
+            onToggle={(id) => setSort(toggleAxisValueSort(sort, id))}
+          />
+        )}
+      </AnimatePresence>
       {hint && <div className="mll-qlist__hint">{hint}</div>}
       {isLoading ? (
         <div className="mll-qlist__status">読み込み中…</div>

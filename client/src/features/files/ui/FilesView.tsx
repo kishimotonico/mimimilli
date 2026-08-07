@@ -6,6 +6,7 @@
 import { useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAtomValue } from "jotai";
+import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import { browseFs } from "../api";
 import { useFilesNavigation } from "../model/useFilesNavigation";
 import { filesDirectionAtom } from "../model/atoms";
@@ -20,10 +21,37 @@ import {
 } from "../../player/model/atoms";
 import { rootLabel, type FsEntry } from "../model/types";
 import { FILE_SYSTEM_QUERY_KEYS } from "../../../entities/file-system/queryKeys";
-import Presence from "../../../shared/ui/Presence";
+import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 import FileColumn from "./FileColumn";
 import FilePreview from "./FilePreview";
 import StackEdge from "./StackEdge";
+
+interface ColstackBackButtonProps {
+  parentName: string;
+  depth: number;
+  onGoUp: () => void;
+}
+
+/** パンくずの「1つ上の階層へ」ボタン。幅方向のcolstack-widthで出入りする。 */
+function ColstackBackButton({ parentName, depth, onGoUp }: ColstackBackButtonProps) {
+  const { colstackWidth } = useMotionVariants();
+  const isPresent = useIsPresent();
+  const v = colstackWidth();
+  return (
+    <motion.button
+      type="button"
+      className="mle-colstack"
+      title={`1つ上の階層（${parentName}）へ戻る`}
+      onClick={onGoUp}
+      inert={!isPresent}
+      initial={v.initial}
+      animate={v.animate}
+      exit={v.exit}
+    >
+      <StackEdge parentName={parentName} depth={depth} />
+    </motion.button>
+  );
+}
 
 interface FilesViewProps {
   rootFolder: string;
@@ -93,18 +121,16 @@ export default function FilesView({ rootFolder }: FilesViewProps) {
 
   return (
     <>
-      <Presence
-        show={hasAncestors}
-        as="button"
-        type="button"
-        variant="colstack-width"
-        skipInitial
-        className="mle-colstack"
-        title={`1つ上の階層（${parentName}）へ戻る`}
-        onClick={nav.goUp}
-      >
-        <StackEdge parentName={parentName} depth={nav.relPath.length} />
-      </Presence>
+      <AnimatePresence initial={false}>
+        {hasAncestors && (
+          <ColstackBackButton
+            key="colstack-back"
+            parentName={parentName}
+            depth={nav.relPath.length}
+            onGoUp={nav.goUp}
+          />
+        )}
+      </AnimatePresence>
 
       <div className="mle-filestage">
         <div
