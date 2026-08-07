@@ -1,10 +1,10 @@
 ---
 id: TASK-234
 title: AND追加を冪等なaddLibraryTagAtomにし、値選択の方針を単一の契約へ集約する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-07 13:20'
-updated_date: '2026-08-07 13:37'
+updated_date: '2026-08-07 13:41'
 labels: []
 dependencies: []
 ordinal: 244000
@@ -30,3 +30,9 @@ Codexレビューで見つかった2件をまとめて解消する。
 - [x] #6 docs/design-system.md の値選択の規約が新しい契約の記述に更新されている
 - [x] #7 pnpm check と変更範囲のテストが通る
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+冪等なaddLibraryTagAtomを新設し、AND追加ボタンの経路を全てこれに繋ぎ替えて選択済みタグを解除する問題を解消。選択済み行には追加ボタンを非表示に。判別共用体ValueSelectionIntentとderiveValueSelectionHandlersを新設し、各入口は既定の意図のみ宣言、主クリック・Ctrl反転先・追加ボタンの有無を導出する形へ集約。オーバーロードによりdefault:addではonAddButton自体が型に存在しない。design-system.md更新。pnpm check・test全通過、レビュー指摘なし
+<!-- SECTION:FINAL_SUMMARY:END -->
