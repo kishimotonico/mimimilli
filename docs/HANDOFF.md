@@ -35,9 +35,8 @@ pnpm check          # shared/server/client の tsc + oxlint + oxfmt --check（�
 pnpm test           # server (Bunランナー + node:test API) + client (vitest)
 pnpm test:server
 pnpm test:client
-pnpm test:visual         # Playwright 比較
-pnpm test:visual:update  # スナップショット再生成
-# ビジュアルテストの webServer は MIMIMILLI_MOCK_SCENARIO=new-work で別ポート(4175)に自前で立つ
+pnpm test:smoke          # Playwright スモークテスト（roleベースの動作確認）
+# smokeテストの webServer は MIMIMILLI_MOCK_SCENARIO=new-work で別ポート(4175)に自前で立つ
 
 # fixture シナリオ
 pnpm dev:fixture:new-work
@@ -54,12 +53,11 @@ pnpm smoke:real        # 固定のサンプル音声で real 経路を手動ス�
 MIMIMILLI_ADAPTER=fixture PORT=18099 pnpm --filter @mimimilli/server start
 ```
 
-ビジュアルテストの注意:
+smokeテストの注意:
 
-- スナップショットは**必ず Playwright で生成**する（agent-browser で撮った画像はレンダリングが違い、CI 比較で落ちる）
-- パネル等の**要素単位**で `toHaveScreenshot` する。`fullPage` は半透明オーバーレイ越しの背景差分が許容差分に薄まり**偽パス**になる（scan結果ダイアログで実際に踏んだ。`role=dialog` 要素を撮る形に修正済み）
-- 共有 fixture 状態に依存するため直列実行が前提（`playwright.config.ts`: workers:1 / fullyParallel:false / retries:2 / maxDiffPixels:1200。比率指定はレイアウト回帰を素通りさせた実績があり使わない）
-- Codex のサンドボックスは Playwright（Chromium 起動・vite listen）が EPERM で動かないことがあるので、Codex に実装を委譲した場合もスナップショット生成は別の環境で行う
+- 最終確認は目視で行う方針のため、スクリーンショット比較は行わない。smoke が赤いときは常に実際の不具合を意味する（見た目のズレでは落ちない設計）
+- 共有 fixture 状態に依存するため直列実行が前提（`playwright.config.ts`: workers:1 / fullyParallel:false / retries:0。リトライで不具合を隠さない）
+- Codex のサンドボックスは Playwright（Chromium 起動・vite listen）が EPERM で動かないことがあるので、Codex に実装を委譲した場合も smoke の実行は別の環境で行う
 
 ## API 契約（現行エンドポイント）
 

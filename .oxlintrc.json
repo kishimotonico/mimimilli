@@ -8,8 +8,7 @@
     "**/coverage/**",
     "**/playwright-report/**",
     "**/test-results/**",
-    "server/tmp-verify205/**",
-    "client/tests/visual/**/*.png"
+    "server/tmp-verify205/**"
   ],
   "settings": {
     "react": {

@@ -21,8 +21,7 @@
     "smoke:real": "pnpm --filter @mimimilli/server smoke:real",
     "test:server": "pnpm --filter @mimimilli/server test",
     "test:client": "pnpm --filter @mimimilli/client test",
-    "test:visual": "pnpm --filter @mimimilli/client test:visual",
-    "test:visual:update": "pnpm --filter @mimimilli/client test:visual:update"
+    "test:smoke": "pnpm --filter @mimimilli/client test:smoke"
   },
   "devDependencies": {
     "backlog.md": "1.47.1",
