@@ -32,7 +32,7 @@ describe("useHoverGroupCoordinator", () => {
     const elA = elAt({ left: 0, top: 90, bottom: 110 });
 
     act(() => {
-      result.current.getTriggerHandlers("a", elA).onPointerEnter();
+      result.current.getTriggerHandlers("a").onPointerEnter({ currentTarget: elA } as never);
     });
     expect(result.current.openKey).toBeNull();
 
@@ -48,15 +48,13 @@ describe("useHoverGroupCoordinator", () => {
     const elA = elAt({ left: 0, top: 90, bottom: 110 });
 
     act(() => {
-      result.current.getTriggerHandlers("a", elA).onPointerEnter();
+      result.current.getTriggerHandlers("a").onPointerEnter({ currentTarget: elA } as never);
       vi.advanceTimersByTime(200);
     });
     expect(result.current.openKey).toBe("a");
 
     act(() => {
-      result.current
-        .getTriggerHandlers("a", elA)
-        .onPointerLeave({ clientX: 0, clientY: 100 } as never);
+      result.current.getTriggerHandlers("a").onPointerLeave({ clientX: 0, clientY: 100 } as never);
     });
     act(() => {
       vi.advanceTimersByTime(150);
@@ -70,15 +68,13 @@ describe("useHoverGroupCoordinator", () => {
     const panelEl = elAt({ left: 200, top: 50, bottom: 150 });
 
     act(() => {
-      result.current.getTriggerHandlers("a", elA).onPointerEnter();
+      result.current.getTriggerHandlers("a").onPointerEnter({ currentTarget: elA } as never);
       vi.advanceTimersByTime(200);
     });
     result.current.panelElRef.current = panelEl;
 
     act(() => {
-      result.current
-        .getTriggerHandlers("a", elA)
-        .onPointerLeave({ clientX: 0, clientY: 100 } as never);
+      result.current.getTriggerHandlers("a").onPointerLeave({ clientX: 0, clientY: 100 } as never);
     });
     act(() => {
       result.current.panelHandlers.onPointerEnter();
@@ -96,7 +92,7 @@ describe("useHoverGroupCoordinator", () => {
     const panelEl = elAt({ left: 200, top: 50, bottom: 150 });
 
     act(() => {
-      result.current.getTriggerHandlers("a", elA).onPointerEnter();
+      result.current.getTriggerHandlers("a").onPointerEnter({ currentTarget: elA } as never);
       vi.advanceTimersByTime(200);
     });
     result.current.panelElRef.current = panelEl;
@@ -104,9 +100,7 @@ describe("useHoverGroupCoordinator", () => {
 
     act(() => {
       // apex = トリガーを離れた時点のポインタ位置
-      result.current
-        .getTriggerHandlers("a", elA)
-        .onPointerLeave({ clientX: 0, clientY: 100 } as never);
+      result.current.getTriggerHandlers("a").onPointerLeave({ clientX: 0, clientY: 100 } as never);
     });
 
     act(() => {
@@ -115,7 +109,7 @@ describe("useHoverGroupCoordinator", () => {
     });
     act(() => {
       // 経路上でb行にポインタが乗る（三角形内での一時的なホバー）
-      result.current.getTriggerHandlers("b", elB).onPointerEnter();
+      result.current.getTriggerHandlers("b").onPointerEnter({ currentTarget: elB } as never);
     });
     act(() => {
       vi.advanceTimersByTime(200); // b行のopen遅延を超えても抑止されたまま
@@ -131,21 +125,19 @@ describe("useHoverGroupCoordinator", () => {
     const panelEl = elAt({ left: 200, top: 50, bottom: 150 });
 
     act(() => {
-      result.current.getTriggerHandlers("a", elA).onPointerEnter();
+      result.current.getTriggerHandlers("a").onPointerEnter({ currentTarget: elA } as never);
       vi.advanceTimersByTime(200);
     });
     result.current.panelElRef.current = panelEl;
 
     act(() => {
-      result.current
-        .getTriggerHandlers("a", elA)
-        .onPointerLeave({ clientX: 0, clientY: 100 } as never);
+      result.current.getTriggerHandlers("a").onPointerLeave({ clientX: 0, clientY: 100 } as never);
     });
     act(() => {
       fireEvent.pointerMove(document, { clientX: 100, clientY: 100 });
     });
     act(() => {
-      result.current.getTriggerHandlers("b", elB).onPointerEnter();
+      result.current.getTriggerHandlers("b").onPointerEnter({ currentTarget: elB } as never);
     });
     expect(result.current.openKey).toBe("a");
 
@@ -165,15 +157,13 @@ describe("useHoverGroupCoordinator", () => {
     const panelEl = elAt({ left: 200, top: 50, bottom: 150 });
 
     act(() => {
-      result.current.getTriggerHandlers("a", elA).onPointerEnter();
+      result.current.getTriggerHandlers("a").onPointerEnter({ currentTarget: elA } as never);
       vi.advanceTimersByTime(200);
     });
     result.current.panelElRef.current = panelEl;
 
     act(() => {
-      result.current
-        .getTriggerHandlers("a", elA)
-        .onPointerLeave({ clientX: 0, clientY: 100 } as never);
+      result.current.getTriggerHandlers("a").onPointerLeave({ clientX: 0, clientY: 100 } as never);
     });
     act(() => {
       result.current.close();
@@ -190,16 +180,14 @@ describe("useHoverGroupCoordinator", () => {
     const panelEl = elAt({ left: 200, top: 50, bottom: 150 });
 
     act(() => {
-      result.current.getTriggerHandlers("a", elA).onPointerEnter();
+      result.current.getTriggerHandlers("a").onPointerEnter({ currentTarget: elA } as never);
       vi.advanceTimersByTime(200);
     });
     result.current.panelElRef.current = panelEl;
 
     act(() => {
       // ガード活性化はここで addEventListener("pointermove", ...) を呼ぶ
-      result.current
-        .getTriggerHandlers("a", elA)
-        .onPointerLeave({ clientX: 0, clientY: 100 } as never);
+      result.current.getTriggerHandlers("a").onPointerLeave({ clientX: 0, clientY: 100 } as never);
     });
     const pointerMoveCall = addSpy.mock.calls.find(([type]) => type === "pointermove");
     expect(pointerMoveCall).toBeDefined();

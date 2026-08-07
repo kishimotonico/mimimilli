@@ -59,7 +59,7 @@ function AxisRowItem({
   hasQuickOverlay: boolean;
   isOverlayOpen: boolean;
   onSelect: () => void;
-  getTriggerHandlers: (key: string, el: HTMLElement | null) => HoverGroupTriggerHandlers;
+  getTriggerHandlers: (key: string) => HoverGroupTriggerHandlers;
   openImmediately: (key: string, el: HTMLElement | null) => void;
 }) {
   const rowRef = useRef<HTMLButtonElement>(null);
@@ -83,7 +83,7 @@ function AxisRowItem({
       aria-expanded={hasQuickOverlay ? isOverlayOpen : undefined}
       onClick={onSelect}
       onKeyDown={handleKeyDown}
-      {...(hasQuickOverlay ? getTriggerHandlers(ax.id, rowRef.current) : undefined)}
+      {...(hasQuickOverlay ? getTriggerHandlers(ax.id) : undefined)}
     >
       <span className="ic">
         <Ic size={14} />

@@ -37,4 +37,13 @@ describe("isPointInTriangle", () => {
     const degenerateC = { x: 20, y: 0 };
     expect(isPointInTriangle({ x: 5, y: 5 }, degenerateA, degenerateB, degenerateC)).toBe(false);
   });
+
+  it("退化した三角形（面積0）で判定点も同じ直線上にあっても false を返す", () => {
+    const degenerateA = { x: 0, y: 0 };
+    const degenerateB = { x: 10, y: 0 };
+    const degenerateC = { x: 20, y: 0 };
+    // 全頂点・判定点が y=0 の直線上に並ぶため、外積が全て0になり誤ってtrueを返しうるケース
+    expect(isPointInTriangle({ x: 30, y: 0 }, degenerateA, degenerateB, degenerateC)).toBe(false);
+    expect(isPointInTriangle({ x: 5, y: 0 }, degenerateA, degenerateB, degenerateC)).toBe(false);
+  });
 });

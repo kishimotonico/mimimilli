@@ -1,27 +1,36 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { TagPrefix } from "@mimimilli/shared";
 import AxisColumn from "../../src/features/library/ui/AxisColumn";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 const PREFIXES: TagPrefix[] = [
   { prefix: "cv", label: "CV", color: "cv", showAsAxis: true, protected: true },
 ];
 
 function renderAxisColumn(props: Partial<React.ComponentProps<typeof AxisColumn>>) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <AxisColumn
-      activeAxis="all"
-      tagPrefixes={[]}
-      smartFolders={[]}
-      onSelectAxis={vi.fn()}
-      selectedTags={[]}
-      onToggleTag={vi.fn()}
-      onReplaceTag={vi.fn()}
-      {...props}
-    />,
+    <QueryClientProvider client={queryClient}>
+      <div className="mle-app">
+        <AxisColumn
+          activeAxis="all"
+          tagPrefixes={[]}
+          smartFolders={[]}
+          onSelectAxis={vi.fn()}
+          selectedTags={[]}
+          onToggleTag={vi.fn()}
+          onReplaceTag={vi.fn()}
+          {...props}
+        />
+      </div>
+    </QueryClientProvider>,
   );
 }
 
@@ -68,5 +77,27 @@ describe("AxisColumn", () => {
 
     expect(screen.queryByText("分類軸の取得に失敗しました")).toBeNull();
     expect(screen.getByRole("button", { name: /CV/ })).toBeTruthy();
+  });
+
+  it("初回レンダー直後（再レンダーを挟まない）の最初のホバーでもクイックオーバーレイが開く", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(JSON.stringify([]), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        ),
+      ),
+    );
+    renderAxisColumn({ tagPrefixes: PREFIXES });
+
+    // マウント直後、再レンダーを一切挟まずに最初のpointerEnterを発火する。
+    fireEvent.pointerEnter(screen.getByRole("button", { name: /CV/ }));
+
+    await waitFor(() => {
+      expect(document.querySelector(".mll-qoverlay")).toBeTruthy();
+    });
   });
 });
