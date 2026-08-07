@@ -49,6 +49,13 @@ pnpm dev:real:server   # API サーバーのみ => http://api.mimi.localhost:135
 pnpm dev:real:client   # client のみ。同じworktreeのapi.mimiへ向けて起動
 pnpm smoke:real        # 固定のサンプル音声で real 経路を手動スモーク
 
+# dev:real:server は scripts/dev-real.mjs 経由で起動する。git worktree add で作った
+# linked worktree から起動した場合は、本番データディレクトリを共有しないよう
+# MIMIMILLI_DATA_DIR を自動で <本番データルートの親>/mimimilli-worktrees/<worktree名> に設定する
+# （起動ログの "[dev-real] ..." 行でどのディレクトリが使われたか確認できる）。
+# メインの作業ディレクトリでは従来どおり本番データディレクトリを使う。
+# worktreeから本番データを明示的に使いたい場合は MIMIMILLI_DATA_DIR を自分で指定する（最優先される）。
+
 # fixture サーバーを単体起動して curl 確認（合成メディアの検証等）
 MIMIMILLI_ADAPTER=fixture PORT=18099 pnpm --filter @mimimilli/server start
 ```
