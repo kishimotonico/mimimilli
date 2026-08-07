@@ -1,8 +1,11 @@
-import { useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useRef, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { NormalizedTag, SmartFolder, TagPrefix } from "@mimimilli/shared";
 import type { AxisId } from "../model/types";
 import { buildFacetAxisRows, isFacetAxis } from "../model/axisDefinitions";
-import { useHoverIntent, type HoverIntentHandlers } from "../../../shared/lib/useHoverIntent";
+import {
+  useHoverGroupCoordinator,
+  type HoverGroupTriggerHandlers,
+} from "../../../shared/lib/useHoverGroupCoordinator";
 import AxisQuickOverlay from "./AxisQuickOverlay";
 import { I, type IconName } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
@@ -42,48 +45,30 @@ interface AxisColumnProps {
   onRetryTagPrefixes?: () => void;
 }
 
-/** 開いている（または開こうとしている）クイックオーバーレイの状態。
- *  panelHandlers はトリガー行を開いた useHoverIntent インスタンスのものをそのまま
- *  オーバーレイパネル側へ渡す。同じタイマーを共有するため、行↔パネル間の移動で
- *  閉じない（ADR-0012 §7・AC#2）。 */
-interface QuickOverlayState {
-  axis: AxisId;
-  anchorEl: HTMLElement;
-  panelHandlers: HoverIntentHandlers;
-}
-
 function AxisRowItem({
   ax,
   isActive,
   hasQuickOverlay,
   isOverlayOpen,
   onSelect,
-  onRequestOverlayOpen,
-  onRequestOverlayClose,
+  getTriggerHandlers,
+  openImmediately,
 }: {
   ax: AxisRow;
   isActive: boolean;
   hasQuickOverlay: boolean;
   isOverlayOpen: boolean;
   onSelect: () => void;
-  onRequestOverlayOpen: (
-    axis: AxisId,
-    el: HTMLElement | null,
-    panelHandlers: HoverIntentHandlers,
-  ) => void;
-  onRequestOverlayClose: () => void;
+  getTriggerHandlers: (key: string, el: HTMLElement | null) => HoverGroupTriggerHandlers;
+  openImmediately: (key: string, el: HTMLElement | null) => void;
 }) {
   const rowRef = useRef<HTMLButtonElement>(null);
-  const { trigger, panel } = useHoverIntent({
-    onOpen: () => onRequestOverlayOpen(ax.id, rowRef.current, panel),
-    onClose: onRequestOverlayClose,
-  });
 
   const handleKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
     if (!hasQuickOverlay || isOverlayOpen) return;
     if (event.key === "ArrowRight") {
       event.preventDefault();
-      onRequestOverlayOpen(ax.id, rowRef.current, panel);
+      openImmediately(ax.id, rowRef.current);
     }
   };
 
@@ -98,7 +83,7 @@ function AxisRowItem({
       aria-expanded={hasQuickOverlay ? isOverlayOpen : undefined}
       onClick={onSelect}
       onKeyDown={handleKeyDown}
-      {...(hasQuickOverlay ? trigger : undefined)}
+      {...(hasQuickOverlay ? getTriggerHandlers(ax.id, rowRef.current) : undefined)}
     >
       <span className="ic">
         <Ic size={14} />
@@ -128,17 +113,15 @@ export default function AxisColumn({
   onRetryTagPrefixes,
 }: AxisColumnProps) {
   const facetAxisRows = buildFacetAxisRows(tagPrefixes);
-  const [overlay, setOverlay] = useState<QuickOverlayState | null>(null);
-
-  const requestOverlayOpen = (
-    axis: AxisId,
-    el: HTMLElement | null,
-    panelHandlers: HoverIntentHandlers,
-  ) => {
-    if (!el) return;
-    setOverlay({ axis, anchorEl: el, panelHandlers });
-  };
-  const requestOverlayClose = () => setOverlay(null);
+  const {
+    openKey: overlayAxis,
+    openAnchorEl,
+    panelElRef,
+    getTriggerHandlers,
+    panelHandlers,
+    openImmediately,
+    close: closeOverlay,
+  } = useHoverGroupCoordinator();
 
   // クイックオーバーレイの選択は既定=置き換え、Ctrl/Cmd+クリックで AND 追加へ反転する（ADR-0012 §7）。
   // 置き換えは結果面を作品一覧へ遷移させ、AND追加は現在の結果面に留まる（ADR-0012 §8）。
@@ -155,13 +138,13 @@ export default function AxisColumn({
         ax={ax}
         isActive={activeAxis === ax.id}
         hasQuickOverlay={hasQuickOverlay}
-        isOverlayOpen={overlay?.axis === ax.id}
+        isOverlayOpen={overlayAxis === ax.id}
         onSelect={() => {
-          requestOverlayClose();
+          closeOverlay();
           onSelectAxis(ax.id);
         }}
-        onRequestOverlayOpen={requestOverlayOpen}
-        onRequestOverlayClose={requestOverlayClose}
+        getTriggerHandlers={getTriggerHandlers}
+        openImmediately={openImmediately}
       />
     );
   };
@@ -210,15 +193,16 @@ export default function AxisColumn({
         </div>
       </div>
 
-      {overlay && (
+      {overlayAxis && (
         <AxisQuickOverlay
-          axis={overlay.axis}
-          anchorEl={overlay.anchorEl}
+          axis={overlayAxis}
+          anchorEl={openAnchorEl}
           isOpen
           selectedTags={selectedTags}
           onSelectValue={handleSelectValue}
-          onClose={requestOverlayClose}
-          panelHandlers={overlay.panelHandlers}
+          onClose={closeOverlay}
+          panelHandlers={panelHandlers}
+          panelElRef={panelElRef}
         />
       )}
     </div>
