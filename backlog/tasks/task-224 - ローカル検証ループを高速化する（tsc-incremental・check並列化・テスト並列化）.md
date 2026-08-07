@@ -1,10 +1,10 @@
 ---
 id: TASK-224
 title: ローカル検証ループを高速化する（tsc incremental・check並列化・テスト並列化）
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-07 07:16'
-updated_date: '2026-08-07 07:21'
+updated_date: '2026-08-07 07:27'
 labels: []
 dependencies: []
 priority: medium
@@ -25,3 +25,9 @@ speed-scout実測調査（2026-08-07）に基づくローカルループの実�
 - [x] #4 root pnpm testがserver/clientを並列実行し、失敗が正しく伝搬する
 - [x] #5 pnpm checkとpnpm testの全体が通る
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+tsc incremental化（shared/server/client、tsBuildInfoFileはnode_modules/.cache/tsc配下）、npm-run-all2導入によるpnpm checkの5工程並列化、server testのbun --parallel化、root testのserver/client並列化を実装。実測: check 15.2s→初回8.1s/ウォーム3.9s、server test 18.2s→8〜9.6s（505件全pass2回確認）、warm tsc はserver 1.87s・client 1.73s。異常系（型エラー注入）でexit非0と失敗元表示を確認。Sonnetレビュー・マージ後master最終検証（check/test全緑）済み。コミット6a2a216、マージ95cbc2d。
+<!-- SECTION:FINAL_SUMMARY:END -->
