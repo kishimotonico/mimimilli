@@ -1,10 +1,10 @@
 ---
 id: TASK-236
 title: 値行の右端の揃えと、AND追加ボタンのホバー装飾を整える
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-07 15:10'
-updated_date: '2026-08-07 15:20'
+updated_date: '2026-08-07 15:38'
 labels: []
 dependencies: []
 ordinal: 246000
@@ -28,3 +28,9 @@ ordinal: 246000
 - [x] #4 IconButton の既定スタイルが変更されていない
 - [x] #5 pnpm check と変更範囲のテスト、pnpm test:smoke が通る
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+値行の右余白を行の選択状態ではなくリスト単位（onAddの有無）で決める形に改め、件数の右端のガタつきを解消。AND追加ボタンは行のホバー背景と同じ--paper-2だったため範囲が見えなかったので、IconButtonにホバー/アクティブ背景を出さないbare variantをopt-inで追加し、CSS側で--paper-3を指定。当初!importantで上書きしていたが競合の根本を絶つ設計へ作り直した。transitionはIconButtonのtransition-colorsに委ねる。pnpm check・unit・smoke全通過、Codexレビュー指摘なしまで到達
+<!-- SECTION:FINAL_SUMMARY:END -->
