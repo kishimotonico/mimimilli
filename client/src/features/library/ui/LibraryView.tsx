@@ -166,6 +166,7 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
         onSelectAxis={nav.setAxis}
         onToggleTag={nav.toggleTag}
         onReplaceTag={nav.replaceTag}
+        onAddTag={nav.addTag}
         onNewSmartFolder={() => {
           saveSmartFolderMutation.reset();
           setSmartFolderEditor(createSmartFolderEditorState);
@@ -203,6 +204,7 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
             selectedTags={nav.selectedTags}
             onReplace={nav.replaceTag}
             onToggle={nav.toggleTag}
+            onAddTag={nav.addTag}
             onClearAll={nav.clearTags}
           />
           {paneKind === "value-list" ? (
@@ -218,6 +220,7 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
                   isTagPrefixesError={isTagPrefixesError}
                   onReplace={nav.replaceTag}
                   onToggle={nav.toggleTag}
+                  onAddTag={nav.addTag}
                   onRetryFacets={refetchFacets}
                   onRetryTagPrefixes={refetchTagPrefixes}
                 />

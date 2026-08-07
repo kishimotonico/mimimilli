@@ -14,7 +14,7 @@ interface AxisValuePopoverPanelProps {
   layout: PopoverLayout;
   selectedTags: NormalizedTag[];
   onSelect: (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
-  /** ホバー/フォーカス時の＋ボタン（常にAND追加）。省略時はボタンを出さない（ADR-0013） */
+  /** ホバー/フォーカス時の＋ボタン（冪等なAND追加）。省略時はボタンを出さない（ADR-0013） */
   onAdd?: (tag: NormalizedTag) => void;
   close: () => void;
   hint?: string;

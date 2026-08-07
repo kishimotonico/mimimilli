@@ -40,7 +40,8 @@ interface AxisValueQuickListProps {
   isSelected: (tag: string) => boolean;
   /** 値を選択したときのハンドラ。Ctrl/Cmdキーで既定動作を反転する（呼び出し側が解釈する） */
   onSelect: (item: AxisFacetItem, event: { ctrlKey: boolean; metaKey: boolean }) => void;
-  /** ホバー/フォーカス時に出る＋ボタン（常にAND追加）。省略時はボタンを出さない（ADR-0013） */
+  /** ホバー/フォーカス時に出る＋ボタン（冪等なAND追加。選択済み行には出さない）。
+   *  省略時はボタンを出さない（ADR-0013） */
   onAdd?: (item: AxisFacetItem) => void;
   /** 既定動作の説明（例:「クリックで置き換え」「AND追加されます」） */
   hint?: string;
@@ -296,7 +297,7 @@ export default function AxisValueQuickList({
                             type="button"
                             data-quicklist-item
                             className={`mll-qlist__item ${on ? "is-on" : ""}`}
-                            style={{ paddingLeft: 8 + indent, paddingRight: onAdd ? 26 : 8 }}
+                            style={{ paddingLeft: 8 + indent, paddingRight: onAdd && !on ? 26 : 8 }}
                             title={row.depth > 0 ? row.item.value : undefined}
                             onClick={(e) =>
                               onSelect(row.item, { ctrlKey: e.ctrlKey, metaKey: e.metaKey })
@@ -305,7 +306,7 @@ export default function AxisValueQuickList({
                             <span className="nm">{row.label}</span>
                             <span className="count">{row.item.count}</span>
                           </button>
-                          {onAdd && (
+                          {onAdd && !on && (
                             <IconButton
                               icon={I.add}
                               label={`${row.item.value}をAND追加`}

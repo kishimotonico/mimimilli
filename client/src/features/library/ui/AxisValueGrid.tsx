@@ -38,7 +38,7 @@ interface AxisValueGridProps {
   resetKey: string;
   /** クリック（既定=置き換え）・Ctrl/Cmd+クリック（AND追加）（ADR-0012 §7） */
   onSelect: (item: AxisFacetItem, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
-  /** ホバー/フォーカス時に出る＋ボタン（常にAND追加） */
+  /** ホバー/フォーカス時に出る＋ボタン（冪等なAND追加。選択済み行には出さない） */
   onAdd: (item: AxisFacetItem) => void;
 }
 
@@ -150,13 +150,14 @@ export default function AxisValueGrid({
                   // depth>0（名前順ソートの階層モード）のときだけパンくずを出す。件数・総時間
                   // ソートのフォールバック（depth は常に0）は label がフルパスなので不要。
                   const parentPath = row.depth > 0 ? parentPathOf(row) : null;
+                  const on = isSelected(row.item);
                   return (
                     <div
                       key={row.path}
-                      className={`mll-vtile ${isSelected(row.item) ? "is-on" : ""}`}
+                      className={`mll-vtile ${on ? "is-on" : ""}`}
                       // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- クリック領域(選択)とAND追加ボタンを両方内包するため<option>にはできない
                       role="option"
-                      aria-selected={isSelected(row.item)}
+                      aria-selected={on}
                     >
                       <button
                         type="button"
@@ -175,13 +176,15 @@ export default function AxisValueGrid({
                         <span className="mll-vtile__nm">{row.label}</span>
                         <span className="mll-vtile__badge">{row.item.count} 件</span>
                       </button>
-                      <IconButton
-                        icon={I.add}
-                        label={`${row.item.value}をAND追加`}
-                        size="xs"
-                        className="mll-vtile__add"
-                        onClick={() => onAdd(row.item)}
-                      />
+                      {!on && (
+                        <IconButton
+                          icon={I.add}
+                          label={`${row.item.value}をAND追加`}
+                          size="xs"
+                          className="mll-vtile__add"
+                          onClick={() => onAdd(row.item)}
+                        />
+                      )}
                     </div>
                   );
                 })}

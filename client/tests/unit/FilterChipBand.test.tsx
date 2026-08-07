@@ -21,6 +21,7 @@ describe("FilterChipBand のチップクリック", () => {
         selectedTags={["cv/藤田茜", "サークル/月白製作所"]}
         onReplace={() => {}}
         onToggle={() => {}}
+        onAddTag={() => {}}
         onClearAll={() => {}}
       />,
     );

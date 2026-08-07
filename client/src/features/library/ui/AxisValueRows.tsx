@@ -36,7 +36,7 @@ interface AxisValueRowsProps {
   resetKey: string;
   /** クリック（既定=置き換え）・Ctrl/Cmd+クリック（AND追加）（ADR-0012 §7） */
   onSelect: (item: AxisFacetItem, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
-  /** ホバー/フォーカス時に出る＋ボタン（常にAND追加） */
+  /** ホバー/フォーカス時に出る＋ボタン（冪等なAND追加。選択済み行には出さない） */
   onAdd: (item: AxisFacetItem) => void;
 }
 
@@ -156,41 +156,48 @@ export default function AxisValueRows({
                     {row.label}
                   </div>
                 ) : (
-                  <div
-                    className={`mll-vrow ${isSelected(row.item) ? "is-on" : ""}`}
-                    // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- クリック領域(選択)とAND追加ボタンを両方内包するため<option>にはできない
-                    role="option"
-                    aria-selected={isSelected(row.item)}
-                  >
-                    <button
-                      type="button"
-                      className="mll-vrow__main"
-                      style={{ paddingLeft: 4 + indent }}
-                      title={row.depth > 0 ? row.item.value : undefined}
-                      onClick={(e) =>
-                        onSelect(row.item, { ctrlKey: e.ctrlKey, metaKey: e.metaKey })
-                      }
-                    >
-                      <CoverCollage
-                        covers={row.item.covers}
-                        size={ROW_COLLAGE_SIZE}
-                        fallbackIcon={fallbackIcon}
-                        requestWidth={collageRequestWidth}
-                      />
-                      <span className="mll-vrow__nm">{row.label}</span>
-                      <span className="mll-vrow__count">{row.item.count}</span>
-                      <span className="mll-vrow__dur">
-                        {formatDuration(row.item.durationSec) ?? "0:00"}
-                      </span>
-                    </button>
-                    <IconButton
-                      icon={I.add}
-                      label={`${row.item.value}をAND追加`}
-                      size="xs"
-                      className="mll-vrow__add"
-                      onClick={() => onAdd(row.item)}
-                    />
-                  </div>
+                  (() => {
+                    const on = isSelected(row.item);
+                    return (
+                      <div
+                        className={`mll-vrow ${on ? "is-on" : ""}`}
+                        // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- クリック領域(選択)とAND追加ボタンを両方内包するため<option>にはできない
+                        role="option"
+                        aria-selected={on}
+                      >
+                        <button
+                          type="button"
+                          className="mll-vrow__main"
+                          style={{ paddingLeft: 4 + indent }}
+                          title={row.depth > 0 ? row.item.value : undefined}
+                          onClick={(e) =>
+                            onSelect(row.item, { ctrlKey: e.ctrlKey, metaKey: e.metaKey })
+                          }
+                        >
+                          <CoverCollage
+                            covers={row.item.covers}
+                            size={ROW_COLLAGE_SIZE}
+                            fallbackIcon={fallbackIcon}
+                            requestWidth={collageRequestWidth}
+                          />
+                          <span className="mll-vrow__nm">{row.label}</span>
+                          <span className="mll-vrow__count">{row.item.count}</span>
+                          <span className="mll-vrow__dur">
+                            {formatDuration(row.item.durationSec) ?? "0:00"}
+                          </span>
+                        </button>
+                        {!on && (
+                          <IconButton
+                            icon={I.add}
+                            label={`${row.item.value}をAND追加`}
+                            size="xs"
+                            className="mll-vrow__add"
+                            onClick={() => onAdd(row.item)}
+                          />
+                        )}
+                      </div>
+                    );
+                  })()
                 )}
               </div>
             );
