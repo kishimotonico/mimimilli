@@ -4,6 +4,7 @@ import type { AxisId } from "../model/types";
 import { buildFacetAxisRows, getAxisLabel } from "../model/axisDefinitions";
 import { useAnchoredPopover } from "./preview/useAnchoredPopover";
 import AxisValuePopoverPanel from "./AxisValuePopoverPanel";
+import Presence from "../../../shared/ui/Presence";
 import { I } from "../../../shared/ui/Icon";
 
 const POPOVER_WIDTH = 240;
@@ -27,6 +28,11 @@ export default function FilterChipAddButton({
   const [pickedAxis, setPickedAxis] = useState<AxisId | null>(null);
   const pickedAxisRef = useRef(pickedAxis);
   pickedAxisRef.current = pickedAxis;
+  // 値ステージ（AxisValuePopoverPanel）を退出アニメーション中もマウントし続けるため、
+  // pickedAxis が null に戻ったあとも直近の軸を保持する。
+  const lastPickedAxisRef = useRef<AxisId | null>(null);
+  if (pickedAxis !== null) lastPickedAxisRef.current = pickedAxis;
+  const displayAxis = pickedAxis ?? lastPickedAxisRef.current;
 
   const { anchorRef, layout, close } = useAnchoredPopover({
     isOpen: open,
@@ -55,33 +61,34 @@ export default function FilterChipAddButton({
         <I.add size={11} />
         絞り込み
       </button>
-      {open && pickedAxis === null && (
-        <div
-          className="mll-qoverlay mll-qoverlay--inline"
-          style={{ left: layout.left, width: layout.width }}
-        >
-          <div className="mll-qlist__hint">{AND_ADD_HINT}・軸を選択</div>
-          {/* oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- AxisValueQuickList の一覧と表現を揃えるため<select>ではなくボタン一覧にする */}
-          <div className="mll-qlist__body" role="listbox" aria-label="絞り込む軸">
-            {facetAxisRows.map((ax) => (
-              <button
-                key={ax.id}
-                type="button"
-                className="mll-qlist__item"
-                onClick={() => setPickedAxis(ax.id)}
-              >
-                <span className="nm">{ax.name}</span>
-                <I.chev size={11} />
-              </button>
-            ))}
-          </div>
+      <Presence
+        show={open && pickedAxis === null}
+        variant="popover-scale"
+        className="mll-qoverlay mll-qoverlay--inline"
+        style={{ left: layout.left, width: layout.width }}
+      >
+        <div className="mll-qlist__hint">{AND_ADD_HINT}・軸を選択</div>
+        {/* oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- AxisValueQuickList の一覧と表現を揃えるため<select>ではなくボタン一覧にする */}
+        <div className="mll-qlist__body" role="listbox" aria-label="絞り込む軸">
+          {facetAxisRows.map((ax) => (
+            <button
+              key={ax.id}
+              type="button"
+              className="mll-qlist__item"
+              onClick={() => setPickedAxis(ax.id)}
+            >
+              <span className="nm">{ax.name}</span>
+              <I.chev size={11} />
+            </button>
+          ))}
         </div>
-      )}
-      {open && pickedAxis !== null && (
+      </Presence>
+      {displayAxis && (
         <AxisValuePopoverPanel
-          axis={pickedAxis}
-          axisLabel={getAxisLabel(pickedAxis, tagPrefixes)}
+          axis={displayAxis}
+          axisLabel={getAxisLabel(displayAxis, tagPrefixes)}
           layout={layout}
+          isOpen={open && pickedAxis !== null}
           selectedTags={selectedTags}
           hint={AND_ADD_HINT}
           onSelect={(tag, opts) => {

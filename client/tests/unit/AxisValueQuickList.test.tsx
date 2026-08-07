@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { AxisFacetItem } from "@mimimilli/shared";
 import AxisValueQuickList from "../../src/features/library/ui/AxisValueQuickList";
@@ -203,7 +203,8 @@ describe("AxisValueQuickList のソート（アイコンボタン＋インライ
     expect(screen.getByRole("group", { name: "並び替え" })).toBeTruthy();
 
     await user.click(toggle);
-    expect(screen.queryByRole("group", { name: "並び替え" })).toBeNull();
+    // collapse variant の退出アニメーション（150ms）が終わるまでマウントされ続ける
+    await waitFor(() => expect(screen.queryByRole("group", { name: "並び替え" })).toBeNull());
     sizeMock.restore();
   });
 
@@ -234,7 +235,7 @@ describe("AxisValueQuickList のソート（アイコンボタン＋インライ
     expect(screen.getByRole("group", { name: "並び替え" })).toBeTruthy();
 
     await user.click(toggle);
-    expect(screen.queryByRole("group", { name: "並び替え" })).toBeNull();
+    await waitFor(() => expect(screen.queryByRole("group", { name: "並び替え" })).toBeNull());
     sizeMock.restore();
   });
 

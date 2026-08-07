@@ -72,20 +72,19 @@ function FilterChip({
       >
         <I.x size={9} />
       </button>
-      {open && (
-        <AxisValuePopoverPanel
-          axis={axis}
-          axisLabel={getAxisLabel(axis, tagPrefixes)}
-          layout={layout}
-          selectedTags={selectedTags}
-          onSelect={(nextTag, opts) => {
-            onSelect(nextTag, opts);
-            close();
-          }}
-          onAdd={onAdd}
-          close={close}
-        />
-      )}
+      <AxisValuePopoverPanel
+        axis={axis}
+        axisLabel={getAxisLabel(axis, tagPrefixes)}
+        layout={layout}
+        isOpen={open}
+        selectedTags={selectedTags}
+        onSelect={(nextTag, opts) => {
+          onSelect(nextTag, opts);
+          close();
+        }}
+        onAdd={onAdd}
+        close={close}
+      />
     </span>
   );
 }

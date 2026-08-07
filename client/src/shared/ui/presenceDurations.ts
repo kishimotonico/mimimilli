@@ -8,6 +8,7 @@ export const PRESENCE_DURATION_MS: Record<PresenceVariant, number> = {
   "dock-bar-slide": 320,
   "dock-bar-switch": 180,
   "dock-popup-scale": 180,
+  "popover-scale": 180,
   "colstack-width": 240,
   "preview-slide": 220,
 };

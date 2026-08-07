@@ -1,12 +1,14 @@
 import { createPortal } from "react-dom";
-import type { RefObject } from "react";
-import type { FacetAxisId, NormalizedTag } from "@mimimilli/shared";
+import { useRef, type RefObject } from "react";
+import type { AxisFacetItem, FacetAxisId, NormalizedTag } from "@mimimilli/shared";
 import type { AxisId } from "../model/types";
 import { useAxisFacetsQuery } from "../model/useAxisFacetsQuery";
 import { buildFilterTag } from "../model/libraryPresentation";
 import { useAnchoredPopover } from "./preview/useAnchoredPopover";
 import type { HoverGroupPanelHandlers } from "../../../shared/lib/useHoverGroupCoordinator";
 import AxisValueQuickList from "./AxisValueQuickList";
+import { usePresence } from "../../../shared/ui/usePresence";
+import { PRESENCE_DURATION_MS } from "../../../shared/ui/presenceDurations";
 
 // 軸レール行のクイックオーバーレイ（ADR-0012 §7）。ホバー約200ms・フォーカス中の
 // ArrowRight で開く。軸行の右向き矢印・ArrowRightキーの操作方向と揃えて右側に出す。
@@ -46,6 +48,25 @@ export default function AxisQuickOverlay({
 }: AxisQuickOverlayProps) {
   const facetQuery = useAxisFacetsQuery(isOpen ? (axis as FacetAxisId) : null, selectedTags);
 
+  // isOpen=false になった直後にクエリを無効化するため facetQuery.data は失われる。
+  // Presence の退出アニメーション中も一覧の中身が消えないよう、開いていた間の最後の
+  // 結果を保持し、退出中はそれを表示し続ける。
+  const lastResultRef = useRef<{
+    items: AxisFacetItem[];
+    isLoading: boolean;
+    isError: boolean;
+  }>({ items: [], isLoading: false, isError: false });
+  if (isOpen) {
+    lastResultRef.current = {
+      items: facetQuery.data ?? [],
+      isLoading: facetQuery.isLoading,
+      isError: facetQuery.isError,
+    };
+  }
+  const displayResult = isOpen
+    ? { items: facetQuery.data ?? [], isLoading: facetQuery.isLoading, isError: facetQuery.isError }
+    : lastResultRef.current;
+
   const { anchorRef, panelRef, layout, close } = useAnchoredPopover({
     isOpen,
     preferredWidth: OVERLAY_WIDTH,
@@ -60,23 +81,37 @@ export default function AxisQuickOverlay({
     panelElRef.current = el;
   };
 
-  if (!isOpen || !anchorEl) return null;
+  // 退出アニメーション完了までマウントを保つ（呼び出し側は isOpen=false のあとも
+  // axis / anchorEl に最後に開いていた値を渡し続ける契約）。
+  const { mounted, phase } = usePresence(isOpen, {
+    durationMs: PRESENCE_DURATION_MS["popover-scale"],
+  });
+
+  if (!mounted || !anchorEl) return null;
 
   return createPortal(
     <div
       ref={setPanelEl}
-      className="mll-qoverlay mll-qoverlay--fixed"
+      data-phase={phase}
+      className="mll-qoverlay mll-qoverlay--fixed ml-presence-popover-scale"
       // マウント直後、パネル実測前の1フレームだけ top が未確定（layout effect が
       // 実サイズを測ってペイント前に補正する。ちらつきは出ない）。
       style={{ left: layout.left, top: layout.top ?? 0, width: layout.width }}
+      // pointer-events:none（CSS）だけではキーボード操作・アクセシビリティツリーからの
+      // 到達を防げないため、退出中は inert にする（Presence コンポーネントと同じ扱い）。
+      // data-phase ではなく isOpen を見るのは、退出中に isOpen が再び true になった
+      // 瞬間（usePresence の effect が phase を "enter" へ更新する前の1レンダー）に
+      // inert が残って子（検索欄）へフォーカスできなくなるのを避けるため。
+      inert={!isOpen}
       {...panelHandlers}
     >
       <AxisValueQuickList
         axis={axis}
         axisLabel={axisLabel}
-        items={facetQuery.data ?? []}
-        isLoading={facetQuery.isLoading}
-        isError={facetQuery.isError}
+        isOpen={isOpen}
+        items={displayResult.items}
+        isLoading={displayResult.isLoading}
+        isError={displayResult.isError}
         isSelected={(value) => selectedTags.includes(buildFilterTag(axis, value))}
         onSelect={(item, e) => {
           onSelectValue(buildFilterTag(axis, item.value), {
