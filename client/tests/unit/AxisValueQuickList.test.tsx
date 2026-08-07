@@ -30,6 +30,7 @@ function renderQuickList(props: Partial<React.ComponentProps<typeof AxisValueQui
   return render(
     <AxisValueQuickList
       axis="cv"
+      axisLabel="CV"
       items={[]}
       isSelected={() => false}
       onSelect={vi.fn()}
@@ -63,7 +64,7 @@ describe("AxisValueQuickList のキーボード移動", () => {
     renderQuickList({ items: makeItems(50) });
     await flushVirtualizer();
 
-    const input = screen.getByPlaceholderText("cvを検索");
+    const input = screen.getByPlaceholderText("CVを検索");
     input.focus();
     await user.keyboard("{ArrowDown}");
     await act(async () => {
@@ -91,7 +92,7 @@ describe("AxisValueQuickList のキーボード移動", () => {
     await user.click(screen.getByRole("button", { name: "名前" }));
     await flushVirtualizer();
 
-    const input = screen.getByPlaceholderText("cvを検索");
+    const input = screen.getByPlaceholderText("CVを検索");
     input.focus();
     await user.keyboard("{ArrowDown}");
     await act(async () => {
@@ -110,7 +111,7 @@ describe("AxisValueQuickList のキーボード移動", () => {
     renderQuickList({ items: makeItems(3) });
     await flushVirtualizer();
 
-    const input = screen.getByPlaceholderText("cvを検索");
+    const input = screen.getByPlaceholderText("CVを検索");
     input.focus();
     await user.keyboard("{ArrowDown}");
     await act(async () => {
@@ -134,7 +135,7 @@ describe("AxisValueQuickList のキーボード移動", () => {
     renderQuickList({ items: makeItems(3) });
     await flushVirtualizer();
 
-    const input = screen.getByPlaceholderText("cvを検索");
+    const input = screen.getByPlaceholderText("CVを検索");
     input.focus();
     await user.keyboard("{ArrowUp}");
     await act(async () => {
@@ -152,7 +153,7 @@ describe("AxisValueQuickList のキーボード移動", () => {
     const { rerender } = renderQuickList({ items: makeItems(3) });
     await flushVirtualizer();
 
-    const input = screen.getByPlaceholderText("cvを検索");
+    const input = screen.getByPlaceholderText("CVを検索");
     input.focus();
     await user.keyboard("{ArrowDown}");
     await act(async () => {
@@ -167,6 +168,7 @@ describe("AxisValueQuickList のキーボード移動", () => {
     rerender(
       <AxisValueQuickList
         axis="cv"
+        axisLabel="CV"
         items={makeItems(3).map((item) => ({ ...item, value: `別${item.value}` }))}
         isSelected={() => false}
         onSelect={vi.fn()}
@@ -277,7 +279,7 @@ describe("AxisValueQuickList の選択", () => {
     renderQuickList({ items, onAdd: vi.fn(), isSelected: (value) => value === selectedValue });
     await flushVirtualizer();
 
-    const rows = Array.from(document.querySelectorAll("[role='option']"));
+    const rows = Array.from(document.querySelectorAll(".mll-qlist__row"));
     expect(rows.length).toBe(3);
     const selectedRow = rows.find((row) => row.textContent?.includes(selectedValue));
     const otherRows = rows.filter((row) => row !== selectedRow);

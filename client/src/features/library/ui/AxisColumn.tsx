@@ -1,7 +1,7 @@
 import { useRef, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { NormalizedTag, SmartFolder, TagPrefix } from "@mimimilli/shared";
 import type { AxisId } from "../model/types";
-import { buildFacetAxisRows, isFacetAxis } from "../model/axisDefinitions";
+import { buildFacetAxisRows, getAxisLabel, isFacetAxis } from "../model/axisDefinitions";
 import {
   useHoverGroupCoordinator,
   type HoverGroupTriggerHandlers,
@@ -85,7 +85,6 @@ function AxisRowItem({
       type="button"
       className={`mll-axis ${isActive ? "is-on" : ""}`}
       aria-current={isActive ? "true" : undefined}
-      aria-haspopup={hasQuickOverlay ? "listbox" : undefined}
       aria-expanded={hasQuickOverlay ? isOverlayOpen : undefined}
       onClick={onSelect}
       onKeyDown={handleKeyDown}
@@ -207,6 +206,7 @@ export default function AxisColumn({
       {overlayAxis && (
         <AxisQuickOverlay
           axis={overlayAxis}
+          axisLabel={getAxisLabel(overlayAxis, tagPrefixes)}
           anchorEl={openAnchorEl}
           isOpen
           selectedTags={selectedTags}

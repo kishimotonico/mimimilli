@@ -47,6 +47,20 @@ async function flushVirtualizer(size = { width: 600, height: 600 }) {
   });
 }
 
+function queryRow(className: string, text: string): HTMLElement | null {
+  return (
+    Array.from(document.querySelectorAll<HTMLElement>(className)).find((el) =>
+      el.textContent?.includes(text),
+    ) ?? null
+  );
+}
+
+function getRow(className: string, text: string): HTMLElement {
+  const row = queryRow(className, text);
+  if (!row) throw new Error(`row not found: ${className} ${text}`);
+  return row;
+}
+
 describe("AxisValueList list 表示（ADR-0012 §5）", () => {
   it("2×2コラージュ・名前・件数・総時間の列を持つ行として並ぶ", async () => {
     const sizeMock = mockElementSize(600, 600);
@@ -55,7 +69,7 @@ describe("AxisValueList list 表示（ADR-0012 §5）", () => {
     });
     await flushVirtualizer();
 
-    const row = screen.getByRole("option", { name: /藤田茜/ });
+    const row = getRow(".mll-vrow", "藤田茜");
     expect(within(row).getByText("藤田茜")).toBeTruthy();
     expect(within(row).getByText("5")).toBeTruthy();
     expect(within(row).getByText("2:05")).toBeTruthy();
@@ -139,7 +153,7 @@ describe("AxisValueList list 表示（ADR-0012 §5）", () => {
     renderAxisValueList({ axis: "cv", facetItems: [makeItem({ value: "藤田茜" })], onReplace });
     await flushVirtualizer();
 
-    const row = screen.getByRole("option", { name: /藤田茜/ });
+    const row = getRow(".mll-vrow", "藤田茜");
     await user.click(row.querySelector(".mll-vrow__main") as HTMLElement);
     expect(onReplace).toHaveBeenCalledWith("cv/藤田茜");
     sizeMock.restore();
@@ -157,7 +171,7 @@ describe("AxisValueList list 表示（ADR-0012 §5）", () => {
     });
     await flushVirtualizer();
 
-    const row = screen.getByRole("option", { name: /藤田茜/ });
+    const row = getRow(".mll-vrow", "藤田茜");
     fireEvent.click(row.querySelector(".mll-vrow__main") as HTMLElement, { ctrlKey: true });
     expect(onToggle).toHaveBeenCalledWith("cv/藤田茜");
     expect(onReplace).not.toHaveBeenCalled();
@@ -171,7 +185,7 @@ describe("AxisValueList list 表示（ADR-0012 §5）", () => {
     renderAxisValueList({ axis: "cv", facetItems: [makeItem({ value: "藤田茜" })], onAddTag });
     await flushVirtualizer();
 
-    const row = screen.getByRole("option", { name: /藤田茜/ });
+    const row = getRow(".mll-vrow", "藤田茜");
     await user.click(row.querySelector(".mll-vrow__add") as HTMLElement);
     expect(onAddTag).toHaveBeenCalledWith("cv/藤田茜");
     sizeMock.restore();
@@ -186,7 +200,7 @@ describe("AxisValueList list 表示（ADR-0012 §5）", () => {
     });
     await flushVirtualizer();
 
-    const row = screen.getByRole("option", { name: /藤田茜/ });
+    const row = getRow(".mll-vrow", "藤田茜");
     expect(row.querySelector(".mll-vrow__add")).toBeNull();
     sizeMock.restore();
   });
@@ -210,7 +224,7 @@ describe("AxisValueList grid 表示", () => {
     renderAxisValueList({ facetItems: [makeItem({ value: "藤田茜", count: 5 })] }, "grid");
     await flushVirtualizer();
 
-    const tile = screen.getByRole("option", { name: /藤田茜/ });
+    const tile = getRow(".mll-vtile", "藤田茜");
     expect(within(tile).getByText("藤田茜")).toBeTruthy();
     expect(within(tile).getByText("5 件")).toBeTruthy();
     expect(tile.querySelector(".mll-collage")).toBeTruthy();
@@ -252,15 +266,15 @@ describe("AxisValueList コンテキスト検索（ADR-0012 §6）", () => {
     });
     await flushVirtualizer();
 
-    expect(screen.getByRole("option", { name: /藤田茜/ })).toBeTruthy();
-    expect(screen.getByRole("option", { name: /夜想曲サークル/ })).toBeTruthy();
+    expect(getRow(".mll-vrow", "藤田茜")).toBeTruthy();
+    expect(getRow(".mll-vrow", "夜想曲サークル")).toBeTruthy();
 
     const input = screen.getByPlaceholderText("値を絞り込み");
     await user.type(input, "藤田");
     await flushVirtualizer();
 
-    expect(screen.getByRole("option", { name: /藤田茜/ })).toBeTruthy();
-    expect(screen.queryByRole("option", { name: /夜想曲サークル/ })).toBeNull();
+    expect(getRow(".mll-vrow", "藤田茜")).toBeTruthy();
+    expect(queryRow(".mll-vrow", "夜想曲サークル")).toBeNull();
     sizeMock.restore();
   });
 

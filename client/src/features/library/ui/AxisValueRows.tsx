@@ -27,6 +27,7 @@ const LIST_PADDING_START = 4;
 const LIST_PADDING_END = 4;
 
 interface AxisValueRowsProps {
+  axisLabel: string;
   rows: AxisValueHierarchyRow[];
   sort: AxisValueSortState;
   onSortChange: (sort: AxisValueSortState) => void;
@@ -74,6 +75,7 @@ function SortHeaderButton({
 }
 
 export default function AxisValueRows({
+  axisLabel,
   rows,
   sort,
   onSortChange,
@@ -125,7 +127,14 @@ export default function AxisValueRows({
           />
         ))}
       </div>
-      <div ref={listRef} className="mle-col__list" style={{ padding: 0 }}>
+      <div
+        ref={listRef}
+        className="mle-col__list"
+        style={{ padding: 0 }}
+        // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- 値ボタン集合を名前付き集合として表す。fieldset等の代替タグは適合しない
+        role="group"
+        aria-label={`${axisLabel}の値一覧`}
+      >
         <div
           style={{
             position: "relative",
@@ -159,17 +168,13 @@ export default function AxisValueRows({
                   (() => {
                     const on = isSelected(row.item);
                     return (
-                      <div
-                        className={`mll-vrow ${on ? "is-on" : ""}`}
-                        // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- クリック領域(選択)とAND追加ボタンを両方内包するため<option>にはできない
-                        role="option"
-                        aria-selected={on}
-                      >
+                      <div className={`mll-vrow ${on ? "is-on" : ""}`}>
                         <button
                           type="button"
                           className="mll-vrow__main"
                           style={{ paddingLeft: 4 + indent }}
                           title={row.depth > 0 ? row.item.value : undefined}
+                          aria-pressed={on}
                           onClick={(e) =>
                             onSelect(row.item, { ctrlKey: e.ctrlKey, metaKey: e.metaKey })
                           }

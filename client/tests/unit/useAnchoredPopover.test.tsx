@@ -83,6 +83,7 @@ function QuickListWithDismissalHarness() {
           { ref: panelRef },
           createElement(AxisValueQuickList, {
             axis: "cv",
+            axisLabel: "CV",
             items: QUICK_LIST_ITEMS,
             isSelected: () => false,
             onSelect: () => close(),
@@ -237,11 +238,11 @@ describe("AxisValueQuickList 経路での close()", () => {
     const anchor = screen.getByTestId("anchor-btn");
     const focusSpy = vi.spyOn(anchor, "focus");
 
-    const input = screen.getByPlaceholderText("cvを検索");
+    const input = screen.getByPlaceholderText("CVを検索");
     input.focus();
     await userEvent.keyboard("{Escape}");
 
-    expect(screen.queryByPlaceholderText("cvを検索")).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("CVを検索")).not.toBeInTheDocument();
     expect(anchor).toHaveFocus();
     expect(focusSpy.mock.calls.length).toBe(1);
     focusSpy.mockRestore();
@@ -258,11 +259,11 @@ describe("AxisValueQuickList 経路での close()", () => {
     const anchor = screen.getByTestId("anchor-btn");
     const focusSpy = vi.spyOn(anchor, "focus");
 
-    const input = screen.getByPlaceholderText("cvを検索");
+    const input = screen.getByPlaceholderText("CVを検索");
     input.focus();
     fireEvent.pointerDown(screen.getByTestId("outside-btn"));
 
-    expect(screen.queryByPlaceholderText("cvを検索")).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("CVを検索")).not.toBeInTheDocument();
     expect(anchor).toHaveFocus();
     expect(focusSpy.mock.calls.length).toBe(1);
     focusSpy.mockRestore();
@@ -284,7 +285,7 @@ describe("AxisValueQuickList 経路での close()", () => {
     firstItem!.focus();
     await userEvent.click(firstItem!);
 
-    expect(screen.queryByPlaceholderText("cvを検索")).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("CVを検索")).not.toBeInTheDocument();
     expect(anchor).toHaveFocus();
     expect(focusSpy.mock.calls.length).toBe(1);
     focusSpy.mockRestore();

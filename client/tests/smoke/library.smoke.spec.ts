@@ -20,10 +20,10 @@ test("軸を選ぶと値一覧が出て、値を選ぶと作品一覧へ遷移�
   await openApp(page);
 
   await page.getByRole("button", { name: "CV" }).click();
-  const valueList = page.locator(".mle-col.is-axis-values");
-  await expect(valueList.getByRole("option").first()).toBeVisible();
+  const valueList = page.getByRole("group", { name: "CVの値一覧" });
+  await expect(valueList.getByRole("button").first()).toBeVisible();
 
-  await page.getByRole("option", { name: "霧島レイ" }).click();
+  await valueList.getByRole("button", { name: /^霧島レイ(?!を)/ }).click();
   await expect(page.locator(".mll-tagband .mll-tagband__chip")).toHaveText(["cv/霧島レイ"]);
   await expect(page.getByRole("button", { name: "すべての作品" })).toHaveAttribute(
     "aria-current",
@@ -41,8 +41,8 @@ test("軸の値一覧をグリッド表示に切り替えられる", async ({ pa
   await page.getByRole("button", { name: "CV" }).click();
   await page.getByRole("button", { name: "グリッド" }).click();
 
-  const valueList = page.locator(".mle-col.is-axis-values");
-  await expect(valueList.getByRole("option").first()).toBeVisible();
+  const valueList = page.getByRole("group", { name: "CVの値一覧" });
+  await expect(valueList.getByRole("button").first()).toBeVisible();
 
   assertNoErrors(tracker);
 });
@@ -67,12 +67,15 @@ test("軸をまたいだAND絞り込みでチップが積み上がる", async ({
   await openApp(page);
 
   await page.getByRole("button", { name: "CV" }).click();
-  await page.getByRole("option", { name: "霧島レイ" }).click();
+  await page
+    .getByRole("group", { name: "CVの値一覧" })
+    .getByRole("button", { name: /^霧島レイ(?!を)/ })
+    .click();
 
   await page.getByRole("button", { name: "サークル" }).click();
-  const circleRow = page.getByRole("option", { name: "月白製作所" });
-  await circleRow.hover();
-  await circleRow.getByRole("button", { name: /をAND追加$/ }).click();
+  const circleList = page.getByRole("group", { name: "サークルの値一覧" });
+  await circleList.getByRole("button", { name: /^月白製作所(?!を)/ }).hover();
+  await circleList.getByRole("button", { name: "月白製作所をAND追加" }).click();
 
   await page.getByRole("button", { name: "すべての作品" }).click();
   await expect(page.locator(".mll-tagband .mll-tagband__chip")).toHaveText([

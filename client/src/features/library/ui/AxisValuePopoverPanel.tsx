@@ -11,6 +11,7 @@ import AxisValueQuickList from "./AxisValueQuickList";
 
 interface AxisValuePopoverPanelProps {
   axis: AxisId;
+  axisLabel: string;
   layout: PopoverLayout;
   selectedTags: NormalizedTag[];
   onSelect: (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
@@ -22,6 +23,7 @@ interface AxisValuePopoverPanelProps {
 
 export default function AxisValuePopoverPanel({
   axis,
+  axisLabel,
   layout,
   selectedTags,
   onSelect,
@@ -38,6 +40,7 @@ export default function AxisValuePopoverPanel({
     >
       <AxisValueQuickList
         axis={axis}
+        axisLabel={axisLabel}
         items={facetQuery.data ?? []}
         isLoading={facetQuery.isLoading}
         isError={facetQuery.isError}
