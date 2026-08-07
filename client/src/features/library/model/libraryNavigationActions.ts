@@ -2,7 +2,7 @@ import { atom } from "jotai";
 import { isBuiltinPseudoTagAxis, parseBuiltinAxisTag, type NormalizedTag } from "@mimimilli/shared";
 import { requestNavigationHistoryCommit } from "../../navigation/model/navigationHistoryCommit";
 import type { AxisId, SortId } from "./types";
-import { computeReplacedTags, computeResultsPaneKind } from "./libraryPresentation";
+import { computeResultsPaneKind } from "./libraryPresentation";
 import { activeAxisAtom, selectedTagsAtom, selectedWorkIdAtom, sortAtom } from "./atoms";
 
 // 軸は値をブラウズするためのビューであり、選択状態を持たない（ADR-0012 §1）。
@@ -45,17 +45,16 @@ export const selectSoleLibraryTagAtom = atom(null, (_get, set, tag: NormalizedTa
   set(selectedWorkIdAtom, null);
 });
 
-// 全入口共通の「既定=置き換え」操作（ADR-0012 §7・§8）。同じ tagFilterGroupKey のタグを
-// 外してから追加し、結果面を作品一覧へ進める。置き換えは「見たいものが変わった」を表す
-// ため、結果面が値一覧/ホームのままなら作品一覧（all）へ切り替える。既に作品一覧
-// （ビュー軸・スマートフォルダー軸）ならそのまま維持する。軸レールのクイックオーバーレイ・
-// チップの兄弟値ドロップダウン・値一覧の値タイル/行クリックが使う、入口を問わない単一の
-// 規則。AND追加（Ctrl+クリック・ホバー時の＋ボタン等、「絞り込みを積んでいる途中」を表す）
-// は現在地に留まる toggleLibraryTagAtom を使う。
+// 全入口共通の「既定=置き換え」操作（ADR-0013）。選択中のタグをすべて捨て、クリックした
+// タグ1つだけの絞り込みにしてから、結果面を作品一覧へ進める。置き換えは「見たいものが
+// 変わった」を表すため、結果面が値一覧/ホームのままなら作品一覧（all）へ切り替える。既に
+// 作品一覧（ビュー軸・スマートフォルダー軸）ならそのまま維持する。軸レールのクイック
+// オーバーレイ・チップの兄弟値ドロップダウン・値一覧の値タイル/行クリックが使う、入口を
+// 問わない単一の規則。AND追加（Ctrl+クリック・ホバー時の＋ボタン等、「絞り込みを積んでいる
+// 途中」を表す）は現在地に留まる toggleLibraryTagAtom を使う。
 export const replaceLibraryTagAtom = atom(null, (get, set, tag: NormalizedTag) => {
   requestNavigationHistoryCommit(set, "push");
-  const prev = get(selectedTagsAtom);
-  set(selectedTagsAtom, computeReplacedTags(prev, tag));
+  set(selectedTagsAtom, [tag]);
   if (computeResultsPaneKind(get(activeAxisAtom)) !== "works") {
     set(activeAxisAtom, "all");
   }
