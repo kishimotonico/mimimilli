@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { useAtomValue } from "jotai";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import { getDefaultPlaylistTrackCount, type ScanResult, type Work } from "@mimimilli/shared";
 import { getWork, patchWork } from "../../../entities/work/api";
 import { mutationErrorMessage } from "../../../shared/lib/mutationError";
 import { libraryTotalQueryOptions } from "../../library/model/useLibraryQueries";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
-import Presence from "../../../shared/ui/Presence";
+import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 import { cn } from "../../../shared/lib/cn";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
@@ -206,112 +207,59 @@ export default function ScanModal({ lastScanTime, onClose, onOpenRjCodeMissing }
             <StatsGrid result={lastResult} changedKeys={changedKeys} />
           </div>
 
-          <Presence
-            show={
-              !!lastResult &&
-              (lastResult.rjCodeMissingCount > 0 || !!lastResult.dataIntegrityWarning)
-            }
-            variant="collapse"
-            skipInitial
-          >
-            {lastResult && lastResult.rjCodeMissingCount > 0 ? (
-              <button
-                type="button"
-                onClick={onOpenRjCodeMissing}
-                className="flex w-full items-center gap-2 overflow-hidden rounded-[6px] border border-[color-mix(in_oklch,var(--r-mustard)_35%,transparent)] bg-[color-mix(in_oklch,var(--r-mustard)_10%,transparent)] px-3 py-2 text-left hover:bg-[color-mix(in_oklch,var(--r-mustard)_16%,transparent)]"
-              >
-                <I.err size={13} className="shrink-0 text-[var(--r-mustard)]" />
-                <span className="flex-1 font-jp text-[12px] text-ink-0">
-                  RJコード未検出の作品が{lastResult.rjCodeMissingCount}件あります
-                </span>
-                <I.chev size={12} className="shrink-0 text-ink-3" />
-              </button>
-            ) : null}
-            {lastResult?.dataIntegrityWarning ? (
-              <div className="flex w-full items-center gap-2 overflow-hidden rounded-[6px] border border-[color-mix(in_oklch,var(--r-mustard)_35%,transparent)] bg-[color-mix(in_oklch,var(--r-mustard)_10%,transparent)] px-3 py-2">
-                <I.err size={13} className="shrink-0 text-[var(--r-mustard)]" />
-                <span className="font-jp text-[12px] text-ink-0">
-                  {lastResult.dataIntegrityWarning.skippedCount}
-                  件の作品がデータ不整合のため除外されました
-                </span>
-              </div>
-            ) : null}
-          </Presence>
+          <AnimatePresence initial={false}>
+            {lastResult &&
+              (lastResult.rjCodeMissingCount > 0 || !!lastResult.dataIntegrityWarning) && (
+                <ScanWarnings
+                  key="warnings"
+                  lastResult={lastResult}
+                  onOpenRjCodeMissing={onOpenRjCodeMissing}
+                />
+              )}
+          </AnimatePresence>
 
-          <Presence show={newWorks.length > 0 || !!newWorksError} variant="collapse" skipInitial>
-            <p className="font-sans text-[10.5px] font-semibold tracking-[0.06em] text-ink-3 uppercase">
-              新規検出した作品
-            </p>
-            {newWorksError ? (
-              <p className="font-jp text-[12px] text-[var(--r-coral)]">{newWorksError}</p>
-            ) : (
-              <ul className="flex max-h-[220px] list-none flex-col gap-1 overflow-y-auto p-0">
-                {newWorks.map((work) => (
-                  <li key={work.id}>
-                    <NewWorkRow
-                      work={work}
-                      editing={editingId === work.id}
-                      editTitle={editTitle}
-                      editSaving={editingId === work.id && editSaving}
-                      editError={editingId === work.id ? editError : null}
-                      titleInputRef={titleInputRef}
-                      onStartEdit={() => handleStartEdit(work)}
-                      onChangeEditTitle={setEditTitle}
-                      onSaveTitle={() => handleSaveTitle(work.id)}
-                    />
-                  </li>
-                ))}
-              </ul>
+          <AnimatePresence initial={false}>
+            {(newWorks.length > 0 || !!newWorksError) && (
+              <ScanNewWorks
+                key="new-works"
+                newWorks={newWorks}
+                newWorksError={newWorksError}
+                editingId={editingId}
+                editTitle={editTitle}
+                editSaving={editSaving}
+                editError={editError}
+                titleInputRef={titleInputRef}
+                onStartEdit={handleStartEdit}
+                onChangeEditTitle={setEditTitle}
+                onSaveTitle={handleSaveTitle}
+              />
             )}
-          </Presence>
+          </AnimatePresence>
         </div>
 
         <footer className="relative flex shrink-0 items-center justify-between gap-3 border-t border-line-soft px-[18px] py-3">
-          <Presence
-            show={scanning}
-            variant="fade"
-            skipInitial
-            className="font-jp text-[11px] text-ink-3"
-          >
-            閉じてもバックグラウンドで続行します
-          </Presence>
+          <AnimatePresence initial={false}>
+            {scanning && <ScanFooterHint key="hint" />}
+          </AnimatePresence>
           <div className="relative flex shrink-0 items-center gap-2">
-            <Presence
-              show={scanning}
-              as="button"
-              type="button"
-              variant="fade"
-              skipInitial
-              onClick={() => void cancel().catch(() => {})}
-              className="inline-flex h-9 min-w-[128px] items-center justify-center gap-1.5 rounded-[6px] border border-[color-mix(in_oklch,var(--r-coral)_45%,transparent)] bg-[color-mix(in_oklch,var(--r-coral)_10%,transparent)] px-4 font-sans text-[12.5px] font-medium text-ink-0 transition-colors hover:bg-[color-mix(in_oklch,var(--r-coral)_16%,transparent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
-            >
-              <I.x size={12} />
-              スキャンを中止
-            </Presence>
-            <Presence
-              show={!scanning}
-              as="button"
-              type="button"
-              variant="fade"
-              skipInitial
-              onClick={() => void start({ full: true }).catch(() => {})}
-              className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[6px] border border-line-soft bg-paper-0 px-3 font-sans text-[12px] font-medium text-ink-1 transition-colors hover:bg-paper-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
-            >
-              <I.refresh size={12} />
-              フルスキャン
-            </Presence>
-            <Presence
-              show={!scanning}
-              as="button"
-              type="button"
-              variant="fade"
-              skipInitial
-              onClick={() => void start().catch(() => {})}
-              className="inline-flex h-9 min-w-[128px] items-center justify-center gap-1.5 rounded-[6px] bg-ink-0 px-4 font-sans text-[12.5px] font-semibold text-paper-1 transition-colors hover:bg-acc focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
-            >
-              <I.refresh size={12} />
-              スキャン開始
-            </Presence>
+            <AnimatePresence initial={false}>
+              {scanning && (
+                <ScanCancelButton key="cancel" onClick={() => void cancel().catch(() => {})} />
+              )}
+            </AnimatePresence>
+            <AnimatePresence initial={false}>
+              {!scanning && (
+                <ScanFullScanButton
+                  key="fullscan"
+                  onClick={() => void start({ full: true }).catch(() => {})}
+                />
+              )}
+            </AnimatePresence>
+            <AnimatePresence initial={false}>
+              {!scanning && (
+                <ScanStartButton key="start" onClick={() => void start().catch(() => {})} />
+              )}
+            </AnimatePresence>
           </div>
         </footer>
       </div>
@@ -319,8 +267,11 @@ export default function ScanModal({ lastScanTime, onClose, onOpenRjCodeMissing }
   );
 }
 
+type StatusState = "scanning" | "completed" | "lastScan";
+
 /** 「最終スキャン: 日時」⇄「実行中のフェーズと進捗」⇄「完了しました」を同じ行の位置で入れ替える。
- *  完了サインは justCompleted の間だけ一時的に挟まり、その後は最終スキャン日時に戻る。 */
+ *  完了サインは justCompleted の間だけ一時的に挟まり、その後は最終スキャン日時に戻る。
+ *  排他3状態を単一スロット化し、sync（並置クロスフェード）+ 退出absoluteで入れ替える。 */
 function StatusRow({
   scanning,
   progress,
@@ -332,47 +283,272 @@ function StatusRow({
   lastScanTime: string | null;
   showCompletedHint: boolean;
 }) {
+  const state: StatusState = scanning ? "scanning" : showCompletedHint ? "completed" : "lastScan";
+
+  return (
+    <div className="relative flex min-h-[20px] flex-col gap-1.5">
+      <AnimatePresence initial={false}>
+        {state === "scanning" && <StatusRowScanning key="scanning" progress={progress} />}
+        {state === "completed" && <StatusRowCompleted key="completed" />}
+        {state === "lastScan" && <StatusRowLastScan key="lastScan" lastScanTime={lastScanTime} />}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function StatusRowScanning({ progress }: { progress: ScanProgress | null }) {
+  const { fade } = useMotionVariants();
+  const isPresent = useIsPresent();
+  const v = fade();
   const pct =
     progress && progress.total > 0
       ? Math.min(100, Math.round((progress.processed / progress.total) * 100))
       : null;
-
   return (
-    <div className="relative flex min-h-[20px] flex-col gap-1.5">
-      <Presence show={scanning} variant="fade" skipInitial className="flex flex-col gap-1.5">
-        <div className="flex items-baseline justify-between gap-2">
-          <span className="font-sans text-[13px] font-medium text-ink-0">
-            {progress ? scanPhaseLabel(progress.phase) : "準備中"}
-          </span>
-          <span className="font-mono text-[11px] text-ink-2 tabular-nums">
-            {progress && progress.total > 0 ? `${progress.processed}/${progress.total}` : "…"}
-          </span>
-        </div>
-        <div className="h-[3px] overflow-hidden rounded-full bg-paper-2">
-          <div
-            className={cn(
-              "h-full rounded-full bg-acc transition-[width] duration-300 ease-out",
-              pct === null && "w-1/3 animate-pulse",
-            )}
-            style={pct !== null ? { width: `${pct}%` } : undefined}
-          />
-        </div>
-      </Presence>
-      <Presence
-        show={!scanning && showCompletedHint}
-        variant="fade"
-        skipInitial
-        className="flex items-center gap-1.5"
-      >
-        <I.check size={12} className="text-[var(--r-leaf)]" />
-        <span className="font-sans text-[13px] font-medium text-ink-0">完了しました</span>
-      </Presence>
-      <Presence show={!scanning && !showCompletedHint} variant="fade" skipInitial>
-        <span className="font-mono text-[11px] text-ink-2">
-          最終スキャン: {formatDate(lastScanTime)}
+    <motion.div
+      className="flex flex-col gap-1.5"
+      inert={!isPresent}
+      initial={v.initial}
+      animate={v.animate}
+      exit={v.exit}
+    >
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="font-sans text-[13px] font-medium text-ink-0">
+          {progress ? scanPhaseLabel(progress.phase) : "準備中"}
         </span>
-      </Presence>
-    </div>
+        <span className="font-mono text-[11px] text-ink-2 tabular-nums">
+          {progress && progress.total > 0 ? `${progress.processed}/${progress.total}` : "…"}
+        </span>
+      </div>
+      <div className="h-[3px] overflow-hidden rounded-full bg-paper-2">
+        <div
+          className={cn(
+            "h-full rounded-full bg-acc transition-[width] duration-300 ease-out",
+            pct === null && "w-1/3 animate-pulse",
+          )}
+          style={pct !== null ? { width: `${pct}%` } : undefined}
+        />
+      </div>
+    </motion.div>
+  );
+}
+
+function StatusRowCompleted() {
+  const { fade } = useMotionVariants();
+  const isPresent = useIsPresent();
+  const v = fade();
+  return (
+    <motion.div
+      className="flex items-center gap-1.5"
+      inert={!isPresent}
+      initial={v.initial}
+      animate={v.animate}
+      exit={v.exit}
+    >
+      <I.check size={12} className="text-[var(--r-leaf)]" />
+      <span className="font-sans text-[13px] font-medium text-ink-0">完了しました</span>
+    </motion.div>
+  );
+}
+
+function StatusRowLastScan({ lastScanTime }: { lastScanTime: string | null }) {
+  const { fade } = useMotionVariants();
+  const isPresent = useIsPresent();
+  const v = fade();
+  return (
+    <motion.div inert={!isPresent} initial={v.initial} animate={v.animate} exit={v.exit}>
+      <span className="font-mono text-[11px] text-ink-2">
+        最終スキャン: {formatDate(lastScanTime)}
+      </span>
+    </motion.div>
+  );
+}
+
+/** RJコード未検出/データ不整合の警告。組み合わせで両方同時に出ることがあるため1つのcollapse境界にまとめる。 */
+function ScanWarnings({
+  lastResult,
+  onOpenRjCodeMissing,
+}: {
+  lastResult: ScanResult;
+  onOpenRjCodeMissing: () => void;
+}) {
+  const { collapse } = useMotionVariants();
+  const isPresent = useIsPresent();
+  const v = collapse();
+  return (
+    <motion.div
+      style={{ overflow: "hidden" }}
+      className="flex flex-col gap-1.5"
+      inert={!isPresent}
+      initial={v.initial}
+      animate={v.animate}
+      exit={v.exit}
+    >
+      {lastResult.rjCodeMissingCount > 0 ? (
+        <button
+          type="button"
+          onClick={onOpenRjCodeMissing}
+          className="flex w-full items-center gap-2 overflow-hidden rounded-[6px] border border-[color-mix(in_oklch,var(--r-mustard)_35%,transparent)] bg-[color-mix(in_oklch,var(--r-mustard)_10%,transparent)] px-3 py-2 text-left hover:bg-[color-mix(in_oklch,var(--r-mustard)_16%,transparent)]"
+        >
+          <I.err size={13} className="shrink-0 text-[var(--r-mustard)]" />
+          <span className="flex-1 font-jp text-[12px] text-ink-0">
+            RJコード未検出の作品が{lastResult.rjCodeMissingCount}件あります
+          </span>
+          <I.chev size={12} className="shrink-0 text-ink-3" />
+        </button>
+      ) : null}
+      {lastResult.dataIntegrityWarning ? (
+        <div className="flex w-full items-center gap-2 overflow-hidden rounded-[6px] border border-[color-mix(in_oklch,var(--r-mustard)_35%,transparent)] bg-[color-mix(in_oklch,var(--r-mustard)_10%,transparent)] px-3 py-2">
+          <I.err size={13} className="shrink-0 text-[var(--r-mustard)]" />
+          <span className="font-jp text-[12px] text-ink-0">
+            {lastResult.dataIntegrityWarning.skippedCount}
+            件の作品がデータ不整合のため除外されました
+          </span>
+        </div>
+      ) : null}
+    </motion.div>
+  );
+}
+
+/** 新規検出した作品一覧。件数見出し+一覧（または取得失敗メッセージ）を1つのcollapse境界にまとめる。 */
+function ScanNewWorks({
+  newWorks,
+  newWorksError,
+  editingId,
+  editTitle,
+  editSaving,
+  editError,
+  titleInputRef,
+  onStartEdit,
+  onChangeEditTitle,
+  onSaveTitle,
+}: {
+  newWorks: Work[];
+  newWorksError: string | null;
+  editingId: string | null;
+  editTitle: string;
+  editSaving: boolean;
+  editError: string | null;
+  titleInputRef: RefObject<HTMLInputElement | null>;
+  onStartEdit: (work: Work) => void;
+  onChangeEditTitle: (title: string) => void;
+  onSaveTitle: (workId: string) => void;
+}) {
+  const { collapse } = useMotionVariants();
+  const isPresent = useIsPresent();
+  const v = collapse();
+  return (
+    <motion.div
+      style={{ overflow: "hidden" }}
+      className="flex flex-col gap-1.5"
+      inert={!isPresent}
+      initial={v.initial}
+      animate={v.animate}
+      exit={v.exit}
+    >
+      <p className="font-sans text-[10.5px] font-semibold tracking-[0.06em] text-ink-3 uppercase">
+        新規検出した作品
+      </p>
+      {newWorksError ? (
+        <p className="font-jp text-[12px] text-[var(--r-coral)]">{newWorksError}</p>
+      ) : (
+        <ul className="flex max-h-[220px] list-none flex-col gap-1 overflow-y-auto p-0">
+          {newWorks.map((work) => (
+            <li key={work.id}>
+              <NewWorkRow
+                work={work}
+                editing={editingId === work.id}
+                editTitle={editTitle}
+                editSaving={editingId === work.id && editSaving}
+                editError={editingId === work.id ? editError : null}
+                titleInputRef={titleInputRef}
+                onStartEdit={() => onStartEdit(work)}
+                onChangeEditTitle={onChangeEditTitle}
+                onSaveTitle={() => onSaveTitle(work.id)}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
+    </motion.div>
+  );
+}
+
+/** フッターの「閉じてもバックグラウンドで続行します」ヒント。中止ボタンと同時に出る。 */
+function ScanFooterHint() {
+  const { fade } = useMotionVariants();
+  const isPresent = useIsPresent();
+  const v = fade();
+  return (
+    <motion.div
+      className="font-jp text-[11px] text-ink-3"
+      inert={!isPresent}
+      initial={v.initial}
+      animate={v.animate}
+      exit={v.exit}
+    >
+      閉じてもバックグラウンドで続行します
+    </motion.div>
+  );
+}
+
+function ScanCancelButton({ onClick }: { onClick: () => void }) {
+  const { fade } = useMotionVariants();
+  const isPresent = useIsPresent();
+  const v = fade();
+  return (
+    <motion.button
+      type="button"
+      onClick={onClick}
+      inert={!isPresent}
+      initial={v.initial}
+      animate={v.animate}
+      exit={v.exit}
+      className="inline-flex h-9 min-w-[128px] items-center justify-center gap-1.5 rounded-[6px] border border-[color-mix(in_oklch,var(--r-coral)_45%,transparent)] bg-[color-mix(in_oklch,var(--r-coral)_10%,transparent)] px-4 font-sans text-[12.5px] font-medium text-ink-0 transition-colors hover:bg-[color-mix(in_oklch,var(--r-coral)_16%,transparent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
+    >
+      <I.x size={12} />
+      スキャンを中止
+    </motion.button>
+  );
+}
+
+function ScanFullScanButton({ onClick }: { onClick: () => void }) {
+  const { fade } = useMotionVariants();
+  const isPresent = useIsPresent();
+  const v = fade();
+  return (
+    <motion.button
+      type="button"
+      onClick={onClick}
+      inert={!isPresent}
+      initial={v.initial}
+      animate={v.animate}
+      exit={v.exit}
+      className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[6px] border border-line-soft bg-paper-0 px-3 font-sans text-[12px] font-medium text-ink-1 transition-colors hover:bg-paper-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
+    >
+      <I.refresh size={12} />
+      フルスキャン
+    </motion.button>
+  );
+}
+
+function ScanStartButton({ onClick }: { onClick: () => void }) {
+  const { fade } = useMotionVariants();
+  const isPresent = useIsPresent();
+  const v = fade();
+  return (
+    <motion.button
+      type="button"
+      onClick={onClick}
+      inert={!isPresent}
+      initial={v.initial}
+      animate={v.animate}
+      exit={v.exit}
+      className="inline-flex h-9 min-w-[128px] items-center justify-center gap-1.5 rounded-[6px] bg-ink-0 px-4 font-sans text-[12.5px] font-semibold text-paper-1 transition-colors hover:bg-acc focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
+    >
+      <I.refresh size={12} />
+      スキャン開始
+    </motion.button>
   );
 }
 
