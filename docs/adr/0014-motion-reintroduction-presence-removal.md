@@ -27,7 +27,7 @@ motion を再導入し、出現・退出アニメーションの基盤を `Anima
 
 1. **Presenceの置換だけでは退避は消えない**。マウント境界を `{open && <Child />}` の条件レンダーへ移し、`AnimatePresence` で包む。手動値退避ref（`AxisQuickOverlay.lastResultRef` / `AxisValuePopoverPanel.lastResultRef` / `FilterChipAddButton.lastPickedAxisRef` / `AxisColumn.lastOverlayAxisRef` / `AxisColumn.lastAnchorElRef`）の削除を受け入れ条件とする
 2. **クエリ購読は条件境界の内側に置き、開閉状態に連動させない**。`useAxisFacetsQuery(isOpen ? axis : null)` のように引数のnull切替でquery keyを変えるパターンが退避の直接原因（このフックに `enabled` オプションは無い）。子がマウントされている間は常に有効な引数で購読する
-3. **AP境界の子は必ずコンポーネントとして切り出し、内部で `useIsPresent()` を呼ぶ**。用途は (a) ルート要素への `inert={!isPresent}`、(b) document/windowレベルのリスナー（outside click / Escape / pointermove 等）の退出中解除、の2つに**限定**する。**フォーカス復帰には使わない**（軸A→B切替時に旧Aが新Bからフォーカスを奪うため。復帰は現行どおり activeElement を検査して reason を渡す close ハンドラ側の責務のまま）
+3. **AP境界の子は必ずコンポーネントとして切り出し、内部で `useIsPresent()` を呼ぶ**。用途は (a) ルート要素への `inert={!isPresent}`、(b) document/windowレベルのリスナー（outside click / Escape / pointermove 等）の退出中解除、の2つに**限定**する。**フォーカス復帰には使わない**（軸A→B切替時に旧Aが新Bからフォーカスを奪うため。復帰は現行どおり activeElement を検査して reason を渡す close ハンドラ側の責務のまま）※用途はTASK-240で3つへ拡張（下記「実装時に判明した訂正」参照）
 4. **variantトークンモジュール**（`presenceDurations.ts` の後継、`useMotionVariants()` フック + booleanを受けるbuilderのペア）に duration・easing・delay・transform-origin を集約する。プロパティ別duration・enter/exitの非対称scale・overshoot easing（cubic-bezier(0.34,1.2,0.64,1)）を表現できる形式にする。**delayを含む全パラメータをbuilder経由にし、コンポーネント側の `transition.delay` 直書きは禁止**（reduced-motion時の0化を迂回するため）
 5. **汎用ラッパーコンポーネントは作らない**。TASK-156でAnimatePresence相当（TransitionPresence）の自作がレビュー5巡で破綻した教訓。共有するのはトークンと原則3の規約のみで、各所で motion コンポーネントを直接使う
 6. **既存ルート要素を直接 `motion.div` 等に置き換える**（ラッパーDOMを被せない）。`position: fixed` オーバーレイの座標系・stacking context破壊を防ぐ
