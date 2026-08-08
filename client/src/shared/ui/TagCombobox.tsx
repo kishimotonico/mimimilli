@@ -47,7 +47,7 @@ export function getTagComboboxOptions(
 
     if (normalized === normalizedQuery) hasExactMatch = true;
     if (excluded.has(normalized)) continue;
-    if (!normalized.includes(normalizedQuery)) continue;
+    if (!normalized.toLowerCase().includes(normalizedQuery.toLowerCase())) continue;
 
     if (matchedSuggestions.length < limit) {
       matchedSuggestions.push({ kind: "suggestion", value: tag });

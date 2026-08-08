@@ -1570,12 +1570,10 @@
   }
   .mll-qoverlay--fixed {
     position: fixed;
-    transform-origin: left center;
   }
   .mll-qoverlay--inline {
     position: absolute;
     top: calc(100% + 6px);
-    transform-origin: top left;
   }
   .mll-qlist {
     display: flex;
