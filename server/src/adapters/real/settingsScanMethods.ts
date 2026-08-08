@@ -17,7 +17,10 @@ const KEY_LAST_SCAN_TIME = "last_scan_time";
 
 export function createSettingsScanMethods(deps: {
   database: DbLocation;
-  repo: WorkRepo;
+  repo: Pick<
+    WorkRepo,
+    "getUserSetting" | "getScanState" | "setUserSetting" | "listSummaries" | "setScanState"
+  >;
   scanner: Scanner;
   dataRoot: string;
   thumbnailCacheDir: string;
@@ -54,13 +57,12 @@ export function createSettingsScanMethods(deps: {
       );
     return root;
   };
+  const getSettings = async (): Promise<Settings> => ({
+    rootFolder: repo.getUserSetting(KEY_ROOT_FOLDER),
+    lastScanTime: repo.getScanState(KEY_LAST_SCAN_TIME),
+  });
   return {
-    async getSettings(): Promise<Settings> {
-      return {
-        rootFolder: repo.getUserSetting(KEY_ROOT_FOLDER),
-        lastScanTime: repo.getScanState(KEY_LAST_SCAN_TIME),
-      };
-    },
+    getSettings,
 
     async updateSettings(patch: SettingsUpdate): Promise<Settings> {
       // 正規化した絶対パスで保存する。スキャンが記録する physicalPath / fs ブラウズの
@@ -90,7 +92,7 @@ export function createSettingsScanMethods(deps: {
         resolvedPath: absRoot,
       });
       repo.setUserSetting(KEY_ROOT_FOLDER, absRoot);
-      return this.getSettings();
+      return getSettings();
     },
 
     async scan(scanOptions?: ScanOptions): Promise<ScanResult> {
