@@ -57,20 +57,30 @@ describe("getTagComboboxOptions", () => {
     ]);
   });
 
-  it("treats flat tags as case-sensitive", () => {
-    expect(getTagComboboxOptions("abc", ["ABC"]).filter((o) => o.kind === "suggestion")).toEqual(
-      [],
-    );
+  it("ignores case in suggestion search for flat tags", () => {
+    expect(getTagComboboxOptions("abc", ["ABC"]).filter((o) => o.kind === "suggestion")).toEqual([
+      { kind: "suggestion", value: "ABC" },
+    ]);
     expect(getTagComboboxOptions("ABC", ["ABC"])).toEqual([{ kind: "suggestion", value: "ABC" }]);
   });
 
-  it("ignores prefix case but not value case for prefix/value tags", () => {
+  it("ignores case in suggestion search for prefix/value tags", () => {
     expect(getTagComboboxOptions("circle/ABC", ["Circle/ABC"])).toEqual([
       { kind: "suggestion", value: "Circle/ABC" },
     ]);
     expect(
       getTagComboboxOptions("circle/abc", ["Circle/ABC"]).filter((o) => o.kind === "suggestion"),
-    ).toEqual([]);
+    ).toEqual([{ kind: "suggestion", value: "Circle/ABC" }]);
+  });
+
+  it("keeps exact-match identity case-sensitive even when search matches loosely", () => {
+    // 検索の寛容さ（大文字小文字無視）と同一性の厳密さ（normalizeTag準拠）は独立。
+    // "asmr" は既存の "ASMR" を候補として拾いつつ、厳密には別タグ扱いなので
+    // create オプションも残る（Enterのデフォルト選択は先頭の候補になる）。
+    expect(getTagComboboxOptions("asmr", ["ASMR"])).toEqual([
+      { kind: "suggestion", value: "ASMR" },
+      { kind: "create", value: "asmr" },
+    ]);
   });
 
   it("returns no options for non-normalizable input", () => {
