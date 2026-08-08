@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@codex'
 created_date: '2026-08-06 04:58'
-updated_date: '2026-08-08 12:44'
+updated_date: '2026-08-08 13:26'
 labels: []
 dependencies: []
 priority: medium
@@ -58,11 +58,11 @@ DLsite（dlsite.ts / dlsiteCache.ts / dlsiteScheduler.ts）、サムネイル（
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
-実装をDLsite、カバー/メディア、設定/スキャン、作品操作、分類の5ファクトリへ分割し、分類ファクトリの直接単体テストを追加した。抽出漏れのbrowseFsを差分監査で復元し、DataAdapter全33メソッドの欠落・重複がないことを型検査と機械照合で確認した。Bun 1.3.14の複数test worker停止はTASK-255で逐次実行へ修正して統合済み。最終検証: pnpm check成功（4.405秒）、pnpm test成功（28.812秒、server 63 files / 524 tests、client 102 files / 777 tests）、git diff --check成功。実DB・real adapter実起動は行っていない。
+実装をDLsite、カバー/メディア、設定/スキャン、作品操作、分類の5ファクトリへ分割し、分類ファクトリと設定/スキャンファクトリの直接単体テストを追加した。DataAdapter全33メソッドの欠落・重複がないことを型検査と機械照合で確認した。Claudeレビューを受け、updateSettingsが元コードから引き継いだthis.getSettings()を、repoを閉じ込めたローカルgetSettings()の直接呼び出しへ変更した。全*Methods.tsにthis依存がないことを確認済み。Bun 1.3.14の複数test worker停止はTASK-255で逐次実行へ修正して統合済み。最終検証: pnpm check成功（4.693秒）、pnpm test成功（29.188秒、server 64 files / 525 tests、client 102 files / 777 tests）、git diff --check成功。実DB・real adapter実起動は行っていない。
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-createRealAdapterの約1000行を5つの関心事別ファクトリへ抽出し、依存を各deps引数へ明示した。createRealAdapterは依存生成・prefix初期化・ファクトリ合成・closeのみになり、分類ファクトリをadapter全体なしで検証するテストを追加した。関連してBun並列test worker停止をTASK-255で解消し、pnpm checkと全1301テストの成功を確認した。
+createRealAdapterの約1000行を5つの関心事別ファクトリへ抽出し、依存を各deps引数へ明示した。createRealAdapterは依存生成・prefix初期化・ファクトリ合成・closeのみになった。分類と設定/スキャンをadapter全体なしで検証するテストを追加し、updateSettingsを含むfactory群から暗黙のthis依存を排除した。関連するBun並列test worker停止もTASK-255で解消し、pnpm checkと全1302テストの成功を確認した。
 <!-- SECTION:FINAL_SUMMARY:END -->
