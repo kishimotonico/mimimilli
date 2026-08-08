@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { Track } from "@mimimilli/shared";
 import { I, type IconFC } from "../../../../shared/ui/Icon";
-import { usePopoverDismissal } from "./useAnchoredPopover";
+import { usePopoverDismissal } from "../../../../shared/ui/usePopoverDismissal";
 
 interface WorkPlayButtonProps {
   hasResume: boolean;

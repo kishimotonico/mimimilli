@@ -17,7 +17,7 @@ import { listSmartFolders } from "../api";
 import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
-import { usePopoverDismissal } from "./preview/useAnchoredPopover";
+import { usePopoverDismissal } from "../../../shared/ui/usePopoverDismissal";
 
 const SMART_FOLDER_SORT_TOOLTIP = "並び順はスマートフォルダーの設定に従います";
 

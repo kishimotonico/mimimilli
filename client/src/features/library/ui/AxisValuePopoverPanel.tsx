@@ -1,9 +1,9 @@
 import { motion, useIsPresent } from "motion/react";
+import type { CSSProperties } from "react";
 import type { FacetAxisId, NormalizedTag } from "@mimimilli/shared";
 import type { AxisId } from "../model/types";
 import { useAxisFacetsQuery } from "../model/useAxisFacetsQuery";
 import { buildFilterTag } from "../model/libraryPresentation";
-import type { PopoverLayout } from "./preview/useAnchoredPopover";
 import AxisValueQuickList from "./AxisValueQuickList";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 
@@ -19,7 +19,8 @@ import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 interface AxisValuePopoverPanelProps {
   axis: AxisId;
   axisLabel: string;
-  layout: PopoverLayout;
+  floatingStyles: CSSProperties;
+  setFloating: (node: HTMLElement | null) => void;
   selectedTags: NormalizedTag[];
   onSelect: (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
   /** ホバー/フォーカス時の＋ボタン（冪等なAND追加）。省略時はボタンを出さない（ADR-0013） */
@@ -31,7 +32,8 @@ interface AxisValuePopoverPanelProps {
 export default function AxisValuePopoverPanel({
   axis,
   axisLabel,
-  layout,
+  floatingStyles,
+  setFloating,
   selectedTags,
   onSelect,
   onAdd,
@@ -45,8 +47,9 @@ export default function AxisValuePopoverPanel({
 
   return (
     <motion.div
+      ref={setFloating}
       className="mll-qoverlay mll-qoverlay--inline"
-      style={{ left: layout.left, width: layout.width }}
+      style={floatingStyles}
       inert={!isPresent}
       {...variant}
     >

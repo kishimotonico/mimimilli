@@ -4,7 +4,7 @@ import type { FacetAxisId, NormalizedTag } from "@mimimilli/shared";
 import type { AxisId } from "../model/types";
 import { useAxisFacetsQuery } from "../model/useAxisFacetsQuery";
 import { buildFilterTag } from "../model/libraryPresentation";
-import { useAnchoredPopover } from "./preview/useAnchoredPopover";
+import { useAnchoredPopover } from "../../../shared/ui/useAnchoredPopover";
 import type { HoverGroupPanelHandlers } from "../../../shared/lib/useHoverGroupCoordinator";
 import AxisValueQuickList from "./AxisValueQuickList";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
@@ -53,17 +53,17 @@ export default function AxisQuickOverlay({
   const { popoverScale } = useMotionVariants();
   const variant = popoverScale({ origin: "left center" });
 
-  const { anchorRef, panelRef, layout, close } = useAnchoredPopover({
+  const { setFloating, floatingStyles, close } = useAnchoredPopover({
     isOpen: isPresent,
     preferredWidth: OVERLAY_WIDTH,
     onClose: () => onClose(),
     getContainer: (el) => el.closest(".mle-app"),
     placement: "right",
+    referenceElement: anchorEl,
   });
-  anchorRef.current = anchorEl as HTMLDivElement | null;
 
   const setPanelEl = (el: HTMLDivElement | null) => {
-    panelRef.current = el;
+    setFloating(el);
     onPanelElChange(el);
   };
 
@@ -74,11 +74,7 @@ export default function AxisQuickOverlay({
       ref={setPanelEl}
       {...variant}
       className="mll-qoverlay mll-qoverlay--fixed"
-      // マウント直後、パネル実測前の1フレームだけ top が未確定（layout effect が
-      // 実サイズを測ってペイント前に補正する。ちらつきは出ない）。
-      style={{ left: layout.left, top: layout.top ?? 0, width: layout.width }}
-      // pointer-events:none（exit variantにbake済み）だけではキーボード操作・
-      // アクセシビリティツリーからの到達を防げないため、退出中は inert にする。
+      style={floatingStyles}
       inert={!isPresent}
       {...panelHandlers}
     >

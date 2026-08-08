@@ -3,7 +3,7 @@ import { AnimatePresence } from "motion/react";
 import type { NormalizedTag, TagPrefix } from "@mimimilli/shared";
 import { getAxisLabel } from "../model/axisDefinitions";
 import { axisOfFilterTag } from "../model/libraryPresentation";
-import { useAnchoredPopover } from "./preview/useAnchoredPopover";
+import { useAnchoredPopover } from "../../../shared/ui/useAnchoredPopover";
 import AxisValuePopoverPanel from "./AxisValuePopoverPanel";
 import FilterChipAddButton from "./FilterChipAddButton";
 import { I } from "../../../shared/ui/Icon";
@@ -50,7 +50,7 @@ function FilterChip({
   onRemove: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const { anchorRef, layout, close } = useAnchoredPopover({
+  const { setReference, setFloating, floatingStyles, close } = useAnchoredPopover({
     isOpen: open,
     preferredWidth: 220,
     onClose: () => setOpen(false),
@@ -58,7 +58,7 @@ function FilterChip({
   const axis = axisOfFilterTag(tag);
 
   return (
-    <span ref={anchorRef} className="mll-tagband__chip relative">
+    <span ref={setReference} className="mll-tagband__chip relative">
       <button type="button" className="lbl" onClick={() => (open ? close() : setOpen(true))}>
         {tag}
       </button>
@@ -79,7 +79,8 @@ function FilterChip({
             key={axis}
             axis={axis}
             axisLabel={getAxisLabel(axis, tagPrefixes)}
-            layout={layout}
+            floatingStyles={floatingStyles}
+            setFloating={setFloating}
             selectedTags={selectedTags}
             onSelect={(nextTag, opts) => {
               onSelect(nextTag, opts);

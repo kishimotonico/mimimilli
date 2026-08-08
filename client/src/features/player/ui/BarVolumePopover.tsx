@@ -6,7 +6,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { I } from "../../../shared/ui/Icon";
-import { usePopoverDismissal } from "../../library/ui/preview/useAnchoredPopover";
+import { usePopoverDismissal } from "../../../shared/ui/usePopoverDismissal";
 
 interface BarVolumePopoverProps {
   volume: number;
