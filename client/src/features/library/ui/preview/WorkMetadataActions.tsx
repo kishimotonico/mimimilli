@@ -4,9 +4,15 @@ import { I } from "../../../../shared/ui/Icon";
 import IconButton from "../../../../shared/ui/IconButton";
 import { mutationErrorMessage } from "../../../../shared/lib/mutationError";
 import type { LibraryBookmarkPatchMutation } from "../../model/workPatchMutations";
-import { useAnchoredPopover } from "../../../../shared/ui/useAnchoredPopover";
+import {
+  useAnchoredPopover,
+  type PopoverContainerResolver,
+} from "../../../../shared/ui/useAnchoredPopover";
 
 const ACTION_POPOVER_WIDTH = 240;
+
+const actionPopoverContainerResolver: PopoverContainerResolver = (anchor) =>
+  anchor.closest(".mle-prv__body");
 
 interface WorkMetadataActionsProps {
   work: Work;
@@ -33,6 +39,7 @@ export function WorkMetadataActions({
   } = useAnchoredPopover({
     isOpen: isActionPopoverOpen,
     preferredWidth: ACTION_POPOVER_WIDTH,
+    getContainer: actionPopoverContainerResolver,
     onClose: (reason) => {
       closeActionPopover();
       if (reason === "escape") bookmarkMutation.reset();
