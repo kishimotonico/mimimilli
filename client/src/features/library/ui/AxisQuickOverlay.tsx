@@ -63,8 +63,12 @@ export default function AxisQuickOverlay({
   });
 
   const setPanelEl = (el: HTMLDivElement | null) => {
-    setFloating(el);
+    const cleanup = setFloating(el);
     onPanelElChange(el);
+    return () => {
+      cleanup?.();
+      onPanelElChange(null);
+    };
   };
 
   if (!anchorEl) return null;

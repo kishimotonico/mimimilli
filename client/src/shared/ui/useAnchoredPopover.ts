@@ -64,9 +64,11 @@ export interface UseAnchoredPopoverOptions {
   referenceElement?: HTMLElement | null;
 }
 
+export type AnchoredPopoverFloatingRefCallback = (node: HTMLElement | null) => (() => void) | void;
+
 export interface UseAnchoredPopoverResult {
   setReference: (node: HTMLElement | null) => void;
-  setFloating: (node: HTMLElement | null) => void;
+  setFloating: AnchoredPopoverFloatingRefCallback;
   floatingStyles: CSSProperties;
   containerWidth: number;
   close: (reason?: PopoverCloseReason) => void;
@@ -83,7 +85,7 @@ export function useAnchoredPopover({
   referenceElement,
 }: UseAnchoredPopoverOptions): UseAnchoredPopoverResult {
   const referenceRef = useRef<HTMLElement | null>(null);
-  const floatingRef = useRef<HTMLElement | null>(null);
+  const floatingNodeRef = useRef<HTMLElement | null>(null);
   const isOpenRef = useRef(isOpen);
   isOpenRef.current = isOpen;
   const closeInFlightRef = useRef(false);
@@ -184,9 +186,16 @@ export function useAnchoredPopover({
 
   const setFloating = useCallback(
     (node: HTMLElement | null) => {
-      floatingRef.current = node;
+      if (!node) return;
+      floatingNodeRef.current = node;
       floatingBoundaryRef.current = node;
       refs.setFloating(node);
+      return () => {
+        if (floatingNodeRef.current !== node) return;
+        floatingNodeRef.current = null;
+        floatingBoundaryRef.current = null;
+        refs.setFloating(null);
+      };
     },
     [refs],
   );

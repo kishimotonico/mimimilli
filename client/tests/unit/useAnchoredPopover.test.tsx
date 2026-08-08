@@ -1,5 +1,5 @@
 // useAnchoredPopover / usePopoverDismissal のフォーカス復帰・外側クリック/Escape挙動のテスト。
-import { createElement, useRef, useState } from "react";
+import { createElement, useRef, useState, type CSSProperties, type MutableRefObject } from "react";
 import { createPortal } from "react-dom";
 import { fireEvent, render, screen, cleanup, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AxisFacetItem } from "@mimimilli/shared";
 import AxisValueQuickList from "../../src/features/library/ui/AxisValueQuickList";
 import { useAnchoredPopover } from "../../src/shared/ui/useAnchoredPopover";
+import type { UseAnchoredPopoverResult } from "../../src/shared/ui/useAnchoredPopover";
 import { usePopoverDismissal } from "../../src/shared/ui/usePopoverDismissal";
 import { clearResizeObservers, flushAllResizeObservers, mockElementSize } from "./setup";
 
@@ -149,6 +150,66 @@ function ContainerWidthHarness() {
   );
 }
 
+function UnregisteredFloatingHarness({
+  stylesRef,
+}: {
+  stylesRef: MutableRefObject<CSSProperties>;
+}) {
+  const { setReference, floatingStyles } = useAnchoredPopover({
+    isOpen: true,
+    preferredWidth: 200,
+    onClose: () => {},
+  });
+  stylesRef.current = floatingStyles;
+
+  return createElement(
+    "div",
+    { ref: setReference, style: { position: "relative", height: 40 } },
+    createElement("div", {
+      "data-testid": "panel",
+      style: floatingStyles,
+    }),
+  );
+}
+
+function RegisteredFloatingHarness({ stylesRef }: { stylesRef: MutableRefObject<CSSProperties> }) {
+  const { setReference, setFloating, floatingStyles } = useAnchoredPopover({
+    isOpen: true,
+    preferredWidth: 200,
+    onClose: () => {},
+  });
+  stylesRef.current = floatingStyles;
+
+  return createElement(
+    "div",
+    { ref: setReference, style: { position: "relative", height: 40 } },
+    createElement("div", {
+      ref: setFloating,
+      "data-testid": "panel",
+      style: floatingStyles,
+    }),
+  );
+}
+
+function FloatingCaptureHarness({
+  captureRef,
+}: {
+  captureRef: MutableRefObject<UseAnchoredPopoverResult | null>;
+}) {
+  const result = useAnchoredPopover({
+    isOpen: true,
+    preferredWidth: 200,
+    onClose: () => {},
+  });
+  captureRef.current = result;
+
+  return createElement(
+    "div",
+    { ref: result.setReference, style: { position: "relative", height: 40, width: 120 } },
+    "anchor",
+  );
+}
+
 describe("useAnchoredPopover", () => {
   it("Escapeで閉じるとトリガーへフォーカスが戻る", () => {
     render(createElement(AnchoredPopoverHarness));
@@ -221,6 +282,75 @@ describe("useAnchoredPopover", () => {
     } finally {
       HTMLElement.prototype.getBoundingClientRect = originalGetBoundingClientRect;
     }
+  });
+
+  it("floating 要素を登録しないときと登録したときで floatingStyles が変わる", async () => {
+    const unregisteredStylesRef: MutableRefObject<CSSProperties> = { current: {} };
+    const { unmount: unmountUnregistered } = render(
+      createElement(UnregisteredFloatingHarness, { stylesRef: unregisteredStylesRef }),
+    );
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    const unregisteredStyles = { ...unregisteredStylesRef.current };
+    unmountUnregistered();
+
+    const registeredStylesRef: MutableRefObject<CSSProperties> = { current: {} };
+    render(createElement(RegisteredFloatingHarness, { stylesRef: registeredStylesRef }));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    const registeredStyles = { ...registeredStylesRef.current };
+
+    expect(unregisteredStyles.top).toBe(0);
+    expect(unregisteredStyles.left).toBe(0);
+    expect(
+      registeredStyles.top !== unregisteredStyles.top ||
+        registeredStyles.left !== unregisteredStyles.left,
+    ).toBe(true);
+  });
+
+  it("新しい floating 要素を登録したあと古い要素のクリーンアップが走っても登録が維持される", async () => {
+    const captureRef: MutableRefObject<UseAnchoredPopoverResult | null> = { current: null };
+    const { container } = render(createElement(FloatingCaptureHarness, { captureRef }));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    const { setFloating } = captureRef.current!;
+    const anchor = container.firstElementChild as HTMLElement;
+    const oldNode = document.createElement("div");
+    const newNode = document.createElement("div");
+    anchor.appendChild(oldNode);
+    anchor.appendChild(newNode);
+
+    let cleanupOld: (() => void) | void;
+    let cleanupNew: (() => void) | void;
+    await act(async () => {
+      cleanupOld = setFloating(oldNode);
+      await new Promise((r) => setTimeout(r, 0));
+      cleanupNew = setFloating(newNode);
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    const stylesBeforeCleanup = { ...captureRef.current!.floatingStyles };
+    expect(stylesBeforeCleanup.top).not.toBe(0);
+    expect(stylesBeforeCleanup.left).not.toBe(0);
+
+    await act(async () => {
+      cleanupOld?.();
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    const stylesAfterCleanup = captureRef.current!.floatingStyles;
+    expect(stylesAfterCleanup.top).toBe(stylesBeforeCleanup.top);
+    expect(stylesAfterCleanup.left).toBe(stylesBeforeCleanup.left);
+
+    await act(async () => {
+      cleanupNew?.();
+    });
+    oldNode.remove();
+    newNode.remove();
   });
 });
 

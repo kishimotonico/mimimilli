@@ -3,7 +3,10 @@ import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import type { NormalizedTag, TagPrefix } from "@mimimilli/shared";
 import type { AxisId } from "../model/types";
 import { buildFacetAxisRows, getAxisLabel } from "../model/axisDefinitions";
-import { useAnchoredPopover } from "../../../shared/ui/useAnchoredPopover";
+import {
+  useAnchoredPopover,
+  type AnchoredPopoverFloatingRefCallback,
+} from "../../../shared/ui/useAnchoredPopover";
 import AxisValuePopoverPanel from "./AxisValuePopoverPanel";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 import { I } from "../../../shared/ui/Icon";
@@ -32,7 +35,7 @@ function AxisPickerStage({
   onPick,
 }: {
   floatingStyles: CSSProperties;
-  setFloating: (node: HTMLElement | null) => void;
+  setFloating: AnchoredPopoverFloatingRefCallback;
   facetAxisRows: ReturnType<typeof buildFacetAxisRows>;
   onPick: (axis: AxisId) => void;
 }) {

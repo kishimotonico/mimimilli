@@ -27,6 +27,7 @@ export function WorkMetadataActions({
 
   const {
     setReference: setActionPopoverRef,
+    setFloating: setActionPopoverFloating,
     floatingStyles: actionPopoverStyles,
     close,
   } = useAnchoredPopover({
@@ -76,6 +77,7 @@ export function WorkMetadataActions({
         />
         {isActionPopoverOpen && (
           <div
+            ref={setActionPopoverFloating}
             className="absolute z-10 rounded-[6px] border border-line-soft bg-paper-1 p-1 shadow-pop"
             style={actionPopoverStyles}
           >

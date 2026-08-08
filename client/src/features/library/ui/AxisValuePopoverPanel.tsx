@@ -6,6 +6,7 @@ import { useAxisFacetsQuery } from "../model/useAxisFacetsQuery";
 import { buildFilterTag } from "../model/libraryPresentation";
 import AxisValueQuickList from "./AxisValueQuickList";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
+import type { AnchoredPopoverFloatingRefCallback } from "../../../shared/ui/useAnchoredPopover";
 
 // チップの兄弟値ドロップダウン・「＋絞り込み」の値ステージが共有する
 // 非ポータル版のポップオーバー本体。呼び出し側の `.mll-tagband` / チップは overflow を
@@ -20,7 +21,7 @@ interface AxisValuePopoverPanelProps {
   axis: AxisId;
   axisLabel: string;
   floatingStyles: CSSProperties;
-  setFloating: (node: HTMLElement | null) => void;
+  setFloating: AnchoredPopoverFloatingRefCallback;
   selectedTags: NormalizedTag[];
   onSelect: (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
   /** ホバー/フォーカス時の＋ボタン（冪等なAND追加）。省略時はボタンを出さない（ADR-0013） */
