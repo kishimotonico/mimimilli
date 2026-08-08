@@ -1,9 +1,11 @@
 ---
 id: TASK-255
 title: Bun並列serverテストの停止を解消する
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@codex'
 created_date: '2026-08-08 12:26'
+updated_date: '2026-08-08 12:42'
 labels: []
 dependencies: []
 references:
@@ -21,9 +23,33 @@ ordinal: 265000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 `pnpm --filter @mimimilli/server test` が現在の全serverテストを完走し、終了コード0になる
-- [ ] #2 `pnpm test` がserver/clientの両方を完走し、終了コード0になる
-- [ ] #3 停止原因がテスト間共有資源なら隔離し、Bun側の問題なら安定する並列度または実行方式へ変更する
-- [ ] #4 並列実行を維持する場合、同じコマンドを連続2回実行して再発しない
-- [ ] #5 pnpm checkが通る
+- [x] #1 `pnpm --filter @mimimilli/server test` が現在の全serverテストを完走し、終了コード0になる
+- [x] #2 `pnpm test` がserver/clientの両方を完走し、終了コード0になる
+- [x] #3 停止原因がテスト間共有資源なら隔離し、Bun側の問題なら安定する並列度または実行方式へ変更する
+- [x] #4 並列実行を維持する場合、同じコマンドを連続2回実行して再発しない
+- [x] #5 pnpm checkが通る
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. TASK-224完了後に追加・変更されたserverテストを中心に、並列実行をファイル集合で二分して停止を再現する最小集合を特定する。
+2. 固定DB・一時ディレクトリ・Worker・共有handle・Bun並列IPCのどれが停止原因か、非並列成功との差から確定する。
+3. テスト隔離の不足なら対象テストを修正する。Bun 1.3.14のrunner問題なら、速度を保ちつつ安定する明示的並列度または実行方式へserver test scriptを変更する。
+4. server testを連続2回、root pnpm test、pnpm checkで検証する。
+5. ACを更新し、原因・変更・実測を記録してコミットする。
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+複数 worker の最小再現として、共有DB・Workerを使わない dlsiteTitle.test.ts と real/dataRoot.test.ts の2ファイルでも bun test --parallel=2/3 がテスト出力前に20秒で停止。--parallel=1 と非並列は全524件成功したため、server test を非並列へ戻した。
+
+原因: Bun 1.3.14 の複数test worker。共有資源を使わない2ファイルでも --parallel=2/3 が開始前に停止し、--parallel=1 と非並列は成功したため、server testを逐次実行へ戻した。検証: server 63 files / 524 testsを2回連続成功（16.62秒、17.20秒）、root pnpm testでserver 524件・client 777件成功（28.41秒）、pnpm check成功（4.51秒）。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Bun 1.3.14の複数workerでserverテストが開始前に停止するため、serverの標準test scriptを逐次実行へ戻した。全524件を2回連続、rootの全1301件、pnpm checkで検証した。
+<!-- SECTION:FINAL_SUMMARY:END -->
