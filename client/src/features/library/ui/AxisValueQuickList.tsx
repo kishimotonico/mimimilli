@@ -71,13 +71,7 @@ function SortMenu({ sort, onToggle }: SortMenuProps) {
   const isPresent = useIsPresent();
   const v = collapse();
   return (
-    <motion.div
-      style={{ overflow: "hidden" }}
-      inert={!isPresent}
-      initial={v.initial}
-      animate={v.animate}
-      exit={v.exit}
-    >
+    <motion.div style={{ overflow: "hidden" }} inert={!isPresent} {...v}>
       {/* oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- ソート切替はボタン列で表現する */}
       <div className="mll-qlist__sort" role="group" aria-label="並び替え">
         {AXIS_VALUE_SORT_OPTIONS.map((opt) => {

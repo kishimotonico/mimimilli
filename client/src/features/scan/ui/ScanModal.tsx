@@ -305,13 +305,7 @@ function StatusRowScanning({ progress }: { progress: ScanProgress | null }) {
       ? Math.min(100, Math.round((progress.processed / progress.total) * 100))
       : null;
   return (
-    <motion.div
-      className="flex flex-col gap-1.5"
-      inert={!isPresent}
-      initial={v.initial}
-      animate={v.animate}
-      exit={v.exit}
-    >
+    <motion.div className="flex flex-col gap-1.5" inert={!isPresent} {...v}>
       <div className="flex items-baseline justify-between gap-2">
         <span className="font-sans text-[13px] font-medium text-ink-0">
           {progress ? scanPhaseLabel(progress.phase) : "準備中"}
@@ -338,13 +332,7 @@ function StatusRowCompleted() {
   const isPresent = useIsPresent();
   const v = fade();
   return (
-    <motion.div
-      className="flex items-center gap-1.5"
-      inert={!isPresent}
-      initial={v.initial}
-      animate={v.animate}
-      exit={v.exit}
-    >
+    <motion.div className="flex items-center gap-1.5" inert={!isPresent} {...v}>
       <I.check size={12} className="text-[var(--r-leaf)]" />
       <span className="font-sans text-[13px] font-medium text-ink-0">完了しました</span>
     </motion.div>
@@ -356,7 +344,7 @@ function StatusRowLastScan({ lastScanTime }: { lastScanTime: string | null }) {
   const isPresent = useIsPresent();
   const v = fade();
   return (
-    <motion.div inert={!isPresent} initial={v.initial} animate={v.animate} exit={v.exit}>
+    <motion.div inert={!isPresent} {...v}>
       <span className="font-mono text-[11px] text-ink-2">
         最終スキャン: {formatDate(lastScanTime)}
       </span>
@@ -380,9 +368,7 @@ function ScanWarnings({
       style={{ overflow: "hidden" }}
       className="flex flex-col gap-1.5"
       inert={!isPresent}
-      initial={v.initial}
-      animate={v.animate}
-      exit={v.exit}
+      {...v}
     >
       {lastResult.rjCodeMissingCount > 0 ? (
         <button
@@ -442,9 +428,7 @@ function ScanNewWorks({
       style={{ overflow: "hidden" }}
       className="flex flex-col gap-1.5"
       inert={!isPresent}
-      initial={v.initial}
-      animate={v.animate}
-      exit={v.exit}
+      {...v}
     >
       <p className="font-sans text-[10.5px] font-semibold tracking-[0.06em] text-ink-3 uppercase">
         新規検出した作品
@@ -480,13 +464,7 @@ function ScanFooterHint() {
   const isPresent = useIsPresent();
   const v = fade();
   return (
-    <motion.div
-      className="font-jp text-[11px] text-ink-3"
-      inert={!isPresent}
-      initial={v.initial}
-      animate={v.animate}
-      exit={v.exit}
-    >
+    <motion.div className="font-jp text-[11px] text-ink-3" inert={!isPresent} {...v}>
       閉じてもバックグラウンドで続行します
     </motion.div>
   );
@@ -501,9 +479,7 @@ function ScanCancelButton({ onClick }: { onClick: () => void }) {
       type="button"
       onClick={onClick}
       inert={!isPresent}
-      initial={v.initial}
-      animate={v.animate}
-      exit={v.exit}
+      {...v}
       className="inline-flex h-9 min-w-[128px] items-center justify-center gap-1.5 rounded-[6px] border border-[color-mix(in_oklch,var(--r-coral)_45%,transparent)] bg-[color-mix(in_oklch,var(--r-coral)_10%,transparent)] px-4 font-sans text-[12.5px] font-medium text-ink-0 transition-colors hover:bg-[color-mix(in_oklch,var(--r-coral)_16%,transparent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
     >
       <I.x size={12} />
@@ -521,9 +497,7 @@ function ScanFullScanButton({ onClick }: { onClick: () => void }) {
       type="button"
       onClick={onClick}
       inert={!isPresent}
-      initial={v.initial}
-      animate={v.animate}
-      exit={v.exit}
+      {...v}
       className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[6px] border border-line-soft bg-paper-0 px-3 font-sans text-[12px] font-medium text-ink-1 transition-colors hover:bg-paper-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
     >
       <I.refresh size={12} />
@@ -541,9 +515,7 @@ function ScanStartButton({ onClick }: { onClick: () => void }) {
       type="button"
       onClick={onClick}
       inert={!isPresent}
-      initial={v.initial}
-      animate={v.animate}
-      exit={v.exit}
+      {...v}
       className="inline-flex h-9 min-w-[128px] items-center justify-center gap-1.5 rounded-[6px] bg-ink-0 px-4 font-sans text-[12.5px] font-semibold text-paper-1 transition-colors hover:bg-acc focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
     >
       <I.refresh size={12} />

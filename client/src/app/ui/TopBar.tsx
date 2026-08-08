@@ -29,10 +29,8 @@ function DlsiteBulkCancelButton({ onClick }: { onClick: () => void }) {
   return (
     <motion.button
       type="button"
-      initial={v.initial}
-      animate={v.animate}
-      exit={v.exit}
       inert={!isPresent}
+      {...v}
       onClick={onClick}
       className="inline-flex h-7 items-center justify-center gap-1 rounded-[6px] border border-[color-mix(in_oklch,var(--r-coral)_45%,transparent)] bg-[color-mix(in_oklch,var(--r-coral)_10%,transparent)] px-2.5 font-sans text-[11px] font-medium text-ink-0 transition-colors hover:bg-[color-mix(in_oklch,var(--r-coral)_16%,transparent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
     >

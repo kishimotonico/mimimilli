@@ -61,13 +61,7 @@ function PreviewPaneSlide(props: PreviewPaneSlideProps) {
   const isPresent = useIsPresent();
   const v = previewSlide();
   return (
-    <motion.div
-      className="mll-results__preview"
-      inert={!isPresent}
-      initial={v.initial}
-      animate={v.animate}
-      exit={v.exit}
-    >
+    <motion.div className="mll-results__preview" inert={!isPresent} {...v}>
       <PreviewPane mode="work" {...props} />
     </motion.div>
   );

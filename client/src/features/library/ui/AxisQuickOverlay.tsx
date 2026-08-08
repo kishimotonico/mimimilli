@@ -72,9 +72,7 @@ export default function AxisQuickOverlay({
   return createPortal(
     <motion.div
       ref={setPanelEl}
-      initial={variant.initial}
-      animate={variant.animate}
-      exit={variant.exit}
+      {...variant}
       className="mll-qoverlay mll-qoverlay--fixed"
       // マウント直後、パネル実測前の1フレームだけ top が未確定（layout effect が
       // 実サイズを測ってペイント前に補正する。ちらつきは出ない）。

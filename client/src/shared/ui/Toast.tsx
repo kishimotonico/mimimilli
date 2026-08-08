@@ -37,10 +37,8 @@ function ToastContent({ message, actionLabel, onAction, onDismiss }: ToastConten
   const v = fadeSlideUp();
   return (
     <motion.output
-      initial={v.initial}
-      animate={v.animate}
-      exit={v.exit}
       inert={!isPresent}
+      {...v}
       className="pointer-events-auto flex items-center gap-2 rounded-2 border border-line-soft bg-paper-1 px-3 py-2 shadow-pop"
     >
       <span className="font-jp text-[12px] text-ink-1">{message}</span>
