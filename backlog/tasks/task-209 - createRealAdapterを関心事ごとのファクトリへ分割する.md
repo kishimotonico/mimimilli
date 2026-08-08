@@ -1,9 +1,11 @@
 ---
 id: TASK-209
 title: createRealAdapterを関心事ごとのファクトリへ分割する
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@codex'
 created_date: '2026-08-06 04:58'
+updated_date: '2026-08-08 13:26'
 labels: []
 dependencies: []
 priority: medium
@@ -34,9 +36,33 @@ DLsite（dlsite.ts / dlsiteCache.ts / dlsiteScheduler.ts）、サムネイル（
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 createRealAdapter が関心事ごとのファクトリ関数を合成するだけの薄い関数になっている
-- [ ] #2 各ファクトリの依存が引数として明示され、クロージャ経由の暗黙共有に頼っていない
-- [ ] #3 分割後のファクトリ単位で単体テストが書ける構造になっており、少なくとも1つの関心事について createRealAdapter 全体を起動しないテストが追加されている
-- [ ] #4 抽出の過程で挙動が変わっていない（既存の server テストと契約テストが通る）
-- [ ] #5 pnpm check と pnpm test が通る
+- [x] #1 createRealAdapter が関心事ごとのファクトリ関数を合成するだけの薄い関数になっている
+- [x] #2 各ファクトリの依存が引数として明示され、クロージャ経由の暗黙共有に頼っていない
+- [x] #3 分割後のファクトリ単位で単体テストが書ける構造になっており、少なくとも1つの関心事について createRealAdapter 全体を起動しないテストが追加されている
+- [x] #4 抽出の過程で挙動が変わっていない（既存の server テストと契約テストが通る）
+- [x] #5 pnpm check と pnpm test が通る
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. DLsite取得・適用・一括処理と、その専用キャッシュ／scheduler配線を createDlsiteMethods(deps) へ抽出する。
+2. カバー記述・サムネイル生成とメディア／ファイル参照を createCoverMediaMethods(deps) へ抽出する。
+3. 設定・スキャンを createSettingsScanMethods(deps) へ抽出し、updateSettings と worker scan の既存ログ・エラー文言を保持する。
+4. 作品検索・登録・CRUD・resume・export を createWorkMethods(deps) へ抽出する。
+5. 分類軸・タグprefix・スマートフォルダーを createClassificationMethods(deps) へ抽出し、prefix seed を明示的な初期化関数へ置く。
+6. createRealAdapter を依存生成・ファクトリ合成・close のみに整理し、最低1ファクトリの直接単体テストを追加する。
+7. 関心事ごとの対象テスト後に各コミットを作成し、Luna が pnpm check と pnpm test を含む最終検証を行う。
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+実装をDLsite、カバー/メディア、設定/スキャン、作品操作、分類の5ファクトリへ分割し、分類ファクトリと設定/スキャンファクトリの直接単体テストを追加した。DataAdapter全33メソッドの欠落・重複がないことを型検査と機械照合で確認した。Claudeレビューを受け、updateSettingsが元コードから引き継いだthis.getSettings()を、repoを閉じ込めたローカルgetSettings()の直接呼び出しへ変更した。全*Methods.tsにthis依存がないことを確認済み。Bun 1.3.14の複数test worker停止はTASK-255で逐次実行へ修正して統合済み。最終検証: pnpm check成功（4.693秒）、pnpm test成功（29.188秒、server 64 files / 525 tests、client 102 files / 777 tests）、git diff --check成功。実DB・real adapter実起動は行っていない。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+createRealAdapterの約1000行を5つの関心事別ファクトリへ抽出し、依存を各deps引数へ明示した。createRealAdapterは依存生成・prefix初期化・ファクトリ合成・closeのみになった。分類と設定/スキャンをadapter全体なしで検証するテストを追加し、updateSettingsを含むfactory群から暗黙のthis依存を排除した。関連するBun並列test worker停止もTASK-255で解消し、pnpm checkと全1302テストの成功を確認した。
+<!-- SECTION:FINAL_SUMMARY:END -->
