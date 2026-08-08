@@ -1573,7 +1573,6 @@
   }
   .mll-qoverlay--inline {
     position: absolute;
-    top: calc(100% + 6px);
   }
   .mll-qlist {
     display: flex;

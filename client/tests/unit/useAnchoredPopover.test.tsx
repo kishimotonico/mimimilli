@@ -6,10 +6,8 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AxisFacetItem } from "@mimimilli/shared";
 import AxisValueQuickList from "../../src/features/library/ui/AxisValueQuickList";
-import {
-  useAnchoredPopover,
-  usePopoverDismissal,
-} from "../../src/features/library/ui/preview/useAnchoredPopover";
+import { useAnchoredPopover } from "../../src/shared/ui/useAnchoredPopover";
+import { usePopoverDismissal } from "../../src/shared/ui/usePopoverDismissal";
 import { clearResizeObservers, flushAllResizeObservers, mockElementSize } from "./setup";
 
 afterEach(() => {
@@ -19,7 +17,7 @@ afterEach(() => {
 
 function AnchoredPopoverHarness() {
   const [isOpen, setIsOpen] = useState(false);
-  const { anchorRef, layout, close } = useAnchoredPopover({
+  const { setReference, setFloating, floatingStyles, close } = useAnchoredPopover({
     isOpen,
     preferredWidth: 200,
     onClose: () => setIsOpen(false),
@@ -27,12 +25,16 @@ function AnchoredPopoverHarness() {
 
   return createElement(
     "div",
-    { ref: anchorRef, style: { position: "relative" } },
+    { ref: setReference, style: { position: "relative" } },
     createElement("button", { onClick: () => setIsOpen((v) => !v) }, "トリガー"),
     isOpen &&
       createElement(
         "div",
-        { role: "menu", style: { left: layout.left, width: layout.width } },
+        {
+          ref: setFloating,
+          role: "menu",
+          style: floatingStyles,
+        },
         createElement("button", { onClick: () => close() }, "項目を選択"),
       ),
   );
@@ -96,6 +98,57 @@ function QuickListWithDismissalHarness() {
   );
 }
 
+function ReferenceElementHarness() {
+  const [isOpen, setIsOpen] = useState(false);
+  const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null);
+  const { setFloating, floatingStyles } = useAnchoredPopover({
+    isOpen,
+    preferredWidth: 200,
+    onClose: () => setIsOpen(false),
+    referenceElement: anchorEl,
+    placement: "right",
+  });
+
+  return createElement(
+    "div",
+    null,
+    createElement("button", { ref: setAnchorEl, onClick: () => setIsOpen(true) }, "トリガー"),
+    isOpen &&
+      createElement(
+        "div",
+        {
+          ref: setFloating,
+          role: "menu",
+          style: floatingStyles,
+        },
+        createElement("button", null, "項目を選択"),
+      ),
+  );
+}
+
+function ContainerWidthHarness() {
+  const [isOpen, setIsOpen] = useState(true);
+  const { setReference, setFloating, floatingStyles, containerWidth } = useAnchoredPopover({
+    isOpen,
+    preferredWidth: 400,
+    onClose: () => setIsOpen(false),
+    getContainer: (anchor) => anchor.parentElement,
+  });
+
+  return createElement(
+    "div",
+    { style: { width: 180, position: "relative" }, "data-testid": "container" },
+    createElement("div", { ref: setReference, style: { position: "relative" } }, "anchor"),
+    isOpen &&
+      createElement("div", {
+        ref: setFloating,
+        "data-testid": "panel",
+        style: floatingStyles,
+      }),
+    createElement("span", { "data-testid": "container-width" }, String(containerWidth)),
+  );
+}
+
 describe("useAnchoredPopover", () => {
   it("Escapeで閉じるとトリガーへフォーカスが戻る", () => {
     render(createElement(AnchoredPopoverHarness));
@@ -139,6 +192,35 @@ describe("useAnchoredPopover", () => {
 
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
     expect(outside).toHaveFocus();
+  });
+
+  it("referenceElement 経路で Escape を押すとアンカーへフォーカスが戻る", () => {
+    render(createElement(ReferenceElementHarness));
+    fireEvent.click(screen.getByRole("button", { name: "トリガー" }));
+
+    const item = screen.getByRole("button", { name: "項目を選択" });
+    item.focus();
+    expect(item).toHaveFocus();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "トリガー" })).toHaveFocus();
+  });
+
+  it("getContainer の境界幅を containerWidth に反映する", async () => {
+    const originalGetBoundingClientRect = HTMLElement.prototype.getBoundingClientRect;
+    HTMLElement.prototype.getBoundingClientRect = function () {
+      return new DOMRect(0, 0, 180, 100);
+    };
+    try {
+      render(createElement(ContainerWidthHarness));
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 0));
+      });
+      expect(Number(screen.getByTestId("container-width").textContent)).toBe(180);
+    } finally {
+      HTMLElement.prototype.getBoundingClientRect = originalGetBoundingClientRect;
+    }
   });
 });
 

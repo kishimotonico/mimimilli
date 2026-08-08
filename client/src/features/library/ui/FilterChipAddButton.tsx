@@ -1,9 +1,9 @@
-import { useRef, useState } from "react";
+import { useRef, useState, type CSSProperties } from "react";
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import type { NormalizedTag, TagPrefix } from "@mimimilli/shared";
 import type { AxisId } from "../model/types";
 import { buildFacetAxisRows, getAxisLabel } from "../model/axisDefinitions";
-import { useAnchoredPopover, type PopoverLayout } from "./preview/useAnchoredPopover";
+import { useAnchoredPopover } from "../../../shared/ui/useAnchoredPopover";
 import AxisValuePopoverPanel from "./AxisValuePopoverPanel";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 import { I } from "../../../shared/ui/Icon";
@@ -26,11 +26,13 @@ interface FilterChipAddButtonProps {
 }
 
 function AxisPickerStage({
-  layout,
+  floatingStyles,
+  setFloating,
   facetAxisRows,
   onPick,
 }: {
-  layout: PopoverLayout;
+  floatingStyles: CSSProperties;
+  setFloating: (node: HTMLElement | null) => void;
   facetAxisRows: ReturnType<typeof buildFacetAxisRows>;
   onPick: (axis: AxisId) => void;
 }) {
@@ -40,8 +42,9 @@ function AxisPickerStage({
 
   return (
     <motion.div
+      ref={setFloating}
       className="mll-qoverlay mll-qoverlay--inline"
-      style={{ left: layout.left, width: layout.width }}
+      style={floatingStyles}
       inert={!isPresent}
       {...variant}
     >
@@ -74,7 +77,7 @@ export default function FilterChipAddButton({
   const pickedAxisRef = useRef(pickedAxis);
   pickedAxisRef.current = pickedAxis;
 
-  const { anchorRef, layout, close } = useAnchoredPopover({
+  const { setReference, setFloating, floatingStyles, close } = useAnchoredPopover({
     isOpen: open,
     preferredWidth: POPOVER_WIDTH,
     onClose: (reason) => {
@@ -90,7 +93,7 @@ export default function FilterChipAddButton({
   const facetAxisRows = buildFacetAxisRows(tagPrefixes);
 
   return (
-    <div ref={anchorRef} className="relative inline-flex">
+    <div ref={setReference} className="relative inline-flex">
       <button
         type="button"
         className="mll-tagband__addbtn"
@@ -103,7 +106,12 @@ export default function FilterChipAddButton({
       </button>
       <AnimatePresence>
         {open && pickedAxis === null && (
-          <AxisPickerStage layout={layout} facetAxisRows={facetAxisRows} onPick={setPickedAxis} />
+          <AxisPickerStage
+            floatingStyles={floatingStyles}
+            setFloating={setFloating}
+            facetAxisRows={facetAxisRows}
+            onPick={setPickedAxis}
+          />
         )}
       </AnimatePresence>
       <AnimatePresence>
@@ -112,7 +120,8 @@ export default function FilterChipAddButton({
             key={pickedAxis}
             axis={pickedAxis}
             axisLabel={getAxisLabel(pickedAxis, tagPrefixes)}
-            layout={layout}
+            floatingStyles={floatingStyles}
+            setFloating={setFloating}
             selectedTags={selectedTags}
             hint={AND_ADD_HINT}
             onSelect={(tag, opts) => {

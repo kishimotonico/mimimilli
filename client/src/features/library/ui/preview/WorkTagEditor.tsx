@@ -11,7 +11,7 @@ import Toast from "../../../../shared/ui/Toast";
 import { mutationErrorMessage } from "../../../../shared/lib/mutationError";
 import type { LibraryTagsPatchMutation } from "../../model/workPatchMutations";
 import { useTagPrefixes } from "../../model/useTagPrefixes";
-import { useAnchoredPopover } from "./useAnchoredPopover";
+import { useAnchoredPopover } from "../../../../shared/ui/useAnchoredPopover";
 import { useWorkTagEditor } from "./useWorkTagEditor";
 
 const TAG_POPOVER_WIDTH = 260;
@@ -69,8 +69,10 @@ export function WorkTagEditor({
 
   const closeTagPopover = () => setIsTagPopoverOpen(false);
   const {
-    anchorRef: tagPopoverAnchorRef,
-    layout: tagPopoverLayout,
+    setReference: setTagPopoverAnchorRef,
+    setFloating: setTagPopoverFloating,
+    floatingStyles: tagPopoverStyles,
+    containerWidth: tagPopoverContainerWidth,
     close,
   } = useAnchoredPopover({
     isOpen: isTagPopoverOpen,
@@ -78,7 +80,7 @@ export function WorkTagEditor({
     onClose: () => closeTagPopover(),
     boundaryRef: tagEditorRef,
   });
-  const isNarrowTagPane = tagPopoverLayout.containerWidth < NARROW_TAG_PANE_PX;
+  const isNarrowTagPane = tagPopoverContainerWidth < NARROW_TAG_PANE_PX;
   const sortedTags = sortTagsForDisplay(tags, tagPrefixes);
   const hiddenTagCount = Math.max(0, sortedTags.length - COLLAPSED_TAG_LIMIT);
   const visibleTags =
@@ -150,7 +152,7 @@ export function WorkTagEditor({
                 onClick={() => setIsEditMode((v) => !v)}
               />
             )}
-            <div ref={tagPopoverAnchorRef} className="relative inline-flex">
+            <div ref={setTagPopoverAnchorRef} className="relative inline-flex">
               <IconButton
                 icon={I.add}
                 label="タグを追加"
@@ -165,13 +167,19 @@ export function WorkTagEditor({
               />
               {isTagPopoverOpen && !isNarrowTagPane && (
                 <div
-                  className="absolute top-[calc(100%+6px)] z-10 rounded-[6px] bg-paper-1 shadow-pop"
-                  style={{
-                    left: tagPopoverLayout.left,
-                    width: tagPopoverLayout.width,
-                  }}
+                  ref={setTagPopoverFloating}
+                  className="absolute z-10 rounded-[6px] bg-paper-1 shadow-pop"
+                  style={tagPopoverStyles}
                 >
-                  <TagCombobox focusOnMount width={tagPopoverLayout.width} {...comboboxProps} />
+                  <TagCombobox
+                    focusOnMount
+                    width={
+                      typeof tagPopoverStyles.width === "number"
+                        ? tagPopoverStyles.width
+                        : TAG_POPOVER_WIDTH
+                    }
+                    {...comboboxProps}
+                  />
                 </div>
               )}
             </div>

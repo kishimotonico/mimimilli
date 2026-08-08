@@ -4,7 +4,7 @@ import { I } from "../../../../shared/ui/Icon";
 import IconButton from "../../../../shared/ui/IconButton";
 import { mutationErrorMessage } from "../../../../shared/lib/mutationError";
 import type { LibraryBookmarkPatchMutation } from "../../model/workPatchMutations";
-import { useAnchoredPopover } from "./useAnchoredPopover";
+import { useAnchoredPopover } from "../../../../shared/ui/useAnchoredPopover";
 
 const ACTION_POPOVER_WIDTH = 240;
 
@@ -26,8 +26,8 @@ export function WorkMetadataActions({
   const closeActionPopover = () => setIsActionPopoverOpen(false);
 
   const {
-    anchorRef: actionPopoverRef,
-    layout: actionPopoverLayout,
+    setReference: setActionPopoverRef,
+    floatingStyles: actionPopoverStyles,
     close,
   } = useAnchoredPopover({
     isOpen: isActionPopoverOpen,
@@ -60,7 +60,7 @@ export function WorkMetadataActions({
         onClick={toggleBookmark}
       />
       <IconButton icon={I.edit} label="作品を編集" size="sm" onClick={onEdit} />
-      <div ref={actionPopoverRef} className="relative inline-flex">
+      <div ref={setActionPopoverRef} className="relative inline-flex">
         <IconButton
           icon={I.more}
           label="その他"
@@ -76,11 +76,8 @@ export function WorkMetadataActions({
         />
         {isActionPopoverOpen && (
           <div
-            className="absolute top-[calc(100%+6px)] z-10 rounded-[6px] border border-line-soft bg-paper-1 p-1 shadow-pop"
-            style={{
-              left: actionPopoverLayout.left,
-              width: actionPopoverLayout.width,
-            }}
+            className="absolute z-10 rounded-[6px] border border-line-soft bg-paper-1 p-1 shadow-pop"
+            style={actionPopoverStyles}
           >
             <div className="flex flex-col gap-1" role="menu">
               <button
