@@ -36,3 +36,4 @@ server/data/
 
 # Local artifacts
 tmp/
+.worktrees/

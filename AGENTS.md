@@ -38,7 +38,7 @@
 - 仕様・要件の確定は統括の仕事。委譲時は「〜をわかりやすく」のような抽象要件ではなく、表示内容・文言・既存UIとの整合まで決めた確定仕様を渡す
 - 実装担当は実装・修正・テストコード追加を担当する。独立サブ実装へ分割できるときは、統括が定めた範囲・受け入れ条件の内側に限り実装担当をさらに委任して並列化してよい（孫の1段まで）。成果は取りまとめて統括へ一括報告する
 - 検証担当はテストやブラウザ検証を担当し、問題は証拠付きで統括へ報告する。原則として修正しない。実装担当がサブ実装を委任していた場合もサブツリー全体を最終検証する（検証所有権は検証担当に一元化）
-- 実装担当は1タスク1worktreeを既定とする。統括が `git worktree add` でパスを用意して渡す（Agentツールのworktree隔離機能は使わない）。統合は統括がマージで行う
+- 実装担当は1タスク1worktreeを既定とする。統括が `git worktree add .worktrees/<タスクID>` で専用ブランチのパスを用意して渡す（Agentツールのworktree隔離機能は使わない）。worktreeごとに `pnpm install` する。統合は統括がマージで行う
 - レビュー担当（Sonnet）を常設し、タスク完了ごとにコミット前レビューを挟む。観点は「報告に書かれていない副作用」に絞る。仕様・設計の妥当性は着手前の相談（Fable/Codex）、節目の敵対的レビューはCodexが担う
 - 実装担当は受け入れ条件を満たすたびに `pnpm backlog task edit <id> --check-ac <n>` でチェックを入れ、完了時はテキストで報告する。統括はこれを進捗信号とし、pollingしない
 - Claude Codeの場合
@@ -56,7 +56,8 @@
 - 開発サーバーは別のシェルで起動済みのことが多いので、`pnpm dev`を実行せず直接アクセスしてOK
 - アクセスURLは `http://mimi.localhost:1355`（`client/package.json` の `portless run --name mimi` 由来）。IPアドレスによるアクセスは不可
 - agent-browser は他セッションとブラウザを共有してタブを奪われることがあるため、`--session <名前>` を付けて専用セッションで操作する
-- 実データDBに対する検証は禁止。破壊的操作を伴う検証は、フィクスチャアダプタ内蔵のviteを別ポートで一時起動して行う: `pnpm exec cross-env MIMIMILLI_MOCK_SCENARIO=new-work vite --host 127.0.0.1 --port 4177`（`client/` で実行し、検証後はプロセスごと落とす）
+- worktree の実機検証は、その worktree の `client/` で `pnpm dev:new-work` を起動し、portless が出力する `http://<ブランチ名>.mimi.localhost:1355` を開く（本体URLを開くと本体側に繋がる）。検証後はプロセスを落とす
+- 実データDBに対する検証は禁止。書き込みを伴う検証はフィクスチャアダプタ（`dev:new-work` 等のモックシナリオ）で行う
 
 <!-- BACKLOG.MD GUIDELINES START -->
 
@@ -67,6 +68,6 @@
 - タスクの作成・着手・完了の前に、対応するガイドを読む: `pnpm backlog instructions task-creation | task-execution | task-finalization`
 - 迷ったら `pnpm backlog <コマンド> --help`
 <!-- BACKLOG.MD GUIDELINES END -->
-- タスク管理は Backlog.md CLI（`pnpm backlog` コマンド、`backlog/` ディレクトリ）に一元化する。残タスク・実装計画・作業メモはタスクに集約し、HANDOFF や他の docs に残タスクリストを分散させない
+- 残タスク・実装計画・作業メモは backlog のタスクに集約し、HANDOFF や他の docs に残タスクリストを分散させない
 - タスクにするのは「検証可能な受け入れ条件が書けて、1〜数PRで完結する見通しがある」ものだけ。要件が未定・ふんわりしたものはドラフト（`pnpm backlog draft`）に置き、着手を決めたらまず「要件を決める」タスクを切る
 - 受け入れ条件は7項目程度を上限にする。超えるならタスクを分割する。起票時に確定仕様（ドラフト・ADR）を受け入れ条件へ1行ずつ対応付ける
