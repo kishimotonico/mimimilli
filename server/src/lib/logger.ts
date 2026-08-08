@@ -1,5 +1,5 @@
 import { mkdirSync, readdirSync, unlinkSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { getFileSink } from "@logtape/file";
 import {
   configureSync,
@@ -104,18 +104,35 @@ export interface InitLoggerOptions {
   logDir?: string;
 }
 
-export function initLogger(options: InitLoggerOptions = {}): void {
+export interface InitLoggerResult {
+  logFilePath: string | null;
+}
+
+export function initLogger(options: InitLoggerOptions = {}): InitLoggerResult {
   const sinkIds = ["console"];
   const sinks: Record<string, ReturnType<typeof getConsoleSink> | ReturnType<typeof getFileSink>> =
     {
       console: getConsoleSink({ formatter: getAnsiColorFormatter() }),
     };
 
+  let logFilePath: string | null = null;
+
   if (options.logDir) {
-    mkdirSync(options.logDir, { recursive: true });
+    const absoluteLogDir = resolve(options.logDir);
+    try {
+      mkdirSync(options.logDir, { recursive: true });
+    } catch (error) {
+      const code =
+        error instanceof Error && "code" in error
+          ? String((error as NodeJS.ErrnoException).code)
+          : "UNKNOWN";
+      throw new Error(`ログディレクトリの作成に失敗しました: ${absoluteLogDir} (${code})`, {
+        cause: error,
+      });
+    }
     purgeOldLogFiles(options.logDir);
-    const logFile = join(options.logDir, `server-${formatLogDate(new Date())}.jsonl`);
-    sinks.file = getFileSink(logFile, { formatter: mimimilliJsonLinesFormatter() });
+    logFilePath = join(options.logDir, `server-${formatLogDate(new Date())}.jsonl`);
+    sinks.file = getFileSink(logFilePath, { formatter: mimimilliJsonLinesFormatter() });
     sinkIds.push("file");
   }
 
@@ -136,6 +153,7 @@ export function initLogger(options: InitLoggerOptions = {}): void {
     ],
   });
   configured = true;
+  return { logFilePath };
 }
 
 type DlsiteEventLevel = "debug" | "info" | "warning" | "error";
