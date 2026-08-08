@@ -44,9 +44,7 @@ function ColstackBackButton({ parentName, depth, onGoUp }: ColstackBackButtonPro
       title={`1つ上の階層（${parentName}）へ戻る`}
       onClick={onGoUp}
       inert={!isPresent}
-      initial={v.initial}
-      animate={v.animate}
-      exit={v.exit}
+      {...v}
     >
       <StackEdge parentName={parentName} depth={depth} />
     </motion.button>

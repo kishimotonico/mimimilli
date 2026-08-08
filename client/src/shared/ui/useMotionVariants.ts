@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import type { TargetAndTransition } from "motion/react";
+import type { MotionProps } from "motion/react";
 
 const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 
@@ -44,16 +44,8 @@ export interface PropertyTiming {
   delay?: number;
 }
 
-// `initial`/`animate` は boolean や AnimationControls も受け付けるが `exit` は
-// 受け付けない。全ビルダーはリテラルの target オブジェクトしか返さないため、
-// 三者に共通する最小の型（`exit` と同じ範囲）に統一する。
-type MotionTarget = TargetAndTransition;
-
-export interface MotionVariant {
-  initial: MotionTarget;
-  animate: MotionTarget;
-  exit: MotionTarget;
-}
+/** motion 要素へ `{...variant}` で展開可能な initial / animate / exit の束。 */
+export type MotionVariant = Pick<MotionProps, "initial" | "animate" | "exit">;
 
 /** CSS `ease`（cubic-bezier(0.25, 0.1, 0.25, 1)）相当。 */
 const EASE_STANDARD = [0.25, 0.1, 0.25, 1] as const;

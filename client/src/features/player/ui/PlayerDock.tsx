@@ -35,10 +35,8 @@ function DockBar({ variant, switching, ...barProps }: DockBarProps) {
     <motion.div
       className="mle-bar1"
       data-ui-switching={switching || undefined}
-      initial={variant.initial}
-      animate={variant.animate}
-      exit={variant.exit}
       inert={!isPresent}
+      {...variant}
     >
       <BarContent {...barProps} />
     </motion.div>
@@ -69,10 +67,8 @@ function DockPopup({ variant, switching, ...popupProps }: DockPopupProps) {
     <motion.div
       className="mle-popup"
       data-ui-switching={switching || undefined}
-      initial={variant.initial}
-      animate={variant.animate}
-      exit={variant.exit}
       inert={!isPresent}
+      {...variant}
     >
       <PopupContent {...popupProps} />
     </motion.div>

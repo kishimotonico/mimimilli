@@ -40,12 +40,10 @@ function AxisPickerStage({
 
   return (
     <motion.div
-      initial={variant.initial}
-      animate={variant.animate}
-      exit={variant.exit}
       className="mll-qoverlay mll-qoverlay--inline"
       style={{ left: layout.left, width: layout.width }}
       inert={!isPresent}
+      {...variant}
     >
       <div className="mll-qlist__hint">{AND_ADD_HINT}・軸を選択</div>
       {/* oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- AxisValueQuickList の一覧と表現を揃えるため<select>ではなくボタン一覧にする */}

@@ -45,12 +45,10 @@ export default function AxisValuePopoverPanel({
 
   return (
     <motion.div
-      initial={variant.initial}
-      animate={variant.animate}
-      exit={variant.exit}
       className="mll-qoverlay mll-qoverlay--inline"
       style={{ left: layout.left, width: layout.width }}
       inert={!isPresent}
+      {...variant}
     >
       <AxisValueQuickList
         axis={axis}
