@@ -7,7 +7,11 @@ import type {
   ScanResult,
 } from "@mimimilli/shared";
 import type { DataAdapter } from "./adapter.ts";
+import { formatError, getCategoryLogger } from "./lib/logger.ts";
 import { enqueueDlsiteJob } from "./routes/dlsiteProgress.ts";
+
+const scanLogger = getCategoryLogger("scan");
+const UNREADABLE_PATH_LOG_SAMPLE_LIMIT = 10;
 
 type Listener = (event: ScanJobEvent) => void;
 
@@ -72,8 +76,7 @@ export class ScanJobManager {
     // POSTのcall stackからscan開始を分離する。同期adapterであってもqueued応答を先に返す。
     setTimeout(() => {
       void this.run(job).catch((error: unknown) => {
-        const message = error instanceof Error ? error.message : "サーバー内部エラーが発生しました";
-        this.finishFailed(job, message);
+        this.finishFailed(job, error);
       });
     }, 0);
     return this.copy(snapshot);
@@ -145,6 +148,13 @@ export class ScanJobManager {
     job.snapshot.startedAt = new Date().toISOString();
     this.emit(job, { type: "state", seq: 0, snapshot: this.copy(job.snapshot) });
     try {
+      const settings = await this.adapter.getSettings();
+      scanLogger.info("スキャンを開始しました", {
+        jobId: job.snapshot.id,
+        full: job.full,
+        rootFolder: settings.rootFolder,
+      });
+      if (job.controller.signal.aborted) return this.finishCancelled(job);
       const result = await this.adapter.scan({
         full: job.full,
         signal: job.controller.signal,
@@ -154,7 +164,7 @@ export class ScanJobManager {
       else this.finishCompleted(job, result);
     } catch (error) {
       if (job.controller.signal.aborted) this.finishCancelled(job);
-      else throw error;
+      else this.finishFailed(job, error);
     }
   }
 
@@ -183,6 +193,7 @@ export class ScanJobManager {
     job.snapshot.result = result;
     job.snapshot.finishedAt = new Date().toISOString();
     this.lastCompleted = { result, finishedAt: job.snapshot.finishedAt };
+    this.logScanCompleted(job, result);
     this.emit(job, { type: "completed", seq: 0, result });
     this.deactivate(job);
     this.pruneTerminal();
@@ -191,16 +202,22 @@ export class ScanJobManager {
     }
   }
 
-  private finishFailed(job: Job, error: string): void {
+  private finishFailed(job: Job, error: unknown): void {
     if (this.isTerminal(job)) return;
     if (job.controller.signal.aborted) {
       this.finishCancelled(job);
       return;
     }
+    const message = error instanceof Error ? error.message : "サーバー内部エラーが発生しました";
     job.snapshot.status = "failed";
-    job.snapshot.error = error;
+    job.snapshot.error = message;
     job.snapshot.finishedAt = new Date().toISOString();
-    this.emit(job, { type: "failed", seq: 0, error });
+    scanLogger.error("スキャンに失敗しました", {
+      jobId: job.snapshot.id,
+      durationMs: this.durationMs(job),
+      ...formatError(error),
+    });
+    this.emit(job, { type: "failed", seq: 0, error: message });
     this.deactivate(job);
     this.pruneTerminal();
   }
@@ -209,9 +226,36 @@ export class ScanJobManager {
     if (this.isTerminal(job)) return;
     job.snapshot.status = "cancelled";
     job.snapshot.finishedAt = new Date().toISOString();
+    scanLogger.info("スキャンを取り消しました", {
+      jobId: job.snapshot.id,
+      durationMs: this.durationMs(job),
+    });
     this.emit(job, { type: "cancelled", seq: 0 });
     this.deactivate(job);
     this.pruneTerminal();
+  }
+
+  private durationMs(job: Job): number {
+    const startedAt = job.snapshot.startedAt ?? job.snapshot.createdAt;
+    return Date.now() - Date.parse(startedAt);
+  }
+
+  private logScanCompleted(job: Job, result: ScanResult): void {
+    const unreadablePaths = result.unreadablePaths ?? [];
+    scanLogger.info("スキャンが完了しました", {
+      jobId: job.snapshot.id,
+      durationMs: this.durationMs(job),
+      registered: result.registered,
+      newlyGenerated: result.newlyGenerated,
+      errors: result.errors,
+      missing: result.missing,
+      skipped: result.skipped,
+      coverErrors: result.coverErrors,
+      rjCodeMissingCount: result.rjCodeMissingCount,
+      unreadablePathsCount: unreadablePaths.length,
+      unreadablePathsSample: unreadablePaths.slice(0, UNREADABLE_PATH_LOG_SAMPLE_LIMIT),
+      dataIntegrityWarning: result.dataIntegrityWarning !== undefined,
+    });
   }
 
   private emit(job: Job, event: ScanJobEvent): void {

@@ -25,7 +25,7 @@ type WorkerMessage = { type: "start"; input: WorkerInput };
 type TerminalMessage =
   | { type: "completed"; result: ScanResult }
   | { type: "cancelled" }
-  | { type: "error"; message: string };
+  | { type: "error"; message: string; errorKind?: string; stack?: string };
 
 function post(message: unknown): void {
   globalThis.postMessage(message);
@@ -103,6 +103,8 @@ async function run(input: WorkerInput): Promise<void> {
       : {
           type: "error",
           message: error instanceof Error ? error.message : "スキャンに失敗しました",
+          errorKind: error instanceof Error ? error.name : undefined,
+          stack: error instanceof Error ? error.stack : undefined,
         };
   } finally {
     db?.close();
