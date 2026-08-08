@@ -1,9 +1,10 @@
 import { mkdirSync } from "node:fs";
 import { dirname, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { constants, Database } from "bun:sqlite";
+import { constants, Database, SQLiteError } from "bun:sqlite";
 import { drizzle, type BunSQLiteDatabase } from "drizzle-orm/bun-sqlite";
 import { migrate } from "drizzle-orm/bun-sqlite/migrator";
+import { formatError, getCategoryLogger } from "../../lib/logger.ts";
 import * as catalogSchema from "./catalogSchema.ts";
 import {
   copyDatabaseToBackup,
@@ -55,50 +56,109 @@ interface VersionedDatabaseContext {
   kind: DbBackupKind;
 }
 
+type DbOpenPhase = "open" | "pragma" | "migrate" | "attach";
+
+function logDbOpenFailure(
+  kind: DbBackupKind,
+  dbPath: string,
+  phase: DbOpenPhase,
+  error: unknown,
+): never {
+  const properties: Record<string, unknown> = {
+    kind,
+    dbPath,
+    phase,
+    ...formatError(error),
+  };
+  if (error instanceof SQLiteError && typeof error.code === "string" && error.code.length > 0) {
+    properties.sqliteCode = error.code;
+  }
+  getCategoryLogger("db").error("データベースのオープンに失敗しました", properties);
+  throw error;
+}
+
 function openVersionedDatabase(
   path: string,
   version: number,
   migrationsFolder: string,
+  kind: DbBackupKind,
   migratableVersions: readonly number[] = [],
   context?: VersionedDatabaseContext,
 ): { sqlite: Database; recreated: boolean } {
   const isMemory = path.startsWith("file:") && path.includes("mode=memory");
-  if (!isMemory) mkdirSync(dirname(path), { recursive: true });
 
-  let sqlite = new Database(path, isMemory ? SQLITE_URI_FLAGS : { create: true });
-  const current = sqlite.query("PRAGMA user_version").get() as { user_version: number };
+  let sqlite: Database;
+  let currentVersion: number;
+  try {
+    if (!isMemory) mkdirSync(dirname(path), { recursive: true });
+    sqlite = new Database(path, isMemory ? SQLITE_URI_FLAGS : { create: true });
+    const current = sqlite.query("PRAGMA user_version").get() as { user_version: number };
+    currentVersion = current.user_version;
+  } catch (error) {
+    logDbOpenFailure(kind, path, "open", error);
+  }
+
   let recreated = false;
   if (
-    current.user_version !== 0 &&
-    current.user_version !== version &&
-    !migratableVersions.includes(current.user_version)
+    currentVersion !== 0 &&
+    currentVersion !== version &&
+    !migratableVersions.includes(currentVersion)
   ) {
     if (isMemory) {
-      throw new Error(
-        `インメモリDBのスキーマバージョンが不一致です（DB: v${current.user_version}, アプリ: v${version}）`,
+      logDbOpenFailure(
+        kind,
+        path,
+        "open",
+        new Error(
+          `インメモリDBのスキーマバージョンが不一致です（DB: v${currentVersion}, アプリ: v${version}）`,
+        ),
       );
     }
     sqlite.close();
     if (!context) {
-      throw new Error("ファイルDBのスキーマ不一致時にはバックアップ先が必要です");
+      logDbOpenFailure(
+        kind,
+        path,
+        "open",
+        new Error("ファイルDBのスキーマ不一致時にはバックアップ先が必要です"),
+      );
     }
     moveDatabaseToBackup(path, context.backupDir, context.kind, "version-mismatch");
-    sqlite = new Database(path, { create: true });
-    recreated = true;
+    try {
+      sqlite = new Database(path, { create: true });
+      recreated = true;
+    } catch (error) {
+      logDbOpenFailure(kind, path, "open", error);
+    }
   }
 
-  sqlite.exec("PRAGMA journal_mode = WAL");
-  sqlite.exec("PRAGMA foreign_keys = ON");
-  applySqliteBusyTimeout(sqlite);
-  if (!isMemory && !recreated && context && hasPendingMigrations(sqlite, migrationsFolder)) {
-    copyDatabaseToBackup(path, context.backupDir, context.kind);
+  try {
+    sqlite.exec("PRAGMA journal_mode = WAL");
+    sqlite.exec("PRAGMA foreign_keys = ON");
+    applySqliteBusyTimeout(sqlite);
+  } catch (error) {
+    logDbOpenFailure(kind, path, "pragma", error);
   }
-  const db = drizzle(sqlite);
-  migrate(db, { migrationsFolder });
-  if (!isMemory && context) {
-    purgeOldBackups(context.backupDir, context.kind);
+
+  try {
+    if (!isMemory && !recreated && context && hasPendingMigrations(sqlite, migrationsFolder)) {
+      copyDatabaseToBackup(path, context.backupDir, context.kind);
+    }
+    const db = drizzle(sqlite);
+    migrate(db, { migrationsFolder });
+    if (!isMemory && context) {
+      purgeOldBackups(context.backupDir, context.kind);
+    }
+  } catch (error) {
+    logDbOpenFailure(kind, path, "migrate", error);
   }
-  sqlite.exec(`PRAGMA user_version = ${version}`);
+
+  try {
+    sqlite.exec(`PRAGMA user_version = ${version}`);
+  } catch (error) {
+    logDbOpenFailure(kind, path, "pragma", error);
+  }
+
   return { sqlite, recreated };
 }
 
@@ -130,6 +190,7 @@ export function openDb(location: DbLocation, options?: DbOpenOptions): Db {
     catalogPath,
     CATALOG_SCHEMA_VERSION,
     CATALOG_MIGRATIONS,
+    "catalog",
     [],
     catalogContext,
   );
@@ -137,6 +198,7 @@ export function openDb(location: DbLocation, options?: DbOpenOptions): Db {
     userPath,
     USER_SCHEMA_VERSION,
     USER_MIGRATIONS,
+    "user",
     [],
     userContext,
   );
@@ -147,12 +209,17 @@ export function openDb(location: DbLocation, options?: DbOpenOptions): Db {
       catalogPath,
       CATALOG_SCHEMA_VERSION,
       CATALOG_MIGRATIONS,
+      "catalog",
       [],
       catalogContext,
     );
   }
   try {
-    catalogOpened.sqlite.run("ATTACH DATABASE ? AS user", [userPath]);
+    try {
+      catalogOpened.sqlite.run("ATTACH DATABASE ? AS user", [userPath]);
+    } catch (error) {
+      logDbOpenFailure("catalog", catalogPath, "attach", error);
+    }
     const missing = catalogOpened.sqlite
       .query(
         "SELECT works.id FROM works LEFT JOIN user.work_states ON work_states.work_id = works.id " +
@@ -160,8 +227,11 @@ export function openDb(location: DbLocation, options?: DbOpenOptions): Db {
       )
       .get() as { id: string } | null;
     if (missing) {
-      throw new Error(
-        `DB整合性エラー: catalogの作品にuser状態がありません（workId: ${missing.id}）`,
+      logDbOpenFailure(
+        "catalog",
+        catalogPath,
+        "attach",
+        new Error(`DB整合性エラー: catalogの作品にuser状態がありません（workId: ${missing.id}）`),
       );
     }
   } catch (error) {

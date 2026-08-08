@@ -105,10 +105,11 @@ import {
 import { querySmartFolderWorks } from "./smartFolderWorks.ts";
 import { logDataIntegritySkips, toDataIntegrityWarning } from "./dataIntegrity.ts";
 import { SharedFlightPool, throwIfAborted } from "./sharedFlight.ts";
-import { getCategoryLogger } from "../../lib/logger.ts";
+import { formatError, getCategoryLogger } from "../../lib/logger.ts";
 
 const dlsiteLogger = getCategoryLogger("dlsite");
 const scanLogger = getCategoryLogger("scan");
+const serverLogger = getCategoryLogger("server");
 
 const KEY_ROOT_FOLDER = "root_folder";
 const KEY_LAST_SCAN_TIME = "last_scan_time";
@@ -146,6 +147,15 @@ interface ScanWorkerMessage {
   progress?: ScanProgressEvent;
   result?: ScanResult;
   message?: string;
+  errorKind?: string;
+  stack?: string;
+}
+
+function reconstructWorkerError(message: ScanWorkerMessage): Error {
+  const error = new Error(message.message ?? "スキャンワーカーが失敗しました");
+  if (message.errorKind) error.name = message.errorKind;
+  if (message.stack) error.stack = message.stack;
+  return error;
 }
 
 async function runFileScanInWorker(
@@ -190,17 +200,27 @@ async function runFileScanInWorker(
           rejectResult(new DOMException("スキャンはキャンセルされました", "AbortError")),
         );
       } else {
-        settle(() => rejectResult(new Error(message.message ?? "スキャンワーカーが失敗しました")));
+        settle(() => rejectResult(reconstructWorkerError(message)));
       }
     };
     const onError = (event: ErrorEvent) => {
+      scanLogger.error("スキャンワーカーでエラーが発生しました", {
+        source: "worker-error",
+        ...formatError(event.error ?? new Error(event.message)),
+      });
       settle(() => rejectResult(event.error ?? new Error(event.message)));
     };
     const onMessageError = () => {
+      scanLogger.error("スキャンワーカーでエラーが発生しました", {
+        source: "worker-messageerror",
+      });
       settle(() => rejectResult(new Error("スキャンワーカーのメッセージを復元できません")));
     };
     const onClose = () => {
       if (!terminalReceived) {
+        scanLogger.error("スキャンワーカーでエラーが発生しました", {
+          source: "worker-close",
+        });
         settle(() => rejectResult(new Error("スキャンワーカーが結果を返さず終了しました")));
       }
     };
@@ -613,11 +633,27 @@ export function createRealAdapter(options: RealAdapterOptions): RealAdapter {
       let absRoot: string;
       try {
         absRoot = realpathSync(resolve(patch.rootFolder));
-      } catch {
+      } catch (error) {
+        const properties: Record<string, unknown> = {
+          requestedPath: patch.rootFolder,
+          ...formatError(error),
+        };
+        if (
+          error instanceof Error &&
+          "code" in error &&
+          typeof (error as NodeJS.ErrnoException).code === "string"
+        ) {
+          properties.code = (error as NodeJS.ErrnoException).code;
+        }
+        serverLogger.warn("ルートフォルダーの解決に失敗しました", properties);
         throw new NotConfiguredError(
           `指定されたルートフォルダーが存在しません: ${patch.rootFolder}`,
         );
       }
+      serverLogger.info("ルートフォルダーを解決しました", {
+        requestedPath: patch.rootFolder,
+        resolvedPath: absRoot,
+      });
       repo.setUserSetting(KEY_ROOT_FOLDER, absRoot);
       return this.getSettings();
     },

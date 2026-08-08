@@ -16,9 +16,33 @@ import { smartFoldersRoute } from "./routes/smartFolders.ts";
 import { tagPrefixesRoute } from "./routes/tagPrefixes.ts";
 import { worksRoute } from "./routes/works.ts";
 
-export function createApp(adapter: DataAdapter): Hono {
-  const app = new Hono();
+export type AppEnv = { Variables: { requestId: string } };
+
+export function createApp(adapter: DataAdapter): Hono<AppEnv> {
+  const app = new Hono<AppEnv>();
   const httpLogger = getCategoryLogger("http");
+
+  app.use("*", async (c, next) => {
+    const requestId = crypto.randomUUID().slice(0, 8);
+    c.set("requestId", requestId);
+    const startedAt = performance.now();
+    await next();
+    const status = c.res.status;
+    const properties = {
+      requestId,
+      method: c.req.method,
+      path: c.req.path,
+      status,
+      durationMs: Math.round(performance.now() - startedAt),
+    };
+    if (status >= 500) {
+      httpLogger.error("HTTPリクエストを処理しました", properties);
+    } else if (status >= 400) {
+      httpLogger.warn("HTTPリクエストを処理しました", properties);
+    } else {
+      httpLogger.debug("HTTPリクエストを処理しました", properties);
+    }
+  });
 
   const api = new Hono();
   const scanJobs = new ScanJobManager(adapter);
@@ -42,14 +66,18 @@ export function createApp(adapter: DataAdapter): Hono {
   });
 
   app.onError((err, c) => {
+    const requestId = c.get("requestId");
+    const path = c.req.path;
     if (err instanceof HTTPException) {
+      httpLogger.warn("HTTP例外が発生しました", { requestId, path, status: err.status });
       return err.getResponse();
     }
     if (err instanceof NotConfiguredError) {
+      httpLogger.warn("未設定のためリクエストを拒否しました", { requestId, path, status: 409 });
       const body: ApiError = { error: { code: "conflict", message: err.message } };
       return c.json(body, 409);
     }
-    httpLogger.error("リクエスト処理中にエラーが発生しました", formatError(err));
+    httpLogger.error("リクエスト処理中にエラーが発生しました", { requestId, ...formatError(err) });
     const body: ApiError = {
       error: { code: "internal", message: "サーバー内部エラーが発生しました" },
     };

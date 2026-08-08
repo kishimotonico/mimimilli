@@ -10,7 +10,7 @@ import type { FsWorkRef } from "../../src/adapters/real/fsBrowse.ts";
 import { buildWorkPathIndex, findOwnerWork } from "../../src/adapters/real/fsBrowse.ts";
 import { openDb, type Db } from "../../src/adapters/real/db.ts";
 import { WorkRepo } from "../../src/adapters/real/workRepo.ts";
-import { createApp } from "../../src/app.ts";
+import { createApp, type AppEnv } from "../../src/app.ts";
 import { makeSampleLibrary, writeWav } from "../helpers/sampleLibrary.ts";
 import { upsertTestWork } from "../helpers/workTestUtils.ts";
 
@@ -69,7 +69,7 @@ class LookupCountingMap<K, V> extends Map<K, V> {
   }
 }
 
-async function listing(app: Hono, path?: string): Promise<FsListing> {
+async function listing(app: Hono<AppEnv>, path?: string): Promise<FsListing> {
   const q = path ? `?path=${encodeURIComponent(path)}` : "";
   const res = await app.request(`/api/fs${q}`);
   assert.equal(res.status, 200);

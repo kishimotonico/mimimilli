@@ -25,10 +25,11 @@ import {
   getCategoryLogger,
   initLogger,
 } from "./lib/logger.ts";
+import { buildStartupLogProperties } from "./lib/startupLog.ts";
 
 const adapterKind = process.env.MIMIMILLI_ADAPTER ?? "real";
-
-initLogger(adapterKind === "real" ? { logDir: resolveDataPaths().logDir } : {});
+const dataPaths = adapterKind === "real" ? resolveDataPaths() : undefined;
+const { logFilePath } = initLogger(dataPaths ? { logDir: dataPaths.logDir } : {});
 
 const serverLogger = getCategoryLogger("server");
 
@@ -37,21 +38,23 @@ function createAdapter(): DataAdapter {
     case "fixture":
       return createFixtureAdapter({ scenario: process.env.MIMIMILLI_MOCK_SCENARIO });
     case "real": {
-      const paths = resolveDataPaths();
+      if (!dataPaths) {
+        throw new Error("real adapter requires dataPaths");
+      }
       return createRealAdapter({
         database: {
           kind: "files",
-          catalogPath: paths.catalogDb,
-          userPath: paths.userDb,
+          catalogPath: dataPaths.catalogDb,
+          userPath: dataPaths.userDb,
         },
-        dbBackupDir: paths.backupDir,
-        dataRoot: paths.root,
-        dlsiteCache: resolveDlsiteCacheConfig(paths.dlsiteCacheDb),
+        dbBackupDir: dataPaths.backupDir,
+        dataRoot: dataPaths.root,
+        dlsiteCache: resolveDlsiteCacheConfig(dataPaths.dlsiteCacheDb),
         dlsiteRequestConfig: resolveDlsiteRequestConfig(),
         dlsiteSchedulerDependencies: { logger: createDlsiteEventLogger() },
         thumbnailCacheDir: process.env.MIMIMILLI_THUMBNAIL_CACHE_DIR
           ? resolve(process.env.MIMIMILLI_THUMBNAIL_CACHE_DIR)
-          : paths.thumbnailCache,
+          : dataPaths.thumbnailCache,
       });
     }
     default:
@@ -133,4 +136,10 @@ server = Bun.serve({
 
 serverLogger.info(
   `サーバーを起動しました: http://localhost:${server.port} (adapter: ${adapterKind})`,
+  buildStartupLogProperties({
+    adapterKind,
+    dataPaths,
+    logFilePath,
+    scenario: process.env.MIMIMILLI_MOCK_SCENARIO,
+  }),
 );
