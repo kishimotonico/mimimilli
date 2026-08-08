@@ -97,3 +97,11 @@ collapseの確定事項に「対象3箇所（ScanModal警告・新規作品、Ax
 これは原則6（既存ルート要素を直接motion化しラッパーDOMを被せない）の例外だが、次の理由で許容する。原則6の趣旨は `position: fixed` オーバーレイの座標系・stacking context破壊の防止であり、in-flowのcollapseには当てはまらない。また旧実装は `.ml-presence-collapse`（無地）→ `.ml-presence-collapse__inner`（flex/gap）→ `.mll-qlist__sort` の2段ラッパー構造で、新実装は1段なので**ラッパーは純減**している。
 
 規約としては次のとおり。**collapseを適用する際はルート要素の padding/border を必ず確認する。無ければルート自身をmotion化し、あれば `overflow: hidden` だけを持つ無地のラッパーを1枚だけ被せる。**
+
+### useIsPresent の用途に「再オープン時の初期フォーカス」を追加（TASK-240）
+
+原則3は `useIsPresent()` の用途を (a) `inert` (b) リスナー解除の2つに限定し「フォーカス復帰には使わない」と定めたが、実装では3つ目の用途が生じた。`AxisValuePopoverPanel` が `isOpen={isPresent}` を `AxisValueQuickList` へ渡し、退出アニメ中に同じ軸が開き直されたとき（Escapeで閉じてすぐ同じ軸を開く等）に検索欄へフォーカスし直すのに使っている。
+
+原則3が禁じたかったのは**閉じたときのフォーカス復帰**であり、これは「軸A→B切替時に旧Aが新Bからフォーカスを奪う」ことを防ぐための制約だった。再オープン時に自分の入力欄へフォーカスを入れる用途はこの失敗モードを起こさない（フォーカスを入れる先が、いま開いている要素自身のため）。実際、軸A→B高速切替のrapid reopenテストで新パネルの検索欄フォーカスが維持されることを確認している。
+
+よって用途を3つに拡張し、禁止事項を「閉じたときのフォーカス復帰に使わない」へ精密化した。復帰は `activeElement` を検査して reason を渡す close ハンドラ側の責務のまま。
