@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ComponentProps } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
+import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import {
   getDefaultPlaylistTrackCount,
   toWorkListItem,
@@ -42,13 +43,34 @@ import SmartFolderEditorModal from "./SmartFolderEditorModal";
 import { SmartFolderView } from "./preview/SmartFolderView";
 import { DataIntegrityWarningBanner } from "./DataIntegrityWarningBanner";
 import LibraryWorksBoundary from "./LibraryWorksBoundary";
-import Presence from "../../../shared/ui/Presence";
+import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 
 interface LibraryViewProps {
   onPlay: (work: WorkListItem, trackIndex: number) => void;
   onResume: (work: Work) => void;
   /** ロード中トラックの再生/一時停止を切り替える（選択中作品が再生中のときのスプリットボタン用） */
   onTogglePlay: () => void;
+}
+
+type PreviewPaneSlideProps = Omit<ComponentProps<typeof PreviewPane>, "mode">;
+
+/** 作品選択プレビューが右から出入りする（ADR-0012 §3）。selectedWorkId が非nullの間だけ
+ *  マウントされ、退出中もAnimatePresenceが凍結した最後のpropsのまま表示され続ける。 */
+function PreviewPaneSlide(props: PreviewPaneSlideProps) {
+  const { previewSlide } = useMotionVariants();
+  const isPresent = useIsPresent();
+  const v = previewSlide();
+  return (
+    <motion.div
+      className="mll-results__preview"
+      inert={!isPresent}
+      initial={v.initial}
+      animate={v.animate}
+      exit={v.exit}
+    >
+      <PreviewPane mode="work" {...props} />
+    </motion.div>
+  );
 }
 
 export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryViewProps) {
@@ -302,35 +324,36 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
                       )}
                     </div>
 
-                    {/* 作品選択時のみスライドイン（ADR-0012 §3）。list/grid どちらでも同じ配線。 */}
-                    <Presence
-                      show={nav.selectedWorkId !== null}
-                      variant="preview-slide"
-                      className="mll-results__preview"
-                    >
-                      <PreviewPane
-                        mode="work"
-                        homeStats={homeStats}
-                        selectedWork={selectedWork}
-                        isSelectedWorkLoading={workDetailQuery.isPending}
-                        isSelectedWorkError={workDetailQuery.isError}
-                        onRetrySelectedWork={workDetailQuery.refetch}
-                        playingTrackIndex={
-                          selectedWork && playingWorkId === selectedWork.id
-                            ? (playingTrackIndex ?? null)
-                            : null
-                        }
-                        isPlaybackActive={isPlaybackActive}
-                        onPlay={handlePlay}
-                        onResume={handleResume}
-                        onTogglePlay={onTogglePlay}
-                        onSelectWork={nav.selectWork}
-                        onTagClick={handleTagClick}
-                        tagSuggestions={tagSuggestions}
-                        nav={nav}
-                        searchQuery={searchQuery}
-                      />
-                    </Presence>
+                    {/* 作品選択時のみスライドイン（ADR-0012 §3）。list/grid どちらでも同じ配線。
+                        selectedWorkId が非nullの間だけマウントする境界にすることで、退出中も
+                        AnimatePresenceが凍結した最後のselectedWorkを表示し続ける（RQキャッシュへの
+                        暗黙依存を断つ）。 */}
+                    <AnimatePresence>
+                      {nav.selectedWorkId !== null && (
+                        <PreviewPaneSlide
+                          key="preview"
+                          homeStats={homeStats}
+                          selectedWork={selectedWork}
+                          isSelectedWorkLoading={workDetailQuery.isPending}
+                          isSelectedWorkError={workDetailQuery.isError}
+                          onRetrySelectedWork={workDetailQuery.refetch}
+                          playingTrackIndex={
+                            selectedWork && playingWorkId === selectedWork.id
+                              ? (playingTrackIndex ?? null)
+                              : null
+                          }
+                          isPlaybackActive={isPlaybackActive}
+                          onPlay={handlePlay}
+                          onResume={handleResume}
+                          onTogglePlay={onTogglePlay}
+                          onSelectWork={nav.selectWork}
+                          onTagClick={handleTagClick}
+                          tagSuggestions={tagSuggestions}
+                          nav={nav}
+                          searchQuery={searchQuery}
+                        />
+                      )}
+                    </AnimatePresence>
                   </div>
                 );
               }}

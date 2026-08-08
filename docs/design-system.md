@@ -88,7 +88,16 @@ top layer 内の前後関係は表示タイミングの新しい方が手前に�
 
 ## Motion / cursor
 
-- 構造的なモーション（要素の出入り・スライド等）は CSS トランジション + `usePresence` / `Presence`（`client/src/shared/ui/`）で実装する。既知の有限状態は `Presence` を並置し、動的リストの退出は省略して入場のみ CSS アニメーションとする
+方針の正は [ADR-0014](adr/0014-motion-reintroduction-presence-removal.md)。実装からは読み取りにくい規約だけをここに記す。
+
+- 構造的なモーション（要素の出入り・スライド等）は `motion`（`motion/react`）の `AnimatePresence` で実装する。マウント境界は `{open && <Child />}` の条件レンダーにし、duration・easing・delay は `client/src/shared/ui/useMotionVariants.ts` の variant ビルダーに集約する。**`transition.delay` の直書きは禁止**（reduced-motion 時の 0 化を迂回するため）。delay が要る場合はビルダーのオプション経由にする
+- 汎用ラッパーコンポーネントは作らない。共有するのはトークン（variant ビルダー）と規約のみで、各所で motion コンポーネントを直接使う
+- 既存ルート要素は直接 `motion.div` 等に置き換える（ラッパー DOM を被せない）。ただし collapse でルート要素に padding/border がある場合は、`overflow: hidden` だけを持つ無地のラッパーを 1 枚だけ被せる
+- `layout` / `layoutId` は使わない（過去にカバー歪みで撤去済み）。スコープは出退場・opacity・transform・width・height(0↔auto) に限定する
+- fade の退出 `position: absolute` は最も近い positioned ancestor を基準にする。fade を使う箇所ごとに祖先が positioned かを確認する
+- AP 境界の子は必ずコンポーネントとして切り出し、内部で `useIsPresent()` を呼ぶ。用途は (a) ルート要素への `inert={!isPresent}`、(b) document/window レベルのリスナー（outside click・Escape 等）の退出中解除、(c) 再オープン時の初期フォーカス（退出アニメ中に同じ対象が開き直されたときに入力欄へフォーカスし直す）の 3 つに限定する。**閉じたときのフォーカス復帰には使わない** — 復帰は `activeElement` を検査して reason を渡す close ハンドラ側の責務。`isPresent` で復帰させると、対象を素早く切り替えたときに退出中の旧要素が新要素からフォーカスを奪う
+- クエリ購読は開閉状態に連動させない（`useXxxQuery(isOpen ? a : null)` のような引数の null 切替をしない）。子がマウントされている間は常に有効な引数で購読する
+- `MotionConfig reducedMotion="user"` は transform/layout のみ抑止し、opacity アニメは止まらない。`useMotionVariants` が reduce 時に全 variant の duration/delay を 0 にすることで opacity アニメも実質即完了させる
 - hover は短い transition のみで十分。派手な演出は避ける
 - 操作不能な要素は `cursor: not-allowed` にする
 - 長時間ループするアニメーション（パルス等）は reduced motion 対応を原則とする

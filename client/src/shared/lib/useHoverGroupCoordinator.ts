@@ -7,6 +7,12 @@ import { isPointInTriangle, type Point } from "./pointInTriangle";
 // useHoverIntent の役割に加え、トリガーからパネルへの斜め移動が他のトリガーの上を
 // 通過しても開閉が横取りされないよう、セーフトライアングル判定で他行の open 要求を
 // 抑止する（参考: https://ics.media/entry/260803/）。
+//
+// パネル側（panelElRef・panelHandlers・セーフトライアングルの document pointermove）は
+// 常に「現在openなオーナー」1つだけに紐づく。AnimatePresence 下では軸A→Bの切替時に
+// 旧Aが退出アニメーション中もマウントされ続けるため、旧Aの登録解除（アンマウント時の
+// ref クリーンアップ）が新Bの登録より遅れて発火しうる。これが新Bの登録を壊さないよう、
+// オーナーが交代するたびに発行するトークンで登録・解除を照合する。
 
 const DEFAULT_OPEN_DELAY_MS = 200;
 const DEFAULT_CLOSE_DELAY_MS = 150;
@@ -22,6 +28,9 @@ export interface HoverGroupPanelHandlers {
   onPointerEnter: () => void;
   onPointerLeave: () => void;
 }
+
+/** 現在openなオーナーを識別するトークン。open状態が変わるたびに新しい値が発行される。 */
+export type HoverGroupOwnerToken = symbol;
 
 export interface UseHoverGroupCoordinatorOptions {
   /** ホバー開始から開くまでの遅延（ms）。既定200ms */
@@ -39,13 +48,19 @@ export interface UseHoverGroupCoordinatorResult {
   openKey: string | null;
   /** 現在開いているトリガーの要素（AxisQuickOverlay の anchorEl に渡す） */
   openAnchorEl: HTMLElement | null;
-  /** パネルのDOM要素をこのrefへ代入する（セーフトライアングルの底辺の算出に使う） */
-  panelElRef: React.RefObject<HTMLElement | null>;
+  /** 現在openなオーナーのトークン。openKeyがnullの間はnull。 */
+  ownerToken: HoverGroupOwnerToken | null;
+  /**
+   * パネルのDOM要素を登録する（セーフトライアングルの底辺の算出に使う）。
+   * token が現在のオーナーと一致しない呼び出しは無視する。
+   */
+  registerPanelEl: (token: HoverGroupOwnerToken, el: HTMLElement | null) => void;
   /** トリガー要素は呼び出し時（render時ではなくpointerイベント発火時）に
    *  event.currentTarget から取得する。renderの時点ではrefがまだDOM要素を
    *  指していない可能性があるため、要素を先渡しにしない。 */
   getTriggerHandlers: (key: string) => HoverGroupTriggerHandlers;
-  panelHandlers: HoverGroupPanelHandlers;
+  /** token が現在のオーナーと一致しない間は何もしないハンドラを返す。 */
+  getPanelHandlers: (token: HoverGroupOwnerToken) => HoverGroupPanelHandlers;
   /** 遅延なしで即座に開く（キーボード操作用） */
   openImmediately: (key: string, el: HTMLElement | null) => void;
   /** 遅延・セーフトライアングルを打ち切って即座に閉じる */
@@ -58,6 +73,12 @@ interface Triangle {
   bottom: Point;
 }
 
+interface OpenState {
+  key: string;
+  anchorEl: HTMLElement | null;
+  token: HoverGroupOwnerToken;
+}
+
 export function useHoverGroupCoordinator(
   options: UseHoverGroupCoordinatorOptions = {},
 ): UseHoverGroupCoordinatorResult {
@@ -68,9 +89,8 @@ export function useHoverGroupCoordinator(
     trianglePaddingPx = DEFAULT_TRIANGLE_PADDING_PX,
   } = options;
 
-  const [openKey, setOpenKey] = useState<string | null>(null);
-  const [openAnchorEl, setOpenAnchorEl] = useState<HTMLElement | null>(null);
-  const openKeyRef = useRef<string | null>(null);
+  const [openState, setOpenState] = useState<OpenState | null>(null);
+  const openStateRef = useRef<OpenState | null>(null);
   const panelElRef = useRef<HTMLElement | null>(null);
   const panelHoveredRef = useRef(false);
   const hoveredTriggerRef = useRef<{ key: string; el: HTMLElement | null } | null>(null);
@@ -107,9 +127,14 @@ export function useHoverGroupCoordinator(
 
   const commitOpen = (key: string, el: HTMLElement | null) => {
     clearOpenTimer();
-    openKeyRef.current = key;
-    setOpenKey(key);
-    setOpenAnchorEl(el);
+    const next: OpenState = { key, anchorEl: el, token: Symbol(key) };
+    openStateRef.current = next;
+    setOpenState(next);
+  };
+
+  const commitClose = () => {
+    openStateRef.current = null;
+    setOpenState(null);
   };
 
   const scheduleOpenTimer = (key: string, el: HTMLElement | null) => {
@@ -121,16 +146,12 @@ export function useHoverGroupCoordinator(
   const scheduleCloseTimer = () => {
     clearOpenTimer();
     clearCloseTimer();
-    closeTimerRef.current = window.setTimeout(() => {
-      openKeyRef.current = null;
-      setOpenKey(null);
-      setOpenAnchorEl(null);
-    }, closeDelayMs);
+    closeTimerRef.current = window.setTimeout(commitClose, closeDelayMs);
   };
 
   const resolveAfterGuard = () => {
     const hovered = hoveredTriggerRef.current;
-    if (hovered && hovered.key !== openKeyRef.current) {
+    if (hovered && hovered.key !== openStateRef.current?.key) {
       handleTriggerEnter(hovered.key, hovered.el);
       return;
     }
@@ -170,9 +191,9 @@ export function useHoverGroupCoordinator(
 
   function handleTriggerEnter(key: string, el: HTMLElement | null) {
     hoveredTriggerRef.current = { key, el };
-    if (triangleRef.current && key !== openKeyRef.current) return; // 抑止: 他行の open 要求
+    if (triangleRef.current && key !== openStateRef.current?.key) return; // 抑止: 他行の open 要求
     clearCloseTimer();
-    if (key === openKeyRef.current) {
+    if (key === openStateRef.current?.key) {
       clearOpenTimer();
       return;
     }
@@ -181,7 +202,7 @@ export function useHoverGroupCoordinator(
 
   const handleTriggerLeave = (key: string, point: Point) => {
     if (hoveredTriggerRef.current?.key === key) hoveredTriggerRef.current = null;
-    if (key !== openKeyRef.current) {
+    if (key !== openStateRef.current?.key) {
       if (pendingOpenKeyRef.current === key) clearOpenTimer();
       return;
     }
@@ -198,17 +219,28 @@ export function useHoverGroupCoordinator(
     onPointerLeave: (event) => handleTriggerLeave(key, { x: event.clientX, y: event.clientY }),
   });
 
-  const panelHandlers: HoverGroupPanelHandlers = {
+  const registerPanelEl = (token: HoverGroupOwnerToken, el: HTMLElement | null) => {
+    const current = openStateRef.current;
+    // 現在のオーナーと異なるトークンからの登録・解除は無視する（軸A→B切替時に、
+    // 退出アニメーション中の旧Aが遅れて解除しても新Bの登録を壊さないため）。
+    // current が null（何もopenでない）のときは保護対象が無いため素直に反映する。
+    if (current !== null && current.token !== token) return;
+    panelElRef.current = el;
+  };
+
+  const getPanelHandlers = (token: HoverGroupOwnerToken): HoverGroupPanelHandlers => ({
     onPointerEnter: () => {
+      if (openStateRef.current?.token !== token) return;
       panelHoveredRef.current = true;
       disengageTriangleGuard();
       clearCloseTimer();
     },
     onPointerLeave: () => {
+      if (openStateRef.current?.token !== token) return;
       panelHoveredRef.current = false;
       scheduleCloseTimer();
     },
-  };
+  });
 
   const openImmediately = (key: string, el: HTMLElement | null) => {
     clearOpenTimer();
@@ -222,9 +254,7 @@ export function useHoverGroupCoordinator(
     clearCloseTimer();
     disengageTriangleGuard();
     panelHoveredRef.current = false;
-    openKeyRef.current = null;
-    setOpenKey(null);
-    setOpenAnchorEl(null);
+    commitClose();
   };
 
   useEffect(() => {
@@ -237,11 +267,12 @@ export function useHoverGroupCoordinator(
   }, []);
 
   return {
-    openKey,
-    openAnchorEl,
-    panelElRef,
+    openKey: openState?.key ?? null,
+    openAnchorEl: openState?.anchorEl ?? null,
+    ownerToken: openState?.token ?? null,
+    registerPanelEl,
     getTriggerHandlers,
-    panelHandlers,
+    getPanelHandlers,
     openImmediately,
     close,
   };

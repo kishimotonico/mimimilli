@@ -1,3 +1,4 @@
+import { normalizeTag, type NormalizedTag } from "@mimimilli/shared";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { cn } from "../lib/cn";
 
@@ -13,10 +14,6 @@ export interface GetTagComboboxOptionsParams {
 
 const DEFAULT_LIMIT = 8;
 
-function normalizeTag(tag: string): string {
-  return tag.trim().toLocaleLowerCase();
-}
-
 export function getTagComboboxOptions(
   input: string,
   suggestions: string[],
@@ -30,8 +27,12 @@ export function getTagComboboxOptions(
   if (query.length === 0) return [];
 
   const normalizedQuery = normalizeTag(query);
-  const excluded = new Set(excludeTags.map(normalizeTag));
-  const seen = new Set<string>();
+  if (normalizedQuery === null) return [];
+
+  const excluded = new Set(
+    excludeTags.map(normalizeTag).filter((t): t is NonNullable<typeof t> => t !== null),
+  );
+  const seen = new Set<NormalizedTag>();
   const matchedSuggestions: TagComboboxOption[] = [];
   let hasExactMatch = excluded.has(normalizedQuery);
 
@@ -40,12 +41,13 @@ export function getTagComboboxOptions(
     if (tag.length === 0) continue;
 
     const normalized = normalizeTag(tag);
+    if (normalized === null) continue;
     if (seen.has(normalized)) continue;
     seen.add(normalized);
 
     if (normalized === normalizedQuery) hasExactMatch = true;
     if (excluded.has(normalized)) continue;
-    if (!normalized.includes(normalizedQuery)) continue;
+    if (!normalized.toLowerCase().includes(normalizedQuery.toLowerCase())) continue;
 
     if (matchedSuggestions.length < limit) {
       matchedSuggestions.push({ kind: "suggestion", value: tag });

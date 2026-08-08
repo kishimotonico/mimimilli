@@ -9,9 +9,6 @@ export type IconButtonSize = "xs" | "sm" | "md" | "lg";
 export type IconButtonVariant = "default" | "bare";
 
 // 箱サイズ・角丸・アイコン描画サイズを対で固定し、呼び出し側での二重管理を無くす。
-// 角丸もサイズごとに1クラスへ含める（呼び出し側がclassNameでrounded-*を上書きする形だと、
-// cn()は単純結合でTailwindクラスの重複解決をしないため、どちらが効くかCSS生成順に
-// 依存して不安定になる。タグ追加＋ボタンがタグチップより一回り大きく見えていたのはこれが原因）。
 const BOX_CLASS: Record<IconButtonSize, string> = {
   xs: "h-5 w-5 rounded-1",
   sm: "h-[26px] w-[26px] rounded-2",

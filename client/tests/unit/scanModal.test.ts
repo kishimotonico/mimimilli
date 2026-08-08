@@ -313,11 +313,20 @@ describe("ScanModal", () => {
       expect(registeredValue.parentElement?.className).toContain("bg-[color-mix");
 
       // レイアウトは動かさず、時間経過（ScanModal の COMPLETION_HINT_MS=2400 と
-      // Presence fade の退出時間=150ms）で最終スキャン表示と通常の枠色に自然に戻る。
-      // 2回に分けて進めるのは、退出タイマー（setPhase("exit")後に登録される）が
-      // 一括advanceだと後続タイマーとして拾われないため。
+      // StatusRow AnimatePresence（fade variant）の退出時間=150ms）で最終スキャン表示と
+      // 通常の枠色に自然に戻る。2回に分けて進めるのは、退出アニメーション開始（状態遷移で
+      // AnimatePresence が退出フェーズへ入るタイミング）が一括advanceだと後続タイマーとして
+      // 拾われないため。
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(2500);
+        await vi.advanceTimersByTimeAsync(2450);
+      });
+      // COMPLETION_HINT_MS(2400)は過ぎてstateはlastScanへ切り替わり退出フェーズに入っているが、
+      // fadeの退出アニメーション(150ms)がまだ終わっていないため、AnimatePresenceがマウントを
+      // 保ったままで「完了しました」がまだDOM上に残っている（退出中に即座に消える実装への退行を検知する）。
+      expect(screen.getByText("完了しました")).toBeInTheDocument();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(50);
       });
       await act(async () => {
         await vi.advanceTimersByTimeAsync(500);

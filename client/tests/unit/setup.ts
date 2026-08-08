@@ -11,6 +11,39 @@ if (!Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = function () {};
 }
 
+// happy-dom は matchMedia が未実装のため、prefers-reduced-motion 判定用にスタブする。
+// change イベントの購読/解除ができるよう addEventListener/removeEventListener を実装する
+// （useMotionVariants の内部実装がこの API を使う）。テストからは setMatchMediaReducedMotion で
+// マッチ状態を切り替え、change イベントを発火できる。
+type MediaQueryChangeListener = (event: MediaQueryListEvent) => void;
+const mediaQueryListeners = new Set<MediaQueryChangeListener>();
+let reducedMotionMatches = false;
+
+window.matchMedia = vi.fn().mockImplementation((query: string) => {
+  const mql = {
+    matches: query === "(prefers-reduced-motion: reduce)" ? reducedMotionMatches : false,
+    media: query,
+    onchange: null,
+    addEventListener: (event: string, listener: MediaQueryChangeListener) => {
+      if (event === "change") mediaQueryListeners.add(listener);
+    },
+    removeEventListener: (event: string, listener: MediaQueryChangeListener) => {
+      if (event === "change") mediaQueryListeners.delete(listener);
+    },
+    addListener: (listener: MediaQueryChangeListener) => mediaQueryListeners.add(listener),
+    removeListener: (listener: MediaQueryChangeListener) => mediaQueryListeners.delete(listener),
+    dispatchEvent: () => true,
+  };
+  return mql;
+});
+
+/** テストから prefers-reduced-motion のマッチ状態を切り替え、登録済み change リスナーへ通知する。 */
+export function setMatchMediaReducedMotion(matches: boolean) {
+  reducedMotionMatches = matches;
+  const event = { matches } as MediaQueryListEvent;
+  mediaQueryListeners.forEach((listener) => listener(event));
+}
+
 // happy-dom では Popover API が未実装のため、Toast の top layer 表示用にスタブする。
 if (!HTMLElement.prototype.showPopover) {
   HTMLElement.prototype.showPopover = function () {};

@@ -101,4 +101,66 @@ describe("AxisColumn", () => {
       expect(document.querySelector(".mll-qoverlay")).toBeTruthy();
     });
   });
+
+  it("オーバーレイ閉鎖（退出）中もfacet一覧が空にならない", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify([{ value: "藤田茜", count: 3, durationSec: 0, covers: [] }]),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+        ),
+      ),
+    );
+    renderAxisColumn({ tagPrefixes: PREFIXES });
+
+    // ArrowRight で遅延なしに開く（openImmediately）。
+    fireEvent.keyDown(screen.getByRole("button", { name: /CV/ }), { key: "ArrowRight" });
+
+    // 読み込み完了で「項目がありません」（空表示）が出ないこと（＝1件のfacetが一覧に載っている）
+    // を、一覧本体（role="group"）の出現で確認する。
+    await waitFor(() => {
+      expect(document.querySelector('.mll-qlist__body[role="group"]')).toBeTruthy();
+    });
+
+    // Escape で閉じる（コーディネーターの close() は遅延なし。閉鎖直後もAnimatePresenceが
+    // 退出アニメーション完了まで内容を保持するため、この時点ではDOMから消えていない）。
+    fireEvent.keyDown(screen.getByLabelText("CVの値を検索"), { key: "Escape" });
+
+    // クエリが無効化されて空扱いになっていれば「項目がありません」に切り替わる。
+    // 退出中も一覧本体が保持されたままであることを確認する。
+    expect(document.querySelector('.mll-qlist__body[role="group"]')).toBeTruthy();
+    expect(screen.queryByText("項目がありません")).toBeNull();
+  });
+
+  it("軸A→B高速切替で新パネルが閉じず、検索欄フォーカスが奪われない", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(JSON.stringify([]), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        ),
+      ),
+    );
+    renderAxisColumn({ tagPrefixes: PREFIXES });
+
+    fireEvent.keyDown(screen.getByRole("button", { name: /CV/ }), { key: "ArrowRight" });
+    await waitFor(() => {
+      expect(screen.getByLabelText("CVの値を検索")).toBeTruthy();
+    });
+
+    // 退出アニメーション完了を待たず、別軸へ即座に切り替える（openImmediately）。
+    fireEvent.keyDown(screen.getByRole("button", { name: /追加日/ }), { key: "ArrowRight" });
+
+    await waitFor(() => {
+      expect(document.activeElement).toBe(screen.getByLabelText("追加日の値を検索"));
+    });
+    // 新パネルが開いたまま維持されている（閉じていない）。
+    expect(screen.getByLabelText("追加日の値を検索")).toBeTruthy();
+  });
 });

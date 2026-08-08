@@ -1,4 +1,5 @@
 import { useRef, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { AnimatePresence } from "motion/react";
 import type { NormalizedTag, SmartFolder, TagPrefix } from "@mimimilli/shared";
 import type { AxisId } from "../model/types";
 import { buildFacetAxisRows, getAxisLabel, isFacetAxis } from "../model/axisDefinitions";
@@ -122,23 +123,13 @@ export default function AxisColumn({
   const {
     openKey: overlayAxis,
     openAnchorEl,
-    panelElRef,
+    ownerToken,
+    registerPanelEl,
     getTriggerHandlers,
-    panelHandlers,
+    getPanelHandlers,
     openImmediately,
     close: closeOverlay,
   } = useHoverGroupCoordinator();
-  // AxisQuickOverlay は退出アニメーション完了までマウントを保つため、閉じたあとも
-  // axis / anchorEl は最後に開いていた値を渡し続ける（コーディネーターは閉じると
-  // 両方を null に戻すため、ここで直近値を保持する）。
-  const lastOverlayAxisRef = useRef<AxisId | null>(null);
-  const lastAnchorElRef = useRef<HTMLElement | null>(null);
-  if (overlayAxis) {
-    lastOverlayAxisRef.current = overlayAxis;
-    lastAnchorElRef.current = openAnchorEl;
-  }
-  const displayOverlayAxis = overlayAxis ?? lastOverlayAxisRef.current;
-  const displayAnchorEl = overlayAxis ? openAnchorEl : lastAnchorElRef.current;
 
   // クイックオーバーレイは既定=置き換えの入口（値選択の契約。design-system.md）。
   // 置き換えは結果面を作品一覧へ遷移させ、AND追加は現在の結果面に留まる（ADR-0012 §8）。
@@ -214,20 +205,22 @@ export default function AxisColumn({
         </div>
       </div>
 
-      {displayOverlayAxis && (
-        <AxisQuickOverlay
-          axis={displayOverlayAxis}
-          axisLabel={getAxisLabel(displayOverlayAxis, tagPrefixes)}
-          anchorEl={displayAnchorEl}
-          isOpen={overlayAxis != null}
-          selectedTags={selectedTags}
-          onSelectValue={handleSelectValue}
-          onAddValue={handleAddValue}
-          onClose={closeOverlay}
-          panelHandlers={panelHandlers}
-          panelElRef={panelElRef}
-        />
-      )}
+      <AnimatePresence>
+        {overlayAxis && ownerToken && (
+          <AxisQuickOverlay
+            key={overlayAxis}
+            axis={overlayAxis}
+            axisLabel={getAxisLabel(overlayAxis, tagPrefixes)}
+            anchorEl={openAnchorEl}
+            selectedTags={selectedTags}
+            onSelectValue={handleSelectValue}
+            onAddValue={handleAddValue}
+            onClose={closeOverlay}
+            panelHandlers={getPanelHandlers(ownerToken)}
+            onPanelElChange={(el) => registerPanelEl(ownerToken, el)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
