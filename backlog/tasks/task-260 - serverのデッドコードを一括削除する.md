@@ -1,10 +1,10 @@
 ---
 id: TASK-260
 title: serverのデッドコードを一括削除する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-08 21:16'
-updated_date: '2026-08-09 00:26'
+updated_date: '2026-08-09 00:56'
 labels: []
 dependencies: []
 priority: medium
@@ -27,6 +27,18 @@ countByStatus のSQL化はTASK-269（workRepo分割）へ移管した（同一�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 上記デッドコードが削除され、依存テストは現行APIへ寄せられていること
-- [ ] #2 変更範囲のserverテストが通ること
+- [x] #1 上記デッドコードが削除され、依存テストは現行APIへ寄せられていること
+- [x] #2 変更範囲のserverテストが通ること
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+migratableVersions は全履歴で常に [] が渡されており、削除後の条件式と等価であることをレビュー担当が git log -p で確認済み（挙動変更なし）。fetchDlsiteInfo のテストは adapter 経由の dlsiteFetch へ寄せ、404/通信エラーの分類検証を維持。thumbnailCache のテストは ThumbnailCache インスタンス経由へ統一し検証内容は維持。検証: pnpm check 成功、server 525 pass / 0 fail。副作用レビュー指摘なし。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+downloadCover・fetchDlsiteInfo・dlsiteScheduler.schedule・thumbnailCache の module singleton・db.ts の migratableVersions 引数・空スタブテスト・shared/src/api.ts の経緯コメントを削除。依存テストは現行APIへ寄せた。countByStatus の SQL 化は TASK-269 へ移管。pnpm check と server 525 テストで検証。
+<!-- SECTION:FINAL_SUMMARY:END -->

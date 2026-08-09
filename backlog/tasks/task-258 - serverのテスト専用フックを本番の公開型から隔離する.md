@@ -1,10 +1,10 @@
 ---
 id: TASK-258
 title: serverのテスト専用フックを本番の公開型から隔離する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-08 21:16'
-updated_date: '2026-08-09 00:26'
+updated_date: '2026-08-09 00:55'
 labels: []
 dependencies: []
 priority: high
@@ -23,8 +23,20 @@ beforeFinalize・scanWorkerTestGate はテスト用ファクトリ（createTestR
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 テストはテスト用ファクトリ経由で同等のフックを利用でき、既存テストが通ること
-- [ ] #2 変更範囲のserverテストが通ること
-- [ ] #3 公開ScanOptionsからabortToken・beforeFinalizeが消え、abortTokenは内部契約として本番Worker取消経路が維持されていること
+- [x] #1 テストはテスト用ファクトリ経由で同等のフックを利用でき、既存テストが通ること
+- [x] #2 変更範囲のserverテストが通ること
+- [x] #3 公開ScanOptionsからabortToken・beforeFinalizeが消え、abortTokenは内部契約として本番Worker取消経路が維持されていること
 - [ ] #4 RealAdapterOptionsからscanWorkerTestGate等のテスト専用フィールドが消えていること
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+abortToken は当初テスト専用と誤認されていたが、Worker の取消を同期 scanner へ伝える本番の内部契約なので、Scanner.scan 第3引数 ScannerAbortHooks として本番経路に残した。隔離したのは beforeFinalize と scanWorkerTestGate 系のみ。検証: pnpm check 成功、server 525 pass / 0 fail。scanWorker.test.ts の cancel テストで取消経路を実測確認。副作用レビュー指摘なし。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+ScanOptions と RealAdapterOptions からテスト専用フィールドを除去。abortToken・beforeFinalize は Scanner.scan の第3引数 ScannerAbortHooks へ移し、runFileScanInWorker を scanRunner.ts へ切り出して createRealAdapter の RealAdapterAssembly 経由で差し替え可能にした。test gate は createTestRealAdapter が注入する。pnpm check と server 525 テストで検証。
+<!-- SECTION:FINAL_SUMMARY:END -->
