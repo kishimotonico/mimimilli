@@ -1,6 +1,5 @@
 import { createContext, useContext, useMemo, useRef, type ReactNode } from "react";
 import type { Work } from "../../../entities/work/model";
-import { PLAYER_CORE_INITIAL } from "../../../entities/player/model/atoms";
 import { PlayerController } from "./playerController";
 import { createPlayerRuntimeCapabilitiesRegistry } from "./playerRuntimeCapabilities";
 import type { PlayerRuntimeCapabilitiesRegistry } from "./playerRuntimeCapabilities";
@@ -31,7 +30,6 @@ export function PlayerRuntimeProvider({ children }: { children: ReactNode }) {
   if (controllerRef.current === null) controllerRef.current = new PlayerController();
   const controller = controllerRef.current;
 
-  const coreStateRef = useRef(PLAYER_CORE_INITIAL);
   const engineRef = useRef<PlayerRuntimeRefs["engine"]["current"]>(null);
   const loadedTrackRef = useRef<PlayerRuntimeRefs["loadedTrack"]["current"]>(null);
   const trackEndedRef = useRef(false);
@@ -48,7 +46,6 @@ export function PlayerRuntimeProvider({ children }: { children: ReactNode }) {
 
   const runtimeRefs = useMemo<PlayerRuntimeRefs>(
     () => ({
-      coreState: coreStateRef,
       engine: engineRef,
       loadedTrack: loadedTrackRef,
       trackEnded: trackEndedRef,
