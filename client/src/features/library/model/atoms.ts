@@ -6,12 +6,7 @@
 import { atom } from "jotai";
 import { atomWithStorage } from "jotai/utils";
 import type { NormalizedTag, TagPrefix } from "@mimimilli/shared";
-import type {
-  AxisId,
-  GridLayoutMode,
-  SortId,
-  ViewMode,
-} from "../../../features/library/model/types";
+import type { AxisId, GridLayoutMode, SortId, ViewMode } from "../model/types";
 import { getAxisLabel } from "./axisDefinitions";
 import { DEFAULT_AXIS_VALUE_SORT, type AxisValueSortState } from "./axisValueSort";
 

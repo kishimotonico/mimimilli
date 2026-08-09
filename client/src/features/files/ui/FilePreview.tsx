@@ -9,7 +9,7 @@ import { formatFileSize } from "../../../shared/lib/format";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { FILE_SYSTEM_QUERY_KEYS } from "../../../entities/file-system/queryKeys";
 import { deleteWork, getWorkRegisterPreview } from "../api";
-import { getFileUrl } from "../api";
+import { getFileUrl } from "../../../entities/work/api";
 import { getWorkFolderDisplay } from "../model/workFolderDisplay";
 import RegisterWorkDialog from "./RegisterWorkDialog";
 import type { WorkRegisterPreview } from "@mimimilli/shared";

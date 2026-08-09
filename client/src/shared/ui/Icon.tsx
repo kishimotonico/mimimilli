@@ -30,7 +30,6 @@ import {
   Maximize,
   Minimize,
   Music,
-  PanelRight,
   Pencil,
   Plus,
   RefreshCw,
@@ -190,7 +189,6 @@ export const I = {
   bookmark: lucideIcon(Bookmark),
   minimize: lucideIcon(Minimize),
   locate: lucideIcon(Locate),
-  panelR: lucideIcon(PanelRight),
   swapLR: (p) => <Svg {...p} d={["M4 8h13", "M14 4l3 4 -3 4", "M20 16H7", "M10 12l-3 4 3 4"]} />,
 } as const satisfies Record<string, IconFC>;
 

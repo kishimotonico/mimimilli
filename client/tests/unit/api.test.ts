@@ -93,11 +93,11 @@ describe("settings api", () => {
     mockFetch.mockReset();
   });
 
-  it("getRootFolder fetches /api/settings and returns rootFolder", async () => {
+  it("getSettings returns rootFolder from /api/settings", async () => {
     mockFetch.mockResolvedValue(makeResponse({ rootFolder: "/test/path", lastScanTime: null }));
-    const result = await settingsApi.getRootFolder();
+    const result = await settingsApi.getSettings();
     expect(mockFetch).toHaveBeenCalledWith("/api/settings");
-    expect(result).toBe("/test/path");
+    expect(result.rootFolder).toBe("/test/path");
   });
 
   it("setRootFolder PUTs to /api/settings", async () => {

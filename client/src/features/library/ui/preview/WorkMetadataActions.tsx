@@ -3,7 +3,7 @@ import type { Work } from "@mimimilli/shared";
 import { I } from "../../../../shared/ui/Icon";
 import IconButton from "../../../../shared/ui/IconButton";
 import { mutationErrorMessage } from "../../../../shared/lib/mutationError";
-import type { LibraryBookmarkPatchMutation } from "../../model/workPatchMutations";
+import type { LibraryBookmarkPatchMutation } from "../../model/useLibraryQueries";
 import {
   useAnchoredPopover,
   type PopoverContainerResolver,

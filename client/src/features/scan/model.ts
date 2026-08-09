@@ -10,14 +10,6 @@ export interface ScanProgress {
   total: number;
 }
 
-/** スキャンのフェーズ進行順。スキャンモーダルの実行中フェーズ表示に使う（TASK-56） */
-export const SCAN_PHASE_ORDER: readonly ScanPhase[] = [
-  "walking",
-  "registering",
-  "generating",
-  "finalizing",
-];
-
 const PHASE_LABEL: Record<ScanPhase, string> = {
   walking: "フォルダーを走査中",
   registering: "作品を登録中",

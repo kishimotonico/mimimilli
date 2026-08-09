@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { Work } from "@mimimilli/shared";
 import { emptyDlsiteState } from "@mimimilli/shared";
-import type { LibraryBookmarkPatchMutation } from "../../src/features/library/model/workPatchMutations";
+import type { LibraryBookmarkPatchMutation } from "../../src/features/library/model/useLibraryQueries";
 import { WorkMetadataActions } from "../../src/features/library/ui/preview/WorkMetadataActions";
 
 function makeWork(): Work {

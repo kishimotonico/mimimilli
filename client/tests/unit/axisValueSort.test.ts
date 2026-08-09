@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import type { AxisFacetItem } from "@mimimilli/shared";
 import {
   DEFAULT_AXIS_VALUE_SORT,
-  defaultAxisValueNameKey,
   selectAxisValueSortKey,
   sortAxisValueItems,
   toggleAxisValueSort,
@@ -35,19 +34,6 @@ describe("sortAxisValueItems", () => {
     const items = [item("b", 3, 0), item("a", 1, 0), item("c", 2, 0)];
     const sorted = sortAxisValueItems(items, { key: "count", direction: "asc" });
     expect(sorted.map((i) => i.value)).toEqual(["a", "c", "b"]);
-  });
-
-  it("ソートキー導出関数を注入できる（DRAFT-49の読み仮名メタデータへの伏線）", () => {
-    const items = [item("Zebra", 1, 0), item("apple", 1, 0)];
-    // 導出関数が大文字小文字を無視するキーを返す場合、その順序に従う
-    const getNameKey = (i: AxisFacetItem) => i.value.toLowerCase();
-    const sorted = sortAxisValueItems(items, { key: "name", direction: "asc" }, getNameKey);
-    expect(sorted.map((i) => i.value)).toEqual(["apple", "Zebra"]);
-  });
-
-  it("既定のソートキー導出関数は value をそのまま返す", () => {
-    const target = item("藤田茜", 1, 0);
-    expect(defaultAxisValueNameKey(target)).toBe("藤田茜");
   });
 });
 

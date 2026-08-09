@@ -147,7 +147,6 @@ export type PlayerControllerCommand =
   | { type: "setAudioPlaybackRate"; playbackRate: number }
   | { type: "setAudioChannelSwap"; enabled: boolean }
   | { type: "persistResume"; reason: "track-change" | "pause" | "stop" | "interval" | "error" }
-  | { type: "playbackQueueEnded"; item: PlaybackItem }
   | { type: "workCompleted"; item: PlaybackItem };
 
 export interface PlayerTransition {
@@ -340,7 +339,7 @@ export function reducePlayer(
       if (item.trackIndex < item.tracks.length - 1) {
         return withTrackIndex(state, item.trackIndex + 1, "preserve");
       }
-      const commands: PlayerControllerCommand[] = [{ type: "playbackQueueEnded", item }];
+      const commands: PlayerControllerCommand[] = [];
       if (item.completionScope === "work") commands.push({ type: "workCompleted", item });
       return { state: { ...state, status: "ended" }, commands };
     }

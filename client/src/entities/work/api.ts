@@ -18,7 +18,6 @@ import {
   dlsiteBulkCancelResponseSchema,
   dlsiteBulkSnapshotSchema,
   type DlsiteBulkSnapshot,
-  fileEntrySchema,
   type Work,
   dlsiteNotificationPageSchema,
   dlsiteNotificationSummarySchema,
@@ -26,7 +25,6 @@ import {
   type DlsiteNotificationPage,
   type DlsiteNotificationSummary,
   type WorkPatchInput,
-  type FileEntry,
   type DlsiteWorkInfo,
   type DlsiteApplyBody,
   type DlsiteStatePatch,
@@ -48,13 +46,6 @@ export async function queryDlsiteNotifications(
 ): Promise<DlsiteNotificationPage> {
   const query = new URLSearchParams({ page: String(params.page), limit: String(params.limit) });
   return getParsed(dlsiteNotificationPageSchema, `/dlsite/notifications/${kind}?${query}`);
-}
-
-export async function queryDlsiteParseFailedNotifications(params: {
-  page: number;
-  limit: number;
-}): Promise<DlsiteNotificationPage> {
-  return queryDlsiteNotifications("parse-failed", params);
 }
 
 export async function patchWork(workId: string, body: WorkPatchInput): Promise<Work> {
@@ -90,11 +81,6 @@ export async function updateLastPlayed(workId: string): Promise<void> {
 
 export async function saveResumePosition(workId: string, resume: ResumeBody): Promise<void> {
   await postVoid(`/works/${encodeURIComponent(workId)}/resume`, resume);
-}
-
-/** GET /works/:id/files も存在しない場合404を返す契約なので、getWork同様にnull分岐は伝播させない（現状未使用） */
-export async function listWorkFiles(workId: string): Promise<FileEntry> {
-  return getParsed(fileEntrySchema, `/works/${encodeURIComponent(workId)}/files`);
 }
 
 export async function fetchDlsiteInfo(workId: string): Promise<DlsiteWorkInfo> {

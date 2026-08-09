@@ -72,9 +72,6 @@ export interface ParsedRequestOptions {
   onStatus?: Partial<Record<number, StatusHandler>>;
 }
 
-/** @deprecated ParsedRequestOptions を使う */
-export type GetOptions = ParsedRequestOptions;
-
 async function handleParsedResponse<T>(
   method: string,
   path: string,

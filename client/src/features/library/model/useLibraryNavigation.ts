@@ -2,7 +2,7 @@
 // Jotai atom の読み取りと write-only action atom を束ね、
 // setAxis・drillInto・toggleTag などのハイレベル操作を提供する。
 
-import { createContext, createElement, useContext, useTransition, type ReactNode } from "react";
+import { useContext, useTransition } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
 import type { NormalizedTag } from "@mimimilli/shared";
 import type { AxisId, SortId } from "../model/types";
@@ -18,6 +18,7 @@ import {
   setLibrarySortAtom,
   toggleLibraryTagAtom,
 } from "./libraryNavigationActions";
+import { LibraryNavigationContext } from "./libraryNavigationContext";
 
 export interface LibraryViewState {
   activeAxis: AxisId;
@@ -86,15 +87,6 @@ export function useLibraryView(): LibraryViewState & LibraryViewActions {
     goToSegment: transition(goToSegment),
     isPending,
   };
-}
-
-const LibraryNavigationContext = createContext<(LibraryViewState & LibraryViewActions) | null>(
-  null,
-);
-
-export function LibraryNavigationProvider({ children }: { children: ReactNode }) {
-  const navigation = useLibraryView();
-  return createElement(LibraryNavigationContext.Provider, { value: navigation }, children);
 }
 
 export function useLibraryNavigation(): LibraryViewState & LibraryViewActions {

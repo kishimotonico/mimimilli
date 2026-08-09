@@ -8,9 +8,11 @@ import {
   useQuery,
   useQueryClient,
   useSuspenseInfiniteQuery,
+  type UseMutationResult,
 } from "@tanstack/react-query";
 import {
   WORKS_DEFAULT_PAGE_SIZE,
+  type NormalizedTag,
   type SmartFolder,
   type SmartFolderCreate,
   type Work,
@@ -28,6 +30,24 @@ import { getAllTags, getWork, patchWork } from "../../../entities/work/api";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
 import { TAG_QUERY_KEYS } from "../../../entities/tag/queryKeys";
+
+export type LibraryTitlePatchMutation = UseMutationResult<
+  Work,
+  Error,
+  { workId: string; title: string }
+>;
+
+export type LibraryBookmarkPatchMutation = UseMutationResult<
+  Work,
+  Error,
+  { workId: string; bookmarked: boolean }
+>;
+
+export type LibraryTagsPatchMutation = UseMutationResult<
+  Work,
+  Error,
+  { workId: string; tags: NormalizedTag[] }
+>;
 import {
   buildSmartFolderFilterParams,
   buildWorksParams,

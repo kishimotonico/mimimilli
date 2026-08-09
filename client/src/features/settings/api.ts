@@ -13,13 +13,3 @@ export async function getSettings(): Promise<Settings> {
 export async function setRootFolder(path: string): Promise<Settings> {
   return putParsed(settingsSchema, "/settings", { rootFolder: path });
 }
-
-export async function getRootFolder(): Promise<string | null> {
-  const s = await getSettings();
-  return s.rootFolder;
-}
-
-export async function getLastScanTime(): Promise<string | null> {
-  const s = await getSettings();
-  return s.lastScanTime;
-}

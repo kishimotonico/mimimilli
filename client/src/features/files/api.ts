@@ -44,5 +44,3 @@ export async function fetchDlsiteInfoByCode(rjCode: string): Promise<DlsiteWorkI
 export function getFsAudioUrl(absolutePath: string): string {
   return `${API_BASE}/media/fs-audio?path=${encodeURIComponent(absolutePath)}`;
 }
-
-export { getFileUrl, getAudioUrl, getCoverImageUrl } from "../../entities/work/api";

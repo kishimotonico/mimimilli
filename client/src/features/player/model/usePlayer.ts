@@ -18,11 +18,8 @@ import { playerCoreAtom, playerCurrentTimeAtom, playerDurationAtom } from "./ato
 import { usePlayerRuntimeContext } from "./PlayerRuntimeProvider";
 import { useAudioEngineLifecycle } from "./useAudioEngineLifecycle";
 import { useResumePersistenceController } from "./useResumePersistence";
-import { formatTime, formatDuration, formatFileSize } from "../../../shared/lib/format";
 import { isPlayerCoreStateEqual, toPlayerCoreState } from "./playerController";
 import { usePlayerActions } from "./usePlayerActions";
-
-export { formatTime, formatDuration, formatFileSize };
 
 export function usePlayerRuntime() {
   const queryClient = useQueryClient();
@@ -127,8 +124,6 @@ export function usePlayerRuntime() {
         }
         case "loadTrack":
           loadTrack(command.item, command.autoplay);
-          break;
-        case "playbackQueueEnded":
           break;
       }
     });

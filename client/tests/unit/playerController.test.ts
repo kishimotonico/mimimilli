@@ -73,7 +73,7 @@ describe("PlayerController scenarios", () => {
     expect(result.commands).toEqual([{ type: "seekAudio", positionSec: 10 }]);
   });
 
-  it("末尾でキュー終了と作品聴了を別コマンドとして通知する", () => {
+  it("末尾で作品聴了を通知する", () => {
     const controller = new PlayerController();
     const commands: string[] = [];
     controller.subscribeCommands((command) => commands.push(command.type));
@@ -81,7 +81,6 @@ describe("PlayerController scenarios", () => {
     controller.dispatch({ type: "audioEnded" });
 
     expect(controller.getState().status).toBe("ended");
-    expect(commands).toContain("playbackQueueEnded");
     expect(commands).toContain("workCompleted");
   });
 
@@ -99,7 +98,6 @@ describe("PlayerController scenarios", () => {
     controller.dispatch({ type: "startRequested", item: fileItem });
     controller.dispatch({ type: "audioEnded" });
 
-    expect(commands).toContain("playbackQueueEnded");
     expect(commands).not.toContain("workCompleted");
   });
 

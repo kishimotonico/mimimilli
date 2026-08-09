@@ -28,9 +28,6 @@ import {
 
 // ── 作品検索（GET /api/works）────────────────────────────────
 
-// 並行作業中の libraryPresentation 向け。shared の WorksQueryInput へのエイリアス。
-export type WorksQueryParams = WorksQueryInput;
-
 export async function searchWorks(
   params: WorksQueryInput,
   options?: { signal?: AbortSignal },

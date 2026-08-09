@@ -12,9 +12,9 @@ import {
   type CollectionStats,
   type FacetAxisId,
   type NormalizedTag,
+  type WorksQueryInput,
 } from "@mimimilli/shared";
 import { ApiRequestError } from "../../../shared/api/http";
-import type { WorksQueryParams } from "../api";
 import type { AxisId, SortId, ViewMode } from "./types";
 import { isFacetAxis, isHomeAxis, isSmartAxis, isViewAxis } from "./axisDefinitions";
 
@@ -99,14 +99,14 @@ function buildTagFilterParams(selectedTags: NormalizedTag[]): TagFilterParams {
 
 /** works 種の結果面（ビュー軸・スマートフォルダー軸）以外は works query を発行しない。
  *  スマートフォルダーは別 query（evalSmartFolder）で取得する。 */
-export function buildWorksParams(input: WorksParamsInput): WorksQueryParams | null {
+export function buildWorksParams(input: WorksParamsInput): WorksQueryInput | null {
   const { activeAxis, sort, searchQuery, selectedTags } = input;
   if (computeResultsPaneKind(activeAxis) !== "works" || isSmartAxis(activeAxis)) return null;
 
-  const p: WorksQueryParams = { sort, ...buildTagFilterParams(selectedTags) };
+  const p: WorksQueryInput = { sort, ...buildTagFilterParams(selectedTags) };
   if (searchQuery) p.q = searchQuery;
   if (isViewAxis(activeAxis) && activeAxis !== "all") {
-    p.view = activeAxis as WorksQueryParams["view"];
+    p.view = activeAxis as WorksQueryInput["view"];
   }
   return p;
 }
