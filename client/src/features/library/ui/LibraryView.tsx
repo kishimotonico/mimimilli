@@ -11,7 +11,7 @@ import {
 import { libraryViewModeAtom } from "../model/atoms";
 import { librarySearchQueryAtom } from "../../../entities/library/model/navigationAtoms";
 import {
-  playerIsPlaybackActiveAtom,
+  playerIsPlayingOrLoadingAtom,
   playingTrackIndexAtom,
   playingWorkIdAtom,
 } from "../../../entities/player/model/atoms";
@@ -79,7 +79,7 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
   const viewMode = useAtomValue(libraryViewModeAtom);
   const playingWorkId = useAtomValue(playingWorkIdAtom);
   const playingTrackIndex = useAtomValue(playingTrackIndexAtom);
-  const isPlaybackActive = useAtomValue(playerIsPlaybackActiveAtom);
+  const isPlaybackActive = useAtomValue(playerIsPlayingOrLoadingAtom);
   const nav = useLibraryNavigation();
   const [smartFolderEditor, setSmartFolderEditor] = useState<SmartFolderEditorState>(
     closedSmartFolderEditorState,

@@ -24,7 +24,7 @@ export const playerIsActiveAtom = atom((get) => {
   return state.currentTrackIndex >= 0 && (state.currentWork !== null || state.isFilePlayback);
 });
 
-export const playerIsPlaybackActiveAtom = atom((get) => get(playerCoreAtom).isPlaying);
+export const playerIsPlayingOrLoadingAtom = atom((get) => get(playerCoreAtom).isPlaying);
 
 export const playingWorkIdAtom = atom((get) => get(playerCoreAtom).currentWork?.id);
 
