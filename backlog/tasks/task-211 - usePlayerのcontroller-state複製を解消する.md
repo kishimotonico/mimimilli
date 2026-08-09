@@ -1,10 +1,10 @@
 ---
 id: TASK-211
 title: usePlayerのcontroller state複製を解消する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-06 04:59'
-updated_date: '2026-08-09 14:31'
+updated_date: '2026-08-09 14:35'
 labels: []
 dependencies: []
 priority: medium

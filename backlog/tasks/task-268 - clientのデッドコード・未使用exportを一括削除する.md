@@ -1,10 +1,10 @@
 ---
 id: TASK-268
 title: clientのデッドコード・未使用exportを一括削除する
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-08-08 21:19'
-updated_date: '2026-08-09 00:57'
+updated_date: '2026-08-09 14:25'
 labels: []
 dependencies: []
 priority: medium
@@ -34,10 +34,12 @@ ordinal: 278000
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 上記の未使用export・ファイル・CSSクラスが削除され、依存テストが整理されていること
-- [ ] #2 scripts/spike/logtape-file-sink が削除されていること
+- [x] #2 scripts/spike/logtape-file-sink が削除されていること
 - [x] #3 clientのcheck・変更範囲のテストが通ること
 - [x] #4 各シンボルの削除前に、直接参照・文字列キー参照（Icon名等）・re-export経由参照が無いことをrgで確認していること
 <!-- AC:END -->
+
+
 
 ## Implementation Notes
 
