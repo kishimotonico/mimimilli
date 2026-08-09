@@ -111,6 +111,27 @@ SQLへ直接移せない規則は、catalog DBにcoreと同じ関数で作った
 
 比較対象は順序付きWork ID列、`total`、ファセット値と件数である。生成テストが反例を出した場合は、SQL結果へ合わせて期待値を緩めず、core契約かSQLのどちらが誤りかを決めて両方を同時に直す。`EXPLAIN QUERY PLAN`と性能計測は同値性を通したクエリに対して行い、その後にindexを決める。
 
+### core↔SQL二重実装の統制
+
+[ADR-0004](0004-core-functions-over-sql.md)が定めた「検索・集計・評価はcoreの純粋関数で行う」という規範のうち、coreを仕様正本とする部分は本ADRが引き継いでいる。realの実行経路をSQLへ移した結果として core と SQL に同一仕様が二重に存在するが、これは無制限に許すものではない。統制の規則を次のとおり定める。
+
+新機能の既定はcore-firstとする。規範形は `evalSmartFolder` で、core の単一実装を fixture と real の両方が呼ぶ。SQLでの再実装は性能上の例外としてのみ認め、認可済みの例外は次の2件に閉じる。
+
+| 例外 | 経路 | 性能理由 | 契約テスト |
+| --- | --- | --- | --- |
+| 作品検索 | `core/worksQuery.ts` の `applyWorksQuery` ↔ `WorkRepo.queryWorks` | user条件を含む絞り込み・ソート・総件数・ページングを1つのSQLスナップショット上で決めるため。全件をメモリへ読む経路を避ける | `server/tests/real/worksQueryContract.test.ts` |
+| 軸ファセット集計 | `core/axisFacets.ts` の `buildAxisFacets` ↔ `WorkRepo.getAxisFacets` | 値ごとの件数・総時間・代表カバーを全件取得なしに集計するため | 同上（ファセット値と件数の同値検証） |
+
+上記2例外の内側でSQL固有の表現になっている断片は、独立した例外として数えない。作品検索の内訳は、RJ/VJコード正規化のCASE式、randomソートのローテーション、`RECENT_VIEW_WINDOW_DAYS` による recent view の期間判定、タグとresumeのEXISTS断片である。これらはSQLフラグメント生成を1モジュールへ集約して同期リスクを下げる。
+
+スマートフォルダーは二重実装ではない。最終評価の `evalSmartFolder` は fixture と real の両方が呼ぶ単一実装であり、SQLの候補抽出は本ADRが定めた2段階評価の第1段にあたる。
+
+例外を増やすには、性能上の必要性を具体的に述べられること、fixture↔realの契約テストがあることの2つを満たしたうえで、本ADRの改訂を必須とする。この2条件を言えないSQL再実装は例外ではなく逸脱として扱い、core化する。
+
+core と SQL で共有する定数・述語は core または shared から export して import する。値やロジックを両側へ書き写さない。SQLの式としてしか表現できないものは、対応するcore関数への参照をコメントで明記し、契約テストで同値を担保する。
+
+タイトルとタグの検索キー・ソートキーに `localeCompare` を使わない規則は、作品検索とファセット集計が返す順序、およびその順序をクライアントが再現・再ソートする経路までを対象とする。ライブラリ外のファイル名一覧（ファイルモードのファイラー表示）は対象外とし、OSのファイラーに近い順序を優先してよい。
+
 ### Work・Playlist・TrackのID
 
 Work、Playlist、Trackはそれぞれ不透明なUUIDを持つ。
