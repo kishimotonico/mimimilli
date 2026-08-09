@@ -6,8 +6,8 @@
 import { atom } from "jotai";
 import { atomWithStorage } from "jotai/utils";
 import type { NormalizedTag, TagPrefix } from "@mimimilli/shared";
-import type { AxisId, GridLayoutMode, SortId, ViewMode } from "../model/types";
-import { getAxisLabel } from "./axisDefinitions";
+import type { AxisId, GridLayoutMode, SortId, ViewMode } from "../../../entities/library/types";
+import { getAxisLabel } from "../../../entities/library/axisDefinitions";
 import { DEFAULT_AXIS_VALUE_SORT, type AxisValueSortState } from "./axisValueSort";
 
 // ライブラリ検索語。URLの q= パラメータへ同期する（useNavigationHistory）。localStorage には保存しない。

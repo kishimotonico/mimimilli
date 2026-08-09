@@ -1,17 +1,15 @@
 import { buildBuiltinAxisTag, splitSelectedTags, type NormalizedTag } from "@mimimilli/shared";
-import { isViewAxis } from "../../library/model/axisDefinitions";
-import type { AxisId, SortId } from "../../library/model/types";
+import type { AppMode } from "../../../shared/model/appMode";
+import { isViewAxis } from "../axisDefinitions";
+import type { AxisId, SortId } from "../types";
 
-export type AppMode = "library" | "files";
+export type { AppMode };
 
 export interface LibraryUrlState {
   activeAxis: AxisId;
-  /** 全軸共通のタグフィルタ（ADR-0012 §2）。year 軸のような組み込み軸も
-   *  "year/2024" 形式の擬似タグとしてここに載る */
   selectedTags: NormalizedTag[];
   selectedWorkId: string | null;
   sort: SortId;
-  /** 検索キーワード。空文字はURLに出さない。省略時は復元経路未対応の呼び出し元向けに空扱い */
   q?: string;
 }
 
@@ -40,8 +38,6 @@ export const DEFAULT_LIBRARY_URL_STATE: LibraryUrlState = {
   q: "",
 };
 
-// ビュー軸（ドリル不可）。それ以外のセグメントは tag / smart-* を除きファセット軸
-// （year または任意の prefix 軸）として受理する（ADR-0005: 軸IDの動的化）
 const SORTS = new Set<SortId>([
   "added-desc",
   "added-asc",
@@ -92,7 +88,6 @@ function parseAxis(value: string): AxisId | null {
   if (value.startsWith("smart-")) {
     return value.length > "smart-".length ? value : null;
   }
-  // ファセット軸（year / 任意 prefix）。prefix は正規形（小文字）で扱う
   return value.toLowerCase();
 }
 
@@ -100,10 +95,6 @@ function uniqueNonEmpty(values: string[]): string[] {
   return [...new Set(values.filter((value) => value.length > 0))];
 }
 
-/** URLの tags= を検証する。UI操作は擬似タグの単一選択・既知軸を常に強制するが、
- *  URLは直接編集され得るため、ここで同じ制約を検証する（ADR-0012 §2）。
- *  未知の組み込み軸・複数の year 擬似タグ・正規化後に空になるタグは黙って残さず、
- *  警告付きで拒否・正規化する（splitSelectedTags の検証を shared から流用する）。 */
 function parseAndValidateSelectedTags(rawValues: string[], warnings: string[]): NormalizedTag[] {
   const { tags, yearValue, warnings: splitWarnings } = splitSelectedTags(uniqueNonEmpty(rawValues));
   for (const warning of splitWarnings) warnings.push(`選択タグを検証しました: ${warning}`);

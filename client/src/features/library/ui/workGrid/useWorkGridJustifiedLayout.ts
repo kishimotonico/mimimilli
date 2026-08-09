@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from "react";
 import type { WorkListItem } from "@mimimilli/shared";
-import { GRID_COLUMN_GAP, GRID_TILE_CHROME_HEIGHT } from "../../model/gridSizing";
+import { GRID_COLUMN_GAP, GRID_TILE_CHROME_HEIGHT } from "../../../../shared/lib/gridSizing";
 import { computeJustifiedLayout, type JustifiedLayout } from "../../model/justifiedLayout";
 import type { VirtualGridJustifiedLayout } from "../../../../shared/ui/useVirtualGrid";
 import { groupJustifiedRows, isJustifiedLayoutRevision } from "./justifiedRows";

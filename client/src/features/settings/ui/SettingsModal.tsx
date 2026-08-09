@@ -5,9 +5,9 @@ import {
   dlsiteBulkActiveAtom,
   dlsiteBulkProgressAtom,
   dlsiteBulkStartingAtom,
-} from "../../dlsite/model/atoms";
-import { useDlsiteBulkActions } from "../../dlsite/model/useDlsiteBulkActions";
-import { scanningAtom, scanProgressLabelAtom } from "../../scan/model/atoms";
+} from "../../../entities/dlsite/model/bulkAtoms";
+import { useDlsiteBulkActions } from "../../../entities/dlsite/useDlsiteBulkActions";
+import { scanningAtom, scanProgressLabelAtom } from "../../../entities/scan/model/atoms";
 import TagPrefixSettings from "./TagPrefixSettings";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
 import { formatLastScanTime } from "../../../shared/lib/format";

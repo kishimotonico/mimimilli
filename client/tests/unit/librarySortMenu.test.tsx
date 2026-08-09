@@ -8,11 +8,8 @@ import { describe, expect, it } from "vitest";
 import type { SmartFolder } from "@mimimilli/shared";
 import LibrarySortMenu from "../../src/features/library/ui/LibrarySortMenu";
 import { LibraryNavigationProvider } from "../../src/features/library/ui/LibraryNavigationProvider";
-import {
-  activeAxisAtom,
-  axisValueSortAtom,
-  sortAtom,
-} from "../../src/features/library/model/atoms";
+import { activeAxisAtom, sortAtom } from "../../src/entities/library/model/navigationAtoms";
+import { axisValueSortAtom } from "../../src/features/library/model/atoms";
 import { SMART_FOLDER_QUERY_KEYS } from "../../src/entities/smart-folder/queryKeys";
 
 const SMART_FOLDER: SmartFolder = {

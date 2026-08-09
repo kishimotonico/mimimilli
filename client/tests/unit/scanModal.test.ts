@@ -8,9 +8,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ScanJobSnapshot, ScanResult, Work } from "@mimimilli/shared";
 import ScanModal from "../../src/features/scan/ui/ScanModal";
 import * as workApi from "../../src/entities/work/api";
-import { scanActionsAtom, scanJobAtom } from "../../src/features/scan/model/atoms";
+import { scanActionsAtom, scanJobAtom } from "../../src/entities/scan/model/atoms";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
-import { libraryTotalQueryOptions } from "../../src/features/library/model/useLibraryQueries";
+import { libraryTotalQueryOptions } from "../../src/entities/work/libraryTotalQueryOptions";
 
 beforeEach(() => {
   HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) {

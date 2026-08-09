@@ -15,30 +15,16 @@ import {
   type WorksQueryInput,
 } from "@mimimilli/shared";
 import { ApiRequestError } from "../../../shared/api/http";
-import type { AxisId, SortId, ViewMode } from "./types";
-import { isFacetAxis, isHomeAxis, isSmartAxis, isViewAxis } from "./axisDefinitions";
+import type { AxisId, SortId, ViewMode } from "../../../entities/library/types";
+import { isSmartAxis, isViewAxis } from "../../../entities/library/axisDefinitions";
+import { computeResultsPaneKind } from "../../../entities/library/resultsPane";
+
+export { computeResultsPaneKind } from "../../../entities/library/resultsPane";
 
 // 組み込み軸の擬似タグ（year 等、ADR-0012 §2）の構築・解析・検証は shared/pseudoTag.ts に
 // 集約している（client・server の両方が同じ実装を使うため）。isBuiltinPseudoTagAxis /
 // buildBuiltinAxisTag / parseBuiltinAxisTag / splitSelectedTags は @mimimilli/shared から
 // 直接importする。
-
-// ── 結果面の種類（ADR-0012: ナビゲーション状態・表示設定・絞り込み状態の分離） ──
-
-type ResultsPaneKind = "home" | "value-list" | "works";
-
-/**
- * 軸だけから決まる結果面の種類。絞り込み状態（selectedTags）や表示設定（viewMode）には
- * 依存しない — 軸は値をブラウズするためのビューであり、選択状態を持たない（ADR-0012 §1）。
- *   - home: 発見ダッシュボード
- *   - value-list: facet 軸・タグ軸の値一覧
- *   - works: 作品一覧（ビュー軸・スマートフォルダー軸）
- */
-export function computeResultsPaneKind(axis: AxisId): ResultsPaneKind {
-  if (isHomeAxis(axis)) return "home";
-  if (isFacetAxis(axis) || axis === "tag") return "value-list";
-  return "works";
-}
 
 /** グリッド／リストの決定は libraryViewModeAtom のみに依存する（ADR-0012 §3・§5）。
  *  works（作品一覧）・value-list（値一覧）の両方がグリッド表示に従う。home はグリッド概念を持たない。 */

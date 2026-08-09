@@ -8,7 +8,7 @@ import DlsiteBulkRuntime from "../../src/features/dlsite/ui/DlsiteBulkRuntime";
 import ScanRuntime from "../../src/features/scan/ui/ScanRuntime";
 import { PlayerRuntimeProvider } from "../../src/features/player/model/PlayerRuntimeProvider";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
-import * as settingsApi from "../../src/features/settings/api";
+import * as settingsApi from "../../src/entities/settings/api";
 import * as scanApi from "../../src/features/scan/api";
 
 const runningJob = {

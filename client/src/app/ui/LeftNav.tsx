@@ -1,6 +1,6 @@
 import { useAtomValue, useSetAtom } from "jotai";
-import { appModeAtom, setAppModeAtom } from "../../features/navigation/model/navigationAtoms";
-import { playerIsActiveAtom } from "../../features/player/model/atoms";
+import { appModeAtom, setAppModeAtom } from "../../shared/model/appModeAtoms";
+import { playerIsActiveAtom } from "../../entities/player/model/atoms";
 import { I, type IconName } from "../../shared/ui/Icon";
 
 interface SurfaceItem {

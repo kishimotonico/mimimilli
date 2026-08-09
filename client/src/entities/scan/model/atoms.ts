@@ -3,8 +3,7 @@
 
 import { atom } from "jotai";
 import type { ScanJobSnapshot, StartScanRequest } from "@mimimilli/shared";
-import { formatScanProgressLabel } from "../model";
-import type { ScanProgress } from "../model";
+import { formatScanProgressLabel, type ScanProgress } from "./scanProgressLabel";
 import { isTerminalScanJob } from "./scanJob";
 
 export const scanJobAtom = atom<ScanJobSnapshot | null>(null);

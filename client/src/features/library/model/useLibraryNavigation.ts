@@ -5,8 +5,13 @@
 import { useContext, useTransition } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
 import type { NormalizedTag } from "@mimimilli/shared";
-import type { AxisId, SortId } from "../model/types";
-import { activeAxisAtom, selectedTagsAtom, selectedWorkIdAtom, sortAtom } from "./atoms";
+import type { AxisId, SortId } from "../../../entities/library/types";
+import {
+  activeAxisAtom,
+  selectedTagsAtom,
+  selectedWorkIdAtom,
+  sortAtom,
+} from "../../../entities/library/model/navigationAtoms";
 import {
   addLibraryTagAtom,
   clearLibraryTagsAtom,
@@ -17,7 +22,7 @@ import {
   setLibraryAxisAtom,
   setLibrarySortAtom,
   toggleLibraryTagAtom,
-} from "./libraryNavigationActions";
+} from "../../../entities/library/model/navigationActions";
 import { LibraryNavigationContext } from "./libraryNavigationContext";
 
 export interface LibraryViewState {

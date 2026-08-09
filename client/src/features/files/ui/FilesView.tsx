@@ -9,16 +9,16 @@ import { useAtomValue } from "jotai";
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import { browseFs } from "../api";
 import { useFilesNavigation } from "../model/useFilesNavigation";
-import { filesDirectionAtom } from "../model/atoms";
+import { filesDirectionAtom } from "../../../entities/files/model/navigationAtoms";
 import { buildFolderAudioQueue } from "../model/filePlayback";
 import { classifyFile } from "../model/types";
-import { usePlayerActions } from "../../player/model/usePlayerActions";
+import type { PlaybackTrack } from "../../../entities/player/model/playbackTrack";
 import {
   playerIsPlaybackActiveAtom,
   playingFsPathAtom,
   playingTrackRelPathAtom,
   playingWorkIdAtom,
-} from "../../player/model/atoms";
+} from "../../../entities/player/model/atoms";
 import { rootLabel, type FsEntry } from "../model/types";
 import { FILE_SYSTEM_QUERY_KEYS } from "../../../entities/file-system/queryKeys";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
@@ -53,10 +53,10 @@ function ColstackBackButton({ parentName, depth, onGoUp }: ColstackBackButtonPro
 
 interface FilesViewProps {
   rootFolder: string;
+  onPlayFile: (tracks: PlaybackTrack[], trackIndex: number) => void;
 }
 
-export default function FilesView({ rootFolder }: FilesViewProps) {
-  const player = usePlayerActions();
+export default function FilesView({ rootFolder, onPlayFile }: FilesViewProps) {
   const nav = useFilesNavigation(rootFolder);
   const direction = useAtomValue(filesDirectionAtom);
   const playingWorkId = useAtomValue(playingWorkIdAtom);
@@ -75,9 +75,9 @@ export default function FilesView({ rootFolder }: FilesViewProps) {
       if (classifyFile(entry) !== "audio") return;
       const { tracks, trackIndex } = buildFolderAudioQueue(folderEntries, entry);
       if (tracks.length === 0) return;
-      player.playFile(tracks, trackIndex);
+      onPlayFile(tracks, trackIndex);
     },
-    [player],
+    [onPlayFile],
   );
 
   const matchPlaying = useMemo(

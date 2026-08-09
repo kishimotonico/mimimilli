@@ -1,6 +1,7 @@
 import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
 import { TAG_QUERY_KEYS } from "../../../entities/tag/queryKeys";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
+import type { QueryClient } from "@tanstack/react-query";
 
 /**
  * DLsite連携（単発のRJコード適用・一括取得）後にどのキャッシュを無効化するか。
@@ -13,8 +14,6 @@ import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
  * 起きる原因になっていたため、一括取得の完了時は実際に処理対象だった
  * （skippedでない）作品IDの配列を渡し、その作品の詳細キャッシュだけを
  * 無効化するようにする（DlsiteBulkRuntime.tsx参照）。
- *
- * 単発適用（DlsiteEditor.tsx）は従来どおり単一workIdまたはundefinedで呼ぶ。
  */
 export function getDlsiteInvalidationKeys(workIds?: string | string[]) {
   const detailKeys =
@@ -29,4 +28,15 @@ export function getDlsiteInvalidationKeys(workIds?: string | string[]) {
     SMART_FOLDER_QUERY_KEYS.allWorks(),
     ...detailKeys,
   ] as const;
+}
+
+export async function invalidateDlsiteCache(
+  queryClient: QueryClient,
+  workIds?: string | string[],
+): Promise<void> {
+  await Promise.all(
+    getDlsiteInvalidationKeys(workIds).map((queryKey) =>
+      queryClient.invalidateQueries({ queryKey }),
+    ),
+  );
 }

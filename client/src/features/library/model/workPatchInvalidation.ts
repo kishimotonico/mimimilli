@@ -3,8 +3,8 @@
 // アクティブ一覧の直接更新/reset と非表示キャッシュの stale 化に棚分けする。
 
 import type { NormalizedTag, Work, WorkPatch, WorkPatchInput } from "@mimimilli/shared";
-import type { SortId } from "./types";
-import { isSmartAxis } from "./axisDefinitions";
+import type { SortId } from "../../../entities/library/types";
+import { isSmartAxis } from "../../../entities/library/axisDefinitions";
 import { computeResultsPaneKind } from "./libraryPresentation";
 
 export interface LibraryListContext {

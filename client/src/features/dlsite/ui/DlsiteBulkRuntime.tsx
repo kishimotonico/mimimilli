@@ -14,7 +14,7 @@ import {
   createSseGeneration,
   parseTypedSseMessage,
 } from "../../../shared/api/sseTransport";
-import { getDlsiteInvalidationKeys } from "../model/dlsiteInvalidation";
+import { invalidateDlsiteCache } from "../model/dlsiteInvalidation";
 import {
   dlsiteBulkActionsAtom,
   dlsiteBulkActiveAtom,
@@ -24,8 +24,9 @@ import {
   dlsiteBulkErrorAtom,
   dlsiteBulkProgressAtom,
   dlsiteBulkResultAtom,
+  dlsiteInvalidateAtom,
   type DlsiteBulkActions,
-} from "../model/atoms";
+} from "../../../entities/dlsite/model/bulkAtoms";
 
 type TerminalEvent = Extract<DlsiteBulkProgressEvent, { type: "complete" | "cancelled" | "error" }>;
 
@@ -47,14 +48,11 @@ export default function DlsiteBulkRuntime() {
   const setCancelledResult = useSetAtom(dlsiteBulkCancelledResultAtom);
   const setError = useSetAtom(dlsiteBulkErrorAtom);
   const setActions = useSetAtom(dlsiteBulkActionsAtom);
+  const setInvalidate = useSetAtom(dlsiteInvalidateAtom);
 
   const invalidateDlsiteQueries = useCallback(
-    (workIds?: string[]) => {
-      void Promise.all(
-        getDlsiteInvalidationKeys(workIds).map((queryKey) =>
-          queryClient.invalidateQueries({ queryKey }),
-        ),
-      );
+    (workIds?: string | string[]) => {
+      void invalidateDlsiteCache(queryClient, workIds);
     },
     [queryClient],
   );
@@ -124,6 +122,12 @@ export default function DlsiteBulkRuntime() {
     setActions(actions);
     return () => setActions(null);
   }, [actions, setActions]);
+
+  useEffect(() => {
+    const invalidate = (workIds?: string | string[]) => invalidateDlsiteCache(queryClient, workIds);
+    setInvalidate(invalidate);
+    return () => setInvalidate(null);
+  }, [queryClient, setInvalidate]);
 
   useEffect(() => {
     if (!active) return;

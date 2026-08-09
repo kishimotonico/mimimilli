@@ -6,26 +6,26 @@ import {
   selectedTagsAtom,
   selectedWorkIdAtom,
   sortAtom,
-} from "../../library/model/atoms";
+} from "../../../entities/library/model/navigationAtoms";
 import {
   filesDirectionAtom,
   filesRelPathAtom,
   filesSelectedPathAtom,
-} from "../../files/model/atoms";
-import { joinPath, relSegments } from "../../files/model/types";
-import { useRootFolder } from "../../settings/useSettingsQuery";
-import { appModeAtom } from "./navigationAtoms";
+} from "../../../entities/files/model/navigationAtoms";
+import { joinPath, relSegments } from "../../../shared/lib/fsPath";
+import { useRootFolder } from "../../../entities/settings/useSettingsQuery";
+import { appModeAtom } from "../../../shared/model/appModeAtoms";
 import {
   consumeNavigationHistoryCommitAtom,
   navigationHistoryCommitAtom,
   navigationHistoryStateAtom,
-} from "./navigationHistoryAtoms";
+} from "../../../shared/model/navigationHistoryAtoms";
 import {
   parseNavigationUrl,
   serializeNavigationUrl,
   type NavigationParseResult,
   type NavigationUrlState,
-} from "./navigationUrl";
+} from "../../../entities/library/model/navigationUrl";
 
 const HISTORY_STATE_KEY = "__mimimilliNavigation";
 const MAX_INDEX_KEY = "mimimilli.navigation.maxIndex";
@@ -104,8 +104,6 @@ export function useNavigationHistory(): void {
   const initializedRef = useRef(false);
   const [ready, setReady] = useState(false);
 
-  // 履歴インデックスは ref が唯一の保持先。派生の可否だけを atom へ公開する
-  // （state を持って effect で atom へ写すと余分なレンダーが1往復増える）。
   const publishHistoryState = useCallback(() => {
     setNavigationHistoryState({
       canBack: currentIndexRef.current > 0,

@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { describe, expect, it, vi } from "vitest";
 import type { Track, WorkSummary } from "../../src/entities/work/model";
-import { PLAYER_CORE_INITIAL, type PlayerCoreState } from "../../src/features/player/model/atoms";
+import { PLAYER_CORE_INITIAL, type PlayerCoreState } from "../../src/entities/player/model/atoms";
 import BarContent from "../../src/features/player/ui/BarContent";
 
 const tracks: Track[] = [

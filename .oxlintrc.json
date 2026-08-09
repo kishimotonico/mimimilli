@@ -44,6 +44,179 @@
           }
         ]
       }
+    },
+    {
+      "files": ["**/client/src/shared/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "**/entities/**",
+                  "../entities/**",
+                  "../../entities/**",
+                  "../../../entities/**",
+                  "../../../../entities/**",
+                  "**/features/**",
+                  "../features/**",
+                  "../../features/**",
+                  "../../../features/**",
+                  "../../../../features/**",
+                  "**/app/**",
+                  "../app/**",
+                  "../../app/**",
+                  "../../../app/**",
+                  "../../../../app/**"
+                ],
+                "message": "shared から entities/features/app への import は禁止"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["**/client/src/entities/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "**/features/**",
+                  "../features/**",
+                  "../../features/**",
+                  "../../../features/**",
+                  "../../../../features/**",
+                  "**/app/**",
+                  "../app/**",
+                  "../../app/**",
+                  "../../../app/**",
+                  "../../../../app/**"
+                ],
+                "message": "entities から features/app への import は禁止"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["**/client/src/features/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "**/app/**",
+                  "../app/**",
+                  "../../app/**",
+                  "../../../app/**",
+                  "../../../../app/**"
+                ],
+                "message": "features から app への import は禁止"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["**/server/src/routes/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**/adapters/real/**", "../adapters/real/**", "../../adapters/real/**"],
+                "message": "routes から adapters/real への直接 import は禁止"
+              },
+              {
+                "group": [
+                  "**/adapters/fixture/**",
+                  "../adapters/fixture/**",
+                  "../../adapters/fixture/**"
+                ],
+                "message": "routes から adapters/fixture への直接 import は禁止"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["**/server/src/adapters/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**/routes/**", "../routes/**", "../../routes/**"],
+                "message": "adapters から routes への import は禁止"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["**/server/src/adapters/fixture/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**/adapters/real/**", "../real/**", "../../real/**"],
+                "message": "adapters/fixture から adapters/real への import は禁止"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["**/server/src/adapters/real/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**/adapters/fixture/**", "../fixture/**", "../../fixture/**"],
+                "message": "adapters/real から adapters/fixture への import は禁止"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["**/server/src/core/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**/routes/**", "../routes/**", "../../routes/**"],
+                "message": "core から routes への import は禁止"
+              },
+              {
+                "group": ["**/adapters/**", "../adapters/**", "../../adapters/**"],
+                "message": "core から adapters への import は禁止"
+              }
+            ]
+          }
+        ]
+      }
     }
   ]
 }

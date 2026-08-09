@@ -7,7 +7,7 @@ import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import SettingsModal from "../../src/features/settings/ui/SettingsModal";
-import { dlsiteBulkActionsAtom } from "../../src/features/dlsite/model/atoms";
+import { dlsiteBulkActionsAtom } from "../../src/entities/dlsite/model/bulkAtoms";
 
 beforeEach(() => {
   HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) {

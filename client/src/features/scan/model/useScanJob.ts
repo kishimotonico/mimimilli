@@ -7,8 +7,8 @@ import {
   connectSse,
 } from "../../../shared/api/sseTransport";
 import { cancelScan, getActiveScan, getScanJob, ScanAlreadyActiveError, startScan } from "../api";
-import type { ScanActionResult } from "./atoms";
-import { isTerminalScanJob } from "./scanJob";
+import type { ScanActionResult } from "../../../entities/scan/model/atoms";
+import { isTerminalScanJob } from "../../../entities/scan/model/scanJob";
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "スキャン状態の取得に失敗しました";

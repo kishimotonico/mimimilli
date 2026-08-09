@@ -15,7 +15,7 @@ import {
   GRID_TILE_CHROME_HEIGHT,
   clampTileSize,
   computeGridColumnCount,
-} from "../../features/library/model/gridSizing";
+} from "../lib/gridSizing";
 import { shouldLoadMore } from "../lib/virtualScroll";
 
 export interface VirtualGridPadding {

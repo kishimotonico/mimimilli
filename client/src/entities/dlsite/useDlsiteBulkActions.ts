@@ -1,6 +1,6 @@
 import { useStore } from "jotai";
 import { useMemo } from "react";
-import { dlsiteBulkActionsAtom } from "./atoms";
+import { dlsiteBulkActionsAtom } from "./model/bulkAtoms";
 
 function requireActions(store: ReturnType<typeof useStore>) {
   const actions = store.get(dlsiteBulkActionsAtom);
@@ -10,7 +10,6 @@ function requireActions(store: ReturnType<typeof useStore>) {
   return actions;
 }
 
-/** DLsite 一括取得の操作のみ。状態 atom は購読しない */
 export function useDlsiteBulkActions() {
   const store = useStore();
 

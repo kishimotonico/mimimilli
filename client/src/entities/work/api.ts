@@ -12,6 +12,7 @@ import {
 } from "../../shared/api/http";
 import {
   workSchema,
+  worksPageSchema,
   dlsiteWorkInfoSchema,
   dlsiteBulkStartResponseSchema,
   dlsiteBulkCancelResponseSchema,
@@ -28,7 +29,33 @@ import {
   type DlsiteApplyBody,
   type DlsiteStatePatch,
   type ResumeBody,
+  type WorksPage,
+  type WorksQueryInput,
 } from "@mimimilli/shared";
+
+function appendTagsTagOp(
+  params: URLSearchParams,
+  filter: { tags?: string[]; tagOp?: "AND" | "OR" },
+): void {
+  for (const tag of filter.tags ?? []) params.append("tags", tag);
+  if (filter.tagOp) params.set("tagOp", filter.tagOp);
+}
+
+export async function searchWorks(
+  params: WorksQueryInput,
+  options?: { signal?: AbortSignal },
+): Promise<WorksPage> {
+  const p = new URLSearchParams();
+  if (params.q) p.set("q", params.q);
+  appendTagsTagOp(p, params);
+  if (params.view) p.set("view", params.view);
+  if (params.sort) p.set("sort", params.sort);
+  if (params.seed !== undefined) p.set("seed", String(params.seed));
+  if (params.page !== undefined) p.set("page", String(params.page));
+  if (params.limit !== undefined) p.set("limit", String(params.limit));
+  const q = p.toString();
+  return getParsed(worksPageSchema, `/works${q ? `?${q}` : ""}`, options);
+}
 
 /** GET /works/:id は存在しない場合404を返す契約。呼び出し側はnull分岐でなくエラー（TanStack QueryのisError等）で扱う */
 export async function getWork(id: string): Promise<Work> {

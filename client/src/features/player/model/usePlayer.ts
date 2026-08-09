@@ -14,7 +14,11 @@ import type { Work } from "../../../entities/work/model";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { useMediaSession } from "./useMediaSession";
 import { toAudioAbsoluteTime, getTrackDurationSec } from "./trackTime";
-import { playerCoreAtom, playerCurrentTimeAtom, playerDurationAtom } from "./atoms";
+import {
+  playerCoreAtom,
+  playerCurrentTimeAtom,
+  playerDurationAtom,
+} from "../../../entities/player/model/atoms";
 import { usePlayerRuntimeContext } from "./PlayerRuntimeProvider";
 import { useAudioEngineLifecycle } from "./useAudioEngineLifecycle";
 import { useResumePersistenceController } from "./useResumePersistence";

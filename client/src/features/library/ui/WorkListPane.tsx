@@ -1,15 +1,15 @@
 import { useCallback, type ReactNode } from "react";
 import { useAtomValue } from "jotai";
 import type { WorkListItem } from "@mimimilli/shared";
-import type { AxisId } from "../model/types";
-import { isSmartAxis } from "../model/axisDefinitions";
+import type { AxisId } from "../../../entities/library/types";
+import { isSmartAxis } from "../../../entities/library/axisDefinitions";
 import { buildEmptyWorksHint, buildEmptyWorksMessage } from "../model/emptyWorks";
 import WorkRow from "./WorkRow";
 import CollectionStatus from "../../../shared/ui/CollectionStatus";
 import LoadMore from "./LoadMore";
 import { I } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
-import { dockedBarActiveAtom } from "../../player/model/atoms";
+import { dockedBarActiveAtom } from "../../../entities/player/model/atoms";
 import { useVirtualList } from "../../../shared/ui/useVirtualList";
 
 // 作品一覧のリスト表示（list/grid のうち list）。ADR-0012 §3 によりレイアウトを固定し、

@@ -6,7 +6,6 @@ export type NavigationHistoryCommit = "push" | "replace";
 export interface NavigationHistoryCommitState {
   kind: NavigationHistoryCommit;
   revision: number;
-  /** useNavigationHistory が未消費のバッチか。false なら次の宣言は kind をそのまま採用する。 */
   pending: boolean;
 }
 

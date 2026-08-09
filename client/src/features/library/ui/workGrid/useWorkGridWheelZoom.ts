@@ -1,5 +1,5 @@
 import { useEffect, type RefObject } from "react";
-import { clampTileSize } from "../../model/gridSizing";
+import { clampTileSize } from "../../../../shared/lib/gridSizing";
 
 export function useWorkGridWheelZoom(
   paneRef: RefObject<HTMLElement | null>,

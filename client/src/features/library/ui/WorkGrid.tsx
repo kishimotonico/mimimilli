@@ -1,16 +1,16 @@
 import { useCallback, useRef, useState, type ReactNode } from "react";
 import { useAtom, useAtomValue } from "jotai";
-import type { AxisId } from "../model/types";
+import type { AxisId } from "../../../entities/library/types";
 import { libraryGridLayoutModeAtom, libraryTileSizeAtom } from "../model/atoms";
 import type { WorkListItem } from "@mimimilli/shared";
 import Button from "../../../shared/ui/Button";
 import { I } from "../../../shared/ui/Icon";
-import { GRID_COLUMN_GAP, GRID_ROW_GAP, clampTileSize } from "../model/gridSizing";
+import { GRID_COLUMN_GAP, GRID_ROW_GAP, clampTileSize } from "../../../shared/lib/gridSizing";
 import { buildEmptyWorksHint, buildEmptyWorksMessage } from "../model/emptyWorks";
-import { isSmartAxis } from "../model/axisDefinitions";
+import { isSmartAxis } from "../../../entities/library/axisDefinitions";
 import CollectionStatus from "../../../shared/ui/CollectionStatus";
 import LoadMore from "./LoadMore";
-import { dockedBarActiveAtom } from "../../player/model/atoms";
+import { dockedBarActiveAtom } from "../../../entities/player/model/atoms";
 import { useVirtualGrid } from "../../../shared/ui/useVirtualGrid";
 import {
   GRID_DOCKED_BAR_EXTRA,

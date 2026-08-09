@@ -9,7 +9,7 @@ import IconButton from "../../../../shared/ui/IconButton";
 import { I } from "../../../../shared/ui/Icon";
 import { useDialogModal } from "../../../../shared/ui/useDialogModal";
 import { WORK_QUERY_KEYS } from "../../../../entities/work/queryKeys";
-import { getDlsiteInvalidationKeys } from "../../../dlsite/model/dlsiteInvalidation";
+import { useDlsiteInvalidation } from "../../../../entities/dlsite/useDlsiteInvalidation";
 import {
   buildDlsiteApplyBody,
   dlsiteInfoTags,
@@ -145,6 +145,7 @@ function DlsiteApplyDialog({
 
 export function DlsiteEditor({ work }: { work: Work }) {
   const queryClient = useQueryClient();
+  const invalidateDlsiteCache = useDlsiteInvalidation();
   const [rjCode, setRjCode] = useState(work.dlsite.rjCode ?? "");
   const [info, setInfo] = useState<DlsiteWorkInfo | null>(null);
   const [applyTitle, setApplyTitle] = useState(true);
@@ -157,11 +158,7 @@ export function DlsiteEditor({ work }: { work: Work }) {
 
   const refresh = async (updated?: Work) => {
     if (updated) queryClient.setQueryData(WORK_QUERY_KEYS.detail(work.id), updated);
-    await Promise.all(
-      getDlsiteInvalidationKeys(updated ? undefined : work.id).map((queryKey) =>
-        queryClient.invalidateQueries({ queryKey }),
-      ),
-    );
+    await invalidateDlsiteCache(updated ? undefined : work.id);
   };
 
   const saveCode = async () => {

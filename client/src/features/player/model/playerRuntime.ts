@@ -1,5 +1,5 @@
 import type { AudioEngine } from "./audioEngine";
-import type { PlayerCoreState } from "./atoms";
+import type { PlayerCoreState } from "../../../entities/player/model/atoms";
 import type { PlaybackSource } from "./playerController";
 import type { PlaybackTrack } from "./trackTime";
 

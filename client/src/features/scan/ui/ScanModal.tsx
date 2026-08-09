@@ -5,15 +5,15 @@ import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import { getDefaultPlaylistTrackCount, type ScanResult, type Work } from "@mimimilli/shared";
 import { getWork, patchWork } from "../../../entities/work/api";
 import { mutationErrorMessage } from "../../../shared/lib/mutationError";
-import { libraryTotalQueryOptions } from "../../library/model/useLibraryQueries";
+import { libraryTotalQueryOptions } from "../../../entities/work/libraryTotalQueryOptions";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 import { cn } from "../../../shared/lib/cn";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
 import { scanPhaseLabel, type ScanProgress } from "../model";
-import { scanningAtom, scanProgressAtom } from "../model/atoms";
-import { useScanActions } from "../model/useScanActions";
+import { scanningAtom, scanProgressAtom } from "../../../entities/scan/model/atoms";
+import { useScanActions } from "../../../entities/scan/useScanActions";
 import { getLastScanResult, SCAN_QUERY_KEYS } from "../api";
 import { formatLastScanTime } from "../../../shared/lib/format";
 

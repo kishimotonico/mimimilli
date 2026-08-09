@@ -2,6 +2,10 @@
 // React に依存せず、usePlayer フックから useRef で保持して使う。
 // 副作用（再生状態・時刻）は callback で通知し、フック側で state/atom に反映する。
 
+import type { AudioEngineError } from "../../../shared/model/audioEngineError";
+
+export type { AudioEngineError } from "../../../shared/model/audioEngineError";
+
 export interface AudioEngineCallbacks {
   onPlay: () => void;
   onPause: () => void;
@@ -11,13 +15,6 @@ export interface AudioEngineCallbacks {
   /** トラック再生終了時。自動送りするか、ループするかはフック側が判断する。 */
   onEnded: (looping: boolean) => void;
   onError: (error: AudioEngineError) => void;
-}
-
-export interface AudioEngineError {
-  source: "play" | "media";
-  name?: string;
-  code?: number;
-  message: string;
 }
 
 export interface AudioEngine {

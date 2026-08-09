@@ -12,7 +12,7 @@ import {
   playerCurrentTimeAtom,
   playerDurationAtom,
   playerCoreAtom,
-} from "../../src/features/player/model/atoms";
+} from "../../src/entities/player/model/atoms";
 import { saveResumePosition } from "../../src/features/player/api";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import type { ResolvedTrack, Track, Work, WorkSummary } from "../../src/entities/work/model";

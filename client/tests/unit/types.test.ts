@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { SORT_OPTIONS } from "../../src/features/library/model/types";
+import { SORT_OPTIONS } from "../../src/entities/library/types";
 
 describe("types constants", () => {
   it("has correct sort options", () => {

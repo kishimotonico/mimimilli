@@ -2,7 +2,7 @@
 // BarSeekStrip / PopupSeek / FullScreenScrub の3 leaf だけが呼び出すこと。
 
 import { useAtomValue } from "jotai";
-import { playerCurrentTimeAtom, playerDurationAtom } from "./atoms";
+import { playerCurrentTimeAtom, playerDurationAtom } from "../../../entities/player/model/atoms";
 
 export interface PlaybackProgress {
   currentTime: number;

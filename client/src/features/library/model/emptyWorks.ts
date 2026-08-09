@@ -1,7 +1,7 @@
 // 作品リストが0件のときの案内メッセージ。
 // リスト表示・グリッド表示の両方から参照する単一実装に統一する。
 
-import type { AxisId } from "./types";
+import type { AxisId } from "../../../entities/library/types";
 
 // 検索語・選択中フィルタ（selectedTagsAtom）が原因で0件になっているかどうかを踏まえて
 // メッセージを組み立てる。どちらも効いていない場合は「そもそもこの軸に作品がない」

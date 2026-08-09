@@ -1,17 +1,8 @@
-// 常駐再生UIの外枠。「画面下張り付きバー」⇄「右下ポップアップ」の2層を切り替える。
-// - 表示/非表示（isPlaying）: 再生開始時に画面下からスライドイン、停止時にスライドアウト
-//   （一時停止中は currentWork が残る限り表示し続ける。× ボタンは置かない）
-// - バー/ポップアップの切替: 2つの AnimatePresence を並置。退出完了後に入場（enter側だけ180ms遅延）
-// - どちらを使っていたかは playerUiModeAtom（localStorage）で記憶・復元する
-
-import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import { useAtom, useAtomValue } from "jotai";
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import { useCallback, useState } from "react";
-import { selectLibraryWorkAtom } from "../../library/model/libraryNavigationActions";
-import { useLibraryNavigation } from "../../library/model/useLibraryNavigation";
-import { setAppModeAtom } from "../../navigation/model/navigationAtoms";
 import { type MotionVariant, useMotionVariants } from "../../../shared/ui/useMotionVariants";
-import { playerIsActiveAtom, playerUiModeAtom } from "../model/atoms";
+import { playerIsActiveAtom, playerUiModeAtom } from "../../../entities/player/model/atoms";
 import { usePlayerActions } from "../model/usePlayerActions";
 import { usePlayerState, type PlayerState } from "../model/usePlayerState";
 import BarContent from "./BarContent";
@@ -75,24 +66,23 @@ function DockPopup({ variant, switching, ...popupProps }: DockPopupProps) {
   );
 }
 
-export default function PlayerDock() {
+interface PlayerDockProps {
+  onShowPlayingWork: (workId: string) => void;
+}
+
+export default function PlayerDock({ onShowPlayingWork }: PlayerDockProps) {
   const state = usePlayerState();
   const actions = usePlayerActions();
   const isPlaying = useAtomValue(playerIsActiveAtom);
   const [uiMode, setUiMode] = useAtom(playerUiModeAtom);
   const [switchingUiMode, setSwitchingUiMode] = useState(false);
-  const setAppMode = useSetAtom(setAppModeAtom);
-  const { setAxis: setLibraryAxis } = useLibraryNavigation();
-  const selectLibraryWork = useSetAtom(selectLibraryWorkAtom);
   const { dockBarSlide, dockBarSwitch, dockPopupScale } = useMotionVariants();
 
   const handleShowPlayingWork = useCallback(() => {
     const workId = state.currentWork?.id;
     if (!workId) return;
-    setAppMode("library");
-    setLibraryAxis("all");
-    selectLibraryWork(workId);
-  }, [selectLibraryWork, setAppMode, setLibraryAxis, state.currentWork]);
+    onShowPlayingWork(workId);
+  }, [onShowPlayingWork, state.currentWork]);
 
   const switchUiMode = (nextMode: "bar" | "popup") => {
     setSwitchingUiMode(true);

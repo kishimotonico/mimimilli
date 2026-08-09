@@ -8,12 +8,13 @@ import {
   type Work,
   type WorkListItem,
 } from "@mimimilli/shared";
-import { librarySearchQueryAtom, libraryViewModeAtom } from "../model/atoms";
+import { libraryViewModeAtom } from "../model/atoms";
+import { librarySearchQueryAtom } from "../../../entities/library/model/navigationAtoms";
 import {
   playerIsPlaybackActiveAtom,
   playingTrackIndexAtom,
   playingWorkIdAtom,
-} from "../../player/model/atoms";
+} from "../../../entities/player/model/atoms";
 import { useLibraryNavigation } from "../model/useLibraryNavigation";
 import {
   useLibraryDebouncedSearchQuery,
@@ -26,7 +27,11 @@ import {
   shouldClearSelectionOnFilterMiss,
   shouldClearSelectionOnWorkNotFound,
 } from "../model/libraryPresentation";
-import { isHomeAxis, isSmartAxis, getSmartFolderId } from "../model/axisDefinitions";
+import {
+  isHomeAxis,
+  isSmartAxis,
+  getSmartFolderId,
+} from "../../../entities/library/axisDefinitions";
 import {
   type SmartFolderEditorState,
   closedSmartFolderEditorState,

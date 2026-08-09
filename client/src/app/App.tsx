@@ -32,10 +32,15 @@ import { isDlsiteNotificationModal } from "./model/activeModal";
 import type { Work, WorkListItem } from "@mimimilli/shared";
 import { getWork } from "../entities/work/api";
 import { useDownloadLibraryExport } from "../features/library/useDownloadLibraryExport";
-import { useScanActions } from "../features/scan/model/useScanActions";
-import { setRootFolder } from "../features/settings/api";
-import { useSettingsQuery } from "../features/settings/useSettingsQuery";
+import { useScanActions } from "../entities/scan/useScanActions";
+import { setRootFolder } from "../entities/settings/api";
+import { useSettingsQuery } from "../entities/settings/useSettingsQuery";
 import NavigationHistorySync from "../features/navigation/ui/NavigationHistorySync";
+import { setAppModeAtom } from "../shared/model/appModeAtoms";
+import {
+  setLibraryAxisAtom,
+  selectLibraryWorkAtom,
+} from "../entities/library/model/navigationActions";
 
 const SettingsModal = lazy(() => import("../features/settings/ui/SettingsModal"));
 const ScanModal = lazy(() => import("../features/scan/ui/ScanModal"));
@@ -45,6 +50,9 @@ export default function App() {
   const scanActions = useScanActions();
   const queryClient = useQueryClient();
   const setErrorToast = useSetAtom(errorToastAtom);
+  const setAppMode = useSetAtom(setAppModeAtom);
+  const setLibraryAxis = useSetAtom(setLibraryAxisAtom);
+  const selectLibraryWork = useSetAtom(selectLibraryWorkAtom);
   const playRequestIdRef = useRef(0);
 
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
@@ -130,6 +138,15 @@ export default function App() {
 
   const handleExport = useDownloadLibraryExport();
 
+  const handleOpenLibraryWork = useCallback(
+    (workId: string) => {
+      setAppMode("library");
+      setLibraryAxis("all");
+      selectLibraryWork(workId);
+    },
+    [selectLibraryWork, setAppMode, setLibraryAxis],
+  );
+
   if (startupState === "loading") {
     return (
       <MotionConfig reducedMotion="user">
@@ -197,9 +214,10 @@ export default function App() {
               onPlay={handlePlay}
               onResume={handleResume}
               onTogglePlay={player.togglePlay}
+              onPlayFile={player.playFile}
             />
           }
-          transportBar={<PlayerDock />}
+          transportBar={<PlayerDock onShowPlayingWork={handleOpenLibraryWork} />}
           fullScreenPlayer={<FullScreenPlayerGate />}
           overlays={
             <>
@@ -229,6 +247,7 @@ export default function App() {
               <DlsiteNotificationModals
                 activeModal={isDlsiteNotificationModal(activeModal) ? activeModal : null}
                 onClose={handleCloseModal}
+                onOpenWork={handleOpenLibraryWork}
               />
               <GlobalToast />
             </>

@@ -1,6 +1,6 @@
 import { createContext, useContext, useMemo, useRef, type ReactNode } from "react";
 import type { Work } from "../../../entities/work/model";
-import { PLAYER_CORE_INITIAL } from "./atoms";
+import { PLAYER_CORE_INITIAL } from "../../../entities/player/model/atoms";
 import { PlayerController } from "./playerController";
 import { createPlayerRuntimeCapabilitiesRegistry } from "./playerRuntimeCapabilities";
 import type { PlayerRuntimeCapabilitiesRegistry } from "./playerRuntimeCapabilities";

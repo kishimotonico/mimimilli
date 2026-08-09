@@ -3,7 +3,7 @@ import {
   navigationHistoryBack,
   navigationHistoryForward,
 } from "../../features/navigation/model/useNavigationHistory";
-import { navigationHistoryStateAtom } from "../../features/navigation/model/navigationHistoryAtoms";
+import { navigationHistoryStateAtom } from "../../shared/model/navigationHistoryAtoms";
 import { I } from "../../shared/ui/Icon";
 import IconButton from "../../shared/ui/IconButton";
 

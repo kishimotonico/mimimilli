@@ -4,7 +4,6 @@ import {
   type NavigationHistoryCommit,
 } from "./navigationHistoryAtoms";
 
-/** 同一バッチ内では push を優先する（push > replace）。 */
 export function mergeNavigationHistoryCommitKind(
   current: NavigationHistoryCommit,
   incoming: NavigationHistoryCommit,

@@ -1,7 +1,7 @@
 import { motion, useIsPresent } from "motion/react";
 import type { CSSProperties } from "react";
 import type { FacetAxisId, NormalizedTag } from "@mimimilli/shared";
-import type { AxisId } from "../model/types";
+import type { AxisId } from "../../../entities/library/types";
 import { useAxisFacetsQuery } from "../model/useAxisFacetsQuery";
 import { buildFilterTag } from "../model/libraryPresentation";
 import AxisValueQuickList from "./AxisValueQuickList";

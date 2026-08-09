@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useAtom, useAtomValue } from "jotai";
 import type { AxisFacetItem, NormalizedTag, TagPrefix } from "@mimimilli/shared";
-import type { AxisId } from "../model/types";
-import { getAxisIcon, getAxisLabel } from "../model/axisDefinitions";
+import type { AxisId } from "../../../entities/library/types";
+import { getAxisIcon, getAxisLabel } from "../../../entities/library/axisDefinitions";
 import { buildFilterTag } from "../model/libraryPresentation";
 import { buildAxisValueDisplayRows } from "../model/axisValueDisplayRows";
 import { axisValueSortAtom, libraryTileSizeAtom, libraryViewModeAtom } from "../model/atoms";

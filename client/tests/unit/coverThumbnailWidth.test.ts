@@ -3,7 +3,22 @@ import { render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { WorkSummary } from "../../src/entities/work/model";
 import { selectFixedCoverThumbnailWidth } from "../../src/entities/work/ui/coverThumbnailWidth";
+import { selectCoverThumbnailWidth } from "../../src/features/library/model/gridSizing";
 import WorkRow from "../../src/features/library/ui/WorkRow";
+
+describe("library cover thumbnail width", () => {
+  it("selects the closest allowed thumbnail width for the rendered density", () => {
+    expect(selectCoverThumbnailWidth(100, 1)).toBe(128);
+    expect(selectCoverThumbnailWidth(160, 1)).toBe(128);
+    expect(selectCoverThumbnailWidth(192, 1)).toBe(256);
+    expect(selectCoverThumbnailWidth(176, 2)).toBe(256);
+    expect(selectCoverThumbnailWidth(280, 2)).toBe(512);
+  });
+
+  it("treats a device pixel ratio below one as one", () => {
+    expect(selectCoverThumbnailWidth(280, 0.5)).toBe(256);
+  });
+});
 
 describe("selectFixedCoverThumbnailWidth", () => {
   it.each([

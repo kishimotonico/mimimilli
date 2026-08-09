@@ -5,11 +5,11 @@ import {
   dlsiteBulkCancelledResultAtom,
   dlsiteBulkErrorAtom,
   dlsiteBulkResultAtom,
-} from "../../features/dlsite/model/atoms";
-import { useDlsiteBulkActions } from "../../features/dlsite/model/useDlsiteBulkActions";
+} from "../../entities/dlsite/model/bulkAtoms";
+import { useDlsiteBulkActions } from "../../entities/dlsite/useDlsiteBulkActions";
 import { errorToastAtom } from "../../shared/model/errorToastAtom";
-import { scanErrorAtom } from "../../features/scan/model/atoms";
-import { useScanActions } from "../../features/scan/model/useScanActions";
+import { scanErrorAtom } from "../../entities/scan/model/atoms";
+import { useScanActions } from "../../entities/scan/useScanActions";
 
 export default function GlobalToast() {
   const scanError = useAtomValue(scanErrorAtom);

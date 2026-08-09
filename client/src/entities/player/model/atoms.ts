@@ -1,4 +1,4 @@
-// player feature の Jotai atoms。
+// player の Jotai atoms。
 //
 // 設計方針（issue参照）:
 //   - playerCoreAtom: position を除く core フィールド（isPlaying / currentWork / tracks 等）
@@ -13,11 +13,10 @@
 
 import { atom } from "jotai";
 import { atomWithStorage } from "jotai/utils";
-import { PLAYER_CORE_INITIAL, type PlayerCoreState } from "./playerController";
+import { PLAYER_CORE_INITIAL, type PlayerCoreState } from "./playerCoreState";
 
-export { PLAYER_CORE_INITIAL, type PlayerCoreState } from "./playerController";
+export { PLAYER_CORE_INITIAL, type PlayerCoreState } from "./playerCoreState";
 
-/** position を除く player core state（timeupdate では参照を維持） */
 export const playerCoreAtom = atom<PlayerCoreState>(PLAYER_CORE_INITIAL);
 
 export const playerIsActiveAtom = atom((get) => {

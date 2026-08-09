@@ -2,7 +2,7 @@ import { Component, Suspense, useEffect, type ReactNode } from "react";
 import { QueryErrorResetBoundary } from "@tanstack/react-query";
 import type { DataIntegrityWarning, WorkListItem } from "@mimimilli/shared";
 import type { LibraryViewState } from "../model/useLibraryNavigation";
-import { isSmartAxis } from "../model/axisDefinitions";
+import { isSmartAxis } from "../../../entities/library/axisDefinitions";
 import {
   useSuspenseNormalLibraryWorks,
   useSuspenseSmartLibraryWorks,

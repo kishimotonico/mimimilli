@@ -8,7 +8,7 @@ import {
   isFacetAxis,
   isSmartAxis,
   isViewAxis,
-} from "../../src/features/library/model/axisDefinitions";
+} from "../../src/entities/library/axisDefinitions";
 
 const PREFIXES: TagPrefix[] = [
   { prefix: "cv", label: "CV", color: null, showAsAxis: true, protected: true },

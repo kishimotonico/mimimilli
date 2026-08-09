@@ -28,3 +28,8 @@ export interface DlsiteBulkActions {
 
 /** DlsiteBulkRuntime がマウント時に登録する操作群。未配線時は null */
 export const dlsiteBulkActionsAtom = atom<DlsiteBulkActions | null>(null);
+
+export type DlsiteInvalidate = (workIds?: string | string[]) => Promise<void>;
+
+/** DlsiteBulkRuntime がマウント時に登録するキャッシュ無効化。未配線時は null */
+export const dlsiteInvalidateAtom = atom<DlsiteInvalidate | null>(null);

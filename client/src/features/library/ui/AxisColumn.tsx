@@ -1,13 +1,13 @@
 import { useRef, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { AnimatePresence } from "motion/react";
 import type { NormalizedTag, SmartFolder, TagPrefix } from "@mimimilli/shared";
-import type { AxisId } from "../model/types";
+import type { AxisId } from "../../../entities/library/types";
 import {
   buildFacetAxisRows,
   buildViewAxisRows,
   getAxisLabel,
   isFacetAxis,
-} from "../model/axisDefinitions";
+} from "../../../entities/library/axisDefinitions";
 import {
   useHoverGroupCoordinator,
   type HoverGroupTriggerHandlers,

@@ -10,8 +10,8 @@ import {
   dlsiteBulkActiveAtom,
   dlsiteBulkProgressAtom,
   dlsiteBulkStartingAtom,
-} from "../../features/dlsite/model/atoms";
-import { useDlsiteBulkActions } from "../../features/dlsite/model/useDlsiteBulkActions";
+} from "../../entities/dlsite/model/bulkAtoms";
+import { useDlsiteBulkActions } from "../../entities/dlsite/useDlsiteBulkActions";
 import { useDlsiteNotificationSummary } from "../../features/library/model/useDlsiteNotificationSummary";
 import { getLastScanResult, SCAN_QUERY_KEYS } from "../../features/scan/api";
 import Button from "../../shared/ui/Button";

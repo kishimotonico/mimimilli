@@ -10,7 +10,7 @@ import {
 import { axisValueSortAtom } from "../model/atoms";
 import { buildAxisValueDisplayRows } from "../model/axisValueDisplayRows";
 import type { AxisValueHierarchyRow } from "../model/axisValueHierarchy";
-import type { AxisId } from "../model/types";
+import type { AxisId } from "../../../entities/library/types";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";

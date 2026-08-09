@@ -8,12 +8,12 @@ import {
   dlsiteBulkActiveAtom,
   dlsiteBulkCancellingAtom,
   dlsiteBulkProgressAtom,
-} from "../../features/dlsite/model/atoms";
-import { useDlsiteBulkActions } from "../../features/dlsite/model/useDlsiteBulkActions";
-import { librarySearchQueryAtom } from "../../features/library/model/atoms";
-import { appModeAtom } from "../../features/navigation/model/navigationAtoms";
-import { playerIsActiveAtom, playingTrackTitleAtom } from "../../features/player/model/atoms";
-import { scanningAtom, scanProgressLabelAtom } from "../../features/scan/model/atoms";
+} from "../../entities/dlsite/model/bulkAtoms";
+import { useDlsiteBulkActions } from "../../entities/dlsite/useDlsiteBulkActions";
+import { librarySearchQueryAtom } from "../../entities/library/model/navigationAtoms";
+import { appModeAtom } from "../../shared/model/appModeAtoms";
+import { playerIsActiveAtom, playingTrackTitleAtom } from "../../entities/player/model/atoms";
+import { scanningAtom, scanProgressLabelAtom } from "../../entities/scan/model/atoms";
 
 interface TopBarProps {
   /** スキャンボタン押下時。即時実行はせずスキャンモーダルを開く（TASK-56） */

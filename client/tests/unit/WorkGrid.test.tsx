@@ -8,7 +8,7 @@ import {
   libraryGridLayoutModeAtom,
   libraryTileSizeAtom,
 } from "../../src/features/library/model/atoms";
-import type { GridLayoutMode } from "../../src/features/library/model/types";
+import type { GridLayoutMode } from "../../src/entities/library/types";
 import { clearResizeObservers, flushAllResizeObservers, mockElementSize } from "./setup";
 
 function createWorks(count: number): WorkListItem[] {

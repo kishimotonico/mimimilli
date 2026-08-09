@@ -4,8 +4,8 @@ import { Provider as JotaiProvider, createStore } from "jotai";
 import { describe, expect, it } from "vitest";
 import GlobalToast from "../../src/app/ui/GlobalToast";
 import { errorToastAtom } from "../../src/shared/model/errorToastAtom";
-import { scanErrorAtom } from "../../src/features/scan/model/atoms";
-import { dlsiteBulkErrorAtom } from "../../src/features/dlsite/model/atoms";
+import { scanErrorAtom } from "../../src/entities/scan/model/atoms";
+import { dlsiteBulkErrorAtom } from "../../src/entities/dlsite/model/bulkAtoms";
 
 describe("GlobalToast", () => {
   it("errorToastAtom のメッセージを表示する", () => {

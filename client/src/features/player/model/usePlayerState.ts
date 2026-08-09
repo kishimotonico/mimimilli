@@ -1,5 +1,5 @@
 import { useAtomValue } from "jotai";
-import { playerCoreAtom } from "./atoms";
+import { playerCoreAtom } from "../../../entities/player/model/atoms";
 import type { PlayerCoreState } from "./playerController";
 
 export type PlayerState = PlayerCoreState;

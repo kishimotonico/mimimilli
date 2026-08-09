@@ -1,7 +1,7 @@
 import { useMemo, type CSSProperties } from "react";
 import type { AxisFacetItem } from "@mimimilli/shared";
 import type { AxisValueHierarchyRow, AxisValueValueRow } from "../model/axisValueHierarchy";
-import { GRID_COLUMN_GAP } from "../model/gridSizing";
+import { GRID_COLUMN_GAP } from "../../../shared/lib/gridSizing";
 import { I, type IconName } from "../../../shared/ui/Icon";
 import { selectFixedCoverThumbnailWidth } from "../../../entities/work/ui/coverThumbnailWidth";
 import CoverCollage from "./CoverCollage";

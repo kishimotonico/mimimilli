@@ -12,7 +12,7 @@ import {
   dlsiteBulkActionsAtom,
   dlsiteBulkActiveAtom,
   dlsiteBulkProgressAtom,
-} from "../../src/features/dlsite/model/atoms";
+} from "../../src/entities/dlsite/model/bulkAtoms";
 
 const scanResult: ScanResult = {
   registered: 12,

@@ -352,7 +352,7 @@ describe("library api", () => {
       stats: { trackCount: 0, durationSec: 0 },
     };
     mockFetch.mockResolvedValue(makeResponse(mockPage));
-    const result = await libraryApi.searchWorks({ q: "test", tags: ["tag,one", "tag2"] });
+    const result = await workApi.searchWorks({ q: "test", tags: ["tag,one", "tag2"] });
     expect(mockFetch).toHaveBeenCalledWith("/api/works?q=test&tags=tag%2Cone&tags=tag2");
     expect(result).toEqual(mockPage);
   });
@@ -364,7 +364,7 @@ describe("library api", () => {
       stats: { trackCount: 0, durationSec: 0 },
     };
     mockFetch.mockResolvedValue(makeResponse(mockPage));
-    const result = await libraryApi.searchWorks({ limit: 1 });
+    const result = await workApi.searchWorks({ limit: 1 });
     expect(mockFetch).toHaveBeenCalledWith("/api/works?limit=1");
     expect(result.total).toBe(42);
   });
@@ -389,8 +389,8 @@ describe("library api", () => {
         }),
       );
 
-    const first = await libraryApi.searchWorks({ sort: "random", page: 1, limit: 2 });
-    const second = await libraryApi.searchWorks({
+    const first = await workApi.searchWorks({ sort: "random", page: 1, limit: 2 });
+    const second = await workApi.searchWorks({
       sort: "random",
       seed: first.seed,
       page: 2,
@@ -520,14 +520,14 @@ describe("レスポンス検証（getParsed等）", () => {
         stats: { trackCount: 0, durationSec: 0 },
       }),
     );
-    await expect(libraryApi.searchWorks({})).rejects.toThrow(/GET \/works/);
+    await expect(workApi.searchWorks({})).rejects.toThrow(/GET \/works/);
   });
 
   it("searchWorks: statsが欠落したレスポンスは検証エラーになる", async () => {
     mockFetch.mockResolvedValue(
       makeResponse({ items: [makeWorkListItem({ id: "work-1" })], total: 1 }),
     );
-    await expect(libraryApi.searchWorks({})).rejects.toThrow(/GET \/works/);
+    await expect(workApi.searchWorks({})).rejects.toThrow(/GET \/works/);
   });
 
   it("getSettings: 契約に適合しない設定は検証エラーになる", async () => {
