@@ -82,15 +82,21 @@ async function shutdown(exitCode: number, reason: string, error?: unknown): Prom
   }
 
   try {
-    if (adapter && isRealAdapter(adapter)) adapter.close();
-  } catch (closeError) {
-    console.error(closeError);
-  }
-
-  try {
     if (server) server.stop();
   } catch (stopError) {
     console.error(stopError);
+  }
+
+  try {
+    await app.shutdown();
+  } catch (shutdownError) {
+    console.error(shutdownError);
+  }
+
+  try {
+    if (adapter && isRealAdapter(adapter)) adapter.close();
+  } catch (closeError) {
+    console.error(closeError);
   }
 
   try {

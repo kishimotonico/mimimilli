@@ -5,7 +5,6 @@ import { tf } from "./helpers/tag.ts";
 import { compareJapaneseSortKeys } from "../src/core/japaneseSortKey.ts";
 import { createApp } from "../src/app.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
-import { resetDlsiteProgressStateForTest } from "../src/dlsiteJobQueue.ts";
 
 function buildApp() {
   return createApp(createFixtureAdapter());
@@ -84,7 +83,6 @@ test("POST /api/dlsite/:id/fetch は取得分類をHTTPエラーコードへ反�
 });
 
 test("GET /api/dlsite/bulk は実行中・終了後の状態を返し、未実行時は204", async () => {
-  resetDlsiteProgressStateForTest();
   const app = buildApp();
   const idle = await app.request("/api/dlsite/bulk");
   assert.equal(idle.status, 204);
@@ -116,7 +114,6 @@ test("GET /api/dlsite/bulk は実行中・終了後の状態を返し、未実�
 });
 
 test("DLsite一括取得は202で開始し、SSEに進捗と完了件数を配信する", async () => {
-  resetDlsiteProgressStateForTest();
   const app = buildApp();
   const start = await app.request("/api/dlsite/bulk", { method: "POST" });
   assert.equal(start.status, 202);
@@ -129,7 +126,6 @@ test("DLsite一括取得は202で開始し、SSEに進捗と完了件数を配�
 });
 
 test("DELETE /api/dlsite/bulk は実行中ジョブの取消を要求し、終了済みには404", async () => {
-  resetDlsiteProgressStateForTest();
   let release!: () => void;
   const gate = new Promise<void>((resolve) => (release = resolve));
   const adapter = createFixtureAdapter();

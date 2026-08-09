@@ -5,7 +5,16 @@ import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { createApp } from "../src/app.ts";
 import type { DataAdapter } from "../src/adapter/index.ts";
 import { scanRoute } from "../src/routes/scan.ts";
+import { DlsiteJobManager } from "../src/dlsiteJobManager.ts";
 import { ScanJobManager } from "../src/scanJobManager.ts";
+
+function createScanJobManager(
+  adapter: DataAdapter,
+  historyLimit?: number,
+  terminalLimit?: number,
+): ScanJobManager {
+  return new ScanJobManager(adapter, new DlsiteJobManager(adapter), historyLimit, terminalLimit);
+}
 
 const emptyResult = {
   registered: 0,
@@ -196,7 +205,7 @@ test("同期的に重いadapterでもPOST応答のcall stackではscanを開始�
 });
 
 test("history切詰時はresetし、terminal上限を超えたjobは404相当のnullになる", async () => {
-  const manager = new ScanJobManager(createFixtureAdapter(), 2, 1);
+  const manager = createScanJobManager(createFixtureAdapter(), 2, 1);
   const first = manager.start();
   while (!manager.get(first.id)?.finishedAt) {
     await new Promise((resolve) => setTimeout(resolve, 10));
@@ -244,7 +253,7 @@ test("reset IDで即再接続すると古い履歴を再送せず、以後のliv
       return scanDone;
     },
   };
-  const manager = new ScanJobManager(adapter, 2, 2);
+  const manager = createScanJobManager(adapter, 2, 2);
   const job = manager.start();
   const emitProgress = await emitProgressReady;
   emitProgress(1);
@@ -279,7 +288,7 @@ test("進捗の無い区間でも一定間隔でpingを送り、完了時にハ�
   });
   const fixture = createFixtureAdapter();
   const adapter: DataAdapter = { ...fixture, scan: () => scanDone };
-  const manager = new ScanJobManager(adapter);
+  const manager = createScanJobManager(adapter);
   const job = manager.start();
 
   // heartbeat間隔を20msに短縮したscanRouteだけを直に積んだ最小appでテストする
