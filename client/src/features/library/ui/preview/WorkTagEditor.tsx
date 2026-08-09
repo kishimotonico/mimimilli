@@ -8,7 +8,7 @@ import ConfirmDialog from "../../../../shared/ui/ConfirmDialog";
 import IconButton from "../../../../shared/ui/IconButton";
 import TagCombobox from "../../../../shared/ui/TagCombobox";
 import Toast from "../../../../shared/ui/Toast";
-import { mutationErrorMessage } from "../../../../shared/lib/mutationError";
+import { apiErrorMessage } from "../../../../shared/lib/apiError";
 import type { LibraryTagsPatchMutation } from "../../model/useLibraryQueries";
 import { useTagPrefixes } from "../../../../entities/tag/useTagPrefixes";
 import { tagPrefixDefinition } from "../../../../entities/tag/tagPrefixDefinition";
@@ -104,7 +104,7 @@ export function WorkTagEditor({
   };
 
   const patchTagsErrorMessage = patchTagsError
-    ? mutationErrorMessage(patchTagsError, "タグを保存できませんでした。")
+    ? apiErrorMessage(patchTagsError, "タグを保存できませんでした。")
     : null;
 
   return (

@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { Work } from "@mimimilli/shared";
 import { I } from "../../../../shared/ui/Icon";
 import IconButton from "../../../../shared/ui/IconButton";
-import { mutationErrorMessage } from "../../../../shared/lib/mutationError";
+import { apiErrorMessage } from "../../../../shared/lib/apiError";
 import type { LibraryBookmarkPatchMutation } from "../../model/useLibraryQueries";
 import {
   useAnchoredPopover,
@@ -53,7 +53,7 @@ export function WorkMetadataActions({
   };
 
   const bookmarkError = bookmarkMutation.error
-    ? mutationErrorMessage(bookmarkMutation.error, "ブックマークを更新できませんでした。")
+    ? apiErrorMessage(bookmarkMutation.error, "ブックマークを更新できませんでした。")
     : null;
 
   return (
