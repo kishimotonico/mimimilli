@@ -4,6 +4,7 @@ title: serverテストの並列実行時フレーキー（busy_timeoutのロッ�
 status: To Do
 assignee: []
 created_date: '2026-08-08 10:25'
+updated_date: '2026-08-09 10:33'
 labels: []
 dependencies: []
 ordinal: 263000
@@ -24,3 +25,9 @@ pnpm test を並列のまま安定させるか、当該テストをロック競�
 - [ ] #1 pnpm test（server/client同時実行）を連続3回実行してserver側が安定して通る
 - [ ] #2 フレーキーの原因が特定されタスクのnotesに記録されている
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-08-09のリファクタ一斉改善バッチで再観測。server単独の pnpm test（bun test --parallel、12スレッド）でも発生する。該当テストは2件: 「file scan Workerの同期停止中もworks/Range mediaへ応答し、cancel後に再scanできる」（scanWorker.test.ts。Worker起動が test gate の2秒タイムアウトに間に合わない）と「スマートフォルダー候補IDが900件を超えてもlistSummariesのchunk境界をまたいで同値」（worksQueryContract.test.ts）。いずれも実行時間が5秒級に膨らんだうえでのタイムアウトで、単独実行では確実に通る。TASK-270（scanner分割）投入の前後でA/B比較したところ、投入前の状態でも3回中3回発生したため機能的な退行ではなく既存のフレーキー。busy_timeout のロック待ちだけでなく、Worker起動待ちのハードコードされた短いタイムアウトも原因に含まれる。
+<!-- SECTION:NOTES:END -->

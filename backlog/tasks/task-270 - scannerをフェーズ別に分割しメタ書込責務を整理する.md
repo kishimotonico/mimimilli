@@ -1,10 +1,10 @@
 ---
 id: TASK-270
 title: scannerをフェーズ別に分割しメタ書込責務を整理する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-08 21:20'
-updated_date: '2026-08-09 00:32'
+updated_date: '2026-08-09 10:34'
 labels: []
 dependencies:
   - TASK-261
@@ -29,9 +29,21 @@ metaIdMigration呼び出し部はTASK-261の完了形（軽量重複ガード）
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 scan() と registerMetaFile がフェーズ・責務別の関数に分割されていること
-- [ ] #2 メタファイル書込が meta.ts 系に集約され、スキャナ本体は読取+DB更新に限定されていること
-- [ ] #3 MetaFile組立・coverSatisfied・probe解決の重複が解消されていること
-- [ ] #4 serverテストが通ること
-- [ ] #5 generateフェーズが追加のディレクトリ走査をせずwalk結果を再利用していること
+- [x] #1 scan() と registerMetaFile がフェーズ・責務別の関数に分割されていること
+- [x] #2 メタファイル書込が meta.ts 系に集約され、スキャナ本体は読取+DB更新に限定されていること
+- [x] #3 MetaFile組立・coverSatisfied・probe解決の重複が解消されていること
+- [x] #4 serverテストが通ること
+- [x] #5 generateフェーズが追加のディレクトリ走査をせずwalk結果を再利用していること
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+scanner.ts 1072行→502行。scanWalk.ts(171)・scanRegister.ts(370)・scanUpsertBatch.ts(69)・scanTypes.ts(56)・scanAudio.ts・scanMetaDraft.ts へ分割。checkAbort は walk(scanWalk.ts:80,97)・register(scanRegister.ts:160,265,281,367)・generate(scanner.ts:275,286)・finalize の全フェーズへ貫通。ScanUpsertBatch の3機能（取消・件数制御flush・user→catalog分離トランザクション）は移動前と同一ロジック。RJ検出のメタ書込は meta.ts の syncDetectedRjCode へ移し、書込条件（既存rjCodeがあれば書かない、skip対象作品には触れない）も一致。初回実装で scanner.ts に互換re-exportが残っていたため差し戻して削除し、scannerWorkRoot.test.ts を scanWalk.ts からの直接importへ書き換えた。registerFolderWork・restoreFolderWork が checkAbort にデフォルト無操作を渡す点は分割前と同じで、Worker発の取消トークン経路に乗らない単発同期処理のため問題なし。検証: pnpm check 成功、server 525 pass / 0 fail（単独）。TASK-263 との合流後に並列実行フレーキーが出るが、270投入前でも同頻度以上に発生するため退行ではない（TASK-253へ記録）。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+scanner.ts を walk→register→generate→finalize のフェーズへ分割し6ファイルへ切り出した。UpsertBatch は scan 用 unit-of-work として scanUpsertBatch.ts へ抽出（repoへは移さない）。RJ検出のメタ書込を meta.ts へ移し、coverSatisfied 判定の重複を scanTypes.ts へ統合。取消の到達性とレガシーメタ不変換を維持。pnpm check と server 525 テストで検証。
+<!-- SECTION:FINAL_SUMMARY:END -->
