@@ -224,6 +224,73 @@ describe("usePlayer adapters", () => {
     expect(() => actions!.seek(10)).toThrow(NOT_REGISTERED_ERROR);
   });
 
+  it("PlayerRuntimeのアンマウントでロード済みトラック情報も解放され、再マウント後の同一ファイル別区間切替でengine.loadが省略されない", async () => {
+    const tracks: ResolvedTrack[] = [
+      { ...track, start: 0, end: 30, durationSec: 30, durationKind: "resolved" },
+      {
+        id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        title: "Track 2",
+        file: track.file,
+        start: 30,
+        end: 60,
+        durationSec: 30,
+        durationKind: "resolved",
+      },
+    ];
+
+    let actions: ReturnType<typeof usePlayerActions> | undefined;
+    let hideRuntime: (() => void) | undefined;
+    let showRuntime: (() => void) | undefined;
+    const queryClient = new QueryClient();
+
+    function RuntimeMount() {
+      usePlayerRuntime();
+      return null;
+    }
+
+    function ActionsHost() {
+      actions = usePlayerActions();
+      return null;
+    }
+
+    function TestRoot() {
+      const [mounted, setMounted] = useState(true);
+      hideRuntime = () => setMounted(false);
+      showRuntime = () => setMounted(true);
+      return createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(
+          JotaiProvider,
+          null,
+          createElement(
+            PlayerRuntimeProvider,
+            null,
+            mounted ? createElement(RuntimeMount) : null,
+            createElement(ActionsHost),
+          ),
+        ),
+      );
+    }
+
+    render(createElement(TestRoot));
+
+    act(() => actions!.play(work, tracks, 0, playlistId));
+    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
+    latestAudio().duration = 60;
+
+    act(() => hideRuntime?.());
+    act(() => showRuntime?.());
+    await waitFor(() => expect(audioInstances.length).toBe(2));
+
+    const remountedAudio = latestAudio();
+    expect(remountedAudio.srcAssignments).toHaveLength(0);
+
+    act(() => actions!.setTrackIndex(1));
+
+    await waitFor(() => expect(remountedAudio.srcAssignments).toHaveLength(1));
+  });
+
   it("StrictModeのeffect再実行後もControllerへHTMLAudioイベントを渡す", async () => {
     const { result } = renderHook(() => usePlayerWithClock(), {
       wrapper: makeWrapper({ strict: true }),

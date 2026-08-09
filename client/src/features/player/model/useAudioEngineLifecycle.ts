@@ -51,6 +51,7 @@ export function useAudioEngineLifecycle({
   useEffect(() => {
     const engineRef = refs.engine;
     const loadCleanupRef = refs.loadCleanup;
+    const loadedTrackRef = refs.loadedTrack;
 
     const finishCurrentTrack = (virtualEnd: boolean) => {
       if (refs.trackEnded.current) return;
@@ -132,6 +133,7 @@ export function useAudioEngineLifecycle({
     return () => {
       if (engineRef.current === engine) {
         engineRef.current = null;
+        loadedTrackRef.current = null;
       }
       loadCleanupRef.current?.();
       loadCleanupRef.current = null;
