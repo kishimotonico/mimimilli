@@ -239,24 +239,6 @@ export class ThumbnailCache {
   }
 }
 
-const defaultThumbnailCache = new ThumbnailCache();
-
-/**
- * 指定幅の webp サムネイルを返す。キャッシュがあればそれを使い、無ければ sharp で生成して
- * cacheDir に保存する（2回目以降は再生成しない）。同一キャッシュキーへの同時リクエストは
- * in-flight マップで束ねて変換を1回だけ実行する（異なるキーは並行のまま）。
- * 元画像が読めない場合は sharp のエラーをそのまま投げる（呼び出し側でエラー隠蔽しない）。
- */
-export async function getOrCreateThumbnail(
-  cacheDir: string,
-  workId: string,
-  width: number,
-  sourceAbsolutePath: string,
-  source?: ThumbnailSource,
-): Promise<Thumbnail> {
-  return defaultThumbnailCache.getOrCreate(cacheDir, workId, width, sourceAbsolutePath, source);
-}
-
 /** GC対象を判定するために必要な、作品ごとのカバー実パス */
 export interface WorkCoverEntry {
   workId: string;

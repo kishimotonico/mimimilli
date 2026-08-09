@@ -6,13 +6,21 @@ import { rename, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
 import sharp from "sharp";
-import { getOrCreateThumbnail, ThumbnailCache } from "../../src/adapters/real/thumbnailCache.ts";
+import { ThumbnailCache } from "../../src/adapters/real/thumbnailCache.ts";
 import { makeTestDirectory } from "../helpers/sampleLibrary.ts";
 
-function setup(t: TestContext): { baseDir: string; cacheDir: string } {
+function setup(t: TestContext): {
+  baseDir: string;
+  cacheDir: string;
+  cache: ThumbnailCache;
+} {
   const directory = makeTestDirectory("thumbnail-cache");
   t.after(directory.cleanup);
-  return { baseDir: directory.path, cacheDir: join(directory.path, "cache") };
+  return {
+    baseDir: directory.path,
+    cacheDir: join(directory.path, "cache"),
+    cache: new ThumbnailCache(),
+  };
 }
 
 async function writeCoverJpeg(path: string): Promise<void> {
@@ -24,12 +32,12 @@ async function writeCoverJpeg(path: string): Promise<void> {
 }
 
 test("同一キーへの同時リクエストは変換を1回だけ実行し、全員同じ完成ファイルを受け取る", async (t) => {
-  const { baseDir, cacheDir } = setup(t);
+  const { baseDir, cacheDir, cache } = setup(t);
   const coverPath = join(baseDir, "cover-concurrent.jpg");
   await writeCoverJpeg(coverPath);
 
   const promises = Array.from({ length: 5 }, () =>
-    getOrCreateThumbnail(cacheDir, "work-concurrent", 256, coverPath),
+    cache.getOrCreate(cacheDir, "work-concurrent", 256, coverPath),
   );
   const results = await Promise.all(promises);
 
@@ -49,12 +57,12 @@ test("同一キーへの同時リクエストは変換を1回だけ実行し、�
 });
 
 test("キャッシュヒット時もファイルの実サイズを返す", async (t) => {
-  const { baseDir, cacheDir } = setup(t);
+  const { baseDir, cacheDir, cache } = setup(t);
   const coverPath = join(baseDir, "cover-cached.jpg");
   await writeCoverJpeg(coverPath);
 
-  const first = await getOrCreateThumbnail(cacheDir, "work-cached", 256, coverPath);
-  const second = await getOrCreateThumbnail(cacheDir, "work-cached", 256, coverPath);
+  const first = await cache.getOrCreate(cacheDir, "work-cached", 256, coverPath);
+  const second = await cache.getOrCreate(cacheDir, "work-cached", 256, coverPath);
 
   assert.equal(second.absolutePath, first.absolutePath);
   assert.equal(second.size, first.size);
@@ -62,14 +70,14 @@ test("キャッシュヒット時もファイルの実サイズを返す", async
 });
 
 test("異なるキーの生成は並行のまま進む", async (t) => {
-  const { baseDir, cacheDir } = setup(t);
+  const { baseDir, cacheDir, cache } = setup(t);
   const coverA = join(baseDir, "cover-a.jpg");
   const coverB = join(baseDir, "cover-b.jpg");
   await Promise.all([writeCoverJpeg(coverA), writeCoverJpeg(coverB)]);
 
   const [resultA, resultB] = await Promise.all([
-    getOrCreateThumbnail(cacheDir, "work-a", 256, coverA),
-    getOrCreateThumbnail(cacheDir, "work-b", 256, coverB),
+    cache.getOrCreate(cacheDir, "work-a", 256, coverA),
+    cache.getOrCreate(cacheDir, "work-b", 256, coverB),
   ]);
 
   assert.notEqual(resultA.absolutePath, resultB.absolutePath);
@@ -77,11 +85,11 @@ test("異なるキーの生成は並行のまま進む", async (t) => {
 });
 
 test("生成失敗時は壊れたキャッシュを残さず、修正後の再試行で成功する", async (t) => {
-  const { baseDir, cacheDir } = setup(t);
+  const { baseDir, cacheDir, cache } = setup(t);
   const brokenPath = join(baseDir, "broken.jpg");
   writeFileSync(brokenPath, "これは画像ではない");
 
-  await assert.rejects(() => getOrCreateThumbnail(cacheDir, "work-broken", 256, brokenPath));
+  await assert.rejects(() => cache.getOrCreate(cacheDir, "work-broken", 256, brokenPath));
 
   if (existsSync(cacheDir)) {
     const files = readdirSync(cacheDir);
@@ -94,7 +102,7 @@ test("生成失敗時は壊れたキャッシュを残さず、修正後の再�
   }
 
   await writeCoverJpeg(brokenPath);
-  const result = await getOrCreateThumbnail(cacheDir, "work-broken", 256, brokenPath);
+  const result = await cache.getOrCreate(cacheDir, "work-broken", 256, brokenPath);
   assert.ok(existsSync(result.absolutePath));
 });
 
@@ -135,9 +143,8 @@ test("片方のキーのadmission判定が保留中でも、別キーのキャ�
   const coverFast = join(baseDir, "cover-fast.jpg");
   await Promise.all([writeCoverJpeg(coverSlow), writeCoverJpeg(coverFast)]);
   const source = { size: 1, mtimeMs: 1 };
-
-  // fast-key は先に生成しておき、以降はキャッシュヒットになる状態を作る。
-  await getOrCreateThumbnail(cacheDir, "fast-key", 256, coverFast, source);
+  const prewarmCache = new ThumbnailCache();
+  await prewarmCache.getOrCreate(cacheDir, "fast-key", 256, coverFast, source);
 
   let resolveGate: (value: number | null) => void = () => {};
   const gate = new Promise<number | null>((resolve) => {

@@ -82,7 +82,6 @@ function openVersionedDatabase(
   version: number,
   migrationsFolder: string,
   kind: DbBackupKind,
-  migratableVersions: readonly number[] = [],
   context?: VersionedDatabaseContext,
 ): { sqlite: Database; recreated: boolean } {
   const isMemory = path.startsWith("file:") && path.includes("mode=memory");
@@ -99,11 +98,7 @@ function openVersionedDatabase(
   }
 
   let recreated = false;
-  if (
-    currentVersion !== 0 &&
-    currentVersion !== version &&
-    !migratableVersions.includes(currentVersion)
-  ) {
+  if (currentVersion !== 0 && currentVersion !== version) {
     if (isMemory) {
       logDbOpenFailure(
         kind,
@@ -191,7 +186,6 @@ export function openDb(location: DbLocation, options?: DbOpenOptions): Db {
     CATALOG_SCHEMA_VERSION,
     CATALOG_MIGRATIONS,
     "catalog",
-    [],
     catalogContext,
   );
   const userOpened = openVersionedDatabase(
@@ -199,7 +193,6 @@ export function openDb(location: DbLocation, options?: DbOpenOptions): Db {
     USER_SCHEMA_VERSION,
     USER_MIGRATIONS,
     "user",
-    [],
     userContext,
   );
   if (location.kind === "files" && userOpened.recreated && !catalogOpened.recreated && backupDir) {
@@ -210,7 +203,6 @@ export function openDb(location: DbLocation, options?: DbOpenOptions): Db {
       CATALOG_SCHEMA_VERSION,
       CATALOG_MIGRATIONS,
       "catalog",
-      [],
       catalogContext,
     );
   }

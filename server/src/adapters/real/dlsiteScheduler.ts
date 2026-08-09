@@ -178,12 +178,6 @@ export class DlsiteScheduler {
     }
   }
 
-  /** 注入した疑似transportも実HTTPと同じ開始間隔へ載せるためのテスト境界。 */
-  async schedule<T>(operation: () => Promise<T>, signal?: AbortSignal): Promise<T> {
-    this.assertOnline();
-    return this.start(operation, signal);
-  }
-
   /** キューに積まれたDLsite HTTP操作の完了を待つ（in-flightの後始末用）。 */
   async drain(): Promise<void> {
     await this.queue;

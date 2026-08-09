@@ -134,7 +134,6 @@ export type DlsiteNotificationQuery = z.infer<typeof dlsiteNotificationQuerySche
 export const tagListSchema = z.array(z.string());
 
 // ── 作品の部分更新（PATCH /api/works/:id）────────────────────
-// 旧 PUT /works/:id/tags・PUT /works/:id/title・POST /works/:id/bookmark を統合。
 
 export const workPatchSchema = z
   .object({

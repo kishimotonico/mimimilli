@@ -8,13 +8,21 @@ import { join } from "node:path";
 import { test, type TestContext } from "node:test";
 import { THUMBNAIL_WIDTHS } from "@mimimilli/shared";
 import sharp from "sharp";
-import { gcThumbnailCache, getOrCreateThumbnail } from "../../src/adapters/real/thumbnailCache.ts";
+import { gcThumbnailCache, ThumbnailCache } from "../../src/adapters/real/thumbnailCache.ts";
 import { makeTestDirectory } from "../helpers/sampleLibrary.ts";
 
-function setup(t: TestContext): { baseDir: string; cacheDir: string } {
+function setup(t: TestContext): {
+  baseDir: string;
+  cacheDir: string;
+  cache: ThumbnailCache;
+} {
   const directory = makeTestDirectory("thumbnail-gc");
   t.after(directory.cleanup);
-  return { baseDir: directory.path, cacheDir: join(directory.path, "cache") };
+  return {
+    baseDir: directory.path,
+    cacheDir: join(directory.path, "cache"),
+    cache: new ThumbnailCache(),
+  };
 }
 
 async function writeCoverJpeg(
@@ -55,13 +63,13 @@ test("現存する作品の現mtimeに対応するキャッシュは温存され
 });
 
 test("旧mtimeキーのキャッシュファイルはカバー更新後のGCで削除される", async (t) => {
-  const { baseDir, cacheDir } = setup(t);
+  const { baseDir, cacheDir, cache } = setup(t);
   const coverPath = join(baseDir, "cover.jpg");
   await writeCoverJpeg(coverPath, { r: 10, g: 20, b: 30 });
 
   const oldThumbnailPaths = await Promise.all(
     THUMBNAIL_WIDTHS.map((width) =>
-      getOrCreateThumbnail(cacheDir, "work-b", width, coverPath).then((t) => t.absolutePath),
+      cache.getOrCreate(cacheDir, "work-b", width, coverPath).then((t) => t.absolutePath),
     ),
   );
   for (const p of oldThumbnailPaths) assert.ok(existsSync(p));
