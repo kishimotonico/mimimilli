@@ -17,10 +17,9 @@ import { META_FILE_NAME, type FsListing, type Work } from "@mimimilli/shared";
 import { createApp } from "../../src/app.ts";
 import { openDb } from "../../src/adapters/real/db.ts";
 import { unregisterWork } from "../../src/adapters/real/workRegister.ts";
-import { WorkRepo } from "../../src/adapters/real/workRepo.ts";
 import { workStates } from "../../src/adapters/real/userSchema.ts";
+import { createWorkRepos, folderMetaPath } from "../helpers/workTestUtils.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
-import { folderMetaPath } from "../helpers/workTestUtils.ts";
 import { makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 
 interface FileSnapshot {
@@ -328,13 +327,13 @@ test("unregisterWork: DB削除失敗時に退避したメタ正本を復元す�
   assert.ok(existsSync(metaPath));
 
   const db = openDb({ kind: "files", catalogPath, userPath });
-  const repo = new WorkRepo(db);
-  repo.deleteWork = () => {
+  const { query, catalog, user } = createWorkRepos(db);
+  catalog.deleteWorkCatalog = () => {
     throw new Error("simulated db delete failure");
   };
 
   assert.throws(
-    () => unregisterWork(repo, work.id),
+    () => unregisterWork(query, catalog, user, work.id),
     (error: Error) => error.message.includes("simulated db delete failure"),
   );
   db.close();
@@ -375,13 +374,13 @@ test("unregisterWork: catalog削除後のuser削除失敗時はメタを復元�
   const stagedPath = join(folder, `.${META_FILE_NAME}.unregistering`);
 
   const db = openDb({ kind: "files", catalogPath, userPath });
-  const repo = new WorkRepo(db);
-  db.userTransaction = () => {
+  const { query, catalog, user } = createWorkRepos(db);
+  user.deleteWorkUserState = () => {
     throw new Error("simulated user delete failure");
   };
 
   assert.throws(
-    () => unregisterWork(repo, work.id),
+    () => unregisterWork(query, catalog, user, work.id),
     (error: Error) => error.message.includes("simulated user delete failure"),
   );
 
@@ -444,8 +443,8 @@ test("unregisterWork: 退避済みメタのまま再実行するとDB削除後�
   assert.ok(existsSync(stagedPath));
 
   const db = openDb({ kind: "files", catalogPath, userPath });
-  const repo = new WorkRepo(db);
-  assert.equal(unregisterWork(repo, work.id), true);
+  const { query, catalog, user } = createWorkRepos(db);
+  assert.equal(unregisterWork(query, catalog, user, work.id), true);
   db.close();
 
   assert.ok(!existsSync(metaPath));

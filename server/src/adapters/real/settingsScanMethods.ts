@@ -8,7 +8,9 @@ import { logDataIntegritySkips } from "./dataIntegrity.ts";
 import { resolveWithin } from "./paths.ts";
 import { Scanner } from "./scanner.ts";
 import { gcThumbnailCache, type WorkCoverEntry } from "./thumbnailCache.ts";
-import { WorkRepo } from "./workRepo.ts";
+import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
+import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
+import type { WorkQueryRepository } from "./workQueryRepository.ts";
 
 const scanLogger = getCategoryLogger("scan");
 const serverLogger = getCategoryLogger("server");
@@ -17,10 +19,9 @@ const KEY_LAST_SCAN_TIME = "last_scan_time";
 
 export function createSettingsScanMethods(deps: {
   database: DbLocation;
-  repo: Pick<
-    WorkRepo,
-    "getUserSetting" | "getScanState" | "setUserSetting" | "listSummaries" | "setScanState"
-  >;
+  query: Pick<WorkQueryRepository, "listSummaries">;
+  catalog: Pick<CatalogWorkRepository, "getScanState" | "setScanState">;
+  user: Pick<UserWorkStateRepository, "getUserSetting" | "setUserSetting">;
   scanner: Scanner;
   dataRoot: string;
   thumbnailCacheDir: string;
@@ -32,9 +33,18 @@ export function createSettingsScanMethods(deps: {
     options: ScanOptions,
   ) => Promise<ScanResult>;
 }) {
-  const { database, repo, scanner, dataRoot, thumbnailCacheDir, runFileScanInWorker } = deps;
+  const {
+    database,
+    query,
+    catalog,
+    user,
+    scanner,
+    dataRoot,
+    thumbnailCacheDir,
+    runFileScanInWorker,
+  } = deps;
   const requireRoot = (): string => {
-    const root = repo.getUserSetting(KEY_ROOT_FOLDER);
+    const root = user.getUserSetting(KEY_ROOT_FOLDER);
     if (!root)
       throw new NotConfiguredError(
         "ルートフォルダーが設定されていません（PUT /api/settings で設定してください）",
@@ -42,8 +52,8 @@ export function createSettingsScanMethods(deps: {
     return root;
   };
   const getSettings = async (): Promise<Settings> => ({
-    rootFolder: repo.getUserSetting(KEY_ROOT_FOLDER),
-    lastScanTime: repo.getScanState(KEY_LAST_SCAN_TIME),
+    rootFolder: user.getUserSetting(KEY_ROOT_FOLDER),
+    lastScanTime: catalog.getScanState(KEY_LAST_SCAN_TIME),
   });
   return {
     getSettings,
@@ -75,7 +85,7 @@ export function createSettingsScanMethods(deps: {
         requestedPath: patch.rootFolder,
         resolvedPath: absRoot,
       });
-      repo.setUserSetting(KEY_ROOT_FOLDER, absRoot);
+      user.setUserSetting(KEY_ROOT_FOLDER, absRoot);
       return getSettings();
     },
 
@@ -105,7 +115,7 @@ export function createSettingsScanMethods(deps: {
 
       // 全作品を走査した直後の自然なタイミングでサムネイルキャッシュをGCする（TASK-26）
       const coverEntries: WorkCoverEntry[] = [];
-      const { summaries, skipped } = repo.listSummaries();
+      const { summaries, skipped } = query.listSummaries();
       logDataIntegritySkips(scanLogger, "scan-thumbnail-gc", skipped);
       for (const work of summaries) {
         checkAbort();
@@ -131,7 +141,7 @@ export function createSettingsScanMethods(deps: {
       }
 
       checkAbort();
-      repo.setScanState(KEY_LAST_SCAN_TIME, new Date().toISOString());
+      catalog.setScanState(KEY_LAST_SCAN_TIME, new Date().toISOString());
 
       return result;
     },

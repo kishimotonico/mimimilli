@@ -22,37 +22,42 @@ import { Scanner } from "./scanner.ts";
 import { logDataIntegritySkips, toDataIntegrityWarning } from "./dataIntegrity.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
 import { WorkRegisterError } from "../../adapter.ts";
-import { WorkRepo } from "./workRepo.ts";
+import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
+import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
+import type { WorkQueryRepository } from "./workQueryRepository.ts";
+import { getWorkWithLiveProbe } from "./workRefresh.ts";
 import { buildWorkRegisterPreview, createWorkFromFolder, unregisterWork } from "./workRegister.ts";
 
 const scanLogger = getCategoryLogger("scan");
 
 export function createWorkMethods(deps: {
   db: Db;
-  repo: WorkRepo;
+  query: WorkQueryRepository;
+  catalog: CatalogWorkRepository;
+  user: UserWorkStateRepository;
   scanner: Scanner;
   requireRoot: () => string;
   cachedCover: (coverUrl: string, workDir: string, signal?: AbortSignal) => Promise<string>;
 }) {
-  const { db, repo, scanner, requireRoot, cachedCover } = deps;
+  const { db, query, catalog, user, scanner, requireRoot, cachedCover } = deps;
   return {
     async queryWorks(params: WorksQuery): Promise<WorksPage> {
-      return repo.queryWorks(params);
+      return query.queryWorks(params);
     },
 
     async getDlsiteNotificationSummary(): Promise<DlsiteNotificationSummary> {
-      return repo.getDlsiteNotificationSummary();
+      return query.getDlsiteNotificationSummary();
     },
 
     async queryDlsiteNotifications(
       kind: DlsiteNotificationKind,
-      query: Required<DlsiteNotificationQuery>,
+      queryParams: Required<DlsiteNotificationQuery>,
     ): Promise<DlsiteNotificationPage> {
-      return repo.queryDlsiteNotifications(kind, query);
+      return query.queryDlsiteNotifications(kind, queryParams);
     },
 
     async getWork(id: string): Promise<Work | null> {
-      return repo.getWork(id);
+      return getWorkWithLiveProbe(db, query, catalog, id);
     },
 
     async getWorkRegisterPreview(path: string): Promise<WorkRegisterPreview | null> {
@@ -64,14 +69,18 @@ export function createWorkMethods(deps: {
       } catch {
         return null;
       }
-      return buildWorkRegisterPreview(repo, workDir);
+      return buildWorkRegisterPreview(query, workDir);
     },
 
     async createWork(body: WorkCreateBody): Promise<Work | null> {
       const root = requireRoot();
       try {
-        return await createWorkFromFolder(repo, scanner, root, body, (coverUrl, workDir) =>
-          cachedCover(coverUrl, workDir),
+        return await createWorkFromFolder(
+          { query, catalog, user },
+          scanner,
+          root,
+          body,
+          (coverUrl, workDir) => cachedCover(coverUrl, workDir),
         );
       } catch (error) {
         if (error instanceof WorkRegisterError) throw error;
@@ -80,22 +89,23 @@ export function createWorkMethods(deps: {
     },
 
     async deleteWork(id: string): Promise<boolean> {
-      return unregisterWork(repo, id);
+      return unregisterWork(query, catalog, user, id);
     },
 
     async patchWork(id: string, patch: WorkPatch): Promise<Work | null> {
       if (patch.title === undefined && patch.tags === undefined) {
-        const updated = repo.patchWork(id, patch);
-        if (!updated) return null;
-        return repo.getWork(id);
+        if (!catalog.workExists(id)) return null;
+        if (patch.bookmarked !== undefined) {
+          user.patchBookmarked(id, patch.bookmarked);
+        }
+        return getWorkWithLiveProbe(db, query, catalog, id);
       }
-      // user書き込みはcatalogトランザクションの外で先に確定させる。
       if (patch.bookmarked !== undefined) {
-        const updated = repo.patchWork(id, { bookmarked: patch.bookmarked });
-        if (!updated) return null;
+        if (!catalog.workExists(id)) return null;
+        user.patchBookmarked(id, patch.bookmarked);
       }
       const ok = db.transaction(() => {
-        const updated = repo.patchWork(id, {
+        const updated = catalog.patchWorkCatalog(id, {
           title: patch.title,
           tags: patch.tags,
         });
@@ -104,29 +114,32 @@ export function createWorkMethods(deps: {
         return true;
       });
       if (!ok) return null;
-      return repo.getWork(id);
+      return getWorkWithLiveProbe(db, query, catalog, id);
     },
 
     async saveResume(id: string, body: ResumeBody): Promise<boolean> {
-      return repo.saveResume(id, body);
+      if (!catalog.workExists(id)) return false;
+      const track = catalog.resolveResumeTrackDuration(id, body.playlistId, body.trackId);
+      return user.saveResume(id, body, track);
     },
 
     async touchLastPlayed(id: string): Promise<boolean> {
-      return repo.touchLastPlayed(id);
+      if (!catalog.workExists(id)) return false;
+      return user.touchLastPlayed(id);
     },
 
     async listWorkFiles(id: string): Promise<FileEntry | null> {
-      const work = await repo.getWork(id);
+      const work = await getWorkWithLiveProbe(db, query, catalog, id);
       if (!work) return null;
       return buildFileTree(work.physicalPath);
     },
 
     async listTags(): Promise<string[]> {
-      return repo.listAllTagNames();
+      return query.listAllTagNames();
     },
 
     async exportLibrary(): Promise<{ data: string; dataIntegrityWarning?: DataIntegrityWarning }> {
-      const { summaries, skipped } = repo.listSummaries();
+      const { summaries, skipped } = query.listSummaries();
       logDataIntegritySkips(scanLogger, "export", skipped);
       const dataIntegrityWarning = toDataIntegrityWarning(skipped);
       const payload: {

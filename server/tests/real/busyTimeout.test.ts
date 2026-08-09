@@ -5,9 +5,8 @@ import { Database } from "bun:sqlite";
 import type { Work } from "@mimimilli/shared";
 import { openDb } from "../../src/adapters/real/db.ts";
 import { SQLITE_BUSY_TIMEOUT_MS } from "../../src/adapters/real/sqliteConnection.ts";
-import { WorkRepo } from "../../src/adapters/real/workRepo.ts";
+import { createWorkRepos, upsertTestWork, resolvedDuration } from "../helpers/workTestUtils.ts";
 import { makeTestDirectory } from "../helpers/sampleLibrary.ts";
-import { upsertTestWork, resolvedDuration } from "../helpers/workTestUtils.ts";
 import type { BusyTimeoutWriteInput } from "./busyTimeoutWriteWorker.ts";
 
 const WORK_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -142,7 +141,8 @@ test("別接続が書き込みロックを保持中でもbusy_timeoutにより�
   const input = { catalogPath, userPath, workId: WORK_ID };
 
   const seed = openDb({ kind: "files", catalogPath, userPath });
-  upsertTestWork(new WorkRepo(seed), sampleWork());
+  const { catalog, user } = createWorkRepos(seed);
+  upsertTestWork(catalog, user, sampleWork());
   seed.close();
 
   const result = await runContendedWrite(input);

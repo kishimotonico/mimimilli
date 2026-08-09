@@ -16,7 +16,7 @@ export function escapeLikeLiteral(value: string): string {
     .replaceAll("_", esc + "_");
 }
 
-/** `LIKE ... ESCAPE '!'` 句。workRepo の physical_path 照合で共通利用 */
+/** `LIKE ... ESCAPE '!'` 句。physical_path 照合で共通利用 */
 export const SQL_LIKE_ESCAPE_CLAUSE = ` ESCAPE '${LIKE_ESCAPE_CHAR}'`;
 
 /** SQL 式の列値を LIKE パターン用にエスケープする */

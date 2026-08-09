@@ -5,8 +5,13 @@ import type { Work } from "@mimimilli/shared";
 import { openDb } from "../../src/adapters/real/db.ts";
 import { works, tags } from "../../src/adapters/real/catalogSchema.ts";
 import { smartFolders } from "../../src/adapters/real/userSchema.ts";
-import { PersistentDataError, WorkRepo } from "../../src/adapters/real/workRepo.ts";
-import { upsertTestWork, resolvedDuration } from "../helpers/workTestUtils.ts";
+import { PersistentDataError } from "../../src/adapters/real/workRowMapping.ts";
+import {
+  upsertTestWork,
+  resolvedDuration,
+  createWorkRepos,
+  getTestWork,
+} from "../helpers/workTestUtils.ts";
 import { nts } from "../helpers/tag.ts";
 
 function sampleWork(id: string): Work {
@@ -68,14 +73,14 @@ function assertPersistentDataErrorAsync(
 
 test("works.status が不正なら listSummaries は当該作品を隔離して続行する", () => {
   const db = openDb({ kind: "memory" });
-  const repo = new WorkRepo(db);
+  const { query, catalog, user } = createWorkRepos(db);
   const good = sampleWork("work-good-status");
   const bad = sampleWork("work-bad-status");
-  upsertTestWork(repo, good);
-  upsertTestWork(repo, bad);
+  upsertTestWork(catalog, user, good);
+  upsertTestWork(catalog, user, bad);
   db.catalog.update(works).set({ status: "unknown" }).where(eq(works.id, bad.id)).run();
 
-  const result = repo.listSummaries();
+  const result = query.listSummaries();
   assert.equal(result.summaries.length, 1);
   assert.equal(result.summaries[0]!.id, good.id);
   assert.equal(result.skipped.length, 1);
@@ -85,9 +90,9 @@ test("works.status が不正なら listSummaries は当該作品を隔離して�
 
 test("works.playlists_json が不正なら getWork はエラーのまま", async () => {
   const db = openDb({ kind: "memory" });
-  const repo = new WorkRepo(db);
+  const { catalog, user } = createWorkRepos(db);
   const work = sampleWork("work-bad-playlists");
-  upsertTestWork(repo, work);
+  upsertTestWork(catalog, user, work);
   db.catalog
     .update(works)
     .set({ playlistsJson: '[{"name":"default","tracks":"broken"}]' })
@@ -95,34 +100,34 @@ test("works.playlists_json が不正なら getWork はエラーのまま", async
     .run();
 
   await assertPersistentDataErrorAsync(
-    () => repo.getWork(work.id),
+    () => getTestWork(db, work.id),
     /works レコード "work-bad-playlists".*0\.tracks:/,
   );
 });
 
 test("壊れたJSON構文は getWork で作品IDとSQLite列名を含むエラーになる", async () => {
   const db = openDb({ kind: "memory" });
-  const repo = new WorkRepo(db);
+  const { catalog, user } = createWorkRepos(db);
   const work = sampleWork("work-bad-json");
-  upsertTestWork(repo, work);
+  upsertTestWork(catalog, user, work);
   db.catalog.update(works).set({ playlistsJson: "[{" }).where(eq(works.id, work.id)).run();
 
   await assertPersistentDataErrorAsync(
-    () => repo.getWork(work.id),
+    () => getTestWork(db, work.id),
     /works レコード "work-bad-json".*playlists_json: JSON パースエラー:/,
   );
 });
 
 test("tags.name が正規化されていなければ listSummaries は当該作品を隔離して続行する", () => {
   const db = openDb({ kind: "memory" });
-  const repo = new WorkRepo(db);
+  const { query, catalog, user } = createWorkRepos(db);
   const good = sampleWork("work-good-tags");
   const bad = { ...sampleWork("work-bad-tags"), tags: nts(["cv/正常"]) };
-  upsertTestWork(repo, good);
-  upsertTestWork(repo, bad);
+  upsertTestWork(catalog, user, good);
+  upsertTestWork(catalog, user, bad);
   db.catalog.update(tags).set({ name: " CV/壊れ " }).where(eq(tags.name, "cv/正常")).run();
 
-  const result = repo.listSummaries();
+  const result = query.listSummaries();
   assert.equal(result.summaries.length, 1);
   assert.equal(result.summaries[0]!.id, good.id);
   assert.equal(result.skipped.length, 1);
@@ -132,7 +137,7 @@ test("tags.name が正規化されていなければ listSummaries は当該作�
 
 test("smart folderのsortも復元時に検証する", () => {
   const db = openDb({ kind: "memory" });
-  const repo = new WorkRepo(db);
+  const { user } = createWorkRepos(db);
   db.user
     .insert(smartFolders)
     .values({
@@ -145,7 +150,7 @@ test("smart folderのsortも復元時に検証する", () => {
     .run();
 
   assert.throws(
-    () => repo.listSmartFolders(),
+    () => user.listSmartFolders(),
     (error: unknown) => {
       assert.ok(error instanceof PersistentDataError);
       assert.match(error.message, /smart_folders レコード "sf-bad-sort".*sort:/);

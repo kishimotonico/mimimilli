@@ -13,8 +13,10 @@ import { detectRjCode } from "./dlsite.ts";
 import { META_FILE_NAME, MetaParseError, readMetaFile, readMetaFileRaw } from "./meta.ts";
 import { resolveWithin } from "./paths.ts";
 import { WorkRegisterError } from "../../adapter.ts";
+import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
+import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
+import type { WorkQueryRepository } from "./workQueryRepository.ts";
 import type { Scanner } from "./scanner.ts";
-import type { WorkRepo } from "./workRepo.ts";
 
 function isDirectory(path: string): boolean {
   try {
@@ -128,20 +130,26 @@ function deleteStagedMeta(plan: MetaDeletionPlan): void {
   if (existsSync(plan.stagedPath)) unlinkSync(plan.stagedPath);
 }
 
-export function unregisterWork(repo: WorkRepo, workId: string): boolean {
-  const target = repo.getWorkDeleteTarget(workId);
+export function unregisterWork(
+  query: WorkQueryRepository,
+  catalog: CatalogWorkRepository,
+  user: UserWorkStateRepository,
+  workId: string,
+): boolean {
+  const target = catalog.getWorkDeleteTarget(workId);
   if (!target) return false;
 
-  const mediaRoot = repo.getMediaRoot(workId);
+  const mediaRoot = query.getMediaRoot(workId);
   const metaPlan = resolveMetaDeletionPlan(workId, target.metaPath, mediaRoot?.physicalPath);
   if (metaPlan) stageMetaForDeletion(metaPlan);
 
   try {
-    const deleted = repo.deleteWork(workId);
-    if (deleted === null) {
+    const deleted = catalog.deleteWorkCatalog(workId);
+    if (!deleted) {
       if (metaPlan) restoreStagedMeta(metaPlan);
       return false;
     }
+    user.deleteWorkUserState(workId);
     if (metaPlan) deleteStagedMeta(metaPlan);
     return true;
   } catch (error) {
@@ -150,11 +158,16 @@ export function unregisterWork(repo: WorkRepo, workId: string): boolean {
   }
 }
 
-function unregisterDescendantWorks(repo: WorkRepo, descendants: Array<{ id: string }>): void {
+function unregisterDescendantWorks(
+  query: WorkQueryRepository,
+  catalog: CatalogWorkRepository,
+  user: UserWorkStateRepository,
+  descendants: Array<{ id: string }>,
+): void {
   const remaining: string[] = [];
   for (const child of descendants) {
     try {
-      if (!unregisterWork(repo, child.id)) {
+      if (!unregisterWork(query, catalog, user, child.id)) {
         remaining.push(child.id);
       }
     } catch {
@@ -168,11 +181,14 @@ function unregisterDescendantWorks(repo: WorkRepo, descendants: Array<{ id: stri
   }
 }
 
-export function buildWorkRegisterPreview(repo: WorkRepo, workDir: string): WorkRegisterPreview {
+export function buildWorkRegisterPreview(
+  query: WorkQueryRepository,
+  workDir: string,
+): WorkRegisterPreview {
   const folderName = basename(workDir);
-  const descendants = repo.listDescendantWorkRefs(workDir);
+  const descendants = query.listDescendantWorkRefs(workDir);
   const metaPath = `${workDir}/${META_FILE_NAME}`;
-  const dbWork = repo.getWorkByPhysicalPathSync(workDir);
+  const dbWork = query.getWorkByPhysicalPathSync(workDir);
   const orphanedMeta = existsSync(metaPath) && dbWork === null;
 
   let suggestedTitle = folderName;
@@ -205,12 +221,17 @@ interface DlsiteAppliedMeta {
 }
 
 export async function createWorkFromFolder(
-  repo: WorkRepo,
+  repos: {
+    query: WorkQueryRepository;
+    catalog: CatalogWorkRepository;
+    user: UserWorkStateRepository;
+  },
   scanner: Scanner,
   root: string,
   body: WorkCreateBody,
   applyDlsiteCover?: (coverUrl: string, workDir: string) => Promise<string | null>,
 ): Promise<Work> {
+  const { query, catalog, user } = repos;
   const workDir = resolveWithin(root, body.path);
   if (!workDir || !isDirectory(workDir)) {
     throw new WorkRegisterError(
@@ -220,7 +241,7 @@ export async function createWorkFromFolder(
   }
 
   const metaPath = `${workDir}/${META_FILE_NAME}`;
-  const dbWork = repo.getWorkByPhysicalPathSync(workDir);
+  const dbWork = query.getWorkByPhysicalPathSync(workDir);
   if (dbWork !== null) {
     throw new WorkRegisterError(
       "already_registered",
@@ -228,7 +249,7 @@ export async function createWorkFromFolder(
     );
   }
 
-  const descendants = repo.listDescendantWorkRefs(workDir);
+  const descendants = query.listDescendantWorkRefs(workDir);
   if (descendants.length > 0 && !body.mergeDescendantWorks) {
     throw new WorkRegisterError(
       "descendants_require_merge",
@@ -269,7 +290,7 @@ export async function createWorkFromFolder(
     }
 
     const work = await scanner.restoreFolderWork(workDir, metaPatch);
-    unregisterDescendantWorks(repo, descendants);
+    unregisterDescendantWorks(query, catalog, user, descendants);
     return work;
   }
 
@@ -297,7 +318,7 @@ export async function createWorkFromFolder(
     coverImage,
     dlsite,
   });
-  unregisterDescendantWorks(repo, descendants);
+  unregisterDescendantWorks(query, catalog, user, descendants);
   return work;
 }
 

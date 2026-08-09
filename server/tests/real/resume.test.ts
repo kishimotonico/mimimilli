@@ -7,8 +7,13 @@ import { InvalidResumeError } from "../../src/adapter.ts";
 import { openDb } from "../../src/adapters/real/db.ts";
 import { probeDurationSec } from "../../src/adapters/real/probe.ts";
 import { workStates } from "../../src/adapters/real/userSchema.ts";
-import { WorkRepo } from "../../src/adapters/real/workRepo.ts";
-import { upsertTestWork, resolvedDuration } from "../helpers/workTestUtils.ts";
+import {
+  upsertTestWork,
+  resolvedDuration,
+  createWorkRepos,
+  getTestWork,
+  saveTestResume,
+} from "../helpers/workTestUtils.ts";
 import { makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 
 function sampleWork(id: string): Work {
@@ -68,27 +73,31 @@ function sampleWork(id: string): Work {
 
 test("レジュームは区間相対秒で保存され、並べ替え後もTrack IDで復元する", async () => {
   const db = openDb({ kind: "memory" });
-  const repo = new WorkRepo(db);
+  const { catalog, user } = createWorkRepos(db);
   const work = sampleWork("resume-reorder");
-  upsertTestWork(repo, work);
+  upsertTestWork(catalog, user, work);
   const playlist = work.playlists[0]!;
   const track = playlist.tracks[1]!;
 
   assert.equal(
-    repo.saveResume(work.id, { playlistId: playlist.id, trackId: track.id, offsetSec: 15 }),
+    saveTestResume(catalog, user, work.id, {
+      playlistId: playlist.id,
+      trackId: track.id,
+      offsetSec: 15,
+    }),
     true,
   );
-  assert.deepEqual((await repo.getWork(work.id))?.resume, {
+  assert.deepEqual((await getTestWork(db, work.id))?.resume, {
     playlistId: playlist.id,
     trackId: track.id,
     offsetSec: 15,
   });
 
-  upsertTestWork(repo, {
+  upsertTestWork(catalog, user, {
     ...work,
     playlists: [{ ...playlist, tracks: [playlist.tracks[1]!, playlist.tracks[0]!] }],
   });
-  assert.deepEqual((await repo.getWork(work.id))?.resume, {
+  assert.deepEqual((await getTestWork(db, work.id))?.resume, {
     playlistId: playlist.id,
     trackId: track.id,
     offsetSec: 15,
@@ -98,15 +107,15 @@ test("レジュームは区間相対秒で保存され、並べ替え後もTrack
 
 test("保存時に所属と区間を検証し、読出し時に解決不能な行だけを無効化する", async () => {
   const db = openDb({ kind: "memory" });
-  const repo = new WorkRepo(db);
+  const { catalog, user } = createWorkRepos(db);
   const work = sampleWork("resume-invalid");
-  upsertTestWork(repo, work);
+  upsertTestWork(catalog, user, work);
   const playlist = work.playlists[0]!;
   const track = playlist.tracks[1]!;
 
   assert.throws(
     () =>
-      repo.saveResume(work.id, {
+      saveTestResume(catalog, user, work.id, {
         playlistId: crypto.randomUUID(),
         trackId: track.id,
         offsetSec: 1,
@@ -114,7 +123,12 @@ test("保存時に所属と区間を検証し、読出し時に解決不能な�
     InvalidResumeError,
   );
   assert.throws(
-    () => repo.saveResume(work.id, { playlistId: playlist.id, trackId: track.id, offsetSec: 61 }),
+    () =>
+      saveTestResume(catalog, user, work.id, {
+        playlistId: playlist.id,
+        trackId: track.id,
+        offsetSec: 61,
+      }),
     InvalidResumeError,
   );
 
@@ -128,7 +142,7 @@ test("保存時に所属と区間を検証し、読出し時に解決不能な�
     })
     .where(eq(workStates.workId, work.id))
     .run();
-  assert.equal((await repo.getWork(work.id))?.resume, null);
+  assert.equal((await getTestWork(db, work.id))?.resume, null);
   assert.equal(
     db.user.select().from(workStates).where(eq(workStates.workId, work.id)).get()?.resumeTrackId,
     unresolvedTrackId,
@@ -140,7 +154,7 @@ test("end省略Trackは音声ファイルを300秒から60秒へ差し替えた�
   const directory = makeTestDirectory("resume-file-replacement");
   t.after(directory.cleanup);
   const db = openDb({ kind: "memory" });
-  const repo = new WorkRepo(db);
+  const { catalog, user } = createWorkRepos(db);
   const base = sampleWork("resume-probed-duration");
   const playlist = base.playlists[0]!;
   const track = { ...playlist.tracks[0]!, start: 0, end: undefined };
@@ -149,7 +163,7 @@ test("end省略Trackは音声ファイルを300秒から60秒へ差し替えた�
     physicalPath: directory.path,
     playlists: [{ ...playlist, tracks: [track] }],
   };
-  upsertTestWork(repo, work);
+  upsertTestWork(catalog, user, work);
   const cachePath = join(work.physicalPath, track.file);
   writeWav(cachePath, 300);
   assert.deepEqual(await probeDurationSec(db.catalog, cachePath, new Map()), {
@@ -158,19 +172,28 @@ test("end省略Trackは音声ファイルを300秒から60秒へ差し替えた�
   });
 
   assert.equal(
-    repo.saveResume(work.id, { playlistId: playlist.id, trackId: track.id, offsetSec: 200 }),
+    saveTestResume(catalog, user, work.id, {
+      playlistId: playlist.id,
+      trackId: track.id,
+      offsetSec: 200,
+    }),
     true,
   );
-  assert.equal((await repo.getWork(work.id))?.resume?.offsetSec, 200);
+  assert.equal((await getTestWork(db, work.id))?.resume?.offsetSec, 200);
 
   writeWav(cachePath, 60);
   assert.deepEqual(await probeDurationSec(db.catalog, cachePath, new Map()), {
     kind: "resolved",
     durationSec: 60,
   });
-  assert.equal((await repo.getWork(work.id))?.resume, null);
+  assert.equal((await getTestWork(db, work.id))?.resume, null);
   assert.throws(
-    () => repo.saveResume(work.id, { playlistId: playlist.id, trackId: track.id, offsetSec: 200 }),
+    () =>
+      saveTestResume(catalog, user, work.id, {
+        playlistId: playlist.id,
+        trackId: track.id,
+        offsetSec: 200,
+      }),
     InvalidResumeError,
   );
   db.close();
@@ -180,7 +203,7 @@ test("end省略Trackはrescan・明示probeなしでもgetWork読み取り時に
   const directory = makeTestDirectory("resume-file-replacement-live-read");
   t.after(directory.cleanup);
   const db = openDb({ kind: "memory" });
-  const repo = new WorkRepo(db);
+  const { catalog, user } = createWorkRepos(db);
   const base = sampleWork("resume-live-read-duration");
   const playlist = base.playlists[0]!;
   const track = { ...playlist.tracks[0]!, start: 0, end: undefined };
@@ -189,17 +212,17 @@ test("end省略Trackはrescan・明示probeなしでもgetWork読み取り時に
     physicalPath: directory.path,
     playlists: [{ ...playlist, tracks: [track] }],
   };
-  upsertTestWork(repo, work);
+  upsertTestWork(catalog, user, work);
   const cachePath = join(work.physicalPath, track.file);
   writeWav(cachePath, 300);
 
   // getWorkの読み取りだけでprobe cacheが作られる（明示的なprobeDurationSec呼び出しはしない）。
-  const first = await repo.getWork(work.id);
+  const first = await getTestWork(db, work.id);
   assert.equal(first?.playlists[0]?.tracks[0]?.durationSec, 300);
 
   // rescanを挟まずファイルだけ差し替える。
   writeWav(cachePath, 60);
-  const second = await repo.getWork(work.id);
+  const second = await getTestWork(db, work.id);
   assert.equal(second?.playlists[0]?.tracks[0]?.durationSec, 60);
   db.close();
 });

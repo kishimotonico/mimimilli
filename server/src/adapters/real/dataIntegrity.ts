@@ -1,5 +1,5 @@
 import type { DataIntegrityWarning } from "@mimimilli/shared";
-import type { SummaryLoadSkip } from "./workRepo.ts";
+import type { SummaryLoadSkip } from "./workRowMapping.ts";
 
 type DataIntegrityLogger = {
   warn: (message: string, properties?: Record<string, unknown>) => void;

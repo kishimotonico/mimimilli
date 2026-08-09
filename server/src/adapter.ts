@@ -68,7 +68,7 @@ export interface AxisFacetsFilter {
 export class NotConfiguredError extends Error {}
 
 /** Workは存在するが、resumeのPlaylist/Track所属またはoffsetが不正。 */
-export class InvalidResumeError extends Error {}
+export { InvalidResumeError } from "./errors.ts";
 
 export class WorkRegisterError extends Error {
   readonly code:

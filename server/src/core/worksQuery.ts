@@ -79,7 +79,7 @@ function compareDuration(a: WorkSummary, b: WorkSummary, direction: 1 | -1): num
 // RJ/VJコード比較用の正規化。大文字小文字と "RJ"/"VJ" 接頭辞の有無を無視して比較する
 // （DLsite商品コードはRJ=同人、VJ=商業/美少女ゲームの2種類。shared/dlsite.tsのrjCode
 // フィールドは両方を同じ形式 `^(RJ|VJ)\d{6,8}$` で保持する）。
-// real側のSQL実装（workRepo.ts queryWorks）と同じ正規化仕様に揃える。
+// real側のSQL実装（workQueryRepository queryWorks）と同じ正規化仕様に揃える。
 export function normalizeRjCode(value: string): string {
   return value
     .trim()

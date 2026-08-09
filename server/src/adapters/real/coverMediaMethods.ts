@@ -10,17 +10,17 @@ import {
 import { browseFs as browseFilesystem } from "./fsBrowse.ts";
 import { mimeOf, isAudioPath, resolveWithin } from "./paths.ts";
 import { ThumbnailCache } from "./thumbnailCache.ts";
-import { WorkRepo } from "./workRepo.ts";
+import type { WorkQueryRepository } from "./workQueryRepository.ts";
 
 export function createCoverMediaMethods(deps: {
-  repo: WorkRepo;
+  query: WorkQueryRepository;
   thumbnailCache: ThumbnailCache;
   thumbnailCacheDir: string;
   requireRoot: () => string;
 }) {
-  const { repo, thumbnailCache, thumbnailCacheDir, requireRoot } = deps;
+  const { query, thumbnailCache, thumbnailCacheDir, requireRoot } = deps;
   async function describeCover(workId: string, width?: number): Promise<CoverDescriptor | null> {
-    const work = repo.getCoverLocation(workId);
+    const work = query.getCoverLocation(workId);
     if (!work?.coverImage) return null;
 
     const sourceAbsolutePath = resolveWithin(
@@ -85,7 +85,7 @@ export function createCoverMediaMethods(deps: {
       workId: string,
       relPath?: string,
     ): Promise<MediaLocation | null> {
-      const root = repo.getMediaRoot(workId);
+      const root = query.getMediaRoot(workId);
       if (!root) return null;
 
       const rel = relPath;
@@ -103,7 +103,7 @@ export function createCoverMediaMethods(deps: {
       if (realRoot === null) return null;
       const target = resolveWithin(root, path ?? root);
       if (target === null) return null;
-      return browseFilesystem(realRoot, repo.listFsWorkRefs(target), target);
+      return browseFilesystem(realRoot, query.listFsWorkRefs(target), target);
     },
 
     async describeCover(workId: string, width?: number): Promise<CoverDescriptor | null> {

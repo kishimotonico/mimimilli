@@ -12,8 +12,7 @@ import { openDb } from "../../src/adapters/real/db.ts";
 import { tags } from "../../src/adapters/real/catalogSchema.ts";
 import { Scanner } from "../../src/adapters/real/scanner.ts";
 import { querySmartFolderWorks } from "../../src/adapters/real/smartFolderWorks.ts";
-import { WorkRepo } from "../../src/adapters/real/workRepo.ts";
-import { upsertTestWork, resolvedDuration } from "../helpers/workTestUtils.ts";
+import { createWorkRepos, upsertTestWork, resolvedDuration } from "../helpers/workTestUtils.ts";
 import { nts } from "../helpers/tag.ts";
 
 function sampleWork(id: string, tag: string): Work {
@@ -63,13 +62,17 @@ function sampleWork(id: string, tag: string): Work {
 }
 
 function seedCorruptedPair(
-  repo: WorkRepo,
+  catalog: ReturnType<typeof createWorkRepos>["catalog"],
+  user: ReturnType<typeof createWorkRepos>["user"],
   db: ReturnType<typeof openDb>,
 ): { goodId: string; badId: string } {
   const goodId = "work-good";
   const badId = "work-bad";
-  upsertTestWork(repo, sampleWork(goodId, "cv/正常"));
-  upsertTestWork(repo, { ...sampleWork(badId, "cv/正常"), tags: nts(["cv/正常", "cv/壊れ対象"]) });
+  upsertTestWork(catalog, user, sampleWork(goodId, "cv/正常"));
+  upsertTestWork(catalog, user, {
+    ...sampleWork(badId, "cv/正常"),
+    tags: nts(["cv/正常", "cv/壊れ対象"]),
+  });
   db.catalog.update(tags).set({ name: " CV/壊れ " }).where(eq(tags.name, "cv/壊れ対象")).run();
   return { goodId, badId };
 }
@@ -85,8 +88,8 @@ function openFileDb(dir: string) {
 test("export は壊れた作品を除外し dataIntegrityWarning を返す", async () => {
   const dir = mkdtempSync(join(tmpdir(), "mimi-export-integrity-"));
   const db = openFileDb(dir);
-  const repo = new WorkRepo(db);
-  const { goodId, badId } = seedCorruptedPair(repo, db);
+  const { catalog, user } = createWorkRepos(db);
+  const { goodId, badId } = seedCorruptedPair(catalog, user, db);
   const adapter = createRealAdapter({
     database: {
       kind: "files",
@@ -114,10 +117,10 @@ test("export は壊れた作品を除外し dataIntegrityWarning を返す", asy
 
 test("ルールベース smart folder は壊れた候補を除外して WorksPage を返す", () => {
   const db = openDb({ kind: "memory" });
-  const repo = new WorkRepo(db);
-  const { goodId, badId } = seedCorruptedPair(repo, db);
+  const { query, catalog, user } = createWorkRepos(db);
+  const { goodId, badId } = seedCorruptedPair(catalog, user, db);
   const page = querySmartFolderWorks(
-    repo,
+    query,
     {
       rules: [
         {
@@ -142,11 +145,11 @@ test("ルールベース smart folder は壊れた候補を除外して WorksPag
 
 test("スキャン finalize は壊れた作品があっても ScanResult を返す", async () => {
   const db = openDb({ kind: "memory" });
-  const repo = new WorkRepo(db);
-  const { badId } = seedCorruptedPair(repo, db);
+  const repos = createWorkRepos(db);
+  const { badId } = seedCorruptedPair(repos.catalog, repos.user, db);
   const root = mkdtempSync(join(tmpdir(), "mimi-scan-integrity-"));
   try {
-    const scanner = new Scanner(db, repo);
+    const scanner = new Scanner(db, repos);
     const result = await scanner.scan(root, { full: true });
     assert.equal(result.dataIntegrityWarning?.skippedCount, 1);
     assert.deepEqual(result.dataIntegrityWarning?.skippedWorkIds, [badId]);
@@ -160,8 +163,8 @@ test("スキャン finalize は壊れた作品があっても ScanResult を返�
 test("DLsite 一括取得は壊れた作品を除外し dataIntegrityWarning を返す", async () => {
   const dir = mkdtempSync(join(tmpdir(), "mimi-dlsite-bulk-integrity-"));
   const db = openFileDb(dir);
-  const repo = new WorkRepo(db);
-  const { badId } = seedCorruptedPair(repo, db);
+  const { catalog, user } = createWorkRepos(db);
+  const { badId } = seedCorruptedPair(catalog, user, db);
   const adapter = createRealAdapter({
     database: {
       kind: "files",
@@ -185,8 +188,8 @@ test("DLsite 一括取得は壊れた作品を除外し dataIntegrityWarning を
 test("DLsite 一括取得: workIds に含まない壊れた作品は dataIntegrityWarning に出ない", async () => {
   const dir = mkdtempSync(join(tmpdir(), "mimi-dlsite-bulk-scope-"));
   const db = openFileDb(dir);
-  const repo = new WorkRepo(db);
-  const { goodId } = seedCorruptedPair(repo, db);
+  const { catalog, user } = createWorkRepos(db);
+  const { goodId } = seedCorruptedPair(catalog, user, db);
   const adapter = createRealAdapter({
     database: {
       kind: "files",
@@ -209,8 +212,8 @@ test("DLsite 一括取得: workIds に含まない壊れた作品は dataIntegri
 test("DLsite 一括取得: workIds に含まれる壊れた作品は dataIntegrityWarning に出る", async () => {
   const dir = mkdtempSync(join(tmpdir(), "mimi-dlsite-bulk-scope-bad-"));
   const db = openFileDb(dir);
-  const repo = new WorkRepo(db);
-  const { badId } = seedCorruptedPair(repo, db);
+  const { catalog, user } = createWorkRepos(db);
+  const { badId } = seedCorruptedPair(catalog, user, db);
   const adapter = createRealAdapter({
     database: {
       kind: "files",
@@ -234,9 +237,9 @@ test("DLsite 一括取得: workIds に含まれる壊れた作品は dataIntegri
 test("HTTP smart folder は dataIntegrityWarning を返す", async () => {
   const dir = mkdtempSync(join(tmpdir(), "mimi-sf-integrity-"));
   const db = openFileDb(dir);
-  const repo = new WorkRepo(db);
-  const { goodId, badId } = seedCorruptedPair(repo, db);
-  const folder = repo.createSmartFolder({
+  const { catalog, user } = createWorkRepos(db);
+  const { goodId, badId } = seedCorruptedPair(catalog, user, db);
+  const folder = user.createSmartFolder({
     name: "タグ一致",
     rules: [
       {

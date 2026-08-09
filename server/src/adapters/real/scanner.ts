@@ -58,7 +58,17 @@ import { isPathWithin } from "../../lib/path.ts";
 import { probeDurationSec, type ProbeCacheEntry } from "./probe.ts";
 import { createProgressThrottle } from "./progressThrottle.ts";
 import { measureCoverDimensions, type CoverDimensions } from "./thumbnailCache.ts";
-import type { CoverColumns, ScanWorkState, WorkRepo } from "./workRepo.ts";
+import type { CoverColumns, ScanWorkState } from "./workRowMapping.ts";
+import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
+import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
+import type { WorkQueryRepository } from "./workQueryRepository.ts";
+import { getWorkWithLiveProbe } from "./workRefresh.ts";
+
+export interface WorkPersistence {
+  query: WorkQueryRepository;
+  catalog: CatalogWorkRepository;
+  user: UserWorkStateRepository;
+}
 import { getCategoryLogger } from "../../lib/logger.ts";
 import { logDataIntegritySkips, toDataIntegrityWarning } from "./dataIntegrity.ts";
 
@@ -332,13 +342,21 @@ interface UpsertItem {
 class UpsertBatch {
   private queue: UpsertItem[] = [];
   private readonly db: Db;
-  private readonly repo: WorkRepo;
+  private readonly catalog: CatalogWorkRepository;
+  private readonly user: UserWorkStateRepository;
   private readonly limit: number;
   private readonly checkAbort: () => void;
 
-  constructor(db: Db, repo: WorkRepo, limit: number, checkAbort: () => void = () => {}) {
+  constructor(
+    db: Db,
+    catalog: CatalogWorkRepository,
+    user: UserWorkStateRepository,
+    limit: number,
+    checkAbort: () => void = () => {},
+  ) {
     this.db = db;
-    this.repo = repo;
+    this.catalog = catalog;
+    this.user = user;
     this.limit = limit;
     this.checkAbort = checkAbort;
   }
@@ -358,14 +376,14 @@ class UpsertBatch {
     this.db.userTransaction(() => {
       for (const item of items) {
         this.checkAbort();
-        this.repo.upsertWorkUserState(item.work);
+        this.user.upsertWorkUserState(item.work);
       }
     });
     this.checkAbort();
     this.db.transaction(() => {
       for (const item of items) {
         this.checkAbort();
-        this.repo.upsertWorkCatalog(item.work, {
+        this.catalog.upsertWorkCatalog(item.work, {
           metaPath: item.metaPath,
           fingerprint: item.fingerprint,
           cover: item.cover,
@@ -424,13 +442,17 @@ export interface ScannerOptions {
 
 export class Scanner {
   private readonly db: Db;
-  private readonly repo: WorkRepo;
+  private readonly query: WorkQueryRepository;
+  private readonly catalog: CatalogWorkRepository;
+  private readonly user: UserWorkStateRepository;
   private readonly upsertBatchSize: number;
   private readonly measureCover: (sourceAbsolutePath: string) => Promise<CoverDimensions | null>;
 
-  constructor(db: Db, repo: WorkRepo, options?: ScannerOptions) {
+  constructor(db: Db, repos: WorkPersistence, options?: ScannerOptions) {
     this.db = db;
-    this.repo = repo;
+    this.query = repos.query;
+    this.catalog = repos.catalog;
+    this.user = repos.user;
     const upsertBatchSize = options?.upsertBatchSize ?? DEFAULT_UPSERT_BATCH_SIZE;
     if (!Number.isInteger(upsertBatchSize) || upsertBatchSize <= 0) {
       throw new RangeError("upsertBatchSize は有限の正整数である必要があります");
@@ -478,7 +500,7 @@ export class Scanner {
     // 変更のない作品のPlaylist/Track関係は再生位置の解決にも使う。全削除してから
     // スキップすると関係だけ失われるため、変更作品のupsert時だけ置き換える。
     const seenIds: SeenMetaIds = { work: new Set(), playlist: new Set(), track: new Set() };
-    const existingWorks = this.repo.getScanWorkMap();
+    const existingWorks = this.query.getScanWorkMap();
     const existingByPhysicalPath = new Map(
       [...existingWorks].map(([id, state]) => [state.physicalPath, { id, state }]),
     );
@@ -502,7 +524,13 @@ export class Scanner {
     const probeCache = this.buildProbeCache(prepared, full, checkAbort);
 
     // 1-c. 実際の登録処理。fingerprint 一致作品はスキップし、それ以外は probe cache を使って処理する。
-    const batch = new UpsertBatch(this.db, this.repo, this.upsertBatchSize, checkAbort);
+    const batch = new UpsertBatch(
+      this.db,
+      this.catalog,
+      this.user,
+      this.upsertBatchSize,
+      checkAbort,
+    );
     const registeringThrottle = createProgressThrottle(PROGRESS_MIN_INTERVAL_MS);
     for (let i = 0; i < prepared.length; i++) {
       checkAbort();
@@ -642,9 +670,9 @@ export class Scanner {
         }
       }
     }
-    this.repo.markMissingExcept([...seenIds.work]);
-    result.missing = this.repo.countByStatus("missing");
-    const { summaries, skipped } = this.repo.listSummaries();
+    this.catalog.markMissingExcept([...seenIds.work]);
+    result.missing = this.catalog.countByStatus("missing");
+    const { summaries, skipped } = this.query.listSummaries();
     logDataIntegritySkips(scanLogger, "scan-finalize", skipped);
     result.rjCodeMissingCount = summaries.filter((work) => isRjCodeMissing(work.dlsite)).length;
     const dataIntegrityWarning = toDataIntegrityWarning(skipped);
@@ -805,7 +833,7 @@ export class Scanner {
         }
       }
     }
-    return this.repo.fetchProbeCache(trackPaths);
+    return this.query.fetchProbeCache(trackPaths);
   }
 
   private handleMetaParseError(
@@ -826,7 +854,7 @@ export class Scanner {
         : null;
     const existing = existingById ?? existingByPhysicalPath.get(workDir) ?? null;
     if (existing) {
-      this.repo.markWorkError(existing.id, workDir, metaPath, error.message);
+      this.catalog.markWorkError(existing.id, workDir, metaPath, error.message);
       seenIds.work.add(existing.id);
     }
     result.errors += 1;
@@ -1024,8 +1052,8 @@ export class Scanner {
     writeMetaFile(metaPath, meta);
 
     const prepared = this.prepareSingleMeta(metaPath);
-    const existingWorks = this.repo.getScanWorkMap();
-    const batch = new UpsertBatch(this.db, this.repo, this.upsertBatchSize, () => {});
+    const existingWorks = this.query.getScanWorkMap();
+    const batch = new UpsertBatch(this.db, this.catalog, this.user, this.upsertBatchSize, () => {});
     const scanResult: Pick<ScanResult, "coverErrors"> = { coverErrors: 0 };
     const seenIds: SeenMetaIds = { work: new Set(), playlist: new Set(), track: new Set() };
     await this.registerMetaFile(
@@ -1040,7 +1068,7 @@ export class Scanner {
     );
     batch.flush();
 
-    const work = await this.repo.getWork(meta.id);
+    const work = await getWorkWithLiveProbe(this.db, this.query, this.catalog, meta.id);
     if (!work) throw new Error("登録した作品の取得に失敗しました");
     return work;
   }
@@ -1072,12 +1100,12 @@ export class Scanner {
     }
 
     const workId = reassignMetaIdsOnDbCollision(metaPath, (id) => {
-      const existing = this.repo.getScanWorkMap().get(id);
+      const existing = this.query.getScanWorkMap().get(id);
       return existing !== undefined && existing.physicalPath !== workDir;
     });
     const prepared = this.prepareSingleMeta(metaPath);
-    const existingWorks = this.repo.getScanWorkMap();
-    const batch = new UpsertBatch(this.db, this.repo, this.upsertBatchSize, () => {});
+    const existingWorks = this.query.getScanWorkMap();
+    const batch = new UpsertBatch(this.db, this.catalog, this.user, this.upsertBatchSize, () => {});
     const scanResult: Pick<ScanResult, "coverErrors"> = { coverErrors: 0 };
     const seenIds: SeenMetaIds = { work: new Set(), playlist: new Set(), track: new Set() };
     await this.registerMetaFile(
@@ -1092,7 +1120,7 @@ export class Scanner {
     );
     batch.flush();
 
-    const work = await this.repo.getWork(workId);
+    const work = await getWorkWithLiveProbe(this.db, this.query, this.catalog, workId);
     if (!work) throw new Error("復元した作品の取得に失敗しました");
     return work;
   }

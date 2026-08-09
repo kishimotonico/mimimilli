@@ -5,7 +5,9 @@ import { resolveWithin } from "./paths.ts";
 import { Scanner } from "./scanner.ts";
 import { gcThumbnailCache, type WorkCoverEntry } from "./thumbnailCache.ts";
 import { logDataIntegritySkips } from "./dataIntegrity.ts";
-import { WorkRepo } from "./workRepo.ts";
+import { CatalogWorkRepository } from "./catalogWorkRepository.ts";
+import { UserWorkStateRepository } from "./userWorkStateRepository.ts";
+import { WorkQueryRepository } from "./workQueryRepository.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
 
 const scanLogger = getCategoryLogger("scan");
@@ -56,8 +58,10 @@ async function run(input: WorkerInput): Promise<void> {
     };
     if (input.testGateStage === "before-scan") waitAtTestGate();
     if (cancelled(token)) throw new Error("スキャンはキャンセルされました");
-    const repo = new WorkRepo(db);
-    const scanner = new Scanner(db, repo);
+    const query = new WorkQueryRepository(db);
+    const catalog = new CatalogWorkRepository(db);
+    const user = new UserWorkStateRepository(db);
+    const scanner = new Scanner(db, { query, catalog, user });
     const result = await scanner.scan(
       input.root,
       {
@@ -73,7 +77,7 @@ async function run(input: WorkerInput): Promise<void> {
       terminal = { type: "cancelled" };
     } else {
       const covers: WorkCoverEntry[] = [];
-      const { summaries, skipped } = repo.listSummaries();
+      const { summaries, skipped } = query.listSummaries();
       logDataIntegritySkips(scanLogger, "scan-worker-thumbnail-gc", skipped);
       for (const work of summaries) {
         if (cancelled(token)) break;
@@ -97,7 +101,7 @@ async function run(input: WorkerInput): Promise<void> {
         if (cancelled(token)) {
           terminal = { type: "cancelled" };
         } else {
-          repo.setScanState("last_scan_time", new Date().toISOString());
+          catalog.setScanState("last_scan_time", new Date().toISOString());
           terminal = { type: "completed", result };
         }
       }
@@ -115,7 +119,6 @@ async function run(input: WorkerInput): Promise<void> {
     db?.close();
   }
 
-  // 親はterminal受信か、terminal前のerror/messageerror/closeのいずれかで必ずsettleする。
   post(terminal);
   globalThis.close();
 }

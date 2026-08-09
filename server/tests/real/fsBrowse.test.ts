@@ -9,7 +9,7 @@ import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import type { FsWorkRef } from "../../src/adapters/real/fsBrowse.ts";
 import { buildWorkPathIndex, findOwnerWork } from "../../src/adapters/real/fsBrowse.ts";
 import { openDb, type Db } from "../../src/adapters/real/db.ts";
-import { WorkRepo } from "../../src/adapters/real/workRepo.ts";
+import { createWorkRepos } from "../helpers/workTestUtils.ts";
 import { createApp, type AppEnv } from "../../src/app.ts";
 import { makeSampleLibrary, writeWav } from "../helpers/sampleLibrary.ts";
 import { upsertTestWork } from "../helpers/workTestUtils.ts";
@@ -179,23 +179,23 @@ test("物理パス索引は境界・重複・未登録を保ち、所有者探�
 
 test("listFsWorkRefs は対象ディレクトリと祖先・子孫の作品だけを返す", () => {
   const db = openDb({ kind: "memory" });
-  const repo = new WorkRepo(db);
+  const { query, catalog, user } = createWorkRepos(db);
 
   const base = "/library/dlsite";
-  upsertTestWork(repo, sampleWork("w-root", `${base}/RJ900001`));
-  upsertTestWork(repo, sampleWork("w-nested", `${base}/RJ900001/nested`));
-  upsertTestWork(repo, sampleWork("w-other", `${base}/RJ900002`));
+  upsertTestWork(catalog, user, sampleWork("w-root", `${base}/RJ900001`));
+  upsertTestWork(catalog, user, sampleWork("w-nested", `${base}/RJ900001/nested`));
+  upsertTestWork(catalog, user, sampleWork("w-other", `${base}/RJ900002`));
 
-  const atNested = repo.listFsWorkRefs(`${base}/RJ900001/nested`);
+  const atNested = query.listFsWorkRefs(`${base}/RJ900001/nested`);
   assert.deepEqual(atNested.map((w) => w.id).sort(), ["w-nested", "w-root"], "子孫と祖先のみ");
 
-  const atSibling = repo.listFsWorkRefs(`${base}/RJ900002`);
+  const atSibling = query.listFsWorkRefs(`${base}/RJ900002`);
   assert.deepEqual(
     atSibling.map((w) => w.id),
     ["w-other"],
   );
 
-  const unrelated = repo.listFsWorkRefs("/elsewhere");
+  const unrelated = query.listFsWorkRefs("/elsewhere");
   assert.equal(unrelated.length, 0);
 
   db.close();
@@ -203,19 +203,19 @@ test("listFsWorkRefs は対象ディレクトリと祖先・子孫の作品だ�
 
 test("listFsWorkRefs は末尾区切りでも子孫を取りこぼさない", () => {
   const db = openDb({ kind: "memory" });
-  const repo = new WorkRepo(db);
+  const { query, catalog, user } = createWorkRepos(db);
 
-  upsertTestWork(repo, sampleWork("w-under-lib", "/library/work"));
+  upsertTestWork(catalog, user, sampleWork("w-under-lib", "/library/work"));
   assert.deepEqual(
-    repo.listFsWorkRefs("/library/").map((w) => w.id),
+    query.listFsWorkRefs("/library/").map((w) => w.id),
     ["w-under-lib"],
   );
 
   const base = "/library/dlsite";
-  upsertTestWork(repo, sampleWork("w-root", `${base}/RJ900001`));
-  upsertTestWork(repo, sampleWork("w-nested", `${base}/RJ900001/nested`));
+  upsertTestWork(catalog, user, sampleWork("w-root", `${base}/RJ900001`));
+  upsertTestWork(catalog, user, sampleWork("w-nested", `${base}/RJ900001/nested`));
   assert.deepEqual(
-    repo
+    query
       .listFsWorkRefs(`${base}/RJ900001/`)
       .map((w) => w.id)
       .sort(),
@@ -227,18 +227,18 @@ test("listFsWorkRefs は末尾区切りでも子孫を取りこぼさない", ()
 
 test("listFsWorkRefs の physical_path 重複時の先勝ちは listSummaries と同じ", () => {
   const db = openDb({ kind: "memory" });
-  const repo = new WorkRepo(db);
+  const { query, catalog, user } = createWorkRepos(db);
   const physicalPath = "/library/duplicate";
 
-  upsertTestWork(repo, sampleWork("w-first", physicalPath));
-  upsertTestWork(repo, sampleWork("w-second", physicalPath));
+  upsertTestWork(catalog, user, sampleWork("w-first", physicalPath));
+  upsertTestWork(catalog, user, sampleWork("w-second", physicalPath));
 
-  const expectedId = repo
+  const expectedId = query
     .listSummaries()
     .summaries.find((s) => s.physicalPath === physicalPath)?.id;
   assert.ok(expectedId, "listSummaries に重複 physical_path の作品があること");
 
-  const indexed = buildWorkPathIndex(repo.listFsWorkRefs(physicalPath));
+  const indexed = buildWorkPathIndex(query.listFsWorkRefs(physicalPath));
   assert.equal(indexed.get(physicalPath)?.id, expectedId);
 
   db.close();
@@ -246,9 +246,9 @@ test("listFsWorkRefs の physical_path 重複時の先勝ちは listSummaries �
 
 test("listFsWorkRefs は listSummaries より軽量（タグ取得なし・SQL 1本）", () => {
   const db = openDb({ kind: "memory" });
-  const repo = new WorkRepo(db);
+  const { query, catalog, user } = createWorkRepos(db);
   for (let i = 0; i < 5; i++) {
-    upsertTestWork(repo, sampleWork(`w-${i}`, `/library/w-${i}`));
+    upsertTestWork(catalog, user, sampleWork(`w-${i}`, `/library/w-${i}`));
   }
 
   let queryCount = 0;
@@ -258,7 +258,7 @@ test("listFsWorkRefs は listSummaries より軽量（タグ取得なし・SQL 1
     return original(sql);
   }) as Db["sqlite"]["query"];
 
-  const refs = repo.listFsWorkRefs("/library/w-0");
+  const refs = query.listFsWorkRefs("/library/w-0");
   assert.equal(refs.length, 1);
   assert.equal(queryCount, 1);
 

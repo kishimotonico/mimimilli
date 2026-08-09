@@ -11,7 +11,7 @@ import {
   type Work,
 } from "@mimimilli/shared";
 import { openDb } from "../src/adapters/real/db.ts";
-import { WorkRepo } from "../src/adapters/real/workRepo.ts";
+import { createWorkRepos, upsertTestWork } from "../tests/helpers/workTestUtils.ts";
 import { smartFolders } from "../src/adapters/real/userSchema.ts";
 import { writeWav } from "../tests/helpers/sampleLibrary.ts";
 import { optionalArg, optionalIntArg, parseArgs } from "./cli.ts";
@@ -189,7 +189,7 @@ async function main(): Promise<void> {
 
   const rng = createRng(rngSeed);
   const db = openDb({ kind: "files", catalogPath: catalogDb, userPath: userDb });
-  const repo = new WorkRepo(db);
+  const { catalog, user } = createWorkRepos(db);
 
   const started = performance.now();
   let firstWork: Work | undefined;
@@ -197,7 +197,7 @@ async function main(): Promise<void> {
     for (let index = 0; index < count; index++) {
       const work = buildWork(index, libRoot, rng);
       if (index === 0) firstWork = work;
-      repo.upsertWork(work, { metaPath: join(work.physicalPath, "mimimilli.json") });
+      upsertTestWork(catalog, user, work, join(work.physicalPath, "mimimilli.json"));
       if ((index + 1) % 1000 === 0 || index + 1 === count) {
         process.stdout.write(`\r${index + 1}/${count} works`);
       }
@@ -207,7 +207,7 @@ async function main(): Promise<void> {
 
   if (!firstWork) throw new Error("作品が1件も生成されませんでした");
 
-  repo.setUserSetting(KEY_ROOT_FOLDER, libRoot);
+  user.setUserSetting(KEY_ROOT_FOLDER, libRoot);
   const sampleAudioRelPath = firstWork.playlists[0]!.tracks[0]!.file;
   const sampleWorkDir = firstWork.physicalPath;
   mkdirSync(join(sampleWorkDir, "mp3"), { recursive: true });

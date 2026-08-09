@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { openDb } from "../src/adapters/real/db.ts";
-import { WorkRepo } from "../src/adapters/real/workRepo.ts";
+import { WorkQueryRepository } from "../src/adapters/real/workQueryRepository.ts";
 import { optionalArg, optionalIntArg, parseArgs } from "./cli.ts";
 
 function uuid(seed: number): string {
@@ -16,14 +16,14 @@ function seedHighCardinality(
   workCount: number,
   uniqueTagCount: number,
   tagsPerWork: number,
-): { db: ReturnType<typeof openDb>; repo: WorkRepo } {
+): { db: ReturnType<typeof openDb>; query: WorkQueryRepository } {
   mkdirSync(join(dir, "db"), { recursive: true });
   const db = openDb({
     kind: "files",
     catalogPath: `${dir}/db/catalog.sqlite`,
     userPath: `${dir}/db/user.sqlite`,
   });
-  const repo = new WorkRepo(db);
+  const query = new WorkQueryRepository(db);
   const sqlite = db.sqlite;
   sqlite.exec("BEGIN");
   const insertWork = sqlite.prepare(`
@@ -60,18 +60,18 @@ function seedHighCardinality(
     }
   }
   sqlite.exec("COMMIT");
-  return { db, repo };
+  return { db, query };
 }
 
-function timeListSummaries(repo: WorkRepo): {
+function timeListSummaries(query: WorkQueryRepository): {
   firstMs: number;
   secondMs: number;
   summaryCount: number;
 } {
   const t0 = performance.now();
-  const first = repo.listSummaries();
+  const first = query.listSummaries();
   const t1 = performance.now();
-  repo.listSummaries();
+  query.listSummaries();
   const t2 = performance.now();
   return {
     firstMs: t1 - t0,
@@ -88,8 +88,8 @@ function main(): void {
   const outDir = optionalArg(args, "out-dir") ?? "/tmp/mimimilli-bench-hc";
 
   const dir = join(outDir, `hc-${uniqueTagCount}`);
-  const { db, repo } = seedHighCardinality(dir, workCount, uniqueTagCount, tagsPerWork);
-  const result = timeListSummaries(repo);
+  const { db, query } = seedHighCardinality(dir, workCount, uniqueTagCount, tagsPerWork);
+  const result = timeListSummaries(query);
   db.close();
 
   console.log(

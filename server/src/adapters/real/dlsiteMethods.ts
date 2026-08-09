@@ -44,14 +44,17 @@ import { resolveWithin } from "./paths.ts";
 import { SharedFlightPool, throwIfAborted } from "./sharedFlight.ts";
 import { logDataIntegritySkips, toDataIntegrityWarning } from "./dataIntegrity.ts";
 import { measureCoverDimensions } from "./thumbnailCache.ts";
-import type { CoverColumns } from "./workRepo.ts";
-import { WorkRepo } from "./workRepo.ts";
+import type { CoverColumns } from "./workRowMapping.ts";
+import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
+import type { WorkQueryRepository } from "./workQueryRepository.ts";
+import { getWorkWithLiveProbe } from "./workRefresh.ts";
 
 const dlsiteLogger = getCategoryLogger("dlsite");
 
 export function createDlsiteMethods(deps: {
   db: Db;
-  repo: WorkRepo;
+  query: WorkQueryRepository;
+  catalog: CatalogWorkRepository;
   dlsiteCache: DlsiteCache;
   dlsiteCacheOptions: DlsiteCacheOptions;
   dlsiteRequestConfig: DlsiteRequestConfig;
@@ -60,7 +63,8 @@ export function createDlsiteMethods(deps: {
 }) {
   const {
     db,
-    repo,
+    query,
+    catalog,
     dlsiteCache,
     dlsiteCacheOptions,
     dlsiteRequestConfig,
@@ -340,7 +344,7 @@ export function createDlsiteMethods(deps: {
       force = false,
       options?: { signal?: AbortSignal },
     ): Promise<DlsiteFetchResult> {
-      const work = await repo.getWork(workId);
+      const work = await getWorkWithLiveProbe(db, query, catalog, workId);
       if (!work)
         return { ok: false, kind: "not_found", message: `作品が見つかりません: ${workId}` };
       const rjCode = work.dlsite.rjCode ?? detectRjCode([basename(work.physicalPath), work.title]);
@@ -365,7 +369,7 @@ export function createDlsiteMethods(deps: {
     ): Promise<boolean> {
       const signal = options?.signal;
       throwIfAborted(signal, "DLsite一括取得はキャンセルされました");
-      const work = await repo.getWork(workId);
+      const work = await getWorkWithLiveProbe(db, query, catalog, workId);
       if (!work) return false;
 
       const patch: {
@@ -394,7 +398,7 @@ export function createDlsiteMethods(deps: {
       throwIfAborted(signal, "DLsite一括取得はキャンセルされました");
 
       return db.transaction(() => {
-        const updated = repo.patchWork(workId, patch);
+        const updated = catalog.patchWorkCatalog(workId, patch);
         if (!updated) return false;
         const dlsite = {
           rjCode: body.info.rjCode,
@@ -404,7 +408,7 @@ export function createDlsiteMethods(deps: {
           errorKind: null,
           appliedTags: dedupeTags([...work.dlsite.appliedTags, ...applyTags]),
         };
-        repo.setDlsiteState(workId, dlsite);
+        catalog.setDlsiteState(workId, dlsite);
         patchMetaFile(updated.metaPath, {
           title: patch.title,
           tags: patch.tags,
@@ -417,16 +421,16 @@ export function createDlsiteMethods(deps: {
     },
 
     async updateDlsiteState(workId: string, patch: DlsiteStatePatch): Promise<Work | null> {
-      const work = await repo.getWork(workId);
+      const work = await getWorkWithLiveProbe(db, query, catalog, workId);
       if (!work) return null;
       const dlsite = applyDlsiteStatePatch(work.dlsite, patch);
       db.transaction(() => {
-        repo.setDlsiteState(workId, dlsite);
-        const metaPath = repo.getWorkMetaPath(workId);
+        catalog.setDlsiteState(workId, dlsite);
+        const metaPath = catalog.getWorkMetaPath(workId);
         if (!metaPath) throw new Error(`作品のメタパスが見つかりません: ${workId}`);
         patchMetaFile(metaPath, { dlsite });
       });
-      return repo.getWork(workId);
+      return getWorkWithLiveProbe(db, query, catalog, workId);
     },
 
     async runDlsiteBulk(
@@ -444,7 +448,7 @@ export function createDlsiteMethods(deps: {
       try {
         // 対象抽出は listSummaries で完結させる（全件 getWork の N+1 を解消。TASK-57）。
         // 以降の個別処理で完全な Work が必要な場合だけ、その作品の getWork を呼ぶ
-        const { summaries, skipped } = repo.listSummaries(workIds);
+        const { summaries, skipped } = query.listSummaries(workIds);
         logDataIntegritySkips(dlsiteLogger, "dlsite-bulk", skipped);
         const dataIntegrityWarning = toDataIntegrityWarning(skipped);
         if (dataIntegrityWarning) result.dataIntegrityWarning = dataIntegrityWarning;
@@ -552,8 +556,8 @@ export function createDlsiteMethods(deps: {
                   errorKind: newErrorKind,
                 };
                 db.transaction(() => {
-                  repo.setDlsiteState(work.id, dlsite);
-                  const metaPath = repo.getWorkMetaPath(work.id);
+                  catalog.setDlsiteState(work.id, dlsite);
+                  const metaPath = catalog.getWorkMetaPath(work.id);
                   if (metaPath) patchMetaFile(metaPath, { dlsite });
                 });
               }
@@ -614,10 +618,10 @@ export function createDlsiteMethods(deps: {
                   appliedTags: nextAppliedTags,
                 };
                 db.transaction(() => {
-                  const updated = repo.patchWork(work.id, patch);
+                  const updated = catalog.patchWorkCatalog(work.id, patch);
                   if (!updated)
                     throw new Error(`一括取得中に作品が見つからなくなりました: ${work.id}`);
-                  repo.setDlsiteState(work.id, dlsite);
+                  catalog.setDlsiteState(work.id, dlsite);
                   patchMetaFile(updated.metaPath, {
                     title: patch.title,
                     tags: patch.tags,
@@ -665,8 +669,8 @@ export function createDlsiteMethods(deps: {
             // failed への加算と進捗通知は必ず行い、次の作品へ続行する
             try {
               db.transaction(() => {
-                repo.setDlsiteState(work.id, dlsite);
-                const metaPath = repo.getWorkMetaPath(work.id);
+                catalog.setDlsiteState(work.id, dlsite);
+                const metaPath = catalog.getWorkMetaPath(work.id);
                 if (metaPath) patchMetaFile(metaPath, { dlsite });
               });
             } catch (persistError) {

@@ -13,7 +13,9 @@ import {
   ThumbnailCache,
   type ThumbnailCacheOptions,
 } from "./thumbnailCache.ts";
-import { WorkRepo } from "./workRepo.ts";
+import { CatalogWorkRepository } from "./catalogWorkRepository.ts";
+import { UserWorkStateRepository } from "./userWorkStateRepository.ts";
+import { WorkQueryRepository } from "./workQueryRepository.ts";
 import { createDlsiteMethods } from "./dlsiteMethods.ts";
 import { createCoverMediaMethods } from "./coverMediaMethods.ts";
 import { createSettingsScanMethods } from "./settingsScanMethods.ts";
@@ -56,7 +58,9 @@ export function createRealAdapter(
     options.dbBackupDir === undefined ? undefined : { backupDir: options.dbBackupDir },
   );
   const dlsiteCache = new DlsiteCache(options.dlsiteCache);
-  const repo = new WorkRepo(db);
+  const query = new WorkQueryRepository(db);
+  const catalog = new CatalogWorkRepository(db);
+  const user = new UserWorkStateRepository(db);
   const thumbnailCacheDir = options.thumbnailCacheDir ?? join(tmpdir(), "mimimilli-memory-cache");
   const thumbnailCache = new ThumbnailCache(options.thumbnailCache);
   const dataRoot =
@@ -64,7 +68,11 @@ export function createRealAdapter(
     (options.database.kind === "files"
       ? dirname(dirname(options.database.catalogPath))
       : join(tmpdir(), "mimimilli-memory-data"));
-  const scanner = new Scanner(db, repo, { measureCover: measureCoverDimensions });
+  const scanner = new Scanner(
+    db,
+    { query, catalog, user },
+    { measureCover: measureCoverDimensions },
+  );
   const dlsiteRequestConfig: DlsiteRequestConfig = {
     ...DEFAULT_DLSITE_REQUEST_CONFIG,
     ...options.dlsiteRequestConfig,
@@ -73,11 +81,12 @@ export function createRealAdapter(
     dlsiteRequestConfig,
     options.dlsiteSchedulerDependencies,
   );
-  initializeTagPrefixes(repo);
+  initializeTagPrefixes(user);
 
   const { cachedCover, ...dlsiteMethods } = createDlsiteMethods({
     db,
-    repo,
+    query,
+    catalog,
     dlsiteCache,
     dlsiteCacheOptions: options.dlsiteCache,
     dlsiteRequestConfig,
@@ -86,20 +95,30 @@ export function createRealAdapter(
   });
   const { requireRoot, ...settingsScanMethods } = createSettingsScanMethods({
     database: options.database,
-    repo,
+    query,
+    catalog,
+    user,
     scanner,
     dataRoot,
     thumbnailCacheDir,
     runFileScanInWorker: assembly.runFileScanInWorker ?? runFileScanInWorker,
   });
   const coverMediaMethods = createCoverMediaMethods({
-    repo,
+    query,
     thumbnailCache,
     thumbnailCacheDir,
     requireRoot,
   });
-  const workMethods = createWorkMethods({ db, repo, scanner, requireRoot, cachedCover });
-  const classificationMethods = createClassificationMethods({ repo });
+  const workMethods = createWorkMethods({
+    db,
+    query,
+    catalog,
+    user,
+    scanner,
+    requireRoot,
+    cachedCover,
+  });
+  const classificationMethods = createClassificationMethods({ query, user });
 
   return {
     ...settingsScanMethods,
