@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { scanJobEventSchema, type ScanJobSnapshot, type StartScanRequest } from "@mimimilli/shared";
 import { API_BASE, ApiRequestError, ApiResponseSchemaError } from "../../shared/api/http";
 import { cancelScan, getActiveScan, getScanJob, ScanAlreadyActiveError, startScan } from "./api";
+import type { ScanActionResult } from "./model/atoms";
 
 function terminal(job: ScanJobSnapshot): boolean {
   return job.status === "completed" || job.status === "failed" || job.status === "cancelled";
@@ -206,26 +207,27 @@ export function useScanJob(options: UseScanJobOptions = {}) {
   }, [attach]);
 
   const start = useCallback(
-    async (options?: StartScanRequest): Promise<ScanJobSnapshot> => {
+    async (options?: StartScanRequest): Promise<ScanActionResult> => {
       setError(null);
       try {
         const next = await startScan(options);
         attach(next);
-        return next;
+        return { ok: true, job: next };
       } catch (cause) {
         if (cause instanceof ScanAlreadyActiveError) {
           attach(cause.active);
-          return cause.active;
+          return { ok: true, job: cause.active };
         }
-        setError(errorMessage(cause));
-        throw cause;
+        const message = errorMessage(cause);
+        setError(message);
+        return { ok: false, error: message };
       }
     },
     [attach],
   );
 
-  const cancel = useCallback(async (): Promise<ScanJobSnapshot | null> => {
-    if (!job) return null;
+  const cancel = useCallback(async (): Promise<ScanActionResult> => {
+    if (!job) return { ok: true, job: null };
     const generation = generationRef.current;
     const jobId = job.id;
     const localSource = sourceRef.current;
@@ -233,10 +235,11 @@ export function useScanJob(options: UseScanJobOptions = {}) {
     try {
       const next = await cancelScan(jobId);
       applyOwned(generation, jobId, localSource, next);
-      return next;
+      return { ok: true, job: next };
     } catch (cause) {
-      if (owns(generation, jobId)) setError(errorMessage(cause));
-      throw cause;
+      const message = errorMessage(cause);
+      if (owns(generation, jobId)) setError(message);
+      return { ok: false, error: message };
     }
   }, [applyOwned, job, owns]);
 

@@ -106,7 +106,6 @@ export default function DlsiteBulkRuntime() {
       await cancelDlsiteBulk();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "一括取得の中止に失敗しました");
-      throw cause;
     }
   }, [active, setError]);
 

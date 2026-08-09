@@ -112,7 +112,10 @@ export default function App() {
     async (path: string) => {
       await setRootFolder(path);
       queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() });
-      await scanActions.start();
+      const result = await scanActions.start();
+      if (!result.ok) {
+        throw new Error(result.error);
+      }
       queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), (prev: typeof settings) =>
         prev ? { ...prev, rootFolder: path } : prev,
       );

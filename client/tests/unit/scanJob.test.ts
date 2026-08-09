@@ -289,14 +289,14 @@ describe("useScanJob", () => {
 
     mode = "start500";
     await act(async () => {
-      await hook.result.current.start().catch(() => {});
+      await hook.result.current.start();
     });
     expect(hook.result.current.error).toBe("start failed");
 
     mode = "cancel500";
     act(() => hook.result.current.attach(running));
     await act(async () => {
-      await hook.result.current.cancel().catch(() => {});
+      await hook.result.current.cancel();
     });
     expect(hook.result.current.error).toBe("cancel failed");
   });

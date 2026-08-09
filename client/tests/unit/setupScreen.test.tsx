@@ -121,4 +121,57 @@ describe("SetupScreen 経路", () => {
 
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("保存に失敗しました"));
   });
+
+  it("スキャン開始に失敗したら SetupScreen に留まり rootFolder を確定しない", async () => {
+    vi.spyOn(settingsApi, "setRootFolder").mockResolvedValue({
+      rootFolder: "/audio/library",
+      lastScanTime: null,
+    });
+    vi.spyOn(scanApi, "startScan").mockRejectedValue(new Error("start failed"));
+
+    const { queryClient } = renderSetupApp();
+    await waitFor(() => expect(screen.getByText("ようこそ")).toBeInTheDocument());
+
+    fireEvent.change(screen.getByPlaceholderText(/Users\/yourname/), {
+      target: { value: "/audio/library" },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /スキャン開始/ }));
+    });
+
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("start failed"));
+    expect(screen.queryByText("初回セットアップに失敗しました")).not.toBeInTheDocument();
+    expect(screen.getByText("ようこそ")).toBeInTheDocument();
+    expect(queryClient.getQueryData(SETTINGS_QUERY_KEYS.all())).toEqual({
+      rootFolder: null,
+      lastScanTime: null,
+    });
+  });
+
+  it("スキャン開始失敗時はサーバー由来のメッセージをインライン表示する", async () => {
+    vi.spyOn(settingsApi, "setRootFolder").mockResolvedValue({
+      rootFolder: "/audio/library",
+      lastScanTime: null,
+    });
+    vi.spyOn(scanApi, "startScan").mockRejectedValue(
+      new Error("ルートフォルダーにアクセスできません: /audio/library"),
+    );
+
+    renderSetupApp();
+    await waitFor(() => expect(screen.getByText("ようこそ")).toBeInTheDocument());
+
+    fireEvent.change(screen.getByPlaceholderText(/Users\/yourname/), {
+      target: { value: "/audio/library" },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /スキャン開始/ }));
+    });
+
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "ルートフォルダーにアクセスできません: /audio/library",
+      ),
+    );
+    expect(screen.queryByText("初回セットアップに失敗しました")).not.toBeInTheDocument();
+  });
 });

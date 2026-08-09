@@ -159,7 +159,7 @@ export default function TopBar({ onOpenScan, onSettings, notificationBell }: Top
           </span>
           <AnimatePresence initial={false}>
             {!dlsiteBulkCancelling && (
-              <DlsiteBulkCancelButton onClick={() => void onCancelDlsiteBulk().catch(() => {})} />
+              <DlsiteBulkCancelButton onClick={() => void onCancelDlsiteBulk()} />
             )}
           </AnimatePresence>
         </>

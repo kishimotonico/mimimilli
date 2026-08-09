@@ -180,7 +180,7 @@ export default function SetupScreen({ onComplete }: SetupScreenProps) {
           {scanning && (
             <button
               type="button"
-              onClick={() => void cancel().catch(() => {})}
+              onClick={() => void cancel()}
               style={{
                 height: 36,
                 borderRadius: 8,

@@ -47,12 +47,8 @@ export default function ScanRuntime() {
   }, [scanJob.error, setError]);
 
   const actionsRef = useRef<ScanActions>({
-    start: async (options?: StartScanRequest) => {
-      await scanJobRef.current.start(options);
-    },
-    cancel: async () => {
-      await scanJobRef.current.cancel();
-    },
+    start: async (options?: StartScanRequest) => scanJobRef.current.start(options),
+    cancel: async () => scanJobRef.current.cancel(),
     clearError: () => {
       scanJobRef.current.clearError();
     },

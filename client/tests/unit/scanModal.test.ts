@@ -123,8 +123,8 @@ function renderModal(
   const onStart = vi.fn();
   const onCancel = vi.fn();
   store.set(scanActionsAtom, {
-    start: onStart.mockResolvedValue(undefined),
-    cancel: onCancel.mockResolvedValue(undefined),
+    start: onStart.mockResolvedValue({ ok: true, job: null }),
+    cancel: onCancel.mockResolvedValue({ ok: true, job: null }),
     clearError: vi.fn(),
   });
   if (scanState.job !== undefined) {
@@ -482,8 +482,8 @@ describe("ScanModalと他画面が同じlibraryTotalQueryOptionsを共有する�
 
     const store = createStore();
     store.set(scanActionsAtom, {
-      start: vi.fn().mockResolvedValue(undefined),
-      cancel: vi.fn().mockResolvedValue(undefined),
+      start: vi.fn().mockResolvedValue({ ok: true, job: null }),
+      cancel: vi.fn().mockResolvedValue({ ok: true, job: null }),
       clearError: vi.fn(),
     });
     const queryClient = createTestQueryClient();

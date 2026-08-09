@@ -16,10 +16,12 @@ import {
 const mockFetch = vi.mocked(fetch);
 
 function makeResponse(data: unknown, status = 200) {
+  const body = data === null || status === 204 ? "" : JSON.stringify(data);
   return {
     ok: status >= 200 && status < 300,
     status,
     json: () => Promise.resolve(data),
+    text: () => Promise.resolve(body),
   } as Response;
 }
 

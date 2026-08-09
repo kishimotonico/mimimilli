@@ -34,8 +34,26 @@ export class ApiResponseSchemaError extends Error {
   }
 }
 
+class UnparsedResponseBody {
+  constructor(readonly text: string) {}
+}
+
+function unparsedBodyMessage(body: unknown): string | null {
+  if (body instanceof UnparsedResponseBody) {
+    const preview = body.text.length > 200 ? `${body.text.slice(0, 200)}…` : body.text;
+    return `応答のJSON解析に失敗しました: ${preview}`;
+  }
+  return null;
+}
+
 async function readResponseBody(res: Response): Promise<unknown> {
-  return res.json().catch(() => null);
+  const text = await res.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return new UnparsedResponseBody(text);
+  }
 }
 
 export type StatusHandler = (res: Response, body: unknown) => void;
@@ -52,7 +70,12 @@ async function throwApiError(
   if (parsed.success) {
     throw new ApiRequestError(res.status, parsed.data.error.code, parsed.data.error.message);
   }
-  throw new Error(`API error ${res.status}: ${method} ${path}`);
+  const unparsed = unparsedBodyMessage(body);
+  throw new Error(
+    unparsed
+      ? `API error ${res.status}: ${method} ${path} (${unparsed})`
+      : `API error ${res.status}: ${method} ${path}`,
+  );
 }
 
 function parseResponse<T>(schema: z.ZodType<T>, method: string, path: string, data: unknown): T {

@@ -243,22 +243,15 @@ export default function ScanModal({ lastScanTime, onClose, onOpenRjCodeMissing }
           </AnimatePresence>
           <div className="relative flex shrink-0 items-center gap-2">
             <AnimatePresence initial={false}>
-              {scanning && (
-                <ScanCancelButton key="cancel" onClick={() => void cancel().catch(() => {})} />
-              )}
+              {scanning && <ScanCancelButton key="cancel" onClick={() => void cancel()} />}
             </AnimatePresence>
             <AnimatePresence initial={false}>
               {!scanning && (
-                <ScanFullScanButton
-                  key="fullscan"
-                  onClick={() => void start({ full: true }).catch(() => {})}
-                />
+                <ScanFullScanButton key="fullscan" onClick={() => void start({ full: true })} />
               )}
             </AnimatePresence>
             <AnimatePresence initial={false}>
-              {!scanning && (
-                <ScanStartButton key="start" onClick={() => void start().catch(() => {})} />
-              )}
+              {!scanning && <ScanStartButton key="start" onClick={() => void start()} />}
             </AnimatePresence>
           </div>
         </footer>

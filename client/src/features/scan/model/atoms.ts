@@ -26,9 +26,13 @@ export const scanProgressLabelAtom = atom((get) => formatScanProgressLabel(get(s
 
 export const scanErrorAtom = atom<string | null>(null);
 
+export type ScanActionResult =
+  | { ok: true; job: ScanJobSnapshot | null }
+  | { ok: false; error: string };
+
 export interface ScanActions {
-  start: (options?: StartScanRequest) => Promise<void>;
-  cancel: () => Promise<void>;
+  start: (options?: StartScanRequest) => Promise<ScanActionResult>;
+  cancel: () => Promise<ScanActionResult>;
   clearError: () => void;
 }
 
