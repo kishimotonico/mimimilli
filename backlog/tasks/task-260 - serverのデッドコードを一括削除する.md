@@ -1,0 +1,32 @@
+---
+id: TASK-260
+title: serverのデッドコードを一括削除する
+status: To Do
+assignee: []
+created_date: '2026-08-08 21:16'
+labels: []
+dependencies: []
+priority: medium
+ordinal: 270000
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+リファクタ一斉調査で検出した確実なデッドコード。
+- server/src/adapters/real/dlsite.ts:266-276 downloadCover（本番未使用、cachedCoverに置換済み）
+- 同 dlsite.ts:142-184 fetchDlsiteInfo（テストのみ使用。fetchDlsiteHtml+parseDlsiteHtmlと三重化。テストは分割APIへ寄せる）
+- server/src/adapters/real/dlsiteScheduler.ts:188-191 schedule()（テストのみ使用）
+- server/src/adapters/real/thumbnailCache.ts:242-258 module singleton getOrCreateThumbnail（本番はThumbnailCacheインスタンス。テストも寄せる）
+- server/src/adapters/real/db.ts:85,194-202 migratableVersions 引数（常に[]渡しで分岐到達不能）
+- server/tests/real/rejection_chain.test.ts（コメントのみの空スタブ）
+- shared/src/api.ts:137 旧API統合の経緯コメント（Git履歴に任せる）
+ついでに workRepo.ts:1650-1655 countByStatus の全行fetch→.length を COUNT(*) に直す。
+<!-- SECTION:DESCRIPTION:END -->
+
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 上記デッドコードが削除され、依存テストは現行APIへ寄せられていること
+- [ ] #2 countByStatus が COUNT(*) クエリになっていること
+- [ ] #3 変更範囲のserverテストが通ること
+<!-- AC:END -->
