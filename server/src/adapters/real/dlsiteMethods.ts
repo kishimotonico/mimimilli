@@ -40,6 +40,7 @@ import {
   type DlsiteSchedulerDependencies,
 } from "./dlsiteScheduler.ts";
 import { patchMetaFile } from "./meta.ts";
+import { persistDlsiteAppliedWork } from "./dlsitePersist.ts";
 import { resolveWithin } from "./paths.ts";
 import { SharedFlightPool, throwIfAborted } from "./sharedFlight.ts";
 import { logDataIntegritySkips, toDataIntegrityWarning } from "./dataIntegrity.ts";
@@ -397,27 +398,20 @@ export function createDlsiteMethods(deps: {
 
       throwIfAborted(signal, "DLsite一括取得はキャンセルされました");
 
-      return db.transaction(() => {
-        const updated = catalog.patchWorkCatalog(workId, patch);
-        if (!updated) return false;
-        const dlsite = {
-          rjCode: body.info.rjCode,
-          status: "applied" as const,
-          lastAttemptAt: new Date().toISOString(),
-          error: null,
-          errorKind: null,
-          appliedTags: dedupeTags([...work.dlsite.appliedTags, ...applyTags]),
-        };
-        catalog.setDlsiteState(workId, dlsite);
-        patchMetaFile(updated.metaPath, {
-          title: patch.title,
-          tags: patch.tags,
-          coverImage,
-          urls: patch.urls,
-          dlsite,
-        });
-        return true;
-      });
+      const dlsite = {
+        rjCode: body.info.rjCode,
+        status: "applied" as const,
+        lastAttemptAt: new Date().toISOString(),
+        error: null,
+        errorKind: null,
+        appliedTags: dedupeTags([...work.dlsite.appliedTags, ...applyTags]),
+      };
+      return persistDlsiteAppliedWork(
+        db,
+        catalog,
+        { workId, catalogPatch: patch, coverImage, dlsite },
+        { ifWorkMissing: "return-false" },
+      );
     },
 
     async updateDlsiteState(workId: string, patch: DlsiteStatePatch): Promise<Work | null> {
@@ -617,19 +611,12 @@ export function createDlsiteMethods(deps: {
                   errorKind: null,
                   appliedTags: nextAppliedTags,
                 };
-                db.transaction(() => {
-                  const updated = catalog.patchWorkCatalog(work.id, patch);
-                  if (!updated)
-                    throw new Error(`一括取得中に作品が見つからなくなりました: ${work.id}`);
-                  catalog.setDlsiteState(work.id, dlsite);
-                  patchMetaFile(updated.metaPath, {
-                    title: patch.title,
-                    tags: patch.tags,
-                    coverImage,
-                    urls: patch.urls,
-                    dlsite,
-                  });
-                });
+                persistDlsiteAppliedWork(
+                  db,
+                  catalog,
+                  { workId: work.id, catalogPatch: patch, coverImage, dlsite },
+                  { ifWorkMissing: "throw" },
+                );
               }
               result.fetched += 1;
             }

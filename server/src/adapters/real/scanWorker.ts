@@ -1,16 +1,10 @@
-import { join } from "node:path";
 import type { ScanProgressEvent, ScanResult } from "@mimimilli/shared";
 import { openDb, type Db, type DbLocation } from "./db.ts";
-import { resolveWithin } from "./paths.ts";
 import { Scanner } from "./scanner.ts";
-import { gcThumbnailCache, type WorkCoverEntry } from "./thumbnailCache.ts";
-import { logDataIntegritySkips } from "./dataIntegrity.ts";
+import { finalizeScan } from "./scanFinalize.ts";
 import { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import { UserWorkStateRepository } from "./userWorkStateRepository.ts";
 import { WorkQueryRepository } from "./workQueryRepository.ts";
-import { getCategoryLogger } from "../../lib/logger.ts";
-
-const scanLogger = getCategoryLogger("scan");
 
 interface WorkerInput {
   database: Extract<DbLocation, { kind: "files" }>;
@@ -76,34 +70,19 @@ async function run(input: WorkerInput): Promise<void> {
     if (cancelled(token)) {
       terminal = { type: "cancelled" };
     } else {
-      const covers: WorkCoverEntry[] = [];
-      const { summaries, skipped } = query.listSummaries();
-      logDataIntegritySkips(scanLogger, "scan-worker-thumbnail-gc", skipped);
-      for (const work of summaries) {
-        if (cancelled(token)) break;
-        if (!work.cover) continue;
-        const absolutePath = resolveWithin(
-          work.physicalPath,
-          join(work.physicalPath, work.cover.image),
-        );
-        if (absolutePath) {
-          covers.push({ workId: work.id, coverAbsolutePath: absolutePath });
-        }
-      }
+      await finalizeScan({
+        query,
+        catalog,
+        thumbnailCacheDir: input.thumbnailCacheDir,
+        throwIfCancelled: () => {
+          if (cancelled(token)) throw new Error("スキャンはキャンセルされました");
+        },
+        integrityLogContext: "scan-worker-thumbnail-gc",
+      });
       if (cancelled(token)) {
         terminal = { type: "cancelled" };
       } else {
-        await gcThumbnailCache(input.thumbnailCacheDir, covers, {
-          throwIfCancelled: () => {
-            if (cancelled(token)) throw new Error("スキャンはキャンセルされました");
-          },
-        });
-        if (cancelled(token)) {
-          terminal = { type: "cancelled" };
-        } else {
-          catalog.setScanState("last_scan_time", new Date().toISOString());
-          terminal = { type: "completed", result };
-        }
+        terminal = { type: "completed", result };
       }
     }
   } catch (error) {

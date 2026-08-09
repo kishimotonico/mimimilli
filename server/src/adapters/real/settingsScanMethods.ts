@@ -1,21 +1,17 @@
 import { realpathSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 import { type ScanOptions, NotConfiguredError } from "../../adapter.ts";
 import type { ScanResult, Settings, SettingsUpdate } from "@mimimilli/shared";
 import { formatError, getCategoryLogger } from "../../lib/logger.ts";
 import { type DbLocation } from "./db.ts";
-import { logDataIntegritySkips } from "./dataIntegrity.ts";
-import { resolveWithin } from "./paths.ts";
 import { Scanner } from "./scanner.ts";
-import { gcThumbnailCache, type WorkCoverEntry } from "./thumbnailCache.ts";
+import { finalizeScan, LAST_SCAN_TIME_KEY } from "./scanFinalize.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";
 
-const scanLogger = getCategoryLogger("scan");
 const serverLogger = getCategoryLogger("server");
 const KEY_ROOT_FOLDER = "root_folder";
-const KEY_LAST_SCAN_TIME = "last_scan_time";
 
 export function createSettingsScanMethods(deps: {
   database: DbLocation;
@@ -53,7 +49,7 @@ export function createSettingsScanMethods(deps: {
   };
   const getSettings = async (): Promise<Settings> => ({
     rootFolder: user.getUserSetting(KEY_ROOT_FOLDER),
-    lastScanTime: catalog.getScanState(KEY_LAST_SCAN_TIME),
+    lastScanTime: catalog.getScanState(LAST_SCAN_TIME_KEY),
   });
   return {
     getSettings,
@@ -111,37 +107,13 @@ export function createSettingsScanMethods(deps: {
           throw new DOMException("スキャンはキャンセルされました", "AbortError");
         }
       };
-      checkAbort();
-
-      // 全作品を走査した直後の自然なタイミングでサムネイルキャッシュをGCする（TASK-26）
-      const coverEntries: WorkCoverEntry[] = [];
-      const { summaries, skipped } = query.listSummaries();
-      logDataIntegritySkips(scanLogger, "scan-thumbnail-gc", skipped);
-      for (const work of summaries) {
-        checkAbort();
-        if (!work.cover) continue;
-        const resolved = resolveWithin(
-          work.physicalPath,
-          join(work.physicalPath, work.cover.image),
-        );
-        if (!resolved) continue;
-        coverEntries.push({ workId: work.id, coverAbsolutePath: resolved });
-      }
-      checkAbort();
-      const gcResult = await gcThumbnailCache(thumbnailCacheDir, coverEntries, {
+      await finalizeScan({
+        query,
+        catalog,
+        thumbnailCacheDir,
         throwIfCancelled: checkAbort,
+        integrityLogContext: "scan-thumbnail-gc",
       });
-      checkAbort();
-      if (gcResult.deleted > 0 || gcResult.skippedWorks > 0) {
-        scanLogger.warn("サムネイルキャッシュGCを実行しました", {
-          deleted: gcResult.deleted,
-          kept: gcResult.kept,
-          skippedWorks: gcResult.skippedWorks,
-        });
-      }
-
-      checkAbort();
-      catalog.setScanState(KEY_LAST_SCAN_TIME, new Date().toISOString());
 
       return result;
     },
