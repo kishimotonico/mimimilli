@@ -1,10 +1,10 @@
 ---
 id: TASK-213
 title: smartFolderEditorの古いコメントを実装に合わせる
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-06 04:59'
-updated_date: '2026-08-09 15:11'
+updated_date: '2026-08-09 15:12'
 labels: []
 dependencies: []
 priority: low

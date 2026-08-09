@@ -1,10 +1,10 @@
 ---
 id: TASK-256
 title: createWorkの両分岐同一のデッドコードcatchを整理する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-08 13:35'
-updated_date: '2026-08-09 15:11'
+updated_date: '2026-08-09 15:12'
 labels: []
 dependencies: []
 ordinal: 266000
