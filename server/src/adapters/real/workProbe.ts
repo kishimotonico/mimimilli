@@ -1,5 +1,12 @@
 import { join } from "node:path";
-import type { ProbeDurationResult } from "@mimimilli/shared";
+import {
+  isInvalidTrackStart,
+  resolveTrackDuration,
+  toTrackDurationFields,
+  type MetaFile,
+  type ProbeDurationResult,
+  type ResolvedPlaylist,
+} from "@mimimilli/shared";
 import type { Db } from "./db.ts";
 import { probeDurationSec, type ProbeCacheEntry } from "./probe.ts";
 
@@ -40,4 +47,42 @@ export async function liveFileProbeMap(
     map.set(path, await probeDurationSec(db.catalog, path, cache));
   });
   return map;
+}
+
+export interface ResolvedPlaylistsResult {
+  resolvedPlaylists: ResolvedPlaylist[];
+  invalidStartTracks: Array<{ file: string; title: string }>;
+}
+
+/** 全playlistのトラックについて解決済み durationSec を求める。同一ファイルは1回だけ probe する。 */
+export async function resolvePlaylistDurations(
+  db: Db,
+  workDir: string,
+  playlists: MetaFile["playlists"],
+  probeCache: Map<string, ProbeCacheEntry>,
+  checkAbort: () => void = () => {},
+): Promise<ResolvedPlaylistsResult> {
+  const fileProbeCache = new Map<string, ProbeDurationResult>();
+  const invalidStartTracks: Array<{ file: string; title: string }> = [];
+  const resolvedPlaylists: ResolvedPlaylist[] = [];
+  for (const p of playlists) {
+    const tracks = [];
+    for (const track of p.tracks) {
+      checkAbort();
+      let probe: ProbeDurationResult;
+      if (fileProbeCache.has(track.file)) {
+        probe = fileProbeCache.get(track.file)!;
+      } else {
+        probe = await probeDurationSec(db.catalog, join(workDir, track.file), probeCache);
+        checkAbort();
+        fileProbeCache.set(track.file, probe);
+      }
+      if (probe.kind === "resolved" && isInvalidTrackStart(track, probe.durationSec)) {
+        invalidStartTracks.push({ file: track.file, title: track.title });
+      }
+      tracks.push({ ...track, ...toTrackDurationFields(resolveTrackDuration(track, probe)) });
+    }
+    resolvedPlaylists.push({ id: p.id, name: p.name, tracks });
+  }
+  return { resolvedPlaylists, invalidStartTracks };
 }

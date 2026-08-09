@@ -4,6 +4,7 @@
 import { readFileSync, renameSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { META_FILE_NAME, metaFileSchema, type MetaFile } from "@mimimilli/shared";
+import { detectRjCode } from "./dlsite.ts";
 
 export { META_FILE_NAME };
 export const META_SUFFIX = ".mimimilli.json";
@@ -163,4 +164,19 @@ export function reassignMetaIdsOnDbCollision(
 /** メタファイルのパスから作品ディレクトリを返す（どちらの形式でも親ディレクトリ） */
 export function workDirOf(metaPath: string): string {
   return dirname(metaPath);
+}
+
+/** フォルダー名・タイトルから RJ コードを検出し、メタと異なる場合は書き戻す。 */
+export function syncDetectedRjCode(
+  metaPath: string,
+  meta: MetaFile,
+  workDirName: string,
+): MetaFile["dlsite"] {
+  const detectedRjCode = meta.dlsite.rjCode ?? detectRjCode([workDirName, meta.title]);
+  if (detectedRjCode === meta.dlsite.rjCode) {
+    return meta.dlsite;
+  }
+  const dlsite = { ...meta.dlsite, rjCode: detectedRjCode };
+  patchMetaFile(metaPath, { dlsite });
+  return dlsite;
 }

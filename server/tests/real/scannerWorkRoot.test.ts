@@ -4,7 +4,8 @@ import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:
 import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
 import { openDb } from "../../src/adapters/real/db.ts";
-import { findWorkRoot, Scanner, walk } from "../../src/adapters/real/scanner.ts";
+import { Scanner } from "../../src/adapters/real/scanner.ts";
+import { findWorkRoot, walk } from "../../src/adapters/real/scanWalk.ts";
 import { createWorkRepos } from "../helpers/workTestUtils.ts";
 import { isPathWithin } from "../../src/lib/path.ts";
 import { makeTestDirectory, writeSampleCover, writeWav } from "../helpers/sampleLibrary.ts";
