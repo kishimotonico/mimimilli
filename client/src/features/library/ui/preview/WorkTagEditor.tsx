@@ -10,7 +10,7 @@ import TagCombobox from "../../../../shared/ui/TagCombobox";
 import Toast from "../../../../shared/ui/Toast";
 import { mutationErrorMessage } from "../../../../shared/lib/mutationError";
 import type { LibraryTagsPatchMutation } from "../../model/useLibraryQueries";
-import { useTagPrefixes } from "../../model/useTagPrefixes";
+import { useTagPrefixes } from "../../../../entities/tag/useTagPrefixes";
 import { useAnchoredPopover } from "../../../../shared/ui/useAnchoredPopover";
 import { useWorkTagEditor } from "./useWorkTagEditor";
 

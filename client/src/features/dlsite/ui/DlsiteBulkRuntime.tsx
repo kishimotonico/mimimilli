@@ -8,7 +8,7 @@ import {
 } from "@mimimilli/shared";
 import { cancelDlsiteBulk, getDlsiteBulkStatus, startDlsiteBulk } from "../../../entities/work/api";
 import { API_BASE } from "../../../shared/api/http";
-import { getDlsiteInvalidationKeys } from "../../library/model/dlsiteInvalidation";
+import { getDlsiteInvalidationKeys } from "../model/dlsiteInvalidation";
 import {
   dlsiteBulkActionsAtom,
   dlsiteBulkActiveAtom,

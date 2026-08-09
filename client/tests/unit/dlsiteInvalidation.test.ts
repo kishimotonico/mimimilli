@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getDlsiteInvalidationKeys } from "../../src/features/library/model/dlsiteInvalidation";
+import { getDlsiteInvalidationKeys } from "../../src/features/dlsite/model/dlsiteInvalidation";
 
 describe("getDlsiteInvalidationKeys", () => {
   it("手動適用では対象作品の詳細を含める", () => {

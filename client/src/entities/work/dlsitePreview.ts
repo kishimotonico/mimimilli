@@ -24,7 +24,6 @@ export function buildDlsiteApplyBody(
 }
 
 export function unappliedDlsiteTags(work: Work, info: DlsiteWorkInfo): NormalizedTag[] {
-  // work.tags は既に正規化済み（NormalizedTag[]）。
   const existing = new Set(work.tags);
   return dlsiteInfoTags(info).filter((tag) => !existing.has(tag));
 }

@@ -10,7 +10,7 @@ import {
   listTagPrefixCandidates,
   listTagPrefixes,
   updateTagPrefix,
-} from "../../library/api";
+} from "../../../entities/tag/api";
 import { TAG_QUERY_KEYS } from "../../../entities/tag/queryKeys";
 import { I } from "../../../shared/ui/Icon";
 

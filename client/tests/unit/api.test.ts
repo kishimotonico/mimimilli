@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import * as workApi from "../../src/entities/work/api";
+import * as smartFolderApi from "../../src/entities/smart-folder/api";
 import * as filesApi from "../../src/features/files/api";
 import * as libraryApi from "../../src/features/library/api";
 import * as settingsApi from "../../src/features/settings/api";
@@ -428,7 +429,7 @@ describe("library api", () => {
 
   it("listSmartFolders fetches /api/smart-folders", async () => {
     mockFetch.mockResolvedValue(makeResponse([]));
-    await libraryApi.listSmartFolders();
+    await smartFolderApi.listSmartFolders();
     expect(mockFetch).toHaveBeenCalledWith("/api/smart-folders");
   });
 
@@ -439,7 +440,7 @@ describe("library api", () => {
       stats: { trackCount: 0, durationSec: 0 },
     };
     mockFetch.mockResolvedValue(makeResponse(mockPage));
-    const result = await libraryApi.evalSmartFolder("sf-1", { page: 1, limit: 200 });
+    const result = await smartFolderApi.evalSmartFolder("sf-1", { page: 1, limit: 200 });
     expect(mockFetch).toHaveBeenCalledWith("/api/smart-folders/sf-1/works?page=1&limit=200");
     expect(result).toEqual(mockPage);
   });
@@ -448,7 +449,7 @@ describe("library api", () => {
     mockFetch.mockResolvedValue(
       makeResponse({ items: [], total: 0, stats: { trackCount: 0, durationSec: 0 } }),
     );
-    await libraryApi.evalSmartFolder("sf-1", {
+    await smartFolderApi.evalSmartFolder("sf-1", {
       page: 1,
       limit: 200,
       tags: ["cv/藤田茜", "ASMR", "@year/2024"],

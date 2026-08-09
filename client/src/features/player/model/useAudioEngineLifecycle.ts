@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from "react";
 import { getAudioUrl } from "../../../entities/work/api";
-import { getFsAudioUrl } from "../../files/api";
+import { getFsAudioUrl } from "../../../entities/file-system/api";
 import { updateLastPlayed } from "../api";
 import { createAudioEngine } from "./audioEngine";
 import {

@@ -13,7 +13,7 @@ import {
   selectAxisValueSortKey,
   type AxisValueSortKey,
 } from "../model/axisValueSort";
-import { listSmartFolders } from "../api";
+import { listSmartFolders } from "../../../entities/smart-folder/api";
 import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";

@@ -19,14 +19,15 @@ import {
   type WorkPatchInput,
   type WorksPage,
 } from "@mimimilli/shared";
+import { searchWorks } from "../api";
 import {
-  searchWorks,
   listSmartFolders,
   createSmartFolder,
   updateSmartFolder,
   evalSmartFolder,
-} from "../api";
-import { getAllTags, getWork, patchWork } from "../../../entities/work/api";
+} from "../../../entities/smart-folder/api";
+import { getAllTags } from "../../../entities/tag/api";
+import { getWork, patchWork } from "../../../entities/work/api";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
 import { TAG_QUERY_KEYS } from "../../../entities/tag/queryKeys";
@@ -54,7 +55,7 @@ import {
   computeCollectionStatsDisplay,
   getFacetAxisForQuery,
 } from "./libraryPresentation";
-import { useTagPrefixes } from "./useTagPrefixes";
+import { useTagPrefixes } from "../../../entities/tag/useTagPrefixes";
 import { useAxisFacetsQuery } from "./useAxisFacetsQuery";
 import { useDebouncedValue } from "../../../shared/lib/useDebouncedValue";
 import { getWorkPatchInvalidationTargets, mergeWorkPatchResponse } from "./workPatchInvalidation";

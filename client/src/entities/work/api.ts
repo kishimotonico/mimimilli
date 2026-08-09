@@ -12,7 +12,6 @@ import {
 } from "../../shared/api/http";
 import {
   workSchema,
-  tagListSchema,
   dlsiteWorkInfoSchema,
   dlsiteBulkStartResponseSchema,
   dlsiteBulkCancelResponseSchema,
@@ -50,10 +49,6 @@ export async function queryDlsiteNotifications(
 
 export async function patchWork(workId: string, body: WorkPatchInput): Promise<Work> {
   return patchParsed(workSchema, `/works/${encodeURIComponent(workId)}`, body);
-}
-
-export async function getAllTags(): Promise<string[]> {
-  return getParsed(tagListSchema, "/tags");
 }
 
 /** カバー画像のURLを返す（<img src> で直接使用可）。

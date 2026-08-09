@@ -9,12 +9,12 @@ import IconButton from "../../../shared/ui/IconButton";
 import { I } from "../../../shared/ui/Icon";
 import TagCombobox from "../../../shared/ui/TagCombobox";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
-import { getAllTags } from "../../../entities/work/api";
+import { getAllTags } from "../../../entities/tag/api";
 import { TAG_QUERY_KEYS } from "../../../entities/tag/queryKeys";
 import { buildTagsWithAdded, buildTagsWithRemoved } from "../../../entities/work/editableTags";
 import Tag from "../../../entities/work/ui/Tag";
-import { useTagPrefixes } from "../../library/model/useTagPrefixes";
-import { buildDlsiteApplyBody, dlsiteInfoTags } from "../../library/model/dlsitePreview";
+import { useTagPrefixes } from "../../../entities/tag/useTagPrefixes";
+import { buildDlsiteApplyBody, dlsiteInfoTags } from "../../../entities/work/dlsitePreview";
 import { mutationErrorMessage } from "../../../shared/lib/mutationError";
 import { createWork, fetchDlsiteInfoByCode } from "../api";
 

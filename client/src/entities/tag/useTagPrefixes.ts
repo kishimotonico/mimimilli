@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { TAG_QUERY_KEYS } from "../../../entities/tag/queryKeys";
-import { listTagPrefixes } from "../api";
+import { listTagPrefixes } from "./api";
+import { TAG_QUERY_KEYS } from "./queryKeys";
 
 export function useTagPrefixes() {
   const query = useQuery({

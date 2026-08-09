@@ -1,26 +1,13 @@
-// library feature の API。作品検索、分類軸ファセット、スマートフォルダー、
-// ライブラリのエクスポート。
+// library feature の API。作品検索、分類軸ファセット、ライブラリのエクスポート。
 // 依存方向: shared/api/http、entities/work（戻り値の WorkSummary）、自 feature の model を参照する。
 
-import { deleteVoid, getParsed, patchParsed, postParsed, putParsed } from "../../shared/api/http";
+import { getParsed, postParsed } from "../../shared/api/http";
 import {
   worksPageSchema,
   axisFacetListSchema,
-  tagPrefixSchema,
-  tagPrefixListSchema,
-  tagPrefixCandidateListSchema,
-  smartFolderSchema,
-  smartFolderListSchema,
   exportResponseSchema,
   type AxisFacetItem,
   type FacetAxisId,
-  type SmartFolder,
-  type SmartFolderCreate,
-  type SmartFolderUpdate,
-  type TagPrefix,
-  type TagPrefixCandidate,
-  type TagPrefixCreate,
-  type TagPrefixUpdate,
   type ExportResponse,
   type WorksPage,
   type WorksQueryInput,
@@ -62,74 +49,6 @@ export async function getAxisFacets(
   if (filter.tagOp) p.set("tagOp", filter.tagOp);
   const q = p.toString();
   return getParsed(axisFacetListSchema, `/axes/${encodeURIComponent(axis)}${q ? `?${q}` : ""}`);
-}
-
-// ── タグ prefix 定義（ADR-0005）──────────────────────────────
-
-export async function listTagPrefixes(): Promise<TagPrefix[]> {
-  return getParsed(tagPrefixListSchema, "/tag-prefixes");
-}
-
-export async function createTagPrefix(data: TagPrefixCreate): Promise<TagPrefix> {
-  return postParsed(tagPrefixSchema, "/tag-prefixes", data);
-}
-
-export async function updateTagPrefix(prefix: string, data: TagPrefixUpdate): Promise<TagPrefix> {
-  return patchParsed(tagPrefixSchema, `/tag-prefixes/${encodeURIComponent(prefix)}`, data);
-}
-
-export async function deleteTagPrefix(prefix: string): Promise<void> {
-  await deleteVoid(`/tag-prefixes/${encodeURIComponent(prefix)}`);
-}
-
-export async function listTagPrefixCandidates(): Promise<TagPrefixCandidate[]> {
-  return getParsed(tagPrefixCandidateListSchema, "/tag-prefixes/candidates");
-}
-
-// ── スマートフォルダー ────────────────────────────────────────
-
-export async function listSmartFolders(): Promise<SmartFolder[]> {
-  return getParsed(smartFolderListSchema, "/smart-folders");
-}
-
-export async function createSmartFolder(data: SmartFolderCreate): Promise<SmartFolder> {
-  return postParsed(smartFolderSchema, "/smart-folders", data);
-}
-
-export async function updateSmartFolder(id: string, data: SmartFolderUpdate): Promise<SmartFolder> {
-  return putParsed(smartFolderSchema, `/smart-folders/${encodeURIComponent(id)}`, data);
-}
-
-export async function deleteSmartFolder(id: string): Promise<void> {
-  await deleteVoid(`/smart-folders/${encodeURIComponent(id)}`);
-}
-
-/** tags はフォルダーのルールに対する追加の AND 条件（ADR-0012） */
-export interface SmartFolderWorksParams {
-  page: number;
-  limit: number;
-  seed?: number;
-  tags?: string[];
-  tagOp?: "AND" | "OR";
-}
-
-export async function evalSmartFolder(
-  id: string,
-  params: SmartFolderWorksParams,
-  options?: { signal?: AbortSignal },
-): Promise<WorksPage> {
-  const p = new URLSearchParams();
-  for (const tag of params.tags ?? []) p.append("tags", tag);
-  if (params.tagOp) p.set("tagOp", params.tagOp);
-  if (params.seed !== undefined) p.set("seed", String(params.seed));
-  p.set("page", String(params.page));
-  p.set("limit", String(params.limit));
-  const q = p.toString();
-  return getParsed(
-    worksPageSchema,
-    `/smart-folders/${encodeURIComponent(id)}/works${q ? `?${q}` : ""}`,
-    options,
-  );
 }
 
 // ── エクスポート ──────────────────────────────────────────────

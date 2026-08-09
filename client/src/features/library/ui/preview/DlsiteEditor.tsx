@@ -9,12 +9,12 @@ import IconButton from "../../../../shared/ui/IconButton";
 import { I } from "../../../../shared/ui/Icon";
 import { useDialogModal } from "../../../../shared/ui/useDialogModal";
 import { WORK_QUERY_KEYS } from "../../../../entities/work/queryKeys";
-import { getDlsiteInvalidationKeys } from "../../model/dlsiteInvalidation";
+import { getDlsiteInvalidationKeys } from "../../../dlsite/model/dlsiteInvalidation";
 import {
   buildDlsiteApplyBody,
   dlsiteInfoTags,
   unappliedDlsiteTags,
-} from "../../model/dlsitePreview";
+} from "../../../../entities/work/dlsitePreview";
 import { formatCoverEditLabel } from "../../../../shared/lib/coverLabel";
 
 export const STATUS_LABEL = {
