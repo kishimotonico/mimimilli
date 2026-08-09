@@ -90,7 +90,7 @@ test("サブツリー読取失敗: 配下の既存作品は missing 化されず
   const db = openDb({ kind: "memory" });
   t.after(() => db.close());
   const repo = new WorkRepo(db);
-  const scanner = new Scanner(db, repo, directory.path);
+  const scanner = new Scanner(db, repo);
   await scanner.scan(root);
 
   assert.equal((await repo.getWork(accessibleId))?.status, "ok");
@@ -131,7 +131,7 @@ test("サブツリー読取失敗: 読取可能な削除作品は引き続き mi
   const db = openDb({ kind: "memory" });
   t.after(() => db.close());
   const repo = new WorkRepo(db);
-  const scanner = new Scanner(db, repo, directory.path);
+  const scanner = new Scanner(db, repo);
   await scanner.scan(root);
 
   rmSync(removedDir, { recursive: true });

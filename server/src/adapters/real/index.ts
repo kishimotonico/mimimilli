@@ -64,7 +64,7 @@ export function createRealAdapter(
     (options.database.kind === "files"
       ? dirname(dirname(options.database.catalogPath))
       : join(tmpdir(), "mimimilli-memory-data"));
-  const scanner = new Scanner(db, repo, dataRoot, { measureCover: measureCoverDimensions });
+  const scanner = new Scanner(db, repo, { measureCover: measureCoverDimensions });
   const dlsiteRequestConfig: DlsiteRequestConfig = {
     ...DEFAULT_DLSITE_REQUEST_CONFIG,
     ...options.dlsiteRequestConfig,

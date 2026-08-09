@@ -146,7 +146,7 @@ test("スキャン finalize は壊れた作品があっても ScanResult を返�
   const { badId } = seedCorruptedPair(repo, db);
   const root = mkdtempSync(join(tmpdir(), "mimi-scan-integrity-"));
   try {
-    const scanner = new Scanner(db, repo, root);
+    const scanner = new Scanner(db, repo);
     const result = await scanner.scan(root, { full: true });
     assert.equal(result.dataIntegrityWarning?.skippedCount, 1);
     assert.deepEqual(result.dataIntegrityWarning?.skippedWorkIds, [badId]);

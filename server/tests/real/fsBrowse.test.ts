@@ -131,8 +131,20 @@ test("ネストした作品ルートではファイルを最も深い作品へ�
         id: nestedId,
         title: "ネストした作品",
         tags: [],
-        playlists: [{ name: "default", tracks: [{ title: "nested", file: "nested.wav" }] }],
-        defaultPlaylist: "default",
+        playlists: [
+          {
+            id: "33333333-3333-4333-8333-333333333333",
+            name: "default",
+            tracks: [
+              {
+                id: "44444444-4444-4444-8444-444444444444",
+                title: "nested",
+                file: "nested.wav",
+              },
+            ],
+          },
+        ],
+        defaultPlaylistId: "33333333-3333-4333-8333-333333333333",
       }),
     );
   });

@@ -57,7 +57,7 @@ async function run(input: WorkerInput): Promise<void> {
     if (input.testGateStage === "before-scan") waitAtTestGate();
     if (cancelled(token)) throw new Error("スキャンはキャンセルされました");
     const repo = new WorkRepo(db);
-    const scanner = new Scanner(db, repo, input.dataRoot);
+    const scanner = new Scanner(db, repo);
     const result = await scanner.scan(
       input.root,
       {

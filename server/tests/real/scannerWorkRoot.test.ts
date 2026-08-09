@@ -73,7 +73,7 @@ test("findWorkRoot: カバー同梱で mp3/ から作品ルートへ昇格", asy
 
   const db = openDb({ kind: "memory" });
   t.after(() => db.close());
-  const scanner = new Scanner(db, new WorkRepo(db), directory.path);
+  const scanner = new Scanner(db, new WorkRepo(db));
   const result = await scanner.scan(root);
   assert.equal(result.newlyGenerated, 1);
   assert.ok(existsSync(join(work, "mimimilli.json")));
@@ -92,7 +92,7 @@ test("findWorkRoot: 単一サブフォルダーラッパーで昇格", async (t)
 
   const db = openDb({ kind: "memory" });
   t.after(() => db.close());
-  const scanner = new Scanner(db, new WorkRepo(db), directory.path);
+  const scanner = new Scanner(db, new WorkRepo(db));
   const result = await scanner.scan(root);
   assert.equal(result.newlyGenerated, 1);
   assert.ok(existsSync(join(outer, "mimimilli.json")));
@@ -110,7 +110,7 @@ test("findWorkRoot: 複数サブフォルダーではジャンルフォルダー
 
   const db = openDb({ kind: "memory" });
   t.after(() => db.close());
-  const scanner = new Scanner(db, new WorkRepo(db), directory.path);
+  const scanner = new Scanner(db, new WorkRepo(db));
   const result = await scanner.scan(root);
   assert.equal(result.newlyGenerated, 1);
   assert.ok(existsSync(join(genre, "album-a", "mimimilli.json")));
@@ -153,7 +153,7 @@ test("findWorkRoot: 兄弟メタ作品があれば親へ昇格しない", async 
 
   const db = openDb({ kind: "memory" });
   t.after(() => db.close());
-  const scanner = new Scanner(db, new WorkRepo(db), directory.path);
+  const scanner = new Scanner(db, new WorkRepo(db));
   const result = await scanner.scan(root);
   assert.equal(result.registered, 1);
   assert.equal(result.newlyGenerated, 1);
@@ -172,7 +172,7 @@ test("findWorkRoot: 深い単一サブフォルダー連鎖はルート直下ま
 
   const db = openDb({ kind: "memory" });
   t.after(() => db.close());
-  const scanner = new Scanner(db, new WorkRepo(db), directory.path);
+  const scanner = new Scanner(db, new WorkRepo(db));
   const result = await scanner.scan(root);
   assert.equal(result.newlyGenerated, 1);
   assert.ok(existsSync(join(root, "a", "mimimilli.json")));
@@ -198,7 +198,7 @@ test("findWorkRoot: メタ無しaudioのみ・audio無しmetaは自動生成し�
 
   const db = openDb({ kind: "memory" });
   t.after(() => db.close());
-  const scanner = new Scanner(db, new WorkRepo(db), directory.path);
+  const scanner = new Scanner(db, new WorkRepo(db));
   const result = await scanner.scan(root);
   assert.equal(result.registered, 1);
   assert.equal(result.newlyGenerated, 0);
@@ -254,7 +254,7 @@ test("findWorkRoot: 非正規化root（末尾スラッシュ・./）でも旧実
 
   const db = openDb({ kind: "memory" });
   t.after(() => db.close());
-  const scanner = new Scanner(db, new WorkRepo(db), directory.path);
+  const scanner = new Scanner(db, new WorkRepo(db));
   const resultTrailing = await scanner.scan(`${root}/`);
   assert.equal(resultTrailing.newlyGenerated, 1);
   assert.ok(existsSync(join(work, "mimimilli.json")));

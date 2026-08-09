@@ -348,7 +348,7 @@ test("増分スキャン: playlists/tracks/urlsの未知キーはfingerprintか�
   const db = openDb({ kind: "memory" });
   t.after(() => db.close());
   const repo = new WorkRepo(db);
-  const scanner = new Scanner(db, repo, directory.path);
+  const scanner = new Scanner(db, repo);
   await scanner.scan(root);
 
   // createdAtはfingerprint対象外かつ不正値なので、ここでZodを通るとerrorになる。
@@ -573,7 +573,7 @@ test("error作品の再評価時はprobe cacheをバイパスし誤durationか�
   const db = openDb({ kind: "memory" });
   t.after(() => db.close());
   const repo = new WorkRepo(db);
-  const scanner = new Scanner(db, repo, directory.path);
+  const scanner = new Scanner(db, repo);
 
   const stat = statSync(audioPath);
   db.catalog
@@ -681,7 +681,7 @@ test("probe cache は一括取得され作品数に比例しない", async (t) =
   const db = openDb({ kind: "memory" });
   t.after(() => db.close());
   const repo = new WorkRepo(db);
-  const scanner = new Scanner(db, repo, directory.path);
+  const scanner = new Scanner(db, repo);
 
   let queryCount = 0;
   const originalQuery = db.sqlite.query.bind(db.sqlite);
@@ -750,7 +750,7 @@ test("変更済みの複数resume作品でもprobe cache SELECTは一括取得�
   const db = openDb({ kind: "memory" });
   t.after(() => db.close());
   const repo = new WorkRepo(db);
-  const scanner = new Scanner(db, repo, directory.path);
+  const scanner = new Scanner(db, repo);
   await scanner.scan(root);
   for (const id of workIds) {
     const work = (await repo.getWork(id))!;
@@ -801,7 +801,7 @@ test("upsertWork はバッチトランザクションで処理され件数上限
   const db = openDb({ kind: "memory" });
   t.after(() => db.close());
   const repo = new WorkRepo(db);
-  const scanner = new Scanner(db, repo, directory.path, { upsertBatchSize: 2 });
+  const scanner = new Scanner(db, repo, { upsertBatchSize: 2 });
 
   let catalogTransactionCount = 0;
   let userTransactionCount = 0;
@@ -835,7 +835,7 @@ test("upsertBatchSizeは有限の正整数だけを受け付ける", (t) => {
   t.after(() => db.close());
   const repo = new WorkRepo(db);
   for (const upsertBatchSize of [0, -1, 1.5, Number.POSITIVE_INFINITY]) {
-    assert.throws(() => new Scanner(db, repo, "/test", { upsertBatchSize }), /有限の正整数/);
+    assert.throws(() => new Scanner(db, repo, { upsertBatchSize }), /有限の正整数/);
   }
 });
 
@@ -860,7 +860,7 @@ test("バッチ途中のcatalog書込失敗はcatalogのみロールバックさ
   const db = openDb({ kind: "memory" });
   t.after(() => db.close());
   const repo = new WorkRepo(db);
-  const scanner = new Scanner(db, repo, directory.path, { upsertBatchSize: 2 });
+  const scanner = new Scanner(db, repo, { upsertBatchSize: 2 });
   const originalCatalogUpsert = repo.upsertWorkCatalog.bind(repo);
   let calls = 0;
   repo.upsertWorkCatalog = (work, options) => {
@@ -903,7 +903,7 @@ test("user先コミット後のcatalog失敗はuser孤児を残すがopenDbは�
   }
   const db = openDb({ kind: "files", catalogPath, userPath });
   const repo = new WorkRepo(db);
-  const scanner = new Scanner(db, repo, directory.path, { upsertBatchSize: 2 });
+  const scanner = new Scanner(db, repo, { upsertBatchSize: 2 });
   const originalCatalogUpsert = repo.upsertWorkCatalog.bind(repo);
   let calls = 0;
   repo.upsertWorkCatalog = (work, options) => {
@@ -920,7 +920,7 @@ test("user先コミット後のcatalog失敗はuser孤児を残すがopenDbは�
   assert.equal(reopenedRepo.countByStatus("ok"), 0);
   assert.equal(countWorkStates(reopened), 2, "catalogに無いwork_states孤児は許容される");
 
-  const recoveredScanner = new Scanner(reopened, reopenedRepo, directory.path, {
+  const recoveredScanner = new Scanner(reopened, reopenedRepo, {
     upsertBatchSize: 2,
   });
   await recoveredScanner.scan(root);
