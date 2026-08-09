@@ -1,7 +1,6 @@
 import type { VirtualItem } from "@tanstack/react-virtual";
 
-/** 仮想リストの末尾検出（TASK-59）。
- *  末尾から overscan 行以内の仮想アイテムがレンダリングされていれば次ページを読み込む。 */
+/** 仮想リストの末尾検出。末尾から overscan 行以内の仮想アイテムがレンダリングされていれば次ページを読み込む。 */
 export function shouldLoadMore(
   virtualItems: Pick<VirtualItem, "index">[],
   count: number,

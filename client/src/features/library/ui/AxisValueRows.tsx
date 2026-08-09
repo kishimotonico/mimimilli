@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { useCallback } from "react";
 import type { AxisFacetItem } from "@mimimilli/shared";
 import type { AxisValueSortKey, AxisValueSortState } from "../model/axisValueSort";
 import { AXIS_VALUE_SORT_OPTIONS, toggleAxisValueSort } from "../model/axisValueSort";
@@ -10,6 +9,7 @@ import { selectFixedCoverThumbnailWidth } from "../../../entities/work/ui/coverT
 import CoverCollage from "./CoverCollage";
 import IconButton from "../../../shared/ui/IconButton";
 import type { IconName } from "../../../shared/ui/Icon";
+import { useVirtualList } from "../../../shared/ui/useVirtualList";
 
 const ROW_COLLAGE_SIZE = 32;
 /** 階層1段あたりのインデント幅。深さに制限は設けない（4階層以上でも破綻しない）。 */
@@ -85,7 +85,6 @@ export default function AxisValueRows({
   onSelect,
   onAdd,
 }: AxisValueRowsProps) {
-  const listRef = useRef<HTMLDivElement>(null);
   // コラージュは32pxを2×2に分割するので、各セルの要求サムネイル幅は半分の16pxを基準にする
   const collageRequestWidth = selectFixedCoverThumbnailWidth(
     ROW_COLLAGE_SIZE / 2,
@@ -93,24 +92,16 @@ export default function AxisValueRows({
   );
 
   const measureElement = useCallback(() => ROW_ESTIMATE_SIZE, []);
-  const virtualizer = useVirtualizer({
+  const { scrollRef, virtualizer, virtualItems, wrapperStyle, getItemStyle } = useVirtualList({
     count: rows.length,
-    getScrollElement: () => listRef.current,
-    estimateSize: () => ROW_ESTIMATE_SIZE,
-    overscan: 8,
+    estimateSize: ROW_ESTIMATE_SIZE,
+    resetKey,
+    resetScrollTop: true,
     gap: 1,
-    paddingStart: LIST_PADDING_START,
-    paddingEnd: LIST_PADDING_END,
+    padding: { start: LIST_PADDING_START, end: LIST_PADDING_END },
+    overscan: 8,
     measureElement,
   });
-
-  const prevResetKeyRef = useRef(resetKey);
-  useEffect(() => {
-    if (prevResetKeyRef.current === resetKey) return;
-    prevResetKeyRef.current = resetKey;
-    virtualizer.scrollToIndex(0);
-    if (listRef.current) listRef.current.scrollTop = 0;
-  }, [resetKey, virtualizer]);
 
   return (
     <>
@@ -128,22 +119,15 @@ export default function AxisValueRows({
         ))}
       </div>
       <div
-        ref={listRef}
+        ref={scrollRef}
         className="mle-col__list"
         style={{ padding: 0 }}
         // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- 値ボタン集合を名前付き集合として表す。fieldset等の代替タグは適合しない
         role="group"
         aria-label={`${axisLabel}の値一覧`}
       >
-        <div
-          style={{
-            position: "relative",
-            width: "100%",
-            height: virtualizer.getTotalSize(),
-            flexShrink: 0,
-          }}
-        >
-          {virtualizer.getVirtualItems().map((virtualRow) => {
+        <div style={wrapperStyle}>
+          {virtualItems.map((virtualRow) => {
             const row = rows[virtualRow.index];
             if (!row) return null;
             const indent = row.depth * INDENT_PER_DEPTH;
@@ -152,13 +136,7 @@ export default function AxisValueRows({
                 key={virtualRow.key}
                 data-index={virtualRow.index}
                 ref={virtualizer.measureElement}
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  width: "100%",
-                  transform: `translateY(${virtualRow.start}px)`,
-                }}
+                style={getItemStyle(virtualRow)}
               >
                 {row.kind === "heading" ? (
                   <div className="mll-vrow-heading" style={{ paddingLeft: indent }}>

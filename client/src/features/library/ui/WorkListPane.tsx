@@ -1,17 +1,16 @@
-import { useCallback, useEffect, useRef, type ReactNode } from "react";
+import { useCallback, type ReactNode } from "react";
 import { useAtomValue } from "jotai";
-import { useVirtualizer } from "@tanstack/react-virtual";
 import type { WorkListItem } from "@mimimilli/shared";
 import type { AxisId } from "../model/types";
 import { isSmartAxis } from "../model/axisDefinitions";
 import { buildEmptyWorksHint, buildEmptyWorksMessage } from "../model/emptyWorks";
-import { shouldLoadMore } from "../model/virtualScroll";
 import WorkRow from "./WorkRow";
 import CollectionStatus from "../../../shared/ui/CollectionStatus";
 import LoadMore from "./LoadMore";
 import { I } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
 import { dockedBarActiveAtom } from "../../player/model/atoms";
+import { useVirtualList } from "../../../shared/ui/useVirtualList";
 
 // 作品一覧のリスト表示（list/grid のうち list）。ADR-0012 §3 によりレイアウトを固定し、
 // 常に結果面全幅で表示する（旧 ContentColumn の300px固定・中間カラム役割は廃止）。
@@ -62,7 +61,6 @@ export default function WorkListPane({
   onClearSearch,
   smartFolderBanner,
 }: WorkListPaneProps) {
-  const listRef = useRef<HTMLDivElement>(null);
   const dockedBarActive = useAtomValue(dockedBarActiveAtom);
   const paddingEnd = dockedBarActive
     ? LIST_PADDING_END_BASE + LIST_DOCKED_BAR_EXTRA
@@ -70,31 +68,23 @@ export default function WorkListPane({
 
   const measureElement = useCallback(() => WORK_ROW_ESTIMATE_SIZE, []);
 
-  const virtualizer = useVirtualizer({
+  const { scrollRef, virtualizer, virtualItems, wrapperStyle, getItemStyle } = useVirtualList({
     count: works.length,
-    getScrollElement: () => listRef.current,
-    estimateSize: () => WORK_ROW_ESTIMATE_SIZE,
-    overscan: 5,
+    estimateSize: WORK_ROW_ESTIMATE_SIZE,
+    resetKey: worksQueryKey,
     gap: 1,
-    paddingStart: LIST_PADDING_START,
-    paddingEnd,
+    padding: { start: LIST_PADDING_START, end: paddingEnd },
+    overscan: 5,
     measureElement,
+    infiniteScroll:
+      hasNextPage && onLoadMore
+        ? {
+            hasNextPage,
+            isFetchingNextPage,
+            onLoadMore,
+          }
+        : undefined,
   });
-
-  const prevWorksQueryKeyRef = useRef(worksQueryKey);
-  useEffect(() => {
-    if (prevWorksQueryKeyRef.current === worksQueryKey) return;
-    prevWorksQueryKeyRef.current = worksQueryKey;
-    virtualizer.scrollToIndex(0);
-  }, [virtualizer, worksQueryKey]);
-
-  const virtualItems = virtualizer.getVirtualItems();
-  useEffect(() => {
-    if (!hasNextPage || isFetchingNextPage || !onLoadMore) return;
-    if (shouldLoadMore(virtualItems, works.length, virtualizer.options.overscan)) {
-      onLoadMore();
-    }
-  }, [virtualItems, hasNextPage, isFetchingNextPage, onLoadMore, works.length, virtualizer]);
 
   const renderWorkRow = useCallback(
     (index: number) => {
@@ -120,7 +110,7 @@ export default function WorkListPane({
         {worksTotal != null && <span className="count">{worksTotal} 件</span>}
       </div>
       {smartFolderBanner}
-      <div ref={listRef} className="mle-col__list">
+      <div ref={scrollRef} className="mle-col__list">
         {works.length === 0 ? (
           <CollectionStatus
             variant="list"
@@ -136,26 +126,13 @@ export default function WorkListPane({
             }
           />
         ) : (
-          <div
-            style={{
-              position: "relative",
-              width: "100%",
-              height: virtualizer.getTotalSize(),
-              flexShrink: 0,
-            }}
-          >
-            {virtualizer.getVirtualItems().map((virtualRow) => (
+          <div style={wrapperStyle}>
+            {virtualItems.map((virtualRow) => (
               <div
                 key={virtualRow.key}
                 data-index={virtualRow.index}
                 ref={virtualizer.measureElement}
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  width: "100%",
-                  transform: `translateY(${virtualRow.start}px)`,
-                }}
+                style={getItemStyle(virtualRow)}
               >
                 {renderWorkRow(virtualRow.index)}
               </div>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { shouldLoadMore } from "../../src/features/library/model/virtualScroll";
+import { shouldLoadMore } from "../../src/shared/lib/virtualScroll";
 
 describe("virtualScroll shouldLoadMore", () => {
   it("returns false when no virtual items are rendered", () => {

@@ -1,7 +1,6 @@
 import {
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -9,7 +8,6 @@ import {
   type ReactNode,
 } from "react";
 import { useAtom, useAtomValue } from "jotai";
-import { useVirtualizer } from "@tanstack/react-virtual";
 import type { AxisId } from "../model/types";
 import { libraryGridLayoutModeAtom, libraryTileSizeAtom } from "../model/atoms";
 import type { WorkListItem } from "@mimimilli/shared";
@@ -20,7 +18,6 @@ import {
   GRID_ROW_GAP,
   GRID_TILE_CHROME_HEIGHT,
   clampTileSize,
-  computeGridColumnCount,
 } from "../model/gridSizing";
 import {
   getNextGridIndex,
@@ -28,13 +25,13 @@ import {
   type GridArrowKey,
 } from "../model/gridNavigation";
 import { computeJustifiedLayout, type JustifiedLayout } from "../model/justifiedLayout";
-import { shouldLoadMore } from "../model/virtualScroll";
 import { buildEmptyWorksHint, buildEmptyWorksMessage } from "../model/emptyWorks";
 import { isSmartAxis } from "../model/axisDefinitions";
 import CollectionStatus from "../../../shared/ui/CollectionStatus";
 import LoadMore from "./LoadMore";
 import WorkGridRow from "./WorkGridRow";
 import { dockedBarActiveAtom } from "../../player/model/atoms";
+import { useVirtualGrid } from "../../../shared/ui/useVirtualGrid";
 
 interface WorkGridProps {
   axis: AxisId;
@@ -96,6 +93,11 @@ const GRID_PADDING_END_BASE = 16;
 /** .mle-app.has-docked-bar の際の追加余白（TASK-59: スクロール終端が見切れないよう） */
 const GRID_DOCKED_BAR_EXTRA = 28;
 
+function isJustifiedLayoutRevision(value: unknown): value is JustifiedLayout {
+  if (typeof value !== "object" || value === null) return false;
+  return "tiles" in value && "rowHeights" in value;
+}
+
 export default function WorkGrid({
   axis,
   works,
@@ -123,122 +125,93 @@ export default function WorkGrid({
   const gridLayoutMode = useAtomValue(libraryGridLayoutModeAtom);
   const safeTileSize = clampTileSize(tileSize);
   const paneRef = useRef<HTMLElement>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  // 作品選択中かどうか。Escape・グリッド背景クリックでの選択解除を有効にする条件に使う。
-  const isWorkSelected = selectedWorkId !== null;
-
-  // .mll-grid のコンテンツ幅（padding除く）。1:1タイルの列数計算・ジャスティファイドの
-  // 行幅計算の両方で使う。ref にコールバックを使うのは、works の読み込み前後で
-  // .mll-grid 自体が CollectionStatus とマウント/アンマウントされ、
-  // useRef + useEffect だけでは DOM 出現タイミングを取り逃すため。
   const [gridEl, setGridEl] = useState<HTMLDivElement | null>(null);
-  const [containerWidth, setContainerWidth] = useState(0);
+  const isWorkSelected = selectedWorkId !== null;
   const dockedBarActive = useAtomValue(dockedBarActiveAtom);
   const paddingEnd = dockedBarActive
     ? GRID_PADDING_END_BASE + GRID_DOCKED_BAR_EXTRA
     : GRID_PADDING_END_BASE;
+  const isJustified = gridLayoutMode === "justified";
 
-  // layout effect でマウント直後に同期測定してから初回ペイントさせる。
-  // ResizeObserver のコールバックはブラウザが非同期にスケジュールするため、
-  // それだけに頼るとマウント直後の1フレームが containerWidth=0 のまま描画され空白になる。
-  useLayoutEffect(() => {
-    if (!gridEl) return;
-    setContainerWidth(gridEl.getBoundingClientRect().width);
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (entry) setContainerWidth(entry.contentRect.width);
-    });
-    observer.observe(gridEl);
-    return () => observer.disconnect();
-  }, [gridEl]);
+  const getJustifiedLayout = useCallback(
+    (containerWidth: number) => {
+      if (!isJustified || containerWidth <= 0 || works.length === 0) return null;
+      const layout = computeJustifiedLayout(
+        works.map((work) => ({
+          id: work.id,
+          aspectRatio: work.cover ? work.cover.dimensions.width / work.cover.dimensions.height : 1,
+        })),
+        {
+          containerWidth,
+          targetRowHeight: safeTileSize,
+          gap: GRID_COLUMN_GAP,
+        },
+      );
+      const rowCount = layout.rowHeights.length;
+      return {
+        rowCount,
+        estimateRowSize: (index: number) =>
+          (layout.rowHeights[index] ?? 0) + GRID_TILE_CHROME_HEIGHT,
+        measureElement: (element: HTMLDivElement) =>
+          (layout.rowHeights[Number(element.getAttribute("data-index"))] ?? 0) +
+          GRID_TILE_CHROME_HEIGHT,
+        layoutRevision: layout,
+      };
+    },
+    [isJustified, works, safeTileSize],
+  );
 
-  const justifiedLayout = useMemo<JustifiedLayout | null>(() => {
-    if (gridLayoutMode !== "justified" || containerWidth <= 0 || works.length === 0) return null;
-    // アスペクト比はサーバー提供の cover.dimensions から確定させる（画像ロードを待たない）。
-    // cover===null は「表示可能なカバーが無い」仕様として正方形プレースホルダで表す。
-    const items = works.map((work) => ({
-      id: work.id,
-      aspectRatio: work.cover ? work.cover.dimensions.width / work.cover.dimensions.height : 1,
-    }));
-    return computeJustifiedLayout(items, {
-      containerWidth,
-      targetRowHeight: safeTileSize,
-      gap: GRID_COLUMN_GAP,
-    });
-  }, [gridLayoutMode, containerWidth, works, safeTileSize]);
+  const justifiedOptions = useMemo(
+    () => (isJustified ? { getLayout: getJustifiedLayout } : undefined),
+    [isJustified, getJustifiedLayout],
+  );
+
+  const {
+    scrollRef,
+    setGridEl: setGridElFromHook,
+    columnCount,
+    safeTileSize: gridTileSize,
+    justifiedLayout: justifiedVirtualLayout,
+    virtualizer,
+    virtualItems,
+    wrapperStyle,
+    getItemStyle,
+  } = useVirtualGrid({
+    itemCount: works.length,
+    tileSize: safeTileSize,
+    resetKey: worksQueryKey,
+    gap: { row: GRID_ROW_GAP, column: GRID_COLUMN_GAP },
+    padding: { start: GRID_PADDING_START, end: paddingEnd },
+    justified: justifiedOptions,
+    infiniteScroll:
+      hasNextPage && onLoadMore
+        ? {
+            hasNextPage,
+            isFetchingNextPage,
+            onLoadMore,
+          }
+        : undefined,
+  });
+
+  const justifiedLayout =
+    isJustified &&
+    justifiedVirtualLayout &&
+    isJustifiedLayoutRevision(justifiedVirtualLayout.layoutRevision)
+      ? justifiedVirtualLayout.layoutRevision
+      : null;
 
   const justifiedRows = useMemo(
     () => (justifiedLayout ? groupJustifiedRows(works, justifiedLayout) : []),
     [justifiedLayout, works],
   );
 
-  const columnCount = useMemo(
-    () => computeGridColumnCount(containerWidth, safeTileSize, GRID_COLUMN_GAP),
-    [containerWidth, safeTileSize],
-  );
-
-  const rowCount = useMemo(
-    () =>
-      gridLayoutMode === "justified" ? justifiedRows.length : Math.ceil(works.length / columnCount),
-    [gridLayoutMode, justifiedRows.length, works.length, columnCount],
-  );
-
-  const estimateSize = useCallback(
-    (index: number) => {
-      if (gridLayoutMode === "justified") {
-        return (justifiedLayout?.rowHeights[index] ?? 0) + GRID_TILE_CHROME_HEIGHT;
-      }
-      // square: 行高 = タイル実寸 + chrome。containerWidth=0 の間は仮に目標値を返す。
-      const tileWidth =
-        containerWidth > 0
-          ? (containerWidth - (columnCount - 1) * GRID_COLUMN_GAP) / columnCount
-          : safeTileSize;
-      return tileWidth + GRID_TILE_CHROME_HEIGHT;
+  const setGridContainer = useCallback(
+    (el: HTMLDivElement | null) => {
+      setGridElFromHook(el);
+      setGridEl(el);
     },
-    [gridLayoutMode, justifiedLayout, containerWidth, columnCount, safeTileSize],
+    [setGridElFromHook],
   );
-
-  // 両モードとも行高はレイアウト計算（justified は cover.dimensions 由来）で確定するため、
-  // DOM 実測ではなく estimateSize をそのまま採用する。
-  const measureElement = useCallback(
-    (element: HTMLDivElement) => estimateSize(Number(element.getAttribute("data-index"))),
-    [estimateSize],
-  );
-
-  const virtualizer = useVirtualizer({
-    count: rowCount,
-    getScrollElement: () => scrollRef.current,
-    estimateSize,
-    overscan: 5,
-    gap: GRID_ROW_GAP,
-    paddingStart: GRID_PADDING_START,
-    paddingEnd,
-    measureElement,
-  });
-
-  // 検索・軸・ソート・タグ・ドリル変更時にスクロール位置をリセット（AC#3）。
-  // virtualizer 自体の再作成（リサイズ等）ではリセットしない。
-  const prevWorksQueryKeyRef = useRef(worksQueryKey);
-  useEffect(() => {
-    if (prevWorksQueryKeyRef.current === worksQueryKey) return;
-    prevWorksQueryKeyRef.current = worksQueryKey;
-    virtualizer.scrollToIndex(0);
-  }, [virtualizer, worksQueryKey]);
-
-  // 末尾近傍の仮想行が表示されたら次ページを自動取得（AC#2）。
-  const virtualItems = virtualizer.getVirtualItems();
-  useEffect(() => {
-    if (!hasNextPage || isFetchingNextPage || !onLoadMore) return;
-    if (shouldLoadMore(virtualItems, rowCount, virtualizer.options.overscan)) {
-      onLoadMore();
-    }
-  }, [virtualItems, hasNextPage, isFetchingNextPage, onLoadMore, rowCount, virtualizer]);
-
-  // justified の行高はリサイズ・ページ追加でレイアウトが再計算されると変わるため、measure で伝える。
-  useEffect(() => {
-    if (gridLayoutMode !== "justified") return;
-    virtualizer.measure();
-  }, [gridLayoutMode, justifiedLayout, virtualizer]);
 
   useEffect(() => {
     const pane = paneRef.current;
@@ -289,22 +262,20 @@ export default function WorkGrid({
 
     scroll.addEventListener("click", handleGridBackgroundClick);
     return () => scroll.removeEventListener("click", handleGridBackgroundClick);
-  }, [isWorkSelected, onDeselect]);
+  }, [isWorkSelected, onDeselect, scrollRef]);
 
-  // 2次元キーボードナビ（TASK-45）。DOM 計測（querySelectorAll）をやめ、
-  // レイアウト計算済みの columnCount / justifiedLayout.tiles から次インデックスを求める。
   const moveTileFocus = useCallback(
     (currentIndex: number, key: GridArrowKey) => {
       if (!gridEl) return;
 
       const nextIndex =
-        gridLayoutMode === "justified" && justifiedLayout
+        isJustified && justifiedLayout
           ? getNextJustifiedIndex(justifiedLayout.tiles, currentIndex, key)
           : getNextGridIndex(currentIndex, key, columnCount, works.length);
       if (nextIndex === currentIndex) return;
 
       const rowIndex =
-        gridLayoutMode === "justified" && justifiedLayout
+        isJustified && justifiedLayout
           ? justifiedLayout.tiles[nextIndex]?.rowIndex
           : Math.floor(nextIndex / columnCount);
       if (rowIndex === undefined || rowIndex < 0) return;
@@ -327,21 +298,21 @@ export default function WorkGrid({
       };
       requestAnimationFrame(tryFocus);
     },
-    [gridEl, gridLayoutMode, justifiedLayout, columnCount, works, onWorkSelect, virtualizer],
+    [gridEl, isJustified, justifiedLayout, columnCount, works, onWorkSelect, virtualizer],
   );
 
   const rowTileProps = {
     selectedWorkId,
     playingWorkId,
     isPlaybackActive,
-    safeTileSize,
+    safeTileSize: gridTileSize,
     onWorkSelect,
     onWorkPlay,
     onTileArrowKey: moveTileFocus,
   };
 
   const renderVirtualRow = (rowIndex: number) => {
-    if (gridLayoutMode === "justified" && justifiedLayout) {
+    if (isJustified && justifiedLayout) {
       const row = justifiedRows[rowIndex];
       if (!row) return null;
       return (
@@ -399,34 +370,16 @@ export default function WorkGrid({
             />
           ) : (
             <div
-              ref={setGridEl}
-              className={`mll-grid ${gridLayoutMode === "justified" ? "mll-grid--justified" : ""}`}
-              style={
-                {
-                  position: "relative",
-                  width: "100%",
-                  height: `${virtualizer.getTotalSize()}px`,
-                  "--tile-size": `${safeTileSize}px`,
-                  "--grid-row-gap": `${GRID_ROW_GAP}px`,
-                  "--grid-col-gap": `${GRID_COLUMN_GAP}px`,
-                  "--tile-chrome-h": `${GRID_TILE_CHROME_HEIGHT}px`,
-                } as CSSProperties
-              }
+              ref={setGridContainer}
+              className={`mll-grid ${isJustified ? "mll-grid--justified" : ""}`}
+              style={wrapperStyle as CSSProperties}
             >
-              {virtualizer.getVirtualItems().map((virtualRow) => (
+              {virtualItems.map((virtualRow) => (
                 <div
                   key={virtualRow.key}
                   data-index={virtualRow.index}
                   ref={virtualizer.measureElement}
-                  style={
-                    {
-                      position: "absolute",
-                      top: 0,
-                      left: 0,
-                      width: "100%",
-                      transform: `translateY(${virtualRow.start}px)`,
-                    } as CSSProperties
-                  }
+                  style={getItemStyle(virtualRow) as CSSProperties}
                 >
                   {renderVirtualRow(virtualRow.index)}
                 </div>
