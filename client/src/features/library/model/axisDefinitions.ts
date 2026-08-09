@@ -94,6 +94,21 @@ export interface FacetAxisRow {
   icon: IconName;
 }
 
+export interface ViewAxisRow {
+  id: AxisId;
+  name: string;
+  icon: IconName;
+}
+
+/** ビュー軸の行。軸レール（AxisColumn）のビューグループが使う。 */
+export function buildViewAxisRows(): ViewAxisRow[] {
+  return VIEW_AXIS_IDS.map((id) => ({
+    id,
+    name: VIEW_AXIS_LABELS[id] ?? id,
+    icon: getAxisIcon(id),
+  }));
+}
+
 /** 分類軸の行 = 軸表示ONの prefix 定義（定義順）＋ 組み込みの tag / year（ADR-0005）。
  *  軸レール（AxisColumn）と「＋絞り込み」の軸選択ステージ（FilterChipAddButton）
  *  が共有する。 */

@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useAtom } from "jotai";
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import type { AxisFacetItem } from "@mimimilli/shared";
 import {
   AXIS_VALUE_SORT_OPTIONS,
-  DEFAULT_AXIS_VALUE_SORT,
   toggleAxisValueSort,
   type AxisValueSortState,
 } from "../model/axisValueSort";
+import { axisValueSortAtom } from "../model/atoms";
 import { buildAxisValueDisplayRows } from "../model/axisValueDisplayRows";
 import type { AxisValueHierarchyRow } from "../model/axisValueHierarchy";
 import type { AxisId } from "../model/types";
@@ -123,7 +124,7 @@ export default function AxisValueQuickList({
   emptyLabel = "項目がありません",
 }: AxisValueQuickListProps) {
   const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<AxisValueSortState>(DEFAULT_AXIS_VALUE_SORT);
+  const [sort, setSort] = useAtom(axisValueSortAtom);
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const sortToggleRef = useRef<HTMLButtonElement>(null);
@@ -135,7 +136,6 @@ export default function AxisValueQuickList({
     if (!isOpen) return;
     searchRef.current?.focus();
     setQuery("");
-    setSort(DEFAULT_AXIS_VALUE_SORT);
     setSortMenuOpen(false);
   }, [axis, isOpen]);
 

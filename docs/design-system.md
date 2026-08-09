@@ -86,6 +86,8 @@ top layer 内の前後関係は表示タイミングの新しい方が手前に�
 
 軸レールのクイックオーバーレイは軸カラム（`overflow: hidden auto`）の外にはみ出すため `document.body` へポータルする。チップの値ドロップダウン・「＋絞り込み」はクリップされない領域にあるため非ポータルの絶対配置で済ませる。両者とも横方向のクランプは `client/src/shared/ui/useAnchoredPopover` の `getContainer` オプションでクランプ対象コンテナ（floating-ui の `shift` / `size` の `boundary`）を差し替える。複数のトリガーが1つのポータル越しパネルを共有し常に高々1つだけ開くホバーUI（軸レールのクイックオーバーレイ等）は `useHoverGroupCoordinator`（`shared/lib/`）を使う。開閉タイマーの共有に加え、トリガーからパネルへの斜め移動が他のトリガー行の上を通過してもセーフトライアングル判定で開閉が横取りされない。
 
+クイックオーバーレイ（`AxisValueQuickList`）は結果面の値一覧（`AxisValueRows` / `AxisValueGrid`）と同じデータ・ソート・階層化ロジックを共有するが、表示密度は意図的に異なる。オーバーレイはポップオーバーで横幅が限られ、行の padding・行高も独自定数（`.mll-qlist__item` の 6px + 12px 行）で詰めている。入れ子タグの階層インデントもメイン一覧（14px/段）より狭い 12px/段にして、狭いパネル内でラベルが読める横幅を確保する。ソート状態（`axisValueSortAtom`）はメイン一覧と共有し、オーバーレイのソートメニュー・結果面のソートメニュー・list 列見出しは同じ state への別入口である。
+
 ## Motion / cursor
 
 方針の正は [ADR-0014](adr/0014-motion-reintroduction-presence-removal.md)。実装からは読み取りにくい規約だけをここに記す。
