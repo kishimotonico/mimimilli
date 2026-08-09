@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import type { DlsiteWorkInfo, Work } from "@mimimilli/shared";
 import { applyDlsiteInfo, fetchDlsiteInfo, updateDlsiteState } from "../../../../entities/work/api";
-import { ApiRequestError } from "../../../../shared/api/http";
+import { dlsiteFetchErrorMessage } from "../../../../entities/work/dlsiteFetchError";
 import Button from "../../../../shared/ui/Button";
 import IconButton from "../../../../shared/ui/IconButton";
 import { I } from "../../../../shared/ui/Icon";
@@ -27,13 +27,6 @@ export const STATUS_LABEL = {
 
 const inputClass =
   "h-8 min-w-0 rounded-[6px] border border-line bg-paper-0 px-2.5 font-mono text-[11px] text-ink-0 placeholder:text-ink-4 focus:border-acc focus:outline-none focus:ring-2 focus:ring-acc-soft disabled:cursor-not-allowed disabled:text-ink-4";
-
-function errorMessage(error: unknown): string {
-  if (!(error instanceof ApiRequestError)) return "DLsite情報の取得に失敗しました";
-  if (error.code === "not_found") return "作品が見つかりません。コードが違うかもしれません。";
-  if (error.code === "parse_error") return "DLsiteのページ構造が変わった可能性があります。";
-  return "DLsiteとの通信に失敗しました。時間をおいて再試行してください。";
-}
 
 interface DlsiteApplyDialogProps {
   work: Work;
@@ -198,7 +191,7 @@ export function DlsiteEditor({ work }: { work: Work }) {
       setApplyCover(Boolean(fetched.coverUrl));
       setInfo(fetched);
     } catch (cause) {
-      setError(errorMessage(cause));
+      setError(dlsiteFetchErrorMessage(cause));
       await refresh();
     } finally {
       setBusy(false);

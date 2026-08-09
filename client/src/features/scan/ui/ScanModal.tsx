@@ -15,6 +15,7 @@ import { scanPhaseLabel, type ScanProgress } from "../model";
 import { scanningAtom, scanProgressAtom } from "../model/atoms";
 import { useScanActions } from "../model/useScanActions";
 import { getLastScanResult, SCAN_QUERY_KEYS } from "../api";
+import { formatLastScanTime } from "../../../shared/lib/format";
 
 interface ScanModalProps {
   lastScanTime: string | null;
@@ -30,10 +31,6 @@ const STAT_KEYS: StatKey[] = ["registered", "newlyGenerated", "errors", "missing
 const COMPLETION_HINT_MS = 2400;
 /** 変化したバッジの強調が消えるまでの時間（バッジ側のtransition-colorsで滑らかに戻す）。 */
 const BADGE_HIGHLIGHT_MS = 1000;
-
-function formatDate(iso: string | null): string {
-  return iso ? new Date(iso).toLocaleString("ja-JP") : "未実行";
-}
 
 export default function ScanModal({ lastScanTime, onClose, onOpenRjCodeMissing }: ScanModalProps) {
   const scanning = useAtomValue(scanningAtom);
@@ -339,7 +336,7 @@ function StatusRowLastScan({ lastScanTime }: { lastScanTime: string | null }) {
   return (
     <motion.div inert={!isPresent} {...v}>
       <span className="font-mono text-[11px] text-ink-2">
-        最終スキャン: {formatDate(lastScanTime)}
+        最終スキャン: {formatLastScanTime(lastScanTime)}
       </span>
     </motion.div>
   );

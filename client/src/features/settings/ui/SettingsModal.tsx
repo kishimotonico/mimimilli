@@ -10,6 +10,7 @@ import { useDlsiteBulkActions } from "../../dlsite/model/useDlsiteBulkActions";
 import { scanningAtom, scanProgressLabelAtom } from "../../scan/model/atoms";
 import TagPrefixSettings from "./TagPrefixSettings";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
+import { formatLastScanTime } from "../../../shared/lib/format";
 
 interface SettingsModalProps {
   rootFolder: string | null;
@@ -63,9 +64,6 @@ export default function SettingsModal({
     if (path) onChangeFolder(path);
     setIsEditingFolder(false);
   };
-
-  const formatDate = (iso: string | null) =>
-    iso ? new Date(iso).toLocaleString("ja-JP") : "未実行";
 
   return (
     // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- backdropクリックで閉じる。EscapeはonCancel（useDialogModal）で処理する。
@@ -298,7 +296,7 @@ export default function SettingsModal({
                 color: "var(--ink-2)",
               }}
             >
-              最終スキャン: {formatDate(lastScanTime)}
+              最終スキャン: {formatLastScanTime(lastScanTime)}
             </span>
             <button
               onClick={onOpenScan}

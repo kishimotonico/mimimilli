@@ -8,7 +8,7 @@ import { WORK_QUERY_KEYS } from "../../../../entities/work/queryKeys";
 import { I } from "../../../../shared/ui/Icon";
 import IconButton from "../../../../shared/ui/IconButton";
 import CollectionStatus from "../../../../shared/ui/CollectionStatus";
-import { formatDuration } from "./format";
+import { formatDuration } from "../../../../shared/lib/format";
 import { WorkCardGrid } from "./WorkCard";
 
 const SECTION_LIMIT = 6;

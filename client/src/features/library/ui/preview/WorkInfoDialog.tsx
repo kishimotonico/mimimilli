@@ -5,7 +5,7 @@ import IconButton from "../../../../shared/ui/IconButton";
 import { I } from "../../../../shared/ui/Icon";
 import { useDialogModal } from "../../../../shared/ui/useDialogModal";
 import { STATUS_LABEL } from "./DlsiteEditor";
-import { formatDate, formatDateTime, formatDuration } from "./format";
+import { formatDate, formatDateTime, formatDuration } from "../../../../shared/lib/format";
 import { formatCoverInfoLabel } from "../../../../shared/lib/coverLabel";
 
 const STATUS_TEXT: Record<Work["status"], string> = {

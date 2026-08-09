@@ -25,3 +25,25 @@ export function formatFileSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
+
+export function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("ja-JP", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+export function formatDateTime(iso: string): string {
+  return new Date(iso).toLocaleString("ja-JP", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+export function formatLastScanTime(iso: string | null): string {
+  return iso ? new Date(iso).toLocaleString("ja-JP") : "未実行";
+}

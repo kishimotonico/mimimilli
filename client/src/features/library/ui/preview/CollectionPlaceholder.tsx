@@ -1,5 +1,5 @@
 import { I } from "../../../../shared/ui/Icon";
-import { formatDuration } from "./format";
+import { formatDuration } from "../../../../shared/lib/format";
 import type { CollectionStatsDisplay } from "../../model/libraryPresentation";
 
 interface CollectionPlaceholderProps {

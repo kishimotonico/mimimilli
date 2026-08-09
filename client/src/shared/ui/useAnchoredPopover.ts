@@ -21,6 +21,7 @@ import {
 import type { Boundary } from "@floating-ui/react";
 import {
   isInsideBoundaries,
+  mapDismissReason,
   refocusPopoverAnchorIfNeeded,
   type PopoverCloseReason,
 } from "./usePopoverDismissal";
@@ -36,12 +37,6 @@ const defaultContainerResolver: PopoverContainerResolver = (anchor) =>
   (anchor.closest(".mle-prv__meta") ??
     anchor.closest(".mle-prv__body") ??
     null) as HTMLElement | null;
-
-function mapDismissReason(reason?: string): PopoverCloseReason {
-  if (reason === "escape-key") return "escape";
-  if (reason === "outside-press") return "outside";
-  return "direct";
-}
 
 function readContainerWidth(boundary: Boundary): number {
   if (boundary instanceof HTMLElement) {

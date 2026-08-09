@@ -15,14 +15,21 @@ import {
 
 // ── 作品検索（GET /api/works）────────────────────────────────
 
+function appendTagsTagOp(
+  params: URLSearchParams,
+  filter: { tags?: string[]; tagOp?: "AND" | "OR" },
+): void {
+  for (const tag of filter.tags ?? []) params.append("tags", tag);
+  if (filter.tagOp) params.set("tagOp", filter.tagOp);
+}
+
 export async function searchWorks(
   params: WorksQueryInput,
   options?: { signal?: AbortSignal },
 ): Promise<WorksPage> {
   const p = new URLSearchParams();
   if (params.q) p.set("q", params.q);
-  for (const tag of params.tags ?? []) p.append("tags", tag);
-  if (params.tagOp) p.set("tagOp", params.tagOp);
+  appendTagsTagOp(p, params);
   if (params.view) p.set("view", params.view);
   if (params.sort) p.set("sort", params.sort);
   if (params.seed !== undefined) p.set("seed", String(params.seed));
@@ -45,8 +52,7 @@ export async function getAxisFacets(
   filter: AxisFacetsParams = {},
 ): Promise<AxisFacetItem[]> {
   const p = new URLSearchParams();
-  for (const tag of filter.tags ?? []) p.append("tags", tag);
-  if (filter.tagOp) p.set("tagOp", filter.tagOp);
+  appendTagsTagOp(p, filter);
   const q = p.toString();
   return getParsed(axisFacetListSchema, `/axes/${encodeURIComponent(axis)}${q ? `?${q}` : ""}`);
 }

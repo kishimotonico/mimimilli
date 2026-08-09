@@ -207,7 +207,8 @@ export type ResumeBody = z.infer<typeof resumeBodySchema>;
 
 // ── カバー画像サムネイル（GET /api/media/cover/:id?w=）───────
 // キャッシュを有界にするため、許可する幅は離散値のみ。未対応の幅はリクエストされても
-// normalizeThumbnailWidth() が最近傍の許可幅へ丸める（丸め方の挙動はテストで担保する）。
+// normalizeThumbnailWidth() が最近傍の許可幅へ丸める（同距離は小さい方。
+// selectNearestThumbnailWidth は同距離で大きい方。挙動はテストで担保する）。
 
 export const THUMBNAIL_WIDTHS = [128, 256, 512] as const;
 export type ThumbnailWidth = (typeof THUMBNAIL_WIDTHS)[number];
@@ -215,6 +216,18 @@ export type ThumbnailWidth = (typeof THUMBNAIL_WIDTHS)[number];
 export function normalizeThumbnailWidth(width: number): ThumbnailWidth {
   return THUMBNAIL_WIDTHS.reduce((closest, candidate) =>
     Math.abs(candidate - width) < Math.abs(closest - width) ? candidate : closest,
+  );
+}
+
+export function selectCeilThumbnailWidth(target: number): ThumbnailWidth {
+  const fallback = THUMBNAIL_WIDTHS[THUMBNAIL_WIDTHS.length - 1];
+  if (fallback === undefined) throw new Error("THUMBNAIL_WIDTHS must not be empty");
+  return THUMBNAIL_WIDTHS.find((width) => width >= target) ?? fallback;
+}
+
+export function selectNearestThumbnailWidth(target: number): ThumbnailWidth {
+  return [...THUMBNAIL_WIDTHS].reduce((nearest, width) =>
+    Math.abs(width - target) <= Math.abs(nearest - target) ? width : nearest,
   );
 }
 

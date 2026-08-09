@@ -3,7 +3,7 @@
 // AddressBar の並び替えメニュー（.mle-sortmenu）と同じ「position:relative + absolute」の
 // 素朴な実装に倣う（work-preview専用の useAnchoredPopover は左寄せクランプ前提でここには合わない）。
 import { useAtomValue } from "jotai";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { DlsiteNotificationModalKind } from "../../features/library/model/dlsiteNotificationModal";
 import {
@@ -17,6 +17,7 @@ import { getLastScanResult, SCAN_QUERY_KEYS } from "../../features/scan/api";
 import Button from "../../shared/ui/Button";
 import { I } from "../../shared/ui/Icon";
 import IconButton from "../../shared/ui/IconButton";
+import { usePopoverDismissal } from "../../shared/ui/usePopoverDismissal";
 
 export interface NotificationBellProps {
   /** 直近のスキャン結果クリックでスキャンモーダルの結果表示を開く（TASK-56） */
@@ -48,6 +49,12 @@ export default function NotificationBell({
   const [isOpen, setIsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
+  usePopoverDismissal({
+    isOpen,
+    onClose: () => setIsOpen(false),
+    anchorRef: rootRef,
+  });
+
   const badgeCount =
     rjCodeMissingCount +
     dlsiteFetchFailedCount +
@@ -59,30 +66,6 @@ export default function NotificationBell({
     !dlsiteParseErrorAlert &&
     !showUnlinkedRow &&
     !scanResult;
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const closeOnOutsidePointerDown = (event: PointerEvent) => {
-      if (
-        rootRef.current &&
-        event.target instanceof Node &&
-        !rootRef.current.contains(event.target)
-      ) {
-        setIsOpen(false);
-      }
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setIsOpen(false);
-    };
-
-    document.addEventListener("pointerdown", closeOnOutsidePointerDown);
-    document.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.removeEventListener("pointerdown", closeOnOutsidePointerDown);
-      document.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [isOpen]);
 
   return (
     <div ref={rootRef} className="relative">
