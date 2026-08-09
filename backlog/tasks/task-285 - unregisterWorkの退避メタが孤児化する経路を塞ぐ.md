@@ -4,6 +4,7 @@ title: unregisterWorkの退避メタが孤児化する経路を塞ぐ
 status: To Do
 assignee: []
 created_date: '2026-08-09 19:14'
+updated_date: '2026-08-09 19:18'
 labels: []
 dependencies: []
 priority: high
@@ -34,3 +35,9 @@ grep で確認したところ unregistering の文字列は workRegister.ts:61�
 - [ ] #3 上記2つが再現テストで担保されていること
 - [ ] #4 ADR-0008の保全要件に退避メタの回収が記載されていること
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+退避後・catalog削除前の窓は、同じworkIdへunregisterを再実行すればstageMetaForDeletionが退避済み状態を許容して続行できる構造ではある。ただしユーザーの再実行に依存するうえ、その前にスキャンが走るとメタ無しとして扱われて実害が出るため、自動回収が必要という判断。
+<!-- SECTION:NOTES:END -->
