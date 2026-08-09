@@ -282,9 +282,6 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
                           hasSelectedTags={nav.selectedTags.length > 0}
                           playingWorkId={playingWorkId}
                           isPlaybackActive={isPlaybackActive}
-                          isLoading={false}
-                          isError={false}
-                          onRetryWorks={result.refetchWorks}
                           hasNextPage={result.hasNextPage}
                           worksTotal={result.worksTotal}
                           isFetchingNextPage={result.isFetchingNextPage}
