@@ -115,14 +115,15 @@ SQLへ直接移せない規則は、catalog DBにcoreと同じ関数で作った
 
 [ADR-0004](0004-core-functions-over-sql.md)が定めた「検索・集計・評価はcoreの純粋関数で行う」という規範のうち、coreを仕様正本とする部分は本ADRが引き継いでいる。realの実行経路をSQLへ移した結果として core と SQL に同一仕様が二重に存在するが、これは無制限に許すものではない。統制の規則を次のとおり定める。
 
-新機能の既定はcore-firstとする。規範形は `evalSmartFolder` で、core の単一実装を fixture と real の両方が呼ぶ。SQLでの再実装は性能上の例外としてのみ認め、認可済みの例外は次の2件に閉じる。
+新機能の既定はcore-firstとする。規範形は `evalSmartFolder` で、core の単一実装を fixture と real の両方が呼ぶ。SQLでの再実装は性能上の例外としてのみ認め、認可済みの例外は次の3件に閉じる。
 
-| 例外             | 経路                                                                 | 性能理由                                                                                                                   | 契約テスト                                     |
-| ---------------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| 作品検索         | `core/worksQuery.ts` の `applyWorksQuery` ↔ `WorkRepo.queryWorks`    | user条件を含む絞り込み・ソート・総件数・ページングを1つのSQLスナップショット上で決めるため。全件をメモリへ読む経路を避ける | `server/tests/real/worksQueryContract.test.ts` |
-| 軸ファセット集計 | `core/axisFacets.ts` の `buildAxisFacets` ↔ `WorkRepo.getAxisFacets` | 値ごとの件数・総時間・代表カバーを全件取得なしに集計するため                                                               | 同上（ファセット値と件数の同値検証）           |
+| 例外             | 経路                                                                                                                                  | 性能理由                                                                                                                   | 契約テスト                                                                                                           |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| 作品検索         | `core/worksQuery.ts` の `applyWorksQuery` ↔ `WorkRepo.queryWorks`                                                                     | user条件を含む絞り込み・ソート・総件数・ページングを1つのSQLスナップショット上で決めるため。全件をメモリへ読む経路を避ける | `server/tests/real/worksQueryContract.test.ts`                                                                       |
+| 軸ファセット集計 | `core/axisFacets.ts` の `buildAxisFacets` ↔ `WorkRepo.getAxisFacets`                                                                  | 値ごとの件数・総時間・代表カバーを全件取得なしに集計するため                                                               | 同上（ファセット値と件数の同値検証）                                                                                 |
+| DLsite通知の集計 | `core/dlsiteNotifications.ts` の `summarizeDlsiteNotifications` ↔ `WorkRepo.getDlsiteNotificationSummary`・`queryDlsiteNotifications` | 件数集計をSQLで完結させるため。core関数を呼ぶには作品行を全件展開する必要があり、集計クエリの利点が失われる                | `server/tests/dlsiteNotifications.test.ts`（fixture↔realの同値検証）・`server/tests/real/worksQueryContract.test.ts` |
 
-上記2例外の内側でSQL固有の表現になっている断片は、独立した例外として数えない。作品検索の内訳は、RJ/VJコード正規化のCASE式、randomソートのローテーション、`RECENT_VIEW_WINDOW_DAYS` による recent view の期間判定、タグとresumeのEXISTS断片である。これらはSQLフラグメント生成を1モジュールへ集約して同期リスクを下げる。
+各例外の内側でSQL固有の表現になっている断片は、独立した例外として数えない。作品検索の内訳は、RJ/VJコード正規化のCASE式、randomソートのローテーション、`RECENT_VIEW_WINDOW_DAYS` による recent view の期間判定、タグとresumeのEXISTS断片である。これらはSQLフラグメント生成を1モジュールへ集約して同期リスクを下げる。DLsite通知の集計では、述語 `isRjCodeMissing`・`isDlsiteFetchFailed` に対応するCASE式がこれにあたる。
 
 スマートフォルダーは二重実装ではない。最終評価の `evalSmartFolder` は fixture と real の両方が呼ぶ単一実装であり、SQLの候補抽出は本ADRが定めた2段階評価の第1段にあたる。
 
