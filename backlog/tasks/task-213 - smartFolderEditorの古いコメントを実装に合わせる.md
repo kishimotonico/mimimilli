@@ -4,6 +4,7 @@ title: smartFolderEditorの古いコメントを実装に合わせる
 status: To Do
 assignee: []
 created_date: '2026-08-06 04:59'
+updated_date: '2026-08-09 15:11'
 labels: []
 dependencies: []
 priority: low
@@ -20,6 +21,6 @@ client/src/features/library/model/smartFolderEditor.ts:40-45 のコメントが�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 smartFolderEditor.ts のコメントが現在の LibraryView の実装（判別可能unionによる状態保持）と一致している
-- [ ] #2 同様に解消済みの残作業を指したままのコメントが library feature 内に他に残っていないか確認されている
+- [x] #1 smartFolderEditor.ts のコメントが現在の LibraryView の実装（判別可能unionによる状態保持）と一致している
+- [x] #2 同様に解消済みの残作業を指したままのコメントが library feature 内に他に残っていないか確認されている
 <!-- AC:END -->

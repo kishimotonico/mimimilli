@@ -21,7 +21,6 @@ import { resolveWithin } from "./paths.ts";
 import { Scanner } from "./scanner.ts";
 import { logDataIntegritySkips, toDataIntegrityWarning } from "./dataIntegrity.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
-import { WorkRegisterError } from "../../errors.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";
@@ -74,18 +73,13 @@ export function createWorkMethods(deps: {
 
     async createWork(body: WorkCreateBody): Promise<Work | null> {
       const root = requireRoot();
-      try {
-        return await createWorkFromFolder(
-          { query, catalog, user },
-          scanner,
-          root,
-          body,
-          (coverUrl, workDir) => cachedCover(coverUrl, workDir),
-        );
-      } catch (error) {
-        if (error instanceof WorkRegisterError) throw error;
-        throw error;
-      }
+      return await createWorkFromFolder(
+        { query, catalog, user },
+        scanner,
+        root,
+        body,
+        (coverUrl, workDir) => cachedCover(coverUrl, workDir),
+      );
     },
 
     async deleteWork(id: string): Promise<boolean> {
