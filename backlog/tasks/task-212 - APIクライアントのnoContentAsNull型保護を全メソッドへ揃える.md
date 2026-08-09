@@ -1,10 +1,10 @@
 ---
 id: TASK-212
 title: APIクライアントのnoContentAsNull型保護を全メソッドへ揃える
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-06 04:59'
-updated_date: '2026-08-09 15:07'
+updated_date: '2026-08-09 15:09'
 labels: []
 dependencies: []
 priority: medium
