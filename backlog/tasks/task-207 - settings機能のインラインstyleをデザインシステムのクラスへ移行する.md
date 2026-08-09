@@ -1,10 +1,10 @@
 ---
 id: TASK-207
 title: settings機能のインラインstyleをデザインシステムのクラスへ移行する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-06 04:57'
-updated_date: '2026-08-09 14:59'
+updated_date: '2026-08-09 15:00'
 labels: []
 dependencies: []
 priority: high
@@ -43,3 +43,9 @@ docs/design-system.md は「mle-/mll- は Library/Files 共通の骨格・固有
 - [x] #4 z-index とモーダルの重なり順が design-system.md の規約どおりで、他のモーダルとの前後関係が変わっていない
 - [x] #5 pnpm check と pnpm test と pnpm test:visual が通る
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+ダークテーマは未実装（docs/design-system.md:19）で切替手段が存在しないため、AC#3の確認はライトテーマのみで実施した。
+<!-- SECTION:NOTES:END -->
