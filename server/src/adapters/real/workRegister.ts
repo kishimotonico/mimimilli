@@ -12,7 +12,7 @@ import { emptyDlsiteState } from "@mimimilli/shared";
 import { detectRjCode } from "./dlsite.ts";
 import { META_FILE_NAME, MetaParseError, readMetaFile, readMetaFileRaw } from "./meta.ts";
 import { resolveWithin } from "./paths.ts";
-import { WorkRegisterError } from "../../adapter.ts";
+import { WorkRegisterError } from "../../errors.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";

@@ -1,6 +1,7 @@
 import { realpathSync } from "node:fs";
 import { resolve } from "node:path";
-import { type ScanOptions, NotConfiguredError } from "../../adapter.ts";
+import { NotConfiguredError } from "../../errors.ts";
+import type { ScanOptions } from "../../adapter/index.ts";
 import type { ScanResult, Settings, SettingsUpdate } from "@mimimilli/shared";
 import { formatError, getCategoryLogger } from "../../lib/logger.ts";
 import { type DbLocation } from "./db.ts";

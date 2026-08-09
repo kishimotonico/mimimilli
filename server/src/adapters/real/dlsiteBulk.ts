@@ -11,7 +11,7 @@ import {
   type WorkSummary,
 } from "@mimimilli/shared";
 import { isDefaultTitle } from "../../core/dlsiteTitle.ts";
-import { DlsiteOfflineError } from "../../adapter.ts";
+import { DlsiteOfflineError } from "../../errors.ts";
 import { mergeDlsiteTags } from "./dlsite.ts";
 import { persistDlsiteAppliedWork } from "./dlsitePersist.ts";
 import { patchMetaFile } from "./meta.ts";

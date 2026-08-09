@@ -1,4 +1,4 @@
-import { DlsiteOfflineError } from "../../adapter.ts";
+import { DlsiteOfflineError } from "../../errors.ts";
 import { MAX_DLSITE_TIMER_MS, type DlsiteRequestConfig } from "./dlsiteConfig.ts";
 
 export type DlsiteTransport = (

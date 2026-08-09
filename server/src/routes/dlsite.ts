@@ -9,8 +9,8 @@ import {
   dlsiteNotificationQuerySchema,
   dlsiteStatePatchSchema,
 } from "@mimimilli/shared";
-import type { DataAdapter } from "../adapter.ts";
-import { DlsiteOfflineError } from "../adapter.ts";
+import { DlsiteOfflineError } from "../errors.ts";
+import type { DataAdapter } from "../adapter/index.ts";
 import { apiError, invalidRequest, notFound } from "../lib/httpError.ts";
 import { getCategoryLogger } from "../lib/logger.ts";
 import {

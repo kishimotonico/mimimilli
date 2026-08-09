@@ -4,7 +4,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import type { MetaFile, NormalizedTag, ScanResult, UrlEntry, Work } from "@mimimilli/shared";
 import { isRjCodeMissing } from "@mimimilli/shared";
 import type { Db } from "./db.ts";
-import type { ScanOptions } from "../../adapter.ts";
+import type { ScanOptions } from "../../adapter/index.ts";
 import {
   META_FILE_NAME,
   MetaParseError,

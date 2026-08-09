@@ -2,7 +2,7 @@
 // 作品検索・件数・ページングはcatalog接続からuser DBをATTACH JOINしてSQLで実行する。
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import type { DataAdapter } from "../../adapter.ts";
+import type { DataAdapter } from "../../adapter/index.ts";
 import { openDb, type Db, type DbLocation } from "./db.ts";
 import { DlsiteCache, type DlsiteCacheOptions } from "./dlsiteCache.ts";
 import { DEFAULT_DLSITE_REQUEST_CONFIG, type DlsiteRequestConfig } from "./dlsiteConfig.ts";

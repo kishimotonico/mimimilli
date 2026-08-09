@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { ScanResult } from "@mimimilli/shared";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
-import type { DataAdapter } from "../src/adapter.ts";
+import type { DataAdapter } from "../src/adapter/index.ts";
 import { ScanJobManager } from "../src/scanJobManager.ts";
 import { captureLogs, scanRecords } from "./helpers/logCapture.ts";
 

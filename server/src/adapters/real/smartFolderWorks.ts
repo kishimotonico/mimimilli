@@ -1,7 +1,7 @@
 import { EMPTY_TAG_FILTERS, type SmartFolder, type WorksPage } from "@mimimilli/shared";
 import { evalSmartFolder } from "../../core/smartFolder.ts";
 import { toWorksPage } from "../../core/worksQuery.ts";
-import type { SmartFolderEvalQuery } from "../../adapter.ts";
+import type { SmartFolderEvalQuery } from "@mimimilli/shared";
 import { getCategoryLogger } from "../../lib/logger.ts";
 import { logDataIntegritySkips, toDataIntegrityWarning } from "./dataIntegrity.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";

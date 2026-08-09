@@ -17,7 +17,7 @@ import type {
   WorksPage,
   WorksQuery,
 } from "@mimimilli/shared";
-import type { AxisFacetsFilterInput } from "../../core/axisFacets.ts";
+import type { AxisFacetsQuery } from "@mimimilli/shared";
 import { japaneseSortKey } from "../../core/japaneseSortKey.ts";
 import type { Db } from "./db.ts";
 import { tags, workDlsite, workTags, works } from "./catalogSchema.ts";
@@ -493,7 +493,7 @@ export class WorkQueryRepository {
     return map;
   }
 
-  getAxisFacets(axis: string, filter: AxisFacetsFilterInput = {}): AxisFacetItem[] {
+  getAxisFacets(axis: string, filter: Partial<AxisFacetsQuery> = {}): AxisFacetItem[] {
     const { tags: realTags, yearValue } = filter.tags ?? { tags: [], yearValue: null };
     const tagAxis = tagAxisConditions(realTags, filter.tagOp ?? "AND", yearValue);
     const filterWhere =

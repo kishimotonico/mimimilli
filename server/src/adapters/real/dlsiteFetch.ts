@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { writeFileSync } from "node:fs";
 import type { DlsiteFetchResult } from "@mimimilli/shared";
-import { DlsiteOfflineError } from "../../adapter.ts";
+import { DlsiteOfflineError } from "../../errors.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
 import {
   fetchDlsiteCover,

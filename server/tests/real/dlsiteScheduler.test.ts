@@ -5,7 +5,7 @@ import {
   resolveDlsiteRequestConfig,
   DEFAULT_DLSITE_USER_AGENT,
 } from "../../src/adapters/real/dlsiteConfig.ts";
-import { DlsiteOfflineError } from "../../src/adapter.ts";
+import { DlsiteOfflineError } from "../../src/errors.ts";
 import { DlsiteScheduler } from "../../src/adapters/real/dlsiteScheduler.ts";
 
 function fakeTime(initial = 0) {

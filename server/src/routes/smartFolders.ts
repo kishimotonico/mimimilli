@@ -6,7 +6,7 @@ import {
   smartFolderWorksQuerySchema,
   WORKS_DEFAULT_PAGE_SIZE,
 } from "@mimimilli/shared";
-import type { DataAdapter } from "../adapter.ts";
+import type { DataAdapter } from "../adapter/index.ts";
 import { invalidRequest, notFound } from "../lib/httpError.ts";
 
 export function smartFoldersRoute(adapter: DataAdapter): Hono {

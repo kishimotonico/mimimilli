@@ -10,7 +10,7 @@ import {
   type TagPrefixUpdate,
   type WorksPage,
 } from "@mimimilli/shared";
-import type { AxisFacetsFilter, SmartFolderEvalQuery } from "../../adapter.ts";
+import type { AxisFacetsQuery, SmartFolderEvalQuery } from "@mimimilli/shared";
 import { buildTagPrefixCandidates } from "../../core/tagPrefixCandidates.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
 import { logDataIntegritySkips } from "./dataIntegrity.ts";
@@ -34,7 +34,7 @@ export function createClassificationMethods(deps: {
 }) {
   const { query, user } = deps;
   return {
-    async getAxisFacets(axis: string, filter?: AxisFacetsFilter): Promise<AxisFacetItem[]> {
+    async getAxisFacets(axis: string, filter?: Partial<AxisFacetsQuery>): Promise<AxisFacetItem[]> {
       return query.getAxisFacets(axis, filter);
     },
 

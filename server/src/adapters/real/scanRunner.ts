@@ -1,5 +1,5 @@
 import type { ScanProgressEvent, ScanResult } from "@mimimilli/shared";
-import type { ScanOptions } from "../../adapter.ts";
+import type { ScanOptions } from "../../adapter/index.ts";
 import { formatError, getCategoryLogger } from "../../lib/logger.ts";
 import type { DbLocation } from "./db.ts";
 

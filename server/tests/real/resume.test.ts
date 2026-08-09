@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import type { Work } from "@mimimilli/shared";
 import { eq } from "drizzle-orm";
-import { InvalidResumeError } from "../../src/adapter.ts";
+import { InvalidResumeError } from "../../src/errors.ts";
 import { openDb } from "../../src/adapters/real/db.ts";
 import { probeDurationSec } from "../../src/adapters/real/probe.ts";
 import { workStates } from "../../src/adapters/real/userSchema.ts";

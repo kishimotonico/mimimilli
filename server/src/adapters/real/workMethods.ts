@@ -21,7 +21,7 @@ import { resolveWithin } from "./paths.ts";
 import { Scanner } from "./scanner.ts";
 import { logDataIntegritySkips, toDataIntegrityWarning } from "./dataIntegrity.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
-import { WorkRegisterError } from "../../adapter.ts";
+import { WorkRegisterError } from "../../errors.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";

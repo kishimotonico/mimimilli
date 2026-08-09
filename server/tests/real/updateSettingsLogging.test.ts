@@ -3,7 +3,7 @@ import { mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { test } from "node:test";
-import { NotConfiguredError } from "../../src/adapter.ts";
+import { NotConfiguredError } from "../../src/errors.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { captureLogs, categoryRecords, recordMessage } from "../helpers/logCapture.ts";
 

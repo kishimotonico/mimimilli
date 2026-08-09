@@ -6,7 +6,7 @@ import type {
   ScanProgressEvent,
   ScanResult,
 } from "@mimimilli/shared";
-import type { DataAdapter } from "./adapter.ts";
+import type { DataAdapter } from "./adapter/index.ts";
 import { formatError, getCategoryLogger } from "./lib/logger.ts";
 import { enqueueDlsiteJob } from "./dlsiteJobQueue.ts";
 

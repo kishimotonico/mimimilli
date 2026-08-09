@@ -6,7 +6,7 @@ import {
   type CoverDescriptor,
   type MediaKind,
   type MediaLocation,
-} from "../../adapter.ts";
+} from "../../adapter/index.ts";
 import { browseFs as browseFilesystem } from "./fsBrowse.ts";
 import { mimeOf, isAudioPath, resolveWithin } from "./paths.ts";
 import { ThumbnailCache } from "./thumbnailCache.ts";

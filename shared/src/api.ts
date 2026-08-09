@@ -85,6 +85,10 @@ export const smartFolderWorksQuerySchema = worksQueryBaseSchema.pick({
 });
 export type SmartFolderWorksQuery = z.infer<typeof smartFolderWorksQuerySchema>;
 
+/** adapter evalSmartFolder が受け取る正規化済みクエリ（page/limit は routes がデフォルト適用後） */
+export type SmartFolderEvalQuery = Required<Pick<SmartFolderWorksQuery, "page" | "limit">> &
+  Partial<Pick<SmartFolderWorksQuery, "tags" | "tagOp" | "seed">>;
+
 /** GET /api/axes/:axis のクエリパラメータ。値一覧の件数・総時間・代表カバーは、渡された
  *  tags による絞り込み後の集合から集計する（自軸除外カウント、TASK-187）。
  *  自軸由来のフィルタを除外した集合を渡すのは呼び出し側（client）の責務 */
