@@ -47,6 +47,9 @@ const worksQueryBaseSchema = z.object({
   seed: z.coerce.number().int().min(0).max(0x7fffffff).optional(),
   page: z.coerce.number().int().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(500).optional(),
+  /** 指定IDの作品だけに絞り込む（同名パラメータを繰り返して配列で受ける）。
+   *  他のフィルタ・ソート・ページングと組み合わせ可能な通常の絞り込み条件として扱う */
+  ids: z.array(z.string()).optional(),
 });
 export const worksQuerySchema = worksQueryBaseSchema;
 /** HTTP クエリの入力型（.default 付きフィールドは省略可能） */

@@ -162,6 +162,11 @@ test("core参照実装とreal SQLは固定例・生成クエリで同値", () =>
       baseQuery({ page: 2, limit: 7 }),
       baseQuery({ page: 99, limit: 7 }),
       baseQuery({ page: 2 }),
+      baseQuery({ ids: [] }),
+      baseQuery({ ids: ["work-005", "work-010", "work-not-exist"] }),
+      baseQuery({ ids: ["work-005"], tags: tf("ASMR") }),
+      baseQuery({ ids: dataset.slice(0, 4).map((w) => w.id), page: 1, limit: 2 }),
+      baseQuery({ ids: dataset.slice(0, 4).map((w) => w.id), sort: "title-asc" }),
     ];
     for (const sort of sortIdSchema.options) {
       fixedQueries.push(baseQuery({ sort, seed: sort === "random" ? 123456 : undefined }));
@@ -202,6 +207,10 @@ test("core参照実装とreal SQLは固定例・生成クエリで同値", () =>
       const tags = tagFilters[next() % tagFilters.length]!;
       const useYearTag = next() % 4 === 0;
       const yearTag = useYearTag ? `@year/${yearPool[next() % yearPool.length]!}` : null;
+      const useIds = next() % 4 === 0;
+      const ids = useIds
+        ? Array.from({ length: (next() % 6) + 1 }, () => dataset[next() % dataset.length]!.id)
+        : undefined;
       assertQueryEquivalent(
         queryRepo,
         baseQuery({
@@ -213,6 +222,7 @@ test("core参照実装とreal SQLは固定例・生成クエリで同値", () =>
           seed: sort === "random" ? next() & 0x7fffffff : undefined,
           page: (next() % 8) + 1,
           limit: (next() % 9) + 1,
+          ids,
         }),
       );
     }

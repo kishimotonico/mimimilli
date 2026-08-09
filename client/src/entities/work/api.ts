@@ -53,6 +53,7 @@ export async function searchWorks(
   if (params.seed !== undefined) p.set("seed", String(params.seed));
   if (params.page !== undefined) p.set("page", String(params.page));
   if (params.limit !== undefined) p.set("limit", String(params.limit));
+  for (const id of params.ids ?? []) p.append("ids", id);
   const q = p.toString();
   return getParsed(worksPageSchema, `/works${q ? `?${q}` : ""}`, options);
 }

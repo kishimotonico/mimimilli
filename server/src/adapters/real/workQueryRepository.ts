@@ -271,6 +271,13 @@ export class WorkQueryRepository {
     const conditions: string[] = [];
     const bindings: Array<string | number> = [];
 
+    if (params.ids !== undefined) {
+      conditions.push(
+        params.ids.length > 0 ? `works.id IN (${inClausePlaceholders(params.ids.length)})` : "0",
+      );
+      bindings.push(...params.ids);
+    }
+
     if (params.q) {
       const text = textSearchCondition(japaneseSortKey(params.q), params.q);
       conditions.push(...text.conditions);
