@@ -1,5 +1,10 @@
 // 作品検索（GET /api/works）の純粋関数。
-import { tagEquals } from "@mimimilli/shared";
+import {
+  tagEquals,
+  toWorkListItem,
+  RECENT_VIEW_WINDOW_DAYS,
+  createRandomSeed,
+} from "@mimimilli/shared";
 import type {
   CollectionStats,
   NormalizedTag,
@@ -15,10 +20,19 @@ import {
   stableRandomSortKey,
 } from "./japaneseSortKey.ts";
 
-const RECENT_VIEW_WINDOW_DAYS = 30;
-
 /** 検索・フィルター・ソート中だけ使う内部ページ型。公開前にWorkListItemへ投影する。 */
 export type WorkSummaryPage = Omit<WorksPage, "items"> & { items: WorkSummary[] };
+
+export function toWorksPage(page: WorkSummaryPage): WorksPage {
+  return page.seed === undefined
+    ? { items: page.items.map(toWorkListItem), total: page.total, stats: page.stats }
+    : {
+        items: page.items.map(toWorkListItem),
+        total: page.total,
+        stats: page.stats,
+        seed: page.seed,
+      };
+}
 
 /** フィルター後・ページング前の集合からコレクション統計を求める。
  *  totalDurationSec が未知（null）の作品は合計から除外する。 */
@@ -186,10 +200,6 @@ export function sortWorkSummaries(
 
 function compareStrings(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
-}
-
-export function createRandomSeed(): number {
-  return crypto.getRandomValues(new Uint32Array(1))[0]! & 0x7fffffff;
 }
 
 /** page/limit が両方指定されているときのみ slice する */

@@ -17,7 +17,8 @@
 import { createHash } from "node:crypto";
 import { statSync } from "node:fs";
 import { dirname, join } from "node:path";
-import type { MetaFile, Playlist } from "@mimimilli/shared";
+import type { MetaFile } from "@mimimilli/shared";
+import { selectDefaultPlaylist } from "@mimimilli/shared";
 
 interface FileStat {
   size: number;
@@ -148,23 +149,15 @@ function statOrNull(workDir: string, relativePath: string | null | undefined): F
   }
 }
 
-/** メタファイルからデフォルトプレイリストを選ぶ（scanner の defaultPlaylistOf と同じロジック） */
-function defaultPlaylistOf(meta: MetaFile): Playlist | null {
-  if (meta.playlists.length === 0) return null;
-  if (meta.defaultPlaylistId) {
-    return meta.playlists.find((p) => p.id === meta.defaultPlaylistId) ?? null;
-  }
-  return meta.playlists[0]!;
-}
-
 function rawDefaultPlaylistOf(raw: JsonObject): JsonObject | null {
   const playlists = Array.isArray(raw.playlists) ? raw.playlists.map(asObject) : [];
-  const validPlaylists = playlists.filter((playlist): playlist is JsonObject => playlist !== null);
-  if (validPlaylists.length === 0) return null;
-  if (typeof raw.defaultPlaylistId === "string") {
-    return validPlaylists.find((playlist) => playlist.id === raw.defaultPlaylistId) ?? null;
-  }
-  return validPlaylists[0]!;
+  const validPlaylists = playlists.filter(
+    (playlist): playlist is JsonObject & { id: string } =>
+      playlist !== null && typeof playlist.id === "string",
+  );
+  const defaultPlaylistId =
+    typeof raw.defaultPlaylistId === "string" ? raw.defaultPlaylistId : null;
+  return selectDefaultPlaylist(validPlaylists, defaultPlaylistId);
 }
 
 function rawTrackFiles(raw: JsonObject): string[] {
@@ -194,7 +187,7 @@ function fileStats(workDir: string, paths: string[]): FileStat[] {
 /** メタファイルの変更検知 fingerprint を計算する */
 export function computeFingerprint(metaPath: string, meta: MetaFile): string {
   const workDir = dirname(metaPath);
-  const playlist = defaultPlaylistOf(meta);
+  const playlist = selectDefaultPlaylist(meta.playlists, meta.defaultPlaylistId);
   return fingerprintFromParts({
     metaContent: normalizeMetaContent(meta),
     trackStats: fileStats(

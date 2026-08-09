@@ -5,6 +5,7 @@ import {
   dlsiteApplyBodySchema,
   dlsiteBulkCancelResponseSchema,
   dlsiteFetchByCodeBodySchema,
+  dlsiteNotificationKindSchema,
   dlsiteNotificationQuerySchema,
   dlsiteStatePatchSchema,
 } from "@mimimilli/shared";
@@ -34,14 +35,12 @@ export function dlsiteRoute(adapter: DataAdapter): Hono {
   );
 
   app.get("/dlsite/notifications/:kind", async (c) => {
-    const kind = c.req.param("kind");
-    if (kind !== "rj-missing" && kind !== "fetch-failed" && kind !== "parse-failed") {
-      notFound("通知種別が見つかりません");
-    }
+    const parsedKind = dlsiteNotificationKindSchema.safeParse(c.req.param("kind"));
+    if (!parsedKind.success) notFound("通知種別が見つかりません");
     const parsed = dlsiteNotificationQuerySchema.safeParse(c.req.query());
     if (!parsed.success) invalidRequest("DLsite通知のクエリパラメータが不正です");
     return c.json(
-      await adapter.queryDlsiteNotifications(kind, {
+      await adapter.queryDlsiteNotifications(parsedKind.data, {
         page: parsed.data.page ?? 1,
         limit: parsed.data.limit ?? 200,
       }),

@@ -1,12 +1,11 @@
 // スマートフォルダーのルール評価（GET /api/smart-folders/:id/works）の純粋関数。
 // shared スキーマが許可した field/operator のみを評価する。DB 内の不正値も黙って無視しない。
 import type { SmartFolder, SmartFolderRule, TagFilters, WorkSummary } from "@mimimilli/shared";
-import { EMPTY_TAG_FILTERS } from "@mimimilli/shared";
+import { EMPTY_TAG_FILTERS, createRandomSeed } from "@mimimilli/shared";
 import type { WorkSummaryPage } from "./worksQuery.ts";
 import { tagEquals } from "@mimimilli/shared";
 import {
   computeCollectionStats,
-  createRandomSeed,
   filterByTags,
   filterByYear,
   sortWorkSummaries,

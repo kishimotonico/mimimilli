@@ -23,7 +23,6 @@ import type {
   Cover,
   MetaFile,
   NormalizedTag,
-  Playlist,
   ResolvedPlaylist,
   ScanResult,
   Track,
@@ -37,6 +36,7 @@ import {
   isInvalidTrackStart,
   metaFileSchema,
   resolveTrackDuration,
+  selectDefaultPlaylist,
   toTrackDurationFields,
 } from "@mimimilli/shared";
 import type { Db } from "./db.ts";
@@ -316,14 +316,6 @@ function buildDefaultTracks(workDir: string): Track[] {
     title: basename(f, extname(f)),
     file: toPortableRelativePath(workDir, f),
   }));
-}
-
-function defaultPlaylistOf(meta: MetaFile): Playlist | null {
-  if (meta.playlists.length === 0) return null;
-  if (meta.defaultPlaylistId) {
-    return meta.playlists.find((p) => p.id === meta.defaultPlaylistId)!;
-  }
-  return meta.playlists[0]!;
 }
 
 const DEFAULT_UPSERT_BATCH_SIZE = 500;
@@ -889,7 +881,7 @@ export class Scanner {
       full || cachedStatus === "error" ? new Map<string, ProbeCacheEntry>() : probeCache;
 
     // 参照先ファイルの欠損チェック
-    const playlist = defaultPlaylistOf(meta);
+    const playlist = selectDefaultPlaylist(meta.playlists, meta.defaultPlaylistId);
     const missingFiles = (playlist?.tracks ?? []).filter((t) => !existsSync(join(workDir, t.file)));
 
     // 全playlistのトラックについて解決済みdurationSecを求める（DTO・total・resume検証で共有する式）。

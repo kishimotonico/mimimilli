@@ -9,8 +9,11 @@ import {
   parseTag,
   playlistSchema,
   probeResultFromCache,
+  RECENT_VIEW_WINDOW_DAYS,
+  createRandomSeed,
   resolveTrackDuration,
   resolveTrackDurationSec,
+  selectDefaultPlaylist,
   smartFolderSchema,
   tagPrefixSchema,
   toTrackDurationFields,
@@ -162,8 +165,6 @@ interface AxisFacetRow {
   coversJson: string;
 }
 
-const RECENT_VIEW_WINDOW_DAYS = 30;
-
 export class PersistentDataError extends Error {
   constructor(table: string, recordId: string | number, detail: string) {
     super(`SQLite の ${table} レコード "${recordId}" が不正です: ${detail}`);
@@ -213,19 +214,15 @@ function defaultPlaylistOf<P extends { id: string; tracks: unknown[] }>(
   row: Pick<CatalogWorkRow, "id" | "defaultPlaylistId">,
   playlists: P[],
 ): P | null {
-  if (playlists.length === 0) return null;
-  if (row.defaultPlaylistId) {
-    const playlist = playlists.find((p) => p.id === row.defaultPlaylistId);
-    if (!playlist) {
-      throw new PersistentDataError(
-        "works",
-        row.id,
-        `defaultPlaylistId: playlists_json に "${row.defaultPlaylistId}" がありません`,
-      );
-    }
-    return playlist;
+  const playlist = selectDefaultPlaylist(playlists, row.defaultPlaylistId);
+  if (row.defaultPlaylistId && !playlist) {
+    throw new PersistentDataError(
+      "works",
+      row.id,
+      `defaultPlaylistId: playlists_json に "${row.defaultPlaylistId}" がありません`,
+    );
   }
-  return playlists[0]!;
+  return playlist;
 }
 
 function rowToSummary(row: SummaryRow, tagNames: string[], dlsite: DlsiteState): WorkSummary {
@@ -337,10 +334,6 @@ function resolveResume(row: WorkRow, playlists: ResolvedPlaylist[]): Work["resum
   // durationSec が未知（プローブ未取得・失敗）の場合は上限が分からないため検証をスキップする。
   if (track.durationSec !== null && offsetSec > track.durationSec) return null;
   return { playlistId, trackId, offsetSec };
-}
-
-function randomSeed(): number {
-  return crypto.getRandomValues(new Uint32Array(1))[0]! & 0x7fffffff;
 }
 
 /** SQLite の IN 句パラメータ上限を避けるため、配列を一定件数ごとに分割する */
@@ -822,7 +815,7 @@ export class WorkRepo {
 
   /** ADR-0008: ATTACH JOINした同じ絞り込み集合から件数とページを求める。 */
   queryWorks(params: WorksQuery): WorksPage {
-    const seed = params.sort === "random" ? (params.seed ?? randomSeed()) : undefined;
+    const seed = params.sort === "random" ? (params.seed ?? createRandomSeed()) : undefined;
     const conditions: string[] = [];
     const bindings: Array<string | number> = [];
 
@@ -960,18 +953,22 @@ export class WorkRepo {
       .query(
         `
           SELECT
+            -- isRjCodeMissing (shared/dlsite.ts)
             SUM(CASE WHEN json_extract(work_dlsite.state_json, '$.rjCode') IS NULL
                            AND COALESCE(json_extract(work_dlsite.state_json, '$.status'), 'none') != 'skipped'
                      THEN 1 ELSE 0 END) AS rjCodeMissingCount,
+            -- isDlsiteFetchFailed (shared/dlsite.ts)
             SUM(CASE WHEN json_extract(work_dlsite.state_json, '$.status') = 'not_found'
                       OR (json_extract(work_dlsite.state_json, '$.status') = 'error'
                           AND COALESCE(json_extract(work_dlsite.state_json, '$.errorKind'), '') != 'parse_error')
                      THEN 1 ELSE 0 END) AS fetchFailedCount,
+            -- isDlsiteParseFailed (shared/dlsite.ts)
             SUM(CASE WHEN json_extract(work_dlsite.state_json, '$.status') = 'error'
                       AND json_extract(work_dlsite.state_json, '$.errorKind') = 'parse_error'
                      THEN 1 ELSE 0 END) AS parseErrorCount,
             SUM(CASE WHEN json_extract(work_dlsite.state_json, '$.status') = 'applied'
                      THEN 1 ELSE 0 END) AS parseSuccessCount,
+            -- isDlsiteUnlinked (shared/dlsite.ts)
             SUM(CASE WHEN json_extract(work_dlsite.state_json, '$.rjCode') IS NOT NULL
                            AND json_extract(work_dlsite.state_json, '$.status') = 'none'
                      THEN 1 ELSE 0 END) AS unlinkedCount
@@ -1005,13 +1002,16 @@ export class WorkRepo {
     const condition = (() => {
       switch (kind) {
         case "rj-missing":
+          // isRjCodeMissing (shared/dlsite.ts)
           return `json_extract(work_dlsite.state_json, '$.rjCode') IS NULL
            AND COALESCE(json_extract(work_dlsite.state_json, '$.status'), 'none') != 'skipped'`;
         case "fetch-failed":
+          // isDlsiteFetchFailed (shared/dlsite.ts)
           return `(json_extract(work_dlsite.state_json, '$.status') = 'not_found'
             OR (json_extract(work_dlsite.state_json, '$.status') = 'error'
                 AND COALESCE(json_extract(work_dlsite.state_json, '$.errorKind'), '') != 'parse_error'))`;
         case "parse-failed":
+          // isDlsiteParseFailed (shared/dlsite.ts)
           return `json_extract(work_dlsite.state_json, '$.status') = 'error'
       AND json_extract(work_dlsite.state_json, '$.errorKind') = 'parse_error'`;
       }

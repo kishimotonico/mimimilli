@@ -5,15 +5,12 @@ import {
   applyDlsiteStatePatch,
   DEFAULT_TAG_PREFIXES,
   emptyDlsiteState,
-  evaluateParseErrorAlert,
   isDlsiteFetchFailed,
   isDlsiteParseFailed,
-  isDlsiteUnlinked,
   isRjCodeMissing,
   normalizeTags,
   dedupeTags,
   tagEquals,
-  toWorkListItem,
   toTrackDurationFieldsFromSec,
   coverFieldsFromColumns,
 } from "@mimimilli/shared";
@@ -68,7 +65,8 @@ import { buildAxisFacets } from "../../core/axisFacets.ts";
 import { buildTagPrefixCandidates } from "../../core/tagPrefixCandidates.ts";
 import { evalSmartFolder } from "../../core/smartFolder.ts";
 import { compareJapaneseSortKeys, compareUtf8Bytes } from "../../core/japaneseSortKey.ts";
-import { applyWorksQuery, type WorkSummaryPage } from "../../core/worksQuery.ts";
+import { applyWorksQuery, toWorksPage } from "../../core/worksQuery.ts";
+import { summarizeDlsiteNotifications } from "../../core/dlsiteNotifications.ts";
 import {
   buildFsRoot,
   buildWorkFileTree,
@@ -108,17 +106,6 @@ interface FixtureState {
   playbackIds: Map<string, PlaybackIds>;
   /** scan() が newWorkIds として返す、未取り込みの新規作品ID（シナリオ "new-work" 用） */
   scanNewWorkIds: string[];
-}
-
-function toListPage(page: WorkSummaryPage): WorksPage {
-  return page.seed === undefined
-    ? { items: page.items.map(toWorkListItem), total: page.total, stats: page.stats }
-    : {
-        items: page.items.map(toWorkListItem),
-        total: page.total,
-        stats: page.stats,
-        seed: page.seed,
-      };
 }
 
 export interface FixtureAdapterOptions {
@@ -435,21 +422,11 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
 
     // ── 作品 ────────────────────────────────────────────────
     async queryWorks(params: WorksQuery): Promise<WorksPage> {
-      return toListPage(applyWorksQuery(state.works, params));
+      return toWorksPage(applyWorksQuery(state.works, params));
     },
 
     async getDlsiteNotificationSummary(): Promise<DlsiteNotificationSummary> {
-      const parseErrorCount = state.works.filter((work) => isDlsiteParseFailed(work.dlsite)).length;
-      const parseSuccessCount = state.works.filter(
-        (work) => work.dlsite.status === "applied",
-      ).length;
-      return {
-        rjCodeMissingCount: state.works.filter((work) => isRjCodeMissing(work.dlsite)).length,
-        fetchFailedCount: state.works.filter((work) => isDlsiteFetchFailed(work.dlsite)).length,
-        parseErrorCount,
-        parseErrorAlert: evaluateParseErrorAlert(parseErrorCount, parseSuccessCount),
-        unlinkedCount: state.works.filter((work) => isDlsiteUnlinked(work.dlsite)).length,
-      };
+      return summarizeDlsiteNotifications(state.works.map((work) => work.dlsite));
     },
 
     async queryDlsiteNotifications(
@@ -687,7 +664,7 @@ export function createFixtureAdapter(options: FixtureAdapterOptions = {}): DataA
     async evalSmartFolder(id: string, query: SmartFolderEvalQuery): Promise<WorksPage | null> {
       const folder = state.smartFolders.find((f) => f.id === id);
       if (!folder) return null;
-      return toListPage(evalSmartFolder(folder, state.works, query));
+      return toWorksPage(evalSmartFolder(folder, state.works, query));
     },
 
     // ── 物理ファイルシステム（Filesモード） ────────────────────

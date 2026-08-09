@@ -1,10 +1,6 @@
-import {
-  EMPTY_TAG_FILTERS,
-  toWorkListItem,
-  type SmartFolder,
-  type WorksPage,
-} from "@mimimilli/shared";
+import { EMPTY_TAG_FILTERS, type SmartFolder, type WorksPage } from "@mimimilli/shared";
 import { evalSmartFolder } from "../../core/smartFolder.ts";
+import { toWorksPage } from "../../core/worksQuery.ts";
 import type { SmartFolderEvalQuery } from "../../adapter.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
 import { logDataIntegritySkips, toDataIntegrityWarning } from "./dataIntegrity.ts";
@@ -35,14 +31,6 @@ export function querySmartFolderWorks(
   logDataIntegritySkips(smartFolderLogger, "smart-folder-works", skipped);
   const dataIntegrityWarning = toDataIntegrityWarning(skipped);
   const page = evalSmartFolder(folder, summaries, query);
-  const envelope =
-    page.seed === undefined
-      ? { items: page.items.map(toWorkListItem), total: page.total, stats: page.stats }
-      : {
-          items: page.items.map(toWorkListItem),
-          total: page.total,
-          stats: page.stats,
-          seed: page.seed,
-        };
-  return dataIntegrityWarning ? { ...envelope, dataIntegrityWarning } : envelope;
+  const worksPage = toWorksPage(page);
+  return dataIntegrityWarning ? { ...worksPage, dataIntegrityWarning } : worksPage;
 }
