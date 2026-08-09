@@ -1,10 +1,10 @@
 ---
 id: TASK-269
 title: workRepoをドメイン別リポジトリへ分割する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-08 21:20'
-updated_date: '2026-08-09 00:32'
+updated_date: '2026-08-09 10:13'
 labels: []
 dependencies: []
 priority: high
@@ -28,10 +28,22 @@ worksQueryContract.test.ts の同値性契約テストを維持したまま行�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 workRepo.ts が行マッピング・SQLフラグメント・ドメイン別repoに分割され、1ファイル1責務になっていること
-- [ ] #2 永続化層から adapter.ts へのimportが消えていること
-- [ ] #3 IN chunk・通知CASE・getWork系パイプラインの重複が解消されていること
-- [ ] #4 worksQueryContract.test.ts を含むserverテストが通ること
-- [ ] #5 probe鮮度の仕様（音声差替え後の反映タイミング）が決定・文書化され、getWorkの読み取りが副作用なし・更新は明示的経路になっていること
-- [ ] #6 countByStatus が COUNT(*) クエリになっていること
+- [x] #1 workRepo.ts が行マッピング・SQLフラグメント・ドメイン別repoに分割され、1ファイル1責務になっていること
+- [x] #2 永続化層から adapter.ts へのimportが消えていること
+- [x] #3 IN chunk・通知CASE・getWork系パイプラインの重複が解消されていること
+- [x] #4 worksQueryContract.test.ts を含むserverテストが通ること
+- [x] #5 probe鮮度の仕様（音声差替え後の反映タイミング）が決定・文書化され、getWorkの読み取りが副作用なし・更新は明示的経路になっていること
+- [x] #6 countByStatus が COUNT(*) クエリになっていること
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+分割は永続化所有権で行い、WorkQueryRepository(616行) / CatalogWorkRepository(304行) / UserWorkStateRepository(262行) / workRowMapping.ts(297行) / workQuerySql.ts(331行) / workProbe.ts(43行) / workRefresh.ts(51行) へ。5つのrepoファイルから adapter.ts へのimportはゼロで、InvalidResumeError は server/src/errors.ts へ移した。probe鮮度の仕様は統括決定により維持（落とすと音声差替え後に再スキャンまで尺が古いままになり退行するため）。WorkQueryRepository.fetchWorkDetail は純粋読取で、catalog.syncTotalDurationSec の書込は workRefresh.ts の明示的な合成に出した。仕様は docs/ARCHITECTURE.md に記録済み。worksQueryContract.test.ts の差分は呼び出し側の置換のみでアサーションは不変。検証: pnpm check 成功、server 525 pass / 0 fail（1回目に1件failしたが再実行で再現せず、TASK-253の並列実行フレーキー）。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+1843行の workRepo.ts を永続化所有権でドメイン別リポジトリへ分割し、行マッピングとSQLフラグメント生成を抽出してタグEXISTS・RJ正規化CASEを一本化した。永続化層から adapter.ts への逆依存を解消し、getWork の読み取りを副作用なしにして probe同期を明示的経路へ出した。countByStatus は COUNT(*) 化。pnpm check と server 525 テストで検証。
+<!-- SECTION:FINAL_SUMMARY:END -->
