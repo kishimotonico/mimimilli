@@ -58,12 +58,17 @@ async function run(input: WorkerInput): Promise<void> {
     if (cancelled(token)) throw new Error("スキャンはキャンセルされました");
     const repo = new WorkRepo(db);
     const scanner = new Scanner(db, repo, input.dataRoot);
-    const result = await scanner.scan(input.root, {
-      full: input.full ?? false,
-      abortToken: token,
-      onProgress: (progress: ScanProgressEvent) => post({ type: "progress", progress }),
-      beforeFinalize: input.testGateStage === "before-finalize" ? waitAtTestGate : undefined,
-    });
+    const result = await scanner.scan(
+      input.root,
+      {
+        full: input.full ?? false,
+        onProgress: (progress: ScanProgressEvent) => post({ type: "progress", progress }),
+      },
+      {
+        abortToken: token,
+        beforeFinalize: input.testGateStage === "before-finalize" ? waitAtTestGate : undefined,
+      },
+    );
     if (cancelled(token)) {
       terminal = { type: "cancelled" };
     } else {

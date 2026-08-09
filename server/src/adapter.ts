@@ -44,10 +44,6 @@ export interface ScanOptions {
   full?: boolean;
   signal?: AbortSignal;
   onProgress?: (event: ScanProgressEvent) => void;
-  /** Worker 内の同期処理にも到達する取消トークン。adapter 内部だけで設定する。 */
-  abortToken?: Int32Array;
-  /** Worker結合テストでfinalize直前に同期停止する内部フック。 */
-  beforeFinalize?: () => void;
 }
 
 /** GET /smart-folders/:id/works のクエリ。tags はフォルダーのルールに対する

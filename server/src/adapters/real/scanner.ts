@@ -128,6 +128,11 @@ function throwIfAborted(signal?: AbortSignal, abortToken?: Int32Array): void {
     throw new ScanCancelledError();
 }
 
+export interface ScannerAbortHooks {
+  abortToken?: Int32Array;
+  beforeFinalize?: () => void;
+}
+
 export async function walk(
   root: string,
   onDirVisited?: (visited: number) => void,
@@ -444,13 +449,17 @@ export class Scanner {
     this.measureCover = options?.measureCover ?? measureCoverDimensions;
   }
 
-  async scan(root: string, options?: ScanOptions): Promise<ScanResult> {
+  async scan(
+    root: string,
+    options?: ScanOptions,
+    abortHooks?: ScannerAbortHooks,
+  ): Promise<ScanResult> {
     root = resolve(root);
     const normalized = options ?? {};
     const full = normalized.full ?? false;
     const emit = normalized.onProgress ?? ((): void => {});
     const signal = normalized.signal;
-    const abortToken = normalized.abortToken;
+    const abortToken = abortHooks?.abortToken;
     const checkAbort = () => throwIfAborted(signal, abortToken);
     checkAbort();
     const result: ScanResult = {
@@ -639,7 +648,7 @@ export class Scanner {
 
     checkAbort();
     emit({ type: "progress", phase: "finalizing", processed: 0, total: 1 });
-    normalized.beforeFinalize?.();
+    abortHooks?.beforeFinalize?.();
     checkAbort();
     if (tree.unreadablePaths.length > 0) {
       result.unreadablePaths = tree.unreadablePaths;

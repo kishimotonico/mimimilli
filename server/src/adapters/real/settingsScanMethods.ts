@@ -30,25 +30,9 @@ export function createSettingsScanMethods(deps: {
     dataRoot: string,
     thumbnailCacheDir: string,
     options: ScanOptions,
-    testGate?: SharedArrayBuffer,
-    testGateStage?: "before-scan" | "before-finalize",
-    onTestGateReady?: () => void,
   ) => Promise<ScanResult>;
-  scanWorkerTestGate?: SharedArrayBuffer;
-  scanWorkerTestGateStage?: "before-scan" | "before-finalize";
-  onScanWorkerTestGateReady?: () => void;
 }) {
-  const {
-    database,
-    repo,
-    scanner,
-    dataRoot,
-    thumbnailCacheDir,
-    runFileScanInWorker,
-    scanWorkerTestGate,
-    scanWorkerTestGateStage,
-    onScanWorkerTestGateReady,
-  } = deps;
+  const { database, repo, scanner, dataRoot, thumbnailCacheDir, runFileScanInWorker } = deps;
   const requireRoot = (): string => {
     const root = repo.getUserSetting(KEY_ROOT_FOLDER);
     if (!root)
@@ -109,9 +93,6 @@ export function createSettingsScanMethods(deps: {
           resolve(dataRoot),
           resolve(thumbnailCacheDir),
           normalized,
-          scanWorkerTestGate,
-          scanWorkerTestGateStage,
-          onScanWorkerTestGateReady,
         );
       }
       const result = await scanner.scan(root, normalized);
