@@ -9,8 +9,7 @@ import {
   workRegisterPreviewQuerySchema,
   worksQuerySchema,
 } from "@mimimilli/shared";
-import { InvalidResumeError, type DataAdapter } from "../adapter.ts";
-import { WorkRegisterError } from "../adapters/real/workRegister.ts";
+import { InvalidResumeError, WorkRegisterError, type DataAdapter } from "../adapter.ts";
 import { conflict, invalidRequest, notFound } from "../lib/httpError.ts";
 
 export function worksRoute(adapter: DataAdapter): Hono {

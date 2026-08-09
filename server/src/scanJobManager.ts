@@ -8,7 +8,7 @@ import type {
 } from "@mimimilli/shared";
 import type { DataAdapter } from "./adapter.ts";
 import { formatError, getCategoryLogger } from "./lib/logger.ts";
-import { enqueueDlsiteJob } from "./routes/dlsiteProgress.ts";
+import { enqueueDlsiteJob } from "./dlsiteJobQueue.ts";
 
 const scanLogger = getCategoryLogger("scan");
 const UNREADABLE_PATH_LOG_SAMPLE_LIMIT = 10;

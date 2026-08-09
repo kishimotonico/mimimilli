@@ -5,7 +5,7 @@ import { tf } from "./helpers/tag.ts";
 import { compareJapaneseSortKeys } from "../src/core/japaneseSortKey.ts";
 import { createApp } from "../src/app.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
-import { resetDlsiteProgressStateForTest } from "../src/routes/dlsiteProgress.ts";
+import { resetDlsiteProgressStateForTest } from "../src/dlsiteJobQueue.ts";
 
 function buildApp() {
   return createApp(createFixtureAdapter());

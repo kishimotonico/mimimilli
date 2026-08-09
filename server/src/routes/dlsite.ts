@@ -9,6 +9,7 @@ import {
   dlsiteStatePatchSchema,
 } from "@mimimilli/shared";
 import type { DataAdapter } from "../adapter.ts";
+import { DlsiteOfflineError } from "../adapter.ts";
 import { apiError, invalidRequest, notFound } from "../lib/httpError.ts";
 import { getCategoryLogger } from "../lib/logger.ts";
 import {
@@ -17,8 +18,7 @@ import {
   isDlsiteJobInProgress,
   subscribeToDlsite,
   cancelDlsiteJob,
-} from "./dlsiteProgress.ts";
-import { DlsiteOfflineError } from "../adapters/real/dlsiteScheduler.ts";
+} from "../dlsiteJobQueue.ts";
 
 const dlsiteLogger = getCategoryLogger("dlsite");
 

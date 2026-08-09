@@ -6,7 +6,7 @@ import { test } from "node:test";
 import { openDb } from "../../src/adapters/real/db.ts";
 import { findWorkRoot, Scanner, walk } from "../../src/adapters/real/scanner.ts";
 import { WorkRepo } from "../../src/adapters/real/workRepo.ts";
-import { isPathWithin } from "../../src/adapters/real/paths.ts";
+import { isPathWithin } from "../../src/lib/path.ts";
 import { makeTestDirectory, writeSampleCover, writeWav } from "../helpers/sampleLibrary.ts";
 
 const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "gif", "bmp", "webp"]);

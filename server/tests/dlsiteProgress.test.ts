@@ -7,7 +7,7 @@ import {
   resetDlsiteProgressStateForTest,
   startDlsiteJob,
   subscribeToDlsite,
-} from "../src/routes/dlsiteProgress.ts";
+} from "../src/dlsiteJobQueue.ts";
 import type { DataAdapter } from "../src/adapter.ts";
 
 test("getDlsiteBulkSnapshot は実行中・終了後の状態を返す", () => {

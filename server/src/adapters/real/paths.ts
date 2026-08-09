@@ -1,15 +1,8 @@
 // パス解決とトラバーサル対策。Rust 版（canonicalize + starts_with）と同水準。
 // /api/fs と /api/media/* のすべての物理パス解決はここを通すこと。
 import { realpathSync } from "node:fs";
-import { dirname, isAbsolute, relative, sep } from "node:path";
-
-export interface PathOperations {
-  isAbsolute(path: string): boolean;
-  relative(from: string, to: string): string;
-  sep: string;
-}
-
-const nativePathOperations: PathOperations = { isAbsolute, relative, sep };
+import { dirname, relative, sep } from "node:path";
+import { isPathWithin } from "../../lib/path.ts";
 
 /** SQLite LIKE の ESCAPE 文字（`ESCAPE '!'` とセットで使う。パス区切り `\` と衝突しない） */
 export const LIKE_ESCAPE_CHAR = "!";
@@ -35,28 +28,12 @@ export function escapeLikeLiteralSql(columnExpr: string): string {
   return `replace(replace(replace(${columnExpr}, '${esc}', '${doubled}'), '%', '${escapedPercent}'), '_', '${escapedUnderscore}')`;
 }
 
-/** target が base 自身または配下かを、パス区切り文字を含む境界で判定する。 */
-export function isPathWithin(
-  base: string,
-  target: string,
-  operations: PathOperations = nativePathOperations,
-): boolean {
-  const rel = operations.relative(base, target);
-  return (
-    rel === "" ||
-    (rel !== ".." && !rel.startsWith(`..${operations.sep}`) && !operations.isAbsolute(rel))
-  );
-}
-
 /**
  * path の直下・子孫を表す SQL LIKE 接頭辞（path 自身は含まない）。
  * 末尾が既に区切り文字のときは重ねない。
  */
-export function likeDescendantsPrefix(
-  path: string,
-  operations: Pick<PathOperations, "sep"> = nativePathOperations,
-): string {
-  const prefix = path.endsWith(operations.sep) ? path : path + operations.sep;
+export function likeDescendantsPrefix(path: string, pathSep: string = sep): string {
+  const prefix = path.endsWith(pathSep) ? path : path + pathSep;
   return escapeLikeLiteral(prefix) + "%";
 }
 

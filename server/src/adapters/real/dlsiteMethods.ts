@@ -16,6 +16,7 @@ import {
 } from "@mimimilli/shared";
 import { isDefaultTitle } from "../../core/dlsiteTitle.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
+import { DlsiteOfflineError } from "../../adapter.ts";
 import { type Db } from "./db.ts";
 import {
   detectRjCode,
@@ -34,7 +35,6 @@ import {
 } from "./dlsiteCache.ts";
 import { type DlsiteRequestConfig } from "./dlsiteConfig.ts";
 import {
-  DlsiteOfflineError,
   DlsiteScheduler,
   type DlsiteHttpLogContext,
   type DlsiteSchedulerDependencies,

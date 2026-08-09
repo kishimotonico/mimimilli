@@ -74,6 +74,33 @@ export class NotConfiguredError extends Error {}
 /** Workは存在するが、resumeのPlaylist/Track所属またはoffsetが不正。 */
 export class InvalidResumeError extends Error {}
 
+export class WorkRegisterError extends Error {
+  readonly code:
+    | "already_registered"
+    | "descendants_require_merge"
+    | "not_configured"
+    | "invalid_meta";
+  readonly descendantCount?: number;
+
+  constructor(
+    code: "already_registered" | "descendants_require_merge" | "not_configured" | "invalid_meta",
+    message: string,
+    descendantCount?: number,
+  ) {
+    super(message);
+    this.name = "WorkRegisterError";
+    this.code = code;
+    this.descendantCount = descendantCount;
+  }
+}
+
+export class DlsiteOfflineError extends Error {
+  constructor() {
+    super("DLsiteはオフライン設定のため取得しませんでした");
+    this.name = "DlsiteOfflineError";
+  }
+}
+
 /** メディア実体の所在。ルートがストリーミング（Range 対応）を担当する。
  *  - "file": 実ファイル参照（real アダプタ）。ルートが node:fs でストリーミングする
  *  - "synthetic": メモリ上で合成するコンテンツ（fixture アダプタ）。

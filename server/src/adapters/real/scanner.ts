@@ -53,7 +53,8 @@ import {
   writeMetaFile,
 } from "./meta.ts";
 import { migrateMetaIds } from "./metaIdMigration.ts";
-import { excludeDescendantPaths, isPathWithin, toPortableRelativePath } from "./paths.ts";
+import { excludeDescendantPaths, toPortableRelativePath } from "./paths.ts";
+import { isPathWithin } from "../../lib/path.ts";
 import { probeDurationSec, type ProbeCacheEntry } from "./probe.ts";
 import { createProgressThrottle } from "./progressThrottle.ts";
 import { measureCoverDimensions, type CoverDimensions } from "./thumbnailCache.ts";

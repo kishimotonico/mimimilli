@@ -3,7 +3,7 @@ import type {
   DlsiteBulkProgressEvent,
   DlsiteBulkSnapshot,
 } from "@mimimilli/shared";
-import type { DataAdapter } from "../adapter.ts";
+import type { DataAdapter } from "./adapter.ts";
 
 type Listener = (event: DlsiteBulkProgressEvent) => void;
 type Progress = Extract<DlsiteBulkProgressEvent, { type: "progress" }>;

@@ -55,6 +55,7 @@ import type {
 import {
   createCoverValidators,
   InvalidResumeError,
+  WorkRegisterError,
   type AxisFacetsFilter,
   type CoverDescriptor,
   type DataAdapter,
@@ -86,8 +87,7 @@ import {
   synthesizeSilentWav,
 } from "./media.ts";
 import { createFixtureScenario } from "./scenarios.ts";
-import { isPathWithin } from "../real/paths.ts";
-import { WorkRegisterError } from "../real/workRegister.ts";
+import { isPathWithin } from "../../lib/path.ts";
 
 /** 作品1件ぶんの安定したplaylist/track ID（呼び出しをまたいで同一IDを保つ） */
 interface PlaybackIds {

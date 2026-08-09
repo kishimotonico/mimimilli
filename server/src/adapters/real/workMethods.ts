@@ -21,13 +21,9 @@ import { resolveWithin } from "./paths.ts";
 import { Scanner } from "./scanner.ts";
 import { logDataIntegritySkips, toDataIntegrityWarning } from "./dataIntegrity.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
+import { WorkRegisterError } from "../../adapter.ts";
 import { WorkRepo } from "./workRepo.ts";
-import {
-  buildWorkRegisterPreview,
-  createWorkFromFolder,
-  unregisterWork,
-  WorkRegisterError,
-} from "./workRegister.ts";
+import { buildWorkRegisterPreview, createWorkFromFolder, unregisterWork } from "./workRegister.ts";
 
 const scanLogger = getCategoryLogger("scan");
 

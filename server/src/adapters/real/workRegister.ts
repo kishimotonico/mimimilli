@@ -12,28 +12,9 @@ import { emptyDlsiteState } from "@mimimilli/shared";
 import { detectRjCode } from "./dlsite.ts";
 import { META_FILE_NAME, MetaParseError, readMetaFile, readMetaFileRaw } from "./meta.ts";
 import { resolveWithin } from "./paths.ts";
+import { WorkRegisterError } from "../../adapter.ts";
 import type { Scanner } from "./scanner.ts";
 import type { WorkRepo } from "./workRepo.ts";
-
-export class WorkRegisterError extends Error {
-  readonly code:
-    | "already_registered"
-    | "descendants_require_merge"
-    | "not_configured"
-    | "invalid_meta";
-  readonly descendantCount?: number;
-
-  constructor(
-    code: "already_registered" | "descendants_require_merge" | "not_configured" | "invalid_meta",
-    message: string,
-    descendantCount?: number,
-  ) {
-    super(message);
-    this.name = "WorkRegisterError";
-    this.code = code;
-    this.descendantCount = descendantCount;
-  }
-}
 
 function isDirectory(path: string): boolean {
   try {

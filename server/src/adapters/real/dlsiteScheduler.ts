@@ -1,3 +1,4 @@
+import { DlsiteOfflineError } from "../../adapter.ts";
 import { MAX_DLSITE_TIMER_MS, type DlsiteRequestConfig } from "./dlsiteConfig.ts";
 
 export type DlsiteTransport = (
@@ -21,13 +22,6 @@ export interface DlsiteSchedulerDependencies {
   sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
   random?: () => number;
   logger?: DlsiteSchedulerLogger;
-}
-
-export class DlsiteOfflineError extends Error {
-  constructor() {
-    super("DLsiteはオフライン設定のため取得しませんでした");
-    this.name = "DlsiteOfflineError";
-  }
 }
 
 function abortError(): DOMException {
