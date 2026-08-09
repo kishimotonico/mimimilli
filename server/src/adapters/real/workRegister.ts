@@ -1,6 +1,6 @@
 // ファイルモードからの手動作品登録。メタファイル生成と子作品の登録解除のみ行い、物理ファイルは移動しない。
-import { existsSync, statSync, unlinkSync } from "node:fs";
-import { basename, join } from "node:path";
+import { existsSync, renameSync, statSync, unlinkSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import type {
   DlsiteApplyBody,
   MetaFile,
@@ -24,8 +24,16 @@ function isDirectory(path: string): boolean {
   }
 }
 
-export function deleteMetaFileOnly(metaPath: string): void {
-  if (existsSync(metaPath)) unlinkSync(metaPath);
+export class MetaUnregisterError extends Error {
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "MetaUnregisterError";
+  }
+}
+
+interface MetaDeletionPlan {
+  canonicalPath: string;
+  stagedPath: string;
 }
 
 function folderMetaPathOf(physicalPath: string): string {
@@ -47,22 +55,77 @@ function metaFileIdMatches(metaPath: string, workId: string): boolean {
   }
 }
 
-/** 登録解除時に削除するメタファイルパスを解決する。 */
-function resolveMetaPathToDelete(
+function metaStagingPath(canonicalPath: string): string {
+  return join(dirname(canonicalPath), `.${basename(canonicalPath)}.unregistering`);
+}
+
+function findStagedMetaPlan(workId: string, canonicalPath: string): MetaDeletionPlan | null {
+  const stagedPath = metaStagingPath(canonicalPath);
+  if (existsSync(stagedPath) && metaFileIdMatches(stagedPath, workId)) {
+    return { canonicalPath, stagedPath };
+  }
+  return null;
+}
+
+/** 登録解除時に退避・削除するメタファイルパスを解決する。 */
+function resolveMetaDeletionPlan(
   workId: string,
   recordedMetaPath: string,
-  physicalPath: string,
-): string | null {
+  physicalPath?: string,
+): MetaDeletionPlan | null {
+  const stagedAtRecorded = findStagedMetaPlan(workId, recordedMetaPath);
+  if (stagedAtRecorded) return stagedAtRecorded;
   if (existsSync(recordedMetaPath)) {
-    return recordedMetaPath;
+    return {
+      canonicalPath: recordedMetaPath,
+      stagedPath: metaStagingPath(recordedMetaPath),
+    };
   }
 
-  const folderMeta = folderMetaPathOf(physicalPath);
-  if (existsSync(folderMeta) && metaFileIdMatches(folderMeta, workId)) {
-    return folderMeta;
+  if (physicalPath) {
+    const folderMeta = folderMetaPathOf(physicalPath);
+    const stagedAtFolder = findStagedMetaPlan(workId, folderMeta);
+    if (stagedAtFolder) return stagedAtFolder;
+    if (existsSync(folderMeta) && metaFileIdMatches(folderMeta, workId)) {
+      return { canonicalPath: folderMeta, stagedPath: metaStagingPath(folderMeta) };
+    }
   }
 
   return null;
+}
+
+function stageMetaForDeletion(plan: MetaDeletionPlan): void {
+  if (existsSync(plan.stagedPath)) {
+    if (existsSync(plan.canonicalPath)) {
+      throw new MetaUnregisterError(
+        `メタの退避状態が矛盾しています: 正本と退避が同時に存在します (${plan.canonicalPath})`,
+      );
+    }
+    return;
+  }
+  if (!existsSync(plan.canonicalPath)) return;
+  renameSync(plan.canonicalPath, plan.stagedPath);
+}
+
+function restoreStagedMeta(plan: MetaDeletionPlan): void {
+  if (!existsSync(plan.stagedPath)) return;
+  if (existsSync(plan.canonicalPath)) {
+    throw new MetaUnregisterError(
+      `退避したメタを復元できません: 正本パスが既に存在します (${plan.canonicalPath})`,
+    );
+  }
+  try {
+    renameSync(plan.stagedPath, plan.canonicalPath);
+  } catch (error) {
+    throw new MetaUnregisterError(
+      `退避したメタを復元できません: ${plan.stagedPath} → ${plan.canonicalPath}`,
+      { cause: error },
+    );
+  }
+}
+
+function deleteStagedMeta(plan: MetaDeletionPlan): void {
+  if (existsSync(plan.stagedPath)) unlinkSync(plan.stagedPath);
 }
 
 export function unregisterWork(repo: WorkRepo, workId: string): boolean {
@@ -70,18 +133,21 @@ export function unregisterWork(repo: WorkRepo, workId: string): boolean {
   if (!target) return false;
 
   const mediaRoot = repo.getMediaRoot(workId);
-  if (mediaRoot) {
-    const metaPathToDelete = resolveMetaPathToDelete(
-      workId,
-      target.metaPath,
-      mediaRoot.physicalPath,
-    );
-    if (metaPathToDelete) deleteMetaFileOnly(metaPathToDelete);
-  } else {
-    deleteMetaFileOnly(target.metaPath);
-  }
+  const metaPlan = resolveMetaDeletionPlan(workId, target.metaPath, mediaRoot?.physicalPath);
+  if (metaPlan) stageMetaForDeletion(metaPlan);
 
-  return repo.deleteWork(workId) !== null;
+  try {
+    const deleted = repo.deleteWork(workId);
+    if (deleted === null) {
+      if (metaPlan) restoreStagedMeta(metaPlan);
+      return false;
+    }
+    if (metaPlan) deleteStagedMeta(metaPlan);
+    return true;
+  } catch (error) {
+    if (metaPlan) restoreStagedMeta(metaPlan);
+    throw error;
+  }
 }
 
 function unregisterDescendantWorks(repo: WorkRepo, descendants: Array<{ id: string }>): void {

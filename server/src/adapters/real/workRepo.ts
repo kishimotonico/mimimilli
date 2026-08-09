@@ -1386,10 +1386,14 @@ export class WorkRepo {
   deleteWork(id: string): { metaPath: string } | null {
     const row = this.getWorkDeleteTarget(id);
     if (!row) return null;
-    this.db.catalog.delete(workTags).where(eq(workTags.workId, id)).run();
-    this.db.catalog.delete(workDlsite).where(eq(workDlsite.workId, id)).run();
-    this.db.catalog.delete(works).where(eq(works.id, id)).run();
-    this.db.user.delete(workStates).where(eq(workStates.workId, id)).run();
+    this.db.transaction(() => {
+      this.db.catalog.delete(workTags).where(eq(workTags.workId, id)).run();
+      this.db.catalog.delete(workDlsite).where(eq(workDlsite.workId, id)).run();
+      this.db.catalog.delete(works).where(eq(works.id, id)).run();
+    });
+    this.db.userTransaction(() => {
+      this.db.user.delete(workStates).where(eq(workStates.workId, id)).run();
+    });
     return { metaPath: row.metaPath };
   }
 
