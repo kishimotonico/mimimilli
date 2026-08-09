@@ -1,10 +1,10 @@
 ---
 id: TASK-284
 title: works ids絞り込みの空配列セマンティクスとScanModalの取得失敗表示を直す
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-09 15:43'
-updated_date: '2026-08-09 15:50'
+updated_date: '2026-08-09 15:54'
 labels: []
 dependencies: []
 ordinal: 294000
