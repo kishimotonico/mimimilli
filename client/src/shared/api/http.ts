@@ -142,16 +142,27 @@ export async function postParsed<T>(
   schema: z.ZodType<T>,
   path: string,
   body?: unknown,
+  options?: ParsedRequestOptions & { noContentAsNull?: false | undefined },
+): Promise<T>;
+export async function postParsed<T>(
+  schema: z.ZodType<T>,
+  path: string,
+  body: unknown,
+  options: ParsedRequestOptions & { noContentAsNull: true },
+): Promise<T | null>;
+export async function postParsed<T>(
+  schema: z.ZodType<T>,
+  path: string,
+  body?: unknown,
   options?: ParsedRequestOptions,
-): Promise<T> {
+): Promise<T | null> {
   const res = await fetch(API_BASE + path, {
     method: "POST",
     headers: body !== undefined ? { "Content-Type": "application/json" } : {},
     body: body !== undefined ? JSON.stringify(body) : undefined,
     signal: options?.signal,
   });
-  const parsed = await handleParsedResponse("POST", path, res, schema, options);
-  return parsed as T;
+  return handleParsedResponse("POST", path, res, schema, options);
 }
 
 /** レスポンスボディを持たない POST。成功時のステータスも204であることを検証する */
@@ -166,14 +177,31 @@ export async function postVoid(path: string, body?: unknown): Promise<void> {
 }
 
 /** shared契約のスキーマでレスポンスを検証する PUT */
-export async function putParsed<T>(schema: z.ZodType<T>, path: string, body: unknown): Promise<T> {
+export async function putParsed<T>(
+  schema: z.ZodType<T>,
+  path: string,
+  body: unknown,
+  options?: ParsedRequestOptions & { noContentAsNull?: false | undefined },
+): Promise<T>;
+export async function putParsed<T>(
+  schema: z.ZodType<T>,
+  path: string,
+  body: unknown,
+  options: ParsedRequestOptions & { noContentAsNull: true },
+): Promise<T | null>;
+export async function putParsed<T>(
+  schema: z.ZodType<T>,
+  path: string,
+  body: unknown,
+  options?: ParsedRequestOptions,
+): Promise<T | null> {
   const res = await fetch(API_BASE + path, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    signal: options?.signal,
   });
-  if (!res.ok) return throwApiError("PUT", path, res, await readResponseBody(res));
-  return parseResponse(schema, "PUT", path, await res.json());
+  return handleParsedResponse("PUT", path, res, schema, options);
 }
 
 /** shared契約のスキーマでレスポンスを検証する PATCH */
@@ -181,28 +209,50 @@ export async function patchParsed<T>(
   schema: z.ZodType<T>,
   path: string,
   body: unknown,
-): Promise<T> {
+  options?: ParsedRequestOptions & { noContentAsNull?: false | undefined },
+): Promise<T>;
+export async function patchParsed<T>(
+  schema: z.ZodType<T>,
+  path: string,
+  body: unknown,
+  options: ParsedRequestOptions & { noContentAsNull: true },
+): Promise<T | null>;
+export async function patchParsed<T>(
+  schema: z.ZodType<T>,
+  path: string,
+  body: unknown,
+  options?: ParsedRequestOptions,
+): Promise<T | null> {
   const res = await fetch(API_BASE + path, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    signal: options?.signal,
   });
-  if (!res.ok) return throwApiError("PATCH", path, res, await readResponseBody(res));
-  return parseResponse(schema, "PATCH", path, await res.json());
+  return handleParsedResponse("PATCH", path, res, schema, options);
 }
 
 /** shared契約のスキーマでレスポンスを検証する DELETE */
 export async function deleteParsed<T>(
   schema: z.ZodType<T>,
   path: string,
+  options?: ParsedRequestOptions & { noContentAsNull?: false | undefined },
+): Promise<T>;
+export async function deleteParsed<T>(
+  schema: z.ZodType<T>,
+  path: string,
+  options: ParsedRequestOptions & { noContentAsNull: true },
+): Promise<T | null>;
+export async function deleteParsed<T>(
+  schema: z.ZodType<T>,
+  path: string,
   options?: ParsedRequestOptions,
-): Promise<T> {
+): Promise<T | null> {
   const res = await fetch(API_BASE + path, {
     method: "DELETE",
     signal: options?.signal,
   });
-  const parsed = await handleParsedResponse("DELETE", path, res, schema, options);
-  return parsed as T;
+  return handleParsedResponse("DELETE", path, res, schema, options);
 }
 
 /** レスポンスボディを持たない DELETE。成功時のステータスも204であることを検証する */

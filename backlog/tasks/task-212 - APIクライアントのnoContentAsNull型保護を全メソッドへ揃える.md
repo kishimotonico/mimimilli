@@ -4,7 +4,7 @@ title: APIクライアントのnoContentAsNull型保護を全メソッドへ揃�
 status: To Do
 assignee: []
 created_date: '2026-08-06 04:59'
-updated_date: '2026-08-09 01:32'
+updated_date: '2026-08-09 15:07'
 labels: []
 dependencies: []
 priority: medium
@@ -25,11 +25,13 @@ client/src/shared/api/http.ts の getParsed（L99-118）は2つのオーバー�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 postParsed / putParsed / patchParsed / deleteParsed が getParsed と同じオーバーロードで noContentAsNull の有無を戻り値型に反映している
-- [ ] #2 noContentAsNull: true を渡した場合に戻り値が null を含む型になり、そうでない場合は含まないことが型レベルで確認できる
-- [ ] #3 parsed as T による型の握りつぶしが残っていない
-- [ ] #4 pnpm check と pnpm test が通る
+- [x] #1 postParsed / putParsed / patchParsed / deleteParsed が getParsed と同じオーバーロードで noContentAsNull の有無を戻り値型に反映している
+- [x] #2 noContentAsNull: true を渡した場合に戻り値が null を含む型になり、そうでない場合は含まないことが型レベルで確認できる
+- [x] #3 parsed as T による型の握りつぶしが残っていない
+- [x] #4 pnpm check と pnpm test が通る
 <!-- AC:END -->
+
+
 
 ## Implementation Notes
 
