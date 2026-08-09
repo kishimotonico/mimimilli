@@ -4,7 +4,7 @@ import {
   filesDirectionAtom,
   filesRelPathAtom,
   filesSelectedPathAtom,
-} from "../../../entities/files/model/navigationAtoms";
+} from "../../../entities/file-system/model/navigationAtoms";
 import { joinPath, relSegments } from "../../../shared/lib/fsPath";
 
 export const openFilesDirAtom = atom(

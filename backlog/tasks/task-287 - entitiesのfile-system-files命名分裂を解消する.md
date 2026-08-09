@@ -4,6 +4,7 @@ title: entitiesのfile-system/files命名分裂を解消する
 status: To Do
 assignee: []
 created_date: '2026-08-09 19:14'
+updated_date: '2026-08-09 19:22'
 labels: []
 dependencies: []
 priority: low
@@ -20,7 +21,7 @@ TASK-264が client/src/entities/file-system/（api.ts・queryKeys.ts）を作っ
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 entities配下のディレクトリが1つに統合され、同一ドメインの分裂が解消していること
-- [ ] #2 旧パスへのre-exportやエイリアスが残っていないこと
-- [ ] #3 pnpm check と pnpm test が通ること
+- [x] #1 entities配下のディレクトリが1つに統合され、同一ドメインの分裂が解消していること
+- [x] #2 旧パスへのre-exportやエイリアスが残っていないこと
+- [x] #3 pnpm check と pnpm test が通ること
 <!-- AC:END -->

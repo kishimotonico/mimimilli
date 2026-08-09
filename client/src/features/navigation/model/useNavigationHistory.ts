@@ -11,7 +11,7 @@ import {
   filesDirectionAtom,
   filesRelPathAtom,
   filesSelectedPathAtom,
-} from "../../../entities/files/model/navigationAtoms";
+} from "../../../entities/file-system/model/navigationAtoms";
 import { joinPath, relSegments } from "../../../shared/lib/fsPath";
 import { useRootFolder } from "../../../entities/settings/useSettingsQuery";
 import { appModeAtom } from "../../../shared/model/appModeAtoms";

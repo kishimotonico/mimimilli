@@ -4,6 +4,7 @@ title: スキャンの安定順ソートの重複実装を統一する
 status: To Do
 assignee: []
 created_date: '2026-08-09 19:14'
+updated_date: '2026-08-09 19:22'
 labels: []
 dependencies: []
 priority: low
@@ -20,6 +21,6 @@ ADR-0008の重複ID修復は安定順が所有者判定の根拠になってい�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 scanWalk.tsがnaturalCompareをimportして使い、比較ロジックの直書きが無いこと
-- [ ] #2 pnpm check と変更範囲のserverテストが通ること
+- [x] #1 scanWalk.tsがnaturalCompareをimportして使い、比較ロジックの直書きが無いこと
+- [x] #2 pnpm check と変更範囲のserverテストが通ること
 <!-- AC:END -->

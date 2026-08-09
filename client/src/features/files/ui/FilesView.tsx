@@ -9,7 +9,8 @@ import { useAtomValue } from "jotai";
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import { browseFs } from "../api";
 import { useFilesNavigation } from "../model/useFilesNavigation";
-import { filesDirectionAtom } from "../../../entities/files/model/navigationAtoms";
+import { filesDirectionAtom } from "../../../entities/file-system/model/navigationAtoms";
+import { FILE_SYSTEM_QUERY_KEYS } from "../../../entities/file-system/queryKeys";
 import { buildFolderAudioQueue } from "../model/filePlayback";
 import { classifyFile } from "../model/types";
 import type { PlaybackTrack } from "../../../entities/player/model/playbackTrack";
@@ -20,7 +21,6 @@ import {
   playingWorkIdAtom,
 } from "../../../entities/player/model/atoms";
 import { rootLabel, type FsEntry } from "../model/types";
-import { FILE_SYSTEM_QUERY_KEYS } from "../../../entities/file-system/queryKeys";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 import FileColumn from "./FileColumn";
 import FilePreview from "./FilePreview";

@@ -1,7 +1,7 @@
 import { useAtomValue, useSetAtom } from "jotai";
 import Breadcrumbs from "../../../shared/ui/Breadcrumbs";
 import { useRootFolder } from "../../../entities/settings/useSettingsQuery";
-import { filesRelPathAtom } from "../../../entities/files/model/navigationAtoms";
+import { filesRelPathAtom } from "../../../entities/file-system/model/navigationAtoms";
 import { goToFilesSegmentAtom } from "../model/filesNavigationActions";
 import { rootLabel } from "../model/types";
 
