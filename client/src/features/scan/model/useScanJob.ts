@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { scanJobEventSchema, type ScanJobSnapshot, type StartScanRequest } from "@mimimilli/shared";
-import { API_BASE, ApiRequestError, ApiResponseSchemaError } from "../../shared/api/http";
-import { cancelScan, getActiveScan, getScanJob, ScanAlreadyActiveError, startScan } from "./api";
-import type { ScanActionResult } from "./model/atoms";
-
-function terminal(job: ScanJobSnapshot): boolean {
-  return job.status === "completed" || job.status === "failed" || job.status === "cancelled";
-}
+import { API_BASE, ApiRequestError, ApiResponseSchemaError } from "../../../shared/api/http";
+import {
+  bindSseTransportError,
+  bindTypedSseEvents,
+  connectSse,
+} from "../../../shared/api/sseTransport";
+import { cancelScan, getActiveScan, getScanJob, ScanAlreadyActiveError, startScan } from "../api";
+import type { ScanActionResult } from "./atoms";
+import { isTerminalScanJob } from "./scanJob";
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "スキャン状態の取得に失敗しました";
@@ -59,14 +61,14 @@ export function useScanJob(options: UseScanJobOptions = {}) {
       const previous = snapshotRef.current;
       if (
         previous?.id === next.id &&
-        (terminal(previous) || statusRank(next.status) < statusRank(previous.status))
+        (isTerminalScanJob(previous) || statusRank(next.status) < statusRank(previous.status))
       ) {
         return;
       }
       snapshotRef.current = next;
       setJob(next);
       setError(next.status === "failed" ? (next.error ?? "スキャンに失敗しました") : null);
-      if (terminal(next) && !terminalHandled.current.has(next.id)) {
+      if (isTerminalScanJob(next) && !terminalHandled.current.has(next.id)) {
         terminalHandled.current.add(next.id);
         if (localSource !== null && sourceRef.current === localSource) {
           localSource.close();
@@ -104,9 +106,10 @@ export function useScanJob(options: UseScanJobOptions = {}) {
       snapshotRef.current = null;
       setError(null);
       applyOwned(generation, initial.id, null, initial);
-      if (terminal(initial)) return;
+      if (isTerminalScanJob(initial)) return;
 
-      const source = new EventSource(`${API_BASE}/scan/${encodeURIComponent(initial.id)}/events`);
+      const connection = connectSse(`${API_BASE}/scan/${encodeURIComponent(initial.id)}/events`);
+      const source = connection.source;
       sourceRef.current = source;
       const fail = (message: string): void => {
         detachWithError(generation, initial.id, source, new Error(message));
@@ -121,33 +124,22 @@ export function useScanJob(options: UseScanJobOptions = {}) {
             if (isDefinitiveRefreshError(cause)) {
               detachWithError(generation, initial.id, source, cause);
             }
-            // fetchの一時的なnetwork errorはEventSource標準の再接続に任せる。
           });
       };
 
-      for (const type of [
-        "reset",
-        "state",
-        "progress",
-        "completed",
-        "failed",
-        "cancelled",
-      ] as const) {
-        source.addEventListener(type, (raw) => {
+      const eventMessages = {
+        parse: "スキャン進捗イベントの解析に失敗しました",
+        schema: "スキャン進捗イベントの形式が不正です",
+      } as const;
+
+      bindTypedSseEvents({
+        source,
+        eventNames: ["reset", "state", "progress", "completed", "failed", "cancelled"],
+        schema: scanJobEventSchema,
+        messages: eventMessages,
+        onValidationFailure: fail,
+        onValidatedEvent: (event) => {
           if (!owns(generation, initial.id)) return;
-          let payload: unknown;
-          try {
-            payload = JSON.parse((raw as MessageEvent<string>).data);
-          } catch {
-            fail("スキャン進捗イベントの解析に失敗しました");
-            return;
-          }
-          const parsed = scanJobEventSchema.safeParse(payload);
-          if (!parsed.success) {
-            fail("スキャン進捗イベントの形式が不正です");
-            return;
-          }
-          const event = parsed.data;
           if (event.type === "reset" || event.type === "state") {
             applyOwned(generation, initial.id, source, event.snapshot);
           } else if (event.type === "progress") {
@@ -173,9 +165,13 @@ export function useScanJob(options: UseScanJobOptions = {}) {
           } else {
             refresh();
           }
-        });
-      }
-      source.onerror = refresh;
+        },
+      });
+
+      bindSseTransportError({
+        source,
+        onConnectionError: refresh,
+      });
     },
     [applyOwned, detachWithError, owns],
   );
@@ -247,7 +243,7 @@ export function useScanJob(options: UseScanJobOptions = {}) {
   return {
     job,
     error,
-    scanning: job !== null && !terminal(job),
+    scanning: job !== null && !isTerminalScanJob(job),
     start,
     cancel,
     attach,

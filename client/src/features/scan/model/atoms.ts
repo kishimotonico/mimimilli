@@ -5,16 +5,13 @@ import { atom } from "jotai";
 import type { ScanJobSnapshot, StartScanRequest } from "@mimimilli/shared";
 import { formatScanProgressLabel } from "../model";
 import type { ScanProgress } from "../model";
+import { isTerminalScanJob } from "./scanJob";
 
 export const scanJobAtom = atom<ScanJobSnapshot | null>(null);
 
-function isTerminal(job: ScanJobSnapshot): boolean {
-  return job.status === "completed" || job.status === "failed" || job.status === "cancelled";
-}
-
 export const scanningAtom = atom((get) => {
   const job = get(scanJobAtom);
-  return job !== null && !isTerminal(job);
+  return job !== null && !isTerminalScanJob(job);
 });
 
 export const scanProgressAtom = atom<ScanProgress | null>((get) => {

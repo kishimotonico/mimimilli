@@ -8,7 +8,7 @@ import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { useDlsiteBulkActions } from "../../dlsite/model/useDlsiteBulkActions";
 import { SCAN_QUERY_KEYS } from "../api";
 import { scanActionsAtom, scanErrorAtom, scanJobAtom, type ScanActions } from "../model/atoms";
-import { useScanJob } from "../useScanJob";
+import { useScanJob } from "../model/useScanJob";
 
 export default function ScanRuntime() {
   const queryClient = useQueryClient();

@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ScanJobEvent, ScanJobSnapshot } from "@mimimilli/shared";
-import { useScanJob } from "../../src/features/scan/useScanJob";
+import { useScanJob } from "../../src/features/scan/model/useScanJob";
 
 class FakeEventSource extends EventTarget {
   static instances: FakeEventSource[] = [];

@@ -45,7 +45,7 @@ const scanJobStub = {
   clearError: vi.fn(),
 };
 
-vi.mock("../../src/features/scan/useScanJob", () => ({
+vi.mock("../../src/features/scan/model/useScanJob", () => ({
   useScanJob: () => scanJobStub,
 }));
 
