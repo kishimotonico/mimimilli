@@ -1,10 +1,10 @@
 ---
 id: TASK-278
 title: playerランタイムの過剰抽象を整理する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-08 21:21'
-updated_date: '2026-08-09 14:39'
+updated_date: '2026-08-09 14:48'
 labels: []
 dependencies: []
 priority: medium
