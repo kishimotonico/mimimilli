@@ -7,6 +7,7 @@ import { cn } from "../../../../shared/lib/cn";
 /** 新規検出した作品一覧。件数見出し+一覧を1つのcollapse境界にまとめる。 */
 export default function ScanNewWorks({
   newWorks,
+  newWorksError,
   truncatedTotal,
   editingId,
   editTitle,
@@ -18,6 +19,7 @@ export default function ScanNewWorks({
   onSaveTitle,
 }: {
   newWorks: WorkListItem[];
+  newWorksError: string | null;
   /** newWorkIds総数がnewWorksより多く、表示を先頭のみに絞っているときはその総数。絞っていなければnull */
   truncatedTotal: number | null;
   editingId: string | null;
@@ -43,29 +45,35 @@ export default function ScanNewWorks({
         <p className="font-sans text-[10.5px] font-semibold tracking-[0.06em] text-ink-3 uppercase">
           新規検出した作品
         </p>
-        {truncatedTotal !== null && (
+        {!newWorksError && truncatedTotal !== null && (
           <span className="font-mono text-[10px] text-ink-4 tabular-nums">
             {newWorks.length} / {truncatedTotal} 件
           </span>
         )}
       </div>
-      <ul className="flex max-h-[220px] list-none flex-col gap-1 overflow-y-auto p-0">
-        {newWorks.map((work) => (
-          <li key={work.id}>
-            <NewWorkRow
-              work={work}
-              editing={editingId === work.id}
-              editTitle={editTitle}
-              editSaving={editingId === work.id && editSaving}
-              editError={editingId === work.id ? editError : null}
-              titleInputRef={titleInputRef}
-              onStartEdit={() => onStartEdit(work)}
-              onChangeEditTitle={onChangeEditTitle}
-              onSaveTitle={() => onSaveTitle(work.id)}
-            />
-          </li>
-        ))}
-      </ul>
+      {newWorksError ? (
+        <p role="alert" className="font-jp text-[12px] text-[var(--r-coral)]">
+          {newWorksError}
+        </p>
+      ) : (
+        <ul className="flex max-h-[220px] list-none flex-col gap-1 overflow-y-auto p-0">
+          {newWorks.map((work) => (
+            <li key={work.id}>
+              <NewWorkRow
+                work={work}
+                editing={editingId === work.id}
+                editTitle={editTitle}
+                editSaving={editingId === work.id && editSaving}
+                editError={editingId === work.id ? editError : null}
+                titleInputRef={titleInputRef}
+                onStartEdit={() => onStartEdit(work)}
+                onChangeEditTitle={onChangeEditTitle}
+                onSaveTitle={() => onSaveTitle(work.id)}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
     </motion.div>
   );
 }

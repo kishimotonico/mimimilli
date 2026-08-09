@@ -418,6 +418,21 @@ describe("ScanModal", () => {
     ).toBeInTheDocument();
   });
 
+  it("新規作品一覧の取得に失敗したときエラーを表示する（統計バッジで件数は出るが一覧が無表示にならない）", async () => {
+    searchWorksSpy.mockImplementation(async (params) => {
+      if (params.ids) throw new Error("network error");
+      return originalSearchWorks(params);
+    });
+
+    renderModal();
+
+    await waitFor(() =>
+      expect(screen.getByText("新規作品の読み込みに失敗しました")).toBeInTheDocument(),
+    );
+    expect(screen.getByText(String(scanResult.newlyGenerated))).toBeInTheDocument();
+    expect(screen.queryByText(newWork.title)).toBeNull();
+  });
+
   it("タイトル保存に失敗したときエラーを表示し、ローカル表示は更新されない", async () => {
     vi.spyOn(workApi, "patchWork").mockRejectedValue(new Error("network error"));
     renderModal();

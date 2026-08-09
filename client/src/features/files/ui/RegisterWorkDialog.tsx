@@ -17,7 +17,7 @@ import { useTagPrefixes } from "../../../entities/tag/useTagPrefixes";
 import { tagPrefixDefinition } from "../../../entities/tag/tagPrefixDefinition";
 import { buildDlsiteApplyBody, dlsiteInfoTags } from "../../../entities/work/dlsitePreview";
 import { dlsiteFetchErrorMessage } from "../../../entities/work/dlsiteFetchError";
-import { mutationErrorMessage } from "../../../shared/lib/mutationError";
+import { apiErrorMessage } from "../../../shared/lib/apiError";
 import { createWork, fetchDlsiteInfoByCode } from "../api";
 
 const inputClass =
@@ -133,10 +133,10 @@ export default function RegisterWorkDialog({
     (dlsiteMutation.error
       ? dlsiteMutation.error instanceof ApiRequestError
         ? dlsiteFetchErrorMessage(dlsiteMutation.error)
-        : mutationErrorMessage(dlsiteMutation.error, "DLsite情報の取得に失敗しました")
+        : apiErrorMessage(dlsiteMutation.error, "DLsite情報の取得に失敗しました")
       : null);
   const submitError = registerMutation.error
-    ? mutationErrorMessage(registerMutation.error, "作品の登録に失敗しました")
+    ? apiErrorMessage(registerMutation.error, "作品の登録に失敗しました")
     : null;
 
   return createPortal(

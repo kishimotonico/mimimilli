@@ -26,7 +26,7 @@ import DlsiteNotificationModals from "../features/library/ui/DlsiteNotificationM
 import { LibraryNavigationProvider } from "../features/library/ui/LibraryNavigationProvider";
 import GlobalToast from "./ui/GlobalToast";
 import { errorToastAtom } from "../shared/model/errorToastAtom";
-import { mutationErrorMessage } from "../shared/lib/mutationError";
+import { apiErrorMessage } from "../shared/lib/apiError";
 import type { ActiveModal } from "./model/activeModal";
 import { isDlsiteNotificationModal } from "./model/activeModal";
 import type { Work, WorkListItem } from "@mimimilli/shared";
@@ -97,7 +97,7 @@ export default function App() {
           player.play(work, tracks, Math.min(trackIndex, tracks.length - 1), playlist!.id);
         }
       } catch (err) {
-        setErrorToast(mutationErrorMessage(err, "作品の再生に失敗しました"));
+        setErrorToast(apiErrorMessage(err, "作品の再生に失敗しました"));
       }
     },
     [player, queryClient, setErrorToast],

@@ -4,6 +4,7 @@ title: works ids絞り込みの空配列セマンティクスとScanModalの取�
 status: To Do
 assignee: []
 created_date: '2026-08-09 15:43'
+updated_date: '2026-08-09 15:50'
 labels: []
 dependencies: []
 ordinal: 294000
@@ -23,9 +24,9 @@ client/src/features/scan/ui/ScanModal.tsx:208 の表示条件が newWorks.length
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 searchWorks に空配列の ids を渡したときサーバーへリクエストせず0件を返し、core・realと同じセマンティクスになっている
-- [ ] #2 上記がテストで担保されている
-- [ ] #3 ScanModalで新規作品一覧の取得が失敗したとき、エラーが表示される（ADR-0015のエラー処理契約に従うこと）
-- [ ] #4 上記がテストで担保されている
-- [ ] #5 pnpm check と pnpm test と pnpm test:smoke が通る
+- [x] #1 searchWorks に空配列の ids を渡したときサーバーへリクエストせず0件を返し、core・realと同じセマンティクスになっている
+- [x] #2 上記がテストで担保されている
+- [x] #3 ScanModalで新規作品一覧の取得が失敗したとき、エラーが表示される（ADR-0015のエラー処理契約に従うこと）
+- [x] #4 上記がテストで担保されている
+- [x] #5 pnpm check と pnpm test と pnpm test:smoke が通る
 <!-- AC:END -->

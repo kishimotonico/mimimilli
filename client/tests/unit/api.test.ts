@@ -369,6 +369,23 @@ describe("library api", () => {
     expect(result.total).toBe(42);
   });
 
+  it("searchWorks: ids:[]はサーバーへリクエストせず0件を返す（core・realと同じ空集合セマンティクス）", async () => {
+    const result = await workApi.searchWorks({ ids: [] });
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(result).toEqual({ items: [], total: 0, stats: { trackCount: 0, durationSec: 0 } });
+  });
+
+  it("searchWorks: ids:[]かつsort:randomでもリクエストせずseedを発行する", async () => {
+    const result = await workApi.searchWorks({ ids: [], sort: "random", seed: 777 });
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      items: [],
+      total: 0,
+      stats: { trackCount: 0, durationSec: 0 },
+      seed: 777,
+    });
+  });
+
   it("randomのレスポンスseedを次ページへ送り、ページ間の重複・欠落を防げる", async () => {
     const seed = 2468;
     mockFetch

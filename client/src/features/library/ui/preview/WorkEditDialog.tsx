@@ -6,7 +6,7 @@ import IconButton from "../../../../shared/ui/IconButton";
 import { I } from "../../../../shared/ui/Icon";
 import { useDialogModal } from "../../../../shared/ui/useDialogModal";
 import type { useLibraryWorkPatchMutations } from "../../model/useLibraryQueries";
-import { mutationErrorMessage } from "../../../../shared/lib/mutationError";
+import { apiErrorMessage } from "../../../../shared/lib/apiError";
 import { DlsiteEditor } from "./DlsiteEditor";
 import { WorkTagEditor } from "./WorkTagEditor";
 
@@ -43,7 +43,7 @@ export function WorkEditDialog({
   };
 
   const titleError = titleMutation.error
-    ? mutationErrorMessage(titleMutation.error, "タイトルを保存できませんでした。")
+    ? apiErrorMessage(titleMutation.error, "タイトルを保存できませんでした。")
     : null;
 
   return (

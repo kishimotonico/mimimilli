@@ -21,7 +21,7 @@ import {
   type FsEntry,
   type FileKind,
 } from "../model/types";
-import { mutationErrorMessage } from "../../../shared/lib/mutationError";
+import { apiErrorMessage } from "../../../shared/lib/apiError";
 
 interface FilePreviewProps {
   /** 選択中エントリ（ファイル or dir）。null ならプレビューなし */
@@ -74,7 +74,7 @@ export default function FilePreview({
       await refreshFsState();
     },
     onError: (cause) => {
-      setErrorToast(mutationErrorMessage(cause, "作品登録の解除に失敗しました"));
+      setErrorToast(apiErrorMessage(cause, "作品登録の解除に失敗しました"));
     },
   });
 
@@ -90,7 +90,7 @@ export default function FilePreview({
       setShowRegisterDialog(true);
     },
     onError: (cause) => {
-      setErrorToast(mutationErrorMessage(cause, "登録情報の取得に失敗しました"));
+      setErrorToast(apiErrorMessage(cause, "登録情報の取得に失敗しました"));
     },
   });
 

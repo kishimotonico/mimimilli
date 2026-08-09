@@ -1,5 +1,5 @@
 import { exportLibrary } from "../api";
-import { mutationErrorMessage } from "../../../shared/lib/mutationError";
+import { apiErrorMessage } from "../../../shared/lib/apiError";
 
 export type DownloadLibraryExportResult =
   | { ok: true; dataIntegrityWarning?: { skippedCount: number } }
@@ -22,7 +22,7 @@ export async function downloadLibraryExport(): Promise<DownloadLibraryExportResu
   } catch (err) {
     return {
       ok: false,
-      message: mutationErrorMessage(err, "ライブラリのエクスポートに失敗しました"),
+      message: apiErrorMessage(err, "ライブラリのエクスポートに失敗しました"),
     };
   }
 }

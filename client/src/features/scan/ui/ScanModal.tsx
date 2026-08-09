@@ -5,7 +5,7 @@ import { AnimatePresence } from "motion/react";
 import { WORKS_DEFAULT_PAGE_SIZE, type WorkListItem, type WorksPage } from "@mimimilli/shared";
 import { patchWork, searchWorks } from "../../../entities/work/api";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
-import { mutationErrorMessage } from "../../../shared/lib/mutationError";
+import { apiErrorMessage } from "../../../shared/lib/apiError";
 import { libraryTotalQueryOptions } from "../../../entities/work/libraryTotalQueryOptions";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
 import { cn } from "../../../shared/lib/cn";
@@ -78,6 +78,9 @@ export default function ScanModal({ lastScanTime, onClose, onOpenRjCodeMissing }
     queryFn: () => searchWorks(newWorksParams),
     enabled: visibleWorkIds.length > 0,
   });
+  const newWorksError = newWorksQuery.isError
+    ? apiErrorMessage(newWorksQuery.error, "新規作品の読み込みに失敗しました")
+    : null;
   const newWorkOrder = useMemo(
     () => new Map(visibleWorkIds.map((id, index) => [id, index])),
     [visibleWorkIds],
@@ -149,7 +152,7 @@ export default function ScanModal({ lastScanTime, onClose, onOpenRjCodeMissing }
   };
 
   const editError = saveTitleMutation.error
-    ? mutationErrorMessage(saveTitleMutation.error, "タイトルの保存に失敗しました")
+    ? apiErrorMessage(saveTitleMutation.error, "タイトルの保存に失敗しました")
     : null;
   const editSaving = saveTitleMutation.isPending;
 
@@ -206,10 +209,11 @@ export default function ScanModal({ lastScanTime, onClose, onOpenRjCodeMissing }
           </AnimatePresence>
 
           <AnimatePresence initial={false}>
-            {newWorks.length > 0 && (
+            {(newWorks.length > 0 || !!newWorksError) && (
               <ScanNewWorks
                 key="new-works"
                 newWorks={newWorks}
+                newWorksError={newWorksError}
                 truncatedTotal={truncatedTotal}
                 editingId={editingId}
                 editTitle={editTitle}
