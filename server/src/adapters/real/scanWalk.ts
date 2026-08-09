@@ -4,6 +4,7 @@ import { isMetaFileName } from "./meta.ts";
 import { isPathWithin } from "../../lib/path.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
 import { AUDIO_EXTENSIONS, extOf } from "./scanAudio.ts";
+import { naturalCompare } from "./naturalCompare.ts";
 
 const scanLogger = getCategoryLogger("scan");
 
@@ -117,7 +118,7 @@ export async function walk(
       onDirVisited?.(visited);
     }
   }
-  result.metaPaths.sort((a, b) => a.localeCompare(b, "ja", { numeric: true, sensitivity: "base" }));
+  result.metaPaths.sort(naturalCompare);
   return result;
 }
 

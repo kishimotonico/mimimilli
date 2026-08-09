@@ -24,7 +24,7 @@ import type { ScanWorkState } from "./workRowMapping.ts";
 import { getWorkWithLiveProbe } from "./workRefresh.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
 import { logDataIntegritySkips, toDataIntegrityWarning } from "./dataIntegrity.ts";
-import { naturalCompare } from "./scanAudio.ts";
+import { naturalCompare } from "./naturalCompare.ts";
 import { createDraftMetaFile } from "./scanMetaDraft.ts";
 import {
   buildProbeCache,

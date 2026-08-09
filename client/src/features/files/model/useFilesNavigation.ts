@@ -7,7 +7,7 @@ import { useCallback } from "react";
 import {
   filesRelPathAtom,
   filesSelectedPathAtom,
-} from "../../../entities/files/model/navigationAtoms";
+} from "../../../entities/file-system/model/navigationAtoms";
 import {
   goToFilesSegmentAtom,
   goUpFilesAtom,

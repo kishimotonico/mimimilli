@@ -2,6 +2,7 @@ import { readdirSync } from "node:fs";
 import { basename, extname, join } from "node:path";
 import type { Track } from "@mimimilli/shared";
 import { toPortableRelativePath } from "./paths.ts";
+import { naturalCompare } from "./naturalCompare.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
 
 const scanLogger = getCategoryLogger("scan");
@@ -20,10 +21,6 @@ const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "gif", "bmp", "webp"]);
 
 export function extOf(name: string): string {
   return extname(name).slice(1).toLowerCase();
-}
-
-export function naturalCompare(a: string, b: string): number {
-  return a.localeCompare(b, "ja", { numeric: true, sensitivity: "base" });
 }
 
 export function findCoverImage(dir: string): string | null {
