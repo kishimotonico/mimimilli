@@ -57,6 +57,45 @@ test("GET /api/works は先頭に空白を挟んだ擬似タグも正規化後�
   assert.equal(res.status, 200);
 });
 
+test("GET /api/works は ids を複数指定すると該当作品のみへ絞り込む", async () => {
+  const app = buildApp();
+  const res = await app.request("/api/works?ids=RJ501001&ids=RJ501003");
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.deepEqual(body.items.map((item: { id: string }) => item.id).sort(), [
+    "RJ501001",
+    "RJ501003",
+  ]);
+  assert.equal(body.total, 2);
+});
+
+test("GET /api/works は ids に他のフィルタ・ページングを組み合わせられる", async () => {
+  const app = buildApp();
+  const res = await app.request(
+    "/api/works?ids=RJ501001&ids=RJ501002&ids=RJ501003&limit=1&page=1&sort=id-asc",
+  );
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.deepEqual(
+    body.items.map((item: { id: string }) => item.id),
+    ["RJ501001"],
+  );
+  assert.equal(body.total, 3);
+});
+
+test("GET /api/works は ids 未指定なら絞り込まない（全件対象）", async () => {
+  const adapter = createFixtureAdapter();
+  let receivedIds: string[] | undefined;
+  adapter.queryWorks = async (query) => {
+    receivedIds = query.ids;
+    return { items: [], total: 0, stats: { trackCount: 0, durationSec: 0 } };
+  };
+  const app = createApp(adapter);
+  const res = await app.request("/api/works");
+  assert.equal(res.status, 200);
+  assert.equal(receivedIds, undefined);
+});
+
 test("GET /api/works/:id 存在しないIDは404 + apiErrorSchema形式", async () => {
   const app = buildApp();
   const res = await app.request("/api/works/NOT_EXIST");

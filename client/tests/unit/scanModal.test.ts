@@ -5,12 +5,40 @@ import { render, screen, fireEvent, waitFor, act } from "@testing-library/react"
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ScanJobSnapshot, ScanResult, Work } from "@mimimilli/shared";
+import {
+  WORKS_DEFAULT_PAGE_SIZE,
+  type ScanJobSnapshot,
+  type ScanResult,
+  type Work,
+  type WorkListItem,
+  type WorksPage,
+} from "@mimimilli/shared";
 import ScanModal from "../../src/features/scan/ui/ScanModal";
 import * as workApi from "../../src/entities/work/api";
+import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { scanActionsAtom, scanJobAtom } from "../../src/entities/scan/model/atoms";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
 import { libraryTotalQueryOptions } from "../../src/entities/work/libraryTotalQueryOptions";
+
+/** ids指定のworks一覧クエリ結果のスタブ。テストごとに登録した作品だけ返す（TASK-210/276）。
+ *  ids指定が無い呼び出し（libraryTotalQueryOptions等）は本来の実装（fetch経由）へ委譲する。 */
+const worksById = new Map<string, WorkListItem>();
+const originalSearchWorks = workApi.searchWorks;
+let searchWorksSpy: ReturnType<typeof vi.spyOn<typeof workApi, "searchWorks">>;
+
+function toListItem(id: string, title: string, trackCount: number): WorkListItem {
+  return {
+    id,
+    title,
+    cover: null,
+    status: "ok",
+    totalDurationSec: null,
+    trackCount,
+    bookmarked: false,
+    lastPlayedAt: null,
+    circleName: null,
+  };
+}
 
 beforeEach(() => {
   HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) {
@@ -19,15 +47,28 @@ beforeEach(() => {
   HTMLDialogElement.prototype.close = vi.fn(function (this: HTMLDialogElement) {
     this.open = false;
   });
+
+  worksById.clear();
+  worksById.set(newWork.id, toListItem(newWork.id, newWork.title, newWork.trackCount));
+  searchWorksSpy = vi.spyOn(workApi, "searchWorks").mockImplementation(async (params, options) => {
+    if (!params.ids) return originalSearchWorks(params, options);
+    const items = params.ids.flatMap((id) => {
+      const item = worksById.get(id);
+      return item ? [item] : [];
+    });
+    return { items, total: items.length, stats: { trackCount: 0, durationSec: 0 } };
+  });
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
 });
 
+const newWork = { id: "work-1", title: "新規作品", trackCount: 1 };
+
 const work: Work = {
-  id: "work-1",
-  title: "新規作品",
+  id: newWork.id,
+  title: newWork.title,
   cover: null,
   coverKind: "none",
   coverImage: null,
@@ -38,7 +79,6 @@ const work: Work = {
   errorMessage: null,
   urls: [],
   tags: [],
-  trackCount: 1,
   bookmarked: false,
   lastPlayedAt: null,
   dlsite: { rjCode: null, status: "none", lastAttemptAt: null, error: null, appliedTags: [] },
@@ -53,7 +93,7 @@ const scanResult: ScanResult = {
   newlyGenerated: 1,
   errors: 0,
   missing: 0,
-  newWorkIds: [work.id],
+  newWorkIds: [newWork.id],
   rjCodeMissingCount: 0,
   skipped: 0,
   coverErrors: 0,
@@ -174,26 +214,24 @@ function renderModal(
 
 describe("ScanModal", () => {
   it("タイトル編集中のEscapeは編集だけをキャンセルし、モーダルは閉じない", async () => {
-    vi.spyOn(workApi, "getWork").mockResolvedValue(work);
     const onClose = vi.fn();
     renderModal({ onClose });
 
-    await waitFor(() => screen.getByText(work.title));
-    fireEvent.click(screen.getByText(work.title));
+    await waitFor(() => screen.getByText(newWork.title));
+    fireEvent.click(screen.getByText(newWork.title));
 
-    const input = screen.getByDisplayValue(work.title);
+    const input = screen.getByDisplayValue(newWork.title);
     expect(input).toBeInTheDocument();
 
     const dialog = screen.getByRole("dialog", { name: "スキャン" });
     dispatchCancel(dialog);
 
     expect(onClose).not.toHaveBeenCalled();
-    expect(screen.queryByDisplayValue(work.title)).toBeNull();
-    expect(screen.getByText(work.title)).toBeInTheDocument();
+    expect(screen.queryByDisplayValue(newWork.title)).toBeNull();
+    expect(screen.getByText(newWork.title)).toBeInTheDocument();
   });
 
   it("編集中でないときのEscapeはモーダルを閉じる", () => {
-    vi.spyOn(workApi, "getWork").mockResolvedValue(work);
     const onClose = vi.fn();
     renderModal({ onClose });
 
@@ -204,40 +242,37 @@ describe("ScanModal", () => {
   });
 
   it("backdropクリックは編集中は編集だけをキャンセルし、モーダルは閉じない", async () => {
-    vi.spyOn(workApi, "getWork").mockResolvedValue(work);
     const onClose = vi.fn();
     renderModal({ onClose });
 
-    await waitFor(() => screen.getByText(work.title));
-    fireEvent.click(screen.getByText(work.title));
-    expect(screen.getByDisplayValue(work.title)).toBeInTheDocument();
+    await waitFor(() => screen.getByText(newWork.title));
+    fireEvent.click(screen.getByText(newWork.title));
+    expect(screen.getByDisplayValue(newWork.title)).toBeInTheDocument();
 
     const dialog = screen.getByRole("dialog", { name: "スキャン" });
     fireEvent.click(dialog);
 
     expect(onClose).not.toHaveBeenCalled();
-    expect(screen.queryByDisplayValue(work.title)).toBeNull();
-    expect(screen.getByText(work.title)).toBeInTheDocument();
+    expect(screen.queryByDisplayValue(newWork.title)).toBeNull();
+    expect(screen.getByText(newWork.title)).toBeInTheDocument();
   });
 
   it("タイトル編集中の×ボタンは編集だけをキャンセルし、モーダルは閉じない", async () => {
-    vi.spyOn(workApi, "getWork").mockResolvedValue(work);
     const onClose = vi.fn();
     renderModal({ onClose });
 
-    await waitFor(() => screen.getByText(work.title));
-    fireEvent.click(screen.getByText(work.title));
-    expect(screen.getByDisplayValue(work.title)).toBeInTheDocument();
+    await waitFor(() => screen.getByText(newWork.title));
+    fireEvent.click(screen.getByText(newWork.title));
+    expect(screen.getByDisplayValue(newWork.title)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "閉じる" }));
 
     expect(onClose).not.toHaveBeenCalled();
-    expect(screen.queryByDisplayValue(work.title)).toBeNull();
-    expect(screen.getByText(work.title)).toBeInTheDocument();
+    expect(screen.queryByDisplayValue(newWork.title)).toBeNull();
+    expect(screen.getByText(newWork.title)).toBeInTheDocument();
   });
 
   it("パネル内側のクリックではモーダルを閉じない", () => {
-    vi.spyOn(workApi, "getWork").mockResolvedValue(work);
     const onClose = vi.fn();
     renderModal({ onClose });
 
@@ -339,65 +374,57 @@ describe("ScanModal", () => {
     }
   });
 
-  it("newWorkIdsが変わったら一覧をクリアし、取得失敗時は古い一覧を残さない", async () => {
-    const workA: Work = { ...work, id: "work-a", title: "作品A" };
-    const workB: Work = { ...work, id: "work-b", title: "作品B" };
+  it("scan結果のnewWorkIdsが変わると一覧も即座に切り替わる（getWorkを呼ばず、worksをids一括取得する）", async () => {
     const getWorkSpy = vi.spyOn(workApi, "getWork");
-    getWorkSpy.mockResolvedValueOnce(workA);
+    const workA = { id: "work-a", title: "作品A", trackCount: 2 };
+    const workB = { id: "work-b", title: "作品B", trackCount: 3 };
+    worksById.set(workA.id, toListItem(workA.id, workA.title, workA.trackCount));
+    worksById.set(workB.id, toListItem(workB.id, workB.title, workB.trackCount));
 
     const { rerenderModal } = renderModal({
       lastResult: { ...scanResult, newWorkIds: [workA.id] },
     });
-    await waitFor(() => screen.getByText(workA.title));
+    await waitFor(() => expect(screen.getByText(workA.title)).toBeInTheDocument());
 
-    getWorkSpy.mockRejectedValueOnce(new Error("fetch failed"));
     rerenderModal({ lastResult: { ...scanResult, newWorkIds: [workB.id] } });
-
-    await waitFor(() =>
-      expect(screen.getByText("新規作品の読み込みに失敗しました")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText(workB.title)).toBeInTheDocument());
     expect(screen.queryByText(workA.title)).toBeNull();
+
+    expect(getWorkSpy).not.toHaveBeenCalled();
+    expect(searchWorksSpy).toHaveBeenCalledWith({ ids: [workA.id] });
+    expect(searchWorksSpy).toHaveBeenCalledWith({ ids: [workB.id] });
   });
 
-  it("遅延した前回リクエストは新しいnewWorkIdsの結果を上書きしない", async () => {
-    const workA: Work = { ...work, id: "work-a", title: "作品A" };
-    const workB: Work = { ...work, id: "work-b", title: "作品B" };
-    let resolveA: (value: Work) => void = () => {};
-    let resolveB: (value: Work) => void = () => {};
-    const getWorkSpy = vi.spyOn(workApi, "getWork");
-    getWorkSpy.mockImplementation((id) => {
-      if (id === workA.id) {
-        return new Promise<Work>((resolve) => {
-          resolveA = resolve;
-        });
-      }
-      return new Promise<Work>((resolve) => {
-        resolveB = resolve;
-      });
-    });
+  it("newWorkIdsがWORKS_DEFAULT_PAGE_SIZEを超えるとidsを先頭で切り詰め、省略件数を表示する", async () => {
+    const manyIds = Array.from(
+      { length: WORKS_DEFAULT_PAGE_SIZE + 50 },
+      (_, i) => `work-many-${i}`,
+    );
+    for (const id of manyIds) worksById.set(id, toListItem(id, id, 1));
 
-    const { rerenderModal } = renderModal({
-      lastResult: { ...scanResult, newWorkIds: [workA.id] },
-    });
+    renderModal({ lastResult: { ...scanResult, newWorkIds: manyIds } });
 
-    rerenderModal({ lastResult: { ...scanResult, newWorkIds: [workB.id] } });
-
-    resolveB(workB);
-    await waitFor(() => screen.getByText(workB.title));
-
-    resolveA(workA);
-    await waitFor(() => expect(screen.queryByText(workA.title)).toBeNull());
-    expect(screen.getByText(workB.title)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("work-many-0")).toBeInTheDocument());
+    expect(
+      searchWorksSpy.mock.calls.some(([params]) => params.ids?.length === WORKS_DEFAULT_PAGE_SIZE),
+    ).toBe(true);
+    expect(
+      searchWorksSpy.mock.calls.every(
+        ([params]) => (params.ids?.length ?? 0) <= WORKS_DEFAULT_PAGE_SIZE,
+      ),
+    ).toBe(true);
+    expect(
+      screen.getByText(`${WORKS_DEFAULT_PAGE_SIZE} / ${manyIds.length} 件`),
+    ).toBeInTheDocument();
   });
 
   it("タイトル保存に失敗したときエラーを表示し、ローカル表示は更新されない", async () => {
-    vi.spyOn(workApi, "getWork").mockResolvedValue(work);
     vi.spyOn(workApi, "patchWork").mockRejectedValue(new Error("network error"));
     renderModal();
 
-    await waitFor(() => screen.getByText(work.title));
-    fireEvent.click(screen.getByText(work.title));
-    const input = screen.getByDisplayValue(work.title);
+    await waitFor(() => screen.getByText(newWork.title));
+    fireEvent.click(screen.getByText(newWork.title));
+    const input = screen.getByDisplayValue(newWork.title);
     fireEvent.change(input, { target: { value: "新しいタイトル" } });
     fireEvent.keyDown(input, { key: "Enter" });
 
@@ -406,17 +433,16 @@ describe("ScanModal", () => {
     );
     // 失敗時はローカルの表示名を更新せず、入力欄は編集状態のまま残る（再試行可能）
     expect(screen.getByDisplayValue("新しいタイトル")).toBeInTheDocument();
-    expect(screen.queryByText(work.title)).toBeNull();
+    expect(screen.queryByText(newWork.title)).toBeNull();
   });
 
   it("タイトル保存に成功したとき表示名が更新され編集モードが閉じる", async () => {
-    vi.spyOn(workApi, "getWork").mockResolvedValue(work);
     vi.spyOn(workApi, "patchWork").mockResolvedValue({ ...work, title: "新しいタイトル" });
     renderModal();
 
-    await waitFor(() => screen.getByText(work.title));
-    fireEvent.click(screen.getByText(work.title));
-    const input = screen.getByDisplayValue(work.title);
+    await waitFor(() => screen.getByText(newWork.title));
+    fireEvent.click(screen.getByText(newWork.title));
+    const input = screen.getByDisplayValue(newWork.title);
     fireEvent.change(input, { target: { value: "新しいタイトル" } });
     fireEvent.keyDown(input, { key: "Enter" });
 
@@ -424,19 +450,38 @@ describe("ScanModal", () => {
     expect(screen.queryByDisplayValue("新しいタイトル")).toBeNull();
   });
 
+  it("タイトル保存に成功すると作品詳細キャッシュと一覧クエリキャッシュの両方に反映される", async () => {
+    const updatedWork: Work = { ...work, title: "新しいタイトル" };
+    vi.spyOn(workApi, "patchWork").mockResolvedValue(updatedWork);
+    const { queryClient } = renderModal();
+
+    await waitFor(() => screen.getByText(newWork.title));
+    fireEvent.click(screen.getByText(newWork.title));
+    const input = screen.getByDisplayValue(newWork.title);
+    fireEvent.change(input, { target: { value: "新しいタイトル" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    await waitFor(() => expect(screen.getByText("新しいタイトル")).toBeInTheDocument());
+
+    expect(queryClient.getQueryData(WORK_QUERY_KEYS.detail(newWork.id))).toEqual(updatedWork);
+    const cachedList = queryClient.getQueryData<WorksPage>(
+      WORK_QUERY_KEYS.list({ ids: [newWork.id] }),
+    );
+    expect(cachedList?.items[0]?.title).toBe("新しいタイトル");
+  });
+
   it("空文字・空白のみのタイトルは保存されず編集モードだけ閉じる", async () => {
-    vi.spyOn(workApi, "getWork").mockResolvedValue(work);
     const patchSpy = vi.spyOn(workApi, "patchWork");
     renderModal();
 
-    await waitFor(() => screen.getByText(work.title));
-    fireEvent.click(screen.getByText(work.title));
-    const input = screen.getByDisplayValue(work.title);
+    await waitFor(() => screen.getByText(newWork.title));
+    fireEvent.click(screen.getByText(newWork.title));
+    const input = screen.getByDisplayValue(newWork.title);
     fireEvent.change(input, { target: { value: "   " } });
     fireEvent.keyDown(input, { key: "Enter" });
 
     expect(patchSpy).not.toHaveBeenCalled();
-    expect(screen.getByText(work.title)).toBeInTheDocument();
+    expect(screen.getByText(newWork.title)).toBeInTheDocument();
   });
 });
 

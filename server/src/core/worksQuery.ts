@@ -51,6 +51,7 @@ export function applyWorksQuery(works: WorkSummary[], params: WorksQuery): WorkS
   let results = [...works];
 
   const { tags, yearValue } = params.tags;
+  results = filterByIds(results, params.ids);
   results = filterByQuery(results, params.q);
   results = filterByTags(results, tags, params.tagOp);
   results = filterByYear(results, yearValue);
@@ -85,6 +86,12 @@ export function normalizeRjCode(value: string): string {
     .trim()
     .toUpperCase()
     .replace(/^(RJ|VJ)/, "");
+}
+
+function filterByIds(works: WorkSummary[], ids: string[] | undefined): WorkSummary[] {
+  if (ids === undefined) return works;
+  const idSet = new Set(ids);
+  return works.filter((work) => idSet.has(work.id));
 }
 
 function filterByQuery(works: WorkSummary[], q: string): WorkSummary[] {

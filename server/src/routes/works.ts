@@ -20,6 +20,7 @@ export function worksRoute(adapter: DataAdapter): Hono {
     const parsed = worksQuerySchema.safeParse({
       ...c.req.query(),
       tags: c.req.queries("tags"),
+      ids: c.req.queries("ids"),
     });
     if (!parsed.success) {
       invalidRequest("works のクエリパラメータが不正です");
