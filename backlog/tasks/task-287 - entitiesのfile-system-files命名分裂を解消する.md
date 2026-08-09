@@ -1,10 +1,10 @@
 ---
 id: TASK-287
 title: entitiesのfile-system/files命名分裂を解消する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-09 19:14'
-updated_date: '2026-08-09 19:22'
+updated_date: '2026-08-09 19:23'
 labels: []
 dependencies: []
 priority: low
