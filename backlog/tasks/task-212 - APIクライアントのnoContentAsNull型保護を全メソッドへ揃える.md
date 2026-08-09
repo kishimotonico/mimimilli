@@ -4,6 +4,7 @@ title: APIクライアントのnoContentAsNull型保護を全メソッドへ揃�
 status: To Do
 assignee: []
 created_date: '2026-08-06 04:59'
+updated_date: '2026-08-09 01:32'
 labels: []
 dependencies: []
 priority: medium
@@ -29,3 +30,9 @@ client/src/shared/api/http.ts の getParsed（L99-118）は2つのオーバー�
 - [ ] #3 parsed as T による型の握りつぶしが残っていない
 - [ ] #4 pnpm check と pnpm test が通る
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+TASK-267（エラー処理契約の一本化）からの統合: client/tests/unit/http.test.ts が非JSON応答とJSON契約エラー応答の2件しかカバーしていない。readResponseBody を res.text() ベースへ変えた直後なので、エラーパスの契約（非JSON応答、ステータス別の型、空本文、パース失敗時の本文保持）に限定したテストを本タスクで併せて整備する。網羅的なカバレッジ拡充は目的にしない（AGENTS.md「テストは網羅性より実行速度」）。
+<!-- SECTION:NOTES:END -->

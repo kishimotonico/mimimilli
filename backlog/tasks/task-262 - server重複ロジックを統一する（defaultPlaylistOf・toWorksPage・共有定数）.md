@@ -4,7 +4,7 @@ title: server重複ロジックを統一する（defaultPlaylistOf・toWorksPage
 status: To Do
 assignee: []
 created_date: '2026-08-08 21:17'
-updated_date: '2026-08-09 00:26'
+updated_date: '2026-08-09 01:32'
 labels: []
 dependencies: []
 priority: medium
@@ -30,3 +30,9 @@ core↔SQLの二重実装自体はTASK-273（ADR適合監査）の管轄。
 - [ ] #4 defaultPlaylistOf の純粋な選択ロジックが1実装になり、schema境界・DB境界のエラー変換は各層に残す形で整理されていること
 - [ ] #5 本番2箇所のWorksPage投影が共通ヘルパを使い、テストの期待値生成は独立のままであること
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+TASK-273（ADR適合監査）からの統合: DLsite通知述語の core化。shared/src/dlsite.ts:33-46 の isRjCodeMissing・isDlsiteFetchFailed が「正典」と明記されているのに、workRepo.ts:958-991 の getDlsiteNotificationSummary が参照コメントすら無くSQLのCASE式で独立再実装している（fixture/index.ts:427,447-448 は正典を直接呼んでいる）。ADR-0004のcore-first規範に照らし、これはSQL性能例外として追認せず core純関数化して fixture が呼ぶ形へ寄せる。realはSQL維持でよいが、既存の dlsiteNotifications.test.ts と worksQueryContract.test.ts:260-309 で同値担保すること。
+<!-- SECTION:NOTES:END -->

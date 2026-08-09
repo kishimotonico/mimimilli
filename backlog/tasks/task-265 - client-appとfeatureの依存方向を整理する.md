@@ -1,10 +1,10 @@
 ---
 id: TASK-265
 title: client appとfeatureの依存方向を整理する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-08 21:19'
-updated_date: '2026-08-09 00:28'
+updated_date: '2026-08-09 01:17'
 labels: []
 dependencies: []
 priority: medium
@@ -25,8 +25,20 @@ ordinal: 275000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 App.tsx からエクスポートのドメイン実装が消えていること
-- [ ] #2 CollectionStatus の feature間importが解消されていること
-- [ ] #3 clientのcheck・変更範囲のテストが通ること
-- [ ] #4 client/src/features 配下から app/ へのimportが0件であることをrgで機械的に確認していること（app→featureのcompositionは許可）
+- [x] #1 App.tsx からエクスポートのドメイン実装が消えていること
+- [x] #2 CollectionStatus の feature間importが解消されていること
+- [x] #3 clientのcheck・変更範囲のテストが通ること
+- [x] #4 client/src/features 配下から app/ へのimportが0件であることをrgで機械的に確認していること（app→featureのcompositionは許可）
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+初回実装は移動元の削除漏れ（Breadcrumbs・CollectionStatus が2箇所に重複）と0バイト空ファイル2件があり差し戻した。修正後は移動元削除・旧パス参照0件・互換re-exportなしを確認。DlsiteNotificationModals が app/model/activeModal から型・関数をimportしていた feature→app 違反も併せて解消し、features/library/model/dlsiteNotificationModal.ts へ切り出した。移動したコンポーネントはDOM構造・className・inline styleとも移動前と完全一致（レビュー担当が diff で照合）。AddressBar.tsx は shell の composition として現状維持。検証: pnpm check 成功、client 102ファイル/775テスト全パス。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Breadcrumbs・CollectionStatus を shared/ui、errorToastAtom を shared/model、useGlobalShortcuts を features/player/model へ移動。App.tsx のライブラリエクスポート実装を features/library へ切り出した。features から app へのimportは rg で0件。pnpm check と client 775 テストで検証。
+<!-- SECTION:FINAL_SUMMARY:END -->
