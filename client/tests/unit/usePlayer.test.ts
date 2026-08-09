@@ -438,6 +438,25 @@ describe("usePlayer adapters", () => {
     expect(saveResumePosition).not.toHaveBeenCalled();
   });
 
+  it("再生速度変更と同時刻のトラック切替でも新しいengine.loadに新しい再生速度が渡る", async () => {
+    const tracks: Track[] = [
+      { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", title: "Track A", file: "audio/track-a.wav" },
+      { id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", title: "Track B", file: "audio/track-b.wav" },
+    ];
+    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
+    act(() => result.current.player.play(work, tracks, 0, playlistId));
+    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
+
+    // 同一 act 内で連続 dispatch する: playbackRateChanged の commit（useLayoutEffect による
+    // runtimeRefs 反映）が挟まらない状態で loadTrack が実行される状況を再現する。
+    act(() => {
+      result.current.player.setPlaybackRate(2);
+      result.current.player.nextTrack();
+    });
+
+    expect(latestAudio().playbackRate).toBe(2);
+  });
+
   it("同一ファイルのトラック切替では再ロードせず区間先頭へシークする", async () => {
     const tracks: ResolvedTrack[] = [
       { ...track, start: 0, end: 30, durationSec: 30, durationKind: "resolved" },

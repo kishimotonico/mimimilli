@@ -4,6 +4,7 @@ title: usePlayerのcontroller state複製を解消する
 status: To Do
 assignee: []
 created_date: '2026-08-06 04:59'
+updated_date: '2026-08-09 14:31'
 labels: []
 dependencies: []
 priority: medium
@@ -28,9 +29,9 @@ doc-3 のメモどおり、複製された ref ではなく controller.getState(
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 usePlayer が playbackRate をはじめとする controller の状態を、ref への複製ではなく controller から直接取得している
-- [ ] #2 player 配下に同種の「controller 状態を ref へ複製して読む」箇所が他に残っていない（残す判断をした場合は理由が記録されている）
-- [ ] #3 古い値を読む状況が再現可能なら退行テストが追加されている。再現不能と結論づけた場合はその根拠が記録されている
-- [ ] #4 再生・一時停止・トラック切替・シーク・再生速度変更が従来どおり動作する
-- [ ] #5 pnpm check と pnpm test が通る
+- [x] #1 usePlayer が playbackRate をはじめとする controller の状態を、ref への複製ではなく controller から直接取得している
+- [x] #2 player 配下に同種の「controller 状態を ref へ複製して読む」箇所が他に残っていない（残す判断をした場合は理由が記録されている）
+- [x] #3 古い値を読む状況が再現可能なら退行テストが追加されている。再現不能と結論づけた場合はその根拠が記録されている
+- [x] #4 再生・一時停止・トラック切替・シーク・再生速度変更が従来どおり動作する
+- [x] #5 pnpm check と pnpm test が通る
 <!-- AC:END -->

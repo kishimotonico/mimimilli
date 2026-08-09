@@ -34,10 +34,6 @@ export function usePlayerRuntime() {
   const setDuration = useSetAtom(playerDurationAtom);
   const lastCoreStateRef = useRef(coreState);
 
-  useLayoutEffect(() => {
-    runtimeRefs.coreState.current = coreState;
-  }, [runtimeRefs.coreState, coreState]);
-
   useEffect(
     () =>
       controller.subscribeState((state) => {
@@ -154,9 +150,9 @@ export function usePlayerRuntime() {
     return {
       duration: context.trackDuration,
       position: context.currentTime,
-      playbackRate: runtimeRefs.coreState.current.playbackRate,
+      playbackRate: controller.getState().playbackRate,
     };
-  }, [getCurrentPlaybackContext, runtimeRefs.coreState]);
+  }, [controller, getCurrentPlaybackContext]);
 
   const actions = usePlayerActions();
   const updateMediaSessionPosition = useMediaSession({
