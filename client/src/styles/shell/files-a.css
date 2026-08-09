@@ -1,0 +1,104 @@
+/* mimimilli shell — files-a
+   所有範囲: ファイル行(.mle-row、mle- prefixだが File Explorer mode 専用)。
+   files系はfiles-a〜files-cの3ファイルに分かれている（library・preview等の区画が
+   元ファイル内でfilesの区画を挟んでいるため）。
+   import順: library-c.cssの次、library-d.cssより前。 */
+
+/* ── File rows (mle-row — File Explorer mode) ─────────────── */
+
+.mle-row {
+  display: grid;
+  grid-template-columns: 18px 1fr auto auto;
+  gap: 6px;
+  align-items: center;
+  padding: 5px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--ink-1);
+  cursor: pointer;
+}
+.mle-row:hover {
+  background: var(--paper-2);
+}
+.mle-row.is-on {
+  background: var(--paper-4);
+  color: var(--ink-0);
+}
+.mle-row.is-on.is-focused {
+  background: var(--ink-0);
+  color: var(--paper-1);
+}
+.mle-row.is-on.is-focused .ficon {
+  color: var(--paper-1);
+}
+.mle-row.is-on.is-focused .meta {
+  color: oklch(80% 0.008 70);
+}
+.mle-row .ficon {
+  color: var(--ink-2);
+  display: grid;
+  place-items: center;
+}
+.mle-row.is-folder .ficon {
+  color: var(--ink-1);
+}
+.mle-row.is-folder-work .ficon {
+  color: var(--acc);
+}
+.mle-row.is-audio .ficon {
+  color: var(--r-leaf);
+}
+.mle-row.is-image .ficon {
+  color: var(--r-plum);
+}
+.mle-row.is-pdf .ficon {
+  color: var(--r-coral);
+}
+.mle-row.is-video .ficon {
+  color: var(--r-coral);
+}
+.mle-row .name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mle-row .meta {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--ink-3);
+}
+.mle-row .chev {
+  color: var(--ink-3);
+  display: grid;
+  place-items: center;
+}
+.mle-row.is-on .chev {
+  color: var(--ink-0);
+}
+.mle-row.is-on.is-focused .chev {
+  color: var(--paper-1);
+}
+.mle-row.is-now {
+  color: var(--acc-ink);
+}
+.mle-row.is-now .ficon {
+  color: var(--acc);
+}
+.mle-row.is-now .name {
+  font-weight: 600;
+}
+.mle-row .wbadge,
+.mle-fprev__name .wbadge {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.04em;
+  background: var(--acc-soft);
+  color: var(--acc-ink);
+  padding: 1px 4px;
+  border-radius: 3px;
+  margin-right: 4px;
+  font-weight: 600;
+  vertical-align: 1px;
+}

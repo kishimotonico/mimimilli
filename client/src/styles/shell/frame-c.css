@@ -1,0 +1,221 @@
+/* mimimilli shell — frame-c
+   所有範囲: 左サイドバー(.mle-side) + 本文カラム領域(.mle-body / .mle-col、is-axis・
+   is-results等のモード修飾込み、.mll-resultspane / .mll-results* を含む)。
+   カラム内部の中身の多く（library の結果ペイン等）はここに同居しているが、元ファイルで
+   .mle-body 区画と分離できない形で隣接しており、単独セレクタ単位に割ると多重定義の
+   selector list（コンマ区切り）を分断してビルド出力が変わるおそれがあるため、
+   frame-c としてこの区画をまとめて所有する。
+   frame-a・frame-bと合わせて frame 全体を構成する（分割理由はframe-a.css冒頭コメント参照）。
+   import順: library-b.cssの次、library-c.cssより前。 */
+
+/* ── Left nav (sidebar) ───────────────────────────────────── */
+
+.mle-side {
+  grid-column: 1;
+  grid-row: 3;
+  background: var(--paper-1);
+  border-right: 1px solid var(--line-soft);
+  display: flex;
+  flex-direction: column;
+  padding: 12px 0;
+  gap: 2px;
+  align-items: center;
+}
+.mle-side__group {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 0;
+  gap: 4px;
+  align-items: center;
+  width: 100%;
+}
+.mle-side__group + .mle-side__group {
+  border-top: 1px solid var(--line-soft);
+}
+.mle-side__group.is-foot {
+  border-top: none;
+  padding-bottom: 0;
+}
+.mle-side__btn {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  color: var(--ink-2);
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+}
+.mle-side__btn:hover {
+  background: var(--paper-2);
+  color: var(--ink-0);
+}
+.mle-side__btn:active {
+  background: var(--paper-3);
+}
+.mle-side__btn.is-on {
+  color: var(--acc);
+  background: var(--acc-soft);
+}
+/* 選択中: 左端に細い柿バー */
+.mle-side__btn.is-on::before {
+  content: "";
+  position: absolute;
+  left: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 20px;
+  border-radius: 0 2px 2px 0;
+  background: var(--acc);
+}
+.mle-side__badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  background: var(--acc);
+  color: var(--paper-1);
+  border-radius: 9px;
+  min-width: 14px;
+  padding: 0 4px;
+  text-align: center;
+  border: 1.5px solid var(--paper-1);
+}
+.mle-side__sp {
+  flex: 1;
+}
+
+/* ── Body / column view ──────────────────────────────────── */
+
+.mle-body {
+  grid-column: 2;
+  grid-row: 3;
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+  border-bottom: 1px solid var(--line);
+}
+/* PlayerDock（画面下張り付きバー）はグリッド行を持たない fixed オーバーレイなので、
+   row 3 は素の状態だとウィンドウ最下端まで伸びてバーの下に潜り込む。
+   その結果、各カラムの実クライアント高さがバーの領域と物理的に重なり、
+   スクロールしていない静止状態でも末尾付近の行がバーの下に「見えているのにクリックできない」
+   状態になる（子要素側の padding-bottom だけでは、この重なり自体は解消できない）。
+   ここで body 自体の内容領域をバー高さぶん縮め、カラムのクライアント高さがバーへ
+   絶対に重ならないようにする。 */
+.mle-app.has-docked-bar .mle-body {
+  padding-bottom: 72px;
+}
+.mle-col {
+  flex: 0 0 auto;
+  width: 240px;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--line-soft);
+  min-height: 0;
+  background: var(--paper-0);
+}
+.mle-col.is-axis {
+  width: 192px;
+}
+.mle-col.is-results.is-pending,
+.mll-grid-pane.is-pending {
+  opacity: 0.55;
+  transition: opacity 150ms ease;
+}
+/* チップ列（.mll-tagband）は .mll-results の外、.mll-resultspane の通常フローに置く。
+     .mll-results 内の作品プレビューは absolute でスライドインするため、チップ列を
+     同じ .mll-results に同居させるとプレビューの下に隠れて操作できなくなる
+     （チップ列はADR-0012 §2で選択フィルタの唯一の表現）。 */
+.mll-resultspane {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* 結果面（値一覧・作品一覧）はレイアウト固定で常に全幅（ADR-0012 §3）。
+     作品選択時のみ .mll-results__preview がスライドインする。 */
+.mll-results {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
+.mll-results__content {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.mle-col.is-results {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+  border-right: none;
+}
+.mll-results__preview {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 420px;
+  max-width: 90%;
+  display: flex;
+  box-shadow: var(--shadow-pop);
+  border-left: 1px solid var(--line-soft);
+}
+.mle-col.is-axis .mle-col__list {
+  gap: 0;
+  padding: 4px 0;
+}
+.mle-col__hd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--paper-1);
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.mle-col__hd .count {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-3);
+  margin-left: auto;
+}
+.mle-col.is-axis .mle-col__hd {
+  background: var(--paper-0);
+}
+.mle-col__list {
+  flex: 1;
+  overflow: hidden auto;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+/* バー本体との重なりは .mle-body の padding-bottom で解消済み。リスト末尾の
+   スクロール余白は WorkListPane の virtualizer paddingEnd で確保する。 */
+.mle-col__list::-webkit-scrollbar {
+  width: 6px;
+}
+.mle-col__list::-webkit-scrollbar-thumb {
+  background: var(--paper-4);
+  border-radius: 3px;
+}

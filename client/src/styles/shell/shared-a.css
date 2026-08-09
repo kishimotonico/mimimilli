@@ -1,0 +1,15 @@
+/* mimimilli shell — shared-a
+   所有範囲: テキスト選択許可(.mll-selectable / .mle-prv__warn-text / .mle-prv__warn-path /
+   .mle-prv__edit-error / .mle-fprev__path)。複数の面（library・preview・files）にまたがる
+   横断規則のため shared として扱う。
+   元ファイルの記述順を保つため shared 系は shared-a〜shared-d の4ファイルに分かれている。
+   本ファイルは元ファイルの先頭（components layer 開始直後）に位置していた内容。
+   import順: base.cssの次、frame-a.cssより前（index.css参照）。 */
+
+.mll-selectable,
+.mle-prv__warn-text,
+.mle-prv__warn-path,
+.mle-prv__edit-error,
+.mle-fprev__path {
+  user-select: text;
+}

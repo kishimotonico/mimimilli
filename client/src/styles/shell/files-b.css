@@ -1,0 +1,93 @@
+/* mimimilli shell — files-b
+   所有範囲: カラムスタック(.mle-colstack*、祖先カラムを束ねて表示し、クリックで1階層
+   戻るナビゲーション)。パルス演出の transition/[data-pulse] 修飾は files-c.css 側にある
+   （元ファイルでファイルモード区画の末尾に離れて存在するため）。
+   files-a〜cの分割理由はfiles-a.css冒頭コメント参照。
+   import順: library-d.cssの次、preview-a.cssより前。 */
+
+/* ── Column stack (ancestor spine — click to go up one level) ─ */
+
+.mle-colstack {
+  flex: 0 0 auto;
+  width: 46px;
+  position: relative;
+  background: var(--paper-2);
+  border-right: 1px solid var(--line-soft);
+  overflow: hidden;
+  cursor: pointer;
+  display: block;
+  padding: 0;
+  text-align: left;
+}
+.mle-colstack:hover {
+  background: var(--paper-3);
+}
+.mle-colstack__edges {
+  position: absolute;
+  inset: 0;
+}
+.mle-colstack__edges span {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 30px;
+  background: var(--paper-0);
+  border-left: 1px solid var(--line);
+  border-right: 1px solid var(--line-soft);
+  border-radius: 4px 0 0 4px;
+  box-shadow: -3px 0 7px -4px oklch(20% 0.02 70 / 0.22);
+}
+.mle-colstack__edges span:nth-child(1) {
+  transform: translateX(-15px);
+  opacity: 0.4;
+}
+.mle-colstack__edges span:nth-child(2) {
+  transform: translateX(-9px);
+  opacity: 0.62;
+}
+.mle-colstack__edges span:nth-child(3) {
+  transform: translateX(-4px);
+  opacity: 0.82;
+}
+.mle-colstack__edges span:nth-child(4) {
+  transform: translateX(0);
+}
+/* ラベルは束の一番右＝前面カードの上に重ねる */
+.mle-colstack__label {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--ink-2);
+  pointer-events: none;
+  padding: 12px 0;
+}
+.mle-colstack:hover .mle-colstack__label {
+  color: var(--ink-0);
+}
+.mle-colstack__label .up {
+  display: grid;
+  place-items: center;
+  color: var(--ink-3);
+  flex-shrink: 0;
+}
+.mle-colstack:hover .mle-colstack__label .up {
+  color: var(--acc);
+}
+.mle-colstack__label .nm {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-family: var(--font-jp);
+  font-size: 11px;
+  font-weight: 500;
+  max-height: calc(100% - 26px);
+  overflow: hidden;
+  white-space: nowrap;
+}

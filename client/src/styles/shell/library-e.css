@@ -1,0 +1,186 @@
+/* mimimilli shell — library-e
+   所有範囲: スマートフォルダ条件ビルダー(.mll-smart*)。
+   library-a〜eの分割理由はlibrary-a.css冒頭コメント参照。
+   import順: shared-b.cssの次、preview-b.cssより前。 */
+
+/* ── Smart folder rule builder ────────────────────────────── */
+
+.mll-smart {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper-0);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.mll-smart__hd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+.mll-smart__hd .pill {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  background: var(--acc-soft);
+  color: var(--acc-ink);
+  padding: 1px 6px;
+  border-radius: 4px;
+  letter-spacing: 0;
+}
+.mll-smart__hd .name {
+  font-family: var(--font-jp);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink-0);
+  letter-spacing: -0.005em;
+  text-transform: none;
+  margin-right: auto;
+}
+.mll-smart__rules {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--paper-1);
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  padding: 8px;
+  /* プレビューペインの実幅（ウィンドウ幅ではない）に応じてルール行のレイアウトを
+     切り替えるためのクエリコンテナ。狭幅時の自然文寄り表示は下の @container を参照 */
+  container-type: inline-size;
+  container-name: smart-rules;
+}
+.mll-smart__rule {
+  display: grid;
+  grid-template-columns: 28px 100px 60px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 5px 8px;
+  border-radius: 4px;
+  background: var(--paper-0);
+  border: 1px solid var(--line-soft);
+  font-size: 12px;
+}
+.mll-smart__rule .conj {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--ink-3);
+  text-align: center;
+}
+.mll-smart__rule .conj.first {
+  color: var(--ink-4);
+  font-style: italic;
+}
+.mll-smart__rule .field {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--ink-1);
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--paper-2);
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+.mll-smart__rule .op {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-2);
+  text-align: center;
+}
+.mll-smart__rule .val {
+  font-family: var(--font-jp);
+  font-size: 12px;
+  color: var(--ink-0);
+  font-weight: 500;
+  flex-wrap: wrap;
+  white-space: normal;
+}
+.mll-smart__rule .x {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 4px;
+  color: var(--ink-3);
+}
+.mll-smart__rule .x:hover {
+  background: var(--paper-2);
+  color: var(--ink-0);
+}
+/* OR区切り: 値チップの間に挟まる小さなバッジ。単なる薄字ラベルではなく
+   区切りとして視認できるよう背景・角丸を持たせる（幅に関わらず常時適用） */
+.mll-smart__rule .or-sep {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--ink-2);
+  background: var(--paper-3);
+  border-radius: 999px;
+  padding: 1px 6px;
+}
+
+/* ── 狭幅（プレビューペイン実幅が小さいとき）: 自然文寄り表示 ──────── */
+@container smart-rules (max-width: 420px) {
+  .mll-smart__rule {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 6px;
+    row-gap: 4px;
+  }
+  .mll-smart__rule .conj {
+    text-align: left;
+  }
+  /* field/operator を装飾なしのテキストに戻し、conj → field → op → values が
+     ひと続きの文として読めるようにする（例:「WHERE 長さ ≥ 1:00:00」） */
+  .mll-smart__rule .field {
+    background: none;
+    border-radius: 0;
+    padding: 0;
+    gap: 0;
+  }
+  .mll-smart__rule .field svg {
+    display: none;
+  }
+  .mll-smart__rule .op {
+    text-align: left;
+  }
+  .mll-smart__rule .val {
+    flex-wrap: wrap;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+}
+.mll-smart__ft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 4px;
+}
+.mll-smart__ft .hits {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--ink-0);
+  font-weight: 500;
+}
+.mll-smart__ft .hits b {
+  color: var(--acc-ink);
+}
+.mll-smart__ft .right {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+}

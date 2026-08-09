@@ -1,0 +1,85 @@
+/* mimimilli shell — frame-b
+   所有範囲: アドレスバー(.mle-addr / .mle-crumbs / .mle-grid-controls、Library modeでは
+   is-lib 修飾で流用)。frame-a・frame-cと合わせて frame 全体を構成する（分割理由は
+   frame-a.css 冒頭コメント参照）。
+   import順: library-a.cssの次、library-b.cssより前。 */
+
+/* ── Address bar ─────────────────────────────────────────── */
+
+.mle-addr {
+  grid-column: 1 / 3;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  background: var(--paper-1);
+  border-bottom: 1px solid var(--line-soft);
+}
+.mle-addr.is-lib .mle-crumbs {
+  background: transparent;
+  padding-left: 0;
+}
+.mle-crumbs {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-1);
+  padding: 0 8px;
+  height: 28px;
+  background: var(--paper-2);
+  border-radius: 6px;
+  overflow: hidden;
+  min-width: 0;
+}
+.mle-crumbs__seg {
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--ink-1);
+  white-space: nowrap;
+}
+.mle-crumbs__seg:hover {
+  background: var(--paper-3);
+  color: var(--ink-0);
+}
+.mle-crumbs__seg.is-last {
+  color: var(--ink-0);
+  font-weight: 600;
+}
+.mle-crumbs__sep {
+  color: var(--ink-4);
+  padding: 0 2px;
+}
+.mle-grid-controls {
+  display: grid;
+  grid-template-columns: 0fr;
+  margin-right: -10px;
+  opacity: 0;
+  transform: translateX(8px);
+  transition:
+    grid-template-columns 180ms ease-out,
+    margin-right 180ms ease-out,
+    opacity 120ms ease-out,
+    transform 180ms ease-out;
+}
+.mle-grid-controls.is-visible {
+  grid-template-columns: 1fr;
+  margin-right: 0;
+  opacity: 1;
+  transform: translateX(0);
+}
+.mle-grid-controls__inner {
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mle-grid-controls {
+    transition: none;
+  }
+}

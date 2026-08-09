@@ -1,0 +1,174 @@
+/* mimimilli shell — files-c
+   所有範囲: 単一カラム舞台(.mle-filestage*)、ファイルプレビュー(.mle-fprev*)、Files mode時の
+   プレビュー幅修飾(.mle-prv.is-files)、カラムスタックのパルス演出(.mle-colstack__edges の
+   transition/[data-pulse]修飾、files-b.cssの基本定義と対になる)、カラム遷移アニメーション
+   (.ml-file-col-enter*)。
+   files-a〜cの分割理由はfiles-a.css冒頭コメント参照。
+   import順: player-a.cssの次、shared-d.cssより前。 */
+
+/* ── File mode — single column stage + preview ────────────── */
+
+/* 現在フォルダー1カラムを載せる舞台。出入りするカラムをクリップする */
+.mle-filestage {
+  position: relative;
+  flex: 0 0 300px;
+  overflow: hidden;
+  border-right: 1px solid var(--line);
+  background: var(--paper-0);
+}
+.mle-filestage__col {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  border-right: none;
+  will-change: transform, opacity;
+}
+
+.mle-prv.is-files {
+  flex: 1;
+  min-width: 0;
+}
+
+.mle-fprev {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* コンパクトなヒーロー（フォルダー・非画像ファイル）。巨大な空ボックスを置かない */
+.mle-fprev__hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-3);
+  background: var(--paper-0);
+}
+.mle-fprev__hero .ic {
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-2);
+  background: var(--paper-2);
+  color: var(--ink-2);
+}
+.mle-fprev__hero.is-dir .ic {
+  color: var(--acc);
+}
+.mle-fprev__hero.is-audio .ic {
+  color: var(--r-leaf);
+}
+.mle-fprev__hero.is-image .ic {
+  color: var(--r-plum);
+}
+.mle-fprev__hero.is-pdf .ic,
+.mle-fprev__hero.is-video .ic {
+  color: var(--r-coral);
+}
+.mle-fprev__hero .bd {
+  min-width: 0;
+}
+
+/* 画像のみ大きく表示 */
+.mle-fprev__media {
+  width: 100%;
+  min-height: 200px;
+  display: grid;
+  place-items: center;
+  background: var(--paper-0);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-3);
+  padding: 18px;
+  overflow: hidden;
+}
+.mle-fprev__img {
+  max-width: 100%;
+  max-height: 360px;
+  object-fit: contain;
+  border-radius: var(--r-2);
+  box-shadow: var(--shadow-cover);
+  background: var(--paper-2);
+}
+.mle-fprev__name {
+  font-family: var(--font-jp);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink-0);
+  line-height: 1.4;
+  word-break: break-all;
+}
+.mle-fprev__path {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-3);
+  word-break: break-all;
+  margin-top: 3px;
+}
+.mle-fprev__meta {
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  color: var(--ink-2);
+  margin-top: 6px;
+  line-height: 1.4;
+}
+.mle-fprev__caption {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.mle-fprev__actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.mle-fprev__note {
+  font-size: 11.5px;
+  color: var(--ink-2);
+  line-height: 1.6;
+  background: var(--paper-0);
+  border-left: 2px solid var(--acc-line);
+  padding: 8px 12px;
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+}
+
+.mle-colstack__edges[data-pulse="enter"] {
+  transform: scale(1.14) translateX(7px);
+}
+.mle-colstack__edges {
+  transition: transform 280ms cubic-bezier(0.34, 1.3, 0.64, 1);
+}
+
+.ml-file-col-enter {
+  transform-origin: left center;
+  opacity: 1;
+  transform: translateX(0) scaleX(1) scaleY(1);
+}
+.ml-file-col-enter[data-dir="forward"] {
+  animation: ml-file-col-enter-forward 350ms cubic-bezier(0.34, 1.1, 0.64, 1);
+}
+.ml-file-col-enter[data-dir="back"] {
+  animation: ml-file-col-enter-back 350ms cubic-bezier(0.34, 1.1, 0.64, 1);
+}
+@keyframes ml-file-col-enter-forward {
+  from {
+    opacity: 0;
+    transform: translateX(60%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes ml-file-col-enter-back {
+  from {
+    opacity: 0;
+    transform: translateX(-8%) scaleX(0.28) scaleY(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scaleX(1) scaleY(1);
+  }
+}

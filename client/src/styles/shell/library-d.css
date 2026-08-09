@@ -1,0 +1,936 @@
+/* mimimilli shell — library-d
+   所有範囲: 軸カラム(.mll-axis* / .mll-axisgroup)、行UI(.mll-wrow / .mll-erow)、
+   タグANDバンド(.mll-tagband* / .mll-taggroup / .mll-tagrow)、カバーコラージュ
+   (.mll-collage*)、軸値一覧(.mll-vsearch / .mll-vlist-hd / .mll-vrow* / .mll-vtile*)、
+   クイックオーバーレイ(.mll-qoverlay / .mll-qlist*)、ドリルヘッダー(.mle-drill、
+   軸値へのドリルダウン)。元ファイルではこれらが連続した区画だったため1ファイルにまとめている。
+   library-a〜eの分割理由はlibrary-a.css冒頭コメント参照。
+   import順: files-a.cssの次、files-b.cssより前。 */
+
+/* ── Axis column (mll-axis / mll-axisgroup) ───────────────── */
+
+.mll-axisgroup {
+  display: flex;
+  flex-direction: column;
+  padding: 2px 4px 8px;
+  gap: 1px;
+}
+.mll-axisgroup + .mll-axisgroup {
+  border-top: 1px solid var(--line-soft);
+  padding-top: 6px;
+}
+.mll-axisgroup__hd {
+  font-family: var(--font-sans);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  padding: 6px 10px 4px;
+}
+.mll-axis {
+  display: grid;
+  grid-template-columns: 22px 1fr auto auto;
+  gap: 6px;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 12.5px;
+  color: var(--ink-1);
+  cursor: pointer;
+  font-family: var(--font-jp);
+}
+.mll-axis:hover {
+  background: var(--paper-2);
+}
+.mll-axis.is-on {
+  background: var(--paper-4);
+  color: var(--ink-0);
+  font-weight: 600;
+}
+.mll-axis.is-on.is-focused {
+  background: var(--ink-0);
+  color: var(--paper-1);
+}
+.mll-axis .ic {
+  display: grid;
+  place-items: center;
+  color: var(--ink-2);
+}
+.mll-axis.is-on .ic {
+  color: var(--acc);
+}
+.mll-axis.is-on.is-focused .ic {
+  color: var(--paper-1);
+}
+.mll-axis .nm {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mll-axis .count {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-3);
+}
+.mll-axis.is-on .count {
+  color: var(--ink-2);
+}
+.mll-axis.is-on.is-focused .count {
+  color: oklch(82% 0.008 70);
+}
+.mll-axis .chev {
+  color: var(--ink-3);
+  display: grid;
+  place-items: center;
+}
+.mll-axis.is-on .chev {
+  color: var(--ink-0);
+}
+.mll-axis.is-on.is-focused .chev {
+  color: var(--paper-1);
+}
+.mll-axis .badge {
+  background: var(--acc);
+  color: var(--paper-1);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 8px;
+  min-width: 16px;
+  text-align: center;
+}
+.mll-axis.is-action {
+  color: var(--ink-3);
+  font-style: italic;
+  font-weight: 400;
+}
+.mll-axis.is-action:hover {
+  color: var(--ink-1);
+}
+.mll-axis-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 8px 10px;
+  margin: 0 0 2px;
+  border-radius: 4px;
+  background: var(--paper-2);
+  color: var(--ink-3);
+  font-size: 11px;
+}
+
+/* ── Work rows (mll-wrow / mll-erow) ─────────────────────── */
+
+.mll-wrow {
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  /* 行高を固定する（仮想スクロールの estimateSize と一致させ、行ごとの高さずれを防ぐ。TASK-59） */
+  block-size: 42px;
+  box-sizing: border-box;
+  padding: 5px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--ink-1);
+}
+.mll-wrow:hover {
+  background: var(--paper-2);
+}
+.mll-wrow.is-on {
+  background: var(--paper-4);
+  color: var(--ink-0);
+}
+.mll-wrow.is-on.is-focused {
+  background: var(--ink-0);
+  color: var(--paper-1);
+}
+.mll-wrow.is-on.is-focused .mll-wrow__sub {
+  color: oklch(72% 0.008 70);
+}
+.mll-wrow.is-on.is-focused .mll-wrow__meta {
+  color: oklch(80% 0.008 70);
+}
+.mll-wrow__cv {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--paper-2);
+  flex-shrink: 0;
+  box-shadow:
+    0 1px 0 0 oklch(100% 0 0 / 0.5) inset,
+    0 2px 6px -3px oklch(20% 0.02 70 / 0.2);
+}
+.mll-wrow__cv img,
+.mll-wrow__cv svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.mll-wrow__body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.mll-wrow__title {
+  font-family: var(--font-jp);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-0);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.005em;
+}
+.mll-wrow.is-on.is-focused .mll-wrow__title {
+  color: var(--paper-1);
+}
+.mll-wrow__status {
+  display: inline-flex;
+  color: var(--r-coral);
+  margin-right: 4px;
+  flex-shrink: 0;
+  vertical-align: -1px;
+}
+.mll-wrow.is-on.is-focused .mll-wrow__status {
+  color: oklch(80% 0.12 25);
+}
+.mll-wrow__sub {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mll-wrow__meta {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--ink-3);
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+.mll-wrow__meta .now {
+  background: var(--acc);
+  color: var(--paper-1);
+  padding: 1px 4px;
+  border-radius: 2px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  font-size: 8.5px;
+}
+.mll-wrow__meta .fav {
+  color: var(--r-mustard);
+}
+
+.mll-erow {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 12.5px;
+  color: var(--ink-1);
+  cursor: pointer;
+  font-family: var(--font-jp);
+}
+.mll-erow:hover {
+  background: var(--paper-2);
+}
+.mll-erow.is-on {
+  background: var(--paper-4);
+  color: var(--ink-0);
+}
+.mll-erow.is-on.is-focused {
+  background: var(--ink-0);
+  color: var(--paper-1);
+}
+.mll-erow .ic {
+  color: var(--ink-2);
+  display: grid;
+  place-items: center;
+}
+.mll-erow.is-on .ic {
+  color: var(--acc);
+}
+.mll-erow.is-on.is-focused .ic {
+  color: var(--paper-1);
+}
+.mll-erow .nm {
+  font-weight: 500;
+  letter-spacing: 0.005em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mll-erow .count {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-3);
+}
+.mll-erow.is-on .count {
+  color: var(--ink-2);
+}
+.mll-erow.is-on.is-focused .count {
+  color: oklch(80% 0.008 70);
+}
+/* ── Tag AND band ─────────────────────────────────────────── */
+
+.mll-tagband {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding: 6px 8px 8px;
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--paper-1);
+}
+.mll-tagband__lbl {
+  font-family: var(--font-sans);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  font-weight: 600;
+  padding-right: 4px;
+}
+.mll-tagband__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 4px 0 8px;
+  border-radius: var(--r-pill);
+  background: var(--acc-soft);
+  border: 1px solid var(--acc-line);
+  color: var(--acc-ink);
+  font-family: var(--font-jp);
+  font-size: 11.5px;
+  font-weight: 500;
+}
+.mll-tagband__chip .lbl {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mll-tagband__chip .lbl:hover {
+  text-decoration: underline;
+}
+.mll-tagband__chip .x {
+  width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--ink-2);
+}
+.mll-tagband__chip .x:hover {
+  background: var(--paper-1);
+  color: var(--ink-0);
+}
+.mll-tagband__addbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--r-pill);
+  border: 1px dashed var(--line-strong);
+  color: var(--ink-2);
+  font-family: var(--font-jp);
+  font-size: 11px;
+  font-weight: 500;
+}
+.mll-tagband__addbtn:hover {
+  color: var(--ink-0);
+  background: var(--paper-2);
+}
+.mll-tagband__and {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--ink-3);
+  padding: 0 2px;
+}
+.mll-tagband__count {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-2);
+}
+.mll-tagband__clear {
+  margin-left: auto;
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+  padding: 3px 6px;
+  border-radius: var(--r-1);
+}
+.mll-tagband__clear:hover {
+  color: var(--ink-0);
+  background: var(--paper-2);
+}
+
+.mll-taggroup + .mll-taggroup {
+  border-top: 1px solid var(--line-soft);
+  margin-top: 4px;
+  padding-top: 4px;
+}
+
+.mll-tagrow {
+  display: grid;
+  grid-template-columns: 16px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--ink-1);
+  cursor: pointer;
+}
+.mll-tagrow:hover {
+  background: var(--paper-2);
+}
+.mll-tagrow .check {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1.5px solid var(--line-strong);
+  background: var(--paper-1);
+  display: grid;
+  place-items: center;
+  color: var(--paper-1);
+}
+.mll-tagrow.is-checked .check {
+  background: var(--ink-0);
+  border-color: var(--ink-0);
+}
+.mll-tagrow.is-on {
+  background: var(--paper-4);
+  color: var(--ink-0);
+}
+.mll-tagrow .nm {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.mll-tagrow .count {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-3);
+}
+/* ── Cover collage (2×2, 値一覧の代表カバー) ───────────── */
+
+.mll-collage {
+  position: relative;
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 1px;
+  overflow: hidden;
+  background: var(--paper-3);
+  box-shadow:
+    0 1px 0 0 oklch(100% 0 0 / 0.5) inset,
+    0 2px 6px -3px oklch(20% 0.02 70 / 0.2);
+}
+.mll-collage__cell {
+  background: var(--paper-2);
+  overflow: hidden;
+}
+.mll-collage__cell img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.mll-collage--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--paper-2);
+  color: var(--ink-3);
+}
+
+/* ── Axis value list ───────────────────────────────────── */
+
+.mll-vsearch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--paper-1);
+}
+.mll-vsearch input {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--ink-0);
+  background: transparent;
+}
+.mll-vsearch input::placeholder {
+  color: var(--ink-3);
+}
+
+.mll-vlist-hd {
+  display: grid;
+  grid-template-columns: 32px 1fr 72px 88px;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 6px 4px 4px;
+}
+.mll-vlist-hd__sort {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+.mll-vlist-hd__sort:first-of-type {
+  justify-content: flex-start;
+}
+.mll-vlist-hd__sort:hover {
+  color: var(--ink-1);
+  background: var(--paper-2);
+}
+.mll-vlist-hd__sort.is-active {
+  color: var(--ink-0);
+}
+.mll-vlist-hd__sort .chev {
+  display: inline-flex;
+}
+.mll-vlist-hd__sort .chev.is-asc {
+  transform: rotate(180deg);
+}
+
+.mll-vrow {
+  position: relative;
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--ink-1);
+}
+.mll-vrow:hover {
+  background: var(--paper-2);
+}
+.mll-vrow.is-on {
+  background: var(--paper-4);
+  color: var(--ink-0);
+}
+.mll-vrow__main {
+  display: grid;
+  grid-template-columns: 32px 1fr 72px 88px;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  block-size: 42px;
+  box-sizing: border-box;
+  padding: 5px 30px 5px 4px;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+}
+.mll-vrow__add {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  opacity: 0;
+  pointer-events: none;
+}
+.mll-vrow:hover .mll-vrow__add,
+.mll-vrow:focus-within .mll-vrow__add {
+  opacity: 1;
+  pointer-events: auto;
+}
+.mll-vrow__add:hover {
+  background: var(--paper-3);
+}
+/* 入れ子タグの中間ノードのうち、実タグとして存在しないもの（選択不可の見出し。
+     ADR-0012 §5・統括判断）。名前順ソート時のみ axisValueHierarchy.ts が生成する。 */
+.mll-vrow-heading {
+  display: flex;
+  align-items: center;
+  block-size: 42px;
+  box-sizing: border-box;
+  padding-right: 4px;
+  overflow: hidden;
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--ink-3);
+  /* 値行（.mll-vrow__nm）と同じく折り返さない。仮想化が行高を固定値で見積もっているため、
+       折り返すと translateY の計算がずれて以降の行が重なる。 */
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.mll-vrow__nm {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-0);
+  font-weight: 500;
+}
+.mll-vrow__count,
+.mll-vrow__dur {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-2);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.mll-vtile {
+  position: relative;
+  min-width: 0;
+  border-radius: var(--r-2);
+  color: var(--ink-1);
+}
+.mll-vtile:hover {
+  background: var(--paper-2);
+}
+.mll-vtile.is-on {
+  background: var(--paper-4);
+  color: var(--ink-0);
+}
+.mll-vtile__main {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 5px;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+.mll-vtile__add {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  opacity: 0;
+  pointer-events: none;
+}
+.mll-vtile:hover .mll-vtile__add,
+.mll-vtile:focus-within .mll-vtile__add {
+  opacity: 1;
+  pointer-events: auto;
+}
+.mll-vtile__add:hover {
+  background: var(--paper-3);
+}
+.mll-vtile .mll-collage {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 6px;
+}
+/* 入れ子タグの親パス（名前順ソート時、depth>0 のタイルにのみ表示）。 */
+.mll-vtile__breadcrumb {
+  margin: 8px 2px 0;
+  overflow: hidden;
+  color: var(--ink-3);
+  font-size: 9.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mll-vtile__nm {
+  display: -webkit-box;
+  min-height: 2.1em;
+  margin: 8px 2px 0;
+  overflow: hidden;
+  color: var(--ink-0);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.mll-vtile__breadcrumb + .mll-vtile__nm {
+  margin-top: 2px;
+}
+.mll-vtile__badge {
+  margin: 3px 2px 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-3);
+}
+
+/* ── 軸のクイックオーバーレイ・チップの値ドロップダウン ─────── */
+
+.mll-qoverlay {
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  width: 280px;
+  max-height: 360px;
+  overflow: hidden;
+  background: var(--paper-1);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-2);
+  box-shadow: var(--shadow-pop);
+}
+.mll-qoverlay--fixed {
+  position: fixed;
+}
+.mll-qoverlay--inline {
+  position: absolute;
+}
+.mll-qlist {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.mll-qlist__search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--ink-3);
+}
+.mll-qlist__search input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  font-size: 12px;
+  color: var(--ink-0);
+  background: transparent;
+}
+.mll-qlist__sorttoggle {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  color: var(--ink-3);
+}
+.mll-qlist__sorttoggle:hover,
+.mll-qlist__sorttoggle.is-open {
+  color: var(--ink-0);
+  background: var(--paper-2);
+}
+.mll-qlist__sort {
+  display: flex;
+  gap: 4px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.mll-qlist__sortbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ink-3);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+.mll-qlist__sortbtn:hover {
+  color: var(--ink-1);
+  background: var(--paper-2);
+}
+.mll-qlist__sortbtn.is-active {
+  color: var(--acc-ink);
+  background: var(--acc-soft);
+}
+.mll-qlist__sortbtn .chev {
+  display: inline-flex;
+}
+.mll-qlist__sortbtn .chev.is-asc {
+  transform: rotate(180deg);
+}
+.mll-qlist__hint {
+  padding: 5px 8px;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  color: var(--ink-2);
+  background: var(--paper-2);
+  border-bottom: 1px solid var(--line-soft);
+}
+.mll-qlist__body {
+  flex: 1;
+  min-height: 0;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.mll-qlist__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--ink-1);
+  text-align: left;
+}
+.mll-qlist__item:hover {
+  background: var(--paper-2);
+}
+.mll-qlist__item.is-on {
+  background: var(--paper-4);
+  color: var(--ink-0);
+  font-weight: 600;
+}
+.mll-qlist__item .nm {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mll-qlist__item .count {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-3);
+}
+.mll-qlist__row {
+  position: relative;
+  border-radius: 4px;
+}
+.mll-qlist__row:hover {
+  background: var(--paper-2);
+}
+.mll-qlist__row.is-on {
+  background: var(--paper-4);
+}
+.mll-qlist__add {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  opacity: 0;
+  pointer-events: none;
+}
+.mll-qlist__row:hover .mll-qlist__add,
+.mll-qlist__row:focus-within .mll-qlist__add {
+  opacity: 1;
+  pointer-events: auto;
+}
+.mll-qlist__add:hover {
+  background: var(--paper-3);
+}
+/* 入れ子タグの選択不可の見出し行（名前順ソート時のみ。値一覧の .mll-vrow-heading と対）。 */
+.mll-qlist__heading {
+  padding: 6px 8px;
+  overflow: hidden;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--ink-3);
+  /* .mll-qlist__item .nm と同じく折り返さない（仮想化の固定行高見積もりが崩れるため）。 */
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.mll-qlist__status {
+  padding: 16px 8px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+/* ── Drill header ─────────────────────────────────────────── */
+
+.mle-drill {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--paper-1);
+}
+.mle-drill__crumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 8px 7px 6px;
+  cursor: pointer;
+}
+.mle-drill__crumb:hover {
+  background: var(--paper-2);
+}
+.mle-drill__crumb + .mle-drill__crumb {
+  border-top: 1px solid var(--line-soft);
+}
+.mle-drill__back {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  color: var(--ink-2);
+  background: var(--paper-2);
+}
+.mle-drill__crumb:hover .mle-drill__back {
+  background: var(--paper-3);
+  color: var(--ink-0);
+}
+.mle-drill__axis {
+  font-family: var(--font-sans);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--ink-3);
+  flex-shrink: 0;
+}
+.mle-drill__sep {
+  color: var(--ink-4);
+  font-size: 11px;
+}
+.mle-drill__val {
+  font-family: var(--font-jp);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-0);
+  letter-spacing: 0.005em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+.mle-drill__val .ic {
+  color: var(--acc);
+  margin-right: 5px;
+  vertical-align: -2px;
+  display: inline-block;
+}
+.mle-drill__count {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-3);
+  flex-shrink: 0;
+}
+.mle-drill__chev {
+  color: var(--ink-3);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}

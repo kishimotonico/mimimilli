@@ -1,0 +1,403 @@
+/* mimimilli shell — preview-a
+   所有範囲: 作品詳細プレビューペイン(.mle-prv、Library/Files共通で使われる詳細面)。
+   ヘッダー・ヒーロー・カバー・メタ・タグ・アクション・再生スプリットボタン・警告・
+   トラック一覧(.mle-prv__*)。
+   preview系はpreview-a・preview-bの2ファイルに分かれている（library の smart folder
+   区画が間に挟まるため）。
+   import順: files-b.cssの次、shared-b.cssより前。 */
+
+/* ── Preview pane ─────────────────────────────────────────── */
+
+.mle-prv {
+  flex: 1;
+  min-width: 360px;
+  background: var(--paper-1);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.mle-prv__hd {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--line-soft);
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+.mle-prv__hd .label {
+  color: var(--ink-1);
+}
+.mle-prv__hd .pill {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  background: var(--paper-2);
+  border: 1px solid var(--line-soft);
+  color: var(--ink-2);
+  padding: 1px 6px;
+  border-radius: 4px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.mle-prv__body {
+  flex: 1;
+  overflow: hidden auto;
+  padding: 18px;
+  container: work-detail / inline-size;
+}
+/* バー本体との重なりは .mle-body の padding-bottom で解消済み。ここでは
+   スクロール終端の視覚的な余白だけを少し足す。 */
+.mle-app.has-docked-bar .mle-prv__body {
+  padding-bottom: 30px;
+}
+/* カバー画像の直下に再生スプリットボタンだけを置く（.mle-prv__coverwrap）。
+     ハート・鉛筆・その他は従来どおりmeta列側（タグの下）に残す。 */
+.mle-prv__hero {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 20px;
+  margin-bottom: 18px;
+}
+.mle-prv__cover {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  border-radius: var(--r-2);
+  overflow: hidden;
+  box-shadow: var(--shadow-cover);
+  background: var(--paper-2);
+}
+.mle-prv__cover img,
+.mle-prv__cover svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* カバー下端に重ねる再開位置の進捗バー（動画サムネの視聴進捗と同じ見た目、
+     この変更の見せ場）。履歴が無ければ描画しない（親側でresumeProgressRatio
+     ===nullのとき出し分け）。時間テキストは出さず割合だけを示す。アニメーション
+     は付けずスナップショット値を静的表示する。親.mle-prv__coverのoverflow:hidden
+     +border-radiusにより、下端の角だけが自然にカバーの丸みへ沿う。
+     fillは実比率が極小でも「聴きかけである」こと自体が見えるよう
+     max(8px, 実割合%)で最小可視幅を確保する（WorkDetail.tsx側で計算）。 */
+.mle-prv__cover-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: oklch(100% 0 0 / 0.3);
+}
+.mle-prv__cover-progress-fill {
+  height: 100%;
+  background: var(--acc);
+}
+/* 140px のカバーと 20px の間隔を除いたメタ列に、タイトル・タグ・操作を
+     無理なく置ける 220px を残せない幅では、ヒーローを縦積みにする。 */
+@container work-detail (max-width: 380px) {
+  .mle-prv__hero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+  .mle-prv__coverwrap {
+    justify-self: center;
+  }
+}
+.mle-prv__meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mle-prv__kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--ink-3);
+}
+.mle-prv__kicker .warn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: oklch(72% 0.165 25 / 0.14);
+  color: var(--r-coral);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+.mle-prv__title {
+  font-family: var(--font-jp);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--ink-0);
+  line-height: 1.25;
+  margin: 0;
+  text-wrap: balance;
+}
+.mle-prv__title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.mle-prv__title-row .mle-prv__title {
+  min-width: 0;
+}
+.mle-prv__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-2);
+}
+.mle-prv__row b {
+  color: var(--ink-0);
+  font-weight: 500;
+}
+.mle-prv__row .dot {
+  color: var(--ink-4);
+}
+.mle-prv__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.mle-prv__tag-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.mle-prv__tag-row .mle-prv__tags {
+  min-width: 0;
+}
+.mle-prv__edit-error {
+  margin: 0;
+  color: var(--r-coral);
+  font-family: var(--font-jp);
+  font-size: 10.5px;
+}
+
+.mle-prv__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 4px;
+  flex-wrap: wrap;
+}
+/* カバー画像＋再生スプリットボタンの縦積み。幅はカバーに合わせる（140px）。 */
+.mle-prv__coverwrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 140px;
+}
+/* 再生スプリットボタン（WorkPlayButton）。カバー幅いっぱいに広げ、主セグメントが
+     伸びて▾は右端の固定幅に収まる。主ボタン+▾は隙間なく並べて1つのピルに見せる
+     （▾も主ボタンと同じ塗り。ホバー時だけセグメント単位で明度を上げる）。
+     時間テキストは載せない（進捗はカバー画像側の帯で示す。WorkDetail.tsx 参照）。 */
+.mle-prv__playsplit {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+}
+.mle-prv__playbtn {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--r-pill);
+  background: var(--ink-0);
+  color: var(--paper-1);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background-color 0.12s ease;
+}
+/* ▾が隣に並ぶときだけ右側を角ばらせ、1つのピルに繋がって見えるようにする */
+.mle-prv__playbtn.has-caret {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.mle-prv__playbtn:hover:not(:disabled) {
+  background: var(--acc);
+}
+.mle-prv__playbtn:disabled {
+  background: var(--paper-2);
+  color: var(--ink-4);
+  cursor: not-allowed;
+}
+/* ▾は主ボタンと同じダーク塗り（主従が逆転して見えないよう新しい色は使わない）。
+     間は控えめな半透過白の1pxセパレータで区切り、ホバー時だけこのセグメント単独で
+     明度を上げる。 */
+.mle-prv__playcaret {
+  display: flex;
+  flex: 0 0 20px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0 var(--r-pill) var(--r-pill) 0;
+  background: var(--ink-0);
+  color: var(--paper-1);
+  border-left: 1px solid oklch(100% 0 0 / 0.16);
+  transition: background-color 0.12s ease;
+}
+.mle-prv__playcaret:hover {
+  background: var(--acc);
+}
+.mle-prv__playmenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 10;
+  min-width: 160px;
+  padding: 4px;
+  background: var(--paper-1);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-2);
+  box-shadow: var(--shadow-pop);
+}
+.mle-prv__playmenu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: var(--r-1);
+  font-family: var(--font-jp);
+  font-size: 12px;
+  color: var(--ink-1);
+  text-align: left;
+  white-space: nowrap;
+}
+.mle-prv__playmenu-item:hover,
+.mle-prv__playmenu-item:focus-visible {
+  background: var(--paper-2);
+  color: var(--ink-0);
+}
+.mle-prv__warn {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-top: 18px;
+  padding: 12px 14px;
+  border-radius: var(--r-2);
+  background: oklch(72% 0.165 25 / 0.08);
+  border: 1px solid oklch(72% 0.165 25 / 0.28);
+  color: var(--r-coral);
+}
+.mle-prv__warn-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.mle-prv__warn-title {
+  font-family: var(--font-jp);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-0);
+  margin: 0;
+}
+.mle-prv__warn-text {
+  font-size: 12px;
+  color: var(--ink-1);
+  margin: 0;
+}
+.mle-prv__warn-path {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-3);
+  margin: 2px 0 0;
+  word-break: break-all;
+}
+
+.mle-prv__tracks {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.mle-prv__trk {
+  display: grid;
+  grid-template-columns: 22px 1fr 56px auto;
+  gap: 8px;
+  align-items: center;
+  padding: 7px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--ink-1);
+}
+.mle-prv__trk:hover {
+  background: var(--paper-2);
+}
+.mle-prv__trk .num {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-3);
+  text-align: center;
+}
+.mle-prv__trk .name {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-0);
+  font-weight: 500;
+}
+.mle-prv__trk .name .title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mle-prv__trk .resume {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--acc-ink);
+}
+.mle-prv__trk .dur {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-2);
+  text-align: right;
+}
+.mle-prv__trk.is-resume .num {
+  color: var(--acc);
+}
+.mle-prv__trk.is-now {
+  background: var(--acc-soft);
+}
+.mle-prv__trk.is-now .name {
+  color: var(--acc-ink);
+  font-weight: 600;
+}
+.mle-prv__trk.is-now .num {
+  color: var(--acc);
+}
+.mle-prv__trk.is-disabled {
+  cursor: not-allowed;
+  color: var(--ink-3);
+}
+.mle-prv__trk.is-disabled:hover {
+  background: transparent;
+}
+.mle-prv__trk.is-disabled .name {
+  color: var(--ink-3);
+}
+.mle-prv__trk.is-disabled .dur {
+  color: var(--ink-4);
+}

@@ -1,0 +1,18 @@
+/* mimimilli shell — frame-a
+   所有範囲: フレームグリッド(.mle-frame)。frame系はframe-a〜frame-cの3ファイルに分かれている
+   （library の .mll-bar / .mle-sortmenu 等が元ファイル内でframeの区画を挟んでいるため、
+   所有境界を保ちつつ元の記述順も保つには分割が必要）。
+   import順: shared-a.cssの次、library-a.cssより前。 */
+
+/* ── Frame grid ───────────────────────────────────────────── */
+
+/* 再生UI（PlayerDock）は position: fixed のオーバーレイなのでグリッド行を持たない。
+   本体（row 3）が常にウィンドウ最下端まで伸びる。 */
+.mle-frame {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-rows: 48px 38px 1fr;
+  grid-template-columns: 56px 1fr;
+  background: var(--paper-0);
+}
