@@ -8,7 +8,7 @@ import { filterAxisValueItems } from "../model/axisValueFilter";
 import { sortAxisValueItems } from "../model/axisValueSort";
 import { buildAxisValueHierarchy, flattenAxisValueRows } from "../model/axisValueHierarchy";
 import { axisValueSortAtom, libraryTileSizeAtom, libraryViewModeAtom } from "../model/atoms";
-import CollectionStatus from "./CollectionStatus";
+import CollectionStatus from "../../../shared/ui/CollectionStatus";
 import AxisValueRows from "./AxisValueRows";
 import AxisValueGrid from "./AxisValueGrid";
 import { I } from "../../../shared/ui/Icon";

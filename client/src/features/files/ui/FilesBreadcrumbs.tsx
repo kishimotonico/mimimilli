@@ -1,5 +1,5 @@
 import { useAtomValue, useSetAtom } from "jotai";
-import Breadcrumbs from "../../../app/ui/Breadcrumbs";
+import Breadcrumbs from "../../../shared/ui/Breadcrumbs";
 import { useRootFolder } from "../../settings/useSettingsQuery";
 import { filesRelPathAtom } from "../model/atoms";
 import { goToFilesSegmentAtom } from "../model/filesNavigationActions";

@@ -1,10 +1,6 @@
 import type { ReactNode } from "react";
-import Button from "../../../shared/ui/Button";
-import { I } from "../../../shared/ui/Icon";
-
-// リスト（WorkListPane・AxisValueList）とグリッド（WorkGrid）で読み込み中・エラー・0件の表示を共通化する。
-// 見た目（DOM構造・クラス／インラインスタイル）は各表示の既存実装をそのまま踏襲し、
-// 挙動（メッセージ選定・再試行導線・状態変化の読み上げ）だけを一箇所に集約する。
+import Button from "./Button";
+import { I } from "./Icon";
 
 type CollectionStatusKind = "loading" | "error" | "empty";
 

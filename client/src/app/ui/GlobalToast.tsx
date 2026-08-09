@@ -7,7 +7,7 @@ import {
   dlsiteBulkResultAtom,
 } from "../../features/dlsite/model/atoms";
 import { useDlsiteBulkActions } from "../../features/dlsite/model/useDlsiteBulkActions";
-import { errorToastAtom } from "../model/errorToastAtom";
+import { errorToastAtom } from "../../shared/model/errorToastAtom";
 import { scanErrorAtom } from "../../features/scan/model/atoms";
 import { useScanActions } from "../../features/scan/model/useScanActions";
 

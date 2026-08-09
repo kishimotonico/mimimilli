@@ -25,12 +25,13 @@ import StartupErrorScreen from "./ui/StartupErrorScreen";
 import DlsiteNotificationModals from "../features/library/ui/DlsiteNotificationModals";
 import { LibraryNavigationProvider } from "../features/library/ui/LibraryNavigationProvider";
 import GlobalToast from "./ui/GlobalToast";
-import { errorToastAtom } from "./model/errorToastAtom";
+import { errorToastAtom } from "../shared/model/errorToastAtom";
 import { mutationErrorMessage } from "../shared/lib/mutationError";
 import type { ActiveModal } from "./model/activeModal";
+import { isDlsiteNotificationModal } from "./model/activeModal";
 import type { Work, WorkListItem } from "@mimimilli/shared";
 import { getWork } from "../entities/work/api";
-import { exportLibrary } from "../features/library/api";
+import { useDownloadLibraryExport } from "../features/library/useDownloadLibraryExport";
 import { useScanActions } from "../features/scan/model/useScanActions";
 import { setRootFolder } from "../features/settings/api";
 import { useSettingsQuery } from "../features/settings/useSettingsQuery";
@@ -124,25 +125,7 @@ export default function App() {
     [changeFolderMutation],
   );
 
-  const handleExport = useCallback(async () => {
-    try {
-      const exported = await exportLibrary();
-      const blob = new Blob([exported.data], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "mimimilli-export.json";
-      a.click();
-      URL.revokeObjectURL(url);
-      if (exported.dataIntegrityWarning) {
-        setErrorToast(
-          `${exported.dataIntegrityWarning.skippedCount}件の作品がデータ不整合のためエクスポートから除外されました`,
-        );
-      }
-    } catch (err) {
-      setErrorToast(mutationErrorMessage(err, "ライブラリのエクスポートに失敗しました"));
-    }
-  }, [setErrorToast]);
+  const handleExport = useDownloadLibraryExport();
 
   if (startupState === "loading") {
     return (
@@ -240,7 +223,10 @@ export default function App() {
                   />
                 </Suspense>
               )}
-              <DlsiteNotificationModals activeModal={activeModal} onClose={handleCloseModal} />
+              <DlsiteNotificationModals
+                activeModal={isDlsiteNotificationModal(activeModal) ? activeModal : null}
+                onClose={handleCloseModal}
+              />
               <GlobalToast />
             </>
           }

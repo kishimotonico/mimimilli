@@ -7,7 +7,7 @@ import { isSmartAxis } from "../model/axisDefinitions";
 import { buildEmptyWorksHint, buildEmptyWorksMessage } from "../model/emptyWorks";
 import { shouldLoadMore } from "../model/virtualScroll";
 import WorkRow from "./WorkRow";
-import CollectionStatus from "./CollectionStatus";
+import CollectionStatus from "../../../shared/ui/CollectionStatus";
 import LoadMore from "./LoadMore";
 import { I } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";

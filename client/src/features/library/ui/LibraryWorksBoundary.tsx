@@ -8,7 +8,7 @@ import {
   useSuspenseSmartLibraryWorks,
 } from "../model/useLibraryQueries";
 import { computeIsNoResultsDueToFilter, isGridViewActive } from "../model/libraryPresentation";
-import CollectionStatus from "./CollectionStatus";
+import CollectionStatus from "../../../shared/ui/CollectionStatus";
 
 interface WorksResult {
   works: WorkListItem[];

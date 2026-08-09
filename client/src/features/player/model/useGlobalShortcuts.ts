@@ -1,6 +1,3 @@
-// アプリ全体のキーボードショートカット。
-// App 層に置き、feature 層の操作は callback として受け取る。
-
 import { useEffect, useRef, useCallback } from "react";
 
 interface UseGlobalShortcutsOptions {
@@ -17,7 +14,6 @@ export function useGlobalShortcuts({
   onSeekRelative,
   isActive,
 }: UseGlobalShortcutsOptions) {
-  // ref 経由にすることでコールバック変化ごとの再登録を防ぐ
   const onTogglePlayRef = useRef(onTogglePlay);
   const onSeekRelativeRef = useRef(onSeekRelative);
   const isActiveRef = useRef(isActive);

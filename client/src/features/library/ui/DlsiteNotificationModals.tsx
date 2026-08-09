@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { useSetAtom } from "jotai";
-import type { ActiveModal } from "../../../app/model/activeModal";
-import { isDlsiteNotificationModal } from "../../../app/model/activeModal";
+import type { DlsiteNotificationModalKind } from "../model/dlsiteNotificationModal";
+import { isDlsiteNotificationModal } from "../model/dlsiteNotificationModal";
 import { setAppModeAtom } from "../../navigation/model/navigationAtoms";
 import { selectLibraryWorkAtom } from "../model/libraryNavigationActions";
 import { useLibraryNavigation } from "../model/useLibraryNavigation";
@@ -10,7 +10,7 @@ import DlsiteParseFailedModal from "./DlsiteParseFailedModal";
 import RjCodeMissingModal from "./RjCodeMissingModal";
 
 interface DlsiteNotificationModalsProps {
-  activeModal: ActiveModal;
+  activeModal: DlsiteNotificationModalKind | null;
   onClose: () => void;
 }
 

@@ -5,7 +5,7 @@
 import { useAtomValue } from "jotai";
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { DlsiteNotificationModalKind } from "../model/activeModal";
+import type { DlsiteNotificationModalKind } from "../../features/library/model/dlsiteNotificationModal";
 import {
   dlsiteBulkActiveAtom,
   dlsiteBulkProgressAtom,

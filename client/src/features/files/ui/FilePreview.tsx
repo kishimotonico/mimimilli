@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSetAtom } from "jotai";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { errorToastAtom } from "../../../app/model/errorToastAtom";
+import { errorToastAtom } from "../../../shared/model/errorToastAtom";
 import { I } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
 import ConfirmDialog from "../../../shared/ui/ConfirmDialog";

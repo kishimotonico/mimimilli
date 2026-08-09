@@ -1,5 +1,5 @@
 import { useAtomValue } from "jotai";
-import Breadcrumbs from "../../../app/ui/Breadcrumbs";
+import Breadcrumbs from "../../../shared/ui/Breadcrumbs";
 import { activeAxisAtom, buildLibraryAddressPath } from "../model/atoms";
 import { useLibraryNavigation } from "../model/useLibraryNavigation";
 import { useTagPrefixes } from "../../../entities/tag/useTagPrefixes";

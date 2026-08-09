@@ -31,7 +31,7 @@ import { computeJustifiedLayout, type JustifiedLayout } from "../model/justified
 import { shouldLoadMore } from "../model/virtualScroll";
 import { buildEmptyWorksHint, buildEmptyWorksMessage } from "../model/emptyWorks";
 import { isSmartAxis } from "../model/axisDefinitions";
-import CollectionStatus from "./CollectionStatus";
+import CollectionStatus from "../../../shared/ui/CollectionStatus";
 import LoadMore from "./LoadMore";
 import WorkGridRow from "./WorkGridRow";
 import { dockedBarActiveAtom } from "../../player/model/atoms";
