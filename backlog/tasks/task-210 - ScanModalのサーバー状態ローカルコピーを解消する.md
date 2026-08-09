@@ -1,10 +1,10 @@
 ---
 id: TASK-210
 title: ScanModalのサーバー状態ローカルコピーを解消する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-06 04:58'
-updated_date: '2026-08-09 15:15'
+updated_date: '2026-08-09 15:28'
 labels: []
 dependencies: []
 priority: medium

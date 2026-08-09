@@ -1,10 +1,10 @@
 ---
 id: TASK-276
 title: ScanModalを分割しscan完了後のN+1 getWorkを解消する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-08 21:21'
-updated_date: '2026-08-09 14:56'
+updated_date: '2026-08-09 15:28'
 labels: []
 dependencies:
   - TASK-210
@@ -24,8 +24,8 @@ Codexレビュー反映:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 ScanModal が関心別に分割され、647行の単一ファイルが解消されていること
-- [ ] #2 shared/fixture/real の契約が揃い、server・clientのテストとsmokeが通ること
-- [ ] #3 scan完了後の作品別getWork呼び出しが0回であること
-- [ ] #4 scan結果契約は新規作品のIDのみを持ち、表示用の作品情報は works API から一括取得している（イベント記録に表示用データを埋め込まない）
+- [x] #1 ScanModal が関心別に分割され、647行の単一ファイルが解消されていること
+- [x] #2 shared/fixture/real の契約が揃い、server・clientのテストとsmokeが通ること
+- [x] #3 scan完了後の作品別getWork呼び出しが0回であること
+- [x] #4 scan結果契約は新規作品のIDのみを持ち、表示用の作品情報は works API から一括取得している（イベント記録に表示用データを埋め込まない）
 <!-- AC:END -->
