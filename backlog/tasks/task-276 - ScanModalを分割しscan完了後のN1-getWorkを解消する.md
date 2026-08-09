@@ -4,6 +4,7 @@ title: ScanModalを分割しscan完了後のN+1 getWorkを解消する
 status: To Do
 assignee: []
 created_date: '2026-08-08 21:21'
+updated_date: '2026-08-09 00:30'
 labels: []
 dependencies:
   - TASK-210
@@ -15,13 +16,16 @@ ordinal: 286000
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
 リファクタ一斉調査で検出。client/src/features/scan/ui/ScanModal.tsx（647行）に進捗UI・新規作品リスト・タイトル編集・統計バッジ・footerが同居。ScanModal/ サブディレクトリへ関心別に分割する。
-あわせて :126 で scan 完了後に newWorkIds ごとに getWork(id) をN回呼んでいる（Promise.all）。scan結果APIに新規作品のsummaryを含める仕様へ変更し、N+1を解消する（server側の契約変更を含む。shared → fixture → real の順で揃える）。
-ScanModalのサーバー状態ローカルコピー解消はTASK-210の担当。先にTASK-210を済ませてから本タスクで分割する。
+あわせて :126 で scan 完了後に newWorkIds ごとに getWork(id) をN回呼んでいる。scan結果契約に新規作品のsummaryを含める仕様へ変更し、N+1を解消する（shared → fixture → real の順で揃える）。
+Codexレビュー反映:
+- TASK-210（サーバー状態ローカルコピー解消）を先に単独実施すると、N件getWorkをuseQueriesへ載せ替えた直後に本タスクで取得経路ごと廃止する手戻りになる。両タスクは同一worktreeで統合実施し、最初からscan結果契約の拡張で解決する（統括が実施時に調整）
+- 契約変更の範囲を明確にする: ScanResult はSSE・last snapshot・DLsite enqueueにも共用されている（shared/src/scan.ts:64-75,92-97 / scanJobManager.ts:187-202）。summaryを載せる位置、newWorkIds の存廃、SSE/lastの契約テストまで含めて設計する
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 ScanModal が関心別に分割され、647行の単一ファイルが解消されていること
-- [ ] #2 scan結果に新規作品summaryが含まれ、完了後のgetWork N+1が消えていること
-- [ ] #3 shared/fixture/real の契約が揃い、server・clientのテストとsmokeが通ること
+- [ ] #2 shared/fixture/real の契約が揃い、server・clientのテストとsmokeが通ること
+- [ ] #3 scan結果契約（SSE・last snapshot含む）に新規作品summaryが定義され、newWorkIdsの存廃が決定・反映されていること
+- [ ] #4 scan完了後の作品別getWork呼び出しが0回であること
 <!-- AC:END -->

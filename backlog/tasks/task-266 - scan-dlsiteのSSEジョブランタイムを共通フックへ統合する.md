@@ -4,6 +4,7 @@ title: scan/dlsiteのSSEジョブランタイムを共通フックへ統合す�
 status: To Do
 assignee: []
 created_date: '2026-08-08 21:19'
+updated_date: '2026-08-09 00:28'
 labels: []
 dependencies: []
 priority: high
@@ -13,17 +14,16 @@ ordinal: 276000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-リファクタ一斉調査で検出した最大の横断的重複。features/scan/useScanJob.ts と features/dlsite/ui/DlsiteBulkRuntime.tsx:64-256 で、generation token管理・EventSource生成・schema検証・terminal判定・切断時poll・named event購読が約130行規模で構造的に重複している。
-- URL構築・イベントschema・terminalコールバックをパラメータ化した useJobEventSource<T> を shared/ に抽出し、両者を載せ替える。invalidate戦略などの差分は呼び出し側に残す
-- terminal判定3条件の重複（useScanJob.ts:6-8 / scan/model/atoms.ts:11-13）も isTerminalScanJob として共有する
+リファクタ一斉調査で検出した最大の横断的重複。features/scan/useScanJob.ts と features/dlsite/ui/DlsiteBulkRuntime.tsx:64-256 で、EventSource生成・schema検証・named event購読・close管理・generation token管理が構造的に重複している。
+Codexレビュー反映: scanとdlsiteで完全に同型なのはSSE transport層まで（job ownership・poll競合・terminal適用・切断判定の状態機械は仕様が異なる）。高水準の「ジョブランタイム丸ごと共通フック」はコールバック過多になるため作らない。共有するのは型付きtransport（URL・イベントschema・named event購読・close/再接続の骨格）までとし、各runtimeの状態機械は残す。
+- terminal判定3条件の重複（useScanJob.ts:6-8 / scan/model/atoms.ts:11-13）は isTerminalScanJob として共有する
 - useScanJob.ts が model/ 外に置かれている配置も model/ へ揃える
-server側のSSEルート重複（routes/scan.ts:94-219 / routes/dlsite.ts:146-172）は仕様差が大きいため対象外（無理な共通化をしない）。
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 共通フックが shared に存在し、scan・dlsite両ランタイムがそれを使うこと
-- [ ] #2 terminal判定が1箇所に定義されていること
-- [ ] #3 useScanJob が scan/model 配下に配置されていること
-- [ ] #4 clientのcheck・変更範囲のテスト・smokeが通ること
+- [ ] #1 terminal判定が1箇所に定義されていること
+- [ ] #2 useScanJob が scan/model 配下に配置されていること
+- [ ] #3 clientのcheck・変更範囲のテスト・smokeが通ること
+- [ ] #4 型付きSSE transport（schema検証・named event購読・close管理）が共有され、scan/dlsite両ランタイムがそれを使うこと（各ジョブの状態機械は独立のまま）
 <!-- AC:END -->

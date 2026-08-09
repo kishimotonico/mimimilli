@@ -4,6 +4,7 @@ title: serverのデッドコードを一括削除する
 status: To Do
 assignee: []
 created_date: '2026-08-08 21:16'
+updated_date: '2026-08-09 00:26'
 labels: []
 dependencies: []
 priority: medium
@@ -21,12 +22,11 @@ ordinal: 270000
 - server/src/adapters/real/db.ts:85,194-202 migratableVersions 引数（常に[]渡しで分岐到達不能）
 - server/tests/real/rejection_chain.test.ts（コメントのみの空スタブ）
 - shared/src/api.ts:137 旧API統合の経緯コメント（Git履歴に任せる）
-ついでに workRepo.ts:1650-1655 countByStatus の全行fetch→.length を COUNT(*) に直す。
+countByStatus のSQL化はTASK-269（workRepo分割）へ移管した（同一巨大ファイルを触るため）。
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 上記デッドコードが削除され、依存テストは現行APIへ寄せられていること
-- [ ] #2 countByStatus が COUNT(*) クエリになっていること
-- [ ] #3 変更範囲のserverテストが通ること
+- [ ] #2 変更範囲のserverテストが通ること
 <!-- AC:END -->
