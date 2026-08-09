@@ -27,7 +27,7 @@ import { usePlayerActions } from "./usePlayerActions";
 
 export function usePlayerRuntime() {
   const queryClient = useQueryClient();
-  const { controller, pendingResumeRef, runtimeRefs, capabilitiesRegistry } =
+  const { controller, pendingResumeRef, runtimeRefs, registerCapabilities } =
     usePlayerRuntimeContext();
   const [coreState, setCoreState] = useAtom(playerCoreAtom);
   const setCurrentTime = useSetAtom(playerCurrentTimeAtom);
@@ -70,11 +70,11 @@ export function usePlayerRuntime() {
   });
 
   useLayoutEffect(() => {
-    return capabilitiesRegistry.register({
+    return registerCapabilities({
       loadResume,
       getCurrentPlaybackContext,
     });
-  }, [capabilitiesRegistry, loadResume, getCurrentPlaybackContext]);
+  }, [registerCapabilities, loadResume, getCurrentPlaybackContext]);
 
   useEffect(() => {
     return controller.subscribeCommands((command) => {
@@ -109,6 +109,9 @@ export function usePlayerRuntime() {
           break;
         case "persistResume":
           saveCurrentResume();
+          break;
+        case "releaseLoadedTrack":
+          runtimeRefs.loadedTrack.current = null;
           break;
         case "workCompleted": {
           if (command.item.source.kind !== "work") break;

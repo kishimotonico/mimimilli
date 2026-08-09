@@ -131,7 +131,8 @@ export type PlayerControllerCommand =
   | { type: "setAudioPlaybackRate"; playbackRate: number }
   | { type: "setAudioChannelSwap"; enabled: boolean }
   | { type: "persistResume"; reason: "track-change" | "pause" | "stop" | "interval" | "error" }
-  | { type: "workCompleted"; item: PlaybackItem };
+  | { type: "workCompleted"; item: PlaybackItem }
+  | { type: "releaseLoadedTrack" };
 
 export interface PlayerTransition {
   state: PlayerControllerState;
@@ -234,6 +235,7 @@ export function reducePlayer(
               { type: "persistResume", reason: "stop" },
               { type: "pauseAudio" },
               { type: "seekAudio", positionSec: 0 },
+              { type: "releaseLoadedTrack" },
             ]
           : [],
       };

@@ -4,7 +4,7 @@ import { Provider as JotaiProvider, createStore, useAtomValue } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PlayerRuntimeProvider } from "../../src/features/player/model/PlayerRuntimeProvider";
-import { NOT_REGISTERED_ERROR } from "../../src/features/player/model/playerRuntimeCapabilities";
+import { NOT_REGISTERED_ERROR } from "../../src/features/player/model/PlayerRuntimeProvider";
 import { usePlayerRuntime } from "../../src/features/player/model/usePlayer";
 import { usePlayerActions } from "../../src/features/player/model/usePlayerActions";
 import { usePlayerState } from "../../src/features/player/model/usePlayerState";

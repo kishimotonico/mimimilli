@@ -14,7 +14,7 @@ import { buildFolderAudioQueue } from "../model/filePlayback";
 import { classifyFile } from "../model/types";
 import type { PlaybackTrack } from "../../../entities/player/model/playbackTrack";
 import {
-  playerIsPlaybackActiveAtom,
+  playerIsPlayingOrLoadingAtom,
   playingFsPathAtom,
   playingTrackRelPathAtom,
   playingWorkIdAtom,
@@ -62,7 +62,7 @@ export default function FilesView({ rootFolder, onPlayFile }: FilesViewProps) {
   const playingWorkId = useAtomValue(playingWorkIdAtom);
   const playingRelPath = useAtomValue(playingTrackRelPathAtom);
   const playingFsPath = useAtomValue(playingFsPathAtom);
-  const isPlaybackActive = useAtomValue(playerIsPlaybackActiveAtom);
+  const isPlaybackActive = useAtomValue(playerIsPlayingOrLoadingAtom);
 
   const cwdQuery = useQuery({
     queryKey: FILE_SYSTEM_QUERY_KEYS.directory(nav.cwd),

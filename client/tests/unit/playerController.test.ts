@@ -186,6 +186,26 @@ describe("PlayerController scenarios", () => {
     expect(result.commands).toEqual([{ type: "persistResume", reason: "error" }]);
   });
 
+  it("停止時は resume保存・pause・先頭シーク・ロード済みトラック解放の順でコマンドを発行する", () => {
+    const result = scenario([{ type: "startRequested", item: item() }, { type: "stopRequested" }]);
+
+    expect(result.state.status).toBe("idle");
+    expect(result.state.item).toBeNull();
+    expect(result.commands).toEqual([
+      { type: "persistResume", reason: "stop" },
+      { type: "pauseAudio" },
+      { type: "seekAudio", positionSec: 0 },
+      { type: "releaseLoadedTrack" },
+    ]);
+  });
+
+  it("再生対象がない状態での停止はコマンドを発行しない", () => {
+    const result = scenario([{ type: "stopRequested" }]);
+
+    expect(result.state.status).toBe("idle");
+    expect(result.commands).toEqual([]);
+  });
+
   it("idle状態への遅延audioFailedは無視する", () => {
     const error = { source: "play" as const, name: "AbortError", message: "Aborted" };
     const result = scenario([{ type: "audioFailed", error }]);
