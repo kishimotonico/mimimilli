@@ -1,10 +1,10 @@
 ---
 id: TASK-291
 title: dlsite-cacheにexport --dirを追加しキャッシュを長期アーカイブ可能にする
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-10 09:31'
-updated_date: '2026-08-10 10:34'
+updated_date: '2026-08-10 10:43'
 labels: []
 dependencies: []
 priority: high
@@ -53,3 +53,9 @@ docsにもこの範囲を明記する。
 - [x] #6 CLIのusage文字列と docs/dlsite.md を更新する（バックアップ・復元手順、復元対象がHTML snapshotのみである旨を含む）
 - [x] #7 pnpm check && pnpm test が通る
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+dlsite-cache CLIに export --dir を追加した。現行representationのHTML snapshotをgzip済みBLOBのまま <PRODUCTCODE>.html.gz へ全件書き出し、出力先は存在しないか空のディレクトリのみ許可する（消えたproduct codeの復活を防ぐため）。結果は import --dir と同形式のJSONで、1件の失敗では止まらない。あわせてローカルファイルimportのサイズ判定を展開後サイズ基準へ統一し、DlsiteHtmlInputMetadata.transferSize を optional にして転送上限をHTTP経路だけに課すようにした。事前のファイルサイズ判定はgzipの膨張分（deflate stored block）を加味した上限にしてある。docs/dlsite.md にバックアップ・復元手順と、復元対象がHTML snapshotのみである旨を追記。pnpm check と pnpm test（server 540 / client 794）が通ることを確認。
+<!-- SECTION:FINAL_SUMMARY:END -->
