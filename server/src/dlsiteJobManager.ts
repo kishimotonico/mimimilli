@@ -47,7 +47,11 @@ export class DlsiteJobManager {
     const job = this.currentJob;
     if (job) {
       const progress = job.lastProgress
-        ? { processed: job.lastProgress.processed, total: job.lastProgress.total }
+        ? {
+            processed: job.lastProgress.processed,
+            total: job.lastProgress.total,
+            work: job.lastProgress.work,
+          }
         : null;
       return { status: job.cancelling ? "cancelling" : "running", progress };
     }

@@ -36,7 +36,7 @@ function renderBell(
   bellOverrides: Partial<Parameters<typeof NotificationBell>[0]> = {},
   atomOverrides?: {
     active?: boolean;
-    progress?: { processed: number; total: number } | null;
+    progress?: import("@mimimilli/shared").DlsiteBulkProgressSnapshot | null;
   },
   scanResultOverride?: ScanResult | null,
 ) {
@@ -176,7 +176,7 @@ describe("NotificationBell", () => {
       {},
       {
         active: true,
-        progress: { processed: 3, total: 8 },
+        progress: { processed: 3, total: 8, work: null },
       },
     );
     fireEvent.click(screen.getByRole("button", { name: /通知/ }));

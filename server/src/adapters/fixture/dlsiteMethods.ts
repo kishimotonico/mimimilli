@@ -99,6 +99,13 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
       for (let index = 0; index < targets.length; index++) {
         if (options?.signal?.aborted) return result;
         const work = targets[index]!;
+        options?.onProgress?.({
+          type: "progress",
+          processed: index,
+          total: targets.length,
+          work: { id: work.id, rjCode: work.dlsite.rjCode!, title: work.title },
+        });
+        if (options?.signal?.aborted) return result;
         const fetchedTags = dedupeTags(
           normalizeTags(["サークル/fixtureサークル", "cv/fixture CV", "genre/テスト"]),
         );
@@ -119,13 +126,13 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
           appliedTags: dedupeTags([...work.dlsite.appliedTags, ...fetchedTags]),
         };
         result.fetched += 1;
-        options?.onProgress?.({
-          type: "progress",
-          processed: index + 1,
-          total: targets.length,
-          workId: work.id,
-        });
       }
+      options?.onProgress?.({
+        type: "progress",
+        processed: targets.length,
+        total: targets.length,
+        work: null,
+      });
       return result;
     },
   };

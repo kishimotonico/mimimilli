@@ -171,12 +171,20 @@ export const dlsiteBulkResultSchema = z.object({
 });
 export type DlsiteBulkResult = z.infer<typeof dlsiteBulkResultSchema>;
 
+/** 一括取得で現在処理中の作品。全件終わった直後は null */
+export const dlsiteBulkProgressWorkSchema = z.object({
+  id: z.string(),
+  rjCode: z.string(),
+  title: z.string(),
+});
+export type DlsiteBulkProgressWork = z.infer<typeof dlsiteBulkProgressWorkSchema>;
+
 export const dlsiteBulkProgressEventSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("progress"),
     processed: z.number().int().nonnegative(),
     total: z.number().int().nonnegative(),
-    workId: z.string(),
+    work: dlsiteBulkProgressWorkSchema.nullable(),
   }),
   z.object({ type: z.literal("cancelling") }),
   z.object({ type: z.literal("complete"), result: dlsiteBulkResultSchema }),
@@ -194,7 +202,9 @@ export type DlsiteBulkCancelResponse = z.infer<typeof dlsiteBulkCancelResponseSc
 const dlsiteBulkProgressSnapshotSchema = z.object({
   processed: z.number().int().nonnegative(),
   total: z.number().int().nonnegative(),
+  work: dlsiteBulkProgressWorkSchema.nullable(),
 });
+export type DlsiteBulkProgressSnapshot = z.infer<typeof dlsiteBulkProgressSnapshotSchema>;
 
 /** GET /api/dlsite/bulk のジョブ状態（実行中・直近の終了結果）。未実行・終了後クリア時は 204 */
 export const dlsiteBulkSnapshotSchema = z.discriminatedUnion("status", [

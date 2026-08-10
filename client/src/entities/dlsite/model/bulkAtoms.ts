@@ -2,7 +2,8 @@
 // SSE 購読は DlsiteBulkRuntime が単一所有者。表示側は必要な atom だけ subscribe する。
 
 import { atom } from "jotai";
-import type { DlsiteBulkResult } from "@mimimilli/shared";
+import type { DlsiteBulkProgressSnapshot, DlsiteBulkResult } from "@mimimilli/shared";
+import { formatDlsiteBulkProgressLabel, formatDlsiteBulkWorkLabel } from "./dlsiteProgressLabel";
 
 export const dlsiteBulkActiveAtom = atom(false);
 
@@ -11,7 +12,16 @@ export const dlsiteBulkStartingAtom = atom(false);
 
 export const dlsiteBulkCancellingAtom = atom(false);
 
-export const dlsiteBulkProgressAtom = atom<{ processed: number; total: number } | null>(null);
+export const dlsiteBulkProgressAtom = atom<DlsiteBulkProgressSnapshot | null>(null);
+
+export const dlsiteBulkProgressLabelAtom = atom((get) =>
+  formatDlsiteBulkProgressLabel(get(dlsiteBulkProgressAtom)),
+);
+
+/** 現在処理中の作品の表示名。タイトル未設定ならRJ番号にフォールバックする */
+export const dlsiteBulkCurrentWorkLabelAtom = atom(
+  (get) => formatDlsiteBulkWorkLabel(get(dlsiteBulkProgressAtom)?.work ?? null) ?? null,
+);
 
 export const dlsiteBulkResultAtom = atom<DlsiteBulkResult | null>(null);
 
