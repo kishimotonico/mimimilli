@@ -59,6 +59,7 @@ export default function BarVolumePopover({ volume, onSetVolume }: BarVolumePopov
             // バー本体のonClick（ポップアップ展開）へスライダー操作を伝播させないためのガード
             onClick={(e) => e.stopPropagation()}
           />
+          <span className="mle-bar1__volval">{volume}</span>
         </div>
       )}
     </div>
