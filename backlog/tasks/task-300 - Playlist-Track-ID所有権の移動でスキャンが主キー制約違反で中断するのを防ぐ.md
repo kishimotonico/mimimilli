@@ -1,10 +1,10 @@
 ---
 id: TASK-300
 title: Playlist/Track ID所有権の移動でスキャンが主キー制約違反で中断するのを防ぐ
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-10 19:29'
-updated_date: '2026-08-10 19:35'
+updated_date: '2026-08-10 19:45'
 labels: []
 dependencies: []
 priority: high
@@ -33,10 +33,10 @@ upsertWorkCatalog の子行削除を、workId単位から「これから挿入�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 安定順で先行する新規作品が既存作品のPlaylist/Track IDを引き継ぐ場合でも、スキャンが主キー制約違反で中断せず完了すること
-- [ ] #2 旧所有者が外部編集検出でerror扱いとなり登録されない場合でも、新所有者の登録が主キー制約違反にならないこと
-- [ ] #3 所有権移動後、DB上のPlaylist/Track行が新所有者の作品にのみ帰属し、旧所有者の残骸が残らないこと
-- [ ] #4 上記が再現テストで担保されていること
+- [x] #1 安定順で先行する新規作品が既存作品のPlaylist/Track IDを引き継ぐ場合でも、スキャンが主キー制約違反で中断せず完了すること
+- [x] #2 旧所有者が外部編集検出でerror扱いとなり登録されない場合でも、新所有者の登録が主キー制約違反にならないこと
+- [x] #3 所有権移動後、DB上のPlaylist/Track行が新所有者の作品にのみ帰属し、旧所有者の残骸が残らないこと
+- [x] #4 上記が再現テストで担保されていること
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -48,4 +48,12 @@ upsertWorkCatalog の子行削除を、workId単位から「これから挿入�
 - catalogスキーマはtracks→playlistsにonDelete: cascadeあり（catalogSchema.ts:72）。Playlist削除でTrackは連鎖削除される。ADRのcascade禁止はDB間のみ
 - 却下した代替案: onConflictDoUpdate付け替え（旧Track残骸とworkId食い違いが残る）、バッチ先頭の一括削除フェーズ（整合性の責務がScanUpsertBatchへ漏れる）、子テーブル全再構築（過大）
 着手時期: 一度発火するとスキャンが毎回中断する恒久故障のため、機能開発より先に対応する
+
+実装: upsertWorkCatalog で workId 単位削除に加え、挿入予定の Playlist/Track ID 集合と衝突する行を inArray（500件チャンク）で削除。子行の insert は単純 insert のまま維持。検証: 新規テスト server/tests/real/scanCatalogIdConflict.test.ts の2件が修正前は UNIQUE constraint failed: playlists.id で落ち、修正後は通ることを負のコントロールで確認。pnpm check && pnpm test は server 553 pass / client 794 pass。
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+upsertWorkCatalog の子行削除を、自作品の workId 単位に加えて「挿入予定の Playlist/Track ID と衝突する他作品の行」まで広げ、所有権移動時の主キー制約違反によるスキャン中断を解消した。所有権移動と外部編集error残骸の2ケースを再現テストで担保。
+<!-- SECTION:FINAL_SUMMARY:END -->
