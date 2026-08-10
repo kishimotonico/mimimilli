@@ -1,5 +1,12 @@
 import assert from "node:assert/strict";
-import { mkdirSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
 import { Database } from "bun:sqlite";
@@ -520,6 +527,30 @@ test("DLsiteキャッシュCLI: export --dir と import --dir の往復で全件
   assert.equal(readFileSync(out, "utf8"), VALID_HTML);
   runDlsiteCacheCli(["export", "--product-code", "RJ123457", "--file", out], restored);
   assert.equal(readFileSync(out, "utf8"), hugeHtml);
+});
+
+test("DLsiteキャッシュCLI: 展開後が上限内ならgzipが元より大きくてもimportできる", (t) => {
+  const directory = makeTestDirectory("dlsite-cache-cli-incompressible");
+  t.after(directory.cleanup);
+  const raw = Buffer.from(VALID_HTML);
+  const file = join(directory.path, "RJ123456.html.gz");
+  // level 0（無圧縮）はgzip枠の分だけ本文より大きくなる。圧縮できないHTMLと同じ形。
+  writeFileSync(file, gzipSync(raw, { level: 0 }));
+  assert.ok(statSync(file).size > raw.byteLength);
+  const env = {
+    MIMIMILLI_DATA_DIR: directory.path,
+    MIMIMILLI_DLSITE_CACHE_DB: join(directory.path, "cache.sqlite"),
+  };
+  const overrides = { maxExpandedBytes: raw.byteLength };
+  assert.deepEqual(
+    JSON.parse(
+      runDlsiteCacheCli(["import", "--product-code", "RJ123456", "--file", file], env, overrides),
+    ),
+    { productCode: "RJ123456", outcome: "ok" },
+  );
+  const out = join(directory.path, "exported.html");
+  runDlsiteCacheCli(["export", "--product-code", "RJ123456", "--file", out], env, overrides);
+  assert.equal(readFileSync(out, "utf8"), VALID_HTML);
 });
 
 test("DLsiteキャッシュCLI: export --dir はTTL切れも書き出し、非空ディレクトリを拒む", (t) => {

@@ -36,8 +36,16 @@ interface FileFailure {
 }
 
 /**
+ * 展開後サイズが上限内でも、圧縮できない本文のgzipは元より少し大きくなる。
+ * deflateのstored block（65535バイトごとに5バイト）とヘッダー・トレーラー18バイトが最大の増加分。
+ */
+function maxImportFileBytes(maxExpandedBytes: number): number {
+  return maxExpandedBytes + Math.ceil(maxExpandedBytes / 65_535) * 5 + 18;
+}
+
+/**
  * symlinkへの差し替えを防ぐため、開いた同じfdを検査・読込する。gzipはmagic byteで判定する。
- * サイズ判定は展開後サイズ基準。gzipファイルの読み込み量も同じ上限で頭打ちにする。
+ * サイズ判定は展開後サイズ基準。読み込み量の頭打ちだけはファイルサイズで先に掛ける。
  */
 function readImportFile(file: string, maxExpandedBytes: number): Buffer {
   let fd: number | undefined;
@@ -45,7 +53,7 @@ function readImportFile(file: string, maxExpandedBytes: number): Buffer {
     fd = openSync(file, constants.O_RDONLY | constants.O_NOFOLLOW);
     const fileStat = fstatSync(fd);
     if (!fileStat.isFile()) throw new Error("import対象は通常ファイルにしてください");
-    if (fileStat.size > maxExpandedBytes) {
+    if (fileStat.size > maxImportFileBytes(maxExpandedBytes)) {
       throw new Error(`DLsite HTMLの読み込みサイズが上限を超えました: ${fileStat.size}`);
     }
     const bytes = readFileSync(fd);
