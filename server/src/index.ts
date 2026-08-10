@@ -29,7 +29,7 @@ import { buildStartupLogProperties } from "./lib/startupLog.ts";
 
 const adapterKind = process.env.MIMIMILLI_ADAPTER ?? "real";
 const dataPaths = adapterKind === "real" ? resolveDataPaths() : undefined;
-const { logFilePath } = initLogger(dataPaths ? { logDir: dataPaths.logDir } : {});
+const { logFilePath } = await initLogger(dataPaths ? { logDir: dataPaths.logDir } : {});
 
 const serverLogger = getCategoryLogger("server");
 
