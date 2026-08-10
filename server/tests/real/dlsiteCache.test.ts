@@ -1,5 +1,12 @@
 import assert from "node:assert/strict";
-import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
 import { Database } from "bun:sqlite";
@@ -183,7 +190,7 @@ test("DLsiteキャッシュ: Content-Typeとサイズ上限で保存前に拒否
         contentType: "text/html",
         html: "x".repeat(1_001),
       }),
-    /転送サイズ/,
+    /展開サイズ/,
   );
   assert.deepEqual(cache.resolve({ productCode: "RJ123456" }), {
     kind: "miss",
@@ -201,6 +208,17 @@ test("DLsiteキャッシュ: 転送上限と展開上限を独立して検証す
       ),
     /展開サイズ/,
   );
+  assert.throws(
+    () =>
+      validateDlsiteHtmlInput(
+        { contentType: "text/html", transferSize: 1_001, expandedSize: 10 },
+        1_000,
+        10_000,
+      ),
+    /転送サイズ/,
+  );
+  // 転送を伴わないローカル入力は展開サイズだけで判定する
+  validateDlsiteHtmlInput({ contentType: "text/html", expandedSize: 5_000 }, 1_000, 10_000);
 });
 
 test("DLsiteキャッシュ: 改ざんされた過大gzip BLOBを展開上限で拒否する", (t) => {
@@ -461,6 +479,140 @@ test("DLsiteキャッシュCLI: ディレクトリを一括importし、成功・
 
   const status = JSON.parse(runDlsiteCacheCli(["status"], env)) as { entries: number };
   assert.equal(status.entries, 2);
+});
+
+test("DLsiteキャッシュCLI: export --dir と import --dir の往復で全件を復元する", (t) => {
+  const directory = makeTestDirectory("dlsite-cache-cli-export-dir");
+  t.after(directory.cleanup);
+  const hugeHtml = `<html><h1 id="work_name">大きい作品</h1><!--${"a".repeat(
+    DEFAULT_DLSITE_CACHE_MAX_EXPANDED_BYTES - 1024,
+  )}--></html>`;
+  const sourceDir = join(directory.path, "source");
+  mkdirSync(sourceDir);
+  writeFileSync(join(sourceDir, "RJ123456.html"), VALID_HTML);
+  writeFileSync(join(sourceDir, "RJ123457.html"), hugeHtml);
+
+  const original = {
+    MIMIMILLI_DATA_DIR: directory.path,
+    MIMIMILLI_DLSITE_CACHE_DB: join(directory.path, "original.sqlite"),
+  };
+  assert.equal(
+    JSON.parse(runDlsiteCacheCli(["import", "--dir", sourceDir], original)).succeeded,
+    2,
+  );
+
+  const archiveDir = join(directory.path, "archive");
+  assert.deepEqual(JSON.parse(runDlsiteCacheCli(["export", "--dir", archiveDir], original)), {
+    succeeded: 2,
+    failed: 0,
+    failures: [],
+  });
+  assert.deepEqual(readdirSync(archiveDir).sort(), ["RJ123456.html.gz", "RJ123457.html.gz"]);
+  assert.deepEqual(
+    readFileSync(join(archiveDir, "RJ123456.html.gz")).subarray(0, 2),
+    Buffer.from([0x1f, 0x8b]),
+  );
+
+  const restored = {
+    MIMIMILLI_DATA_DIR: directory.path,
+    MIMIMILLI_DLSITE_CACHE_DB: join(directory.path, "restored.sqlite"),
+  };
+  assert.deepEqual(JSON.parse(runDlsiteCacheCli(["import", "--dir", archiveDir], restored)), {
+    succeeded: 2,
+    failed: 0,
+    failures: [],
+  });
+  const out = join(directory.path, "roundtrip.html");
+  runDlsiteCacheCli(["export", "--product-code", "RJ123456", "--file", out], restored);
+  assert.equal(readFileSync(out, "utf8"), VALID_HTML);
+  runDlsiteCacheCli(["export", "--product-code", "RJ123457", "--file", out], restored);
+  assert.equal(readFileSync(out, "utf8"), hugeHtml);
+});
+
+test("DLsiteキャッシュCLI: 展開後が上限内ならgzipが元より大きくてもimportできる", (t) => {
+  const directory = makeTestDirectory("dlsite-cache-cli-incompressible");
+  t.after(directory.cleanup);
+  const raw = Buffer.from(VALID_HTML);
+  const file = join(directory.path, "RJ123456.html.gz");
+  // level 0（無圧縮）はgzip枠の分だけ本文より大きくなる。圧縮できないHTMLと同じ形。
+  writeFileSync(file, gzipSync(raw, { level: 0 }));
+  assert.ok(statSync(file).size > raw.byteLength);
+  const env = {
+    MIMIMILLI_DATA_DIR: directory.path,
+    MIMIMILLI_DLSITE_CACHE_DB: join(directory.path, "cache.sqlite"),
+  };
+  const overrides = { maxExpandedBytes: raw.byteLength };
+  assert.deepEqual(
+    JSON.parse(
+      runDlsiteCacheCli(["import", "--product-code", "RJ123456", "--file", file], env, overrides),
+    ),
+    { productCode: "RJ123456", outcome: "ok" },
+  );
+  const out = join(directory.path, "exported.html");
+  runDlsiteCacheCli(["export", "--product-code", "RJ123456", "--file", out], env, overrides);
+  assert.equal(readFileSync(out, "utf8"), VALID_HTML);
+});
+
+test("DLsiteキャッシュCLI: export --dir はTTL切れも書き出し、非空ディレクトリを拒む", (t) => {
+  const directory = makeTestDirectory("dlsite-cache-cli-export-dir-guard");
+  t.after(directory.cleanup);
+  const source = join(directory.path, "work.html");
+  writeFileSync(source, VALID_HTML);
+  const env = {
+    MIMIMILLI_DATA_DIR: directory.path,
+    MIMIMILLI_DLSITE_CACHE_DB: join(directory.path, "cache.sqlite"),
+  };
+  let now = 10_000;
+  const overrides = {
+    clock: () => now,
+    ttlsMs: { ok: 10, parse_error: 10, not_found: 10, error: 10 },
+  };
+  runDlsiteCacheCli(["import", "--product-code", "RJ123456", "--file", source], env, overrides);
+  now += 10;
+
+  const archiveDir = join(directory.path, "archive");
+  assert.equal(
+    JSON.parse(runDlsiteCacheCli(["export", "--dir", archiveDir], env, overrides)).succeeded,
+    1,
+  );
+  assert.throws(
+    () => runDlsiteCacheCli(["export", "--dir", archiveDir], env, overrides),
+    /空のディレクトリ/,
+  );
+});
+
+test("DLsiteキャッシュCLI: export --dir は1件の失敗で全体を止めない", (t) => {
+  const directory = makeTestDirectory("dlsite-cache-cli-export-dir-partial");
+  t.after(directory.cleanup);
+  const source = join(directory.path, "work.html");
+  writeFileSync(source, VALID_HTML);
+  const cachePath = join(directory.path, "cache.sqlite");
+  const env = { MIMIMILLI_DATA_DIR: directory.path, MIMIMILLI_DLSITE_CACHE_DB: cachePath };
+  runDlsiteCacheCli(["import", "--product-code", "RJ123456", "--file", source], env);
+
+  const sqlite = new Database(cachePath);
+  sqlite
+    .query(
+      `INSERT INTO dlsite_html_snapshots
+        (store, product_code, representation, outcome, content_fetched_at,
+         content_expires_at, html_gzip, html_size)
+       SELECT store, 'RJ12', representation, outcome, content_fetched_at,
+         content_expires_at, html_gzip, html_size
+       FROM dlsite_html_snapshots`,
+    )
+    .run();
+  sqlite.close();
+
+  const archiveDir = join(directory.path, "archive");
+  const result = JSON.parse(runDlsiteCacheCli(["export", "--dir", archiveDir], env)) as {
+    succeeded: number;
+    failed: number;
+    failures: { file: string; error: string }[];
+  };
+  assert.equal(result.succeeded, 1);
+  assert.equal(result.failed, 1);
+  assert.equal(result.failures[0]?.file, "RJ12.html.gz");
+  assert.deepEqual(readdirSync(archiveDir), ["RJ123456.html.gz"]);
 });
 
 test("DLsiteカバーキャッシュ: 正規化URLのhashごとに非圧縮バイト列を保持する", (t) => {

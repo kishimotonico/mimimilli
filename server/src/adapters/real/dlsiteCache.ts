@@ -42,7 +42,8 @@ export interface DlsiteCacheConfig {
 
 export interface DlsiteHtmlInputMetadata {
   contentType: string;
-  transferSize: number;
+  /** HTTP応答の受信バイト数。ローカル入力では転送そのものがないため省略する。 */
+  transferSize?: number;
   expandedSize: number;
 }
 
@@ -132,7 +133,7 @@ function normalizeKey(key: DlsiteCacheKey): NormalizedKey {
 }
 
 /**
- * HTTP入力の検証契約。transferSizeとexpandedSizeは意図的に分ける。
+ * 入力の検証契約。transferSizeとexpandedSizeは意図的に分ける。
  * 現在のHTML保存は展開済みbodyを受け取るが、TASK-93.2では圧縮HTTP応答にも同じ検証を使う。
  */
 export function validateDlsiteHtmlInput(
@@ -143,10 +144,12 @@ export function validateDlsiteHtmlInput(
   if (!/^text\/html(?:\s*;|$)/i.test(input.contentType)) {
     throw new Error(`DLsite HTMLのContent-Typeが不正です: ${input.contentType}`);
   }
-  requireNonNegativeSafeInteger(input.transferSize, "DLsite HTMLの転送サイズ");
   requireNonNegativeSafeInteger(input.expandedSize, "DLsite HTMLの展開サイズ");
-  if (input.transferSize > maxTransferBytes) {
-    throw new Error(`DLsite HTMLの転送サイズが上限を超えました: ${input.transferSize}`);
+  if (input.transferSize !== undefined) {
+    requireNonNegativeSafeInteger(input.transferSize, "DLsite HTMLの転送サイズ");
+    if (input.transferSize > maxTransferBytes) {
+      throw new Error(`DLsite HTMLの転送サイズが上限を超えました: ${input.transferSize}`);
+    }
   }
   if (input.expandedSize > maxExpandedBytes) {
     throw new Error(`DLsite HTMLの展開サイズが上限を超えました: ${input.expandedSize}`);
@@ -221,9 +224,12 @@ export class DlsiteCache {
   ): void {
     const key = normalizeKey(input);
     const bytes = typeof input.html === "string" ? Buffer.from(input.html) : input.html;
-    const transferSize = input.transferSize ?? bytes.byteLength;
     validateDlsiteHtmlInput(
-      { contentType: input.contentType, transferSize, expandedSize: bytes.byteLength },
+      {
+        contentType: input.contentType,
+        transferSize: input.transferSize,
+        expandedSize: bytes.byteLength,
+      },
       this.maxTransferBytes,
       this.maxExpandedBytes,
     );
@@ -392,6 +398,27 @@ export class DlsiteCache {
       throw new Error("DLsiteキャッシュにHTML snapshotがありません");
     }
     return this.decompressHtml(body);
+  }
+
+  /** 現行representationのHTML snapshotを持つproduct codeを列挙する（TTLは見ない）。 */
+  listSnapshotProductCodes(): string[] {
+    const rows = this.sqlite
+      .query(
+        `SELECT product_code FROM dlsite_html_snapshots
+         WHERE representation = ? ORDER BY product_code`,
+      )
+      .all(DLSITE_CACHE_REPRESENTATION) as { product_code: string }[];
+    return rows.map((row) => row.product_code);
+  }
+
+  /** gzip圧縮されたままのHTML snapshotを取り出す（アーカイブ用。TTLは見ない）。 */
+  exportHtmlGzip(keyInput: DlsiteCacheKey): Uint8Array {
+    const key = normalizeKey(keyInput);
+    const body = this.readSnapshotBody(key);
+    if (!body) {
+      throw new Error("DLsiteキャッシュにHTML snapshotがありません");
+    }
+    return body.html_gzip;
   }
 
   cleanupExpired(): number {

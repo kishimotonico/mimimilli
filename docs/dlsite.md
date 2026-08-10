@@ -87,7 +87,7 @@ failure_kind（失敗記録側）と既定TTL。
 
 TTLは `DEFAULT_DLSITE_CACHE_TTLS_MS`（`dlsiteCache.ts`）の定数で固定されている。通常取得の判断順序は、有効な失敗記録があればそれを返し（ネットワークへ出ない）、なければ有効なHTML snapshotをパースして返し、どちらもなければネットワークへ出る。`?force=true` はキャッシュの読み取りだけを無視して必ずネットワークへ出るが、書き込みは通常時と同じ規則に従う。
 
-HTMLの転送・展開サイズには上限があり（既定2 MiB / 8 MiB、`DEFAULT_DLSITE_CACHE_MAX_TRANSFER_BYTES` / `DEFAULT_DLSITE_CACHE_MAX_EXPANDED_BYTES`）、gzip展開時にも `zlib` の `maxOutputLength` で同じ上限を渡してgzip bombを防ぐ。
+HTMLの転送・展開サイズには上限があり（既定2 MiB / 8 MiB、`DEFAULT_DLSITE_CACHE_MAX_TRANSFER_BYTES` / `DEFAULT_DLSITE_CACHE_MAX_EXPANDED_BYTES`）、gzip展開時にも `zlib` の `maxOutputLength` で同じ上限を渡してgzip bombを防ぐ。転送サイズの上限はHTTP応答にだけ課す。CLIのローカルファイルimportは転送を伴わないため、展開後サイズの上限だけで判定する。
 
 一括取得の対象は `applied` と `skipped` を除く（上記「作品ごとの状態」参照）。`applied` の作品は2回目以降の一括取得では対象外になるため、成功時の「変更なしなら書き込まない」判定は存在しない。
 
@@ -146,7 +146,7 @@ pnpm --filter @mimimilli/server dlsite-cache -- cleanup
 pnpm --filter @mimimilli/server dlsite-cache -- import --product-code RJ000000 --file /absolute/path/work.html
 ```
 
-キャッシュ済みHTMLを取り出す（パース失敗の原因調査用）。
+キャッシュ済みHTMLを取り出す（パース失敗の原因調査用。単体exportは非圧縮で書き出す）。
 
 ```sh
 pnpm --filter @mimimilli/server dlsite-cache -- export --product-code RJ000000 --file /absolute/path/work.html
@@ -160,7 +160,32 @@ pnpm --filter @mimimilli/server dlsite-cache -- import --dir /absolute/path/to/b
 
 対象の絞り込みは二段階になっている。拡張子が `.html` / `.html.gz` 以外のファイルはディレクトリ列挙の時点で無視され、成功・失敗どちらの件数にも出てこない。拡張子は合っていてもファイル名が `<RJまたはVJコード>.html[.gz]` の命名規約に合わない場合（例: `readme.html`）は一覧に残り、失敗として記録・返却される。
 
-gzip入力かどうかは拡張子ではなくheaderのmagic byte（`0x1f 0x8b`）で判定し、該当すれば自動で展開して取り込む（`.html` 拡張子のgzipファイルも展開できる）。importはsymlinkと上限超過を拒否し、実HTTPで新たに試料を取得することはしない。importはHTML snapshotだけを更新し（成功記録と同じ扱い）、失敗記録には触れない。ディレクトリimportは1件の失敗で全体を止めず、成功・失敗の件数と失敗したファイル名・理由をJSONで返す。
+gzip入力かどうかは拡張子ではなくheaderのmagic byte（`0x1f 0x8b`）で判定し、該当すれば自動で展開して取り込む（`.html` 拡張子のgzipファイルも展開できる）。importはsymlinkと上限超過を拒否し、実HTTPで新たに試料を取得することはしない。サイズ判定は展開後サイズの上限（8 MiB）だけで行う。転送サイズの上限はHTTP応答にのみ課すもので、ローカルファイルには適用しない。importはHTML snapshotだけを更新し（成功記録と同じ扱い）、失敗記録には触れない。ディレクトリimportは1件の失敗で全体を止めず、成功・失敗の件数と失敗したファイル名・理由をJSONで返す。
+
+### バックアップと復元
+
+キャッシュ済みのHTML snapshotをディレクトリへ書き出して長期保管する。
+
+```sh
+pnpm --filter @mimimilli/server dlsite-cache -- export --dir /absolute/path/to/archive
+```
+
+出力先は存在しないディレクトリか空のディレクトリのみ許可し、非空ならエラーで中断する。上書きを許すと、前回のexport後にDBから消えたproduct codeのファイルが残り、復元時に消したはずのsnapshotが復活してしまうため。
+
+書き出すのは現行representationのHTML snapshotだけで、TTL切れの行も対象になる（cleanupで消える前なら書き出せる）。DBはgzip圧縮したBLOBを持っているので、展開せずそのまま `<PRODUCTCODE>.html.gz` として書く。結果はディレクトリimportと同じJSON（成功件数・失敗件数・失敗したファイル名と理由）で、1件の失敗で全体を止めない。
+
+復元はそのまま `import --dir` に渡す。
+
+```sh
+pnpm --filter @mimimilli/server dlsite-cache -- import --dir /absolute/path/to/archive
+```
+
+importはHTML snapshotを成功記録として書き直すため、取り込んだ時点からTTLが振り直される。DBファイルのバックアップと違い、生HTMLのアーカイブはキャッシュDBのスキーマ変更を跨いで使える。
+
+復元できるのはHTML snapshotだけで、次のものは対象外。復元後も実HTTPが発生しうる。
+
+- 取得失敗記録（`dlsite_fetch_failures`）。404・通信失敗はTTLが3日・1時間と短く、アーカイブしてもすぐ期限切れになる
+- カバー画像（`dlsite_cover_entries`）。ローカルにカバーがない作品は、HTMLがcache hitしても一括適用でカバー取得へ進む。適用済み作品のカバーは作品フォルダーへ保存されるため通常は再取得されない
 
 強制的に再取得したい場合は、`POST /dlsite/:id/fetch?force=true` でキャッシュの読み取りだけを無視する。クライアント（`client/src/entities/work/api.ts`）はforceを付けずに呼ぶため、UIからは到達できない。現状は手で叩くときだけの手段。キャッシュの行自体を消したい場合は、TTLが切れるのを待って `cleanup` する。
 
