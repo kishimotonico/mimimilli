@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { parseTag, probeResultFromCache, resolveTrackDurationSec } from "@mimimilli/shared";
 import type { NormalizedTag, DlsiteState, UrlEntry, Work } from "@mimimilli/shared";
 import { japaneseSortKey } from "../../core/japaneseSortKey.ts";
@@ -20,6 +20,9 @@ import {
   type CoverColumns,
   type WorkRow,
 } from "./workRowMapping.ts";
+import { chunk } from "./workQuerySql.ts";
+
+const CATALOG_ID_DELETE_CHUNK_SIZE = 500;
 
 export class CatalogWorkRepository {
   private readonly db: Db;
@@ -142,6 +145,16 @@ export class CatalogWorkRepository {
       .onConflictDoUpdate({ target: works.id, set: values })
       .run();
     this.db.catalog.delete(catalogPlaylists).where(eq(catalogPlaylists.workId, work.id)).run();
+    const playlistIds = work.playlists.map((playlist) => playlist.id);
+    const trackIds = work.playlists.flatMap((playlist) => playlist.tracks.map((track) => track.id));
+    for (const idsChunk of chunk(playlistIds, CATALOG_ID_DELETE_CHUNK_SIZE)) {
+      if (idsChunk.length === 0) continue;
+      this.db.catalog.delete(catalogPlaylists).where(inArray(catalogPlaylists.id, idsChunk)).run();
+    }
+    for (const idsChunk of chunk(trackIds, CATALOG_ID_DELETE_CHUNK_SIZE)) {
+      if (idsChunk.length === 0) continue;
+      this.db.catalog.delete(catalogTracks).where(inArray(catalogTracks.id, idsChunk)).run();
+    }
     for (let playlistPosition = 0; playlistPosition < work.playlists.length; playlistPosition++) {
       const playlist = work.playlists[playlistPosition]!;
       this.db.catalog
