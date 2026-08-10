@@ -1,10 +1,10 @@
 ---
 id: TASK-292
 title: コンソールログを抑制しファイル書き込み負荷を調整する
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-08-10 18:59'
-updated_date: '2026-08-10 23:25'
+updated_date: '2026-08-10 23:26'
 labels: []
 dependencies: []
 priority: medium
