@@ -1,7 +1,7 @@
 ---
 id: TASK-297
 title: プレイヤーに停止UIと音量の数値表示を追加する
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-08-10 19:00'
 updated_date: '2026-08-10 23:31'
