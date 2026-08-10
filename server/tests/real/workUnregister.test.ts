@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   readdirSync,
@@ -17,6 +18,7 @@ import { META_FILE_NAME, type FsListing, type Work } from "@mimimilli/shared";
 import { createApp } from "../../src/app.ts";
 import { openDb } from "../../src/adapters/real/db.ts";
 import { unregisterWork } from "../../src/adapters/real/workRegister.ts";
+import { metaStagingPath } from "../../src/adapters/real/metaStaging.ts";
 import { workStates } from "../../src/adapters/real/userSchema.ts";
 import { createWorkRepos, folderMetaPath } from "../helpers/workTestUtils.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
@@ -451,4 +453,184 @@ test("unregisterWork: 退避済みメタのまま再実行するとDB削除後�
   assert.ok(!existsSync(stagedPath));
   const gone = await app.request(`/api/works/${work.id}`);
   assert.equal(gone.status, 404);
+});
+
+test("スキャン: 退避のみ残存（catalogあり）でメタ正本を復元し当該回で登録する", async (t) => {
+  const directory = makeTestDirectory("work-unregister-staged-restore");
+  t.after(directory.cleanup);
+  const catalogPath = join(directory.path, "catalog.db");
+  const userPath = join(directory.path, "user.db");
+  const root = join(directory.path, "lib");
+  const folder = join(root, "RJ900028_staged_restore");
+  mkdirSync(folder, { recursive: true });
+  writeWav(join(folder, "track.wav"), 2);
+
+  const adapter = createTestRealAdapter({
+    database: { kind: "files", catalogPath, userPath },
+  });
+  const app = createApp(adapter);
+  await adapter.updateSettings({ rootFolder: root });
+
+  const createRes = await app.request("/api/works", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: folder, title: "退避復元テスト" }),
+  });
+  assert.equal(createRes.status, 201);
+  const work = (await createRes.json()) as Work;
+
+  const metaPath = folderMetaPath(folder);
+  const stagedPath = metaStagingPath(metaPath);
+  const metaBefore = readFileSync(metaPath, "utf-8");
+  renameSync(metaPath, stagedPath);
+  assert.ok(!existsSync(metaPath));
+  assert.ok(existsSync(stagedPath));
+
+  await adapter.scan();
+
+  assert.ok(existsSync(metaPath));
+  assert.ok(!existsSync(stagedPath));
+  assert.equal(readFileSync(metaPath, "utf-8"), metaBefore);
+
+  const restored = await adapter.getWork(work.id);
+  assert.ok(restored);
+  assert.notEqual(restored.status, "missing");
+});
+
+test("スキャン: 退避のみ残存（catalogなし）で孤児退避ファイルを除去する", async (t) => {
+  const directory = makeTestDirectory("work-unregister-staged-orphan");
+  t.after(directory.cleanup);
+  const catalogPath = join(directory.path, "catalog.db");
+  const userPath = join(directory.path, "user.db");
+  const root = join(directory.path, "lib");
+  const folder = join(root, "RJ900026_staged_orphan");
+  mkdirSync(folder, { recursive: true });
+  writeWav(join(folder, "track.wav"), 2);
+
+  const adapter = createTestRealAdapter({
+    database: { kind: "files", catalogPath, userPath },
+  });
+  const app = createApp(adapter);
+  await adapter.updateSettings({ rootFolder: root });
+
+  const createRes = await app.request("/api/works", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: folder, title: "孤児退避テスト" }),
+  });
+  assert.equal(createRes.status, 201);
+  const work = (await createRes.json()) as Work;
+  const metaPath = folderMetaPath(folder);
+  const stagedPath = metaStagingPath(metaPath);
+  renameSync(metaPath, stagedPath);
+
+  const db = openDb({ kind: "files", catalogPath, userPath });
+  const { catalog, user } = createWorkRepos(db);
+  assert.equal(catalog.deleteWorkCatalog(work.id), true);
+  user.deleteWorkUserState(work.id);
+  db.close();
+
+  await adapter.scan();
+
+  assert.ok(!existsSync(stagedPath));
+});
+
+test("スキャン: 正本と退避の併存では退避を削除し、その後の登録解除が成功する", async (t) => {
+  const directory = makeTestDirectory("work-unregister-staged-coexist");
+  t.after(directory.cleanup);
+  const catalogPath = join(directory.path, "catalog.db");
+  const userPath = join(directory.path, "user.db");
+  const root = join(directory.path, "lib");
+  const folder = join(root, "RJ900029_staged_coexist");
+  mkdirSync(folder, { recursive: true });
+  writeWav(join(folder, "track.wav"), 2);
+
+  const adapter = createTestRealAdapter({
+    database: { kind: "files", catalogPath, userPath },
+  });
+  const app = createApp(adapter);
+  await adapter.updateSettings({ rootFolder: root });
+
+  const createRes = await app.request("/api/works", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: folder, title: "併存退避テスト" }),
+  });
+  assert.equal(createRes.status, 201);
+  const work = (await createRes.json()) as Work;
+
+  const metaPath = folderMetaPath(folder);
+  const stagedPath = metaStagingPath(metaPath);
+  writeFileSync(stagedPath, readFileSync(metaPath, "utf-8"));
+  assert.ok(existsSync(metaPath));
+  assert.ok(existsSync(stagedPath));
+
+  await adapter.scan();
+
+  assert.ok(existsSync(metaPath));
+  assert.ok(!existsSync(stagedPath));
+
+  const res = await app.request(`/api/works/${work.id}`, { method: "DELETE" });
+  assert.equal(res.status, 204);
+  assert.ok(!existsSync(metaPath));
+});
+
+test("スキャン: 退避メタの回収でfs操作が失敗してもスキャンは完了する", async (t) => {
+  const directory = makeTestDirectory("work-unregister-staged-fs-fail");
+  t.after(directory.cleanup);
+  const catalogPath = join(directory.path, "catalog.db");
+  const userPath = join(directory.path, "user.db");
+  const root = join(directory.path, "lib");
+  const folder = join(root, "RJ900030_staged_fs_fail");
+  mkdirSync(folder, { recursive: true });
+  writeWav(join(folder, "track.wav"), 2);
+
+  const adapter = createTestRealAdapter({
+    database: { kind: "files", catalogPath, userPath },
+  });
+  const app = createApp(adapter);
+  await adapter.updateSettings({ rootFolder: root });
+
+  const createRes = await app.request("/api/works", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: folder, title: "回収fs失敗テスト" }),
+  });
+  assert.equal(createRes.status, 201);
+  const work = (await createRes.json()) as Work;
+
+  const metaPath = folderMetaPath(folder);
+  const stagedPath = metaStagingPath(metaPath);
+  writeFileSync(stagedPath, readFileSync(metaPath, "utf-8"));
+  assert.ok(existsSync(metaPath));
+  assert.ok(existsSync(stagedPath));
+
+  chmodSync(folder, 0o555);
+  t.after(() => chmodSync(folder, 0o755));
+
+  const result = await adapter.scan();
+  assert.ok(result);
+  assert.ok(existsSync(metaPath));
+  assert.ok(existsSync(stagedPath));
+
+  const stillThere = await adapter.getWork(work.id);
+  assert.ok(stillThere);
+  assert.notEqual(stillThere.status, "missing");
+});
+
+test("スキャン: Work IDを読めない退避ファイルはスキップし削除しない", async (t) => {
+  const directory = makeTestDirectory("work-unregister-staged-corrupt");
+  t.after(directory.cleanup);
+  const root = join(directory.path, "lib");
+  const folder = join(root, "RJ900027_staged_corrupt");
+  mkdirSync(folder, { recursive: true });
+  const stagedPath = join(folder, `.${META_FILE_NAME}.unregistering`);
+  writeFileSync(stagedPath, "{ not valid json");
+
+  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
+  await adapter.updateSettings({ rootFolder: root });
+  await adapter.scan();
+
+  assert.ok(existsSync(stagedPath));
+  assert.equal(readFileSync(stagedPath, "utf-8"), "{ not valid json");
 });

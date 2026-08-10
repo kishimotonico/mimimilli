@@ -26,6 +26,7 @@ import { getCategoryLogger } from "../../lib/logger.ts";
 import { logDataIntegritySkips, toDataIntegrityWarning } from "./dataIntegrity.ts";
 import { naturalCompare } from "./naturalCompare.ts";
 import { createDraftMetaFile } from "./scanMetaDraft.ts";
+import { recoverStagedMetaFiles } from "./scanMetaStagingRecovery.ts";
 import {
   buildProbeCache,
   handleMetaParseError,
@@ -108,6 +109,8 @@ export class Scanner {
     };
 
     const tree = await this.walkPhase(root, emit, signal, abortToken, checkAbort);
+    recoverStagedMetaFiles(root, tree, this.catalog);
+    checkAbort();
     const seenIds: SeenMetaIds = { work: new Set(), playlist: new Set(), track: new Set() };
     const existingWorks = this.query.getScanWorkMap();
     const existingByPhysicalPath = new Map(
