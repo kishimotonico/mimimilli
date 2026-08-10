@@ -4,6 +4,7 @@ title: Playlist/Track ID所有権の移動でスキャンが主キー制約違�
 status: To Do
 assignee: []
 created_date: '2026-08-10 19:29'
+updated_date: '2026-08-10 19:35'
 labels: []
 dependencies: []
 priority: high
@@ -37,3 +38,14 @@ upsertWorkCatalog の子行削除を、workId単位から「これから挿入�
 - [ ] #3 所有権移動後、DB上のPlaylist/Track行が新所有者の作品にのみ帰属し、旧所有者の残骸が残らないこと
 - [ ] #4 上記が再現テストで担保されていること
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+設計レビュー（2026-08-11、Fable＋Codex相談）: 方針は現案（upsertWorkCatalogで挿入予定ID集合と衝突する行を解放）で確定。補強点:
+- 自作品のworkId単位削除を置き換えるのではなく、それに加えて挿入予定Playlist/Track IDと衝突する他作品の行を削除する
+- 子行のinsertは単純insertのまま維持する（onConflictDoUpdateにしない）。修復をすり抜けた重複IDをPK制約違反として検出でき、ADR-0008「ライブラリ全体で一意」の監視役になるため
+- catalogスキーマはtracks→playlistsにonDelete: cascadeあり（catalogSchema.ts:72）。Playlist削除でTrackは連鎖削除される。ADRのcascade禁止はDB間のみ
+- 却下した代替案: onConflictDoUpdate付け替え（旧Track残骸とworkId食い違いが残る）、バッチ先頭の一括削除フェーズ（整合性の責務がScanUpsertBatchへ漏れる）、子テーブル全再構築（過大）
+着手時期: 一度発火するとスキャンが毎回中断する恒久故障のため、機能開発より先に対応する
+<!-- SECTION:NOTES:END -->
