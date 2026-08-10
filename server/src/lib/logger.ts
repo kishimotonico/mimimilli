@@ -1,20 +1,28 @@
 import { mkdirSync, readdirSync, unlinkSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { getFileSink } from "@logtape/file";
+import { getStreamFileSink } from "@logtape/file";
 import {
+  configure,
   configureSync,
   dispose,
-  disposeSync,
   getAnsiColorFormatter,
   getConsoleSink,
   getLogger,
   type LogRecord,
+  type Sink,
   type TextFormatter,
+  withFilter,
 } from "@logtape/logtape";
 
 export type LogCategory = "dlsite" | "scan" | "db" | "http" | "server";
 
 export const LOG_RETENTION_DAYS = 14;
+
+/** コンソールへ出す最低レベル。debugはファイルのみに記録する。 */
+const CONSOLE_LOWEST_LEVEL = "info";
+
+/** file sinkのストリームバッファ長。超過時のみ書き込みに背圧がかかる。 */
+const LOG_FILE_HIGH_WATER_MARK = 64 * 1024;
 
 const LOG_CATEGORIES: LogCategory[] = ["dlsite", "scan", "db", "http", "server"];
 const LOG_FILE_PATTERN = /^server-(\d{4}-\d{2}-\d{2})\.jsonl$/;
@@ -71,11 +79,15 @@ export function purgeOldLogFiles(logDir: string, retentionDays = LOG_RETENTION_D
   }
 }
 
+function createConsoleSink(): Sink {
+  return withFilter(getConsoleSink({ formatter: getAnsiColorFormatter() }), CONSOLE_LOWEST_LEVEL);
+}
+
 function ensureConfigured(): void {
   if (configured) return;
   configureSync({
     sinks: {
-      console: getConsoleSink({ formatter: getAnsiColorFormatter() }),
+      console: createConsoleSink(),
     },
     loggers: [
       ...LOG_CATEGORIES.map((category) => ({
@@ -108,12 +120,9 @@ export interface InitLoggerResult {
   logFilePath: string | null;
 }
 
-export function initLogger(options: InitLoggerOptions = {}): InitLoggerResult {
+export async function initLogger(options: InitLoggerOptions = {}): Promise<InitLoggerResult> {
   const sinkIds = ["console"];
-  const sinks: Record<string, ReturnType<typeof getConsoleSink> | ReturnType<typeof getFileSink>> =
-    {
-      console: getConsoleSink({ formatter: getAnsiColorFormatter() }),
-    };
+  const sinks: Record<string, Sink> = { console: createConsoleSink() };
 
   let logFilePath: string | null = null;
 
@@ -132,11 +141,14 @@ export function initLogger(options: InitLoggerOptions = {}): InitLoggerResult {
     }
     purgeOldLogFiles(options.logDir);
     logFilePath = join(options.logDir, `server-${formatLogDate(new Date())}.jsonl`);
-    sinks.file = getFileSink(logFilePath, { formatter: mimimilliJsonLinesFormatter() });
+    sinks.file = getStreamFileSink(logFilePath, {
+      formatter: mimimilliJsonLinesFormatter(),
+      highWaterMark: LOG_FILE_HIGH_WATER_MARK,
+    });
     sinkIds.push("file");
   }
 
-  configureSync({
+  await configure({
     reset: true,
     sinks,
     loggers: [
@@ -210,4 +222,4 @@ export function formatError(error: unknown): Record<string, unknown> {
   return { message: String(error) };
 }
 
-export { dispose, disposeSync };
+export { dispose };
