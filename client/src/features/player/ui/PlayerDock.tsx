@@ -18,6 +18,7 @@ interface DockBarProps {
   onSeek: (t: number) => void;
   onSwitchToPopup: () => void;
   onSetVolume: (v: number) => void;
+  onStop: () => void;
 }
 
 function DockBar({ variant, switching, ...barProps }: DockBarProps) {
@@ -50,6 +51,7 @@ interface DockPopupProps {
   onFold: () => void;
   onExpandFullScreen: () => void;
   onShowPlayingWork: () => void;
+  onStop: () => void;
 }
 
 function DockPopup({ variant, switching, ...popupProps }: DockPopupProps) {
@@ -115,6 +117,7 @@ export default function PlayerDock({ onShowPlayingWork }: PlayerDockProps) {
             onSeek={actions.seek}
             onSwitchToPopup={() => switchUiMode("popup")}
             onSetVolume={actions.setVolume}
+            onStop={actions.stop}
           />
         )}
       </AnimatePresence>
@@ -137,6 +140,7 @@ export default function PlayerDock({ onShowPlayingWork }: PlayerDockProps) {
             onFold={() => switchUiMode("bar")}
             onExpandFullScreen={() => actions.setShowFullPlayer(true)}
             onShowPlayingWork={handleShowPlayingWork}
+            onStop={actions.stop}
           />
         )}
       </AnimatePresence>

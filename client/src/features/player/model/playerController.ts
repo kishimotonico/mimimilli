@@ -229,6 +229,7 @@ export function reducePlayer(
           durationSec: 0,
           playbackError: null,
           abRepeat: { a: null, b: null },
+          showFullPlayer: false,
         },
         commands: state.item
           ? [

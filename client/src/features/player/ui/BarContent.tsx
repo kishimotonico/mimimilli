@@ -17,6 +17,7 @@ interface BarContentProps {
   onSeek: (t: number) => void;
   onSwitchToPopup: () => void;
   onSetVolume: (volume: number) => void;
+  onStop: () => void;
 }
 
 export default function BarContent({
@@ -27,6 +28,7 @@ export default function BarContent({
   onSeek,
   onSwitchToPopup,
   onSetVolume,
+  onStop,
 }: BarContentProps) {
   const {
     currentWork,
@@ -121,6 +123,19 @@ export default function BarContent({
           }}
         >
           <I.chevD size={13} style={{ transform: "rotate(180deg)" }} />
+        </button>
+
+        <button
+          type="button"
+          className="mle-bar1__stop"
+          aria-label="再生を停止"
+          title="再生を停止"
+          onClick={(e) => {
+            e.stopPropagation();
+            onStop();
+          }}
+        >
+          <I.x size={13} />
         </button>
       </div>
 

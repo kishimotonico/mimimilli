@@ -23,6 +23,7 @@ export default function FullScreenPlayerGate() {
       onPrev={actions.prevTrack}
       onSelectTrack={actions.setTrackIndex}
       onClose={() => actions.setShowFullPlayer(false)}
+      onStop={actions.stop}
       onSetChannelSwap={actions.setChannelSwap}
       onSetABPoint={actions.setABPoint}
       onClearABRepeat={actions.clearABRepeat}

@@ -20,6 +20,7 @@ interface FullScreenPlayerProps {
   onPrev: () => void;
   onSelectTrack: (i: number) => void;
   onClose: () => void;
+  onStop: () => void;
   onSetChannelSwap: (enabled: boolean) => void;
   onSetABPoint: (point: "a" | "b") => void;
   onClearABRepeat: () => void;
@@ -41,6 +42,7 @@ export default function FullScreenPlayer({
   onPrev,
   onSelectTrack,
   onClose,
+  onStop,
   onSetChannelSwap,
   onSetABPoint,
   onClearABRepeat,
@@ -108,6 +110,13 @@ export default function FullScreenPlayer({
           <span className="font-mono text-[11px] text-ink-3">
             {isFilePlayback ? "ファイル" : currentWork!.title}
           </span>
+          <IconButton
+            size="md"
+            icon={I.x}
+            label="再生を停止"
+            onClick={onStop}
+            className="ml-1 hover:text-[var(--r-coral)]"
+          />
         </div>
 
         {/* Stage: cover + metadata */}
@@ -210,6 +219,9 @@ export default function FullScreenPlayer({
                   onChange={(e) => onSetVolume(Number(e.target.value))}
                   className="w-20 cursor-pointer accent-[var(--ink-2)]"
                 />
+                <span className="w-[3ch] text-right font-mono text-[11px] tabular-nums text-ink-3">
+                  {volume}
+                </span>
               </div>
             </div>
 
