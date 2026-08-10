@@ -1,10 +1,10 @@
 ---
 id: TASK-293
 title: DLsite取得進捗の可視化を改善する
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-08-10 18:59'
-updated_date: '2026-08-10 23:31'
+updated_date: '2026-08-10 23:32'
 labels: []
 dependencies: []
 priority: medium
