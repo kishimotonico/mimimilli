@@ -163,6 +163,23 @@ export function prepareMetaEntries(
       const repair = repairDuplicateMetaIds(metaPath, content, seenIds, checkAbort);
       if (repair.externallyModified) {
         externallyModified.push(toPortableRelativePath(root, metaPath));
+        const candidateId = (() => {
+          try {
+            const value: unknown = JSON.parse(content);
+            if (typeof value === "object" && value !== null && "id" in value) {
+              const id = (value as { id: unknown }).id;
+              return typeof id === "string" ? id : null;
+            }
+          } catch {
+            return null;
+          }
+          return null;
+        })();
+        throw new MetaParseError(
+          metaPath,
+          "重複ID修復中に外部編集を検出したため、このスキャンでは登録をスキップします",
+          candidateId,
+        );
       }
       if (repair.repaired) {
         content = readFileSync(metaPath, "utf-8");

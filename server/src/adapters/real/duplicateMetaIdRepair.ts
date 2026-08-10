@@ -69,16 +69,25 @@ function repairDuplicates(raw: JsonObject, playlists: JsonObject[], seenIds: See
   let changed = false;
   const defaultPlaylistId =
     typeof raw.defaultPlaylistId === "string" ? raw.defaultPlaylistId : null;
+  const localPlaylistIds = new Set<string>();
+  const localTrackIds = new Set<string>();
 
   if (seenIds.work.has(raw.id as string)) {
     const oldDefaultPlaylistId =
       typeof raw.defaultPlaylistId === "string" ? raw.defaultPlaylistId : null;
     raw.id = crypto.randomUUID();
     let newDefaultPlaylistId: string | null = null;
+    let defaultPlaylistOwnerHandled = false;
     for (const playlist of playlists) {
-      const wasDefault = typeof playlist.id === "string" && playlist.id === oldDefaultPlaylistId;
+      const wasDefault =
+        !defaultPlaylistOwnerHandled &&
+        typeof playlist.id === "string" &&
+        playlist.id === oldDefaultPlaylistId;
       playlist.id = crypto.randomUUID();
-      if (wasDefault) newDefaultPlaylistId = playlist.id as string;
+      if (wasDefault) {
+        newDefaultPlaylistId = playlist.id as string;
+        defaultPlaylistOwnerHandled = true;
+      }
       for (const track of playlist.tracks as JsonObject[]) {
         track.id = crypto.randomUUID();
       }
@@ -86,20 +95,38 @@ function repairDuplicates(raw: JsonObject, playlists: JsonObject[], seenIds: See
     raw.defaultPlaylistId = oldDefaultPlaylistId === null ? null : newDefaultPlaylistId;
     changed = true;
   } else {
+    let defaultPlaylistOwnerHandled = false;
     for (const playlist of playlists) {
       const oldPlaylistId = typeof playlist.id === "string" ? playlist.id : null;
-      if (typeof playlist.id !== "string" || seenIds.playlist.has(playlist.id)) {
+      if (
+        typeof playlist.id !== "string" ||
+        seenIds.playlist.has(playlist.id) ||
+        localPlaylistIds.has(playlist.id)
+      ) {
         playlist.id = crypto.randomUUID();
         changed = true;
       }
-      if (oldPlaylistId !== null && oldPlaylistId === defaultPlaylistId) {
-        raw.defaultPlaylistId = playlist.id as string;
+      localPlaylistIds.add(playlist.id as string);
+      if (
+        !defaultPlaylistOwnerHandled &&
+        oldPlaylistId !== null &&
+        oldPlaylistId === defaultPlaylistId
+      ) {
+        if (playlist.id !== oldPlaylistId) {
+          raw.defaultPlaylistId = playlist.id as string;
+        }
+        defaultPlaylistOwnerHandled = true;
       }
       for (const track of playlist.tracks as JsonObject[]) {
-        if (typeof track.id !== "string" || seenIds.track.has(track.id)) {
+        if (
+          typeof track.id !== "string" ||
+          seenIds.track.has(track.id) ||
+          localTrackIds.has(track.id)
+        ) {
           track.id = crypto.randomUUID();
           changed = true;
         }
+        localTrackIds.add(track.id as string);
       }
     }
   }
