@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
-import type { DataAdapter } from "../src/adapter.ts";
+import type { DataAdapter } from "../src/adapter/index.ts";
 import { createApp } from "../src/app.ts";
 import { captureLogs, categoryRecords, recordMessage } from "./helpers/logCapture.ts";
 

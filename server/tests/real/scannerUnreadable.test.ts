@@ -6,7 +6,7 @@ import { test } from "node:test";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { openDb } from "../../src/adapters/real/db.ts";
 import { Scanner } from "../../src/adapters/real/scanner.ts";
-import { WorkRepo } from "../../src/adapters/real/workRepo.ts";
+import { createWorkRepos, getTestWork } from "../helpers/workTestUtils.ts";
 import { makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 
 function metaWithSingleTrack(id: string, title: string): unknown {
@@ -89,12 +89,12 @@ test("サブツリー読取失敗: 配下の既存作品は missing 化されず
 
   const db = openDb({ kind: "memory" });
   t.after(() => db.close());
-  const repo = new WorkRepo(db);
-  const scanner = new Scanner(db, repo, directory.path);
+  const repos = createWorkRepos(db);
+  const scanner = new Scanner(db, repos);
   await scanner.scan(root);
 
-  assert.equal((await repo.getWork(accessibleId))?.status, "ok");
-  assert.equal((await repo.getWork(blockedId))?.status, "ok");
+  assert.equal((await getTestWork(db, accessibleId))?.status, "ok");
+  assert.equal((await getTestWork(db, blockedId))?.status, "ok");
 
   const blockedRoot = join(root, "blocked");
   const blockedMode = statSync(blockedRoot).mode & 0o777;
@@ -102,8 +102,8 @@ test("サブツリー読取失敗: 配下の既存作品は missing 化されず
   await withRestoredMode(blockedRoot, blockedMode, async () => {
     const result = await scanner.scan(root);
     assert.ok(result.unreadablePaths?.includes(blockedRoot));
-    assert.equal((await repo.getWork(blockedId))?.status, "ok");
-    assert.equal((await repo.getWork(accessibleId))?.status, "ok");
+    assert.equal((await getTestWork(db, blockedId))?.status, "ok");
+    assert.equal((await getTestWork(db, accessibleId))?.status, "ok");
   })();
 });
 
@@ -130,8 +130,8 @@ test("サブツリー読取失敗: 読取可能な削除作品は引き続き mi
 
   const db = openDb({ kind: "memory" });
   t.after(() => db.close());
-  const repo = new WorkRepo(db);
-  const scanner = new Scanner(db, repo, directory.path);
+  const repos = createWorkRepos(db);
+  const scanner = new Scanner(db, repos);
   await scanner.scan(root);
 
   rmSync(removedDir, { recursive: true });
@@ -141,9 +141,9 @@ test("サブツリー読取失敗: 読取可能な削除作品は引き続き mi
   await withRestoredMode(blockedDir, blockedMode, async () => {
     const result = await scanner.scan(root);
     assert.ok(result.unreadablePaths?.includes(blockedDir));
-    assert.equal((await repo.getWork(blockedId))?.status, "ok");
-    assert.equal((await repo.getWork(removedId))?.status, "missing");
-    assert.equal((await repo.getWork(accessibleId))?.status, "ok");
+    assert.equal((await getTestWork(db, blockedId))?.status, "ok");
+    assert.equal((await getTestWork(db, removedId))?.status, "missing");
+    assert.equal((await getTestWork(db, accessibleId))?.status, "ok");
     assert.equal(result.missing, 1);
   })();
 });

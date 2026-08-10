@@ -8,7 +8,7 @@ import { stat } from "node:fs/promises";
 import { Readable } from "node:stream";
 import { Hono } from "hono";
 import { coverQuerySchema, fsAudioQuerySchema, normalizeThumbnailWidth } from "@mimimilli/shared";
-import type { CoverDescriptor, DataAdapter, MediaLocation } from "../adapter.ts";
+import type { CoverDescriptor, DataAdapter, MediaLocation } from "../adapter/index.ts";
 import { invalidRequest, notFound } from "../lib/httpError.ts";
 
 export function mediaRoute(adapter: DataAdapter): Hono {

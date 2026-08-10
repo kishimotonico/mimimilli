@@ -3,7 +3,7 @@
 
 import Button from "../../../shared/ui/Button";
 import { I } from "../../../shared/ui/Icon";
-import CollectionStatus from "../../library/ui/CollectionStatus";
+import CollectionStatus from "../../../shared/ui/CollectionStatus";
 import { classifyFile, sortEntries, type FsEntry } from "../model/types";
 import FileRow from "./FileRow";
 

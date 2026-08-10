@@ -8,7 +8,13 @@ import {
 } from "@mimimilli/shared";
 import { cancelDlsiteBulk, getDlsiteBulkStatus, startDlsiteBulk } from "../../../entities/work/api";
 import { API_BASE } from "../../../shared/api/http";
-import { getDlsiteInvalidationKeys } from "../../library/model/dlsiteInvalidation";
+import {
+  bindSseTransportError,
+  connectSse,
+  createSseGeneration,
+  parseTypedSseMessage,
+} from "../../../shared/api/sseTransport";
+import { invalidateDlsiteCache } from "../model/dlsiteInvalidation";
 import {
   dlsiteBulkActionsAtom,
   dlsiteBulkActiveAtom,
@@ -18,8 +24,9 @@ import {
   dlsiteBulkErrorAtom,
   dlsiteBulkProgressAtom,
   dlsiteBulkResultAtom,
+  dlsiteInvalidateAtom,
   type DlsiteBulkActions,
-} from "../model/atoms";
+} from "../../../entities/dlsite/model/bulkAtoms";
 
 type TerminalEvent = Extract<DlsiteBulkProgressEvent, { type: "complete" | "cancelled" | "error" }>;
 
@@ -41,14 +48,11 @@ export default function DlsiteBulkRuntime() {
   const setCancelledResult = useSetAtom(dlsiteBulkCancelledResultAtom);
   const setError = useSetAtom(dlsiteBulkErrorAtom);
   const setActions = useSetAtom(dlsiteBulkActionsAtom);
+  const setInvalidate = useSetAtom(dlsiteInvalidateAtom);
 
   const invalidateDlsiteQueries = useCallback(
-    (workIds?: string[]) => {
-      void Promise.all(
-        getDlsiteInvalidationKeys(workIds).map((queryKey) =>
-          queryClient.invalidateQueries({ queryKey }),
-        ),
-      );
+    (workIds?: string | string[]) => {
+      void invalidateDlsiteCache(queryClient, workIds);
     },
     [queryClient],
   );
@@ -106,7 +110,6 @@ export default function DlsiteBulkRuntime() {
       await cancelDlsiteBulk();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "一括取得の中止に失敗しました");
-      throw cause;
     }
   }, [active, setError]);
 
@@ -121,12 +124,19 @@ export default function DlsiteBulkRuntime() {
   }, [actions, setActions]);
 
   useEffect(() => {
+    const invalidate = (workIds?: string | string[]) => invalidateDlsiteCache(queryClient, workIds);
+    setInvalidate(invalidate);
+    return () => setInvalidate(null);
+  }, [queryClient, setInvalidate]);
+
+  useEffect(() => {
     if (!active) return;
 
     let disposed = false;
     let terminalHandled = false;
-    let generation = 0;
-    const source = new EventSource(`${API_BASE}/dlsite/events`);
+    const generation = createSseGeneration();
+    const connection = connectSse(`${API_BASE}/dlsite/events`);
+    const source = connection.source;
     // progressイベントのworkIdを集め、完了時にskippedでない（実際に処理対象だった）
     // 作品の詳細キャッシュだけを選択的に無効化する（getDlsiteInvalidationKeys参照）。
     // SSE切断→再接続、またはattach()での後乗り（開始直後からの購読と確信できない）
@@ -140,7 +150,7 @@ export default function DlsiteBulkRuntime() {
       if (disposed) return;
       setActive(false);
       setCancelling(false);
-      source.close();
+      connection.close();
     };
 
     const fail = (message: string): void => {
@@ -174,40 +184,37 @@ export default function DlsiteBulkRuntime() {
       if (terminal) applyTerminal(terminal);
     };
 
-    const handle = (event: MessageEvent<string>): void => {
-      generation += 1;
-      let json: unknown;
-      try {
-        json = JSON.parse(event.data);
-      } catch {
-        fail("DLsite進捗イベントの解析に失敗しました");
+    const eventMessages = {
+      parse: "DLsite進捗イベントの解析に失敗しました",
+      schema: "DLsite進捗イベントの形式が不正です",
+    } as const;
+
+    const handleRawSseEvent = (raw: Event): void => {
+      if (!(raw instanceof MessageEvent) || typeof raw.data !== "string") return;
+      generation.bump();
+      const parsed = parseTypedSseMessage(raw.data, dlsiteBulkProgressEventSchema, eventMessages);
+      if (!parsed.ok) {
+        fail(parsed.message);
         return;
       }
-      const parsed = dlsiteBulkProgressEventSchema.safeParse(json);
-      if (!parsed.success) {
-        fail("DLsite進捗イベントの形式が不正です");
-        return;
-      }
-      if (parsed.data.type === "progress") {
-        setProgress({ processed: parsed.data.processed, total: parsed.data.total });
-        updatedWorkIds.add(parsed.data.workId);
-      } else if (parsed.data.type === "cancelling") {
+      const event = parsed.event;
+      if (event.type === "progress") {
+        setProgress({ processed: event.processed, total: event.total });
+        updatedWorkIds.add(event.workId);
+      } else if (event.type === "cancelling") {
         setCancelling(true);
       } else {
-        applyTerminal(parsed.data);
+        applyTerminal(event);
       }
     };
 
     const refresh = (): void => {
       if (disposed || terminalHandled) return;
-      // SSE切断からの再接続経路。この間に配信されたはずのprogressイベント
-      // （workId）を取りこぼした可能性があるため、以降の完了判定は安全側
-      // （全作品無効化）に倒す。
       missedProgress = true;
-      const pollGeneration = ++generation;
+      const pollGeneration = generation.bump();
       void getDlsiteBulkStatus()
         .then((snapshot) => {
-          if (disposed || terminalHandled || pollGeneration !== generation) return;
+          if (disposed || terminalHandled || !generation.isCurrent(pollGeneration)) return;
           if (!snapshot) {
             if (source.readyState === EventSource.CLOSED) {
               fail("DLsite一括取得の接続が切断されました");
@@ -224,7 +231,7 @@ export default function DlsiteBulkRuntime() {
           applySnapshot(snapshot);
         })
         .catch((cause: unknown) => {
-          if (disposed || terminalHandled || pollGeneration !== generation) return;
+          if (disposed || terminalHandled || !generation.isCurrent(pollGeneration)) return;
           if (source.readyState === EventSource.CLOSED) {
             fail(
               cause instanceof Error ? cause.message : "DLsite一括取得の状態を取得できませんでした",
@@ -233,26 +240,19 @@ export default function DlsiteBulkRuntime() {
         });
     };
 
-    const onNamedEvent = (event: Event): void => {
-      if (event instanceof MessageEvent && typeof event.data === "string") {
-        handle(event);
-      }
-    };
-
     for (const type of ["progress", "cancelling", "complete", "cancelled"] as const) {
-      source.addEventListener(type, onNamedEvent);
+      source.addEventListener(type, handleRawSseEvent);
     }
-    source.addEventListener("error", (event) => {
-      if (event instanceof MessageEvent && typeof event.data === "string") {
-        handle(event);
-        return;
-      }
-      refresh();
+
+    bindSseTransportError({
+      source,
+      onConnectionError: refresh,
+      onNamedErrorEvent: handleRawSseEvent,
     });
 
     return () => {
       disposed = true;
-      source.close();
+      connection.close();
     };
   }, [
     active,

@@ -20,6 +20,14 @@ export const sortIdSchema = z.enum([
 ]);
 export type SortId = z.infer<typeof sortIdSchema>;
 
+/** 「最近追加」ビューの対象期間（日）。core と SQL の recent view 判定で共有する。 */
+export const RECENT_VIEW_WINDOW_DAYS = 30;
+
+/** random ソート用 seed。0x7fffffff 以下の非負整数。 */
+export function createRandomSeed(): number {
+  return crypto.getRandomValues(new Uint32Array(1))[0]! & 0x7fffffff;
+}
+
 // ── ビュー・分類軸 ────────────────────────────────────────────
 
 /** 軸レールのビュー（単純ビュー） */

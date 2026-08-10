@@ -14,28 +14,25 @@ import type { Work } from "../../../entities/work/model";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { useMediaSession } from "./useMediaSession";
 import { toAudioAbsoluteTime, getTrackDurationSec } from "./trackTime";
-import { playerCoreAtom, playerCurrentTimeAtom, playerDurationAtom } from "./atoms";
+import {
+  playerCoreAtom,
+  playerCurrentTimeAtom,
+  playerDurationAtom,
+} from "../../../entities/player/model/atoms";
 import { usePlayerRuntimeContext } from "./PlayerRuntimeProvider";
 import { useAudioEngineLifecycle } from "./useAudioEngineLifecycle";
 import { useResumePersistenceController } from "./useResumePersistence";
-import { formatTime, formatDuration, formatFileSize } from "../../../shared/lib/format";
 import { isPlayerCoreStateEqual, toPlayerCoreState } from "./playerController";
 import { usePlayerActions } from "./usePlayerActions";
 
-export { formatTime, formatDuration, formatFileSize };
-
 export function usePlayerRuntime() {
   const queryClient = useQueryClient();
-  const { controller, pendingResumeRef, runtimeRefs, capabilitiesRegistry } =
+  const { controller, pendingResumeRef, runtimeRefs, registerCapabilities } =
     usePlayerRuntimeContext();
   const [coreState, setCoreState] = useAtom(playerCoreAtom);
   const setCurrentTime = useSetAtom(playerCurrentTimeAtom);
   const setDuration = useSetAtom(playerDurationAtom);
   const lastCoreStateRef = useRef(coreState);
-
-  useLayoutEffect(() => {
-    runtimeRefs.coreState.current = coreState;
-  }, [runtimeRefs.coreState, coreState]);
 
   useEffect(
     () =>
@@ -73,11 +70,11 @@ export function usePlayerRuntime() {
   });
 
   useLayoutEffect(() => {
-    return capabilitiesRegistry.register({
+    return registerCapabilities({
       loadResume,
       getCurrentPlaybackContext,
     });
-  }, [capabilitiesRegistry, loadResume, getCurrentPlaybackContext]);
+  }, [registerCapabilities, loadResume, getCurrentPlaybackContext]);
 
   useEffect(() => {
     return controller.subscribeCommands((command) => {
@@ -113,6 +110,9 @@ export function usePlayerRuntime() {
         case "persistResume":
           saveCurrentResume();
           break;
+        case "releaseLoadedTrack":
+          runtimeRefs.loadedTrack.current = null;
+          break;
         case "workCompleted": {
           if (command.item.source.kind !== "work") break;
           const firstTrack = command.item.tracks[0];
@@ -127,8 +127,6 @@ export function usePlayerRuntime() {
         }
         case "loadTrack":
           loadTrack(command.item, command.autoplay);
-          break;
-        case "playbackQueueEnded":
           break;
       }
     });
@@ -155,9 +153,9 @@ export function usePlayerRuntime() {
     return {
       duration: context.trackDuration,
       position: context.currentTime,
-      playbackRate: runtimeRefs.coreState.current.playbackRate,
+      playbackRate: controller.getState().playbackRate,
     };
-  }, [getCurrentPlaybackContext, runtimeRefs.coreState]);
+  }, [controller, getCurrentPlaybackContext]);
 
   const actions = usePlayerActions();
   const updateMediaSessionPosition = useMediaSession({

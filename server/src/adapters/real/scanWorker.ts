@@ -1,14 +1,10 @@
-import { join } from "node:path";
 import type { ScanProgressEvent, ScanResult } from "@mimimilli/shared";
 import { openDb, type Db, type DbLocation } from "./db.ts";
-import { resolveWithin } from "./paths.ts";
 import { Scanner } from "./scanner.ts";
-import { gcThumbnailCache, type WorkCoverEntry } from "./thumbnailCache.ts";
-import { logDataIntegritySkips } from "./dataIntegrity.ts";
-import { WorkRepo } from "./workRepo.ts";
-import { getCategoryLogger } from "../../lib/logger.ts";
-
-const scanLogger = getCategoryLogger("scan");
+import { finalizeScan } from "./scanFinalize.ts";
+import { CatalogWorkRepository } from "./catalogWorkRepository.ts";
+import { UserWorkStateRepository } from "./userWorkStateRepository.ts";
+import { WorkQueryRepository } from "./workQueryRepository.ts";
 
 interface WorkerInput {
   database: Extract<DbLocation, { kind: "files" }>;
@@ -56,45 +52,37 @@ async function run(input: WorkerInput): Promise<void> {
     };
     if (input.testGateStage === "before-scan") waitAtTestGate();
     if (cancelled(token)) throw new Error("スキャンはキャンセルされました");
-    const repo = new WorkRepo(db);
-    const scanner = new Scanner(db, repo, input.dataRoot);
-    const result = await scanner.scan(input.root, {
-      full: input.full ?? false,
-      abortToken: token,
-      onProgress: (progress: ScanProgressEvent) => post({ type: "progress", progress }),
-      beforeFinalize: input.testGateStage === "before-finalize" ? waitAtTestGate : undefined,
-    });
+    const query = new WorkQueryRepository(db);
+    const catalog = new CatalogWorkRepository(db);
+    const user = new UserWorkStateRepository(db);
+    const scanner = new Scanner(db, { query, catalog, user });
+    const result = await scanner.scan(
+      input.root,
+      {
+        full: input.full ?? false,
+        onProgress: (progress: ScanProgressEvent) => post({ type: "progress", progress }),
+      },
+      {
+        abortToken: token,
+        beforeFinalize: input.testGateStage === "before-finalize" ? waitAtTestGate : undefined,
+      },
+    );
     if (cancelled(token)) {
       terminal = { type: "cancelled" };
     } else {
-      const covers: WorkCoverEntry[] = [];
-      const { summaries, skipped } = repo.listSummaries();
-      logDataIntegritySkips(scanLogger, "scan-worker-thumbnail-gc", skipped);
-      for (const work of summaries) {
-        if (cancelled(token)) break;
-        if (!work.cover) continue;
-        const absolutePath = resolveWithin(
-          work.physicalPath,
-          join(work.physicalPath, work.cover.image),
-        );
-        if (absolutePath) {
-          covers.push({ workId: work.id, coverAbsolutePath: absolutePath });
-        }
-      }
+      await finalizeScan({
+        query,
+        catalog,
+        thumbnailCacheDir: input.thumbnailCacheDir,
+        throwIfCancelled: () => {
+          if (cancelled(token)) throw new Error("スキャンはキャンセルされました");
+        },
+        integrityLogContext: "scan-worker-thumbnail-gc",
+      });
       if (cancelled(token)) {
         terminal = { type: "cancelled" };
       } else {
-        await gcThumbnailCache(input.thumbnailCacheDir, covers, {
-          throwIfCancelled: () => {
-            if (cancelled(token)) throw new Error("スキャンはキャンセルされました");
-          },
-        });
-        if (cancelled(token)) {
-          terminal = { type: "cancelled" };
-        } else {
-          repo.setScanState("last_scan_time", new Date().toISOString());
-          terminal = { type: "completed", result };
-        }
+        terminal = { type: "completed", result };
       }
     }
   } catch (error) {
@@ -110,7 +98,6 @@ async function run(input: WorkerInput): Promise<void> {
     db?.close();
   }
 
-  // 親はterminal受信か、terminal前のerror/messageerror/closeのいずれかで必ずsettleする。
   post(terminal);
   globalThis.close();
 }

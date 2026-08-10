@@ -4,7 +4,7 @@ import { Provider as JotaiProvider, createStore, useAtomValue } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PlayerRuntimeProvider } from "../../src/features/player/model/PlayerRuntimeProvider";
-import { NOT_REGISTERED_ERROR } from "../../src/features/player/model/playerRuntimeCapabilities";
+import { NOT_REGISTERED_ERROR } from "../../src/features/player/model/PlayerRuntimeProvider";
 import { usePlayerRuntime } from "../../src/features/player/model/usePlayer";
 import { usePlayerActions } from "../../src/features/player/model/usePlayerActions";
 import { usePlayerState } from "../../src/features/player/model/usePlayerState";
@@ -12,7 +12,7 @@ import {
   playerCurrentTimeAtom,
   playerDurationAtom,
   playerCoreAtom,
-} from "../../src/features/player/model/atoms";
+} from "../../src/entities/player/model/atoms";
 import { saveResumePosition } from "../../src/features/player/api";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import type { ResolvedTrack, Track, Work, WorkSummary } from "../../src/entities/work/model";
@@ -222,6 +222,73 @@ describe("usePlayer adapters", () => {
 
     act(() => hideRuntime?.());
     expect(() => actions!.seek(10)).toThrow(NOT_REGISTERED_ERROR);
+  });
+
+  it("PlayerRuntimeのアンマウントでロード済みトラック情報も解放され、再マウント後の同一ファイル別区間切替でengine.loadが省略されない", async () => {
+    const tracks: ResolvedTrack[] = [
+      { ...track, start: 0, end: 30, durationSec: 30, durationKind: "resolved" },
+      {
+        id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        title: "Track 2",
+        file: track.file,
+        start: 30,
+        end: 60,
+        durationSec: 30,
+        durationKind: "resolved",
+      },
+    ];
+
+    let actions: ReturnType<typeof usePlayerActions> | undefined;
+    let hideRuntime: (() => void) | undefined;
+    let showRuntime: (() => void) | undefined;
+    const queryClient = new QueryClient();
+
+    function RuntimeMount() {
+      usePlayerRuntime();
+      return null;
+    }
+
+    function ActionsHost() {
+      actions = usePlayerActions();
+      return null;
+    }
+
+    function TestRoot() {
+      const [mounted, setMounted] = useState(true);
+      hideRuntime = () => setMounted(false);
+      showRuntime = () => setMounted(true);
+      return createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(
+          JotaiProvider,
+          null,
+          createElement(
+            PlayerRuntimeProvider,
+            null,
+            mounted ? createElement(RuntimeMount) : null,
+            createElement(ActionsHost),
+          ),
+        ),
+      );
+    }
+
+    render(createElement(TestRoot));
+
+    act(() => actions!.play(work, tracks, 0, playlistId));
+    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
+    latestAudio().duration = 60;
+
+    act(() => hideRuntime?.());
+    act(() => showRuntime?.());
+    await waitFor(() => expect(audioInstances.length).toBe(2));
+
+    const remountedAudio = latestAudio();
+    expect(remountedAudio.srcAssignments).toHaveLength(0);
+
+    act(() => actions!.setTrackIndex(1));
+
+    await waitFor(() => expect(remountedAudio.srcAssignments).toHaveLength(1));
   });
 
   it("StrictModeのeffect再実行後もControllerへHTMLAudioイベントを渡す", async () => {
@@ -436,6 +503,25 @@ describe("usePlayer adapters", () => {
 
     expect(result.current.player.state.isPlaying).toBe(false);
     expect(saveResumePosition).not.toHaveBeenCalled();
+  });
+
+  it("再生速度変更と同時刻のトラック切替でも新しいengine.loadに新しい再生速度が渡る", async () => {
+    const tracks: Track[] = [
+      { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", title: "Track A", file: "audio/track-a.wav" },
+      { id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", title: "Track B", file: "audio/track-b.wav" },
+    ];
+    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
+    act(() => result.current.player.play(work, tracks, 0, playlistId));
+    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
+
+    // 同一 act 内で連続 dispatch する: playbackRateChanged の commit（useLayoutEffect による
+    // runtimeRefs 反映）が挟まらない状態で loadTrack が実行される状況を再現する。
+    act(() => {
+      result.current.player.setPlaybackRate(2);
+      result.current.player.nextTrack();
+    });
+
+    expect(latestAudio().playbackRate).toBe(2);
   });
 
   it("同一ファイルのトラック切替では再ロードせず区間先頭へシークする", async () => {

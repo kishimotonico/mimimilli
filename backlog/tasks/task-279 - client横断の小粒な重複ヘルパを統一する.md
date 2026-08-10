@@ -1,10 +1,10 @@
 ---
 id: TASK-279
 title: client横断の小粒な重複ヘルパを統一する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-08 21:21'
-updated_date: '2026-08-09 00:30'
+updated_date: '2026-08-09 03:28'
 labels: []
 dependencies: []
 priority: low
@@ -27,7 +27,19 @@ ordinal: 289000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 日付・エラー文言・フォーカス系・タグクエリの各ヘルパが1実装に統一され、全呼び出し箇所が置き換わっていること
-- [ ] #2 NotificationBell が共有dismissal機構を使っていること
-- [ ] #3 clientのcheck・変更範囲のテスト・smokeが通ること
+- [x] #1 日付・エラー文言・フォーカス系・タグクエリの各ヘルパが1実装に統一され、全呼び出し箇所が置き換わっていること
+- [x] #2 NotificationBell が共有dismissal機構を使っていること
+- [x] #3 clientのcheck・変更範囲のテスト・smokeが通ること
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+formatUserError は fallback を呼び出し側から渡す形にし、RootErrorBoundary の「予期しないエラーが発生しました」と StartupErrorScreen の「設定の取得に失敗しました」を両方保った。navigationUrl.ts の tags 組み立ては tagOp を持たないURL codecのため独立のまま維持。サムネ幅は ceil（画質優先）と nearest（列幅優先）の2規則を維持したうえで shared/src/api.ts の THUMBNAIL_WIDTHS 定義元へ集約し、戻り値型を ThumbnailWidth にして client 側の型アサーションを解消した。shared の normalizeThumbnailWidth とは同距離時の丸めが異なり（< と <=、target=192 で 128 と 256）、統一すると gridSizing.test.ts の期待値と表示解像度が変わるため統合しない判断。NotificationBell の手動dismissal を usePopoverDismissal へ寄せたことで、閉じる際にアンカーへフォーカスが戻る挙動が加わる（共有フックの仕様に揃えたもの）。検証: pnpm check 成功、client 781テスト・server 525テスト・smoke 10件全パス。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+日付フォーマット・DLsiteエラー文言・エラー整形・FOCUSABLE_SELECTOR・mapDismissReason・definitionOf を各1実装へ統一し、NotificationBell を共有dismissal機構へ寄せた。サムネ幅の2規則は意味別に維持したまま shared へ集約し型を厳密化。文言・挙動の退行なし。pnpm check と client 781 / server 525 テスト・smoke 10件で検証。
+<!-- SECTION:FINAL_SUMMARY:END -->

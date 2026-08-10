@@ -1,0 +1,31 @@
+/* mimimilli shell — shared-b
+   所有範囲: セクション見出し(.mle-sect*、preview・library双方で使用)。
+   shared-a〜dの分割理由はshared-a.css冒頭コメント参照。
+   import順: preview-a.cssの次、library-e.cssより前。 */
+
+/* ── Section labels ───────────────────────────────────────── */
+
+.mle-sect {
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 18px 0 8px;
+}
+.mle-sect__rule {
+  flex: 1;
+  height: 1px;
+  background: var(--line-soft);
+}
+.mle-sect .count {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink-3);
+}

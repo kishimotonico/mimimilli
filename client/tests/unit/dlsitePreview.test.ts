@@ -4,7 +4,7 @@ import {
   buildDlsiteApplyBody,
   dlsiteInfoTags,
   unappliedDlsiteTags,
-} from "../../src/features/library/model/dlsitePreview";
+} from "../../src/entities/work/dlsitePreview";
 
 const info: DlsiteWorkInfo = {
   rjCode: "RJ123456",

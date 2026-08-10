@@ -1,20 +1,30 @@
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAtomValue } from "jotai";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { AnimatePresence, motion, useIsPresent } from "motion/react";
-import { getDefaultPlaylistTrackCount, type ScanResult, type Work } from "@mimimilli/shared";
-import { getWork, patchWork } from "../../../entities/work/api";
-import { mutationErrorMessage } from "../../../shared/lib/mutationError";
-import { libraryTotalQueryOptions } from "../../library/model/useLibraryQueries";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AnimatePresence } from "motion/react";
+import { WORKS_DEFAULT_PAGE_SIZE, type WorkListItem, type WorksPage } from "@mimimilli/shared";
+import { patchWork, searchWorks } from "../../../entities/work/api";
+import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
+import { apiErrorMessage } from "../../../shared/lib/apiError";
+import { libraryTotalQueryOptions } from "../../../entities/work/libraryTotalQueryOptions";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
-import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 import { cn } from "../../../shared/lib/cn";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
-import { scanPhaseLabel, type ScanProgress } from "../model";
-import { scanningAtom, scanProgressAtom } from "../model/atoms";
-import { useScanActions } from "../model/useScanActions";
+import { scanningAtom, scanProgressAtom } from "../../../entities/scan/model/atoms";
+import { useScanActions } from "../../../entities/scan/useScanActions";
 import { getLastScanResult, SCAN_QUERY_KEYS } from "../api";
+import StatusRow from "./scanModal/StatusRow";
+import StatsGrid from "./scanModal/StatsGrid";
+import ScanWarnings from "./scanModal/ScanWarnings";
+import ScanNewWorks from "./scanModal/ScanNewWorks";
+import {
+  ScanCancelButton,
+  ScanFooterHint,
+  ScanFullScanButton,
+  ScanStartButton,
+} from "./scanModal/ScanFooterControls";
+import { useScanCompletionHint } from "./scanModal/useScanCompletionHint";
 
 interface ScanModalProps {
   lastScanTime: string | null;
@@ -23,22 +33,26 @@ interface ScanModalProps {
   onOpenRjCodeMissing: () => void;
 }
 
-type StatKey = keyof Pick<ScanResult, "registered" | "newlyGenerated" | "errors" | "missing">;
-const STAT_KEYS: StatKey[] = ["registered", "newlyGenerated", "errors", "missing"];
+const EMPTY_WORK_IDS: string[] = [];
 
-/** 完了サインの表示時間。派手にしないため短めに留める。 */
-const COMPLETION_HINT_MS = 2400;
-/** 変化したバッジの強調が消えるまでの時間（バッジ側のtransition-colorsで滑らかに戻す）。 */
-const BADGE_HIGHLIGHT_MS = 1000;
-
-function formatDate(iso: string | null): string {
-  return iso ? new Date(iso).toLocaleString("ja-JP") : "未実行";
+/** 一覧クエリキャッシュ内のitemsから該当作品のタイトルだけを差し替える */
+function patchTitleInWorksPage(
+  prev: WorksPage | undefined,
+  workId: string,
+  title: string,
+): WorksPage | undefined {
+  if (!prev) return prev;
+  return {
+    ...prev,
+    items: prev.items.map((item) => (item.id === workId ? { ...item, title } : item)),
+  };
 }
 
 export default function ScanModal({ lastScanTime, onClose, onOpenRjCodeMissing }: ScanModalProps) {
   const scanning = useAtomValue(scanningAtom);
   const progress = useAtomValue(scanProgressAtom);
   const { start, cancel } = useScanActions();
+  const queryClient = useQueryClient();
 
   // 前回スキャン結果（ディスク永続化なし、TASK-56）。サーバー起動後に一度でも完了していれば
   // GET /api/scan/last から取得でき、リロードをまたいでスキャンモーダルに表示できる。
@@ -48,6 +62,36 @@ export default function ScanModal({ lastScanTime, onClose, onOpenRjCodeMissing }
     queryFn: getLastScanResult,
   });
   const lastResult = lastScanQuery.data?.result ?? null;
+  const newWorkIds = lastResult?.newWorkIds ?? EMPTY_WORK_IDS;
+  // 初回フルスキャン等でnewWorkIdsが数千〜数万件になりうるため、表示・取得は先頭の
+  // 1ページ分（WORKS_DEFAULT_PAGE_SIZE）に制限する。全件をidsへ載せるとURLとSQLite
+  // 束縛パラメータの上限を超える。省略が発生したかはScanNewWorks側の表示に渡す。
+  const visibleWorkIds = useMemo(() => newWorkIds.slice(0, WORKS_DEFAULT_PAGE_SIZE), [newWorkIds]);
+  const truncatedTotal = newWorkIds.length > visibleWorkIds.length ? newWorkIds.length : null;
+
+  // 新規作品の表示用データ（title/trackCount）は visibleWorkIds を1回のworks一覧クエリで引く。
+  // WORK_QUERY_KEYS.list() 配下に載るため、DLsite一括取得完了時のWORK_QUERY_KEYS.all()
+  // 無効化に自動で乗る（追加の無効化配線は不要）。
+  const newWorksParams = useMemo(() => ({ ids: visibleWorkIds }), [visibleWorkIds]);
+  const newWorksQuery = useQuery({
+    queryKey: WORK_QUERY_KEYS.list(newWorksParams),
+    queryFn: () => searchWorks(newWorksParams),
+    enabled: visibleWorkIds.length > 0,
+  });
+  const newWorksError = newWorksQuery.isError
+    ? apiErrorMessage(newWorksQuery.error, "新規作品の読み込みに失敗しました")
+    : null;
+  const newWorkOrder = useMemo(
+    () => new Map(visibleWorkIds.map((id, index) => [id, index])),
+    [visibleWorkIds],
+  );
+  const newWorks: WorkListItem[] = useMemo(
+    () =>
+      [...(newWorksQuery.data?.items ?? [])].sort(
+        (a, b) => (newWorkOrder.get(a.id) ?? 0) - (newWorkOrder.get(b.id) ?? 0),
+      ),
+    [newWorksQuery.data, newWorkOrder],
+  );
 
   // ライブラリ総件数（サイドバーの「ライブラリ N 件」と同じ既存クエリキーを共有する）。
   // スキャンモーダルで統計バッジが全て0でも蔵書自体は0件ではないことを示すために使う。
@@ -55,8 +99,6 @@ export default function ScanModal({ lastScanTime, onClose, onOpenRjCodeMissing }
   // 共有し、同じキーに違う形のデータを期待する食い違い（TASK-188）を型で防ぐ。
   const libraryTotalQuery = useQuery(libraryTotalQueryOptions);
   const libraryTotal = libraryTotalQuery.data?.total ?? null;
-  const [newWorks, setNewWorks] = useState<Work[]>([]);
-  const [newWorksError, setNewWorksError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const titleInputRef = useRef<HTMLInputElement | null>(null);
@@ -65,43 +107,15 @@ export default function ScanModal({ lastScanTime, onClose, onOpenRjCodeMissing }
     mutationFn: ({ workId, title }: { workId: string; title: string }) =>
       patchWork(workId, { title }),
     onSuccess: (updatedWork, { workId }) => {
-      setNewWorks((prev) =>
-        prev.map((w) => (w.id === workId ? { ...w, title: updatedWork.title } : w)),
+      queryClient.setQueryData(WORK_QUERY_KEYS.detail(workId), updatedWork);
+      queryClient.setQueryData<WorksPage>(WORK_QUERY_KEYS.list(newWorksParams), (prev) =>
+        patchTitleInWorksPage(prev, workId, updatedWork.title),
       );
       setEditingId(null);
     },
   });
 
-  // 実行中→完了の遷移を自分で見ていたときだけ、控えめな完了サインを一時的に出す
-  // （レイアウトは動かさず、ステータス行のテキストと変化した統計バッジの色だけを使う）。
-  const [justCompleted, setJustCompleted] = useState(false);
-  const [changedKeys, setChangedKeys] = useState<ReadonlySet<StatKey>>(new Set());
-  const wasScanningRef = useRef(scanning);
-  const resultBeforeRunRef = useRef(lastResult);
-  useEffect(() => {
-    const wasScanning = wasScanningRef.current;
-    wasScanningRef.current = scanning;
-    if (!wasScanning && scanning) {
-      resultBeforeRunRef.current = lastResult;
-      return;
-    }
-    if (!(wasScanning && !scanning)) return;
-    const before = resultBeforeRunRef.current;
-    const changed = new Set<StatKey>(
-      STAT_KEYS.filter((key) => (before?.[key] ?? 0) !== (lastResult?.[key] ?? 0)),
-    );
-    setChangedKeys(changed);
-    setJustCompleted(true);
-    const hintTimer = setTimeout(() => setJustCompleted(false), COMPLETION_HINT_MS);
-    const badgeTimer = setTimeout(() => setChangedKeys(new Set()), BADGE_HIGHLIGHT_MS);
-    return () => {
-      clearTimeout(hintTimer);
-      clearTimeout(badgeTimer);
-    };
-  }, [scanning, lastResult]);
-
-  const wasScanning = wasScanningRef.current;
-  const justStoppedScanning = wasScanning && !scanning;
+  const { showCompletedHint, changedKeys } = useScanCompletionHint(scanning, lastResult);
 
   // タイトル編集中は編集だけをキャンセルし、モーダル自体は閉じない。
   // 実行中でも閉じられるが、スキャン自体はバックグラウンドで継続する（TASK-56）。
@@ -115,36 +129,12 @@ export default function ScanModal({ lastScanTime, onClose, onOpenRjCodeMissing }
   };
   const { dialogRef, handleCancel, handleBackdropClick } = useDialogModal({ onClose: dismiss });
 
-  const newWorkIds = lastResult?.newWorkIds ?? [];
-  const newWorkIdsKey = newWorkIds.join(",");
-  useEffect(() => {
-    setNewWorks([]);
-    setNewWorksError(null);
-    if (newWorkIds.length === 0) return;
-
-    let cancelled = false;
-    Promise.all(newWorkIds.map((id) => getWork(id)))
-      .then((works) => {
-        if (!cancelled) setNewWorks(works);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setNewWorks([]);
-          setNewWorksError("新規作品の読み込みに失敗しました");
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- newWorkIds は配列参照が毎回変わるため内容で比較する
-  }, [newWorkIdsKey]);
-
   useEffect(() => {
     if (!editingId) return;
     titleInputRef.current?.focus({ preventScroll: true });
   }, [editingId]);
 
-  const handleStartEdit = (work: Work) => {
+  const handleStartEdit = (work: WorkListItem) => {
     setEditingId(work.id);
     setEditTitle(work.title);
     saveTitleMutation.reset();
@@ -162,7 +152,7 @@ export default function ScanModal({ lastScanTime, onClose, onOpenRjCodeMissing }
   };
 
   const editError = saveTitleMutation.error
-    ? mutationErrorMessage(saveTitleMutation.error, "タイトルの保存に失敗しました")
+    ? apiErrorMessage(saveTitleMutation.error, "タイトルの保存に失敗しました")
     : null;
   const editSaving = saveTitleMutation.isPending;
 
@@ -189,7 +179,7 @@ export default function ScanModal({ lastScanTime, onClose, onOpenRjCodeMissing }
             scanning={scanning}
             progress={progress}
             lastScanTime={lastScanTime}
-            showCompletedHint={justCompleted || justStoppedScanning}
+            showCompletedHint={showCompletedHint}
           />
 
           <div className="flex items-baseline justify-between gap-2">
@@ -224,6 +214,7 @@ export default function ScanModal({ lastScanTime, onClose, onOpenRjCodeMissing }
                 key="new-works"
                 newWorks={newWorks}
                 newWorksError={newWorksError}
+                truncatedTotal={truncatedTotal}
                 editingId={editingId}
                 editTitle={editTitle}
                 editSaving={editSaving}
@@ -243,404 +234,19 @@ export default function ScanModal({ lastScanTime, onClose, onOpenRjCodeMissing }
           </AnimatePresence>
           <div className="relative flex shrink-0 items-center gap-2">
             <AnimatePresence initial={false}>
-              {scanning && (
-                <ScanCancelButton key="cancel" onClick={() => void cancel().catch(() => {})} />
-              )}
+              {scanning && <ScanCancelButton key="cancel" onClick={() => void cancel()} />}
             </AnimatePresence>
             <AnimatePresence initial={false}>
               {!scanning && (
-                <ScanFullScanButton
-                  key="fullscan"
-                  onClick={() => void start({ full: true }).catch(() => {})}
-                />
+                <ScanFullScanButton key="fullscan" onClick={() => void start({ full: true })} />
               )}
             </AnimatePresence>
             <AnimatePresence initial={false}>
-              {!scanning && (
-                <ScanStartButton key="start" onClick={() => void start().catch(() => {})} />
-              )}
+              {!scanning && <ScanStartButton key="start" onClick={() => void start()} />}
             </AnimatePresence>
           </div>
         </footer>
       </div>
     </dialog>
-  );
-}
-
-type StatusState = "scanning" | "completed" | "lastScan";
-
-/** 「最終スキャン: 日時」⇄「実行中のフェーズと進捗」⇄「完了しました」を同じ行の位置で入れ替える。
- *  完了サインは justCompleted の間だけ一時的に挟まり、その後は最終スキャン日時に戻る。
- *  排他3状態を単一スロット化し、sync（並置クロスフェード）+ 退出absoluteで入れ替える。 */
-function StatusRow({
-  scanning,
-  progress,
-  lastScanTime,
-  showCompletedHint,
-}: {
-  scanning: boolean;
-  progress: ScanProgress | null;
-  lastScanTime: string | null;
-  showCompletedHint: boolean;
-}) {
-  const state: StatusState = scanning ? "scanning" : showCompletedHint ? "completed" : "lastScan";
-
-  return (
-    <div className="relative flex min-h-[20px] flex-col gap-1.5">
-      <AnimatePresence initial={false}>
-        {state === "scanning" && <StatusRowScanning key="scanning" progress={progress} />}
-        {state === "completed" && <StatusRowCompleted key="completed" />}
-        {state === "lastScan" && <StatusRowLastScan key="lastScan" lastScanTime={lastScanTime} />}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-function StatusRowScanning({ progress }: { progress: ScanProgress | null }) {
-  const { fade } = useMotionVariants();
-  const isPresent = useIsPresent();
-  const v = fade();
-  const pct =
-    progress && progress.total > 0
-      ? Math.min(100, Math.round((progress.processed / progress.total) * 100))
-      : null;
-  return (
-    <motion.div className="flex flex-col gap-1.5" inert={!isPresent} {...v}>
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="font-sans text-[13px] font-medium text-ink-0">
-          {progress ? scanPhaseLabel(progress.phase) : "準備中"}
-        </span>
-        <span className="font-mono text-[11px] text-ink-2 tabular-nums">
-          {progress && progress.total > 0 ? `${progress.processed}/${progress.total}` : "…"}
-        </span>
-      </div>
-      <div className="h-[3px] overflow-hidden rounded-full bg-paper-2">
-        <div
-          className={cn(
-            "h-full rounded-full bg-acc transition-[width] duration-300 ease-out",
-            pct === null && "w-1/3 animate-pulse",
-          )}
-          style={pct !== null ? { width: `${pct}%` } : undefined}
-        />
-      </div>
-    </motion.div>
-  );
-}
-
-function StatusRowCompleted() {
-  const { fade } = useMotionVariants();
-  const isPresent = useIsPresent();
-  const v = fade();
-  return (
-    <motion.div className="flex items-center gap-1.5" inert={!isPresent} {...v}>
-      <I.check size={12} className="text-[var(--r-leaf)]" />
-      <span className="font-sans text-[13px] font-medium text-ink-0">完了しました</span>
-    </motion.div>
-  );
-}
-
-function StatusRowLastScan({ lastScanTime }: { lastScanTime: string | null }) {
-  const { fade } = useMotionVariants();
-  const isPresent = useIsPresent();
-  const v = fade();
-  return (
-    <motion.div inert={!isPresent} {...v}>
-      <span className="font-mono text-[11px] text-ink-2">
-        最終スキャン: {formatDate(lastScanTime)}
-      </span>
-    </motion.div>
-  );
-}
-
-/** RJコード未検出/データ不整合の警告。組み合わせで両方同時に出ることがあるため1つのcollapse境界にまとめる。 */
-function ScanWarnings({
-  lastResult,
-  onOpenRjCodeMissing,
-}: {
-  lastResult: ScanResult;
-  onOpenRjCodeMissing: () => void;
-}) {
-  const { collapse } = useMotionVariants();
-  const isPresent = useIsPresent();
-  const v = collapse();
-  return (
-    <motion.div
-      style={{ overflow: "hidden" }}
-      className="flex flex-col gap-1.5"
-      inert={!isPresent}
-      {...v}
-    >
-      {lastResult.rjCodeMissingCount > 0 ? (
-        <button
-          type="button"
-          onClick={onOpenRjCodeMissing}
-          className="flex w-full items-center gap-2 overflow-hidden rounded-[6px] border border-[color-mix(in_oklch,var(--r-mustard)_35%,transparent)] bg-[color-mix(in_oklch,var(--r-mustard)_10%,transparent)] px-3 py-2 text-left hover:bg-[color-mix(in_oklch,var(--r-mustard)_16%,transparent)]"
-        >
-          <I.err size={13} className="shrink-0 text-[var(--r-mustard)]" />
-          <span className="flex-1 font-jp text-[12px] text-ink-0">
-            RJコード未検出の作品が{lastResult.rjCodeMissingCount}件あります
-          </span>
-          <I.chev size={12} className="shrink-0 text-ink-3" />
-        </button>
-      ) : null}
-      {lastResult.dataIntegrityWarning ? (
-        <div className="flex w-full items-center gap-2 overflow-hidden rounded-[6px] border border-[color-mix(in_oklch,var(--r-mustard)_35%,transparent)] bg-[color-mix(in_oklch,var(--r-mustard)_10%,transparent)] px-3 py-2">
-          <I.err size={13} className="shrink-0 text-[var(--r-mustard)]" />
-          <span className="font-jp text-[12px] text-ink-0">
-            {lastResult.dataIntegrityWarning.skippedCount}
-            件の作品がデータ不整合のため除外されました
-          </span>
-        </div>
-      ) : null}
-    </motion.div>
-  );
-}
-
-/** 新規検出した作品一覧。件数見出し+一覧（または取得失敗メッセージ）を1つのcollapse境界にまとめる。 */
-function ScanNewWorks({
-  newWorks,
-  newWorksError,
-  editingId,
-  editTitle,
-  editSaving,
-  editError,
-  titleInputRef,
-  onStartEdit,
-  onChangeEditTitle,
-  onSaveTitle,
-}: {
-  newWorks: Work[];
-  newWorksError: string | null;
-  editingId: string | null;
-  editTitle: string;
-  editSaving: boolean;
-  editError: string | null;
-  titleInputRef: RefObject<HTMLInputElement | null>;
-  onStartEdit: (work: Work) => void;
-  onChangeEditTitle: (title: string) => void;
-  onSaveTitle: (workId: string) => void;
-}) {
-  const { collapse } = useMotionVariants();
-  const isPresent = useIsPresent();
-  const v = collapse();
-  return (
-    <motion.div
-      style={{ overflow: "hidden" }}
-      className="flex flex-col gap-1.5"
-      inert={!isPresent}
-      {...v}
-    >
-      <p className="font-sans text-[10.5px] font-semibold tracking-[0.06em] text-ink-3 uppercase">
-        新規検出した作品
-      </p>
-      {newWorksError ? (
-        <p className="font-jp text-[12px] text-[var(--r-coral)]">{newWorksError}</p>
-      ) : (
-        <ul className="flex max-h-[220px] list-none flex-col gap-1 overflow-y-auto p-0">
-          {newWorks.map((work) => (
-            <li key={work.id}>
-              <NewWorkRow
-                work={work}
-                editing={editingId === work.id}
-                editTitle={editTitle}
-                editSaving={editingId === work.id && editSaving}
-                editError={editingId === work.id ? editError : null}
-                titleInputRef={titleInputRef}
-                onStartEdit={() => onStartEdit(work)}
-                onChangeEditTitle={onChangeEditTitle}
-                onSaveTitle={() => onSaveTitle(work.id)}
-              />
-            </li>
-          ))}
-        </ul>
-      )}
-    </motion.div>
-  );
-}
-
-/** フッターの「閉じてもバックグラウンドで続行します」ヒント。中止ボタンと同時に出る。 */
-function ScanFooterHint() {
-  const { fade } = useMotionVariants();
-  const isPresent = useIsPresent();
-  const v = fade();
-  return (
-    <motion.div className="font-jp text-[11px] text-ink-3" inert={!isPresent} {...v}>
-      閉じてもバックグラウンドで続行します
-    </motion.div>
-  );
-}
-
-function ScanCancelButton({ onClick }: { onClick: () => void }) {
-  const { fade } = useMotionVariants();
-  const isPresent = useIsPresent();
-  const v = fade();
-  return (
-    <motion.button
-      type="button"
-      onClick={onClick}
-      inert={!isPresent}
-      {...v}
-      className="inline-flex h-9 min-w-[128px] items-center justify-center gap-1.5 rounded-[6px] border border-[color-mix(in_oklch,var(--r-coral)_45%,transparent)] bg-[color-mix(in_oklch,var(--r-coral)_10%,transparent)] px-4 font-sans text-[12.5px] font-medium text-ink-0 transition-colors hover:bg-[color-mix(in_oklch,var(--r-coral)_16%,transparent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
-    >
-      <I.x size={12} />
-      スキャンを中止
-    </motion.button>
-  );
-}
-
-function ScanFullScanButton({ onClick }: { onClick: () => void }) {
-  const { fade } = useMotionVariants();
-  const isPresent = useIsPresent();
-  const v = fade();
-  return (
-    <motion.button
-      type="button"
-      onClick={onClick}
-      inert={!isPresent}
-      {...v}
-      className="inline-flex h-9 items-center justify-center gap-1.5 rounded-[6px] border border-line-soft bg-paper-0 px-3 font-sans text-[12px] font-medium text-ink-1 transition-colors hover:bg-paper-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
-    >
-      <I.refresh size={12} />
-      フルスキャン
-    </motion.button>
-  );
-}
-
-function ScanStartButton({ onClick }: { onClick: () => void }) {
-  const { fade } = useMotionVariants();
-  const isPresent = useIsPresent();
-  const v = fade();
-  return (
-    <motion.button
-      type="button"
-      onClick={onClick}
-      inert={!isPresent}
-      {...v}
-      className="inline-flex h-9 min-w-[128px] items-center justify-center gap-1.5 rounded-[6px] bg-ink-0 px-4 font-sans text-[12.5px] font-semibold text-paper-1 transition-colors hover:bg-acc focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
-    >
-      <I.refresh size={12} />
-      スキャン開始
-    </motion.button>
-  );
-}
-
-const STAT_TILES: Array<{
-  key: StatKey;
-  label: string;
-  tone: (value: number) => string;
-}> = [
-  { key: "registered", label: "登録済み", tone: () => "text-ink-0" },
-  { key: "newlyGenerated", label: "新規検出", tone: () => "text-ink-0" },
-  { key: "errors", label: "エラー", tone: (v) => (v > 0 ? "text-[var(--r-coral)]" : "text-ink-3") },
-  {
-    key: "missing",
-    label: "行方不明",
-    tone: (v) => (v > 0 ? "text-[var(--r-mustard)]" : "text-ink-3"),
-  },
-];
-
-/** 常に4枠を表示し、値だけが更新される（実行中も直前の値のまま）。
- *  changedKeys に含まれる枠は、直前のスキャンで値が変わったことを示す短い強調を出す。 */
-function StatsGrid({
-  result,
-  changedKeys,
-}: {
-  result: ScanResult | null;
-  changedKeys: ReadonlySet<StatKey>;
-}) {
-  return (
-    <div className="grid grid-cols-4 gap-2">
-      {STAT_TILES.map(({ key, label, tone }) => {
-        const value = result?.[key] ?? null;
-        const highlighted = changedKeys.has(key);
-        return (
-          <div
-            key={key}
-            className={cn(
-              "flex flex-col gap-0.5 rounded-[6px] border px-2.5 py-2 transition-colors duration-700",
-              highlighted
-                ? "border-[color-mix(in_oklch,var(--acc)_45%,transparent)] bg-[color-mix(in_oklch,var(--acc)_12%,transparent)]"
-                : "border-line-soft bg-paper-0",
-            )}
-          >
-            <span
-              className={cn(
-                "font-mono text-[16px] leading-none font-semibold tabular-nums",
-                value === null ? "text-ink-4" : tone(value),
-              )}
-            >
-              {value ?? "—"}
-            </span>
-            <span className="font-jp text-[10px] text-ink-3">{label}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function NewWorkRow({
-  work,
-  editing,
-  editTitle,
-  editSaving,
-  editError,
-  titleInputRef,
-  onStartEdit,
-  onChangeEditTitle,
-  onSaveTitle,
-}: {
-  work: Work;
-  editing: boolean;
-  editTitle: string;
-  editSaving: boolean;
-  editError: string | null;
-  titleInputRef: RefObject<HTMLInputElement | null>;
-  onStartEdit: () => void;
-  onChangeEditTitle: (title: string) => void;
-  onSaveTitle: () => void;
-}) {
-  return (
-    <div className="flex flex-col gap-1 rounded-[6px] border border-line-soft bg-paper-0 px-2.5 py-1.5">
-      <div className="flex items-center gap-2">
-        <span className="shrink-0 rounded-pill bg-[color-mix(in_oklch,var(--r-leaf)_16%,transparent)] px-1.5 py-0.5 font-sans text-[9.5px] font-semibold text-[var(--r-leaf)]">
-          NEW
-        </span>
-        {editing ? (
-          <input
-            ref={titleInputRef}
-            value={editTitle}
-            disabled={editSaving}
-            onChange={(e) => onChangeEditTitle(e.target.value)}
-            onBlur={onSaveTitle}
-            onKeyDown={(e) => {
-              // Escapeのキャンセルは dialog の onCancel（useDialogModal）に一元化する
-              if (e.key === "Enter") onSaveTitle();
-            }}
-            className={cn(
-              "min-w-0 flex-1 rounded-[4px] border bg-paper-2 px-2 py-0.5 font-jp text-[12.5px] text-ink-0 outline-none disabled:opacity-60",
-              editError ? "border-[var(--r-coral)]" : "border-acc",
-            )}
-          />
-        ) : (
-          <button
-            type="button"
-            onClick={onStartEdit}
-            title="クリックしてタイトルを編集"
-            className="min-w-0 flex-1 truncate text-left font-jp text-[12.5px] text-ink-0"
-          >
-            {work.title}
-          </button>
-        )}
-        <span className="shrink-0 font-mono text-[10.5px] text-ink-4">
-          {editSaving ? "保存中…" : `${getDefaultPlaylistTrackCount(work)} tracks`}
-        </span>
-      </div>
-      {editError && (
-        <span role="alert" className="mll-selectable font-jp text-[10.5px] text-[var(--r-coral)]">
-          {editError}
-        </span>
-      )}
-    </div>
   );
 }

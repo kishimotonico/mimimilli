@@ -12,13 +12,13 @@ import {
 } from "../../shared/api/http";
 import {
   workSchema,
-  tagListSchema,
+  worksPageSchema,
   dlsiteWorkInfoSchema,
   dlsiteBulkStartResponseSchema,
   dlsiteBulkCancelResponseSchema,
   dlsiteBulkSnapshotSchema,
+  createRandomSeed,
   type DlsiteBulkSnapshot,
-  fileEntrySchema,
   type Work,
   dlsiteNotificationPageSchema,
   dlsiteNotificationSummarySchema,
@@ -26,12 +26,48 @@ import {
   type DlsiteNotificationPage,
   type DlsiteNotificationSummary,
   type WorkPatchInput,
-  type FileEntry,
   type DlsiteWorkInfo,
   type DlsiteApplyBody,
   type DlsiteStatePatch,
   type ResumeBody,
+  type WorksPage,
+  type WorksQueryInput,
 } from "@mimimilli/shared";
+
+function appendTagsTagOp(
+  params: URLSearchParams,
+  filter: { tags?: string[]; tagOp?: "AND" | "OR" },
+): void {
+  for (const tag of filter.tags ?? []) params.append("tags", tag);
+  if (filter.tagOp) params.set("tagOp", filter.tagOp);
+}
+
+/** クエリ文字列は「未指定」と「空配列」を区別できないため、ids:[] は空集合として
+ *  リクエストせずに返す（core の filterByIds・real SQL と同じセマンティクス） */
+function emptyIdsPage(params: WorksQueryInput): WorksPage {
+  const stats = { trackCount: 0, durationSec: 0 };
+  if (params.sort !== "random") return { items: [], total: 0, stats };
+  const seed = params.seed === undefined ? createRandomSeed() : Number(params.seed);
+  return { items: [], total: 0, stats, seed };
+}
+
+export async function searchWorks(
+  params: WorksQueryInput,
+  options?: { signal?: AbortSignal },
+): Promise<WorksPage> {
+  if (params.ids?.length === 0) return emptyIdsPage(params);
+  const p = new URLSearchParams();
+  if (params.q) p.set("q", params.q);
+  appendTagsTagOp(p, params);
+  if (params.view) p.set("view", params.view);
+  if (params.sort) p.set("sort", params.sort);
+  if (params.seed !== undefined) p.set("seed", String(params.seed));
+  if (params.page !== undefined) p.set("page", String(params.page));
+  if (params.limit !== undefined) p.set("limit", String(params.limit));
+  for (const id of params.ids ?? []) p.append("ids", id);
+  const q = p.toString();
+  return getParsed(worksPageSchema, `/works${q ? `?${q}` : ""}`, options);
+}
 
 /** GET /works/:id は存在しない場合404を返す契約。呼び出し側はnull分岐でなくエラー（TanStack QueryのisError等）で扱う */
 export async function getWork(id: string): Promise<Work> {
@@ -50,19 +86,8 @@ export async function queryDlsiteNotifications(
   return getParsed(dlsiteNotificationPageSchema, `/dlsite/notifications/${kind}?${query}`);
 }
 
-export async function queryDlsiteParseFailedNotifications(params: {
-  page: number;
-  limit: number;
-}): Promise<DlsiteNotificationPage> {
-  return queryDlsiteNotifications("parse-failed", params);
-}
-
 export async function patchWork(workId: string, body: WorkPatchInput): Promise<Work> {
   return patchParsed(workSchema, `/works/${encodeURIComponent(workId)}`, body);
-}
-
-export async function getAllTags(): Promise<string[]> {
-  return getParsed(tagListSchema, "/tags");
 }
 
 /** カバー画像のURLを返す（<img src> で直接使用可）。
@@ -90,11 +115,6 @@ export async function updateLastPlayed(workId: string): Promise<void> {
 
 export async function saveResumePosition(workId: string, resume: ResumeBody): Promise<void> {
   await postVoid(`/works/${encodeURIComponent(workId)}/resume`, resume);
-}
-
-/** GET /works/:id/files も存在しない場合404を返す契約なので、getWork同様にnull分岐は伝播させない（現状未使用） */
-export async function listWorkFiles(workId: string): Promise<FileEntry> {
-  return getParsed(fileEntrySchema, `/works/${encodeURIComponent(workId)}/files`);
 }
 
 export async function fetchDlsiteInfo(workId: string): Promise<DlsiteWorkInfo> {

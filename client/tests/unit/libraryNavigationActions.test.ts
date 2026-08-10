@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { createStore } from "jotai";
-import { selectedWorkIdAtom, selectedTagsAtom } from "../../src/features/library/model/atoms";
+import {
+  selectedWorkIdAtom,
+  selectedTagsAtom,
+} from "../../src/entities/library/model/navigationAtoms";
 import { nt, nts } from "../helpers/tag";
 import {
   consumeNavigationHistoryCommitAtom,
   navigationHistoryCommitAtom,
-} from "../../src/features/navigation/model/navigationHistoryAtoms";
-import { activeAxisAtom } from "../../src/features/library/model/atoms";
+} from "../../src/shared/model/navigationHistoryAtoms";
+import { activeAxisAtom } from "../../src/entities/library/model/navigationAtoms";
 import {
   addLibraryTagAtom,
   clearLibraryTagsAtom,
@@ -15,7 +18,7 @@ import {
   selectSoleLibraryTagAtom,
   setLibraryAxisAtom,
   toggleLibraryTagAtom,
-} from "../../src/features/library/model/libraryNavigationActions";
+} from "../../src/entities/library/model/navigationActions";
 
 describe("ナビゲーション操作は選択中の作品をクリアする", () => {
   it("setLibraryAxisAtom は選択中の作品をクリアする", () => {

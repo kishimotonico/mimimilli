@@ -34,8 +34,26 @@ export class ApiResponseSchemaError extends Error {
   }
 }
 
+class UnparsedResponseBody {
+  constructor(readonly text: string) {}
+}
+
+function unparsedBodyMessage(body: unknown): string | null {
+  if (body instanceof UnparsedResponseBody) {
+    const preview = body.text.length > 200 ? `${body.text.slice(0, 200)}…` : body.text;
+    return `応答のJSON解析に失敗しました: ${preview}`;
+  }
+  return null;
+}
+
 async function readResponseBody(res: Response): Promise<unknown> {
-  return res.json().catch(() => null);
+  const text = await res.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return new UnparsedResponseBody(text);
+  }
 }
 
 export type StatusHandler = (res: Response, body: unknown) => void;
@@ -52,7 +70,12 @@ async function throwApiError(
   if (parsed.success) {
     throw new ApiRequestError(res.status, parsed.data.error.code, parsed.data.error.message);
   }
-  throw new Error(`API error ${res.status}: ${method} ${path}`);
+  const unparsed = unparsedBodyMessage(body);
+  throw new Error(
+    unparsed
+      ? `API error ${res.status}: ${method} ${path} (${unparsed})`
+      : `API error ${res.status}: ${method} ${path}`,
+  );
 }
 
 function parseResponse<T>(schema: z.ZodType<T>, method: string, path: string, data: unknown): T {
@@ -71,9 +94,6 @@ export interface ParsedRequestOptions {
   /** 非 ok 応答時、既定の ApiRequestError の前に呼ぶ。throw すればそこで終了する */
   onStatus?: Partial<Record<number, StatusHandler>>;
 }
-
-/** @deprecated ParsedRequestOptions を使う */
-export type GetOptions = ParsedRequestOptions;
 
 async function handleParsedResponse<T>(
   method: string,
@@ -122,16 +142,27 @@ export async function postParsed<T>(
   schema: z.ZodType<T>,
   path: string,
   body?: unknown,
+  options?: ParsedRequestOptions & { noContentAsNull?: false | undefined },
+): Promise<T>;
+export async function postParsed<T>(
+  schema: z.ZodType<T>,
+  path: string,
+  body: unknown,
+  options: ParsedRequestOptions & { noContentAsNull: true },
+): Promise<T | null>;
+export async function postParsed<T>(
+  schema: z.ZodType<T>,
+  path: string,
+  body?: unknown,
   options?: ParsedRequestOptions,
-): Promise<T> {
+): Promise<T | null> {
   const res = await fetch(API_BASE + path, {
     method: "POST",
     headers: body !== undefined ? { "Content-Type": "application/json" } : {},
     body: body !== undefined ? JSON.stringify(body) : undefined,
     signal: options?.signal,
   });
-  const parsed = await handleParsedResponse("POST", path, res, schema, options);
-  return parsed as T;
+  return handleParsedResponse("POST", path, res, schema, options);
 }
 
 /** レスポンスボディを持たない POST。成功時のステータスも204であることを検証する */
@@ -146,14 +177,31 @@ export async function postVoid(path: string, body?: unknown): Promise<void> {
 }
 
 /** shared契約のスキーマでレスポンスを検証する PUT */
-export async function putParsed<T>(schema: z.ZodType<T>, path: string, body: unknown): Promise<T> {
+export async function putParsed<T>(
+  schema: z.ZodType<T>,
+  path: string,
+  body: unknown,
+  options?: ParsedRequestOptions & { noContentAsNull?: false | undefined },
+): Promise<T>;
+export async function putParsed<T>(
+  schema: z.ZodType<T>,
+  path: string,
+  body: unknown,
+  options: ParsedRequestOptions & { noContentAsNull: true },
+): Promise<T | null>;
+export async function putParsed<T>(
+  schema: z.ZodType<T>,
+  path: string,
+  body: unknown,
+  options?: ParsedRequestOptions,
+): Promise<T | null> {
   const res = await fetch(API_BASE + path, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    signal: options?.signal,
   });
-  if (!res.ok) return throwApiError("PUT", path, res, await readResponseBody(res));
-  return parseResponse(schema, "PUT", path, await res.json());
+  return handleParsedResponse("PUT", path, res, schema, options);
 }
 
 /** shared契約のスキーマでレスポンスを検証する PATCH */
@@ -161,28 +209,50 @@ export async function patchParsed<T>(
   schema: z.ZodType<T>,
   path: string,
   body: unknown,
-): Promise<T> {
+  options?: ParsedRequestOptions & { noContentAsNull?: false | undefined },
+): Promise<T>;
+export async function patchParsed<T>(
+  schema: z.ZodType<T>,
+  path: string,
+  body: unknown,
+  options: ParsedRequestOptions & { noContentAsNull: true },
+): Promise<T | null>;
+export async function patchParsed<T>(
+  schema: z.ZodType<T>,
+  path: string,
+  body: unknown,
+  options?: ParsedRequestOptions,
+): Promise<T | null> {
   const res = await fetch(API_BASE + path, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    signal: options?.signal,
   });
-  if (!res.ok) return throwApiError("PATCH", path, res, await readResponseBody(res));
-  return parseResponse(schema, "PATCH", path, await res.json());
+  return handleParsedResponse("PATCH", path, res, schema, options);
 }
 
 /** shared契約のスキーマでレスポンスを検証する DELETE */
 export async function deleteParsed<T>(
   schema: z.ZodType<T>,
   path: string,
+  options?: ParsedRequestOptions & { noContentAsNull?: false | undefined },
+): Promise<T>;
+export async function deleteParsed<T>(
+  schema: z.ZodType<T>,
+  path: string,
+  options: ParsedRequestOptions & { noContentAsNull: true },
+): Promise<T | null>;
+export async function deleteParsed<T>(
+  schema: z.ZodType<T>,
+  path: string,
   options?: ParsedRequestOptions,
-): Promise<T> {
+): Promise<T | null> {
   const res = await fetch(API_BASE + path, {
     method: "DELETE",
     signal: options?.signal,
   });
-  const parsed = await handleParsedResponse("DELETE", path, res, schema, options);
-  return parsed as T;
+  return handleParsedResponse("DELETE", path, res, schema, options);
 }
 
 /** レスポンスボディを持たない DELETE。成功時のステータスも204であることを検証する */

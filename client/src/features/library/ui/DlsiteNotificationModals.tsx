@@ -1,35 +1,27 @@
 import { useCallback } from "react";
-import { useSetAtom } from "jotai";
-import type { ActiveModal } from "../../../app/model/activeModal";
-import { isDlsiteNotificationModal } from "../../../app/model/activeModal";
-import { setAppModeAtom } from "../../navigation/model/navigationAtoms";
-import { selectLibraryWorkAtom } from "../model/libraryNavigationActions";
-import { useLibraryNavigation } from "../model/useLibraryNavigation";
+import type { DlsiteNotificationModalKind } from "../model/dlsiteNotificationModal";
+import { isDlsiteNotificationModal } from "../model/dlsiteNotificationModal";
 import DlsiteFetchFailedModal from "./DlsiteFetchFailedModal";
 import DlsiteParseFailedModal from "./DlsiteParseFailedModal";
 import RjCodeMissingModal from "./RjCodeMissingModal";
 
 interface DlsiteNotificationModalsProps {
-  activeModal: ActiveModal;
+  activeModal: DlsiteNotificationModalKind | null;
   onClose: () => void;
+  onOpenWork: (workId: string) => void;
 }
 
 export default function DlsiteNotificationModals({
   activeModal,
   onClose,
+  onOpenWork,
 }: DlsiteNotificationModalsProps) {
-  const setAppMode = useSetAtom(setAppModeAtom);
-  const { setAxis: setLibraryAxis } = useLibraryNavigation();
-  const selectLibraryWork = useSetAtom(selectLibraryWorkAtom);
-
   const handleOpenWork = useCallback(
     (workId: string) => {
       onClose();
-      setAppMode("library");
-      setLibraryAxis("all");
-      selectLibraryWork(workId);
+      onOpenWork(workId);
     },
-    [onClose, selectLibraryWork, setAppMode, setLibraryAxis],
+    [onClose, onOpenWork],
   );
 
   if (!isDlsiteNotificationModal(activeModal)) return null;

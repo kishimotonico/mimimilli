@@ -1,0 +1,70 @@
+/* mimimilli shell — base
+   所有範囲: body/#root/ポータル要素に対するグローバルUAリセット（フォント・input/button/a等）。
+   frame・library・files・player・preview のどの面にも属さない土台。
+   layer は shell/index.css の @import base.css layer(base) で割り当てる
+   （Tailwind の @layer utilities より弱く保つため）。
+   import順: shell/index.css 内で最初に読み込む。 */
+
+/* ── Base app ─────────────────────────────────────────────── */
+
+/* Tailwind の @layer utilities はレイヤー内なので、これらの規則が unlayered のままだと
+   カスケードレイヤーの規則（unlayered が常に layered に勝つ）でユーティリティの色指定を
+   問答無用で潰してしまう。base レイヤーに収めて utilities より弱くする
+   （layer への割り当ては shell/index.css の @import 側で行う）。 */
+body {
+  user-select: none;
+}
+input,
+textarea,
+select {
+  user-select: text;
+}
+/* body 直下（#root の .mle-app と、createPortal で document.body へ出るポータル要素の
+   どちらも）にフォント・UAリセットを効かせる。.mle-app にだけスコープすると、ポータル
+   先の要素は打ち消しCSSが無い限りブラウザ既定のフォント・枠が出てしまう
+   （新しくポータルを追加するたび個別対処が要る状態になっていた）。body の子は
+   #root（= .mle-app）とポータル要素しかないため、スコープをここへ引き上げれば
+   新規ポータルにも自動で適用される。 */
+body,
+body * {
+  font-family: var(--font-jp);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "palt" 1;
+}
+.mle-app {
+  width: 100%;
+  height: 100%;
+  background: var(--paper-0);
+  color: var(--ink-0);
+  font-size: 12.5px;
+  line-height: 1.5;
+  overflow: hidden;
+}
+/* text-align: inherit は UA 既定の center を打ち消す。行系UI（mll-axis / mll-wrow / mle-row 等）を
+   a11y 対応で div→button 化しても左寄せレイアウトが崩れないようにする。 */
+body button {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  padding: 0;
+  text-align: inherit;
+}
+body input {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  padding: 0;
+}
+body a {
+  color: inherit;
+  text-decoration: none;
+}
+body ul,
+body ol {
+  list-style: none;
+}

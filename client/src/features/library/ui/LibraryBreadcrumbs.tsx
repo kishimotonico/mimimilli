@@ -1,8 +1,9 @@
 import { useAtomValue } from "jotai";
-import Breadcrumbs from "../../../app/ui/Breadcrumbs";
-import { activeAxisAtom, buildLibraryAddressPath } from "../model/atoms";
+import Breadcrumbs from "../../../shared/ui/Breadcrumbs";
+import { buildLibraryAddressPath } from "../model/atoms";
+import { activeAxisAtom } from "../../../entities/library/model/navigationAtoms";
 import { useLibraryNavigation } from "../model/useLibraryNavigation";
-import { useTagPrefixes } from "../model/useTagPrefixes";
+import { useTagPrefixes } from "../../../entities/tag/useTagPrefixes";
 
 export default function LibraryBreadcrumbs() {
   const activeAxis = useAtomValue(activeAxisAtom);

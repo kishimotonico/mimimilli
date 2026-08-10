@@ -1,0 +1,75 @@
+/* mimimilli shell — shared-c
+   所有範囲: 汎用アイコンボタン(.mle-icbtn*)、再生中インジケーター(.barwave*)。
+   元ファイルで連続した区画のため1ファイルにまとめている。
+   shared-a〜dの分割理由はshared-a.css冒頭コメント参照。
+   import順: preview-b.cssの次、player-a.cssより前。 */
+
+/* ── Generic icon button ──────────────────────────────────── */
+
+.mle-icbtn {
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  display: grid;
+  place-items: center;
+  color: var(--ink-2);
+}
+.mle-icbtn:hover {
+  background: var(--paper-3);
+  color: var(--ink-0);
+}
+.mle-icbtn:disabled,
+.mle-icbtn[aria-disabled="true"] {
+  cursor: not-allowed;
+  color: var(--ink-4);
+}
+.mle-icbtn:disabled:hover,
+.mle-icbtn[aria-disabled="true"]:hover {
+  background: transparent;
+  color: var(--ink-4);
+}
+
+/* ── Barwave (now-playing animation) ─────────────────────── */
+
+.barwave {
+  display: none;
+  gap: 2px;
+  height: 10px;
+  align-items: end;
+  justify-content: center;
+}
+.barwave span {
+  display: block;
+  width: 2px;
+  background: var(--acc);
+  border-radius: 1px;
+  animation: barwave-anim 1s ease-in-out infinite;
+}
+.barwave span:nth-child(1) {
+  height: 50%;
+  animation-delay: -0.1s;
+}
+.barwave span:nth-child(2) {
+  height: 100%;
+  animation-delay: -0.4s;
+}
+.barwave span:nth-child(3) {
+  height: 60%;
+  animation-delay: -0.7s;
+}
+@keyframes barwave-anim {
+  0%,
+  100% {
+    transform: scaleY(0.6);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+.mle-row.is-now .barwave {
+  display: inline-flex;
+  margin-right: 2px;
+}
+.barwave.is-paused span {
+  animation: none;
+}

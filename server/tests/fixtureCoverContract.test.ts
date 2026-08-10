@@ -3,8 +3,12 @@ import { test } from "node:test";
 import { emptyDlsiteState, type Work } from "@mimimilli/shared";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { openDb } from "../src/adapters/real/db.ts";
-import { WorkRepo } from "../src/adapters/real/workRepo.ts";
-import { folderMetaPath, resolvedDuration } from "./helpers/workTestUtils.ts";
+import {
+  createWorkRepos,
+  folderMetaPath,
+  getTestWork,
+  resolvedDuration,
+} from "./helpers/workTestUtils.ts";
 
 const FIXTURE_UNMEASURED_ID = "RJ501003";
 const REAL_UNMEASURED_ID = "cover-unmeasured-contract";
@@ -66,14 +70,15 @@ test("fixtureとreal: カバー列が unmeasured のとき編集用契約が同�
   assert.ok(fixtureWork);
 
   const db = openDb({ kind: "memory" });
-  const repo = new WorkRepo(db);
+  const { catalog, user } = createWorkRepos(db);
   const work = minimalUnmeasuredWork(REAL_UNMEASURED_ID);
-  repo.upsertWork(work, {
+  user.upsertWorkUserState(work);
+  catalog.upsertWorkCatalog(work, {
     metaPath: folderMetaPath(work.physicalPath),
     cover: { image: "cover.jpg", dimensions: null },
   });
 
-  const realWork = await repo.getWork(REAL_UNMEASURED_ID);
+  const realWork = await getTestWork(db, REAL_UNMEASURED_ID);
   assert.ok(realWork);
   assert.deepEqual(coverContractSlice(fixtureWork), coverContractSlice(realWork));
 });

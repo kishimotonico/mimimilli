@@ -29,25 +29,9 @@ export interface PlayerControllerState {
   playbackError: AudioEngineError | null;
 }
 
-export interface PlayerCoreState {
-  /** UI 表示用。"loading" も再生中扱いに含む（play/pause アイコン切替等）。status の値そのものが必要な処理では代わりに `status` を見ること。 */
-  isPlaying: boolean;
-  /** status をそのまま反映する派生値。isPlaying とは異なり loading を "再生中" に丸めない。 */
-  status: PlaybackStatus;
-  currentTrackIndex: number;
-  currentPlaylistId: string | null;
-  currentWork: WorkListItem | Work | null;
-  /** ファイルモードからの work 非依存再生 */
-  isFilePlayback: boolean;
-  tracks: PlaybackTrack[];
-  volume: number;
-  loop: boolean;
-  showFullPlayer: boolean;
-  playbackRate: number;
-  channelSwap: boolean;
-  abRepeat: { a: number | null; b: number | null };
-  playbackError: AudioEngineError | null;
-}
+import type { PlayerCoreState } from "../../../entities/player/model/playerCoreState";
+
+export type { PlayerCoreState } from "../../../entities/player/model/playerCoreState";
 
 export const PLAYER_CONTROLLER_INITIAL: PlayerControllerState = {
   status: "idle",
@@ -147,8 +131,8 @@ export type PlayerControllerCommand =
   | { type: "setAudioPlaybackRate"; playbackRate: number }
   | { type: "setAudioChannelSwap"; enabled: boolean }
   | { type: "persistResume"; reason: "track-change" | "pause" | "stop" | "interval" | "error" }
-  | { type: "playbackQueueEnded"; item: PlaybackItem }
-  | { type: "workCompleted"; item: PlaybackItem };
+  | { type: "workCompleted"; item: PlaybackItem }
+  | { type: "releaseLoadedTrack" };
 
 export interface PlayerTransition {
   state: PlayerControllerState;
@@ -251,6 +235,7 @@ export function reducePlayer(
               { type: "persistResume", reason: "stop" },
               { type: "pauseAudio" },
               { type: "seekAudio", positionSec: 0 },
+              { type: "releaseLoadedTrack" },
             ]
           : [],
       };
@@ -340,7 +325,7 @@ export function reducePlayer(
       if (item.trackIndex < item.tracks.length - 1) {
         return withTrackIndex(state, item.trackIndex + 1, "preserve");
       }
-      const commands: PlayerControllerCommand[] = [{ type: "playbackQueueEnded", item }];
+      const commands: PlayerControllerCommand[] = [];
       if (item.completionScope === "work") commands.push({ type: "workCompleted", item });
       return { state: { ...state, status: "ended" }, commands };
     }

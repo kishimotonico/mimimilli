@@ -5,7 +5,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { describe, expect, it, vi } from "vitest";
 import TopBar from "../../src/app/ui/TopBar";
-import { librarySearchQueryAtom } from "../../src/features/library/model/atoms";
+import { librarySearchQueryAtom } from "../../src/entities/library/model/navigationAtoms";
 import { appModeAtom } from "../../src/features/navigation/model/navigationAtoms";
 
 const PLACEHOLDER = /ライブラリを検索/;

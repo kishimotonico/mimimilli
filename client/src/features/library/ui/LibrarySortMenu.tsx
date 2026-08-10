@@ -3,17 +3,18 @@ import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useAtom, useAtomValue } from "jotai";
 import { useQuery } from "@tanstack/react-query";
 import type { SortId } from "@mimimilli/shared";
-import { SORT_OPTIONS } from "../model/types";
-import { activeAxisAtom, axisValueSortAtom, sortAtom } from "../model/atoms";
+import { SORT_OPTIONS } from "../../../entities/library/types";
+import { axisValueSortAtom } from "../model/atoms";
+import { activeAxisAtom, sortAtom } from "../../../entities/library/model/navigationAtoms";
 import { useLibraryNavigation } from "../model/useLibraryNavigation";
-import { isSmartAxis, getSmartFolderId } from "../model/axisDefinitions";
+import { isSmartAxis, getSmartFolderId } from "../../../entities/library/axisDefinitions";
 import { computeResultsPaneKind } from "../model/libraryPresentation";
 import {
   AXIS_VALUE_SORT_OPTIONS,
   selectAxisValueSortKey,
   type AxisValueSortKey,
 } from "../model/axisValueSort";
-import { listSmartFolders } from "../api";
+import { listSmartFolders } from "../../../entities/smart-folder/api";
 import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";

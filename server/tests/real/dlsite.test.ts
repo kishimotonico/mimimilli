@@ -12,7 +12,6 @@ import {
   fetchDlsiteCover,
   fetchDlsiteHtml,
   dlsiteWorkUrl,
-  fetchDlsiteInfo,
   listDlsiteMissingFields,
   mergeDlsiteTags,
   normalizeDlsiteCoverUrl,
@@ -181,19 +180,43 @@ test("DLsite: キャッシュ判定ログに理由を含める", async (t) => {
   adapter.close();
 });
 
-test("fetchDlsiteInfo: HTTP 404 / 通信エラーを分類する", async () => {
-  const notFound = await fetchDlsiteInfo(
-    "RJ000001",
-    async () => new Response("<html>404</html>", { status: 404 }),
-  );
+test("fetchDlsiteHtml: HTTP 404 / 通信エラーを分類する", async (t) => {
+  const lib = makeSampleLibrary();
+  t.after(lib.cleanup);
+  const dir = makeTestDirectory("dlsite-html-classify");
+  t.after(dir.cleanup);
+
+  const notFoundAdapter = createTestRealAdapter({
+    database: { kind: "memory" },
+    dlsiteCache: { path: join(dir.path, "not-found.sqlite") },
+    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+    dlsiteSchedulerDependencies: mockDlsiteTransport({
+      html: () => htmlResponse("<html></html>", 404),
+    }),
+  });
+  await notFoundAdapter.updateSettings({ rootFolder: lib.root });
+  await notFoundAdapter.scan();
+  const notFound = await notFoundAdapter.dlsiteFetch(lib.existingWorkId);
   assert.equal(notFound.ok, false);
   if (!notFound.ok) assert.equal(notFound.kind, "not_found");
+  notFoundAdapter.close();
 
-  const networkError = await fetchDlsiteInfo("RJ000001", async () => {
-    throw new TypeError("connection reset");
+  const networkAdapter = createTestRealAdapter({
+    database: { kind: "memory" },
+    dlsiteCache: { path: join(dir.path, "network.sqlite") },
+    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+    dlsiteSchedulerDependencies: mockDlsiteTransport({
+      html: () => {
+        throw new TypeError("connection reset");
+      },
+    }),
   });
+  await networkAdapter.updateSettings({ rootFolder: lib.root });
+  await networkAdapter.scan();
+  const networkError = await networkAdapter.dlsiteFetch(lib.existingWorkId);
   assert.equal(networkError.ok, false);
   if (!networkError.ok) assert.equal(networkError.kind, "error");
+  networkAdapter.close();
 });
 
 test("fetchDlsiteHtml / fetchDlsiteCover: User-Agentを指定・既定値で切り替える", async () => {

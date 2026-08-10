@@ -8,7 +8,7 @@ import {
   libraryGridLayoutModeAtom,
   libraryTileSizeAtom,
 } from "../../src/features/library/model/atoms";
-import type { GridLayoutMode } from "../../src/features/library/model/types";
+import type { GridLayoutMode } from "../../src/entities/library/types";
 import { clearResizeObservers, flushAllResizeObservers, mockElementSize } from "./setup";
 
 function createWorks(count: number): WorkListItem[] {
@@ -40,13 +40,10 @@ function workGridElement(props: Partial<React.ComponentProps<typeof WorkGrid>>) 
       selectedWorkId={null}
       searchQuery=""
       hasSelectedTags={false}
-      isLoading={false}
-      isError={false}
       hasNextPage={false}
       onWorkSelect={vi.fn()}
       onWorkPlay={vi.fn()}
       onClearSearch={vi.fn()}
-      inspector={null}
       onDeselect={vi.fn()}
       {...props}
     />
@@ -244,19 +241,10 @@ describe("WorkGrid virtual scrolling", () => {
   });
 });
 
-describe("WorkGrid error/empty states", () => {
+describe("WorkGrid empty states", () => {
   afterEach(() => {
     cleanup();
     clearResizeObservers();
-  });
-
-  it("isError のとき再試行ボタンをクリックすると onRetryWorks を呼ぶ", async () => {
-    const onRetryWorks = vi.fn();
-    const user = userEvent.setup();
-    renderWorkGrid({ props: { isError: true, works: [], onRetryWorks } });
-
-    await user.click(screen.getByRole("button", { name: "再試行" }));
-    expect(onRetryWorks).toHaveBeenCalledTimes(1);
   });
 
   it("お気に入りビューが0件のとき文脈付きの案内を1行添える", () => {

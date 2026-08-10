@@ -5,26 +5,28 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { createSettingsScanMethods } from "../../src/adapters/real/settingsScanMethods.ts";
 import type { Scanner } from "../../src/adapters/real/scanner.ts";
-import type { WorkRepo } from "../../src/adapters/real/workRepo.ts";
 
 test("updateSettings は receiver なしで呼び出せる", async () => {
   const rootDir = mkdtempSync(join(tmpdir(), "mimimilli-settings-methods-"));
   const settings = new Map<string, string>();
-  const repo = {
+  const user = {
     getUserSetting: (key: string) => settings.get(key) ?? null,
-    getScanState: () => null,
     setUserSetting: (key: string, value: string) => settings.set(key, value),
-    listSummaries: () => ({ summaries: [], skipped: [] }),
+  };
+  const catalog = {
+    getScanState: () => null,
     setScanState: () => undefined,
-  } satisfies Pick<
-    WorkRepo,
-    "getUserSetting" | "getScanState" | "setUserSetting" | "listSummaries" | "setScanState"
-  >;
+  };
+  const query = {
+    listSummaries: () => ({ summaries: [], skipped: [] }),
+  };
 
   try {
     const { updateSettings } = createSettingsScanMethods({
       database: { kind: "memory" },
-      repo,
+      query,
+      catalog,
+      user,
       scanner: undefined as unknown as Scanner,
       dataRoot: rootDir,
       thumbnailCacheDir: rootDir,

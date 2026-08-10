@@ -73,7 +73,7 @@ describe("PlayerController scenarios", () => {
     expect(result.commands).toEqual([{ type: "seekAudio", positionSec: 10 }]);
   });
 
-  it("末尾でキュー終了と作品聴了を別コマンドとして通知する", () => {
+  it("末尾で作品聴了を通知する", () => {
     const controller = new PlayerController();
     const commands: string[] = [];
     controller.subscribeCommands((command) => commands.push(command.type));
@@ -81,7 +81,6 @@ describe("PlayerController scenarios", () => {
     controller.dispatch({ type: "audioEnded" });
 
     expect(controller.getState().status).toBe("ended");
-    expect(commands).toContain("playbackQueueEnded");
     expect(commands).toContain("workCompleted");
   });
 
@@ -99,7 +98,6 @@ describe("PlayerController scenarios", () => {
     controller.dispatch({ type: "startRequested", item: fileItem });
     controller.dispatch({ type: "audioEnded" });
 
-    expect(commands).toContain("playbackQueueEnded");
     expect(commands).not.toContain("workCompleted");
   });
 
@@ -186,6 +184,26 @@ describe("PlayerController scenarios", () => {
     expect(result.state.status).toBe("error");
     expect(result.state.playbackError).toEqual(error);
     expect(result.commands).toEqual([{ type: "persistResume", reason: "error" }]);
+  });
+
+  it("停止時は resume保存・pause・先頭シーク・ロード済みトラック解放の順でコマンドを発行する", () => {
+    const result = scenario([{ type: "startRequested", item: item() }, { type: "stopRequested" }]);
+
+    expect(result.state.status).toBe("idle");
+    expect(result.state.item).toBeNull();
+    expect(result.commands).toEqual([
+      { type: "persistResume", reason: "stop" },
+      { type: "pauseAudio" },
+      { type: "seekAudio", positionSec: 0 },
+      { type: "releaseLoadedTrack" },
+    ]);
+  });
+
+  it("再生対象がない状態での停止はコマンドを発行しない", () => {
+    const result = scenario([{ type: "stopRequested" }]);
+
+    expect(result.state.status).toBe("idle");
+    expect(result.commands).toEqual([]);
   });
 
   it("idle状態への遅延audioFailedは無視する", () => {

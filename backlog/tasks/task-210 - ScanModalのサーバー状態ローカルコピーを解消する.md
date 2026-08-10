@@ -1,9 +1,10 @@
 ---
 id: TASK-210
 title: ScanModalのサーバー状態ローカルコピーを解消する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-06 04:58'
+updated_date: '2026-08-09 15:28'
 labels: []
 dependencies: []
 priority: medium
@@ -30,8 +31,8 @@ mutation 部分は TASK-206（サーバー更新の状態管理を useMutation �
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 ScanModal が新規作品の一覧を TanStack Query 経由で取得しており、useState によるサーバー状態のローカルコピーを持っていない
-- [ ] #2 スキャン結果一覧でタイトルを編集すると、ライブラリ側の作品詳細にも再フェッチを待たずに反映される
-- [ ] #3 手書きの Promise.all による取得が残っていない
-- [ ] #4 pnpm check と pnpm test と pnpm test:visual が通る
+- [x] #1 ScanModal が新規作品の一覧を TanStack Query 経由で取得しており、useState によるサーバー状態のローカルコピーを持っていない
+- [x] #2 スキャン結果一覧でタイトルを編集すると、ライブラリ側の作品詳細にも再フェッチを待たずに反映される
+- [x] #3 手書きの Promise.all による取得が残っていない
+- [x] #4 pnpm check と pnpm test と pnpm test:visual が通る
 <!-- AC:END -->

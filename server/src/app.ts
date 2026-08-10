@@ -3,13 +3,15 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { ApiError } from "@mimimilli/shared";
-import { NotConfiguredError, type DataAdapter } from "./adapter.ts";
+import { NotConfiguredError } from "./errors.ts";
+import type { DataAdapter } from "./adapter/index.ts";
 import { formatError, getCategoryLogger } from "./lib/logger.ts";
 import { axesRoute } from "./routes/axes.ts";
 import { dlsiteRoute } from "./routes/dlsite.ts";
 import { fsRoute } from "./routes/fs.ts";
 import { mediaRoute } from "./routes/media.ts";
 import { scanRoute } from "./routes/scan.ts";
+import { DlsiteJobManager } from "./dlsiteJobManager.ts";
 import { ScanJobManager } from "./scanJobManager.ts";
 import { settingsRoute } from "./routes/settings.ts";
 import { smartFoldersRoute } from "./routes/smartFolders.ts";
@@ -18,7 +20,11 @@ import { worksRoute } from "./routes/works.ts";
 
 export type AppEnv = { Variables: { requestId: string } };
 
-export function createApp(adapter: DataAdapter): Hono<AppEnv> {
+export type App = Hono<AppEnv> & {
+  shutdown(): Promise<void>;
+};
+
+export function createApp(adapter: DataAdapter): App {
   const app = new Hono<AppEnv>();
   const httpLogger = getCategoryLogger("http");
 
@@ -45,7 +51,8 @@ export function createApp(adapter: DataAdapter): Hono<AppEnv> {
   });
 
   const api = new Hono();
-  const scanJobs = new ScanJobManager(adapter);
+  const dlsiteJobs = new DlsiteJobManager(adapter);
+  const scanJobs = new ScanJobManager(adapter, dlsiteJobs);
   api.route("/", settingsRoute(adapter));
   api.route("/", scanRoute(scanJobs));
   api.route("/", worksRoute(adapter));
@@ -54,7 +61,7 @@ export function createApp(adapter: DataAdapter): Hono<AppEnv> {
   api.route("/", smartFoldersRoute(adapter));
   api.route("/", fsRoute(adapter));
   api.route("/", mediaRoute(adapter));
-  api.route("/", dlsiteRoute(adapter));
+  api.route("/", dlsiteRoute(adapter, dlsiteJobs));
 
   app.route("/api", api);
 
@@ -84,5 +91,7 @@ export function createApp(adapter: DataAdapter): Hono<AppEnv> {
     return c.json(body, 500);
   });
 
-  return app;
+  return Object.assign(app, {
+    shutdown: () => dlsiteJobs.shutdown(),
+  });
 }

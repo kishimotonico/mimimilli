@@ -1,5 +1,10 @@
 // 作品検索（GET /api/works）の純粋関数。
-import { tagEquals } from "@mimimilli/shared";
+import {
+  tagEquals,
+  toWorkListItem,
+  RECENT_VIEW_WINDOW_DAYS,
+  createRandomSeed,
+} from "@mimimilli/shared";
 import type {
   CollectionStats,
   NormalizedTag,
@@ -15,10 +20,19 @@ import {
   stableRandomSortKey,
 } from "./japaneseSortKey.ts";
 
-const RECENT_VIEW_WINDOW_DAYS = 30;
-
 /** 検索・フィルター・ソート中だけ使う内部ページ型。公開前にWorkListItemへ投影する。 */
 export type WorkSummaryPage = Omit<WorksPage, "items"> & { items: WorkSummary[] };
+
+export function toWorksPage(page: WorkSummaryPage): WorksPage {
+  return page.seed === undefined
+    ? { items: page.items.map(toWorkListItem), total: page.total, stats: page.stats }
+    : {
+        items: page.items.map(toWorkListItem),
+        total: page.total,
+        stats: page.stats,
+        seed: page.seed,
+      };
+}
 
 /** フィルター後・ページング前の集合からコレクション統計を求める。
  *  totalDurationSec が未知（null）の作品は合計から除外する。 */
@@ -37,6 +51,7 @@ export function applyWorksQuery(works: WorkSummary[], params: WorksQuery): WorkS
   let results = [...works];
 
   const { tags, yearValue } = params.tags;
+  results = filterByIds(results, params.ids);
   results = filterByQuery(results, params.q);
   results = filterByTags(results, tags, params.tagOp);
   results = filterByYear(results, yearValue);
@@ -65,12 +80,18 @@ function compareDuration(a: WorkSummary, b: WorkSummary, direction: 1 | -1): num
 // RJ/VJコード比較用の正規化。大文字小文字と "RJ"/"VJ" 接頭辞の有無を無視して比較する
 // （DLsite商品コードはRJ=同人、VJ=商業/美少女ゲームの2種類。shared/dlsite.tsのrjCode
 // フィールドは両方を同じ形式 `^(RJ|VJ)\d{6,8}$` で保持する）。
-// real側のSQL実装（workRepo.ts queryWorks）と同じ正規化仕様に揃える。
+// real側のSQL実装（workQueryRepository queryWorks）と同じ正規化仕様に揃える。
 export function normalizeRjCode(value: string): string {
   return value
     .trim()
     .toUpperCase()
     .replace(/^(RJ|VJ)/, "");
+}
+
+function filterByIds(works: WorkSummary[], ids: string[] | undefined): WorkSummary[] {
+  if (ids === undefined) return works;
+  const idSet = new Set(ids);
+  return works.filter((work) => idSet.has(work.id));
 }
 
 function filterByQuery(works: WorkSummary[], q: string): WorkSummary[] {
@@ -186,10 +207,6 @@ export function sortWorkSummaries(
 
 function compareStrings(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
-}
-
-export function createRandomSeed(): number {
-  return crypto.getRandomValues(new Uint32Array(1))[0]! & 0x7fffffff;
 }
 
 /** page/limit が両方指定されているときのみ slice する */

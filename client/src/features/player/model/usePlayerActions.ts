@@ -5,7 +5,7 @@ import type { PlaybackTrack } from "./trackTime";
 import type { PlaybackItem } from "./playerController";
 
 export function usePlayerActions() {
-  const { controller, lastVolumeRef, pendingResumeRef, runtimeRefs, capabilitiesRegistry } =
+  const { controller, lastVolumeRef, pendingResumeRef, requireCapabilities } =
     usePlayerRuntimeContext();
 
   const startPlayback = useCallback(
@@ -58,12 +58,12 @@ export function usePlayerActions() {
 
   const playWithResume = useCallback(
     (work: Work) => {
-      const { loadResume } = capabilitiesRegistry.require();
+      const { loadResume } = requireCapabilities();
       const resume = loadResume(work);
       if (!resume) return;
       startPlayback(work, resume.tracks, resume.trackIndex, resume.playlistId, resume.positionSec);
     },
-    [capabilitiesRegistry, startPlayback],
+    [requireCapabilities, startPlayback],
   );
 
   const togglePlay = useCallback(() => {
@@ -81,26 +81,25 @@ export function usePlayerActions() {
   const stop = useCallback(() => {
     pendingResumeRef.current = null;
     controller.dispatch({ type: "stopRequested" });
-    runtimeRefs.loadedTrack.current = null;
-  }, [controller, pendingResumeRef, runtimeRefs.loadedTrack]);
+  }, [controller, pendingResumeRef]);
 
   const seek = useCallback(
     (time: number) => {
-      const { getCurrentPlaybackContext } = capabilitiesRegistry.require();
+      const { getCurrentPlaybackContext } = requireCapabilities();
       if (!getCurrentPlaybackContext()) return;
       controller.dispatch({ type: "seekRequested", positionSec: time });
     },
-    [controller, capabilitiesRegistry],
+    [controller, requireCapabilities],
   );
 
   const seekRelative = useCallback(
     (delta: number) => {
-      const { getCurrentPlaybackContext } = capabilitiesRegistry.require();
+      const { getCurrentPlaybackContext } = requireCapabilities();
       const context = getCurrentPlaybackContext();
       if (!context) return;
       controller.dispatch({ type: "seekRequested", positionSec: context.currentTime + delta });
     },
-    [controller, capabilitiesRegistry],
+    [controller, requireCapabilities],
   );
 
   const setVolume = useCallback(
@@ -166,11 +165,11 @@ export function usePlayerActions() {
 
   const setABPoint = useCallback(
     (point: "a" | "b") => {
-      const { getCurrentPlaybackContext } = capabilitiesRegistry.require();
+      const { getCurrentPlaybackContext } = requireCapabilities();
       const time = getCurrentPlaybackContext()?.currentTime ?? 0;
       controller.dispatch({ type: "abPointSet", point, positionSec: time });
     },
-    [controller, capabilitiesRegistry],
+    [controller, requireCapabilities],
   );
 
   const clearABRepeat = useCallback(() => {

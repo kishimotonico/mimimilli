@@ -3,38 +3,58 @@
 // コンポーネント側は返された view model を配線するだけにする。
 
 import {
-  queryOptions,
   useMutation,
   useQuery,
   useQueryClient,
   useSuspenseInfiniteQuery,
+  type UseMutationResult,
 } from "@tanstack/react-query";
 import {
   WORKS_DEFAULT_PAGE_SIZE,
+  type NormalizedTag,
   type SmartFolder,
   type SmartFolderCreate,
   type Work,
   type WorkPatchInput,
   type WorksPage,
 } from "@mimimilli/shared";
+import { searchWorks } from "../../../entities/work/api";
 import {
-  searchWorks,
   listSmartFolders,
   createSmartFolder,
   updateSmartFolder,
   evalSmartFolder,
-} from "../api";
-import { getAllTags, getWork, patchWork } from "../../../entities/work/api";
+} from "../../../entities/smart-folder/api";
+import { getAllTags } from "../../../entities/tag/api";
+import { getWork, patchWork } from "../../../entities/work/api";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
 import { TAG_QUERY_KEYS } from "../../../entities/tag/queryKeys";
+
+export type LibraryTitlePatchMutation = UseMutationResult<
+  Work,
+  Error,
+  { workId: string; title: string }
+>;
+
+export type LibraryBookmarkPatchMutation = UseMutationResult<
+  Work,
+  Error,
+  { workId: string; bookmarked: boolean }
+>;
+
+export type LibraryTagsPatchMutation = UseMutationResult<
+  Work,
+  Error,
+  { workId: string; tags: NormalizedTag[] }
+>;
 import {
   buildSmartFolderFilterParams,
   buildWorksParams,
   computeCollectionStatsDisplay,
   getFacetAxisForQuery,
 } from "./libraryPresentation";
-import { useTagPrefixes } from "./useTagPrefixes";
+import { useTagPrefixes } from "../../../entities/tag/useTagPrefixes";
 import { useAxisFacetsQuery } from "./useAxisFacetsQuery";
 import { useDebouncedValue } from "../../../shared/lib/useDebouncedValue";
 import { getWorkPatchInvalidationTargets, mergeWorkPatchResponse } from "./workPatchInvalidation";
@@ -43,7 +63,7 @@ import {
   staleInactiveListCaches,
   workToListItem,
 } from "./workPatchListCache";
-import { isSmartAxis, getSmartFolderId } from "./axisDefinitions";
+import { isSmartAxis, getSmartFolderId } from "../../../entities/library/axisDefinitions";
 import type { LibraryViewState } from "./useLibraryNavigation";
 
 /** 検索クエリのデバウンス時間（TASK-61）。1文字ごとの全件検索発行を間引く */
@@ -61,12 +81,7 @@ const SEARCH_DEBOUNCE_MS = 250;
  * queryOptions() で定義を共有すれば、両者の .data の型が常に一致し、この種の食い違いは
  * 型チェックの時点で検知できる。
  */
-export const libraryTotalQueryOptions = queryOptions({
-  queryKey: WORK_QUERY_KEYS.total(),
-  queryFn: () => searchWorks({ limit: 1 }),
-});
-
-/** 追加読み込みのページ指定。randomソートのseedを次ページへ引き継ぐ（TASK-73） */
+import { libraryTotalQueryOptions } from "../../../entities/work/libraryTotalQueryOptions";
 interface WorksPageParam {
   page: number;
   seed: number | undefined;

@@ -1,8 +1,13 @@
 import { useRef, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { AnimatePresence } from "motion/react";
 import type { NormalizedTag, SmartFolder, TagPrefix } from "@mimimilli/shared";
-import type { AxisId } from "../model/types";
-import { buildFacetAxisRows, getAxisLabel, isFacetAxis } from "../model/axisDefinitions";
+import type { AxisId } from "../../../entities/library/types";
+import {
+  buildFacetAxisRows,
+  buildViewAxisRows,
+  getAxisLabel,
+  isFacetAxis,
+} from "../../../entities/library/axisDefinitions";
 import {
   useHoverGroupCoordinator,
   type HoverGroupTriggerHandlers,
@@ -24,15 +29,6 @@ interface AxisRow {
 }
 
 const HOME_AXIS: AxisRow = { id: "home", name: "ホーム", icon: "home" };
-
-const VIEW_AXES: AxisRow[] = [
-  { id: "all", name: "すべての作品", icon: "gridS" },
-  { id: "recent", name: "最近再生", icon: "refresh" },
-  { id: "added", name: "最近追加", icon: "add" },
-  { id: "fav", name: "お気に入り", icon: "star" },
-  { id: "unplayed", name: "未再生", icon: "audio" },
-  { id: "missing", name: "ファイル欠損", icon: "err" },
-];
 
 interface AxisColumnProps {
   activeAxis: AxisId;
@@ -119,6 +115,7 @@ export default function AxisColumn({
   onNewSmartFolder,
   onRetryTagPrefixes,
 }: AxisColumnProps) {
+  const viewAxisRows = buildViewAxisRows();
   const facetAxisRows = buildFacetAxisRows(tagPrefixes);
   const {
     openKey: overlayAxis,
@@ -172,7 +169,7 @@ export default function AxisColumn({
 
         <div className="mll-axisgroup">
           <div className="mll-axisgroup__hd">ビュー</div>
-          {VIEW_AXES.map(renderRow)}
+          {viewAxisRows.map(renderRow)}
         </div>
 
         <div className="mll-axisgroup">

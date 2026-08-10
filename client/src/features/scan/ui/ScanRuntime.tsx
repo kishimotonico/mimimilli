@@ -5,11 +5,17 @@ import type { ScanJobSnapshot, StartScanRequest } from "@mimimilli/shared";
 import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
 import { SETTINGS_QUERY_KEYS } from "../../../entities/settings/queryKeys";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
-import { useDlsiteBulkActions } from "../../dlsite/model/useDlsiteBulkActions";
+import { useDlsiteBulkActions } from "../../../entities/dlsite/useDlsiteBulkActions";
 import { SCAN_QUERY_KEYS } from "../api";
-import { scanActionsAtom, scanErrorAtom, scanJobAtom, type ScanActions } from "../model/atoms";
-import { useScanJob } from "../useScanJob";
+import {
+  scanActionsAtom,
+  scanErrorAtom,
+  scanJobAtom,
+  type ScanActions,
+} from "../../../entities/scan/model/atoms";
+import { useScanJob } from "../model/useScanJob";
 
+// SSE 購読の単一所有者。scanJobAtom / scanActionsAtom をここで配線する。
 export default function ScanRuntime() {
   const queryClient = useQueryClient();
   const dlsiteBulk = useDlsiteBulkActions();
@@ -47,12 +53,8 @@ export default function ScanRuntime() {
   }, [scanJob.error, setError]);
 
   const actionsRef = useRef<ScanActions>({
-    start: async (options?: StartScanRequest) => {
-      await scanJobRef.current.start(options);
-    },
-    cancel: async () => {
-      await scanJobRef.current.cancel();
-    },
+    start: async (options?: StartScanRequest) => scanJobRef.current.start(options),
+    cancel: async () => scanJobRef.current.cancel(),
     clearError: () => {
       scanJobRef.current.clearError();
     },

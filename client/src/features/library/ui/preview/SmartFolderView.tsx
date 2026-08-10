@@ -1,7 +1,7 @@
 import { parseTag, type SmartFolder, type SmartFolderRule } from "@mimimilli/shared";
 import { I } from "../../../../shared/ui/Icon";
 import Button from "../../../../shared/ui/Button";
-import { formatDuration } from "./format";
+import { formatDuration } from "../../../../shared/lib/format";
 
 const TAG_PREFIX_LABEL: Record<string, string> = {
   circle: "サークル",

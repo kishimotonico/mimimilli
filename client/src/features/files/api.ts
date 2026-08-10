@@ -10,7 +10,7 @@ import {
   type WorkCreateBodyInput,
   type WorkRegisterPreview,
 } from "@mimimilli/shared";
-import { API_BASE, getParsed, postParsed, deleteVoid } from "../../shared/api/http";
+import { getParsed, postParsed, deleteVoid } from "../../shared/api/http";
 import { fsListingSchema, type FsListing } from "@mimimilli/shared";
 
 /** 物理ディレクトリを1階層ぶん列挙する。path 省略でルートフォルダー */
@@ -39,10 +39,3 @@ export async function deleteWork(workId: string): Promise<void> {
 export async function fetchDlsiteInfoByCode(rjCode: string): Promise<DlsiteWorkInfo> {
   return postParsed(dlsiteWorkInfoSchema, "/dlsite/fetch-by-code", { rjCode });
 }
-
-/** ファイルモード用: スキャンルート配下の絶対物理パスから音声をストリーミングする URL */
-export function getFsAudioUrl(absolutePath: string): string {
-  return `${API_BASE}/media/fs-audio?path=${encodeURIComponent(absolutePath)}`;
-}
-
-export { getFileUrl, getAudioUrl, getCoverImageUrl } from "../../entities/work/api";

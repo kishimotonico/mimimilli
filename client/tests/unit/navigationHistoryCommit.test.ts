@@ -1,16 +1,16 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { createStore } from "jotai";
 import { setAppModeAtom } from "../../src/features/navigation/model/navigationAtoms";
-import { mergeNavigationHistoryCommitKind } from "../../src/features/navigation/model/navigationHistoryCommit";
+import { mergeNavigationHistoryCommitKind } from "../../src/shared/model/navigationHistoryCommit";
 import {
   consumeNavigationHistoryCommitAtom,
   navigationHistoryCommitAtom,
   requestNavigationHistoryCommitAtom,
-} from "../../src/features/navigation/model/navigationHistoryAtoms";
+} from "../../src/shared/model/navigationHistoryAtoms";
 import {
   selectLibraryWorkAtom,
   setLibraryAxisAtom,
-} from "../../src/features/library/model/libraryNavigationActions";
+} from "../../src/entities/library/model/navigationActions";
 
 const initialUrl = `${window.location.pathname}${window.location.search}`;
 

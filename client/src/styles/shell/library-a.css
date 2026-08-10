@@ -1,0 +1,122 @@
+/* mimimilli shell — library-a
+   所有範囲: トップバー(.mll-bar、Library mode replaces tbar)。
+   library系はlibrary-a〜library-eの5ファイルに分かれている（frame・preview・shared・files
+   の区画が元ファイル内でlibraryの区画を何度も挟んでいるため、所有境界を保ちつつ元の
+   記述順も保つには分割が必要。理由は各ファイル内のコメントに記す）。
+   import順: frame-a.cssの次、frame-b.cssより前。 */
+
+/* ── App top bar / mll-bar (Library mode replaces tbar) ──── */
+
+.mll-bar {
+  position: relative;
+  grid-column: 1 / 3;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 14px 0 18px;
+  background: var(--paper-1);
+  border-bottom: 1px solid var(--line);
+}
+.mll-bar__brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 4px;
+}
+.mll-bar__mark {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  background: var(--ink-0);
+  color: var(--paper-1);
+  display: grid;
+  place-items: center;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+}
+.mll-bar__name {
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--ink-0);
+  letter-spacing: -0.01em;
+}
+.mll-bar__divider {
+  width: 1px;
+  height: 20px;
+  background: var(--line);
+}
+.mll-bar__pulse {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 12px 0 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line);
+  background: var(--paper-0);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-1);
+}
+.mll-bar__pulse .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--r-leaf);
+  animation: mll-pulse 1.8s ease-out infinite;
+}
+@keyframes mll-pulse {
+  0% {
+    box-shadow: 0 0 0 0 oklch(74% 0.115 145 / 0.5);
+  }
+  100% {
+    box-shadow: 0 0 0 6px oklch(74% 0.115 145 / 0);
+  }
+}
+.mll-bar__pulse .ch {
+  color: var(--ink-0);
+  font-weight: 600;
+}
+.mll-bar__pulse .sep {
+  color: var(--ink-4);
+}
+.mll-bar__pulse .lbl {
+  color: var(--ink-2);
+}
+.mll-bar__spacer {
+  flex: 1;
+}
+.mll-bar__search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 10px 0 12px;
+  background: var(--paper-2);
+  border-radius: 8px;
+  color: var(--ink-2);
+  font-size: 12px;
+  min-width: 280px;
+}
+.mll-bar__search:focus-within {
+  background: var(--paper-1);
+  box-shadow: 0 0 0 1.5px var(--acc-line);
+}
+.mll-bar__search input {
+  flex: 1;
+}
+.mll-bar__search input::placeholder {
+  color: var(--ink-3);
+}
+.mll-bar__search .kbd {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-2);
+  background: var(--paper-1);
+  border-radius: 4px;
+  padding: 1px 5px;
+  border: 1px solid var(--line-soft);
+}

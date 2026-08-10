@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { parseTag, tagEquals } from "@mimimilli/shared";
 import type { NormalizedTag, TagPrefix, Work } from "@mimimilli/shared";
 import { buildTagsWithAdded, buildTagsWithRemoved } from "../../../../entities/work/editableTags";
-import type { LibraryTagsPatchMutation } from "../../model/workPatchMutations";
+import type { LibraryTagsPatchMutation } from "../../model/useLibraryQueries";
 
 const TAG_UNDO_TOAST_MS = 6000;
 

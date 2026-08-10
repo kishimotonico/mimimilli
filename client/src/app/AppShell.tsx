@@ -7,7 +7,7 @@
 
 import { useAtomValue } from "jotai";
 import type { ReactNode } from "react";
-import { dockedBarActiveAtom } from "../features/player/model/atoms";
+import { dockedBarActiveAtom } from "../entities/player/model/atoms";
 
 interface AppShellProps {
   topBar: ReactNode;

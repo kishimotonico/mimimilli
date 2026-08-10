@@ -3,15 +3,9 @@
 // が useState で保持し、軸切り替えでリセットする。
 
 import type { AxisFacetItem } from "@mimimilli/shared";
-import type { AxisValueNameKeyFn } from "./axisValueSort";
-import { defaultAxisValueNameKey } from "./axisValueSort";
 
-export function filterAxisValueItems(
-  items: AxisFacetItem[],
-  query: string,
-  getNameKey: AxisValueNameKeyFn = defaultAxisValueNameKey,
-): AxisFacetItem[] {
+export function filterAxisValueItems(items: AxisFacetItem[], query: string): AxisFacetItem[] {
   const trimmed = query.trim().toLowerCase();
   if (!trimmed) return items;
-  return items.filter((item) => getNameKey(item).toLowerCase().includes(trimmed));
+  return items.filter((item) => item.value.toLowerCase().includes(trimmed));
 }

@@ -1,8 +1,8 @@
 import { useRef, useState, type CSSProperties } from "react";
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import type { NormalizedTag, TagPrefix } from "@mimimilli/shared";
-import type { AxisId } from "../model/types";
-import { buildFacetAxisRows, getAxisLabel } from "../model/axisDefinitions";
+import type { AxisId } from "../../../entities/library/types";
+import { buildFacetAxisRows, getAxisLabel } from "../../../entities/library/axisDefinitions";
 import {
   useAnchoredPopover,
   type AnchoredPopoverFloatingRefCallback,

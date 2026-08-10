@@ -3,11 +3,11 @@ import { posix, win32 } from "node:path";
 import { test } from "node:test";
 import {
   excludeDescendantPaths,
-  isPathWithin,
   likeDescendantsPrefix,
   likeStrictDescendantPrefixSql,
   SQL_LIKE_ESCAPE_CLAUSE,
 } from "../../src/adapters/real/paths.ts";
+import { isPathWithin } from "../../src/lib/path.ts";
 import { openDb } from "../../src/adapters/real/db.ts";
 
 test("POSIX パスは名前の前方一致ではなくディレクトリ境界で判定する", () => {
@@ -24,12 +24,12 @@ test("Windows パスの親子関係をバックスラッシュ境界で判定す
 });
 
 test("LIKE 子孫接頭辞は区切り文字を重ねず、Windows 形式でも境界を保つ", () => {
-  assert.equal(likeDescendantsPrefix("/library", posix), "/library/%");
-  assert.equal(likeDescendantsPrefix("/library/", posix), "/library/%");
-  assert.equal(likeDescendantsPrefix("/library/A_B", posix), "/library/A!_B/%");
-  assert.equal(likeDescendantsPrefix("C:\\library", win32), "C:\\library\\%");
-  assert.equal(likeDescendantsPrefix("C:\\library\\", win32), "C:\\library\\%");
-  assert.equal(likeDescendantsPrefix("D:\\", win32), "D:\\%");
+  assert.equal(likeDescendantsPrefix("/library", posix.sep), "/library/%");
+  assert.equal(likeDescendantsPrefix("/library/", posix.sep), "/library/%");
+  assert.equal(likeDescendantsPrefix("/library/A_B", posix.sep), "/library/A!_B/%");
+  assert.equal(likeDescendantsPrefix("C:\\library", win32.sep), "C:\\library\\%");
+  assert.equal(likeDescendantsPrefix("C:\\library\\", win32.sep), "C:\\library\\%");
+  assert.equal(likeDescendantsPrefix("D:\\", win32.sep), "D:\\%");
 });
 
 test("祖先 LIKE 接頭辞 SQL は Windows 区切りでも子孫判定できる", () => {

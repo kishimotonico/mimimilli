@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { test, type TestContext } from "node:test";
 import type { WorksPage } from "@mimimilli/shared";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
-import { WorkRepo } from "../../src/adapters/real/workRepo.ts";
+import { WorkQueryRepository } from "../../src/adapters/real/workQueryRepository.ts";
 import { createApp } from "../../src/app.ts";
 import { makeSampleLibrary, makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 
@@ -94,15 +94,15 @@ test("メディア解決: getWork・probe cache問い合わせを伴わない", 
     ),
   );
 
-  const originalGetWork = WorkRepo.prototype.getWork;
-  const originalFetchProbeCache = WorkRepo.prototype.fetchProbeCache;
-  let getWorkCalls = 0;
+  const originalFetchWorkDetail = WorkQueryRepository.prototype.fetchWorkDetail;
+  const originalFetchProbeCache = WorkQueryRepository.prototype.fetchProbeCache;
+  let fetchWorkDetailCalls = 0;
   let fetchProbeCacheCalls = 0;
-  WorkRepo.prototype.getWork = async function (...args) {
-    getWorkCalls += 1;
-    return originalGetWork.apply(this, args);
+  WorkQueryRepository.prototype.fetchWorkDetail = function (...args) {
+    fetchWorkDetailCalls += 1;
+    return originalFetchWorkDetail.apply(this, args);
   };
-  WorkRepo.prototype.fetchProbeCache = function (...args) {
+  WorkQueryRepository.prototype.fetchProbeCache = function (...args) {
     fetchProbeCacheCalls += 1;
     return originalFetchProbeCache.apply(this, args);
   };
@@ -113,7 +113,7 @@ test("メディア解決: getWork・probe cache問い合わせを伴わない", 
   await adapter.scan();
 
   try {
-    getWorkCalls = 0;
+    fetchWorkDetailCalls = 0;
     fetchProbeCacheCalls = 0;
 
     const audio = await app.request(`/api/media/audio/${workId}/track-00.wav`);
@@ -125,10 +125,10 @@ test("メディア解決: getWork・probe cache問い合わせを伴わない", 
     const missing = await app.request(`/api/media/file/${workId}/no-such.wav`);
     assert.equal(missing.status, 404);
 
-    assert.equal(getWorkCalls, 0, "locateMedia must not call getWork");
+    assert.equal(fetchWorkDetailCalls, 0, "locateMedia must not call fetchWorkDetail");
     assert.equal(fetchProbeCacheCalls, 0, "locateMedia must not fetch probe cache");
   } finally {
-    WorkRepo.prototype.getWork = originalGetWork;
-    WorkRepo.prototype.fetchProbeCache = originalFetchProbeCache;
+    WorkQueryRepository.prototype.fetchWorkDetail = originalFetchWorkDetail;
+    WorkQueryRepository.prototype.fetchProbeCache = originalFetchProbeCache;
   }
 });

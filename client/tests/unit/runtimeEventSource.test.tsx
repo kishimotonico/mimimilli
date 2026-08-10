@@ -14,7 +14,7 @@ import {
   dlsiteBulkProgressAtom,
   dlsiteBulkStartingAtom,
   dlsiteBulkResultAtom,
-} from "../../src/features/dlsite/model/atoms";
+} from "../../src/entities/dlsite/model/bulkAtoms";
 
 class FakeEventSource extends EventTarget {
   static readonly CONNECTING = 0;

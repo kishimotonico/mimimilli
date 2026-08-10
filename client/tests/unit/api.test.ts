@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import * as workApi from "../../src/entities/work/api";
+import * as smartFolderApi from "../../src/entities/smart-folder/api";
 import * as filesApi from "../../src/features/files/api";
 import * as libraryApi from "../../src/features/library/api";
 import * as settingsApi from "../../src/features/settings/api";
@@ -15,10 +16,12 @@ import {
 const mockFetch = vi.mocked(fetch);
 
 function makeResponse(data: unknown, status = 200) {
+  const body = data === null || status === 204 ? "" : JSON.stringify(data);
   return {
     ok: status >= 200 && status < 300,
     status,
     json: () => Promise.resolve(data),
+    text: () => Promise.resolve(body),
   } as Response;
 }
 
@@ -93,11 +96,11 @@ describe("settings api", () => {
     mockFetch.mockReset();
   });
 
-  it("getRootFolder fetches /api/settings and returns rootFolder", async () => {
+  it("getSettings returns rootFolder from /api/settings", async () => {
     mockFetch.mockResolvedValue(makeResponse({ rootFolder: "/test/path", lastScanTime: null }));
-    const result = await settingsApi.getRootFolder();
+    const result = await settingsApi.getSettings();
     expect(mockFetch).toHaveBeenCalledWith("/api/settings");
-    expect(result).toBe("/test/path");
+    expect(result.rootFolder).toBe("/test/path");
   });
 
   it("setRootFolder PUTs to /api/settings", async () => {
@@ -349,7 +352,7 @@ describe("library api", () => {
       stats: { trackCount: 0, durationSec: 0 },
     };
     mockFetch.mockResolvedValue(makeResponse(mockPage));
-    const result = await libraryApi.searchWorks({ q: "test", tags: ["tag,one", "tag2"] });
+    const result = await workApi.searchWorks({ q: "test", tags: ["tag,one", "tag2"] });
     expect(mockFetch).toHaveBeenCalledWith("/api/works?q=test&tags=tag%2Cone&tags=tag2");
     expect(result).toEqual(mockPage);
   });
@@ -361,9 +364,26 @@ describe("library api", () => {
       stats: { trackCount: 0, durationSec: 0 },
     };
     mockFetch.mockResolvedValue(makeResponse(mockPage));
-    const result = await libraryApi.searchWorks({ limit: 1 });
+    const result = await workApi.searchWorks({ limit: 1 });
     expect(mockFetch).toHaveBeenCalledWith("/api/works?limit=1");
     expect(result.total).toBe(42);
+  });
+
+  it("searchWorks: ids:[]はサーバーへリクエストせず0件を返す（core・realと同じ空集合セマンティクス）", async () => {
+    const result = await workApi.searchWorks({ ids: [] });
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(result).toEqual({ items: [], total: 0, stats: { trackCount: 0, durationSec: 0 } });
+  });
+
+  it("searchWorks: ids:[]かつsort:randomでもリクエストせずseedを発行する", async () => {
+    const result = await workApi.searchWorks({ ids: [], sort: "random", seed: 777 });
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      items: [],
+      total: 0,
+      stats: { trackCount: 0, durationSec: 0 },
+      seed: 777,
+    });
   });
 
   it("randomのレスポンスseedを次ページへ送り、ページ間の重複・欠落を防げる", async () => {
@@ -386,8 +406,8 @@ describe("library api", () => {
         }),
       );
 
-    const first = await libraryApi.searchWorks({ sort: "random", page: 1, limit: 2 });
-    const second = await libraryApi.searchWorks({
+    const first = await workApi.searchWorks({ sort: "random", page: 1, limit: 2 });
+    const second = await workApi.searchWorks({
       sort: "random",
       seed: first.seed,
       page: 2,
@@ -428,7 +448,7 @@ describe("library api", () => {
 
   it("listSmartFolders fetches /api/smart-folders", async () => {
     mockFetch.mockResolvedValue(makeResponse([]));
-    await libraryApi.listSmartFolders();
+    await smartFolderApi.listSmartFolders();
     expect(mockFetch).toHaveBeenCalledWith("/api/smart-folders");
   });
 
@@ -439,7 +459,7 @@ describe("library api", () => {
       stats: { trackCount: 0, durationSec: 0 },
     };
     mockFetch.mockResolvedValue(makeResponse(mockPage));
-    const result = await libraryApi.evalSmartFolder("sf-1", { page: 1, limit: 200 });
+    const result = await smartFolderApi.evalSmartFolder("sf-1", { page: 1, limit: 200 });
     expect(mockFetch).toHaveBeenCalledWith("/api/smart-folders/sf-1/works?page=1&limit=200");
     expect(result).toEqual(mockPage);
   });
@@ -448,7 +468,7 @@ describe("library api", () => {
     mockFetch.mockResolvedValue(
       makeResponse({ items: [], total: 0, stats: { trackCount: 0, durationSec: 0 } }),
     );
-    await libraryApi.evalSmartFolder("sf-1", {
+    await smartFolderApi.evalSmartFolder("sf-1", {
       page: 1,
       limit: 200,
       tags: ["cv/藤田茜", "ASMR", "@year/2024"],
@@ -517,14 +537,14 @@ describe("レスポンス検証（getParsed等）", () => {
         stats: { trackCount: 0, durationSec: 0 },
       }),
     );
-    await expect(libraryApi.searchWorks({})).rejects.toThrow(/GET \/works/);
+    await expect(workApi.searchWorks({})).rejects.toThrow(/GET \/works/);
   });
 
   it("searchWorks: statsが欠落したレスポンスは検証エラーになる", async () => {
     mockFetch.mockResolvedValue(
       makeResponse({ items: [makeWorkListItem({ id: "work-1" })], total: 1 }),
     );
-    await expect(libraryApi.searchWorks({})).rejects.toThrow(/GET \/works/);
+    await expect(workApi.searchWorks({})).rejects.toThrow(/GET \/works/);
   });
 
   it("getSettings: 契約に適合しない設定は検証エラーになる", async () => {

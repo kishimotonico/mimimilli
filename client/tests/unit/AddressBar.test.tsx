@@ -10,7 +10,8 @@ import { describe, expect, it, afterEach } from "vitest";
 import AddressBar from "../../src/app/ui/AddressBar";
 import { LibraryNavigationProvider } from "../../src/features/library/ui/LibraryNavigationProvider";
 import { appModeAtom } from "../../src/features/navigation/model/navigationAtoms";
-import { activeAxisAtom, libraryViewModeAtom } from "../../src/features/library/model/atoms";
+import { activeAxisAtom } from "../../src/entities/library/model/navigationAtoms";
+import { libraryViewModeAtom } from "../../src/features/library/model/atoms";
 
 afterEach(cleanup);
 

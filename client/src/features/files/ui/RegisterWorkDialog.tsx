@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { normalizeTag, parseTag } from "@mimimilli/shared";
+import { normalizeTag } from "@mimimilli/shared";
 import type { DlsiteApplyBody, DlsiteWorkInfo, WorkRegisterPreview } from "@mimimilli/shared";
 import { ApiRequestError } from "../../../shared/api/http";
 import Button from "../../../shared/ui/Button";
@@ -9,24 +9,19 @@ import IconButton from "../../../shared/ui/IconButton";
 import { I } from "../../../shared/ui/Icon";
 import TagCombobox from "../../../shared/ui/TagCombobox";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
-import { getAllTags } from "../../../entities/work/api";
+import { getAllTags } from "../../../entities/tag/api";
 import { TAG_QUERY_KEYS } from "../../../entities/tag/queryKeys";
 import { buildTagsWithAdded, buildTagsWithRemoved } from "../../../entities/work/editableTags";
 import Tag from "../../../entities/work/ui/Tag";
-import { useTagPrefixes } from "../../library/model/useTagPrefixes";
-import { buildDlsiteApplyBody, dlsiteInfoTags } from "../../library/model/dlsitePreview";
-import { mutationErrorMessage } from "../../../shared/lib/mutationError";
+import { useTagPrefixes } from "../../../entities/tag/useTagPrefixes";
+import { tagPrefixDefinition } from "../../../entities/tag/tagPrefixDefinition";
+import { buildDlsiteApplyBody, dlsiteInfoTags } from "../../../entities/work/dlsitePreview";
+import { dlsiteFetchErrorMessage } from "../../../entities/work/dlsiteFetchError";
+import { apiErrorMessage } from "../../../shared/lib/apiError";
 import { createWork, fetchDlsiteInfoByCode } from "../api";
 
 const inputClass =
   "h-8 min-w-0 w-full rounded-[6px] border border-line bg-paper-0 px-2.5 font-sans text-[12px] text-ink-0 placeholder:text-ink-4 focus:border-acc focus:outline-none focus:ring-2 focus:ring-acc-soft disabled:cursor-not-allowed disabled:text-ink-4";
-
-function dlsiteErrorMessage(error: unknown): string {
-  if (!(error instanceof ApiRequestError)) return "DLsite情報の取得に失敗しました";
-  if (error.code === "not_found") return "作品が見つかりません。コードが違うかもしれません。";
-  if (error.code === "parse_error") return "DLsiteのページ構造が変わった可能性があります。";
-  return "DLsiteとの通信に失敗しました。時間をおいて再試行してください。";
-}
 
 interface RegisterWorkDialogProps {
   folderPath: string;
@@ -114,11 +109,7 @@ export default function RegisterWorkDialog({
   };
   const { dialogRef, handleCancel, handleBackdropClick } = useDialogModal({ onClose: close });
 
-  const definitionOf = (tag: string) => {
-    const parsed = parseTag(tag);
-    if (parsed.kind !== "annotated") return null;
-    return tagPrefixes.find((p) => p.prefix === parsed.prefix) ?? null;
-  };
+  const definitionOf = (tag: string) => tagPrefixDefinition(tag, tagPrefixes);
 
   const addTag = (tag: string) => {
     const next = buildTagsWithAdded(tags, tag);
@@ -141,11 +132,11 @@ export default function RegisterWorkDialog({
     dlsiteValidationError ??
     (dlsiteMutation.error
       ? dlsiteMutation.error instanceof ApiRequestError
-        ? dlsiteErrorMessage(dlsiteMutation.error)
-        : mutationErrorMessage(dlsiteMutation.error, "DLsite情報の取得に失敗しました")
+        ? dlsiteFetchErrorMessage(dlsiteMutation.error)
+        : apiErrorMessage(dlsiteMutation.error, "DLsite情報の取得に失敗しました")
       : null);
   const submitError = registerMutation.error
-    ? mutationErrorMessage(registerMutation.error, "作品の登録に失敗しました")
+    ? apiErrorMessage(registerMutation.error, "作品の登録に失敗しました")
     : null;
 
   return createPortal(

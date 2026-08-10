@@ -7,7 +7,7 @@ import {
   tagPrefixNameSchema,
   tagPrefixUpdateSchema,
 } from "@mimimilli/shared";
-import type { DataAdapter } from "../adapter.ts";
+import type { DataAdapter } from "../adapter/index.ts";
 import { conflict, invalidRequest, notFound } from "../lib/httpError.ts";
 
 export function tagPrefixesRoute(adapter: DataAdapter): Hono {

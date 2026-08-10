@@ -1,14 +1,25 @@
 // 作品登録解除 API（DELETE /works/:id）の結合テスト。
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
+import { eq } from "drizzle-orm";
 import { test, type TestContext } from "node:test";
 import { META_FILE_NAME, type FsListing, type Work } from "@mimimilli/shared";
 import { createApp } from "../../src/app.ts";
 import { openDb } from "../../src/adapters/real/db.ts";
+import { unregisterWork } from "../../src/adapters/real/workRegister.ts";
+import { workStates } from "../../src/adapters/real/userSchema.ts";
+import { createWorkRepos, folderMetaPath } from "../helpers/workTestUtils.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
-import { folderMetaPath } from "../helpers/workTestUtils.ts";
 import { makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 
 interface FileSnapshot {
@@ -286,4 +297,158 @@ test("DELETE /works/:id: id不一致のmimimilli.jsonは削除しない", async 
   assert.ok(existsSync(actualMetaPath));
   const remaining = JSON.parse(readFileSync(actualMetaPath, "utf-8")) as { id: string };
   assert.equal(remaining.id, otherId);
+});
+
+test("unregisterWork: DB削除失敗時に退避したメタ正本を復元する", async (t) => {
+  const directory = makeTestDirectory("work-unregister-db-failure");
+  t.after(directory.cleanup);
+  const catalogPath = join(directory.path, "catalog.db");
+  const userPath = join(directory.path, "user.db");
+  const root = join(directory.path, "lib");
+  const folder = join(root, "RJ900023_db_failure");
+  mkdirSync(folder, { recursive: true });
+  writeWav(join(folder, "track.wav"), 2);
+
+  const adapter = createTestRealAdapter({
+    database: { kind: "files", catalogPath, userPath },
+  });
+  const app = createApp(adapter);
+  await adapter.updateSettings({ rootFolder: root });
+
+  const createRes = await app.request("/api/works", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: folder, title: "DB失敗テスト" }),
+  });
+  assert.equal(createRes.status, 201);
+  const work = (await createRes.json()) as Work;
+  const metaPath = folderMetaPath(folder);
+  const metaBefore = readFileSync(metaPath, "utf-8");
+  assert.ok(existsSync(metaPath));
+
+  const db = openDb({ kind: "files", catalogPath, userPath });
+  const { query, catalog, user } = createWorkRepos(db);
+  catalog.deleteWorkCatalog = () => {
+    throw new Error("simulated db delete failure");
+  };
+
+  assert.throws(
+    () => unregisterWork(query, catalog, user, work.id),
+    (error: Error) => error.message.includes("simulated db delete failure"),
+  );
+  db.close();
+
+  assert.ok(existsSync(metaPath));
+  assert.equal(readFileSync(metaPath, "utf-8"), metaBefore);
+  assert.ok(!existsSync(join(folder, `.${META_FILE_NAME}.unregistering`)));
+
+  const stillThere = await app.request(`/api/works/${work.id}`);
+  assert.equal(stillThere.status, 200);
+});
+
+test("unregisterWork: catalog削除後のuser削除失敗時はメタを復元し起動時整合性検査を通す", async (t) => {
+  const directory = makeTestDirectory("work-unregister-user-delete-failure");
+  t.after(directory.cleanup);
+  const catalogPath = join(directory.path, "catalog.db");
+  const userPath = join(directory.path, "user.db");
+  const root = join(directory.path, "lib");
+  const folder = join(root, "RJ900025_user_failure");
+  mkdirSync(folder, { recursive: true });
+  writeWav(join(folder, "track.wav"), 2);
+
+  const adapter = createTestRealAdapter({
+    database: { kind: "files", catalogPath, userPath },
+  });
+  const app = createApp(adapter);
+  await adapter.updateSettings({ rootFolder: root });
+
+  const createRes = await app.request("/api/works", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: folder, title: "user削除失敗テスト" }),
+  });
+  assert.equal(createRes.status, 201);
+  const work = (await createRes.json()) as Work;
+  const metaPath = folderMetaPath(folder);
+  const metaBefore = readFileSync(metaPath, "utf-8");
+  const stagedPath = join(folder, `.${META_FILE_NAME}.unregistering`);
+
+  const db = openDb({ kind: "files", catalogPath, userPath });
+  const { query, catalog, user } = createWorkRepos(db);
+  user.deleteWorkUserState = () => {
+    throw new Error("simulated user delete failure");
+  };
+
+  assert.throws(
+    () => unregisterWork(query, catalog, user, work.id),
+    (error: Error) => error.message.includes("simulated user delete failure"),
+  );
+
+  assert.ok(existsSync(metaPath));
+  assert.equal(readFileSync(metaPath, "utf-8"), metaBefore);
+  assert.ok(!existsSync(stagedPath));
+
+  const catalogRow = db.sqlite.query("SELECT id FROM works WHERE id = ?").get(work.id) as {
+    id: string;
+  } | null;
+  assert.equal(catalogRow, null);
+
+  const userRow = db.user.select().from(workStates).where(eq(workStates.workId, work.id)).get();
+  assert.ok(userRow);
+
+  const integrityViolation = db.sqlite
+    .query(
+      "SELECT works.id FROM works LEFT JOIN user.work_states ON work_states.work_id = works.id " +
+        "WHERE work_states.work_id IS NULL LIMIT 1",
+    )
+    .get();
+  assert.equal(integrityViolation, null);
+
+  db.close();
+
+  const reopened = openDb({ kind: "files", catalogPath, userPath });
+  reopened.close();
+
+  const gone = await app.request(`/api/works/${work.id}`);
+  assert.equal(gone.status, 404);
+});
+
+test("unregisterWork: 退避済みメタのまま再実行するとDB削除後に実削除する", async (t) => {
+  const directory = makeTestDirectory("work-unregister-staged-retry");
+  t.after(directory.cleanup);
+  const catalogPath = join(directory.path, "catalog.db");
+  const userPath = join(directory.path, "user.db");
+  const root = join(directory.path, "lib");
+  const folder = join(root, "RJ900024_staged_retry");
+  mkdirSync(folder, { recursive: true });
+  writeWav(join(folder, "track.wav"), 2);
+
+  const adapter = createTestRealAdapter({
+    database: { kind: "files", catalogPath, userPath },
+  });
+  const app = createApp(adapter);
+  await adapter.updateSettings({ rootFolder: root });
+
+  const createRes = await app.request("/api/works", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: folder, title: "退避再実行テスト" }),
+  });
+  assert.equal(createRes.status, 201);
+  const work = (await createRes.json()) as Work;
+  const metaPath = folderMetaPath(folder);
+  const stagedPath = join(folder, `.${META_FILE_NAME}.unregistering`);
+  renameSync(metaPath, stagedPath);
+  assert.ok(!existsSync(metaPath));
+  assert.ok(existsSync(stagedPath));
+
+  const db = openDb({ kind: "files", catalogPath, userPath });
+  const { query, catalog, user } = createWorkRepos(db);
+  assert.equal(unregisterWork(query, catalog, user, work.id), true);
+  db.close();
+
+  assert.ok(!existsSync(metaPath));
+  assert.ok(!existsSync(stagedPath));
+  const gone = await app.request(`/api/works/${work.id}`);
+  assert.equal(gone.status, 404);
 });

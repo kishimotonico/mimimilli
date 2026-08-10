@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import Button from "../shared/ui/Button";
+import { formatUserError } from "../shared/lib/formatUserError";
 
 interface Props {
   children: ReactNode;
@@ -7,12 +8,6 @@ interface Props {
 
 interface State {
   error: Error | null;
-}
-
-function formatErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  if (typeof error === "string") return error;
-  return "予期しないエラーが発生しました";
 }
 
 export default class RootErrorBoundary extends Component<Props, State> {
@@ -38,7 +33,7 @@ export default class RootErrorBoundary extends Component<Props, State> {
           <div className="flex max-w-md flex-col items-center gap-4 px-6 text-center font-jp">
             <h1 className="text-[15px] font-medium text-ink-0">表示中にエラーが発生しました</h1>
             <p className="mll-selectable text-[13px] text-ink-2" role="alert">
-              {formatErrorMessage(error)}
+              {formatUserError(error, "予期しないエラーが発生しました")}
             </p>
             {error.stack ? (
               <details className="w-full text-left">

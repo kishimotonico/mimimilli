@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ScanJobEvent, ScanJobSnapshot } from "@mimimilli/shared";
-import { useScanJob } from "../../src/features/scan/useScanJob";
+import { useScanJob } from "../../src/features/scan/model/useScanJob";
 
 class FakeEventSource extends EventTarget {
   static instances: FakeEventSource[] = [];
@@ -289,14 +289,14 @@ describe("useScanJob", () => {
 
     mode = "start500";
     await act(async () => {
-      await hook.result.current.start().catch(() => {});
+      await hook.result.current.start();
     });
     expect(hook.result.current.error).toBe("start failed");
 
     mode = "cancel500";
     act(() => hook.result.current.attach(running));
     await act(async () => {
-      await hook.result.current.cancel().catch(() => {});
+      await hook.result.current.cancel();
     });
     expect(hook.result.current.error).toBe("cancel failed");
   });

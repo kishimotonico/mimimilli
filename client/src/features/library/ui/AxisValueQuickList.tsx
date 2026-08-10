@@ -1,24 +1,20 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { useAtom } from "jotai";
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import type { AxisFacetItem } from "@mimimilli/shared";
-import { filterAxisValueItems } from "../model/axisValueFilter";
 import {
   AXIS_VALUE_SORT_OPTIONS,
-  DEFAULT_AXIS_VALUE_SORT,
-  sortAxisValueItems,
   toggleAxisValueSort,
   type AxisValueSortState,
 } from "../model/axisValueSort";
-import {
-  buildAxisValueHierarchy,
-  flattenAxisValueRows,
-  type AxisValueHierarchyRow,
-} from "../model/axisValueHierarchy";
-import type { AxisId } from "../model/types";
+import { axisValueSortAtom } from "../model/atoms";
+import { buildAxisValueDisplayRows } from "../model/axisValueDisplayRows";
+import type { AxisValueHierarchyRow } from "../model/axisValueHierarchy";
+import type { AxisId } from "../../../entities/library/types";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
+import { useVirtualList } from "../../../shared/ui/useVirtualList";
 
 // 軸レールのクイックオーバーレイ・「＋絞り込み」・チップの兄弟値ドロップダウン
 // が共有する簡易値リスト。データ取得・フィルタ・ソートは値一覧本体
@@ -65,7 +61,7 @@ interface SortMenuProps {
 
 /** ソート切替メニュー。height:0↔auto の collapse で開閉する。
  *  `.mll-qlist__sort` 自体は padding/border-bottom を持つ実要素のため、
- *  overflow:hidden で高さをクリップする役目はこの外側の motion.div が担う。 */
+ *  overflow:hidden で高さをクリップする役割はこの外側の motion.div が担う。 */
 function SortMenu({ sort, onToggle }: SortMenuProps) {
   const { collapse } = useMotionVariants();
   const isPresent = useIsPresent();
@@ -128,10 +124,9 @@ export default function AxisValueQuickList({
   emptyLabel = "項目がありません",
 }: AxisValueQuickListProps) {
   const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<AxisValueSortState>(DEFAULT_AXIS_VALUE_SORT);
+  const [sort, setSort] = useAtom(axisValueSortAtom);
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
-  const listRef = useRef<HTMLDivElement>(null);
   const sortToggleRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -141,32 +136,24 @@ export default function AxisValueQuickList({
     if (!isOpen) return;
     searchRef.current?.focus();
     setQuery("");
-    setSort(DEFAULT_AXIS_VALUE_SORT);
     setSortMenuOpen(false);
   }, [axis, isOpen]);
 
   const currentSortLabel = AXIS_VALUE_SORT_OPTIONS.find((opt) => opt.id === sort.key)?.label ?? "";
 
-  const filtered = filterAxisValueItems(items, query);
-  const rows =
-    sort.key === "name"
-      ? buildAxisValueHierarchy(filtered, sort.direction)
-      : flattenAxisValueRows(sortAxisValueItems(filtered, sort));
+  const rows = buildAxisValueDisplayRows(items, query, sort);
+  const resetKey = `${axis}:${sort.key}:${sort.direction}:${query}`;
 
-  // 行はすべて固定高さ（見出し・値行とも1行に収まるよう nowrap+ellipsis で折り返しを禁止済み）。
-  // DOM実測（measureElement + ref配線）はせず、estimateSize の定数をそのまま採用する。
-  const virtualizer = useVirtualizer({
+  const { scrollRef, virtualizer, virtualItems, wrapperStyle, getItemStyle } = useVirtualList({
     count: rows.length,
-    getScrollElement: () => listRef.current,
-    estimateSize: () => ROW_ESTIMATE_SIZE,
-    overscan: 8,
+    estimateSize: ROW_ESTIMATE_SIZE,
+    resetKey,
+    resetScrollTop: true,
     gap: 1,
-    paddingStart: LIST_PADDING,
-    paddingEnd: LIST_PADDING,
+    padding: { start: LIST_PADDING, end: LIST_PADDING },
+    overscan: 8,
   });
 
-  const resetKey = `${axis}:${sort.key}:${sort.direction}:${query}`;
-  const prevResetKeyRef = useRef(resetKey);
   // キーボード移動中の「現在位置」を自前で追跡する（rows のインデックス、未選択は-1）。
   // document.activeElement から逆算すると、フォーカス確定（下記のダブルrAF）より速く
   // 次のキー入力が来た場合に取りこぼす（キーリピート等）。scrollToIndex/focus の実際の
@@ -177,12 +164,8 @@ export default function AxisValueQuickList({
     // selectedTags が変わると facet データが再取得され items の参照だけ変わるが、
     // 見ている対象は変わっていないためスクロール位置・キーボード位置は維持する
     // （ADR-0013: AND追加はオーバーレイを開いたまま連続で行える）。
-    if (prevResetKeyRef.current === resetKey) return;
-    prevResetKeyRef.current = resetKey;
     activeIndexRef.current = -1;
-    virtualizer.scrollToIndex(0);
-    if (listRef.current) listRef.current.scrollTop = 0;
-  }, [resetKey, virtualizer]);
+  }, [resetKey]);
 
   // 仮想化中は範囲外の行がDOMに無いため、scrollToIndexで画面内へ入れてから
   // レイアウト確定後（ダブルrAF）にフォーカスする。
@@ -191,7 +174,7 @@ export default function AxisValueQuickList({
     virtualizer.scrollToIndex(index, { align: "auto" });
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        listRef.current
+        scrollRef.current
           ?.querySelector<HTMLElement>(`[data-index="${index}"] [data-quicklist-item]`)
           ?.focus();
       });
@@ -283,7 +266,7 @@ export default function AxisValueQuickList({
       ) : (
         // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- onFocusはキーボード移動位置の追従用。フォーカスは子のボタンが受ける
         <div
-          ref={listRef}
+          ref={scrollRef}
           className="mll-qlist__body"
           // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- 値ボタン集合を名前付き集合として表す。fieldset等の代替タグは適合しない
           role="group"
@@ -297,15 +280,8 @@ export default function AxisValueQuickList({
             }
           }}
         >
-          <div
-            style={{
-              position: "relative",
-              width: "100%",
-              height: virtualizer.getTotalSize(),
-              flexShrink: 0,
-            }}
-          >
-            {virtualizer.getVirtualItems().map((virtualRow) => {
+          <div style={wrapperStyle}>
+            {virtualItems.map((virtualRow) => {
               const row = rows[virtualRow.index];
               if (!row) return null;
               const indent = row.depth * INDENT_PER_DEPTH;
@@ -313,13 +289,7 @@ export default function AxisValueQuickList({
                 <div
                   key={virtualRow.key}
                   data-index={virtualRow.index}
-                  style={{
-                    position: "absolute",
-                    top: 0,
-                    left: 0,
-                    width: "100%",
-                    transform: `translateY(${virtualRow.start}px)`,
-                  }}
+                  style={getItemStyle(virtualRow)}
                 >
                   {row.kind === "heading" ? (
                     <div className="mll-qlist__heading" style={{ paddingLeft: indent }}>

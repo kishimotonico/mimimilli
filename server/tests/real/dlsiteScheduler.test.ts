@@ -5,7 +5,8 @@ import {
   resolveDlsiteRequestConfig,
   DEFAULT_DLSITE_USER_AGENT,
 } from "../../src/adapters/real/dlsiteConfig.ts";
-import { DlsiteOfflineError, DlsiteScheduler } from "../../src/adapters/real/dlsiteScheduler.ts";
+import { DlsiteOfflineError } from "../../src/errors.ts";
+import { DlsiteScheduler } from "../../src/adapters/real/dlsiteScheduler.ts";
 
 function fakeTime(initial = 0) {
   let current = initial;
@@ -238,32 +239,29 @@ test("DLsite scheduler: queue待機とcooldown待機のAbortはtransportを増�
   );
 });
 
-test("DLsite scheduler: scheduleの間隔待機中もAbortで即時に返す", async () => {
+test("DLsite scheduler: 間隔待機中もAbortで即時に返す", async () => {
   const time = fakeTime();
-  let operations = 0;
+  let transportCalls = 0;
   const scheduler = new DlsiteScheduler(
     { ...config, requestIntervalMs: 5_000 },
     {
       now: time.now,
       sleep: time.sleep,
-      transport: async () => new Response(null, { status: 200 }),
+      transport: async () => {
+        transportCalls += 1;
+        return new Response(null, { status: 200 });
+      },
     },
   );
-  await scheduler.schedule(async () => {
-    operations += 1;
-    return "first";
-  });
+  await scheduler.fetch("https://www.dlsite.com/a");
   const controller = new AbortController();
-  const pending = scheduler.schedule(async () => {
-    operations += 1;
-    return "second";
-  }, controller.signal);
+  const pending = scheduler.fetch("https://www.dlsite.com/b", { signal: controller.signal });
   controller.abort();
   await assert.rejects(
     pending,
     (error: unknown) => error instanceof DOMException && error.name === "AbortError",
   );
-  assert.equal(operations, 1);
+  assert.equal(transportCalls, 1);
 });
 
 test("DLsite scheduler: HTTP待機中のAbortはtimeoutSignal経由で打ち切る", async () => {

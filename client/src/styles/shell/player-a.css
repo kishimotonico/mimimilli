@@ -1,0 +1,575 @@
+/* mimimilli shell — player-a
+   所有範囲: PlayerDock（画面下張り付きバー .mle-bar1* / 右下ポップアップ .mle-popup*）、
+   評価ピッカー(.mle-ratepick* / .mle-ratepill*)、フルスクリーン再生のシーク
+   (.mle-fullscreen__seek)。いずれも position: fixed のオーバーレイで、frame のグリッド行を
+   持たない。player系はこの1ファイルのみ（元ファイル内で連続した区画だったため分割不要）。
+   import順: shared-c.cssの次、files-c.cssより前。 */
+
+/* ── Player dock — 画面下張り付きバー / 右下ポップアップ共通 ─── */
+/* 両モードとも常駐チェック用 UI で position: fixed のオーバーレイ。
+   FullScreenPlayer は dialog の top layer に出るため、ここではモーダルより下に置く。 */
+
+/* ── 画面下張り付きバー（最小構成）───────────────────────── */
+
+.mle-bar1 {
+  position: fixed;
+  left: 56px;
+  right: 0;
+  bottom: 0;
+  z-index: 32;
+  /* 60px（操作行）+ 12px（シーク行）。経過/総時間のテキストは撤去し
+       （縦幅を圧迫する割に、詳しい時間はポップアップ展開で見れば十分なため）、
+       シーク行はトラック分の帯だけ確保する。空いた縦幅はカバー画像を
+       大きくする方へ回す。シーク行は操作行と高さを分け合わず専用の帯として
+       確保し、ボタン行との重なり・クリップを避ける。 */
+  height: 72px;
+  background: var(--paper-1);
+  border-top: 1px solid var(--line);
+  box-shadow: 0 -8px 24px -16px oklch(20% 0.02 70 / 0.18);
+}
+.mle-bar1__body {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 20px;
+  cursor: pointer;
+}
+.mle-bar1__cover {
+  width: 52px;
+  height: 52px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--paper-2);
+  flex-shrink: 0;
+  box-shadow: var(--shadow-cover);
+}
+.mle-bar1__cover img,
+.mle-bar1__cover svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.mle-bar1__meta {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+}
+.mle-bar1__track {
+  font-family: var(--font-jp);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-0);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.005em;
+}
+.mle-bar1__work {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mle-bar1__error {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  font-family: var(--font-jp);
+  font-size: 10.5px;
+  color: var(--r-coral);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mle-bar1__error svg {
+  flex-shrink: 0;
+}
+.mle-bar1__controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.mle-bar1__track-button {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: var(--ink-1);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.mle-bar1__track-button:hover:not(:disabled) {
+  background: var(--paper-2);
+  color: var(--ink-0);
+}
+.mle-bar1__track-button:disabled {
+  color: var(--ink-4);
+  cursor: not-allowed;
+}
+.mle-bar1__track-button.is-muted {
+  color: var(--ink-4);
+}
+/* 音量ボタン。デフォルトは.mle-bar1__track-buttonと同じ単体ボタン表示で、
+     クリックすると上へ開くポップオーバーにスライダーを出す（ミュート単体の
+     ボタンは撤去。0まで下げればミュート相当になる）。 */
+.mle-bar1__vol {
+  position: relative;
+  display: flex;
+}
+.mle-bar1__volpop {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 33;
+  display: flex;
+  align-items: center;
+  padding: 8px 10px;
+  background: var(--paper-1);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-2);
+  box-shadow: var(--shadow-pop);
+}
+.mle-bar1__volpop input[type="range"] {
+  width: 96px;
+  accent-color: var(--acc);
+  cursor: pointer;
+}
+/* ミスクリックで展開しないよう、再生ボタン自体を大きめにする */
+.mle-bar1__play {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--ink-0);
+  color: var(--paper-1);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.mle-bar1__play:hover {
+  background: var(--acc);
+}
+.mle-bar1__expand {
+  color: var(--ink-3);
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+.mle-bar1__expand:hover {
+  background: var(--paper-2);
+  color: var(--ink-1);
+}
+.mle-bar1__body:hover .mle-bar1__expand {
+  color: var(--ink-1);
+}
+
+/* シークバーは要素全体の下辺を使う（DLsite Play 風。スライダーではない）。
+   当たり判定は表示より広く取り、バー最下端（= 画面最下端）まで含める。
+   経過/総時間のテキストは出さない（撤去。詳しい時間はポップアップ展開で見る）。 */
+.mle-bar1__seek {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  height: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  cursor: pointer;
+}
+.mle-bar1__seek-track {
+  position: relative;
+  width: 100%;
+  height: 7px;
+  background: var(--line-strong);
+  transition: height 0.12s ease;
+}
+.mle-bar1__seek:hover .mle-bar1__seek-track,
+.mle-bar1__seek.is-dragging .mle-bar1__seek-track {
+  height: 11px;
+}
+.mle-bar1__seek-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: var(--acc);
+}
+.mle-bar1__seek-tooltip,
+.mle-seek-tooltip {
+  position: absolute;
+  bottom: 100%;
+  margin-bottom: 8px;
+  transform: translateX(-50%);
+  background: var(--ink-0);
+  color: var(--paper-1);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 3px 7px;
+  border-radius: 5px;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: var(--shadow-2);
+}
+.mle-bar1__seek-tooltip::after,
+.mle-seek-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-top-color: var(--ink-0);
+}
+
+/* ── 右下ポップアップ ─────────────────────────────────────── */
+
+.mle-popup {
+  position: fixed;
+  right: 16px;
+  /* グリッド末尾カードとの重なりを避ける安全マージン */
+  bottom: 24px;
+  z-index: 32;
+  width: 336px;
+  /* ビューポートが低い時、上端がはみ出さないよう高さを制限する。
+     万一それでも収まらない極端なケースの保険として overflow-y も許可する。 */
+  max-height: calc(100dvh - 32px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  background: var(--paper-1);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-3);
+  box-shadow: var(--shadow-pop);
+  padding: 14px;
+}
+/* 左に再生中作品への導線、右にサイズ変更系ボタンをまとめる。 */
+.mle-popup__head {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.mle-popup__head-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+/* 高さ不足時はカバー画像領域だけを縮める（他のコントロールは flex-shrink: 0 で維持） */
+.mle-popup__cover-wrap {
+  position: relative;
+  flex-shrink: 1;
+  min-height: 0;
+  width: 100%;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  container-type: size;
+}
+.mle-popup__cover {
+  position: relative;
+  width: min(100cqw, 100cqh);
+  height: min(100cqw, 100cqh);
+  aspect-ratio: 1;
+  min-height: 0;
+  border-radius: var(--r-2);
+  overflow: hidden;
+  box-shadow: var(--shadow-cover);
+  background: var(--paper-2);
+}
+.mle-popup__cover img,
+.mle-popup__cover svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* ±10秒: カバー画像上のオーバーレイ円ボタン。常時薄く表示し、ホバーで強調する
+   （.mle-app button リセットに勝つため親クラスでスコープして詳細度を上げる） */
+.mle-popup__cover .mle-popup__skip {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: oklch(20% 0.02 70 / 0.5);
+  color: var(--paper-1);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  opacity: 0.55;
+  transition:
+    opacity 0.15s ease,
+    background 0.15s ease;
+}
+.mle-popup__cover:hover .mle-popup__skip {
+  opacity: 1;
+}
+.mle-popup__cover .mle-popup__skip:hover {
+  background: oklch(20% 0.02 70 / 0.7);
+}
+.mle-popup__skip--back {
+  left: 14px;
+}
+.mle-popup__skip--fwd {
+  right: 14px;
+}
+.mle-ratepick {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 4;
+}
+.mle-ratepick__pop {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 7px);
+  min-width: 112px;
+  padding: 4px;
+  background: var(--paper-1);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-2);
+  box-shadow: var(--shadow-pop);
+  animation: mle-ratepick-pop 0.12s ease-out both;
+}
+.mle-ratepick__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-1);
+  text-align: left;
+  white-space: nowrap;
+}
+.mle-ratepick__item:hover {
+  background: var(--paper-2);
+  color: var(--ink-0);
+}
+.mle-ratepick__item.is-checked {
+  color: var(--ink-0);
+}
+.mle-ratepick__item .check {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  color: var(--paper-1);
+}
+.mle-ratepick__item.is-checked .check {
+  background: var(--ink-0);
+}
+@keyframes mle-ratepick-pop {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.mle-ratepill.is-overlay {
+  position: relative;
+  background: oklch(20% 0.02 70 / 0.55);
+  color: var(--paper-1);
+}
+.mle-ratepill.is-overlay:hover {
+  background: oklch(20% 0.02 70 / 0.75);
+  color: var(--paper-1);
+}
+.mle-ratepill.is-overlay.is-on {
+  background: var(--acc);
+  color: var(--paper-1);
+}
+
+.mle-popup__meta {
+  flex-shrink: 0;
+  text-align: center;
+  min-width: 0;
+}
+.mle-popup__track {
+  font-family: var(--font-jp);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-0);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mle-popup__work {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-3);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mle-popup__error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-family: var(--font-jp);
+  font-size: 10.5px;
+  color: var(--r-coral);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mle-popup__error svg {
+  flex-shrink: 0;
+}
+.mle-popup__seek {
+  flex-shrink: 0;
+  padding: 8px 0 2px;
+  cursor: pointer;
+}
+.mle-popup__seek-track {
+  position: relative;
+  height: 4px;
+  background: var(--paper-3);
+  border-radius: 2px;
+}
+.mle-popup__seek-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: var(--acc);
+  border-radius: 2px;
+}
+.mle-popup__seek-thumb {
+  position: absolute;
+  top: 50%;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--paper-1);
+  box-shadow:
+    0 0 0 1.5px var(--acc),
+    var(--shadow-1);
+  transform: translate(-50%, -50%);
+}
+.mle-popup__time-row {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-3);
+  margin-top: -4px;
+}
+.mle-popup__controls {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+.mle-popup__play {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--ink-0);
+  color: var(--paper-1);
+  display: grid;
+  place-items: center;
+}
+.mle-popup__play:hover {
+  background: var(--acc);
+}
+.mle-popup__tbtn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--ink-1);
+}
+.mle-popup__tbtn:hover {
+  background: var(--paper-2);
+  color: var(--ink-0);
+}
+.mle-popup__tbtn.is-on {
+  color: var(--acc);
+  background: var(--acc-soft);
+}
+.mle-popup__row {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.mle-popup__volrange {
+  flex: 1;
+  height: 3px;
+  accent-color: var(--ink-2);
+  cursor: pointer;
+}
+/* ── 共有アイコンボタン / 再生速度ピル（バー・ポップアップ共通） ── */
+
+.mle-icbtn.is-on {
+  color: var(--acc);
+  background: var(--acc-soft);
+}
+.mle-icbtn.is-muted {
+  color: var(--ink-4);
+}
+.mle-ratepill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  height: 26px;
+  padding: 0 9px;
+  border-radius: var(--r-pill);
+  background: var(--paper-2);
+  color: var(--ink-1);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+}
+.mle-ratepill:hover {
+  background: var(--paper-3);
+  color: var(--ink-0);
+}
+.mle-ratepill.is-on {
+  background: var(--acc-soft);
+  color: var(--acc-ink);
+}
+
+.mle-fullscreen__seek {
+  touch-action: none;
+}

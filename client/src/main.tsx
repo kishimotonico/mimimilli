@@ -7,7 +7,7 @@ import "./styles/fonts.css";
 import "./styles/tokens.css";
 import "./styles/tailwind.css";
 import "./styles/global.css";
-import "./styles/shell.css";
+import "./styles/shell/index.css";
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>

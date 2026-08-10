@@ -1,6 +1,6 @@
 // ファイルモードからの手動作品登録。メタファイル生成と子作品の登録解除のみ行い、物理ファイルは移動しない。
-import { existsSync, statSync, unlinkSync } from "node:fs";
-import { basename, join } from "node:path";
+import { existsSync, renameSync, statSync, unlinkSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import type {
   DlsiteApplyBody,
   MetaFile,
@@ -12,28 +12,11 @@ import { emptyDlsiteState } from "@mimimilli/shared";
 import { detectRjCode } from "./dlsite.ts";
 import { META_FILE_NAME, MetaParseError, readMetaFile, readMetaFileRaw } from "./meta.ts";
 import { resolveWithin } from "./paths.ts";
+import { WorkRegisterError } from "../../errors.ts";
+import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
+import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
+import type { WorkQueryRepository } from "./workQueryRepository.ts";
 import type { Scanner } from "./scanner.ts";
-import type { WorkRepo } from "./workRepo.ts";
-
-export class WorkRegisterError extends Error {
-  readonly code:
-    | "already_registered"
-    | "descendants_require_merge"
-    | "not_configured"
-    | "invalid_meta";
-  readonly descendantCount?: number;
-
-  constructor(
-    code: "already_registered" | "descendants_require_merge" | "not_configured" | "invalid_meta",
-    message: string,
-    descendantCount?: number,
-  ) {
-    super(message);
-    this.name = "WorkRegisterError";
-    this.code = code;
-    this.descendantCount = descendantCount;
-  }
-}
 
 function isDirectory(path: string): boolean {
   try {
@@ -43,8 +26,16 @@ function isDirectory(path: string): boolean {
   }
 }
 
-export function deleteMetaFileOnly(metaPath: string): void {
-  if (existsSync(metaPath)) unlinkSync(metaPath);
+export class MetaUnregisterError extends Error {
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "MetaUnregisterError";
+  }
+}
+
+interface MetaDeletionPlan {
+  canonicalPath: string;
+  stagedPath: string;
 }
 
 function folderMetaPathOf(physicalPath: string): string {
@@ -66,48 +57,117 @@ function metaFileIdMatches(metaPath: string, workId: string): boolean {
   }
 }
 
-/** 登録解除時に削除するメタファイルパスを解決する。 */
-function resolveMetaPathToDelete(
+function metaStagingPath(canonicalPath: string): string {
+  return join(dirname(canonicalPath), `.${basename(canonicalPath)}.unregistering`);
+}
+
+function findStagedMetaPlan(workId: string, canonicalPath: string): MetaDeletionPlan | null {
+  const stagedPath = metaStagingPath(canonicalPath);
+  if (existsSync(stagedPath) && metaFileIdMatches(stagedPath, workId)) {
+    return { canonicalPath, stagedPath };
+  }
+  return null;
+}
+
+/** 登録解除時に退避・削除するメタファイルパスを解決する。 */
+function resolveMetaDeletionPlan(
   workId: string,
   recordedMetaPath: string,
-  physicalPath: string,
-): string | null {
+  physicalPath?: string,
+): MetaDeletionPlan | null {
+  const stagedAtRecorded = findStagedMetaPlan(workId, recordedMetaPath);
+  if (stagedAtRecorded) return stagedAtRecorded;
   if (existsSync(recordedMetaPath)) {
-    return recordedMetaPath;
+    return {
+      canonicalPath: recordedMetaPath,
+      stagedPath: metaStagingPath(recordedMetaPath),
+    };
   }
 
-  const folderMeta = folderMetaPathOf(physicalPath);
-  if (existsSync(folderMeta) && metaFileIdMatches(folderMeta, workId)) {
-    return folderMeta;
+  if (physicalPath) {
+    const folderMeta = folderMetaPathOf(physicalPath);
+    const stagedAtFolder = findStagedMetaPlan(workId, folderMeta);
+    if (stagedAtFolder) return stagedAtFolder;
+    if (existsSync(folderMeta) && metaFileIdMatches(folderMeta, workId)) {
+      return { canonicalPath: folderMeta, stagedPath: metaStagingPath(folderMeta) };
+    }
   }
 
   return null;
 }
 
-export function unregisterWork(repo: WorkRepo, workId: string): boolean {
-  const target = repo.getWorkDeleteTarget(workId);
-  if (!target) return false;
-
-  const mediaRoot = repo.getMediaRoot(workId);
-  if (mediaRoot) {
-    const metaPathToDelete = resolveMetaPathToDelete(
-      workId,
-      target.metaPath,
-      mediaRoot.physicalPath,
-    );
-    if (metaPathToDelete) deleteMetaFileOnly(metaPathToDelete);
-  } else {
-    deleteMetaFileOnly(target.metaPath);
+function stageMetaForDeletion(plan: MetaDeletionPlan): void {
+  if (existsSync(plan.stagedPath)) {
+    if (existsSync(plan.canonicalPath)) {
+      throw new MetaUnregisterError(
+        `メタの退避状態が矛盾しています: 正本と退避が同時に存在します (${plan.canonicalPath})`,
+      );
+    }
+    return;
   }
-
-  return repo.deleteWork(workId) !== null;
+  if (!existsSync(plan.canonicalPath)) return;
+  renameSync(plan.canonicalPath, plan.stagedPath);
 }
 
-function unregisterDescendantWorks(repo: WorkRepo, descendants: Array<{ id: string }>): void {
+function restoreStagedMeta(plan: MetaDeletionPlan): void {
+  if (!existsSync(plan.stagedPath)) return;
+  if (existsSync(plan.canonicalPath)) {
+    throw new MetaUnregisterError(
+      `退避したメタを復元できません: 正本パスが既に存在します (${plan.canonicalPath})`,
+    );
+  }
+  try {
+    renameSync(plan.stagedPath, plan.canonicalPath);
+  } catch (error) {
+    throw new MetaUnregisterError(
+      `退避したメタを復元できません: ${plan.stagedPath} → ${plan.canonicalPath}`,
+      { cause: error },
+    );
+  }
+}
+
+function deleteStagedMeta(plan: MetaDeletionPlan): void {
+  if (existsSync(plan.stagedPath)) unlinkSync(plan.stagedPath);
+}
+
+export function unregisterWork(
+  query: WorkQueryRepository,
+  catalog: CatalogWorkRepository,
+  user: UserWorkStateRepository,
+  workId: string,
+): boolean {
+  const target = catalog.getWorkDeleteTarget(workId);
+  if (!target) return false;
+
+  const mediaRoot = query.getMediaRoot(workId);
+  const metaPlan = resolveMetaDeletionPlan(workId, target.metaPath, mediaRoot?.physicalPath);
+  if (metaPlan) stageMetaForDeletion(metaPlan);
+
+  try {
+    const deleted = catalog.deleteWorkCatalog(workId);
+    if (!deleted) {
+      if (metaPlan) restoreStagedMeta(metaPlan);
+      return false;
+    }
+    user.deleteWorkUserState(workId);
+    if (metaPlan) deleteStagedMeta(metaPlan);
+    return true;
+  } catch (error) {
+    if (metaPlan) restoreStagedMeta(metaPlan);
+    throw error;
+  }
+}
+
+function unregisterDescendantWorks(
+  query: WorkQueryRepository,
+  catalog: CatalogWorkRepository,
+  user: UserWorkStateRepository,
+  descendants: Array<{ id: string }>,
+): void {
   const remaining: string[] = [];
   for (const child of descendants) {
     try {
-      if (!unregisterWork(repo, child.id)) {
+      if (!unregisterWork(query, catalog, user, child.id)) {
         remaining.push(child.id);
       }
     } catch {
@@ -121,11 +181,14 @@ function unregisterDescendantWorks(repo: WorkRepo, descendants: Array<{ id: stri
   }
 }
 
-export function buildWorkRegisterPreview(repo: WorkRepo, workDir: string): WorkRegisterPreview {
+export function buildWorkRegisterPreview(
+  query: WorkQueryRepository,
+  workDir: string,
+): WorkRegisterPreview {
   const folderName = basename(workDir);
-  const descendants = repo.listDescendantWorkRefs(workDir);
+  const descendants = query.listDescendantWorkRefs(workDir);
   const metaPath = `${workDir}/${META_FILE_NAME}`;
-  const dbWork = repo.getWorkByPhysicalPathSync(workDir);
+  const dbWork = query.getWorkByPhysicalPathSync(workDir);
   const orphanedMeta = existsSync(metaPath) && dbWork === null;
 
   let suggestedTitle = folderName;
@@ -158,12 +221,17 @@ interface DlsiteAppliedMeta {
 }
 
 export async function createWorkFromFolder(
-  repo: WorkRepo,
+  repos: {
+    query: WorkQueryRepository;
+    catalog: CatalogWorkRepository;
+    user: UserWorkStateRepository;
+  },
   scanner: Scanner,
   root: string,
   body: WorkCreateBody,
   applyDlsiteCover?: (coverUrl: string, workDir: string) => Promise<string | null>,
 ): Promise<Work> {
+  const { query, catalog, user } = repos;
   const workDir = resolveWithin(root, body.path);
   if (!workDir || !isDirectory(workDir)) {
     throw new WorkRegisterError(
@@ -173,7 +241,7 @@ export async function createWorkFromFolder(
   }
 
   const metaPath = `${workDir}/${META_FILE_NAME}`;
-  const dbWork = repo.getWorkByPhysicalPathSync(workDir);
+  const dbWork = query.getWorkByPhysicalPathSync(workDir);
   if (dbWork !== null) {
     throw new WorkRegisterError(
       "already_registered",
@@ -181,7 +249,7 @@ export async function createWorkFromFolder(
     );
   }
 
-  const descendants = repo.listDescendantWorkRefs(workDir);
+  const descendants = query.listDescendantWorkRefs(workDir);
   if (descendants.length > 0 && !body.mergeDescendantWorks) {
     throw new WorkRegisterError(
       "descendants_require_merge",
@@ -222,7 +290,7 @@ export async function createWorkFromFolder(
     }
 
     const work = await scanner.restoreFolderWork(workDir, metaPatch);
-    unregisterDescendantWorks(repo, descendants);
+    unregisterDescendantWorks(query, catalog, user, descendants);
     return work;
   }
 
@@ -250,7 +318,7 @@ export async function createWorkFromFolder(
     coverImage,
     dlsite,
   });
-  unregisterDescendantWorks(repo, descendants);
+  unregisterDescendantWorks(query, catalog, user, descendants);
   return work;
 }
 

@@ -1,0 +1,33 @@
+/* mimimilli shell — 分割ファイルの束ね役。
+   各ファイルの所有範囲は各ファイル冒頭のコメントを参照。
+   ここでの @import 順は、元の shell.css の記述順と完全に一致するように並べてある
+   （同一レイヤー内は同じ詳細度ならソース順で優劣が決まるため）。
+   ある「面」の規則が元ファイル内で連続しておらず離れた複数箇所に分散している場合は、
+   その面を <owner>-a / <owner>-b ... の複数ファイルへ分け、元の位置どおりに import する
+   （例: library は library-a〜library-e の5ファイル）。
+   layer(base) は Tailwind の @layer utilities より弱く、layer(components) は
+   @layer utilities より強い（レイヤー順は theme, base, components, utilities）。
+   元ファイルの base 相当の規則（1-67行目）はもともと unlayered ではなく @layer base の中に
+   あったため、layer(base) への割り当てで優先度は変わっていない。
+   shared-d.css は reduced-motion の一括打ち消しを含み、元ファイルでも components layer の
+   末尾にあったため、必ず最後に読み込む。 */
+
+@import "./base.css" layer(base);
+@import "./shared-a.css" layer(components);
+@import "./frame-a.css" layer(components);
+@import "./library-a.css" layer(components);
+@import "./frame-b.css" layer(components);
+@import "./library-b.css" layer(components);
+@import "./frame-c.css" layer(components);
+@import "./library-c.css" layer(components);
+@import "./files-a.css" layer(components);
+@import "./library-d.css" layer(components);
+@import "./files-b.css" layer(components);
+@import "./preview-a.css" layer(components);
+@import "./shared-b.css" layer(components);
+@import "./library-e.css" layer(components);
+@import "./preview-b.css" layer(components);
+@import "./shared-c.css" layer(components);
+@import "./player-a.css" layer(components);
+@import "./files-c.css" layer(components);
+@import "./shared-d.css" layer(components);

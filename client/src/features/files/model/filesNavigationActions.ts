@@ -1,7 +1,11 @@
 import { atom } from "jotai";
-import { requestNavigationHistoryCommit } from "../../navigation/model/navigationHistoryCommit";
-import { filesDirectionAtom, filesRelPathAtom, filesSelectedPathAtom } from "./atoms";
-import { joinPath, relSegments } from "./types";
+import { requestNavigationHistoryCommit } from "../../../shared/model/navigationHistoryCommit";
+import {
+  filesDirectionAtom,
+  filesRelPathAtom,
+  filesSelectedPathAtom,
+} from "../../../entities/file-system/model/navigationAtoms";
+import { joinPath, relSegments } from "../../../shared/lib/fsPath";
 
 export const openFilesDirAtom = atom(
   null,

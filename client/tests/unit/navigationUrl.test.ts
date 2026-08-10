@@ -4,7 +4,7 @@ import {
   parseNavigationUrl,
   serializeNavigationUrl,
   type NavigationUrlState,
-} from "../../src/features/navigation/model/navigationUrl";
+} from "../../src/entities/library/model/navigationUrl";
 
 describe("navigation URL codec", () => {
   it("round-trips a Japanese library axis with a tag filter, work, and sort", () => {

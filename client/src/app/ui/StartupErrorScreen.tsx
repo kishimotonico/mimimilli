@@ -1,4 +1,5 @@
 import Button from "../../shared/ui/Button";
+import { formatUserError } from "../../shared/lib/formatUserError";
 
 interface StartupErrorScreenProps {
   error: unknown;
@@ -6,18 +7,12 @@ interface StartupErrorScreenProps {
   isRetrying?: boolean;
 }
 
-function formatStartupError(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  if (typeof error === "string") return error;
-  return "設定の取得に失敗しました";
-}
-
 export default function StartupErrorScreen({
   error,
   onRetry,
   isRetrying = false,
 }: StartupErrorScreenProps) {
-  const message = formatStartupError(error);
+  const message = formatUserError(error, "設定の取得に失敗しました");
 
   return (
     <div className="flex h-screen w-full items-center justify-center bg-paper-0">

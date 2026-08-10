@@ -1,3 +1,4 @@
+import { DlsiteOfflineError } from "../../errors.ts";
 import { MAX_DLSITE_TIMER_MS, type DlsiteRequestConfig } from "./dlsiteConfig.ts";
 
 export type DlsiteTransport = (
@@ -21,13 +22,6 @@ export interface DlsiteSchedulerDependencies {
   sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
   random?: () => number;
   logger?: DlsiteSchedulerLogger;
-}
-
-export class DlsiteOfflineError extends Error {
-  constructor() {
-    super("DLsiteはオフライン設定のため取得しませんでした");
-    this.name = "DlsiteOfflineError";
-  }
 }
 
 function abortError(): DOMException {
@@ -182,12 +176,6 @@ export class DlsiteScheduler {
       });
       await this.sleep(delay, init.signal ?? undefined);
     }
-  }
-
-  /** 注入した疑似transportも実HTTPと同じ開始間隔へ載せるためのテスト境界。 */
-  async schedule<T>(operation: () => Promise<T>, signal?: AbortSignal): Promise<T> {
-    this.assertOnline();
-    return this.start(operation, signal);
   }
 
   /** キューに積まれたDLsite HTTP操作の完了を待つ（in-flightの後始末用）。 */

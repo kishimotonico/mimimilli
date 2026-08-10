@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from "react";
 import { getAudioUrl } from "../../../entities/work/api";
-import { getFsAudioUrl } from "../../files/api";
+import { getFsAudioUrl } from "../../../entities/file-system/api";
 import { updateLastPlayed } from "../api";
 import { createAudioEngine } from "./audioEngine";
 import {
@@ -11,7 +11,7 @@ import {
   toTrackRelativeTime,
 } from "./trackTime";
 import type { LoadedTrack, PlaybackContext, PlayerRuntimeRefs } from "./playerRuntime";
-import type { PlaybackItem, PlayerController } from "./playerController";
+import { toPlayerCoreState, type PlaybackItem, type PlayerController } from "./playerController";
 
 interface UseAudioEngineLifecycleOptions {
   refs: PlayerRuntimeRefs;
@@ -51,13 +51,14 @@ export function useAudioEngineLifecycle({
   useEffect(() => {
     const engineRef = refs.engine;
     const loadCleanupRef = refs.loadCleanup;
+    const loadedTrackRef = refs.loadedTrack;
 
     const finishCurrentTrack = (virtualEnd: boolean) => {
       if (refs.trackEnded.current) return;
       refs.trackEnded.current = true;
 
       const loadedTrack = refs.loadedTrack.current;
-      const state = refs.coreState.current;
+      const state = toPlayerCoreState(controller.getState());
       const nextTrack = loadedTrack ? state.tracks[loadedTrack.trackIndex + 1] : undefined;
       const continuesSameAsset =
         loadedTrack !== null &&
@@ -72,7 +73,7 @@ export function useAudioEngineLifecycle({
       if (controller.getState().loop) refs.trackEnded.current = false;
     };
 
-    const engine = createAudioEngine(refs.coreState.current.volume, {
+    const engine = createAudioEngine(controller.getState().volume, {
       onPlay: () => {
         if (refs.trackEnded.current) {
           const loadedTrack = refs.loadedTrack.current;
@@ -132,6 +133,7 @@ export function useAudioEngineLifecycle({
     return () => {
       if (engineRef.current === engine) {
         engineRef.current = null;
+        loadedTrackRef.current = null;
       }
       loadCleanupRef.current?.();
       loadCleanupRef.current = null;
@@ -217,7 +219,7 @@ export function useAudioEngineLifecycle({
 
       refs.loadCleanup.current?.();
       refs.loadCleanup.current = engine.load(assetUrl, {
-        playbackRate: refs.coreState.current.playbackRate,
+        playbackRate: controller.getState().playbackRate,
         startSec:
           pendingSeekSec === undefined && track.start !== undefined ? track.start : undefined,
         pendingSeekSec,

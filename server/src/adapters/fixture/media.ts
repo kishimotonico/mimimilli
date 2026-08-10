@@ -2,7 +2,7 @@
 // 実ファイルを持たない fixture でも再生・シーク・カバー表示が成立するよう、
 // 「指定秒数の無音WAV」と「作品ごとのSVGプレースホルダー」をメモリ上で合成する。
 import type { WorkSummary } from "@mimimilli/shared";
-import type { MediaLocation } from "../../adapter.ts";
+import type { MediaLocation } from "../../adapter/index.ts";
 
 /** 合成WAVのフォーマット: 8kHz / mono / 8bit PCM（符号なし、無音=128） → 8,000 byte/sec */
 const SAMPLE_RATE = 8000;

@@ -26,23 +26,13 @@ export type ScanResult = z.infer<typeof scanResultSchema>;
 export const scanPhaseSchema = z.enum(["walking", "registering", "generating", "finalizing"]);
 export type ScanPhase = z.infer<typeof scanPhaseSchema>;
 
-/** adapter内部の進捗コールバック契約。HTTP SSEではScanJobEventへ変換する。 */
-export const scanProgressEventSchema = z.discriminatedUnion("type", [
-  z.object({
-    type: z.literal("progress"),
-    phase: scanPhaseSchema,
-    processed: z.number().int().nonnegative(),
-    total: z.number().int().nonnegative(),
-  }),
-  z.object({
-    type: z.literal("complete"),
-    result: scanResultSchema,
-  }),
-  z.object({
-    type: z.literal("error"),
-    message: z.string(),
-  }),
-]);
+/** adapter内部の進捗コールバック契約。完了・失敗は ScanJobManager が別経路で扱う。 */
+export const scanProgressEventSchema = z.object({
+  type: z.literal("progress"),
+  phase: scanPhaseSchema,
+  processed: z.number().int().nonnegative(),
+  total: z.number().int().nonnegative(),
+});
 export type ScanProgressEvent = z.infer<typeof scanProgressEventSchema>;
 
 export const scanJobStatusSchema = z.enum([

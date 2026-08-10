@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { normalizeTag, parseTag } from "@mimimilli/shared";
+import { normalizeTag } from "@mimimilli/shared";
 import type { NormalizedTag, Work } from "@mimimilli/shared";
 import { sortTagsForDisplay } from "../../../../entities/work/sortTagsForDisplay";
 import Tag from "../../../../entities/work/ui/Tag";
@@ -8,9 +8,10 @@ import ConfirmDialog from "../../../../shared/ui/ConfirmDialog";
 import IconButton from "../../../../shared/ui/IconButton";
 import TagCombobox from "../../../../shared/ui/TagCombobox";
 import Toast from "../../../../shared/ui/Toast";
-import { mutationErrorMessage } from "../../../../shared/lib/mutationError";
-import type { LibraryTagsPatchMutation } from "../../model/workPatchMutations";
-import { useTagPrefixes } from "../../model/useTagPrefixes";
+import { apiErrorMessage } from "../../../../shared/lib/apiError";
+import type { LibraryTagsPatchMutation } from "../../model/useLibraryQueries";
+import { useTagPrefixes } from "../../../../entities/tag/useTagPrefixes";
+import { tagPrefixDefinition } from "../../../../entities/tag/tagPrefixDefinition";
 import { useAnchoredPopover } from "../../../../shared/ui/useAnchoredPopover";
 import { useWorkTagEditor } from "./useWorkTagEditor";
 
@@ -91,11 +92,7 @@ export function WorkTagEditor({
     void addTag(tag);
   };
 
-  const definitionOf = (tag: string) => {
-    const parsed = parseTag(tag);
-    if (parsed.kind !== "annotated") return null;
-    return tagPrefixes.find((p) => p.prefix === parsed.prefix) ?? null;
-  };
+  const definitionOf = (tag: string) => tagPrefixDefinition(tag, tagPrefixes);
 
   const comboboxProps = {
     suggestions,
@@ -107,7 +104,7 @@ export function WorkTagEditor({
   };
 
   const patchTagsErrorMessage = patchTagsError
-    ? mutationErrorMessage(patchTagsError, "タグを保存できませんでした。")
+    ? apiErrorMessage(patchTagsError, "タグを保存できませんでした。")
     : null;
 
   return (

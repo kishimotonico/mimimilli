@@ -3,12 +3,12 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import type { WorksPage } from "@mimimilli/shared";
 import type { CollectionStatsDisplay } from "../../model/libraryPresentation";
-import { searchWorks } from "../../api";
+import { searchWorks } from "../../../../entities/work/api";
 import { WORK_QUERY_KEYS } from "../../../../entities/work/queryKeys";
 import { I } from "../../../../shared/ui/Icon";
 import IconButton from "../../../../shared/ui/IconButton";
-import CollectionStatus from "../CollectionStatus";
-import { formatDuration } from "./format";
+import CollectionStatus from "../../../../shared/ui/CollectionStatus";
+import { formatDuration } from "../../../../shared/lib/format";
 import { WorkCardGrid } from "./WorkCard";
 
 const SECTION_LIMIT = 6;

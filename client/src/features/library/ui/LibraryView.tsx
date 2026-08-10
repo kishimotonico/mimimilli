@@ -8,12 +8,13 @@ import {
   type Work,
   type WorkListItem,
 } from "@mimimilli/shared";
-import { librarySearchQueryAtom, libraryViewModeAtom } from "../model/atoms";
+import { libraryViewModeAtom } from "../model/atoms";
+import { librarySearchQueryAtom } from "../../../entities/library/model/navigationAtoms";
 import {
-  playerIsPlaybackActiveAtom,
+  playerIsPlayingOrLoadingAtom,
   playingTrackIndexAtom,
   playingWorkIdAtom,
-} from "../../player/model/atoms";
+} from "../../../entities/player/model/atoms";
 import { useLibraryNavigation } from "../model/useLibraryNavigation";
 import {
   useLibraryDebouncedSearchQuery,
@@ -26,7 +27,11 @@ import {
   shouldClearSelectionOnFilterMiss,
   shouldClearSelectionOnWorkNotFound,
 } from "../model/libraryPresentation";
-import { isHomeAxis, isSmartAxis, getSmartFolderId } from "../model/axisDefinitions";
+import {
+  isHomeAxis,
+  isSmartAxis,
+  getSmartFolderId,
+} from "../../../entities/library/axisDefinitions";
 import {
   type SmartFolderEditorState,
   closedSmartFolderEditorState,
@@ -74,7 +79,7 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
   const viewMode = useAtomValue(libraryViewModeAtom);
   const playingWorkId = useAtomValue(playingWorkIdAtom);
   const playingTrackIndex = useAtomValue(playingTrackIndexAtom);
-  const isPlaybackActive = useAtomValue(playerIsPlaybackActiveAtom);
+  const isPlaybackActive = useAtomValue(playerIsPlayingOrLoadingAtom);
   const nav = useLibraryNavigation();
   const [smartFolderEditor, setSmartFolderEditor] = useState<SmartFolderEditorState>(
     closedSmartFolderEditorState,
@@ -282,9 +287,6 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
                           hasSelectedTags={nav.selectedTags.length > 0}
                           playingWorkId={playingWorkId}
                           isPlaybackActive={isPlaybackActive}
-                          isLoading={false}
-                          isError={false}
-                          onRetryWorks={result.refetchWorks}
                           hasNextPage={result.hasNextPage}
                           worksTotal={result.worksTotal}
                           isFetchingNextPage={result.isFetchingNextPage}

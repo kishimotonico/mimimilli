@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { Provider as JotaiProvider, createStore } from "jotai";
 import type { AxisFacetItem } from "@mimimilli/shared";
 import AxisValueQuickList from "../../src/features/library/ui/AxisValueQuickList";
+import { axisValueSortAtom } from "../../src/features/library/model/atoms";
 import { clearResizeObservers, flushAllResizeObservers, mockElementSize } from "./setup";
 
 afterEach(() => {
@@ -27,17 +29,21 @@ async function flushVirtualizer(size = { width: 260, height: 260 }) {
 }
 
 function renderQuickList(props: Partial<React.ComponentProps<typeof AxisValueQuickList>> = {}) {
-  return render(
-    <AxisValueQuickList
-      axis="cv"
-      axisLabel="CV"
-      items={[]}
-      isSelected={() => false}
-      onSelect={vi.fn()}
-      close={vi.fn()}
-      {...props}
-    />,
+  const store = createStore();
+  const result = render(
+    <JotaiProvider store={store}>
+      <AxisValueQuickList
+        axis="cv"
+        axisLabel="CV"
+        items={[]}
+        isSelected={() => false}
+        onSelect={vi.fn()}
+        close={vi.fn()}
+        {...props}
+      />
+    </JotaiProvider>,
   );
+  return { ...result, store };
 }
 
 describe("AxisValueQuickList の仮想化", () => {
@@ -150,7 +156,19 @@ describe("AxisValueQuickList のキーボード移動", () => {
   it("items だけが変わっても activeIndexRef はリセットされず、位置を維持したまま移動する", async () => {
     const sizeMock = mockElementSize(260, 260);
     const user = userEvent.setup();
-    const { rerender } = renderQuickList({ items: makeItems(3) });
+    const store = createStore();
+    const { rerender } = render(
+      <JotaiProvider store={store}>
+        <AxisValueQuickList
+          axis="cv"
+          axisLabel="CV"
+          items={makeItems(3)}
+          isSelected={() => false}
+          onSelect={vi.fn()}
+          close={vi.fn()}
+        />
+      </JotaiProvider>,
+    );
     await flushVirtualizer();
 
     const input = screen.getByPlaceholderText("CVを検索");
@@ -166,14 +184,16 @@ describe("AxisValueQuickList のキーボード移動", () => {
     // AND追加は一覧を開いたまま連続で行えるため、ここでスクロール・キーボード位置を
     // 先頭へ戻してはならない）。
     rerender(
-      <AxisValueQuickList
-        axis="cv"
-        axisLabel="CV"
-        items={makeItems(3).map((item) => ({ ...item, value: `別${item.value}` }))}
-        isSelected={() => false}
-        onSelect={vi.fn()}
-        onClose={vi.fn()}
-      />,
+      <JotaiProvider store={store}>
+        <AxisValueQuickList
+          axis="cv"
+          axisLabel="CV"
+          items={makeItems(3).map((item) => ({ ...item, value: `別${item.value}` }))}
+          isSelected={() => false}
+          onSelect={vi.fn()}
+          close={vi.fn()}
+        />
+      </JotaiProvider>,
     );
     await flushVirtualizer();
     input.focus();
@@ -252,6 +272,19 @@ describe("AxisValueQuickList のソート（アイコンボタン＋インライ
 
     await user.click(screen.getByRole("button", { name: "名前（昇順）" }));
     expect(screen.getByRole("button", { name: "名前（降順）" })).toBeTruthy();
+    sizeMock.restore();
+  });
+
+  it("ソート変更は axisValueSortAtom へ書き込み、メイン値一覧と共有する", async () => {
+    const sizeMock = mockElementSize(260, 260);
+    const user = userEvent.setup();
+    const { store } = renderQuickList({ items: makeItems(5) });
+    await flushVirtualizer();
+
+    await user.click(screen.getByRole("button", { name: /^並び替え/ }));
+    await user.click(screen.getByRole("button", { name: "名前" }));
+
+    expect(store.get(axisValueSortAtom)).toEqual({ key: "name", direction: "asc" });
     sizeMock.restore();
   });
 });

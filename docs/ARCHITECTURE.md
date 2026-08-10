@@ -31,13 +31,32 @@ pnpm workspace のモノレポで、`client/` / `server/` / `shared/` の3パッ
 - `server/`: `routes/`（HTTP層）・`core/`（ドメイン層）・`adapters/`（データ層）
 - `shared/`: API 契約（Zod スキーマ + 型）と `mimimilli.json` スキーマの正典。`client` / `server` / fixture アダプタが同じ型を参照する
 
+## レイヤ境界の機械的検証
+
+依存方向は lint と境界スクリプトで固定する。`pnpm check` に含まれる。
+
+**client**（`.oxlintrc.json` + `scripts/check-layer-boundaries.mjs`）:
+
+- `features` 間の sibling import 禁止。複数 feature で共有する state・操作は `shared/model/` か `entities/` へ引き上げる
+- `features` → `app` の import 禁止（`app` → `feature` の composition は許可）
+- `entities`・`shared` への依存は許可。`shared` と `entities` は上位レイヤー（`features` / `app`）へ依存しない
+
+**server**（`.oxlintrc.json` + `scripts/check-layer-boundaries.mjs`）:
+
+- `routes/` → `adapters/`（`real` / `fixture` 含む）の直接 import 禁止。HTTP 層は `server/src/adapter/` の `DataAdapter` 境界を経由する
+- `adapters/` → `routes/` 禁止
+- `core/` → `routes/` / `adapters/` 禁止
+- `adapters/fixture/` ↔ `adapters/real/` の相互 import 禁止
+
+oxlint の `overrides[].files` は `**/…` 形式で書く（複数セグメントの相対パスは一致せず silent に無効化される）。
+
 ## サーバー内部の境界
 
 サーバー内部は3層に分かれるが、過剰なレイヤリングは避ける方針で、各層の責務は最小限にとどめている。
 
 - `routes/`（`server/src/routes/`）: HTTP とバリデーションだけを担う薄い層。ドメインロジックは持たない
 - `core/`（`server/src/core/`）: 純粋関数によるドメイン処理。`worksQuery`（検索・フィルタ・ソート・ページング）、`axisFacets`（分類軸の値集計）、`smartFolder`（スマートフォルダー条件の評価・ソート・ページング）の3つがある。fixture アダプタはインメモリ配列をこの純粋関数群（`applyWorksQuery` / `buildAxisFacets` / `evalSmartFolder`）に渡して検索・集計する
-- real アダプタの検索・ファセット集計は SQL で行う。`workRepo.ts` の `queryWorks()` が catalog に user を ATTACH した JOIN で件数とページを同じ絞り込み集合から求め（ADR-0008）、`getAxisFacets()` がタグ軸専用 SQL を含むファセット集計を担う。日本語ソートキー（`japaneseSortKey`）は書き込み時に列へ事前計算する。SQL と core 純粋関数の結果が一致することは `server/tests/real/worksQueryContract.test.ts` の同値性契約テストで担保する。スマートフォルダー評価だけは real でも `listSummaries()` + `evalSmartFolder` を使い、戻り値は `WorksPage`（ページングエンベロープ）である
+- real アダプタの検索・ファセット集計は SQL で行う。`WorkQueryRepository` の `queryWorks()` が catalog に user を ATTACH した JOIN で件数とページを同じ絞り込み集合から求め（ADR-0008）、`getAxisFacets()` がタグ軸専用 SQL を含むファセット集計を担う。SQL フラグメントは `workQuerySql.ts` に集約する。日本語ソートキー（`japaneseSortKey`）は書き込み時に列へ事前計算する。SQL と core 純粋関数の結果が一致することは `server/tests/real/worksQueryContract.test.ts` の同値性契約テストで担保する。スマートフォルダー評価だけは real でも `listSummaries()` + `evalSmartFolder` を使い、戻り値は `WorksPage`（ページングエンベロープ）である
 - `adapters/`（`server/src/adapters/`）: `DataAdapter` インターフェース（`server/src/adapter.ts`）でデータの出どころ（real | fixture）だけを差し替える。ルーターとドメインロジックは1系統のみ
 
 新機能は `shared` → fixture アダプタ → real アダプタの順に実装を揃える（fixture が先行してよい）。
@@ -47,6 +66,7 @@ pnpm workspace のモノレポで、`client/` / `server/` / `shared/` の3パッ
 - `mimimilli.json` が Source of Truth。タイトル・タグ・分類軸情報などの作品メタデータはここに保持する
 - SQLiteは `bun:sqlite` + Drizzleを使い、`catalog.sqlite` と `user.sqlite` に分ける。catalogには作品メタ・走査状態・派生キャッシュ、userには設定・プリセット・スマートフォルダー・ブックマーク・レジューム・最終再生を置く
 - catalog接続をmainとしてuser DBを `user` でATTACHし、作品とuser状態をJOINして読む。DB間外部キーとcascade deleteは使わない
+- 作品詳細のトラック尺は、音声ファイルの size/mtime と `audio_probe_cache` を照合し、不一致なら再プローブする（`workProbe.ts`）。`GET /works/:id` は読み取り後に `catalog.total_duration_sec` をライブ合計へ同期する（`workRefresh.ts` 経由）。一覧の `totalDurationSec` ソート・表示はこの保存列を読むため、詳細取得を経ると一覧にも反映される。再スキャンは不要
 - UI からの編集は `mimimilli.json` へ即時書き戻す
 - スキーマの正本は `catalogSchema.ts` / `userSchema.ts` のDrizzle定義。`pnpm --filter @mimimilli/server db:generate` で生成したSQLを起動時に適用する。開発中は `user_version` 不一致のDBを再作成し、配布開始後のuser migration基盤は別途整備する
 - データルートはADR-0007に従い、Linuxでは `${XDG_DATA_HOME:-$HOME/.local/share}/mimimilli`、Windowsでは `%LOCALAPPDATA%\mimimilli`。`MIMIMILLI_DATA_DIR` で上書きできる

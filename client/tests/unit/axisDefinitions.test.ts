@@ -2,12 +2,13 @@ import { describe, expect, it } from "vitest";
 import type { TagPrefix } from "@mimimilli/shared";
 import {
   VIEW_AXES,
+  buildViewAxisRows,
   getAxisLabel,
   getSmartFolderId,
   isFacetAxis,
   isSmartAxis,
   isViewAxis,
-} from "../../src/features/library/model/axisDefinitions";
+} from "../../src/entities/library/axisDefinitions";
 
 const PREFIXES: TagPrefix[] = [
   { prefix: "cv", label: "CV", color: null, showAsAxis: true, protected: true },
@@ -46,5 +47,16 @@ describe("axisDefinitions", () => {
     expect(getAxisLabel("year")).toBe("追加日");
     expect(getAxisLabel("smart-abc")).toBe("スマートフォルダー");
     expect(getAxisLabel("all")).toBe("すべての作品");
+  });
+
+  it("buildViewAxisRows returns view axis rows from centralized definitions", () => {
+    const rows = buildViewAxisRows();
+    expect(rows.map((r) => r.id)).toEqual(["all", "recent", "added", "fav", "unplayed", "missing"]);
+    expect(rows[0]).toEqual({ id: "all", name: "すべての作品", icon: "gridS" });
+    expect(rows.find((r) => r.id === "fav")).toEqual({
+      id: "fav",
+      name: "お気に入り",
+      icon: "star",
+    });
   });
 });

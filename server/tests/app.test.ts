@@ -5,7 +5,6 @@ import { tf } from "./helpers/tag.ts";
 import { compareJapaneseSortKeys } from "../src/core/japaneseSortKey.ts";
 import { createApp } from "../src/app.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
-import { resetDlsiteProgressStateForTest } from "../src/routes/dlsiteProgress.ts";
 
 function buildApp() {
   return createApp(createFixtureAdapter());
@@ -58,6 +57,45 @@ test("GET /api/works は先頭に空白を挟んだ擬似タグも正規化後�
   assert.equal(res.status, 200);
 });
 
+test("GET /api/works は ids を複数指定すると該当作品のみへ絞り込む", async () => {
+  const app = buildApp();
+  const res = await app.request("/api/works?ids=RJ501001&ids=RJ501003");
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.deepEqual(body.items.map((item: { id: string }) => item.id).sort(), [
+    "RJ501001",
+    "RJ501003",
+  ]);
+  assert.equal(body.total, 2);
+});
+
+test("GET /api/works は ids に他のフィルタ・ページングを組み合わせられる", async () => {
+  const app = buildApp();
+  const res = await app.request(
+    "/api/works?ids=RJ501001&ids=RJ501002&ids=RJ501003&limit=1&page=1&sort=id-asc",
+  );
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.deepEqual(
+    body.items.map((item: { id: string }) => item.id),
+    ["RJ501001"],
+  );
+  assert.equal(body.total, 3);
+});
+
+test("GET /api/works は ids 未指定なら絞り込まない（全件対象）", async () => {
+  const adapter = createFixtureAdapter();
+  let receivedIds: string[] | undefined;
+  adapter.queryWorks = async (query) => {
+    receivedIds = query.ids;
+    return { items: [], total: 0, stats: { trackCount: 0, durationSec: 0 } };
+  };
+  const app = createApp(adapter);
+  const res = await app.request("/api/works");
+  assert.equal(res.status, 200);
+  assert.equal(receivedIds, undefined);
+});
+
 test("GET /api/works/:id 存在しないIDは404 + apiErrorSchema形式", async () => {
   const app = buildApp();
   const res = await app.request("/api/works/NOT_EXIST");
@@ -84,7 +122,6 @@ test("POST /api/dlsite/:id/fetch は取得分類をHTTPエラーコードへ反�
 });
 
 test("GET /api/dlsite/bulk は実行中・終了後の状態を返し、未実行時は204", async () => {
-  resetDlsiteProgressStateForTest();
   const app = buildApp();
   const idle = await app.request("/api/dlsite/bulk");
   assert.equal(idle.status, 204);
@@ -116,7 +153,6 @@ test("GET /api/dlsite/bulk は実行中・終了後の状態を返し、未実�
 });
 
 test("DLsite一括取得は202で開始し、SSEに進捗と完了件数を配信する", async () => {
-  resetDlsiteProgressStateForTest();
   const app = buildApp();
   const start = await app.request("/api/dlsite/bulk", { method: "POST" });
   assert.equal(start.status, 202);
@@ -129,7 +165,6 @@ test("DLsite一括取得は202で開始し、SSEに進捗と完了件数を配�
 });
 
 test("DELETE /api/dlsite/bulk は実行中ジョブの取消を要求し、終了済みには404", async () => {
-  resetDlsiteProgressStateForTest();
   let release!: () => void;
   const gate = new Promise<void>((resolve) => (release = resolve));
   const adapter = createFixtureAdapter();

@@ -1,0 +1,74 @@
+/* mimimilli shell — library-b
+   所有範囲: 並び替えメニュー・グリッドサイズ(.mle-sortmenu / .mll-grid-size)。
+   library-a〜eの分割理由はlibrary-a.css冒頭コメント参照。
+   import順: frame-b.cssの次、frame-c.cssより前。 */
+
+/* ── 並び替えメニュー ─────────────────────────────────────── */
+
+.mle-sortmenu {
+  position: relative;
+}
+.mle-sortmenu__pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  min-width: 188px;
+  padding: 4px;
+  background: var(--paper-1);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-2);
+  box-shadow: var(--shadow-pop);
+}
+.mle-sortmenu__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-family: var(--font-jp);
+  font-size: 12px;
+  color: var(--ink-1);
+  text-align: left;
+  white-space: nowrap;
+}
+.mle-sortmenu__item:hover {
+  background: var(--paper-2);
+  color: var(--ink-0);
+}
+.mle-sortmenu__item.is-checked {
+  background: var(--acc-soft);
+  color: var(--acc-ink);
+  font-weight: 600;
+}
+.mle-sortmenu__item .check {
+  width: 16px;
+  height: 14px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  color: var(--acc);
+}
+
+.mll-grid-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ink-2);
+  font-family: var(--font-sans);
+  font-size: 10px;
+  white-space: nowrap;
+}
+.mll-grid-size input[type="range"] {
+  width: 112px;
+  accent-color: var(--acc);
+  cursor: ew-resize;
+}
+.mll-grid-size output {
+  width: 34px;
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-align: right;
+}

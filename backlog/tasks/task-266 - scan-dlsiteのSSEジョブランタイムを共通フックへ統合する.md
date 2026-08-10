@@ -1,10 +1,10 @@
 ---
 id: TASK-266
 title: scan/dlsiteのSSEジョブランタイムを共通フックへ統合する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-08 21:19'
-updated_date: '2026-08-09 00:28'
+updated_date: '2026-08-09 02:12'
 labels: []
 dependencies: []
 priority: high
@@ -22,8 +22,20 @@ Codexレビュー反映: scanとdlsiteで完全に同型なのはSSE transport�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 terminal判定が1箇所に定義されていること
-- [ ] #2 useScanJob が scan/model 配下に配置されていること
-- [ ] #3 clientのcheck・変更範囲のテスト・smokeが通ること
-- [ ] #4 型付きSSE transport（schema検証・named event購読・close管理）が共有され、scan/dlsite両ランタイムがそれを使うこと（各ジョブの状態機械は独立のまま）
+- [x] #1 terminal判定が1箇所に定義されていること
+- [x] #2 useScanJob が scan/model 配下に配置されていること
+- [x] #3 clientのcheck・変更範囲のテスト・smokeが通ること
+- [x] #4 型付きSSE transport（schema検証・named event購読・close管理）が共有され、scan/dlsite両ランタイムがそれを使うこと（各ジョブの状態機械は独立のまま）
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+共有は SSE transport 層まで（connectSse・parseTypedSseMessage・bindTypedSseEvents・bindSseTransportError・createSseGeneration）に限定し、job ownership・poll競合・terminal適用・切断判定の状態機械は各ランタイムに残した。TASK-267 の ScanActionResult 契約（Promiseをrejectしない）は維持。レビュー指摘により、世代カウンタの bump をパース前に戻して terminalHandled ガードへの暗黙依存を解消した。検証: pnpm check 成功、client 781テスト・smoke 10件全パス。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+EventSource生成・schema検証・named event購読・close管理・世代カウンタを shared/api/sseTransport.ts へ切り出し、scan/dlsite両ランタイムが使う形にした。terminal判定は isTerminalScanJob へ一本化し、useScanJob を features/scan/model 配下へ移動。pnpm check と client 781テスト・smokeで検証。
+<!-- SECTION:FINAL_SUMMARY:END -->

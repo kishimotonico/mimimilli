@@ -1,6 +1,6 @@
 // GET /fs?path=...
 import { Hono } from "hono";
-import type { DataAdapter } from "../adapter.ts";
+import type { DataAdapter } from "../adapter/index.ts";
 import { notFound } from "../lib/httpError.ts";
 
 export function fsRoute(adapter: DataAdapter): Hono {

@@ -1,9 +1,10 @@
 ---
 id: TASK-259
 title: real実装のエラー型・パスヘルパを境界へ移しroutes/fixtureのreal依存を断つ
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-08 21:16'
+updated_date: '2026-08-09 00:55'
 labels: []
 dependencies: []
 priority: high
@@ -24,8 +25,20 @@ ordinal: 269000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 routes/ と adapters/fixture/ から adapters/real/ へのimportが消えていること
-- [ ] #2 scanJobManager.ts が routes/ をimportしていないこと
-- [ ] #3 lib/ が adapters/real/ の型に依存していないこと
-- [ ] #4 変更範囲のserverテストが通ること
+- [x] #1 routes/ と adapters/fixture/ から adapters/real/ へのimportが消えていること
+- [x] #2 scanJobManager.ts が routes/ をimportしていないこと
+- [x] #3 lib/ が adapters/real/ の型に依存していないこと
+- [x] #4 変更範囲のserverテストが通ること
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+abortToken/エラー型/パスヘルパの移動はシンボル移動のみでロジック無変更。dlsiteProgress.ts→dlsiteJobQueue.ts はSSE購読・配信ロジック無変更。likeDescendantsPrefix は PathOperations ではなく pathSep を受け取る形へ簡素化。検証: pnpm check 成功、server 525 pass / 0 fail。副作用レビュー指摘なし。
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+WorkRegisterError・DlsiteOfflineError を adapter.ts へ、isPathWithin を lib/path.ts へ、DataPaths を lib/dataPaths.ts へ移し、routes/fixture から adapters/real への import を排除。routes/dlsiteProgress.ts を dlsiteJobQueue.ts へ移して scanJobManager のアプリ層→HTTP層の逆依存を解消。pnpm check と server 525 テストで検証。
+<!-- SECTION:FINAL_SUMMARY:END -->

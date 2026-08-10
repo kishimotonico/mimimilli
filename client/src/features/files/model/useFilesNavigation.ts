@@ -4,14 +4,18 @@
 
 import { useAtomValue, useSetAtom } from "jotai";
 import { useCallback } from "react";
-import { filesRelPathAtom, filesSelectedPathAtom } from "./atoms";
+import {
+  filesRelPathAtom,
+  filesSelectedPathAtom,
+} from "../../../entities/file-system/model/navigationAtoms";
 import {
   goToFilesSegmentAtom,
   goUpFilesAtom,
   openFilesDirAtom,
   selectFilesEntryAtom,
 } from "./filesNavigationActions";
-import { joinPath, rootLabel } from "./types";
+import { joinPath } from "../../../shared/lib/fsPath";
+import { rootLabel } from "./types";
 
 export interface FilesNav {
   /** ルート絶対パス */

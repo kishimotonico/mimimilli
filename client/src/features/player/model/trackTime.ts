@@ -1,8 +1,8 @@
-import type { ResolvedTrack, Track } from "../../../entities/work/model";
+import type { ResolvedTrack } from "../../../entities/work/model";
 import { resolveTrackDurationSec } from "@mimimilli/shared";
+import type { PlaybackTrack } from "../../../entities/player/model/playbackTrack";
 
-/** プレイヤーが扱うトラック。登録トラックは ResolvedTrack、Files モードの即席トラックは Track。 */
-export type PlaybackTrack = Track | ResolvedTrack;
+export type { PlaybackTrack } from "../../../entities/player/model/playbackTrack";
 
 /** durationSec を持つ ResolvedTrack（登録トラック）かどうかを判定する。 */
 export function isResolvedTrack(track: PlaybackTrack): track is ResolvedTrack {

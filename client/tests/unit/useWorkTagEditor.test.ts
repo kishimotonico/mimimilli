@@ -1,7 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { TagPrefix, Work } from "@mimimilli/shared";
-import type { LibraryTagsPatchMutation } from "../../src/features/library/model/workPatchMutations";
+import type { LibraryTagsPatchMutation } from "../../src/features/library/model/useLibraryQueries";
 import { useWorkTagEditor } from "../../src/features/library/ui/preview/useWorkTagEditor";
 
 const PREFIXES: TagPrefix[] = [

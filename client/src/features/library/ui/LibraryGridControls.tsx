@@ -2,12 +2,12 @@ import { useAtom, useAtomValue } from "jotai";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
 import {
-  activeAxisAtom,
   libraryGridLayoutModeAtom,
   libraryTileSizeAtom,
   libraryViewModeAtom,
 } from "../model/atoms";
-import { clampTileSize, MAX_TILE_SIZE, MIN_TILE_SIZE } from "../model/gridSizing";
+import { activeAxisAtom } from "../../../entities/library/model/navigationAtoms";
+import { clampTileSize, MAX_TILE_SIZE, MIN_TILE_SIZE } from "../../../shared/lib/gridSizing";
 import { computeResultsPaneKind, isGridViewActive } from "../model/libraryPresentation";
 
 export default function LibraryGridControls() {

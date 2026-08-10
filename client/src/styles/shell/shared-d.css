@@ -1,0 +1,17 @@
+/* mimimilli shell — shared-d
+   所有範囲: prefers-reduced-motion の一括無効化（frame-c/library-a/files-c/player-a各所の
+   transition・animationを横断して打ち消す）。
+   同一詳細度のtransition/animation上書きはソース順で後勝ちのため、必ず最後に読み込む
+   （元ファイルでもcomponents layerの末尾に位置していた）。
+   shared-a〜dの分割理由はshared-a.css冒頭コメント参照。
+   import順: 全ファイル中で最後。 */
+
+@media (prefers-reduced-motion: reduce) {
+  .mle-colstack__edges,
+  .ml-file-col-enter,
+  .mll-bar__pulse .dot,
+  .barwave span {
+    transition: none;
+    animation: none;
+  }
+}

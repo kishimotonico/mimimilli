@@ -2,7 +2,11 @@
 // 許可幅は THUMBNAIL_WIDTHS = [128, 256, 512] の離散値のみ。
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { normalizeThumbnailWidth } from "@mimimilli/shared";
+import {
+  normalizeThumbnailWidth,
+  selectCeilThumbnailWidth,
+  selectNearestThumbnailWidth,
+} from "@mimimilli/shared";
 
 test("normalizeThumbnailWidth: 許可幅そのものはそのまま返す", () => {
   assert.equal(normalizeThumbnailWidth(128), 128);
@@ -26,4 +30,16 @@ test("normalizeThumbnailWidth: ちょうど中間（同距離）は小さい側�
 test("normalizeThumbnailWidth: 範囲外（極端に小さい/大きい）でも最も近い許可幅に収める", () => {
   assert.equal(normalizeThumbnailWidth(1), 128);
   assert.equal(normalizeThumbnailWidth(10000), 512);
+});
+
+test("selectCeilThumbnailWidth: target以上の最小許可幅を返す", () => {
+  assert.equal(selectCeilThumbnailWidth(128), 128);
+  assert.equal(selectCeilThumbnailWidth(129), 256);
+  assert.equal(selectCeilThumbnailWidth(512), 512);
+  assert.equal(selectCeilThumbnailWidth(1000), 512);
+});
+
+test("selectNearestThumbnailWidth: 同距離は大きい許可幅を選ぶ", () => {
+  assert.equal(selectNearestThumbnailWidth(192), 256);
+  assert.equal(selectNearestThumbnailWidth(384), 512);
 });

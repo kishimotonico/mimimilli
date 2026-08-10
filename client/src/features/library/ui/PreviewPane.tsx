@@ -1,7 +1,7 @@
 import type { NormalizedTag, Work } from "@mimimilli/shared";
 import type { CollectionStatsDisplay } from "../model/libraryPresentation";
 import type { LibraryViewState } from "../model/useLibraryNavigation";
-import CollectionStatus from "./CollectionStatus";
+import CollectionStatus from "../../../shared/ui/CollectionStatus";
 import { DiscoveryDashboard } from "./preview/DiscoveryDashboard";
 import { WorkDetailPatchScope } from "./preview/WorkDetailPatchScope";
 

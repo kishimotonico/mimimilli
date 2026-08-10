@@ -65,6 +65,18 @@ export const playlistSchema = z.object({
 });
 export type Playlist = z.infer<typeof playlistSchema>;
 
+/** デフォルトプレイリストの純粋な選択。ID 不一致時は null（エラー変換は呼び出し側）。 */
+export function selectDefaultPlaylist<P extends { id: string }>(
+  playlists: readonly P[],
+  defaultPlaylistId: string | null | undefined,
+): P | null {
+  if (playlists.length === 0) return null;
+  if (defaultPlaylistId) {
+    return playlists.find((playlist) => playlist.id === defaultPlaylistId) ?? null;
+  }
+  return playlists[0]!;
+}
+
 /**
  * API DTO 用の解決済みトラック。durationSec はトラック区間の相対長（秒）で、
  * end 省略時はファイル全体長から解決する。durationKind が resolved 以外のときは

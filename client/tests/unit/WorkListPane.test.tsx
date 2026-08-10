@@ -8,7 +8,7 @@ import {
   PLAYER_CORE_INITIAL,
   playerCoreAtom,
   playerUiModeAtom,
-} from "../../src/features/player/model/atoms";
+} from "../../src/entities/player/model/atoms";
 import { clearResizeObservers, flushAllResizeObservers, mockElementSize } from "./setup";
 
 function createWorks(count: number): WorkListItem[] {

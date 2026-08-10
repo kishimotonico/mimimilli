@@ -18,6 +18,7 @@ API 契約の正典はドキュメントではなく **`shared/src/`（Zod ス�
 ## 規約として参照するもの
 
 - [design-system.md](design-system.md) — デザインシステムの規約（カラートークン・テーマ・z-index・motion・カーソル・アイコン等）。実装から読み取れない設計意図・規約だけを抜粋したもので、レイアウト・機能の正は実装済みのフロントエンド。アイコンライブラリ選定の経緯は [ADR-0009](adr/0009-icon-library-lucide.md)
+- [client-error-handling.md](client-error-handling.md) — client のエラー所有権・Promise 契約・best-effort 失敗の基準（[ADR-0015](adr/0015-client-error-contracts.md)）
 
 ## 作業記録
 

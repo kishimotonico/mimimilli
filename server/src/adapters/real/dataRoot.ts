@@ -1,15 +1,6 @@
 import { homedir } from "node:os";
 import { posix, win32 } from "node:path";
-
-export interface DataPaths {
-  root: string;
-  catalogDb: string;
-  userDb: string;
-  dlsiteCacheDb: string;
-  thumbnailCache: string;
-  logDir: string;
-  backupDir: string;
-}
+import type { DataPaths } from "../../lib/dataPaths.ts";
 
 /** ADR-0007に従ったユーザーデータ配置を返す。 */
 export function resolveDataPaths(

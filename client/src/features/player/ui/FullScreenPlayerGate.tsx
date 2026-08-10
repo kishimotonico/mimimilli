@@ -1,5 +1,5 @@
 import { useAtomValue } from "jotai";
-import { playerIsActiveAtom } from "../model/atoms";
+import { playerIsActiveAtom } from "../../../entities/player/model/atoms";
 import { usePlayerActions } from "../model/usePlayerActions";
 import { usePlayerState } from "../model/usePlayerState";
 import FullScreenPlayer from "./FullScreenPlayer";

@@ -47,6 +47,9 @@ const worksQueryBaseSchema = z.object({
   seed: z.coerce.number().int().min(0).max(0x7fffffff).optional(),
   page: z.coerce.number().int().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(500).optional(),
+  /** 指定IDの作品だけに絞り込む（同名パラメータを繰り返して配列で受ける）。
+   *  他のフィルタ・ソート・ページングと組み合わせ可能な通常の絞り込み条件として扱う */
+  ids: z.array(z.string()).optional(),
 });
 export const worksQuerySchema = worksQueryBaseSchema;
 /** HTTP クエリの入力型（.default 付きフィールドは省略可能） */
@@ -84,6 +87,10 @@ export const smartFolderWorksQuerySchema = worksQueryBaseSchema.pick({
   seed: true,
 });
 export type SmartFolderWorksQuery = z.infer<typeof smartFolderWorksQuerySchema>;
+
+/** adapter evalSmartFolder が受け取る正規化済みクエリ（page/limit は routes がデフォルト適用後） */
+export type SmartFolderEvalQuery = Required<Pick<SmartFolderWorksQuery, "page" | "limit">> &
+  Partial<Pick<SmartFolderWorksQuery, "tags" | "tagOp" | "seed">>;
 
 /** GET /api/axes/:axis のクエリパラメータ。値一覧の件数・総時間・代表カバーは、渡された
  *  tags による絞り込み後の集合から集計する（自軸除外カウント、TASK-187）。
@@ -134,7 +141,6 @@ export type DlsiteNotificationQuery = z.infer<typeof dlsiteNotificationQuerySche
 export const tagListSchema = z.array(z.string());
 
 // ── 作品の部分更新（PATCH /api/works/:id）────────────────────
-// 旧 PUT /works/:id/tags・PUT /works/:id/title・POST /works/:id/bookmark を統合。
 
 export const workPatchSchema = z
   .object({
@@ -208,7 +214,8 @@ export type ResumeBody = z.infer<typeof resumeBodySchema>;
 
 // ── カバー画像サムネイル（GET /api/media/cover/:id?w=）───────
 // キャッシュを有界にするため、許可する幅は離散値のみ。未対応の幅はリクエストされても
-// normalizeThumbnailWidth() が最近傍の許可幅へ丸める（丸め方の挙動はテストで担保する）。
+// normalizeThumbnailWidth() が最近傍の許可幅へ丸める（同距離は小さい方。
+// selectNearestThumbnailWidth は同距離で大きい方。挙動はテストで担保する）。
 
 export const THUMBNAIL_WIDTHS = [128, 256, 512] as const;
 export type ThumbnailWidth = (typeof THUMBNAIL_WIDTHS)[number];
@@ -216,6 +223,18 @@ export type ThumbnailWidth = (typeof THUMBNAIL_WIDTHS)[number];
 export function normalizeThumbnailWidth(width: number): ThumbnailWidth {
   return THUMBNAIL_WIDTHS.reduce((closest, candidate) =>
     Math.abs(candidate - width) < Math.abs(closest - width) ? candidate : closest,
+  );
+}
+
+export function selectCeilThumbnailWidth(target: number): ThumbnailWidth {
+  const fallback = THUMBNAIL_WIDTHS[THUMBNAIL_WIDTHS.length - 1];
+  if (fallback === undefined) throw new Error("THUMBNAIL_WIDTHS must not be empty");
+  return THUMBNAIL_WIDTHS.find((width) => width >= target) ?? fallback;
+}
+
+export function selectNearestThumbnailWidth(target: number): ThumbnailWidth {
+  return [...THUMBNAIL_WIDTHS].reduce((nearest, width) =>
+    Math.abs(width - target) <= Math.abs(nearest - target) ? width : nearest,
   );
 }
 

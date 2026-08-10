@@ -3,10 +3,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { LibraryViewState } from "../../src/features/library/model/useLibraryNavigation";
-import {
-  LibraryNavigationProvider,
-  useLibraryNavigation,
-} from "../../src/features/library/model/useLibraryNavigation";
+import { useLibraryNavigation } from "../../src/features/library/model/useLibraryNavigation";
+import { LibraryNavigationProvider } from "../../src/features/library/ui/LibraryNavigationProvider";
 import LibraryWorksBoundary from "../../src/features/library/ui/LibraryWorksBoundary";
 
 const baseNav: LibraryViewState = {

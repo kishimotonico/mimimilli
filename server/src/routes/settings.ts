@@ -1,7 +1,7 @@
 // GET/PUT /settings
 import { Hono } from "hono";
 import { settingsUpdateSchema } from "@mimimilli/shared";
-import type { DataAdapter } from "../adapter.ts";
+import type { DataAdapter } from "../adapter/index.ts";
 import { invalidRequest } from "../lib/httpError.ts";
 
 export function settingsRoute(adapter: DataAdapter): Hono {

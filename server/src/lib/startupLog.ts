@@ -1,4 +1,4 @@
-import type { DataPaths } from "../adapters/real/dataRoot.ts";
+import type { DataPaths } from "./dataPaths.ts";
 
 export function buildStartupLogProperties(input: {
   adapterKind: string;

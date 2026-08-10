@@ -1,9 +1,10 @@
 ---
 id: TASK-256
 title: createWorkの両分岐同一のデッドコードcatchを整理する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-08 13:35'
+updated_date: '2026-08-09 15:12'
 labels: []
 dependencies: []
 ordinal: 266000
@@ -17,6 +18,6 @@ server/src/adapters/real/workMethods.ts の createWork にある catch (error) {
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 createWorkのcatch節から無意味な分岐が消え、挙動（送出される例外の型・メッセージ）が変わらないこと
-- [ ] #2 変更範囲のserverテストが通ること
+- [x] #1 createWorkのcatch節から無意味な分岐が消え、挙動（送出される例外の型・メッセージ）が変わらないこと
+- [x] #2 変更範囲のserverテストが通ること
 <!-- AC:END -->

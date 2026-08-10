@@ -5,7 +5,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import FullScreenPlayer from "../../src/features/player/ui/FullScreenPlayer";
-import { PLAYER_CORE_INITIAL, type PlayerCoreState } from "../../src/features/player/model/atoms";
+import { PLAYER_CORE_INITIAL, type PlayerCoreState } from "../../src/entities/player/model/atoms";
 import type { AudioEngineError } from "../../src/features/player/model/audioEngine";
 import type { Track, WorkSummary } from "../../src/entities/work/model";
 

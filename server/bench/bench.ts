@@ -4,7 +4,7 @@ import { WORKS_DEFAULT_PAGE_SIZE } from "@mimimilli/shared";
 import { createApp } from "../src/app.ts";
 import { createRealAdapter } from "../src/adapters/real/index.ts";
 import { openDb } from "../src/adapters/real/db.ts";
-import { WorkRepo } from "../src/adapters/real/workRepo.ts";
+import { WorkQueryRepository } from "../src/adapters/real/workQueryRepository.ts";
 import { optionalArg, optionalIntArg, parseArgs, requireArg } from "./cli.ts";
 import type { BenchManifest } from "./manifest.ts";
 import { summarizeLatencies, type LatencyStats } from "./stats.ts";
@@ -147,12 +147,12 @@ async function main(): Promise<void> {
     catalogPath: manifest.catalogDb,
     userPath: manifest.userDb,
   });
-  const repo = new WorkRepo(db);
+  const query = new WorkQueryRepository(db);
   const listSummariesCase = {
     name: "list-summaries-all",
-    path: "(WorkRepo.listSummaries)",
+    path: "(WorkQueryRepository.listSummaries)",
     run: async () => {
-      repo.listSummaries();
+      query.listSummaries();
       return new Response(null, { status: 200 });
     },
   };

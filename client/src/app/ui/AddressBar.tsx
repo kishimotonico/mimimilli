@@ -1,6 +1,7 @@
 import { useAtom, useAtomValue } from "jotai";
-import { appModeAtom } from "../../features/navigation/model/navigationAtoms";
-import { activeAxisAtom, libraryViewModeAtom } from "../../features/library/model/atoms";
+import { appModeAtom } from "../../shared/model/appModeAtoms";
+import { libraryViewModeAtom } from "../../features/library/model/atoms";
+import { activeAxisAtom } from "../../entities/library/model/navigationAtoms";
 import { isGridViewActive } from "../../features/library/model/libraryPresentation";
 import LibraryGridControls from "../../features/library/ui/LibraryGridControls";
 import LibraryBreadcrumbs from "../../features/library/ui/LibraryBreadcrumbs";

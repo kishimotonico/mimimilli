@@ -10,67 +10,71 @@ import {
   type TagPrefixUpdate,
   type WorksPage,
 } from "@mimimilli/shared";
-import type { AxisFacetsFilter, SmartFolderEvalQuery } from "../../adapter.ts";
+import type { AxisFacetsQuery, SmartFolderEvalQuery } from "@mimimilli/shared";
 import { buildTagPrefixCandidates } from "../../core/tagPrefixCandidates.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
 import { logDataIntegritySkips } from "./dataIntegrity.ts";
+import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
+import type { WorkQueryRepository } from "./workQueryRepository.ts";
 import { querySmartFolderWorks } from "./smartFolderWorks.ts";
-import { WorkRepo } from "./workRepo.ts";
 
 const scanLogger = getCategoryLogger("scan");
 const KEY_TAG_PREFIXES_SEEDED = "tag_prefixes_seeded";
 
-export function initializeTagPrefixes(repo: WorkRepo): void {
-  if (repo.getUserSetting(KEY_TAG_PREFIXES_SEEDED) === null) {
-    for (const def of DEFAULT_TAG_PREFIXES) repo.createTagPrefix(def);
-    repo.setUserSetting(KEY_TAG_PREFIXES_SEEDED, "1");
+export function initializeTagPrefixes(user: UserWorkStateRepository): void {
+  if (user.getUserSetting(KEY_TAG_PREFIXES_SEEDED) === null) {
+    for (const def of DEFAULT_TAG_PREFIXES) user.createTagPrefix(def);
+    user.setUserSetting(KEY_TAG_PREFIXES_SEEDED, "1");
   }
 }
 
-export function createClassificationMethods(deps: { repo: WorkRepo }) {
-  const { repo } = deps;
+export function createClassificationMethods(deps: {
+  query: WorkQueryRepository;
+  user: UserWorkStateRepository;
+}) {
+  const { query, user } = deps;
   return {
-    async getAxisFacets(axis: string, filter?: AxisFacetsFilter): Promise<AxisFacetItem[]> {
-      return repo.getAxisFacets(axis, filter);
+    async getAxisFacets(axis: string, filter?: Partial<AxisFacetsQuery>): Promise<AxisFacetItem[]> {
+      return query.getAxisFacets(axis, filter);
     },
 
     async listTagPrefixes(): Promise<TagPrefix[]> {
-      return repo.listTagPrefixes();
+      return user.listTagPrefixes();
     },
     async createTagPrefix(input: TagPrefixCreate): Promise<TagPrefix | null> {
-      return repo.createTagPrefix(input);
+      return user.createTagPrefix(input);
     },
     async updateTagPrefix(prefix: string, patch: TagPrefixUpdate): Promise<TagPrefix | null> {
-      return repo.updateTagPrefix(prefix, patch);
+      return user.updateTagPrefix(prefix, patch);
     },
     async deleteTagPrefix(prefix: string): Promise<boolean> {
-      return repo.deleteTagPrefix(prefix);
+      return user.deleteTagPrefix(prefix);
     },
     async listTagPrefixCandidates(): Promise<TagPrefixCandidate[]> {
-      const { summaries, skipped } = repo.listSummaries();
+      const { summaries, skipped } = query.listSummaries();
       logDataIntegritySkips(scanLogger, "tag-prefix-candidates", skipped);
       return buildTagPrefixCandidates(
         summaries,
-        repo.listTagPrefixes().map((p) => p.prefix),
+        user.listTagPrefixes().map((p) => p.prefix),
       );
     },
 
     async listSmartFolders(): Promise<SmartFolder[]> {
-      return repo.listSmartFolders();
+      return user.listSmartFolders();
     },
     async createSmartFolder(input: SmartFolderCreate): Promise<SmartFolder> {
-      return repo.createSmartFolder(input);
+      return user.createSmartFolder(input);
     },
     async updateSmartFolder(id: string, input: SmartFolderUpdate): Promise<SmartFolder | null> {
-      return repo.updateSmartFolder(id, input);
+      return user.updateSmartFolder(id, input);
     },
     async deleteSmartFolder(id: string): Promise<boolean> {
-      return repo.deleteSmartFolder(id);
+      return user.deleteSmartFolder(id);
     },
-    async evalSmartFolder(id: string, query: SmartFolderEvalQuery): Promise<WorksPage | null> {
-      const folder = repo.getSmartFolder(id);
+    async evalSmartFolder(id: string, evalQuery: SmartFolderEvalQuery): Promise<WorksPage | null> {
+      const folder = user.getSmartFolder(id);
       if (!folder) return null;
-      return querySmartFolderWorks(repo, folder, query);
+      return querySmartFolderWorks(query, folder, evalQuery);
     },
   };
 }

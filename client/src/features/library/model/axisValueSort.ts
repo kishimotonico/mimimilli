@@ -46,28 +46,26 @@ export function toggleAxisValueSort(
   return { key, direction: current.direction === "asc" ? "desc" : "asc" };
 }
 
-/** 値からソートキー（表示名）を導く関数。将来の読み仮名メタデータ（DRAFT-49）に備え、
- *  呼び出し側が注入できる形にする。既定は表示名（value）そのままの単純比較。 */
-export type AxisValueNameKeyFn = (item: AxisFacetItem) => string;
-
-export const defaultAxisValueNameKey: AxisValueNameKeyFn = (item) => item.value;
+/** 値からソートキー（表示名）を導く。既定は表示名（value）そのままの単純比較。 */
+function axisValueNameKey(item: AxisFacetItem): string {
+  return item.value;
+}
 
 export function sortAxisValueItems(
   items: AxisFacetItem[],
   sort: AxisValueSortState,
-  getNameKey: AxisValueNameKeyFn = defaultAxisValueNameKey,
 ): AxisFacetItem[] {
   const dir = sort.direction === "asc" ? 1 : -1;
   return [...items].sort((a, b) => {
     let cmp = 0;
     if (sort.key === "name") {
-      cmp = getNameKey(a).localeCompare(getNameKey(b), "ja");
+      cmp = axisValueNameKey(a).localeCompare(axisValueNameKey(b), "ja");
     } else if (sort.key === "count") {
       cmp = a.count - b.count;
     } else {
       cmp = a.durationSec - b.durationSec;
     }
-    if (cmp === 0) cmp = getNameKey(a).localeCompare(getNameKey(b), "ja");
+    if (cmp === 0) cmp = axisValueNameKey(a).localeCompare(axisValueNameKey(b), "ja");
     return cmp * dir;
   });
 }

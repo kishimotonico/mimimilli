@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, type RefObject } from "react";
 import { useDismiss, useFloating, useInteractions } from "@floating-ui/react";
-
-const FOCUSABLE_SELECTOR =
-  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+import { FOCUSABLE_SELECTOR } from "./focusable";
 
 export type PopoverCloseReason = "escape" | "outside" | "direct";
 
@@ -18,7 +16,7 @@ export interface UsePopoverDismissalResult {
   close: (reason?: PopoverCloseReason) => void;
 }
 
-function mapDismissReason(reason?: string): PopoverCloseReason {
+export function mapDismissReason(reason?: string): PopoverCloseReason {
   if (reason === "escape-key") return "escape";
   if (reason === "outside-press") return "outside";
   return "direct";

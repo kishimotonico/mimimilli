@@ -1,9 +1,10 @@
 ---
 id: TASK-207
 title: settings機能のインラインstyleをデザインシステムのクラスへ移行する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-06 04:57'
+updated_date: '2026-08-09 15:00'
 labels: []
 dependencies: []
 priority: high
@@ -36,9 +37,15 @@ docs/design-system.md は「mle-/mll- は Library/Files 共通の骨格・固有
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 SettingsModal.tsx と TagPrefixSettings.tsx の style={{...}} が解消され、Tailwind ユーティリティと mle-/mll- 系クラスで構成されている
-- [ ] #2 色指定が docs/design-system.md のカラートークン経由になり、CSS 変数やカラーコードの直書きが残っていない
-- [ ] #3 移行前後で設定画面の見た目が変わっていない（ライト・ダーク両テーマで確認）
-- [ ] #4 z-index とモーダルの重なり順が design-system.md の規約どおりで、他のモーダルとの前後関係が変わっていない
-- [ ] #5 pnpm check と pnpm test と pnpm test:visual が通る
+- [x] #1 SettingsModal.tsx と TagPrefixSettings.tsx の style={{...}} が解消され、Tailwind ユーティリティと mle-/mll- 系クラスで構成されている
+- [x] #2 色指定が docs/design-system.md のカラートークン経由になり、CSS 変数やカラーコードの直書きが残っていない
+- [x] #3 移行前後で設定画面の見た目が変わっていない（ライト・ダーク両テーマで確認）
+- [x] #4 z-index とモーダルの重なり順が design-system.md の規約どおりで、他のモーダルとの前後関係が変わっていない
+- [x] #5 pnpm check と pnpm test と pnpm test:visual が通る
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+ダークテーマは未実装（docs/design-system.md:19）で切替手段が存在しないため、AC#3の確認はライトテーマのみで実施した。
+<!-- SECTION:NOTES:END -->

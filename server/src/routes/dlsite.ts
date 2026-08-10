@@ -5,20 +5,15 @@ import {
   dlsiteApplyBodySchema,
   dlsiteBulkCancelResponseSchema,
   dlsiteFetchByCodeBodySchema,
+  dlsiteNotificationKindSchema,
   dlsiteNotificationQuerySchema,
   dlsiteStatePatchSchema,
 } from "@mimimilli/shared";
-import type { DataAdapter } from "../adapter.ts";
+import { DlsiteOfflineError } from "../errors.ts";
+import type { DataAdapter } from "../adapter/index.ts";
 import { apiError, invalidRequest, notFound } from "../lib/httpError.ts";
 import { getCategoryLogger } from "../lib/logger.ts";
-import {
-  enqueueDlsiteJob,
-  getDlsiteBulkSnapshot,
-  isDlsiteJobInProgress,
-  subscribeToDlsite,
-  cancelDlsiteJob,
-} from "./dlsiteProgress.ts";
-import { DlsiteOfflineError } from "../adapters/real/dlsiteScheduler.ts";
+import type { DlsiteJobManager } from "../dlsiteJobManager.ts";
 
 const dlsiteLogger = getCategoryLogger("dlsite");
 
@@ -26,7 +21,7 @@ function isClientAbort(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
 }
 
-export function dlsiteRoute(adapter: DataAdapter): Hono {
+export function dlsiteRoute(adapter: DataAdapter, dlsiteJobs: DlsiteJobManager): Hono {
   const app = new Hono();
 
   app.get("/dlsite/notifications", async (c) =>
@@ -34,14 +29,12 @@ export function dlsiteRoute(adapter: DataAdapter): Hono {
   );
 
   app.get("/dlsite/notifications/:kind", async (c) => {
-    const kind = c.req.param("kind");
-    if (kind !== "rj-missing" && kind !== "fetch-failed" && kind !== "parse-failed") {
-      notFound("通知種別が見つかりません");
-    }
+    const parsedKind = dlsiteNotificationKindSchema.safeParse(c.req.param("kind"));
+    if (!parsedKind.success) notFound("通知種別が見つかりません");
     const parsed = dlsiteNotificationQuerySchema.safeParse(c.req.query());
     if (!parsed.success) invalidRequest("DLsite通知のクエリパラメータが不正です");
     return c.json(
-      await adapter.queryDlsiteNotifications(kind, {
+      await adapter.queryDlsiteNotifications(parsedKind.data, {
         page: parsed.data.page ?? 1,
         limit: parsed.data.limit ?? 200,
       }),
@@ -128,18 +121,18 @@ export function dlsiteRoute(adapter: DataAdapter): Hono {
   });
 
   app.get("/dlsite/bulk", (c) => {
-    const snapshot = getDlsiteBulkSnapshot();
+    const snapshot = dlsiteJobs.getSnapshot();
     return snapshot ? c.json(snapshot) : c.body(null, 204);
   });
 
   app.post("/dlsite/bulk", async (c) => {
-    if (isDlsiteJobInProgress()) throw apiError("conflict", "DLsite取得は既に実行中です");
-    enqueueDlsiteJob(adapter, "existing", undefined);
+    if (dlsiteJobs.isInProgress()) throw apiError("conflict", "DLsite取得は既に実行中です");
+    dlsiteJobs.enqueue("existing", undefined);
     return c.json({ started: true }, 202);
   });
 
   app.delete("/dlsite/bulk", (c) => {
-    if (!cancelDlsiteJob()) notFound("実行中のDLsite一括取得がありません");
+    if (!dlsiteJobs.cancel()) notFound("実行中のDLsite一括取得がありません");
     return c.json(dlsiteBulkCancelResponseSchema.parse({ cancelling: true }));
   });
 
@@ -159,7 +152,7 @@ export function dlsiteRoute(adapter: DataAdapter): Hono {
         if (event.type !== "progress" && event.type !== "cancelling")
           void written.then(resolveDone);
       };
-      const subscription = subscribeToDlsite(listener);
+      const subscription = dlsiteJobs.subscribe(listener);
       for (const event of subscription.replay) await send(event);
       if (!subscription.isLive || subscription.replay.some((event) => event.type !== "progress")) {
         subscription.unsubscribe();

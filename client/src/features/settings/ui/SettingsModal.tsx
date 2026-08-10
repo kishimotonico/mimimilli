@@ -5,11 +5,21 @@ import {
   dlsiteBulkActiveAtom,
   dlsiteBulkProgressAtom,
   dlsiteBulkStartingAtom,
-} from "../../dlsite/model/atoms";
-import { useDlsiteBulkActions } from "../../dlsite/model/useDlsiteBulkActions";
-import { scanningAtom, scanProgressLabelAtom } from "../../scan/model/atoms";
+} from "../../../entities/dlsite/model/bulkAtoms";
+import { useDlsiteBulkActions } from "../../../entities/dlsite/useDlsiteBulkActions";
+import { scanningAtom, scanProgressLabelAtom } from "../../../entities/scan/model/atoms";
 import TagPrefixSettings from "./TagPrefixSettings";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
+import { formatLastScanTime } from "../../../shared/lib/format";
+
+const SECTION_CLASS = "flex flex-col gap-2";
+const SECTION_LABEL_CLASS =
+  "font-sans text-[10.5px] font-semibold tracking-[0.08em] text-ink-3 uppercase";
+const SECTION_LABEL_NO_UPPERCASE_CLASS =
+  "font-sans text-[10.5px] font-semibold tracking-[0.08em] text-ink-3";
+const ROW_CLASS = "flex items-center gap-2";
+const SECONDARY_BUTTON_CLASS =
+  "h-[34px] cursor-pointer rounded-[6px] border border-line bg-paper-1 px-3 font-sans text-[12px] font-medium whitespace-nowrap text-ink-1";
 
 interface SettingsModalProps {
   rootFolder: string | null;
@@ -64,9 +74,6 @@ export default function SettingsModal({
     setIsEditingFolder(false);
   };
 
-  const formatDate = (iso: string | null) =>
-    iso ? new Date(iso).toLocaleString("ja-JP") : "未実行";
-
   return (
     // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- backdropクリックで閉じる。EscapeはonCancel（useDialogModal）で処理する。
     <dialog
@@ -74,90 +81,29 @@ export default function SettingsModal({
       aria-label="設定"
       onCancel={handleCancel}
       onClick={handleBackdropClick}
-      className="backdrop:bg-[oklch(20%_0.020_70_/_0.3)]"
-      style={{
-        width: 440,
-        maxWidth: "calc(100vw - 32px)",
-        maxHeight: "calc(100vh - 32px)",
-        margin: "auto",
-        padding: 0,
-        background: "var(--paper-1)",
-        borderRadius: 12,
-        boxShadow: "var(--shadow-pop)",
-        border: "1px solid var(--line-soft)",
-        overflow: "hidden",
-        fontFamily: "var(--font-jp)",
-        color: "var(--ink-0)",
-      }}
+      className="m-auto w-[440px] max-w-[calc(100vw-32px)] max-h-[calc(100vh-32px)] overflow-hidden rounded-[12px] border border-line-soft bg-paper-1 p-0 font-jp text-ink-0 shadow-pop backdrop:bg-[oklch(20%_0.020_70_/_0.3)]"
     >
       {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          padding: "14px 18px",
-          borderBottom: "1px solid var(--line-soft)",
-        }}
-      >
-        <span
-          style={{
-            fontFamily: "var(--font-sans)",
-            fontWeight: 600,
-            fontSize: 14,
-            color: "var(--ink-0)",
-            flex: 1,
-          }}
-        >
-          設定
-        </span>
+      <div className="flex items-center border-b border-line-soft px-[18px] py-[14px]">
+        <span className="flex-1 font-sans text-[14px] font-semibold text-ink-0">設定</span>
         <button
           type="button"
           aria-label="閉じる"
           onClick={dismiss}
-          style={{
-            width: 26,
-            height: 26,
-            display: "grid",
-            placeItems: "center",
-            borderRadius: 6,
-            color: "var(--ink-2)",
-            border: "none",
-            background: "none",
-            cursor: "pointer",
-          }}
+          className="grid h-[26px] w-[26px] cursor-pointer place-items-center rounded-[6px] border-none bg-transparent text-ink-2"
         >
           <I.x size={14} />
         </button>
       </div>
 
       {/* Body */}
-      <div
-        style={{
-          padding: "18px 18px 8px",
-          display: "flex",
-          flexDirection: "column",
-          gap: 18,
-          maxHeight: "min(72vh, 640px)",
-          overflowY: "auto",
-        }}
-      >
+      <div className="flex max-h-[min(72vh,640px)] flex-col gap-[18px] overflow-y-auto px-[18px] pt-[18px] pb-2">
         {/* Root folder */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <span
-            style={{
-              fontFamily: "var(--font-sans)",
-              fontSize: 10.5,
-              fontWeight: 600,
-              letterSpacing: "0.08em",
-              color: "var(--ink-3)",
-              textTransform: "uppercase",
-            }}
-          >
-            ルートフォルダー
-          </span>
+        <div className={SECTION_CLASS}>
+          <span className={SECTION_LABEL_CLASS}>ルートフォルダー</span>
           {isEditingFolder ? (
             <form
-              style={{ display: "flex", alignItems: "center", gap: 8 }}
+              className={ROW_CLASS}
               onSubmit={(e) => {
                 e.preventDefault();
                 saveFolder();
@@ -169,106 +115,34 @@ export default function SettingsModal({
                 onChange={(e) => setFolderDraft(e.target.value)}
                 aria-label="ルートフォルダーのパス"
                 placeholder="ルートフォルダーのパスを入力"
-                style={{
-                  flex: 1,
-                  height: 34,
-                  padding: "0 12px",
-                  background: "var(--paper-0)",
-                  border: "1px solid var(--acc)",
-                  borderRadius: 6,
-                  fontFamily: "var(--font-mono)",
-                  fontSize: 11,
-                  color: "var(--ink-1)",
-                  outline: "none",
-                }}
+                className="h-[34px] flex-1 rounded-[6px] border border-acc bg-paper-0 px-3 font-mono text-[11px] text-ink-1 outline-none"
               />
               <button
                 type="button"
                 onClick={() => setIsEditingFolder(false)}
-                style={{
-                  height: 34,
-                  padding: "0 12px",
-                  borderRadius: 6,
-                  border: "1px solid var(--line)",
-                  background: "var(--paper-1)",
-                  color: "var(--ink-1)",
-                  fontFamily: "var(--font-sans)",
-                  fontSize: 12,
-                  fontWeight: 500,
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                }}
+                className={SECONDARY_BUTTON_CLASS}
               >
                 キャンセル
               </button>
               <button
                 type="submit"
                 disabled={!folderDraft.trim()}
-                style={{
-                  height: 34,
-                  padding: "0 12px",
-                  borderRadius: 6,
-                  border: "none",
-                  background: "var(--ink-0)",
-                  color: "var(--paper-1)",
-                  fontFamily: "var(--font-sans)",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: folderDraft.trim() ? "pointer" : "not-allowed",
-                  opacity: folderDraft.trim() ? 1 : 0.6,
-                  whiteSpace: "nowrap",
-                }}
+                className="h-[34px] cursor-pointer rounded-[6px] border-none bg-ink-0 px-3 font-sans text-[12px] font-semibold whitespace-nowrap text-paper-1 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 保存
               </button>
             </form>
           ) : (
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div
-                style={{
-                  flex: 1,
-                  height: 34,
-                  padding: "0 12px",
-                  background: "var(--paper-0)",
-                  border: "1px solid var(--line-soft)",
-                  borderRadius: 6,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  overflow: "hidden",
-                }}
-              >
-                <I.folder size={13} style={{ color: "var(--ink-3)", flexShrink: 0 }} />
+            <div className={ROW_CLASS}>
+              <div className="flex h-[34px] flex-1 items-center gap-2 overflow-hidden rounded-[6px] border border-line-soft bg-paper-0 px-3">
+                <I.folder size={13} className="shrink-0 text-ink-3" />
                 <span
-                  className="mll-selectable"
-                  style={{
-                    fontFamily: "var(--font-mono)",
-                    fontSize: 11,
-                    color: rootFolder ? "var(--ink-1)" : "var(--ink-4)",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
+                  className={`mll-selectable overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[11px] ${rootFolder ? "text-ink-1" : "text-ink-4"}`}
                 >
                   {rootFolder ?? "未設定"}
                 </span>
               </div>
-              <button
-                onClick={startEditingFolder}
-                style={{
-                  height: 34,
-                  padding: "0 12px",
-                  borderRadius: 6,
-                  border: "1px solid var(--line)",
-                  background: "var(--paper-1)",
-                  color: "var(--ink-1)",
-                  fontFamily: "var(--font-sans)",
-                  fontSize: 12,
-                  fontWeight: 500,
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                }}
-              >
+              <button onClick={startEditingFolder} className={SECONDARY_BUTTON_CLASS}>
                 変更
               </button>
             </div>
@@ -276,47 +150,15 @@ export default function SettingsModal({
         </div>
 
         {/* Scan */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <span
-            style={{
-              fontFamily: "var(--font-sans)",
-              fontSize: 10.5,
-              fontWeight: 600,
-              letterSpacing: "0.08em",
-              color: "var(--ink-3)",
-              textTransform: "uppercase",
-            }}
-          >
-            スキャン
-          </span>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span
-              style={{
-                flex: 1,
-                fontFamily: "var(--font-mono)",
-                fontSize: 11,
-                color: "var(--ink-2)",
-              }}
-            >
-              最終スキャン: {formatDate(lastScanTime)}
+        <div className={SECTION_CLASS}>
+          <span className={SECTION_LABEL_CLASS}>スキャン</span>
+          <div className={ROW_CLASS}>
+            <span className="flex-1 font-mono text-[11px] text-ink-2">
+              最終スキャン: {formatLastScanTime(lastScanTime)}
             </span>
             <button
               onClick={onOpenScan}
-              style={{
-                height: 34,
-                padding: "0 14px",
-                borderRadius: 6,
-                background: "var(--ink-0)",
-                color: "var(--paper-1)",
-                fontFamily: "var(--font-sans)",
-                fontSize: 12,
-                fontWeight: 600,
-                border: "none",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-              }}
+              className="flex h-[34px] cursor-pointer items-center gap-1.5 rounded-[6px] border-none bg-ink-0 px-3.5 font-sans text-[12px] font-semibold text-paper-1"
             >
               <I.refresh size={12} className={scanning ? "animate-spin" : undefined} />
               {scanning ? (scanProgressLabel ?? "スキャン中...") : "スキャン"}
@@ -325,34 +167,13 @@ export default function SettingsModal({
         </div>
 
         {/* Tag prefixes（ADR-0005） */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <span
-            style={{
-              fontFamily: "var(--font-sans)",
-              fontSize: 10.5,
-              fontWeight: 600,
-              letterSpacing: "0.08em",
-              color: "var(--ink-3)",
-            }}
-          >
-            DLSITE連携
-          </span>
+        <div className={SECTION_CLASS}>
+          <span className={SECTION_LABEL_NO_UPPERCASE_CLASS}>DLSITE連携</span>
           <button
             type="button"
             disabled={dlsiteBulkBusy}
             onClick={() => void onStartDlsiteBulk()}
-            style={{
-              alignSelf: "flex-start",
-              height: 34,
-              padding: "0 14px",
-              borderRadius: 6,
-              border: "1px solid var(--line)",
-              background: "var(--paper-1)",
-              color: "var(--ink-1)",
-              fontFamily: "var(--font-sans)",
-              fontSize: 12,
-              cursor: dlsiteBulkBusy ? "not-allowed" : "pointer",
-            }}
+            className="h-[34px] cursor-pointer self-start rounded-[6px] border border-line bg-paper-1 px-3.5 font-sans text-[12px] text-ink-1 disabled:cursor-not-allowed"
           >
             {dlsiteBulkActive
               ? `取得中${dlsiteBulkProgress ? ` (${dlsiteBulkProgress.processed}/${dlsiteBulkProgress.total})` : "..."}`
@@ -364,37 +185,11 @@ export default function SettingsModal({
         <TagPrefixSettings />
 
         {/* Export */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <span
-            style={{
-              fontFamily: "var(--font-sans)",
-              fontSize: 10.5,
-              fontWeight: 600,
-              letterSpacing: "0.08em",
-              color: "var(--ink-3)",
-              textTransform: "uppercase",
-            }}
-          >
-            データ
-          </span>
+        <div className={SECTION_CLASS}>
+          <span className={SECTION_LABEL_CLASS}>データ</span>
           <button
             onClick={onExport}
-            style={{
-              alignSelf: "flex-start",
-              height: 34,
-              padding: "0 14px",
-              borderRadius: 6,
-              border: "1px solid var(--line)",
-              background: "var(--paper-1)",
-              color: "var(--ink-1)",
-              fontFamily: "var(--font-sans)",
-              fontSize: 12,
-              fontWeight: 500,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-            }}
+            className="flex h-[34px] cursor-pointer items-center gap-1.5 self-start rounded-[6px] border border-line bg-paper-1 px-3.5 font-sans text-[12px] font-medium text-ink-1"
           >
             <I.download size={12} /> ライブラリをエクスポート
           </button>
@@ -402,21 +197,10 @@ export default function SettingsModal({
       </div>
 
       {/* Footer */}
-      <div style={{ padding: "12px 18px 16px", display: "flex", justifyContent: "flex-end" }}>
+      <div className="flex justify-end px-[18px] pt-3 pb-4">
         <button
           onClick={onClose}
-          style={{
-            height: 32,
-            padding: "0 16px",
-            borderRadius: 6,
-            background: "var(--paper-2)",
-            color: "var(--ink-1)",
-            fontFamily: "var(--font-sans)",
-            fontSize: 12,
-            fontWeight: 500,
-            border: "none",
-            cursor: "pointer",
-          }}
+          className="h-8 cursor-pointer rounded-[6px] border-none bg-paper-2 px-4 font-sans text-[12px] font-medium text-ink-1"
         >
           閉じる
         </button>

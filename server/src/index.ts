@@ -17,7 +17,7 @@ import { resolveDataPaths } from "./adapters/real/dataRoot.ts";
 import { resolveDlsiteCacheConfig } from "./adapters/real/dlsiteCache.ts";
 import { resolveDlsiteRequestConfig } from "./adapters/real/dlsiteConfig.ts";
 import { createRealAdapter, type RealAdapter } from "./adapters/real/index.ts";
-import type { DataAdapter } from "./adapter.ts";
+import type { DataAdapter } from "./adapter/index.ts";
 import {
   createDlsiteEventLogger,
   dispose,
@@ -82,15 +82,21 @@ async function shutdown(exitCode: number, reason: string, error?: unknown): Prom
   }
 
   try {
-    if (adapter && isRealAdapter(adapter)) adapter.close();
-  } catch (closeError) {
-    console.error(closeError);
-  }
-
-  try {
     if (server) server.stop();
   } catch (stopError) {
     console.error(stopError);
+  }
+
+  try {
+    await app.shutdown();
+  } catch (shutdownError) {
+    console.error(shutdownError);
+  }
+
+  try {
+    if (adapter && isRealAdapter(adapter)) adapter.close();
+  } catch (closeError) {
+    console.error(closeError);
   }
 
   try {

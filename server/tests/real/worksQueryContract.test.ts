@@ -11,10 +11,10 @@ import {
   type WorksQuery,
   type WorkSummary,
 } from "@mimimilli/shared";
-import { WorkRepo } from "../../src/adapters/real/workRepo.ts";
+import { WorkQueryRepository } from "../../src/adapters/real/workQueryRepository.ts";
 import { querySmartFolderWorks } from "../../src/adapters/real/smartFolderWorks.ts";
 import { nts, tf, EMPTY_TAG_FILTERS } from "../helpers/tag.ts";
-import { upsertTestWork, resolvedDuration } from "../helpers/workTestUtils.ts";
+import { upsertTestWork, resolvedDuration, createWorkRepos } from "../helpers/workTestUtils.ts";
 import { openDb } from "../../src/adapters/real/db.ts";
 import { buildAxisFacets } from "../../src/core/axisFacets.ts";
 import { evalSmartFolder } from "../../src/core/smartFolder.ts";
@@ -112,9 +112,9 @@ function baseQuery(overrides: Partial<WorksQuery> = {}): WorksQuery {
   return { q: "", tags: EMPTY_TAG_FILTERS, tagOp: "AND", sort: "added-desc", ...overrides };
 }
 
-function assertQueryEquivalent(repo: WorkRepo, query: WorksQuery): void {
+function assertQueryEquivalent(queryRepo: WorkQueryRepository, query: WorksQuery): void {
   const fixture = applyWorksQuery(dataset, query);
-  const real = repo.queryWorks(query);
+  const real = queryRepo.queryWorks(query);
   assert.deepEqual(
     real.items.map((work) => work.id),
     fixture.items.map((work) => work.id),
@@ -127,9 +127,9 @@ function assertQueryEquivalent(repo: WorkRepo, query: WorksQuery): void {
 
 test("core参照実装とreal SQLは固定例・生成クエリで同値", () => {
   const db = openDb({ kind: "memory" });
-  const repo = new WorkRepo(db);
+  const { query: queryRepo, catalog, user } = createWorkRepos(db);
   try {
-    for (const item of dataset) upsertTestWork(repo, fullWork(item));
+    for (const item of dataset) upsertTestWork(catalog, user, fullWork(item));
     db.sqlite
       .query(`
         INSERT INTO user.work_states
@@ -162,6 +162,11 @@ test("core参照実装とreal SQLは固定例・生成クエリで同値", () =>
       baseQuery({ page: 2, limit: 7 }),
       baseQuery({ page: 99, limit: 7 }),
       baseQuery({ page: 2 }),
+      baseQuery({ ids: [] }),
+      baseQuery({ ids: ["work-005", "work-010", "work-not-exist"] }),
+      baseQuery({ ids: ["work-005"], tags: tf("ASMR") }),
+      baseQuery({ ids: dataset.slice(0, 4).map((w) => w.id), page: 1, limit: 2 }),
+      baseQuery({ ids: dataset.slice(0, 4).map((w) => w.id), sort: "title-asc" }),
     ];
     for (const sort of sortIdSchema.options) {
       fixedQueries.push(baseQuery({ sort, seed: sort === "random" ? 123456 : undefined }));
@@ -169,7 +174,7 @@ test("core参照実装とreal SQLは固定例・生成クエリで同値", () =>
         baseQuery({ sort, seed: sort === "random" ? 98765 : undefined, page: 3, limit: 5 }),
       );
     }
-    for (const query of fixedQueries) assertQueryEquivalent(repo, query);
+    for (const query of fixedQueries) assertQueryEquivalent(queryRepo, query);
 
     let state = 0x6d2b79f5;
     const next = (): number => {
@@ -202,8 +207,12 @@ test("core参照実装とreal SQLは固定例・生成クエリで同値", () =>
       const tags = tagFilters[next() % tagFilters.length]!;
       const useYearTag = next() % 4 === 0;
       const yearTag = useYearTag ? `@year/${yearPool[next() % yearPool.length]!}` : null;
+      const useIds = next() % 4 === 0;
+      const ids = useIds
+        ? Array.from({ length: (next() % 6) + 1 }, () => dataset[next() % dataset.length]!.id)
+        : undefined;
       assertQueryEquivalent(
-        repo,
+        queryRepo,
         baseQuery({
           q: queryTerms[next() % queryTerms.length]!,
           tags: tf(...(yearTag ? [...tags, yearTag] : tags)),
@@ -213,6 +222,7 @@ test("core参照実装とreal SQLは固定例・生成クエリで同値", () =>
           seed: sort === "random" ? next() & 0x7fffffff : undefined,
           page: (next() % 8) + 1,
           limit: (next() % 9) + 1,
+          ids,
         }),
       );
     }
@@ -223,12 +233,12 @@ test("core参照実装とreal SQLは固定例・生成クエリで同値", () =>
 
 test("realのrandomはseedを発行し、同じseedの次要求でページ順を再現する", () => {
   const db = openDb({ kind: "memory" });
-  const repo = new WorkRepo(db);
+  const { query: queryRepo, catalog, user } = createWorkRepos(db);
   try {
-    for (const item of dataset) upsertTestWork(repo, fullWork(item));
-    const first = repo.queryWorks(baseQuery({ sort: "random", page: 2, limit: 8 }));
+    for (const item of dataset) upsertTestWork(catalog, user, fullWork(item));
+    const first = queryRepo.queryWorks(baseQuery({ sort: "random", page: 2, limit: 8 }));
     assert.notEqual(first.seed, undefined);
-    const repeated = repo.queryWorks(
+    const repeated = queryRepo.queryWorks(
       baseQuery({ sort: "random", seed: first.seed, page: 2, limit: 8 }),
     );
     assert.deepEqual(
@@ -242,14 +252,14 @@ test("realのrandomはseedを発行し、同じseedの次要求でページ順�
 
 test("複数サークルタグのcircleNameはsharedとrealでUTF-8 BINARY順の先頭に揃う", () => {
   const db = openDb({ kind: "memory" });
-  const repo = new WorkRepo(db);
+  const { query: queryRepo, catalog, user } = createWorkRepos(db);
   const item = {
     ...dataset[0]!,
     tags: nts(["サークル/和風", "circle/Zeta", "circle/Alpha", "ASMR"]),
   };
   try {
-    upsertTestWork(repo, fullWork(item));
-    const page = repo.queryWorks(baseQuery({ page: 1, limit: 1 }));
+    upsertTestWork(catalog, user, fullWork(item));
+    const page = queryRepo.queryWorks(baseQuery({ page: 1, limit: 1 }));
     assert.equal(toWorkListItem(item).circleName, "Alpha");
     assert.equal(page.items[0]?.circleName, toWorkListItem(item).circleName);
   } finally {
@@ -259,7 +269,7 @@ test("複数サークルタグのcircleNameはsharedとrealでUTF-8 BINARY順の
 
 test("realのDLsite通知集計とページは状態別に一覧契約を返す", () => {
   const db = openDb({ kind: "memory" });
-  const repo = new WorkRepo(db);
+  const { query: queryRepo, catalog, user } = createWorkRepos(db);
   try {
     const missing = fullWork({ ...dataset[0]!, dlsite: emptyDlsiteState() });
     const failed = fullWork({
@@ -284,22 +294,22 @@ test("realのDLsite通知集計とページは状態別に一覧契約を返す"
         appliedTags: [],
       },
     });
-    upsertTestWork(repo, missing);
-    upsertTestWork(repo, failed);
-    upsertTestWork(repo, unlinked);
+    upsertTestWork(catalog, user, missing);
+    upsertTestWork(catalog, user, failed);
+    upsertTestWork(catalog, user, unlinked);
 
-    assert.deepEqual(repo.getDlsiteNotificationSummary(), {
+    assert.deepEqual(queryRepo.getDlsiteNotificationSummary(), {
       rjCodeMissingCount: 1,
       fetchFailedCount: 1,
       parseErrorCount: 0,
       parseErrorAlert: false,
       unlinkedCount: 1,
     });
-    assert.deepEqual(repo.queryDlsiteNotifications("rj-missing", { page: 1, limit: 10 }), {
+    assert.deepEqual(queryRepo.queryDlsiteNotifications("rj-missing", { page: 1, limit: 10 }), {
       items: [{ id: missing.id, title: missing.title, status: "none", rjCode: null }],
       total: 1,
     });
-    assert.deepEqual(repo.queryDlsiteNotifications("fetch-failed", { page: 1, limit: 10 }), {
+    assert.deepEqual(queryRepo.queryDlsiteNotifications("fetch-failed", { page: 1, limit: 10 }), {
       items: [{ id: failed.id, title: failed.title, status: "error", rjCode: null }],
       total: 1,
     });
@@ -310,14 +320,14 @@ test("realのDLsite通知集計とページは状態別に一覧契約を返す"
 
 test("core参照実装とreal SQLのファセット値・件数・順序が同値", () => {
   const db = openDb({ kind: "memory" });
-  const repo = new WorkRepo(db);
+  const { query: queryRepo, catalog, user } = createWorkRepos(db);
   try {
-    for (const item of dataset) upsertTestWork(repo, fullWork(item));
+    for (const item of dataset) upsertTestWork(catalog, user, fullWork(item));
     for (const axis of ["tag", "year", "cv", "気分", "シリーズ", "e\u0301x", "unknown"]) {
-      assert.deepEqual(repo.getAxisFacets(axis), buildAxisFacets(axis, dataset), axis);
+      assert.deepEqual(queryRepo.getAxisFacets(axis), buildAxisFacets(axis, dataset), axis);
     }
     const exDurationSec = dataset.reduce((sum, work) => sum + (work.totalDurationSec ?? 0), 0);
-    assert.deepEqual(repo.getAxisFacets("e\u0301x"), [
+    assert.deepEqual(queryRepo.getAxisFacets("e\u0301x"), [
       { value: "Ａlpha", count: dataset.length, durationSec: exDurationSec, covers: [] },
       { value: "Ｂeta", count: dataset.length, durationSec: exDurationSec, covers: [] },
     ]);
@@ -328,9 +338,9 @@ test("core参照実装とreal SQLのファセット値・件数・順序が同�
 
 test("軸ファセットの絞り込み（自軸除外カウント用フィルタ）もreal SQLとcoreが同値（TASK-187）", () => {
   const db = openDb({ kind: "memory" });
-  const repo = new WorkRepo(db);
+  const { query: queryRepo, catalog, user } = createWorkRepos(db);
   try {
-    for (const item of dataset) upsertTestWork(repo, fullWork(item));
+    for (const item of dataset) upsertTestWork(catalog, user, fullWork(item));
     const filters: Array<{
       tags?: import("@mimimilli/shared").TagFilters;
       tagOp?: "AND" | "OR";
@@ -346,7 +356,7 @@ test("軸ファセットの絞り込み（自軸除外カウント用フィル�
     for (const axis of ["tag", "year", "cv", "サークル", "気分", "シリーズ"]) {
       for (const filter of filters) {
         assert.deepEqual(
-          repo.getAxisFacets(axis, filter),
+          queryRepo.getAxisFacets(axis, filter),
           buildAxisFacets(axis, dataset, filter),
           `${axis}: ${JSON.stringify(filter)}`,
         );
@@ -358,7 +368,7 @@ test("軸ファセットの絞り込み（自軸除外カウント用フィル�
 });
 
 function assertSmartFolderEquivalent(
-  repo: WorkRepo,
+  queryRepo: WorkQueryRepository,
   rules: SmartFolderRule[],
   sort: WorksQuery["sort"],
   query: {
@@ -370,7 +380,7 @@ function assertSmartFolderEquivalent(
   },
 ): void {
   const fixture = evalSmartFolder({ rules, sort }, dataset, query);
-  const real = querySmartFolderWorks(repo, { rules, sort }, query);
+  const real = querySmartFolderWorks(queryRepo, { rules, sort }, query);
   assert.deepEqual(
     real.items.map((work) => work.id),
     fixture.items.map((work) => work.id),
@@ -391,9 +401,9 @@ function assertSmartFolderEquivalent(
 
 test("スマートフォルダーのSQL候補絞り込み(第1段)とcore純粋関数の最終評価(第2段)がfixtureと同値", () => {
   const db = openDb({ kind: "memory" });
-  const repo = new WorkRepo(db);
+  const { query: queryRepo, catalog, user } = createWorkRepos(db);
   try {
-    for (const item of dataset) upsertTestWork(repo, fullWork(item));
+    for (const item of dataset) upsertTestWork(catalog, user, fullWork(item));
 
     const tagRule = (values: string[], conjunction: SmartFolderRule["conjunction"] = "WHERE") =>
       ({ conjunction, field: "タグ", operator: "∋", values }) as SmartFolderRule;
@@ -423,11 +433,11 @@ test("スマートフォルダーのSQL候補絞り込み(第1段)とcore純粋�
       },
     ];
     for (const { rules, sort } of fixedCases) {
-      assertSmartFolderEquivalent(repo, rules, sort, { page: 1, limit: 7 });
-      assertSmartFolderEquivalent(repo, rules, sort, { page: 2, limit: 5 });
+      assertSmartFolderEquivalent(queryRepo, rules, sort, { page: 1, limit: 7 });
+      assertSmartFolderEquivalent(queryRepo, rules, sort, { page: 2, limit: 5 });
     }
     // random は同じseedを両経路へ与えて比較する
-    assertSmartFolderEquivalent(repo, [lengthRule(0)], "random", {
+    assertSmartFolderEquivalent(queryRepo, [lengthRule(0)], "random", {
       page: 1,
       limit: 6,
       seed: 42,
@@ -436,24 +446,24 @@ test("スマートフォルダーのSQL候補絞り込み(第1段)とcore純粋�
     // 保持中フィルタ（tags、@year/... 擬似タグも含む）はルールに対する追加のAND条件（TASK-185）。
     // ルールなし（第1段のSQL高速経路）・ルールあり（第2段のcore純粋関数経路）の両方で
     // real⇔fixtureが同値になることを確認する。
-    assertSmartFolderEquivalent(repo, [], "added-desc", {
+    assertSmartFolderEquivalent(queryRepo, [], "added-desc", {
       page: 1,
       limit: 7,
       tags: tf("ASMR"),
       tagOp: "AND",
     });
-    assertSmartFolderEquivalent(repo, [], "added-desc", {
+    assertSmartFolderEquivalent(queryRepo, [], "added-desc", {
       page: 1,
       limit: 7,
       tags: tf(`@year/${recent.slice(0, 4)}`),
     });
-    assertSmartFolderEquivalent(repo, [lengthRule(0)], "title-asc", {
+    assertSmartFolderEquivalent(queryRepo, [lengthRule(0)], "title-asc", {
       page: 1,
       limit: 7,
       tags: tf("cv/水瀬なずな"),
       tagOp: "AND",
     });
-    assertSmartFolderEquivalent(repo, [tagRule(["ASMR", "催眠"])], "duration-desc", {
+    assertSmartFolderEquivalent(queryRepo, [tagRule(["ASMR", "催眠"])], "duration-desc", {
       page: 1,
       limit: 7,
       tags: tf(`@year/${recent.slice(0, 4)}`),
@@ -485,7 +495,7 @@ test("スマートフォルダーのSQL候補絞り込み(第1段)とcore純粋�
         );
       }
       const sort = sortIdSchema.options[next() % sortIdSchema.options.length]!;
-      assertSmartFolderEquivalent(repo, rules, sort, {
+      assertSmartFolderEquivalent(queryRepo, rules, sort, {
         page: (next() % 4) + 1,
         limit: (next() % 6) + 1,
         seed: sort === "random" ? next() & 0x7fffffff : undefined,
@@ -498,13 +508,13 @@ test("スマートフォルダーのSQL候補絞り込み(第1段)とcore純粋�
 
 test("スマートフォルダー候補IDが900件を超えてもlistSummariesのchunk境界をまたいで同値", () => {
   const db = openDb({ kind: "memory" });
-  const repo = new WorkRepo(db);
+  const { query: queryRepo, catalog, user } = createWorkRepos(db);
   try {
     // listSummaries(workIds) はSQLiteのパラメータ上限を避けるため900件ごとに分割してIN句を発行する
     // （TASK-85）。候補IDがちょうどその境界をまたぐ件数になるデータセットで、分割・再結合が
     // 欠落や重複なく行われることを直接検証する。
     const largeDataset = Array.from({ length: 950 }, (_, index) => summary(index));
-    for (const item of largeDataset) upsertTestWork(repo, fullWork(item));
+    for (const item of largeDataset) upsertTestWork(catalog, user, fullWork(item));
 
     const rule: SmartFolderRule = {
       conjunction: "WHERE",
@@ -514,14 +524,14 @@ test("スマートフォルダー候補IDが900件を超えてもlistSummaries�
     };
     const query = { page: 1, limit: largeDataset.length };
 
-    const candidateIds = repo.resolveSmartFolderCandidateIds([rule]);
+    const candidateIds = queryRepo.resolveSmartFolderCandidateIds([rule]);
     assert.notEqual(candidateIds, null);
     assert.ok(
       candidateIds!.size > 900,
       `候補IDがchunk境界(900件)を超えている前提が崩れている: ${candidateIds!.size}`,
     );
 
-    const works = repo.listSummaries([...candidateIds!]).summaries;
+    const works = queryRepo.listSummaries([...candidateIds!]).summaries;
     assert.equal(works.length, candidateIds!.size, "chunk分割後も欠落・重複がない");
 
     const fixture = evalSmartFolder({ rules: [rule], sort: "id-asc" }, largeDataset, query);
@@ -538,17 +548,17 @@ test("スマートフォルダー候補IDが900件を超えてもlistSummaries�
 
 test("tag軸はprefixタグも自由タグも数える（ADR-0005 追記）", () => {
   const db = openDb({ kind: "memory" });
-  const repo = new WorkRepo(db);
+  const { query: queryRepo, catalog, user } = createWorkRepos(db);
   const annotatedOnly = dataset.map((item) => ({
     ...item,
     tags: item.tags.filter((tag) => tag.includes("/")),
   }));
   try {
-    for (const item of annotatedOnly) upsertTestWork(repo, fullWork(item));
+    for (const item of annotatedOnly) upsertTestWork(catalog, user, fullWork(item));
 
-    assert.deepEqual(repo.getAxisFacets("tag"), buildAxisFacets("tag", annotatedOnly));
-    assert.notDeepEqual(repo.getAxisFacets("tag"), []);
-    assert.notDeepEqual(repo.getAxisFacets("cv"), []);
+    assert.deepEqual(queryRepo.getAxisFacets("tag"), buildAxisFacets("tag", annotatedOnly));
+    assert.notDeepEqual(queryRepo.getAxisFacets("tag"), []);
+    assert.notDeepEqual(queryRepo.getAxisFacets("cv"), []);
   } finally {
     db.close();
   }

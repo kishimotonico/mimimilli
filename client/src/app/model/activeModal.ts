@@ -1,18 +1,6 @@
-export type ActiveModal =
-  | null
-  | "settings"
-  | "scan"
-  | "rj-missing"
-  | "fetch-failed"
-  | "parse-failed";
+import type { DlsiteNotificationModalKind } from "../../features/library/model/dlsiteNotificationModal";
+import { isDlsiteNotificationModal } from "../../features/library/model/dlsiteNotificationModal";
 
-export type DlsiteNotificationModalKind = Extract<
-  ActiveModal,
-  "rj-missing" | "fetch-failed" | "parse-failed"
->;
+export type ActiveModal = null | "settings" | "scan" | DlsiteNotificationModalKind;
 
-export function isDlsiteNotificationModal(
-  modal: ActiveModal,
-): modal is DlsiteNotificationModalKind {
-  return modal === "rj-missing" || modal === "fetch-failed" || modal === "parse-failed";
-}
+export { isDlsiteNotificationModal };

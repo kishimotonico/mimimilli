@@ -1,8 +1,6 @@
 // DLsite スクレイパー（fetch + cheerio）。このファイルのセレクタとフィクスチャテストを正典とする。
 // HTML 構造変更を parse_error として検知したら、セレクタとテストを同時に更新する。
 // HTML パースは pure 関数に分離し、ネットワークなしでテストできるようにする。
-import { writeFileSync } from "node:fs";
-import { join } from "node:path";
 import { load } from "cheerio";
 import {
   dedupeTags,
@@ -138,51 +136,6 @@ export function parseDlsiteHtml(html: string, rjCode: string): DlsiteFetchResult
   };
 }
 
-/** DLsite から作品情報を取得する（年齢確認は Cookie adultchecked=1 でバイパス） */
-export async function fetchDlsiteInfo(
-  rjCode: string,
-  fetchImpl: FetchLike = fetch,
-  transferMax = Number.MAX_SAFE_INTEGER,
-  expandedMax = Number.MAX_SAFE_INTEGER,
-  userAgent = DEFAULT_DLSITE_USER_AGENT,
-): Promise<DlsiteFetchResult> {
-  try {
-    const res = await fetchImpl(dlsiteWorkUrl(rjCode), {
-      headers: {
-        Cookie: "adultchecked=1",
-        "User-Agent": userAgent,
-        "Accept-Language": "ja",
-      },
-      redirect: "follow",
-    });
-    if (res.status === 404) {
-      return {
-        ok: false,
-        kind: "not_found",
-        message: `DLsite作品が見つかりません（${rjCode}）`,
-      };
-    }
-    if (!res.ok) {
-      return {
-        ok: false,
-        kind: "error",
-        message: `DLsiteの取得に失敗しました（${rjCode}: HTTP ${res.status}）`,
-      };
-    }
-    return parseDlsiteHtml(
-      new TextDecoder().decode((await readLimitedBody(res, transferMax, expandedMax)).body),
-      rjCode,
-    );
-  } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") throw error;
-    return {
-      ok: false,
-      kind: "error",
-      message: `DLsiteとの通信に失敗しました（${rjCode}: ${(error as Error).message}）`,
-    };
-  }
-}
-
 /** HTTP取得だけを担当する。パースとキャッシュは呼び出し側で行う。 */
 export async function fetchDlsiteHtml(
   rjCode: string,
@@ -260,17 +213,4 @@ export function mergeDlsiteTags(existing: NormalizedTag[], info: DlsiteWorkInfo)
   for (const cv of info.cvs) newTags.push(`cv/${cv}`);
   for (const genre of info.genreTags) newTags.push(`genre/${genre}`);
   return dedupeTags([...existing, ...normalizeTags(newTags)]);
-}
-
-/** カバー画像をダウンロードして作品フォルダーへ保存し、ファイル名を返す */
-export async function downloadCover(
-  coverUrl: string,
-  workDir: string,
-  userAgent = DEFAULT_DLSITE_USER_AGENT,
-): Promise<string> {
-  const cover = await fetchDlsiteCover(coverUrl, fetch, Number.MAX_SAFE_INTEGER, userAgent);
-  const ext = (new URL(cover.finalUrl).pathname.split(".").pop() ?? "jpg").toLowerCase();
-  const fileName = `dlsite_cover.${ext}`;
-  writeFileSync(join(workDir, fileName), cover.body);
-  return fileName;
 }

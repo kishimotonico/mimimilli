@@ -1,8 +1,12 @@
 import { useAtomValue } from "jotai";
 import { useEffect, useRef, useState } from "react";
 import { I } from "../../../shared/ui/Icon";
-import { scanningAtom, scanErrorAtom, scanProgressLabelAtom } from "../../scan/model/atoms";
-import { useScanActions } from "../../scan/model/useScanActions";
+import {
+  scanningAtom,
+  scanErrorAtom,
+  scanProgressLabelAtom,
+} from "../../../entities/scan/model/atoms";
+import { useScanActions } from "../../../entities/scan/useScanActions";
 
 interface SetupScreenProps {
   onComplete: (path: string) => Promise<void>;
@@ -180,7 +184,7 @@ export default function SetupScreen({ onComplete }: SetupScreenProps) {
           {scanning && (
             <button
               type="button"
-              onClick={() => void cancel().catch(() => {})}
+              onClick={() => void cancel()}
               style={{
                 height: 36,
                 borderRadius: 8,

@@ -25,16 +25,22 @@ import StartupErrorScreen from "./ui/StartupErrorScreen";
 import DlsiteNotificationModals from "../features/library/ui/DlsiteNotificationModals";
 import { LibraryNavigationProvider } from "../features/library/ui/LibraryNavigationProvider";
 import GlobalToast from "./ui/GlobalToast";
-import { errorToastAtom } from "./model/errorToastAtom";
-import { mutationErrorMessage } from "../shared/lib/mutationError";
+import { errorToastAtom } from "../shared/model/errorToastAtom";
+import { apiErrorMessage } from "../shared/lib/apiError";
 import type { ActiveModal } from "./model/activeModal";
+import { isDlsiteNotificationModal } from "./model/activeModal";
 import type { Work, WorkListItem } from "@mimimilli/shared";
 import { getWork } from "../entities/work/api";
-import { exportLibrary } from "../features/library/api";
-import { useScanActions } from "../features/scan/model/useScanActions";
-import { setRootFolder } from "../features/settings/api";
-import { useSettingsQuery } from "../features/settings/useSettingsQuery";
+import { useDownloadLibraryExport } from "../features/library/useDownloadLibraryExport";
+import { useScanActions } from "../entities/scan/useScanActions";
+import { setRootFolder } from "../entities/settings/api";
+import { useSettingsQuery } from "../entities/settings/useSettingsQuery";
 import NavigationHistorySync from "../features/navigation/ui/NavigationHistorySync";
+import { setAppModeAtom } from "../shared/model/appModeAtoms";
+import {
+  setLibraryAxisAtom,
+  selectLibraryWorkAtom,
+} from "../entities/library/model/navigationActions";
 
 const SettingsModal = lazy(() => import("../features/settings/ui/SettingsModal"));
 const ScanModal = lazy(() => import("../features/scan/ui/ScanModal"));
@@ -44,6 +50,9 @@ export default function App() {
   const scanActions = useScanActions();
   const queryClient = useQueryClient();
   const setErrorToast = useSetAtom(errorToastAtom);
+  const setAppMode = useSetAtom(setAppModeAtom);
+  const setLibraryAxis = useSetAtom(setLibraryAxisAtom);
+  const selectLibraryWork = useSetAtom(selectLibraryWorkAtom);
   const playRequestIdRef = useRef(0);
 
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
@@ -88,7 +97,7 @@ export default function App() {
           player.play(work, tracks, Math.min(trackIndex, tracks.length - 1), playlist!.id);
         }
       } catch (err) {
-        setErrorToast(mutationErrorMessage(err, "作品の再生に失敗しました"));
+        setErrorToast(apiErrorMessage(err, "作品の再生に失敗しました"));
       }
     },
     [player, queryClient, setErrorToast],
@@ -111,7 +120,10 @@ export default function App() {
     async (path: string) => {
       await setRootFolder(path);
       queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() });
-      await scanActions.start();
+      const result = await scanActions.start();
+      if (!result.ok) {
+        throw new Error(result.error);
+      }
       queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), (prev: typeof settings) =>
         prev ? { ...prev, rootFolder: path } : prev,
       );
@@ -124,25 +136,16 @@ export default function App() {
     [changeFolderMutation],
   );
 
-  const handleExport = useCallback(async () => {
-    try {
-      const exported = await exportLibrary();
-      const blob = new Blob([exported.data], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "mimimilli-export.json";
-      a.click();
-      URL.revokeObjectURL(url);
-      if (exported.dataIntegrityWarning) {
-        setErrorToast(
-          `${exported.dataIntegrityWarning.skippedCount}件の作品がデータ不整合のためエクスポートから除外されました`,
-        );
-      }
-    } catch (err) {
-      setErrorToast(mutationErrorMessage(err, "ライブラリのエクスポートに失敗しました"));
-    }
-  }, [setErrorToast]);
+  const handleExport = useDownloadLibraryExport();
+
+  const handleOpenLibraryWork = useCallback(
+    (workId: string) => {
+      setAppMode("library");
+      setLibraryAxis("all");
+      selectLibraryWork(workId);
+    },
+    [selectLibraryWork, setAppMode, setLibraryAxis],
+  );
 
   if (startupState === "loading") {
     return (
@@ -211,9 +214,10 @@ export default function App() {
               onPlay={handlePlay}
               onResume={handleResume}
               onTogglePlay={player.togglePlay}
+              onPlayFile={player.playFile}
             />
           }
-          transportBar={<PlayerDock />}
+          transportBar={<PlayerDock onShowPlayingWork={handleOpenLibraryWork} />}
           fullScreenPlayer={<FullScreenPlayerGate />}
           overlays={
             <>
@@ -240,7 +244,11 @@ export default function App() {
                   />
                 </Suspense>
               )}
-              <DlsiteNotificationModals activeModal={activeModal} onClose={handleCloseModal} />
+              <DlsiteNotificationModals
+                activeModal={isDlsiteNotificationModal(activeModal) ? activeModal : null}
+                onClose={handleCloseModal}
+                onOpenWork={handleOpenLibraryWork}
+              />
               <GlobalToast />
             </>
           }

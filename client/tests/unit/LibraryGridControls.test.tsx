@@ -3,8 +3,8 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Provider, createStore } from "jotai";
 import LibraryGridControls from "../../src/features/library/ui/LibraryGridControls";
+import { activeAxisAtom } from "../../src/entities/library/model/navigationAtoms";
 import {
-  activeAxisAtom,
   libraryGridLayoutModeAtom,
   libraryViewModeAtom,
 } from "../../src/features/library/model/atoms";

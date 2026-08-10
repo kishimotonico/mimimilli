@@ -89,7 +89,9 @@ TTLは `DEFAULT_DLSITE_CACHE_TTLS_MS`（`dlsiteCache.ts`）の定数で固定さ
 
 HTMLの転送・展開サイズには上限があり（既定2 MiB / 8 MiB、`DEFAULT_DLSITE_CACHE_MAX_TRANSFER_BYTES` / `DEFAULT_DLSITE_CACHE_MAX_EXPANDED_BYTES`）、gzip展開時にも `zlib` の `maxOutputLength` で同じ上限を渡してgzip bombを防ぐ。
 
-一括取得は同じキャッシュ済みRJコードに対して2回目以降HTTPに出なくても、適用結果に実質差分がなければDBにも `mimimilli.json` にも書き込まない。`lastAttemptAt` は実際にHTTPを試みたときだけ更新し、cache hitでは更新しない。
+一括取得の対象は `applied` と `skipped` を除く（上記「作品ごとの状態」参照）。`applied` の作品は2回目以降の一括取得では対象外になるため、成功時の「変更なしなら書き込まない」判定は存在しない。
+
+取得が失敗した作品について、キャッシュ hit（HTTPを試みなかった）かつ、作品の `status`・`error`・`errorKind` が、今回の失敗結果とすでに一致しているときは、DBと `mimimilli.json` への書き込みを省略する。実HTTPを試みた場合は常に書き込む。`lastAttemptAt` は実際にHTTPを試みたときだけ更新し、cache hitでは更新しない。
 
 ## レート制限とリトライ
 

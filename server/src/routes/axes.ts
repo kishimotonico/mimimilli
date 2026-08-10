@@ -3,7 +3,7 @@
 // 未登録 prefix でも集計自体は可能。軸レールに出すかどうかはクライアント側の関心）
 import { Hono } from "hono";
 import { axisFacetsQuerySchema, facetAxisIdSchema } from "@mimimilli/shared";
-import type { DataAdapter } from "../adapter.ts";
+import type { DataAdapter } from "../adapter/index.ts";
 import { invalidRequest } from "../lib/httpError.ts";
 
 export function axesRoute(adapter: DataAdapter): Hono {

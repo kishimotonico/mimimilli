@@ -9,8 +9,8 @@ import {
   workRegisterPreviewQuerySchema,
   worksQuerySchema,
 } from "@mimimilli/shared";
-import { InvalidResumeError, type DataAdapter } from "../adapter.ts";
-import { WorkRegisterError } from "../adapters/real/workRegister.ts";
+import { InvalidResumeError, WorkRegisterError } from "../errors.ts";
+import type { DataAdapter } from "../adapter/index.ts";
 import { conflict, invalidRequest, notFound } from "../lib/httpError.ts";
 
 export function worksRoute(adapter: DataAdapter): Hono {
@@ -20,6 +20,7 @@ export function worksRoute(adapter: DataAdapter): Hono {
     const parsed = worksQuerySchema.safeParse({
       ...c.req.query(),
       tags: c.req.queries("tags"),
+      ids: c.req.queries("ids"),
     });
     if (!parsed.success) {
       invalidRequest("works のクエリパラメータが不正です");

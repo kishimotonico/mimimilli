@@ -7,9 +7,9 @@ import {
   dlsiteBulkActionsAtom,
   dlsiteBulkActiveAtom,
   dlsiteBulkProgressAtom,
-} from "../../src/features/dlsite/model/atoms";
+} from "../../src/entities/dlsite/model/bulkAtoms";
 import { appModeAtom } from "../../src/features/navigation/model/navigationAtoms";
-import { scanJobAtom } from "../../src/features/scan/model/atoms";
+import { scanJobAtom } from "../../src/entities/scan/model/atoms";
 
 function renderTopBar(atomState?: {
   scanJob?: import("@mimimilli/shared").ScanJobSnapshot | null;

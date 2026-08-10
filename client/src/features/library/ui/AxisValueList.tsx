@@ -1,14 +1,12 @@
 import { useEffect, useState } from "react";
 import { useAtom, useAtomValue } from "jotai";
 import type { AxisFacetItem, NormalizedTag, TagPrefix } from "@mimimilli/shared";
-import type { AxisId } from "../model/types";
-import { getAxisIcon, getAxisLabel } from "../model/axisDefinitions";
+import type { AxisId } from "../../../entities/library/types";
+import { getAxisIcon, getAxisLabel } from "../../../entities/library/axisDefinitions";
 import { buildFilterTag } from "../model/libraryPresentation";
-import { filterAxisValueItems } from "../model/axisValueFilter";
-import { sortAxisValueItems } from "../model/axisValueSort";
-import { buildAxisValueHierarchy, flattenAxisValueRows } from "../model/axisValueHierarchy";
+import { buildAxisValueDisplayRows } from "../model/axisValueDisplayRows";
 import { axisValueSortAtom, libraryTileSizeAtom, libraryViewModeAtom } from "../model/atoms";
-import CollectionStatus from "./CollectionStatus";
+import CollectionStatus from "../../../shared/ui/CollectionStatus";
 import AxisValueRows from "./AxisValueRows";
 import AxisValueGrid from "./AxisValueGrid";
 import { I } from "../../../shared/ui/Icon";
@@ -66,11 +64,7 @@ export default function AxisValueList({
     setContextQuery("");
   }, [axis]);
 
-  const filtered = filterAxisValueItems(facetItems, contextQuery);
-  const rows =
-    sort.key === "name"
-      ? buildAxisValueHierarchy(filtered, sort.direction)
-      : flattenAxisValueRows(sortAxisValueItems(filtered, sort));
+  const rows = buildAxisValueDisplayRows(facetItems, contextQuery, sort);
   const fallbackIcon = getAxisIcon(axis);
   const axisLabel = getAxisLabel(axis, tagPrefixes);
   const resetKey = `${axis}:${sort.key}:${sort.direction}:${contextQuery}`;
@@ -90,7 +84,7 @@ export default function AxisValueList({
     handleSelectTag(buildFilterTag(axis, item.value), opts);
   const handleAdd = (item: AxisFacetItem) => handleAddTag(buildFilterTag(axis, item.value));
 
-  const showSearchMiss = facetItems.length > 0 && filtered.length === 0;
+  const showSearchMiss = facetItems.length > 0 && rows.length === 0 && contextQuery.length > 0;
 
   return (
     <div className={`mle-col is-results is-axis-values ${viewMode === "grid" ? "is-grid" : ""}`}>

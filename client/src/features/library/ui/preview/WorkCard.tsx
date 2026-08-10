@@ -2,7 +2,7 @@ import type { WorkListItem } from "@mimimilli/shared";
 import CoverImg from "../../../../entities/work/ui/CoverImg";
 import { selectFixedCoverThumbnailWidth } from "../../../../entities/work/ui/coverThumbnailWidth";
 import { I } from "../../../../shared/ui/Icon";
-import { formatDuration } from "./format";
+import { formatDuration } from "../../../../shared/lib/format";
 
 /** 作品カード。DiscoveryDashboard・PreviewPane のタグ絞り込み結果など、
  *  作品一覧をカード列で並べる箇所で共有する描画実装 */

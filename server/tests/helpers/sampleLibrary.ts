@@ -79,6 +79,9 @@ export function makeSampleLibrary(): SampleLibrary {
   writeSampleCover(join(work1, "cover.jpg"));
 
   const existingWorkId = "11111111-1111-4111-8111-111111111111";
+  const existingPlaylistId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const existingTrackId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const missingTrackId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
   writeFileSync(
     join(work2, "mimimilli.json"),
     JSON.stringify(
@@ -88,14 +91,15 @@ export function makeSampleLibrary(): SampleLibrary {
         tags: ["cv/水瀬なずな", "サークル/夜想曲", "バイノーラル"],
         playlists: [
           {
+            id: existingPlaylistId,
             name: "default",
             tracks: [
-              { title: "本編", file: "track.wav" },
-              { title: "欠損", file: "missing.wav" },
+              { id: existingTrackId, title: "本編", file: "track.wav" },
+              { id: missingTrackId, title: "欠損", file: "missing.wav" },
             ],
           },
         ],
-        defaultPlaylist: "default",
+        defaultPlaylistId: existingPlaylistId,
       },
       null,
       2,

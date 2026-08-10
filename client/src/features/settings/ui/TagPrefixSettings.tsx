@@ -10,29 +10,18 @@ import {
   listTagPrefixCandidates,
   listTagPrefixes,
   updateTagPrefix,
-} from "../../library/api";
+} from "../../../entities/tag/api";
 import { TAG_QUERY_KEYS } from "../../../entities/tag/queryKeys";
 import { I } from "../../../shared/ui/Icon";
 
-const SECTION_LABEL_STYLE: React.CSSProperties = {
-  fontFamily: "var(--font-sans)",
-  fontSize: 10.5,
-  fontWeight: 600,
-  letterSpacing: "0.08em",
-  color: "var(--ink-3)",
-  textTransform: "uppercase",
-};
+const SECTION_LABEL_CLASS =
+  "font-sans text-[10.5px] font-semibold tracking-[0.08em] text-ink-3 uppercase";
 
-const TOGGLE_LABEL_STYLE: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 4,
-  fontFamily: "var(--font-sans)",
-  fontSize: 11,
-  color: "var(--ink-2)",
-  cursor: "pointer",
-  whiteSpace: "nowrap",
-};
+const TOGGLE_LABEL_CLASS =
+  "inline-flex items-center gap-1 font-sans text-[11px] text-ink-2 cursor-pointer whitespace-nowrap";
+
+const INPUT_CLASS =
+  "h-[30px] min-w-0 flex-1 rounded-[6px] border border-line-soft bg-paper-0 px-2.5 font-jp text-[11.5px] text-ink-1";
 
 export default function TagPrefixSettings() {
   const queryClient = useQueryClient();
@@ -101,61 +90,24 @@ export default function TagPrefixSettings() {
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <span style={SECTION_LABEL_STYLE}>タグ設定（prefix 定義）</span>
+    <div className="flex flex-col gap-2">
+      <span className={SECTION_LABEL_CLASS}>タグ設定（prefix 定義）</span>
 
       {/* 定義一覧 */}
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          border: "1px solid var(--line-soft)",
-          borderRadius: 6,
-          background: "var(--paper-0)",
-          maxHeight: 180,
-          overflowY: "auto",
-        }}
-      >
+      <div className="flex max-h-[180px] flex-col overflow-y-auto rounded-[6px] border border-line-soft bg-paper-0">
         {prefixes.length === 0 && (
-          <span style={{ padding: "10px 12px", fontSize: 11.5, color: "var(--ink-3)" }}>
-            prefix 定義がありません
-          </span>
+          <span className="px-3 py-2.5 text-[11.5px] text-ink-3">prefix 定義がありません</span>
         )}
         {prefixes.map((p) => (
           <div
             key={p.prefix}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              padding: "6px 10px",
-              borderBottom: "1px solid var(--line-soft)",
-            }}
+            className="flex items-center gap-2.5 border-b border-line-soft px-2.5 py-1.5"
           >
-            <span
-              style={{
-                flex: 1,
-                minWidth: 0,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-                fontSize: 12,
-                color: "var(--ink-1)",
-              }}
-            >
+            <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-ink-1">
               {p.label}
-              <span
-                style={{
-                  marginLeft: 6,
-                  fontFamily: "var(--font-mono)",
-                  fontSize: 10,
-                  color: "var(--ink-3)",
-                }}
-              >
-                {p.prefix}/
-              </span>
+              <span className="ml-1.5 font-mono text-[10px] text-ink-3">{p.prefix}/</span>
             </span>
-            <label style={TOGGLE_LABEL_STYLE}>
+            <label className={TOGGLE_LABEL_CLASS}>
               <input
                 type="checkbox"
                 checked={p.showAsAxis}
@@ -169,7 +121,7 @@ export default function TagPrefixSettings() {
               />
               軸
             </label>
-            <label style={TOGGLE_LABEL_STYLE}>
+            <label className={TOGGLE_LABEL_CLASS}>
               <input
                 type="checkbox"
                 checked={p.protected}
@@ -188,17 +140,7 @@ export default function TagPrefixSettings() {
               aria-label={`prefix「${p.prefix}」を削除`}
               disabled={isMutating}
               onClick={() => deleteMutation.mutate(p.prefix)}
-              style={{
-                width: 22,
-                height: 22,
-                display: "grid",
-                placeItems: "center",
-                borderRadius: 4,
-                border: "none",
-                background: "none",
-                color: "var(--ink-3)",
-                cursor: isMutating ? "not-allowed" : "pointer",
-              }}
+              className="grid h-[22px] w-[22px] cursor-pointer place-items-center rounded-[4px] border-none bg-transparent text-ink-3 disabled:cursor-not-allowed"
             >
               <I.x size={12} />
             </button>
@@ -208,7 +150,7 @@ export default function TagPrefixSettings() {
 
       {/* 新規追加 */}
       <form
-        style={{ display: "flex", alignItems: "center", gap: 6 }}
+        className="flex items-center gap-1.5"
         onSubmit={(e) => {
           e.preventDefault();
           submitNew();
@@ -219,53 +161,19 @@ export default function TagPrefixSettings() {
           onChange={(e) => setNewPrefix(e.target.value)}
           aria-label="新しい prefix"
           placeholder="prefix（例: 気分）"
-          style={{
-            flex: 1,
-            minWidth: 0,
-            height: 30,
-            padding: "0 10px",
-            background: "var(--paper-0)",
-            border: "1px solid var(--line-soft)",
-            borderRadius: 6,
-            fontFamily: "var(--font-jp)",
-            fontSize: 11.5,
-            color: "var(--ink-1)",
-          }}
+          className={INPUT_CLASS}
         />
         <input
           value={newLabel}
           onChange={(e) => setNewLabel(e.target.value)}
           aria-label="表示ラベル"
           placeholder="ラベル（省略可）"
-          style={{
-            flex: 1,
-            minWidth: 0,
-            height: 30,
-            padding: "0 10px",
-            background: "var(--paper-0)",
-            border: "1px solid var(--line-soft)",
-            borderRadius: 6,
-            fontFamily: "var(--font-jp)",
-            fontSize: 11.5,
-            color: "var(--ink-1)",
-          }}
+          className={INPUT_CLASS}
         />
         <button
           type="submit"
           disabled={!newPrefix.trim() || isMutating}
-          style={{
-            height: 30,
-            padding: "0 12px",
-            borderRadius: 6,
-            border: "1px solid var(--line)",
-            background: "var(--paper-1)",
-            color: "var(--ink-1)",
-            fontFamily: "var(--font-sans)",
-            fontSize: 12,
-            fontWeight: 500,
-            cursor: !newPrefix.trim() || isMutating ? "not-allowed" : "pointer",
-            whiteSpace: "nowrap",
-          }}
+          className="h-[30px] cursor-pointer rounded-[6px] border border-line bg-paper-1 px-3 font-sans text-[12px] font-medium whitespace-nowrap text-ink-1 disabled:cursor-not-allowed"
         >
           追加
         </button>
@@ -273,8 +181,8 @@ export default function TagPrefixSettings() {
 
       {/* 未登録 prefix のサジェスト */}
       {candidates.length > 0 && (
-        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
-          <span style={{ fontSize: 10.5, color: "var(--ink-3)" }}>データ内の未登録 prefix:</span>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[10.5px] text-ink-3">データ内の未登録 prefix:</span>
           {candidates.map((c) => (
             <button
               key={c.prefix}
@@ -290,37 +198,18 @@ export default function TagPrefixSettings() {
                 })
               }
               title={`「${c.prefix}/」を prefix 定義に登録`}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 4,
-                height: 22,
-                padding: "0 8px",
-                borderRadius: 11,
-                border: "1px dashed var(--line)",
-                background: "var(--paper-0)",
-                color: "var(--ink-2)",
-                fontFamily: "var(--font-jp)",
-                fontSize: 10.5,
-                cursor: isMutating ? "not-allowed" : "pointer",
-              }}
+              className="inline-flex h-[22px] cursor-pointer items-center gap-1 rounded-[11px] border border-dashed border-line bg-paper-0 px-2 font-jp text-[10.5px] text-ink-2 disabled:cursor-not-allowed"
             >
               <I.add size={10} />
               {c.prefix}
-              <span style={{ fontFamily: "var(--font-mono)", color: "var(--ink-3)" }}>
-                {c.count}
-              </span>
+              <span className="font-mono text-ink-3">{c.count}</span>
             </button>
           ))}
         </div>
       )}
 
       {error && (
-        <p
-          role="alert"
-          className="mll-selectable"
-          style={{ margin: 0, fontSize: 11, color: "var(--r-coral)" }}
-        >
+        <p role="alert" className="mll-selectable m-0 text-[11px] text-[var(--r-coral)]">
           {error}
         </p>
       )}

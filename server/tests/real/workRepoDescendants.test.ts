@@ -3,8 +3,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Work } from "@mimimilli/shared";
 import { openDb } from "../../src/adapters/real/db.ts";
-import { WorkRepo } from "../../src/adapters/real/workRepo.ts";
-import { resolvedDuration, upsertTestWork } from "../helpers/workTestUtils.ts";
+import { createWorkRepos, resolvedDuration, upsertTestWork } from "../helpers/workTestUtils.ts";
 
 function sampleWork(id: string, physicalPath: string): Work {
   const playlistId = `${id}-playlist`;
@@ -54,15 +53,15 @@ function sampleWork(id: string, physicalPath: string): Work {
 
 test("listDescendantWorkRefs: アンダースコア入りフォルダ名は別パスの作品を子孫と誤判定しない", () => {
   const db = openDb({ kind: "memory" });
-  const repo = new WorkRepo(db);
+  const { query, catalog, user } = createWorkRepos(db);
   const parentPath = "/library/A_B";
   const trueChildPath = "/library/A_B/child";
   const falseMatchPath = "/library/AXB/child";
 
-  upsertTestWork(repo, sampleWork("true-child", trueChildPath));
-  upsertTestWork(repo, sampleWork("false-match", falseMatchPath));
+  upsertTestWork(catalog, user, sampleWork("true-child", trueChildPath));
+  upsertTestWork(catalog, user, sampleWork("false-match", falseMatchPath));
 
-  const descendants = repo.listDescendantWorkRefs(parentPath);
+  const descendants = query.listDescendantWorkRefs(parentPath);
   assert.equal(descendants.length, 1);
   assert.equal(descendants[0]?.physicalPath, trueChildPath);
   db.close();
@@ -70,15 +69,15 @@ test("listDescendantWorkRefs: アンダースコア入りフォルダ名は別�
 
 test("listFsWorkRefs: アンダースコア入り祖先パスは別パスの作品を子孫と誤判定しない", () => {
   const db = openDb({ kind: "memory" });
-  const repo = new WorkRepo(db);
+  const { query, catalog, user } = createWorkRepos(db);
   const ancestorPath = "/library/A_B";
   const trueChildPath = "/library/A_B/child";
   const falseMatchPath = "/library/AXB/child";
 
-  upsertTestWork(repo, sampleWork("true-child", trueChildPath));
-  upsertTestWork(repo, sampleWork("false-match", falseMatchPath));
+  upsertTestWork(catalog, user, sampleWork("true-child", trueChildPath));
+  upsertTestWork(catalog, user, sampleWork("false-match", falseMatchPath));
 
-  const refs = repo.listFsWorkRefs(ancestorPath);
+  const refs = query.listFsWorkRefs(ancestorPath);
   const paths = refs.map((ref) => ref.physicalPath).sort();
   assert.deepEqual(paths, [trueChildPath]);
   db.close();

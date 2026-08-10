@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import CollectionStatus from "../../src/features/library/ui/CollectionStatus";
+import CollectionStatus from "../../src/shared/ui/CollectionStatus";
 
 afterEach(cleanup);
 
