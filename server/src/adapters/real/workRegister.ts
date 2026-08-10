@@ -1,6 +1,6 @@
 // ファイルモードからの手動作品登録。メタファイル生成と子作品の登録解除のみ行い、物理ファイルは移動しない。
 import { existsSync, renameSync, statSync, unlinkSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { basename, join } from "node:path";
 import type {
   DlsiteApplyBody,
   MetaFile,
@@ -11,6 +11,7 @@ import type {
 import { emptyDlsiteState } from "@mimimilli/shared";
 import { detectRjCode } from "./dlsite.ts";
 import { META_FILE_NAME, MetaParseError, readMetaFile, readMetaFileRaw } from "./meta.ts";
+import { metaStagingPath } from "./metaStaging.ts";
 import { resolveWithin } from "./paths.ts";
 import { WorkRegisterError } from "../../errors.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
@@ -55,10 +56,6 @@ function metaFileIdMatches(metaPath: string, workId: string): boolean {
   } catch {
     return false;
   }
-}
-
-function metaStagingPath(canonicalPath: string): string {
-  return join(dirname(canonicalPath), `.${basename(canonicalPath)}.unregistering`);
 }
 
 function findStagedMetaPlan(workId: string, canonicalPath: string): MetaDeletionPlan | null {

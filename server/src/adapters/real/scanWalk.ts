@@ -1,6 +1,7 @@
 import { readdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { isMetaFileName } from "./meta.ts";
+import { isMetaStagingFileName } from "./metaStaging.ts";
 import { isPathWithin } from "../../lib/path.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
 import { AUDIO_EXTENSIONS, extOf } from "./scanAudio.ts";
@@ -16,6 +17,7 @@ export interface DirEntryInfo {
 
 export interface WalkResult {
   metaPaths: string[];
+  stagedMetaPaths: string[];
   /** メタファイル（いずれかの形式）が直接存在するディレクトリ */
   metaDirs: Set<string>;
   /** 音声ファイルが直接存在するディレクトリ */
@@ -69,6 +71,7 @@ export async function walk(
 ): Promise<WalkResult> {
   const result: WalkResult = {
     metaPaths: [],
+    stagedMetaPaths: [],
     metaDirs: new Set(),
     audioDirs: new Set(),
     unreadablePaths: [],
@@ -105,6 +108,8 @@ export async function walk(
           result.metaPaths.push(full);
           result.metaDirs.add(dir);
           markDirsWithMetaInSubtree(dir, root, result.dirsWithMetaInSubtree);
+        } else if (isMetaStagingFileName(entry.name)) {
+          result.stagedMetaPaths.push(full);
         } else if (AUDIO_EXTENSIONS.has(extOf(entry.name))) {
           result.audioDirs.add(dir);
         } else if (IMAGE_EXTENSIONS.has(extOf(entry.name))) {
@@ -122,7 +127,7 @@ export async function walk(
   return result;
 }
 
-function markDirsWithMetaInSubtree(
+export function markDirsWithMetaInSubtree(
   metaDir: string,
   root: string,
   dirsWithMetaInSubtree: Set<string>,
