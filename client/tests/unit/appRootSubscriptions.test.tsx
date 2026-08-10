@@ -366,10 +366,10 @@ describe("App root subscriptions", () => {
       const baseline = await waitForAppShellBaseline();
 
       act(() => {
-        store.set(dlsiteBulkProgressAtom, { processed: 1, total: 10 });
+        store.set(dlsiteBulkProgressAtom, { processed: 1, total: 10, work: null });
       });
       act(() => {
-        store.set(dlsiteBulkProgressAtom, { processed: 7, total: 10 });
+        store.set(dlsiteBulkProgressAtom, { processed: 7, total: 10, work: null });
       });
 
       expect(appShellCallCount).toBe(baseline);

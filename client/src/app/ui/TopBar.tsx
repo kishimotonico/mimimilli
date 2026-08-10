@@ -7,7 +7,8 @@ import { useMotionVariants } from "../../shared/ui/useMotionVariants";
 import {
   dlsiteBulkActiveAtom,
   dlsiteBulkCancellingAtom,
-  dlsiteBulkProgressAtom,
+  dlsiteBulkCurrentWorkLabelAtom,
+  dlsiteBulkProgressLabelAtom,
 } from "../../entities/dlsite/model/bulkAtoms";
 import { useDlsiteBulkActions } from "../../entities/dlsite/useDlsiteBulkActions";
 import { librarySearchQueryAtom } from "../../entities/library/model/navigationAtoms";
@@ -44,7 +45,8 @@ export default function TopBar({ onOpenScan, onSettings, notificationBell }: Top
   const scanning = useAtomValue(scanningAtom);
   const scanProgressLabel = useAtomValue(scanProgressLabelAtom);
   const dlsiteBulkActive = useAtomValue(dlsiteBulkActiveAtom);
-  const dlsiteBulkProgress = useAtomValue(dlsiteBulkProgressAtom);
+  const dlsiteBulkProgressLabel = useAtomValue(dlsiteBulkProgressLabelAtom);
+  const dlsiteBulkCurrentWorkLabel = useAtomValue(dlsiteBulkCurrentWorkLabelAtom);
   const dlsiteBulkCancelling = useAtomValue(dlsiteBulkCancellingAtom);
   const { cancel: onCancelDlsiteBulk } = useDlsiteBulkActions();
   const mode = useAtomValue(appModeAtom);
@@ -152,10 +154,16 @@ export default function TopBar({ onOpenScan, onSettings, notificationBell }: Top
       />
       {dlsiteBulkActive && (
         <>
-          <span className="font-mono text-[10.5px] text-ink-3" aria-live="polite">
-            {dlsiteBulkProgress
-              ? `DLsite取得中 (${dlsiteBulkProgress.processed}/${dlsiteBulkProgress.total})`
-              : "DLsite取得中..."}
+          <span
+            className="flex min-w-0 items-center gap-1 text-[10.5px] text-ink-3"
+            aria-live="polite"
+          >
+            <span className="whitespace-nowrap font-mono">{dlsiteBulkProgressLabel}</span>
+            {dlsiteBulkCurrentWorkLabel && (
+              <span className="max-w-[220px] truncate" title={dlsiteBulkCurrentWorkLabel}>
+                — {dlsiteBulkCurrentWorkLabel}
+              </span>
+            )}
           </span>
           <AnimatePresence initial={false}>
             {!dlsiteBulkCancelling && (

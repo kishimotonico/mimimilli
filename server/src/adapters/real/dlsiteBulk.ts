@@ -297,6 +297,20 @@ export function createDlsiteBulk(deps: DlsiteBulkDeps) {
             return result;
           }
           const work = targets[index]!;
+          options?.onProgress?.({
+            type: "progress",
+            processed: index,
+            total: targets.length,
+            work: { id: work.id, rjCode: work.dlsite.rjCode!, title: work.title },
+          });
+          if (isAborted()) {
+            dlsiteLogger.info("DLsite一括取得を中断しました", {
+              mode,
+              durationMs: Date.now() - bulkStartedAt,
+              ...result,
+            });
+            return result;
+          }
           const attempt = attempts.get(work.dlsite.rjCode!)!;
           const attemptedAt = attempt.httpAttempted
             ? new Date().toISOString()
@@ -316,12 +330,6 @@ export function createDlsiteBulk(deps: DlsiteBulkDeps) {
               attempt.result.ok === false &&
               attempt.result.kind === "offline"
             ) {
-              options?.onProgress?.({
-                type: "progress",
-                processed: index + 1,
-                total: targets.length,
-                workId: work.id,
-              });
               continue;
             }
           } catch (error) {
@@ -336,12 +344,6 @@ export function createDlsiteBulk(deps: DlsiteBulkDeps) {
             }
             if (error instanceof DlsiteOfflineError) {
               result.failed += 1;
-              options?.onProgress?.({
-                type: "progress",
-                processed: index + 1,
-                total: targets.length,
-                workId: work.id,
-              });
               continue;
             }
             dlsiteLogger.error("DLsite一括取得: 作品の適用に失敗しました", {
@@ -371,13 +373,13 @@ export function createDlsiteBulk(deps: DlsiteBulkDeps) {
             }
             result.failed += 1;
           }
-          options?.onProgress?.({
-            type: "progress",
-            processed: index + 1,
-            total: targets.length,
-            workId: work.id,
-          });
         }
+        options?.onProgress?.({
+          type: "progress",
+          processed: targets.length,
+          total: targets.length,
+          work: null,
+        });
         dlsiteLogger.info("DLsite一括取得を完了しました", {
           mode,
           durationMs: Date.now() - bulkStartedAt,

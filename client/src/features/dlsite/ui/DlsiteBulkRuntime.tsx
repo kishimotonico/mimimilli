@@ -137,7 +137,7 @@ export default function DlsiteBulkRuntime() {
     const generation = createSseGeneration();
     const connection = connectSse(`${API_BASE}/dlsite/events`);
     const source = connection.source;
-    // progressイベントのworkIdを集め、完了時にskippedでない（実際に処理対象だった）
+    // progressイベントが伝える処理中作品のIDを集め、完了時にskippedでない（実際に処理対象だった）
     // 作品の詳細キャッシュだけを選択的に無効化する（getDlsiteInvalidationKeys参照）。
     // SSE切断→再接続、またはattach()での後乗り（開始直後からの購読と確信できない）
     // でprogressイベントを取りこぼした可能性がある場合はmissedProgressを立て、
@@ -199,8 +199,8 @@ export default function DlsiteBulkRuntime() {
       }
       const event = parsed.event;
       if (event.type === "progress") {
-        setProgress({ processed: event.processed, total: event.total });
-        updatedWorkIds.add(event.workId);
+        setProgress({ processed: event.processed, total: event.total, work: event.work });
+        if (event.work) updatedWorkIds.add(event.work.id);
       } else if (event.type === "cancelling") {
         setCancelling(true);
       } else {

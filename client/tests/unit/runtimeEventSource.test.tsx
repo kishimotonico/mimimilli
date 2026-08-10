@@ -355,13 +355,13 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
       type: "progress",
       processed: 1,
       total: 2,
-      workId: "work-1",
+      work: { id: "work-1", rjCode: "RJ111111", title: "作品1" },
     });
     dispatchDlsite(source, "progress", {
       type: "progress",
       processed: 2,
       total: 2,
-      workId: "work-2",
+      work: { id: "work-2", rjCode: "RJ222222", title: "作品2" },
     });
 
     const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries");
@@ -401,7 +401,7 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
       type: "progress",
       processed: 1,
       total: 2,
-      workId: "work-1",
+      work: { id: "work-1", rjCode: "RJ111111", title: "作品1" },
     });
     // ネイティブerror（再接続）: この間のprogressイベントを取りこぼした可能性がある
     source.readyState = FakeEventSource.CONNECTING;
@@ -489,7 +489,7 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
   it("ネイティブ error で status 照会は1回だけ走る", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       if (String(input).endsWith("/dlsite/bulk") && init?.method !== "POST") {
-        return response({ status: "running", progress: { processed: 1, total: 5 } });
+        return response({ status: "running", progress: { processed: 1, total: 5, work: null } });
       }
       return response({ ok: true });
     });
@@ -522,7 +522,7 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
       "fetch",
       vi.fn(async (input: RequestInfo | URL) =>
         String(input).endsWith("/dlsite/bulk")
-          ? response({ status: "running", progress: { processed: 1, total: 5 } })
+          ? response({ status: "running", progress: { processed: 1, total: 5, work: null } })
           : response({ ok: true }),
       ),
     );
@@ -547,7 +547,7 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
       "fetch",
       vi.fn(async (input: RequestInfo | URL) =>
         String(input).endsWith("/dlsite/bulk")
-          ? response({ status: "running", progress: { processed: 1, total: 5 } })
+          ? response({ status: "running", progress: { processed: 1, total: 5, work: null } })
           : response({ ok: true }),
       ),
     );
@@ -599,7 +599,7 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
       type: "progress",
       processed: 3,
       total: 5,
-      workId: "work-1",
+      work: { id: "work-1", rjCode: "RJ111111", title: "作品1" },
     });
     resolveStatus(response({ status: "complete", result: staleResult }));
 
@@ -608,7 +608,11 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
       await Promise.resolve();
     });
     expect(store.get(dlsiteBulkActiveAtom)).toBe(true);
-    expect(store.get(dlsiteBulkProgressAtom)).toEqual({ processed: 3, total: 5 });
+    expect(store.get(dlsiteBulkProgressAtom)).toEqual({
+      processed: 3,
+      total: 5,
+      work: { id: "work-1", rjCode: "RJ111111", title: "作品1" },
+    });
     expect(store.get(dlsiteBulkResultAtom)).toBeNull();
   });
 
