@@ -4,7 +4,7 @@ title: dlsite-cacheにexport --dirを追加しキャッシュを長期アーカ�
 status: To Do
 assignee: []
 created_date: '2026-08-10 09:31'
-updated_date: '2026-08-10 09:46'
+updated_date: '2026-08-10 10:34'
 labels: []
 dependencies: []
 priority: high
@@ -45,11 +45,11 @@ docsにもこの範囲を明記する。
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 export --dir <path> が現行representationのHTML snapshotのみを全件 <PRODUCTCODE>.html.gz として書き出す（gzip済みBLOBを無展開、TTL切れの行も対象）
-- [ ] #2 出力先は存在しないか空のディレクトリのみ許可し、非空ならエラーで中断する
-- [ ] #3 結果を import --dir と同形式のJSON（成功件数・失敗ファイル名と理由）で返し、1件の失敗で全体を止めない
-- [ ] #4 ローカルファイルimportのサイズ判定を展開後サイズ基準に統一し、転送サイズ由来の2 MiB判定を外す
-- [ ] #5 export --dir → import --dir の往復で全件が同一HTMLとして復元されることをテストで確認する（展開後8 MiB近傍の行を含む）
-- [ ] #6 CLIのusage文字列と docs/dlsite.md を更新する（バックアップ・復元手順、復元対象がHTML snapshotのみである旨を含む）
-- [ ] #7 pnpm check && pnpm test が通る
+- [x] #1 export --dir <path> が現行representationのHTML snapshotのみを全件 <PRODUCTCODE>.html.gz として書き出す（gzip済みBLOBを無展開、TTL切れの行も対象）
+- [x] #2 出力先は存在しないか空のディレクトリのみ許可し、非空ならエラーで中断する
+- [x] #3 結果を import --dir と同形式のJSON（成功件数・失敗ファイル名と理由）で返し、1件の失敗で全体を止めない
+- [x] #4 ローカルファイルimportのサイズ判定を展開後サイズ基準に統一し、転送サイズ由来の2 MiB判定を外す
+- [x] #5 export --dir → import --dir の往復で全件が同一HTMLとして復元されることをテストで確認する（展開後8 MiB近傍の行を含む）
+- [x] #6 CLIのusage文字列と docs/dlsite.md を更新する（バックアップ・復元手順、復元対象がHTML snapshotのみである旨を含む）
+- [x] #7 pnpm check && pnpm test が通る
 <!-- AC:END -->

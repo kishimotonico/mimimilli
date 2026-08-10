@@ -2,6 +2,7 @@ import {
   closeSync,
   constants,
   fstatSync,
+  mkdirSync,
   openSync,
   readFileSync,
   readdirSync,
@@ -29,25 +30,25 @@ interface ImportSuccess {
   outcome: "ok" | "parse_error";
 }
 
-interface ImportFailure {
+interface FileFailure {
   file: string;
   error: string;
 }
 
-/** symlinkへの差し替えを防ぐため、開いた同じfdを検査・読込する。gzipはmagic byteで判定する。 */
-function readImportFile(file: string, maxTransferBytes: number, maxExpandedBytes: number): Buffer {
+/**
+ * symlinkへの差し替えを防ぐため、開いた同じfdを検査・読込する。gzipはmagic byteで判定する。
+ * サイズ判定は展開後サイズ基準。gzipファイルの読み込み量も同じ上限で頭打ちにする。
+ */
+function readImportFile(file: string, maxExpandedBytes: number): Buffer {
   let fd: number | undefined;
   try {
     fd = openSync(file, constants.O_RDONLY | constants.O_NOFOLLOW);
     const fileStat = fstatSync(fd);
     if (!fileStat.isFile()) throw new Error("import対象は通常ファイルにしてください");
-    if (fileStat.size > maxTransferBytes) {
-      throw new Error(`DLsite HTMLの転送サイズが上限を超えました: ${fileStat.size}`);
+    if (fileStat.size > maxExpandedBytes) {
+      throw new Error(`DLsite HTMLの読み込みサイズが上限を超えました: ${fileStat.size}`);
     }
     const bytes = readFileSync(fd);
-    if (bytes.byteLength > maxTransferBytes) {
-      throw new Error(`DLsite HTMLの転送サイズが上限を超えました: ${bytes.byteLength}`);
-    }
     if (!bytes.subarray(0, 2).equals(GZIP_MAGIC)) {
       if (bytes.byteLength > maxExpandedBytes) {
         throw new Error(`DLsite HTMLの展開サイズが上限を超えました: ${bytes.byteLength}`);
@@ -110,21 +111,56 @@ function deriveProductCodeFromFileName(name: string): string {
 function importDirectory(
   dir: string,
   cache: DlsiteCache,
-  maxTransferBytes: number,
   maxExpandedBytes: number,
-): { succeeded: ImportSuccess[]; failed: ImportFailure[] } {
+): { succeeded: ImportSuccess[]; failed: FileFailure[] } {
   const names = readdirSync(dir, { withFileTypes: true })
     .filter((entry) => entry.isFile() && IMPORT_FILE_EXTENSION_PATTERN.test(entry.name))
     .map((entry) => entry.name)
     .sort();
   const succeeded: ImportSuccess[] = [];
-  const failed: ImportFailure[] = [];
+  const failed: FileFailure[] = [];
   for (const name of names) {
     try {
       const productCode = deriveProductCodeFromFileName(name);
-      const bytes = readImportFile(join(dir, name), maxTransferBytes, maxExpandedBytes);
+      const bytes = readImportFile(join(dir, name), maxExpandedBytes);
       const { outcome } = importOne(cache, productCode, bytes);
       succeeded.push({ file: name, productCode, outcome });
+    } catch (error) {
+      failed.push({ file: name, error: (error as Error).message });
+    }
+  }
+  return { succeeded, failed };
+}
+
+/** 消えたproduct codeのファイルが残ってimportで復活しないよう、空のディレクトリだけを許す。 */
+function prepareExportDirectory(dir: string): void {
+  let entries: string[];
+  try {
+    entries = readdirSync(dir);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      mkdirSync(dir, { recursive: true });
+      return;
+    }
+    throw error;
+  }
+  if (entries.length > 0) {
+    throw new Error(`export先は存在しないか空のディレクトリにしてください: ${dir}`);
+  }
+}
+
+function exportDirectory(
+  dir: string,
+  cache: DlsiteCache,
+): { succeeded: string[]; failed: FileFailure[] } {
+  prepareExportDirectory(dir);
+  const succeeded: string[] = [];
+  const failed: FileFailure[] = [];
+  for (const productCode of cache.listSnapshotProductCodes()) {
+    const name = `${productCode}.html.gz`;
+    try {
+      writeFileSync(join(dir, name), cache.exportHtmlGzip({ productCode }));
+      succeeded.push(name);
     } catch (error) {
       failed.push({ file: name, error: (error as Error).message });
     }
@@ -135,6 +171,7 @@ function importDirectory(
 const USAGE =
   "usage: dlsite-cache <status|cleanup" +
   "|export --product-code <RJ|VJ> --file <path.html>" +
+  "|export --dir <path>" +
   "|import --product-code <RJ|VJ> --file <path.html[.gz]>" +
   "|import --dir <path>>";
 
@@ -148,6 +185,7 @@ export function runDlsiteCacheCli(
 ): string {
   const config = resolveDlsiteCacheConfig(resolveDataPaths(env).dlsiteCacheDb, env);
   const cache = new DlsiteCache({ ...config, ...overrides });
+  const maxExpandedBytes = overrides.maxExpandedBytes ?? config.maxExpandedBytes;
   try {
     const [command, ...args] = argv;
     if (command === "status" && args.length === 0) return JSON.stringify(cache.status());
@@ -167,15 +205,20 @@ export function runDlsiteCacheCli(
       writeFileSync(fileArg, html, "utf8");
       return JSON.stringify({ productCode, bytes: Buffer.byteLength(html, "utf8") });
     }
+    if (command === "export" && args.length === 2 && args[0] === "--dir") {
+      const dirArg = args[1];
+      if (dirArg === undefined) throw new Error(USAGE);
+      const result = exportDirectory(dirArg, cache);
+      return JSON.stringify({
+        succeeded: result.succeeded.length,
+        failed: result.failed.length,
+        failures: result.failed,
+      });
+    }
     if (command === "import" && args.length === 2 && args[0] === "--dir") {
       const dirArg = args[1];
       if (dirArg === undefined) throw new Error(USAGE);
-      const result = importDirectory(
-        dirArg,
-        cache,
-        config.maxTransferBytes,
-        config.maxExpandedBytes,
-      );
+      const result = importDirectory(dirArg, cache, maxExpandedBytes);
       return JSON.stringify({
         succeeded: result.succeeded.length,
         failed: result.failed.length,
@@ -192,7 +235,7 @@ export function runDlsiteCacheCli(
       const fileArg = args[3];
       if (productCodeArg === undefined || fileArg === undefined) throw new Error(USAGE);
       const productCode = normalizeDlsiteProductCode(productCodeArg).productCode;
-      const bytes = readImportFile(fileArg, config.maxTransferBytes, config.maxExpandedBytes);
+      const bytes = readImportFile(fileArg, maxExpandedBytes);
       const { outcome } = importOne(cache, productCode, bytes);
       return JSON.stringify({ productCode, outcome });
     }
