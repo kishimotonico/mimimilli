@@ -133,6 +133,17 @@ describe("navigation URL codec", () => {
     expect(result.warnings).toEqual(["存在しないライブラリ軸を拒否しました: smart-"]);
   });
 
+  it("rejects the abolished home axis and falls back to the default axis (TASK-302)", () => {
+    const result = parseNavigationUrl("/library/home");
+
+    expect(result.state).toEqual({
+      mode: "library",
+      library: DEFAULT_LIBRARY_URL_STATE,
+    });
+    expect(result.canonicalUrl).toBe("/library/all");
+    expect(result.warnings).toEqual(["存在しないライブラリ軸を拒否しました: home"]);
+  });
+
   it("rejects a drillValue-style third path segment (drill segment abolished, ADR-0012 §2)", () => {
     const result = parseNavigationUrl("/library/fav/value");
     expect(result.state).toEqual({

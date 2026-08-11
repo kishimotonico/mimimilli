@@ -22,7 +22,6 @@ const VIEW_AXIS_LABELS: Record<string, string> = {
 const BUILTIN_AXIS_LABELS: Record<string, string> = {
   tag: "タグ",
   year: "追加日",
-  home: "ホーム",
 };
 
 export const VIEW_AXES = new Set<string>(VIEW_AXIS_IDS);
@@ -35,12 +34,8 @@ export function isSmartAxis(axis: AxisId): boolean {
   return axis.startsWith("smart-");
 }
 
-export function isHomeAxis(axis: AxisId): boolean {
-  return axis === "home";
-}
-
 export function isFacetAxis(axis: AxisId): boolean {
-  return !isViewAxis(axis) && axis !== "tag" && !isHomeAxis(axis) && !isSmartAxis(axis);
+  return !isViewAxis(axis) && axis !== "tag" && !isSmartAxis(axis);
 }
 
 export function getSmartFolderId(axis: AxisId): string {
@@ -63,7 +58,6 @@ const PREFIX_ICONS: Record<string, IconName> = {
 };
 
 const BUILTIN_AXIS_ICONS: Record<string, IconName> = {
-  home: "home",
   tag: "filter",
   year: "refresh",
   all: "gridS",

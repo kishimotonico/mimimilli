@@ -188,7 +188,7 @@ function toSuspenseWorksResult(
  * このフックは一覧を取得しない。
  */
 export function useLibrarySupportingQueries(nav: LibraryViewState) {
-  // 件数バッジ（libraryTotal）とホームビューの統計表示を兼ねる。
+  // 件数バッジ（libraryTotal）と軸レール下部のライブラリ統計表示を兼ねる。
   const libraryStatsQuery = useQuery(libraryTotalQueryOptions);
   const facetAxis = getFacetAxisForQuery(nav.activeAxis);
   const facetQuery = useAxisFacetsQuery(facetAxis, nav.selectedTags);
@@ -210,7 +210,7 @@ export function useLibrarySupportingQueries(nav: LibraryViewState) {
 
   return {
     libraryTotal: libraryStatsQuery.data?.total,
-    homeStats: computeCollectionStatsDisplay(
+    libraryStats: computeCollectionStatsDisplay(
       libraryStatsQuery.isLoading,
       libraryStatsQuery.isError,
       libraryStatsQuery.data?.total,

@@ -1,9 +1,11 @@
 ---
 id: TASK-302
 title: ホーム軸を削除しライブラリ統計を軸レール下部へ移設する
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude-sonnet'
 created_date: '2026-08-11 09:51'
+updated_date: '2026-08-11 10:20'
 labels: []
 dependencies: []
 ordinal: 312000
@@ -17,9 +19,9 @@ DRAFT-52(ビュー軸再編)より。ホーム軸は実質使われていない�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 軸レールからホームが消え、/library/home を開くとデフォルト軸(すべての作品)で表示される
-- [ ] #2 どの軸でも作品未選択時は右ペインなしの既存レイアウトに一本化されている
-- [ ] #3 ライブラリ統計(作品数・トラック数・合計時間)が軸レール下部に常時表示される
-- [ ] #4 DiscoveryDashboardとhome分岐の残骸コードが削除されている
-- [ ] #5 pnpm test:smoke が通る
+- [x] #1 軸レールからホームが消え、/library/home を開くとデフォルト軸(すべての作品)で表示される
+- [x] #2 どの軸でも作品未選択時は右ペインなしの既存レイアウトに一本化されている
+- [x] #3 ライブラリ統計(作品数・トラック数・合計時間)が軸レール下部に常時表示される
+- [x] #4 DiscoveryDashboardとhome分岐の残骸コードが削除されている
+- [x] #5 pnpm test:smoke が通る
 <!-- AC:END -->

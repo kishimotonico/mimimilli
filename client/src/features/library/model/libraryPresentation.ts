@@ -27,7 +27,7 @@ export { computeResultsPaneKind } from "../../../entities/library/resultsPane";
 // 直接importする。
 
 /** グリッド／リストの決定は libraryViewModeAtom のみに依存する（ADR-0012 §3・§5）。
- *  works（作品一覧）・value-list（値一覧）の両方がグリッド表示に従う。home はグリッド概念を持たない。 */
+ *  works（作品一覧）・value-list（値一覧）の両方がグリッド表示に従う。 */
 export function isGridViewActive(axis: AxisId, viewMode: ViewMode): boolean {
   const kind = computeResultsPaneKind(axis);
   return (kind === "works" || kind === "value-list") && viewMode === "grid";

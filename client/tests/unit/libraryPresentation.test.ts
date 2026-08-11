@@ -17,9 +17,6 @@ import {
 } from "../../src/features/library/model/libraryPresentation";
 
 describe("computeResultsPaneKind", () => {
-  it("home 軸は home", () => {
-    expect(computeResultsPaneKind("home")).toBe("home");
-  });
   it("facet 軸（prefix・year）は value-list", () => {
     expect(computeResultsPaneKind("circle")).toBe("value-list");
     expect(computeResultsPaneKind("year")).toBe("value-list");
@@ -42,9 +39,6 @@ describe("isGridViewActive", () => {
     expect(isGridViewActive("circle", "list")).toBe(false);
     expect(isGridViewActive("circle", "grid")).toBe(true);
     expect(isGridViewActive("tag", "grid")).toBe(true);
-  });
-  it("home 種の結果面はグリッド概念を持たない", () => {
-    expect(isGridViewActive("home", "grid")).toBe(false);
   });
 });
 
@@ -71,17 +65,6 @@ describe("buildWorksParams", () => {
     expect(
       buildWorksParams({
         activeAxis: "smart-abc",
-        sort: "added-desc",
-        searchQuery: "",
-        selectedTags: [],
-      }),
-    ).toBeNull();
-  });
-
-  it("returns null for the home axis (dashboard has its own queries)", () => {
-    expect(
-      buildWorksParams({
-        activeAxis: "home",
         sort: "added-desc",
         searchQuery: "",
         selectedTags: [],
@@ -209,10 +192,9 @@ describe("getFacetAxisForQuery", () => {
     expect(getFacetAxisForQuery("circle")).toBe("circle");
     expect(getFacetAxisForQuery("tag")).toBe("tag");
   });
-  it("returns null for view/smart/home axes", () => {
+  it("returns null for view/smart axes", () => {
     expect(getFacetAxisForQuery("all")).toBeNull();
     expect(getFacetAxisForQuery("smart-abc")).toBeNull();
-    expect(getFacetAxisForQuery("home")).toBeNull();
   });
 });
 
