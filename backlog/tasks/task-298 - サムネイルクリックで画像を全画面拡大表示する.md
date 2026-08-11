@@ -1,7 +1,7 @@
 ---
 id: TASK-298
 title: サムネイルクリックで画像を全画面拡大表示する
-status: In Progress
+status: Done
 assignee:
   - '@sonnet'
 created_date: '2026-08-10 19:00'

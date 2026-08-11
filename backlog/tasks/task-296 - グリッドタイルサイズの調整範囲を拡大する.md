@@ -1,7 +1,7 @@
 ---
 id: TASK-296
 title: グリッドタイルサイズの調整範囲を拡大する
-status: In Progress
+status: Done
 assignee:
   - '@sonnet'
 created_date: '2026-08-10 18:59'

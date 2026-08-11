@@ -1,7 +1,7 @@
 ---
 id: TASK-294
 title: ライブラリ画面の件数表示を整理する
-status: In Progress
+status: Done
 assignee:
   - '@sonnet'
 created_date: '2026-08-10 18:59'

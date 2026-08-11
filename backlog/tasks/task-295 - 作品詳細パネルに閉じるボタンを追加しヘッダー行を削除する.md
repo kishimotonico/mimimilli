@@ -1,7 +1,7 @@
 ---
 id: TASK-295
 title: 作品詳細パネルに閉じるボタンを追加しヘッダー行を削除する
-status: In Progress
+status: Done
 assignee:
   - '@sonnet'
 created_date: '2026-08-10 18:59'
