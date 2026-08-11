@@ -255,11 +255,12 @@ describe("スマートフォルダー軸への保持中フィルタの適用", (
     );
 
     await waitFor(() => expect(result.current.works.length).toBeGreaterThan(0));
-    expect(smartFolderCallUrls(fetchMock)).toHaveLength(1);
+    await waitFor(() => expect(queryClient.isFetching()).toBe(0));
+    fetchMock.mockClear();
 
     rerender({ ...baseNav, selectedTags: ["cv/藤田茜"] });
 
-    await waitFor(() => expect(smartFolderCallUrls(fetchMock)).toHaveLength(2));
-    expect(smartFolderCallUrls(fetchMock).at(-1)).toContain("tags=cv%2F");
+    await waitFor(() => expect(smartFolderCallUrls(fetchMock)).toHaveLength(1));
+    expect(smartFolderCallUrls(fetchMock)[0]).toContain("tags=cv%2F");
   });
 });
