@@ -9,14 +9,13 @@ import type { AxisId } from "./types";
 import type { IconName } from "../../shared/ui/Icon";
 
 // 軸レールの単純ビュー（GET /works の view パラメータに対応）
-const VIEW_AXIS_IDS = ["all", "recent", "added", "fav", "unplayed", "missing"] as const;
+const VIEW_AXIS_IDS = ["all", "recent", "added", "fav", "missing"] as const;
 
 const VIEW_AXIS_LABELS: Record<string, string> = {
   all: "すべての作品",
   recent: "最近再生",
   added: "最近追加",
   fav: "お気に入り",
-  unplayed: "未再生",
   missing: "ファイル欠損",
 };
 
@@ -71,7 +70,6 @@ const BUILTIN_AXIS_ICONS: Record<string, IconName> = {
   recent: "refresh",
   added: "add",
   fav: "star",
-  unplayed: "audio",
   missing: "err",
 };
 

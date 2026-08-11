@@ -184,14 +184,6 @@ test("view: fav はブックマーク済みのみ", () => {
   );
 });
 
-test("view: unplayed は未再生かつ status=ok のみ", () => {
-  const result = applyWorksQuery(WORKS, baseQuery({ view: "unplayed" }));
-  assert.deepEqual(
-    result.items.map((w) => w.id),
-    ["RJ002"],
-  );
-});
-
 test("view: missing は status=missing のみ", () => {
   const result = applyWorksQuery(WORKS, baseQuery({ view: "missing" }));
   assert.deepEqual(
@@ -343,7 +335,6 @@ test("ページング: 検索・タグAND/OR・year擬似タグ・viewでもペ�
     ["year擬似タグ", { tags: tf(`@year/${new Date().getFullYear()}`) }],
     ["view:fav", { view: "fav" }],
     ["view:missing", { view: "missing" }],
-    ["view:unplayed", { view: "unplayed" }],
     ["view:recent", { view: "recent" }],
   ];
   for (const [label, query] of cases) {

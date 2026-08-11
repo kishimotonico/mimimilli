@@ -9,7 +9,6 @@ export const RESERVED_AXIS_IDS = [
   "recent",
   "added",
   "fav",
-  "unplayed",
   "missing",
   "tag",
   "year",

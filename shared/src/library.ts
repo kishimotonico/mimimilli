@@ -31,7 +31,7 @@ export function createRandomSeed(): number {
 // ── ビュー・分類軸 ────────────────────────────────────────────
 
 /** 軸レールのビュー（単純ビュー） */
-export const viewIdSchema = z.enum(["all", "recent", "added", "fav", "unplayed", "missing"]);
+export const viewIdSchema = z.enum(["all", "recent", "added", "fav", "missing"]);
 export type ViewId = z.infer<typeof viewIdSchema>;
 
 /** 分類軸の ID（ADR-0005）。enum ではなく文字列:

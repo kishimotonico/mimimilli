@@ -195,9 +195,6 @@ export function viewConditions(view: WorksQuery["view"]): {
     case "fav":
       conditions.push("work_states.bookmarked = 1");
       break;
-    case "unplayed":
-      conditions.push("work_states.last_played_at IS NULL AND works.status = 'ok'");
-      break;
     case "missing":
       conditions.push("works.status = 'missing'");
       break;

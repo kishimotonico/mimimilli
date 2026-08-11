@@ -157,7 +157,6 @@ test("core参照実装とreal SQLは固定例・生成クエリで同値", () =>
       baseQuery({ view: "fav" }),
       baseQuery({ view: "recent" }),
       baseQuery({ view: "added" }),
-      baseQuery({ view: "unplayed" }),
       baseQuery({ view: "missing" }),
       baseQuery({ page: 2, limit: 7 }),
       baseQuery({ page: 99, limit: 7 }),
@@ -198,7 +197,7 @@ test("core参照実装とreal SQLは固定例・生成クエリで同値", () =>
       "rj9999999",
     ];
     const tagFilters = [[], ["ASMR"], ["cv/水瀬なずな"], ["催眠", "添い寝"]];
-    const views = [undefined, "all", "recent", "added", "fav", "unplayed", "missing"] as const;
+    const views = [undefined, "all", "recent", "added", "fav", "missing"] as const;
     // year擬似タグ（@year/...）は実タグと混在してtagsへ渡る（ADR-0012 §2）。生成テストでも
     // 単独・実タグとの組み合わせの両方を織り交ぜる
     const yearPool = [recent.slice(0, 4), old.slice(0, 4), "1999"];

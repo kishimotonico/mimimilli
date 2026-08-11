@@ -51,7 +51,7 @@ describe("axisDefinitions", () => {
 
   it("buildViewAxisRows returns view axis rows from centralized definitions", () => {
     const rows = buildViewAxisRows();
-    expect(rows.map((r) => r.id)).toEqual(["all", "recent", "added", "fav", "unplayed", "missing"]);
+    expect(rows.map((r) => r.id)).toEqual(["all", "recent", "added", "fav", "missing"]);
     expect(rows[0]).toEqual({ id: "all", name: "すべての作品", icon: "gridS" });
     expect(rows.find((r) => r.id === "fav")).toEqual({
       id: "fav",
