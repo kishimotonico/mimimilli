@@ -15,6 +15,8 @@ import {
 import AxisQuickOverlay from "./AxisQuickOverlay";
 import { I, type IconName } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
+import { formatDuration } from "../../../shared/lib/format";
+import type { CollectionStatsDisplay } from "../model/libraryPresentation";
 import {
   deriveValueSelectionHandlers,
   type ValueSelectionIntent,
@@ -28,13 +30,15 @@ interface AxisRow {
   isAction?: boolean;
 }
 
-const HOME_AXIS: AxisRow = { id: "home", name: "ホーム", icon: "home" };
-
 interface AxisColumnProps {
   activeAxis: AxisId;
   tagPrefixes: TagPrefix[];
   smartFolders: SmartFolder[];
   selectedTags: NormalizedTag[];
+  /** エラービュー（status !== "ok"）の件数。0またはundefined（未取得）の間は軸レールから隠す */
+  errorViewCount?: number;
+  /** ライブラリ全体の統計。軸レール下部に常時表示する */
+  stats: CollectionStatsDisplay;
   /** 分類軸の元になる GET /tag-prefixes の取得失敗。無言でCV/サークル等の行が
    *  消えるのを防ぎ、分類軸グループにエラー行を出す */
   isTagPrefixesError?: boolean;
@@ -105,6 +109,8 @@ export default function AxisColumn({
   tagPrefixes,
   smartFolders,
   selectedTags,
+  errorViewCount,
+  stats,
   isTagPrefixesError,
   onSelectAxis,
   onToggleTag,
@@ -113,7 +119,9 @@ export default function AxisColumn({
   onNewSmartFolder,
   onRetryTagPrefixes,
 }: AxisColumnProps) {
-  const viewAxisRows = buildViewAxisRows();
+  const viewAxisRows = buildViewAxisRows()
+    .filter((ax) => ax.id !== "error" || !!errorViewCount)
+    .map((ax) => (ax.id === "error" ? { ...ax, badge: errorViewCount } : ax));
   const facetAxisRows = buildFacetAxisRows(tagPrefixes);
   const {
     openKey: overlayAxis,
@@ -159,8 +167,6 @@ export default function AxisColumn({
   return (
     <div className="mle-col is-axis">
       <div className="mle-col__list">
-        <div className="mll-axisgroup">{renderRow(HOME_AXIS)}</div>
-
         <div className="mll-axisgroup">
           <div className="mll-axisgroup__hd">ビュー</div>
           {viewAxisRows.map(renderRow)}
@@ -195,6 +201,14 @@ export default function AxisColumn({
           </button>
         </div>
       </div>
+
+      {stats.status === "ready" && (
+        <div className="mll-axisfoot">
+          {stats.count}作品 · {stats.trackCount}トラック ·{" "}
+          {formatDuration(stats.durationSec) ?? "0:00"}
+        </div>
+      )}
+      {stats.status === "error" && <div className="mll-axisfoot">統計の取得に失敗しました</div>}
 
       <AnimatePresence>
         {overlayAxis && ownerToken && (

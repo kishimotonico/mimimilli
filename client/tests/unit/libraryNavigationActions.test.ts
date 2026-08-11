@@ -141,15 +141,6 @@ describe("置き換え選択は作品一覧へ進み、AND追加は現在地に�
     expect(store.get(selectedTagsAtom)).toEqual(["cv/藤田茜"]);
   });
 
-  it("replaceLibraryTagAtom: ホーム軸から選んでも作品一覧（all）へ切り替わる", () => {
-    const store = createStore();
-    store.set(activeAxisAtom, "home");
-
-    store.set(replaceLibraryTagAtom, nt("cv/藤田茜"));
-
-    expect(store.get(activeAxisAtom)).toBe("all");
-  });
-
   it("replaceLibraryTagAtom: 既に作品一覧（ビュー軸）ならそのまま維持する", () => {
     const store = createStore();
     store.set(activeAxisAtom, "recent");

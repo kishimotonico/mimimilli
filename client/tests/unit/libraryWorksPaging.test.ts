@@ -9,6 +9,7 @@ import { Provider as JotaiProvider, createStore } from "jotai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WORKS_DEFAULT_PAGE_SIZE } from "@mimimilli/shared";
 import { useSuspenseNormalLibraryWorks } from "../../src/features/library/model/useLibraryQueries";
+import { randomSeedAtom } from "../../src/entities/library/model/navigationAtoms";
 import type { LibraryViewState } from "../../src/features/library/model/useLibraryNavigation";
 import type { WorkListItem } from "@mimimilli/shared";
 
@@ -91,7 +92,11 @@ function worksCallUrls(fetchMock: ReturnType<typeof createFetchMock>): string[] 
     .filter((u) => u.startsWith("/api/works"));
 }
 
-function renderWorks(nav: LibraryViewState, initialQuery = "") {
+function renderWorks(
+  nav: LibraryViewState,
+  initialQuery = "",
+  store: ReturnType<typeof createStore> = createStore(),
+) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -101,7 +106,7 @@ function renderWorks(nav: LibraryViewState, initialQuery = "") {
       { client: queryClient },
       createElement(
         JotaiProvider,
-        { store: createStore() },
+        { store },
         createElement(Suspense, { fallback: null }, children),
       ),
     );
@@ -183,5 +188,57 @@ describe("ライブラリ works 一覧のページング", () => {
     const page2Urls = worksCallUrls(fetchMock).filter((u) => u.includes("page=2"));
     expect(page2Urls).toHaveLength(1);
     expect(page2Urls[0]).toContain("seed=42195");
+  });
+
+  it("random ソート時、page=1 のリクエストに randomSeedAtom の値を送る（TASK-305）", async () => {
+    fetchMock = createFetchMock({ total: WORKS_DEFAULT_PAGE_SIZE, randomSeed: 999 });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const store = createStore();
+    store.set(randomSeedAtom, 12_345);
+    const nav: LibraryViewState = { ...baseNav, sort: "random" };
+    const { result } = renderWorks(nav, "", store);
+
+    await waitFor(() => expect(result.current.works).toHaveLength(WORKS_DEFAULT_PAGE_SIZE));
+
+    const page1Urls = worksCallUrls(fetchMock).filter((u) => u.includes("page=1"));
+    expect(page1Urls[0]).toContain("seed=12345");
+  });
+
+  it("random ソート時、randomSeedAtom を変えるとqueryKeyが変わり別クエリとして再取得する（再シャッフル、TASK-305）", async () => {
+    fetchMock = createFetchMock({ total: WORKS_DEFAULT_PAGE_SIZE, randomSeed: 999 });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const store = createStore();
+    store.set(randomSeedAtom, 111);
+    const nav: LibraryViewState = { ...baseNav, sort: "random" };
+    const { result, rerender } = renderHook(() => useSuspenseNormalLibraryWorks(nav, ""), {
+      wrapper: ({ children }: { children: ReactNode }) =>
+        createElement(
+          QueryClientProvider,
+          { client: new QueryClient({ defaultOptions: { queries: { retry: false } } }) },
+          createElement(
+            JotaiProvider,
+            { store },
+            createElement(Suspense, { fallback: null }, children),
+          ),
+        ),
+    });
+
+    await waitFor(() => expect(result.current.works).toHaveLength(WORKS_DEFAULT_PAGE_SIZE));
+    const urlsBefore = worksCallUrls(fetchMock).filter((u) => u.includes("page=1"));
+    expect(urlsBefore.at(-1)).toContain("seed=111");
+
+    act(() => {
+      store.set(randomSeedAtom, 222);
+    });
+    rerender();
+
+    await waitFor(() => {
+      const urls = worksCallUrls(fetchMock).filter(
+        (u) => u.includes("page=1") && u.includes("seed=222"),
+      );
+      expect(urls.length).toBeGreaterThan(0);
+    });
   });
 });

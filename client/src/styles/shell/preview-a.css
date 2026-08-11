@@ -2,8 +2,6 @@
    所有範囲: 作品詳細プレビューペイン(.mle-prv、Library/Files共通で使われる詳細面)。
    ヘッダー・ヒーロー・カバー・メタ・タグ・アクション・再生スプリットボタン・警告・
    トラック一覧(.mle-prv__*)。
-   preview系はpreview-a・preview-bの2ファイルに分かれている（library の smart folder
-   区画が間に挟まるため）。
    import順: files-b.cssの次、shared-b.cssより前。 */
 
 /* ── Preview pane ─────────────────────────────────────────── */

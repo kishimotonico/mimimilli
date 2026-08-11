@@ -141,10 +141,8 @@ function filterByView(works: WorkSummary[], view: WorksQuery["view"]): WorkSumma
     }
     case "fav":
       return works.filter((work) => work.bookmarked);
-    case "unplayed":
-      return works.filter((work) => !work.lastPlayedAt && work.status === "ok");
-    case "missing":
-      return works.filter((work) => work.status === "missing");
+    case "error":
+      return works.filter((work) => work.status !== "ok");
     case "all":
     case undefined:
       return works;

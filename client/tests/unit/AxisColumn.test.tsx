@@ -28,6 +28,7 @@ function renderAxisColumn(props: Partial<React.ComponentProps<typeof AxisColumn>
           onToggleTag={vi.fn()}
           onReplaceTag={vi.fn()}
           onAddTag={vi.fn()}
+          stats={{ status: "loading" }}
           {...props}
         />
       </div>
@@ -36,6 +37,20 @@ function renderAxisColumn(props: Partial<React.ComponentProps<typeof AxisColumn>
 }
 
 describe("AxisColumn", () => {
+  it("ライブラリ統計を軸レール下部に常時表示する", () => {
+    renderAxisColumn({
+      stats: { status: "ready", count: 12, trackCount: 34, durationSec: 3661 },
+    });
+
+    expect(screen.getByText(/12作品.*34トラック/)).toBeTruthy();
+  });
+
+  it("統計取得に失敗した場合はエラー文言を表示する", () => {
+    renderAxisColumn({ stats: { status: "error" } });
+
+    expect(screen.getByText("統計の取得に失敗しました")).toBeTruthy();
+  });
+
   it("選択中のビュー項目に aria-current を付与する", () => {
     renderAxisColumn({
       activeAxis: "fav",

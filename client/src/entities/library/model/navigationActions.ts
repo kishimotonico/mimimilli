@@ -1,9 +1,20 @@
 import { atom } from "jotai";
-import { isBuiltinPseudoTagAxis, parseBuiltinAxisTag, type NormalizedTag } from "@mimimilli/shared";
+import {
+  createRandomSeed,
+  isBuiltinPseudoTagAxis,
+  parseBuiltinAxisTag,
+  type NormalizedTag,
+} from "@mimimilli/shared";
 import { requestNavigationHistoryCommit } from "../../../shared/model/navigationHistoryCommit";
 import { computeResultsPaneKind } from "../resultsPane";
 import type { AxisId, SortId } from "../types";
-import { activeAxisAtom, selectedTagsAtom, selectedWorkIdAtom, sortAtom } from "./navigationAtoms";
+import {
+  activeAxisAtom,
+  randomSeedAtom,
+  selectedTagsAtom,
+  selectedWorkIdAtom,
+  sortAtom,
+} from "./navigationAtoms";
 
 export const setLibraryAxisAtom = atom(null, (_get, set, axis: AxisId) => {
   requestNavigationHistoryCommit(set, "push");
@@ -74,6 +85,10 @@ export const selectLibraryWorkAtom = atom(null, (get, set, id: string | null) =>
 export const setLibrarySortAtom = atom(null, (_get, set, sort: SortId) => {
   requestNavigationHistoryCommit(set, "replace");
   set(sortAtom, sort);
+});
+
+export const reshuffleLibraryRandomSeedAtom = atom(null, (_get, set) => {
+  set(randomSeedAtom, createRandomSeed());
 });
 
 export const goToLibrarySegmentAtom = atom(null, (get, set, index: number) => {

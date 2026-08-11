@@ -9,21 +9,19 @@ import type { AxisId } from "./types";
 import type { IconName } from "../../shared/ui/Icon";
 
 // 軸レールの単純ビュー（GET /works の view パラメータに対応）
-const VIEW_AXIS_IDS = ["all", "recent", "added", "fav", "unplayed", "missing"] as const;
+const VIEW_AXIS_IDS = ["all", "recent", "added", "fav", "error"] as const;
 
 const VIEW_AXIS_LABELS: Record<string, string> = {
   all: "すべての作品",
   recent: "最近再生",
   added: "最近追加",
   fav: "お気に入り",
-  unplayed: "未再生",
-  missing: "ファイル欠損",
+  error: "エラー",
 };
 
 const BUILTIN_AXIS_LABELS: Record<string, string> = {
   tag: "タグ",
   year: "追加日",
-  home: "ホーム",
 };
 
 export const VIEW_AXES = new Set<string>(VIEW_AXIS_IDS);
@@ -36,12 +34,8 @@ export function isSmartAxis(axis: AxisId): boolean {
   return axis.startsWith("smart-");
 }
 
-export function isHomeAxis(axis: AxisId): boolean {
-  return axis === "home";
-}
-
 export function isFacetAxis(axis: AxisId): boolean {
-  return !isViewAxis(axis) && axis !== "tag" && !isHomeAxis(axis) && !isSmartAxis(axis);
+  return !isViewAxis(axis) && axis !== "tag" && !isSmartAxis(axis);
 }
 
 export function getSmartFolderId(axis: AxisId): string {
@@ -64,15 +58,13 @@ const PREFIX_ICONS: Record<string, IconName> = {
 };
 
 const BUILTIN_AXIS_ICONS: Record<string, IconName> = {
-  home: "home",
   tag: "filter",
   year: "refresh",
   all: "gridS",
   recent: "refresh",
   added: "add",
   fav: "star",
-  unplayed: "audio",
-  missing: "err",
+  error: "err",
 };
 
 export function getAxisIcon(axis: AxisId): IconName {

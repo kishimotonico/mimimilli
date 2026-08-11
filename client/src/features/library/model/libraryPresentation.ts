@@ -27,7 +27,7 @@ export { computeResultsPaneKind } from "../../../entities/library/resultsPane";
 // 直接importする。
 
 /** グリッド／リストの決定は libraryViewModeAtom のみに依存する（ADR-0012 §3・§5）。
- *  works（作品一覧）・value-list（値一覧）の両方がグリッド表示に従う。home はグリッド概念を持たない。 */
+ *  works（作品一覧）・value-list（値一覧）の両方がグリッド表示に従う。 */
 export function isGridViewActive(axis: AxisId, viewMode: ViewMode): boolean {
   const kind = computeResultsPaneKind(axis);
   return (kind === "works" || kind === "value-list") && viewMode === "grid";
@@ -67,6 +67,8 @@ interface WorksParamsInput {
   sort: SortId;
   searchQuery: string;
   selectedTags: NormalizedTag[];
+  /** sort="random" のときだけ使う。呼び出し側の randomSeedAtom 由来 */
+  randomSeed?: number;
 }
 
 /** selectedTagsAtom（組み込み軸の擬似タグ混じり）を works query の tags フィールドへ変換する。
@@ -86,7 +88,7 @@ function buildTagFilterParams(selectedTags: NormalizedTag[]): TagFilterParams {
 /** works 種の結果面（ビュー軸・スマートフォルダー軸）以外は works query を発行しない。
  *  スマートフォルダーは別 query（evalSmartFolder）で取得する。 */
 export function buildWorksParams(input: WorksParamsInput): WorksQueryInput | null {
-  const { activeAxis, sort, searchQuery, selectedTags } = input;
+  const { activeAxis, sort, searchQuery, selectedTags, randomSeed } = input;
   if (computeResultsPaneKind(activeAxis) !== "works" || isSmartAxis(activeAxis)) return null;
 
   const p: WorksQueryInput = { sort, ...buildTagFilterParams(selectedTags) };
@@ -94,6 +96,7 @@ export function buildWorksParams(input: WorksParamsInput): WorksQueryInput | nul
   if (isViewAxis(activeAxis) && activeAxis !== "all") {
     p.view = activeAxis as WorksQueryInput["view"];
   }
+  if (sort === "random" && randomSeed !== undefined) p.seed = randomSeed;
   return p;
 }
 
@@ -127,7 +130,7 @@ export function buildAxisFacetFilterParams(
 
 /**
  * 検索語やタグフィルタが原因で作品一覧が0件になっているかどうか。
- * fav/unplayed 等が本来的に0件のケースとは区別し、原因表示が必要な場合だけ案内する。
+ * fav 等が本来的に0件のケースとは区別し、原因表示が必要な場合だけ案内する。
  *
  * 検索デバウンス後に queryKey が変わった直後は、新クエリが確定するまで
  * works が一時的に空配列になる（isLoading中）。この間を「絞り込みで0件」と

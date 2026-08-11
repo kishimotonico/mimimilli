@@ -29,15 +29,15 @@ describe("buildEmptyWorksHint", () => {
     expect(buildEmptyWorksHint("fav", false)).toBe("作品詳細の☆ボタンでお気に入りに追加できます");
   });
 
-  it("adds context for missing view when not filtered", () => {
-    expect(buildEmptyWorksHint("missing", false)).toBe(
-      "元ファイルが見つからない作品はここに表示されます",
+  it("adds context for error view when not filtered", () => {
+    expect(buildEmptyWorksHint("error", false)).toBe(
+      "元ファイルが見つからない・メタデータの読み込みに失敗した作品はここに表示されます",
     );
   });
 
   it("omits hint when the empty state is due to a filter (search/tags)", () => {
     expect(buildEmptyWorksHint("fav", true)).toBeUndefined();
-    expect(buildEmptyWorksHint("missing", true)).toBeUndefined();
+    expect(buildEmptyWorksHint("error", true)).toBeUndefined();
   });
 
   it("omits hint for axes without a specific context", () => {

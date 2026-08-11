@@ -20,7 +20,7 @@ describe("axisDefinitions", () => {
     expect(isViewAxis("all")).toBe(true);
     expect(isViewAxis("fav")).toBe(true);
     expect(isViewAxis("サークル")).toBe(false);
-    expect(VIEW_AXES.has("missing")).toBe(true);
+    expect(VIEW_AXES.has("error")).toBe(true);
   });
 
   it("classifies facet axes: view・tag・smart 以外はすべてファセット軸（ADR-0005）", () => {
@@ -51,7 +51,7 @@ describe("axisDefinitions", () => {
 
   it("buildViewAxisRows returns view axis rows from centralized definitions", () => {
     const rows = buildViewAxisRows();
-    expect(rows.map((r) => r.id)).toEqual(["all", "recent", "added", "fav", "unplayed", "missing"]);
+    expect(rows.map((r) => r.id)).toEqual(["all", "recent", "added", "fav", "error"]);
     expect(rows[0]).toEqual({ id: "all", name: "すべての作品", icon: "gridS" });
     expect(rows.find((r) => r.id === "fav")).toEqual({
       id: "fav",

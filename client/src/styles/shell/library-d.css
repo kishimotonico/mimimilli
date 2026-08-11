@@ -121,6 +121,15 @@
   color: var(--ink-3);
   font-size: 11px;
 }
+/* ライブラリ統計フッター。軸レール最下部（.mle-col__listの外）に常時表示する */
+.mll-axisfoot {
+  flex-shrink: 0;
+  padding: 8px 10px;
+  border-top: 1px solid var(--line-soft);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-3);
+}
 
 /* ── Work rows (mll-wrow / mll-erow) ─────────────────────── */
 

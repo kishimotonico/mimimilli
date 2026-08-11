@@ -23,7 +23,7 @@ interface WorksResult {
 }
 
 // LibraryWorksBoundary は「作品一覧を表示する結果面」（ビュー軸・スマートフォルダー軸）
-// でのみ使う。facet/tag 軸の値一覧・home 軸は works query 自体を発行しないため、
+// でのみ使う。facet/tag 軸の値一覧は works query 自体を発行しないため、
 // 呼び出し側（LibraryView）でこの境界に入らない。
 
 interface Props {

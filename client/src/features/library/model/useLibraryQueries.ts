@@ -9,6 +9,8 @@ import {
   useSuspenseInfiniteQuery,
   type UseMutationResult,
 } from "@tanstack/react-query";
+import { useAtomValue } from "jotai";
+import { randomSeedAtom } from "../../../entities/library/model/navigationAtoms";
 import {
   WORKS_DEFAULT_PAGE_SIZE,
   type NormalizedTag,
@@ -82,6 +84,7 @@ const SEARCH_DEBOUNCE_MS = 250;
  * 型チェックの時点で検知できる。
  */
 import { libraryTotalQueryOptions } from "../../../entities/work/libraryTotalQueryOptions";
+import { errorViewCountQueryOptions } from "../../../entities/work/errorViewCountQueryOptions";
 interface WorksPageParam {
   page: number;
   seed: number | undefined;
@@ -99,11 +102,13 @@ function getNextWorksPageParam(
 
 /** Suspense 境界配下でのみ使う通常作品一覧。親で enabled を切り替えない。 */
 export function useSuspenseNormalLibraryWorks(nav: LibraryViewState, searchQuery: string) {
+  const randomSeed = useAtomValue(randomSeedAtom);
   const worksParams = buildWorksParams({
     activeAxis: nav.activeAxis,
     sort: nav.sort,
     searchQuery,
     selectedTags: nav.selectedTags,
+    randomSeed,
   });
   // 呼び出し側は通常軸だけをマウントする。スマート軸は専用の子コンポーネントが担当する。
   const normalWorksParams = worksParams!;
@@ -120,7 +125,7 @@ export function useSuspenseNormalLibraryWorks(nav: LibraryViewState, searchQuery
         },
         { signal },
       ),
-    initialPageParam: { page: 1, seed: undefined } as WorksPageParam,
+    initialPageParam: { page: 1, seed: normalWorksParams.seed } as WorksPageParam,
     getNextPageParam: getNextWorksPageParam,
   });
   return toSuspenseWorksResult(query, normalWorksParams);
@@ -188,8 +193,9 @@ function toSuspenseWorksResult(
  * このフックは一覧を取得しない。
  */
 export function useLibrarySupportingQueries(nav: LibraryViewState) {
-  // 件数バッジ（libraryTotal）とホームビューの統計表示を兼ねる。
+  // 件数バッジ（libraryTotal）と軸レール下部のライブラリ統計表示を兼ねる。
   const libraryStatsQuery = useQuery(libraryTotalQueryOptions);
+  const errorViewCountQuery = useQuery(errorViewCountQueryOptions);
   const facetAxis = getFacetAxisForQuery(nav.activeAxis);
   const facetQuery = useAxisFacetsQuery(facetAxis, nav.selectedTags);
   const smartFoldersQuery = useQuery({
@@ -210,7 +216,8 @@ export function useLibrarySupportingQueries(nav: LibraryViewState) {
 
   return {
     libraryTotal: libraryStatsQuery.data?.total,
-    homeStats: computeCollectionStatsDisplay(
+    errorViewCount: errorViewCountQuery.data?.total,
+    libraryStats: computeCollectionStatsDisplay(
       libraryStatsQuery.isLoading,
       libraryStatsQuery.isError,
       libraryStatsQuery.data?.total,
@@ -232,6 +239,7 @@ export function useLibrarySupportingQueries(nav: LibraryViewState) {
 
 function useWorkPatchMutationContext(nav: LibraryViewState, searchQuery: string) {
   const queryClient = useQueryClient();
+  const randomSeed = useAtomValue(randomSeedAtom);
   const debouncedSearchQuery = useDebouncedValue(
     searchQuery,
     SEARCH_DEBOUNCE_MS,
@@ -242,6 +250,7 @@ function useWorkPatchMutationContext(nav: LibraryViewState, searchQuery: string)
     sort: nav.sort,
     searchQuery: debouncedSearchQuery,
     selectedTags: nav.selectedTags,
+    randomSeed,
   });
 
   const applyPatchSuccess = async (

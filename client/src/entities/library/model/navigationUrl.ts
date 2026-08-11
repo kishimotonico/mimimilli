@@ -84,7 +84,8 @@ function isSafeRelativeSegment(value: string): boolean {
 }
 
 function parseAxis(value: string): AxisId | null {
-  if (isViewAxis(value as AxisId) || value === "tag" || value === "home") return value;
+  if (value === "home") return null;
+  if (isViewAxis(value as AxisId) || value === "tag") return value;
   if (value.startsWith("smart-")) {
     return value.length > "smart-".length ? value : null;
   }

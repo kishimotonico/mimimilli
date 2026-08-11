@@ -19,7 +19,7 @@ export function buildEmptyWorksMessage(searchQuery: string, hasSelectedTags: boo
   return "作品が見つかりません";
 }
 
-/** 絞り込みが原因ではない0件時、軸ごとの文脈を1行添える（fav/missing など）。
+/** 絞り込みが原因ではない0件時、軸ごとの文脈を1行添える（fav/error など）。
  *  該当する軸がなければ undefined（メッセージのみで案内は足さない）。 */
 export function buildEmptyWorksHint(
   activeAxis: AxisId,
@@ -27,6 +27,7 @@ export function buildEmptyWorksHint(
 ): string | undefined {
   if (isEmptyDueToFilter) return undefined;
   if (activeAxis === "fav") return "作品詳細の☆ボタンでお気に入りに追加できます";
-  if (activeAxis === "missing") return "元ファイルが見つからない作品はここに表示されます";
+  if (activeAxis === "error")
+    return "元ファイルが見つからない・メタデータの読み込みに失敗した作品はここに表示されます";
   return undefined;
 }

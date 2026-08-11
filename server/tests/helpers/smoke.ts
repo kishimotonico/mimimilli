@@ -25,8 +25,8 @@ console.log(
 console.log("== scan ==", JSON.stringify(await json("/api/scan", { method: "POST" })));
 const works = await json("/api/works?sort=title-asc");
 console.log("== works ==", JSON.stringify(works.body, null, 1).slice(0, 1200));
-const errWork = await json("/api/works?view=missing");
-console.log("== missing view ==", JSON.stringify(errWork.body));
+const errWork = await json("/api/works?view=error");
+console.log("== error view ==", JSON.stringify(errWork.body));
 console.log("== axes/cv ==", JSON.stringify(await json("/api/axes/cv")));
 console.log(
   "== fs ==",
