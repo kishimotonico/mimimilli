@@ -114,7 +114,9 @@ test("詳細パネル: 再開ボタンが正しいアクセシブル名で表示
   });
   expect(resumeResponse.ok()).toBe(true);
 
-  await page.getByText("夜更けの図書室で囁き朗読", { exact: false }).click();
+  const workTitle = page.getByText("夜更けの図書室で囁き朗読", { exact: false });
+  await expect(workTitle).toBeVisible();
+  await workTitle.click();
 
   const panel = page.locator(".mle-prv");
   // 主ボタンのアクセシブル名は状態を表す短い文言（「続きから再生」）で、

@@ -25,7 +25,8 @@ export default defineConfig({
     // VITE_DISABLE_QUERY_DEVTOOLS: smokeテスト用サーバーではdevtoolsのトグルボタンを
     // 無効化する（TASK-9）
     command: `pnpm exec cross-env MIMIMILLI_MOCK_SCENARIO=new-work VITE_DISABLE_QUERY_DEVTOOLS=1 vite --host 127.0.0.1 --port ${smokePort} --strictPort`,
-    port: smokePort,
+    // ポート開放だけでは Vite 本体と fixture API middleware の初期化完了を保証できない。
+    url: `http://127.0.0.1:${smokePort}/api/settings`,
     reuseExistingServer: false,
     timeout: 120_000,
     gracefulShutdown: { signal: "SIGTERM", timeout: 500 },

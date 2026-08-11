@@ -6,6 +6,8 @@ export const FIXED_NOW = "2026-05-29T00:00:00+09:00";
  *  遷移待ちの揺らぎを減らす。 */
 export async function openApp(page: Page) {
   await page.addInitScript((fixedNow) => {
+    localStorage.clear();
+    sessionStorage.clear();
     const fixedTime = new Date(fixedNow as string).getTime();
     const RealDate = Date;
     class FixedDate extends RealDate {
@@ -23,7 +25,12 @@ export async function openApp(page: Page) {
     window.Date = FixedDate as DateConstructor;
   }, FIXED_NOW);
 
-  await page.goto("/", { waitUntil: "networkidle" });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  const bootTimeout = 20_000;
+  await expect(page.locator(".mll-results").first()).toBeVisible({ timeout: bootTimeout });
+  await expect(
+    page.locator(".mll-results .mle-col.is-results").getByRole("button").first(),
+  ).toBeVisible({ timeout: bootTimeout });
   await page.addStyleTag({
     content: `
       *, *::before, *::after {
