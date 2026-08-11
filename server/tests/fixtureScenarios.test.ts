@@ -3,6 +3,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createApp } from "../src/app.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
+import {
+  createFixtureScenario,
+  LARGE_SCENARIO_WORK_COUNT,
+} from "../src/adapters/fixture/scenarios.ts";
 
 function buildApp(scenario?: string) {
   return createApp(createFixtureAdapter({ scenario }));
@@ -66,6 +70,32 @@ test("errors: エラー・行方不明の作品のみが含まれる", async () 
   }
   const statuses = new Set(items.map((w: { status: string }) => w.status));
   assert.ok(statuses.has("error") || statuses.has("missing"));
+});
+
+test("large: 1000件の作品が生成され、IDが一意でスキーマ検証を通る", async () => {
+  const app = buildApp("large");
+
+  const pages = await Promise.all(
+    [1, 2].map(async (page) => {
+      const res = await app.request(`/api/works?limit=500&page=${page}`);
+      assert.equal(res.status, 200);
+      return res.json();
+    }),
+  );
+  const ids = pages.flatMap((page) => page.items.map((w: { id: string }) => w.id));
+  assert.equal(pages[0].total, LARGE_SCENARIO_WORK_COUNT);
+  assert.equal(ids.length, LARGE_SCENARIO_WORK_COUNT);
+  assert.equal(new Set(ids).size, LARGE_SCENARIO_WORK_COUNT);
+
+  // 手書きシードも先頭に含まれ、詳細取得まで通る（合成メディアの参照元が壊れていない）
+  const detail = await app.request("/api/works/RJ600500");
+  assert.equal(detail.status, 200);
+});
+
+test("large: 生成データが決定的（同じシナリオを2回作っても同一）", () => {
+  const first = createFixtureScenario("large", "2026-08-11T00:00:00.000Z");
+  const second = createFixtureScenario("large", "2026-08-11T00:00:00.000Z");
+  assert.deepEqual(first.works, second.works);
 });
 
 test("不明なシナリオIDはエラーになる（黙って default にフォールバックしない）", () => {

@@ -14,7 +14,7 @@ DLsite/FANZA 等からダウンロードした音声作品（ASMR・ボイスド
 
 構造・境界・データフロー（vite middleware / portless の開発時トポロジー含む）は [docs/ARCHITECTURE.md](ARCHITECTURE.md) を参照。HANDOFF 固有の補足:
 
-- fixture アダプタはシナリオ切替（`MIMIMILLI_MOCK_SCENARIO` = default/empty/new-work/errors）と**合成メディア**（無音WAV・SVGカバー、Range対応）を持つ
+- fixture アダプタはシナリオ切替（`MIMIMILLI_MOCK_SCENARIO` = default/empty/new-work/errors/large）と**合成メディア**（無音WAV・SVGカバー、Range対応）を持つ。`large` は手書きシード11件 + 決定的生成989件の計1000件で、実ライブラリ規模の見え方を確認する用途
 
 ### dev サーバーへの server/src 自動反映
 
@@ -30,7 +30,7 @@ fixture API は `ssrLoadModule` 経由の遅延読み込みで、`server/src`・
 
 ```bash
 # ルートから（fixture アダプタ同居の通常開発）
-pnpm dev            # client 起動。vite middleware が fixture API を /api/* にマウント
+pnpm dev            # client 起動（large シナリオ=1000件）。vite middleware が fixture API を /api/* にマウント
 pnpm check          # shared/server/client の tsc + oxlint + oxfmt --check（これが通れば typecheck/lint/fmt の DoD を満たす）
 pnpm test           # server (Bunランナー + node:test API) + client (vitest)
 pnpm test:server
@@ -40,6 +40,7 @@ pnpm test:smoke          # Playwright スモークテスト（roleベースの�
 # ポートはworktreeの絶対パスをsha256ハッシュ化して4200〜4699の範囲から決定的に導出するため、worktreeごとに一意になる
 
 # fixture シナリオ
+pnpm dev:fixture           # 手書きシードの11件のみ
 pnpm dev:fixture:new-work
 pnpm dev:fixture:empty
 pnpm dev:fixture:errors

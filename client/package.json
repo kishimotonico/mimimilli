@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "cross-env PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run vite",
+    "dev:large": "cross-env MIMIMILLI_MOCK_SCENARIO=large PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run vite",
     "dev:new-work": "cross-env MIMIMILLI_MOCK_SCENARIO=new-work PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run vite",
     "dev:empty": "cross-env MIMIMILLI_MOCK_SCENARIO=empty PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run vite",
     "dev:errors": "cross-env MIMIMILLI_MOCK_SCENARIO=errors PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run vite",

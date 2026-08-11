@@ -1,11 +1,21 @@
 // fixture アダプタのシナリオ（ADR-0002 / client/mocks/scenarios.ts からの移植）。
 // 開発サーバー・Playwright ビジュアルテストでのデータ切替に使う。
 import type { SmartFolder, WorkSummary } from "@mimimilli/shared";
+import { createBulkWorks } from "./bulkData.ts";
 import { createSeedSmartFolders, SEED_WORKS } from "./data.ts";
 
-export type FixtureScenarioId = "default" | "empty" | "new-work" | "errors";
+export type FixtureScenarioId = "default" | "empty" | "new-work" | "errors" | "large";
 
-const SCENARIO_IDS: readonly FixtureScenarioId[] = ["default", "empty", "new-work", "errors"];
+const SCENARIO_IDS: readonly FixtureScenarioId[] = [
+  "default",
+  "empty",
+  "new-work",
+  "errors",
+  "large",
+];
+
+/** "large" シナリオの総作品数（手書きシード + 生成分） */
+export const LARGE_SCENARIO_WORK_COUNT = 1000;
 
 export interface FixtureScenario {
   id: FixtureScenarioId;
@@ -63,6 +73,20 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       rootFolder: "/library",
       lastScanTime: now,
       scanNewWorkIds: ["RJ501011"],
+    };
+  }
+
+  if (id === "large") {
+    return {
+      id,
+      works: [
+        ...cloneWorks(SEED_WORKS),
+        ...createBulkWorks(LARGE_SCENARIO_WORK_COUNT - SEED_WORKS.length),
+      ],
+      smartFolders: cloneSmartFolders(smartFolders),
+      rootFolder: "/library",
+      lastScanTime: now,
+      scanNewWorkIds: [],
     };
   }
 

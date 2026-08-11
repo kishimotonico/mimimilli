@@ -59,11 +59,12 @@ pnpm dev
 # => http://mimi.localhost:1355
 ```
 
-`pnpm dev` は `pnpm dev:fixture` のエイリアスとして、ルートから client を起動する。
+`pnpm dev` は `pnpm dev:fixture:large`（実ライブラリ規模を模した1000件のシナリオ）のエイリアスとして、ルートから client を起動する。
 `vite.config.ts` は server の Hono アプリ（fixture アダプタ注入）を dev middleware として `/api/*` にマウントするため、UI とモック API が同一プロセスで動く。
 代表的な fixture シナリオは、次のコマンドで切り替える。
 
 ```bash
+pnpm dev:fixture           # 手書きシードの11件のみ
 pnpm dev:fixture:new-work
 pnpm dev:fixture:empty
 pnpm dev:fixture:errors
