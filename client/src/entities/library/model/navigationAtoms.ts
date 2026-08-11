@@ -1,5 +1,5 @@
 import { atom } from "jotai";
-import type { NormalizedTag } from "@mimimilli/shared";
+import { createRandomSeed, type NormalizedTag } from "@mimimilli/shared";
 import type { AxisId, SortId } from "../types";
 
 // ライブラリ検索語。URLの q= パラメータへ同期する（useNavigationHistory）。localStorage には保存しない。
@@ -11,3 +11,5 @@ export const activeAxisAtom = atom<AxisId>("all");
 export const selectedTagsAtom = atom<NormalizedTag[]>([]);
 export const selectedWorkIdAtom = atom<string | null>(null);
 export const sortAtom = atom<SortId>("added-desc");
+// sort=random の作品一覧が使う seed。URLへは同期しない。再シャッフル時に navigationActions から差し替える
+export const randomSeedAtom = atom(createRandomSeed());

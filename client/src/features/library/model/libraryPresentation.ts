@@ -67,6 +67,8 @@ interface WorksParamsInput {
   sort: SortId;
   searchQuery: string;
   selectedTags: NormalizedTag[];
+  /** sort="random" のときだけ使う。呼び出し側の randomSeedAtom 由来 */
+  randomSeed?: number;
 }
 
 /** selectedTagsAtom（組み込み軸の擬似タグ混じり）を works query の tags フィールドへ変換する。
@@ -86,7 +88,7 @@ function buildTagFilterParams(selectedTags: NormalizedTag[]): TagFilterParams {
 /** works 種の結果面（ビュー軸・スマートフォルダー軸）以外は works query を発行しない。
  *  スマートフォルダーは別 query（evalSmartFolder）で取得する。 */
 export function buildWorksParams(input: WorksParamsInput): WorksQueryInput | null {
-  const { activeAxis, sort, searchQuery, selectedTags } = input;
+  const { activeAxis, sort, searchQuery, selectedTags, randomSeed } = input;
   if (computeResultsPaneKind(activeAxis) !== "works" || isSmartAxis(activeAxis)) return null;
 
   const p: WorksQueryInput = { sort, ...buildTagFilterParams(selectedTags) };
@@ -94,6 +96,7 @@ export function buildWorksParams(input: WorksParamsInput): WorksQueryInput | nul
   if (isViewAxis(activeAxis) && activeAxis !== "all") {
     p.view = activeAxis as WorksQueryInput["view"];
   }
+  if (sort === "random" && randomSeed !== undefined) p.seed = randomSeed;
   return p;
 }
 

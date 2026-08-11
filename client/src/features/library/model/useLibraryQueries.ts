@@ -9,6 +9,8 @@ import {
   useSuspenseInfiniteQuery,
   type UseMutationResult,
 } from "@tanstack/react-query";
+import { useAtomValue } from "jotai";
+import { randomSeedAtom } from "../../../entities/library/model/navigationAtoms";
 import {
   WORKS_DEFAULT_PAGE_SIZE,
   type NormalizedTag,
@@ -100,11 +102,13 @@ function getNextWorksPageParam(
 
 /** Suspense 境界配下でのみ使う通常作品一覧。親で enabled を切り替えない。 */
 export function useSuspenseNormalLibraryWorks(nav: LibraryViewState, searchQuery: string) {
+  const randomSeed = useAtomValue(randomSeedAtom);
   const worksParams = buildWorksParams({
     activeAxis: nav.activeAxis,
     sort: nav.sort,
     searchQuery,
     selectedTags: nav.selectedTags,
+    randomSeed,
   });
   // 呼び出し側は通常軸だけをマウントする。スマート軸は専用の子コンポーネントが担当する。
   const normalWorksParams = worksParams!;
@@ -121,7 +125,7 @@ export function useSuspenseNormalLibraryWorks(nav: LibraryViewState, searchQuery
         },
         { signal },
       ),
-    initialPageParam: { page: 1, seed: undefined } as WorksPageParam,
+    initialPageParam: { page: 1, seed: normalWorksParams.seed } as WorksPageParam,
     getNextPageParam: getNextWorksPageParam,
   });
   return toSuspenseWorksResult(query, normalWorksParams);
@@ -235,6 +239,7 @@ export function useLibrarySupportingQueries(nav: LibraryViewState) {
 
 function useWorkPatchMutationContext(nav: LibraryViewState, searchQuery: string) {
   const queryClient = useQueryClient();
+  const randomSeed = useAtomValue(randomSeedAtom);
   const debouncedSearchQuery = useDebouncedValue(
     searchQuery,
     SEARCH_DEBOUNCE_MS,
@@ -245,6 +250,7 @@ function useWorkPatchMutationContext(nav: LibraryViewState, searchQuery: string)
     sort: nav.sort,
     searchQuery: debouncedSearchQuery,
     selectedTags: nav.selectedTags,
+    randomSeed,
   });
 
   const applyPatchSuccess = async (

@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
-import { useAtom, useAtomValue } from "jotai";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useQuery } from "@tanstack/react-query";
 import type { SortId } from "@mimimilli/shared";
 import { SORT_OPTIONS } from "../../../entities/library/types";
 import { axisValueSortAtom } from "../model/atoms";
 import { activeAxisAtom, sortAtom } from "../../../entities/library/model/navigationAtoms";
+import { reshuffleLibraryRandomSeedAtom } from "../../../entities/library/model/navigationActions";
 import { useLibraryNavigation } from "../model/useLibraryNavigation";
 import { isSmartAxis, getSmartFolderId } from "../../../entities/library/axisDefinitions";
 import { computeResultsPaneKind } from "../model/libraryPresentation";
@@ -41,6 +42,7 @@ export default function LibrarySortMenu() {
   const [axisValueSort, setAxisValueSort] = useAtom(axisValueSortAtom);
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
+  const reshuffle = useSetAtom(reshuffleLibraryRandomSeedAtom);
 
   const isValueListPane = computeResultsPaneKind(activeAxis) === "value-list";
   const onSmartAxis = isSmartAxis(activeAxis);
@@ -102,6 +104,8 @@ export default function LibrarySortMenu() {
     items[nextIndex]?.focus();
   };
 
+  const showReshuffle = !disabled && !isValueListPane && sort === "random";
+
   return (
     <div className="mle-sortmenu" ref={sortRef}>
       <IconButton
@@ -120,6 +124,15 @@ export default function LibrarySortMenu() {
           }
         }}
       />
+      {showReshuffle && (
+        <IconButton
+          size="sm"
+          icon={I.refresh}
+          label="再シャッフル"
+          title="別の並びを再抽選"
+          onClick={() => reshuffle()}
+        />
+      )}
       {sortMenuOpen && !disabled && (
         <div
           className="mle-sortmenu__pop"

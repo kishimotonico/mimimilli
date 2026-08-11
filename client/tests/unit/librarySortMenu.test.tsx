@@ -8,7 +8,11 @@ import { describe, expect, it } from "vitest";
 import type { SmartFolder } from "@mimimilli/shared";
 import LibrarySortMenu from "../../src/features/library/ui/LibrarySortMenu";
 import { LibraryNavigationProvider } from "../../src/features/library/ui/LibraryNavigationProvider";
-import { activeAxisAtom, sortAtom } from "../../src/entities/library/model/navigationAtoms";
+import {
+  activeAxisAtom,
+  randomSeedAtom,
+  sortAtom,
+} from "../../src/entities/library/model/navigationAtoms";
 import { axisValueSortAtom } from "../../src/features/library/model/atoms";
 import { SMART_FOLDER_QUERY_KEYS } from "../../src/entities/smart-folder/queryKeys";
 
@@ -162,6 +166,34 @@ describe("LibrarySortMenu", () => {
       "title",
       "並び替え: 再生時間（長い順）",
     );
+  });
+
+  it("ソートがランダムのときだけ再シャッフルボタンを表示し、押すとseedが変わる（TASK-305）", () => {
+    const { store } = renderSortMenu({ axis: "all", sort: "added-desc" });
+    expect(screen.queryByRole("button", { name: "再シャッフル" })).not.toBeInTheDocument();
+
+    act(() => {
+      store.set(sortAtom, "random");
+    });
+    const reshuffleButton = screen.getByRole("button", { name: "再シャッフル" });
+    const seedBefore = store.get(randomSeedAtom);
+
+    fireEvent.click(reshuffleButton);
+    expect(store.get(randomSeedAtom)).not.toBe(seedBefore);
+
+    act(() => {
+      store.set(sortAtom, "added-desc");
+    });
+    expect(screen.queryByRole("button", { name: "再シャッフル" })).not.toBeInTheDocument();
+  });
+
+  it("スマートフォルダー軸ではソートがランダムでも再シャッフルボタンを出さない", () => {
+    renderSortMenu({
+      axis: "smart-sf-1",
+      sort: "random",
+      smartFolders: [{ ...SMART_FOLDER, sort: "random" }],
+    });
+    expect(screen.queryByRole("button", { name: "再シャッフル" })).not.toBeInTheDocument();
   });
 
   it("スマートフォルダー一覧に該当フォルダーがないときも無効化を維持する", () => {
