@@ -86,7 +86,6 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
   );
 
   const {
-    libraryTotal,
     homeStats,
     facetItems,
     isFacetLoading,
@@ -101,6 +100,7 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
     refetchFacets,
   } = useLibrarySupportingQueries(nav);
   const [isNoResultsDueToFilter, setIsNoResultsDueToFilter] = useState(false);
+  const [worksTotal, setWorksTotal] = useState<number | undefined>(undefined);
 
   const saveSmartFolderMutation = useSmartFolderMutation({
     onSaved: (savedFolder, wasNew) => {
@@ -178,7 +178,6 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
     <>
       <AxisColumn
         activeAxis={nav.activeAxis}
-        totalCount={libraryTotal}
         tagPrefixes={tagPrefixes}
         isTagPrefixesError={isTagPrefixesError}
         onRetryTagPrefixes={refetchTagPrefixes}
@@ -197,6 +196,7 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
       {isHome ? (
         <PreviewPane
           mode={nav.selectedWorkId !== null ? "work" : "home"}
+          onClose={() => nav.selectWork(null)}
           homeStats={homeStats}
           selectedWork={selectedWork}
           isSelectedWorkLoading={workDetailQuery.isPending}
@@ -227,6 +227,7 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
             onToggle={nav.toggleTag}
             onAddTag={nav.addTag}
             onClearAll={nav.clearTags}
+            worksTotal={paneKind === "value-list" ? undefined : worksTotal}
           />
           {paneKind === "value-list" ? (
             <div className="mll-results">
@@ -254,6 +255,7 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
               viewMode={viewMode}
               isPending={nav.isPending}
               onNoResultsChange={setIsNoResultsDueToFilter}
+              onWorksTotalChange={setWorksTotal}
             >
               {(result, isPending) => {
                 const worksQueryKey = JSON.stringify({
@@ -328,6 +330,7 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
                       {nav.selectedWorkId !== null && (
                         <PreviewPaneSlide
                           key="preview"
+                          onClose={() => nav.selectWork(null)}
                           homeStats={homeStats}
                           selectedWork={selectedWork}
                           isSelectedWorkLoading={workDetailQuery.isPending}

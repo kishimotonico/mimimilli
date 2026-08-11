@@ -252,26 +252,3 @@ describe("WorkGrid empty states", () => {
     expect(screen.getByText("作品詳細の☆ボタンでお気に入りに追加できます")).toBeTruthy();
   });
 });
-
-describe("WorkGrid の件数表示", () => {
-  afterEach(() => {
-    cleanup();
-    clearResizeObservers();
-  });
-
-  it("worksTotal が未確定のときは件数テキストを描画しない", () => {
-    const { container } = renderWorkGrid({ props: { works: createWorks(12) } });
-    expect(container.querySelector(".mle-col__hd .count")).toBeNull();
-  });
-
-  it("worksTotal が 0 のときは 0 件と表示する", () => {
-    renderWorkGrid({ props: { works: [], worksTotal: 0, axis: "fav" } });
-    expect(screen.getByText("0 件")).toBeTruthy();
-  });
-
-  it("worksTotal が渡されたとき、works.length ではなく worksTotal を表示する", () => {
-    renderWorkGrid({ props: { works: createWorks(50), worksTotal: 120 } });
-    expect(screen.getByText("120 件")).toBeTruthy();
-    expect(screen.queryByText("50 件")).toBeNull();
-  });
-});

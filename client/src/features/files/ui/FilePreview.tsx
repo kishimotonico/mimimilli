@@ -12,6 +12,7 @@ import { deleteWork, getWorkRegisterPreview } from "../api";
 import { getFileUrl } from "../../../entities/work/api";
 import { getWorkFolderDisplay } from "../model/workFolderDisplay";
 import RegisterWorkDialog from "./RegisterWorkDialog";
+import Lightbox from "../../../shared/ui/Lightbox";
 import type { WorkRegisterPreview } from "@mimimilli/shared";
 import {
   classifyFile,
@@ -308,6 +309,7 @@ function ImageMedia({
   kind: FileKind;
 }) {
   const [errored, setErrored] = useState(false);
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   useEffect(() => setErrored(false), [workId, relPath]);
 
   if (errored) {
@@ -323,13 +325,24 @@ function ImageMedia({
       </div>
     );
   }
+  const src = getFileUrl(workId, relPath);
   return (
     <>
       <div className="mle-fprev__media">
         <img
-          className="mle-fprev__img"
-          src={getFileUrl(workId, relPath)}
+          // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role, jsx-a11y/no-noninteractive-element-to-interactive-role -- imgをbuttonで包むとサイズ算出が崩れる（縮小フィットのみのimgをshrink-to-fitコンテナに置くと0x0になる既知の挙動）ため、img自体をクリック領域にする
+          role="button"
+          className="mle-fprev__img cursor-zoom-in"
+          src={src}
           alt={entry.name}
+          tabIndex={0}
+          aria-label="画像を拡大表示"
+          onClick={() => setIsLightboxOpen(true)}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter" && event.key !== " ") return;
+            event.preventDefault();
+            setIsLightboxOpen(true);
+          }}
           onError={() => setErrored(true)}
         />
       </div>
@@ -338,6 +351,9 @@ function ImageMedia({
         <div className="mle-fprev__path">{entry.path}</div>
         <div className="mle-fprev__meta">{formatFileSize(entry.size)}</div>
       </div>
+      {isLightboxOpen && (
+        <Lightbox src={src} alt={entry.name} onClose={() => setIsLightboxOpen(false)} />
+      )}
     </>
   );
 }
