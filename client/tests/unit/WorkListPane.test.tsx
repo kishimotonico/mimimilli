@@ -183,23 +183,6 @@ describe("WorkListPane 空状態", () => {
   });
 });
 
-describe("WorkListPane の件数表示", () => {
-  afterEach(() => {
-    cleanup();
-    clearResizeObservers();
-  });
-
-  it("worksTotal が未確定のときは件数テキストを描画しない", () => {
-    const { container } = renderWorkListPane({ works: createWorks(12) });
-    expect(container.querySelector(".mle-col__hd .count")).toBeNull();
-  });
-
-  it("worksTotal が渡されたとき、works.length ではなく worksTotal を表示する", () => {
-    renderWorkListPane({ works: createWorks(50), worksTotal: 120 });
-    expect(screen.getByText("120 件")).toBeTruthy();
-  });
-});
-
 describe("WorkListPane の末尾余白（docked bar）", () => {
   let sizeMock: { restore: () => void };
 

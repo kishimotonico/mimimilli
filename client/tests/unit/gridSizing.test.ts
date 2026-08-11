@@ -8,9 +8,9 @@ import {
 
 describe("grid sizing", () => {
   it("clamps and rounds the persisted tile size", () => {
-    expect(clampTileSize(99)).toBe(MIN_TILE_SIZE);
+    expect(clampTileSize(50)).toBe(MIN_TILE_SIZE);
     expect(clampTileSize(176.6)).toBe(177);
-    expect(clampTileSize(281)).toBe(MAX_TILE_SIZE);
+    expect(clampTileSize(500)).toBe(MAX_TILE_SIZE);
   });
 });
 

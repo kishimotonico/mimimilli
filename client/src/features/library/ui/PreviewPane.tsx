@@ -2,6 +2,7 @@ import type { NormalizedTag, Work } from "@mimimilli/shared";
 import type { CollectionStatsDisplay } from "../model/libraryPresentation";
 import type { LibraryViewState } from "../model/useLibraryNavigation";
 import CollectionStatus from "../../../shared/ui/CollectionStatus";
+import { I } from "../../../shared/ui/Icon";
 import { DiscoveryDashboard } from "./preview/DiscoveryDashboard";
 import { WorkDetailPatchScope } from "./preview/WorkDetailPatchScope";
 
@@ -31,6 +32,9 @@ interface PreviewPaneProps {
   tagSuggestions: string[];
   nav: LibraryViewState;
   searchQuery: string;
+  /** mode==="work" のときの閉じるボタン用。home 軸埋め込み・grid/listスライドインの
+   *  どちらの経路でも同じ閉じ方にする（TASK-295）。 */
+  onClose: () => void;
 }
 
 export default function PreviewPane({
@@ -50,37 +54,50 @@ export default function PreviewPane({
   tagSuggestions,
   nav,
   searchQuery,
+  onClose,
 }: PreviewPaneProps) {
-  const title = mode === "work" ? "詳細" : "ホーム";
-
   return (
-    <div className="mle-prv">
-      <div className="mle-prv__hd">
-        <span className="label">{title}</span>
+    <div className="mle-prv-shell">
+      {mode === "work" && (
+        <button
+          type="button"
+          className="mle-prv__close"
+          aria-label="詳細を閉じる"
+          onClick={onClose}
+        >
+          <I.chev size={14} />
+        </button>
+      )}
+      <div className="mle-prv">
+        {mode === "home" && (
+          <div className="mle-prv__hd">
+            <span className="label">ホーム</span>
+          </div>
+        )}
+        {mode === "work" &&
+          (selectedWork ? (
+            <WorkDetailPatchScope
+              key={selectedWork.id}
+              work={selectedWork}
+              nav={nav}
+              searchQuery={searchQuery}
+              onPlay={onPlay}
+              onResume={onResume}
+              onTogglePlay={onTogglePlay}
+              playingTrackIndex={playingTrackIndex}
+              isPlaybackActive={isPlaybackActive}
+              tagSuggestions={tagSuggestions}
+              onTagClick={onTagClick}
+            />
+          ) : isSelectedWorkLoading ? (
+            <CollectionStatus variant="list" kind="loading" />
+          ) : (
+            isSelectedWorkError && (
+              <CollectionStatus variant="list" kind="error" onRetry={onRetrySelectedWork} />
+            )
+          ))}
+        {mode === "home" && <DiscoveryDashboard stats={homeStats} onSelectWork={onSelectWork} />}
       </div>
-      {mode === "work" &&
-        (selectedWork ? (
-          <WorkDetailPatchScope
-            key={selectedWork.id}
-            work={selectedWork}
-            nav={nav}
-            searchQuery={searchQuery}
-            onPlay={onPlay}
-            onResume={onResume}
-            onTogglePlay={onTogglePlay}
-            playingTrackIndex={playingTrackIndex}
-            isPlaybackActive={isPlaybackActive}
-            tagSuggestions={tagSuggestions}
-            onTagClick={onTagClick}
-          />
-        ) : isSelectedWorkLoading ? (
-          <CollectionStatus variant="list" kind="loading" />
-        ) : (
-          isSelectedWorkError && (
-            <CollectionStatus variant="list" kind="error" onRetry={onRetrySelectedWork} />
-          )
-        ))}
-      {mode === "home" && <DiscoveryDashboard stats={homeStats} onSelectWork={onSelectWork} />}
     </div>
   );
 }

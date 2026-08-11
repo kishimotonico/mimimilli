@@ -107,6 +107,9 @@ export function useHoverGroupCoordinator(
   const stableOnDocumentPointerMove = useRef((event: PointerEvent) => {
     onDocumentPointerMoveRef.current(event);
   }).current;
+  // 本物のpointermoveを一度も観測していない間はホバー起動を無視する（静止したポインタ
+  // 直下に新しい行が現れただけの pointerenter で誤って開かないようにするため）。
+  const hasGenuinePointerMovedRef = useRef(false);
 
   const clearOpenTimer = () => {
     window.clearTimeout(openTimerRef.current);
@@ -191,6 +194,7 @@ export function useHoverGroupCoordinator(
 
   function handleTriggerEnter(key: string, el: HTMLElement | null) {
     hoveredTriggerRef.current = { key, el };
+    if (!hasGenuinePointerMovedRef.current) return;
     if (triangleRef.current && key !== openStateRef.current?.key) return; // 抑止: 他行の open 要求
     clearCloseTimer();
     if (key === openStateRef.current?.key) {
@@ -265,6 +269,35 @@ export function useHoverGroupCoordinator(
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- アンマウント時のクリーンアップのみ
   }, []);
+
+  useEffect(() => {
+    const handleFirstPointerMove = () => {
+      hasGenuinePointerMovedRef.current = true;
+      document.removeEventListener("pointermove", handleFirstPointerMove);
+      const hovered = hoveredTriggerRef.current;
+      if (hovered) handleTriggerEnter(hovered.key, hovered.el);
+    };
+    document.addEventListener("pointermove", handleFirstPointerMove);
+    return () => document.removeEventListener("pointermove", handleFirstPointerMove);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- handleTriggerEnterはrefのみ参照する安定した処理のため、マウント時の1回だけで良い
+  }, []);
+
+  // トリガー・パネルの外への pointerdown はタイマーを待たず即座に閉じる
+  // （他のポップオーバー群のoutsidePress相当。usePopoverDismissal.ts参照）。
+  useEffect(() => {
+    if (!openState) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      const panelEl = panelElRef.current;
+      const anchorEl = openStateRef.current?.anchorEl;
+      if (panelEl?.contains(target) || anchorEl?.contains(target)) return;
+      close();
+    };
+    document.addEventListener("pointerdown", handlePointerDown, true);
+    return () => document.removeEventListener("pointerdown", handlePointerDown, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- close/panelElRef/openStateRefは安定参照
+  }, [openState]);
 
   return {
     openKey: openState?.key ?? null,

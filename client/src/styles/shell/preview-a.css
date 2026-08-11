@@ -8,9 +8,31 @@
 
 /* ── Preview pane ─────────────────────────────────────────── */
 
-.mle-prv {
+/* mode==="work"の閉じるボタン(.mle-prv__close)と.mle-prvを横に並べる外枠。
+   grid/listスライドイン・home軸埋め込みのどちらでも同じ閉じ方にする（TASK-295）。 */
+.mle-prv-shell {
+  display: flex;
   flex: 1;
   min-width: 360px;
+  min-height: 0;
+}
+.mle-prv__close {
+  flex: 0 0 auto;
+  width: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--paper-2);
+  border-right: 1px solid var(--line-soft);
+  color: var(--ink-3);
+}
+.mle-prv__close:hover {
+  color: var(--ink-0);
+  background: var(--paper-3);
+}
+.mle-prv {
+  flex: 1;
+  min-width: 0;
   background: var(--paper-1);
   display: flex;
   flex-direction: column;

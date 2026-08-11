@@ -1,7 +1,9 @@
 import { useState } from "react";
 import type { NormalizedTag, Work } from "@mimimilli/shared";
 import CoverImg from "../../../../entities/work/ui/CoverImg";
+import { getCoverImageUrl } from "../../../../entities/work/api";
 import { selectFixedCoverThumbnailWidth } from "../../../../entities/work/ui/coverThumbnailWidth";
+import Lightbox from "../../../../shared/ui/Lightbox";
 import {
   computeResumeProgressRatio,
   resumeProgressBarWidth,
@@ -62,6 +64,7 @@ export function WorkDetail({
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isInfoDialogOpen, setIsInfoDialogOpen] = useState(false);
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const hasKickerWarning = work.status === "missing" || work.status === "error";
 
   return (
@@ -69,14 +72,32 @@ export function WorkDetail({
       <div className="mle-prv__hero">
         <div className="mle-prv__coverwrap">
           <div className="mle-prv__cover">
-            <CoverImg
-              id={work.id}
-              title={work.title}
-              cover={work.cover}
-              size={140}
-              radius={6}
-              requestWidth={selectFixedCoverThumbnailWidth(140, window.devicePixelRatio)}
-            />
+            {work.cover ? (
+              <button
+                type="button"
+                className="block h-full w-full cursor-zoom-in p-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
+                aria-label="カバー画像を拡大表示"
+                onClick={() => setIsLightboxOpen(true)}
+              >
+                <CoverImg
+                  id={work.id}
+                  title={work.title}
+                  cover={work.cover}
+                  size={140}
+                  radius={6}
+                  requestWidth={selectFixedCoverThumbnailWidth(140, window.devicePixelRatio)}
+                />
+              </button>
+            ) : (
+              <CoverImg
+                id={work.id}
+                title={work.title}
+                cover={work.cover}
+                size={140}
+                radius={6}
+                requestWidth={selectFixedCoverThumbnailWidth(140, window.devicePixelRatio)}
+              />
+            )}
             {resumeProgressRatio !== null && (
               <div
                 className="mle-prv__cover-progress"
@@ -182,6 +203,13 @@ export function WorkDetail({
           resumeTrack={resumeTrack}
           resumeTime={resumeTime}
           onClose={() => setIsInfoDialogOpen(false)}
+        />
+      )}
+      {isLightboxOpen && work.cover && (
+        <Lightbox
+          src={getCoverImageUrl(work.id)}
+          alt={work.title}
+          onClose={() => setIsLightboxOpen(false)}
         />
       )}
     </div>
