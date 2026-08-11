@@ -82,6 +82,7 @@ const SEARCH_DEBOUNCE_MS = 250;
  * 型チェックの時点で検知できる。
  */
 import { libraryTotalQueryOptions } from "../../../entities/work/libraryTotalQueryOptions";
+import { errorViewCountQueryOptions } from "../../../entities/work/errorViewCountQueryOptions";
 interface WorksPageParam {
   page: number;
   seed: number | undefined;
@@ -190,6 +191,7 @@ function toSuspenseWorksResult(
 export function useLibrarySupportingQueries(nav: LibraryViewState) {
   // 件数バッジ（libraryTotal）と軸レール下部のライブラリ統計表示を兼ねる。
   const libraryStatsQuery = useQuery(libraryTotalQueryOptions);
+  const errorViewCountQuery = useQuery(errorViewCountQueryOptions);
   const facetAxis = getFacetAxisForQuery(nav.activeAxis);
   const facetQuery = useAxisFacetsQuery(facetAxis, nav.selectedTags);
   const smartFoldersQuery = useQuery({
@@ -210,6 +212,7 @@ export function useLibrarySupportingQueries(nav: LibraryViewState) {
 
   return {
     libraryTotal: libraryStatsQuery.data?.total,
+    errorViewCount: errorViewCountQuery.data?.total,
     libraryStats: computeCollectionStatsDisplay(
       libraryStatsQuery.isLoading,
       libraryStatsQuery.isError,

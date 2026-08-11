@@ -195,8 +195,8 @@ export function viewConditions(view: WorksQuery["view"]): {
     case "fav":
       conditions.push("work_states.bookmarked = 1");
       break;
-    case "missing":
-      conditions.push("works.status = 'missing'");
+    case "error":
+      conditions.push("works.status != 'ok'");
       break;
   }
   return { conditions, bindings };

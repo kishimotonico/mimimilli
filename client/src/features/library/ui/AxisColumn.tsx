@@ -35,6 +35,8 @@ interface AxisColumnProps {
   tagPrefixes: TagPrefix[];
   smartFolders: SmartFolder[];
   selectedTags: NormalizedTag[];
+  /** エラービュー（status !== "ok"）の件数。0またはundefined（未取得）の間は軸レールから隠す */
+  errorViewCount?: number;
   /** ライブラリ全体の統計。軸レール下部に常時表示する */
   stats: CollectionStatsDisplay;
   /** 分類軸の元になる GET /tag-prefixes の取得失敗。無言でCV/サークル等の行が
@@ -107,6 +109,7 @@ export default function AxisColumn({
   tagPrefixes,
   smartFolders,
   selectedTags,
+  errorViewCount,
   stats,
   isTagPrefixesError,
   onSelectAxis,
@@ -116,7 +119,9 @@ export default function AxisColumn({
   onNewSmartFolder,
   onRetryTagPrefixes,
 }: AxisColumnProps) {
-  const viewAxisRows = buildViewAxisRows();
+  const viewAxisRows = buildViewAxisRows()
+    .filter((ax) => ax.id !== "error" || !!errorViewCount)
+    .map((ax) => (ax.id === "error" ? { ...ax, badge: errorViewCount } : ax));
   const facetAxisRows = buildFacetAxisRows(tagPrefixes);
   const {
     openKey: overlayAxis,

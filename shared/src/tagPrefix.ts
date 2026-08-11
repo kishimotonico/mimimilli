@@ -4,15 +4,7 @@
 import { z } from "zod";
 
 /** prefix に使えない予約軸ID。ビュー・組み込み軸（tag / year）と軸IDの名前空間を共有するため */
-export const RESERVED_AXIS_IDS = [
-  "all",
-  "recent",
-  "added",
-  "fav",
-  "missing",
-  "tag",
-  "year",
-] as const;
+export const RESERVED_AXIS_IDS = ["all", "recent", "added", "fav", "error", "tag", "year"] as const;
 
 /** prefix 名。正規形（trim + 小文字）へ変換した上で予約ID・不正文字を拒否する */
 export const tagPrefixNameSchema = z

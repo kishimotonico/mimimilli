@@ -9,14 +9,14 @@ import type { AxisId } from "./types";
 import type { IconName } from "../../shared/ui/Icon";
 
 // 軸レールの単純ビュー（GET /works の view パラメータに対応）
-const VIEW_AXIS_IDS = ["all", "recent", "added", "fav", "missing"] as const;
+const VIEW_AXIS_IDS = ["all", "recent", "added", "fav", "error"] as const;
 
 const VIEW_AXIS_LABELS: Record<string, string> = {
   all: "すべての作品",
   recent: "最近再生",
   added: "最近追加",
   fav: "お気に入り",
-  missing: "ファイル欠損",
+  error: "エラー",
 };
 
 const BUILTIN_AXIS_LABELS: Record<string, string> = {
@@ -64,7 +64,7 @@ const BUILTIN_AXIS_ICONS: Record<string, IconName> = {
   recent: "refresh",
   added: "add",
   fav: "star",
-  missing: "err",
+  error: "err",
 };
 
 export function getAxisIcon(axis: AxisId): IconName {

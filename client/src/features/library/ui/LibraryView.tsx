@@ -82,6 +82,7 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
   );
 
   const {
+    errorViewCount,
     libraryStats,
     facetItems,
     isFacetLoading,
@@ -178,6 +179,7 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
         onRetryTagPrefixes={refetchTagPrefixes}
         smartFolders={smartFolders}
         selectedTags={nav.selectedTags}
+        errorViewCount={errorViewCount}
         stats={libraryStats}
         onSelectAxis={nav.setAxis}
         onToggleTag={nav.toggleTag}
