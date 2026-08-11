@@ -8,36 +8,49 @@
 
 /* ── Preview pane ─────────────────────────────────────────── */
 
-/* mode==="work"の閉じるボタン(.mle-prv__close)と.mle-prvを横に並べる外枠。
-   grid/listスライドイン・home軸埋め込みのどちらでも同じ閉じ方にする（TASK-295）。 */
-.mle-prv-shell {
+/* Library側の詳細プレビュー(.mle-prv)と閉じるボタン(.mle-prv__close)の位置合わせ用アンカー。
+   .mle-prvがoverflow: hiddenを持つため、ボタンをその外へ出すにはこの一段外の
+   position: relativeな薄いラッパーが要る。ラッパー自身は列・行を確保せず.mle-prvの
+   フレックスサイズをそのまま引き継ぐので、幅は変わらない。 */
+.mle-prv-anchor {
+  position: relative;
   display: flex;
   flex: 1;
   min-width: 360px;
   min-height: 0;
 }
+.mle-prv {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  background: var(--paper-1);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* 閉じるボタンは.mle-prvの左外側にオーバーレイし、.mle-prv自体の幅・本文の
+   縦位置を一切消費しない。背後には一覧の行・タイルが透けるため、視認できるよう
+   ポップオーバー相当の背景と影を付ける（帯・全高の線にはしない）。 */
 .mle-prv__close {
-  flex: 0 0 auto;
-  width: 22px;
+  position: absolute;
+  top: 4px;
+  left: -30px;
+  z-index: 2;
+  width: 26px;
+  height: 26px;
   display: flex;
   align-items: center;
   justify-content: center;
+  border-radius: var(--r-1);
   background: var(--paper-2);
-  border-right: 1px solid var(--line-soft);
+  border: 1px solid var(--line-soft);
+  box-shadow: var(--shadow-pop);
   color: var(--ink-3);
 }
 .mle-prv__close:hover {
   color: var(--ink-0);
   background: var(--paper-3);
-}
-.mle-prv {
-  flex: 1;
-  min-width: 0;
-  background: var(--paper-1);
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  overflow: hidden;
 }
 .mle-prv__hd {
   display: flex;

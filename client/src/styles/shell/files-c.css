@@ -1,8 +1,7 @@
 /* mimimilli shell — files-c
-   所有範囲: 単一カラム舞台(.mle-filestage*)、ファイルプレビュー(.mle-fprev*)、Files mode時の
-   プレビュー幅修飾(.mle-prv.is-files)、カラムスタックのパルス演出(.mle-colstack__edges の
-   transition/[data-pulse]修飾、files-b.cssの基本定義と対になる)、カラム遷移アニメーション
-   (.ml-file-col-enter*)。
+   所有範囲: 単一カラム舞台(.mle-filestage*)、ファイルプレビュー(.mle-fprev*)、カラムスタックの
+   パルス演出(.mle-colstack__edges の transition/[data-pulse]修飾、files-b.cssの基本定義と
+   対になる)、カラム遷移アニメーション(.ml-file-col-enter*)。
    files-a〜cの分割理由はfiles-a.css冒頭コメント参照。
    import順: player-a.cssの次、shared-d.cssより前。 */
 
@@ -22,11 +21,6 @@
   width: 100%;
   border-right: none;
   will-change: transform, opacity;
-}
-
-.mle-prv.is-files {
-  flex: 1;
-  min-width: 0;
 }
 
 .mle-fprev {

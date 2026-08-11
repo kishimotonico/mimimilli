@@ -57,7 +57,7 @@ export default function PreviewPane({
   onClose,
 }: PreviewPaneProps) {
   return (
-    <div className="mle-prv-shell">
+    <div className="mle-prv-anchor">
       {mode === "work" && (
         <button
           type="button"

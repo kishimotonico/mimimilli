@@ -158,9 +158,6 @@ export default function AxisColumn({
 
   return (
     <div className="mle-col is-axis">
-      <div className="mle-col__hd">
-        <span>ライブラリ</span>
-      </div>
       <div className="mle-col__list">
         <div className="mll-axisgroup">{renderRow(HOME_AXIS)}</div>
 

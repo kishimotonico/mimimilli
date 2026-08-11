@@ -199,9 +199,6 @@
   color: var(--ink-3);
   margin-left: auto;
 }
-.mle-col.is-axis .mle-col__hd {
-  background: var(--paper-0);
-}
 .mle-col__list {
   flex: 1;
   overflow: hidden auto;
