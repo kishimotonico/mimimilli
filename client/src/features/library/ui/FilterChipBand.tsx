@@ -31,6 +31,8 @@ interface FilterChipBandProps {
   /** 追加ボタン用の冪等なAND追加（ADR-0013） */
   onAddTag: (tag: NormalizedTag) => void;
   onClearAll: () => void;
+  /** 絞り込み後の作品件数。作品一覧を出さない結果面では undefined */
+  worksTotal?: number;
 }
 
 function FilterChip({
@@ -102,6 +104,7 @@ export default function FilterChipBand({
   onToggle,
   onAddTag,
   onClearAll,
+  worksTotal,
 }: FilterChipBandProps) {
   // チップの兄弟値ドロップダウンは既定=置き換えの入口、「＋絞り込み」は既定=AND追加の入口
   // （値選択の契約。design-system.md）。
@@ -142,11 +145,14 @@ export default function FilterChipBand({
         selectedTags={selectedTags}
         onAddValue={handleAddFilterSelect}
       />
-      {selectedTags.length > 0 && (
-        <button type="button" className="mll-tagband__clear" onClick={onClearAll}>
-          すべてクリア
-        </button>
-      )}
+      <div className="mll-tagband__tail">
+        {selectedTags.length > 0 && (
+          <button type="button" className="mll-tagband__clear" onClick={onClearAll}>
+            すべてクリア
+          </button>
+        )}
+        {worksTotal != null && <span className="mll-tagband__count">{worksTotal} 件</span>}
+      </div>
     </div>
   );
 }

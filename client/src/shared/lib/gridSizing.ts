@@ -1,5 +1,5 @@
-export const MIN_TILE_SIZE = 100;
-export const MAX_TILE_SIZE = 280;
+export const MIN_TILE_SIZE = 72;
+export const MAX_TILE_SIZE = 480;
 
 export function clampTileSize(size: number): number {
   return Math.min(MAX_TILE_SIZE, Math.max(MIN_TILE_SIZE, Math.round(size)));

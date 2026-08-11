@@ -19,6 +19,18 @@ function elAt(rect: Partial<DOMRect>): HTMLElement {
   return el;
 }
 
+// ページ内で一度も本物のpointermoveを観測していない間はホバー起動を無視する
+// （TASK-301。ページ読み込み直後に静止したポインタ直下へ新しい行が現れただけの
+// hover誤起動を防ぐガード）。ホバー系のテストは「ユーザーが既にマウスを動かした
+// 状態」を前提にするため、renderHook直後に一度だけ本物のpointermoveを発火させる。
+function renderCoordinator(...args: Parameters<typeof useHoverGroupCoordinator>) {
+  const rendered = renderHook(() => useHoverGroupCoordinator(...args));
+  act(() => {
+    fireEvent.pointerMove(document, { clientX: -1, clientY: -1 });
+  });
+  return rendered;
+}
+
 describe("useHoverGroupCoordinator", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -27,8 +39,28 @@ describe("useHoverGroupCoordinator", () => {
     vi.useRealTimers();
   });
 
-  it("トリガーを200msホバーすると開く", () => {
+  it("ページ内で本物のpointermoveを観測するまではホバーで開かない（TASK-301）", () => {
     const { result } = renderHook(() => useHoverGroupCoordinator());
+    const elA = elAt({ left: 0, top: 90, bottom: 110 });
+
+    act(() => {
+      result.current.getTriggerHandlers("a").onPointerEnter({ currentTarget: elA } as never);
+      vi.advanceTimersByTime(200);
+    });
+    expect(result.current.openKey).toBeNull();
+
+    act(() => {
+      fireEvent.pointerMove(document, { clientX: 10, clientY: 10 });
+    });
+    act(() => {
+      result.current.getTriggerHandlers("a").onPointerEnter({ currentTarget: elA } as never);
+      vi.advanceTimersByTime(200);
+    });
+    expect(result.current.openKey).toBe("a");
+  });
+
+  it("トリガーを200msホバーすると開く", () => {
+    const { result } = renderCoordinator();
     const elA = elAt({ left: 0, top: 90, bottom: 110 });
 
     act(() => {
@@ -44,7 +76,7 @@ describe("useHoverGroupCoordinator", () => {
   });
 
   it("パネル未登録のままトリガーを離れると150msで閉じる", () => {
-    const { result } = renderHook(() => useHoverGroupCoordinator());
+    const { result } = renderCoordinator();
     const elA = elAt({ left: 0, top: 90, bottom: 110 });
 
     act(() => {
@@ -63,7 +95,7 @@ describe("useHoverGroupCoordinator", () => {
   });
 
   it("トリガーからパネルへ直接移動すると閉じない（トリガー⇄パネル間のタイマー共有）", () => {
-    const { result } = renderHook(() => useHoverGroupCoordinator());
+    const { result } = renderCoordinator();
     const elA = elAt({ left: 0, top: 90, bottom: 110 });
     const panelEl = elAt({ left: 200, top: 50, bottom: 150 });
 
@@ -87,7 +119,7 @@ describe("useHoverGroupCoordinator", () => {
   });
 
   it("斜め移動が他のトリガー行の上を通過しても、セーフトライアングル内なら開閉が横取りされない（AC1）", () => {
-    const { result } = renderHook(() => useHoverGroupCoordinator());
+    const { result } = renderCoordinator();
     const elA = elAt({ left: 0, top: 90, bottom: 110 });
     const elB = elAt({ left: 0, top: 130, bottom: 150 });
     const panelEl = elAt({ left: 200, top: 50, bottom: 150 });
@@ -120,7 +152,7 @@ describe("useHoverGroupCoordinator", () => {
   });
 
   it("セーフトライアングル内でもポインタが約300ms静止すると、その行への切り替えが行われる（AC2）", () => {
-    const { result } = renderHook(() => useHoverGroupCoordinator());
+    const { result } = renderCoordinator();
     const elA = elAt({ left: 0, top: 90, bottom: 110 });
     const elB = elAt({ left: 0, top: 130, bottom: 150 });
     const panelEl = elAt({ left: 200, top: 50, bottom: 150 });
@@ -153,7 +185,7 @@ describe("useHoverGroupCoordinator", () => {
   });
 
   it("close() は遅延・セーフトライアングルを打ち切って即座に閉じる", () => {
-    const { result } = renderHook(() => useHoverGroupCoordinator());
+    const { result } = renderCoordinator();
     const elA = elAt({ left: 0, top: 90, bottom: 110 });
     const panelEl = elAt({ left: 200, top: 50, bottom: 150 });
 
@@ -174,9 +206,9 @@ describe("useHoverGroupCoordinator", () => {
   });
 
   it("ガード活性中にアンマウントすると document の pointermove リスナーが解除される（レンダーを跨いでも同一参照）", () => {
+    const { result, rerender, unmount } = renderCoordinator();
     const addSpy = vi.spyOn(document, "addEventListener");
     const removeSpy = vi.spyOn(document, "removeEventListener");
-    const { result, rerender, unmount } = renderHook(() => useHoverGroupCoordinator());
     const elA = elAt({ left: 0, top: 90, bottom: 110 });
     const panelEl = elAt({ left: 200, top: 50, bottom: 150 });
 

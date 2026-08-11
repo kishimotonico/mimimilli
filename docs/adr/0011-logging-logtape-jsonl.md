@@ -14,7 +14,18 @@ serverのログはconsole出力のみで永続化されず、常駐利用では�
 
 ログレコードは日本語の自由文 `message` を主役とし、必須フィールドは `ts` / `level`（debug·info·warn·error）/ `category`（dlsite·scan·db·http·server）/ `message` の4つとする。イベントIDの事前登録カタログは作らない。後から絞り込みに使う値（workId・status・durationMs・errorKind等）は文中だけでなく文脈フィールド（properties）にも入れる。これが機械可読性の担保で、ルールはこれだけとする。
 
-出力はstdoutとファイルの2系統。ファイルはデータルート配下 `log/server-YYYY-MM-DD.jsonl`（ADR-0007の配置に従う）で、ローテーション機構は作らず起動時にN日より古いファイルを削除するのみとする。file sinkはrealアダプタ起動時のみ有効にし、fixture・テストではconsoleのみとする。
+出力はstdout（console sink）とファイル（file sink）の2系統。ファイルはデータルート配下 `log/server-YYYY-MM-DD.jsonl`（ADR-0007の配置に従う）で、ローテーション機構は作らず起動時にN日より古いファイルを削除するのみとする。file sinkはrealアダプタ起動時のみ有効にし、fixture・テストではconsoleのみとする。
+
+出力先ごとの最低レベルは次のとおり。logger設定の `lowestLevel` は全カテゴリ `debug` のままとし、sink単位で絞り込む。
+
+| 出力先        | 最低レベル | 実装                                   |
+| ------------- | ---------- | -------------------------------------- |
+| console       | info以上   | `withFilter(getConsoleSink(), "info")` |
+| file（JSONL） | debug以上  | `getStreamFileSink` にそのまま流す     |
+
+HTTPアクセスログの2xx/3xxは `debug` で記録するため、コンソールには出ずJSONLのみに残る。4xxは `warn`、5xxは `error` でコンソールにも出る。
+
+file sinkは `@logtape/file` の `getStreamFileSink` を使う。同期 `getFileSink` はエンコード後200バイト未満のレコードを都度 `fsync` するため、通常運用での小レコード連発（HTTPアクセスログ等）に不向き。`highWaterMark` は64KB（`LOG_FILE_HIGH_WATER_MARK`）とし、Node.js `WriteStream` のバッファリングに任せる。graceful shutdown では `dispose()` がストリームの `end`/`close` を待ち、バッファ内容の flush を保証する。
 
 あわせてプロセスの安全網（uncaught例外の最終記録、graceful shutdownでのdispose、Hono onErrorのlogger化）を基盤の一部として持つ。
 

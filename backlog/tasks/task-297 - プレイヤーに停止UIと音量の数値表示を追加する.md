@@ -1,9 +1,10 @@
 ---
 id: TASK-297
 title: プレイヤーに停止UIと音量の数値表示を追加する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-10 19:00'
+updated_date: '2026-08-10 23:31'
 labels: []
 dependencies: []
 ordinal: 307000
@@ -17,8 +18,14 @@ ordinal: 307000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 バー型プレイヤーから再生を停止でき、プレイヤーが非表示になる
-- [ ] #2 全画面プレイヤーからも停止できる
-- [ ] #3 音量スライダーに0〜100の数値が表示される（バー型ポップオーバー・全画面とも）
-- [ ] #4 pnpm test:smoke が通る
+- [x] #1 バー型プレイヤーから再生を停止でき、プレイヤーが非表示になる
+- [x] #2 全画面プレイヤーからも停止できる
+- [x] #3 音量スライダーに0〜100の数値が表示される（バー型ポップオーバー・全画面とも）
+- [x] #4 pnpm test:smoke が通る
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+バー型・ポップアップ型・全画面型の3種すべてに停止ボタンを配線し、停止でplayerIsActiveAtomがfalseになりドックと全画面が同時に閉じるようにした。音量スライダーに0〜100の数値ラベルを常時表示（幅3ch固定）。ミュートは既存の設計判断どおり追加せず。pnpm check通過、pnpm test server 540 / client 796 pass、pnpm test:smoke 10 passed。
+<!-- SECTION:FINAL_SUMMARY:END -->

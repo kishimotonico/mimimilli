@@ -25,6 +25,7 @@ interface PopupContentProps {
   onFold: () => void;
   onExpandFullScreen: () => void;
   onShowPlayingWork: () => void;
+  onStop: () => void;
 }
 
 const RATE_PRESETS = [0.75, 1, 1.25, 1.5, 2];
@@ -54,6 +55,7 @@ export default function PopupContent({
   onFold,
   onExpandFullScreen,
   onShowPlayingWork,
+  onStop,
 }: PopupContentProps) {
   const {
     currentWork,
@@ -108,6 +110,13 @@ export default function PopupContent({
         <div className="mle-popup__head-actions">
           <IconButton size="sm" icon={I.chevD} label="バーへ戻る" onClick={onFold} />
           <IconButton size="sm" icon={I.fs} label="全画面プレイヤー" onClick={onExpandFullScreen} />
+          <IconButton
+            size="sm"
+            icon={I.x}
+            label="再生を停止"
+            onClick={onStop}
+            className="ml-1 hover:text-[var(--r-coral)]"
+          />
         </div>
       </div>
 
@@ -233,6 +242,7 @@ export default function PopupContent({
           className="mle-popup__volrange"
           title={`音量 ${volume}%`}
         />
+        <span className="mle-popup__volval">{volume}</span>
       </div>
     </>
   );

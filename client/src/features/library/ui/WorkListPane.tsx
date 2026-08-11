@@ -2,7 +2,6 @@ import { useCallback, type ReactNode } from "react";
 import { useAtomValue } from "jotai";
 import type { WorkListItem } from "@mimimilli/shared";
 import type { AxisId } from "../../../entities/library/types";
-import { isSmartAxis } from "../../../entities/library/axisDefinitions";
 import { buildEmptyWorksHint, buildEmptyWorksMessage } from "../model/emptyWorks";
 import WorkRow from "./WorkRow";
 import CollectionStatus from "../../../shared/ui/CollectionStatus";
@@ -105,10 +104,6 @@ export default function WorkListPane({
 
   return (
     <div className={`mle-col is-results ${isPending ? "is-pending" : ""}`}>
-      <div className="mle-col__hd">
-        <span>{isSmartAxis(axis) ? "スマートフォルダー" : "作品"}</span>
-        {worksTotal != null && <span className="count">{worksTotal} 件</span>}
-      </div>
       {smartFolderBanner}
       <div ref={scrollRef} className="mle-col__list">
         {works.length === 0 ? (

@@ -3,17 +3,38 @@ import { test } from "node:test";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import type { DataAdapter } from "../src/adapter/index.ts";
 import { createApp } from "../src/app.ts";
+import { dispose, initLogger } from "../src/lib/logger.ts";
 import { captureLogs, categoryRecords, recordMessage } from "./helpers/logCapture.ts";
 
 function withStubAdapter(overrides: Partial<DataAdapter>): DataAdapter {
   return { ...createFixtureAdapter(), ...overrides };
 }
 
+const CONSOLE_METHODS = ["debug", "info", "warn", "error"] as const;
+
+async function captureConsole(
+  run: (calls: { method: string; text: string }[]) => Promise<void>,
+): Promise<void> {
+  const calls: { method: string; text: string }[] = [];
+  const originals = CONSOLE_METHODS.map((method) => [method, console[method]] as const);
+  for (const method of CONSOLE_METHODS) {
+    console[method] = (...args: unknown[]) => {
+      calls.push({ method, text: args.map((arg) => String(arg)).join(" ") });
+    };
+  }
+  try {
+    await run(calls);
+  } finally {
+    for (const [method, original] of originals) console[method] = original;
+    await dispose();
+  }
+}
+
 function httpRequestRecords(records: ReturnType<typeof categoryRecords>) {
   return records.filter((record) => recordMessage(record) === "HTTPリクエストを処理しました");
 }
 
-test("2xx リクエストは http カテゴリの DEBUG で requestId 等を記録する", async () => {
+test("2xx リクエストは http カテゴリの DEBUG で requestId 等を記録する（ファイルのみ）", async () => {
   await captureLogs(
     async (records) => {
       const app = createApp(createFixtureAdapter());
@@ -107,4 +128,30 @@ test("内部エラー(5xx) は http カテゴリの ERROR で記録する", asyn
     },
     { categories: ["http"] },
   );
+});
+
+test("2xx のアクセスログはコンソールへ出さず、5xx はコンソールへ出す", async () => {
+  await captureConsole(async (calls) => {
+    await initLogger();
+    const requestCalls = () =>
+      calls.filter((call) => call.text.includes("HTTPリクエストを処理しました"));
+
+    const ok = await createApp(createFixtureAdapter()).request("/api/works");
+    assert.equal(ok.status, 200);
+    assert.deepEqual(requestCalls(), []);
+
+    const failing = createApp(
+      withStubAdapter({
+        getSettings: async () => {
+          throw new Error("fixture internal failure");
+        },
+      }),
+    );
+    const res = await failing.request("/api/settings");
+    assert.equal(res.status, 500);
+
+    const logged = requestCalls();
+    assert.equal(logged.length, 1);
+    assert.equal(logged[0]!.method, "error");
+  });
 });

@@ -44,6 +44,7 @@ function renderBoundary(children: Parameters<typeof LibraryWorksBoundary>[0]["ch
         viewMode="list"
         isPending={false}
         onNoResultsChange={() => undefined}
+        onWorksTotalChange={() => undefined}
       >
         {children}
       </LibraryWorksBoundary>
@@ -109,6 +110,7 @@ describe("LibraryWorksBoundary", () => {
           viewMode="list"
           isPending={nav.isPending}
           onNoResultsChange={() => undefined}
+          onWorksTotalChange={() => undefined}
         >
           {(result, isPending) => (
             <div className={isPending ? "is-pending" : ""}>{result.works[0]?.title}</div>

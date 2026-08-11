@@ -7,7 +7,6 @@ import Button from "../../../shared/ui/Button";
 import { I } from "../../../shared/ui/Icon";
 import { GRID_COLUMN_GAP, GRID_ROW_GAP, clampTileSize } from "../../../shared/lib/gridSizing";
 import { buildEmptyWorksHint, buildEmptyWorksMessage } from "../model/emptyWorks";
-import { isSmartAxis } from "../../../entities/library/axisDefinitions";
 import CollectionStatus from "../../../shared/ui/CollectionStatus";
 import LoadMore from "./LoadMore";
 import { dockedBarActiveAtom } from "../../../entities/player/model/atoms";
@@ -157,10 +156,6 @@ export default function WorkGrid({
       className={`mll-grid-pane ${isPending ? "is-pending" : ""}`}
       aria-label="作品グリッド"
     >
-      <div className="mle-col__hd">
-        <span>{isSmartAxis(axis) ? "スマートフォルダー" : "作品"}</span>
-        {worksTotal != null && <span className="count">{worksTotal} 件</span>}
-      </div>
       {smartFolderBanner}
       <div className="mll-grid-body">
         <div ref={scrollRef} className="mll-grid-scroll">

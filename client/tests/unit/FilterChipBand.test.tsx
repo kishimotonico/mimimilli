@@ -11,7 +11,7 @@ vi.mock("../../src/features/library/api", () => ({
   getAxisFacets: vi.fn(() => Promise.resolve([])),
 }));
 
-function renderFilterChipBand() {
+function renderFilterChipBand(worksTotal?: number) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
@@ -22,6 +22,7 @@ function renderFilterChipBand() {
         onToggle={() => {}}
         onAddTag={() => {}}
         onClearAll={() => {}}
+        worksTotal={worksTotal}
       />
     </QueryClientProvider>,
   );
@@ -39,5 +40,17 @@ describe("FilterChipBand のチップクリック", () => {
         tagOp: "AND",
       });
     });
+  });
+});
+
+describe("FilterChipBand の件数表示", () => {
+  it("worksTotal が未確定のときは件数テキストを描画しない", () => {
+    renderFilterChipBand();
+    expect(screen.queryByText(/件$/)).toBeNull();
+  });
+
+  it("worksTotal が渡されたとき、絞り込み後件数を表示する", () => {
+    renderFilterChipBand(120);
+    expect(screen.getByText("120 件")).toBeTruthy();
   });
 });

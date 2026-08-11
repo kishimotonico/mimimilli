@@ -365,14 +365,18 @@
   color: var(--ink-3);
   padding: 0 2px;
 }
-.mll-tagband__count {
+.mll-tagband__tail {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-left: auto;
+}
+.mll-tagband__count {
   font-family: var(--font-mono);
   font-size: 10.5px;
   color: var(--ink-2);
 }
 .mll-tagband__clear {
-  margin-left: auto;
   font-family: var(--font-sans);
   font-size: 10.5px;
   font-weight: 600;

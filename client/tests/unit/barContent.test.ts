@@ -42,6 +42,7 @@ function renderBar(currentTrackIndex: number) {
     onSeek: vi.fn(),
     onSwitchToPopup: vi.fn(),
     onSetVolume: vi.fn(),
+    onStop: vi.fn(),
   };
 
   render(
@@ -95,6 +96,22 @@ describe("BarContent", () => {
     fireEvent.click(expandButton);
 
     expect(onSwitchToPopup).toHaveBeenCalledTimes(1);
+  });
+
+  it("停止ボタンはポップアップへ切り替えずに onStop を呼ぶ", () => {
+    const { onStop, onSwitchToPopup } = renderBar(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "再生を停止" }));
+
+    expect(onStop).toHaveBeenCalledTimes(1);
+    expect(onSwitchToPopup).not.toHaveBeenCalled();
+  });
+
+  it("音量ポップオーバーは現在値を数値で表示する", () => {
+    renderBar(0);
+    fireEvent.click(screen.getByRole("button", { name: "音量 75%" }));
+
+    expect(screen.getByText("75")).toBeTruthy();
   });
 
   it("音量ボタンはデフォルトで単体表示され、クリックするとスライダーのポップオーバーが開く", () => {

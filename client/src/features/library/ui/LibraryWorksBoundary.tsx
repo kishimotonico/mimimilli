@@ -1,4 +1,4 @@
-import { Component, Suspense, useEffect, type ReactNode } from "react";
+import { Component, Suspense, useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import { QueryErrorResetBoundary } from "@tanstack/react-query";
 import type { DataIntegrityWarning, WorkListItem } from "@mimimilli/shared";
 import type { LibraryViewState } from "../model/useLibraryNavigation";
@@ -32,6 +32,7 @@ interface Props {
   viewMode: "list" | "grid";
   isPending: boolean;
   onNoResultsChange: (isNoResults: boolean) => void;
+  onWorksTotalChange: (worksTotal: number | undefined) => void;
   children: (result: WorksResult, isPending: boolean) => ReactNode;
 }
 
@@ -90,6 +91,7 @@ function ResolvedWorks({
   searchQuery,
   isPending,
   onNoResultsChange,
+  onWorksTotalChange,
   children,
   result,
 }: Props & { result: WorksResult }) {
@@ -102,7 +104,25 @@ function ResolvedWorks({
     false,
   );
   useEffect(() => onNoResultsChange(isNoResults), [isNoResults, onNoResultsChange]);
+  useEffect(() => onWorksTotalChange(result.worksTotal), [result.worksTotal, onWorksTotalChange]);
+  // アンマウント時（エラー捕捉）は未確定へ戻す。すでに表示済みのSuspense境界が再サスペンド
+  // した場合はアンマウントされず非表示のまま保持されるため、その経路はSuspenseフォールバック
+  // 側（LoadingFallback）で別途未確定に戻す。startTransition中の再検証（旧一覧を薄表示のまま
+  // 保持）では再サスペンドもアンマウントも起きないため、その間は直前の件数を出し続ける
+  // （結果面の「旧一覧を保持」と一貫させる）。
+  const onWorksTotalChangeRef = useRef(onWorksTotalChange);
+  onWorksTotalChangeRef.current = onWorksTotalChange;
+  useEffect(() => {
+    return () => onWorksTotalChangeRef.current(undefined);
+  }, []);
   return <>{children(result, isPending)}</>;
+}
+
+/** Suspenseのfallbackとして描画される間、件数を未確定へ戻す。fallback自体はサスペンドしない
+ *  通常のコンポーネントなので、表示された瞬間にmount effectが確実に発火する。 */
+function LoadingFallback({ variant, onShow }: { variant: "list" | "grid"; onShow: () => void }) {
+  useLayoutEffect(() => onShow(), [onShow]);
+  return <CollectionStatus variant={variant} kind="loading" />;
 }
 
 export default function LibraryWorksBoundary(props: Props) {
@@ -117,7 +137,14 @@ export default function LibraryWorksBoundary(props: Props) {
     <QueryErrorResetBoundary>
       {({ reset }) => (
         <WorksErrorBoundary resetKey={resetKey} variant={variant} onRetry={reset}>
-          <Suspense fallback={<CollectionStatus variant={variant} kind="loading" />}>
+          <Suspense
+            fallback={
+              <LoadingFallback
+                variant={variant}
+                onShow={() => props.onWorksTotalChange(undefined)}
+              />
+            }
+          >
             {isSmartAxis(props.nav.activeAxis) ? (
               <SmartWorks {...props} />
             ) : (

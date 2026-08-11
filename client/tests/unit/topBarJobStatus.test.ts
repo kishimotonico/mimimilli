@@ -14,7 +14,7 @@ import { scanJobAtom } from "../../src/entities/scan/model/atoms";
 function renderTopBar(atomState?: {
   scanJob?: import("@mimimilli/shared").ScanJobSnapshot | null;
   dlsiteActive?: boolean;
-  dlsiteProgress?: { processed: number; total: number } | null;
+  dlsiteProgress?: import("@mimimilli/shared").DlsiteBulkProgressSnapshot | null;
 }) {
   const store = createStore();
   store.set(appModeAtom, "library");
@@ -71,23 +71,38 @@ describe("TopBar のジョブ状態表示", () => {
   it("DLsite 一括取得中は進捗と中止ボタンを表示する", () => {
     renderTopBar({
       dlsiteActive: true,
-      dlsiteProgress: { processed: 2, total: 5 },
+      dlsiteProgress: {
+        processed: 2,
+        total: 5,
+        work: { id: "work-1", rjCode: "RJ111111", title: "夜のラジオ" },
+      },
     });
 
-    expect(screen.getByText("DLsite取得中 (2/5)")).toBeInTheDocument();
+    expect(screen.getByText("DLsiteから取得中 (2/5)")).toBeInTheDocument();
+    expect(screen.getByText("— 夜のラジオ")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "中止" })).toBeInTheDocument();
   });
 
   it("atom 更新で進捗表示が追従する", () => {
     const store = renderTopBar({
       dlsiteActive: true,
-      dlsiteProgress: { processed: 1, total: 5 },
+      dlsiteProgress: {
+        processed: 1,
+        total: 5,
+        work: { id: "work-1", rjCode: "RJ111111", title: "" },
+      },
     });
-    expect(screen.getByText("DLsite取得中 (1/5)")).toBeInTheDocument();
+    expect(screen.getByText("DLsiteから取得中 (1/5)")).toBeInTheDocument();
+    expect(screen.getByText("— RJ111111")).toBeInTheDocument();
 
     act(() => {
-      store.set(dlsiteBulkProgressAtom, { processed: 4, total: 5 });
+      store.set(dlsiteBulkProgressAtom, {
+        processed: 4,
+        total: 5,
+        work: { id: "work-2", rjCode: "RJ222222", title: "朝のラジオ" },
+      });
     });
-    expect(screen.getByText("DLsite取得中 (4/5)")).toBeInTheDocument();
+    expect(screen.getByText("DLsiteから取得中 (4/5)")).toBeInTheDocument();
+    expect(screen.getByText("— 朝のラジオ")).toBeInTheDocument();
   });
 });

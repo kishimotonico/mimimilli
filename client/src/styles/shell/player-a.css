@@ -148,6 +148,15 @@
   accent-color: var(--acc);
   cursor: pointer;
 }
+.mle-bar1__volval {
+  margin-left: 8px;
+  min-width: 3ch;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-3);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
 /* ミスクリックで展開しないよう、再生ボタン自体を大きめにする */
 .mle-bar1__play {
   width: 44px;
@@ -177,6 +186,20 @@
 }
 .mle-bar1__body:hover .mle-bar1__expand {
   color: var(--ink-1);
+}
+/* 停止は取り消しの効かない操作なので、展開ボタンとは body の gap を挟んだ右端に置く */
+.mle-bar1__stop {
+  color: var(--ink-3);
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+.mle-bar1__stop:hover {
+  background: var(--paper-2);
+  color: var(--r-coral);
 }
 
 /* シークバーは要素全体の下辺を使う（DLsite Play 風。スライダーではない）。
@@ -537,6 +560,14 @@
   height: 3px;
   accent-color: var(--ink-2);
   cursor: pointer;
+}
+.mle-popup__volval {
+  min-width: 3ch;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-3);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 /* ── 共有アイコンボタン / 再生速度ピル（バー・ポップアップ共通） ── */
 

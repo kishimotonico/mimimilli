@@ -34,7 +34,6 @@ interface AxisColumnProps {
   activeAxis: AxisId;
   tagPrefixes: TagPrefix[];
   smartFolders: SmartFolder[];
-  totalCount?: number;
   selectedTags: NormalizedTag[];
   /** 分類軸の元になる GET /tag-prefixes の取得失敗。無言でCV/サークル等の行が
    *  消えるのを防ぎ、分類軸グループにエラー行を出す */
@@ -105,7 +104,6 @@ export default function AxisColumn({
   activeAxis,
   tagPrefixes,
   smartFolders,
-  totalCount,
   selectedTags,
   isTagPrefixesError,
   onSelectAxis,
@@ -162,7 +160,6 @@ export default function AxisColumn({
     <div className="mle-col is-axis">
       <div className="mle-col__hd">
         <span>ライブラリ</span>
-        {totalCount != null && <span className="count">{totalCount} 件</span>}
       </div>
       <div className="mle-col__list">
         <div className="mll-axisgroup">{renderRow(HOME_AXIS)}</div>

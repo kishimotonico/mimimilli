@@ -19,10 +19,11 @@ test("getSnapshot は実行中・終了後の状態を返す", () => {
   assert.equal(manager.getSnapshot(), null);
 
   const job = manager.startJob();
-  job.emit({ type: "progress", processed: 2, total: 5, workId: "work-1" });
+  const work = { id: "work-1", rjCode: "RJ111111", title: "作品1" };
+  job.emit({ type: "progress", processed: 2, total: 5, work });
   assert.deepEqual(manager.getSnapshot(), {
     status: "running",
-    progress: { processed: 2, total: 5 },
+    progress: { processed: 2, total: 5, work },
   });
 
   job.emit({ type: "complete", result: { fetched: 1, failed: 0, parseErrors: 0, skipped: 0 } });
@@ -38,7 +39,12 @@ test("DLsiteジョブは進捗を購読者へ配信し、完了を再接続時�
   const received: string[] = [];
   const job = manager.startJob();
   const subscription = manager.subscribe((event) => received.push(event.type));
-  job.emit({ type: "progress", processed: 1, total: 2, workId: "work-1" });
+  job.emit({
+    type: "progress",
+    processed: 1,
+    total: 2,
+    work: { id: "work-1", rjCode: "RJ111111", title: "作品1" },
+  });
   job.emit({ type: "complete", result: { fetched: 1, failed: 1, parseErrors: 0, skipped: 0 } });
   job.finish();
   subscription.unsubscribe();
