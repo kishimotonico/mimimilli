@@ -114,6 +114,48 @@ test(
   },
 );
 
+test("app shutdown は同期停止中のfile scan Workerを終了まで待機する", async (t) => {
+  const library = makeSampleLibrary();
+  t.after(library.cleanup);
+  const database = {
+    kind: "files" as const,
+    catalogPath: join(library.baseDir, "data", "db", "catalog.sqlite"),
+    userPath: join(library.baseDir, "data", "db", "user.sqlite"),
+  };
+  const thumbnailCacheDir = join(library.baseDir, "data", "thumbnails");
+  const seed = createTestRealAdapter({
+    database,
+    dataRoot: join(library.baseDir, "data"),
+    thumbnailCacheDir,
+  });
+  await seed.updateSettings({ rootFolder: library.root });
+  await seed.scan();
+  seed.close();
+
+  const gateBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT);
+  let ready!: () => void;
+  const workerReady = new Promise<void>((resolve) => {
+    ready = resolve;
+  });
+  const adapter = createTestRealAdapter({
+    database,
+    dataRoot: join(library.baseDir, "data"),
+    thumbnailCacheDir,
+    scanWorkerTestGate: gateBuffer,
+    scanWorkerTestGateStage: "before-scan",
+    onScanWorkerTestGateReady: ready,
+  });
+  t.after(() => adapter.close());
+  const app = createApp(adapter);
+  const startedResponse = await app.request("/api/scan", { method: "POST" });
+  const started = (await startedResponse.json()) as { job: ScanJobSnapshot };
+  await workerReady;
+
+  await app.shutdown();
+
+  assert.equal((await waitForTerminal(app, started.job.id)).status, "cancelled");
+});
+
 test("file scan Workerはfull:trueをscannerへ伝播し全件再処理する", async (t) => {
   const library = makeSampleLibrary();
   t.after(library.cleanup);
