@@ -1,5 +1,5 @@
 // files feature のドメイン型とロジック。
-// 物理ファイルシステムのブラウズ（/api/fs）を前提に、種別判定とパス操作の pure functions を提供する。
+// 物理ファイルシステムのブラウズ（/api/fs）を前提に、表示用の種別・パス操作を提供する。
 // React / API に依存しない（テスト容易性のため）。
 
 import type { IconName } from "../../../shared/ui/Icon";
@@ -13,52 +13,16 @@ export type { FsEntry, FsListing } from "@mimimilli/shared";
 
 export type FileKind = "dir" | "audio" | "image" | "video" | "pdf" | "text" | "other";
 
-const EXT_KIND: Record<string, FileKind> = {
-  mp3: "audio",
-  wav: "audio",
-  flac: "audio",
-  m4a: "audio",
-  ogg: "audio",
-  opus: "audio",
-  aac: "audio",
-  jpg: "image",
-  jpeg: "image",
-  png: "image",
-  gif: "image",
-  webp: "image",
-  bmp: "image",
-  avif: "image",
-  mp4: "video",
-  mov: "video",
-  mkv: "video",
-  webm: "video",
-  avi: "video",
-  pdf: "pdf",
-  txt: "text",
-  md: "text",
-  lrc: "text",
-  json: "text",
-  vtt: "text",
-  srt: "text",
-};
-
-const KNOWN_KINDS = new Set<FileKind>(["audio", "image", "video", "pdf", "text"]);
-
-/** classifyFile が受け取る最小構造（FsEntry / FileEntry の両方が満たす） */
+/** classifyFile が受け取る最小構造 */
 interface Classifiable {
   isDir: boolean;
-  fileType?: string | null;
-  name: string;
+  mediaKind?: Exclude<FileKind, "dir"> | null;
 }
 
-/** 表示種別を判定する。fileType を優先し、無ければ拡張子でフォールバック */
+/** 表示種別はサーバーが判定したmediaKindを使う。 */
 export function classifyFile(entry: Classifiable): FileKind {
   if (entry.isDir) return "dir";
-  const ft = entry.fileType?.toLowerCase() as FileKind | undefined;
-  if (ft && KNOWN_KINDS.has(ft)) return ft;
-  const dot = entry.name.lastIndexOf(".");
-  const ext = dot > 0 ? entry.name.slice(dot + 1).toLowerCase() : "";
-  return EXT_KIND[ext] ?? "other";
+  return entry.mediaKind ?? "other";
 }
 
 /** 種別 → Icon キー（shared/ui/Icon の I[...] に対応） */

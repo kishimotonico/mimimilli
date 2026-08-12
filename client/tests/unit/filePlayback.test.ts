@@ -12,6 +12,8 @@ function entry(name: string, overrides: Partial<FsEntry> = {}): FsEntry {
     childCount: 0,
     workId: null,
     workRelPath: null,
+    mediaKind: "audio",
+    preview: { kind: "available" },
     ...overrides,
   };
 }
@@ -19,9 +21,15 @@ function entry(name: string, overrides: Partial<FsEntry> = {}): FsEntry {
 describe("buildFolderAudioQueue", () => {
   const folder = [
     entry("02_b.wav"),
-    entry("folder", { isDir: true, fileType: "dir", path: "/root/folder" }),
+    entry("folder", {
+      isDir: true,
+      fileType: "dir",
+      path: "/root/folder",
+      mediaKind: null,
+      preview: null,
+    }),
     entry("01_a.mp3"),
-    entry("cover.jpg", { fileType: "jpg" }),
+    entry("cover.jpg", { fileType: "jpg", mediaKind: "image" }),
     entry("03_c.flac"),
   ];
 
@@ -39,7 +47,7 @@ describe("buildFolderAudioQueue", () => {
   it("音声以外を指定した場合は空キュー", () => {
     const { tracks, trackIndex } = buildFolderAudioQueue(
       folder,
-      entry("cover.jpg", { fileType: "jpg" }),
+      entry("cover.jpg", { fileType: "jpg", mediaKind: "image" }),
     );
     expect(tracks).toEqual([]);
     expect(trackIndex).toBe(0);

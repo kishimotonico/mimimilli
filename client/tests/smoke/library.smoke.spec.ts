@@ -192,3 +192,46 @@ test("主要画面でヨコ方向スクロールが発生しない", async ({ pa
 
   assertNoErrors(tracker);
 });
+
+test("Files: Workspace viewerで画像・PDF・text・videoをプレビューできる", async ({ page }) => {
+  const tracker = trackErrors(page);
+  await openApp(page);
+
+  await page.getByRole("button", { name: "ファイル" }).click();
+  await page.getByTitle("viewer").dblclick();
+  await expect(page.getByText("sample.png", { exact: true })).toBeVisible();
+
+  await page.getByTitle("sample.png").click();
+  await expect(page.getByRole("img", { name: "sample.png" })).toBeVisible();
+  await expect
+    .poll(() =>
+      page.getByRole("img", { name: "sample.png" }).evaluate((image) => image.naturalWidth > 0),
+    )
+    .toBe(true);
+
+  await page.getByTitle("sample.pdf").click();
+  await expect(page.locator("object[aria-label='sample.pdfのPDFプレビュー']")).toBeVisible();
+  // ChromiumのPDF viewerはobject.contentDocumentを公開しないため、viewerが受け取るPDF本体を確認する。
+  const pdfResponse = await page.request.get("/api/media/workspace?path=viewer%2Fsample.pdf");
+  expect(pdfResponse.ok()).toBe(true);
+  expect(pdfResponse.headers()["content-type"]).toContain("application/pdf");
+  expect((await pdfResponse.text()).startsWith("%PDF-")).toBe(true);
+
+  await page.getByTitle("sample.txt").click();
+  await expect(page.locator(".mle-fprev__text")).toContainText("fixture text");
+
+  await page.getByTitle("large.txt").click();
+  await expect(page.getByText("サイズ上限のため先頭のみ表示", { exact: true })).toBeVisible();
+
+  await page.getByTitle("sample.webm").click();
+  const video = page.locator("video[controls]");
+  await expect(video).toBeVisible();
+  await expect
+    .poll(() => video.evaluate((element) => element.readyState >= 1 && element.duration > 0))
+    .toBe(true);
+
+  await page.getByTitle("archive.zip").click();
+  await expect(page.getByText("ファイル（.zip）のプレビューは利用できません")).toBeVisible();
+
+  assertNoErrors(tracker);
+});

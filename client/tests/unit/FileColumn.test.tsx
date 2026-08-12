@@ -16,6 +16,8 @@ function makeEntry(overrides: Partial<FsEntry> = {}): FsEntry {
     childCount: 0,
     workId: null,
     workRelPath: null,
+    mediaKind: "audio",
+    preview: { kind: "available" },
     ...overrides,
   };
 }

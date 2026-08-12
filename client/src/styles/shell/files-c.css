@@ -86,6 +86,38 @@
   box-shadow: var(--shadow-cover);
   background: var(--paper-2);
 }
+.mle-fprev__media.is-document,
+.mle-fprev__media.is-video,
+.mle-fprev__media.is-text {
+  height: min(52vh, 480px);
+  padding: 0;
+}
+.mle-fprev__document,
+.mle-fprev__video,
+.mle-fprev__text {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: var(--r-2);
+}
+.mle-fprev__video {
+  background: var(--ink-0);
+}
+.mle-fprev__text {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 14px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--paper-0);
+  color: var(--ink-0);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  text-align: start;
+  user-select: text;
+}
 .mle-fprev__name {
   font-family: var(--font-jp);
   font-size: 16px;
