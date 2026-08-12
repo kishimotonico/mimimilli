@@ -27,7 +27,7 @@ export async function openApp(page: Page) {
 
   await page.goto("/", { waitUntil: "domcontentloaded" });
   const bootTimeout = 20_000;
-  await expect(page.locator(".mll-results").first()).toBeVisible({ timeout: bootTimeout });
+  await expect(page.locator(".mle-col.is-axis")).toBeVisible({ timeout: bootTimeout });
   await expect(
     page.locator(".mll-results .mle-col.is-results").getByRole("button").first(),
   ).toBeVisible({ timeout: bootTimeout });

@@ -49,7 +49,11 @@ export function WorkMetadataActions({
   const toggleBookmark = () => {
     if (bookmarkMutation.isPending) return;
     bookmarkMutation.reset();
-    bookmarkMutation.mutate({ workId: work.id, bookmarked: !work.bookmarked, sourceRevision: work.sourceRevision ?? "" });
+    bookmarkMutation.mutate({
+      workId: work.id,
+      bookmarked: !work.bookmarked,
+      sourceRevision: work.sourceRevision ?? "",
+    });
   };
 
   const bookmarkError = bookmarkMutation.error

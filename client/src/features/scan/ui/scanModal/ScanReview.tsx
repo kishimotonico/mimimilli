@@ -16,6 +16,8 @@ interface ScanReviewProps {
   onOpenFiles: (path: string) => void;
 }
 
+const EMPTY_CANDIDATES: ScanCandidate[] = [];
+
 function candidatePaths(candidates: ScanCandidate[]): string[] {
   return candidates.map((candidate) => candidate.path);
 }
@@ -28,7 +30,11 @@ export default function ScanReview({ result, onOpenFiles }: ScanReviewProps) {
     enabled: result.candidates.length > 0,
     initialData: result.candidates,
   });
-  const candidates = result.candidates.length > 0 ? (candidatesQuery.data ?? result.candidates) : [];
+  const candidates = useMemo(
+    () =>
+      result.candidates.length > 0 ? (candidatesQuery.data ?? result.candidates) : EMPTY_CANDIDATES,
+    [result.candidates, candidatesQuery.data],
+  );
   const [selectedPaths, setSelectedPaths] = useState<string[]>(() => candidatePaths(candidates));
   const [resultMessage, setResultMessage] = useState<string | null>(null);
 
@@ -110,26 +116,27 @@ export default function ScanReview({ result, onOpenFiles }: ScanReviewProps) {
             新規登録候補 {candidates.length}件
           </p>
           <div className="flex flex-col divide-y divide-line-soft rounded-[6px] border border-line-soft">
-            {candidates.map((candidate) => (
-              <label
-                key={candidate.path}
-                className="flex cursor-pointer gap-2 px-2.5 py-2 text-[11px]"
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedPaths.includes(candidate.path)}
-                  disabled={busy}
-                  onChange={(event) => toggle(candidate.path, event.target.checked)}
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-ink-0">{candidate.inferredTitle}</span>
-                  <span className="mll-selectable block break-all font-mono text-[10px] text-ink-3">
-                    {candidate.path}
-                  </span>
-                  <span className="text-ink-2">音声 {candidate.audioFileCount}件</span>
-                </span>
-              </label>
-            ))}
+            {candidates.map((candidate) => {
+              const checkboxId = `scan-candidate-${candidate.path.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+              return (
+                <div key={candidate.path} className="flex gap-2 px-2.5 py-2 text-[11px]">
+                  <input
+                    id={checkboxId}
+                    type="checkbox"
+                    checked={selectedPaths.includes(candidate.path)}
+                    disabled={busy}
+                    onChange={(event) => toggle(candidate.path, event.target.checked)}
+                  />
+                  <label htmlFor={checkboxId} className="min-w-0 flex-1 cursor-pointer">
+                    <span className="block text-ink-0">{candidate.inferredTitle}</span>
+                    <span className="mll-selectable block break-all font-mono text-[10px] text-ink-3">
+                      {candidate.path}
+                    </span>
+                    <span className="text-ink-2">音声 {candidate.audioFileCount}件</span>
+                  </label>
+                </div>
+              );
+            })}
           </div>
           <div className="flex flex-wrap gap-2">
             <Button
@@ -193,11 +200,7 @@ export default function ScanReview({ result, onOpenFiles }: ScanReviewProps) {
           <p className="text-[10px] text-ink-3">項目を選ぶとFilesで確認できます。</p>
         </div>
       )}
-      {resultMessage && (
-        <p role="status" className="text-[11px] text-ink-2">
-          {resultMessage}
-        </p>
-      )}
+      {resultMessage && <output className="block text-[11px] text-ink-2">{resultMessage}</output>}
     </section>
   );
 }
