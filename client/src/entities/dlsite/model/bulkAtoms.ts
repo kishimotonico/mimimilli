@@ -29,6 +29,12 @@ export const dlsiteBulkCancelledResultAtom = atom<DlsiteBulkResult | null>(null)
 
 export const dlsiteBulkErrorAtom = atom<string | null>(null);
 
+export const dlsiteBulkApplyOpenAtom = atom(false);
+
+export const dlsiteBulkApplyBusyAtom = atom(false);
+
+export const dlsiteBulkApplyResultAtom = atom<string | null>(null);
+
 export interface DlsiteBulkActions {
   start: () => Promise<void>;
   attach: () => void;
