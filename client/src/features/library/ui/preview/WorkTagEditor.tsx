@@ -9,11 +9,13 @@ import IconButton from "../../../../shared/ui/IconButton";
 import TagCombobox from "../../../../shared/ui/TagCombobox";
 import Toast from "../../../../shared/ui/Toast";
 import { apiErrorMessage } from "../../../../shared/lib/apiError";
+import { canPatchWorkSource } from "../../../../entities/work/sourceRevision";
 import type { LibraryTagsPatchMutation } from "../../model/useLibraryQueries";
 import { useTagPrefixes } from "../../../../entities/tag/useTagPrefixes";
 import { tagPrefixDefinition } from "../../../../entities/tag/tagPrefixDefinition";
 import { useAnchoredPopover } from "../../../../shared/ui/useAnchoredPopover";
 import { useWorkTagEditor } from "./useWorkTagEditor";
+import { WorkSourcePatchBlockedNotice } from "./WorkSourcePatchBlockedNotice";
 
 const TAG_POPOVER_WIDTH = 260;
 // 詳細ペインをタグで圧迫せず、優先度の高い分類を一目で確認できる表示上限。
@@ -94,10 +96,12 @@ export function WorkTagEditor({
 
   const definitionOf = (tag: string) => tagPrefixDefinition(tag, tagPrefixes);
 
+  const canEditTags = canPatchWorkSource(work.sourceRevision);
+
   const comboboxProps = {
     suggestions,
     excludeTags: tags,
-    disabled: isTagSaving,
+    disabled: isTagSaving || !canEditTags,
     canCreate: (tag: string) => normalizeTag(tag) !== null,
     onSelect: selectTag,
     onCancel: close,
@@ -115,6 +119,7 @@ export function WorkTagEditor({
             const isPending = pendingRemoveTag === tag;
             const isFailed = failedRemoveTag === tag;
             const isBlocked = isTagSaving && !isPending;
+            const canRemove = showRemoveButtons && !isBlocked && canEditTags;
             return (
               <Tag
                 key={tag}
@@ -122,9 +127,7 @@ export function WorkTagEditor({
                 definition={definitionOf(tag)}
                 pending={isPending}
                 failed={isFailed}
-                onRemove={
-                  showRemoveButtons && !isBlocked ? () => void requestRemoveTag(tag) : undefined
-                }
+                onRemove={canRemove ? () => void requestRemoveTag(tag) : undefined}
                 onClick={!showRemoveButtons && onTagClick ? () => onTagClick(tag) : undefined}
                 ariaLabel={
                   !showRemoveButtons && onTagClick ? `タグ「${tag}」で絞り込む` : undefined
@@ -146,6 +149,7 @@ export function WorkTagEditor({
                 label={isEditMode ? "タグ編集を終了" : "タグを編集"}
                 size="xs"
                 active={isEditMode}
+                disabled={!canEditTags}
                 onClick={() => setIsEditMode((v) => !v)}
               />
             )}
@@ -155,7 +159,7 @@ export function WorkTagEditor({
                 label="タグを追加"
                 size="xs"
                 className="bg-paper-2 text-ink-2 hover:bg-paper-3 hover:text-ink-0"
-                disabled={isTagSaving}
+                disabled={isTagSaving || !canEditTags}
                 onClick={() => {
                   resetPatchTagsError();
                   if (isTagPopoverOpen) close();
@@ -191,6 +195,7 @@ export function WorkTagEditor({
           </div>
         </div>
       </div>
+      <WorkSourcePatchBlockedNotice sourceRevision={work.sourceRevision} />
       {patchTagsErrorMessage && (
         <p className="mle-prv__edit-error" role="alert">
           {patchTagsErrorMessage}

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { parseTag, tagEquals } from "@mimimilli/shared";
 import type { NormalizedTag, TagPrefix, Work } from "@mimimilli/shared";
 import { buildTagsWithAdded, buildTagsWithRemoved } from "../../../../entities/work/editableTags";
+import { canPatchWorkSource } from "../../../../entities/work/sourceRevision";
 import type { LibraryTagsPatchMutation } from "../../model/useLibraryQueries";
 
 const TAG_UNDO_TOAST_MS = 6000;
@@ -64,13 +65,13 @@ export function useWorkTagEditor({
   };
 
   const patchTags = async (nextTags: NormalizedTag[]): Promise<boolean> => {
-    if (tagsMutation.isPending) return false;
+    if (tagsMutation.isPending || !canPatchWorkSource(work.sourceRevision)) return false;
     tagsMutation.reset();
     try {
       await tagsMutation.mutateAsync({
         workId: work.id,
         tags: nextTags,
-        sourceRevision: work.sourceRevision ?? "",
+        sourceRevision: work.sourceRevision,
       });
       return true;
     } catch {

@@ -320,13 +320,6 @@ describe("work api", () => {
     );
   });
 
-  it("getFileUrl returns the media/file URL and encodes nested segments", () => {
-    expect(workApi.getFileUrl("RJ001001", "cover.jpg")).toBe("/api/media/file/RJ001001/cover.jpg");
-    expect(workApi.getFileUrl("RJ001001", "特典/台本.pdf")).toBe(
-      `/api/media/file/RJ001001/${encodeURIComponent("特典")}/${encodeURIComponent("台本.pdf")}`,
-    );
-  });
-
   it("getDlsiteNotificationSummary fetches the dedicated endpoint", async () => {
     const summary = {
       rjCodeMissingCount: 2,

@@ -29,6 +29,7 @@ function makeWork(tags: string[]): Work {
     createdAt: "2026-01-01T00:00:00.000Z",
     playlists: [],
     resume: null,
+    sourceRevision: "revision-1",
   };
 }
 
@@ -309,5 +310,20 @@ describe("useWorkTagEditor", () => {
 
     clearTimeoutSpy.mockRestore();
     vi.useRealTimers();
+  });
+
+  it("sourceRevision未設定時はタグ保存を実行しない", async () => {
+    const work = makeWork(["ASMR"]);
+    delete work.sourceRevision;
+    const onPatchTags = vi.fn(async (): Promise<Work> => work);
+
+    const { result, tagsMutation } = renderTagEditor(work, onPatchTags);
+
+    await act(async () => {
+      await result.current.addTag("cv/新人");
+    });
+
+    expect(tagsMutation.mutateAsync).not.toHaveBeenCalled();
+    expect(onPatchTags).not.toHaveBeenCalled();
   });
 });

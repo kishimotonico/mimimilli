@@ -90,6 +90,7 @@ const work: Work = {
   createdAt: null,
   playlists: [],
   resume: null,
+  sourceRevision: "revision-1",
 };
 
 const scanResult: ScanResult = {

@@ -56,7 +56,7 @@ scanはsidecarのないフォルダーを自動登録しない。未登録候補
 
 sidecarのWork UUIDを作品identityとする。Playlist IDとTrack IDはWork配下のローカルidentityであり、catalogのキーは`(work_id, playlist_id)`と`(work_id, playlist_id, track_id)`にする。異なるWork間でPlaylist IDまたはTrack IDが同じでも衝突ではない。これにより、複製時のidentity問題はWork IDだけに閉じる。
 
-この方針は、ADR-0008のWork、Playlist、Track IDをライブラリ全体で一意とする決定を、Playlist/Trackについて上書きする。ADR-0008のスキャン時自動重複修復はWork IDの重複について本ADRが置き換える。一方、同一Work内のPlaylist/Track ID重複は不正sidecarとしてTASK-289の修復・外部編集検出時の扱いを維持し、本ADRの`identity_conflict`にはしない。
+この方針は、ADR-0008のWork、Playlist、Track IDをライブラリ全体で一意とする決定を、Playlist/Trackについて上書きする。ADR-0008のスキャン時自動重複修復はWork IDの重複について本ADRが置き換える。同一Work内のPlaylist/Track ID重複は不正sidecarとしてスキーマ検証で弾き、scanとFilesで診断表示する。sidecarを自動修復しない。
 
 scanとFilesは次の状態を区別する。
 
@@ -95,6 +95,17 @@ done
 ```
 
 移行後はcatalogだけを再構築してよい。`user.sqlite`は削除・再作成しない。catalogの再構築方法は配布時に提供する明示コマンドに従い、その後にfull scanを実行して、`identity_conflict`、不正sidecar、broken referenceがないことを確認する。source形式の自動移行、旧形式の読取りフォールバック、互換レイヤーは追加しない。
+
+### catalog migration 0012後の再スキャン
+
+`server/drizzle/catalog/0012_scan_revisions.sql` で `works.source_revision` 等が追加される。既存のcatalog行は、次のスキャンが各sidecarを再投影するまで `source_revision` が未設定のまま残る。起動時の自動フルスキャンはない。この間、作品のタイトル・タグ・ブックマークなどsidecarへの書き戻しを伴う編集はできない。
+
+解消手順:
+
+1. アプリ画面上部の「スキャン」を開き、「フルスキャン」を実行する
+2. または API から `POST /api/scan` を呼ぶ（例: `curl -X POST http://127.0.0.1:1355/api/scan`）
+
+スキャン完了後、各作品の `source_revision` がsidecarのexact bytesから埋まり、編集操作が使えるようになる。
 
 ## 帰結
 

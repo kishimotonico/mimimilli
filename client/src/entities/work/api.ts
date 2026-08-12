@@ -104,12 +104,6 @@ export function getAudioUrl(workId: string, relativePath: string): string {
   return `${API_BASE}/media/audio/${encodeURIComponent(workId)}/${encoded}`;
 }
 
-/** 物理ファイル（画像・PDF・テキスト等）のURLを返す（<img src> 等で直接使用可） */
-export function getFileUrl(workId: string, relativePath: string): string {
-  const encoded = relativePath.split("/").map(encodeURIComponent).join("/");
-  return `${API_BASE}/media/file/${encodeURIComponent(workId)}/${encoded}`;
-}
-
 export async function updateLastPlayed(workId: string): Promise<void> {
   await postVoid(`/works/${encodeURIComponent(workId)}/last-played`);
 }

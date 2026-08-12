@@ -3,7 +3,10 @@ import { createPortal } from "react-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import type { DlsitePreview, Work } from "@mimimilli/shared";
 import { applyDlsiteInfo, fetchDlsiteInfo, updateDlsiteState } from "../../../../entities/work/api";
-import { dlsiteFetchErrorMessage } from "../../../../entities/work/dlsiteFetchError";
+import {
+  dlsiteApplyErrorMessage,
+  dlsiteFetchErrorMessage,
+} from "../../../../entities/work/dlsiteFetchError";
 import Button from "../../../../shared/ui/Button";
 import IconButton from "../../../../shared/ui/IconButton";
 import { I } from "../../../../shared/ui/Icon";
@@ -233,13 +236,7 @@ export function DlsiteEditor({ work }: { work: Work }) {
       setPreview(null);
       await refresh();
     } catch (cause) {
-      setError(
-        cause instanceof Error && cause.message.includes("外部で変更")
-          ? "作品データが変更されました。取得結果を確認し直してから適用してください。"
-          : cause instanceof Error
-            ? cause.message
-            : "DLsite情報を適用できませんでした",
-      );
+      setError(dlsiteApplyErrorMessage(cause));
     } finally {
       setBusy(false);
     }

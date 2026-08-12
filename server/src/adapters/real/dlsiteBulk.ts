@@ -3,7 +3,6 @@ import {
   type DlsiteBulkMode,
   type DlsiteBulkProgressEvent,
   type DlsiteBulkResult,
-  type DlsiteFetchResult,
   type WorkSummary,
 } from "@mimimilli/shared";
 import { DlsiteOfflineError } from "../../errors.ts";
@@ -78,24 +77,6 @@ export async function fetchDlsiteBulkAttempts(
     }
   }
   return attempts;
-}
-
-export function shouldSkipCachedFailureWrite(
-  work: WorkSummary,
-  fetched: Extract<DlsiteFetchResult, { ok: false }>,
-  httpAttempted: boolean,
-): boolean {
-  if (httpAttempted) return false;
-  const newStatus = fetched.kind === "not_found" ? ("not_found" as const) : ("error" as const);
-  const newErrorKind =
-    fetched.kind === "not_found" || fetched.kind === "parse_error" || fetched.kind === "error"
-      ? fetched.kind
-      : null;
-  return (
-    work.dlsite.status === newStatus &&
-    work.dlsite.error === fetched.message &&
-    work.dlsite.errorKind === newErrorKind
-  );
 }
 
 interface ApplyDlsiteBulkWorkInput {

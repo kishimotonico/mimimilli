@@ -3,6 +3,8 @@ import type { Work } from "@mimimilli/shared";
 import { I } from "../../../../shared/ui/Icon";
 import IconButton from "../../../../shared/ui/IconButton";
 import { apiErrorMessage } from "../../../../shared/lib/apiError";
+import { canPatchWorkSource } from "../../../../entities/work/sourceRevision";
+import { WorkSourcePatchBlockedNotice } from "./WorkSourcePatchBlockedNotice";
 import type { LibraryBookmarkPatchMutation } from "../../model/useLibraryQueries";
 import {
   useAnchoredPopover,
@@ -47,12 +49,12 @@ export function WorkMetadataActions({
   });
 
   const toggleBookmark = () => {
-    if (bookmarkMutation.isPending) return;
+    if (bookmarkMutation.isPending || !canPatchWorkSource(work.sourceRevision)) return;
     bookmarkMutation.reset();
     bookmarkMutation.mutate({
       workId: work.id,
       bookmarked: !work.bookmarked,
-      sourceRevision: work.sourceRevision ?? "",
+      sourceRevision: work.sourceRevision,
     });
   };
 
@@ -67,7 +69,7 @@ export function WorkMetadataActions({
         label={work.bookmarked ? "ブックマークを解除" : "ブックマークに追加"}
         size="sm"
         active={work.bookmarked}
-        disabled={bookmarkMutation.isPending}
+        disabled={bookmarkMutation.isPending || !canPatchWorkSource(work.sourceRevision)}
         className={work.bookmarked ? "[&_svg]:fill-current" : undefined}
         onClick={toggleBookmark}
       />
@@ -130,6 +132,7 @@ export function WorkMetadataActions({
           </div>
         )}
       </div>
+      <WorkSourcePatchBlockedNotice sourceRevision={work.sourceRevision} />
       {bookmarkError && (
         <p className="mle-prv__edit-error" role="alert">
           {bookmarkError}
