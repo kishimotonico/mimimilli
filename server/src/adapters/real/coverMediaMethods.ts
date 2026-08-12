@@ -1,14 +1,16 @@
 import { stat } from "node:fs/promises";
 import { join } from "node:path";
+import { TEXT_PREVIEW_LIMIT_BYTES, type WorkspaceResourceRef } from "@mimimilli/shared";
 import type { FsListing } from "@mimimilli/shared";
 import {
   createCoverValidators,
+  type CatalogMediaKind,
   type CoverDescriptor,
-  type MediaKind,
   type MediaLocation,
 } from "../../adapter/index.ts";
+import type { WorkspacePath } from "@mimimilli/shared";
 import { browseFs as browseFilesystem } from "./fsBrowse.ts";
-import { mimeOf, isAudioPath, resolveWithin } from "./paths.ts";
+import { mimeOf, resolveWithin, workspaceMediaMetadata } from "./paths.ts";
 import { ThumbnailCache } from "./thumbnailCache.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";
 
@@ -67,21 +69,31 @@ export function createCoverMediaMethods(deps: {
     };
   }
   return {
-    async locateFsAudio(absolutePath: string): Promise<MediaLocation | null> {
+    async locateWorkspaceMedia(ref: WorkspaceResourceRef) {
       const root = requireRoot();
-      const resolved = resolveWithin(root, absolutePath);
-      if (!resolved || !isAudioPath(resolved)) return null;
+      const resolved = resolveWithin(root, join(root, ref.path));
+      if (!resolved) return null;
       try {
         const stats = await stat(resolved);
         if (!stats.isFile()) return null;
+        const metadata = workspaceMediaMetadata(resolved, stats.size);
+        return {
+          location: {
+            type: "file" as const,
+            absolutePath: resolved,
+            mime: mimeOf(resolved),
+            size: stats.size,
+          },
+          ...metadata,
+          maxBytes: metadata.mediaKind === "text" ? TEXT_PREVIEW_LIMIT_BYTES : undefined,
+        };
       } catch {
         return null;
       }
-      return { type: "file", absolutePath: resolved, mime: mimeOf(resolved) };
     },
 
     async locateMedia(
-      _kind: MediaKind,
+      _kind: CatalogMediaKind,
       workId: string,
       relPath?: string,
     ): Promise<MediaLocation | null> {
@@ -97,11 +109,11 @@ export function createCoverMediaMethods(deps: {
       return { type: "file", absolutePath: resolved, mime: mimeOf(resolved) };
     },
 
-    async browseFs(path?: string): Promise<FsListing | null> {
+    async browseFs(path?: WorkspacePath): Promise<FsListing | null> {
       const root = requireRoot();
       const realRoot = resolveWithin(root, root);
       if (realRoot === null) return null;
-      const target = resolveWithin(root, path ?? root);
+      const target = resolveWithin(root, path ? join(root, path) : root);
       if (target === null) return null;
       return browseFilesystem(realRoot, query.listFsWorkRefs(target), target);
     },

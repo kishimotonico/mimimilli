@@ -5,35 +5,20 @@ import {
   filesRelPathAtom,
   filesSelectedPathAtom,
 } from "../../../entities/file-system/model/navigationAtoms";
-import { joinPath, relSegments } from "../../../shared/lib/fsPath";
+import type { WorkspacePath } from "@mimimilli/shared";
 
-export const openFilesDirAtom = atom(
-  null,
-  (_get, set, { root, absPath }: { root: string; absPath: string }) => {
-    const nextRelPath = relSegments(root, absPath);
-    if (joinPath(root, nextRelPath) !== absPath) {
-      console.warn(`[navigation] root 外のディレクトリを拒否しました: ${absPath}`);
-      return;
-    }
-    requestNavigationHistoryCommit(set, "push");
-    set(filesDirectionAtom, 1);
-    set(filesRelPathAtom, nextRelPath);
-    set(filesSelectedPathAtom, absPath);
-  },
-);
+export const openFilesDirAtom = atom(null, (_get, set, absPath: WorkspacePath) => {
+  const nextRelPath = absPath ? absPath.split("/") : [];
+  requestNavigationHistoryCommit(set, "push");
+  set(filesDirectionAtom, 1);
+  set(filesRelPathAtom, nextRelPath);
+  set(filesSelectedPathAtom, absPath);
+});
 
-export const selectFilesEntryAtom = atom(
-  null,
-  (_get, set, { root, absPath }: { root: string; absPath: string }) => {
-    const selectedRelPath = relSegments(root, absPath);
-    if (joinPath(root, selectedRelPath) !== absPath) {
-      console.warn(`[navigation] root 外のファイルを拒否しました: ${absPath}`);
-      return;
-    }
-    requestNavigationHistoryCommit(set, "replace");
-    set(filesSelectedPathAtom, absPath);
-  },
-);
+export const selectFilesEntryAtom = atom(null, (_get, set, absPath: WorkspacePath) => {
+  requestNavigationHistoryCommit(set, "replace");
+  set(filesSelectedPathAtom, absPath);
+});
 
 export const goToFilesSegmentAtom = atom(null, (get, set, index: number) => {
   const relPath = get(filesRelPathAtom);

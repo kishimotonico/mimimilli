@@ -10,8 +10,9 @@ export {
   createCoverValidators,
   type CoverDescriptor,
   type MediaAdapter,
-  type MediaKind,
+  type CatalogMediaKind,
   type MediaLocation,
+  type WorkspaceMedia,
 } from "./media.ts";
 export type { DlsiteAdapter } from "./dlsite.ts";
 

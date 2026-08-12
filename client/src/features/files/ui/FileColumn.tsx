@@ -5,16 +5,17 @@ import Button from "../../../shared/ui/Button";
 import { I } from "../../../shared/ui/Icon";
 import CollectionStatus from "../../../shared/ui/CollectionStatus";
 import { classifyFile, sortEntries, type FsEntry } from "../model/types";
+import type { WorkspacePath } from "@mimimilli/shared";
 import FileRow from "./FileRow";
 
 interface FileColumnProps {
   title: string;
   entries: FsEntry[];
-  selectedPath: string | null;
+  selectedPath: WorkspacePath | null;
   matchPlaying: (entry: FsEntry) => boolean;
   isPlaybackActive?: boolean;
-  onOpenDir: (absPath: string) => void;
-  onSelectFile: (absPath: string) => void;
+  onOpenDir: (absPath: WorkspacePath) => void;
+  onSelectFile: (absPath: WorkspacePath) => void;
   onPlayFile: (entry: FsEntry, folderEntries: FsEntry[]) => void;
   isLoading?: boolean;
   /** フォルダー一覧取得の失敗。無言で「空のフォルダー」にせず区別する */

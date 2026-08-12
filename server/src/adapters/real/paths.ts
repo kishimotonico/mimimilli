@@ -3,6 +3,13 @@
 import { realpathSync } from "node:fs";
 import { dirname, relative, sep } from "node:path";
 import { isPathWithin } from "../../lib/path.ts";
+import {
+  IMAGE_PREVIEW_LIMIT_BYTES,
+  PDF_PREVIEW_LIMIT_BYTES,
+  TEXT_PREVIEW_LIMIT_BYTES,
+  type MediaKind,
+  type PreviewCapability,
+} from "@mimimilli/shared";
 
 /** SQLite LIKE の ESCAPE 文字（`ESCAPE '!'` とセットで使う。パス区切り `\` と衝突しない） */
 export const LIKE_ESCAPE_CHAR = "!";
@@ -171,4 +178,39 @@ const AUDIO_EXTENSIONS = new Set(["mp3", "m4a", "aac", "wav", "ogg", "flac", "we
 export function isAudioPath(path: string): boolean {
   const ext = path.split(".").pop()?.toLowerCase() ?? "";
   return AUDIO_EXTENSIONS.has(ext);
+}
+
+export function workspaceMediaMetadata(
+  path: string,
+  size: number,
+): { mediaKind: MediaKind; preview: PreviewCapability } {
+  const ext = path.split(".").pop()?.toLowerCase() ?? "";
+  const mediaKind: MediaKind = isAudioPath(path)
+    ? "audio"
+    : ["jpg", "jpeg", "png", "gif", "bmp", "webp", "avif", "svg"].includes(ext)
+      ? "image"
+      : ext === "pdf"
+        ? "pdf"
+        : ["txt", "md", "lrc", "vtt", "srt", "json"].includes(ext)
+          ? "text"
+          : ["mp4", "mov", "mkv", "webm", "avi"].includes(ext)
+            ? "video"
+            : "other";
+  if (mediaKind === "text" && size > TEXT_PREVIEW_LIMIT_BYTES)
+    return { mediaKind, preview: { kind: "truncated", limitBytes: TEXT_PREVIEW_LIMIT_BYTES } };
+  const limit =
+    mediaKind === "image"
+      ? IMAGE_PREVIEW_LIMIT_BYTES
+      : mediaKind === "pdf"
+        ? PDF_PREVIEW_LIMIT_BYTES
+        : undefined;
+  return {
+    mediaKind,
+    preview:
+      limit !== undefined && size > limit
+        ? { kind: "unavailable", reason: "size-limit" }
+        : mediaKind === "other"
+          ? { kind: "unavailable", reason: "unsupported" }
+          : { kind: "available" },
+  };
 }

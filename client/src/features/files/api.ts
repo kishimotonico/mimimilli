@@ -9,6 +9,7 @@ import {
   type Work,
   type WorkCreateBodyInput,
   type WorkRegisterPreview,
+  type WorkspacePath,
 } from "@mimimilli/shared";
 import { getParsed, postParsed, deleteVoid } from "../../shared/api/http";
 import { fsListingSchema, type FsListing } from "@mimimilli/shared";
@@ -20,7 +21,7 @@ export async function browseFs(path?: string): Promise<FsListing> {
 }
 
 /** 作品登録前のプレビュー（タイトル候補・RJコード・子作品数） */
-export async function getWorkRegisterPreview(path: string): Promise<WorkRegisterPreview> {
+export async function getWorkRegisterPreview(path: WorkspacePath): Promise<WorkRegisterPreview> {
   const q = `?path=${encodeURIComponent(path)}`;
   return getParsed(workRegisterPreviewSchema, `/works/register-preview${q}`);
 }

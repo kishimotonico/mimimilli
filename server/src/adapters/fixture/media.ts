@@ -151,7 +151,7 @@ function escapeXml(text: string): string {
 }
 
 /** 文字列全体をUTF-8バイト列として保持する静的コンテンツの MediaLocation を作る */
-function synthesizeStaticContent(text: string, mime: string): MediaLocation {
+export function synthesizeStaticContent(text: string, mime: string): MediaLocation {
   const bytes = new TextEncoder().encode(text);
   return {
     type: "synthetic",

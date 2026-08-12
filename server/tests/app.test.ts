@@ -329,7 +329,7 @@ test("GET /api/fs はルートの listing を返す", async () => {
   const res = await app.request("/api/fs");
   assert.equal(res.status, 200);
   const body = await res.json();
-  assert.equal(typeof body.path, "string");
+  assert.equal(body.path, null);
   assert.ok(Array.isArray(body.entries));
 });
 

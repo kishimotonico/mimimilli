@@ -14,6 +14,7 @@ import type {
   WorkCreateBody,
   WorkPatch,
   WorkRegisterPreview,
+  WorkspacePath,
   WorksPage,
   WorksQuery,
   WorkSummary,
@@ -29,9 +30,9 @@ import { normalizeFsPath } from "./fsResolve.ts";
 import { coverColumnsOf, type FixtureState } from "./state.ts";
 
 export function createWorkMethods(state: FixtureState): WorkAdapter {
-  async function getWorkRegisterPreview(path: string): Promise<WorkRegisterPreview | null> {
+  async function getWorkRegisterPreview(path: WorkspacePath): Promise<WorkRegisterPreview | null> {
     const rootAbs = normalizeFsPath(state.rootFolder ?? "/library");
-    const workDir = normalizeFsPath(path);
+    const workDir = normalizeFsPath(`${rootAbs}/${path}`);
     if (!isPathWithin(rootAbs, workDir, posix)) return null;
     const folderName = workDir.split("/").filter(Boolean).pop() ?? workDir;
     const descendants = state.works.filter(
@@ -109,7 +110,8 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
           preview.descendantWorkCount,
         );
       }
-      const workDir = normalizeFsPath(body.path);
+      const rootAbs = normalizeFsPath(state.rootFolder ?? "/library");
+      const workDir = normalizeFsPath(`${rootAbs}/${body.path}`);
       state.works = state.works.filter(
         (work) => !(work.physicalPath.startsWith(`${workDir}/`) && work.physicalPath !== workDir),
       );

@@ -12,6 +12,7 @@ import {
 } from "./work.ts";
 import { splitSelectedTags, type TagFilters } from "./pseudoTag.ts";
 import { dlsiteApplyBodySchema, dlsiteStatusSchema } from "./dlsite.ts";
+import { workspacePathSchema } from "./media.ts";
 
 // ── 作品検索（GET /api/works）────────────────────────────────
 
@@ -165,7 +166,7 @@ export type WorkPatch = z.output<typeof workPatchSchema>;
 // ── 作品の手動登録（POST /api/works, GET /api/works/register-preview）────
 
 export const workRegisterPreviewQuerySchema = z.object({
-  path: z.string().min(1),
+  path: workspacePathSchema,
 });
 export type WorkRegisterPreviewQuery = z.infer<typeof workRegisterPreviewQuerySchema>;
 
@@ -181,7 +182,7 @@ export const workRegisterPreviewSchema = z.object({
 export type WorkRegisterPreview = z.infer<typeof workRegisterPreviewSchema>;
 
 export const workCreateBodySchema = z.object({
-  path: z.string().min(1),
+  path: workspacePathSchema,
   title: z.string().min(1),
   /** タグは契約の入口で正規形へ寄せる（ADR-0005 決定5） */
   tags: z

@@ -229,7 +229,7 @@ export async function createWorkFromFolder(
   applyDlsiteCover?: (coverUrl: string, workDir: string) => Promise<string | null>,
 ): Promise<Work> {
   const { query, catalog, user } = repos;
-  const workDir = resolveWithin(root, body.path);
+  const workDir = resolveWithin(root, join(root, body.path));
   if (!workDir || !isDirectory(workDir)) {
     throw new WorkRegisterError(
       "not_configured",

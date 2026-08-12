@@ -10,6 +10,7 @@ export * from "./library.ts";
 export * from "./pseudoTag.ts";
 export * from "./tagPrefix.ts";
 export * from "./fs.ts";
+export * from "./media.ts";
 export * from "./settings.ts";
 export * from "./scan.ts";
 export * from "./dlsite.ts";
