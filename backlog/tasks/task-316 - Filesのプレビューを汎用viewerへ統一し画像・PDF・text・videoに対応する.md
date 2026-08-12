@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-12 11:31'
-updated_date: '2026-08-12 13:14'
+updated_date: '2026-08-12 16:40'
 labels: []
 dependencies:
   - TASK-315
@@ -25,8 +25,10 @@ ordinal: 326000
 - [x] #2 種別判定がsharedのMediaKind/PreviewCapability経由になり、clientの拡張子推測が削除されている
 - [x] #3 preview不可種別が種別名つきの空状態で表示され、読み込みエラーと区別される
 - [x] #4 textのサイズ上限超過時に先頭のみ表示と注記が出る
-- [ ] #5 pnpm test:smokeが通り、各種別のプレビュー表示のsmokeがある
+- [x] #5 pnpm test:smokeが通り、各種別のプレビュー表示のsmokeがある
 <!-- AC:END -->
+
+
 
 ## Implementation Plan
 

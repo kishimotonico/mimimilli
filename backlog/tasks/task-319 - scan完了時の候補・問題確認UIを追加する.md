@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-12 12:18'
-updated_date: '2026-08-12 14:02'
+updated_date: '2026-08-12 16:40'
 labels: []
 dependencies:
   - TASK-313
@@ -25,8 +25,10 @@ TASK-318の確認UI側。scan完了時に新規登録候補・identity_conflict�
 - [x] #2 候補一覧から全件登録・選択登録・除外が実行できる
 - [x] #3 除外が永続化され、次回scanの候補に出ない
 - [x] #4 identity_conflictと不正sidecarが問題セクションに件数つきで表示される
-- [ ] #5 pnpm test:smokeが通り、候補承認フローのsmokeがある
+- [x] #5 pnpm test:smokeが通り、候補承認フローのsmokeがある
 <!-- AC:END -->
+
+
 
 ## Implementation Plan
 

@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@codex'
 created_date: '2026-08-12 11:32'
-updated_date: '2026-08-12 13:26'
+updated_date: '2026-08-12 16:40'
 labels: []
 dependencies:
   - TASK-313
@@ -25,8 +25,10 @@ ordinal: 327000
 - [x] #2 inspectorに競合相手のフォルダーパスが表示される
 - [x] #3 「別作品として取り込む」操作で複製側のWork IDが再採番され、新規作品として登録される
 - [x] #4 操作は確認ダイアログを経由し、再採番は明示操作のみで発生する
-- [ ] #5 pnpm test:smokeが通り、conflict表示と解決操作のテストがある
+- [x] #5 pnpm test:smokeが通り、conflict表示と解決操作のテストがある
 <!-- AC:END -->
+
+
 
 ## Implementation Plan
 
