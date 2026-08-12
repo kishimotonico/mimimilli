@@ -92,6 +92,9 @@ export function createApp(adapter: DataAdapter): App {
   });
 
   return Object.assign(app, {
-    shutdown: () => dlsiteJobs.shutdown(),
+    async shutdown(): Promise<void> {
+      await scanJobs.shutdown();
+      await dlsiteJobs.shutdown();
+    },
   });
 }

@@ -40,6 +40,8 @@ export class ScanJobManager {
   private readonly terminalLimit: number;
   private readonly jobs = new Map<string, Job>();
   private activeId: string | null = null;
+  private runCompletion: Promise<void> | null = null;
+  private shuttingDown = false;
   // terminal job はpruneTerminalで消えるため、前回結果はディスク永続化せずここにだけ保持する（TASK-56）。
   private lastCompleted: ScanLastResultResponse | null = null;
 
@@ -56,6 +58,7 @@ export class ScanJobManager {
   }
 
   start(options?: { full?: boolean }): ScanJobSnapshot {
+    if (this.shuttingDown) throw new Error("スキャンジョブマネージャーは終了処理中です");
     const active = this.getActive();
     if (active) throw new ActiveScanConflictError(active);
     const full = options?.full ?? false;
@@ -81,11 +84,19 @@ export class ScanJobManager {
     this.activeId = snapshot.id;
 
     // POSTのcall stackからscan開始を分離する。同期adapterであってもqueued応答を先に返す。
-    setTimeout(() => {
-      void this.run(job).catch((error: unknown) => {
-        this.finishFailed(job, error);
-      });
-    }, 0);
+    const completion = new Promise<void>((resolve) => {
+      setTimeout(() => {
+        void this.run(job)
+          .catch((error: unknown) => {
+            this.finishFailed(job, error);
+          })
+          .finally(resolve);
+      }, 0);
+    });
+    this.runCompletion = completion;
+    void completion.finally(() => {
+      if (this.runCompletion === completion) this.runCompletion = null;
+    });
     return this.copy(snapshot);
   }
 
@@ -113,6 +124,16 @@ export class ScanJobManager {
     }
     job.controller.abort();
     return this.copy(job.snapshot);
+  }
+
+  async shutdown(): Promise<void> {
+    if (this.shuttingDown) {
+      await this.runCompletion;
+      return;
+    }
+    this.shuttingDown = true;
+    if (this.activeId) this.cancel(this.activeId);
+    await this.runCompletion;
   }
 
   subscribe(
