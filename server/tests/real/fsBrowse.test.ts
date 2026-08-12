@@ -11,6 +11,7 @@ import { buildWorkPathIndex, findOwnerWork } from "../../src/adapters/real/fsBro
 import { openDb, type Db } from "../../src/adapters/real/db.ts";
 import { createWorkRepos } from "../helpers/workTestUtils.ts";
 import { createApp, type AppEnv } from "../../src/app.ts";
+import { scanAndRegisterCandidates } from "../helpers/scanLibrary.ts";
 import { makeSampleLibrary, writeWav } from "../helpers/sampleLibrary.ts";
 import { upsertTestWork } from "../helpers/workTestUtils.ts";
 
@@ -52,7 +53,7 @@ async function setup(t: TestContext, prepare?: (root: string) => void) {
   const adapter = createTestRealAdapter({ database: { kind: "memory" } });
   const app = createApp(adapter);
   await adapter.updateSettings({ rootFolder: lib.root });
-  await adapter.scan();
+  await scanAndRegisterCandidates(adapter);
   return { app, root: resolve(lib.root), existingWorkId: lib.existingWorkId };
 }
 
@@ -130,6 +131,7 @@ test("ネストした作品ルートではファイルを最も深い作品へ�
     writeFileSync(
       join(nested, "mimimilli.json"),
       JSON.stringify({
+        formatVersion: 1,
         id: nestedId,
         title: "ネストした作品",
         tags: [],
