@@ -29,7 +29,12 @@ async function setup(t: TestContext) {
   t.after(lib.cleanup);
   const adapter = createTestRealAdapter({ database: { kind: "memory" } });
   await adapter.updateSettings({ rootFolder: lib.root });
-  return { ...lib, adapter };
+  const initial = await adapter.scan();
+  const result = await adapter.registerScanCandidates(
+    initial.candidates.map((candidate) => candidate.path),
+  );
+  const candidateWorkId = result.registered[0]!.workId;
+  return { ...lib, adapter, candidateWorkId: candidateWorkId! };
 }
 
 function countWorkStates(db: Db): number {
@@ -39,16 +44,16 @@ function countWorkStates(db: Db): number {
   return row.total;
 }
 
-test("初回スキャン: 登録・自動生成・エラー検出・duration プローブ", async (t) => {
-  const { adapter, existingWorkId, root } = await setup(t);
+test("初回スキャン: 登録済みsidecarを投影し、候補を自動登録しない", async (t) => {
+  const { adapter, candidateWorkId, existingWorkId, root } = await setup(t);
   const result = await adapter.scan();
 
   assert.equal(result.registered, 1);
-  assert.equal(result.newlyGenerated, 1);
-  assert.equal(result.newWorkIds.length, 1);
+  assert.equal(result.newlyGenerated, 0);
+  assert.equal(result.newWorkIds.length, 0);
   assert.equal(result.missing, 0);
 
-  // 自動生成された mimimilli.json が物理的に存在し、作品ルートは mp3/ ではなく RJ900001 になる
+  // 明示登録したsidecarは作品ルートにだけ存在する。
   const generatedMeta = join(root, "dlsite", "RJ900001_テスト作品", "mimimilli.json");
   assert.ok(existsSync(generatedMeta));
   const meta = JSON.parse(readFileSync(generatedMeta, "utf-8"));
@@ -76,7 +81,7 @@ test("初回スキャン: 登録・自動生成・エラー検出・duration プ
   });
 
   // duration プローブ（2秒 + 3秒）
-  const generated = await adapter.getWork(result.newWorkIds[0]!);
+  const generated = await adapter.getWork(candidateWorkId);
   assert.ok(generated);
   assert.ok(generated.totalDurationSec !== null);
   assert.ok(
@@ -201,7 +206,10 @@ test("メタ不正: 壊れた JSON は errors にカウントされスキャン�
   assert.equal(result.errors, 1);
   assert.equal(result.registered, 1); // 既存メタ作品は通常どおり登録される
   // メタ不正フォルダーは「メタあり」扱いなので自動生成はされない
-  assert.equal(result.newlyGenerated, 1); // RJ900001 のみ
+  assert.equal(result.newlyGenerated, 0);
+  assert.equal(result.invalidSidecars.length, 1);
+  assert.equal(result.invalidSidecars[0]?.path, "broken-work/mimimilli.json");
+  assert.match(result.invalidSidecars[0]?.message ?? "", /メタファイルが不正です/);
 });
 
 test("大量ディレクトリの走査中、walking フェーズの進捗イベントが複数回発火する（同期walkの詰まり修正の検証）", async (t) => {
@@ -262,9 +270,9 @@ test("登録済み作品のメタが壊れた場合は missing ではなく erro
 test("増分スキャン: 完全未変更の作品は2回目以降スキップされる", async (t) => {
   const { adapter } = await setup(t);
   const first = await adapter.scan();
-  assert.equal(first.skipped, 0);
+  assert.equal(first.skipped, 1);
   assert.equal(first.registered, 1);
-  assert.equal(first.newlyGenerated, 1);
+  assert.equal(first.newlyGenerated, 0);
 
   const second = await adapter.scan();
   assert.equal(second.registered, 1); // error状態の既存メタは毎回再評価（TASK-95）
@@ -275,9 +283,8 @@ test("増分スキャン: 完全未変更の作品は2回目以降スキップ�
 });
 
 test("増分スキャン: スキップした作品もPlaylist/Trackとresumeを維持する", async (t) => {
-  const { adapter } = await setup(t);
-  const first = await adapter.scan();
-  const workId = first.newWorkIds[0]!;
+  const { adapter, candidateWorkId } = await setup(t);
+  const workId = candidateWorkId;
   const before = await adapter.getWork(workId);
   assert.ok(before);
   const playlist = before!.playlists[0]!;
@@ -306,6 +313,10 @@ test("増分スキャン: source revisionが変わった不正sidecarはerrorと
   const second = await adapter.scan();
   assert.equal(second.skipped, 0);
   assert.equal(second.errors, 1);
+  assert.deepEqual(
+    second.invalidSidecars.map((sidecar) => sidecar.path),
+    ["dlsite/RJ900001_テスト作品/mimimilli.json"],
+  );
 });
 
 test("増分スキャン: sidecar bytesが変われば未知キーだけでも再投影する", async (t) => {
@@ -391,9 +402,8 @@ test("増分スキャン: sidecar bytesが変われば未知キーだけでも�
 });
 
 test("増分スキャン: 音声削除時は fingerprint 不一致で再処理され error になる", async (t) => {
-  const { adapter, root } = await setup(t);
-  const first = await adapter.scan();
-  const generatedId = first.newWorkIds[0]!;
+  const { adapter, candidateWorkId, root } = await setup(t);
+  const generatedId = candidateWorkId;
 
   const before = await adapter.getWork(generatedId);
   assert.equal(before?.status, "ok");
@@ -410,9 +420,8 @@ test("増分スキャン: 音声削除時は fingerprint 不一致で再処理�
 });
 
 test("増分スキャン: 音声 mtime/size 変更時は duration が再計算される", async (t) => {
-  const { adapter, root } = await setup(t);
-  const first = await adapter.scan();
-  const generatedId = first.newWorkIds[0]!;
+  const { adapter, candidateWorkId, root } = await setup(t);
+  const generatedId = candidateWorkId;
 
   const before = await adapter.getWork(generatedId);
   assert.ok(before);
@@ -457,13 +466,13 @@ test("増分スキャン: カバー画像の更新でも再処理する", async 
 });
 
 test("カバー計測失敗: 画像が読めない場合は寸法NULLでcoverErrorsに計上され、DTOはcover:nullになる", async (t) => {
-  const { adapter, root } = await setup(t);
+  const { adapter, candidateWorkId, root } = await setup(t);
   const coverPath = join(root, "dlsite", "RJ900001_テスト作品", "cover.jpg");
   writeFileSync(coverPath, "not an image");
 
   const first = await adapter.scan();
   assert.equal(first.coverErrors, 1);
-  const generated = await adapter.getWork(first.newWorkIds[0]!);
+  const generated = await adapter.getWork(candidateWorkId);
   // 画像はあるが計測失敗＝表示可能なカバー無しとしてnull投影する（0/1で埋めない）
   assert.equal(generated!.cover, null);
   assert.equal(generated!.coverKind, "unmeasured");

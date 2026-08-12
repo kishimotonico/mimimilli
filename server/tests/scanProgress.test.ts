@@ -25,6 +25,8 @@ const emptyResult = {
   skipped: 0,
   coverErrors: 0,
   identityConflicts: [],
+  invalidSidecars: [],
+  candidates: [],
 };
 
 async function start(

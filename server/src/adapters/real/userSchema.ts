@@ -34,3 +34,8 @@ export const smartFolders = sqliteTable("smart_folders", {
   sort: text("sort").notNull(),
   createdAt: text("created_at").notNull(),
 });
+
+/** ユーザーが未登録候補として再表示しないよう指定したroot相対パス。 */
+export const scanCandidateExclusions = sqliteTable("scan_candidate_exclusions", {
+  path: text("path").primaryKey(),
+});

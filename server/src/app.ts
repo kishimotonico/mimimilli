@@ -54,7 +54,10 @@ export function createApp(adapter: DataAdapter): App {
   const dlsiteJobs = new DlsiteJobManager(adapter);
   const scanJobs = new ScanJobManager(adapter);
   api.route("/", settingsRoute(adapter));
-  api.route("/", scanRoute(scanJobs));
+  api.route(
+    "/",
+    scanRoute(scanJobs, undefined, (workId) => dlsiteJobs.enqueue("new", [workId])),
+  );
   api.route(
     "/",
     worksRoute(adapter, (workId) => dlsiteJobs.enqueue("new", [workId])),

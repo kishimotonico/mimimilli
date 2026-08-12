@@ -18,6 +18,7 @@ import StatusRow from "./scanModal/StatusRow";
 import StatsGrid from "./scanModal/StatsGrid";
 import ScanWarnings from "./scanModal/ScanWarnings";
 import ScanNewWorks from "./scanModal/ScanNewWorks";
+import ScanReview from "./scanModal/ScanReview";
 import {
   ScanCancelButton,
   ScanFooterHint,
@@ -31,6 +32,7 @@ interface ScanModalProps {
   onClose: () => void;
   /** RJコード未検出の作品一覧を開く（結果にrjCodeMissingCount > 0のときのみ表示） */
   onOpenRjCodeMissing: () => void;
+  onOpenFiles: (path: string) => void;
 }
 
 const EMPTY_WORK_IDS: string[] = [];
@@ -48,7 +50,12 @@ function patchTitleInWorksPage(
   };
 }
 
-export default function ScanModal({ lastScanTime, onClose, onOpenRjCodeMissing }: ScanModalProps) {
+export default function ScanModal({
+  lastScanTime,
+  onClose,
+  onOpenRjCodeMissing,
+  onOpenFiles,
+}: ScanModalProps) {
   const scanning = useAtomValue(scanningAtom);
   const progress = useAtomValue(scanProgressAtom);
   const { start, cancel } = useScanActions();
@@ -212,6 +219,8 @@ export default function ScanModal({ lastScanTime, onClose, onOpenRjCodeMissing }
                 />
               )}
           </AnimatePresence>
+
+          {lastResult && <ScanReview result={lastResult} onOpenFiles={onOpenFiles} />}
 
           <AnimatePresence initial={false}>
             {(newWorks.length > 0 || !!newWorksError) && (

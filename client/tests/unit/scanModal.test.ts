@@ -97,6 +97,9 @@ const scanResult: ScanResult = {
   rjCodeMissingCount: 0,
   skipped: 0,
   coverErrors: 0,
+  identityConflicts: [],
+  invalidSidecars: [],
+  candidates: [],
 };
 
 function dispatchCancel(dialog: HTMLElement) {

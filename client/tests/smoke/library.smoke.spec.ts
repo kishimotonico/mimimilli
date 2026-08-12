@@ -196,6 +196,34 @@ test("FilesでID重複を表示し、確認して別作品として取り込め�
   ).toBeVisible();
   await dialog.getByRole("button", { name: "取り込む" }).click();
   await expect(preview.getByText("ID重複", { exact: true })).toBeHidden();
+  assertNoErrors(tracker);
+});
+
+test("スキャン完了後に候補を選択登録でき、問題をFilesで確認できる", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-chromium", "desktop scenario only");
+
+  const tracker = trackErrors(page);
+  await openApp(page);
+  await page.getByRole("button", { name: "スキャン" }).click();
+  const dialog = page.getByRole("dialog", { name: "スキャン" });
+  await dialog.getByRole("button", { name: "スキャン開始" }).click();
+
+  const review = dialog.getByRole("region", { name: "スキャン確認" });
+  await expect(review).toBeVisible({ timeout: 15_000 });
+  await expect(review.getByText("新規登録候補 2件")).toBeVisible();
+  await expect(review.getByText("ID重複 1件")).toBeVisible();
+  await expect(review.getByText("不正なsidecar 1件")).toBeVisible();
+
+  await review.getByRole("button", { name: "選択したものを登録" }).click();
+  await expect(review.getByText("2件を登録しました。")).toBeVisible();
+  await expect(review.getByText(/新規登録候補/)).toHaveCount(0);
+
+  await review.getByRole("button", { name: "viewer / dlsite" }).click();
+  await expect(page.getByRole("button", { name: "ファイル" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.getByTitle("viewer")).toHaveClass(/is-on/);
 
   assertNoErrors(tracker);
 });

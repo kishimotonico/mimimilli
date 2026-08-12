@@ -1,6 +1,8 @@
 import { DEFAULT_TAG_PREFIXES } from "@mimimilli/shared";
 import type {
+  InvalidSidecar,
   ResumeBody,
+  ScanCandidate,
   ScanDiagnostic,
   SmartFolder,
   TagPrefix,
@@ -29,6 +31,9 @@ export interface FixtureState {
   /** scan() が newWorkIds として返す、未取り込みの新規作品ID（シナリオ "new-work" 用） */
   scanNewWorkIds: string[];
   identityConflicts: ScanDiagnostic[];
+  scanCandidates: ScanCandidate[];
+  scanIdentityConflicts: ScanDiagnostic[];
+  scanInvalidSidecars: InvalidSidecar[];
 }
 
 export interface FixtureAdapterOptions {
@@ -74,6 +79,9 @@ export function createInitialState(options: FixtureAdapterOptions): FixtureState
             },
           ]
         : [],
+    scanCandidates: scenario.scanCandidates,
+    scanIdentityConflicts: scenario.scanIdentityConflicts,
+    scanInvalidSidecars: scenario.scanInvalidSidecars,
   };
 }
 

@@ -1,5 +1,11 @@
-import { isRjCodeMissing } from "@mimimilli/shared";
-import type { ScanResult, Settings, SettingsUpdate } from "@mimimilli/shared";
+import { isRjCodeMissing, workspacePath } from "@mimimilli/shared";
+import type {
+  ScanCandidate,
+  ScanCandidatesRegisterResponse,
+  ScanResult,
+  Settings,
+  SettingsUpdate,
+} from "@mimimilli/shared";
 import type { ScanOptions } from "../../adapter/index.ts";
 import type { SettingsAdapter } from "../../adapter/settings.ts";
 import type { FixtureState } from "./state.ts";
@@ -54,12 +60,41 @@ export function createSettingsScanMethods(state: FixtureState): SettingsAdapter 
         skipped: 0,
         coverErrors: 0,
         unreadablePaths: [],
-        identityConflicts: state.identityConflicts,
+        identityConflicts: state.scanIdentityConflicts,
+        invalidSidecars: state.scanInvalidSidecars,
+        candidates: state.scanCandidates,
       };
     },
 
     async listScanDiagnostics() {
       return state.identityConflicts;
+    },
+    async listScanCandidates(): Promise<ScanCandidate[]> {
+      return state.scanCandidates;
+    },
+    async registerScanCandidates(paths): Promise<ScanCandidatesRegisterResponse> {
+      const candidatesByPath = new Map<string, ScanCandidate>(
+        state.scanCandidates.map((candidate) => [candidate.path, candidate]),
+      );
+      const registered = paths.flatMap((path, index) => {
+        const candidate = candidatesByPath.get(path);
+        return candidate ? [{ path: candidate.path, workId: `fixture-candidate-${index}` }] : [];
+      });
+      const failures = paths.flatMap((path) =>
+        candidatesByPath.has(path)
+          ? []
+          : [{ path: workspacePath(path), message: "候補が見つかりません" }],
+      );
+      const registeredPaths = new Set(registered.map((candidate) => candidate.path));
+      state.scanCandidates = state.scanCandidates.filter(
+        (candidate) => !registeredPaths.has(candidate.path),
+      );
+      return { registered, failures };
+    },
+    async excludeScanCandidates(paths): Promise<void> {
+      state.scanCandidates = state.scanCandidates.filter(
+        (candidate) => !paths.includes(candidate.path),
+      );
     },
   };
 }
