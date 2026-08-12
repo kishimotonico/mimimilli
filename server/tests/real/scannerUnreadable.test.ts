@@ -11,6 +11,7 @@ import { makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 
 function metaWithSingleTrack(id: string, title: string): unknown {
   return {
+    formatVersion: 1,
     id,
     title,
     playlists: [

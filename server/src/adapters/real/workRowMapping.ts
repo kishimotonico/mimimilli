@@ -65,7 +65,9 @@ export type RawWorkListRow = {
 };
 
 export interface ScanWorkState {
-  fingerprint: string | null;
+  sourceRevision: string | null;
+  projectionRevision: string | null;
+  mediaRevision: string | null;
   status: Work["status"];
   physicalPath: string;
   addedAt: string;

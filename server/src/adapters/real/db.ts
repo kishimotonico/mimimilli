@@ -21,7 +21,7 @@ import {
 import { applySqliteBusyTimeout } from "./sqliteConnection.ts";
 import * as userSchema from "./userSchema.ts";
 
-const CATALOG_SCHEMA_VERSION = 8;
+const CATALOG_SCHEMA_VERSION = 9;
 const USER_SCHEMA_VERSION = 6;
 const SQLITE_URI_FLAGS =
   constants.SQLITE_OPEN_READWRITE | constants.SQLITE_OPEN_CREATE | constants.SQLITE_OPEN_URI;

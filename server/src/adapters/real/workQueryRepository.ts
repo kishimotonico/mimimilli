@@ -469,7 +469,9 @@ export class WorkQueryRepository {
         `
           SELECT
             works.id AS id,
-            works.fingerprint AS fingerprint,
+            works.source_revision AS sourceRevision,
+            works.projection_revision AS projectionRevision,
+            works.media_revision AS mediaRevision,
             works.status AS status,
             works.physical_path AS physicalPath,
             works.cover_image AS coverImage,
@@ -487,7 +489,9 @@ export class WorkQueryRepository {
       )
       .all() as Array<{
       id: string;
-      fingerprint: string | null;
+      sourceRevision: string | null;
+      projectionRevision: string | null;
+      mediaRevision: string | null;
       status: Work["status"];
       physicalPath: string;
       coverImage: string | null;
@@ -503,7 +507,9 @@ export class WorkQueryRepository {
     const map = new Map<string, ScanWorkState>();
     for (const row of rows) {
       map.set(row.id, {
-        fingerprint: row.fingerprint,
+        sourceRevision: row.sourceRevision,
+        projectionRevision: row.projectionRevision,
+        mediaRevision: row.mediaRevision,
         status: row.status,
         physicalPath: row.physicalPath,
         addedAt: row.addedAt,

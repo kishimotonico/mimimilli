@@ -14,7 +14,10 @@ import type { DataAdapter } from "../adapter/index.ts";
 import { apiError, conflict, invalidRequest, notFound } from "../lib/httpError.ts";
 import { SourceChangedError } from "../errors.ts";
 
-export function worksRoute(adapter: DataAdapter): Hono {
+export function worksRoute(
+  adapter: DataAdapter,
+  onWorkRegistered: (workId: string) => void = () => {},
+): Hono {
   const app = new Hono();
 
   app.get("/works", async (c) => {
@@ -51,6 +54,7 @@ export function worksRoute(adapter: DataAdapter): Hono {
     try {
       const work = await adapter.createWork(parsed.data);
       if (!work) notFound("指定されたパスは存在しないか、ルート配下ではありません");
+      onWorkRegistered(work.id);
       return c.json(work, 201);
     } catch (error) {
       if (error instanceof WorkRegisterError) {

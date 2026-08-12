@@ -31,8 +31,10 @@ export const works = sqliteTable(
     totalDurationSec: real("total_duration_sec"),
     /** デフォルトプレイリストのトラック数。upsert時に維持する。 */
     trackCount: integer("track_count").notNull().default(0),
-    /** 増分スキャンの変更検知フィンガープリント（TASK-75で値を設定する。列はTASK-57と同じv5で先行追加） */
-    fingerprint: text("fingerprint"),
+    sourceRevision: text("source_revision"),
+    projectionRevision: text("projection_revision"),
+    mediaRevision: text("media_revision"),
+    verificationStatus: text("verification_status").notNull().default("verified"),
     errorMessage: text("error_message"),
     urlsJson: text("urls_json").notNull(),
   },

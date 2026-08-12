@@ -85,6 +85,13 @@
       "when": 1786539788236,
       "tag": "0011_robust_gauntlet",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1786541030600,
+      "tag": "0012_scan_revisions",
+      "breakpoints": true
     }
   ]
 }

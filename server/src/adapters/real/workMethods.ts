@@ -18,7 +18,7 @@ import type {
 } from "@mimimilli/shared";
 import { type Db } from "./db.ts";
 import { buildFileTree } from "./fileTree.ts";
-import { patchMetaFileCas, readMetaSource } from "./meta.ts";
+import { MetaParseError, patchMetaFileCas, readMetaSource } from "./meta.ts";
 import { SourceChangedError } from "../../errors.ts";
 import { resolveWithin } from "./paths.ts";
 import { Scanner } from "./scanner.ts";
@@ -66,7 +66,8 @@ export function createWorkMethods(deps: {
       try {
         return { ...work, sourceRevision: readMetaSource(metaPath).sourceRevision };
       } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === "ENOENT") return work;
+        if ((error as NodeJS.ErrnoException).code === "ENOENT" || error instanceof MetaParseError)
+          return work;
         throw error;
       }
     },

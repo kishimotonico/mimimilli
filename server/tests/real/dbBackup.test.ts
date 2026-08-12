@@ -291,7 +291,7 @@ test("catalogはスキーマ不一致時にバックアップ退避してから�
   assert.match(backups[0]!, /version-mismatch/);
   const reopened = new Database(catalogPath, { readonly: true });
   const version = reopened.query("PRAGMA user_version").get() as { user_version: number };
-  assert.equal(version.user_version, 8);
+  assert.equal(version.user_version, 9);
   reopened.close();
 });
 
