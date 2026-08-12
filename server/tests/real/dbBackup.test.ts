@@ -79,7 +79,10 @@ test("createDatabaseBackupはWALを含むDBから一貫した論理スナップ�
   assert.equal(existsSync(`${backupPath}-wal`), false);
   verifyDatabaseBackup(backupPath, "user");
   const snapshot = new Database(backupPath, { readonly: true });
-  assert.equal(snapshot.query("SELECT value FROM entries").get()?.value, "user");
+  assert.equal(
+    snapshot.query<{ value: string }, []>("SELECT value FROM entries").get()?.value,
+    "user",
+  );
   snapshot.close();
 });
 
@@ -123,7 +126,10 @@ test("候補DBは既存destinationを直接上書きせず同一ディレクト�
   assert.equal(readFileSync(dbPath, "utf-8"), "new");
   assert.equal(existsSync(`${dbPath}-wal`), false);
   assert.ok(destinations.some((destination) => destination.includes(".rollback-")));
-  assert.equal(readdirSync(dirname(dbPath)).some((name) => name.startsWith(".user.sqlite.")), false);
+  assert.equal(
+    readdirSync(dirname(dbPath)).some((name) => name.startsWith(".user.sqlite.")),
+    false,
+  );
 });
 
 test("候補DBのinstall失敗時は旧DBを復元し一時ファイルを削除する", (t) => {
@@ -156,7 +162,10 @@ test("候補DBのinstall失敗時は旧DBを復元し一時ファイルを削除
   assert.equal(readFileSync(dbPath, "utf-8"), "old");
   assert.equal(readFileSync(`${dbPath}-wal`, "utf-8"), "old-wal");
   assert.equal(existsSync(candidatePath), false);
-  assert.equal(readdirSync(dirname(dbPath)).some((name) => name.startsWith(".user.sqlite.")), false);
+  assert.equal(
+    readdirSync(dirname(dbPath)).some((name) => name.startsWith(".user.sqlite.")),
+    false,
+  );
 });
 
 test("createDatabaseBackupは同一タイムスタンプで衝突した場合に上書きせず連番サフィックスを付ける", (t) => {
@@ -178,8 +187,14 @@ test("createDatabaseBackupは同一タイムスタンプで衝突した場合に
   assert.notEqual(first, second);
   const firstSnapshot = new Database(first, { readonly: true });
   const secondSnapshot = new Database(second, { readonly: true });
-  assert.equal(firstSnapshot.query("SELECT value FROM entries").get()?.value, "user-v1");
-  assert.equal(secondSnapshot.query("SELECT value FROM entries").get()?.value, "user-v2");
+  assert.equal(
+    firstSnapshot.query<{ value: string }, []>("SELECT value FROM entries").get()?.value,
+    "user-v1",
+  );
+  assert.equal(
+    secondSnapshot.query<{ value: string }, []>("SELECT value FROM entries").get()?.value,
+    "user-v2",
+  );
   firstSnapshot.close();
   secondSnapshot.close();
   assert.match(second!, /-1\.sqlite$/);
@@ -276,7 +291,7 @@ test("catalogはスキーマ不一致時にバックアップ退避してから�
   assert.match(backups[0]!, /version-mismatch/);
   const reopened = new Database(catalogPath, { readonly: true });
   const version = reopened.query("PRAGMA user_version").get() as { user_version: number };
-  assert.equal(version.user_version, 7);
+  assert.equal(version.user_version, 8);
   reopened.close();
 });
 

@@ -224,7 +224,7 @@ export function rowsToPlaylists(rows: RawPlaylistRow[]): ResolvedPlaylist[] {
       ...(track.start === null ? {} : { start: track.start }),
       ...(track.end === null ? {} : { end: track.end }),
       durationSec: null,
-      durationKind: "unknown",
+      durationKind: "unprobed",
     })),
   }));
 }
