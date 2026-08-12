@@ -13,6 +13,7 @@ function writeMeta(path: string, title: string, workId = WORK_ID): void {
     path,
     `${JSON.stringify(
       {
+        formatVersion: 1,
         id: workId,
         title,
         playlists: [
@@ -91,14 +92,51 @@ test("既存投影は競合pathの順序にかかわらず保持し、解消後�
   assert.equal(conflict.registered, 0);
   assert.equal((await adapter.getWork(WORK_ID))?.title, "既存投影");
   assert.equal((await adapter.getWork(WORK_ID))?.physicalPath, join(root, "work-z-owner"));
-  assert.deepEqual(conflict.identityConflicts[0]?.paths, [
-    "work-a-copy",
-    "work-z-owner",
-  ]);
+  assert.deepEqual(conflict.identityConflicts[0]?.paths, ["work-a-copy", "work-z-owner"]);
 
   writeMeta(duplicate, "別作品", "22222222-2222-4222-8222-222222222222");
   const resolved = await adapter.scan({ full: true });
   assert.deepEqual(resolved.identityConflicts, []);
   assert.equal((await adapter.getWork("22222222-2222-4222-8222-222222222222"))?.title, "別作品");
   assert.equal(readFileSync(owner, "utf-8").includes(WORK_ID), true);
+});
+
+test("identity_conflictの指定pathだけを別作品として取り込み、Work ID以外を維持する", async (t) => {
+  const directory = makeTestDirectory("identity-conflict-reassign");
+  t.after(directory.cleanup);
+  const root = join(directory.path, "library");
+  makeWork(root, "work-owner", "元作品");
+  const copy = makeWork(root, "work-copy", "複製側");
+  const before = JSON.parse(readFileSync(copy, "utf-8"));
+  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
+  t.after(() => adapter.close());
+  await adapter.updateSettings({ rootFolder: root });
+  await adapter.scan({ full: true });
+
+  const app = createApp(adapter);
+  t.after(() => app.shutdown());
+  const rejected = await app.request("/api/works/identity-conflicts/reassign", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: "not-a-diagnostic" }),
+  });
+  assert.equal(rejected.status, 404);
+
+  const response = await app.request("/api/works/identity-conflicts/reassign", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: "work-copy" }),
+  });
+  assert.equal(response.status, 201);
+  const work = await response.json();
+  assert.notEqual(work.id, WORK_ID);
+  assert.equal(work.title, "複製側");
+  assert.equal(work.bookmarked, false);
+  assert.equal(work.resume, null);
+
+  const after = JSON.parse(readFileSync(copy, "utf-8"));
+  assert.notEqual(after.id, before.id);
+  assert.deepEqual({ ...after, id: before.id }, before);
+  assert.deepEqual(await adapter.listScanDiagnostics(), []);
+  assert.equal((await adapter.getWork(work.id))?.physicalPath, join(root, "work-copy"));
 });

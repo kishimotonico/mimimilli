@@ -5,6 +5,7 @@ import {
   resumeBodySchema,
   WORKS_DEFAULT_PAGE_SIZE,
   workCreateBodySchema,
+  identityConflictReassignBodySchema,
   workPatchSchema,
   workRegisterPreviewQuerySchema,
   worksQuerySchema,
@@ -65,6 +66,18 @@ export function worksRoute(
       }
       throw error;
     }
+  });
+
+  app.post("/works/identity-conflicts/reassign", async (c) => {
+    const body = await c.req.json().catch(() => null);
+    const parsed = identityConflictReassignBodySchema.safeParse(body);
+    if (!parsed.success) invalidRequest("再取り込み対象のパスが不正です");
+    const work = await adapter.reassignIdentityConflict(parsed.data).catch((error) => {
+      if (error instanceof SourceChangedError) throw apiError("source_changed", error.message);
+      throw error;
+    });
+    if (!work) notFound("指定されたパスはidentity_conflict診断の対象ではありません");
+    return c.json(work, 201);
   });
 
   app.get("/works/:id", async (c) => {

@@ -174,6 +174,32 @@ test("スキャンダイアログが開いて完了し、閉じられる", async
   assertNoErrors(tracker);
 });
 
+test("FilesでID重複を表示し、確認して別作品として取り込める", async ({ page }) => {
+  const tracker = trackErrors(page);
+  await openApp(page);
+
+  await page.getByRole("button", { name: "ファイル" }).click();
+  await page.locator(".mle-row", { hasText: "dlsite" }).click();
+  await page.locator(".mle-row", { hasText: "夜想曲スタジオ" }).click();
+  const conflictRow = page.locator(".mle-row", { hasText: "RJ501001_夜更けの図書室で囁き朗読" });
+  await expect(conflictRow.getByText("ID重複", { exact: true })).toBeVisible();
+
+  await conflictRow.click();
+  const preview = page.locator(".mle-prv.is-files");
+  await expect(preview.getByText("ID重複", { exact: true })).toBeVisible();
+  await expect(preview.getByText("copies/RJ501001_夜更けの図書室で囁き朗読")).toBeVisible();
+  await preview.getByRole("button", { name: "別作品として取り込む" }).click();
+
+  const dialog = page.getByRole("alertdialog", { name: "別作品として取り込む" });
+  await expect(
+    dialog.getByText("dlsite/夜想曲スタジオ/RJ501001_夜更けの図書室で囁き朗読"),
+  ).toBeVisible();
+  await dialog.getByRole("button", { name: "取り込む" }).click();
+  await expect(preview.getByText("ID重複", { exact: true })).toBeHidden();
+
+  assertNoErrors(tracker);
+});
+
 test("主要画面でヨコ方向スクロールが発生しない", async ({ page }) => {
   const tracker = trackErrors(page);
 

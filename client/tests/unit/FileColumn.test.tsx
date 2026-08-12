@@ -27,6 +27,7 @@ function renderColumn(props: Partial<React.ComponentProps<typeof FileColumn>> = 
     <FileColumn
       title="フォルダー"
       entries={[]}
+      identityConflictPaths={new Map()}
       selectedPath={null}
       matchPlaying={() => false}
       onOpenDir={vi.fn()}
