@@ -77,12 +77,18 @@ async function setupRegisteredWork(t: TestContext) {
     body: JSON.stringify({ path: workspace(root, folder), title: "解除テスト作品" }),
   });
   assert.equal(createRes.status, 201);
-  const work = (await createRes.json()) as Work;
+  const created = (await createRes.json()) as Work;
+  const detailRes = await app.request(`/api/works/${created.id}`);
+  assert.equal(detailRes.status, 200);
+  const work = (await detailRes.json()) as Work;
 
   const patchRes = await app.request(`/api/works/${work.id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ tags: ["ジャンル/テスト", "サークル/解除用"] }),
+    body: JSON.stringify({
+      tags: ["ジャンル/テスト", "サークル/解除用"],
+      sourceRevision: work.sourceRevision,
+    }),
   });
   assert.equal(patchRes.status, 200);
 

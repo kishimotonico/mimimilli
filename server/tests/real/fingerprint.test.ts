@@ -41,6 +41,7 @@ test("metaFileSchemaのキー集合とfingerprintのnormalizeMetaContent対象�
     "urls",
     "coverImage",
     "dlsite",
+    "formatVersion",
   ].sort();
 
   const schemaKeys = keysOf(metaFileSchema).filter((key) => !excluded.has(key));

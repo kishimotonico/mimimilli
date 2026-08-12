@@ -5,6 +5,7 @@ import { test } from "node:test";
 import type { ScanJobSnapshot, WorksPage } from "@mimimilli/shared";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { createApp } from "../../src/app.ts";
+import { scanAndRegisterCandidates } from "../helpers/scanLibrary.ts";
 import { makeSampleLibrary } from "../helpers/sampleLibrary.ts";
 
 async function waitForTerminal(
@@ -39,7 +40,7 @@ test(
       thumbnailCacheDir,
     });
     await seed.updateSettings({ rootFolder: library.root });
-    await seed.scan();
+    await scanAndRegisterCandidates(seed);
     const settingsBeforeCancel = await seed.getSettings();
     seed.close();
 
@@ -129,7 +130,7 @@ test("app shutdown は同期停止中のfile scan Workerを終了まで待機す
     thumbnailCacheDir,
   });
   await seed.updateSettings({ rootFolder: library.root });
-  await seed.scan();
+  await scanAndRegisterCandidates(seed);
   seed.close();
 
   const gateBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT);
@@ -172,7 +173,7 @@ test("file scan Workerはfull:trueをscannerへ伝播し全件再処理する", 
   });
   t.after(() => adapter.close());
   await adapter.updateSettings({ rootFolder: library.root });
-  await adapter.scan();
+  await scanAndRegisterCandidates(adapter);
 
   const second = await adapter.scan({ full: true });
   assert.equal(second.skipped, 0);

@@ -11,13 +11,13 @@
 // データ補正は必ず新しいtimestampを持つ独立migration（0008）に置き、既に0006/0007を適用済みのDBでも
 // 0008だけが新規適用されることを保証する。
 import assert from "node:assert/strict";
-import { cpSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { Database } from "bun:sqlite";
 import { drizzle } from "drizzle-orm/bun-sqlite";
 import { migrate } from "drizzle-orm/bun-sqlite/migrator";
-import { openDb } from "../../src/adapters/real/db.ts";
+import { openDb, CATALOG_SCHEMA_VERSION } from "../../src/adapters/real/db.ts";
 import { makeTestDirectory } from "../helpers/sampleLibrary.ts";
 
 const CATALOG_MIGRATIONS_DIR = join(import.meta.dir, "../../drizzle/catalog");
@@ -25,32 +25,20 @@ const CATALOG_MIGRATIONS_DIR = join(import.meta.dir, "../../drizzle/catalog");
 /** 0006以降の適用前（TASK-92導入前）の migrations フォルダーを一時ディレクトリへ再現する。 */
 function buildPreTask92MigrationsDir(destDir: string): void {
   cpSync(CATALOG_MIGRATIONS_DIR, destDir, { recursive: true });
-  for (const tag of [
-    "0006_heavy_emma_frost",
-    "0007_hesitant_robin_chapel",
-    "0008_probe_cache_zero_duration_backfill",
-    "0009_gifted_sersi",
-    "0010_cynical_catseye",
-    "0011_robust_gauntlet",
-  ]) {
-    require("node:fs").rmSync(join(destDir, `${tag}.sql`), { force: true });
-    require("node:fs").rmSync(join(destDir, "meta", `${tag.slice(0, 4)}_snapshot.json`), {
-      force: true,
-    });
-  }
   const journalPath = join(destDir, "meta", "_journal.json");
   const journal = JSON.parse(readFileSync(journalPath, "utf-8")) as {
     entries: Array<{ tag: string }>;
   };
-  journal.entries = journal.entries.filter(
-    (entry) =>
-      entry.tag !== "0006_heavy_emma_frost" &&
-      entry.tag !== "0007_hesitant_robin_chapel" &&
-      entry.tag !== "0008_probe_cache_zero_duration_backfill" &&
-      entry.tag !== "0009_gifted_sersi" &&
-      entry.tag !== "0010_cynical_catseye" &&
-      entry.tag !== "0011_robust_gauntlet",
-  );
+  const excludedTags = journal.entries
+    .filter((entry) => Number.parseInt(entry.tag.slice(0, 4), 10) >= 6)
+    .map((entry) => entry.tag);
+  for (const tag of excludedTags) {
+    rmSync(join(destDir, `${tag}.sql`), { force: true });
+    rmSync(join(destDir, "meta", `${tag.slice(0, 4)}_snapshot.json`), {
+      force: true,
+    });
+  }
+  journal.entries = journal.entries.filter((entry) => !excludedTags.includes(entry.tag));
   writeFileSync(journalPath, JSON.stringify(journal, null, 2));
 }
 
@@ -91,8 +79,8 @@ test("migration 0006: 旧実装が0秒で保存したaudio_probe_cacheをNULLへ
   const sqlite = new Database(catalogPath, { create: true });
   sqlite.exec("PRAGMA journal_mode = WAL");
   migrate(drizzle(sqlite), { migrationsFolder: preMigrationsDir });
-  // openDb（CATALOG_SCHEMA_VERSION=8）がDBを再作成しないよう、シード前に現行版へ合わせる。
-  sqlite.exec("PRAGMA user_version = 8");
+  // openDbがDBを再作成しないよう、シード前に現行版へ合わせる。
+  sqlite.exec(`PRAGMA user_version = ${CATALOG_SCHEMA_VERSION}`);
 
   // 旧実装（probe失敗/解析失敗時にdurationSec:0で保存）が残した行を再現する。
   sqlite.exec(
@@ -176,28 +164,20 @@ DROP TABLE \`audio_probe_cache\`;--> statement-breakpoint
 ALTER TABLE \`__new_audio_probe_cache\` RENAME TO \`audio_probe_cache\`;--> statement-breakpoint
 PRAGMA foreign_keys=ON;`;
   writeFileSync(join(destDir, "0006_heavy_emma_frost.sql"), vanilla0006);
-  for (const tag of [
-    "0008_probe_cache_zero_duration_backfill",
-    "0009_gifted_sersi",
-    "0010_cynical_catseye",
-    "0011_robust_gauntlet",
-  ]) {
-    require("node:fs").rmSync(join(destDir, `${tag}.sql`), { force: true });
-    require("node:fs").rmSync(join(destDir, "meta", `${tag.slice(0, 4)}_snapshot.json`), {
-      force: true,
-    });
-  }
   const journalPath = join(destDir, "meta", "_journal.json");
   const journal = JSON.parse(readFileSync(journalPath, "utf-8")) as {
     entries: Array<{ tag: string }>;
   };
-  journal.entries = journal.entries.filter(
-    (entry) =>
-      entry.tag !== "0008_probe_cache_zero_duration_backfill" &&
-      entry.tag !== "0009_gifted_sersi" &&
-      entry.tag !== "0010_cynical_catseye" &&
-      entry.tag !== "0011_robust_gauntlet",
-  );
+  const excludedTags = journal.entries
+    .filter((entry) => Number.parseInt(entry.tag.slice(0, 4), 10) >= 8)
+    .map((entry) => entry.tag);
+  for (const tag of excludedTags) {
+    rmSync(join(destDir, `${tag}.sql`), { force: true });
+    rmSync(join(destDir, "meta", `${tag.slice(0, 4)}_snapshot.json`), {
+      force: true,
+    });
+  }
+  journal.entries = journal.entries.filter((entry) => !excludedTags.includes(entry.tag));
   writeFileSync(journalPath, JSON.stringify(journal, null, 2));
 }
 
@@ -250,15 +230,14 @@ test("migration 0011: playlists_jsonを削除し関係表を再構築用に空�
   t.after(directory.cleanup);
   const migrationsDir = join(directory.path, "migrations");
   mkdirSync(migrationsDir, { recursive: true });
-  cpSync(CATALOG_MIGRATIONS_DIR, migrationsDir, { recursive: true });
-  require("node:fs").rmSync(join(migrationsDir, "0011_robust_gauntlet.sql"), { force: true });
-  require("node:fs").rmSync(join(migrationsDir, "meta/0011_snapshot.json"), { force: true });
-  const journalPath = join(migrationsDir, "meta/_journal.json");
-  const journal = JSON.parse(readFileSync(journalPath, "utf-8")) as {
-    entries: Array<{ tag: string }>;
-  };
-  journal.entries = journal.entries.filter((entry) => entry.tag !== "0011_robust_gauntlet");
-  writeFileSync(journalPath, JSON.stringify(journal, null, 2));
+  buildPreTask92MigrationsDir(migrationsDir);
+  appendCatalogMigrations(migrationsDir, [
+    "0006_heavy_emma_frost",
+    "0007_hesitant_robin_chapel",
+    "0008_probe_cache_zero_duration_backfill",
+    "0009_gifted_sersi",
+    "0010_cynical_catseye",
+  ]);
 
   const sqlite = new Database(join(directory.path, "catalog.sqlite"), { create: true });
   migrate(drizzle(sqlite), { migrationsFolder: migrationsDir });

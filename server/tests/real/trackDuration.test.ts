@@ -30,6 +30,7 @@ test("durationSec: end-start / end有start無 / start有end無 / 両無 / 同一
     join(workDir, "mimimilli.json"),
     JSON.stringify(
       {
+        formatVersion: 1,
         id,
         title: "区間テスト",
         tags: [],
@@ -146,6 +147,7 @@ test("startがファイル全体長以上のトラックは作品をerror状態�
     join(workDir, "mimimilli.json"),
     JSON.stringify(
       {
+        formatVersion: 1,
         id,
         title: "不正start",
         tags: [],
@@ -204,6 +206,7 @@ test("end指定トラックでもstartがファイル全体長を超えていれ
     join(workDir, "mimimilli.json"),
     JSON.stringify(
       {
+        formatVersion: 1,
         id,
         title: "end指定不正start",
         tags: [],
@@ -263,6 +266,7 @@ test("endがファイル実測長をわずかに超えるだけの正常デー�
     join(workDir, "mimimilli.json"),
     JSON.stringify(
       {
+        formatVersion: 1,
         id,
         title: "end微小超過",
         tags: [],
@@ -313,6 +317,7 @@ test("rescan無しのファイル差し替え後、getWorkのtotalDurationSecは
     join(workDir, "mimimilli.json"),
     JSON.stringify(
       {
+        formatVersion: 1,
         id,
         title: "総時間同期",
         tags: [],
