@@ -1,6 +1,6 @@
 /* mimimilli shell — library-d
-   所有範囲: 軸カラム(.mll-axis* / .mll-axisgroup)、行UI(.mll-wrow / .mll-erow)、
-   タグANDバンド(.mll-tagband* / .mll-taggroup / .mll-tagrow)、カバーコラージュ
+   所有範囲: 軸カラム(.mll-axis* / .mll-axisgroup)、行UI(.mll-wrow)、
+   タグANDバンド(.mll-tagband* / .mll-taggroup)、カバーコラージュ
    (.mll-collage*)、軸値一覧(.mll-vsearch / .mll-vlist-hd / .mll-vrow* / .mll-vtile*)、
    クイックオーバーレイ(.mll-qoverlay / .mll-qlist*)、ドリルヘッダー(.mle-drill、
    軸値へのドリルダウン)。元ファイルではこれらが連続した区画だったため1ファイルにまとめている。
@@ -131,13 +131,15 @@
   color: var(--ink-3);
 }
 
-/* ── Work rows (mll-wrow / mll-erow) ─────────────────────── */
+/* ── Work rows (mll-wrow) ─────────────────────────────────── */
 
 .mll-wrow {
   display: grid;
   grid-template-columns: 32px 1fr auto;
   gap: 8px;
   align-items: center;
+  width: 100%;
+  min-width: 0;
   /* 行高を固定する（仮想スクロールの estimateSize と一致させ、行ごとの高さずれを防ぐ。TASK-59） */
   block-size: 42px;
   box-sizing: border-box;
@@ -242,58 +244,6 @@
   color: var(--r-mustard);
 }
 
-.mll-erow {
-  display: grid;
-  grid-template-columns: 22px 1fr auto;
-  gap: 8px;
-  align-items: center;
-  padding: 6px 8px;
-  border-radius: 4px;
-  font-size: 12.5px;
-  color: var(--ink-1);
-  cursor: pointer;
-  font-family: var(--font-jp);
-}
-.mll-erow:hover {
-  background: var(--paper-2);
-}
-.mll-erow.is-on {
-  background: var(--paper-4);
-  color: var(--ink-0);
-}
-.mll-erow.is-on.is-focused {
-  background: var(--ink-0);
-  color: var(--paper-1);
-}
-.mll-erow .ic {
-  color: var(--ink-2);
-  display: grid;
-  place-items: center;
-}
-.mll-erow.is-on .ic {
-  color: var(--acc);
-}
-.mll-erow.is-on.is-focused .ic {
-  color: var(--paper-1);
-}
-.mll-erow .nm {
-  font-weight: 500;
-  letter-spacing: 0.005em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.mll-erow .count {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--ink-3);
-}
-.mll-erow.is-on .count {
-  color: var(--ink-2);
-}
-.mll-erow.is-on.is-focused .count {
-  color: oklch(80% 0.008 70);
-}
 /* ── Tag AND band ─────────────────────────────────────────── */
 
 .mll-tagband {
@@ -404,49 +354,6 @@
   padding-top: 4px;
 }
 
-.mll-tagrow {
-  display: grid;
-  grid-template-columns: 16px 1fr auto;
-  gap: 8px;
-  align-items: center;
-  padding: 6px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  color: var(--ink-1);
-  cursor: pointer;
-}
-.mll-tagrow:hover {
-  background: var(--paper-2);
-}
-.mll-tagrow .check {
-  width: 14px;
-  height: 14px;
-  border-radius: 3px;
-  border: 1.5px solid var(--line-strong);
-  background: var(--paper-1);
-  display: grid;
-  place-items: center;
-  color: var(--paper-1);
-}
-.mll-tagrow.is-checked .check {
-  background: var(--ink-0);
-  border-color: var(--ink-0);
-}
-.mll-tagrow.is-on {
-  background: var(--paper-4);
-  color: var(--ink-0);
-}
-.mll-tagrow .nm {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 500;
-}
-.mll-tagrow .count {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--ink-3);
-}
 /* ── Cover collage (2×2, 値一覧の代表カバー) ───────────── */
 
 .mll-collage {

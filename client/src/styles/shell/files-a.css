@@ -11,6 +11,8 @@
   grid-template-columns: 18px 1fr auto auto;
   gap: 6px;
   align-items: center;
+  width: 100%;
+  min-width: 0;
   padding: 5px 8px;
   border-radius: 4px;
   font-size: 12px;
