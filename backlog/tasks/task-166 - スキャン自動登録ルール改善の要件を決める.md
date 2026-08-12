@@ -1,9 +1,10 @@
 ---
 id: TASK-166
 title: スキャン自動登録ルール改善の要件を決める
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-01 18:02'
+updated_date: '2026-08-12 12:19'
 labels: []
 dependencies: []
 priority: medium
@@ -32,3 +33,9 @@ ordinal: 176000
 - [ ] #4 スキャン除外マーク（特定フォルダを自動登録対象から外す機能）の要否が判断されている
 - [ ] #5 要件がまとまった後の実装タスクへの分割方針が示されている
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-08-12に要件確定: 自動登録は候補提示＋一括承認へ全面置換／DLsite取得は自動・適用は明示承認／確認UIは候補・問題があるときのみ表示／既存登録済みライブラリへは新ルールを適用しない。実装はTASK-318（候補提示・ヒューリスティック改善）、TASK-319（確認UI）、TASK-320（DLsite明示承認）へ分割。
+<!-- SECTION:NOTES:END -->

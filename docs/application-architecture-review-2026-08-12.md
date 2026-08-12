@@ -321,8 +321,8 @@ LAN外、複数利用者、共有、同時端末を扱う段階です。現時�
 | Library                   | 維持             | Catalog moduleとしてWorkspaceと分離            |
 | 複数Playlist              | 維持             | IDをWork配下へ閉じ、再生sessionへ変換          |
 | DLsite取得                | 維持・拡充       | scanから分離し、previewと明示適用を追加        |
-| scan自動登録              | 廃止候補         | 候補提示と一括承認へ置換                       |
-| scan後のDLsite自動取得    | 廃止候補         | 対象・適用policyを明示して開始                 |
+| scan自動登録              | 廃止決定         | 候補提示と一括承認へ置換（TASK-318、TASK-319） |
+| scan後のDLsite自動取得    | 適用のみ承認制へ | 取得は自動・cacheへ。適用はpreview明示承認（TASK-320） |
 | スマートフォルダーDSL     | 維持             | 縮小提案は撤回。requirements-v4 §7.5の正式機能であり、DRAFT-37は条件フィールド拡充の方向 |
 | スマホUI                  | 近く実装         | Responsive UIとしてremoteから分離              |
 | LANスマホ再生             | 判断保留         | 単一所有者の限定再生面として設計可能           |
@@ -365,12 +365,12 @@ DataAdapterの再設計は別途調査対象とします。ただし、上記の
 
 - catalog/userの物理2DBは維持する。ADR-0008の単一DB案却下理由（migration失敗がuserデータへ到達しうる）は現在も有効
 - sidecar重複の自動修復（自動ID再採番）は廃止し、`identity_conflict`診断と明示操作による再採番へ置き換える（TASK-313、TASK-317）
-- scan完了後のDLsite自動取得連鎖は当面維持し、preview・明示適用の整備と合わせて見直す
+- scan自動登録は候補提示＋一括承認へ全面置換する。既存の登録済みライブラリへは新ルールを再適用しない（TASK-318、TASK-319。TASK-166の要件確定）
+- DLsite取得は自動のまま、sidecarへの適用はpreview差分の明示承認にする。既定policyは未設定フィールドのみ適用、上書きはフィールド単位で選択（TASK-320）
+- scanの確認UIは候補・問題（identity_conflict、不正sidecar）があるときだけ表示する
 - Filesの内蔵viewerは画像・PDF・text・videoまで対象にする（TASK-315、TASK-316）
 - 未登録音声の再生履歴・resumeは保存しない
 
 次の点は、実装前に利用方針を確認する必要があります。
 
-- scanのレビューを毎回表示するか、問題と新規候補がある場合だけ表示するか
-- DLsite一括適用で上書きを許すフィールドと既定policy
 - 近い将来の「スマホ対応」がResponsive UIまでか、実機からのLAN再生までを含むか

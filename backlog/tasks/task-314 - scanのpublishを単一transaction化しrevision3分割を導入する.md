@@ -4,6 +4,7 @@ title: scanのpublishを単一transaction化しrevision3分割を導入する
 status: To Do
 assignee: []
 created_date: '2026-08-12 11:30'
+updated_date: '2026-08-12 12:19'
 labels: []
 dependencies:
   - TASK-310
@@ -24,6 +25,6 @@ ordinal: 324000
 - [ ] #2 scanのキャンセル・失敗時に公開catalogへ新世代が部分反映されない
 - [ ] #3 読み取れなかったsubtreeの作品がmissingにならずunverifiedとして旧投影を維持する
 - [ ] #4 fingerprintがsource_revision/projection_revision/media_revisionへ分割され、locationがrevisionに含まれない
-- [ ] #5 scan完了後のDLsite自動取得連鎖が従来どおり動作する
-- [ ] #6 キャンセル・途中失敗・unverified・移動検知のテストがある
+- [ ] #5 キャンセル・途中失敗・unverified・移動検知のテストがある
+- [ ] #6 DLsite自動取得の起点が「scan完了時のnewWorkIds」から「登録実行時」へ移り、登録済み作品の取得が従来どおり動作する（TASK-318と整合）
 <!-- AC:END -->
