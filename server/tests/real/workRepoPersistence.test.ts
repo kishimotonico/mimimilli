@@ -14,7 +14,11 @@ import {
 } from "../helpers/workTestUtils.ts";
 import { nts } from "../helpers/tag.ts";
 
-function sampleWork(id: string, playlistId = crypto.randomUUID(), trackId = crypto.randomUUID()): Work {
+function sampleWork(
+  id: string,
+  playlistId = crypto.randomUUID(),
+  trackId = crypto.randomUUID(),
+): Work {
   return {
     id,
     title: "永続データ検証用",

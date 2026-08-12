@@ -71,7 +71,11 @@ export function sourceRevision(bytes: Buffer): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-export function readMetaSource(metaPath: string): { bytes: Buffer; meta: MetaFile; sourceRevision: string } {
+export function readMetaSource(metaPath: string): {
+  bytes: Buffer;
+  meta: MetaFile;
+  sourceRevision: string;
+} {
   const bytes = readFileSync(metaPath);
   let raw: unknown;
   try {
@@ -82,7 +86,10 @@ export function readMetaSource(metaPath: string): { bytes: Buffer; meta: MetaFil
   const parsed = metaFileSchema.safeParse(raw);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
-    throw new MetaParseError(metaPath, `${issue?.path.join(".") ?? ""} ${issue?.message ?? "不明"}`);
+    throw new MetaParseError(
+      metaPath,
+      `${issue?.path.join(".") ?? ""} ${issue?.message ?? "不明"}`,
+    );
   }
   return { bytes, meta: parsed.data, sourceRevision: sourceRevision(bytes) };
 }
@@ -121,7 +128,10 @@ export function replaceWithRollback(
 
 function writeBytesAtomic(filePath: string, bytes: Buffer, expectedBytes?: Buffer): void {
   const tmp = join(dirname(filePath), `.${basename(filePath)}.${crypto.randomUUID()}.tmp`);
-  const rollback = join(dirname(filePath), `.${basename(filePath)}.${crypto.randomUUID()}.rollback`);
+  const rollback = join(
+    dirname(filePath),
+    `.${basename(filePath)}.${crypto.randomUUID()}.rollback`,
+  );
   let fd: number | undefined;
   let rollbackCanBeRemoved = false;
   try {
@@ -146,7 +156,11 @@ function writeBytesAtomic(filePath: string, bytes: Buffer, expectedBytes?: Buffe
       // rename済み、または一時ファイル未作成。
     }
     if (rollbackCanBeRemoved) {
-      try { unlinkSync(rollback); } catch { /* rollback cleanup */ }
+      try {
+        unlinkSync(rollback);
+      } catch {
+        /* rollback cleanup */
+      }
     }
   }
 }
@@ -165,12 +179,12 @@ export function writeMetaFile(metaPath: string, meta: MetaFile): void {
  * 生 JSON を読み、指定フィールドだけ更新して書き戻す。スキーマ外のフィールドは保持する。
  */
 type MetaPatch = {
-    title?: string;
-    tags?: string[];
-    id?: string;
-    coverImage?: string | null;
-    urls?: MetaFile["urls"];
-    dlsite?: MetaFile["dlsite"];
+  title?: string;
+  tags?: string[];
+  id?: string;
+  coverImage?: string | null;
+  urls?: MetaFile["urls"];
+  dlsite?: MetaFile["dlsite"];
 };
 
 /**
@@ -194,7 +208,10 @@ export function patchMetaFileCas(
   const parsed = metaFileSchema.safeParse(raw);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
-    throw new MetaParseError(metaPath, `${issue?.path.join(".") ?? ""} ${issue?.message ?? "不明"}`);
+    throw new MetaParseError(
+      metaPath,
+      `${issue?.path.join(".") ?? ""} ${issue?.message ?? "不明"}`,
+    );
   }
   const bytes = Buffer.from(JSON.stringify(raw, null, 2) + "\n", "utf-8");
   writeBytesAtomic(metaPath, bytes, source.bytes);
@@ -261,7 +278,11 @@ export function reassignMetaIdsOnDbCollision(
       typeof raw.id === "string" ? raw.id : null,
     );
   }
-  writeBytesAtomic(metaPath, Buffer.from(JSON.stringify(raw, null, 2) + "\n", "utf-8"), source.bytes);
+  writeBytesAtomic(
+    metaPath,
+    Buffer.from(JSON.stringify(raw, null, 2) + "\n", "utf-8"),
+    source.bytes,
+  );
   return raw.id as string;
 }
 
@@ -271,12 +292,10 @@ export function workDirOf(metaPath: string): string {
 }
 
 /** フォルダー名・タイトルから RJ コードを検出し、メタと異なる場合は書き戻す。 */
-export function syncDetectedRjCode(
-  metaPath: string,
-  workDirName: string,
-): MetaFile["dlsite"] {
+export function syncDetectedRjCode(metaPath: string, workDirName: string): MetaFile["dlsite"] {
   const source = readMetaSource(metaPath);
-  const detectedRjCode = source.meta.dlsite.rjCode ?? detectRjCode([workDirName, source.meta.title]);
+  const detectedRjCode =
+    source.meta.dlsite.rjCode ?? detectRjCode([workDirName, source.meta.title]);
   if (detectedRjCode === source.meta.dlsite.rjCode) {
     return source.meta.dlsite;
   }

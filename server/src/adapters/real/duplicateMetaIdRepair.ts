@@ -67,10 +67,7 @@ function repairDuplicates(raw: JsonObject, playlists: JsonObject[]): boolean {
   let defaultPlaylistOwnerHandled = false;
   for (const playlist of playlists) {
     const oldPlaylistId = typeof playlist.id === "string" ? playlist.id : null;
-    if (
-      typeof playlist.id !== "string" ||
-      localPlaylistIds.has(playlist.id)
-    ) {
+    if (typeof playlist.id !== "string" || localPlaylistIds.has(playlist.id)) {
       playlist.id = crypto.randomUUID();
       changed = true;
     }
@@ -86,10 +83,7 @@ function repairDuplicates(raw: JsonObject, playlists: JsonObject[]): boolean {
       defaultPlaylistOwnerHandled = true;
     }
     for (const track of playlist.tracks as JsonObject[]) {
-      if (
-        typeof track.id !== "string" ||
-        localTrackIds.has(track.id)
-      ) {
+      if (typeof track.id !== "string" || localTrackIds.has(track.id)) {
         track.id = crypto.randomUUID();
         changed = true;
       }

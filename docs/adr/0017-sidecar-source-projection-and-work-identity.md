@@ -44,11 +44,11 @@ scanはsidecarのないフォルダーを自動登録しない。未登録候補
 
 変更検知は次の3種類に分ける。これらは同じhashへ戻さない。
 
-| 名前 | 入力 | 用途 |
-| --- | --- | --- |
-| `source_revision` | sidecarのexact bytes | 外部編集検知と更新APIのCAS |
+| 名前                  | 入力                                                            | 用途                                   |
+| --------------------- | --------------------------------------------------------------- | -------------------------------------- |
+| `source_revision`     | sidecarのexact bytes                                            | 外部編集検知と更新APIのCAS             |
 | `projection_revision` | `formatVersion`、parser version、投影に使った検証済みフィールド | parser・投影ロジック変更時の再投影判断 |
-| `media_revision` | 全Playlistが参照する音声とcoverの相対パス、存在、size、mtime | mediaの変更検知、probe・表示の更新判断 |
+| `media_revision`      | 全Playlistが参照する音声とcoverの相対パス、存在、size、mtime    | mediaの変更検知、probe・表示の更新判断 |
 
 作品フォルダーの絶対パスは`location`という独立した観測値であり、revisionには含めない。watcherはscanを早めるヒントであり、最終的な整合はperiodic/full scanが取る。
 

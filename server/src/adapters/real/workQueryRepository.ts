@@ -174,10 +174,20 @@ export class WorkQueryRepository {
     for (const row of rows) {
       let playlist = playlistsById.get(row.playlistId);
       if (!playlist) {
-        playlist = { id: row.playlistId, name: row.playlistName, position: row.playlistPosition, tracks: [] };
+        playlist = {
+          id: row.playlistId,
+          name: row.playlistName,
+          position: row.playlistPosition,
+          tracks: [],
+        };
         playlistsById.set(row.playlistId, playlist);
       }
-      if (row.trackId !== null && row.trackTitle !== null && row.trackFile !== null && row.trackPosition !== null) {
+      if (
+        row.trackId !== null &&
+        row.trackTitle !== null &&
+        row.trackFile !== null &&
+        row.trackPosition !== null
+      ) {
         playlist.tracks.push({
           id: row.trackId,
           title: row.trackTitle,
