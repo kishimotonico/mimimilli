@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import type { DlsiteWorkInfo, Work } from "@mimimilli/shared";
+import type { DlsitePreview, Work } from "@mimimilli/shared";
 import { applyDlsiteInfo, fetchDlsiteInfo, updateDlsiteState } from "../../../../entities/work/api";
 import { dlsiteFetchErrorMessage } from "../../../../entities/work/dlsiteFetchError";
 import Button from "../../../../shared/ui/Button";
@@ -30,13 +30,15 @@ const inputClass =
 
 interface DlsiteApplyDialogProps {
   work: Work;
-  info: DlsiteWorkInfo;
+  preview: DlsitePreview;
   busy: boolean;
   applyTitle: boolean;
   applyCover: boolean;
+  applyUrl: boolean;
   selectedTags: string[];
   onApplyTitleChange: (checked: boolean) => void;
   onApplyCoverChange: (checked: boolean) => void;
+  onApplyUrlChange: (checked: boolean) => void;
   onSelectedTagsChange: (tags: string[]) => void;
   onApply: () => void;
   onClose: () => void;
@@ -44,17 +46,20 @@ interface DlsiteApplyDialogProps {
 
 function DlsiteApplyDialog({
   work,
-  info,
+  preview,
   busy,
   applyTitle,
   applyCover,
+  applyUrl,
   selectedTags,
   onApplyTitleChange,
   onApplyCoverChange,
+  onApplyUrlChange,
   onSelectedTagsChange,
   onApply,
   onClose,
 }: DlsiteApplyDialogProps) {
+  const { info } = preview;
   const allInfoTags = useMemo(() => dlsiteInfoTags(info), [info]);
   const close = () => {
     if (!busy) onClose();
@@ -91,6 +96,19 @@ function DlsiteApplyDialog({
             <span className="min-w-0 break-words text-ink-2">{work.title}</span>
             <span className="text-ink-3">→</span>
             <span className="min-w-0 break-words">{info.title}</span>
+          </label>
+          <label className="grid grid-cols-[18px_60px_minmax(0,1fr)_18px_minmax(0,1fr)] items-center gap-1.5 border-b border-line-soft py-2">
+            <input
+              type="checkbox"
+              checked={applyUrl}
+              onChange={(event) => onApplyUrlChange(event.target.checked)}
+            />
+            <span>URL</span>
+            <span className="min-w-0 break-all text-ink-2">
+              {work.urls.find((entry) => entry.url.includes("dlsite.com"))?.url ?? "未設定"}
+            </span>
+            <span className="text-ink-3">→</span>
+            <span className="min-w-0 break-all">{info.url}</span>
           </label>
           <label className="grid grid-cols-[18px_60px_minmax(0,1fr)_18px_minmax(0,1fr)] items-center gap-1.5 border-b border-line-soft py-2">
             <input
@@ -147,9 +165,10 @@ export function DlsiteEditor({ work }: { work: Work }) {
   const queryClient = useQueryClient();
   const invalidateDlsiteCache = useDlsiteInvalidation();
   const [rjCode, setRjCode] = useState(work.dlsite.rjCode ?? "");
-  const [info, setInfo] = useState<DlsiteWorkInfo | null>(null);
-  const [applyTitle, setApplyTitle] = useState(true);
+  const [preview, setPreview] = useState<DlsitePreview | null>(null);
+  const [applyTitle, setApplyTitle] = useState(false);
   const [applyCover, setApplyCover] = useState(true);
+  const [applyUrl, setApplyUrl] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -182,11 +201,12 @@ export function DlsiteEditor({ work }: { work: Work }) {
         const updated = await updateDlsiteState(work.id, { rjCode: rjCode.trim() || null });
         queryClient.setQueryData(WORK_QUERY_KEYS.detail(work.id), updated);
       }
-      const fetched = await fetchDlsiteInfo(work.id);
-      setSelectedTags(unappliedDlsiteTags(work, fetched));
-      setApplyTitle(fetched.title !== work.title);
-      setApplyCover(Boolean(fetched.coverUrl));
-      setInfo(fetched);
+      const nextPreview = await fetchDlsiteInfo(work.id);
+      setSelectedTags(unappliedDlsiteTags(work, nextPreview.info));
+      setApplyTitle(false);
+      setApplyCover(!work.cover && Boolean(nextPreview.info.coverUrl));
+      setApplyUrl(!work.urls.some((entry) => entry.url.includes("dlsite.com")));
+      setPreview(nextPreview);
     } catch (cause) {
       setError(dlsiteFetchErrorMessage(cause));
       await refresh();
@@ -196,18 +216,30 @@ export function DlsiteEditor({ work }: { work: Work }) {
   };
 
   const apply = async () => {
-    if (!info) return;
+    if (!preview) return;
     setBusy(true);
     setError(null);
     try {
       await applyDlsiteInfo(
         work.id,
-        buildDlsiteApplyBody(info, { applyTitle, applyCover, applyTags: selectedTags }),
+        buildDlsiteApplyBody(preview.info, {
+          sourceRevision: preview.sourceRevision,
+          applyTitle,
+          applyCover,
+          applyUrl,
+          applyTags: selectedTags,
+        }),
       );
-      setInfo(null);
+      setPreview(null);
       await refresh();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "DLsite情報を適用できませんでした");
+      setError(
+        cause instanceof Error && cause.message.includes("外部で変更")
+          ? "作品データが変更されました。取得結果を確認し直してから適用してください。"
+          : cause instanceof Error
+            ? cause.message
+            : "DLsite情報を適用できませんでした",
+      );
     } finally {
       setBusy(false);
     }
@@ -279,7 +311,7 @@ export function DlsiteEditor({ work }: { work: Work }) {
           disabled={busy || !rjCode.trim() || work.dlsite.status === "skipped"}
           onClick={() => void fetchInfo()}
         >
-          DLsiteから取得
+          取得結果を確認
         </Button>
       </div>
       {error && (
@@ -287,19 +319,21 @@ export function DlsiteEditor({ work }: { work: Work }) {
           {error}
         </p>
       )}
-      {info && (
+      {preview && (
         <DlsiteApplyDialog
           work={work}
-          info={info}
+          preview={preview}
           busy={busy}
           applyTitle={applyTitle}
           applyCover={applyCover}
+          applyUrl={applyUrl}
           selectedTags={selectedTags}
           onApplyTitleChange={setApplyTitle}
           onApplyCoverChange={setApplyCover}
+          onApplyUrlChange={setApplyUrl}
           onSelectedTagsChange={setSelectedTags}
           onApply={() => void apply()}
-          onClose={() => setInfo(null)}
+          onClose={() => setPreview(null)}
         />
       )}
     </section>

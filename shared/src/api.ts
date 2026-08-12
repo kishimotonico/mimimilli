@@ -11,7 +11,7 @@ import {
   workSchema,
 } from "./work.ts";
 import { splitSelectedTags, type TagFilters } from "./pseudoTag.ts";
-import { dlsiteApplyBodySchema, dlsiteStatusSchema } from "./dlsite.ts";
+import { dlsiteRegistrationBodySchema, dlsiteStatusSchema } from "./dlsite.ts";
 import { workspacePathSchema } from "./media.ts";
 
 // ── 作品検索（GET /api/works）────────────────────────────────
@@ -190,7 +190,7 @@ export const workCreateBodySchema = z.object({
     .default([])
     .transform((tags) => dedupeTags(normalizeTags(tags))),
   mergeDescendantWorks: z.boolean().default(false),
-  dlsite: dlsiteApplyBodySchema.optional(),
+  dlsite: dlsiteRegistrationBodySchema.optional(),
 });
 /** クライアントが送信するリクエストボディ（tags は正規化前の生 string[]） */
 export type WorkCreateBodyInput = z.input<typeof workCreateBodySchema>;

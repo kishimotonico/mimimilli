@@ -1,25 +1,17 @@
 import {
-  dedupeTags,
-  tagEquals,
   type DataIntegrityWarning,
   type DlsiteBulkMode,
   type DlsiteBulkProgressEvent,
   type DlsiteBulkResult,
   type DlsiteFetchResult,
-  type NormalizedTag,
-  type Work,
   type WorkSummary,
 } from "@mimimilli/shared";
-import { isDefaultTitle } from "../../core/dlsiteTitle.ts";
 import { DlsiteOfflineError } from "../../errors.ts";
-import { mergeDlsiteTags } from "./dlsite.ts";
-import { persistDlsiteAppliedWork } from "./dlsitePersist.ts";
 import { logDataIntegritySkips, toDataIntegrityWarning } from "./dataIntegrity.ts";
 import type { Db } from "./db.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";
 import type { Scanner } from "./scanner.ts";
-import type { CoverColumns } from "./workRowMapping.ts";
 import type { createDlsiteFetch, DlsiteFetchAttempt } from "./dlsiteFetch.ts";
 
 export interface DlsiteBulkDeps {
@@ -107,17 +99,11 @@ export function shouldSkipCachedFailureWrite(
 }
 
 interface ApplyDlsiteBulkWorkInput {
-  mode: DlsiteBulkMode;
   work: WorkSummary;
   attempt: DlsiteFetchAttempt;
-  signal?: AbortSignal;
 }
 
 interface ApplyDlsiteBulkWorkDeps {
-  catalog: CatalogWorkRepository;
-  scanner: Scanner;
-  cachedCover: ReturnType<typeof createDlsiteFetch>["cachedCover"];
-  measureDownloadedCover: ReturnType<typeof createDlsiteFetch>["measureDownloadedCover"];
   logger: {
     warn: (message: string, context?: Record<string, unknown>) => void;
   };
@@ -133,10 +119,9 @@ export async function applyDlsiteBulkWork(
   deps: ApplyDlsiteBulkWorkDeps,
   input: ApplyDlsiteBulkWorkInput,
 ): Promise<ApplyDlsiteBulkWorkOutcome> {
-  const { catalog, scanner, cachedCover, measureDownloadedCover, logger } = deps;
-  const { mode, work, attempt, signal } = input;
+  const { logger } = deps;
+  const { work, attempt } = input;
   const fetched = attempt.result;
-  const attemptedAt = attempt.httpAttempted ? new Date().toISOString() : work.dlsite.lastAttemptAt;
 
   if (!fetched.ok) {
     const logContext = {
@@ -146,28 +131,10 @@ export async function applyDlsiteBulkWork(
       message: fetched.message,
       httpAttempted: attempt.httpAttempted,
     };
-    if (fetched.kind === "offline") {
-      return { fetched: 0, failed: 1, parseErrors: 0 };
-    }
     if (fetched.kind === "parse_error") {
       logger.warn("DLsite一括取得: 作品のパースに失敗しました", logContext);
     } else {
       logger.warn("DLsite一括取得: 作品の取得に失敗しました", logContext);
-    }
-    if (!shouldSkipCachedFailureWrite(work, fetched, attempt.httpAttempted)) {
-      const newStatus = fetched.kind === "not_found" ? ("not_found" as const) : ("error" as const);
-      const newErrorKind =
-        fetched.kind === "not_found" || fetched.kind === "parse_error" || fetched.kind === "error"
-          ? fetched.kind
-          : null;
-      const dlsite = {
-        ...work.dlsite,
-        status: newStatus,
-        lastAttemptAt: attemptedAt,
-        error: fetched.message,
-        errorKind: newErrorKind,
-      };
-      await persistDlsiteAppliedWork(catalog, scanner, { workId: work.id, catalogPatch: {}, dlsite });
     }
     return {
       fetched: 0,
@@ -175,65 +142,12 @@ export async function applyDlsiteBulkWork(
       parseErrors: fetched.kind === "parse_error" ? 1 : 0,
     };
   }
-
-  const allInfoTags = mergeDlsiteTags([], fetched.info);
-  const applyTags =
-    mode === "new"
-      ? allInfoTags
-      : allInfoTags.filter(
-          (tag) => !work.dlsite.appliedTags.some((applied) => tagEquals(applied, tag)),
-        );
-  const nextTags = dedupeTags([...work.tags, ...applyTags]);
-  const nextTitle =
-    mode === "new" || isDefaultTitle(work.title, work.physicalPath, work.dlsite.rjCode)
-      ? fetched.info.title
-      : undefined;
-  const nextUrls = !work.urls.some((entry) => entry.url.includes("dlsite.com"))
-    ? [...work.urls, { label: "DLsite", url: fetched.info.url }]
-    : undefined;
-  const coverNeeded = !work.cover && !!fetched.info.coverUrl;
-  const nextAppliedTags = dedupeTags([...work.dlsite.appliedTags, ...allInfoTags]);
-  const patch: {
-    title?: string;
-    tags?: NormalizedTag[];
-    cover?: CoverColumns;
-    urls?: Work["urls"];
-  } = { tags: nextTags };
-  if (nextTitle !== undefined) patch.title = nextTitle;
-  if (nextUrls !== undefined) patch.urls = nextUrls;
-  let coverImage: string | undefined;
-  if (coverNeeded) {
-    coverImage = await cachedCover(fetched.info.coverUrl!, work.physicalPath, signal);
-    const cover = await measureDownloadedCover(work.physicalPath, coverImage);
-    if (!cover) throw new Error(`カバー寸法を計測できません: ${coverImage}`);
-    patch.cover = cover;
-  }
-  const dlsite = {
-    rjCode: fetched.info.rjCode,
-    status: "applied" as const,
-    lastAttemptAt: attemptedAt,
-    error: null,
-    errorKind: null,
-    appliedTags: nextAppliedTags,
-  };
-  await persistDlsiteAppliedWork(
-    catalog,
-    scanner,
-    { workId: work.id, catalogPatch: patch, coverImage, dlsite },
-    { ifWorkMissing: "throw" },
-  );
   return { fetched: 1, failed: 0, parseErrors: 0 };
 }
 
 export function createDlsiteBulk(deps: DlsiteBulkDeps) {
-  const { query, catalog, scanner, fetch } = deps;
-  const {
-    dlsiteLogger,
-    dlsiteScheduler,
-    fetchCachedDlsiteAttempt,
-    cachedCover,
-    measureDownloadedCover,
-  } = fetch;
+  const { query, fetch } = deps;
+  const { dlsiteLogger, dlsiteScheduler, fetchCachedDlsiteAttempt } = fetch;
 
   return {
     async runDlsiteBulk(
@@ -276,13 +190,7 @@ export function createDlsiteBulk(deps: DlsiteBulkDeps) {
           return result;
         }
 
-        const applyDeps: ApplyDlsiteBulkWorkDeps = {
-          catalog,
-          scanner,
-          cachedCover,
-          measureDownloadedCover,
-          logger: dlsiteLogger,
-        };
+        const applyDeps: ApplyDlsiteBulkWorkDeps = { logger: dlsiteLogger };
 
         for (let index = 0; index < targets.length; index++) {
           if (isAborted()) {
@@ -309,15 +217,10 @@ export function createDlsiteBulk(deps: DlsiteBulkDeps) {
             return result;
           }
           const attempt = attempts.get(work.dlsite.rjCode!)!;
-          const attemptedAt = attempt.httpAttempted
-            ? new Date().toISOString()
-            : work.dlsite.lastAttemptAt;
           try {
             const outcome = await applyDlsiteBulkWork(applyDeps, {
-              mode,
               work,
               attempt,
-              signal,
             });
             result.fetched += outcome.fetched;
             result.failed += outcome.failed;
@@ -343,31 +246,11 @@ export function createDlsiteBulk(deps: DlsiteBulkDeps) {
               result.failed += 1;
               continue;
             }
-            dlsiteLogger.error("DLsite一括取得: 作品の適用に失敗しました", {
+            dlsiteLogger.error("DLsite一括取得の結果処理に失敗しました", {
               workId: work.id,
               rjCode: work.dlsite.rjCode,
               message: error instanceof Error ? error.message : String(error),
             });
-            const dlsite = {
-              ...work.dlsite,
-              status: "error" as const,
-              lastAttemptAt: attemptedAt,
-              error: error instanceof Error ? error.message : "DLsite情報の適用に失敗しました",
-              errorKind: "error" as const,
-            };
-            try {
-              await persistDlsiteAppliedWork(catalog, scanner, {
-                workId: work.id,
-                catalogPatch: {},
-                dlsite,
-              });
-            } catch (persistError) {
-              dlsiteLogger.error("DLsite失敗状態の保存に失敗しました", {
-                workId: work.id,
-                persistError:
-                  persistError instanceof Error ? persistError.message : String(persistError),
-              });
-            }
             result.failed += 1;
           }
         }

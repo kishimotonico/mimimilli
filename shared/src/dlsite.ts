@@ -84,6 +84,13 @@ export const dlsiteWorkInfoSchema = z.object({
 });
 export type DlsiteWorkInfo = z.infer<typeof dlsiteWorkInfoSchema>;
 
+/** 作品ごとの取得結果確認に使う。sourceRevision は適用時のCASトークン。 */
+export const dlsitePreviewSchema = z.object({
+  info: dlsiteWorkInfoSchema,
+  sourceRevision: z.string().min(1),
+});
+export type DlsitePreview = z.infer<typeof dlsitePreviewSchema>;
+
 export const dlsiteFetchResultSchema = z.discriminatedUnion("ok", [
   z.object({ ok: z.literal(true), info: dlsiteWorkInfoSchema }),
   z.object({
@@ -96,14 +103,27 @@ export type DlsiteFetchResult = z.infer<typeof dlsiteFetchResultSchema>;
 
 export const dlsiteApplyBodySchema = z.object({
   info: dlsiteWorkInfoSchema,
+  sourceRevision: z.string().min(1),
   applyTitle: z.boolean(),
   applyTags: normalizedTagInputArraySchema,
   applyCover: z.boolean(),
+  applyUrl: z.boolean(),
 });
 /** クライアントが送信するリクエストボディ（applyTags は正規化前の生 string[]） */
 export type DlsiteApplyBodyInput = z.input<typeof dlsiteApplyBodySchema>;
 /** サーバーがパース後に扱う型（applyTags は正規化済み NormalizedTag[]） */
 export type DlsiteApplyBody = z.output<typeof dlsiteApplyBodySchema>;
+
+/** 新規登録時はsidecarがまだ存在しないためCASトークンを持たない。 */
+export const dlsiteRegistrationBodySchema = dlsiteApplyBodySchema.omit({ sourceRevision: true });
+export type DlsiteRegistrationBody = z.output<typeof dlsiteRegistrationBodySchema>;
+
+export const dlsiteBulkApplyMissingResultSchema = z.object({
+  applied: z.number().int().nonnegative(),
+  skipped: z.number().int().nonnegative(),
+  failed: z.number().int().nonnegative(),
+});
+export type DlsiteBulkApplyMissingResult = z.infer<typeof dlsiteBulkApplyMissingResultSchema>;
 
 export const dlsiteStatePatchSchema = z
   .object({

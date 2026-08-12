@@ -309,6 +309,7 @@ test("POST /works: DLsiteカバー適用失敗時は子作品を削除しない"
         applyTitle: false,
         applyTags: [],
         applyCover: true,
+        applyUrl: false,
       },
     }),
   });
@@ -406,6 +407,87 @@ test("POST /works: 孤立メタ復元時、フォームで編集したタグを�
   const get = await app.request(`/api/works/${orphanedId}`);
   assert.equal(get.status, 200);
   assert.deepEqual((await get.json()).tags, ["new-tag"]);
+});
+
+test("POST /works: 孤立メタ復元でDLsite URLの選択外は保持し、選択時だけ置換する", async (t) => {
+  const { app, root, parent } = await setupPlainLibrary(t);
+  const orphanedId = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+  writeMetaFile(join(parent, META_FILE_NAME), {
+    formatVersion: 1,
+    id: orphanedId,
+    title: "復元前タイトル",
+    urls: [
+      { label: "公式", url: "https://example.test/work" },
+      { label: "DLsite", url: "https://www.dlsite.com/maniax/work/=/product_id/RJ000001.html" },
+    ],
+    tags: nts(["orphaned-tag"]),
+    coverImage: null,
+    playlists: [],
+    defaultPlaylistId: null,
+    createdAt: new Date().toISOString(),
+    dlsite: emptyDlsiteState(),
+    customTopLevel: "preserved",
+  });
+
+  const restore = async (folder: string, applyUrl: boolean) =>
+    app.request("/api/works", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        path: workspace(root, folder),
+        title: "復元後タイトル",
+        dlsite: {
+          info: {
+            rjCode: "RJ900020",
+            title: "DLsiteタイトル",
+            circle: null,
+            cvs: [],
+            genreTags: [],
+            coverUrl: null,
+            url: "https://www.dlsite.com/maniax/work/=/product_id/RJ900020.html",
+          },
+          applyTitle: false,
+          applyTags: [],
+          applyCover: false,
+          applyUrl,
+        },
+      }),
+    });
+
+  const preserved = await restore(parent, false);
+  assert.equal(preserved.status, 201);
+  let meta = JSON.parse(readFileSync(join(parent, META_FILE_NAME), "utf-8")) as {
+    urls: Array<{ label: string; url: string }>;
+    customTopLevel: string;
+  };
+  assert.deepEqual(meta.urls, [
+    { label: "公式", url: "https://example.test/work" },
+    { label: "DLsite", url: "https://www.dlsite.com/maniax/work/=/product_id/RJ000001.html" },
+  ]);
+  assert.equal(meta.customTopLevel, "preserved");
+
+  const replacementFolder = join(root, "orphan-url-replace");
+  mkdirSync(replacementFolder);
+  writeWav(join(replacementFolder, "track.wav"), 1);
+  writeMetaFile(join(replacementFolder, META_FILE_NAME), {
+    formatVersion: 1,
+    id: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+    title: "復元前タイトル",
+    urls: meta.urls,
+    tags: nts(["orphaned-tag"]),
+    coverImage: null,
+    playlists: [],
+    defaultPlaylistId: null,
+    createdAt: new Date().toISOString(),
+    dlsite: emptyDlsiteState(),
+  });
+  const replaced = await restore(replacementFolder, true);
+  assert.equal(replaced.status, 201);
+  meta = JSON.parse(readFileSync(join(replacementFolder, META_FILE_NAME), "utf-8")) as typeof meta;
+  assert.deepEqual(meta.urls, [
+    { label: "公式", url: "https://example.test/work" },
+    { label: "DLsite", url: "https://www.dlsite.com/maniax/work/=/product_id/RJ900020.html" },
+  ]);
 });
 
 test("POST /works: 壊れた孤立メタは invalid_meta エラー", async (t) => {

@@ -1,6 +1,5 @@
-import type { DlsiteState, NormalizedTag, UrlEntry } from "@mimimilli/shared";
-import { patchMetaFileCas, readMetaSource } from "./meta.ts";
-import { SourceChangedError } from "../../errors.ts";
+import type { NormalizedTag, UrlEntry } from "@mimimilli/shared";
+import { patchMetaFileCas } from "./meta.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { CoverColumns } from "./workRowMapping.ts";
 import type { Scanner } from "./scanner.ts";
@@ -14,9 +13,9 @@ export interface DlsiteWorkCatalogPatch {
 
 export interface DlsiteAppliedWorkPersistInput {
   workId: string;
+  sourceRevision: string;
   catalogPatch: DlsiteWorkCatalogPatch;
   coverImage?: string;
-  dlsite: DlsiteState;
 }
 
 export async function persistDlsiteAppliedWork(
@@ -26,7 +25,7 @@ export async function persistDlsiteAppliedWork(
   options?: { ifWorkMissing?: "return-false" | "throw" },
 ): Promise<boolean> {
   const ifWorkMissing = options?.ifWorkMissing ?? "return-false";
-  const { workId, catalogPatch, coverImage, dlsite } = input;
+  const { workId, sourceRevision, catalogPatch, coverImage } = input;
   const metaPath = catalog.getWorkMetaPath(workId);
   if (!metaPath) {
     if (ifWorkMissing === "throw") {
@@ -34,19 +33,12 @@ export async function persistDlsiteAppliedWork(
     }
     return false;
   }
-  const source = readMetaSource(metaPath);
-  try {
-    const updated = patchMetaFileCas(metaPath, source.sourceRevision, {
-      title: catalogPatch.title,
-      tags: catalogPatch.tags,
-      coverImage,
-      urls: catalogPatch.urls,
-      dlsite,
-    });
-    await scanner.projectMetaFile(metaPath, updated.meta);
-    return true;
-  } catch (error) {
-    if (error instanceof SourceChangedError) return false;
-    throw error;
-  }
+  const updated = patchMetaFileCas(metaPath, sourceRevision, {
+    title: catalogPatch.title,
+    tags: catalogPatch.tags,
+    coverImage,
+    urls: catalogPatch.urls,
+  });
+  await scanner.projectMetaFile(metaPath, updated.meta);
+  return true;
 }

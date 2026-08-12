@@ -1,6 +1,5 @@
-import { applyDlsiteStatePatch, dedupeTags, normalizeTags, tagEquals } from "@mimimilli/shared";
+import { applyDlsiteStatePatch, dedupeTags, normalizeTags } from "@mimimilli/shared";
 import type {
-  DlsiteApplyBody,
   DlsiteBulkResult,
   DlsiteFetchResult,
   DlsiteStatePatch,
@@ -45,9 +44,33 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
 
     dlsiteFetchByCode,
 
+    async dlsiteApplyMissing(workIds) {
+      const candidates = state.works.filter((work) => !workIds || workIds.includes(work.id));
+      let applied = 0;
+      let skipped = 0;
+      for (const work of candidates) {
+        if (!work.dlsite.rjCode || work.dlsite.status === "skipped") {
+          skipped += 1;
+          continue;
+        }
+        const fetched = await dlsiteFetchByCode(work.dlsite.rjCode);
+        if (!fetched.ok) continue;
+        const tags = dedupeTags(
+          normalizeTags(["サークル/fixtureサークル", "cv/fixture CV", "genre/テスト"]),
+        ).filter((tag) => !work.tags.includes(tag));
+        if (tags.length === 0) {
+          skipped += 1;
+          continue;
+        }
+        work.tags = dedupeTags([...work.tags, ...tags]);
+        applied += 1;
+      }
+      return { applied, skipped, failed: 0 };
+    },
+
     async dlsiteApply(
       workId: string,
-      body: DlsiteApplyBody,
+      body: import("@mimimilli/shared").DlsiteApplyBody,
       _options?: { signal?: AbortSignal },
     ): Promise<boolean> {
       const work = state.works.find((w) => w.id === workId);
@@ -64,14 +87,6 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
         state.coverColumns.set(workId, columns);
         work.cover = fixtureCoverFromColumns(columns);
       }
-      work.dlsite = {
-        rjCode: body.info.rjCode,
-        status: "applied",
-        lastAttemptAt: new Date().toISOString(),
-        error: null,
-        errorKind: null,
-        appliedTags: dedupeTags([...work.dlsite.appliedTags, ...applyTags]),
-      };
       return true;
     },
 
@@ -82,7 +97,7 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
       return buildFullWorkFromState(state, work);
     },
 
-    async runDlsiteBulk(mode, workIds, options) {
+    async runDlsiteBulk(_mode, workIds, options) {
       const requested = workIds
         ? state.works.filter((work) => workIds.includes(work.id))
         : state.works;
@@ -106,25 +121,6 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
           work: { id: work.id, rjCode: work.dlsite.rjCode!, title: work.title },
         });
         if (options?.signal?.aborted) return result;
-        const fetchedTags = dedupeTags(
-          normalizeTags(["サークル/fixtureサークル", "cv/fixture CV", "genre/テスト"]),
-        );
-        const applyTags =
-          mode === "new"
-            ? fetchedTags
-            : fetchedTags.filter(
-                (tag) => !work.dlsite.appliedTags.some((applied) => tagEquals(applied, tag)),
-              );
-        if (mode === "new") work.title = `（fixture）${work.dlsite.rjCode}`;
-        work.tags = dedupeTags([...work.tags, ...applyTags]);
-        work.dlsite = {
-          ...work.dlsite,
-          status: "applied",
-          lastAttemptAt: new Date().toISOString(),
-          error: null,
-          errorKind: null,
-          appliedTags: dedupeTags([...work.dlsite.appliedTags, ...fetchedTags]),
-        };
         result.fetched += 1;
       }
       options?.onProgress?.({

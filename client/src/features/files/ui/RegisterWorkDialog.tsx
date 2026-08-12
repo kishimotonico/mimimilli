@@ -2,7 +2,11 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { normalizeTag } from "@mimimilli/shared";
-import type { DlsiteApplyBody, DlsiteWorkInfo, WorkRegisterPreview } from "@mimimilli/shared";
+import type {
+  DlsiteRegistrationBody,
+  DlsiteWorkInfo,
+  WorkRegisterPreview,
+} from "@mimimilli/shared";
 import { ApiRequestError } from "../../../shared/api/http";
 import Button from "../../../shared/ui/Button";
 import IconButton from "../../../shared/ui/IconButton";
@@ -15,7 +19,7 @@ import { buildTagsWithAdded, buildTagsWithRemoved } from "../../../entities/work
 import Tag from "../../../entities/work/ui/Tag";
 import { useTagPrefixes } from "../../../entities/tag/useTagPrefixes";
 import { tagPrefixDefinition } from "../../../entities/tag/tagPrefixDefinition";
-import { buildDlsiteApplyBody, dlsiteInfoTags } from "../../../entities/work/dlsitePreview";
+import { buildDlsiteRegistrationBody, dlsiteInfoTags } from "../../../entities/work/dlsitePreview";
 import { dlsiteFetchErrorMessage } from "../../../entities/work/dlsiteFetchError";
 import { apiErrorMessage } from "../../../shared/lib/apiError";
 import { createWork, fetchDlsiteInfoByCode } from "../api";
@@ -63,10 +67,11 @@ export default function RegisterWorkDialog({
       const dlsiteAppliedTags = dlsiteInfo
         ? dlsiteInfoTags(dlsiteInfo).filter((tag) => tags.includes(tag))
         : [];
-      const dlsite: DlsiteApplyBody | undefined = dlsiteInfo
-        ? buildDlsiteApplyBody(dlsiteInfo, {
+      const dlsite: DlsiteRegistrationBody | undefined = dlsiteInfo
+        ? buildDlsiteRegistrationBody(dlsiteInfo, {
             applyTitle: false,
             applyCover,
+            applyUrl: true,
             applyTags: dlsiteAppliedTags,
           })
         : undefined;
