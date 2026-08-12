@@ -21,6 +21,30 @@ test("workspace media: fixtureの非音声textをroot相対パスで配信する
   assert.equal((await res.arrayBuffer()).byteLength, 16);
 });
 
+test("workspace media: viewer fixtureはブラウザで読める画像・PDF・動画を返す", async () => {
+  const app = buildApp();
+
+  const image = await app.request("/api/media/workspace?path=viewer%2Fsample.png");
+  assert.equal(image.status, 200);
+  assert.equal(image.headers.get("content-type"), "image/svg+xml");
+  assert.match(await image.text(), /<svg/);
+
+  const pdf = await app.request("/api/media/workspace?path=viewer%2Fsample.pdf");
+  assert.equal(pdf.status, 200);
+  assert.equal(pdf.headers.get("content-type"), "application/pdf");
+  const pdfText = await pdf.text();
+  assert.match(pdfText, /^%PDF-/);
+  assert.match(pdfText, /%%EOF\s*$/);
+
+  const video = await app.request("/api/media/workspace?path=viewer%2Fsample.webm");
+  assert.equal(video.status, 200);
+  assert.equal(video.headers.get("content-type"), "video/webm");
+  assert.deepEqual(
+    [...new Uint8Array(await video.arrayBuffer()).subarray(0, 4)],
+    [0x1a, 0x45, 0xdf, 0xa3],
+  );
+});
+
 test("カバー画像: coverImage ありの作品は 200 + image/svg+xml", async () => {
   const app = buildApp();
 

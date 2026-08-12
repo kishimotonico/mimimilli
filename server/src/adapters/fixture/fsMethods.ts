@@ -14,6 +14,9 @@ import { buildFsRoot } from "./data.ts";
 import { normalizeFsPath, resolveFsDir, resolveFsPath } from "./fsResolve.ts";
 import {
   DEFAULT_TRACK_DURATION_SEC,
+  synthesizeFixturePdf,
+  synthesizeFixtureVideo,
+  synthesizeFilePlaceholderSvg,
   synthesizeSilentWav,
   synthesizeStaticContent,
 } from "./media.ts";
@@ -100,11 +103,11 @@ export function createFsMethods(
         result.mediaKind === "audio"
           ? synthesizeSilentWav(DEFAULT_TRACK_DURATION_SEC)
           : result.mediaKind === "image"
-            ? synthesizeStaticContent("fixture image", "image/svg+xml")
+            ? synthesizeFilePlaceholderSvg(ref.path)
             : result.mediaKind === "pdf"
-              ? synthesizeStaticContent("%PDF-1.4\nfixture\n", "application/pdf")
+              ? synthesizeFixturePdf()
               : result.mediaKind === "video"
-                ? synthesizeStaticContent("fixture video", "video/mp4")
+                ? synthesizeFixtureVideo()
                 : synthesizeStaticContent(
                     "fixture text\n".repeat(Math.ceil(node.size / 13)),
                     "text/plain; charset=utf-8",
