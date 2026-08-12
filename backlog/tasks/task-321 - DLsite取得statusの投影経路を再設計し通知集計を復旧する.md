@@ -4,8 +4,10 @@ title: DLsite取得statusの投影経路を再設計し通知集計を復旧す�
 status: To Do
 assignee: []
 created_date: '2026-08-12 16:54'
+updated_date: '2026-08-12 17:46'
 labels: []
 dependencies: []
+priority: high
 ordinal: 331000
 ---
 
