@@ -1,4 +1,4 @@
-import type { Track } from "@mimimilli/shared";
+import type { Track, WorkspacePath } from "@mimimilli/shared";
 import type { FsEntry } from "./types";
 import { classifyFile, sortEntries } from "./types";
 
@@ -13,7 +13,7 @@ export function buildFolderAudioQueue(
   const tracks = audioFiles.map((e) => ({
     id: e.path,
     title: e.name,
-    file: e.path,
+    file: e.path as WorkspacePath,
   }));
   return { tracks, trackIndex };
 }

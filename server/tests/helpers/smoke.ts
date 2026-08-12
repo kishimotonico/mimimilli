@@ -28,13 +28,7 @@ console.log("== works ==", JSON.stringify(works.body, null, 1).slice(0, 1200));
 const errWork = await json("/api/works?view=error");
 console.log("== error view ==", JSON.stringify(errWork.body));
 console.log("== axes/cv ==", JSON.stringify(await json("/api/axes/cv")));
-console.log(
-  "== fs ==",
-  JSON.stringify((await json(`/api/fs?path=${encodeURIComponent(root + "/dlsite")}`)).body).slice(
-    0,
-    600,
-  ),
-);
+console.log("== fs ==", JSON.stringify((await json(`/api/fs?path=dlsite`)).body).slice(0, 600));
 
 // 自動生成された作品のメディア配信（Range）
 const generated = (works.body as { items: { id: string; title: string }[] }).items.find((w) =>

@@ -12,7 +12,7 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
-import { META_FILE_NAME, emptyDlsiteState } from "@mimimilli/shared";
+import { META_FILE_NAME, emptyDlsiteState, workspacePath } from "@mimimilli/shared";
 import { createApp } from "../../src/app.ts";
 import { writeMetaFile } from "../../src/adapters/real/meta.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
@@ -50,6 +50,10 @@ function snapshotFiles(root: string, excludeMeta = false): FileSnapshot[] {
   return out.sort((a, b) => a.path.localeCompare(b.path));
 }
 
+function workspace(root: string, absolutePath: string) {
+  return workspacePath(absolutePath.slice(root.length + 1));
+}
+
 async function setupPlainLibrary(t: TestContext) {
   const directory = makeTestDirectory("work-register");
   t.after(directory.cleanup);
@@ -84,7 +88,7 @@ async function setupLibraryWithChild(t: TestContext) {
   const childRes = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: child, title: "子作品" }),
+    body: JSON.stringify({ path: workspace(root, child), title: "子作品" }),
   });
   assert.equal(childRes.status, 201);
   const childWork = await childRes.json();
@@ -112,7 +116,7 @@ async function setupLibraryWithTwoChildren(t: TestContext) {
   const childARes = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: childA, title: "子作品A" }),
+    body: JSON.stringify({ path: workspace(root, childA), title: "子作品A" }),
   });
   assert.equal(childARes.status, 201);
   const childAWork = await childARes.json();
@@ -120,22 +124,22 @@ async function setupLibraryWithTwoChildren(t: TestContext) {
   const childBRes = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: childB, title: "子作品B" }),
+    body: JSON.stringify({ path: workspace(root, childB), title: "子作品B" }),
   });
   assert.equal(childBRes.status, 201);
   const childBWork = await childBRes.json();
 
-  return { adapter, app, parent, childA, childB, childAWork, childBWork };
+  return { adapter, app, root, parent, childA, childB, childAWork, childBWork };
 }
 
 test("POST /works: 未登録フォルダーを作品として登録できる", async (t) => {
-  const { app, parent } = await setupPlainLibrary(t);
+  const { app, root, parent } = await setupPlainLibrary(t);
   const before = snapshotFiles(parent, true);
 
   const res = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: parent, title: "親作品タイトル" }),
+    body: JSON.stringify({ path: workspace(root, parent), title: "親作品タイトル" }),
   });
   assert.equal(res.status, 201);
   const body = await res.json();
@@ -148,19 +152,19 @@ test("POST /works: 未登録フォルダーを作品として登録できる", a
 });
 
 test("POST /works: 既に登録済みのフォルダへ再実行すると 409 (already_registered)", async (t) => {
-  const { app, parent } = await setupPlainLibrary(t);
+  const { app, root, parent } = await setupPlainLibrary(t);
 
   const first = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: parent, title: "初回登録" }),
+    body: JSON.stringify({ path: workspace(root, parent), title: "初回登録" }),
   });
   assert.equal(first.status, 201);
 
   const second = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: parent, title: "再登録" }),
+    body: JSON.stringify({ path: workspace(root, parent), title: "再登録" }),
   });
   assert.equal(second.status, 409);
   const body = await second.json();
@@ -168,39 +172,39 @@ test("POST /works: 既に登録済みのフォルダへ再実行すると 409 (a
   assert.match(body.error.message, /既に.*登録/);
 });
 
-test("POST /works: スキャンルート外のパスは 404", async (t) => {
+test("POST /works: 絶対パスとパストラバーサルを拒否する", async (t) => {
   const directory = makeTestDirectory("work-register-outside");
   t.after(directory.cleanup);
   const root = join(directory.path, "lib");
   mkdirSync(root, { recursive: true });
-  const outside = join(directory.path, "outside");
-  mkdirSync(outside, { recursive: true });
 
   const adapter = createTestRealAdapter({ database: { kind: "memory" } });
   const app = createApp(adapter);
   await adapter.updateSettings({ rootFolder: root });
 
-  const res = await app.request("/api/works", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: outside, title: "外" }),
-  });
-  assert.equal(res.status, 404);
+  for (const path of [join(directory.path, "outside"), "../outside"]) {
+    const res = await app.request("/api/works", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path, title: "外" }),
+    });
+    assert.equal(res.status, 400);
+  }
 });
 
 test("POST /works: 配下の子作品を統合して親を登録する", async (t) => {
-  const { app, parent, child, childWork } = await setupLibraryWithChild(t);
+  const { app, root, parent, child, childWork } = await setupLibraryWithChild(t);
   assert.ok(existsSync(folderMetaPath(child)));
 
   const conflict = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: parent, title: "親に統合" }),
+    body: JSON.stringify({ path: workspace(root, parent), title: "親に統合" }),
   });
   assert.equal(conflict.status, 409);
 
   const preview = await app.request(
-    `/api/works/register-preview?path=${encodeURIComponent(parent)}`,
+    `/api/works/register-preview?path=${encodeURIComponent(workspace(root, parent))}`,
   );
   assert.equal(preview.status, 200);
   const previewBody = await preview.json();
@@ -212,7 +216,7 @@ test("POST /works: 配下の子作品を統合して親を登録する", async (
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      path: parent,
+      path: workspace(root, parent),
       title: "親に統合",
       mergeDescendantWorks: true,
     }),
@@ -247,7 +251,7 @@ test("POST /works: 登録前後で音声等の物理ファイルは変更され�
   const res = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: folder, title: "プレーン" }),
+    body: JSON.stringify({ path: workspace(root, folder), title: "プレーン" }),
   });
   assert.equal(res.status, 201);
 
@@ -257,12 +261,16 @@ test("POST /works: 登録前後で音声等の物理ファイルは変更され�
 });
 
 test("POST /works: フォームで入力したタグを登録する", async (t) => {
-  const { app, parent } = await setupPlainLibrary(t);
+  const { app, root, parent } = await setupPlainLibrary(t);
 
   const res = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: parent, title: "タグ付き作品", tags: ["voice", "ASMR"] }),
+    body: JSON.stringify({
+      path: workspace(root, parent),
+      title: "タグ付き作品",
+      tags: ["voice", "ASMR"],
+    }),
   });
   assert.equal(res.status, 201);
   const body = await res.json();
@@ -270,8 +278,10 @@ test("POST /works: フォームで入力したタグを登録する", async (t) 
 });
 
 test("GET /works/register-preview: RJコードをフォルダ名から検出する", async (t) => {
-  const { app, sibling } = await setupLibraryWithChild(t);
-  const res = await app.request(`/api/works/register-preview?path=${encodeURIComponent(sibling)}`);
+  const { app, root, sibling } = await setupLibraryWithChild(t);
+  const res = await app.request(
+    `/api/works/register-preview?path=${encodeURIComponent(workspace(root, sibling))}`,
+  );
   assert.equal(res.status, 200);
   const body = await res.json();
   assert.equal(body.detectedRjCode, "RJ900012");
@@ -279,14 +289,14 @@ test("GET /works/register-preview: RJコードをフォルダ名から検出す�
 });
 
 test("POST /works: DLsiteカバー適用失敗時は子作品を削除しない", async (t) => {
-  const { app, parent, child, childWork } = await setupLibraryWithChild(t);
+  const { app, root, parent, child, childWork } = await setupLibraryWithChild(t);
   assert.ok(existsSync(folderMetaPath(child)));
 
   const res = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      path: parent,
+      path: workspace(root, parent),
       title: "親に統合",
       mergeDescendantWorks: true,
       dlsite: {
@@ -326,11 +336,13 @@ function writeOrphanedMeta(folder: string, id: string, title: string): void {
 }
 
 test("GET /works/register-preview: 孤立メタは orphanedMeta とメタの title を返す", async (t) => {
-  const { app, parent } = await setupPlainLibrary(t);
+  const { app, root, parent } = await setupPlainLibrary(t);
   const orphanedId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
   writeOrphanedMeta(parent, orphanedId, "孤立メタのタイトル");
 
-  const res = await app.request(`/api/works/register-preview?path=${encodeURIComponent(parent)}`);
+  const res = await app.request(
+    `/api/works/register-preview?path=${encodeURIComponent(workspace(root, parent))}`,
+  );
   assert.equal(res.status, 200);
   const body = await res.json();
   assert.equal(body.orphanedMeta, true);
@@ -339,14 +351,14 @@ test("GET /works/register-preview: 孤立メタは orphanedMeta とメタの tit
 });
 
 test("POST /works: 孤立メタを復元登録し id を保持する", async (t) => {
-  const { app, parent } = await setupPlainLibrary(t);
+  const { app, root, parent } = await setupPlainLibrary(t);
   const orphanedId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
   writeOrphanedMeta(parent, orphanedId, "復元前タイトル");
 
   const res = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: parent, title: "復元後タイトル" }),
+    body: JSON.stringify({ path: workspace(root, parent), title: "復元後タイトル" }),
   });
   assert.equal(res.status, 201);
   const body = await res.json();
@@ -359,25 +371,31 @@ test("POST /works: 孤立メタを復元登録し id を保持する", async (t)
 });
 
 test("GET /works/register-preview: 孤立メタの tags を返す", async (t) => {
-  const { app, parent } = await setupPlainLibrary(t);
+  const { app, root, parent } = await setupPlainLibrary(t);
   const orphanedId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
   writeOrphanedMeta(parent, orphanedId, "復元前タイトル");
 
-  const res = await app.request(`/api/works/register-preview?path=${encodeURIComponent(parent)}`);
+  const res = await app.request(
+    `/api/works/register-preview?path=${encodeURIComponent(workspace(root, parent))}`,
+  );
   assert.equal(res.status, 200);
   const body = await res.json();
   assert.deepEqual(body.tags, ["orphaned-tag"]);
 });
 
 test("POST /works: 孤立メタ復元時、フォームで編集したタグを反映する", async (t) => {
-  const { app, parent } = await setupPlainLibrary(t);
+  const { app, root, parent } = await setupPlainLibrary(t);
   const orphanedId = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
   writeOrphanedMeta(parent, orphanedId, "復元前タイトル");
 
   const res = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: parent, title: "復元後タイトル", tags: ["new-tag"] }),
+    body: JSON.stringify({
+      path: workspace(root, parent),
+      title: "復元後タイトル",
+      tags: ["new-tag"],
+    }),
   });
   assert.equal(res.status, 201);
   const body = await res.json();
@@ -390,13 +408,13 @@ test("POST /works: 孤立メタ復元時、フォームで編集したタグを�
 });
 
 test("POST /works: 壊れた孤立メタは invalid_meta エラー", async (t) => {
-  const { app, parent } = await setupPlainLibrary(t);
+  const { app, root, parent } = await setupPlainLibrary(t);
   writeFileSync(join(parent, META_FILE_NAME), '{"id":"not-uuid","title":""}');
 
   const res = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: parent, title: "復元試行" }),
+    body: JSON.stringify({ path: workspace(root, parent), title: "復元試行" }),
   });
   assert.equal(res.status, 409);
   const body = await res.json();
@@ -405,7 +423,7 @@ test("POST /works: 壊れた孤立メタは invalid_meta エラー", async (t) =
 });
 
 test("POST /works: 孤立メタが不正でも mergeDescendantWorks 時は子作品を削除しない", async (t) => {
-  const { app, parent, child, childWork } = await setupLibraryWithChild(t);
+  const { app, root, parent, child, childWork } = await setupLibraryWithChild(t);
   writeFileSync(join(parent, META_FILE_NAME), '{"id":"not-uuid","title":""}');
   assert.ok(existsSync(folderMetaPath(child)));
 
@@ -413,7 +431,7 @@ test("POST /works: 孤立メタが不正でも mergeDescendantWorks 時は子作
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      path: parent,
+      path: workspace(root, parent),
       title: "親に統合",
       mergeDescendantWorks: true,
     }),
@@ -436,7 +454,7 @@ test("POST /works: 別パスの既存作品と同一IDの孤立メタを復元�
   const siblingRes = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: sibling, title: "既存作品" }),
+    body: JSON.stringify({ path: workspace(root, sibling), title: "既存作品" }),
   });
   assert.equal(siblingRes.status, 201);
   const existingWork = await siblingRes.json();
@@ -456,7 +474,7 @@ test("POST /works: 別パスの既存作品と同一IDの孤立メタを復元�
   const res = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: orphanDir, title: "復元後タイトル" }),
+    body: JSON.stringify({ path: workspace(root, orphanDir), title: "復元後タイトル" }),
   });
   assert.equal(res.status, 201);
   const restored = await res.json();
@@ -482,7 +500,7 @@ test("POST /works: ID衝突復元時もスキーマ外フィールドを保持�
   const siblingRes = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: sibling, title: "既存作品" }),
+    body: JSON.stringify({ path: workspace(root, sibling), title: "既存作品" }),
   });
   assert.equal(siblingRes.status, 201);
   const existingWork = await siblingRes.json();
@@ -530,7 +548,7 @@ test("POST /works: ID衝突復元時もスキーマ外フィールドを保持�
   const res = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: orphanDir, title: "復元後タイトル" }),
+    body: JSON.stringify({ path: workspace(root, orphanDir), title: "復元後タイトル" }),
   });
   assert.equal(res.status, 201);
   const restored = await res.json();
@@ -554,7 +572,7 @@ test("POST /works: ID衝突復元時もスキーマ外フィールドを保持�
 });
 
 test("POST /works: 1番目の子のメタ削除が失敗しても2番目の子は解除されエラーに残存IDが含まれる", async (t) => {
-  const { adapter, parent, childA, childB, childAWork, childBWork } =
+  const { adapter, root, parent, childA, childB, childAWork, childBWork } =
     await setupLibraryWithTwoChildren(t);
 
   chmodSync(childA, 0o555);
@@ -565,7 +583,7 @@ test("POST /works: 1番目の子のメタ削除が失敗しても2番目の子�
   await assert.rejects(
     () =>
       adapter.createWork({
-        path: parent,
+        path: workspacePath(parent.slice(root.length + 1)),
         title: "親に統合",
         tags: [],
         mergeDescendantWorks: true,
@@ -584,7 +602,7 @@ test("POST /works: 1番目の子のメタ削除が失敗しても2番目の子�
   assert.equal(childBWorkAfter, null);
   assert.ok(!existsSync(folderMetaPath(childB)));
 
-  const preview = await adapter.getWorkRegisterPreview(parent);
+  const preview = await adapter.getWorkRegisterPreview(workspace(root, parent));
   assert.equal(preview?.alreadyRegistered, true);
 });
 
@@ -594,7 +612,7 @@ test("POST /works: ID衝突復元時も defaultPlaylist キーを保持する", 
   const siblingRes = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: sibling, title: "既存作品" }),
+    body: JSON.stringify({ path: workspace(root, sibling), title: "既存作品" }),
   });
   assert.equal(siblingRes.status, 201);
   const existingWork = await siblingRes.json();
@@ -633,7 +651,7 @@ test("POST /works: ID衝突復元時も defaultPlaylist キーを保持する", 
   const res = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: orphanDir, title: "復元後タイトル" }),
+    body: JSON.stringify({ path: workspace(root, orphanDir), title: "復元後タイトル" }),
   });
   assert.equal(res.status, 201);
   const restored = await res.json();

@@ -10,6 +10,17 @@ function buildApp() {
 
 const FIXTURE_UNMEASURED_ID = "RJ501003";
 
+test("workspace media: fixtureの非音声textをroot相対パスで配信する", async () => {
+  const app = buildApp();
+  const res = await app.request("/api/media/workspace?path=readme.txt", {
+    headers: { Range: "bytes=0-15" },
+  });
+
+  assert.equal(res.status, 206);
+  assert.equal(res.headers.get("content-type"), "text/plain; charset=utf-8");
+  assert.equal((await res.arrayBuffer()).byteLength, 16);
+});
+
 test("カバー画像: coverImage ありの作品は 200 + image/svg+xml", async () => {
   const app = buildApp();
 

@@ -13,7 +13,7 @@ import { getFileUrl } from "../../../entities/work/api";
 import { getWorkFolderDisplay } from "../model/workFolderDisplay";
 import RegisterWorkDialog from "./RegisterWorkDialog";
 import Lightbox from "../../../shared/ui/Lightbox";
-import type { WorkRegisterPreview } from "@mimimilli/shared";
+import type { WorkRegisterPreview, WorkspacePath } from "@mimimilli/shared";
 import {
   classifyFile,
   summarizeKinds,
@@ -80,7 +80,7 @@ export default function FilePreview({
   });
 
   const registerPreviewMutation = useMutation({
-    mutationFn: (path: string) => getWorkRegisterPreview(path),
+    mutationFn: (path: WorkspacePath) => getWorkRegisterPreview(path),
     onSuccess: async (preview) => {
       if (preview.alreadyRegistered) {
         setErrorToast("このフォルダーは既に作品として登録されています");

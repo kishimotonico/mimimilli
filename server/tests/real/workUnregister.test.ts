@@ -14,7 +14,7 @@ import {
 import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import { test, type TestContext } from "node:test";
-import { META_FILE_NAME, type FsListing, type Work } from "@mimimilli/shared";
+import { META_FILE_NAME, workspacePath, type FsListing, type Work } from "@mimimilli/shared";
 import { createApp } from "../../src/app.ts";
 import { openDb } from "../../src/adapters/real/db.ts";
 import { unregisterWork } from "../../src/adapters/real/workRegister.ts";
@@ -54,6 +54,10 @@ function snapshotFiles(root: string, excludeMeta = false): FileSnapshot[] {
   return out.sort((a, b) => a.path.localeCompare(b.path));
 }
 
+function workspace(root: string, absolutePath: string) {
+  return workspacePath(absolutePath.slice(root.length + 1));
+}
+
 async function setupRegisteredWork(t: TestContext) {
   const directory = makeTestDirectory("work-unregister");
   t.after(directory.cleanup);
@@ -70,7 +74,7 @@ async function setupRegisteredWork(t: TestContext) {
   const createRes = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: folder, title: "解除テスト作品" }),
+    body: JSON.stringify({ path: workspace(root, folder), title: "解除テスト作品" }),
   });
   assert.equal(createRes.status, 201);
   const work = (await createRes.json()) as Work;
@@ -116,10 +120,10 @@ test("DELETE /works/:id: メタファイルとDB上の作品データ（履歴�
 });
 
 test("DELETE /works/:id: 解除後はファイルモードで未登録フォルダーとして表示される", async (t) => {
-  const { app, folder, work } = await setupRegisteredWork(t);
+  const { app, work } = await setupRegisteredWork(t);
 
   const beforeListing = (await (
-    await app.request(`/api/fs?path=${encodeURIComponent(folder)}`)
+    await app.request(`/api/fs?path=${encodeURIComponent("RJ900020_unregister")}`)
   ).json()) as FsListing;
   assert.equal(beforeListing.workId, work.id);
 
@@ -127,7 +131,7 @@ test("DELETE /works/:id: 解除後はファイルモードで未登録フォル�
   assert.equal(res.status, 204);
 
   const afterListing = (await (
-    await app.request(`/api/fs?path=${encodeURIComponent(folder)}`)
+    await app.request(`/api/fs?path=${encodeURIComponent("RJ900020_unregister")}`)
   ).json()) as FsListing;
   assert.equal(afterListing.workId, null);
   const dirEntry = afterListing.entries.find((e) => e.name === "track.wav");
@@ -178,13 +182,13 @@ test("DELETE /works/:id: 解除前後で音声等の物理ファイルは変更�
 });
 
 test("DELETE /works/:id: 解除後に同じフォルダーを再登録できる", async (t) => {
-  const { app, folder, work } = await setupRegisteredWork(t);
+  const { app, root, folder, work } = await setupRegisteredWork(t);
 
   const delRes = await app.request(`/api/works/${work.id}`, { method: "DELETE" });
   assert.equal(delRes.status, 204);
 
   const previewRes = await app.request(
-    `/api/works/register-preview?path=${encodeURIComponent(folder)}`,
+    `/api/works/register-preview?path=${encodeURIComponent(workspace(root, folder))}`,
   );
   assert.equal(previewRes.status, 200);
   const preview = await previewRes.json();
@@ -193,7 +197,7 @@ test("DELETE /works/:id: 解除後に同じフォルダーを再登録できる"
   const reRegRes = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: folder, title: "再登録作品" }),
+    body: JSON.stringify({ path: workspace(root, folder), title: "再登録作品" }),
   });
   assert.equal(reRegRes.status, 201);
   const reRegBody = await reRegRes.json();
@@ -241,7 +245,7 @@ test("DELETE /works/:id: DBのmeta_pathが古い場合でもid一致のmimimilli
   const createRes = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: folder, title: "古いmeta_pathテスト" }),
+    body: JSON.stringify({ path: workspace(root, folder), title: "古いmeta_pathテスト" }),
   });
   assert.equal(createRes.status, 201);
   const work = (await createRes.json()) as Work;
@@ -277,7 +281,7 @@ test("DELETE /works/:id: id不一致のmimimilli.jsonは削除しない", async 
   const createRes = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: folder, title: "id不一致テスト" }),
+    body: JSON.stringify({ path: workspace(root, folder), title: "id不一致テスト" }),
   });
   assert.equal(createRes.status, 201);
   const work = (await createRes.json()) as Work;
@@ -320,7 +324,7 @@ test("unregisterWork: DB削除失敗時に退避したメタ正本を復元す�
   const createRes = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: folder, title: "DB失敗テスト" }),
+    body: JSON.stringify({ path: workspace(root, folder), title: "DB失敗テスト" }),
   });
   assert.equal(createRes.status, 201);
   const work = (await createRes.json()) as Work;
@@ -367,7 +371,7 @@ test("unregisterWork: catalog削除後のuser削除失敗時はメタを復元�
   const createRes = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: folder, title: "user削除失敗テスト" }),
+    body: JSON.stringify({ path: workspace(root, folder), title: "user削除失敗テスト" }),
   });
   assert.equal(createRes.status, 201);
   const work = (await createRes.json()) as Work;
@@ -434,7 +438,7 @@ test("unregisterWork: 退避済みメタのまま再実行するとDB削除後�
   const createRes = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: folder, title: "退避再実行テスト" }),
+    body: JSON.stringify({ path: workspace(root, folder), title: "退避再実行テスト" }),
   });
   assert.equal(createRes.status, 201);
   const work = (await createRes.json()) as Work;
@@ -474,7 +478,7 @@ test("スキャン: 退避のみ残存（catalogあり）でメタ正本を復�
   const createRes = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: folder, title: "退避復元テスト" }),
+    body: JSON.stringify({ path: workspace(root, folder), title: "退避復元テスト" }),
   });
   assert.equal(createRes.status, 201);
   const work = (await createRes.json()) as Work;
@@ -516,7 +520,7 @@ test("スキャン: 退避のみ残存（catalogなし）で孤児退避ファ�
   const createRes = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: folder, title: "孤児退避テスト" }),
+    body: JSON.stringify({ path: workspace(root, folder), title: "孤児退避テスト" }),
   });
   assert.equal(createRes.status, 201);
   const work = (await createRes.json()) as Work;
@@ -554,7 +558,7 @@ test("スキャン: 正本と退避の併存では退避を削除し、その後
   const createRes = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: folder, title: "併存退避テスト" }),
+    body: JSON.stringify({ path: workspace(root, folder), title: "併存退避テスト" }),
   });
   assert.equal(createRes.status, 201);
   const work = (await createRes.json()) as Work;
@@ -594,7 +598,7 @@ test("スキャン: 退避メタの回収でfs操作が失敗してもスキャ�
   const createRes = await app.request("/api/works", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: folder, title: "回収fs失敗テスト" }),
+    body: JSON.stringify({ path: workspace(root, folder), title: "回収fs失敗テスト" }),
   });
   assert.equal(createRes.status, 201);
   const work = (await createRes.json()) as Work;

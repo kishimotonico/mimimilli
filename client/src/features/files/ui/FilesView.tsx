@@ -21,6 +21,7 @@ import {
   playingWorkIdAtom,
 } from "../../../entities/player/model/atoms";
 import { rootLabel, type FsEntry } from "../model/types";
+import { workspacePath } from "@mimimilli/shared";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 import FileColumn from "./FileColumn";
 import FilePreview from "./FilePreview";
@@ -100,13 +101,15 @@ export default function FilesView({ rootFolder, onPlayFile }: FilesViewProps) {
   // ファイル選択中はそのファイル、それ以外はカレント dir 自身。
   const cwdFolderEntry: FsEntry = {
     name: cwdTitle,
-    path: nav.cwd,
+    path: workspacePath(nav.relPath.join("/")),
     isDir: true,
     size: 0,
     fileType: "dir",
     childCount: cwdEntries.length,
     workId: cwdQuery.data?.workId ?? null,
     workRelPath: null,
+    mediaKind: null,
+    preview: null,
   };
   const fileSelection =
     nav.selectedPath && nav.selectedPath !== nav.cwd

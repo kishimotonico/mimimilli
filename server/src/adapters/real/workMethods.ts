@@ -1,4 +1,5 @@
 import { statSync } from "node:fs";
+import { join } from "node:path";
 import type {
   DataIntegrityWarning,
   DlsiteNotificationKind,
@@ -11,6 +12,7 @@ import type {
   WorkCreateBody,
   WorkPatch,
   WorkRegisterPreview,
+  WorkspacePath,
   WorksPage,
   WorksQuery,
 } from "@mimimilli/shared";
@@ -59,9 +61,9 @@ export function createWorkMethods(deps: {
       return getWorkWithLiveProbe(db, query, catalog, id);
     },
 
-    async getWorkRegisterPreview(path: string): Promise<WorkRegisterPreview | null> {
+    async getWorkRegisterPreview(path: WorkspacePath): Promise<WorkRegisterPreview | null> {
       const root = requireRoot();
-      const workDir = resolveWithin(root, path);
+      const workDir = resolveWithin(root, join(root, path));
       if (!workDir) return null;
       try {
         if (!statSync(workDir).isDirectory()) return null;

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
+import type { MediaKind, PreviewCapability, WorkspaceResourceRef } from "@mimimilli/shared";
 
-export type MediaKind = "audio" | "file";
+export type CatalogMediaKind = "audio" | "file";
 
 /**
  * カバーの条件付きGETを、実体の生成・読み込みより先に判定するための情報。
@@ -42,10 +43,21 @@ export function createCoverValidators(
 }
 
 export interface MediaAdapter {
-  /** スキャンルート配下の絶対物理パスから音声を解決する。ルート外・非音声・不存在は null */
-  locateFsAudio(absolutePath: string): Promise<MediaLocation | null>;
+  locateWorkspaceMedia(ref: WorkspaceResourceRef): Promise<WorkspaceMedia | null>;
   /** 実体が無い（fixture 等）場合は null → ルートが 404 を返す。カバーは describeCover を使う。 */
-  locateMedia(kind: MediaKind, workId: string, relPath?: string): Promise<MediaLocation | null>;
+  locateMedia(
+    kind: CatalogMediaKind,
+    workId: string,
+    relPath?: string,
+  ): Promise<MediaLocation | null>;
   /** カバー専用の軽量な事前確認。音声・通常ファイルの契約は locateMedia のまま維持する。 */
   describeCover(workId: string, width?: number): Promise<CoverDescriptor | null>;
+}
+
+export interface WorkspaceMedia {
+  location: MediaLocation;
+  mediaKind: MediaKind;
+  preview: PreviewCapability;
+  /** textのプレビューのみ先頭に制限する。 */
+  maxBytes?: number;
 }
