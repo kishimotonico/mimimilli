@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@nico'
 created_date: '2026-08-12 12:18'
-updated_date: '2026-08-12 13:34'
+updated_date: '2026-08-12 16:51'
 labels: []
 dependencies:
   - TASK-310
@@ -27,8 +27,10 @@ ordinal: 330000
 - [x] #3 preview差分がフィールド単位で現値と取得値を対比表示する
 - [x] #4 既定は未設定フィールドのみ適用で、上書きはフィールド単位で選択できる
 - [x] #5 複数作品への一括適用（未設定項目のみ）ができる
-- [ ] #6 適用がCAS編集経路を通り、pnpm test:smokeが通る
+- [x] #6 適用がCAS編集経路を通り、pnpm test:smokeが通る
 <!-- AC:END -->
+
+
 
 ## Implementation Plan
 

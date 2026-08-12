@@ -2,6 +2,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Provider as JotaiProvider } from "jotai";
 import { lazy, Suspense, type ReactNode } from "react";
 import DlsiteBulkRuntime from "../features/dlsite/ui/DlsiteBulkRuntime";
+import DlsiteBulkApplyRuntime from "../features/dlsite/ui/DlsiteBulkApplyRuntime";
 import ScanRuntime from "../features/scan/ui/ScanRuntime";
 import { PlayerRuntimeProvider } from "../features/player/model/PlayerRuntimeProvider";
 import { queryClient } from "../shared/api/queryClient";
@@ -44,6 +45,7 @@ export default function Providers({ children }: ProvidersProps) {
       <JotaiProvider>
         <PlayerRuntimeProvider>
           <DlsiteBulkRuntime />
+          <DlsiteBulkApplyRuntime />
           <ScanRuntime />
           {children}
           {ReactQueryDevtools && (
