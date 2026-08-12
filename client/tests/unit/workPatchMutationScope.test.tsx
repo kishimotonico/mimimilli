@@ -60,6 +60,7 @@ function makeWork(id: string): Work {
       },
     ],
     resume: null,
+    sourceRevision: "revision-1",
   };
 }
 

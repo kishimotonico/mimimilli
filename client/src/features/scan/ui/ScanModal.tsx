@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence } from "motion/react";
 import { WORKS_DEFAULT_PAGE_SIZE, type WorkListItem, type WorksPage } from "@mimimilli/shared";
 import { getWork, patchWork, searchWorks } from "../../../entities/work/api";
+import { assertWorkSourceRevision } from "../../../entities/work/sourceRevision";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { apiErrorMessage } from "../../../shared/lib/apiError";
 import { libraryTotalQueryOptions } from "../../../entities/work/libraryTotalQueryOptions";
@@ -113,7 +114,10 @@ export default function ScanModal({
   const saveTitleMutation = useMutation({
     mutationFn: async ({ workId, title }: { workId: string; title: string }) => {
       const work = await getWork(workId);
-      return patchWork(workId, { title, sourceRevision: work.sourceRevision ?? "" });
+      return patchWork(workId, {
+        title,
+        sourceRevision: assertWorkSourceRevision(work.sourceRevision),
+      });
     },
     onSuccess: (updatedWork, { workId }) => {
       queryClient.setQueryData(WORK_QUERY_KEYS.detail(workId), updatedWork);

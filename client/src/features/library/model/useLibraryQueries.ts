@@ -29,6 +29,7 @@ import {
 } from "../../../entities/smart-folder/api";
 import { getAllTags } from "../../../entities/tag/api";
 import { getWork, patchWork } from "../../../entities/work/api";
+import { assertWorkSourceRevision } from "../../../entities/work/sourceRevision";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
 import { TAG_QUERY_KEYS } from "../../../entities/tag/queryKeys";
@@ -300,7 +301,8 @@ export function useLibraryWorkPatchMutations(nav: LibraryViewState, searchQuery:
     queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.detail(variables.workId) });
 
   const titleMutation = useMutation<Work, Error, LibraryTitlePatchVariables>({
-    mutationFn: ({ workId, title, sourceRevision }) => patchWork(workId, { title, sourceRevision }),
+    mutationFn: ({ workId, title, sourceRevision }) =>
+      patchWork(workId, { title, sourceRevision: assertWorkSourceRevision(sourceRevision) }),
     onSuccess: (updatedWork, { workId, title, sourceRevision }) =>
       applyPatchSuccess(updatedWork, workId, { title, sourceRevision }),
     onError: refetchAfterPatchError,
@@ -308,14 +310,18 @@ export function useLibraryWorkPatchMutations(nav: LibraryViewState, searchQuery:
 
   const bookmarkMutation = useMutation<Work, Error, LibraryBookmarkPatchVariables>({
     mutationFn: ({ workId, bookmarked, sourceRevision }) =>
-      patchWork(workId, { bookmarked, sourceRevision }),
+      patchWork(workId, {
+        bookmarked,
+        sourceRevision: assertWorkSourceRevision(sourceRevision),
+      }),
     onSuccess: (updatedWork, { workId, bookmarked, sourceRevision }) =>
       applyPatchSuccess(updatedWork, workId, { bookmarked, sourceRevision }),
     onError: refetchAfterPatchError,
   });
 
   const tagsMutation = useMutation<Work, Error, LibraryTagsPatchVariables>({
-    mutationFn: ({ workId, tags, sourceRevision }) => patchWork(workId, { tags, sourceRevision }),
+    mutationFn: ({ workId, tags, sourceRevision }) =>
+      patchWork(workId, { tags, sourceRevision: assertWorkSourceRevision(sourceRevision) }),
     onSuccess: (updatedWork, { workId, tags, sourceRevision }) =>
       applyPatchSuccess(updatedWork, workId, { tags, sourceRevision }),
     onError: refetchAfterPatchError,

@@ -7,6 +7,8 @@ import { I } from "../../../../shared/ui/Icon";
 import { useDialogModal } from "../../../../shared/ui/useDialogModal";
 import type { useLibraryWorkPatchMutations } from "../../model/useLibraryQueries";
 import { apiErrorMessage } from "../../../../shared/lib/apiError";
+import { canPatchWorkSource } from "../../../../entities/work/sourceRevision";
+import { WorkSourcePatchBlockedNotice } from "./WorkSourcePatchBlockedNotice";
 import { DlsiteEditor } from "./DlsiteEditor";
 import { WorkTagEditor } from "./WorkTagEditor";
 
@@ -35,11 +37,14 @@ export function WorkEditDialog({
 
   useEffect(() => setTitleDraft(work.title), [work.title]);
 
+  const canEditTitle = canPatchWorkSource(work.sourceRevision);
+
   const saveTitle = (event: FormEvent) => {
     event.preventDefault();
     const title = titleDraft.trim();
     if (!title || titleMutation.isPending || title === work.title) return;
-    titleMutation.mutate({ workId: work.id, title, sourceRevision: work.sourceRevision ?? "" });
+    if (!canPatchWorkSource(work.sourceRevision)) return;
+    titleMutation.mutate({ workId: work.id, title, sourceRevision: work.sourceRevision });
   };
 
   const titleError = titleMutation.error
@@ -64,6 +69,7 @@ export function WorkEditDialog({
         </header>
         <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-[18px] py-4">
           <form className="flex flex-col gap-2" onSubmit={saveTitle}>
+            <WorkSourcePatchBlockedNotice sourceRevision={work.sourceRevision} />
             <label
               htmlFor="work-title-input"
               className="font-sans text-[11px] font-semibold text-ink-1"
@@ -77,13 +83,16 @@ export function WorkEditDialog({
                 className="h-8 min-w-0 flex-1 rounded-[6px] border border-line bg-paper-0 px-2.5 font-jp text-[12px] text-ink-0 focus:border-acc focus:outline-none focus:ring-2 focus:ring-acc-soft disabled:cursor-not-allowed disabled:text-ink-4"
                 value={titleDraft}
                 aria-invalid={titleDraft.trim().length === 0}
-                disabled={titleMutation.isPending}
+                disabled={titleMutation.isPending || !canEditTitle}
                 onChange={(event) => setTitleDraft(event.target.value)}
               />
               <Button
                 type="submit"
                 disabled={
-                  !titleDraft.trim() || titleDraft.trim() === work.title || titleMutation.isPending
+                  !titleDraft.trim() ||
+                  titleDraft.trim() === work.title ||
+                  titleMutation.isPending ||
+                  !canEditTitle
                 }
               >
                 タイトルを保存

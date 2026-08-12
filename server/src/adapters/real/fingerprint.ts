@@ -84,34 +84,3 @@ export function computeWorkRevisions(
     mediaRevision: computeMediaRevision(metaPath, meta),
   };
 }
-
-/** @deprecated TASK-314以前のテスト互換用。新規コードはrevision3分割を使う。 */
-export function computeFingerprint(metaPath: string, meta: MetaFile): string {
-  return revision({
-    projectionRevision: computeProjectionRevision(meta),
-    mediaRevision: computeMediaRevision(metaPath, meta),
-  });
-}
-
-/** @deprecated 検証前rawによるskipは廃止した。 */
-export function computeRawFingerprint(
-  _metaPath: string,
-  value: unknown,
-): { id: string; fingerprint: string; coverImage: string | null } | null {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
-  const raw = value as Record<string, unknown>;
-  if (typeof raw.id !== "string") return null;
-  const dlsite =
-    typeof raw.dlsite === "object" && raw.dlsite !== null && !Array.isArray(raw.dlsite)
-      ? Object.fromEntries(
-          Object.entries(raw.dlsite as Record<string, unknown>).filter(
-            ([key]) => key !== "errorKind",
-          ),
-        )
-      : raw.dlsite;
-  return {
-    id: raw.id,
-    coverImage: typeof raw.coverImage === "string" ? raw.coverImage : null,
-    fingerprint: revision({ ...raw, dlsite }),
-  };
-}
