@@ -1,11 +1,11 @@
 ---
 id: TASK-317
 title: identity_conflictをFilesで表示し「別作品として取り込む」操作を追加する
-status: In Progress
+status: Done
 assignee:
   - '@codex'
 created_date: '2026-08-12 11:32'
-updated_date: '2026-08-12 16:40'
+updated_date: '2026-08-12 17:43'
 labels: []
 dependencies:
   - TASK-313

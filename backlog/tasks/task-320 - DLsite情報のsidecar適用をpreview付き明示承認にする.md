@@ -1,11 +1,11 @@
 ---
 id: TASK-320
 title: DLsite情報のsidecar適用をpreview付き明示承認にする
-status: In Progress
+status: Done
 assignee:
   - '@nico'
 created_date: '2026-08-12 12:18'
-updated_date: '2026-08-12 16:51'
+updated_date: '2026-08-12 17:43'
 labels: []
 dependencies:
   - TASK-310

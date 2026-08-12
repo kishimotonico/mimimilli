@@ -1,11 +1,11 @@
 ---
 id: TASK-316
 title: Filesのプレビューを汎用viewerへ統一し画像・PDF・text・videoに対応する
-status: In Progress
+status: Done
 assignee:
   - '@codex'
 created_date: '2026-08-12 11:31'
-updated_date: '2026-08-12 16:40'
+updated_date: '2026-08-12 17:43'
 labels: []
 dependencies:
   - TASK-315

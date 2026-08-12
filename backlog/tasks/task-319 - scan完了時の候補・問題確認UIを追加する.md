@@ -1,11 +1,11 @@
 ---
 id: TASK-319
 title: scan完了時の候補・問題確認UIを追加する
-status: In Progress
+status: Done
 assignee:
   - '@codex'
 created_date: '2026-08-12 12:18'
-updated_date: '2026-08-12 16:40'
+updated_date: '2026-08-12 17:43'
 labels: []
 dependencies:
   - TASK-313
