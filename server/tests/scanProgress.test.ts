@@ -25,6 +25,7 @@ const emptyResult = {
   rjCodeMissingCount: 0,
   skipped: 0,
   coverErrors: 0,
+  identityConflicts: [],
 };
 
 async function start(

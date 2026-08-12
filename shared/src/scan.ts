@@ -19,8 +19,21 @@ export const scanResultSchema = z.object({
   unreadablePaths: z.array(z.string()).optional(),
   /** finalize 時の listSummaries でタグ等の不整合により除外した作品 */
   dataIntegrityWarning: dataIntegrityWarningSchema.optional(),
+  /** 同じ Work ID を持つ sidecar が複数見つかった診断。paths はroot相対・separator正規化済みのportable pathで、相互参照用に全件を含む。 */
+  identityConflicts: z.array(
+    z.object({
+      kind: z.literal("identity_conflict"),
+      workId: z.string(),
+      paths: z.array(z.string()).min(2),
+    }),
+  ),
 });
 export type ScanResult = z.infer<typeof scanResultSchema>;
+
+export type ScanDiagnostic = ScanResult["identityConflicts"][number];
+export const scanDiagnosticsResponseSchema = z.object({
+  diagnostics: z.array(scanResultSchema.shape.identityConflicts.element),
+});
 
 /** スキャンの大まかな進行段階（各アダプタの scanner 相当の処理に対応） */
 export const scanPhaseSchema = z.enum(["walking", "registering", "generating", "finalizing"]);

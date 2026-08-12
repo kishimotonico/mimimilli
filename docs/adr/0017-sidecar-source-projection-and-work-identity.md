@@ -64,6 +64,7 @@ scanとFilesは次の状態を区別する。
 - root外へ一時的に移動した場合はcatalogでmissingにするが、user状態は保持する。
 - 同じWork IDが1か所だけで再発見された場合は、同じ作品としてcatalogとuser状態を再接続する。
 - sidecarだけを複製して同じWork IDが複数箇所で見つかった場合、routine scanはsidecarを書き換えず`identity_conflict`として診断・表示する。
+- `identity_conflict`の全pathはroot相対・separator正規化済みの`WorkspacePath`として診断へ保持する。既存catalog投影があるWork IDは、そのlocationと投影を更新せず保持し、新しく見つかった競合pathは作品としてupsertしない。既存投影がない場合は、いずれのpathも通常作品として公開しない。path順でcatalogの所有者を選ばない。
 - 複製側を「別作品として取り込む」とユーザーが明示した場合だけ、そのsidecarのWork IDを再採番する。Playlist/Track IDはWork配下のlocal identityなので維持する。
 - 音声だけを移動してsidecarの相対パスが古くなった場合は、パスや内容から推測して追従しない。`broken reference`として表示する。
 

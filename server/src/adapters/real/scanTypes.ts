@@ -26,7 +26,13 @@ interface PreparedSkip {
   id: string;
 }
 
-export type PreparedEntry = PreparedMeta | PreparedError | PreparedSkip;
+export interface PreparedIdentityConflict {
+  kind: "identity_conflict";
+  metaPath: string;
+  workId: string;
+}
+
+export type PreparedEntry = PreparedMeta | PreparedError | PreparedSkip | PreparedIdentityConflict;
 
 /** fingerprint 一致かつカバー充足のとき増分スキャンでスキップできるか。 */
 export function canSkipIncremental(

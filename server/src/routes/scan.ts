@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import {
   scanConflictResponseSchema,
+  scanDiagnosticsResponseSchema,
   startScanRequestSchema,
   startScanResponseSchema,
   type ScanJobEvent,
@@ -75,6 +76,11 @@ export function scanRoute(
   app.get("/scan/last", (c) => {
     const last = jobs.getLastCompleted();
     return last ? c.json(last) : c.body(null, 204);
+  });
+
+  app.get("/scan/diagnostics", async (c) => {
+    const diagnostics = await jobs.listDiagnostics();
+    return c.json(scanDiagnosticsResponseSchema.parse({ diagnostics }));
   });
 
   app.get("/scan/:id", (c) => {

@@ -115,6 +115,19 @@ export const scanState = sqliteTable("scan_state", {
   value: text("value"),
 });
 
+/** sidecar正本の Work ID が複数の場所で見つかったときの再構築可能な診断投影。 */
+export const identityConflicts = sqliteTable(
+  "identity_conflicts",
+  {
+    workId: text("work_id").notNull(),
+    path: text("path").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.workId, table.path] }),
+    index("idx_identity_conflicts_work_id").on(table.workId),
+  ],
+);
+
 /** 音声ファイル長のプローブ結果キャッシュ。durationSec は計測失敗時 NULL（未知。0 では埋めない）。 */
 export const audioProbeCache = sqliteTable("audio_probe_cache", {
   path: text("path").primaryKey(),

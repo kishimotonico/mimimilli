@@ -17,7 +17,10 @@ const KEY_ROOT_FOLDER = "root_folder";
 export function createSettingsScanMethods(deps: {
   database: DbLocation;
   query: Pick<WorkQueryRepository, "listSummaries">;
-  catalog: Pick<CatalogWorkRepository, "getScanState" | "setScanState">;
+  catalog: Pick<
+    CatalogWorkRepository,
+    "getScanState" | "setScanState" | "listIdentityConflicts"
+  >;
   user: Pick<UserWorkStateRepository, "getUserSetting" | "setUserSetting">;
   scanner: Scanner;
   dataRoot: string;
@@ -117,6 +120,10 @@ export function createSettingsScanMethods(deps: {
       });
 
       return result;
+    },
+
+    async listScanDiagnostics() {
+      return catalog.listIdentityConflicts();
     },
     requireRoot,
   };
