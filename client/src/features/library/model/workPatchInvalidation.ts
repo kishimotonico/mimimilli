@@ -113,6 +113,7 @@ export function getWorkPatchInvalidationTargets(
 // コンパイルエラーになる（「PATCHは成功するのにキャッシュへ反映されない」という
 // 静かな不整合を機械的に検出する。Codexレビュー指摘）。
 const WORK_PATCH_KEYS = [
+  "sourceRevision",
   "title",
   "tags",
   "bookmarked",

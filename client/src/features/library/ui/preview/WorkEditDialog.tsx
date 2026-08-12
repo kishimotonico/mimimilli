@@ -39,7 +39,7 @@ export function WorkEditDialog({
     event.preventDefault();
     const title = titleDraft.trim();
     if (!title || titleMutation.isPending || title === work.title) return;
-    titleMutation.mutate({ workId: work.id, title });
+    titleMutation.mutate({ workId: work.id, title, sourceRevision: work.sourceRevision ?? "" });
   };
 
   const titleError = titleMutation.error

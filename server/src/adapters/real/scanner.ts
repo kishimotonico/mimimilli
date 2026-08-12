@@ -8,7 +8,8 @@ import type { ScanOptions } from "../../adapter/index.ts";
 import {
   META_FILE_NAME,
   MetaParseError,
-  patchMetaFile,
+  patchMetaFileCas,
+  readMetaSource,
   reassignMetaIdsOnDbCollision,
   writeMetaFile,
 } from "./meta.ts";
@@ -431,6 +432,31 @@ export class Scanner {
     return work;
   }
 
+  /** 確定済みsidecarを入力に、対象作品だけをcatalogへ投影する。 */
+  async projectMetaFile(metaPath: string, meta: MetaFile): Promise<Work> {
+    const prepared = prepareSingleMeta(metaPath, meta);
+    const existingWorks = this.query.getScanWorkMap();
+    const batch = new ScanUpsertBatch(this.db, this.catalog, this.user, 1, () => {});
+    const scanResult: Pick<ScanResult, "coverErrors"> = { coverErrors: 0 };
+    const seenIds: SeenMetaIds = { work: new Set(), playlist: new Set(), track: new Set() };
+    await registerMetaFile(
+      this.db,
+      prepared,
+      seenIds,
+      new Map(),
+      batch,
+      existingWorks,
+      scanResult,
+      true,
+      false,
+      this.measureCover,
+    );
+    batch.flush();
+    const work = await getWorkWithLiveProbe(this.db, this.query, this.catalog, meta.id);
+    if (!work) throw new Error("再投影した作品の取得に失敗しました");
+    return work;
+  }
+
   async restoreFolderWork(
     workDir: string,
     patch: {
@@ -453,7 +479,8 @@ export class Scanner {
     if (patch.coverImage !== undefined) metaPatch.coverImage = patch.coverImage;
     if (patch.dlsite !== undefined) metaPatch.dlsite = patch.dlsite;
     if (Object.keys(metaPatch).length > 0) {
-      patchMetaFile(metaPath, metaPatch);
+      const source = readMetaSource(metaPath);
+      patchMetaFileCas(metaPath, source.sourceRevision, metaPatch);
     }
 
     const workId = reassignMetaIdsOnDbCollision(metaPath, (id) => {

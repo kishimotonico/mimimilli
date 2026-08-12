@@ -16,7 +16,8 @@ import type {
 } from "@mimimilli/shared";
 import { type Db } from "./db.ts";
 import { buildFileTree } from "./fileTree.ts";
-import { patchMetaFile } from "./meta.ts";
+import { patchMetaFileCas, readMetaSource } from "./meta.ts";
+import { SourceChangedError } from "../../errors.ts";
 import { resolveWithin } from "./paths.ts";
 import { Scanner } from "./scanner.ts";
 import { logDataIntegritySkips, toDataIntegrityWarning } from "./dataIntegrity.ts";
@@ -56,7 +57,16 @@ export function createWorkMethods(deps: {
     },
 
     async getWork(id: string): Promise<Work | null> {
-      return getWorkWithLiveProbe(db, query, catalog, id);
+      const work = await getWorkWithLiveProbe(db, query, catalog, id);
+      if (!work) return null;
+      const metaPath = catalog.getWorkMetaPath(id);
+      if (!metaPath) return null;
+      try {
+        return { ...work, sourceRevision: readMetaSource(metaPath).sourceRevision };
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") return work;
+        throw error;
+      }
     },
 
     async getWorkRegisterPreview(path: string): Promise<WorkRegisterPreview | null> {
@@ -87,28 +97,25 @@ export function createWorkMethods(deps: {
     },
 
     async patchWork(id: string, patch: WorkPatch): Promise<Work | null> {
-      if (patch.title === undefined && patch.tags === undefined) {
-        if (!catalog.workExists(id)) return null;
-        if (patch.bookmarked !== undefined) {
-          user.patchBookmarked(id, patch.bookmarked);
-        }
-        return getWorkWithLiveProbe(db, query, catalog, id);
+      const metaPath = catalog.getWorkMetaPath(id);
+      if (!metaPath) return null;
+      const source = readMetaSource(metaPath);
+      if (patch.sourceRevision !== undefined && source.sourceRevision !== patch.sourceRevision) {
+        throw new SourceChangedError();
       }
       if (patch.bookmarked !== undefined) {
-        if (!catalog.workExists(id)) return null;
         user.patchBookmarked(id, patch.bookmarked);
       }
-      const ok = db.transaction(() => {
-        const updated = catalog.patchWorkCatalog(id, {
-          title: patch.title,
-          tags: patch.tags,
-        });
-        if (!updated) return false;
-        patchMetaFile(updated.metaPath, { title: patch.title, tags: patch.tags });
-        return true;
+      if (patch.title === undefined && patch.tags === undefined) {
+        const work = await getWorkWithLiveProbe(db, query, catalog, id);
+        return work ? { ...work, sourceRevision: source.sourceRevision } : null;
+      }
+      const updated = patchMetaFileCas(metaPath, patch.sourceRevision ?? source.sourceRevision, {
+        title: patch.title,
+        tags: patch.tags,
       });
-      if (!ok) return null;
-      return getWorkWithLiveProbe(db, query, catalog, id);
+      const work = await scanner.projectMetaFile(metaPath, updated.meta);
+      return { ...work, sourceRevision: updated.sourceRevision };
     },
 
     async saveResume(id: string, body: ResumeBody): Promise<boolean> {

@@ -3,7 +3,7 @@ import { useAtomValue } from "jotai";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence } from "motion/react";
 import { WORKS_DEFAULT_PAGE_SIZE, type WorkListItem, type WorksPage } from "@mimimilli/shared";
-import { patchWork, searchWorks } from "../../../entities/work/api";
+import { getWork, patchWork, searchWorks } from "../../../entities/work/api";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { apiErrorMessage } from "../../../shared/lib/apiError";
 import { libraryTotalQueryOptions } from "../../../entities/work/libraryTotalQueryOptions";
@@ -104,14 +104,19 @@ export default function ScanModal({ lastScanTime, onClose, onOpenRjCodeMissing }
   const titleInputRef = useRef<HTMLInputElement | null>(null);
 
   const saveTitleMutation = useMutation({
-    mutationFn: ({ workId, title }: { workId: string; title: string }) =>
-      patchWork(workId, { title }),
+    mutationFn: async ({ workId, title }: { workId: string; title: string }) => {
+      const work = await getWork(workId);
+      return patchWork(workId, { title, sourceRevision: work.sourceRevision ?? "" });
+    },
     onSuccess: (updatedWork, { workId }) => {
       queryClient.setQueryData(WORK_QUERY_KEYS.detail(workId), updatedWork);
       queryClient.setQueryData<WorksPage>(WORK_QUERY_KEYS.list(newWorksParams), (prev) =>
         patchTitleInWorksPage(prev, workId, updatedWork.title),
       );
       setEditingId(null);
+    },
+    onError: (_error, { workId }) => {
+      void queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.detail(workId) });
     },
   });
 

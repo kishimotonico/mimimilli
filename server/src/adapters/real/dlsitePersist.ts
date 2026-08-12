@@ -1,8 +1,9 @@
 import type { DlsiteState, NormalizedTag, UrlEntry } from "@mimimilli/shared";
-import { patchMetaFile } from "./meta.ts";
-import type { Db } from "./db.ts";
+import { patchMetaFileCas, readMetaSource } from "./meta.ts";
+import { SourceChangedError } from "../../errors.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { CoverColumns } from "./workRowMapping.ts";
+import type { Scanner } from "./scanner.ts";
 
 export interface DlsiteWorkCatalogPatch {
   title?: string;
@@ -18,30 +19,34 @@ export interface DlsiteAppliedWorkPersistInput {
   dlsite: DlsiteState;
 }
 
-export function persistDlsiteAppliedWork(
-  db: Db,
+export async function persistDlsiteAppliedWork(
   catalog: CatalogWorkRepository,
+  scanner: Scanner,
   input: DlsiteAppliedWorkPersistInput,
   options?: { ifWorkMissing?: "return-false" | "throw" },
-): boolean {
+): Promise<boolean> {
   const ifWorkMissing = options?.ifWorkMissing ?? "return-false";
   const { workId, catalogPatch, coverImage, dlsite } = input;
-  return db.transaction(() => {
-    const updated = catalog.patchWorkCatalog(workId, catalogPatch);
-    if (!updated) {
-      if (ifWorkMissing === "throw") {
-        throw new Error(`一括取得中に作品が見つからなくなりました: ${workId}`);
-      }
-      return false;
+  const metaPath = catalog.getWorkMetaPath(workId);
+  if (!metaPath) {
+    if (ifWorkMissing === "throw") {
+      throw new Error(`一括取得中に作品が見つからなくなりました: ${workId}`);
     }
-    catalog.setDlsiteState(workId, dlsite);
-    patchMetaFile(updated.metaPath, {
+    return false;
+  }
+  const source = readMetaSource(metaPath);
+  try {
+    const updated = patchMetaFileCas(metaPath, source.sourceRevision, {
       title: catalogPatch.title,
       tags: catalogPatch.tags,
       coverImage,
       urls: catalogPatch.urls,
       dlsite,
     });
+    await scanner.projectMetaFile(metaPath, updated.meta);
     return true;
-  });
+  } catch (error) {
+    if (error instanceof SourceChangedError) return false;
+    throw error;
+  }
 }

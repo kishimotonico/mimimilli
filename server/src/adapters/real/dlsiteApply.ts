@@ -6,13 +6,13 @@ import {
   type NormalizedTag,
   type Work,
 } from "@mimimilli/shared";
-import { patchMetaFile } from "./meta.ts";
 import { persistDlsiteAppliedWork } from "./dlsitePersist.ts";
 import { getWorkWithLiveProbe } from "./workRefresh.ts";
 import { throwIfAborted } from "./sharedFlight.ts";
 import type { Db } from "./db.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";
+import type { Scanner } from "./scanner.ts";
 import type { CoverColumns } from "./workRowMapping.ts";
 import type { createDlsiteFetch } from "./dlsiteFetch.ts";
 
@@ -20,11 +20,12 @@ export interface DlsiteApplyDeps {
   db: Db;
   query: WorkQueryRepository;
   catalog: CatalogWorkRepository;
+  scanner: Scanner;
   fetch: ReturnType<typeof createDlsiteFetch>;
 }
 
 export function createDlsiteApply(deps: DlsiteApplyDeps) {
-  const { db, query, catalog, fetch } = deps;
+  const { db, query, catalog, scanner, fetch } = deps;
   const { cachedCover, measureDownloadedCover } = fetch;
 
   return {
@@ -70,9 +71,9 @@ export function createDlsiteApply(deps: DlsiteApplyDeps) {
         errorKind: null,
         appliedTags: dedupeTags([...work.dlsite.appliedTags, ...applyTags]),
       };
-      return persistDlsiteAppliedWork(
-        db,
+      return await persistDlsiteAppliedWork(
         catalog,
+        scanner,
         { workId, catalogPatch: patch, coverImage, dlsite },
         { ifWorkMissing: "return-false" },
       );
@@ -82,12 +83,7 @@ export function createDlsiteApply(deps: DlsiteApplyDeps) {
       const work = await getWorkWithLiveProbe(db, query, catalog, workId);
       if (!work) return null;
       const dlsite = applyDlsiteStatePatch(work.dlsite, patch);
-      db.transaction(() => {
-        catalog.setDlsiteState(workId, dlsite);
-        const metaPath = catalog.getWorkMetaPath(workId);
-        if (!metaPath) throw new Error(`作品のメタパスが見つかりません: ${workId}`);
-        patchMetaFile(metaPath, { dlsite });
-      });
+      await persistDlsiteAppliedWork(catalog, scanner, { workId, catalogPatch: {}, dlsite });
       return getWorkWithLiveProbe(db, query, catalog, workId);
     },
   };

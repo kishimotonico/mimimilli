@@ -5,6 +5,7 @@ import { tf } from "./helpers/tag.ts";
 import { compareJapaneseSortKeys } from "../src/core/japaneseSortKey.ts";
 import { createApp } from "../src/app.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
+import { SourceChangedError } from "../src/errors.ts";
 
 function buildApp() {
   return createApp(createFixtureAdapter());
@@ -193,11 +194,13 @@ test("PATCH /api/works/:id でタグ更新が反映される", async () => {
   const listRes = await app.request("/api/works");
   const { items } = await listRes.json();
   const targetId: string = items[0].id;
+  const detailRes = await app.request(`/api/works/${targetId}`);
+  const detail = await detailRes.json();
 
   const patchRes = await app.request(`/api/works/${targetId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ tags: ["テスト用タグ"] }),
+    body: JSON.stringify({ tags: ["テスト用タグ"], sourceRevision: detail.sourceRevision }),
   });
   assert.equal(patchRes.status, 200);
   const patched = await patchRes.json();
@@ -207,6 +210,34 @@ test("PATCH /api/works/:id でタグ更新が反映される", async () => {
   const getRes = await app.request(`/api/works/${targetId}`);
   const fetched = await getRes.json();
   assert.deepEqual(fetched.tags, ["テスト用タグ"]);
+});
+
+test("PATCH /api/works/:id はsourceRevisionなしを400で拒否する", async () => {
+  const app = buildApp();
+  const list = await app.request("/api/works");
+  const { items } = await list.json();
+  const res = await app.request(`/api/works/${items[0].id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title: "更新" }),
+  });
+  assert.equal(res.status, 400);
+  assert.equal((await res.json()).error.code, "invalid_request");
+});
+
+test("PATCH /api/works/:id はsidecar競合を409 source_changedで返す", async () => {
+  const adapter = createFixtureAdapter();
+  adapter.patchWork = async () => {
+    throw new SourceChangedError();
+  };
+  const app = createApp(adapter);
+  const res = await app.request("/api/works/any", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title: "更新", sourceRevision: "stale" }),
+  });
+  assert.equal(res.status, 409);
+  assert.equal((await res.json()).error.code, "source_changed");
 });
 
 test("GET /api/axes/cv は AxisFacetItem[] を count 降順で返す", async () => {

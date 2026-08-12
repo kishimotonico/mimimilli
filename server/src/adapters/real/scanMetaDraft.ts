@@ -17,6 +17,7 @@ export function createDraftMetaFile(
   const tracks = fields.tracks ?? buildDefaultTracks(workDir);
   const playlistId = tracks.length > 0 ? crypto.randomUUID() : null;
   return {
+    formatVersion: 1,
     id: fields.id,
     title: fields.title,
     urls: fields.urls ?? [],
