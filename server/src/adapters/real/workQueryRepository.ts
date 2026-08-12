@@ -49,7 +49,7 @@ import {
   type MediaRootRow,
   mapRawWorkRows,
   parseDlsiteStateJson,
-  parseWorkPlaylists,
+  type RawPlaylistRow,
   type RawSummaryListRow,
   type RawWorkListRow,
   type RawWorkRow,
@@ -136,12 +136,67 @@ export class WorkQueryRepository {
     return parseDlsiteStateJson(workId, row?.stateJson ?? null);
   }
 
+  private playlistsForWork(workId: string): RawPlaylistRow[] {
+    const rows = this.db.sqlite
+      .query(
+        `
+          SELECT
+            playlists.id AS playlistId,
+            playlists.name AS playlistName,
+            playlists.position AS playlistPosition,
+            tracks.id AS trackId,
+            tracks.title AS trackTitle,
+            tracks.file AS trackFile,
+            tracks.start AS trackStart,
+            tracks.end AS trackEnd,
+            tracks.position AS trackPosition
+          FROM main.playlists AS playlists
+          LEFT JOIN main.tracks AS tracks
+            ON tracks.work_id = playlists.work_id
+           AND tracks.playlist_id = playlists.id
+          WHERE playlists.work_id = ?
+          ORDER BY playlists.position ASC, playlists.id COLLATE BINARY ASC,
+                   tracks.position ASC, tracks.id COLLATE BINARY ASC
+        `,
+      )
+      .all(workId) as Array<{
+      playlistId: string;
+      playlistName: string;
+      playlistPosition: number;
+      trackId: string | null;
+      trackTitle: string | null;
+      trackFile: string | null;
+      trackStart: number | null;
+      trackEnd: number | null;
+      trackPosition: number | null;
+    }>;
+    const playlistsById = new Map<string, RawPlaylistRow>();
+    for (const row of rows) {
+      let playlist = playlistsById.get(row.playlistId);
+      if (!playlist) {
+        playlist = { id: row.playlistId, name: row.playlistName, position: row.playlistPosition, tracks: [] };
+        playlistsById.set(row.playlistId, playlist);
+      }
+      if (row.trackId !== null && row.trackTitle !== null && row.trackFile !== null && row.trackPosition !== null) {
+        playlist.tracks.push({
+          id: row.trackId,
+          title: row.trackTitle,
+          file: row.trackFile,
+          start: row.trackStart,
+          end: row.trackEnd,
+          position: row.trackPosition,
+        });
+      }
+    }
+    return [...playlistsById.values()];
+  }
+
   fetchWorkDetail(id: string): WorkDetailParts | null {
     const row = this.joinedWorks("WHERE works.id = ?", id)[0];
     if (!row) return null;
     return {
       row,
-      rawPlaylists: parseWorkPlaylists(row),
+      rawPlaylists: this.playlistsForWork(id),
       tagNames: this.tagMap([id]).get(id) ?? [],
       dlsite: this.dlsiteState(id),
     };
@@ -152,7 +207,7 @@ export class WorkQueryRepository {
     if (!row) return null;
     return {
       row,
-      rawPlaylists: parseWorkPlaylists(row),
+      rawPlaylists: this.playlistsForWork(row.id),
       tagNames: this.tagMap([row.id]).get(row.id) ?? [],
       dlsite: this.dlsiteState(row.id),
     };

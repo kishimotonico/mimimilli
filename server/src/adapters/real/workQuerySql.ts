@@ -162,7 +162,6 @@ export const JOINED_WORKS_SELECT = `
     works.track_count AS trackCount,
     works.error_message AS errorMessage,
     works.urls_json AS urlsJson,
-    works.playlists_json AS playlistsJson,
     work_states.work_id AS workId,
     work_states.added_at AS addedAt,
     work_states.bookmarked,

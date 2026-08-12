@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { eq } from "drizzle-orm";
 import type { Work } from "@mimimilli/shared";
 import { openDb } from "../../src/adapters/real/db.ts";
-import { works, tags } from "../../src/adapters/real/catalogSchema.ts";
+import { playlists, works, tags } from "../../src/adapters/real/catalogSchema.ts";
 import { smartFolders } from "../../src/adapters/real/userSchema.ts";
 import { PersistentDataError } from "../../src/adapters/real/workRowMapping.ts";
 import {
@@ -14,9 +14,7 @@ import {
 } from "../helpers/workTestUtils.ts";
 import { nts } from "../helpers/tag.ts";
 
-function sampleWork(id: string): Work {
-  const playlistId = `${id}-playlist`;
-  const trackId = `${id}-track`;
+function sampleWork(id: string, playlistId = crypto.randomUUID(), trackId = crypto.randomUUID()): Work {
   return {
     id,
     title: "永続データ検証用",
@@ -88,34 +86,32 @@ test("works.status が不正なら listSummaries は当該作品を隔離して�
   assert.match(result.skipped[0]!.reason, /status:/);
 });
 
-test("works.playlists_json が不正なら getWork はエラーのまま", async () => {
+test("defaultPlaylistが関係表にない場合はgetWorkが不正データとして扱う", async () => {
   const db = openDb({ kind: "memory" });
   const { catalog, user } = createWorkRepos(db);
   const work = sampleWork("work-bad-playlists");
   upsertTestWork(catalog, user, work);
-  db.catalog
-    .update(works)
-    .set({ playlistsJson: '[{"name":"default","tracks":"broken"}]' })
-    .where(eq(works.id, work.id))
-    .run();
+  db.catalog.delete(playlists).where(eq(playlists.workId, work.id)).run();
 
   await assertPersistentDataErrorAsync(
     () => getTestWork(db, work.id),
-    /works レコード "work-bad-playlists".*0\.tracks:/,
+    /works レコード "work-bad-playlists".*playlists に/,
   );
 });
 
-test("壊れたJSON構文は getWork で作品IDとSQLite列名を含むエラーになる", async () => {
+test("PlaylistとTrackのIDはWorkごとに同じ値を使える", async () => {
   const db = openDb({ kind: "memory" });
   const { catalog, user } = createWorkRepos(db);
-  const work = sampleWork("work-bad-json");
-  upsertTestWork(catalog, user, work);
-  db.catalog.update(works).set({ playlistsJson: "[{" }).where(eq(works.id, work.id)).run();
+  const playlistId = crypto.randomUUID();
+  const trackId = crypto.randomUUID();
+  const first = sampleWork("work-local-id-a", playlistId, trackId);
+  const second = sampleWork("work-local-id-b", playlistId, trackId);
+  upsertTestWork(catalog, user, first);
+  upsertTestWork(catalog, user, second);
 
-  await assertPersistentDataErrorAsync(
-    () => getTestWork(db, work.id),
-    /works レコード "work-bad-json".*playlists_json: JSON パースエラー:/,
-  );
+  assert.equal((await getTestWork(db, first.id))?.playlists[0]?.tracks[0]?.id, trackId);
+  assert.equal((await getTestWork(db, second.id))?.playlists[0]?.tracks[0]?.id, trackId);
+  db.close();
 });
 
 test("tags.name が正規化されていなければ listSummaries は当該作品を隔離して続行する", () => {
