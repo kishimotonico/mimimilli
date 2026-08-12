@@ -1,5 +1,5 @@
 // TASK-57: listSummaries の N+1 解消と軽量投影の検証。
-// SQL 発行数が作品数に比例しないこと、track_count 列の維持、playlists_json を読まないことを確認する。
+// SQL 発行数が作品数に比例しないこととtrack_count列の維持を確認する。
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { ResolvedPlaylist, Work } from "@mimimilli/shared";
@@ -129,19 +129,6 @@ test("listSummaries の SQL 発行数は作品数に依存しない", () => {
   }
   const n100 = countQueries();
   assert.equal(n100, n1, `SQL 発行数が作品数に比例しています (N=1: ${n1}, N=100: ${n100})`);
-  db.close();
-});
-
-test("listSummaries は playlists_json を読まない（壊れたplaylists_jsonでも一覧を返せる）", () => {
-  const db = openDb({ kind: "memory" });
-  const { query, catalog, user } = createWorkRepos(db);
-  upsertTestWork(catalog, user, sampleWork("w-1", [makePlaylist(2)], null));
-  // playlists_json を直接壊す。listSummaries が読まないなら影響を受けないはず
-  db.sqlite.run("UPDATE main.works SET playlists_json = '[{' WHERE id = 'w-1'");
-
-  const summaries = query.listSummaries().summaries;
-  assert.equal(summaries.length, 1);
-  assert.equal(summaries[0]!.trackCount, 2);
   db.close();
 });
 

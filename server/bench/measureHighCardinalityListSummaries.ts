@@ -29,8 +29,8 @@ function seedHighCardinality(
   const insertWork = sqlite.prepare(`
     INSERT INTO works (
       id, title, title_sort_key, status, physical_path, meta_path,
-      total_duration_sec, track_count, urls_json, playlists_json
-    ) VALUES (?, ?, ?, 'ok', ?, ?, 10, 1, '[]', '[]')
+      total_duration_sec, track_count, urls_json
+    ) VALUES (?, ?, ?, 'ok', ?, ?, 10, 1, '[]')
   `);
   const insertWorkState = sqlite.prepare(`
     INSERT INTO work_states (work_id, added_at, bookmarked)

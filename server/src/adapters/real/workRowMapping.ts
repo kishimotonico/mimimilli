@@ -3,7 +3,6 @@ import {
   coverFieldsFromColumns,
   dlsiteStateSchema,
   emptyDlsiteState,
-  playlistSchema,
   resolveTrackDuration,
   selectDefaultPlaylist,
   toTrackDurationFields,
@@ -12,7 +11,6 @@ import {
 } from "@mimimilli/shared";
 import type {
   DlsiteState,
-  Playlist,
   ProbeDurationResult,
   ResolvedPlaylist,
   Work,
@@ -101,7 +99,7 @@ export interface AxisFacetRow {
 
 export interface WorkDetailParts {
   row: WorkRow;
-  rawPlaylists: Playlist[];
+  rawPlaylists: RawPlaylistRow[];
   tagNames: string[];
   dlsite: DlsiteState;
 }
@@ -167,7 +165,7 @@ export function defaultPlaylistOf<P extends { id: string; tracks: unknown[] }>(
     throw new PersistentDataError(
       "works",
       row.id,
-      `defaultPlaylistId: playlists_json に "${row.defaultPlaylistId}" がありません`,
+      `defaultPlaylistId: playlists に "${row.defaultPlaylistId}" がありません`,
     );
   }
   return playlist;
@@ -201,13 +199,34 @@ export function rowToSummary(
   );
 }
 
-export function parseWorkPlaylists(row: Pick<WorkRow, "id" | "playlistsJson">): Playlist[] {
-  return parseRecord(
-    z.array(playlistSchema),
-    parseJsonField(row.playlistsJson, "works", row.id, "playlists_json"),
-    "works",
-    row.id,
-  );
+export interface RawPlaylistRow {
+  id: string;
+  name: string;
+  position: number;
+  tracks: Array<{
+    id: string;
+    title: string;
+    file: string;
+    start: number | null;
+    end: number | null;
+    position: number;
+  }>;
+}
+
+export function rowsToPlaylists(rows: RawPlaylistRow[]): ResolvedPlaylist[] {
+  return rows.map((playlist) => ({
+    id: playlist.id,
+    name: playlist.name,
+    tracks: playlist.tracks.map((track) => ({
+      id: track.id,
+      title: track.title,
+      file: track.file,
+      ...(track.start === null ? {} : { start: track.start }),
+      ...(track.end === null ? {} : { end: track.end }),
+      durationSec: null,
+      durationKind: "unknown",
+    })),
+  }));
 }
 
 export function sumDefaultPlaylistDuration(
@@ -222,12 +241,12 @@ export function sumDefaultPlaylistDuration(
 
 export function rowToWork(
   row: WorkRow,
-  rawPlaylists: Playlist[],
+  rawPlaylists: RawPlaylistRow[],
   tagNames: string[],
   dlsite: DlsiteState,
   liveFileProbes: Map<string, ProbeDurationResult>,
 ): Work {
-  const playlists: ResolvedPlaylist[] = rawPlaylists.map((playlist) => ({
+  const playlists: ResolvedPlaylist[] = rowsToPlaylists(rawPlaylists).map((playlist) => ({
     id: playlist.id,
     name: playlist.name,
     tracks: playlist.tracks.map((track) => {
