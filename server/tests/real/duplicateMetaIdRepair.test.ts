@@ -24,6 +24,7 @@ function writeMeta(path: string, value: Record<string, unknown>): void {
 
 function singlePlaylist(workId: string): Record<string, unknown> {
   return {
+    formatVersion: 1,
     id: workId,
     title: "作品",
     playlists: [
@@ -67,7 +68,10 @@ test("同一sidecarのPlaylist ID重複は後続だけを修復しdefaultPlaylis
   });
   writeMeta(path, meta);
 
-  assert.equal(repairDuplicateMetaIds(path, readFileSync(path, "utf-8"), emptySeenIds()).repaired, true);
+  assert.equal(
+    repairDuplicateMetaIds(path, readFileSync(path, "utf-8"), emptySeenIds()).repaired,
+    true,
+  );
   const repaired = JSON.parse(readFileSync(path, "utf-8"));
   assert.equal(repaired.playlists[0].id, PLAYLIST_ID);
   assert.notEqual(repaired.playlists[1].id, PLAYLIST_ID);
@@ -84,7 +88,10 @@ test("同一sidecarのTrack ID重複は後続だけを修復する", (t) => {
   tracks.push({ id: TRACK_ID, title: "後続", file: "b.wav" });
   writeMeta(path, meta);
 
-  assert.equal(repairDuplicateMetaIds(path, readFileSync(path, "utf-8"), emptySeenIds()).repaired, true);
+  assert.equal(
+    repairDuplicateMetaIds(path, readFileSync(path, "utf-8"), emptySeenIds()).repaired,
+    true,
+  );
   const repaired = JSON.parse(readFileSync(path, "utf-8"));
   assert.equal(repaired.playlists[0].tracks[0].id, TRACK_ID);
   assert.notEqual(repaired.playlists[0].tracks[1].id, TRACK_ID);

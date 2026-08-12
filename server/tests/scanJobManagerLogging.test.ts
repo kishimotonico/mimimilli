@@ -54,6 +54,13 @@ test("完了時に scan カテゴリの INFO 要約ログを1回記録する", a
     rjCodeMissingCount: 5,
     skipped: 6,
     coverErrors: 7,
+    identityConflicts: [
+      {
+        kind: "identity_conflict",
+        workId: "work-id",
+        paths: ["copy-a/mimimilli.json", "copy-b/mimimilli.json"],
+      },
+    ],
     unreadablePaths,
     dataIntegrityWarning: { skippedCount: 1, skippedWorkIds: ["bad-work"] },
   };
@@ -81,6 +88,7 @@ test("完了時に scan カテゴリの INFO 要約ログを1回記録する", a
     assert.equal(properties.skipped, 6);
     assert.equal(properties.coverErrors, 7);
     assert.equal(properties.rjCodeMissingCount, 5);
+    assert.equal(properties.identityConflictsCount, 1);
     assert.equal(properties.unreadablePathsCount, 12);
     assert.deepEqual(properties.unreadablePathsSample, unreadablePaths.slice(0, 10));
     assert.equal(properties.dataIntegrityWarning, true);

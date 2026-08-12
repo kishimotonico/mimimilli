@@ -285,6 +285,7 @@ export class ScanJobManager {
       skipped: result.skipped,
       coverErrors: result.coverErrors,
       rjCodeMissingCount: result.rjCodeMissingCount,
+      identityConflictsCount: result.identityConflicts.length,
       unreadablePathsCount: unreadablePaths.length,
       unreadablePathsSample: unreadablePaths.slice(0, UNREADABLE_PATH_LOG_SAMPLE_LIMIT),
       dataIntegrityWarning: result.dataIntegrityWarning !== undefined,

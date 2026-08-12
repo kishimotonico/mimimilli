@@ -476,7 +476,7 @@ export class Scanner {
     const existingWorks = this.query.getScanWorkMap();
     const batch = new ScanUpsertBatch(this.db, this.catalog, this.user, 1, () => {});
     const scanResult: Pick<ScanResult, "coverErrors"> = { coverErrors: 0 };
-    const seenIds: SeenMetaIds = { work: new Set(), playlist: new Set(), track: new Set() };
+    const seenIds: SeenMetaIds = { work: new Set() };
     await registerMetaFile(
       this.db,
       prepared,

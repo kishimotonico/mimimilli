@@ -16,6 +16,7 @@ test("updateSettings は receiver なしで呼び出せる", async () => {
   const catalog = {
     getScanState: () => null,
     setScanState: () => undefined,
+    listIdentityConflicts: () => [],
   };
   const query = {
     listSummaries: () => ({ summaries: [], skipped: [] }),
