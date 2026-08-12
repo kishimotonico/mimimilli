@@ -7,7 +7,7 @@ import { useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAtomValue } from "jotai";
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
-import { browseFs } from "../api";
+import { browseFs, getScanDiagnostics } from "../api";
 import { useFilesNavigation } from "../model/useFilesNavigation";
 import { filesDirectionAtom } from "../../../entities/file-system/model/navigationAtoms";
 import { FILE_SYSTEM_QUERY_KEYS } from "../../../entities/file-system/queryKeys";
@@ -70,6 +70,19 @@ export default function FilesView({ rootFolder, onPlayFile }: FilesViewProps) {
     queryFn: () => browseFs(nav.cwd),
   });
   const cwdEntries = cwdQuery.data?.entries ?? [];
+  const diagnosticsQuery = useQuery({
+    queryKey: ["scan", "diagnostics"],
+    queryFn: getScanDiagnostics,
+  });
+  const identityConflictPaths = useMemo(
+    () =>
+      new Map(
+        (diagnosticsQuery.data?.diagnostics ?? []).flatMap((diagnostic) =>
+          diagnostic.paths.map((path) => [path, diagnostic] as const),
+        ),
+      ),
+    [diagnosticsQuery.data],
+  );
 
   const handlePlayFile = useCallback(
     (entry: FsEntry, folderEntries: FsEntry[]) => {
@@ -142,6 +155,7 @@ export default function FilesView({ rootFolder, onPlayFile }: FilesViewProps) {
           <FileColumn
             title={cwdTitle}
             entries={cwdEntries}
+            identityConflictPaths={identityConflictPaths}
             selectedPath={nav.selectedPath}
             matchPlaying={matchPlaying}
             isPlaybackActive={isPlaybackActive}
@@ -163,6 +177,7 @@ export default function FilesView({ rootFolder, onPlayFile }: FilesViewProps) {
         isPlayingEntry={matchPlaying(previewEntry)}
         onPlay={(entry) => handlePlayFile(entry, folderEntries ?? cwdEntries)}
         onWorkRegistered={() => cwdQuery.refetch()}
+        identityConflict={identityConflictPaths.get(previewEntry.path) ?? null}
       />
     </>
   );

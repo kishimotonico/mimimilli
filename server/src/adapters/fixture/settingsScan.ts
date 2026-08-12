@@ -54,12 +54,12 @@ export function createSettingsScanMethods(state: FixtureState): SettingsAdapter 
         skipped: 0,
         coverErrors: 0,
         unreadablePaths: [],
-        identityConflicts: [],
+        identityConflicts: state.identityConflicts,
       };
     },
 
     async listScanDiagnostics() {
-      return [];
+      return state.identityConflicts;
     },
   };
 }

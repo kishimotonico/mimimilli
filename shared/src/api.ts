@@ -210,6 +210,15 @@ export type DlsiteFetchByCodeBody = z.infer<typeof dlsiteFetchByCodeBodySchema>;
 export const workCreateResponseSchema = workSchema;
 export type WorkCreateResponse = z.infer<typeof workCreateResponseSchema>;
 
+export const identityConflictReassignBodySchema = z.object({
+  path: workspacePathSchema,
+});
+export type IdentityConflictReassignBody = z.infer<typeof identityConflictReassignBodySchema>;
+export const identityConflictReassignResponseSchema = workSchema;
+export type IdentityConflictReassignResponse = z.infer<
+  typeof identityConflictReassignResponseSchema
+>;
+
 /** POST /api/works/:id/resume（高頻度更新のため PATCH と分離） */
 export const resumeBodySchema = resumeSchema;
 export type ResumeBody = z.infer<typeof resumeBodySchema>;

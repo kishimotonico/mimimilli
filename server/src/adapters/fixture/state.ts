@@ -1,5 +1,11 @@
 import { DEFAULT_TAG_PREFIXES } from "@mimimilli/shared";
-import type { ResumeBody, SmartFolder, TagPrefix, WorkSummary } from "@mimimilli/shared";
+import type {
+  ResumeBody,
+  ScanDiagnostic,
+  SmartFolder,
+  TagPrefix,
+  WorkSummary,
+} from "@mimimilli/shared";
 import { fixtureCoverColumnsForWork, type FixtureCoverColumns } from "./data.ts";
 import { createFixtureScenario } from "./scenarios.ts";
 
@@ -22,6 +28,7 @@ export interface FixtureState {
   playbackIds: Map<string, PlaybackIds>;
   /** scan() が newWorkIds として返す、未取り込みの新規作品ID（シナリオ "new-work" 用） */
   scanNewWorkIds: string[];
+  identityConflicts: ScanDiagnostic[];
 }
 
 export interface FixtureAdapterOptions {
@@ -54,6 +61,19 @@ export function createInitialState(options: FixtureAdapterOptions): FixtureState
     resumes: new Map(),
     playbackIds: new Map(),
     scanNewWorkIds: scenario.scanNewWorkIds,
+    identityConflicts:
+      scenario.id === "new-work"
+        ? [
+            {
+              kind: "identity_conflict",
+              workId: "RJ501001",
+              paths: [
+                "dlsite/夜想曲スタジオ/RJ501001_夜更けの図書室で囁き朗読",
+                "copies/RJ501001_夜更けの図書室で囁き朗読",
+              ],
+            },
+          ]
+        : [],
   };
 }
 

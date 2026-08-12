@@ -7,6 +7,7 @@ import type {
   DlsiteNotificationQuery,
   DlsiteNotificationSummary,
   FileEntry,
+  IdentityConflictReassignBody,
   ResumeBody,
   Work,
   WorkCreateBody,
@@ -92,6 +93,32 @@ export function createWorkMethods(deps: {
         body,
         (coverUrl, workDir) => cachedCover(coverUrl, workDir),
       );
+    },
+
+    async reassignIdentityConflict(body: IdentityConflictReassignBody): Promise<Work | null> {
+      const diagnostic = catalog
+        .listIdentityConflicts()
+        .find((candidate) => candidate.paths.includes(body.path));
+      if (!diagnostic) return null;
+
+      const root = requireRoot();
+      const workDir = resolveWithin(root, join(root, body.path));
+      if (!workDir) return null;
+      const metaPath = join(workDir, "mimimilli.json");
+      const source = readMetaSource(metaPath);
+      if (source.meta.id !== diagnostic.workId) return null;
+
+      const updated = patchMetaFileCas(metaPath, source.sourceRevision, {
+        id: crypto.randomUUID(),
+      });
+      const work = await scanner.projectMetaFile(metaPath, updated.meta);
+      const remaining = catalog.listIdentityConflicts().flatMap((candidate) => {
+        if (candidate.workId !== diagnostic.workId) return [candidate];
+        const paths = candidate.paths.filter((path) => path !== body.path);
+        return paths.length >= 2 ? [{ ...candidate, paths }] : [];
+      });
+      catalog.replaceIdentityConflicts(remaining);
+      return { ...work, sourceRevision: updated.sourceRevision };
     },
 
     async deleteWork(id: string): Promise<boolean> {

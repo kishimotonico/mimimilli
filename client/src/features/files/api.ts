@@ -4,6 +4,8 @@
 import {
   dlsiteWorkInfoSchema,
   workCreateResponseSchema,
+  identityConflictReassignResponseSchema,
+  scanDiagnosticsResponseSchema,
   workRegisterPreviewSchema,
   type DlsiteWorkInfo,
   type Work,
@@ -34,6 +36,16 @@ export async function createWork(body: WorkCreateBodyInput): Promise<Work> {
 /** 作品登録を解除する（DB・メタファイルのみ。物理ファイルは残す） */
 export async function deleteWork(workId: string): Promise<void> {
   await deleteVoid(`/works/${encodeURIComponent(workId)}`);
+}
+
+export async function getScanDiagnostics() {
+  return getParsed(scanDiagnosticsResponseSchema, "/scan/diagnostics");
+}
+
+export async function reassignIdentityConflict(path: WorkspacePath): Promise<Work> {
+  return postParsed(identityConflictReassignResponseSchema, "/works/identity-conflicts/reassign", {
+    path,
+  });
 }
 
 /** 作品未登録時の DLsite メタ取得（RJ/VJコード指定） */

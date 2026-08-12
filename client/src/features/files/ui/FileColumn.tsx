@@ -6,11 +6,13 @@ import { I } from "../../../shared/ui/Icon";
 import CollectionStatus from "../../../shared/ui/CollectionStatus";
 import { classifyFile, sortEntries, type FsEntry } from "../model/types";
 import type { WorkspacePath } from "@mimimilli/shared";
+import type { ScanDiagnostic } from "@mimimilli/shared";
 import FileRow from "./FileRow";
 
 interface FileColumnProps {
   title: string;
   entries: FsEntry[];
+  identityConflictPaths: ReadonlyMap<string, ScanDiagnostic>;
   selectedPath: WorkspacePath | null;
   matchPlaying: (entry: FsEntry) => boolean;
   isPlaybackActive?: boolean;
@@ -26,6 +28,7 @@ interface FileColumnProps {
 export default function FileColumn({
   title,
   entries,
+  identityConflictPaths,
   selectedPath,
   matchPlaying,
   isPlaybackActive,
@@ -80,6 +83,7 @@ export default function FileColumn({
                   <FileRow
                     key={entry.path}
                     entry={entry}
+                    identityConflict={identityConflictPaths.get(entry.path) ?? null}
                     isFocused={entry.path === selectedPath}
                     isPlaying={matchPlaying(entry)}
                     isPlaybackActive={isPlaybackActive}
