@@ -1,12 +1,12 @@
 import {
   applyDlsiteStatePatch,
   dedupeTags,
-  type DlsiteApplyBody,
   type DlsiteStatePatch,
   type NormalizedTag,
   type Work,
 } from "@mimimilli/shared";
 import { persistDlsiteAppliedWork } from "./dlsitePersist.ts";
+import { patchMetaFileCas, readMetaSource } from "./meta.ts";
 import { getWorkWithLiveProbe } from "./workRefresh.ts";
 import { throwIfAborted } from "./sharedFlight.ts";
 import type { Db } from "./db.ts";
@@ -31,7 +31,7 @@ export function createDlsiteApply(deps: DlsiteApplyDeps) {
   return {
     async dlsiteApply(
       workId: string,
-      body: DlsiteApplyBody,
+      body: import("@mimimilli/shared").DlsiteApplyBody,
       options?: { signal?: AbortSignal },
     ): Promise<boolean> {
       const signal = options?.signal;
@@ -48,8 +48,11 @@ export function createDlsiteApply(deps: DlsiteApplyDeps) {
       if (body.applyTitle && body.info.title) patch.title = body.info.title;
       const { applyTags } = body;
       if (applyTags.length > 0) patch.tags = dedupeTags([...work.tags, ...applyTags]);
-      if (body.info.url && !work.urls.some((entry) => entry.url.includes("dlsite.com"))) {
-        patch.urls = [...work.urls, { label: "DLsite", url: body.info.url }];
+      if (body.applyUrl && body.info.url) {
+        patch.urls = [
+          ...work.urls.filter((entry) => !entry.url.includes("dlsite.com")),
+          { label: "DLsite", url: body.info.url },
+        ];
       }
       let coverImage: string | undefined;
       if (body.applyCover && body.info.coverUrl) {
@@ -63,18 +66,15 @@ export function createDlsiteApply(deps: DlsiteApplyDeps) {
 
       throwIfAborted(signal, "DLsite一括取得はキャンセルされました");
 
-      const dlsite = {
-        rjCode: body.info.rjCode,
-        status: "applied" as const,
-        lastAttemptAt: new Date().toISOString(),
-        error: null,
-        errorKind: null,
-        appliedTags: dedupeTags([...work.dlsite.appliedTags, ...applyTags]),
-      };
       return await persistDlsiteAppliedWork(
         catalog,
         scanner,
-        { workId, catalogPatch: patch, coverImage, dlsite },
+        {
+          workId,
+          sourceRevision: body.sourceRevision,
+          catalogPatch: patch,
+          coverImage,
+        },
         { ifWorkMissing: "return-false" },
       );
     },
@@ -83,7 +83,11 @@ export function createDlsiteApply(deps: DlsiteApplyDeps) {
       const work = await getWorkWithLiveProbe(db, query, catalog, workId);
       if (!work) return null;
       const dlsite = applyDlsiteStatePatch(work.dlsite, patch);
-      await persistDlsiteAppliedWork(catalog, scanner, { workId, catalogPatch: {}, dlsite });
+      const metaPath = catalog.getWorkMetaPath(workId);
+      if (!metaPath) return null;
+      const source = readMetaSource(metaPath);
+      const updated = patchMetaFileCas(metaPath, source.sourceRevision, { dlsite });
+      await scanner.projectMetaFile(metaPath, updated.meta);
       return getWorkWithLiveProbe(db, query, catalog, workId);
     },
   };

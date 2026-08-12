@@ -294,13 +294,14 @@ describe("work api", () => {
       coverUrl: null,
       url: "",
     };
-    mockFetch.mockResolvedValue(makeResponse(mockInfo));
+    const preview = { info: mockInfo, sourceRevision: "revision-1" };
+    mockFetch.mockResolvedValue(makeResponse(preview));
     const result = await workApi.fetchDlsiteInfo("work-1");
     expect(mockFetch).toHaveBeenCalledWith(
       "/api/dlsite/work-1/fetch",
       expect.objectContaining({ method: "POST" }),
     );
-    expect(result).toEqual(mockInfo);
+    expect(result).toEqual(preview);
   });
 
   it("startDlsiteBulk: ジョブ開始レスポンスを検証する", async () => {

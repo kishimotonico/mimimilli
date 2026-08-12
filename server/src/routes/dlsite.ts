@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import {
   dlsiteApplyBodySchema,
+  dlsiteBulkApplyMissingResultSchema,
   dlsiteBulkCancelResponseSchema,
   dlsiteFetchByCodeBodySchema,
   dlsiteNotificationKindSchema,
@@ -10,6 +11,7 @@ import {
   dlsiteStatePatchSchema,
 } from "@mimimilli/shared";
 import { DlsiteOfflineError } from "../errors.ts";
+import { SourceChangedError } from "../errors.ts";
 import type { DataAdapter } from "../adapter/index.ts";
 import { apiError, invalidRequest, notFound } from "../lib/httpError.ts";
 import { getCategoryLogger } from "../lib/logger.ts";
@@ -79,7 +81,9 @@ export function dlsiteRoute(adapter: DataAdapter, dlsiteJobs: DlsiteJobManager):
         signal: c.req.raw.signal,
       });
       if (!result.ok) throw apiError(result.kind, result.message);
-      return c.json(result.info);
+      const work = await adapter.getWork(workId);
+      if (!work?.sourceRevision) notFound(`作品が見つかりません: ${workId}`);
+      return c.json({ info: result.info, sourceRevision: work.sourceRevision });
     } catch (error) {
       if (isClientAbort(error)) {
         dlsiteLogger.info("クライアント切断によりDLsite取得を中断しました", { workId });
@@ -105,10 +109,26 @@ export function dlsiteRoute(adapter: DataAdapter, dlsiteJobs: DlsiteJobManager):
         return;
       }
       if (error instanceof DlsiteOfflineError) throw apiError("offline", error.message);
+      if (error instanceof SourceChangedError) throw apiError("source_changed", error.message);
       throw error;
     }
     if (!ok) notFound(`作品が見つかりません: ${workId}`);
     return c.body(null, 204);
+  });
+
+  app.post("/dlsite/apply-missing", async (c) => {
+    const body = await c.req.json().catch(() => null);
+    const workIds =
+      body === null
+        ? undefined
+        : Array.isArray((body as { workIds?: unknown }).workIds) &&
+            (body as { workIds: unknown[] }).workIds.every((id) => typeof id === "string")
+          ? (body as { workIds: string[] }).workIds
+          : null;
+    if (workIds === null) invalidRequest("workIds は文字列配列で指定してください");
+    return c.json(
+      dlsiteBulkApplyMissingResultSchema.parse(await adapter.dlsiteApplyMissing(workIds)),
+    );
   });
 
   app.patch("/dlsite/:id", async (c) => {

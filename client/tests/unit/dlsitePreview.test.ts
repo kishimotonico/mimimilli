@@ -56,10 +56,19 @@ describe("DLsite適用プレビュー", () => {
   it("タイトル・カバーと選択タグだけをapply bodyへ入れる", () => {
     expect(
       buildDlsiteApplyBody(info, {
+        sourceRevision: "revision-1",
         applyTitle: false,
         applyCover: true,
+        applyUrl: true,
         applyTags: ["Genre/ 耳かき ", "genre/耳かき"],
       }),
-    ).toEqual({ info, applyTitle: false, applyCover: true, applyTags: ["genre/耳かき"] });
+    ).toEqual({
+      info,
+      sourceRevision: "revision-1",
+      applyTitle: false,
+      applyCover: true,
+      applyUrl: true,
+      applyTags: ["genre/耳かき"],
+    });
   });
 });

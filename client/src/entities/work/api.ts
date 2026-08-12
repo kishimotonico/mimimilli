@@ -13,8 +13,9 @@ import {
 import {
   workSchema,
   worksPageSchema,
-  dlsiteWorkInfoSchema,
+  dlsitePreviewSchema,
   dlsiteBulkStartResponseSchema,
+  dlsiteBulkApplyMissingResultSchema,
   dlsiteBulkCancelResponseSchema,
   dlsiteBulkSnapshotSchema,
   createRandomSeed,
@@ -26,7 +27,7 @@ import {
   type DlsiteNotificationPage,
   type DlsiteNotificationSummary,
   type WorkPatchInput,
-  type DlsiteWorkInfo,
+  type DlsitePreview,
   type DlsiteApplyBody,
   type DlsiteStatePatch,
   type ResumeBody,
@@ -117,8 +118,8 @@ export async function saveResumePosition(workId: string, resume: ResumeBody): Pr
   await postVoid(`/works/${encodeURIComponent(workId)}/resume`, resume);
 }
 
-export async function fetchDlsiteInfo(workId: string): Promise<DlsiteWorkInfo> {
-  return postParsed(dlsiteWorkInfoSchema, `/dlsite/${encodeURIComponent(workId)}/fetch`);
+export async function fetchDlsiteInfo(workId: string): Promise<DlsitePreview> {
+  return postParsed(dlsitePreviewSchema, `/dlsite/${encodeURIComponent(workId)}/fetch`);
 }
 
 export async function applyDlsiteInfo(workId: string, body: DlsiteApplyBody): Promise<void> {
@@ -131,6 +132,14 @@ export async function updateDlsiteState(workId: string, body: DlsiteStatePatch):
 
 export async function startDlsiteBulk(): Promise<void> {
   await postParsed(dlsiteBulkStartResponseSchema, "/dlsite/bulk");
+}
+
+export async function applyDlsiteMissing(workIds?: string[]) {
+  return postParsed(
+    dlsiteBulkApplyMissingResultSchema,
+    "/dlsite/apply-missing",
+    workIds ? { workIds } : undefined,
+  );
 }
 
 export async function getDlsiteBulkStatus(): Promise<DlsiteBulkSnapshot | null> {

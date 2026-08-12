@@ -14,6 +14,8 @@ import { getWorkWithLiveProbe } from "./workRefresh.ts";
 import { createDlsiteFetch } from "./dlsiteFetch.ts";
 import { createDlsiteApply } from "./dlsiteApply.ts";
 import { createDlsiteBulk } from "./dlsiteBulk.ts";
+import { mergeDlsiteTags } from "./dlsite.ts";
+import { readMetaSource } from "./meta.ts";
 
 export function createDlsiteMethods(deps: {
   db: Db;
@@ -54,6 +56,50 @@ export function createDlsiteMethods(deps: {
       options?: { signal?: AbortSignal },
     ): Promise<DlsiteFetchResult> {
       return fetch.fetchCachedDlsite(rjCode, force, options?.signal);
+    },
+
+    async dlsiteApplyMissing(workIds?: string[]) {
+      const { summaries } = query.listSummaries(workIds);
+      const result = { applied: 0, skipped: 0, failed: 0 };
+      for (const summary of summaries) {
+        if (!summary.dlsite.rjCode || summary.dlsite.status === "skipped") {
+          result.skipped += 1;
+          continue;
+        }
+        const fetched = await fetch.fetchCachedDlsite(summary.dlsite.rjCode);
+        if (!fetched.ok) {
+          result.failed += 1;
+          continue;
+        }
+        const work = await getWorkWithLiveProbe(db, query, catalog, summary.id);
+        const metaPath = catalog.getWorkMetaPath(summary.id);
+        if (!work || !metaPath) {
+          result.skipped += 1;
+          continue;
+        }
+        const tags = mergeDlsiteTags([], fetched.info).filter((tag) => !work.tags.includes(tag));
+        const applyCover = !work.cover && fetched.info.coverUrl !== null;
+        const applyUrl = !work.urls.some((entry) => entry.url.includes("dlsite.com"));
+        if (tags.length === 0 && !applyCover && !applyUrl) {
+          result.skipped += 1;
+          continue;
+        }
+        try {
+          const applied = await apply.dlsiteApply(summary.id, {
+            info: fetched.info,
+            sourceRevision: readMetaSource(metaPath).sourceRevision,
+            applyTitle: false,
+            applyTags: tags,
+            applyCover,
+            applyUrl,
+          });
+          if (applied) result.applied += 1;
+          else result.skipped += 1;
+        } catch {
+          result.failed += 1;
+        }
+      }
+      return result;
     },
 
     ...apply,
