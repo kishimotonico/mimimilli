@@ -4,8 +4,6 @@ import { metaFileSchema } from "@mimimilli/shared";
 
 export interface SeenMetaIds {
   work: Set<string>;
-  playlist: Set<string>;
-  track: Set<string>;
 }
 
 export interface DuplicateRepairResult {
@@ -55,79 +53,47 @@ function hasCompleteIds(raw: JsonObject, playlists: JsonObject[]): boolean {
   );
 }
 
-function registerSeenIds(raw: JsonObject, playlists: JsonObject[], seenIds: SeenMetaIds): void {
+function registerSeenIds(raw: JsonObject, seenIds: SeenMetaIds): void {
   seenIds.work.add(raw.id as string);
-  for (const playlist of playlists) {
-    seenIds.playlist.add(playlist.id as string);
-    for (const track of playlist.tracks as JsonObject[]) {
-      seenIds.track.add(track.id as string);
-    }
-  }
 }
 
-function repairDuplicates(raw: JsonObject, playlists: JsonObject[], seenIds: SeenMetaIds): boolean {
+function repairDuplicates(raw: JsonObject, playlists: JsonObject[]): boolean {
   let changed = false;
   const defaultPlaylistId =
     typeof raw.defaultPlaylistId === "string" ? raw.defaultPlaylistId : null;
   const localPlaylistIds = new Set<string>();
   const localTrackIds = new Set<string>();
 
-  if (seenIds.work.has(raw.id as string)) {
-    const oldDefaultPlaylistId =
-      typeof raw.defaultPlaylistId === "string" ? raw.defaultPlaylistId : null;
-    raw.id = crypto.randomUUID();
-    let newDefaultPlaylistId: string | null = null;
-    let defaultPlaylistOwnerHandled = false;
-    for (const playlist of playlists) {
-      const wasDefault =
-        !defaultPlaylistOwnerHandled &&
-        typeof playlist.id === "string" &&
-        playlist.id === oldDefaultPlaylistId;
+  let defaultPlaylistOwnerHandled = false;
+  for (const playlist of playlists) {
+    const oldPlaylistId = typeof playlist.id === "string" ? playlist.id : null;
+    if (
+      typeof playlist.id !== "string" ||
+      localPlaylistIds.has(playlist.id)
+    ) {
       playlist.id = crypto.randomUUID();
-      if (wasDefault) {
-        newDefaultPlaylistId = playlist.id as string;
-        defaultPlaylistOwnerHandled = true;
-      }
-      for (const track of playlist.tracks as JsonObject[]) {
-        track.id = crypto.randomUUID();
-      }
+      changed = true;
     }
-    raw.defaultPlaylistId = oldDefaultPlaylistId === null ? null : newDefaultPlaylistId;
-    changed = true;
-  } else {
-    let defaultPlaylistOwnerHandled = false;
-    for (const playlist of playlists) {
-      const oldPlaylistId = typeof playlist.id === "string" ? playlist.id : null;
+    localPlaylistIds.add(playlist.id as string);
+    if (
+      !defaultPlaylistOwnerHandled &&
+      oldPlaylistId !== null &&
+      oldPlaylistId === defaultPlaylistId
+    ) {
+      if (playlist.id !== oldPlaylistId) {
+        raw.defaultPlaylistId = playlist.id as string;
+      }
+      defaultPlaylistOwnerHandled = true;
+    }
+    for (const track of playlist.tracks as JsonObject[]) {
       if (
-        typeof playlist.id !== "string" ||
-        seenIds.playlist.has(playlist.id) ||
-        localPlaylistIds.has(playlist.id)
+        typeof track.id !== "string" ||
+        localTrackIds.has(track.id)
       ) {
-        playlist.id = crypto.randomUUID();
+        track.id = crypto.randomUUID();
         changed = true;
       }
-      localPlaylistIds.add(playlist.id as string);
-      if (
-        !defaultPlaylistOwnerHandled &&
-        oldPlaylistId !== null &&
-        oldPlaylistId === defaultPlaylistId
-      ) {
-        if (playlist.id !== oldPlaylistId) {
-          raw.defaultPlaylistId = playlist.id as string;
-        }
-        defaultPlaylistOwnerHandled = true;
-      }
-      for (const track of playlist.tracks as JsonObject[]) {
-        if (
-          typeof track.id !== "string" ||
-          seenIds.track.has(track.id) ||
-          localTrackIds.has(track.id)
-        ) {
-          track.id = crypto.randomUUID();
-          changed = true;
-        }
-        localTrackIds.add(track.id as string);
-      }
+      localTrackIds.add(track.id as string);
     }
   }
 
@@ -148,9 +114,9 @@ export function repairDuplicateMetaIds(
     return { repaired: false, externallyModified: false };
   }
 
-  const changed = repairDuplicates(raw, playlists, seenIds);
+  const changed = repairDuplicates(raw, playlists);
   if (!changed) {
-    registerSeenIds(raw, playlists, seenIds);
+    registerSeenIds(raw, seenIds);
     return { repaired: false, externallyModified: false };
   }
 
@@ -179,6 +145,6 @@ export function repairDuplicateMetaIds(
     return { repaired: false, externallyModified: true };
   }
   renameSync(temporary, metaPath);
-  registerSeenIds(raw, playlists, seenIds);
+  registerSeenIds(raw, seenIds);
   return { repaired: true, externallyModified: false };
 }

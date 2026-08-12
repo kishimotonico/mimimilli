@@ -1,7 +1,14 @@
 // ライブラリスキャン。
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
-import type { MetaFile, NormalizedTag, ScanResult, UrlEntry, Work } from "@mimimilli/shared";
+import type {
+  MetaFile,
+  NormalizedTag,
+  ScanDiagnostic,
+  ScanResult,
+  UrlEntry,
+  Work,
+} from "@mimimilli/shared";
 import { isRjCodeMissing } from "@mimimilli/shared";
 import type { Db } from "./db.ts";
 import type { ScanOptions } from "../../adapter/index.ts";
@@ -13,7 +20,7 @@ import {
   writeMetaFile,
 } from "./meta.ts";
 import type { SeenMetaIds } from "./duplicateMetaIdRepair.ts";
-import { excludeDescendantPaths } from "./paths.ts";
+import { excludeDescendantPaths, toPortableRelativePath } from "./paths.ts";
 import { isPathWithin } from "../../lib/path.ts";
 import { createProgressThrottle } from "./progressThrottle.ts";
 import { measureCoverDimensions, type CoverDimensions } from "./thumbnailCache.ts";
@@ -50,6 +57,30 @@ const scanLogger = getCategoryLogger("scan");
 const DEFAULT_UPSERT_BATCH_SIZE = 500;
 
 const PROGRESS_MIN_INTERVAL_MS = 200;
+
+function findIdentityConflicts(root: string, metaPaths: string[]): ScanDiagnostic[] {
+  const pathsByWorkId = new Map<string, string[]>();
+  for (const metaPath of metaPaths) {
+    try {
+      const value: unknown = JSON.parse(readFileSync(metaPath, "utf-8"));
+      if (typeof value !== "object" || value === null || !("id" in value)) continue;
+      if (typeof value.id !== "string") continue;
+      const paths = pathsByWorkId.get(value.id) ?? [];
+      paths.push(toPortableRelativePath(root, dirname(metaPath)));
+      pathsByWorkId.set(value.id, paths);
+    } catch {
+      // 不正JSONは登録フェーズで parse error として扱う。
+    }
+  }
+  return [...pathsByWorkId]
+    .filter(([, paths]) => paths.length > 1)
+    .sort(([a], [b]) => naturalCompare(a, b))
+    .map(([workId, paths]) => ({
+      kind: "identity_conflict",
+      workId,
+      paths: paths.sort(naturalCompare),
+    }));
+}
 
 export interface WorkPersistence {
   query: WorkQueryRepository;
@@ -106,16 +137,18 @@ export class Scanner {
       rjCodeMissingCount: 0,
       skipped: 0,
       coverErrors: 0,
+      identityConflicts: [],
     };
 
     const tree = await this.walkPhase(root, emit, signal, abortToken, checkAbort);
     recoverStagedMetaFiles(root, tree, this.catalog);
     checkAbort();
-    const seenIds: SeenMetaIds = { work: new Set(), playlist: new Set(), track: new Set() };
+    const seenIds: SeenMetaIds = { work: new Set() };
     const existingWorks = this.query.getScanWorkMap();
     const existingByPhysicalPath = new Map(
       [...existingWorks].map(([id, state]) => [state.physicalPath, { id, state }]),
     );
+    result.identityConflicts = findIdentityConflicts(root, tree.metaPaths);
 
     const batch = new ScanUpsertBatch(
       this.db,
@@ -195,6 +228,7 @@ export class Scanner {
       full,
       seenIds,
       checkAbort,
+      new Set(result.identityConflicts.map((diagnostic) => diagnostic.workId)),
     );
     const probeCache = buildProbeCache(this.query, prepared, full, checkAbort);
 
@@ -203,7 +237,9 @@ export class Scanner {
       checkAbort();
       const entry = prepared[i]!;
       try {
-        if (entry.kind === "error") {
+        if (entry.kind === "identity_conflict") {
+          if (existingWorks.has(entry.workId)) seenIds.work.add(entry.workId);
+        } else if (entry.kind === "error") {
           handleMetaParseError(
             this.catalog,
             entry.metaPath,
@@ -365,6 +401,8 @@ export class Scanner {
       }
     }
 
+    this.catalog.replaceIdentityConflicts(result.identityConflicts);
+
     this.catalog.markMissingExcept([...seenIds.work]);
     result.missing = this.catalog.countByStatus("missing");
     const { summaries, skipped } = this.query.listSummaries();
@@ -411,7 +449,7 @@ export class Scanner {
       () => {},
     );
     const scanResult: Pick<ScanResult, "coverErrors"> = { coverErrors: 0 };
-    const seenIds: SeenMetaIds = { work: new Set(), playlist: new Set(), track: new Set() };
+    const seenIds: SeenMetaIds = { work: new Set() };
     await registerMetaFile(
       this.db,
       prepared,
@@ -470,7 +508,7 @@ export class Scanner {
       () => {},
     );
     const scanResult: Pick<ScanResult, "coverErrors"> = { coverErrors: 0 };
-    const seenIds: SeenMetaIds = { work: new Set(), playlist: new Set(), track: new Set() };
+    const seenIds: SeenMetaIds = { work: new Set() };
     await registerMetaFile(
       this.db,
       prepared,

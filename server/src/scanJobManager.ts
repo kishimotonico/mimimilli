@@ -3,6 +3,7 @@ import type {
   ScanJobEvent,
   ScanJobSnapshot,
   ScanLastResultResponse,
+  ScanDiagnostic,
   ScanProgressEvent,
   ScanResult,
 } from "@mimimilli/shared";
@@ -112,6 +113,10 @@ export class ScanJobManager {
 
   getLastCompleted(): ScanLastResultResponse | null {
     return this.lastCompleted ? structuredClone(this.lastCompleted) : null;
+  }
+
+  async listDiagnostics(): Promise<ScanDiagnostic[]> {
+    return this.adapter.listScanDiagnostics();
   }
 
   cancel(id: string): ScanJobSnapshot | null {

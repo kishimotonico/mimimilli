@@ -71,6 +71,13 @@
       "when": 1785427344586,
       "tag": "0009_gifted_sersi",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1786538944846,
+      "tag": "0010_cynical_catseye",
+      "breakpoints": true
     }
   ]
 }

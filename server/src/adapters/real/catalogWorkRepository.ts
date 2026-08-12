@@ -1,11 +1,12 @@
 import { join } from "node:path";
 import { eq, inArray } from "drizzle-orm";
 import { parseTag, probeResultFromCache, resolveTrackDurationSec } from "@mimimilli/shared";
-import type { NormalizedTag, DlsiteState, UrlEntry, Work } from "@mimimilli/shared";
+import type { NormalizedTag, DlsiteState, ScanDiagnostic, UrlEntry, Work } from "@mimimilli/shared";
 import { japaneseSortKey } from "../../core/japaneseSortKey.ts";
 import type { Db } from "./db.ts";
 import {
   audioProbeCache,
+  identityConflicts,
   playlists as catalogPlaylists,
   scanState,
   tags,
@@ -64,6 +65,32 @@ export class CatalogWorkRepository {
         set: { stateJson: JSON.stringify(state) },
       })
       .run();
+  }
+
+  replaceIdentityConflicts(diagnostics: ScanDiagnostic[]): void {
+    this.db.transaction(() => {
+      this.db.catalog.delete(identityConflicts).run();
+      for (const diagnostic of diagnostics) {
+        for (const path of diagnostic.paths) {
+          this.db.catalog.insert(identityConflicts).values({ workId: diagnostic.workId, path }).run();
+        }
+      }
+    });
+  }
+
+  listIdentityConflicts(): ScanDiagnostic[] {
+    const rows = this.db.catalog
+      .select()
+      .from(identityConflicts)
+      .orderBy(identityConflicts.workId, identityConflicts.path)
+      .all();
+    const grouped = new Map<string, string[]>();
+    for (const row of rows) {
+      const paths = grouped.get(row.workId) ?? [];
+      paths.push(row.path);
+      grouped.set(row.workId, paths);
+    }
+    return [...grouped].map(([workId, paths]) => ({ kind: "identity_conflict", workId, paths }));
   }
 
   syncTotalDurationSec(row: WorkRow, liveTotalDurationSec: number | null): void {

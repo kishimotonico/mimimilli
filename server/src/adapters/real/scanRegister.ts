@@ -30,23 +30,7 @@ function assertUniqueMetaIds(metaPath: string, meta: MetaFile, seenIds: SeenMeta
   if (seenIds.work.has(id)) {
     throw new MetaParseError(metaPath, `Work IDが重複しています: ${id}`, id);
   }
-  for (const playlist of meta.playlists) {
-    if (seenIds.playlist.has(playlist.id)) {
-      throw new MetaParseError(metaPath, `Playlist IDが重複しています: ${playlist.id}`, id);
-    }
-    for (const track of playlist.tracks) {
-      if (seenIds.track.has(track.id)) {
-        throw new MetaParseError(metaPath, `Track IDが重複しています: ${track.id}`, id);
-      }
-    }
-  }
   seenIds.work.add(id);
-  for (const playlist of meta.playlists) {
-    seenIds.playlist.add(playlist.id);
-    for (const track of playlist.tracks) {
-      seenIds.track.add(track.id);
-    }
-  }
 }
 
 function deriveWorkErrorMessage(
@@ -152,6 +136,7 @@ export function prepareMetaEntries(
   full: boolean,
   seenIds: SeenMetaIds,
   checkAbort: () => void = () => {},
+  conflictedWorkIds: ReadonlySet<string> = new Set(),
 ): PreparedEntry[] {
   const prepared: PreparedEntry[] = [];
   const externallyModified: string[] = [];
@@ -160,6 +145,23 @@ export function prepareMetaEntries(
     checkAbort();
     try {
       let content = readFileSync(metaPath, "utf-8");
+      const initialRaw = (() => {
+        try {
+          return JSON.parse(content) as unknown;
+        } catch (e) {
+          throw new MetaParseError(metaPath, `JSON パースエラー: ${(e as Error).message}`);
+        }
+      })();
+      const candidateId =
+        typeof initialRaw === "object" && initialRaw !== null && "id" in initialRaw &&
+        typeof initialRaw.id === "string"
+          ? initialRaw.id
+          : null;
+      if (candidateId !== null && conflictedWorkIds.has(candidateId)) {
+        prepared.push({ kind: "identity_conflict", metaPath, workId: candidateId });
+        continue;
+      }
+
       const repair = repairDuplicateMetaIds(metaPath, content, seenIds, checkAbort);
       if (repair.externallyModified) {
         externallyModified.push(toPortableRelativePath(root, metaPath));
