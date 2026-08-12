@@ -17,7 +17,11 @@ import {
   trackSchema,
   urlEntrySchema,
 } from "@mimimilli/shared";
-import { computeFingerprint, computeRawFingerprint } from "../../src/adapters/real/fingerprint.ts";
+import {
+  computeFingerprint,
+  computeProjectionRevision,
+  computeRawFingerprint,
+} from "../../src/adapters/real/fingerprint.ts";
 import { makeTestDirectory } from "../helpers/sampleLibrary.ts";
 
 function keysOf(schema: { shape: Record<string, unknown> }): string[] {
@@ -73,6 +77,7 @@ test("errorKindを追加してもfingerprintは変わらない", (t) => {
   t.after(directory.cleanup);
   const metaPath = join(directory.path, "mimimilli.json");
   const legacyRaw = {
+    formatVersion: 1,
     id: "00000000-0000-4000-8000-000000000001",
     title: "テスト作品",
     tags: [],
@@ -103,5 +108,37 @@ test("errorKindを追加してもfingerprintは変わらない", (t) => {
   assert.equal(
     computeFingerprint(metaPath, legacyMeta),
     computeFingerprint(metaPath, withErrorKindMeta),
+  );
+});
+
+test("projection revisionは投影対象fieldだけを含みDLsiteの一時状態では変化しない", () => {
+  const meta = metaFileSchema.parse({
+    formatVersion: 1,
+    id: "00000000-0000-4000-8000-000000000010",
+    title: "テスト作品",
+    playlists: [],
+    dlsite: {
+      rjCode: "RJ123456",
+      status: "none",
+      lastAttemptAt: null,
+      error: null,
+      errorKind: null,
+      appliedTags: [],
+    },
+  });
+  const transient = {
+    ...meta,
+    dlsite: {
+      ...meta.dlsite,
+      status: "error" as const,
+      lastAttemptAt: "2026-08-12T00:00:00.000Z",
+      error: "offline",
+      errorKind: "offline" as const,
+    },
+  };
+  assert.equal(computeProjectionRevision(meta), computeProjectionRevision(transient));
+  assert.notEqual(
+    computeProjectionRevision(meta),
+    computeProjectionRevision({ ...meta, title: "更新" }),
   );
 });

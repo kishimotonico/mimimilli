@@ -3,14 +3,11 @@ import { basename, dirname, join } from "node:path";
 import type { Cover, MetaFile, ScanResult, Work } from "@mimimilli/shared";
 import { coverFieldsFromColumns, metaFileSchema, selectDefaultPlaylist } from "@mimimilli/shared";
 import type { Db } from "./db.ts";
-import { computeFingerprint, computeRawFingerprint } from "./fingerprint.ts";
-import { MetaParseError, readMetaFile, syncDetectedRjCode } from "./meta.ts";
+import { computeWorkRevisions } from "./fingerprint.ts";
+import { MetaParseError, readMetaFile, readMetaSource, syncDetectedRjCode } from "./meta.ts";
 import type { SeenMetaIds } from "./duplicateMetaIdRepair.ts";
-import { repairDuplicateMetaIds } from "./duplicateMetaIdRepair.ts";
-import { toPortableRelativePath } from "./paths.ts";
 import type { ProbeCacheEntry } from "./probe.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
-import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";
 import type { CoverColumns, ScanWorkState } from "./workRowMapping.ts";
 import { resolvePlaylistDurations } from "./workProbe.ts";
@@ -66,7 +63,7 @@ function totalDurationFromResolved(
 interface AssembledWork {
   work: Work;
   cover: CoverColumns;
-  finalFingerprint: string;
+  revisions: ReturnType<typeof computeWorkRevisions>;
 }
 
 async function assembleWorkForUpsert(
@@ -75,11 +72,13 @@ async function assembleWorkForUpsert(
   measureCover: (sourceAbsolutePath: string) => Promise<CoverDimensions | null>,
   checkAbort: () => void,
 ): Promise<{ assembled: AssembledWork; coverErrors: number }> {
-  const { metaPath, meta } = prepared;
+  const { metaPath } = prepared;
   const workDir = dirname(metaPath);
-  const id = meta.id;
 
-  const dlsite = syncDetectedRjCode(metaPath, basename(workDir));
+  syncDetectedRjCode(metaPath, basename(workDir));
+  const source = readMetaSource(metaPath);
+  const meta = source.meta;
+  const id = meta.id;
   checkAbort();
 
   const cover: CoverColumns = { image: meta.coverImage, dimensions: null };
@@ -100,7 +99,7 @@ async function assembleWorkForUpsert(
     cover.dimensions?.height ?? null,
   );
 
-  const finalFingerprint = computeFingerprint(metaPath, { ...meta, dlsite });
+  const revisions = computeWorkRevisions(metaPath, meta, source.bytes);
   const work: Work = {
     id,
     title: meta.title,
@@ -120,31 +119,29 @@ async function assembleWorkForUpsert(
     bookmarked: existing?.bookmarked ?? false,
     lastPlayedAt: existing?.lastPlayedAt ?? null,
     resume: existing?.resume ?? null,
-    dlsite,
+    dlsite: meta.dlsite,
   };
 
   return {
-    assembled: { work, cover, finalFingerprint },
+    assembled: { work, cover, revisions },
     coverErrors,
   };
 }
 
 export function prepareMetaEntries(
-  root: string,
+  _root: string,
   metaPaths: string[],
   existingWorks: Map<string, ScanWorkState>,
   full: boolean,
-  seenIds: SeenMetaIds,
+  _seenIds: SeenMetaIds,
   checkAbort: () => void = () => {},
   conflictedWorkIds: ReadonlySet<string> = new Set(),
 ): PreparedEntry[] {
   const prepared: PreparedEntry[] = [];
-  const externallyModified: string[] = [];
-
   for (const metaPath of metaPaths) {
     checkAbort();
     try {
-      let content = readFileSync(metaPath, "utf-8");
+      const content = readFileSync(metaPath, "utf-8");
       const initialRaw = (() => {
         try {
           return JSON.parse(content) as unknown;
@@ -153,38 +150,15 @@ export function prepareMetaEntries(
         }
       })();
       const candidateId =
-        typeof initialRaw === "object" && initialRaw !== null && "id" in initialRaw &&
+        typeof initialRaw === "object" &&
+        initialRaw !== null &&
+        "id" in initialRaw &&
         typeof initialRaw.id === "string"
           ? initialRaw.id
           : null;
       if (candidateId !== null && conflictedWorkIds.has(candidateId)) {
         prepared.push({ kind: "identity_conflict", metaPath, workId: candidateId });
         continue;
-      }
-
-      const repair = repairDuplicateMetaIds(metaPath, content, seenIds, checkAbort);
-      if (repair.externallyModified) {
-        externallyModified.push(toPortableRelativePath(root, metaPath));
-        const candidateId = (() => {
-          try {
-            const value: unknown = JSON.parse(content);
-            if (typeof value === "object" && value !== null && "id" in value) {
-              const id = (value as { id: unknown }).id;
-              return typeof id === "string" ? id : null;
-            }
-          } catch {
-            return null;
-          }
-          return null;
-        })();
-        throw new MetaParseError(
-          metaPath,
-          "重複ID修復中に外部編集を検出したため、このスキャンでは登録をスキップします",
-          candidateId,
-        );
-      }
-      if (repair.repaired) {
-        content = readFileSync(metaPath, "utf-8");
       }
 
       const raw = (() => {
@@ -194,27 +168,6 @@ export function prepareMetaEntries(
           throw new MetaParseError(metaPath, `JSON パースエラー: ${(e as Error).message}`);
         }
       })();
-      const rawFingerprint = computeRawFingerprint(metaPath, raw);
-      if (rawFingerprint) {
-        const state = existingWorks.get(rawFingerprint.id);
-        const coverSatisfied = coverSatisfiedForState(
-          { coverImage: rawFingerprint.coverImage },
-          state,
-        );
-        if (
-          canSkipIncremental(
-            full,
-            state?.fingerprint ?? undefined,
-            rawFingerprint.fingerprint,
-            coverSatisfied,
-            state?.status,
-          )
-        ) {
-          prepared.push({ kind: "skip", metaPath, id: rawFingerprint.id });
-          continue;
-        }
-      }
-
       const parsed = metaFileSchema.safeParse(raw);
       if (!parsed.success) {
         const issue = parsed.error.issues[0];
@@ -229,16 +182,32 @@ export function prepareMetaEntries(
         );
       }
       const meta = parsed.data;
-      const fingerprint = computeFingerprint(metaPath, meta);
+      const revisions = computeWorkRevisions(metaPath, meta, Buffer.from(content));
       const state = existingWorks.get(meta.id);
+      const cachedRevisions =
+        state && state.sourceRevision && state.projectionRevision && state.mediaRevision
+          ? {
+              sourceRevision: state.sourceRevision,
+              projectionRevision: state.projectionRevision,
+              mediaRevision: state.mediaRevision,
+            }
+          : undefined;
+      const coverSatisfied = coverSatisfiedForState(meta, state);
+      if (
+        canSkipIncremental(full, cachedRevisions, revisions, coverSatisfied, state?.status) &&
+        state?.physicalPath === dirname(metaPath)
+      ) {
+        prepared.push({ kind: "skip", metaPath, id: meta.id });
+        continue;
+      }
       prepared.push({
         kind: "ok",
         metaPath,
         meta,
-        fingerprint,
-        cachedFingerprint: state?.fingerprint ?? undefined,
+        revisions,
+        cachedRevisions,
         cachedStatus: state?.status,
-        coverSatisfied: coverSatisfiedForState(meta, state),
+        coverSatisfied,
       });
     } catch (e) {
       if (e instanceof MetaParseError) {
@@ -249,24 +218,19 @@ export function prepareMetaEntries(
     }
   }
 
-  if (externallyModified.length > 0) {
-    scanLogger.warn("重複ID修復: 外部編集を検出したため上書きしませんでした", {
-      paths: [...new Set(externallyModified)].sort(),
-    });
-  }
-
   return prepared;
 }
 
 export function prepareSingleMeta(metaPath: string, suppliedMeta?: MetaFile): PreparedMeta {
   const meta = suppliedMeta ?? readMetaFile(metaPath);
-  const fingerprint = computeFingerprint(metaPath, meta);
+  const source = readMetaSource(metaPath);
+  const revisions = computeWorkRevisions(metaPath, meta, source.bytes);
   return {
     kind: "ok",
     metaPath,
     meta,
-    fingerprint,
-    cachedFingerprint: undefined,
+    revisions,
+    cachedRevisions: undefined,
     cachedStatus: undefined,
     coverSatisfied: false,
   };
@@ -286,8 +250,8 @@ export function buildProbeCache(
     if (
       canSkipIncremental(
         full,
-        entry.cachedFingerprint,
-        entry.fingerprint,
+        entry.cachedRevisions,
+        entry.revisions,
         entry.coverSatisfied,
         entry.cachedStatus,
       )
@@ -306,7 +270,7 @@ export function buildProbeCache(
 }
 
 export function handleMetaParseError(
-  catalog: CatalogWorkRepository,
+  batch: ScanUpsertBatch,
   metaPath: string,
   error: MetaParseError,
   seenIds: SeenMetaIds,
@@ -324,7 +288,7 @@ export function handleMetaParseError(
       : null;
   const existing = existingById ?? existingByPhysicalPath.get(workDir) ?? null;
   if (existing) {
-    catalog.markWorkError(existing.id, workDir, metaPath, error.message);
+    batch.addError(existing.id, workDir, metaPath, error.message);
     seenIds.work.add(existing.id);
   }
   result.errors += 1;
@@ -343,7 +307,7 @@ export async function registerMetaFile(
   measureCover: (sourceAbsolutePath: string) => Promise<CoverDimensions | null>,
   checkAbort: () => void = () => {},
 ): Promise<"skipped" | string> {
-  const { metaPath, meta, fingerprint, cachedFingerprint, cachedStatus, coverSatisfied } = prepared;
+  const { metaPath, meta, revisions, cachedRevisions, cachedStatus, coverSatisfied } = prepared;
   const workDir = dirname(metaPath);
   const id = meta.id;
 
@@ -351,7 +315,7 @@ export async function registerMetaFile(
     assertUniqueMetaIds(metaPath, meta, seenIds);
   }
 
-  if (canSkipIncremental(full, cachedFingerprint, fingerprint, coverSatisfied, cachedStatus)) {
+  if (canSkipIncremental(full, cachedRevisions, revisions, coverSatisfied, cachedStatus)) {
     return "skipped";
   }
 
@@ -384,6 +348,6 @@ export async function registerMetaFile(
   assembled.work.playlists = resolvedPlaylists;
 
   checkAbort();
-  batch.add(assembled.work, assembled.finalFingerprint, assembled.cover, metaPath);
+  batch.add(assembled.work, assembled.revisions, assembled.cover, metaPath);
   return id;
 }

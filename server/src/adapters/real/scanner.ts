@@ -55,8 +55,6 @@ import {
 
 const scanLogger = getCategoryLogger("scan");
 
-const DEFAULT_UPSERT_BATCH_SIZE = 500;
-
 const PROGRESS_MIN_INTERVAL_MS = 200;
 
 function findIdentityConflicts(root: string, metaPaths: string[]): ScanDiagnostic[] {
@@ -99,7 +97,6 @@ export class Scanner {
   private readonly query: WorkQueryRepository;
   private readonly catalog: CatalogWorkRepository;
   private readonly user: UserWorkStateRepository;
-  private readonly upsertBatchSize: number;
   private readonly measureCover: (sourceAbsolutePath: string) => Promise<CoverDimensions | null>;
 
   constructor(db: Db, repos: WorkPersistence, options?: ScannerOptions) {
@@ -107,11 +104,12 @@ export class Scanner {
     this.query = repos.query;
     this.catalog = repos.catalog;
     this.user = repos.user;
-    const upsertBatchSize = options?.upsertBatchSize ?? DEFAULT_UPSERT_BATCH_SIZE;
-    if (!Number.isInteger(upsertBatchSize) || upsertBatchSize <= 0) {
+    if (
+      options?.upsertBatchSize !== undefined &&
+      (!Number.isInteger(options.upsertBatchSize) || options.upsertBatchSize <= 0)
+    ) {
       throw new RangeError("upsertBatchSize は有限の正整数である必要があります");
     }
-    this.upsertBatchSize = upsertBatchSize;
     this.measureCover = options?.measureCover ?? measureCoverDimensions;
   }
 
@@ -151,13 +149,7 @@ export class Scanner {
     );
     result.identityConflicts = findIdentityConflicts(root, tree.metaPaths);
 
-    const batch = new ScanUpsertBatch(
-      this.db,
-      this.catalog,
-      this.user,
-      this.upsertBatchSize,
-      checkAbort,
-    );
+    const batch = new ScanUpsertBatch(this.db, this.catalog, this.user, checkAbort);
 
     await this.registerPhase(
       root,
@@ -184,7 +176,16 @@ export class Scanner {
       checkAbort,
     );
 
-    return this.finalizePhase(tree, seenIds, existingWorks, result, emit, abortHooks, checkAbort);
+    return this.finalizePhase(
+      tree,
+      seenIds,
+      existingWorks,
+      batch,
+      result,
+      emit,
+      abortHooks,
+      checkAbort,
+    );
   }
 
   private async walkPhase(
@@ -242,7 +243,7 @@ export class Scanner {
           if (existingWorks.has(entry.workId)) seenIds.work.add(entry.workId);
         } else if (entry.kind === "error") {
           handleMetaParseError(
-            this.catalog,
+            batch,
             entry.metaPath,
             entry.error,
             seenIds,
@@ -251,6 +252,7 @@ export class Scanner {
             existingByPhysicalPath,
           );
         } else if (entry.kind === "skip") {
+          seenIds.work.add(entry.id);
           result.skipped += 1;
         } else {
           const outcome = await registerMetaFile(
@@ -262,7 +264,7 @@ export class Scanner {
             existingWorks,
             result,
             full,
-            true,
+            false,
             this.measureCover,
             checkAbort,
           );
@@ -275,7 +277,7 @@ export class Scanner {
       } catch (e) {
         if (e instanceof MetaParseError) {
           handleMetaParseError(
-            this.catalog,
+            batch,
             entry.metaPath,
             e,
             seenIds,
@@ -293,7 +295,6 @@ export class Scanner {
       }
     }
     checkAbort();
-    batch.flush();
   }
 
   private async generatePhase(
@@ -372,13 +373,13 @@ export class Scanner {
       }
     }
     checkAbort();
-    batch.flush();
   }
 
   private finalizePhase(
     tree: WalkResult,
     seenIds: SeenMetaIds,
     existingWorks: Map<string, ScanWorkState>,
+    batch: ScanUpsertBatch,
     result: ScanResult,
     emit: NonNullable<ScanOptions["onProgress"]>,
     abortHooks: ScannerAbortHooks | undefined,
@@ -402,9 +403,24 @@ export class Scanner {
       }
     }
 
-    this.catalog.replaceIdentityConflicts(result.identityConflicts);
-
-    this.catalog.markMissingExcept([...seenIds.work]);
+    const unverifiedIds = new Set<string>();
+    const changedIds = batch.discardChangedSources();
+    for (const id of changedIds) {
+      seenIds.work.add(id);
+      unverifiedIds.add(id);
+    }
+    if (tree.unreadablePaths.length > 0) {
+      for (const [id, state] of existingWorks) {
+        if (tree.unreadablePaths.some((prefix) => isPathWithin(prefix, state.physicalPath))) {
+          unverifiedIds.add(id);
+        }
+      }
+    }
+    batch.publishScanGeneration({
+      seenIds: [...seenIds.work],
+      unverifiedIds: [...unverifiedIds],
+      diagnostics: result.identityConflicts,
+    });
     result.missing = this.catalog.countByStatus("missing");
     const { summaries, skipped } = this.query.listSummaries();
     logDataIntegritySkips(scanLogger, "scan-finalize", skipped);
@@ -442,13 +458,7 @@ export class Scanner {
 
     const prepared = prepareSingleMeta(metaPath);
     const existingWorks = this.query.getScanWorkMap();
-    const batch = new ScanUpsertBatch(
-      this.db,
-      this.catalog,
-      this.user,
-      this.upsertBatchSize,
-      () => {},
-    );
+    const batch = new ScanUpsertBatch(this.db, this.catalog, this.user, () => {});
     const scanResult: Pick<ScanResult, "coverErrors"> = { coverErrors: 0 };
     const seenIds: SeenMetaIds = { work: new Set() };
     await registerMetaFile(
@@ -463,7 +473,7 @@ export class Scanner {
       false,
       this.measureCover,
     );
-    batch.flush();
+    batch.publishWork();
 
     const work = await getWorkWithLiveProbe(this.db, this.query, this.catalog, meta.id);
     if (!work) throw new Error("登録した作品の取得に失敗しました");
@@ -474,9 +484,9 @@ export class Scanner {
   async projectMetaFile(metaPath: string, meta: MetaFile): Promise<Work> {
     const prepared = prepareSingleMeta(metaPath, meta);
     const existingWorks = this.query.getScanWorkMap();
-    const batch = new ScanUpsertBatch(this.db, this.catalog, this.user, 1, () => {});
+    const batch = new ScanUpsertBatch(this.db, this.catalog, this.user, () => {});
     const scanResult: Pick<ScanResult, "coverErrors"> = { coverErrors: 0 };
-    const seenIds: SeenMetaIds = { work: new Set(), playlist: new Set(), track: new Set() };
+    const seenIds: SeenMetaIds = { work: new Set() };
     await registerMetaFile(
       this.db,
       prepared,
@@ -489,7 +499,7 @@ export class Scanner {
       false,
       this.measureCover,
     );
-    batch.flush();
+    batch.publishWork();
     const work = await getWorkWithLiveProbe(this.db, this.query, this.catalog, meta.id);
     if (!work) throw new Error("再投影した作品の取得に失敗しました");
     return work;
@@ -527,13 +537,7 @@ export class Scanner {
     });
     const prepared = prepareSingleMeta(metaPath);
     const existingWorks = this.query.getScanWorkMap();
-    const batch = new ScanUpsertBatch(
-      this.db,
-      this.catalog,
-      this.user,
-      this.upsertBatchSize,
-      () => {},
-    );
+    const batch = new ScanUpsertBatch(this.db, this.catalog, this.user, () => {});
     const scanResult: Pick<ScanResult, "coverErrors"> = { coverErrors: 0 };
     const seenIds: SeenMetaIds = { work: new Set() };
     await registerMetaFile(
@@ -548,7 +552,7 @@ export class Scanner {
       false,
       this.measureCover,
     );
-    batch.flush();
+    batch.publishWork();
 
     const work = await getWorkWithLiveProbe(this.db, this.query, this.catalog, workId);
     if (!work) throw new Error("復元した作品の取得に失敗しました");

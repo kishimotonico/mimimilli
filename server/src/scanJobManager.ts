@@ -9,7 +9,6 @@ import type {
 } from "@mimimilli/shared";
 import type { DataAdapter } from "./adapter/index.ts";
 import { formatError, getCategoryLogger } from "./lib/logger.ts";
-import type { DlsiteJobManager } from "./dlsiteJobManager.ts";
 
 const scanLogger = getCategoryLogger("scan");
 const UNREADABLE_PATH_LOG_SAMPLE_LIMIT = 10;
@@ -36,7 +35,6 @@ export class ActiveScanConflictError extends Error {
 
 export class ScanJobManager {
   private readonly adapter: DataAdapter;
-  private readonly dlsiteJobs: DlsiteJobManager;
   private readonly historyLimit: number;
   private readonly terminalLimit: number;
   private readonly jobs = new Map<string, Job>();
@@ -46,14 +44,8 @@ export class ScanJobManager {
   // terminal job はpruneTerminalで消えるため、前回結果はディスク永続化せずここにだけ保持する（TASK-56）。
   private lastCompleted: ScanLastResultResponse | null = null;
 
-  constructor(
-    adapter: DataAdapter,
-    dlsiteJobs: DlsiteJobManager,
-    historyLimit = 128,
-    terminalLimit = 16,
-  ) {
+  constructor(adapter: DataAdapter, historyLimit = 128, terminalLimit = 16) {
     this.adapter = adapter;
-    this.dlsiteJobs = dlsiteJobs;
     this.historyLimit = historyLimit;
     this.terminalLimit = terminalLimit;
   }
@@ -230,9 +222,6 @@ export class ScanJobManager {
     this.emit(job, { type: "completed", seq: 0, result });
     this.deactivate(job);
     this.pruneTerminal();
-    if (result.newWorkIds.length > 0) {
-      this.dlsiteJobs.enqueue("new", result.newWorkIds);
-    }
   }
 
   private finishFailed(job: Job, error: unknown): void {

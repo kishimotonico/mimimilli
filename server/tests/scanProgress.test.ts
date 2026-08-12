@@ -5,7 +5,6 @@ import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { createApp } from "../src/app.ts";
 import type { DataAdapter } from "../src/adapter/index.ts";
 import { scanRoute } from "../src/routes/scan.ts";
-import { DlsiteJobManager } from "../src/dlsiteJobManager.ts";
 import { ScanJobManager } from "../src/scanJobManager.ts";
 
 function createScanJobManager(
@@ -13,7 +12,7 @@ function createScanJobManager(
   historyLimit?: number,
   terminalLimit?: number,
 ): ScanJobManager {
-  return new ScanJobManager(adapter, new DlsiteJobManager(adapter), historyLimit, terminalLimit);
+  return new ScanJobManager(adapter, historyLimit, terminalLimit);
 }
 
 const emptyResult = {

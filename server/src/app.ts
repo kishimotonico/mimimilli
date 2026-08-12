@@ -52,10 +52,13 @@ export function createApp(adapter: DataAdapter): App {
 
   const api = new Hono();
   const dlsiteJobs = new DlsiteJobManager(adapter);
-  const scanJobs = new ScanJobManager(adapter, dlsiteJobs);
+  const scanJobs = new ScanJobManager(adapter);
   api.route("/", settingsRoute(adapter));
   api.route("/", scanRoute(scanJobs));
-  api.route("/", worksRoute(adapter));
+  api.route(
+    "/",
+    worksRoute(adapter, (workId) => dlsiteJobs.enqueue("new", [workId])),
+  );
   api.route("/", axesRoute(adapter));
   api.route("/", tagPrefixesRoute(adapter));
   api.route("/", smartFoldersRoute(adapter));
