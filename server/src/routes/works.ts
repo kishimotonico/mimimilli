@@ -11,7 +11,8 @@ import {
 } from "@mimimilli/shared";
 import { InvalidResumeError, WorkRegisterError } from "../errors.ts";
 import type { DataAdapter } from "../adapter/index.ts";
-import { conflict, invalidRequest, notFound } from "../lib/httpError.ts";
+import { apiError, conflict, invalidRequest, notFound } from "../lib/httpError.ts";
+import { SourceChangedError } from "../errors.ts";
 
 export function worksRoute(adapter: DataAdapter): Hono {
   const app = new Hono();
@@ -74,7 +75,15 @@ export function worksRoute(adapter: DataAdapter): Hono {
     if (!parsed.success) {
       invalidRequest("作品の更新内容が不正です");
     }
-    const work = await adapter.patchWork(c.req.param("id"), parsed.data);
+    if (parsed.data.sourceRevision === undefined) {
+      invalidRequest("sourceRevision は必須です");
+    }
+    const work = await adapter.patchWork(c.req.param("id"), parsed.data).catch((error) => {
+      if (error instanceof SourceChangedError) {
+        throw apiError("source_changed", error.message);
+      }
+      throw error;
+    });
     if (!work) notFound(`作品が見つかりません: ${c.req.param("id")}`);
     return c.json(work);
   });

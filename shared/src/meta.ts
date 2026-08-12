@@ -13,6 +13,7 @@ import {
 
 export const metaFileSchema = z
   .object({
+    formatVersion: z.literal(1),
     id: z.uuid(),
     title: z.string().min(1),
     urls: z.array(urlEntrySchema).default([]),

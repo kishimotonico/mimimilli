@@ -14,11 +14,11 @@ import { isDefaultTitle } from "../../core/dlsiteTitle.ts";
 import { DlsiteOfflineError } from "../../errors.ts";
 import { mergeDlsiteTags } from "./dlsite.ts";
 import { persistDlsiteAppliedWork } from "./dlsitePersist.ts";
-import { patchMetaFile } from "./meta.ts";
 import { logDataIntegritySkips, toDataIntegrityWarning } from "./dataIntegrity.ts";
 import type { Db } from "./db.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";
+import type { Scanner } from "./scanner.ts";
 import type { CoverColumns } from "./workRowMapping.ts";
 import type { createDlsiteFetch, DlsiteFetchAttempt } from "./dlsiteFetch.ts";
 
@@ -26,6 +26,7 @@ export interface DlsiteBulkDeps {
   db: Db;
   query: WorkQueryRepository;
   catalog: CatalogWorkRepository;
+  scanner: Scanner;
   fetch: ReturnType<typeof createDlsiteFetch>;
 }
 
@@ -113,8 +114,8 @@ interface ApplyDlsiteBulkWorkInput {
 }
 
 interface ApplyDlsiteBulkWorkDeps {
-  db: Db;
   catalog: CatalogWorkRepository;
+  scanner: Scanner;
   cachedCover: ReturnType<typeof createDlsiteFetch>["cachedCover"];
   measureDownloadedCover: ReturnType<typeof createDlsiteFetch>["measureDownloadedCover"];
   logger: {
@@ -132,7 +133,7 @@ export async function applyDlsiteBulkWork(
   deps: ApplyDlsiteBulkWorkDeps,
   input: ApplyDlsiteBulkWorkInput,
 ): Promise<ApplyDlsiteBulkWorkOutcome> {
-  const { db, catalog, cachedCover, measureDownloadedCover, logger } = deps;
+  const { catalog, scanner, cachedCover, measureDownloadedCover, logger } = deps;
   const { mode, work, attempt, signal } = input;
   const fetched = attempt.result;
   const attemptedAt = attempt.httpAttempted ? new Date().toISOString() : work.dlsite.lastAttemptAt;
@@ -166,11 +167,7 @@ export async function applyDlsiteBulkWork(
         error: fetched.message,
         errorKind: newErrorKind,
       };
-      db.transaction(() => {
-        catalog.setDlsiteState(work.id, dlsite);
-        const metaPath = catalog.getWorkMetaPath(work.id);
-        if (metaPath) patchMetaFile(metaPath, { dlsite });
-      });
+      await persistDlsiteAppliedWork(catalog, scanner, { workId: work.id, catalogPatch: {}, dlsite });
     }
     return {
       fetched: 0,
@@ -219,9 +216,9 @@ export async function applyDlsiteBulkWork(
     errorKind: null,
     appliedTags: nextAppliedTags,
   };
-  persistDlsiteAppliedWork(
-    db,
+  await persistDlsiteAppliedWork(
     catalog,
+    scanner,
     { workId: work.id, catalogPatch: patch, coverImage, dlsite },
     { ifWorkMissing: "throw" },
   );
@@ -229,7 +226,7 @@ export async function applyDlsiteBulkWork(
 }
 
 export function createDlsiteBulk(deps: DlsiteBulkDeps) {
-  const { db, query, catalog, fetch } = deps;
+  const { query, catalog, scanner, fetch } = deps;
   const {
     dlsiteLogger,
     dlsiteScheduler,
@@ -280,8 +277,8 @@ export function createDlsiteBulk(deps: DlsiteBulkDeps) {
         }
 
         const applyDeps: ApplyDlsiteBulkWorkDeps = {
-          db,
           catalog,
+          scanner,
           cachedCover,
           measureDownloadedCover,
           logger: dlsiteLogger,
@@ -359,10 +356,10 @@ export function createDlsiteBulk(deps: DlsiteBulkDeps) {
               errorKind: "error" as const,
             };
             try {
-              db.transaction(() => {
-                catalog.setDlsiteState(work.id, dlsite);
-                const metaPath = catalog.getWorkMetaPath(work.id);
-                if (metaPath) patchMetaFile(metaPath, { dlsite });
+              await persistDlsiteAppliedWork(catalog, scanner, {
+                workId: work.id,
+                catalogPatch: {},
+                dlsite,
               });
             } catch (persistError) {
               dlsiteLogger.error("DLsite失敗状態の保存に失敗しました", {

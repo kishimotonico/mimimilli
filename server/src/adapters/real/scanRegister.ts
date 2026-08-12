@@ -79,7 +79,7 @@ async function assembleWorkForUpsert(
   const workDir = dirname(metaPath);
   const id = meta.id;
 
-  const dlsite = syncDetectedRjCode(metaPath, meta, basename(workDir));
+  const dlsite = syncDetectedRjCode(metaPath, basename(workDir));
   checkAbort();
 
   const cover: CoverColumns = { image: meta.coverImage, dimensions: null };
@@ -258,8 +258,8 @@ export function prepareMetaEntries(
   return prepared;
 }
 
-export function prepareSingleMeta(metaPath: string): PreparedMeta {
-  const meta = readMetaFile(metaPath);
+export function prepareSingleMeta(metaPath: string, suppliedMeta?: MetaFile): PreparedMeta {
+  const meta = suppliedMeta ?? readMetaFile(metaPath);
   const fingerprint = computeFingerprint(metaPath, meta);
   return {
     kind: "ok",

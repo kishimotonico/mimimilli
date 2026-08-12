@@ -290,31 +290,36 @@ function useWorkPatchMutationContext(nav: LibraryViewState, searchQuery: string)
     ]);
   };
 
-  return { applyPatchSuccess };
+  return { applyPatchSuccess, queryClient };
 }
 
 /** タイトル・ブックマーク・タグ編集を独立した mutation として提供する */
 export function useLibraryWorkPatchMutations(nav: LibraryViewState, searchQuery: string) {
-  const { applyPatchSuccess } = useWorkPatchMutationContext(nav, searchQuery);
+  const { applyPatchSuccess, queryClient } = useWorkPatchMutationContext(nav, searchQuery);
+  const refetchAfterPatchError = (_error: unknown, variables: { workId: string }) =>
+    queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.detail(variables.workId) });
 
   const titleMutation = useMutation({
-    mutationFn: ({ workId, title }: { workId: string; title: string }) =>
-      patchWork(workId, { title }),
-    onSuccess: (updatedWork, { workId, title }) =>
-      applyPatchSuccess(updatedWork, workId, { title }),
+    mutationFn: ({ workId, title, sourceRevision }: { workId: string; title: string; sourceRevision: string }) =>
+      patchWork(workId, { title, sourceRevision }),
+    onSuccess: (updatedWork, { workId, title, sourceRevision }) =>
+      applyPatchSuccess(updatedWork, workId, { title, sourceRevision }),
+    onError: refetchAfterPatchError,
   });
 
   const bookmarkMutation = useMutation({
-    mutationFn: ({ workId, bookmarked }: { workId: string; bookmarked: boolean }) =>
-      patchWork(workId, { bookmarked }),
-    onSuccess: (updatedWork, { workId, bookmarked }) =>
-      applyPatchSuccess(updatedWork, workId, { bookmarked }),
+    mutationFn: ({ workId, bookmarked, sourceRevision }: { workId: string; bookmarked: boolean; sourceRevision: string }) =>
+      patchWork(workId, { bookmarked, sourceRevision }),
+    onSuccess: (updatedWork, { workId, bookmarked, sourceRevision }) =>
+      applyPatchSuccess(updatedWork, workId, { bookmarked, sourceRevision }),
+    onError: refetchAfterPatchError,
   });
 
   const tagsMutation = useMutation({
-    mutationFn: ({ workId, tags }: { workId: string; tags: Work["tags"] }) =>
-      patchWork(workId, { tags }),
-    onSuccess: (updatedWork, { workId, tags }) => applyPatchSuccess(updatedWork, workId, { tags }),
+    mutationFn: ({ workId, tags, sourceRevision }: { workId: string; tags: Work["tags"]; sourceRevision: string }) =>
+      patchWork(workId, { tags, sourceRevision }),
+    onSuccess: (updatedWork, { workId, tags, sourceRevision }) => applyPatchSuccess(updatedWork, workId, { tags, sourceRevision }),
+    onError: refetchAfterPatchError,
   });
 
   return { titleMutation, bookmarkMutation, tagsMutation };

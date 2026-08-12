@@ -313,6 +313,7 @@ test("POST /works: DLsiteカバー適用失敗時は子作品を削除しない"
 
 function writeOrphanedMeta(folder: string, id: string, title: string): void {
   writeMetaFile(join(folder, META_FILE_NAME), {
+    formatVersion: 1,
     id,
     title,
     urls: [],

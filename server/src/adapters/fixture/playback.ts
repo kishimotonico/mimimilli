@@ -113,6 +113,7 @@ export function buildFullWork(
     createdAt: summary.addedAt,
     playlists,
     resume: resume ?? null,
+    sourceRevision: "fixture",
   };
 }
 

@@ -9,6 +9,7 @@ import type { DlsiteSchedulerDependencies } from "./dlsiteScheduler.ts";
 import type { Db } from "./db.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";
+import type { Scanner } from "./scanner.ts";
 import { getWorkWithLiveProbe } from "./workRefresh.ts";
 import { createDlsiteFetch } from "./dlsiteFetch.ts";
 import { createDlsiteApply } from "./dlsiteApply.ts";
@@ -18,6 +19,7 @@ export function createDlsiteMethods(deps: {
   db: Db;
   query: WorkQueryRepository;
   catalog: CatalogWorkRepository;
+  scanner: Scanner;
   dlsiteCache: DlsiteCache;
   dlsiteCacheOptions: DlsiteCacheOptions;
   dlsiteRequestConfig: DlsiteRequestConfig;
@@ -26,8 +28,8 @@ export function createDlsiteMethods(deps: {
 }) {
   const { db, query, catalog } = deps;
   const fetch = createDlsiteFetch(deps);
-  const apply = createDlsiteApply({ db, query, catalog, fetch });
-  const bulk = createDlsiteBulk({ db, query, catalog, fetch });
+  const apply = createDlsiteApply({ db, query, catalog, scanner: deps.scanner, fetch });
+  const bulk = createDlsiteBulk({ db, query, catalog, scanner: deps.scanner, fetch });
 
   return {
     cachedCover: fetch.cachedCover,

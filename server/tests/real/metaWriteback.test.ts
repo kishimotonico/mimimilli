@@ -4,6 +4,9 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
 import { emptyDlsiteState } from "@mimimilli/shared";
+import { SourceChangedError } from "../../src/errors.ts";
+import { CatalogWorkRepository } from "../../src/adapters/real/catalogWorkRepository.ts";
+import { replaceWithRollback } from "../../src/adapters/real/meta.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { makeSampleLibrary, makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 import { nts } from "../helpers/tag.ts";
@@ -37,6 +40,68 @@ test("patchWork の title / tags がメタファイルへ反映され、スキ�
   assert.deepEqual(meta.tags, ["cv/水瀬なずな", "新タグ"]);
   assert.equal(meta.myNote, "ユーザーの手書きメモ"); // 知らないフィールドを消さない
   assert.equal(meta.id, existingWorkId);
+});
+
+test("sidecarの外部更新後は古いsourceRevisionで上書きしない", async (t) => {
+  const { adapter, existingWorkId, metaPath } = await setup(t);
+  const work = await adapter.getWork(existingWorkId);
+  assert.ok(work?.sourceRevision);
+  const raw = JSON.parse(readFileSync(metaPath, "utf-8"));
+  raw.title = "外部で変更したタイトル";
+  writeFileSync(metaPath, JSON.stringify(raw, null, 2));
+
+  await assert.rejects(
+    adapter.patchWork(existingWorkId, {
+      title: "アプリからのタイトル",
+      sourceRevision: work.sourceRevision,
+    }),
+    SourceChangedError,
+  );
+  assert.equal(JSON.parse(readFileSync(metaPath, "utf-8")).title, "外部で変更したタイトル");
+});
+
+test("Windows互換置換でinstallと復元が失敗してもrollbackを保持する", () => {
+  const files = new Set(["meta", "temp"]);
+  assert.throws(
+    () =>
+      replaceWithRollback("meta", "temp", "rollback", {
+        exists: (path) => files.has(path),
+        rename: (from, to) => {
+          if (from === "temp" && to === "meta") throw new Error("install failed");
+          if (from === "rollback" && to === "meta") throw new Error("restore failed");
+          files.delete(from);
+          files.add(to);
+        },
+        unlink: (path) => files.delete(path),
+      }),
+    (error: Error) => error.message === "sidecarの復元に失敗しました",
+  );
+  assert.ok(files.has("rollback"));
+});
+
+test("catalog再投影に失敗しても確定済みsidecarは残り、scanで収束する", async (t) => {
+  const { adapter, existingWorkId, metaPath } = await setup(t);
+  const work = await adapter.getWork(existingWorkId);
+  assert.ok(work?.sourceRevision);
+  const originalUpsert = CatalogWorkRepository.prototype.upsertWorkCatalog;
+  CatalogWorkRepository.prototype.upsertWorkCatalog = () => {
+    throw new Error("catalog projection failed");
+  };
+  try {
+    await assert.rejects(
+      adapter.patchWork(existingWorkId, {
+        title: "sidecarだけは確定する",
+        sourceRevision: work.sourceRevision,
+      }),
+      /catalog projection failed/,
+    );
+  } finally {
+    CatalogWorkRepository.prototype.upsertWorkCatalog = originalUpsert;
+  }
+  assert.equal(JSON.parse(readFileSync(metaPath, "utf-8")).title, "sidecarだけは確定する");
+  assert.equal((await adapter.getWork(existingWorkId))?.title, "既存メタの作品");
+  await adapter.scan({ full: true });
+  assert.equal((await adapter.getWork(existingWorkId))?.title, "sidecarだけは確定する");
 });
 
 test("bookmarked の PATCH はメタファイルを変更しない（DB 固有情報）", async (t) => {
@@ -92,6 +157,7 @@ test("単一ファイル形式作品の patch が同居する mimimilli.json を
     folderMetaPath,
     JSON.stringify(
       {
+        formatVersion: 1,
         id: folderWorkId,
         title: "フォルダー形式作品",
         tags: ["フォルダータグ"],
@@ -116,6 +182,7 @@ test("単一ファイル形式作品の patch が同居する mimimilli.json を
     singleMetaPath,
     JSON.stringify(
       {
+        formatVersion: 1,
         id: singleWorkId,
         title: "単一ファイル作品",
         tags: ["単一タグ"],

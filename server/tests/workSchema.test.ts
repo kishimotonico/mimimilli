@@ -7,6 +7,7 @@ const TRACK_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 
 function validMeta() {
   return {
+    formatVersion: 1 as const,
     id: "11111111-1111-4111-8111-111111111111",
     title: "作品",
     playlists: [
@@ -55,7 +56,7 @@ test("Playlist ID・Track IDとdefaultPlaylistIdの不変条件を検証する",
   );
 });
 
-test("dlsite.errorKindが無い旧metaはパースできerrorKindはnullになる", () => {
+test("formatVersionのない既存sidecarは自動互換せず拒否する", () => {
   const meta = {
     ...validMeta(),
     dlsite: {
@@ -66,11 +67,11 @@ test("dlsite.errorKindが無い旧metaはパースできerrorKindはnullにな�
       appliedTags: [],
     },
   };
-  const parsed = metaFileSchema.parse(meta);
-  assert.equal(parsed.dlsite.errorKind, null);
+  delete (meta as { formatVersion?: number }).formatVersion;
+  assert.equal(metaFileSchema.safeParse(meta).success, false);
 });
 
-test("dlsiteキー自体が無い旧metaはパースできerrorKindはnullになる", () => {
+test("formatVersion 1はdlsiteキーを省略できる", () => {
   const parsed = metaFileSchema.parse(validMeta());
   assert.equal(parsed.dlsite.errorKind, null);
 });
