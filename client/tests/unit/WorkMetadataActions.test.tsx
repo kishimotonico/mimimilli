@@ -70,6 +70,10 @@ describe("WorkMetadataActions", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "ブックマークに追加" }));
-    expect(mutate).toHaveBeenCalledWith({ workId: "w1", bookmarked: true });
+    expect(mutate).toHaveBeenCalledWith({
+      workId: "w1",
+      bookmarked: true,
+      sourceRevision: "",
+    });
   });
 });

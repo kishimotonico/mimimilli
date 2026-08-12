@@ -58,6 +58,10 @@ beforeEach(() => {
     });
     return { items, total: items.length, stats: { trackCount: 0, durationSec: 0 } };
   });
+  vi.spyOn(workApi, "getWork").mockImplementation(async (workId) => {
+    if (workId === work.id) return work;
+    throw new Error(`work not found: ${workId}`);
+  });
 });
 
 afterEach(() => {

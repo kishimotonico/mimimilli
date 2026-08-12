@@ -67,7 +67,11 @@ export function useWorkTagEditor({
     if (tagsMutation.isPending) return false;
     tagsMutation.reset();
     try {
-      await tagsMutation.mutateAsync({ workId: work.id, tags: nextTags, sourceRevision: work.sourceRevision ?? "" });
+      await tagsMutation.mutateAsync({
+        workId: work.id,
+        tags: nextTags,
+        sourceRevision: work.sourceRevision ?? "",
+      });
       return true;
     } catch {
       return false;

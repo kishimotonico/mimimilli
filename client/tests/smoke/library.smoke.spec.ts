@@ -164,8 +164,9 @@ test("スキャンダイアログが開いて完了し、閉じられる", async
 
   await dialog.getByRole("button", { name: "スキャン開始" }).click();
   await expect(dialog.getByText("新規検出した作品")).toBeVisible({ timeout: 15_000 });
-  // new-work シナリオの RJ501011。スキャン直後の DLsite 一括取得でタイトルが fixture 名に置き換わる。
-  await expect(dialog.getByRole("button", { name: /RJ501011/ })).toBeVisible();
+  await expect(
+    dialog.getByRole("button", { name: /ツンデレ後輩ちゃんの秘密のお世話ボイス/ }),
+  ).toBeVisible({ timeout: 15_000 });
   await expect(dialog.getByText("完了しました")).toBeVisible({ timeout: 15_000 });
 
   await dialog.getByRole("button", { name: "閉じる" }).click();
@@ -178,10 +179,10 @@ test("FilesでID重複を表示し、確認して別作品として取り込め�
   const tracker = trackErrors(page);
   await openApp(page);
 
-  await page.getByRole("button", { name: "ファイル" }).click();
+  await page.getByRole("button", { name: "ファイル", exact: true }).click();
   await page.locator(".mle-row", { hasText: "dlsite" }).click();
   await page.locator(".mle-row", { hasText: "夜想曲スタジオ" }).click();
-  const conflictRow = page.locator(".mle-row", { hasText: "RJ501001_夜更けの図書室で囁き朗読" });
+  const conflictRow = page.locator(".mle-row", { hasText: "夜更けの図書室で囁き朗読" });
   await expect(conflictRow.getByText("ID重複", { exact: true })).toBeVisible();
 
   await conflictRow.click();
@@ -219,7 +220,7 @@ test("スキャン完了後に候補を選択登録でき、問題をFilesで確
   await expect(review.getByText(/新規登録候補/)).toHaveCount(0);
 
   await review.getByRole("button", { name: "viewer / dlsite" }).click();
-  await expect(page.getByRole("button", { name: "ファイル" })).toHaveAttribute(
+  await expect(page.getByRole("button", { name: "ファイル", exact: true })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
@@ -251,17 +252,14 @@ test("Files: Workspace viewerで画像・PDF・text・videoをプレビューで
   const tracker = trackErrors(page);
   await openApp(page);
 
-  await page.getByRole("button", { name: "ファイル" }).click();
+  await page.getByRole("button", { name: "ファイル", exact: true }).click();
   await page.getByTitle("viewer").dblclick();
   await expect(page.getByText("sample.png", { exact: true })).toBeVisible();
 
   await page.getByTitle("sample.png").click();
-  await expect(page.getByRole("img", { name: "sample.png" })).toBeVisible();
-  await expect
-    .poll(() =>
-      page.getByRole("img", { name: "sample.png" }).evaluate((image) => image.naturalWidth > 0),
-    )
-    .toBe(true);
+  const sampleImage = page.locator('img[alt="sample.png"]');
+  await expect(sampleImage).toBeVisible();
+  await expect.poll(() => sampleImage.evaluate((image) => image.naturalWidth > 0)).toBe(true);
 
   await page.getByTitle("sample.pdf").click();
   await expect(page.locator("object[aria-label='sample.pdfのPDFプレビュー']")).toBeVisible();
