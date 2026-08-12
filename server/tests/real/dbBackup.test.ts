@@ -98,6 +98,31 @@ test("verifyDatabaseBackupはDB種別ごとの必須schemaを読み出す", (t) 
   assert.throws(() => verifyDatabaseBackup(backupPath, "user"), /必須テーブルがありません/);
 });
 
+test("user DBのmigrationは候補除外テーブルを作成し、バックアップ検証の必須schemaに含める", (t) => {
+  const directory = makeTestDirectory("db-backup-candidate-exclusions");
+  t.after(directory.cleanup);
+  const catalogPath = join(directory.path, "db", "catalog.sqlite");
+  const userPath = join(directory.path, "db", "user.sqlite");
+  const db = openDb({ kind: "files", catalogPath, userPath });
+  try {
+    const table = db.sqlite
+      .query(
+        "SELECT name FROM user.sqlite_master WHERE type = 'table' AND name = 'scan_candidate_exclusions'",
+      )
+      .get();
+    assert.ok(table);
+  } finally {
+    db.close();
+  }
+  const user = new Database(userPath);
+  try {
+    const backupPath = createDatabaseBackup(user, join(directory.path, "backup"), "user");
+    assert.doesNotThrow(() => verifyDatabaseBackup(backupPath, "user"));
+  } finally {
+    user.close();
+  }
+});
+
 test("候補DBは既存destinationを直接上書きせず同一ディレクトリで入れ替える", (t) => {
   const directory = makeTestDirectory("db-candidate-replace");
   t.after(directory.cleanup);
@@ -319,7 +344,7 @@ test("userはschema version不一致でも退避・再作成せずmigration jour
   const reopened = new Database(userPath, { readonly: true });
   assert.equal(
     (reopened.query("PRAGMA user_version").get() as { user_version: number }).user_version,
-    6,
+    7,
   );
   assert.equal(
     readAppliedMigrationCount(reopened),

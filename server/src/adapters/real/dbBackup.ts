@@ -1,11 +1,4 @@
-import {
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  renameSync,
-  rmSync,
-} from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { Database, type Database as DatabaseType } from "bun:sqlite";
 import { getCategoryLogger } from "../../lib/logger.ts";
@@ -29,7 +22,13 @@ const REQUIRED_TABLES: Record<DbBackupKind, readonly string[]> = {
     "scan_state",
     "audio_probe_cache",
   ],
-  user: ["work_states", "tag_prefixes", "app_settings", "smart_folders"],
+  user: [
+    "work_states",
+    "tag_prefixes",
+    "app_settings",
+    "smart_folders",
+    "scan_candidate_exclusions",
+  ],
 };
 
 function formatBackupTimestamp(date = new Date()): string {
@@ -173,9 +172,9 @@ export function verifyDatabaseBackup(backupPath: string, kind: DbBackupKind): vo
     if (integrity.integrity_check !== "ok") {
       throw new Error(`integrity_check が失敗しました: ${integrity.integrity_check}`);
     }
-    const tableRows = backup.query(
-      "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
-    ).all() as Array<{ name: string }>;
+    const tableRows = backup
+      .query("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
+      .all() as Array<{ name: string }>;
     const tables = new Set(tableRows.map(({ name }) => name));
     const requiredTables = REQUIRED_TABLES[kind];
     if (requiredTables.some((table) => tables.has(table))) {

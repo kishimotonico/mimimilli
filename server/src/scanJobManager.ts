@@ -4,6 +4,8 @@ import type {
   ScanJobSnapshot,
   ScanLastResultResponse,
   ScanDiagnostic,
+  ScanCandidate,
+  ScanCandidatesRegisterResponse,
   ScanProgressEvent,
   ScanResult,
 } from "@mimimilli/shared";
@@ -109,6 +111,21 @@ export class ScanJobManager {
 
   async listDiagnostics(): Promise<ScanDiagnostic[]> {
     return this.adapter.listScanDiagnostics();
+  }
+
+  async listCandidates(): Promise<ScanCandidate[]> {
+    return this.adapter.listScanCandidates();
+  }
+
+  async registerCandidates(
+    paths: string[],
+    onRegistered: (workId: string) => void,
+  ): Promise<ScanCandidatesRegisterResponse> {
+    return this.adapter.registerScanCandidates(paths, onRegistered);
+  }
+
+  async excludeCandidates(paths: string[]): Promise<void> {
+    await this.adapter.excludeScanCandidates(paths);
   }
 
   cancel(id: string): ScanJobSnapshot | null {

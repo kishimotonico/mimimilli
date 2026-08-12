@@ -16,6 +16,8 @@ const emptyResult: ScanResult = {
   skipped: 0,
   coverErrors: 0,
   identityConflicts: [],
+  invalidSidecars: [],
+  candidates: [],
 };
 
 function withStubAdapter(overrides: Partial<DataAdapter> & Pick<DataAdapter, "scan">): DataAdapter {
@@ -53,6 +55,7 @@ test("完了時に scan カテゴリの INFO 要約ログを1回記録する", a
     rjCodeMissingCount: 5,
     skipped: 6,
     coverErrors: 7,
+    candidates: [],
     identityConflicts: [
       {
         kind: "identity_conflict",
@@ -60,6 +63,7 @@ test("完了時に scan カテゴリの INFO 要約ログを1回記録する", a
         paths: ["copy-a/mimimilli.json", "copy-b/mimimilli.json"],
       },
     ],
+    invalidSidecars: [],
     unreadablePaths,
     dataIntegrityWarning: { skippedCount: 1, skippedWorkIds: ["bad-work"] },
   };

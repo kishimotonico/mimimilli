@@ -6,6 +6,7 @@ import {
   deleteParsed,
   getParsed,
   postParsed,
+  postVoid,
   type StatusHandler,
 } from "../../shared/api/http";
 import type { StartScanRequest } from "@mimimilli/shared";
@@ -13,14 +14,20 @@ import {
   scanConflictResponseSchema,
   scanJobSnapshotSchema,
   scanLastResultResponseSchema,
+  scanCandidatesMutationSchema,
+  scanCandidatesRegisterResponseSchema,
+  scanCandidatesResponseSchema,
   startScanRequestSchema,
   startScanResponseSchema,
   type ScanJobSnapshot,
   type ScanLastResultResponse,
+  type ScanCandidatesRegisterResponse,
+  type ScanCandidate,
 } from "@mimimilli/shared";
 
 export const SCAN_QUERY_KEYS = {
   last: () => ["scan", "last"] as const,
+  candidates: () => ["scan", "candidates"] as const,
 } as const;
 
 export type { ScanResult } from "./model";
@@ -70,4 +77,23 @@ export async function cancelScan(id: string): Promise<ScanJobSnapshot> {
 /** サーバー起動後に一度でも完了したスキャンの結果（TASK-56）。一度も完了していなければnull。 */
 export async function getLastScanResult(): Promise<ScanLastResultResponse | null> {
   return getParsed(scanLastResultResponseSchema, "/scan/last", { noContentAsNull: true });
+}
+
+export async function getScanCandidates(): Promise<ScanCandidate[]> {
+  const { candidates } = await getParsed(scanCandidatesResponseSchema, "/scan/candidates");
+  return candidates;
+}
+
+export async function registerScanCandidates(
+  paths: string[],
+): Promise<ScanCandidatesRegisterResponse> {
+  return postParsed(
+    scanCandidatesRegisterResponseSchema,
+    "/scan/candidates/register",
+    scanCandidatesMutationSchema.parse({ paths }),
+  );
+}
+
+export async function excludeScanCandidates(paths: string[]): Promise<void> {
+  await postVoid("/scan/candidates/exclude", scanCandidatesMutationSchema.parse({ paths }));
 }

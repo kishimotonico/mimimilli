@@ -468,6 +468,10 @@ test("一括取得: 編集済みタイトルは保持しフォルダー名のま
   });
   await adapter.updateSettings({ rootFolder: lib.root });
   const scan = await adapter.scan();
+  const registered = await adapter.registerScanCandidates(
+    scan.candidates.map((candidate) => candidate.path),
+  );
+  const candidateId = registered.registered[0]!.workId;
   const beforeExisting = await adapter.getWork(lib.existingWorkId);
   const metaPath = join(beforeExisting!.physicalPath, "mimimilli.json");
   const meta = JSON.parse(readFileSync(metaPath, "utf-8"));
@@ -494,7 +498,7 @@ test("一括取得: 編集済みタイトルは保持しフォルダー名のま
   assert.deepEqual(existing?.dlsite.appliedTags, ["genre/削除済み", "genre/新着"]);
 
   // スキャナー自動生成のタイトル（フォルダー名そのまま）は初期値のままとみなし、DLsite情報で更新する
-  const generated = await adapter.getWork(scan.newWorkIds[0]!);
+  const generated = await adapter.getWork(candidateId!);
   assert.equal(generated?.title, `DLsite取得タイトル ${generated?.dlsite.rjCode}`);
 });
 
@@ -522,7 +526,11 @@ test("一括取得: skippedとappliedを対象外にし、not_foundはキャッ�
   });
   await adapter.updateSettings({ rootFolder: lib.root });
   const scan = await adapter.scan();
-  await adapter.updateDlsiteState(scan.newWorkIds[0]!, { skipped: true });
+  const registered = await adapter.registerScanCandidates(
+    scan.candidates.map((candidate) => candidate.path),
+  );
+  const candidateId = registered.registered[0]!.workId;
+  await adapter.updateDlsiteState(candidateId!, { skipped: true });
   const first = await adapter.runDlsiteBulk("existing", undefined);
   assert.equal(first.failed, 1);
   assert.equal(first.skipped, 1);
@@ -1200,8 +1208,14 @@ test("DLsite HTMLキャッシュ: fresh DBでmimimilli.jsonを削除して同じ
   const second = makeAdapter(secondDb);
   await second.updateSettings({ rootFolder: lib.root });
   const scan = await second.scan();
-  assert.equal(scan.newWorkIds.length, 1);
-  const works = await Promise.all(scan.newWorkIds.map((id) => second.getWork(id)));
+  const registration = await second.registerScanCandidates(
+    scan.candidates
+      .filter((candidate) => candidate.path.endsWith("RJ900002_既存メタ"))
+      .map((candidate) => candidate.path),
+  );
+  const workIds = registration.registered.map((entry) => entry.workId);
+  assert.equal(workIds.length, 1);
+  const works = await Promise.all(workIds.map((id) => second.getWork(id)));
   const reregistered = works.find((work) => work?.physicalPath.endsWith("RJ900002_既存メタ"));
   assert.ok(reregistered);
   assert.deepEqual(await second.runDlsiteBulk("existing", [reregistered!.id]), {
@@ -1347,7 +1361,12 @@ test("DLsiteカバー: 同じURLを2作品へ同時適用してもHTTPは1回で
   await adapter.updateSettings({ rootFolder: lib.root });
   const scan = await adapter.scan();
   const workAId = lib.existingWorkId;
-  const workBId = scan.newWorkIds[0]!;
+  const registration = await adapter.registerScanCandidates(
+    scan.candidates.map((candidate) => candidate.path),
+  );
+  const registeredWorkBId = registration.registered[0]?.workId;
+  assert.ok(registeredWorkBId);
+  const workBId = registeredWorkBId;
   const coverUrl = "https://img.dlsite.jp/modpub/images2/work/shared_cover.jpg";
   const infoFor = (rjCode: string): DlsiteWorkInfo => ({
     rjCode,
@@ -1543,6 +1562,10 @@ test("一括取得: カバー取得失敗を作品のerrorへ記録し、後続�
   });
   await adapter.updateSettings({ rootFolder: lib.root });
   const scan = await adapter.scan();
+  const registered = await adapter.registerScanCandidates(
+    scan.candidates.map((candidate) => candidate.path),
+  );
+  const candidateId = registered.registered[0]!.workId;
 
   const result = await adapter.runDlsiteBulk("existing", undefined);
 
@@ -1552,7 +1575,7 @@ test("一括取得: カバー取得失敗を作品のerrorへ記録し、後続�
   assert.equal(failed?.dlsite.status, "error");
   assert.equal(failed?.dlsite.error, "カバー取得失敗");
   assert.ok(failed?.dlsite.lastAttemptAt);
-  const succeeded = await adapter.getWork(scan.newWorkIds[0]!);
+  const succeeded = await adapter.getWork(candidateId!);
   assert.equal(succeeded?.dlsite.status, "applied");
   adapter.close();
 });
@@ -1580,6 +1603,10 @@ test("一括取得: 失敗状態のメタ書き戻しが例外を投げても後
   });
   await adapter.updateSettings({ rootFolder: lib.root });
   const scan = await adapter.scan();
+  const registered = await adapter.registerScanCandidates(
+    scan.candidates.map((candidate) => candidate.path),
+  );
+  const candidateId = registered.registered[0]!.workId;
 
   const failedMetaPath = join(lib.root, "dlsite", "RJ900002_既存メタ", "mimimilli.json");
   chmodSync(failedMetaPath, 0o444);
@@ -1588,7 +1615,7 @@ test("一括取得: 失敗状態のメタ書き戻しが例外を投げても後
 
   // 保存に失敗した作品も failed に数え、後続作品は処理される（ジョブは中断しない）
   assert.deepEqual(result, { fetched: 1, failed: 1, parseErrors: 0, skipped: 0 });
-  const succeeded = await adapter.getWork(scan.newWorkIds[0]!);
+  const succeeded = await adapter.getWork(candidateId!);
   assert.equal(succeeded?.dlsite.status, "applied");
   adapter.close();
 });

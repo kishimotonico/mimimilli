@@ -1,5 +1,11 @@
 import { isRjCodeMissing } from "@mimimilli/shared";
-import type { ScanResult, Settings, SettingsUpdate } from "@mimimilli/shared";
+import type {
+  ScanCandidate,
+  ScanCandidatesRegisterResponse,
+  ScanResult,
+  Settings,
+  SettingsUpdate,
+} from "@mimimilli/shared";
 import type { ScanOptions } from "../../adapter/index.ts";
 import type { SettingsAdapter } from "../../adapter/settings.ts";
 import type { FixtureState } from "./state.ts";
@@ -54,12 +60,34 @@ export function createSettingsScanMethods(state: FixtureState): SettingsAdapter 
         skipped: 0,
         coverErrors: 0,
         unreadablePaths: [],
-        identityConflicts: [],
+        identityConflicts: state.scanIdentityConflicts,
+        invalidSidecars: state.scanInvalidSidecars,
+        candidates: state.scanCandidates,
       };
     },
 
     async listScanDiagnostics() {
-      return [];
+      return state.scanIdentityConflicts;
+    },
+    async listScanCandidates(): Promise<ScanCandidate[]> {
+      return state.scanCandidates;
+    },
+    async registerScanCandidates(paths): Promise<ScanCandidatesRegisterResponse> {
+      const registered = state.scanCandidates
+        .filter((candidate) => paths.includes(candidate.path))
+        .map((candidate, index) => ({
+          path: candidate.path,
+          workId: `fixture-candidate-${index}`,
+        }));
+      state.scanCandidates = state.scanCandidates.filter(
+        (candidate) => !paths.includes(candidate.path),
+      );
+      return { registered, failures: [] };
+    },
+    async excludeScanCandidates(paths): Promise<void> {
+      state.scanCandidates = state.scanCandidates.filter(
+        (candidate) => !paths.includes(candidate.path),
+      );
     },
   };
 }

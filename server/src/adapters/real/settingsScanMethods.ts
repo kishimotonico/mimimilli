@@ -2,7 +2,13 @@ import { realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { NotConfiguredError } from "../../errors.ts";
 import type { ScanOptions } from "../../adapter/index.ts";
-import type { ScanResult, Settings, SettingsUpdate } from "@mimimilli/shared";
+import type {
+  ScanCandidate,
+  ScanCandidatesRegisterResponse,
+  ScanResult,
+  Settings,
+  SettingsUpdate,
+} from "@mimimilli/shared";
 import { formatError, getCategoryLogger } from "../../lib/logger.ts";
 import { type DbLocation } from "./db.ts";
 import { Scanner } from "./scanner.ts";
@@ -17,11 +23,11 @@ const KEY_ROOT_FOLDER = "root_folder";
 export function createSettingsScanMethods(deps: {
   database: DbLocation;
   query: Pick<WorkQueryRepository, "listSummaries">;
-  catalog: Pick<
-    CatalogWorkRepository,
-    "getScanState" | "setScanState" | "listIdentityConflicts"
+  catalog: Pick<CatalogWorkRepository, "getScanState" | "setScanState" | "listIdentityConflicts">;
+  user: Pick<
+    UserWorkStateRepository,
+    "getUserSetting" | "setUserSetting" | "listScanCandidateExclusions" | "excludeScanCandidates"
   >;
-  user: Pick<UserWorkStateRepository, "getUserSetting" | "setUserSetting">;
   scanner: Scanner;
   dataRoot: string;
   thumbnailCacheDir: string;
@@ -124,6 +130,18 @@ export function createSettingsScanMethods(deps: {
 
     async listScanDiagnostics() {
       return catalog.listIdentityConflicts();
+    },
+    async listScanCandidates(): Promise<ScanCandidate[]> {
+      return scanner.listCandidates(requireRoot());
+    },
+    async registerScanCandidates(
+      paths: string[],
+      onRegistered?: (workId: string) => void,
+    ): Promise<ScanCandidatesRegisterResponse> {
+      return scanner.registerCandidates(requireRoot(), paths, onRegistered);
+    },
+    async excludeScanCandidates(paths: string[]): Promise<void> {
+      await scanner.excludeCandidates(requireRoot(), paths);
     },
     requireRoot,
   };

@@ -4,12 +4,14 @@ import { basename, dirname, join, resolve } from "node:path";
 import type {
   MetaFile,
   NormalizedTag,
+  ScanCandidate,
+  ScanCandidatesRegisterResponse,
   ScanDiagnostic,
   ScanResult,
   UrlEntry,
   Work,
 } from "@mimimilli/shared";
-import { isRjCodeMissing } from "@mimimilli/shared";
+import { isRjCodeMissing, workspacePath } from "@mimimilli/shared";
 import type { Db } from "./db.ts";
 import type { ScanOptions } from "../../adapter/index.ts";
 import {
@@ -43,7 +45,6 @@ import {
   registerMetaFile,
 } from "./scanRegister.ts";
 import { ScanUpsertBatch } from "./scanUpsertBatch.ts";
-import type { PreparedMeta } from "./scanTypes.ts";
 import {
   findWorkRoot,
   isCoveredByMeta,
@@ -137,6 +138,8 @@ export class Scanner {
       skipped: 0,
       coverErrors: 0,
       identityConflicts: [],
+      invalidSidecars: [],
+      candidates: [],
     };
 
     const tree = await this.walkPhase(root, emit, signal, abortToken, checkAbort);
@@ -164,17 +167,9 @@ export class Scanner {
       checkAbort,
     );
 
-    await this.generatePhase(
-      root,
-      tree,
-      full,
-      seenIds,
-      existingWorks,
-      batch,
-      result,
-      emit,
-      checkAbort,
-    );
+    result.candidates = this.collectCandidates(root, tree);
+
+    await this.generatePhase(root, result, emit, checkAbort);
 
     return this.finalizePhase(
       tree,
@@ -251,6 +246,10 @@ export class Scanner {
             existingWorks,
             existingByPhysicalPath,
           );
+          result.invalidSidecars.push({
+            path: workspacePath(toPortableRelativePath(root, entry.metaPath)),
+            message: entry.error.message,
+          });
         } else if (entry.kind === "skip") {
           seenIds.work.add(entry.id);
           result.skipped += 1;
@@ -285,6 +284,10 @@ export class Scanner {
             existingWorks,
             existingByPhysicalPath,
           );
+          result.invalidSidecars.push({
+            path: workspacePath(toPortableRelativePath(root, entry.metaPath)),
+            message: e.message,
+          });
         } else {
           throw e;
         }
@@ -299,80 +302,106 @@ export class Scanner {
 
   private async generatePhase(
     root: string,
-    tree: WalkResult,
-    full: boolean,
-    seenIds: SeenMetaIds,
-    existingWorks: Map<string, ScanWorkState>,
-    batch: ScanUpsertBatch,
     result: ScanResult,
     emit: NonNullable<ScanOptions["onProgress"]>,
     checkAbort: () => void,
   ): Promise<void> {
-    const workRoots = new Set<string>();
-    for (const audioDir of tree.audioDirs) {
-      checkAbort();
-      if (isCoveredByMeta(audioDir, root, tree.metaDirs)) continue;
-      if (audioDir === root) continue;
-      workRoots.add(findWorkRoot(audioDir, root, tree.dirsWithMetaInSubtree, tree.dirIndex));
-    }
-    const roots = excludeDescendantPaths(workRoots).sort(naturalCompare);
+    const roots = result.candidates.map((candidate) => resolve(root, candidate.path));
 
     emit({ type: "progress", phase: "generating", processed: 0, total: roots.length });
-    const generated: Array<{ id: string; prepared: PreparedMeta }> = [];
     const generatingThrottle = createProgressThrottle(PROGRESS_MIN_INTERVAL_MS);
     for (let i = 0; i < roots.length; i++) {
       checkAbort();
-      const workDir = roots[i]!;
-      try {
-        const id = this.generateMetaForFolder(workDir);
-        generated.push({ id, prepared: prepareSingleMeta(join(workDir, META_FILE_NAME)) });
-      } catch (e) {
-        scanLogger.warn(`メタファイルの自動生成に失敗: ${workDir}`, {
-          path: workDir,
-          error: (e as Error).message,
-        });
-        result.errors += 1;
-      }
       const processed = i + 1;
       if (generatingThrottle(processed, roots.length)) {
         emit({ type: "progress", phase: "generating", processed, total: roots.length });
       }
     }
 
-    const generatedProbeCache = buildProbeCache(
-      this.query,
-      generated.map((entry) => entry.prepared),
-      full,
-      checkAbort,
+    checkAbort();
+  }
+
+  private collectCandidates(root: string, tree: WalkResult): ScanCandidate[] {
+    const workRoots = new Set<string>();
+    for (const audioDir of tree.audioDirs) {
+      if (isCoveredByMeta(audioDir, root, tree.metaDirs) || audioDir === root) continue;
+      workRoots.add(findWorkRoot(audioDir, root, tree.dirsWithMetaInSubtree, tree.dirIndex));
+    }
+    const excluded = new Set(this.user.listScanCandidateExclusions());
+    return excludeDescendantPaths(workRoots)
+      .sort(naturalCompare)
+      .map((workDir) => {
+        const breakdown = new Map<string, number>();
+        for (const [audioDir, entries] of tree.audioBreakdownByDir) {
+          if (!isPathWithin(workDir, audioDir)) continue;
+          for (const [extension, count] of entries) {
+            breakdown.set(extension, (breakdown.get(extension) ?? 0) + count);
+          }
+        }
+        return {
+          path: workspacePath(toPortableRelativePath(root, workDir)),
+          inferredTitle: basename(workDir),
+          audioFileCount: [...breakdown.values()].reduce((total, count) => total + count, 0),
+          audioBreakdown: [...breakdown]
+            .sort(([a], [b]) => naturalCompare(a, b))
+            .map(([extension, count]) => ({ extension, count })),
+        };
+      })
+      .filter((candidate) => !excluded.has(candidate.path));
+  }
+
+  async listCandidates(root: string): Promise<ScanCandidate[]> {
+    root = resolve(root);
+    const tree = await this.walkPhase(
+      root,
+      () => {},
+      undefined,
+      undefined,
+      () => {},
     );
-    for (const entry of generated) {
-      checkAbort();
+    return this.collectCandidates(root, tree);
+  }
+
+  async registerCandidates(
+    root: string,
+    paths: string[],
+    onRegistered: (workId: string) => void = () => {},
+  ): Promise<ScanCandidatesRegisterResponse> {
+    const candidates = await this.listCandidates(root);
+    const byPath = new Map<string, ScanCandidate>(
+      candidates.map((candidate) => [candidate.path, candidate]),
+    );
+    const selected = paths.map((path) => byPath.get(path));
+    if (selected.some((candidate) => candidate === undefined)) {
+      throw new Error("候補が更新されています。再スキャンして選び直してください");
+    }
+    const registered: ScanCandidatesRegisterResponse["registered"] = [];
+    const failures: ScanCandidatesRegisterResponse["failures"] = [];
+    for (const candidate of selected) {
+      const current = candidate!;
       try {
-        await registerMetaFile(
-          this.db,
-          entry.prepared,
-          seenIds,
-          generatedProbeCache,
-          batch,
-          existingWorks,
-          result,
-          full,
-          false,
-          this.measureCover,
-          checkAbort,
-        );
-        result.newlyGenerated += 1;
-        result.newWorkIds.push(entry.id);
-      } catch (e) {
-        if (!(e instanceof MetaParseError)) throw e;
-        scanLogger.warn(`メタファイルの自動生成に失敗: ${dirname(entry.prepared.metaPath)}`, {
-          path: dirname(entry.prepared.metaPath),
-          error: (e as Error).message,
+        const work = await this.registerFolderWork(resolve(root, current.path), {
+          title: current.inferredTitle,
         });
-        result.errors += 1;
+        registered.push({ path: current.path, workId: work.id });
+        onRegistered(work.id);
+      } catch (error) {
+        failures.push({
+          path: current.path,
+          message: error instanceof Error ? error.message : "候補の登録に失敗しました",
+        });
       }
     }
-    checkAbort();
+    return { registered, failures };
+  }
+
+  async excludeCandidates(root: string, paths: string[]): Promise<void> {
+    const candidates = await this.listCandidates(root);
+    const currentPaths = new Set(candidates.map((candidate) => candidate.path));
+    if (paths.some((path) => !currentPaths.has(path as ScanCandidate["path"]))) {
+      throw new Error("候補が更新されています。再スキャンして選び直してください");
+    }
+    this.user.excludeScanCandidates(paths);
   }
 
   private finalizePhase(
@@ -557,15 +586,5 @@ export class Scanner {
     const work = await getWorkWithLiveProbe(this.db, this.query, this.catalog, workId);
     if (!work) throw new Error("復元した作品の取得に失敗しました");
     return work;
-  }
-
-  private generateMetaForFolder(workDir: string): string {
-    const id = crypto.randomUUID();
-    const meta = createDraftMetaFile(workDir, {
-      id,
-      title: basename(workDir),
-    });
-    writeMetaFile(join(workDir, META_FILE_NAME), meta);
-    return id;
   }
 }

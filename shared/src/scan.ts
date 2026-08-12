@@ -1,6 +1,44 @@
 // サーバー側スキャンジョブ（TASK-76）の HTTP / SSE 契約。
 import { z } from "zod";
 import { dataIntegrityWarningSchema } from "./dataIntegrity.ts";
+import { workspacePathSchema } from "./media.ts";
+
+export const scanCandidateSchema = z.object({
+  path: workspacePathSchema,
+  inferredTitle: z.string().min(1),
+  audioFileCount: z.number().int().positive(),
+  audioBreakdown: z.array(
+    z.object({ extension: z.string().min(1), count: z.number().int().positive() }),
+  ),
+});
+export type ScanCandidate = z.infer<typeof scanCandidateSchema>;
+
+export const invalidSidecarSchema = z.object({
+  path: workspacePathSchema,
+  message: z.string().min(1),
+});
+export type InvalidSidecar = z.infer<typeof invalidSidecarSchema>;
+
+export const scanCandidatesResponseSchema = z.object({ candidates: z.array(scanCandidateSchema) });
+export const scanCandidatesMutationSchema = z.object({
+  paths: z
+    .array(workspacePathSchema)
+    .min(1)
+    .refine((paths) => new Set(paths).size === paths.length, "候補パスが重複しています"),
+});
+export const scanCandidateRegistrationSchema = z.object({
+  path: workspacePathSchema,
+  workId: z.string(),
+});
+export const scanCandidateRegistrationFailureSchema = z.object({
+  path: workspacePathSchema,
+  message: z.string().min(1),
+});
+export const scanCandidatesRegisterResponseSchema = z.object({
+  registered: z.array(scanCandidateRegistrationSchema),
+  failures: z.array(scanCandidateRegistrationFailureSchema),
+});
+export type ScanCandidatesRegisterResponse = z.infer<typeof scanCandidatesRegisterResponseSchema>;
 
 export const scanResultSchema = z.object({
   registered: z.number().int().nonnegative(),
@@ -27,6 +65,10 @@ export const scanResultSchema = z.object({
       paths: z.array(z.string()).min(2),
     }),
   ),
+  /** 読み取りまたは検証に失敗したsidecar。pathはroot相対のportable path。 */
+  invalidSidecars: z.array(invalidSidecarSchema),
+  /** sidecar を持たない音声フォルダー。scan はこの候補へ書き込まない。 */
+  candidates: z.array(scanCandidateSchema),
 });
 export type ScanResult = z.infer<typeof scanResultSchema>;
 
