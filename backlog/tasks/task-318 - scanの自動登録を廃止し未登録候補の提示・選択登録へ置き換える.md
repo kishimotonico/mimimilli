@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@codex'
 created_date: '2026-08-12 12:18'
-updated_date: '2026-08-12 13:48'
+updated_date: '2026-08-13 17:55'
 labels: []
 dependencies:
   - TASK-310
@@ -17,7 +17,7 @@ ordinal: 328000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-TASK-166の要件確定（2026-08-12決定: 候補提示＋一括承認へ全面置換）を受けた実装。scanはメタ無し音声フォルダーへsidecarを自動生成・自動登録せず、未登録候補としてscan結果に記録する。候補判定はfindWorkRoot昇格ヒューリスティックを改善し、既知の誤登録パターン（入れ子作品が複数に分割される／ルート直下音声で親フォルダーが作品化する。TASK-166参照）を候補段階で正しく扱う。既存の登録済み作品（sidecarあり）は新ルールで再判定しない（2026-08-12決定）。除外マークはuser DBへ保存し、除外済み候補は以後提示しない。登録実行APIは選択された候補のみsidecar生成→catalog投影し、登録された作品をDLsite取得ジョブへenqueueする（取得は自動・適用は明示承認、TASK-320参照）。確認UIはTASK-319。
+TASK-166の要件確定（2026-08-12決定: 候補提示＋一括承認へ全面置換）を受けた実装。scanはメタ無し音声フォルダーへmimimilli.jsonを自動生成・自動登録せず、未登録候補としてscan結果に記録する。候補判定はfindWorkRoot昇格ヒューリスティックを改善し、既知の誤登録パターン（入れ子作品が複数に分割される／ルート直下音声で親フォルダーが作品化する。TASK-166参照）を候補段階で正しく扱う。既存の登録済み作品（mimimilli.jsonあり）は新ルールで再判定しない（2026-08-12決定）。除外マークはuser DBへ保存し、除外済み候補は以後提示しない。登録実行APIは選択された候補のみmimimilli.json生成→catalog投影し、登録された作品をDLsite取得ジョブへenqueueする（取得は自動・適用は明示承認、TASK-320参照）。確認UIはTASK-319。
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria

@@ -39,7 +39,7 @@ client
               Navigation
 ```
 
-ここでのWorkspaceは現在のFilesに相当します。単なるファイラーではなく、物理階層、未登録ファイル、sidecarの状態、作品登録、修復を扱うコンテキストです。Catalogは現在のLibraryに相当し、同じ作品を検索・分類の座標から扱います。
+ここでのWorkspaceは現在のFilesに相当します。単なるファイラーではなく、物理階層、未登録ファイル、mimimilli.jsonの状態、作品登録、修復を扱うコンテキストです。Catalogは現在のLibraryに相当し、同じ作品を検索・分類の座標から扱います。
 
 WorkspaceとCatalogを統合する必要はありません。共有すべきなのは作品編集と再生基盤であり、物理ブラウズとカタログ検索の画面・状態・queryは分けたままにします。
 
@@ -63,9 +63,9 @@ WorkspaceとCatalogを統合する必要はありません。共有すべきな�
 
 これは他の設計変更より先に行うべきです。
 
-### 2. sidecarからSQLiteへの一方向投影を徹底する
+### 2. mimimilli.jsonからSQLiteへの一方向投影を徹底する
 
-現在は同じ作品情報を、sidecar、`works`の列、`playlists_json`、`playlists`、`tracks`、`work_tags`などへ保存しています。[catalogSchema.ts](../server/src/adapters/real/catalogSchema.ts#L12) アプリからの編集では、catalog更新とsidecar書き込みを同じSQLite callback内で行っています。[workMethods.ts](../server/src/adapters/real/workMethods.ts#L89)
+現在は同じ作品情報を、mimimilli.json、`works`の列、`playlists_json`、`playlists`、`tracks`、`work_tags`などへ保存しています。[catalogSchema.ts](../server/src/adapters/real/catalogSchema.ts#L12) アプリからの編集では、catalog更新とmimimilli.json書き込みを同じSQLite callback内で行っています。[workMethods.ts](../server/src/adapters/real/workMethods.ts#L89)
 
 SQLite transactionはファイル書き込みをrollbackできません。そこで、書き込み方向を次に統一します。
 
@@ -79,33 +79,33 @@ SQLite transactionはファイル書き込みをrollbackできません。そこ
 
 1. 編集画面の取得時に`sourceRevision`を返す
 2. 更新時に`sourceRevision`を必須にする
-3. 現在のsidecarと一致しなければ`409 source_changed`を返す
+3. 現在のmimimilli.jsonと一致しなければ`409 source_changed`を返す
 4. 未知フィールドを保持したままJSONへpatchする
 5. uniqueな一時ファイルへ書き、fsync後にatomic replaceする
 6. 確定したbytesから、その作品だけをcatalogへ再投影する
 
-catalog更新に失敗してもsidecarが正しい状態として残り、次回scanやwatcherで収束できます。catalog-firstの更新経路は廃止します。
+catalog更新に失敗してもmimimilli.jsonが正しい状態として残り、次回scanやwatcherで収束できます。catalog-firstの更新経路は廃止します。
 
 catalog内では検索に適した正規化表を使いますが、それらはすべて投影です。`playlists_json`と関係表の二重投影はやめ、PlaylistとTrackは関係表から組み立てます。DLsiteの取得失敗、最終試行時刻、HTTP状態なども正本へ書かず、削除可能なcacheへ置きます。
 
 ### 3. 移動追従とidentity conflictを仕様化する
 
-Work UUIDを作品identityとし、絶対パスは現在観測されたlocationとして扱います。Work UUIDはsidecarに保存済みです。[meta.ts](../shared/src/meta.ts#L14)
+Work UUIDを作品identityとし、絶対パスは現在観測されたlocationとして扱います。Work UUIDはmimimilli.jsonに保存済みです。[meta.ts](../shared/src/meta.ts#L14)
 
 期待する挙動は次の通りです。
 
 - 作品フォルダーを丸ごと移動した場合、同じWork IDのlocationを更新する
 - root外へ一時的に移動した場合、catalogではmissingにするがuser状態は保持する
 - 同じWork IDが1か所だけで再発見された場合、同じ作品として再接続する
-- sidecarだけを複製した場合、routine scanで自動修復せず`identity_conflict`として表示する
+- mimimilli.jsonだけを複製した場合、routine scanで自動修復せず`identity_conflict`として表示する
 - 「別作品として取り込む」という明示操作だけが複製側のWork IDを再採番する
-- 音声だけを移動してsidecarの相対パスが古い場合、推測で追従せずbroken referenceとして表示する
+- 音声だけを移動してmimimilli.jsonの相対パスが古い場合、推測で追従せずbroken referenceとして表示する
 
-現在の重複ID修復は、パスの自然順で所有者を選び、後続sidecarのIDを書き換えます。[duplicateMetaIdRepair.ts](../server/src/adapters/real/duplicateMetaIdRepair.ts#L68) コピー先の並び順によって元作品のidentityを奪えるため、正本をscanが自動変更する処理は廃止した方が安全です。
+現在の重複ID修復は、パスの自然順で所有者を選び、後続mimimilli.jsonのIDを書き換えます。[duplicateMetaIdRepair.ts](../server/src/adapters/real/duplicateMetaIdRepair.ts#L68) コピー先の並び順によって元作品のidentityを奪えるため、正本をscanが自動変更する処理は廃止した方が安全です。
 
 Playlist IDとTrack IDはWork配下のローカルidentityとして扱えます。catalogの主キーを`(work_id, playlist_id)`、`(work_id, playlist_id, track_id)`にすれば、作品フォルダーを複製したときの衝突修復をWork IDだけに限定できます。複数プレイリストの機能は維持できます。
 
-sidecarには`formatVersion`も必要です。外部編集可能な長寿命の正本なので、parserの互換性とデータ形式の世代を区別します。後方互換レイヤーを常設せず、非対応versionは診断表示し、明示migration commandで変換する方針が合っています。
+mimimilli.jsonには`formatVersion`も必要です。外部編集可能な長寿命の正本なので、parserの互換性とデータ形式の世代を区別します。後方互換レイヤーを常設せず、非対応versionは診断表示し、明示migration commandで変換する方針が合っています。
 
 ### 4. 変更検知のrevisionを分ける
 
@@ -113,7 +113,7 @@ sidecarには`formatVersion`も必要です。外部編集可能な長寿命の�
 
 次の三つへ分けます。
 
-- `source_revision`: sidecarのexact bytes。外部編集検知とCASに使う
+- `source_revision`: mimimilli.jsonのexact bytes。外部編集検知とCASに使う
 - `projection_revision`: `formatVersion`、parser version、検証済みフィールド。投影ロジック変更の検出に使う
 - `media_revision`: 全Playlistが参照する音声、coverの相対パス、存在、size、mtime。物理資源の変更検知に使う
 
@@ -125,17 +125,17 @@ locationはrevisionに混ぜず、独立した観測値にします。filesystem
 
 推奨フローは次です。
 
-1. Discover: sidecarと物理資源を列挙する
+1. Discover: mimimilli.jsonと物理資源を列挙する
 2. Resolve identity: 継続、移動、新規、重複、missingを分類する
 3. Build staging: JSON検証、media stat、duration probe、投影行の生成を行う
-4. Review: 未登録候補、重複、不正sidecar、外部変更をユーザーへ提示する
+4. Review: 未登録候補、重複、不正mimimilli.json、外部変更をユーザーへ提示する
 5. Validate: publish直前に`source_revision`を再確認する
 6. Publish: catalogの作品投影、診断、presence、scan generationを一つのtransactionで公開する
 7. Optional enrichment: ユーザーが選んだ作品だけDLsite取得へ進める
 
 現状は500件ごとに公開catalogへcommitし、missing確定だけ最後に実施します。[scanUpsertBatch.ts](../server/src/adapters/real/scanUpsertBatch.ts#L46) キャンセルや失敗時には新旧世代が混在します。I/Oとparseはtransaction外で行い、完成した差分だけを短いtransactionで公開します。
 
-読み取れなかったsubtreeの作品はmissingへ落とさず、`unverified`として旧投影を維持します。scan中にsidecarが変わった作品も今回のpublishから外し、次回対象にします。
+読み取れなかったsubtreeの作品はmissingへ落とさず、`unverified`として旧投影を維持します。scan中にmimimilli.jsonが変わった作品も今回のpublishから外し、次回対象にします。
 
 未登録候補が多い場合は、候補一覧で「全件登録」「条件に合うものだけ登録」「例外だけ除外」を選べるようにします。自動登録と同程度の操作量を保ちながら、正本を書き換える前に結果を確認できます。
 
@@ -150,9 +150,9 @@ locationはrevisionに混ぜず、独立した観測値にします。filesystem
 ```text
 client/src/modules/
   navigation/       # typed routeとhistory
-  workspace/        # 物理browse、viewer、sidecar診断、登録・修復
+  workspace/        # 物理browse、viewer、mimimilli.json診断、登録・修復
   catalog/          # 検索、分類、一覧、保存済み検索
-  work-management/  # Work取得・編集・sidecar書き戻し・DLsite適用
+  work-management/  # Work取得・編集・mimimilli.json書き戻し・DLsite適用
   playback/         # session、controller、engine、resume policy
   scan/
   settings/
@@ -167,12 +167,12 @@ type WorkspaceManagementState =
   | { kind: "unmanaged" }
   | { kind: "managed"; workId: string }
   | { kind: "inside-managed-work"; workId: string; relativePath: string }
-  | { kind: "orphaned-sidecar" }
-  | { kind: "invalid-sidecar"; diagnostics: Diagnostic[] }
+  | { kind: "orphaned-meta-file" }
+  | { kind: "invalid-meta-file"; diagnostics: Diagnostic[] }
   | { kind: "identity-conflict"; workId: string };
 ```
 
-Filesはsidecar正本の管理画面でもあるため、不正sidecarやidentity conflictを登録ボタン押下後に初めて見せるのではなく、一覧・inspectorの第一級状態として表示します。
+Filesはmimimilli.json正本の管理画面でもあるため、不正mimimilli.jsonやidentity conflictを登録ボタン押下後に初めて見せるのではなく、一覧・inspectorの第一級状態として表示します。
 
 ### 未登録viewerをWorkspace resourceへ統一する
 
@@ -228,14 +228,14 @@ Libraryの作品詳細・編集はLibraryのquery hookやタグ遷移へ結合�
 次を`work-management`へ移します。
 
 - `useWork(id)`
-- sidecarのCAS編集
+- mimimilli.jsonのCAS編集
 - Workspace folderの登録
 - 登録解除
 - DLsite previewと適用
 - catalogとWorkspaceのcache invalidation方針
 - 共有の`WorkInspector`と`WorkEditor`
 
-Libraryにはタグクリックによる絞り込みや一覧選択を残します。Filesには物理path、ファイル内訳、sidecar health、登録・修復を残します。画面全体を共有せず、作品を管理する能力だけを共有します。
+Libraryにはタグクリックによる絞り込みや一覧選択を残します。Filesには物理path、ファイル内訳、mimimilli.json health、登録・修復を残します。画面全体を共有せず、作品を管理する能力だけを共有します。
 
 ### Navigationの正本を一つにする
 
@@ -257,7 +257,7 @@ type WorkspaceRoute = {
 
 ## DLsite連携
 
-DLsiteから作品情報を取得する機能は維持します。見直すのは機能そのものではなく、scanとの暗黙連鎖と、外部サービスの一時状態をsidecarへ書くことです。
+DLsiteから作品情報を取得する機能は維持します。見直すのは機能そのものではなく、scanとの暗黙連鎖と、外部サービスの一時状態をmimimilli.jsonへ書くことです。
 
 推奨する境界はmetadata providerです。
 
@@ -269,7 +269,7 @@ DLsiteから作品情報を取得する機能は維持します。見直すの�
             └─ 見送り・手動修正
 ```
 
-providerは`search`、`fetchPreview`、`applySelection`程度の能力に限定します。取得したHTML、HTTP状態、retry、selector version、lastAttemptAtはprovider cacheへ置きます。sidecarへ保存するのは、ユーザーが承認したRJ/VJ ID、title、circle、tags、URL、cover参照などです。
+providerは`search`、`fetchPreview`、`applySelection`程度の能力に限定します。取得したHTML、HTTP状態、retry、selector version、lastAttemptAtはprovider cacheへ置きます。mimimilli.jsonへ保存するのは、ユーザーが承認したRJ/VJ ID、title、circle、tags、URL、cover参照などです。
 
 一括処理は残せます。対象件数と変更内容のsummaryを表示し、「新規作品だけ」「未設定項目だけ」「選択フィールドだけ」といった適用policyをユーザーが明示します。scan完了から無条件には開始しません。
 
@@ -316,7 +316,7 @@ LAN外、複数利用者、共有、同時端末を扱う段階です。現時�
 
 | 項目                      | 判断             | 見直す内容                                                                               |
 | ------------------------- | ---------------- | ---------------------------------------------------------------------------------------- |
-| 物理ファイル・sidecar正本 | 維持             | 一方向投影、CAS編集、identity conflictを追加                                             |
+| 物理ファイル・mimimilli.json正本 | 維持             | 一方向投影、CAS編集、identity conflictを追加                                             |
 | Files                     | 維持             | Workspace module化、管理状態とviewerを強化                                               |
 | Library                   | 維持             | Catalog moduleとしてWorkspaceと分離                                                      |
 | 複数Playlist              | 維持             | IDをWork配下へ閉じ、再生sessionへ変換                                                    |
@@ -347,7 +347,7 @@ DRAFT-25、26、27、28、29、33は、実装前の問題設定が多く残っ�
 ## 実施順
 
 1. user DBの自動再作成を禁止し、migrationとbackupを一本化する
-2. sidecar正本、一方向投影、CAS編集、移動・複製時の挙動をADRとして確定する
+2. mimimilli.json正本、一方向投影、CAS編集、移動・複製時の挙動をADRとして確定する
 3. scanをstaging、review、publishへ分割し、自動登録・自動DLsite取得を外す
 4. root相対`WorkspacePath`と汎用Workspace media APIを定義する
 5. typed route storeとPlaybackSessionを導入し、Files起因の分岐をplayer外へ出す
@@ -357,17 +357,17 @@ DRAFT-25、26、27、28、29、33は、実装前の問題設定が多く残っ�
 9. Responsive UIを実装する。LAN接続とPWAは別判断にする
 10. requirementsと解消済みDraftを現在の状態へ更新する
 
-DataAdapterの再設計は別途調査対象とします。ただし、上記のWork Managementとsidecar投影を先に決めると、adapterへ残すI/O能力と共通use caseの境界を判断しやすくなります。
+DataAdapterの再設計は別途調査対象とします。ただし、上記のWork Managementとmimimilli.json投影を先に決めると、adapterへ残すI/O能力と共通use caseの境界を判断しやすくなります。
 
 ## 未決事項
 
 2026-08-12に次を決定しました。
 
 - catalog/userの物理2DBは維持する。ADR-0008の単一DB案却下理由（migration失敗がuserデータへ到達しうる）は現在も有効
-- sidecar重複の自動修復（自動ID再採番）は廃止し、`identity_conflict`診断と明示操作による再採番へ置き換える（TASK-313、TASK-317）
+- mimimilli.json重複の自動修復（自動ID再採番）は廃止し、`identity_conflict`診断と明示操作による再採番へ置き換える（TASK-313、TASK-317）
 - scan自動登録は候補提示＋一括承認へ全面置換する。既存の登録済みライブラリへは新ルールを再適用しない（TASK-318、TASK-319。TASK-166の要件確定）
-- DLsite取得は自動のまま、sidecarへの適用はpreview差分の明示承認にする。既定policyは未設定フィールドのみ適用、上書きはフィールド単位で選択（TASK-320）
-- scanの確認UIは候補・問題（identity_conflict、不正sidecar）があるときだけ表示する
+- DLsite取得は自動のまま、mimimilli.jsonへの適用はpreview差分の明示承認にする。既定policyは未設定フィールドのみ適用、上書きはフィールド単位で選択（TASK-320）
+- scanの確認UIは候補・問題（identity_conflict、不正mimimilli.json）があるときだけ表示する
 - Filesの内蔵viewerは画像・PDF・text・videoまで対象にする（TASK-315、TASK-316）
 - 未登録音声の再生履歴・resumeは保存しない
 

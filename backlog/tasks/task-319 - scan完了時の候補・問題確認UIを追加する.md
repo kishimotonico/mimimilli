@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@codex'
 created_date: '2026-08-12 12:18'
-updated_date: '2026-08-12 17:43'
+updated_date: '2026-08-13 17:56'
 labels: []
 dependencies:
   - TASK-313
@@ -16,7 +16,7 @@ ordinal: 329000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-TASK-318の確認UI側。scan完了時に新規登録候補・identity_conflict・不正sidecarのいずれかがある場合のみ確認UIを表示する（2026-08-12決定。何もなければ従来どおり無人で完了）。UI仕様: scan進捗UIの完了状態から遷移するパネルまたはダイアログ／候補一覧はチェックボックス付きリスト（フォルダーパス・推定タイトル・音声ファイル数を表示、既定は全選択）／操作は「すべて登録」「選択したものを登録」「選択したものを除外」の3つ／identity_conflict・不正sidecarは同じ画面に問題セクションとして件数と一覧を表示（解決操作はTASK-317のinspector導線へ）／除外したフォルダーは以後の候補に出ない。デザインはdocs/design-system.md準拠。
+TASK-318の確認UI側。scan完了時に新規登録候補・identity_conflict・不正な作品情報ファイルのいずれかがある場合のみ確認UIを表示する（2026-08-12決定。何もなければ従来どおり無人で完了）。UI仕様: scan進捗UIの完了状態から遷移するパネルまたはダイアログ／候補一覧はチェックボックス付きリスト（フォルダーパス・推定タイトル・音声ファイル数を表示、既定は全選択）／操作は「すべて登録」「選択したものを登録」「選択したものを除外」の3つ／identity_conflict・不正な作品情報ファイルは同じ画面に問題セクションとして件数と一覧を表示（解決操作はTASK-317のinspector導線へ）／除外したフォルダーは以後の候補に出ない。デザインはdocs/design-system.md準拠。
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
@@ -27,8 +27,6 @@ TASK-318の確認UI側。scan完了時に新規登録候補・identity_conflict�
 - [x] #4 identity_conflictと不正sidecarが問題セクションに件数つきで表示される
 - [x] #5 pnpm test:smokeが通り、候補承認フローのsmokeがある
 <!-- AC:END -->
-
-
 
 ## Implementation Plan
 
