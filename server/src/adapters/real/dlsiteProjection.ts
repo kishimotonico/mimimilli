@@ -2,18 +2,18 @@ import type { DlsiteFetchErrorKind, DlsiteFetchResult, DlsiteState } from "@mimi
 import { readMetaSource } from "./meta.ts";
 import type { DlsiteCache, DlsiteCacheResolution } from "./dlsiteCache.ts";
 
-export type SidecarLinkageStatus = "none" | "applied" | "skipped";
+export type MetaLinkageStatus = "none" | "applied" | "skipped";
 
-export function sidecarLinkageStatus(status: DlsiteState["status"]): SidecarLinkageStatus {
+export function metaLinkageStatus(status: DlsiteState["status"]): MetaLinkageStatus {
   if (status === "applied" || status === "skipped") return status;
   return "none";
 }
 
-/** sidecar（mimimilli.json）へ書くDLsite状態。取得失敗の一時情報は含めない。 */
-export function toSidecarDlsiteState(state: DlsiteState): DlsiteState {
+/** mimimilli.jsonへ書くDLsite状態。取得失敗の一時情報は含めない。 */
+export function toMetaDlsiteState(state: DlsiteState): DlsiteState {
   return {
     rjCode: state.rjCode,
-    status: sidecarLinkageStatus(state.status),
+    status: metaLinkageStatus(state.status),
     appliedTags: state.appliedTags,
     lastAttemptAt: null,
     error: null,
@@ -52,17 +52,17 @@ function projectedFetchFailure(
 }
 
 /**
- * sidecar正本とDLsiteキャッシュを合成し、catalog・APIが読む DlsiteState を組み立てる。
- * applied/skipped はsidecarの連携分類が優先し、none のときだけキャッシュの取得結果を反映する。
+ * mimimilli.json正本とDLsiteキャッシュを合成し、catalog・APIが読む DlsiteState を組み立てる。
+ * applied/skipped はmimimilli.jsonの連携分類が優先し、none のときだけキャッシュの取得結果を反映する。
  */
 export function projectDlsiteState(
-  sidecar: DlsiteState,
+  metaDlsite: DlsiteState,
   cacheResolution: DlsiteCacheResolution | null,
 ): DlsiteState {
-  const linkage = sidecarLinkageStatus(sidecar.status);
+  const linkage = metaLinkageStatus(metaDlsite.status);
   const base = {
-    rjCode: sidecar.rjCode,
-    appliedTags: sidecar.appliedTags,
+    rjCode: metaDlsite.rjCode,
+    appliedTags: metaDlsite.appliedTags,
   };
   if (linkage === "applied" || linkage === "skipped") {
     return {
@@ -73,7 +73,7 @@ export function projectDlsiteState(
       errorKind: null,
     };
   }
-  const rjCode = sidecar.rjCode;
+  const rjCode = metaDlsite.rjCode;
   if (!rjCode || !cacheResolution) {
     return {
       ...base,
@@ -112,12 +112,12 @@ export function projectDlsiteState(
   };
 }
 
-export function resolveSidecarDlsiteProjection(
-  sidecar: DlsiteState,
+export function resolveMetaDlsiteProjection(
+  metaDlsite: DlsiteState,
   cache: DlsiteCache | null | undefined,
 ): DlsiteState {
-  if (!cache || !sidecar.rjCode) return projectDlsiteState(sidecar, null);
-  return projectDlsiteState(sidecar, cache.resolve({ productCode: sidecar.rjCode }));
+  if (!cache || !metaDlsite.rjCode) return projectDlsiteState(metaDlsite, null);
+  return projectDlsiteState(metaDlsite, cache.resolve({ productCode: metaDlsite.rjCode }));
 }
 
 export function refreshCatalogDlsiteProjection(
@@ -126,13 +126,13 @@ export function refreshCatalogDlsiteProjection(
     setDlsiteState(workId: string, state: DlsiteState): void;
   },
   workId: string,
-  sidecar: DlsiteState,
+  metaDlsite: DlsiteState,
   cache: DlsiteCache | null | undefined,
 ): void {
-  catalog.setDlsiteState(workId, resolveSidecarDlsiteProjection(sidecar, cache));
+  catalog.setDlsiteState(workId, resolveMetaDlsiteProjection(metaDlsite, cache));
 }
 
-/** sidecar を読み、cache と合成した DLsite 状態を catalog へ投影する。 */
+/** mimimilli.json を読み、cache と合成した DLsite 状態を catalog へ投影する。 */
 export function refreshWorkDlsiteProjection(
   catalog: {
     getWorkMetaPath(id: string): string | null;

@@ -3,7 +3,7 @@ import { patchMetaFileCas } from "./meta.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { CoverColumns } from "./workRowMapping.ts";
 import type { Scanner } from "./scanner.ts";
-import { toSidecarDlsiteState } from "./dlsiteProjection.ts";
+import { toMetaDlsiteState } from "./dlsiteProjection.ts";
 
 export interface DlsiteWorkCatalogPatch {
   title?: string;
@@ -41,7 +41,7 @@ export async function persistDlsiteAppliedWork(
     tags: catalogPatch.tags,
     coverImage,
     urls: catalogPatch.urls,
-    dlsite: toSidecarDlsiteState({
+    dlsite: toMetaDlsiteState({
       rjCode,
       status: "applied",
       lastAttemptAt: null,

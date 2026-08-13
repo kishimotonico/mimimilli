@@ -10,7 +10,7 @@ import type {
 } from "@mimimilli/shared";
 import { emptyDlsiteState } from "@mimimilli/shared";
 import { detectRjCode } from "./dlsite.ts";
-import { toSidecarDlsiteState } from "./dlsiteProjection.ts";
+import { toMetaDlsiteState } from "./dlsiteProjection.ts";
 import { META_FILE_NAME, MetaParseError, readMetaFile, readMetaFileRaw } from "./meta.ts";
 import { metaStagingPath } from "./metaStaging.ts";
 import { resolveWithin } from "./paths.ts";
@@ -344,7 +344,7 @@ async function buildMetaFromDlsiteApply(
   return {
     urls: body.applyUrl && body.info.url ? [{ label: "DLsite", url: body.info.url }] : [],
     coverImage,
-    dlsite: toSidecarDlsiteState({
+    dlsite: toMetaDlsiteState({
       rjCode: body.info.rjCode,
       status: "applied",
       lastAttemptAt: null,

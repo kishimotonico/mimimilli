@@ -20,7 +20,7 @@ import {
 } from "./scanTypes.ts";
 import type { CoverDimensions } from "./thumbnailCache.ts";
 import type { DlsiteCache } from "./dlsiteCache.ts";
-import { resolveSidecarDlsiteProjection } from "./dlsiteProjection.ts";
+import { resolveMetaDlsiteProjection } from "./dlsiteProjection.ts";
 
 const scanLogger = getCategoryLogger("scan");
 
@@ -122,7 +122,7 @@ async function assembleWorkForUpsert(
     bookmarked: existing?.bookmarked ?? false,
     lastPlayedAt: existing?.lastPlayedAt ?? null,
     resume: existing?.resume ?? null,
-    dlsite: resolveSidecarDlsiteProjection(meta.dlsite, dlsiteCache),
+    dlsite: resolveMetaDlsiteProjection(meta.dlsite, dlsiteCache),
   };
 
   return {

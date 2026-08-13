@@ -100,7 +100,7 @@ test("初回スキャン: 登録済みmimimilli.jsonを投影し、候補を自�
   assert.equal(existing.dlsite.rjCode, "RJ900002");
 });
 
-test("DLsite状態: sidecarの旧errorは投影でnone、RJコードとappliedTagsは維持する", async (t) => {
+test("DLsite状態: mimimilli.jsonの旧errorは投影でnone、RJコードとappliedTagsは維持する", async (t) => {
   const { adapter, existingWorkId, root } = await setup(t);
   await adapter.scan();
   const metaPath = join(root, "dlsite", "RJ900002_既存メタ", "mimimilli.json");

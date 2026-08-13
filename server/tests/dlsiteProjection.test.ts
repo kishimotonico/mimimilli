@@ -4,22 +4,22 @@ import { emptyDlsiteState } from "@mimimilli/shared";
 import {
   projectDlsiteState,
   shouldRefreshDlsiteProjectionAfterFetch,
-  sidecarLinkageStatus,
-  toSidecarDlsiteState,
+  metaLinkageStatus,
+  toMetaDlsiteState,
 } from "../src/adapters/real/dlsiteProjection.ts";
 import { nts } from "./helpers/tag.ts";
 
-test("sidecarLinkageStatus: 取得失敗は none として扱う", () => {
-  assert.equal(sidecarLinkageStatus("none"), "none");
-  assert.equal(sidecarLinkageStatus("applied"), "applied");
-  assert.equal(sidecarLinkageStatus("skipped"), "skipped");
-  assert.equal(sidecarLinkageStatus("not_found"), "none");
-  assert.equal(sidecarLinkageStatus("error"), "none");
+test("metaLinkageStatus: 取得失敗は none として扱う", () => {
+  assert.equal(metaLinkageStatus("none"), "none");
+  assert.equal(metaLinkageStatus("applied"), "applied");
+  assert.equal(metaLinkageStatus("skipped"), "skipped");
+  assert.equal(metaLinkageStatus("not_found"), "none");
+  assert.equal(metaLinkageStatus("error"), "none");
 });
 
-test("toSidecarDlsiteState: 一時状態フィールドを落とす", () => {
+test("toMetaDlsiteState: 一時状態フィールドを落とす", () => {
   assert.deepEqual(
-    toSidecarDlsiteState({
+    toMetaDlsiteState({
       rjCode: "RJ123456",
       status: "error",
       lastAttemptAt: "2026-01-01T00:00:00.000Z",

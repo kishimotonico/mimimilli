@@ -20,7 +20,7 @@ import {
   type MetaFile,
 } from "@mimimilli/shared";
 import { detectRjCode } from "./dlsite.ts";
-import { toSidecarDlsiteState } from "./dlsiteProjection.ts";
+import { toMetaDlsiteState } from "./dlsiteProjection.ts";
 import { SourceChangedError } from "../../errors.ts";
 
 export { SourceChangedError } from "../../errors.ts";
@@ -305,7 +305,7 @@ export function syncDetectedRjCode(metaPath: string, workDirName: string): MetaF
   if (detectedRjCode === source.meta.dlsite.rjCode) {
     return source.meta.dlsite;
   }
-  const dlsite = toSidecarDlsiteState(
+  const dlsite = toMetaDlsiteState(
     applyDlsiteStatePatch(source.meta.dlsite, { rjCode: detectedRjCode }),
   );
   patchMetaFileCas(metaPath, source.sourceRevision, { dlsite });

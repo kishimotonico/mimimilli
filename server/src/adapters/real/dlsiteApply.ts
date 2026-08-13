@@ -7,7 +7,7 @@ import {
 } from "@mimimilli/shared";
 import { persistDlsiteAppliedWork } from "./dlsitePersist.ts";
 import { patchMetaFileCas, readMetaSource } from "./meta.ts";
-import { toSidecarDlsiteState } from "./dlsiteProjection.ts";
+import { toMetaDlsiteState } from "./dlsiteProjection.ts";
 import { getWorkWithLiveProbe } from "./workRefresh.ts";
 import { throwIfAborted } from "./sharedFlight.ts";
 import type { Db } from "./db.ts";
@@ -85,7 +85,7 @@ export function createDlsiteApply(deps: DlsiteApplyDeps) {
     async updateDlsiteState(workId: string, patch: DlsiteStatePatch): Promise<Work | null> {
       const work = await getWorkWithLiveProbe(db, query, catalog, workId);
       if (!work) return null;
-      const dlsite = toSidecarDlsiteState(applyDlsiteStatePatch(work.dlsite, patch));
+      const dlsite = toMetaDlsiteState(applyDlsiteStatePatch(work.dlsite, patch));
       const metaPath = catalog.getWorkMetaPath(workId);
       if (!metaPath) return null;
       const source = readMetaSource(metaPath);
