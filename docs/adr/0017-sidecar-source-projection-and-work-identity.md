@@ -38,6 +38,36 @@ catalog更新が失敗してもsidecarは正しい状態として残す。watche
 
 catalogでは検索に必要な正規化表を投影する。PlaylistとTrackは関係表から組み立て、`works.playlists_json`の二重投影は廃止する。DLsiteのHTTP状態、取得失敗、最終試行時刻などの一時状態もsidecar正本へは保存せず、削除可能なcacheへ置く。
 
+#### DLsite `status` の正本と投影
+
+`work.dlsite.status` は通知集計・外部連携表示（TASK-328）で読む5値（`none` / `applied` / `not_found` / `error` / `skipped`）を持つが、正本の置き場所は値によって分かれる。
+
+| 分類                                    | 正本                                                                                   | catalog投影                                                |
+| --------------------------------------- | -------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| 連携済み（`applied`）                   | `mimimilli.json` の `dlsite`                                                           | sidecarの `status`・`appliedTags`・`rjCode` をそのまま投影 |
+| ユーザー除外（`skipped`）               | 同上                                                                                   | 同上                                                       |
+| 未取得（`none`）                        | sidecarの連携分類が `none` のとき                                                      | cacheに有効な取得結果がなければ `none`                     |
+| 取得失敗（`not_found` / `error`）       | DLsiteキャッシュ（`dlsite_fetch_failures` / `dlsite_html_snapshots` の `parse_error`） | sidecarが `none` のとき、cacheの失敗記録を合成して投影     |
+| `lastAttemptAt` / `error` / `errorKind` | cache由来のみ                                                                          | 投影時にcacheから組み立て。sidecarには書かない             |
+
+sidecarの `dlsite` に永続化するのは `rjCode`・連携分類（`applied` / `skipped` / `none`）・`appliedTags` だけとする。適用（`POST /dlsite/:id/apply`）や登録時のDLsite適用はsource-first経路で `status=applied` をsidecarへ書き、scanまたは `projectMetaFile` でcatalogへ再投影する。一括取得・手動fetchの失敗はcacheへだけ記録し、sidecarのexact bytesは変えない。失敗後はcatalogの `work_dlsite.state_json` をcacheとsidecarから再合成して更新し、通知SQL集計を復旧する。`applied` / `skipped` の作品はcache上の失敗よりsidecarの連携分類を優先する。
+
+既存sidecarに `not_found` / `error` が残っている場合は、投影時に連携分類 `none` として扱いcacheから再合成する。sidecarから一時状態を除去する手動例:
+
+```bash
+library_root=<ライブラリルート>
+rg --files -0 "$library_root" -g 'mimimilli.json' -g '*.mimimilli.json' | while IFS= read -r -d '' meta; do
+  temporary=$(mktemp "${meta}.dlsite-sidecar.XXXXXX")
+  if jq 'if .dlsite.status == "applied" or .dlsite.status == "skipped" then . else .dlsite.lastAttemptAt = null | .dlsite.error = null | .dlsite.errorKind = null | if .dlsite.status != "applied" and .dlsite.status != "skipped" then .dlsite.status = "none" else . end end' "$meta" > "$temporary" && mv "$temporary" "$meta"; then
+    continue
+  fi
+  rm -f "$temporary"
+  exit 1
+done
+```
+
+移行後はフルスキャンまたは `POST /api/scan` でcatalogを再投影する。
+
 scanはsidecarのないフォルダーを自動登録しない。未登録候補を提示し、ユーザーが登録を実行したときにだけsidecar生成、catalog投影、DLsite取得ジョブのenqueueを行う。取得結果はcacheに留め、sidecarへの適用はpreviewを経た明示承認とこの節のsource-first経路を通す。登録済み作品のDLsite取得は維持する。候補提示と登録実行はTASK-318、確認UIはTASK-319、適用内容はTASK-320で実装する。
 
 ### revisionとlocation

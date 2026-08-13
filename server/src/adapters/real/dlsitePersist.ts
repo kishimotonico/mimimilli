@@ -1,8 +1,9 @@
-import type { NormalizedTag, UrlEntry } from "@mimimilli/shared";
+import { dedupeTags, type NormalizedTag, type UrlEntry } from "@mimimilli/shared";
 import { patchMetaFileCas } from "./meta.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { CoverColumns } from "./workRowMapping.ts";
 import type { Scanner } from "./scanner.ts";
+import { toSidecarDlsiteState } from "./dlsiteProjection.ts";
 
 export interface DlsiteWorkCatalogPatch {
   title?: string;
@@ -16,6 +17,8 @@ export interface DlsiteAppliedWorkPersistInput {
   sourceRevision: string;
   catalogPatch: DlsiteWorkCatalogPatch;
   coverImage?: string;
+  appliedTags: NormalizedTag[];
+  rjCode: string;
 }
 
 export async function persistDlsiteAppliedWork(
@@ -25,7 +28,7 @@ export async function persistDlsiteAppliedWork(
   options?: { ifWorkMissing?: "return-false" | "throw" },
 ): Promise<boolean> {
   const ifWorkMissing = options?.ifWorkMissing ?? "return-false";
-  const { workId, sourceRevision, catalogPatch, coverImage } = input;
+  const { workId, sourceRevision, catalogPatch, coverImage, appliedTags, rjCode } = input;
   const metaPath = catalog.getWorkMetaPath(workId);
   if (!metaPath) {
     if (ifWorkMissing === "throw") {
@@ -38,6 +41,14 @@ export async function persistDlsiteAppliedWork(
     tags: catalogPatch.tags,
     coverImage,
     urls: catalogPatch.urls,
+    dlsite: toSidecarDlsiteState({
+      rjCode,
+      status: "applied",
+      lastAttemptAt: null,
+      error: null,
+      errorKind: null,
+      appliedTags: dedupeTags(appliedTags),
+    }),
   });
   await scanner.projectMetaFile(metaPath, updated.meta);
   return true;

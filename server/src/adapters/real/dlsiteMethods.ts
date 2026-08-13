@@ -31,7 +31,14 @@ export function createDlsiteMethods(deps: {
   const { db, query, catalog } = deps;
   const fetch = createDlsiteFetch(deps);
   const apply = createDlsiteApply({ db, query, catalog, scanner: deps.scanner, fetch });
-  const bulk = createDlsiteBulk({ db, query, catalog, scanner: deps.scanner, fetch });
+  const bulk = createDlsiteBulk({
+    db,
+    query,
+    catalog,
+    scanner: deps.scanner,
+    fetch,
+    dlsiteCache: deps.dlsiteCache,
+  });
 
   return {
     cachedCover: fetch.cachedCover,

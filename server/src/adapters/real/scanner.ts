@@ -53,6 +53,7 @@ import {
   type ScannerAbortHooks,
   type WalkResult,
 } from "./scanWalk.ts";
+import type { DlsiteCache } from "./dlsiteCache.ts";
 
 const scanLogger = getCategoryLogger("scan");
 
@@ -91,6 +92,7 @@ export interface WorkPersistence {
 export interface ScannerOptions {
   upsertBatchSize?: number;
   measureCover?: (sourceAbsolutePath: string) => Promise<CoverDimensions | null>;
+  dlsiteCache?: DlsiteCache | null;
 }
 
 export class Scanner {
@@ -99,6 +101,7 @@ export class Scanner {
   private readonly catalog: CatalogWorkRepository;
   private readonly user: UserWorkStateRepository;
   private readonly measureCover: (sourceAbsolutePath: string) => Promise<CoverDimensions | null>;
+  private readonly dlsiteCache: DlsiteCache | null;
 
   constructor(db: Db, repos: WorkPersistence, options?: ScannerOptions) {
     this.db = db;
@@ -112,6 +115,7 @@ export class Scanner {
       throw new RangeError("upsertBatchSize は有限の正整数である必要があります");
     }
     this.measureCover = options?.measureCover ?? measureCoverDimensions;
+    this.dlsiteCache = options?.dlsiteCache ?? null;
   }
 
   async scan(
@@ -266,6 +270,7 @@ export class Scanner {
             false,
             this.measureCover,
             checkAbort,
+            this.dlsiteCache,
           );
           if (outcome === "skipped") {
             result.skipped += 1;
@@ -501,6 +506,8 @@ export class Scanner {
       true,
       false,
       this.measureCover,
+      undefined,
+      this.dlsiteCache,
     );
     batch.publishWork();
 
@@ -527,6 +534,8 @@ export class Scanner {
       true,
       false,
       this.measureCover,
+      undefined,
+      this.dlsiteCache,
     );
     batch.publishWork();
     const work = await getWorkWithLiveProbe(this.db, this.query, this.catalog, meta.id);
@@ -580,6 +589,8 @@ export class Scanner {
       true,
       false,
       this.measureCover,
+      undefined,
+      this.dlsiteCache,
     );
     batch.publishWork();
 

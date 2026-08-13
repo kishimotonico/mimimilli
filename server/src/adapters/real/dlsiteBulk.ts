@@ -7,10 +7,13 @@ import {
 } from "@mimimilli/shared";
 import { DlsiteOfflineError } from "../../errors.ts";
 import { logDataIntegritySkips, toDataIntegrityWarning } from "./dataIntegrity.ts";
+import { readMetaSource } from "./meta.ts";
+import { refreshCatalogDlsiteProjection } from "./dlsiteProjection.ts";
 import type { Db } from "./db.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";
 import type { Scanner } from "./scanner.ts";
+import type { DlsiteCache } from "./dlsiteCache.ts";
 import type { createDlsiteFetch, DlsiteFetchAttempt } from "./dlsiteFetch.ts";
 
 export interface DlsiteBulkDeps {
@@ -19,6 +22,7 @@ export interface DlsiteBulkDeps {
   catalog: CatalogWorkRepository;
   scanner: Scanner;
   fetch: ReturnType<typeof createDlsiteFetch>;
+  dlsiteCache: DlsiteCache;
 }
 
 export interface DlsiteBulkTargetSelection {
@@ -127,8 +131,19 @@ export async function applyDlsiteBulkWork(
 }
 
 export function createDlsiteBulk(deps: DlsiteBulkDeps) {
-  const { query, fetch } = deps;
+  const { query, fetch, catalog, dlsiteCache } = deps;
   const { dlsiteLogger, dlsiteScheduler, fetchCachedDlsiteAttempt } = fetch;
+
+  const refreshWorkProjection = (workId: string): void => {
+    const metaPath = catalog.getWorkMetaPath(workId);
+    if (!metaPath) return;
+    refreshCatalogDlsiteProjection(
+      catalog,
+      workId,
+      readMetaSource(metaPath).meta.dlsite,
+      dlsiteCache,
+    );
+  };
 
   return {
     async runDlsiteBulk(
@@ -213,6 +228,7 @@ export function createDlsiteBulk(deps: DlsiteBulkDeps) {
             ) {
               continue;
             }
+            refreshWorkProjection(work.id);
           } catch (error) {
             if (error instanceof DOMException && error.name === "AbortError") {
               dlsiteLogger.info("DLsite一括取得を中断しました", {
