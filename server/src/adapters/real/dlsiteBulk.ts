@@ -7,10 +7,15 @@ import {
 } from "@mimimilli/shared";
 import { DlsiteOfflineError } from "../../errors.ts";
 import { logDataIntegritySkips, toDataIntegrityWarning } from "./dataIntegrity.ts";
+import {
+  refreshWorkDlsiteProjection,
+  shouldRefreshDlsiteProjectionAfterFetch,
+} from "./dlsiteProjection.ts";
 import type { Db } from "./db.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";
 import type { Scanner } from "./scanner.ts";
+import type { DlsiteCache } from "./dlsiteCache.ts";
 import type { createDlsiteFetch, DlsiteFetchAttempt } from "./dlsiteFetch.ts";
 
 export interface DlsiteBulkDeps {
@@ -19,6 +24,7 @@ export interface DlsiteBulkDeps {
   catalog: CatalogWorkRepository;
   scanner: Scanner;
   fetch: ReturnType<typeof createDlsiteFetch>;
+  dlsiteCache: DlsiteCache;
 }
 
 export interface DlsiteBulkTargetSelection {
@@ -127,8 +133,12 @@ export async function applyDlsiteBulkWork(
 }
 
 export function createDlsiteBulk(deps: DlsiteBulkDeps) {
-  const { query, fetch } = deps;
+  const { query, fetch, catalog, dlsiteCache } = deps;
   const { dlsiteLogger, dlsiteScheduler, fetchCachedDlsiteAttempt } = fetch;
+
+  const refreshWorkProjection = (workId: string): void => {
+    refreshWorkDlsiteProjection(catalog, workId, dlsiteCache);
+  };
 
   return {
     async runDlsiteBulk(
@@ -206,12 +216,8 @@ export function createDlsiteBulk(deps: DlsiteBulkDeps) {
             result.fetched += outcome.fetched;
             result.failed += outcome.failed;
             result.parseErrors += outcome.parseErrors;
-            if (
-              outcome.failed > 0 &&
-              attempt.result.ok === false &&
-              attempt.result.kind === "offline"
-            ) {
-              continue;
+            if (shouldRefreshDlsiteProjectionAfterFetch(attempt.result)) {
+              refreshWorkProjection(work.id);
             }
           } catch (error) {
             if (error instanceof DOMException && error.name === "AbortError") {

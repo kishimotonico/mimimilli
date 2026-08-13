@@ -16,6 +16,10 @@ import { createDlsiteApply } from "./dlsiteApply.ts";
 import { createDlsiteBulk } from "./dlsiteBulk.ts";
 import { mergeDlsiteTags } from "./dlsite.ts";
 import { readMetaSource } from "./meta.ts";
+import {
+  refreshWorkDlsiteProjection,
+  shouldRefreshDlsiteProjectionAfterFetch,
+} from "./dlsiteProjection.ts";
 
 export function createDlsiteMethods(deps: {
   db: Db;
@@ -28,10 +32,17 @@ export function createDlsiteMethods(deps: {
   dlsiteScheduler: DlsiteScheduler;
   schedulerDependencies?: DlsiteSchedulerDependencies;
 }) {
-  const { db, query, catalog } = deps;
+  const { db, query, catalog, dlsiteCache } = deps;
   const fetch = createDlsiteFetch(deps);
   const apply = createDlsiteApply({ db, query, catalog, scanner: deps.scanner, fetch });
-  const bulk = createDlsiteBulk({ db, query, catalog, scanner: deps.scanner, fetch });
+  const bulk = createDlsiteBulk({
+    db,
+    query,
+    catalog,
+    scanner: deps.scanner,
+    fetch,
+    dlsiteCache: deps.dlsiteCache,
+  });
 
   return {
     cachedCover: fetch.cachedCover,
@@ -47,7 +58,11 @@ export function createDlsiteMethods(deps: {
       if (!rjCode) {
         return { ok: false, kind: "not_found", message: "RJコードが検出されていません" };
       }
-      return fetch.fetchCachedDlsite(rjCode, force, options?.signal);
+      const result = await fetch.fetchCachedDlsite(rjCode, force, options?.signal);
+      if (shouldRefreshDlsiteProjectionAfterFetch(result)) {
+        refreshWorkDlsiteProjection(catalog, workId, dlsiteCache);
+      }
+      return result;
     },
 
     async dlsiteFetchByCode(
@@ -67,6 +82,9 @@ export function createDlsiteMethods(deps: {
           continue;
         }
         const fetched = await fetch.fetchCachedDlsite(summary.dlsite.rjCode);
+        if (shouldRefreshDlsiteProjectionAfterFetch(fetched)) {
+          refreshWorkDlsiteProjection(catalog, summary.id, dlsiteCache);
+        }
         if (!fetched.ok) {
           result.failed += 1;
           continue;

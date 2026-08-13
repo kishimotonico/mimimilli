@@ -13,8 +13,14 @@ import {
 } from "node:fs";
 import { createHash } from "node:crypto";
 import { basename, dirname, join } from "node:path";
-import { META_FILE_NAME, metaFileSchema, type MetaFile } from "@mimimilli/shared";
+import {
+  META_FILE_NAME,
+  metaFileSchema,
+  applyDlsiteStatePatch,
+  type MetaFile,
+} from "@mimimilli/shared";
 import { detectRjCode } from "./dlsite.ts";
+import { toSidecarDlsiteState } from "./dlsiteProjection.ts";
 import { SourceChangedError } from "../../errors.ts";
 
 export { SourceChangedError } from "../../errors.ts";
@@ -299,7 +305,9 @@ export function syncDetectedRjCode(metaPath: string, workDirName: string): MetaF
   if (detectedRjCode === source.meta.dlsite.rjCode) {
     return source.meta.dlsite;
   }
-  const dlsite = { ...source.meta.dlsite, rjCode: detectedRjCode };
+  const dlsite = toSidecarDlsiteState(
+    applyDlsiteStatePatch(source.meta.dlsite, { rjCode: detectedRjCode }),
+  );
   patchMetaFileCas(metaPath, source.sourceRevision, { dlsite });
   return dlsite;
 }

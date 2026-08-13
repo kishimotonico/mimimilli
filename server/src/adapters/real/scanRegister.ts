@@ -19,6 +19,8 @@ import {
   type PreparedMeta,
 } from "./scanTypes.ts";
 import type { CoverDimensions } from "./thumbnailCache.ts";
+import type { DlsiteCache } from "./dlsiteCache.ts";
+import { resolveSidecarDlsiteProjection } from "./dlsiteProjection.ts";
 
 const scanLogger = getCategoryLogger("scan");
 
@@ -71,6 +73,7 @@ async function assembleWorkForUpsert(
   existing: ScanWorkState | undefined,
   measureCover: (sourceAbsolutePath: string) => Promise<CoverDimensions | null>,
   checkAbort: () => void,
+  dlsiteCache?: DlsiteCache | null,
 ): Promise<{ assembled: AssembledWork; coverErrors: number }> {
   const { metaPath } = prepared;
   const workDir = dirname(metaPath);
@@ -119,7 +122,7 @@ async function assembleWorkForUpsert(
     bookmarked: existing?.bookmarked ?? false,
     lastPlayedAt: existing?.lastPlayedAt ?? null,
     resume: existing?.resume ?? null,
-    dlsite: meta.dlsite,
+    dlsite: resolveSidecarDlsiteProjection(meta.dlsite, dlsiteCache),
   };
 
   return {
@@ -306,6 +309,7 @@ export async function registerMetaFile(
   idsAlreadyRegistered: boolean,
   measureCover: (sourceAbsolutePath: string) => Promise<CoverDimensions | null>,
   checkAbort: () => void = () => {},
+  dlsiteCache?: DlsiteCache | null,
 ): Promise<"skipped" | string> {
   const { metaPath, meta, revisions, cachedRevisions, cachedStatus, coverSatisfied } = prepared;
   const workDir = dirname(metaPath);
@@ -339,6 +343,7 @@ export async function registerMetaFile(
     existing,
     measureCover,
     checkAbort,
+    dlsiteCache,
   );
   result.coverErrors += coverErrors;
 

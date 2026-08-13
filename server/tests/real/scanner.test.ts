@@ -100,7 +100,7 @@ test("初回スキャン: 登録済みmimimilli.jsonを投影し、候補を自�
   assert.equal(existing.dlsite.rjCode, "RJ900002");
 });
 
-test("DLsite状態: メタ未定義はnone扱いで検出コードを書き戻し、再スキャンでDBへ復元する", async (t) => {
+test("DLsite状態: sidecarの旧errorは投影でnone、RJコードとappliedTagsは維持する", async (t) => {
   const { adapter, existingWorkId, root } = await setup(t);
   await adapter.scan();
   const metaPath = join(root, "dlsite", "RJ900002_既存メタ", "mimimilli.json");
@@ -117,7 +117,16 @@ test("DLsite状態: メタ未定義はnone扱いで検出コードを書き戻�
 
   await adapter.scan();
   const restored = await adapter.getWork(existingWorkId);
-  assert.deepEqual(restored?.dlsite, meta.dlsite);
+  assert.deepEqual(restored?.dlsite, {
+    rjCode: "RJ7654321",
+    status: "none",
+    lastAttemptAt: null,
+    error: null,
+    errorKind: null,
+    appliedTags: ["genre/耳かき"],
+  });
+  const rawMeta = JSON.parse(readFileSync(metaPath, "utf-8"));
+  assert.equal(rawMeta.dlsite.status, "error");
 });
 
 test("移動追従: フォルダー移動後も同一 ID で path 更新・DB固有情報を保持", async (t) => {
