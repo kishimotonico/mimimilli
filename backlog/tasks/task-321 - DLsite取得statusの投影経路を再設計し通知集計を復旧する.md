@@ -4,7 +4,7 @@ title: DLsite取得statusの投影経路を再設計し通知集計を復旧す�
 status: To Do
 assignee: []
 created_date: '2026-08-12 16:54'
-updated_date: '2026-08-13 17:42'
+updated_date: '2026-08-13 17:59'
 labels: []
 dependencies: []
 priority: high
@@ -19,12 +19,22 @@ source-projection移行でDLsite取得の一時状態をcacheへ移した結果�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 既存作品へDLsite情報を適用した後、その作品が未連携件数に含まれなくなる
-- [ ] #2 DLsite取得の失敗が通知ベルの取得失敗件数へ反映される
-- [ ] #3 パースエラー警報が発火する条件が実データの流れで満たされる
-- [ ] #4 statusの位置づけ（sidecar正本かcache由来か）がADR-0017に明記されている
-- [ ] #5 上記を検証するテストがある
+- [x] #1 既存作品へDLsite情報を適用した後、その作品が未連携件数に含まれなくなる
+- [x] #2 DLsite取得の失敗が通知ベルの取得失敗件数へ反映される
+- [x] #3 パースエラー警報が発火する条件が実データの流れで満たされる
+- [x] #4 statusの位置づけ（sidecar正本かcache由来か）がADR-0017に明記されている
+- [x] #5 上記を検証するテストがある
 <!-- AC:END -->
+
+
+
+
+
+
+
+
+
+
 
 ## Comments
 
