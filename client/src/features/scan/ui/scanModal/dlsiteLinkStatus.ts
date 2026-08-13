@@ -1,5 +1,5 @@
 // 外部連携列（新規登録済み・更新された作品タブ共通）の表示状態判定。
-import { hasRjCode } from "@mimimilli/shared";
+import { hasRjCode, isDlsiteLinkFailed } from "@mimimilli/shared";
 import type { WorkListItemDlsite } from "@mimimilli/shared";
 
 export type DlsiteLinkDisplayStatus = "linked" | "pending" | "failed" | "none";
@@ -7,7 +7,7 @@ export type DlsiteLinkDisplayStatus = "linked" | "pending" | "failed" | "none";
 export function dlsiteLinkDisplayStatus(dlsite: WorkListItemDlsite): DlsiteLinkDisplayStatus {
   if (!hasRjCode(dlsite)) return "none";
   if (dlsite.status === "applied") return "linked";
-  if (dlsite.status === "not_found" || dlsite.status === "error") return "failed";
+  if (isDlsiteLinkFailed(dlsite)) return "failed";
   return "pending";
 }
 

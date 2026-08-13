@@ -56,6 +56,13 @@ export function isDlsiteFetchFailed(state: DlsiteState): boolean {
   );
 }
 
+/** 外部連携列（スキャン結果タブ）の「失敗」表示に使う正典。理由を問わず取得できなかった
+ *  状態（not_found・error。parse_errorも含む）をまとめて「失敗」とする。`isDlsiteFetchFailed`
+ *  は通知バッジ向けにparse_errorを除外して数えるが、この列は理由を出し分けないため区別しない。 */
+export function isDlsiteLinkFailed(state: Pick<DlsiteState, "status">): boolean {
+  return state.status === "not_found" || state.status === "error";
+}
+
 /** パース失敗が構造変更レベルで増えたかのしきい値（件数・割合の下限） */
 export const DLSITE_PARSE_ERROR_ALERT_MIN_COUNT = 3;
 export const DLSITE_PARSE_ERROR_ALERT_MIN_RATIO = 0.2;
