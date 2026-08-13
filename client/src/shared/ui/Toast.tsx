@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import { useMotionVariants } from "./useMotionVariants";
@@ -69,18 +69,24 @@ export default function Toast({ message, actionLabel, onAction, onDismiss }: Toa
   const anchorRef = useRef<HTMLSpanElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const visible = message != null;
-  // アンカーは初回マウント時点では未commitでnullだが、その時点では常にmessage===null
-  // （表示するものが無い）なので実害はない。以降の再描画では直前のcommitで既に
-  // アタッチ済みのため、レンダー中に読んでも1フレーム遅れて配置先が切り替わる
-  // （=一瞬だけ間違った位置に出る）ことはない。
-  const ownerDialog = anchorRef.current?.closest<HTMLDialogElement>("dialog:modal") ?? null;
+  // アンカーがDOMへ実際にアタッチされるまでは配置先を確定できない。未確定のまま
+  // document.bodyへ倒すと、dialog内で宣言されたトーストが誤って外へ出て
+  // クリック不能になりうる（TASK-327の元バグの再発）。確定するまでは何も描画しない
+  // （常にmessage===nullの休眠状態からmountされるため、体感できる遅延にはならない）。
+  const [anchored, setAnchored] = useState(false);
+  useLayoutEffect(() => {
+    setAnchored(true);
+  }, []);
+  const ownerDialog = anchored
+    ? (anchorRef.current?.closest<HTMLDialogElement>("dialog:modal") ?? null)
+    : null;
   const insideDialog = ownerDialog !== null;
 
   useLayoutEffect(() => {
     const el = popoverRef.current;
-    if (!el || !visible || insideDialog) return;
+    if (!el || !visible || !anchored || insideDialog) return;
     syncPopoverVisibility(el, true);
-  }, [visible, insideDialog]);
+  }, [visible, anchored, insideDialog]);
 
   const handleExitComplete = () => {
     const el = popoverRef.current;
@@ -91,25 +97,26 @@ export default function Toast({ message, actionLabel, onAction, onDismiss }: Toa
     <>
       {/* JSX上の宣言位置（dialog内かどうか）を実DOMから判定するための目印。見た目には影響しない */}
       <span ref={anchorRef} aria-hidden="true" style={{ display: "none" }} />
-      {createPortal(
-        <div
-          ref={popoverRef}
-          popover={insideDialog ? undefined : "manual"}
-          className="pointer-events-none fixed inset-x-0 top-[58px] m-0 flex justify-center border-none bg-transparent p-0"
-        >
-          <AnimatePresence onExitComplete={handleExitComplete}>
-            {message != null && (
-              <ToastContent
-                message={message}
-                actionLabel={actionLabel}
-                onAction={onAction}
-                onDismiss={onDismiss}
-              />
-            )}
-          </AnimatePresence>
-        </div>,
-        ownerDialog ?? document.body,
-      )}
+      {anchored &&
+        createPortal(
+          <div
+            ref={popoverRef}
+            popover={insideDialog ? undefined : "manual"}
+            className="pointer-events-none fixed inset-x-0 top-[58px] m-0 flex justify-center border-none bg-transparent p-0"
+          >
+            <AnimatePresence onExitComplete={handleExitComplete}>
+              {message != null && (
+                <ToastContent
+                  message={message}
+                  actionLabel={actionLabel}
+                  onAction={onAction}
+                  onDismiss={onDismiss}
+                />
+              )}
+            </AnimatePresence>
+          </div>,
+          ownerDialog ?? document.body,
+        )}
     </>
   );
 }
