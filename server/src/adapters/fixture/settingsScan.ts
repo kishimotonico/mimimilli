@@ -1,14 +1,15 @@
-import { isRjCodeMissing, workspacePath } from "@mimimilli/shared";
+import { emptyDlsiteState, isRjCodeMissing, workspacePath } from "@mimimilli/shared";
 import type {
   ScanCandidate,
-  ScanCandidateRegisterItem,
   ScanCandidatesRegisterResponse,
   ScanResult,
   Settings,
   SettingsUpdate,
+  WorkSummary,
 } from "@mimimilli/shared";
 import type { ScanOptions } from "../../adapter/index.ts";
 import type { SettingsAdapter } from "../../adapter/settings.ts";
+import { normalizeFsPath } from "./fsResolve.ts";
 import type { FixtureState } from "./state.ts";
 
 const FIXTURE_SCAN_STEP_MS = 20;
@@ -17,10 +18,14 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function registrationRjLabel(candidate: ScanCandidate, item: ScanCandidateRegisterItem): string {
-  if (item.rjCode === undefined) return `auto:${candidate.rjCode ?? "none"}`;
-  if (item.rjCode === "") return "explicit-empty";
-  return item.rjCode;
+/** 候補承認時のRJコード解決（候補登録APIの規約と同じ）。
+ *  rjCode省略=候補が検出した値を採用 / ""=明示的になし / 値=そのまま採用。 */
+export function resolveRegisteredRjCode(
+  candidateRjCode: string | null,
+  itemRjCode: string | undefined,
+): string | null {
+  if (itemRjCode === undefined) return candidateRjCode;
+  return itemRjCode === "" ? null : itemRjCode;
 }
 
 export function createSettingsScanMethods(state: FixtureState): SettingsAdapter {
@@ -85,15 +90,33 @@ export function createSettingsScanMethods(state: FixtureState): SettingsAdapter 
       const candidatesByPath = new Map<string, ScanCandidate>(
         state.scanCandidates.map((candidate) => [candidate.path, candidate]),
       );
-      const registered = items.flatMap((item, index) => {
+      const rootAbs = normalizeFsPath(state.rootFolder ?? "/library");
+      const now = new Date().toISOString();
+      // real adapter の registerCandidates（scanner.ts）と同じ意味論: 登録した候補は
+      // 実際にcatalog（ここではstate.works）へ行が増える。作品一覧・スキャン結果一覧の
+      // 両方から見えて初めて「登録した」と言える。
+      const registered = items.flatMap((item) => {
         const candidate = candidatesByPath.get(item.path);
         if (!candidate) return [];
-        return [
-          {
-            path: candidate.path,
-            workId: `fixture-candidate-${index}-${registrationRjLabel(candidate, item)}`,
-          },
-        ];
+        const rjCode = resolveRegisteredRjCode(candidate.rjCode, item.rjCode);
+        const work: WorkSummary = {
+          id: crypto.randomUUID(),
+          title: candidate.inferredTitle,
+          cover: null,
+          status: "ok",
+          physicalPath: normalizeFsPath(`${rootAbs}/${candidate.path}`),
+          totalDurationSec: 0,
+          trackCount: candidate.audioFileCount,
+          addedAt: now,
+          errorMessage: null,
+          urls: [],
+          tags: [],
+          bookmarked: false,
+          lastPlayedAt: null,
+          dlsite: rjCode ? { ...emptyDlsiteState(), rjCode } : emptyDlsiteState(),
+        };
+        state.works.push(work);
+        return [{ path: candidate.path, workId: work.id }];
       });
       const failures = items.flatMap((item) =>
         candidatesByPath.has(item.path)
