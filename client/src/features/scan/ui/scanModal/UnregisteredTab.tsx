@@ -14,22 +14,22 @@ import {
   restoreScanCandidateExclusions,
   SCAN_QUERY_KEYS,
 } from "../../api";
-
-export interface UnregisteredTabRegisteredResult {
-  addedCount: number;
-  failedCount: number;
-  /** この登録の後もまだ未登録として残っている件数 */
-  remainingCount: number;
-}
+import type { CandidatesRegisteredResult } from "./types";
 
 export interface UnregisteredTabProps {
   candidates: ScanCandidate[];
-  onRegistered: (result: UnregisteredTabRegisteredResult) => void;
+  onRegistered: (result: CandidatesRegisteredResult) => void;
 }
 
 interface ExcludeToast {
   path: string;
   title: string;
+}
+
+/** candidate.path の親ディレクトリ（root相対）。ルート直下は親を持たない。 */
+function parentFolderOf(path: string): string | null {
+  const idx = path.lastIndexOf("/");
+  return idx <= 0 ? null : path.slice(0, idx);
 }
 
 export default function UnregisteredTab({ candidates, onRegistered }: UnregisteredTabProps) {
@@ -69,7 +69,7 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
         failures.length > 0 ? `${failures.length}件はライブラリに追加できませんでした。` : null,
       );
       onRegistered({
-        addedCount: registered.length,
+        registeredWorkIds: registered.map((entry) => entry.workId),
         failedCount: failures.length,
         remainingCount: candidates.length - registeredPaths.size,
       });
@@ -201,6 +201,7 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
                   const effectiveRjCode = rjCodeOverrides.has(candidate.path)
                     ? (rjCodeOverrides.get(candidate.path) ?? "")
                     : candidate.rjCode;
+                  const parentFolder = parentFolderOf(candidate.path);
                   return (
                     <tr key={candidate.path}>
                       <td className="px-2.5 py-2 align-middle">
@@ -244,10 +245,16 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
                         )}
                       </td>
                       <td
-                        className="mll-selectable truncate px-2.5 py-2 align-middle font-mono text-[10px] text-ink-3"
-                        title={candidate.path}
+                        className="px-2.5 py-2 align-middle font-mono text-[10px] text-ink-3"
+                        title={parentFolder ?? undefined}
                       >
-                        {candidate.path}
+                        {parentFolder ? (
+                          <span dir="rtl" className="mll-selectable block truncate text-left">
+                            {parentFolder}
+                          </span>
+                        ) : (
+                          <span className="text-ink-4">—</span>
+                        )}
                       </td>
                       <td className="px-2.5 py-2 align-middle whitespace-nowrap text-ink-2">
                         {candidate.audioFileCount}件

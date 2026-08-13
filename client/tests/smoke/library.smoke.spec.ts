@@ -177,6 +177,45 @@ test("スキャンダイアログが開いて完了し、閉じられる", async
   assertNoErrors(tracker);
 });
 
+test("未登録タブでRJコードを編集でき、候補を1件ずつ除外して元に戻せる", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-chromium", "desktop scenario only");
+
+  const tracker = trackErrors(page);
+  await openApp(page);
+  await page.getByRole("button", { name: "スキャン" }).click();
+  const dialog = page.getByRole("dialog", { name: "スキャン" });
+  await dialog.getByRole("button", { name: "スキャン開始" }).click();
+
+  const unregistered = dialog.getByRole("tabpanel", { name: "未登録" });
+  await expect(unregistered).toBeVisible({ timeout: 15_000 });
+  await expect(dialog.getByRole("tab", { name: "未登録（2件）" })).toBeVisible();
+
+  // 行の accessible name は全セルの連結。x ボタンのラベルは全行が「〜を候補から外す」を
+  // 含むため、行の識別は先頭セル（チェックボックスのラベル）へのアンカーで一意にする。
+  const editRow = unregistered.getByRole("row", { name: /^「未登録作品」を選択/ });
+  await editRow.getByRole("button", { name: "未検出" }).click();
+  const rjInput = editRow.getByPlaceholder("RJコード");
+  await rjInput.fill("RJ999999");
+  await rjInput.press("Enter");
+  await expect(editRow.getByRole("button", { name: "RJ999999" })).toBeVisible();
+
+  const excludeRowName = /^「候補」を選択/;
+  const excludeRow = unregistered.getByRole("row", { name: excludeRowName });
+  await excludeRow.getByRole("button", { name: "「候補」を候補から外す" }).click();
+  await expect(unregistered.getByRole("row", { name: excludeRowName })).toBeHidden();
+  await expect(dialog.getByRole("tab", { name: "未登録（1件）" })).toBeVisible();
+
+  await expect(page.getByText("「候補」を候補から外しました")).toBeVisible();
+  await page.getByRole("button", { name: "元に戻す" }).click();
+
+  await expect(dialog.getByRole("tab", { name: "未登録（2件）" })).toBeVisible();
+  await expect(unregistered.getByRole("row", { name: excludeRowName })).toBeVisible();
+
+  assertNoErrors(tracker);
+});
+
 test("スキャン完了後に候補を選択登録でき、問題をFilesで確認できる", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop-chromium", "desktop scenario only");
 
@@ -190,8 +229,8 @@ test("スキャン完了後に候補を選択登録でき、問題をFilesで確
   await expect(unregistered).toBeVisible({ timeout: 15_000 });
   await expect(dialog.getByRole("tab", { name: "未登録（2件）" })).toBeVisible();
 
-  await unregistered.getByRole("button", { name: "選択したものを登録" }).click();
-  await expect(unregistered.getByText("2件を登録しました。")).toBeVisible();
+  await unregistered.getByRole("button", { name: "2件をライブラリに追加" }).click();
+  await expect(page.getByText("2件をライブラリに追加しました")).toBeVisible();
   await expect(dialog.getByRole("tab", { name: "未登録（0件）" })).toBeVisible();
 
   await dialog.getByRole("tab", { name: /^要対応/ }).click();

@@ -16,13 +16,13 @@ import { scanningAtom, scanProgressAtom } from "../../../entities/scan/model/ato
 import { useScanActions } from "../../../entities/scan/useScanActions";
 import { getLastScanResult, getScanCandidates, getScanDiagnostics, SCAN_QUERY_KEYS } from "../api";
 import ScanSidebar from "./scanModal/ScanSidebar";
-import UnregisteredTab, { type UnregisteredTabRegisteredResult } from "./scanModal/UnregisteredTab";
+import UnregisteredTab from "./scanModal/UnregisteredTab";
 import NeedsAttentionTab from "./scanModal/NeedsAttentionTab";
 import NewlyRegisteredTab from "./scanModal/NewlyRegisteredTab";
 import UpdatedWorksTab from "./scanModal/UpdatedWorksTab";
 import ScanFooter from "./scanModal/ScanFooter";
 import { useScanCompletionHint } from "./scanModal/useScanCompletionHint";
-import type { ScanTabKey } from "./scanModal/types";
+import type { CandidatesRegisteredResult, ScanTabKey } from "./scanModal/types";
 
 interface ScanModalProps {
   lastScanTime: string | null;
@@ -61,14 +61,14 @@ export default function ScanModal({
   const [unregisteredToast, setUnregisteredToast] = useState<string | null>(null);
 
   const handleUnregisteredRegistered = ({
-    addedCount,
+    registeredWorkIds,
     failedCount,
     remainingCount,
-  }: UnregisteredTabRegisteredResult) => {
+  }: CandidatesRegisteredResult) => {
     setUnregisteredToast(
       failedCount > 0
-        ? `${addedCount}件をライブラリに追加しました。${failedCount}件は追加できませんでした。`
-        : `${addedCount}件をライブラリに追加しました`,
+        ? `${registeredWorkIds.length}件をライブラリに追加しました。${failedCount}件は追加できませんでした。`
+        : `${registeredWorkIds.length}件をライブラリに追加しました`,
     );
     if (remainingCount === 0) setActiveTab("newlyRegistered");
   };
