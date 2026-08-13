@@ -20,7 +20,7 @@ export default function ScanNewWorks({
 }: {
   newWorks: WorkListItem[];
   newWorksError: string | null;
-  /** newWorkIds総数がnewWorksより多く、表示を先頭のみに絞っているときはその総数。絞っていなければnull */
+  /** insertedWorkIds総数がnewWorksより多く、表示を先頭のみに絞っているときはその総数。絞っていなければnull */
   truncatedTotal: number | null;
   editingId: string | null;
   editTitle: string;

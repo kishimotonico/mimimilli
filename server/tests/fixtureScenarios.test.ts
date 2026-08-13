@@ -1,6 +1,7 @@
 // fixture アダプタのシナリオ機能（ADR-0002 / client/mocks/scenarios.ts からの移植）のテスト。
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { workspacePath } from "@mimimilli/shared";
 import { createApp } from "../src/app.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import {
@@ -26,7 +27,7 @@ test("new-work: スキャン結果に新規作品IDが含まれる", async () =>
   const started = await app.request("/api/scan", { method: "POST" });
   assert.equal(started.status, 202);
   const { job } = await started.json();
-  let scanResult: { newWorkIds: string[]; newlyGenerated: number } | null = null;
+  let scanResult: { insertedWorkIds: string[] } | null = null;
   for (let attempt = 0; attempt < 80; attempt++) {
     const state = await app.request(`/api/scan/${job.id}`);
     const snapshot = await state.json();
@@ -37,8 +38,7 @@ test("new-work: スキャン結果に新規作品IDが含まれる", async () =>
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
   assert.ok(scanResult);
-  assert.deepEqual(scanResult.newWorkIds, ["RJ501011"]);
-  assert.equal(scanResult.newlyGenerated, 1);
+  assert.deepEqual(scanResult.insertedWorkIds, ["RJ501011"]);
 
   // 新規作品自体は works 一覧に存在する（スキャンで見つかった扱い）
   const worksRes = await app.request("/api/works");
@@ -62,7 +62,10 @@ test("new-work: Files用診断とscan確認用の候補・問題を独立して�
     "copies/RJ501001_夜更けの図書室で囁き朗読",
   ]);
 
-  const registration = await adapter.registerScanCandidates(["未登録作品", "消えた候補"]);
+  const registration = await adapter.registerScanCandidates([
+    { path: workspacePath("未登録作品") },
+    { path: workspacePath("消えた候補") },
+  ]);
   assert.deepEqual(
     registration.registered.map((entry) => entry.path),
     ["未登録作品"],
@@ -73,6 +76,23 @@ test("new-work: Files用診断とscan確認用の候補・問題を独立して�
 
   await adapter.excludeScanCandidates(["朗読/候補"]);
   assert.deepEqual(await adapter.listScanCandidates(), []);
+});
+
+test("fixture: rjCode省略・空文字・指定を区別する", async () => {
+  const omitted = await createFixtureAdapter({ scenario: "new-work" }).registerScanCandidates([
+    { path: workspacePath("未登録作品") },
+  ]);
+  assert.match(omitted.registered[0]!.workId, /auto:none$/);
+
+  const empty = await createFixtureAdapter({ scenario: "new-work" }).registerScanCandidates([
+    { path: workspacePath("未登録作品"), rjCode: "" },
+  ]);
+  assert.match(empty.registered[0]!.workId, /explicit-empty$/);
+
+  const specified = await createFixtureAdapter({ scenario: "new-work" }).registerScanCandidates([
+    { path: workspacePath("未登録作品"), rjCode: "RJ111111" },
+  ]);
+  assert.match(specified.registered[0]!.workId, /RJ111111$/);
 });
 
 test("empty: 作品・スマートフォルダーが0件", async () => {

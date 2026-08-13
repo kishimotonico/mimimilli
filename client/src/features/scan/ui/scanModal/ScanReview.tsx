@@ -142,13 +142,17 @@ export default function ScanReview({ result, onOpenFiles }: ScanReviewProps) {
             <Button
               variant="primary"
               disabled={busy}
-              onClick={() => registerMutation.mutate(candidatePaths(candidates))}
+              onClick={() =>
+                registerMutation.mutate(candidates.map((candidate) => ({ path: candidate.path })))
+              }
             >
               すべて登録
             </Button>
             <Button
               disabled={busy || selected.length === 0}
-              onClick={() => registerMutation.mutate(selectedPaths)}
+              onClick={() =>
+                registerMutation.mutate(selected.map((candidate) => ({ path: candidate.path })))
+              }
             >
               選択したものを登録
             </Button>

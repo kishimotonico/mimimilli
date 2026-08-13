@@ -10,6 +10,8 @@ export const scanCandidateSchema = z.object({
   audioBreakdown: z.array(
     z.object({ extension: z.string().min(1), count: z.number().int().positive() }),
   ),
+  /** フォルダー名から検出したRJコード。未検出は null。 */
+  rjCode: z.string().nullable(),
 });
 export type ScanCandidate = z.infer<typeof scanCandidateSchema>;
 
@@ -25,6 +27,23 @@ export const scanCandidatesMutationSchema = z.object({
     .array(workspacePathSchema)
     .min(1)
     .refine((paths) => new Set(paths).size === paths.length, "候補パスが重複しています"),
+});
+export const scanCandidateRegisterItemSchema = z.object({
+  path: workspacePathSchema,
+  /** 省略時はフォルダー名から自動検出。空文字はRJコードなしの明示。値ありはそのまま mimimilli.json へ書き込む。 */
+  rjCode: z.string().optional(),
+});
+export const scanCandidatesRegisterRequestSchema = z.object({
+  items: z
+    .array(scanCandidateRegisterItemSchema)
+    .min(1)
+    .refine((items) => new Set(items.map((item) => item.path)).size === items.length, {
+      message: "候補パスが重複しています",
+    }),
+});
+export type ScanCandidateRegisterItem = z.infer<typeof scanCandidateRegisterItemSchema>;
+export const scanCandidateExclusionsResponseSchema = z.object({
+  paths: z.array(workspacePathSchema),
 });
 export const scanCandidateRegistrationSchema = z.object({
   path: workspacePathSchema,
@@ -42,10 +61,12 @@ export type ScanCandidatesRegisterResponse = z.infer<typeof scanCandidatesRegist
 
 export const scanResultSchema = z.object({
   registered: z.number().int().nonnegative(),
-  newlyGenerated: z.number().int().nonnegative(),
+  /** 今回のスキャンでカタログへ新規挿入された Work ID（mimimilli.json の自動投影） */
+  insertedWorkIds: z.array(z.string()),
+  /** 今回のスキャンでメタファイル更新等により再投影された Work ID */
+  updatedWorkIds: z.array(z.string()),
   errors: z.number().int().nonnegative(),
   missing: z.number().int().nonnegative(),
-  newWorkIds: z.array(z.string()),
   /** スキャン完了時点でRJコード未検出（かつ未スキップ）のまま残っている作品数。
    *  新規作品に限らずライブラリ全体を対象に数える（isRjCodeMissing が判定基準） */
   rjCodeMissingCount: z.number().int().nonnegative(),

@@ -5,6 +5,7 @@ import type {
   ScanLastResultResponse,
   ScanDiagnostic,
   ScanCandidate,
+  ScanCandidateRegisterItem,
   ScanCandidatesRegisterResponse,
   ScanProgressEvent,
   ScanResult,
@@ -118,14 +119,22 @@ export class ScanJobManager {
   }
 
   async registerCandidates(
-    paths: string[],
+    items: ScanCandidateRegisterItem[],
     onRegistered: (workId: string) => void,
   ): Promise<ScanCandidatesRegisterResponse> {
-    return this.adapter.registerScanCandidates(paths, onRegistered);
+    return this.adapter.registerScanCandidates(items, onRegistered);
   }
 
   async excludeCandidates(paths: string[]): Promise<void> {
     await this.adapter.excludeScanCandidates(paths);
+  }
+
+  async listCandidateExclusions(): Promise<string[]> {
+    return this.adapter.listScanCandidateExclusions();
+  }
+
+  async restoreCandidateExclusions(paths: string[]): Promise<void> {
+    await this.adapter.restoreScanCandidateExclusions(paths);
   }
 
   cancel(id: string): ScanJobSnapshot | null {
@@ -285,7 +294,8 @@ export class ScanJobManager {
       jobId: job.snapshot.id,
       durationMs: this.durationMs(job),
       registered: result.registered,
-      newlyGenerated: result.newlyGenerated,
+      insertedWorkIdsCount: result.insertedWorkIds.length,
+      updatedWorkIdsCount: result.updatedWorkIds.length,
       errors: result.errors,
       missing: result.missing,
       skipped: result.skipped,

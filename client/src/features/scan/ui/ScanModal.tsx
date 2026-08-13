@@ -70,12 +70,16 @@ export default function ScanModal({
     queryFn: getLastScanResult,
   });
   const lastResult = lastScanQuery.data?.result ?? null;
-  const newWorkIds = lastResult?.newWorkIds ?? EMPTY_WORK_IDS;
-  // 初回フルスキャン等でnewWorkIdsが数千〜数万件になりうるため、表示・取得は先頭の
+  const insertedWorkIds = lastResult?.insertedWorkIds ?? EMPTY_WORK_IDS;
+  // 初回フルスキャン等でinsertedWorkIdsが数千〜数万件になりうるため、表示・取得は先頭の
   // 1ページ分（WORKS_DEFAULT_PAGE_SIZE）に制限する。全件をidsへ載せるとURLとSQLite
   // 束縛パラメータの上限を超える。省略が発生したかはScanNewWorks側の表示に渡す。
-  const visibleWorkIds = useMemo(() => newWorkIds.slice(0, WORKS_DEFAULT_PAGE_SIZE), [newWorkIds]);
-  const truncatedTotal = newWorkIds.length > visibleWorkIds.length ? newWorkIds.length : null;
+  const visibleWorkIds = useMemo(
+    () => insertedWorkIds.slice(0, WORKS_DEFAULT_PAGE_SIZE),
+    [insertedWorkIds],
+  );
+  const truncatedTotal =
+    insertedWorkIds.length > visibleWorkIds.length ? insertedWorkIds.length : null;
 
   // 新規作品の表示用データ（title/trackCount）は visibleWorkIds を1回のworks一覧クエリで引く。
   // WORK_QUERY_KEYS.list() 配下に載るため、DLsite一括取得完了時のWORK_QUERY_KEYS.all()

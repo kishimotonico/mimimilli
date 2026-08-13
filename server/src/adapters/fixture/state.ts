@@ -28,8 +28,12 @@ export interface FixtureState {
   /** 作品ごとのレジューム位置 */
   resumes: Map<string, ResumeBody>;
   playbackIds: Map<string, PlaybackIds>;
-  /** scan() が newWorkIds として返す、未取り込みの新規作品ID（シナリオ "new-work" 用） */
-  scanNewWorkIds: string[];
+  /** scan() が insertedWorkIds として返す、未取り込みの新規作品ID（シナリオ "new-work" 用） */
+  scanInsertedWorkIds: string[];
+  /** scan() が updatedWorkIds として返す作品ID */
+  scanUpdatedWorkIds: string[];
+  /** 永続化された候補除外パス */
+  scanCandidateExclusions: string[];
   identityConflicts: ScanDiagnostic[];
   scanCandidates: ScanCandidate[];
   scanIdentityConflicts: ScanDiagnostic[];
@@ -65,7 +69,9 @@ export function createInitialState(options: FixtureAdapterOptions): FixtureState
     nextSmartFolderId: maxSmartFolderNum + 1,
     resumes: new Map(),
     playbackIds: new Map(),
-    scanNewWorkIds: scenario.scanNewWorkIds,
+    scanInsertedWorkIds: scenario.scanInsertedWorkIds,
+    scanUpdatedWorkIds: scenario.scanUpdatedWorkIds,
+    scanCandidateExclusions: [],
     identityConflicts:
       scenario.id === "new-work"
         ? [

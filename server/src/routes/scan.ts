@@ -4,8 +4,10 @@ import {
   scanConflictResponseSchema,
   scanDiagnosticsResponseSchema,
   scanCandidatesMutationSchema,
+  scanCandidatesRegisterRequestSchema,
   scanCandidatesRegisterResponseSchema,
   scanCandidatesResponseSchema,
+  scanCandidateExclusionsResponseSchema,
   startScanRequestSchema,
   startScanResponseSchema,
   type ScanJobEvent,
@@ -106,11 +108,25 @@ export function scanRoute(
     return c.body(null, 204);
   });
 
-  app.post("/scan/candidates/register", async (c) => {
+  app.get("/scan/candidates/exclusions", async (c) => {
+    const paths = await jobs.listCandidateExclusions();
+    return c.json(scanCandidateExclusionsResponseSchema.parse({ paths }));
+  });
+
+  app.post("/scan/candidates/exclusions/restore", async (c) => {
     const parsed = scanCandidatesMutationSchema.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) invalidRequest("候補除外の解除内容が不正です");
+    await jobs.restoreCandidateExclusions(parsed.data.paths);
+    return c.body(null, 204);
+  });
+
+  app.post("/scan/candidates/register", async (c) => {
+    const parsed = scanCandidatesRegisterRequestSchema.safeParse(
+      await c.req.json().catch(() => null),
+    );
     if (!parsed.success) invalidRequest("候補の登録内容が不正です");
     try {
-      const result = await jobs.registerCandidates(parsed.data.paths, onCandidateRegistered);
+      const result = await jobs.registerCandidates(parsed.data.items, onCandidateRegistered);
       return c.json(scanCandidatesRegisterResponseSchema.parse(result), 201);
     } catch (error) {
       if (error instanceof Error && error.message.startsWith("候補が更新されています")) {

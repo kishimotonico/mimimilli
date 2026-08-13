@@ -3,6 +3,8 @@ import {
   type DlsiteBulkMode,
   type DlsiteBulkProgressEvent,
   type DlsiteBulkResult,
+  type DlsiteState,
+  hasRjCode,
   type WorkSummary,
 } from "@mimimilli/shared";
 import { DlsiteOfflineError } from "../../errors.ts";
@@ -27,9 +29,11 @@ export interface DlsiteBulkDeps {
   dlsiteCache: DlsiteCache;
 }
 
+export type DlsiteBulkTarget = WorkSummary & { dlsite: DlsiteState & { rjCode: string } };
+
 export interface DlsiteBulkTargetSelection {
   requested: WorkSummary[];
-  targets: WorkSummary[];
+  targets: DlsiteBulkTarget[];
   skipped: number;
   dataIntegrityWarning?: DataIntegrityWarning;
 }
@@ -43,8 +47,8 @@ export function selectDlsiteBulkTargets(
   logDataIntegritySkips(logger, "dlsite-bulk", skipped);
   const dataIntegrityWarning = toDataIntegrityWarning(skipped);
   const requested = summaries;
-  const targets = requested.filter((work) => {
-    if (!work.dlsite.rjCode || work.dlsite.status === "skipped") return false;
+  const targets = requested.filter((work): work is DlsiteBulkTarget => {
+    if (!hasRjCode(work.dlsite) || work.dlsite.status === "skipped") return false;
     return work.dlsite.status !== "applied";
   });
   return {
@@ -160,7 +164,7 @@ export function createDlsiteBulk(deps: DlsiteBulkDeps) {
         }
         const { targets } = selection;
         result.skipped = selection.skipped;
-        const uniqueRjCodes = [...new Set(targets.map((work) => work.dlsite.rjCode!))];
+        const uniqueRjCodes = [...new Set(targets.map((work) => work.dlsite.rjCode))];
         dlsiteLogger.info("DLsite一括取得を開始しました", {
           mode,
           targetCount: targets.length,
@@ -197,7 +201,7 @@ export function createDlsiteBulk(deps: DlsiteBulkDeps) {
             type: "progress",
             processed: index,
             total: targets.length,
-            work: { id: work.id, rjCode: work.dlsite.rjCode!, title: work.title },
+            work: { id: work.id, rjCode: work.dlsite.rjCode, title: work.title },
           });
           if (isAborted()) {
             dlsiteLogger.info("DLsite一括取得を中断しました", {
@@ -207,7 +211,7 @@ export function createDlsiteBulk(deps: DlsiteBulkDeps) {
             });
             return result;
           }
-          const attempt = attempts.get(work.dlsite.rjCode!)!;
+          const attempt = attempts.get(work.dlsite.rjCode)!;
           try {
             const outcome = await applyDlsiteBulkWork(applyDeps, {
               work,

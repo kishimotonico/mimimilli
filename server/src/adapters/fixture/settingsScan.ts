@@ -1,6 +1,7 @@
 import { isRjCodeMissing, workspacePath } from "@mimimilli/shared";
 import type {
   ScanCandidate,
+  ScanCandidateRegisterItem,
   ScanCandidatesRegisterResponse,
   ScanResult,
   Settings,
@@ -14,6 +15,12 @@ const FIXTURE_SCAN_STEP_MS = 20;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function registrationRjLabel(candidate: ScanCandidate, item: ScanCandidateRegisterItem): string {
+  if (item.rjCode === undefined) return `auto:${candidate.rjCode ?? "none"}`;
+  if (item.rjCode === "") return "explicit-empty";
+  return item.rjCode;
 }
 
 export function createSettingsScanMethods(state: FixtureState): SettingsAdapter {
@@ -50,19 +57,20 @@ export function createSettingsScanMethods(state: FixtureState): SettingsAdapter 
       emit({ type: "progress", phase: "finalizing", processed: 1, total: 1 });
 
       state.lastScanTime = new Date().toISOString();
+      const excluded = new Set(state.scanCandidateExclusions);
       return {
         registered: state.works.length,
-        newlyGenerated: state.scanNewWorkIds.length,
+        insertedWorkIds: state.scanInsertedWorkIds,
+        updatedWorkIds: state.scanUpdatedWorkIds,
         errors: state.works.filter((w) => w.status === "error").length,
         missing: state.works.filter((w) => w.status === "missing").length,
-        newWorkIds: state.scanNewWorkIds,
         rjCodeMissingCount: state.works.filter((w) => isRjCodeMissing(w.dlsite)).length,
         skipped: 0,
         coverErrors: 0,
         unreadablePaths: [],
         identityConflicts: state.scanIdentityConflicts,
         invalidMetaFiles: state.scanInvalidMetaFiles,
-        candidates: state.scanCandidates,
+        candidates: state.scanCandidates.filter((candidate) => !excluded.has(candidate.path)),
       };
     },
 
@@ -70,20 +78,27 @@ export function createSettingsScanMethods(state: FixtureState): SettingsAdapter 
       return state.identityConflicts;
     },
     async listScanCandidates(): Promise<ScanCandidate[]> {
-      return state.scanCandidates;
+      const excluded = new Set(state.scanCandidateExclusions);
+      return state.scanCandidates.filter((candidate) => !excluded.has(candidate.path));
     },
-    async registerScanCandidates(paths): Promise<ScanCandidatesRegisterResponse> {
+    async registerScanCandidates(items): Promise<ScanCandidatesRegisterResponse> {
       const candidatesByPath = new Map<string, ScanCandidate>(
         state.scanCandidates.map((candidate) => [candidate.path, candidate]),
       );
-      const registered = paths.flatMap((path, index) => {
-        const candidate = candidatesByPath.get(path);
-        return candidate ? [{ path: candidate.path, workId: `fixture-candidate-${index}` }] : [];
+      const registered = items.flatMap((item, index) => {
+        const candidate = candidatesByPath.get(item.path);
+        if (!candidate) return [];
+        return [
+          {
+            path: candidate.path,
+            workId: `fixture-candidate-${index}-${registrationRjLabel(candidate, item)}`,
+          },
+        ];
       });
-      const failures = paths.flatMap((path) =>
-        candidatesByPath.has(path)
+      const failures = items.flatMap((item) =>
+        candidatesByPath.has(item.path)
           ? []
-          : [{ path: workspacePath(path), message: "候補が見つかりません" }],
+          : [{ path: workspacePath(item.path), message: "候補が見つかりません" }],
       );
       const registeredPaths = new Set(registered.map((candidate) => candidate.path));
       state.scanCandidates = state.scanCandidates.filter(
@@ -92,8 +107,21 @@ export function createSettingsScanMethods(state: FixtureState): SettingsAdapter 
       return { registered, failures };
     },
     async excludeScanCandidates(paths): Promise<void> {
+      for (const path of paths) {
+        if (!state.scanCandidateExclusions.includes(path)) {
+          state.scanCandidateExclusions.push(path);
+        }
+      }
       state.scanCandidates = state.scanCandidates.filter(
         (candidate) => !paths.includes(candidate.path),
+      );
+    },
+    async listScanCandidateExclusions(): Promise<string[]> {
+      return [...state.scanCandidateExclusions];
+    },
+    async restoreScanCandidateExclusions(paths): Promise<void> {
+      state.scanCandidateExclusions = state.scanCandidateExclusions.filter(
+        (path) => !paths.includes(path),
       );
     },
   };
