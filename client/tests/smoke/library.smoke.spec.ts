@@ -198,7 +198,7 @@ test("スキャン完了後に候補を選択登録でき、問題をFilesで確
   const attention = dialog.getByRole("tabpanel", { name: "要対応" });
   const primaryRow = attention.getByRole("row", { name: /夜想曲スタジオ/ });
   await expect(primaryRow.getByText("ID重複", { exact: true })).toBeVisible();
-  const conflictRow = attention.getByRole("row", { name: /^copies\// });
+  const conflictRow = attention.getByRole("row", { name: /copies\// });
   await expect(conflictRow.getByText("競合相手", { exact: true })).toBeVisible();
   await expect(attention.getByText("読み取り失敗", { exact: true })).toBeVisible();
 
@@ -212,7 +212,9 @@ test("スキャン完了後に候補を選択登録でき、問題をFilesで確
   assertNoErrors(tracker);
 });
 
-test("FilesでID重複を表示し、確認して別作品として取り込める", async ({ page }) => {
+test("FilesでID重複を表示し、確認して別作品として取り込める（解決後はスキャンの要対応からも消える、TASK-322）", async ({
+  page,
+}) => {
   const tracker = trackErrors(page);
   await openApp(page);
 
@@ -234,6 +236,16 @@ test("FilesでID重複を表示し、確認して別作品として取り込め�
   ).toBeVisible();
   await dialog.getByRole("button", { name: "取り込む" }).click();
   await expect(preview.getByText("ID重複", { exact: true })).toBeHidden();
+
+  // 解決した診断はスキャン結果のスナップショットではなく常に最新を購読するため、
+  // ダイアログを開き直しても要対応タブに残らない（TASK-322）。
+  await page.getByRole("button", { name: "スキャン" }).click();
+  const scanDialog = page.getByRole("dialog", { name: "スキャン" });
+  await scanDialog.getByRole("tab", { name: /^要対応/ }).click();
+  const attention = scanDialog.getByRole("tabpanel", { name: "要対応" });
+  await expect(attention.getByRole("row", { name: /夜想曲スタジオ/ })).toBeHidden();
+  await expect(attention.getByRole("row", { name: /copies\// })).toBeHidden();
+
   assertNoErrors(tracker);
 });
 
