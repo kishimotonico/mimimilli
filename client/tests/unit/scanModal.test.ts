@@ -323,13 +323,20 @@ describe("ScanModal", () => {
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
-  it("前回結果が無ければ左リストの集計は未計測（—）のままスキャン開始ボタンを表示する", () => {
+  it("前回結果が無ければ左リストの集計は未計測（—）のまま主ボタンに「スキャン」を表示する", () => {
     const { onStart } = renderModal({ lastResult: null });
 
     expect(screen.getByText("更新なし")).toBeInTheDocument();
     expect(screen.getByText("ライブラリ全体")).toBeInTheDocument();
     expect(screen.getByText("11")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /スキャン開始/ }));
+    fireEvent.click(screen.getByRole("button", { name: "スキャン" }));
+    expect(onStart).toHaveBeenCalledTimes(1);
+  });
+
+  it("前回結果があれば主ボタンに「再スキャン」を表示する", () => {
+    const { onStart } = renderModal({ lastResult: scanResult });
+
+    fireEvent.click(screen.getByRole("button", { name: "再スキャン" }));
     expect(onStart).toHaveBeenCalledTimes(1);
   });
 

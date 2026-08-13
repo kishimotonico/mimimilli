@@ -162,7 +162,7 @@ test("スキャンダイアログが開いて完了し、閉じられる", async
   const dialog = page.getByRole("dialog", { name: "スキャン" });
   await expect(dialog.getByRole("heading", { name: "スキャン", level: 2 })).toBeVisible();
 
-  await dialog.getByRole("button", { name: "スキャン開始" }).click();
+  await dialog.getByRole("button", { name: "スキャン" }).click();
   await expect(dialog.getByText("完了しました")).toBeVisible({ timeout: 15_000 });
 
   await dialog.getByRole("tab", { name: /^新規登録済み/ }).click();
@@ -184,7 +184,7 @@ test("スキャン完了後に候補を選択登録でき、問題をFilesで確
   await openApp(page);
   await page.getByRole("button", { name: "スキャン" }).click();
   const dialog = page.getByRole("dialog", { name: "スキャン" });
-  await dialog.getByRole("button", { name: "スキャン開始" }).click();
+  await dialog.getByRole("button", { name: "スキャン" }).click();
 
   const unregistered = dialog.getByRole("tabpanel", { name: "未登録" });
   await expect(unregistered).toBeVisible({ timeout: 15_000 });

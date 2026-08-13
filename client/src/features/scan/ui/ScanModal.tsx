@@ -303,6 +303,7 @@ export default function ScanModal({
 
         <ScanFooter
           scanning={scanning}
+          hasResult={lastResult !== null}
           onCancel={() => void cancel()}
           onFullScan={() => void start({ full: true })}
           onStart={() => void start()}
