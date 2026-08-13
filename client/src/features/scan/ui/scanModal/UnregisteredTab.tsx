@@ -4,7 +4,12 @@ import type { ScanCandidate } from "@mimimilli/shared";
 import Button from "../../../../shared/ui/Button";
 import { ApiRequestError } from "../../../../shared/api/http";
 import { apiErrorMessage } from "../../../../shared/lib/apiError";
-import { excludeScanCandidates, getScanCandidates, registerScanCandidates, SCAN_QUERY_KEYS } from "../../api";
+import {
+  excludeScanCandidates,
+  getScanCandidates,
+  registerScanCandidates,
+  SCAN_QUERY_KEYS,
+} from "../../api";
 
 export interface UnregisteredTabProps {
   candidates: ScanCandidate[];
@@ -82,9 +87,7 @@ export default function UnregisteredTab({ candidates }: UnregisteredTabProps) {
     return (
       <div className="flex flex-col gap-2">
         <p className="font-jp text-[12px] text-ink-3">未登録の候補はありません。</p>
-        {resultMessage && (
-          <output className="block text-[11px] text-ink-2">{resultMessage}</output>
-        )}
+        {resultMessage && <output className="block text-[11px] text-ink-2">{resultMessage}</output>}
       </div>
     );
   }

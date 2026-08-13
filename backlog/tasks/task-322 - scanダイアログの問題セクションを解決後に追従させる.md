@@ -4,7 +4,7 @@ title: scanダイアログの問題セクションを解決後に追従させる
 status: To Do
 assignee: []
 created_date: '2026-08-12 16:54'
-updated_date: '2026-08-13 19:21'
+updated_date: '2026-08-13 20:23'
 labels: []
 dependencies:
   - TASK-326
@@ -23,5 +23,5 @@ ScanReviewの問題セクションは、identity_conflictと不正なmimimilli.j
 <!-- AC:BEGIN -->
 - [x] #1 Filesでidentity_conflictを解決した後にscanダイアログへ戻ると、その項目が問題セクションから消える
 - [x] #2 問題がゼロになったとき問題セクション自体が表示されない
-- [ ] #3 上記を検証するテストがある
+- [x] #3 上記を検証するテストがある
 <!-- AC:END -->

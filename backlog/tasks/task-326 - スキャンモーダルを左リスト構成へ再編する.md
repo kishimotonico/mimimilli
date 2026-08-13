@@ -4,7 +4,7 @@ title: スキャンモーダルを左リスト構成へ再編する
 status: To Do
 assignee: []
 created_date: '2026-08-13 16:58'
-updated_date: '2026-08-13 19:20'
+updated_date: '2026-08-13 20:23'
 labels: []
 dependencies:
   - TASK-324
@@ -27,5 +27,5 @@ ordinal: 336000
 - [x] #4 要対応テーブルでID重複の競合パスが別行に分かれて表示される
 - [x] #5 典型ケース（未登録5件・新規10件・要対応5件）でモーダル内のスクロールが入れ子にならない
 - [x] #6 TopBarのスキャンボタンに未登録件数のバッジが表示される
-- [ ] #7 pnpm test:smokeが通る
+- [x] #7 pnpm test:smokeが通る
 <!-- AC:END -->
