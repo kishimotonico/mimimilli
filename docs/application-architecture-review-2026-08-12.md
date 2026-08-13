@@ -314,20 +314,20 @@ LAN外、複数利用者、共有、同時端末を扱う段階です。現時�
 
 ## 残す仕様と見直す仕様
 
-| 項目                      | 判断             | 見直す内容                                                                               |
-| ------------------------- | ---------------- | ---------------------------------------------------------------------------------------- |
+| 項目                             | 判断             | 見直す内容                                                                               |
+| -------------------------------- | ---------------- | ---------------------------------------------------------------------------------------- |
 | 物理ファイル・mimimilli.json正本 | 維持             | 一方向投影、CAS編集、identity conflictを追加                                             |
-| Files                     | 維持             | Workspace module化、管理状態とviewerを強化                                               |
-| Library                   | 維持             | Catalog moduleとしてWorkspaceと分離                                                      |
-| 複数Playlist              | 維持             | IDをWork配下へ閉じ、再生sessionへ変換                                                    |
-| DLsite取得                | 維持・拡充       | scanから分離し、previewと明示適用を追加                                                  |
-| scan自動登録              | 廃止決定         | 候補提示と一括承認へ置換（TASK-318、TASK-319）                                           |
-| scan後のDLsite自動取得    | 適用のみ承認制へ | 取得は自動・cacheへ。適用はpreview明示承認（TASK-320）                                   |
-| スマートフォルダーDSL     | 維持             | 縮小提案は撤回。requirements-v4 §7.5の正式機能であり、DRAFT-37は条件フィールド拡充の方向 |
-| スマホUI                  | 近く実装         | Responsive UIとしてremoteから分離                                                        |
-| LANスマホ再生             | 判断保留         | 単一所有者の限定再生面として設計可能                                                     |
-| 広いremote                | 現時点では非目標 | 必要時に別gatewayとして再設計                                                            |
-| DataAdapter               | 別途調査         | real/fixtureのユースケース二重実装を中心に確認                                           |
+| Files                            | 維持             | Workspace module化、管理状態とviewerを強化                                               |
+| Library                          | 維持             | Catalog moduleとしてWorkspaceと分離                                                      |
+| 複数Playlist                     | 維持             | IDをWork配下へ閉じ、再生sessionへ変換                                                    |
+| DLsite取得                       | 維持・拡充       | scanから分離し、previewと明示適用を追加                                                  |
+| scan自動登録                     | 廃止決定         | 候補提示と一括承認へ置換（TASK-318、TASK-319）                                           |
+| scan後のDLsite自動取得           | 適用のみ承認制へ | 取得は自動・cacheへ。適用はpreview明示承認（TASK-320）                                   |
+| スマートフォルダーDSL            | 維持             | 縮小提案は撤回。requirements-v4 §7.5の正式機能であり、DRAFT-37は条件フィールド拡充の方向 |
+| スマホUI                         | 近く実装         | Responsive UIとしてremoteから分離                                                        |
+| LANスマホ再生                    | 判断保留         | 単一所有者の限定再生面として設計可能                                                     |
+| 広いremote                       | 現時点では非目標 | 必要時に別gatewayとして再設計                                                            |
+| DataAdapter                      | 別途調査         | real/fixtureのユースケース二重実装を中心に確認                                           |
 
 ## 現行設計で維持したい改善
 
