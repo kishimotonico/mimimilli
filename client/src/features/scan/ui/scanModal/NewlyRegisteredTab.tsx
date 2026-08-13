@@ -1,23 +1,8 @@
 import type { RefObject } from "react";
-import { motion, useIsPresent } from "motion/react";
 import type { WorkListItem } from "@mimimilli/shared";
-import { useMotionVariants } from "../../../../shared/ui/useMotionVariants";
 import { cn } from "../../../../shared/lib/cn";
 
-/** 新規検出した作品一覧。件数見出し+一覧を1つのcollapse境界にまとめる。 */
-export default function ScanNewWorks({
-  newWorks,
-  newWorksError,
-  truncatedTotal,
-  editingId,
-  editTitle,
-  editSaving,
-  editError,
-  titleInputRef,
-  onStartEdit,
-  onChangeEditTitle,
-  onSaveTitle,
-}: {
+export interface NewlyRegisteredTabProps {
   newWorks: WorkListItem[];
   newWorksError: string | null;
   /** insertedWorkIds総数がnewWorksより多く、表示を先頭のみに絞っているときはその総数。絞っていなければnull */
@@ -30,51 +15,63 @@ export default function ScanNewWorks({
   onStartEdit: (work: WorkListItem) => void;
   onChangeEditTitle: (title: string) => void;
   onSaveTitle: (workId: string) => void;
-}) {
-  const { collapse } = useMotionVariants();
-  const isPresent = useIsPresent();
-  const v = collapse();
+}
+
+export default function NewlyRegisteredTab({
+  newWorks,
+  newWorksError,
+  truncatedTotal,
+  editingId,
+  editTitle,
+  editSaving,
+  editError,
+  titleInputRef,
+  onStartEdit,
+  onChangeEditTitle,
+  onSaveTitle,
+}: NewlyRegisteredTabProps) {
+  if (newWorksError) {
+    return (
+      <p role="alert" className="font-jp text-[12px] text-[var(--r-coral)]">
+        {newWorksError}
+      </p>
+    );
+  }
+
+  if (newWorks.length === 0) {
+    return <p className="font-jp text-[12px] text-ink-3">新規に登録した作品はありません。</p>;
+  }
+
   return (
-    <motion.div
-      style={{ overflow: "hidden" }}
-      className="flex flex-col gap-1.5"
-      inert={!isPresent}
-      {...v}
-    >
+    <div className="flex flex-col gap-2">
       <div className="flex items-baseline justify-between gap-2">
         <p className="font-sans text-[10.5px] font-semibold tracking-[0.06em] text-ink-3 uppercase">
           新規検出した作品
         </p>
-        {!newWorksError && truncatedTotal !== null && (
+        {truncatedTotal !== null && (
           <span className="font-mono text-[10px] text-ink-4 tabular-nums">
             {newWorks.length} / {truncatedTotal} 件
           </span>
         )}
       </div>
-      {newWorksError ? (
-        <p role="alert" className="font-jp text-[12px] text-[var(--r-coral)]">
-          {newWorksError}
-        </p>
-      ) : (
-        <ul className="flex max-h-[220px] list-none flex-col gap-1 overflow-y-auto p-0">
-          {newWorks.map((work) => (
-            <li key={work.id}>
-              <NewWorkRow
-                work={work}
-                editing={editingId === work.id}
-                editTitle={editTitle}
-                editSaving={editingId === work.id && editSaving}
-                editError={editingId === work.id ? editError : null}
-                titleInputRef={titleInputRef}
-                onStartEdit={() => onStartEdit(work)}
-                onChangeEditTitle={onChangeEditTitle}
-                onSaveTitle={() => onSaveTitle(work.id)}
-              />
-            </li>
-          ))}
-        </ul>
-      )}
-    </motion.div>
+      <ul className="flex list-none flex-col gap-1 p-0">
+        {newWorks.map((work) => (
+          <li key={work.id}>
+            <NewWorkRow
+              work={work}
+              editing={editingId === work.id}
+              editTitle={editTitle}
+              editSaving={editingId === work.id && editSaving}
+              editError={editingId === work.id ? editError : null}
+              titleInputRef={titleInputRef}
+              onStartEdit={() => onStartEdit(work)}
+              onChangeEditTitle={onChangeEditTitle}
+              onSaveTitle={() => onSaveTitle(work.id)}
+            />
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

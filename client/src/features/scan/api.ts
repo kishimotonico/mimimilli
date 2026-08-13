@@ -12,6 +12,7 @@ import {
 import type { StartScanRequest } from "@mimimilli/shared";
 import {
   scanConflictResponseSchema,
+  scanDiagnosticsResponseSchema,
   scanJobSnapshotSchema,
   scanLastResultResponseSchema,
   scanCandidatesMutationSchema,
@@ -31,6 +32,9 @@ import {
 export const SCAN_QUERY_KEYS = {
   last: () => ["scan", "last"] as const,
   candidates: () => ["scan", "candidates"] as const,
+  /** files feature の同名キー（features/files/api.ts）と同じ /scan/diagnostics を指す。
+   *  各 feature の api.ts は自 feature の model のみに依存する方針のため、意図的に別定義。 */
+  diagnostics: () => ["scan", "diagnostics"] as const,
 } as const;
 
 export type { ScanResult } from "./model";
@@ -114,4 +118,9 @@ export async function restoreScanCandidateExclusions(paths: string[]): Promise<v
     "/scan/candidates/exclusions/restore",
     scanCandidatesMutationSchema.parse({ paths }),
   );
+}
+
+/** ID重複の診断。スキャン完了時点のスナップショットではなく常に最新を返す。 */
+export async function getScanDiagnostics() {
+  return getParsed(scanDiagnosticsResponseSchema, "/scan/diagnostics");
 }
