@@ -51,6 +51,8 @@ function makeWorkListItem(id: string, title = `作品 ${id}`): WorkListItem {
     bookmarked: false,
     lastPlayedAt: null,
     circleName: null,
+    folderName: id,
+    dlsite: { rjCode: null, status: "none" },
   };
 }
 

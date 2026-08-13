@@ -1,11 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useState } from "react";
 import { useAtomValue } from "jotai";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { WORKS_DEFAULT_PAGE_SIZE, type WorkListItem, type WorksPage } from "@mimimilli/shared";
-import { getWork, patchWork, searchWorks } from "../../../entities/work/api";
-import { assertWorkSourceRevision } from "../../../entities/work/sourceRevision";
-import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
-import { apiErrorMessage } from "../../../shared/lib/apiError";
+import { useQuery } from "@tanstack/react-query";
 import { libraryTotalQueryOptions } from "../../../entities/work/libraryTotalQueryOptions";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
 import { cn } from "../../../shared/lib/cn";
@@ -33,19 +28,6 @@ interface ScanModalProps {
 
 const EMPTY_WORK_IDS: string[] = [];
 
-/** 一覧クエリキャッシュ内のitemsから該当作品のタイトルだけを差し替える */
-function patchTitleInWorksPage(
-  prev: WorksPage | undefined,
-  workId: string,
-  title: string,
-): WorksPage | undefined {
-  if (!prev) return prev;
-  return {
-    ...prev,
-    items: prev.items.map((item) => (item.id === workId ? { ...item, title } : item)),
-  };
-}
-
 export default function ScanModal({
   lastScanTime,
   onClose,
@@ -55,7 +37,6 @@ export default function ScanModal({
   const scanning = useAtomValue(scanningAtom);
   const progress = useAtomValue(scanProgressAtom);
   const { start, cancel } = useScanActions();
-  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<ScanTabKey>("unregistered");
 
   // 前回スキャン結果（ディスク永続化なし、TASK-56）。サーバー起動後に一度でも完了していれば
@@ -87,93 +68,10 @@ export default function ScanModal({
 
   const insertedWorkIds = lastResult?.insertedWorkIds ?? EMPTY_WORK_IDS;
   const updatedWorkIds = lastResult?.updatedWorkIds ?? EMPTY_WORK_IDS;
-  // insertedWorkIds/updatedWorkIdsが数千〜数万件になりうるため、表示・取得は先頭の1ページ分
-  // （WORKS_DEFAULT_PAGE_SIZE）に制限する。全件をidsへ載せるとURLとSQLite束縛パラメータの
-  // 上限を超える。省略が発生したかは各タブ側の表示に渡す。
-  const visibleInsertedIds = useMemo(
-    () => insertedWorkIds.slice(0, WORKS_DEFAULT_PAGE_SIZE),
-    [insertedWorkIds],
-  );
-  const truncatedInsertedTotal =
-    insertedWorkIds.length > visibleInsertedIds.length ? insertedWorkIds.length : null;
-  const visibleUpdatedIds = useMemo(
-    () => updatedWorkIds.slice(0, WORKS_DEFAULT_PAGE_SIZE),
-    [updatedWorkIds],
-  );
-  const truncatedUpdatedTotal =
-    updatedWorkIds.length > visibleUpdatedIds.length ? updatedWorkIds.length : null;
-
-  // 新規登録済み作品の表示用データ（title/trackCount）は visibleInsertedIds を1回のworks一覧
-  // クエリで引く。WORK_QUERY_KEYS.list() 配下に載るため、DLsite一括取得完了時のWORK_QUERY_KEYS.all()
-  // 無効化に自動で乗る（追加の無効化配線は不要）。
-  const newWorksParams = useMemo(() => ({ ids: visibleInsertedIds }), [visibleInsertedIds]);
-  const newWorksQuery = useQuery({
-    queryKey: WORK_QUERY_KEYS.list(newWorksParams),
-    queryFn: () => searchWorks(newWorksParams),
-    enabled: visibleInsertedIds.length > 0,
-  });
-  const newWorksError = newWorksQuery.isError
-    ? apiErrorMessage(newWorksQuery.error, "新規作品の読み込みに失敗しました")
-    : null;
-  const newWorkOrder = useMemo(
-    () => new Map(visibleInsertedIds.map((id, index) => [id, index])),
-    [visibleInsertedIds],
-  );
-  const newWorks: WorkListItem[] = useMemo(
-    () =>
-      [...(newWorksQuery.data?.items ?? [])].sort(
-        (a, b) => (newWorkOrder.get(a.id) ?? 0) - (newWorkOrder.get(b.id) ?? 0),
-      ),
-    [newWorksQuery.data, newWorkOrder],
-  );
-
-  const updatedWorksParams = useMemo(() => ({ ids: visibleUpdatedIds }), [visibleUpdatedIds]);
-  const updatedWorksQuery = useQuery({
-    queryKey: WORK_QUERY_KEYS.list(updatedWorksParams),
-    queryFn: () => searchWorks(updatedWorksParams),
-    enabled: visibleUpdatedIds.length > 0,
-  });
-  const updatedWorksError = updatedWorksQuery.isError
-    ? apiErrorMessage(updatedWorksQuery.error, "更新された作品の読み込みに失敗しました")
-    : null;
-  const updatedWorkOrder = useMemo(
-    () => new Map(visibleUpdatedIds.map((id, index) => [id, index])),
-    [visibleUpdatedIds],
-  );
-  const updatedWorks: WorkListItem[] = useMemo(
-    () =>
-      [...(updatedWorksQuery.data?.items ?? [])].sort(
-        (a, b) => (updatedWorkOrder.get(a.id) ?? 0) - (updatedWorkOrder.get(b.id) ?? 0),
-      ),
-    [updatedWorksQuery.data, updatedWorkOrder],
-  );
 
   // ライブラリ総件数（サイドバーの「ライブラリ N 件」と同じ既存クエリキーを共有する）。
   const libraryTotalQuery = useQuery(libraryTotalQueryOptions);
   const libraryTotal = libraryTotalQuery.data?.total ?? null;
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editTitle, setEditTitle] = useState("");
-  const titleInputRef = useRef<HTMLInputElement | null>(null);
-
-  const saveTitleMutation = useMutation({
-    mutationFn: async ({ workId, title }: { workId: string; title: string }) => {
-      const work = await getWork(workId);
-      return patchWork(workId, {
-        title,
-        sourceRevision: assertWorkSourceRevision(work.sourceRevision),
-      });
-    },
-    onSuccess: (updatedWork, { workId }) => {
-      queryClient.setQueryData(WORK_QUERY_KEYS.detail(workId), updatedWork);
-      queryClient.setQueryData<WorksPage>(WORK_QUERY_KEYS.list(newWorksParams), (prev) =>
-        patchTitleInWorksPage(prev, workId, updatedWork.title),
-      );
-      setEditingId(null);
-    },
-    onError: (_error, { workId }) => {
-      void queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.detail(workId) });
-    },
-  });
 
   const { showCompletedHint } = useScanCompletionHint(scanning);
 
@@ -190,44 +88,8 @@ export default function ScanModal({
     updated: updatedWorkIds.length,
   };
 
-  // タイトル編集中は編集だけをキャンセルし、モーダル自体は閉じない。
-  // 実行中でも閉じられるが、スキャン自体はバックグラウンドで継続する（TASK-56）。
-  const dismiss = () => {
-    if (editingId) {
-      setEditingId(null);
-      saveTitleMutation.reset();
-      return;
-    }
-    onClose();
-  };
-  const { dialogRef, handleCancel, handleBackdropClick } = useDialogModal({ onClose: dismiss });
-
-  useEffect(() => {
-    if (!editingId) return;
-    titleInputRef.current?.focus({ preventScroll: true });
-  }, [editingId]);
-
-  const handleStartEdit = (work: WorkListItem) => {
-    setEditingId(work.id);
-    setEditTitle(work.title);
-    saveTitleMutation.reset();
-  };
-
-  const handleSaveTitle = (workId: string) => {
-    if (saveTitleMutation.isPending) return;
-    const trimmed = editTitle.trim();
-    if (!trimmed) {
-      setEditingId(null);
-      saveTitleMutation.reset();
-      return;
-    }
-    saveTitleMutation.mutate({ workId, title: trimmed });
-  };
-
-  const editError = saveTitleMutation.error
-    ? apiErrorMessage(saveTitleMutation.error, "タイトルの保存に失敗しました")
-    : null;
-  const editSaving = saveTitleMutation.isPending;
+  // スキャン実行中でも閉じられる。スキャン自体はバックグラウンドで継続する（TASK-56）。
+  const { dialogRef, handleCancel, handleBackdropClick } = useDialogModal({ onClose });
 
   return (
     // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- backdropクリックで閉じる。EscapeはonCancel（useDialogModal）で処理する。
@@ -244,7 +106,7 @@ export default function ScanModal({
           <h2 id="scan-modal-title" className="flex-1 font-sans text-[14px] font-semibold">
             スキャン
           </h2>
-          <IconButton icon={I.x} label="閉じる" size="sm" onClick={dismiss} />
+          <IconButton icon={I.x} label="閉じる" size="sm" onClick={onClose} />
         </header>
 
         <div className="flex min-h-0 flex-1 overflow-hidden">
@@ -276,28 +138,8 @@ export default function ScanModal({
                 onOpenRjCodeMissing={onOpenRjCodeMissing}
               />
             )}
-            {activeTab === "newlyRegistered" && (
-              <NewlyRegisteredTab
-                newWorks={newWorks}
-                newWorksError={newWorksError}
-                truncatedTotal={truncatedInsertedTotal}
-                editingId={editingId}
-                editTitle={editTitle}
-                editSaving={editSaving}
-                editError={editError}
-                titleInputRef={titleInputRef}
-                onStartEdit={handleStartEdit}
-                onChangeEditTitle={setEditTitle}
-                onSaveTitle={handleSaveTitle}
-              />
-            )}
-            {activeTab === "updated" && (
-              <UpdatedWorksTab
-                updatedWorks={updatedWorks}
-                updatedWorksError={updatedWorksError}
-                truncatedTotal={truncatedUpdatedTotal}
-              />
-            )}
+            {activeTab === "newlyRegistered" && <NewlyRegisteredTab workIds={insertedWorkIds} />}
+            {activeTab === "updated" && <UpdatedWorksTab workIds={updatedWorkIds} />}
           </div>
         </div>
 

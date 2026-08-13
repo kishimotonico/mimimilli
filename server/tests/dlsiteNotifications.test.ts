@@ -196,6 +196,8 @@ test("real adapter経由のHTTP一覧もWorkListItemの許可キーだけを返�
       "bookmarked",
       "circleName",
       "cover",
+      "dlsite",
+      "folderName",
       "id",
       "lastPlayedAt",
       "status",

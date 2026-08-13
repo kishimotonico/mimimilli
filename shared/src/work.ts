@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { coverKindSchema, coverSchema } from "./cover.ts";
 import { dlsiteStateSchema } from "./dlsite.ts";
+import type { DlsiteState } from "./dlsite.ts";
 import { trackDurationKindSchema } from "./duration.ts";
 import {
   isInvalidTrackStart,
@@ -161,6 +162,13 @@ export const workSummarySchema = z.object({
 });
 export type WorkSummary = z.infer<typeof workSummarySchema>;
 
+/** 一覧の外部連携表示に要る最小限のDLsite状態（rjCode有無とstatusのみ）。 */
+export const workListItemDlsiteSchema = dlsiteStateSchema.pick({
+  rjCode: true,
+  status: true,
+});
+export type WorkListItemDlsite = z.infer<typeof workListItemDlsiteSchema>;
+
 /** 一覧表示専用の軽量な作品DTO。検索・詳細編集で必要な情報は含めない。 */
 export const workListItemSchema = z.object({
   id: z.string(),
@@ -172,8 +180,21 @@ export const workListItemSchema = z.object({
   bookmarked: z.boolean(),
   lastPlayedAt: z.string().nullable(),
   circleName: z.string().nullable(),
+  folderName: z.string(),
+  dlsite: workListItemDlsiteSchema,
 });
 export type WorkListItem = z.infer<typeof workListItemSchema>;
+
+/** DlsiteState を一覧表示用の最小限の形へ投影する。 */
+export function toWorkListItemDlsite(dlsite: DlsiteState): WorkListItemDlsite {
+  return { rjCode: dlsite.rjCode, status: dlsite.status };
+}
+
+/** physicalPath 末尾のフォルダー名だけを取り出す（一覧表示用。フルパスは持たせない）。 */
+export function folderNameFromPhysicalPath(physicalPath: string): string {
+  const segments = physicalPath.split("/").filter(Boolean);
+  return segments[segments.length - 1] ?? physicalPath;
+}
 
 const CIRCLE_TAG_PREFIXES = ["サークル/", "circle/"];
 
@@ -201,6 +222,8 @@ export function toWorkListItem(work: WorkSummary): WorkListItem {
     bookmarked: work.bookmarked,
     lastPlayedAt: work.lastPlayedAt,
     circleName: extractCircleName(work.tags),
+    folderName: folderNameFromPhysicalPath(work.physicalPath),
+    dlsite: toWorkListItemDlsite(work.dlsite),
   };
 }
 

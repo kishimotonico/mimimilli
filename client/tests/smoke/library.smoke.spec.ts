@@ -166,7 +166,7 @@ test("スキャンダイアログが開いて完了し、閉じられる", async
   await expect(dialog.getByText("完了しました")).toBeVisible({ timeout: 15_000 });
 
   await dialog.getByRole("tab", { name: /^新規登録済み/ }).click();
-  await expect(dialog.getByText("新規検出した作品")).toBeVisible({ timeout: 15_000 });
+  await expect(dialog.getByText("新規登録済みの作品")).toBeVisible({ timeout: 15_000 });
   await expect(
     dialog.getByRole("button", { name: /ツンデレ後輩ちゃんの秘密のお世話ボイス/ }),
   ).toBeVisible({ timeout: 15_000 });

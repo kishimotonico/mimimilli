@@ -94,8 +94,10 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       smartFolders: cloneSmartFolders(smartFolders),
       rootFolder: "/library",
       lastScanTime: now,
-      scanInsertedWorkIds: ["RJ501011"],
-      scanUpdatedWorkIds: [],
+      // 外部連携列の状態を一通り確認できるよう、取得待ち(RJ501011)・連携済み(RJ501001)・
+      // 失敗(RJ501003)を新規登録済みに、スキップ(RJ501007)を更新された作品に含める
+      scanInsertedWorkIds: ["RJ501011", "RJ501001", "RJ501003"],
+      scanUpdatedWorkIds: ["RJ501007"],
       scanCandidates: [
         {
           path: workspacePath("未登録作品"),

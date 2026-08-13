@@ -72,6 +72,8 @@ test("一覧HTTPレスポンスは軽量DTOの許可キーだけを返す", asyn
     "bookmarked",
     "circleName",
     "cover",
+    "dlsite",
+    "folderName",
     "id",
     "lastPlayedAt",
     "status",
@@ -79,8 +81,8 @@ test("一覧HTTPレスポンスは軽量DTOの許可キーだけを返す", asyn
     "totalDurationSec",
     "trackCount",
   ]);
+  assert.deepEqual(Object.keys(body.items[0]!.dlsite).sort(), ["rjCode", "status"]);
   assert.equal("physicalPath" in body.items[0]!, false);
-  assert.equal("dlsite" in body.items[0]!, false);
   assert.equal("playlists" in body.items[0]!, false);
 });
 

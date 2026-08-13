@@ -57,6 +57,8 @@ function makeWorkListItem(overrides: Partial<WorkListItem> = {}): WorkListItem {
     bookmarked: false,
     lastPlayedAt: null,
     circleName: null,
+    folderName: "work-1",
+    dlsite: { rjCode: null, status: "none" },
     ...overrides,
   };
 }

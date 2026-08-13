@@ -37,6 +37,8 @@ function toListItem(id: string, title: string, trackCount: number): WorkListItem
     bookmarked: false,
     lastPlayedAt: null,
     circleName: null,
+    folderName: id,
+    dlsite: { rjCode: null, status: "none" },
   };
 }
 
@@ -230,36 +232,7 @@ function renderModal(
 }
 
 describe("ScanModal", () => {
-  it("タイトル編集中のEscapeは編集だけをキャンセルし、モーダルは閉じない", async () => {
-    const onClose = vi.fn();
-    renderModal({ onClose });
-
-    openTab("新規登録済み");
-    await waitFor(() => screen.getByText(newWork.title));
-    fireEvent.click(screen.getByText(newWork.title));
-
-    const input = screen.getByDisplayValue(newWork.title);
-    expect(input).toBeInTheDocument();
-
-    const dialog = screen.getByRole("dialog", { name: "スキャン" });
-    dispatchCancel(dialog);
-
-    expect(onClose).not.toHaveBeenCalled();
-    expect(screen.queryByDisplayValue(newWork.title)).toBeNull();
-    expect(screen.getByText(newWork.title)).toBeInTheDocument();
-  });
-
-  it("編集中でないときのEscapeはモーダルを閉じる", () => {
-    const onClose = vi.fn();
-    renderModal({ onClose });
-
-    const dialog = screen.getByRole("dialog", { name: "スキャン" });
-    dispatchCancel(dialog);
-
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it("backdropクリックは編集中は編集だけをキャンセルし、モーダルは閉じない", async () => {
+  it("Escapeはモーダルを閉じる（タイトル編集中でも、タブが編集stateを自分で持つため親は関知しない）", async () => {
     const onClose = vi.fn();
     renderModal({ onClose });
 
@@ -269,14 +242,12 @@ describe("ScanModal", () => {
     expect(screen.getByDisplayValue(newWork.title)).toBeInTheDocument();
 
     const dialog = screen.getByRole("dialog", { name: "スキャン" });
-    fireEvent.click(dialog);
+    dispatchCancel(dialog);
 
-    expect(onClose).not.toHaveBeenCalled();
-    expect(screen.queryByDisplayValue(newWork.title)).toBeNull();
-    expect(screen.getByText(newWork.title)).toBeInTheDocument();
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("タイトル編集中の×ボタンは編集だけをキャンセルし、モーダルは閉じない", async () => {
+  it("×ボタンはモーダルを閉じる（タイトル編集中でも）", async () => {
     const onClose = vi.fn();
     renderModal({ onClose });
 
@@ -287,9 +258,17 @@ describe("ScanModal", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "閉じる" }));
 
-    expect(onClose).not.toHaveBeenCalled();
-    expect(screen.queryByDisplayValue(newWork.title)).toBeNull();
-    expect(screen.getByText(newWork.title)).toBeInTheDocument();
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("backdropクリックはモーダルを閉じる", () => {
+    const onClose = vi.fn();
+    renderModal({ onClose });
+
+    const dialog = screen.getByRole("dialog", { name: "スキャン" });
+    fireEvent.click(dialog);
+
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it("パネル内側のクリックではモーダルを閉じない", () => {
@@ -414,7 +393,7 @@ describe("ScanModal", () => {
     renderModal({ lastResult: { ...scanResult, insertedWorkIds: manyIds } });
     openTab("新規登録済み");
 
-    await waitFor(() => expect(screen.getByText("work-many-0")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText("work-many-0").length).toBeGreaterThan(0));
     expect(
       searchWorksSpy.mock.calls.some(([params]) => params.ids?.length === WORKS_DEFAULT_PAGE_SIZE),
     ).toBe(true);
@@ -424,7 +403,7 @@ describe("ScanModal", () => {
       ),
     ).toBe(true);
     expect(
-      screen.getByText(`${WORKS_DEFAULT_PAGE_SIZE} / ${manyIds.length} 件`),
+      screen.getByText(`${manyIds.length}件中${WORKS_DEFAULT_PAGE_SIZE}件を表示`),
     ).toBeInTheDocument();
   });
 

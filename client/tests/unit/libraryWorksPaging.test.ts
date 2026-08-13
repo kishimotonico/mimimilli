@@ -44,6 +44,8 @@ function makeWork(id: string): WorkListItem {
     bookmarked: false,
     lastPlayedAt: null,
     circleName: null,
+    folderName: id,
+    dlsite: { rjCode: null, status: "none" },
   };
 }
 
