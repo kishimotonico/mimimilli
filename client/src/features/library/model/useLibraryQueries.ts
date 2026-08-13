@@ -31,6 +31,7 @@ import { getAllTags } from "../../../entities/tag/api";
 import { getWork, patchWork } from "../../../entities/work/api";
 import { assertWorkSourceRevision } from "../../../entities/work/sourceRevision";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
+import { useRootFolder } from "../../../entities/settings/useSettingsQuery";
 import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
 import { TAG_QUERY_KEYS } from "../../../entities/tag/queryKeys";
 
@@ -240,6 +241,7 @@ export function useLibrarySupportingQueries(nav: LibraryViewState) {
 
 function useWorkPatchMutationContext(nav: LibraryViewState, searchQuery: string) {
   const queryClient = useQueryClient();
+  const rootFolder = useRootFolder();
   const randomSeed = useAtomValue(randomSeedAtom);
   const debouncedSearchQuery = useDebouncedValue(
     searchQuery,
@@ -276,8 +278,13 @@ function useWorkPatchMutationContext(nav: LibraryViewState, searchQuery: string)
       : worksParams !== null
         ? WORK_QUERY_KEYS.list(worksParams)
         : null;
-    if (targets.patchActiveListCache && activeListQueryKey !== null) {
-      patchWorkInQueryCache(queryClient, activeListQueryKey, workId, workToListItem(updatedWork));
+    if (targets.patchActiveListCache && activeListQueryKey !== null && rootFolder !== null) {
+      patchWorkInQueryCache(
+        queryClient,
+        activeListQueryKey,
+        workId,
+        workToListItem(updatedWork, rootFolder),
+      );
     }
     await Promise.all([
       targets.staleInactiveListCaches ? staleInactiveListCaches(queryClient) : null,

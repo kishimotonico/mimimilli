@@ -28,6 +28,8 @@ export interface InlineTitleEdit {
   startEdit: (work: WorkListItem) => void;
   changeTitle: (title: string) => void;
   saveTitle: (workId: string) => void;
+  /** Escapeでの取り消し。保存はせず編集モードだけを閉じる。 */
+  cancelEdit: () => void;
 }
 
 /** タイトルのインライン編集state。表示中のWorksPageクエリキャッシュを保存成功時に直接パッチする。 */
@@ -83,6 +85,11 @@ export function useInlineTitleEdit(queryKey: QueryKey): InlineTitleEdit {
     ? apiErrorMessage(saveTitleMutation.error, "タイトルの保存に失敗しました")
     : null;
 
+  const cancelEdit = () => {
+    setEditingId(null);
+    saveTitleMutation.reset();
+  };
+
   return {
     editingId,
     editTitle,
@@ -92,5 +99,6 @@ export function useInlineTitleEdit(queryKey: QueryKey): InlineTitleEdit {
     startEdit,
     changeTitle: setEditTitle,
     saveTitle,
+    cancelEdit,
   };
 }

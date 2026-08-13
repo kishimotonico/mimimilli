@@ -13,13 +13,15 @@ import {
 
 export interface UnregisteredTabProps {
   candidates: ScanCandidate[];
+  /** 候補承認で登録された作品IDを親（ScanModal）へ伝える。TASK-327が本実装を持つ。 */
+  onRegistered?: (workIds: string[]) => void;
 }
 
 function candidatePaths(candidates: ScanCandidate[]): string[] {
   return candidates.map((candidate) => candidate.path);
 }
 
-export default function UnregisteredTab({ candidates }: UnregisteredTabProps) {
+export default function UnregisteredTab({ candidates, onRegistered }: UnregisteredTabProps) {
   const queryClient = useQueryClient();
   const [selectedPaths, setSelectedPaths] = useState<string[]>(() => candidatePaths(candidates));
   const [resultMessage, setResultMessage] = useState<string | null>(null);
@@ -54,6 +56,7 @@ export default function UnregisteredTab({ candidates }: UnregisteredTabProps) {
         previous.filter((candidate) => !registeredPaths.has(candidate.path)),
       );
       setSelectedPaths((previous) => previous.filter((path) => !registeredPaths.has(path)));
+      onRegistered?.(registered.map((entry) => entry.workId));
       setResultMessage(
         failures.length > 0
           ? `${registered.length}件を登録しました。${failures.length}件は登録できませんでした。`

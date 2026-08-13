@@ -1,12 +1,9 @@
 // 新規登録済み・更新された作品タブ共通のテーブル本体。
 import type { WorkListItem } from "@mimimilli/shared";
-import { hasRjCode } from "@mimimilli/shared";
+import { dlsiteLinkDisplayStatus, hasRjCode } from "@mimimilli/shared";
 import { cn } from "../../../../shared/lib/cn";
-import {
-  DLSITE_LINK_STATUS_LABEL,
-  DLSITE_LINK_STATUS_TONE,
-  dlsiteLinkDisplayStatus,
-} from "./dlsiteLinkStatus";
+import { DLSITE_LINK_STATUS_LABEL, DLSITE_LINK_STATUS_TONE } from "./dlsiteLinkStatus";
+import { parentDirOf } from "./scanResultWorkIds";
 import type { InlineTitleEdit } from "./useInlineTitleEdit";
 
 export interface ScanResultWorksTableProps {
@@ -79,6 +76,7 @@ function WorkRow({ work, edit }: { work: WorkListItem; edit: InlineTitleEdit }) 
   const editing = edit.editingId === work.id;
   const editError = edit.editErrorFor(work.id);
   const linkStatus = dlsiteLinkDisplayStatus(work.dlsite);
+  const folderDisplay = parentDirOf(work.relativePath) || "（ルート直下）";
 
   return (
     <tr className="border-b border-line-soft last:border-b-0">
@@ -91,8 +89,14 @@ function WorkRow({ work, edit }: { work: WorkListItem; edit: InlineTitleEdit }) 
             onChange={(e) => edit.changeTitle(e.target.value)}
             onBlur={() => edit.saveTitle(work.id)}
             onKeyDown={(e) => {
-              // Escapeのキャンセルは dialog の onCancel（useDialogModal）に一元化する
               if (e.key === "Enter") edit.saveTitle(work.id);
+              if (e.key === "Escape") {
+                // 入力欄側で編集を取り消し、モーダルのEscapeクローズ（<dialog>のcancel既定動作）
+                // まで伝播させない。親は編集中かどうかを知らなくてよい。
+                e.preventDefault();
+                e.stopPropagation();
+                edit.cancelEdit();
+              }
             }}
             className={cn(
               "min-w-0 w-full rounded-[4px] border bg-paper-2 px-2 py-0.5 font-jp text-[12px] text-ink-0 outline-none disabled:opacity-60",
@@ -118,8 +122,11 @@ function WorkRow({ work, edit }: { work: WorkListItem; edit: InlineTitleEdit }) 
           </span>
         )}
       </td>
-      <td className="min-w-0 truncate px-2 py-1.5 font-mono text-[10.5px] text-ink-3">
-        {work.folderName}
+      <td className="min-w-0 px-2 py-1.5 font-mono text-[10.5px] text-ink-3">
+        {/* 先頭側を省略し末尾（作品に近い部分）を残す。dir="rtl" + text-left の組み合わせで実現する */}
+        <span dir="rtl" title={folderDisplay} className="block truncate text-left">
+          {folderDisplay}
+        </span>
       </td>
       <td className="min-w-0 px-2 py-1.5">
         <span

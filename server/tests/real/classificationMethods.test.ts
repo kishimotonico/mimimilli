@@ -14,6 +14,7 @@ test("分類メソッドは real adapter を起動せず直接生成できる", 
   const methods = createClassificationMethods({
     query: {} as unknown as WorkQueryRepository,
     user,
+    requireRoot: () => "/library",
   });
 
   assert.deepStrictEqual(await methods.listTagPrefixes(), [

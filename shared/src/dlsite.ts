@@ -63,6 +63,19 @@ export function isDlsiteLinkFailed(state: Pick<DlsiteState, "status">): boolean 
   return state.status === "not_found" || state.status === "error";
 }
 
+export type DlsiteLinkDisplayStatus = "linked" | "pending" | "failed" | "none";
+
+/** 外部連携列（スキャン結果タブ）の4状態（連携済み・取得待ち・失敗・—）を判定する正典。
+ *  rjCodeの有無は`hasRjCode`、失敗は`isDlsiteLinkFailed`をそのまま使う。 */
+export function dlsiteLinkDisplayStatus(
+  state: Pick<DlsiteState, "rjCode" | "status">,
+): DlsiteLinkDisplayStatus {
+  if (!hasRjCode(state)) return "none";
+  if (state.status === "applied") return "linked";
+  if (isDlsiteLinkFailed(state)) return "failed";
+  return "pending";
+}
+
 /** パース失敗が構造変更レベルで増えたかのしきい値（件数・割合の下限） */
 export const DLSITE_PARSE_ERROR_ALERT_MIN_COUNT = 3;
 export const DLSITE_PARSE_ERROR_ALERT_MIN_RATIO = 0.2;

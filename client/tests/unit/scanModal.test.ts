@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-quer
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   WORKS_DEFAULT_PAGE_SIZE,
+  workspacePath,
   type ScanJobSnapshot,
   type ScanResult,
   type Work,
@@ -37,7 +38,7 @@ function toListItem(id: string, title: string, trackCount: number): WorkListItem
     bookmarked: false,
     lastPlayedAt: null,
     circleName: null,
-    folderName: id,
+    relativePath: workspacePath(id),
     dlsite: { rjCode: null, status: "none" },
   };
 }

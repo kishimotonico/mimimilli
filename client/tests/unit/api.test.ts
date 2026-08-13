@@ -8,6 +8,7 @@ import * as scanApi from "../../src/features/scan/api";
 import {
   emptyDlsiteState,
   coverFieldsFromCover,
+  workspacePath,
   type Work,
   type WorkListItem,
   type WorkSummary,
@@ -57,7 +58,7 @@ function makeWorkListItem(overrides: Partial<WorkListItem> = {}): WorkListItem {
     bookmarked: false,
     lastPlayedAt: null,
     circleName: null,
-    folderName: "work-1",
+    relativePath: workspacePath("work-1"),
     dlsite: { rjCode: null, status: "none" },
     ...overrides,
   };

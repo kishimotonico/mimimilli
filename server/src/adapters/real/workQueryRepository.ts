@@ -4,7 +4,7 @@ import {
   coverFieldsFromColumns,
   createRandomSeed,
   evaluateParseErrorAlert,
-  folderNameFromPhysicalPath,
+  relativeToRoot,
   toWorkListItemDlsite,
   withNormalizeTagBatchCache,
 } from "@mimimilli/shared";
@@ -333,7 +333,7 @@ export class WorkQueryRepository {
     return new Set(rows.map((row) => row.id));
   }
 
-  queryWorks(params: WorksQuery): WorksPage {
+  queryWorks(params: WorksQuery, root: string): WorksPage {
     const seed = params.sort === "random" ? (params.seed ?? createRandomSeed()) : undefined;
     const conditions: string[] = [];
     const bindings: Array<string | number> = [];
@@ -414,7 +414,7 @@ export class WorkQueryRepository {
         bookmarked: row.bookmarked !== 0,
         lastPlayedAt: row.lastPlayedAt,
         circleName: circleNames.get(row.id) ?? null,
-        folderName: folderNameFromPhysicalPath(row.physicalPath),
+        relativePath: relativeToRoot(row.physicalPath, root),
         dlsite: toWorkListItemDlsite(parseDlsiteStateJson(row.id, row.dlsiteStateJson)),
       }));
       const stats = { trackCount: statsRow.trackCount, durationSec: statsRow.durationSec };

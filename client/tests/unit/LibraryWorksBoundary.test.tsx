@@ -26,7 +26,7 @@ function response(items: { id: string; title: string }[]) {
         bookmarked: false,
         lastPlayedAt: null,
         circleName: null,
-        folderName: item.id,
+        relativePath: item.id,
         dlsite: { rjCode: null, status: "none" },
       })),
       total: items.length,

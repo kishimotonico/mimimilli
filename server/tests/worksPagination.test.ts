@@ -3,14 +3,13 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   emptyDlsiteState,
-  toWorkListItem,
   WORKS_DEFAULT_PAGE_SIZE,
   type WorksPage,
   type WorkSummary,
 } from "@mimimilli/shared";
 import { createApp } from "../src/app.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
-import { applyWorksQuery } from "../src/core/worksQuery.ts";
+import { applyWorksQuery, toWorksPage } from "../src/core/worksQuery.ts";
 
 const RECENT = new Date(Date.now() - 5 * 86400000).toISOString();
 
@@ -38,17 +37,7 @@ function summary(index: number): WorkSummary {
 function buildAppWithManyWorks(count = 210) {
   const adapter = createFixtureAdapter();
   const manyWorks = Array.from({ length: count }, (_, index) => summary(index));
-  adapter.queryWorks = async (query) => {
-    const page = applyWorksQuery(manyWorks, query);
-    return page.seed === undefined
-      ? { items: page.items.map(toWorkListItem), total: page.total, stats: page.stats }
-      : {
-          items: page.items.map(toWorkListItem),
-          total: page.total,
-          stats: page.stats,
-          seed: page.seed,
-        };
-  };
+  adapter.queryWorks = async (query) => toWorksPage(applyWorksQuery(manyWorks, query), "/library");
   return createApp(adapter);
 }
 
@@ -73,9 +62,9 @@ test("一覧HTTPレスポンスは軽量DTOの許可キーだけを返す", asyn
     "circleName",
     "cover",
     "dlsite",
-    "folderName",
     "id",
     "lastPlayedAt",
+    "relativePath",
     "status",
     "title",
     "totalDurationSec",

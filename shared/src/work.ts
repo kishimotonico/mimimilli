@@ -3,6 +3,8 @@ import { z } from "zod";
 import { coverKindSchema, coverSchema } from "./cover.ts";
 import { dlsiteStateSchema } from "./dlsite.ts";
 import type { DlsiteState } from "./dlsite.ts";
+import { workspacePath, workspacePathSchema } from "./media.ts";
+import type { WorkspacePath } from "./media.ts";
 import { trackDurationKindSchema } from "./duration.ts";
 import {
   isInvalidTrackStart,
@@ -180,7 +182,9 @@ export const workListItemSchema = z.object({
   bookmarked: z.boolean(),
   lastPlayedAt: z.string().nullable(),
   circleName: z.string().nullable(),
-  folderName: z.string(),
+  /** 作品フォルダー自身のライブラリルートからの相対パス（ScanCandidate.pathと同じ形）。
+   *  フォルダー列にはこの親ディレクトリ部分をUI側で取り出して表示する。フルパスは持たせない。 */
+  relativePath: workspacePathSchema,
   dlsite: workListItemDlsiteSchema,
 });
 export type WorkListItem = z.infer<typeof workListItemSchema>;
@@ -190,10 +194,17 @@ export function toWorkListItemDlsite(dlsite: DlsiteState): WorkListItemDlsite {
   return { rjCode: dlsite.rjCode, status: dlsite.status };
 }
 
-/** physicalPath 末尾のフォルダー名だけを取り出す（一覧表示用。フルパスは持たせない）。 */
-export function folderNameFromPhysicalPath(physicalPath: string): string {
-  const segments = physicalPath.split("/").filter(Boolean);
-  return segments[segments.length - 1] ?? physicalPath;
+/** 絶対パス physicalPath をライブラリルート root からの相対パスへ変換する。
+ *  physicalPath は必ず root 配下という前提（カタログの正本はスキャン時に root 配下でのみ書かれる）。
+ *  区切り文字はどちらも "/" へ正規化してから比較する。 */
+export function relativeToRoot(physicalPath: string, root: string): WorkspacePath {
+  const normalize = (value: string) => value.replace(/\\/g, "/").replace(/\/+$/g, "");
+  const normalizedPath = normalize(physicalPath);
+  const normalizedRoot = normalize(root);
+  const stripped = normalizedPath.startsWith(normalizedRoot)
+    ? normalizedPath.slice(normalizedRoot.length)
+    : normalizedPath;
+  return workspacePath(stripped.replace(/^\/+/, ""));
 }
 
 const CIRCLE_TAG_PREFIXES = ["サークル/", "circle/"];
@@ -210,8 +221,8 @@ export function extractCircleName(tags: string[]): string | null {
   return circleTag ? circleTag.slice(circleTag.indexOf("/") + 1) : null;
 }
 
-/** WorkSummary を一覧用の公開契約へ投影する。 */
-export function toWorkListItem(work: WorkSummary): WorkListItem {
+/** WorkSummary を一覧用の公開契約へ投影する。root はライブラリルート（絶対パス）。 */
+export function toWorkListItem(work: WorkSummary, root: string): WorkListItem {
   return {
     id: work.id,
     title: work.title,
@@ -222,7 +233,7 @@ export function toWorkListItem(work: WorkSummary): WorkListItem {
     bookmarked: work.bookmarked,
     lastPlayedAt: work.lastPlayedAt,
     circleName: extractCircleName(work.tags),
-    folderName: folderNameFromPhysicalPath(work.physicalPath),
+    relativePath: relativeToRoot(work.physicalPath, root),
     dlsite: toWorkListItemDlsite(work.dlsite),
   };
 }

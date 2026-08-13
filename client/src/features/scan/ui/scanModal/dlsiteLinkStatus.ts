@@ -1,15 +1,6 @@
-// 外部連携列（新規登録済み・更新された作品タブ共通）の表示状態判定。
-import { hasRjCode, isDlsiteLinkFailed } from "@mimimilli/shared";
-import type { WorkListItemDlsite } from "@mimimilli/shared";
-
-export type DlsiteLinkDisplayStatus = "linked" | "pending" | "failed" | "none";
-
-export function dlsiteLinkDisplayStatus(dlsite: WorkListItemDlsite): DlsiteLinkDisplayStatus {
-  if (!hasRjCode(dlsite)) return "none";
-  if (dlsite.status === "applied") return "linked";
-  if (isDlsiteLinkFailed(dlsite)) return "failed";
-  return "pending";
-}
+// 外部連携列（新規登録済み・更新された作品タブ共通）の表示（文言・色）。
+// 状態判定そのものは shared/src/dlsite.ts の dlsiteLinkDisplayStatus が正典。
+import type { DlsiteLinkDisplayStatus } from "@mimimilli/shared";
 
 export const DLSITE_LINK_STATUS_LABEL: Record<DlsiteLinkDisplayStatus, string> = {
   linked: "連携済み",
