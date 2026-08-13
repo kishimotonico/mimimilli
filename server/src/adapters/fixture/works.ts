@@ -10,10 +10,12 @@ import type {
   DlsiteNotificationPage,
   DlsiteNotificationQuery,
   DlsiteNotificationSummary,
+  IdentityConflictReassignBody,
   Work,
   WorkCreateBody,
   WorkPatch,
   WorkRegisterPreview,
+  WorkspacePath,
   WorksPage,
   WorksQuery,
   WorkSummary,
@@ -29,9 +31,9 @@ import { normalizeFsPath } from "./fsResolve.ts";
 import { coverColumnsOf, type FixtureState } from "./state.ts";
 
 export function createWorkMethods(state: FixtureState): WorkAdapter {
-  async function getWorkRegisterPreview(path: string): Promise<WorkRegisterPreview | null> {
+  async function getWorkRegisterPreview(path: WorkspacePath): Promise<WorkRegisterPreview | null> {
     const rootAbs = normalizeFsPath(state.rootFolder ?? "/library");
-    const workDir = normalizeFsPath(path);
+    const workDir = normalizeFsPath(`${rootAbs}/${path}`);
     if (!isPathWithin(rootAbs, workDir, posix)) return null;
     const folderName = workDir.split("/").filter(Boolean).pop() ?? workDir;
     const descendants = state.works.filter(
@@ -109,7 +111,8 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
           preview.descendantWorkCount,
         );
       }
-      const workDir = normalizeFsPath(body.path);
+      const rootAbs = normalizeFsPath(state.rootFolder ?? "/library");
+      const workDir = normalizeFsPath(`${rootAbs}/${body.path}`);
       state.works = state.works.filter(
         (work) => !(work.physicalPath.startsWith(`${workDir}/`) && work.physicalPath !== workDir),
       );
@@ -146,6 +149,27 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
             : emptyDlsiteState(),
       };
       state.works.push(work);
+      return buildFullWorkFromState(state, work);
+    },
+
+    async reassignIdentityConflict(_body: IdentityConflictReassignBody): Promise<Work | null> {
+      const diagnostic = state.identityConflicts.find((candidate) =>
+        candidate.paths.includes(_body.path),
+      );
+      if (!diagnostic) return null;
+      const rootAbs = normalizeFsPath(state.rootFolder ?? "/library");
+      const workDir = normalizeFsPath(`${rootAbs}/${_body.path}`);
+      const work = state.works.find((candidate) => candidate.physicalPath === workDir);
+      if (!work || work.id !== diagnostic.workId) return null;
+      work.id = crypto.randomUUID();
+      work.bookmarked = false;
+      work.lastPlayedAt = null;
+      state.resumes.delete(diagnostic.workId);
+      state.identityConflicts = state.identityConflicts.flatMap((candidate) => {
+        if (candidate.workId !== diagnostic.workId) return [candidate];
+        const paths = candidate.paths.filter((path) => path !== _body.path);
+        return paths.length >= 2 ? [{ ...candidate, paths }] : [];
+      });
       return buildFullWorkFromState(state, work);
     },
 

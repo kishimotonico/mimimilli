@@ -2,9 +2,11 @@ import { I } from "../../../shared/ui/Icon";
 import { formatFileSize } from "../../../shared/lib/format";
 import { classifyFile, FILE_KIND_ICON, FILE_KIND_ROW_CLASS, type FsEntry } from "../model/types";
 import { getWorkFolderDisplay } from "../model/workFolderDisplay";
+import type { ScanDiagnostic } from "@mimimilli/shared";
 
 interface FileRowProps {
   entry: FsEntry;
+  identityConflict: ScanDiagnostic | null;
   /** 選択中エントリ本体（濃いハイライト） */
   isFocused: boolean;
   /** このファイルが今再生中 */
@@ -16,6 +18,7 @@ interface FileRowProps {
 
 export default function FileRow({
   entry,
+  identityConflict,
   isFocused,
   isPlaying,
   isPlaybackActive,
@@ -63,6 +66,7 @@ export default function FileRow({
       <span className="name">
         {display.badge && <span className="wbadge">{display.badge}</span>}
         {display.name}
+        {identityConflict && <span className="mle-identity-conflict-badge">ID重複</span>}
       </span>
       <span className="meta">
         {entry.isDir ? `${entry.childCount}` : formatFileSize(entry.size)}

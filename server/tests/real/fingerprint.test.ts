@@ -8,7 +8,6 @@
 // （このテストに手動転記した期待値）を突き合わせる。スキーマにフィールドが増減すればどちらかの
 // 一致が崩れて失敗するため、fingerprint.ts側の更新漏れをこのテストが検知する。
 import assert from "node:assert/strict";
-import { join } from "node:path";
 import { test } from "node:test";
 import {
   dlsiteStateSchema,
@@ -17,8 +16,7 @@ import {
   trackSchema,
   urlEntrySchema,
 } from "@mimimilli/shared";
-import { computeFingerprint, computeRawFingerprint } from "../../src/adapters/real/fingerprint.ts";
-import { makeTestDirectory } from "../helpers/sampleLibrary.ts";
+import { computeProjectionRevision } from "../../src/adapters/real/fingerprint.ts";
 
 function keysOf(schema: { shape: Record<string, unknown> }): string[] {
   return Object.keys(schema.shape).sort();
@@ -37,6 +35,7 @@ test("metaFileSchemaのキー集合とfingerprintのnormalizeMetaContent対象�
     "urls",
     "coverImage",
     "dlsite",
+    "formatVersion",
   ].sort();
 
   const schemaKeys = keysOf(metaFileSchema).filter((key) => !excluded.has(key));
@@ -68,11 +67,9 @@ test("playlistSchema/trackSchema/urlEntrySchemaのキー集合はfingerprintが�
   assert.deepEqual(keysOf(urlEntrySchema), ["label", "url"]);
 });
 
-test("errorKindを追加してもfingerprintは変わらない", (t) => {
-  const directory = makeTestDirectory("fingerprint-errorKind");
-  t.after(directory.cleanup);
-  const metaPath = join(directory.path, "mimimilli.json");
-  const legacyRaw = {
+test("errorKindを追加してもprojection revisionは変わらない", () => {
+  const base = {
+    formatVersion: 1,
     id: "00000000-0000-4000-8000-000000000001",
     title: "テスト作品",
     tags: [],
@@ -82,26 +79,51 @@ test("errorKindを追加してもfingerprintは変わらない", (t) => {
     coverImage: null,
     dlsite: {
       rjCode: "RJ123456",
-      status: "none",
+      status: "none" as const,
       lastAttemptAt: null,
       error: null,
       appliedTags: [],
     },
   };
-  const withErrorKindRaw = {
-    ...legacyRaw,
-    dlsite: { ...legacyRaw.dlsite, errorKind: "parse_error" },
-  };
-  const legacyFp = computeRawFingerprint(metaPath, legacyRaw);
-  const withErrorKindFp = computeRawFingerprint(metaPath, withErrorKindRaw);
-  assert.ok(legacyFp);
-  assert.ok(withErrorKindFp);
-  assert.equal(legacyFp.fingerprint, withErrorKindFp.fingerprint);
-
-  const legacyMeta = metaFileSchema.parse(legacyRaw);
-  const withErrorKindMeta = metaFileSchema.parse(withErrorKindRaw);
+  const withErrorKind = metaFileSchema.parse({
+    ...base,
+    dlsite: { ...base.dlsite, errorKind: "parse_error" },
+  });
+  const withoutErrorKind = metaFileSchema.parse(base);
   assert.equal(
-    computeFingerprint(metaPath, legacyMeta),
-    computeFingerprint(metaPath, withErrorKindMeta),
+    computeProjectionRevision(withoutErrorKind),
+    computeProjectionRevision(withErrorKind),
+  );
+});
+
+test("projection revisionは投影対象fieldだけを含みDLsiteの一時状態では変化しない", () => {
+  const meta = metaFileSchema.parse({
+    formatVersion: 1,
+    id: "00000000-0000-4000-8000-000000000010",
+    title: "テスト作品",
+    playlists: [],
+    dlsite: {
+      rjCode: "RJ123456",
+      status: "none",
+      lastAttemptAt: null,
+      error: null,
+      errorKind: null,
+      appliedTags: [],
+    },
+  });
+  const transient = {
+    ...meta,
+    dlsite: {
+      ...meta.dlsite,
+      status: "error" as const,
+      lastAttemptAt: "2026-08-12T00:00:00.000Z",
+      error: "offline",
+      errorKind: "offline" as const,
+    },
+  };
+  assert.equal(computeProjectionRevision(meta), computeProjectionRevision(transient));
+  assert.notEqual(
+    computeProjectionRevision(meta),
+    computeProjectionRevision({ ...meta, title: "更新" }),
   );
 });

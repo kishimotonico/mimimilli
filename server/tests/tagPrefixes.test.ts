@@ -262,11 +262,12 @@ test("PATCH /api/works/:id: タグを正規化して保存する", async () => {
   const listRes = await app.request("/api/works");
   const { items } = await listRes.json();
   const workId: string = items[0].id;
+  const sourceRevision = "fixture";
 
   const patched = await app.request(`/api/works/${workId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ tags: ["CV/ x ", "cv/x"] }),
+    body: JSON.stringify({ sourceRevision, tags: ["CV/ x ", "cv/x"] }),
   });
   assert.equal(patched.status, 200);
   const body = await patched.json();
@@ -292,6 +293,7 @@ test("POST /api/dlsite/:id/apply: applyTags を正規化して保存する", asy
   const listRes = await app.request("/api/works");
   const { items } = await listRes.json();
   const workId: string = items[0].id;
+  const sourceRevision = "fixture";
 
   const applied = await app.request(`/api/dlsite/${workId}/apply`, {
     method: "POST",
@@ -308,6 +310,8 @@ test("POST /api/dlsite/:id/apply: applyTags を正規化して保存する", asy
       },
       applyTitle: false,
       applyCover: false,
+      applyUrl: false,
+      sourceRevision,
       applyTags: ["Genre/ 耳かき ", "genre/耳かき"],
     }),
   });
@@ -323,6 +327,7 @@ test("POST /api/dlsite/:id/apply: 正規化後に空になる applyTags は400�
   const listRes = await app.request("/api/works");
   const { items } = await listRes.json();
   const workId: string = items[0].id;
+  const sourceRevision = "fixture";
 
   const applied = await app.request(`/api/dlsite/${workId}/apply`, {
     method: "POST",
@@ -339,6 +344,8 @@ test("POST /api/dlsite/:id/apply: 正規化後に空になる applyTags は400�
       },
       applyTitle: false,
       applyCover: false,
+      applyUrl: false,
+      sourceRevision,
       applyTags: ["genre/耳かき", "  "],
     }),
   });
@@ -350,6 +357,7 @@ test("POST /api/dlsite/:id/apply: 予約文字 @ 始まりの applyTags は400�
   const listRes = await app.request("/api/works");
   const { items } = await listRes.json();
   const workId: string = items[0].id;
+  const sourceRevision = "fixture";
 
   const applied = await app.request(`/api/dlsite/${workId}/apply`, {
     method: "POST",
@@ -366,6 +374,8 @@ test("POST /api/dlsite/:id/apply: 予約文字 @ 始まりの applyTags は400�
       },
       applyTitle: false,
       applyCover: false,
+      applyUrl: false,
+      sourceRevision,
       applyTags: ["@year/2024"],
     }),
   });
@@ -465,11 +475,12 @@ test("PATCH /api/works/:id のタグは正規形で保存される", async () =>
   const app = buildApp();
   const works = await (await app.request("/api/works")).json();
   const id = works.items[0].id;
+  const sourceRevision = "fixture";
 
   const res = await app.request(`/api/works/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ tags: ["CV/ 新人 ", "ASMR", "asmr", "ASMR"] }),
+    body: JSON.stringify({ sourceRevision, tags: ["CV/ 新人 ", "ASMR", "asmr", "ASMR"] }),
   });
   assert.equal(res.status, 200);
   const body = await res.json();

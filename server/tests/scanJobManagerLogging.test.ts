@@ -3,7 +3,6 @@ import { test } from "node:test";
 import type { ScanResult } from "@mimimilli/shared";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import type { DataAdapter } from "../src/adapter/index.ts";
-import { DlsiteJobManager } from "../src/dlsiteJobManager.ts";
 import { ScanJobManager } from "../src/scanJobManager.ts";
 import { captureLogs, scanRecords } from "./helpers/logCapture.ts";
 
@@ -16,6 +15,9 @@ const emptyResult: ScanResult = {
   rjCodeMissingCount: 0,
   skipped: 0,
   coverErrors: 0,
+  identityConflicts: [],
+  invalidSidecars: [],
+  candidates: [],
 };
 
 function withStubAdapter(overrides: Partial<DataAdapter> & Pick<DataAdapter, "scan">): DataAdapter {
@@ -53,6 +55,15 @@ test("完了時に scan カテゴリの INFO 要約ログを1回記録する", a
     rjCodeMissingCount: 5,
     skipped: 6,
     coverErrors: 7,
+    candidates: [],
+    identityConflicts: [
+      {
+        kind: "identity_conflict",
+        workId: "work-id",
+        paths: ["copy-a/mimimilli.json", "copy-b/mimimilli.json"],
+      },
+    ],
+    invalidSidecars: [],
     unreadablePaths,
     dataIntegrityWarning: { skippedCount: 1, skippedWorkIds: ["bad-work"] },
   };
@@ -61,7 +72,7 @@ test("完了時に scan カテゴリの INFO 要約ログを1回記録する", a
   });
 
   await captureLogs(async (records) => {
-    const manager = new ScanJobManager(adapter, new DlsiteJobManager(adapter));
+    const manager = new ScanJobManager(adapter);
     const job = manager.start({ full: true });
     await waitForTerminal(manager, job.id);
     assert.equal(manager.get(job.id)?.status, "completed");
@@ -80,6 +91,7 @@ test("完了時に scan カテゴリの INFO 要約ログを1回記録する", a
     assert.equal(properties.skipped, 6);
     assert.equal(properties.coverErrors, 7);
     assert.equal(properties.rjCodeMissingCount, 5);
+    assert.equal(properties.identityConflictsCount, 1);
     assert.equal(properties.unreadablePathsCount, 12);
     assert.deepEqual(properties.unreadablePathsSample, unreadablePaths.slice(0, 10));
     assert.equal(properties.dataIntegrityWarning, true);
@@ -97,7 +109,7 @@ test("取消時に jobId と durationMs を INFO で1回記録する", async () 
   });
 
   await captureLogs(async (records) => {
-    const manager = new ScanJobManager(adapter, new DlsiteJobManager(adapter));
+    const manager = new ScanJobManager(adapter);
     const job = manager.start();
     await new Promise((resolve) => setTimeout(resolve, 0));
     manager.cancel(job.id);
@@ -122,7 +134,7 @@ test("失敗時に元の Error の errorKind と stack を ERROR で1回記録�
   });
 
   await captureLogs(async (records) => {
-    const manager = new ScanJobManager(adapter, new DlsiteJobManager(adapter));
+    const manager = new ScanJobManager(adapter);
     const job = manager.start();
     await waitForTerminal(manager, job.id);
     const snapshot = manager.get(job.id);
@@ -160,7 +172,7 @@ test("getSettings の await 中に取消すると scan を呼ばず cancelled �
   });
 
   await captureLogs(async (records) => {
-    const manager = new ScanJobManager(adapter, new DlsiteJobManager(adapter));
+    const manager = new ScanJobManager(adapter);
     const job = manager.start();
     await new Promise((resolve) => setTimeout(resolve, 0));
     manager.cancel(job.id);

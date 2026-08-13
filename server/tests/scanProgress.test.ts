@@ -5,7 +5,6 @@ import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { createApp } from "../src/app.ts";
 import type { DataAdapter } from "../src/adapter/index.ts";
 import { scanRoute } from "../src/routes/scan.ts";
-import { DlsiteJobManager } from "../src/dlsiteJobManager.ts";
 import { ScanJobManager } from "../src/scanJobManager.ts";
 
 function createScanJobManager(
@@ -13,7 +12,7 @@ function createScanJobManager(
   historyLimit?: number,
   terminalLimit?: number,
 ): ScanJobManager {
-  return new ScanJobManager(adapter, new DlsiteJobManager(adapter), historyLimit, terminalLimit);
+  return new ScanJobManager(adapter, historyLimit, terminalLimit);
 }
 
 const emptyResult = {
@@ -25,6 +24,9 @@ const emptyResult = {
   rjCodeMissingCount: 0,
   skipped: 0,
   coverErrors: 0,
+  identityConflicts: [],
+  invalidSidecars: [],
+  candidates: [],
 };
 
 async function start(
@@ -177,6 +179,73 @@ test("DELETE /scan/:id は取消を要求し、終了済みjobには冪等", asy
   const terminal = await waitForTerminal(app, id);
   assert.equal(terminal.status, "cancelled");
   assert.equal((await app.request(`/api/scan/${id}`, { method: "DELETE" })).status, 200);
+});
+
+test("shutdown は実行中スキャンを取消して完了を待つ", async () => {
+  let scanStarted!: () => void;
+  const started = new Promise<void>((resolve) => {
+    scanStarted = resolve;
+  });
+  let abortObserved = false;
+  const fixture = createFixtureAdapter();
+  const adapter: DataAdapter = {
+    ...fixture,
+    scan: (options) =>
+      new Promise((resolve) => {
+        scanStarted();
+        options?.signal?.addEventListener(
+          "abort",
+          () => {
+            abortObserved = true;
+            resolve(emptyResult);
+          },
+          { once: true },
+        );
+      }),
+  };
+  const manager = createScanJobManager(adapter);
+  const job = manager.start();
+  await started;
+
+  await manager.shutdown();
+
+  assert.equal(abortObserved, true);
+  assert.equal(manager.get(job.id)?.status, "cancelled");
+  assert.equal(manager.getActive(), null);
+});
+
+test("app.shutdown は実行中スキャンの完了後に解決する", async () => {
+  let scanStarted!: () => void;
+  const started = new Promise<void>((resolve) => {
+    scanStarted = resolve;
+  });
+  let abortObserved = false;
+  const fixture = createFixtureAdapter();
+  const adapter: DataAdapter = {
+    ...fixture,
+    scan: (options) =>
+      new Promise((resolve) => {
+        scanStarted();
+        options?.signal?.addEventListener(
+          "abort",
+          () => {
+            abortObserved = true;
+            resolve(emptyResult);
+          },
+          { once: true },
+        );
+      }),
+  };
+  const app = createApp(adapter);
+  const { id } = await start(app);
+  await started;
+
+  await app.shutdown();
+
+  assert.equal(abortObserved, true);
+  const response = await app.request(`/api/scan/${id}`);
+  assert.equal(response.status, 200);
+  assert.equal(((await response.json()) as { status: string }).status, "cancelled");
 });
 
 test("unknown jobは404", async () => {

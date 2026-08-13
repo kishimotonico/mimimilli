@@ -3,12 +3,14 @@ import type {
   ScanJobEvent,
   ScanJobSnapshot,
   ScanLastResultResponse,
+  ScanDiagnostic,
+  ScanCandidate,
+  ScanCandidatesRegisterResponse,
   ScanProgressEvent,
   ScanResult,
 } from "@mimimilli/shared";
 import type { DataAdapter } from "./adapter/index.ts";
 import { formatError, getCategoryLogger } from "./lib/logger.ts";
-import type { DlsiteJobManager } from "./dlsiteJobManager.ts";
 
 const scanLogger = getCategoryLogger("scan");
 const UNREADABLE_PATH_LOG_SAMPLE_LIMIT = 10;
@@ -35,27 +37,23 @@ export class ActiveScanConflictError extends Error {
 
 export class ScanJobManager {
   private readonly adapter: DataAdapter;
-  private readonly dlsiteJobs: DlsiteJobManager;
   private readonly historyLimit: number;
   private readonly terminalLimit: number;
   private readonly jobs = new Map<string, Job>();
   private activeId: string | null = null;
+  private runCompletion: Promise<void> | null = null;
+  private shuttingDown = false;
   // terminal job はpruneTerminalで消えるため、前回結果はディスク永続化せずここにだけ保持する（TASK-56）。
   private lastCompleted: ScanLastResultResponse | null = null;
 
-  constructor(
-    adapter: DataAdapter,
-    dlsiteJobs: DlsiteJobManager,
-    historyLimit = 128,
-    terminalLimit = 16,
-  ) {
+  constructor(adapter: DataAdapter, historyLimit = 128, terminalLimit = 16) {
     this.adapter = adapter;
-    this.dlsiteJobs = dlsiteJobs;
     this.historyLimit = historyLimit;
     this.terminalLimit = terminalLimit;
   }
 
   start(options?: { full?: boolean }): ScanJobSnapshot {
+    if (this.shuttingDown) throw new Error("スキャンジョブマネージャーは終了処理中です");
     const active = this.getActive();
     if (active) throw new ActiveScanConflictError(active);
     const full = options?.full ?? false;
@@ -81,11 +79,19 @@ export class ScanJobManager {
     this.activeId = snapshot.id;
 
     // POSTのcall stackからscan開始を分離する。同期adapterであってもqueued応答を先に返す。
-    setTimeout(() => {
-      void this.run(job).catch((error: unknown) => {
-        this.finishFailed(job, error);
-      });
-    }, 0);
+    const completion = new Promise<void>((resolve) => {
+      setTimeout(() => {
+        void this.run(job)
+          .catch((error: unknown) => {
+            this.finishFailed(job, error);
+          })
+          .finally(resolve);
+      }, 0);
+    });
+    this.runCompletion = completion;
+    void completion.finally(() => {
+      if (this.runCompletion === completion) this.runCompletion = null;
+    });
     return this.copy(snapshot);
   }
 
@@ -103,6 +109,25 @@ export class ScanJobManager {
     return this.lastCompleted ? structuredClone(this.lastCompleted) : null;
   }
 
+  async listDiagnostics(): Promise<ScanDiagnostic[]> {
+    return this.adapter.listScanDiagnostics();
+  }
+
+  async listCandidates(): Promise<ScanCandidate[]> {
+    return this.adapter.listScanCandidates();
+  }
+
+  async registerCandidates(
+    paths: string[],
+    onRegistered: (workId: string) => void,
+  ): Promise<ScanCandidatesRegisterResponse> {
+    return this.adapter.registerScanCandidates(paths, onRegistered);
+  }
+
+  async excludeCandidates(paths: string[]): Promise<void> {
+    await this.adapter.excludeScanCandidates(paths);
+  }
+
   cancel(id: string): ScanJobSnapshot | null {
     const job = this.jobs.get(id);
     if (!job) return null;
@@ -113,6 +138,16 @@ export class ScanJobManager {
     }
     job.controller.abort();
     return this.copy(job.snapshot);
+  }
+
+  async shutdown(): Promise<void> {
+    if (this.shuttingDown) {
+      await this.runCompletion;
+      return;
+    }
+    this.shuttingDown = true;
+    if (this.activeId) this.cancel(this.activeId);
+    await this.runCompletion;
   }
 
   subscribe(
@@ -204,9 +239,6 @@ export class ScanJobManager {
     this.emit(job, { type: "completed", seq: 0, result });
     this.deactivate(job);
     this.pruneTerminal();
-    if (result.newWorkIds.length > 0) {
-      this.dlsiteJobs.enqueue("new", result.newWorkIds);
-    }
   }
 
   private finishFailed(job: Job, error: unknown): void {
@@ -259,6 +291,7 @@ export class ScanJobManager {
       skipped: result.skipped,
       coverErrors: result.coverErrors,
       rjCodeMissingCount: result.rjCodeMissingCount,
+      identityConflictsCount: result.identityConflicts.length,
       unreadablePathsCount: unreadablePaths.length,
       unreadablePathsSample: unreadablePaths.slice(0, UNREADABLE_PATH_LOG_SAMPLE_LIMIT),
       dataIntegrityWarning: result.dataIntegrityWarning !== undefined,

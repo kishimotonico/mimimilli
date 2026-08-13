@@ -1,10 +1,23 @@
 // fixture アダプタのシナリオ（ADR-0002 / client/mocks/scenarios.ts からの移植）。
 // 開発サーバー・Playwright ビジュアルテストでのデータ切替に使う。
-import type { SmartFolder, WorkSummary } from "@mimimilli/shared";
+import {
+  workspacePath,
+  type InvalidSidecar,
+  type ScanCandidate,
+  type ScanDiagnostic,
+  type SmartFolder,
+  type WorkSummary,
+} from "@mimimilli/shared";
 import { createBulkWorks } from "./bulkData.ts";
 import { createSeedSmartFolders, SEED_WORKS } from "./data.ts";
 
-export type FixtureScenarioId = "default" | "empty" | "new-work" | "errors" | "large";
+export type FixtureScenarioId =
+  | "default"
+  | "empty"
+  | "new-work"
+  | "errors"
+  | "large"
+  | "scan-review";
 
 const SCENARIO_IDS: readonly FixtureScenarioId[] = [
   "default",
@@ -12,6 +25,7 @@ const SCENARIO_IDS: readonly FixtureScenarioId[] = [
   "new-work",
   "errors",
   "large",
+  "scan-review",
 ];
 
 /** "large" シナリオの総作品数（手書きシード + 生成分） */
@@ -25,6 +39,9 @@ export interface FixtureScenario {
   lastScanTime: string;
   /** scan() が newWorkIds として返す、新規に見つかった作品ID */
   scanNewWorkIds: string[];
+  scanCandidates: ScanCandidate[];
+  scanIdentityConflicts: ScanDiagnostic[];
+  scanInvalidSidecars: InvalidSidecar[];
 }
 
 function cloneWorks(works: WorkSummary[]): WorkSummary[] {
@@ -62,6 +79,9 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       rootFolder: "/library/empty-library",
       lastScanTime: now,
       scanNewWorkIds: [],
+      scanCandidates: [],
+      scanIdentityConflicts: [],
+      scanInvalidSidecars: [],
     };
   }
 
@@ -73,6 +93,26 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       rootFolder: "/library",
       lastScanTime: now,
       scanNewWorkIds: ["RJ501011"],
+      scanCandidates: [
+        {
+          path: workspacePath("未登録作品"),
+          inferredTitle: "未登録作品",
+          audioFileCount: 2,
+          audioBreakdown: [{ extension: "mp3", count: 2 }],
+        },
+        {
+          path: workspacePath("朗読/候補"),
+          inferredTitle: "候補",
+          audioFileCount: 3,
+          audioBreakdown: [{ extension: "m4a", count: 3 }],
+        },
+      ],
+      scanIdentityConflicts: [
+        { kind: "identity_conflict", workId: "duplicate-id", paths: ["viewer", "dlsite"] },
+      ],
+      scanInvalidSidecars: [
+        { path: workspacePath("壊れた/mimimilli.json"), message: "メタファイルが不正です" },
+      ],
     };
   }
 
@@ -87,6 +127,9 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       rootFolder: "/library",
       lastScanTime: now,
       scanNewWorkIds: [],
+      scanCandidates: [],
+      scanIdentityConflicts: [],
+      scanInvalidSidecars: [],
     };
   }
 
@@ -98,6 +141,40 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       rootFolder: "/library/error-library",
       lastScanTime: now,
       scanNewWorkIds: [],
+      scanCandidates: [],
+      scanIdentityConflicts: [],
+      scanInvalidSidecars: [],
+    };
+  }
+
+  if (id === "scan-review") {
+    return {
+      id,
+      works: cloneWorks(SEED_WORKS),
+      smartFolders: cloneSmartFolders(smartFolders),
+      rootFolder: "/library",
+      lastScanTime: now,
+      scanNewWorkIds: [],
+      scanCandidates: [
+        {
+          path: workspacePath("未登録作品"),
+          inferredTitle: "未登録作品",
+          audioFileCount: 2,
+          audioBreakdown: [{ extension: "mp3", count: 2 }],
+        },
+        {
+          path: workspacePath("朗読/候補"),
+          inferredTitle: "候補",
+          audioFileCount: 3,
+          audioBreakdown: [{ extension: "m4a", count: 3 }],
+        },
+      ],
+      scanIdentityConflicts: [
+        { kind: "identity_conflict", workId: "duplicate-id", paths: ["viewer", "dlsite"] },
+      ],
+      scanInvalidSidecars: [
+        { path: workspacePath("壊れた/mimimilli.json"), message: "メタファイルが不正です" },
+      ],
     };
   }
 
@@ -108,5 +185,8 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
     rootFolder: "/library",
     lastScanTime: now,
     scanNewWorkIds: [],
+    scanCandidates: [],
+    scanIdentityConflicts: [],
+    scanInvalidSidecars: [],
   };
 }

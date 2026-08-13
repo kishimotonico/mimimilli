@@ -58,6 +58,10 @@ beforeEach(() => {
     });
     return { items, total: items.length, stats: { trackCount: 0, durationSec: 0 } };
   });
+  vi.spyOn(workApi, "getWork").mockImplementation(async (workId) => {
+    if (workId === work.id) return work;
+    throw new Error(`work not found: ${workId}`);
+  });
 });
 
 afterEach(() => {
@@ -86,6 +90,7 @@ const work: Work = {
   createdAt: null,
   playlists: [],
   resume: null,
+  sourceRevision: "revision-1",
 };
 
 const scanResult: ScanResult = {
@@ -97,6 +102,9 @@ const scanResult: ScanResult = {
   rjCodeMissingCount: 0,
   skipped: 0,
   coverErrors: 0,
+  identityConflicts: [],
+  invalidSidecars: [],
+  candidates: [],
 };
 
 function dispatchCancel(dialog: HTMLElement) {

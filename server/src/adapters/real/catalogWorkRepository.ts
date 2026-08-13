@@ -1,11 +1,12 @@
 import { join } from "node:path";
 import { eq, inArray } from "drizzle-orm";
 import { parseTag, probeResultFromCache, resolveTrackDurationSec } from "@mimimilli/shared";
-import type { NormalizedTag, DlsiteState, UrlEntry, Work } from "@mimimilli/shared";
+import type { NormalizedTag, DlsiteState, ScanDiagnostic, UrlEntry, Work } from "@mimimilli/shared";
 import { japaneseSortKey } from "../../core/japaneseSortKey.ts";
 import type { Db } from "./db.ts";
 import {
   audioProbeCache,
+  identityConflicts,
   playlists as catalogPlaylists,
   scanState,
   tags,
@@ -20,9 +21,6 @@ import {
   type CoverColumns,
   type WorkRow,
 } from "./workRowMapping.ts";
-import { chunk } from "./workQuerySql.ts";
-
-const CATALOG_ID_DELETE_CHUNK_SIZE = 500;
 
 export class CatalogWorkRepository {
   private readonly db: Db;
@@ -66,6 +64,30 @@ export class CatalogWorkRepository {
       .run();
   }
 
+  replaceIdentityConflicts(diagnostics: ScanDiagnostic[]): void {
+    this.db.catalog.delete(identityConflicts).run();
+    for (const diagnostic of diagnostics) {
+      for (const path of diagnostic.paths) {
+        this.db.catalog.insert(identityConflicts).values({ workId: diagnostic.workId, path }).run();
+      }
+    }
+  }
+
+  listIdentityConflicts(): ScanDiagnostic[] {
+    const rows = this.db.catalog
+      .select()
+      .from(identityConflicts)
+      .orderBy(identityConflicts.workId, identityConflicts.path)
+      .all();
+    const grouped = new Map<string, string[]>();
+    for (const row of rows) {
+      const paths = grouped.get(row.workId) ?? [];
+      paths.push(row.path);
+      grouped.set(row.workId, paths);
+    }
+    return [...grouped].map(([workId, paths]) => ({ kind: "identity_conflict", workId, paths }));
+  }
+
   syncTotalDurationSec(row: WorkRow, liveTotalDurationSec: number | null): void {
     if (row.totalDurationSec === liveTotalDurationSec) return;
     this.db.catalog
@@ -106,7 +128,11 @@ export class CatalogWorkRepository {
 
   upsertWorkCatalog(
     work: Work,
-    options: { metaPath: string; fingerprint?: string; cover?: CoverColumns },
+    options: {
+      metaPath: string;
+      revisions?: { sourceRevision: string; projectionRevision: string; mediaRevision: string };
+      cover?: CoverColumns;
+    },
   ): void {
     const trackCount =
       defaultPlaylistOf({ id: work.id, defaultPlaylistId: work.defaultPlaylistId }, work.playlists)
@@ -126,18 +152,12 @@ export class CatalogWorkRepository {
       metaPath: options.metaPath,
       totalDurationSec: work.totalDurationSec,
       trackCount,
-      fingerprint: options.fingerprint ?? null,
+      sourceRevision: options.revisions?.sourceRevision ?? null,
+      projectionRevision: options.revisions?.projectionRevision ?? null,
+      mediaRevision: options.revisions?.mediaRevision ?? null,
+      verificationStatus: "verified",
       errorMessage: work.errorMessage,
       urlsJson: JSON.stringify(work.urls),
-      playlistsJson: JSON.stringify(
-        work.playlists.map((playlist) => ({
-          id: playlist.id,
-          name: playlist.name,
-          tracks: playlist.tracks.map(
-            ({ durationSec: _durationSec, durationKind: _durationKind, ...track }) => track,
-          ),
-        })),
-      ),
     };
     this.db.catalog
       .insert(works)
@@ -145,16 +165,6 @@ export class CatalogWorkRepository {
       .onConflictDoUpdate({ target: works.id, set: values })
       .run();
     this.db.catalog.delete(catalogPlaylists).where(eq(catalogPlaylists.workId, work.id)).run();
-    const playlistIds = work.playlists.map((playlist) => playlist.id);
-    const trackIds = work.playlists.flatMap((playlist) => playlist.tracks.map((track) => track.id));
-    for (const idsChunk of chunk(playlistIds, CATALOG_ID_DELETE_CHUNK_SIZE)) {
-      if (idsChunk.length === 0) continue;
-      this.db.catalog.delete(catalogPlaylists).where(inArray(catalogPlaylists.id, idsChunk)).run();
-    }
-    for (const idsChunk of chunk(trackIds, CATALOG_ID_DELETE_CHUNK_SIZE)) {
-      if (idsChunk.length === 0) continue;
-      this.db.catalog.delete(catalogTracks).where(inArray(catalogTracks.id, idsChunk)).run();
-    }
     for (let playlistPosition = 0; playlistPosition < work.playlists.length; playlistPosition++) {
       const playlist = work.playlists[playlistPosition]!;
       this.db.catalog
@@ -229,10 +239,25 @@ export class CatalogWorkRepository {
     );
   }
 
-  markMissingExcept(foundIds: string[]): void {
+  markMissingExcept(foundIds: string[], unverifiedIds: string[] = []): void {
     const set = { status: "missing", errorMessage: null } as const;
     if (foundIds.length === 0) {
-      this.db.catalog.update(works).set(set).run();
+      if (unverifiedIds.length === 0) {
+        this.db.catalog
+          .update(works)
+          .set({ ...set, verificationStatus: "verified" })
+          .run();
+      } else {
+        this.db.catalog
+          .update(works)
+          .set({ verificationStatus: "unverified" })
+          .where(inArray(works.id, unverifiedIds))
+          .run();
+        this.db.sqlite.exec(
+          "UPDATE main.works SET status = 'missing', error_message = NULL, verification_status = 'verified' " +
+            "WHERE id NOT IN (SELECT id FROM main.works WHERE verification_status = 'unverified')",
+        );
+      }
       return;
     }
     const sqlite = this.db.sqlite;
@@ -240,12 +265,26 @@ export class CatalogWorkRepository {
     sqlite.exec("CREATE TEMP TABLE scan_seen_ids (id TEXT PRIMARY KEY)");
     try {
       const insert = sqlite.prepare("INSERT INTO temp.scan_seen_ids (id) VALUES (?)");
-      sqlite.transaction((ids: string[]) => {
-        for (const id of ids) insert.run(id);
-      })(foundIds);
+      for (const id of foundIds) insert.run(id);
+      const insertUnverified = sqlite.prepare(
+        "INSERT OR IGNORE INTO temp.scan_seen_ids (id) VALUES (?)",
+      );
+      for (const id of unverifiedIds) insertUnverified.run(id);
+      if (unverifiedIds.length > 0) {
+        const placeholders = unverifiedIds.map(() => "?").join(",");
+        sqlite
+          .query(
+            `UPDATE main.works SET verification_status = 'unverified' WHERE id IN (${placeholders})`,
+          )
+          .run(...unverifiedIds);
+      }
       sqlite.exec(
-        "UPDATE main.works SET status = 'missing', error_message = NULL " +
+        "UPDATE main.works SET status = 'missing', error_message = NULL, verification_status = 'verified' " +
           "WHERE id NOT IN (SELECT id FROM temp.scan_seen_ids)",
+      );
+      sqlite.exec(
+        "UPDATE main.works SET verification_status = 'verified' " +
+          "WHERE id IN (SELECT id FROM temp.scan_seen_ids) AND verification_status <> 'unverified'",
       );
     } finally {
       sqlite.exec("DROP TABLE IF EXISTS temp.scan_seen_ids");
@@ -282,7 +321,9 @@ export class CatalogWorkRepository {
         SELECT tracks.start, tracks.end, tracks.file,
                works.physical_path AS physicalPath
         FROM main.playlists
-        INNER JOIN main.tracks ON tracks.playlist_id = playlists.id
+        INNER JOIN main.tracks
+          ON tracks.work_id = playlists.work_id
+         AND tracks.playlist_id = playlists.id
         INNER JOIN main.works ON works.id = playlists.work_id
         WHERE playlists.work_id = ? AND playlists.id = ?
           AND tracks.work_id = ? AND tracks.id = ?

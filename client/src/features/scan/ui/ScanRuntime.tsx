@@ -28,6 +28,8 @@ export default function ScanRuntime() {
       if (job.status !== "completed" || !job.result || !job.finishedAt) return;
       const result = job.result;
       queryClient.setQueryData(SCAN_QUERY_KEYS.last(), { result, finishedAt: job.finishedAt });
+      queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), result.candidates);
+      queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.candidates() });
       queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.all() });
       queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.dlsiteNotifications() });
       queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.allFacets() });

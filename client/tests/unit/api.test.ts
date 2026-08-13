@@ -294,13 +294,14 @@ describe("work api", () => {
       coverUrl: null,
       url: "",
     };
-    mockFetch.mockResolvedValue(makeResponse(mockInfo));
+    const preview = { info: mockInfo, sourceRevision: "revision-1" };
+    mockFetch.mockResolvedValue(makeResponse(preview));
     const result = await workApi.fetchDlsiteInfo("work-1");
     expect(mockFetch).toHaveBeenCalledWith(
       "/api/dlsite/work-1/fetch",
       expect.objectContaining({ method: "POST" }),
     );
-    expect(result).toEqual(mockInfo);
+    expect(result).toEqual(preview);
   });
 
   it("startDlsiteBulk: ジョブ開始レスポンスを検証する", async () => {
@@ -316,13 +317,6 @@ describe("work api", () => {
   it("getAudioUrl returns the media/audio URL", () => {
     expect(workApi.getAudioUrl("RJ001001", "track01.mp3")).toBe(
       "/api/media/audio/RJ001001/track01.mp3",
-    );
-  });
-
-  it("getFileUrl returns the media/file URL and encodes nested segments", () => {
-    expect(workApi.getFileUrl("RJ001001", "cover.jpg")).toBe("/api/media/file/RJ001001/cover.jpg");
-    expect(workApi.getFileUrl("RJ001001", "特典/台本.pdf")).toBe(
-      `/api/media/file/RJ001001/${encodeURIComponent("特典")}/${encodeURIComponent("台本.pdf")}`,
     );
   });
 

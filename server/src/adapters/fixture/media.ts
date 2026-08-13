@@ -2,6 +2,7 @@
 // 実ファイルを持たない fixture でも再生・シーク・カバー表示が成立するよう、
 // 「指定秒数の無音WAV」と「作品ごとのSVGプレースホルダー」をメモリ上で合成する。
 import type { WorkSummary } from "@mimimilli/shared";
+import { readFileSync } from "node:fs";
 import type { MediaLocation } from "../../adapter/index.ts";
 
 /** 合成WAVのフォーマット: 8kHz / mono / 8bit PCM（符号なし、無音=128） → 8,000 byte/sec */
@@ -151,8 +152,12 @@ function escapeXml(text: string): string {
 }
 
 /** 文字列全体をUTF-8バイト列として保持する静的コンテンツの MediaLocation を作る */
-function synthesizeStaticContent(text: string, mime: string): MediaLocation {
-  const bytes = new TextEncoder().encode(text);
+export function synthesizeStaticContent(text: string, mime: string): MediaLocation {
+  return synthesizeBinaryContent(new TextEncoder().encode(text), mime);
+}
+
+/** fixture内の静的バイナリを表すMediaLocationを作る。 */
+export function synthesizeBinaryContent(bytes: Uint8Array, mime: string): MediaLocation {
   return {
     type: "synthetic",
     mime,
@@ -161,4 +166,32 @@ function synthesizeStaticContent(text: string, mime: string): MediaLocation {
       return bytes.subarray(start, end + 1);
     },
   };
+}
+
+/** ブラウザ内蔵viewerで読める最小構成の1ページPDF。 */
+export function synthesizeFixturePdf(): MediaLocation {
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Resources << >> /Contents 4 0 R >>",
+    "<< /Length 0 >>\nstream\n\nendstream",
+  ];
+  let pdf = "%PDF-1.4\n";
+  const offsets = [0];
+  for (let index = 0; index < objects.length; index++) {
+    offsets.push(pdf.length);
+    pdf += `${index + 1} 0 obj\n${objects[index]}\nendobj\n`;
+  }
+  const xref = pdf.length;
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  for (const offset of offsets.slice(1)) pdf += `${String(offset).padStart(10, "0")} 00000 n \n`;
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return synthesizeStaticContent(pdf, "application/pdf");
+}
+
+const FIXTURE_VIDEO = readFileSync(new URL("./assets/viewer.webm", import.meta.url));
+
+/** ブラウザでloadedmetadataまで進めるWebM fixture。 */
+export function synthesizeFixtureVideo(): MediaLocation {
+  return synthesizeBinaryContent(FIXTURE_VIDEO, "video/webm");
 }

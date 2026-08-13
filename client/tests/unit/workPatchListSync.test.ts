@@ -90,6 +90,7 @@ function makeWorkDetail(id: string, title = `作品 ${id}`): Work {
       },
     ],
     resume: null,
+    sourceRevision: "revision-1",
   };
 }
 
@@ -219,6 +220,7 @@ describe("作品 PATCH 後の一覧キャッシュ同期", () => {
       await result.current.workPatchMutations.titleMutation.mutateAsync({
         workId: "p1-w1",
         title: "更新後タイトル",
+        sourceRevision: "revision-1",
       });
     });
 
@@ -257,6 +259,7 @@ describe("作品 PATCH 後の一覧キャッシュ同期", () => {
       await result.current.workPatchMutations.bookmarkMutation.mutateAsync({
         workId: "p1-w1",
         bookmarked: true,
+        sourceRevision: "revision-1",
       });
     });
 
@@ -288,6 +291,7 @@ describe("作品 PATCH 後の一覧キャッシュ同期", () => {
       await result.current.workPatchMutations.bookmarkMutation.mutateAsync({
         workId: "p1-w1",
         bookmarked: false,
+        sourceRevision: "revision-1",
       });
     });
 
@@ -327,6 +331,7 @@ describe("作品 PATCH 後の一覧キャッシュ同期", () => {
       await result.current.workPatchMutations.bookmarkMutation.mutateAsync({
         workId: "p1-w1",
         bookmarked: false,
+        sourceRevision: "revision-1",
       });
     });
 

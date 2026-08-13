@@ -1,6 +1,7 @@
 import type {
   DlsiteApplyBody,
   DlsiteBulkMode,
+  DlsiteBulkApplyMissingResult,
   DlsiteBulkProgressEvent,
   DlsiteBulkResult,
   DlsiteFetchResult,
@@ -27,6 +28,7 @@ export interface DlsiteAdapter {
     options?: { signal?: AbortSignal },
   ): Promise<boolean>;
   updateDlsiteState(workId: string, patch: DlsiteStatePatch): Promise<Work | null>;
+  dlsiteApplyMissing(workIds?: string[]): Promise<DlsiteBulkApplyMissingResult>;
   runDlsiteBulk(
     mode: DlsiteBulkMode,
     workIds: string[] | undefined,

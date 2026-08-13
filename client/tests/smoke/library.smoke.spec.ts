@@ -164,12 +164,67 @@ test("スキャンダイアログが開いて完了し、閉じられる", async
 
   await dialog.getByRole("button", { name: "スキャン開始" }).click();
   await expect(dialog.getByText("新規検出した作品")).toBeVisible({ timeout: 15_000 });
-  // new-work シナリオの RJ501011。スキャン直後の DLsite 一括取得でタイトルが fixture 名に置き換わる。
-  await expect(dialog.getByRole("button", { name: /RJ501011/ })).toBeVisible();
+  await expect(
+    dialog.getByRole("button", { name: /ツンデレ後輩ちゃんの秘密のお世話ボイス/ }),
+  ).toBeVisible({ timeout: 15_000 });
   await expect(dialog.getByText("完了しました")).toBeVisible({ timeout: 15_000 });
 
   await dialog.getByRole("button", { name: "閉じる" }).click();
   await expect(dialog).toBeHidden();
+
+  assertNoErrors(tracker);
+});
+
+test("FilesでID重複を表示し、確認して別作品として取り込める", async ({ page }) => {
+  const tracker = trackErrors(page);
+  await openApp(page);
+
+  await page.getByRole("button", { name: "ファイル", exact: true }).click();
+  await page.locator(".mle-row", { hasText: "dlsite" }).click();
+  await page.locator(".mle-row", { hasText: "夜想曲スタジオ" }).click();
+  const conflictRow = page.locator(".mle-row", { hasText: "夜更けの図書室で囁き朗読" });
+  await expect(conflictRow.getByText("ID重複", { exact: true })).toBeVisible();
+
+  await conflictRow.click();
+  const preview = page.locator(".mle-prv.is-files");
+  await expect(preview.getByText("ID重複", { exact: true })).toBeVisible();
+  await expect(preview.getByText("copies/RJ501001_夜更けの図書室で囁き朗読")).toBeVisible();
+  await preview.getByRole("button", { name: "別作品として取り込む" }).click();
+
+  const dialog = page.getByRole("alertdialog", { name: "別作品として取り込む" });
+  await expect(
+    dialog.getByText("dlsite/夜想曲スタジオ/RJ501001_夜更けの図書室で囁き朗読"),
+  ).toBeVisible();
+  await dialog.getByRole("button", { name: "取り込む" }).click();
+  await expect(preview.getByText("ID重複", { exact: true })).toBeHidden();
+  assertNoErrors(tracker);
+});
+
+test("スキャン完了後に候補を選択登録でき、問題をFilesで確認できる", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-chromium", "desktop scenario only");
+
+  const tracker = trackErrors(page);
+  await openApp(page);
+  await page.getByRole("button", { name: "スキャン" }).click();
+  const dialog = page.getByRole("dialog", { name: "スキャン" });
+  await dialog.getByRole("button", { name: "スキャン開始" }).click();
+
+  const review = dialog.getByRole("region", { name: "スキャン確認" });
+  await expect(review).toBeVisible({ timeout: 15_000 });
+  await expect(review.getByText("新規登録候補 2件")).toBeVisible();
+  await expect(review.getByText("ID重複 1件")).toBeVisible();
+  await expect(review.getByText("不正なsidecar 1件")).toBeVisible();
+
+  await review.getByRole("button", { name: "選択したものを登録" }).click();
+  await expect(review.getByText("2件を登録しました。")).toBeVisible();
+  await expect(review.getByText(/新規登録候補/)).toHaveCount(0);
+
+  await review.getByRole("button", { name: "viewer / dlsite" }).click();
+  await expect(page.getByRole("button", { name: "ファイル", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.getByTitle("viewer")).toHaveClass(/is-on/);
 
   assertNoErrors(tracker);
 });
@@ -189,6 +244,46 @@ test("主要画面でヨコ方向スクロールが発生しない", async ({ pa
   await openApp(page);
   await page.getByText("お気に入りだった朗読劇", { exact: false }).click();
   await expectNoHorizontalOverflow(page);
+
+  assertNoErrors(tracker);
+});
+
+test("Files: Workspace viewerで画像・PDF・text・videoをプレビューできる", async ({ page }) => {
+  const tracker = trackErrors(page);
+  await openApp(page);
+
+  await page.getByRole("button", { name: "ファイル", exact: true }).click();
+  await page.getByTitle("viewer").dblclick();
+  await expect(page.getByText("sample.png", { exact: true })).toBeVisible();
+
+  await page.getByTitle("sample.png").click();
+  const sampleImage = page.locator('img[alt="sample.png"]');
+  await expect(sampleImage).toBeVisible();
+  await expect.poll(() => sampleImage.evaluate((image) => image.naturalWidth > 0)).toBe(true);
+
+  await page.getByTitle("sample.pdf").click();
+  await expect(page.locator("object[aria-label='sample.pdfのPDFプレビュー']")).toBeVisible();
+  // ChromiumのPDF viewerはobject.contentDocumentを公開しないため、viewerが受け取るPDF本体を確認する。
+  const pdfResponse = await page.request.get("/api/media/workspace?path=viewer%2Fsample.pdf");
+  expect(pdfResponse.ok()).toBe(true);
+  expect(pdfResponse.headers()["content-type"]).toContain("application/pdf");
+  expect((await pdfResponse.text()).startsWith("%PDF-")).toBe(true);
+
+  await page.getByTitle("sample.txt").click();
+  await expect(page.locator(".mle-fprev__text")).toContainText("fixture text");
+
+  await page.getByTitle("large.txt").click();
+  await expect(page.getByText("サイズ上限のため先頭のみ表示", { exact: true })).toBeVisible();
+
+  await page.getByTitle("sample.webm").click();
+  const video = page.locator("video[controls]");
+  await expect(video).toBeVisible();
+  await expect
+    .poll(() => video.evaluate((element) => element.readyState >= 1 && element.duration > 0))
+    .toBe(true);
+
+  await page.getByTitle("archive.zip").click();
+  await expect(page.getByText("ファイル（.zip）のプレビューは利用できません")).toBeVisible();
 
   assertNoErrors(tracker);
 });

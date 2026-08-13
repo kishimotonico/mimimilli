@@ -199,6 +199,12 @@
       }
     },
     {
+      "files": ["**/FilePreview.tsx"],
+      "rules": {
+        "jsx-a11y/media-has-caption": "off"
+      }
+    },
+    {
       "files": ["**/server/src/core/**"],
       "rules": {
         "no-restricted-imports": [

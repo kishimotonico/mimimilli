@@ -39,6 +39,9 @@ const result = {
   rjCodeMissingCount: 0,
   skipped: 0,
   coverErrors: 0,
+  identityConflicts: [],
+  invalidSidecars: [],
+  candidates: [],
 };
 const completed: ScanJobSnapshot = {
   ...running,

@@ -7,7 +7,7 @@ import { useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAtomValue } from "jotai";
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
-import { browseFs } from "../api";
+import { browseFs, getScanDiagnostics } from "../api";
 import { useFilesNavigation } from "../model/useFilesNavigation";
 import { filesDirectionAtom } from "../../../entities/file-system/model/navigationAtoms";
 import { FILE_SYSTEM_QUERY_KEYS } from "../../../entities/file-system/queryKeys";
@@ -21,6 +21,7 @@ import {
   playingWorkIdAtom,
 } from "../../../entities/player/model/atoms";
 import { rootLabel, type FsEntry } from "../model/types";
+import { workspacePath } from "@mimimilli/shared";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 import FileColumn from "./FileColumn";
 import FilePreview from "./FilePreview";
@@ -69,6 +70,19 @@ export default function FilesView({ rootFolder, onPlayFile }: FilesViewProps) {
     queryFn: () => browseFs(nav.cwd),
   });
   const cwdEntries = cwdQuery.data?.entries ?? [];
+  const diagnosticsQuery = useQuery({
+    queryKey: ["scan", "diagnostics"],
+    queryFn: getScanDiagnostics,
+  });
+  const identityConflictPaths = useMemo(
+    () =>
+      new Map(
+        (diagnosticsQuery.data?.diagnostics ?? []).flatMap((diagnostic) =>
+          diagnostic.paths.map((path) => [path, diagnostic] as const),
+        ),
+      ),
+    [diagnosticsQuery.data],
+  );
 
   const handlePlayFile = useCallback(
     (entry: FsEntry, folderEntries: FsEntry[]) => {
@@ -100,13 +114,15 @@ export default function FilesView({ rootFolder, onPlayFile }: FilesViewProps) {
   // ファイル選択中はそのファイル、それ以外はカレント dir 自身。
   const cwdFolderEntry: FsEntry = {
     name: cwdTitle,
-    path: nav.cwd,
+    path: workspacePath(nav.relPath.join("/")),
     isDir: true,
     size: 0,
     fileType: "dir",
     childCount: cwdEntries.length,
     workId: cwdQuery.data?.workId ?? null,
     workRelPath: null,
+    mediaKind: null,
+    preview: null,
   };
   const fileSelection =
     nav.selectedPath && nav.selectedPath !== nav.cwd
@@ -139,6 +155,7 @@ export default function FilesView({ rootFolder, onPlayFile }: FilesViewProps) {
           <FileColumn
             title={cwdTitle}
             entries={cwdEntries}
+            identityConflictPaths={identityConflictPaths}
             selectedPath={nav.selectedPath}
             matchPlaying={matchPlaying}
             isPlaybackActive={isPlaybackActive}
@@ -160,6 +177,7 @@ export default function FilesView({ rootFolder, onPlayFile }: FilesViewProps) {
         isPlayingEntry={matchPlaying(previewEntry)}
         onPlay={(entry) => handlePlayFile(entry, folderEntries ?? cwdEntries)}
         onWorkRegistered={() => cwdQuery.refetch()}
+        identityConflict={identityConflictPaths.get(previewEntry.path) ?? null}
       />
     </>
   );

@@ -2,7 +2,7 @@
 import { existsSync, renameSync, statSync, unlinkSync } from "node:fs";
 import { basename, join } from "node:path";
 import type {
-  DlsiteApplyBody,
+  DlsiteRegistrationBody,
   MetaFile,
   Work,
   WorkCreateBody,
@@ -229,7 +229,7 @@ export async function createWorkFromFolder(
   applyDlsiteCover?: (coverUrl: string, workDir: string) => Promise<string | null>,
 ): Promise<Work> {
   const { query, catalog, user } = repos;
-  const workDir = resolveWithin(root, body.path);
+  const workDir = resolveWithin(root, join(root, body.path));
   if (!workDir || !isDirectory(workDir)) {
     throw new WorkRegisterError(
       "not_configured",
@@ -281,7 +281,12 @@ export async function createWorkFromFolder(
 
     if (body.dlsite) {
       const applied = await buildMetaFromDlsiteApply(body.dlsite, workDir, applyDlsiteCover);
-      metaPatch.urls = applied.urls;
+      if (body.dlsite.applyUrl) {
+        metaPatch.urls = [
+          ...meta.urls.filter((entry) => !entry.url.includes("dlsite.com")),
+          ...applied.urls,
+        ];
+      }
       if (applied.coverImage !== undefined) metaPatch.coverImage = applied.coverImage;
       metaPatch.dlsite = applied.dlsite;
     }
@@ -320,7 +325,7 @@ export async function createWorkFromFolder(
 }
 
 async function buildMetaFromDlsiteApply(
-  body: DlsiteApplyBody,
+  body: DlsiteRegistrationBody,
   workDir: string,
   applyDlsiteCover?: (coverUrl: string, workDir: string) => Promise<string | null>,
 ): Promise<DlsiteAppliedMeta> {
@@ -336,7 +341,7 @@ async function buildMetaFromDlsiteApply(
   }
 
   return {
-    urls: body.info.url ? [{ label: "DLsite", url: body.info.url }] : [],
+    urls: body.applyUrl && body.info.url ? [{ label: "DLsite", url: body.info.url }] : [],
     coverImage,
     dlsite: {
       rjCode: body.info.rjCode,

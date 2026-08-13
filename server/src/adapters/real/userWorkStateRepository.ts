@@ -12,7 +12,13 @@ import type {
 } from "@mimimilli/shared";
 import { InvalidResumeError } from "../../errors.ts";
 import type { Db } from "./db.ts";
-import { appSettings, smartFolders, tagPrefixes, workStates } from "./userSchema.ts";
+import {
+  appSettings,
+  scanCandidateExclusions,
+  smartFolders,
+  tagPrefixes,
+  workStates,
+} from "./userSchema.ts";
 import { parseJsonField, parseRecord } from "./workRowMapping.ts";
 
 export class UserWorkStateRepository {
@@ -175,6 +181,20 @@ export class UserWorkStateRepository {
       .values({ key, value })
       .onConflictDoUpdate({ target: appSettings.key, set: { value } })
       .run();
+  }
+
+  listScanCandidateExclusions(): string[] {
+    return this.db.user
+      .select({ path: scanCandidateExclusions.path })
+      .from(scanCandidateExclusions)
+      .all()
+      .map((row) => row.path);
+  }
+
+  excludeScanCandidates(paths: string[]): void {
+    for (const path of paths) {
+      this.db.user.insert(scanCandidateExclusions).values({ path }).onConflictDoNothing().run();
+    }
   }
 
   listSmartFolders(): SmartFolder[] {

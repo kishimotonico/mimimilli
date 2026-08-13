@@ -86,6 +86,7 @@ export function makeSampleLibrary(): SampleLibrary {
     join(work2, "mimimilli.json"),
     JSON.stringify(
       {
+        formatVersion: 1,
         id: existingWorkId,
         title: "既存メタの作品",
         tags: ["cv/水瀬なずな", "サークル/夜想曲", "バイノーラル"],

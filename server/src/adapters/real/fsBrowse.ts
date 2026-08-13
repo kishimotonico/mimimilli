@@ -4,9 +4,9 @@
 // 「physical_path が祖先である作品」のうち最も深いものに紐づけ、workRelPath を付与する。
 import { readdirSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
-import type { FsEntry, FsListing } from "@mimimilli/shared";
+import { workspacePath, type FsEntry, type FsListing } from "@mimimilli/shared";
 import { isMetaFileName } from "./meta.ts";
-import { toPortableRelativePath } from "./paths.ts";
+import { toPortableRelativePath, workspaceMediaMetadata } from "./paths.ts";
 import { isPathWithin } from "../../lib/path.ts";
 
 /** GET /api/fs の作品対応付けに必要な最小投影。 */
@@ -75,13 +75,15 @@ export function browseFs(root: string, works: FsWorkRef[], target: string): FsLi
       }
       fsEntries.push({
         name: entry.name,
-        path: full,
+        path: workspacePath(toPortableRelativePath(root, full)),
         isDir: true,
         size: 0,
         fileType: "dir",
         childCount,
         workId: worksByPhysicalPath.get(full)?.id ?? null,
         workRelPath: null,
+        mediaKind: null,
+        preview: null,
       });
     } else if (entry.isFile()) {
       if (isMetaFileName(entry.name) || entry.name.startsWith(".")) continue; // 管理ファイルは隠す
@@ -94,13 +96,14 @@ export function browseFs(root: string, works: FsWorkRef[], target: string): FsLi
       const owner = findOwnerWork(realRoot, full, worksByPhysicalPath);
       fsEntries.push({
         name: entry.name,
-        path: full,
+        path: workspacePath(toPortableRelativePath(root, full)),
         isDir: false,
         size,
         fileType: extOf(entry.name),
         childCount: 0,
         workId: owner?.id ?? null,
         workRelPath: owner ? toPortableRelativePath(owner.physicalPath, full) : null,
+        ...workspaceMediaMetadata(full, size),
       });
     }
   }
@@ -115,8 +118,13 @@ export function browseFs(root: string, works: FsWorkRef[], target: string): FsLi
   );
 
   return {
-    path: target,
-    parent: target === realRoot ? null : dirname(target),
+    path: target === realRoot ? null : workspacePath(toPortableRelativePath(root, target)),
+    parent:
+      target === realRoot
+        ? null
+        : dirname(target) === realRoot
+          ? null
+          : workspacePath(toPortableRelativePath(root, dirname(target))),
     workId: dirWork?.id ?? null,
     entries: fsEntries,
   };

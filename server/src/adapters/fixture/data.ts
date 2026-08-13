@@ -5,6 +5,7 @@ import {
   dedupeTags,
   emptyDlsiteState,
   normalizeTags,
+  TEXT_PREVIEW_LIMIT_BYTES,
 } from "@mimimilli/shared";
 import type { Cover, SmartFolder, WorkSummary } from "@mimimilli/shared";
 
@@ -505,7 +506,18 @@ export function buildFsRoot(
       ),
     );
 
-  return fsDir("library", [fsDir("dlsite", circleDirs), fsFile("readme.txt", "text", 512)]);
+  return fsDir("library", [
+    fsDir("dlsite", circleDirs),
+    fsDir("viewer", [
+      fsFile("sample.png", "image", 64 * 1024),
+      fsFile("sample.pdf", "pdf", 64 * 1024),
+      fsFile("sample.txt", "text", 512),
+      fsFile("large.txt", "text", TEXT_PREVIEW_LIMIT_BYTES + 1),
+      fsFile("sample.webm", "video", 64 * 1024),
+      fsFile("archive.zip", "other", 64 * 1024),
+    ]),
+    fsFile("readme.txt", "text", 512),
+  ]);
 }
 
 /** スマートフォルダーのシード（2件） */

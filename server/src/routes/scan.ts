@@ -2,13 +2,17 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import {
   scanConflictResponseSchema,
+  scanDiagnosticsResponseSchema,
+  scanCandidatesMutationSchema,
+  scanCandidatesRegisterResponseSchema,
+  scanCandidatesResponseSchema,
   startScanRequestSchema,
   startScanResponseSchema,
   type ScanJobEvent,
   type ScanJobStatus,
 } from "@mimimilli/shared";
 import { ActiveScanConflictError, ScanJobManager } from "../scanJobManager.ts";
-import { invalidRequest } from "../lib/httpError.ts";
+import { conflict, invalidRequest } from "../lib/httpError.ts";
 import { readOptionalJsonBody } from "../lib/jsonBody.ts";
 
 /** SSE 接続を生かし続けるための ping 間隔（ms）。walking フェーズ等、進捗が長く無音になり得るため */
@@ -41,6 +45,7 @@ function isTerminalEvent(event: ScanJobEvent): boolean {
 export function scanRoute(
   jobs: ScanJobManager,
   heartbeatIntervalMs: number = HEARTBEAT_INTERVAL_MS,
+  onCandidateRegistered: (workId: string) => void = () => {},
 ): Hono {
   const app = new Hono();
 
@@ -75,6 +80,44 @@ export function scanRoute(
   app.get("/scan/last", (c) => {
     const last = jobs.getLastCompleted();
     return last ? c.json(last) : c.body(null, 204);
+  });
+
+  app.get("/scan/diagnostics", async (c) => {
+    const diagnostics = await jobs.listDiagnostics();
+    return c.json(scanDiagnosticsResponseSchema.parse({ diagnostics }));
+  });
+
+  app.get("/scan/candidates", async (c) => {
+    const candidates = await jobs.listCandidates();
+    return c.json(scanCandidatesResponseSchema.parse({ candidates }));
+  });
+
+  app.post("/scan/candidates/exclude", async (c) => {
+    const parsed = scanCandidatesMutationSchema.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) invalidRequest("候補の除外内容が不正です");
+    try {
+      await jobs.excludeCandidates(parsed.data.paths);
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith("候補が更新されています")) {
+        conflict(error.message);
+      }
+      throw error;
+    }
+    return c.body(null, 204);
+  });
+
+  app.post("/scan/candidates/register", async (c) => {
+    const parsed = scanCandidatesMutationSchema.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) invalidRequest("候補の登録内容が不正です");
+    try {
+      const result = await jobs.registerCandidates(parsed.data.paths, onCandidateRegistered);
+      return c.json(scanCandidatesRegisterResponseSchema.parse(result), 201);
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith("候補が更新されています")) {
+        conflict(error.message);
+      }
+      throw error;
+    }
   });
 
   app.get("/scan/:id", (c) => {

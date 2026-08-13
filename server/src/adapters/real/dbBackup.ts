@@ -1,24 +1,35 @@
-import {
-  copyFileSync,
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  renameSync,
-  rmSync,
-} from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import type { Database } from "bun:sqlite";
+import { Database, type Database as DatabaseType } from "bun:sqlite";
 import { getCategoryLogger } from "../../lib/logger.ts";
 
 /** pre-migration バックアップの保持世代数。 */
 export const DB_BACKUP_RETENTION_COUNT = 5;
 
 export type DbBackupKind = "catalog" | "user";
-export type DbBackupReason = "version-mismatch" | "catalog-user-asymmetry" | "pre-migration";
+export type DbBackupReason = "version-mismatch" | "pre-migration";
 
 const dbLogger = getCategoryLogger("db");
 const PRE_MIGRATION_SUFFIX = "-pre-migration.sqlite";
+const REQUIRED_TABLES: Record<DbBackupKind, readonly string[]> = {
+  catalog: [
+    "works",
+    "playlists",
+    "tracks",
+    "tags",
+    "work_tags",
+    "work_dlsite",
+    "scan_state",
+    "audio_probe_cache",
+  ],
+  user: [
+    "work_states",
+    "tag_prefixes",
+    "app_settings",
+    "smart_folders",
+    "scan_candidate_exclusions",
+  ],
+};
 
 function formatBackupTimestamp(date = new Date()): string {
   return date.toISOString().slice(0, 23).replace(/:/g, "-").replace(".", "-");
@@ -47,17 +58,13 @@ function resolveUniqueBackupPath(
 
 const DB_FILE_SUFFIXES = ["", "-wal", "-shm"] as const;
 
-function transferDatabaseFiles(dbPath: string, backupPath: string, mode: "move" | "copy"): boolean {
+function moveDatabaseFiles(dbPath: string, backupPath: string): boolean {
   let transferred = false;
   for (const suffix of DB_FILE_SUFFIXES) {
     const source = `${dbPath}${suffix}`;
     if (!existsSync(source)) continue;
     const destination = `${backupPath}${suffix}`;
-    if (mode === "move") {
-      renameSync(source, destination);
-    } else {
-      copyFileSync(source, destination);
-    }
+    renameSync(source, destination);
     transferred = true;
   }
   return transferred;
@@ -93,7 +100,7 @@ export function readMigrationJournalEntryCount(migrationsFolder: string): number
   return journal.entries.length;
 }
 
-export function readAppliedMigrationCount(sqlite: Database): number {
+export function readAppliedMigrationCount(sqlite: DatabaseType): number {
   const table = sqlite
     .query(
       "SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table' AND name = '__drizzle_migrations'",
@@ -106,7 +113,7 @@ export function readAppliedMigrationCount(sqlite: Database): number {
   return row.count;
 }
 
-export function hasPendingMigrations(sqlite: Database, migrationsFolder: string): boolean {
+export function hasPendingMigrations(sqlite: DatabaseType, migrationsFolder: string): boolean {
   return readAppliedMigrationCount(sqlite) < readMigrationJournalEntryCount(migrationsFolder);
 }
 
@@ -120,7 +127,7 @@ export function moveDatabaseToBackup(
 ): string {
   mkdirSync(backupDir, { recursive: true });
   const backupPath = resolveUniqueBackupPath(backupDir, kind, reason, date);
-  if (!transferDatabaseFiles(dbPath, backupPath, "move")) {
+  if (!moveDatabaseFiles(dbPath, backupPath)) {
     throw new Error(`バックアップ対象のDBファイルが見つかりません: ${dbPath}`);
   }
   dbLogger.error("DBファイルをバックアップへ退避しました", {
@@ -132,25 +139,53 @@ export function moveDatabaseToBackup(
   return backupPath;
 }
 
-/** マイグレーション前にDB一式をコピーでバックアップする。DB未作成時は何もしない。 */
-export function copyDatabaseToBackup(
-  dbPath: string,
+/** 開いているDBの一貫した論理スナップショットを作成する。 */
+export function createDatabaseBackup(
+  sqlite: DatabaseType,
   backupDir: string,
   kind: DbBackupKind,
   date = new Date(),
-): string | null {
-  if (!existsSync(dbPath)) return null;
+): string {
   mkdirSync(backupDir, { recursive: true });
   const backupPath = resolveUniqueBackupPath(backupDir, kind, "pre-migration", date);
-  if (!transferDatabaseFiles(dbPath, backupPath, "copy")) {
-    return null;
+  try {
+    sqlite.run("VACUUM INTO ?", [backupPath]);
+  } catch (error) {
+    throw new Error(`マイグレーション前バックアップの作成に失敗しました: ${backupPath}`, {
+      cause: error,
+    });
   }
   dbLogger.warn("マイグレーション前のDBバックアップを作成しました", {
     kind,
     reason: "pre-migration",
-    dbPath,
+    dbPath: sqlite.filename,
     backupPath,
   });
-  purgeOldBackups(backupDir, kind);
   return backupPath;
+}
+
+/** 論理スナップショットを独立接続で検査し、DB種別ごとの現行schemaを読み出す。 */
+export function verifyDatabaseBackup(backupPath: string, kind: DbBackupKind): void {
+  const backup = new Database(backupPath, { readonly: true });
+  try {
+    const integrity = backup.query("PRAGMA integrity_check").get() as { integrity_check: string };
+    if (integrity.integrity_check !== "ok") {
+      throw new Error(`integrity_check が失敗しました: ${integrity.integrity_check}`);
+    }
+    const tableRows = backup
+      .query("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
+      .all() as Array<{ name: string }>;
+    const tables = new Set(tableRows.map(({ name }) => name));
+    const requiredTables = REQUIRED_TABLES[kind];
+    if (requiredTables.some((table) => tables.has(table))) {
+      for (const table of requiredTables) {
+        if (!tables.has(table)) {
+          throw new Error(`必須テーブルがありません: ${table}`);
+        }
+        backup.query(`SELECT * FROM "${table}" LIMIT 1`).all();
+      }
+    }
+  } finally {
+    backup.close();
+  }
 }

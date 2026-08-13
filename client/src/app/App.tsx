@@ -38,6 +38,11 @@ import { useSettingsQuery } from "../entities/settings/useSettingsQuery";
 import NavigationHistorySync from "../features/navigation/ui/NavigationHistorySync";
 import { setAppModeAtom } from "../shared/model/appModeAtoms";
 import {
+  filesRelPathAtom,
+  filesSelectedPathAtom,
+} from "../entities/file-system/model/navigationAtoms";
+import { workspacePath } from "@mimimilli/shared";
+import {
   setLibraryAxisAtom,
   selectLibraryWorkAtom,
 } from "../entities/library/model/navigationActions";
@@ -51,6 +56,8 @@ export default function App() {
   const queryClient = useQueryClient();
   const setErrorToast = useSetAtom(errorToastAtom);
   const setAppMode = useSetAtom(setAppModeAtom);
+  const setFilesRelPath = useSetAtom(filesRelPathAtom);
+  const setFilesSelectedPath = useSetAtom(filesSelectedPathAtom);
   const setLibraryAxis = useSetAtom(setLibraryAxisAtom);
   const selectLibraryWork = useSetAtom(selectLibraryWorkAtom);
   const playRequestIdRef = useRef(0);
@@ -147,6 +154,18 @@ export default function App() {
     [selectLibraryWork, setAppMode, setLibraryAxis],
   );
 
+  const handleOpenScanProblemInFiles = useCallback(
+    (path: string) => {
+      const segments = path.split("/").filter(Boolean);
+      const directory = segments.slice(0, -1);
+      setAppMode("files");
+      setFilesRelPath(directory);
+      setFilesSelectedPath(workspacePath(path));
+      setActiveModal(null);
+    },
+    [setAppMode, setFilesRelPath, setFilesSelectedPath],
+  );
+
   if (startupState === "loading") {
     return (
       <MotionConfig reducedMotion="user">
@@ -241,6 +260,7 @@ export default function App() {
                     lastScanTime={settings?.lastScanTime ?? null}
                     onClose={handleCloseModal}
                     onOpenRjCodeMissing={() => setActiveModal("rj-missing")}
+                    onOpenFiles={handleOpenScanProblemInFiles}
                   />
                 </Suspense>
               )}

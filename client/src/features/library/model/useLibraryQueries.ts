@@ -29,27 +29,28 @@ import {
 } from "../../../entities/smart-folder/api";
 import { getAllTags } from "../../../entities/tag/api";
 import { getWork, patchWork } from "../../../entities/work/api";
+import { assertWorkSourceRevision } from "../../../entities/work/sourceRevision";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
 import { TAG_QUERY_KEYS } from "../../../entities/tag/queryKeys";
 
-export type LibraryTitlePatchMutation = UseMutationResult<
-  Work,
-  Error,
-  { workId: string; title: string }
->;
+type LibraryTitlePatchVariables = { workId: string; title: string; sourceRevision: string };
+type LibraryBookmarkPatchVariables = {
+  workId: string;
+  bookmarked: boolean;
+  sourceRevision: string;
+};
+type LibraryTagsPatchVariables = { workId: string; tags: NormalizedTag[]; sourceRevision: string };
+
+export type LibraryTitlePatchMutation = UseMutationResult<Work, Error, LibraryTitlePatchVariables>;
 
 export type LibraryBookmarkPatchMutation = UseMutationResult<
   Work,
   Error,
-  { workId: string; bookmarked: boolean }
+  LibraryBookmarkPatchVariables
 >;
 
-export type LibraryTagsPatchMutation = UseMutationResult<
-  Work,
-  Error,
-  { workId: string; tags: NormalizedTag[] }
->;
+export type LibraryTagsPatchMutation = UseMutationResult<Work, Error, LibraryTagsPatchVariables>;
 import {
   buildSmartFolderFilterParams,
   buildWorksParams,
@@ -290,31 +291,40 @@ function useWorkPatchMutationContext(nav: LibraryViewState, searchQuery: string)
     ]);
   };
 
-  return { applyPatchSuccess };
+  return { applyPatchSuccess, queryClient };
 }
 
 /** タイトル・ブックマーク・タグ編集を独立した mutation として提供する */
 export function useLibraryWorkPatchMutations(nav: LibraryViewState, searchQuery: string) {
-  const { applyPatchSuccess } = useWorkPatchMutationContext(nav, searchQuery);
+  const { applyPatchSuccess, queryClient } = useWorkPatchMutationContext(nav, searchQuery);
+  const refetchAfterPatchError = (_error: unknown, variables: { workId: string }) =>
+    queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.detail(variables.workId) });
 
-  const titleMutation = useMutation({
-    mutationFn: ({ workId, title }: { workId: string; title: string }) =>
-      patchWork(workId, { title }),
-    onSuccess: (updatedWork, { workId, title }) =>
-      applyPatchSuccess(updatedWork, workId, { title }),
+  const titleMutation = useMutation<Work, Error, LibraryTitlePatchVariables>({
+    mutationFn: ({ workId, title, sourceRevision }) =>
+      patchWork(workId, { title, sourceRevision: assertWorkSourceRevision(sourceRevision) }),
+    onSuccess: (updatedWork, { workId, title, sourceRevision }) =>
+      applyPatchSuccess(updatedWork, workId, { title, sourceRevision }),
+    onError: refetchAfterPatchError,
   });
 
-  const bookmarkMutation = useMutation({
-    mutationFn: ({ workId, bookmarked }: { workId: string; bookmarked: boolean }) =>
-      patchWork(workId, { bookmarked }),
-    onSuccess: (updatedWork, { workId, bookmarked }) =>
-      applyPatchSuccess(updatedWork, workId, { bookmarked }),
+  const bookmarkMutation = useMutation<Work, Error, LibraryBookmarkPatchVariables>({
+    mutationFn: ({ workId, bookmarked, sourceRevision }) =>
+      patchWork(workId, {
+        bookmarked,
+        sourceRevision: assertWorkSourceRevision(sourceRevision),
+      }),
+    onSuccess: (updatedWork, { workId, bookmarked, sourceRevision }) =>
+      applyPatchSuccess(updatedWork, workId, { bookmarked, sourceRevision }),
+    onError: refetchAfterPatchError,
   });
 
-  const tagsMutation = useMutation({
-    mutationFn: ({ workId, tags }: { workId: string; tags: Work["tags"] }) =>
-      patchWork(workId, { tags }),
-    onSuccess: (updatedWork, { workId, tags }) => applyPatchSuccess(updatedWork, workId, { tags }),
+  const tagsMutation = useMutation<Work, Error, LibraryTagsPatchVariables>({
+    mutationFn: ({ workId, tags, sourceRevision }) =>
+      patchWork(workId, { tags, sourceRevision: assertWorkSourceRevision(sourceRevision) }),
+    onSuccess: (updatedWork, { workId, tags, sourceRevision }) =>
+      applyPatchSuccess(updatedWork, workId, { tags, sourceRevision }),
+    onError: refetchAfterPatchError,
   });
 
   return { titleMutation, bookmarkMutation, tagsMutation };

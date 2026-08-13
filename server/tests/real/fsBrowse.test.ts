@@ -11,6 +11,7 @@ import { buildWorkPathIndex, findOwnerWork } from "../../src/adapters/real/fsBro
 import { openDb, type Db } from "../../src/adapters/real/db.ts";
 import { createWorkRepos } from "../helpers/workTestUtils.ts";
 import { createApp, type AppEnv } from "../../src/app.ts";
+import { scanAndRegisterCandidates } from "../helpers/scanLibrary.ts";
 import { makeSampleLibrary, writeWav } from "../helpers/sampleLibrary.ts";
 import { upsertTestWork } from "../helpers/workTestUtils.ts";
 
@@ -52,7 +53,7 @@ async function setup(t: TestContext, prepare?: (root: string) => void) {
   const adapter = createTestRealAdapter({ database: { kind: "memory" } });
   const app = createApp(adapter);
   await adapter.updateSettings({ rootFolder: lib.root });
-  await adapter.scan();
+  await scanAndRegisterCandidates(adapter);
   return { app, root: resolve(lib.root), existingWorkId: lib.existingWorkId };
 }
 
@@ -78,16 +79,16 @@ async function listing(app: Hono<AppEnv>, path?: string): Promise<FsListing> {
 
 test("ルート外のパス指定は 404", async (t) => {
   const { app } = await setup(t);
-  for (const path of ["/etc", "/", join("data", "..")]) {
+  for (const path of ["/etc", "../etc", join("data", "..")]) {
     const res = await app.request(`/api/fs?path=${encodeURIComponent(path)}`);
     assert.equal(res.status, 404, `should block: ${path}`);
   }
 });
 
 test("作品ディレクトリには workId、作品配下のファイルには workId + workRelPath が付く", async (t) => {
-  const { app, root, existingWorkId } = await setup(t);
+  const { app, existingWorkId } = await setup(t);
 
-  const dlsite = await listing(app, join(root, "dlsite"));
+  const dlsite = await listing(app, "dlsite");
   const workDir = dlsite.entries.find((e) => e.name === "RJ900002_既存メタ");
   assert.equal(workDir?.isDir, true);
   assert.equal(workDir?.workId, existingWorkId);
@@ -95,20 +96,22 @@ test("作品ディレクトリには workId、作品配下のファイルには 
   // 作品配下のサブフォルダー内ファイル（mp3/01_intro.wav）
   const works = (await (await app.request("/api/works")).json()) as WorksPage;
   const generated = works.items.find((w) => w.title.includes("RJ900001"))!;
-  const mp3 = await listing(app, join(root, "dlsite", "RJ900001_テスト作品", "mp3"));
+  const mp3 = await listing(app, "dlsite/RJ900001_テスト作品/mp3");
   const file = mp3.entries.find((e) => e.name === "01_intro.wav");
   assert.equal(file?.workId, generated.id);
   assert.equal(file?.workRelPath, "mp3/01_intro.wav");
   assert.equal(file?.fileType, "wav");
+  assert.equal(file?.mediaKind, "audio");
+  assert.deepEqual(file?.preview, { kind: "available" });
   assert.ok((file?.size ?? 0) > 0);
 });
 
 test("listing 自身の workId と parent、mimimilli.json の非表示", async (t) => {
-  const { app, root, existingWorkId } = await setup(t);
+  const { app, existingWorkId } = await setup(t);
 
-  const workListing = await listing(app, join(root, "dlsite", "RJ900002_既存メタ"));
+  const workListing = await listing(app, "dlsite/RJ900002_既存メタ");
   assert.equal(workListing.workId, existingWorkId);
-  assert.equal(workListing.parent, join(root, "dlsite"));
+  assert.equal(workListing.parent, "dlsite");
   assert.ok(
     !workListing.entries.some(
       (e) => e.name === "mimimilli.json" || e.name.endsWith(".mimimilli.json"),
@@ -121,13 +124,14 @@ test("listing 自身の workId と parent、mimimilli.json の非表示", async 
 
 test("ネストした作品ルートではファイルを最も深い作品へ対応付ける", async (t) => {
   const nestedId = "22222222-2222-4222-8222-222222222222";
-  const { app, root, existingWorkId } = await setup(t, (libraryRoot) => {
+  const { app, existingWorkId } = await setup(t, (libraryRoot) => {
     const nested = join(libraryRoot, "dlsite", "RJ900002_既存メタ", "nested-work");
     mkdirSync(nested, { recursive: true });
     writeWav(join(nested, "nested.wav"), 1);
     writeFileSync(
       join(nested, "mimimilli.json"),
       JSON.stringify({
+        formatVersion: 1,
         id: nestedId,
         title: "ネストした作品",
         tags: [],
@@ -149,11 +153,11 @@ test("ネストした作品ルートではファイルを最も深い作品へ�
     );
   });
 
-  const parent = await listing(app, join(root, "dlsite", "RJ900002_既存メタ"));
+  const parent = await listing(app, "dlsite/RJ900002_既存メタ");
   assert.equal(parent.workId, existingWorkId);
   assert.equal(parent.entries.find((entry) => entry.name === "nested-work")?.workId, nestedId);
 
-  const nested = await listing(app, join(root, "dlsite", "RJ900002_既存メタ", "nested-work"));
+  const nested = await listing(app, "dlsite/RJ900002_既存メタ/nested-work");
   const file = nested.entries.find((entry) => entry.name === "nested.wav");
   assert.equal(file?.workId, nestedId);
   assert.equal(file?.workRelPath, "nested.wav");

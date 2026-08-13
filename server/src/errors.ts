@@ -4,6 +4,13 @@ export class InvalidResumeError extends Error {}
 /** 前提条件（ルートフォルダー未設定等）を満たしていない操作。HTTP では 409 conflict */
 export class NotConfiguredError extends Error {}
 
+export class SourceChangedError extends Error {
+  constructor() {
+    super("作品データが外部で変更されました。再読み込みしてから編集してください");
+    this.name = "SourceChangedError";
+  }
+}
+
 export class WorkRegisterError extends Error {
   readonly code:
     | "already_registered"

@@ -11,7 +11,8 @@ import {
   workSchema,
 } from "./work.ts";
 import { splitSelectedTags, type TagFilters } from "./pseudoTag.ts";
-import { dlsiteApplyBodySchema, dlsiteStatusSchema } from "./dlsite.ts";
+import { dlsiteRegistrationBodySchema, dlsiteStatusSchema } from "./dlsite.ts";
+import { workspacePathSchema } from "./media.ts";
 
 // ── 作品検索（GET /api/works）────────────────────────────────
 
@@ -144,6 +145,7 @@ export const tagListSchema = z.array(z.string());
 
 export const workPatchSchema = z
   .object({
+    sourceRevision: z.string().min(1).optional(),
     title: z.string().min(1).optional(),
     /** タグは契約の入口で正規形へ寄せる（ADR-0005 決定5。prefix 小文字化・trim・重複排除） */
     tags: z
@@ -164,7 +166,7 @@ export type WorkPatch = z.output<typeof workPatchSchema>;
 // ── 作品の手動登録（POST /api/works, GET /api/works/register-preview）────
 
 export const workRegisterPreviewQuerySchema = z.object({
-  path: z.string().min(1),
+  path: workspacePathSchema,
 });
 export type WorkRegisterPreviewQuery = z.infer<typeof workRegisterPreviewQuerySchema>;
 
@@ -180,7 +182,7 @@ export const workRegisterPreviewSchema = z.object({
 export type WorkRegisterPreview = z.infer<typeof workRegisterPreviewSchema>;
 
 export const workCreateBodySchema = z.object({
-  path: z.string().min(1),
+  path: workspacePathSchema,
   title: z.string().min(1),
   /** タグは契約の入口で正規形へ寄せる（ADR-0005 決定5） */
   tags: z
@@ -188,7 +190,7 @@ export const workCreateBodySchema = z.object({
     .default([])
     .transform((tags) => dedupeTags(normalizeTags(tags))),
   mergeDescendantWorks: z.boolean().default(false),
-  dlsite: dlsiteApplyBodySchema.optional(),
+  dlsite: dlsiteRegistrationBodySchema.optional(),
 });
 /** クライアントが送信するリクエストボディ（tags は正規化前の生 string[]） */
 export type WorkCreateBodyInput = z.input<typeof workCreateBodySchema>;
@@ -207,6 +209,15 @@ export type DlsiteFetchByCodeBody = z.infer<typeof dlsiteFetchByCodeBodySchema>;
 /** POST /api/works のレスポンス */
 export const workCreateResponseSchema = workSchema;
 export type WorkCreateResponse = z.infer<typeof workCreateResponseSchema>;
+
+export const identityConflictReassignBodySchema = z.object({
+  path: workspacePathSchema,
+});
+export type IdentityConflictReassignBody = z.infer<typeof identityConflictReassignBodySchema>;
+export const identityConflictReassignResponseSchema = workSchema;
+export type IdentityConflictReassignResponse = z.infer<
+  typeof identityConflictReassignResponseSchema
+>;
 
 /** POST /api/works/:id/resume（高頻度更新のため PATCH と分離） */
 export const resumeBodySchema = resumeSchema;
@@ -254,7 +265,7 @@ export type ExportResponse = z.infer<typeof exportResponseSchema>;
 
 // ── エラー形式 ───────────────────────────────────────────────
 // 4xx/5xx は常にこの形で返す。ステータスコードと code の対応:
-//   404 not_found / 400 invalid_request / 409 conflict / 500 internal
+//   404 not_found / 400 invalid_request / 409 conflict|source_changed / 500 internal
 
 export const apiErrorSchema = z.object({
   error: z.object({
@@ -265,6 +276,7 @@ export const apiErrorSchema = z.object({
       "error",
       "invalid_request",
       "conflict",
+      "source_changed",
       "internal",
     ]),
     message: z.string(),

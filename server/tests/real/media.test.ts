@@ -7,6 +7,7 @@ import type { WorksPage } from "@mimimilli/shared";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { WorkQueryRepository } from "../../src/adapters/real/workQueryRepository.ts";
 import { createApp } from "../../src/app.ts";
+import { scanAndRegisterCandidates } from "../helpers/scanLibrary.ts";
 import { makeSampleLibrary, makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 
 async function setup(t: TestContext) {
@@ -17,7 +18,7 @@ async function setup(t: TestContext) {
   const adapter = createTestRealAdapter({ database: { kind: "memory" } });
   const app = createApp(adapter);
   await adapter.updateSettings({ rootFolder: lib.root });
-  await adapter.scan();
+  await scanAndRegisterCandidates(adapter);
 
   const res = await app.request("/api/works");
   const works = (await res.json()) as WorksPage;
@@ -83,6 +84,7 @@ test("メディア解決: getWork・probe cache問い合わせを伴わない", 
     join(workDir, "mimimilli.json"),
     JSON.stringify(
       {
+        formatVersion: 1,
         id: workId,
         title: "多トラック作品",
         tags: [],

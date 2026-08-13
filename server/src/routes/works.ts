@@ -5,15 +5,20 @@ import {
   resumeBodySchema,
   WORKS_DEFAULT_PAGE_SIZE,
   workCreateBodySchema,
+  identityConflictReassignBodySchema,
   workPatchSchema,
   workRegisterPreviewQuerySchema,
   worksQuerySchema,
 } from "@mimimilli/shared";
 import { InvalidResumeError, WorkRegisterError } from "../errors.ts";
 import type { DataAdapter } from "../adapter/index.ts";
-import { conflict, invalidRequest, notFound } from "../lib/httpError.ts";
+import { apiError, conflict, invalidRequest, notFound } from "../lib/httpError.ts";
+import { SourceChangedError } from "../errors.ts";
 
-export function worksRoute(adapter: DataAdapter): Hono {
+export function worksRoute(
+  adapter: DataAdapter,
+  onWorkRegistered: (workId: string) => void = () => {},
+): Hono {
   const app = new Hono();
 
   app.get("/works", async (c) => {
@@ -50,6 +55,7 @@ export function worksRoute(adapter: DataAdapter): Hono {
     try {
       const work = await adapter.createWork(parsed.data);
       if (!work) notFound("指定されたパスは存在しないか、ルート配下ではありません");
+      onWorkRegistered(work.id);
       return c.json(work, 201);
     } catch (error) {
       if (error instanceof WorkRegisterError) {
@@ -60,6 +66,18 @@ export function worksRoute(adapter: DataAdapter): Hono {
       }
       throw error;
     }
+  });
+
+  app.post("/works/identity-conflicts/reassign", async (c) => {
+    const body = await c.req.json().catch(() => null);
+    const parsed = identityConflictReassignBodySchema.safeParse(body);
+    if (!parsed.success) invalidRequest("再取り込み対象のパスが不正です");
+    const work = await adapter.reassignIdentityConflict(parsed.data).catch((error) => {
+      if (error instanceof SourceChangedError) throw apiError("source_changed", error.message);
+      throw error;
+    });
+    if (!work) notFound("指定されたパスはidentity_conflict診断の対象ではありません");
+    return c.json(work, 201);
   });
 
   app.get("/works/:id", async (c) => {
@@ -74,7 +92,15 @@ export function worksRoute(adapter: DataAdapter): Hono {
     if (!parsed.success) {
       invalidRequest("作品の更新内容が不正です");
     }
-    const work = await adapter.patchWork(c.req.param("id"), parsed.data);
+    if (parsed.data.sourceRevision === undefined) {
+      invalidRequest("sourceRevision は必須です");
+    }
+    const work = await adapter.patchWork(c.req.param("id"), parsed.data).catch((error) => {
+      if (error instanceof SourceChangedError) {
+        throw apiError("source_changed", error.message);
+      }
+      throw error;
+    });
     if (!work) notFound(`作品が見つかりません: ${c.req.param("id")}`);
     return c.json(work);
   });

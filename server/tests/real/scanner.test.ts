@@ -20,6 +20,7 @@ import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { openDb, type Db } from "../../src/adapters/real/db.ts";
 import { Scanner } from "../../src/adapters/real/scanner.ts";
 import { audioProbeCache } from "../../src/adapters/real/catalogSchema.ts";
+import { readMetaSource } from "../../src/adapters/real/meta.ts";
 import { createWorkRepos, getTestWork, saveTestResume } from "../helpers/workTestUtils.ts";
 import { makeSampleLibrary, makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 
@@ -28,7 +29,12 @@ async function setup(t: TestContext) {
   t.after(lib.cleanup);
   const adapter = createTestRealAdapter({ database: { kind: "memory" } });
   await adapter.updateSettings({ rootFolder: lib.root });
-  return { ...lib, adapter };
+  const initial = await adapter.scan();
+  const result = await adapter.registerScanCandidates(
+    initial.candidates.map((candidate) => candidate.path),
+  );
+  const candidateWorkId = result.registered[0]!.workId;
+  return { ...lib, adapter, candidateWorkId: candidateWorkId! };
 }
 
 function countWorkStates(db: Db): number {
@@ -38,16 +44,16 @@ function countWorkStates(db: Db): number {
   return row.total;
 }
 
-test("初回スキャン: 登録・自動生成・エラー検出・duration プローブ", async (t) => {
-  const { adapter, existingWorkId, root } = await setup(t);
+test("初回スキャン: 登録済みsidecarを投影し、候補を自動登録しない", async (t) => {
+  const { adapter, candidateWorkId, existingWorkId, root } = await setup(t);
   const result = await adapter.scan();
 
   assert.equal(result.registered, 1);
-  assert.equal(result.newlyGenerated, 1);
-  assert.equal(result.newWorkIds.length, 1);
+  assert.equal(result.newlyGenerated, 0);
+  assert.equal(result.newWorkIds.length, 0);
   assert.equal(result.missing, 0);
 
-  // 自動生成された mimimilli.json が物理的に存在し、作品ルートは mp3/ ではなく RJ900001 になる
+  // 明示登録したsidecarは作品ルートにだけ存在する。
   const generatedMeta = join(root, "dlsite", "RJ900001_テスト作品", "mimimilli.json");
   assert.ok(existsSync(generatedMeta));
   const meta = JSON.parse(readFileSync(generatedMeta, "utf-8"));
@@ -75,7 +81,7 @@ test("初回スキャン: 登録・自動生成・エラー検出・duration プ
   });
 
   // duration プローブ（2秒 + 3秒）
-  const generated = await adapter.getWork(result.newWorkIds[0]!);
+  const generated = await adapter.getWork(candidateWorkId);
   assert.ok(generated);
   assert.ok(generated.totalDurationSec !== null);
   assert.ok(
@@ -157,6 +163,7 @@ test("UUID 重複: 後に検出された方が再採番されメタファイル�
     writeFileSync(
       join(root, name, "mimimilli.json"),
       JSON.stringify({
+        formatVersion: 1,
         id,
         title: name,
         playlists: [
@@ -174,23 +181,18 @@ test("UUID 重複: 後に検出された方が再採番されメタファイル�
   await adapter.updateSettings({ rootFolder: root });
   const result = await adapter.scan();
 
-  assert.equal(result.registered, 2);
+  assert.equal(result.registered, 0);
   const metaA = JSON.parse(readFileSync(join(root, "work-a", "mimimilli.json"), "utf-8"));
   const metaB = JSON.parse(readFileSync(join(root, "work-b", "mimimilli.json"), "utf-8"));
-  assert.equal(metaA.id, id); // 正規化パス順の先頭が所有する
-  assert.equal(metaA.playlists[0].id, playlistId);
-  assert.equal(metaA.playlists[0].tracks[0].id, trackId);
-  assert.notEqual(metaB.id, id);
-  assert.notEqual(metaB.playlists[0].id, playlistId);
-  assert.notEqual(metaB.playlists[0].tracks[0].id, trackId);
-  assert.equal(metaB.defaultPlaylistId, metaB.playlists[0].id);
+  assert.equal(metaA.id, id);
+  assert.equal(metaB.id, id);
   const works = await adapter.queryWorks({
     q: "",
     tags: EMPTY_TAG_FILTERS,
     tagOp: "AND",
     sort: "added-desc",
   });
-  assert.equal(works.total, 2);
+  assert.equal(works.total, 0);
 });
 
 test("メタ不正: 壊れた JSON は errors にカウントされスキャン自体は成功する", async (t) => {
@@ -204,7 +206,10 @@ test("メタ不正: 壊れた JSON は errors にカウントされスキャン�
   assert.equal(result.errors, 1);
   assert.equal(result.registered, 1); // 既存メタ作品は通常どおり登録される
   // メタ不正フォルダーは「メタあり」扱いなので自動生成はされない
-  assert.equal(result.newlyGenerated, 1); // RJ900001 のみ
+  assert.equal(result.newlyGenerated, 0);
+  assert.equal(result.invalidSidecars.length, 1);
+  assert.equal(result.invalidSidecars[0]?.path, "broken-work/mimimilli.json");
+  assert.match(result.invalidSidecars[0]?.message ?? "", /メタファイルが不正です/);
 });
 
 test("大量ディレクトリの走査中、walking フェーズの進捗イベントが複数回発火する（同期walkの詰まり修正の検証）", async (t) => {
@@ -265,9 +270,9 @@ test("登録済み作品のメタが壊れた場合は missing ではなく erro
 test("増分スキャン: 完全未変更の作品は2回目以降スキップされる", async (t) => {
   const { adapter } = await setup(t);
   const first = await adapter.scan();
-  assert.equal(first.skipped, 0);
+  assert.equal(first.skipped, 1);
   assert.equal(first.registered, 1);
-  assert.equal(first.newlyGenerated, 1);
+  assert.equal(first.newlyGenerated, 0);
 
   const second = await adapter.scan();
   assert.equal(second.registered, 1); // error状態の既存メタは毎回再評価（TASK-95）
@@ -278,9 +283,8 @@ test("増分スキャン: 完全未変更の作品は2回目以降スキップ�
 });
 
 test("増分スキャン: スキップした作品もPlaylist/Trackとresumeを維持する", async (t) => {
-  const { adapter } = await setup(t);
-  const first = await adapter.scan();
-  const workId = first.newWorkIds[0]!;
+  const { adapter, candidateWorkId } = await setup(t);
+  const workId = candidateWorkId;
   const before = await adapter.getWork(workId);
   assert.ok(before);
   const playlist = before!.playlists[0]!;
@@ -298,7 +302,7 @@ test("増分スキャン: スキップした作品もPlaylist/Trackとresumeを�
   });
 });
 
-test("増分スキャン: 除外対象のcreatedAtが不正でも完全未変更ならschema検証を省略する", async (t) => {
+test("増分スキャン: source revisionが変わった不正sidecarはerrorとして検出する", async (t) => {
   const { adapter, root } = await setup(t);
   await adapter.scan();
   const metaPath = join(root, "dlsite", "RJ900001_テスト作品", "mimimilli.json");
@@ -307,11 +311,15 @@ test("増分スキャン: 除外対象のcreatedAtが不正でも完全未変更
   writeFileSync(metaPath, JSON.stringify(meta, null, 2));
 
   const second = await adapter.scan();
-  assert.equal(second.skipped, 1);
-  assert.equal(second.errors, 0);
+  assert.equal(second.skipped, 0);
+  assert.equal(second.errors, 1);
+  assert.deepEqual(
+    second.invalidSidecars.map((sidecar) => sidecar.path),
+    ["dlsite/RJ900001_テスト作品/mimimilli.json"],
+  );
 });
 
-test("増分スキャン: playlists/tracks/urlsの未知キーはfingerprintから除外してスキップする", async (t) => {
+test("増分スキャン: sidecar bytesが変われば未知キーだけでも再投影する", async (t) => {
   const directory = makeTestDirectory("raw-fingerprint-projection");
   t.after(directory.cleanup);
   const root = join(directory.path, "lib");
@@ -325,6 +333,7 @@ test("増分スキャン: playlists/tracks/urlsの未知キーはfingerprintか�
     join(workDir, "mimimilli.json"),
     JSON.stringify({
       id: workId,
+      formatVersion: 1,
       title: "unknown fields",
       urls: [{ label: "source", url: "https://example.com", ignored: "url" }],
       playlists: [
@@ -351,10 +360,10 @@ test("増分スキャン: playlists/tracks/urlsの未知キーはfingerprintか�
   const scanner = new Scanner(db, { query, catalog, user });
   await scanner.scan(root);
 
-  // createdAtはfingerprint対象外かつ不正値なので、ここでZodを通るとerrorになる。
+  // source revisionはexact bytesなので、未知キーだけの変更も再投影対象になる。
   const metaPath = join(workDir, "mimimilli.json");
   const meta = JSON.parse(readFileSync(metaPath, "utf-8")) as Record<string, unknown>;
-  meta.createdAt = "invalid timestamp";
+  meta.unknown = "changed";
   writeFileSync(metaPath, JSON.stringify(meta, null, 2));
 
   let catalogUpsertCount = 0;
@@ -379,23 +388,22 @@ test("増分スキャン: playlists/tracks/urlsの未知キーはfingerprintか�
   }) as unknown as Db["sqlite"]["query"];
   try {
     const second = await scanner.scan(root);
-    assert.equal(second.skipped, 1);
-    assert.equal(second.registered, 0);
+    assert.equal(second.skipped, 0);
+    assert.equal(second.registered, 1);
     assert.equal(second.errors, 0);
   } finally {
     catalog.upsertWorkCatalog = originalCatalogUpsert;
     user.upsertWorkUserState = originalUserUpsert;
     db.sqlite.query = originalQuery;
   }
-  assert.equal(catalogUpsertCount, 0);
-  assert.equal(userUpsertCount, 0);
-  assert.equal(probeCacheQueryCount, 0);
+  assert.equal(catalogUpsertCount, 1);
+  assert.equal(userUpsertCount, 1);
+  assert.equal(probeCacheQueryCount, 1);
 });
 
 test("増分スキャン: 音声削除時は fingerprint 不一致で再処理され error になる", async (t) => {
-  const { adapter, root } = await setup(t);
-  const first = await adapter.scan();
-  const generatedId = first.newWorkIds[0]!;
+  const { adapter, candidateWorkId, root } = await setup(t);
+  const generatedId = candidateWorkId;
 
   const before = await adapter.getWork(generatedId);
   assert.equal(before?.status, "ok");
@@ -412,9 +420,8 @@ test("増分スキャン: 音声削除時は fingerprint 不一致で再処理�
 });
 
 test("増分スキャン: 音声 mtime/size 変更時は duration が再計算される", async (t) => {
-  const { adapter, root } = await setup(t);
-  const first = await adapter.scan();
-  const generatedId = first.newWorkIds[0]!;
+  const { adapter, candidateWorkId, root } = await setup(t);
+  const generatedId = candidateWorkId;
 
   const before = await adapter.getWork(generatedId);
   assert.ok(before);
@@ -459,13 +466,13 @@ test("増分スキャン: カバー画像の更新でも再処理する", async 
 });
 
 test("カバー計測失敗: 画像が読めない場合は寸法NULLでcoverErrorsに計上され、DTOはcover:nullになる", async (t) => {
-  const { adapter, root } = await setup(t);
+  const { adapter, candidateWorkId, root } = await setup(t);
   const coverPath = join(root, "dlsite", "RJ900001_テスト作品", "cover.jpg");
   writeFileSync(coverPath, "not an image");
 
   const first = await adapter.scan();
   assert.equal(first.coverErrors, 1);
-  const generated = await adapter.getWork(first.newWorkIds[0]!);
+  const generated = await adapter.getWork(candidateWorkId);
   // 画像はあるが計測失敗＝表示可能なカバー無しとしてnull投影する（0/1で埋めない）
   assert.equal(generated!.cover, null);
   assert.equal(generated!.coverKind, "unmeasured");
@@ -557,6 +564,7 @@ test("error作品の再評価時はprobe cacheをバイパスし誤durationか�
   writeFileSync(
     join(workDir, "mimimilli.json"),
     JSON.stringify({
+      formatVersion: 1,
       id: workId,
       title: "probe-cache-bypass",
       playlists: [
@@ -600,7 +608,7 @@ test("error作品の再評価時はprobe cacheをバイパスし誤durationか�
   assert.equal(recovered!.errorMessage, null);
 });
 
-test("増分スキャン: 2回目に検出したduplicate UUIDもID移行後に別作品として登録する", async (t) => {
+test("増分スキャン: 2回目に検出したduplicate UUIDはidentity conflictとして公開しない", async (t) => {
   const { adapter, root } = await setup(t);
   await adapter.scan();
   const sourceDir = join(root, "dlsite", "RJ900001_テスト作品");
@@ -633,19 +641,20 @@ test("増分スキャン: 2回目に検出したduplicate UUIDもID移行後に�
   writeFileSync(join(duplicateDir, "mimimilli.json"), JSON.stringify(source, null, 2));
 
   const second = await adapter.scan();
-  assert.equal(second.registered, 2);
-  assert.equal(second.skipped, 1);
+  assert.equal(second.registered, 1);
+  assert.equal(second.skipped, 0);
   const copiedMeta = JSON.parse(readFileSync(join(duplicateDir, "mimimilli.json"), "utf-8"));
-  assert.notEqual(copiedMeta.id, source.id);
+  assert.equal(copiedMeta.id, source.id);
   assert.equal(
     (await adapter.queryWorks({ q: "", tags: EMPTY_TAG_FILTERS, tagOp: "AND", sort: "id-asc" }))
       .total,
-    3,
+    2,
   );
 });
 
 function metaWithSingleTrack(id: string, title: string): unknown {
   return {
+    formatVersion: 1,
     id,
     title,
     playlists: [
@@ -785,7 +794,7 @@ test("変更済みの複数resume作品でもprobe cache SELECTは一括取得�
   assert.equal(queryCount, 1);
 });
 
-test("upsertWork はバッチトランザクションで処理され件数上限で分割される", async (t) => {
+test("scanのpublishは件数にかかわらず単一catalog transactionで処理される", async (t) => {
   const directory = makeTestDirectory("batch-transaction");
   t.after(directory.cleanup);
   const root = join(directory.path, "lib");
@@ -824,15 +833,8 @@ test("upsertWork はバッチトランザクションで処理され件数上限
 
   await scanner.scan(root);
 
-  assert.ok(
-    catalogTransactionCount >= 3,
-    `catalogバッチトランザクションが分割されること: expected >=3, got ${catalogTransactionCount}`,
-  );
-  assert.equal(
-    userTransactionCount,
-    catalogTransactionCount,
-    "userとcatalogのバッチトランザクション回数は一致する",
-  );
+  assert.equal(catalogTransactionCount, 1);
+  assert.equal(userTransactionCount, 1);
   assert.equal(catalog.countByStatus("ok"), workCount);
 });
 
@@ -843,6 +845,89 @@ test("upsertBatchSizeは有限の正整数だけを受け付ける", (t) => {
   for (const upsertBatchSize of [0, -1, 1.5, Number.POSITIVE_INFINITY]) {
     assert.throws(() => new Scanner(db, repos, { upsertBatchSize }), /有限の正整数/);
   }
+});
+
+test("staging後にsidecarが変わった作品はpublishせず旧投影を維持する", async (t) => {
+  const directory = makeTestDirectory("scan-source-changed-before-publish");
+  t.after(directory.cleanup);
+  const root = join(directory.path, "lib");
+  const workDir = join(root, "work");
+  const id = "77777777-7777-4777-8777-777777777777";
+  mkdirSync(workDir, { recursive: true });
+  writeWav(join(workDir, "track.wav"), 1);
+  const metaPath = join(workDir, "mimimilli.json");
+  writeFileSync(
+    metaPath,
+    JSON.stringify({
+      ...(metaWithSingleTrack(id, "before") as Record<string, unknown>),
+      coverImage: "cover.jpg",
+    }),
+  );
+  writeFileSync(join(workDir, "cover.jpg"), "cover");
+
+  const db = openDb({ kind: "memory" });
+  t.after(() => db.close());
+  const repos = createWorkRepos(db);
+  const initial = new Scanner(db, repos, { measureCover: async () => null });
+  await initial.scan(root);
+
+  let changed = false;
+  const scanner = new Scanner(db, repos, {
+    measureCover: async () => {
+      if (!changed) {
+        changed = true;
+        const meta = JSON.parse(readFileSync(metaPath, "utf-8")) as Record<string, unknown>;
+        meta.title = "after";
+        writeFileSync(metaPath, JSON.stringify(meta));
+      }
+      return null;
+    },
+  });
+  await scanner.scan(root, { full: true });
+
+  assert.equal((await getTestWork(db, id))?.title, "before");
+  const row = db.sqlite
+    .query("SELECT verification_status AS status FROM works WHERE id = ?")
+    .get(id) as { status: string };
+  assert.equal(row.status, "unverified");
+});
+
+test("単一作品再投影は他作品のpresenceとidentity conflict診断を変更しない", async (t) => {
+  const directory = makeTestDirectory("single-work-publish-isolated");
+  t.after(directory.cleanup);
+  const root = join(directory.path, "lib");
+  const workA = join(root, "a");
+  const workB = join(root, "b");
+  const idA = "88888888-8888-4888-8888-888888888888";
+  const idB = "99999999-9999-4999-8999-999999999999";
+  for (const [dir, id, title] of [
+    [workA, idA, "a"],
+    [workB, idB, "b"],
+  ] as const) {
+    mkdirSync(dir, { recursive: true });
+    writeWav(join(dir, "track.wav"), 1);
+    writeFileSync(join(dir, "mimimilli.json"), JSON.stringify(metaWithSingleTrack(id, title)));
+  }
+  const db = openDb({ kind: "memory" });
+  t.after(() => db.close());
+  const repos = createWorkRepos(db);
+  const scanner = new Scanner(db, repos, { measureCover: async () => null });
+  await scanner.scan(root);
+  repos.catalog.replaceIdentityConflicts([
+    { kind: "identity_conflict", workId: idB, paths: ["b", "copy"] },
+  ]);
+  const source = JSON.parse(readFileSync(join(workA, "mimimilli.json"), "utf-8")) as Record<
+    string,
+    unknown
+  >;
+  source.title = "a updated";
+  writeFileSync(join(workA, "mimimilli.json"), JSON.stringify(source));
+  const metaPath = join(workA, "mimimilli.json");
+  await scanner.projectMetaFile(metaPath, readMetaSource(metaPath).meta);
+  assert.equal((await getTestWork(db, idB))?.status, "ok");
+  assert.deepEqual(repos.catalog.listIdentityConflicts(), [
+    { kind: "identity_conflict", workId: idB, paths: ["b", "copy"] },
+  ]);
 });
 
 test("バッチ途中のcatalog書込失敗はcatalogのみロールバックされ、再スキャンできる", async (t) => {

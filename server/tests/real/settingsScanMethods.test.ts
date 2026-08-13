@@ -12,10 +12,13 @@ test("updateSettings は receiver なしで呼び出せる", async () => {
   const user = {
     getUserSetting: (key: string) => settings.get(key) ?? null,
     setUserSetting: (key: string, value: string) => settings.set(key, value),
+    listScanCandidateExclusions: () => [],
+    excludeScanCandidates: () => undefined,
   };
   const catalog = {
     getScanState: () => null,
     setScanState: () => undefined,
+    listIdentityConflicts: () => [],
   };
   const query = {
     listSummaries: () => ({ summaries: [], skipped: [] }),

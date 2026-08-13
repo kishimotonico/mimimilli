@@ -7,7 +7,11 @@ import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { Readable } from "node:stream";
 import { Hono } from "hono";
-import { coverQuerySchema, fsAudioQuerySchema, normalizeThumbnailWidth } from "@mimimilli/shared";
+import {
+  coverQuerySchema,
+  normalizeThumbnailWidth,
+  workspaceMediaQuerySchema,
+} from "@mimimilli/shared";
 import type { CoverDescriptor, DataAdapter, MediaLocation } from "../adapter/index.ts";
 import { invalidRequest, notFound } from "../lib/httpError.ts";
 
@@ -31,12 +35,13 @@ export function mediaRoute(adapter: DataAdapter): Hono {
     return streamWhole(location, cacheHeaders);
   });
 
-  app.get("/media/fs-audio", async (c) => {
-    const parsed = fsAudioQuerySchema.safeParse(c.req.query());
+  app.get("/media/workspace", async (c) => {
+    const parsed = workspaceMediaQuerySchema.safeParse(c.req.query());
     if (!parsed.success) invalidRequest(`不正なクエリパラメータです: ${parsed.error.message}`);
-    const location = await adapter.locateFsAudio(parsed.data.path);
-    if (!location) notFound(`音声ファイルが見つかりません: ${parsed.data.path}`);
-    return streamWithRange(location, c.req.header("Range"));
+    const media = await adapter.locateWorkspaceMedia({ kind: "workspace", path: parsed.data.path });
+    if (!media) notFound(`ファイルが見つかりません: ${parsed.data.path}`);
+    if (media.preview.kind === "unavailable") notFound(`プレビューできません: ${parsed.data.path}`);
+    return streamWithRange(media.location, c.req.header("Range"), media.maxBytes);
   });
 
   app.get("/media/audio/:id/:path{.+}", async (c) => {
@@ -130,10 +135,21 @@ function stripWeakPrefix(etag: string): string {
 async function streamWithRange(
   location: MediaLocation,
   rangeHeader: string | undefined,
+  maxBytes?: number,
 ): Promise<Response> {
-  const fileSize = await sizeOf(location);
+  const fileSize = Math.min(await sizeOf(location), maxBytes ?? Number.POSITIVE_INFINITY);
 
   if (!rangeHeader) {
+    if (fileSize === 0) {
+      return new Response(null, {
+        status: 200,
+        headers: {
+          "Content-Type": location.mime,
+          "Content-Length": "0",
+          "Accept-Ranges": "bytes",
+        },
+      });
+    }
     if (location.type === "synthetic") {
       const body = location.read(0, fileSize - 1);
       return new Response(body, {
@@ -147,7 +163,7 @@ async function streamWithRange(
     }
 
     const stream = Readable.toWeb(
-      createReadStream(location.absolutePath),
+      createReadStream(location.absolutePath, { start: 0, end: fileSize - 1 }),
     ) as unknown as ReadableStream;
     return new Response(stream, {
       status: 200,

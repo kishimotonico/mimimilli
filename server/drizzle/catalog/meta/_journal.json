@@ -71,6 +71,27 @@
       "when": 1785427344586,
       "tag": "0009_gifted_sersi",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1786538944846,
+      "tag": "0010_cynical_catseye",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1786539788236,
+      "tag": "0011_robust_gauntlet",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1786541030600,
+      "tag": "0012_scan_revisions",
+      "breakpoints": true
     }
   ]
 }

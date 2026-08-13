@@ -4,11 +4,14 @@
 import {
   dlsiteWorkInfoSchema,
   workCreateResponseSchema,
+  identityConflictReassignResponseSchema,
+  scanDiagnosticsResponseSchema,
   workRegisterPreviewSchema,
   type DlsiteWorkInfo,
   type Work,
   type WorkCreateBodyInput,
   type WorkRegisterPreview,
+  type WorkspacePath,
 } from "@mimimilli/shared";
 import { getParsed, postParsed, deleteVoid } from "../../shared/api/http";
 import { fsListingSchema, type FsListing } from "@mimimilli/shared";
@@ -20,7 +23,7 @@ export async function browseFs(path?: string): Promise<FsListing> {
 }
 
 /** 作品登録前のプレビュー（タイトル候補・RJコード・子作品数） */
-export async function getWorkRegisterPreview(path: string): Promise<WorkRegisterPreview> {
+export async function getWorkRegisterPreview(path: WorkspacePath): Promise<WorkRegisterPreview> {
   const q = `?path=${encodeURIComponent(path)}`;
   return getParsed(workRegisterPreviewSchema, `/works/register-preview${q}`);
 }
@@ -33,6 +36,16 @@ export async function createWork(body: WorkCreateBodyInput): Promise<Work> {
 /** 作品登録を解除する（DB・メタファイルのみ。物理ファイルは残す） */
 export async function deleteWork(workId: string): Promise<void> {
   await deleteVoid(`/works/${encodeURIComponent(workId)}`);
+}
+
+export async function getScanDiagnostics() {
+  return getParsed(scanDiagnosticsResponseSchema, "/scan/diagnostics");
+}
+
+export async function reassignIdentityConflict(path: WorkspacePath): Promise<Work> {
+  return postParsed(identityConflictReassignResponseSchema, "/works/identity-conflicts/reassign", {
+    path,
+  });
 }
 
 /** 作品未登録時の DLsite メタ取得（RJ/VJコード指定） */

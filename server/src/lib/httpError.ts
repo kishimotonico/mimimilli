@@ -10,6 +10,7 @@ const STATUS_BY_CODE = {
   error: 502,
   invalid_request: 400,
   conflict: 409,
+  source_changed: 409,
   internal: 500,
 } as const;
 

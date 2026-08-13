@@ -8,12 +8,17 @@ import ConfirmDialog from "../../../shared/ui/ConfirmDialog";
 import { formatFileSize } from "../../../shared/lib/format";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { FILE_SYSTEM_QUERY_KEYS } from "../../../entities/file-system/queryKeys";
-import { deleteWork, getWorkRegisterPreview } from "../api";
-import { getFileUrl } from "../../../entities/work/api";
+import { deleteWork, getWorkRegisterPreview, reassignIdentityConflict } from "../api";
+import { getWorkspaceMediaUrl } from "../../../entities/file-system/api";
 import { getWorkFolderDisplay } from "../model/workFolderDisplay";
 import RegisterWorkDialog from "./RegisterWorkDialog";
 import Lightbox from "../../../shared/ui/Lightbox";
-import type { WorkRegisterPreview } from "@mimimilli/shared";
+import type {
+  MediaKind,
+  ScanDiagnostic,
+  WorkRegisterPreview,
+  WorkspacePath,
+} from "@mimimilli/shared";
 import {
   classifyFile,
   summarizeKinds,
@@ -37,6 +42,7 @@ interface FilePreviewProps {
   onPlay: (entry: FsEntry) => void;
   /** 作品登録・解除後にファイル一覧を再取得する */
   onWorkRegistered?: () => void | Promise<unknown>;
+  identityConflict: ScanDiagnostic | null;
 }
 
 export default function FilePreview({
@@ -47,12 +53,14 @@ export default function FilePreview({
   isPlayingEntry,
   onPlay,
   onWorkRegistered,
+  identityConflict,
 }: FilePreviewProps) {
   const queryClient = useQueryClient();
   const setErrorToast = useSetAtom(errorToastAtom);
   const [registerPreview, setRegisterPreview] = useState<WorkRegisterPreview | null>(null);
   const [showRegisterDialog, setShowRegisterDialog] = useState(false);
   const [showUnregisterConfirm, setShowUnregisterConfirm] = useState(false);
+  const [showReassignConfirm, setShowReassignConfirm] = useState(false);
 
   const refreshFsState = useCallback(async () => {
     const paths = new Set<string>();
@@ -64,6 +72,7 @@ export default function FilePreview({
       ),
     );
     await queryClient.invalidateQueries({ queryKey: ["fs"] });
+    await queryClient.invalidateQueries({ queryKey: ["scan", "diagnostics"] });
     await queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.all() });
     await onWorkRegistered?.();
   }, [browsePath, entry, onWorkRegistered, queryClient]);
@@ -79,8 +88,19 @@ export default function FilePreview({
     },
   });
 
+  const reassignMutation = useMutation({
+    mutationFn: (path: WorkspacePath) => reassignIdentityConflict(path),
+    onSuccess: async () => {
+      setShowReassignConfirm(false);
+      await refreshFsState();
+    },
+    onError: (cause) => {
+      setErrorToast(apiErrorMessage(cause, "別作品としての取り込みに失敗しました"));
+    },
+  });
+
   const registerPreviewMutation = useMutation({
-    mutationFn: (path: string) => getWorkRegisterPreview(path),
+    mutationFn: (path: WorkspacePath) => getWorkRegisterPreview(path),
     onSuccess: async (preview) => {
       if (preview.alreadyRegistered) {
         setErrorToast("このフォルダーは既に作品として登録されています");
@@ -97,9 +117,6 @@ export default function FilePreview({
 
   const kind = entry ? classifyFile(entry) : null;
   const isDir = kind === "dir";
-  const canServeWorkFile = !!entry && !!entry.workId && !!entry.workRelPath;
-  const showImage = kind === "image" && canServeWorkFile;
-
   const label = isDir
     ? "フォルダー · 物理"
     : kind
@@ -152,6 +169,7 @@ export default function FilePreview({
   ) : null;
 
   const hasActions = playActions != null || workActions != null;
+  const conflictingPaths = identityConflict?.paths.filter((path) => path !== entry?.path) ?? [];
 
   return (
     <div className="mle-prv is-files">
@@ -169,13 +187,8 @@ export default function FilePreview({
           <EmptyPreview />
         ) : (
           <div className="mle-fprev">
-            {showImage ? (
-              <ImageMedia
-                workId={entry.workId!}
-                relPath={entry.workRelPath!}
-                entry={entry}
-                kind={kind!}
-              />
+            {!isDir && entry.preview && entry.mediaKind ? (
+              <WorkspaceMedia entry={entry} />
             ) : (
               <Hero
                 kind={kind!}
@@ -185,20 +198,29 @@ export default function FilePreview({
               />
             )}
 
-            {!isDir &&
-              canServeWorkFile &&
-              (kind === "pdf" || kind === "text" || kind === "video") && (
-                <p className="mle-fprev__note">
-                  {kind === "video" ? "動画" : kind === "pdf" ? "PDF" : "テキスト"}
-                  の埋め込みプレビューは未対応です。
-                </p>
-              )}
-
             {hasActions && (
               <div className="mle-fprev__actions">
                 {playActions}
                 {workActions}
               </div>
+            )}
+            {identityConflict && entry?.isDir && (
+              <section className="mle-identity-conflict" aria-label="ID重複">
+                <span className="mle-identity-conflict-badge">ID重複</span>
+                <p>同じWork IDを持つフォルダーがあります。</p>
+                <div className="mle-identity-conflict__paths">
+                  {conflictingPaths.map((path) => (
+                    <code key={path}>{path}</code>
+                  ))}
+                </div>
+                <Button
+                  variant="primary"
+                  disabled={reassignMutation.isPending}
+                  onClick={() => setShowReassignConfirm(true)}
+                >
+                  別作品として取り込む
+                </Button>
+              </section>
             )}
           </div>
         )}
@@ -225,6 +247,16 @@ export default function FilePreview({
             if (entry?.workId) unregisterMutation.mutate(entry.workId);
           }}
           onCancel={() => setShowUnregisterConfirm(false)}
+        />
+      )}
+
+      {showReassignConfirm && entry && (
+        <ConfirmDialog
+          title="別作品として取り込む"
+          message={`「${entry.path}」のWork IDを新しくして、別作品として取り込みます。再生履歴やタグなどのユーザー状態は引き継ぎません。`}
+          confirmLabel="取り込む"
+          onConfirm={() => reassignMutation.mutate(entry.path)}
+          onCancel={() => setShowReassignConfirm(false)}
         />
       )}
     </div>
@@ -295,37 +327,49 @@ function Hero({
   );
 }
 
-// ── 画像だけ大きく表示 ────────────────────────────────────────
+function WorkspaceMedia({ entry }: { entry: FsEntry }) {
+  const kind = entry.mediaKind!;
+  const preview = entry.preview!;
+  const src = getWorkspaceMediaUrl(entry.path);
 
-function ImageMedia({
-  workId,
-  relPath,
-  entry,
-  kind,
-}: {
-  workId: string;
-  relPath: string;
-  entry: FsEntry;
-  kind: FileKind;
-}) {
+  if (preview.kind === "unavailable") {
+    return <UnavailableMedia entry={entry} kind={kind} />;
+  }
+
+  switch (kind) {
+    case "audio":
+      return <Hero kind="audio" entry={entry} isWorkFolder={false} />;
+    case "image":
+      return <ImageMedia entry={entry} src={src} />;
+    case "pdf":
+      return <PdfMedia entry={entry} src={src} />;
+    case "text":
+      return <TextMedia entry={entry} src={src} truncated={preview.kind === "truncated"} />;
+    case "video":
+      return <VideoMedia entry={entry} src={src} />;
+    default:
+      return <UnavailableMedia entry={entry} kind={kind} />;
+  }
+}
+
+function MediaCaption({ entry }: { entry: FsEntry }) {
+  return (
+    <div className="mle-fprev__caption">
+      <div className="mle-fprev__name">{entry.name}</div>
+      <div className="mle-fprev__path">{entry.path}</div>
+      <div className="mle-fprev__meta">{formatFileSize(entry.size)}</div>
+    </div>
+  );
+}
+
+function ImageMedia({ entry, src }: { entry: FsEntry; src: string }) {
   const [errored, setErrored] = useState(false);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
-  useEffect(() => setErrored(false), [workId, relPath]);
+  useEffect(() => setErrored(false), [src]);
 
   if (errored) {
-    return (
-      <div className={`mle-fprev__hero is-${kind}`}>
-        <span className="ic">
-          <I.image size={28} />
-        </span>
-        <div className="bd">
-          <div className="mle-fprev__name">{entry.name}</div>
-          <div className="mle-fprev__path">プレビューを読み込めませんでした</div>
-        </div>
-      </div>
-    );
+    return <MediaError entry={entry} kind="image" />;
   }
-  const src = getFileUrl(workId, relPath);
   return (
     <>
       <div className="mle-fprev__media">
@@ -346,14 +390,125 @@ function ImageMedia({
           onError={() => setErrored(true)}
         />
       </div>
-      <div className="mle-fprev__caption">
-        <div className="mle-fprev__name">{entry.name}</div>
-        <div className="mle-fprev__path">{entry.path}</div>
-        <div className="mle-fprev__meta">{formatFileSize(entry.size)}</div>
-      </div>
+      <MediaCaption entry={entry} />
       {isLightboxOpen && (
         <Lightbox src={src} alt={entry.name} onClose={() => setIsLightboxOpen(false)} />
       )}
     </>
   );
+}
+
+function PdfMedia({ entry, src }: { entry: FsEntry; src: string }) {
+  const [errored, setErrored] = useState(false);
+  useEffect(() => setErrored(false), [src]);
+  if (errored) return <MediaError entry={entry} kind="pdf" />;
+  return (
+    <>
+      <div className="mle-fprev__media is-document">
+        <object
+          className="mle-fprev__document"
+          data={src}
+          type="application/pdf"
+          aria-label={`${entry.name}のPDFプレビュー`}
+          onError={() => setErrored(true)}
+        >
+          <span>PDFを表示できませんでした。</span>
+        </object>
+      </div>
+      <MediaCaption entry={entry} />
+    </>
+  );
+}
+
+function VideoMedia({ entry, src }: { entry: FsEntry; src: string }) {
+  const [errored, setErrored] = useState(false);
+  useEffect(() => setErrored(false), [src]);
+  if (errored) return <MediaError entry={entry} kind="video" />;
+  return (
+    <>
+      <div className="mle-fprev__media is-video">
+        <video className="mle-fprev__video" controls src={src} onError={() => setErrored(true)}>
+          このブラウザは動画再生に対応していません。
+        </video>
+      </div>
+      <MediaCaption entry={entry} />
+    </>
+  );
+}
+
+function TextMedia({ entry, src, truncated }: { entry: FsEntry; src: string; truncated: boolean }) {
+  const [state, setState] = useState<{ text: string; error: boolean }>({ text: "", error: false });
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setState({ text: "", error: false });
+    fetch(src, { signal: controller.signal })
+      .then((response) => {
+        if (!response.ok) throw new Error("text preview failed");
+        return response.text();
+      })
+      .then((text) => setState({ text, error: false }))
+      .catch((error: unknown) => {
+        if (error instanceof Error && error.name === "AbortError") return;
+        setState({ text: "", error: true });
+      });
+    return () => controller.abort();
+  }, [src]);
+
+  if (state.error) return <MediaError entry={entry} kind="text" />;
+  return (
+    <>
+      <div className="mle-fprev__media is-text">
+        <pre className="mle-fprev__text">{state.text}</pre>
+      </div>
+      {truncated && <p className="mle-fprev__note">サイズ上限のため先頭のみ表示</p>}
+      <MediaCaption entry={entry} />
+    </>
+  );
+}
+
+function UnavailableMedia({ entry, kind }: { entry: FsEntry; kind: MediaKind }) {
+  const fileKind = kind === "other" ? "other" : kind;
+  const Icon = I[FILE_KIND_ICON[fileKind]];
+  const extension = extensionOf(entry.name);
+  return (
+    <div className={`mle-fprev__hero is-${fileKind}`}>
+      <span className="ic">
+        <Icon size={28} />
+      </span>
+      <div className="bd">
+        <div className="mle-fprev__name">{entry.name}</div>
+        <div className="mle-fprev__path">
+          {FILE_KIND_LABEL[fileKind]}
+          {extension ? `（.${extension}）` : ""}のプレビューは利用できません
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MediaError({
+  entry,
+  kind,
+}: {
+  entry: FsEntry;
+  kind: Exclude<MediaKind, "audio" | "other">;
+}) {
+  const Icon = I[FILE_KIND_ICON[kind]];
+  return (
+    <div className={`mle-fprev__hero is-${kind}`} role="alert">
+      <span className="ic">
+        <Icon size={28} />
+      </span>
+      <div className="bd">
+        <div className="mle-fprev__name">{entry.name}</div>
+        <div className="mle-fprev__path">プレビューを読み込めませんでした</div>
+      </div>
+    </div>
+  );
+}
+
+function extensionOf(name: string): string | null {
+  const dot = name.lastIndexOf(".");
+  return dot > 0 && dot < name.length - 1 ? name.slice(dot + 1) : null;
 }

@@ -47,6 +47,34 @@ test("new-work: スキャン結果に新規作品IDが含まれる", async () =>
   assert.ok(ids.includes("RJ501011"));
 });
 
+test("new-work: Files用診断とscan確認用の候補・問題を独立して返す", async () => {
+  const adapter = createFixtureAdapter({ scenario: "new-work" });
+
+  const result = await adapter.scan();
+  assert.deepEqual(
+    result.candidates.map((candidate) => candidate.path),
+    ["未登録作品", "朗読/候補"],
+  );
+  assert.deepEqual(result.identityConflicts[0]?.paths, ["viewer", "dlsite"]);
+  assert.equal(result.invalidSidecars[0]?.path, "壊れた/mimimilli.json");
+  assert.deepEqual((await adapter.listScanDiagnostics())[0]?.paths, [
+    "dlsite/夜想曲スタジオ/RJ501001_夜更けの図書室で囁き朗読",
+    "copies/RJ501001_夜更けの図書室で囁き朗読",
+  ]);
+
+  const registration = await adapter.registerScanCandidates(["未登録作品", "消えた候補"]);
+  assert.deepEqual(
+    registration.registered.map((entry) => entry.path),
+    ["未登録作品"],
+  );
+  assert.deepEqual(registration.failures, [
+    { path: "消えた候補", message: "候補が見つかりません" },
+  ]);
+
+  await adapter.excludeScanCandidates(["朗読/候補"]);
+  assert.deepEqual(await adapter.listScanCandidates(), []);
+});
+
 test("empty: 作品・スマートフォルダーが0件", async () => {
   const app = buildApp("empty");
 
@@ -108,7 +136,7 @@ test("不明なシナリオIDはエラーになる（黙って default にフォ
 test("register-preview: ルート境界の前方一致だけでは配下扱いしない", async () => {
   const app = buildApp();
   const res = await app.request("/api/works/register-preview?path=/library2/foo");
-  assert.equal(res.status, 404);
+  assert.equal(res.status, 400);
 });
 
 test("fixtureのDLsite取得は保存済みRJコードの修正を反映する", async () => {

@@ -87,6 +87,7 @@ export function createRealAdapter(
     db,
     query,
     catalog,
+    scanner,
     dlsiteCache,
     dlsiteCacheOptions: options.dlsiteCache,
     dlsiteRequestConfig,

@@ -71,6 +71,9 @@ const scanResult = {
   rjCodeMissingCount: 0,
   skipped: 0,
   coverErrors: 0,
+  identityConflicts: [],
+  invalidSidecars: [],
+  candidates: [],
 };
 
 const dlsiteResult = {
@@ -175,11 +178,22 @@ describe("ScanRuntime EventSource ownership", () => {
     dispatchScan(source, completed);
     dispatchScan(source, completed);
 
-    await waitFor(() => expect(setQueryData).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(setQueryData).toHaveBeenCalledWith(
+        SCAN_QUERY_KEYS.last(),
+        expect.objectContaining({ result: scanResult }),
+      ),
+    );
     expect(setQueryData).toHaveBeenCalledWith(
       SCAN_QUERY_KEYS.last(),
       expect.objectContaining({ result: scanResult }),
     );
+    expect(setQueryData).toHaveBeenCalledWith(SCAN_QUERY_KEYS.candidates(), scanResult.candidates);
+    expect(
+      setQueryData.mock.calls.filter(
+        ([queryKey]) => JSON.stringify(queryKey) === JSON.stringify(SCAN_QUERY_KEYS.last()),
+      ),
+    ).toHaveLength(1);
   });
 
   it("アンマウント時に EventSource を close する", async () => {

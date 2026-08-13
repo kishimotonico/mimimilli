@@ -1,5 +1,5 @@
 import { readdir } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { isMetaFileName } from "./meta.ts";
 import { isMetaStagingFileName } from "./metaStaging.ts";
 import { isPathWithin } from "../../lib/path.ts";
@@ -13,6 +13,7 @@ const scanLogger = getCategoryLogger("scan");
 export interface DirEntryInfo {
   subdirCount: number;
   hasImage: boolean;
+  childDirectories: string[];
 }
 
 export interface WalkResult {
@@ -22,6 +23,8 @@ export interface WalkResult {
   metaDirs: Set<string>;
   /** 音声ファイルが直接存在するディレクトリ */
   audioDirs: Set<string>;
+  /** 音声を直下に持つディレクトリごとの拡張子内訳 */
+  audioBreakdownByDir: Map<string, Map<string, number>>;
   /** readdir に失敗したサブツリーのディレクトリパス（ルート失敗は例外） */
   unreadablePaths: string[];
   /** 走査済みディレクトリの直下サブフォルダー数・画像有無 */
@@ -74,6 +77,7 @@ export async function walk(
     stagedMetaPaths: [],
     metaDirs: new Set(),
     audioDirs: new Set(),
+    audioBreakdownByDir: new Map(),
     unreadablePaths: [],
     dirIndex: new Map(),
     dirsWithMetaInSubtree: new Set(),
@@ -96,12 +100,14 @@ export async function walk(
       continue;
     }
     let subdirCount = 0;
+    const childDirectories: string[] = [];
     let hasImage = false;
     for (const entry of entries) {
       throwIfAborted(signal, abortToken);
       const full = join(dir, entry.name);
       if (entry.isDirectory()) {
         subdirCount += 1;
+        childDirectories.push(full);
         stack.push(full);
       } else if (entry.isFile()) {
         if (isMetaFileName(entry.name)) {
@@ -112,12 +118,16 @@ export async function walk(
           result.stagedMetaPaths.push(full);
         } else if (AUDIO_EXTENSIONS.has(extOf(entry.name))) {
           result.audioDirs.add(dir);
+          const breakdown = result.audioBreakdownByDir.get(dir) ?? new Map<string, number>();
+          const extension = extOf(entry.name);
+          breakdown.set(extension, (breakdown.get(extension) ?? 0) + 1);
+          result.audioBreakdownByDir.set(dir, breakdown);
         } else if (IMAGE_EXTENSIONS.has(extOf(entry.name))) {
           hasImage = true;
         }
       }
     }
-    result.dirIndex.set(dir, { subdirCount, hasImage });
+    result.dirIndex.set(dir, { subdirCount, hasImage, childDirectories });
     visited += 1;
     if (visited % WALK_PROGRESS_INTERVAL === 0) {
       onDirVisited?.(visited);
@@ -167,11 +177,20 @@ export function findWorkRoot(
     const info = dirIndex.get(parent);
     if (!info) break;
 
-    if (info.hasImage || info.subdirCount === 1) {
+    if (info.hasImage || info.subdirCount === 1 || isMultiDiscContainer(info, audioDir)) {
       cur = parent;
     } else {
       break;
     }
   }
   return cur;
+}
+
+/** Disc 1/2 のような媒体分割だけは、カバーなしでも親フォルダーを一作品として扱う。 */
+function isMultiDiscContainer(info: DirEntryInfo, audioDir: string): boolean {
+  if (info.subdirCount < 2) return false;
+  return info.childDirectories.every((path) => {
+    const name = basename(path);
+    return /^(?:cd|disc|disk|part|track)[ _.-]*\d+$/i.test(name) || path === audioDir;
+  });
 }

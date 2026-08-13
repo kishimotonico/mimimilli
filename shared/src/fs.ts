@@ -1,10 +1,11 @@
 // 物理ファイルシステムブラウズ（Filesモード、GET /api/fs）の契約。
 import { z } from "zod";
+import { mediaKindSchema, previewCapabilitySchema, workspacePathSchema } from "./media.ts";
 
 export const fsEntrySchema = z.object({
   name: z.string(),
-  /** 絶対物理パス（次に browse する dir / 選択キー） */
-  path: z.string(),
+  /** root 相対・portable なパス */
+  path: workspacePathSchema,
   isDir: z.boolean(),
   size: z.number(),
   fileType: z.string(),
@@ -14,22 +15,16 @@ export const fsEntrySchema = z.object({
   workId: z.string().nullable(),
   /** file のとき所属作品からの相対パス（メディア配信 URL 用） */
   workRelPath: z.string().nullable(),
+  mediaKind: mediaKindSchema.nullable(),
+  preview: previewCapabilitySchema.nullable(),
 });
 export type FsEntry = z.infer<typeof fsEntrySchema>;
 
 export const fsListingSchema = z.object({
-  /** この listing の dir 絶対パス */
-  path: z.string(),
-  /** 親 dir 絶対パス（ルートなら null） */
-  parent: z.string().nullable(),
+  path: workspacePathSchema.nullable(),
+  parent: workspacePathSchema.nullable(),
   /** この dir 自身が登録作品ルートなら作品 ID */
   workId: z.string().nullable(),
   entries: z.array(fsEntrySchema),
 });
 export type FsListing = z.infer<typeof fsListingSchema>;
-
-/** GET /api/media/fs-audio のクエリ。path はスキャンルート配下の絶対物理パス */
-export const fsAudioQuerySchema = z.object({
-  path: z.string().min(1),
-});
-export type FsAudioQuery = z.infer<typeof fsAudioQuerySchema>;

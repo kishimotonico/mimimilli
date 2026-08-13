@@ -3,7 +3,8 @@ import { useAtomValue } from "jotai";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence } from "motion/react";
 import { WORKS_DEFAULT_PAGE_SIZE, type WorkListItem, type WorksPage } from "@mimimilli/shared";
-import { patchWork, searchWorks } from "../../../entities/work/api";
+import { getWork, patchWork, searchWorks } from "../../../entities/work/api";
+import { assertWorkSourceRevision } from "../../../entities/work/sourceRevision";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { apiErrorMessage } from "../../../shared/lib/apiError";
 import { libraryTotalQueryOptions } from "../../../entities/work/libraryTotalQueryOptions";
@@ -18,6 +19,7 @@ import StatusRow from "./scanModal/StatusRow";
 import StatsGrid from "./scanModal/StatsGrid";
 import ScanWarnings from "./scanModal/ScanWarnings";
 import ScanNewWorks from "./scanModal/ScanNewWorks";
+import ScanReview from "./scanModal/ScanReview";
 import {
   ScanCancelButton,
   ScanFooterHint,
@@ -31,6 +33,7 @@ interface ScanModalProps {
   onClose: () => void;
   /** RJコード未検出の作品一覧を開く（結果にrjCodeMissingCount > 0のときのみ表示） */
   onOpenRjCodeMissing: () => void;
+  onOpenFiles: (path: string) => void;
 }
 
 const EMPTY_WORK_IDS: string[] = [];
@@ -48,7 +51,12 @@ function patchTitleInWorksPage(
   };
 }
 
-export default function ScanModal({ lastScanTime, onClose, onOpenRjCodeMissing }: ScanModalProps) {
+export default function ScanModal({
+  lastScanTime,
+  onClose,
+  onOpenRjCodeMissing,
+  onOpenFiles,
+}: ScanModalProps) {
   const scanning = useAtomValue(scanningAtom);
   const progress = useAtomValue(scanProgressAtom);
   const { start, cancel } = useScanActions();
@@ -104,14 +112,22 @@ export default function ScanModal({ lastScanTime, onClose, onOpenRjCodeMissing }
   const titleInputRef = useRef<HTMLInputElement | null>(null);
 
   const saveTitleMutation = useMutation({
-    mutationFn: ({ workId, title }: { workId: string; title: string }) =>
-      patchWork(workId, { title }),
+    mutationFn: async ({ workId, title }: { workId: string; title: string }) => {
+      const work = await getWork(workId);
+      return patchWork(workId, {
+        title,
+        sourceRevision: assertWorkSourceRevision(work.sourceRevision),
+      });
+    },
     onSuccess: (updatedWork, { workId }) => {
       queryClient.setQueryData(WORK_QUERY_KEYS.detail(workId), updatedWork);
       queryClient.setQueryData<WorksPage>(WORK_QUERY_KEYS.list(newWorksParams), (prev) =>
         patchTitleInWorksPage(prev, workId, updatedWork.title),
       );
       setEditingId(null);
+    },
+    onError: (_error, { workId }) => {
+      void queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.detail(workId) });
     },
   });
 
@@ -207,6 +223,8 @@ export default function ScanModal({ lastScanTime, onClose, onOpenRjCodeMissing }
                 />
               )}
           </AnimatePresence>
+
+          {lastResult && <ScanReview result={lastResult} onOpenFiles={onOpenFiles} />}
 
           <AnimatePresence initial={false}>
             {(newWorks.length > 0 || !!newWorksError) && (

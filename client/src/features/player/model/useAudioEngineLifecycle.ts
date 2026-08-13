@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from "react";
 import { getAudioUrl } from "../../../entities/work/api";
-import { getFsAudioUrl } from "../../../entities/file-system/api";
+import { getWorkspaceMediaUrl } from "../../../entities/file-system/api";
 import { updateLastPlayed } from "../api";
 import { createAudioEngine } from "./audioEngine";
 import {
@@ -156,7 +156,9 @@ export function useAudioEngineLifecycle({
 
       const isFileSource = source.kind === "file";
       const workId = source.kind === "work" ? source.work.id : null;
-      const assetUrl = isFileSource ? getFsAudioUrl(track.file) : getAudioUrl(workId!, track.file);
+      const assetUrl = isFileSource
+        ? getWorkspaceMediaUrl(track.file as import("@mimimilli/shared").WorkspacePath)
+        : getAudioUrl(workId!, track.file);
 
       const previousTrack = refs.loadedTrack.current;
       const switchedTrack =

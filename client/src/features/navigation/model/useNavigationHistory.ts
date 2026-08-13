@@ -12,8 +12,7 @@ import {
   filesRelPathAtom,
   filesSelectedPathAtom,
 } from "../../../entities/file-system/model/navigationAtoms";
-import { joinPath, relSegments } from "../../../shared/lib/fsPath";
-import { useRootFolder } from "../../../entities/settings/useSettingsQuery";
+import { workspacePath } from "@mimimilli/shared";
 import { appModeAtom } from "../../../shared/model/appModeAtoms";
 import {
   consumeNavigationHistoryCommitAtom,
@@ -94,13 +93,8 @@ export function useNavigationHistory(): void {
   const setNavigationHistoryState = useSetAtom(navigationHistoryStateAtom);
   const consumeNavigationHistoryCommit = useSetAtom(consumeNavigationHistoryCommitAtom);
 
-  const rootFolder = useRootFolder();
-
-  const rootFolderRef = useRef(rootFolder);
-  rootFolderRef.current = rootFolder;
   const currentIndexRef = useRef(0);
   const maxIndexRef = useRef(0);
-  const pendingFileSelectionRef = useRef<string[] | null>(null);
   const initializedRef = useRef(false);
   const [ready, setReady] = useState(false);
 
@@ -128,10 +122,8 @@ export function useNavigationHistory(): void {
 
       setFilesDirection(fileDirection);
       setFilesRelPath(state.files.relPath);
-      pendingFileSelectionRef.current = state.files.selectedRelPath;
-      const root = rootFolderRef.current;
       setFilesSelectedPath(
-        root && state.files.selectedRelPath ? joinPath(root, state.files.selectedRelPath) : null,
+        state.files.selectedRelPath ? workspacePath(state.files.selectedRelPath.join("/")) : null,
       );
     },
     [
@@ -192,11 +184,6 @@ export function useNavigationHistory(): void {
   }, [applyParsedState, publishHistoryState]);
 
   useEffect(() => {
-    if (!rootFolder || pendingFileSelectionRef.current === null) return;
-    setFilesSelectedPath(joinPath(rootFolder, pendingFileSelectionRef.current));
-  }, [rootFolder, setFilesSelectedPath]);
-
-  useEffect(() => {
     if (!ready) return;
 
     let state: NavigationUrlState;
@@ -206,22 +193,7 @@ export function useNavigationHistory(): void {
         library: { activeAxis, selectedTags, selectedWorkId, sort, q: searchQuery },
       };
     } else {
-      if (!rootFolder) return;
-      let selectedRelPath: string[] | null = null;
-      const pendingSelection = pendingFileSelectionRef.current;
-      if (pendingSelection !== null) {
-        selectedRelPath = pendingSelection;
-        if (filesSelectedPath === joinPath(rootFolder, pendingSelection)) {
-          pendingFileSelectionRef.current = null;
-        }
-      } else if (filesSelectedPath) {
-        const candidate = relSegments(rootFolder, filesSelectedPath);
-        if (joinPath(rootFolder, candidate) === filesSelectedPath) {
-          selectedRelPath = candidate;
-        } else {
-          console.warn(`[navigation] root 外の選択パスを URL へ同期しません: ${filesSelectedPath}`);
-        }
-      }
+      const selectedRelPath = filesSelectedPath ? filesSelectedPath.split("/") : null;
       state = { mode, files: { relPath: filesRelPath, selectedRelPath } };
     }
 
@@ -256,7 +228,6 @@ export function useNavigationHistory(): void {
     mode,
     publishHistoryState,
     ready,
-    rootFolder,
     searchQuery,
     selectedTags,
     selectedWorkId,

@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { copyFileSync, mkdirSync, rmSync } from "node:fs";
 import { dirname, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { constants, Database, SQLiteError } from "bun:sqlite";
@@ -7,17 +7,22 @@ import { migrate } from "drizzle-orm/bun-sqlite/migrator";
 import { formatError, getCategoryLogger } from "../../lib/logger.ts";
 import * as catalogSchema from "./catalogSchema.ts";
 import {
-  copyDatabaseToBackup,
+  createDatabaseCandidatePath,
+  replaceDatabaseWithCandidate,
+} from "./databaseReplacement.ts";
+import {
+  createDatabaseBackup,
   hasPendingMigrations,
   moveDatabaseToBackup,
   purgeOldBackups,
+  verifyDatabaseBackup,
   type DbBackupKind,
 } from "./dbBackup.ts";
 import { applySqliteBusyTimeout } from "./sqliteConnection.ts";
 import * as userSchema from "./userSchema.ts";
 
-const CATALOG_SCHEMA_VERSION = 7;
-const USER_SCHEMA_VERSION = 6;
+export const CATALOG_SCHEMA_VERSION = 9;
+const USER_SCHEMA_VERSION = 7;
 const SQLITE_URI_FLAGS =
   constants.SQLITE_OPEN_READWRITE | constants.SQLITE_OPEN_CREATE | constants.SQLITE_OPEN_URI;
 const CATALOG_MIGRATIONS = fileURLToPath(new URL("../../../drizzle/catalog", import.meta.url));
@@ -83,7 +88,7 @@ function openVersionedDatabase(
   migrationsFolder: string,
   kind: DbBackupKind,
   context?: VersionedDatabaseContext,
-): { sqlite: Database; recreated: boolean } {
+): { sqlite: Database } {
   const isMemory = path.startsWith("file:") && path.includes("mode=memory");
 
   let sqlite: Database;
@@ -97,8 +102,7 @@ function openVersionedDatabase(
     logDbOpenFailure(kind, path, "open", error);
   }
 
-  let recreated = false;
-  if (currentVersion !== 0 && currentVersion !== version) {
+  if (kind === "catalog" && currentVersion !== 0 && currentVersion !== version) {
     if (isMemory) {
       logDbOpenFailure(
         kind,
@@ -121,7 +125,6 @@ function openVersionedDatabase(
     moveDatabaseToBackup(path, context.backupDir, context.kind, "version-mismatch");
     try {
       sqlite = new Database(path, { create: true });
-      recreated = true;
     } catch (error) {
       logDbOpenFailure(kind, path, "open", error);
     }
@@ -136,13 +139,37 @@ function openVersionedDatabase(
   }
 
   try {
-    if (!isMemory && !recreated && context && hasPendingMigrations(sqlite, migrationsFolder)) {
-      copyDatabaseToBackup(path, context.backupDir, context.kind);
-    }
-    const db = drizzle(sqlite);
-    migrate(db, { migrationsFolder });
-    if (!isMemory && context) {
+    if (!isMemory && context && hasPendingMigrations(sqlite, migrationsFolder)) {
+      const backupPath = createDatabaseBackup(sqlite, context.backupDir, context.kind);
+      verifyDatabaseBackup(backupPath, kind);
       purgeOldBackups(context.backupDir, context.kind);
+      if (kind === "user") {
+        const candidatePath = createDatabaseCandidatePath(path);
+        copyFileSync(backupPath, candidatePath);
+        sqlite.close();
+        const candidate = new Database(candidatePath);
+        try {
+          candidate.exec("PRAGMA journal_mode = DELETE");
+          candidate.exec("PRAGMA foreign_keys = ON");
+          applySqliteBusyTimeout(candidate);
+          migrate(drizzle(candidate), { migrationsFolder });
+        } catch (error) {
+          rmSync(candidatePath, { force: true });
+          throw error;
+        } finally {
+          candidate.close();
+        }
+        replaceDatabaseWithCandidate(path, candidatePath);
+        sqlite = new Database(path);
+        sqlite.exec("PRAGMA journal_mode = WAL");
+        sqlite.exec("PRAGMA foreign_keys = ON");
+        applySqliteBusyTimeout(sqlite);
+      } else {
+        migrate(drizzle(sqlite), { migrationsFolder });
+      }
+    } else {
+      const db = drizzle(sqlite);
+      migrate(db, { migrationsFolder });
     }
   } catch (error) {
     logDbOpenFailure(kind, path, "migrate", error);
@@ -154,7 +181,7 @@ function openVersionedDatabase(
     logDbOpenFailure(kind, path, "pragma", error);
   }
 
-  return { sqlite, recreated };
+  return { sqlite };
 }
 
 /** catalogをmainとして開き、user DBを `user` という名前でATTACHする。 */
@@ -181,30 +208,25 @@ export function openDb(location: DbLocation, options?: DbOpenOptions): Db {
   const catalogContext =
     backupDir === undefined ? undefined : { backupDir, kind: "catalog" as const };
   const userContext = backupDir === undefined ? undefined : { backupDir, kind: "user" as const };
-  let catalogOpened = openVersionedDatabase(
+  const catalogOpened = openVersionedDatabase(
     catalogPath,
     CATALOG_SCHEMA_VERSION,
     CATALOG_MIGRATIONS,
     "catalog",
     catalogContext,
   );
-  const userOpened = openVersionedDatabase(
-    userPath,
-    USER_SCHEMA_VERSION,
-    USER_MIGRATIONS,
-    "user",
-    userContext,
-  );
-  if (location.kind === "files" && userOpened.recreated && !catalogOpened.recreated && backupDir) {
-    catalogOpened.sqlite.close();
-    moveDatabaseToBackup(catalogPath, backupDir, "catalog", "catalog-user-asymmetry");
-    catalogOpened = openVersionedDatabase(
-      catalogPath,
-      CATALOG_SCHEMA_VERSION,
-      CATALOG_MIGRATIONS,
-      "catalog",
-      catalogContext,
+  let userOpened: { sqlite: Database };
+  try {
+    userOpened = openVersionedDatabase(
+      userPath,
+      USER_SCHEMA_VERSION,
+      USER_MIGRATIONS,
+      "user",
+      userContext,
     );
+  } catch (error) {
+    catalogOpened.sqlite.close();
+    throw error;
   }
   try {
     try {

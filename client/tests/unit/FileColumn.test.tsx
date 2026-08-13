@@ -16,6 +16,8 @@ function makeEntry(overrides: Partial<FsEntry> = {}): FsEntry {
     childCount: 0,
     workId: null,
     workRelPath: null,
+    mediaKind: "audio",
+    preview: { kind: "available" },
     ...overrides,
   };
 }
@@ -25,6 +27,7 @@ function renderColumn(props: Partial<React.ComponentProps<typeof FileColumn>> = 
     <FileColumn
       title="フォルダー"
       entries={[]}
+      identityConflictPaths={new Map()}
       selectedPath={null}
       matchPlaying={() => false}
       onOpenDir={vi.fn()}

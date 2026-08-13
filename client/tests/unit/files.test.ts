@@ -19,6 +19,8 @@ function file(name: string, fileType = "file", size = 100): FsEntry {
     childCount: 0,
     workId: null,
     workRelPath: null,
+    mediaKind: fileType === "file" ? "other" : (fileType as FsEntry["mediaKind"]),
+    preview: { kind: "available" },
   };
 }
 function dir(name: string, childCount = 0): FsEntry {
@@ -31,21 +33,21 @@ function dir(name: string, childCount = 0): FsEntry {
     childCount,
     workId: null,
     workRelPath: null,
+    mediaKind: null,
+    preview: null,
   };
 }
 
 describe("classifyFile", () => {
-  it("uses backend fileType when it is a known kind", () => {
+  it("uses the server-provided mediaKind", () => {
     expect(classifyFile(file("a.bin", "audio"))).toBe("audio");
     expect(classifyFile(file("a.bin", "image"))).toBe("image");
   });
 
-  it("falls back to extension when fileType is generic", () => {
-    expect(classifyFile(file("cover.JPG", "file"))).toBe("image");
-    expect(classifyFile(file("script.txt", "file"))).toBe("text");
-    expect(classifyFile(file("clip.webm", "other"))).toBe("video");
-    expect(classifyFile(file("Thumbs.db", "other"))).toBe("other");
-    expect(classifyFile(file("readme", "file"))).toBe("other");
+  it("does not infer a kind from the extension", () => {
+    expect(classifyFile(file("cover.JPG", "file"))).toBe("other");
+    expect(classifyFile(file("script.txt", "file"))).toBe("other");
+    expect(classifyFile(file("clip.webm", "other"))).toBe("other");
   });
 
   it("classifies directories as dir", () => {

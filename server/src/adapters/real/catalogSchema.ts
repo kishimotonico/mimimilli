@@ -1,5 +1,6 @@
 import {
   check,
+  foreignKey,
   index,
   integer,
   primaryKey,
@@ -28,13 +29,14 @@ export const works = sqliteTable(
     metaPath: text("meta_path").notNull(),
     /** デフォルトプレイリストの合計秒数。未解決トラックを1件でも含む場合はNULL（未知。0では埋めない）。 */
     totalDurationSec: real("total_duration_sec"),
-    /** デフォルトプレイリストのトラック数。upsert時に維持する（TASK-57: 一覧でplaylists_jsonを読まないため） */
+    /** デフォルトプレイリストのトラック数。upsert時に維持する。 */
     trackCount: integer("track_count").notNull().default(0),
-    /** 増分スキャンの変更検知フィンガープリント（TASK-75で値を設定する。列はTASK-57と同じv5で先行追加） */
-    fingerprint: text("fingerprint"),
+    sourceRevision: text("source_revision"),
+    projectionRevision: text("projection_revision"),
+    mediaRevision: text("media_revision"),
+    verificationStatus: text("verification_status").notNull().default("verified"),
     errorMessage: text("error_message"),
     urlsJson: text("urls_json").notNull(),
-    playlistsJson: text("playlists_json").notNull(),
   },
   (table) => [
     index("idx_works_physical_path").on(table.physicalPath),
@@ -50,7 +52,7 @@ export const works = sqliteTable(
 export const playlists = sqliteTable(
   "playlists",
   {
-    id: text("id").primaryKey(),
+    id: text("id").notNull(),
     workId: text("work_id")
       .notNull()
       .references(() => works.id, { onDelete: "cascade" }),
@@ -58,6 +60,7 @@ export const playlists = sqliteTable(
     name: text("name").notNull(),
   },
   (table) => [
+    primaryKey({ columns: [table.workId, table.id] }),
     index("idx_playlists_work_position").on(table.workId, table.position),
     index("idx_playlists_work_name").on(table.workId, table.name),
   ],
@@ -66,10 +69,8 @@ export const playlists = sqliteTable(
 export const tracks = sqliteTable(
   "tracks",
   {
-    id: text("id").primaryKey(),
-    playlistId: text("playlist_id")
-      .notNull()
-      .references(() => playlists.id, { onDelete: "cascade" }),
+    id: text("id").notNull(),
+    playlistId: text("playlist_id").notNull(),
     workId: text("work_id")
       .notNull()
       .references(() => works.id, { onDelete: "cascade" }),
@@ -80,7 +81,12 @@ export const tracks = sqliteTable(
     end: real("end"),
   },
   (table) => [
-    index("idx_tracks_playlist_position").on(table.playlistId, table.position),
+    primaryKey({ columns: [table.workId, table.playlistId, table.id] }),
+    foreignKey({
+      columns: [table.workId, table.playlistId],
+      foreignColumns: [playlists.workId, playlists.id],
+    }).onDelete("cascade"),
+    index("idx_tracks_playlist_position").on(table.workId, table.playlistId, table.position),
     index("idx_tracks_work").on(table.workId),
   ],
 );
@@ -114,6 +120,19 @@ export const scanState = sqliteTable("scan_state", {
   key: text("key").primaryKey(),
   value: text("value"),
 });
+
+/** sidecar正本の Work ID が複数の場所で見つかったときの再構築可能な診断投影。 */
+export const identityConflicts = sqliteTable(
+  "identity_conflicts",
+  {
+    workId: text("work_id").notNull(),
+    path: text("path").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.workId, table.path] }),
+    index("idx_identity_conflicts_work_id").on(table.workId),
+  ],
+);
 
 /** 音声ファイル長のプローブ結果キャッシュ。durationSec は計測失敗時 NULL（未知。0 では埋めない）。 */
 export const audioProbeCache = sqliteTable("audio_probe_cache", {

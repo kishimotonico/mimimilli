@@ -3,10 +3,12 @@ import { useEffect, useRef, useState } from "react";
 import { I } from "../../../shared/ui/Icon";
 import {
   dlsiteBulkActiveAtom,
+  dlsiteBulkApplyBusyAtom,
   dlsiteBulkProgressAtom,
   dlsiteBulkStartingAtom,
 } from "../../../entities/dlsite/model/bulkAtoms";
 import { useDlsiteBulkActions } from "../../../entities/dlsite/useDlsiteBulkActions";
+import { useDlsiteBulkApplyActions } from "../../../entities/dlsite/useDlsiteBulkApplyActions";
 import { scanningAtom, scanProgressLabelAtom } from "../../../entities/scan/model/atoms";
 import TagPrefixSettings from "./TagPrefixSettings";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
@@ -44,8 +46,10 @@ export default function SettingsModal({
   const dlsiteBulkActive = useAtomValue(dlsiteBulkActiveAtom);
   const dlsiteBulkStarting = useAtomValue(dlsiteBulkStartingAtom);
   const dlsiteBulkProgress = useAtomValue(dlsiteBulkProgressAtom);
+  const dlsiteBulkApplyBusy = useAtomValue(dlsiteBulkApplyBusyAtom);
   const dlsiteBulkBusy = dlsiteBulkActive || dlsiteBulkStarting;
   const { start: onStartDlsiteBulk } = useDlsiteBulkActions();
+  const { openDialog: onOpenDlsiteBulkApply } = useDlsiteBulkApplyActions();
   const [isEditingFolder, setIsEditingFolder] = useState(false);
   const [folderDraft, setFolderDraft] = useState(rootFolder ?? "");
   const folderInputRef = useRef<HTMLInputElement | null>(null);
@@ -171,13 +175,21 @@ export default function SettingsModal({
           <span className={SECTION_LABEL_NO_UPPERCASE_CLASS}>DLSITE連携</span>
           <button
             type="button"
-            disabled={dlsiteBulkBusy}
+            disabled={dlsiteBulkBusy || dlsiteBulkApplyBusy}
             onClick={() => void onStartDlsiteBulk()}
             className="h-[34px] cursor-pointer self-start rounded-[6px] border border-line bg-paper-1 px-3.5 font-sans text-[12px] text-ink-1 disabled:cursor-not-allowed"
           >
             {dlsiteBulkActive
               ? `取得中${dlsiteBulkProgress ? ` (${dlsiteBulkProgress.processed}/${dlsiteBulkProgress.total})` : "..."}`
               : "未連携をまとめて取得"}
+          </button>
+          <button
+            type="button"
+            disabled={dlsiteBulkBusy || dlsiteBulkApplyBusy}
+            onClick={onOpenDlsiteBulkApply}
+            className="h-[34px] cursor-pointer self-start rounded-[6px] border border-line bg-paper-1 px-3.5 font-sans text-[12px] text-ink-1 disabled:cursor-not-allowed"
+          >
+            {dlsiteBulkApplyBusy ? "適用中..." : "未設定項目をまとめて適用"}
           </button>
         </div>
 
