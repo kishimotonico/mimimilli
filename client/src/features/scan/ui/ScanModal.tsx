@@ -11,11 +11,12 @@ import { useDialogModal } from "../../../shared/ui/useDialogModal";
 import { cn } from "../../../shared/lib/cn";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
+import Toast from "../../../shared/ui/Toast";
 import { scanningAtom, scanProgressAtom } from "../../../entities/scan/model/atoms";
 import { useScanActions } from "../../../entities/scan/useScanActions";
 import { getLastScanResult, getScanCandidates, getScanDiagnostics, SCAN_QUERY_KEYS } from "../api";
 import ScanSidebar from "./scanModal/ScanSidebar";
-import UnregisteredTab from "./scanModal/UnregisteredTab";
+import UnregisteredTab, { type UnregisteredTabRegisteredResult } from "./scanModal/UnregisteredTab";
 import NeedsAttentionTab from "./scanModal/NeedsAttentionTab";
 import NewlyRegisteredTab from "./scanModal/NewlyRegisteredTab";
 import UpdatedWorksTab from "./scanModal/UpdatedWorksTab";
@@ -57,6 +58,20 @@ export default function ScanModal({
   const { start, cancel } = useScanActions();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<ScanTabKey>("unregistered");
+  const [unregisteredToast, setUnregisteredToast] = useState<string | null>(null);
+
+  const handleUnregisteredRegistered = ({
+    addedCount,
+    failedCount,
+    remainingCount,
+  }: UnregisteredTabRegisteredResult) => {
+    setUnregisteredToast(
+      failedCount > 0
+        ? `${addedCount}件をライブラリに追加しました。${failedCount}件は追加できませんでした。`
+        : `${addedCount}件をライブラリに追加しました`,
+    );
+    if (remainingCount === 0) setActiveTab("newlyRegistered");
+  };
 
   // 前回スキャン結果（ディスク永続化なし、TASK-56）。サーバー起動後に一度でも完了していれば
   // GET /api/scan/last から取得でき、リロードをまたいでスキャンモーダルに表示できる。
@@ -265,7 +280,12 @@ export default function ScanModal({
             aria-labelledby={`scan-tab-${activeTab}`}
             className="min-h-0 flex-1 overflow-y-auto px-[18px] py-4"
           >
-            {activeTab === "unregistered" && <UnregisteredTab candidates={candidates} />}
+            {activeTab === "unregistered" && (
+              <UnregisteredTab
+                candidates={candidates}
+                onRegistered={handleUnregisteredRegistered}
+              />
+            )}
             {activeTab === "needsAttention" && (
               <NeedsAttentionTab
                 identityConflicts={identityConflicts}
@@ -308,6 +328,12 @@ export default function ScanModal({
           onStart={() => void start()}
         />
       </div>
+      <Toast
+        message={unregisteredToast}
+        actionLabel="新規登録済みを見る"
+        onAction={() => setActiveTab("newlyRegistered")}
+        onDismiss={() => setUnregisteredToast(null)}
+      />
     </dialog>
   );
 }

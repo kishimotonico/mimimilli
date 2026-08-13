@@ -1,152 +1,297 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { ScanCandidate } from "@mimimilli/shared";
+import { hasRjCode, type ScanCandidate } from "@mimimilli/shared";
 import Button from "../../../../shared/ui/Button";
+import IconButton from "../../../../shared/ui/IconButton";
+import Toast from "../../../../shared/ui/Toast";
+import { I } from "../../../../shared/ui/Icon";
+import { cn } from "../../../../shared/lib/cn";
 import { ApiRequestError } from "../../../../shared/api/http";
 import { apiErrorMessage } from "../../../../shared/lib/apiError";
 import {
   excludeScanCandidates,
-  getScanCandidates,
   registerScanCandidates,
+  restoreScanCandidateExclusions,
   SCAN_QUERY_KEYS,
 } from "../../api";
 
+export interface UnregisteredTabRegisteredResult {
+  addedCount: number;
+  failedCount: number;
+  /** この登録の後もまだ未登録として残っている件数 */
+  remainingCount: number;
+}
+
 export interface UnregisteredTabProps {
   candidates: ScanCandidate[];
+  onRegistered: (result: UnregisteredTabRegisteredResult) => void;
 }
 
-function candidatePaths(candidates: ScanCandidate[]): string[] {
-  return candidates.map((candidate) => candidate.path);
+interface ExcludeToast {
+  path: string;
+  title: string;
 }
 
-export default function UnregisteredTab({ candidates }: UnregisteredTabProps) {
+export default function UnregisteredTab({ candidates, onRegistered }: UnregisteredTabProps) {
   const queryClient = useQueryClient();
-  const [selectedPaths, setSelectedPaths] = useState<string[]>(() => candidatePaths(candidates));
-  const [resultMessage, setResultMessage] = useState<string | null>(null);
+  const [deselectedPaths, setDeselectedPaths] = useState<Set<string>>(() => new Set());
+  const [rjCodeOverrides, setRjCodeOverrides] = useState<Map<string, string>>(() => new Map());
+  const [editingPath, setEditingPath] = useState<string | null>(null);
+  const [editingValue, setEditingValue] = useState("");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [excludeToast, setExcludeToast] = useState<ExcludeToast | null>(null);
+  const headerCheckboxRef = useRef<HTMLInputElement>(null);
+  const rjCodeInputRef = useRef<HTMLInputElement>(null);
+
+  const selectedCandidates = useMemo(
+    () => candidates.filter((candidate) => !deselectedPaths.has(candidate.path)),
+    [candidates, deselectedPaths],
+  );
+  const allSelected = candidates.length > 0 && selectedCandidates.length === candidates.length;
+  const partiallySelected = selectedCandidates.length > 0 && !allSelected;
 
   useEffect(() => {
-    setSelectedPaths(candidatePaths(candidates));
-  }, [candidates]);
+    if (headerCheckboxRef.current) headerCheckboxRef.current.indeterminate = partiallySelected;
+  }, [partiallySelected]);
 
-  const refetchAndReset = async () => {
-    await queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.candidates() });
-    const refreshed = await queryClient.fetchQuery({
-      queryKey: SCAN_QUERY_KEYS.candidates(),
-      queryFn: getScanCandidates,
-    });
-    setSelectedPaths(candidatePaths(refreshed));
-  };
-
-  const onMutationError = async (error: unknown) => {
-    if (error instanceof ApiRequestError && error.status === 409) {
-      setResultMessage("候補が更新されました。選択を更新しました。");
-      await refetchAndReset();
-      return;
-    }
-    setResultMessage(apiErrorMessage(error, "候補の操作に失敗しました"));
-  };
+  useEffect(() => {
+    if (editingPath) rjCodeInputRef.current?.focus();
+  }, [editingPath]);
 
   const registerMutation = useMutation({
     mutationFn: registerScanCandidates,
-    onSuccess: async ({ registered, failures }) => {
-      const registeredPaths = new Set<string>(registered.map((entry) => entry.path));
+    onSuccess: ({ registered, failures }) => {
+      const registeredPaths = new Set(registered.map((entry) => entry.path));
       queryClient.setQueryData<ScanCandidate[]>(SCAN_QUERY_KEYS.candidates(), (previous = []) =>
         previous.filter((candidate) => !registeredPaths.has(candidate.path)),
       );
-      setSelectedPaths((previous) => previous.filter((path) => !registeredPaths.has(path)));
-      setResultMessage(
-        failures.length > 0
-          ? `${registered.length}件を登録しました。${failures.length}件は登録できませんでした。`
-          : `${registered.length}件を登録しました。`,
+      setErrorMessage(
+        failures.length > 0 ? `${failures.length}件はライブラリに追加できませんでした。` : null,
       );
+      onRegistered({
+        addedCount: registered.length,
+        failedCount: failures.length,
+        remainingCount: candidates.length - registeredPaths.size,
+      });
     },
-    onError: (error) => void onMutationError(error),
+    onError: async (error) => {
+      if (error instanceof ApiRequestError && error.status === 409) {
+        setErrorMessage("候補が更新されたため表示を更新しました。選び直してください。");
+        await queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.candidates() });
+        return;
+      }
+      setErrorMessage(apiErrorMessage(error, "ライブラリへの追加に失敗しました"));
+    },
   });
+
   const excludeMutation = useMutation({
-    mutationFn: excludeScanCandidates,
-    onSuccess: async () => {
-      setResultMessage("選択した候補を除外しました。");
-      await refetchAndReset();
+    mutationFn: (candidate: ScanCandidate) => excludeScanCandidates([candidate.path]),
+    onSuccess: (_void, candidate) => {
+      queryClient.setQueryData<ScanCandidate[]>(SCAN_QUERY_KEYS.candidates(), (previous = []) =>
+        previous.filter((entry) => entry.path !== candidate.path),
+      );
+      setExcludeToast({ path: candidate.path, title: candidate.inferredTitle });
     },
-    onError: (error) => void onMutationError(error),
+    onError: (error) => setErrorMessage(apiErrorMessage(error, "候補から外せませんでした")),
   });
 
-  const busy = registerMutation.isPending || excludeMutation.isPending;
-  const selected = useMemo(
-    () => candidates.filter((candidate) => selectedPaths.includes(candidate.path)),
-    [candidates, selectedPaths],
-  );
+  const restoreMutation = useMutation({
+    mutationFn: (path: string) => restoreScanCandidateExclusions([path]),
+    onSuccess: async () => {
+      setExcludeToast(null);
+      await queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.candidates() });
+    },
+    onError: (error) => setErrorMessage(apiErrorMessage(error, "取り消しに失敗しました")),
+  });
 
-  const toggle = (path: string, checked: boolean) => {
-    setSelectedPaths((previous) =>
-      checked ? [...new Set([...previous, path])] : previous.filter((value) => value !== path),
+  const busy = registerMutation.isPending || excludeMutation.isPending || restoreMutation.isPending;
+
+  const toggleAll = () => {
+    setDeselectedPaths(
+      allSelected ? new Set(candidates.map((candidate) => candidate.path)) : new Set(),
     );
   };
 
-  if (candidates.length === 0) {
-    return (
-      <div className="flex flex-col gap-2">
-        <p className="font-jp text-[12px] text-ink-3">未登録の候補はありません。</p>
-        {resultMessage && <output className="block text-[11px] text-ink-2">{resultMessage}</output>}
-      </div>
-    );
-  }
+  const toggleRow = (path: string) => {
+    setDeselectedPaths((previous) => {
+      const next = new Set(previous);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+  };
+
+  const startEdit = (candidate: ScanCandidate) => {
+    setEditingPath(candidate.path);
+    setEditingValue(rjCodeOverrides.get(candidate.path) ?? candidate.rjCode ?? "");
+  };
+
+  const commitEdit = () => {
+    if (editingPath === null) return;
+    const path = editingPath;
+    const value = editingValue.trim();
+    setRjCodeOverrides((previous) => {
+      const next = new Map(previous);
+      next.set(path, value);
+      return next;
+    });
+    setEditingPath(null);
+  };
+
+  const handleRegisterSelected = () => {
+    const items = selectedCandidates.map((candidate) => ({
+      path: candidate.path,
+      rjCode: rjCodeOverrides.get(candidate.path) ?? candidate.rjCode ?? "",
+    }));
+    registerMutation.mutate(items);
+  };
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="font-jp text-[11.5px] text-ink-2">
-        mimimilli.json を持たない音声フォルダーです。登録前に確認してください。
-      </p>
-      <div className="flex flex-col divide-y divide-line-soft rounded-[6px] border border-line-soft">
-        {candidates.map((candidate) => {
-          const checkboxId = `scan-candidate-${candidate.path.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
-          return (
-            <div key={candidate.path} className="flex gap-2 px-2.5 py-2 text-[11px]">
-              <input
-                id={checkboxId}
-                type="checkbox"
-                checked={selectedPaths.includes(candidate.path)}
-                disabled={busy}
-                onChange={(event) => toggle(candidate.path, event.target.checked)}
-              />
-              <label htmlFor={checkboxId} className="min-w-0 flex-1 cursor-pointer">
-                <span className="block text-ink-0">{candidate.inferredTitle}</span>
-                <span className="mll-selectable block break-all font-mono text-[10px] text-ink-3">
-                  {candidate.path}
-                </span>
-                <span className="text-ink-2">音声 {candidate.audioFileCount}件</span>
-              </label>
-            </div>
-          );
-        })}
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <Button
-          variant="primary"
-          disabled={busy}
-          onClick={() =>
-            registerMutation.mutate(candidates.map((candidate) => ({ path: candidate.path })))
-          }
-        >
-          すべて登録
-        </Button>
-        <Button
-          disabled={busy || selected.length === 0}
-          onClick={() =>
-            registerMutation.mutate(selected.map((candidate) => ({ path: candidate.path })))
-          }
-        >
-          選択したものを登録
-        </Button>
-        <Button
-          variant="quiet"
-          disabled={busy || selected.length === 0}
-          onClick={() => excludeMutation.mutate(selectedPaths)}
-        >
-          選択したものを除外
-        </Button>
-      </div>
-      {resultMessage && <output className="block text-[11px] text-ink-2">{resultMessage}</output>}
+      {candidates.length === 0 ? (
+        <p className="font-jp text-[12px] text-ink-3">未登録の候補はありません。</p>
+      ) : (
+        <>
+          <p className="font-jp text-[11.5px] text-ink-2">
+            まだライブラリで管理していないフォルダーです。追加すると mimimilli.json
+            を作成して、作品として管理します。RJコードはフォルダー名から自動で拾い、未検出なら手入力できます。
+          </p>
+          <div className="overflow-hidden rounded-[6px] border border-line-soft">
+            <table className="w-full table-fixed border-collapse text-[11px]">
+              <colgroup>
+                <col className="w-[32px]" />
+                <col className="w-[26%]" />
+                <col className="w-[104px]" />
+                <col />
+                <col className="w-[56px]" />
+                <col className="w-[32px]" />
+              </colgroup>
+              <thead>
+                <tr className="bg-paper-0 text-left">
+                  <th className="border-b border-line-soft px-2.5 py-1.5">
+                    <input
+                      ref={headerCheckboxRef}
+                      type="checkbox"
+                      aria-label="すべて選択"
+                      checked={allSelected}
+                      disabled={busy}
+                      onChange={toggleAll}
+                    />
+                  </th>
+                  <th className="border-b border-line-soft px-2.5 py-1.5 font-sans font-semibold text-ink-2">
+                    フォルダー名
+                  </th>
+                  <th className="border-b border-line-soft px-2.5 py-1.5 font-sans font-semibold text-ink-2">
+                    RJコード
+                  </th>
+                  <th className="border-b border-line-soft px-2.5 py-1.5 font-sans font-semibold text-ink-2">
+                    フォルダー
+                  </th>
+                  <th className="border-b border-line-soft px-2.5 py-1.5 font-sans font-semibold text-ink-2">
+                    音声
+                  </th>
+                  <th className="border-b border-line-soft px-2.5 py-1.5">
+                    <span className="sr-only">操作</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line-soft">
+                {candidates.map((candidate) => {
+                  const editing = editingPath === candidate.path;
+                  const effectiveRjCode = rjCodeOverrides.has(candidate.path)
+                    ? (rjCodeOverrides.get(candidate.path) ?? "")
+                    : candidate.rjCode;
+                  return (
+                    <tr key={candidate.path}>
+                      <td className="px-2.5 py-2 align-middle">
+                        <input
+                          type="checkbox"
+                          aria-label={`「${candidate.inferredTitle}」を選択`}
+                          checked={!deselectedPaths.has(candidate.path)}
+                          disabled={busy}
+                          onChange={() => toggleRow(candidate.path)}
+                        />
+                      </td>
+                      <td className="truncate px-2.5 py-2 align-middle text-ink-0">
+                        {candidate.inferredTitle}
+                      </td>
+                      <td className="px-2.5 py-2 align-middle">
+                        {editing ? (
+                          <input
+                            ref={rjCodeInputRef}
+                            value={editingValue}
+                            onChange={(event) => setEditingValue(event.target.value)}
+                            onBlur={commitEdit}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") commitEdit();
+                            }}
+                            placeholder="RJコード"
+                            className="w-full min-w-0 rounded-[4px] border border-acc bg-paper-2 px-1.5 py-0.5 font-mono text-[10.5px] text-ink-0 outline-none"
+                          />
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => startEdit(candidate)}
+                            title="クリックしてRJコードを編集"
+                            className={cn(
+                              "font-mono text-[10.5px]",
+                              hasRjCode({ rjCode: effectiveRjCode }) ? "text-ink-1" : "text-ink-4",
+                            )}
+                          >
+                            {hasRjCode({ rjCode: effectiveRjCode }) ? effectiveRjCode : "未検出"}
+                          </button>
+                        )}
+                      </td>
+                      <td
+                        className="mll-selectable truncate px-2.5 py-2 align-middle font-mono text-[10px] text-ink-3"
+                        title={candidate.path}
+                      >
+                        {candidate.path}
+                      </td>
+                      <td className="px-2.5 py-2 align-middle whitespace-nowrap text-ink-2">
+                        {candidate.audioFileCount}件
+                      </td>
+                      <td className="px-2.5 py-2 align-middle">
+                        <IconButton
+                          icon={I.x}
+                          label={`「${candidate.inferredTitle}」を候補から外す`}
+                          size="xs"
+                          disabled={busy}
+                          onClick={() => excludeMutation.mutate(candidate)}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-jp text-[11px] text-ink-2">
+              {selectedCandidates.length}件選択中
+            </span>
+            <Button
+              variant="primary"
+              disabled={busy || selectedCandidates.length === 0}
+              onClick={handleRegisterSelected}
+            >
+              {selectedCandidates.length}件をライブラリに追加
+            </Button>
+          </div>
+        </>
+      )}
+      {errorMessage && (
+        <p role="alert" className="font-jp text-[11px] text-[var(--r-coral)]">
+          {errorMessage}
+        </p>
+      )}
+      <Toast
+        message={excludeToast ? `「${excludeToast.title}」を候補から外しました` : null}
+        actionLabel="元に戻す"
+        onAction={() => excludeToast && restoreMutation.mutate(excludeToast.path)}
+        onDismiss={() => setExcludeToast(null)}
+      />
     </div>
   );
 }
