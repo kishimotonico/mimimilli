@@ -4,6 +4,7 @@ title: スキャン結果に新規・更新のWork IDと候補のRJコードを�
 status: To Do
 assignee: []
 created_date: '2026-08-13 16:58'
+updated_date: '2026-08-13 17:42'
 labels: []
 dependencies: []
 priority: high
@@ -24,4 +25,14 @@ ordinal: 335000
 - [ ] #4 候補の登録APIがRJコードの指定を受け付け、指定された値がmimimilli.jsonへ書き込まれる（未指定・空は従来どおり自動検出）
 - [ ] #5 常に0/空になっていたnewlyGenerated・newWorkIdsが廃止または実データを返すよう修正されている
 - [ ] #6 新規・更新・スキップの分類を検証するテストがある
+- [ ] #7 候補除外の一覧取得APIと解除APIが追加されている（adapterインターフェース・real/fixture実装・HTTPルート。解除後の次回スキャンで候補が再提示される）
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-08-13 17:42
+---
+設計レビュー引き継ぎ時の追加決定: 除外の解除APIはTASK-327のトースト「元に戻す」とTASK-330の設定UIの両方が必要とするため、サーバー基盤である本タスクで用意する。327・330はこのAPIを利用するUIタスクとする。
+---
+<!-- COMMENTS:END -->

@@ -4,7 +4,7 @@ title: DLsite取得statusの投影経路を再設計し通知集計を復旧す�
 status: To Do
 assignee: []
 created_date: '2026-08-12 16:54'
-updated_date: '2026-08-12 17:46'
+updated_date: '2026-08-13 17:42'
 labels: []
 dependencies: []
 priority: high
@@ -25,3 +25,12 @@ source-projection移行でDLsite取得の一時状態をcacheへ移した結果�
 - [ ] #4 statusの位置づけ（sidecar正本かcache由来か）がADR-0017に明記されている
 - [ ] #5 上記を検証するテストがある
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-08-13 17:42
+---
+設計レビュー引き継ぎ時の追加決定: TASK-328の外部連携状態表示が本タスクのstatus投影修復に依存するため、スキャンUI再設計パッケージ（feat/scan-ui-redesign）に組み込む。TASK-324・325と並列で先行実施し、TASK-328の前に完了させる。
+---
+<!-- COMMENTS:END -->

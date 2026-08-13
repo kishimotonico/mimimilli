@@ -4,9 +4,11 @@ title: 新規登録済み・更新された作品タブを実装する
 status: To Do
 assignee: []
 created_date: '2026-08-13 16:59'
+updated_date: '2026-08-13 17:42'
 labels: []
 dependencies:
   - TASK-326
+  - TASK-321
 priority: medium
 ordinal: 338000
 ---
@@ -26,3 +28,12 @@ ordinal: 338000
 - [ ] #5 表示上限を超える場合に総件数が分かる表示がある
 - [ ] #6 pnpm test:smokeが通る
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-08-13 17:42
+---
+設計レビュー引き継ぎ時の追加決定: 外部連携列の「失敗」表示はDLsite statusの投影（TASK-321で修復）に依存するため、TASK-321を依存に追加。321完了後に着手する。
+---
+<!-- COMMENTS:END -->
