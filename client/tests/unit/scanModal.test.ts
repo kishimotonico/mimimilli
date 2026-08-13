@@ -1,12 +1,14 @@
 // ScanModal のEsc/backdrop挙動（TASK-56: NewWorkPopupの統合先）のコンポーネントテスト。
 // happy-dom は <dialog> の showModal/close を実装していないため、テスト対象に必要な分だけ差し替える。
 import { createElement } from "react";
-import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act, within } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   WORKS_DEFAULT_PAGE_SIZE,
+  workspacePath,
+  type ScanCandidate,
   type ScanJobSnapshot,
   type ScanResult,
   type Work,
@@ -17,6 +19,7 @@ import ScanModal from "../../src/features/scan/ui/ScanModal";
 import * as workApi from "../../src/entities/work/api";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { scanActionsAtom, scanJobAtom } from "../../src/entities/scan/model/atoms";
+import * as scanApi from "../../src/features/scan/api";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
 import { libraryTotalQueryOptions } from "../../src/entities/work/libraryTotalQueryOptions";
 
@@ -105,6 +108,21 @@ const scanResult: ScanResult = {
   identityConflicts: [],
   invalidMetaFiles: [],
   candidates: [],
+};
+
+const candidateDetected: ScanCandidate = {
+  path: workspacePath("dlsite/検出済み作品"),
+  inferredTitle: "検出済み作品",
+  audioFileCount: 2,
+  audioBreakdown: [{ extension: "mp3", count: 2 }],
+  rjCode: "RJ100001",
+};
+const candidateUndetected: ScanCandidate = {
+  path: workspacePath("dlsite/未検出作品"),
+  inferredTitle: "未検出作品",
+  audioFileCount: 1,
+  audioBreakdown: [{ extension: "mp3", count: 1 }],
+  rjCode: null,
 };
 
 function dispatchCancel(dialog: HTMLElement) {
@@ -515,6 +533,103 @@ describe("ScanModal", () => {
 
     expect(patchSpy).not.toHaveBeenCalled();
     expect(screen.getByText(newWork.title)).toBeInTheDocument();
+  });
+
+  it("検出済みRJコードは明示送信し、未検出のまま登録すると空文字を送る。全件登録で新規登録済みへ自動遷移する", async () => {
+    const registerSpy = vi.spyOn(scanApi, "registerScanCandidates").mockResolvedValue({
+      registered: [
+        { path: candidateDetected.path, workId: "w-detected" },
+        { path: candidateUndetected.path, workId: "w-undetected" },
+      ],
+      failures: [],
+    });
+    renderModal({
+      lastResult: { ...scanResult, candidates: [candidateDetected, candidateUndetected] },
+    });
+
+    const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });
+    await expect.poll(() => unregistered.textContent).toContain(candidateDetected.inferredTitle);
+
+    fireEvent.click(within(unregistered).getByRole("button", { name: "2件をライブラリに追加" }));
+
+    await waitFor(() => expect(registerSpy).toHaveBeenCalled());
+    expect(registerSpy.mock.calls[0]?.[0]).toEqual([
+      { path: candidateDetected.path, rjCode: candidateDetected.rjCode },
+      { path: candidateUndetected.path, rjCode: "" },
+    ]);
+
+    await waitFor(() =>
+      expect(screen.getByText("2件をライブラリに追加しました")).toBeInTheDocument(),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("tabpanel", { name: /^新規登録済み/ })).toBeInTheDocument(),
+    );
+  });
+
+  it("未検出のRJコードをクリックで編集し、編集した値を登録に送る", async () => {
+    const registerSpy = vi.spyOn(scanApi, "registerScanCandidates").mockResolvedValue({
+      registered: [{ path: candidateUndetected.path, workId: "w-undetected" }],
+      failures: [],
+    });
+    renderModal({
+      lastResult: { ...scanResult, candidates: [candidateDetected, candidateUndetected] },
+    });
+
+    const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });
+    fireEvent.click(within(unregistered).getByRole("button", { name: "未検出" }));
+    const input = within(unregistered).getByPlaceholderText("RJコード");
+    fireEvent.change(input, { target: { value: "RJ200002" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    fireEvent.click(
+      within(unregistered).getByRole("checkbox", {
+        name: `「${candidateDetected.inferredTitle}」を選択`,
+      }),
+    );
+    fireEvent.click(within(unregistered).getByRole("button", { name: "1件をライブラリに追加" }));
+
+    await waitFor(() => expect(registerSpy).toHaveBeenCalled());
+    expect(registerSpy.mock.calls[0]?.[0]).toEqual([
+      { path: candidateUndetected.path, rjCode: "RJ200002" },
+    ]);
+  });
+
+  it("候補を1件ずつ除外でき、「元に戻す」で取り消せる", async () => {
+    const excludeSpy = vi.spyOn(scanApi, "excludeScanCandidates").mockResolvedValue(undefined);
+    const restoreSpy = vi
+      .spyOn(scanApi, "restoreScanCandidateExclusions")
+      .mockResolvedValue(undefined);
+    const getCandidatesSpy = vi
+      .spyOn(scanApi, "getScanCandidates")
+      .mockResolvedValue([candidateDetected, candidateUndetected]);
+    renderModal({
+      lastResult: { ...scanResult, candidates: [candidateDetected, candidateUndetected] },
+    });
+
+    const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });
+    await expect.poll(() => unregistered.textContent).toContain(candidateUndetected.inferredTitle);
+
+    fireEvent.click(
+      within(unregistered).getByRole("button", {
+        name: `「${candidateUndetected.inferredTitle}」を候補から外す`,
+      }),
+    );
+
+    await waitFor(() => expect(excludeSpy).toHaveBeenCalledWith([candidateUndetected.path]));
+    await waitFor(() =>
+      expect(
+        screen.getByText(`「${candidateUndetected.inferredTitle}」を候補から外しました`),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.queryByText(candidateUndetected.inferredTitle)).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "元に戻す" }));
+
+    await waitFor(() => expect(restoreSpy).toHaveBeenCalledWith([candidateUndetected.path]));
+    await waitFor(() => expect(getCandidatesSpy).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(screen.getByText(candidateUndetected.inferredTitle)).toBeInTheDocument(),
+    );
   });
 });
 
