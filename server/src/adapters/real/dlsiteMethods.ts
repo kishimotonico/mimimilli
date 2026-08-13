@@ -81,7 +81,7 @@ export function createDlsiteMethods(deps: {
           result.skipped += 1;
           continue;
         }
-        const fetched = await fetch.fetchCachedDlsite(summary.dlsite.rjCode!);
+        const fetched = await fetch.fetchCachedDlsite(summary.dlsite.rjCode);
         if (shouldRefreshDlsiteProjectionAfterFetch(fetched)) {
           refreshWorkDlsiteProjection(catalog, summary.id, dlsiteCache);
         }

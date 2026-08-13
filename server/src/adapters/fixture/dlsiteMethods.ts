@@ -2,8 +2,10 @@ import { applyDlsiteStatePatch, dedupeTags, hasRjCode, normalizeTags } from "@mi
 import type {
   DlsiteBulkResult,
   DlsiteFetchResult,
+  DlsiteState,
   DlsiteStatePatch,
   Work,
+  WorkSummary,
 } from "@mimimilli/shared";
 import type { DlsiteAdapter } from "../../adapter/dlsite.ts";
 import { fixtureCoverFromColumns, type FixtureCoverColumns } from "./data.ts";
@@ -38,7 +40,7 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
       if (!hasRjCode(work.dlsite)) {
         return { ok: false, kind: "not_found", message: "RJコードが検出されていません" };
       }
-      return dlsiteFetchByCode(work.dlsite.rjCode!);
+      return dlsiteFetchByCode(work.dlsite.rjCode);
     },
 
     dlsiteFetchByCode,
@@ -52,7 +54,7 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
           skipped += 1;
           continue;
         }
-        const fetched = await dlsiteFetchByCode(work.dlsite.rjCode!);
+        const fetched = await dlsiteFetchByCode(work.dlsite.rjCode);
         if (!fetched.ok) continue;
         const tags = dedupeTags(
           normalizeTags(["サークル/fixtureサークル", "cv/fixture CV", "genre/テスト"]),
@@ -101,7 +103,7 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
         ? state.works.filter((work) => workIds.includes(work.id))
         : state.works;
       const targets = requested.filter(
-        (work) =>
+        (work): work is WorkSummary & { dlsite: DlsiteState & { rjCode: string } } =>
           hasRjCode(work.dlsite) &&
           (work.dlsite.status === "none" || work.dlsite.status === "error"),
       );
@@ -118,7 +120,7 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
           type: "progress",
           processed: index,
           total: targets.length,
-          work: { id: work.id, rjCode: work.dlsite.rjCode!, title: work.title },
+          work: { id: work.id, rjCode: work.dlsite.rjCode, title: work.title },
         });
         if (options?.signal?.aborted) return result;
         result.fetched += 1;

@@ -31,7 +31,9 @@ export function emptyDlsiteState(): DlsiteState {
 }
 
 /** RJコードが非空文字列として設定されているか。`null` と明示的な `""` は含まない。 */
-export function hasRjCode(state: Pick<DlsiteState, "rjCode">): boolean {
+export function hasRjCode<T extends Pick<DlsiteState, "rjCode">>(
+  state: T,
+): state is T & { rjCode: string } {
   return state.rjCode !== null && state.rjCode !== "";
 }
 

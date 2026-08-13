@@ -87,7 +87,7 @@ export function projectDlsiteState(
       errorKind: null,
     };
   }
-  const rjCode = metaDlsite.rjCode!;
+  const rjCode = metaDlsite.rjCode;
   if (cacheResolution.kind === "failure") {
     const status = cacheResolution.outcome === "not_found" ? "not_found" : "error";
     const errorKind = cacheResolution.outcome === "not_found" ? "not_found" : "error";
@@ -122,7 +122,7 @@ export function resolveMetaDlsiteProjection(
   cache: DlsiteCache | null | undefined,
 ): DlsiteState {
   if (!cache || !hasRjCode(metaDlsite)) return projectDlsiteState(metaDlsite, null);
-  return projectDlsiteState(metaDlsite, cache.resolve({ productCode: metaDlsite.rjCode! }));
+  return projectDlsiteState(metaDlsite, cache.resolve({ productCode: metaDlsite.rjCode }));
 }
 
 export function refreshCatalogDlsiteProjection(
