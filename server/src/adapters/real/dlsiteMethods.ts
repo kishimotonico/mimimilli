@@ -1,5 +1,5 @@
 import { basename } from "node:path";
-import type { DlsiteFetchResult } from "@mimimilli/shared";
+import { hasRjCode, type DlsiteFetchResult } from "@mimimilli/shared";
 import { detectRjCode } from "./dlsite.ts";
 import { DlsiteCache } from "./dlsiteCache.ts";
 import type { DlsiteCacheOptions } from "./dlsiteCache.ts";
@@ -77,11 +77,11 @@ export function createDlsiteMethods(deps: {
       const { summaries } = query.listSummaries(workIds);
       const result = { applied: 0, skipped: 0, failed: 0 };
       for (const summary of summaries) {
-        if (!summary.dlsite.rjCode || summary.dlsite.status === "skipped") {
+        if (!hasRjCode(summary.dlsite) || summary.dlsite.status === "skipped") {
           result.skipped += 1;
           continue;
         }
-        const fetched = await fetch.fetchCachedDlsite(summary.dlsite.rjCode);
+        const fetched = await fetch.fetchCachedDlsite(summary.dlsite.rjCode!);
         if (shouldRefreshDlsiteProjectionAfterFetch(fetched)) {
           refreshWorkDlsiteProjection(catalog, summary.id, dlsiteCache);
         }

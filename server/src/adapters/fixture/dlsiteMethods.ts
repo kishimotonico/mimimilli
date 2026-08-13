@@ -1,4 +1,4 @@
-import { applyDlsiteStatePatch, dedupeTags, normalizeTags } from "@mimimilli/shared";
+import { applyDlsiteStatePatch, dedupeTags, hasRjCode, normalizeTags } from "@mimimilli/shared";
 import type {
   DlsiteBulkResult,
   DlsiteFetchResult,
@@ -35,11 +35,10 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
       const work = state.works.find((candidate) => candidate.id === workId);
       if (!work)
         return { ok: false, kind: "not_found", message: `作品が見つかりません: ${workId}` };
-      const rjCode = work.dlsite.rjCode;
-      if (!rjCode) {
+      if (!hasRjCode(work.dlsite)) {
         return { ok: false, kind: "not_found", message: "RJコードが検出されていません" };
       }
-      return dlsiteFetchByCode(rjCode);
+      return dlsiteFetchByCode(work.dlsite.rjCode!);
     },
 
     dlsiteFetchByCode,
@@ -49,11 +48,11 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
       let applied = 0;
       let skipped = 0;
       for (const work of candidates) {
-        if (!work.dlsite.rjCode || work.dlsite.status === "skipped") {
+        if (!hasRjCode(work.dlsite) || work.dlsite.status === "skipped") {
           skipped += 1;
           continue;
         }
-        const fetched = await dlsiteFetchByCode(work.dlsite.rjCode);
+        const fetched = await dlsiteFetchByCode(work.dlsite.rjCode!);
         if (!fetched.ok) continue;
         const tags = dedupeTags(
           normalizeTags(["サークル/fixtureサークル", "cv/fixture CV", "genre/テスト"]),
@@ -103,7 +102,8 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
         : state.works;
       const targets = requested.filter(
         (work) =>
-          work.dlsite.rjCode && (work.dlsite.status === "none" || work.dlsite.status === "error"),
+          hasRjCode(work.dlsite) &&
+          (work.dlsite.status === "none" || work.dlsite.status === "error"),
       );
       const result: DlsiteBulkResult = {
         fetched: 0,
