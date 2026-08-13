@@ -49,7 +49,7 @@ export class ScanUpsertBatch {
     this.errors.push({ id, physicalPath, metaPath, message });
   }
 
-  /** staging後にsidecarが変わった作品は今回の世代から除外する。 */
+  /** staging後にmimimilli.jsonが変わった作品は今回の世代から除外する。 */
   discardChangedSources(): string[] {
     const changed: string[] = [];
     const retained = this.queue.filter((item) => {

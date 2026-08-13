@@ -114,7 +114,7 @@ export type DlsiteApplyBodyInput = z.input<typeof dlsiteApplyBodySchema>;
 /** サーバーがパース後に扱う型（applyTags は正規化済み NormalizedTag[]） */
 export type DlsiteApplyBody = z.output<typeof dlsiteApplyBodySchema>;
 
-/** 新規登録時はsidecarがまだ存在しないためCASトークンを持たない。 */
+/** 新規登録時はmimimilli.jsonがまだ存在しないためCASトークンを持たない。 */
 export const dlsiteRegistrationBodySchema = dlsiteApplyBodySchema.omit({ sourceRevision: true });
 export type DlsiteRegistrationBody = z.output<typeof dlsiteRegistrationBodySchema>;
 

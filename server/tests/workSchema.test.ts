@@ -56,7 +56,7 @@ test("Playlist ID・Track IDとdefaultPlaylistIdの不変条件を検証する",
   );
 });
 
-test("formatVersionのない既存sidecarは自動互換せず拒否する", () => {
+test("formatVersionのない既存mimimilli.jsonは自動互換せず拒否する", () => {
   const meta = {
     ...validMeta(),
     dlsite: {

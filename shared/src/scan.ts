@@ -13,11 +13,11 @@ export const scanCandidateSchema = z.object({
 });
 export type ScanCandidate = z.infer<typeof scanCandidateSchema>;
 
-export const invalidSidecarSchema = z.object({
+export const invalidMetaFileSchema = z.object({
   path: workspacePathSchema,
   message: z.string().min(1),
 });
-export type InvalidSidecar = z.infer<typeof invalidSidecarSchema>;
+export type InvalidMetaFile = z.infer<typeof invalidMetaFileSchema>;
 
 export const scanCandidatesResponseSchema = z.object({ candidates: z.array(scanCandidateSchema) });
 export const scanCandidatesMutationSchema = z.object({
@@ -57,7 +57,7 @@ export const scanResultSchema = z.object({
   unreadablePaths: z.array(z.string()).optional(),
   /** finalize 時の listSummaries でタグ等の不整合により除外した作品 */
   dataIntegrityWarning: dataIntegrityWarningSchema.optional(),
-  /** 同じ Work ID を持つ sidecar が複数見つかった診断。paths はroot相対・separator正規化済みのportable pathで、相互参照用に全件を含む。 */
+  /** 同じ Work ID を持つ mimimilli.json が複数見つかった診断。paths はroot相対・separator正規化済みのportable pathで、相互参照用に全件を含む。 */
   identityConflicts: z.array(
     z.object({
       kind: z.literal("identity_conflict"),
@@ -65,9 +65,9 @@ export const scanResultSchema = z.object({
       paths: z.array(z.string()).min(2),
     }),
   ),
-  /** 読み取りまたは検証に失敗したsidecar。pathはroot相対のportable path。 */
-  invalidSidecars: z.array(invalidSidecarSchema),
-  /** sidecar を持たない音声フォルダー。scan はこの候補へ書き込まない。 */
+  /** 読み取りまたは検証に失敗した作品情報ファイル。pathはroot相対のportable path。 */
+  invalidMetaFiles: z.array(invalidMetaFileSchema),
+  /** mimimilli.json を持たない音声フォルダー。scan はこの候補へ書き込まない。 */
   candidates: z.array(scanCandidateSchema),
 });
 export type ScanResult = z.infer<typeof scanResultSchema>;

@@ -1,6 +1,6 @@
 import { DEFAULT_TAG_PREFIXES } from "@mimimilli/shared";
 import type {
-  InvalidSidecar,
+  InvalidMetaFile,
   ResumeBody,
   ScanCandidate,
   ScanDiagnostic,
@@ -33,7 +33,7 @@ export interface FixtureState {
   identityConflicts: ScanDiagnostic[];
   scanCandidates: ScanCandidate[];
   scanIdentityConflicts: ScanDiagnostic[];
-  scanInvalidSidecars: InvalidSidecar[];
+  scanInvalidMetaFiles: InvalidMetaFile[];
 }
 
 export interface FixtureAdapterOptions {
@@ -81,7 +81,7 @@ export function createInitialState(options: FixtureAdapterOptions): FixtureState
         : [],
     scanCandidates: scenario.scanCandidates,
     scanIdentityConflicts: scenario.scanIdentityConflicts,
-    scanInvalidSidecars: scenario.scanInvalidSidecars,
+    scanInvalidMetaFiles: scenario.scanInvalidMetaFiles,
   };
 }
 

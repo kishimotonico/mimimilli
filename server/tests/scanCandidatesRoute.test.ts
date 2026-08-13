@@ -119,7 +119,7 @@ test("候補登録APIは全失敗を成功なしの結果として返し、stale
     registerScanCandidates: async () =>
       scanCandidatesRegisterResponseSchema.parse({
         registered: [],
-        failures: [{ path: "候補作品", message: "sidecarの生成に失敗しました" }],
+        failures: [{ path: "候補作品", message: "mimimilli.jsonの生成に失敗しました" }],
       }),
   });
   try {
@@ -131,7 +131,7 @@ test("候補登録APIは全失敗を成功なしの結果として返し、stale
     assert.equal(failed.status, 201);
     assert.deepEqual(await failed.json(), {
       registered: [],
-      failures: [{ path: "候補作品", message: "sidecarの生成に失敗しました" }],
+      failures: [{ path: "候補作品", message: "mimimilli.jsonの生成に失敗しました" }],
     });
   } finally {
     await app.shutdown();

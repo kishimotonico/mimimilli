@@ -16,7 +16,7 @@ const emptyResult: ScanResult = {
   skipped: 0,
   coverErrors: 0,
   identityConflicts: [],
-  invalidSidecars: [],
+  invalidMetaFiles: [],
   candidates: [],
 };
 
@@ -63,7 +63,7 @@ test("完了時に scan カテゴリの INFO 要約ログを1回記録する", a
         paths: ["copy-a/mimimilli.json", "copy-b/mimimilli.json"],
       },
     ],
-    invalidSidecars: [],
+    invalidMetaFiles: [],
     unreadablePaths,
     dataIntegrityWarning: { skippedCount: 1, skippedWorkIds: ["bad-work"] },
   };

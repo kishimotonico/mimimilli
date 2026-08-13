@@ -25,7 +25,7 @@ function mediaEntry(workDir: string, relativePath: string): MediaEntry {
   }
 }
 
-/** sidecarのexact bytes。外部編集とのCASとpublish直前の再検証に使う。 */
+/** mimimilli.jsonのexact bytes。外部編集とのCASとpublish直前の再検証に使う。 */
 export function computeSourceRevision(bytes: Buffer): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
