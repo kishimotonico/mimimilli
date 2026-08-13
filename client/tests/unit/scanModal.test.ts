@@ -161,6 +161,15 @@ function seedScanQueries(
       stats: { trackCount: 0, durationSec: 0 },
     });
   }
+  // ID重複の診断（TASK-322で常に最新を購読する）。未シードだとテストごとに実fetchへ
+  // 落ちてしまうため、明示的な指定がなければ空で固定する。
+  if (queryClient.getQueryData(SCAN_QUERY_KEYS.diagnostics()) === undefined) {
+    queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), { diagnostics: [] });
+  }
+}
+
+function openTab(name: string) {
+  fireEvent.click(screen.getByRole("tab", { name: new RegExp(`^${name}`) }));
 }
 
 function renderModal(
@@ -225,6 +234,7 @@ describe("ScanModal", () => {
     const onClose = vi.fn();
     renderModal({ onClose });
 
+    openTab("新規登録済み");
     await waitFor(() => screen.getByText(newWork.title));
     fireEvent.click(screen.getByText(newWork.title));
 
@@ -253,6 +263,7 @@ describe("ScanModal", () => {
     const onClose = vi.fn();
     renderModal({ onClose });
 
+    openTab("新規登録済み");
     await waitFor(() => screen.getByText(newWork.title));
     fireEvent.click(screen.getByText(newWork.title));
     expect(screen.getByDisplayValue(newWork.title)).toBeInTheDocument();
@@ -269,6 +280,7 @@ describe("ScanModal", () => {
     const onClose = vi.fn();
     renderModal({ onClose });
 
+    openTab("新規登録済み");
     await waitFor(() => screen.getByText(newWork.title));
     fireEvent.click(screen.getByText(newWork.title));
     expect(screen.getByDisplayValue(newWork.title)).toBeInTheDocument();
@@ -288,7 +300,7 @@ describe("ScanModal", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it("実行中はフェーズと進捗を表示し、直前の統計は残したまま中止ボタンを表示する", () => {
+  it("実行中はフェーズと進捗を表示し、中止ボタンを表示する", () => {
     const onClose = vi.fn();
     const { onCancel } = renderModal(
       { onClose },
@@ -300,8 +312,6 @@ describe("ScanModal", () => {
     expect(screen.getByRole("dialog", { name: "スキャン" })).toBeInTheDocument();
     expect(screen.getByText("作品を登録中")).toBeInTheDocument();
     expect(screen.getByText("3/12")).toBeInTheDocument();
-    // 実行中も統計バッジは直前の値のまま表示され続ける（画面が切り替わったように見せない）
-    expect(screen.getByText(String(scanResult.registered))).toBeInTheDocument();
 
     // 閉じるは常設のヘッダーアイコンで、バックグラウンド継続の案内文だけが実行中に出る
     expect(screen.getByText("閉じてもバックグラウンドで続行します")).toBeInTheDocument();
@@ -313,53 +323,45 @@ describe("ScanModal", () => {
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
-  it("前回結果が無ければ統計は未計測（—）のままスキャン開始ボタンを表示する", () => {
+  it("前回結果が無ければ左リストの集計は未計測（—）のままスキャン開始ボタンを表示する", () => {
     const { onStart } = renderModal({ lastResult: null });
 
-    // 「今回のスキャン」の4枠は未計測、ライブラリ全体の件数は別枠で表示される
-    expect(screen.getAllByText("—")).toHaveLength(4);
+    expect(screen.getByText("更新なし")).toBeInTheDocument();
     expect(screen.getByText("ライブラリ全体")).toBeInTheDocument();
     expect(screen.getByText("11")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /スキャン開始/ }));
     expect(onStart).toHaveBeenCalledTimes(1);
   });
 
-  it("蔵書が0件でも「今回のスキャン」が全て0とライブラリ全体の0件は別枠で区別される", () => {
+  it("蔵書が0件でもライブラリ全体の0件が表示される", () => {
     renderModal({
       lastResult: { ...scanResult, registered: 0, insertedWorkIds: [], updatedWorkIds: [] },
       libraryTotal: 0,
     });
 
-    expect(screen.getByText("ライブラリ全体")).toBeInTheDocument();
-    // ライブラリ全体の0件と「今回のスキャン」の登録済み0件が同じ「0」でも別要素として存在する
-    expect(screen.getAllByText("0").length).toBeGreaterThanOrEqual(2);
+    const totalLabel = screen.getByText("ライブラリ全体");
+    expect(totalLabel.parentElement?.textContent).toContain("0");
   });
 
-  it("実行中から完了への遷移を見ていたときだけ、完了サインと変化した統計の強調が一時的に出る", async () => {
+  it("実行中から完了への遷移を見ていたときだけ、完了サインが一時的に出る", async () => {
     vi.useFakeTimers();
     try {
-      const before: ScanResult = { ...scanResult, registered: 5, insertedWorkIds: [] };
-      const after: ScanResult = { ...scanResult, registered: 6, insertedWorkIds: [newWork.id] };
       const { store, rerenderModal } = renderModal(
-        { lastResult: before },
+        { lastResult: scanResult },
         { job: createRunningJob({ phase: "registering", processed: 1, total: 1 }) },
       );
 
       act(() => {
         store.set(scanJobAtom, null);
-        rerenderModal({ lastResult: after, lastScanTime: "2026-01-01T00:00:00.000Z" });
+        rerenderModal({ lastScanTime: "2026-01-01T00:00:00.000Z" });
       });
 
       expect(screen.getByText("完了しました")).toBeInTheDocument();
-      // 変化した「登録済み」の値は強調用の背景クラスが付く
-      const registeredValue = screen.getByText("6");
-      expect(registeredValue.parentElement?.className).toContain("bg-[color-mix");
 
       // レイアウトは動かさず、時間経過（ScanModal の COMPLETION_HINT_MS=2400 と
-      // StatusRow AnimatePresence（fade variant）の退出時間=150ms）で最終スキャン表示と
-      // 通常の枠色に自然に戻る。2回に分けて進めるのは、退出アニメーション開始（状態遷移で
-      // AnimatePresence が退出フェーズへ入るタイミング）が一括advanceだと後続タイマーとして
-      // 拾われないため。
+      // AnimatePresence（fade variant）の退出時間=150ms）で最終スキャン表示へ自然に戻る。
+      // 2回に分けて進めるのは、退出アニメーション開始（状態遷移でAnimatePresenceが退出
+      // フェーズへ入るタイミング）が一括advanceだと後続タイマーとして拾われないため。
       await act(async () => {
         await vi.advanceTimersByTimeAsync(2450);
       });
@@ -375,8 +377,6 @@ describe("ScanModal", () => {
         await vi.advanceTimersByTimeAsync(500);
       });
       expect(screen.queryByText("完了しました")).toBeNull();
-      expect(screen.getByText(/最終スキャン/)).toBeInTheDocument();
-      expect(registeredValue.parentElement?.className).not.toContain("bg-[color-mix");
     } finally {
       vi.useRealTimers();
     }
@@ -392,6 +392,7 @@ describe("ScanModal", () => {
     const { rerenderModal } = renderModal({
       lastResult: { ...scanResult, insertedWorkIds: [workA.id] },
     });
+    openTab("新規登録済み");
     await waitFor(() => expect(screen.getByText(workA.title)).toBeInTheDocument());
 
     rerenderModal({ lastResult: { ...scanResult, insertedWorkIds: [workB.id] } });
@@ -411,6 +412,7 @@ describe("ScanModal", () => {
     for (const id of manyIds) worksById.set(id, toListItem(id, id, 1));
 
     renderModal({ lastResult: { ...scanResult, insertedWorkIds: manyIds } });
+    openTab("新規登録済み");
 
     await waitFor(() => expect(screen.getByText("work-many-0")).toBeInTheDocument());
     expect(
@@ -433,17 +435,22 @@ describe("ScanModal", () => {
     });
 
     renderModal();
+    openTab("新規登録済み");
 
     await waitFor(() =>
       expect(screen.getByText("新規作品の読み込みに失敗しました")).toBeInTheDocument(),
     );
-    expect(screen.getByText(String(scanResult.insertedWorkIds.length))).toBeInTheDocument();
+    // 一覧の取得に失敗しても、左リストのバッジ件数（lastResultから直接計算）は出続ける
+    expect(
+      screen.getByRole("tab", { name: `新規登録済み（${scanResult.insertedWorkIds.length}件）` }),
+    ).toBeInTheDocument();
     expect(screen.queryByText(newWork.title)).toBeNull();
   });
 
   it("タイトル保存に失敗したときエラーを表示し、ローカル表示は更新されない", async () => {
     vi.spyOn(workApi, "patchWork").mockRejectedValue(new Error("network error"));
     renderModal();
+    openTab("新規登録済み");
 
     await waitFor(() => screen.getByText(newWork.title));
     fireEvent.click(screen.getByText(newWork.title));
@@ -462,6 +469,7 @@ describe("ScanModal", () => {
   it("タイトル保存に成功したとき表示名が更新され編集モードが閉じる", async () => {
     vi.spyOn(workApi, "patchWork").mockResolvedValue({ ...work, title: "新しいタイトル" });
     renderModal();
+    openTab("新規登録済み");
 
     await waitFor(() => screen.getByText(newWork.title));
     fireEvent.click(screen.getByText(newWork.title));
@@ -477,6 +485,7 @@ describe("ScanModal", () => {
     const updatedWork: Work = { ...work, title: "新しいタイトル" };
     vi.spyOn(workApi, "patchWork").mockResolvedValue(updatedWork);
     const { queryClient } = renderModal();
+    openTab("新規登録済み");
 
     await waitFor(() => screen.getByText(newWork.title));
     fireEvent.click(screen.getByText(newWork.title));
@@ -496,6 +505,7 @@ describe("ScanModal", () => {
   it("空文字・空白のみのタイトルは保存されず編集モードだけ閉じる", async () => {
     const patchSpy = vi.spyOn(workApi, "patchWork");
     renderModal();
+    openTab("新規登録済み");
 
     await waitFor(() => screen.getByText(newWork.title));
     fireEvent.click(screen.getByText(newWork.title));
@@ -543,6 +553,9 @@ describe("ScanModalと他画面が同じlibraryTotalQueryOptionsを共有する�
         return Promise.resolve(
           jsonResponse({ items: [], total: 42, stats: { trackCount: 0, durationSec: 0 } }),
         );
+      }
+      if (url.pathname === "/api/scan/diagnostics") {
+        return Promise.resolve(jsonResponse({ diagnostics: [] }));
       }
       return Promise.reject(new Error(`unexpected fetch: ${url.toString()}`));
     });

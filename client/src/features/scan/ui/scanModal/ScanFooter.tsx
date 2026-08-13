@@ -1,9 +1,35 @@
-import { motion, useIsPresent } from "motion/react";
+import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import { useMotionVariants } from "../../../../shared/ui/useMotionVariants";
 import { I } from "../../../../shared/ui/Icon";
 
+export interface ScanFooterProps {
+  scanning: boolean;
+  onCancel: () => void;
+  onFullScan: () => void;
+  onStart: () => void;
+}
+
+export default function ScanFooter({ scanning, onCancel, onFullScan, onStart }: ScanFooterProps) {
+  return (
+    <footer className="relative flex shrink-0 items-center justify-between gap-3 border-t border-line-soft px-[18px] py-3">
+      <AnimatePresence initial={false}>{scanning && <ScanFooterHint key="hint" />}</AnimatePresence>
+      <div className="relative flex shrink-0 items-center gap-2">
+        <AnimatePresence initial={false}>
+          {scanning && <ScanCancelButton key="cancel" onClick={onCancel} />}
+        </AnimatePresence>
+        <AnimatePresence initial={false}>
+          {!scanning && <ScanFullScanButton key="fullscan" onClick={onFullScan} />}
+        </AnimatePresence>
+        <AnimatePresence initial={false}>
+          {!scanning && <ScanStartButton key="start" onClick={onStart} />}
+        </AnimatePresence>
+      </div>
+    </footer>
+  );
+}
+
 /** フッターの「閉じてもバックグラウンドで続行します」ヒント。中止ボタンと同時に出る。 */
-export function ScanFooterHint() {
+function ScanFooterHint() {
   const { fade } = useMotionVariants();
   const isPresent = useIsPresent();
   const v = fade();
@@ -14,7 +40,7 @@ export function ScanFooterHint() {
   );
 }
 
-export function ScanCancelButton({ onClick }: { onClick: () => void }) {
+function ScanCancelButton({ onClick }: { onClick: () => void }) {
   const { fade } = useMotionVariants();
   const isPresent = useIsPresent();
   const v = fade();
@@ -32,7 +58,7 @@ export function ScanCancelButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-export function ScanFullScanButton({ onClick }: { onClick: () => void }) {
+function ScanFullScanButton({ onClick }: { onClick: () => void }) {
   const { fade } = useMotionVariants();
   const isPresent = useIsPresent();
   const v = fade();
@@ -50,7 +76,7 @@ export function ScanFullScanButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-export function ScanStartButton({ onClick }: { onClick: () => void }) {
+function ScanStartButton({ onClick }: { onClick: () => void }) {
   const { fade } = useMotionVariants();
   const isPresent = useIsPresent();
   const v = fade();

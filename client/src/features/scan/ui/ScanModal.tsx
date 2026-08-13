@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAtomValue } from "jotai";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AnimatePresence } from "motion/react";
 import { WORKS_DEFAULT_PAGE_SIZE, type WorkListItem, type WorksPage } from "@mimimilli/shared";
 import { getWork, patchWork, searchWorks } from "../../../entities/work/api";
 import { assertWorkSourceRevision } from "../../../entities/work/sourceRevision";
@@ -14,19 +13,15 @@ import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
 import { scanningAtom, scanProgressAtom } from "../../../entities/scan/model/atoms";
 import { useScanActions } from "../../../entities/scan/useScanActions";
-import { getLastScanResult, SCAN_QUERY_KEYS } from "../api";
-import StatusRow from "./scanModal/StatusRow";
-import StatsGrid from "./scanModal/StatsGrid";
-import ScanWarnings from "./scanModal/ScanWarnings";
-import ScanNewWorks from "./scanModal/ScanNewWorks";
-import ScanReview from "./scanModal/ScanReview";
-import {
-  ScanCancelButton,
-  ScanFooterHint,
-  ScanFullScanButton,
-  ScanStartButton,
-} from "./scanModal/ScanFooterControls";
+import { getLastScanResult, getScanCandidates, getScanDiagnostics, SCAN_QUERY_KEYS } from "../api";
+import ScanSidebar from "./scanModal/ScanSidebar";
+import UnregisteredTab from "./scanModal/UnregisteredTab";
+import NeedsAttentionTab from "./scanModal/NeedsAttentionTab";
+import NewlyRegisteredTab from "./scanModal/NewlyRegisteredTab";
+import UpdatedWorksTab from "./scanModal/UpdatedWorksTab";
+import ScanFooter from "./scanModal/ScanFooter";
 import { useScanCompletionHint } from "./scanModal/useScanCompletionHint";
+import type { ScanTabKey } from "./scanModal/types";
 
 interface ScanModalProps {
   lastScanTime: string | null;
@@ -61,41 +56,68 @@ export default function ScanModal({
   const progress = useAtomValue(scanProgressAtom);
   const { start, cancel } = useScanActions();
   const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState<ScanTabKey>("unregistered");
 
   // 前回スキャン結果（ディスク永続化なし、TASK-56）。サーバー起動後に一度でも完了していれば
   // GET /api/scan/last から取得でき、リロードをまたいでスキャンモーダルに表示できる。
-  // App から降ろした購読（TASK-124）: 唯一の消費者であるここで直接持つ。
   const lastScanQuery = useQuery({
     queryKey: SCAN_QUERY_KEYS.last(),
     queryFn: getLastScanResult,
   });
   const lastResult = lastScanQuery.data?.result ?? null;
+
+  const candidatesQuery = useQuery({
+    queryKey: SCAN_QUERY_KEYS.candidates(),
+    queryFn: getScanCandidates,
+    enabled: (lastResult?.candidates.length ?? 0) > 0,
+    initialData: lastResult && lastResult.candidates.length > 0 ? lastResult.candidates : undefined,
+  });
+  const candidates = candidatesQuery.data ?? lastResult?.candidates ?? [];
+
+  // ID重複はFilesでの解決を随時反映する必要があるため、スキャン時点のスナップショットではなく
+  // 常に最新の診断を購読する（TASK-322）。FilePreview の解決操作が同じキーを無効化する。
+  const diagnosticsQuery = useQuery({
+    queryKey: SCAN_QUERY_KEYS.diagnostics(),
+    queryFn: getScanDiagnostics,
+  });
+  const identityConflicts = diagnosticsQuery.data?.diagnostics ?? [];
+  const invalidMetaFiles = lastResult?.invalidMetaFiles ?? [];
+  const rjCodeMissingCount = lastResult?.rjCodeMissingCount ?? 0;
+  const dataIntegrityWarning = lastResult?.dataIntegrityWarning;
+
   const insertedWorkIds = lastResult?.insertedWorkIds ?? EMPTY_WORK_IDS;
-  // 初回フルスキャン等でinsertedWorkIdsが数千〜数万件になりうるため、表示・取得は先頭の
-  // 1ページ分（WORKS_DEFAULT_PAGE_SIZE）に制限する。全件をidsへ載せるとURLとSQLite
-  // 束縛パラメータの上限を超える。省略が発生したかはScanNewWorks側の表示に渡す。
-  const visibleWorkIds = useMemo(
+  const updatedWorkIds = lastResult?.updatedWorkIds ?? EMPTY_WORK_IDS;
+  // insertedWorkIds/updatedWorkIdsが数千〜数万件になりうるため、表示・取得は先頭の1ページ分
+  // （WORKS_DEFAULT_PAGE_SIZE）に制限する。全件をidsへ載せるとURLとSQLite束縛パラメータの
+  // 上限を超える。省略が発生したかは各タブ側の表示に渡す。
+  const visibleInsertedIds = useMemo(
     () => insertedWorkIds.slice(0, WORKS_DEFAULT_PAGE_SIZE),
     [insertedWorkIds],
   );
-  const truncatedTotal =
-    insertedWorkIds.length > visibleWorkIds.length ? insertedWorkIds.length : null;
+  const truncatedInsertedTotal =
+    insertedWorkIds.length > visibleInsertedIds.length ? insertedWorkIds.length : null;
+  const visibleUpdatedIds = useMemo(
+    () => updatedWorkIds.slice(0, WORKS_DEFAULT_PAGE_SIZE),
+    [updatedWorkIds],
+  );
+  const truncatedUpdatedTotal =
+    updatedWorkIds.length > visibleUpdatedIds.length ? updatedWorkIds.length : null;
 
-  // 新規作品の表示用データ（title/trackCount）は visibleWorkIds を1回のworks一覧クエリで引く。
-  // WORK_QUERY_KEYS.list() 配下に載るため、DLsite一括取得完了時のWORK_QUERY_KEYS.all()
+  // 新規登録済み作品の表示用データ（title/trackCount）は visibleInsertedIds を1回のworks一覧
+  // クエリで引く。WORK_QUERY_KEYS.list() 配下に載るため、DLsite一括取得完了時のWORK_QUERY_KEYS.all()
   // 無効化に自動で乗る（追加の無効化配線は不要）。
-  const newWorksParams = useMemo(() => ({ ids: visibleWorkIds }), [visibleWorkIds]);
+  const newWorksParams = useMemo(() => ({ ids: visibleInsertedIds }), [visibleInsertedIds]);
   const newWorksQuery = useQuery({
     queryKey: WORK_QUERY_KEYS.list(newWorksParams),
     queryFn: () => searchWorks(newWorksParams),
-    enabled: visibleWorkIds.length > 0,
+    enabled: visibleInsertedIds.length > 0,
   });
   const newWorksError = newWorksQuery.isError
     ? apiErrorMessage(newWorksQuery.error, "新規作品の読み込みに失敗しました")
     : null;
   const newWorkOrder = useMemo(
-    () => new Map(visibleWorkIds.map((id, index) => [id, index])),
-    [visibleWorkIds],
+    () => new Map(visibleInsertedIds.map((id, index) => [id, index])),
+    [visibleInsertedIds],
   );
   const newWorks: WorkListItem[] = useMemo(
     () =>
@@ -105,10 +127,28 @@ export default function ScanModal({
     [newWorksQuery.data, newWorkOrder],
   );
 
+  const updatedWorksParams = useMemo(() => ({ ids: visibleUpdatedIds }), [visibleUpdatedIds]);
+  const updatedWorksQuery = useQuery({
+    queryKey: WORK_QUERY_KEYS.list(updatedWorksParams),
+    queryFn: () => searchWorks(updatedWorksParams),
+    enabled: visibleUpdatedIds.length > 0,
+  });
+  const updatedWorksError = updatedWorksQuery.isError
+    ? apiErrorMessage(updatedWorksQuery.error, "更新された作品の読み込みに失敗しました")
+    : null;
+  const updatedWorkOrder = useMemo(
+    () => new Map(visibleUpdatedIds.map((id, index) => [id, index])),
+    [visibleUpdatedIds],
+  );
+  const updatedWorks: WorkListItem[] = useMemo(
+    () =>
+      [...(updatedWorksQuery.data?.items ?? [])].sort(
+        (a, b) => (updatedWorkOrder.get(a.id) ?? 0) - (updatedWorkOrder.get(b.id) ?? 0),
+      ),
+    [updatedWorksQuery.data, updatedWorkOrder],
+  );
+
   // ライブラリ総件数（サイドバーの「ライブラリ N 件」と同じ既存クエリキーを共有する）。
-  // スキャンモーダルで統計バッジが全て0でも蔵書自体は0件ではないことを示すために使う。
-  // App から降ろした購読（TASK-124）。queryKey/queryFn は libraryTotalQueryOptions を
-  // 共有し、同じキーに違う形のデータを期待する食い違い（TASK-188）を型で防ぐ。
   const libraryTotalQuery = useQuery(libraryTotalQueryOptions);
   const libraryTotal = libraryTotalQuery.data?.total ?? null;
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -135,7 +175,20 @@ export default function ScanModal({
     },
   });
 
-  const { showCompletedHint, changedKeys } = useScanCompletionHint(scanning, lastResult);
+  const { showCompletedHint } = useScanCompletionHint(scanning);
+
+  const needsAttentionCount =
+    identityConflicts.reduce((total, conflict) => total + conflict.paths.length, 0) +
+    invalidMetaFiles.length +
+    (rjCodeMissingCount > 0 ? 1 : 0) +
+    (dataIntegrityWarning ? 1 : 0);
+
+  const counts: Record<ScanTabKey, number> = {
+    unregistered: candidates.length,
+    needsAttention: needsAttentionCount,
+    newlyRegistered: insertedWorkIds.length,
+    updated: updatedWorkIds.length,
+  };
 
   // タイトル編集中は編集だけをキャンセルし、モーダル自体は閉じない。
   // 実行中でも閉じられるが、スキャン自体はバックグラウンドで継続する（TASK-56）。
@@ -183,7 +236,7 @@ export default function ScanModal({
       aria-labelledby="scan-modal-title"
       onCancel={handleCancel}
       onClick={handleBackdropClick}
-      className="m-auto w-[min(460px,calc(100vw-32px))] overflow-hidden rounded-[12px] border border-line-soft bg-paper-1 p-0 font-jp text-ink-0 shadow-pop backdrop:bg-[oklch(20%_0.020_70_/_0.3)]"
+      className="m-auto w-[min(740px,calc(100vw-32px))] overflow-hidden rounded-[12px] border border-line-soft bg-paper-1 p-0 font-jp text-ink-0 shadow-pop backdrop:bg-[oklch(20%_0.020_70_/_0.3)]"
     >
       <div className="flex max-h-[min(80vh,calc(100vh-32px))] min-h-0 flex-col overflow-hidden">
         <header className="flex shrink-0 items-center gap-2 border-b border-line-soft px-[18px] py-[14px]">
@@ -194,49 +247,40 @@ export default function ScanModal({
           <IconButton icon={I.x} label="閉じる" size="sm" onClick={dismiss} />
         </header>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-[18px] py-4">
-          <StatusRow
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          <ScanSidebar
+            active={activeTab}
+            onSelect={setActiveTab}
+            counts={counts}
+            skippedCount={lastResult?.skipped ?? null}
+            libraryTotal={libraryTotal}
             scanning={scanning}
             progress={progress}
             lastScanTime={lastScanTime}
             showCompletedHint={showCompletedHint}
           />
-
-          <div className="flex items-baseline justify-between gap-2">
-            <span className="font-jp text-[11.5px] text-ink-2">ライブラリ全体</span>
-            <span className="font-mono text-[13px] font-semibold text-ink-0 tabular-nums">
-              {libraryTotal ?? "—"}
-              <span className="ml-1 font-jp text-[10px] font-normal text-ink-3">件</span>
-            </span>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <p className="font-sans text-[9.5px] font-semibold tracking-[0.06em] text-ink-3 uppercase">
-              今回のスキャン
-            </p>
-            <StatsGrid result={lastResult} changedKeys={changedKeys} />
-          </div>
-
-          <AnimatePresence initial={false}>
-            {lastResult &&
-              (lastResult.rjCodeMissingCount > 0 || !!lastResult.dataIntegrityWarning) && (
-                <ScanWarnings
-                  key="warnings"
-                  lastResult={lastResult}
-                  onOpenRjCodeMissing={onOpenRjCodeMissing}
-                />
-              )}
-          </AnimatePresence>
-
-          {lastResult && <ScanReview result={lastResult} onOpenFiles={onOpenFiles} />}
-
-          <AnimatePresence initial={false}>
-            {(newWorks.length > 0 || !!newWorksError) && (
-              <ScanNewWorks
-                key="new-works"
+          <div
+            role="tabpanel"
+            id={`scan-tabpanel-${activeTab}`}
+            aria-labelledby={`scan-tab-${activeTab}`}
+            className="min-h-0 flex-1 overflow-y-auto px-[18px] py-4"
+          >
+            {activeTab === "unregistered" && <UnregisteredTab candidates={candidates} />}
+            {activeTab === "needsAttention" && (
+              <NeedsAttentionTab
+                identityConflicts={identityConflicts}
+                invalidMetaFiles={invalidMetaFiles}
+                rjCodeMissingCount={rjCodeMissingCount}
+                dataIntegrityWarning={dataIntegrityWarning}
+                onOpenFiles={onOpenFiles}
+                onOpenRjCodeMissing={onOpenRjCodeMissing}
+              />
+            )}
+            {activeTab === "newlyRegistered" && (
+              <NewlyRegisteredTab
                 newWorks={newWorks}
                 newWorksError={newWorksError}
-                truncatedTotal={truncatedTotal}
+                truncatedTotal={truncatedInsertedTotal}
                 editingId={editingId}
                 editTitle={editTitle}
                 editSaving={editSaving}
@@ -247,27 +291,22 @@ export default function ScanModal({
                 onSaveTitle={handleSaveTitle}
               />
             )}
-          </AnimatePresence>
+            {activeTab === "updated" && (
+              <UpdatedWorksTab
+                updatedWorks={updatedWorks}
+                updatedWorksError={updatedWorksError}
+                truncatedTotal={truncatedUpdatedTotal}
+              />
+            )}
+          </div>
         </div>
 
-        <footer className="relative flex shrink-0 items-center justify-between gap-3 border-t border-line-soft px-[18px] py-3">
-          <AnimatePresence initial={false}>
-            {scanning && <ScanFooterHint key="hint" />}
-          </AnimatePresence>
-          <div className="relative flex shrink-0 items-center gap-2">
-            <AnimatePresence initial={false}>
-              {scanning && <ScanCancelButton key="cancel" onClick={() => void cancel()} />}
-            </AnimatePresence>
-            <AnimatePresence initial={false}>
-              {!scanning && (
-                <ScanFullScanButton key="fullscan" onClick={() => void start({ full: true })} />
-              )}
-            </AnimatePresence>
-            <AnimatePresence initial={false}>
-              {!scanning && <ScanStartButton key="start" onClick={() => void start()} />}
-            </AnimatePresence>
-          </div>
-        </footer>
+        <ScanFooter
+          scanning={scanning}
+          onCancel={() => void cancel()}
+          onFullScan={() => void start({ full: true })}
+          onStart={() => void start()}
+        />
       </div>
     </dialog>
   );

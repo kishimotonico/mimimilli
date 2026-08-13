@@ -3,10 +3,12 @@
 import { act, createElement } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import TopBar from "../../src/app/ui/TopBar";
 import { librarySearchQueryAtom } from "../../src/entities/library/model/navigationAtoms";
 import { appModeAtom } from "../../src/features/navigation/model/navigationAtoms";
+import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
 
 const PLACEHOLDER = /ライブラリを検索/;
 
@@ -15,15 +17,24 @@ function renderTopBar(initialQuery = "") {
   store.set(appModeAtom, "library");
   store.set(librarySearchQueryAtom, initialQuery);
 
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
+  });
+  queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), []);
+
   render(
     createElement(
-      JotaiProvider,
-      { store },
-      createElement(TopBar, {
-        onOpenScan: vi.fn(),
-        onSettings: vi.fn(),
-        notificationBell: createElement("span", { "aria-label": "通知" }),
-      }),
+      QueryClientProvider,
+      { client: queryClient },
+      createElement(
+        JotaiProvider,
+        { store },
+        createElement(TopBar, {
+          onOpenScan: vi.fn(),
+          onSettings: vi.fn(),
+          notificationBell: createElement("span", { "aria-label": "通知" }),
+        }),
+      ),
     ),
   );
   return store;
