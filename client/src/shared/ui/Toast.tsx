@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import { useMotionVariants } from "./useMotionVariants";
@@ -69,13 +69,12 @@ export default function Toast({ message, actionLabel, onAction, onDismiss }: Toa
   const anchorRef = useRef<HTMLSpanElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const visible = message != null;
-  const [ownerDialog, setOwnerDialog] = useState<HTMLDialogElement | null>(null);
+  // アンカーは初回マウント時点では未commitでnullだが、その時点では常にmessage===null
+  // （表示するものが無い）なので実害はない。以降の再描画では直前のcommitで既に
+  // アタッチ済みのため、レンダー中に読んでも1フレーム遅れて配置先が切り替わる
+  // （=一瞬だけ間違った位置に出る）ことはない。
+  const ownerDialog = anchorRef.current?.closest<HTMLDialogElement>("dialog:modal") ?? null;
   const insideDialog = ownerDialog !== null;
-
-  useLayoutEffect(() => {
-    if (!visible) return;
-    setOwnerDialog(anchorRef.current?.closest<HTMLDialogElement>("dialog:modal") ?? null);
-  }, [visible]);
 
   useLayoutEffect(() => {
     const el = popoverRef.current;
