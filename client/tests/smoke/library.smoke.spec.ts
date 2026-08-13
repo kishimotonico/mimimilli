@@ -207,8 +207,8 @@ test("未登録タブでRJコードを編集でき、候補を1件ずつ除外�
   await expect(unregistered.getByRole("row", { name: excludeRowName })).toBeHidden();
   await expect(dialog.getByRole("tab", { name: "未登録（1件）" })).toBeVisible();
 
-  await expect(page.getByText("「候補」を候補から外しました")).toBeVisible();
-  await page.getByRole("button", { name: "元に戻す" }).click();
+  await expect(dialog.getByText("「候補」を候補から外しました")).toBeVisible();
+  await dialog.getByRole("button", { name: "元に戻す" }).click();
 
   await expect(dialog.getByRole("tab", { name: "未登録（2件）" })).toBeVisible();
   await expect(unregistered.getByRole("row", { name: excludeRowName })).toBeVisible();
@@ -230,7 +230,7 @@ test("スキャン完了後に候補を選択登録でき、問題をFilesで確
   await expect(dialog.getByRole("tab", { name: "未登録（2件）" })).toBeVisible();
 
   await unregistered.getByRole("button", { name: "2件をライブラリに追加" }).click();
-  await expect(page.getByText("2件をライブラリに追加しました")).toBeVisible();
+  await expect(dialog.getByText("2件をライブラリに追加しました")).toBeVisible();
   await expect(dialog.getByRole("tab", { name: "未登録（0件）" })).toBeVisible();
 
   await dialog.getByRole("tab", { name: /^要対応/ }).click();
