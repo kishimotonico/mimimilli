@@ -119,7 +119,7 @@ export function createRealAdapter(
     requireRoot,
     cachedCover,
   });
-  const classificationMethods = createClassificationMethods({ query, user });
+  const classificationMethods = createClassificationMethods({ query, user, requireRoot });
 
   return {
     ...settingsScanMethods,

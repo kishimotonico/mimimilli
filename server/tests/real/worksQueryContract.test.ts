@@ -128,7 +128,7 @@ function baseQuery(overrides: Partial<WorksQuery> = {}): WorksQuery {
 
 function assertQueryEquivalent(queryRepo: WorkQueryRepository, query: WorksQuery): void {
   const fixture = applyWorksQuery(dataset, query);
-  const real = queryRepo.queryWorks(query);
+  const real = queryRepo.queryWorks(query, "/library");
   assert.deepEqual(
     real.items.map((work) => work.id),
     fixture.items.map((work) => work.id),
@@ -249,10 +249,14 @@ test("realのrandomはseedを発行し、同じseedの次要求でページ順�
   const { query: queryRepo, catalog, user } = createWorkRepos(db);
   try {
     for (const item of dataset) upsertTestWork(catalog, user, fullWork(item));
-    const first = queryRepo.queryWorks(baseQuery({ sort: "random", page: 2, limit: 8 }));
+    const first = queryRepo.queryWorks(
+      baseQuery({ sort: "random", page: 2, limit: 8 }),
+      "/library",
+    );
     assert.notEqual(first.seed, undefined);
     const repeated = queryRepo.queryWorks(
       baseQuery({ sort: "random", seed: first.seed, page: 2, limit: 8 }),
+      "/library",
     );
     assert.deepEqual(
       repeated.items.map((work) => work.id),
@@ -272,9 +276,9 @@ test("複数サークルタグのcircleNameはsharedとrealでUTF-8 BINARY順の
   };
   try {
     upsertTestWork(catalog, user, fullWork(item));
-    const page = queryRepo.queryWorks(baseQuery({ page: 1, limit: 1 }));
-    assert.equal(toWorkListItem(item).circleName, "Alpha");
-    assert.equal(page.items[0]?.circleName, toWorkListItem(item).circleName);
+    const page = queryRepo.queryWorks(baseQuery({ page: 1, limit: 1 }), "/library");
+    assert.equal(toWorkListItem(item, "/library").circleName, "Alpha");
+    assert.equal(page.items[0]?.circleName, toWorkListItem(item, "/library").circleName);
   } finally {
     db.close();
   }
@@ -393,7 +397,7 @@ function assertSmartFolderEquivalent(
   },
 ): void {
   const fixture = evalSmartFolder({ rules, sort }, dataset, query);
-  const real = querySmartFolderWorks(queryRepo, { rules, sort }, query);
+  const real = querySmartFolderWorks(queryRepo, { rules, sort }, query, "/library");
   assert.deepEqual(
     real.items.map((work) => work.id),
     fixture.items.map((work) => work.id),

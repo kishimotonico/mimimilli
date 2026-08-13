@@ -8,6 +8,7 @@ import {
   createFixtureScenario,
   LARGE_SCENARIO_WORK_COUNT,
 } from "../src/adapters/fixture/scenarios.ts";
+import { resolveRegisteredRjCode } from "../src/adapters/fixture/settingsScan.ts";
 
 function buildApp(scenario?: string) {
   return createApp(createFixtureAdapter({ scenario }));
@@ -38,7 +39,7 @@ test("new-work: スキャン結果に新規作品IDが含まれる", async () =>
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
   assert.ok(scanResult);
-  assert.deepEqual(scanResult.insertedWorkIds, ["RJ501011"]);
+  assert.deepEqual(scanResult.insertedWorkIds, ["RJ501011", "RJ501001", "RJ501003"]);
 
   // 新規作品自体は works 一覧に存在する（スキャンで見つかった扱い）
   const worksRes = await app.request("/api/works");
@@ -74,25 +75,31 @@ test("new-work: Files用診断とscan確認用の候補・問題を独立して�
     { path: "消えた候補", message: "候補が見つかりません" },
   ]);
 
+  // 候補承認はreal adapterのregisterCandidates（scanner.ts）と同じく、実際にcatalog
+  // （fixtureではstate.works）へ行を増やす。新規登録済みタブはこのworksを介して
+  // 承認分を表示するため、ここで見えなければタブにも出ない（TASK-328）。
+  const registeredWorkId = registration.registered[0]?.workId;
+  assert.ok(registeredWorkId);
+  const registeredWorksPage = await adapter.queryWorks({
+    q: "",
+    tags: { tags: [], yearValue: null },
+    tagOp: "AND",
+    sort: "id-asc",
+    ids: [registeredWorkId],
+  });
+  assert.equal(registeredWorksPage.items.length, 1);
+  assert.equal(registeredWorksPage.items[0]?.title, "未登録作品");
+
   await adapter.excludeScanCandidates(["朗読/候補"]);
   assert.deepEqual(await adapter.listScanCandidates(), []);
 });
 
-test("fixture: rjCode省略・空文字・指定を区別する", async () => {
-  const omitted = await createFixtureAdapter({ scenario: "new-work" }).registerScanCandidates([
-    { path: workspacePath("未登録作品") },
-  ]);
-  assert.match(omitted.registered[0]!.workId, /auto:none$/);
-
-  const empty = await createFixtureAdapter({ scenario: "new-work" }).registerScanCandidates([
-    { path: workspacePath("未登録作品"), rjCode: "" },
-  ]);
-  assert.match(empty.registered[0]!.workId, /explicit-empty$/);
-
-  const specified = await createFixtureAdapter({ scenario: "new-work" }).registerScanCandidates([
-    { path: workspacePath("未登録作品"), rjCode: "RJ111111" },
-  ]);
-  assert.match(specified.registered[0]!.workId, /RJ111111$/);
+test("fixture: rjCode省略・空文字・指定を区別する", () => {
+  // 省略=候補が検出した値を採用、空文字=明示的になし、値=そのまま採用（候補登録APIの規約）。
+  assert.equal(resolveRegisteredRjCode("RJ999999", undefined), "RJ999999");
+  assert.equal(resolveRegisteredRjCode("RJ999999", ""), null);
+  assert.equal(resolveRegisteredRjCode("RJ999999", "RJ111111"), "RJ111111");
+  assert.equal(resolveRegisteredRjCode(null, undefined), null);
 });
 
 test("empty: 作品・スマートフォルダーが0件", async () => {

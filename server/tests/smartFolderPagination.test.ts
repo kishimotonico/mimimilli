@@ -5,7 +5,6 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   emptyDlsiteState,
-  toWorkListItem,
   WORKS_DEFAULT_PAGE_SIZE,
   type SmartFolder,
   type WorksPage,
@@ -14,6 +13,7 @@ import {
 import { createApp } from "../src/app.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import { evalSmartFolder } from "../src/core/smartFolder.ts";
+import { toWorksPage } from "../src/core/worksQuery.ts";
 import { nts } from "./helpers/tag.ts";
 
 const RECENT = new Date(Date.now() - 5 * 86400000).toISOString();
@@ -55,14 +55,7 @@ function buildAppWithManyWorks(count = 210) {
   adapter.evalSmartFolder = async (id, query) => {
     if (id !== folder.id) return null;
     const page = evalSmartFolder(folder, manyWorks, query);
-    return page.seed === undefined
-      ? { items: page.items.map(toWorkListItem), total: page.total, stats: page.stats }
-      : {
-          items: page.items.map(toWorkListItem),
-          total: page.total,
-          stats: page.stats,
-          seed: page.seed,
-        };
+    return toWorksPage(page, "/library");
   };
   adapter.listSmartFolders = async () => [folder];
   return createApp(adapter);
@@ -108,14 +101,7 @@ test("randomソートは発行されたseedを次ページへ送ると重複・�
   adapter.evalSmartFolder = async (id, query) => {
     if (id !== folder.id) return null;
     const page = evalSmartFolder(folder, manyWorks, query);
-    return page.seed === undefined
-      ? { items: page.items.map(toWorkListItem), total: page.total, stats: page.stats }
-      : {
-          items: page.items.map(toWorkListItem),
-          total: page.total,
-          stats: page.stats,
-          seed: page.seed,
-        };
+    return toWorksPage(page, "/library");
   };
   adapter.listSmartFolders = async () => [folder];
   const app = createApp(adapter);
@@ -142,14 +128,7 @@ test("スマートフォルダー固有の sort が維持される", async () =>
   adapter.evalSmartFolder = async (id, query) => {
     if (id !== folder.id) return null;
     const page = evalSmartFolder(folder, manyWorks, query);
-    return page.seed === undefined
-      ? { items: page.items.map(toWorkListItem), total: page.total, stats: page.stats }
-      : {
-          items: page.items.map(toWorkListItem),
-          total: page.total,
-          stats: page.stats,
-          seed: page.seed,
-        };
+    return toWorksPage(page, "/library");
   };
   adapter.listSmartFolders = async () => [folder];
   const appSorted = createApp(adapter);

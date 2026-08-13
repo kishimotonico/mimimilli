@@ -133,6 +133,7 @@ test("ルールベース smart folder は壊れた候補を除外して WorksPag
       sort: "id-asc",
     },
     { page: 1, limit: 200 },
+    "/library",
   );
   assert.deepEqual(
     page.items.map((item) => item.id),
@@ -239,6 +240,7 @@ test("HTTP smart folder は dataIntegrityWarning を返す", async () => {
   const db = openFileDb(dir);
   const { catalog, user } = createWorkRepos(db);
   const { goodId, badId } = seedCorruptedPair(catalog, user, db);
+  user.setUserSetting("root_folder", "/library");
   const folder = user.createSmartFolder({
     name: "タグ一致",
     rules: [

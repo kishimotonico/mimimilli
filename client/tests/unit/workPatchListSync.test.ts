@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   WORKS_DEFAULT_PAGE_SIZE,
   emptyDlsiteState,
+  workspacePath,
   type Work,
   type WorkListItem,
 } from "@mimimilli/shared";
@@ -51,6 +52,8 @@ function makeWorkListItem(id: string, title = `作品 ${id}`): WorkListItem {
     bookmarked: false,
     lastPlayedAt: null,
     circleName: null,
+    relativePath: workspacePath(id),
+    dlsite: { rjCode: null, status: "none" },
   };
 }
 
@@ -146,6 +149,9 @@ function createFetchMock(total = WORKS_DEFAULT_PAGE_SIZE + 50) {
       if (path === "/api/tag-prefixes") return Promise.resolve(jsonResponse([]));
       if (path === "/api/tags") return Promise.resolve(jsonResponse([]));
       if (path === "/api/smart-folders") return Promise.resolve(jsonResponse([]));
+      if (path === "/api/settings") {
+        return Promise.resolve(jsonResponse({ rootFolder: "/lib", lastScanTime: null }));
+      }
 
       return Promise.reject(new Error(`unexpected fetch: ${url.toString()}`));
     }),

@@ -52,7 +52,7 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
 
   return {
     async queryWorks(params: WorksQuery): Promise<WorksPage> {
-      return toWorksPage(applyWorksQuery(state.works, params));
+      return toWorksPage(applyWorksQuery(state.works, params), state.rootFolder ?? "/library");
     },
 
     getWorkRegisterPreview,

@@ -45,7 +45,7 @@ export function createWorkMethods(deps: {
   const { db, query, catalog, user, scanner, requireRoot, cachedCover } = deps;
   return {
     async queryWorks(params: WorksQuery): Promise<WorksPage> {
-      return query.queryWorks(params);
+      return query.queryWorks(params, requireRoot());
     },
 
     async getDlsiteNotificationSummary(): Promise<DlsiteNotificationSummary> {

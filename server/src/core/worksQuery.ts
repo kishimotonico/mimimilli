@@ -23,15 +23,11 @@ import {
 /** 検索・フィルター・ソート中だけ使う内部ページ型。公開前にWorkListItemへ投影する。 */
 export type WorkSummaryPage = Omit<WorksPage, "items"> & { items: WorkSummary[] };
 
-export function toWorksPage(page: WorkSummaryPage): WorksPage {
+export function toWorksPage(page: WorkSummaryPage, root: string): WorksPage {
+  const items = page.items.map((work) => toWorkListItem(work, root));
   return page.seed === undefined
-    ? { items: page.items.map(toWorkListItem), total: page.total, stats: page.stats }
-    : {
-        items: page.items.map(toWorkListItem),
-        total: page.total,
-        stats: page.stats,
-        seed: page.seed,
-      };
+    ? { items, total: page.total, stats: page.stats }
+    : { items, total: page.total, stats: page.stats, seed: page.seed };
 }
 
 /** フィルター後・ページング前の集合からコレクション統計を求める。
