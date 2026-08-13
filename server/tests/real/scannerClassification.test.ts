@@ -35,6 +35,28 @@ test("スキャン分類: 初回は新規挿入、変更なし再スキャンは
   assert.deepEqual(third.updatedWorkIds, [lib.existingWorkId]);
 });
 
+test("候補登録: RJコード省略時はフォルダー名から自動検出する", async (t) => {
+  const directory = makeTestDirectory("scan-candidate-rj-auto");
+  t.after(directory.cleanup);
+  const root = join(directory.path, "lib");
+  const workDir = join(root, "RJ123456_自動検出作品");
+  mkdirSync(workDir, { recursive: true });
+  writeWav(join(workDir, "track.wav"), 1);
+
+  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
+  t.after(() => adapter.close());
+  await adapter.updateSettings({ rootFolder: root });
+  await adapter.scan();
+
+  const registered = await adapter.registerScanCandidates([
+    { path: workspacePath("RJ123456_自動検出作品") },
+  ]);
+  assert.equal(registered.registered.length, 1);
+
+  const meta = JSON.parse(readFileSync(join(workDir, "mimimilli.json"), "utf-8"));
+  assert.equal(meta.dlsite.rjCode, "RJ123456");
+});
+
 test("候補登録: RJコード指定をmimimilli.jsonへ書き込む", async (t) => {
   const directory = makeTestDirectory("scan-candidate-rj-code");
   t.after(directory.cleanup);
@@ -55,6 +77,30 @@ test("候補登録: RJコード指定をmimimilli.jsonへ書き込む", async (t
 
   const meta = JSON.parse(readFileSync(join(workDir, "mimimilli.json"), "utf-8"));
   assert.equal(meta.dlsite.rjCode, "RJ999999");
+});
+
+test("候補登録: RJコード空文字は自動検出せずRJコードなしで書き込む", async (t) => {
+  const directory = makeTestDirectory("scan-candidate-rj-empty");
+  t.after(directory.cleanup);
+  const root = join(directory.path, "lib");
+  const workDir = join(root, "RJ123456_誤検出を消す作品");
+  mkdirSync(workDir, { recursive: true });
+  writeWav(join(workDir, "track.wav"), 1);
+
+  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
+  t.after(() => adapter.close());
+  await adapter.updateSettings({ rootFolder: root });
+  const scanned = await adapter.scan();
+  assert.equal(scanned.candidates[0]?.rjCode, "RJ123456");
+
+  const registered = await adapter.registerScanCandidates([
+    { path: workspacePath("RJ123456_誤検出を消す作品"), rjCode: "" },
+  ]);
+  assert.equal(registered.registered.length, 1);
+
+  const meta = JSON.parse(readFileSync(join(workDir, "mimimilli.json"), "utf-8"));
+  assert.notEqual(meta.dlsite.rjCode, "RJ123456");
+  assert.ok(meta.dlsite.rjCode === null || meta.dlsite.rjCode === "");
 });
 
 test("候補除外の一覧取得と解除で次回スキャンに候補が戻る", async (t) => {

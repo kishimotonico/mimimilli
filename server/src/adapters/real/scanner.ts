@@ -503,12 +503,13 @@ export class Scanner {
 
     let dlsite = options.dlsite;
     if (dlsite === undefined) {
-      const specified = options.rjCode;
-      if (specified === undefined || specified === "") {
+      if (options.rjCode === undefined) {
         const detected = detectRjCode([basename(workDir), options.title]);
         dlsite = detected ? { ...emptyDlsiteState(), rjCode: detected } : emptyDlsiteState();
+      } else if (options.rjCode === "") {
+        dlsite = { ...emptyDlsiteState(), rjCode: "" };
       } else {
-        dlsite = { ...emptyDlsiteState(), rjCode: specified };
+        dlsite = { ...emptyDlsiteState(), rjCode: options.rjCode };
       }
     }
 

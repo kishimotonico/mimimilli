@@ -17,15 +17,10 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function resolveCandidateRjCode(
-  candidate: ScanCandidate,
-  item: ScanCandidateRegisterItem,
-): string | null {
-  const specified = item.rjCode;
-  if (specified === undefined || specified === "") {
-    return candidate.rjCode;
-  }
-  return specified;
+function registrationRjLabel(candidate: ScanCandidate, item: ScanCandidateRegisterItem): string {
+  if (item.rjCode === undefined) return `auto:${candidate.rjCode ?? "none"}`;
+  if (item.rjCode === "") return "explicit-empty";
+  return item.rjCode;
 }
 
 export function createSettingsScanMethods(state: FixtureState): SettingsAdapter {
@@ -93,11 +88,10 @@ export function createSettingsScanMethods(state: FixtureState): SettingsAdapter 
       const registered = items.flatMap((item, index) => {
         const candidate = candidatesByPath.get(item.path);
         if (!candidate) return [];
-        const rjCode = resolveCandidateRjCode(candidate, item);
         return [
           {
             path: candidate.path,
-            workId: `fixture-candidate-${index}-${rjCode ?? "none"}`,
+            workId: `fixture-candidate-${index}-${registrationRjLabel(candidate, item)}`,
           },
         ];
       });

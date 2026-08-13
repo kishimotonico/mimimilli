@@ -30,7 +30,7 @@ export const scanCandidatesMutationSchema = z.object({
 });
 export const scanCandidateRegisterItemSchema = z.object({
   path: workspacePathSchema,
-  /** 省略または空文字はフォルダー名から自動検出。値ありはそのまま mimimilli.json へ書き込む。 */
+  /** 省略時はフォルダー名から自動検出。空文字はRJコードなしの明示。値ありはそのまま mimimilli.json へ書き込む。 */
   rjCode: z.string().optional(),
 });
 export const scanCandidatesRegisterRequestSchema = z.object({

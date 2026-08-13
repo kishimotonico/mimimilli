@@ -156,6 +156,37 @@ test("候補登録APIは全失敗を成功なしの結果として返し、stale
   }
 });
 
+test("候補登録APIはrjCode省略と空文字を区別してadapterへ渡す", async () => {
+  const fixture = createFixtureAdapter();
+  let received: Array<{ path: string; rjCode?: string }> = [];
+  const app = createApp({
+    ...fixture,
+    registerScanCandidates: async (requestedItems) => {
+      received = requestedItems;
+      return { registered: [], failures: [] };
+    },
+  });
+  try {
+    const empty = await app.request("/api/scan/candidates/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items: [{ path: "候補作品", rjCode: "" }] }),
+    });
+    assert.equal(empty.status, 201);
+    assert.equal(received[0]?.rjCode, "");
+
+    const omitted = await app.request("/api/scan/candidates/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items: [{ path: "候補作品" }] }),
+    });
+    assert.equal(omitted.status, 201);
+    assert.equal(received[0]?.rjCode, undefined);
+  } finally {
+    await app.shutdown();
+  }
+});
+
 test("候補APIは101件以上の一括登録を受け付ける", async () => {
   const paths = Array.from({ length: 101 }, (_, index) => `候補-${index}`);
   const fixture = createFixtureAdapter();

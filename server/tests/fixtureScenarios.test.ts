@@ -78,6 +78,23 @@ test("new-work: Files用診断とscan確認用の候補・問題を独立して�
   assert.deepEqual(await adapter.listScanCandidates(), []);
 });
 
+test("fixture: rjCode省略・空文字・指定を区別する", async () => {
+  const omitted = await createFixtureAdapter({ scenario: "new-work" }).registerScanCandidates([
+    { path: workspacePath("未登録作品") },
+  ]);
+  assert.match(omitted.registered[0]!.workId, /auto:none$/);
+
+  const empty = await createFixtureAdapter({ scenario: "new-work" }).registerScanCandidates([
+    { path: workspacePath("未登録作品"), rjCode: "" },
+  ]);
+  assert.match(empty.registered[0]!.workId, /explicit-empty$/);
+
+  const specified = await createFixtureAdapter({ scenario: "new-work" }).registerScanCandidates([
+    { path: workspacePath("未登録作品"), rjCode: "RJ111111" },
+  ]);
+  assert.match(specified.registered[0]!.workId, /RJ111111$/);
+});
+
 test("empty: 作品・スマートフォルダーが0件", async () => {
   const app = buildApp("empty");
 
