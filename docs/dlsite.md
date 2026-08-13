@@ -91,7 +91,9 @@ HTMLの転送・展開サイズには上限があり（既定2 MiB / 8 MiB、`DE
 
 一括取得の対象は `applied` と `skipped` を除く（上記「作品ごとの状態」参照）。`applied` の作品は2回目以降の一括取得では対象外になるため、成功時の「変更なしなら書き込まない」判定は存在しない。
 
-取得が失敗した作品について、キャッシュ hit（HTTPを試みなかった）かつ、作品の `status`・`error`・`errorKind` が、今回の失敗結果とすでに一致しているときは、DBと `mimimilli.json` への書き込みを省略する。実HTTPを試みた場合は常に書き込む。`lastAttemptAt` は実際にHTTPを試みたときだけ更新し、cache hitでは更新しない。
+取得が失敗した作品は、HTTPレスポンスまたはパース結果を DLsite キャッシュへ記録する。sidecar（`mimimilli.json`）は変更しない。キャッシュ更新後、scan・一括取得・手動fetch・`POST /dlsite/apply-missing` はいずれも、sidecar とキャッシュを合成して `work_dlsite.state_json` を再投影する（`dlsiteProjection.ts`）。これにより通知ベルの取得失敗件数・パースエラー警報が、フルスキャンを待たずに反映される。`offline` 由来の miss はキャッシュにも catalog にも書かない。
+
+キャッシュ hit（HTTPを試みなかった）で、投影済みの `status`・`error`・`errorKind` がキャッシュ内容とすでに一致しているときは、catalog への再投影を省略してよい（実装は経路ごとに投影関数を呼ぶ。副作用は同一状態の upsert にとどまる）。`lastAttemptAt` は実HTTPを試みたときだけキャッシュに記録され、投影時に catalog へ載る。cache hit では更新しない。
 
 ## レート制限とリトライ
 

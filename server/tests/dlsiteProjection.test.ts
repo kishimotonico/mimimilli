@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { emptyDlsiteState } from "@mimimilli/shared";
 import {
   projectDlsiteState,
+  shouldRefreshDlsiteProjectionAfterFetch,
   sidecarLinkageStatus,
   toSidecarDlsiteState,
 } from "../src/adapters/real/dlsiteProjection.ts";
@@ -86,6 +87,25 @@ test("projectDlsiteState: cache の parse_error を投影する", () => {
   );
   assert.equal(projected.status, "error");
   assert.equal(projected.errorKind, "parse_error");
+});
+
+test("shouldRefreshDlsiteProjectionAfterFetch: offline は投影しない", () => {
+  assert.equal(
+    shouldRefreshDlsiteProjectionAfterFetch({
+      ok: false,
+      kind: "offline",
+      message: "offline",
+    }),
+    false,
+  );
+  assert.equal(
+    shouldRefreshDlsiteProjectionAfterFetch({
+      ok: false,
+      kind: "not_found",
+      message: "404",
+    }),
+    true,
+  );
 });
 
 test("projectDlsiteState: cache ok は none のまま", () => {

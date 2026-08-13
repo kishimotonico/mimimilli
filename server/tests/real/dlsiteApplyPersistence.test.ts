@@ -342,6 +342,40 @@ test("missing-only一括適用はCAS競合を集計して後続作品を続行�
   assert.ok((await adapter.getWork(secondId))?.tags.length);
 });
 
+test("missing-only一括適用: 取得失敗後もcatalog投影で通知集計へ反映される", async (t) => {
+  const lib = makeSampleLibrary();
+  const dir = makeTestDirectory("dlsite-apply-missing-failure-projection");
+  t.after(lib.cleanup);
+  t.after(dir.cleanup);
+  const adapter = createRealAdapter({
+    database: { kind: "memory" },
+    dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+    dlsiteSchedulerDependencies: mockDlsiteTransport({
+      html: () => htmlResponse("<html>404</html>", 404),
+    }),
+  });
+  await adapter.updateSettings({ rootFolder: lib.root });
+  await adapter.scan();
+  const metaPath = join((await adapter.getWork(lib.existingWorkId))!.physicalPath, META_FILE_NAME);
+  const bytesBefore = readFileSync(metaPath);
+
+  assert.deepEqual(await adapter.dlsiteApplyMissing([lib.existingWorkId]), {
+    applied: 0,
+    skipped: 0,
+    failed: 1,
+  });
+
+  const work = await adapter.getWork(lib.existingWorkId);
+  assert.equal(work?.dlsite.status, "not_found");
+  assert.equal(work?.dlsite.errorKind, "not_found");
+  assert.deepEqual(readFileSync(metaPath), bytesBefore);
+
+  const summary = await adapter.getDlsiteNotificationSummary();
+  assert.ok(summary.fetchFailedCount >= 1);
+  adapter.close();
+});
+
 test("一括取得はカバーをキャッシュも適用もせず、明示適用で取得する", async (t) => {
   const lib = makeSampleLibrary();
   const dir = makeTestDirectory("dlsite-shared-cache");

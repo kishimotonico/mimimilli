@@ -7,8 +7,10 @@ import {
 } from "@mimimilli/shared";
 import { DlsiteOfflineError } from "../../errors.ts";
 import { logDataIntegritySkips, toDataIntegrityWarning } from "./dataIntegrity.ts";
-import { readMetaSource } from "./meta.ts";
-import { refreshCatalogDlsiteProjection } from "./dlsiteProjection.ts";
+import {
+  refreshWorkDlsiteProjection,
+  shouldRefreshDlsiteProjectionAfterFetch,
+} from "./dlsiteProjection.ts";
 import type { Db } from "./db.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";
@@ -135,14 +137,7 @@ export function createDlsiteBulk(deps: DlsiteBulkDeps) {
   const { dlsiteLogger, dlsiteScheduler, fetchCachedDlsiteAttempt } = fetch;
 
   const refreshWorkProjection = (workId: string): void => {
-    const metaPath = catalog.getWorkMetaPath(workId);
-    if (!metaPath) return;
-    refreshCatalogDlsiteProjection(
-      catalog,
-      workId,
-      readMetaSource(metaPath).meta.dlsite,
-      dlsiteCache,
-    );
+    refreshWorkDlsiteProjection(catalog, workId, dlsiteCache);
   };
 
   return {
@@ -221,14 +216,9 @@ export function createDlsiteBulk(deps: DlsiteBulkDeps) {
             result.fetched += outcome.fetched;
             result.failed += outcome.failed;
             result.parseErrors += outcome.parseErrors;
-            if (
-              outcome.failed > 0 &&
-              attempt.result.ok === false &&
-              attempt.result.kind === "offline"
-            ) {
-              continue;
+            if (shouldRefreshDlsiteProjectionAfterFetch(attempt.result)) {
+              refreshWorkProjection(work.id);
             }
-            refreshWorkProjection(work.id);
           } catch (error) {
             if (error instanceof DOMException && error.name === "AbortError") {
               dlsiteLogger.info("DLsite一括取得を中断しました", {

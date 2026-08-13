@@ -1,4 +1,5 @@
-import type { DlsiteFetchErrorKind, DlsiteState } from "@mimimilli/shared";
+import type { DlsiteFetchErrorKind, DlsiteFetchResult, DlsiteState } from "@mimimilli/shared";
+import { readMetaSource } from "./meta.ts";
 import type { DlsiteCache, DlsiteCacheResolution } from "./dlsiteCache.ts";
 
 export type SidecarLinkageStatus = "none" | "applied" | "skipped";
@@ -129,4 +130,23 @@ export function refreshCatalogDlsiteProjection(
   cache: DlsiteCache | null | undefined,
 ): void {
   catalog.setDlsiteState(workId, resolveSidecarDlsiteProjection(sidecar, cache));
+}
+
+/** sidecar を読み、cache と合成した DLsite 状態を catalog へ投影する。 */
+export function refreshWorkDlsiteProjection(
+  catalog: {
+    getWorkMetaPath(id: string): string | null;
+    setDlsiteState(workId: string, state: DlsiteState): void;
+  },
+  workId: string,
+  cache: DlsiteCache | null | undefined,
+): void {
+  const metaPath = catalog.getWorkMetaPath(workId);
+  if (!metaPath) return;
+  refreshCatalogDlsiteProjection(catalog, workId, readMetaSource(metaPath).meta.dlsite, cache);
+}
+
+/** offline 由来の取得失敗は cache・catalog とも更新しない。 */
+export function shouldRefreshDlsiteProjectionAfterFetch(result: DlsiteFetchResult): boolean {
+  return result.ok || result.kind !== "offline";
 }
