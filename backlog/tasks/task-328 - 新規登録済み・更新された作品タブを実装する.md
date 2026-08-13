@@ -4,7 +4,7 @@ title: 新規登録済み・更新された作品タブを実装する
 status: To Do
 assignee: []
 created_date: '2026-08-13 16:59'
-updated_date: '2026-08-13 21:31'
+updated_date: '2026-08-13 21:35'
 labels: []
 dependencies:
   - TASK-326
@@ -21,7 +21,7 @@ ordinal: 338000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [x] #1 新規登録済みタブに今回ライブラリへ入った作品が表示され、自動登録分と候補承認分の両方が含まれる
+- [ ] #1 新規登録済みタブに今回ライブラリへ入った作品が表示され、自動登録分と候補承認分の両方が含まれる
 - [x] #2 外部連携列にRJコードと状態（連携済み・取得待ち・失敗・—）が表示され、取得待ちが警告色でない
 - [x] #3 更新された作品タブにメタファイル更新で再投影された作品が表示される
 - [x] #4 タイトルのインライン編集が両タブで従来どおり動作する
@@ -29,17 +29,16 @@ ordinal: 338000
 - [x] #6 pnpm test:smokeが通る
 <!-- AC:END -->
 
-
-
-
-
-
-
 ## Comments
 
 <!-- COMMENTS:BEGIN -->
 created: 2026-08-13 17:42
 ---
 設計レビュー引き継ぎ時の追加決定: 外部連携列の「失敗」表示はDLsite statusの投影（TASK-321で修復）に依存するため、TASK-321を依存に追加。321完了後に着手する。
+---
+
+created: 2026-08-13 21:35
+---
+AC#1のうち候補承認分の集約は、TASK-327のUnregisteredTab.tsxとの衝突を避けるため実装せず統括のマージ時対応に委ねる（統括判断）。自動登録分（insertedWorkIds）の表示は完了。dedupeIdsヘルパー（scanModal/scanResultWorkIds.ts）を集約用に用意済み。
 ---
 <!-- COMMENTS:END -->

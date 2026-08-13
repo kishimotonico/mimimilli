@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useAtomValue } from "jotai";
 import { useQuery } from "@tanstack/react-query";
 import { libraryTotalQueryOptions } from "../../../entities/work/libraryTotalQueryOptions";
@@ -15,7 +15,6 @@ import NeedsAttentionTab from "./scanModal/NeedsAttentionTab";
 import NewlyRegisteredTab from "./scanModal/NewlyRegisteredTab";
 import UpdatedWorksTab from "./scanModal/UpdatedWorksTab";
 import ScanFooter from "./scanModal/ScanFooter";
-import { dedupeIds } from "./scanModal/scanResultWorkIds";
 import { useScanCompletionHint } from "./scanModal/useScanCompletionHint";
 import type { ScanTabKey } from "./scanModal/types";
 
@@ -70,17 +69,6 @@ export default function ScanModal({
   const insertedWorkIds = lastResult?.insertedWorkIds ?? EMPTY_WORK_IDS;
   const updatedWorkIds = lastResult?.updatedWorkIds ?? EMPTY_WORK_IDS;
 
-  // 候補承認で登録された作品ID（このモーダル表示中に蓄積、TASK-325の分離を踏まえクライアント側で集約）。
-  // insertedWorkIds（スキャン時点の自動登録分）と重複排除して結合し、新規登録済みタブへ渡す。
-  const [registeredWorkIds, setRegisteredWorkIds] = useState<string[]>([]);
-  const handleCandidatesRegistered = (workIds: string[]) => {
-    setRegisteredWorkIds((previous) => dedupeIds(previous, workIds));
-  };
-  const newlyRegisteredWorkIds = useMemo(
-    () => dedupeIds(registeredWorkIds, insertedWorkIds),
-    [registeredWorkIds, insertedWorkIds],
-  );
-
   // ライブラリ総件数（サイドバーの「ライブラリ N 件」と同じ既存クエリキーを共有する）。
   const libraryTotalQuery = useQuery(libraryTotalQueryOptions);
   const libraryTotal = libraryTotalQuery.data?.total ?? null;
@@ -96,7 +84,7 @@ export default function ScanModal({
   const counts: Record<ScanTabKey, number> = {
     unregistered: candidates.length,
     needsAttention: needsAttentionCount,
-    newlyRegistered: newlyRegisteredWorkIds.length,
+    newlyRegistered: insertedWorkIds.length,
     updated: updatedWorkIds.length,
   };
 
@@ -139,9 +127,7 @@ export default function ScanModal({
             aria-labelledby={`scan-tab-${activeTab}`}
             className="min-h-0 flex-1 overflow-y-auto px-[18px] py-4"
           >
-            {activeTab === "unregistered" && (
-              <UnregisteredTab candidates={candidates} onRegistered={handleCandidatesRegistered} />
-            )}
+            {activeTab === "unregistered" && <UnregisteredTab candidates={candidates} />}
             {activeTab === "needsAttention" && (
               <NeedsAttentionTab
                 identityConflicts={identityConflicts}
@@ -152,9 +138,7 @@ export default function ScanModal({
                 onOpenRjCodeMissing={onOpenRjCodeMissing}
               />
             )}
-            {activeTab === "newlyRegistered" && (
-              <NewlyRegisteredTab workIds={newlyRegisteredWorkIds} />
-            )}
+            {activeTab === "newlyRegistered" && <NewlyRegisteredTab workIds={insertedWorkIds} />}
             {activeTab === "updated" && <UpdatedWorksTab workIds={updatedWorkIds} />}
           </div>
         </div>
