@@ -56,7 +56,7 @@ test("new-work: Files用診断とscan確認用の候補・問題を独立して�
     ["未登録作品", "朗読/候補"],
   );
   assert.deepEqual(result.identityConflicts[0]?.paths, ["viewer", "dlsite"]);
-  assert.equal(result.invalidSidecars[0]?.path, "壊れた/mimimilli.json");
+  assert.equal(result.invalidMetaFiles[0]?.path, "壊れた/mimimilli.json");
   assert.deepEqual((await adapter.listScanDiagnostics())[0]?.paths, [
     "dlsite/夜想曲スタジオ/RJ501001_夜更けの図書室で囁き朗読",
     "copies/RJ501001_夜更けの図書室で囁き朗読",

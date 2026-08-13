@@ -61,7 +61,7 @@ export function createSettingsScanMethods(state: FixtureState): SettingsAdapter 
         coverErrors: 0,
         unreadablePaths: [],
         identityConflicts: state.scanIdentityConflicts,
-        invalidSidecars: state.scanInvalidSidecars,
+        invalidMetaFiles: state.scanInvalidMetaFiles,
         candidates: state.scanCandidates,
       };
     },

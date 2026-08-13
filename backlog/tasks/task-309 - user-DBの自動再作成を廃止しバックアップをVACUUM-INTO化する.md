@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@codex'
 created_date: '2026-08-12 11:28'
-updated_date: '2026-08-12 12:45'
+updated_date: '2026-08-13 17:55'
 labels: []
 dependencies: []
 modified_files:
@@ -20,7 +20,7 @@ ordinal: 319000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-draft-54昇格。docs/application-architecture-review-2026-08-12.md 優先改善1。user DB（resume・bookmark・スマートフォルダー等）はsidecarから復元不可能な耐久正本だが、openVersionedDatabase（server/src/adapters/real/db.ts）のschema version不一致ガードがmigrationを試す前にファイルごと退避して空DBを作る。さらにuser再作成時にcatalogも連鎖再作成する非対称是正処理がある。バックアップ（dbBackup.ts）は開いたWAL DBの本体・WAL・SHMを素朴にファイルコピーしており一貫性リスクがある。drizzle forward-only migrationは両DB導入済みなので、破壊的ガードの廃止とバックアップ方式の置き換えが主作業。2DB構成は維持する（2026-08-12決定、ADR-0008の却下理由は有効）。
+draft-54昇格。docs/application-architecture-review-2026-08-12.md 優先改善1。user DB（resume・bookmark・スマートフォルダー等）はmimimilli.jsonから復元不可能な耐久正本だが、openVersionedDatabase（server/src/adapters/real/db.ts）のschema version不一致ガードがmigrationを試す前にファイルごと退避して空DBを作る。さらにuser再作成時にcatalogも連鎖再作成する非対称是正処理がある。バックアップ（dbBackup.ts）は開いたWAL DBの本体・WAL・SHMを素朴にファイルコピーしており一貫性リスクがある。drizzle forward-only migrationは両DB導入済みなので、破壊的ガードの廃止とバックアップ方式の置き換えが主作業。2DB構成は維持する（2026-08-12決定、ADR-0008の却下理由は有効）。
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria

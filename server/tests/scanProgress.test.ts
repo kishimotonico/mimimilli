@@ -25,7 +25,7 @@ const emptyResult = {
   skipped: 0,
   coverErrors: 0,
   identityConflicts: [],
-  invalidSidecars: [],
+  invalidMetaFiles: [],
   candidates: [],
 };
 

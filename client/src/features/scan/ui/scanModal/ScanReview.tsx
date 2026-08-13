@@ -90,7 +90,7 @@ export default function ScanReview({ result, onOpenFiles }: ScanReviewProps) {
     () => candidates.filter((candidate) => selectedPaths.includes(candidate.path)),
     [candidates, selectedPaths],
   );
-  const hasProblems = result.identityConflicts.length > 0 || result.invalidSidecars.length > 0;
+  const hasProblems = result.identityConflicts.length > 0 || result.invalidMetaFiles.length > 0;
   if (candidates.length === 0 && !hasProblems) return null;
 
   const toggle = (path: string, checked: boolean) => {
@@ -180,19 +180,19 @@ export default function ScanReview({ result, onOpenFiles }: ScanReviewProps) {
               ))}
             </div>
           )}
-          {result.invalidSidecars.length > 0 && (
+          {result.invalidMetaFiles.length > 0 && (
             <div>
               <p className="text-[11px] text-ink-1">
-                不正なsidecar {result.invalidSidecars.length}件
+                不正な作品情報 {result.invalidMetaFiles.length}件
               </p>
-              {result.invalidSidecars.map((sidecar) => (
+              {result.invalidMetaFiles.map((metaFile) => (
                 <button
-                  key={sidecar.path}
+                  key={metaFile.path}
                   type="button"
                   className="mll-selectable mt-1 block break-all text-left font-mono text-[10px] text-acc"
-                  onClick={() => onOpenFiles(sidecar.path)}
+                  onClick={() => onOpenFiles(metaFile.path)}
                 >
-                  {sidecar.path} · {sidecar.message}
+                  {metaFile.path} · {metaFile.message}
                 </button>
               ))}
             </div>

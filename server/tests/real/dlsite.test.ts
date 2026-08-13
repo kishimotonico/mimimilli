@@ -440,7 +440,7 @@ test("dlsiteFetch: 存在しない作品はnot_found", async (t) => {
   if (!generatedFree.ok) assert.equal(generatedFree.kind, "not_found");
 });
 
-test("bulk取得はタイトル・タグを自動適用せず、sidecarのexact bytesとcatalogを維持する", async (t) => {
+test("bulk取得はタイトル・タグを自動適用せず、mimimilli.jsonのexact bytesとcatalogを維持する", async (t) => {
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
   const calls: number[] = [];
@@ -486,7 +486,7 @@ test("bulk取得はタイトル・タグを自動適用せず、sidecarのexact 
   assert.deepEqual(generated?.tags, beforeCandidate?.tags);
 });
 
-test("bulk取得はcache TTLとskipped状態を利用し、sidecarを変更しない", async (t) => {
+test("bulk取得はcache TTLとskipped状態を利用し、mimimilli.jsonを変更しない", async (t) => {
   const lib = makeSampleLibrary();
   const dir = makeTestDirectory("dlsite-bulk-target-ttl");
   t.after(lib.cleanup);
@@ -579,7 +579,7 @@ test("DLsite HTMLキャッシュ: 手動fetchはhitでHTTPせず、single-flight
   adapter.close();
 });
 
-test("offline結果はcache-onlyで、sidecarのexact bytesを変更しない", async (t) => {
+test("offline結果はcache-onlyで、mimimilli.jsonのexact bytesを変更しない", async (t) => {
   const lib = makeSampleLibrary();
   const dir = makeTestDirectory("dlsite-offline");
   t.after(lib.cleanup);
@@ -789,7 +789,7 @@ test("DLsite: parse_errorは実HTTP時だけdlsite_parse_errorをログする", 
   adapter.close();
 });
 
-test("parse_errorはcacheに保存し、sidecarへ状態を書かない", async (t) => {
+test("parse_errorはcacheに保存し、mimimilli.jsonへ状態を書かない", async (t) => {
   const lib = makeSampleLibrary();
   const dir = makeTestDirectory("dlsite-bulk-parse-error");
   t.after(lib.cleanup);
@@ -1276,7 +1276,7 @@ test("DLsite HTMLキャッシュ: forceが失敗しても次回の通常取得�
   adapter.close();
 });
 
-test("bulk取得のlastAttemptAtはsidecarへ保存しない", async (t) => {
+test("bulk取得のlastAttemptAtはmimimilli.jsonへ保存しない", async (t) => {
   const lib = makeSampleLibrary();
   const dir = makeTestDirectory("dlsite-bulk-no-op-write");
   t.after(lib.cleanup);
@@ -1512,7 +1512,7 @@ test("bulk取得はカバーをダウンロードも適用もしない", async (
   adapter.close();
 });
 
-test("bulk取得はカバー失敗に依存せず、sidecarを変更しない", async (t) => {
+test("bulk取得はカバー失敗に依存せず、mimimilli.jsonを変更しない", async (t) => {
   const lib = makeSampleLibrary();
   const dir = makeTestDirectory("dlsite-bulk-cover-failure");
   t.after(lib.cleanup);
@@ -1548,7 +1548,7 @@ test("bulk取得はカバー失敗に依存せず、sidecarを変更しない", 
   adapter.close();
 });
 
-test("bulk取得はsidecar書込み権限に依存しない", async (t) => {
+test("bulk取得はmimimilli.json書込み権限に依存しない", async (t) => {
   const lib = makeSampleLibrary();
   const dir = makeTestDirectory("dlsite-bulk-meta-write-failure");
   t.after(lib.cleanup);
@@ -1582,7 +1582,7 @@ test("bulk取得はsidecar書込み権限に依存しない", async (t) => {
   adapter.close();
 });
 
-test("bulkキャンセル後の再開はcache結果を使い、sidecarを変更しない", async (t) => {
+test("bulkキャンセル後の再開はcache結果を使い、mimimilli.jsonを変更しない", async (t) => {
   const lib = makeSampleLibrary();
   const dir = makeTestDirectory("dlsite-bulk-cancel-resume");
   t.after(lib.cleanup);

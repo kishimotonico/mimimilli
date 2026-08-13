@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@codex'
 created_date: '2026-08-12 11:28'
-updated_date: '2026-08-12 12:58'
+updated_date: '2026-08-13 17:55'
 labels: []
 dependencies:
   - TASK-310
@@ -16,7 +16,7 @@ ordinal: 321000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-draft-55昇格（実装部分）。レビュー優先改善2。現状はworkMethods.tsがdb.transaction callback内でcatalog更新→sidecar書き込みの順に行い、sidecar書き込み成功後COMMIT前のクラッシュで不整合になる窓がある。TASK-310のADRに従い、アプリ編集をsource-first（sidecar確定→その作品だけcatalogへ再投影）へ統一する。編集画面取得時にsourceRevisionを返し、更新時に必須化、不一致は409 source_changed。未知フィールドを保持したままJSONへpatchし、一時ファイル書き込み＋fsync後のatomic replaceで確定する。catalog更新失敗時はsidecarが正として残り、次回scan/watcherで収束できること。
+draft-55昇格（実装部分）。レビュー優先改善2。現状はworkMethods.tsがdb.transaction callback内でcatalog更新→mimimilli.json書き込みの順に行い、mimimilli.json書き込み成功後COMMIT前のクラッシュで不整合になる窓がある。TASK-310のADRに従い、アプリ編集をsource-first（mimimilli.json確定→その作品だけcatalogへ再投影）へ統一する。編集画面取得時にsourceRevisionを返し、更新時に必須化、不一致は409 source_changed。未知フィールドを保持したままJSONへpatchし、一時ファイル書き込み＋fsync後のatomic replaceで確定する。catalog更新失敗時はmimimilli.jsonが正として残り、次回scan/watcherで収束できること。
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria

@@ -46,7 +46,7 @@ function makeWork(root: string, name: string, title: string, workId = WORK_ID): 
   return metaPath;
 }
 
-test("重複Work IDはsidecarを変更せず、catalog公開せずに全pathを診断する", async (t) => {
+test("重複Work IDはmimimilli.jsonを変更せず、catalog公開せずに全pathを診断する", async (t) => {
   const directory = makeTestDirectory("identity-conflict-new");
   t.after(directory.cleanup);
   const root = join(directory.path, "library");
@@ -77,7 +77,7 @@ test("重複Work IDはsidecarを変更せず、catalog公開せずに全pathを�
   assert.deepEqual((await response.json()).diagnostics, result.identityConflicts);
 });
 
-test("既存投影は競合pathの順序にかかわらず保持し、解消後に一意なsidecarを投影する", async (t) => {
+test("既存投影は競合pathの順序にかかわらず保持し、解消後に一意なmimimilli.jsonを投影する", async (t) => {
   const directory = makeTestDirectory("identity-conflict-existing");
   t.after(directory.cleanup);
   const root = join(directory.path, "library");

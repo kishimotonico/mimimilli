@@ -138,7 +138,7 @@ export class Scanner {
       skipped: 0,
       coverErrors: 0,
       identityConflicts: [],
-      invalidSidecars: [],
+      invalidMetaFiles: [],
       candidates: [],
     };
 
@@ -246,7 +246,7 @@ export class Scanner {
             existingWorks,
             existingByPhysicalPath,
           );
-          result.invalidSidecars.push({
+          result.invalidMetaFiles.push({
             path: workspacePath(toPortableRelativePath(root, entry.metaPath)),
             message: entry.error.message,
           });
@@ -284,7 +284,7 @@ export class Scanner {
             existingWorks,
             existingByPhysicalPath,
           );
-          result.invalidSidecars.push({
+          result.invalidMetaFiles.push({
             path: workspacePath(toPortableRelativePath(root, entry.metaPath)),
             message: e.message,
           });
@@ -509,7 +509,7 @@ export class Scanner {
     return work;
   }
 
-  /** 確定済みsidecarを入力に、対象作品だけをcatalogへ投影する。 */
+  /** 確定済みmimimilli.jsonを入力に、対象作品だけをcatalogへ投影する。 */
   async projectMetaFile(metaPath: string, meta: MetaFile): Promise<Work> {
     const prepared = prepareSingleMeta(metaPath, meta);
     const existingWorks = this.query.getScanWorkMap();

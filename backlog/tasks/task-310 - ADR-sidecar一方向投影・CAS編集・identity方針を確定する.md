@@ -5,11 +5,11 @@ status: Done
 assignee:
   - '@codex'
 created_date: '2026-08-12 11:28'
-updated_date: '2026-08-12 12:40'
+updated_date: '2026-08-13 17:55'
 labels: []
 dependencies: []
 modified_files:
-  - docs/adr/0017-sidecar-source-projection-and-work-identity.md
+  - docs/adr/0017-meta-source-projection-and-work-identity.md
 priority: high
 ordinal: 320000
 ---
@@ -17,7 +17,7 @@ ordinal: 320000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-draft-55の設計確定部分＋レビュー実施順2。docs/application-architecture-review-2026-08-12.md 優先改善2〜4を正式決定としてADR化する。決定済みの前提（2026-08-12）: 2DB構成は維持（ADR-0008の却下理由は有効）／重複sidecarの自動ID再採番は廃止し診断状態化／scan自動登録は候補提示＋一括承認へ置換し、DLsite取得は登録実行時に開始する。ADRに含める内容: source-first書き込み（sourceRevision→409 source_changed、未知フィールド保持patch、atomic replace→単一作品の再投影）とcatalog-first経路の廃止、revisionの3分割（source_revision/projection_revision/media_revision、locationは独立観測値）、移動追従とidentity conflictの期待挙動（レビュー優先改善3の6項目）、sidecarへのformatVersion追加、playlists_json二重投影の廃止方針。
+draft-55の設計確定部分＋レビュー実施順2。docs/application-architecture-review-2026-08-12.md 優先改善2〜4を正式決定としてADR化する。決定済みの前提（2026-08-12）: 2DB構成は維持（ADR-0008の却下理由は有効）／重複mimimilli.jsonの自動ID再採番は廃止し診断状態化／scan自動登録は候補提示＋一括承認へ置換し、DLsite取得は登録実行時に開始する。ADRに含める内容: source-first書き込み（sourceRevision→409 source_changed、未知フィールド保持patch、atomic replace→単一作品の再投影）とcatalog-first経路の廃止、revisionの3分割（source_revision/projection_revision/media_revision、locationは独立観測値）、移動追従とidentity conflictの期待挙動（レビュー優先改善3の6項目）、mimimilli.jsonへのformatVersion追加、playlists_json二重投影の廃止方針。
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria

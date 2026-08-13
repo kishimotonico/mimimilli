@@ -44,7 +44,7 @@ function countWorkStates(db: Db): number {
   return row.total;
 }
 
-test("初回スキャン: 登録済みsidecarを投影し、候補を自動登録しない", async (t) => {
+test("初回スキャン: 登録済みmimimilli.jsonを投影し、候補を自動登録しない", async (t) => {
   const { adapter, candidateWorkId, existingWorkId, root } = await setup(t);
   const result = await adapter.scan();
 
@@ -53,7 +53,7 @@ test("初回スキャン: 登録済みsidecarを投影し、候補を自動登�
   assert.equal(result.newWorkIds.length, 0);
   assert.equal(result.missing, 0);
 
-  // 明示登録したsidecarは作品ルートにだけ存在する。
+  // 明示登録したmimimilli.jsonは作品ルートにだけ存在する。
   const generatedMeta = join(root, "dlsite", "RJ900001_テスト作品", "mimimilli.json");
   assert.ok(existsSync(generatedMeta));
   const meta = JSON.parse(readFileSync(generatedMeta, "utf-8"));
@@ -207,9 +207,9 @@ test("メタ不正: 壊れた JSON は errors にカウントされスキャン�
   assert.equal(result.registered, 1); // 既存メタ作品は通常どおり登録される
   // メタ不正フォルダーは「メタあり」扱いなので自動生成はされない
   assert.equal(result.newlyGenerated, 0);
-  assert.equal(result.invalidSidecars.length, 1);
-  assert.equal(result.invalidSidecars[0]?.path, "broken-work/mimimilli.json");
-  assert.match(result.invalidSidecars[0]?.message ?? "", /メタファイルが不正です/);
+  assert.equal(result.invalidMetaFiles.length, 1);
+  assert.equal(result.invalidMetaFiles[0]?.path, "broken-work/mimimilli.json");
+  assert.match(result.invalidMetaFiles[0]?.message ?? "", /メタファイルが不正です/);
 });
 
 test("大量ディレクトリの走査中、walking フェーズの進捗イベントが複数回発火する（同期walkの詰まり修正の検証）", async (t) => {
@@ -302,7 +302,7 @@ test("増分スキャン: スキップした作品もPlaylist/Trackとresumeを�
   });
 });
 
-test("増分スキャン: source revisionが変わった不正sidecarはerrorとして検出する", async (t) => {
+test("増分スキャン: source revisionが変わった不正mimimilli.jsonはerrorとして検出する", async (t) => {
   const { adapter, root } = await setup(t);
   await adapter.scan();
   const metaPath = join(root, "dlsite", "RJ900001_テスト作品", "mimimilli.json");
@@ -314,12 +314,12 @@ test("増分スキャン: source revisionが変わった不正sidecarはerrorと
   assert.equal(second.skipped, 0);
   assert.equal(second.errors, 1);
   assert.deepEqual(
-    second.invalidSidecars.map((sidecar) => sidecar.path),
+    second.invalidMetaFiles.map((metaFile) => metaFile.path),
     ["dlsite/RJ900001_テスト作品/mimimilli.json"],
   );
 });
 
-test("増分スキャン: sidecar bytesが変われば未知キーだけでも再投影する", async (t) => {
+test("増分スキャン: mimimilli.json bytesが変われば未知キーだけでも再投影する", async (t) => {
   const directory = makeTestDirectory("raw-fingerprint-projection");
   t.after(directory.cleanup);
   const root = join(directory.path, "lib");
@@ -847,7 +847,7 @@ test("upsertBatchSizeは有限の正整数だけを受け付ける", (t) => {
   }
 });
 
-test("staging後にsidecarが変わった作品はpublishせず旧投影を維持する", async (t) => {
+test("staging後にmimimilli.jsonが変わった作品はpublishせず旧投影を維持する", async (t) => {
   const directory = makeTestDirectory("scan-source-changed-before-publish");
   t.after(directory.cleanup);
   const root = join(directory.path, "lib");

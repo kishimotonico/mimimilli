@@ -2,7 +2,7 @@
 // 開発サーバー・Playwright ビジュアルテストでのデータ切替に使う。
 import {
   workspacePath,
-  type InvalidSidecar,
+  type InvalidMetaFile,
   type ScanCandidate,
   type ScanDiagnostic,
   type SmartFolder,
@@ -41,7 +41,7 @@ export interface FixtureScenario {
   scanNewWorkIds: string[];
   scanCandidates: ScanCandidate[];
   scanIdentityConflicts: ScanDiagnostic[];
-  scanInvalidSidecars: InvalidSidecar[];
+  scanInvalidMetaFiles: InvalidMetaFile[];
 }
 
 function cloneWorks(works: WorkSummary[]): WorkSummary[] {
@@ -81,7 +81,7 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       scanNewWorkIds: [],
       scanCandidates: [],
       scanIdentityConflicts: [],
-      scanInvalidSidecars: [],
+      scanInvalidMetaFiles: [],
     };
   }
 
@@ -110,7 +110,7 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       scanIdentityConflicts: [
         { kind: "identity_conflict", workId: "duplicate-id", paths: ["viewer", "dlsite"] },
       ],
-      scanInvalidSidecars: [
+      scanInvalidMetaFiles: [
         { path: workspacePath("壊れた/mimimilli.json"), message: "メタファイルが不正です" },
       ],
     };
@@ -129,7 +129,7 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       scanNewWorkIds: [],
       scanCandidates: [],
       scanIdentityConflicts: [],
-      scanInvalidSidecars: [],
+      scanInvalidMetaFiles: [],
     };
   }
 
@@ -143,7 +143,7 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       scanNewWorkIds: [],
       scanCandidates: [],
       scanIdentityConflicts: [],
-      scanInvalidSidecars: [],
+      scanInvalidMetaFiles: [],
     };
   }
 
@@ -172,7 +172,7 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       scanIdentityConflicts: [
         { kind: "identity_conflict", workId: "duplicate-id", paths: ["viewer", "dlsite"] },
       ],
-      scanInvalidSidecars: [
+      scanInvalidMetaFiles: [
         { path: workspacePath("壊れた/mimimilli.json"), message: "メタファイルが不正です" },
       ],
     };
@@ -187,6 +187,6 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
     scanNewWorkIds: [],
     scanCandidates: [],
     scanIdentityConflicts: [],
-    scanInvalidSidecars: [],
+    scanInvalidMetaFiles: [],
   };
 }
