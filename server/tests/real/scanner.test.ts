@@ -31,7 +31,7 @@ async function setup(t: TestContext) {
   await adapter.updateSettings({ rootFolder: lib.root });
   const initial = await adapter.scan();
   const result = await adapter.registerScanCandidates(
-    initial.candidates.map((candidate) => candidate.path),
+    initial.candidates.map((candidate) => ({ path: candidate.path })),
   );
   const candidateWorkId = result.registered[0]!.workId;
   return { ...lib, adapter, candidateWorkId: candidateWorkId! };
@@ -49,8 +49,7 @@ test("初回スキャン: 登録済みmimimilli.jsonを投影し、候補を自�
   const result = await adapter.scan();
 
   assert.equal(result.registered, 1);
-  assert.equal(result.newlyGenerated, 0);
-  assert.equal(result.newWorkIds.length, 0);
+  assert.equal(result.insertedWorkIds.length, 0);
   assert.equal(result.missing, 0);
 
   // 明示登録したmimimilli.jsonは作品ルートにだけ存在する。
@@ -215,7 +214,7 @@ test("メタ不正: 壊れた JSON は errors にカウントされスキャン�
   assert.equal(result.errors, 1);
   assert.equal(result.registered, 1); // 既存メタ作品は通常どおり登録される
   // メタ不正フォルダーは「メタあり」扱いなので自動生成はされない
-  assert.equal(result.newlyGenerated, 0);
+  assert.equal(result.insertedWorkIds.length, 0);
   assert.equal(result.invalidMetaFiles.length, 1);
   assert.equal(result.invalidMetaFiles[0]?.path, "broken-work/mimimilli.json");
   assert.match(result.invalidMetaFiles[0]?.message ?? "", /メタファイルが不正です/);
@@ -281,11 +280,11 @@ test("増分スキャン: 完全未変更の作品は2回目以降スキップ�
   const first = await adapter.scan();
   assert.equal(first.skipped, 1);
   assert.equal(first.registered, 1);
-  assert.equal(first.newlyGenerated, 0);
+  assert.equal(first.insertedWorkIds.length, 0);
 
   const second = await adapter.scan();
   assert.equal(second.registered, 1); // error状態の既存メタは毎回再評価（TASK-95）
-  assert.equal(second.newlyGenerated, 0);
+  assert.equal(second.insertedWorkIds.length, 0);
   assert.equal(second.skipped, 1); // 正常な自動生成メタのみスキップ
   assert.equal(second.missing, 0);
   assert.equal(second.errors, 0);

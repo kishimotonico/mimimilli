@@ -197,6 +197,15 @@ export class UserWorkStateRepository {
     }
   }
 
+  restoreScanCandidateExclusions(paths: string[]): void {
+    for (const path of paths) {
+      this.db.user
+        .delete(scanCandidateExclusions)
+        .where(eq(scanCandidateExclusions.path, path))
+        .run();
+    }
+  }
+
   listSmartFolders(): SmartFolder[] {
     return this.db.user
       .select()

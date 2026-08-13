@@ -14,6 +14,7 @@ test("updateSettings は receiver なしで呼び出せる", async () => {
     setUserSetting: (key: string, value: string) => settings.set(key, value),
     listScanCandidateExclusions: () => [],
     excludeScanCandidates: () => undefined,
+    restoreScanCandidateExclusions: () => undefined,
   };
   const catalog = {
     getScanState: () => null,

@@ -98,11 +98,16 @@ function seedQueryCache(queryClient: QueryClient) {
   queryClient.setQueryData(SCAN_QUERY_KEYS.last(), {
     result: {
       registered: 0,
-      newlyGenerated: 0,
+      insertedWorkIds: [],
+      updatedWorkIds: [],
       errors: 0,
       missing: 0,
-      newWorkIds: [],
       rjCodeMissingCount: 0,
+      skipped: 0,
+      coverErrors: 0,
+      identityConflicts: [],
+      invalidMetaFiles: [],
+      candidates: [],
     },
     finishedAt: "2026-01-01T00:00:00.000Z",
   });
@@ -341,11 +346,16 @@ describe("App root subscriptions", () => {
       const nextResult = {
         result: {
           registered: 1,
-          newlyGenerated: 1,
+          insertedWorkIds: ["work-1"],
+          updatedWorkIds: [],
           errors: 0,
           missing: 0,
-          newWorkIds: [],
           rjCodeMissingCount: 0,
+          skipped: 0,
+          coverErrors: 0,
+          identityConflicts: [],
+          invalidMetaFiles: [],
+          candidates: [],
         },
         finishedAt: "2026-01-02T00:00:00.000Z",
       };

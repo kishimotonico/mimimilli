@@ -95,10 +95,10 @@ const work: Work = {
 
 const scanResult: ScanResult = {
   registered: 10,
-  newlyGenerated: 1,
+  insertedWorkIds: [newWork.id],
+  updatedWorkIds: [],
   errors: 0,
   missing: 0,
-  newWorkIds: [newWork.id],
   rjCodeMissingCount: 0,
   skipped: 0,
   coverErrors: 0,
@@ -326,7 +326,7 @@ describe("ScanModal", () => {
 
   it("蔵書が0件でも「今回のスキャン」が全て0とライブラリ全体の0件は別枠で区別される", () => {
     renderModal({
-      lastResult: { ...scanResult, registered: 0, newlyGenerated: 0, newWorkIds: [] },
+      lastResult: { ...scanResult, registered: 0, insertedWorkIds: [], updatedWorkIds: [] },
       libraryTotal: 0,
     });
 
@@ -338,8 +338,8 @@ describe("ScanModal", () => {
   it("実行中から完了への遷移を見ていたときだけ、完了サインと変化した統計の強調が一時的に出る", async () => {
     vi.useFakeTimers();
     try {
-      const before: ScanResult = { ...scanResult, registered: 5, newlyGenerated: 0 };
-      const after: ScanResult = { ...scanResult, registered: 6, newlyGenerated: 1 };
+      const before: ScanResult = { ...scanResult, registered: 5, insertedWorkIds: [] };
+      const after: ScanResult = { ...scanResult, registered: 6, insertedWorkIds: [newWork.id] };
       const { store, rerenderModal } = renderModal(
         { lastResult: before },
         { job: createRunningJob({ phase: "registering", processed: 1, total: 1 }) },
@@ -382,7 +382,7 @@ describe("ScanModal", () => {
     }
   });
 
-  it("scan結果のnewWorkIdsが変わると一覧も即座に切り替わる（getWorkを呼ばず、worksをids一括取得する）", async () => {
+  it("scan結果のinsertedWorkIdsが変わると一覧も即座に切り替わる（getWorkを呼ばず、worksをids一括取得する）", async () => {
     const getWorkSpy = vi.spyOn(workApi, "getWork");
     const workA = { id: "work-a", title: "作品A", trackCount: 2 };
     const workB = { id: "work-b", title: "作品B", trackCount: 3 };
@@ -390,11 +390,11 @@ describe("ScanModal", () => {
     worksById.set(workB.id, toListItem(workB.id, workB.title, workB.trackCount));
 
     const { rerenderModal } = renderModal({
-      lastResult: { ...scanResult, newWorkIds: [workA.id] },
+      lastResult: { ...scanResult, insertedWorkIds: [workA.id] },
     });
     await waitFor(() => expect(screen.getByText(workA.title)).toBeInTheDocument());
 
-    rerenderModal({ lastResult: { ...scanResult, newWorkIds: [workB.id] } });
+    rerenderModal({ lastResult: { ...scanResult, insertedWorkIds: [workB.id] } });
     await waitFor(() => expect(screen.getByText(workB.title)).toBeInTheDocument());
     expect(screen.queryByText(workA.title)).toBeNull();
 
@@ -403,14 +403,14 @@ describe("ScanModal", () => {
     expect(searchWorksSpy).toHaveBeenCalledWith({ ids: [workB.id] });
   });
 
-  it("newWorkIdsがWORKS_DEFAULT_PAGE_SIZEを超えるとidsを先頭で切り詰め、省略件数を表示する", async () => {
+  it("insertedWorkIdsがWORKS_DEFAULT_PAGE_SIZEを超えるとidsを先頭で切り詰め、省略件数を表示する", async () => {
     const manyIds = Array.from(
       { length: WORKS_DEFAULT_PAGE_SIZE + 50 },
       (_, i) => `work-many-${i}`,
     );
     for (const id of manyIds) worksById.set(id, toListItem(id, id, 1));
 
-    renderModal({ lastResult: { ...scanResult, newWorkIds: manyIds } });
+    renderModal({ lastResult: { ...scanResult, insertedWorkIds: manyIds } });
 
     await waitFor(() => expect(screen.getByText("work-many-0")).toBeInTheDocument());
     expect(
@@ -437,7 +437,7 @@ describe("ScanModal", () => {
     await waitFor(() =>
       expect(screen.getByText("新規作品の読み込みに失敗しました")).toBeInTheDocument(),
     );
-    expect(screen.getByText(String(scanResult.newlyGenerated))).toBeInTheDocument();
+    expect(screen.getByText(String(scanResult.insertedWorkIds.length))).toBeInTheDocument();
     expect(screen.queryByText(newWork.title)).toBeNull();
   });
 

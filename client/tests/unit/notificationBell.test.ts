@@ -16,11 +16,16 @@ import {
 
 const scanResult: ScanResult = {
   registered: 12,
-  newlyGenerated: 3,
+  insertedWorkIds: ["a", "b", "c"],
+  updatedWorkIds: [],
   errors: 1,
   missing: 0,
-  newWorkIds: [],
   rjCodeMissingCount: 3,
+  skipped: 0,
+  coverErrors: 0,
+  identityConflicts: [],
+  invalidMetaFiles: [],
+  candidates: [],
 };
 
 const summaryDefaults = {

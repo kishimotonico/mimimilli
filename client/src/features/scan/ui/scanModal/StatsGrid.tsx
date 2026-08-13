@@ -1,11 +1,15 @@
 import { cn } from "../../../../shared/lib/cn";
 import type { ScanResult } from "@mimimilli/shared";
 
-export type StatKey = keyof Pick<
-  ScanResult,
-  "registered" | "newlyGenerated" | "errors" | "missing"
->;
-export const STAT_KEYS: StatKey[] = ["registered", "newlyGenerated", "errors", "missing"];
+export type StatKey = "registered" | "inserted" | "errors" | "missing";
+
+export const STAT_KEYS: StatKey[] = ["registered", "inserted", "errors", "missing"];
+
+export function statValue(result: ScanResult | null, key: StatKey): number | null {
+  if (!result) return null;
+  if (key === "inserted") return result.insertedWorkIds.length;
+  return result[key];
+}
 
 const STAT_TILES: Array<{
   key: StatKey;
@@ -13,7 +17,7 @@ const STAT_TILES: Array<{
   tone: (value: number) => string;
 }> = [
   { key: "registered", label: "登録済み", tone: () => "text-ink-0" },
-  { key: "newlyGenerated", label: "新規検出", tone: () => "text-ink-0" },
+  { key: "inserted", label: "新規検出", tone: () => "text-ink-0" },
   { key: "errors", label: "エラー", tone: (v) => (v > 0 ? "text-[var(--r-coral)]" : "text-ink-3") },
   {
     key: "missing",
@@ -34,7 +38,7 @@ export default function StatsGrid({
   return (
     <div className="grid grid-cols-4 gap-2">
       {STAT_TILES.map(({ key, label, tone }) => {
-        const value = result?.[key] ?? null;
+        const value = statValue(result, key);
         const highlighted = changedKeys.has(key);
         return (
           <div

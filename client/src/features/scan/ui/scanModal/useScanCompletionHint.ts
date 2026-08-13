@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ScanResult } from "@mimimilli/shared";
-import { STAT_KEYS, type StatKey } from "./StatsGrid";
+import { STAT_KEYS, statValue, type StatKey } from "./StatsGrid";
 
 /** 完了サインの表示時間。派手にしないため短めに留める。 */
 const COMPLETION_HINT_MS = 2400;
@@ -24,7 +24,7 @@ export function useScanCompletionHint(scanning: boolean, lastResult: ScanResult 
     if (!(wasScanning && !scanning)) return;
     const before = resultBeforeRunRef.current;
     const changed = new Set<StatKey>(
-      STAT_KEYS.filter((key) => (before?.[key] ?? 0) !== (lastResult?.[key] ?? 0)),
+      STAT_KEYS.filter((key) => statValue(before, key) !== statValue(lastResult, key)),
     );
     setChangedKeys(changed);
     setJustCompleted(true);

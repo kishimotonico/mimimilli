@@ -470,7 +470,7 @@ test("bulk取得はタイトル・タグを自動適用せず、mimimilli.json�
   await adapter.updateSettings({ rootFolder: lib.root });
   const scan = await adapter.scan();
   const registered = await adapter.registerScanCandidates(
-    scan.candidates.map((candidate) => candidate.path),
+    scan.candidates.map((candidate) => ({ path: candidate.path })),
   );
   const candidateId = registered.registered[0]!.workId;
   const beforeExisting = await adapter.getWork(lib.existingWorkId);
@@ -516,7 +516,7 @@ test("bulk取得はcache TTLとskipped状態を利用し、mimimilli.jsonを変�
   await adapter.updateSettings({ rootFolder: lib.root });
   const scan = await adapter.scan();
   const registered = await adapter.registerScanCandidates(
-    scan.candidates.map((candidate) => candidate.path),
+    scan.candidates.map((candidate) => ({ path: candidate.path })),
   );
   const candidateId = registered.registered[0]!.workId;
   await adapter.updateDlsiteState(candidateId!, { skipped: true });
@@ -1185,7 +1185,7 @@ test("DLsite HTMLキャッシュ: fresh DBでmimimilli.jsonを削除して同じ
   const registration = await second.registerScanCandidates(
     scan.candidates
       .filter((candidate) => candidate.path.endsWith("RJ900002_既存メタ"))
-      .map((candidate) => candidate.path),
+      .map((candidate) => ({ path: candidate.path })),
   );
   const workIds = registration.registered.map((entry) => entry.workId);
   assert.equal(workIds.length, 1);
@@ -1334,7 +1334,7 @@ test("DLsiteカバー: 同じURLを2作品へ同時適用してもHTTPは1回で
   const scan = await adapter.scan();
   const workAId = lib.existingWorkId;
   const registration = await adapter.registerScanCandidates(
-    scan.candidates.map((candidate) => candidate.path),
+    scan.candidates.map((candidate) => ({ path: candidate.path })),
   );
   const registeredWorkBId = registration.registered[0]?.workId;
   assert.ok(registeredWorkBId);
@@ -1540,7 +1540,9 @@ test("bulk取得はカバー失敗に依存せず、mimimilli.jsonを変更し�
   });
   await adapter.updateSettings({ rootFolder: lib.root });
   const scan = await adapter.scan();
-  await adapter.registerScanCandidates(scan.candidates.map((candidate) => candidate.path));
+  await adapter.registerScanCandidates(
+    scan.candidates.map((candidate) => ({ path: candidate.path })),
+  );
   const metaPath = join(
     (await adapter.getWork(lib.existingWorkId))!.physicalPath,
     "mimimilli.json",
@@ -1578,7 +1580,9 @@ test("bulk取得はmimimilli.json書込み権限に依存しない", async (t) =
   });
   await adapter.updateSettings({ rootFolder: lib.root });
   const scan = await adapter.scan();
-  await adapter.registerScanCandidates(scan.candidates.map((candidate) => candidate.path));
+  await adapter.registerScanCandidates(
+    scan.candidates.map((candidate) => ({ path: candidate.path })),
+  );
 
   const failedMetaPath = join(lib.root, "dlsite", "RJ900002_既存メタ", "mimimilli.json");
   chmodSync(failedMetaPath, 0o444);

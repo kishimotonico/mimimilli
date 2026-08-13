@@ -17,10 +17,10 @@ function createScanJobManager(
 
 const emptyResult = {
   registered: 0,
-  newlyGenerated: 0,
+  insertedWorkIds: [],
+  updatedWorkIds: [],
   errors: 0,
   missing: 0,
-  newWorkIds: [],
   rjCodeMissingCount: 0,
   skipped: 0,
   coverErrors: 0,
@@ -114,7 +114,7 @@ test("POST /scan は202とLocationを即時返し、完了状態はjobから取�
   assert.equal(location, `/api/scan/${id}`);
   const job = await waitForTerminal(app, id);
   assert.equal(job.status, "completed");
-  assert.deepEqual((job.result as { newWorkIds: string[] }).newWorkIds, ["RJ501011"]);
+  assert.deepEqual((job.result as { insertedWorkIds: string[] }).insertedWorkIds, ["RJ501011"]);
 });
 
 test("active jobは409でsnapshotを返し、終了後はactiveが204になる", async () => {
@@ -136,7 +136,7 @@ test("GET /scan/last は一度も完了していなければ204、完了後は�
   const last = await app.request("/api/scan/last");
   assert.equal(last.status, 200);
   const body = await last.json();
-  assert.deepEqual(body.result.newWorkIds, ["RJ501011"]);
+  assert.deepEqual(body.result.insertedWorkIds, ["RJ501011"]);
   assert.equal(typeof body.finishedAt, "string");
 });
 

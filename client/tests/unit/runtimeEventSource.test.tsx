@@ -64,10 +64,10 @@ const running: ScanJobSnapshot = {
 
 const scanResult = {
   registered: 1,
-  newlyGenerated: 0,
+  insertedWorkIds: [],
+  updatedWorkIds: [],
   errors: 0,
   missing: 0,
-  newWorkIds: [],
   rjCodeMissingCount: 0,
   skipped: 0,
   coverErrors: 0,
@@ -215,8 +215,8 @@ describe("ScanRuntime EventSource ownership", () => {
 });
 
 describe("Runtime間連携: ScanRuntime → DlsiteBulkRuntime", () => {
-  it("newWorkIds を含む完了イベントで dlsiteBulk.attach が一度だけ成立する", async () => {
-    const scanResultWithNewWorks = { ...scanResult, newWorkIds: ["work-1"] };
+  it("insertedWorkIds を含む完了イベントで dlsiteBulk.attach が一度だけ成立する", async () => {
+    const scanResultWithNewWorks = { ...scanResult, insertedWorkIds: ["work-1"] };
     const completedWithNewWorks: ScanJobSnapshot = {
       ...completedJob,
       result: scanResultWithNewWorks,

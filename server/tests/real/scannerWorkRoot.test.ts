@@ -28,9 +28,10 @@ test("複数のdiscフォルダーを一つの未登録候補へ統合し、mimi
       inferredTitle: "作品",
       audioFileCount: 2,
       audioBreakdown: [{ extension: "wav", count: 2 }],
+      rjCode: null,
     },
   ]);
-  assert.equal(result.newlyGenerated, 0);
+  assert.equal(result.insertedWorkIds.length, 0);
   assert.equal(existsSync(join(work, "mimimilli.json")), false);
 });
 

@@ -74,7 +74,7 @@ test("title: 単発適用は applyTitle に従い、一括取得は作品情報�
   assert.equal(existingAfterApply?.title, applyTitle);
 
   const registration = await adapter.registerScanCandidates(
-    scan.candidates.map((candidate) => candidate.path),
+    scan.candidates.map((candidate) => ({ path: candidate.path })),
   );
   const generatedId = registration.registered[0]!.workId;
   const generatedBefore = await adapter.getWork(generatedId);

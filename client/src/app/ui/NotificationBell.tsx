@@ -165,7 +165,7 @@ export default function NotificationBell({
                   </p>
                   <dl className="grid grid-cols-2 gap-x-3 gap-y-1 font-mono text-[10.5px]">
                     <ScanStat label="登録済み" value={scanResult.registered} />
-                    <ScanStat label="新規" value={scanResult.newlyGenerated} />
+                    <ScanStat label="新規" value={scanResult.insertedWorkIds.length} />
                     <ScanStat label="エラー" value={scanResult.errors} />
                     <ScanStat label="行方不明" value={scanResult.missing} />
                   </dl>

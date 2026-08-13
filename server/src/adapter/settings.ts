@@ -1,6 +1,7 @@
 import type {
   ScanDiagnostic,
   ScanCandidate,
+  ScanCandidateRegisterItem,
   ScanCandidatesRegisterResponse,
   ScanProgressEvent,
   ScanResult,
@@ -23,8 +24,10 @@ export interface SettingsAdapter {
   listScanDiagnostics(): Promise<ScanDiagnostic[]>;
   listScanCandidates(): Promise<ScanCandidate[]>;
   registerScanCandidates(
-    paths: string[],
+    items: ScanCandidateRegisterItem[],
     onRegistered?: (workId: string) => void,
   ): Promise<ScanCandidatesRegisterResponse>;
   excludeScanCandidates(paths: string[]): Promise<void>;
+  listScanCandidateExclusions(): Promise<string[]>;
+  restoreScanCandidateExclusions(paths: string[]): Promise<void>;
 }

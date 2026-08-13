@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
+import { workspacePath } from "@mimimilli/shared";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 
@@ -48,16 +49,17 @@ test("選択した候補だけを登録し、除外した候補は以後返さ�
       inferredTitle: "選択作品",
       audioFileCount: 1,
       audioBreakdown: [{ extension: "wav", count: 1 }],
+      rjCode: null,
     },
   ]);
 
-  const result = await adapter.registerScanCandidates(["選択作品"]);
+  const result = await adapter.registerScanCandidates([{ path: workspacePath("選択作品") }]);
   assert.equal(result.registered.length, 1);
   assert.deepEqual(result.failures, []);
   assert.equal(existsSync(join(selected, "mimimilli.json")), true);
   assert.equal(existsSync(join(excluded, "mimimilli.json")), false);
   await assert.rejects(
-    () => adapter.registerScanCandidates(["選択作品"]),
+    () => adapter.registerScanCandidates([{ path: workspacePath("選択作品") }]),
     /候補が更新されています/,
   );
 });
@@ -74,7 +76,11 @@ test("stale候補を含む一括登録は書込み前に全件拒否する", asy
   await adapter.updateSettings({ rootFolder: root });
 
   await assert.rejects(
-    () => adapter.registerScanCandidates(["現在の候補", "古い候補"]),
+    () =>
+      adapter.registerScanCandidates([
+        { path: workspacePath("現在の候補") },
+        { path: workspacePath("古い候補") },
+      ]),
     /候補が更新されています/,
   );
   assert.equal(existsSync(join(current, "mimimilli.json")), false);

@@ -15,10 +15,13 @@ import {
   scanJobSnapshotSchema,
   scanLastResultResponseSchema,
   scanCandidatesMutationSchema,
+  scanCandidatesRegisterRequestSchema,
   scanCandidatesRegisterResponseSchema,
   scanCandidatesResponseSchema,
+  scanCandidateExclusionsResponseSchema,
   startScanRequestSchema,
   startScanResponseSchema,
+  type ScanCandidateRegisterItem,
   type ScanJobSnapshot,
   type ScanLastResultResponse,
   type ScanCandidatesRegisterResponse,
@@ -85,15 +88,30 @@ export async function getScanCandidates(): Promise<ScanCandidate[]> {
 }
 
 export async function registerScanCandidates(
-  paths: string[],
+  items: ScanCandidateRegisterItem[],
 ): Promise<ScanCandidatesRegisterResponse> {
   return postParsed(
     scanCandidatesRegisterResponseSchema,
     "/scan/candidates/register",
-    scanCandidatesMutationSchema.parse({ paths }),
+    scanCandidatesRegisterRequestSchema.parse({ items }),
   );
 }
 
 export async function excludeScanCandidates(paths: string[]): Promise<void> {
   await postVoid("/scan/candidates/exclude", scanCandidatesMutationSchema.parse({ paths }));
+}
+
+export async function getScanCandidateExclusions(): Promise<string[]> {
+  const { paths } = await getParsed(
+    scanCandidateExclusionsResponseSchema,
+    "/scan/candidates/exclusions",
+  );
+  return paths;
+}
+
+export async function restoreScanCandidateExclusions(paths: string[]): Promise<void> {
+  await postVoid(
+    "/scan/candidates/exclusions/restore",
+    scanCandidatesMutationSchema.parse({ paths }),
+  );
 }

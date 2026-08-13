@@ -37,8 +37,9 @@ export interface FixtureScenario {
   smartFolders: SmartFolder[];
   rootFolder: string | null;
   lastScanTime: string;
-  /** scan() が newWorkIds として返す、新規に見つかった作品ID */
-  scanNewWorkIds: string[];
+  /** scan() が insertedWorkIds として返す、新規に見つかった作品ID */
+  scanInsertedWorkIds: string[];
+  scanUpdatedWorkIds: string[];
   scanCandidates: ScanCandidate[];
   scanIdentityConflicts: ScanDiagnostic[];
   scanInvalidMetaFiles: InvalidMetaFile[];
@@ -78,7 +79,8 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       smartFolders: [],
       rootFolder: "/library/empty-library",
       lastScanTime: now,
-      scanNewWorkIds: [],
+      scanInsertedWorkIds: [],
+      scanUpdatedWorkIds: [],
       scanCandidates: [],
       scanIdentityConflicts: [],
       scanInvalidMetaFiles: [],
@@ -92,19 +94,22 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       smartFolders: cloneSmartFolders(smartFolders),
       rootFolder: "/library",
       lastScanTime: now,
-      scanNewWorkIds: ["RJ501011"],
+      scanInsertedWorkIds: ["RJ501011"],
+      scanUpdatedWorkIds: [],
       scanCandidates: [
         {
           path: workspacePath("未登録作品"),
           inferredTitle: "未登録作品",
           audioFileCount: 2,
           audioBreakdown: [{ extension: "mp3", count: 2 }],
+          rjCode: null,
         },
         {
           path: workspacePath("朗読/候補"),
           inferredTitle: "候補",
           audioFileCount: 3,
           audioBreakdown: [{ extension: "m4a", count: 3 }],
+          rjCode: null,
         },
       ],
       scanIdentityConflicts: [
@@ -126,7 +131,8 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       smartFolders: cloneSmartFolders(smartFolders),
       rootFolder: "/library",
       lastScanTime: now,
-      scanNewWorkIds: [],
+      scanInsertedWorkIds: [],
+      scanUpdatedWorkIds: [],
       scanCandidates: [],
       scanIdentityConflicts: [],
       scanInvalidMetaFiles: [],
@@ -140,7 +146,8 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       smartFolders: [],
       rootFolder: "/library/error-library",
       lastScanTime: now,
-      scanNewWorkIds: [],
+      scanInsertedWorkIds: [],
+      scanUpdatedWorkIds: [],
       scanCandidates: [],
       scanIdentityConflicts: [],
       scanInvalidMetaFiles: [],
@@ -154,19 +161,22 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       smartFolders: cloneSmartFolders(smartFolders),
       rootFolder: "/library",
       lastScanTime: now,
-      scanNewWorkIds: [],
+      scanInsertedWorkIds: [],
+      scanUpdatedWorkIds: [],
       scanCandidates: [
         {
           path: workspacePath("未登録作品"),
           inferredTitle: "未登録作品",
           audioFileCount: 2,
           audioBreakdown: [{ extension: "mp3", count: 2 }],
+          rjCode: null,
         },
         {
           path: workspacePath("朗読/候補"),
           inferredTitle: "候補",
           audioFileCount: 3,
           audioBreakdown: [{ extension: "m4a", count: 3 }],
+          rjCode: null,
         },
       ],
       scanIdentityConflicts: [
@@ -184,7 +194,8 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
     smartFolders: cloneSmartFolders(smartFolders),
     rootFolder: "/library",
     lastScanTime: now,
-    scanNewWorkIds: [],
+    scanInsertedWorkIds: [],
+    scanUpdatedWorkIds: [],
     scanCandidates: [],
     scanIdentityConflicts: [],
     scanInvalidMetaFiles: [],
