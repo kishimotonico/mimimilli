@@ -296,6 +296,7 @@ export const DLSITE_PARSE_SUCCESS_CASE =
 // isDlsiteUnlinked (shared/dlsite.ts)
 export const DLSITE_UNLINKED_CASE =
   "SUM(CASE WHEN json_extract(work_dlsite.state_json, '$.rjCode') IS NOT NULL " +
+  "AND json_extract(work_dlsite.state_json, '$.rjCode') != '' " +
   "AND json_extract(work_dlsite.state_json, '$.status') = 'none' THEN 1 ELSE 0 END)";
 
 export const DLSITE_NOTIFICATION_SUMMARY_SELECT = `

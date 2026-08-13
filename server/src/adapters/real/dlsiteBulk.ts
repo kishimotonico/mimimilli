@@ -3,6 +3,7 @@ import {
   type DlsiteBulkMode,
   type DlsiteBulkProgressEvent,
   type DlsiteBulkResult,
+  hasRjCode,
   type WorkSummary,
 } from "@mimimilli/shared";
 import { DlsiteOfflineError } from "../../errors.ts";
@@ -44,7 +45,7 @@ export function selectDlsiteBulkTargets(
   const dataIntegrityWarning = toDataIntegrityWarning(skipped);
   const requested = summaries;
   const targets = requested.filter((work) => {
-    if (!work.dlsite.rjCode || work.dlsite.status === "skipped") return false;
+    if (!hasRjCode(work.dlsite) || work.dlsite.status === "skipped") return false;
     return work.dlsite.status !== "applied";
   });
   return {

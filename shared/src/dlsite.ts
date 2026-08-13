@@ -30,7 +30,13 @@ export function emptyDlsiteState(): DlsiteState {
   };
 }
 
+/** RJコードが非空文字列として設定されているか。`null` と明示的な `""` は含まない。 */
+export function hasRjCode(state: Pick<DlsiteState, "rjCode">): boolean {
+  return state.rjCode !== null && state.rjCode !== "";
+}
+
 /** RJコードが未検出のまま放置されている作品か（ユーザーが明示的にスキップした作品は除く）。
+ *  `rjCode === ""` はユーザーが明示的にRJコードなしとした状態であり、未検出には含めない。
  *  スキャン完了通知・一覧の両方で判定基準を一致させるための正典 */
 export function isRjCodeMissing(state: DlsiteState): boolean {
   return state.rjCode === null && state.status !== "skipped";
@@ -70,7 +76,7 @@ export function evaluateParseErrorAlert(
  *  POST /dlsite/bulk（mode: "existing"）は取得失敗（error）も再試行対象に含めるため、
  *  実際に処理される件数とは意図的に区別している（error は isDlsiteFetchFailed 側で別掲する）。 */
 export function isDlsiteUnlinked(state: DlsiteState): boolean {
-  return state.rjCode !== null && state.status === "none";
+  return hasRjCode(state) && state.status === "none";
 }
 
 export const dlsiteWorkInfoSchema = z.object({
