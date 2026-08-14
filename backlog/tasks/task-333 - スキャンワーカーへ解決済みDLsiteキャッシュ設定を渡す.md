@@ -4,7 +4,7 @@ title: スキャンワーカーへ解決済みDLsiteキャッシュ設定を渡�
 status: To Do
 assignee: []
 created_date: '2026-08-14 08:21'
-updated_date: '2026-08-14 08:25'
+updated_date: '2026-08-14 08:35'
 labels: []
 dependencies: []
 priority: medium
@@ -19,10 +19,12 @@ Codexレビュー2026-08-14（マージe9c16fbの事後レビュー）の指摘�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 MIMIMILLI_DLSITE_CACHE_DBを設定した環境で、スキャンの投影が取得処理と同じキャッシュDBを参照する
-- [ ] #2 TTL設定がワーカー側のDlsiteCacheにも適用される
-- [ ] #3 設定の受け渡しを検証するテストがある
+- [x] #1 MIMIMILLI_DLSITE_CACHE_DBを設定した環境で、スキャンの投影が取得処理と同じキャッシュDBを参照する
+- [x] #2 TTL設定がワーカー側のDlsiteCacheにも適用される
+- [x] #3 設定の受け渡しを検証するテストがある
 <!-- AC:END -->
+
+
 
 ## Comments
 
