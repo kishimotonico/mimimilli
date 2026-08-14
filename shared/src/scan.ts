@@ -1,6 +1,7 @@
 // サーバー側スキャンジョブ（TASK-76）の HTTP / SSE 契約。
 import { z } from "zod";
 import { dataIntegrityWarningSchema } from "./dataIntegrity.ts";
+import { rjCodeFormatSchema } from "./dlsite.ts";
 import { workspacePathSchema } from "./media.ts";
 
 export const scanCandidateSchema = z.object({
@@ -30,8 +31,8 @@ export const scanCandidatesMutationSchema = z.object({
 });
 export const scanCandidateRegisterItemSchema = z.object({
   path: workspacePathSchema,
-  /** 省略時はフォルダー名から自動検出。空文字はRJコードなしの明示。値ありはそのまま mimimilli.json へ書き込む。 */
-  rjCode: z.string().optional(),
+  /** 省略時はフォルダー名から自動検出。空文字はRJコードなしの明示。値ありは検証・正規化して mimimilli.json へ書き込む。 */
+  rjCode: z.union([z.literal(""), rjCodeFormatSchema]).optional(),
 });
 export const scanCandidatesRegisterRequestSchema = z.object({
   items: z

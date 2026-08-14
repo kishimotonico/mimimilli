@@ -153,15 +153,20 @@ export const dlsiteBulkApplyMissingResultSchema = z.object({
 });
 export type DlsiteBulkApplyMissingResult = z.infer<typeof dlsiteBulkApplyMissingResultSchema>;
 
+/** RJ/VJコードの形式。DLsiteキャッシュが受け付ける形式（`^(RJ|VJ)\d{6,8}$`）と一致させる。 */
+export const RJ_CODE_PATTERN = /^(RJ|VJ)\d{6,8}$/i;
+
+/** 非空のRJ/VJコード1件の形式検証・正規化（大文字化）の正典。
+ *  空文字（RJコードなしの明示）・未指定は呼び出し側で個別に扱う。 */
+export const rjCodeFormatSchema = z
+  .string()
+  .trim()
+  .regex(RJ_CODE_PATTERN, "RJ/VJコードはRJまたはVJに続く6〜8桁で入力してください")
+  .transform((value) => value.toUpperCase());
+
 export const dlsiteStatePatchSchema = z
   .object({
-    rjCode: z
-      .string()
-      .trim()
-      .regex(/^(RJ|VJ)\d{6,8}$/i, "RJ/VJコードはRJまたはVJに続く6〜8桁で入力してください")
-      .transform((value) => value.toUpperCase())
-      .nullable()
-      .optional(),
+    rjCode: rjCodeFormatSchema.nullable().optional(),
     skipped: z.boolean().optional(),
   })
   .refine((patch) => patch.rjCode !== undefined || patch.skipped !== undefined);
