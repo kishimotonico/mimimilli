@@ -27,7 +27,6 @@ const emptyResult = {
   identityConflicts: [],
   invalidMetaFiles: [],
   candidates: [],
-  candidatePool: [],
 };
 
 async function start(

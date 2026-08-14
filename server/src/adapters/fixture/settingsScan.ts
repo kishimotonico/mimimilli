@@ -75,7 +75,6 @@ export function createSettingsScanMethods(state: FixtureState): SettingsAdapter 
         unreadablePaths: [],
         identityConflicts: state.scanIdentityConflicts,
         invalidMetaFiles: state.scanInvalidMetaFiles,
-        candidatePool: state.scanCandidates,
         candidates: state.scanCandidates.filter((candidate) => !excluded.has(candidate.path)),
       };
     },

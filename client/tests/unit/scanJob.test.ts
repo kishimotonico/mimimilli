@@ -42,7 +42,6 @@ const result = {
   identityConflicts: [],
   invalidMetaFiles: [],
   candidates: [],
-  candidatePool: [],
 };
 const completed: ScanJobSnapshot = {
   ...running,

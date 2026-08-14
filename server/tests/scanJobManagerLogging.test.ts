@@ -18,7 +18,6 @@ const emptyResult: ScanResult = {
   identityConflicts: [],
   invalidMetaFiles: [],
   candidates: [],
-  candidatePool: [],
 };
 
 function withStubAdapter(overrides: Partial<DataAdapter> & Pick<DataAdapter, "scan">): DataAdapter {
@@ -57,7 +56,6 @@ test("完了時に scan カテゴリの INFO 要約ログを1回記録する", a
     skipped: 6,
     coverErrors: 7,
     candidates: [],
-    candidatePool: [],
     identityConflicts: [
       {
         kind: "identity_conflict",

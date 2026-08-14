@@ -111,7 +111,6 @@ const scanResult: ScanResult = {
   identityConflicts: [],
   invalidMetaFiles: [],
   candidates: [],
-  candidatePool: [],
 };
 
 const candidateDetected: ScanCandidate = {
@@ -536,7 +535,6 @@ describe("ScanModal", () => {
       lastResult: {
         ...scanResult,
         candidates: [candidateDetected, candidateUndetected],
-        candidatePool: [candidateDetected, candidateUndetected],
       },
     });
 
@@ -568,7 +566,6 @@ describe("ScanModal", () => {
       lastResult: {
         ...scanResult,
         candidates: [candidateDetected, candidateUndetected],
-        candidatePool: [candidateDetected, candidateUndetected],
       },
     });
 
@@ -607,7 +604,6 @@ describe("ScanModal", () => {
       lastResult: {
         ...scanResult,
         candidates: [candidateDetected, candidateUndetected],
-        candidatePool: [candidateDetected, candidateUndetected],
       },
     });
 

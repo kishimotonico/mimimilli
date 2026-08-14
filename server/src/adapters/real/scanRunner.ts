@@ -1,14 +1,21 @@
-import type { ScanProgressEvent, ScanResult } from "@mimimilli/shared";
+import type { ScanCandidate, ScanProgressEvent, ScanResult } from "@mimimilli/shared";
 import type { ScanOptions } from "../../adapter/index.ts";
 import { formatError, getCategoryLogger } from "../../lib/logger.ts";
 import type { DbLocation } from "./db.ts";
 
 const scanLogger = getCategoryLogger("scan");
 
+/** worker 完了時に親プロセスへ渡す内部結果。HTTP/SSE 契約の ScanResult とは分離する。 */
+export type FileScanWorkerResult = {
+  result: ScanResult;
+  candidatePool: ScanCandidate[];
+};
+
 interface ScanWorkerMessage {
   type: "progress" | "completed" | "cancelled" | "error" | "test-gate-ready";
   progress?: ScanProgressEvent;
   result?: ScanResult;
+  candidatePool?: ScanCandidate[];
   message?: string;
   errorKind?: string;
   stack?: string;
@@ -27,7 +34,7 @@ export type FileScanRunner = (
   dataRoot: string,
   thumbnailCacheDir: string,
   options: ScanOptions,
-) => Promise<ScanResult>;
+) => Promise<FileScanWorkerResult>;
 
 export async function runFileScanInWorker(
   database: Extract<DbLocation, { kind: "files" }>,
@@ -38,11 +45,11 @@ export async function runFileScanInWorker(
   testGate?: SharedArrayBuffer,
   testGateStage: "before-scan" | "before-finalize" = "before-scan",
   onTestGateReady?: () => void,
-): Promise<ScanResult> {
+): Promise<FileScanWorkerResult> {
   const abortBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT);
   const token = new Int32Array(abortBuffer);
   const worker = new Worker(new URL("./scanWorker.ts", import.meta.url), { type: "module" });
-  return new Promise<ScanResult>((resolveResult, rejectResult) => {
+  return new Promise<FileScanWorkerResult>((resolveResult, rejectResult) => {
     let settled = false;
     let terminalReceived = false;
     const abort = () => {
@@ -65,7 +72,12 @@ export async function runFileScanInWorker(
       }
       terminalReceived = true;
       if (message.type === "completed" && message.result) {
-        settle(() => resolveResult(message.result!));
+        settle(() =>
+          resolveResult({
+            result: message.result!,
+            candidatePool: message.candidatePool ?? [],
+          }),
+        );
       } else if (message.type === "cancelled") {
         settle(() =>
           rejectResult(new DOMException("スキャンはキャンセルされました", "AbortError")),

@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { existsSync } from "node:fs";
-import type { ScanProgressEvent, ScanResult } from "@mimimilli/shared";
+import type { ScanCandidate, ScanProgressEvent, ScanResult } from "@mimimilli/shared";
 import { openDb, type Db, type DbLocation } from "./db.ts";
 import { Scanner } from "./scanner.ts";
 import { finalizeScan } from "./scanFinalize.ts";
@@ -22,7 +22,7 @@ interface WorkerInput {
 
 type WorkerMessage = { type: "start"; input: WorkerInput };
 type TerminalMessage =
-  | { type: "completed"; result: ScanResult }
+  | { type: "completed"; result: ScanResult; candidatePool: ScanCandidate[] }
   | { type: "cancelled" }
   | { type: "error"; message: string; errorKind?: string; stack?: string };
 
@@ -89,7 +89,7 @@ async function run(input: WorkerInput): Promise<void> {
       if (cancelled(token)) {
         terminal = { type: "cancelled" };
       } else {
-        terminal = { type: "completed", result };
+        terminal = { type: "completed", result, candidatePool: scanner.getCandidatePool() };
       }
     }
   } catch (error) {

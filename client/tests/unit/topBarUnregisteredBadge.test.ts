@@ -95,7 +95,6 @@ describe("TopBar の未登録バッジ", () => {
         identityConflicts: [],
         invalidMetaFiles: [],
         candidates: [candidate, { ...candidate, path: "もう1件", inferredTitle: "もう1件" }],
-        candidatePool: [candidate, { ...candidate, path: "もう1件", inferredTitle: "もう1件" }],
       },
     });
 

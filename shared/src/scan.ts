@@ -90,8 +90,6 @@ export const scanResultSchema = z.object({
   invalidMetaFiles: z.array(invalidMetaFileSchema),
   /** mimimilli.json を持たない音声フォルダー。scan はこの候補へ書き込まない。 */
   candidates: z.array(scanCandidateSchema),
-  /** 除外フィルタ前の候補プール。サーバー側 listScanCandidates の正本。UI は candidates を使う。 */
-  candidatePool: z.array(scanCandidateSchema),
 });
 export type ScanResult = z.infer<typeof scanResultSchema>;
 
