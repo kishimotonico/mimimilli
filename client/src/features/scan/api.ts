@@ -22,14 +22,12 @@ import {
   scanCandidatesMutationSchema,
   scanCandidatesRegisterRequestSchema,
   scanCandidatesRegisterResponseSchema,
-  scanCandidatesResponseSchema,
   startScanRequestSchema,
   startScanResponseSchema,
   type ScanCandidateRegisterItem,
   type ScanJobSnapshot,
   type ScanLastResultResponse,
   type ScanCandidatesRegisterResponse,
-  type ScanCandidate,
 } from "@mimimilli/shared";
 
 export const SCAN_QUERY_KEYS = {
@@ -88,11 +86,6 @@ export async function cancelScan(id: string): Promise<ScanJobSnapshot> {
 /** サーバー起動後に一度でも完了したスキャンの結果（TASK-56）。一度も完了していなければnull。 */
 export async function getLastScanResult(): Promise<ScanLastResultResponse | null> {
   return getParsed(scanLastResultResponseSchema, "/scan/last", { noContentAsNull: true });
-}
-
-export async function getScanCandidates(): Promise<ScanCandidate[]> {
-  const { candidates } = await getParsed(scanCandidatesResponseSchema, "/scan/candidates");
-  return candidates;
 }
 
 export async function registerScanCandidates(

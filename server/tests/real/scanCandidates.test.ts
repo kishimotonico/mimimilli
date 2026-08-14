@@ -19,6 +19,37 @@ function snapshotTree(root: string): string[] {
   return snapshot.sort();
 }
 
+test("listScanCandidatesは最後のスキャン結果を返し、再帰走査しない", async (t) => {
+  const directory = makeTestDirectory("scan-candidates-cache");
+  t.after(directory.cleanup);
+  const root = join(directory.path, "lib");
+  const initial = join(root, "初期候補");
+  mkdirSync(initial, { recursive: true });
+  writeWav(join(initial, "track.wav"), 1);
+
+  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
+  t.after(() => adapter.close());
+  await adapter.updateSettings({ rootFolder: root });
+  await adapter.scan();
+
+  const before = await adapter.listScanCandidates();
+  assert.equal(before.length, 1);
+  assert.equal(before[0]?.path, "初期候補");
+
+  const added = join(root, "走査後追加");
+  mkdirSync(added, { recursive: true });
+  writeWav(join(added, "track.wav"), 1);
+
+  const after = await adapter.listScanCandidates();
+  assert.deepEqual(after, before);
+
+  const rescanned = await adapter.scan();
+  assert.deepEqual(
+    rescanned.candidates.map((candidate) => candidate.path).sort(),
+    ["初期候補", "走査後追加"].sort(),
+  );
+});
+
 test("選択した候補だけを登録し、除外した候補は以後返さない", async (t) => {
   const directory = makeTestDirectory("scan-candidates");
   t.after(directory.cleanup);
@@ -84,6 +115,42 @@ test("stale候補を含む一括登録は書込み前に全件拒否する", asy
     /候補が更新されています/,
   );
   assert.equal(existsSync(join(current, "mimimilli.json")), false);
+});
+
+test("files-kind: 除外→再スキャン→除外解除で候補が復活する", async (t) => {
+  const directory = makeTestDirectory("scan-candidate-rescan-restore-files");
+  t.after(directory.cleanup);
+  const root = join(directory.path, "library");
+  mkdirSync(join(root, "除外対象"), { recursive: true });
+  mkdirSync(join(root, "他の作品"), { recursive: true });
+  writeWav(join(root, "除外対象", "track.wav"), 1);
+  writeWav(join(root, "他の作品", "track.wav"), 1);
+  const database = {
+    kind: "files" as const,
+    catalogPath: join(directory.path, "data", "db", "catalog.sqlite"),
+    userPath: join(directory.path, "data", "db", "user.sqlite"),
+  };
+  const adapter = createTestRealAdapter({
+    database,
+    dataRoot: join(directory.path, "data"),
+    thumbnailCacheDir: join(directory.path, "data", "cache", "thumbnails"),
+  });
+  t.after(() => adapter.close());
+  await adapter.updateSettings({ rootFolder: root });
+  await adapter.scan();
+  await adapter.excludeScanCandidates(["除外対象"]);
+  assert.deepEqual(
+    (await adapter.listScanCandidates()).map((candidate) => candidate.path),
+    ["他の作品"],
+  );
+
+  await adapter.scan();
+
+  await adapter.restoreScanCandidateExclusions(["除外対象"]);
+  assert.deepEqual(
+    (await adapter.listScanCandidates()).map((candidate) => candidate.path).sort(),
+    ["他の作品", "除外対象"].sort(),
+  );
 });
 
 test("候補除外はuser DBを再オープンしても保持される", async (t) => {

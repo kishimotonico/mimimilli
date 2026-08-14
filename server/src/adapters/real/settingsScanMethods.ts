@@ -15,6 +15,7 @@ import { type DbLocation } from "./db.ts";
 import type { DlsiteCacheConfig } from "./dlsiteCache.ts";
 import { Scanner } from "./scanner.ts";
 import { finalizeScan, LAST_SCAN_TIME_KEY } from "./scanFinalize.ts";
+import type { FileScanWorkerResult } from "./scanRunner.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";
@@ -43,7 +44,7 @@ export function createSettingsScanMethods(deps: {
     thumbnailCacheDir: string,
     dlsiteCache: DlsiteCacheConfig,
     options: ScanOptions,
-  ) => Promise<ScanResult>;
+  ) => Promise<FileScanWorkerResult>;
 }) {
   const {
     database,
@@ -105,7 +106,7 @@ export function createSettingsScanMethods(deps: {
       const root = requireRoot();
       const normalized = scanOptions ?? {};
       if (database.kind === "files") {
-        return runFileScanInWorker(
+        const { result, candidatePool } = await runFileScanInWorker(
           {
             ...database,
             catalogPath: resolve(database.catalogPath),
@@ -116,6 +117,8 @@ export function createSettingsScanMethods(deps: {
           dlsiteCache,
           normalized,
         );
+        scanner.seedCandidatePool(candidatePool);
+        return result;
       }
       const result = await scanner.scan(root, normalized);
       const checkAbort = () => {

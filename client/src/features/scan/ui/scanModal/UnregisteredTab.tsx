@@ -10,7 +10,10 @@ import { ApiRequestError } from "../../../../shared/api/http";
 import { apiErrorMessage } from "../../../../shared/lib/apiError";
 import { parentDirOf } from "../../../../shared/lib/workspacePath";
 import { excludeScanCandidates, registerScanCandidates, SCAN_QUERY_KEYS } from "../../api";
-import { restoreScanCandidateExclusions } from "../../../../entities/scan/api";
+import {
+  refreshScanCandidates,
+  restoreScanCandidateExclusions,
+} from "../../../../entities/scan/api";
 import type { CandidatesRegisteredResult } from "./types";
 
 export interface UnregisteredTabProps {
@@ -69,7 +72,7 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
     onError: async (error) => {
       if (error instanceof ApiRequestError && error.status === 409) {
         setErrorMessage("候補が更新されたため表示を更新しました。選び直してください。");
-        await queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.candidates() });
+        await refreshScanCandidates(queryClient);
         return;
       }
       setErrorMessage(apiErrorMessage(error, "ライブラリへの追加に失敗しました"));
@@ -92,8 +95,7 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
     mutationFn: (path: string) => restoreScanCandidateExclusions([path]),
     onSuccess: async () => {
       setExcludeToast(null);
-      // candidateExclusions()はcandidates()の子キーなので、candidates()の無効化で連動して無効化される。
-      await queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.candidates() });
+      await refreshScanCandidates(queryClient);
     },
     onError: (error) => setErrorMessage(apiErrorMessage(error, "取り消しに失敗しました")),
   });
