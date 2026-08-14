@@ -1,10 +1,10 @@
 ---
 id: TASK-337
 title: 実Bun.serveを通すtransport smokeテストを追加する
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-08-14 10:27'
-updated_date: '2026-08-14 13:03'
+updated_date: '2026-08-14 13:31'
 labels: []
 dependencies: []
 priority: medium
@@ -29,9 +29,9 @@ TASK-335と独立に着手できる（MIMIMILLI_ADAPTER=fixtureのBun.serve起�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 実ポートにbindしたBun.serveへHTTP接続するテストがserverテストに追加され、bun testで実行できる
-- [ ] #2 SSEエンドポイントのストリーム受信と、クライアント切断（AbortSignal）でサーバー側ジョブが中断されることを検証する
-- [ ] #3 audioのRangeリクエストで206と指定範囲のボディが返ることを検証する
-- [ ] #4 graceful shutdown（server.stop→app.shutdown→adapter close→logger dispose）が完了することを検証する
-- [ ] #5 /apiと/api/の両方が同じルーティング結果になることを実HTTPで検証する
+- [x] #1 実ポートにbindしたBun.serveへHTTP接続するテストがserverテストに追加され、bun testで実行できる
+- [x] #2 SSEエンドポイントのストリーム受信と、クライアント切断（AbortSignal）でサーバー側ジョブが中断されることを検証する
+- [x] #3 audioのRangeリクエストで206と指定範囲のボディが返ることを検証する
+- [x] #4 graceful shutdown（server.stop→app.shutdown→adapter close→logger dispose）が完了することを検証する
+- [x] #5 /apiと/api/の両方が同じルーティング結果になることを実HTTPで検証する
 <!-- AC:END -->
