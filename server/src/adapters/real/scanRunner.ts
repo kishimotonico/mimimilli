@@ -25,7 +25,6 @@ function reconstructWorkerError(message: ScanWorkerMessage): Error {
 export type FileScanRunner = (
   database: Extract<DbLocation, { kind: "files" }>,
   root: string,
-  dataRoot: string,
   thumbnailCacheDir: string,
   dlsiteCache: DlsiteCacheConfig,
   options: ScanOptions,
@@ -34,7 +33,6 @@ export type FileScanRunner = (
 export async function runFileScanInWorker(
   database: Extract<DbLocation, { kind: "files" }>,
   root: string,
-  dataRoot: string,
   thumbnailCacheDir: string,
   dlsiteCache: DlsiteCacheConfig,
   options: ScanOptions,
@@ -123,7 +121,6 @@ export async function runFileScanInWorker(
       input: {
         database,
         root,
-        dataRoot,
         thumbnailCacheDir,
         dlsiteCache,
         abortBuffer,

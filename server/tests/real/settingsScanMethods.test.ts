@@ -37,7 +37,6 @@ test("updateSettings は receiver なしで呼び出せる", async () => {
       catalog,
       user,
       scanner: undefined as unknown as Scanner,
-      dataRoot: rootDir,
       thumbnailCacheDir: rootDir,
       dlsiteCache: {
         path: ":memory:",

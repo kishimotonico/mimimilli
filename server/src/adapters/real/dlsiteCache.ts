@@ -219,7 +219,7 @@ export class DlsiteCache {
   get config(): DlsiteCacheConfig {
     return {
       path: this.path,
-      ttlsMs: this.ttlsMs,
+      ttlsMs: { ...this.ttlsMs },
       maxTransferBytes: this.maxTransferBytes,
       maxExpandedBytes: this.maxExpandedBytes,
     };

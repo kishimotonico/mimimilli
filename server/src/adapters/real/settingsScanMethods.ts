@@ -35,13 +35,11 @@ export function createSettingsScanMethods(deps: {
     | "restoreScanCandidateExclusions"
   >;
   scanner: Scanner;
-  dataRoot: string;
   thumbnailCacheDir: string;
   dlsiteCache: DlsiteCacheConfig;
   runFileScanInWorker: (
     database: Extract<DbLocation, { kind: "files" }>,
     root: string,
-    dataRoot: string,
     thumbnailCacheDir: string,
     dlsiteCache: DlsiteCacheConfig,
     options: ScanOptions,
@@ -53,7 +51,6 @@ export function createSettingsScanMethods(deps: {
     catalog,
     user,
     scanner,
-    dataRoot,
     thumbnailCacheDir,
     dlsiteCache,
     runFileScanInWorker,
@@ -115,7 +112,6 @@ export function createSettingsScanMethods(deps: {
             userPath: resolve(database.userPath),
           },
           resolve(root),
-          resolve(dataRoot),
           resolve(thumbnailCacheDir),
           dlsiteCache,
           normalized,

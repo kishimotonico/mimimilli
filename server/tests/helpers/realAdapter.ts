@@ -32,18 +32,10 @@ export function createTestRealAdapter(options: TestRealAdapterOptions) {
     },
     hasScanWorkerTestHooks
       ? {
-          runFileScanInWorker: (
-            database,
-            root,
-            dataRoot,
-            thumbnailCacheDir,
-            dlsiteCache,
-            scanOptions,
-          ) =>
+          runFileScanInWorker: (database, root, thumbnailCacheDir, dlsiteCache, scanOptions) =>
             runFileScanInWorker(
               database,
               root,
-              dataRoot,
               thumbnailCacheDir,
               dlsiteCache,
               scanOptions,

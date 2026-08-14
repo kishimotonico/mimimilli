@@ -1,7 +1,7 @@
 // real アダプタ: SQLite（キャッシュ）+ 実ファイルシステム + `mimimilli.json`（Source of Truth）。
 // 作品検索・件数・ページングはcatalog接続からuser DBをATTACH JOINしてSQLで実行する。
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import type { DataAdapter } from "../../adapter/index.ts";
 import { openDb, type Db, type DbLocation } from "./db.ts";
 import { DlsiteCache, type DlsiteCacheOptions } from "./dlsiteCache.ts";
@@ -63,11 +63,6 @@ export function createRealAdapter(
   const user = new UserWorkStateRepository(db);
   const thumbnailCacheDir = options.thumbnailCacheDir ?? join(tmpdir(), "mimimilli-memory-cache");
   const thumbnailCache = new ThumbnailCache(options.thumbnailCache);
-  const dataRoot =
-    options.dataRoot ??
-    (options.database.kind === "files"
-      ? dirname(dirname(options.database.catalogPath))
-      : join(tmpdir(), "mimimilli-memory-data"));
   const scanner = new Scanner(
     db,
     { query, catalog, user },
@@ -100,7 +95,6 @@ export function createRealAdapter(
     catalog,
     user,
     scanner,
-    dataRoot,
     thumbnailCacheDir,
     dlsiteCache: dlsiteCache.config,
     runFileScanInWorker: assembly.runFileScanInWorker ?? runFileScanInWorker,

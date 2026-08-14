@@ -11,7 +11,6 @@ import { DlsiteCache, type DlsiteCacheConfig } from "./dlsiteCache.ts";
 interface WorkerInput {
   database: Extract<DbLocation, { kind: "files" }>;
   root: string;
-  dataRoot: string;
   thumbnailCacheDir: string;
   dlsiteCache: DlsiteCacheConfig;
   abortBuffer: SharedArrayBuffer;
