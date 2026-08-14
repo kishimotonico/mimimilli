@@ -46,9 +46,23 @@ function restoreWalShmFiles(
   }
 }
 
-function removeDatabaseFiles(path: string, operations: DatabaseFileOperations): void {
+export function removeDatabaseFiles(
+  path: string,
+  operations: DatabaseFileOperations = defaultFileOperations,
+): void {
   operations.remove(path);
   for (const suffix of WAL_SHM_SUFFIXES) operations.remove(`${path}${suffix}`);
+}
+
+function removeDatabaseFilesWithoutThrowing(
+  path: string,
+  operations: DatabaseFileOperations,
+): void {
+  try {
+    removeDatabaseFiles(path, operations);
+  } catch {
+    // 入替失敗時は、候補・rollbackのcleanupより復元と一次例外を優先する。
+  }
 }
 
 /** 候補DBを同一ディレクトリ内で入れ替え、失敗時は元DBを復元する。 */
@@ -72,11 +86,11 @@ export function replaceDatabaseWithCandidate(
       if (originalMoved) {
         operations.rename(rollbackPath, path);
         restoreWalShmFiles(rollbackPath, path, movedWalShmFiles, operations);
+        restored = true;
       }
-      restored = true;
     } finally {
-      removeDatabaseFiles(candidatePath, operations);
-      if (restored) removeDatabaseFiles(rollbackPath, operations);
+      removeDatabaseFilesWithoutThrowing(candidatePath, operations);
+      if (restored) removeDatabaseFilesWithoutThrowing(rollbackPath, operations);
     }
     throw error;
   }

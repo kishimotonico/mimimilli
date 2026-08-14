@@ -101,15 +101,23 @@ export function readMigrationJournalEntryCount(migrationsFolder: string): number
 }
 
 export function readAppliedMigrationCount(sqlite: DatabaseType): number {
-  const table = sqlite
-    .query(
-      "SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table' AND name = '__drizzle_migrations'",
-    )
-    .get() as { count: number };
+  const tableStatement = sqlite.query(
+    "SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table' AND name = '__drizzle_migrations'",
+  );
+  let table: { count: number };
+  try {
+    table = tableStatement.get() as { count: number };
+  } finally {
+    tableStatement.finalize();
+  }
   if (table.count === 0) return 0;
-  const row = sqlite.query("SELECT COUNT(*) AS count FROM __drizzle_migrations").get() as {
-    count: number;
-  };
+  const countStatement = sqlite.query("SELECT COUNT(*) AS count FROM __drizzle_migrations");
+  let row: { count: number };
+  try {
+    row = countStatement.get() as { count: number };
+  } finally {
+    countStatement.finalize();
+  }
   return row.count;
 }
 
