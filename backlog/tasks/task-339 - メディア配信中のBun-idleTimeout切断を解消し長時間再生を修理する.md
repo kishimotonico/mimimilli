@@ -1,10 +1,10 @@
 ---
 id: TASK-339
 title: メディア配信中のBun idleTimeout切断を解消し長時間再生を復旧する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-14 10:39'
-updated_date: '2026-08-14 11:23'
+updated_date: '2026-08-14 11:31'
 labels: []
 dependencies: []
 priority: high

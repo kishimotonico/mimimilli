@@ -4,7 +4,7 @@ title: fixture開発をBunサーバーへ移しViteのAPI経路をproxyへ一本
 status: To Do
 assignee: []
 created_date: '2026-08-14 10:26'
-updated_date: '2026-08-14 10:30'
+updated_date: '2026-08-14 11:24'
 labels: []
 dependencies: []
 priority: high
@@ -36,3 +36,9 @@ ADR-0018の実装本体。fixture開発のAPIをViteプロセス内のNode middl
 - [ ] #5 server/shared配下のコード変更がbun --watchの再起動でfixture APIへ反映される
 - [ ] #6 worktreeでdev:new-workを起動するとBunサーバーもブランチ名サブドメインで分離される
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+TASK-339でserver/tests/fixtureMediaNodeServer.test.tsとserver/package.jsonのdevDependency @hono/node-server を追加した（fixture開発経路でメディアルートが壊れないことの回帰テスト）。本タスクでfixture経路をBun.serveへ移したら、このテストとserver側のdevDependencyも削除する。
+<!-- SECTION:NOTES:END -->
