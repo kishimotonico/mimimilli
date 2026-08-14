@@ -9,12 +9,8 @@ import { cn } from "../../../../shared/lib/cn";
 import { ApiRequestError } from "../../../../shared/api/http";
 import { apiErrorMessage } from "../../../../shared/lib/apiError";
 import { parentDirOf } from "../../../../shared/lib/workspacePath";
-import {
-  excludeScanCandidates,
-  registerScanCandidates,
-  restoreScanCandidateExclusions,
-  SCAN_QUERY_KEYS,
-} from "../../api";
+import { excludeScanCandidates, registerScanCandidates, SCAN_QUERY_KEYS } from "../../api";
+import { restoreScanCandidateExclusions } from "../../../../entities/scan/api";
 import type { CandidatesRegisteredResult } from "./types";
 
 export interface UnregisteredTabProps {
@@ -81,11 +77,12 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
 
   const excludeMutation = useMutation({
     mutationFn: (candidate: ScanCandidate) => excludeScanCandidates([candidate.path]),
-    onSuccess: (_void, candidate) => {
+    onSuccess: async (_void, candidate) => {
       queryClient.setQueryData<ScanCandidate[]>(SCAN_QUERY_KEYS.candidates(), (previous = []) =>
         previous.filter((entry) => entry.path !== candidate.path),
       );
       setExcludeToast({ path: candidate.path, title: candidate.inferredTitle });
+      await queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.candidateExclusions() });
     },
     onError: (error) => setErrorMessage(apiErrorMessage(error, "候補から外せませんでした")),
   });
@@ -94,6 +91,7 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
     mutationFn: (path: string) => restoreScanCandidateExclusions([path]),
     onSuccess: async () => {
       setExcludeToast(null);
+      // candidateExclusions()はcandidates()の子キーなので、candidates()の無効化で連動して無効化される。
       await queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.candidates() });
     },
     onError: (error) => setErrorMessage(apiErrorMessage(error, "取り消しに失敗しました")),

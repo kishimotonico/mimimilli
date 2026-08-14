@@ -11,6 +11,7 @@ import { useDlsiteBulkActions } from "../../../entities/dlsite/useDlsiteBulkActi
 import { useDlsiteBulkApplyActions } from "../../../entities/dlsite/useDlsiteBulkApplyActions";
 import { scanningAtom, scanProgressLabelAtom } from "../../../entities/scan/model/atoms";
 import TagPrefixSettings from "./TagPrefixSettings";
+import ExcludedFoldersSettings from "./ExcludedFoldersSettings";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
 import { formatLastScanTime } from "../../../shared/lib/format";
 
@@ -192,6 +193,9 @@ export default function SettingsModal({
             {dlsiteBulkApplyBusy ? "適用中..." : "未設定項目をまとめて適用"}
           </button>
         </div>
+
+        {/* 候補から外したフォルダー（TASK-330） */}
+        <ExcludedFoldersSettings />
 
         {/* Tag prefixes（ADR-0005） */}
         <TagPrefixSettings />
