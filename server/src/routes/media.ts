@@ -6,7 +6,8 @@
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { Readable } from "node:stream";
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
+import { getBunServer } from "hono/bun";
 import {
   coverQuerySchema,
   normalizeThumbnailWidth,
@@ -15,10 +16,23 @@ import {
 import type { CoverDescriptor, DataAdapter, MediaLocation } from "../adapter/index.ts";
 import { invalidRequest, notFound } from "../lib/httpError.ts";
 
+/**
+ * Bunのidle timeoutは配信中のストリーミング接続にも適用されるため、リクエスト単位で無効化する。
+ * fixture開発経路（Bun Serverなし）では何もしない。
+ */
+function disableIdleTimeout(c: Context): void {
+  if (!c.env) return;
+  const server = getBunServer<{ timeout?: (req: Request, seconds: number) => void }>(c);
+  if (server && typeof server.timeout === "function") {
+    server.timeout(c.req.raw, 0);
+  }
+}
+
 export function mediaRoute(adapter: DataAdapter): Hono {
   const app = new Hono();
 
   app.get("/media/cover/:id", async (c) => {
+    disableIdleTimeout(c);
     const parsed = coverQuerySchema.safeParse(c.req.query());
     if (!parsed.success) invalidRequest(`不正なクエリパラメータです: ${parsed.error.message}`);
     const width = parsed.data.w === undefined ? undefined : normalizeThumbnailWidth(parsed.data.w);
@@ -36,6 +50,7 @@ export function mediaRoute(adapter: DataAdapter): Hono {
   });
 
   app.get("/media/workspace", async (c) => {
+    disableIdleTimeout(c);
     const parsed = workspaceMediaQuerySchema.safeParse(c.req.query());
     if (!parsed.success) invalidRequest(`不正なクエリパラメータです: ${parsed.error.message}`);
     const media = await adapter.locateWorkspaceMedia({ kind: "workspace", path: parsed.data.path });
@@ -45,6 +60,7 @@ export function mediaRoute(adapter: DataAdapter): Hono {
   });
 
   app.get("/media/audio/:id/:path{.+}", async (c) => {
+    disableIdleTimeout(c);
     const location = await adapter.locateMedia("audio", c.req.param("id"), c.req.param("path"));
     if (!location)
       notFound(`音声ファイルが見つかりません: ${c.req.param("id")}/${c.req.param("path")}`);
@@ -52,6 +68,7 @@ export function mediaRoute(adapter: DataAdapter): Hono {
   });
 
   app.get("/media/file/:id/:path{.+}", async (c) => {
+    disableIdleTimeout(c);
     const location = await adapter.locateMedia("file", c.req.param("id"), c.req.param("path"));
     if (!location)
       notFound(`ファイルが見つかりません: ${c.req.param("id")}/${c.req.param("path")}`);

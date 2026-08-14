@@ -4,7 +4,7 @@ title: メディア配信中のBun idleTimeout切断を解消し長時間再生�
 status: To Do
 assignee: []
 created_date: '2026-08-14 10:39'
-updated_date: '2026-08-14 10:40'
+updated_date: '2026-08-14 11:23'
 labels: []
 dependencies: []
 priority: high
@@ -38,8 +38,8 @@ Bun.serveのidleTimeout=90秒（server/src/index.ts:129,140）は「配信中の
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 実Bun.serve経由で /media/audio を取得中に90秒以上読み取りを停止しても接続が切断されず、再開後に残りのバイトを受信できる（テストで検証）
-- [ ] #2 fixture開発経路（@hono/node-server経由）でメディアルートがエラーにならない
-- [ ] #3 DLsite同期など他ルートのidleTimeout挙動が変わらない（idleTimeout: 90の設定は維持）
-- [ ] #4 pnpm check と server側テストが通る
+- [x] #1 実Bun.serve経由で /media/audio を取得中に90秒以上読み取りを停止しても接続が切断されず、再開後に残りのバイトを受信できる（テストで検証）
+- [x] #2 fixture開発経路（@hono/node-server経由）でメディアルートがエラーにならない
+- [x] #3 DLsite同期など他ルートのidleTimeout挙動が変わらない（idleTimeout: 90の設定は維持）
+- [x] #4 pnpm check と server側テストが通る
 <!-- AC:END -->
