@@ -1,54 +1,21 @@
-import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import type { Database } from "bun:sqlite";
+import { readMigrationFiles, type MigrationMeta } from "drizzle-orm/migrator";
+import { appendSuppressedError } from "../../lib/suppressedError.ts";
 
-interface MigrationJournal {
-  entries: Array<{ tag: string; when: number }>;
-}
-
-interface Migration {
-  hash: string;
-  sql: string[];
-  when: number;
-}
-
-function suppressRollbackError(migrationError: unknown, rollbackError: unknown): void {
-  if (migrationError === null || typeof migrationError !== "object") return;
+function tableExists(sqlite: Database, name: string): boolean {
+  const statement = sqlite.query(
+    "SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table' AND name = ?",
+  );
   try {
-    const error = migrationError as { suppressed?: unknown };
-    const suppressed = Array.isArray(error.suppressed) ? error.suppressed : [];
-    Object.defineProperty(error, "suppressed", {
-      configurable: true,
-      value: [...suppressed, rollbackError],
-    });
-  } catch {
-    // 一次例外の保持を優先する。
+    const row = statement.get(name) as { count: number } | null;
+    return (row?.count ?? 0) > 0;
+  } finally {
+    statement.finalize();
   }
 }
 
-function readMigrations(migrationsFolder: string): Migration[] {
-  const journalPath = join(migrationsFolder, "meta", "_journal.json");
-  if (!existsSync(journalPath)) throw new Error("Can't find meta/_journal.json file");
-
-  const journal = JSON.parse(readFileSync(journalPath, "utf8")) as MigrationJournal;
-  return journal.entries.map(({ tag, when }) => {
-    const migrationPath = join(migrationsFolder, `${tag}.sql`);
-    let source: string;
-    try {
-      source = readFileSync(migrationPath, "utf8");
-    } catch {
-      throw new Error(`No file ${migrationPath} found in ${migrationsFolder} folder`);
-    }
-    return {
-      hash: createHash("sha256").update(source).digest("hex"),
-      sql: source.split("--> statement-breakpoint"),
-      when,
-    };
-  });
-}
-
 function readLatestMigrationTime(sqlite: Database): number | undefined {
+  if (!tableExists(sqlite, "__drizzle_migrations")) return undefined;
   const statement = sqlite.query(
     "SELECT created_at FROM __drizzle_migrations ORDER BY created_at DESC LIMIT 1",
   );
@@ -60,16 +27,30 @@ function readLatestMigrationTime(sqlite: Database): number | undefined {
   }
 }
 
-function insertMigration(sqlite: Database, migration: Migration): void {
+function isMigrationPending(
+  migration: MigrationMeta,
+  latestMigrationTime: number | undefined,
+): boolean {
+  return latestMigrationTime === undefined || latestMigrationTime < migration.folderMillis;
+}
+
+function insertMigration(sqlite: Database, migration: MigrationMeta): void {
   sqlite.run("INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)", [
     migration.hash,
-    migration.when,
+    migration.folderMillis,
   ]);
+}
+
+/** ledgerとjournalを比較し、未適用のmigrationがあるかを判定する。executeSqliteMigrationsと同一の判定基準を使う。 */
+export function hasPendingSqliteMigrations(sqlite: Database, migrationsFolder: string): boolean {
+  const migrations = readMigrationFiles({ migrationsFolder });
+  const latestMigrationTime = readLatestMigrationTime(sqlite);
+  return migrations.some((migration) => isMigrationPending(migration, latestMigrationTime));
 }
 
 /** Drizzleのprepared statementを残さず、SQLite接続上でmigrationを実行する。 */
 export function executeSqliteMigrations(sqlite: Database, migrationsFolder: string): void {
-  const migrations = readMigrations(migrationsFolder);
+  const migrations = readMigrationFiles({ migrationsFolder });
   sqlite.exec(`
     CREATE TABLE IF NOT EXISTS __drizzle_migrations (
       id SERIAL PRIMARY KEY,
@@ -82,7 +63,7 @@ export function executeSqliteMigrations(sqlite: Database, migrationsFolder: stri
   sqlite.exec("BEGIN");
   try {
     for (const migration of migrations) {
-      if (latestMigrationTime === undefined || latestMigrationTime < migration.when) {
+      if (isMigrationPending(migration, latestMigrationTime)) {
         for (const statement of migration.sql) sqlite.exec(statement);
         insertMigration(sqlite, migration);
       }
@@ -92,7 +73,7 @@ export function executeSqliteMigrations(sqlite: Database, migrationsFolder: stri
     try {
       sqlite.exec("ROLLBACK");
     } catch (rollbackError) {
-      suppressRollbackError(error, rollbackError);
+      appendSuppressedError(error, rollbackError);
     }
     throw error;
   }

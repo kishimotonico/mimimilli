@@ -12,7 +12,10 @@ import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { Database } from "bun:sqlite";
 import { openDb } from "../../src/adapters/real/db.ts";
-import { executeSqliteMigrations } from "../../src/adapters/real/sqliteMigrationExecutor.ts";
+import {
+  executeSqliteMigrations,
+  hasPendingSqliteMigrations,
+} from "../../src/adapters/real/sqliteMigrationExecutor.ts";
 import {
   createDatabaseCandidatePath,
   replaceDatabaseWithCandidate,
@@ -20,11 +23,8 @@ import {
 import {
   createDatabaseBackup,
   DB_BACKUP_RETENTION_COUNT,
-  hasPendingMigrations,
   moveDatabaseToBackup,
   purgeOldBackups,
-  readAppliedMigrationCount,
-  readMigrationJournalEntryCount,
   verifyDatabaseBackup,
 } from "../../src/adapters/real/dbBackup.ts";
 import { makeTestDirectory } from "../helpers/sampleLibrary.ts";
@@ -34,6 +34,15 @@ function countPreMigrationBackups(backupDir: string, kind: "catalog" | "user"): 
   return readdirSync(backupDir).filter(
     (name) => name.startsWith(`${kind}-`) && name.endsWith("-pre-migration.sqlite"),
   ).length;
+}
+
+function appliedMigrationCount(sqlite: Database): number {
+  const statement = sqlite.query("SELECT COUNT(*) AS count FROM __drizzle_migrations");
+  try {
+    return (statement.get() as { count: number }).count;
+  } finally {
+    statement.finalize();
+  }
 }
 
 function assertNoReplacementFiles(dbPath: string): void {
@@ -237,7 +246,7 @@ test("候補DBのcleanup失敗はinstall失敗を上書きせず旧DBを復元�
   assertNoReplacementFiles(dbPath);
 });
 
-test("候補DBの復元失敗時はrollbackを復旧用に残す", (t) => {
+test("候補DBの復元失敗時はinstall失敗を一次例外として保持し、restore失敗はsuppressedへ積む", (t) => {
   const directory = makeTestDirectory("db-candidate-restore-failure");
   t.after(directory.cleanup);
   const dbPath = join(directory.path, "db", "user.sqlite");
@@ -247,25 +256,32 @@ test("候補DBの復元失敗時はrollbackを復旧用に残す", (t) => {
   writeFileSync(`${dbPath}-wal`, "old-wal");
   writeFileSync(candidatePath, "new");
 
-  assert.throws(
-    () =>
-      replaceDatabaseWithCandidate(dbPath, candidatePath, {
-        exists: existsSync,
-        rename(source, destination) {
-          if (source === candidatePath && destination === dbPath) {
-            throw new Error("candidate install failed");
-          }
-          if (source.includes(".rollback-") && destination === dbPath) {
-            throw new Error("rollback restore failed");
-          }
-          renameSync(source, destination);
-        },
-        remove(path) {
-          rmSync(path, { force: true });
-        },
-      }),
-    /rollback restore failed/,
-  );
+  let thrown: unknown;
+  try {
+    replaceDatabaseWithCandidate(dbPath, candidatePath, {
+      exists: existsSync,
+      rename(source, destination) {
+        if (source === candidatePath && destination === dbPath) {
+          throw new Error("candidate install failed");
+        }
+        if (source.includes(".rollback-") && destination === dbPath) {
+          throw new Error("rollback restore failed");
+        }
+        renameSync(source, destination);
+      },
+      remove(path) {
+        rmSync(path, { force: true });
+      },
+    });
+  } catch (error) {
+    thrown = error;
+  }
+
+  assert.ok(thrown instanceof Error);
+  assert.match(thrown.message, /candidate install failed/);
+  const suppressed = (thrown as Error & { suppressed?: unknown[] }).suppressed;
+  assert.equal(suppressed?.length, 1);
+  assert.match((suppressed![0] as Error).message, /rollback restore failed/);
 
   assert.equal(existsSync(dbPath), false);
   assert.equal(existsSync(candidatePath), false);
@@ -273,6 +289,29 @@ test("候補DBの復元失敗時はrollbackを復旧用に残す", (t) => {
   assert.ok(rollbackPath);
   assert.equal(readFileSync(join(dirname(dbPath), rollbackPath), "utf-8"), "old");
   assert.equal(readFileSync(`${join(dirname(dbPath), rollbackPath)}-wal`, "utf-8"), "old-wal");
+});
+
+test("入替成功後のrollback一時ファイル削除失敗はbest-effortで処理され、入替自体は成功する", (t) => {
+  const directory = makeTestDirectory("db-candidate-rollback-cleanup-failure");
+  t.after(directory.cleanup);
+  const dbPath = join(directory.path, "db", "user.sqlite");
+  mkdirSync(join(directory.path, "db"), { recursive: true });
+  const candidatePath = createDatabaseCandidatePath(dbPath);
+  writeFileSync(dbPath, "old");
+  writeFileSync(candidatePath, "new");
+
+  assert.doesNotThrow(() =>
+    replaceDatabaseWithCandidate(dbPath, candidatePath, {
+      exists: existsSync,
+      rename: renameSync,
+      remove(path) {
+        if (path.includes(".rollback-")) throw new Error("EBUSY: resource busy or locked");
+        rmSync(path, { force: true });
+      },
+    }),
+  );
+
+  assert.equal(readFileSync(dbPath, "utf-8"), "new");
 });
 
 test("migration rollback失敗は元のmigration例外を保持する", () => {
@@ -407,27 +446,33 @@ test("purgeOldBackupsは退避バックアップ(version-mismatch等)を削除�
   );
 });
 
-test("hasPendingMigrationsは__drizzle_migrations未存在を全件未適用として判定する", () => {
+test("hasPendingSqliteMigrationsは__drizzle_migrations未存在を全件未適用として判定する", () => {
   const sqlite = new Database(":memory:");
-  assert.equal(readAppliedMigrationCount(sqlite), 0);
-  assert.equal(
-    hasPendingMigrations(sqlite, USER_MIGRATIONS_DIR),
-    readMigrationJournalEntryCount(USER_MIGRATIONS_DIR) > 0,
-  );
+  assert.equal(hasPendingSqliteMigrations(sqlite, USER_MIGRATIONS_DIR), true);
   sqlite.close();
 });
 
-test("hasPendingMigrationsは適用済み件数がjournal件数以上ならfalse", (t) => {
+test("hasPendingSqliteMigrationsは全件適用済みならfalse", (t) => {
   const directory = makeTestDirectory("db-pending-migrations");
   t.after(directory.cleanup);
   const dbPath = join(directory.path, "user.sqlite");
   const sqlite = new Database(dbPath, { create: true });
   executeSqliteMigrations(sqlite, USER_MIGRATIONS_DIR);
-  assert.equal(
-    readAppliedMigrationCount(sqlite),
-    readMigrationJournalEntryCount(USER_MIGRATIONS_DIR),
-  );
-  assert.equal(hasPendingMigrations(sqlite, USER_MIGRATIONS_DIR), false);
+  assert.equal(hasPendingSqliteMigrations(sqlite, USER_MIGRATIONS_DIR), false);
+  sqlite.close();
+});
+
+test("hasPendingSqliteMigrationsは適用件数が足りていても最新created_atがjournalより古ければpendingとみなす", (t) => {
+  const directory = makeTestDirectory("db-pending-stale-created-at");
+  t.after(directory.cleanup);
+  const dbPath = join(directory.path, "user.sqlite");
+  const sqlite = new Database(dbPath, { create: true });
+  executeSqliteMigrations(sqlite, USER_MIGRATIONS_DIR);
+  assert.equal(hasPendingSqliteMigrations(sqlite, USER_MIGRATIONS_DIR), false);
+
+  sqlite.exec("UPDATE __drizzle_migrations SET created_at = 0");
+
+  assert.equal(hasPendingSqliteMigrations(sqlite, USER_MIGRATIONS_DIR), true);
   sqlite.close();
 });
 
@@ -482,10 +527,7 @@ test("userはschema version不一致でも退避・再作成せずmigration jour
     (reopened.query("PRAGMA user_version").get() as { user_version: number }).user_version,
     7,
   );
-  assert.equal(
-    readAppliedMigrationCount(reopened),
-    readMigrationJournalEntryCount(USER_MIGRATIONS_DIR),
-  );
+  assert.equal(hasPendingSqliteMigrations(reopened, USER_MIGRATIONS_DIR), false);
   reopened.close();
 });
 
@@ -520,7 +562,7 @@ test("Windows実ファイルのuser migration失敗時は候補をcloseして元
   );
 
   const retained = new Database(userPath, { readonly: true });
-  assert.equal(readAppliedMigrationCount(retained), 0);
+  assert.equal(appliedMigrationCount(retained), 0);
   const workStatesStatement = retained.query(
     "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'work_states'",
   );
@@ -544,10 +586,7 @@ test("Windows実ファイルのuser migration成功時は候補をcloseして入
   db.close();
 
   const user = new Database(userPath, { readonly: true });
-  assert.equal(
-    readAppliedMigrationCount(user),
-    readMigrationJournalEntryCount(USER_MIGRATIONS_DIR),
-  );
+  assert.equal(hasPendingSqliteMigrations(user, USER_MIGRATIONS_DIR), false);
   user.close();
   assertNoReplacementFiles(userPath);
 });

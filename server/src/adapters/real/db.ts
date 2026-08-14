@@ -12,14 +12,13 @@ import {
 } from "./databaseReplacement.ts";
 import {
   createDatabaseBackup,
-  hasPendingMigrations,
   moveDatabaseToBackup,
   purgeOldBackups,
   verifyDatabaseBackup,
   type DbBackupKind,
 } from "./dbBackup.ts";
 import { applySqliteBusyTimeout } from "./sqliteConnection.ts";
-import { executeSqliteMigrations } from "./sqliteMigrationExecutor.ts";
+import { executeSqliteMigrations, hasPendingSqliteMigrations } from "./sqliteMigrationExecutor.ts";
 import * as userSchema from "./userSchema.ts";
 
 export const CATALOG_SCHEMA_VERSION = 9;
@@ -140,7 +139,7 @@ function openVersionedDatabase(
   }
 
   try {
-    if (!isMemory && context && hasPendingMigrations(sqlite, migrationsFolder)) {
+    if (!isMemory && context && hasPendingSqliteMigrations(sqlite, migrationsFolder)) {
       const backupPath = createDatabaseBackup(sqlite, context.backupDir, context.kind);
       verifyDatabaseBackup(backupPath, kind);
       purgeOldBackups(context.backupDir, context.kind);
@@ -161,8 +160,13 @@ function openVersionedDatabase(
         } catch (error) {
           try {
             removeDatabaseFiles(candidatePath);
-          } catch {
-            // migration例外をcleanup失敗で上書きしない。
+          } catch (cleanupError) {
+            // migration例外をcleanup失敗で上書きしない。cleanup失敗自体はwarningとして記録する。
+            getCategoryLogger("db").warn("候補DBのcleanupに失敗しました", {
+              candidatePath,
+              operation: "remove",
+              ...formatError(cleanupError),
+            });
           }
           throw error;
         }

@@ -215,9 +215,24 @@ export function createDlsiteEventLogger(): (event: Record<string, unknown>) => v
   };
 }
 
+function summarizeError(error: unknown): unknown {
+  if (error instanceof Error) return { errorKind: error.name, message: error.message };
+  return String(error);
+}
+
 export function formatError(error: unknown): Record<string, unknown> {
   if (error instanceof Error) {
-    return { errorKind: error.name, message: error.message, stack: error.stack };
+    const properties: Record<string, unknown> = {
+      errorKind: error.name,
+      message: error.message,
+      stack: error.stack,
+    };
+    if (error.cause !== undefined) properties.cause = summarizeError(error.cause);
+    const suppressed = (error as { suppressed?: unknown }).suppressed;
+    if (Array.isArray(suppressed) && suppressed.length > 0) {
+      properties.suppressed = suppressed.map(summarizeError);
+    }
+    return properties;
   }
   return { message: String(error) };
 }
