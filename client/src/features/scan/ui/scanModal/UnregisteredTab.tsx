@@ -86,11 +86,12 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
 
   const excludeMutation = useMutation({
     mutationFn: (candidate: ScanCandidate) => excludeScanCandidates([candidate.path]),
-    onSuccess: (_void, candidate) => {
+    onSuccess: async (_void, candidate) => {
       queryClient.setQueryData<ScanCandidate[]>(SCAN_QUERY_KEYS.candidates(), (previous = []) =>
         previous.filter((entry) => entry.path !== candidate.path),
       );
       setExcludeToast({ path: candidate.path, title: candidate.inferredTitle });
+      await queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.candidateExclusions() });
     },
     onError: (error) => setErrorMessage(apiErrorMessage(error, "候補から外せませんでした")),
   });
@@ -99,7 +100,10 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
     mutationFn: (path: string) => restoreScanCandidateExclusions([path]),
     onSuccess: async () => {
       setExcludeToast(null);
-      await queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.candidates() });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.candidates() }),
+        queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.candidateExclusions() }),
+      ]);
     },
     onError: (error) => setErrorMessage(apiErrorMessage(error, "取り消しに失敗しました")),
   });
