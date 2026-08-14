@@ -60,8 +60,10 @@ export type RawWorkListRow = {
   status: WorkSummary["status"];
   totalDurationSec: number | null;
   trackCount: number;
+  physicalPath: string;
   bookmarked: number;
   lastPlayedAt: string | null;
+  dlsiteStateJson: string | null;
 };
 
 export interface ScanWorkState {

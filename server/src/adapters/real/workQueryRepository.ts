@@ -4,6 +4,8 @@ import {
   coverFieldsFromColumns,
   createRandomSeed,
   evaluateParseErrorAlert,
+  relativeToRoot,
+  toWorkListItemDlsite,
   withNormalizeTagBatchCache,
 } from "@mimimilli/shared";
 import type {
@@ -331,7 +333,7 @@ export class WorkQueryRepository {
     return new Set(rows.map((row) => row.id));
   }
 
-  queryWorks(params: WorksQuery): WorksPage {
+  queryWorks(params: WorksQuery, root: string): WorksPage {
     const seed = params.sort === "random" ? (params.seed ?? createRandomSeed()) : undefined;
     const conditions: string[] = [];
     const bindings: Array<string | number> = [];
@@ -389,9 +391,12 @@ export class WorkQueryRepository {
           works.status,
           works.total_duration_sec AS totalDurationSec,
           works.track_count AS trackCount,
+          works.physical_path AS physicalPath,
           work_states.bookmarked,
-          work_states.last_played_at AS lastPlayedAt
+          work_states.last_played_at AS lastPlayedAt,
+          work_dlsite.state_json AS dlsiteStateJson
         ${WORKS_QUERY_FROM}
+        LEFT JOIN main.work_dlsite AS work_dlsite ON work_dlsite.work_id = works.id
         ${whereSql}
         ORDER BY ${orderSql}
         ${paginationSql}
@@ -409,6 +414,8 @@ export class WorkQueryRepository {
         bookmarked: row.bookmarked !== 0,
         lastPlayedAt: row.lastPlayedAt,
         circleName: circleNames.get(row.id) ?? null,
+        relativePath: relativeToRoot(row.physicalPath, root),
+        dlsite: toWorkListItemDlsite(parseDlsiteStateJson(row.id, row.dlsiteStateJson)),
       }));
       const stats = { trackCount: statsRow.trackCount, durationSec: statsRow.durationSec };
       return seed === undefined

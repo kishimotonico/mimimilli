@@ -225,7 +225,7 @@ test("PATCH /api/works/:id はsourceRevisionなしを400で拒否する", async 
   assert.equal((await res.json()).error.code, "invalid_request");
 });
 
-test("PATCH /api/works/:id はsidecar競合を409 source_changedで返す", async () => {
+test("PATCH /api/works/:id はmimimilli.json競合を409 source_changedで返す", async () => {
   const adapter = createFixtureAdapter();
   adapter.patchWork = async () => {
     throw new SourceChangedError();

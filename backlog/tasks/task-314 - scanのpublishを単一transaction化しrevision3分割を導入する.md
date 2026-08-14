@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@codex'
 created_date: '2026-08-12 11:30'
-updated_date: '2026-08-12 13:19'
+updated_date: '2026-08-13 17:55'
 labels: []
 dependencies:
   - TASK-310
@@ -17,7 +17,7 @@ ordinal: 324000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-レビュー優先改善4・5のserver側部分。現状はScanUpsertBatchが500件ごとに公開catalogへ即commitし、キャンセル・失敗時に新旧世代が混在する。missing確定は最後のfinalizePhaseのみ。I/Oとparse（JSON検証・media stat・duration probe）はtransaction外のstagingで行い、完成した差分だけを短いtransactionで公開する。読み取れなかったsubtreeはmissingへ落とさずunverifiedとして旧投影を維持し、scan中にsidecarが変わった作品は今回のpublishから外す。fingerprintはADRのrevision3分割（source/projection/media、locationは独立観測値）に置き換える。スコープ外: 自動登録の見直し（TASK-166）、Review UI、scan後のDLsite自動連鎖は現状維持（2026-08-12決定）。
+レビュー優先改善4・5のserver側部分。現状はScanUpsertBatchが500件ごとに公開catalogへ即commitし、キャンセル・失敗時に新旧世代が混在する。missing確定は最後のfinalizePhaseのみ。I/Oとparse（JSON検証・media stat・duration probe）はtransaction外のstagingで行い、完成した差分だけを短いtransactionで公開する。読み取れなかったsubtreeはmissingへ落とさずunverifiedとして旧投影を維持し、scan中にmimimilli.jsonが変わった作品は今回のpublishから外す。fingerprintはADRのrevision3分割（source/projection/media、locationは独立観測値）に置き換える。スコープ外: 自動登録の見直し（TASK-166）、Review UI、scan後のDLsite自動連鎖は現状維持（2026-08-12決定）。
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria

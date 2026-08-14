@@ -31,8 +31,9 @@ export function initializeTagPrefixes(user: UserWorkStateRepository): void {
 export function createClassificationMethods(deps: {
   query: WorkQueryRepository;
   user: UserWorkStateRepository;
+  requireRoot: () => string;
 }) {
-  const { query, user } = deps;
+  const { query, user, requireRoot } = deps;
   return {
     async getAxisFacets(axis: string, filter?: Partial<AxisFacetsQuery>): Promise<AxisFacetItem[]> {
       return query.getAxisFacets(axis, filter);
@@ -74,7 +75,7 @@ export function createClassificationMethods(deps: {
     async evalSmartFolder(id: string, evalQuery: SmartFolderEvalQuery): Promise<WorksPage | null> {
       const folder = user.getSmartFolder(id);
       if (!folder) return null;
-      return querySmartFolderWorks(query, folder, evalQuery);
+      return querySmartFolderWorks(query, folder, evalQuery, requireRoot());
     },
   };
 }

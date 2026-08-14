@@ -30,7 +30,15 @@ export function emptyDlsiteState(): DlsiteState {
   };
 }
 
+/** RJコードが非空文字列として設定されているか。`null` と明示的な `""` は含まない。 */
+export function hasRjCode<T extends Pick<DlsiteState, "rjCode">>(
+  state: T,
+): state is T & { rjCode: string } {
+  return state.rjCode !== null && state.rjCode !== "";
+}
+
 /** RJコードが未検出のまま放置されている作品か（ユーザーが明示的にスキップした作品は除く）。
+ *  `rjCode === ""` はユーザーが明示的にRJコードなしとした状態であり、未検出には含めない。
  *  スキャン完了通知・一覧の両方で判定基準を一致させるための正典 */
 export function isRjCodeMissing(state: DlsiteState): boolean {
   return state.rjCode === null && state.status !== "skipped";
@@ -46,6 +54,26 @@ export function isDlsiteFetchFailed(state: DlsiteState): boolean {
   return (
     state.status === "not_found" || (state.status === "error" && state.errorKind !== "parse_error")
   );
+}
+
+/** 外部連携列（スキャン結果タブ）の「失敗」表示に使う正典。理由を問わず取得できなかった
+ *  状態（not_found・error。parse_errorも含む）をまとめて「失敗」とする。`isDlsiteFetchFailed`
+ *  は通知バッジ向けにparse_errorを除外して数えるが、この列は理由を出し分けないため区別しない。 */
+export function isDlsiteLinkFailed(state: Pick<DlsiteState, "status">): boolean {
+  return state.status === "not_found" || state.status === "error";
+}
+
+export type DlsiteLinkDisplayStatus = "linked" | "pending" | "failed" | "none";
+
+/** 外部連携列（スキャン結果タブ）の4状態（連携済み・取得待ち・失敗・—）を判定する正典。
+ *  rjCodeの有無は`hasRjCode`、失敗は`isDlsiteLinkFailed`をそのまま使う。 */
+export function dlsiteLinkDisplayStatus(
+  state: Pick<DlsiteState, "rjCode" | "status">,
+): DlsiteLinkDisplayStatus {
+  if (!hasRjCode(state)) return "none";
+  if (state.status === "applied") return "linked";
+  if (isDlsiteLinkFailed(state)) return "failed";
+  return "pending";
 }
 
 /** パース失敗が構造変更レベルで増えたかのしきい値（件数・割合の下限） */
@@ -70,7 +98,7 @@ export function evaluateParseErrorAlert(
  *  POST /dlsite/bulk（mode: "existing"）は取得失敗（error）も再試行対象に含めるため、
  *  実際に処理される件数とは意図的に区別している（error は isDlsiteFetchFailed 側で別掲する）。 */
 export function isDlsiteUnlinked(state: DlsiteState): boolean {
-  return state.rjCode !== null && state.status === "none";
+  return hasRjCode(state) && state.status === "none";
 }
 
 export const dlsiteWorkInfoSchema = z.object({
@@ -114,7 +142,7 @@ export type DlsiteApplyBodyInput = z.input<typeof dlsiteApplyBodySchema>;
 /** サーバーがパース後に扱う型（applyTags は正規化済み NormalizedTag[]） */
 export type DlsiteApplyBody = z.output<typeof dlsiteApplyBodySchema>;
 
-/** 新規登録時はsidecarがまだ存在しないためCASトークンを持たない。 */
+/** 新規登録時はmimimilli.jsonがまだ存在しないためCASトークンを持たない。 */
 export const dlsiteRegistrationBodySchema = dlsiteApplyBodySchema.omit({ sourceRevision: true });
 export type DlsiteRegistrationBody = z.output<typeof dlsiteRegistrationBodySchema>;
 

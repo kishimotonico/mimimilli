@@ -162,12 +162,14 @@ test("スキャンダイアログが開いて完了し、閉じられる", async
   const dialog = page.getByRole("dialog", { name: "スキャン" });
   await expect(dialog.getByRole("heading", { name: "スキャン", level: 2 })).toBeVisible();
 
-  await dialog.getByRole("button", { name: "スキャン開始" }).click();
-  await expect(dialog.getByText("新規検出した作品")).toBeVisible({ timeout: 15_000 });
+  await dialog.getByRole("button", { name: "スキャン" }).click();
+  await expect(dialog.getByText("完了しました")).toBeVisible({ timeout: 15_000 });
+
+  await dialog.getByRole("tab", { name: /^新規登録済み/ }).click();
+  await expect(dialog.getByText("新規登録済みの作品")).toBeVisible({ timeout: 15_000 });
   await expect(
     dialog.getByRole("button", { name: /ツンデレ後輩ちゃんの秘密のお世話ボイス/ }),
   ).toBeVisible({ timeout: 15_000 });
-  await expect(dialog.getByText("完了しました")).toBeVisible({ timeout: 15_000 });
 
   await dialog.getByRole("button", { name: "閉じる" }).click();
   await expect(dialog).toBeHidden();
@@ -175,7 +177,92 @@ test("スキャンダイアログが開いて完了し、閉じられる", async
   assertNoErrors(tracker);
 });
 
-test("FilesでID重複を表示し、確認して別作品として取り込める", async ({ page }) => {
+test("未登録タブでRJコードを編集でき、候補を1件ずつ除外して元に戻せる", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-chromium", "desktop scenario only");
+
+  const tracker = trackErrors(page);
+  await openApp(page);
+  await page.getByRole("button", { name: "スキャン" }).click();
+  const dialog = page.getByRole("dialog", { name: "スキャン" });
+  await dialog.getByRole("button", { name: "スキャン" }).click();
+
+  const unregistered = dialog.getByRole("tabpanel", { name: "未登録" });
+  await expect(unregistered).toBeVisible({ timeout: 15_000 });
+  await expect(dialog.getByRole("tab", { name: "未登録（2件）" })).toBeVisible();
+
+  // 行の accessible name は全セルの連結。x ボタンのラベルは全行が「〜を候補から外す」を
+  // 含むため、行の識別は先頭セル（チェックボックスのラベル）へのアンカーで一意にする。
+  const editRow = unregistered.getByRole("row", { name: /^「未登録作品」を選択/ });
+  await editRow.getByRole("button", { name: "未検出" }).click();
+  const rjInput = editRow.getByPlaceholder("RJコード");
+  await rjInput.fill("RJ999999");
+  await rjInput.press("Enter");
+  await expect(editRow.getByRole("button", { name: "RJ999999" })).toBeVisible();
+
+  const excludeRowName = /^「候補」を選択/;
+  const excludeRow = unregistered.getByRole("row", { name: excludeRowName });
+  await excludeRow.getByRole("button", { name: "「候補」を候補から外す" }).click();
+  await expect(unregistered.getByRole("row", { name: excludeRowName })).toBeHidden();
+  await expect(dialog.getByRole("tab", { name: "未登録（1件）" })).toBeVisible();
+
+  await expect(dialog.getByText("「候補」を候補から外しました")).toBeVisible();
+  await dialog.getByRole("button", { name: "元に戻す" }).click();
+
+  await expect(dialog.getByRole("tab", { name: "未登録（2件）" })).toBeVisible();
+  await expect(unregistered.getByRole("row", { name: excludeRowName })).toBeVisible();
+
+  assertNoErrors(tracker);
+});
+
+test("スキャン完了後に候補を選択登録でき、問題をFilesで確認できる", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-chromium", "desktop scenario only");
+
+  const tracker = trackErrors(page);
+  await openApp(page);
+  await page.getByRole("button", { name: "スキャン" }).click();
+  const dialog = page.getByRole("dialog", { name: "スキャン" });
+  await dialog.getByRole("button", { name: "スキャン" }).click();
+
+  const unregistered = dialog.getByRole("tabpanel", { name: "未登録" });
+  await expect(unregistered).toBeVisible({ timeout: 15_000 });
+  await expect(dialog.getByRole("tab", { name: "未登録（2件）" })).toBeVisible();
+
+  await unregistered.getByRole("button", { name: "2件をライブラリに追加" }).click();
+  await expect(dialog.getByText("2件をライブラリに追加しました")).toBeVisible();
+  await expect(dialog.getByRole("tab", { name: "未登録（0件）" })).toBeVisible();
+
+  // 未登録が0件になったので新規登録済みタブへ自動で切り替わり、承認した候補が見える（TASK-328）。
+  await expect(dialog.getByRole("tab", { name: /^新規登録済み/ })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  const newlyRegistered = dialog.getByRole("tabpanel", { name: "新規登録済み" });
+  await expect(newlyRegistered.getByRole("button", { name: "未登録作品" })).toBeVisible();
+  await expect(newlyRegistered.getByRole("button", { name: "候補" })).toBeVisible();
+
+  await dialog.getByRole("tab", { name: /^要対応/ }).click();
+  const attention = dialog.getByRole("tabpanel", { name: "要対応" });
+  const primaryRow = attention.getByRole("row", { name: /夜想曲スタジオ/ });
+  await expect(primaryRow.getByText("ID重複", { exact: true })).toBeVisible();
+  const conflictRow = attention.getByRole("row", { name: /copies\// });
+  await expect(conflictRow.getByText("競合相手", { exact: true })).toBeVisible();
+  await expect(attention.getByText("読み取り失敗", { exact: true })).toBeVisible();
+
+  await primaryRow.getByRole("button", { name: "Filesで開く" }).click();
+  await expect(page.getByRole("button", { name: "ファイル", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.getByTitle("RJ501001_夜更けの図書室で囁き朗読")).toHaveClass(/is-on/);
+
+  assertNoErrors(tracker);
+});
+
+test("FilesでID重複を表示し、確認して別作品として取り込める（解決後はスキャンの要対応からも消える、TASK-322）", async ({
+  page,
+}) => {
   const tracker = trackErrors(page);
   await openApp(page);
 
@@ -197,34 +284,15 @@ test("FilesでID重複を表示し、確認して別作品として取り込め�
   ).toBeVisible();
   await dialog.getByRole("button", { name: "取り込む" }).click();
   await expect(preview.getByText("ID重複", { exact: true })).toBeHidden();
-  assertNoErrors(tracker);
-});
 
-test("スキャン完了後に候補を選択登録でき、問題をFilesで確認できる", async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== "desktop-chromium", "desktop scenario only");
-
-  const tracker = trackErrors(page);
-  await openApp(page);
+  // 解決した診断はスキャン結果のスナップショットではなく常に最新を購読するため、
+  // ダイアログを開き直しても要対応タブに残らない（TASK-322）。
   await page.getByRole("button", { name: "スキャン" }).click();
-  const dialog = page.getByRole("dialog", { name: "スキャン" });
-  await dialog.getByRole("button", { name: "スキャン開始" }).click();
-
-  const review = dialog.getByRole("region", { name: "スキャン確認" });
-  await expect(review).toBeVisible({ timeout: 15_000 });
-  await expect(review.getByText("新規登録候補 2件")).toBeVisible();
-  await expect(review.getByText("ID重複 1件")).toBeVisible();
-  await expect(review.getByText("不正なsidecar 1件")).toBeVisible();
-
-  await review.getByRole("button", { name: "選択したものを登録" }).click();
-  await expect(review.getByText("2件を登録しました。")).toBeVisible();
-  await expect(review.getByText(/新規登録候補/)).toHaveCount(0);
-
-  await review.getByRole("button", { name: "viewer / dlsite" }).click();
-  await expect(page.getByRole("button", { name: "ファイル", exact: true })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
-  await expect(page.getByTitle("viewer")).toHaveClass(/is-on/);
+  const scanDialog = page.getByRole("dialog", { name: "スキャン" });
+  await scanDialog.getByRole("tab", { name: /^要対応/ }).click();
+  const attention = scanDialog.getByRole("tabpanel", { name: "要対応" });
+  await expect(attention.getByRole("row", { name: /夜想曲スタジオ/ })).toBeHidden();
+  await expect(attention.getByRole("row", { name: /copies\// })).toBeHidden();
 
   assertNoErrors(tracker);
 });

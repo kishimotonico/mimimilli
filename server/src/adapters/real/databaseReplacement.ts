@@ -13,19 +13,19 @@ const defaultFileOperations: DatabaseFileOperations = {
   remove: (path) => rmSync(path, { force: true }),
 };
 
-const SIDE_CAR_SUFFIXES = ["-wal", "-shm"] as const;
+const WAL_SHM_SUFFIXES = ["-wal", "-shm"] as const;
 
 function uniqueSiblingPath(path: string, purpose: "candidate" | "rollback"): string {
   return join(dirname(path), `.${basename(path)}.${purpose}-${crypto.randomUUID()}`);
 }
 
-function moveSidecars(
+function moveWalShmFiles(
   sourcePath: string,
   destinationPath: string,
   operations: DatabaseFileOperations,
 ): string[] {
   const moved: string[] = [];
-  for (const suffix of SIDE_CAR_SUFFIXES) {
+  for (const suffix of WAL_SHM_SUFFIXES) {
     const source = `${sourcePath}${suffix}`;
     if (operations.exists(source)) {
       operations.rename(source, `${destinationPath}${suffix}`);
@@ -35,7 +35,7 @@ function moveSidecars(
   return moved;
 }
 
-function restoreSidecars(
+function restoreWalShmFiles(
   rollbackPath: string,
   path: string,
   suffixes: readonly string[],
@@ -48,7 +48,7 @@ function restoreSidecars(
 
 function removeDatabaseFiles(path: string, operations: DatabaseFileOperations): void {
   operations.remove(path);
-  for (const suffix of SIDE_CAR_SUFFIXES) operations.remove(`${path}${suffix}`);
+  for (const suffix of WAL_SHM_SUFFIXES) operations.remove(`${path}${suffix}`);
 }
 
 /** 候補DBを同一ディレクトリ内で入れ替え、失敗時は元DBを復元する。 */
@@ -59,19 +59,19 @@ export function replaceDatabaseWithCandidate(
 ): void {
   const rollbackPath = uniqueSiblingPath(path, "rollback");
   let originalMoved = false;
-  let movedSidecars: string[] = [];
+  let movedWalShmFiles: string[] = [];
 
   try {
     operations.rename(path, rollbackPath);
     originalMoved = true;
-    movedSidecars = moveSidecars(path, rollbackPath, operations);
+    movedWalShmFiles = moveWalShmFiles(path, rollbackPath, operations);
     operations.rename(candidatePath, path);
   } catch (error) {
     let restored = false;
     try {
       if (originalMoved) {
         operations.rename(rollbackPath, path);
-        restoreSidecars(rollbackPath, path, movedSidecars, operations);
+        restoreWalShmFiles(rollbackPath, path, movedWalShmFiles, operations);
       }
       restored = true;
     } finally {

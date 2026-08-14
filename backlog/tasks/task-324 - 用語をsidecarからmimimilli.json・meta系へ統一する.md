@@ -4,7 +4,7 @@ title: 用語をsidecarからmimimilli.json・meta系へ統一する
 status: To Do
 assignee: []
 created_date: '2026-08-13 16:57'
-updated_date: '2026-08-13 17:03'
+updated_date: '2026-08-13 17:56'
 labels: []
 dependencies: []
 priority: high
@@ -19,12 +19,12 @@ ordinal: 334000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 shared/src/scan.tsのinvalidSidecars・InvalidSidecar・invalidSidecarSchemaがinvalidMetaFiles・InvalidMetaFile・invalidMetaFileSchemaへ改名され、HTTP/SSEの応答も追従している
-- [ ] #2 server側のmoveSidecars・restoreSidecars・movedSidecars（databaseReplacement.ts）とscanInvalidSidecars（fixture）がmeta系の名前になっている
-- [ ] #3 meta.ts:121のエラーメッセージが「作品情報の復元に失敗しました」になっている
-- [ ] #4 docs/adr/0017がファイル名を0017-meta-source-projection-and-work-identity.mdへ変更され、他ADR・backlogからの参照も追従している
-- [ ] #5 ADR-0017の冒頭に用語定義（メタデータ正本ファイルはmimimilli.json、コード識別子はmeta系）が明記されている
-- [ ] #6 docs/application-architecture-review-2026-08-12.mdとbacklogタスク本文のsidecar表記が置換されている（ADR-0001・0007は除く）
-- [ ] #7 client/src・server/src・shared/srcにmimimilli.jsonを指す意味でのsidecarが残っていない
-- [ ] #8 ADR-0017のファイル名変更をgit mvで行い、リネーム履歴が追跡できる
+- [x] #1 shared/src/scan.tsのinvalidSidecars・InvalidSidecar・invalidSidecarSchemaがinvalidMetaFiles・InvalidMetaFile・invalidMetaFileSchemaへ改名され、HTTP/SSEの応答も追従している
+- [x] #2 server側のmoveSidecars・restoreSidecars・movedSidecars（databaseReplacement.ts）とscanInvalidSidecars（fixture）がmeta系の名前になっている
+- [x] #3 meta.ts:121のエラーメッセージが「作品情報の復元に失敗しました」になっている
+- [x] #4 docs/adr/0017がファイル名を0017-meta-source-projection-and-work-identity.mdへ変更され、他ADR・backlogからの参照も追従している
+- [x] #5 ADR-0017の冒頭に用語定義（メタデータ正本ファイルはmimimilli.json、コード識別子はmeta系）が明記されている
+- [x] #6 docs/application-architecture-review-2026-08-12.mdとbacklogタスク本文のsidecar表記が置換されている（ADR-0001・0007は除く）
+- [x] #7 client/src・server/src・shared/srcにmimimilli.jsonを指す意味でのsidecarが残っていない
+- [x] #8 ADR-0017のファイル名変更をgit mvで行い、リネーム履歴が追跡できる
 <!-- AC:END -->

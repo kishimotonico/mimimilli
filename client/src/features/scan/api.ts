@@ -1,5 +1,5 @@
 // scan feature の API。ライブラリのスキャン実行。
-// 依存方向: shared/api/http と自 feature の model のみを参照する。
+// 依存方向: shared/api/http・entities/scan（候補除外の一覧・解除）と自 feature の model のみを参照する。
 
 import {
   ApiRequestError,
@@ -9,16 +9,23 @@ import {
   postVoid,
   type StatusHandler,
 } from "../../shared/api/http";
+import {
+  SCAN_CANDIDATES_QUERY_KEY,
+  SCAN_CANDIDATE_EXCLUSIONS_QUERY_KEY,
+} from "../../entities/scan/api";
 import type { StartScanRequest } from "@mimimilli/shared";
 import {
   scanConflictResponseSchema,
+  scanDiagnosticsResponseSchema,
   scanJobSnapshotSchema,
   scanLastResultResponseSchema,
   scanCandidatesMutationSchema,
+  scanCandidatesRegisterRequestSchema,
   scanCandidatesRegisterResponseSchema,
   scanCandidatesResponseSchema,
   startScanRequestSchema,
   startScanResponseSchema,
+  type ScanCandidateRegisterItem,
   type ScanJobSnapshot,
   type ScanLastResultResponse,
   type ScanCandidatesRegisterResponse,
@@ -27,7 +34,11 @@ import {
 
 export const SCAN_QUERY_KEYS = {
   last: () => ["scan", "last"] as const,
-  candidates: () => ["scan", "candidates"] as const,
+  candidates: () => SCAN_CANDIDATES_QUERY_KEY,
+  candidateExclusions: () => SCAN_CANDIDATE_EXCLUSIONS_QUERY_KEY,
+  /** files feature の同名キー（features/files/api.ts）と同じ /scan/diagnostics を指す。
+   *  各 feature の api.ts は自 feature の model のみに依存する方針のため、意図的に別定義。 */
+  diagnostics: () => ["scan", "diagnostics"] as const,
 } as const;
 
 export type { ScanResult } from "./model";
@@ -85,15 +96,20 @@ export async function getScanCandidates(): Promise<ScanCandidate[]> {
 }
 
 export async function registerScanCandidates(
-  paths: string[],
+  items: ScanCandidateRegisterItem[],
 ): Promise<ScanCandidatesRegisterResponse> {
   return postParsed(
     scanCandidatesRegisterResponseSchema,
     "/scan/candidates/register",
-    scanCandidatesMutationSchema.parse({ paths }),
+    scanCandidatesRegisterRequestSchema.parse({ items }),
   );
 }
 
 export async function excludeScanCandidates(paths: string[]): Promise<void> {
   await postVoid("/scan/candidates/exclude", scanCandidatesMutationSchema.parse({ paths }));
+}
+
+/** ID重複の診断。スキャン完了時点のスナップショットではなく常に最新を返す。 */
+export async function getScanDiagnostics() {
+  return getParsed(scanDiagnosticsResponseSchema, "/scan/diagnostics");
 }

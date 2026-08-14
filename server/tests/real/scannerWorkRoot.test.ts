@@ -7,7 +7,7 @@ import { Scanner } from "../../src/adapters/real/scanner.ts";
 import { createWorkRepos } from "../helpers/workTestUtils.ts";
 import { makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 
-test("複数のdiscフォルダーを一つの未登録候補へ統合し、sidecarを書き込まない", async (t) => {
+test("複数のdiscフォルダーを一つの未登録候補へ統合し、mimimilli.jsonを書き込まない", async (t) => {
   const directory = makeTestDirectory("candidate-multidisc");
   t.after(directory.cleanup);
   const root = join(directory.path, "lib");
@@ -28,9 +28,10 @@ test("複数のdiscフォルダーを一つの未登録候補へ統合し、side
       inferredTitle: "作品",
       audioFileCount: 2,
       audioBreakdown: [{ extension: "wav", count: 2 }],
+      rjCode: null,
     },
   ]);
-  assert.equal(result.newlyGenerated, 0);
+  assert.equal(result.insertedWorkIds.length, 0);
   assert.equal(existsSync(join(work, "mimimilli.json")), false);
 });
 
@@ -50,7 +51,7 @@ test("ルート直下の音声は親フォルダー候補へ昇格しない", as
   assert.equal(existsSync(join(root, "mimimilli.json")), false);
 });
 
-test("sidecarがある既存作品は未登録候補として再判定しない", async (t) => {
+test("mimimilli.jsonがある既存作品は未登録候補として再判定しない", async (t) => {
   const directory = makeTestDirectory("candidate-existing");
   t.after(directory.cleanup);
   const root = join(directory.path, "lib");

@@ -121,7 +121,7 @@ export const scanState = sqliteTable("scan_state", {
   value: text("value"),
 });
 
-/** sidecar正本の Work ID が複数の場所で見つかったときの再構築可能な診断投影。 */
+/** mimimilli.json正本の Work ID が複数の場所で見つかったときの再構築可能な診断投影。 */
 export const identityConflicts = sqliteTable(
   "identity_conflicts",
   {

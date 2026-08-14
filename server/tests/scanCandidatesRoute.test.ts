@@ -13,6 +13,7 @@ const candidate = scanCandidateSchema.parse({
   inferredTitle: "候補作品",
   audioFileCount: 2,
   audioBreakdown: [{ extension: "wav", count: 2 }],
+  rjCode: null,
 });
 
 test("候補APIは取得・一括登録・stale拒否を提供し、登録ごとにDLsite取得をenqueueする", async () => {
@@ -21,7 +22,7 @@ test("候補APIは取得・一括登録・stale拒否を提供し、登録ごと
   const app = createApp({
     ...adapter,
     listScanCandidates: async () => [candidate],
-    registerScanCandidates: async (_paths, onRegistered) => {
+    registerScanCandidates: async (_items, onRegistered) => {
       onRegistered?.("work-a");
       onRegistered?.("work-b");
       return scanCandidatesRegisterResponseSchema.parse({
@@ -49,7 +50,7 @@ test("候補APIは取得・一括登録・stale拒否を提供し、登録ごと
     const registered = await app.request("/api/scan/candidates/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ paths: ["候補作品"] }),
+      body: JSON.stringify({ items: [{ path: "候補作品" }] }),
     });
     assert.equal(registered.status, 201);
     assert.deepEqual(await registered.json(), {
@@ -80,7 +81,7 @@ test("候補登録APIは部分失敗と全失敗を201で返し、成功分だ�
   const fixture = createFixtureAdapter();
   const app = createApp({
     ...fixture,
-    registerScanCandidates: async (_paths, onRegistered) => {
+    registerScanCandidates: async (_items, onRegistered) => {
       onRegistered?.("work-ok");
       return scanCandidatesRegisterResponseSchema.parse({
         registered: [{ path: "候補作品", workId: "work-ok" }],
@@ -96,7 +97,7 @@ test("候補登録APIは部分失敗と全失敗を201で返し、成功分だ�
     const partial = await app.request("/api/scan/candidates/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ paths: ["候補作品"] }),
+      body: JSON.stringify({ items: [{ path: "候補作品" }] }),
     });
     assert.equal(partial.status, 201);
     assert.deepEqual(await partial.json(), {
@@ -119,19 +120,19 @@ test("候補登録APIは全失敗を成功なしの結果として返し、stale
     registerScanCandidates: async () =>
       scanCandidatesRegisterResponseSchema.parse({
         registered: [],
-        failures: [{ path: "候補作品", message: "sidecarの生成に失敗しました" }],
+        failures: [{ path: "候補作品", message: "mimimilli.jsonの生成に失敗しました" }],
       }),
   });
   try {
     const failed = await app.request("/api/scan/candidates/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ paths: ["候補作品"] }),
+      body: JSON.stringify({ items: [{ path: "候補作品" }] }),
     });
     assert.equal(failed.status, 201);
     assert.deepEqual(await failed.json(), {
       registered: [],
-      failures: [{ path: "候補作品", message: "sidecarの生成に失敗しました" }],
+      failures: [{ path: "候補作品", message: "mimimilli.jsonの生成に失敗しました" }],
     });
   } finally {
     await app.shutdown();
@@ -147,7 +148,7 @@ test("候補登録APIは全失敗を成功なしの結果として返し、stale
     const stale = await staleApp.request("/api/scan/candidates/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ paths: ["候補作品"] }),
+      body: JSON.stringify({ items: [{ path: "候補作品" }] }),
     });
     assert.equal(stale.status, 409);
   } finally {
@@ -155,14 +156,45 @@ test("候補登録APIは全失敗を成功なしの結果として返し、stale
   }
 });
 
+test("候補登録APIはrjCode省略と空文字を区別してadapterへ渡す", async () => {
+  const fixture = createFixtureAdapter();
+  let received: Array<{ path: string; rjCode?: string }> = [];
+  const app = createApp({
+    ...fixture,
+    registerScanCandidates: async (requestedItems) => {
+      received = requestedItems;
+      return { registered: [], failures: [] };
+    },
+  });
+  try {
+    const empty = await app.request("/api/scan/candidates/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items: [{ path: "候補作品", rjCode: "" }] }),
+    });
+    assert.equal(empty.status, 201);
+    assert.equal(received[0]?.rjCode, "");
+
+    const omitted = await app.request("/api/scan/candidates/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items: [{ path: "候補作品" }] }),
+    });
+    assert.equal(omitted.status, 201);
+    assert.equal(received[0]?.rjCode, undefined);
+  } finally {
+    await app.shutdown();
+  }
+});
+
 test("候補APIは101件以上の一括登録を受け付ける", async () => {
   const paths = Array.from({ length: 101 }, (_, index) => `候補-${index}`);
   const fixture = createFixtureAdapter();
-  let received: string[] = [];
+  let received: Array<{ path: string }> = [];
   const app = createApp({
     ...fixture,
-    registerScanCandidates: async (requestedPaths) => {
-      received = requestedPaths;
+    registerScanCandidates: async (requestedItems) => {
+      received = requestedItems;
       return { registered: [], failures: [] };
     },
   });
@@ -170,10 +202,13 @@ test("候補APIは101件以上の一括登録を受け付ける", async () => {
     const response = await app.request("/api/scan/candidates/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ paths }),
+      body: JSON.stringify({ items: paths.map((path) => ({ path })) }),
     });
     assert.equal(response.status, 201);
-    assert.deepEqual(received, paths);
+    assert.deepEqual(
+      received,
+      paths.map((path) => ({ path })),
+    );
   } finally {
     await app.shutdown();
   }

@@ -35,7 +35,7 @@ export default function ScanRuntime() {
       queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.allFacets() });
       queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.allWorks() });
       queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() });
-      if (result.newWorkIds.length > 0) dlsiteBulk.attach();
+      if (result.insertedWorkIds.length > 0) dlsiteBulk.attach();
     },
     [dlsiteBulk, queryClient],
   );

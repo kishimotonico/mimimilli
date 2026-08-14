@@ -10,14 +10,16 @@ export const scanCandidateSchema = z.object({
   audioBreakdown: z.array(
     z.object({ extension: z.string().min(1), count: z.number().int().positive() }),
   ),
+  /** フォルダー名から検出したRJコード。未検出は null。 */
+  rjCode: z.string().nullable(),
 });
 export type ScanCandidate = z.infer<typeof scanCandidateSchema>;
 
-export const invalidSidecarSchema = z.object({
+export const invalidMetaFileSchema = z.object({
   path: workspacePathSchema,
   message: z.string().min(1),
 });
-export type InvalidSidecar = z.infer<typeof invalidSidecarSchema>;
+export type InvalidMetaFile = z.infer<typeof invalidMetaFileSchema>;
 
 export const scanCandidatesResponseSchema = z.object({ candidates: z.array(scanCandidateSchema) });
 export const scanCandidatesMutationSchema = z.object({
@@ -25,6 +27,23 @@ export const scanCandidatesMutationSchema = z.object({
     .array(workspacePathSchema)
     .min(1)
     .refine((paths) => new Set(paths).size === paths.length, "候補パスが重複しています"),
+});
+export const scanCandidateRegisterItemSchema = z.object({
+  path: workspacePathSchema,
+  /** 省略時はフォルダー名から自動検出。空文字はRJコードなしの明示。値ありはそのまま mimimilli.json へ書き込む。 */
+  rjCode: z.string().optional(),
+});
+export const scanCandidatesRegisterRequestSchema = z.object({
+  items: z
+    .array(scanCandidateRegisterItemSchema)
+    .min(1)
+    .refine((items) => new Set(items.map((item) => item.path)).size === items.length, {
+      message: "候補パスが重複しています",
+    }),
+});
+export type ScanCandidateRegisterItem = z.infer<typeof scanCandidateRegisterItemSchema>;
+export const scanCandidateExclusionsResponseSchema = z.object({
+  paths: z.array(workspacePathSchema),
 });
 export const scanCandidateRegistrationSchema = z.object({
   path: workspacePathSchema,
@@ -42,10 +61,12 @@ export type ScanCandidatesRegisterResponse = z.infer<typeof scanCandidatesRegist
 
 export const scanResultSchema = z.object({
   registered: z.number().int().nonnegative(),
-  newlyGenerated: z.number().int().nonnegative(),
+  /** 今回のスキャンでカタログへ新規挿入された Work ID（mimimilli.json の自動投影） */
+  insertedWorkIds: z.array(z.string()),
+  /** 今回のスキャンでメタファイル更新等により再投影された Work ID */
+  updatedWorkIds: z.array(z.string()),
   errors: z.number().int().nonnegative(),
   missing: z.number().int().nonnegative(),
-  newWorkIds: z.array(z.string()),
   /** スキャン完了時点でRJコード未検出（かつ未スキップ）のまま残っている作品数。
    *  新規作品に限らずライブラリ全体を対象に数える（isRjCodeMissing が判定基準） */
   rjCodeMissingCount: z.number().int().nonnegative(),
@@ -57,7 +78,7 @@ export const scanResultSchema = z.object({
   unreadablePaths: z.array(z.string()).optional(),
   /** finalize 時の listSummaries でタグ等の不整合により除外した作品 */
   dataIntegrityWarning: dataIntegrityWarningSchema.optional(),
-  /** 同じ Work ID を持つ sidecar が複数見つかった診断。paths はroot相対・separator正規化済みのportable pathで、相互参照用に全件を含む。 */
+  /** 同じ Work ID を持つ mimimilli.json が複数見つかった診断。paths はroot相対・separator正規化済みのportable pathで、相互参照用に全件を含む。 */
   identityConflicts: z.array(
     z.object({
       kind: z.literal("identity_conflict"),
@@ -65,9 +86,9 @@ export const scanResultSchema = z.object({
       paths: z.array(z.string()).min(2),
     }),
   ),
-  /** 読み取りまたは検証に失敗したsidecar。pathはroot相対のportable path。 */
-  invalidSidecars: z.array(invalidSidecarSchema),
-  /** sidecar を持たない音声フォルダー。scan はこの候補へ書き込まない。 */
+  /** 読み取りまたは検証に失敗した作品情報ファイル。pathはroot相対のportable path。 */
+  invalidMetaFiles: z.array(invalidMetaFileSchema),
+  /** mimimilli.json を持たない音声フォルダー。scan はこの候補へ書き込まない。 */
   candidates: z.array(scanCandidateSchema),
 });
 export type ScanResult = z.infer<typeof scanResultSchema>;

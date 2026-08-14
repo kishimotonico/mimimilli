@@ -19,8 +19,18 @@ import {
   type PreparedMeta,
 } from "./scanTypes.ts";
 import type { CoverDimensions } from "./thumbnailCache.ts";
+import type { DlsiteCache } from "./dlsiteCache.ts";
+import { resolveMetaDlsiteProjection } from "./dlsiteProjection.ts";
 
 const scanLogger = getCategoryLogger("scan");
+
+type ScanUpsertTracking = Pick<ScanResult, "coverErrors" | "insertedWorkIds" | "updatedWorkIds">;
+type ScanErrorTracking = ScanUpsertTracking & Pick<ScanResult, "errors">;
+
+function trackUpsertedWork(result: ScanUpsertTracking, workId: string, isNew: boolean): void {
+  if (isNew) result.insertedWorkIds.push(workId);
+  else result.updatedWorkIds.push(workId);
+}
 
 function assertUniqueMetaIds(metaPath: string, meta: MetaFile, seenIds: SeenMetaIds): void {
   const id = meta.id;
@@ -71,6 +81,7 @@ async function assembleWorkForUpsert(
   existing: ScanWorkState | undefined,
   measureCover: (sourceAbsolutePath: string) => Promise<CoverDimensions | null>,
   checkAbort: () => void,
+  dlsiteCache?: DlsiteCache | null,
 ): Promise<{ assembled: AssembledWork; coverErrors: number }> {
   const { metaPath } = prepared;
   const workDir = dirname(metaPath);
@@ -119,7 +130,7 @@ async function assembleWorkForUpsert(
     bookmarked: existing?.bookmarked ?? false,
     lastPlayedAt: existing?.lastPlayedAt ?? null,
     resume: existing?.resume ?? null,
-    dlsite: meta.dlsite,
+    dlsite: resolveMetaDlsiteProjection(meta.dlsite, dlsiteCache),
   };
 
   return {
@@ -274,7 +285,7 @@ export function handleMetaParseError(
   metaPath: string,
   error: MetaParseError,
   seenIds: SeenMetaIds,
-  result: ScanResult,
+  result: ScanErrorTracking,
   existingWorks: Map<string, ScanWorkState>,
   existingByPhysicalPath: Map<string, { id: string; state: ScanWorkState }>,
 ): void {
@@ -290,6 +301,7 @@ export function handleMetaParseError(
   if (existing) {
     batch.addError(existing.id, workDir, metaPath, error.message);
     seenIds.work.add(existing.id);
+    trackUpsertedWork(result, existing.id, false);
   }
   result.errors += 1;
 }
@@ -301,11 +313,12 @@ export async function registerMetaFile(
   probeCache: Map<string, ProbeCacheEntry>,
   batch: ScanUpsertBatch,
   existingWorks: Map<string, ScanWorkState>,
-  result: Pick<ScanResult, "coverErrors">,
+  result: ScanUpsertTracking,
   full: boolean,
   idsAlreadyRegistered: boolean,
   measureCover: (sourceAbsolutePath: string) => Promise<CoverDimensions | null>,
   checkAbort: () => void = () => {},
+  dlsiteCache?: DlsiteCache | null,
 ): Promise<"skipped" | string> {
   const { metaPath, meta, revisions, cachedRevisions, cachedStatus, coverSatisfied } = prepared;
   const workDir = dirname(metaPath);
@@ -334,11 +347,13 @@ export async function registerMetaFile(
   const totalDurationSec = totalDurationFromResolved(resolvedPlaylists, meta.defaultPlaylistId);
 
   const existing = existingWorks.get(id);
+  const isNew = existing === undefined;
   const { assembled, coverErrors } = await assembleWorkForUpsert(
     prepared,
     existing,
     measureCover,
     checkAbort,
+    dlsiteCache,
   );
   result.coverErrors += coverErrors;
 
@@ -349,5 +364,6 @@ export async function registerMetaFile(
 
   checkAbort();
   batch.add(assembled.work, assembled.revisions, assembled.cover, metaPath);
+  trackUpsertedWork(result, id, isNew);
   return id;
 }

@@ -12,11 +12,14 @@ import {
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
 
-export function workToListItem(work: Work): WorkListItem {
-  return toWorkListItem({
-    ...work,
-    trackCount: getDefaultPlaylistTrackCount(work),
-  });
+export function workToListItem(work: Work, root: string): WorkListItem {
+  return toWorkListItem(
+    {
+      ...work,
+      trackCount: getDefaultPlaylistTrackCount(work),
+    },
+    root,
+  );
 }
 
 function patchWorkInInfiniteData(

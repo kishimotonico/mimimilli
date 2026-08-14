@@ -28,6 +28,7 @@ import {
   shouldClearSelectionOnWorkNotFound,
 } from "../model/libraryPresentation";
 import { isSmartAxis, getSmartFolderId } from "../../../entities/library/axisDefinitions";
+import { useRootFolder } from "../../../entities/settings/useSettingsQuery";
 import {
   type SmartFolderEditorState,
   closedSmartFolderEditorState,
@@ -69,6 +70,7 @@ function PreviewPaneSlide(props: PreviewPaneSlideProps) {
 }
 
 export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryViewProps) {
+  const rootFolder = useRootFolder();
   const searchQuery = useAtomValue(librarySearchQueryAtom);
   const debouncedSearchQuery = useLibraryDebouncedSearchQuery(searchQuery);
   const setSearchQuery = useSetAtom(librarySearchQueryAtom);
@@ -137,17 +139,20 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
 
   const handlePlay = useCallback(
     (trackIndex: number) => {
-      if (selectedWork) {
+      if (selectedWork && rootFolder !== null) {
         onPlay(
-          toWorkListItem({
-            ...selectedWork,
-            trackCount: getDefaultPlaylistTrackCount(selectedWork),
-          }),
+          toWorkListItem(
+            {
+              ...selectedWork,
+              trackCount: getDefaultPlaylistTrackCount(selectedWork),
+            },
+            rootFolder,
+          ),
           trackIndex,
         );
       }
     },
-    [selectedWork, onPlay],
+    [selectedWork, rootFolder, onPlay],
   );
 
   const handleResume = useCallback(() => {

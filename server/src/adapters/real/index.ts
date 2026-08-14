@@ -71,7 +71,7 @@ export function createRealAdapter(
   const scanner = new Scanner(
     db,
     { query, catalog, user },
-    { measureCover: measureCoverDimensions },
+    { measureCover: measureCoverDimensions, dlsiteCache },
   );
   const dlsiteRequestConfig: DlsiteRequestConfig = {
     ...DEFAULT_DLSITE_REQUEST_CONFIG,
@@ -119,7 +119,7 @@ export function createRealAdapter(
     requireRoot,
     cachedCover,
   });
-  const classificationMethods = createClassificationMethods({ query, user });
+  const classificationMethods = createClassificationMethods({ query, user, requireRoot });
 
   return {
     ...settingsScanMethods,

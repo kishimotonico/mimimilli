@@ -1,12 +1,14 @@
 // fixture アダプタのシナリオ機能（ADR-0002 / client/mocks/scenarios.ts からの移植）のテスト。
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { workspacePath } from "@mimimilli/shared";
 import { createApp } from "../src/app.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import {
   createFixtureScenario,
   LARGE_SCENARIO_WORK_COUNT,
 } from "../src/adapters/fixture/scenarios.ts";
+import { resolveRegisteredRjCode } from "../src/adapters/fixture/settingsScan.ts";
 
 function buildApp(scenario?: string) {
   return createApp(createFixtureAdapter({ scenario }));
@@ -26,7 +28,7 @@ test("new-work: スキャン結果に新規作品IDが含まれる", async () =>
   const started = await app.request("/api/scan", { method: "POST" });
   assert.equal(started.status, 202);
   const { job } = await started.json();
-  let scanResult: { newWorkIds: string[]; newlyGenerated: number } | null = null;
+  let scanResult: { insertedWorkIds: string[] } | null = null;
   for (let attempt = 0; attempt < 80; attempt++) {
     const state = await app.request(`/api/scan/${job.id}`);
     const snapshot = await state.json();
@@ -37,8 +39,7 @@ test("new-work: スキャン結果に新規作品IDが含まれる", async () =>
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
   assert.ok(scanResult);
-  assert.deepEqual(scanResult.newWorkIds, ["RJ501011"]);
-  assert.equal(scanResult.newlyGenerated, 1);
+  assert.deepEqual(scanResult.insertedWorkIds, ["RJ501011", "RJ501001", "RJ501003"]);
 
   // 新規作品自体は works 一覧に存在する（スキャンで見つかった扱い）
   const worksRes = await app.request("/api/works");
@@ -56,13 +57,16 @@ test("new-work: Files用診断とscan確認用の候補・問題を独立して�
     ["未登録作品", "朗読/候補"],
   );
   assert.deepEqual(result.identityConflicts[0]?.paths, ["viewer", "dlsite"]);
-  assert.equal(result.invalidSidecars[0]?.path, "壊れた/mimimilli.json");
+  assert.equal(result.invalidMetaFiles[0]?.path, "壊れた/mimimilli.json");
   assert.deepEqual((await adapter.listScanDiagnostics())[0]?.paths, [
     "dlsite/夜想曲スタジオ/RJ501001_夜更けの図書室で囁き朗読",
     "copies/RJ501001_夜更けの図書室で囁き朗読",
   ]);
 
-  const registration = await adapter.registerScanCandidates(["未登録作品", "消えた候補"]);
+  const registration = await adapter.registerScanCandidates([
+    { path: workspacePath("未登録作品") },
+    { path: workspacePath("消えた候補") },
+  ]);
   assert.deepEqual(
     registration.registered.map((entry) => entry.path),
     ["未登録作品"],
@@ -71,8 +75,39 @@ test("new-work: Files用診断とscan確認用の候補・問題を独立して�
     { path: "消えた候補", message: "候補が見つかりません" },
   ]);
 
+  // 候補承認はreal adapterのregisterCandidates（scanner.ts）と同じく、実際にcatalog
+  // （fixtureではstate.works）へ行を増やす。新規登録済みタブはこのworksを介して
+  // 承認分を表示するため、ここで見えなければタブにも出ない（TASK-328）。
+  const registeredWorkId = registration.registered[0]?.workId;
+  assert.ok(registeredWorkId);
+  const registeredWorksPage = await adapter.queryWorks({
+    q: "",
+    tags: { tags: [], yearValue: null },
+    tagOp: "AND",
+    sort: "id-asc",
+    ids: [registeredWorkId],
+  });
+  assert.equal(registeredWorksPage.items.length, 1);
+  assert.equal(registeredWorksPage.items[0]?.title, "未登録作品");
+
   await adapter.excludeScanCandidates(["朗読/候補"]);
   assert.deepEqual(await adapter.listScanCandidates(), []);
+
+  // 除外は可逆な扱い。restoreで戻すと一覧に復帰する（実装adapterは毎回ディスクを
+  // 再走査するため自然に復帰するが、fixtureは静的リストを持つため個別に検証する）。
+  await adapter.restoreScanCandidateExclusions(["朗読/候補"]);
+  assert.deepEqual(
+    (await adapter.listScanCandidates()).map((candidate) => candidate.path),
+    ["朗読/候補"],
+  );
+});
+
+test("fixture: rjCode省略・空文字・指定を区別する", () => {
+  // 省略=候補が検出した値を採用、空文字=明示的になし、値=そのまま採用（候補登録APIの規約）。
+  assert.equal(resolveRegisteredRjCode("RJ999999", undefined), "RJ999999");
+  assert.equal(resolveRegisteredRjCode("RJ999999", ""), null);
+  assert.equal(resolveRegisteredRjCode("RJ999999", "RJ111111"), "RJ111111");
+  assert.equal(resolveRegisteredRjCode(null, undefined), null);
 });
 
 test("empty: 作品・スマートフォルダーが0件", async () => {

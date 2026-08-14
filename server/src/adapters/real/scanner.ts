@@ -11,7 +11,8 @@ import type {
   UrlEntry,
   Work,
 } from "@mimimilli/shared";
-import { isRjCodeMissing, workspacePath } from "@mimimilli/shared";
+import { emptyDlsiteState, isRjCodeMissing, workspacePath } from "@mimimilli/shared";
+import type { ScanCandidateRegisterItem } from "@mimimilli/shared";
 import type { Db } from "./db.ts";
 import type { ScanOptions } from "../../adapter/index.ts";
 import {
@@ -53,10 +54,19 @@ import {
   type ScannerAbortHooks,
   type WalkResult,
 } from "./scanWalk.ts";
+import type { DlsiteCache } from "./dlsiteCache.ts";
+import { detectRjCode } from "./dlsite.ts";
 
 const scanLogger = getCategoryLogger("scan");
 
 const PROGRESS_MIN_INTERVAL_MS = 200;
+
+function emptyRegisterTracking(): Pick<
+  ScanResult,
+  "coverErrors" | "insertedWorkIds" | "updatedWorkIds"
+> {
+  return { coverErrors: 0, insertedWorkIds: [], updatedWorkIds: [] };
+}
 
 function findIdentityConflicts(root: string, metaPaths: string[]): ScanDiagnostic[] {
   const pathsByWorkId = new Map<string, string[]>();
@@ -91,6 +101,7 @@ export interface WorkPersistence {
 export interface ScannerOptions {
   upsertBatchSize?: number;
   measureCover?: (sourceAbsolutePath: string) => Promise<CoverDimensions | null>;
+  dlsiteCache?: DlsiteCache | null;
 }
 
 export class Scanner {
@@ -99,6 +110,7 @@ export class Scanner {
   private readonly catalog: CatalogWorkRepository;
   private readonly user: UserWorkStateRepository;
   private readonly measureCover: (sourceAbsolutePath: string) => Promise<CoverDimensions | null>;
+  private readonly dlsiteCache: DlsiteCache | null;
 
   constructor(db: Db, repos: WorkPersistence, options?: ScannerOptions) {
     this.db = db;
@@ -112,6 +124,7 @@ export class Scanner {
       throw new RangeError("upsertBatchSize は有限の正整数である必要があります");
     }
     this.measureCover = options?.measureCover ?? measureCoverDimensions;
+    this.dlsiteCache = options?.dlsiteCache ?? null;
   }
 
   async scan(
@@ -130,15 +143,15 @@ export class Scanner {
 
     const result: ScanResult = {
       registered: 0,
-      newlyGenerated: 0,
+      insertedWorkIds: [],
+      updatedWorkIds: [],
       errors: 0,
       missing: 0,
-      newWorkIds: [],
       rjCodeMissingCount: 0,
       skipped: 0,
       coverErrors: 0,
       identityConflicts: [],
-      invalidSidecars: [],
+      invalidMetaFiles: [],
       candidates: [],
     };
 
@@ -246,7 +259,7 @@ export class Scanner {
             existingWorks,
             existingByPhysicalPath,
           );
-          result.invalidSidecars.push({
+          result.invalidMetaFiles.push({
             path: workspacePath(toPortableRelativePath(root, entry.metaPath)),
             message: entry.error.message,
           });
@@ -266,6 +279,7 @@ export class Scanner {
             false,
             this.measureCover,
             checkAbort,
+            this.dlsiteCache,
           );
           if (outcome === "skipped") {
             result.skipped += 1;
@@ -284,7 +298,7 @@ export class Scanner {
             existingWorks,
             existingByPhysicalPath,
           );
-          result.invalidSidecars.push({
+          result.invalidMetaFiles.push({
             path: workspacePath(toPortableRelativePath(root, entry.metaPath)),
             message: e.message,
           });
@@ -338,13 +352,15 @@ export class Scanner {
             breakdown.set(extension, (breakdown.get(extension) ?? 0) + count);
           }
         }
+        const folderName = basename(workDir);
         return {
           path: workspacePath(toPortableRelativePath(root, workDir)),
-          inferredTitle: basename(workDir),
+          inferredTitle: folderName,
           audioFileCount: [...breakdown.values()].reduce((total, count) => total + count, 0),
           audioBreakdown: [...breakdown]
             .sort(([a], [b]) => naturalCompare(a, b))
             .map(([extension, count]) => ({ extension, count })),
+          rjCode: detectRjCode([folderName]),
         };
       })
       .filter((candidate) => !excluded.has(candidate.path));
@@ -364,24 +380,25 @@ export class Scanner {
 
   async registerCandidates(
     root: string,
-    paths: string[],
+    items: ScanCandidateRegisterItem[],
     onRegistered: (workId: string) => void = () => {},
   ): Promise<ScanCandidatesRegisterResponse> {
     const candidates = await this.listCandidates(root);
     const byPath = new Map<string, ScanCandidate>(
       candidates.map((candidate) => [candidate.path, candidate]),
     );
-    const selected = paths.map((path) => byPath.get(path));
-    if (selected.some((candidate) => candidate === undefined)) {
+    const selected = items.map((item) => ({ item, candidate: byPath.get(item.path) }));
+    if (selected.some((entry) => entry.candidate === undefined)) {
       throw new Error("候補が更新されています。再スキャンして選び直してください");
     }
     const registered: ScanCandidatesRegisterResponse["registered"] = [];
     const failures: ScanCandidatesRegisterResponse["failures"] = [];
-    for (const candidate of selected) {
+    for (const { item, candidate } of selected) {
       const current = candidate!;
       try {
         const work = await this.registerFolderWork(resolve(root, current.path), {
           title: current.inferredTitle,
+          rjCode: item.rjCode,
         });
         registered.push({ path: current.path, workId: work.id });
         onRegistered(work.id);
@@ -402,6 +419,14 @@ export class Scanner {
       throw new Error("候補が更新されています。再スキャンして選び直してください");
     }
     this.user.excludeScanCandidates(paths);
+  }
+
+  listExcludedCandidates(): string[] {
+    return this.user.listScanCandidateExclusions();
+  }
+
+  restoreExcludedCandidates(paths: string[]): void {
+    this.user.restoreScanCandidateExclusions(paths);
   }
 
   private finalizePhase(
@@ -468,11 +493,24 @@ export class Scanner {
       urls?: UrlEntry[];
       coverImage?: string | null;
       dlsite?: MetaFile["dlsite"];
+      rjCode?: string;
     },
   ): Promise<Work> {
     const metaPath = join(workDir, META_FILE_NAME);
     if (existsSync(metaPath)) {
       throw new Error("このフォルダーには既にメタファイルがあります");
+    }
+
+    let dlsite = options.dlsite;
+    if (dlsite === undefined) {
+      if (options.rjCode === undefined) {
+        const detected = detectRjCode([basename(workDir), options.title]);
+        dlsite = detected ? { ...emptyDlsiteState(), rjCode: detected } : emptyDlsiteState();
+      } else if (options.rjCode === "") {
+        dlsite = { ...emptyDlsiteState(), rjCode: "" };
+      } else {
+        dlsite = { ...emptyDlsiteState(), rjCode: options.rjCode };
+      }
     }
 
     const meta = createDraftMetaFile(workDir, {
@@ -481,14 +519,14 @@ export class Scanner {
       tags: options.tags,
       urls: options.urls,
       coverImage: options.coverImage,
-      dlsite: options.dlsite,
+      dlsite,
     });
     writeMetaFile(metaPath, meta);
 
     const prepared = prepareSingleMeta(metaPath);
     const existingWorks = this.query.getScanWorkMap();
     const batch = new ScanUpsertBatch(this.db, this.catalog, this.user, () => {});
-    const scanResult: Pick<ScanResult, "coverErrors"> = { coverErrors: 0 };
+    const scanResult = emptyRegisterTracking();
     const seenIds: SeenMetaIds = { work: new Set() };
     await registerMetaFile(
       this.db,
@@ -501,6 +539,8 @@ export class Scanner {
       true,
       false,
       this.measureCover,
+      undefined,
+      this.dlsiteCache,
     );
     batch.publishWork();
 
@@ -509,12 +549,12 @@ export class Scanner {
     return work;
   }
 
-  /** 確定済みsidecarを入力に、対象作品だけをcatalogへ投影する。 */
+  /** 確定済みmimimilli.jsonを入力に、対象作品だけをcatalogへ投影する。 */
   async projectMetaFile(metaPath: string, meta: MetaFile): Promise<Work> {
     const prepared = prepareSingleMeta(metaPath, meta);
     const existingWorks = this.query.getScanWorkMap();
     const batch = new ScanUpsertBatch(this.db, this.catalog, this.user, () => {});
-    const scanResult: Pick<ScanResult, "coverErrors"> = { coverErrors: 0 };
+    const scanResult = emptyRegisterTracking();
     const seenIds: SeenMetaIds = { work: new Set() };
     await registerMetaFile(
       this.db,
@@ -527,6 +567,8 @@ export class Scanner {
       true,
       false,
       this.measureCover,
+      undefined,
+      this.dlsiteCache,
     );
     batch.publishWork();
     const work = await getWorkWithLiveProbe(this.db, this.query, this.catalog, meta.id);
@@ -567,7 +609,7 @@ export class Scanner {
     const prepared = prepareSingleMeta(metaPath);
     const existingWorks = this.query.getScanWorkMap();
     const batch = new ScanUpsertBatch(this.db, this.catalog, this.user, () => {});
-    const scanResult: Pick<ScanResult, "coverErrors"> = { coverErrors: 0 };
+    const scanResult = emptyRegisterTracking();
     const seenIds: SeenMetaIds = { work: new Set() };
     await registerMetaFile(
       this.db,
@@ -580,6 +622,8 @@ export class Scanner {
       true,
       false,
       this.measureCover,
+      undefined,
+      this.dlsiteCache,
     );
     batch.publishWork();
 

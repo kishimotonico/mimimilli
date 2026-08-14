@@ -1,3 +1,5 @@
+import { join } from "node:path";
+import { existsSync } from "node:fs";
 import type { ScanProgressEvent, ScanResult } from "@mimimilli/shared";
 import { openDb, type Db, type DbLocation } from "./db.ts";
 import { Scanner } from "./scanner.ts";
@@ -5,6 +7,7 @@ import { finalizeScan } from "./scanFinalize.ts";
 import { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import { UserWorkStateRepository } from "./userWorkStateRepository.ts";
 import { WorkQueryRepository } from "./workQueryRepository.ts";
+import { DlsiteCache } from "./dlsiteCache.ts";
 
 interface WorkerInput {
   database: Extract<DbLocation, { kind: "files" }>;
@@ -55,7 +58,11 @@ async function run(input: WorkerInput): Promise<void> {
     const query = new WorkQueryRepository(db);
     const catalog = new CatalogWorkRepository(db);
     const user = new UserWorkStateRepository(db);
-    const scanner = new Scanner(db, { query, catalog, user });
+    const dlsiteCachePath = join(input.dataRoot, "db", "dlsite-cache.sqlite");
+    const dlsiteCache = existsSync(dlsiteCachePath)
+      ? new DlsiteCache({ path: dlsiteCachePath })
+      : null;
+    const scanner = new Scanner(db, { query, catalog, user }, { dlsiteCache });
     const result = await scanner.scan(
       input.root,
       {

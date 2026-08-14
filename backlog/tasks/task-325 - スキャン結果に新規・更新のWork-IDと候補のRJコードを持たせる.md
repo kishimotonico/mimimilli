@@ -4,7 +4,7 @@ title: スキャン結果に新規・更新のWork IDと候補のRJコードを�
 status: To Do
 assignee: []
 created_date: '2026-08-13 16:58'
-updated_date: '2026-08-13 17:42'
+updated_date: '2026-08-13 18:25'
 labels: []
 dependencies: []
 priority: high
@@ -19,14 +19,28 @@ ordinal: 335000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 ScanResultに今回カタログへ新規挿入されたWork IDの配列が含まれ、候補承認による登録分と自動登録分の両方を識別できる
-- [ ] #2 ScanResultにメタファイル更新により再投影されたWork IDの配列が含まれる
-- [ ] #3 ScanCandidateにフォルダー名から検出したRJコード（未検出はnull）が含まれる
-- [ ] #4 候補の登録APIがRJコードの指定を受け付け、指定された値がmimimilli.jsonへ書き込まれる（未指定・空は従来どおり自動検出）
-- [ ] #5 常に0/空になっていたnewlyGenerated・newWorkIdsが廃止または実データを返すよう修正されている
-- [ ] #6 新規・更新・スキップの分類を検証するテストがある
-- [ ] #7 候補除外の一覧取得APIと解除APIが追加されている（adapterインターフェース・real/fixture実装・HTTPルート。解除後の次回スキャンで候補が再提示される）
+- [x] #1 ScanResultに今回カタログへ新規挿入されたWork IDの配列が含まれ、候補承認による登録分と自動登録分の両方を識別できる
+- [x] #2 ScanResultにメタファイル更新により再投影されたWork IDの配列が含まれる
+- [x] #3 ScanCandidateにフォルダー名から検出したRJコード（未検出はnull）が含まれる
+- [x] #4 候補の登録APIがRJコードの指定を受け付け、指定された値がmimimilli.jsonへ書き込まれる（未指定・空は従来どおり自動検出）
+- [x] #5 常に0/空になっていたnewlyGenerated・newWorkIdsが廃止または実データを返すよう修正されている
+- [x] #6 新規・更新・スキップの分類を検証するテストがある
+- [x] #7 候補除外の一覧取得APIと解除APIが追加されている（adapterインターフェース・real/fixture実装・HTTPルート。解除後の次回スキャンで候補が再提示される）
 <!-- AC:END -->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ## Comments
 

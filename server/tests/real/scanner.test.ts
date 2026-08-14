@@ -31,7 +31,7 @@ async function setup(t: TestContext) {
   await adapter.updateSettings({ rootFolder: lib.root });
   const initial = await adapter.scan();
   const result = await adapter.registerScanCandidates(
-    initial.candidates.map((candidate) => candidate.path),
+    initial.candidates.map((candidate) => ({ path: candidate.path })),
   );
   const candidateWorkId = result.registered[0]!.workId;
   return { ...lib, adapter, candidateWorkId: candidateWorkId! };
@@ -44,16 +44,15 @@ function countWorkStates(db: Db): number {
   return row.total;
 }
 
-test("初回スキャン: 登録済みsidecarを投影し、候補を自動登録しない", async (t) => {
+test("初回スキャン: 登録済みmimimilli.jsonを投影し、候補を自動登録しない", async (t) => {
   const { adapter, candidateWorkId, existingWorkId, root } = await setup(t);
   const result = await adapter.scan();
 
   assert.equal(result.registered, 1);
-  assert.equal(result.newlyGenerated, 0);
-  assert.equal(result.newWorkIds.length, 0);
+  assert.equal(result.insertedWorkIds.length, 0);
   assert.equal(result.missing, 0);
 
-  // 明示登録したsidecarは作品ルートにだけ存在する。
+  // 明示登録したmimimilli.jsonは作品ルートにだけ存在する。
   const generatedMeta = join(root, "dlsite", "RJ900001_テスト作品", "mimimilli.json");
   assert.ok(existsSync(generatedMeta));
   const meta = JSON.parse(readFileSync(generatedMeta, "utf-8"));
@@ -100,7 +99,7 @@ test("初回スキャン: 登録済みsidecarを投影し、候補を自動登�
   assert.equal(existing.dlsite.rjCode, "RJ900002");
 });
 
-test("DLsite状態: メタ未定義はnone扱いで検出コードを書き戻し、再スキャンでDBへ復元する", async (t) => {
+test("DLsite状態: mimimilli.jsonの旧errorは投影でnone、RJコードとappliedTagsは維持する", async (t) => {
   const { adapter, existingWorkId, root } = await setup(t);
   await adapter.scan();
   const metaPath = join(root, "dlsite", "RJ900002_既存メタ", "mimimilli.json");
@@ -117,7 +116,16 @@ test("DLsite状態: メタ未定義はnone扱いで検出コードを書き戻�
 
   await adapter.scan();
   const restored = await adapter.getWork(existingWorkId);
-  assert.deepEqual(restored?.dlsite, meta.dlsite);
+  assert.deepEqual(restored?.dlsite, {
+    rjCode: "RJ7654321",
+    status: "none",
+    lastAttemptAt: null,
+    error: null,
+    errorKind: null,
+    appliedTags: ["genre/耳かき"],
+  });
+  const rawMeta = JSON.parse(readFileSync(metaPath, "utf-8"));
+  assert.equal(rawMeta.dlsite.status, "error");
 });
 
 test("移動追従: フォルダー移動後も同一 ID で path 更新・DB固有情報を保持", async (t) => {
@@ -206,10 +214,10 @@ test("メタ不正: 壊れた JSON は errors にカウントされスキャン�
   assert.equal(result.errors, 1);
   assert.equal(result.registered, 1); // 既存メタ作品は通常どおり登録される
   // メタ不正フォルダーは「メタあり」扱いなので自動生成はされない
-  assert.equal(result.newlyGenerated, 0);
-  assert.equal(result.invalidSidecars.length, 1);
-  assert.equal(result.invalidSidecars[0]?.path, "broken-work/mimimilli.json");
-  assert.match(result.invalidSidecars[0]?.message ?? "", /メタファイルが不正です/);
+  assert.equal(result.insertedWorkIds.length, 0);
+  assert.equal(result.invalidMetaFiles.length, 1);
+  assert.equal(result.invalidMetaFiles[0]?.path, "broken-work/mimimilli.json");
+  assert.match(result.invalidMetaFiles[0]?.message ?? "", /メタファイルが不正です/);
 });
 
 test("大量ディレクトリの走査中、walking フェーズの進捗イベントが複数回発火する（同期walkの詰まり修正の検証）", async (t) => {
@@ -272,11 +280,11 @@ test("増分スキャン: 完全未変更の作品は2回目以降スキップ�
   const first = await adapter.scan();
   assert.equal(first.skipped, 1);
   assert.equal(first.registered, 1);
-  assert.equal(first.newlyGenerated, 0);
+  assert.equal(first.insertedWorkIds.length, 0);
 
   const second = await adapter.scan();
   assert.equal(second.registered, 1); // error状態の既存メタは毎回再評価（TASK-95）
-  assert.equal(second.newlyGenerated, 0);
+  assert.equal(second.insertedWorkIds.length, 0);
   assert.equal(second.skipped, 1); // 正常な自動生成メタのみスキップ
   assert.equal(second.missing, 0);
   assert.equal(second.errors, 0);
@@ -302,7 +310,7 @@ test("増分スキャン: スキップした作品もPlaylist/Trackとresumeを�
   });
 });
 
-test("増分スキャン: source revisionが変わった不正sidecarはerrorとして検出する", async (t) => {
+test("増分スキャン: source revisionが変わった不正mimimilli.jsonはerrorとして検出する", async (t) => {
   const { adapter, root } = await setup(t);
   await adapter.scan();
   const metaPath = join(root, "dlsite", "RJ900001_テスト作品", "mimimilli.json");
@@ -314,12 +322,12 @@ test("増分スキャン: source revisionが変わった不正sidecarはerrorと
   assert.equal(second.skipped, 0);
   assert.equal(second.errors, 1);
   assert.deepEqual(
-    second.invalidSidecars.map((sidecar) => sidecar.path),
+    second.invalidMetaFiles.map((metaFile) => metaFile.path),
     ["dlsite/RJ900001_テスト作品/mimimilli.json"],
   );
 });
 
-test("増分スキャン: sidecar bytesが変われば未知キーだけでも再投影する", async (t) => {
+test("増分スキャン: mimimilli.json bytesが変われば未知キーだけでも再投影する", async (t) => {
   const directory = makeTestDirectory("raw-fingerprint-projection");
   t.after(directory.cleanup);
   const root = join(directory.path, "lib");
@@ -847,7 +855,7 @@ test("upsertBatchSizeは有限の正整数だけを受け付ける", (t) => {
   }
 });
 
-test("staging後にsidecarが変わった作品はpublishせず旧投影を維持する", async (t) => {
+test("staging後にmimimilli.jsonが変わった作品はpublishせず旧投影を維持する", async (t) => {
   const directory = makeTestDirectory("scan-source-changed-before-publish");
   t.after(directory.cleanup);
   const root = join(directory.path, "lib");

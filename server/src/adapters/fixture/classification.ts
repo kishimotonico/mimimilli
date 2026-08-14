@@ -92,7 +92,10 @@ export function createClassificationMethods(state: FixtureState): Classification
     async evalSmartFolder(id: string, query: SmartFolderEvalQuery): Promise<WorksPage | null> {
       const folder = state.smartFolders.find((f) => f.id === id);
       if (!folder) return null;
-      return toWorksPage(evalSmartFolder(folder, state.works, query));
+      return toWorksPage(
+        evalSmartFolder(folder, state.works, query),
+        state.rootFolder ?? "/library",
+      );
     },
   };
 }

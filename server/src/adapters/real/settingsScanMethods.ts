@@ -4,6 +4,7 @@ import { NotConfiguredError } from "../../errors.ts";
 import type { ScanOptions } from "../../adapter/index.ts";
 import type {
   ScanCandidate,
+  ScanCandidateRegisterItem,
   ScanCandidatesRegisterResponse,
   ScanResult,
   Settings,
@@ -26,7 +27,11 @@ export function createSettingsScanMethods(deps: {
   catalog: Pick<CatalogWorkRepository, "getScanState" | "setScanState" | "listIdentityConflicts">;
   user: Pick<
     UserWorkStateRepository,
-    "getUserSetting" | "setUserSetting" | "listScanCandidateExclusions" | "excludeScanCandidates"
+    | "getUserSetting"
+    | "setUserSetting"
+    | "listScanCandidateExclusions"
+    | "excludeScanCandidates"
+    | "restoreScanCandidateExclusions"
   >;
   scanner: Scanner;
   dataRoot: string;
@@ -135,13 +140,19 @@ export function createSettingsScanMethods(deps: {
       return scanner.listCandidates(requireRoot());
     },
     async registerScanCandidates(
-      paths: string[],
+      items: ScanCandidateRegisterItem[],
       onRegistered?: (workId: string) => void,
     ): Promise<ScanCandidatesRegisterResponse> {
-      return scanner.registerCandidates(requireRoot(), paths, onRegistered);
+      return scanner.registerCandidates(requireRoot(), items, onRegistered);
     },
     async excludeScanCandidates(paths: string[]): Promise<void> {
       await scanner.excludeCandidates(requireRoot(), paths);
+    },
+    async listScanCandidateExclusions(): Promise<string[]> {
+      return scanner.listExcludedCandidates();
+    },
+    async restoreScanCandidateExclusions(paths: string[]): Promise<void> {
+      scanner.restoreExcludedCandidates(paths);
     },
     requireRoot,
   };

@@ -8,15 +8,15 @@ import { captureLogs, scanRecords } from "./helpers/logCapture.ts";
 
 const emptyResult: ScanResult = {
   registered: 0,
-  newlyGenerated: 0,
+  insertedWorkIds: [],
+  updatedWorkIds: [],
   errors: 0,
   missing: 0,
-  newWorkIds: [],
   rjCodeMissingCount: 0,
   skipped: 0,
   coverErrors: 0,
   identityConflicts: [],
-  invalidSidecars: [],
+  invalidMetaFiles: [],
   candidates: [],
 };
 
@@ -48,10 +48,10 @@ test("完了時に scan カテゴリの INFO 要約ログを1回記録する", a
   const unreadablePaths = Array.from({ length: 12 }, (_, index) => `/blocked/${index}`);
   const result: ScanResult = {
     registered: 4,
-    newlyGenerated: 2,
+    insertedWorkIds: ["RJ501011", "RJ501012"],
+    updatedWorkIds: [],
     errors: 1,
     missing: 3,
-    newWorkIds: ["RJ501011", "RJ501012"],
     rjCodeMissingCount: 5,
     skipped: 6,
     coverErrors: 7,
@@ -63,7 +63,7 @@ test("完了時に scan カテゴリの INFO 要約ログを1回記録する", a
         paths: ["copy-a/mimimilli.json", "copy-b/mimimilli.json"],
       },
     ],
-    invalidSidecars: [],
+    invalidMetaFiles: [],
     unreadablePaths,
     dataIntegrityWarning: { skippedCount: 1, skippedWorkIds: ["bad-work"] },
   };
@@ -85,7 +85,8 @@ test("完了時に scan カテゴリの INFO 要約ログを1回記録する", a
     assert.equal(properties.jobId, job.id);
     assert.equal(typeof properties.durationMs, "number");
     assert.equal(properties.registered, 4);
-    assert.equal(properties.newlyGenerated, 2);
+    assert.equal(properties.insertedWorkIdsCount, 2);
+    assert.equal(properties.updatedWorkIdsCount, 0);
     assert.equal(properties.errors, 1);
     assert.equal(properties.missing, 3);
     assert.equal(properties.skipped, 6);
@@ -95,7 +96,7 @@ test("完了時に scan カテゴリの INFO 要約ログを1回記録する", a
     assert.equal(properties.unreadablePathsCount, 12);
     assert.deepEqual(properties.unreadablePathsSample, unreadablePaths.slice(0, 10));
     assert.equal(properties.dataIntegrityWarning, true);
-    assert.equal("newWorkIds" in properties, false);
+    assert.equal("insertedWorkIds" in properties, false);
   });
 });
 

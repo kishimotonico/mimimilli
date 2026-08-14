@@ -32,15 +32,15 @@ const running: ScanJobSnapshot = {
 };
 const result = {
   registered: 1,
-  newlyGenerated: 0,
+  insertedWorkIds: [],
+  updatedWorkIds: [],
   errors: 0,
   missing: 0,
-  newWorkIds: [],
   rjCodeMissingCount: 0,
   skipped: 0,
   coverErrors: 0,
   identityConflicts: [],
-  invalidSidecars: [],
+  invalidMetaFiles: [],
   candidates: [],
 };
 const completed: ScanJobSnapshot = {

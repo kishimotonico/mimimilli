@@ -7,7 +7,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { WORKS_DEFAULT_PAGE_SIZE } from "@mimimilli/shared";
+import { WORKS_DEFAULT_PAGE_SIZE, workspacePath } from "@mimimilli/shared";
 import { useSuspenseSmartLibraryWorks } from "../../src/features/library/model/useLibraryQueries";
 import type { LibraryViewState } from "../../src/features/library/model/useLibraryNavigation";
 import type { WorkListItem } from "@mimimilli/shared";
@@ -45,6 +45,8 @@ function makeWork(id: string): WorkListItem {
     bookmarked: false,
     lastPlayedAt: null,
     circleName: null,
+    relativePath: workspacePath(id),
+    dlsite: { rjCode: null, status: "none" },
   };
 }
 

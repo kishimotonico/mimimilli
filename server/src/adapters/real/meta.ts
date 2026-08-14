@@ -13,8 +13,14 @@ import {
 } from "node:fs";
 import { createHash } from "node:crypto";
 import { basename, dirname, join } from "node:path";
-import { META_FILE_NAME, metaFileSchema, type MetaFile } from "@mimimilli/shared";
+import {
+  META_FILE_NAME,
+  metaFileSchema,
+  applyDlsiteStatePatch,
+  type MetaFile,
+} from "@mimimilli/shared";
 import { detectRjCode } from "./dlsite.ts";
+import { toMetaDlsiteState } from "./dlsiteProjection.ts";
 import { SourceChangedError } from "../../errors.ts";
 
 export { SourceChangedError } from "../../errors.ts";
@@ -118,7 +124,7 @@ export function replaceWithRollback(
       try {
         ops.rename(rollback, filePath);
       } catch (restoreError) {
-        throw new Error("sidecarの復元に失敗しました", { cause: restoreError });
+        throw new Error("作品情報の復元に失敗しました", { cause: restoreError });
       }
       throw replaceError;
     }
@@ -188,7 +194,7 @@ type MetaPatch = {
 };
 
 /**
- * sourceRevision を比較してsidecarを更新する。JSON objectを直接patchするので未知fieldと
+ * sourceRevision を比較してmimimilli.jsonを更新する。JSON objectを直接patchするので未知fieldと
  * 既存キー順を保持する。replace直前にもbytesを比較し、外部更新を上書きしない。
  */
 export function patchMetaFileCas(
@@ -299,7 +305,9 @@ export function syncDetectedRjCode(metaPath: string, workDirName: string): MetaF
   if (detectedRjCode === source.meta.dlsite.rjCode) {
     return source.meta.dlsite;
   }
-  const dlsite = { ...source.meta.dlsite, rjCode: detectedRjCode };
+  const dlsite = toMetaDlsiteState(
+    applyDlsiteStatePatch(source.meta.dlsite, { rjCode: detectedRjCode }),
+  );
   patchMetaFileCas(metaPath, source.sourceRevision, { dlsite });
   return dlsite;
 }

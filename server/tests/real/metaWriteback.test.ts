@@ -42,7 +42,7 @@ test("patchWork の title / tags がメタファイルへ反映され、スキ�
   assert.equal(meta.id, existingWorkId);
 });
 
-test("sidecarの外部更新後は古いsourceRevisionで上書きしない", async (t) => {
+test("mimimilli.jsonの外部更新後は古いsourceRevisionで上書きしない", async (t) => {
   const { adapter, existingWorkId, metaPath } = await setup(t);
   const work = await adapter.getWork(existingWorkId);
   assert.ok(work?.sourceRevision);
@@ -74,12 +74,12 @@ test("Windows互換置換でinstallと復元が失敗してもrollbackを保持�
         },
         unlink: (path) => files.delete(path),
       }),
-    (error: Error) => error.message === "sidecarの復元に失敗しました",
+    (error: Error) => error.message === "作品情報の復元に失敗しました",
   );
   assert.ok(files.has("rollback"));
 });
 
-test("catalog再投影に失敗しても確定済みsidecarは残り、scanで収束する", async (t) => {
+test("catalog再投影に失敗しても確定済みmimimilli.jsonは残り、scanで収束する", async (t) => {
   const { adapter, existingWorkId, metaPath } = await setup(t);
   const work = await adapter.getWork(existingWorkId);
   assert.ok(work?.sourceRevision);
@@ -90,7 +90,7 @@ test("catalog再投影に失敗しても確定済みsidecarは残り、scanで�
   try {
     await assert.rejects(
       adapter.patchWork(existingWorkId, {
-        title: "sidecarだけは確定する",
+        title: "mimimilli.jsonだけは確定する",
         sourceRevision: work.sourceRevision,
       }),
       /catalog projection failed/,
@@ -98,10 +98,10 @@ test("catalog再投影に失敗しても確定済みsidecarは残り、scanで�
   } finally {
     CatalogWorkRepository.prototype.upsertWorkCatalog = originalUpsert;
   }
-  assert.equal(JSON.parse(readFileSync(metaPath, "utf-8")).title, "sidecarだけは確定する");
+  assert.equal(JSON.parse(readFileSync(metaPath, "utf-8")).title, "mimimilli.jsonだけは確定する");
   assert.equal((await adapter.getWork(existingWorkId))?.title, "既存メタの作品");
   await adapter.scan({ full: true });
-  assert.equal((await adapter.getWork(existingWorkId))?.title, "sidecarだけは確定する");
+  assert.equal((await adapter.getWork(existingWorkId))?.title, "mimimilli.jsonだけは確定する");
 });
 
 test("bookmarked の PATCH はメタファイルを変更しない（DB 固有情報）", async (t) => {

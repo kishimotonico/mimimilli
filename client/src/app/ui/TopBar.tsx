@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
+import { useQuery } from "@tanstack/react-query";
 import { I } from "../../shared/ui/Icon";
 import IconButton from "../../shared/ui/IconButton";
 import { useAtom, useAtomValue } from "jotai";
@@ -15,6 +16,7 @@ import { librarySearchQueryAtom } from "../../entities/library/model/navigationA
 import { appModeAtom } from "../../shared/model/appModeAtoms";
 import { playerIsActiveAtom, playingTrackTitleAtom } from "../../entities/player/model/atoms";
 import { scanningAtom, scanProgressLabelAtom } from "../../entities/scan/model/atoms";
+import { getScanCandidates, SCAN_QUERY_KEYS } from "../../features/scan/api";
 
 interface TopBarProps {
   /** スキャンボタン押下時。即時実行はせずスキャンモーダルを開く（TASK-56） */
@@ -44,6 +46,11 @@ function DlsiteBulkCancelButton({ onClick }: { onClick: () => void }) {
 export default function TopBar({ onOpenScan, onSettings, notificationBell }: TopBarProps) {
   const scanning = useAtomValue(scanningAtom);
   const scanProgressLabel = useAtomValue(scanProgressLabelAtom);
+  const candidatesQuery = useQuery({
+    queryKey: SCAN_QUERY_KEYS.candidates(),
+    queryFn: getScanCandidates,
+  });
+  const unregisteredCount = candidatesQuery.data?.length ?? 0;
   const dlsiteBulkActive = useAtomValue(dlsiteBulkActiveAtom);
   const dlsiteBulkProgressLabel = useAtomValue(dlsiteBulkProgressLabelAtom);
   const dlsiteBulkCurrentWorkLabel = useAtomValue(dlsiteBulkCurrentWorkLabelAtom);
@@ -145,13 +152,30 @@ export default function TopBar({ onOpenScan, onSettings, notificationBell }: Top
           {scanProgressLabel ?? "スキャン中..."}
         </span>
       )}
-      <IconButton
-        size="md"
-        icon={I.refresh}
-        label={scanning ? (scanProgressLabel ?? "スキャン中...") : "スキャン"}
-        onClick={onOpenScan}
-        className={scanning ? "animate-spin" : undefined}
-      />
+      <div className="relative">
+        <IconButton
+          size="md"
+          icon={I.refresh}
+          label={
+            scanning
+              ? (scanProgressLabel ?? "スキャン中...")
+              : unregisteredCount > 0
+                ? `スキャン（未登録${unregisteredCount}件）`
+                : "スキャン"
+          }
+          onClick={onOpenScan}
+          className={scanning ? "animate-spin" : undefined}
+        />
+        {!scanning && unregisteredCount > 0 && (
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute top-0 right-0 flex h-[15px] min-w-[15px] items-center justify-center rounded-pill px-[3px] font-mono text-[9px] font-bold text-paper-1"
+            style={{ background: "var(--acc)" }}
+          >
+            {unregisteredCount > 99 ? "99+" : unregisteredCount}
+          </span>
+        )}
+      </div>
       {dlsiteBulkActive && (
         <>
           <span

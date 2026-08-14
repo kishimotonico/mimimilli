@@ -1,6 +1,7 @@
 import { act, createElement } from "react";
 import { render, screen } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import TopBar from "../../src/app/ui/TopBar";
 import {
@@ -10,6 +11,7 @@ import {
 } from "../../src/entities/dlsite/model/bulkAtoms";
 import { appModeAtom } from "../../src/features/navigation/model/navigationAtoms";
 import { scanJobAtom } from "../../src/entities/scan/model/atoms";
+import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
 
 function renderTopBar(atomState?: {
   scanJob?: import("@mimimilli/shared").ScanJobSnapshot | null;
@@ -35,15 +37,24 @@ function renderTopBar(atomState?: {
     store.set(dlsiteBulkProgressAtom, atomState.dlsiteProgress);
   }
 
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
+  });
+  queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), []);
+
   render(
     createElement(
-      JotaiProvider,
-      { store },
-      createElement(TopBar, {
-        onOpenScan: vi.fn(),
-        onSettings: vi.fn(),
-        notificationBell: createElement("span", { "aria-label": "通知" }),
-      }),
+      QueryClientProvider,
+      { client: queryClient },
+      createElement(
+        JotaiProvider,
+        { store },
+        createElement(TopBar, {
+          onOpenScan: vi.fn(),
+          onSettings: vi.fn(),
+          notificationBell: createElement("span", { "aria-label": "通知" }),
+        }),
+      ),
     ),
   );
   return store;

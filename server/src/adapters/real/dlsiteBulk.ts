@@ -3,14 +3,21 @@ import {
   type DlsiteBulkMode,
   type DlsiteBulkProgressEvent,
   type DlsiteBulkResult,
+  type DlsiteState,
+  hasRjCode,
   type WorkSummary,
 } from "@mimimilli/shared";
 import { DlsiteOfflineError } from "../../errors.ts";
 import { logDataIntegritySkips, toDataIntegrityWarning } from "./dataIntegrity.ts";
+import {
+  refreshWorkDlsiteProjection,
+  shouldRefreshDlsiteProjectionAfterFetch,
+} from "./dlsiteProjection.ts";
 import type { Db } from "./db.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";
 import type { Scanner } from "./scanner.ts";
+import type { DlsiteCache } from "./dlsiteCache.ts";
 import type { createDlsiteFetch, DlsiteFetchAttempt } from "./dlsiteFetch.ts";
 
 export interface DlsiteBulkDeps {
@@ -19,11 +26,14 @@ export interface DlsiteBulkDeps {
   catalog: CatalogWorkRepository;
   scanner: Scanner;
   fetch: ReturnType<typeof createDlsiteFetch>;
+  dlsiteCache: DlsiteCache;
 }
+
+export type DlsiteBulkTarget = WorkSummary & { dlsite: DlsiteState & { rjCode: string } };
 
 export interface DlsiteBulkTargetSelection {
   requested: WorkSummary[];
-  targets: WorkSummary[];
+  targets: DlsiteBulkTarget[];
   skipped: number;
   dataIntegrityWarning?: DataIntegrityWarning;
 }
@@ -37,8 +47,8 @@ export function selectDlsiteBulkTargets(
   logDataIntegritySkips(logger, "dlsite-bulk", skipped);
   const dataIntegrityWarning = toDataIntegrityWarning(skipped);
   const requested = summaries;
-  const targets = requested.filter((work) => {
-    if (!work.dlsite.rjCode || work.dlsite.status === "skipped") return false;
+  const targets = requested.filter((work): work is DlsiteBulkTarget => {
+    if (!hasRjCode(work.dlsite) || work.dlsite.status === "skipped") return false;
     return work.dlsite.status !== "applied";
   });
   return {
@@ -127,8 +137,12 @@ export async function applyDlsiteBulkWork(
 }
 
 export function createDlsiteBulk(deps: DlsiteBulkDeps) {
-  const { query, fetch } = deps;
+  const { query, fetch, catalog, dlsiteCache } = deps;
   const { dlsiteLogger, dlsiteScheduler, fetchCachedDlsiteAttempt } = fetch;
+
+  const refreshWorkProjection = (workId: string): void => {
+    refreshWorkDlsiteProjection(catalog, workId, dlsiteCache);
+  };
 
   return {
     async runDlsiteBulk(
@@ -150,7 +164,7 @@ export function createDlsiteBulk(deps: DlsiteBulkDeps) {
         }
         const { targets } = selection;
         result.skipped = selection.skipped;
-        const uniqueRjCodes = [...new Set(targets.map((work) => work.dlsite.rjCode!))];
+        const uniqueRjCodes = [...new Set(targets.map((work) => work.dlsite.rjCode))];
         dlsiteLogger.info("DLsite一括取得を開始しました", {
           mode,
           targetCount: targets.length,
@@ -187,7 +201,7 @@ export function createDlsiteBulk(deps: DlsiteBulkDeps) {
             type: "progress",
             processed: index,
             total: targets.length,
-            work: { id: work.id, rjCode: work.dlsite.rjCode!, title: work.title },
+            work: { id: work.id, rjCode: work.dlsite.rjCode, title: work.title },
           });
           if (isAborted()) {
             dlsiteLogger.info("DLsite一括取得を中断しました", {
@@ -197,7 +211,7 @@ export function createDlsiteBulk(deps: DlsiteBulkDeps) {
             });
             return result;
           }
-          const attempt = attempts.get(work.dlsite.rjCode!)!;
+          const attempt = attempts.get(work.dlsite.rjCode)!;
           try {
             const outcome = await applyDlsiteBulkWork(applyDeps, {
               work,
@@ -206,12 +220,8 @@ export function createDlsiteBulk(deps: DlsiteBulkDeps) {
             result.fetched += outcome.fetched;
             result.failed += outcome.failed;
             result.parseErrors += outcome.parseErrors;
-            if (
-              outcome.failed > 0 &&
-              attempt.result.ok === false &&
-              attempt.result.kind === "offline"
-            ) {
-              continue;
+            if (shouldRefreshDlsiteProjectionAfterFetch(attempt.result)) {
+              refreshWorkProjection(work.id);
             }
           } catch (error) {
             if (error instanceof DOMException && error.name === "AbortError") {

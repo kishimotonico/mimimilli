@@ -2,6 +2,9 @@
 import { z } from "zod";
 import { coverKindSchema, coverSchema } from "./cover.ts";
 import { dlsiteStateSchema } from "./dlsite.ts";
+import type { DlsiteState } from "./dlsite.ts";
+import { workspacePath, workspacePathSchema } from "./media.ts";
+import type { WorkspacePath } from "./media.ts";
 import { trackDurationKindSchema } from "./duration.ts";
 import {
   isInvalidTrackStart,
@@ -161,6 +164,13 @@ export const workSummarySchema = z.object({
 });
 export type WorkSummary = z.infer<typeof workSummarySchema>;
 
+/** 一覧の外部連携表示に要る最小限のDLsite状態（rjCode有無とstatusのみ）。 */
+export const workListItemDlsiteSchema = dlsiteStateSchema.pick({
+  rjCode: true,
+  status: true,
+});
+export type WorkListItemDlsite = z.infer<typeof workListItemDlsiteSchema>;
+
 /** 一覧表示専用の軽量な作品DTO。検索・詳細編集で必要な情報は含めない。 */
 export const workListItemSchema = z.object({
   id: z.string(),
@@ -172,8 +182,30 @@ export const workListItemSchema = z.object({
   bookmarked: z.boolean(),
   lastPlayedAt: z.string().nullable(),
   circleName: z.string().nullable(),
+  /** 作品フォルダー自身のライブラリルートからの相対パス（ScanCandidate.pathと同じ形）。
+   *  フォルダー列にはこの親ディレクトリ部分をUI側で取り出して表示する。フルパスは持たせない。 */
+  relativePath: workspacePathSchema,
+  dlsite: workListItemDlsiteSchema,
 });
 export type WorkListItem = z.infer<typeof workListItemSchema>;
+
+/** DlsiteState を一覧表示用の最小限の形へ投影する。 */
+export function toWorkListItemDlsite(dlsite: DlsiteState): WorkListItemDlsite {
+  return { rjCode: dlsite.rjCode, status: dlsite.status };
+}
+
+/** 絶対パス physicalPath をライブラリルート root からの相対パスへ変換する。
+ *  physicalPath は必ず root 配下という前提（カタログの正本はスキャン時に root 配下でのみ書かれる）。
+ *  区切り文字はどちらも "/" へ正規化してから比較する。 */
+export function relativeToRoot(physicalPath: string, root: string): WorkspacePath {
+  const normalize = (value: string) => value.replace(/\\/g, "/").replace(/\/+$/g, "");
+  const normalizedPath = normalize(physicalPath);
+  const normalizedRoot = normalize(root);
+  const stripped = normalizedPath.startsWith(normalizedRoot)
+    ? normalizedPath.slice(normalizedRoot.length)
+    : normalizedPath;
+  return workspacePath(stripped.replace(/^\/+/, ""));
+}
 
 const CIRCLE_TAG_PREFIXES = ["サークル/", "circle/"];
 
@@ -189,8 +221,8 @@ export function extractCircleName(tags: string[]): string | null {
   return circleTag ? circleTag.slice(circleTag.indexOf("/") + 1) : null;
 }
 
-/** WorkSummary を一覧用の公開契約へ投影する。 */
-export function toWorkListItem(work: WorkSummary): WorkListItem {
+/** WorkSummary を一覧用の公開契約へ投影する。root はライブラリルート（絶対パス）。 */
+export function toWorkListItem(work: WorkSummary, root: string): WorkListItem {
   return {
     id: work.id,
     title: work.title,
@@ -201,6 +233,8 @@ export function toWorkListItem(work: WorkSummary): WorkListItem {
     bookmarked: work.bookmarked,
     lastPlayedAt: work.lastPlayedAt,
     circleName: extractCircleName(work.tags),
+    relativePath: relativeToRoot(work.physicalPath, root),
+    dlsite: toWorkListItemDlsite(work.dlsite),
   };
 }
 
@@ -307,7 +341,7 @@ export const workSchema = workSummarySchema
     createdAt: z.string().nullable(),
     playlists: z.array(resolvedPlaylistSchema),
     resume: resumeSchema.nullable(),
-    /** 編集時のsidecar CASに使う、取得時点の正確なsource bytesのrevision。 */
+    /** 編集時のmimimilli.json CASに使う、取得時点の正確なsource bytesのrevision。 */
     sourceRevision: z.string().optional(),
   })
   .superRefine((work, ctx) => {

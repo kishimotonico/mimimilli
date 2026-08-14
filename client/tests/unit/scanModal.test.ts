@@ -1,12 +1,14 @@
 // ScanModal のEsc/backdrop挙動（TASK-56: NewWorkPopupの統合先）のコンポーネントテスト。
 // happy-dom は <dialog> の showModal/close を実装していないため、テスト対象に必要な分だけ差し替える。
 import { createElement } from "react";
-import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act, within } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   WORKS_DEFAULT_PAGE_SIZE,
+  workspacePath,
+  type ScanCandidate,
   type ScanJobSnapshot,
   type ScanResult,
   type Work,
@@ -17,7 +19,9 @@ import ScanModal from "../../src/features/scan/ui/ScanModal";
 import * as workApi from "../../src/entities/work/api";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { scanActionsAtom, scanJobAtom } from "../../src/entities/scan/model/atoms";
+import * as scanApi from "../../src/features/scan/api";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
+import * as scanEntityApi from "../../src/entities/scan/api";
 import { libraryTotalQueryOptions } from "../../src/entities/work/libraryTotalQueryOptions";
 
 /** ids指定のworks一覧クエリ結果のスタブ。テストごとに登録した作品だけ返す（TASK-210/276）。
@@ -37,6 +41,8 @@ function toListItem(id: string, title: string, trackCount: number): WorkListItem
     bookmarked: false,
     lastPlayedAt: null,
     circleName: null,
+    relativePath: workspacePath(id),
+    dlsite: { rjCode: null, status: "none" },
   };
 }
 
@@ -95,16 +101,31 @@ const work: Work = {
 
 const scanResult: ScanResult = {
   registered: 10,
-  newlyGenerated: 1,
+  insertedWorkIds: [newWork.id],
+  updatedWorkIds: [],
   errors: 0,
   missing: 0,
-  newWorkIds: [newWork.id],
   rjCodeMissingCount: 0,
   skipped: 0,
   coverErrors: 0,
   identityConflicts: [],
-  invalidSidecars: [],
+  invalidMetaFiles: [],
   candidates: [],
+};
+
+const candidateDetected: ScanCandidate = {
+  path: workspacePath("dlsite/検出済み作品"),
+  inferredTitle: "検出済み作品",
+  audioFileCount: 2,
+  audioBreakdown: [{ extension: "mp3", count: 2 }],
+  rjCode: "RJ100001",
+};
+const candidateUndetected: ScanCandidate = {
+  path: workspacePath("dlsite/未検出作品"),
+  inferredTitle: "未検出作品",
+  audioFileCount: 1,
+  audioBreakdown: [{ extension: "mp3", count: 1 }],
+  rjCode: null,
 };
 
 function dispatchCancel(dialog: HTMLElement) {
@@ -161,6 +182,15 @@ function seedScanQueries(
       stats: { trackCount: 0, durationSec: 0 },
     });
   }
+  // ID重複の診断（TASK-322で常に最新を購読する）。未シードだとテストごとに実fetchへ
+  // 落ちてしまうため、明示的な指定がなければ空で固定する。
+  if (queryClient.getQueryData(SCAN_QUERY_KEYS.diagnostics()) === undefined) {
+    queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), { diagnostics: [] });
+  }
+}
+
+function openTab(name: string) {
+  fireEvent.click(screen.getByRole("tab", { name: new RegExp(`^${name}`) }));
 }
 
 function renderModal(
@@ -221,27 +251,14 @@ function renderModal(
 }
 
 describe("ScanModal", () => {
-  it("タイトル編集中のEscapeは編集だけをキャンセルし、モーダルは閉じない", async () => {
+  it("Escapeはモーダルを閉じる（タイトル編集中でも、タブが編集stateを自分で持つため親は関知しない）", async () => {
     const onClose = vi.fn();
     renderModal({ onClose });
 
+    openTab("新規登録済み");
     await waitFor(() => screen.getByText(newWork.title));
     fireEvent.click(screen.getByText(newWork.title));
-
-    const input = screen.getByDisplayValue(newWork.title);
-    expect(input).toBeInTheDocument();
-
-    const dialog = screen.getByRole("dialog", { name: "スキャン" });
-    dispatchCancel(dialog);
-
-    expect(onClose).not.toHaveBeenCalled();
-    expect(screen.queryByDisplayValue(newWork.title)).toBeNull();
-    expect(screen.getByText(newWork.title)).toBeInTheDocument();
-  });
-
-  it("編集中でないときのEscapeはモーダルを閉じる", () => {
-    const onClose = vi.fn();
-    renderModal({ onClose });
+    expect(screen.getByDisplayValue(newWork.title)).toBeInTheDocument();
 
     const dialog = screen.getByRole("dialog", { name: "スキャン" });
     dispatchCancel(dialog);
@@ -249,35 +266,28 @@ describe("ScanModal", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("backdropクリックは編集中は編集だけをキャンセルし、モーダルは閉じない", async () => {
+  it("×ボタンはモーダルを閉じる（タイトル編集中でも）", async () => {
     const onClose = vi.fn();
     renderModal({ onClose });
 
-    await waitFor(() => screen.getByText(newWork.title));
-    fireEvent.click(screen.getByText(newWork.title));
-    expect(screen.getByDisplayValue(newWork.title)).toBeInTheDocument();
-
-    const dialog = screen.getByRole("dialog", { name: "スキャン" });
-    fireEvent.click(dialog);
-
-    expect(onClose).not.toHaveBeenCalled();
-    expect(screen.queryByDisplayValue(newWork.title)).toBeNull();
-    expect(screen.getByText(newWork.title)).toBeInTheDocument();
-  });
-
-  it("タイトル編集中の×ボタンは編集だけをキャンセルし、モーダルは閉じない", async () => {
-    const onClose = vi.fn();
-    renderModal({ onClose });
-
+    openTab("新規登録済み");
     await waitFor(() => screen.getByText(newWork.title));
     fireEvent.click(screen.getByText(newWork.title));
     expect(screen.getByDisplayValue(newWork.title)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "閉じる" }));
 
-    expect(onClose).not.toHaveBeenCalled();
-    expect(screen.queryByDisplayValue(newWork.title)).toBeNull();
-    expect(screen.getByText(newWork.title)).toBeInTheDocument();
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("backdropクリックはモーダルを閉じる", () => {
+    const onClose = vi.fn();
+    renderModal({ onClose });
+
+    const dialog = screen.getByRole("dialog", { name: "スキャン" });
+    fireEvent.click(dialog);
+
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it("パネル内側のクリックではモーダルを閉じない", () => {
@@ -288,7 +298,7 @@ describe("ScanModal", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it("実行中はフェーズと進捗を表示し、直前の統計は残したまま中止ボタンを表示する", () => {
+  it("実行中はフェーズと進捗を表示し、中止ボタンを表示する", () => {
     const onClose = vi.fn();
     const { onCancel } = renderModal(
       { onClose },
@@ -300,8 +310,6 @@ describe("ScanModal", () => {
     expect(screen.getByRole("dialog", { name: "スキャン" })).toBeInTheDocument();
     expect(screen.getByText("作品を登録中")).toBeInTheDocument();
     expect(screen.getByText("3/12")).toBeInTheDocument();
-    // 実行中も統計バッジは直前の値のまま表示され続ける（画面が切り替わったように見せない）
-    expect(screen.getByText(String(scanResult.registered))).toBeInTheDocument();
 
     // 閉じるは常設のヘッダーアイコンで、バックグラウンド継続の案内文だけが実行中に出る
     expect(screen.getByText("閉じてもバックグラウンドで続行します")).toBeInTheDocument();
@@ -313,53 +321,52 @@ describe("ScanModal", () => {
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
-  it("前回結果が無ければ統計は未計測（—）のままスキャン開始ボタンを表示する", () => {
+  it("前回結果が無ければ左リストの集計は未計測（—）のまま主ボタンに「スキャン」を表示する", () => {
     const { onStart } = renderModal({ lastResult: null });
 
-    // 「今回のスキャン」の4枠は未計測、ライブラリ全体の件数は別枠で表示される
-    expect(screen.getAllByText("—")).toHaveLength(4);
+    expect(screen.getByText("更新なし")).toBeInTheDocument();
     expect(screen.getByText("ライブラリ全体")).toBeInTheDocument();
     expect(screen.getByText("11")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /スキャン開始/ }));
+    fireEvent.click(screen.getByRole("button", { name: "スキャン" }));
     expect(onStart).toHaveBeenCalledTimes(1);
   });
 
-  it("蔵書が0件でも「今回のスキャン」が全て0とライブラリ全体の0件は別枠で区別される", () => {
+  it("前回結果があれば主ボタンに「再スキャン」を表示する", () => {
+    const { onStart } = renderModal({ lastResult: scanResult });
+
+    fireEvent.click(screen.getByRole("button", { name: "再スキャン" }));
+    expect(onStart).toHaveBeenCalledTimes(1);
+  });
+
+  it("蔵書が0件でもライブラリ全体の0件が表示される", () => {
     renderModal({
-      lastResult: { ...scanResult, registered: 0, newlyGenerated: 0, newWorkIds: [] },
+      lastResult: { ...scanResult, registered: 0, insertedWorkIds: [], updatedWorkIds: [] },
       libraryTotal: 0,
     });
 
-    expect(screen.getByText("ライブラリ全体")).toBeInTheDocument();
-    // ライブラリ全体の0件と「今回のスキャン」の登録済み0件が同じ「0」でも別要素として存在する
-    expect(screen.getAllByText("0").length).toBeGreaterThanOrEqual(2);
+    const totalLabel = screen.getByText("ライブラリ全体");
+    expect(totalLabel.parentElement?.textContent).toContain("0");
   });
 
-  it("実行中から完了への遷移を見ていたときだけ、完了サインと変化した統計の強調が一時的に出る", async () => {
+  it("実行中から完了への遷移を見ていたときだけ、完了サインが一時的に出る", async () => {
     vi.useFakeTimers();
     try {
-      const before: ScanResult = { ...scanResult, registered: 5, newlyGenerated: 0 };
-      const after: ScanResult = { ...scanResult, registered: 6, newlyGenerated: 1 };
       const { store, rerenderModal } = renderModal(
-        { lastResult: before },
+        { lastResult: scanResult },
         { job: createRunningJob({ phase: "registering", processed: 1, total: 1 }) },
       );
 
       act(() => {
         store.set(scanJobAtom, null);
-        rerenderModal({ lastResult: after, lastScanTime: "2026-01-01T00:00:00.000Z" });
+        rerenderModal({ lastScanTime: "2026-01-01T00:00:00.000Z" });
       });
 
       expect(screen.getByText("完了しました")).toBeInTheDocument();
-      // 変化した「登録済み」の値は強調用の背景クラスが付く
-      const registeredValue = screen.getByText("6");
-      expect(registeredValue.parentElement?.className).toContain("bg-[color-mix");
 
       // レイアウトは動かさず、時間経過（ScanModal の COMPLETION_HINT_MS=2400 と
-      // StatusRow AnimatePresence（fade variant）の退出時間=150ms）で最終スキャン表示と
-      // 通常の枠色に自然に戻る。2回に分けて進めるのは、退出アニメーション開始（状態遷移で
-      // AnimatePresence が退出フェーズへ入るタイミング）が一括advanceだと後続タイマーとして
-      // 拾われないため。
+      // AnimatePresence（fade variant）の退出時間=150ms）で最終スキャン表示へ自然に戻る。
+      // 2回に分けて進めるのは、退出アニメーション開始（状態遷移でAnimatePresenceが退出
+      // フェーズへ入るタイミング）が一括advanceだと後続タイマーとして拾われないため。
       await act(async () => {
         await vi.advanceTimersByTimeAsync(2450);
       });
@@ -375,14 +382,12 @@ describe("ScanModal", () => {
         await vi.advanceTimersByTimeAsync(500);
       });
       expect(screen.queryByText("完了しました")).toBeNull();
-      expect(screen.getByText(/最終スキャン/)).toBeInTheDocument();
-      expect(registeredValue.parentElement?.className).not.toContain("bg-[color-mix");
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it("scan結果のnewWorkIdsが変わると一覧も即座に切り替わる（getWorkを呼ばず、worksをids一括取得する）", async () => {
+  it("scan結果のinsertedWorkIdsが変わると一覧も即座に切り替わる（getWorkを呼ばず、worksをids一括取得する）", async () => {
     const getWorkSpy = vi.spyOn(workApi, "getWork");
     const workA = { id: "work-a", title: "作品A", trackCount: 2 };
     const workB = { id: "work-b", title: "作品B", trackCount: 3 };
@@ -390,11 +395,12 @@ describe("ScanModal", () => {
     worksById.set(workB.id, toListItem(workB.id, workB.title, workB.trackCount));
 
     const { rerenderModal } = renderModal({
-      lastResult: { ...scanResult, newWorkIds: [workA.id] },
+      lastResult: { ...scanResult, insertedWorkIds: [workA.id] },
     });
+    openTab("新規登録済み");
     await waitFor(() => expect(screen.getByText(workA.title)).toBeInTheDocument());
 
-    rerenderModal({ lastResult: { ...scanResult, newWorkIds: [workB.id] } });
+    rerenderModal({ lastResult: { ...scanResult, insertedWorkIds: [workB.id] } });
     await waitFor(() => expect(screen.getByText(workB.title)).toBeInTheDocument());
     expect(screen.queryByText(workA.title)).toBeNull();
 
@@ -403,16 +409,17 @@ describe("ScanModal", () => {
     expect(searchWorksSpy).toHaveBeenCalledWith({ ids: [workB.id] });
   });
 
-  it("newWorkIdsがWORKS_DEFAULT_PAGE_SIZEを超えるとidsを先頭で切り詰め、省略件数を表示する", async () => {
+  it("insertedWorkIdsがWORKS_DEFAULT_PAGE_SIZEを超えるとidsを先頭で切り詰め、省略件数を表示する", async () => {
     const manyIds = Array.from(
       { length: WORKS_DEFAULT_PAGE_SIZE + 50 },
       (_, i) => `work-many-${i}`,
     );
     for (const id of manyIds) worksById.set(id, toListItem(id, id, 1));
 
-    renderModal({ lastResult: { ...scanResult, newWorkIds: manyIds } });
+    renderModal({ lastResult: { ...scanResult, insertedWorkIds: manyIds } });
+    openTab("新規登録済み");
 
-    await waitFor(() => expect(screen.getByText("work-many-0")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText("work-many-0").length).toBeGreaterThan(0));
     expect(
       searchWorksSpy.mock.calls.some(([params]) => params.ids?.length === WORKS_DEFAULT_PAGE_SIZE),
     ).toBe(true);
@@ -422,7 +429,7 @@ describe("ScanModal", () => {
       ),
     ).toBe(true);
     expect(
-      screen.getByText(`${WORKS_DEFAULT_PAGE_SIZE} / ${manyIds.length} 件`),
+      screen.getByText(`${manyIds.length}件中${WORKS_DEFAULT_PAGE_SIZE}件を表示`),
     ).toBeInTheDocument();
   });
 
@@ -433,17 +440,22 @@ describe("ScanModal", () => {
     });
 
     renderModal();
+    openTab("新規登録済み");
 
     await waitFor(() =>
       expect(screen.getByText("新規作品の読み込みに失敗しました")).toBeInTheDocument(),
     );
-    expect(screen.getByText(String(scanResult.newlyGenerated))).toBeInTheDocument();
+    // 一覧の取得に失敗しても、左リストのバッジ件数（lastResultから直接計算）は出続ける
+    expect(
+      screen.getByRole("tab", { name: `新規登録済み（${scanResult.insertedWorkIds.length}件）` }),
+    ).toBeInTheDocument();
     expect(screen.queryByText(newWork.title)).toBeNull();
   });
 
   it("タイトル保存に失敗したときエラーを表示し、ローカル表示は更新されない", async () => {
     vi.spyOn(workApi, "patchWork").mockRejectedValue(new Error("network error"));
     renderModal();
+    openTab("新規登録済み");
 
     await waitFor(() => screen.getByText(newWork.title));
     fireEvent.click(screen.getByText(newWork.title));
@@ -462,6 +474,7 @@ describe("ScanModal", () => {
   it("タイトル保存に成功したとき表示名が更新され編集モードが閉じる", async () => {
     vi.spyOn(workApi, "patchWork").mockResolvedValue({ ...work, title: "新しいタイトル" });
     renderModal();
+    openTab("新規登録済み");
 
     await waitFor(() => screen.getByText(newWork.title));
     fireEvent.click(screen.getByText(newWork.title));
@@ -477,6 +490,7 @@ describe("ScanModal", () => {
     const updatedWork: Work = { ...work, title: "新しいタイトル" };
     vi.spyOn(workApi, "patchWork").mockResolvedValue(updatedWork);
     const { queryClient } = renderModal();
+    openTab("新規登録済み");
 
     await waitFor(() => screen.getByText(newWork.title));
     fireEvent.click(screen.getByText(newWork.title));
@@ -496,6 +510,7 @@ describe("ScanModal", () => {
   it("空文字・空白のみのタイトルは保存されず編集モードだけ閉じる", async () => {
     const patchSpy = vi.spyOn(workApi, "patchWork");
     renderModal();
+    openTab("新規登録済み");
 
     await waitFor(() => screen.getByText(newWork.title));
     fireEvent.click(screen.getByText(newWork.title));
@@ -505,6 +520,103 @@ describe("ScanModal", () => {
 
     expect(patchSpy).not.toHaveBeenCalled();
     expect(screen.getByText(newWork.title)).toBeInTheDocument();
+  });
+
+  it("検出済みRJコードは明示送信し、未検出のまま登録すると空文字を送る。全件登録で新規登録済みへ自動遷移する", async () => {
+    const registerSpy = vi.spyOn(scanApi, "registerScanCandidates").mockResolvedValue({
+      registered: [
+        { path: candidateDetected.path, workId: "w-detected" },
+        { path: candidateUndetected.path, workId: "w-undetected" },
+      ],
+      failures: [],
+    });
+    renderModal({
+      lastResult: { ...scanResult, candidates: [candidateDetected, candidateUndetected] },
+    });
+
+    const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });
+    await expect.poll(() => unregistered.textContent).toContain(candidateDetected.inferredTitle);
+
+    fireEvent.click(within(unregistered).getByRole("button", { name: "2件をライブラリに追加" }));
+
+    await waitFor(() => expect(registerSpy).toHaveBeenCalled());
+    expect(registerSpy.mock.calls[0]?.[0]).toEqual([
+      { path: candidateDetected.path, rjCode: candidateDetected.rjCode },
+      { path: candidateUndetected.path, rjCode: "" },
+    ]);
+
+    await waitFor(() =>
+      expect(screen.getByText("2件をライブラリに追加しました")).toBeInTheDocument(),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("tabpanel", { name: /^新規登録済み/ })).toBeInTheDocument(),
+    );
+  });
+
+  it("未検出のRJコードをクリックで編集し、編集した値を登録に送る", async () => {
+    const registerSpy = vi.spyOn(scanApi, "registerScanCandidates").mockResolvedValue({
+      registered: [{ path: candidateUndetected.path, workId: "w-undetected" }],
+      failures: [],
+    });
+    renderModal({
+      lastResult: { ...scanResult, candidates: [candidateDetected, candidateUndetected] },
+    });
+
+    const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });
+    fireEvent.click(within(unregistered).getByRole("button", { name: "未検出" }));
+    const input = within(unregistered).getByPlaceholderText("RJコード");
+    fireEvent.change(input, { target: { value: "RJ200002" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    fireEvent.click(
+      within(unregistered).getByRole("checkbox", {
+        name: `「${candidateDetected.inferredTitle}」を選択`,
+      }),
+    );
+    fireEvent.click(within(unregistered).getByRole("button", { name: "1件をライブラリに追加" }));
+
+    await waitFor(() => expect(registerSpy).toHaveBeenCalled());
+    expect(registerSpy.mock.calls[0]?.[0]).toEqual([
+      { path: candidateUndetected.path, rjCode: "RJ200002" },
+    ]);
+  });
+
+  it("候補を1件ずつ除外でき、「元に戻す」で取り消せる", async () => {
+    const excludeSpy = vi.spyOn(scanApi, "excludeScanCandidates").mockResolvedValue(undefined);
+    const restoreSpy = vi
+      .spyOn(scanEntityApi, "restoreScanCandidateExclusions")
+      .mockResolvedValue(undefined);
+    const getCandidatesSpy = vi
+      .spyOn(scanApi, "getScanCandidates")
+      .mockResolvedValue([candidateDetected, candidateUndetected]);
+    renderModal({
+      lastResult: { ...scanResult, candidates: [candidateDetected, candidateUndetected] },
+    });
+
+    const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });
+    await expect.poll(() => unregistered.textContent).toContain(candidateUndetected.inferredTitle);
+
+    fireEvent.click(
+      within(unregistered).getByRole("button", {
+        name: `「${candidateUndetected.inferredTitle}」を候補から外す`,
+      }),
+    );
+
+    await waitFor(() => expect(excludeSpy).toHaveBeenCalledWith([candidateUndetected.path]));
+    await waitFor(() =>
+      expect(
+        screen.getByText(`「${candidateUndetected.inferredTitle}」を候補から外しました`),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.queryByText(candidateUndetected.inferredTitle)).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "元に戻す" }));
+
+    await waitFor(() => expect(restoreSpy).toHaveBeenCalledWith([candidateUndetected.path]));
+    await waitFor(() => expect(getCandidatesSpy).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(screen.getByText(candidateUndetected.inferredTitle)).toBeInTheDocument(),
+    );
   });
 });
 
@@ -543,6 +655,9 @@ describe("ScanModalと他画面が同じlibraryTotalQueryOptionsを共有する�
         return Promise.resolve(
           jsonResponse({ items: [], total: 42, stats: { trackCount: 0, durationSec: 0 } }),
         );
+      }
+      if (url.pathname === "/api/scan/diagnostics") {
+        return Promise.resolve(jsonResponse({ diagnostics: [] }));
       }
       return Promise.reject(new Error(`unexpected fetch: ${url.toString()}`));
     });
