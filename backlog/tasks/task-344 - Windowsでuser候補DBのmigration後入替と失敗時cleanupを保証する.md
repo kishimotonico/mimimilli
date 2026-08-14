@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@codex'
 created_date: '2026-08-14 18:15'
-updated_date: '2026-08-14 18:34'
+updated_date: '2026-08-14 19:18'
 labels:
   - bug
   - server
@@ -47,6 +47,8 @@ TASK-309で導入したuser候補DBのforward-only-migration後の入替処理�
 最終pnpm checkで検出されたserver/tests/real/dbBackup.test.tsのoxfmt指摘を、同ファイルのみ標準formatterで修正。pnpm exec oxfmt --check server/tests/real/dbBackup.test.tsおよびgit diff --checkを通過。
 
 最終検証:pnpm-checkはpass。対象のdbBackupテストは22-pass。全pnpm-testは476-pass/147-fail/26-errorsで、失敗は既存のWindows並列問題によるreal-testsのEBUSY、dlsiteCacheのEEXIST、loggerテストのパス期待値不一致であり、TASK-344の差分起因ではない。フォローアップとしてTASK-345、TASK-346、TASK-347へ起票した。
+
+独立レビュー指摘を反映: 候補DBのclose保証範囲をPRAGMA設定を含む全体へ復元、migration実行をexecuteSqliteMigrationsへ1系統化しdrizzle migrator依存を削除、insertMigrationをDatabase.runへ簡素化。fix/task-344-windows-db-replacementブランチでmaster最新へ再ベース。
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
