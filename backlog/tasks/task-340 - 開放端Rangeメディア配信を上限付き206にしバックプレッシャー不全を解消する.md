@@ -4,6 +4,7 @@ title: 開放端Rangeメディア配信を上限付き206にしバックプレ�
 status: To Do
 assignee: []
 created_date: '2026-08-14 10:39'
+updated_date: '2026-08-14 11:35'
 labels: []
 dependencies:
   - TASK-339
@@ -39,9 +40,9 @@ streamWithRange（server/src/routes/media.ts:135-215）は開放端Range（bytes
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 開放端Range（bytes=N-）に対して上限チャンクサイズで打ち切った206とContent-Rangeが返る（テストで検証）
-- [ ] #2 閉区間Range（bytes=N-M）は従来どおり指定範囲全体を返す
-- [ ] #3 配信中のサーバー側ファイル読み取り量がチャンク上限で有界になる（全量先読みが起きない）
+- [x] #1 開放端Range（bytes=N-）に対して上限チャンクサイズで打ち切った206とContent-Rangeが返る（テストで検証）
+- [x] #2 閉区間Range（bytes=N-M）は従来どおり指定範囲全体を返す
+- [x] #3 配信中のサーバー側ファイル読み取り量がチャンク上限で有界になる（全量先読みが起きない）
 - [ ] #4 Chromeでの通し再生・シークが正常動作する（実機確認を受け入れ条件に含む）
 - [ ] #5 pnpm check と server側テストが通る
 <!-- AC:END -->
