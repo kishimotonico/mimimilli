@@ -92,6 +92,14 @@ test("new-work: Files用診断とscan確認用の候補・問題を独立して�
 
   await adapter.excludeScanCandidates(["朗読/候補"]);
   assert.deepEqual(await adapter.listScanCandidates(), []);
+
+  // 除外は可逆な扱い。restoreで戻すと一覧に復帰する（実装adapterは毎回ディスクを
+  // 再走査するため自然に復帰するが、fixtureは静的リストを持つため個別に検証する）。
+  await adapter.restoreScanCandidateExclusions(["朗読/候補"]);
+  assert.deepEqual(
+    (await adapter.listScanCandidates()).map((candidate) => candidate.path),
+    ["朗読/候補"],
+  );
 });
 
 test("fixture: rjCode省略・空文字・指定を区別する", () => {

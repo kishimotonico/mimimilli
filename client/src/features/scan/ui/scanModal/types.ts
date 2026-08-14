@@ -16,3 +16,12 @@ export const SCAN_TAB_LABEL: Record<ScanTabKey, string> = {
   newlyRegistered: "新規登録済み",
   updated: "更新された作品",
 };
+
+/** UnregisteredTab が候補登録の成否をScanModalへ伝える契約（TASK-327/328境界）。
+ *  registeredWorkIds は「新規登録済み」タブがinsertedWorkIdsとは別経路で拾う承認分のID。 */
+export interface CandidatesRegisteredResult {
+  registeredWorkIds: string[];
+  failedCount: number;
+  /** この登録の後もまだ未登録として残っている件数 */
+  remainingCount: number;
+}

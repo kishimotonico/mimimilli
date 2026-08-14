@@ -130,14 +130,14 @@ export function createSettingsScanMethods(state: FixtureState): SettingsAdapter 
       return { registered, failures };
     },
     async excludeScanCandidates(paths): Promise<void> {
+      // 除外は可逆な扱い（restoreScanCandidateExclusionsで戻せる）なので、
+      // state.scanCandidates 自体からは削除しない。一覧側（listScanCandidates/scan）が
+      // scanCandidateExclusions を都度フィルタして隠す。
       for (const path of paths) {
         if (!state.scanCandidateExclusions.includes(path)) {
           state.scanCandidateExclusions.push(path);
         }
       }
-      state.scanCandidates = state.scanCandidates.filter(
-        (candidate) => !paths.includes(candidate.path),
-      );
     },
     async listScanCandidateExclusions(): Promise<string[]> {
       return [...state.scanCandidateExclusions];
