@@ -1,19 +1,19 @@
-import { join } from "node:path";
 import { existsSync } from "node:fs";
-import type { ScanProgressEvent, ScanResult } from "@mimimilli/shared";
+import type { ScanProgressEvent } from "@mimimilli/shared";
 import { openDb, type Db, type DbLocation } from "./db.ts";
 import { Scanner } from "./scanner.ts";
 import { finalizeScan } from "./scanFinalize.ts";
 import { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import { UserWorkStateRepository } from "./userWorkStateRepository.ts";
 import { WorkQueryRepository } from "./workQueryRepository.ts";
-import { DlsiteCache } from "./dlsiteCache.ts";
+import { DlsiteCache, type DlsiteCacheConfig } from "./dlsiteCache.ts";
+import type { ScanWorkerOutboundMessage, ScanWorkerTerminalMessage } from "./scanWorkerMessages.ts";
 
 interface WorkerInput {
   database: Extract<DbLocation, { kind: "files" }>;
   root: string;
-  dataRoot: string;
   thumbnailCacheDir: string;
+  dlsiteCache: DlsiteCacheConfig;
   abortBuffer: SharedArrayBuffer;
   full?: boolean;
   testGate?: SharedArrayBuffer;
@@ -21,12 +21,8 @@ interface WorkerInput {
 }
 
 type WorkerMessage = { type: "start"; input: WorkerInput };
-type TerminalMessage =
-  | { type: "completed"; result: ScanResult }
-  | { type: "cancelled" }
-  | { type: "error"; message: string; errorKind?: string; stack?: string };
 
-function post(message: unknown): void {
+function post(message: ScanWorkerOutboundMessage): void {
   globalThis.postMessage(message);
 }
 
@@ -41,7 +37,7 @@ globalThis.onmessage = (event: MessageEvent<WorkerMessage>) => {
 
 async function run(input: WorkerInput): Promise<void> {
   const token = new Int32Array(input.abortBuffer);
-  let terminal: TerminalMessage;
+  let terminal: ScanWorkerTerminalMessage;
   let db: Db | null = null;
   try {
     db = openDb(input.database);
@@ -58,9 +54,8 @@ async function run(input: WorkerInput): Promise<void> {
     const query = new WorkQueryRepository(db);
     const catalog = new CatalogWorkRepository(db);
     const user = new UserWorkStateRepository(db);
-    const dlsiteCachePath = join(input.dataRoot, "db", "dlsite-cache.sqlite");
-    const dlsiteCache = existsSync(dlsiteCachePath)
-      ? new DlsiteCache({ path: dlsiteCachePath })
+    const dlsiteCache = existsSync(input.dlsiteCache.path)
+      ? new DlsiteCache(input.dlsiteCache)
       : null;
     const scanner = new Scanner(db, { query, catalog, user }, { dlsiteCache });
     const result = await scanner.scan(
@@ -89,7 +84,7 @@ async function run(input: WorkerInput): Promise<void> {
       if (cancelled(token)) {
         terminal = { type: "cancelled" };
       } else {
-        terminal = { type: "completed", result };
+        terminal = { type: "completed", result, candidatePool: scanner.getCandidatePool() };
       }
     }
   } catch (error) {

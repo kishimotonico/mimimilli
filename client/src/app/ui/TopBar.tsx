@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
-import { useQuery } from "@tanstack/react-query";
 import { I } from "../../shared/ui/Icon";
 import IconButton from "../../shared/ui/IconButton";
 import { useAtom, useAtomValue } from "jotai";
@@ -16,7 +15,7 @@ import { librarySearchQueryAtom } from "../../entities/library/model/navigationA
 import { appModeAtom } from "../../shared/model/appModeAtoms";
 import { playerIsActiveAtom, playingTrackTitleAtom } from "../../entities/player/model/atoms";
 import { scanningAtom, scanProgressLabelAtom } from "../../entities/scan/model/atoms";
-import { getScanCandidates, SCAN_QUERY_KEYS } from "../../features/scan/api";
+import { useUnregisteredCandidateCount } from "../../features/scan/model/useScanCandidatesCache";
 
 interface TopBarProps {
   /** スキャンボタン押下時。即時実行はせずスキャンモーダルを開く（TASK-56） */
@@ -46,11 +45,7 @@ function DlsiteBulkCancelButton({ onClick }: { onClick: () => void }) {
 export default function TopBar({ onOpenScan, onSettings, notificationBell }: TopBarProps) {
   const scanning = useAtomValue(scanningAtom);
   const scanProgressLabel = useAtomValue(scanProgressLabelAtom);
-  const candidatesQuery = useQuery({
-    queryKey: SCAN_QUERY_KEYS.candidates(),
-    queryFn: getScanCandidates,
-  });
-  const unregisteredCount = candidatesQuery.data?.length ?? 0;
+  const unregisteredCount = useUnregisteredCandidateCount();
   const dlsiteBulkActive = useAtomValue(dlsiteBulkActiveAtom);
   const dlsiteBulkProgressLabel = useAtomValue(dlsiteBulkProgressLabelAtom);
   const dlsiteBulkCurrentWorkLabel = useAtomValue(dlsiteBulkCurrentWorkLabelAtom);

@@ -7,6 +7,7 @@ import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { createApp } from "../../src/app.ts";
 import { scanAndRegisterCandidates } from "../helpers/scanLibrary.ts";
 import { makeSampleLibrary } from "../helpers/sampleLibrary.ts";
+import { DlsiteCache, resolveDlsiteCacheConfig } from "../../src/adapters/real/dlsiteCache.ts";
 
 async function waitForTerminal(
   app: ReturnType<typeof createApp>,
@@ -178,4 +179,38 @@ test("file scan Workerはfull:trueをscannerへ伝播し全件再処理する", 
   const second = await adapter.scan({ full: true });
   assert.equal(second.skipped, 0);
   assert.equal(second.registered, 2);
+});
+
+test("file scan WorkerはMIMIMILLI_DLSITE_CACHE_DBで解決したDLsiteキャッシュを取得処理と共有する", async (t) => {
+  const library = makeSampleLibrary();
+  t.after(library.cleanup);
+  const dataRoot = join(library.baseDir, "data");
+  const database = {
+    kind: "files" as const,
+    catalogPath: join(dataRoot, "db", "catalog.sqlite"),
+    userPath: join(dataRoot, "db", "user.sqlite"),
+  };
+  const thumbnailCacheDir = join(dataRoot, "thumbnails");
+
+  // 既定パス（旧ハードコード相当）は空のままにし、env override先だけへキャッシュを仕込む。
+  const defaultCachePath = join(dataRoot, "db", "dlsite-cache.sqlite");
+  const overrideCachePath = join(library.baseDir, "dlsite-cache-override.sqlite");
+  const dlsiteCache = resolveDlsiteCacheConfig(defaultCachePath, {
+    MIMIMILLI_DLSITE_CACHE_DB: overrideCachePath,
+  });
+  assert.equal(dlsiteCache.path, overrideCachePath);
+  assert.notEqual(dlsiteCache.path, defaultCachePath);
+
+  const seedCache = new DlsiteCache(dlsiteCache);
+  seedCache.recordFailure({ productCode: "RJ900002", outcome: "not_found" });
+  seedCache.close();
+  assert.equal(existsSync(defaultCachePath), false);
+
+  const adapter = createTestRealAdapter({ database, dataRoot, thumbnailCacheDir, dlsiteCache });
+  t.after(() => adapter.close());
+  await adapter.updateSettings({ rootFolder: library.root });
+  await adapter.scan();
+
+  const work = await adapter.getWork(library.existingWorkId);
+  assert.equal(work?.dlsite.status, "not_found");
 });

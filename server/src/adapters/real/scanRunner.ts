@@ -1,21 +1,22 @@
-import type { ScanProgressEvent, ScanResult } from "@mimimilli/shared";
+import type { ScanCandidate, ScanResult } from "@mimimilli/shared";
 import type { ScanOptions } from "../../adapter/index.ts";
 import { formatError, getCategoryLogger } from "../../lib/logger.ts";
 import type { DbLocation } from "./db.ts";
+import type { DlsiteCacheConfig } from "./dlsiteCache.ts";
+import type { ScanWorkerOutboundMessage } from "./scanWorkerMessages.ts";
 
 const scanLogger = getCategoryLogger("scan");
 
-interface ScanWorkerMessage {
-  type: "progress" | "completed" | "cancelled" | "error" | "test-gate-ready";
-  progress?: ScanProgressEvent;
-  result?: ScanResult;
-  message?: string;
-  errorKind?: string;
-  stack?: string;
-}
+/** worker 完了時に親プロセスへ渡す内部結果。HTTP/SSE 契約の ScanResult とは分離する。 */
+export type FileScanWorkerResult = {
+  result: ScanResult;
+  candidatePool: ScanCandidate[];
+};
 
-function reconstructWorkerError(message: ScanWorkerMessage): Error {
-  const error = new Error(message.message ?? "スキャンワーカーが失敗しました");
+function reconstructWorkerError(
+  message: Extract<ScanWorkerOutboundMessage, { type: "error" }>,
+): Error {
+  const error = new Error(message.message);
   if (message.errorKind) error.name = message.errorKind;
   if (message.stack) error.stack = message.stack;
   return error;
@@ -24,25 +25,25 @@ function reconstructWorkerError(message: ScanWorkerMessage): Error {
 export type FileScanRunner = (
   database: Extract<DbLocation, { kind: "files" }>,
   root: string,
-  dataRoot: string,
   thumbnailCacheDir: string,
+  dlsiteCache: DlsiteCacheConfig,
   options: ScanOptions,
-) => Promise<ScanResult>;
+) => Promise<FileScanWorkerResult>;
 
 export async function runFileScanInWorker(
   database: Extract<DbLocation, { kind: "files" }>,
   root: string,
-  dataRoot: string,
   thumbnailCacheDir: string,
+  dlsiteCache: DlsiteCacheConfig,
   options: ScanOptions,
   testGate?: SharedArrayBuffer,
   testGateStage: "before-scan" | "before-finalize" = "before-scan",
   onTestGateReady?: () => void,
-): Promise<ScanResult> {
+): Promise<FileScanWorkerResult> {
   const abortBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT);
   const token = new Int32Array(abortBuffer);
   const worker = new Worker(new URL("./scanWorker.ts", import.meta.url), { type: "module" });
-  return new Promise<ScanResult>((resolveResult, rejectResult) => {
+  return new Promise<FileScanWorkerResult>((resolveResult, rejectResult) => {
     let settled = false;
     let terminalReceived = false;
     const abort = () => {
@@ -53,25 +54,34 @@ export async function runFileScanInWorker(
         Atomics.notify(gate, 0);
       }
     };
-    const onMessage = (event: MessageEvent<ScanWorkerMessage>) => {
+    const onMessage = (event: MessageEvent<ScanWorkerOutboundMessage>) => {
       const message = event.data;
       if (message.type === "test-gate-ready") {
         onTestGateReady?.();
         return;
       }
-      if (message.type === "progress" && message.progress) {
+      if (message.type === "progress") {
         options.onProgress?.(message.progress);
         return;
       }
       terminalReceived = true;
-      if (message.type === "completed" && message.result) {
-        settle(() => resolveResult(message.result!));
-      } else if (message.type === "cancelled") {
-        settle(() =>
-          rejectResult(new DOMException("スキャンはキャンセルされました", "AbortError")),
-        );
-      } else {
-        settle(() => rejectResult(reconstructWorkerError(message)));
+      switch (message.type) {
+        case "completed":
+          settle(() =>
+            resolveResult({
+              result: message.result,
+              candidatePool: message.candidatePool,
+            }),
+          );
+          break;
+        case "cancelled":
+          settle(() =>
+            rejectResult(new DOMException("スキャンはキャンセルされました", "AbortError")),
+          );
+          break;
+        case "error":
+          settle(() => rejectResult(reconstructWorkerError(message)));
+          break;
       }
     };
     const onError = (event: ErrorEvent) => {
@@ -120,8 +130,8 @@ export async function runFileScanInWorker(
       input: {
         database,
         root,
-        dataRoot,
         thumbnailCacheDir,
+        dlsiteCache,
         abortBuffer,
         full: options.full ?? false,
         testGate,

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  scanCandidateRegisterItemSchema,
   scanCandidateSchema,
   scanCandidatesRegisterResponseSchema,
   type DlsiteBulkResult,
@@ -182,6 +183,52 @@ test("候補登録APIはrjCode省略と空文字を区別してadapterへ渡す"
     });
     assert.equal(omitted.status, 201);
     assert.equal(received[0]?.rjCode, undefined);
+  } finally {
+    await app.shutdown();
+  }
+});
+
+test("scanCandidateRegisterItemSchema: RJ/VJコードの形式を検証・正規化し、空文字はそのまま通す", () => {
+  const lowercase = scanCandidateRegisterItemSchema.safeParse({
+    path: "候補作品",
+    rjCode: "rj1234567",
+  });
+  assert.equal(lowercase.success, true);
+  if (lowercase.success) assert.equal(lowercase.data.rjCode, "RJ1234567");
+
+  const empty = scanCandidateRegisterItemSchema.safeParse({ path: "候補作品", rjCode: "" });
+  assert.equal(empty.success, true);
+  if (empty.success) assert.equal(empty.data.rjCode, "");
+
+  const omitted = scanCandidateRegisterItemSchema.safeParse({ path: "候補作品" });
+  assert.equal(omitted.success, true);
+  if (omitted.success) assert.equal(omitted.data.rjCode, undefined);
+
+  const tooShort = scanCandidateRegisterItemSchema.safeParse({
+    path: "候補作品",
+    rjCode: "RJ123",
+  });
+  assert.equal(tooShort.success, false);
+});
+
+test("候補登録APIは不正な形式のRJコードを4xxで拒否し、adapterへ渡さない", async () => {
+  const fixture = createFixtureAdapter();
+  let called = false;
+  const app = createApp({
+    ...fixture,
+    registerScanCandidates: async () => {
+      called = true;
+      return { registered: [], failures: [] };
+    },
+  });
+  try {
+    const response = await app.request("/api/scan/candidates/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items: [{ path: "候補作品", rjCode: "RJ123" }] }),
+    });
+    assert.equal(response.status, 400);
+    assert.equal(called, false);
   } finally {
     await app.shutdown();
   }

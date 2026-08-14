@@ -3,6 +3,7 @@ import { dirname, isAbsolute } from "node:path";
 import { createHash } from "node:crypto";
 import { gunzipSync, gzipSync } from "node:zlib";
 import { Database } from "bun:sqlite";
+import { RJ_CODE_PATTERN } from "@mimimilli/shared";
 import { applySqliteBusyTimeout } from "./sqliteConnection.ts";
 
 export const DLSITE_CACHE_REPRESENTATION = "work-html-ja-adultchecked-v1";
@@ -120,7 +121,7 @@ export function normalizeDlsiteProductCode(code: string): {
   store: DlsiteStore;
 } {
   const productCode = code.trim().toUpperCase();
-  const match = /^(RJ|VJ)\d{6,8}$/.exec(productCode);
+  const match = RJ_CODE_PATTERN.exec(productCode);
   if (!match) throw new Error(`DLsite product_codeの形式が不正です: ${code}`);
   return { productCode, store: match[1] === "RJ" ? "maniax" : "pro" };
 }
@@ -158,12 +159,14 @@ export function validateDlsiteHtmlInput(
 
 export class DlsiteCache {
   private readonly sqlite: Database;
+  private readonly path: string;
   private readonly ttlsMs: Record<DlsiteCacheOutcome, number>;
   private readonly maxTransferBytes: number;
   private readonly maxExpandedBytes: number;
   private readonly clock: () => number;
 
   constructor(options: DlsiteCacheOptions) {
+    this.path = options.path;
     mkdirSync(dirname(options.path), { recursive: true });
     this.sqlite = new Database(options.path, { create: true });
     this.sqlite.exec("PRAGMA journal_mode = WAL");
@@ -211,6 +214,16 @@ export class DlsiteCache {
       "maxExpandedBytes",
     );
     this.clock = options.clock ?? Date.now;
+  }
+
+  /** 解決済みのパス・TTLをスキャンWorker等の別コンシューマーへ渡すための構成。 */
+  get config(): DlsiteCacheConfig {
+    return {
+      path: this.path,
+      ttlsMs: { ...this.ttlsMs },
+      maxTransferBytes: this.maxTransferBytes,
+      maxExpandedBytes: this.maxExpandedBytes,
+    };
   }
 
   /** HTTP成功時（2xxでパースできてもできなくても）に呼ぶ。失敗記録は消す。 */
