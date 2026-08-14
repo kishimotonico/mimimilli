@@ -3,8 +3,8 @@ import { defineConfig, devices } from "@playwright/test";
 
 // worktreeの絶対パスから決定的にポートを導出する。同一worktreeなら常に同じポートになる。
 // 予約済みの固定ポート（旧smokePort=4175、real-adapter検証用の手動起動サーバー=4177）を避けた帯域。
-// reuseExistingServer は無効化しているため、ポートが衝突した場合は他のサーバーへ相乗りせず
-// 常にstrictPortの明示的な失敗になる。
+// webServerはログ待ち方式（ADR-0020）でreuseExistingServerを参照しないため、
+// ポートが衝突した場合はVite側は--strictPort、Bun側はbind失敗で明示的に落ちる。
 const VITE_PORT_RANGE_START = 4200;
 const VITE_PORT_RANGE_SIZE = 500;
 const BUN_PORT_RANGE_START = 4700;
@@ -38,8 +38,9 @@ export default defineConfig({
         MIMIMILLI_MOCK_SCENARIO: "new-work",
         PORT: String(bunPort),
       },
-      url: `http://127.0.0.1:${bunPort}/api/settings`,
-      reuseExistingServer: false,
+      // url/portのTCPプローブはWSL2 mirroredのloopbackブラックホールを踏むため使わず、
+      // 起動完了ログを待つ（ADR-0020）。
+      wait: { stdout: /サーバーを起動しました/ },
       timeout: 120_000,
       gracefulShutdown: { signal: "SIGTERM", timeout: 5_000 },
       stdout: "pipe",
@@ -49,10 +50,9 @@ export default defineConfig({
       // VITE_DISABLE_QUERY_DEVTOOLS: smokeテスト用サーバーではdevtoolsのトグルボタンを
       // 無効化する（TASK-9）
       command: `pnpm exec cross-env VITE_DISABLE_QUERY_DEVTOOLS=1 MIMIMILLI_BACKEND_URL=http://127.0.0.1:${bunPort} vite --host 127.0.0.1 --port ${smokePort} --strictPort`,
-      // Bun 側の API 応答と Vite のページ配信がそれぞれ独立して起動完了するまで待つ。
-      // Vite の /api proxy は Bun 未起動でも 502 を返すため、ここではページ応答のみを見る。
-      url: `http://127.0.0.1:${smokePort}/`,
-      reuseExistingServer: false,
+      // url/portのTCPプローブはWSL2 mirroredのloopbackブラックホールを踏むため使わず、
+      // 起動完了ログを待つ（ADR-0020）。ANSIカラーが混ざるため色コードに影響されない最小の正規表現にする。
+      wait: { stdout: /ready in/ },
       timeout: 120_000,
       gracefulShutdown: { signal: "SIGTERM", timeout: 500 },
       stdout: "pipe",
