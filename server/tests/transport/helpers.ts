@@ -1,11 +1,11 @@
 import type { DataAdapter } from "../../src/adapter/index.ts";
-import { createApp, type CreateAppOptions } from "../../src/app.ts";
+import type { CreateAppOptions } from "../../src/app.ts";
 import { createFixtureAdapter } from "../../src/adapters/fixture/index.ts";
-import { SERVER_IDLE_TIMEOUT_SECONDS } from "../../src/serverLifecycle.ts";
+import { serveMimimilli } from "../../src/serve.ts";
 
 export type FixtureTransportServer = {
-  app: ReturnType<typeof createApp>;
-  server: ReturnType<typeof Bun.serve>;
+  app: ReturnType<typeof serveMimimilli>["app"];
+  server: ReturnType<typeof serveMimimilli>["server"];
   adapter: DataAdapter;
   baseUrl: string;
 };
@@ -14,13 +14,7 @@ export function serveFixtureTransport(
   adapter: DataAdapter = createFixtureAdapter(),
   options: CreateAppOptions = {},
 ): FixtureTransportServer {
-  const app = createApp(adapter, options);
-  const server = Bun.serve({
-    fetch: app.fetch,
-    hostname: "127.0.0.1",
-    port: 0,
-    idleTimeout: SERVER_IDLE_TIMEOUT_SECONDS,
-  });
+  const { app, server } = serveMimimilli({ adapter, port: 0, appOptions: options });
   return {
     app,
     server,

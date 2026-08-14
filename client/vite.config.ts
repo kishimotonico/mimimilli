@@ -32,7 +32,7 @@ function resolveApiProxy() {
   return resolveBackendProxy(backendService);
 }
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [tailwindcss(), react()],
 
   test: {
@@ -43,14 +43,10 @@ export default defineConfig({
     setupFiles: "./tests/unit/setup.ts",
   },
 
-  server: {
-    proxy: {
-      "/api": resolveApiProxy(),
-    },
-  },
+  server: command === "serve" ? { proxy: { "/api": resolveApiProxy() } } : undefined,
 
   build: {
     // 4KB 未満の unicode-range 分割 woff2 が base64 インライン化され CSS が肥大化するため無効化
     assetsInlineLimit: 0,
   },
-});
+}));

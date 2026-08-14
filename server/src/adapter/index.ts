@@ -28,4 +28,6 @@ export type DataAdapter = SettingsAdapter &
   ClassificationAdapter &
   FsAdapter &
   MediaAdapter &
-  DlsiteAdapter;
+  DlsiteAdapter & {
+    close?: () => void | Promise<void>;
+  };

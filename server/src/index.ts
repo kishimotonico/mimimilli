@@ -11,7 +11,6 @@
 //   MIMIMILLI_MOCK_SCENARIO … fixture アダプタのデータシナリオ
 //                             ("default" | "empty" | "new-work" | "errors"、省略時 "default")
 import { resolve } from "node:path";
-import { createApp } from "./app.ts";
 import { createFixtureAdapter } from "./adapters/fixture/index.ts";
 import { resolveDataPaths } from "./adapters/real/dataRoot.ts";
 import { resolveDlsiteCacheConfig } from "./adapters/real/dlsiteCache.ts";
@@ -24,7 +23,8 @@ import {
   getCategoryLogger,
   initLogger,
 } from "./lib/logger.ts";
-import { performGracefulShutdown, SERVER_IDLE_TIMEOUT_SECONDS } from "./serverLifecycle.ts";
+import { performGracefulShutdown } from "./serverLifecycle.ts";
+import { serveMimimilli } from "./serve.ts";
 import { buildStartupLogProperties } from "./lib/startupLog.ts";
 
 const adapterKind = process.env.MIMIMILLI_ADAPTER ?? "real";
@@ -103,14 +103,9 @@ let adapter: DataAdapter | undefined;
 let server: ReturnType<typeof Bun.serve> | undefined;
 
 adapter = createAdapter();
-const app = createApp(adapter);
-
-server = Bun.serve({
-  fetch: app.fetch,
-  hostname: "127.0.0.1",
-  port,
-  idleTimeout: SERVER_IDLE_TIMEOUT_SECONDS,
-});
+const served = serveMimimilli({ adapter, port });
+const app = served.app;
+server = served.server;
 
 serverLogger.info(
   `サーバーを起動しました: http://localhost:${server.port} (adapter: ${adapterKind})`,

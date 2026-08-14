@@ -67,7 +67,7 @@ function withCloseTrack(base: DataAdapter): { adapter: DataAdapter; wasClosed: (
       close() {
         closed = true;
       },
-    } as unknown as DataAdapter,
+    },
     wasClosed: () => closed,
   };
 }
