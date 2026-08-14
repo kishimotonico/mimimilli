@@ -233,6 +233,15 @@ test("スキャン完了後に候補を選択登録でき、問題をFilesで確
   await expect(dialog.getByText("2件をライブラリに追加しました")).toBeVisible();
   await expect(dialog.getByRole("tab", { name: "未登録（0件）" })).toBeVisible();
 
+  // 未登録が0件になったので新規登録済みタブへ自動で切り替わり、承認した候補が見える（TASK-328）。
+  await expect(dialog.getByRole("tab", { name: /^新規登録済み/ })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  const newlyRegistered = dialog.getByRole("tabpanel", { name: "新規登録済み" });
+  await expect(newlyRegistered.getByRole("button", { name: "未登録作品" })).toBeVisible();
+  await expect(newlyRegistered.getByRole("button", { name: "候補" })).toBeVisible();
+
   await dialog.getByRole("tab", { name: /^要対応/ }).click();
   const attention = dialog.getByRole("tabpanel", { name: "要対応" });
   const primaryRow = attention.getByRole("row", { name: /夜想曲スタジオ/ });
