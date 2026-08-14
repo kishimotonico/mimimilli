@@ -32,6 +32,7 @@ import {
 export const SCAN_QUERY_KEYS = {
   last: () => ["scan", "last"] as const,
   candidates: () => ["scan", "candidates"] as const,
+  candidateExclusions: () => ["scan", "candidates", "exclusions"] as const,
   /** files feature の同名キー（features/files/api.ts）と同じ /scan/diagnostics を指す。
    *  各 feature の api.ts は自 feature の model のみに依存する方針のため、意図的に別定義。 */
   diagnostics: () => ["scan", "diagnostics"] as const,
