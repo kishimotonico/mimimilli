@@ -34,10 +34,3 @@ export function dedupeIds(...idLists: string[][]): string[] {
   }
   return result;
 }
-
-/** root相対パス（work自身のフォルダーのパス）から、フォルダー列に出す親ディレクトリ部分を取り出す。
- *  ライブラリルート直下（親が無い）場合は空文字。 */
-export function parentDirOf(relativePath: string): string {
-  const idx = relativePath.lastIndexOf("/");
-  return idx === -1 ? "" : relativePath.slice(0, idx);
-}

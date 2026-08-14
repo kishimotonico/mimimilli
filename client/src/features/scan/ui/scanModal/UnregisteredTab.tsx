@@ -8,6 +8,7 @@ import { I } from "../../../../shared/ui/Icon";
 import { cn } from "../../../../shared/lib/cn";
 import { ApiRequestError } from "../../../../shared/api/http";
 import { apiErrorMessage } from "../../../../shared/lib/apiError";
+import { parentDirOf } from "../../../../shared/lib/workspacePath";
 import {
   excludeScanCandidates,
   registerScanCandidates,
@@ -24,12 +25,6 @@ export interface UnregisteredTabProps {
 interface ExcludeToast {
   path: string;
   title: string;
-}
-
-/** candidate.path の親ディレクトリ（root相対）。ルート直下は親を持たない。 */
-function parentFolderOf(path: string): string | null {
-  const idx = path.lastIndexOf("/");
-  return idx <= 0 ? null : path.slice(0, idx);
 }
 
 export default function UnregisteredTab({ candidates, onRegistered }: UnregisteredTabProps) {
@@ -201,7 +196,7 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
                   const effectiveRjCode = rjCodeOverrides.has(candidate.path)
                     ? (rjCodeOverrides.get(candidate.path) ?? "")
                     : candidate.rjCode;
-                  const parentFolder = parentFolderOf(candidate.path);
+                  const parentFolder = parentDirOf(candidate.path);
                   return (
                     <tr key={candidate.path}>
                       <td className="px-2.5 py-2 align-middle">

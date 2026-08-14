@@ -2,8 +2,8 @@
 import type { WorkListItem } from "@mimimilli/shared";
 import { dlsiteLinkDisplayStatus, hasRjCode } from "@mimimilli/shared";
 import { cn } from "../../../../shared/lib/cn";
+import { parentDirOf } from "../../../../shared/lib/workspacePath";
 import { DLSITE_LINK_STATUS_LABEL, DLSITE_LINK_STATUS_TONE } from "./dlsiteLinkStatus";
-import { parentDirOf } from "./scanResultWorkIds";
 import type { InlineTitleEdit } from "./useInlineTitleEdit";
 
 export interface ScanResultWorksTableProps {
@@ -76,7 +76,7 @@ function WorkRow({ work, edit }: { work: WorkListItem; edit: InlineTitleEdit }) 
   const editing = edit.editingId === work.id;
   const editError = edit.editErrorFor(work.id);
   const linkStatus = dlsiteLinkDisplayStatus(work.dlsite);
-  const folderDisplay = parentDirOf(work.relativePath) || "（ルート直下）";
+  const folderDisplay = parentDirOf(work.relativePath) ?? "（ルート直下）";
 
   return (
     <tr className="border-b border-line-soft last:border-b-0">

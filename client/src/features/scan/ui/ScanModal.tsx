@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useAtomValue } from "jotai";
 import { useQuery } from "@tanstack/react-query";
 import { libraryTotalQueryOptions } from "../../../entities/work/libraryTotalQueryOptions";
@@ -16,6 +16,7 @@ import NeedsAttentionTab from "./scanModal/NeedsAttentionTab";
 import NewlyRegisteredTab from "./scanModal/NewlyRegisteredTab";
 import UpdatedWorksTab from "./scanModal/UpdatedWorksTab";
 import ScanFooter from "./scanModal/ScanFooter";
+import { dedupeIds } from "./scanModal/scanResultWorkIds";
 import { useScanCompletionHint } from "./scanModal/useScanCompletionHint";
 import type { CandidatesRegisteredResult, ScanTabKey } from "./scanModal/types";
 
@@ -40,12 +41,17 @@ export default function ScanModal({
   const { start, cancel } = useScanActions();
   const [activeTab, setActiveTab] = useState<ScanTabKey>("unregistered");
   const [unregisteredToast, setUnregisteredToast] = useState<string | null>(null);
+  // 候補承認で登録された作品ID（このモーダル表示中に蓄積、TASK-325の分離を踏まえクライアント側で
+  // 集約する）。insertedWorkIds（スキャン時点の自動登録分）とは別経路のため、ここで結合する。
+  const [approvedWorkIds, setApprovedWorkIds] = useState<string[]>([]);
 
   const handleUnregisteredRegistered = ({
     registeredWorkIds,
     failedCount,
     remainingCount,
   }: CandidatesRegisteredResult) => {
+    // 承認分、先頭＝直近。
+    setApprovedWorkIds((previous) => dedupeIds(registeredWorkIds, previous));
     setUnregisteredToast(
       failedCount > 0
         ? `${registeredWorkIds.length}件をライブラリに追加しました。${failedCount}件は追加できませんでした。`
@@ -83,6 +89,11 @@ export default function ScanModal({
 
   const insertedWorkIds = lastResult?.insertedWorkIds ?? EMPTY_WORK_IDS;
   const updatedWorkIds = lastResult?.updatedWorkIds ?? EMPTY_WORK_IDS;
+  // 承認分（直近が先頭）→ 自動登録分の順で重複排除して結合する。
+  const newlyRegisteredWorkIds = useMemo(
+    () => dedupeIds(approvedWorkIds, insertedWorkIds),
+    [approvedWorkIds, insertedWorkIds],
+  );
 
   // ライブラリ総件数（サイドバーの「ライブラリ N 件」と同じ既存クエリキーを共有する）。
   const libraryTotalQuery = useQuery(libraryTotalQueryOptions);
@@ -99,7 +110,7 @@ export default function ScanModal({
   const counts: Record<ScanTabKey, number> = {
     unregistered: candidates.length,
     needsAttention: needsAttentionCount,
-    newlyRegistered: insertedWorkIds.length,
+    newlyRegistered: newlyRegisteredWorkIds.length,
     updated: updatedWorkIds.length,
   };
 
@@ -158,7 +169,9 @@ export default function ScanModal({
                 onOpenRjCodeMissing={onOpenRjCodeMissing}
               />
             )}
-            {activeTab === "newlyRegistered" && <NewlyRegisteredTab workIds={insertedWorkIds} />}
+            {activeTab === "newlyRegistered" && (
+              <NewlyRegisteredTab workIds={newlyRegisteredWorkIds} />
+            )}
             {activeTab === "updated" && <UpdatedWorksTab workIds={updatedWorkIds} />}
           </div>
         </div>
