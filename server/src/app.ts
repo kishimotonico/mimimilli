@@ -9,7 +9,7 @@ import { formatError, getCategoryLogger } from "./lib/logger.ts";
 import { axesRoute } from "./routes/axes.ts";
 import { dlsiteRoute } from "./routes/dlsite.ts";
 import { fsRoute } from "./routes/fs.ts";
-import { mediaRoute } from "./routes/media.ts";
+import { mediaRoute, type MediaRouteOptions } from "./routes/media.ts";
 import { scanRoute } from "./routes/scan.ts";
 import { DlsiteJobManager } from "./dlsiteJobManager.ts";
 import { ScanJobManager } from "./scanJobManager.ts";
@@ -24,7 +24,9 @@ export type App = Hono<AppEnv> & {
   shutdown(): Promise<void>;
 };
 
-export function createApp(adapter: DataAdapter): App {
+export type CreateAppOptions = { media?: MediaRouteOptions };
+
+export function createApp(adapter: DataAdapter, options: CreateAppOptions = {}): App {
   const app = new Hono<AppEnv>();
   const httpLogger = getCategoryLogger("http");
 
@@ -66,7 +68,7 @@ export function createApp(adapter: DataAdapter): App {
   api.route("/", tagPrefixesRoute(adapter));
   api.route("/", smartFoldersRoute(adapter));
   api.route("/", fsRoute(adapter));
-  api.route("/", mediaRoute(adapter));
+  api.route("/", mediaRoute(adapter, options.media));
   api.route("/", dlsiteRoute(adapter, dlsiteJobs));
 
   app.route("/api", api);

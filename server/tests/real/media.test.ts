@@ -10,13 +10,13 @@ import { createApp } from "../../src/app.ts";
 import { scanAndRegisterCandidates } from "../helpers/scanLibrary.ts";
 import { makeSampleLibrary, makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 
-async function setup(t: TestContext) {
+async function setup(t: TestContext, chunkSizeBytes?: number) {
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
   // ルート直下（作品フォルダー外）に「秘密ファイル」を置き、トラバーサルの検証に使う
   writeFileSync(join(lib.root, "secret.txt"), "library-secret");
   const adapter = createTestRealAdapter({ database: { kind: "memory" } });
-  const app = createApp(adapter);
+  const app = createApp(adapter, chunkSizeBytes ? { media: { chunkSizeBytes } } : undefined);
   await adapter.updateSettings({ rootFolder: lib.root });
   await scanAndRegisterCandidates(adapter);
 
@@ -41,6 +41,44 @@ test("音声配信: 200 全体取得と Range 206", async (t) => {
   assert.equal(part.status, 206);
   assert.match(part.headers.get("content-range") ?? "", /^bytes 44-143\/\d+$/);
   assert.equal((await part.arrayBuffer()).byteLength, 100);
+});
+
+test("音声配信: 開放端Rangeは上限チャンクサイズで打ち切った206を返す（サーバー側読み取り量が有界）", async (t) => {
+  // 01_intro.wav は 32044 バイト。チャンク上限を1000バイトに絞り、要求の残り全体（32000バイト）ではなく
+  // 上限どおりに打ち切られることを確認する。
+  const { app, generated } = await setup(t, 1000);
+
+  const res = await app.request(`/api/media/audio/${generated.id}/mp3/01_intro.wav`, {
+    headers: { Range: "bytes=44-" },
+  });
+  assert.equal(res.status, 206);
+  assert.equal(res.headers.get("content-range"), "bytes 44-1043/32044");
+  assert.equal(res.headers.get("content-length"), "1000");
+  assert.equal((await res.arrayBuffer()).byteLength, 1000);
+});
+
+test("音声配信: 閉区間Range（bytes=N-M）は上限を超えても指定範囲全体を返す", async (t) => {
+  const { app, generated } = await setup(t, 1000);
+
+  const res = await app.request(`/api/media/audio/${generated.id}/mp3/01_intro.wav`, {
+    headers: { Range: "bytes=44-30043" },
+  });
+  assert.equal(res.status, 206);
+  assert.equal(res.headers.get("content-range"), "bytes 44-30043/32044");
+  assert.equal(res.headers.get("content-length"), "30000");
+  assert.equal((await res.arrayBuffer()).byteLength, 30000);
+});
+
+test("音声配信: 末尾指定Range（bytes=-N）は上限を超えても指定量全体を返す", async (t) => {
+  const { app, generated } = await setup(t, 1000);
+
+  const res = await app.request(`/api/media/audio/${generated.id}/mp3/01_intro.wav`, {
+    headers: { Range: "bytes=-30000" },
+  });
+  assert.equal(res.status, 206);
+  assert.equal(res.headers.get("content-range"), "bytes 2044-32043/32044");
+  assert.equal(res.headers.get("content-length"), "30000");
+  assert.equal((await res.arrayBuffer()).byteLength, 30000);
 });
 
 test("パストラバーサル: ../ を含む相対パスは 404", async (t) => {
