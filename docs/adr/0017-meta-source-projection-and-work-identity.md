@@ -56,6 +56,8 @@ catalogでは検索に必要な正規化表を投影する。PlaylistとTrackは
 
 `mimimilli.json` の `dlsite` に永続化するのは `rjCode`・連携分類（`applied` / `skipped` / `none`）・`appliedTags` だけとする。適用（`POST /dlsite/:id/apply`）や登録時のDLsite適用はsource-first経路で `status=applied` を `mimimilli.json` へ書き、scanまたは `projectMetaFile` でcatalogへ再投影する。一括取得・手動fetchの失敗はcacheへだけ記録し、`mimimilli.json` のexact bytesは変えない。失敗後はcatalogの `work_dlsite.state_json` をcacheと `mimimilli.json` から再合成して更新し、通知SQL集計を復旧する。`applied` / `skipped` の作品はcache上の失敗より `mimimilli.json` の連携分類を優先する。
 
+失敗記録のTTLは再取得の可否だけを制御し、catalog投影の表示は制御しない。TTLが切れてもcatalog投影は最後の取得結果を保持し続ける。「最後の試行が失敗した」という事実はTTL経過後も変わらないため、表示を空へ戻す理由はない。一括取得の対象選定は失敗状態（`not_found` / `error`）の作品を含み、TTL切れの作品はそこで再取得され `refreshWorkProjection` の再合成で投影が更新される。期限切れの失敗投影は次回の一括取得で自己修復するため、増分スキャンのスキップ判定（`canSkipIncremental`）に再投影処理を追加しない。追加すると投影が「取得待ち」相当の状態に戻り表示がかえって不正確になるうえ、再合成の経路が増える。
+
 既存の `mimimilli.json` に `not_found` / `error` が残っている場合は、投影時に連携分類 `none` として扱いcacheから再合成する。`mimimilli.json` から一時状態を除去する手動例:
 
 ```bash
