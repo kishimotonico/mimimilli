@@ -1,9 +1,10 @@
 ---
 id: TASK-336
 title: Playwright smokeのwebServerをBun fixtureサーバーとViteの2本構成へ再設計する
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-08-14 10:26'
+updated_date: '2026-08-14 13:39'
 labels: []
 dependencies:
   - TASK-335
@@ -25,8 +26,8 @@ webServerをBun fixtureサーバー（MIMIMILLI_ADAPTER=fixture、決定的ポ�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 playwright.config.tsのwebServerがBun fixtureサーバーとViteの2本構成になり、fixtureApiPluginへの依存が消える
-- [ ] #2 起動待ちがBun側/api/settingsの応答とVite側の応答の両方を保証する
-- [ ] #3 pnpm test:smokeが全件パスする
-- [ ] #4 冷起動時の起動待ち時間が現行から悪化しない（TASK-307の症状を悪化させない）
+- [x] #1 playwright.config.tsのwebServerがBun fixtureサーバーとViteの2本構成になり、fixtureApiPluginへの依存が消える
+- [x] #2 起動待ちがBun側/api/settingsの応答とVite側の応答の両方を保証する
+- [x] #3 pnpm test:smokeが全件パスする
+- [x] #4 冷起動時の起動待ち時間が現行から悪化しない（TASK-307の症状を悪化させない）
 <!-- AC:END -->
