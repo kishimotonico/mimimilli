@@ -1,4 +1,6 @@
 // fixture開発経路（@hono/node-server経由）でメディアルートが壊れないことのテスト。
+// getRequestListenerはoverrideGlobalObjects（既定true）でglobal.Response/Requestを
+// プロセス全体で上書きするため、同一プロセスの他テスト（Bun.serveのRes判定）を壊す。
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { getRequestListener } from "@hono/node-server";
@@ -8,7 +10,7 @@ import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 
 async function startFixtureNodeServer(t: TestContext) {
   const app = createApp(createFixtureAdapter());
-  const listener = getRequestListener(app.fetch);
+  const listener = getRequestListener(app.fetch, { overrideGlobalObjects: false });
   const server = createServer(listener);
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   t.after(() => new Promise((resolve) => server.close(resolve)));
