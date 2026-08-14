@@ -1,10 +1,10 @@
 ---
 id: TASK-335
 title: fixture開発をBunサーバーへ移しViteのAPI経路をproxyへ一本化する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-14 10:26'
-updated_date: '2026-08-14 13:18'
+updated_date: '2026-08-14 16:28'
 labels: []
 dependencies: []
 priority: high
@@ -37,20 +37,14 @@ ADR-0018の実装本体。fixture開発のAPIをViteプロセス内のNode middl
 - [x] #6 worktreeでdev:new-workを起動するとBunサーバーもブランチ名サブドメインで分離される
 <!-- AC:END -->
 
-
-
-
-
-
-
-
-
-
-
-
-
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 TASK-339でserver/tests/fixtureMediaNodeServer.test.tsとserver/package.jsonのdevDependency @hono/node-server を追加した（fixture開発経路でメディアルートが壊れないことの回帰テスト）。本タスクでfixture経路をBun.serveへ移したら、このテストとserver側のdevDependencyも削除する。
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+vite.config.tsのfixtureApiPlugin・server/shared watcher・module graph無効化・ssr.noExternalを削除し、/api proxyをMIMIMILLI_BACKEND_URL → MIMIMILLI_BACKEND_SERVICE（既定api.mimi）の一本に統一。server/package.jsonにdev:fixtureを追加し、ルートのdev:fixture:*はViteとBun fixtureサーバーをrun-pで並列起動する。client/package.jsonから@hono/node-serverと@mimimilli/serverを削除し、Node middleware経路の回帰テストfixtureMediaNodeServer.test.tsも削除。media.tsはhono/bunのトップレベルimport禁止という制約が消えたためgetBunServerを直接使う形へ戻した（仕様は不変）。検証: pnpm check成功、server 617 pass / client 811 pass、実機でworktreeのportless分離（vite-bun-task-335.api.mimi.localhost:1355）とbun --watch再起動での反映を確認。
+<!-- SECTION:FINAL_SUMMARY:END -->
