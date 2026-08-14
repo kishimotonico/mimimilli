@@ -12,13 +12,13 @@ DLsite/FANZA 等からダウンロードした音声作品（ASMR・ボイスド
 
 ## アーキテクチャ
 
-構造・境界・データフロー（vite middleware / portless の開発時トポロジー含む）は [docs/ARCHITECTURE.md](ARCHITECTURE.md) を参照。HANDOFF 固有の補足:
+構造・境界・データフロー（Vite proxy / portless の開発時トポロジー含む）は [docs/ARCHITECTURE.md](ARCHITECTURE.md) を参照。HANDOFF 固有の補足:
 
 - fixture アダプタはシナリオ切替（`MIMIMILLI_MOCK_SCENARIO` = default/empty/new-work/errors/large）と**合成メディア**（無音WAV・SVGカバー、Range対応）を持つ。`large` は手書きシード11件 + 決定的生成989件の計1000件で、実ライブラリ規模の見え方を確認する用途
 
 ### dev サーバーへの server/src 自動反映
 
-fixture API は `ssrLoadModule` 経由の遅延読み込みで、`server/src`・`shared/src` の変更は watcher がモジュールグラフを無効化し**次の `/api` リクエストで自動反映される**（手動再起動は不要）。client 側（`src/`）は通常の HMR。ただし `shared/src` に新しい export を追加すると画面が白くなることがあり、その場合は dev サーバーの再起動が要る。仕組みの詳細は `client/vite.config.ts` の `fixtureApiPlugin` を参照。
+fixture API は Bun サーバー（`bun --watch`）で動く。`server/src`・`shared/src` の変更は watcher による再起動で**次の `/api` リクエストに反映される**。client 側（`src/`）は Vite の HMR。`shared/src` に新しい export を追加すると画面が白くなることがあり、その場合は dev サーバーの再起動が要る。
 
 ### CSS レイヤー
 
@@ -29,8 +29,8 @@ fixture API は `ssrLoadModule` 経由の遅延読み込みで、`server/src`・
 起動・デバッグの約束事（`pnpm dev` を勝手に実行しない、アクセスは `http://mimi.localhost:1355`、agent-browser は `--session` 必須など）は [AGENTS.md](../AGENTS.md) が正。ここではコマンド一覧だけを持つ。
 
 ```bash
-# ルートから（fixture アダプタ同居の通常開発）
-pnpm dev            # client 起動（large シナリオ=1000件）。vite middleware が fixture API を /api/* にマウント
+# ルートから（fixture 開発）
+pnpm dev            # Vite + Bun fixture サーバーを並列起動（large シナリオ=1000件）
 pnpm check          # shared/server/client の tsc + oxlint + oxfmt --check（これが通れば typecheck/lint/fmt の DoD を満たす）
 pnpm test           # server (Bunランナー + node:test API) + client (vitest)
 pnpm test:server

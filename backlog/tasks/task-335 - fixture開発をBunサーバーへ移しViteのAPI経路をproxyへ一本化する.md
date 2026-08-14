@@ -4,7 +4,7 @@ title: fixture開発をBunサーバーへ移しViteのAPI経路をproxyへ一本
 status: To Do
 assignee: []
 created_date: '2026-08-14 10:26'
-updated_date: '2026-08-14 11:24'
+updated_date: '2026-08-14 13:18'
 labels: []
 dependencies: []
 priority: high
@@ -29,13 +29,25 @@ ADR-0018の実装本体。fixture開発のAPIをViteプロセス内のNode middl
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 server側にfixture起動スクリプトがあり、MIMIMILLI_ADAPTER=fixture + シナリオ環境変数でbun --watch起動し、portlessへサービス登録される
-- [ ] #2 ルートpnpm devとシナリオ別スクリプト（dev:new-work等）がViteとBun fixtureサーバーを並列起動し、一コマンドで従来どおり開発できる
-- [ ] #3 client/vite.config.tsからfixtureApiPlugin・server/shared watcher・module graph無効化が消え、/api proxyがfixture/real共通の一本になる
-- [ ] #4 client/package.jsonから@hono/node-serverと@mimimilli/serverの依存が消える
-- [ ] #5 server/shared配下のコード変更がbun --watchの再起動でfixture APIへ反映される
-- [ ] #6 worktreeでdev:new-workを起動するとBunサーバーもブランチ名サブドメインで分離される
+- [x] #1 server側にfixture起動スクリプトがあり、MIMIMILLI_ADAPTER=fixture + シナリオ環境変数でbun --watch起動し、portlessへサービス登録される
+- [x] #2 ルートpnpm devとシナリオ別スクリプト（dev:new-work等）がViteとBun fixtureサーバーを並列起動し、一コマンドで従来どおり開発できる
+- [x] #3 client/vite.config.tsからfixtureApiPlugin・server/shared watcher・module graph無効化が消え、/api proxyがfixture/real共通の一本になる
+- [x] #4 client/package.jsonから@hono/node-serverと@mimimilli/serverの依存が消える
+- [x] #5 server/shared配下のコード変更がbun --watchの再起動でfixture APIへ反映される
+- [x] #6 worktreeでdev:new-workを起動するとBunサーバーもブランチ名サブドメインで分離される
 <!-- AC:END -->
+
+
+
+
+
+
+
+
+
+
+
+
 
 ## Implementation Notes
 

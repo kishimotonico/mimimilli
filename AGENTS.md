@@ -44,8 +44,8 @@
 
 - ブラウザデバッグはagent-browserを使い、`--session <name>` で専用セッションを分ける
 - 開発サーバーはだいたい起動中なので `pnpm dev` せず `http://[<ブランチ名>.]mimi.localhost:1355` へ（IPアドレス不可）
-- worktreeでは `client/` で `pnpm dev:new-work` を起動して確認する
-- 実データDBで検証しない。書き込みを伴う検証はフィクスチャアダプタ（`dev:new-work` 等のモックシナリオ）で行う
+- worktreeではルートで `pnpm dev:fixture:new-work` を起動して確認する
+- 実データDBで検証しない。書き込みを伴う検証はフィクスチャアダプタ（`dev:fixture:new-work` 等のモックシナリオ）で行う
 
 <!-- BACKLOG.MD GUIDELINES START -->
 
