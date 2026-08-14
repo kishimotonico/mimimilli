@@ -3,6 +3,7 @@ import { dirname, isAbsolute } from "node:path";
 import { createHash } from "node:crypto";
 import { gunzipSync, gzipSync } from "node:zlib";
 import { Database } from "bun:sqlite";
+import { RJ_CODE_PATTERN } from "@mimimilli/shared";
 import { applySqliteBusyTimeout } from "./sqliteConnection.ts";
 
 export const DLSITE_CACHE_REPRESENTATION = "work-html-ja-adultchecked-v1";
@@ -120,7 +121,7 @@ export function normalizeDlsiteProductCode(code: string): {
   store: DlsiteStore;
 } {
   const productCode = code.trim().toUpperCase();
-  const match = /^(RJ|VJ)\d{6,8}$/.exec(productCode);
+  const match = RJ_CODE_PATTERN.exec(productCode);
   if (!match) throw new Error(`DLsite product_codeの形式が不正です: ${code}`);
   return { productCode, store: match[1] === "RJ" ? "maniax" : "pro" };
 }

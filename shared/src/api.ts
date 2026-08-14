@@ -11,7 +11,7 @@ import {
   workSchema,
 } from "./work.ts";
 import { splitSelectedTags, type TagFilters } from "./pseudoTag.ts";
-import { dlsiteRegistrationBodySchema, dlsiteStatusSchema } from "./dlsite.ts";
+import { dlsiteRegistrationBodySchema, dlsiteStatusSchema, rjCodeFormatSchema } from "./dlsite.ts";
 import { workspacePathSchema } from "./media.ts";
 
 // ── 作品検索（GET /api/works）────────────────────────────────
@@ -198,11 +198,7 @@ export type WorkCreateBodyInput = z.input<typeof workCreateBodySchema>;
 export type WorkCreateBody = z.output<typeof workCreateBodySchema>;
 
 export const dlsiteFetchByCodeBodySchema = z.object({
-  rjCode: z
-    .string()
-    .trim()
-    .regex(/^(RJ|VJ)\d{6,8}$/i, "RJ/VJコードはRJまたはVJに続く6〜8桁で入力してください")
-    .transform((value) => value.toUpperCase()),
+  rjCode: rjCodeFormatSchema,
 });
 export type DlsiteFetchByCodeBody = z.infer<typeof dlsiteFetchByCodeBodySchema>;
 

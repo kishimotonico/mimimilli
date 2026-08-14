@@ -1,14 +1,40 @@
 // fixture アダプタのシナリオ機能（ADR-0002 / client/mocks/scenarios.ts からの移植）のテスト。
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { workspacePath } from "@mimimilli/shared";
+import { scanCandidateSchema, workspacePath } from "@mimimilli/shared";
+import type { DataAdapter } from "../src/adapter/index.ts";
 import { createApp } from "../src/app.ts";
+import { createClassificationMethods } from "../src/adapters/fixture/classification.ts";
+import { createCoverMediaMethods } from "../src/adapters/fixture/coverMedia.ts";
+import { createDlsiteMethods } from "../src/adapters/fixture/dlsiteMethods.ts";
+import { createFsMethods } from "../src/adapters/fixture/fsMethods.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import {
   createFixtureScenario,
   LARGE_SCENARIO_WORK_COUNT,
 } from "../src/adapters/fixture/scenarios.ts";
-import { resolveRegisteredRjCode } from "../src/adapters/fixture/settingsScan.ts";
+import {
+  createSettingsScanMethods,
+  resolveRegisteredRjCode,
+} from "../src/adapters/fixture/settingsScan.ts";
+import { createInitialState } from "../src/adapters/fixture/state.ts";
+import { createWorkMethods } from "../src/adapters/fixture/works.ts";
+import type { ScanCandidate } from "@mimimilli/shared";
+
+/** createFixtureAdapter同様の合成だが、候補一覧だけを差し替えられる（候補登録の契約テスト用） */
+function buildFixtureAdapterWithCandidates(candidates: ScanCandidate[]): DataAdapter {
+  const state = createInitialState({ scenario: "empty" });
+  state.rootFolder = "/library";
+  state.scanCandidates = candidates;
+  return {
+    ...createSettingsScanMethods(state),
+    ...createWorkMethods(state),
+    ...createClassificationMethods(state),
+    ...createFsMethods(state),
+    ...createCoverMediaMethods(state),
+    ...createDlsiteMethods(state),
+  };
+}
 
 function buildApp(scenario?: string) {
   return createApp(createFixtureAdapter({ scenario }));
@@ -108,6 +134,64 @@ test("fixture: rjCode省略・空文字・指定を区別する", () => {
   assert.equal(resolveRegisteredRjCode("RJ999999", ""), "");
   assert.equal(resolveRegisteredRjCode("RJ999999", "RJ111111"), "RJ111111");
   assert.equal(resolveRegisteredRjCode(null, undefined), null);
+});
+
+test("候補登録APIはHTTP境界の正規化からfixture adapterの保存まで、rjCodeの3状態をモックを挟まず通す", async () => {
+  const candidates = [
+    scanCandidateSchema.parse({
+      path: "自動検出済み",
+      inferredTitle: "自動検出済み",
+      audioFileCount: 1,
+      audioBreakdown: [{ extension: "wav", count: 1 }],
+      rjCode: "RJ700001",
+    }),
+    scanCandidateSchema.parse({
+      path: "明示なし",
+      inferredTitle: "明示なし",
+      audioFileCount: 1,
+      audioBreakdown: [{ extension: "wav", count: 1 }],
+      rjCode: null,
+    }),
+    scanCandidateSchema.parse({
+      path: "値指定",
+      inferredTitle: "値指定",
+      audioFileCount: 1,
+      audioBreakdown: [{ extension: "wav", count: 1 }],
+      rjCode: null,
+    }),
+  ];
+  const app = createApp(buildFixtureAdapterWithCandidates(candidates));
+  try {
+    const response = await app.request("/api/scan/candidates/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        items: [
+          { path: "自動検出済み" },
+          { path: "明示なし", rjCode: "" },
+          { path: "値指定", rjCode: "rj1234567" },
+        ],
+      }),
+    });
+    assert.equal(response.status, 201);
+    const { registered } = await response.json();
+    const workIdByPath = new Map<string, string>(
+      registered.map((entry: { path: string; workId: string }) => [entry.path, entry.workId]),
+    );
+
+    const rjCodeOf = async (path: string) => {
+      const workId = workIdByPath.get(path);
+      assert.ok(workId, `${path}が登録されていません`);
+      const detail = await app.request(`/api/works/${workId}`);
+      assert.equal(detail.status, 200);
+      return (await detail.json()).dlsite.rjCode;
+    };
+    assert.equal(await rjCodeOf("自動検出済み"), "RJ700001");
+    assert.equal(await rjCodeOf("明示なし"), "");
+    assert.equal(await rjCodeOf("値指定"), "RJ1234567");
+  } finally {
+    await app.shutdown();
+  }
 });
 
 test("empty: 作品・スマートフォルダーが0件", async () => {
