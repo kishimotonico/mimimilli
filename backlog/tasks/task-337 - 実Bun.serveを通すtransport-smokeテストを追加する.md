@@ -4,6 +4,7 @@ title: 実Bun.serveを通すtransport smokeテストを追加する
 status: To Do
 assignee: []
 created_date: '2026-08-14 10:27'
+updated_date: '2026-08-14 10:30'
 labels: []
 dependencies: []
 priority: medium
@@ -16,6 +17,8 @@ ordinal: 347000
 ADR-0018の一部。serverテストは現状app.request()レベル（実HTTPソケットなし）のみで、transport層の挙動が自動検証されていない。/api末尾スラッシュ差（5e541a2）やBun idleTimeoutによるDLsite同期fetch切断（TASK-172、6296840）はいずれもtransport層の差異・特性が原因だった。
 
 実ポートへbindしたBun.serveに対してfetchで接続するsmokeテストを追加し、SSE・Range・AbortSignal・shutdownを実HTTPで検証する。fixture adapterを使えばDB・実FSなしで完結する。
+
+限界の明記: fixture adapterのメディアはroutes/media.tsのlocation.type=synthetic経路を通るため、real特有の実ファイルstream＋Rangeの相互作用はこのsmokeでは検証されない。実ファイル経路まで検証する場合は一時ファイル＋real adapter構成が必要で、やるかどうかは実装時に判断し、やらないなら限界としてテストコードに残す。
 
 TASK-335と独立に着手できる（MIMIMILLI_ADAPTER=fixtureのBun.serve起動は実装済み）。
 

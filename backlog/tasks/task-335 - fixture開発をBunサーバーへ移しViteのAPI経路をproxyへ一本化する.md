@@ -4,6 +4,7 @@ title: fixture開発をBunサーバーへ移しViteのAPI経路をproxyへ一本
 status: To Do
 assignee: []
 created_date: '2026-08-14 10:26'
+updated_date: '2026-08-14 10:30'
 labels: []
 dependencies: []
 priority: high
@@ -17,7 +18,11 @@ ADR-0018の実装本体。fixture開発のAPIをViteプロセス内のNode middl
 
 土台は実装済み: server/src/index.tsはMIMIMILLI_ADAPTER=fixtureでfixture adapterをBun.serve起動でき、MIMIMILLI_MOCK_SCENARIOでシナリオ切替できる。real開発用のMIMIMILLI_BACKEND_SERVICE + portless proxy（vite.config.tsのresolveBackendProxy）をfixtureにも流用する。
 
-注意: fixtureのin-memory状態はbun --watch再起動でリセットされるが、現行のlistener再生成と同じ挙動なので許容。Playwright smokeのwebServer再設計は別タスク（このタスクの完了までsmokeが壊れる場合は同一統合ブランチ内で続けて対応する）。
+注意:
+- fixtureのin-memory状態はbun --watch再起動でリセットされるが、現行のlistener再生成と同じ挙動なので許容
+- bun --watch再起動時はSSE接続も切れる。クライアント側の再接続で吸収されること（スキャン・DLsite進捗UIが再起動後も追従すること）を確認する
+- 現行fixture APIはclientのportless登録（mimi）に相乗りしており独立ポートを持たない。分離後はBunサーバー側のportlessサービス登録（real開発のapi.mimiと同様）が新たに必要
+- Playwright smokeのwebServer再設計は別タスク（TASK-336）。このタスクの完了までsmokeが壊れる場合は同一統合ブランチ内で続けて対応する
 
 参照: docs/adr/0018-vite-client-bun-server-separation.md、client/vite.config.ts、server/src/index.ts、client/package.json（dev:*スクリプト群）
 <!-- SECTION:DESCRIPTION:END -->
