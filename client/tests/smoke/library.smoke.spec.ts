@@ -186,7 +186,7 @@ test("未登録タブでRJコードを編集でき、候補を1件ずつ除外�
   await openApp(page);
   await page.getByRole("button", { name: "スキャン" }).click();
   const dialog = page.getByRole("dialog", { name: "スキャン" });
-  await dialog.getByRole("button", { name: "スキャン開始" }).click();
+  await dialog.getByRole("button", { name: "スキャン" }).click();
 
   const unregistered = dialog.getByRole("tabpanel", { name: "未登録" });
   await expect(unregistered).toBeVisible({ timeout: 15_000 });
