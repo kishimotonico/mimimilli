@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { hasRjCode, type ScanCandidate } from "@mimimilli/shared";
+import { hasRjCode, rjCodeFormatSchema, type ScanCandidate } from "@mimimilli/shared";
 import Button from "../../../../shared/ui/Button";
 import IconButton from "../../../../shared/ui/IconButton";
 import Toast from "../../../../shared/ui/Toast";
@@ -27,6 +27,7 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
   const queryClient = useQueryClient();
   const [deselectedPaths, setDeselectedPaths] = useState<Set<string>>(() => new Set());
   const [rjCodeOverrides, setRjCodeOverrides] = useState<Map<string, string>>(() => new Map());
+  const [rjCodeErrors, setRjCodeErrors] = useState<Map<string, string>>(() => new Map());
   const [editingPath, setEditingPath] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -123,15 +124,45 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
     if (editingPath === null) return;
     const path = editingPath;
     const value = editingValue.trim();
-    setRjCodeOverrides((previous) => {
+    if (value === "") {
+      setRjCodeOverrides((previous) => new Map(previous).set(path, ""));
+      setRjCodeErrors((previous) => {
+        if (!previous.has(path)) return previous;
+        const next = new Map(previous);
+        next.delete(path);
+        return next;
+      });
+      setEditingPath(null);
+      return;
+    }
+    const parsed = rjCodeFormatSchema.safeParse(value);
+    if (!parsed.success) {
+      setRjCodeOverrides((previous) => new Map(previous).set(path, value));
+      setRjCodeErrors((previous) =>
+        new Map(previous).set(
+          path,
+          parsed.error.issues[0]?.message ?? "RJ/VJコードの形式が正しくありません",
+        ),
+      );
+      setEditingPath(null);
+      return;
+    }
+    setRjCodeOverrides((previous) => new Map(previous).set(path, parsed.data));
+    setRjCodeErrors((previous) => {
+      if (!previous.has(path)) return previous;
       const next = new Map(previous);
-      next.set(path, value);
+      next.delete(path);
       return next;
     });
     setEditingPath(null);
   };
 
+  const selectedRjCodeErrorCount = selectedCandidates.filter((candidate) =>
+    rjCodeErrors.has(candidate.path),
+  ).length;
+
   const handleRegisterSelected = () => {
+    if (selectedRjCodeErrorCount > 0) return;
     const items = selectedCandidates.map((candidate) => ({
       path: candidate.path,
       rjCode: rjCodeOverrides.get(candidate.path) ?? candidate.rjCode ?? "",
@@ -194,6 +225,7 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
                   const effectiveRjCode = rjCodeOverrides.has(candidate.path)
                     ? (rjCodeOverrides.get(candidate.path) ?? "")
                     : candidate.rjCode;
+                  const rjCodeError = rjCodeErrors.get(candidate.path);
                   const parentFolder = parentDirOf(candidate.path);
                   return (
                     <tr key={candidate.path}>
@@ -223,18 +255,29 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
                             className="w-full min-w-0 rounded-[4px] border border-acc bg-paper-2 px-1.5 py-0.5 font-mono text-[10.5px] text-ink-0 outline-none"
                           />
                         ) : (
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => startEdit(candidate)}
-                            title="クリックしてRJコードを編集"
-                            className={cn(
-                              "font-mono text-[10.5px]",
-                              hasRjCode({ rjCode: effectiveRjCode }) ? "text-ink-1" : "text-ink-4",
+                          <>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => startEdit(candidate)}
+                              title={rjCodeError ?? "クリックしてRJコードを編集"}
+                              className={cn(
+                                "font-mono text-[10.5px]",
+                                rjCodeError
+                                  ? "text-[var(--r-coral)]"
+                                  : hasRjCode({ rjCode: effectiveRjCode })
+                                    ? "text-ink-1"
+                                    : "text-ink-4",
+                              )}
+                            >
+                              {hasRjCode({ rjCode: effectiveRjCode }) ? effectiveRjCode : "未検出"}
+                            </button>
+                            {rjCodeError && (
+                              <p className="font-jp text-[9.5px] text-[var(--r-coral)]">
+                                {rjCodeError}
+                              </p>
                             )}
-                          >
-                            {hasRjCode({ rjCode: effectiveRjCode }) ? effectiveRjCode : "未検出"}
-                          </button>
+                          </>
                         )}
                       </td>
                       <td
@@ -273,11 +316,17 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
             </span>
             <Button
               variant="primary"
-              disabled={busy || selectedCandidates.length === 0}
+              disabled={busy || selectedCandidates.length === 0 || selectedRjCodeErrorCount > 0}
               onClick={handleRegisterSelected}
             >
               {selectedCandidates.length}件をライブラリに追加
             </Button>
+            {selectedRjCodeErrorCount > 0 && (
+              <span role="alert" className="font-jp text-[11px] text-[var(--r-coral)]">
+                RJコードの形式が正しくない項目が{selectedRjCodeErrorCount}
+                件あります。修正してください。
+              </span>
+            )}
           </div>
         </>
       )}

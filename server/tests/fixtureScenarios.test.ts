@@ -103,9 +103,9 @@ test("new-work: Files用診断とscan確認用の候補・問題を独立して�
 });
 
 test("fixture: rjCode省略・空文字・指定を区別する", () => {
-  // 省略=候補が検出した値を採用、空文字=明示的になし、値=そのまま採用（候補登録APIの規約）。
+  // 省略=候補が検出した値を採用、空文字=明示的になし（real adapterと同じく""のまま）、値=そのまま採用（候補登録APIの規約）。
   assert.equal(resolveRegisteredRjCode("RJ999999", undefined), "RJ999999");
-  assert.equal(resolveRegisteredRjCode("RJ999999", ""), null);
+  assert.equal(resolveRegisteredRjCode("RJ999999", ""), "");
   assert.equal(resolveRegisteredRjCode("RJ999999", "RJ111111"), "RJ111111");
   assert.equal(resolveRegisteredRjCode(null, undefined), null);
 });

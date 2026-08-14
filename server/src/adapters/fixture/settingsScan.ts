@@ -24,8 +24,7 @@ export function resolveRegisteredRjCode(
   candidateRjCode: string | null,
   itemRjCode: string | undefined,
 ): string | null {
-  if (itemRjCode === undefined) return candidateRjCode;
-  return itemRjCode === "" ? null : itemRjCode;
+  return itemRjCode === undefined ? candidateRjCode : itemRjCode;
 }
 
 export function createSettingsScanMethods(state: FixtureState): SettingsAdapter {
@@ -113,7 +112,7 @@ export function createSettingsScanMethods(state: FixtureState): SettingsAdapter 
           tags: [],
           bookmarked: false,
           lastPlayedAt: null,
-          dlsite: rjCode ? { ...emptyDlsiteState(), rjCode } : emptyDlsiteState(),
+          dlsite: rjCode !== null ? { ...emptyDlsiteState(), rjCode } : emptyDlsiteState(),
         };
         state.works.push(work);
         return [{ path: candidate.path, workId: work.id }];
