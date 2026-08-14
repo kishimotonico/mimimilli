@@ -1,10 +1,10 @@
 ---
 id: TASK-321
 title: DLsite取得statusの投影経路を再設計し通知集計を復旧する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-12 16:54'
-updated_date: '2026-08-13 17:59'
+updated_date: '2026-08-14 07:44'
 labels: []
 dependencies: []
 priority: high
@@ -26,16 +26,6 @@ source-projection移行でDLsite取得の一時状態をcacheへ移した結果�
 - [x] #5 上記を検証するテストがある
 <!-- AC:END -->
 
-
-
-
-
-
-
-
-
-
-
 ## Comments
 
 <!-- COMMENTS:BEGIN -->
@@ -44,3 +34,9 @@ created: 2026-08-13 17:42
 設計レビュー引き継ぎ時の追加決定: TASK-328の外部連携状態表示が本タスクのstatus投影修復に依存するため、スキャンUI再設計パッケージ（feat/scan-ui-redesign）に組み込む。TASK-324・325と並列で先行実施し、TASK-328の前に完了させる。
 ---
 <!-- COMMENTS:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+連携分類(applied/skipped/none)をmimimilli.json正本、取得失敗(not_found/error/parse_error)をDLsiteキャッシュへ分離し、catalogのwork_dlsite.state_jsonを両者の合成投影にした。取得を伴う全経路（単発取得・一括取得・一括適用）で投影をリフレッシュするようにし、通知ベルの取得失敗件数とパースエラー警報が実データで動くようになった。ADR-0017にstatusの位置づけを明記。verified: 実データの流れを通すテスト、pnpm check && pnpm test、pnpm test:smoke。
+<!-- SECTION:FINAL_SUMMARY:END -->

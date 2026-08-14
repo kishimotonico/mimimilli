@@ -1,10 +1,10 @@
 ---
 id: TASK-328
 title: 新規登録済み・更新された作品タブを実装する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-13 16:59'
-updated_date: '2026-08-13 21:35'
+updated_date: '2026-08-14 07:45'
 labels: []
 dependencies:
   - TASK-326
@@ -21,7 +21,7 @@ ordinal: 338000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 新規登録済みタブに今回ライブラリへ入った作品が表示され、自動登録分と候補承認分の両方が含まれる
+- [x] #1 新規登録済みタブに今回ライブラリへ入った作品が表示され、自動登録分と候補承認分の両方が含まれる
 - [x] #2 外部連携列にRJコードと状態（連携済み・取得待ち・失敗・—）が表示され、取得待ちが警告色でない
 - [x] #3 更新された作品タブにメタファイル更新で再投影された作品が表示される
 - [x] #4 タイトルのインライン編集が両タブで従来どおり動作する
@@ -42,3 +42,9 @@ created: 2026-08-13 21:35
 AC#1のうち候補承認分の集約は、TASK-327のUnregisteredTab.tsxとの衝突を避けるため実装せず統括のマージ時対応に委ねる（統括判断）。自動登録分（insertedWorkIds）の表示は完了。dedupeIdsヘルパー（scanModal/scanResultWorkIds.ts）を集約用に用意済み。
 ---
 <!-- COMMENTS:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+WorkListItemにdlsite(rjCode,status)とrelativePathを追加し、外部連携列に連携済み・取得待ち・失敗・—の4状態を表示（取得待ちは警告色にしない）。relativePathはrootを永続化せず読み出し時に導出する形にし、root変更で陳腐化しないようにした。タブの編集stateはuseInlineTitleEditへ切り出しpropsをworkIds1個へ整理。表示上限を超える場合の総件数表示を追加。新規登録済みタブは当初自動登録分のみだったが、ScanModalにapprovedWorkIds stateを追加しinsertedWorkIdsとdedupeIdsで結合することで候補承認分も含めた（AC1）。fixtureのregisterScanCandidatesがstate.worksへ追加していなかった実データとの乖離も塞いだ。verified: 候補承認分がタブに現れることをsmokeで検証、pnpm test:smoke。
+<!-- SECTION:FINAL_SUMMARY:END -->

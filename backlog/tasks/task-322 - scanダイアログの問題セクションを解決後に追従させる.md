@@ -1,10 +1,10 @@
 ---
 id: TASK-322
 title: scanダイアログの問題セクションを解決後に追従させる
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-12 16:54'
-updated_date: '2026-08-13 20:23'
+updated_date: '2026-08-14 07:44'
 labels: []
 dependencies:
   - TASK-326
@@ -25,3 +25,9 @@ ScanReviewの問題セクションは、identity_conflictと不正なmimimilli.j
 - [x] #2 問題がゼロになったとき問題セクション自体が表示されない
 - [x] #3 上記を検証するテストがある
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+単独タスクとしては着手せず、TASK-326のスキャンモーダル再編に吸収して解決した。要対応タブをGET /api/scan/diagnosticsのライブ購読に切り替え、Filesでidentity_conflictを解決した後にscanダイアログへ戻ると項目が問題セクションから即座に消えるようにし、問題ゼロ時はセクション自体を非表示にした。verified: 回帰テストをsmokeへ追加、pnpm test:smoke。
+<!-- SECTION:FINAL_SUMMARY:END -->

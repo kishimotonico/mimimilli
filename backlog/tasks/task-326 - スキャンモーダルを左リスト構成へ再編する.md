@@ -1,10 +1,10 @@
 ---
 id: TASK-326
 title: スキャンモーダルを左リスト構成へ再編する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-13 16:58'
-updated_date: '2026-08-13 20:23'
+updated_date: '2026-08-14 07:44'
 labels: []
 dependencies:
   - TASK-324
@@ -29,3 +29,9 @@ ordinal: 336000
 - [x] #6 TopBarのスキャンボタンに未登録件数のバッジが表示される
 - [x] #7 pnpm test:smokeが通る
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+460pxの縦積み6ブロック構成を740px幅・左リスト+タブ構成へ作り直した。ScanWarnings・ScanReview・ScanNewWorks・StatsGrid・StatusRow・ScanFooterControlsを廃止し、タブ（未登録・要対応・新規登録済み・更新された作品）ごとのコンポーネントへ分割。左リストに件数バッジ・更新なし件数・ライブラリ全体件数・最終スキャン日時を表示。要対応タブはGET /api/scan/diagnosticsのライブ購読に切り替え、解決済みの問題が残り続ける不具合（TASK-322）を解消。TopBarのスキャンボタンに未登録件数バッジを追加。verified: 典型ケースでのスクロール確認、pnpm test:smoke。
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -1,10 +1,10 @@
 ---
 id: TASK-324
 title: 用語をsidecarからmimimilli.json・meta系へ統一する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-13 16:57'
-updated_date: '2026-08-13 17:56'
+updated_date: '2026-08-14 07:44'
 labels: []
 dependencies: []
 priority: high
@@ -28,3 +28,9 @@ ordinal: 334000
 - [x] #7 client/src・server/src・shared/srcにmimimilli.jsonを指す意味でのsidecarが残っていない
 - [x] #8 ADR-0017のファイル名変更をgit mvで行い、リネーム履歴が追跡できる
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+shared/src/scan.tsのinvalidSidecars系をinvalidMetaFilesへ改名しHTTP/SSE契約を追従させた。databaseReplacementのsidecar系はSQLiteのWAL/SHM補助ファイルという実体に合わせWalShm系へ改名。ADR-0017をgit mvで0017-meta-source-projection-and-work-identity.mdへリネームし、冒頭に用語定義（メタデータ正本ファイルはmimimilli.json、コード識別子はmeta系）を追記。docs・backlog本文のsidecar表記も置換（ADR-0001・0007は意図的に除外）。その後TASK-321で新規混入したsidecar識別子も追って改名し用語を統一した（a21f68c）。verified: pnpm check && pnpm test、client/src・server/src・shared/srcにmimimilli.jsonを指すsidecarが残っていないことをgrepで確認。
+<!-- SECTION:FINAL_SUMMARY:END -->

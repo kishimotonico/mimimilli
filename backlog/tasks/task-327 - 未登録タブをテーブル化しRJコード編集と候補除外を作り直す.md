@@ -1,10 +1,10 @@
 ---
 id: TASK-327
 title: 未登録タブをテーブル化しRJコード編集と候補除外を作り直す
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-13 16:58'
-updated_date: '2026-08-13 22:03'
+updated_date: '2026-08-14 07:44'
 labels: []
 dependencies:
   - TASK-326
@@ -28,3 +28,9 @@ ordinal: 337000
 - [x] #6 追加後はタブが自動遷移せず、未登録が0件になったときだけ新規登録済みへ切り替わる
 - [x] #7 pnpm test:smokeが通り、RJコード編集と候補除外の取り消しを検証するテストがある
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+未登録候補を1件1行のテーブルに作り直し、RJコード列で検出値の修正・未検出時の手入力ができるようにした（登録時にmimimilli.jsonへ反映）。行の✕で1件ずつ候補から外し、「元に戻す」トーストで取り消せるようにした。マスターチェックボックスで全選択・全解除・一部選択の横棒表示に対応。操作ボタンは「N件をライブラリに追加」のみに整理し、すべて登録・まとめて除外を廃止。実装中に共有Toast.tsxの実バグ（showModal中のdialog内でinert化されクリックできない問題）を発見・修正し、WorkTagEditorの「元に戻す」への波及も解消した。fixtureのexcludeScanCandidatesが候補自体を物理削除し復元できなくなっていた不具合も修正。verified: RJコード編集・候補除外の取り消しを検証するテスト、pnpm test:smoke。
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -1,10 +1,10 @@
 ---
 id: TASK-329
 title: スキャンのボタン構成を整理し操作の役割を明確にする
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-13 16:59'
-updated_date: '2026-08-13 20:44'
+updated_date: '2026-08-14 07:45'
 labels: []
 dependencies:
   - TASK-326
@@ -26,3 +26,9 @@ ordinal: 339000
 - [x] #4 スキャン中の中止ボタンとバックグラウンド継続のヒントが従来どおり動作する
 - [x] #5 pnpm test:smokeが通る
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+スキャンフッターの主ボタンを結果の有無で「スキャン」「再スキャン」に切り替え、近くに差分スキャンであることの説明文を添えた。フルスキャンは「すべて読み直す」の弱いリンクへ降格し主ボタンと同じ強さで並べないようにした。スキャン中の中止ボタン・バックグラウンド継続のヒントは従来どおり維持。verified: pnpm test:smoke。
+<!-- SECTION:FINAL_SUMMARY:END -->

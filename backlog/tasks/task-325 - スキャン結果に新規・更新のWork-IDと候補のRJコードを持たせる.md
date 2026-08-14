@@ -1,10 +1,10 @@
 ---
 id: TASK-325
 title: スキャン結果に新規・更新のWork IDと候補のRJコードを持たせる
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-13 16:58'
-updated_date: '2026-08-13 18:25'
+updated_date: '2026-08-14 07:44'
 labels: []
 dependencies: []
 priority: high
@@ -28,20 +28,6 @@ ordinal: 335000
 - [x] #7 候補除外の一覧取得APIと解除APIが追加されている（adapterインターフェース・real/fixture実装・HTTPルート。解除後の次回スキャンで候補が再提示される）
 <!-- AC:END -->
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 ## Comments
 
 <!-- COMMENTS:BEGIN -->
@@ -50,3 +36,9 @@ created: 2026-08-13 17:42
 設計レビュー引き継ぎ時の追加決定: 除外の解除APIはTASK-327のトースト「元に戻す」とTASK-330の設定UIの両方が必要とするため、サーバー基盤である本タスクで用意する。327・330はこのAPIを利用するUIタスクとする。
 ---
 <!-- COMMENTS:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+常に0/空だったnewlyGenerated・newWorkIdsを廃止し、ScanResultにinsertedWorkIds（自動登録分・候補承認分の両方を含む新規挿入ID）とupdatedWorkIds（メタファイル更新で再投影されたID）を実データで返すようにした。ScanCandidateにフォルダー名から検出したRJコード（未検出はnull）を追加し、登録APIは未指定=自動検出・空文字=RJコードなしの明示・値=そのまま書込みの3値を区別する。RJコードの有無判定をhasRjCode型述語に統一しJS・SQL・一括取得で基準を揃えた。候補除外の一覧取得・解除APIを追加（adapterインターフェース・real/fixture実装・HTTPルート）。verified: 新規・更新・スキップの分類テスト、pnpm check && pnpm test。
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -1,10 +1,10 @@
 ---
 id: TASK-330
 title: 設定に候補から外したフォルダーの一覧と解除を追加する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-13 16:59'
-updated_date: '2026-08-14 07:07'
+updated_date: '2026-08-14 07:45'
 labels: []
 dependencies:
   - TASK-327
@@ -25,3 +25,9 @@ ordinal: 340000
 - [x] #3 0件のときも案内文とともにセクションが表示される
 - [x] #4 pnpm test:smokeが通る
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+設定モーダルに「候補から外したフォルダー」セクションを追加し、一覧表示・0件時の案内文・各行の解除ボタンを実装した。候補除外の一覧・解除APIをentities/scan/apiへ切り出し、features/scanとfeatures/settingsのsibling import禁止（レイヤー境界）を避けた。当初は互換のための再エクスポートを置いたがレビューで指摘を受け撤去し、呼び出し側の直接importに直した。解除時のキャッシュ無効化がスキャンモーダル側と設定画面側で非対称（設定画面側は候補一覧を無効化していなかった）だった問題も、candidateExclusionsがcandidates親キーの子であることを利用し親キー1つの無効化に統一して解消した。verified: agent-browserで解除→スキャン未実行のままTopBarバッジ・スキャンモーダルに即反映されることを確認、pnpm check && pnpm test（805件）、pnpm test:smoke（15件）。
+<!-- SECTION:FINAL_SUMMARY:END -->
