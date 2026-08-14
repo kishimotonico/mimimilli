@@ -104,7 +104,7 @@ export function createSettingsScanMethods(deps: {
       const root = requireRoot();
       const normalized = scanOptions ?? {};
       if (database.kind === "files") {
-        return runFileScanInWorker(
+        const result = await runFileScanInWorker(
           {
             ...database,
             catalogPath: resolve(database.catalogPath),
@@ -115,6 +115,8 @@ export function createSettingsScanMethods(deps: {
           resolve(thumbnailCacheDir),
           normalized,
         );
+        scanner.seedCandidatePool(result.candidates);
+        return result;
       }
       const result = await scanner.scan(root, normalized);
       const checkAbort = () => {

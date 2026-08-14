@@ -171,6 +171,7 @@ function seedScanQueries(
       SCAN_QUERY_KEYS.last(),
       lastResult ? { result: lastResult, finishedAt: "2026-01-01T00:00:00.000Z" } : null,
     );
+    queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), lastResult?.candidates ?? []);
   }
   if (libraryTotal !== undefined && libraryTotal !== null) {
     // queryKey は libraryTotalQueryOptions 由来（DataTag付き）を使う。setQueryData の第二引数が
@@ -586,9 +587,11 @@ describe("ScanModal", () => {
     const restoreSpy = vi
       .spyOn(scanEntityApi, "restoreScanCandidateExclusions")
       .mockResolvedValue(undefined);
-    const getCandidatesSpy = vi
-      .spyOn(scanApi, "getScanCandidates")
-      .mockResolvedValue([candidateDetected, candidateUndetected]);
+    const refreshSpy = vi.spyOn(scanApi, "refreshScanCandidates").mockImplementation(async (queryClient) => {
+      const candidates = [candidateDetected, candidateUndetected];
+      queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), candidates);
+      return candidates;
+    });
     renderModal({
       lastResult: { ...scanResult, candidates: [candidateDetected, candidateUndetected] },
     });
@@ -613,7 +616,7 @@ describe("ScanModal", () => {
     fireEvent.click(screen.getByRole("button", { name: "元に戻す" }));
 
     await waitFor(() => expect(restoreSpy).toHaveBeenCalledWith([candidateUndetected.path]));
-    await waitFor(() => expect(getCandidatesSpy).toHaveBeenCalled());
+    await waitFor(() => expect(refreshSpy).toHaveBeenCalled());
     await waitFor(() =>
       expect(screen.getByText(candidateUndetected.inferredTitle)).toBeInTheDocument(),
     );
@@ -658,6 +661,9 @@ describe("ScanModalと他画面が同じlibraryTotalQueryOptionsを共有する�
       }
       if (url.pathname === "/api/scan/diagnostics") {
         return Promise.resolve(jsonResponse({ diagnostics: [] }));
+      }
+      if (url.pathname === "/api/scan/candidates") {
+        return Promise.resolve(jsonResponse({ candidates: [] }));
       }
       return Promise.reject(new Error(`unexpected fetch: ${url.toString()}`));
     });

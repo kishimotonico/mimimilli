@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAtomValue } from "jotai";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { libraryTotalQueryOptions } from "../../../entities/work/libraryTotalQueryOptions";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
 import { cn } from "../../../shared/lib/cn";
@@ -9,7 +9,13 @@ import IconButton from "../../../shared/ui/IconButton";
 import Toast from "../../../shared/ui/Toast";
 import { scanningAtom, scanProgressAtom } from "../../../entities/scan/model/atoms";
 import { useScanActions } from "../../../entities/scan/useScanActions";
-import { getLastScanResult, getScanCandidates, getScanDiagnostics, SCAN_QUERY_KEYS } from "../api";
+import {
+  getLastScanResult,
+  getScanDiagnostics,
+  refreshScanCandidates,
+  SCAN_QUERY_KEYS,
+} from "../api";
+import { useScanCandidatesCache } from "../model/useScanCandidatesCache";
 import ScanSidebar from "./scanModal/ScanSidebar";
 import UnregisteredTab from "./scanModal/UnregisteredTab";
 import NeedsAttentionTab from "./scanModal/NeedsAttentionTab";
@@ -36,6 +42,7 @@ export default function ScanModal({
   onOpenRjCodeMissing,
   onOpenFiles,
 }: ScanModalProps) {
+  const queryClient = useQueryClient();
   const scanning = useAtomValue(scanningAtom);
   const progress = useAtomValue(scanProgressAtom);
   const { start, cancel } = useScanActions();
@@ -68,13 +75,12 @@ export default function ScanModal({
   });
   const lastResult = lastScanQuery.data?.result ?? null;
 
-  const candidatesQuery = useQuery({
-    queryKey: SCAN_QUERY_KEYS.candidates(),
-    queryFn: getScanCandidates,
-    enabled: (lastResult?.candidates.length ?? 0) > 0,
-    initialData: lastResult && lastResult.candidates.length > 0 ? lastResult.candidates : undefined,
-  });
-  const candidates = candidatesQuery.data ?? lastResult?.candidates ?? [];
+  const candidates = useScanCandidatesCache();
+
+  useEffect(() => {
+    if (queryClient.getQueryData(SCAN_QUERY_KEYS.candidates()) !== undefined) return;
+    void refreshScanCandidates(queryClient);
+  }, [queryClient]);
 
   // ID重複はFilesでの解決を随時反映する必要があるため、スキャン時点のスナップショットではなく
   // 常に最新の診断を購読する（TASK-322）。FilePreview の解決操作が同じキーを無効化する。

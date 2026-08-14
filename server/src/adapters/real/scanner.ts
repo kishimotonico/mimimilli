@@ -111,6 +111,7 @@ export class Scanner {
   private readonly user: UserWorkStateRepository;
   private readonly measureCover: (sourceAbsolutePath: string) => Promise<CoverDimensions | null>;
   private readonly dlsiteCache: DlsiteCache | null;
+  private lastCandidatePool: ScanCandidate[] = [];
 
   constructor(db: Db, repos: WorkPersistence, options?: ScannerOptions) {
     this.db = db;
@@ -180,6 +181,7 @@ export class Scanner {
       checkAbort,
     );
 
+    this.lastCandidatePool = this.collectCandidates(root, tree, { filterExclusions: false });
     result.candidates = this.collectCandidates(root, tree);
 
     await this.generatePhase(root, result, emit, checkAbort);
@@ -335,14 +337,18 @@ export class Scanner {
     checkAbort();
   }
 
-  private collectCandidates(root: string, tree: WalkResult): ScanCandidate[] {
+  private collectCandidates(
+    root: string,
+    tree: WalkResult,
+    options?: { filterExclusions?: boolean },
+  ): ScanCandidate[] {
     const workRoots = new Set<string>();
     for (const audioDir of tree.audioDirs) {
       if (isCoveredByMeta(audioDir, root, tree.metaDirs) || audioDir === root) continue;
       workRoots.add(findWorkRoot(audioDir, root, tree.dirsWithMetaInSubtree, tree.dirIndex));
     }
     const excluded = new Set(this.user.listScanCandidateExclusions());
-    return excludeDescendantPaths(workRoots)
+    const candidates = excludeDescendantPaths(workRoots)
       .sort(naturalCompare)
       .map((workDir) => {
         const breakdown = new Map<string, number>();
@@ -362,20 +368,18 @@ export class Scanner {
             .map(([extension, count]) => ({ extension, count })),
           rjCode: detectRjCode([folderName]),
         };
-      })
-      .filter((candidate) => !excluded.has(candidate.path));
+      });
+    if (options?.filterExclusions === false) return candidates;
+    return candidates.filter((candidate) => !excluded.has(candidate.path));
   }
 
-  async listCandidates(root: string): Promise<ScanCandidate[]> {
-    root = resolve(root);
-    const tree = await this.walkPhase(
-      root,
-      () => {},
-      undefined,
-      undefined,
-      () => {},
-    );
-    return this.collectCandidates(root, tree);
+  async listCandidates(_root: string): Promise<ScanCandidate[]> {
+    const excluded = new Set(this.user.listScanCandidateExclusions());
+    return this.lastCandidatePool.filter((candidate) => !excluded.has(candidate.path));
+  }
+
+  seedCandidatePool(candidates: ScanCandidate[]): void {
+    this.lastCandidatePool = candidates;
   }
 
   async registerCandidates(
@@ -409,6 +413,10 @@ export class Scanner {
         });
       }
     }
+    const registeredPaths = new Set(registered.map((entry) => entry.path));
+    this.lastCandidatePool = this.lastCandidatePool.filter(
+      (candidate) => !registeredPaths.has(candidate.path),
+    );
     return { registered, failures };
   }
 

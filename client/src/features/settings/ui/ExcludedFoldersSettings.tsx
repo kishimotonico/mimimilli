@@ -6,9 +6,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getScanCandidateExclusions,
   restoreScanCandidateExclusions,
-  SCAN_CANDIDATES_QUERY_KEY,
   SCAN_CANDIDATE_EXCLUSIONS_QUERY_KEY,
 } from "../../../entities/scan/api";
+import { refreshScanCandidates, SCAN_QUERY_KEYS } from "../../scan/api";
 import Button from "../../../shared/ui/Button";
 import Toast from "../../../shared/ui/Toast";
 import { apiErrorMessage } from "../../../shared/lib/apiError";
@@ -32,9 +32,7 @@ export default function ExcludedFoldersSettings() {
     onSuccess: async (_void, path) => {
       setErrorMessage(null);
       setRestoredToast(path);
-      // candidateExclusionsはcandidatesの子キーなので、candidatesの無効化で連動して無効化される。
-      // TopBarのバッジ・スキャンモーダルの候補一覧も同じキーを見ているため、これで両方に反映される。
-      await queryClient.invalidateQueries({ queryKey: SCAN_CANDIDATES_QUERY_KEY });
+      await refreshScanCandidates(queryClient);
     },
     onError: (error: unknown) => setErrorMessage(apiErrorMessage(error, "解除に失敗しました")),
   });
