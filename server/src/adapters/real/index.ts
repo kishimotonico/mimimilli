@@ -102,6 +102,7 @@ export function createRealAdapter(
     scanner,
     dataRoot,
     thumbnailCacheDir,
+    dlsiteCache: dlsiteCache.config,
     runFileScanInWorker: assembly.runFileScanInWorker ?? runFileScanInWorker,
   });
   const coverMediaMethods = createCoverMediaMethods({

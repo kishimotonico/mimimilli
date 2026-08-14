@@ -2,6 +2,7 @@ import type { ScanProgressEvent, ScanResult } from "@mimimilli/shared";
 import type { ScanOptions } from "../../adapter/index.ts";
 import { formatError, getCategoryLogger } from "../../lib/logger.ts";
 import type { DbLocation } from "./db.ts";
+import type { DlsiteCacheConfig } from "./dlsiteCache.ts";
 
 const scanLogger = getCategoryLogger("scan");
 
@@ -26,6 +27,7 @@ export type FileScanRunner = (
   root: string,
   dataRoot: string,
   thumbnailCacheDir: string,
+  dlsiteCache: DlsiteCacheConfig,
   options: ScanOptions,
 ) => Promise<ScanResult>;
 
@@ -34,6 +36,7 @@ export async function runFileScanInWorker(
   root: string,
   dataRoot: string,
   thumbnailCacheDir: string,
+  dlsiteCache: DlsiteCacheConfig,
   options: ScanOptions,
   testGate?: SharedArrayBuffer,
   testGateStage: "before-scan" | "before-finalize" = "before-scan",
@@ -122,6 +125,7 @@ export async function runFileScanInWorker(
         root,
         dataRoot,
         thumbnailCacheDir,
+        dlsiteCache,
         abortBuffer,
         full: options.full ?? false,
         testGate,
