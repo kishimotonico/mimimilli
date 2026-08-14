@@ -12,6 +12,7 @@ import type {
 } from "@mimimilli/shared";
 import { formatError, getCategoryLogger } from "../../lib/logger.ts";
 import { type DbLocation } from "./db.ts";
+import type { DlsiteCacheConfig } from "./dlsiteCache.ts";
 import { Scanner } from "./scanner.ts";
 import { finalizeScan, LAST_SCAN_TIME_KEY } from "./scanFinalize.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
@@ -34,13 +35,13 @@ export function createSettingsScanMethods(deps: {
     | "restoreScanCandidateExclusions"
   >;
   scanner: Scanner;
-  dataRoot: string;
   thumbnailCacheDir: string;
+  dlsiteCache: DlsiteCacheConfig;
   runFileScanInWorker: (
     database: Extract<DbLocation, { kind: "files" }>,
     root: string,
-    dataRoot: string,
     thumbnailCacheDir: string,
+    dlsiteCache: DlsiteCacheConfig,
     options: ScanOptions,
   ) => Promise<ScanResult>;
 }) {
@@ -50,8 +51,8 @@ export function createSettingsScanMethods(deps: {
     catalog,
     user,
     scanner,
-    dataRoot,
     thumbnailCacheDir,
+    dlsiteCache,
     runFileScanInWorker,
   } = deps;
   const requireRoot = (): string => {
@@ -111,8 +112,8 @@ export function createSettingsScanMethods(deps: {
             userPath: resolve(database.userPath),
           },
           resolve(root),
-          resolve(dataRoot),
           resolve(thumbnailCacheDir),
+          dlsiteCache,
           normalized,
         );
       }

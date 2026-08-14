@@ -4,6 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { createSettingsScanMethods } from "../../src/adapters/real/settingsScanMethods.ts";
+import {
+  DEFAULT_DLSITE_CACHE_MAX_EXPANDED_BYTES,
+  DEFAULT_DLSITE_CACHE_MAX_TRANSFER_BYTES,
+  DEFAULT_DLSITE_CACHE_TTLS_MS,
+} from "../../src/adapters/real/dlsiteCache.ts";
 import type { Scanner } from "../../src/adapters/real/scanner.ts";
 
 test("updateSettings は receiver なしで呼び出せる", async () => {
@@ -32,8 +37,13 @@ test("updateSettings は receiver なしで呼び出せる", async () => {
       catalog,
       user,
       scanner: undefined as unknown as Scanner,
-      dataRoot: rootDir,
       thumbnailCacheDir: rootDir,
+      dlsiteCache: {
+        path: ":memory:",
+        ttlsMs: DEFAULT_DLSITE_CACHE_TTLS_MS,
+        maxTransferBytes: DEFAULT_DLSITE_CACHE_MAX_TRANSFER_BYTES,
+        maxExpandedBytes: DEFAULT_DLSITE_CACHE_MAX_EXPANDED_BYTES,
+      },
       runFileScanInWorker: async () => {
         throw new Error("scan はこのテストで呼び出されません");
       },
