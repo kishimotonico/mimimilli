@@ -23,12 +23,13 @@ function uniqueSiblingPath(path: string, purpose: "candidate" | "rollback"): str
   return join(dirname(path), `.${basename(path)}.${purpose}-${crypto.randomUUID()}`);
 }
 
+/** rename成功直後に呼び出し元所有の配列へ記録する。途中で例外が起きても部分進捗を失わない。 */
 function moveWalShmFiles(
   sourcePath: string,
   destinationPath: string,
   operations: DatabaseFileOperations,
-): string[] {
-  const moved: string[] = [];
+  moved: string[],
+): void {
   for (const suffix of WAL_SHM_SUFFIXES) {
     const source = `${sourcePath}${suffix}`;
     if (operations.exists(source)) {
@@ -36,18 +37,67 @@ function moveWalShmFiles(
       moved.push(suffix);
     }
   }
-  return moved;
 }
 
-function restoreWalShmFiles(
+/**
+ * rollback一式（本体+WAL/SHM）を通常pathへ復元する。途中失敗時は復元済み分を
+ * best-effortでrollback側へ戻し、最終的に「全ファイルが通常path側」か
+ * 「全ファイルがrollback側」のどちらかへ収束させる。戻すこと自体に失敗した
+ * ファイルはpath側に取り残されるため、その旨を警告ログに残す。
+ * 戻り値は復元が完全に成功したかどうか。
+ */
+function restoreOriginalDatabase(
+  installError: unknown,
   rollbackPath: string,
   path: string,
-  suffixes: readonly string[],
+  walShmSuffixes: readonly string[],
   operations: DatabaseFileOperations,
-): void {
+): boolean {
+  const suffixes: readonly string[] = ["", ...walShmSuffixes];
+  const restoredSuffixes: string[] = [];
+  let restoreError: unknown;
   for (const suffix of suffixes) {
-    operations.rename(`${rollbackPath}${suffix}`, `${path}${suffix}`);
+    try {
+      operations.rename(`${rollbackPath}${suffix}`, `${path}${suffix}`);
+      restoredSuffixes.push(suffix);
+    } catch (error) {
+      restoreError = error;
+      break;
+    }
   }
+  if (restoreError === undefined) return true;
+  appendSuppressedError(installError, restoreError);
+
+  // 復元未到達分(restoredSuffixesに入らなかった分)はrollbackPathから動いていないため、そのまま保全対象。
+  const preservedAtRollback = suffixes.filter((suffix) => !restoredSuffixes.includes(suffix));
+
+  for (const suffix of restoredSuffixes.reverse()) {
+    try {
+      operations.rename(`${path}${suffix}`, `${rollbackPath}${suffix}`);
+      preservedAtRollback.push(suffix);
+    } catch (reEvacuationError) {
+      appendSuppressedError(installError, reEvacuationError);
+      dbLogger.warn(
+        "復元失敗後の再退避に失敗し、DBファイルがrollback側と通常path側へ分断されました",
+        {
+          stuckAt: `${path}${suffix}`,
+          expectedAt: `${rollbackPath}${suffix}`,
+          operation: "rename",
+          ...formatError(reEvacuationError),
+        },
+      );
+    }
+  }
+
+  // 手動復旧用にrollback側の所在と、実際にそこへ揃ったファイルのみを構造化ログへ残す
+  // (再退避に失敗した分はpath側に取り残るため、preservedSuffixesには含めない)。
+  dbLogger.warn("入替に失敗しました。rollback一式を手動復旧用に残しています", {
+    rollbackPath,
+    preservedSuffixes: preservedAtRollback,
+    operation: "preserve",
+  });
+
+  return false;
 }
 
 export function removeDatabaseFiles(
@@ -81,28 +131,20 @@ export function replaceDatabaseWithCandidate(
 ): void {
   const rollbackPath = uniqueSiblingPath(path, "rollback");
   let originalMoved = false;
-  let movedWalShmFiles: string[] = [];
+  const movedWalShmFiles: string[] = [];
 
   try {
     operations.rename(path, rollbackPath);
     originalMoved = true;
-    movedWalShmFiles = moveWalShmFiles(path, rollbackPath, operations);
+    moveWalShmFiles(path, rollbackPath, operations, movedWalShmFiles);
     operations.rename(candidatePath, path);
   } catch (error) {
-    let restored = false;
-    try {
-      if (originalMoved) {
-        operations.rename(rollbackPath, path);
-        restoreWalShmFiles(rollbackPath, path, movedWalShmFiles, operations);
-        restored = true;
-      }
-    } catch (restoreError) {
-      // 復元失敗時はrollback一式を復旧用に残し、一次例外(install失敗)を保持したまま投げる。
-      appendSuppressedError(error, restoreError);
-    } finally {
-      removeDatabaseFilesWithoutThrowing(candidatePath, operations);
-      if (restored) removeDatabaseFilesWithoutThrowing(rollbackPath, operations);
-    }
+    // 復元(再退避含む)の失敗はrollback一式を復旧用に残し、一次例外(install失敗)を保持したまま投げる。
+    const restored = originalMoved
+      ? restoreOriginalDatabase(error, rollbackPath, path, movedWalShmFiles, operations)
+      : false;
+    removeDatabaseFilesWithoutThrowing(candidatePath, operations);
+    if (restored) removeDatabaseFilesWithoutThrowing(rollbackPath, operations);
     throw error;
   }
 

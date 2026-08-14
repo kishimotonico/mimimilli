@@ -291,6 +291,187 @@ test("候補DBの復元失敗時はinstall失敗を一次例外として保持�
   assert.equal(readFileSync(`${join(dirname(dbPath), rollbackPath)}-wal`, "utf-8"), "old-wal");
 });
 
+test("本体復元成功後にsidecar復元が失敗しても、best-effortで一式をrollback側へ収束させる", (t) => {
+  const directory = makeTestDirectory("db-candidate-sidecar-restore-failure");
+  t.after(directory.cleanup);
+  const dbPath = join(directory.path, "db", "user.sqlite");
+  mkdirSync(join(directory.path, "db"), { recursive: true });
+  const candidatePath = createDatabaseCandidatePath(dbPath);
+  writeFileSync(dbPath, "old");
+  writeFileSync(`${dbPath}-wal`, "old-wal");
+  writeFileSync(candidatePath, "new");
+
+  let thrown: unknown;
+  try {
+    replaceDatabaseWithCandidate(dbPath, candidatePath, {
+      exists: existsSync,
+      rename(source, destination) {
+        if (source === candidatePath && destination === dbPath) {
+          throw new Error("candidate install failed");
+        }
+        if (
+          source.endsWith("-wal") &&
+          source.includes(".rollback-") &&
+          destination === `${dbPath}-wal`
+        ) {
+          throw new Error("sidecar restore failed");
+        }
+        renameSync(source, destination);
+      },
+      remove(path) {
+        rmSync(path, { force: true });
+      },
+    });
+  } catch (error) {
+    thrown = error;
+  }
+
+  assert.ok(thrown instanceof Error);
+  assert.match(thrown.message, /candidate install failed/);
+  const suppressed = (thrown as Error & { suppressed?: unknown[] }).suppressed;
+  assert.equal(suppressed?.length, 1);
+  assert.match((suppressed![0] as Error).message, /sidecar restore failed/);
+
+  // 分断が残らない: 本体・WALのいずれも通常path側には存在せず、rollback側へ収束している。
+  assert.equal(existsSync(dbPath), false);
+  assert.equal(existsSync(`${dbPath}-wal`), false);
+  assert.equal(existsSync(candidatePath), false);
+  const rollbackName = readdirSync(dirname(dbPath)).find(
+    (name) => name.includes(".rollback-") && !name.endsWith("-wal") && !name.endsWith("-shm"),
+  );
+  assert.ok(rollbackName);
+  const rollbackPath = join(dirname(dbPath), rollbackName);
+  assert.equal(readFileSync(rollbackPath, "utf-8"), "old");
+  assert.equal(readFileSync(`${rollbackPath}-wal`, "utf-8"), "old-wal");
+});
+
+test("sidecar復元の再退避にも失敗した場合は両例外をsuppressedへ保持し、分断状態を警告ログへ残す", async (t) => {
+  const directory = makeTestDirectory("db-candidate-sidecar-reevacuation-failure");
+  t.after(directory.cleanup);
+  const dbPath = join(directory.path, "db", "user.sqlite");
+  mkdirSync(join(directory.path, "db"), { recursive: true });
+  const candidatePath = createDatabaseCandidatePath(dbPath);
+  writeFileSync(dbPath, "old");
+  writeFileSync(`${dbPath}-wal`, "old-wal");
+  writeFileSync(candidatePath, "new");
+
+  let thrown: unknown;
+  // dbPathを起点とするrenameは「初回のrollback退避」と「再退避」の2回発生し、
+  // source/destinationだけでは区別できないため出現回数で2回目のみ失敗させる。
+  let dbPathRenameCount = 0;
+  await captureLogs(
+    async (records) => {
+      try {
+        replaceDatabaseWithCandidate(dbPath, candidatePath, {
+          exists: existsSync,
+          rename(source, destination) {
+            if (source === candidatePath && destination === dbPath) {
+              throw new Error("candidate install failed");
+            }
+            if (
+              source.endsWith("-wal") &&
+              source.includes(".rollback-") &&
+              destination === `${dbPath}-wal`
+            ) {
+              throw new Error("sidecar restore failed");
+            }
+            if (source === dbPath) {
+              dbPathRenameCount += 1;
+              if (dbPathRenameCount === 2) throw new Error("re-evacuation failed");
+            }
+            renameSync(source, destination);
+          },
+          remove(path) {
+            rmSync(path, { force: true });
+          },
+        });
+      } catch (error) {
+        thrown = error;
+      }
+
+      const warning = categoryRecords(records, "db").find(
+        (record) =>
+          recordMessage(record) ===
+          "復元失敗後の再退避に失敗し、DBファイルがrollback側と通常path側へ分断されました",
+      );
+      assert.ok(warning);
+      assert.equal(warning.properties.stuckAt, dbPath);
+
+      // preservedSuffixesは実際にrollback側へ揃った分のみを指す。本体は再退避に失敗しpath側に
+      // 取り残されているため、WALのみが挙がり本体("")は含まれない。
+      const preserveWarning = categoryRecords(records, "db").find(
+        (record) =>
+          recordMessage(record) === "入替に失敗しました。rollback一式を手動復旧用に残しています",
+      );
+      assert.ok(preserveWarning);
+      assert.deepEqual(preserveWarning.properties.preservedSuffixes, ["-wal"]);
+    },
+    { categories: ["db"] },
+  );
+
+  assert.ok(thrown instanceof Error);
+  assert.match(thrown.message, /candidate install failed/);
+  const suppressed = (thrown as Error & { suppressed?: unknown[] }).suppressed;
+  assert.equal(suppressed?.length, 2);
+  assert.match((suppressed![0] as Error).message, /sidecar restore failed/);
+  assert.match((suppressed![1] as Error).message, /re-evacuation failed/);
+
+  // 最終的な復旧対象の場所が判別できる: 本体はpath側に取り残され、WALはrollback側に残る。
+  assert.equal(existsSync(dbPath), true);
+  assert.equal(readFileSync(dbPath, "utf-8"), "old");
+  assert.equal(existsSync(`${dbPath}-wal`), false);
+  const rollbackWalName = readdirSync(dirname(dbPath)).find(
+    (name) => name.includes(".rollback-") && name.endsWith("-wal"),
+  );
+  assert.ok(rollbackWalName);
+  assert.equal(readFileSync(join(dirname(dbPath), rollbackWalName), "utf-8"), "old-wal");
+});
+
+test("WAL退避成功後にSHM退避が失敗しても部分進捗を追跡し、rollback cleanupが元WALを削除しない", (t) => {
+  const directory = makeTestDirectory("db-candidate-shm-evacuation-failure");
+  t.after(directory.cleanup);
+  const dbPath = join(directory.path, "db", "user.sqlite");
+  mkdirSync(join(directory.path, "db"), { recursive: true });
+  const candidatePath = createDatabaseCandidatePath(dbPath);
+  writeFileSync(dbPath, "old");
+  writeFileSync(`${dbPath}-wal`, "old-wal");
+  writeFileSync(`${dbPath}-shm`, "old-shm");
+  writeFileSync(candidatePath, "new");
+
+  let thrown: unknown;
+  try {
+    replaceDatabaseWithCandidate(dbPath, candidatePath, {
+      exists: existsSync,
+      rename(source, destination) {
+        if (source === `${dbPath}-shm`) throw new Error("shm evacuation failed");
+        renameSync(source, destination);
+      },
+      remove(path) {
+        rmSync(path, { force: true });
+      },
+    });
+  } catch (error) {
+    thrown = error;
+  }
+
+  // SHM退避エラーが一次例外として伝播する(candidate installには到達しない)。
+  assert.ok(thrown instanceof Error);
+  assert.match(thrown.message, /shm evacuation failed/);
+
+  // 本体・WALの両方が通常pathへ復元され、WALの内容が保全される(rollback cleanupで削除されない)。
+  assert.equal(existsSync(dbPath), true);
+  assert.equal(readFileSync(dbPath, "utf-8"), "old");
+  assert.equal(existsSync(`${dbPath}-wal`), true);
+  assert.equal(readFileSync(`${dbPath}-wal`, "utf-8"), "old-wal");
+
+  // SHMは退避に失敗したため元の場所に残る。
+  assert.equal(existsSync(`${dbPath}-shm`), true);
+  assert.equal(readFileSync(`${dbPath}-shm`, "utf-8"), "old-shm");
+
+  // 最終的に分断が残らない: candidate/rollback系の残骸がない。
+  assertNoReplacementFiles(dbPath);
+});
+
 test("入替成功後のrollback一時ファイル削除失敗はbest-effortで処理され、入替自体は成功する", (t) => {
   const directory = makeTestDirectory("db-candidate-rollback-cleanup-failure");
   t.after(directory.cleanup);
