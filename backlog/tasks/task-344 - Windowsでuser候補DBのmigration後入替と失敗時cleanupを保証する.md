@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@codex'
 created_date: '2026-08-14 18:15'
-updated_date: '2026-08-14 20:28'
+updated_date: '2026-08-14 20:49'
 labels:
   - bug
   - server
@@ -51,6 +51,8 @@ TASK-309で導入したuser候補DBのforward-only-migration後の入替処理�
 独立レビュー指摘を反映: 候補DBのclose保証範囲をPRAGMA設定を含む全体へ復元、migration実行をexecuteSqliteMigrationsへ1系統化しdrizzle migrator依存を削除、insertMigrationをDatabase.runへ簡素化。fix/task-344-windows-db-replacementブランチでmaster最新へ再ベース。
 
 外部レビュー反映: 入替成功後cleanupのbest-effort化、install/restore両例外の保持、pending判定のexecutor統一、journal解析のreadMigrationFiles委譲、二次障害のログ整備。
+
+外部レビュー最終指摘反映: sidecar(WAL/SHM)復元が本体復元成功後に途中失敗すると、本体・sidecarがrollback側と通常path側へ分断されrollback cleanupも走らない不備を修正。復元処理を本体+WAL/SHMの一連リストとして扱い、途中失敗時は復元済み分をbest-effortでrollback側へ戻して一式を収束させ、戻すこと自体の失敗はwarningログ(stuckAt/expectedAt)へ記録した上でrestore/re-evacuation両例外をinstall一次例外のsuppressedへ保持するよう変更。
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
