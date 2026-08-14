@@ -1,10 +1,10 @@
 ---
 id: TASK-337
 title: 実Bun.serveを通すtransport smokeテストを追加する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-14 10:27'
-updated_date: '2026-08-14 13:03'
+updated_date: '2026-08-14 16:28'
 labels: []
 dependencies: []
 priority: medium
@@ -29,9 +29,15 @@ TASK-335と独立に着手できる（MIMIMILLI_ADAPTER=fixtureのBun.serve起�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 実ポートにbindしたBun.serveへHTTP接続するテストがserverテストに追加され、bun testで実行できる
-- [ ] #2 SSEエンドポイントのストリーム受信と、クライアント切断（AbortSignal）でサーバー側ジョブが中断されることを検証する
-- [ ] #3 audioのRangeリクエストで206と指定範囲のボディが返ることを検証する
-- [ ] #4 graceful shutdown（server.stop→app.shutdown→adapter close→logger dispose）が完了することを検証する
-- [ ] #5 /apiと/api/の両方が同じルーティング結果になることを実HTTPで検証する
+- [x] #1 実ポートにbindしたBun.serveへHTTP接続するテストがserverテストに追加され、bun testで実行できる
+- [x] #2 SSEエンドポイントのストリーム受信と、クライアント切断（AbortSignal）でサーバー側ジョブが中断されることを検証する
+- [x] #3 audioのRangeリクエストで206と指定範囲のボディが返ることを検証する
+- [x] #4 graceful shutdown（server.stop→app.shutdown→adapter close→logger dispose）が完了することを検証する
+- [x] #5 /apiと/api/の両方が同じルーティング結果になることを実HTTPで検証する
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+server/tests/transport/にSSE・Range・shutdown・末尾スラッシュの4テストと共通helperを追加し、実ポートにbindしたBun.serve（port 0）へHTTP接続して検証する。SSEはサーバー側のabortイベント観測でジョブ中断を判定し、Rangeは開放端bytes=N-の8MiB打ち切りをcontent-range・content-length・実ボディ長の3点でアサート。shutdownはserverLifecycle.tsへ切り出したperformGracefulShutdownに対し、close付きスタブadapter・close無しfixture・server.stopがthrowする場合の3ケースで各ステップの実行と継続性を検証する（本番の順序・挙動は不変）。検証: pnpm check成功、pnpm test:server 617 pass、該当ステップを潰すとテストが赤くなる負の検証をレビュー担当が再現。
+<!-- SECTION:FINAL_SUMMARY:END -->

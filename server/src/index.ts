@@ -16,15 +16,15 @@ import { createFixtureAdapter } from "./adapters/fixture/index.ts";
 import { resolveDataPaths } from "./adapters/real/dataRoot.ts";
 import { resolveDlsiteCacheConfig } from "./adapters/real/dlsiteCache.ts";
 import { resolveDlsiteRequestConfig } from "./adapters/real/dlsiteConfig.ts";
-import { createRealAdapter, type RealAdapter } from "./adapters/real/index.ts";
+import { createRealAdapter } from "./adapters/real/index.ts";
 import type { DataAdapter } from "./adapter/index.ts";
 import {
   createDlsiteEventLogger,
-  dispose,
   formatError,
   getCategoryLogger,
   initLogger,
 } from "./lib/logger.ts";
+import { performGracefulShutdown, SERVER_IDLE_TIMEOUT_SECONDS } from "./serverLifecycle.ts";
 import { buildStartupLogProperties } from "./lib/startupLog.ts";
 
 const adapterKind = process.env.MIMIMILLI_ADAPTER ?? "real";
@@ -62,10 +62,6 @@ function createAdapter(): DataAdapter {
   }
 }
 
-function isRealAdapter(value: DataAdapter): value is RealAdapter {
-  return "close" in value && typeof value.close === "function";
-}
-
 let shuttingDown = false;
 
 async function shutdown(exitCode: number, reason: string, error?: unknown): Promise<void> {
@@ -81,29 +77,7 @@ async function shutdown(exitCode: number, reason: string, error?: unknown): Prom
     console.error(logError);
   }
 
-  try {
-    if (server) server.stop();
-  } catch (stopError) {
-    console.error(stopError);
-  }
-
-  try {
-    await app.shutdown();
-  } catch (shutdownError) {
-    console.error(shutdownError);
-  }
-
-  try {
-    if (adapter && isRealAdapter(adapter)) adapter.close();
-  } catch (closeError) {
-    console.error(closeError);
-  }
-
-  try {
-    await dispose();
-  } catch (disposeError) {
-    console.error(disposeError);
-  }
+  await performGracefulShutdown({ server, app, adapter });
 
   process.exit(exitCode);
 }
@@ -125,8 +99,6 @@ process.on("SIGTERM", () => {
 });
 
 const port = Number(process.env.PORT ?? 8080);
-/** DLsite同期fetchの総期限(60s)+余裕。Bun既定の10sアイドル制限を上書きする。 */
-const SERVER_IDLE_TIMEOUT_SECONDS = 90;
 let adapter: DataAdapter | undefined;
 let server: ReturnType<typeof Bun.serve> | undefined;
 

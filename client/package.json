@@ -5,11 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "cross-env PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run vite",
-    "dev:large": "cross-env MIMIMILLI_MOCK_SCENARIO=large PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run vite",
-    "dev:new-work": "cross-env MIMIMILLI_MOCK_SCENARIO=new-work PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run vite",
-    "dev:empty": "cross-env MIMIMILLI_MOCK_SCENARIO=empty PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run vite",
-    "dev:errors": "cross-env MIMIMILLI_MOCK_SCENARIO=errors PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run vite",
-    "dev:real": "cross-env MIMIMILLI_BACKEND_SERVICE=api.mimi PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run vite",
+    "dev:real": "pnpm dev",
     "check": "tsc",
     "build": "tsc && vite build",
     "preview": "vite preview",
@@ -35,8 +31,6 @@
     "zod": "^4.1.0"
   },
   "devDependencies": {
-    "@hono/node-server": "^1.14.0",
-    "@mimimilli/server": "workspace:*",
     "@playwright/test": "^1.60.0",
     "@tailwindcss/vite": "^4.3.0",
     "@tanstack/react-query-devtools": "^5.100.14",

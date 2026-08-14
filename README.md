@@ -54,13 +54,13 @@ cd mimimilli
 # 依存関係（ルートのワークスペースで一括）
 pnpm install
 
-# 開発サーバー起動（fixture アダプタの API も同じプロセスで動く）
+# 開発サーバー起動（Vite + Bun fixture サーバーを並列起動）
 pnpm dev
 # => http://mimi.localhost:1355
 ```
 
-`pnpm dev` は `pnpm dev:fixture:large`（実ライブラリ規模を模した1000件のシナリオ）のエイリアスとして、ルートから client を起動する。
-`vite.config.ts` は server の Hono アプリ（fixture アダプタ注入）を dev middleware として `/api/*` にマウントするため、UI とモック API が同一プロセスで動く。
+`pnpm dev` は `pnpm dev:fixture:large`（実ライブラリ規模を模した1000件のシナリオ）のエイリアスとして、ルートから Vite と Bun fixture サーバーを並列起動する。
+Vite は `/api` を同じ worktree の Bun サーバー（portless サービス `api.mimi`）へ proxy する。
 代表的な fixture シナリオは、次のコマンドで切り替える。
 
 ```bash
