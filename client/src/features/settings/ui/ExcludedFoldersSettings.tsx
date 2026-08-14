@@ -6,8 +6,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getScanCandidateExclusions,
   restoreScanCandidateExclusions,
-  SCAN_QUERY_KEYS,
-} from "../../scan/api";
+  SCAN_CANDIDATE_EXCLUSIONS_QUERY_KEY,
+} from "../../../entities/scan/api";
 import Button from "../../../shared/ui/Button";
 import Toast from "../../../shared/ui/Toast";
 import { apiErrorMessage } from "../../../shared/lib/apiError";
@@ -21,7 +21,7 @@ export default function ExcludedFoldersSettings() {
   const [restoredToast, setRestoredToast] = useState<string | null>(null);
 
   const exclusionsQuery = useQuery({
-    queryKey: SCAN_QUERY_KEYS.candidateExclusions(),
+    queryKey: SCAN_CANDIDATE_EXCLUSIONS_QUERY_KEY,
     queryFn: getScanCandidateExclusions,
   });
   const exclusions = exclusionsQuery.data ?? [];
@@ -31,10 +31,7 @@ export default function ExcludedFoldersSettings() {
     onSuccess: async (_void, path) => {
       setErrorMessage(null);
       setRestoredToast(path);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.candidateExclusions() }),
-        queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.candidates() }),
-      ]);
+      await queryClient.invalidateQueries({ queryKey: SCAN_CANDIDATE_EXCLUSIONS_QUERY_KEY });
     },
     onError: (error: unknown) => setErrorMessage(apiErrorMessage(error, "解除に失敗しました")),
   });
