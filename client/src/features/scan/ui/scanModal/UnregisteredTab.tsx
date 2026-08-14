@@ -8,12 +8,8 @@ import { I } from "../../../../shared/ui/Icon";
 import { cn } from "../../../../shared/lib/cn";
 import { ApiRequestError } from "../../../../shared/api/http";
 import { apiErrorMessage } from "../../../../shared/lib/apiError";
-import {
-  excludeScanCandidates,
-  registerScanCandidates,
-  restoreScanCandidateExclusions,
-  SCAN_QUERY_KEYS,
-} from "../../api";
+import { excludeScanCandidates, registerScanCandidates, SCAN_QUERY_KEYS } from "../../api";
+import { restoreScanCandidateExclusions } from "../../../../entities/scan/api";
 import type { CandidatesRegisteredResult } from "./types";
 
 export interface UnregisteredTabProps {

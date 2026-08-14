@@ -21,6 +21,7 @@ import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { scanActionsAtom, scanJobAtom } from "../../src/entities/scan/model/atoms";
 import * as scanApi from "../../src/features/scan/api";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
+import * as scanEntityApi from "../../src/entities/scan/api";
 import { libraryTotalQueryOptions } from "../../src/entities/work/libraryTotalQueryOptions";
 
 /** ids指定のworks一覧クエリ結果のスタブ。テストごとに登録した作品だけ返す（TASK-210/276）。
@@ -583,7 +584,7 @@ describe("ScanModal", () => {
   it("候補を1件ずつ除外でき、「元に戻す」で取り消せる", async () => {
     const excludeSpy = vi.spyOn(scanApi, "excludeScanCandidates").mockResolvedValue(undefined);
     const restoreSpy = vi
-      .spyOn(scanApi, "restoreScanCandidateExclusions")
+      .spyOn(scanEntityApi, "restoreScanCandidateExclusions")
       .mockResolvedValue(undefined);
     const getCandidatesSpy = vi
       .spyOn(scanApi, "getScanCandidates")

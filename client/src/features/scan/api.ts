@@ -40,10 +40,6 @@ export const SCAN_QUERY_KEYS = {
 
 export type { ScanResult } from "./model";
 export type { StartScanRequest };
-export {
-  getScanCandidateExclusions,
-  restoreScanCandidateExclusions,
-} from "../../entities/scan/api";
 
 export class ScanAlreadyActiveError extends ApiRequestError {
   readonly active: ScanJobSnapshot;
