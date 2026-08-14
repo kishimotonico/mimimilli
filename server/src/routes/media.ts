@@ -7,7 +7,6 @@ import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { Readable } from "node:stream";
 import { Hono, type Context } from "hono";
-import { getBunServer } from "hono/bun";
 import {
   coverQuerySchema,
   normalizeThumbnailWidth,
@@ -16,13 +15,19 @@ import {
 import type { CoverDescriptor, DataAdapter, MediaLocation } from "../adapter/index.ts";
 import { invalidRequest, notFound } from "../lib/httpError.ts";
 
+type BunServerLike = { timeout?: (req: Request, seconds: number) => void };
+
 /**
  * Bunのidle timeoutは配信中のストリーミング接続にも適用されるため、リクエスト単位で無効化する。
  * fixture開発経路（Bun Serverなし）では何もしない。
+ *
+ * hono/bunのgetBunServerはグローバルBunを評価時に参照しNode実行下でimportできないため、
+ * その実体（c.envからBun Serverを取り出すだけの処理）をここに直接書く。
  */
 function disableIdleTimeout(c: Context): void {
   if (!c.env) return;
-  const server = getBunServer<{ timeout?: (req: Request, seconds: number) => void }>(c);
+  const env = c.env as { server?: BunServerLike } & BunServerLike;
+  const server = "server" in env ? env.server : env;
   if (server && typeof server.timeout === "function") {
     server.timeout(c.req.raw, 0);
   }
