@@ -1,13 +1,16 @@
-// 候補除外の一覧・解除。features/scan（除外操作・直後の取り消しトースト）と
-// features/settings（後から気づいた場合の解除UI、TASK-330）の両方から参照される
-// 横断的なAPIのため entities に置く。
+// 候補除外の一覧・解除。features/scan と features/settings の両方から参照される共通API。
 import { getParsed, postVoid } from "../../shared/api/http";
 import {
   scanCandidateExclusionsResponseSchema,
   scanCandidatesMutationSchema,
 } from "@mimimilli/shared";
 
-export const SCAN_CANDIDATE_EXCLUSIONS_QUERY_KEY = ["scan", "candidates", "exclusions"] as const;
+export const SCAN_CANDIDATES_QUERY_KEY = ["scan", "candidates"] as const;
+/** exclusionsはcandidatesの子キーなので、candidatesを無効化すれば連動して無効化される。 */
+export const SCAN_CANDIDATE_EXCLUSIONS_QUERY_KEY = [
+  ...SCAN_CANDIDATES_QUERY_KEY,
+  "exclusions",
+] as const;
 
 export async function getScanCandidateExclusions(): Promise<string[]> {
   const { paths } = await getParsed(

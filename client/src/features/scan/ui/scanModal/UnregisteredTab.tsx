@@ -96,10 +96,8 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
     mutationFn: (path: string) => restoreScanCandidateExclusions([path]),
     onSuccess: async () => {
       setExcludeToast(null);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.candidates() }),
-        queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.candidateExclusions() }),
-      ]);
+      // candidateExclusions()はcandidates()の子キーなので、candidates()の無効化で連動して無効化される。
+      await queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.candidates() });
     },
     onError: (error) => setErrorMessage(apiErrorMessage(error, "取り消しに失敗しました")),
   });
