@@ -30,9 +30,7 @@ function subscribeToScanCandidates(
 ): () => void {
   const queryKey = SCAN_QUERY_KEYS.candidates();
   return queryClient.getQueryCache().subscribe((event) => {
-    if (event.query.queryHash !== queryClient.getQueryCache().find({ queryKey })?.queryHash) {
-      return;
-    }
+    if (JSON.stringify(event.query.queryKey) !== JSON.stringify(queryKey)) return;
     onStoreChange();
   });
 }
