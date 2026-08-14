@@ -9,7 +9,6 @@ import {
   postVoid,
   type StatusHandler,
 } from "../../shared/api/http";
-import type { QueryClient } from "@tanstack/react-query";
 import {
   SCAN_CANDIDATES_QUERY_KEY,
   SCAN_CANDIDATE_EXCLUSIONS_QUERY_KEY,
@@ -23,14 +22,12 @@ import {
   scanCandidatesMutationSchema,
   scanCandidatesRegisterRequestSchema,
   scanCandidatesRegisterResponseSchema,
-  scanCandidatesResponseSchema,
   startScanRequestSchema,
   startScanResponseSchema,
   type ScanCandidateRegisterItem,
   type ScanJobSnapshot,
   type ScanLastResultResponse,
   type ScanCandidatesRegisterResponse,
-  type ScanCandidate,
 } from "@mimimilli/shared";
 
 export const SCAN_QUERY_KEYS = {
@@ -91,16 +88,7 @@ export async function getLastScanResult(): Promise<ScanLastResultResponse | null
   return getParsed(scanLastResultResponseSchema, "/scan/last", { noContentAsNull: true });
 }
 
-export async function getScanCandidates(): Promise<ScanCandidate[]> {
-  const { candidates } = await getParsed(scanCandidatesResponseSchema, "/scan/candidates");
-  return candidates;
-}
-
-export async function refreshScanCandidates(queryClient: QueryClient): Promise<ScanCandidate[]> {
-  const candidates = await getScanCandidates();
-  queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), candidates);
-  return candidates;
-}
+export { getScanCandidates, refreshScanCandidates } from "../../entities/scan/api";
 
 export async function registerScanCandidates(
   items: ScanCandidateRegisterItem[],

@@ -5,10 +5,10 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getScanCandidateExclusions,
+  refreshScanCandidates,
   restoreScanCandidateExclusions,
   SCAN_CANDIDATE_EXCLUSIONS_QUERY_KEY,
 } from "../../../entities/scan/api";
-import { refreshScanCandidates, SCAN_QUERY_KEYS } from "../../scan/api";
 import Button from "../../../shared/ui/Button";
 import Toast from "../../../shared/ui/Toast";
 import { apiErrorMessage } from "../../../shared/lib/apiError";

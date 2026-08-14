@@ -587,11 +587,13 @@ describe("ScanModal", () => {
     const restoreSpy = vi
       .spyOn(scanEntityApi, "restoreScanCandidateExclusions")
       .mockResolvedValue(undefined);
-    const refreshSpy = vi.spyOn(scanApi, "refreshScanCandidates").mockImplementation(async (queryClient) => {
-      const candidates = [candidateDetected, candidateUndetected];
-      queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), candidates);
-      return candidates;
-    });
+    const refreshSpy = vi
+      .spyOn(scanApi, "refreshScanCandidates")
+      .mockImplementation(async (queryClient) => {
+        const candidates = [candidateDetected, candidateUndetected];
+        queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), candidates);
+        return candidates;
+      });
     renderModal({
       lastResult: { ...scanResult, candidates: [candidateDetected, candidateUndetected] },
     });
