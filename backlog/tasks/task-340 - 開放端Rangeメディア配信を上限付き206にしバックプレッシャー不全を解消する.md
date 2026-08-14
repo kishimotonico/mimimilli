@@ -1,10 +1,10 @@
 ---
 id: TASK-340
 title: 開放端Rangeメディア配信を上限付き206にしバックプレッシャー不全を解消する
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-08-14 10:39'
-updated_date: '2026-08-14 11:35'
+updated_date: '2026-08-14 12:11'
 labels: []
 dependencies:
   - TASK-339
@@ -46,3 +46,9 @@ streamWithRange（server/src/routes/media.ts:135-215）は開放端Range（bytes
 - [ ] #4 Chromeでの通し再生・シークが正常動作する（実機確認を受け入れ条件に含む）
 - [ ] #5 pnpm check と server側テストが通る
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+実装・自動テストは完了し統合ブランチ feat/media-connection-lifetime にマージ済み（99ea67c）。上限8MiB、開放端Range（bytes=N-）のみ丸め、閉区間と末尾指定は従来どおり、200経路は上限なし。残るはAC#4のChrome実機確認のみ（この開発環境はSSH越しWSLのため実施不可。別PCでの確認待ち）。確認内容: 長時間の通し再生が停止しないこと、シークが正常に動作すること。
+<!-- SECTION:NOTES:END -->
