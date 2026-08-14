@@ -1,7 +1,8 @@
-import type { ScanCandidate, ScanProgressEvent, ScanResult } from "@mimimilli/shared";
+import type { ScanCandidate, ScanResult } from "@mimimilli/shared";
 import type { ScanOptions } from "../../adapter/index.ts";
 import { formatError, getCategoryLogger } from "../../lib/logger.ts";
 import type { DbLocation } from "./db.ts";
+import type { ScanWorkerOutboundMessage } from "./scanWorkerMessages.ts";
 
 const scanLogger = getCategoryLogger("scan");
 
@@ -11,18 +12,10 @@ export type FileScanWorkerResult = {
   candidatePool: ScanCandidate[];
 };
 
-interface ScanWorkerMessage {
-  type: "progress" | "completed" | "cancelled" | "error" | "test-gate-ready";
-  progress?: ScanProgressEvent;
-  result?: ScanResult;
-  candidatePool?: ScanCandidate[];
-  message?: string;
-  errorKind?: string;
-  stack?: string;
-}
-
-function reconstructWorkerError(message: ScanWorkerMessage): Error {
-  const error = new Error(message.message ?? "スキャンワーカーが失敗しました");
+function reconstructWorkerError(
+  message: Extract<ScanWorkerOutboundMessage, { type: "error" }>,
+): Error {
+  const error = new Error(message.message);
   if (message.errorKind) error.name = message.errorKind;
   if (message.stack) error.stack = message.stack;
   return error;
@@ -60,30 +53,34 @@ export async function runFileScanInWorker(
         Atomics.notify(gate, 0);
       }
     };
-    const onMessage = (event: MessageEvent<ScanWorkerMessage>) => {
+    const onMessage = (event: MessageEvent<ScanWorkerOutboundMessage>) => {
       const message = event.data;
       if (message.type === "test-gate-ready") {
         onTestGateReady?.();
         return;
       }
-      if (message.type === "progress" && message.progress) {
+      if (message.type === "progress") {
         options.onProgress?.(message.progress);
         return;
       }
       terminalReceived = true;
-      if (message.type === "completed" && message.result) {
-        settle(() =>
-          resolveResult({
-            result: message.result!,
-            candidatePool: message.candidatePool ?? [],
-          }),
-        );
-      } else if (message.type === "cancelled") {
-        settle(() =>
-          rejectResult(new DOMException("スキャンはキャンセルされました", "AbortError")),
-        );
-      } else {
-        settle(() => rejectResult(reconstructWorkerError(message)));
+      switch (message.type) {
+        case "completed":
+          settle(() =>
+            resolveResult({
+              result: message.result,
+              candidatePool: message.candidatePool,
+            }),
+          );
+          break;
+        case "cancelled":
+          settle(() =>
+            rejectResult(new DOMException("スキャンはキャンセルされました", "AbortError")),
+          );
+          break;
+        case "error":
+          settle(() => rejectResult(reconstructWorkerError(message)));
+          break;
       }
     };
     const onError = (event: ErrorEvent) => {
