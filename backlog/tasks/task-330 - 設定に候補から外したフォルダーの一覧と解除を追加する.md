@@ -4,7 +4,7 @@ title: 設定に候補から外したフォルダーの一覧と解除を追加�
 status: To Do
 assignee: []
 created_date: '2026-08-13 16:59'
-updated_date: '2026-08-14 05:49'
+updated_date: '2026-08-14 07:07'
 labels: []
 dependencies:
   - TASK-327
@@ -23,5 +23,5 @@ ordinal: 340000
 - [x] #1 設定画面で候補から外したフォルダーの一覧を確認できる
 - [x] #2 各行から解除でき、解除後の次回スキャンで候補として再び提示される
 - [x] #3 0件のときも案内文とともにセクションが表示される
-- [ ] #4 pnpm test:smokeが通る
+- [x] #4 pnpm test:smokeが通る
 <!-- AC:END -->
