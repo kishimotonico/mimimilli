@@ -26,6 +26,7 @@ const scanResult: ScanResult = {
   identityConflicts: [],
   invalidMetaFiles: [],
   candidates: [],
+  candidatePool: [],
 };
 
 const summaryDefaults = {

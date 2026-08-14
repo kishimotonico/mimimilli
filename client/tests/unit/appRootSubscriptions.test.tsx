@@ -108,6 +108,7 @@ function seedQueryCache(queryClient: QueryClient) {
       identityConflicts: [],
       invalidMetaFiles: [],
       candidates: [],
+      candidatePool: [],
     },
     finishedAt: "2026-01-01T00:00:00.000Z",
   });
@@ -356,6 +357,7 @@ describe("App root subscriptions", () => {
           identityConflicts: [],
           invalidMetaFiles: [],
           candidates: [],
+          candidatePool: [],
         },
         finishedAt: "2026-01-02T00:00:00.000Z",
       };

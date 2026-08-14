@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import TopBar from "../../src/app/ui/TopBar";
 import { appModeAtom } from "../../src/features/navigation/model/navigationAtoms";
 import * as scanApi from "../../src/features/scan/api";
+import * as scanEntityApi from "../../src/entities/scan/api";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
 
 const candidate = {
@@ -40,7 +41,7 @@ function renderTopBar(queryClient: QueryClient) {
 describe("TopBar の未登録バッジ", () => {
   beforeEach(() => {
     vi.spyOn(scanApi, "getLastScanResult").mockResolvedValue(null);
-    vi.spyOn(scanApi, "getScanCandidates").mockResolvedValue([candidate]);
+    vi.spyOn(scanEntityApi, "getScanCandidates").mockResolvedValue([candidate]);
   });
 
   afterEach(() => {
@@ -55,7 +56,7 @@ describe("TopBar の未登録バッジ", () => {
 
     renderTopBar(queryClient);
 
-    expect(scanApi.getScanCandidates).not.toHaveBeenCalled();
+    expect(scanEntityApi.getScanCandidates).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "スキャン（未登録1件）" })).toBeInTheDocument();
   });
 
@@ -66,14 +67,14 @@ describe("TopBar の未登録バッジ", () => {
     queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), [candidate]);
 
     renderTopBar(queryClient);
-    expect(scanApi.getScanCandidates).not.toHaveBeenCalled();
+    expect(scanEntityApi.getScanCandidates).not.toHaveBeenCalled();
 
     await act(async () => {
       focusManager.setFocused(false);
       focusManager.setFocused(true);
     });
 
-    expect(scanApi.getScanCandidates).not.toHaveBeenCalled();
+    expect(scanEntityApi.getScanCandidates).not.toHaveBeenCalled();
   });
 
   it("前回スキャン結果から件数を導出する", async () => {
@@ -94,6 +95,7 @@ describe("TopBar の未登録バッジ", () => {
         identityConflicts: [],
         invalidMetaFiles: [],
         candidates: [candidate, { ...candidate, path: "もう1件", inferredTitle: "もう1件" }],
+        candidatePool: [candidate, { ...candidate, path: "もう1件", inferredTitle: "もう1件" }],
       },
     });
 
@@ -102,6 +104,6 @@ describe("TopBar の未登録バッジ", () => {
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "スキャン（未登録2件）" })).toBeInTheDocument();
     });
-    expect(scanApi.getScanCandidates).not.toHaveBeenCalled();
+    expect(scanEntityApi.getScanCandidates).not.toHaveBeenCalled();
   });
 });

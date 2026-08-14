@@ -154,6 +154,7 @@ export class Scanner {
       identityConflicts: [],
       invalidMetaFiles: [],
       candidates: [],
+      candidatePool: [],
     };
 
     const tree = await this.walkPhase(root, emit, signal, abortToken, checkAbort);
@@ -182,6 +183,7 @@ export class Scanner {
     );
 
     this.lastCandidatePool = this.collectCandidates(root, tree, { filterExclusions: false });
+    result.candidatePool = this.lastCandidatePool;
     result.candidates = this.collectCandidates(root, tree);
 
     await this.generatePhase(root, result, emit, checkAbort);

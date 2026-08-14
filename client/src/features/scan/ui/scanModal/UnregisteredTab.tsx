@@ -9,13 +9,11 @@ import { cn } from "../../../../shared/lib/cn";
 import { ApiRequestError } from "../../../../shared/api/http";
 import { apiErrorMessage } from "../../../../shared/lib/apiError";
 import { parentDirOf } from "../../../../shared/lib/workspacePath";
+import { excludeScanCandidates, registerScanCandidates, SCAN_QUERY_KEYS } from "../../api";
 import {
-  excludeScanCandidates,
   refreshScanCandidates,
-  registerScanCandidates,
-  SCAN_QUERY_KEYS,
-} from "../../api";
-import { restoreScanCandidateExclusions } from "../../../../entities/scan/api";
+  restoreScanCandidateExclusions,
+} from "../../../../entities/scan/api";
 import type { CandidatesRegisteredResult } from "./types";
 
 export interface UnregisteredTabProps {

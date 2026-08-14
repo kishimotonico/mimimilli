@@ -111,6 +111,7 @@ const scanResult: ScanResult = {
   identityConflicts: [],
   invalidMetaFiles: [],
   candidates: [],
+  candidatePool: [],
 };
 
 const candidateDetected: ScanCandidate = {
@@ -532,7 +533,11 @@ describe("ScanModal", () => {
       failures: [],
     });
     renderModal({
-      lastResult: { ...scanResult, candidates: [candidateDetected, candidateUndetected] },
+      lastResult: {
+        ...scanResult,
+        candidates: [candidateDetected, candidateUndetected],
+        candidatePool: [candidateDetected, candidateUndetected],
+      },
     });
 
     const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });
@@ -560,7 +565,11 @@ describe("ScanModal", () => {
       failures: [],
     });
     renderModal({
-      lastResult: { ...scanResult, candidates: [candidateDetected, candidateUndetected] },
+      lastResult: {
+        ...scanResult,
+        candidates: [candidateDetected, candidateUndetected],
+        candidatePool: [candidateDetected, candidateUndetected],
+      },
     });
 
     const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });
@@ -588,14 +597,18 @@ describe("ScanModal", () => {
       .spyOn(scanEntityApi, "restoreScanCandidateExclusions")
       .mockResolvedValue(undefined);
     const refreshSpy = vi
-      .spyOn(scanApi, "refreshScanCandidates")
+      .spyOn(scanEntityApi, "refreshScanCandidates")
       .mockImplementation(async (queryClient) => {
         const candidates = [candidateDetected, candidateUndetected];
         queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), candidates);
         return candidates;
       });
     renderModal({
-      lastResult: { ...scanResult, candidates: [candidateDetected, candidateUndetected] },
+      lastResult: {
+        ...scanResult,
+        candidates: [candidateDetected, candidateUndetected],
+        candidatePool: [candidateDetected, candidateUndetected],
+      },
     });
 
     const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });

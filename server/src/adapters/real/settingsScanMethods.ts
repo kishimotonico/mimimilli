@@ -115,7 +115,7 @@ export function createSettingsScanMethods(deps: {
           resolve(thumbnailCacheDir),
           normalized,
         );
-        scanner.seedCandidatePool(result.candidates);
+        scanner.seedCandidatePool(result.candidatePool);
         return result;
       }
       const result = await scanner.scan(root, normalized);

@@ -74,6 +74,7 @@ const scanResult = {
   identityConflicts: [],
   invalidMetaFiles: [],
   candidates: [],
+  candidatePool: [],
 };
 
 const dlsiteResult = {

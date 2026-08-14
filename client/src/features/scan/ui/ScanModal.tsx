@@ -9,12 +9,8 @@ import IconButton from "../../../shared/ui/IconButton";
 import Toast from "../../../shared/ui/Toast";
 import { scanningAtom, scanProgressAtom } from "../../../entities/scan/model/atoms";
 import { useScanActions } from "../../../entities/scan/useScanActions";
-import {
-  getLastScanResult,
-  getScanDiagnostics,
-  refreshScanCandidates,
-  SCAN_QUERY_KEYS,
-} from "../api";
+import { getLastScanResult, getScanDiagnostics, SCAN_QUERY_KEYS } from "../api";
+import { refreshScanCandidates } from "../../../entities/scan/api";
 import { useScanCandidatesCache } from "../model/useScanCandidatesCache";
 import ScanSidebar from "./scanModal/ScanSidebar";
 import UnregisteredTab from "./scanModal/UnregisteredTab";

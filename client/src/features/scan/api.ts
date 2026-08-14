@@ -88,8 +88,6 @@ export async function getLastScanResult(): Promise<ScanLastResultResponse | null
   return getParsed(scanLastResultResponseSchema, "/scan/last", { noContentAsNull: true });
 }
 
-export { getScanCandidates, refreshScanCandidates } from "../../entities/scan/api";
-
 export async function registerScanCandidates(
   items: ScanCandidateRegisterItem[],
 ): Promise<ScanCandidatesRegisterResponse> {
