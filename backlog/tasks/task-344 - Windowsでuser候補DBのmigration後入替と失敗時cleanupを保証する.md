@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@codex'
 created_date: '2026-08-14 18:15'
-updated_date: '2026-08-14 20:49'
+updated_date: '2026-08-15 14:20'
 labels:
   - bug
   - server
@@ -53,6 +53,8 @@ TASK-309で導入したuser候補DBのforward-only-migration後の入替処理�
 外部レビュー反映: 入替成功後cleanupのbest-effort化、install/restore両例外の保持、pending判定のexecutor統一、journal解析のreadMigrationFiles委譲、二次障害のログ整備。
 
 外部レビュー最終指摘反映: sidecar(WAL/SHM)復元が本体復元成功後に途中失敗すると、本体・sidecarがrollback側と通常path側へ分断されrollback cleanupも走らない不備を修正。復元処理を本体+WAL/SHMの一連リストとして扱い、途中失敗時は復元済み分をbest-effortでrollback側へ戻して一式を収束させ、戻すこと自体の失敗はwarningログ(stuckAt/expectedAt)へ記録した上でrestore/re-evacuation両例外をinstall一次例外のsuppressedへ保持するよう変更。
+
+退避側moveWalShmFilesの部分進捗追跡を呼び出し元所有の配列へ変更し、途中失敗時のWAL削除を防止。あわせて復元失敗時(restored=false)にrollbackPathと退避済みsuffix一覧を含む構造化warningを追加し、手動復旧対象の所在を明確化。
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
