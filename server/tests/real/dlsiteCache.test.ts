@@ -23,7 +23,7 @@ import {
   validateDlsiteHtmlInput,
 } from "../../src/adapters/real/dlsiteCache.ts";
 import { runDlsiteCacheCli } from "../../src/dlsiteCacheCli.ts";
-import { makeTestDirectory } from "../helpers/sampleLibrary.ts";
+import { makeTestDirectory, makeTestScope } from "../helpers/sampleLibrary.ts";
 
 const VALID_HTML = '<html><h1 id="work_name">テスト作品</h1></html>';
 
@@ -624,9 +624,8 @@ test("DLsiteキャッシュ: 相対パスでも生成に成功する", (t) => {
   t.after(directory.cleanup);
   const previousCwd = process.cwd();
   process.chdir(directory.path);
-  t.after(() => process.chdir(previousCwd));
-  const cache = new DlsiteCache({ path: "cache.sqlite" });
-  t.after(() => cache.close());
+  directory.ownFn(previousCwd, (cwd) => process.chdir(cwd));
+  const cache = directory.own(new DlsiteCache({ path: "cache.sqlite" }));
   assert.equal(cache.resolve({ productCode: "RJ123456" }).kind, "miss");
 });
 
@@ -635,8 +634,7 @@ test("DLsiteキャッシュ: 既存ディレクトリを出力先に指定して
   t.after(directory.cleanup);
   const cachePath = join(directory.path, "cache.sqlite");
   mkdirSync(directory.path, { recursive: true });
-  const cache = new DlsiteCache({ path: cachePath });
-  t.after(() => cache.close());
+  const cache = directory.own(new DlsiteCache({ path: cachePath }));
   assert.equal(cache.resolve({ productCode: "RJ123456" }).kind, "miss");
 });
 
@@ -647,7 +645,9 @@ test("DLsiteキャッシュ: 同一出力先への並行生成でEEXISTを投げ
   const caches = await Promise.all(
     Array.from({ length: 8 }, () => Promise.resolve(new DlsiteCache({ path: cachePath }))),
   );
-  t.after(() => caches.forEach((cache) => cache.close()));
+  for (const cache of caches) {
+    directory.own(cache);
+  }
   assert.equal(caches.length, 8);
 });
 
@@ -656,18 +656,18 @@ test("DLsiteキャッシュ: 相対パスは絶対パスとして保持する", 
   t.after(directory.cleanup);
   const previousCwd = process.cwd();
   process.chdir(directory.path);
-  t.after(() => process.chdir(previousCwd));
+  directory.ownFn(previousCwd, (cwd) => process.chdir(cwd));
   const relativePath = "cache.sqlite";
-  const cache = new DlsiteCache({ path: relativePath });
-  t.after(() => cache.close());
+  const cache = directory.own(new DlsiteCache({ path: relativePath }));
   assert.ok(isAbsolute(cache.config.path));
   assert.equal(cache.config.path, resolve(directory.path, relativePath));
 });
 
 test("DLsiteキャッシュ: :memory: はファイルシステム上にDBファイルを作らない", (t) => {
+  const scope = makeTestScope();
+  t.after(scope.cleanup);
   const memoryFile = join(process.cwd(), DLSITE_CACHE_MEMORY_PATH);
-  const cache = new DlsiteCache({ path: DLSITE_CACHE_MEMORY_PATH });
-  t.after(() => cache.close());
+  const cache = scope.own(new DlsiteCache({ path: DLSITE_CACHE_MEMORY_PATH }));
   assert.equal(cache.config.path, DLSITE_CACHE_MEMORY_PATH);
   assert.ok(!existsSync(memoryFile));
   cache.recordSuccess({
