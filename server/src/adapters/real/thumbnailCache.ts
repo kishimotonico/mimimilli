@@ -253,6 +253,8 @@ export interface ThumbnailGcResult {
   kept: number;
   /** カバーを stat できず有効集合の計算から除外した作品数 */
   skippedWorks: number;
+  /** スナップショット不完全のため削除フェーズを実行しなかった場合 true */
+  deletionSkipped: boolean;
 }
 
 /**
@@ -262,9 +264,8 @@ export interface ThumbnailGcResult {
  * 削除する。元カバーが更新されて mtime が変わると旧ファイル名は有効集合に含まれなく
  * なるため、次のGCで自然に消える。
  *
- * カバーが無い・stat できない作品は有効集合の計算から単にスキップする（キー計算不能
- * = そのファイルは有効集合に入らないだけで、GC全体は止めない。skippedWorks で件数を
- * 可視化する）。
+ * カバーが無い作品は有効集合の計算から除外する。カバーの stat が1件でも失敗した場合は
+ * スナップショットが不完全とみなし、削除フェーズは実行しない（deletionSkipped）。
  *
  * 生成中の一時ファイル（.tmp-プレフィックス、cacheFileName の命名規則に一致しない）は
  * 有効集合に入りようがないため、孤児として常に削除対象になる。GC実行のタイミングと
@@ -298,13 +299,17 @@ export async function gcThumbnailCache(
     }
   }
 
+  if (skippedWorks > 0) {
+    return { deleted: 0, kept: 0, skippedWorks, deletionSkipped: true };
+  }
+
   let entries: string[];
   checkpoint();
   try {
     entries = await readdir(cacheDir);
   } catch {
     // cacheDir 自体が未作成（一度もサムネイルを生成していない）なら削除対象は無い
-    return { deleted: 0, kept: 0, skippedWorks };
+    return { deleted: 0, kept: 0, skippedWorks, deletionSkipped: false };
   }
   checkpoint();
 
@@ -320,5 +325,5 @@ export async function gcThumbnailCache(
     checkpoint();
     deleted++;
   }
-  return { deleted, kept, skippedWorks };
+  return { deleted, kept, skippedWorks, deletionSkipped: false };
 }

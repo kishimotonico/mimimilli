@@ -57,6 +57,7 @@ test("現存する作品の現mtimeに対応するキャッシュは温存され
   assert.equal(result.deleted, 0);
   assert.equal(result.kept, validNames.length);
   assert.equal(result.skippedWorks, 0);
+  assert.equal(result.deletionSkipped, false);
   for (const name of validNames) {
     assert.ok(existsSync(join(cacheDir, name)), `${name} が残っていること`);
   }
@@ -83,14 +84,17 @@ test("旧mtimeキーのキャッシュファイルはカバー更新後のGCで�
   ]);
 
   assert.equal(result.deleted, THUMBNAIL_WIDTHS.length, "旧mtimeキーの全幅分が削除される");
+  assert.equal(result.deletionSkipped, false);
   for (const p of oldThumbnailPaths) assert.ok(!existsSync(p), "旧キーのファイルは削除済み");
 });
 
-test("孤児の .tmp- ファイルは削除され、カバーをstatできない作品はスキップされ全体は止まらない", async (t) => {
+test("カバーをstatできない作品がある場合は削除フェーズを実行しない", async (t) => {
   const { baseDir, cacheDir } = setup(t);
   mkdirSync(cacheDir, { recursive: true });
   const orphanTmp = join(cacheDir, "deadbeef.webp.tmp-123-0");
+  const orphanWebp = join(cacheDir, "orphan.webp");
   writeFileSync(orphanTmp, "orphan");
+  writeFileSync(orphanWebp, "orphan");
 
   const missingCoverPath = join(baseDir, "does-not-exist.jpg");
 
@@ -98,13 +102,30 @@ test("孤児の .tmp- ファイルは削除され、カバーをstatできない
     { workId: "work-missing", coverAbsolutePath: missingCoverPath },
   ]);
 
-  assert.equal(result.skippedWorks, 1, "statできない作品はスキップされる");
-  assert.equal(result.deleted, 1, "孤児tmpファイルは削除される");
+  assert.equal(result.skippedWorks, 1);
+  assert.equal(result.deletionSkipped, true);
+  assert.equal(result.deleted, 0);
+  assert.equal(result.kept, 0);
+  assert.ok(existsSync(orphanTmp));
+  assert.ok(existsSync(orphanWebp));
+});
+
+test("孤児の .tmp- ファイルは削除される", async (t) => {
+  const { cacheDir } = setup(t);
+  mkdirSync(cacheDir, { recursive: true });
+  const orphanTmp = join(cacheDir, "deadbeef.webp.tmp-123-0");
+  writeFileSync(orphanTmp, "orphan");
+
+  const result = await gcThumbnailCache(cacheDir, []);
+
+  assert.equal(result.skippedWorks, 0);
+  assert.equal(result.deletionSkipped, false);
+  assert.equal(result.deleted, 1);
   assert.ok(!existsSync(orphanTmp));
 });
 
 test("cacheDirがまだ作成されていない場合は削除0件で終える", async (t) => {
   const { cacheDir } = setup(t);
   const result = await gcThumbnailCache(cacheDir, []);
-  assert.deepEqual(result, { deleted: 0, kept: 0, skippedWorks: 0 });
+  assert.deepEqual(result, { deleted: 0, kept: 0, skippedWorks: 0, deletionSkipped: false });
 });
