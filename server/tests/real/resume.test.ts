@@ -14,6 +14,7 @@ import {
   getTestWork,
   saveTestResume,
 } from "../helpers/workTestUtils.ts";
+import { makeTestScope } from "../helpers/sampleLibrary.ts";
 import { makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 
 function sampleWork(id: string): Work {
@@ -71,8 +72,10 @@ function sampleWork(id: string): Work {
   };
 }
 
-test("レジュームは区間相対秒で保存され、並べ替え後もTrack IDで復元する", async () => {
-  const db = openDb({ kind: "memory" });
+test("レジュームは区間相対秒で保存され、並べ替え後もTrack IDで復元する", async (t) => {
+  const scope = makeTestScope();
+  t.after(scope.cleanup);
+  const db = scope.own(openDb({ kind: "memory" }));
   const { catalog, user } = createWorkRepos(db);
   const work = sampleWork("resume-reorder");
   upsertTestWork(catalog, user, work);
@@ -102,11 +105,12 @@ test("レジュームは区間相対秒で保存され、並べ替え後もTrack
     trackId: track.id,
     offsetSec: 15,
   });
-  db.close();
 });
 
-test("保存時に所属と区間を検証し、読出し時に解決不能な行だけを無効化する", async () => {
-  const db = openDb({ kind: "memory" });
+test("保存時に所属と区間を検証し、読出し時に解決不能な行だけを無効化する", async (t) => {
+  const scope = makeTestScope();
+  t.after(scope.cleanup);
+  const db = scope.own(openDb({ kind: "memory" }));
   const { catalog, user } = createWorkRepos(db);
   const work = sampleWork("resume-invalid");
   upsertTestWork(catalog, user, work);
@@ -147,13 +151,14 @@ test("保存時に所属と区間を検証し、読出し時に解決不能な�
     db.user.select().from(workStates).where(eq(workStates.workId, work.id)).get()?.resumeTrackId,
     unresolvedTrackId,
   );
-  db.close();
 });
 
 test("end省略Trackは音声ファイルを300秒から60秒へ差し替えた後にoffset超過resumeを無効化する", async (t) => {
+  const scope = makeTestScope();
+  t.after(scope.cleanup);
   const directory = makeTestDirectory("resume-file-replacement");
   t.after(directory.cleanup);
-  const db = openDb({ kind: "memory" });
+  const db = scope.own(openDb({ kind: "memory" }));
   const { catalog, user } = createWorkRepos(db);
   const base = sampleWork("resume-probed-duration");
   const playlist = base.playlists[0]!;
@@ -196,13 +201,14 @@ test("end省略Trackは音声ファイルを300秒から60秒へ差し替えた�
       }),
     InvalidResumeError,
   );
-  db.close();
 });
 
 test("end省略Trackはrescan・明示probeなしでもgetWork読み取り時にファイル差し替えを検知する", async (t) => {
+  const scope = makeTestScope();
+  t.after(scope.cleanup);
   const directory = makeTestDirectory("resume-file-replacement-live-read");
   t.after(directory.cleanup);
-  const db = openDb({ kind: "memory" });
+  const db = scope.own(openDb({ kind: "memory" }));
   const { catalog, user } = createWorkRepos(db);
   const base = sampleWork("resume-live-read-duration");
   const playlist = base.playlists[0]!;
@@ -224,5 +230,4 @@ test("end省略Trackはrescan・明示probeなしでもgetWork読み取り時に
   writeWav(cachePath, 60);
   const second = await getTestWork(db, work.id);
   assert.equal(second?.playlists[0]?.tracks[0]?.durationSec, 60);
-  db.close();
 });

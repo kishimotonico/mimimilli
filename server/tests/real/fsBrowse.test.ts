@@ -13,6 +13,7 @@ import { createWorkRepos } from "../helpers/workTestUtils.ts";
 import { createApp, type AppEnv } from "../../src/app.ts";
 import { scanAndRegisterCandidates } from "../helpers/scanLibrary.ts";
 import { makeSampleLibrary, writeWav } from "../helpers/sampleLibrary.ts";
+import { makeTestScope } from "../helpers/sampleLibrary.ts";
 import { upsertTestWork } from "../helpers/workTestUtils.ts";
 
 function sampleWork(id: string, physicalPath: string): Work {
@@ -50,7 +51,7 @@ async function setup(t: TestContext, prepare?: (root: string) => void) {
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
   prepare?.(lib.root);
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
+  const adapter = lib.own(createTestRealAdapter({ database: { kind: "memory" } }));
   const app = createApp(adapter);
   await adapter.updateSettings({ rootFolder: lib.root });
   await scanAndRegisterCandidates(adapter);
@@ -163,7 +164,9 @@ test("ネストした作品ルートではファイルを最も深い作品へ�
   assert.equal(file?.workRelPath, "nested.wav");
 });
 
-test("物理パス索引は境界・重複・未登録を保ち、所有者探索は全作品走査しない", () => {
+test("物理パス索引は境界・重複・未登録を保ち、所有者探索は全作品走査しない", (t) => {
+  const scope = makeTestScope();
+  t.after(scope.cleanup);
   const first = workAt("first", "/library/work");
   const duplicate = workAt("duplicate", "/library/work");
   const indexed = buildWorkPathIndex([first, duplicate]);
@@ -181,8 +184,10 @@ test("物理パス索引は境界・重複・未登録を保ち、所有者探�
   assert.equal(countingIndex.getCalls, 3);
 });
 
-test("listFsWorkRefs は対象ディレクトリと祖先・子孫の作品だけを返す", () => {
-  const db = openDb({ kind: "memory" });
+test("listFsWorkRefs は対象ディレクトリと祖先・子孫の作品だけを返す", (t) => {
+  const scope = makeTestScope();
+  t.after(scope.cleanup);
+  const db = scope.own(openDb({ kind: "memory" }));
   const { query, catalog, user } = createWorkRepos(db);
 
   const base = "/library/dlsite";
@@ -201,12 +206,12 @@ test("listFsWorkRefs は対象ディレクトリと祖先・子孫の作品だ�
 
   const unrelated = query.listFsWorkRefs("/elsewhere");
   assert.equal(unrelated.length, 0);
-
-  db.close();
 });
 
-test("listFsWorkRefs は末尾区切りでも子孫を取りこぼさない", () => {
-  const db = openDb({ kind: "memory" });
+test("listFsWorkRefs は末尾区切りでも子孫を取りこぼさない", (t) => {
+  const scope = makeTestScope();
+  t.after(scope.cleanup);
+  const db = scope.own(openDb({ kind: "memory" }));
   const { query, catalog, user } = createWorkRepos(db);
 
   upsertTestWork(catalog, user, sampleWork("w-under-lib", "/library/work"));
@@ -225,12 +230,12 @@ test("listFsWorkRefs は末尾区切りでも子孫を取りこぼさない", ()
       .sort(),
     ["w-nested", "w-root"],
   );
-
-  db.close();
 });
 
-test("listFsWorkRefs の physical_path 重複時の先勝ちは listSummaries と同じ", () => {
-  const db = openDb({ kind: "memory" });
+test("listFsWorkRefs の physical_path 重複時の先勝ちは listSummaries と同じ", (t) => {
+  const scope = makeTestScope();
+  t.after(scope.cleanup);
+  const db = scope.own(openDb({ kind: "memory" }));
   const { query, catalog, user } = createWorkRepos(db);
   const physicalPath = "/library/duplicate";
 
@@ -244,12 +249,12 @@ test("listFsWorkRefs の physical_path 重複時の先勝ちは listSummaries �
 
   const indexed = buildWorkPathIndex(query.listFsWorkRefs(physicalPath));
   assert.equal(indexed.get(physicalPath)?.id, expectedId);
-
-  db.close();
 });
 
-test("listFsWorkRefs は listSummaries より軽量（タグ取得なし・SQL 1本）", () => {
-  const db = openDb({ kind: "memory" });
+test("listFsWorkRefs は listSummaries より軽量（タグ取得なし・SQL 1本）", (t) => {
+  const scope = makeTestScope();
+  t.after(scope.cleanup);
+  const db = scope.own(openDb({ kind: "memory" }));
   const { query, catalog, user } = createWorkRepos(db);
   for (let i = 0; i < 5; i++) {
     upsertTestWork(catalog, user, sampleWork(`w-${i}`, `/library/w-${i}`));
@@ -265,6 +270,4 @@ test("listFsWorkRefs は listSummaries より軽量（タグ取得なし・SQL 1
   const refs = query.listFsWorkRefs("/library/w-0");
   assert.equal(refs.length, 1);
   assert.equal(queryCount, 1);
-
-  db.close();
 });

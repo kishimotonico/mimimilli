@@ -13,7 +13,7 @@ test("catalog削除後の再スキャンでもuser状態を保持し、ATTACH JO
   const userPath = join(library.baseDir, "data", "db", "user.sqlite");
   const database = { kind: "files" as const, catalogPath, userPath };
 
-  const adapter = createTestRealAdapter({ database });
+  const adapter = library.own(createTestRealAdapter({ database }));
   await adapter.updateSettings({ rootFolder: library.root });
   await adapter.scan();
   const before = await adapter.getWork(library.existingWorkId);
@@ -86,7 +86,7 @@ test("catalog削除後の再スキャンでもuser状態を保持し、ATTACH JO
   catalog.close();
 
   rmSync(catalogPath);
-  const rebuilt = createTestRealAdapter({ database });
+  const rebuilt = library.own(createTestRealAdapter({ database }));
   assert.deepEqual(await rebuilt.getSettings(), { rootFolder: library.root, lastScanTime: null });
   await rebuilt.scan();
 
@@ -102,5 +102,4 @@ test("catalog削除後の再スキャンでもuser状態を保持し、ATTACH JO
   assert.ok(after.lastPlayedAt);
   assert.ok((await rebuilt.listTagPrefixes()).some((prefix) => prefix.prefix === "気分"));
   assert.equal((await rebuilt.listSmartFolders())[0]?.name, "保持フォルダー");
-  rebuilt.close();
 });

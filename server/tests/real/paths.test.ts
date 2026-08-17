@@ -9,6 +9,7 @@ import {
 } from "../../src/adapters/real/paths.ts";
 import { isPathWithin } from "../../src/lib/path.ts";
 import { openDb } from "../../src/adapters/real/db.ts";
+import { makeTestScope } from "../helpers/sampleLibrary.ts";
 
 test("POSIX パスは名前の前方一致ではなくディレクトリ境界で判定する", () => {
   assert.equal(isPathWithin("/library", "/library", posix), true);
@@ -32,8 +33,10 @@ test("LIKE 子孫接頭辞は区切り文字を重ねず、Windows 形式でも�
   assert.equal(likeDescendantsPrefix("D:\\", win32.sep), "D:\\%");
 });
 
-test("祖先 LIKE 接頭辞 SQL は Windows 区切りでも子孫判定できる", () => {
-  const db = openDb({ kind: "memory" });
+test("祖先 LIKE 接頭辞 SQL は Windows 区切りでも子孫判定できる", (t) => {
+  const scope = makeTestScope();
+  t.after(scope.cleanup);
+  const db = scope.own(openDb({ kind: "memory" }));
   const ancestor = "C:\\library";
   const row = db.sqlite
     .query(
@@ -57,7 +60,6 @@ test("祖先 LIKE 接頭辞 SQL は Windows 区切りでも子孫判定できる
     ) as { isDescendant: number; isNotPrefix: number };
   assert.equal(row.isDescendant, 1);
   assert.equal(row.isNotPrefix, 1);
-  db.close();
 });
 
 // ── excludeDescendantPaths（TASK-62: 祖先除外の線形化） ─────────

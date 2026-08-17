@@ -14,6 +14,7 @@ import {
   folderMetaPath,
 } from "../helpers/workTestUtils.ts";
 import { eq } from "drizzle-orm";
+import { makeTestScope } from "../helpers/sampleLibrary.ts";
 
 function makePlaylist(trackCount: number, id = crypto.randomUUID()): ResolvedPlaylist {
   return {
@@ -69,34 +70,39 @@ function trackCountOf(query: WorkQueryRepository, id: string): number {
   return summary.trackCount;
 }
 
-test("track_count はデフォルトプレイリスト指定ありなら指定PLのトラック数", () => {
-  const db = openDb({ kind: "memory" });
+test("track_count はデフォルトプレイリスト指定ありなら指定PLのトラック数", (t) => {
+  const scope = makeTestScope();
+  t.after(scope.cleanup);
+  const db = scope.own(openDb({ kind: "memory" }));
   const { query, catalog, user } = createWorkRepos(db);
   const first = makePlaylist(3);
   const second = makePlaylist(1);
   upsertTestWork(catalog, user, sampleWork("w-1", [first, second], second.id));
   assert.equal(trackCountOf(query, "w-1"), 1);
-  db.close();
 });
 
-test("track_count はデフォルトプレイリスト指定なしなら先頭PLのトラック数", () => {
-  const db = openDb({ kind: "memory" });
+test("track_count はデフォルトプレイリスト指定なしなら先頭PLのトラック数", (t) => {
+  const scope = makeTestScope();
+  t.after(scope.cleanup);
+  const db = scope.own(openDb({ kind: "memory" }));
   const { query, catalog, user } = createWorkRepos(db);
   upsertTestWork(catalog, user, sampleWork("w-1", [makePlaylist(3), makePlaylist(1)], null));
   assert.equal(trackCountOf(query, "w-1"), 3);
-  db.close();
 });
 
-test("track_count はプレイリストなしなら0", () => {
-  const db = openDb({ kind: "memory" });
+test("track_count はプレイリストなしなら0", (t) => {
+  const scope = makeTestScope();
+  t.after(scope.cleanup);
+  const db = scope.own(openDb({ kind: "memory" }));
   const { query, catalog, user } = createWorkRepos(db);
   upsertTestWork(catalog, user, sampleWork("w-1", [], null));
   assert.equal(trackCountOf(query, "w-1"), 0);
-  db.close();
 });
 
-test("track_count は update でも再計算される", () => {
-  const db = openDb({ kind: "memory" });
+test("track_count は update でも再計算される", (t) => {
+  const scope = makeTestScope();
+  t.after(scope.cleanup);
+  const db = scope.own(openDb({ kind: "memory" }));
   const { query, catalog, user } = createWorkRepos(db);
   const work = sampleWork("w-1", [makePlaylist(2)], null);
   upsertTestWork(catalog, user, work);
@@ -104,11 +110,12 @@ test("track_count は update でも再計算される", () => {
 
   upsertTestWork(catalog, user, { ...work, playlists: [makePlaylist(5)] });
   assert.equal(trackCountOf(query, "w-1"), 5);
-  db.close();
 });
 
-test("listSummaries の SQL 発行数は作品数に依存しない", () => {
-  const db = openDb({ kind: "memory" });
+test("listSummaries の SQL 発行数は作品数に依存しない", (t) => {
+  const scope = makeTestScope();
+  t.after(scope.cleanup);
+  const db = scope.own(openDb({ kind: "memory" }));
   const { query, catalog, user } = createWorkRepos(db);
 
   const countQueries = (): number => {
@@ -135,11 +142,12 @@ test("listSummaries の SQL 発行数は作品数に依存しない", () => {
   }
   const n100 = countQueries();
   assert.equal(n100, n1, `SQL 発行数が作品数に比例しています (N=1: ${n1}, N=100: ${n100})`);
-  db.close();
 });
 
-test("work_dlsite 行がない作品は emptyDlsiteState() になる", () => {
-  const db = openDb({ kind: "memory" });
+test("work_dlsite 行がない作品は emptyDlsiteState() になる", (t) => {
+  const scope = makeTestScope();
+  t.after(scope.cleanup);
+  const db = scope.own(openDb({ kind: "memory" }));
   const { query, catalog, user } = createWorkRepos(db);
   upsertTestWork(catalog, user, sampleWork("w-1", [makePlaylist(1)], null));
   db.catalog.delete(workDlsite).where(eq(workDlsite.workId, "w-1")).run();
@@ -153,7 +161,6 @@ test("work_dlsite 行がない作品は emptyDlsiteState() になる", () => {
     errorKind: null,
     appliedTags: [],
   });
-  db.close();
 });
 
 function unmeasuredWork(id: string): Work {
@@ -194,16 +201,19 @@ function unmeasuredWork(id: string): Work {
   };
 }
 
-test("listSummaries: 寸法未計測カバーがないとき unmeasuredCovers は空", () => {
-  const db = openDb({ kind: "memory" });
+test("listSummaries: 寸法未計測カバーがないとき unmeasuredCovers は空", (t) => {
+  const scope = makeTestScope();
+  t.after(scope.cleanup);
+  const db = scope.own(openDb({ kind: "memory" }));
   const { query, catalog, user } = createWorkRepos(db);
   upsertTestWork(catalog, user, sampleWork("w-1", [makePlaylist(1)], null));
   assert.deepEqual(query.listSummaries().unmeasuredCovers, []);
-  db.close();
 });
 
-test("listSummaries: 寸法未計測カバーの作品IDを返す", () => {
-  const db = openDb({ kind: "memory" });
+test("listSummaries: 寸法未計測カバーの作品IDを返す", (t) => {
+  const scope = makeTestScope();
+  t.after(scope.cleanup);
+  const db = scope.own(openDb({ kind: "memory" }));
   const { query, catalog, user } = createWorkRepos(db);
   upsertTestWork(catalog, user, sampleWork("w-none", [makePlaylist(1)], null));
   const unmeasured = unmeasuredWork("w-unmeasured");
@@ -213,11 +223,12 @@ test("listSummaries: 寸法未計測カバーの作品IDを返す", () => {
     cover: { image: "cover.jpg", dimensions: null },
   });
   assert.deepEqual(query.listSummaries().unmeasuredCovers, ["w-unmeasured"]);
-  db.close();
 });
 
-test("listSummaries: skipped になる行は unmeasuredCovers に載らない", () => {
-  const db = openDb({ kind: "memory" });
+test("listSummaries: skipped になる行は unmeasuredCovers に載らない", (t) => {
+  const scope = makeTestScope();
+  t.after(scope.cleanup);
+  const db = scope.own(openDb({ kind: "memory" }));
   const { query, catalog, user } = createWorkRepos(db);
   const unmeasured = unmeasuredWork("w-skipped-unmeasured");
   user.upsertWorkUserState(unmeasured);
@@ -231,5 +242,4 @@ test("listSummaries: skipped になる行は unmeasuredCovers に載らない", 
   assert.equal(result.skipped.length, 1);
   assert.equal(result.skipped[0]!.workId, unmeasured.id);
   assert.deepEqual(result.unmeasuredCovers, []);
-  db.close();
 });

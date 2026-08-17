@@ -56,8 +56,7 @@ test("重複Work IDはmimimilli.jsonを変更せず、catalog公開せずに全p
   duplicateLocalIdentity.playlists.push(structuredClone(duplicateLocalIdentity.playlists[0]));
   writeFileSync(second, `${JSON.stringify(duplicateLocalIdentity, null, 2)}\n`);
   const before = [readFileSync(first, "utf-8"), readFileSync(second, "utf-8")];
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
-  t.after(() => adapter.close());
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await adapter.updateSettings({ rootFolder: root });
 
   const result = await adapter.scan({ full: true });
@@ -70,8 +69,7 @@ test("重複Work IDはmimimilli.jsonを変更せず、catalog公開せずに全p
   assert.equal(readFileSync(second, "utf-8"), before[1]);
   assert.equal(await adapter.getWork(WORK_ID), null);
 
-  const app = createApp(adapter);
-  t.after(() => app.shutdown());
+  const app = directory.ownFn(createApp(adapter), (a) => a.shutdown());
   const response = await app.request("/api/scan/diagnostics");
   assert.equal(response.status, 200);
   assert.deepEqual((await response.json()).diagnostics, result.identityConflicts);
@@ -82,8 +80,7 @@ test("既存投影は競合pathの順序にかかわらず保持し、解消後�
   t.after(directory.cleanup);
   const root = join(directory.path, "library");
   const owner = makeWork(root, "work-z-owner", "既存投影");
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
-  t.after(() => adapter.close());
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await adapter.updateSettings({ rootFolder: root });
   await adapter.scan({ full: true });
 
@@ -108,13 +105,11 @@ test("identity_conflictの指定pathだけを別作品として取り込み、Wo
   makeWork(root, "work-owner", "元作品");
   const copy = makeWork(root, "work-copy", "複製側");
   const before = JSON.parse(readFileSync(copy, "utf-8"));
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
-  t.after(() => adapter.close());
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await adapter.updateSettings({ rootFolder: root });
   await adapter.scan({ full: true });
 
-  const app = createApp(adapter);
-  t.after(() => app.shutdown());
+  const app = directory.ownFn(createApp(adapter), (a) => a.shutdown());
   const rejected = await app.request("/api/works/identity-conflicts/reassign", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

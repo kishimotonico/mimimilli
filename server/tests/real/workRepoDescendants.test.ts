@@ -4,6 +4,7 @@ import { test } from "node:test";
 import type { Work } from "@mimimilli/shared";
 import { openDb } from "../../src/adapters/real/db.ts";
 import { createWorkRepos, resolvedDuration, upsertTestWork } from "../helpers/workTestUtils.ts";
+import { makeTestScope } from "../helpers/sampleLibrary.ts";
 
 function sampleWork(id: string, physicalPath: string): Work {
   const playlistId = `${id}-playlist`;
@@ -51,8 +52,10 @@ function sampleWork(id: string, physicalPath: string): Work {
   };
 }
 
-test("listDescendantWorkRefs: アンダースコア入りフォルダ名は別パスの作品を子孫と誤判定しない", () => {
-  const db = openDb({ kind: "memory" });
+test("listDescendantWorkRefs: アンダースコア入りフォルダ名は別パスの作品を子孫と誤判定しない", (t) => {
+  const scope = makeTestScope();
+  t.after(scope.cleanup);
+  const db = scope.own(openDb({ kind: "memory" }));
   const { query, catalog, user } = createWorkRepos(db);
   const parentPath = "/library/A_B";
   const trueChildPath = "/library/A_B/child";
@@ -64,11 +67,12 @@ test("listDescendantWorkRefs: アンダースコア入りフォルダ名は別�
   const descendants = query.listDescendantWorkRefs(parentPath);
   assert.equal(descendants.length, 1);
   assert.equal(descendants[0]?.physicalPath, trueChildPath);
-  db.close();
 });
 
-test("listFsWorkRefs: アンダースコア入り祖先パスは別パスの作品を子孫と誤判定しない", () => {
-  const db = openDb({ kind: "memory" });
+test("listFsWorkRefs: アンダースコア入り祖先パスは別パスの作品を子孫と誤判定しない", (t) => {
+  const scope = makeTestScope();
+  t.after(scope.cleanup);
+  const db = scope.own(openDb({ kind: "memory" }));
   const { query, catalog, user } = createWorkRepos(db);
   const ancestorPath = "/library/A_B";
   const trueChildPath = "/library/A_B/child";
@@ -80,5 +84,4 @@ test("listFsWorkRefs: アンダースコア入り祖先パスは別パスの作�
   const refs = query.listFsWorkRefs(ancestorPath);
   const paths = refs.map((ref) => ref.physicalPath).sort();
   assert.deepEqual(paths, [trueChildPath]);
-  db.close();
 });

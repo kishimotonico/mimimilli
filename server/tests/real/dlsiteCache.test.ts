@@ -31,14 +31,15 @@ function createCache(t: { after: (callback: () => void) => void }, now = 1_000) 
   const directory = makeTestDirectory("dlsite-cache");
   t.after(directory.cleanup);
   let clock = now;
-  const cache = new DlsiteCache({
-    path: join(directory.path, "dlsite-cache.sqlite"),
-    clock: () => clock,
-    ttlsMs: { ok: 100, parse_error: 20, not_found: 30, error: 40 },
-    maxTransferBytes: 1_000,
-    maxExpandedBytes: 1_000,
-  });
-  t.after(() => cache.close());
+  const cache = directory.own(
+    new DlsiteCache({
+      path: join(directory.path, "dlsite-cache.sqlite"),
+      clock: () => clock,
+      ttlsMs: { ok: 100, parse_error: 20, not_found: 30, error: 40 },
+      maxTransferBytes: 1_000,
+      maxExpandedBytes: 1_000,
+    }),
+  );
   return { cache, directory, setClock: (value: number) => (clock = value) };
 }
 
@@ -227,8 +228,9 @@ test("DLsiteキャッシュ: 改ざんされた過大gzip BLOBを展開上限で
   const directory = makeTestDirectory("dlsite-cache-gzip-limit");
   t.after(directory.cleanup);
   const path = join(directory.path, "cache.sqlite");
-  const cache = new DlsiteCache({ path, maxTransferBytes: 1_000, maxExpandedBytes: 64 });
-  t.after(() => cache.close());
+  const cache = directory.own(
+    new DlsiteCache({ path, maxTransferBytes: 1_000, maxExpandedBytes: 64 }),
+  );
   cache.recordSuccess({
     productCode: "RJ123456",
     outcome: "ok",
@@ -256,8 +258,7 @@ test("DLsiteキャッシュ: close後に同じDBを開き直してHTMLを読め�
     html: VALID_HTML,
   });
   first.close();
-  const reopened = new DlsiteCache({ path });
-  t.after(() => reopened.close());
+  const reopened = directory.own(new DlsiteCache({ path }));
   const hit = reopened.resolve({ productCode: "RJ123456" });
   assert.equal(hit.kind, "html");
   if (hit.kind === "html") assert.equal(hit.html, VALID_HTML);
@@ -266,12 +267,13 @@ test("DLsiteキャッシュ: close後に同じDBを開き直してHTMLを読め�
 test("DLsiteキャッシュ: fetched_atとTTLの加算が安全な整数を超えると保存しない", (t) => {
   const directory = makeTestDirectory("dlsite-cache-clock-overflow");
   t.after(directory.cleanup);
-  const cache = new DlsiteCache({
-    path: join(directory.path, "cache.sqlite"),
-    clock: () => Number.MAX_SAFE_INTEGER - 10,
-    ttlsMs: { error: 20 },
-  });
-  t.after(() => cache.close());
+  const cache = directory.own(
+    new DlsiteCache({
+      path: join(directory.path, "cache.sqlite"),
+      clock: () => Number.MAX_SAFE_INTEGER - 10,
+      ttlsMs: { error: 20 },
+    }),
+  );
   assert.throws(
     () => cache.recordFailure({ productCode: "RJ123456", outcome: "error" }),
     /attempted_at \+ TTL/,

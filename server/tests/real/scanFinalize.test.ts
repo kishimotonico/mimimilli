@@ -1,9 +1,8 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import * as fs from "node:fs/promises";
 import { stat } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { spyOn } from "bun:test";
@@ -12,6 +11,7 @@ import type { WorkSummary } from "@mimimilli/shared";
 import sharp from "sharp";
 import { finalizeScan, LAST_SCAN_TIME_KEY } from "../../src/adapters/real/scanFinalize.ts";
 import { captureLogs, recordMessage, scanRecords } from "../helpers/logCapture.ts";
+import { makeTestDirectory } from "../helpers/sampleLibrary.ts";
 
 function makeSummary(
   overrides: Partial<WorkSummary> & Pick<WorkSummary, "id" | "physicalPath">,
@@ -41,9 +41,9 @@ function makeSummary(
 }
 
 function setupCacheDir(t: { after: (fn: () => void) => void }): string {
-  const thumbnailCacheDir = mkdtempSync(join(tmpdir(), "mimimilli-scan-finalize-"));
-  t.after(() => rmSync(thumbnailCacheDir, { recursive: true, force: true }));
-  return thumbnailCacheDir;
+  const directory = makeTestDirectory("scan-finalize");
+  t.after(directory.cleanup);
+  return join(directory.path, "thumbnails");
 }
 
 test("finalizeScan: サムネイルGC後に last_scan_time を記録する", async (t) => {
@@ -104,8 +104,9 @@ test("finalizeScan: throwIfCancelled が呼ばれたら last_scan_time を記録
 
 test("finalizeScan: 作品0件でも既存キャッシュは削除されず、メタ修正後の再スキャン後も残る", async (t) => {
   const thumbnailCacheDir = setupCacheDir(t);
-  const workDir = mkdtempSync(join(tmpdir(), "mimimilli-work-"));
-  t.after(() => rmSync(workDir, { recursive: true, force: true }));
+  const workDirectory = makeTestDirectory("scan-finalize-work");
+  t.after(workDirectory.cleanup);
+  const workDir = workDirectory.path;
   const coverPath = join(workDir, "cover.jpg");
   await sharp({
     create: { width: 100, height: 100, channels: 3, background: { r: 1, g: 2, b: 3 } },
@@ -159,8 +160,9 @@ test("finalizeScan: listSummaries の skipped がある場合は削除されな�
   const cachedFile = join(thumbnailCacheDir, "orphan.webp");
   writeFileSync(cachedFile, "orphan");
 
-  const workDir = mkdtempSync(join(tmpdir(), "mimimilli-work-"));
-  t.after(() => rmSync(workDir, { recursive: true, force: true }));
+  const workDirectory = makeTestDirectory("scan-finalize-work");
+  t.after(workDirectory.cleanup);
+  const workDir = workDirectory.path;
 
   await finalizeScan({
     query: {
@@ -183,8 +185,9 @@ test("finalizeScan: resolveWithin 失敗がある場合は削除されない", a
   const cachedFile = join(thumbnailCacheDir, "orphan.webp");
   writeFileSync(cachedFile, "orphan");
 
-  const workDir = mkdtempSync(join(tmpdir(), "mimimilli-work-"));
-  t.after(() => rmSync(workDir, { recursive: true, force: true }));
+  const workDirectory = makeTestDirectory("scan-finalize-work");
+  t.after(workDirectory.cleanup);
+  const workDir = workDirectory.path;
 
   await finalizeScan({
     query: {
@@ -225,35 +228,33 @@ test("finalizeScan: GCスキップ時も last_scan_time を更新する", async 
 
 test("finalizeScan: GCスキップ時に reason・件数・cacheDir を含む warn を出す", async (t) => {
   const thumbnailCacheDir = setupCacheDir(t);
-  const workDir = mkdtempSync(join(tmpdir(), "mimimilli-work-"));
-  try {
-    await captureLogs(async (records) => {
-      await finalizeScan({
-        query: {
-          listSummaries: () => ({
-            summaries: [makeSummary({ id: "work-1", physicalPath: workDir })],
-            skipped: [{ workId: "work-bad", reason: "invalid" }],
-            unmeasuredCovers: [],
-          }),
-        },
-        catalog: { setScanState: () => {} },
-        thumbnailCacheDir,
-      });
-
-      const warned = scanRecords(records).filter(
-        (record) =>
-          recordMessage(record) ===
-          "スナップショットが不完全なためサムネイルキャッシュGCをスキップしました",
-      );
-      assert.equal(warned.length, 1);
-      assert.equal(warned[0]!.level, "warning");
-      assert.deepEqual(warned[0]!.properties.gaps, { "work-load-failed": 1 });
-      assert.equal(warned[0]!.properties.workCount, 1);
-      assert.equal(warned[0]!.properties.cacheDir, thumbnailCacheDir);
+  const workDirectory = makeTestDirectory("scan-finalize-work-warn");
+  t.after(workDirectory.cleanup);
+  const workDir = workDirectory.path;
+  await captureLogs(async (records) => {
+    await finalizeScan({
+      query: {
+        listSummaries: () => ({
+          summaries: [makeSummary({ id: "work-1", physicalPath: workDir })],
+          skipped: [{ workId: "work-bad", reason: "invalid" }],
+          unmeasuredCovers: [],
+        }),
+      },
+      catalog: { setScanState: () => {} },
+      thumbnailCacheDir,
     });
-  } finally {
-    rmSync(workDir, { recursive: true, force: true });
-  }
+
+    const warned = scanRecords(records).filter(
+      (record) =>
+        recordMessage(record) ===
+        "スナップショットが不完全なためサムネイルキャッシュGCをスキップしました",
+    );
+    assert.equal(warned.length, 1);
+    assert.equal(warned[0]!.level, "warning");
+    assert.deepEqual(warned[0]!.properties.gaps, { "work-load-failed": 1 });
+    assert.equal(warned[0]!.properties.workCount, 1);
+    assert.equal(warned[0]!.properties.cacheDir, thumbnailCacheDir);
+  });
 });
 
 test("finalizeScan: 作品あり・全作品カバーなしの場合はGCが実行される", async (t) => {
@@ -262,8 +263,9 @@ test("finalizeScan: 作品あり・全作品カバーなしの場合はGCが実�
   const orphan = join(thumbnailCacheDir, "orphan.webp");
   writeFileSync(orphan, "orphan");
 
-  const workDir = mkdtempSync(join(tmpdir(), "mimimilli-work-"));
-  t.after(() => rmSync(workDir, { recursive: true, force: true }));
+  const workDirectory = makeTestDirectory("scan-finalize-work");
+  t.after(workDirectory.cleanup);
+  const workDir = workDirectory.path;
 
   await finalizeScan({
     query: {
@@ -286,8 +288,9 @@ test("finalizeScan: 寸法未計測カバーがある場合は削除されない
   const cachedFile = join(thumbnailCacheDir, "orphan.webp");
   writeFileSync(cachedFile, "orphan");
 
-  const workDir = mkdtempSync(join(tmpdir(), "mimimilli-work-"));
-  t.after(() => rmSync(workDir, { recursive: true, force: true }));
+  const workDirectory = makeTestDirectory("scan-finalize-work");
+  t.after(workDirectory.cleanup);
+  const workDir = workDirectory.path;
 
   await finalizeScan({
     query: {
@@ -306,36 +309,34 @@ test("finalizeScan: 寸法未計測カバーがある場合は削除されない
 
 test("finalizeScan: 寸法未計測カバーでGCスキップ時に unmeasured-covers warn を出す", async (t) => {
   const thumbnailCacheDir = setupCacheDir(t);
-  const workDir = mkdtempSync(join(tmpdir(), "mimimilli-work-"));
-  try {
-    await captureLogs(async (records) => {
-      await finalizeScan({
-        query: {
-          listSummaries: () => ({
-            summaries: [
-              makeSummary({ id: "work-unmeasured", physicalPath: workDir, cover: null }),
-              makeSummary({ id: "work-ok", physicalPath: workDir, cover: null }),
-            ],
-            skipped: [],
-            unmeasuredCovers: ["work-unmeasured"],
-          }),
-        },
-        catalog: { setScanState: () => {} },
-        thumbnailCacheDir,
-      });
-
-      const warned = scanRecords(records).filter(
-        (record) =>
-          recordMessage(record) ===
-          "スナップショットが不完全なためサムネイルキャッシュGCをスキップしました",
-      );
-      assert.equal(warned.length, 1);
-      assert.deepEqual(warned[0]!.properties.gaps, { "cover-unmeasured": 1 });
-      assert.equal(warned[0]!.properties.workCount, 2);
+  const workDirectory = makeTestDirectory("scan-finalize-unmeasured-warn");
+  t.after(workDirectory.cleanup);
+  const workDir = workDirectory.path;
+  await captureLogs(async (records) => {
+    await finalizeScan({
+      query: {
+        listSummaries: () => ({
+          summaries: [
+            makeSummary({ id: "work-unmeasured", physicalPath: workDir, cover: null }),
+            makeSummary({ id: "work-ok", physicalPath: workDir, cover: null }),
+          ],
+          skipped: [],
+          unmeasuredCovers: ["work-unmeasured"],
+        }),
+      },
+      catalog: { setScanState: () => {} },
+      thumbnailCacheDir,
     });
-  } finally {
-    rmSync(workDir, { recursive: true, force: true });
-  }
+
+    const warned = scanRecords(records).filter(
+      (record) =>
+        recordMessage(record) ===
+        "スナップショットが不完全なためサムネイルキャッシュGCをスキップしました",
+    );
+    assert.equal(warned.length, 1);
+    assert.deepEqual(warned[0]!.properties.gaps, { "cover-unmeasured": 1 });
+    assert.equal(warned[0]!.properties.workCount, 2);
+  });
 });
 
 test("finalizeScan: 寸法未計測カバーでGCスキップ時も last_scan_time を更新する", async (t) => {
@@ -344,8 +345,9 @@ test("finalizeScan: 寸法未計測カバーでGCスキップ時も last_scan_ti
   const catalog = {
     setScanState: (key: string, value: string | null) => scanStates.set(key, value),
   };
-  const workDir = mkdtempSync(join(tmpdir(), "mimimilli-work-"));
-  t.after(() => rmSync(workDir, { recursive: true, force: true }));
+  const workDirectory = makeTestDirectory("scan-finalize-work");
+  t.after(workDirectory.cleanup);
+  const workDir = workDirectory.path;
 
   await finalizeScan({
     query: {
@@ -368,8 +370,9 @@ test("finalizeScan: カバーの stat 失敗がある場合は削除されない
   const cachedFile = join(thumbnailCacheDir, "orphan.webp");
   writeFileSync(cachedFile, "orphan");
 
-  const workDir = mkdtempSync(join(tmpdir(), "mimimilli-work-"));
-  t.after(() => rmSync(workDir, { recursive: true, force: true }));
+  const workDirectory = makeTestDirectory("scan-finalize-work");
+  t.after(workDirectory.cleanup);
+  const workDir = workDirectory.path;
   const coverPath = join(workDir, "cover.jpg");
   writeFileSync(coverPath, "cover");
 

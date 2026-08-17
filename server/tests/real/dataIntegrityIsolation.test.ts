@@ -1,7 +1,5 @@
 // listSummaries の行単位隔離が export / スマートフォルダー / スキャン finalize で継続することを検証する。
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { eq } from "drizzle-orm";
@@ -13,6 +11,7 @@ import { tags } from "../../src/adapters/real/catalogSchema.ts";
 import { Scanner } from "../../src/adapters/real/scanner.ts";
 import { querySmartFolderWorks } from "../../src/adapters/real/smartFolderWorks.ts";
 import { createWorkRepos, upsertTestWork, resolvedDuration } from "../helpers/workTestUtils.ts";
+import { makeTestDirectory, makeTestScope } from "../helpers/sampleLibrary.ts";
 import { nts } from "../helpers/tag.ts";
 
 function sampleWork(id: string, tag: string): Work {
@@ -85,38 +84,42 @@ function openFileDb(dir: string) {
   });
 }
 
-test("export は壊れた作品を除外し dataIntegrityWarning を返す", async () => {
-  const dir = mkdtempSync(join(tmpdir(), "mimi-export-integrity-"));
-  const db = openFileDb(dir);
+function fileAdapter(directory: ReturnType<typeof makeTestDirectory>) {
+  return directory.own(
+    createRealAdapter({
+      database: {
+        kind: "files",
+        catalogPath: join(directory.path, "catalog.sqlite"),
+        userPath: join(directory.path, "user.sqlite"),
+      },
+      dataRoot: directory.path,
+      dlsiteCache: { path: join(directory.path, "dlsite-cache.sqlite") },
+    }),
+  );
+}
+
+test("export は壊れた作品を除外し dataIntegrityWarning を返す", async (t) => {
+  const directory = makeTestDirectory("export-integrity");
+  t.after(directory.cleanup);
+  const db = directory.own(openFileDb(directory.path));
   const { catalog, user } = createWorkRepos(db);
   const { goodId, badId } = seedCorruptedPair(catalog, user, db);
-  const adapter = createRealAdapter({
-    database: {
-      kind: "files",
-      catalogPath: join(dir, "catalog.sqlite"),
-      userPath: join(dir, "user.sqlite"),
-    },
-    dataRoot: dir,
-    dlsiteCache: { path: join(dir, "dlsite-cache.sqlite") },
-  });
-  try {
-    const exported = await adapter.exportLibrary();
-    const payload = JSON.parse(exported.data) as { works: Array<{ id: string }> };
-    assert.deepEqual(
-      payload.works.map((work) => work.id),
-      [goodId],
-    );
-    assert.equal(exported.dataIntegrityWarning?.skippedCount, 1);
-    assert.deepEqual(exported.dataIntegrityWarning?.skippedWorkIds, [badId]);
-  } finally {
-    adapter.close();
-    db.close();
-    rmSync(dir, { recursive: true, force: true });
-  }
+  const adapter = fileAdapter(directory);
+
+  const exported = await adapter.exportLibrary();
+  const payload = JSON.parse(exported.data) as { works: Array<{ id: string }> };
+  assert.deepEqual(
+    payload.works.map((work) => work.id),
+    [goodId],
+  );
+  assert.equal(exported.dataIntegrityWarning?.skippedCount, 1);
+  assert.deepEqual(exported.dataIntegrityWarning?.skippedWorkIds, [badId]);
 });
 
-test("ルールベース smart folder は壊れた候補を除外して WorksPage を返す", () => {
-  const db = openDb({ kind: "memory" });
+test("ルールベース smart folder は壊れた候補を除外して WorksPage を返す", (t) => {
+  const scope = makeTestScope();
+  t.after(scope.cleanup);
+  const db = scope.own(openDb({ kind: "memory" }));
   const { query, catalog, user } = createWorkRepos(db);
   const { goodId, badId } = seedCorruptedPair(catalog, user, db);
   const page = querySmartFolderWorks(
@@ -141,103 +144,65 @@ test("ルールベース smart folder は壊れた候補を除外して WorksPag
   );
   assert.equal(page.dataIntegrityWarning?.skippedCount, 1);
   assert.deepEqual(page.dataIntegrityWarning?.skippedWorkIds, [badId]);
-  db.close();
 });
 
-test("スキャン finalize は壊れた作品があっても ScanResult を返す", async () => {
-  const db = openDb({ kind: "memory" });
+test("スキャン finalize は壊れた作品があっても ScanResult を返す", async (t) => {
+  const scope = makeTestScope();
+  t.after(scope.cleanup);
+  const db = scope.own(openDb({ kind: "memory" }));
   const repos = createWorkRepos(db);
   const { badId } = seedCorruptedPair(repos.catalog, repos.user, db);
-  const root = mkdtempSync(join(tmpdir(), "mimi-scan-integrity-"));
-  try {
-    const scanner = new Scanner(db, repos);
-    const result = await scanner.scan(root, { full: true });
-    assert.equal(result.dataIntegrityWarning?.skippedCount, 1);
-    assert.deepEqual(result.dataIntegrityWarning?.skippedWorkIds, [badId]);
-    assert.equal(typeof result.rjCodeMissingCount, "number");
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-    db.close();
-  }
+  const scanRoot = makeTestDirectory("scan-integrity");
+  t.after(scanRoot.cleanup);
+  const scanner = new Scanner(db, repos);
+  const result = await scanner.scan(scanRoot.path, { full: true });
+  assert.equal(result.dataIntegrityWarning?.skippedCount, 1);
+  assert.deepEqual(result.dataIntegrityWarning?.skippedWorkIds, [badId]);
+  assert.equal(typeof result.rjCodeMissingCount, "number");
 });
 
-test("DLsite 一括取得は壊れた作品を除外し dataIntegrityWarning を返す", async () => {
-  const dir = mkdtempSync(join(tmpdir(), "mimi-dlsite-bulk-integrity-"));
-  const db = openFileDb(dir);
+test("DLsite 一括取得は壊れた作品を除外し dataIntegrityWarning を返す", async (t) => {
+  const directory = makeTestDirectory("dlsite-bulk-integrity");
+  t.after(directory.cleanup);
+  const db = directory.own(openFileDb(directory.path));
   const { catalog, user } = createWorkRepos(db);
   const { badId } = seedCorruptedPair(catalog, user, db);
-  const adapter = createRealAdapter({
-    database: {
-      kind: "files",
-      catalogPath: join(dir, "catalog.sqlite"),
-      userPath: join(dir, "user.sqlite"),
-    },
-    dataRoot: dir,
-    dlsiteCache: { path: join(dir, "dlsite-cache.sqlite") },
-  });
-  try {
-    const result = await adapter.runDlsiteBulk("existing", undefined);
-    assert.equal(result.dataIntegrityWarning?.skippedCount, 1);
-    assert.deepEqual(result.dataIntegrityWarning?.skippedWorkIds, [badId]);
-  } finally {
-    adapter.close();
-    db.close();
-    rmSync(dir, { recursive: true, force: true });
-  }
+  const adapter = fileAdapter(directory);
+
+  const result = await adapter.runDlsiteBulk("existing", undefined);
+  assert.equal(result.dataIntegrityWarning?.skippedCount, 1);
+  assert.deepEqual(result.dataIntegrityWarning?.skippedWorkIds, [badId]);
 });
 
-test("DLsite 一括取得: workIds に含まない壊れた作品は dataIntegrityWarning に出ない", async () => {
-  const dir = mkdtempSync(join(tmpdir(), "mimi-dlsite-bulk-scope-"));
-  const db = openFileDb(dir);
+test("DLsite 一括取得: workIds に含まない壊れた作品は dataIntegrityWarning に出ない", async (t) => {
+  const directory = makeTestDirectory("dlsite-bulk-scope");
+  t.after(directory.cleanup);
+  const db = directory.own(openFileDb(directory.path));
   const { catalog, user } = createWorkRepos(db);
   const { goodId } = seedCorruptedPair(catalog, user, db);
-  const adapter = createRealAdapter({
-    database: {
-      kind: "files",
-      catalogPath: join(dir, "catalog.sqlite"),
-      userPath: join(dir, "user.sqlite"),
-    },
-    dataRoot: dir,
-    dlsiteCache: { path: join(dir, "dlsite-cache.sqlite") },
-  });
-  try {
-    const result = await adapter.runDlsiteBulk("existing", [goodId]);
-    assert.equal(result.dataIntegrityWarning, undefined);
-  } finally {
-    adapter.close();
-    db.close();
-    rmSync(dir, { recursive: true, force: true });
-  }
+  const adapter = fileAdapter(directory);
+
+  const result = await adapter.runDlsiteBulk("existing", [goodId]);
+  assert.equal(result.dataIntegrityWarning, undefined);
 });
 
-test("DLsite 一括取得: workIds に含まれる壊れた作品は dataIntegrityWarning に出る", async () => {
-  const dir = mkdtempSync(join(tmpdir(), "mimi-dlsite-bulk-scope-bad-"));
-  const db = openFileDb(dir);
+test("DLsite 一括取得: workIds に含まれる壊れた作品は dataIntegrityWarning に出る", async (t) => {
+  const directory = makeTestDirectory("dlsite-bulk-scope-bad");
+  t.after(directory.cleanup);
+  const db = directory.own(openFileDb(directory.path));
   const { catalog, user } = createWorkRepos(db);
   const { badId } = seedCorruptedPair(catalog, user, db);
-  const adapter = createRealAdapter({
-    database: {
-      kind: "files",
-      catalogPath: join(dir, "catalog.sqlite"),
-      userPath: join(dir, "user.sqlite"),
-    },
-    dataRoot: dir,
-    dlsiteCache: { path: join(dir, "dlsite-cache.sqlite") },
-  });
-  try {
-    const result = await adapter.runDlsiteBulk("existing", [badId]);
-    assert.equal(result.dataIntegrityWarning?.skippedCount, 1);
-    assert.deepEqual(result.dataIntegrityWarning?.skippedWorkIds, [badId]);
-  } finally {
-    adapter.close();
-    db.close();
-    rmSync(dir, { recursive: true, force: true });
-  }
+  const adapter = fileAdapter(directory);
+
+  const result = await adapter.runDlsiteBulk("existing", [badId]);
+  assert.equal(result.dataIntegrityWarning?.skippedCount, 1);
+  assert.deepEqual(result.dataIntegrityWarning?.skippedWorkIds, [badId]);
 });
 
-test("HTTP smart folder は dataIntegrityWarning を返す", async () => {
-  const dir = mkdtempSync(join(tmpdir(), "mimi-sf-integrity-"));
-  const db = openFileDb(dir);
+test("HTTP smart folder は dataIntegrityWarning を返す", async (t) => {
+  const directory = makeTestDirectory("sf-integrity");
+  t.after(directory.cleanup);
+  const db = directory.own(openFileDb(directory.path));
   const { catalog, user } = createWorkRepos(db);
   const { goodId, badId } = seedCorruptedPair(catalog, user, db);
   user.setUserSetting("root_folder", "/library");
@@ -253,32 +218,18 @@ test("HTTP smart folder は dataIntegrityWarning を返す", async () => {
     ],
     sort: "id-asc",
   });
-  const adapter = createRealAdapter({
-    database: {
-      kind: "files",
-      catalogPath: join(dir, "catalog.sqlite"),
-      userPath: join(dir, "user.sqlite"),
-    },
-    dataRoot: dir,
-    dlsiteCache: { path: join(dir, "dlsite-cache.sqlite") },
-  });
-  try {
-    const app = createApp(adapter);
-    const res = await app.request(`/api/smart-folders/${folder.id}/works`);
-    assert.equal(res.status, 200);
-    const body = (await res.json()) as {
-      items: Array<{ id: string }>;
-      dataIntegrityWarning?: { skippedCount: number; skippedWorkIds: string[] };
-    };
-    assert.deepEqual(
-      body.items.map((item) => item.id),
-      [goodId],
-    );
-    assert.equal(body.dataIntegrityWarning?.skippedCount, 1);
-    assert.deepEqual(body.dataIntegrityWarning?.skippedWorkIds, [badId]);
-  } finally {
-    adapter.close();
-    db.close();
-    rmSync(dir, { recursive: true, force: true });
-  }
+  const adapter = fileAdapter(directory);
+  const app = createApp(adapter);
+  const res = await app.request(`/api/smart-folders/${folder.id}/works`);
+  assert.equal(res.status, 200);
+  const body = (await res.json()) as {
+    items: Array<{ id: string }>;
+    dataIntegrityWarning?: { skippedCount: number; skippedWorkIds: string[] };
+  };
+  assert.deepEqual(
+    body.items.map((item) => item.id),
+    [goodId],
+  );
+  assert.equal(body.dataIntegrityWarning?.skippedCount, 1);
+  assert.deepEqual(body.dataIntegrityWarning?.skippedWorkIds, [badId]);
 });

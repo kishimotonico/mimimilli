@@ -17,8 +17,7 @@ test("複数のdiscフォルダーを一つの未登録候補へ統合し、mimi
   writeWav(join(work, "disc 1", "a.wav"), 1);
   writeWav(join(work, "disc 2", "b.wav"), 1);
 
-  const db = openDb({ kind: "memory" });
-  t.after(() => db.close());
+  const db = directory.own(openDb({ kind: "memory" }));
   const scanner = new Scanner(db, createWorkRepos(db));
   const result = await scanner.scan(root);
 
@@ -42,8 +41,7 @@ test("ルート直下の音声は親フォルダー候補へ昇格しない", as
   mkdirSync(root, { recursive: true });
   writeWav(join(root, "track.wav"), 1);
 
-  const db = openDb({ kind: "memory" });
-  t.after(() => db.close());
+  const db = directory.own(openDb({ kind: "memory" }));
   const scanner = new Scanner(db, createWorkRepos(db));
   const result = await scanner.scan(root);
 
@@ -67,8 +65,7 @@ test("mimimilli.jsonがある既存作品は未登録候補として再判定し
   });
   writeFileSync(join(work, "mimimilli.json"), source);
 
-  const db = openDb({ kind: "memory" });
-  t.after(() => db.close());
+  const db = directory.own(openDb({ kind: "memory" }));
   const scanner = new Scanner(db, createWorkRepos(db));
   const result = await scanner.scan(root);
 
