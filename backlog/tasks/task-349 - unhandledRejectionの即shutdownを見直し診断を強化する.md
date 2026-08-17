@@ -1,10 +1,10 @@
 ---
 id: TASK-349
 title: unhandledRejectionの即shutdownを見直し診断を強化する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-17 16:13'
-updated_date: '2026-08-17 16:59'
+updated_date: '2026-08-17 17:04'
 labels: []
 dependencies: []
 ordinal: 359000
