@@ -1,10 +1,10 @@
 ---
 id: TASK-346
 title: dlsiteCacheの並列mkdirでEEXISTを発生させない
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-14 18:33'
-updated_date: '2026-08-17 18:06'
+updated_date: '2026-08-17 18:49'
 labels:
   - bug
   - server

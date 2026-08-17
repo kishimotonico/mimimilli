@@ -1,10 +1,10 @@
 ---
 id: TASK-345
 title: Windows並列realテストのtemp・DB削除EBUSYを解消する
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-08-14 18:33'
-updated_date: '2026-08-17 18:43'
+updated_date: '2026-08-17 18:49'
 labels:
   - bug
   - server

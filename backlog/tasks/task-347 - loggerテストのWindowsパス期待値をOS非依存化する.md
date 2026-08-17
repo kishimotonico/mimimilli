@@ -1,10 +1,10 @@
 ---
 id: TASK-347
 title: loggerテストのWindowsパス期待値をOS非依存化する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-14 18:34'
-updated_date: '2026-08-17 18:05'
+updated_date: '2026-08-17 18:49'
 labels:
   - bug
   - server
