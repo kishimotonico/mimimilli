@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { test } from "node:test";
 import { dispose, formatError, getCategoryLogger, initLogger } from "../src/lib/logger.ts";
@@ -10,7 +10,7 @@ test("initLogger は logDir 指定時に debug も含めてJSONLへ記録する"
   try {
     const { logFilePath } = await initLogger({ logDir });
     assert.ok(logFilePath);
-    assert.equal(logFilePath, join(logDir, logFilePath.slice(logFilePath.lastIndexOf("/") + 1)));
+    assert.equal(dirname(logFilePath), logDir);
     assert.match(logFilePath, /server-\d{4}-\d{2}-\d{2}\.jsonl$/);
 
     getCategoryLogger("http").debug("テストデバッグログ", { status: 200 });
