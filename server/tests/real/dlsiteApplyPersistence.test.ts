@@ -29,14 +29,16 @@ const COVER_URL = "https://img.dlsite.jp/modpub/images2/work/a.jpg";
 test("title: 単発適用は applyTitle に従い、一括取得は作品情報を変更しない", async (t) => {
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
-  const adapter = createTestRealAdapter({
-    database: { kind: "memory" },
-    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
-    dlsiteSchedulerDependencies: mockDlsiteTransport({
-      html: (code) =>
-        htmlResponse(sampleWorkHtml(code, { title: `DLsiteタイトル ${code}`, cover: false })),
+  const adapter = lib.own(
+    createTestRealAdapter({
+      database: { kind: "memory" },
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: (code) =>
+          htmlResponse(sampleWorkHtml(code, { title: `DLsiteタイトル ${code}`, cover: false })),
+      }),
     }),
-  });
+  );
   await adapter.updateSettings({ rootFolder: lib.root });
   const scan = await adapter.scan();
 
@@ -100,7 +102,6 @@ test("title: 単発適用は applyTitle に従い、一括取得は作品情報�
   });
   const generatedAfterApply = await adapter.getWork(generatedId);
   assert.equal(generatedAfterApply?.title, generatedAfterBulk?.title);
-  adapter.close();
 });
 
 test("cover: 単発適用は applyCover で既存カバーを上書きし、一括取得は変更しない", async (t) => {
@@ -112,18 +113,20 @@ test("cover: 単発適用は applyCover で既存カバーを上書きし、一�
   const coverBody = new Uint8Array(
     readFileSync(join(lib.root, "dlsite", "RJ900001_テスト作品", "cover.jpg")),
   );
-  const adapter = createRealAdapter({
-    database: { kind: "memory" },
-    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
-    dlsiteCache: { path: join(dir.path, "cache.sqlite") },
-    dlsiteSchedulerDependencies: mockDlsiteTransport({
-      html: (code) => htmlResponse(sampleWorkHtml(code, { title: `取得 ${code}`, cover: true })),
-      cover: () => {
-        coverHttpCalls += 1;
-        return jpegResponse(coverBody);
-      },
+  const adapter = dir.own(
+    createRealAdapter({
+      database: { kind: "memory" },
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+      dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: (code) => htmlResponse(sampleWorkHtml(code, { title: `取得 ${code}`, cover: true })),
+        cover: () => {
+          coverHttpCalls += 1;
+          return jpegResponse(coverBody);
+        },
+      }),
     }),
-  });
+  );
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
 
@@ -169,7 +172,6 @@ test("cover: 単発適用は applyCover で既存カバーを上書きし、一�
     true,
   );
   assert.equal(coverHttpCalls, 2);
-  adapter.close();
 });
 
 test("登録時のDLsite指定はregistration bodyでタイトルを上書きしない", async (t) => {
@@ -180,7 +182,7 @@ test("登録時のDLsite指定はregistration bodyでタイトルを上書きし
   mkdirSync(folder, { recursive: true });
   writeWav(join(folder, "intro.wav"), 1);
 
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   const app = createApp(adapter);
   await adapter.updateSettings({ rootFolder: root });
 
@@ -214,7 +216,6 @@ test("登録時のDLsite指定はregistration bodyでタイトルを上書きし
 
   const meta = JSON.parse(readFileSync(join(folder, META_FILE_NAME), "utf-8")) as { title: string };
   assert.equal(meta.title, formTitle);
-  adapter.close();
 });
 
 test("missing-only一括適用はcache結果だけを使い、既存フィールドを上書きしない", async (t) => {
@@ -223,17 +224,19 @@ test("missing-only一括適用はcache結果だけを使い、既存フィール
   t.after(lib.cleanup);
   t.after(dir.cleanup);
   let htmlCalls = 0;
-  const adapter = createRealAdapter({
-    database: { kind: "memory" },
-    dlsiteCache: { path: join(dir.path, "cache.sqlite") },
-    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
-    dlsiteSchedulerDependencies: mockDlsiteTransport({
-      html: (code) => {
-        htmlCalls += 1;
-        return htmlResponse(sampleWorkHtml(code, { title: "取得タイトル", cover: false }));
-      },
+  const adapter = dir.own(
+    createRealAdapter({
+      database: { kind: "memory" },
+      dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: (code) => {
+          htmlCalls += 1;
+          return htmlResponse(sampleWorkHtml(code, { title: "取得タイトル", cover: false }));
+        },
+      }),
     }),
-  });
+  );
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
   const before = await adapter.getWork(lib.existingWorkId);
@@ -257,7 +260,6 @@ test("missing-only一括適用はcache結果だけを使い、既存フィール
     skipped: 1,
     failed: 0,
   });
-  adapter.close();
 });
 
 test("missing-only一括適用はCAS競合を集計して後続作品を続行する", async (t) => {
@@ -308,24 +310,25 @@ test("missing-only一括適用はCAS競合を集計して後続作品を続行�
   const coverBody = new Uint8Array(
     readFileSync(join(library.root, "dlsite", "RJ900001_テスト作品", "cover.jpg")),
   );
-  const adapter = createRealAdapter({
-    database: { kind: "memory" },
-    dlsiteCache: { path: join(directory.path, "cache.sqlite") },
-    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
-    dlsiteSchedulerDependencies: mockDlsiteTransport({
-      html: (code) => htmlResponse(sampleWorkHtml(code, { cover: true })),
-      cover: () => {
-        if (!changedSource) {
-          changedSource = true;
-          const source = JSON.parse(readFileSync(firstMetaPath, "utf-8")) as { title: string };
-          source.title = "外部変更済み";
-          writeFileSync(firstMetaPath, `${JSON.stringify(source, null, 2)}\n`);
-        }
-        return jpegResponse(coverBody);
-      },
+  const adapter = directory.own(
+    createRealAdapter({
+      database: { kind: "memory" },
+      dlsiteCache: { path: join(directory.path, "cache.sqlite") },
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: (code) => htmlResponse(sampleWorkHtml(code, { cover: true })),
+        cover: () => {
+          if (!changedSource) {
+            changedSource = true;
+            const source = JSON.parse(readFileSync(firstMetaPath, "utf-8")) as { title: string };
+            source.title = "外部変更済み";
+            writeFileSync(firstMetaPath, `${JSON.stringify(source, null, 2)}\n`);
+          }
+          return jpegResponse(coverBody);
+        },
+      }),
     }),
-  });
-  t.after(() => adapter.close());
+  );
   await adapter.updateSettings({ rootFolder: root });
   await adapter.scan({ full: true });
   await adapter.runDlsiteBulk("existing", [firstId, secondId]);
@@ -347,14 +350,16 @@ test("missing-only一括適用: 取得失敗後もcatalog投影で通知集計�
   const dir = makeTestDirectory("dlsite-apply-missing-failure-projection");
   t.after(lib.cleanup);
   t.after(dir.cleanup);
-  const adapter = createRealAdapter({
-    database: { kind: "memory" },
-    dlsiteCache: { path: join(dir.path, "cache.sqlite") },
-    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
-    dlsiteSchedulerDependencies: mockDlsiteTransport({
-      html: () => htmlResponse("<html>404</html>", 404),
+  const adapter = dir.own(
+    createRealAdapter({
+      database: { kind: "memory" },
+      dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: () => htmlResponse("<html>404</html>", 404),
+      }),
     }),
-  });
+  );
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
   const metaPath = join((await adapter.getWork(lib.existingWorkId))!.physicalPath, META_FILE_NAME);
@@ -373,7 +378,6 @@ test("missing-only一括適用: 取得失敗後もcatalog投影で通知集計�
 
   const summary = await adapter.getDlsiteNotificationSummary();
   assert.ok(summary.fetchFailedCount >= 1);
-  adapter.close();
 });
 
 test("一括取得はカバーをキャッシュも適用もせず、明示適用で取得する", async (t) => {
@@ -387,18 +391,20 @@ test("一括取得はカバーをキャッシュも適用もせず、明示適�
   );
   const bulkCoverUrl =
     "https://img.dlsite.jp/modpub/images2/work/doujin/RJ900000/RJ900002_img_main.jpg";
-  const adapter = createRealAdapter({
-    database: { kind: "memory" },
-    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
-    dlsiteCache: { path: join(dir.path, "cache.sqlite") },
-    dlsiteSchedulerDependencies: mockDlsiteTransport({
-      html: (code) => htmlResponse(sampleWorkHtml(code, { title: `取得 ${code}`, cover: true })),
-      cover: () => {
-        coverHttpCalls += 1;
-        return jpegResponse(coverBody);
-      },
+  const adapter = dir.own(
+    createRealAdapter({
+      database: { kind: "memory" },
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+      dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: (code) => htmlResponse(sampleWorkHtml(code, { title: `取得 ${code}`, cover: true })),
+        cover: () => {
+          coverHttpCalls += 1;
+          return jpegResponse(coverBody);
+        },
+      }),
     }),
-  });
+  );
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
 
@@ -422,5 +428,4 @@ test("一括取得はカバーをキャッシュも適用もせず、明示適�
     sourceRevision: (await adapter.getWork(lib.existingWorkId))!.sourceRevision!,
   });
   assert.equal(coverHttpCalls, 1);
-  adapter.close();
 });

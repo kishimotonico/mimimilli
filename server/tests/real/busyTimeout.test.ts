@@ -120,22 +120,19 @@ async function runContendedWrite(input: BusyTimeoutWriteInput): Promise<{
   }
 }
 
-test("openDb接続にbusy_timeoutが設定される", () => {
+test("openDb接続にbusy_timeoutが設定される", (t) => {
   const directory = makeTestDirectory("busy-timeout-pragma");
+  t.after(directory.cleanup);
   const catalogPath = join(directory.path, "catalog.sqlite");
   const userPath = join(directory.path, "user.sqlite");
-  const db = openDb({ kind: "files", catalogPath, userPath });
-  try {
-    const catalog = db.sqlite.query("PRAGMA busy_timeout").get() as { timeout: number };
-    assert.equal(catalog.timeout, SQLITE_BUSY_TIMEOUT_MS);
-  } finally {
-    db.close();
-    directory.cleanup();
-  }
+  const db = directory.own(openDb({ kind: "files", catalogPath, userPath }));
+  const catalog = db.sqlite.query("PRAGMA busy_timeout").get() as { timeout: number };
+  assert.equal(catalog.timeout, SQLITE_BUSY_TIMEOUT_MS);
 });
 
-test("別接続が書き込みロックを保持中でもbusy_timeoutにより書き込みが待機して成功する", async () => {
+test("別接続が書き込みロックを保持中でもbusy_timeoutにより書き込みが待機して成功する", async (t) => {
   const directory = makeTestDirectory("busy-timeout-write");
+  t.after(directory.cleanup);
   const catalogPath = join(directory.path, "catalog.sqlite");
   const userPath = join(directory.path, "user.sqlite");
   const input = { catalogPath, userPath, workId: WORK_ID };
@@ -146,7 +143,6 @@ test("別接続が書き込みロックを保持中でもbusy_timeoutにより�
   seed.close();
 
   const result = await runContendedWrite(input);
-  directory.cleanup();
 
   assert.equal(result.ok, true, result.message);
   assert.ok(

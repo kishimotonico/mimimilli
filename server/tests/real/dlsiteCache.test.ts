@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {
+  existsSync,
   mkdirSync,
   readFileSync,
   readdirSync,
@@ -7,7 +8,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
 import { gzipSync } from "node:zlib";
 import { Database } from "bun:sqlite";
 import { test } from "node:test";
@@ -15,13 +16,14 @@ import {
   DEFAULT_DLSITE_CACHE_MAX_EXPANDED_BYTES,
   DEFAULT_DLSITE_CACHE_MAX_TRANSFER_BYTES,
   DEFAULT_DLSITE_CACHE_TTLS_MS,
+  DLSITE_CACHE_MEMORY_PATH,
   DlsiteCache,
   normalizeDlsiteProductCode,
   resolveDlsiteCacheConfig,
   validateDlsiteHtmlInput,
 } from "../../src/adapters/real/dlsiteCache.ts";
 import { runDlsiteCacheCli } from "../../src/dlsiteCacheCli.ts";
-import { makeTestDirectory } from "../helpers/sampleLibrary.ts";
+import { makeTestDirectory, makeTestScope } from "../helpers/sampleLibrary.ts";
 
 const VALID_HTML = '<html><h1 id="work_name">テスト作品</h1></html>';
 
@@ -29,14 +31,15 @@ function createCache(t: { after: (callback: () => void) => void }, now = 1_000) 
   const directory = makeTestDirectory("dlsite-cache");
   t.after(directory.cleanup);
   let clock = now;
-  const cache = new DlsiteCache({
-    path: join(directory.path, "dlsite-cache.sqlite"),
-    clock: () => clock,
-    ttlsMs: { ok: 100, parse_error: 20, not_found: 30, error: 40 },
-    maxTransferBytes: 1_000,
-    maxExpandedBytes: 1_000,
-  });
-  t.after(() => cache.close());
+  const cache = directory.own(
+    new DlsiteCache({
+      path: join(directory.path, "dlsite-cache.sqlite"),
+      clock: () => clock,
+      ttlsMs: { ok: 100, parse_error: 20, not_found: 30, error: 40 },
+      maxTransferBytes: 1_000,
+      maxExpandedBytes: 1_000,
+    }),
+  );
   return { cache, directory, setClock: (value: number) => (clock = value) };
 }
 
@@ -225,8 +228,9 @@ test("DLsiteキャッシュ: 改ざんされた過大gzip BLOBを展開上限で
   const directory = makeTestDirectory("dlsite-cache-gzip-limit");
   t.after(directory.cleanup);
   const path = join(directory.path, "cache.sqlite");
-  const cache = new DlsiteCache({ path, maxTransferBytes: 1_000, maxExpandedBytes: 64 });
-  t.after(() => cache.close());
+  const cache = directory.own(
+    new DlsiteCache({ path, maxTransferBytes: 1_000, maxExpandedBytes: 64 }),
+  );
   cache.recordSuccess({
     productCode: "RJ123456",
     outcome: "ok",
@@ -254,8 +258,7 @@ test("DLsiteキャッシュ: close後に同じDBを開き直してHTMLを読め�
     html: VALID_HTML,
   });
   first.close();
-  const reopened = new DlsiteCache({ path });
-  t.after(() => reopened.close());
+  const reopened = directory.own(new DlsiteCache({ path }));
   const hit = reopened.resolve({ productCode: "RJ123456" });
   assert.equal(hit.kind, "html");
   if (hit.kind === "html") assert.equal(hit.html, VALID_HTML);
@@ -264,12 +267,13 @@ test("DLsiteキャッシュ: close後に同じDBを開き直してHTMLを読め�
 test("DLsiteキャッシュ: fetched_atとTTLの加算が安全な整数を超えると保存しない", (t) => {
   const directory = makeTestDirectory("dlsite-cache-clock-overflow");
   t.after(directory.cleanup);
-  const cache = new DlsiteCache({
-    path: join(directory.path, "cache.sqlite"),
-    clock: () => Number.MAX_SAFE_INTEGER - 10,
-    ttlsMs: { error: 20 },
-  });
-  t.after(() => cache.close());
+  const cache = directory.own(
+    new DlsiteCache({
+      path: join(directory.path, "cache.sqlite"),
+      clock: () => Number.MAX_SAFE_INTEGER - 10,
+      ttlsMs: { error: 20 },
+    }),
+  );
   assert.throws(
     () => cache.recordFailure({ productCode: "RJ123456", outcome: "error" }),
     /attempted_at \+ TTL/,
@@ -613,6 +617,65 @@ test("DLsiteキャッシュCLI: export --dir は1件の失敗で全体を止め�
   assert.equal(result.failed, 1);
   assert.equal(result.failures[0]?.file, "RJ12.html.gz");
   assert.deepEqual(readdirSync(archiveDir), ["RJ123456.html.gz"]);
+});
+
+test("DLsiteキャッシュ: 相対パスでも生成に成功する", (t) => {
+  const directory = makeTestDirectory("dlsite-cache-relative");
+  t.after(directory.cleanup);
+  const previousCwd = process.cwd();
+  process.chdir(directory.path);
+  directory.ownFn(previousCwd, (cwd) => process.chdir(cwd));
+  const cache = directory.own(new DlsiteCache({ path: "cache.sqlite" }));
+  assert.equal(cache.resolve({ productCode: "RJ123456" }).kind, "miss");
+});
+
+test("DLsiteキャッシュ: 既存ディレクトリを出力先に指定しても成功する", (t) => {
+  const directory = makeTestDirectory("dlsite-cache-existing-dir");
+  t.after(directory.cleanup);
+  const cachePath = join(directory.path, "cache.sqlite");
+  mkdirSync(directory.path, { recursive: true });
+  const cache = directory.own(new DlsiteCache({ path: cachePath }));
+  assert.equal(cache.resolve({ productCode: "RJ123456" }).kind, "miss");
+});
+
+test("DLsiteキャッシュ: 同一相対パスへ連続生成しても成功する", (t) => {
+  const directory = makeTestDirectory("dlsite-cache-repeated-relative");
+  t.after(directory.cleanup);
+  const previousCwd = process.cwd();
+  process.chdir(directory.path);
+  directory.ownFn(previousCwd, (cwd) => process.chdir(cwd));
+  for (let index = 0; index < 8; index += 1) {
+    const cache = directory.own(new DlsiteCache({ path: "cache.sqlite" }));
+    assert.equal(cache.resolve({ productCode: "RJ123456" }).kind, "miss");
+  }
+});
+
+test("DLsiteキャッシュ: 相対パスは絶対パスとして保持する", (t) => {
+  const directory = makeTestDirectory("dlsite-cache-absolute-path");
+  t.after(directory.cleanup);
+  const previousCwd = process.cwd();
+  process.chdir(directory.path);
+  directory.ownFn(previousCwd, (cwd) => process.chdir(cwd));
+  const relativePath = "cache.sqlite";
+  const cache = directory.own(new DlsiteCache({ path: relativePath }));
+  assert.ok(isAbsolute(cache.config.path));
+  assert.equal(cache.config.path, resolve(directory.path, relativePath));
+});
+
+test("DLsiteキャッシュ: :memory: はファイルシステム上にDBファイルを作らない", (t) => {
+  const scope = makeTestScope();
+  t.after(scope.cleanup);
+  const memoryFile = join(process.cwd(), DLSITE_CACHE_MEMORY_PATH);
+  const cache = scope.own(new DlsiteCache({ path: DLSITE_CACHE_MEMORY_PATH }));
+  assert.equal(cache.config.path, DLSITE_CACHE_MEMORY_PATH);
+  assert.ok(!existsSync(memoryFile));
+  cache.recordSuccess({
+    productCode: "RJ123456",
+    outcome: "ok",
+    contentType: "text/html",
+    html: VALID_HTML,
+  });
+  assert.ok(!existsSync(memoryFile));
 });
 
 test("DLsiteカバーキャッシュ: 正規化URLのhashごとに非圧縮バイト列を保持する", (t) => {

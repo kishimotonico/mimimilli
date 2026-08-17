@@ -1,11 +1,12 @@
 import { existsSync, mkdirSync, statSync } from "node:fs";
-import { dirname, isAbsolute } from "node:path";
+import { dirname, isAbsolute, resolve } from "node:path";
 import { createHash } from "node:crypto";
 import { gunzipSync, gzipSync } from "node:zlib";
 import { Database } from "bun:sqlite";
 import { RJ_CODE_PATTERN } from "@mimimilli/shared";
 import { applySqliteBusyTimeout } from "./sqliteConnection.ts";
 
+export const DLSITE_CACHE_MEMORY_PATH = ":memory:" as const;
 export const DLSITE_CACHE_REPRESENTATION = "work-html-ja-adultchecked-v1";
 export const DEFAULT_DLSITE_CACHE_TTLS_MS = {
   ok: 30 * 24 * 60 * 60 * 1000,
@@ -166,9 +167,13 @@ export class DlsiteCache {
   private readonly clock: () => number;
 
   constructor(options: DlsiteCacheOptions) {
-    this.path = options.path;
-    mkdirSync(dirname(options.path), { recursive: true });
-    this.sqlite = new Database(options.path, { create: true });
+    if (options.path === DLSITE_CACHE_MEMORY_PATH) {
+      this.path = DLSITE_CACHE_MEMORY_PATH;
+    } else {
+      this.path = resolve(options.path);
+      mkdirSync(dirname(this.path), { recursive: true });
+    }
+    this.sqlite = new Database(this.path, { create: true });
     this.sqlite.exec("PRAGMA journal_mode = WAL");
     applySqliteBusyTimeout(this.sqlite);
     this.sqlite.exec(`

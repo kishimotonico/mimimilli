@@ -71,7 +71,7 @@ test("durationSec: end-start / end有start無 / start有end無 / 両無 / 同一
     ),
   );
 
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await adapter.updateSettings({ rootFolder: root });
   await adapter.scan();
 
@@ -168,7 +168,7 @@ test("startがファイル全体長以上のトラックは作品をerror状態�
     ),
   );
 
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await adapter.updateSettings({ rootFolder: root });
   await adapter.scan();
 
@@ -232,7 +232,7 @@ test("end指定トラックでもstartがファイル全体長を超えていれ
     ),
   );
 
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await adapter.updateSettings({ rootFolder: root });
   await adapter.scan();
 
@@ -286,7 +286,7 @@ test("endがファイル実測長をわずかに超えるだけの正常デー�
     ),
   );
 
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await adapter.updateSettings({ rootFolder: root });
   await adapter.scan();
 
@@ -335,7 +335,7 @@ test("rescan無しのファイル差し替え後、getWorkのtotalDurationSecは
     ),
   );
 
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await adapter.updateSettings({ rootFolder: root });
   await adapter.scan();
 

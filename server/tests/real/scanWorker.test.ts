@@ -51,16 +51,17 @@ test(
     const workerReady = new Promise<void>((resolve) => {
       ready = resolve;
     });
-    const adapter = createTestRealAdapter({
-      database,
-      dataRoot: join(library.baseDir, "data"),
-      thumbnailCacheDir,
-      scanWorkerTestGate: gateBuffer,
-      scanWorkerTestGateStage: "before-finalize",
-      onScanWorkerTestGateReady: ready,
-    });
-    t.after(() => adapter.close());
-    const app = createApp(adapter);
+    const adapter = library.own(
+      createTestRealAdapter({
+        database,
+        dataRoot: join(library.baseDir, "data"),
+        thumbnailCacheDir,
+        scanWorkerTestGate: gateBuffer,
+        scanWorkerTestGateStage: "before-finalize",
+        onScanWorkerTestGateReady: ready,
+      }),
+    );
+    const app = library.ownFn(createApp(adapter), (a) => a.shutdown());
 
     const worksBefore = (await (await app.request("/api/works")).json()) as WorksPage;
     const generated = worksBefore.items.find((work) => work.title.includes("RJ900001"));
@@ -139,15 +140,16 @@ test("app shutdown は同期停止中のfile scan Workerを終了まで待機す
   const workerReady = new Promise<void>((resolve) => {
     ready = resolve;
   });
-  const adapter = createTestRealAdapter({
-    database,
-    dataRoot: join(library.baseDir, "data"),
-    thumbnailCacheDir,
-    scanWorkerTestGate: gateBuffer,
-    scanWorkerTestGateStage: "before-scan",
-    onScanWorkerTestGateReady: ready,
-  });
-  t.after(() => adapter.close());
+  const adapter = library.own(
+    createTestRealAdapter({
+      database,
+      dataRoot: join(library.baseDir, "data"),
+      thumbnailCacheDir,
+      scanWorkerTestGate: gateBuffer,
+      scanWorkerTestGateStage: "before-scan",
+      onScanWorkerTestGateReady: ready,
+    }),
+  );
   const app = createApp(adapter);
   const startedResponse = await app.request("/api/scan", { method: "POST" });
   const started = (await startedResponse.json()) as { job: ScanJobSnapshot };
@@ -167,12 +169,13 @@ test("file scan Workerはfull:trueをscannerへ伝播し全件再処理する", 
     userPath: join(library.baseDir, "data", "db", "user.sqlite"),
   };
   const thumbnailCacheDir = join(library.baseDir, "data", "thumbnails");
-  const adapter = createTestRealAdapter({
-    database,
-    dataRoot: join(library.baseDir, "data"),
-    thumbnailCacheDir,
-  });
-  t.after(() => adapter.close());
+  const adapter = library.own(
+    createTestRealAdapter({
+      database,
+      dataRoot: join(library.baseDir, "data"),
+      thumbnailCacheDir,
+    }),
+  );
   await adapter.updateSettings({ rootFolder: library.root });
   await scanAndRegisterCandidates(adapter);
 
@@ -206,8 +209,9 @@ test("file scan WorkerはMIMIMILLI_DLSITE_CACHE_DBで解決したDLsiteキャッ
   seedCache.close();
   assert.equal(existsSync(defaultCachePath), false);
 
-  const adapter = createTestRealAdapter({ database, dataRoot, thumbnailCacheDir, dlsiteCache });
-  t.after(() => adapter.close());
+  const adapter = library.own(
+    createTestRealAdapter({ database, dataRoot, thumbnailCacheDir, dlsiteCache }),
+  );
   await adapter.updateSettings({ rootFolder: library.root });
   await adapter.scan();
 

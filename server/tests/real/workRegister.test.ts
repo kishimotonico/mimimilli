@@ -62,7 +62,7 @@ async function setupPlainLibrary(t: TestContext) {
   mkdirSync(parent, { recursive: true });
   writeWav(join(parent, "intro.wav"), 1);
 
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   const app = createApp(adapter);
   await adapter.updateSettings({ rootFolder: root });
   return { app, root, parent };
@@ -81,7 +81,7 @@ async function setupLibraryWithChild(t: TestContext) {
   writeWav(join(child, "tracks", "01.wav"), 2);
   writeWav(join(sibling, "tracks", "01.wav"), 2);
 
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   const app = createApp(adapter);
   await adapter.updateSettings({ rootFolder: root });
 
@@ -109,7 +109,7 @@ async function setupLibraryWithTwoChildren(t: TestContext) {
   writeWav(join(childA, "tracks", "01.wav"), 2);
   writeWav(join(childB, "tracks", "01.wav"), 2);
 
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   const app = createApp(adapter);
   await adapter.updateSettings({ rootFolder: root });
 
@@ -178,7 +178,7 @@ test("POST /works: 絶対パスとパストラバーサルを拒否する", asyn
   const root = join(directory.path, "lib");
   mkdirSync(root, { recursive: true });
 
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   const app = createApp(adapter);
   await adapter.updateSettings({ rootFolder: root });
 
@@ -243,7 +243,7 @@ test("POST /works: 登録前後で音声等の物理ファイルは変更され�
   writeWav(join(folder, "track.wav"), 3);
   writeFileSync(join(folder, "notes.txt"), "memo");
 
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   const app = createApp(adapter);
   await adapter.updateSettings({ rootFolder: root });
 

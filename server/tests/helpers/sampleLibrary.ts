@@ -3,6 +3,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { appendSuppressedError } from "../../src/lib/suppressedError.ts";
 
 /** 指定秒数の有効な 8kHz mono PCM WAV を生成する */
 export function writeWav(path: string, seconds: number): void {
@@ -36,26 +37,70 @@ export function writeSampleCover(path: string): void {
   writeFileSync(path, Buffer.from(SAMPLE_COVER_JPEG_BASE64, "base64"));
 }
 
-export interface SampleLibrary {
+export interface TestResourceScope {
+  own<T extends { close(): void }>(resource: T): T;
+  ownFn<T>(resource: T, close: (resource: T) => void): T;
+  cleanup(): void;
+}
+
+function runClosersSafely(closers: Array<() => void>): unknown | undefined {
+  let primaryError: unknown;
+  for (let index = closers.length - 1; index >= 0; index -= 1) {
+    try {
+      closers[index]!();
+    } catch (error) {
+      if (primaryError === undefined) {
+        primaryError = error;
+      } else {
+        appendSuppressedError(primaryError, error);
+      }
+    }
+  }
+  return primaryError;
+}
+
+export function makeTestScope(): TestResourceScope {
+  const closers: Array<() => void> = [];
+  return {
+    own<T extends { close(): void }>(resource: T): T {
+      closers.push(() => resource.close());
+      return resource;
+    },
+    ownFn<T>(resource: T, close: (resource: T) => void): T {
+      closers.push(() => close(resource));
+      return resource;
+    },
+    cleanup(): void {
+      const primaryError = runClosersSafely(closers);
+      if (primaryError !== undefined) {
+        throw primaryError;
+      }
+    },
+  };
+}
+
+export interface TestDirectory extends TestResourceScope {
+  path: string;
+}
+
+/** os.tmpdir() 配下にテスト専用ディレクトリを作る。呼び出し側は t.after(directory.cleanup) を1回登録する。 */
+export function makeTestDirectory(name: string): TestDirectory {
+  const path = mkdtempSync(join(tmpdir(), `mimimilli-${name}-`));
+  const scope = makeTestScope();
+  scope.ownFn(path, (target) => rmSync(target, { recursive: true, force: true }));
+  return {
+    path,
+    own: scope.own.bind(scope),
+    ownFn: scope.ownFn.bind(scope),
+    cleanup: scope.cleanup.bind(scope),
+  };
+}
+
+export interface SampleLibrary extends TestDirectory {
   baseDir: string;
   root: string;
   /** 既存メタを持つ作品の ID */
   existingWorkId: string;
-  cleanup: () => void;
-}
-
-export interface TestDirectory {
-  path: string;
-  cleanup: () => void;
-}
-
-/** os.tmpdir() 配下にテスト専用ディレクトリを作る。呼び出し側は t.after で cleanup を登録する。 */
-export function makeTestDirectory(name: string): TestDirectory {
-  const path = mkdtempSync(join(tmpdir(), `mimimilli-${name}-`));
-  return {
-    path,
-    cleanup: () => rmSync(path, { recursive: true, force: true }),
-  };
 }
 
 /**
@@ -107,5 +152,13 @@ export function makeSampleLibrary(): SampleLibrary {
     ),
   );
 
-  return { baseDir, root, existingWorkId, cleanup: directory.cleanup };
+  return {
+    path: baseDir,
+    baseDir,
+    root,
+    existingWorkId,
+    own: directory.own.bind(directory),
+    ownFn: directory.ownFn.bind(directory),
+    cleanup: directory.cleanup.bind(directory),
+  };
 }

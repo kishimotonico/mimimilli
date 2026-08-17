@@ -10,6 +10,7 @@ import {
   resolvedDuration,
   upsertTestWork,
 } from "../helpers/workTestUtils.ts";
+import { makeTestScope } from "../helpers/sampleLibrary.ts";
 
 function sampleWork(id: string): Work {
   const playlistId = crypto.randomUUID();
@@ -51,8 +52,10 @@ function sampleWork(id: string): Work {
   };
 }
 
-test("foundIds 以外の作品だけが missing になる", async () => {
-  const db = openDb({ kind: "memory" });
+test("foundIds 以外の作品だけが missing になる", async (t) => {
+  const scope = makeTestScope();
+  t.after(scope.cleanup);
+  const db = scope.own(openDb({ kind: "memory" }));
   const { catalog, user } = createWorkRepos(db);
   upsertTestWork(catalog, user, sampleWork("keep-1"));
   upsertTestWork(catalog, user, sampleWork("keep-2"));
@@ -64,11 +67,12 @@ test("foundIds 以外の作品だけが missing になる", async () => {
   assert.equal((await getTestWork(db, "keep-2"))?.status, "ok");
   assert.equal((await getTestWork(db, "lost-1"))?.status, "missing");
   assert.equal((await getTestWork(db, "lost-1"))?.errorMessage, null);
-  db.close();
 });
 
-test("foundIds が空なら全件 missing になる", async () => {
-  const db = openDb({ kind: "memory" });
+test("foundIds が空なら全件 missing になる", async (t) => {
+  const scope = makeTestScope();
+  t.after(scope.cleanup);
+  const db = scope.own(openDb({ kind: "memory" }));
   const { catalog, user } = createWorkRepos(db);
   upsertTestWork(catalog, user, sampleWork("w-1"));
   upsertTestWork(catalog, user, sampleWork("w-2"));
@@ -77,11 +81,12 @@ test("foundIds が空なら全件 missing になる", async () => {
 
   assert.equal((await getTestWork(db, "w-1"))?.status, "missing");
   assert.equal((await getTestWork(db, "w-2"))?.status, "missing");
-  db.close();
 });
 
-test("SQLiteパラメータ上限を超える大量IDでも動作し、一時テーブルを残さない", async () => {
-  const db = openDb({ kind: "memory" });
+test("SQLiteパラメータ上限を超える大量IDでも動作し、一時テーブルを残さない", async (t) => {
+  const scope = makeTestScope();
+  t.after(scope.cleanup);
+  const db = scope.own(openDb({ kind: "memory" }));
   const { catalog, user } = createWorkRepos(db);
   upsertTestWork(catalog, user, sampleWork("keep-1"));
   upsertTestWork(catalog, user, sampleWork("lost-1"));
@@ -101,5 +106,4 @@ test("SQLiteパラメータ上限を超える大量IDでも動作し、一時テ
     false,
     "一時テーブル scan_seen_ids が残存しています",
   );
-  db.close();
 });
