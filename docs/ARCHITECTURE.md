@@ -68,7 +68,7 @@ oxlint の `overrides[].files` は `**/…` 形式で書く（複数セグメン
 - catalog接続をmainとしてuser DBを `user` でATTACHし、作品とuser状態をJOINして読む。DB間外部キーとcascade deleteは使わない
 - 作品詳細のトラック尺は、音声ファイルの size/mtime と `audio_probe_cache` を照合し、不一致なら再プローブする（`workProbe.ts`）。`GET /works/:id` は読み取り後に `catalog.total_duration_sec` をライブ合計へ同期する（`workRefresh.ts` 経由）。一覧の `totalDurationSec` ソート・表示はこの保存列を読むため、詳細取得を経ると一覧にも反映される。再スキャンは不要
 - UI からの編集は `mimimilli.json` へ即時書き戻す
-- スキーマの正本は `catalogSchema.ts` / `userSchema.ts` のDrizzle定義。`pnpm --filter @mimimilli/server db:generate` で生成したSQLを起動時に適用する。開発中は `user_version` 不一致のDBを再作成し、配布開始後のuser migration基盤は別途整備する
+- スキーマの正本は `catalogSchema.ts` / `userSchema.ts` のDrizzle定義。`pnpm --filter @mimimilli/server db:generate` で生成したSQLを、起動時に自前のmigration executor（`sqliteMigrationExecutor.ts`、[ADR-0021](adr/0021-custom-sqlite-migration-executor.md)）で適用する。catalogは `user_version` 不一致で退避・再作成し、userはpre-migrationバックアップ後に候補DBへforward migrationを適用してから現行DBと入れ替える（[ADR-0008](adr/0008-persistence-topology-query-ownership-playback-ids.md)）
 - データルートはADR-0007に従い、Linuxでは `${XDG_DATA_HOME:-$HOME/.local/share}/mimimilli`、Windowsでは `%LOCALAPPDATA%\mimimilli`。`MIMIMILLI_DATA_DIR` で上書きできる
 
 ## 主要データフロー
