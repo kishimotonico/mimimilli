@@ -39,6 +39,7 @@ async function run(input: WorkerInput): Promise<void> {
   const token = new Int32Array(input.abortBuffer);
   let terminal: ScanWorkerTerminalMessage;
   let db: Db | null = null;
+  let dlsiteCache: DlsiteCache | null = null;
   try {
     db = openDb(input.database);
     const waitAtTestGate = (): void => {
@@ -54,9 +55,7 @@ async function run(input: WorkerInput): Promise<void> {
     const query = new WorkQueryRepository(db);
     const catalog = new CatalogWorkRepository(db);
     const user = new UserWorkStateRepository(db);
-    const dlsiteCache = existsSync(input.dlsiteCache.path)
-      ? new DlsiteCache(input.dlsiteCache)
-      : null;
+    dlsiteCache = existsSync(input.dlsiteCache.path) ? new DlsiteCache(input.dlsiteCache) : null;
     const scanner = new Scanner(db, { query, catalog, user }, { dlsiteCache });
     const result = await scanner.scan(
       input.root,
@@ -97,6 +96,7 @@ async function run(input: WorkerInput): Promise<void> {
           stack: error instanceof Error ? error.stack : undefined,
         };
   } finally {
+    dlsiteCache?.close();
     db?.close();
   }
 
