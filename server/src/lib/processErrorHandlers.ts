@@ -1,12 +1,20 @@
 import { formatError } from "./logger.ts";
 
 const UNHANDLED_REJECTION_MESSAGE = "未処理のPromise拒否を検出しました（プロセスは継続します）";
+const MAX_REJECTION_SIGNATURE_COUNT = 256;
+const OVERFLOW_SIGNATURE_MARKER = "\u001eoverflow";
 
 function createRejectionSignature(properties: Record<string, unknown>): string {
   const errorKind = String(properties.errorKind ?? "");
   const code = String(properties.code ?? "");
   const message = String(properties.message ?? properties.content ?? "");
   return `${errorKind}\0${code}\0${message}`;
+}
+
+function createOverflowSignature(properties: Record<string, unknown>): string {
+  const errorKind = String(properties.errorKind ?? "");
+  const code = String(properties.code ?? "");
+  return `${errorKind}\0${code}\0${OVERFLOW_SIGNATURE_MARKER}`;
 }
 
 function isPowerOfTen(n: number): boolean {
@@ -26,12 +34,24 @@ export function createUnhandledRejectionReporter(
   return (reason: unknown) => {
     const formatted = formatError(reason);
     const signature = createRejectionSignature(formatted);
-    const occurrences = (occurrenceCounts.get(signature) ?? 0) + 1;
-    occurrenceCounts.set(signature, occurrences);
+    let bucketKey = signature;
+    let aggregated = false;
+
+    if (!occurrenceCounts.has(signature)) {
+      if (occurrenceCounts.size >= MAX_REJECTION_SIGNATURE_COUNT) {
+        bucketKey = createOverflowSignature(formatted);
+        aggregated = true;
+      }
+    }
+
+    const occurrences = (occurrenceCounts.get(bucketKey) ?? 0) + 1;
+    occurrenceCounts.set(bucketKey, occurrences);
 
     if (!isPowerOfTen(occurrences)) return;
 
-    log(UNHANDLED_REJECTION_MESSAGE, { ...formatted, occurrences });
+    const properties: Record<string, unknown> = { ...formatted, occurrences };
+    if (aggregated) properties.aggregated = true;
+    log(UNHANDLED_REJECTION_MESSAGE, properties);
   };
 }
 

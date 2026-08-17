@@ -206,3 +206,32 @@ test("runCleanupAndExit: 起動完了後の通常シャットダウンでexitに
     assert.equal(exitCode, 0);
   });
 });
+
+const STARTUP_FAILURE_TIMEOUT_MS = 10_000;
+
+test("index.ts: 起動途中の失敗で exit code 1 に到達する", async () => {
+  const indexPath = join(import.meta.dir, "../../src/index.ts");
+  const proc = Bun.spawn({
+    cmd: ["bun", indexPath],
+    cwd: join(import.meta.dir, ".."),
+    env: {
+      ...process.env,
+      MIMIMILLI_ADAPTER: "invalid-adapter-for-test",
+    },
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+
+  const [exitCode, stderr] = await Promise.race([
+    Promise.all([proc.exited, new Response(proc.stderr).text()]),
+    new Promise<[number, string]>((_, reject) => {
+      setTimeout(
+        () => reject(new Error("index.ts subprocess timed out")),
+        STARTUP_FAILURE_TIMEOUT_MS,
+      );
+    }),
+  ]);
+
+  assert.equal(exitCode, 1);
+  assert.match(stderr, /未捕捉例外で終了します/);
+});

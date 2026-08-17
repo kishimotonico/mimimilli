@@ -4,7 +4,7 @@ title: unhandledRejectionの即shutdownを見直し診断を強化する
 status: In Progress
 assignee: []
 created_date: '2026-08-17 16:13'
-updated_date: '2026-08-17 17:19'
+updated_date: '2026-08-17 17:24'
 labels: []
 dependencies: []
 ordinal: 359000
@@ -35,14 +35,16 @@ ordinal: 359000
 - [x] #3 uncaughtExceptionではshutdown(1)が維持される
 - [x] #4 起動途中（app初期化前）に例外が起きてもexit code 1で終了する（shutdownのTDZ参照解消、クリーンアップ失敗時もexit到達）。起動途中・起動完了後の両方をテストで確認する
 - [x] #5 Bunバージョン更新の要否の結論（2026-08-18時点で1.3.14がlatest stable・該当修正なし）と、引用するissue番号の実在確認結果をADRまたはタスクノートに記録する
-- [ ] #6 rejectionシグネチャの保持数に上限があり、上限到達後の新規シグネチャは汎用シグネチャへ集約されてログ自体は失われない
-- [ ] #7 index.tsをsubprocessで起動し、起動途中に失敗させてexit code 1になることを実測するテストがある（環境依存で不安定なら対応なしの判断と根拠をタスクノートに明記）
+- [x] #6 rejectionシグネチャの保持数に上限があり、上限到達後の新規シグネチャは汎用シグネチャへ集約されてログ自体は失われない
+- [x] #7 index.tsをsubprocessで起動し、起動途中に失敗させてexit code 1になることを実測するテストがある（環境依存で不安定なら対応なしの判断と根拠をタスクノートに明記）
 <!-- AC:END -->
-
-
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 ADR-0022にBun 1.3.14 latest・該当修正なし、issue #37474/#13456の実在確認と症状との関係を記録済み。本文は未改変。
+
+AC#6: MAX_REJECTION_SIGNATURE_COUNT=256でMap上限を実装。300種の可変messageシグネチャ投入後にaggregated:trueのログが観測されるテスト、上限後の新規シグネチャがmessage付きでログされるテスト、上限前登録シグネチャがoccurrences=10で個別集計されるテストを追加。負の検証: overflow集約をreturnに差し替えと2テストが落ちた（上限超過後ログ欠落・aggregated未観測）。
+
+AC#7: shutdown.test.tsにBun.spawnでindex.tsをMIMIMILLI_ADAPTER=invalid-adapter-for-test起動するテストを追加。10sタイムアウト付きでproc.exitedをawaitしexit code 1を実測（ポートbindなし）。負の検証: 期待値を0にするとactual 1で落ちた。
 <!-- SECTION:NOTES:END -->
