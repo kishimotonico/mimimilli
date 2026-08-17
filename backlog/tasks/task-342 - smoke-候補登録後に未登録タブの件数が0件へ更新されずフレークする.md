@@ -4,7 +4,7 @@ title: 'smoke: 候補登録後に未登録タブの件数が0件へ更新され�
 status: In Progress
 assignee: []
 created_date: '2026-08-14 16:27'
-updated_date: '2026-08-17 20:34'
+updated_date: '2026-08-17 20:48'
 labels: []
 dependencies: []
 priority: medium
@@ -25,6 +25,16 @@ TASK-323（openAppの .mle-col.is-axis 可視待ちタイムアウト）とは�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 フルスイートを5回連続実行してlibrary.smoke.spec.ts:219が失敗しない
-- [ ] #2 件数更新の待機が固定待ちやtimeout延長ではなく確定的な状態の待機になっている
+- [x] #1 フルスイートを5回連続実行してlibrary.smoke.spec.ts:219が失敗しない
+- [x] #2 件数更新の待機が固定待ちやtimeout延長ではなく確定的な状態の待機になっている
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+自動切り替えの発火条件: ScanModal.handleUnregisteredRegistered で remainingCount===0 のとき setActiveTab('newlyRegistered')（ScanModal.tsx:63）。remainingCount は UnregisteredTab の registerMutation.onSuccess が candidates.length - registeredPaths.size で算出。
+
+採用した待機: サイドバー件数ラベル「未登録（0件）」は useScanCandidatesCache（useSyncExternalStore）経由で別レンダーになるため、mutation onSuccess 内の setActiveTab と非同期にずれる。代わりに (1) 新規登録済みタブの aria-selected=true（remainingCount===0 の確定的シグナル）、(2) 新規登録済みタブパネルに登録作品が表示、(3) 未登録タブパネルが非表示、で待機・検証する。
+
+検証: フルスイート5回連続（pw-run3 RUN1-5）で library.smoke.spec.ts:219 に ✘/failed なし。各回 15 passed、所要36-37秒。
+<!-- SECTION:NOTES:END -->
