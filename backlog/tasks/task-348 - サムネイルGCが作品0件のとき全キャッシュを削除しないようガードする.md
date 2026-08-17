@@ -1,10 +1,10 @@
 ---
 id: TASK-348
 title: サムネイルGCを完全なスナップショット構築時のみ実行するようガードする
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-08-17 16:12'
-updated_date: '2026-08-17 17:25'
+updated_date: '2026-08-17 17:39'
 labels: []
 dependencies: []
 ordinal: 358000
