@@ -268,13 +268,6 @@ export class WorkQueryRepository {
       const skipped: ListSummariesResult["skipped"] = [];
       const unmeasuredCovers: string[] = [];
       for (const rawRow of rows) {
-        if (
-          isCoverUnmeasured(
-            projectCoverKind(rawRow.coverImage, rawRow.coverWidth, rawRow.coverHeight),
-          )
-        ) {
-          unmeasuredCovers.push(rawRow.id);
-        }
         try {
           const row: SummaryRow = { ...rawRow, bookmarked: rawRow.bookmarked !== 0 };
           summaries.push(
@@ -284,6 +277,13 @@ export class WorkQueryRepository {
               parseDlsiteStateJson(row.id, rawRow.dlsiteStateJson),
             ),
           );
+          if (
+            isCoverUnmeasured(
+              projectCoverKind(rawRow.coverImage, rawRow.coverWidth, rawRow.coverHeight),
+            )
+          ) {
+            unmeasuredCovers.push(rawRow.id);
+          }
         } catch (error) {
           if (error instanceof PersistentDataError) {
             skipped.push({ workId: rawRow.id, reason: error.message });
