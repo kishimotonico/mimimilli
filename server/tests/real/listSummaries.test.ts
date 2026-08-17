@@ -5,7 +5,7 @@ import { test } from "node:test";
 import type { ResolvedPlaylist, Work } from "@mimimilli/shared";
 import { emptyDlsiteState } from "@mimimilli/shared";
 import { openDb, type Db } from "../../src/adapters/real/db.ts";
-import { workDlsite } from "../../src/adapters/real/catalogSchema.ts";
+import { workDlsite, works } from "../../src/adapters/real/catalogSchema.ts";
 import type { WorkQueryRepository } from "../../src/adapters/real/workQueryRepository.ts";
 import {
   upsertTestWork,
@@ -213,5 +213,23 @@ test("listSummaries: 寸法未計測カバーの作品IDを返す", () => {
     cover: { image: "cover.jpg", dimensions: null },
   });
   assert.deepEqual(query.listSummaries().unmeasuredCovers, ["w-unmeasured"]);
+  db.close();
+});
+
+test("listSummaries: skipped になる行は unmeasuredCovers に載らない", () => {
+  const db = openDb({ kind: "memory" });
+  const { query, catalog, user } = createWorkRepos(db);
+  const unmeasured = unmeasuredWork("w-skipped-unmeasured");
+  user.upsertWorkUserState(unmeasured);
+  catalog.upsertWorkCatalog(unmeasured, {
+    metaPath: folderMetaPath(unmeasured.physicalPath),
+    cover: { image: "cover.jpg", dimensions: null },
+  });
+  db.catalog.update(works).set({ status: "unknown" }).where(eq(works.id, unmeasured.id)).run();
+
+  const result = query.listSummaries();
+  assert.equal(result.skipped.length, 1);
+  assert.equal(result.skipped[0]!.workId, unmeasured.id);
+  assert.deepEqual(result.unmeasuredCovers, []);
   db.close();
 });
