@@ -1,9 +1,10 @@
 ---
 id: TASK-351
 title: 候補登録後に未登録件数が古いまま更新されないことがある
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-08-17 21:08'
+updated_date: '2026-08-17 21:09'
 labels: []
 dependencies: []
 ordinal: 361000
@@ -53,3 +54,16 @@ client/src/features/scan/model/useScanCandidatesCache.ts の readScanCandidates 
 - [ ] #3 原因構造が修正されている（暗黙フォールバックの存在意義を確認したうえでの判断がタスクnotesに記録されている）
 - [ ] #4 client側テストが通り、smokeフルスイートを5回連続実行して library.smoke.spec.ts の候補登録テストが失敗しない
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+統括による追加調査（2026-08-18）: 起票時の仮説（useScanCandidatesCache の last?.result.candidates フォールバック）より有力な経路が見つかった。候補キャッシュへの書き込みは2箇所ある。
+
+1. client/src/features/scan/ui/ScanRuntime.tsx:31 handleScanTerminal — job が completed になったとき queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), result.candidates) でスキャン結果の候補全件をそのまま書き込む
+2. client/src/features/scan/ui/scanModal/UnregisteredTab.tsx:60 registerMutation.onSuccess — 登録済みpathを previous.filter で取り除く
+
+1が2の後に走ると、登録で減らしたはずの候補がスキャン結果の全件（今回は2件）で上書きされ、件数が登録前の値に戻る。観測された『登録は成功しUIも落ち着いているのに件数だけ2のまま確定』と整合する。
+
+したがってAC#1の検証では、フォールバック経路と ScanRuntime の上書き経路の両方を候補として切り分けること。どちらが実際に起きているかを再現で確定させてから修正する。
+<!-- SECTION:NOTES:END -->
