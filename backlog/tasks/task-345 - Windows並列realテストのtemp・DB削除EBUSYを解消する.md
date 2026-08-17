@@ -4,6 +4,7 @@ title: Windows並列realテストのtemp・DB削除EBUSYを解消する
 status: To Do
 assignee: []
 created_date: '2026-08-14 18:33'
+updated_date: '2026-08-17 17:58'
 labels:
   - bug
   - server
@@ -24,8 +25,8 @@ TASK-344の最終pnpm-testで、多数のreal-testsがteardown時のtempディ�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 EBUSYを起こす未解放ハンドルまたはcleanup競合の原因が特定され、タスクnotesに記録されている
-- [ ] #2 影響するreal-testsはteardown前にDB・ファイルハンドルを解放し、tempディレクトリとDBをEBUSYなしで削除できる
-- [ ] #3 再現対象のreal-testsをWindowsで並列実行して10回連続で安定して通る
-- [ ] #4 pnpm-testをWindowsで3回連続実行し、real-testsのtemp・DB削除にEBUSYが発生しない
+- [ ] #1 EBUSYの最有力原因の機構・根拠と、実測で棄却した仮説がタスクnotesに記録されている
+- [ ] #2 テストのDB・ファイルハンドルは、個々のテストでの登録順に依存せず、tempディレクトリ削除より前に必ず解放される構造になっている
+- [ ] #3 server/tests/real 配下をLinuxで10回連続実行して全て成功する
+- [ ] #4 次回Windowsドッグフーディングで、並列real-testsのtemp・DB削除にEBUSYが再発しないことを確認する（実機確認待ち）
 <!-- AC:END -->

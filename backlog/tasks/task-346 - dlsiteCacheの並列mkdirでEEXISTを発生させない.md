@@ -4,6 +4,7 @@ title: dlsiteCacheの並列mkdirでEEXISTを発生させない
 status: To Do
 assignee: []
 created_date: '2026-08-14 18:33'
+updated_date: '2026-08-17 17:58'
 labels:
   - bug
   - server
@@ -26,6 +27,6 @@ TASK-344の最終pnpm-testで、server/src/adapters/real/dlsiteCache.ts:170のmk
 <!-- AC:BEGIN -->
 - [ ] #1 DLsiteキャッシュの出力先ディレクトリ準備は既存ディレクトリおよびカレント相当パスに対して成功する
 - [ ] #2 複数処理が同じ出力先を並列に準備してもEEXISTを送出しない
-- [ ] #3 mkdir競合を再現するテストが追加され、Windowsで10回連続して安定して通る
-- [ ] #4 関連するDLsiteキャッシュのreal-testsが並列実行で通る
+- [ ] #3 関連するDLsiteキャッシュのreal-testsが並列実行で通る
+- [ ] #4 mkdir競合を再現するテストが追加され、10回連続実行で安定して通る
 <!-- AC:END -->
