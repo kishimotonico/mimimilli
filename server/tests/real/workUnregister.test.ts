@@ -67,7 +67,7 @@ async function setupRegisteredWork(t: TestContext) {
   writeWav(join(folder, "track.wav"), 2);
   writeFileSync(join(folder, "readme.txt"), "notes");
 
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   const app = createApp(adapter);
   await adapter.updateSettings({ rootFolder: root });
 
@@ -150,7 +150,7 @@ test("DELETE /works/:id: 存在しない作品IDは 404", async (t) => {
   const root = join(directory.path, "lib");
   mkdirSync(root, { recursive: true });
 
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   const app = createApp(adapter);
   await adapter.updateSettings({ rootFolder: root });
 
@@ -166,7 +166,7 @@ test("DELETE /works/:id: 不正な作品IDは 404", async (t) => {
   const root = join(directory.path, "lib");
   mkdirSync(root, { recursive: true });
 
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   const app = createApp(adapter);
   await adapter.updateSettings({ rootFolder: root });
 
@@ -242,9 +242,11 @@ test("DELETE /works/:id: DBのmeta_pathが古い場合でもid一致のmimimilli
   mkdirSync(folder, { recursive: true });
   writeWav(join(folder, "track.wav"), 2);
 
-  const adapter = createTestRealAdapter({
-    database: { kind: "files", catalogPath, userPath },
-  });
+  const adapter = directory.own(
+    createTestRealAdapter({
+      database: { kind: "files", catalogPath, userPath },
+    }),
+  );
   const app = createApp(adapter);
   await adapter.updateSettings({ rootFolder: root });
 
@@ -278,9 +280,11 @@ test("DELETE /works/:id: id不一致のmimimilli.jsonは削除しない", async 
   mkdirSync(folder, { recursive: true });
   writeWav(join(folder, "track.wav"), 2);
 
-  const adapter = createTestRealAdapter({
-    database: { kind: "files", catalogPath, userPath },
-  });
+  const adapter = directory.own(
+    createTestRealAdapter({
+      database: { kind: "files", catalogPath, userPath },
+    }),
+  );
   const app = createApp(adapter);
   await adapter.updateSettings({ rootFolder: root });
 
@@ -321,9 +325,11 @@ test("unregisterWork: DB削除失敗時に退避したメタ正本を復元す�
   mkdirSync(folder, { recursive: true });
   writeWav(join(folder, "track.wav"), 2);
 
-  const adapter = createTestRealAdapter({
-    database: { kind: "files", catalogPath, userPath },
-  });
+  const adapter = directory.own(
+    createTestRealAdapter({
+      database: { kind: "files", catalogPath, userPath },
+    }),
+  );
   const app = createApp(adapter);
   await adapter.updateSettings({ rootFolder: root });
 
@@ -368,9 +374,11 @@ test("unregisterWork: catalog削除後のuser削除失敗時はメタを復元�
   mkdirSync(folder, { recursive: true });
   writeWav(join(folder, "track.wav"), 2);
 
-  const adapter = createTestRealAdapter({
-    database: { kind: "files", catalogPath, userPath },
-  });
+  const adapter = directory.own(
+    createTestRealAdapter({
+      database: { kind: "files", catalogPath, userPath },
+    }),
+  );
   const app = createApp(adapter);
   await adapter.updateSettings({ rootFolder: root });
 
@@ -435,9 +443,11 @@ test("unregisterWork: 退避済みメタのまま再実行するとDB削除後�
   mkdirSync(folder, { recursive: true });
   writeWav(join(folder, "track.wav"), 2);
 
-  const adapter = createTestRealAdapter({
-    database: { kind: "files", catalogPath, userPath },
-  });
+  const adapter = directory.own(
+    createTestRealAdapter({
+      database: { kind: "files", catalogPath, userPath },
+    }),
+  );
   const app = createApp(adapter);
   await adapter.updateSettings({ rootFolder: root });
 
@@ -475,9 +485,11 @@ test("スキャン: 退避のみ残存（catalogあり）でメタ正本を復�
   mkdirSync(folder, { recursive: true });
   writeWav(join(folder, "track.wav"), 2);
 
-  const adapter = createTestRealAdapter({
-    database: { kind: "files", catalogPath, userPath },
-  });
+  const adapter = directory.own(
+    createTestRealAdapter({
+      database: { kind: "files", catalogPath, userPath },
+    }),
+  );
   const app = createApp(adapter);
   await adapter.updateSettings({ rootFolder: root });
 
@@ -517,9 +529,11 @@ test("スキャン: 退避のみ残存（catalogなし）で孤児退避ファ�
   mkdirSync(folder, { recursive: true });
   writeWav(join(folder, "track.wav"), 2);
 
-  const adapter = createTestRealAdapter({
-    database: { kind: "files", catalogPath, userPath },
-  });
+  const adapter = directory.own(
+    createTestRealAdapter({
+      database: { kind: "files", catalogPath, userPath },
+    }),
+  );
   const app = createApp(adapter);
   await adapter.updateSettings({ rootFolder: root });
 
@@ -555,9 +569,11 @@ test("スキャン: 正本と退避の併存では退避を削除し、その後
   mkdirSync(folder, { recursive: true });
   writeWav(join(folder, "track.wav"), 2);
 
-  const adapter = createTestRealAdapter({
-    database: { kind: "files", catalogPath, userPath },
-  });
+  const adapter = directory.own(
+    createTestRealAdapter({
+      database: { kind: "files", catalogPath, userPath },
+    }),
+  );
   const app = createApp(adapter);
   await adapter.updateSettings({ rootFolder: root });
 
@@ -595,9 +611,11 @@ test("スキャン: 退避メタの回収でfs操作が失敗してもスキャ�
   mkdirSync(folder, { recursive: true });
   writeWav(join(folder, "track.wav"), 2);
 
-  const adapter = createTestRealAdapter({
-    database: { kind: "files", catalogPath, userPath },
-  });
+  const adapter = directory.own(
+    createTestRealAdapter({
+      database: { kind: "files", catalogPath, userPath },
+    }),
+  );
   const app = createApp(adapter);
   await adapter.updateSettings({ rootFolder: root });
 
@@ -637,7 +655,7 @@ test("スキャン: Work IDを読めない退避ファイルはスキップし�
   const stagedPath = join(folder, `.${META_FILE_NAME}.unregistering`);
   writeFileSync(stagedPath, "{ not valid json");
 
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await adapter.updateSettings({ rootFolder: root });
   await adapter.scan();
 

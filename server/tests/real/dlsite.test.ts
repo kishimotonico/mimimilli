@@ -117,17 +117,20 @@ test("DLsite: パース成功時の欠落フィールドをwarnイベントと�
   t.after(lib.cleanup);
   t.after(dir.cleanup);
   const logs: Array<Record<string, unknown>> = [];
-  const adapter = createRealAdapter({
-    database: { kind: "memory" },
-    dlsiteCache: { path: join(dir.path, "cache.sqlite") },
-    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
-    dlsiteSchedulerDependencies: {
-      logger: (event) => logs.push(event),
-      ...mockDlsiteTransport({
-        html: () => htmlResponse('<html><body><h1 id="work_name">タイトルのみ</h1></body></html>'),
-      }),
-    },
-  });
+  const adapter = dir.own(
+    createRealAdapter({
+      database: { kind: "memory" },
+      dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+      dlsiteSchedulerDependencies: {
+        logger: (event) => logs.push(event),
+        ...mockDlsiteTransport({
+          html: () =>
+            htmlResponse('<html><body><h1 id="work_name">タイトルのみ</h1></body></html>'),
+        }),
+      },
+    }),
+  );
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
   const result = await adapter.dlsiteFetch(lib.existingWorkId);
@@ -136,7 +139,6 @@ test("DLsite: パース成功時の欠落フィールドをwarnイベントと�
   assert.equal(missing.length, 1);
   assert.deepEqual(missing[0]?.missingFields, ["circle", "cvs", "genreTags", "coverUrl"]);
   assert.equal(missing[0]?.productCode, "RJ900002");
-  adapter.close();
 });
 
 test("DLsite: キャッシュ判定ログに理由を含める", async (t) => {
@@ -146,15 +148,17 @@ test("DLsite: キャッシュ判定ログに理由を含める", async (t) => {
   t.after(dir.cleanup);
   let now = 1_000;
   const logs: Array<Record<string, unknown>> = [];
-  const adapter = createRealAdapter({
-    database: { kind: "memory" },
-    dlsiteCache: { path: join(dir.path, "cache.sqlite"), ttlsMs: { ok: 10 }, clock: () => now },
-    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
-    dlsiteSchedulerDependencies: {
-      logger: (event) => logs.push(event),
-      ...mockDlsiteTransport({ html: () => htmlResponse(SAMPLE_HTML) }),
-    },
-  });
+  const adapter = dir.own(
+    createRealAdapter({
+      database: { kind: "memory" },
+      dlsiteCache: { path: join(dir.path, "cache.sqlite"), ttlsMs: { ok: 10 }, clock: () => now },
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+      dlsiteSchedulerDependencies: {
+        logger: (event) => logs.push(event),
+        ...mockDlsiteTransport({ html: () => htmlResponse(SAMPLE_HTML) }),
+      },
+    }),
+  );
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
   await adapter.dlsiteFetch(lib.existingWorkId);
@@ -176,7 +180,6 @@ test("DLsite: キャッシュ判定ログに理由を含める", async (t) => {
   await adapter.dlsiteFetch(lib.existingWorkId, true);
   const forceMiss = logs.find((event) => event.event === "dlsite_cache_miss");
   assert.equal(forceMiss?.reason, "force_refresh");
-  adapter.close();
 });
 
 test("fetchDlsiteHtml: HTTP 404 / 通信エラーを分類する", async (t) => {
@@ -320,7 +323,7 @@ test("mergeDlsiteTags: prefix 変換と重複排除", () => {
 test("dlsiteApply: タグマージとメタ書き戻し（カバー DL なし）", async (t) => {
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
+  const adapter = lib.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
 
@@ -371,7 +374,7 @@ test("dlsiteApply: タグマージとメタ書き戻し（カバー DL なし）
 test("updateDlsiteState: RJコード修正とskipped切替をメタへ保存する", async (t) => {
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
+  const adapter = lib.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
 
@@ -391,13 +394,15 @@ test("updateDlsiteState: RJコード修正とskipped切替をメタへ保存す�
 test("updateDlsiteState: RJコード変更で旧状態をリセットし一括取得対象に戻す", async (t) => {
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
-  const adapter = createTestRealAdapter({
-    database: { kind: "memory" },
-    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
-    dlsiteSchedulerDependencies: mockDlsiteTransport({
-      html: (code) => htmlResponse(sampleWorkHtml(code, { title: `取得 ${code}`, cover: false })),
+  const adapter = lib.own(
+    createTestRealAdapter({
+      database: { kind: "memory" },
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: (code) => htmlResponse(sampleWorkHtml(code, { title: `取得 ${code}`, cover: false })),
+      }),
     }),
-  });
+  );
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
 
@@ -429,13 +434,12 @@ test("updateDlsiteState: RJコード変更で旧状態をリセットし一括�
   const bulk = await adapter.runDlsiteBulk("existing", [lib.existingWorkId]);
   assert.equal(bulk.fetched, 1);
   assert.equal(bulk.skipped, 0);
-  adapter.close();
 });
 
 test("dlsiteFetch: 存在しない作品はnot_found", async (t) => {
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
+  const adapter = lib.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
   // 既存メタ作品はフォルダー名 RJ900002… なので、タイトル・パスとも RJ なしに変更してから検証
@@ -449,24 +453,26 @@ test("bulk取得はタイトル・タグを自動適用せず、mimimilli.json�
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
   const calls: number[] = [];
-  const adapter = createTestRealAdapter({
-    database: { kind: "memory" },
-    dlsiteRequestConfig: { ...FAST_DLSITE_REQUEST_CONFIG, requestIntervalMs: 40 },
-    dlsiteSchedulerDependencies: mockDlsiteTransport({
-      html: (code) => {
-        calls.push(Date.now());
-        return htmlResponse(
-          sampleWorkHtml(code, {
-            title: `DLsite取得タイトル ${code}`,
-            genres: ["削除済み", "新着"],
-            circle: null,
-            cvs: false,
-            cover: false,
-          }),
-        );
-      },
+  const adapter = lib.own(
+    createTestRealAdapter({
+      database: { kind: "memory" },
+      dlsiteRequestConfig: { ...FAST_DLSITE_REQUEST_CONFIG, requestIntervalMs: 40 },
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: (code) => {
+          calls.push(Date.now());
+          return htmlResponse(
+            sampleWorkHtml(code, {
+              title: `DLsite取得タイトル ${code}`,
+              genres: ["削除済み", "新着"],
+              circle: null,
+              cvs: false,
+              cover: false,
+            }),
+          );
+        },
+      }),
     }),
-  });
+  );
   await adapter.updateSettings({ rootFolder: lib.root });
   const scan = await adapter.scan();
   const registered = await adapter.registerScanCandidates(
@@ -498,21 +504,23 @@ test("bulk取得はcache TTLとskipped状態を利用し、mimimilli.jsonを変�
   t.after(dir.cleanup);
   let calls = 0;
   let now = 1_000;
-  const adapter = createRealAdapter({
-    database: { kind: "memory" },
-    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
-    dlsiteCache: {
-      path: join(dir.path, "cache.sqlite"),
-      ttlsMs: { not_found: 30 },
-      clock: () => now,
-    },
-    dlsiteSchedulerDependencies: mockDlsiteTransport({
-      html: () => {
-        calls += 1;
-        return htmlResponse("<html>404</html>", 404);
+  const adapter = dir.own(
+    createRealAdapter({
+      database: { kind: "memory" },
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+      dlsiteCache: {
+        path: join(dir.path, "cache.sqlite"),
+        ttlsMs: { not_found: 30 },
+        clock: () => now,
       },
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: () => {
+          calls += 1;
+          return htmlResponse("<html>404</html>", 404);
+        },
+      }),
     }),
-  });
+  );
   await adapter.updateSettings({ rootFolder: lib.root });
   const scan = await adapter.scan();
   const registered = await adapter.registerScanCandidates(
@@ -549,7 +557,6 @@ test("bulk取得はcache TTLとskipped状態を利用し、mimimilli.jsonを変�
   assert.equal(fourth.skipped, 1);
   assert.equal(calls, 2);
   assert.deepEqual(readFileSync(metaPath), bytesBefore);
-  adapter.close();
 });
 
 test("DLsite HTMLキャッシュ: 手動fetchはhitでHTTPせず、single-flightとforce refreshを扱う", async (t) => {
@@ -560,17 +567,19 @@ test("DLsite HTMLキャッシュ: 手動fetchはhitでHTTPせず、single-flight
   let calls = 0;
   let resolveFetch!: () => void;
   const pending = new Promise<void>((resolve) => (resolveFetch = resolve));
-  const adapter = createRealAdapter({
-    database: { kind: "memory" },
-    dlsiteCache: { path: join(dir.path, "dlsite-cache.sqlite") },
-    dlsiteSchedulerDependencies: mockDlsiteTransport({
-      html: async () => {
-        calls += 1;
-        if (calls === 1) await pending;
-        return htmlResponse(SAMPLE_HTML);
-      },
+  const adapter = dir.own(
+    createRealAdapter({
+      database: { kind: "memory" },
+      dlsiteCache: { path: join(dir.path, "dlsite-cache.sqlite") },
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: async () => {
+          calls += 1;
+          if (calls === 1) await pending;
+          return htmlResponse(SAMPLE_HTML);
+        },
+      }),
     }),
-  });
+  );
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
   const first = adapter.dlsiteFetch(lib.existingWorkId);
@@ -583,7 +592,6 @@ test("DLsite HTMLキャッシュ: 手動fetchはhitでHTTPせず、single-flight
   assert.equal(calls, 1);
   assert.equal((await adapter.dlsiteFetch(lib.existingWorkId, true)).ok, true);
   assert.equal(calls, 2);
-  adapter.close();
 });
 
 test("offline結果はcache-onlyで、mimimilli.jsonのexact bytesを変更しない", async (t) => {
@@ -659,29 +667,30 @@ test("offline結果はcache-onlyで、mimimilli.jsonのexact bytesを変更し�
   assert.equal(calls, 1);
   online.close();
 
-  const cachedOffline = createRealAdapter({
-    database: { kind: "memory" },
-    dlsiteCache: cache,
-    dlsiteRequestConfig: {
-      ...DEFAULT_DLSITE_REQUEST_CONFIG,
-      offline: true,
-      requestIntervalMs: 0,
-      retryCount: 0,
-      maxBackoffMs: 0,
-      timeoutMs: 1_000,
-    },
-    dlsiteSchedulerDependencies: mockDlsiteTransport({
-      html: () => {
-        calls += 1;
-        return htmlResponse(SAMPLE_HTML);
+  const cachedOffline = dir.own(
+    createRealAdapter({
+      database: { kind: "memory" },
+      dlsiteCache: cache,
+      dlsiteRequestConfig: {
+        ...DEFAULT_DLSITE_REQUEST_CONFIG,
+        offline: true,
+        requestIntervalMs: 0,
+        retryCount: 0,
+        maxBackoffMs: 0,
+        timeoutMs: 1_000,
       },
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: () => {
+          calls += 1;
+          return htmlResponse(SAMPLE_HTML);
+        },
+      }),
     }),
-  });
+  );
   await cachedOffline.updateSettings({ rootFolder: lib.root });
   await cachedOffline.scan();
   assert.equal((await cachedOffline.dlsiteFetch(lib.existingWorkId)).ok, true);
   assert.equal(calls, 1);
-  cachedOffline.close();
 });
 
 test("DLsite HTMLキャッシュ: hitでも保存HTMLを毎回パースする", async (t) => {
@@ -690,17 +699,19 @@ test("DLsite HTMLキャッシュ: hitでも保存HTMLを毎回パースする", 
   t.after(lib.cleanup);
   t.after(dir.cleanup);
   let httpCalls = 0;
-  const adapter = createRealAdapter({
-    database: { kind: "memory" },
-    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
-    dlsiteCache: { path: join(dir.path, "cache.sqlite") },
-    dlsiteSchedulerDependencies: mockDlsiteTransport({
-      html: () => {
-        httpCalls += 1;
-        return htmlResponse(SAMPLE_HTML);
-      },
+  const adapter = dir.own(
+    createRealAdapter({
+      database: { kind: "memory" },
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+      dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: () => {
+          httpCalls += 1;
+          return htmlResponse(SAMPLE_HTML);
+        },
+      }),
     }),
-  });
+  );
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
   const first = await adapter.dlsiteFetch(lib.existingWorkId);
@@ -724,7 +735,6 @@ test("DLsite HTMLキャッシュ: hitでも保存HTMLを毎回パースする", 
   const second = await adapter.dlsiteFetch(lib.existingWorkId);
   assert.equal(httpCalls, 1);
   assert.equal(second.ok && second.info.title, "キャッシュ差し替えタイトル");
-  adapter.close();
 });
 
 test("DLsite HTMLキャッシュ: parse_errorは同じHTTPをretryしない", async (t) => {
@@ -733,31 +743,32 @@ test("DLsite HTMLキャッシュ: parse_errorは同じHTTPをretryしない", as
   t.after(lib.cleanup);
   t.after(dir.cleanup);
   let calls = 0;
-  const adapter = createRealAdapter({
-    database: { kind: "memory" },
-    dlsiteCache: { path: join(dir.path, "cache.sqlite") },
-    dlsiteRequestConfig: {
-      ...DEFAULT_DLSITE_REQUEST_CONFIG,
-      offline: false,
-      requestIntervalMs: 0,
-      retryCount: 3,
-      maxBackoffMs: 1,
-      timeoutMs: 1_000,
-    },
-    dlsiteSchedulerDependencies: mockDlsiteTransport({
-      html: () => {
-        calls += 1;
-        return htmlResponse("<html></html>");
+  const adapter = dir.own(
+    createRealAdapter({
+      database: { kind: "memory" },
+      dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+      dlsiteRequestConfig: {
+        ...DEFAULT_DLSITE_REQUEST_CONFIG,
+        offline: false,
+        requestIntervalMs: 0,
+        retryCount: 3,
+        maxBackoffMs: 1,
+        timeoutMs: 1_000,
       },
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: () => {
+          calls += 1;
+          return htmlResponse("<html></html>");
+        },
+      }),
     }),
-  });
+  );
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
   const result = await adapter.dlsiteFetch(lib.existingWorkId);
   assert.equal(result.ok, false);
   if (!result.ok) assert.equal(result.kind, "parse_error");
   assert.equal(calls, 1);
-  adapter.close();
 });
 
 test("DLsite: parse_errorは実HTTP時だけdlsite_parse_errorをログする", async (t) => {
@@ -766,24 +777,26 @@ test("DLsite: parse_errorは実HTTP時だけdlsite_parse_errorをログする", 
   t.after(lib.cleanup);
   t.after(dir.cleanup);
   const logs: Array<Record<string, unknown>> = [];
-  const adapter = createRealAdapter({
-    database: { kind: "memory" },
-    dlsiteCache: { path: join(dir.path, "cache.sqlite") },
-    dlsiteRequestConfig: {
-      ...DEFAULT_DLSITE_REQUEST_CONFIG,
-      offline: false,
-      requestIntervalMs: 0,
-      retryCount: 0,
-      maxBackoffMs: 0,
-      timeoutMs: 1_000,
-    },
-    dlsiteSchedulerDependencies: {
-      logger: (event) => logs.push(event),
-      ...mockDlsiteTransport({
-        html: () => htmlResponse("<html></html>"),
-      }),
-    },
-  });
+  const adapter = dir.own(
+    createRealAdapter({
+      database: { kind: "memory" },
+      dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+      dlsiteRequestConfig: {
+        ...DEFAULT_DLSITE_REQUEST_CONFIG,
+        offline: false,
+        requestIntervalMs: 0,
+        retryCount: 0,
+        maxBackoffMs: 0,
+        timeoutMs: 1_000,
+      },
+      dlsiteSchedulerDependencies: {
+        logger: (event) => logs.push(event),
+        ...mockDlsiteTransport({
+          html: () => htmlResponse("<html></html>"),
+        }),
+      },
+    }),
+  );
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
   const first = await adapter.dlsiteFetch(lib.existingWorkId);
@@ -793,7 +806,6 @@ test("DLsite: parse_errorは実HTTP時だけdlsite_parse_errorをログする", 
   const second = await adapter.dlsiteFetch(lib.existingWorkId);
   assert.equal(second.ok, false);
   assert.equal(logs.filter((event) => event.event === "dlsite_parse_error").length, 0);
-  adapter.close();
 });
 
 test("parse_errorはcacheに保存し、mimimilli.jsonへ状態を書かない", async (t) => {
@@ -801,21 +813,23 @@ test("parse_errorはcacheに保存し、mimimilli.jsonへ状態を書かない",
   const dir = makeTestDirectory("dlsite-bulk-parse-error");
   t.after(lib.cleanup);
   t.after(dir.cleanup);
-  const adapter = createRealAdapter({
-    database: { kind: "memory" },
-    dlsiteCache: { path: join(dir.path, "cache.sqlite") },
-    dlsiteRequestConfig: {
-      ...DEFAULT_DLSITE_REQUEST_CONFIG,
-      offline: false,
-      requestIntervalMs: 0,
-      retryCount: 0,
-      maxBackoffMs: 0,
-      timeoutMs: 1_000,
-    },
-    dlsiteSchedulerDependencies: mockDlsiteTransport({
-      html: () => htmlResponse("<html></html>"),
+  const adapter = dir.own(
+    createRealAdapter({
+      database: { kind: "memory" },
+      dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+      dlsiteRequestConfig: {
+        ...DEFAULT_DLSITE_REQUEST_CONFIG,
+        offline: false,
+        requestIntervalMs: 0,
+        retryCount: 0,
+        maxBackoffMs: 0,
+        timeoutMs: 1_000,
+      },
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: () => htmlResponse("<html></html>"),
+      }),
     }),
-  });
+  );
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
   const metaPath = join(
@@ -829,7 +843,6 @@ test("parse_errorはcacheに保存し、mimimilli.jsonへ状態を書かない",
   assert.equal(work?.dlsite.status, "error");
   assert.equal(work?.dlsite.errorKind, "parse_error");
   assert.deepEqual(readFileSync(metaPath), bytesBefore);
-  adapter.close();
 });
 
 test("DLsite HTMLキャッシュ: cache missのforceとnormalは同じHTTPへ合流する", async (t) => {
@@ -840,18 +853,20 @@ test("DLsite HTMLキャッシュ: cache missのforceとnormalは同じHTTPへ合
   let calls = 0;
   let release!: () => void;
   const pending = new Promise<void>((resolve) => (release = resolve));
-  const adapter = createRealAdapter({
-    database: { kind: "memory" },
-    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
-    dlsiteCache: { path: join(dir.path, "cache.sqlite") },
-    dlsiteSchedulerDependencies: mockDlsiteTransport({
-      html: async () => {
-        calls += 1;
-        await pending;
-        return htmlResponse(SAMPLE_HTML);
-      },
+  const adapter = dir.own(
+    createRealAdapter({
+      database: { kind: "memory" },
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+      dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: async () => {
+          calls += 1;
+          await pending;
+          return htmlResponse(SAMPLE_HTML);
+        },
+      }),
     }),
-  });
+  );
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
   const force = adapter.dlsiteFetch(lib.existingWorkId, true);
@@ -860,7 +875,6 @@ test("DLsite HTMLキャッシュ: cache missのforceとnormalは同じHTTPへ合
   assert.equal((await force).ok, true);
   assert.equal((await normal).ok, true);
   assert.equal(calls, 1);
-  adapter.close();
 });
 
 test("DLsite HTMLキャッシュ: 相乗り中の先着abortはその呼び出し元だけ失敗し他方は完了できる", async (t) => {
@@ -872,18 +886,20 @@ test("DLsite HTMLキャッシュ: 相乗り中の先着abortはその呼び出�
   const pending = new Promise<void>((resolve) => (release = resolve));
   let started!: () => void;
   const gate = new Promise<void>((resolve) => (started = resolve));
-  const adapter = createRealAdapter({
-    database: { kind: "memory" },
-    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
-    dlsiteCache: { path: join(dir.path, "cache.sqlite") },
-    dlsiteSchedulerDependencies: mockDlsiteTransport({
-      html: async () => {
-        started();
-        await pending;
-        return htmlResponse(SAMPLE_HTML);
-      },
+  const adapter = dir.own(
+    createRealAdapter({
+      database: { kind: "memory" },
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+      dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: async () => {
+          started();
+          await pending;
+          return htmlResponse(SAMPLE_HTML);
+        },
+      }),
     }),
-  });
+  );
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
   const controllerA = new AbortController();
@@ -897,7 +913,6 @@ test("DLsite HTMLキャッシュ: 相乗り中の先着abortはその呼び出�
   );
   release();
   assert.equal((await promiseB).ok, true);
-  adapter.close();
 });
 
 test("DLsite HTMLキャッシュ: 相乗り中の後着abortはその呼び出し元だけ失敗し先着は完了できる", async (t) => {
@@ -909,18 +924,20 @@ test("DLsite HTMLキャッシュ: 相乗り中の後着abortはその呼び出�
   const pending = new Promise<void>((resolve) => (release = resolve));
   let started!: () => void;
   const gate = new Promise<void>((resolve) => (started = resolve));
-  const adapter = createRealAdapter({
-    database: { kind: "memory" },
-    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
-    dlsiteCache: { path: join(dir.path, "cache.sqlite") },
-    dlsiteSchedulerDependencies: mockDlsiteTransport({
-      html: async () => {
-        started();
-        await pending;
-        return htmlResponse(SAMPLE_HTML);
-      },
+  const adapter = dir.own(
+    createRealAdapter({
+      database: { kind: "memory" },
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+      dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: async () => {
+          started();
+          await pending;
+          return htmlResponse(SAMPLE_HTML);
+        },
+      }),
     }),
-  });
+  );
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
   const controllerB = new AbortController();
@@ -934,13 +951,12 @@ test("DLsite HTMLキャッシュ: 相乗り中の後着abortはその呼び出�
   );
   release();
   assert.equal((await promiseA).ok, true);
-  adapter.close();
 });
 
 test("dlsiteApply: abort済みsignalではDB・メタを更新しない", async (t) => {
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
+  const adapter = lib.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
   const before = await adapter.getWork(lib.existingWorkId);
@@ -975,7 +991,6 @@ test("dlsiteApply: abort済みsignalではDB・メタを更新しない", async 
   assert.equal(after?.title, before?.title);
   const meta = JSON.parse(readFileSync(metaPath, "utf-8")) as { title: string };
   assert.equal(meta.title, before?.title);
-  adapter.close();
 });
 
 test("DLsite bulk: 2回目はHTML cache hitでHTTPしない", async (t) => {
@@ -988,27 +1003,28 @@ test("DLsite bulk: 2回目はHTML cache hitでHTTPしない", async (t) => {
   const coverBody = new Uint8Array(
     readFileSync(join(lib.root, "dlsite", "RJ900001_テスト作品", "cover.jpg")),
   );
-  const adapter = createRealAdapter({
-    database: { kind: "memory" },
-    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
-    dlsiteCache: { path: join(dir.path, "cache.sqlite") },
-    dlsiteSchedulerDependencies: mockDlsiteTransport({
-      html: () => {
-        httpCalls += 1;
-        return htmlResponse(SAMPLE_HTML);
-      },
-      cover: () => {
-        coverCalls += 1;
-        return jpegResponse(coverBody);
-      },
+  const adapter = dir.own(
+    createRealAdapter({
+      database: { kind: "memory" },
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+      dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: () => {
+          httpCalls += 1;
+          return htmlResponse(SAMPLE_HTML);
+        },
+        cover: () => {
+          coverCalls += 1;
+          return jpegResponse(coverBody);
+        },
+      }),
     }),
-  });
+  );
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
   await adapter.runDlsiteBulk("existing", [lib.existingWorkId]);
   await adapter.runDlsiteBulk("existing", [lib.existingWorkId]);
   assert.equal(httpCalls, 1);
-  adapter.close();
 });
 
 test("DLsite bulk: 同一RJコードは同じ実行・別実行・adapter再オープン後もHTTPを1回に集約する", async (t) => {
@@ -1209,17 +1225,19 @@ test("DLsite HTMLキャッシュ: 期限切れの再取得失敗はstaleへ戻�
   t.after(dir.cleanup);
   let now = 1_000;
   let fail = false;
-  const adapter = createRealAdapter({
-    database: { kind: "memory" },
-    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
-    dlsiteCache: { path: join(dir.path, "cache.sqlite"), ttlsMs: { ok: 1 }, clock: () => now },
-    dlsiteSchedulerDependencies: mockDlsiteTransport({
-      html: () => {
-        if (fail) throw new Error("transport failed");
-        return htmlResponse(SAMPLE_HTML);
-      },
+  const adapter = dir.own(
+    createRealAdapter({
+      database: { kind: "memory" },
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+      dlsiteCache: { path: join(dir.path, "cache.sqlite"), ttlsMs: { ok: 1 }, clock: () => now },
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: () => {
+          if (fail) throw new Error("transport failed");
+          return htmlResponse(SAMPLE_HTML);
+        },
+      }),
     }),
-  });
+  );
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
   assert.equal((await adapter.dlsiteFetch(lib.existingWorkId)).ok, true);
@@ -1242,7 +1260,6 @@ test("DLsite HTMLキャッシュ: 期限切れの再取得失敗はstaleへ戻�
   now = 1_000;
   assert.equal((await adapter.dlsiteFetch(lib.existingWorkId, true)).ok, false);
   assert.equal((await adapter.dlsiteFetch(lib.existingWorkId)).ok, false);
-  adapter.close();
 });
 
 test("DLsite HTMLキャッシュ: forceが失敗しても次回の通常取得は抑制される", async (t) => {
@@ -1252,18 +1269,20 @@ test("DLsite HTMLキャッシュ: forceが失敗しても次回の通常取得�
   t.after(dir.cleanup);
   let calls = 0;
   let succeed = true;
-  const adapter = createRealAdapter({
-    database: { kind: "memory" },
-    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
-    dlsiteCache: { path: join(dir.path, "cache.sqlite") },
-    dlsiteSchedulerDependencies: mockDlsiteTransport({
-      html: () => {
-        calls += 1;
-        if (succeed) return htmlResponse(SAMPLE_HTML);
-        return htmlResponse("<html>error</html>", 500);
-      },
+  const adapter = dir.own(
+    createRealAdapter({
+      database: { kind: "memory" },
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+      dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: () => {
+          calls += 1;
+          if (succeed) return htmlResponse(SAMPLE_HTML);
+          return htmlResponse("<html>error</html>", 500);
+        },
+      }),
     }),
-  });
+  );
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
   assert.equal((await adapter.dlsiteFetch(lib.existingWorkId)).ok, true);
@@ -1280,7 +1299,6 @@ test("DLsite HTMLキャッシュ: forceが失敗しても次回の通常取得�
   assert.equal(normal.ok, false);
   if (!normal.ok) assert.equal(normal.kind, "error");
   assert.equal(calls, 2);
-  adapter.close();
 });
 
 test("bulk取得のlastAttemptAtはmimimilli.jsonへ保存しない", async (t) => {
@@ -1288,14 +1306,16 @@ test("bulk取得のlastAttemptAtはmimimilli.jsonへ保存しない", async (t) 
   const dir = makeTestDirectory("dlsite-bulk-no-op-write");
   t.after(lib.cleanup);
   t.after(dir.cleanup);
-  const adapter = createRealAdapter({
-    database: { kind: "memory" },
-    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
-    dlsiteCache: { path: join(dir.path, "cache.sqlite") },
-    dlsiteSchedulerDependencies: mockDlsiteTransport({
-      html: () => htmlResponse(sampleWorkHtml("RJ900002", { cover: false })),
+  const adapter = dir.own(
+    createRealAdapter({
+      database: { kind: "memory" },
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+      dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: () => htmlResponse(sampleWorkHtml("RJ900002", { cover: false })),
+      }),
     }),
-  });
+  );
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
   await adapter.runDlsiteBulk("existing", [lib.existingWorkId]);
@@ -1307,7 +1327,6 @@ test("bulk取得のlastAttemptAtはmimimilli.jsonへ保存しない", async (t) 
   const after = await adapter.getWork(lib.existingWorkId);
   assert.deepEqual(readFileSync(metaPath), bytesBefore);
   assert.equal(after!.dlsite.lastAttemptAt, before!.dlsite.lastAttemptAt);
-  adapter.close();
 });
 
 test("DLsiteカバー: 同じURLを2作品へ同時適用してもHTTPは1回で両方にファイルができる", async (t) => {
@@ -1319,17 +1338,19 @@ test("DLsiteカバー: 同じURLを2作品へ同時適用してもHTTPは1回で
   const coverBody = new Uint8Array(
     readFileSync(join(lib.root, "dlsite", "RJ900001_テスト作品", "cover.jpg")),
   );
-  const adapter = createRealAdapter({
-    database: { kind: "memory" },
-    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
-    dlsiteCache: { path: join(dir.path, "cache.sqlite") },
-    dlsiteSchedulerDependencies: mockDlsiteTransport({
-      cover: () => {
-        coverCalls += 1;
-        return jpegResponse(coverBody);
-      },
+  const adapter = dir.own(
+    createRealAdapter({
+      database: { kind: "memory" },
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+      dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        cover: () => {
+          coverCalls += 1;
+          return jpegResponse(coverBody);
+        },
+      }),
     }),
-  });
+  );
   await adapter.updateSettings({ rootFolder: lib.root });
   const scan = await adapter.scan();
   const workAId = lib.existingWorkId;
@@ -1382,7 +1403,6 @@ test("DLsiteカバー: 同じURLを2作品へ同時適用してもHTTPは1回で
     readFileSync(join(workB!.physicalPath, workB!.cover!.image)),
     Buffer.from(coverBody),
   );
-  adapter.close();
 });
 
 test("DLsiteカバーURL: HTTPSの許可画像ホスト以外を拒否する", () => {
@@ -1456,17 +1476,19 @@ test("DLsite apply: カバーはcache transportを通る", async (t) => {
   const coverBody = new Uint8Array(
     readFileSync(join(lib.root, "dlsite", "RJ900001_テスト作品", "cover.jpg")),
   );
-  const adapter = createRealAdapter({
-    database: { kind: "memory" },
-    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
-    dlsiteCache: { path: join(dir.path, "cache.sqlite") },
-    dlsiteSchedulerDependencies: mockDlsiteTransport({
-      cover: () => {
-        coverCalls += 1;
-        return jpegResponse(coverBody);
-      },
+  const adapter = dir.own(
+    createRealAdapter({
+      database: { kind: "memory" },
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+      dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        cover: () => {
+          coverCalls += 1;
+          return jpegResponse(coverBody);
+        },
+      }),
     }),
-  });
+  );
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
   const ok = await adapter.dlsiteApply(lib.existingWorkId, {
@@ -1487,7 +1509,6 @@ test("DLsite apply: カバーはcache transportを通る", async (t) => {
   });
   assert.equal(ok, true);
   assert.equal(coverCalls, 1);
-  adapter.close();
 });
 
 test("bulk取得はカバーをダウンロードも適用もしない", async (t) => {
@@ -1499,24 +1520,25 @@ test("bulk取得はカバーをダウンロードも適用もしない", async (
   const coverBody = new Uint8Array(
     readFileSync(join(lib.root, "dlsite", "RJ900001_テスト作品", "cover.jpg")),
   );
-  const adapter = createRealAdapter({
-    database: { kind: "memory" },
-    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
-    dlsiteCache: { path: join(dir.path, "cache.sqlite") },
-    dlsiteSchedulerDependencies: mockDlsiteTransport({
-      html: () => htmlResponse(SAMPLE_HTML),
-      cover: () => {
-        coverCalls += 1;
-        return jpegResponse(coverBody);
-      },
+  const adapter = dir.own(
+    createRealAdapter({
+      database: { kind: "memory" },
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+      dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: () => htmlResponse(SAMPLE_HTML),
+        cover: () => {
+          coverCalls += 1;
+          return jpegResponse(coverBody);
+        },
+      }),
     }),
-  });
+  );
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
   const result = await adapter.runDlsiteBulk("existing", [lib.existingWorkId]);
   assert.deepEqual(result, { fetched: 1, failed: 0, parseErrors: 0, skipped: 0 });
   assert.equal(coverCalls, 0);
-  adapter.close();
 });
 
 test("bulk取得はカバー失敗に依存せず、mimimilli.jsonを変更しない", async (t) => {
@@ -1525,19 +1547,21 @@ test("bulk取得はカバー失敗に依存せず、mimimilli.jsonを変更し�
   t.after(lib.cleanup);
   t.after(dir.cleanup);
   let coverCalls = 0;
-  const adapter = createRealAdapter({
-    database: { kind: "memory" },
-    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
-    dlsiteCache: { path: join(dir.path, "cache.sqlite") },
-    dlsiteSchedulerDependencies: mockDlsiteTransport({
-      html: (code) =>
-        htmlResponse(sampleWorkHtml(code, { title: `取得済み ${code}`, genres: ["テスト"] })),
-      cover: () => {
-        coverCalls += 1;
-        return Promise.reject(new Error("カバー取得失敗"));
-      },
+  const adapter = dir.own(
+    createRealAdapter({
+      database: { kind: "memory" },
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+      dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: (code) =>
+          htmlResponse(sampleWorkHtml(code, { title: `取得済み ${code}`, genres: ["テスト"] })),
+        cover: () => {
+          coverCalls += 1;
+          return Promise.reject(new Error("カバー取得失敗"));
+        },
+      }),
     }),
-  });
+  );
   await adapter.updateSettings({ rootFolder: lib.root });
   const scan = await adapter.scan();
   await adapter.registerScanCandidates(
@@ -1554,7 +1578,6 @@ test("bulk取得はカバー失敗に依存せず、mimimilli.jsonを変更し�
   assert.deepEqual(result, { fetched: 2, failed: 0, parseErrors: 0, skipped: 0 });
   assert.equal(coverCalls, 0);
   assert.deepEqual(readFileSync(metaPath), bytesBefore);
-  adapter.close();
 });
 
 test("bulk取得はmimimilli.json書込み権限に依存しない", async (t) => {
@@ -1565,19 +1588,21 @@ test("bulk取得はmimimilli.json書込み権限に依存しない", async (t) =
   const coverBody = new Uint8Array(
     readFileSync(join(lib.root, "dlsite", "RJ900001_テスト作品", "cover.jpg")),
   );
-  const adapter = createRealAdapter({
-    database: { kind: "memory" },
-    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
-    dlsiteCache: { path: join(dir.path, "cache.sqlite") },
-    dlsiteSchedulerDependencies: mockDlsiteTransport({
-      html: (code) =>
-        htmlResponse(sampleWorkHtml(code, { title: `取得済み ${code}`, genres: ["テスト"] })),
-      cover: (url) => {
-        if (url.includes("RJ900002")) return Promise.reject(new Error("カバー取得失敗"));
-        return jpegResponse(coverBody);
-      },
+  const adapter = dir.own(
+    createRealAdapter({
+      database: { kind: "memory" },
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+      dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: (code) =>
+          htmlResponse(sampleWorkHtml(code, { title: `取得済み ${code}`, genres: ["テスト"] })),
+        cover: (url) => {
+          if (url.includes("RJ900002")) return Promise.reject(new Error("カバー取得失敗"));
+          return jpegResponse(coverBody);
+        },
+      }),
     }),
-  });
+  );
   await adapter.updateSettings({ rootFolder: lib.root });
   const scan = await adapter.scan();
   await adapter.registerScanCandidates(
@@ -1590,7 +1615,6 @@ test("bulk取得はmimimilli.json書込み権限に依存しない", async (t) =
   const result = await adapter.runDlsiteBulk("existing", undefined);
 
   assert.deepEqual(result, { fetched: 2, failed: 0, parseErrors: 0, skipped: 0 });
-  adapter.close();
 });
 
 test("bulkキャンセル後の再開はcache結果を使い、mimimilli.jsonを変更しない", async (t) => {
@@ -1607,17 +1631,19 @@ test("bulkキャンセル後の再開はcache結果を使い、mimimilli.jsonを
 
   let httpCalls = 0;
   const controller = new AbortController();
-  const adapter = createRealAdapter({
-    database: { kind: "memory" },
-    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
-    dlsiteCache: { path: join(dir.path, "dlsite-cache.sqlite") },
-    dlsiteSchedulerDependencies: mockDlsiteTransport({
-      html: () => {
-        httpCalls += 1;
-        return htmlResponse(sampleWorkHtml("RJ900002", { cover: false }));
-      },
+  const adapter = dir.own(
+    createRealAdapter({
+      database: { kind: "memory" },
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+      dlsiteCache: { path: join(dir.path, "dlsite-cache.sqlite") },
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: () => {
+          httpCalls += 1;
+          return htmlResponse(sampleWorkHtml("RJ900002", { cover: false }));
+        },
+      }),
     }),
-  });
+  );
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
   const duplicateId = "22222222-2222-4222-8222-222222222222";
@@ -1639,7 +1665,6 @@ test("bulkキャンセル後の再開はcache結果を使い、mimimilli.jsonを
   assert.equal(httpCalls, 1);
   const completed = await Promise.all(ids.map((id) => adapter.getWork(id)));
   assert.ok(completed.every((work) => work?.dlsite.status === "none"));
-  adapter.close();
 });
 
 test("dlsiteFetch: request signalがscheduler.fetchまで伝播する", async (t) => {
@@ -1648,17 +1673,19 @@ test("dlsiteFetch: request signalがscheduler.fetchまで伝播する", async (t
   t.after(lib.cleanup);
   t.after(dir.cleanup);
   let receivedSignal: AbortSignal | null | undefined;
-  const adapter = createRealAdapter({
-    database: { kind: "memory" },
-    dlsiteCache: { path: join(dir.path, "cache.sqlite") },
-    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
-    dlsiteSchedulerDependencies: mockDlsiteTransport({
-      html: (code, _url, init) => {
-        receivedSignal = init?.signal;
-        return htmlResponse(sampleWorkHtml(code));
-      },
+  const adapter = dir.own(
+    createRealAdapter({
+      database: { kind: "memory" },
+      dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: (code, _url, init) => {
+          receivedSignal = init?.signal;
+          return htmlResponse(sampleWorkHtml(code));
+        },
+      }),
     }),
-  });
+  );
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
   const controller = new AbortController();
@@ -1670,7 +1697,6 @@ test("dlsiteFetch: request signalがscheduler.fetchまで伝播する", async (t
   assert.equal(receivedSignal.aborted, false);
   controller.abort();
   assert.equal(receivedSignal.aborted, true);
-  adapter.close();
 });
 
 test("dlsiteFetch: abortでDLsite HTTP取得が中断される", async (t) => {
@@ -1683,32 +1709,34 @@ test("dlsiteFetch: abortでDLsite HTTP取得が中断される", async (t) => {
   let transportCalls = 0;
   let transportReady!: () => void;
   const started = new Promise<void>((resolve) => (transportReady = resolve));
-  const adapter = createRealAdapter({
-    database: { kind: "memory" },
-    dlsiteCache: { path: join(dir.path, "cache.sqlite") },
-    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
-    dlsiteSchedulerDependencies: mockDlsiteTransport({
-      html: async (_code, _url, init) => {
-        transportCalls += 1;
-        transportReady();
-        await new Promise<void>((resolve, reject) => {
-          const signal = init?.signal;
-          if (signal?.aborted) {
-            reject(new DOMException("DLsiteリクエストはキャンセルされました", "AbortError"));
-            return;
-          }
-          const onAbort = () =>
-            reject(new DOMException("DLsiteリクエストはキャンセルされました", "AbortError"));
-          if (signal) signal.addEventListener("abort", onAbort, { once: true });
-          gate.then(() => {
-            if (signal) signal.removeEventListener("abort", onAbort);
-            resolve();
+  const adapter = dir.own(
+    createRealAdapter({
+      database: { kind: "memory" },
+      dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: async (_code, _url, init) => {
+          transportCalls += 1;
+          transportReady();
+          await new Promise<void>((resolve, reject) => {
+            const signal = init?.signal;
+            if (signal?.aborted) {
+              reject(new DOMException("DLsiteリクエストはキャンセルされました", "AbortError"));
+              return;
+            }
+            const onAbort = () =>
+              reject(new DOMException("DLsiteリクエストはキャンセルされました", "AbortError"));
+            if (signal) signal.addEventListener("abort", onAbort, { once: true });
+            gate.then(() => {
+              if (signal) signal.removeEventListener("abort", onAbort);
+              resolve();
+            });
           });
-        });
-        return htmlResponse(SAMPLE_HTML);
-      },
+          return htmlResponse(SAMPLE_HTML);
+        },
+      }),
     }),
-  });
+  );
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
   const controller = new AbortController();
@@ -1721,13 +1749,12 @@ test("dlsiteFetch: abortでDLsite HTTP取得が中断される", async (t) => {
     (error: unknown) => error instanceof DOMException && error.name === "AbortError",
   );
   release();
-  adapter.close();
 });
 
 test("DLsite通知: 適用後は未連携件数から外れる", async (t) => {
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
+  const adapter = lib.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
   const before = await adapter.getDlsiteNotificationSummary();
@@ -1751,7 +1778,6 @@ test("DLsite通知: 適用後は未連携件数から外れる", async (t) => {
   assert.equal(ok, true);
   const after = await adapter.getDlsiteNotificationSummary();
   assert.equal(after.unlinkedCount, before.unlinkedCount - 1);
-  adapter.close();
 });
 
 test("DLsite通知: bulk失敗が取得失敗件数へ反映される", async (t) => {
@@ -1759,21 +1785,22 @@ test("DLsite通知: bulk失敗が取得失敗件数へ反映される", async (t
   const dir = makeTestDirectory("dlsite-notification-fetch-failed");
   t.after(lib.cleanup);
   t.after(dir.cleanup);
-  const adapter = createRealAdapter({
-    database: { kind: "memory" },
-    dlsiteCache: { path: join(dir.path, "cache.sqlite") },
-    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
-    dlsiteSchedulerDependencies: mockDlsiteTransport({
-      html: () => htmlResponse("<html>404</html>", 404),
+  const adapter = dir.own(
+    createRealAdapter({
+      database: { kind: "memory" },
+      dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: () => htmlResponse("<html>404</html>", 404),
+      }),
     }),
-  });
+  );
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
   const before = await adapter.getDlsiteNotificationSummary();
   await adapter.runDlsiteBulk("existing", [lib.existingWorkId]);
   const after = await adapter.getDlsiteNotificationSummary();
   assert.equal(after.fetchFailedCount, before.fetchFailedCount + 1);
-  adapter.close();
 });
 
 test("DLsite通知: parse_error 警報が実データの流れで発火する", async (t) => {
@@ -1794,19 +1821,20 @@ test("DLsite通知: parse_error 警報が実データの流れで発火する", 
     meta.id = workId;
     writeFileSync(metaPath, JSON.stringify(meta, null, 2));
   }
-  const adapter = createRealAdapter({
-    database: { kind: "memory" },
-    dlsiteCache: { path: join(dir.path, "cache.sqlite") },
-    dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
-    dlsiteSchedulerDependencies: mockDlsiteTransport({
-      html: () => htmlResponse("<html></html>"),
+  const adapter = dir.own(
+    createRealAdapter({
+      database: { kind: "memory" },
+      dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: () => htmlResponse("<html></html>"),
+      }),
     }),
-  });
+  );
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
   await adapter.runDlsiteBulk("existing", undefined);
   const summary = await adapter.getDlsiteNotificationSummary();
   assert.ok(summary.parseErrorCount >= 3);
   assert.equal(summary.parseErrorAlert, true);
-  adapter.close();
 });

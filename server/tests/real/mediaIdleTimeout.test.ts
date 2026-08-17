@@ -42,13 +42,15 @@ test("音声配信: 配信中に無通信期間が続いても切断されず全
   execFileSync("mkfifo", [fifoPath]);
 
   const app = mediaRoute(fifoAdapter(fifoPath));
-  const server = Bun.serve({
-    fetch: app.fetch,
-    hostname: "127.0.0.1",
-    port: 0,
-    idleTimeout: IDLE_TIMEOUT_SECONDS,
-  });
-  t.after(() => server.stop(true));
+  const server = dir.ownFn(
+    Bun.serve({
+      fetch: app.fetch,
+      hostname: "127.0.0.1",
+      port: 0,
+      idleTimeout: IDLE_TIMEOUT_SECONDS,
+    }),
+    (s) => s.stop(true),
+  );
 
   const responsePromise = fetch(`http://127.0.0.1:${server.port}/media/file/w/track.bin`);
 

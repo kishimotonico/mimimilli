@@ -9,8 +9,7 @@ import { makeSampleLibrary, makeTestDirectory, writeWav } from "../helpers/sampl
 test("スキャン分類: 初回は新規挿入、変更なし再スキャンはスキップ、メタ更新は再投影", async (t) => {
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
-  t.after(() => adapter.close());
+  const adapter = lib.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await adapter.updateSettings({ rootFolder: lib.root });
 
   const first = await adapter.scan();
@@ -43,8 +42,7 @@ test("候補登録: RJコード省略時はフォルダー名から自動検出�
   mkdirSync(workDir, { recursive: true });
   writeWav(join(workDir, "track.wav"), 1);
 
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
-  t.after(() => adapter.close());
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await adapter.updateSettings({ rootFolder: root });
   await adapter.scan();
 
@@ -65,8 +63,7 @@ test("候補登録: RJコード指定をmimimilli.jsonへ書き込む", async (t
   mkdirSync(workDir, { recursive: true });
   writeWav(join(workDir, "track.wav"), 1);
 
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
-  t.after(() => adapter.close());
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await adapter.updateSettings({ rootFolder: root });
   await adapter.scan();
 
@@ -87,8 +84,7 @@ test("候補登録: RJコード空文字は自動検出せずRJコードなし�
   mkdirSync(workDir, { recursive: true });
   writeWav(join(workDir, "track.wav"), 1);
 
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
-  t.after(() => adapter.close());
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await adapter.updateSettings({ rootFolder: root });
   const scanned = await adapter.scan();
   assert.equal(scanned.candidates[0]?.rjCode, "RJ123456");
@@ -110,8 +106,7 @@ test("候補除外の一覧取得と解除で次回スキャンに候補が戻�
   mkdirSync(join(root, "除外対象"), { recursive: true });
   writeWav(join(root, "除外対象", "track.wav"), 1);
 
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
-  t.after(() => adapter.close());
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await adapter.updateSettings({ rootFolder: root });
   await adapter.scan();
   await adapter.excludeScanCandidates(["除外対象"]);

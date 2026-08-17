@@ -13,6 +13,7 @@ import {
   getTestWork,
 } from "../helpers/workTestUtils.ts";
 import { nts } from "../helpers/tag.ts";
+import { makeTestScope } from "../helpers/sampleLibrary.ts";
 
 function sampleWork(
   id: string,
@@ -73,8 +74,10 @@ function assertPersistentDataErrorAsync(
   });
 }
 
-test("works.status が不正なら listSummaries は当該作品を隔離して続行する", () => {
-  const db = openDb({ kind: "memory" });
+test("works.status が不正なら listSummaries は当該作品を隔離して続行する", (t) => {
+  const scope = makeTestScope();
+  t.after(scope.cleanup);
+  const db = scope.own(openDb({ kind: "memory" }));
   const { query, catalog, user } = createWorkRepos(db);
   const good = sampleWork("work-good-status");
   const bad = sampleWork("work-bad-status");
@@ -90,8 +93,10 @@ test("works.status が不正なら listSummaries は当該作品を隔離して�
   assert.match(result.skipped[0]!.reason, /status:/);
 });
 
-test("defaultPlaylistが関係表にない場合はgetWorkが不正データとして扱う", async () => {
-  const db = openDb({ kind: "memory" });
+test("defaultPlaylistが関係表にない場合はgetWorkが不正データとして扱う", async (t) => {
+  const scope = makeTestScope();
+  t.after(scope.cleanup);
+  const db = scope.own(openDb({ kind: "memory" }));
   const { catalog, user } = createWorkRepos(db);
   const work = sampleWork("work-bad-playlists");
   upsertTestWork(catalog, user, work);
@@ -103,8 +108,10 @@ test("defaultPlaylistが関係表にない場合はgetWorkが不正データと�
   );
 });
 
-test("PlaylistとTrackのIDはWorkごとに同じ値を使える", async () => {
-  const db = openDb({ kind: "memory" });
+test("PlaylistとTrackのIDはWorkごとに同じ値を使える", async (t) => {
+  const scope = makeTestScope();
+  t.after(scope.cleanup);
+  const db = scope.own(openDb({ kind: "memory" }));
   const { catalog, user } = createWorkRepos(db);
   const playlistId = crypto.randomUUID();
   const trackId = crypto.randomUUID();
@@ -115,11 +122,12 @@ test("PlaylistとTrackのIDはWorkごとに同じ値を使える", async () => {
 
   assert.equal((await getTestWork(db, first.id))?.playlists[0]?.tracks[0]?.id, trackId);
   assert.equal((await getTestWork(db, second.id))?.playlists[0]?.tracks[0]?.id, trackId);
-  db.close();
 });
 
-test("tags.name が正規化されていなければ listSummaries は当該作品を隔離して続行する", () => {
-  const db = openDb({ kind: "memory" });
+test("tags.name が正規化されていなければ listSummaries は当該作品を隔離して続行する", (t) => {
+  const scope = makeTestScope();
+  t.after(scope.cleanup);
+  const db = scope.own(openDb({ kind: "memory" }));
   const { query, catalog, user } = createWorkRepos(db);
   const good = sampleWork("work-good-tags");
   const bad = { ...sampleWork("work-bad-tags"), tags: nts(["cv/正常"]) };
@@ -135,8 +143,10 @@ test("tags.name が正規化されていなければ listSummaries は当該作�
   assert.match(result.skipped[0]!.reason, /タグが正規化されていません/);
 });
 
-test("smart folderのsortも復元時に検証する", () => {
-  const db = openDb({ kind: "memory" });
+test("smart folderのsortも復元時に検証する", (t) => {
+  const scope = makeTestScope();
+  t.after(scope.cleanup);
+  const db = scope.own(openDb({ kind: "memory" }));
   const { user } = createWorkRepos(db);
   db.user
     .insert(smartFolders)

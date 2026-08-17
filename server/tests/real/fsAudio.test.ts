@@ -24,7 +24,7 @@ async function setup(t: TestContext) {
   writeFileSync(join(root, "large.png"), Buffer.alloc(64 * 1024 * 1024 + 1));
   writeFileSync(join(root, "large.pdf"), Buffer.alloc(256 * 1024 * 1024 + 1));
 
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   const app = createApp(adapter);
   await adapter.updateSettings({ rootFolder: root });
 
