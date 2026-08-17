@@ -4,9 +4,10 @@ title: 'smoke: 候補登録後に未登録タブの件数が0件へ更新され�
 status: In Progress
 assignee: []
 created_date: '2026-08-14 16:27'
-updated_date: '2026-08-17 20:34'
+updated_date: '2026-08-17 21:08'
 labels: []
-dependencies: []
+dependencies:
+  - TASK-351
 priority: medium
 ordinal: 352000
 ---
