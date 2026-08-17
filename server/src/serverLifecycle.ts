@@ -3,7 +3,7 @@ import { dispose } from "./lib/logger.ts";
 
 export async function performGracefulShutdown(options: {
   server?: { stop: (closeActiveConnections?: boolean) => void };
-  app: { shutdown(): Promise<void> };
+  app?: { shutdown(): Promise<void> };
   adapter?: DataAdapter;
 }): Promise<void> {
   const { server, app, adapter } = options;
@@ -15,7 +15,7 @@ export async function performGracefulShutdown(options: {
   }
 
   try {
-    await app.shutdown();
+    await app?.shutdown();
   } catch (shutdownError) {
     console.error(shutdownError);
   }
@@ -33,5 +33,19 @@ export async function performGracefulShutdown(options: {
     await dispose();
   } catch (disposeError) {
     console.error(disposeError);
+  }
+}
+
+export async function runCleanupAndExit(
+  cleanup: () => Promise<void>,
+  exitCode: number,
+  exit: (code: number) => never = process.exit,
+): Promise<never> {
+  try {
+    await cleanup();
+  } catch (error) {
+    console.error(error);
+  } finally {
+    exit(exitCode);
   }
 }
