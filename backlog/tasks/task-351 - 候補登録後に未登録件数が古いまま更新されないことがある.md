@@ -1,10 +1,10 @@
 ---
 id: TASK-351
 title: 候補登録後に未登録件数が古いまま更新されないことがある
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-17 21:08'
-updated_date: '2026-08-17 23:14'
+updated_date: '2026-08-17 23:17'
 labels: []
 dependencies: []
 ordinal: 361000
