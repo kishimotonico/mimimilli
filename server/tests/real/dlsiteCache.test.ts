@@ -638,17 +638,16 @@ test("DLsiteキャッシュ: 既存ディレクトリを出力先に指定して
   assert.equal(cache.resolve({ productCode: "RJ123456" }).kind, "miss");
 });
 
-test("DLsiteキャッシュ: 同一出力先への並行生成でEEXISTを投げない", async (t) => {
-  const directory = makeTestDirectory("dlsite-cache-parallel");
+test("DLsiteキャッシュ: 同一相対パスへ連続生成しても成功する", (t) => {
+  const directory = makeTestDirectory("dlsite-cache-repeated-relative");
   t.after(directory.cleanup);
-  const cachePath = join(directory.path, "cache.sqlite");
-  const caches = await Promise.all(
-    Array.from({ length: 8 }, () => Promise.resolve(new DlsiteCache({ path: cachePath }))),
-  );
-  for (const cache of caches) {
-    directory.own(cache);
+  const previousCwd = process.cwd();
+  process.chdir(directory.path);
+  directory.ownFn(previousCwd, (cwd) => process.chdir(cwd));
+  for (let index = 0; index < 8; index += 1) {
+    const cache = directory.own(new DlsiteCache({ path: "cache.sqlite" }));
+    assert.equal(cache.resolve({ productCode: "RJ123456" }).kind, "miss");
   }
-  assert.equal(caches.length, 8);
 });
 
 test("DLsiteキャッシュ: 相対パスは絶対パスとして保持する", (t) => {

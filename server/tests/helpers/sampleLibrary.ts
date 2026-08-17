@@ -3,6 +3,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { appendSuppressedError } from "../../src/lib/suppressedError.ts";
 
 /** 指定秒数の有効な 8kHz mono PCM WAV を生成する */
 export function writeWav(path: string, seconds: number): void {
@@ -42,6 +43,22 @@ export interface TestResourceScope {
   cleanup(): void;
 }
 
+function runClosersSafely(closers: Array<() => void>): unknown | undefined {
+  let primaryError: unknown;
+  for (let index = closers.length - 1; index >= 0; index -= 1) {
+    try {
+      closers[index]!();
+    } catch (error) {
+      if (primaryError === undefined) {
+        primaryError = error;
+      } else {
+        appendSuppressedError(primaryError, error);
+      }
+    }
+  }
+  return primaryError;
+}
+
 export function makeTestScope(): TestResourceScope {
   const closers: Array<() => void> = [];
   return {
@@ -54,8 +71,9 @@ export function makeTestScope(): TestResourceScope {
       return resource;
     },
     cleanup(): void {
-      for (let index = closers.length - 1; index >= 0; index -= 1) {
-        closers[index]!();
+      const primaryError = runClosersSafely(closers);
+      if (primaryError !== undefined) {
+        throw primaryError;
       }
     },
   };
@@ -69,14 +87,12 @@ export interface TestDirectory extends TestResourceScope {
 export function makeTestDirectory(name: string): TestDirectory {
   const path = mkdtempSync(join(tmpdir(), `mimimilli-${name}-`));
   const scope = makeTestScope();
+  scope.ownFn(path, (target) => rmSync(target, { recursive: true, force: true }));
   return {
     path,
     own: scope.own.bind(scope),
     ownFn: scope.ownFn.bind(scope),
-    cleanup(): void {
-      scope.cleanup();
-      rmSync(path, { recursive: true, force: true });
-    },
+    cleanup: scope.cleanup.bind(scope),
   };
 }
 
