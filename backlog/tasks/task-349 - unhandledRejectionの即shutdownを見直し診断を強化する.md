@@ -4,7 +4,7 @@ title: unhandledRejectionの即shutdownを見直し診断を強化する
 status: To Do
 assignee: []
 created_date: '2026-08-17 16:13'
-updated_date: '2026-08-17 16:52'
+updated_date: '2026-08-17 16:59'
 labels: []
 dependencies: []
 ordinal: 359000
@@ -30,9 +30,15 @@ ordinal: 359000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 unhandledRejection発生時、reasonの型と内容（非Error・falsyでも判別可能）、stack・cause・suppressed、fsエラーのcode/syscall/pathを含む構造化ログが残る
-- [ ] #2 unhandledRejection時の終了ポリシーを選択肢比較つきのADRとして記録し、決定した動作（継続/終了の条件）が実装・テストされている
-- [ ] #3 uncaughtExceptionではshutdown(1)が維持される
-- [ ] #4 起動途中（app初期化前）に例外が起きてもexit code 1で終了する（shutdownのTDZ参照解消、クリーンアップ失敗時もexit到達）。起動途中・起動完了後の両方をテストで確認する
-- [ ] #5 Bunバージョン更新の要否の結論（2026-08-18時点で1.3.14がlatest stable・該当修正なし）と、引用するissue番号の実在確認結果をADRまたはタスクノートに記録する
+- [x] #1 unhandledRejection発生時、reasonの型と内容（非Error・falsyでも判別可能）、stack・cause・suppressed、fsエラーのcode/syscall/pathを含む構造化ログが残る
+- [x] #2 unhandledRejection時の終了ポリシーを選択肢比較つきのADRとして記録し、決定した動作（継続/終了の条件）が実装・テストされている
+- [x] #3 uncaughtExceptionではshutdown(1)が維持される
+- [x] #4 起動途中（app初期化前）に例外が起きてもexit code 1で終了する（shutdownのTDZ参照解消、クリーンアップ失敗時もexit到達）。起動途中・起動完了後の両方をテストで確認する
+- [x] #5 Bunバージョン更新の要否の結論（2026-08-18時点で1.3.14がlatest stable・該当修正なし）と、引用するissue番号の実在確認結果をADRまたはタスクノートに記録する
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+ADR-0022にBun 1.3.14 latest・該当修正なし、issue #37474/#13456の実在確認と症状との関係を記録済み。本文は未改変。
+<!-- SECTION:NOTES:END -->

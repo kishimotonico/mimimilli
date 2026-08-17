@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { test } from "node:test";
-import { dispose, getCategoryLogger, initLogger } from "../src/lib/logger.ts";
+import { dispose, formatError, getCategoryLogger, initLogger } from "../src/lib/logger.ts";
 
 test("initLogger は logDir 指定時に debug も含めてJSONLへ記録する", async () => {
   const logDir = mkdtempSync(join(tmpdir(), "mimimilli-logger-"));
@@ -59,4 +59,83 @@ test("initLogger はログディレクトリの作成に失敗したとき errno
   } finally {
     rmSync(baseDir, { recursive: true, force: true });
   }
+});
+
+test("formatError は非Errorのreasonで型と内容を判別できる", () => {
+  assert.deepEqual(formatError({ code: "ENOENT", path: "/tmp/missing" }), {
+    errorKind: "object",
+    content: '{"code":"ENOENT","path":"/tmp/missing"}',
+  });
+  assert.deepEqual(formatError("plain failure"), {
+    errorKind: "string",
+    content: '"plain failure"',
+  });
+  assert.deepEqual(formatError(42), {
+    errorKind: "number",
+    content: "42",
+  });
+  assert.deepEqual(formatError(null), {
+    errorKind: "null",
+    content: "null",
+  });
+  assert.deepEqual(formatError(undefined), {
+    errorKind: "undefined",
+    content: "undefined",
+  });
+  assert.deepEqual(formatError(0), {
+    errorKind: "number",
+    content: "0",
+  });
+  assert.deepEqual(formatError(""), {
+    errorKind: "string",
+    content: '""',
+  });
+});
+
+test("formatError はfsエラーの code / errno / syscall / path を含める", () => {
+  const error = Object.assign(new Error("ENOENT: no such file"), {
+    code: "ENOENT",
+    errno: -2,
+    syscall: "stat",
+    path: "/tmp/missing",
+  });
+
+  assert.deepEqual(formatError(error), {
+    errorKind: "Error",
+    message: "ENOENT: no such file",
+    stack: error.stack,
+    code: "ENOENT",
+    errno: -2,
+    syscall: "stat",
+    path: "/tmp/missing",
+  });
+});
+
+test("formatError は cause / suppressed の既存挙動を維持する", () => {
+  const cause = Object.assign(new Error("root cause"), { code: "EACCES", path: "/secret" });
+  const suppressed = Object.assign(new Error("suppressed"), {
+    code: "EBUSY",
+    syscall: "unlink",
+  });
+  const error = new Error("wrapper", { cause });
+  (error as { suppressed?: unknown[] }).suppressed = [suppressed];
+
+  const formatted = formatError(error);
+  assert.equal(formatted.errorKind, "Error");
+  assert.equal(formatted.message, "wrapper");
+  assert.equal(formatted.stack, error.stack);
+  assert.deepEqual(formatted.cause, {
+    errorKind: "Error",
+    message: "root cause",
+    code: "EACCES",
+    path: "/secret",
+  });
+  assert.deepEqual(formatted.suppressed, [
+    {
+      errorKind: "Error",
+      message: "suppressed",
+      code: "EBUSY",
+      syscall: "unlink",
+    },
+  ]);
 });

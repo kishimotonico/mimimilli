@@ -215,9 +215,50 @@ export function createDlsiteEventLogger(): (event: Record<string, unknown>) => v
   };
 }
 
+function classifyNonErrorKind(value: unknown): string {
+  if (value === null) return "null";
+  if (value === undefined) return "undefined";
+  return typeof value;
+}
+
+function stringifyNonErrorContent(value: unknown): string {
+  try {
+    const json = JSON.stringify(value);
+    if (json !== undefined) return json;
+  } catch {
+    // fall through
+  }
+  return String(value);
+}
+
+function collectFsErrorFields(error: Error): Record<string, string | number> {
+  const fields: Record<string, string | number> = {};
+  const errnoError = error as NodeJS.ErrnoException & { dest?: string | number };
+  for (const key of ["code", "errno", "syscall", "path", "dest"] as const) {
+    const value = errnoError[key];
+    if (typeof value === "string" || typeof value === "number") {
+      fields[key] = value;
+    }
+  }
+  return fields;
+}
+
+function formatNonError(value: unknown): Record<string, unknown> {
+  return {
+    errorKind: classifyNonErrorKind(value),
+    content: stringifyNonErrorContent(value),
+  };
+}
+
 function summarizeError(error: unknown): unknown {
-  if (error instanceof Error) return { errorKind: error.name, message: error.message };
-  return String(error);
+  if (error instanceof Error) {
+    return {
+      errorKind: error.name,
+      message: error.message,
+      ...collectFsErrorFields(error),
+    };
+  }
+  return formatNonError(error);
 }
 
 export function formatError(error: unknown): Record<string, unknown> {
@@ -226,6 +267,7 @@ export function formatError(error: unknown): Record<string, unknown> {
       errorKind: error.name,
       message: error.message,
       stack: error.stack,
+      ...collectFsErrorFields(error),
     };
     if (error.cause !== undefined) properties.cause = summarizeError(error.cause);
     const suppressed = (error as { suppressed?: unknown }).suppressed;
@@ -234,7 +276,7 @@ export function formatError(error: unknown): Record<string, unknown> {
     }
     return properties;
   }
-  return { message: String(error) };
+  return formatNonError(error);
 }
 
 export { dispose };
