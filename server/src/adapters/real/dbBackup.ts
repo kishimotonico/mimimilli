@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, renameSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { Database, type Database as DatabaseType } from "bun:sqlite";
 import { getCategoryLogger } from "../../lib/logger.ts";
@@ -92,29 +92,6 @@ export function purgeOldBackups(backupDir: string, kind: DbBackupKind): void {
       rmSync(join(backupDir, `${base}.sqlite${suffix === "" ? "" : suffix}`), { force: true });
     }
   }
-}
-
-export function readMigrationJournalEntryCount(migrationsFolder: string): number {
-  const journalPath = join(migrationsFolder, "meta", "_journal.json");
-  const journal = JSON.parse(readFileSync(journalPath, "utf-8")) as { entries: unknown[] };
-  return journal.entries.length;
-}
-
-export function readAppliedMigrationCount(sqlite: DatabaseType): number {
-  const table = sqlite
-    .query(
-      "SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table' AND name = '__drizzle_migrations'",
-    )
-    .get() as { count: number };
-  if (table.count === 0) return 0;
-  const row = sqlite.query("SELECT COUNT(*) AS count FROM __drizzle_migrations").get() as {
-    count: number;
-  };
-  return row.count;
-}
-
-export function hasPendingMigrations(sqlite: DatabaseType, migrationsFolder: string): boolean {
-  return readAppliedMigrationCount(sqlite) < readMigrationJournalEntryCount(migrationsFolder);
 }
 
 /** 既存DB一式をバックアップへ移動する。失敗時は例外を投げる。 */

@@ -1,24 +1,24 @@
-import { copyFileSync, mkdirSync, rmSync } from "node:fs";
+import { copyFileSync, mkdirSync } from "node:fs";
 import { dirname, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { constants, Database, SQLiteError } from "bun:sqlite";
 import { drizzle, type BunSQLiteDatabase } from "drizzle-orm/bun-sqlite";
-import { migrate } from "drizzle-orm/bun-sqlite/migrator";
 import { formatError, getCategoryLogger } from "../../lib/logger.ts";
 import * as catalogSchema from "./catalogSchema.ts";
 import {
   createDatabaseCandidatePath,
+  removeDatabaseFiles,
   replaceDatabaseWithCandidate,
 } from "./databaseReplacement.ts";
 import {
   createDatabaseBackup,
-  hasPendingMigrations,
   moveDatabaseToBackup,
   purgeOldBackups,
   verifyDatabaseBackup,
   type DbBackupKind,
 } from "./dbBackup.ts";
 import { applySqliteBusyTimeout } from "./sqliteConnection.ts";
+import { executeSqliteMigrations, hasPendingSqliteMigrations } from "./sqliteMigrationExecutor.ts";
 import * as userSchema from "./userSchema.ts";
 
 export const CATALOG_SCHEMA_VERSION = 9;
@@ -139,7 +139,7 @@ function openVersionedDatabase(
   }
 
   try {
-    if (!isMemory && context && hasPendingMigrations(sqlite, migrationsFolder)) {
+    if (!isMemory && context && hasPendingSqliteMigrations(sqlite, migrationsFolder)) {
       const backupPath = createDatabaseBackup(sqlite, context.backupDir, context.kind);
       verifyDatabaseBackup(backupPath, kind);
       purgeOldBackups(context.backupDir, context.kind);
@@ -147,17 +147,28 @@ function openVersionedDatabase(
         const candidatePath = createDatabaseCandidatePath(path);
         copyFileSync(backupPath, candidatePath);
         sqlite.close();
-        const candidate = new Database(candidatePath);
         try {
-          candidate.exec("PRAGMA journal_mode = DELETE");
-          candidate.exec("PRAGMA foreign_keys = ON");
-          applySqliteBusyTimeout(candidate);
-          migrate(drizzle(candidate), { migrationsFolder });
+          const candidate = new Database(candidatePath);
+          try {
+            candidate.exec("PRAGMA journal_mode = DELETE");
+            candidate.exec("PRAGMA foreign_keys = ON");
+            applySqliteBusyTimeout(candidate);
+            executeSqliteMigrations(candidate, migrationsFolder);
+          } finally {
+            candidate.close();
+          }
         } catch (error) {
-          rmSync(candidatePath, { force: true });
+          try {
+            removeDatabaseFiles(candidatePath);
+          } catch (cleanupError) {
+            // migration例外をcleanup失敗で上書きしない。cleanup失敗自体はwarningとして記録する。
+            getCategoryLogger("db").warn("候補DBのcleanupに失敗しました", {
+              candidatePath,
+              operation: "remove",
+              ...formatError(cleanupError),
+            });
+          }
           throw error;
-        } finally {
-          candidate.close();
         }
         replaceDatabaseWithCandidate(path, candidatePath);
         sqlite = new Database(path);
@@ -165,11 +176,10 @@ function openVersionedDatabase(
         sqlite.exec("PRAGMA foreign_keys = ON");
         applySqliteBusyTimeout(sqlite);
       } else {
-        migrate(drizzle(sqlite), { migrationsFolder });
+        executeSqliteMigrations(sqlite, migrationsFolder);
       }
     } else {
-      const db = drizzle(sqlite);
-      migrate(db, { migrationsFolder });
+      executeSqliteMigrations(sqlite, migrationsFolder);
     }
   } catch (error) {
     logDbOpenFailure(kind, path, "migrate", error);
