@@ -1,9 +1,10 @@
 ---
 id: TASK-350
 title: dbBackupテストのrollbackファイル特定を決定的にする
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-17 17:03'
+updated_date: '2026-08-17 17:58'
 labels: []
 dependencies: []
 ordinal: 360000
@@ -23,6 +24,6 @@ AssertionError: Expected values to be strictly equal: 'old-wal' !== 'old' (dbBac
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 server/tests/real/dbBackup.test.ts の当該テストが、rollbackファイルの特定を列挙順に依存せず決定的に行う
-- [ ] #2 bun test tests/real/dbBackup.test.ts を10回連続実行して全て成功する
+- [x] #1 server/tests/real/dbBackup.test.ts の当該テストが、rollbackファイルの特定を列挙順に依存せず決定的に行う
+- [x] #2 bun test tests/real/dbBackup.test.ts を10回連続実行して全て成功する
 <!-- AC:END -->
