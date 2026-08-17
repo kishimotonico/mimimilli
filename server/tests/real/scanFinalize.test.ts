@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import * as fs from "node:fs/promises";
 import { stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { spyOn } from "bun:test";
 import { THUMBNAIL_WIDTHS } from "@mimimilli/shared";
 import type { WorkSummary } from "@mimimilli/shared";
 import sharp from "sharp";
@@ -55,6 +57,7 @@ test("finalizeScan: サムネイルGC後に last_scan_time を記録する", asy
     listSummaries: () => ({
       summaries: [],
       skipped: [],
+      unmeasuredCovers: [],
     }),
   };
 
@@ -80,6 +83,7 @@ test("finalizeScan: throwIfCancelled が呼ばれたら last_scan_time を記録
     listSummaries: () => ({
       summaries: [],
       skipped: [],
+      unmeasuredCovers: [],
     }),
   };
 
@@ -123,7 +127,7 @@ test("finalizeScan: 作品0件でも既存キャッシュは削除されず、�
   };
 
   await finalizeScan({
-    query: { listSummaries: () => ({ summaries: [], skipped: [] }) },
+    query: { listSummaries: () => ({ summaries: [], skipped: [], unmeasuredCovers: [] }) },
     catalog,
     thumbnailCacheDir,
   });
@@ -140,6 +144,7 @@ test("finalizeScan: 作品0件でも既存キャッシュは削除されず、�
           }),
         ],
         skipped: [],
+        unmeasuredCovers: [],
       }),
     },
     catalog,
@@ -162,6 +167,7 @@ test("finalizeScan: listSummaries の skipped がある場合は削除されな�
       listSummaries: () => ({
         summaries: [makeSummary({ id: "work-ok", physicalPath: workDir })],
         skipped: [{ workId: "work-bad", reason: "formatVersion missing" }],
+        unmeasuredCovers: [],
       }),
     },
     catalog: { setScanState: () => {} },
@@ -191,6 +197,7 @@ test("finalizeScan: resolveWithin 失敗がある場合は削除されない", a
           }),
         ],
         skipped: [],
+        unmeasuredCovers: [],
       }),
     },
     catalog: { setScanState: () => {} },
@@ -208,7 +215,7 @@ test("finalizeScan: GCスキップ時も last_scan_time を更新する", async 
   };
 
   await finalizeScan({
-    query: { listSummaries: () => ({ summaries: [], skipped: [] }) },
+    query: { listSummaries: () => ({ summaries: [], skipped: [], unmeasuredCovers: [] }) },
     catalog,
     thumbnailCacheDir,
   });
@@ -226,6 +233,7 @@ test("finalizeScan: GCスキップ時に reason・件数・cacheDir を含む wa
           listSummaries: () => ({
             summaries: [makeSummary({ id: "work-1", physicalPath: workDir })],
             skipped: [{ workId: "work-bad", reason: "invalid" }],
+            unmeasuredCovers: [],
           }),
         },
         catalog: { setScanState: () => {} },
@@ -239,10 +247,8 @@ test("finalizeScan: GCスキップ時に reason・件数・cacheDir を含む wa
       );
       assert.equal(warned.length, 1);
       assert.equal(warned[0]!.level, "warning");
-      assert.equal(warned[0]!.properties.reason, "skipped-works");
+      assert.deepEqual(warned[0]!.properties.gaps, { "work-load-failed": 1 });
       assert.equal(warned[0]!.properties.workCount, 1);
-      assert.equal(warned[0]!.properties.skippedCount, 1);
-      assert.equal(warned[0]!.properties.unresolvedCoverCount, 0);
       assert.equal(warned[0]!.properties.cacheDir, thumbnailCacheDir);
     });
   } finally {
@@ -264,6 +270,7 @@ test("finalizeScan: 作品あり・全作品カバーなしの場合はGCが実�
       listSummaries: () => ({
         summaries: [makeSummary({ id: "work-no-cover", physicalPath: workDir, cover: null })],
         skipped: [],
+        unmeasuredCovers: [],
       }),
     },
     catalog: { setScanState: () => {} },
@@ -271,4 +278,126 @@ test("finalizeScan: 作品あり・全作品カバーなしの場合はGCが実�
   });
 
   assert.ok(!existsSync(orphan), "カバーなし作品のみでも孤児キャッシュは削除される");
+});
+
+test("finalizeScan: 寸法未計測カバーがある場合は削除されない", async (t) => {
+  const thumbnailCacheDir = setupCacheDir(t);
+  mkdirSync(thumbnailCacheDir, { recursive: true });
+  const cachedFile = join(thumbnailCacheDir, "orphan.webp");
+  writeFileSync(cachedFile, "orphan");
+
+  const workDir = mkdtempSync(join(tmpdir(), "mimimilli-work-"));
+  t.after(() => rmSync(workDir, { recursive: true, force: true }));
+
+  await finalizeScan({
+    query: {
+      listSummaries: () => ({
+        summaries: [makeSummary({ id: "work-unmeasured", physicalPath: workDir, cover: null })],
+        skipped: [],
+        unmeasuredCovers: ["work-unmeasured"],
+      }),
+    },
+    catalog: { setScanState: () => {} },
+    thumbnailCacheDir,
+  });
+
+  assert.ok(existsSync(cachedFile));
+});
+
+test("finalizeScan: 寸法未計測カバーでGCスキップ時に unmeasured-covers warn を出す", async (t) => {
+  const thumbnailCacheDir = setupCacheDir(t);
+  const workDir = mkdtempSync(join(tmpdir(), "mimimilli-work-"));
+  try {
+    await captureLogs(async (records) => {
+      await finalizeScan({
+        query: {
+          listSummaries: () => ({
+            summaries: [
+              makeSummary({ id: "work-unmeasured", physicalPath: workDir, cover: null }),
+              makeSummary({ id: "work-ok", physicalPath: workDir, cover: null }),
+            ],
+            skipped: [],
+            unmeasuredCovers: ["work-unmeasured"],
+          }),
+        },
+        catalog: { setScanState: () => {} },
+        thumbnailCacheDir,
+      });
+
+      const warned = scanRecords(records).filter(
+        (record) =>
+          recordMessage(record) ===
+          "スナップショットが不完全なためサムネイルキャッシュGCをスキップしました",
+      );
+      assert.equal(warned.length, 1);
+      assert.deepEqual(warned[0]!.properties.gaps, { "cover-unmeasured": 1 });
+      assert.equal(warned[0]!.properties.workCount, 2);
+    });
+  } finally {
+    rmSync(workDir, { recursive: true, force: true });
+  }
+});
+
+test("finalizeScan: 寸法未計測カバーでGCスキップ時も last_scan_time を更新する", async (t) => {
+  const thumbnailCacheDir = setupCacheDir(t);
+  const scanStates = new Map<string, string | null>();
+  const catalog = {
+    setScanState: (key: string, value: string | null) => scanStates.set(key, value),
+  };
+  const workDir = mkdtempSync(join(tmpdir(), "mimimilli-work-"));
+  t.after(() => rmSync(workDir, { recursive: true, force: true }));
+
+  await finalizeScan({
+    query: {
+      listSummaries: () => ({
+        summaries: [makeSummary({ id: "work-unmeasured", physicalPath: workDir, cover: null })],
+        skipped: [],
+        unmeasuredCovers: ["work-unmeasured"],
+      }),
+    },
+    catalog,
+    thumbnailCacheDir,
+  });
+
+  assert.ok(scanStates.has(LAST_SCAN_TIME_KEY));
+});
+
+test("finalizeScan: カバーの stat 失敗がある場合は削除されない", async (t) => {
+  const thumbnailCacheDir = setupCacheDir(t);
+  mkdirSync(thumbnailCacheDir, { recursive: true });
+  const cachedFile = join(thumbnailCacheDir, "orphan.webp");
+  writeFileSync(cachedFile, "orphan");
+
+  const workDir = mkdtempSync(join(tmpdir(), "mimimilli-work-"));
+  t.after(() => rmSync(workDir, { recursive: true, force: true }));
+  const coverPath = join(workDir, "cover.jpg");
+  writeFileSync(coverPath, "cover");
+
+  const spy = spyOn(fs, "stat").mockImplementation((async (path) => {
+    if (String(path) === coverPath) {
+      throw new Error("stat failed");
+    }
+    return stat(path);
+  }) as typeof fs.stat);
+  t.after(() => spy.mockRestore());
+
+  await finalizeScan({
+    query: {
+      listSummaries: () => ({
+        summaries: [
+          makeSummary({
+            id: "work-stat-fail",
+            physicalPath: workDir,
+            cover: { image: "cover.jpg", dimensions: { width: 100, height: 100 } },
+          }),
+        ],
+        skipped: [],
+        unmeasuredCovers: [],
+      }),
+    },
+    catalog: { setScanState: () => {} },
+    thumbnailCacheDir,
+  });
+
+  assert.ok(existsSync(cachedFile));
 });

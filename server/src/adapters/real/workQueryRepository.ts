@@ -4,6 +4,8 @@ import {
   coverFieldsFromColumns,
   createRandomSeed,
   evaluateParseErrorAlert,
+  isCoverUnmeasured,
+  projectCoverKind,
   relativeToRoot,
   toWorkListItemDlsite,
   withNormalizeTagBatchCache,
@@ -228,7 +230,7 @@ export class WorkQueryRepository {
   listSummaries(workIds?: string[]): ListSummariesResult {
     return withNormalizeTagBatchCache(() => {
       if (workIds !== undefined && workIds.length === 0) {
-        return { summaries: [], skipped: [] };
+        return { summaries: [], skipped: [], unmeasuredCovers: [] };
       }
 
       const baseSql = `
@@ -264,7 +266,15 @@ export class WorkQueryRepository {
       const tagsByWork = this.tagMap(workIds);
       const summaries: ListSummariesResult["summaries"] = [];
       const skipped: ListSummariesResult["skipped"] = [];
+      const unmeasuredCovers: string[] = [];
       for (const rawRow of rows) {
+        if (
+          isCoverUnmeasured(
+            projectCoverKind(rawRow.coverImage, rawRow.coverWidth, rawRow.coverHeight),
+          )
+        ) {
+          unmeasuredCovers.push(rawRow.id);
+        }
         try {
           const row: SummaryRow = { ...rawRow, bookmarked: rawRow.bookmarked !== 0 };
           summaries.push(
@@ -282,7 +292,7 @@ export class WorkQueryRepository {
           throw error;
         }
       }
-      return { summaries, skipped };
+      return { summaries, skipped, unmeasuredCovers };
     });
   }
 
