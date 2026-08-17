@@ -7,6 +7,7 @@ import { SETTINGS_QUERY_KEYS } from "../../../entities/settings/queryKeys";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { useDlsiteBulkActions } from "../../../entities/dlsite/useDlsiteBulkActions";
 import { SCAN_QUERY_KEYS } from "../api";
+import { applyScanTerminalCandidates } from "../model/syncScanTerminalCandidates";
 import {
   scanActionsAtom,
   scanErrorAtom,
@@ -27,8 +28,8 @@ export default function ScanRuntime() {
     (job: ScanJobSnapshot) => {
       if (job.status !== "completed" || !job.result || !job.finishedAt) return;
       const result = job.result;
+      applyScanTerminalCandidates(queryClient, job.finishedAt, result.candidates);
       queryClient.setQueryData(SCAN_QUERY_KEYS.last(), { result, finishedAt: job.finishedAt });
-      queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), result.candidates);
       queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.all() });
       queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.dlsiteNotifications() });
       queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.allFacets() });

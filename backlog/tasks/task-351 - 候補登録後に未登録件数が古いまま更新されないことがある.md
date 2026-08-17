@@ -1,10 +1,10 @@
 ---
 id: TASK-351
 title: 候補登録後に未登録件数が古いまま更新されないことがある
-status: In Progress
+status: To Do
 assignee: []
 created_date: '2026-08-17 21:08'
-updated_date: '2026-08-17 21:09'
+updated_date: '2026-08-17 23:14'
 labels: []
 dependencies: []
 ordinal: 361000
@@ -49,21 +49,52 @@ client/src/features/scan/model/useScanCandidatesCache.ts の readScanCandidates 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 候補キャッシュが undefined になる実経路が特定され、last?.result.candidates へのフォールバックが件数据え置きの原因であることが再現で縛られている
-- [ ] #2 候補を登録したあと、サイドバーの未登録タブとトップバーの件数が登録結果を反映する
-- [ ] #3 原因構造が修正されている（暗黙フォールバックの存在意義を確認したうえでの判断がタスクnotesに記録されている）
-- [ ] #4 client側テストが通り、smokeフルスイートを5回連続実行して library.smoke.spec.ts の候補登録テストが失敗しない
+- [x] #1 候補を登録したあと、サイドバーの未登録タブとトップバーの件数が登録結果を反映する
+- [x] #2 原因構造が修正されている（暗黙フォールバックの存在意義を確認したうえでの判断がタスクnotesに記録されている）
+- [x] #3 client側テストが通り、smokeフルスイートを5回連続実行して library.smoke.spec.ts の候補登録テストが失敗しない
+- [x] #4 候補キャッシュの上書き経路が特定され、原因（ScanRuntimeのhandleScanTerminal再入で登録後の候補がスキャン結果全件で上書きされる）が再現テストで縛られている。フォールバック仮説（候補B）の棄却根拠もnotesに記録されている
 <!-- AC:END -->
+
+
+
+
+
+
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
-統括による追加調査（2026-08-18）: 起票時の仮説（useScanCandidatesCache の last?.result.candidates フォールバック）より有力な経路が見つかった。候補キャッシュへの書き込みは2箇所ある。
+## 原因確定（実測）
 
-1. client/src/features/scan/ui/ScanRuntime.tsx:31 handleScanTerminal — job が completed になったとき queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), result.candidates) でスキャン結果の候補全件をそのまま書き込む
-2. client/src/features/scan/ui/scanModal/UnregisteredTab.tsx:60 registerMutation.onSuccess — 登録済みpathを previous.filter で取り除く
+候補Aが原因。候補Bは今回の症状経路ではない。
 
-1が2の後に走ると、登録で減らしたはずの候補がスキャン結果の全件（今回は2件）で上書きされ、件数が登録前の値に戻る。観測された『登録は成功しUIも落ち着いているのに件数だけ2のまま確定』と整合する。
+### 候補A（確定）
+ユニットテスト `useScanCandidatesCache.test.ts`「候補A: 登録後に handleScanTerminal 相当の書き込みが走ると件数が戻る」で再現。
+1. 候補キャッシュを2件で初期化
+2. UnregisteredTab と同じ filter で登録（空配列）
+3. `applyScanTerminalCandidates`（旧 handleScanTerminal の candidates 書き込み）を同じ finishedAt で実行
+→ 修正前はキャッシュが2件に戻り件数が復元される。
 
-したがってAC#1の検証では、フォールバック経路と ScanRuntime の上書き経路の両方を候補として切り分けること。どちらが実際に起きているかを再現で確定させてから修正する。
+実経路: useScanJob は SSE の completed/failed/cancelled で `refresh()`（GET /scan/:id）を呼び、非同期で `onTerminal` が走る。登録成功の setQueryData より後に terminal 副作用が到着すると、スナップショットの全候補で上書きされる。
+
+### 候補B（棄却）
+フォールバック自体は `removeQueries` 等でキャッシュが undefined になったときに last.result.candidates を返す（テスト「候補B: キャッシュが undefined のときだけ…」で確認）。
+ただし登録成功時は空配列 `[]` がキャッシュに残るため、本番コードに candidates キャッシュを undefined にする経路は見つからず（removeQueries/resetQueries/gc による削除なし）、今回の「登録後に件数が戻る」症状の直接原因ではない。
+
+### 暗黙フォールバックの存在意義
+TopBar が /scan/candidates を叩かずに初回表示件数を出すため（topBarUnregisteredBadge.test「前回スキャン結果から件数を導出する」）。ScanModal は undefined 時に refreshScanCandidates するが、TopBar 単体表示ではフォールバックが必要。登録後はキャッシュが優先されるため削除不要。
+
+### 修正
+`syncScanTerminalCandidates.ts` の `applyScanTerminalCandidates` を追加。同一 finishedAt の再入時、キャッシュがスナップショット候補の部分集合なら（登録・除外後）上書きしない。新スキャン（finishedAt 変更）は従来どおり全置換。
+
+### 負の検証
+applyScanTerminalCandidates を常時上書きに戻すと候補Aテストが失敗（2件に復元）。
+
+### smoke
+5回連続: 15 passed / 37s, 37s, 37s, 36s, 36s。library.smoke 候補登録テスト含め全通過。残留プロセスなし。
+
+### AC#1
+起票時の候補B前提のため未チェック。文言修正が必要。
+
+修正の設計を差し替え（統括レビュー後）: 初版は last() 更新後に prevLast を読んでいたため再入判定が常にtrueで、部分集合チェックが誤って再入判定の役目を負っていた（前回⊆今回のとき新スキャン結果が反映されない誤判定あり）。applyScanTerminalCandidates を last() 更新より前に呼ぶ順序へ変え、prevFinishedAt === finishedAt なら触らない・新しければ全置換、へ簡素化。部分集合チェックは削除。負の検証: 再入判定を外すと候補Aテストが落ち（[]が2件に復元）、旧実装に戻すと新スキャンsupersetテストが落ちる（[A]のまま[A,B]へ更新されない）。client 816 passed、smoke2回全通過。
 <!-- SECTION:NOTES:END -->
