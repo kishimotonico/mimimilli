@@ -46,6 +46,11 @@ function cacheFileName(workId: string, width: number, source: ThumbnailSource): 
   return `${hash}.webp`;
 }
 
+/** 1作品のカバーに対応する、有効なキャッシュファイル名の一覧 */
+export function thumbnailCacheNames(workId: string, source: ThumbnailSource): string[] {
+  return THUMBNAIL_WIDTHS.map((width) => cacheFileName(workId, width, source));
+}
+
 async function statSizeOrNull(path: string): Promise<number | null> {
   try {
     return (await stat(path)).size;
@@ -239,32 +244,10 @@ export class ThumbnailCache {
   }
 }
 
-/** GC対象を判定するために必要な、作品ごとのカバー実パス */
-export interface WorkCoverEntry {
-  workId: string;
-  /** 作品配下のカバー画像の絶対パス（resolveWithin 済み） */
-  coverAbsolutePath: string;
-}
-
-export interface ThumbnailGcResult {
-  /** 削除したファイル数（孤児キャッシュ + 孤児 .tmp- ファイル） */
-  deleted: number;
-  /** 有効なキャッシュとして残したファイル数 */
-  kept: number;
-  /** カバーを stat できず有効集合の計算から除外した作品数 */
-  skippedWorks: number;
-}
-
 /**
- * サムネイルキャッシュのGC。real アダプタのスキャン完了時（全作品を走査する自然な
- * タイミング）に呼ぶ想定。「現存する作品 × THUMBNAIL_WIDTHS × 現在のカバー mtime」
- * から有効なキャッシュファイル名の集合を作り、cacheDir 配下でそれ以外の .webp を
- * 削除する。元カバーが更新されて mtime が変わると旧ファイル名は有効集合に含まれなく
- * なるため、次のGCで自然に消える。
- *
- * カバーが無い・stat できない作品は有効集合の計算から単にスキップする（キー計算不能
- * = そのファイルは有効集合に入らないだけで、GC全体は止めない。skippedWorks で件数を
- * 可視化する）。
+ * サムネイルキャッシュのGC。cacheDir 配下で validNames に含まれないエントリを削除する。
+ * 有効集合の構築（作品走査・カバー stat・不完全性の判定）は呼び出し側の責務であり、
+ * 完全な CoverSnapshot のときだけ呼ぶこと。
  *
  * 生成中の一時ファイル（.tmp-プレフィックス、cacheFileName の命名規則に一致しない）は
  * 有効集合に入りようがないため、孤児として常に削除対象になる。GC実行のタイミングと
@@ -274,37 +257,18 @@ export interface ThumbnailGcResult {
  */
 export async function gcThumbnailCache(
   cacheDir: string,
-  works: WorkCoverEntry[],
+  validNames: ReadonlySet<string>,
   options: { throwIfCancelled?: () => void } = {},
-): Promise<ThumbnailGcResult> {
+): Promise<{ deleted: number; kept: number }> {
   const checkpoint = options.throwIfCancelled ?? (() => {});
   checkpoint();
-  const validNames = new Set<string>();
-  let skippedWorks = 0;
-  for (const work of works) {
-    checkpoint();
-    let source: ThumbnailSource;
-    try {
-      const sourceStat = await stat(work.coverAbsolutePath);
-      source = { size: sourceStat.size, mtimeMs: sourceStat.mtimeMs };
-    } catch {
-      skippedWorks++;
-      continue;
-    }
-    checkpoint();
-    for (const width of THUMBNAIL_WIDTHS) {
-      checkpoint();
-      validNames.add(cacheFileName(work.workId, width, source));
-    }
-  }
 
   let entries: string[];
   checkpoint();
   try {
     entries = await readdir(cacheDir);
   } catch {
-    // cacheDir 自体が未作成（一度もサムネイルを生成していない）なら削除対象は無い
-    return { deleted: 0, kept: 0, skippedWorks };
+    return { deleted: 0, kept: 0 };
   }
   checkpoint();
 
@@ -320,5 +284,5 @@ export async function gcThumbnailCache(
     checkpoint();
     deleted++;
   }
-  return { deleted, kept, skippedWorks };
+  return { deleted, kept };
 }

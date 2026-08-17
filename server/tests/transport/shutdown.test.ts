@@ -7,7 +7,7 @@ import { test, type TestContext } from "node:test";
 import type { DataAdapter } from "../../src/adapter/index.ts";
 import { createFixtureAdapter } from "../../src/adapters/fixture/index.ts";
 import { getCategoryLogger, initLogger } from "../../src/lib/logger.ts";
-import { performGracefulShutdown } from "../../src/serverLifecycle.ts";
+import { performGracefulShutdown, runCleanupAndExit } from "../../src/serverLifecycle.ts";
 import { serveFixtureTransport } from "./helpers.ts";
 
 const emptyScanResult = {
@@ -154,4 +154,84 @@ test("graceful shutdown: server.stopがthrowしてもapp.shutdownとdisposeが�
     assert.equal(wasClosed(), true);
     assert.match(await readJsonlLog(logDir), new RegExp(LOG_MARKER));
   });
+});
+
+test("graceful shutdown: app未初期化でもperformGracefulShutdownが完了する", async () => {
+  await withLogDir(async (logDir) => {
+    await initLogger({ logDir });
+
+    await assert.doesNotReject(() => performGracefulShutdown({ server: { stop() {} } }));
+  });
+});
+
+test("runCleanupAndExit: クリーンアップ失敗でもexitに到達する", async () => {
+  let exitCode: number | undefined;
+  await assert.rejects(
+    () =>
+      runCleanupAndExit(
+        async () => {
+          throw new Error("cleanup failed");
+        },
+        1,
+        (code) => {
+          exitCode = code;
+          throw new Error("exit called");
+        },
+      ),
+    /exit called/,
+  );
+  assert.equal(exitCode, 1);
+});
+
+test("runCleanupAndExit: 起動完了後の通常シャットダウンでexitに到達する", async () => {
+  await withLogDir(async (logDir) => {
+    await initLogger({ logDir });
+
+    const adapter = createFixtureAdapter();
+    const { app, server } = serveFixtureTransport(adapter);
+    let exitCode: number | undefined;
+
+    await assert.rejects(
+      () =>
+        runCleanupAndExit(
+          () => performGracefulShutdown({ server, app, adapter }),
+          0,
+          (code) => {
+            exitCode = code;
+            throw new Error("exit called");
+          },
+        ),
+      /exit called/,
+    );
+    assert.equal(exitCode, 0);
+  });
+});
+
+const STARTUP_FAILURE_TIMEOUT_MS = 10_000;
+
+test("index.ts: 起動途中の失敗で exit code 1 に到達する", async () => {
+  const indexPath = join(import.meta.dir, "../../src/index.ts");
+  const proc = Bun.spawn({
+    cmd: ["bun", indexPath],
+    cwd: join(import.meta.dir, ".."),
+    env: {
+      ...process.env,
+      MIMIMILLI_ADAPTER: "invalid-adapter-for-test",
+    },
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+
+  const [exitCode, stderr] = await Promise.race([
+    Promise.all([proc.exited, new Response(proc.stderr).text()]),
+    new Promise<[number, string]>((_, reject) => {
+      setTimeout(
+        () => reject(new Error("index.ts subprocess timed out")),
+        STARTUP_FAILURE_TIMEOUT_MS,
+      );
+    }),
+  ]);
+
+  assert.equal(exitCode, 1);
+  assert.match(stderr, /未捕捉例外で終了します/);
 });

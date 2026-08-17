@@ -23,7 +23,11 @@ import {
   getCategoryLogger,
   initLogger,
 } from "./lib/logger.ts";
-import { performGracefulShutdown } from "./serverLifecycle.ts";
+import {
+  createUnhandledRejectionReporter,
+  registerProcessErrorHandlers,
+} from "./lib/processErrorHandlers.ts";
+import { performGracefulShutdown, runCleanupAndExit } from "./serverLifecycle.ts";
 import { serveMimimilli } from "./serve.ts";
 import { buildStartupLogProperties } from "./lib/startupLog.ts";
 
@@ -63,6 +67,13 @@ function createAdapter(): DataAdapter {
 }
 
 let shuttingDown = false;
+let adapter: DataAdapter | undefined;
+let server: ReturnType<typeof Bun.serve> | undefined;
+let app: ReturnType<typeof serveMimimilli>["app"] | undefined;
+
+const reportUnhandledRejection = createUnhandledRejectionReporter((message, properties) => {
+  serverLogger.error(message, properties);
+});
 
 async function shutdown(exitCode: number, reason: string, error?: unknown): Promise<void> {
   if (shuttingDown) return;
@@ -77,34 +88,28 @@ async function shutdown(exitCode: number, reason: string, error?: unknown): Prom
     console.error(logError);
   }
 
-  await performGracefulShutdown({ server, app, adapter });
-
-  process.exit(exitCode);
+  await runCleanupAndExit(() => performGracefulShutdown({ server, app, adapter }), exitCode);
 }
 
-process.on("uncaughtException", (error) => {
-  void shutdown(1, "未捕捉例外で終了します", error);
-});
-
-process.on("unhandledRejection", (reason) => {
-  void shutdown(1, "未処理のPromise拒否で終了します", reason);
-});
-
-process.on("SIGINT", () => {
-  void shutdown(0, "SIGINTを受信して終了します");
-});
-
-process.on("SIGTERM", () => {
-  void shutdown(0, "SIGTERMを受信して終了します");
+registerProcessErrorHandlers({
+  target: process,
+  onUnhandledRejection: reportUnhandledRejection,
+  onUncaughtException: (error) => {
+    void shutdown(1, "未捕捉例外で終了します", error);
+  },
+  onSignal: (signal) => {
+    void shutdown(
+      0,
+      signal === "SIGINT" ? "SIGINTを受信して終了します" : "SIGTERMを受信して終了します",
+    );
+  },
 });
 
 const port = Number(process.env.PORT ?? 8080);
-let adapter: DataAdapter | undefined;
-let server: ReturnType<typeof Bun.serve> | undefined;
 
 adapter = createAdapter();
 const served = serveMimimilli({ adapter, port });
-const app = served.app;
+app = served.app;
 server = served.server;
 
 serverLogger.info(

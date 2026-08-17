@@ -123,6 +123,8 @@ export interface SummaryLoadSkip {
 export interface ListSummariesResult {
   summaries: WorkSummary[];
   skipped: SummaryLoadSkip[];
+  /** coverImage はあるが寸法未計測で cover: null に潰れた作品のID */
+  unmeasuredCovers: string[];
 }
 
 export function parseJsonField(
