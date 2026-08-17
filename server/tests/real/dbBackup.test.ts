@@ -57,6 +57,14 @@ function assertNoReplacementFiles(dbPath: string): void {
   );
 }
 
+function findRollbackFileName(directory: string, part: "main" | "wal"): string | undefined {
+  return readdirSync(directory).find((name) => {
+    if (!name.includes(".rollback-")) return false;
+    if (part === "wal") return name.endsWith("-wal");
+    return !name.endsWith("-wal") && !name.endsWith("-shm");
+  });
+}
+
 const USER_MIGRATIONS_DIR = join(import.meta.dir, "../../drizzle/user");
 
 test("moveDatabaseToBackupはsqlite/wal/shmを退避し、元ファイルを残さない", (t) => {
@@ -285,10 +293,11 @@ test("候補DBの復元失敗時はinstall失敗を一次例外として保持�
 
   assert.equal(existsSync(dbPath), false);
   assert.equal(existsSync(candidatePath), false);
-  const rollbackPath = readdirSync(dirname(dbPath)).find((name) => name.includes(".rollback-"));
-  assert.ok(rollbackPath);
-  assert.equal(readFileSync(join(dirname(dbPath), rollbackPath), "utf-8"), "old");
-  assert.equal(readFileSync(`${join(dirname(dbPath), rollbackPath)}-wal`, "utf-8"), "old-wal");
+  const rollbackName = findRollbackFileName(dirname(dbPath), "main");
+  assert.ok(rollbackName);
+  const rollbackPath = join(dirname(dbPath), rollbackName);
+  assert.equal(readFileSync(rollbackPath, "utf-8"), "old");
+  assert.equal(readFileSync(`${rollbackPath}-wal`, "utf-8"), "old-wal");
 });
 
 test("本体復元成功後にsidecar復元が失敗しても、best-effortで一式をrollback側へ収束させる", (t) => {
@@ -336,9 +345,7 @@ test("本体復元成功後にsidecar復元が失敗しても、best-effortで�
   assert.equal(existsSync(dbPath), false);
   assert.equal(existsSync(`${dbPath}-wal`), false);
   assert.equal(existsSync(candidatePath), false);
-  const rollbackName = readdirSync(dirname(dbPath)).find(
-    (name) => name.includes(".rollback-") && !name.endsWith("-wal") && !name.endsWith("-shm"),
-  );
+  const rollbackName = findRollbackFileName(dirname(dbPath), "main");
   assert.ok(rollbackName);
   const rollbackPath = join(dirname(dbPath), rollbackName);
   assert.equal(readFileSync(rollbackPath, "utf-8"), "old");
@@ -420,9 +427,7 @@ test("sidecar復元の再退避にも失敗した場合は両例外をsuppressed
   assert.equal(existsSync(dbPath), true);
   assert.equal(readFileSync(dbPath, "utf-8"), "old");
   assert.equal(existsSync(`${dbPath}-wal`), false);
-  const rollbackWalName = readdirSync(dirname(dbPath)).find(
-    (name) => name.includes(".rollback-") && name.endsWith("-wal"),
-  );
+  const rollbackWalName = findRollbackFileName(dirname(dbPath), "wal");
   assert.ok(rollbackWalName);
   assert.equal(readFileSync(join(dirname(dbPath), rollbackWalName), "utf-8"), "old-wal");
 });
