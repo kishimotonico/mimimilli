@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {
+  existsSync,
   mkdirSync,
   readFileSync,
   readdirSync,
@@ -7,7 +8,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
 import { gzipSync } from "node:zlib";
 import { Database } from "bun:sqlite";
 import { test } from "node:test";
@@ -15,6 +16,7 @@ import {
   DEFAULT_DLSITE_CACHE_MAX_EXPANDED_BYTES,
   DEFAULT_DLSITE_CACHE_MAX_TRANSFER_BYTES,
   DEFAULT_DLSITE_CACHE_TTLS_MS,
+  DLSITE_CACHE_MEMORY_PATH,
   DlsiteCache,
   normalizeDlsiteProductCode,
   resolveDlsiteCacheConfig,
@@ -613,6 +615,66 @@ test("DLsiteキャッシュCLI: export --dir は1件の失敗で全体を止め�
   assert.equal(result.failed, 1);
   assert.equal(result.failures[0]?.file, "RJ12.html.gz");
   assert.deepEqual(readdirSync(archiveDir), ["RJ123456.html.gz"]);
+});
+
+test("DLsiteキャッシュ: 相対パスでも生成に成功する", (t) => {
+  const directory = makeTestDirectory("dlsite-cache-relative");
+  t.after(directory.cleanup);
+  const previousCwd = process.cwd();
+  process.chdir(directory.path);
+  t.after(() => process.chdir(previousCwd));
+  const cache = new DlsiteCache({ path: "cache.sqlite" });
+  t.after(() => cache.close());
+  assert.equal(cache.resolve({ productCode: "RJ123456" }).kind, "miss");
+});
+
+test("DLsiteキャッシュ: 既存ディレクトリを出力先に指定しても成功する", (t) => {
+  const directory = makeTestDirectory("dlsite-cache-existing-dir");
+  t.after(directory.cleanup);
+  const cachePath = join(directory.path, "cache.sqlite");
+  mkdirSync(directory.path, { recursive: true });
+  const cache = new DlsiteCache({ path: cachePath });
+  t.after(() => cache.close());
+  assert.equal(cache.resolve({ productCode: "RJ123456" }).kind, "miss");
+});
+
+test("DLsiteキャッシュ: 同一出力先への並行生成でEEXISTを投げない", async (t) => {
+  const directory = makeTestDirectory("dlsite-cache-parallel");
+  t.after(directory.cleanup);
+  const cachePath = join(directory.path, "cache.sqlite");
+  const caches = await Promise.all(
+    Array.from({ length: 8 }, () => Promise.resolve(new DlsiteCache({ path: cachePath }))),
+  );
+  t.after(() => caches.forEach((cache) => cache.close()));
+  assert.equal(caches.length, 8);
+});
+
+test("DLsiteキャッシュ: 相対パスは絶対パスとして保持する", (t) => {
+  const directory = makeTestDirectory("dlsite-cache-absolute-path");
+  t.after(directory.cleanup);
+  const previousCwd = process.cwd();
+  process.chdir(directory.path);
+  t.after(() => process.chdir(previousCwd));
+  const relativePath = "cache.sqlite";
+  const cache = new DlsiteCache({ path: relativePath });
+  t.after(() => cache.close());
+  assert.ok(isAbsolute(cache.config.path));
+  assert.equal(cache.config.path, resolve(directory.path, relativePath));
+});
+
+test("DLsiteキャッシュ: :memory: はファイルシステム上にDBファイルを作らない", (t) => {
+  const memoryFile = join(process.cwd(), DLSITE_CACHE_MEMORY_PATH);
+  const cache = new DlsiteCache({ path: DLSITE_CACHE_MEMORY_PATH });
+  t.after(() => cache.close());
+  assert.equal(cache.config.path, DLSITE_CACHE_MEMORY_PATH);
+  assert.ok(!existsSync(memoryFile));
+  cache.recordSuccess({
+    productCode: "RJ123456",
+    outcome: "ok",
+    contentType: "text/html",
+    html: VALID_HTML,
+  });
+  assert.ok(!existsSync(memoryFile));
 });
 
 test("DLsiteカバーキャッシュ: 正規化URLのhashごとに非圧縮バイト列を保持する", (t) => {
