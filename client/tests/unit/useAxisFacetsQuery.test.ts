@@ -91,11 +91,12 @@ describe("useAxisFacetsQuery の自軸除外フィルタ適用", () => {
     );
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(axesCallUrls(fetchMock)).toHaveLength(1);
+    await waitFor(() => expect(queryClient.isFetching()).toBe(0));
+    fetchMock.mockClear();
 
     rerender({ selectedTags: ["サークル/月白製作所"] });
 
-    await waitFor(() => expect(axesCallUrls(fetchMock)).toHaveLength(2));
-    expect(axesCallUrls(fetchMock).at(-1)).toContain("tags=");
+    await waitFor(() => expect(axesCallUrls(fetchMock)).toHaveLength(1));
+    expect(axesCallUrls(fetchMock)[0]).toContain("tags=");
   });
 });

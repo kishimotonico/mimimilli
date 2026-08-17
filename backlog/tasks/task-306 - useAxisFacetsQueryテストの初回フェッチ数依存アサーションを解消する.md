@@ -1,10 +1,10 @@
 ---
 id: TASK-306
 title: useAxisFacetsQueryテストの初回フェッチ数依存アサーションを解消する
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-08-11 10:09'
-updated_date: '2026-08-17 19:13'
+updated_date: '2026-08-17 20:52'
 labels: []
 dependencies: []
 ordinal: 316000
@@ -18,7 +18,7 @@ TASK-228でsmartFolderWorksPaging.test.tsのフレーキーを解消した際、
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 useAxisFacetsQuery.test.tsが初回マウント時の累計フェッチ数に依存しない形になっている
-- [ ] #2 検証対象（rerender後に新しいクエリキーでフェッチし直すこと）が従来と同等以上に保たれている
-- [ ] #3 client側テストが通る
+- [x] #1 useAxisFacetsQuery.test.tsが初回マウント時の累計フェッチ数に依存しない形になっている
+- [x] #2 検証対象（rerender後に新しいクエリキーでフェッチし直すこと）が従来と同等以上に保たれている
+- [x] #3 client側テストが通る
 <!-- AC:END -->
