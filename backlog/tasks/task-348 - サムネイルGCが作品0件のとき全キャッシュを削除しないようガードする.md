@@ -1,10 +1,10 @@
 ---
 id: TASK-348
 title: サムネイルGCを完全なスナップショット構築時のみ実行するようガードする
-status: Done
+status: In Progress
 assignee: []
 created_date: '2026-08-17 16:12'
-updated_date: '2026-08-17 17:04'
+updated_date: '2026-08-17 17:19'
 labels: []
 dependencies: []
 ordinal: 358000
@@ -39,7 +39,10 @@ ordinal: 358000
 - [x] #5 正常時（完全なスナップショット構築成功時）の孤児.webp・孤児.tmp-削除の既存挙動は維持され、既存のGCテストが通る
 - [x] #6 空のcatalog＋既存キャッシュから開始し、全件メタ不正スキャン直後・メタ修正後の再スキャン後ともキャッシュが残ることを検証するテストを追加する
 - [x] #7 作品あり・全作品カバーなし（正常な空coverEntries）の場合はGCが実行されることをテストで確認する
+- [ ] #8 coverImageが設定されているのに寸法未計測（cover: null）の作品が1件以上ある場合、その回の削除フェーズが実行されない。メタにcoverImage自体が無い正常ケースではGCが実行される
 <!-- AC:END -->
+
+
 
 ## Implementation Notes
 
