@@ -15,7 +15,7 @@ async function setup(t: TestContext, chunkSizeBytes?: number) {
   t.after(lib.cleanup);
   // ルート直下（作品フォルダー外）に「秘密ファイル」を置き、トラバーサルの検証に使う
   writeFileSync(join(lib.root, "secret.txt"), "library-secret");
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
+  const adapter = lib.own(createTestRealAdapter({ database: { kind: "memory" } }));
   const app = createApp(adapter, chunkSizeBytes ? { media: { chunkSizeBytes } } : undefined);
   await adapter.updateSettings({ rootFolder: lib.root });
   await scanAndRegisterCandidates(adapter);
@@ -147,7 +147,7 @@ test("メディア解決: getWork・probe cache問い合わせを伴わない", 
     return originalFetchProbeCache.apply(this, args);
   };
 
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   const app = createApp(adapter);
   await adapter.updateSettings({ rootFolder: root });
   await adapter.scan();

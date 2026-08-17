@@ -20,7 +20,7 @@ async function setup(t: TestContext) {
   raw.myNote = "ユーザーの手書きメモ";
   writeFileSync(metaPath, JSON.stringify(raw, null, 2));
 
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
+  const adapter = lib.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
   return { ...lib, adapter, metaPath };
@@ -202,7 +202,7 @@ test("単一ファイル形式作品の patch が同居する mimimilli.json を
     ),
   );
 
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
+  const adapter = dir.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await adapter.updateSettings({ rootFolder: dir.path });
   await adapter.scan();
 

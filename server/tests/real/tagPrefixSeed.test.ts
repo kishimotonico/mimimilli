@@ -1,20 +1,19 @@
 // real アダプタの prefix 定義 seed（ADR-0005）のテスト。
 // seed はファイル DB の初回のみで、全削除しても再 seed されないことを確認する。
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { DEFAULT_TAG_PREFIXES } from "@mimimilli/shared";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
+import { makeTestDirectory } from "../helpers/sampleLibrary.ts";
 
 test("初回起動で DEFAULT_TAG_PREFIXES が seed され、全削除後の再起動で再 seed されない", async (t) => {
-  const dir = mkdtempSync(join(tmpdir(), "mimimilli-tagprefix-"));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const directory = makeTestDirectory("tagprefix");
+  t.after(directory.cleanup);
   const database = {
     kind: "files" as const,
-    catalogPath: join(dir, "catalog.sqlite"),
-    userPath: join(dir, "user.sqlite"),
+    catalogPath: join(directory.path, "catalog.sqlite"),
+    userPath: join(directory.path, "user.sqlite"),
   };
 
   const adapter = createTestRealAdapter({ database });
@@ -31,22 +30,22 @@ test("初回起動で DEFAULT_TAG_PREFIXES が seed され、全削除後の再�
 
   // 再起動相当: 同じ DB ファイルでアダプタを作り直す
   adapter.close();
-  const reopened = createTestRealAdapter({ database });
-  t.after(() => reopened.close());
+  const reopened = directory.own(createTestRealAdapter({ database }));
   assert.deepEqual(await reopened.listTagPrefixes(), []);
 });
 
 test("real アダプタで prefix 定義の CRUD が動く", async (t) => {
-  const dir = mkdtempSync(join(tmpdir(), "mimimilli-tagprefix-"));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
-  const adapter = createTestRealAdapter({
-    database: {
-      kind: "files",
-      catalogPath: join(dir, "catalog.sqlite"),
-      userPath: join(dir, "user.sqlite"),
-    },
-  });
-  t.after(() => adapter.close());
+  const directory = makeTestDirectory("tagprefix-crud");
+  t.after(directory.cleanup);
+  const adapter = directory.own(
+    createTestRealAdapter({
+      database: {
+        kind: "files",
+        catalogPath: join(directory.path, "catalog.sqlite"),
+        userPath: join(directory.path, "user.sqlite"),
+      },
+    }),
+  );
 
   const created = await adapter.createTagPrefix({
     prefix: "気分",

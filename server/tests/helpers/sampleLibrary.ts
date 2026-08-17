@@ -36,26 +36,55 @@ export function writeSampleCover(path: string): void {
   writeFileSync(path, Buffer.from(SAMPLE_COVER_JPEG_BASE64, "base64"));
 }
 
-export interface SampleLibrary {
+export interface TestResourceScope {
+  own<T extends { close(): void }>(resource: T): T;
+  ownFn<T>(resource: T, close: (resource: T) => void): T;
+  cleanup(): void;
+}
+
+export function makeTestScope(): TestResourceScope {
+  const closers: Array<() => void> = [];
+  return {
+    own<T extends { close(): void }>(resource: T): T {
+      closers.push(() => resource.close());
+      return resource;
+    },
+    ownFn<T>(resource: T, close: (resource: T) => void): T {
+      closers.push(() => close(resource));
+      return resource;
+    },
+    cleanup(): void {
+      for (let index = closers.length - 1; index >= 0; index -= 1) {
+        closers[index]!();
+      }
+    },
+  };
+}
+
+export interface TestDirectory extends TestResourceScope {
+  path: string;
+}
+
+/** os.tmpdir() 配下にテスト専用ディレクトリを作る。呼び出し側は t.after(directory.cleanup) を1回登録する。 */
+export function makeTestDirectory(name: string): TestDirectory {
+  const path = mkdtempSync(join(tmpdir(), `mimimilli-${name}-`));
+  const scope = makeTestScope();
+  return {
+    path,
+    own: scope.own.bind(scope),
+    ownFn: scope.ownFn.bind(scope),
+    cleanup(): void {
+      scope.cleanup();
+      rmSync(path, { recursive: true, force: true });
+    },
+  };
+}
+
+export interface SampleLibrary extends TestDirectory {
   baseDir: string;
   root: string;
   /** 既存メタを持つ作品の ID */
   existingWorkId: string;
-  cleanup: () => void;
-}
-
-export interface TestDirectory {
-  path: string;
-  cleanup: () => void;
-}
-
-/** os.tmpdir() 配下にテスト専用ディレクトリを作る。呼び出し側は t.after で cleanup を登録する。 */
-export function makeTestDirectory(name: string): TestDirectory {
-  const path = mkdtempSync(join(tmpdir(), `mimimilli-${name}-`));
-  return {
-    path,
-    cleanup: () => rmSync(path, { recursive: true, force: true }),
-  };
 }
 
 /**
@@ -107,5 +136,13 @@ export function makeSampleLibrary(): SampleLibrary {
     ),
   );
 
-  return { baseDir, root, existingWorkId, cleanup: directory.cleanup };
+  return {
+    path: baseDir,
+    baseDir,
+    root,
+    existingWorkId,
+    own: directory.own.bind(directory),
+    ownFn: directory.ownFn.bind(directory),
+    cleanup: directory.cleanup.bind(directory),
+  };
 }

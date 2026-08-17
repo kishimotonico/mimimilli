@@ -92,7 +92,7 @@ test("migration 0006: 旧実装が0秒で保存したaudio_probe_cacheをNULLへ
   sqlite.close();
 
   const userPath = join(directory.path, "db", "user.sqlite");
-  const db = openDb({ kind: "files", catalogPath, userPath });
+  const db = directory.own(openDb({ kind: "files", catalogPath, userPath }));
   const rows = db.sqlite
     .query("SELECT path, duration_sec AS durationSec FROM audio_probe_cache ORDER BY path")
     .all() as Array<{ path: string; durationSec: number | null }>;
@@ -104,7 +104,6 @@ test("migration 0006: 旧実装が0秒で保存したaudio_probe_cacheをNULLへ
     .query(`SELECT COUNT(*) AS count FROM pragma_table_info('works') WHERE name = 'meta_path'`)
     .get() as { count: number };
   assert.equal(metaPathColumn.count, 1);
-  db.close();
 });
 
 test("migration 0006: 既存作品のfingerprintを無効化し次回スキャンで全playlistを再処理させる", (t) => {

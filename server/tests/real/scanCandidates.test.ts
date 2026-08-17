@@ -27,8 +27,7 @@ test("listScanCandidatesは最後のスキャン結果を返し、再帰走査�
   mkdirSync(initial, { recursive: true });
   writeWav(join(initial, "track.wav"), 1);
 
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
-  t.after(() => adapter.close());
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await adapter.updateSettings({ rootFolder: root });
   await adapter.scan();
 
@@ -61,8 +60,7 @@ test("選択した候補だけを登録し、除外した候補は以後返さ�
   writeWav(join(selected, "track.wav"), 1);
   writeWav(join(excluded, "track.wav"), 1);
 
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
-  t.after(() => adapter.close());
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await adapter.updateSettings({ rootFolder: root });
   const beforeScan = snapshotTree(root);
   const scanned = await adapter.scan();
@@ -102,8 +100,7 @@ test("stale候補を含む一括登録は書込み前に全件拒否する", asy
   const current = join(root, "現在の候補");
   mkdirSync(current, { recursive: true });
   writeWav(join(current, "track.wav"), 1);
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
-  t.after(() => adapter.close());
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await adapter.updateSettings({ rootFolder: root });
 
   await assert.rejects(
@@ -130,12 +127,13 @@ test("files-kind: 除外→再スキャン→除外解除で候補が復活す�
     catalogPath: join(directory.path, "data", "db", "catalog.sqlite"),
     userPath: join(directory.path, "data", "db", "user.sqlite"),
   };
-  const adapter = createTestRealAdapter({
-    database,
-    dataRoot: join(directory.path, "data"),
-    thumbnailCacheDir: join(directory.path, "data", "cache", "thumbnails"),
-  });
-  t.after(() => adapter.close());
+  const adapter = directory.own(
+    createTestRealAdapter({
+      database,
+      dataRoot: join(directory.path, "data"),
+      thumbnailCacheDir: join(directory.path, "data", "cache", "thumbnails"),
+    }),
+  );
   await adapter.updateSettings({ rootFolder: root });
   await adapter.scan();
   await adapter.excludeScanCandidates(["除外対象"]);
@@ -175,10 +173,6 @@ test("候補除外はuser DBを再オープンしても保持される", async (
   await first.excludeScanCandidates(["除外対象"]);
   first.close();
 
-  const reopened = createTestRealAdapter(options);
-  try {
-    assert.deepEqual(await reopened.listScanCandidates(), []);
-  } finally {
-    reopened.close();
-  }
+  const reopened = directory.own(createTestRealAdapter(options));
+  assert.deepEqual(await reopened.listScanCandidates(), []);
 });

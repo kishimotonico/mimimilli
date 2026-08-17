@@ -53,7 +53,7 @@ test("ルート読取失敗: スキャンがエラー終了し missing 更新さ
     JSON.stringify(metaWithSingleTrack(workId, "work")),
   );
 
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await adapter.updateSettings({ rootFolder: root });
   await adapter.scan();
 
@@ -88,8 +88,7 @@ test("サブツリー読取失敗: 配下の既存作品は missing 化されず
     writeFileSync(join(dir, "mimimilli.json"), JSON.stringify(metaWithSingleTrack(id, title)));
   }
 
-  const db = openDb({ kind: "memory" });
-  t.after(() => db.close());
+  const db = directory.own(openDb({ kind: "memory" }));
   const repos = createWorkRepos(db);
   const scanner = new Scanner(db, repos);
   await scanner.scan(root);
@@ -129,8 +128,7 @@ test("サブツリー読取失敗: 読取可能な削除作品は引き続き mi
     writeFileSync(join(dir, "mimimilli.json"), JSON.stringify(metaWithSingleTrack(id, title)));
   }
 
-  const db = openDb({ kind: "memory" });
-  t.after(() => db.close());
+  const db = directory.own(openDb({ kind: "memory" }));
   const repos = createWorkRepos(db);
   const scanner = new Scanner(db, repos);
   await scanner.scan(root);

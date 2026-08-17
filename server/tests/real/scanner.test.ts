@@ -22,12 +22,17 @@ import { Scanner } from "../../src/adapters/real/scanner.ts";
 import { audioProbeCache } from "../../src/adapters/real/catalogSchema.ts";
 import { readMetaSource } from "../../src/adapters/real/meta.ts";
 import { createWorkRepos, getTestWork, saveTestResume } from "../helpers/workTestUtils.ts";
-import { makeSampleLibrary, makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
+import {
+  makeSampleLibrary,
+  makeTestDirectory,
+  makeTestScope,
+  writeWav,
+} from "../helpers/sampleLibrary.ts";
 
 async function setup(t: TestContext) {
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
+  const adapter = lib.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await adapter.updateSettings({ rootFolder: lib.root });
   const initial = await adapter.scan();
   const result = await adapter.registerScanCandidates(
@@ -185,7 +190,7 @@ test("UUID 重複: 後に検出された方が再採番されメタファイル�
       }),
     );
   }
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
+  const adapter = lib.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await adapter.updateSettings({ rootFolder: root });
   const result = await adapter.scan();
 
@@ -228,7 +233,7 @@ test("大量ディレクトリの走査中、walking フェーズの進捗イベ
   for (let i = 0; i < dirCount; i++) {
     mkdirSync(join(root, `dir-${i}`), { recursive: true });
   }
-  const adapter = createTestRealAdapter({ database: { kind: "memory" } });
+  const adapter = lib.own(createTestRealAdapter({ database: { kind: "memory" } }));
   await adapter.updateSettings({ rootFolder: root });
 
   const walkingEvents: { processed: number; total: number }[] = [];
@@ -362,8 +367,7 @@ test("増分スキャン: mimimilli.json bytesが変われば未知キーだけ�
       defaultPlaylistId: playlistId,
     }),
   );
-  const db = openDb({ kind: "memory" });
-  t.after(() => db.close());
+  const db = directory.own(openDb({ kind: "memory" }));
   const { query, catalog, user } = createWorkRepos(db);
   const scanner = new Scanner(db, { query, catalog, user });
   await scanner.scan(root);
@@ -586,8 +590,7 @@ test("error作品の再評価時はprobe cacheをバイパスし誤durationか�
     }),
   );
 
-  const db = openDb({ kind: "memory" });
-  t.after(() => db.close());
+  const db = directory.own(openDb({ kind: "memory" }));
   const { query, catalog, user } = createWorkRepos(db);
   const scanner = new Scanner(db, { query, catalog, user });
 
@@ -695,8 +698,7 @@ test("probe cache は一括取得され作品数に比例しない", async (t) =
     );
   }
 
-  const db = openDb({ kind: "memory" });
-  t.after(() => db.close());
+  const db = directory.own(openDb({ kind: "memory" }));
   const { query, catalog, user } = createWorkRepos(db);
   const scanner = new Scanner(db, { query, catalog, user });
 
@@ -726,8 +728,9 @@ test("probe cache は一括取得され作品数に比例しない", async (t) =
 });
 
 test("probe cache一括取得は空集合を問い合わせず、重複排除して900件境界で分割する", (t) => {
-  const db = openDb({ kind: "memory" });
-  t.after(() => db.close());
+  const scope = makeTestScope();
+  t.after(scope.cleanup);
+  const db = scope.own(openDb({ kind: "memory" }));
   const { query } = createWorkRepos(db);
   let queryCount = 0;
   const originalQuery = db.sqlite.query.bind(db.sqlite);
@@ -764,8 +767,7 @@ test("変更済みの複数resume作品でもprobe cache SELECTは一括取得�
       JSON.stringify(metaWithSingleTrack(id, `work-${index}`)),
     );
   }
-  const db = openDb({ kind: "memory" });
-  t.after(() => db.close());
+  const db = directory.own(openDb({ kind: "memory" }));
   const { query, catalog, user } = createWorkRepos(db);
   const scanner = new Scanner(db, { query, catalog, user });
   await scanner.scan(root);
@@ -821,8 +823,7 @@ test("scanのpublishは件数にかかわらず単一catalog transactionで処�
     );
   }
 
-  const db = openDb({ kind: "memory" });
-  t.after(() => db.close());
+  const db = directory.own(openDb({ kind: "memory" }));
   const { query, catalog, user } = createWorkRepos(db);
   const scanner = new Scanner(db, { query, catalog, user }, { upsertBatchSize: 2 });
 
@@ -847,8 +848,9 @@ test("scanのpublishは件数にかかわらず単一catalog transactionで処�
 });
 
 test("upsertBatchSizeは有限の正整数だけを受け付ける", (t) => {
-  const db = openDb({ kind: "memory" });
-  t.after(() => db.close());
+  const scope = makeTestScope();
+  t.after(scope.cleanup);
+  const db = scope.own(openDb({ kind: "memory" }));
   const repos = createWorkRepos(db);
   for (const upsertBatchSize of [0, -1, 1.5, Number.POSITIVE_INFINITY]) {
     assert.throws(() => new Scanner(db, repos, { upsertBatchSize }), /有限の正整数/);
@@ -873,8 +875,7 @@ test("staging後にmimimilli.jsonが変わった作品はpublishせず旧投影�
   );
   writeFileSync(join(workDir, "cover.jpg"), "cover");
 
-  const db = openDb({ kind: "memory" });
-  t.after(() => db.close());
+  const db = directory.own(openDb({ kind: "memory" }));
   const repos = createWorkRepos(db);
   const initial = new Scanner(db, repos, { measureCover: async () => null });
   await initial.scan(root);
@@ -916,8 +917,7 @@ test("単一作品再投影は他作品のpresenceとidentity conflict診断を�
     writeWav(join(dir, "track.wav"), 1);
     writeFileSync(join(dir, "mimimilli.json"), JSON.stringify(metaWithSingleTrack(id, title)));
   }
-  const db = openDb({ kind: "memory" });
-  t.after(() => db.close());
+  const db = directory.own(openDb({ kind: "memory" }));
   const repos = createWorkRepos(db);
   const scanner = new Scanner(db, repos, { measureCover: async () => null });
   await scanner.scan(root);
@@ -956,8 +956,7 @@ test("バッチ途中のcatalog書込失敗はcatalogのみロールバックさ
       ),
     );
   }
-  const db = openDb({ kind: "memory" });
-  t.after(() => db.close());
+  const db = directory.own(openDb({ kind: "memory" }));
   const { query, catalog, user } = createWorkRepos(db);
   const scanner = new Scanner(db, { query, catalog, user }, { upsertBatchSize: 2 });
   const originalCatalogUpsert = catalog.upsertWorkCatalog.bind(catalog);
@@ -1013,8 +1012,7 @@ test("user先コミット後のcatalog失敗はuser孤児を残すがopenDbは�
   await assert.rejects(scanner.scan(root), /injected catalog write failure/);
   db.close();
 
-  const reopened = openDb({ kind: "files", catalogPath, userPath });
-  t.after(() => reopened.close());
+  const reopened = directory.own(openDb({ kind: "files", catalogPath, userPath }));
   const reopenedRepos = createWorkRepos(reopened);
   const { catalog: reopenedCatalog } = reopenedRepos;
   assert.equal(reopenedCatalog.countByStatus("ok"), 0);
