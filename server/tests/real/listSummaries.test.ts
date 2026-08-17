@@ -3,10 +3,16 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { ResolvedPlaylist, Work } from "@mimimilli/shared";
+import { emptyDlsiteState } from "@mimimilli/shared";
 import { openDb, type Db } from "../../src/adapters/real/db.ts";
 import { workDlsite } from "../../src/adapters/real/catalogSchema.ts";
 import type { WorkQueryRepository } from "../../src/adapters/real/workQueryRepository.ts";
-import { upsertTestWork, resolvedDuration, createWorkRepos } from "../helpers/workTestUtils.ts";
+import {
+  upsertTestWork,
+  resolvedDuration,
+  createWorkRepos,
+  folderMetaPath,
+} from "../helpers/workTestUtils.ts";
 import { eq } from "drizzle-orm";
 
 function makePlaylist(trackCount: number, id = crypto.randomUUID()): ResolvedPlaylist {
@@ -147,5 +153,65 @@ test("work_dlsite 行がない作品は emptyDlsiteState() になる", () => {
     errorKind: null,
     appliedTags: [],
   });
+  db.close();
+});
+
+function unmeasuredWork(id: string): Work {
+  const playlistId = crypto.randomUUID();
+  return {
+    id,
+    title: `作品 ${id}`,
+    cover: null,
+    coverKind: "unmeasured",
+    coverImage: "cover.jpg",
+    status: "ok",
+    physicalPath: `/library/${id}`,
+    totalDurationSec: 10,
+    addedAt: "2026-07-19T00:00:00.000Z",
+    errorMessage: null,
+    urls: [],
+    tags: [],
+    defaultPlaylistId: playlistId,
+    createdAt: null,
+    playlists: [
+      {
+        id: playlistId,
+        name: "default",
+        tracks: [
+          {
+            id: crypto.randomUUID(),
+            title: "track",
+            file: "track.wav",
+            ...resolvedDuration(60),
+          },
+        ],
+      },
+    ],
+    bookmarked: false,
+    lastPlayedAt: null,
+    resume: null,
+    dlsite: emptyDlsiteState(),
+  };
+}
+
+test("listSummaries: 寸法未計測カバーがないとき unmeasuredCovers は空", () => {
+  const db = openDb({ kind: "memory" });
+  const { query, catalog, user } = createWorkRepos(db);
+  upsertTestWork(catalog, user, sampleWork("w-1", [makePlaylist(1)], null));
+  assert.deepEqual(query.listSummaries().unmeasuredCovers, []);
+  db.close();
+});
+
+test("listSummaries: 寸法未計測カバーの作品IDを返す", () => {
+  const db = openDb({ kind: "memory" });
+  const { query, catalog, user } = createWorkRepos(db);
+  upsertTestWork(catalog, user, sampleWork("w-none", [makePlaylist(1)], null));
+  const unmeasured = unmeasuredWork("w-unmeasured");
+  user.upsertWorkUserState(unmeasured);
+  catalog.upsertWorkCatalog(unmeasured, {
+    metaPath: folderMetaPath(unmeasured.physicalPath),
+    cover: { image: "cover.jpg", dimensions: null },
+  });
+  assert.deepEqual(query.listSummaries().unmeasuredCovers, ["w-unmeasured"]);
   db.close();
 });

@@ -27,7 +27,7 @@ test("updateSettings は receiver なしで呼び出せる", async () => {
     listIdentityConflicts: () => [],
   };
   const query = {
-    listSummaries: () => ({ summaries: [], skipped: [] }),
+    listSummaries: () => ({ summaries: [], skipped: [], unmeasuredCovers: [] }),
   };
 
   try {
