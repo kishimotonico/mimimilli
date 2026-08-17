@@ -1,9 +1,10 @@
 ---
 id: TASK-341
 title: DLsite系serverテストの並列実行時フレーキー（SQLITE_BUSYと5秒タイムアウト）を解消する
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-08-14 11:50'
+updated_date: '2026-08-17 19:13'
 labels: []
 dependencies: []
 priority: medium
@@ -36,3 +37,9 @@ run-p でserver側が落ちるとclient側がSIGTERMで打ち切られ、client 
 - [ ] #2 各失敗の原因が特定されタスクのnotesに記録されている
 - [ ] #3 pnpm test（server/client同時実行）を3回連続で実行してserver側が安定して通る
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+TASK-345のバッチ検証中に観測した挙動（統括による実測、2026-08-17）: tests/real/dlsite.test.ts の「同一RJコードは同じ実行・別実行・adapter再オープン後もHTTPを1回に集約する」のSQLITE_BUSYは、負荷と逆相関する。cd server && bun test tests/real を単独で10回連続実行するとベース（345未適用）で10回中5回、345適用後で10回中6回失敗（同一シグネチャ・144 pass / 33 fail で以降打ち切り）。一方、2つのworktreeで同じコマンドを同時に走らせた条件では両方とも6回中0回失敗でクリア。負荷が高い方が落ちにくいという逆相関が出ており、単なるロック競合では説明が付かない。タイミング依存の切り分けに使える可能性がある。
+<!-- SECTION:NOTES:END -->

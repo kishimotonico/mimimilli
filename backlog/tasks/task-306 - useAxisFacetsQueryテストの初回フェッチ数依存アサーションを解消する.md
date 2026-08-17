@@ -1,9 +1,10 @@
 ---
 id: TASK-306
 title: useAxisFacetsQueryテストの初回フェッチ数依存アサーションを解消する
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-08-11 10:09'
+updated_date: '2026-08-17 19:13'
 labels: []
 dependencies: []
 ordinal: 316000
