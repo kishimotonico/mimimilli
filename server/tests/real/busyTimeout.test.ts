@@ -12,6 +12,15 @@ import type { BusyTimeoutWriteInput } from "./busyTimeoutWriteWorker.ts";
 const WORK_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const LOCK_HOLD_MS = 150;
 
+function workerFailureError(phase: string, event: Event): Error {
+  const { message, filename, lineno, colno, error } = event as ErrorEvent;
+  const detail = error ?? new Error(message);
+  const location = filename ? ` (${filename}:${lineno}:${colno})` : "";
+  const stack = detail.stack ?? (message !== detail.message ? message : undefined);
+  const body = stack ? `${detail.message}\n${stack}` : detail.message;
+  return new Error(`Worker failed to ${phase}${location}: ${body}`);
+}
+
 function sampleWork(): Work {
   const playlistId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
   return {
@@ -57,6 +66,25 @@ function sampleWork(): Work {
   };
 }
 
+function waitForWorkerMessage(
+  worker: Worker,
+  types: string[],
+  phase: string,
+): Promise<{ type: string; ok?: boolean; elapsedMs?: number; message?: string }> {
+  const expected = new Set(types);
+  return new Promise((resolve, reject) => {
+    const onMessage = (
+      event: MessageEvent<{ type: string; ok?: boolean; elapsedMs?: number; message?: string }>,
+    ) => {
+      if (!expected.has(event.data.type)) return;
+      worker.removeEventListener("message", onMessage);
+      resolve(event.data);
+    };
+    worker.addEventListener("message", onMessage);
+    worker.addEventListener("error", (event) => reject(workerFailureError(phase, event)));
+  });
+}
+
 async function runContendedWrite(input: BusyTimeoutWriteInput): Promise<{
   ok: boolean;
   elapsedMs: number;
@@ -66,40 +94,17 @@ async function runContendedWrite(input: BusyTimeoutWriteInput): Promise<{
     type: "module",
   });
   try {
-    await new Promise<void>((resolve, reject) => {
-      const onMessage = (event: MessageEvent<{ type: string }>) => {
-        if (event.data.type === "ready") {
-          worker.removeEventListener("message", onMessage);
-          resolve();
-        }
-      };
-      worker.addEventListener("message", onMessage);
-      worker.addEventListener("error", () => reject(new Error("Worker failed to start")));
-    });
+    await waitForWorkerMessage(worker, ["ready"], "start");
 
     const locker = new Database(input.userPath);
     locker.exec("BEGIN IMMEDIATE");
     locker.run("UPDATE work_states SET bookmarked = 0 WHERE work_id = ?", [input.workId]);
 
-    const resultPromise = new Promise<{
-      ok: boolean;
-      elapsedMs: number;
-      message?: string;
-    }>((resolve, reject) => {
-      const onMessage = (
-        event: MessageEvent<{ type: string; ok?: boolean; elapsedMs?: number; message?: string }>,
-      ) => {
-        if (event.data.type !== "result") return;
-        worker.removeEventListener("message", onMessage);
-        resolve({
-          ok: event.data.ok === true,
-          elapsedMs: event.data.elapsedMs ?? 0,
-          message: event.data.message,
-        });
-      };
-      worker.addEventListener("message", onMessage);
-      worker.addEventListener("error", () => reject(new Error("Worker failed during write")));
-    });
+    const resultPromise = waitForWorkerMessage(worker, ["result"], "write").then((event) => ({
+      ok: event.ok === true,
+      elapsedMs: event.elapsedMs ?? 0,
+      message: event.message,
+    }));
 
     worker.postMessage({ type: "write", input });
     await new Promise((resolve) => setTimeout(resolve, LOCK_HOLD_MS));

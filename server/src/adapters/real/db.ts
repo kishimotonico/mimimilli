@@ -96,6 +96,7 @@ function openVersionedDatabase(
   try {
     if (!isMemory) mkdirSync(dirname(path), { recursive: true });
     sqlite = new Database(path, isMemory ? SQLITE_URI_FLAGS : { create: true });
+    applySqliteBusyTimeout(sqlite);
     const current = sqlite.query("PRAGMA user_version").get() as { user_version: number };
     currentVersion = current.user_version;
   } catch (error) {
@@ -125,6 +126,7 @@ function openVersionedDatabase(
     moveDatabaseToBackup(path, context.backupDir, context.kind, "version-mismatch");
     try {
       sqlite = new Database(path, { create: true });
+      applySqliteBusyTimeout(sqlite);
     } catch (error) {
       logDbOpenFailure(kind, path, "open", error);
     }
@@ -133,7 +135,6 @@ function openVersionedDatabase(
   try {
     sqlite.exec("PRAGMA journal_mode = WAL");
     sqlite.exec("PRAGMA foreign_keys = ON");
-    applySqliteBusyTimeout(sqlite);
   } catch (error) {
     logDbOpenFailure(kind, path, "pragma", error);
   }
@@ -149,10 +150,10 @@ function openVersionedDatabase(
         sqlite.close();
         try {
           const candidate = new Database(candidatePath);
+          applySqliteBusyTimeout(candidate);
           try {
             candidate.exec("PRAGMA journal_mode = DELETE");
             candidate.exec("PRAGMA foreign_keys = ON");
-            applySqliteBusyTimeout(candidate);
             executeSqliteMigrations(candidate, migrationsFolder);
           } finally {
             candidate.close();
@@ -172,9 +173,9 @@ function openVersionedDatabase(
         }
         replaceDatabaseWithCandidate(path, candidatePath);
         sqlite = new Database(path);
+        applySqliteBusyTimeout(sqlite);
         sqlite.exec("PRAGMA journal_mode = WAL");
         sqlite.exec("PRAGMA foreign_keys = ON");
-        applySqliteBusyTimeout(sqlite);
       } else {
         executeSqliteMigrations(sqlite, migrationsFolder);
       }
