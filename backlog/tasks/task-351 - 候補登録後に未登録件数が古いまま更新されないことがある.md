@@ -1,10 +1,10 @@
 ---
 id: TASK-351
 title: 候補登録後に未登録件数が古いまま更新されないことがある
-status: Done
+status: In Progress
 assignee: []
 created_date: '2026-08-17 21:08'
-updated_date: '2026-08-18 00:59'
+updated_date: '2026-08-18 03:03'
 labels: []
 dependencies: []
 ordinal: 361000
@@ -53,7 +53,11 @@ client/src/features/scan/model/useScanCandidatesCache.ts の readScanCandidates 
 - [x] #2 原因構造が修正されている（暗黙フォールバックの存在意義を確認したうえでの判断がタスクnotesに記録されている）
 - [x] #3 client側テストが通り、smokeフルスイートを5回連続実行して library.smoke.spec.ts の候補登録テストが失敗しない
 - [x] #4 巻き戻しの経路が実測で特定されている（handleScanTerminalが登録の約35ms後にスキャン時点のスナップショットで上書き。同一finishedAtの二重呼び出しではなく遅延到着）。原因が再現テストで縛られている
+- [ ] #5 候補キャッシュが未確定（bootstrap応答前）の状態で登録・除外を行っても、表示中の候補が消去されない。部分更新の前提が無い場合の扱いが設計として決まっている
+- [ ] #6 サーバー再取得が並行したとき、解決順ではなく発行順で後発が優先される（古い先発応答が後着で勝たない）
 <!-- AC:END -->
+
+
 
 
 
