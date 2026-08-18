@@ -4,7 +4,7 @@ title: DLsite系serverテストの並列実行時フレーキー（SQLITE_BUSY�
 status: In Progress
 assignee: []
 created_date: '2026-08-14 11:50'
-updated_date: '2026-08-17 20:52'
+updated_date: '2026-08-18 01:15'
 labels: []
 dependencies: []
 priority: medium
@@ -38,8 +38,6 @@ run-p でserver側が落ちるとclient側がSIGTERMで打ち切られ、client 
 - [x] #3 CPU負荷下（stress-ngは本環境に未インストールのため yes プロセス8本で代替）でtests/realを10回連続実行して安定して通る
 <!-- AC:END -->
 
-
-
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
@@ -70,4 +68,8 @@ TASK-345のバッチ検証中に観測した挙動（統括による実測、202
 - 変更ファイル: `server/src/adapters/real/scanWorker.ts` のみ（本番コード、テスト変更なし）
 
 統括による独立検証: 修正後 cd server && bun test tests/real を負荷なしで10回連続→全回 374 pass / 0 fail。CPU負荷下（nproc=12の環境で yes プロセス8本を並走。stress-ngは未インストールのため代替）でも10回連続→全回 374 pass / 0 fail。修正前のベースでは同コマンド10回中5回 SQLITE_BUSY で失敗していたため、改善は明確。AC#1の文言をstress-ng限定から実施した負荷条件へ書き換えた。
+
+統括によるAC#2検証（2026-08-18）: 対象だったDLsiteフレーキー（同一RJコード…のSQLITE_BUSY）は統合ブランチで消えている。統合ブランチでserver単独フル並列18回・pnpm test 4回の計22回、いずれも当該テストの失敗は0。対照としてmaster（6d80fe3、341未適用）ではpnpm test 4回中1回で当該テストが再現した。
+
+ただしAC#2（pnpm testを3回連続でserver側が安定して通る）は、別テストのフレーキーによりチェックできない。busyTimeout.test.ts の『別接続が書き込みロックを保持中でも…』が統合ブランチでおよそ4/25の頻度で失敗する（master 0/19）。DLsiteとは別事象で、帰属も未確定のためTASK-352として起票した。AC#2はTASK-352の解消後に再検証する。
 <!-- SECTION:NOTES:END -->
