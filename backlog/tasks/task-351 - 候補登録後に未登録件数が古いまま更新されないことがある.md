@@ -1,14 +1,10 @@
 ---
 id: TASK-351
 title: 候補登録後に未登録件数が古いまま更新されないことがある
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-08-17 21:08'
-<<<<<<< HEAD
-updated_date: '2026-08-17 23:34'
-=======
 updated_date: '2026-08-18 00:59'
->>>>>>> fix/task-351-scan-count
 labels: []
 dependencies: []
 ordinal: 361000
@@ -56,8 +52,14 @@ client/src/features/scan/model/useScanCandidatesCache.ts の readScanCandidates 
 - [x] #1 候補を登録したあと、サイドバーの未登録タブとトップバーの件数が登録結果を反映する
 - [x] #2 原因構造が修正されている（暗黙フォールバックの存在意義を確認したうえでの判断がタスクnotesに記録されている）
 - [x] #3 client側テストが通り、smokeフルスイートを5回連続実行して library.smoke.spec.ts の候補登録テストが失敗しない
-- [x] #4 候補キャッシュの上書き経路が特定され、原因（ScanRuntimeのhandleScanTerminal再入で登録後の候補がスキャン結果全件で上書きされる）が再現テストで縛られている。フォールバック仮説（候補B）の棄却根拠もnotesに記録されている
+- [x] #4 巻き戻しの経路が実測で特定されている（handleScanTerminalが登録の約35ms後にスキャン時点のスナップショットで上書き。同一finishedAtの二重呼び出しではなく遅延到着）。原因が再現テストで縛られている
 <!-- AC:END -->
+
+
+
+
+
+
 
 ## Implementation Notes
 
