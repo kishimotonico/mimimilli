@@ -4,7 +4,7 @@ title: 候補登録後に未登録件数が古いまま更新されないこと�
 status: Done
 assignee: []
 created_date: '2026-08-17 21:08'
-updated_date: '2026-08-17 23:17'
+updated_date: '2026-08-18 00:59'
 labels: []
 dependencies: []
 ordinal: 361000
@@ -55,12 +55,6 @@ client/src/features/scan/model/useScanCandidatesCache.ts の readScanCandidates 
 - [x] #4 候補キャッシュの上書き経路が特定され、原因（ScanRuntimeのhandleScanTerminal再入で登録後の候補がスキャン結果全件で上書きされる）が再現テストで縛られている。フォールバック仮説（候補B）の棄却根拠もnotesに記録されている
 <!-- AC:END -->
 
-
-
-
-
-
-
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
@@ -97,4 +91,55 @@ applyScanTerminalCandidates を常時上書きに戻すと候補Aテストが失
 起票時の候補B前提のため未チェック。文言修正が必要。
 
 修正の設計を差し替え（統括レビュー後）: 初版は last() 更新後に prevLast を読んでいたため再入判定が常にtrueで、部分集合チェックが誤って再入判定の役目を負っていた（前回⊆今回のとき新スキャン結果が反映されない誤判定あり）。applyScanTerminalCandidates を last() 更新より前に呼ぶ順序へ変え、prevFinishedAt === finishedAt なら触らない・新しければ全置換、へ簡素化。部分集合チェックは削除。負の検証: 再入判定を外すと候補Aテストが落ち（[]が2件に復元）、旧実装に戻すと新スキャンsupersetテストが落ちる（[A]のまま[A,B]へ更新されない）。client 816 passed、smoke2回全通過。
+
+## 再調査（refreshScanCandidates in-flight）
+
+統合ブランチで applyScanTerminalCandidates 再入ガード入りでも smoke 2/5 失敗。handleScanTerminal 再入説は棄却（useScanJob の terminalHandled で同一 job の onTerminal 二重呼び出し経路なし）。
+
+### 真の原因（ユニットで確定）
+ScanModal マウント時（cache undefined）に飛ぶ refreshScanCandidates の GET が遅延し、登録後に setQueryData すると古い候補一覧へ巻き戻る。refreshScanCandidates.test「bootstrap 中にキャッシュが埋まったあとの遅延応答は適用しない」で再現。
+
+### 修正
+- refreshScanCandidates: 発火時に cache が undefined だった場合、応答到着時に既に cache が定義されていれば適用しない（shouldSkipStaleBootstrapRefresh）
+- 409 / 除外復元 / 設定画面の復元は `{ force: true }` でサーバー正を維持
+- applyScanTerminalCandidates は削除（誤った原因へのパッチワーク。ScanRuntime は直接 setQueryData に戻した）
+
+### 負の検証
+- shouldSkipStaleBootstrapRefresh 適用を外すと bootstrap 遅延テストが失敗（[] が [A,B] に戻る）
+
+### smoke 5回
+15 passed×4 (36-36s)、RUN2のみ候補登録テスト1件失敗（14 passed）。単体再実行は成功。残留プロセスなし。
+
+計測ラウンド（console実測・修正なし、2026-08-18）: smoke 10回中1回で再現。失敗回の candidates 書き込みシーケンス（performance.now ms）:
+
+1605.3 refreshScanCandidates（bootstrap初回） → 2件
+1625.0 refreshScanCandidates SKIP（stale bootstrap ガードが作動）
+2248.4 register POST response（items=2, 42ms）
+2248.8 UnregisteredTab.registerMutation.onSuccess → 0件
+2283.5 ScanRuntime.handleScanTerminal → 2件  ← 巻き戻し
+
+巻き戻しの経路は handleScanTerminal で確定。ただし観測されたのは1回だけで、同一 finishedAt での二重呼び出しではない。terminal が登録の約35ms後に遅れて到着し、スキャン時点のスナップショット（2件）を、登録で更新済みのキャッシュ（0件）へ上書きしている。
+
+refresh bootstrap ガードは今回の失敗には無関係（SKIPが作動しており、register後のrefresh書き込みは観測されず）。
+
+## 4周目: 世代方式への統一（承認済み設計）
+
+### 棄却したもの
+- handleScanTerminal 再入ガード（実測で terminal 書き込み1回のみ。復活なし）
+- shouldSkipStaleBootstrapRefresh / force オプション（世代方式で代替し削除）
+- terminal での result.candidates 直書き（スナップショット押し込み廃止）
+
+### 実装
+- scanCandidatesCache.ts: 候補キャッシュの revision。ローカル更新（登録・除外）とサーバー同期はすべて世代を進める
+- refreshScanCandidates: 発行時 revision を保持し、応答到着時に変わっていれば破棄（bootstrap・terminal）
+- syncScanCandidatesFromServer: 409/復元/設定向け。世代に関わらずサーバー正を適用
+- ScanRuntime: last() 更新後に refreshScanCandidates のみ（スナップショットはキャッシュへ入れない）
+
+### 負の検証
+- applyScanCandidatesIfRevisionCurrent の世代チェック無効化で「登録後スナップショット」「bootstrap遅延」の2テストが失敗
+
+### smoke 5回
+15 passed × 5（39s, 37s, 36s, 38s, 36s）。残留プロセスなし。
+
+最終設計（統括レビュー後の整理）: 候補キャッシュを client/src/entities/scan/scanCandidatesCache.ts へ一元化し、exportは SCAN_CANDIDATES_QUERY_KEY / updateScanCandidatesCache / refreshScanCandidates の3つのみ。refreshScanCandidatesが発行時の世代を捕まえ、応答到着時に世代が変わっていたら破棄する。世代はprivateな兄弟キー['scan','candidatesRevision']。5周の試行で積もった投機的ガード（syncScanTerminalCandidatesの再入ガード、shouldSkipStaleBootstrapRefresh、forceオプション、syncScanCandidatesFromServer）はすべて削除。未使用になったgetScanCandidatesも削除し、それを参照して空振りになっていたtopBarUnregisteredBadge.testを実fetch経路の検証へ直した。設計方針はCodexのセカンドオピニオンでも裏付け済み（useQuery+invalidateだけではTopBarが/scan/candidatesを常時取得することになり遅延取得の設計が変わるため、鮮度管理は必要）。統括の独立検証: client unit 817 passed、pnpm check全パス、smokeフルスイート10回連続で全通過（修正前は3回に1回失敗）。
 <!-- SECTION:NOTES:END -->

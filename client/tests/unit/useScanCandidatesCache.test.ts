@@ -3,7 +3,7 @@ import { act, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
-import { applyScanTerminalCandidates } from "../../src/features/scan/model/syncScanTerminalCandidates";
+import { updateScanCandidatesCache } from "../../src/entities/scan/scanCandidatesCache";
 import {
   syncScanCandidatesFromLast,
   useUnregisteredCandidateCount,
@@ -54,7 +54,7 @@ function renderCount(queryClient: QueryClient) {
 }
 
 function registerCandidates(queryClient: QueryClient, registeredPaths: Set<string>) {
-  queryClient.setQueryData<typeof scanCandidates>(SCAN_QUERY_KEYS.candidates(), (previous = []) =>
+  updateScanCandidatesCache(queryClient, (previous) =>
     previous.filter((candidate) => !registeredPaths.has(candidate.path)),
   );
 }
@@ -93,38 +93,7 @@ describe("useUnregisteredCandidateCount", () => {
   });
 });
 
-function simulateHandleScanTerminal(
-  queryClient: QueryClient,
-  finishedAt: string,
-  candidates: typeof scanCandidates,
-) {
-  applyScanTerminalCandidates(queryClient, finishedAt, candidates);
-  queryClient.setQueryData(SCAN_QUERY_KEYS.last(), {
-    finishedAt,
-    result: { ...lastScanResult.result, candidates },
-  });
-}
-
 describe("候補登録後の件数更新（TASK-351）", () => {
-  it("候補A: 登録後に handleScanTerminal 相当の書き込みが走ると件数が戻る", () => {
-    const queryClient = new QueryClient({
-      defaultOptions: { queries: { retry: false } },
-    });
-    queryClient.setQueryData(SCAN_QUERY_KEYS.last(), lastScanResult);
-    queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), scanCandidates);
-
-    registerCandidates(queryClient, new Set(scanCandidates.map((candidate) => candidate.path)));
-    expect(queryClient.getQueryData(SCAN_QUERY_KEYS.candidates())).toEqual([]);
-
-    applyScanTerminalCandidates(
-      queryClient,
-      lastScanResult.finishedAt,
-      lastScanResult.result.candidates,
-    );
-
-    expect(queryClient.getQueryData(SCAN_QUERY_KEYS.candidates())).toEqual([]);
-  });
-
   it("候補B: キャッシュが undefined のときだけ last.result.candidates にフォールバックする", () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
@@ -154,33 +123,5 @@ describe("候補登録後の件数更新（TASK-351）", () => {
 
     renderCount(queryClient);
     expect(screen.getByTestId("count")).toHaveTextContent("0");
-  });
-
-  it("新しいスキャン完了時は前回の削減済みキャッシュを上書きする", () => {
-    const queryClient = new QueryClient({
-      defaultOptions: { queries: { retry: false } },
-    });
-    queryClient.setQueryData(SCAN_QUERY_KEYS.last(), lastScanResult);
-    queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), [candidateA]);
-
-    const nextFinishedAt = "2026-01-02T00:00:00.000Z";
-    const nextCandidates = [candidateA, candidateB];
-    applyScanTerminalCandidates(queryClient, nextFinishedAt, nextCandidates);
-
-    expect(queryClient.getQueryData(SCAN_QUERY_KEYS.candidates())).toEqual(nextCandidates);
-  });
-
-  it("新スキャンで前回候補が新候補に含まれていてもキャッシュを新候補集合へ置き換える", () => {
-    const queryClient = new QueryClient({
-      defaultOptions: { queries: { retry: false } },
-    });
-    queryClient.setQueryData(SCAN_QUERY_KEYS.last(), lastScanResult);
-    queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), [candidateA]);
-
-    const nextFinishedAt = "2026-01-02T00:00:00.000Z";
-    const nextCandidates = [candidateA, candidateB];
-    simulateHandleScanTerminal(queryClient, nextFinishedAt, nextCandidates);
-
-    expect(queryClient.getQueryData(SCAN_QUERY_KEYS.candidates())).toEqual(nextCandidates);
   });
 });
