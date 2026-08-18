@@ -1,9 +1,10 @@
 ---
 id: TASK-352
 title: busyTimeoutテストのWorker起動失敗フレーキーを解消する
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-08-18 01:15'
+updated_date: '2026-08-18 01:17'
 labels: []
 dependencies: []
 ordinal: 362000
