@@ -161,6 +161,9 @@ describe("ScanRuntime EventSource ownership", () => {
         const url = String(input);
         if (url.endsWith("/scan/active")) return response(running);
         if (url.endsWith("/scan/job-1")) return response(completedJob);
+        if (url.endsWith("/scan/candidates")) {
+          return response({ candidates: scanResult.candidates });
+        }
         return response(null, 204);
       }),
     );
@@ -184,11 +187,12 @@ describe("ScanRuntime EventSource ownership", () => {
         expect.objectContaining({ result: scanResult }),
       ),
     );
-    expect(setQueryData).toHaveBeenCalledWith(
-      SCAN_QUERY_KEYS.last(),
-      expect.objectContaining({ result: scanResult }),
+    await waitFor(() =>
+      expect(setQueryData).toHaveBeenCalledWith(
+        SCAN_QUERY_KEYS.candidates(),
+        scanResult.candidates,
+      ),
     );
-    expect(setQueryData).toHaveBeenCalledWith(SCAN_QUERY_KEYS.candidates(), scanResult.candidates);
     expect(
       setQueryData.mock.calls.filter(
         ([queryKey]) => JSON.stringify(queryKey) === JSON.stringify(SCAN_QUERY_KEYS.last()),
@@ -228,6 +232,9 @@ describe("Runtime間連携: ScanRuntime → DlsiteBulkRuntime", () => {
         const url = String(input);
         if (url.endsWith("/scan/active")) return response(running);
         if (url.endsWith("/scan/job-1")) return response(completedWithNewWorks);
+        if (url.endsWith("/scan/candidates")) {
+          return response({ candidates: scanResultWithNewWorks.candidates });
+        }
         return response(null, 204);
       }),
     );
