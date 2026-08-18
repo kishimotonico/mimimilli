@@ -119,6 +119,7 @@ describe("候補登録後の件数更新（TASK-351）", () => {
       defaultOptions: { queries: { retry: false } },
     });
     queryClient.setQueryData(SCAN_QUERY_KEYS.last(), lastScanResult);
+    queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), scanCandidates);
     registerCandidates(queryClient, new Set(scanCandidates.map((candidate) => candidate.path)));
 
     renderCount(queryClient);

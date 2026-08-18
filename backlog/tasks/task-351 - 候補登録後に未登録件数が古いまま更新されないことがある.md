@@ -4,7 +4,7 @@ title: 候補登録後に未登録件数が古いまま更新されないこと�
 status: Done
 assignee: []
 created_date: '2026-08-17 21:08'
-updated_date: '2026-08-18 00:59'
+updated_date: '2026-08-18 03:40'
 labels: []
 dependencies: []
 ordinal: 361000
@@ -53,13 +53,9 @@ client/src/features/scan/model/useScanCandidatesCache.ts の readScanCandidates 
 - [x] #2 原因構造が修正されている（暗黙フォールバックの存在意義を確認したうえでの判断がタスクnotesに記録されている）
 - [x] #3 client側テストが通り、smokeフルスイートを5回連続実行して library.smoke.spec.ts の候補登録テストが失敗しない
 - [x] #4 巻き戻しの経路が実測で特定されている（handleScanTerminalが登録の約35ms後にスキャン時点のスナップショットで上書き。同一finishedAtの二重呼び出しではなく遅延到着）。原因が再現テストで縛られている
+- [x] #5 候補キャッシュが未確定（bootstrap応答前）の状態で登録・除外を行っても、表示中の候補が消去されない。部分更新の前提が無い場合の扱いが設計として決まっている
+- [x] #6 サーバー再取得が並行したとき、解決順ではなく発行順で後発が優先される（古い先発応答が後着で勝たない）
 <!-- AC:END -->
-
-
-
-
-
-
 
 ## Implementation Notes
 
@@ -148,4 +144,10 @@ refresh bootstrap ガードは今回の失敗には無関係（SKIPが作動し�
 15 passed × 5（39s, 37s, 36s, 38s, 36s）。残留プロセスなし。
 
 最終設計（統括レビュー後の整理）: 候補キャッシュを client/src/entities/scan/scanCandidatesCache.ts へ一元化し、exportは SCAN_CANDIDATES_QUERY_KEY / updateScanCandidatesCache / refreshScanCandidates の3つのみ。refreshScanCandidatesが発行時の世代を捕まえ、応答到着時に世代が変わっていたら破棄する。世代はprivateな兄弟キー['scan','candidatesRevision']。5周の試行で積もった投機的ガード（syncScanTerminalCandidatesの再入ガード、shouldSkipStaleBootstrapRefresh、forceオプション、syncScanCandidatesFromServer）はすべて削除。未使用になったgetScanCandidatesも削除し、それを参照して空振りになっていたtopBarUnregisteredBadge.testを実fetch経路の検証へ直した。設計方針はCodexのセカンドオピニオンでも裏付け済み（useQuery+invalidateだけではTopBarが/scan/candidatesを常時取得することになり遅延取得の設計が変わるため、鮮度管理は必要）。統括の独立検証: client unit 817 passed、pnpm check全パス、smokeフルスイート10回連続で全通過（修正前は3回に1回失敗）。
+
+最終レビュー指摘への対応（2026-08-18）: 世代方式に2件の欠陥（①キャッシュ未確定時に ?? [] で空配列へ部分更新を適用し候補が全消去され復旧不能 ②再取得が発行順を持たず解決順の早い者勝ちで古い先発応答が勝てる）。両方を『発行と適用の順序規律』1つへ統一。単調増加の発行シーケンスと適用シーケンスを持ち、非同期の適用は自分の発行より後に何も適用されていない場合のみ。部分更新はキャッシュ確定時のみ行い、未確定なら再取得を発火する（登録・除外はサーバーへ永続化済みのため取り直せば正しい）。
+
+テスト整理: 実装を呼ばず常にpassする空振りの『負の検証』2件を削除。重複していた2件を統合し、空いた枠へ未検証だった逆順シナリオ（refresh応答が先着・bootstrap応答が後着）を追加。負の検証は実物で実施し、undefinedガードを ?? [] に戻すと2件、canApply判定を外すと3件が落ちることを確認して復元。
+
+統括の独立検証: client unit 819 passed、pnpm check全パス、smokeフルスイート10回連続で全通過。
 <!-- SECTION:NOTES:END -->
