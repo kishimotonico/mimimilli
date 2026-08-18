@@ -1,10 +1,10 @@
 ---
 id: TASK-341
 title: DLsite系serverテストの並列実行時フレーキー（SQLITE_BUSYと5秒タイムアウト）を解消する
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-08-14 11:50'
-updated_date: '2026-08-18 01:15'
+updated_date: '2026-08-18 02:51'
 labels: []
 dependencies: []
 priority: medium
@@ -72,4 +72,6 @@ TASK-345のバッチ検証中に観測した挙動（統括による実測、202
 統括によるAC#2検証（2026-08-18）: 対象だったDLsiteフレーキー（同一RJコード…のSQLITE_BUSY）は統合ブランチで消えている。統合ブランチでserver単独フル並列18回・pnpm test 4回の計22回、いずれも当該テストの失敗は0。対照としてmaster（6d80fe3、341未適用）ではpnpm test 4回中1回で当該テストが再現した。
 
 ただしAC#2（pnpm testを3回連続でserver側が安定して通る）は、別テストのフレーキーによりチェックできない。busyTimeout.test.ts の『別接続が書き込みロックを保持中でも…』が統合ブランチでおよそ4/25の頻度で失敗する（master 0/19）。DLsiteとは別事象で、帰属も未確定のためTASK-352として起票した。AC#2はTASK-352の解消後に再検証する。
+
+AC#2の再検証（TASK-352の修正取り込み後、2026-08-18）: pnpm test（run-p）を10回連続実行して失敗なし。AC#2の要求（3回連続）を満たす。保留の原因だったbusyTimeoutのフレーキーはTASK-352で解消し、帰属は341ではなく共通のプロダクト欠陥（busy_timeoutの設定順序）だったと判明した。
 <!-- SECTION:NOTES:END -->
