@@ -174,8 +174,8 @@ export class DlsiteCache {
       mkdirSync(dirname(this.path), { recursive: true });
     }
     this.sqlite = new Database(this.path, { create: true });
-    this.sqlite.exec("PRAGMA journal_mode = WAL");
     applySqliteBusyTimeout(this.sqlite);
+    this.sqlite.exec("PRAGMA journal_mode = WAL");
     this.sqlite.exec(`
       CREATE TABLE IF NOT EXISTS dlsite_html_snapshots (
         store TEXT NOT NULL CHECK(store IN ('maniax', 'pro')),
