@@ -4,7 +4,7 @@ title: Windows並列realテストのtemp・DB削除EBUSYを解消する
 status: In Progress
 assignee: []
 created_date: '2026-08-14 18:33'
-updated_date: '2026-08-18 22:58'
+updated_date: '2026-08-18 23:19'
 labels:
   - bug
   - server
@@ -29,10 +29,8 @@ TASK-344の最終pnpm-testで、多数のreal-testsがteardown時のtempディ�
 - [x] #2 テストのDB・ファイルハンドルは、個々のテストでの登録順に依存せず、tempディレクトリ削除より前に必ず解放される構造になっている
 - [ ] #3 次回Windowsドッグフーディングで、並列real-testsのtemp・DB削除にEBUSYが再発しないことを確認する（実機確認待ち）
 - [x] #4 cleanupはcloserが例外を投げても残りのcloserとディレクトリ削除を必ず実行し、最初の例外を投げて以降をsuppressedへ積む
-- [ ] #5 server/tests/real 配下を除外なしでLinuxで10回連続実行して全て成功する（TASK-341/353完了後の現masterで測り直す）
+- [x] #5 server/tests/real 配下を除外なしでLinuxで10回連続実行して全て成功する（TASK-341/353完了後の現masterで測り直す）
 <!-- AC:END -->
-
-
 
 ## Implementation Notes
 
@@ -72,4 +70,9 @@ ADR-0021と同機構。drizzle-orm bun-sqliteセッションはクエリごと�
 TASK-341（DLsite系フレーキー）は2026-08-18に完了済み。scanWorker.ts の dlsiteCache?.close() 修正で SQLITE_BUSY は解消し、修正後は bun test tests/real の10回連続で 374 pass / 0 fail。TASK-353（CLI往復テストのタイムアウト）も完了済み。
 
 したがって上記AC#4の『dlsite.test.ts を除く』という除外条件は不要になった。AC#4を除外なしの10回連続実行へ差し替え、現masterで測り直す。残件は引き続きAC#3（Windows実機での並列real-tests再検証）。
+
+### AC#5 実測（2026-08-19、commit 007fc1b）
+除外なしで `cd server && bun test tests/real --parallel` を10回連続実行。10回とも 374 pass / 0 fail（43ファイル、各回 8.8〜10.4秒）。TASK-341完了前に観測されていた dlsite.test.ts の SQLITE_BUSY は一度も再現せず、除外条件が不要になったことを確認した。`pnpm check` も exit 0。
+
+残件はAC#3（Windows実機での並列real-tests再検証）のみ。ドッグフーディング中にEBUSYを踏まなければ達成とみなす。
 <!-- SECTION:NOTES:END -->
