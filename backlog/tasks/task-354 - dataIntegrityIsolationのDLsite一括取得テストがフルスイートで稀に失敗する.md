@@ -1,9 +1,10 @@
 ---
 id: TASK-354
 title: dataIntegrityIsolationのDLsite一括取得テストがフルスイートで稀に失敗する
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-08-18 04:07'
+updated_date: '2026-08-18 04:37'
 labels: []
 dependencies: []
 ordinal: 364000
@@ -39,3 +40,26 @@ server/tests/real/dataIntegrityIsolation.test.ts:164「DLsite 一括取得は壊
 - [ ] #2 失敗の原因（どのテストとの相互作用か、または単独の問題か）が特定されている
 - [ ] #3 原因構造が修正され、ルートのpnpm testを15回連続実行して当該テストが失敗しない
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+統括による帰属確定と再現試行（2026-08-18）:
+
+発生率の実測
+- master 2c7007b（TASK-353マージ後、現行）: フルスイート pnpm test 30回連続、失敗0
+- 同 master、CPU負荷下（yes 8本並走、nproc=12）: 15回連続、失敗0
+- 参考（起票時）: 353のworktree 10回中1回、353マージ前master 8回中0回
+- 単体（bun test tests/real/dataIntegrityIsolation.test.ts）をCPU負荷下で30回（master 15・353worktree 15）: 失敗0
+
+合計48回中1回のみの観測。当初の1/10という印象より実際の発生率はかなり低い。TASK-353への帰属は否定される（353はmasterへマージ済みで、その状態で45回失敗0）。
+
+静的調査（TASK-339型の相互作用の有無）
+- getRequestListener / overrideGlobalObjects / globalThis.fetch|Response|Request への代入 / stubGlobal を server/src・server/tests 全文検索 → ヒット0
+- テスト内での process.env 書き換え → ヒット0
+
+TASK-339で実在した『同一プロセス内でグローバルオブジェクトを差し替えて他テストを壊す』パターンは、現在のserver配下には存在しない。
+
+未取得の情報
+起票のきっかけになった1回の失敗出力を保存していなかった（失敗テスト名と所要130.84msのみ）。130msでの失敗なのでタイムアウトではなくアサーション不一致か例外だが、どのアサーションが落ちたかは不明。以後の計測では失敗回の出力を丸ごと保存する運用にしている。
+<!-- SECTION:NOTES:END -->
