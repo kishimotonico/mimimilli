@@ -10,10 +10,11 @@ import { ApiRequestError } from "../../../../shared/api/http";
 import { apiErrorMessage } from "../../../../shared/lib/apiError";
 import { parentDirOf } from "../../../../shared/lib/workspacePath";
 import { excludeScanCandidates, registerScanCandidates, SCAN_QUERY_KEYS } from "../../api";
+import { restoreScanCandidateExclusions } from "../../../../entities/scan/api";
 import {
   refreshScanCandidates,
-  restoreScanCandidateExclusions,
-} from "../../../../entities/scan/api";
+  updateScanCandidatesCache,
+} from "../../../../entities/scan/scanCandidatesCache";
 import type { CandidatesRegisteredResult } from "./types";
 
 export interface UnregisteredTabProps {
@@ -57,7 +58,7 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
     mutationFn: registerScanCandidates,
     onSuccess: ({ registered, failures }) => {
       const registeredPaths = new Set(registered.map((entry) => entry.path));
-      queryClient.setQueryData<ScanCandidate[]>(SCAN_QUERY_KEYS.candidates(), (previous = []) =>
+      updateScanCandidatesCache(queryClient, (previous) =>
         previous.filter((candidate) => !registeredPaths.has(candidate.path)),
       );
       setErrorMessage(
@@ -82,7 +83,7 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
   const excludeMutation = useMutation({
     mutationFn: (candidate: ScanCandidate) => excludeScanCandidates([candidate.path]),
     onSuccess: async (_void, candidate) => {
-      queryClient.setQueryData<ScanCandidate[]>(SCAN_QUERY_KEYS.candidates(), (previous = []) =>
+      updateScanCandidatesCache(queryClient, (previous) =>
         previous.filter((entry) => entry.path !== candidate.path),
       );
       setExcludeToast({ path: candidate.path, title: candidate.inferredTitle });

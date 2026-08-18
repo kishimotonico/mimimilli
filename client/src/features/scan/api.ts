@@ -9,10 +9,8 @@ import {
   postVoid,
   type StatusHandler,
 } from "../../shared/api/http";
-import {
-  SCAN_CANDIDATES_QUERY_KEY,
-  SCAN_CANDIDATE_EXCLUSIONS_QUERY_KEY,
-} from "../../entities/scan/api";
+import { SCAN_CANDIDATE_EXCLUSIONS_QUERY_KEY } from "../../entities/scan/api";
+import { SCAN_CANDIDATES_QUERY_KEY } from "../../entities/scan/scanCandidatesCache";
 import type { StartScanRequest } from "@mimimilli/shared";
 import {
   scanConflictResponseSchema,

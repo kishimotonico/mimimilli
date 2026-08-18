@@ -231,13 +231,13 @@ test("スキャン完了後に候補を選択登録でき、問題をFilesで確
 
   await unregistered.getByRole("button", { name: "2件をライブラリに追加" }).click();
   await expect(dialog.getByText("2件をライブラリに追加しました")).toBeVisible();
-  await expect(dialog.getByRole("tab", { name: "未登録（0件）" })).toBeVisible();
 
-  // 未登録が0件になったので新規登録済みタブへ自動で切り替わり、承認した候補が見える（TASK-328）。
+  // 切り替え完了を先に待つと、件数ラベル更新に別の5秒枠が与えられる（useScanCandidatesCache は setActiveTab と別レンダー）。
   await expect(dialog.getByRole("tab", { name: /^新規登録済み/ })).toHaveAttribute(
     "aria-selected",
     "true",
   );
+  await expect(dialog.getByRole("tab", { name: "未登録（0件）" })).toBeVisible();
   const newlyRegistered = dialog.getByRole("tabpanel", { name: "新規登録済み" });
   await expect(newlyRegistered.getByRole("button", { name: "未登録作品" })).toBeVisible();
   await expect(newlyRegistered.getByRole("button", { name: "候補" })).toBeVisible();

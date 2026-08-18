@@ -21,6 +21,7 @@ import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { scanActionsAtom, scanJobAtom } from "../../src/entities/scan/model/atoms";
 import * as scanApi from "../../src/features/scan/api";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
+import * as scanCandidatesCache from "../../src/entities/scan/scanCandidatesCache";
 import * as scanEntityApi from "../../src/entities/scan/api";
 import { libraryTotalQueryOptions } from "../../src/entities/work/libraryTotalQueryOptions";
 
@@ -594,10 +595,10 @@ describe("ScanModal", () => {
       .spyOn(scanEntityApi, "restoreScanCandidateExclusions")
       .mockResolvedValue(undefined);
     const refreshSpy = vi
-      .spyOn(scanEntityApi, "refreshScanCandidates")
+      .spyOn(scanCandidatesCache, "refreshScanCandidates")
       .mockImplementation(async (queryClient) => {
         const candidates = [candidateDetected, candidateUndetected];
-        queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), candidates);
+        scanCandidatesCache.updateScanCandidatesCache(queryClient, () => candidates);
         return candidates;
       });
     renderModal({
