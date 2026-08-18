@@ -1,9 +1,10 @@
 ---
 id: TASK-353
 title: DLsiteキャッシュCLIのexport/import往復テストの5秒タイムアウトを解消する
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-08-18 03:47'
+updated_date: '2026-08-18 03:48'
 labels: []
 dependencies: []
 ordinal: 363000
