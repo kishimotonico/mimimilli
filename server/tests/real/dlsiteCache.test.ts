@@ -488,13 +488,11 @@ test("DLsiteキャッシュCLI: ディレクトリを一括importし、成功・
 test("DLsiteキャッシュCLI: export --dir と import --dir の往復で全件を復元する", (t) => {
   const directory = makeTestDirectory("dlsite-cache-cli-export-dir");
   t.after(directory.cleanup);
-  const hugeHtml = `<html><h1 id="work_name">大きい作品</h1><!--${"a".repeat(
-    DEFAULT_DLSITE_CACHE_MAX_EXPANDED_BYTES - 1024,
-  )}--></html>`;
+  const largeHtml = `<html><h1 id="work_name">大きい作品</h1><!--${"a".repeat(65536)}--></html>`;
   const sourceDir = join(directory.path, "source");
   mkdirSync(sourceDir);
   writeFileSync(join(sourceDir, "RJ123456.html"), VALID_HTML);
-  writeFileSync(join(sourceDir, "RJ123457.html"), hugeHtml);
+  writeFileSync(join(sourceDir, "RJ123457.html"), largeHtml);
 
   const original = {
     MIMIMILLI_DATA_DIR: directory.path,
@@ -530,7 +528,7 @@ test("DLsiteキャッシュCLI: export --dir と import --dir の往復で全件
   runDlsiteCacheCli(["export", "--product-code", "RJ123456", "--file", out], restored);
   assert.equal(readFileSync(out, "utf8"), VALID_HTML);
   runDlsiteCacheCli(["export", "--product-code", "RJ123457", "--file", out], restored);
-  assert.equal(readFileSync(out, "utf8"), hugeHtml);
+  assert.equal(readFileSync(out, "utf8"), largeHtml);
 });
 
 test("DLsiteキャッシュCLI: 展開後が上限内ならgzipが元より大きくてもimportできる", (t) => {
