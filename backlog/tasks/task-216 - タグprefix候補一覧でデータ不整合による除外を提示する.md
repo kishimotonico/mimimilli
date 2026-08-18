@@ -4,6 +4,7 @@ title: タグprefix候補一覧でデータ不整合による除外を提示す�
 status: To Do
 assignee: []
 created_date: '2026-08-06 15:43'
+updated_date: '2026-08-18 22:57'
 labels: []
 dependencies: []
 priority: low
@@ -13,7 +14,7 @@ ordinal: 226000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-listTagPrefixCandidates()（server/src/adapters/real/index.ts:813-820）は listSummaries() を使うため、タグが不正な作品は候補の集計から除外される。しかし戻り値が配列を直接返す設計のため dataIntegrityWarning を載せておらず、除外があっても設定画面のタグprefix候補一覧には何も表示されない。
+listTagPrefixCandidates()（server/src/adapters/real/classificationMethods.ts:54-61）は listSummaries() を使うため、タグが不正な作品は候補の集計から除外される。除外は logDataIntegritySkips でログに出るだけで、戻り値が TagPrefixCandidate[] を直接返す設計のため dataIntegrityWarning を載せておらず、設定画面のタグprefix候補一覧（client/src/features/settings/ui/TagPrefixSettings.tsx）には何も表示されない。
 
 TASK-205 では、隔離した作品を「件数と対象をログに記録し、UI のある経路ではユーザーに提示する」方針とし、エクスポート・スマートフォルダー・スキャン・DLsite一括取得の4経路に提示を実装した。この経路だけが未対応で残っている。
 

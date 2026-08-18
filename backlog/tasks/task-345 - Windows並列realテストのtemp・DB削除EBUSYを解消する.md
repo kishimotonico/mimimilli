@@ -4,7 +4,7 @@ title: Windows並列realテストのtemp・DB削除EBUSYを解消する
 status: In Progress
 assignee: []
 created_date: '2026-08-14 18:33'
-updated_date: '2026-08-17 19:06'
+updated_date: '2026-08-18 22:58'
 labels:
   - bug
   - server
@@ -28,11 +28,9 @@ TASK-344の最終pnpm-testで、多数のreal-testsがteardown時のtempディ�
 - [x] #1 EBUSYの最有力原因の機構・根拠と、実測で棄却した仮説がタスクnotesに記録されている
 - [x] #2 テストのDB・ファイルハンドルは、個々のテストでの登録順に依存せず、tempディレクトリ削除より前に必ず解放される構造になっている
 - [ ] #3 次回Windowsドッグフーディングで、並列real-testsのtemp・DB削除にEBUSYが再発しないことを確認する（実機確認待ち）
-- [x] #4 server/tests/real 配下（TASK-341の既知フレーキー tests/real/dlsite.test.ts を除く）をLinuxで10回連続実行して全て成功する
-- [x] #5 cleanupはcloserが例外を投げても残りのcloserとディレクトリ削除を必ず実行し、最初の例外を投げて以降をsuppressedへ積む
+- [x] #4 cleanupはcloserが例外を投げても残りのcloserとディレクトリ削除を必ず実行し、最初の例外を投げて以降をsuppressedへ積む
+- [ ] #5 server/tests/real 配下を除外なしでLinuxで10回連続実行して全て成功する（TASK-341/353完了後の現masterで測り直す）
 <!-- AC:END -->
-
-
 
 
 
@@ -69,4 +67,9 @@ ADR-0021と同機構。drizzle-orm bun-sqliteセッションはクエリごと�
 `pnpm check` 成功。
 
 統括による二分検証: AC#3（旧）の10回連続全成功はTASK-341の既知フレーキーにより達成不能。ベース（b440624、345未適用）で10回中5回、345適用後で10回中6回、いずれも tests/real/dlsite.test.ts の「同一RJコードは…HTTPを1回に集約する」SQLITE_BUSY で同一の落ち方（144 pass / 33 fail、以降打ち切り）。発生率・シグネチャとも同等で、345が誘発したものではないと判断した。ACを『dlsite.test.ts を除く10回連続全成功』へ修正し、除外条件で10回連続 319 pass / 0 fail を実測。dlsite.test.ts の解消はTASK-341に委ねる。
+## 2026-08-19 棚卸し
+
+TASK-341（DLsite系フレーキー）は2026-08-18に完了済み。scanWorker.ts の dlsiteCache?.close() 修正で SQLITE_BUSY は解消し、修正後は bun test tests/real の10回連続で 374 pass / 0 fail。TASK-353（CLI往復テストのタイムアウト）も完了済み。
+
+したがって上記AC#4の『dlsite.test.ts を除く』という除外条件は不要になった。AC#4を除外なしの10回連続実行へ差し替え、現masterで測り直す。残件は引き続きAC#3（Windows実機での並列real-tests再検証）。
 <!-- SECTION:NOTES:END -->

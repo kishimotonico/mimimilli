@@ -4,7 +4,7 @@ title: 開放端Rangeメディア配信を上限付き206にしバックプレ�
 status: In Progress
 assignee: []
 created_date: '2026-08-14 10:39'
-updated_date: '2026-08-14 12:11'
+updated_date: '2026-08-18 22:58'
 labels: []
 dependencies:
   - TASK-339
@@ -50,5 +50,9 @@ streamWithRange（server/src/routes/media.ts:135-215）は開放端Range（bytes
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
-実装・自動テストは完了し統合ブランチ feat/media-connection-lifetime にマージ済み（99ea67c）。上限8MiB、開放端Range（bytes=N-）のみ丸め、閉区間と末尾指定は従来どおり、200経路は上限なし。残るはAC#4のChrome実機確認のみ（この開発環境はSSH越しWSLのため実施不可。別PCでの確認待ち）。確認内容: 長時間の通し再生が停止しないこと、シークが正常に動作すること。
+実装・自動テストは完了し master にマージ済み（99ea67c → 統合 5cb40db）。統合ブランチ feat/media-connection-lifetime は削除済み。上限8MiB（server/src/routes/media.ts:28-29）、開放端Range（bytes=N-）のみ丸め（:207-208）、閉区間と末尾指定は従来どおり、200経路は上限なし。
+
+自動テストの所在: server/tests/real/media.test.ts:46-69、server/tests/fixtureMedia.test.ts、server/tests/transport/range.test.ts:52-65。
+
+残件はAC#4のChrome実機確認のみ。この開発環境はSSH越しWSLのため実施不可で、別PCでの確認待ち。確認内容: 長時間音声の通し再生が停止しないこと、シークが正常に動作すること。実機確認後にAC#5（pnpm check + server側テスト）を消化してクローズする。
 <!-- SECTION:NOTES:END -->
