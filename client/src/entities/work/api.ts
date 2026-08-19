@@ -9,6 +9,7 @@ import {
   postParsed,
   postVoid,
   deleteParsed,
+  deleteVoid,
 } from "../../shared/api/http";
 import {
   workSchema,
@@ -89,6 +90,11 @@ export async function queryDlsiteNotifications(
 
 export async function patchWork(workId: string, body: WorkPatchInput): Promise<Work> {
   return patchParsed(workSchema, `/works/${encodeURIComponent(workId)}`, body);
+}
+
+/** 作品登録を解除する（DB・メタファイルのみ。物理ファイルは残す） */
+export async function deleteWork(workId: string): Promise<void> {
+  await deleteVoid(`/works/${encodeURIComponent(workId)}`);
 }
 
 /** カバー画像のURLを返す（<img src> で直接使用可）。

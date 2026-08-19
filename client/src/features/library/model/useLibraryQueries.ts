@@ -28,7 +28,7 @@ import {
   evalSmartFolder,
 } from "../../../entities/smart-folder/api";
 import { getAllTags } from "../../../entities/tag/api";
-import { getWork, patchWork } from "../../../entities/work/api";
+import { deleteWork, getWork, patchWork } from "../../../entities/work/api";
 import { assertWorkSourceRevision } from "../../../entities/work/sourceRevision";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { useRootFolder } from "../../../entities/settings/useSettingsQuery";
@@ -335,6 +335,21 @@ export function useLibraryWorkPatchMutations(nav: LibraryViewState, searchQuery:
   });
 
   return { titleMutation, bookmarkMutation, tagsMutation };
+}
+
+/** 作品登録の解除（削除）mutation。成功時に一覧系クエリを無効化し、詳細キャッシュを
+ *  破棄したうえで onDeleted（選択解除・詳細パネルを閉じる）を呼ぶ */
+export function useLibraryWorkDeleteMutation(onDeleted: (workId: string) => void) {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, string>({
+    mutationFn: (workId) => deleteWork(workId),
+    onSuccess: async (_data, workId) => {
+      await queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.all() });
+      queryClient.removeQueries({ queryKey: WORK_QUERY_KEYS.detail(workId) });
+      onDeleted(workId);
+    },
+  });
 }
 
 // ── スマートフォルダー作成・編集 mutation ─────────────────────

@@ -100,6 +100,30 @@ test("作品を選ぶとプレビューが開く（ファイル欠損の状態�
   assertNoErrors(tracker);
 });
 
+test("詳細パネルの「その他」メニューから作品登録を解除できる（確認ダイアログ経由、パネルは閉じ一覧から消える）", async ({
+  page,
+}) => {
+  // このテストは作品を実際に削除するため、他のテストが参照しない作品（添い寝カフェへようこそ）を使う。
+  const tracker = trackErrors(page);
+  await openApp(page);
+
+  await page.getByText("添い寝カフェへようこそ", { exact: false }).click();
+
+  const panel = page.locator(".mle-prv");
+  await expect(panel).toBeVisible();
+  await panel.getByRole("button", { name: "その他" }).click();
+  await panel.getByRole("menuitem", { name: "作品登録を解除" }).click();
+
+  const dialog = page.getByRole("alertdialog", { name: "作品登録を解除" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "解除する" }).click();
+
+  await expect(panel).toBeHidden();
+  await expect(page.getByText("添い寝カフェへようこそ", { exact: false })).toBeHidden();
+
+  assertNoErrors(tracker);
+});
+
 test("詳細パネル: 再開ボタンが正しいアクセシブル名で表示される", async ({ page }) => {
   const tracker = trackErrors(page);
   await openApp(page);

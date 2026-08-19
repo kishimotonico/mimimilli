@@ -55,6 +55,7 @@ describe("WorkMetadataActions", () => {
         })}
         onEdit={vi.fn()}
         onShowInfo={vi.fn()}
+        onDelete={vi.fn()}
       />,
     );
 
@@ -69,6 +70,7 @@ describe("WorkMetadataActions", () => {
         bookmarkMutation={makeBookmarkMutation({ mutate })}
         onEdit={vi.fn()}
         onShowInfo={vi.fn()}
+        onDelete={vi.fn()}
       />,
     );
 
@@ -88,6 +90,7 @@ describe("WorkMetadataActions", () => {
         bookmarkMutation={makeBookmarkMutation({ mutate })}
         onEdit={vi.fn()}
         onShowInfo={vi.fn()}
+        onDelete={vi.fn()}
       />,
     );
 
@@ -96,5 +99,22 @@ describe("WorkMetadataActions", () => {
     fireEvent.click(bookmarkButton);
     expect(mutate).not.toHaveBeenCalled();
     expect(screen.getByRole("alert")).toHaveTextContent(WORK_SOURCE_PATCH_BLOCKED_MESSAGE);
+  });
+
+  it("その他メニューから作品登録を解除を選ぶと onDelete を呼ぶ", () => {
+    const onDelete = vi.fn();
+    render(
+      <WorkMetadataActions
+        work={makeWork()}
+        bookmarkMutation={makeBookmarkMutation()}
+        onEdit={vi.fn()}
+        onShowInfo={vi.fn()}
+        onDelete={onDelete}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "その他" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "作品登録を解除" }));
+    expect(onDelete).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,5 +1,10 @@
 import { useState } from "react";
+import { useSetAtom } from "jotai";
+import type { UseMutationResult } from "@tanstack/react-query";
 import type { NormalizedTag, Work } from "@mimimilli/shared";
+import { errorToastAtom } from "../../../../shared/model/errorToastAtom";
+import { apiErrorMessage } from "../../../../shared/lib/apiError";
+import ConfirmDialog from "../../../../shared/ui/ConfirmDialog";
 import CoverImg from "../../../../entities/work/ui/CoverImg";
 import { getCoverImageUrl } from "../../../../entities/work/api";
 import { selectFixedCoverThumbnailWidth } from "../../../../entities/work/ui/coverThumbnailWidth";
@@ -28,6 +33,7 @@ interface WorkDetailProps {
   isPlaybackActive?: boolean;
   tagSuggestions: string[];
   workPatchMutations: ReturnType<typeof useLibraryWorkPatchMutations>;
+  deleteMutation: UseMutationResult<void, Error, string>;
   /** タグチップクリック時のハンドラ（タグ軸への絞り込み遷移） */
   onTagClick: (tag: NormalizedTag) => void;
 }
@@ -41,6 +47,7 @@ export function WorkDetail({
   isPlaybackActive,
   tagSuggestions,
   workPatchMutations,
+  deleteMutation,
   onTagClick,
 }: WorkDetailProps) {
   const playlist = work.playlists.find((p) => p.id === work.defaultPlaylistId) ?? work.playlists[0];
@@ -65,7 +72,15 @@ export function WorkDetail({
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isInfoDialogOpen, setIsInfoDialogOpen] = useState(false);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const hasKickerWarning = work.status === "missing" || work.status === "error";
+  const setErrorToast = useSetAtom(errorToastAtom);
+
+  const handleDeleteConfirm = () => {
+    deleteMutation.mutate(work.id, {
+      onError: (cause) => setErrorToast(apiErrorMessage(cause, "作品登録の解除に失敗しました")),
+    });
+  };
 
   return (
     <div className="mle-prv__body">
@@ -169,11 +184,16 @@ export function WorkDetail({
             bookmarkMutation={workPatchMutations.bookmarkMutation}
             onEdit={() => setIsEditDialogOpen(true)}
             onShowInfo={() => setIsInfoDialogOpen(true)}
+            onDelete={() => setIsDeleteConfirmOpen(true)}
           />
         </div>
       </div>
 
-      <WorkStatusWarnings work={work} onEdit={() => setIsEditDialogOpen(true)} />
+      <WorkStatusWarnings
+        work={work}
+        onEdit={() => setIsEditDialogOpen(true)}
+        onDelete={() => setIsDeleteConfirmOpen(true)}
+      />
 
       <WorkTrackList
         tracks={tracks}
@@ -210,6 +230,18 @@ export function WorkDetail({
           src={getCoverImageUrl(work.id)}
           alt={work.title}
           onClose={() => setIsLightboxOpen(false)}
+        />
+      )}
+      {isDeleteConfirmOpen && (
+        <ConfirmDialog
+          title="作品登録を解除"
+          message="この作品のデータ（再生履歴・タグを含む）と管理ファイル（mimimilli.json）を削除します。音声などの物理ファイルは削除されません。"
+          confirmLabel="解除する"
+          onConfirm={() => {
+            setIsDeleteConfirmOpen(false);
+            handleDeleteConfirm();
+          }}
+          onCancel={() => setIsDeleteConfirmOpen(false)}
         />
       )}
     </div>
