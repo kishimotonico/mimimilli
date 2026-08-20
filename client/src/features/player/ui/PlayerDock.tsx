@@ -5,6 +5,7 @@ import { type MotionVariant, useMotionVariants } from "../../../shared/ui/useMot
 import { playerIsActiveAtom, playerUiModeAtom } from "../../../entities/player/model/atoms";
 import { usePlayerActions } from "../model/usePlayerActions";
 import { usePlayerState, type PlayerState } from "../model/usePlayerState";
+import { usePopupDrag } from "../model/usePopupDrag";
 import BarContent from "./BarContent";
 import PopupContent from "./PopupContent";
 
@@ -56,11 +57,23 @@ interface DockPopupProps {
 
 function DockPopup({ variant, switching, ...popupProps }: DockPopupProps) {
   const isPresent = useIsPresent();
+  const drag = usePopupDrag();
   return (
     <motion.div
+      ref={drag.popupRef}
       className="mle-popup"
       data-ui-switching={switching || undefined}
       inert={!isPresent}
+      drag
+      dragListener={false}
+      dragControls={drag.dragControls}
+      dragConstraints={drag.dragConstraints}
+      dragElastic={0}
+      dragMomentum={false}
+      style={{ x: drag.x, y: drag.y }}
+      onPointerDown={drag.onPointerDown}
+      onDoubleClick={drag.onDoubleClick}
+      onDragEnd={drag.onDragEnd}
       {...variant}
     >
       <PopupContent {...popupProps} />

@@ -10,6 +10,8 @@ import {
 } from "@mimimilli/shared";
 import { libraryViewModeAtom } from "../model/atoms";
 import { librarySearchQueryAtom } from "../../../entities/library/model/navigationAtoms";
+import { setAppModeAtom } from "../../../shared/model/appModeAtoms";
+import { openWorkDetailAtom } from "../../../entities/work/model/navigationActions";
 import {
   playerIsPlayingOrLoadingAtom,
   playingTrackIndexAtom,
@@ -77,6 +79,8 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
   const searchQuery = useAtomValue(librarySearchQueryAtom);
   const debouncedSearchQuery = useLibraryDebouncedSearchQuery(searchQuery);
   const setSearchQuery = useSetAtom(librarySearchQueryAtom);
+  const setAppMode = useSetAtom(setAppModeAtom);
+  const openWorkDetail = useSetAtom(openWorkDetailAtom);
   const viewMode = useAtomValue(libraryViewModeAtom);
   const playingWorkId = useAtomValue(playingWorkIdAtom);
   const playingTrackIndex = useAtomValue(playingTrackIndexAtom);
@@ -167,6 +171,12 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
   const handleResume = useCallback(() => {
     if (selectedWork) onResume(selectedWork);
   }, [selectedWork, onResume]);
+
+  const handleExpand = useCallback(() => {
+    if (selectedWork) openWorkDetail(selectedWork.id);
+  }, [selectedWork, openWorkDetail]);
+
+  const handleGoToPlayingScreen = useCallback(() => setAppMode("nowPlaying"), [setAppMode]);
 
   // タグチップクリック → replaceTagと同一挙動（ADR-0013）。Ctrl/Cmd+クリックは
   // AND追加（addLibraryTagAtom相当）へ反転する。
@@ -344,6 +354,12 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
                         tagSuggestions={tagSuggestions}
                         nav={nav}
                         searchQuery={searchQuery}
+                        onExpand={handleExpand}
+                        onGoToPlayingScreen={
+                          selectedWork && playingWorkId === selectedWork.id
+                            ? handleGoToPlayingScreen
+                            : undefined
+                        }
                       />
                     )}
                   </AnimatePresence>

@@ -5,6 +5,7 @@ import { activeAxisAtom } from "../../entities/library/model/navigationAtoms";
 import { isGridViewActive } from "../../features/library/model/libraryPresentation";
 import LibraryGridControls from "../../features/library/ui/LibraryGridControls";
 import LibraryBreadcrumbs from "../../features/library/ui/LibraryBreadcrumbs";
+import WorkDetailBreadcrumbs from "../../features/library/ui/WorkDetailBreadcrumbs";
 import LibrarySortMenu from "../../features/library/ui/LibrarySortMenu";
 import FilesBreadcrumbs from "../../features/files/ui/FilesBreadcrumbs";
 import NavigationHistoryButtons from "./NavigationHistoryButtons";
@@ -27,37 +28,46 @@ export default function AddressBar() {
     <div className="mle-addr is-lib">
       <NavigationHistoryButtons />
 
-      {mode === "library" ? <LibraryBreadcrumbs /> : <FilesBreadcrumbs />}
+      {mode === "library" && <LibraryBreadcrumbs />}
+      {mode === "files" && <FilesBreadcrumbs />}
+      {mode === "workDetail" && <WorkDetailBreadcrumbs />}
+      {mode === "nowPlaying" && (
+        <div className="mle-crumbs">
+          <span className="mle-crumbs__seg is-last">再生中</span>
+        </div>
+      )}
 
       {mode === "library" && <LibraryGridControls />}
 
-      <div className="inline-flex items-center gap-[1px] rounded-2 bg-paper-2 p-[2px]">
-        <IconButton
-          size="sm"
-          icon={I.gridS}
-          label="カラム"
-          active={mode !== "library"}
-          disabled={!availableViewModes.includes("column")}
-        />
-        <IconButton
-          size="sm"
-          icon={I.list}
-          label="リスト"
-          active={mode === "library" && !showGrid}
-          onClick={() => setLibraryViewMode("list")}
-          disabled={!availableViewModes.includes("list")}
-          title={mode !== "library" ? "ファイルモードはカラム表示のみ" : undefined}
-        />
-        <IconButton
-          size="sm"
-          icon={I.grid}
-          label="グリッド"
-          active={mode === "library" && showGrid}
-          onClick={() => setLibraryViewMode("grid")}
-          disabled={!availableViewModes.includes("grid")}
-          title={mode !== "library" ? "ファイルモードはカラム表示のみ" : undefined}
-        />
-      </div>
+      {mode !== "nowPlaying" && mode !== "workDetail" && (
+        <div className="inline-flex items-center gap-[1px] rounded-2 bg-paper-2 p-[2px]">
+          <IconButton
+            size="sm"
+            icon={I.gridS}
+            label="カラム"
+            active={mode !== "library"}
+            disabled={!availableViewModes.includes("column")}
+          />
+          <IconButton
+            size="sm"
+            icon={I.list}
+            label="リスト"
+            active={mode === "library" && !showGrid}
+            onClick={() => setLibraryViewMode("list")}
+            disabled={!availableViewModes.includes("list")}
+            title={mode !== "library" ? "ファイルモードはカラム表示のみ" : undefined}
+          />
+          <IconButton
+            size="sm"
+            icon={I.grid}
+            label="グリッド"
+            active={mode === "library" && showGrid}
+            onClick={() => setLibraryViewMode("grid")}
+            disabled={!availableViewModes.includes("grid")}
+            title={mode !== "library" ? "ファイルモードはカラム表示のみ" : undefined}
+          />
+        </div>
+      )}
 
       {mode === "library" && <LibrarySortMenu />}
       <IconButton size="sm" icon={I.more} label="その他" disabled title="近日実装" />

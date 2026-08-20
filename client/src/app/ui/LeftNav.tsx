@@ -34,11 +34,11 @@ export default function LeftNav() {
           <I.folderO size={20} />
         </button>
         <button
-          className={`mle-side__btn ${mode === "library" ? "is-on" : ""}`}
+          className={`mle-side__btn ${mode === "library" || mode === "workDetail" ? "is-on" : ""}`}
           onClick={() => setAppMode("library")}
           title="ライブラリ"
           aria-label="ライブラリ"
-          aria-pressed={mode === "library"}
+          aria-pressed={mode === "library" || mode === "workDetail"}
         >
           <I.gridS size={19} />
         </button>
@@ -48,6 +48,21 @@ export default function LeftNav() {
         {SURFACES.map((s) => {
           const Ic = I[s.icon];
           const badge = s.label === "再生中" ? playingCount : s.badge;
+          if (s.label === "再生中") {
+            return (
+              <button
+                key={s.label}
+                className={`mle-side__btn ${mode === "nowPlaying" ? "is-on" : ""}`}
+                onClick={() => setAppMode("nowPlaying")}
+                title="再生中"
+                aria-label="再生中"
+                aria-pressed={mode === "nowPlaying"}
+              >
+                <Ic size={19} />
+                {badge != null && badge > 0 && <span className="mle-side__badge">{badge}</span>}
+              </button>
+            );
+          }
           return (
             <button
               key={s.label}

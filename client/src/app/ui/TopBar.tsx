@@ -71,7 +71,7 @@ export default function TopBar({ onOpenScan, onSettings, notificationBell }: Top
 
   // ⌘K / Ctrl+K で検索ボックスへフォーカスする。テキスト入力中は横取りしない。
   useEffect(() => {
-    if (mode === "files") return;
+    if (mode !== "library") return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() !== "k" || !(e.metaKey || e.ctrlKey)) return;
       const target = e.target as HTMLElement | null;
@@ -107,7 +107,7 @@ export default function TopBar({ onOpenScan, onSettings, notificationBell }: Top
 
       <div className="mll-bar__spacer" />
 
-      {mode !== "files" && (
+      {mode === "library" && (
         <div className="mll-bar__search">
           <I.search size={13} />
           <input

@@ -20,7 +20,9 @@ export interface FilesUrlState {
 
 export type NavigationUrlState =
   | { mode: "library"; library: LibraryUrlState }
-  | { mode: "files"; files: FilesUrlState };
+  | { mode: "files"; files: FilesUrlState }
+  | { mode: "nowPlaying" }
+  | { mode: "workDetail"; workId: string };
 
 export interface NavigationParseResult {
   state: NavigationUrlState;
@@ -163,6 +165,25 @@ export function parseNavigationUrl(input: string | URL): NavigationParseResult {
     return { state, canonicalUrl: serializeNavigationUrl(state), warnings };
   }
 
+  if (segments[0] === "now-playing") {
+    if (segments.length > 1) {
+      warnings.push(`再生中画面の階層として不正な URL を拒否しました: ${url.pathname}`);
+      return defaultResult(warnings);
+    }
+    const state: NavigationUrlState = { mode: "nowPlaying" };
+    return { state, canonicalUrl: serializeNavigationUrl(state), warnings };
+  }
+
+  if (segments[0] === "work") {
+    const workId = segments[1];
+    if (segments.length !== 2 || !workId) {
+      warnings.push(`作品詳細の階層として不正な URL を拒否しました: ${url.pathname}`);
+      return defaultResult(warnings);
+    }
+    const state: NavigationUrlState = { mode: "workDetail", workId };
+    return { state, canonicalUrl: serializeNavigationUrl(state), warnings };
+  }
+
   if (segments[0] === "files") {
     const selectedValues = url.searchParams.getAll("sel");
     if (selectedValues.length > 1) warnings.push("複数の sel query のうち先頭だけを使用しました");
@@ -186,6 +207,14 @@ function encodeSegments(segments: string[]): string {
 
 export function serializeNavigationUrl(state: NavigationUrlState): string {
   const params = new URLSearchParams();
+
+  if (state.mode === "nowPlaying") {
+    return "/now-playing";
+  }
+
+  if (state.mode === "workDetail") {
+    return `/work/${encodeURIComponent(state.workId)}`;
+  }
 
   if (state.mode === "library") {
     const { activeAxis, selectedTags, selectedWorkId, sort, q } = state.library;

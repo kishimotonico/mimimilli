@@ -199,6 +199,31 @@ test("詳細パネル: タグクリックで1クリックそのタグの作品�
   assertNoErrors(tracker);
 });
 
+test("詳細パネル: 「全画面へ展開」で全画面詳細へ遷移し、戻るでパネル状態に戻る（TASK-361）", async ({
+  page,
+}) => {
+  const tracker = trackErrors(page);
+  await openApp(page);
+
+  await page.getByText("夜更けの図書室で囁き朗読", { exact: false }).click();
+
+  const panel = page.locator(".mle-prv");
+  await expect(panel).toBeVisible();
+  await panel.getByRole("button", { name: "全画面へ展開" }).click();
+
+  await expect(page).toHaveURL(/\/work\//);
+  await expect(
+    page.getByRole("heading", { name: "夜更けの図書室で囁き朗読", exact: false }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "作品を編集" })).toBeVisible();
+
+  await page.goBack();
+  await expect(page).toHaveURL(/\/library\//);
+  await expect(panel).toBeVisible();
+
+  assertNoErrors(tracker);
+});
+
 test("スキャンダイアログが開いて完了し、閉じられる", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop-chromium", "desktop scenario only");
 

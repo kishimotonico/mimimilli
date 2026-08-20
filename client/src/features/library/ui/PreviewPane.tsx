@@ -25,6 +25,10 @@ interface PreviewPaneProps {
   searchQuery: string;
   /** grid/listスライドインどちらの経路でも同じ閉じ方にする（TASK-295）。 */
   onClose: () => void;
+  /** 全画面詳細（/work/:id）へ遷移する */
+  onExpand: () => void;
+  /** 表示中の作品が再生中の作品と一致するときだけ渡す */
+  onGoToPlayingScreen?: () => void;
 }
 
 export default function PreviewPane({
@@ -42,6 +46,8 @@ export default function PreviewPane({
   nav,
   searchQuery,
   onClose,
+  onExpand,
+  onGoToPlayingScreen,
 }: PreviewPaneProps) {
   return (
     <div className="mle-prv-anchor">
@@ -62,6 +68,8 @@ export default function PreviewPane({
             isPlaybackActive={isPlaybackActive}
             tagSuggestions={tagSuggestions}
             onTagClick={onTagClick}
+            onExpand={onExpand}
+            onGoToPlayingScreen={onGoToPlayingScreen}
           />
         ) : isSelectedWorkLoading ? (
           <CollectionStatus variant="list" kind="loading" />

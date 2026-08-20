@@ -223,4 +223,22 @@ describe("navigation URL codec", () => {
     });
     expect(result.warnings).toEqual(["存在しない sort を既定値へ戻しました: nope"]);
   });
+
+  it("round-trips the full-screen work detail route", () => {
+    const state: NavigationUrlState = { mode: "workDetail", workId: "RJ01234567" };
+
+    const url = serializeNavigationUrl(state);
+    expect(url).toBe("/work/RJ01234567");
+    expect(parseNavigationUrl(url)).toMatchObject({ state, warnings: [] });
+  });
+
+  it("rejects a work detail URL missing the work id", () => {
+    const result = parseNavigationUrl("/work");
+
+    expect(result.state).toEqual({
+      mode: "library",
+      library: DEFAULT_LIBRARY_URL_STATE,
+    });
+    expect(result.warnings[0]).toContain("作品詳細の階層として不正な URL");
+  });
 });

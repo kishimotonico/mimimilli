@@ -12,6 +12,7 @@ import {
   filesRelPathAtom,
   filesSelectedPathAtom,
 } from "../../../entities/file-system/model/navigationAtoms";
+import { workDetailIdAtom } from "../../../entities/work/model/navigationAtoms";
 import { workspacePath } from "@mimimilli/shared";
 import { appModeAtom } from "../../../shared/model/appModeAtoms";
 import {
@@ -79,6 +80,7 @@ export function useNavigationHistory(): void {
   const searchQuery = useAtomValue(librarySearchQueryAtom);
   const filesRelPath = useAtomValue(filesRelPathAtom);
   const filesSelectedPath = useAtomValue(filesSelectedPathAtom);
+  const workDetailId = useAtomValue(workDetailIdAtom);
   const commit = useAtomValue(navigationHistoryCommitAtom);
 
   const setMode = useSetAtom(appModeAtom);
@@ -90,6 +92,7 @@ export function useNavigationHistory(): void {
   const setFilesRelPath = useSetAtom(filesRelPathAtom);
   const setFilesSelectedPath = useSetAtom(filesSelectedPathAtom);
   const setFilesDirection = useSetAtom(filesDirectionAtom);
+  const setWorkDetailId = useSetAtom(workDetailIdAtom);
   const setNavigationHistoryState = useSetAtom(navigationHistoryStateAtom);
   const consumeNavigationHistoryCommit = useSetAtom(consumeNavigationHistoryCommitAtom);
 
@@ -120,6 +123,13 @@ export function useNavigationHistory(): void {
         return;
       }
 
+      if (state.mode === "nowPlaying") return;
+
+      if (state.mode === "workDetail") {
+        setWorkDetailId(state.workId);
+        return;
+      }
+
       setFilesDirection(fileDirection);
       setFilesRelPath(state.files.relPath);
       setFilesSelectedPath(
@@ -136,6 +146,7 @@ export function useNavigationHistory(): void {
       setSelectedTags,
       setSelectedWorkId,
       setSort,
+      setWorkDetailId,
     ],
   );
 
@@ -192,6 +203,10 @@ export function useNavigationHistory(): void {
         mode,
         library: { activeAxis, selectedTags, selectedWorkId, sort, q: searchQuery },
       };
+    } else if (mode === "nowPlaying") {
+      state = { mode };
+    } else if (mode === "workDetail") {
+      state = { mode, workId: workDetailId ?? "" };
     } else {
       const selectedRelPath = filesSelectedPath ? filesSelectedPath.split("/") : null;
       state = { mode, files: { relPath: filesRelPath, selectedRelPath } };
@@ -232,5 +247,6 @@ export function useNavigationHistory(): void {
     selectedTags,
     selectedWorkId,
     sort,
+    workDetailId,
   ]);
 }
