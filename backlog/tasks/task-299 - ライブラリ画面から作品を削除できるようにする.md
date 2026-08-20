@@ -1,10 +1,11 @@
 ---
 id: TASK-299
 title: ライブラリ画面から作品を削除できるようにする
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude-sonnet'
 created_date: '2026-08-10 19:00'
-updated_date: '2026-08-18 22:57'
+updated_date: '2026-08-19 16:54'
 labels: []
 dependencies:
   - TASK-285
@@ -21,8 +22,32 @@ TASK-304でmissing軸は廃止され、現在はエラービュー（view: "erro
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 作品詳細パネルから作品をライブラリから削除できる（確認ダイアログ付き）
-- [ ] #2 削除後、一覧と件数が即時更新される
-- [ ] #3 pnpm test:smoke が通る
-- [ ] #4 エラービュー（view: error）に現れる欠損作品も同じ導線で削除できる
+- [x] #1 作品詳細パネルから作品をライブラリから削除できる（確認ダイアログ付き）
+- [x] #2 削除後、一覧と件数が即時更新される
+- [x] #3 pnpm test:smoke が通る
+- [x] #4 エラービュー（view: error）に現れる欠損作品も同じ導線で削除できる
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. WorkMetadataActionsのその他メニューに区切り線+「作品登録を解除」を追加
+2. WorkStatusWarningsのmissingバナーに「登録を解除」ボタンを追加（errorには追加しない）
+3. 共通ConfirmDialogでFilePreviewと同文言の確認ダイアログ
+4. deleteWork()再利用（必要ならentities/workへ移設）
+5. 成功後: works系無効化 + detail(id)キャッシュ除去 + 選択解除（パネルを閉じる）
+6. エラービュー0件時のビュー遷移を確認、破綻すればデフォルトビューへフォールバック
+体制: feat/work-deletion統合ブランチ、worktree .worktrees/task-299、実装@claude-sonnet、TASK-355（欠損一括削除）が後続
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+実装: task-299ブランチ 44a3ea3（14ファイル、+243/-17）。deleteWork()をentities/work/api.tsへ移設しfeatures間横参照を解消。useLibraryWorkDeleteMutation（works系invalidate + detail(id) removeQueries + selectWork(null)）。導線は「その他」メニューとmissingバナーの2箇所、確認ダイアログはFilePreviewと同文言。エラービュー0件時の専用フォールバックは不要と判断（activeAxis=errorのまま既存の空状態UIが正常表示、実機確認済み。空なら空表示という既存設計に例外を持ち込まない）。pnpm check全通過・unit 824件・smoke 16/16（新規1本追加）。レビュー担当による副作用チェック: なし
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+作品詳細パネルの「その他」メニューとmissing警告バナーから作品登録を解除できるようにした（確認ダイアログ付き、物理ファイルは残る旨明記）。削除後は一覧・件数が即時更新され詳細パネルが閉じる。エラービューの欠損作品も同導線で削除可能で、最後の1件を消してもビュー遷移は破綻しない。check/unit/smoke全通過で検証済み
+<!-- SECTION:FINAL_SUMMARY:END -->
