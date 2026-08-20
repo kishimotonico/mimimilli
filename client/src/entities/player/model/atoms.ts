@@ -60,6 +60,26 @@ export const dockedBarActiveAtom = atom(
   (get) => get(playerIsActiveAtom) && get(playerUiModeAtom) === "bar",
 );
 
+/** ポップアップの初期位置（右下）からのドラッグ移動オフセット（px）。 */
+export interface PlayerPopupOffset {
+  x: number;
+  y: number;
+}
+
+export const PLAYER_POPUP_OFFSET_INITIAL: PlayerPopupOffset = { x: 0, y: 0 };
+
+/**
+ * 再生ポップアップの初期位置からのドラッグ移動オフセット。localStorage に永続化し、
+ * リロード後も維持する。motion value の初期値としてマウント時に一度だけ読まれるため
+ * getOnInit で同期読み込みする（既定の遅延読み込みだと初回描画に間に合わない）。
+ */
+export const playerPopupOffsetAtom = atomWithStorage<PlayerPopupOffset>(
+  "mimimilli:playerPopupOffset",
+  PLAYER_POPUP_OFFSET_INITIAL,
+  undefined,
+  { getOnInit: true },
+);
+
 /**
  * 高頻度更新の audio 再生時刻（秒）。
  * usePlaybackProgress 経由で BarSeekStrip / PopupSeek / FullScreenScrub のみ subscribe すること。
