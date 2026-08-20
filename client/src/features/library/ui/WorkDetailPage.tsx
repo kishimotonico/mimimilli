@@ -15,7 +15,7 @@ import { getAllTags } from "../../../entities/tag/api";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { TAG_QUERY_KEYS } from "../../../entities/tag/queryKeys";
 import { useRootFolder } from "../../../entities/settings/useSettingsQuery";
-import { setAppModeAtom } from "../../../shared/model/appModeAtoms";
+import { replaceAppModeAtom, setAppModeAtom } from "../../../shared/model/appModeAtoms";
 import {
   playerIsPlayingOrLoadingAtom,
   playingTrackIndexAtom,
@@ -44,6 +44,7 @@ export default function WorkDetailPage({ onPlay, onResume, onTogglePlay }: WorkD
   const playingTrackIndex = useAtomValue(playingTrackIndexAtom);
   const isPlaybackActive = useAtomValue(playerIsPlayingOrLoadingAtom);
   const setAppMode = useSetAtom(setAppModeAtom);
+  const replaceAppMode = useSetAtom(replaceAppModeAtom);
   const nav = useLibraryNavigation();
 
   const workQuery = useQuery({
@@ -53,15 +54,18 @@ export default function WorkDetailPage({ onPlay, onResume, onTogglePlay }: WorkD
   });
   const tagsQuery = useQuery({ queryKey: TAG_QUERY_KEYS.all(), queryFn: getAllTags });
   const workPatchMutations = useLibraryWorkPatchMutations(nav, searchQuery);
-  const deleteMutation = useLibraryWorkDeleteMutation(() => setAppMode("library"));
+  // 削除で詳細が無効化された結果の退避も、404と同じくreplaceで抜ける（下のuseEffect参照）。
+  const deleteMutation = useLibraryWorkDeleteMutation(() => replaceAppMode("library"));
 
   // 削除済み作品などをURLで直接開いた場合、404を確認したらライブラリへ戻す（LibraryViewの
   // 選択解除と同じ考え方。ネットワーク断・5xx等の一時的な失敗では留まりエラー表示・再試行を出す）。
+  // 現在の画面自体が無効なのでreplaceで退避する。pushだと「404→自動でlibraryへpush→
+  // 戻るで404詳細に戻る→また自動push」のループになり、戻る操作で抜けられなくなる。
   useEffect(() => {
     if (workQuery.error instanceof ApiRequestError && workQuery.error.status === 404) {
-      setAppMode("library");
+      replaceAppMode("library");
     }
-  }, [workQuery.error, setAppMode]);
+  }, [workQuery.error, replaceAppMode]);
 
   const work = workQuery.data ?? null;
   const isCurrentWorkPlaying = work !== null && playingWorkId === work.id;
