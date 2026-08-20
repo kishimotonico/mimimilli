@@ -120,6 +120,8 @@ export function useNavigationHistory(): void {
         return;
       }
 
+      if (state.mode === "nowPlaying") return;
+
       setFilesDirection(fileDirection);
       setFilesRelPath(state.files.relPath);
       setFilesSelectedPath(
@@ -192,6 +194,8 @@ export function useNavigationHistory(): void {
         mode,
         library: { activeAxis, selectedTags, selectedWorkId, sort, q: searchQuery },
       };
+    } else if (mode === "nowPlaying") {
+      state = { mode };
     } else {
       const selectedRelPath = filesSelectedPath ? filesSelectedPath.split("/") : null;
       state = { mode, files: { relPath: filesRelPath, selectedRelPath } };

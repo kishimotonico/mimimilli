@@ -1,5 +1,7 @@
-export type AppMode = "library" | "files";
+export type AppMode = "library" | "files" | "nowPlaying";
 
 export function readAppModeFromPathname(pathname: string): AppMode {
-  return pathname === "/files" || pathname.startsWith("/files/") ? "files" : "library";
+  if (pathname === "/files" || pathname.startsWith("/files/")) return "files";
+  if (pathname === "/now-playing") return "nowPlaying";
+  return "library";
 }
