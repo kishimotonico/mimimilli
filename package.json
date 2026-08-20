@@ -33,6 +33,7 @@
   "devDependencies": {
     "backlog.md": "1.47.1",
     "cross-env": "^10.1.0",
+    "cross-spawn": "^7.0.6",
     "npm-run-all2": "^9.0.3",
     "oxfmt": "^0.57.0",
     "oxlint": "^1.72.0",
