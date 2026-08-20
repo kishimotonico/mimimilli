@@ -109,6 +109,9 @@ export function usePopupDrag(): PopupDragBind {
     const duration = reduced ? 0 : RESET_DURATION_S;
     animate(x, 0, { duration, ease: [0, 0, 0.2, 1] });
     animate(y, 0, { duration, ease: [0, 0, 0.2, 1] });
+    // 既に原点なら書き込み・再レンダー不要（未ドラッグ状態での通常クリックが毎回ここを通るため）。
+    const current = offsetRef.current;
+    if (current.x === 0 && current.y === 0) return;
     setOffset({ x: 0, y: 0 });
   }, [reduced, setOffset, x, y]);
 
