@@ -31,9 +31,9 @@ interface WorkTagEditorProps {
   /** 編集ダイアログなど、折りたたむ必要がない場所では全タグを表示する。
    *  この場合は編集ダイアログ自体が明示的な編集操作なので削除ボタンは常時表示のまま。 */
   expanded?: boolean;
-  /** タグチップクリック時のハンドラ（タグ軸への絞り込み遷移）。expanded=true の
+  /** タグチップクリック時のハンドラ（絞り込み遷移。ADR-0013）。expanded=true の
    *  編集ダイアログ内では使わない（そこはタグクリックで遷移させない） */
-  onTagClick?: (tag: NormalizedTag) => void;
+  onTagClick?: (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
 }
 
 export function WorkTagEditor({
@@ -128,7 +128,9 @@ export function WorkTagEditor({
                 pending={isPending}
                 failed={isFailed}
                 onRemove={canRemove ? () => void requestRemoveTag(tag) : undefined}
-                onClick={!showRemoveButtons && onTagClick ? () => onTagClick(tag) : undefined}
+                onClick={
+                  !showRemoveButtons && onTagClick ? (opts) => onTagClick(tag, opts) : undefined
+                }
                 ariaLabel={
                   !showRemoveButtons && onTagClick ? `タグ「${tag}」で絞り込む` : undefined
                 }

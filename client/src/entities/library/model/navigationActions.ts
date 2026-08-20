@@ -54,13 +54,6 @@ export const addLibraryTagAtom = atom(null, (get, set, tag: NormalizedTag) => {
   set(selectedWorkIdAtom, null);
 });
 
-export const selectSoleLibraryTagAtom = atom(null, (_get, set, tag: NormalizedTag) => {
-  requestNavigationHistoryCommit(set, "push");
-  set(activeAxisAtom, "tag");
-  set(selectedTagsAtom, [tag]);
-  set(selectedWorkIdAtom, null);
-});
-
 export const replaceLibraryTagAtom = atom(null, (get, set, tag: NormalizedTag) => {
   requestNavigationHistoryCommit(set, "push");
   set(selectedTagsAtom, [tag]);

@@ -168,13 +168,15 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
     if (selectedWork) onResume(selectedWork);
   }, [selectedWork, onResume]);
 
-  // タグチップクリック → タグ軸へ遷移し、そのタグだけを選択した絞り込み状態にする
+  // タグチップクリック → replaceTagと同一挙動（ADR-0013）。Ctrl/Cmd+クリックは
+  // AND追加（addLibraryTagAtom相当）へ反転する。
   const handleTagClick = useCallback(
-    (tag: NormalizedTag) => {
-      nav.selectSoleTag(tag);
+    (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => {
+      if (opts.ctrlKey || opts.metaKey) nav.addTag(tag);
+      else nav.replaceTag(tag);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- nav は毎レンダー新規オブジェクトのため参照する値だけに依存を絞る
-    [nav.selectSoleTag],
+    [nav.addTag, nav.replaceTag],
   );
 
   const handleEditSmartFolder = useCallback(() => {

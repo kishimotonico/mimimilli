@@ -34,8 +34,8 @@ interface WorkDetailProps {
   tagSuggestions: string[];
   workPatchMutations: ReturnType<typeof useLibraryWorkPatchMutations>;
   deleteMutation: UseMutationResult<void, Error, string>;
-  /** タグチップクリック時のハンドラ（タグ軸への絞り込み遷移） */
-  onTagClick: (tag: NormalizedTag) => void;
+  /** タグチップクリック時のハンドラ（絞り込み遷移。ADR-0013） */
+  onTagClick: (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
 }
 
 export function WorkDetail({

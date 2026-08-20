@@ -9,6 +9,7 @@ import {
   parseBuiltinAxisTag,
   parseTag,
   TagNormalizationError,
+  type AxisFacetItem,
   type CollectionStats,
   type FacetAxisId,
   type NormalizedTag,
@@ -47,6 +48,22 @@ export function buildFilterTag(axis: AxisId, value: string): NormalizedTag {
   const normalized = normalizeTag(`${axis}/${value}`);
   if (normalized === null) throw new TagNormalizationError(`${axis}/${value}`);
   return normalized;
+}
+
+/** サーバー由来の facet 一覧から、buildFilterTag が正規化できない値を取り除く。
+ *  軸の値一覧はこれを通ったデータだけを描画対象にすることで、不正値による
+ *  render中throw（RootErrorBoundaryへの巻き込み）を経路として残さない。 */
+export function filterValidFacetItems<T extends AxisFacetItem>(axis: AxisId, items: T[]): T[] {
+  return items.filter((item) => {
+    try {
+      buildFilterTag(axis, item.value);
+      return true;
+    } catch (cause) {
+      if (!(cause instanceof TagNormalizationError)) throw cause;
+      console.warn(`軸「${axis}」の値「${item.value}」を正規化できないためスキップしました`, cause);
+      return false;
+    }
+  });
 }
 
 // ── 軸レール・チップの入口共通「置き換え既定」（ADR-0013） ─────────────

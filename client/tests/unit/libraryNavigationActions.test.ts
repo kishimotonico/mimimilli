@@ -15,7 +15,6 @@ import {
   clearLibraryTagsAtom,
   replaceLibraryTagAtom,
   selectLibraryWorkAtom,
-  selectSoleLibraryTagAtom,
   setLibraryAxisAtom,
   toggleLibraryTagAtom,
 } from "../../src/entities/library/model/navigationActions";
@@ -105,28 +104,6 @@ describe("toggleLibraryTagAtom: year は単一選択（別の年を選ぶと前�
     store.set(toggleLibraryTagAtom, nt("@year/2024"));
 
     expect(store.get(selectedTagsAtom)).toEqual(["year/2025", "@year/2024"]);
-  });
-});
-
-describe("selectSoleLibraryTagAtom: 作品詳細のタグクリックはタグ軸へ切り替えつつそのタグだけを選択する", () => {
-  it("既存の絞り込み・軸が何であってもそのタグだけを選択した状態になる", () => {
-    const store = createStore();
-    store.set(activeAxisAtom, "circle");
-    store.set(selectedTagsAtom, nts(["cv/藤田茜", "サークル/月白製作所"]));
-
-    store.set(selectSoleLibraryTagAtom, nt("genre/ASMR"));
-
-    expect(store.get(activeAxisAtom)).toBe("tag");
-    expect(store.get(selectedTagsAtom)).toEqual(["genre/ASMR"]);
-  });
-
-  it("選択中の作品をクリアする", () => {
-    const store = createStore();
-    store.set(selectedWorkIdAtom, "work-1");
-
-    store.set(selectSoleLibraryTagAtom, nt("genre/ASMR"));
-
-    expect(store.get(selectedWorkIdAtom)).toBeNull();
   });
 });
 
