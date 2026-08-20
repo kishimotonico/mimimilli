@@ -234,6 +234,7 @@ export default function App() {
               onResume={handleResume}
               onTogglePlay={player.togglePlay}
               onPlayFile={player.playFile}
+              onOpenWork={handleOpenLibraryWork}
             />
           }
           transportBar={<PlayerDock onShowPlayingWork={handleOpenLibraryWork} />}

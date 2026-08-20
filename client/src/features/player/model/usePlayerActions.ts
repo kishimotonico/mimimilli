@@ -172,6 +172,13 @@ export function usePlayerActions() {
     [controller, requireCapabilities],
   );
 
+  const setABPointAt = useCallback(
+    (point: "a" | "b", positionSec: number) => {
+      controller.dispatch({ type: "abPointSet", point, positionSec });
+    },
+    [controller],
+  );
+
   const clearABRepeat = useCallback(() => {
     controller.dispatch({ type: "abCleared" });
   }, [controller]);
@@ -195,6 +202,7 @@ export function usePlayerActions() {
       setPlaybackRate,
       setChannelSwap,
       setABPoint,
+      setABPointAt,
       clearABRepeat,
       resume,
       pause,
@@ -217,6 +225,7 @@ export function usePlayerActions() {
       setPlaybackRate,
       setChannelSwap,
       setABPoint,
+      setABPointAt,
       clearABRepeat,
       resume,
       pause,
