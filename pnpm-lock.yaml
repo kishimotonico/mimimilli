@@ -14,6 +14,9 @@ importers:
       cross-env:
         specifier: ^10.1.0
         version: 10.1.0
+      cross-spawn:
+        specifier: ^7.0.6
+        version: 7.0.6
       npm-run-all2:
         specifier: ^9.0.3
         version: 9.0.3
@@ -2890,6 +2893,7 @@ packages:
   which@2.0.2:
     resolution: {integrity: sha512-BLI3Tl1TW3Pvl70l3yq3Y64i+awpwXqsGBYWkkqMtnbXgrMD+yj7rhW0kuEDxzJaYXGjEW5ogapKNMEKNMjibA==}
     engines: {node: '>= 8'}
+    hasBin: true
 
   which@7.0.0:
     resolution: {integrity: sha512-RancgH2dmbLdHl6LRhEqvklWMgl/Hdnun0Y90KhBOLkMefg8Qa7/Zel8Sm+8HEcP6DEjzsWzpkuBQEZok58isA==}

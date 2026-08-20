@@ -10,9 +10,10 @@
 //
 // 使い方: node scripts/dev-real.mjs -- <実行したいコマンド...>
 import { createHash } from "node:crypto";
-import { spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { homedir } from "node:os";
 import path from "node:path";
+import { spawnAndForward } from "./lib/spawnAndForward.mjs";
 
 function parseArgs(argv) {
   const sep = argv.indexOf("--");
@@ -82,34 +83,7 @@ function main() {
   const extraEnv = resolveExtraEnv(process.env, process.platform);
   const env = { ...process.env, ...extraEnv };
 
-  const child = spawn(command[0], command.slice(1), {
-    stdio: "inherit",
-    env,
-    shell: process.platform === "win32",
-  });
-
-  const signalHandlers = new Map();
-  for (const signal of ["SIGINT", "SIGTERM"]) {
-    const handler = () => child.kill(signal);
-    signalHandlers.set(signal, handler);
-    process.on(signal, handler);
-  }
-
-  child.on("exit", (code, signal) => {
-    if (signal) {
-      for (const [sig, handler] of signalHandlers) {
-        process.removeListener(sig, handler);
-      }
-      process.kill(process.pid, signal);
-      return;
-    }
-    process.exit(code ?? 1);
-  });
-
-  child.on("error", (err) => {
-    console.error(`[dev-real] コマンド起動に失敗しました: ${err.message}`);
-    process.exit(1);
-  });
+  spawnAndForward(command[0], command.slice(1), { env });
 }
 
 main();
