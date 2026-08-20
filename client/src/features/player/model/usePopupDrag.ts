@@ -68,15 +68,20 @@ export function usePopupDrag(): PopupDragBind {
   const recomputeConstraints = useCallback(() => {
     const el = popupRef.current;
     if (!el) return;
-    const rect = el.getBoundingClientRect();
+    // getBoundingClientRect は入場アニメ中の scale の影響を受けて縮んだ値になるため使わない。
+    // offsetWidth/offsetHeight は transform の影響を受けないレイアウトサイズ、
+    // 初期位置は CSS の right/bottom（transform 適用前の値）から直接求める。
+    const style = getComputedStyle(el);
+    const rightPx = Number.parseFloat(style.right) || 0;
+    const bottomPx = Number.parseFloat(style.bottom) || 0;
+    const width = el.offsetWidth;
+    const height = el.offsetHeight;
     const current = offsetRef.current;
-    const zeroLeft = rect.left - current.x;
-    const zeroTop = rect.top - current.y;
     const next: DragConstraints = {
-      left: -zeroLeft,
-      top: -zeroTop,
-      right: window.innerWidth - rect.width - zeroLeft,
-      bottom: window.innerHeight - rect.height - zeroTop,
+      left: -(window.innerWidth - rightPx - width),
+      top: -(window.innerHeight - bottomPx - height),
+      right: rightPx,
+      bottom: bottomPx,
     };
     setDragConstraints(next);
 
@@ -137,9 +142,12 @@ export function usePopupDrag(): PopupDragBind {
       x: clamp(rawX, constraints.left, constraints.right),
       y: clamp(rawY, constraints.top, constraints.bottom),
     };
-    setOffset(next);
     if (next.x !== rawX) x.set(next.x);
     if (next.y !== rawY) y.set(next.y);
+    // 移動を伴わないクリック（next が現在値と同じ）では localStorage 書き込み・再レンダーを起こさない。
+    const current = offsetRef.current;
+    if (next.x === current.x && next.y === current.y) return;
+    setOffset(next);
   }, [resetToOrigin, setOffset, x, y]);
 
   return {
