@@ -52,8 +52,11 @@ function ABHandle({ point, pct, trackRef, duration, time, onSetABPointAt }: ABHa
       onPointerUp={drag.onPointerUp}
       onKeyDown={(e) => {
         if (!duration) return;
+        if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+        e.preventDefault();
+        e.stopPropagation();
         if (e.key === "ArrowLeft") onSetABPointAt(point, Math.max(0, time - 1));
-        if (e.key === "ArrowRight") onSetABPointAt(point, Math.min(duration, time + 1));
+        else onSetABPointAt(point, Math.min(duration, time + 1));
       }}
     >
       <div
