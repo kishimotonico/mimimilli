@@ -19,7 +19,7 @@ interface PreviewPaneProps {
   onPlay: (trackIndex: number) => void;
   onResume: () => void;
   onTogglePlay: () => void;
-  onTagClick: (tag: NormalizedTag) => void;
+  onTagClick: (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
   tagSuggestions: string[];
   nav: LibraryViewState & Pick<LibraryViewActions, "selectWork">;
   searchQuery: string;

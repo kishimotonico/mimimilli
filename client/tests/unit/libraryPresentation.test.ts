@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import type { AxisFacetItem } from "@mimimilli/shared";
 import { ApiRequestError } from "../../src/shared/api/http";
 import { nt } from "../helpers/tag";
 import {
@@ -10,11 +11,16 @@ import {
   computeCollectionStatsDisplay,
   computeIsNoResultsDueToFilter,
   computeResultsPaneKind,
+  filterValidFacetItems,
   getFacetAxisForQuery,
   isGridViewActive,
   shouldClearSelectionOnFilterMiss,
   shouldClearSelectionOnWorkNotFound,
 } from "../../src/features/library/model/libraryPresentation";
+
+function facetItem(value: string): AxisFacetItem {
+  return { value, count: 1, durationSec: 0, covers: [] };
+}
 
 describe("computeResultsPaneKind", () => {
   it("facet 軸（prefix・year）は value-list", () => {
@@ -51,6 +57,24 @@ describe("buildFilterTag", () => {
   });
   it("year（タグ由来でない組み込み軸）は @軸/値 の擬似タグを組み立てる", () => {
     expect(buildFilterTag("year", "2024")).toBe("@year/2024");
+  });
+});
+
+describe("filterValidFacetItems", () => {
+  it("正規化できない値をスキップしconsole.warnする", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const result = filterValidFacetItems("tag", [facetItem("cv/藤田茜"), facetItem("   ")]);
+
+    expect(result).toEqual([facetItem("cv/藤田茜")]);
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+  });
+
+  it("すべて正規化できる値ならそのまま返す", () => {
+    const items = [facetItem("cv/藤田茜"), facetItem("cv/霧島レイ")];
+
+    expect(filterValidFacetItems("cv", items)).toEqual(items);
   });
 });
 

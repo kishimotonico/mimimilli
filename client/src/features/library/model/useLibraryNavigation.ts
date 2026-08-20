@@ -18,7 +18,6 @@ import {
   goToLibrarySegmentAtom,
   replaceLibraryTagAtom,
   selectLibraryWorkAtom,
-  selectSoleLibraryTagAtom,
   setLibraryAxisAtom,
   setLibrarySortAtom,
   toggleLibraryTagAtom,
@@ -40,7 +39,6 @@ export interface LibraryViewActions {
   replaceTag: (tag: NormalizedTag) => void;
   /** 追加ボタン用の冪等なAND追加（ADR-0013）。既に選択済みなら何もしない */
   addTag: (tag: NormalizedTag) => void;
-  selectSoleTag: (tag: NormalizedTag) => void;
   clearTags: () => void;
   selectWork: (id: string | null) => void;
   setSort: (sort: SortId) => void;
@@ -59,7 +57,6 @@ export function useLibraryView(): LibraryViewState & LibraryViewActions {
   const toggleTag = useSetAtom(toggleLibraryTagAtom);
   const replaceTag = useSetAtom(replaceLibraryTagAtom);
   const addTag = useSetAtom(addLibraryTagAtom);
-  const selectSoleTag = useSetAtom(selectSoleLibraryTagAtom);
   const clearTags = useSetAtom(clearLibraryTagsAtom);
   const selectWork = useSetAtom(selectLibraryWorkAtom);
   const setSort = useSetAtom(setLibrarySortAtom);
@@ -82,7 +79,6 @@ export function useLibraryView(): LibraryViewState & LibraryViewActions {
     toggleTag: transition(toggleTag),
     replaceTag: transition(replaceTag),
     addTag: transition(addTag),
-    selectSoleTag: transition(selectSoleTag),
     clearTags: () =>
       startTransition(() => {
         clearTags();

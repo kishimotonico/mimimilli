@@ -176,6 +176,29 @@ test("詳細パネル: 編集モードでのみタグ削除ボタンが現れる
   assertNoErrors(tracker);
 });
 
+test("詳細パネル: タグクリックで1クリックそのタグの作品一覧へ絞り込まれ詳細は閉じる（TASK-358）", async ({
+  page,
+}) => {
+  const tracker = trackErrors(page);
+  await openApp(page);
+
+  await page.getByText("夜更けの図書室で囁き朗読", { exact: false }).click();
+
+  const panel = page.locator(".mle-prv");
+  await expect(panel).toBeVisible();
+  await panel.getByRole("button", { name: "タグ「囁き」で絞り込む" }).click();
+
+  await expect(panel).toBeHidden();
+  await expect(page.locator(".mll-tagband .mll-tagband__chip")).toHaveText(["囁き"]);
+  await expect(page.getByRole("button", { name: "すべての作品" })).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
+  await expect(page.locator(".mle-col.is-results")).toBeVisible();
+
+  assertNoErrors(tracker);
+});
+
 test("スキャンダイアログが開いて完了し、閉じられる", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop-chromium", "desktop scenario only");
 

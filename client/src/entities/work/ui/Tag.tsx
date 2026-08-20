@@ -10,7 +10,7 @@ interface TagProps {
    *  未登録 prefix は prefix 文字列そのままのフォールバック表示 */
   definition?: TagPrefix | null;
   onRemove?: () => void;
-  onClick?: () => void;
+  onClick?: (opts: { ctrlKey: boolean; metaKey: boolean }) => void;
   /** onClick を持つ操作チップのアクセシブルネーム */
   ariaLabel?: string;
   /** 削除リクエスト送信中。専用のスピナーに差し替え、クリック不可にする */
@@ -94,7 +94,12 @@ export default function Tag({
 
     if (onClick && !onRemove) {
       return (
-        <button type="button" className={tagClass} aria-label={ariaLabel} onClick={onClick}>
+        <button
+          type="button"
+          className={tagClass}
+          aria-label={ariaLabel}
+          onClick={(e) => onClick({ ctrlKey: e.ctrlKey, metaKey: e.metaKey })}
+        >
           {content}
         </button>
       );
@@ -118,7 +123,12 @@ export default function Tag({
 
   if (onClick && !onRemove) {
     return (
-      <button type="button" className={tagClass} aria-label={ariaLabel} onClick={onClick}>
+      <button
+        type="button"
+        className={tagClass}
+        aria-label={ariaLabel}
+        onClick={(e) => onClick({ ctrlKey: e.ctrlKey, metaKey: e.metaKey })}
+      >
         {content}
       </button>
     );

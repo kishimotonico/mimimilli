@@ -16,7 +16,7 @@ interface WorkDetailPatchScopeProps {
   playingTrackIndex: number | null;
   isPlaybackActive?: boolean;
   tagSuggestions: string[];
-  onTagClick: (tag: NormalizedTag) => void;
+  onTagClick: (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
 }
 
 /** 作品単位で PATCH mutation を生成する。親で key={work.id} を付けてマウントし直すこと。 */
