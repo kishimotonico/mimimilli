@@ -19,6 +19,8 @@ import {
   dlsiteBulkApplyMissingResultSchema,
   dlsiteBulkCancelResponseSchema,
   dlsiteBulkSnapshotSchema,
+  missingWorksCountSchema,
+  unregisterMissingWorksResultSchema,
   createRandomSeed,
   type DlsiteBulkSnapshot,
   type Work,
@@ -32,6 +34,7 @@ import {
   type DlsiteApplyBody,
   type DlsiteStatePatch,
   type ResumeBody,
+  type UnregisterMissingWorksResult,
   type WorksPage,
   type WorksQueryInput,
 } from "@mimimilli/shared";
@@ -95,6 +98,17 @@ export async function patchWork(workId: string, body: WorkPatchInput): Promise<W
 /** 作品登録を解除する（DB・メタファイルのみ。物理ファイルは残す） */
 export async function deleteWork(workId: string): Promise<void> {
   await deleteVoid(`/works/${encodeURIComponent(workId)}`);
+}
+
+/** status === "missing" の作品数（一括削除の確認ダイアログ用） */
+export async function getMissingWorksCount(): Promise<number> {
+  const { count } = await getParsed(missingWorksCountSchema, "/works/missing-count");
+  return count;
+}
+
+/** status === "missing" の作品を一括で登録解除する（DB・メタファイルのみ。物理ファイルは残す） */
+export async function unregisterMissingWorks(): Promise<UnregisterMissingWorksResult> {
+  return postParsed(unregisterMissingWorksResultSchema, "/works/unregister-missing");
 }
 
 /** カバー画像のURLを返す（<img src> で直接使用可）。

@@ -180,6 +180,16 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
       return true;
     },
 
+    async countMissingWorks(): Promise<number> {
+      return state.works.filter((w) => w.status === "missing").length;
+    },
+
+    async unregisterMissingWorks(): Promise<{ deletedCount: number; failedCount: number }> {
+      const deletedCount = state.works.filter((w) => w.status === "missing").length;
+      state.works = state.works.filter((w) => w.status !== "missing");
+      return { deletedCount, failedCount: 0 };
+    },
+
     async patchWork(id: string, patch: WorkPatch): Promise<Work | null> {
       const work = state.works.find((w) => w.id === id);
       if (!work) return null;

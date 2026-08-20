@@ -37,9 +37,9 @@ interface WorkListPaneProps {
   onLoadMore?: () => void;
   onWorkSelect: (id: string) => void;
   onClearSearch: () => void;
-  /** スマートフォルダー軸のときだけ渡すルール表示・編集導線（プレビュー側ではなく
-   *  結果面ヘッダー直下に置く） */
-  smartFolderBanner?: ReactNode;
+  /** 結果面ヘッダー直下に置くバナー（スマートフォルダー軸のルール表示・編集導線、
+   *  エラービュー軸の一括削除導線など。プレビュー側ではなく結果面ヘッダー直下に置く） */
+  resultsBanner?: ReactNode;
 }
 
 export default function WorkListPane({
@@ -58,7 +58,7 @@ export default function WorkListPane({
   onLoadMore,
   onWorkSelect,
   onClearSearch,
-  smartFolderBanner,
+  resultsBanner,
 }: WorkListPaneProps) {
   const dockedBarActive = useAtomValue(dockedBarActiveAtom);
   const paddingEnd = dockedBarActive
@@ -104,7 +104,7 @@ export default function WorkListPane({
 
   return (
     <div className={`mle-col is-results ${isPending ? "is-pending" : ""}`}>
-      {smartFolderBanner}
+      {resultsBanner}
       <div ref={scrollRef} className="mle-col__list">
         {works.length === 0 ? (
           <CollectionStatus

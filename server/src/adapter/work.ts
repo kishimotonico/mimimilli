@@ -23,6 +23,10 @@ export interface WorkAdapter {
   reassignIdentityConflict(body: IdentityConflictReassignBody): Promise<Work | null>;
   /** 作品を DB とメタファイルから削除する。物理ファイルは触らない。存在しなければ false */
   deleteWork(id: string): Promise<boolean>;
+  /** status === "missing" の作品数 */
+  countMissingWorks(): Promise<number>;
+  /** status === "missing" の作品を全件登録解除する。一部失敗しても残りを続行する */
+  unregisterMissingWorks(): Promise<{ deletedCount: number; failedCount: number }>;
   getDlsiteNotificationSummary(): Promise<DlsiteNotificationSummary>;
   queryDlsiteNotifications(
     kind: DlsiteNotificationKind,

@@ -141,6 +141,20 @@ export type DlsiteNotificationQuery = z.infer<typeof dlsiteNotificationQuerySche
 /** GET /api/tags */
 export const tagListSchema = z.array(z.string());
 
+// ── 欠損作品の一括登録解除（GET /api/works/missing-count, POST /api/works/unregister-missing）──
+
+/** status === "missing" の作品数。一括削除の確認ダイアログが件数表示に使う */
+export const missingWorksCountSchema = z.object({
+  count: z.number().int().nonnegative(),
+});
+export type MissingWorksCount = z.infer<typeof missingWorksCountSchema>;
+
+export const unregisterMissingWorksResultSchema = z.object({
+  deletedCount: z.number().int().nonnegative(),
+  failedCount: z.number().int().nonnegative(),
+});
+export type UnregisterMissingWorksResult = z.infer<typeof unregisterMissingWorksResultSchema>;
+
 // ── 作品の部分更新（PATCH /api/works/:id）────────────────────
 
 export const workPatchSchema = z

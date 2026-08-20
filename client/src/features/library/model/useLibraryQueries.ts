@@ -16,6 +16,7 @@ import {
   type NormalizedTag,
   type SmartFolder,
   type SmartFolderCreate,
+  type UnregisterMissingWorksResult,
   type Work,
   type WorkPatchInput,
   type WorksPage,
@@ -28,7 +29,7 @@ import {
   evalSmartFolder,
 } from "../../../entities/smart-folder/api";
 import { getAllTags } from "../../../entities/tag/api";
-import { deleteWork, getWork, patchWork } from "../../../entities/work/api";
+import { deleteWork, getWork, patchWork, unregisterMissingWorks } from "../../../entities/work/api";
 import { assertWorkSourceRevision } from "../../../entities/work/sourceRevision";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { useRootFolder } from "../../../entities/settings/useSettingsQuery";
@@ -87,6 +88,7 @@ const SEARCH_DEBOUNCE_MS = 250;
  */
 import { libraryTotalQueryOptions } from "../../../entities/work/libraryTotalQueryOptions";
 import { errorViewCountQueryOptions } from "../../../entities/work/errorViewCountQueryOptions";
+import { missingWorksCountQueryOptions } from "../../../entities/work/missingWorksCountQueryOptions";
 interface WorksPageParam {
   page: number;
   seed: number | undefined;
@@ -348,6 +350,26 @@ export function useLibraryWorkDeleteMutation(onDeleted: (workId: string) => void
       await queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.all() });
       queryClient.removeQueries({ queryKey: WORK_QUERY_KEYS.detail(workId) });
       onDeleted(workId);
+    },
+  });
+}
+
+/** エラービュー表示中だけ、missing件数を取得する（一括削除の導線・確認ダイアログ用） */
+export function useMissingWorksCountQuery(enabled: boolean) {
+  return useQuery({ ...missingWorksCountQueryOptions, enabled });
+}
+
+/** missing作品の一括登録解除 mutation。成功時にworks系クエリを無効化する */
+export function useLibraryBulkUnregisterMissingMutation(
+  onSuccess: (result: UnregisterMissingWorksResult) => void,
+) {
+  const queryClient = useQueryClient();
+
+  return useMutation<UnregisterMissingWorksResult, Error, void>({
+    mutationFn: unregisterMissingWorks,
+    onSuccess: async (result) => {
+      await queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.all() });
+      onSuccess(result);
     },
   });
 }

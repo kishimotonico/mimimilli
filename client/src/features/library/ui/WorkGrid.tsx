@@ -48,9 +48,10 @@ interface WorkGridProps {
   onClearSearch: () => void;
   /** Esc・グリッド背景クリック時の選択解除 */
   onDeselect: () => void;
-  /** スマートフォルダー軸のときだけ渡すルール表示・編集導線（結果面ヘッダー直下に置く。
-   *  ADR-0012 §3 のレイアウト固定により、プレビュー側ではなく結果面自体が持つ） */
-  smartFolderBanner?: ReactNode;
+  /** 結果面ヘッダー直下に置くバナー（スマートフォルダー軸のルール表示・編集導線、
+   *  エラービュー軸の一括削除導線など）。ADR-0012 §3 のレイアウト固定により、
+   *  プレビュー側ではなく結果面自体が持つ */
+  resultsBanner?: ReactNode;
 }
 
 export default function WorkGrid({
@@ -71,7 +72,7 @@ export default function WorkGrid({
   onWorkPlay,
   onClearSearch,
   onDeselect,
-  smartFolderBanner,
+  resultsBanner,
 }: WorkGridProps) {
   const [tileSize, setTileSize] = useAtom(libraryTileSizeAtom);
   const gridLayoutMode = useAtomValue(libraryGridLayoutModeAtom);
@@ -156,7 +157,7 @@ export default function WorkGrid({
       className={`mll-grid-pane ${isPending ? "is-pending" : ""}`}
       aria-label="作品グリッド"
     >
-      {smartFolderBanner}
+      {resultsBanner}
       <div className="mll-grid-body">
         <div ref={scrollRef} className="mll-grid-scroll">
           {works.length === 0 ? (
