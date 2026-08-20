@@ -126,6 +126,25 @@ export function createWorkMethods(deps: {
       return unregisterWork(query, catalog, user, id);
     },
 
+    async countMissingWorks(): Promise<number> {
+      return query.countWorksByStatus("missing");
+    },
+
+    async unregisterMissingWorks(): Promise<{ deletedCount: number; failedCount: number }> {
+      const ids = query.listWorkIdsByStatus("missing");
+      let deletedCount = 0;
+      let failedCount = 0;
+      for (const id of ids) {
+        try {
+          if (unregisterWork(query, catalog, user, id)) deletedCount++;
+          else failedCount++;
+        } catch {
+          failedCount++;
+        }
+      }
+      return { deletedCount, failedCount };
+    },
+
     async patchWork(id: string, patch: WorkPatch): Promise<Work | null> {
       const metaPath = catalog.getWorkMetaPath(id);
       if (!metaPath) return null;

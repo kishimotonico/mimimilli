@@ -21,6 +21,7 @@ interface WorkMetadataActionsProps {
   bookmarkMutation: LibraryBookmarkPatchMutation;
   onEdit: () => void;
   onShowInfo: () => void;
+  onDelete: () => void;
 }
 
 export function WorkMetadataActions({
@@ -28,6 +29,7 @@ export function WorkMetadataActions({
   bookmarkMutation,
   onEdit,
   onShowInfo,
+  onDelete,
 }: WorkMetadataActionsProps) {
   const [isActionPopoverOpen, setIsActionPopoverOpen] = useState(false);
 
@@ -128,6 +130,19 @@ export function WorkMetadataActions({
                   ))}
                 </>
               )}
+              <hr className="my-1 border-0 border-t border-t-line-soft" />
+              <button
+                type="button"
+                role="menuitem"
+                className="flex min-h-7 w-full items-center gap-2 rounded-1 px-2 font-jp text-[12px] text-[color:var(--r-coral)] hover:bg-paper-2 focus:bg-paper-2 focus:outline-none"
+                onClick={() => {
+                  close();
+                  onDelete();
+                }}
+              >
+                <I.trash size={13} />
+                <span className="min-w-0 flex-1 truncate">作品登録を解除</span>
+              </button>
             </div>
           </div>
         )}

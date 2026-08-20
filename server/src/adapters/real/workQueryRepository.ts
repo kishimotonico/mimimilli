@@ -699,6 +699,21 @@ export class WorkQueryRepository {
     return row ?? null;
   }
 
+  countWorksByStatus(status: Work["status"]): number {
+    const row = this.db.sqlite
+      .query(`SELECT COUNT(*) AS count FROM main.works WHERE status = ?`)
+      .get(status) as { count: number };
+    return row.count;
+  }
+
+  listWorkIdsByStatus(status: Work["status"]): string[] {
+    return (
+      this.db.sqlite.query(`SELECT id FROM main.works WHERE status = ?`).all(status) as Array<{
+        id: string;
+      }>
+    ).map((row) => row.id);
+  }
+
   listAllTagNames(): string[] {
     return this.db.catalog
       .selectDistinct({ name: tags.name })

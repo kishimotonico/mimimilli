@@ -1,5 +1,5 @@
 import type { NormalizedTag, Work } from "@mimimilli/shared";
-import type { LibraryViewState } from "../model/useLibraryNavigation";
+import type { LibraryViewActions, LibraryViewState } from "../model/useLibraryNavigation";
 import CollectionStatus from "../../../shared/ui/CollectionStatus";
 import { I } from "../../../shared/ui/Icon";
 import { WorkDetailPatchScope } from "./preview/WorkDetailPatchScope";
@@ -21,7 +21,7 @@ interface PreviewPaneProps {
   onTogglePlay: () => void;
   onTagClick: (tag: NormalizedTag) => void;
   tagSuggestions: string[];
-  nav: LibraryViewState;
+  nav: LibraryViewState & Pick<LibraryViewActions, "selectWork">;
   searchQuery: string;
   /** grid/listスライドインどちらの経路でも同じ閉じ方にする（TASK-295）。 */
   onClose: () => void;

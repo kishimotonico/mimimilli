@@ -3,7 +3,7 @@
 // 確認する。重いサブコンポーネント（タグ編集・トラック一覧等）はモック化し、
 // 再生ボタンまわりの配線だけを検証する。
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { Work } from "@mimimilli/shared";
 import { emptyDlsiteState } from "@mimimilli/shared";
 import { WorkDetail } from "../../src/features/library/ui/preview/WorkDetail";
@@ -71,6 +71,16 @@ function makeWorkPatchMutationsStub() {
   };
 }
 
+function makeDeleteMutationStub(overrides: Partial<{ mutate: ReturnType<typeof vi.fn> }> = {}) {
+  return {
+    isPending: false,
+    error: null,
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    ...overrides,
+  } as unknown as React.ComponentProps<typeof WorkDetail>["deleteMutation"];
+}
+
 function renderDetail(props: Partial<React.ComponentProps<typeof WorkDetail>> = {}) {
   return render(
     <WorkDetail
@@ -82,6 +92,7 @@ function renderDetail(props: Partial<React.ComponentProps<typeof WorkDetail>> = 
       isPlaybackActive={false}
       tagSuggestions={[]}
       workPatchMutations={makeWorkPatchMutationsStub()}
+      deleteMutation={makeDeleteMutationStub()}
       onTagClick={vi.fn()}
       {...props}
     />,
@@ -128,5 +139,31 @@ describe("WorkDetail: 再生ボタンの状態導出", () => {
     renderDetail({ work, playingTrackIndex: null });
     const bar = screen.getByRole("progressbar", { name: "再開位置" });
     expect(bar.getAttribute("aria-valuenow")).toBe("1");
+  });
+});
+
+describe("WorkDetail: 作品登録の解除", () => {
+  it("その他メニューから解除を選び確認ダイアログで解除するとmutation.mutateを呼ぶ", () => {
+    const mutate = vi.fn();
+    renderDetail({ deleteMutation: makeDeleteMutationStub({ mutate }) });
+
+    fireEvent.click(screen.getByRole("button", { name: "その他" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "作品登録を解除" }));
+    expect(screen.getByRole("alertdialog", { name: "作品登録を解除" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "解除する" }));
+    expect(mutate).toHaveBeenCalledWith("w1", expect.anything());
+  });
+
+  it("確認ダイアログをキャンセルするとmutation.mutateを呼ばない", () => {
+    const mutate = vi.fn();
+    renderDetail({ deleteMutation: makeDeleteMutationStub({ mutate }) });
+
+    fireEvent.click(screen.getByRole("button", { name: "その他" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "作品登録を解除" }));
+    fireEvent.click(screen.getByRole("button", { name: "キャンセル" }));
+
+    expect(mutate).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alertdialog")).toBeNull();
   });
 });

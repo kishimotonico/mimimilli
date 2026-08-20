@@ -80,6 +80,17 @@ export function worksRoute(
     return c.json(work, 201);
   });
 
+  // ":id" と衝突するため、GET /works/:id より前で定義する
+  app.get("/works/missing-count", async (c) => {
+    const count = await adapter.countMissingWorks();
+    return c.json({ count });
+  });
+
+  app.post("/works/unregister-missing", async (c) => {
+    const result = await adapter.unregisterMissingWorks();
+    return c.json(result);
+  });
+
   app.get("/works/:id", async (c) => {
     const work = await adapter.getWork(c.req.param("id"));
     if (!work) notFound(`作品が見つかりません: ${c.req.param("id")}`);

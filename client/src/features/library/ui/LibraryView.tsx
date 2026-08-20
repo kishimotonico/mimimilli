@@ -17,8 +17,10 @@ import {
 } from "../../../entities/player/model/atoms";
 import { useLibraryNavigation } from "../model/useLibraryNavigation";
 import {
+  useLibraryBulkUnregisterMissingMutation,
   useLibraryDebouncedSearchQuery,
   useLibrarySupportingQueries,
+  useMissingWorksCountQuery,
   useSmartFolderMutation,
 } from "../model/useLibraryQueries";
 import {
@@ -44,6 +46,7 @@ import WorkListPane from "./WorkListPane";
 import SmartFolderEditorModal from "./SmartFolderEditorModal";
 import { SmartFolderView } from "./preview/SmartFolderView";
 import { DataIntegrityWarningBanner } from "./DataIntegrityWarningBanner";
+import { ErrorViewBulkDeleteBanner } from "./ErrorViewBulkDeleteBanner";
 import LibraryWorksBoundary from "./LibraryWorksBoundary";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 
@@ -107,6 +110,12 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
       if (wasNew) nav.setAxis(`smart-${savedFolder.id}`);
     },
     onError: () => {},
+  });
+
+  const isErrorView = nav.activeAxis === "error";
+  const missingWorksCountQuery = useMissingWorksCountQuery(isErrorView);
+  const bulkUnregisterMissingMutation = useLibraryBulkUnregisterMissingMutation(() => {
+    if (selectedWork?.status === "missing") nav.selectWork(null);
   });
 
   // ── 表示導出（純粋計算は model/libraryPresentation に集約） ──
@@ -242,7 +251,7 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
                 axis: nav.activeAxis,
                 params: result.worksParams,
               });
-              const smartFolderBanner = activeSmartFolder ? (
+              const resultsBanner = activeSmartFolder ? (
                 <div className="flex flex-col gap-2">
                   {result.dataIntegrityWarning ? (
                     <DataIntegrityWarningBanner
@@ -255,6 +264,11 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
                     onEdit={handleEditSmartFolder}
                   />
                 </div>
+              ) : isErrorView ? (
+                <ErrorViewBulkDeleteBanner
+                  missingCount={missingWorksCountQuery.data}
+                  mutation={bulkUnregisterMissingMutation}
+                />
               ) : undefined;
               return (
                 <div className="mll-results">
@@ -278,7 +292,7 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
                         onWorkPlay={(work) => onPlay(work, 0)}
                         onClearSearch={() => setSearchQuery("")}
                         onDeselect={() => nav.selectWork(null)}
-                        smartFolderBanner={smartFolderBanner}
+                        resultsBanner={resultsBanner}
                       />
                     ) : (
                       <WorkListPane
@@ -297,7 +311,7 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
                         onLoadMore={() => void result.fetchNextPage()}
                         onWorkSelect={nav.selectWork}
                         onClearSearch={() => setSearchQuery("")}
-                        smartFolderBanner={smartFolderBanner}
+                        resultsBanner={resultsBanner}
                       />
                     )}
                   </div>
