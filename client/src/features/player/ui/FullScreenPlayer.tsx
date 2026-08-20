@@ -3,7 +3,9 @@ import type { PlayerState } from "../model/usePlayerState";
 import FullScreenScrub from "./FullScreenScrub";
 import PlaybackErrorNotice from "./PlaybackErrorNotice";
 import PlaybackArtwork from "./PlaybackArtwork";
-import { formatTime, formatDuration } from "../../../shared/lib/format";
+import PlayerTransportControls from "./PlayerTransportControls";
+import ABRepeatBar from "./ABRepeatBar";
+import { formatDuration } from "../../../shared/lib/format";
 import { selectFixedCoverThumbnailWidth } from "../../../entities/work/ui/coverThumbnailWidth";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
@@ -25,11 +27,6 @@ interface FullScreenPlayerProps {
   onSetABPoint: (point: "a" | "b") => void;
   onClearABRepeat: () => void;
 }
-
-// 円形のトランスポートボタン（±10秒 / prev / next / ループ）共通スタイル。
-// IconButton のサイズ対（26/30/38px）に収まらない全画面専用の 40px 円のため、
-// ここでは素の button + Tailwind クラスで組む。
-const ROUND_BTN = "grid h-[40px] w-[40px] place-items-center rounded-full cursor-pointer";
 
 export default function FullScreenPlayer({
   state,
@@ -62,8 +59,6 @@ export default function FullScreenPlayer({
     playbackError,
   } = state;
   const track = tracks[currentTrackIndex] ?? null;
-  // リピートが実際に成立する条件（usePlayer 側のループ発動条件と同じ a < b）
-  const hasABRepeat = abRepeat.a !== null && abRepeat.b !== null && abRepeat.a < abRepeat.b;
 
   useLayoutEffect(() => {
     const dialog = dialogRef.current;
@@ -147,134 +142,26 @@ export default function FullScreenPlayer({
             <FullScreenScrub onSeek={onSeek} abRepeat={abRepeat} />
 
             {/* Controls */}
-            <div className="flex items-center gap-3.5 pt-2">
-              <button
-                aria-label="10秒戻る"
-                title="10秒戻る"
-                onClick={() => onSeekRelative(-10)}
-                className={cn(ROUND_BTN, "text-ink-1")}
-              >
-                <span className="font-mono text-[11px] font-bold">−10</span>
-              </button>
-              <button
-                aria-label="前のトラック"
-                title="前のトラック"
-                onClick={onPrev}
-                className={cn(ROUND_BTN, "text-ink-1")}
-              >
-                <I.prev size={16} />
-              </button>
-              <button
-                aria-label={isPlaying ? "一時停止" : "再生"}
-                title={isPlaying ? "一時停止" : "再生"}
-                onClick={onTogglePlay}
-                className="grid h-[56px] w-[56px] cursor-pointer place-items-center rounded-full bg-ink-0 text-paper-1"
-              >
-                {isPlaying ? <I.pause size={18} /> : <I.play size={18} />}
-              </button>
-              <button
-                aria-label="次のトラック"
-                title="次のトラック"
-                onClick={onNext}
-                className={cn(ROUND_BTN, "text-ink-1")}
-              >
-                <I.next size={16} />
-              </button>
-              <button
-                aria-label="10秒進む"
-                title="10秒進む"
-                onClick={() => onSeekRelative(10)}
-                className={cn(ROUND_BTN, "text-ink-1")}
-              >
-                <span className="font-mono text-[11px] font-bold">+10</span>
-              </button>
-              <button
-                aria-label="ループ"
-                title="ループ"
-                aria-pressed={loop}
-                onClick={() => onSetLoop(!loop)}
-                className={cn(ROUND_BTN, loop ? "bg-acc-soft text-acc" : "text-ink-1")}
-              >
-                <I.loopOne size={16} />
-              </button>
-              <button
-                aria-label="左右チャンネル入替"
-                title="左右チャンネル入替"
-                aria-pressed={channelSwap}
-                onClick={() => onSetChannelSwap(!channelSwap)}
-                className={cn(ROUND_BTN, channelSwap ? "bg-acc-soft text-acc" : "text-ink-1")}
-              >
-                <I.swapLR size={16} />
-              </button>
-
-              <div className="ml-auto flex items-center gap-2">
-                <I.volume size={13} className="text-ink-3" />
-                <input
-                  type="range"
-                  aria-label="音量"
-                  title={`音量 ${volume}%`}
-                  min={0}
-                  max={100}
-                  value={volume}
-                  onChange={(e) => onSetVolume(Number(e.target.value))}
-                  className="w-20 cursor-pointer accent-[var(--ink-2)]"
-                />
-                <span className="w-[3ch] text-right font-mono text-[11px] tabular-nums text-ink-3">
-                  {volume}
-                </span>
-              </div>
-            </div>
+            <PlayerTransportControls
+              isPlaying={isPlaying}
+              volume={volume}
+              loop={loop}
+              channelSwap={channelSwap}
+              onTogglePlay={onTogglePlay}
+              onSeekRelative={onSeekRelative}
+              onNext={onNext}
+              onPrev={onPrev}
+              onSetLoop={onSetLoop}
+              onSetChannelSwap={onSetChannelSwap}
+              onSetVolume={onSetVolume}
+            />
 
             {/* A-Bリピート: A/B点の設定・解除。設定中はシークバー上の範囲表示（上部）で分かる */}
-            <div className="flex items-center gap-2 pt-2.5">
-              <span className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-ink-3">
-                A-Bリピート
-              </span>
-              <button
-                type="button"
-                aria-label="A地点を設定"
-                title="A地点を設定"
-                onClick={() => onSetABPoint("a")}
-                className={cn(
-                  "grid h-[26px] w-[26px] cursor-pointer place-items-center rounded-2 font-mono text-[11px] font-bold",
-                  abRepeat.a !== null ? "bg-acc-soft text-acc" : "text-ink-1 hover:bg-paper-2",
-                )}
-              >
-                A
-              </button>
-              <button
-                type="button"
-                aria-label="B地点を設定"
-                title="B地点を設定"
-                onClick={() => onSetABPoint("b")}
-                className={cn(
-                  "grid h-[26px] w-[26px] cursor-pointer place-items-center rounded-2 font-mono text-[11px] font-bold",
-                  abRepeat.b !== null ? "bg-acc-soft text-acc" : "text-ink-1 hover:bg-paper-2",
-                )}
-              >
-                B
-              </button>
-              {(abRepeat.a !== null || abRepeat.b !== null) && (
-                <>
-                  <span className="font-mono text-[10.5px] text-ink-3">
-                    {abRepeat.a !== null ? formatTime(abRepeat.a) : "--:--"}
-                    {" – "}
-                    {abRepeat.b !== null ? formatTime(abRepeat.b) : "--:--"}
-                  </span>
-                  <IconButton
-                    size="sm"
-                    icon={I.x}
-                    label="A-Bリピートを解除"
-                    onClick={onClearABRepeat}
-                  />
-                </>
-              )}
-              {hasABRepeat && (
-                <span className="font-mono text-[10.5px] text-acc" aria-live="polite">
-                  リピート中
-                </span>
-              )}
-            </div>
+            <ABRepeatBar
+              abRepeat={abRepeat}
+              onSetABPoint={onSetABPoint}
+              onClearABRepeat={onClearABRepeat}
+            />
           </div>
         </div>
       </div>
