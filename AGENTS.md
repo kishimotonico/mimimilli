@@ -4,7 +4,7 @@
 
 - コミットメッセージは日本語・Conventional Commits形式で（例: `feat: プロジェクト一覧画面を追加`）
 - `git -C` オプションは使用禁止。プッシュは人間がやる
-- 中規模以上のタスクは統合ブランチ（`feat/〜`）に作業ブランチを集約し、全タスク完了時に最終レビューを経てmasterへマージする。統合ブランチのマージは最後の1回のみ
+- 中規模以上のタスクは統合ブランチ（`feat/〜`）に作業ブランチを集約し、全タスク完了時に最終レビューを経てmasterへ `--no-ff` マージする（`Merge <ブランチ名>: 要約（TASK-ID）`、詳細は本文へ）。作業ブランチを個別にmasterへマージせず、統合ブランチへは原則fast-forwardで取り込む
 
 ## ドキュメント運用
 
@@ -34,7 +34,7 @@
 - 委譲時は表示内容・文言・既存UIとの整合まで決めた仕様を渡す
 - 実装担当は担当範囲内でさらに委任・並列化してよい。成果は統括へ一括報告する
 - 検証担当は問題を証拠付きで統括へ報告する。修正しない
-- 1タスク1worktreeが基本。統括が `git worktree add .worktrees/<タスクID>` で専用ブランチを用意して渡し、統合もマージで行う。worktreeごとに `pnpm install` する
+- 1タスク1worktreeが基本。統括が `git worktree add .worktrees/<タスクID>` で専用ブランチを用意して渡す。worktreeごとに `pnpm install` する
 - レビュー担当（Sonnet）を常設し、コミット前に「報告にない副作用」だけをレビューする
 - 実装担当は受け入れ条件を満たすたび `pnpm backlog task edit <id> --check-ac <n>` でチェックし、完了時はテキストで報告する。統括はpollingしない
 - Claude Code: 総括 Fable or Opus / 実装 Sonnet or Cursor（UI・デザイン系はSonnet、ロジック中心はCursor）/ 検証・レビュー Sonnet
