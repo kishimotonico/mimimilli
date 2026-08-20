@@ -1,38 +1,40 @@
 import assert from "node:assert/strict";
 import {
+  cpSync,
   existsSync,
   mkdirSync,
   readdirSync,
   readFileSync,
-  renameSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { test } from "node:test";
 import { Database } from "bun:sqlite";
+import { drizzle } from "drizzle-orm/bun-sqlite";
+import { migrate } from "drizzle-orm/bun-sqlite/migrator";
 import { openDb } from "../../src/adapters/real/db.ts";
 import {
-  executeSqliteMigrations,
-  hasPendingSqliteMigrations,
-} from "../../src/adapters/real/sqliteMigrationExecutor.ts";
-import {
-  createDatabaseCandidatePath,
-  replaceDatabaseWithCandidate,
-} from "../../src/adapters/real/databaseReplacement.ts";
-import {
   createDatabaseBackup,
-  DB_BACKUP_RETENTION_COUNT,
-  moveDatabaseToBackup,
   purgeOldBackups,
   verifyDatabaseBackup,
 } from "../../src/adapters/real/dbBackup.ts";
+import {
+  assertDatabaseNotNewerThanApp,
+  executeSqliteMigrations,
+  hasPendingSqliteMigrations,
+} from "../../src/adapters/real/sqliteMigrationExecutor.ts";
 import { makeTestDirectory } from "../helpers/sampleLibrary.ts";
 import { captureLogs, categoryRecords, recordMessage } from "../helpers/logCapture.ts";
 
+const USER_MIGRATIONS_DIR = join(import.meta.dir, "../../drizzle/user");
+const CATALOG_MIGRATIONS_DIR = join(import.meta.dir, "../../drizzle/catalog");
+const OPEN_DB_HARNESS = join(import.meta.dir, "helpers/openDbHarness.ts");
+
 function countPreMigrationBackups(backupDir: string, kind: "catalog" | "user"): number {
+  if (!existsSync(backupDir)) return 0;
   return readdirSync(backupDir).filter(
-    (name) => name.startsWith(`${kind}-`) && name.endsWith("-pre-migration.sqlite"),
+    (name) => name.startsWith(`${kind}-`) && name.includes("-pre-migration"),
   ).length;
 }
 
@@ -45,48 +47,340 @@ function appliedMigrationCount(sqlite: Database): number {
   }
 }
 
-function assertNoReplacementFiles(dbPath: string): void {
-  const directory = dirname(dbPath);
-  assert.equal(
-    readdirSync(directory).some(
-      (name) =>
-        name.startsWith(`.${dbPath.split(/[\\/]/).at(-1)}.candidate-`) ||
-        name.startsWith(`.${dbPath.split(/[\\/]/).at(-1)}.rollback-`),
-    ),
-    false,
+function tableExists(sqlite: Database, name: string): boolean {
+  const statement = sqlite.query(
+    "SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table' AND name = ?",
   );
+  try {
+    return ((statement.get(name) as { count: number } | null)?.count ?? 0) > 0;
+  } finally {
+    statement.finalize();
+  }
 }
 
-function findRollbackFileName(directory: string, part: "main" | "wal"): string | undefined {
-  return readdirSync(directory).find((name) => {
-    if (!name.includes(".rollback-")) return false;
-    if (part === "wal") return name.endsWith("-wal");
-    return !name.endsWith("-wal") && !name.endsWith("-shm");
-  });
+function buildUserMigrationsDirThrough(destDir: string, lastTag: string): void {
+  cpSync(USER_MIGRATIONS_DIR, destDir, { recursive: true });
+  const journalPath = join(destDir, "meta", "_journal.json");
+  const journal = JSON.parse(readFileSync(journalPath, "utf-8")) as {
+    entries: Array<{ tag: string }>;
+  };
+  const lastIndex = journal.entries.findIndex((entry) => entry.tag === lastTag);
+  assert.ok(lastIndex >= 0, `journal entry not found: ${lastTag}`);
+  const excludedTags = journal.entries.slice(lastIndex + 1).map((entry) => entry.tag);
+  for (const tag of excludedTags) {
+    rmSync(join(destDir, `${tag}.sql`), { force: true });
+    rmSync(join(destDir, "meta", `${tag.slice(0, 4)}_snapshot.json`), { force: true });
+  }
+  journal.entries = journal.entries.slice(0, lastIndex + 1);
+  writeFileSync(journalPath, JSON.stringify(journal, null, 2));
 }
 
-const USER_MIGRATIONS_DIR = join(import.meta.dir, "../../drizzle/user");
+function seedLegacyUserDb(userPath: string, migrationsDir: string): void {
+  mkdirSync(join(userPath, ".."), { recursive: true });
+  const sqlite = new Database(userPath, { create: true });
+  sqlite.exec("PRAGMA journal_mode = WAL");
+  migrate(drizzle(sqlite), { migrationsFolder: migrationsDir });
+  sqlite.close();
+}
 
-test("moveDatabaseToBackupはsqlite/wal/shmを退避し、元ファイルを残さない", (t) => {
-  const directory = makeTestDirectory("db-backup-move");
+test("AC1: user migration 0004までの旧スキーマはopenDbで0005まで適用され開ける", (t) => {
+  const directory = makeTestDirectory("db-inplace-user-0004");
   t.after(directory.cleanup);
-  const dbPath = join(directory.path, "db", "catalog.sqlite");
+  const catalogPath = join(directory.path, "db", "catalog.sqlite");
+  const userPath = join(directory.path, "db", "user.sqlite");
+  const backupDir = join(directory.path, "backup");
+  const legacyMigrations = join(directory.path, "legacy-user-migrations");
+  buildUserMigrationsDirThrough(legacyMigrations, "0004_sparkling_masked_marvel");
+  seedLegacyUserDb(userPath, legacyMigrations);
+
+  const legacy = new Database(userPath, { readonly: true });
+  assert.equal(tableExists(legacy, "scan_candidate_exclusions"), false);
+  assert.equal(hasPendingSqliteMigrations(legacy, USER_MIGRATIONS_DIR), true);
+  legacy.close();
+
+  const db = openDb({ kind: "files", catalogPath, userPath }, { backupDir });
+  try {
+    const table = db.sqlite
+      .query(
+        "SELECT name FROM user.sqlite_master WHERE type = 'table' AND name = 'scan_candidate_exclusions'",
+      )
+      .get();
+    assert.ok(table);
+  } finally {
+    db.close();
+  }
+});
+
+test("AC2: migration途中kill後の再openは完了境界のいずれかの一貫状態になる", async (t) => {
+  const directory = makeTestDirectory("db-inplace-kill");
+  t.after(directory.cleanup);
+  const catalogPath = join(directory.path, "db", "catalog.sqlite");
+  const userPath = join(directory.path, "db", "user.sqlite");
+  const backupDir = join(directory.path, "backup");
+  const legacyMigrations = join(directory.path, "legacy-user-migrations");
+  buildUserMigrationsDirThrough(legacyMigrations, "0004_sparkling_masked_marvel");
+  seedLegacyUserDb(userPath, legacyMigrations);
+
+  openDb({ kind: "files", catalogPath, userPath }, { backupDir }).close();
+
+  const proc = Bun.spawn(["bun", OPEN_DB_HARNESS, catalogPath, userPath, backupDir], {
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  await Bun.sleep(30);
+  proc.kill(9);
+  await proc.exited;
+
+  const reopened = new Database(userPath, { readonly: true });
+  const migrationCount = appliedMigrationCount(reopened);
+  const hasExclusions = tableExists(reopened, "scan_candidate_exclusions");
+  reopened.close();
+
+  assert.ok(migrationCount === 5 || migrationCount === 6);
+  if (migrationCount === 5) assert.equal(hasExclusions, false);
+  if (migrationCount === 6) assert.equal(hasExclusions, true);
+
+  assert.doesNotThrow(() =>
+    openDb({ kind: "files", catalogPath, userPath }, { backupDir }).close(),
+  );
+});
+
+test("AC3: PRAGMA foreign_keysを含むmigrationはトランザクション外で適用され終了後にONへ戻る", (t) => {
+  const directory = makeTestDirectory("db-inplace-fk-pragma");
+  t.after(directory.cleanup);
+  const migrationsDir = join(directory.path, "migrations");
+  mkdirSync(join(migrationsDir, "meta"), { recursive: true });
+  cpSync(
+    join(CATALOG_MIGRATIONS_DIR, "0006_heavy_emma_frost.sql"),
+    join(migrationsDir, "0006_heavy_emma_frost.sql"),
+  );
+  cpSync(
+    join(CATALOG_MIGRATIONS_DIR, "meta", "0006_snapshot.json"),
+    join(migrationsDir, "meta", "0006_snapshot.json"),
+  );
+  const folderMillis = JSON.parse(
+    readFileSync(join(CATALOG_MIGRATIONS_DIR, "meta/_journal.json"), "utf-8"),
+  ).entries.find((entry: { tag: string }) => entry.tag === "0006_heavy_emma_frost").when;
+  writeFileSync(
+    join(migrationsDir, "meta/_journal.json"),
+    JSON.stringify({
+      version: "7",
+      dialect: "sqlite",
+      entries: [
+        {
+          idx: 0,
+          version: "6",
+          when: folderMillis,
+          tag: "0006_heavy_emma_frost",
+          breakpoints: true,
+        },
+      ],
+    }),
+  );
+
+  const dbPath = join(directory.path, "catalog.sqlite");
+  const sqlite = new Database(dbPath, { create: true });
+  sqlite.exec("PRAGMA journal_mode = WAL");
+  sqlite.exec("PRAGMA foreign_keys = ON");
+  sqlite.exec(`
+    CREATE TABLE audio_probe_cache (
+      path text PRIMARY KEY NOT NULL,
+      size integer NOT NULL,
+      mtime_ms integer NOT NULL,
+      duration_sec real
+    )
+  `);
+  sqlite.exec(
+    `INSERT INTO audio_probe_cache (path, size, mtime_ms, duration_sec) VALUES ('/lib/ok.wav', 1, 1, 1.0)`,
+  );
+  executeSqliteMigrations(sqlite, migrationsDir, 9);
+  const foreignKeys = sqlite.query("PRAGMA foreign_keys").get() as { foreign_keys: number };
+  assert.equal(foreignKeys.foreign_keys, 1);
+  sqlite.close();
+});
+
+test("AC3: FK違反データではforeign_key_checkによりmigrationが失敗する", (t) => {
+  const directory = makeTestDirectory("db-inplace-fk-violation");
+  t.after(directory.cleanup);
+  const migrationsDir = join(directory.path, "migrations");
+  mkdirSync(join(migrationsDir, "meta"), { recursive: true });
+  writeFileSync(
+    join(migrationsDir, "0000_bad.sql"),
+    [
+      "PRAGMA foreign_keys=OFF;",
+      "CREATE TABLE parent (id INTEGER PRIMARY KEY);",
+      "CREATE TABLE child (parent_id INTEGER REFERENCES parent(id));",
+      "INSERT INTO child (parent_id) VALUES (1);",
+      "PRAGMA foreign_keys=ON;",
+    ].join("\n--> statement-breakpoint\n"),
+  );
+  writeFileSync(
+    join(migrationsDir, "meta/_journal.json"),
+    JSON.stringify({
+      version: "7",
+      dialect: "sqlite",
+      entries: [
+        {
+          idx: 0,
+          version: "6",
+          when: 1,
+          tag: "0000_bad",
+          breakpoints: true,
+        },
+      ],
+    }),
+  );
+  const sqlite = new Database(join(directory.path, "db.sqlite"), { create: true });
+  assert.throws(
+    () => executeSqliteMigrations(sqlite, migrationsDir, 1),
+    /foreign_key_check が失敗しました/,
+  );
+  const foreignKeys = sqlite.query("PRAGMA foreign_keys").get() as { foreign_keys: number };
+  assert.equal(foreignKeys.foreign_keys, 1);
+  assert.equal(appliedMigrationCount(sqlite), 0);
+  sqlite.close();
+});
+
+test("AC4: DBがアプリより新しい場合はバックアップもuser_version書換えもせずfail-fastする", (t) => {
+  const directory = makeTestDirectory("db-inplace-newer-db");
+  t.after(directory.cleanup);
+  const catalogPath = join(directory.path, "db", "catalog.sqlite");
+  const userPath = join(directory.path, "db", "user.sqlite");
+  const backupDir = join(directory.path, "backup");
   mkdirSync(join(directory.path, "db"), { recursive: true });
-  writeFileSync(dbPath, "catalog");
-  writeFileSync(`${dbPath}-wal`, "wal");
-  writeFileSync(`${dbPath}-shm`, "shm");
+  const sqlite = new Database(userPath, { create: true });
+  sqlite.exec("PRAGMA user_version = 99");
+  sqlite.close();
+
+  assert.throws(
+    () => openDb({ kind: "files", catalogPath, userPath }, { backupDir }),
+    /DBのスキーマバージョンがアプリより新しいです/,
+  );
+  assert.equal(existsSync(backupDir), false);
+  const reopened = new Database(userPath, { readonly: true });
+  assert.equal(
+    (reopened.query("PRAGMA user_version").get() as { user_version: number }).user_version,
+    99,
+  );
+  reopened.close();
+});
+
+test("AC4: journalにない新しいledgerエントリでもfail-fastする", (t) => {
+  const directory = makeTestDirectory("db-inplace-unknown-ledger");
+  t.after(directory.cleanup);
+  const sqlite = new Database(join(directory.path, "user.sqlite"), { create: true });
+  sqlite.exec(`
+    CREATE TABLE __drizzle_migrations (
+      id SERIAL PRIMARY KEY,
+      hash text NOT NULL,
+      created_at numeric
+    )
+  `);
+  sqlite.run("INSERT INTO __drizzle_migrations (hash, created_at) VALUES (?, ?)", [
+    "future",
+    Number.MAX_SAFE_INTEGER,
+  ]);
+  assert.throws(
+    () => assertDatabaseNotNewerThanApp(sqlite, USER_MIGRATIONS_DIR, 7),
+    /アプリ未対応のmigration履歴/,
+  );
+  sqlite.close();
+});
+
+test("AC5: migration失敗時は旧スキーマのまま起動失敗しpre-migrationバックアップが残る", async (t) => {
+  const directory = makeTestDirectory("db-inplace-migration-failure");
+  t.after(directory.cleanup);
+  const catalogPath = join(directory.path, "db", "catalog.sqlite");
+  const userPath = join(directory.path, "db", "user.sqlite");
+  const backupDir = join(directory.path, "backup");
+  const location = { kind: "files" as const, catalogPath, userPath };
+  const options = { backupDir };
+
+  openDb(location, options).close();
+  const backupsBeforeFailure = countPreMigrationBackups(backupDir, "user");
+  const user = new Database(userPath);
+  user.exec("DELETE FROM __drizzle_migrations");
+  user.close();
+
+  await captureLogs(
+    async (records) => {
+      assert.throws(() => openDb(location, options), /already exists/);
+      const failure = categoryRecords(records, "db").find(
+        (record) =>
+          recordMessage(record) === "データベースのオープンに失敗しました" &&
+          record.properties.kind === "user" &&
+          record.properties.phase === "migrate",
+      );
+      assert.ok(failure);
+    },
+    { categories: ["db"] },
+  );
+
+  const retained = new Database(userPath, { readonly: true });
+  assert.equal(appliedMigrationCount(retained), 0);
+  assert.ok(tableExists(retained, "work_states"));
+  retained.close();
+  assert.equal(countPreMigrationBackups(backupDir, "user"), backupsBeforeFailure + 1);
+  assert.doesNotThrow(() => rmSync(userPath));
+});
+
+test("AC5: VACUUM INTO失敗・検証NGの出力ファイルは残らない", (t) => {
+  const directory = makeTestDirectory("db-inplace-backup-cleanup");
+  t.after(directory.cleanup);
+  const dbPath = join(directory.path, "user.sqlite");
+  const backupDir = join(directory.path, "backup");
+  mkdirSync(backupDir, { recursive: true });
+  const sqlite = new Database(dbPath, { create: true });
+  sqlite.exec("CREATE TABLE entries (value TEXT NOT NULL)");
+  sqlite.run("INSERT INTO entries (value) VALUES (?)", ["broken"]);
+  const backupPath = join(backupDir, "user-broken-pre-migration.sqlite");
+  writeFileSync(backupPath, "not-a-database");
+
+  assert.throws(() => verifyDatabaseBackup(backupPath));
+  assert.equal(existsSync(backupPath), false);
+  sqlite.close();
+});
+
+test("AC6: 新規DBではバックアップ・検証がスキップされる", (t) => {
+  const directory = makeTestDirectory("db-inplace-new-db-skip-backup");
+  t.after(directory.cleanup);
+  const catalogPath = join(directory.path, "db", "catalog.sqlite");
+  const userPath = join(directory.path, "db", "user.sqlite");
   const backupDir = join(directory.path, "backup");
 
-  const backupPath = moveDatabaseToBackup(dbPath, backupDir, "catalog", "version-mismatch");
+  openDb({ kind: "files", catalogPath, userPath }, { backupDir }).close();
 
-  assert.ok(backupPath.includes("catalog-"));
-  assert.ok(backupPath.includes("version-mismatch.sqlite"));
-  assert.equal(existsSync(dbPath), false);
-  assert.equal(existsSync(`${dbPath}-wal`), false);
-  assert.equal(existsSync(`${dbPath}-shm`), false);
-  assert.equal(readFileSync(backupPath, "utf-8"), "catalog");
-  assert.equal(readFileSync(`${backupPath}-wal`, "utf-8"), "wal");
-  assert.equal(readFileSync(`${backupPath}-shm`, "utf-8"), "shm");
+  assert.equal(existsSync(backupDir), false);
+});
+
+test("AC6: purgeOldBackupsは連番付きも生成順で世代管理する", (t) => {
+  const directory = makeTestDirectory("db-inplace-purge-sequence");
+  t.after(directory.cleanup);
+  const backupDir = join(directory.path, "backup");
+  mkdirSync(backupDir, { recursive: true });
+  const timestamp = "2026-03-01T00-00-00-000";
+  const names = [
+    `user-${timestamp}-pre-migration.sqlite`,
+    `user-${timestamp}-pre-migration-1.sqlite`,
+    `user-${timestamp}-pre-migration-2.sqlite`,
+    `user-2026-03-02T00-00-00-000-pre-migration.sqlite`,
+    `user-2026-03-03T00-00-00-000-pre-migration.sqlite`,
+    `user-2026-03-04T00-00-00-000-pre-migration.sqlite`,
+    `user-2026-03-05T00-00-00-000-pre-migration.sqlite`,
+    `user-2026-03-06T00-00-00-000-pre-migration.sqlite`,
+  ];
+  for (const name of names) writeFileSync(join(backupDir, name), name);
+
+  purgeOldBackups(backupDir, "user");
+
+  const remaining = readdirSync(backupDir).sort();
+  assert.deepEqual(remaining, [
+    "user-2026-03-02T00-00-00-000-pre-migration.sqlite",
+    "user-2026-03-03T00-00-00-000-pre-migration.sqlite",
+    "user-2026-03-04T00-00-00-000-pre-migration.sqlite",
+    "user-2026-03-05T00-00-00-000-pre-migration.sqlite",
+    "user-2026-03-06T00-00-00-000-pre-migration.sqlite",
+  ]);
 });
 
 test("createDatabaseBackupはWALを含むDBから一貫した論理スナップショットを作成する", (t) => {
@@ -105,7 +399,7 @@ test("createDatabaseBackupはWALを含むDBから一貫した論理スナップ�
 
   assert.ok(backupPath.includes("pre-migration.sqlite"));
   assert.equal(existsSync(`${backupPath}-wal`), false);
-  verifyDatabaseBackup(backupPath, "user");
+  verifyDatabaseBackup(backupPath);
   const snapshot = new Database(backupPath, { readonly: true });
   assert.equal(
     snapshot.query<{ value: string }, []>("SELECT value FROM entries").get()?.value,
@@ -114,390 +408,15 @@ test("createDatabaseBackupはWALを含むDBから一貫した論理スナップ�
   snapshot.close();
 });
 
-test("verifyDatabaseBackupはDB種別ごとの必須schemaを読み出す", (t) => {
-  const directory = makeTestDirectory("db-backup-schema-read");
+test("verifyDatabaseBackupはintegrity_checkのみを検査する", (t) => {
+  const directory = makeTestDirectory("db-backup-integrity-only");
   t.after(directory.cleanup);
   const dbPath = join(directory.path, "user.sqlite");
   const sqlite = new Database(dbPath, { create: true });
   sqlite.exec("CREATE TABLE work_states (work_id TEXT PRIMARY KEY)");
   const backupPath = createDatabaseBackup(sqlite, join(directory.path, "backup"), "user");
   sqlite.close();
-
-  assert.throws(() => verifyDatabaseBackup(backupPath, "user"), /必須テーブルがありません/);
-});
-
-test("user DBのmigrationは候補除外テーブルを作成し、バックアップ検証の必須schemaに含める", (t) => {
-  const directory = makeTestDirectory("db-backup-candidate-exclusions");
-  t.after(directory.cleanup);
-  const catalogPath = join(directory.path, "db", "catalog.sqlite");
-  const userPath = join(directory.path, "db", "user.sqlite");
-  const db = openDb({ kind: "files", catalogPath, userPath });
-  try {
-    const table = db.sqlite
-      .query(
-        "SELECT name FROM user.sqlite_master WHERE type = 'table' AND name = 'scan_candidate_exclusions'",
-      )
-      .get();
-    assert.ok(table);
-  } finally {
-    db.close();
-  }
-  const user = new Database(userPath);
-  try {
-    const backupPath = createDatabaseBackup(user, join(directory.path, "backup"), "user");
-    assert.doesNotThrow(() => verifyDatabaseBackup(backupPath, "user"));
-  } finally {
-    user.close();
-  }
-});
-
-test("候補DBは既存destinationを直接上書きせず同一ディレクトリで入れ替える", (t) => {
-  const directory = makeTestDirectory("db-candidate-replace");
-  t.after(directory.cleanup);
-  const dbPath = join(directory.path, "db", "user.sqlite");
-  mkdirSync(join(directory.path, "db"), { recursive: true });
-  const candidatePath = createDatabaseCandidatePath(dbPath);
-  writeFileSync(dbPath, "old");
-  writeFileSync(`${dbPath}-wal`, "old-wal");
-  writeFileSync(candidatePath, "new");
-  const destinations: string[] = [];
-
-  replaceDatabaseWithCandidate(dbPath, candidatePath, {
-    exists: existsSync,
-    rename(source, destination) {
-      if (source === candidatePath) {
-        assert.equal(existsSync(destination), false, "candidateは空のdestinationへ置換する");
-      }
-      destinations.push(destination);
-      renameSync(source, destination);
-    },
-    remove(path) {
-      rmSync(path, { force: true });
-    },
-  });
-
-  assert.equal(readFileSync(dbPath, "utf-8"), "new");
-  assert.equal(existsSync(`${dbPath}-wal`), false);
-  assert.ok(destinations.some((destination) => destination.includes(".rollback-")));
-  assert.equal(
-    readdirSync(dirname(dbPath)).some((name) => name.startsWith(".user.sqlite.")),
-    false,
-  );
-});
-
-test("候補DBのinstall失敗時は旧DBを復元し一時ファイルを削除する", (t) => {
-  const directory = makeTestDirectory("db-candidate-rollback");
-  t.after(directory.cleanup);
-  const dbPath = join(directory.path, "db", "user.sqlite");
-  mkdirSync(join(directory.path, "db"), { recursive: true });
-  const candidatePath = createDatabaseCandidatePath(dbPath);
-  writeFileSync(dbPath, "old");
-  writeFileSync(`${dbPath}-wal`, "old-wal");
-  writeFileSync(candidatePath, "new");
-
-  assert.throws(
-    () =>
-      replaceDatabaseWithCandidate(dbPath, candidatePath, {
-        exists: existsSync,
-        rename(source, destination) {
-          if (source === candidatePath && destination === dbPath) {
-            throw new Error("candidate install failed");
-          }
-          renameSync(source, destination);
-        },
-        remove(path) {
-          rmSync(path, { force: true });
-        },
-      }),
-    /candidate install failed/,
-  );
-
-  assert.equal(readFileSync(dbPath, "utf-8"), "old");
-  assert.equal(readFileSync(`${dbPath}-wal`, "utf-8"), "old-wal");
-  assert.equal(existsSync(candidatePath), false);
-  assert.equal(
-    readdirSync(dirname(dbPath)).some((name) => name.startsWith(".user.sqlite.")),
-    false,
-  );
-});
-
-test("候補DBのcleanup失敗はinstall失敗を上書きせず旧DBを復元する", (t) => {
-  const directory = makeTestDirectory("db-candidate-cleanup-failure");
-  t.after(directory.cleanup);
-  const dbPath = join(directory.path, "db", "user.sqlite");
-  mkdirSync(join(directory.path, "db"), { recursive: true });
-  const candidatePath = createDatabaseCandidatePath(dbPath);
-  writeFileSync(dbPath, "old");
-  writeFileSync(`${dbPath}-wal`, "old-wal");
-  writeFileSync(candidatePath, "new");
-
-  assert.throws(
-    () =>
-      replaceDatabaseWithCandidate(dbPath, candidatePath, {
-        exists: existsSync,
-        rename(source, destination) {
-          if (source === candidatePath && destination === dbPath) {
-            throw new Error("candidate install failed");
-          }
-          renameSync(source, destination);
-        },
-        remove(path) {
-          rmSync(path, { force: true });
-          if (path === candidatePath) throw new Error("candidate cleanup failed");
-        },
-      }),
-    /candidate install failed/,
-  );
-
-  assert.equal(readFileSync(dbPath, "utf-8"), "old");
-  assert.equal(readFileSync(`${dbPath}-wal`, "utf-8"), "old-wal");
-  assertNoReplacementFiles(dbPath);
-});
-
-test("候補DBの復元失敗時はinstall失敗を一次例外として保持し、restore失敗はsuppressedへ積む", (t) => {
-  const directory = makeTestDirectory("db-candidate-restore-failure");
-  t.after(directory.cleanup);
-  const dbPath = join(directory.path, "db", "user.sqlite");
-  mkdirSync(join(directory.path, "db"), { recursive: true });
-  const candidatePath = createDatabaseCandidatePath(dbPath);
-  writeFileSync(dbPath, "old");
-  writeFileSync(`${dbPath}-wal`, "old-wal");
-  writeFileSync(candidatePath, "new");
-
-  let thrown: unknown;
-  try {
-    replaceDatabaseWithCandidate(dbPath, candidatePath, {
-      exists: existsSync,
-      rename(source, destination) {
-        if (source === candidatePath && destination === dbPath) {
-          throw new Error("candidate install failed");
-        }
-        if (source.includes(".rollback-") && destination === dbPath) {
-          throw new Error("rollback restore failed");
-        }
-        renameSync(source, destination);
-      },
-      remove(path) {
-        rmSync(path, { force: true });
-      },
-    });
-  } catch (error) {
-    thrown = error;
-  }
-
-  assert.ok(thrown instanceof Error);
-  assert.match(thrown.message, /candidate install failed/);
-  const suppressed = (thrown as Error & { suppressed?: unknown[] }).suppressed;
-  assert.equal(suppressed?.length, 1);
-  assert.match((suppressed![0] as Error).message, /rollback restore failed/);
-
-  assert.equal(existsSync(dbPath), false);
-  assert.equal(existsSync(candidatePath), false);
-  const rollbackName = findRollbackFileName(dirname(dbPath), "main");
-  assert.ok(rollbackName);
-  const rollbackPath = join(dirname(dbPath), rollbackName);
-  assert.equal(readFileSync(rollbackPath, "utf-8"), "old");
-  assert.equal(readFileSync(`${rollbackPath}-wal`, "utf-8"), "old-wal");
-});
-
-test("本体復元成功後にsidecar復元が失敗しても、best-effortで一式をrollback側へ収束させる", (t) => {
-  const directory = makeTestDirectory("db-candidate-sidecar-restore-failure");
-  t.after(directory.cleanup);
-  const dbPath = join(directory.path, "db", "user.sqlite");
-  mkdirSync(join(directory.path, "db"), { recursive: true });
-  const candidatePath = createDatabaseCandidatePath(dbPath);
-  writeFileSync(dbPath, "old");
-  writeFileSync(`${dbPath}-wal`, "old-wal");
-  writeFileSync(candidatePath, "new");
-
-  let thrown: unknown;
-  try {
-    replaceDatabaseWithCandidate(dbPath, candidatePath, {
-      exists: existsSync,
-      rename(source, destination) {
-        if (source === candidatePath && destination === dbPath) {
-          throw new Error("candidate install failed");
-        }
-        if (
-          source.endsWith("-wal") &&
-          source.includes(".rollback-") &&
-          destination === `${dbPath}-wal`
-        ) {
-          throw new Error("sidecar restore failed");
-        }
-        renameSync(source, destination);
-      },
-      remove(path) {
-        rmSync(path, { force: true });
-      },
-    });
-  } catch (error) {
-    thrown = error;
-  }
-
-  assert.ok(thrown instanceof Error);
-  assert.match(thrown.message, /candidate install failed/);
-  const suppressed = (thrown as Error & { suppressed?: unknown[] }).suppressed;
-  assert.equal(suppressed?.length, 1);
-  assert.match((suppressed![0] as Error).message, /sidecar restore failed/);
-
-  // 分断が残らない: 本体・WALのいずれも通常path側には存在せず、rollback側へ収束している。
-  assert.equal(existsSync(dbPath), false);
-  assert.equal(existsSync(`${dbPath}-wal`), false);
-  assert.equal(existsSync(candidatePath), false);
-  const rollbackName = findRollbackFileName(dirname(dbPath), "main");
-  assert.ok(rollbackName);
-  const rollbackPath = join(dirname(dbPath), rollbackName);
-  assert.equal(readFileSync(rollbackPath, "utf-8"), "old");
-  assert.equal(readFileSync(`${rollbackPath}-wal`, "utf-8"), "old-wal");
-});
-
-test("sidecar復元の再退避にも失敗した場合は両例外をsuppressedへ保持し、分断状態を警告ログへ残す", async (t) => {
-  const directory = makeTestDirectory("db-candidate-sidecar-reevacuation-failure");
-  t.after(directory.cleanup);
-  const dbPath = join(directory.path, "db", "user.sqlite");
-  mkdirSync(join(directory.path, "db"), { recursive: true });
-  const candidatePath = createDatabaseCandidatePath(dbPath);
-  writeFileSync(dbPath, "old");
-  writeFileSync(`${dbPath}-wal`, "old-wal");
-  writeFileSync(candidatePath, "new");
-
-  let thrown: unknown;
-  // dbPathを起点とするrenameは「初回のrollback退避」と「再退避」の2回発生し、
-  // source/destinationだけでは区別できないため出現回数で2回目のみ失敗させる。
-  let dbPathRenameCount = 0;
-  await captureLogs(
-    async (records) => {
-      try {
-        replaceDatabaseWithCandidate(dbPath, candidatePath, {
-          exists: existsSync,
-          rename(source, destination) {
-            if (source === candidatePath && destination === dbPath) {
-              throw new Error("candidate install failed");
-            }
-            if (
-              source.endsWith("-wal") &&
-              source.includes(".rollback-") &&
-              destination === `${dbPath}-wal`
-            ) {
-              throw new Error("sidecar restore failed");
-            }
-            if (source === dbPath) {
-              dbPathRenameCount += 1;
-              if (dbPathRenameCount === 2) throw new Error("re-evacuation failed");
-            }
-            renameSync(source, destination);
-          },
-          remove(path) {
-            rmSync(path, { force: true });
-          },
-        });
-      } catch (error) {
-        thrown = error;
-      }
-
-      const warning = categoryRecords(records, "db").find(
-        (record) =>
-          recordMessage(record) ===
-          "復元失敗後の再退避に失敗し、DBファイルがrollback側と通常path側へ分断されました",
-      );
-      assert.ok(warning);
-      assert.equal(warning.properties.stuckAt, dbPath);
-
-      // preservedSuffixesは実際にrollback側へ揃った分のみを指す。本体は再退避に失敗しpath側に
-      // 取り残されているため、WALのみが挙がり本体("")は含まれない。
-      const preserveWarning = categoryRecords(records, "db").find(
-        (record) =>
-          recordMessage(record) === "入替に失敗しました。rollback一式を手動復旧用に残しています",
-      );
-      assert.ok(preserveWarning);
-      assert.deepEqual(preserveWarning.properties.preservedSuffixes, ["-wal"]);
-    },
-    { categories: ["db"] },
-  );
-
-  assert.ok(thrown instanceof Error);
-  assert.match(thrown.message, /candidate install failed/);
-  const suppressed = (thrown as Error & { suppressed?: unknown[] }).suppressed;
-  assert.equal(suppressed?.length, 2);
-  assert.match((suppressed![0] as Error).message, /sidecar restore failed/);
-  assert.match((suppressed![1] as Error).message, /re-evacuation failed/);
-
-  // 最終的な復旧対象の場所が判別できる: 本体はpath側に取り残され、WALはrollback側に残る。
-  assert.equal(existsSync(dbPath), true);
-  assert.equal(readFileSync(dbPath, "utf-8"), "old");
-  assert.equal(existsSync(`${dbPath}-wal`), false);
-  const rollbackWalName = findRollbackFileName(dirname(dbPath), "wal");
-  assert.ok(rollbackWalName);
-  assert.equal(readFileSync(join(dirname(dbPath), rollbackWalName), "utf-8"), "old-wal");
-});
-
-test("WAL退避成功後にSHM退避が失敗しても部分進捗を追跡し、rollback cleanupが元WALを削除しない", (t) => {
-  const directory = makeTestDirectory("db-candidate-shm-evacuation-failure");
-  t.after(directory.cleanup);
-  const dbPath = join(directory.path, "db", "user.sqlite");
-  mkdirSync(join(directory.path, "db"), { recursive: true });
-  const candidatePath = createDatabaseCandidatePath(dbPath);
-  writeFileSync(dbPath, "old");
-  writeFileSync(`${dbPath}-wal`, "old-wal");
-  writeFileSync(`${dbPath}-shm`, "old-shm");
-  writeFileSync(candidatePath, "new");
-
-  let thrown: unknown;
-  try {
-    replaceDatabaseWithCandidate(dbPath, candidatePath, {
-      exists: existsSync,
-      rename(source, destination) {
-        if (source === `${dbPath}-shm`) throw new Error("shm evacuation failed");
-        renameSync(source, destination);
-      },
-      remove(path) {
-        rmSync(path, { force: true });
-      },
-    });
-  } catch (error) {
-    thrown = error;
-  }
-
-  // SHM退避エラーが一次例外として伝播する(candidate installには到達しない)。
-  assert.ok(thrown instanceof Error);
-  assert.match(thrown.message, /shm evacuation failed/);
-
-  // 本体・WALの両方が通常pathへ復元され、WALの内容が保全される(rollback cleanupで削除されない)。
-  assert.equal(existsSync(dbPath), true);
-  assert.equal(readFileSync(dbPath, "utf-8"), "old");
-  assert.equal(existsSync(`${dbPath}-wal`), true);
-  assert.equal(readFileSync(`${dbPath}-wal`, "utf-8"), "old-wal");
-
-  // SHMは退避に失敗したため元の場所に残る。
-  assert.equal(existsSync(`${dbPath}-shm`), true);
-  assert.equal(readFileSync(`${dbPath}-shm`, "utf-8"), "old-shm");
-
-  // 最終的に分断が残らない: candidate/rollback系の残骸がない。
-  assertNoReplacementFiles(dbPath);
-});
-
-test("入替成功後のrollback一時ファイル削除失敗はbest-effortで処理され、入替自体は成功する", (t) => {
-  const directory = makeTestDirectory("db-candidate-rollback-cleanup-failure");
-  t.after(directory.cleanup);
-  const dbPath = join(directory.path, "db", "user.sqlite");
-  mkdirSync(join(directory.path, "db"), { recursive: true });
-  const candidatePath = createDatabaseCandidatePath(dbPath);
-  writeFileSync(dbPath, "old");
-  writeFileSync(candidatePath, "new");
-
-  assert.doesNotThrow(() =>
-    replaceDatabaseWithCandidate(dbPath, candidatePath, {
-      exists: existsSync,
-      rename: renameSync,
-      remove(path) {
-        if (path.includes(".rollback-")) throw new Error("EBUSY: resource busy or locked");
-        rmSync(path, { force: true });
-      },
-    }),
-  );
-
-  assert.equal(readFileSync(dbPath, "utf-8"), "new");
+  assert.doesNotThrow(() => verifyDatabaseBackup(backupPath));
 });
 
 test("migration rollback失敗は元のmigration例外を保持する", () => {
@@ -507,51 +426,30 @@ test("migration rollback失敗は元のmigration例外を保持する", () => {
   const sqlite = {
     exec(sql: string) {
       if (sql === "ROLLBACK") throw rollbackError;
+      if (sql === "PRAGMA foreign_keys = ON") return;
+      if (sql === "PRAGMA foreign_keys = OFF") return;
       if (sql !== "BEGIN" && executions++ > 0) throw migrationError;
     },
     query() {
       return {
         get: () => null,
+        all: () => [],
         finalize() {},
         run() {},
       };
     },
+    run() {},
   } as unknown as Database;
 
   let thrown: unknown;
   try {
-    executeSqliteMigrations(sqlite, USER_MIGRATIONS_DIR);
+    executeSqliteMigrations(sqlite, USER_MIGRATIONS_DIR, 7);
   } catch (error) {
     thrown = error;
   }
 
   assert.equal(thrown, migrationError);
   assert.deepEqual((thrown as Error & { suppressed?: unknown[] }).suppressed, [rollbackError]);
-});
-
-test("Windows実ファイルで候補migration executorは成功後にDBを解放する", (t) => {
-  const directory = makeTestDirectory("db-candidate-migration-executor-success");
-  t.after(directory.cleanup);
-  const dbPath = join(directory.path, "candidate.sqlite");
-  const sqlite = new Database(dbPath, { create: true });
-
-  executeSqliteMigrations(sqlite, USER_MIGRATIONS_DIR);
-  sqlite.close();
-
-  assert.doesNotThrow(() => rmSync(dbPath));
-});
-
-test("Windows実ファイルで候補migration executorは失敗後にもDBを解放する", (t) => {
-  const directory = makeTestDirectory("db-candidate-migration-executor-failure");
-  t.after(directory.cleanup);
-  const dbPath = join(directory.path, "candidate.sqlite");
-  const sqlite = new Database(dbPath, { create: true });
-  sqlite.exec("CREATE TABLE app_settings (key TEXT PRIMARY KEY)");
-
-  assert.throws(() => executeSqliteMigrations(sqlite, USER_MIGRATIONS_DIR), /already exists/);
-  sqlite.close();
-
-  assert.doesNotThrow(() => rmSync(dbPath));
 });
 
 test("createDatabaseBackupは同一タイムスタンプで衝突した場合に上書きせず連番サフィックスを付ける", (t) => {
@@ -583,53 +481,7 @@ test("createDatabaseBackupは同一タイムスタンプで衝突した場合に
   );
   firstSnapshot.close();
   secondSnapshot.close();
-  assert.match(second!, /-1\.sqlite$/);
-});
-
-test("purgeOldBackupsはpre-migrationのみN世代を超えた分を削除する", (t) => {
-  const directory = makeTestDirectory("db-backup-purge");
-  t.after(directory.cleanup);
-  const backupDir = join(directory.path, "backup");
-  mkdirSync(backupDir, { recursive: true });
-  const keep = DB_BACKUP_RETENTION_COUNT + 2;
-  for (let i = 0; i < keep; i++) {
-    const name = `catalog-2026-01-${String(i + 1).padStart(2, "0")}T00-00-00-pre-migration.sqlite`;
-    writeFileSync(join(backupDir, name), `v${i}`);
-  }
-
-  purgeOldBackups(backupDir, "catalog");
-
-  const remaining = readdirSync(backupDir).filter((name) => name.startsWith("catalog-"));
-  assert.equal(remaining.length, DB_BACKUP_RETENTION_COUNT);
-  assert.ok(!remaining.some((name) => name.includes("2026-01-01T")));
-  assert.ok(!remaining.some((name) => name.includes("2026-01-02T")));
-});
-
-test("purgeOldBackupsは退避バックアップ(version-mismatch等)を削除しない", (t) => {
-  const directory = makeTestDirectory("db-backup-purge-evacuation");
-  t.after(directory.cleanup);
-  const backupDir = join(directory.path, "backup");
-  mkdirSync(backupDir, { recursive: true });
-  for (let i = 0; i < DB_BACKUP_RETENTION_COUNT + 2; i++) {
-    const name = `catalog-2026-02-${String(i + 1).padStart(2, "0")}T00-00-00-pre-migration.sqlite`;
-    writeFileSync(join(backupDir, name), `pre-${i}`);
-  }
-  writeFileSync(
-    join(backupDir, "catalog-2026-02-99T00-00-00-version-mismatch.sqlite"),
-    "evacuated",
-  );
-
-  purgeOldBackups(backupDir, "catalog");
-
-  const remaining = readdirSync(backupDir);
-  assert.ok(
-    remaining.some((name) => name.includes("version-mismatch")),
-    "退避バックアップが残ること",
-  );
-  assert.equal(
-    remaining.filter((name) => name.endsWith("-pre-migration.sqlite")).length,
-    DB_BACKUP_RETENTION_COUNT,
-  );
+  assert.match(second, /-1\.sqlite$/);
 });
 
 test("hasPendingSqliteMigrationsは__drizzle_migrations未存在を全件未適用として判定する", () => {
@@ -643,7 +495,7 @@ test("hasPendingSqliteMigrationsは全件適用済みならfalse", (t) => {
   t.after(directory.cleanup);
   const dbPath = join(directory.path, "user.sqlite");
   const sqlite = new Database(dbPath, { create: true });
-  executeSqliteMigrations(sqlite, USER_MIGRATIONS_DIR);
+  executeSqliteMigrations(sqlite, USER_MIGRATIONS_DIR, 7);
   assert.equal(hasPendingSqliteMigrations(sqlite, USER_MIGRATIONS_DIR), false);
   sqlite.close();
 });
@@ -653,7 +505,7 @@ test("hasPendingSqliteMigrationsは適用件数が足りていても最新create
   t.after(directory.cleanup);
   const dbPath = join(directory.path, "user.sqlite");
   const sqlite = new Database(dbPath, { create: true });
-  executeSqliteMigrations(sqlite, USER_MIGRATIONS_DIR);
+  executeSqliteMigrations(sqlite, USER_MIGRATIONS_DIR, 7);
   assert.equal(hasPendingSqliteMigrations(sqlite, USER_MIGRATIONS_DIR), false);
 
   sqlite.exec("UPDATE __drizzle_migrations SET created_at = 0");
@@ -662,143 +514,15 @@ test("hasPendingSqliteMigrationsは適用件数が足りていても最新create
   sqlite.close();
 });
 
-test("catalogはスキーマ不一致時にバックアップ退避してから再作成する", (t) => {
-  const directory = makeTestDirectory("db-version-mismatch");
-  t.after(directory.cleanup);
-  const catalogPath = join(directory.path, "db", "catalog.sqlite");
-  const userPath = join(directory.path, "db", "user.sqlite");
-  const backupDir = join(directory.path, "backup");
-  mkdirSync(join(directory.path, "db"), { recursive: true });
-  const sqlite = new Database(catalogPath, { create: true });
-  sqlite.exec("PRAGMA user_version = 99");
-  sqlite.close();
-
-  openDb({ kind: "files", catalogPath, userPath }, { backupDir }).close();
-
-  const backups = readdirSync(backupDir).filter(
-    (name) =>
-      name.startsWith("catalog-") && name.includes("version-mismatch") && name.endsWith(".sqlite"),
-  );
-  assert.equal(backups.length, 1);
-  assert.match(backups[0]!, /version-mismatch/);
-  const reopened = new Database(catalogPath, { readonly: true });
-  const version = reopened.query("PRAGMA user_version").get() as { user_version: number };
-  assert.equal(version.user_version, 9);
-  reopened.close();
-});
-
-test("userはschema version不一致でも退避・再作成せずmigration journalで開く", (t) => {
-  const directory = makeTestDirectory("db-user-version-mismatch");
-  t.after(directory.cleanup);
-  const catalogPath = join(directory.path, "db", "catalog.sqlite");
-  const userPath = join(directory.path, "db", "user.sqlite");
-  const backupDir = join(directory.path, "backup");
-  mkdirSync(join(directory.path, "db"), { recursive: true });
-
-  openDb({ kind: "files", catalogPath, userPath }, { backupDir }).close();
-  const user = new Database(userPath);
-  user.exec("PRAGMA user_version = 99");
-  user.close();
-
-  openDb({ kind: "files", catalogPath, userPath }, { backupDir }).close();
-
-  assert.equal(
-    readdirSync(backupDir).some(
-      (name) => name.includes("user-") && name.includes("version-mismatch"),
-    ),
-    false,
-  );
-  const reopened = new Database(userPath, { readonly: true });
-  assert.equal(
-    (reopened.query("PRAGMA user_version").get() as { user_version: number }).user_version,
-    7,
-  );
-  assert.equal(hasPendingSqliteMigrations(reopened, USER_MIGRATIONS_DIR), false);
-  reopened.close();
-});
-
-test("Windows実ファイルのuser migration失敗時は候補をcloseして元の例外とDBを保持する", async (t) => {
-  const directory = makeTestDirectory("db-user-migration-failure");
-  t.after(directory.cleanup);
-  const catalogPath = join(directory.path, "db", "catalog.sqlite");
-  const userPath = join(directory.path, "db", "user.sqlite");
-  const backupDir = join(directory.path, "backup");
-  const location = { kind: "files" as const, catalogPath, userPath };
-  const options = { backupDir };
-
-  openDb(location, options).close();
-  const backupsBeforeFailure = countPreMigrationBackups(backupDir, "user");
-  const user = new Database(userPath);
-  user.exec("DELETE FROM __drizzle_migrations");
-  user.close();
-
-  await captureLogs(
-    async (records) => {
-      assert.throws(() => openDb(location, options), /already exists/);
-      const failure = categoryRecords(records, "db").find(
-        (record) =>
-          recordMessage(record) === "データベースのオープンに失敗しました" &&
-          record.properties.kind === "user" &&
-          record.properties.phase === "migrate",
-      );
-      assert.ok(failure);
-      assert.equal(typeof failure.properties.message, "string");
-    },
-    { categories: ["db"] },
-  );
-
-  const retained = new Database(userPath, { readonly: true });
-  assert.equal(appliedMigrationCount(retained), 0);
-  const workStatesStatement = retained.query(
-    "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'work_states'",
-  );
-  try {
-    assert.ok(workStatesStatement.get());
-  } finally {
-    workStatesStatement.finalize();
-  }
-  retained.close();
-  assert.equal(countPreMigrationBackups(backupDir, "user"), backupsBeforeFailure + 1);
-  assertNoReplacementFiles(userPath);
-});
-
-test("Windows実ファイルのuser migration成功時は候補をcloseして入替後に残骸を残さない", (t) => {
-  const directory = makeTestDirectory("db-user-migration-windows-file-replace");
-  t.after(directory.cleanup);
-  const catalogPath = join(directory.path, "db", "catalog.sqlite");
-  const userPath = join(directory.path, "db", "user.sqlite");
-
-  const db = openDb({ kind: "files", catalogPath, userPath });
-  db.close();
-
-  const user = new Database(userPath, { readonly: true });
-  assert.equal(hasPendingSqliteMigrations(user, USER_MIGRATIONS_DIR), false);
-  user.close();
-  assertNoReplacementFiles(userPath);
-});
-
-test("初回起動(未適用マイグレーションあり)ではpre-migrationバックアップを作成する", (t) => {
-  const directory = makeTestDirectory("db-pre-migration-backup");
-  t.after(directory.cleanup);
-  const catalogPath = join(directory.path, "db", "catalog.sqlite");
-  const userPath = join(directory.path, "db", "user.sqlite");
-  const backupDir = join(directory.path, "backup");
-
-  const db = openDb({ kind: "files", catalogPath, userPath }, { backupDir });
-  db.close();
-
-  const catalogBackups = countPreMigrationBackups(backupDir, "catalog");
-  const userBackups = countPreMigrationBackups(backupDir, "user");
-  assert.equal(catalogBackups, 1);
-  assert.equal(userBackups, 1);
-});
-
 test("マイグレーション済みの再起動ではpre-migrationバックアップを増やさない", (t) => {
   const directory = makeTestDirectory("db-no-pre-migration-on-restart");
   t.after(directory.cleanup);
   const catalogPath = join(directory.path, "db", "catalog.sqlite");
   const userPath = join(directory.path, "db", "user.sqlite");
   const backupDir = join(directory.path, "backup");
+  const legacyMigrations = join(directory.path, "legacy-user-migrations");
+  buildUserMigrationsDirThrough(legacyMigrations, "0004_sparkling_masked_marvel");
+  seedLegacyUserDb(userPath, legacyMigrations);
   const location = { kind: "files" as const, catalogPath, userPath };
   const options = { backupDir };
 
@@ -810,4 +534,46 @@ test("マイグレーション済みの再起動ではpre-migrationバックア�
     countPreMigrationBackups(backupDir, "catalog") + countPreMigrationBackups(backupDir, "user");
 
   assert.equal(afterSecond, afterFirst);
+  assert.equal(afterFirst, 1);
+});
+
+test("既存データを持つDBで初回migration時のみpre-migrationバックアップを作成する", (t) => {
+  const directory = makeTestDirectory("db-pre-migration-backup-existing");
+  t.after(directory.cleanup);
+  const catalogPath = join(directory.path, "db", "catalog.sqlite");
+  const userPath = join(directory.path, "db", "user.sqlite");
+  const backupDir = join(directory.path, "backup");
+  const legacyMigrations = join(directory.path, "legacy-user-migrations");
+  buildUserMigrationsDirThrough(legacyMigrations, "0004_sparkling_masked_marvel");
+  seedLegacyUserDb(userPath, legacyMigrations);
+
+  openDb({ kind: "files", catalogPath, userPath }, { backupDir }).close();
+
+  assert.equal(countPreMigrationBackups(backupDir, "catalog"), 0);
+  assert.equal(countPreMigrationBackups(backupDir, "user"), 1);
+});
+
+test("Windows実ファイルでmigration executorは成功後にDBを解放する", (t) => {
+  const directory = makeTestDirectory("db-migration-executor-success");
+  t.after(directory.cleanup);
+  const dbPath = join(directory.path, "user.sqlite");
+  const sqlite = new Database(dbPath, { create: true });
+
+  executeSqliteMigrations(sqlite, USER_MIGRATIONS_DIR, 7);
+  sqlite.close();
+
+  assert.doesNotThrow(() => rmSync(dbPath));
+});
+
+test("Windows実ファイルでmigration executorは失敗後にもDBを解放する", (t) => {
+  const directory = makeTestDirectory("db-migration-executor-failure");
+  t.after(directory.cleanup);
+  const dbPath = join(directory.path, "user.sqlite");
+  const sqlite = new Database(dbPath, { create: true });
+  sqlite.exec("CREATE TABLE app_settings (key TEXT PRIMARY KEY)");
+
+  assert.throws(() => executeSqliteMigrations(sqlite, USER_MIGRATIONS_DIR, 7), /already exists/);
+  sqlite.close();
+
+  assert.doesNotThrow(() => rmSync(dbPath));
 });

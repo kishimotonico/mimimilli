@@ -77,7 +77,7 @@ WALモードでは、ATTACHした複数DBへの書き込みは各DB内では原�
 | 単一DBでcatalogテーブルだけ再構築 | 不採用。再構築対象の指定ミスやmigration失敗がuserデータへ到達し、物理分離による保護がない          |
 | catalogからuserを`ATTACH`してJOIN | 採用。1つのSQLスナップショット上でuser条件を含む検索・ソート・件数・ページ境界を決められる         |
 
-開発中はcatalog DBとuser DBのどちらも互換migrationを持たず、スキーマ世代が合わなければ再作成してよい。配布開始までに、user DBだけは順序付きのforward migrationへ切り替える。migration前のスナップショットと復元検証も、配布開始の前提条件とする。catalog DBは配布開始後も再構築できる。
+開発中はcatalog DBとuser DBのどちらも互換migrationを持たず、スキーマ世代が合わなければ再作成してよい。配布開始までに、user DBだけは順序付きのforward migrationへ切り替える。migration前のスナップショットと復元検証も、配布開始の前提条件とする。catalog DBは配布開始後も再構築できる。マイグレーション適用方式の詳細は [ADR-0023](0023-in-place-migration-simplification.md) を正とする。
 
 スキーマの正本は1系統にし、現行のように実行用DDLと型用スキーマを手動で二重管理しない。配布開始後のuser migrationには、Bun SQLiteで実行できる生成済みmigration SQLをリポジトリへ保存して使う。生成ツールが`bun:sqlite`と整合しない場合だけ、版管理した手書きSQLを代替にできる。その場合は空DBへ適用した実スキーマとの一致テストを必須とする。
 
@@ -254,9 +254,9 @@ CAS、revision、端末間の競合解決はDRAFT-22のデバイス間同期へ�
 
 ### バックアップと配布開始条件
 
-開発中はuser DBもスキーマ世代不一致で再作成できるため、user migration前のバックアップを必須にしない。配布開始までに、順序付きforward migration、migration前スナップショット、スナップショットからの復元検証を揃える。
+開発中はuser DBもスキーマ世代不一致で再作成できるため、user migration前のバックアップを必須にしない。配布開始までに、順序付きforward migration、migration前スナップショット、スナップショットからの復元検証を揃える。起動時のバックアップ・検証・in-place適用の運用は [ADR-0023](0023-in-place-migration-simplification.md) を正とする。
 
-WAL中の`.sqlite`本体だけをファイルコピーしてはならない。`-wal`に未checkpointの更新があるためである。スナップショットは書き込みを止めて`VACUUM INTO`で作り、別データルートで開いて`PRAGMA integrity_check`とserverからの読出しを確認する。将来`bun:sqlite`がSQLite Online Backup APIを直接公開し、Windows実機で同じ復元検証を通した場合は置き換えてよい。`Database.serialize()`でDB全体をメモリへ載せる方式は、大規模catalogでメモリ上限がDBサイズに比例するため既定にしない。
+WAL中の`.sqlite`本体だけをファイルコピーしてはならない。`-wal`に未checkpointの更新があるためである。スナップショットは書き込みを止めて`VACUUM INTO`で作り、別接続で`PRAGMA integrity_check`を通す。スキーマ固定リストによる読出し検証は行わない（pre-migration スナップショットは旧スキーマのため、現行スキーマを要求すると矛盾する）。将来`bun:sqlite`がSQLite Online Backup APIを直接公開し、Windows実機で同じ復元検証を通した場合は置き換えてよい。`Database.serialize()`でDB全体をメモリへ載せる方式は、大規模catalogでメモリ上限がDBサイズに比例するため既定にしない。
 
 ### 旧単一DBからの移行順序
 

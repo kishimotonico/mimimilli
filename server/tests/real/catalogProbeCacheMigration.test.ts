@@ -1,7 +1,5 @@
 // migration 0006（audio_probe_cacheのNULLABLE化）と0008（0秒probe cache/fingerprintのデータ補正）が、
-// TASK-92以前の実データに対して安全に働くことを検証する。0009（works.meta_path）導入で
-// CATALOG_SCHEMA_VERSIONは7にバンプされ、user_version不一致の旧catalogはopenDb時に再作成される。
-// 本テストは再現用migrations dirから0006-0009を除きレガシー状態を作る。works行を先に挿入する
+// TASK-92以前の実データに対して安全に働くことを検証する。本テストは再現用migrations dirから0006-0009を除き
 // ケースは0009を飛ばして0006-0008だけ適用する（0009を先に記録するとfolderMillis順で0006-0008が
 // スキップされるため）。0009はテスト1のopenDb経由（空のworks）で適用される。
 //
@@ -79,7 +77,7 @@ test("migration 0006: 旧実装が0秒で保存したaudio_probe_cacheをNULLへ
   const sqlite = new Database(catalogPath, { create: true });
   sqlite.exec("PRAGMA journal_mode = WAL");
   migrate(drizzle(sqlite), { migrationsFolder: preMigrationsDir });
-  // openDbがDBを再作成しないよう、シード前に現行版へ合わせる。
+  // openDbはDBがアプリより新しい場合にfail-fastするため、テスト用の旧catalogに現行版を設定する。
   sqlite.exec(`PRAGMA user_version = ${CATALOG_SCHEMA_VERSION}`);
 
   // 旧実装（probe失敗/解析失敗時にdurationSec:0で保存）が残した行を再現する。
