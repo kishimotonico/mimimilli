@@ -46,6 +46,7 @@ import {
   setLibraryAxisAtom,
   selectLibraryWorkAtom,
 } from "../entities/library/model/navigationActions";
+import { openWorkDetailAtom } from "../entities/work/model/navigationActions";
 
 const SettingsModal = lazy(() => import("../features/settings/ui/SettingsModal"));
 const ScanModal = lazy(() => import("../features/scan/ui/ScanModal"));
@@ -60,6 +61,7 @@ export default function App() {
   const setFilesSelectedPath = useSetAtom(filesSelectedPathAtom);
   const setLibraryAxis = useSetAtom(setLibraryAxisAtom);
   const selectLibraryWork = useSetAtom(selectLibraryWorkAtom);
+  const openWorkDetail = useSetAtom(openWorkDetailAtom);
   const playRequestIdRef = useRef(0);
 
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
@@ -154,6 +156,11 @@ export default function App() {
     [selectLibraryWork, setAppMode, setLibraryAxis],
   );
 
+  const handleOpenWorkDetail = useCallback(
+    (workId: string) => openWorkDetail(workId),
+    [openWorkDetail],
+  );
+
   const handleOpenScanProblemInFiles = useCallback(
     (path: string) => {
       const segments = path.split("/").filter(Boolean);
@@ -234,7 +241,7 @@ export default function App() {
               onResume={handleResume}
               onTogglePlay={player.togglePlay}
               onPlayFile={player.playFile}
-              onOpenWork={handleOpenLibraryWork}
+              onOpenWorkDetail={handleOpenWorkDetail}
             />
           }
           transportBar={<PlayerDock onShowPlayingWork={handleOpenLibraryWork} />}

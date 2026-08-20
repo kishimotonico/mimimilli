@@ -83,6 +83,25 @@
   padding: 18px;
   container: work-detail / inline-size;
 }
+/* 全画面作品詳細（/work/:id）。右ペインと同じ構造・部品のまま、カバーと余白だけ拡大する。 */
+.mle-prv__body.is-full {
+  padding: 40px 40px 60px;
+}
+.mle-prv__body.is-full .mle-prv__hero {
+  grid-template-columns: 220px 1fr;
+  gap: 32px;
+  margin-bottom: 28px;
+}
+.mle-prv__body.is-full .mle-prv__cover,
+.mle-prv__body.is-full .mle-prv__coverwrap {
+  width: 220px;
+}
+.mle-prv__body.is-full .mle-prv__cover {
+  height: 220px;
+}
+.mle-prv__body.is-full .mle-prv__title {
+  font-size: 30px;
+}
 /* バー本体との重なりは .mle-body の padding-bottom で解消済み。ここでは
    スクロール終端の視覚的な余白だけを少し足す。 */
 .mle-app.has-docked-bar .mle-prv__body {

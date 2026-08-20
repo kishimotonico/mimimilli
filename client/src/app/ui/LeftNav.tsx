@@ -34,11 +34,11 @@ export default function LeftNav() {
           <I.folderO size={20} />
         </button>
         <button
-          className={`mle-side__btn ${mode === "library" ? "is-on" : ""}`}
+          className={`mle-side__btn ${mode === "library" || mode === "workDetail" ? "is-on" : ""}`}
           onClick={() => setAppMode("library")}
           title="ライブラリ"
           aria-label="ライブラリ"
-          aria-pressed={mode === "library"}
+          aria-pressed={mode === "library" || mode === "workDetail"}
         >
           <I.gridS size={19} />
         </button>

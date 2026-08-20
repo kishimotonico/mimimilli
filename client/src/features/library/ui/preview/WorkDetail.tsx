@@ -14,6 +14,7 @@ import {
   resumeProgressBarWidth,
 } from "../../../../entities/work/resumeProgress";
 import { I } from "../../../../shared/ui/Icon";
+import Button from "../../../../shared/ui/Button";
 import { formatDuration, formatTime } from "../../../../shared/lib/format";
 import type { useLibraryWorkPatchMutations } from "../../model/useLibraryQueries";
 import { WorkMetadataActions } from "./WorkMetadataActions";
@@ -36,6 +37,12 @@ interface WorkDetailProps {
   deleteMutation: UseMutationResult<void, Error, string>;
   /** タグチップクリック時のハンドラ（絞り込み遷移。ADR-0013） */
   onTagClick: (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
+  /** "pane" = 右ペイン（既定）、"full" = 全画面詳細。カバー・余白のサイズだけを変える */
+  layout?: "pane" | "full";
+  /** 右ペインでのみ渡す。全画面詳細へ遷移する「全画面へ展開」ボタンを表示する */
+  onExpand?: () => void;
+  /** 表示中の作品が再生中の作品と一致するときだけ渡す。「再生画面へ」ボタンを表示する */
+  onGoToPlayingScreen?: () => void;
 }
 
 export function WorkDetail({
@@ -49,6 +56,9 @@ export function WorkDetail({
   workPatchMutations,
   deleteMutation,
   onTagClick,
+  layout = "pane",
+  onExpand,
+  onGoToPlayingScreen,
 }: WorkDetailProps) {
   const playlist = work.playlists.find((p) => p.id === work.defaultPlaylistId) ?? work.playlists[0];
   const tracks = playlist?.tracks ?? [];
@@ -83,7 +93,7 @@ export function WorkDetail({
   };
 
   return (
-    <div className="mle-prv__body">
+    <div className={layout === "full" ? "mle-prv__body is-full" : "mle-prv__body"}>
       <div className="mle-prv__hero">
         <div className="mle-prv__coverwrap">
           <div className="mle-prv__cover">
@@ -186,6 +196,20 @@ export function WorkDetail({
             onShowInfo={() => setIsInfoDialogOpen(true)}
             onDelete={() => setIsDeleteConfirmOpen(true)}
           />
+          {(onExpand !== undefined || (isLoaded && onGoToPlayingScreen !== undefined)) && (
+            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+              {onExpand && (
+                <Button variant="ghost" icon={I.fs} onClick={onExpand}>
+                  全画面へ展開
+                </Button>
+              )}
+              {isLoaded && onGoToPlayingScreen && (
+                <Button variant="ghost" icon={I.audio} onClick={onGoToPlayingScreen}>
+                  再生画面へ
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

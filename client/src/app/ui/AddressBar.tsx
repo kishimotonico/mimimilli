@@ -5,6 +5,7 @@ import { activeAxisAtom } from "../../entities/library/model/navigationAtoms";
 import { isGridViewActive } from "../../features/library/model/libraryPresentation";
 import LibraryGridControls from "../../features/library/ui/LibraryGridControls";
 import LibraryBreadcrumbs from "../../features/library/ui/LibraryBreadcrumbs";
+import WorkDetailBreadcrumbs from "../../features/library/ui/WorkDetailBreadcrumbs";
 import LibrarySortMenu from "../../features/library/ui/LibrarySortMenu";
 import FilesBreadcrumbs from "../../features/files/ui/FilesBreadcrumbs";
 import NavigationHistoryButtons from "./NavigationHistoryButtons";
@@ -29,6 +30,7 @@ export default function AddressBar() {
 
       {mode === "library" && <LibraryBreadcrumbs />}
       {mode === "files" && <FilesBreadcrumbs />}
+      {mode === "workDetail" && <WorkDetailBreadcrumbs />}
       {mode === "nowPlaying" && (
         <div className="mle-crumbs">
           <span className="mle-crumbs__seg is-last">再生中</span>
@@ -37,7 +39,7 @@ export default function AddressBar() {
 
       {mode === "library" && <LibraryGridControls />}
 
-      {mode !== "nowPlaying" && (
+      {mode !== "nowPlaying" && mode !== "workDetail" && (
         <div className="inline-flex items-center gap-[1px] rounded-2 bg-paper-2 p-[2px]">
           <IconButton
             size="sm"
