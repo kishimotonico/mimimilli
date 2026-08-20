@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, renameSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { Database, type Database as DatabaseType } from "bun:sqlite";
 import { getCategoryLogger } from "../../lib/logger.ts";
@@ -7,46 +7,20 @@ import { getCategoryLogger } from "../../lib/logger.ts";
 export const DB_BACKUP_RETENTION_COUNT = 5;
 
 export type DbBackupKind = "catalog" | "user";
-export type DbBackupReason = "version-mismatch" | "pre-migration";
 
 const dbLogger = getCategoryLogger("db");
-const PRE_MIGRATION_SUFFIX = "-pre-migration.sqlite";
-const REQUIRED_TABLES: Record<DbBackupKind, readonly string[]> = {
-  catalog: [
-    "works",
-    "playlists",
-    "tracks",
-    "tags",
-    "work_tags",
-    "work_dlsite",
-    "scan_state",
-    "audio_probe_cache",
-  ],
-  user: [
-    "work_states",
-    "tag_prefixes",
-    "app_settings",
-    "smart_folders",
-    "scan_candidate_exclusions",
-  ],
-};
 
 function formatBackupTimestamp(date = new Date()): string {
   return date.toISOString().slice(0, 23).replace(/:/g, "-").replace(".", "-");
 }
 
-function backupFileName(kind: DbBackupKind, reason: DbBackupReason, date = new Date()): string {
-  return `${kind}-${formatBackupTimestamp(date)}-${reason}.sqlite`;
+function backupFileName(kind: DbBackupKind, date = new Date()): string {
+  return `${kind}-${formatBackupTimestamp(date)}-pre-migration.sqlite`;
 }
 
 /** 既存バックアップと衝突しないパスを返す（上書きはしない）。 */
-function resolveUniqueBackupPath(
-  backupDir: string,
-  kind: DbBackupKind,
-  reason: DbBackupReason,
-  date = new Date(),
-): string {
-  const baseName = backupFileName(kind, reason, date);
+function resolveUniqueBackupPath(backupDir: string, kind: DbBackupKind, date = new Date()): string {
+  const baseName = backupFileName(kind, date);
   let candidate = join(backupDir, baseName);
   if (!existsSync(candidate)) return candidate;
   const stem = baseName.slice(0, -".sqlite".length);
@@ -58,23 +32,35 @@ function resolveUniqueBackupPath(
 
 const DB_FILE_SUFFIXES = ["", "-wal", "-shm"] as const;
 
-function moveDatabaseFiles(dbPath: string, backupPath: string): boolean {
-  let transferred = false;
-  for (const suffix of DB_FILE_SUFFIXES) {
-    const source = `${dbPath}${suffix}`;
-    if (!existsSync(source)) continue;
-    const destination = `${backupPath}${suffix}`;
-    renameSync(source, destination);
-    transferred = true;
-  }
-  return transferred;
-}
-
 function isPreMigrationBackupFile(name: string, kind: DbBackupKind): boolean {
-  return name.startsWith(`${kind}-`) && name.endsWith(PRE_MIGRATION_SUFFIX);
+  return name.startsWith(`${kind}-`) && name.includes("-pre-migration");
 }
 
-/** pre-migration バックアップのみ世代管理する。退避バックアップは削除しない。 */
+function parsePreMigrationBackupOrder(
+  name: string,
+  kind: DbBackupKind,
+): { timestamp: string; sequence: number } | null {
+  const match = name.match(new RegExp(`^${kind}-(.+)-pre-migration(?:-(\\d+))?\\.sqlite$`));
+  if (!match) return null;
+  return { timestamp: match[1]!, sequence: match[2] ? Number.parseInt(match[2], 10) : 0 };
+}
+
+function sortPreMigrationBackups(names: readonly string[], kind: DbBackupKind): string[] {
+  return names
+    .map((name) => ({ name, order: parsePreMigrationBackupOrder(name, kind) }))
+    .filter(
+      (item): item is { name: string; order: { timestamp: string; sequence: number } } =>
+        item.order !== null,
+    )
+    .sort((left, right) => {
+      const timestampOrder = left.order.timestamp.localeCompare(right.order.timestamp);
+      if (timestampOrder !== 0) return timestampOrder;
+      return left.order.sequence - right.order.sequence;
+    })
+    .map((item) => item.name);
+}
+
+/** pre-migration バックアップのみ世代管理する。 */
 export function purgeOldBackups(backupDir: string, kind: DbBackupKind): void {
   let entries: string[];
   try {
@@ -82,38 +68,16 @@ export function purgeOldBackups(backupDir: string, kind: DbBackupKind): void {
   } catch {
     return;
   }
-  const mainFiles = entries
-    .filter((name) => isPreMigrationBackupFile(name, kind))
-    .sort()
-    .reverse();
-  for (const name of mainFiles.slice(DB_BACKUP_RETENTION_COUNT)) {
+  const sorted = sortPreMigrationBackups(
+    entries.filter((name) => isPreMigrationBackupFile(name, kind)),
+    kind,
+  );
+  for (const name of sorted.slice(0, Math.max(0, sorted.length - DB_BACKUP_RETENTION_COUNT))) {
     const base = name.slice(0, -".sqlite".length);
     for (const suffix of DB_FILE_SUFFIXES) {
       rmSync(join(backupDir, `${base}.sqlite${suffix === "" ? "" : suffix}`), { force: true });
     }
   }
-}
-
-/** 既存DB一式をバックアップへ移動する。失敗時は例外を投げる。 */
-export function moveDatabaseToBackup(
-  dbPath: string,
-  backupDir: string,
-  kind: DbBackupKind,
-  reason: DbBackupReason,
-  date = new Date(),
-): string {
-  mkdirSync(backupDir, { recursive: true });
-  const backupPath = resolveUniqueBackupPath(backupDir, kind, reason, date);
-  if (!moveDatabaseFiles(dbPath, backupPath)) {
-    throw new Error(`バックアップ対象のDBファイルが見つかりません: ${dbPath}`);
-  }
-  dbLogger.error("DBファイルをバックアップへ退避しました", {
-    kind,
-    reason,
-    dbPath,
-    backupPath,
-  });
-  return backupPath;
 }
 
 /** 開いているDBの一貫した論理スナップショットを作成する。 */
@@ -124,10 +88,11 @@ export function createDatabaseBackup(
   date = new Date(),
 ): string {
   mkdirSync(backupDir, { recursive: true });
-  const backupPath = resolveUniqueBackupPath(backupDir, kind, "pre-migration", date);
+  const backupPath = resolveUniqueBackupPath(backupDir, kind, date);
   try {
     sqlite.run("VACUUM INTO ?", [backupPath]);
   } catch (error) {
+    rmSync(backupPath, { force: true });
     throw new Error(`マイグレーション前バックアップの作成に失敗しました: ${backupPath}`, {
       cause: error,
     });
@@ -141,28 +106,22 @@ export function createDatabaseBackup(
   return backupPath;
 }
 
-/** 論理スナップショットを独立接続で検査し、DB種別ごとの現行schemaを読み出す。 */
-export function verifyDatabaseBackup(backupPath: string, kind: DbBackupKind): void {
-  const backup = new Database(backupPath, { readonly: true });
+/** 論理スナップショットを独立接続で検査する。 */
+export function verifyDatabaseBackup(backupPath: string): void {
   try {
-    const integrity = backup.query("PRAGMA integrity_check").get() as { integrity_check: string };
-    if (integrity.integrity_check !== "ok") {
-      throw new Error(`integrity_check が失敗しました: ${integrity.integrity_check}`);
-    }
-    const tableRows = backup
-      .query("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
-      .all() as Array<{ name: string }>;
-    const tables = new Set(tableRows.map(({ name }) => name));
-    const requiredTables = REQUIRED_TABLES[kind];
-    if (requiredTables.some((table) => tables.has(table))) {
-      for (const table of requiredTables) {
-        if (!tables.has(table)) {
-          throw new Error(`必須テーブルがありません: ${table}`);
-        }
-        backup.query(`SELECT * FROM "${table}" LIMIT 1`).all();
+    const backup = new Database(backupPath, { readonly: true });
+    try {
+      const integrity = backup.query("PRAGMA integrity_check").get() as {
+        integrity_check: string;
+      };
+      if (integrity.integrity_check !== "ok") {
+        throw new Error(`integrity_check が失敗しました: ${integrity.integrity_check}`);
       }
+    } finally {
+      backup.close();
     }
-  } finally {
-    backup.close();
+  } catch (error) {
+    rmSync(backupPath, { force: true });
+    throw error;
   }
 }

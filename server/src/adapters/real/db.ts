@@ -1,4 +1,4 @@
-import { copyFileSync, mkdirSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { dirname, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { constants, Database, SQLiteError } from "bun:sqlite";
@@ -6,19 +6,17 @@ import { drizzle, type BunSQLiteDatabase } from "drizzle-orm/bun-sqlite";
 import { formatError, getCategoryLogger } from "../../lib/logger.ts";
 import * as catalogSchema from "./catalogSchema.ts";
 import {
-  createDatabaseCandidatePath,
-  removeDatabaseFiles,
-  replaceDatabaseWithCandidate,
-} from "./databaseReplacement.ts";
-import {
   createDatabaseBackup,
-  moveDatabaseToBackup,
   purgeOldBackups,
   verifyDatabaseBackup,
   type DbBackupKind,
 } from "./dbBackup.ts";
 import { applySqliteBusyTimeout } from "./sqliteConnection.ts";
-import { executeSqliteMigrations, hasPendingSqliteMigrations } from "./sqliteMigrationExecutor.ts";
+import {
+  assertDatabaseNotNewerThanApp,
+  executeSqliteMigrations,
+  hasPendingSqliteMigrations,
+} from "./sqliteMigrationExecutor.ts";
 import * as userSchema from "./userSchema.ts";
 
 export const CATALOG_SCHEMA_VERSION = 9;
@@ -82,6 +80,17 @@ function logDbOpenFailure(
   throw error;
 }
 
+function isNewDatabase(sqlite: Database): boolean {
+  const current = sqlite.query("PRAGMA user_version").get() as { user_version: number };
+  if (current.user_version !== 0) return false;
+  const tables = sqlite
+    .query(
+      "SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
+    )
+    .get() as { count: number };
+  return tables.count === 0;
+}
+
 function openVersionedDatabase(
   path: string,
   version: number,
@@ -92,104 +101,44 @@ function openVersionedDatabase(
   const isMemory = path.startsWith("file:") && path.includes("mode=memory");
 
   let sqlite: Database;
-  let currentVersion: number;
   try {
     if (!isMemory) mkdirSync(dirname(path), { recursive: true });
     sqlite = new Database(path, isMemory ? SQLITE_URI_FLAGS : { create: true });
     applySqliteBusyTimeout(sqlite);
-    const current = sqlite.query("PRAGMA user_version").get() as { user_version: number };
-    currentVersion = current.user_version;
   } catch (error) {
     logDbOpenFailure(kind, path, "open", error);
   }
 
-  if (kind === "catalog" && currentVersion !== 0 && currentVersion !== version) {
-    if (isMemory) {
-      logDbOpenFailure(
-        kind,
-        path,
-        "open",
-        new Error(
-          `インメモリDBのスキーマバージョンが不一致です（DB: v${currentVersion}, アプリ: v${version}）`,
-        ),
-      );
-    }
+  try {
+    assertDatabaseNotNewerThanApp(sqlite, migrationsFolder, version);
+  } catch (error) {
     sqlite.close();
-    if (!context) {
-      logDbOpenFailure(
-        kind,
-        path,
-        "open",
-        new Error("ファイルDBのスキーマ不一致時にはバックアップ先が必要です"),
-      );
-    }
-    moveDatabaseToBackup(path, context.backupDir, context.kind, "version-mismatch");
-    try {
-      sqlite = new Database(path, { create: true });
-      applySqliteBusyTimeout(sqlite);
-    } catch (error) {
-      logDbOpenFailure(kind, path, "open", error);
-    }
+    logDbOpenFailure(kind, path, "open", error);
   }
 
   try {
     sqlite.exec("PRAGMA journal_mode = WAL");
     sqlite.exec("PRAGMA foreign_keys = ON");
   } catch (error) {
+    sqlite.close();
     logDbOpenFailure(kind, path, "pragma", error);
   }
 
   try {
-    if (!isMemory && context && hasPendingSqliteMigrations(sqlite, migrationsFolder)) {
+    const needsBackup =
+      !isMemory &&
+      context !== undefined &&
+      !isNewDatabase(sqlite) &&
+      hasPendingSqliteMigrations(sqlite, migrationsFolder);
+    if (needsBackup) {
       const backupPath = createDatabaseBackup(sqlite, context.backupDir, context.kind);
-      verifyDatabaseBackup(backupPath, kind);
+      verifyDatabaseBackup(backupPath);
       purgeOldBackups(context.backupDir, context.kind);
-      if (kind === "user") {
-        const candidatePath = createDatabaseCandidatePath(path);
-        copyFileSync(backupPath, candidatePath);
-        sqlite.close();
-        try {
-          const candidate = new Database(candidatePath);
-          applySqliteBusyTimeout(candidate);
-          try {
-            candidate.exec("PRAGMA journal_mode = DELETE");
-            candidate.exec("PRAGMA foreign_keys = ON");
-            executeSqliteMigrations(candidate, migrationsFolder);
-          } finally {
-            candidate.close();
-          }
-        } catch (error) {
-          try {
-            removeDatabaseFiles(candidatePath);
-          } catch (cleanupError) {
-            // migration例外をcleanup失敗で上書きしない。cleanup失敗自体はwarningとして記録する。
-            getCategoryLogger("db").warn("候補DBのcleanupに失敗しました", {
-              candidatePath,
-              operation: "remove",
-              ...formatError(cleanupError),
-            });
-          }
-          throw error;
-        }
-        replaceDatabaseWithCandidate(path, candidatePath);
-        sqlite = new Database(path);
-        applySqliteBusyTimeout(sqlite);
-        sqlite.exec("PRAGMA journal_mode = WAL");
-        sqlite.exec("PRAGMA foreign_keys = ON");
-      } else {
-        executeSqliteMigrations(sqlite, migrationsFolder);
-      }
-    } else {
-      executeSqliteMigrations(sqlite, migrationsFolder);
     }
+    executeSqliteMigrations(sqlite, migrationsFolder, version);
   } catch (error) {
+    sqlite.close();
     logDbOpenFailure(kind, path, "migrate", error);
-  }
-
-  try {
-    sqlite.exec(`PRAGMA user_version = ${version}`);
-  } catch (error) {
-    logDbOpenFailure(kind, path, "pragma", error);
   }
 
   return { sqlite };

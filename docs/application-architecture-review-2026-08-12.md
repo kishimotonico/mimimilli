@@ -47,7 +47,9 @@ WorkspaceとCatalogを統合する必要はありません。共有すべきな�
 
 ### 1. user DBを自動再作成しない
 
-`user.sqlite`にはresume、履歴、bookmark、スマートフォルダーなど、物理ファイルから復元できない情報があります。現在は独自のschema versionが一致しない場合にDBを退避し、空DBを作成します。[db.ts](../server/src/adapters/real/db.ts#L100)では、この処理をuser DBにも適用しています。[db.ts](../server/src/adapters/real/db.ts#L191)
+**対応済み（TASK-356 / [ADR-0023](adr/0023-in-place-migration-simplification.md)）。**
+
+`user.sqlite`にはresume、履歴、bookmark、スマートフォルダーなど、物理ファイルから復元できない情報があります。現在は独自のschema versionが一致しない場合にDBを退避し、空DBを作成します。[db.ts](../server/src/adapters/real/db.ts)では、この処理をuser DBにも適用しています。[db.ts](../server/src/adapters/real/db.ts)
 
 更新契約を次に統一します。
 
