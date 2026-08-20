@@ -27,37 +27,45 @@ export default function AddressBar() {
     <div className="mle-addr is-lib">
       <NavigationHistoryButtons />
 
-      {mode === "library" ? <LibraryBreadcrumbs /> : <FilesBreadcrumbs />}
+      {mode === "library" && <LibraryBreadcrumbs />}
+      {mode === "files" && <FilesBreadcrumbs />}
+      {mode === "nowPlaying" && (
+        <div className="mle-crumbs">
+          <span className="mle-crumbs__seg is-last">再生中</span>
+        </div>
+      )}
 
       {mode === "library" && <LibraryGridControls />}
 
-      <div className="inline-flex items-center gap-[1px] rounded-2 bg-paper-2 p-[2px]">
-        <IconButton
-          size="sm"
-          icon={I.gridS}
-          label="カラム"
-          active={mode !== "library"}
-          disabled={!availableViewModes.includes("column")}
-        />
-        <IconButton
-          size="sm"
-          icon={I.list}
-          label="リスト"
-          active={mode === "library" && !showGrid}
-          onClick={() => setLibraryViewMode("list")}
-          disabled={!availableViewModes.includes("list")}
-          title={mode !== "library" ? "ファイルモードはカラム表示のみ" : undefined}
-        />
-        <IconButton
-          size="sm"
-          icon={I.grid}
-          label="グリッド"
-          active={mode === "library" && showGrid}
-          onClick={() => setLibraryViewMode("grid")}
-          disabled={!availableViewModes.includes("grid")}
-          title={mode !== "library" ? "ファイルモードはカラム表示のみ" : undefined}
-        />
-      </div>
+      {mode !== "nowPlaying" && (
+        <div className="inline-flex items-center gap-[1px] rounded-2 bg-paper-2 p-[2px]">
+          <IconButton
+            size="sm"
+            icon={I.gridS}
+            label="カラム"
+            active={mode !== "library"}
+            disabled={!availableViewModes.includes("column")}
+          />
+          <IconButton
+            size="sm"
+            icon={I.list}
+            label="リスト"
+            active={mode === "library" && !showGrid}
+            onClick={() => setLibraryViewMode("list")}
+            disabled={!availableViewModes.includes("list")}
+            title={mode !== "library" ? "ファイルモードはカラム表示のみ" : undefined}
+          />
+          <IconButton
+            size="sm"
+            icon={I.grid}
+            label="グリッド"
+            active={mode === "library" && showGrid}
+            onClick={() => setLibraryViewMode("grid")}
+            disabled={!availableViewModes.includes("grid")}
+            title={mode !== "library" ? "ファイルモードはカラム表示のみ" : undefined}
+          />
+        </div>
+      )}
 
       {mode === "library" && <LibrarySortMenu />}
       <IconButton size="sm" icon={I.more} label="その他" disabled title="近日実装" />
