@@ -19,6 +19,7 @@ import type {
 import { z } from "zod";
 import { works } from "./catalogSchema.ts";
 import type { workStates } from "./userSchema.ts";
+import { coverDtoFromColumns } from "./coverDto.ts";
 
 export type CatalogWorkRow = typeof works.$inferSelect;
 export type WorkStateRow = typeof workStates.$inferSelect;
@@ -187,7 +188,13 @@ export function rowToSummary(
     {
       id: row.id,
       title: row.title,
-      cover: coverFieldsFromColumns(row.coverImage, row.coverWidth, row.coverHeight).cover,
+      cover: coverDtoFromColumns(
+        row.id,
+        row.physicalPath,
+        row.coverImage,
+        row.coverWidth,
+        row.coverHeight,
+      ),
       status: row.status,
       physicalPath: row.physicalPath,
       totalDurationSec: row.totalDurationSec,
@@ -263,12 +270,19 @@ export function rowToWork(
   const resume = resolveResume(row, playlists);
   const totalDurationSec = sumDefaultPlaylistDuration(row, playlists);
   const coverFields = coverFieldsFromColumns(row.coverImage, row.coverWidth, row.coverHeight);
+  const cover = coverDtoFromColumns(
+    row.id,
+    row.physicalPath,
+    row.coverImage,
+    row.coverWidth,
+    row.coverHeight,
+  );
   return parseRecord(
     workSchema,
     {
       id: row.id,
       title: row.title,
-      cover: coverFields.cover,
+      cover,
       coverKind: coverFields.coverKind,
       coverImage: coverFields.coverImage,
       status: row.status,

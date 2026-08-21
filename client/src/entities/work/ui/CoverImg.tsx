@@ -35,14 +35,14 @@ export default function CoverImg({
   // 同一作品のカバー差し替え後も表示を復帰させる。
   useEffect(() => {
     setErrored(false);
-  }, [id, cover?.image]);
+  }, [id, cover?.image, cover?.version]);
 
   const fixedSize = fit === "fixed" ? size : undefined;
 
   if (cover && !errored) {
     return (
       <img
-        src={getCoverImageUrl(id, requestWidth)}
+        src={getCoverImageUrl(id, cover.version, requestWidth)}
         alt=""
         loading={loading}
         width={fixedSize}

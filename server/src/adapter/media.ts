@@ -27,15 +27,24 @@ export type MediaLocation =
       read: (start: number, end: number) => Uint8Array;
     };
 
+/** カバーrepresentationのopaqueバージョン（DTO・URLキャッシュバスター用）。 */
+export function deriveCoverVersion(
+  workId: string,
+  width: number | undefined,
+  source: { size: number; mtimeMs: number },
+): string {
+  const representation = width === undefined ? "original" : String(width);
+  const canonical = `mimimilli-cover-v1\0${workId}\0${representation}\0${source.size}\0${source.mtimeMs}`;
+  return createHash("sha256").update(canonical).digest("base64url");
+}
+
 /** カバーrepresentationのvalidator。mtimeはHTTP-dateの精度へ丸める。 */
 export function createCoverValidators(
   workId: string,
   width: number | undefined,
   source: { size: number; mtimeMs: number },
 ): Pick<CoverDescriptor, "etag" | "lastModifiedMs"> {
-  const representation = width === undefined ? "original" : String(width);
-  const canonical = `mimimilli-cover-v1\0${workId}\0${representation}\0${source.size}\0${source.mtimeMs}`;
-  const digest = createHash("sha256").update(canonical).digest("base64url");
+  const digest = deriveCoverVersion(workId, width, source);
   return {
     etag: `W/"mimimilli-cover-v1-${digest}"`,
     lastModifiedMs: source.mtimeMs,

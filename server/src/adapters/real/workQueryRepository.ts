@@ -1,7 +1,6 @@
 import { sep } from "node:path";
 import { asc, eq } from "drizzle-orm";
 import {
-  coverFieldsFromColumns,
   createRandomSeed,
   evaluateParseErrorAlert,
   isCoverUnmeasured,
@@ -64,6 +63,8 @@ import {
   type WorkRow,
   PersistentDataError,
 } from "./workRowMapping.ts";
+import { coverDtoFromColumns, statCoverSource } from "./coverDto.ts";
+import { deriveCoverVersion } from "../../adapter/media.ts";
 
 export class WorkQueryRepository {
   private readonly db: Db;
@@ -417,7 +418,13 @@ export class WorkQueryRepository {
       const items = rows.map((row) => ({
         id: row.id,
         title: row.title,
-        cover: coverFieldsFromColumns(row.coverImage, row.coverWidth, row.coverHeight).cover,
+        cover: coverDtoFromColumns(
+          row.id,
+          row.physicalPath,
+          row.coverImage,
+          row.coverWidth,
+          row.coverHeight,
+        ),
         status: row.status,
         totalDurationSec: row.totalDurationSec,
         trackCount: row.trackCount,
@@ -660,12 +667,46 @@ export class WorkQueryRepository {
         .all(axis, ...tagAxis.bindings) as AxisFacetRow[];
     }
 
+    const versions = this.facetCoverVersions(
+      rows.flatMap((row) =>
+        (JSON.parse(row.coversJson) as Array<{ workId: string }>).map((cover) => cover.workId),
+      ),
+    );
+
     return rows.map((row) => ({
       value: row.value,
       count: row.count,
       durationSec: row.durationSec,
-      covers: JSON.parse(row.coversJson) as AxisFacetItem["covers"],
+      covers: (
+        JSON.parse(row.coversJson) as Array<Omit<AxisFacetItem["covers"][number], "version">>
+      ).map((cover) => ({
+        ...cover,
+        version: versions.get(cover.workId)!,
+      })),
     }));
+  }
+
+  private facetCoverVersions(workIds: string[]): Map<string, string> {
+    const uniqueIds = [...new Set(workIds)];
+    const versions = new Map<string, string>();
+    if (uniqueIds.length === 0) return versions;
+
+    for (let i = 0; i < uniqueIds.length; i += SQLITE_IN_CHUNK_SIZE) {
+      const idsChunk = uniqueIds.slice(i, i + SQLITE_IN_CHUNK_SIZE);
+      const locationRows = this.db.sqlite
+        .query(
+          `SELECT id, physical_path AS physicalPath, cover_image AS coverImage
+           FROM main.works WHERE id IN (${inClausePlaceholders(idsChunk.length)})`,
+        )
+        .all(...idsChunk) as Array<{ id: string; physicalPath: string; coverImage: string }>;
+      for (const row of locationRows) {
+        const source = statCoverSource(row.physicalPath, row.coverImage);
+        if (source) {
+          versions.set(row.id, deriveCoverVersion(row.id, undefined, source));
+        }
+      }
+    }
+    return versions;
   }
 
   getCoverLocation(id: string): CoverLocationRow | null {

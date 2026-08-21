@@ -2,7 +2,7 @@
 // 実ライブラリ規模（数百〜数千件）でのページング・ファセット・仮想スクロールを
 // 手元で確認するために、決定的な擬似乱数で作品を組み立てる。
 import { dedupeTags, normalizeTags } from "@mimimilli/shared";
-import type { DlsiteState, WorkSummary } from "@mimimilli/shared";
+import type { CoverValueBase, DlsiteState, WorkSummary } from "@mimimilli/shared";
 import { fixtureCoverColumnsForWork, fixtureCoverFromColumns } from "./data.ts";
 
 /** 決定的な擬似乱数（mulberry32）。同じシードなら常に同じライブラリになる */
@@ -309,11 +309,11 @@ export function createBulkWorks(count: number): WorkSummary[] {
       lastPlayedAt: played
         ? new Date(Date.parse(addedAt) + random() * (END_MS - Date.parse(addedAt))).toISOString()
         : null,
-    } satisfies Omit<WorkSummary, "dlsite">;
+    } satisfies Omit<WorkSummary, "dlsite" | "cover"> & { cover: CoverValueBase | null };
 
     works.push({
       ...raw,
-      cover: fixtureCoverFromColumns(fixtureCoverColumnsForWork(raw)),
+      cover: fixtureCoverFromColumns(raw, fixtureCoverColumnsForWork(raw)),
       dlsite: buildDlsiteState(random, id, tags),
     });
   }

@@ -86,7 +86,7 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
           dimensions,
         };
         state.coverColumns.set(workId, columns);
-        work.cover = fixtureCoverFromColumns(columns);
+        work.cover = fixtureCoverFromColumns(work, columns);
       }
       return true;
     },

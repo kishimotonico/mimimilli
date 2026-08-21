@@ -1,7 +1,7 @@
 // fixture アダプタ用のメディア合成ロジック。
 // 実ファイルを持たない fixture でも再生・シーク・カバー表示が成立するよう、
 // 「指定秒数の無音WAV」と「作品ごとのSVGプレースホルダー」をメモリ上で合成する。
-import type { WorkSummary } from "@mimimilli/shared";
+import type { CoverValueBase, WorkSummary } from "@mimimilli/shared";
 import { readFileSync } from "node:fs";
 import type { MediaLocation } from "../../adapter/index.ts";
 
@@ -102,7 +102,9 @@ function colorForWorkId(workId: string): string {
 
 /** タイトル先頭1文字＋作品IDから決まる背景色で、簡易カバー画像SVGを合成する。
  *  viewBox は work.cover.dimensions（DTOに載る寸法）に合わせ、見かけと寸法データを一致させる。 */
-export function synthesizeCoverSvg(work: WorkSummary): MediaLocation {
+export function synthesizeCoverSvg(
+  work: Pick<WorkSummary, "id" | "title"> & { cover: CoverValueBase | null },
+): MediaLocation {
   const initial = (work.title.trim().charAt(0) || "?").replace(/[<>&"']/g, "");
   const bg = colorForWorkId(work.id);
   const { width, height } = work.cover?.dimensions ?? { width: 400, height: 400 };

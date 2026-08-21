@@ -141,7 +141,11 @@ test("finalizeScan: 作品0件でも既存キャッシュは削除されず、�
           makeSummary({
             id: "work-fixed",
             physicalPath: workDir,
-            cover: { image: "cover.jpg", dimensions: { width: 100, height: 100 } },
+            cover: {
+              image: "cover.jpg",
+              dimensions: { width: 100, height: 100 },
+              version: "cover",
+            },
           }),
         ],
         skipped: [],
@@ -196,7 +200,11 @@ test("finalizeScan: resolveWithin 失敗がある場合は削除されない", a
           makeSummary({
             id: "work-missing-cover",
             physicalPath: workDir,
-            cover: { image: "missing-cover.jpg", dimensions: { width: 100, height: 100 } },
+            cover: {
+              image: "missing-cover.jpg",
+              dimensions: { width: 100, height: 100 },
+              version: "missing",
+            },
           }),
         ],
         skipped: [],
@@ -391,7 +399,11 @@ test("finalizeScan: カバーの stat 失敗がある場合は削除されない
           makeSummary({
             id: "work-stat-fail",
             physicalPath: workDir,
-            cover: { image: "cover.jpg", dimensions: { width: 100, height: 100 } },
+            cover: {
+              image: "cover.jpg",
+              dimensions: { width: 100, height: 100 },
+              version: "cover",
+            },
           }),
         ],
         skipped: [],

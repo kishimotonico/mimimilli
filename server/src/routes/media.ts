@@ -39,11 +39,13 @@ export function mediaRoute(adapter: DataAdapter, options: MediaRouteOptions = {}
     const parsed = coverQuerySchema.safeParse(c.req.query());
     if (!parsed.success) invalidRequest(`不正なクエリパラメータです: ${parsed.error.message}`);
     const width = parsed.data.w === undefined ? undefined : normalizeThumbnailWidth(parsed.data.w);
+    const immutable = parsed.data.v !== undefined;
 
     const descriptor = await adapter.describeCover(c.req.param("id"), width);
     if (!descriptor) notFound(`カバー画像が見つかりません: ${c.req.param("id")}`);
-    const cacheHeaders = coverCacheHeaders(descriptor);
+    const cacheHeaders = coverCacheHeaders(descriptor, immutable);
     if (
+      !immutable &&
       isNotModified(c.req.header("If-None-Match"), c.req.header("If-Modified-Since"), descriptor)
     ) {
       return new Response(null, { status: 304, headers: cacheHeaders });
@@ -119,11 +121,16 @@ async function streamWhole(
   });
 }
 
-function coverCacheHeaders(descriptor: CoverDescriptor): Record<string, string> {
+function coverCacheHeaders(
+  descriptor: CoverDescriptor,
+  immutable: boolean,
+): Record<string, string> {
   return {
     ETag: descriptor.etag,
     "Last-Modified": new Date(Math.floor(descriptor.lastModifiedMs / 1000) * 1000).toUTCString(),
-    "Cache-Control": "private, max-age=0, must-revalidate",
+    "Cache-Control": immutable
+      ? "private, max-age=31536000, immutable"
+      : "private, max-age=0, must-revalidate",
   };
 }
 

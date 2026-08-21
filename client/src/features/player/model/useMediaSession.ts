@@ -117,7 +117,15 @@ export function useMediaSession({
       album: source.isFilePlayback ? "" : source.currentWork.title,
       artwork:
         !source.isFilePlayback && source.currentWork.cover
-          ? [{ src: getCoverImageUrl(source.currentWork.id, ARTWORK_WIDTH) }]
+          ? [
+              {
+                src: getCoverImageUrl(
+                  source.currentWork.id,
+                  source.currentWork.cover.version,
+                  ARTWORK_WIDTH,
+                ),
+              },
+            ]
           : [],
     });
   }, [currentTrack, currentWork, isFilePlayback, mediaSession]);

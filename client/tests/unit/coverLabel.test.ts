@@ -21,7 +21,7 @@ describe("coverFieldsFromColumns", () => {
 
   it("寸法ありは measured", () => {
     expect(coverFieldsFromColumns("cover.jpg", 800, 600)).toEqual({
-      cover: { image: "cover.jpg", dimensions: { width: 800, height: 600 } },
+      cover: { image: "cover.jpg", dimensions: { width: 800, height: 600 }, version: "v1" },
       coverKind: "measured",
       coverImage: "cover.jpg",
     });
@@ -31,7 +31,9 @@ describe("coverFieldsFromColumns", () => {
 describe("coverFieldsFromCover", () => {
   it("表示用 cover から編集用フィールドを導出する", () => {
     expect(coverFieldsFromCover(null)).toEqual({ coverKind: "none", coverImage: null });
-    expect(coverFieldsFromCover({ image: "a.jpg", dimensions: { width: 1, height: 2 } })).toEqual({
+    expect(
+      coverFieldsFromCover({ image: "a.jpg", dimensions: { width: 1, height: 2 }, version: "v1" }),
+    ).toEqual({
       coverKind: "measured",
       coverImage: "a.jpg",
     });
@@ -52,7 +54,7 @@ describe("formatCoverEditLabel", () => {
       formatCoverEditLabel({
         coverKind: "measured",
         coverImage: "cover.jpg",
-        cover: { image: "cover.jpg", dimensions: { width: 800, height: 600 } },
+        cover: { image: "cover.jpg", dimensions: { width: 800, height: 600 }, version: "v1" },
       }),
     ).toBe("cover.jpg");
   });

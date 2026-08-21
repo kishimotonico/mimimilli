@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
-import type { Cover, MetaFile, ScanResult, Work } from "@mimimilli/shared";
 import { coverFieldsFromColumns, metaFileSchema, selectDefaultPlaylist } from "@mimimilli/shared";
+import type { Cover, MetaFile, ScanResult, Work } from "@mimimilli/shared";
 import type { Db } from "./db.ts";
 import { computeWorkRevisions } from "./fingerprint.ts";
 import { MetaParseError, readMetaFile, readMetaSource, syncDetectedRjCode } from "./meta.ts";
@@ -10,6 +10,7 @@ import type { ProbeCacheEntry } from "./probe.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";
 import type { CoverColumns, ScanWorkState } from "./workRowMapping.ts";
+import { coverDtoFromColumns } from "./coverDto.ts";
 import { resolvePlaylistDurations } from "./workProbe.ts";
 import type { ScanUpsertBatch } from "./scanUpsertBatch.ts";
 import {
@@ -100,10 +101,13 @@ async function assembleWorkForUpsert(
     if (dimensions) cover.dimensions = dimensions;
     else coverErrors += 1;
   }
-  const workCover: Cover =
-    cover.image !== null && cover.dimensions !== null
-      ? { image: cover.image, dimensions: cover.dimensions }
-      : null;
+  const workCover: Cover = coverDtoFromColumns(
+    id,
+    workDir,
+    cover.image,
+    cover.dimensions?.width ?? null,
+    cover.dimensions?.height ?? null,
+  );
   const { coverKind, coverImage } = coverFieldsFromColumns(
     cover.image,
     cover.dimensions?.width ?? null,

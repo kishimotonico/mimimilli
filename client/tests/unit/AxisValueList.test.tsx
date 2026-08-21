@@ -103,8 +103,18 @@ describe("AxisValueList list 表示（ADR-0012 §5）", () => {
         makeItem({
           value: "夜想曲",
           covers: [
-            { workId: "w1", image: "a.jpg", dimensions: { width: 100, height: 100 } },
-            { workId: "w2", image: "b.jpg", dimensions: { width: 100, height: 100 } },
+            {
+              workId: "w1",
+              image: "a.jpg",
+              dimensions: { width: 100, height: 100 },
+              version: "v1",
+            },
+            {
+              workId: "w2",
+              image: "b.jpg",
+              dimensions: { width: 100, height: 100 },
+              version: "v2",
+            },
           ],
         }),
       ],

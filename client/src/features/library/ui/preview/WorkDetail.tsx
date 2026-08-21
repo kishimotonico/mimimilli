@@ -251,7 +251,7 @@ export function WorkDetail({
       )}
       {isLightboxOpen && work.cover && (
         <Lightbox
-          src={getCoverImageUrl(work.id)}
+          src={getCoverImageUrl(work.id, work.cover.version)}
           alt={work.title}
           onClose={() => setIsLightboxOpen(false)}
         />

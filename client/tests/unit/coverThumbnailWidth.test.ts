@@ -58,7 +58,7 @@ describe("WorkRow のカバー画像", () => {
   const workWithCover: WorkSummary = {
     id: "work-1",
     title: "Work 1",
-    cover: { image: "cover.jpg", dimensions: { width: 800, height: 600 } },
+    cover: { image: "cover.jpg", dimensions: { width: 800, height: 600 }, version: "v1" },
     status: "ok",
     physicalPath: "/audio/work-1",
     totalDurationSec: 120,

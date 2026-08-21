@@ -101,7 +101,11 @@ test("buildCoverSnapshot: resolveWithin 失敗を cover-path-unresolved とし�
           makeSummary({
             id: "work-missing",
             physicalPath: workDir,
-            cover: { image: "missing.jpg", dimensions: { width: 100, height: 100 } },
+            cover: {
+              image: "missing.jpg",
+              dimensions: { width: 100, height: 100 },
+              version: "missing",
+            },
           }),
         ],
       }),
@@ -132,7 +136,7 @@ test("buildCoverSnapshot: カバーの stat 失敗を cover-stat-failed とし�
         makeSummary({
           id: "work-stat-fail",
           physicalPath: workDir,
-          cover: { image: "cover.jpg", dimensions: { width: 100, height: 100 } },
+          cover: { image: "cover.jpg", dimensions: { width: 100, height: 100 }, version: "cover" },
         }),
       ],
     }),
@@ -156,7 +160,7 @@ test("buildCoverSnapshot: stat 成功時に validNames が期待どおりにな�
         makeSummary({
           id: "work-a",
           physicalPath: workDir,
-          cover: { image: "cover.jpg", dimensions: { width: 100, height: 100 } },
+          cover: { image: "cover.jpg", dimensions: { width: 100, height: 100 }, version: "cover" },
         }),
       ],
     }),

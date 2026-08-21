@@ -104,6 +104,7 @@ export default function NowPlayingImmersive({
     !isFilePlayback && currentWork?.cover
       ? getCoverImageUrl(
           currentWork.id,
+          currentWork.cover.version,
           selectFixedCoverThumbnailWidth(AMBIENT_DISPLAY_SIZE, window.devicePixelRatio),
         )
       : null;
