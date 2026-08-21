@@ -3,6 +3,7 @@
 // abPointSet の positionSec を動かす点が異なるため、シーク本体のドラッグとは分離している。
 
 import { useCallback, useState } from "react";
+import { useRatioFromClientX } from "../model/ratioFromClientX";
 
 interface UseABHandleDragOptions {
   trackRef: React.RefObject<HTMLDivElement | null>;
@@ -24,16 +25,7 @@ export function useABHandleDrag({
 }: UseABHandleDragOptions): ABHandleDragBind {
   const [dragging, setDragging] = useState(false);
 
-  const ratioFromClientX = useCallback(
-    (clientX: number) => {
-      const el = trackRef.current;
-      if (!el) return 0;
-      const rect = el.getBoundingClientRect();
-      if (rect.width === 0) return 0;
-      return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-    },
-    [trackRef],
-  );
+  const ratioFromClientX = useRatioFromClientX(trackRef);
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {

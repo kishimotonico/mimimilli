@@ -1,12 +1,16 @@
 // 没入モードのマウスアクティブ時だけ現れる最小トランスポート（試験導入）。
-// シーク行とは独立した層で、自分専用のアイドル判定を持つ。削除するときは
-// このファイルと NowPlayingImmersive 側の1行の呼び出しを消すだけでよい。
+// シーク行とは独立した層。idle判定は NowPlayingImmersive 側のuseImmersiveIdle
+// 1箇所に集約されており、ここへは表示用の値だけがpropsで渡ってくる
+// （トラック切替では再表示されない）。削除するときは以下を消すだけでよい:
+//   - このファイル
+//   - NowPlayingImmersive 側の import・JSXでの呼び出し・idle propsの受け渡し
+//   - now-playing-immersive.css の .mle-nowplaying__immersive-minicontrols* 3ルール
 
 import { I } from "../../../shared/ui/Icon";
 import { cn } from "../../../shared/lib/cn";
-import { useImmersiveIdle } from "../model/useImmersiveIdle";
 
 interface NowPlayingImmersiveMiniControlsProps {
+  idle: boolean;
   isPlaying: boolean;
   volume: number;
   onTogglePlay: () => void;
@@ -19,6 +23,7 @@ const GHOST_BTN =
   "grid h-9 w-9 place-items-center rounded-full cursor-pointer text-white/90 drop-shadow-[0_1px_5px_rgba(0,0,0,0.65)] hover:text-white";
 
 export default function NowPlayingImmersiveMiniControls({
+  idle,
   isPlaying,
   volume,
   onTogglePlay,
@@ -26,8 +31,6 @@ export default function NowPlayingImmersiveMiniControls({
   onPrev,
   onSetVolume,
 }: NowPlayingImmersiveMiniControlsProps) {
-  const idle = useImmersiveIdle(true);
-
   return (
     <div
       className={cn("mle-nowplaying__immersive-minicontrols", idle && "is-idle")}

@@ -10,7 +10,9 @@
 
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import { useAtom, useAtomValue } from "jotai";
-import { playerIsActiveAtom, nowPlayingViewModeAtom } from "../../../entities/player/model/atoms";
+import { playerIsActiveAtom } from "../../../entities/player/model/atoms";
+import { selectActiveTrackView } from "../../../entities/player/model/playerCoreState";
+import { nowPlayingViewModeAtom } from "../model/playerPresentationAtoms";
 import { usePlayerActions } from "../model/usePlayerActions";
 import { usePlayerState, type PlayerState } from "../model/usePlayerState";
 import PlaybackArtwork from "./PlaybackArtwork";
@@ -67,7 +69,7 @@ function NowPlayingNormalBody({
   const isPresent = useIsPresent();
   const { fade } = useMotionVariants();
   const { currentWork, isFilePlayback, tracks, currentTrackIndex, playbackError } = state;
-  const track = tracks[currentTrackIndex] ?? null;
+  const { workTitle, trackTitle } = selectActiveTrackView(state);
 
   return (
     <motion.div className="h-full min-h-0" inert={!isPresent} {...fade({ exitAbsolute: false })}>
@@ -95,10 +97,10 @@ function NowPlayingNormalBody({
 
           <div className="flex w-full min-w-0 shrink-0 flex-col items-center gap-1.5 text-center">
             <div className="font-sans text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-3">
-              {isFilePlayback ? "ファイル" : currentWork!.title}
+              {workTitle}
             </div>
             <h1 className="m-0 max-w-full text-balance font-jp text-[24px] font-semibold leading-[1.2] tracking-[-0.01em] text-ink-0">
-              {track?.title ?? "—"}
+              {trackTitle}
             </h1>
           </div>
 

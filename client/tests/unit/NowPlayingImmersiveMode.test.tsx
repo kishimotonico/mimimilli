@@ -2,8 +2,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import NowPlayingView from "../../src/features/player/ui/NowPlayingView";
-import { playerCoreAtom } from "../../src/entities/player/model/atoms";
-import { PLAYER_CORE_INITIAL } from "../../src/features/player/model/playerController";
+import { PLAYER_CORE_INITIAL, playerCoreAtom } from "../../src/entities/player/model/atoms";
 import { NOW_PLAYING_IMMERSIVE_IDLE_MS } from "../../src/features/player/model/useImmersiveIdle";
 
 const playerActions = {

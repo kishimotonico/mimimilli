@@ -1,5 +1,6 @@
 import type { ResolvedTrack } from "../../../entities/work/model";
 import { resolveTrackDurationSec } from "@mimimilli/shared";
+import { clamp } from "../../../shared/lib/clamp";
 import type { PlaybackTrack } from "../../../entities/player/model/playbackTrack";
 
 export type { PlaybackTrack } from "../../../entities/player/model/playbackTrack";
@@ -56,8 +57,4 @@ export function toAudioAbsoluteTime(
 
 export function hasReachedTrackEnd(absoluteTime: number, track: PlaybackTrack): boolean {
   return track.end !== undefined && absoluteTime >= track.end;
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
 }

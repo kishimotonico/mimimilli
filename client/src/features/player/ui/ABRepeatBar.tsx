@@ -2,6 +2,7 @@ import { formatTime } from "../../../shared/lib/format";
 import { cn } from "../../../shared/lib/cn";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
+import { isAbRepeatEstablished } from "../../../entities/player/model/playerCoreState";
 import type { PlayerState } from "../model/usePlayerState";
 
 interface ABRepeatBarProps {
@@ -11,11 +12,10 @@ interface ABRepeatBarProps {
 }
 
 export default function ABRepeatBar({ abRepeat, onSetABPoint, onClearABRepeat }: ABRepeatBarProps) {
-  // リピートが実際に成立する条件（usePlayer 側のループ発動条件と同じ a < b）
-  const hasABRepeat = abRepeat.a !== null && abRepeat.b !== null && abRepeat.a < abRepeat.b;
+  const hasABRepeat = isAbRepeatEstablished(abRepeat);
 
   return (
-    <div className="flex items-center gap-2 whitespace-nowrap pt-2.5">
+    <div className="mle-nowplaying__controls-ab flex items-center gap-2 whitespace-nowrap pt-2.5">
       <span className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-ink-3">
         A-Bリピート
       </span>

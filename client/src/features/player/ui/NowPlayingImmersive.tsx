@@ -5,9 +5,10 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import type { PlayerState } from "../model/usePlayerState";
+import { selectActiveTrackView } from "../../../entities/player/model/playerCoreState";
 import PlaybackArtwork from "./PlaybackArtwork";
 import NowPlayingImmersiveMiniControls from "./NowPlayingImmersiveMiniControls";
-import { useImmersiveIdle } from "../model/useImmersiveIdle";
+import { NOW_PLAYING_IMMERSIVE_IDLE_MS, useImmersiveIdle } from "../model/useImmersiveIdle";
 import { useNowPlayingImmersiveShell } from "../model/useNowPlayingImmersiveShell";
 import { getCoverImageUrl } from "../../../entities/work/api";
 import { selectFixedCoverThumbnailWidth } from "../../../entities/work/ui/coverThumbnailWidth";
@@ -83,11 +84,22 @@ export default function NowPlayingImmersive({
   const isPresent = useIsPresent();
   const { fade } = useMotionVariants();
   const toggleRef = useRef<HTMLButtonElement>(null);
-  const { currentWork, isFilePlayback, tracks, currentTrackIndex, isPlaying, volume } = state;
-  const idle = useImmersiveIdle(isPresent, undefined, currentTrackIndex);
+  const { currentWork, isFilePlayback, currentTrackIndex, isPlaying, volume } = state;
+  // マウス移動・キー操作の監視は1箇所（このidle）に集約し、ミニコントロールへは
+  // 表示用の値だけをpropsで渡す（window listener・timerの二重化を避ける）。
+  const idle = useImmersiveIdle(isPresent);
+  // タイトル・切替アイコンはトラック切替のたびに一定時間だけ再表示する
+  // （ミニコントロールはこの再表示規則の対象外）。
+  const [trackJustChanged, setTrackJustChanged] = useState(false);
+  useEffect(() => {
+    setTrackJustChanged(true);
+    const timer = setTimeout(() => setTrackJustChanged(false), NOW_PLAYING_IMMERSIVE_IDLE_MS);
+    return () => clearTimeout(timer);
+  }, [currentTrackIndex]);
+  const titleIdle = idle && !trackJustChanged;
   useNowPlayingImmersiveShell(isPresent, onExit, toggleRef);
 
-  const track = tracks[currentTrackIndex] ?? null;
+  const { workTitle, trackTitle } = selectActiveTrackView(state);
   const ambientUrl =
     !isFilePlayback && currentWork?.cover
       ? getCoverImageUrl(
@@ -100,7 +112,7 @@ export default function NowPlayingImmersive({
     <motion.div
       className="mle-nowplaying__immersive"
       inert={!isPresent}
-      data-idle={idle || undefined}
+      data-idle={titleIdle || undefined}
       onClick={onTogglePlay}
       {...fade({ exitAbsolute: false })}
     >
@@ -131,7 +143,7 @@ export default function NowPlayingImmersive({
         type="button"
         aria-label="通常表示に戻す"
         title="通常表示に戻す"
-        className={cn("mle-nowplaying__immersive-toggle", idle && "is-idle")}
+        className={cn("mle-nowplaying__immersive-toggle", titleIdle && "is-idle")}
         onClick={(e) => {
           e.stopPropagation();
           onExit();
@@ -140,14 +152,13 @@ export default function NowPlayingImmersive({
         <I.minimize size={16} />
       </button>
 
-      <div className={cn("mle-nowplaying__immersive-title", idle && "is-idle")}>
-        <div className="mle-nowplaying__immersive-eyebrow">
-          {isFilePlayback ? "ファイル" : currentWork!.title}
-        </div>
-        <h1 className="mle-nowplaying__immersive-h1">{track?.title ?? "—"}</h1>
+      <div className={cn("mle-nowplaying__immersive-title", titleIdle && "is-idle")}>
+        <div className="mle-nowplaying__immersive-eyebrow">{workTitle}</div>
+        <h1 className="mle-nowplaying__immersive-h1">{trackTitle}</h1>
       </div>
 
       <NowPlayingImmersiveMiniControls
+        idle={idle}
         isPlaying={isPlaying}
         volume={volume}
         onTogglePlay={onTogglePlay}

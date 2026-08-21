@@ -7,7 +7,8 @@
 
 import { useAtomValue } from "jotai";
 import type { ReactNode } from "react";
-import { dockedBarActiveAtom } from "../entities/player/model/atoms";
+import { playerDockBarVisibleAtom } from "../features/player/model/playerPresentationAtoms";
+import { appModeAtom } from "../shared/model/appModeAtoms";
 
 interface AppShellProps {
   topBar: ReactNode;
@@ -28,7 +29,10 @@ export default function AppShell({
   transportBar,
   overlays,
 }: AppShellProps) {
-  const dockedBarActive = useAtomValue(dockedBarActiveAtom);
+  const dockBarVisible = useAtomValue(playerDockBarVisibleAtom);
+  const isNowPlaying = useAtomValue(appModeAtom) === "nowPlaying";
+  // 再生中タブでは PlayerDock 自体を描画しないため、docked bar 用の余白確保も対象外にする。
+  const dockedBarActive = dockBarVisible && !isNowPlaying;
 
   return (
     <div className={`mle-app ${dockedBarActive ? "has-docked-bar" : ""}`}>

@@ -4,6 +4,8 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import { formatDuration, formatTime } from "../../../shared/lib/format";
+import { clamp } from "../../../shared/lib/clamp";
+import { useRatioFromClientX } from "../model/ratioFromClientX";
 
 /** WAI-ARIA slider パターンの矢印キー刻み（秒） */
 export const SEEK_KEYBOARD_STEP_SEC = 5;
@@ -42,10 +44,6 @@ export interface SeekDragBind {
   onPointerLeave: () => void;
 }
 
-function clampSeekTime(time: number, duration: number): number {
-  return Math.max(0, Math.min(duration, time));
-}
-
 const SLIDER_KEYDOWN_KEYS = new Set([
   "ArrowLeft",
   "ArrowDown",
@@ -65,13 +63,7 @@ export function useSeekDrag({
   const [dragging, setDragging] = useState(false);
   const [hoverRatio, setHoverRatio] = useState<number | null>(null);
 
-  const ratioFromClientX = useCallback((clientX: number) => {
-    const el = trackRef.current;
-    if (!el) return 0;
-    const rect = el.getBoundingClientRect();
-    if (rect.width === 0) return 0;
-    return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-  }, []);
+  const ratioFromClientX = useRatioFromClientX(trackRef);
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
@@ -128,11 +120,11 @@ export function useSeekDrag({
       switch (e.key) {
         case "ArrowLeft":
         case "ArrowDown":
-          nextTime = clampSeekTime(currentTime - SEEK_KEYBOARD_STEP_SEC, duration);
+          nextTime = clamp(currentTime - SEEK_KEYBOARD_STEP_SEC, 0, duration);
           break;
         case "ArrowRight":
         case "ArrowUp":
-          nextTime = clampSeekTime(currentTime + SEEK_KEYBOARD_STEP_SEC, duration);
+          nextTime = clamp(currentTime + SEEK_KEYBOARD_STEP_SEC, 0, duration);
           break;
         case "Home":
           nextTime = 0;
@@ -150,7 +142,7 @@ export function useSeekDrag({
 
   const sliderProps = useMemo((): SeekSliderProps => {
     const valueMax = sliderEnabled ? duration : 0;
-    const valueNow = sliderEnabled ? clampSeekTime(currentTime, duration) : 0;
+    const valueNow = sliderEnabled ? clamp(currentTime, 0, duration) : 0;
     const currentLabel = formatTime(valueNow) ?? "0:00";
     const durationLabel =
       sliderEnabled && duration !== null ? (formatDuration(duration) ?? "--:--") : null;

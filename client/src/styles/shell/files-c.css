@@ -3,7 +3,7 @@
    パルス演出(.mle-colstack__edges の transition/[data-pulse]修飾、files-b.cssの基本定義と
    対になる)、カラム遷移アニメーション(.ml-file-col-enter*)。
    files-a〜cの分割理由はfiles-a.css冒頭コメント参照。
-   import順: player-a.cssの次、shared-d.cssより前。 */
+   import順: now-playing-immersive.cssの次、shared-d.cssより前。 */
 
 /* ── File mode — single column stage + preview ────────────── */
 

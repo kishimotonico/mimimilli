@@ -1,0 +1,334 @@
+/* mimimilli shell — player-popup
+   所有範囲: 右下ポップアップ（.mle-popup*）、評価ピッカー
+   （.mle-ratepick* / .mle-ratepill*、ポップアップ内でのみ使用）。
+   position: fixed のオーバーレイで、frame のグリッド行を持たない。
+   import順: player-dock.cssの次、now-playing.cssより前。
+   z-index の割り当ては docs/design-system.md の Overlay/z-index 一覧を参照。 */
+
+.mle-popup {
+  position: fixed;
+  right: 16px;
+  /* グリッド末尾カードとの重なりを避ける安全マージン */
+  bottom: 24px;
+  z-index: 32;
+  width: 336px;
+  /* ビューポートが低い時、上端がはみ出さないよう高さを制限する。
+     万一それでも収まらない極端なケースの保険として overflow-y も許可する。 */
+  max-height: calc(100dvh - 32px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  background: var(--paper-1);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-3);
+  box-shadow: var(--shadow-pop);
+  padding: 14px;
+}
+/* 左に再生中作品への導線、右にサイズ変更系ボタンをまとめる。 */
+.mle-popup__head {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.mle-popup__head-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+/* 高さ不足時はカバー画像領域だけを縮める（他のコントロールは flex-shrink: 0 で維持） */
+.mle-popup__cover-wrap {
+  position: relative;
+  flex-shrink: 1;
+  min-height: 0;
+  width: 100%;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  container-type: size;
+}
+.mle-popup__cover {
+  position: relative;
+  width: min(100cqw, 100cqh);
+  height: min(100cqw, 100cqh);
+  aspect-ratio: 1;
+  min-height: 0;
+  border-radius: var(--r-2);
+  overflow: hidden;
+  box-shadow: var(--shadow-cover);
+  background: var(--paper-2);
+}
+.mle-popup__cover img,
+.mle-popup__cover svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* ±10秒: カバー画像上のオーバーレイ円ボタン。常時薄く表示し、ホバーで強調する
+   （.mle-app button リセットに勝つため親クラスでスコープして詳細度を上げる） */
+.mle-popup__cover .mle-popup__skip {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: oklch(20% 0.02 70 / 0.5);
+  color: var(--paper-1);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  opacity: 0.55;
+  transition:
+    opacity 0.15s ease,
+    background 0.15s ease;
+}
+.mle-popup__cover:hover .mle-popup__skip {
+  opacity: 1;
+}
+.mle-popup__cover .mle-popup__skip:hover {
+  background: oklch(20% 0.02 70 / 0.7);
+}
+.mle-popup__skip--back {
+  left: 14px;
+}
+.mle-popup__skip--fwd {
+  right: 14px;
+}
+.mle-ratepick {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 4;
+}
+.mle-ratepick__pop {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 7px);
+  min-width: 112px;
+  padding: 4px;
+  background: var(--paper-1);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-2);
+  box-shadow: var(--shadow-pop);
+  animation: mle-ratepick-pop 0.12s ease-out both;
+}
+.mle-ratepick__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-1);
+  text-align: left;
+  white-space: nowrap;
+}
+.mle-ratepick__item:hover {
+  background: var(--paper-2);
+  color: var(--ink-0);
+}
+.mle-ratepick__item.is-checked {
+  color: var(--ink-0);
+}
+.mle-ratepick__item .check {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  color: var(--paper-1);
+}
+.mle-ratepick__item.is-checked .check {
+  background: var(--ink-0);
+}
+@keyframes mle-ratepick-pop {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.mle-ratepill.is-overlay {
+  position: relative;
+  background: oklch(20% 0.02 70 / 0.55);
+  color: var(--paper-1);
+}
+.mle-ratepill.is-overlay:hover {
+  background: oklch(20% 0.02 70 / 0.75);
+  color: var(--paper-1);
+}
+.mle-ratepill.is-overlay.is-on {
+  background: var(--acc);
+  color: var(--paper-1);
+}
+
+.mle-popup__meta {
+  flex-shrink: 0;
+  text-align: center;
+  min-width: 0;
+}
+.mle-popup__track {
+  font-family: var(--font-jp);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-0);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mle-popup__work {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-3);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mle-popup__error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-family: var(--font-jp);
+  font-size: 10.5px;
+  color: var(--r-coral);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mle-popup__error svg {
+  flex-shrink: 0;
+}
+.mle-popup__seek {
+  flex-shrink: 0;
+  padding: 8px 0 2px;
+  cursor: pointer;
+}
+.mle-popup__seek-track {
+  position: relative;
+  height: 4px;
+  background: var(--paper-3);
+  border-radius: 2px;
+}
+.mle-popup__seek-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: var(--acc);
+  border-radius: 2px;
+}
+.mle-popup__seek-thumb {
+  position: absolute;
+  top: 50%;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--paper-1);
+  box-shadow:
+    0 0 0 1.5px var(--acc),
+    var(--shadow-1);
+  transform: translate(-50%, -50%);
+}
+.mle-popup__time-row {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-3);
+  margin-top: -4px;
+}
+.mle-popup__controls {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+.mle-popup__play {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--ink-0);
+  color: var(--paper-1);
+  display: grid;
+  place-items: center;
+}
+.mle-popup__play:hover {
+  background: var(--acc);
+}
+.mle-popup__tbtn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--ink-1);
+}
+.mle-popup__tbtn:hover {
+  background: var(--paper-2);
+  color: var(--ink-0);
+}
+.mle-popup__tbtn.is-on {
+  color: var(--acc);
+  background: var(--acc-soft);
+}
+.mle-popup__row {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.mle-popup__volrange {
+  flex: 1;
+  height: 3px;
+  accent-color: var(--ink-2);
+  cursor: pointer;
+}
+.mle-popup__volval {
+  min-width: 3ch;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-3);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+/* 再生速度ピル（ポップアップ専用。.mle-ratepill.is-overlay がカバー画像上に重ねて使う）。 */
+.mle-ratepill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  height: 26px;
+  padding: 0 9px;
+  border-radius: var(--r-pill);
+  background: var(--paper-2);
+  color: var(--ink-1);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+}
+.mle-ratepill:hover {
+  background: var(--paper-3);
+  color: var(--ink-0);
+}
+.mle-ratepill.is-on {
+  background: var(--acc-soft);
+  color: var(--acc-ink);
+}

@@ -27,6 +27,9 @@
 @import "./shared-b.css" layer(components);
 @import "./library-e.css" layer(components);
 @import "./shared-c.css" layer(components);
-@import "./player-a.css" layer(components);
+@import "./player-dock.css" layer(components);
+@import "./player-popup.css" layer(components);
+@import "./now-playing.css" layer(components);
+@import "./now-playing-immersive.css" layer(components);
 @import "./files-c.css" layer(components);
 @import "./shared-d.css" layer(components);
