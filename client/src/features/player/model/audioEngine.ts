@@ -34,7 +34,6 @@ export interface AudioEngine {
   play: () => void;
   pause: () => void;
   seek: (time: number) => void;
-  seekRelative: (delta: number) => void;
   setVolume: (vol: number) => void; // 0-100
   setPlaybackRate: (rate: number) => void;
   setChannelSwap: (enabled: boolean) => void;
@@ -230,10 +229,6 @@ export function createAudioEngine(
 
     seek(time) {
       audio.currentTime = time;
-    },
-
-    seekRelative(delta) {
-      audio.currentTime = Math.max(0, Math.min(audio.duration || 0, audio.currentTime + delta));
     },
 
     setVolume(vol) {

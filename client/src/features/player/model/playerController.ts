@@ -99,7 +99,6 @@ export type PlayerControllerInput =
   | { type: "toggleRequested" }
   | { type: "stopRequested" }
   | { type: "seekRequested"; positionSec: number }
-  | { type: "seekRelativeRequested"; deltaSec: number }
   | { type: "nextRequested" }
   | { type: "previousRequested" }
   | { type: "trackSelected"; trackIndex: number }
@@ -242,11 +241,6 @@ export function reducePlayer(
         commands: state.item ? [{ type: "seekAudio", positionSec }] : [],
       };
     }
-    case "seekRelativeRequested":
-      return reducePlayer(state, {
-        type: "seekRequested",
-        positionSec: state.positionSec + input.deltaSec,
-      });
     case "nextRequested":
       return withTrackIndex(state, (state.item?.trackIndex ?? -1) + 1, "preserve");
     case "previousRequested":
