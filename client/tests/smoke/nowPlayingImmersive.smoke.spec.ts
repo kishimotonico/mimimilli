@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { assertNoErrors, openApp, trackErrors } from "./support";
 
-test("再生中タブ: 没入モードでカバーがビューポート内に収まり、シーク行の位置がモード切替前後で不変", async ({
+test("再生中タブ: 没入モードでカバーが拡大クロップされてページに漏れず、シーク行の位置がモード切替前後で不変", async ({
   page,
 }) => {
   const tracker = trackErrors(page);
@@ -24,16 +24,21 @@ test("再生中タブ: 没入モードでカバーがビューポート内に収
   await expect(cover).toBeVisible();
 
   // カバーは拡大（scale）してから親の overflow: hidden でクロップする設計（TASK-365）。
-  // img 自体はビューポートよりはみ出す想定なので、クロップの器
-  // （.mle-nowplaying__immersive-cover）がビューポート内に収まり、ページに
-  // スクロールを生まないことを回帰ガードとして確認する。
+  // (1) 中身（img またはプレースホルダー svg）がビューポートより実際にはみ出している
+  //     こと（拡大が効いている証拠。等倍に退行したら失敗する）
+  // (2) クロップの器（.mle-nowplaying__immersive-cover）が overflow: hidden である
+  //     こと（クロップ機構そのものの証拠）
+  // (3) それでもページ全体にスクロールを生まないこと（漏れていない証拠）
   const viewport = page.viewportSize()!;
-  const coverBox = await cover.boundingBox();
-  expect(coverBox).not.toBeNull();
-  expect(coverBox!.y).toBeGreaterThanOrEqual(0);
-  expect(coverBox!.x).toBeGreaterThanOrEqual(0);
-  expect(coverBox!.y + coverBox!.height).toBeLessThanOrEqual(viewport.height);
-  expect(coverBox!.x + coverBox!.width).toBeLessThanOrEqual(viewport.width);
+  const coverContent = cover.locator(":scope > *").first();
+  const contentBox = await coverContent.boundingBox();
+  expect(contentBox).not.toBeNull();
+  expect(
+    contentBox!.width > viewport.width || contentBox!.height > viewport.height,
+  ).toBe(true);
+
+  const coverOverflow = await cover.evaluate((el) => getComputedStyle(el).overflow);
+  expect(coverOverflow).toBe("hidden");
 
   const hasPageOverflow = await page.evaluate(
     () =>
