@@ -7,10 +7,14 @@ export const NOW_PLAYING_IMMERSIVE_IDLE_MS = 3000;
  * active な間、マウス移動・キー操作が timeoutMs 途絶えたら true を返す。
  * キー操作は capture フェーズで拾うため、AB ハンドルの矢印キー操作（stopPropagation
  * される）でも復帰を検知できる。
+ *
+ * resetKey が変わるたび（トラック切替など）タイマーを最初から数え直し、idle を
+ * 一旦解除する。マウス操作を伴わない契機でも一定時間だけ再表示したい場合に使う。
  */
 export function useImmersiveIdle(
   active: boolean,
   timeoutMs: number = NOW_PLAYING_IMMERSIVE_IDLE_MS,
+  resetKey?: unknown,
 ): boolean {
   const [idle, setIdle] = useState(false);
 
@@ -35,7 +39,7 @@ export function useImmersiveIdle(
       window.removeEventListener("mousemove", reset, true);
       window.removeEventListener("keydown", reset, true);
     };
-  }, [active, timeoutMs]);
+  }, [active, timeoutMs, resetKey]);
 
   return idle;
 }

@@ -186,6 +186,9 @@ export default function NowPlayingView({ onOpenWork }: NowPlayingViewProps) {
             state={state}
             onTogglePlay={actions.togglePlay}
             onExit={() => setMode("normal")}
+            onNext={actions.nextTrack}
+            onPrev={actions.prevTrack}
+            onSetVolume={actions.setVolume}
           />
         ) : (
           <NowPlayingNormalBody

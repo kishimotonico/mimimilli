@@ -117,6 +117,17 @@ export function collapseVariant(reduced: boolean): MotionVariant {
   };
 }
 
+/** 没入モードの再生⇄一時停止バーストフィードバック。中央にポップして少し拡大しながら消える。 */
+export function playbackBurstVariant(reduced: boolean): MotionVariant {
+  const enterT = timing(reduced, 0.18, EASE_OVERSHOOT);
+  const exitT = timing(reduced, 0.25, EASE_STANDARD);
+  return {
+    initial: { opacity: 0, scale: 0.6 },
+    animate: { opacity: 1, scale: 1, transition: { opacity: enterT, scale: enterT } },
+    exit: { opacity: 0, scale: 1.08, transition: { opacity: exitT, scale: exitT } },
+  };
+}
+
 /** PlayerDock のバー型が下から出入りする動き。 */
 export function dockBarSlideVariant(reduced: boolean): MotionVariant {
   const yT = timing(reduced, DUR.dockBarTransform, EASE_OVERSHOOT);
@@ -247,6 +258,7 @@ export function useMotionVariants() {
   return {
     reduced,
     fade: (opts?: FadeOptions) => fadeVariant(reduced, opts),
+    playbackBurst: () => playbackBurstVariant(reduced),
     fadeSlideUp: () => fadeSlideUpVariant(reduced),
     collapse: () => collapseVariant(reduced),
     dockBarSlide: () => dockBarSlideVariant(reduced),
