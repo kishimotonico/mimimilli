@@ -16,6 +16,8 @@ import { cn } from "../../../shared/lib/cn";
 
 /** ファイル再生・カバー欠損時のプレースホルダーの表示サイズ（正方形）。 */
 const COVER_PLACEHOLDER_SIZE = 480;
+/** 環境光風の背景は60pxブラーで潰れるため、小さいサムネイルで十分。 */
+const AMBIENT_DISPLAY_SIZE = 96;
 
 interface NowPlayingImmersiveProps {
   state: Pick<PlayerState, "currentWork" | "isFilePlayback" | "tracks" | "currentTrackIndex">;
@@ -37,7 +39,12 @@ export default function NowPlayingImmersive({
   const { currentWork, isFilePlayback, tracks, currentTrackIndex } = state;
   const track = tracks[currentTrackIndex] ?? null;
   const ambientUrl =
-    !isFilePlayback && currentWork?.cover ? getCoverImageUrl(currentWork.id) : null;
+    !isFilePlayback && currentWork?.cover
+      ? getCoverImageUrl(
+          currentWork.id,
+          selectFixedCoverThumbnailWidth(AMBIENT_DISPLAY_SIZE, window.devicePixelRatio),
+        )
+      : null;
 
   return (
     <motion.div

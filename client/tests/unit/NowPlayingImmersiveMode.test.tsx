@@ -55,24 +55,6 @@ function renderNowPlaying() {
   return { store };
 }
 
-/** テスト内では JSDOM が実レイアウトを計算しないため、シーク行のみ固定の
- * DOMRect を返すよう差し替える。モード切替の前後で同じ値であることを見る。 */
-function stubSeekRowRect() {
-  const original = HTMLElement.prototype.getBoundingClientRect;
-  HTMLElement.prototype.getBoundingClientRect = function () {
-    if (
-      this.dataset.testid === "nowplaying-seek-row" ||
-      this.getAttribute("data-testid") === "nowplaying-seek-row"
-    ) {
-      return new DOMRectReadOnly(48, 900, 1200, 56);
-    }
-    return original.call(this);
-  };
-  return () => {
-    HTMLElement.prototype.getBoundingClientRect = original;
-  };
-}
-
 describe("再生中タブ: 没入モード切替とシーク行の非再マウント", () => {
   afterEach(() => {
     vi.useRealTimers();
@@ -80,26 +62,19 @@ describe("再生中タブ: 没入モード切替とシーク行の非再マウ�
     localStorage.clear();
   });
 
-  it("モード切替の前後でシーク行が同一DOMノード・同一サイズ・同一位置のまま残る", () => {
-    const restoreRect = stubSeekRowRect();
+  // 実レイアウトでの位置・寸法不変（getBoundingClientRect）は JSDOM では検証できないため、
+  // 実ブラウザの smoke テスト（nowPlayingImmersive.smoke.spec.ts）で確認する。ここでは
+  // DOM ノードの同一性（再マウントしていないこと）だけを見る。
+  it("モード切替の前後でシーク行が同一DOMノードのまま残る", () => {
     renderNowPlaying();
 
     const seekRowBefore = screen.getByTestId("nowplaying-seek-row");
-    const rectBefore = seekRowBefore.getBoundingClientRect();
 
     fireEvent.click(screen.getByRole("button", { name: "没入モードにする" }));
-
-    const seekRowAfter = screen.getByTestId("nowplaying-seek-row");
-    expect(seekRowAfter).toBe(seekRowBefore);
-    expect(seekRowAfter.getBoundingClientRect()).toEqual(rectBefore);
+    expect(screen.getByTestId("nowplaying-seek-row")).toBe(seekRowBefore);
 
     fireEvent.click(screen.getByRole("button", { name: "通常表示に戻す" }));
-
-    const seekRowFinal = screen.getByTestId("nowplaying-seek-row");
-    expect(seekRowFinal).toBe(seekRowBefore);
-    expect(seekRowFinal.getBoundingClientRect()).toEqual(rectBefore);
-
-    restoreRect();
+    expect(screen.getByTestId("nowplaying-seek-row")).toBe(seekRowBefore);
   });
 
   it("没入モードでは周辺（2カラム本文）が退出し、通常モード固有のUIが残らない", async () => {

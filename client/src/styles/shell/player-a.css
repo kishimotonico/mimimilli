@@ -765,8 +765,6 @@
   position: fixed;
   inset: 0;
   z-index: 40;
-  display: grid;
-  place-items: center;
   overflow: hidden;
   cursor: pointer;
 }
@@ -793,13 +791,13 @@
    縦横比を固定しない大きな矩形にする（縦横比は作品ごとに可変）。
    ファイル再生・カバー欠損時のプレースホルダーは正方形のまま中央に収まる。 */
 .mle-nowplaying__immersive-cover {
-  position: relative;
+  position: absolute;
+  inset: 0;
   z-index: 2;
-  width: 100%;
-  height: 100%;
   padding: 96px 120px calc(var(--now-playing-seek-h) + 96px);
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .mle-nowplaying__immersive-cover > * {
   max-width: 100%;
