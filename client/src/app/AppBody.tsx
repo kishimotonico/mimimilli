@@ -4,6 +4,7 @@ import { appModeAtom } from "../shared/model/appModeAtoms";
 import LibraryView from "../features/library/ui/LibraryView";
 import WorkDetailPage from "../features/library/ui/WorkDetailPage";
 import NowPlayingView from "../features/player/ui/NowPlayingView";
+import { playerDockBarVisibleAtom } from "../features/player/model/playerPresentationAtoms";
 import type { Work, WorkListItem } from "@mimimilli/shared";
 import type { PlaybackTrack } from "../entities/player/model/playbackTrack";
 
@@ -28,6 +29,7 @@ export default function AppBody({
   onOpenWorkDetail,
 }: AppBodyProps) {
   const mode = useAtomValue(appModeAtom);
+  const dockedBarActive = useAtomValue(playerDockBarVisibleAtom);
 
   if (mode === "files") {
     return (
@@ -45,5 +47,12 @@ export default function AppBody({
     return <WorkDetailPage onPlay={onPlay} onResume={onResume} onTogglePlay={onTogglePlay} />;
   }
 
-  return <LibraryView onPlay={onPlay} onResume={onResume} onTogglePlay={onTogglePlay} />;
+  return (
+    <LibraryView
+      onPlay={onPlay}
+      onResume={onResume}
+      onTogglePlay={onTogglePlay}
+      dockedBarActive={dockedBarActive}
+    />
+  );
 }

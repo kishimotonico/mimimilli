@@ -57,6 +57,8 @@ interface LibraryViewProps {
   onResume: (work: Work) => void;
   /** ロード中トラックの再生/一時停止を切り替える（選択中作品が再生中のときのスプリットボタン用） */
   onTogglePlay: () => void;
+  /** 画面下張り付きの再生バーが表示中か（結果面の末尾余白の確保に使う） */
+  dockedBarActive: boolean;
 }
 
 type PreviewPaneSlideProps = ComponentProps<typeof PreviewPane>;
@@ -74,7 +76,12 @@ function PreviewPaneSlide(props: PreviewPaneSlideProps) {
   );
 }
 
-export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryViewProps) {
+export default function LibraryView({
+  onPlay,
+  onResume,
+  onTogglePlay,
+  dockedBarActive,
+}: LibraryViewProps) {
   const rootFolder = useRootFolder();
   const searchQuery = useAtomValue(librarySearchQueryAtom);
   const debouncedSearchQuery = useLibraryDebouncedSearchQuery(searchQuery);
@@ -295,6 +302,7 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
                         hasSelectedTags={nav.selectedTags.length > 0}
                         playingWorkId={playingWorkId}
                         isPlaybackActive={isPlaybackActive}
+                        dockedBarActive={dockedBarActive}
                         hasNextPage={result.hasNextPage}
                         worksTotal={result.worksTotal}
                         isFetchingNextPage={result.isFetchingNextPage}
@@ -316,6 +324,7 @@ export default function LibraryView({ onPlay, onResume, onTogglePlay }: LibraryV
                         hasSelectedTags={nav.selectedTags.length > 0}
                         playingWorkId={playingWorkId}
                         isPlaybackActive={isPlaybackActive}
+                        dockedBarActive={dockedBarActive}
                         isPending={isPending}
                         hasNextPage={result.hasNextPage}
                         worksTotal={result.worksTotal}

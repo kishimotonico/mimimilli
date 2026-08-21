@@ -6,10 +6,7 @@
 import { useAtom } from "jotai";
 import { animate, useDragControls, useMotionValue, type PanInfo } from "motion/react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import {
-  playerPopupOffsetAtom,
-  type PlayerPopupOffset,
-} from "../../../entities/player/model/atoms";
+import { playerPopupOffsetAtom, type PlayerPopupOffset } from "./playerPresentationAtoms";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 
 /** 離した位置が初期位置からこの距離(px)以内なら吸着して初期位置へ戻す。 */

@@ -3,8 +3,8 @@ import { Provider as JotaiProvider, createStore } from "jotai";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import PlayerDock from "../../src/features/player/ui/PlayerDock";
 import { LibraryNavigationProvider } from "../../src/features/library/ui/LibraryNavigationProvider";
-import { playerCoreAtom, playerUiModeAtom } from "../../src/entities/player/model/atoms";
-import { PLAYER_CORE_INITIAL } from "../../src/features/player/model/playerController";
+import { PLAYER_CORE_INITIAL, playerCoreAtom } from "../../src/entities/player/model/atoms";
+import { playerUiModeAtom } from "../../src/features/player/model/playerPresentationAtoms";
 
 vi.mock("../../src/features/player/ui/BarContent", () => ({
   default: ({ onSwitchToPopup }: { onSwitchToPopup: () => void }) => (

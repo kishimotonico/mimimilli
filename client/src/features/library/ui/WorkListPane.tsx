@@ -1,5 +1,4 @@
 import { useCallback, type ReactNode } from "react";
-import { useAtomValue } from "jotai";
 import type { WorkListItem } from "@mimimilli/shared";
 import type { AxisId } from "../../../entities/library/types";
 import { buildEmptyWorksHint, buildEmptyWorksMessage } from "../model/emptyWorks";
@@ -8,7 +7,6 @@ import CollectionStatus from "../../../shared/ui/CollectionStatus";
 import LoadMore from "./LoadMore";
 import { I } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
-import { dockedBarActiveAtom } from "../../../entities/player/model/atoms";
 import { useVirtualList } from "../../../shared/ui/useVirtualList";
 
 // 作品一覧のリスト表示（list/grid のうち list）。ADR-0012 §3 によりレイアウトを固定し、
@@ -30,6 +28,8 @@ interface WorkListPaneProps {
   hasSelectedTags: boolean;
   playingWorkId?: string;
   isPlaybackActive?: boolean;
+  /** 画面下張り付きの再生バーが表示中か（末尾余白の確保に使う） */
+  dockedBarActive?: boolean;
   isPending?: boolean;
   hasNextPage?: boolean;
   worksTotal?: number;
@@ -51,6 +51,7 @@ export default function WorkListPane({
   hasSelectedTags,
   playingWorkId,
   isPlaybackActive,
+  dockedBarActive = false,
   isPending = false,
   hasNextPage = false,
   worksTotal,
@@ -60,7 +61,6 @@ export default function WorkListPane({
   onClearSearch,
   resultsBanner,
 }: WorkListPaneProps) {
-  const dockedBarActive = useAtomValue(dockedBarActiveAtom);
   const paddingEnd = dockedBarActive
     ? LIST_PADDING_END_BASE + LIST_DOCKED_BAR_EXTRA
     : LIST_PADDING_END_BASE;

@@ -9,7 +9,6 @@ import { GRID_COLUMN_GAP, GRID_ROW_GAP, clampTileSize } from "../../../shared/li
 import { buildEmptyWorksHint, buildEmptyWorksMessage } from "../model/emptyWorks";
 import CollectionStatus from "../../../shared/ui/CollectionStatus";
 import LoadMore from "./LoadMore";
-import { dockedBarActiveAtom } from "../../../entities/player/model/atoms";
 import { useVirtualGrid } from "../../../shared/ui/useVirtualGrid";
 import {
   GRID_DOCKED_BAR_EXTRA,
@@ -35,6 +34,8 @@ interface WorkGridProps {
   hasSelectedTags: boolean;
   playingWorkId?: string | null;
   isPlaybackActive?: boolean;
+  /** 画面下張り付きの再生バーが表示中か（末尾余白の確保に使う） */
+  dockedBarActive?: boolean;
   /** 遷移中は直前の一覧を薄く表示する。 */
   isPending?: boolean;
   /** 次ページがあるか（追加読み込みボタンの表示判定。TASK-73） */
@@ -63,6 +64,7 @@ export default function WorkGrid({
   hasSelectedTags,
   playingWorkId = null,
   isPlaybackActive = false,
+  dockedBarActive = false,
   isPending = false,
   hasNextPage = false,
   worksTotal,
@@ -80,7 +82,6 @@ export default function WorkGrid({
   const paneRef = useRef<HTMLElement>(null);
   const [gridEl, setGridEl] = useState<HTMLDivElement | null>(null);
   const isWorkSelected = selectedWorkId !== null;
-  const dockedBarActive = useAtomValue(dockedBarActiveAtom);
   const paddingEnd = dockedBarActive
     ? GRID_PADDING_END_BASE + GRID_DOCKED_BAR_EXTRA
     : GRID_PADDING_END_BASE;

@@ -4,11 +4,6 @@ import { Provider as JotaiProvider, createStore } from "jotai";
 import userEvent from "@testing-library/user-event";
 import type { WorkListItem } from "@mimimilli/shared";
 import WorkListPane from "../../src/features/library/ui/WorkListPane";
-import {
-  PLAYER_CORE_INITIAL,
-  playerCoreAtom,
-  playerUiModeAtom,
-} from "../../src/entities/player/model/atoms";
 import { clearResizeObservers, flushAllResizeObservers, mockElementSize } from "./setup";
 
 function createWorks(count: number): WorkListItem[] {
@@ -30,14 +25,6 @@ function renderWorkListPane(
   options?: { dockedBarActive?: boolean },
 ) {
   const store = createStore();
-  if (options?.dockedBarActive) {
-    store.set(playerCoreAtom, {
-      ...PLAYER_CORE_INITIAL,
-      currentTrackIndex: 0,
-      currentWork: createWorks(1)[0],
-    });
-    store.set(playerUiModeAtom, "bar");
-  }
 
   return render(
     <JotaiProvider store={store}>
@@ -50,6 +37,7 @@ function renderWorkListPane(
         hasSelectedTags={false}
         playingWorkId={undefined}
         isPlaybackActive={false}
+        dockedBarActive={options?.dockedBarActive ?? false}
         hasNextPage={false}
         onLoadMore={vi.fn()}
         onWorkSelect={vi.fn()}

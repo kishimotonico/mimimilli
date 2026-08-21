@@ -10,7 +10,8 @@
 
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import { useAtom, useAtomValue } from "jotai";
-import { playerIsActiveAtom, nowPlayingViewModeAtom } from "../../../entities/player/model/atoms";
+import { playerIsActiveAtom } from "../../../entities/player/model/atoms";
+import { nowPlayingViewModeAtom } from "../model/playerPresentationAtoms";
 import { usePlayerActions } from "../model/usePlayerActions";
 import { usePlayerState, type PlayerState } from "../model/usePlayerState";
 import PlaybackArtwork from "./PlaybackArtwork";
