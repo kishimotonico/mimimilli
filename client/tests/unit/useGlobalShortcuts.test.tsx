@@ -25,25 +25,36 @@ function TestHost({
 }
 
 describe("useGlobalShortcuts", () => {
-  it("フォーカスがボタン・リンク・select・sliderにあるときはネイティブ動作を優先しショートカットを発火しない", () => {
+  it("フォーカスがボタン・リンク・select・contentEditableにあるときはネイティブ動作を優先しショートカットを発火しない", () => {
     const onTogglePlay = vi.fn();
     const onSeekRelative = vi.fn();
     const { getByRole, getByText } = render(
       createElement(TestHost, { onTogglePlay, onSeekRelative }),
     );
 
-    for (const el of [
-      getByRole("button"),
-      getByRole("link"),
-      getByRole("combobox"),
-      getByRole("slider"),
-    ]) {
+    for (const el of [getByRole("button"), getByRole("link"), getByRole("combobox")]) {
       fireEvent.keyDown(el, { code: "Space" });
       fireEvent.keyDown(el, { code: "ArrowLeft" });
     }
     fireEvent.keyDown(getByText("editable"), { code: "Space" });
 
     expect(onTogglePlay).not.toHaveBeenCalled();
+    expect(onSeekRelative).not.toHaveBeenCalled();
+  });
+
+  it("フォーカスがsliderにあるとき、Spaceはトグル＋preventDefaultされ、矢印はスライダー側に委ねグローバル側は無反応", () => {
+    const onTogglePlay = vi.fn();
+    const onSeekRelative = vi.fn();
+    const { getByRole } = render(createElement(TestHost, { onTogglePlay, onSeekRelative }));
+    const slider = getByRole("slider");
+
+    const spaceResult = fireEvent.keyDown(slider, { code: "Space", key: " " });
+    expect(onTogglePlay).toHaveBeenCalledTimes(1);
+    // fireEventの戻り値はpreventDefaultされなかった(=イベントがdispatchDefault可能なまま)場合にtrueになる。
+    // ここではpreventDefaultされる（=スクロールしない）ためfalseが正しい。
+    expect(spaceResult).toBe(false);
+
+    fireEvent.keyDown(slider, { code: "ArrowLeft", key: "ArrowLeft" });
     expect(onSeekRelative).not.toHaveBeenCalled();
   });
 
