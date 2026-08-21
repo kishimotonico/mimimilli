@@ -42,8 +42,8 @@
   /* Type stacks */
   --font-sans: "Geist", -apple-system, system-ui, "Segoe UI", sans-serif;
   --font-jp:
-    "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", Meiryo, "Noto Sans CJK JP",
-    "Noto Sans JP", system-ui, sans-serif;
+    "Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans CJK JP", system-ui,
+    sans-serif;
   --font-mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
 
   /* Radii */
