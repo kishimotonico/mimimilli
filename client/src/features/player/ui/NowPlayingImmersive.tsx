@@ -147,16 +147,14 @@ export default function NowPlayingImmersive({
         <h1 className="mle-nowplaying__immersive-h1">{track?.title ?? "—"}</h1>
       </div>
 
-      {isPresent && (
-        <NowPlayingImmersiveMiniControls
-          isPlaying={isPlaying}
-          volume={volume}
-          onTogglePlay={onTogglePlay}
-          onNext={onNext}
-          onPrev={onPrev}
-          onSetVolume={onSetVolume}
-        />
-      )}
+      <NowPlayingImmersiveMiniControls
+        isPlaying={isPlaying}
+        volume={volume}
+        onTogglePlay={onTogglePlay}
+        onNext={onNext}
+        onPrev={onPrev}
+        onSetVolume={onSetVolume}
+      />
     </motion.div>
   );
 }
