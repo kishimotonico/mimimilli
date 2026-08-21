@@ -665,31 +665,25 @@
 .mle-nowplaying__controls > *:first-child {
   grid-column: 2;
   justify-self: center;
-  min-width: 0;
 }
 .mle-nowplaying__controls > *:last-child {
   grid-column: 3;
   justify-self: end;
-  min-width: 0;
-  overflow: hidden;
 }
 
-/* トランスポート（約500px固定）とAB行（長いAB時刻＋「リピート中」表示込みで
-   約350px）は、1024〜1280px幅では1fr列に収まらない。nowrap化だけでは
-   足りないため、この帯ではAB行をトランスポートの下段へ秩序だって退避させる
-   （1600px以上は元の1行のまま、見た目を変えない）。 */
+/* サポート下限1024px〜1439pxはAB行をトランスポートの下段へ退避させる。 */
 @media (max-width: 1439px) {
   .mle-nowplaying__controls {
     grid-template-columns: 1fr;
     grid-template-rows: auto auto;
-    row-gap: 2px;
-    padding-bottom: 8px;
+    row-gap: 0;
+    padding-bottom: 4px;
   }
   .mle-nowplaying__controls > *:first-child,
   .mle-nowplaying__controls > *:last-child {
     grid-column: 1;
     justify-self: center;
-    overflow: visible;
+    min-width: 0;
     padding-top: 0;
   }
 }
