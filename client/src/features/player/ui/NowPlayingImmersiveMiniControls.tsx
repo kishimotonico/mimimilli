@@ -35,6 +35,7 @@ export default function NowPlayingImmersiveMiniControls({
     <div
       className={cn("mle-nowplaying__immersive-minicontrols", idle && "is-idle")}
       aria-hidden={idle}
+      inert={idle}
     >
       <div className="mle-nowplaying__immersive-minicontrols-group">
         <button

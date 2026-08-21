@@ -15,3 +15,11 @@ export function useRatioFromClientX(
     [trackRef],
   );
 }
+
+/**
+ * すでに解放済みのポインターキャプチャを releasePointerCapture すると例外になるため、
+ * 保持している場合のみ解放する（シークバー・ABハンドル共通）。
+ */
+export function releasePointerCaptureSafe(el: Element, pointerId: number) {
+  if (el.hasPointerCapture(pointerId)) el.releasePointerCapture(pointerId);
+}

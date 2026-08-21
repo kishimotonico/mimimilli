@@ -51,6 +51,8 @@ function ABHandle({ point, pct, trackRef, duration, time, onSetABPointAt }: ABHa
       onPointerDown={drag.onPointerDown}
       onPointerMove={drag.onPointerMove}
       onPointerUp={drag.onPointerUp}
+      onPointerCancel={drag.onPointerCancel}
+      onLostPointerCapture={drag.onLostPointerCapture}
       onKeyDown={(e) => {
         if (!duration) return;
         if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
@@ -96,6 +98,8 @@ export default function NowPlayingScrub({
         onPointerDown={seek.onPointerDown}
         onPointerMove={seek.onPointerMove}
         onPointerUp={seek.onPointerUp}
+        onPointerCancel={seek.onPointerCancel}
+        onLostPointerCapture={seek.onLostPointerCapture}
         onPointerLeave={seek.onPointerLeave}
       >
         <div

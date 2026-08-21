@@ -22,6 +22,8 @@ export default function BarSeekStrip({ onSeek }: BarSeekStripProps) {
       onPointerDown={seek.onPointerDown}
       onPointerMove={seek.onPointerMove}
       onPointerUp={seek.onPointerUp}
+      onPointerCancel={seek.onPointerCancel}
+      onLostPointerCapture={seek.onLostPointerCapture}
       onPointerLeave={seek.onPointerLeave}
     >
       <div className="mle-bar1__seek-track">

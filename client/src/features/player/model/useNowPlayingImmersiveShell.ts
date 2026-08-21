@@ -25,6 +25,7 @@ export function useNowPlayingImmersiveShell(
     const shellSiblings = Array.from(
       document.querySelectorAll<HTMLElement>(".mle-frame > :not(main)"),
     );
+    const wasInert = shellSiblings.map((el) => el.hasAttribute("inert"));
     for (const el of shellSiblings) el.setAttribute("inert", "");
 
     previousFocusRef.current =
@@ -40,7 +41,9 @@ export function useNowPlayingImmersiveShell(
     document.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      for (const el of shellSiblings) el.removeAttribute("inert");
+      shellSiblings.forEach((el, i) => {
+        if (!wasInert[i]) el.removeAttribute("inert");
+      });
       document.removeEventListener("keydown", handleKeyDown);
       // 没入前のフォーカス元（カバー等）は通常表示側の AnimatePresence 境界ごと
       // アンマウントされていることがある。その場合は通常表示に必ず存在する

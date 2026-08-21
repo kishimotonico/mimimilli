@@ -5,8 +5,7 @@ import type { PlaybackTrack } from "./trackTime";
 import type { PlaybackItem } from "./playerController";
 
 export function usePlayerActions() {
-  const { controller, lastVolumeRef, pendingResumeRef, requireCapabilities } =
-    usePlayerRuntimeContext();
+  const { controller, pendingResumeRef, requireCapabilities } = usePlayerRuntimeContext();
 
   const startPlayback = useCallback(
     (
@@ -109,17 +108,6 @@ export function usePlayerActions() {
     [controller],
   );
 
-  const toggleMute = useCallback(() => {
-    const volume = controller.getState().volume;
-    if (volume > 0) {
-      lastVolumeRef.current = volume;
-      controller.dispatch({ type: "volumeChanged", volume: 0 });
-    } else {
-      const restored = lastVolumeRef.current || 75;
-      controller.dispatch({ type: "volumeChanged", volume: restored });
-    }
-  }, [controller, lastVolumeRef]);
-
   const setLoop = useCallback(
     (loop: boolean) => {
       controller.dispatch({ type: "loopChanged", loop });
@@ -186,7 +174,6 @@ export function usePlayerActions() {
       seek,
       seekRelative,
       setVolume,
-      toggleMute,
       setLoop,
       nextTrack,
       prevTrack,
@@ -208,7 +195,6 @@ export function usePlayerActions() {
       seek,
       seekRelative,
       setVolume,
-      toggleMute,
       setLoop,
       nextTrack,
       prevTrack,

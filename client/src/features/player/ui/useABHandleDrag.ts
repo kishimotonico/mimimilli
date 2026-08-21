@@ -3,7 +3,7 @@
 // abPointSet の positionSec を動かす点が異なるため、シーク本体のドラッグとは分離している。
 
 import { useCallback, useState } from "react";
-import { useRatioFromClientX } from "../model/ratioFromClientX";
+import { releasePointerCaptureSafe, useRatioFromClientX } from "../model/ratioFromClientX";
 
 interface UseABHandleDragOptions {
   trackRef: React.RefObject<HTMLDivElement | null>;
@@ -16,6 +16,8 @@ export interface ABHandleDragBind {
   onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => void;
   onPointerMove: (e: React.PointerEvent<HTMLDivElement>) => void;
   onPointerUp: (e: React.PointerEvent<HTMLDivElement>) => void;
+  onPointerCancel: (e: React.PointerEvent<HTMLDivElement>) => void;
+  onLostPointerCapture: (e: React.PointerEvent<HTMLDivElement>) => void;
 }
 
 export function useABHandleDrag({
@@ -50,8 +52,26 @@ export function useABHandleDrag({
   const onPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     e.stopPropagation();
     setDragging(false);
-    e.currentTarget.releasePointerCapture(e.pointerId);
+    releasePointerCaptureSafe(e.currentTarget, e.pointerId);
   }, []);
 
-  return { dragging, onPointerDown, onPointerMove, onPointerUp };
+  const onPointerCancel = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    setDragging(false);
+    releasePointerCaptureSafe(e.currentTarget, e.pointerId);
+  }, []);
+
+  const onLostPointerCapture = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    setDragging(false);
+  }, []);
+
+  return {
+    dragging,
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
+    onPointerCancel,
+    onLostPointerCapture,
+  };
 }
