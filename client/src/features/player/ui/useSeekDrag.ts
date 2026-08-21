@@ -5,7 +5,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { formatDuration, formatTime } from "../../../shared/lib/format";
 import { clamp } from "../../../shared/lib/clamp";
-import { useRatioFromClientX } from "../model/ratioFromClientX";
+import { releasePointerCaptureSafe, useRatioFromClientX } from "../model/ratioFromClientX";
 
 /** WAI-ARIA slider パターンの矢印キー刻み（秒） */
 export const SEEK_KEYBOARD_STEP_SEC = 5;
@@ -41,6 +41,8 @@ export interface SeekDragBind {
   onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => void;
   onPointerMove: (e: React.PointerEvent<HTMLDivElement>) => void;
   onPointerUp: (e: React.PointerEvent<HTMLDivElement>) => void;
+  onPointerCancel: (e: React.PointerEvent<HTMLDivElement>) => void;
+  onLostPointerCapture: (e: React.PointerEvent<HTMLDivElement>) => void;
   onPointerLeave: () => void;
 }
 
@@ -89,7 +91,7 @@ export function useSeekDrag({
 
   const onPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     setDragging(false);
-    e.currentTarget.releasePointerCapture(e.pointerId);
+    releasePointerCaptureSafe(e.currentTarget, e.pointerId);
     const rect = trackRef.current?.getBoundingClientRect();
     if (rect) {
       const inside =
@@ -99,6 +101,16 @@ export function useSeekDrag({
         e.clientY <= rect.bottom;
       if (!inside) setHoverRatio(null);
     }
+  }, []);
+
+  const onPointerCancel = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    setDragging(false);
+    setHoverRatio(null);
+    releasePointerCaptureSafe(e.currentTarget, e.pointerId);
+  }, []);
+
+  const onLostPointerCapture = useCallback(() => {
+    setDragging(false);
   }, []);
 
   const onPointerLeave = useCallback(() => {
@@ -170,6 +182,8 @@ export function useSeekDrag({
     onPointerDown,
     onPointerMove,
     onPointerUp,
+    onPointerCancel,
+    onLostPointerCapture,
     onPointerLeave,
   };
 }

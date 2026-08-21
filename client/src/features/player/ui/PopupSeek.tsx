@@ -21,6 +21,8 @@ export default function PopupSeek({ onSeek }: PopupSeekProps) {
         onPointerDown={seek.onPointerDown}
         onPointerMove={seek.onPointerMove}
         onPointerUp={seek.onPointerUp}
+        onPointerCancel={seek.onPointerCancel}
+        onLostPointerCapture={seek.onLostPointerCapture}
         onPointerLeave={seek.onPointerLeave}
       >
         <div className="mle-popup__seek-track">
