@@ -1,0 +1,171 @@
+/* mimimilli shell — now-playing
+   所有範囲: 再生中タブの通常モード（.mle-nowplaying*、没入モードは除く）。
+   幅Wと下部帯の高さはCSS変数で一元定義する。Wはビューポート基準
+   （シェル本文基準にしない）にして、没入モード（now-playing-immersive.css）
+   へ切り替えたときにシーク行の位置が変わらないようにする。
+   シーク行（.mle-nowplaying__seek）とトランスポート/AB行（.mle-nowplaying__controls）は
+   それぞれ独立した position: fixed のスロットとし、後者の表示有無で前者の
+   位置・寸法が変わらない構造にする。帯の背景（.mle-nowplaying__bg）は
+   シーク行スロットの外の装飾層として分離する。
+   import順: player-popup.cssの次、now-playing-immersive.cssより前。
+   z-index の割り当ては docs/design-system.md の Overlay/z-index 一覧を参照。 */
+
+.mle-nowplaying {
+  --now-playing-w: calc(100vw - 96px);
+  --now-playing-seek-h: 56px;
+  --now-playing-controls-h: 112px;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.mle-nowplaying__bg {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 32;
+  height: calc(var(--now-playing-seek-h) + var(--now-playing-controls-h));
+  background: var(--paper-1);
+  border-top: 1px solid var(--line);
+  box-shadow: 0 -8px 24px -16px oklch(20% 0.02 70 / 0.18);
+}
+
+/* z-index 41: 没入面（40）より常に手前に置く。没入モードでもシーク行の
+   DOM ノード・位置・寸法は変えない。器（背景・ぼかし）は持たず、
+   トラック地・進捗色・時刻の文字色だけを NowPlayingScrub 側で
+   [data-mode] に応じて出し分ける。padding は両モードで固定のまま
+   （変えると getBoundingClientRect の高さが変わってしまう）。 */
+.mle-nowplaying__seek {
+  position: fixed;
+  left: 50%;
+  bottom: var(--now-playing-controls-h);
+  z-index: 41;
+  width: var(--now-playing-w);
+  transform: translateX(-50%);
+  padding: 0 4px;
+}
+
+.mle-nowplaying__controls {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  z-index: 33;
+  width: var(--now-playing-w);
+  height: var(--now-playing-controls-h);
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 16px;
+  padding: 0 4px 14px;
+}
+.mle-nowplaying__controls-transport {
+  grid-column: 2;
+  justify-self: center;
+}
+.mle-nowplaying__controls-ab {
+  grid-column: 3;
+  justify-self: end;
+}
+
+/* サポート下限1024px〜1439pxはAB行をトランスポートの下段へ退避させる。 */
+@media (max-width: 1439px) {
+  .mle-nowplaying__controls {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+    row-gap: 0;
+    padding-bottom: 4px;
+  }
+  .mle-nowplaying__controls-transport,
+  .mle-nowplaying__controls-ab {
+    grid-column: 1;
+    justify-self: center;
+    min-width: 0;
+    padding-top: 0;
+  }
+}
+
+.mle-nowplaying__body {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 2fr 3fr;
+  gap: 24px;
+  padding: 40px 48px calc(var(--now-playing-seek-h) + var(--now-playing-controls-h) + 24px);
+}
+
+.mle-nowplaying__mode-toggle {
+  position: absolute;
+  top: 40px;
+  right: 48px;
+}
+
+.mle-nowplaying__left {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  overflow: hidden;
+}
+
+/* カバーは左カラム内で最大化しつつ、上限目安 min(56vh, 480px) を超えない。
+   縦幅が足りない場合に正方形を保ったまま縮小するため、コンテナクエリで
+   実際に使える幅・高さの小さい方に合わせる（.mle-popup__cover-wrap と同じ技法）。 */
+.mle-nowplaying__cover-wrap {
+  position: relative;
+  flex: 0 1 auto;
+  min-height: 0;
+  width: 100%;
+  max-width: min(56vh, 480px);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  container-type: size;
+}
+
+.mle-nowplaying__cover {
+  width: min(100cqw, 100cqh);
+  height: min(100cqw, 100cqh);
+  min-height: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow:
+    var(--shadow-cover),
+    0 30px 60px -16px oklch(20% 0.02 70 / 0.25);
+}
+
+.mle-nowplaying__right {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.mle-nowplaying__tracklist-wrap {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.mle-nowplaying__tracklist-head {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.mle-nowplaying__tracklist {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-top: 8px;
+}

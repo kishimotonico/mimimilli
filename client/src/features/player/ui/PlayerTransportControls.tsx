@@ -34,7 +34,7 @@ export default function PlayerTransportControls({
   onSetVolume,
 }: PlayerTransportControlsProps) {
   return (
-    <div className="flex items-center gap-3.5 pt-2">
+    <div className="mle-nowplaying__controls-transport flex items-center gap-3.5 pt-2">
       <button
         aria-label="10秒戻る"
         title="10秒戻る"

@@ -1,8 +1,10 @@
 // 没入モードのマウスアクティブ時だけ現れる最小トランスポート（試験導入）。
 // シーク行とは独立した層。idle判定は NowPlayingImmersive 側のuseImmersiveIdle
 // 1箇所に集約されており、ここへは表示用の値だけがpropsで渡ってくる
-// （トラック切替では再表示されない）。削除するときはこのファイルと
-// NowPlayingImmersive 側の呼び出し・import・CSSを消すだけでよい。
+// （トラック切替では再表示されない）。削除するときは以下を消すだけでよい:
+//   - このファイル
+//   - NowPlayingImmersive 側の import・JSXでの呼び出し・idle propsの受け渡し
+//   - now-playing-immersive.css の .mle-nowplaying__immersive-minicontrols* 3ルール
 
 import { I } from "../../../shared/ui/Icon";
 import { cn } from "../../../shared/lib/cn";
