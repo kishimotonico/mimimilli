@@ -12,16 +12,13 @@
 // currentTime / duration は PlayerState の型には残さず、atom からのみ読む。
 
 import { atom } from "jotai";
-import { PLAYER_CORE_INITIAL, type PlayerCoreState } from "./playerCoreState";
+import { isPlayerActive, PLAYER_CORE_INITIAL, type PlayerCoreState } from "./playerCoreState";
 
 export { PLAYER_CORE_INITIAL, type PlayerCoreState } from "./playerCoreState";
 
 export const playerCoreAtom = atom<PlayerCoreState>(PLAYER_CORE_INITIAL);
 
-export const playerIsActiveAtom = atom((get) => {
-  const state = get(playerCoreAtom);
-  return state.currentTrackIndex >= 0 && (state.currentWork !== null || state.isFilePlayback);
-});
+export const playerIsActiveAtom = atom((get) => isPlayerActive(get(playerCoreAtom)));
 
 export const playerIsPlayingOrLoadingAtom = atom((get) => get(playerCoreAtom).isPlaying);
 

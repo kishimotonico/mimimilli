@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import type { PlayerState } from "../model/usePlayerState";
+import { selectActiveTrackView } from "../../../entities/player/model/playerCoreState";
 import PlaybackArtwork from "./PlaybackArtwork";
 import NowPlayingImmersiveMiniControls from "./NowPlayingImmersiveMiniControls";
 import { NOW_PLAYING_IMMERSIVE_IDLE_MS, useImmersiveIdle } from "../model/useImmersiveIdle";
@@ -83,7 +84,7 @@ export default function NowPlayingImmersive({
   const isPresent = useIsPresent();
   const { fade } = useMotionVariants();
   const toggleRef = useRef<HTMLButtonElement>(null);
-  const { currentWork, isFilePlayback, tracks, currentTrackIndex, isPlaying, volume } = state;
+  const { currentWork, isFilePlayback, currentTrackIndex, isPlaying, volume } = state;
   // マウス移動・キー操作の監視は1箇所（このidle）に集約し、ミニコントロールへは
   // 表示用の値だけをpropsで渡す（window listener・timerの二重化を避ける）。
   const idle = useImmersiveIdle(isPresent);
@@ -98,7 +99,7 @@ export default function NowPlayingImmersive({
   const titleIdle = idle && !trackJustChanged;
   useNowPlayingImmersiveShell(isPresent, onExit, toggleRef);
 
-  const track = tracks[currentTrackIndex] ?? null;
+  const { workTitle, trackTitle } = selectActiveTrackView(state);
   const ambientUrl =
     !isFilePlayback && currentWork?.cover
       ? getCoverImageUrl(
@@ -152,10 +153,8 @@ export default function NowPlayingImmersive({
       </button>
 
       <div className={cn("mle-nowplaying__immersive-title", titleIdle && "is-idle")}>
-        <div className="mle-nowplaying__immersive-eyebrow">
-          {isFilePlayback ? "ファイル" : currentWork!.title}
-        </div>
-        <h1 className="mle-nowplaying__immersive-h1">{track?.title ?? "—"}</h1>
+        <div className="mle-nowplaying__immersive-eyebrow">{workTitle}</div>
+        <h1 className="mle-nowplaying__immersive-h1">{trackTitle}</h1>
       </div>
 
       <NowPlayingImmersiveMiniControls

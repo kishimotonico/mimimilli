@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo } from "react";
 import type { Work, WorkListItem } from "../../../entities/work/model";
 import { getCircleName } from "../../../entities/work/model";
 import { getCoverImageUrl } from "../../../entities/work/api";
+import { hasResolvedPlaybackSource } from "../../../entities/player/model/playerCoreState";
 import type { PlaybackTrack } from "./trackTime";
 
 const DEFAULT_SEEK_OFFSET = 10;
@@ -104,18 +105,19 @@ export function useMediaSession({
   useEffect(() => {
     if (!mediaSession) return;
 
-    if (!currentTrack || (!currentWork && !isFilePlayback)) {
+    const source = { currentWork, isFilePlayback };
+    if (!currentTrack || !hasResolvedPlaybackSource(source)) {
       mediaSession.metadata = null;
       return;
     }
 
     mediaSession.metadata = new MediaMetadata({
       title: currentTrack.title,
-      artist: isFilePlayback ? "" : (getCircleName(currentWork!) ?? ""),
-      album: isFilePlayback ? "" : currentWork!.title,
+      artist: source.isFilePlayback ? "" : (getCircleName(source.currentWork) ?? ""),
+      album: source.isFilePlayback ? "" : source.currentWork.title,
       artwork:
-        !isFilePlayback && currentWork?.cover
-          ? [{ src: getCoverImageUrl(currentWork.id, ARTWORK_WIDTH) }]
+        !source.isFilePlayback && source.currentWork.cover
+          ? [{ src: getCoverImageUrl(source.currentWork.id, ARTWORK_WIDTH) }]
           : [],
     });
   }, [currentTrack, currentWork, isFilePlayback, mediaSession]);
