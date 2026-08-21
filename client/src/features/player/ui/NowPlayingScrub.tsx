@@ -10,6 +10,7 @@ import { cn } from "../../../shared/lib/cn";
 import type { PlayerState } from "../model/usePlayerState";
 
 interface NowPlayingScrubProps {
+  mode: "normal" | "immersive";
   onSeek: (t: number) => void;
   abRepeat: PlayerState["abRepeat"];
   onSetABPointAt: (point: "a" | "b", time: number) => void;
@@ -71,6 +72,7 @@ function ABHandle({ point, pct, trackRef, duration, time, onSetABPointAt }: ABHa
 }
 
 export default function NowPlayingScrub({
+  mode,
   onSeek,
   abRepeat,
   onSetABPointAt,
@@ -80,6 +82,7 @@ export default function NowPlayingScrub({
   const hasDuration = duration !== null && duration > 0;
   const abStartPct = hasDuration && abRepeat.a !== null ? (abRepeat.a / duration) * 100 : null;
   const abEndPct = hasDuration && abRepeat.b !== null ? (abRepeat.b / duration) * 100 : null;
+  const isImmersive = mode === "immersive";
 
   return (
     <div className="mt-4">
@@ -95,7 +98,12 @@ export default function NowPlayingScrub({
         onPointerUp={seek.onPointerUp}
         onPointerLeave={seek.onPointerLeave}
       >
-        <div className="relative h-[5px] w-full rounded-[3px] bg-paper-3">
+        <div
+          className={cn(
+            "relative h-[5px] w-full rounded-[3px]",
+            isImmersive ? "bg-paper-0/30" : "bg-paper-3",
+          )}
+        >
           {abStartPct !== null && (
             <div
               className="absolute bottom-0 top-0 rounded-[3px] bg-acc-soft"
@@ -106,7 +114,10 @@ export default function NowPlayingScrub({
             />
           )}
           <div
-            className="absolute bottom-0 left-0 top-0 rounded-[3px] bg-ink-0"
+            className={cn(
+              "absolute bottom-0 left-0 top-0 rounded-[3px]",
+              isImmersive ? "bg-acc" : "bg-ink-0",
+            )}
             style={{ width: `${Math.min(100, pct)}%` }}
           />
         </div>
@@ -136,8 +147,16 @@ export default function NowPlayingScrub({
           />
         )}
       </div>
-      <div className="flex items-center gap-2.5 pt-1.5 font-mono text-xs text-ink-2">
-        <span className="text-ink-0">{formatTime(currentTime) ?? "0:00"}</span>
+      <div
+        className={cn(
+          "flex items-center gap-2.5 pt-1.5 font-mono text-xs",
+          isImmersive ? "text-paper-0" : "text-ink-2",
+        )}
+        style={isImmersive ? { textShadow: "0 1px 6px oklch(10% 0.02 70 / 0.6)" } : undefined}
+      >
+        <span className={isImmersive ? undefined : "text-ink-0"}>
+          {formatTime(currentTime) ?? "0:00"}
+        </span>
         <div className="flex-1" />
         <span>{duration !== null ? (formatDuration(duration) ?? "--:--") : "--:--"}</span>
       </div>

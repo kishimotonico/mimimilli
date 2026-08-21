@@ -209,6 +209,7 @@ export default function NowPlayingView({ onOpenWork }: NowPlayingViewProps) {
 
       <div className="mle-nowplaying__seek" data-testid="nowplaying-seek-row">
         <NowPlayingScrub
+          mode={mode}
           onSeek={actions.seek}
           abRepeat={state.abRepeat}
           onSetABPointAt={actions.setABPointAt}

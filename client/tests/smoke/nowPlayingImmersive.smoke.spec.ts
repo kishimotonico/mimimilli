@@ -23,15 +23,24 @@ test("再生中タブ: 没入モードでカバーがビューポート内に収
   const cover = page.locator(".mle-nowplaying__immersive-cover");
   await expect(cover).toBeVisible();
 
-  // カバー本体（img）がビューポート内に収まっていること（AC1 のはみ出し回帰ガード）。
+  // カバーは拡大（scale）してから親の overflow: hidden でクロップする設計（TASK-365）。
+  // img 自体はビューポートよりはみ出す想定なので、クロップの器
+  // （.mle-nowplaying__immersive-cover）がビューポート内に収まり、ページに
+  // スクロールを生まないことを回帰ガードとして確認する。
   const viewport = page.viewportSize()!;
-  const img = cover.locator("img");
-  const imgBox = await img.boundingBox();
-  expect(imgBox).not.toBeNull();
-  expect(imgBox!.y).toBeGreaterThanOrEqual(0);
-  expect(imgBox!.x).toBeGreaterThanOrEqual(0);
-  expect(imgBox!.y + imgBox!.height).toBeLessThanOrEqual(viewport.height);
-  expect(imgBox!.x + imgBox!.width).toBeLessThanOrEqual(viewport.width);
+  const coverBox = await cover.boundingBox();
+  expect(coverBox).not.toBeNull();
+  expect(coverBox!.y).toBeGreaterThanOrEqual(0);
+  expect(coverBox!.x).toBeGreaterThanOrEqual(0);
+  expect(coverBox!.y + coverBox!.height).toBeLessThanOrEqual(viewport.height);
+  expect(coverBox!.x + coverBox!.width).toBeLessThanOrEqual(viewport.width);
+
+  const hasPageOverflow = await page.evaluate(
+    () =>
+      document.documentElement.scrollWidth > document.documentElement.clientWidth ||
+      document.documentElement.scrollHeight > document.documentElement.clientHeight,
+  );
+  expect(hasPageOverflow).toBe(false);
 
   // シーク行は同一DOMノードのまま、位置・寸法が変わらない（AC7）。
   const rectDuringImmersive = await seekRow.boundingBox();
