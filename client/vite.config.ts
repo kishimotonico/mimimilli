@@ -3,6 +3,7 @@ import { defineConfig } from "vitest/config";
 import { execFileSync } from "node:child_process";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import { compression } from "vite-plugin-compression2";
 
 function resolveBackendProxy(service: string) {
   // Windows の portless は node_modules/.bin のバッチシム（.CMD）なので shell 経由が必須。
@@ -33,7 +34,15 @@ function resolveApiProxy() {
 }
 
 export default defineConfig(({ command }) => ({
-  plugins: [tailwindcss(), react()],
+  plugins: [
+    tailwindcss(),
+    react(),
+    compression({
+      include: [/\.(js|mjs|css|html|svg|json)$/],
+      exclude: [/\.(png|jpe?g|gif|webp|woff2?|ico)$/],
+      algorithms: ["gzip", "brotliCompress"],
+    }),
+  ],
 
   test: {
     environment: "happy-dom",
