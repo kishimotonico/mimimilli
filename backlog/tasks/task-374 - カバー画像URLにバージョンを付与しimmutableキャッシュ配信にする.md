@@ -4,6 +4,7 @@ title: カバー画像URLにバージョンを付与しimmutableキャッシュ�
 status: To Do
 assignee: []
 created_date: '2026-08-21 12:49'
+updated_date: '2026-08-21 12:57'
 labels: []
 dependencies: []
 ordinal: 374000
@@ -24,9 +25,21 @@ ordinal: 374000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 coverSchema に version が追加され、real/fixture 両アダプタのDTOに設定されている（両アダプタを通す契約テストあり）
-- [ ] #2 カバー画像URLに v= が付与され、v付きリクエストへのレスポンスが Cache-Control: private, max-age=31536000, immutable になっている（テストとpreview実測で確認）
-- [ ] #3 v無しリクエストは従来の must-revalidate + ETag/304 挙動を維持している
+- [x] #1 coverSchema に version が追加され、real/fixture 両アダプタのDTOに設定されている（両アダプタを通す契約テストあり）
+- [x] #2 カバー画像URLに v= が付与され、v付きリクエストへのレスポンスが Cache-Control: private, max-age=31536000, immutable になっている（テストとpreview実測で確認）
+- [x] #3 v無しリクエストは従来の must-revalidate + ETag/304 挙動を維持している
 - [ ] #4 preview環境で一覧→リロード時にカバー画像のネットワークリクエストが発生しない（ブラウザ実測）
-- [ ] #5 カバー元ファイルを差し替えると version とURLが変わり、新画像が取得される意味論がテストで保証されている
+- [x] #5 カバー元ファイルを差し替えると version とURLが変わり、新画像が取得される意味論がテストで保証されている
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+shared/coverValueSchemaにversion追加。realはcoverDtoFromColumns(stat)、fixtureはfixtureCoverFromColumns(synthetic SVG size+mtimeMs=0)。server/tests/coverVersionContract.test.tsで両アダプタのgetWork経由を検証。
+
+getCoverImageUrl(workId,version,width)が?v=付与。server/tests/coverVersionContract.test.tsでv付きCache-Control: private,max-age=31536000,immutableをreal/fixtureルートで検証。preview実測は委譲元。
+
+v無しはmust-revalidate維持。coverVersionContract.test.tsの「v無しはETag一致で304、v付きは304にしない」およびfixtureMedia既存ETagテストで検証。
+
+real: tmpライブラリでcover.jpg差し替え→version/ETag変化をcoverVersionContract.test.tsで検証。fixture: タイトル変更でSVG内容変化→version変化を同テストで検証。負の検証: deriveCoverVersion定数化でreal差し替えテスト失敗、v付きCache-Control破壊でimmutableテスト3件失敗を確認後復元。
+<!-- SECTION:NOTES:END -->
