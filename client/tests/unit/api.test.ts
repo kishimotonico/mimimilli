@@ -313,8 +313,12 @@ describe("work api", () => {
   });
 
   it("getCoverImageUrl returns the media/cover URL", () => {
-    expect(workApi.getCoverImageUrl("RJ001001")).toBe("/api/media/cover/RJ001001");
-    expect(workApi.getCoverImageUrl("RJ001001", 256)).toBe("/api/media/cover/RJ001001?w=256");
+    expect(workApi.getCoverImageUrl("RJ001001", "abc123")).toBe(
+      "/api/media/cover/RJ001001?v=abc123",
+    );
+    expect(workApi.getCoverImageUrl("RJ001001", "abc123", 256)).toBe(
+      "/api/media/cover/RJ001001?v=abc123&w=256",
+    );
   });
 
   it("getAudioUrl returns the media/audio URL", () => {

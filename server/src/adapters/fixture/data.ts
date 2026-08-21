@@ -1,13 +1,13 @@
 // fixture アダプタ用の自己完結シードデータ。
 // client/mocks からは import せず、本ファイル内で完結させる。
 import {
-  coverFieldsFromColumns,
   dedupeTags,
   emptyDlsiteState,
   normalizeTags,
   TEXT_PREVIEW_LIMIT_BYTES,
 } from "@mimimilli/shared";
-import type { Cover, SmartFolder, WorkSummary } from "@mimimilli/shared";
+import type { CoverValueBase, SmartFolder, WorkSummary } from "@mimimilli/shared";
+import { fixtureCoverFromColumns } from "./coverDto.ts";
 
 /** fixture 内部のカバー列（real の cover_image / cover_width / cover_height に相当） */
 export interface FixtureCoverColumns {
@@ -22,7 +22,7 @@ export const SEED_COVER_COLUMNS: Partial<Record<string, FixtureCoverColumns>> = 
 
 /** WorkSummary の cover からカバー列を導出する（契約テスト用 works 差し替え向け） */
 export function fixtureCoverColumnsForWork(
-  work: Pick<WorkSummary, "id" | "cover">,
+  work: Pick<WorkSummary, "id"> & { cover: CoverValueBase | null },
 ): FixtureCoverColumns {
   const explicit = SEED_COVER_COLUMNS[work.id];
   if (explicit) return explicit;
@@ -31,13 +31,7 @@ export function fixtureCoverColumnsForWork(
 }
 
 /** カバー列から一覧・表示用 cover を投影する */
-export function fixtureCoverFromColumns(columns: FixtureCoverColumns): Cover {
-  return coverFieldsFromColumns(
-    columns.image,
-    columns.dimensions?.width ?? null,
-    columns.dimensions?.height ?? null,
-  ).cover;
-}
+export { fixtureCoverFromColumns } from "./coverDto.ts";
 
 /** シードとなる作品データ（約10件）。
  *  - サークル/cv/シリーズ/カテゴリの annotated タグとフラットタグを混在させる
@@ -46,7 +40,9 @@ export function fixtureCoverFromColumns(columns: FixtureCoverColumns): Cover {
  *  - bookmarked / lastPlayedAt の有無を混在させる
  *  - trackCount は1〜20の範囲でばらつかせる
  */
-const RAW_SEED_WORKS: Array<Omit<WorkSummary, "dlsite" | "tags"> & { tags: string[] }> = [
+const RAW_SEED_WORKS: Array<
+  Omit<WorkSummary, "dlsite" | "tags" | "cover"> & { tags: string[]; cover: CoverValueBase | null }
+> = [
   {
     id: "RJ501001",
     title: "【ASMR】夜更けの図書室で囁き朗読",
@@ -292,7 +288,7 @@ const RAW_SEED_WORKS: Array<Omit<WorkSummary, "dlsite" | "tags"> & { tags: strin
 
 export const SEED_WORKS: WorkSummary[] = RAW_SEED_WORKS.map((work, index) => {
   const columns = fixtureCoverColumnsForWork(work);
-  const cover = fixtureCoverFromColumns(columns);
+  const cover = fixtureCoverFromColumns(work, columns);
   const tags = dedupeTags(normalizeTags(work.tags));
   return {
     ...work,

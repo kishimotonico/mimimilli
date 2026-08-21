@@ -14,6 +14,7 @@ import {
   type FixtureCoverColumns,
   type FsNode,
 } from "./data.ts";
+import { fixtureCoverFromColumns } from "./coverDto.ts";
 import type { FixtureState, PlaybackIds } from "./state.ts";
 import { coverColumnsOf } from "./state.ts";
 
@@ -98,17 +99,18 @@ export function buildFullWork(
 
   const { trackCount: _trackCount, ...rest } = summary;
   const resume = resumes.get(summary.id);
-  const { cover, coverKind, coverImage } = coverFieldsFromColumns(
+  const coverFields = coverFieldsFromColumns(
     coverColumns.image,
     coverColumns.dimensions?.width ?? null,
     coverColumns.dimensions?.height ?? null,
   );
+  const cover = fixtureCoverFromColumns(summary, coverColumns);
 
   return {
     ...rest,
     cover,
-    coverKind,
-    coverImage,
+    coverKind: coverFields.coverKind,
+    coverImage: coverFields.coverImage,
     defaultPlaylistId: playlists[0]?.id ?? null,
     createdAt: summary.addedAt,
     playlists,

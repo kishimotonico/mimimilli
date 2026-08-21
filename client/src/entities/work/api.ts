@@ -112,10 +112,11 @@ export async function unregisterMissingWorks(): Promise<UnregisterMissingWorksRe
 }
 
 /** カバー画像のURLを返す（<img src> で直接使用可）。
- *  width を指定すると `?w=` でサムネイル幅を要求する（サーバー側で許可幅へ正規化される） */
-export function getCoverImageUrl(workId: string, width?: number): string {
-  const query = width === undefined ? "" : `?w=${encodeURIComponent(width)}`;
-  return `${API_BASE}/media/cover/${encodeURIComponent(workId)}${query}`;
+ *  version は DTO の cover.version。width を指定すると `?w=` でサムネイル幅を要求する。 */
+export function getCoverImageUrl(workId: string, version: string, width?: number): string {
+  const params = new URLSearchParams({ v: version });
+  if (width !== undefined) params.set("w", String(width));
+  return `${API_BASE}/media/cover/${encodeURIComponent(workId)}?${params}`;
 }
 
 /** 音声ファイルのURLを返す（<audio src> で直接使用可） */

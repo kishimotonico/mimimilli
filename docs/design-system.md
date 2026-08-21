@@ -22,9 +22,9 @@
 
 ## タイポグラフィ
 
-- `IBM Plex Sans JP`: 本文の既定書体
-- `Geist`（sans）: ブランド表記・操作系コントロールなど非本文
-- `JetBrains Mono`: 時刻・件数・メタ情報などの数値表示
+- OSゴシック（`--font-jp`）: 本文・日本語UIの既定書体。`"Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", Meiryo, "Noto Sans CJK JP", "Noto Sans JP", system-ui, sans-serif`（Windows/Mac実機は先頭側、Linux開発環境は Noto で描画）
+- `Geist`（`--font-sans`）: ブランド表記・操作系コントロールなど非本文
+- `JetBrains Mono`（`--font-mono`）: 時刻・件数・メタ情報などの数値表示
 
 ## クラス命名
 

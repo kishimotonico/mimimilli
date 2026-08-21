@@ -58,7 +58,7 @@ describe("WorkRow のカバー画像", () => {
   const workWithCover: WorkSummary = {
     id: "work-1",
     title: "Work 1",
-    cover: { image: "cover.jpg", dimensions: { width: 800, height: 600 } },
+    cover: { image: "cover.jpg", dimensions: { width: 800, height: 600 }, version: "v1" },
     status: "ok",
     physicalPath: "/audio/work-1",
     totalDurationSec: 120,
@@ -82,7 +82,7 @@ describe("WorkRow のカバー画像", () => {
     expect(img).toHaveAttribute("loading", "lazy");
     const src = img?.getAttribute("src") ?? "";
     expect(src).toContain("/api/media/cover/work-1");
-    expect(src).toMatch(/\?w=(128|256|512)$/);
+    expect(src).toMatch(/\?v=[^&]+&w=(128|256|512)$/);
   });
 
   it("カバーなし作品はプレースホルダー表示のまま（imgを出さない）", () => {

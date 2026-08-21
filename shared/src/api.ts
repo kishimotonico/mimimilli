@@ -261,6 +261,7 @@ export function selectNearestThumbnailWidth(target: number): ThumbnailWidth {
 
 export const coverQuerySchema = z.object({
   w: z.coerce.number().int().positive().optional(),
+  v: z.string().min(1).optional(),
 });
 export type CoverQuery = z.infer<typeof coverQuerySchema>;
 

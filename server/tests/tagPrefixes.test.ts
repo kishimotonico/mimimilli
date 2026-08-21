@@ -182,7 +182,11 @@ test("buildAxisFacets: durationSecは同じ値に属する作品の合計、dura
 });
 
 test("buildAxisFacets: coversは追加日時の新しい順で最大4件、cover未設定の作品は含まない", () => {
-  const cover = (n: number) => ({ image: `cover-${n}.jpg`, dimensions: { width: n, height: n } });
+  const cover = (n: number) => ({
+    image: `cover-${n}.jpg`,
+    dimensions: { width: n, height: n },
+    version: `cover-${n}`,
+  });
   const works = [
     { ...summaryWith("W1", ["気分/睡眠用"], "2026-01-01T00:00:00.000Z"), cover: cover(1) },
     { ...summaryWith("W2", ["気分/睡眠用"], "2026-01-03T00:00:00.000Z"), cover: cover(2) },

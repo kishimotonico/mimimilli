@@ -43,7 +43,11 @@ export default function CoverCollage({
       {cells.map((cover, i) => (
         <div key={cover?.workId ?? `empty-${i}`} className="mll-collage__cell">
           {cover && (
-            <img src={getCoverImageUrl(cover.workId, requestWidth)} alt="" loading="lazy" />
+            <img
+              src={getCoverImageUrl(cover.workId, cover.version, requestWidth)}
+              alt=""
+              loading="lazy"
+            />
           )}
         </div>
       ))}

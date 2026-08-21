@@ -4,12 +4,18 @@ import { z } from "zod";
  * 表示可能なカバー画像。image は作品ルート相対のファイル名、dimensions は EXIF 回転適用後の
  * 表示ピクセル寸法（単位 px）。
  */
-export const coverValueSchema = z.object({
+export const coverValueBaseSchema = z.object({
   image: z.string(),
   dimensions: z.object({
     width: z.number().int().positive(),
     height: z.number().int().positive(),
   }),
+});
+export type CoverValueBase = z.infer<typeof coverValueBaseSchema>;
+
+export const coverValueSchema = coverValueBaseSchema.extend({
+  /** カバー実体の opaque バージョン（URL キャッシュバスター用）。内容が変わると必ず変わる。 */
+  version: z.string(),
 });
 
 /** カバー未設定・計測失敗はいずれも null に投影する
@@ -36,10 +42,10 @@ export function coverFieldsFromColumns(
   image: string | null,
   width: number | null,
   height: number | null,
-): { cover: Cover; coverKind: CoverKind; coverImage: string | null } {
+): { cover: CoverValueBase | null; coverKind: CoverKind; coverImage: string | null } {
   const coverKind = projectCoverKind(image, width, height);
   const coverImage = image;
-  const cover: Cover =
+  const cover: CoverValueBase | null =
     coverKind === "measured"
       ? { image: image!, dimensions: { width: width!, height: height! } }
       : null;

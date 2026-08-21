@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { brotliCompressSync, brotliDecompressSync, gunzipSync, gzipSync } from "node:zlib";
 import { test } from "node:test";
 import { createApp } from "../src/app.ts";
 import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
@@ -14,6 +15,19 @@ function createStaticFixture(): string {
   const assetsDir = join(dir, "assets");
   mkdirSync(assetsDir);
   writeFileSync(join(assetsDir, "app.abc123.js"), "console.log('app');");
+  return dir;
+}
+
+function createCompressedStaticFixture(): string {
+  const dir = createStaticFixture();
+  const jsPath = join(dir, "assets", "app.abc123.js");
+  const jsContent = "console.log('app');";
+  writeFileSync(`${jsPath}.br`, brotliCompressSync(jsContent));
+  writeFileSync(`${jsPath}.gz`, gzipSync(jsContent));
+  const indexPath = join(dir, "index.html");
+  const indexContent = "<!doctype html><html><body>app</body></html>";
+  writeFileSync(`${indexPath}.br`, brotliCompressSync(indexContent));
+  writeFileSync(`${indexPath}.gz`, gzipSync(indexContent));
   return dir;
 }
 
@@ -138,4 +152,72 @@ test("createStaticMiddleware は /api 配下を通過させる", async () => {
 
   const res = await app.request("/api/works");
   assert.equal(res.status, 200);
+});
+
+test("Accept-Encoding: br のリクエストは .br を Content-Encoding: br で配信する", async () => {
+  const staticDir = createCompressedStaticFixture();
+  const app = createApp(createFixtureAdapter(), { staticDir });
+
+  const res = await app.request("/assets/app.abc123.js", {
+    headers: { "Accept-Encoding": "br" },
+  });
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get("content-encoding"), "br");
+  assert.equal(res.headers.get("vary"), "Accept-Encoding");
+  assert.match(res.headers.get("content-type") ?? "", /javascript/);
+  const body = brotliDecompressSync(Buffer.from(await res.arrayBuffer()));
+  assert.equal(body.toString("utf8"), "console.log('app');");
+});
+
+test("Accept-Encoding: gzip のみのリクエストは .gz を Content-Encoding: gzip で配信する", async () => {
+  const staticDir = createCompressedStaticFixture();
+  const app = createApp(createFixtureAdapter(), { staticDir });
+
+  const res = await app.request("/assets/app.abc123.js", {
+    headers: { "Accept-Encoding": "gzip" },
+  });
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get("content-encoding"), "gzip");
+  assert.equal(res.headers.get("vary"), "Accept-Encoding");
+  assert.match(res.headers.get("content-type") ?? "", /javascript/);
+  const body = gunzipSync(Buffer.from(await res.arrayBuffer()));
+  assert.equal(body.toString("utf8"), "console.log('app');");
+});
+
+test("Accept-Encoding 未指定時は素のファイルを配信する", async () => {
+  const staticDir = createCompressedStaticFixture();
+  const app = createApp(createFixtureAdapter(), { staticDir });
+
+  const res = await app.request("/assets/app.abc123.js");
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get("content-encoding"), null);
+  assert.equal(res.headers.get("vary"), "Accept-Encoding");
+  assert.match(res.headers.get("content-type") ?? "", /javascript/);
+  assert.equal(await res.text(), "console.log('app');");
+});
+
+test("圧縮ファイルが無いアセットは従来通り素のファイルを配信する", async () => {
+  const staticDir = createStaticFixture();
+  const app = createApp(createFixtureAdapter(), { staticDir });
+
+  const res = await app.request("/assets/app.abc123.js", {
+    headers: { "Accept-Encoding": "br, gzip" },
+  });
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get("content-encoding"), null);
+  assert.equal(await res.text(), "console.log('app');");
+});
+
+test("SPA フォールバックも圧縮版 index.html を配信する", async () => {
+  const staticDir = createCompressedStaticFixture();
+  const app = createApp(createFixtureAdapter(), { staticDir });
+
+  const res = await app.request("/works/RJ501001", {
+    headers: { "Accept-Encoding": "br" },
+  });
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get("content-encoding"), "br");
+  assert.equal(res.headers.get("cache-control"), "no-cache");
+  const body = brotliDecompressSync(Buffer.from(await res.arrayBuffer()));
+  assert.match(body.toString("utf8"), /app/);
 });

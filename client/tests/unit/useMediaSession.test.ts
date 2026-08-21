@@ -19,7 +19,7 @@ function makeWork(): WorkSummary {
   return {
     id: "work-1",
     title: "作品タイトル",
-    cover: { image: "cover.jpg", dimensions: { width: 800, height: 600 } },
+    cover: { image: "cover.jpg", dimensions: { width: 800, height: 600 }, version: "v1" },
     status: "ok",
     physicalPath: "/works/work-1",
     totalDurationSec: 120,
@@ -100,7 +100,7 @@ describe("useMediaSession", () => {
         title: "区間トラック",
         artist: "星月夜",
         album: "作品タイトル",
-        artwork: [{ src: "/api/media/cover/work-1?w=512" }],
+        artwork: [{ src: "/api/media/cover/work-1?v=v1&w=512" }],
       }),
     );
     expect(mediaSession.playbackState).toBe("playing");

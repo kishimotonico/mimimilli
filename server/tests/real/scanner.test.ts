@@ -93,7 +93,10 @@ test("初回スキャン: 登録済みmimimilli.jsonを投影し、候補を自�
     `expected ~5, got ${generated.totalDurationSec}`,
   );
   // カバー寸法がSharpで計測されDBへ永続化・DTOへ投影されている（writeSampleCoverは6x4 JPEG）
-  assert.deepEqual(generated!.cover, { image: "cover.jpg", dimensions: { width: 6, height: 4 } });
+  assert.equal(generated!.cover?.image, "cover.jpg");
+  assert.deepEqual(generated!.cover?.dimensions, { width: 6, height: 4 });
+  assert.equal(typeof generated!.cover?.version, "string");
+  assert.ok(generated!.cover!.version.length > 0);
   assert.equal(result.coverErrors, 0);
 
   // 欠損トラックの作品は error
