@@ -657,7 +657,7 @@
   height: var(--now-playing-controls-h);
   transform: translateX(-50%);
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   column-gap: 16px;
   padding: 0 4px 14px;
@@ -669,6 +669,23 @@
 .mle-nowplaying__controls > *:last-child {
   grid-column: 3;
   justify-self: end;
+}
+
+/* サポート下限1024px〜1439pxはAB行をトランスポートの下段へ退避させる。 */
+@media (max-width: 1439px) {
+  .mle-nowplaying__controls {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+    row-gap: 0;
+    padding-bottom: 4px;
+  }
+  .mle-nowplaying__controls > *:first-child,
+  .mle-nowplaying__controls > *:last-child {
+    grid-column: 1;
+    justify-self: center;
+    min-width: 0;
+    padding-top: 0;
+  }
 }
 
 .mle-nowplaying__body {

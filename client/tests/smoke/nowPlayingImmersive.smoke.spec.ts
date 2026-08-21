@@ -33,9 +33,7 @@ test("再生中タブ: 没入モードでカバーが拡大クロップされて
   const coverContent = cover.locator(":scope > *").first();
   const contentBox = await coverContent.boundingBox();
   expect(contentBox).not.toBeNull();
-  expect(
-    contentBox!.width > viewport.width || contentBox!.height > viewport.height,
-  ).toBe(true);
+  expect(contentBox!.width > viewport.width || contentBox!.height > viewport.height).toBe(true);
 
   const coverOverflow = await cover.evaluate((el) => getComputedStyle(el).overflow);
   expect(coverOverflow).toBe("hidden");
