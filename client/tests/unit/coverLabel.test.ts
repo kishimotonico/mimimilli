@@ -21,7 +21,7 @@ describe("coverFieldsFromColumns", () => {
 
   it("寸法ありは measured", () => {
     expect(coverFieldsFromColumns("cover.jpg", 800, 600)).toEqual({
-      cover: { image: "cover.jpg", dimensions: { width: 800, height: 600 }, version: "v1" },
+      cover: { image: "cover.jpg", dimensions: { width: 800, height: 600 } },
       coverKind: "measured",
       coverImage: "cover.jpg",
     });

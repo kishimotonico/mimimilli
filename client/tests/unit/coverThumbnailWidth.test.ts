@@ -82,7 +82,7 @@ describe("WorkRow のカバー画像", () => {
     expect(img).toHaveAttribute("loading", "lazy");
     const src = img?.getAttribute("src") ?? "";
     expect(src).toContain("/api/media/cover/work-1");
-    expect(src).toMatch(/\?w=(128|256|512)$/);
+    expect(src).toMatch(/\?v=[^&]+&w=(128|256|512)$/);
   });
 
   it("カバーなし作品はプレースホルダー表示のまま（imgを出さない）", () => {

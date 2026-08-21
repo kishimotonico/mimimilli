@@ -46,7 +46,7 @@ export default function CoverPlaceholder({
         x="16"
         y="21"
         textAnchor="middle"
-        fontFamily='"IBM Plex Sans JP", sans-serif'
+        fontFamily="var(--font-jp)"
         fontSize="14"
         fontWeight="600"
         fill={fg}
