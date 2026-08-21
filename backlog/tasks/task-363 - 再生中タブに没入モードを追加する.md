@@ -1,10 +1,11 @@
 ---
 id: TASK-363
 title: 再生中タブに没入モードを追加する
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@fable'
 created_date: '2026-08-21 01:50'
-updated_date: '2026-08-21 01:59'
+updated_date: '2026-08-21 03:42'
 labels: []
 dependencies:
   - TASK-362
@@ -42,11 +43,23 @@ ordinal: 363000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 カバークリックまたは右上アイコンで没入モードになり、ビューポート全面にカバーがcontain表示される（縦横比可変・余白は環境光背景）
-- [ ] #2 画面中央付近のクリックで再生/一時停止がトグルする
-- [ ] #3 Escまたは右上アイコンで通常モードへ戻り、選択モードはlocalStorageに記憶されリロード後も引き継がれる
-- [ ] #4 pnpm check && pnpm test と pnpm test:smoke が全緑
-- [ ] #5 没入モードのオーバーレイがシークバー（時刻表示含む）・切替アイコン・タイトルのみで構成され、シークバー上でAB区間・角括弧ハンドルが操作できる
-- [ ] #6 無操作の既定時間で切替アイコンとタイトルのみフェードし、シークバーは表示され続ける。マウス移動・キー操作で復帰する
-- [ ] #7 モード切替の前後でシーク行が同一DOMノード・同一サイズ・同一位置のまま（再マウントなし）周囲だけがクロスフェードし、getBoundingClientRect不変がテストで検証されている
+- [x] #1 カバークリックまたは右上アイコンで没入モードになり、ビューポート全面にカバーがcontain表示される（縦横比可変・余白は環境光背景）
+- [x] #2 画面中央付近のクリックで再生/一時停止がトグルする
+- [x] #3 Escまたは右上アイコンで通常モードへ戻り、選択モードはlocalStorageに記憶されリロード後も引き継がれる
+- [x] #4 pnpm check && pnpm test と pnpm test:smoke が全緑
+- [x] #5 没入モードのオーバーレイがシークバー（時刻表示含む）・切替アイコン・タイトルのみで構成され、シークバー上でAB区間・角括弧ハンドルが操作できる
+- [x] #6 無操作の既定時間で切替アイコンとタイトルのみフェードし、シークバーは表示され続ける。マウス移動・キー操作で復帰する
+- [x] #7 モード切替の前後でシーク行が同一DOMノード・同一サイズ・同一位置のまま（再マウントなし）周囲だけがクロスフェードし、getBoundingClientRect不変がテストで検証されている
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+実装f654d9f＋修正066692d。レビュー（Sonnet）で没入カバーのビューポート超過blockerを検出→grid+place-items:centerの高さ循環をabsolute確定ボックス化で解消、実機rect実測で3viewport確認。rect不変検証はsmoke（実ブラウザ）へ一本化。check/test/smoke(19)全緑。feat/now-playing-redesignへff取り込み済み
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+没入モードを追加（f654d9f＋066692d）。全面containカバー・環境光背景・中央クリック再生トグル・無操作フェード・inert/フォーカス管理・localStorage永続化。シーク行は単一コンポーネントのままモード切替で再マウントなし（実ブラウザsmokeでrect不変検証）。レビューで発見したカバーはみ出しblockerを修正済み
+<!-- SECTION:FINAL_SUMMARY:END -->
