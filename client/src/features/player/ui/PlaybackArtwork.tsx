@@ -8,6 +8,7 @@ interface PlaybackArtworkProps {
   size: number;
   radius: number;
   fit?: "fixed" | "fill";
+  objectFit?: "cover" | "contain";
   requestWidth?: number;
 }
 
@@ -16,6 +17,7 @@ export default function PlaybackArtwork({
   size,
   radius,
   fit = "fixed",
+  objectFit,
   requestWidth,
 }: PlaybackArtworkProps) {
   if (state.isFilePlayback) {
@@ -44,6 +46,7 @@ export default function PlaybackArtwork({
       size={size}
       radius={radius}
       fit={fit}
+      objectFit={objectFit}
       requestWidth={requestWidth ?? selectFixedCoverThumbnailWidth(size, window.devicePixelRatio)}
     />
   );

@@ -45,6 +45,10 @@
 | 並び替えメニューのポップアップ                                        | z-index 30            |
 | 軸のクイックオーバーレイ・チップの値ドロップダウン（`.mll-qoverlay`） | z-index 30            |
 | プレイヤー（バー/ポップアップ）                                       | z-index 32            |
+| 再生中タブ・下部帯の背景（`.mle-nowplaying__bg`）                     | z-index 32            |
+| 再生中タブ・トランスポート/AB行（`.mle-nowplaying__controls`）        | z-index 33            |
+| 再生中タブ・没入モード面（`.mle-nowplaying__immersive`）              | z-index 40            |
+| 再生中タブ・シーク行（`.mle-nowplaying__seek`、没入面より常に手前）   | z-index 41            |
 | 設定モーダル                                                          | top layer（下記）     |
 | 全画面プレイヤー                                                      | top layer（下記）     |
 | スキャンモーダル                                                      | top layer（下記）     |

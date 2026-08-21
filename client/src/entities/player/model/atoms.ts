@@ -94,3 +94,11 @@ export const playerCurrentTimeAtom = atom(0);
  * usePlaybackProgress 経由で BarSeekStrip / PopupSeek / FullScreenScrub / NowPlayingScrub のみ subscribe すること。
  */
 export const playerDurationAtom = atom<number | null>(0);
+
+export type NowPlayingViewMode = "normal" | "immersive";
+
+/** 再生中タブの表示モード。localStorage に永続化し、次回もそのモードで開く。 */
+export const nowPlayingViewModeAtom = atomWithStorage<NowPlayingViewMode>(
+  "mimimilli:nowPlayingViewMode",
+  "normal",
+);
