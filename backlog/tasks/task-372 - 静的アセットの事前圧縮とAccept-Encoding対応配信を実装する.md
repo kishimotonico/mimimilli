@@ -1,10 +1,10 @@
 ---
 id: TASK-372
 title: 静的アセットの事前圧縮とAccept-Encoding対応配信を実装する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-21 12:49'
-updated_date: '2026-08-21 12:55'
+updated_date: '2026-08-21 13:11'
 labels: []
 dependencies: []
 ordinal: 372000
@@ -40,4 +40,12 @@ ordinal: 372000
 根拠: portless run --force --app-port 6421（6420占有のため）で http://372-precompressed-assets.mimi.localhost:1355 起動。curl実測: JS 803184B→br 210421B(26%)、CSS 417507B→br 39897B(9.6%)、いずれも素の1/3以下。Content-Encoding: br/gzip、Vary: Accept-Encoding、Content-Type(text/javascript,text/css)を確認。検証後プロセス終了済み。
 
 根拠: 圧縮ファイル無しの createStaticFixture では Accept-Encoding: br,gzip でも素配信(content-encoding null)。既存12件+新規5件の staticServe テスト計17件、server全体688件 pass。キャッシュヘッダ(/assets immutable・index no-cache)・シンボリックリンクガードテストも維持。
+
+統合検証: Accept-Encoding br/gzip/無しの3パターンをcurl実測でOK（br時 content-encoding: br + vary + 正しいcontent-type、無指定はフルサイズ素配信）。
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+vite-plugin-compression2でdistのテキスト系アセットに.br/.gzを事前生成し、staticServeがAccept-Encoding（q値対応）で .br→.gz→素 を選択配信。主JS 803KB→br 210KB、主CSS 417KB→br 40KB。テスト17件、curl実測で検証。
+<!-- SECTION:FINAL_SUMMARY:END -->

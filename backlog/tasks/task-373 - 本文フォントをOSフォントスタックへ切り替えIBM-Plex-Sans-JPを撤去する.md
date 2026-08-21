@@ -1,10 +1,10 @@
 ---
 id: TASK-373
 title: 本文フォントをOSフォントスタックへ切り替えIBM Plex Sans JPを撤去する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-21 12:49'
-updated_date: '2026-08-21 12:58'
+updated_date: '2026-08-21 13:11'
 labels: []
 dependencies: []
 ordinal: 373000
@@ -25,7 +25,7 @@ ordinal: 373000
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 @fontsource/ibm-plex-sans-jp が依存・import・distから消え、distのwoff2本数が大幅に減っている（Geist/JetBrains Mono分のみ）
-- [ ] #2 --font-jp がOSフォントスタックになり、本文が日本語ゴシック体で崩れなく表示される（preview環境スクリーンショットで確認）
+- [x] #2 --font-jp がOSフォントスタックになり、本文が日本語ゴシック体で崩れなく表示される（preview環境スクリーンショットで確認）
 - [x] #3 Geist・JetBrains Monoの用途（ブランド表記・数値表示）は従来通り維持されている
 - [x] #4 pnpm test:smoke が通り、docs/design-system.md が新構成に更新されている
 <!-- AC:END -->
@@ -42,4 +42,12 @@ docs/design-system.mdタイポグラフィ節をOSゴシック/Geist/JetBrains M
 【ウェイト運用】--font-jp上のfont-weight 500/600: shell CSS（library-d/e, files-b/c, preview-a, player-dock/popup, now-playing-immersive等）とNowPlayingView(font-semibold)、Tag.tsx(font-medium)、SetupScreen(inline 500/600)で使用。Windows主環境のYu Gothic UIはRegular(400)とBold(700)のみ。CSS Font Matching Algorithmにより500/600は専用faceが無いためfont-synthesis: weight（UA既定）でRegularから合成太字、または700へスナップ。500と600は視覚差が小さくなりやすい（IBM Plex Sans JP時代のような独立Medium/Semibold faceは無い）。font-sans(Geist)側のfont-medium/semiboldは@fontsourceの500/600 faceが引き続き供給されるため影響なし。
 
 追記: --font-jpにNoto Sans CJK JP/Noto Sans JPをLinux開発環境向けフォールバックとして追加（tokens.css・design-system.md同期）。pnpm test:smoke 23/23 passed（Noto追加後再実行）。
+
+AC#2根拠: 統合検証で一覧・詳細のスクリーンショット（scratchpad/list-view.png, detail-view.png）を取得し、日本語本文がNoto Sans CJK JPの正常なゴシック体で描画されることを確認。woff2リクエストは4件（geist×2, jetbrains-mono×2）、ibm-plex系0件。Windows実機（Yu Gothic UI）の見た目とウェイト500/600の合成太字はユーザーの実機確認に委ねる。
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+IBM Plex Sans JPを撤去し、--font-jpをOSフォントスタック（Hiragino/Yu Gothic UI/Meiryo/Noto Sans CJK JP…）へ変更。distのwoff2は407本→38本、初回ロードのフォントリクエストは4件に減少。CoverPlaceholderのインライン指定もvar(--font-jp)へ追随。smoke 23/23。
+<!-- SECTION:FINAL_SUMMARY:END -->
