@@ -10,6 +10,7 @@
 //                                   （デフォルト ./data/cache/thumbnails）
 //   MIMIMILLI_MOCK_SCENARIO … fixture アダプタのデータシナリオ
 //                             ("default" | "empty" | "new-work" | "errors"、省略時 "default")
+//   MIMIMILLI_STATIC_DIR    … client/dist 等の静的配信ルート（未設定ならAPIのみ）
 import { resolve } from "node:path";
 import { createFixtureAdapter } from "./adapters/fixture/index.ts";
 import { resolveDataPaths } from "./adapters/real/dataRoot.ts";
@@ -29,6 +30,7 @@ import {
 } from "./lib/processErrorHandlers.ts";
 import { performGracefulShutdown, runCleanupAndExit } from "./serverLifecycle.ts";
 import { serveMimimilli } from "./serve.ts";
+import { resolveStaticDir } from "./staticServe.ts";
 import { buildStartupLogProperties } from "./lib/startupLog.ts";
 
 const adapterKind = process.env.MIMIMILLI_ADAPTER ?? "real";
@@ -106,9 +108,10 @@ registerProcessErrorHandlers({
 });
 
 const port = Number(process.env.PORT ?? 8080);
+const staticDir = resolveStaticDir(process.env.MIMIMILLI_STATIC_DIR);
 
 adapter = createAdapter();
-const served = serveMimimilli({ adapter, port });
+const served = serveMimimilli({ adapter, port, appOptions: { staticDir } });
 app = served.app;
 server = served.server;
 

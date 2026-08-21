@@ -28,7 +28,13 @@
     "smoke:real": "pnpm --filter @mimimilli/server smoke:real",
     "test:server": "pnpm --filter @mimimilli/server test",
     "test:client": "pnpm --filter @mimimilli/client test",
-    "test:smoke": "pnpm --filter @mimimilli/client test:smoke"
+    "test:smoke": "pnpm --filter @mimimilli/client test:smoke",
+    "preview:fixture": "pnpm --filter @mimimilli/client build && cross-env MIMIMILLI_ADAPTER=fixture MIMIMILLI_STATIC_DIR=client/dist PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run --name mimi bun server/src/index.ts",
+    "preview:fixture:large": "cross-env MIMIMILLI_MOCK_SCENARIO=large pnpm run preview:fixture",
+    "preview:fixture:new-work": "cross-env MIMIMILLI_MOCK_SCENARIO=new-work pnpm run preview:fixture",
+    "preview:fixture:empty": "cross-env MIMIMILLI_MOCK_SCENARIO=empty pnpm run preview:fixture",
+    "preview:fixture:errors": "cross-env MIMIMILLI_MOCK_SCENARIO=errors pnpm run preview:fixture",
+    "preview:real": "pnpm --filter @mimimilli/client build && node scripts/dev-real.mjs -- cross-env MIMIMILLI_STATIC_DIR=client/dist PORTLESS_HTTPS=0 PORTLESS_PORT=1355 portless run --name mimi bun server/src/index.ts"
   },
   "devDependencies": {
     "backlog.md": "1.47.1",

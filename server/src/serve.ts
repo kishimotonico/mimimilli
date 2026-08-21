@@ -18,8 +18,8 @@ export type ServeOptions = {
 };
 
 export function serveMimimilli(options: ServeOptions): ServeResult {
-  const { adapter, port, appOptions = {} } = options;
-  const app = createApp(adapter, appOptions);
+  const { adapter, port, appOptions } = options;
+  const app = createApp(adapter, appOptions ?? {});
   const server = Bun.serve({
     fetch: app.fetch,
     hostname: "127.0.0.1",
