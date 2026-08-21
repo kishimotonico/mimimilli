@@ -1,9 +1,11 @@
 ---
 id: TASK-369
 title: プレイヤーの入力操作の不具合修正とテスト補強を行う
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@fable'
 created_date: '2026-08-21 08:01'
+updated_date: '2026-08-21 09:47'
 labels: []
 dependencies:
   - TASK-368
@@ -29,10 +31,16 @@ Codex品質レビューで見つかった実害のある挙動問題の修正と
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 ボタン・リンク・select・sliderへフォーカス中はSpace/矢印がネイティブ動作のままで、それ以外では従来どおりショートカットが効く
-- [ ] #2 シーク・ABハンドルのドラッグ中にpointercancelが起きてもdragging状態が残らない
-- [ ] #3 没入モードの出入りで既存のinert状態が破壊されず、idle時の不可視ミニコントロールへTabフォーカスが入らない
-- [ ] #4 Popupのミュートボタンが撤去され、関連する未使用配線・CSSが残っていない
-- [ ] #5 1024px幅のplayer smoke・NowPlayingScrubのAB unit・PopupContent操作テストが追加され、低価値な購読性能テストが整理されている
-- [ ] #6 pnpm check && pnpm test と pnpm test:smoke が全緑
+- [x] #1 ボタン・リンク・select・sliderへフォーカス中はSpace/矢印がネイティブ動作のままで、それ以外では従来どおりショートカットが効く
+- [x] #2 シーク・ABハンドルのドラッグ中にpointercancelが起きてもdragging状態が残らない
+- [x] #3 没入モードの出入りで既存のinert状態が破壊されず、idle時の不可視ミニコントロールへTabフォーカスが入らない
+- [x] #4 Popupのミュートボタンが撤去され、関連する未使用配線・CSSが残っていない
+- [x] #5 1024px幅のplayer smoke・NowPlayingScrubのAB unit・PopupContent操作テストが追加され、低価値な購読性能テストが整理されている
+- [x] #6 pnpm check && pnpm test と pnpm test:smoke が全緑
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+プレイヤー入力操作の実害不具合4件を修正しテストを補強（6コミット）。グローバルショートカットの除外をbutton/a/input/textarea/select/[contenteditable]へ拡大（[role=slider]はArrow系・Home/Endのみ除外、Spaceはグローバルトグル維持でスクロール副作用を回避）。シーク・ABハンドルへpointercancel/lostpointercaptureの冪等な終了処理を接続。没入モードのinertを保存復元方式にし、idle時ミニコントロールへinert適用で表示とフォーカス可否を同期。Popupミュートボタンと配線を完全撤去。1024px smoke・Scrub AB unit・PopupContent操作・ショートカット除外のテスト追加、低価値な購読性能テストをatom参照同一性テストへ一本化、dialog不在smokeのassertを.mle-nowplaying配下へ縮小。check/test（server671+client845）/smoke23件全緑、実機検証・レビュー通過。masterへ--no-ffマージ済み
+<!-- SECTION:FINAL_SUMMARY:END -->
