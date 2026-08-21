@@ -1,5 +1,8 @@
 import { useEffect, useRef, useCallback } from "react";
 
+/** ネイティブ操作を優先し、グローバルショートカットの対象から外す要素。 */
+const SHORTCUT_EXEMPT_SELECTOR = 'button, a, input, textarea, select, [role="slider"], [contenteditable]';
+
 interface UseGlobalShortcutsOptions {
   /** Space キーで再生/一時停止。isActive が false の場合は何もしない。 */
   onTogglePlay: () => void;
@@ -23,8 +26,7 @@ export function useGlobalShortcuts({
 
   const handler = useCallback((e: KeyboardEvent) => {
     const target = e.target as HTMLElement;
-    if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)
-      return;
+    if (target.closest?.(SHORTCUT_EXEMPT_SELECTOR)) return;
     if (!isActiveRef.current) return;
 
     if (e.code === "Space") {
