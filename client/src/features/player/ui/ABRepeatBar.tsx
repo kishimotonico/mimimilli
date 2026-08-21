@@ -15,7 +15,7 @@ export default function ABRepeatBar({ abRepeat, onSetABPoint, onClearABRepeat }:
   const hasABRepeat = abRepeat.a !== null && abRepeat.b !== null && abRepeat.a < abRepeat.b;
 
   return (
-    <div className="flex items-center gap-2 pt-2.5">
+    <div className="flex items-center gap-2 whitespace-nowrap pt-2.5">
       <span className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-ink-3">
         A-Bリピート
       </span>
