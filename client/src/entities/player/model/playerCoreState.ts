@@ -4,6 +4,18 @@ import type { PlaybackTrack } from "./playbackTrack";
 
 export type PlaybackStatus = "idle" | "loading" | "playing" | "paused" | "ended" | "error";
 
+export interface AbRepeatRange {
+  a: number | null;
+  b: number | null;
+}
+
+/** AB区間が実際に成立している（ループ発動条件）かを判定する。 */
+export function isAbRepeatEstablished(
+  abRepeat: AbRepeatRange,
+): abRepeat is { a: number; b: number } {
+  return abRepeat.a !== null && abRepeat.b !== null && abRepeat.a < abRepeat.b;
+}
+
 export interface PlayerCoreState {
   isPlaying: boolean;
   status: PlaybackStatus;
@@ -16,7 +28,7 @@ export interface PlayerCoreState {
   loop: boolean;
   playbackRate: number;
   channelSwap: boolean;
-  abRepeat: { a: number | null; b: number | null };
+  abRepeat: AbRepeatRange;
   playbackError: AudioEngineError | null;
 }
 

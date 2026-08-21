@@ -1,8 +1,13 @@
 import type { Work, WorkListItem } from "../../../entities/work/model";
 import type { AudioEngineError } from "./audioEngine";
 import { isResolvedTrack, type PlaybackTrack } from "./trackTime";
+import {
+  isAbRepeatEstablished,
+  type AbRepeatRange,
+  type PlaybackStatus,
+  type PlayerCoreState,
+} from "../../../entities/player/model/playerCoreState";
 
-export type PlaybackStatus = "idle" | "loading" | "playing" | "paused" | "ended" | "error";
 export type PlaybackCompletionScope = "queue" | "work";
 
 export type PlaybackSource = { kind: "work"; work: WorkListItem | Work } | { kind: "file" };
@@ -24,13 +29,9 @@ export interface PlayerControllerState {
   loop: boolean;
   playbackRate: number;
   channelSwap: boolean;
-  abRepeat: { a: number | null; b: number | null };
+  abRepeat: AbRepeatRange;
   playbackError: AudioEngineError | null;
 }
-
-import type { PlayerCoreState } from "../../../entities/player/model/playerCoreState";
-
-export type { PlayerCoreState } from "../../../entities/player/model/playerCoreState";
 
 export const PLAYER_CONTROLLER_INITIAL: PlayerControllerState = {
   status: "idle",
@@ -46,8 +47,6 @@ export const PLAYER_CONTROLLER_INITIAL: PlayerControllerState = {
 };
 
 const EMPTY_TRACKS: PlaybackTrack[] = [];
-
-export const PLAYER_CORE_INITIAL: PlayerCoreState = toPlayerCoreState(PLAYER_CONTROLLER_INITIAL);
 
 type PlayerCoreComparators = {
   [K in keyof PlayerCoreState]: (a: PlayerCoreState[K], b: PlayerCoreState[K]) => boolean;
@@ -298,10 +297,10 @@ export function reducePlayer(
       };
     case "audioTimeUpdated": {
       const commands: PlayerControllerCommand[] = [];
-      const { a, b } = state.abRepeat;
-      if (a !== null && b !== null && a < b && input.positionSec >= b) {
-        commands.push({ type: "seekAudio", positionSec: a });
-        return { state: { ...state, positionSec: a }, commands };
+      const { abRepeat } = state;
+      if (isAbRepeatEstablished(abRepeat) && input.positionSec >= abRepeat.b) {
+        commands.push({ type: "seekAudio", positionSec: abRepeat.a });
+        return { state: { ...state, positionSec: abRepeat.a }, commands };
       }
       return { state: { ...state, positionSec: input.positionSec }, commands };
     }
