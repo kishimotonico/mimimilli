@@ -17,6 +17,7 @@ import { settingsRoute } from "./routes/settings.ts";
 import { smartFoldersRoute } from "./routes/smartFolders.ts";
 import { tagPrefixesRoute } from "./routes/tagPrefixes.ts";
 import { worksRoute } from "./routes/works.ts";
+import { createStaticMiddleware } from "./staticServe.ts";
 
 export type AppEnv = { Variables: { requestId: string } };
 
@@ -24,7 +25,7 @@ export type App = Hono<AppEnv> & {
   shutdown(): Promise<void>;
 };
 
-export type CreateAppOptions = { media?: MediaRouteOptions };
+export type CreateAppOptions = { media?: MediaRouteOptions; staticDir?: string };
 
 export function createApp(adapter: DataAdapter, options: CreateAppOptions = {}): App {
   const app = new Hono<AppEnv>();
@@ -72,6 +73,10 @@ export function createApp(adapter: DataAdapter, options: CreateAppOptions = {}):
   api.route("/", dlsiteRoute(adapter, dlsiteJobs));
 
   app.route("/api", api);
+
+  if (options.staticDir) {
+    app.use("*", createStaticMiddleware(options.staticDir));
+  }
 
   app.notFound((c) => {
     const body: ApiError = {
