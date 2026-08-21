@@ -5,6 +5,7 @@ import PlayerDock from "../../src/features/player/ui/PlayerDock";
 import { LibraryNavigationProvider } from "../../src/features/library/ui/LibraryNavigationProvider";
 import { PLAYER_CORE_INITIAL, playerCoreAtom } from "../../src/entities/player/model/atoms";
 import { playerUiModeAtom } from "../../src/features/player/model/playerPresentationAtoms";
+import { buildPlayerDockProps } from "./fixtures/playerDock";
 
 // PopupContent はモックしない: 再生速度メニューの window リスナーが
 // 退出中（useIsPresent() === false）に解除されることを実物のコンポーネントで検証する。
@@ -56,7 +57,7 @@ function renderPlayerDock() {
   return render(
     <JotaiProvider store={store}>
       <LibraryNavigationProvider>
-        <PlayerDock />
+        <PlayerDock {...buildPlayerDockProps()} />
       </LibraryNavigationProvider>
     </JotaiProvider>,
   );
