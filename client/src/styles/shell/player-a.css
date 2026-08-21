@@ -615,6 +615,7 @@
   --now-playing-w: calc(100vw - 96px);
   --now-playing-seek-h: 56px;
   --now-playing-controls-h: 112px;
+  width: 100%;
   height: 100%;
   min-height: 0;
   overflow: hidden;
@@ -633,8 +634,9 @@
 }
 
 /* z-index 41: 没入面（40）より常に手前に置く。没入モードでもシーク行の
-   DOM ノード・位置・寸法は変えず、器の見た目（背景・角丸・ぼかし）だけを
-   [data-mode="immersive"] で切り替える。padding は両モードで固定のまま
+   DOM ノード・位置・寸法は変えない。器（背景・ぼかし）は持たず、
+   トラック地・進捗色・時刻の文字色だけを NowPlayingScrub 側で
+   [data-mode] に応じて出し分ける。padding は両モードで固定のまま
    （変えると getBoundingClientRect の高さが変わってしまう）。 */
 .mle-nowplaying__seek {
   position: fixed;
@@ -644,16 +646,6 @@
   width: var(--now-playing-w);
   transform: translateX(-50%);
   padding: 0 4px;
-  border-radius: 999px;
-  transition:
-    background 0.2s ease,
-    box-shadow 0.2s ease;
-}
-
-[data-mode="immersive"] .mle-nowplaying__seek {
-  background: color-mix(in oklch, var(--paper-0) 55%, transparent);
-  backdrop-filter: blur(20px);
-  box-shadow: var(--shadow-pop);
 }
 
 .mle-nowplaying__controls {
@@ -664,11 +656,19 @@
   width: var(--now-playing-w);
   height: var(--now-playing-controls-h);
   transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 2px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  column-gap: 16px;
   padding: 0 4px 14px;
+}
+.mle-nowplaying__controls > *:first-child {
+  grid-column: 2;
+  justify-self: center;
+}
+.mle-nowplaying__controls > *:last-child {
+  grid-column: 3;
+  justify-self: end;
 }
 
 .mle-nowplaying__body {
@@ -772,7 +772,7 @@
   background-color: var(--paper-1);
   background-size: cover;
   background-position: center;
-  filter: blur(60px) saturate(1.3);
+  filter: blur(24px) saturate(1.3);
   transform: scale(1.15);
 }
 
@@ -780,7 +780,7 @@
   position: absolute;
   inset: 0;
   z-index: 1;
-  background: oklch(15% 0.01 70 / 0.42);
+  background: oklch(15% 0.01 70 / 0.2);
 }
 
 /* カバーの実画像は object-fit: contain で表示するため、この箱自体は
@@ -794,10 +794,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
 }
 .mle-nowplaying__immersive-cover > * {
   max-width: 100%;
   max-height: 100%;
+  transform: scale(1.35);
 }
 
 .mle-nowplaying__immersive-toggle {
@@ -833,7 +835,7 @@
   position: absolute;
   left: 0;
   right: 0;
-  bottom: calc(var(--now-playing-seek-h) + 40px);
+  bottom: calc(var(--now-playing-controls-h) + var(--now-playing-seek-h) + 24px);
   z-index: 3;
   display: flex;
   flex-direction: column;

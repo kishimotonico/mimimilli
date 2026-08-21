@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { assertNoErrors, openApp, trackErrors } from "./support";
 
-test("再生中タブ: 没入モードでカバーがビューポート内に収まり、シーク行の位置がモード切替前後で不変", async ({
+test("再生中タブ: 没入モードでカバーが拡大クロップされてページに漏れず、シーク行の位置がモード切替前後で不変", async ({
   page,
 }) => {
   const tracker = trackErrors(page);
@@ -23,15 +23,29 @@ test("再生中タブ: 没入モードでカバーがビューポート内に収
   const cover = page.locator(".mle-nowplaying__immersive-cover");
   await expect(cover).toBeVisible();
 
-  // カバー本体（img）がビューポート内に収まっていること（AC1 のはみ出し回帰ガード）。
+  // カバーは拡大（scale）してから親の overflow: hidden でクロップする設計（TASK-365）。
+  // (1) 中身（img またはプレースホルダー svg）がビューポートより実際にはみ出している
+  //     こと（拡大が効いている証拠。等倍に退行したら失敗する）
+  // (2) クロップの器（.mle-nowplaying__immersive-cover）が overflow: hidden である
+  //     こと（クロップ機構そのものの証拠）
+  // (3) それでもページ全体にスクロールを生まないこと（漏れていない証拠）
   const viewport = page.viewportSize()!;
-  const img = cover.locator("img");
-  const imgBox = await img.boundingBox();
-  expect(imgBox).not.toBeNull();
-  expect(imgBox!.y).toBeGreaterThanOrEqual(0);
-  expect(imgBox!.x).toBeGreaterThanOrEqual(0);
-  expect(imgBox!.y + imgBox!.height).toBeLessThanOrEqual(viewport.height);
-  expect(imgBox!.x + imgBox!.width).toBeLessThanOrEqual(viewport.width);
+  const coverContent = cover.locator(":scope > *").first();
+  const contentBox = await coverContent.boundingBox();
+  expect(contentBox).not.toBeNull();
+  expect(
+    contentBox!.width > viewport.width || contentBox!.height > viewport.height,
+  ).toBe(true);
+
+  const coverOverflow = await cover.evaluate((el) => getComputedStyle(el).overflow);
+  expect(coverOverflow).toBe("hidden");
+
+  const hasPageOverflow = await page.evaluate(
+    () =>
+      document.documentElement.scrollWidth > document.documentElement.clientWidth ||
+      document.documentElement.scrollHeight > document.documentElement.clientHeight,
+  );
+  expect(hasPageOverflow).toBe(false);
 
   // シーク行は同一DOMノードのまま、位置・寸法が変わらない（AC7）。
   const rectDuringImmersive = await seekRow.boundingBox();
