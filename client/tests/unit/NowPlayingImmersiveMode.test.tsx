@@ -131,4 +131,29 @@ describe("再生中タブ: 没入モード切替とシーク行の非再マウ�
 
     expect(playerActions.togglePlay).toHaveBeenCalled();
   });
+
+  // カバークリックで没入に入ると、フォーカス元（カバー）は通常表示の
+  // AnimatePresence 境界ごとアンマウントされる。退出時にそこへ戻そうとしても
+  // 存在しないため、通常表示に必ず存在する切替アイコンへフォールバックする
+  // （フォーカスが document.body へ落ちないことを保証する）。
+  it("カバークリックで没入に入り退出すると、フォーカスがbodyへ落ちず切替アイコンへ復帰する", async () => {
+    vi.useFakeTimers();
+    renderNowPlaying();
+
+    const coverButton = screen.getByRole("button", { name: "カバーを没入表示にする" });
+    coverButton.focus();
+    fireEvent.click(coverButton);
+    expect(screen.getByRole("button", { name: "通常表示に戻す" })).toHaveFocus();
+
+    // 通常表示（カバー元ボタンを含む）の退出アニメーションを完了させ、
+    // フォーカス元がアンマウント済みの状態を再現する。
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(400);
+    });
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(document.activeElement).not.toBe(document.body);
+    expect(screen.getByRole("button", { name: "没入モードにする" })).toHaveFocus();
+  });
 });
