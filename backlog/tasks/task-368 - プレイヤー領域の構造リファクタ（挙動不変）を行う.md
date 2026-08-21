@@ -1,9 +1,11 @@
 ---
 id: TASK-368
 title: プレイヤー領域の構造リファクタ（挙動不変）を行う
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@fable'
 created_date: '2026-08-21 08:01'
+updated_date: '2026-08-21 08:53'
 labels: []
 dependencies: []
 ordinal: 368000
@@ -30,11 +32,23 @@ ordinal: 368000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 UI/shell系atomがfeatures/playerへ移動し、entities/playerにはcore・progress・selectorのみが残る（レイヤー境界検査通過）
-- [ ] #2 useImmersiveIdleの呼び出しが親1箇所になり、ミニコントロールのidleフェード（reset規則含む）がテストで検証されている
-- [ ] #3 再生状態の型・初期値・AB判定がentityに一本化され、featureの重複定義・透過re-exportが削除されている
-- [ ] #4 player-a.cssが所有者単位の4ファイルに分割され、実機確認で見た目の変化がない
-- [ ] #5 seekRelativeの未使用経路が削除され、clamp・ratioFromClientXが共通化されている
-- [ ] #6 既存の全テストが修正なしで通る挙動不変が保たれている（テスト変更はfixture導入・idleテスト追加のみ）
-- [ ] #7 pnpm check && pnpm test と pnpm test:smoke が全緑
+- [x] #1 UI/shell系atomがfeatures/playerへ移動し、entities/playerにはcore・progress・selectorのみが残る（レイヤー境界検査通過）
+- [x] #2 useImmersiveIdleの呼び出しが親1箇所になり、ミニコントロールのidleフェード（reset規則含む）がテストで検証されている
+- [x] #3 再生状態の型・初期値・AB判定がentityに一本化され、featureの重複定義・透過re-exportが削除されている
+- [x] #4 player-a.cssが所有者単位の4ファイルに分割され、実機確認で見た目の変化がない
+- [x] #5 seekRelativeの未使用経路が削除され、clamp・ratioFromClientXが共通化されている
+- [x] #6 既存の全テストが修正なしで通る挙動不変が保たれている（テスト変更はfixture導入・idleテスト追加のみ）
+- [x] #7 pnpm check && pnpm test と pnpm test:smoke が全緑
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+検証メモ: 480px幅でトランスポート行がはみ出すのは対応なしと判断（サポート下限はTASK-366で定めた1024px。CSSセレクタ等価性のレビュー確認によりmaster時点からの既存状態で、本リファクタ起因ではない）
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+プレイヤー領域の構造的負債を9項目の純リファクタで整理（8コミット）。UI/shell atomのfeatures移動（dockedBarActiveはplayerDockBarVisibleAtom＋shell合成へ分解、props配布＋結合テスト）、没入idleの親一元化（reset規則維持＋unitテスト）、型・初期値・AB判定のentity一本化、active view model化、player-a.cssの所有者単位4分割（未使用.mle-icbtn.is-on/.is-muted削除、役割class化）、seekRelative未使用経路削除、clamp/ratioFromClientX共通化、PlayerDockテストfixture導入。挙動不変はレビューで式レベルの等価性確認＋実機で見た目・localStorageキー不変確認。pnpm check / pnpm test / pnpm test:smoke 全緑。masterへ--no-ffマージ済み
+<!-- SECTION:FINAL_SUMMARY:END -->
