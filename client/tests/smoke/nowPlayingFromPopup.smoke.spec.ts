@@ -23,8 +23,9 @@ test("ポップアップの展開ボタンから再生中タブへ遷移し、�
   await expect(page.locator(".mle-popup")).toBeVisible();
   await page.getByRole("button", { name: "再生中タブを表示" }).click();
 
-  // 旧 <dialog> 全画面プレイヤーは存在せず、ポップアップ／下部バーも画面に残らない。
-  await expect(page.locator("dialog")).toHaveCount(0);
+  // 旧 <dialog> 全画面プレイヤーは再生中タブ領域には存在せず、ポップアップ／下部バーも
+  // 画面に残らない（設定等の正当な<dialog>は他領域にあり得るため再生中タブ配下に絞る）。
+  await expect(page.locator(".mle-nowplaying dialog")).toHaveCount(0);
   await expect(page.locator(".mle-popup")).toHaveCount(0);
   await expect(page.locator(".mle-bar1")).toHaveCount(0);
 

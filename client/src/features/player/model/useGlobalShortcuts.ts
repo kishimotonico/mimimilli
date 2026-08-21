@@ -1,7 +1,8 @@
 import { useEffect, useRef, useCallback } from "react";
 
 /** ネイティブ操作を優先し、グローバルショートカットの対象から外す要素。 */
-const SHORTCUT_EXEMPT_SELECTOR = 'button, a, input, textarea, select, [role="slider"], [contenteditable]';
+const SHORTCUT_EXEMPT_SELECTOR =
+  'button, a, input, textarea, select, [role="slider"], [contenteditable]';
 
 interface UseGlobalShortcutsOptions {
   /** Space キーで再生/一時停止。isActive が false の場合は何もしない。 */
