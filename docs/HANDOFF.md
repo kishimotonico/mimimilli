@@ -139,7 +139,7 @@ smokeテストの注意:
 - `model/playerRuntime.ts`: controller と React の間で共有する参照型（`PlayerRuntimeRefs` / `LoadedTrack` / `PendingResume` 等）
 - `model/atoms.ts`:
   - `playerCoreAtom`（低頻度 state。`toPlayerCoreState` で controller state から導出）
-  - `playerCurrentTimeAtom` / `playerDurationAtom`（**高頻度**。timeupdate 毎に更新。`usePlaybackProgress` を介して **BarSeekStrip / PopupSeek / FullScreenScrub の3 leaf だけが subscribe**する。親コンポーネント（BarContent / PopupContent / FullScreenPlayer）や App.tsx は subscribe しないので再生中に上位が再レンダリングされない — この分離は**維持必須**）
+  - `playerCurrentTimeAtom` / `playerDurationAtom`（**高頻度**。timeupdate 毎に更新。`usePlaybackProgress` を介して **BarSeekStrip / PopupSeek / FullScreenScrub / NowPlayingScrub の4 leaf だけが subscribe**する。親コンポーネント（BarContent / PopupContent / FullScreenPlayer / NowPlayingView）や App.tsx は subscribe しないので再生中に上位が再レンダリングされない — この分離は**維持必須**）
   - `playerUiModeAtom`（bar⇄popup。localStorage 永続）
 - `model/audioEngine.ts`: 低レベル。`new Audio()`（DOM外）。load/play/pause/seek/setVolume/setPlaybackRate/setChannelSwap、timeupdate/durationchange/ended コールバック
 - `model/useAudioEngineLifecycle.ts`: エンジンの生成・イベント購読・last-played 送信。同一アセットを再利用する経路（再生中のトラックへ戻る等）では `<audio>` の `play()` がすでに再生中だとイベントを発火しないため、`audioPlaying` を代理で dispatch して状態機械を同期させる

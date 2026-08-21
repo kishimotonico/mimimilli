@@ -6,14 +6,15 @@
 //     → PlayerDock など state 全体が必要な leaf で subscribe する
 //   - 派生 atom: TopBar / LeftNav など一部の値だけ必要な購読者向け
 //   - playerCurrentTimeAtom / playerDurationAtom: timeupdate ごとに更新される高頻度 state
-//     → usePlaybackProgress hook 経由で BarSeekStrip / PopupSeek / FullScreenScrub の
-//       3 leaf のみが subscribe する（親の BarContent / PopupContent / FullScreenPlayer は購読しない）
+//     → usePlaybackProgress hook 経由で BarSeekStrip / PopupSeek / FullScreenScrub / NowPlayingScrub の
+//       4 leaf のみが subscribe する（親の BarContent / PopupContent / FullScreenPlayer / NowPlayingView は購読しない）
 //
 // currentTime / duration は PlayerState の型には残さず、atom からのみ読む。
 
 import { atom } from "jotai";
 import { atomWithStorage } from "jotai/utils";
 import { PLAYER_CORE_INITIAL, type PlayerCoreState } from "./playerCoreState";
+import { appModeAtom } from "../../../shared/model/appModeAtoms";
 
 export { PLAYER_CORE_INITIAL, type PlayerCoreState } from "./playerCoreState";
 
@@ -56,8 +57,10 @@ export type PlayerUiMode = "bar" | "popup";
  */
 export const playerUiModeAtom = atomWithStorage<PlayerUiMode>("mimimilli:playerUiMode", "bar");
 
+/** 再生中タブでは PlayerDock 自体を描画しないため、docked bar 用の余白確保も対象外にする。 */
 export const dockedBarActiveAtom = atom(
-  (get) => get(playerIsActiveAtom) && get(playerUiModeAtom) === "bar",
+  (get) =>
+    get(playerIsActiveAtom) && get(playerUiModeAtom) === "bar" && get(appModeAtom) !== "nowPlaying",
 );
 
 /** ポップアップの初期位置（右下）からのドラッグ移動オフセット（px）。 */
@@ -82,12 +85,12 @@ export const playerPopupOffsetAtom = atomWithStorage<PlayerPopupOffset>(
 
 /**
  * 高頻度更新の audio 再生時刻（秒）。
- * usePlaybackProgress 経由で BarSeekStrip / PopupSeek / FullScreenScrub のみ subscribe すること。
+ * usePlaybackProgress 経由で BarSeekStrip / PopupSeek / FullScreenScrub / NowPlayingScrub のみ subscribe すること。
  */
 export const playerCurrentTimeAtom = atom(0);
 
 /**
  * 高頻度更新の audio 総時間（秒）。
- * usePlaybackProgress 経由で BarSeekStrip / PopupSeek / FullScreenScrub のみ subscribe すること。
+ * usePlaybackProgress 経由で BarSeekStrip / PopupSeek / FullScreenScrub / NowPlayingScrub のみ subscribe すること。
  */
 export const playerDurationAtom = atom<number | null>(0);

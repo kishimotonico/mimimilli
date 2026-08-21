@@ -604,3 +604,133 @@
 .mle-fullscreen__seek {
   touch-action: none;
 }
+
+/* ── 再生中タブ（通常モード）─────────────────────────────────
+   幅Wと下部帯の高さはCSS変数で一元定義する。Wはビューポート基準
+   （シェル本文基準にしない）にして、没入モード（TASK-363・ビューポート全面）
+   へ切り替えたときにシーク行の位置が変わらないようにする。
+   シーク行（.mle-nowplaying__seek）とトランスポート/AB行（.mle-nowplaying__controls）は
+   それぞれ独立した position: fixed のスロットとし、後者の表示有無で前者の
+   位置・寸法が変わらない構造にする。帯の背景（.mle-nowplaying__bg）は
+   シーク行スロットの外の装飾層として分離する。 */
+.mle-nowplaying {
+  --now-playing-w: calc(100vw - 96px);
+  --now-playing-seek-h: 56px;
+  --now-playing-controls-h: 112px;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.mle-nowplaying__bg {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 32;
+  height: calc(var(--now-playing-seek-h) + var(--now-playing-controls-h));
+  background: var(--paper-1);
+  border-top: 1px solid var(--line);
+  box-shadow: 0 -8px 24px -16px oklch(20% 0.02 70 / 0.18);
+}
+
+.mle-nowplaying__seek {
+  position: fixed;
+  left: 50%;
+  bottom: var(--now-playing-controls-h);
+  z-index: 33;
+  width: var(--now-playing-w);
+  transform: translateX(-50%);
+  padding: 0 4px;
+}
+
+.mle-nowplaying__controls {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  z-index: 33;
+  width: var(--now-playing-w);
+  height: var(--now-playing-controls-h);
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 4px 14px;
+}
+
+.mle-nowplaying__body {
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 2fr 3fr;
+  gap: 24px;
+  padding: 40px 48px calc(var(--now-playing-seek-h) + var(--now-playing-controls-h) + 24px);
+}
+
+.mle-nowplaying__left {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  overflow: hidden;
+}
+
+/* カバーは左カラム内で最大化しつつ、上限目安 min(56vh, 480px) を超えない。
+   縦幅が足りない場合に正方形を保ったまま縮小するため、コンテナクエリで
+   実際に使える幅・高さの小さい方に合わせる（.mle-popup__cover-wrap と同じ技法）。 */
+.mle-nowplaying__cover-wrap {
+  position: relative;
+  flex: 0 1 auto;
+  min-height: 0;
+  width: 100%;
+  max-width: min(56vh, 480px);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  container-type: size;
+}
+
+.mle-nowplaying__cover {
+  width: min(100cqw, 100cqh);
+  height: min(100cqw, 100cqh);
+  min-height: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow:
+    var(--shadow-cover),
+    0 30px 60px -16px oklch(20% 0.02 70 / 0.25);
+}
+
+.mle-nowplaying__right {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.mle-nowplaying__tracklist-wrap {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.mle-nowplaying__tracklist-head {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.mle-nowplaying__tracklist {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-top: 8px;
+}

@@ -22,7 +22,11 @@ export default function PlaybackArtwork({
     return (
       <div
         className="grid place-items-center bg-paper-2 text-ink-3"
-        style={{ width: size, height: size, borderRadius: radius }}
+        style={
+          fit === "fill"
+            ? { width: "100%", height: "100%", borderRadius: radius }
+            : { width: size, height: size, borderRadius: radius }
+        }
         aria-hidden
       >
         <I.audio size={Math.round(size * 0.38)} />
