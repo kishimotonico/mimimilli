@@ -11,6 +11,9 @@ interface CoverImgProps {
   size?: number;
   radius?: number;
   fit?: "fixed" | "fill";
+  /** img の object-fit。既定 cover（クロップして敷き詰め）。contain は縦横比を保って
+   * 余白ありで収める（没入モードの全面カバー表示等、縦横比を可変にしたい場合に使う）。 */
+  objectFit?: "cover" | "contain";
   requestWidth?: number;
   loading?: "eager" | "lazy";
 }
@@ -22,6 +25,7 @@ export default function CoverImg({
   size = 32,
   radius = 4,
   fit = "fixed",
+  objectFit = "cover",
   requestWidth,
   loading = "eager",
 }: CoverImgProps) {
@@ -47,7 +51,7 @@ export default function CoverImg({
           display: "block",
           width: "100%",
           height: "100%",
-          objectFit: "cover",
+          objectFit,
           borderRadius: radius,
         }}
         onError={() => setErrored(true)}

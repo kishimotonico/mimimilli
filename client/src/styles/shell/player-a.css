@@ -1,13 +1,15 @@
 /* mimimilli shell — player-a
    所有範囲: PlayerDock（画面下張り付きバー .mle-bar1* / 右下ポップアップ .mle-popup*）、
-   評価ピッカー(.mle-ratepick* / .mle-ratepill*)、フルスクリーン再生のシーク
-   (.mle-fullscreen__seek)。いずれも position: fixed のオーバーレイで、frame のグリッド行を
-   持たない。player系はこの1ファイルのみ（元ファイル内で連続した区画だったため分割不要）。
-   import順: shared-c.cssの次、files-c.cssより前。 */
+   評価ピッカー(.mle-ratepick* / .mle-ratepill*)、再生中タブ
+   （.mle-nowplaying*、通常モード＋没入モード）。
+   いずれも position: fixed のオーバーレイで、frame のグリッド行を持たない。
+   player系はこの1ファイルのみ（元ファイル内で連続した区画だったため分割不要）。
+   import順: shared-c.cssの次、files-c.cssより前。
+   z-index の割り当ては docs/design-system.md の Overlay/z-index 一覧を参照。 */
 
 /* ── Player dock — 画面下張り付きバー / 右下ポップアップ共通 ─── */
 /* 両モードとも常駐チェック用 UI で position: fixed のオーバーレイ。
-   FullScreenPlayer は dialog の top layer に出るため、ここではモーダルより下に置く。 */
+   設定・スキャン等のモーダルは dialog の top layer に出るため、ここではモーダルより下に置く。 */
 
 /* ── 画面下張り付きバー（最小構成）───────────────────────── */
 
@@ -601,6 +603,280 @@
   color: var(--acc-ink);
 }
 
-.mle-fullscreen__seek {
-  touch-action: none;
+/* ── 再生中タブ（通常モード）─────────────────────────────────
+   幅Wと下部帯の高さはCSS変数で一元定義する。Wはビューポート基準
+   （シェル本文基準にしない）にして、没入モード（TASK-363・ビューポート全面）
+   へ切り替えたときにシーク行の位置が変わらないようにする。
+   シーク行（.mle-nowplaying__seek）とトランスポート/AB行（.mle-nowplaying__controls）は
+   それぞれ独立した position: fixed のスロットとし、後者の表示有無で前者の
+   位置・寸法が変わらない構造にする。帯の背景（.mle-nowplaying__bg）は
+   シーク行スロットの外の装飾層として分離する。 */
+.mle-nowplaying {
+  --now-playing-w: calc(100vw - 96px);
+  --now-playing-seek-h: 56px;
+  --now-playing-controls-h: 112px;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.mle-nowplaying__bg {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 32;
+  height: calc(var(--now-playing-seek-h) + var(--now-playing-controls-h));
+  background: var(--paper-1);
+  border-top: 1px solid var(--line);
+  box-shadow: 0 -8px 24px -16px oklch(20% 0.02 70 / 0.18);
+}
+
+/* z-index 41: 没入面（40）より常に手前に置く。没入モードでもシーク行の
+   DOM ノード・位置・寸法は変えず、器の見た目（背景・角丸・ぼかし）だけを
+   [data-mode="immersive"] で切り替える。padding は両モードで固定のまま
+   （変えると getBoundingClientRect の高さが変わってしまう）。 */
+.mle-nowplaying__seek {
+  position: fixed;
+  left: 50%;
+  bottom: var(--now-playing-controls-h);
+  z-index: 41;
+  width: var(--now-playing-w);
+  transform: translateX(-50%);
+  padding: 0 4px;
+  border-radius: 999px;
+  transition:
+    background 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+[data-mode="immersive"] .mle-nowplaying__seek {
+  background: color-mix(in oklch, var(--paper-0) 55%, transparent);
+  backdrop-filter: blur(20px);
+  box-shadow: var(--shadow-pop);
+}
+
+.mle-nowplaying__controls {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  z-index: 33;
+  width: var(--now-playing-w);
+  height: var(--now-playing-controls-h);
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 4px 14px;
+}
+
+.mle-nowplaying__body {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 2fr 3fr;
+  gap: 24px;
+  padding: 40px 48px calc(var(--now-playing-seek-h) + var(--now-playing-controls-h) + 24px);
+}
+
+.mle-nowplaying__mode-toggle {
+  position: absolute;
+  top: 40px;
+  right: 48px;
+}
+
+.mle-nowplaying__left {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  overflow: hidden;
+}
+
+/* カバーは左カラム内で最大化しつつ、上限目安 min(56vh, 480px) を超えない。
+   縦幅が足りない場合に正方形を保ったまま縮小するため、コンテナクエリで
+   実際に使える幅・高さの小さい方に合わせる（.mle-popup__cover-wrap と同じ技法）。 */
+.mle-nowplaying__cover-wrap {
+  position: relative;
+  flex: 0 1 auto;
+  min-height: 0;
+  width: 100%;
+  max-width: min(56vh, 480px);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  container-type: size;
+}
+
+.mle-nowplaying__cover {
+  width: min(100cqw, 100cqh);
+  height: min(100cqw, 100cqh);
+  min-height: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow:
+    var(--shadow-cover),
+    0 30px 60px -16px oklch(20% 0.02 70 / 0.25);
+}
+
+.mle-nowplaying__right {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.mle-nowplaying__tracklist-wrap {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.mle-nowplaying__tracklist-head {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.mle-nowplaying__tracklist {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-top: 8px;
+}
+
+/* ── 再生中タブ（没入モード）─────────────────────────────────
+   ビューポート全面（アプリシェルの上）を覆う fixed 面。z-index 40（没入面）。
+   シーク行（z-index 41）だけが常にこの上に乗る。 */
+.mle-nowplaying__immersive {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.mle-nowplaying__immersive-ambient {
+  position: absolute;
+  inset: -5%;
+  z-index: 0;
+  background-color: var(--paper-1);
+  background-size: cover;
+  background-position: center;
+  filter: blur(60px) saturate(1.3);
+  transform: scale(1.15);
+}
+
+.mle-nowplaying__immersive-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: oklch(15% 0.01 70 / 0.42);
+}
+
+/* カバーの実画像は object-fit: contain で表示するため、この箱自体は
+   縦横比を固定しない大きな矩形にする（縦横比は作品ごとに可変）。
+   ファイル再生・カバー欠損時のプレースホルダーは正方形のまま中央に収まる。 */
+.mle-nowplaying__immersive-cover {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  padding: 96px 120px calc(var(--now-playing-seek-h) + 96px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mle-nowplaying__immersive-cover > * {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.mle-nowplaying__immersive-toggle {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  width: 36px;
+  border-radius: 999px;
+  color: var(--paper-0);
+  background: oklch(15% 0.01 70 / 0.4);
+  backdrop-filter: blur(12px);
+  transition:
+    opacity 0.2s ease,
+    background 0.15s ease;
+}
+.mle-nowplaying__immersive-toggle:hover {
+  background: oklch(15% 0.01 70 / 0.55);
+}
+.mle-nowplaying__immersive-toggle.is-idle {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* カバー画像の色柄によらずタイトルを読めるようにする。::before で自身の
+   ボックスより広い範囲へグラデーションの下地を敷く（カバー(z-index 2)より
+   手前、タイトル文字より奥）。 */
+.mle-nowplaying__immersive-title {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--now-playing-seek-h) + 40px);
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+  padding: 0 48px;
+  color: var(--paper-0);
+  text-shadow: 0 2px 16px oklch(10% 0.02 70 / 0.5);
+  transition: opacity 0.2s ease;
+}
+.mle-nowplaying__immersive-title::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -56px -100vw -64px -100vw;
+  background: linear-gradient(
+    to top,
+    oklch(10% 0.02 70 / 0.55) 0%,
+    oklch(10% 0.02 70 / 0.3) 55%,
+    transparent 100%
+  );
+}
+.mle-nowplaying__immersive-title.is-idle {
+  opacity: 0;
+}
+
+.mle-nowplaying__immersive-eyebrow {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  opacity: 0.75;
+}
+
+.mle-nowplaying__immersive-h1 {
+  margin: 0;
+  max-width: 100%;
+  font-family: var(--font-jp);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
 }

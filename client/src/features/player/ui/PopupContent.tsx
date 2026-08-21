@@ -1,5 +1,5 @@
 // 右下ポップアップの中身。日常操作（音量・トラック移動・ループ・再生速度）を厳選して置く。
-// channelSwap / abRepeat 等のニッチ機能は置かない（全画面側の役割）。
+// channelSwap / abRepeat 等のニッチ機能は置かない（再生中タブ側の役割）。
 
 import { useIsPresent } from "motion/react";
 import { useEffect, useRef, useState } from "react";
@@ -23,7 +23,7 @@ interface PopupContentProps {
   onNext: () => void;
   onPrev: () => void;
   onFold: () => void;
-  onExpandFullScreen: () => void;
+  onOpenNowPlaying: () => void;
   onShowPlayingWork: () => void;
   onStop: () => void;
 }
@@ -53,7 +53,7 @@ export default function PopupContent({
   onNext,
   onPrev,
   onFold,
-  onExpandFullScreen,
+  onOpenNowPlaying,
   onShowPlayingWork,
   onStop,
 }: PopupContentProps) {
@@ -109,7 +109,7 @@ export default function PopupContent({
         {isFilePlayback && <div />}
         <div className="mle-popup__head-actions">
           <IconButton size="sm" icon={I.chevD} label="バーへ戻る" onClick={onFold} />
-          <IconButton size="sm" icon={I.fs} label="全画面プレイヤー" onClick={onExpandFullScreen} />
+          <IconButton size="sm" icon={I.fs} label="再生中タブを表示" onClick={onOpenNowPlaying} />
           <IconButton
             size="sm"
             icon={I.x}

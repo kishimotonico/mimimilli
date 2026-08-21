@@ -45,14 +45,17 @@
 | 並び替えメニューのポップアップ                                        | z-index 30            |
 | 軸のクイックオーバーレイ・チップの値ドロップダウン（`.mll-qoverlay`） | z-index 30            |
 | プレイヤー（バー/ポップアップ）                                       | z-index 32            |
+| 再生中タブ・下部帯の背景（`.mle-nowplaying__bg`）                     | z-index 32            |
+| 再生中タブ・トランスポート/AB行（`.mle-nowplaying__controls`）        | z-index 33            |
+| 再生中タブ・没入モード面（`.mle-nowplaying__immersive`）              | z-index 40            |
+| 再生中タブ・シーク行（`.mle-nowplaying__seek`、没入面より常に手前）   | z-index 41            |
 | 設定モーダル                                                          | top layer（下記）     |
-| 全画面プレイヤー                                                      | top layer（下記）     |
 | スキャンモーダル                                                      | top layer（下記）     |
 | スマートフォルダーエディタ                                            | top layer（下記）     |
 | 作品編集・DLsite適用プレビュー                                        | top layer（下記）     |
 | **グローバルトースト**（`Toast` / `GlobalToast`）                     | **top layer（下記）** |
 
-設定モーダル・全画面プレイヤー・スキャンモーダル・スマートフォルダーエディタ・作品編集・DLsite適用プレビューは
+設定モーダル・スキャンモーダル・スマートフォルダーエディタ・作品編集・DLsite適用プレビューは
 ネイティブ `<dialog>` + `showModal()` で実装しており、z-index ではなくブラウザの
 top layer によって最前面に重なる（TASK-29）。開閉ライフサイクル・Escapeキャンセル・
 backdropクリックの共通処理は `client/src/shared/ui/useDialogModal.ts` に集約している。

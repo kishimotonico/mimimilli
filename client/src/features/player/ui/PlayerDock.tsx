@@ -1,8 +1,9 @@
-import { useAtom, useAtomValue } from "jotai";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import { useCallback, useState } from "react";
 import { type MotionVariant, useMotionVariants } from "../../../shared/ui/useMotionVariants";
 import { playerIsActiveAtom, playerUiModeAtom } from "../../../entities/player/model/atoms";
+import { appModeAtom, setAppModeAtom } from "../../../shared/model/appModeAtoms";
 import { usePlayerActions } from "../model/usePlayerActions";
 import { usePlayerState, type PlayerState } from "../model/usePlayerState";
 import { usePopupDrag } from "../model/usePopupDrag";
@@ -50,7 +51,7 @@ interface DockPopupProps {
   onNext: () => void;
   onPrev: () => void;
   onFold: () => void;
-  onExpandFullScreen: () => void;
+  onOpenNowPlaying: () => void;
   onShowPlayingWork: () => void;
   onStop: () => void;
 }
@@ -89,6 +90,8 @@ export default function PlayerDock({ onShowPlayingWork }: PlayerDockProps) {
   const state = usePlayerState();
   const actions = usePlayerActions();
   const isPlaying = useAtomValue(playerIsActiveAtom);
+  const isNowPlaying = useAtomValue(appModeAtom) === "nowPlaying";
+  const setAppMode = useSetAtom(setAppModeAtom);
   const [uiMode, setUiMode] = useAtom(playerUiModeAtom);
   const [switchingUiMode, setSwitchingUiMode] = useState(false);
   const { dockBarSlide, dockBarSwitch, dockPopupScale } = useMotionVariants();
@@ -108,8 +111,11 @@ export default function PlayerDock({ onShowPlayingWork }: PlayerDockProps) {
     setSwitchingUiMode(false);
   }, []);
 
-  const showBar = isPlaying && uiMode === "bar";
-  const showPopup = isPlaying && uiMode === "popup";
+  // 再生中タブでは自前の下部固定バーを持つため、PlayerDock（バー/ポップアップ）は
+  // 描画しない。playerUiModeAtom（bar/popup）の保存値はここでは変更せず、
+  // 他モードへ戻れば保存値どおりに復元される。
+  const showBar = isPlaying && uiMode === "bar" && !isNowPlaying;
+  const showPopup = isPlaying && uiMode === "popup" && !isNowPlaying;
   const barVariant = switchingUiMode
     ? dockBarSwitch({ waitEnter: uiMode === "bar" })
     : dockBarSlide();
@@ -151,7 +157,7 @@ export default function PlayerDock({ onShowPlayingWork }: PlayerDockProps) {
             onNext={actions.nextTrack}
             onPrev={actions.prevTrack}
             onFold={() => switchUiMode("bar")}
-            onExpandFullScreen={() => actions.setShowFullPlayer(true)}
+            onOpenNowPlaying={() => setAppMode("nowPlaying")}
             onShowPlayingWork={handleShowPlayingWork}
             onStop={actions.stop}
           />

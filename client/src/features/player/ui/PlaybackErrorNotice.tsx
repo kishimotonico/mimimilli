@@ -1,4 +1,4 @@
-// 再生エラー表示。Bar / Popup / 全画面プレイヤーで共通利用する。
+// 再生エラー表示。Bar / Popup / 再生中タブで共通利用する。
 
 import type { AudioEngineError } from "../model/audioEngine";
 import { formatPlaybackError } from "./formatPlaybackError";

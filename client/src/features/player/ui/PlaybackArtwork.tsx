@@ -8,6 +8,7 @@ interface PlaybackArtworkProps {
   size: number;
   radius: number;
   fit?: "fixed" | "fill";
+  objectFit?: "cover" | "contain";
   requestWidth?: number;
 }
 
@@ -16,13 +17,18 @@ export default function PlaybackArtwork({
   size,
   radius,
   fit = "fixed",
+  objectFit,
   requestWidth,
 }: PlaybackArtworkProps) {
   if (state.isFilePlayback) {
     return (
       <div
         className="grid place-items-center bg-paper-2 text-ink-3"
-        style={{ width: size, height: size, borderRadius: radius }}
+        style={
+          fit === "fill"
+            ? { width: "100%", height: "100%", borderRadius: radius }
+            : { width: size, height: size, borderRadius: radius }
+        }
         aria-hidden
       >
         <I.audio size={Math.round(size * 0.38)} />
@@ -40,6 +46,7 @@ export default function PlaybackArtwork({
       size={size}
       radius={radius}
       fit={fit}
+      objectFit={objectFit}
       requestWidth={requestWidth ?? selectFixedCoverThumbnailWidth(size, window.devicePixelRatio)}
     />
   );

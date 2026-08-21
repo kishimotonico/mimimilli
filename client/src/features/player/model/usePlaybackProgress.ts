@@ -1,5 +1,5 @@
 // 高頻度更新の再生位置を購読する headless hook。
-// BarSeekStrip / PopupSeek / FullScreenScrub の3 leaf だけが呼び出すこと。
+// BarSeekStrip / PopupSeek / NowPlayingScrub の3 leaf だけが呼び出すこと。
 
 import { useAtomValue } from "jotai";
 import { playerCurrentTimeAtom, playerDurationAtom } from "../../../entities/player/model/atoms";

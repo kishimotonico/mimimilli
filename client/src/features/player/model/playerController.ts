@@ -22,7 +22,6 @@ export interface PlayerControllerState {
   durationSec: number | null;
   volume: number;
   loop: boolean;
-  showFullPlayer: boolean;
   playbackRate: number;
   channelSwap: boolean;
   abRepeat: { a: number | null; b: number | null };
@@ -40,7 +39,6 @@ export const PLAYER_CONTROLLER_INITIAL: PlayerControllerState = {
   durationSec: 0,
   volume: 75,
   loop: false,
-  showFullPlayer: false,
   playbackRate: 1,
   channelSwap: false,
   abRepeat: { a: null, b: null },
@@ -81,7 +79,6 @@ const playerCoreComparators = {
   tracks: areTracksEqual,
   volume: Object.is,
   loop: Object.is,
-  showFullPlayer: Object.is,
   playbackRate: Object.is,
   channelSwap: Object.is,
   abRepeat: areAbRepeatEqual,
@@ -109,7 +106,6 @@ export type PlayerControllerInput =
   | { type: "trackSelected"; trackIndex: number }
   | { type: "volumeChanged"; volume: number }
   | { type: "loopChanged"; loop: boolean }
-  | { type: "fullPlayerVisibilityChanged"; visible: boolean }
   | { type: "playbackRateChanged"; playbackRate: number }
   | { type: "channelSwapChanged"; enabled: boolean }
   | { type: "abPointSet"; point: "a" | "b"; positionSec: number }
@@ -229,7 +225,6 @@ export function reducePlayer(
           durationSec: 0,
           playbackError: null,
           abRepeat: { a: null, b: null },
-          showFullPlayer: false,
         },
         commands: state.item
           ? [
@@ -268,8 +263,6 @@ export function reducePlayer(
     }
     case "loopChanged":
       return { state: { ...state, loop: input.loop }, commands: [] };
-    case "fullPlayerVisibilityChanged":
-      return { state: { ...state, showFullPlayer: input.visible }, commands: [] };
     case "playbackRateChanged":
       return {
         state: { ...state, playbackRate: input.playbackRate },
@@ -357,7 +350,6 @@ export function toPlayerCoreState(state: PlayerControllerState): PlayerCoreState
     tracks: state.item?.tracks ?? EMPTY_TRACKS,
     volume: state.volume,
     loop: state.loop,
-    showFullPlayer: state.showFullPlayer,
     playbackRate: state.playbackRate,
     channelSwap: state.channelSwap,
     abRepeat: state.abRepeat,

@@ -9,7 +9,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSetAtom } from "jotai";
 import { usePlayerActions } from "../features/player/model/usePlayerActions";
 import PlayerRuntime from "../features/player/ui/PlayerRuntime";
-import FullScreenPlayerGate from "../features/player/ui/FullScreenPlayerGate";
 import AppShell from "./AppShell";
 import AppBody from "./AppBody";
 import TopBar from "./ui/TopBar";
@@ -245,7 +244,6 @@ export default function App() {
             />
           }
           transportBar={<PlayerDock onShowPlayingWork={handleOpenLibraryWork} />}
-          fullScreenPlayer={<FullScreenPlayerGate />}
           overlays={
             <>
               <PlayerRuntime />
