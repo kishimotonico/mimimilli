@@ -22,7 +22,7 @@
 
 ## タイポグラフィ
 
-- OSゴシック（`--font-jp`）: 本文・日本語UIの既定書体。`"Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", Meiryo, "Noto Sans CJK JP", "Noto Sans JP", system-ui, sans-serif`（Windows/Mac実機は先頭側、Linux開発環境は Noto で描画）
+- OSゴシック（`--font-jp`）: 本文・日本語UIの既定書体。`"Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans CJK JP", system-ui, sans-serif`（Windows 11 24H2以降は Noto Sans JP、Mac は Hiragino、Linux 開発環境は Noto Sans CJK JP で描画）
 - `Geist`（`--font-sans`）: ブランド表記・操作系コントロールなど非本文
 - `JetBrains Mono`（`--font-mono`）: 時刻・件数・メタ情報などの数値表示
 
