@@ -17,7 +17,6 @@ interface PopupContentProps {
   onSeek: (t: number) => void;
   onSeekRelative: (deltaSec: number) => void;
   onSetVolume: (v: number) => void;
-  onToggleMute: () => void;
   onSetLoop: (l: boolean) => void;
   onSetPlaybackRate: (r: number) => void;
   onNext: () => void;
@@ -47,7 +46,6 @@ export default function PopupContent({
   onSeek,
   onSeekRelative,
   onSetVolume,
-  onToggleMute,
   onSetLoop,
   onSetPlaybackRate,
   onNext,
@@ -226,13 +224,7 @@ export default function PopupContent({
       </div>
 
       <div className="mle-popup__row">
-        <IconButton
-          size="sm"
-          icon={I.volume}
-          label={volume === 0 ? "ミュート解除" : "ミュート"}
-          onClick={onToggleMute}
-          className={volume === 0 ? "text-ink-4" : undefined}
-        />
+        <I.volume size={14} className={volume === 0 ? "text-ink-4" : "text-ink-2"} aria-hidden />
         <input
           type="range"
           min={0}

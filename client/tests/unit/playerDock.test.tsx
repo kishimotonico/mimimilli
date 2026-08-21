@@ -31,7 +31,6 @@ vi.mock("../../src/features/player/model/usePlayerActions", () => ({
     seek: vi.fn(),
     seekRelative: vi.fn(),
     setVolume: vi.fn(),
-    toggleMute: vi.fn(),
     setLoop: vi.fn(),
     setPlaybackRate: vi.fn(),
   }),

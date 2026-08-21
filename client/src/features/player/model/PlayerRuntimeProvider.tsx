@@ -24,7 +24,6 @@ export const NOT_REGISTERED_ERROR =
 
 export interface PlayerRuntimeContextValue {
   controller: PlayerController;
-  lastVolumeRef: MutableRef<number>;
   pendingResumeRef: MutableRef<PendingResume | null>;
   runtimeRefs: PlayerRuntimeRefs;
   registerCapabilities: (capabilities: PlayerRuntimeCapabilities) => () => void;
@@ -44,7 +43,6 @@ export function PlayerRuntimeProvider({ children }: { children: ReactNode }) {
   const updateMediaSessionPositionRef = useRef<(position?: number) => void>(() => {});
   const filesModeFileDurationSecRef = useRef<number | null>(null);
   const loadCleanupRef = useRef<(() => void) | null>(null);
-  const lastVolumeRef = useRef(75);
   const pendingResumeRef = useRef<PendingResume | null>(null);
   const capabilitiesRef = useRef<PlayerRuntimeCapabilities | null>(null);
   const capabilitiesTokenRef = useRef(0);
@@ -81,7 +79,6 @@ export function PlayerRuntimeProvider({ children }: { children: ReactNode }) {
   const value = useMemo<PlayerRuntimeContextValue>(
     () => ({
       controller,
-      lastVolumeRef,
       pendingResumeRef,
       runtimeRefs,
       registerCapabilities,

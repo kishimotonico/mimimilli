@@ -46,7 +46,6 @@ interface DockPopupProps {
   onSeek: (t: number) => void;
   onSeekRelative: (deltaSec: number) => void;
   onSetVolume: (v: number) => void;
-  onToggleMute: () => void;
   onSetLoop: (l: boolean) => void;
   onSetPlaybackRate: (r: number) => void;
   onNext: () => void;
@@ -152,7 +151,6 @@ export default function PlayerDock({ onShowPlayingWork }: PlayerDockProps) {
             onSeek={actions.seek}
             onSeekRelative={actions.seekRelative}
             onSetVolume={actions.setVolume}
-            onToggleMute={actions.toggleMute}
             onSetLoop={actions.setLoop}
             onSetPlaybackRate={actions.setPlaybackRate}
             onNext={actions.nextTrack}

@@ -812,21 +812,6 @@ describe("usePlayer adapters", () => {
     }
   });
 
-  it("toggleMuteでミュート前の音量を復元する", async () => {
-    const { result } = renderHook(() => usePlayerWithClock(), { wrapper: makeWrapper() });
-    act(() => result.current.player.play(work, [track], 0, playlistId));
-    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
-
-    act(() => result.current.player.setVolume(50));
-    await waitFor(() => expect(result.current.player.state.volume).toBe(50));
-
-    act(() => result.current.player.toggleMute());
-    await waitFor(() => expect(result.current.player.state.volume).toBe(0));
-
-    act(() => result.current.player.toggleMute());
-    await waitFor(() => expect(result.current.player.state.volume).toBe(50));
-  });
-
   it("timeupdate では core atom の参照を維持しつつ currentTime を更新する", async () => {
     const store = createStore();
     const { result } = renderHook(() => usePlayerWithClock(), {
