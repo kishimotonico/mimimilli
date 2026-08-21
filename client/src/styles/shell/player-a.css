@@ -845,36 +845,21 @@
   pointer-events: none;
 }
 
-/* カバー画像の色柄によらずタイトルを読めるようにする。::before で自身の
-   ボックスより広い範囲へグラデーションの下地を敷く（カバー(z-index 2)より
-   手前、タイトル文字より奥）。 */
+/* 暗幕は敷かず、小さめの文字＋text-shadowだけでカバー柄の上でも読めるようにする。
+   切替アイコン（右上）と対角の左上に置き、シークバー付近は避ける。 */
 .mle-nowplaying__immersive-title {
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: calc(var(--now-playing-controls-h) + var(--now-playing-seek-h) + 24px);
+  top: 24px;
+  left: 24px;
   z-index: 3;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  text-align: center;
-  padding: 0 48px;
+  align-items: flex-start;
+  gap: 2px;
+  max-width: min(60%, 420px);
   color: var(--paper-0);
-  text-shadow: 0 2px 16px oklch(10% 0.02 70 / 0.5);
+  text-shadow: 0 1px 8px oklch(10% 0.02 70 / 0.65);
   transition: opacity 0.2s ease;
-}
-.mle-nowplaying__immersive-title::before {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  inset: -56px -100vw -64px -100vw;
-  background: linear-gradient(
-    to top,
-    oklch(10% 0.02 70 / 0.55) 0%,
-    oklch(10% 0.02 70 / 0.3) 55%,
-    transparent 100%
-  );
 }
 .mle-nowplaying__immersive-title.is-idle {
   opacity: 0;
@@ -882,20 +867,66 @@
 
 .mle-nowplaying__immersive-eyebrow {
   font-family: var(--font-sans);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.16em;
-  opacity: 0.75;
+  opacity: 0.8;
 }
 
 .mle-nowplaying__immersive-h1 {
   margin: 0;
   max-width: 100%;
   font-family: var(--font-jp);
-  font-size: 22px;
+  font-size: 15px;
   font-weight: 600;
   line-height: 1.3;
   letter-spacing: -0.01em;
   text-wrap: balance;
+}
+
+/* 再生⇄一時停止のバーストフィードバック（AC2）。画面中央に短時間ポップして消える。 */
+.mle-nowplaying__immersive-burst-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.mle-nowplaying__immersive-burst {
+  display: grid;
+  place-items: center;
+  width: 88px;
+  height: 88px;
+  border-radius: 999px;
+  background: oklch(15% 0.01 70 / 0.45);
+  color: var(--paper-0);
+}
+
+/* マウスアクティブ時のみ現れる最小トランスポート（試験導入）。
+   通常モードの .mle-nowplaying__controls と同じ帯（シーク行の直下）に重ねるが、
+   背景パネルは持たない。シーク行の DOM・寸法には触れない。 */
+.mle-nowplaying__immersive-minicontrols {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  z-index: 3;
+  width: var(--now-playing-w);
+  height: var(--now-playing-controls-h);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px 14px;
+  transition: opacity 0.2s ease;
+}
+.mle-nowplaying__immersive-minicontrols.is-idle {
+  opacity: 0;
+  pointer-events: none;
+}
+.mle-nowplaying__immersive-minicontrols-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
