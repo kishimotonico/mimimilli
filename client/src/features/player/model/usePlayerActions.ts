@@ -142,13 +142,6 @@ export function usePlayerActions() {
     [controller],
   );
 
-  const setShowFullPlayer = useCallback(
-    (show: boolean) => {
-      controller.dispatch({ type: "fullPlayerVisibilityChanged", visible: show });
-    },
-    [controller],
-  );
-
   const setPlaybackRate = useCallback(
     (rate: number) => {
       controller.dispatch({ type: "playbackRateChanged", playbackRate: rate });
@@ -198,7 +191,6 @@ export function usePlayerActions() {
       nextTrack,
       prevTrack,
       setTrackIndex,
-      setShowFullPlayer,
       setPlaybackRate,
       setChannelSwap,
       setABPoint,
@@ -221,7 +213,6 @@ export function usePlayerActions() {
       nextTrack,
       prevTrack,
       setTrackIndex,
-      setShowFullPlayer,
       setPlaybackRate,
       setChannelSwap,
       setABPoint,

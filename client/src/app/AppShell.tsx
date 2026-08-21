@@ -16,8 +16,6 @@ interface AppShellProps {
   body: ReactNode;
   /** 常駐再生UI（PlayerDock。fixed オーバーレイなので自身で表示/非表示を制御する） */
   transportBar: ReactNode;
-  /** フルスクリーンプレイヤー（表示条件は呼び出し側で制御） */
-  fullScreenPlayer?: ReactNode;
   /** 設定モーダル等のオーバーレイ */
   overlays?: ReactNode;
 }
@@ -28,7 +26,6 @@ export default function AppShell({
   leftNav,
   body,
   transportBar,
-  fullScreenPlayer,
   overlays,
 }: AppShellProps) {
   const dockedBarActive = useAtomValue(dockedBarActiveAtom);
@@ -43,7 +40,6 @@ export default function AppShell({
       </div>
 
       {transportBar}
-      {fullScreenPlayer}
       {overlays}
     </div>
   );

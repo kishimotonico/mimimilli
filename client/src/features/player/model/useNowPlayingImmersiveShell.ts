@@ -2,8 +2,9 @@ import { useEffect, useRef, type RefObject } from "react";
 
 /**
  * 没入モード中、アプリシェル（TopBar/AddressBar/LeftNav。`.mle-frame` 直下のうち
- * main を除く要素）を inert にし、Escape で解除する。トップレベルの <dialog> が
- * 開いている間（旧全画面プレイヤー等）は Escape を消費させない。
+ * main を除く要素）を inert にし、Escape で解除する。設定・スキャン等のモーダルを開く
+ * トリガーは inert 化された領域にしかないため、没入モード中に <dialog> が開くことはない
+ * （native showModal() も外側の入力をブロックするため逆方向の同時発生もない）。
  */
 export function useNowPlayingImmersiveShell(
   active: boolean,
@@ -28,7 +29,6 @@ export function useNowPlayingImmersiveShell(
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      if (document.querySelector(":modal")) return;
       e.preventDefault();
       onExitRef.current();
     };

@@ -1,7 +1,7 @@
 /* mimimilli shell — player-a
    所有範囲: PlayerDock（画面下張り付きバー .mle-bar1* / 右下ポップアップ .mle-popup*）、
-   評価ピッカー(.mle-ratepick* / .mle-ratepill*)、フルスクリーン再生のシーク
-   (.mle-fullscreen__seek)、再生中タブ（.mle-nowplaying*、通常モード＋没入モード）。
+   評価ピッカー(.mle-ratepick* / .mle-ratepill*)、再生中タブ
+   （.mle-nowplaying*、通常モード＋没入モード）。
    いずれも position: fixed のオーバーレイで、frame のグリッド行を持たない。
    player系はこの1ファイルのみ（元ファイル内で連続した区画だったため分割不要）。
    import順: shared-c.cssの次、files-c.cssより前。
@@ -9,7 +9,7 @@
 
 /* ── Player dock — 画面下張り付きバー / 右下ポップアップ共通 ─── */
 /* 両モードとも常駐チェック用 UI で position: fixed のオーバーレイ。
-   FullScreenPlayer は dialog の top layer に出るため、ここではモーダルより下に置く。 */
+   設定・スキャン等のモーダルは dialog の top layer に出るため、ここではモーダルより下に置く。 */
 
 /* ── 画面下張り付きバー（最小構成）───────────────────────── */
 
@@ -601,10 +601,6 @@
 .mle-ratepill.is-on {
   background: var(--acc-soft);
   color: var(--acc-ink);
-}
-
-.mle-fullscreen__seek {
-  touch-action: none;
 }
 
 /* ── 再生中タブ（通常モード）─────────────────────────────────

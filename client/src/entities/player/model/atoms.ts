@@ -6,8 +6,8 @@
 //     → PlayerDock など state 全体が必要な leaf で subscribe する
 //   - 派生 atom: TopBar / LeftNav など一部の値だけ必要な購読者向け
 //   - playerCurrentTimeAtom / playerDurationAtom: timeupdate ごとに更新される高頻度 state
-//     → usePlaybackProgress hook 経由で BarSeekStrip / PopupSeek / FullScreenScrub / NowPlayingScrub の
-//       4 leaf のみが subscribe する（親の BarContent / PopupContent / FullScreenPlayer / NowPlayingView は購読しない）
+//     → usePlaybackProgress hook 経由で BarSeekStrip / PopupSeek / NowPlayingScrub の
+//       3 leaf のみが subscribe する（親の BarContent / PopupContent / NowPlayingView は購読しない）
 //
 // currentTime / duration は PlayerState の型には残さず、atom からのみ読む。
 
@@ -85,13 +85,13 @@ export const playerPopupOffsetAtom = atomWithStorage<PlayerPopupOffset>(
 
 /**
  * 高頻度更新の audio 再生時刻（秒）。
- * usePlaybackProgress 経由で BarSeekStrip / PopupSeek / FullScreenScrub / NowPlayingScrub のみ subscribe すること。
+ * usePlaybackProgress 経由で BarSeekStrip / PopupSeek / NowPlayingScrub のみ subscribe すること。
  */
 export const playerCurrentTimeAtom = atom(0);
 
 /**
  * 高頻度更新の audio 総時間（秒）。
- * usePlaybackProgress 経由で BarSeekStrip / PopupSeek / FullScreenScrub / NowPlayingScrub のみ subscribe すること。
+ * usePlaybackProgress 経由で BarSeekStrip / PopupSeek / NowPlayingScrub のみ subscribe すること。
  */
 export const playerDurationAtom = atom<number | null>(0);
 

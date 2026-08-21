@@ -14,7 +14,6 @@ export interface PlayerCoreState {
   tracks: PlaybackTrack[];
   volume: number;
   loop: boolean;
-  showFullPlayer: boolean;
   playbackRate: number;
   channelSwap: boolean;
   abRepeat: { a: number | null; b: number | null };
@@ -31,7 +30,6 @@ export const PLAYER_CORE_INITIAL: PlayerCoreState = {
   tracks: [],
   volume: 75,
   loop: false,
-  showFullPlayer: false,
   playbackRate: 1,
   channelSwap: false,
   abRepeat: { a: null, b: null },

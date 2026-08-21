@@ -16,7 +16,7 @@ interface PlayerTransportControlsProps {
 }
 
 // 円形のトランスポートボタン（±10秒 / prev / next / ループ / L⇄R入替）共通スタイル。
-// IconButton のサイズ対（26/30/38px）に収まらない全画面専用の 40px 円のため、
+// IconButton のサイズ対（26/30/38px）に収まらない再生中タブ専用の 40px 円のため、
 // ここでは素の button + Tailwind クラスで組む。
 const ROUND_BTN = "grid h-[40px] w-[40px] place-items-center rounded-full cursor-pointer";
 
