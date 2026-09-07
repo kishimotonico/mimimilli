@@ -2,6 +2,7 @@
 import { Hono } from "hono";
 import { settingsUpdateSchema } from "@mimimilli/shared";
 import type { DataAdapter } from "../adapter/index.ts";
+import { InvalidRootFolderError } from "../errors.ts";
 import { invalidRequest } from "../lib/httpError.ts";
 
 export function settingsRoute(adapter: DataAdapter): Hono {
@@ -16,10 +17,15 @@ export function settingsRoute(adapter: DataAdapter): Hono {
     const body = await c.req.json().catch(() => null);
     const parsed = settingsUpdateSchema.safeParse(body);
     if (!parsed.success) {
-      invalidRequest("settings の更新内容が不正です");
+      invalidRequest(`ルートフォルダーの指定が不正です: ${parsed.error.issues[0]?.message ?? ""}`);
     }
-    const settings = await adapter.updateSettings(parsed.data);
-    return c.json(settings);
+    try {
+      const settings = await adapter.updateSettings(parsed.data);
+      return c.json(settings);
+    } catch (error) {
+      if (error instanceof InvalidRootFolderError) invalidRequest(error.message);
+      throw error;
+    }
   });
 
   return app;

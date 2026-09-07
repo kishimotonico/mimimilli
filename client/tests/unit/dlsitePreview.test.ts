@@ -5,7 +5,11 @@ import {
   type DlsiteWorkInfo,
   type Work,
 } from "@mimimilli/shared";
-import { buildDlsiteApplyBody, unappliedDlsiteTags } from "../../src/entities/work/dlsitePreview";
+import {
+  buildDlsiteApplyBody,
+  computeDlsiteApplyDiff,
+  unappliedDlsiteTags,
+} from "../../src/entities/work/dlsitePreview";
 
 const info: DlsiteWorkInfo = {
   rjCode: "RJ123456",
@@ -55,6 +59,35 @@ describe("DLsite適用プレビュー", () => {
       "genre/睡眠",
       "rating/R15",
     ]);
+  });
+
+  it("変更あり・変更なし・適用不可を行ごとに区別する（TASK-428.1）", () => {
+    const sameTitleInfo: DlsiteWorkInfo = { ...info, title: work.title, coverUrl: null };
+    const diff = computeDlsiteApplyDiff(work, sameTitleInfo);
+    expect(diff.title).toEqual({ kind: "unchanged", value: work.title });
+    expect(diff.url).toEqual({ kind: "changed", current: "未設定", next: sameTitleInfo.url });
+    expect(diff.cover).toEqual({
+      kind: "unavailable",
+      current: "なし",
+      reason: "DLsiteに画像がありません",
+    });
+    expect(diff.newTags).toEqual(["cv/水瀬なずな", "genre/耳かき", "genre/睡眠", "rating/R15"]);
+    expect(diff.appliedTags).toEqual(["サークル/夜想曲"]);
+    expect(diff.hasChanges).toBe(true);
+  });
+
+  it("差分が無ければhasChangesがfalseになる", () => {
+    const noChangeInfo: DlsiteWorkInfo = {
+      ...info,
+      title: work.title,
+      circle: "夜想曲",
+      cvs: [],
+      genreTags: [],
+      ageRating: null,
+      coverUrl: null,
+      url: "",
+    };
+    expect(computeDlsiteApplyDiff(work, noChangeInfo).hasChanges).toBe(false);
   });
 
   it("タイトル・カバーと選択タグだけをapply bodyへ入れる", () => {

@@ -16,6 +16,7 @@ import {
   worksPageSchema,
   dlsitePreviewSchema,
   dlsiteBulkStartResponseSchema,
+  dlsiteApplyMissingPreviewSchema,
   dlsiteBulkApplyMissingResultSchema,
   dlsiteBulkCancelResponseSchema,
   dlsiteBulkSnapshotSchema,
@@ -100,7 +101,7 @@ export async function deleteWork(workId: string): Promise<void> {
   await deleteVoid(`/works/${encodeURIComponent(workId)}`);
 }
 
-/** status === "missing" の作品数（一括削除の確認ダイアログ用） */
+/** status === "missing" の作品数（一括登録解除の確認ダイアログ用） */
 export async function getMissingWorksCount(): Promise<number> {
   const { count } = await getParsed(missingWorksCountSchema, "/works/missing-count");
   return count;
@@ -153,6 +154,14 @@ export async function applyDlsiteMissing(workIds?: string[]) {
   return postParsed(
     dlsiteBulkApplyMissingResultSchema,
     "/dlsite/apply-missing",
+    workIds ? { workIds } : undefined,
+  );
+}
+
+export async function previewDlsiteMissing(workIds?: string[]) {
+  return postParsed(
+    dlsiteApplyMissingPreviewSchema,
+    "/dlsite/apply-missing/preview",
     workIds ? { workIds } : undefined,
   );
 }

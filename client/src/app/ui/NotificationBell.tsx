@@ -5,15 +5,21 @@
 import { useAtomValue } from "jotai";
 import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { DlsiteNotificationModalKind } from "../../features/dlsite/model/dlsiteNotificationModal";
+import type { DlsiteNotificationModalKind } from "../../entities/dlsite/model/dlsiteNotificationModal";
 import {
   dlsiteBulkActiveAtom,
   dlsiteBulkProgressAtom,
   dlsiteBulkStartingAtom,
 } from "../../entities/dlsite/model/bulkAtoms";
 import { useDlsiteBulkActions } from "../../entities/dlsite/useDlsiteBulkActions";
-import { useDlsiteNotificationSummary } from "../../features/dlsite/model/useDlsiteNotificationSummary";
-import { getLastScanResult, SCAN_QUERY_KEYS } from "../../features/scan/api";
+import { useDlsiteNotificationSummary } from "../../entities/dlsite/model/useDlsiteNotificationSummary";
+import { getLastScanResult, getScanDiagnostics, SCAN_QUERY_KEYS } from "../../features/scan/api";
+import {
+  buildNeedsAttentionRows,
+  countNeedsAttention,
+  needsAttentionRowWeight,
+  type NeedsAttentionRow,
+} from "../../features/scan/model/needsAttention";
 import Button from "../../shared/ui/Button";
 import { I } from "../../shared/ui/Icon";
 import IconButton from "../../shared/ui/IconButton";
@@ -22,11 +28,14 @@ import { usePopoverDismissal } from "../../shared/ui/usePopoverDismissal";
 export interface NotificationBellProps {
   /** 直近のスキャン結果クリックでスキャンモーダルの結果表示を開く（TASK-56） */
   onOpenScanResult: () => void;
+  /** ID重複・読み取り失敗・データ不整合の行からスキャンモーダルの要対応タブを開く（TASK-428.4） */
+  onOpenNeedsAttention: () => void;
   onOpenNotificationModal: (kind: DlsiteNotificationModalKind) => void;
 }
 
 export default function NotificationBell({
   onOpenScanResult,
+  onOpenNeedsAttention,
   onOpenNotificationModal,
 }: NotificationBellProps) {
   const dlsiteBulkActive = useAtomValue(dlsiteBulkActiveAtom);
@@ -39,6 +48,11 @@ export default function NotificationBell({
     queryFn: getLastScanResult,
   });
   const scanResult = lastScanQuery.data?.result ?? null;
+  // ID重複はスキャン時点のスナップショットではなく常に最新を見る（要対応タブと同じクエリキー、TASK-428.4）。
+  const diagnosticsQuery = useQuery({
+    queryKey: SCAN_QUERY_KEYS.diagnostics(),
+    queryFn: getScanDiagnostics,
+  });
   const {
     rjCodeMissingCount,
     fetchFailedCount: dlsiteFetchFailedCount,
@@ -55,17 +69,19 @@ export default function NotificationBell({
     anchorRef: rootRef,
   });
 
-  const badgeCount =
-    rjCodeMissingCount +
-    dlsiteFetchFailedCount +
-    (dlsiteParseErrorAlert ? dlsiteParseErrorCount : 0);
+  // 要対応タブと同じ定義・同じ件数を使う（TASK-428.4 / scan-dlsite-A-05）。
+  const needsAttentionRows = buildNeedsAttentionRows({
+    identityConflicts: diagnosticsQuery.data?.diagnostics ?? [],
+    invalidMetaFiles: scanResult?.invalidMetaFiles ?? [],
+    rjCodeMissingCount,
+    dlsiteFetchFailedCount,
+    dlsiteParseErrorCount,
+    dlsiteParseErrorAlert,
+    dataIntegrityWarning: scanResult?.dataIntegrityWarning,
+  });
+  const badgeCount = countNeedsAttention(needsAttentionRows);
   const showUnlinkedRow = dlsiteUnlinkedCount > 0 || dlsiteBulkActive;
-  const isEmpty =
-    rjCodeMissingCount === 0 &&
-    dlsiteFetchFailedCount === 0 &&
-    !dlsiteParseErrorAlert &&
-    !showUnlinkedRow &&
-    !scanResult;
+  const isEmpty = needsAttentionRows.length === 0 && !showUnlinkedRow && !scanResult;
 
   return (
     <div ref={rootRef} className="relative">
@@ -94,47 +110,40 @@ export default function NotificationBell({
           className="absolute top-[calc(100%+8px)] right-0 z-30 w-[340px] max-w-[calc(100vw-32px)] overflow-hidden rounded-[10px] border border-line-soft bg-paper-1 shadow-pop"
         >
           {isEmpty ? (
-            <p className="px-3.5 py-4 text-center text-[11.5px] text-ink-3">
+            <p className="px-3.5 py-4 text-center text-caption text-ink-2">
               対応が必要な通知はありません
             </p>
           ) : (
             <div className="flex flex-col [&>*+*]:border-t [&>*+*]:border-line-soft">
-              {rjCodeMissingCount > 0 && (
+              {needsAttentionRows.map((row) => (
                 <NotifRow
-                  label="RJコード未検出"
-                  count={rjCodeMissingCount}
+                  key={row.key}
+                  label={NEEDS_ATTENTION_LABEL[row.kind]}
+                  count={needsAttentionRowWeight(row)}
+                  accent={row.kind === "dlsiteParseFailed" ? "mustard" : "coral"}
                   onClick={() => {
                     setIsOpen(false);
-                    onOpenNotificationModal("rj-missing");
+                    switch (row.kind) {
+                      case "rjCodeMissing":
+                        onOpenNotificationModal("rj-missing");
+                        break;
+                      case "dlsiteFetchFailed":
+                        onOpenNotificationModal("fetch-failed");
+                        break;
+                      case "dlsiteParseFailed":
+                        onOpenNotificationModal("parse-failed");
+                        break;
+                      default:
+                        onOpenNeedsAttention();
+                    }
                   }}
                 />
-              )}
-              {dlsiteParseErrorAlert && (
-                <NotifRow
-                  label="DLsiteパース失敗"
-                  count={dlsiteParseErrorCount}
-                  accent="mustard"
-                  onClick={() => {
-                    setIsOpen(false);
-                    onOpenNotificationModal("parse-failed");
-                  }}
-                />
-              )}
-              {dlsiteFetchFailedCount > 0 && (
-                <NotifRow
-                  label="DLsite取得失敗"
-                  count={dlsiteFetchFailedCount}
-                  onClick={() => {
-                    setIsOpen(false);
-                    onOpenNotificationModal("fetch-failed");
-                  }}
-                />
-              )}
+              ))}
               {showUnlinkedRow && (
                 <div className="flex items-center justify-between gap-2 px-3.5 py-2.5">
                   <div className="min-w-0">
-                    <p className="text-[12px] text-ink-0">DLsite未連携</p>
-                    <p className="font-mono text-[10.5px] text-ink-3" aria-live="polite">
+                    <p className="text-body text-ink-0">DLsite未連携</p>
+                    <p className="font-mono text-mono text-ink-2" aria-live="polite">
                       {dlsiteBulkActive
                         ? dlsiteBulkProgress
                           ? `取得中 (${dlsiteBulkProgress.processed}/${dlsiteBulkProgress.total})`
@@ -154,16 +163,16 @@ export default function NotificationBell({
               {scanResult && (
                 <button
                   type="button"
-                  className="block w-full px-3.5 py-2.5 text-left hover:bg-paper-2 focus-visible:outline focus-visible:-outline-offset-2 focus-visible:outline-2 focus-visible:outline-acc"
+                  className="block w-full px-3.5 py-2.5 text-left hover:bg-paper-2 focus-visible:-outline-offset-2"
                   onClick={() => {
                     setIsOpen(false);
                     onOpenScanResult();
                   }}
                 >
-                  <p className="mb-1.5 font-sans text-[11px] font-medium text-ink-1">
+                  <p className="mb-1.5 font-sans text-secondary font-medium text-ink-1">
                     直近のスキャン結果
                   </p>
-                  <dl className="grid grid-cols-2 gap-x-3 gap-y-1 font-mono text-[10.5px]">
+                  <dl className="grid grid-cols-2 gap-x-3 gap-y-1 font-mono text-mono">
                     <ScanStat label="登録済み" value={scanResult.registered} />
                     <ScanStat label="新規" value={scanResult.insertedWorkIds.length} />
                     <ScanStat label="エラー" value={scanResult.errors} />
@@ -178,6 +187,15 @@ export default function NotificationBell({
     </div>
   );
 }
+
+const NEEDS_ATTENTION_LABEL: Record<NeedsAttentionRow["kind"], string> = {
+  identityConflict: "ID重複",
+  invalidMetaFile: "読み取り失敗",
+  rjCodeMissing: "RJコード未検出",
+  dlsiteFetchFailed: "DLsite取得失敗",
+  dlsiteParseFailed: "DLsiteパース失敗",
+  dataIntegrity: "データ不整合",
+};
 
 function NotifRow({
   label,
@@ -195,14 +213,14 @@ function NotifRow({
     <button
       type="button"
       role="menuitem"
-      className="flex items-center justify-between gap-2 px-3.5 py-2.5 text-left hover:bg-paper-2 focus-visible:outline focus-visible:-outline-offset-2 focus-visible:outline-2 focus-visible:outline-acc"
+      className="flex items-center justify-between gap-2 px-3.5 py-2.5 text-left hover:bg-paper-2 focus-visible:-outline-offset-2"
       onClick={onClick}
     >
-      <span className="flex items-center gap-1.5 text-[12px] text-ink-0">
+      <span className="flex items-center gap-1.5 text-body text-ink-0">
         <I.err size={13} style={{ color: iconColor }} />
         {label}
       </span>
-      <span className="flex items-center gap-1 font-mono text-[11px] text-ink-2">
+      <span className="flex items-center gap-1 font-mono text-mono text-ink-2">
         {count}件
         <I.chev size={12} className="text-ink-3" />
       </span>
@@ -213,7 +231,7 @@ function NotifRow({
 function ScanStat({ label, value }: { label: string; value: number }) {
   return (
     <div className="flex items-center justify-between gap-2">
-      <dt className="text-ink-3">{label}</dt>
+      <dt className="text-ink-2">{label}</dt>
       <dd className="text-ink-1">{value}</dd>
     </div>
   );

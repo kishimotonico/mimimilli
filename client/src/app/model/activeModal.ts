@@ -1,5 +1,5 @@
-import type { DlsiteNotificationModalKind } from "../../features/dlsite/model/dlsiteNotificationModal";
-import { isDlsiteNotificationModal } from "../../features/dlsite/model/dlsiteNotificationModal";
+import type { DlsiteNotificationModalKind } from "../../entities/dlsite/model/dlsiteNotificationModal";
+import { isDlsiteNotificationModal } from "../../entities/dlsite/model/dlsiteNotificationModal";
 
 export type ActiveModal = null | "settings" | "scan" | DlsiteNotificationModalKind;
 

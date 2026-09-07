@@ -1,8 +1,12 @@
+import { useRef, useState } from "react";
 import type { ResolvedTrack } from "@mimimilli/shared";
 import { I } from "../../../../shared/ui/Icon";
 import { formatTime } from "../../../../shared/lib/format";
 import { formatTrackDuration, trackDurationAriaLabel } from "../../../../shared/lib/trackDuration";
 import { cn } from "../../../../shared/lib/cn";
+import { getNextGridIndex, type GridArrowKey } from "../../model/gridNavigation";
+
+const TRACK_ARROW_KEYS = new Set<GridArrowKey>(["ArrowUp", "ArrowDown", "Home", "End"]);
 
 interface WorkTrackListProps {
   tracks: ResolvedTrack[];
@@ -25,6 +29,11 @@ export function WorkTrackList({
   resumeOffsetSec,
   onPlay,
 }: WorkTrackListProps) {
+  // roving tabindexの現在位置。トラックに「選択」概念は無いため、初期値は再生中の
+  // トラック（無ければ先頭）。フォーカス移動のたびにonFocusで更新する（TASK-428.12）。
+  const [activeIndex, setActiveIndex] = useState(() => playingTrackIndex ?? 0);
+  const rowRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
   if (tracks.length === 0) return null;
 
   return (
@@ -40,6 +49,9 @@ export function WorkTrackList({
             <button
               type="button"
               key={tr.id}
+              ref={(el) => {
+                rowRefs.current[i] = el;
+              }}
               className={cn(
                 "group mle-prv__trk",
                 isNowPlaying && "is-now",
@@ -47,11 +59,20 @@ export function WorkTrackList({
                 !isPlayable && "is-disabled",
               )}
               disabled={!isPlayable}
+              tabIndex={i === activeIndex ? 0 : -1}
               aria-label={`${tr.title}を再生`}
               // 行全体がトラックの再生操作。右端のアイコンは補助的な視覚ヒントで、
               // 独立したボタンではない（トラックに「選択」概念は持たせない）。
               onClick={() => {
                 if (isPlayable) onPlay(i);
+              }}
+              onFocus={() => setActiveIndex(i)}
+              onKeyDown={(event) => {
+                if (!TRACK_ARROW_KEYS.has(event.key as GridArrowKey)) return;
+                event.preventDefault();
+                const nextIndex = getNextGridIndex(i, event.key as GridArrowKey, 1, tracks.length);
+                if (nextIndex === i) return;
+                rowRefs.current[nextIndex]?.focus();
               }}
             >
               <span className="num">{String(i + 1).padStart(2, "0")}</span>

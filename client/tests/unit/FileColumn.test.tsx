@@ -66,6 +66,12 @@ describe("FileColumn", () => {
     expect(screen.queryByText("読み込みに失敗しました")).toBeNull();
   });
 
+  it("notFound は再試行ボタンを出さず「見つかりません」と案内する（404はisErrorと区別）", () => {
+    renderColumn({ isError: true, notFound: true, entries: [] });
+    expect(screen.getByText("このフォルダーは見つかりません")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "再試行" })).toBeNull();
+  });
+
   it("0件のときは空のフォルダーと案内する", () => {
     renderColumn({ entries: [] });
     expect(screen.getByText("空のフォルダー")).toBeTruthy();

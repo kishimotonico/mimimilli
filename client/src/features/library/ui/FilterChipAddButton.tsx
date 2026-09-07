@@ -10,9 +10,10 @@ import {
 import AxisValuePopoverPanel from "./AxisValuePopoverPanel";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 import { I } from "../../../shared/ui/Icon";
+import { getValueSelectionHint } from "../model/valueSelectionContract";
 
 const POPOVER_WIDTH = 240;
-const AND_ADD_HINT = "AND追加されます";
+const AND_ADD_HINT = getValueSelectionHint("add");
 
 // チップ列の「＋絞り込み」（ADR-0012 §2）。軸→値の2段オーバーレイ。
 // 既定は AND 追加（ヒント表示つき）、Ctrl/Cmd+クリックで置き換えへ反転する。
@@ -126,6 +127,9 @@ export default function FilterChipAddButton({
             floatingStyles={floatingStyles}
             setFloating={setFloating}
             selectedTags={selectedTags}
+            // 既定=AND追加の入口（ADR-0013）。件数基準は現在の選択タグ込みの集計にする
+            // （「追加したら何件になるか」を示す。TASK-428.14。TASK-432でsmartFolder条件を追加予定）。
+            countTags={selectedTags}
             hint={AND_ADD_HINT}
             onSelect={(tag, opts) => {
               onAddValue(tag, opts);

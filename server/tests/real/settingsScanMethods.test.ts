@@ -53,6 +53,7 @@ test("updateSettings は receiver なしで呼び出せる", async () => {
     assert.deepEqual(await updateSettings({ rootFolder: rootDir }), {
       rootFolder: expectedRoot,
       lastScanTime: null,
+      lastScanRootFolder: null,
     });
     assert.equal(settings.get("root_folder"), expectedRoot);
   } finally {

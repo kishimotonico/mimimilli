@@ -6,8 +6,13 @@
 // グリッド行には含めない（PlayerDock 参照）。
 
 import { useAtomValue } from "jotai";
-import type { ReactNode } from "react";
-import { playerDockBarVisibleAtom } from "../features/player/model/playerPresentationAtoms";
+import type { CSSProperties, ReactNode } from "react";
+import {
+  playerDockBarVisibleAtom,
+  playerDockPopupVisibleAtom,
+  playerPopupAtOriginAtom,
+  playerPopupMeasuredHeightAtom,
+} from "../features/player/model/playerPresentationAtoms";
 import { appModeAtom } from "../shared/model/appModeAtoms";
 
 interface AppShellProps {
@@ -30,12 +35,28 @@ export default function AppShell({
   overlays,
 }: AppShellProps) {
   const dockBarVisible = useAtomValue(playerDockBarVisibleAtom);
+  const dockPopupVisible = useAtomValue(playerDockPopupVisibleAtom);
+  const popupAtOrigin = useAtomValue(playerPopupAtOriginAtom);
+  const popupHeight = useAtomValue(playerPopupMeasuredHeightAtom);
   const isNowPlaying = useAtomValue(appModeAtom) === "nowPlaying";
-  // 再生中タブでは PlayerDock 自体を描画しないため、docked bar 用の余白確保も対象外にする。
+  // 再生中タブでは PlayerDock 自体を描画しないため、docked bar / popup 用の余白確保も対象外にする。
   const dockedBarActive = dockBarVisible && !isNowPlaying;
+  // ドラッグで初期位置から動かされている間は、ユーザーが置き場所を決めたとみなし余白を付けない。
+  const dockedPopupActive = dockPopupVisible && !isNowPlaying && popupAtOrigin;
+
+  const appClassName = [
+    "mle-app",
+    dockedBarActive ? "has-docked-bar" : "",
+    dockedPopupActive ? "has-docked-popup" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const appStyle = dockedPopupActive
+    ? ({ "--popup-h": `${popupHeight}px` } as CSSProperties)
+    : undefined;
 
   return (
-    <div className={`mle-app ${dockedBarActive ? "has-docked-bar" : ""}`}>
+    <div className={appClassName} style={appStyle}>
       <div className="mle-frame is-lib">
         {topBar}
         {addressBar}

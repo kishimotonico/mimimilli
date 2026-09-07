@@ -359,3 +359,10 @@ describe("AxisValueList の件数表示", () => {
     expect(document.querySelector(".mle-col__hd .count")).toBeNull();
   });
 });
+
+describe("AxisValueList の操作ヒント（TASK-428.14: 既定=置き換えの説明を出す）", () => {
+  it("置き換え・AND追加の操作方法を検索欄の隣に表示する", () => {
+    renderAxisValueList({ facetItems: [makeItem()] });
+    expect(screen.getByText("クリックで置き換え・Ctrl+クリックでAND追加")).toBeTruthy();
+  });
+});

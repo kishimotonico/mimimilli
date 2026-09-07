@@ -1,7 +1,7 @@
 // tag entity の API。タグ一覧と prefix 定義（ADR-0005）を扱う。
 // 依存方向: shared/api/http のみを参照する。
 
-import { deleteVoid, getParsed, patchParsed, postParsed } from "../../shared/api/http";
+import { deleteVoid, getParsed, patchParsed, postParsed, putParsed } from "../../shared/api/http";
 import {
   tagListSchema,
   tagPrefixSchema,
@@ -31,6 +31,11 @@ export async function updateTagPrefix(prefix: string, data: TagPrefixUpdate): Pr
 
 export async function deleteTagPrefix(prefix: string): Promise<void> {
   await deleteVoid(`/tag-prefixes/${encodeURIComponent(prefix)}`);
+}
+
+/** 登録済み全 prefix を渡された順序でアトミックに並び替える */
+export async function reorderTagPrefixes(prefixes: string[]): Promise<TagPrefix[]> {
+  return putParsed(tagPrefixListSchema, "/tag-prefixes/order", { prefixes });
 }
 
 export async function listTagPrefixCandidates(): Promise<TagPrefixCandidate[]> {

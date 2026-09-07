@@ -15,12 +15,17 @@
   min-width: 0;
   padding: 5px 8px;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
   color: var(--ink-1);
   cursor: pointer;
 }
 .mle-row:hover {
   background: var(--paper-2);
+}
+/* overflow: hidden な一覧スクロール域内なので、共通リングのoffsetを負値にして欠けを防ぐ */
+.mle-row:focus-visible {
+  outline-offset: var(--focus-ring-offset-clipped);
 }
 .mle-row.is-on {
   background: var(--paper-4);
@@ -44,7 +49,7 @@
 .mle-row.is-folder .ficon {
   color: var(--ink-1);
 }
-.mle-row.is-folder-work .ficon {
+.mle-row.is-work .ficon {
   color: var(--acc);
 }
 .mle-row.is-audio .ficon {
@@ -66,8 +71,9 @@
 }
 .mle-row .meta {
   font-family: var(--font-mono);
-  font-size: 9.5px;
-  color: var(--ink-3);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  color: var(--ink-2);
 }
 .mle-row .chev {
   color: var(--ink-3);
@@ -94,7 +100,8 @@
   display: inline-flex;
   align-items: center;
   font-family: var(--font-mono);
-  font-size: 8.5px;
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
   letter-spacing: 0.04em;
   background: var(--acc-soft);
   color: var(--acc-ink);

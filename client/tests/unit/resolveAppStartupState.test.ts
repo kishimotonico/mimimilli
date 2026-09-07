@@ -8,6 +8,7 @@ describe("resolveAppStartupState", () => {
         isPending: true,
         isError: false,
         data: undefined,
+        hasErroredBefore: false,
       }),
     ).toBe("loading");
   });
@@ -18,6 +19,7 @@ describe("resolveAppStartupState", () => {
         isPending: false,
         isError: true,
         data: undefined,
+        hasErroredBefore: true,
       }),
     ).toBe("error");
   });
@@ -28,6 +30,7 @@ describe("resolveAppStartupState", () => {
         isPending: false,
         isError: false,
         data: { rootFolder: null },
+        hasErroredBefore: false,
       }),
     ).toBe("setup-required");
   });
@@ -38,6 +41,7 @@ describe("resolveAppStartupState", () => {
         isPending: false,
         isError: false,
         data: { rootFolder: "/audio/library" },
+        hasErroredBefore: false,
       }),
     ).toBe("ready");
   });
@@ -48,7 +52,21 @@ describe("resolveAppStartupState", () => {
         isPending: false,
         isError: true,
         data: { rootFolder: "/audio/library" },
+        hasErroredBefore: true,
       }),
     ).toBe("ready");
+  });
+
+  // TanStack Queryは一度も成功していないクエリをrefetchすると status を pending・error を null に
+  // 巻き戻すため、isPending/isError だけでは初回ロードと再試行中を区別できない（settings-setup-errors-A-09/B-11）。
+  it("一度エラーになった後の再試行中（pendingへ巻き戻る）は error のまま", () => {
+    expect(
+      resolveAppStartupState({
+        isPending: true,
+        isError: false,
+        data: undefined,
+        hasErroredBefore: true,
+      }),
+    ).toBe("error");
   });
 });

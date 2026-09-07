@@ -23,20 +23,31 @@ https://www.dlsite.com/pro/work/=/product_id/VJ000000.html
 
 ## タグの変換規則
 
-`dlsiteInfoTags` / `mergeDlsiteTags`（`shared/src/dlsite.ts`）が取得情報を既存タグへ統合する際、prefixを付けて変換する。
+`dlsiteInfoTags`（`shared/src/dlsite.ts`）が取得情報を既存タグへ統合する際、prefixを付けて変換する。変換元は `DLSITE_TAG_FIELDS` という1つのテーブルにまとめてあり、各フィールドの cardinality（single/multi）もここで定義する。
 
-- サークル名 → `サークル/<サークル名>`
-- CV → `cv/<CV名>`
-- ジャンルタグ → `genre/<ジャンル名>`
-- 年齢指定 → `rating/全年齢` または `rating/R15` または `rating/R18`
+- サークル名 → `サークル/<サークル名>`（single。DLsite側も1作品1値）
+- CV → `cv/<CV名>`（multi）
+- ジャンルタグ → `genre/<ジャンル名>`（multi）
+- 年齢指定 → `rating/全年齢` または `rating/R15` または `rating/R18`（single。DLsite側も1作品1値）
 
-変換後は `normalizeTags` で正規形にし、正規化後に重複するタグは追加しない。既存作品へ後からratingタグを足す場合は、キャッシュ済みHTMLを再パースする `POST /dlsite/apply-missing` を使う。prefix定義 `rating`（ラベル: レーティング）は初回起動のseedに含まれる。すでにseed済みのライブラリには自動追加しないので、軸表示が必要ならタグ設定の候補から登録する。
+変換後は `normalizeTags` で正規形にする。既存タグとの合流には2つの関数があり、prefix名で分岐する判定はマージ関数側に書かない（`DLSITE_TAG_FIELDS` の cardinality から導出する）。
+
+- `fillUnsetDlsiteTags(existing, info)`: 一括適用（fill-unset）用。single prefixは既存に同prefixのタグが1つでもあれば追加しない（既存値を上書きしない、TASK-428.1）。multi prefixは完全一致のみ除外して加算する。`POST /dlsite/apply-missing` とそのdry-run `POST /dlsite/apply-missing/preview` が共有する
+- `mergeAppliedDlsiteTags(existing, applyTags)`: 単体適用（replace）用。ユーザーが `POST /dlsite/:id/apply` で明示的に選んだタグを反映する際に使う。single prefixは既存の同prefixタグを置き換え（2値共存を作らない）、multi prefixは加算する
+
+既存作品へ後からratingタグを足す場合は、キャッシュ済みHTMLを再パースする `POST /dlsite/apply-missing` を使う。prefix定義 `rating`（ラベル: レーティング）は初回起動のseedに含まれる。すでにseed済みのライブラリには自動追加しないので、軸表示が必要ならタグ設定の候補から登録する。
 
 ## 適用の流れ
 
 適用経路は2つある。
 
 **手動プレビュー→適用**: `POST /dlsite/:id/fetch` で取得結果をプレビューし、ユーザーが選んだ項目だけを `POST /dlsite/:id/apply`（`DlsiteApplyBody`）で反映する。タイトル・タグ・カバーそれぞれに適用可否のフラグがあり、ユーザーが個別に選べる。
+
+**未設定項目をまとめて適用**（設定モーダル）: `POST /dlsite/apply-missing/preview` で対象作品ごとの差分（追加タグ・cover/url適用有無）を取得し、差分のある作品をユーザーが選んでから `POST /dlsite/apply-missing`（選択したworkIdsのみ）で反映する。差分計算のロジックは `fillUnsetDlsiteTags` を通した `computeMissingDiff`（`server/src/adapters/{real,fixture}/dlsiteMethods.ts`）をプレビューと実適用で共有している（TASK-428.1）。
+
+ただし適用時に送るのは選択した workIds のみで、プレビュー時にクライアントが見た差分オブジェクト（`newTags` 等）そのものは送らない。適用実行時にサーバーが対象作品ごとの差分を独立に再計算するため、プレビュー取得後〜適用実行までの間に対象作品のタグやDLsite側の情報が変わっていた場合、ユーザーが見た内容と実際に適用される内容が食い違う余地がある。差分が消えていた分はskip扱いになり安全側に倒れるが、異なる内容が適用される場合でも警告・エラーは出ない。
+
+このデータドリフト自体への対応（単発適用の`sourceRevision`のようなCASチェック）は行っていない。理由: (1) このアプリはローカル単一ユーザー向けで、プレビュー取得から適用実行までの時間差が短い、(2) 差分が消えた場合はskipされるため壊れる方向には倒れない、(3) 一括適用は「未設定項目を埋める」操作なので、埋める先が既に埋まっていれば埋めない、という結果自体は妥当。将来複数クライアント・長時間放置されたプレビュー等でズレが問題になった場合は改めて検討する。
 
 **一括取得**: `POST /dlsite/bulk` が `runDlsiteBulk`（`index.ts`）を呼び、対象作品をまとめて処理する。`mode` には `new` と `existing` があり、スキャン直後の自動起動（`scanJobManager.ts`）は新規作品だけを対象に `new` で呼ぶ。手動の「まとめて取得」ボタンは `existing` で呼ぶ。
 
@@ -229,4 +240,4 @@ importはHTML snapshotを成功記録として書き直すため、取り込ん�
 - `DELETE /dlsite/bulk` — 実行中の一括取得をキャンセル（実行中ジョブがなければ404）
 - `GET /dlsite/events` — 一括取得の進捗をSSEで配信。ジョブ実行中に接続すると直近の進捗を再送し、実行中でなければ直近の完了/エラーを1件返す
 
-一括取得ジョブは `dlsiteProgress.ts` のFIFOキューで直列実行するが、投入経路によって挙動が非対称になっている。スキャン完了後の自動起動（`scanJobManager.ts`、`mode: "new"`）は `enqueueDlsiteJob` を直接呼ぶため、実行中のジョブがあってもキューに積まれ、順番に処理される。一方、手動の `POST /dlsite/bulk` は先に `isDlsiteJobInProgress()` を確認し、実行中ならキューに積まれずconflictエラーで即座に弾かれる。
+一括取得ジョブは `DlsiteJobManager` のFIFOキューで直列実行するが、投入経路によって挙動が非対称になっている。スキャン完了・候補登録の自動起動（`mode: "new"`）は `dlsiteJobs.enqueue()` を直接呼ぶため、実行中のジョブがあってもキューに積まれ、順番に処理される。スキャン完了時の配線は `app.ts` が `ScanJobManager` のコンストラクタへ渡す完了コールバックで行い（`ScanJobManager` は `DlsiteJobManager` を直接知らない）、`result.insertedWorkIds` が1件以上あるときだけ `enqueue("new", insertedWorkIds)` を呼ぶ。一方、手動の `POST /dlsite/bulk` は先に `isDlsiteJobInProgress()` を確認し、実行中ならキューに積まれずconflictエラーで即座に弾かれる。

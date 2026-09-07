@@ -21,10 +21,11 @@
 }
 .mll-axisgroup__hd {
   font-family: var(--font-sans);
-  font-size: 9.5px;
+  font-size: var(--fs-label);
+  line-height: var(--lh-label);
   font-weight: 600;
   letter-spacing: 0.1em;
-  color: var(--ink-3);
+  color: var(--ink-2);
   text-transform: uppercase;
   padding: 6px 10px 4px;
 }
@@ -35,7 +36,8 @@
   align-items: center;
   padding: 6px 8px;
   border-radius: 4px;
-  font-size: 12.5px;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
   color: var(--ink-1);
   cursor: pointer;
   font-family: var(--font-jp);
@@ -70,8 +72,9 @@
 }
 .mll-axis .count {
   font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--ink-3);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  color: var(--ink-2);
 }
 .mll-axis.is-on .count {
   color: var(--ink-2);
@@ -94,7 +97,8 @@
   background: var(--acc);
   color: var(--paper-1);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
   font-weight: 600;
   padding: 1px 5px;
   border-radius: 8px;
@@ -102,7 +106,7 @@
   text-align: center;
 }
 .mll-axis.is-action {
-  color: var(--ink-3);
+  color: var(--ink-2);
   font-style: italic;
   font-weight: 400;
 }
@@ -118,8 +122,9 @@
   margin: 0 0 2px;
   border-radius: 4px;
   background: var(--paper-2);
-  color: var(--ink-3);
-  font-size: 11px;
+  color: var(--ink-2);
+  font-size: var(--fs-secondary);
+  line-height: var(--lh-secondary);
 }
 /* ライブラリ統計フッター。軸レール最下部（.mle-col__listの外）に常時表示する */
 .mll-axisfoot {
@@ -127,8 +132,9 @@
   padding: 8px 10px;
   border-top: 1px solid var(--line-soft);
   font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--ink-3);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  color: var(--ink-2);
 }
 
 /* ── Work rows (mll-wrow) ─────────────────────────────────── */
@@ -146,11 +152,16 @@
   padding: 5px 6px;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
   color: var(--ink-1);
 }
 .mll-wrow:hover {
   background: var(--paper-2);
+}
+/* overflow: hidden な一覧スクロール域内なので、共通リングのoffsetを負値にして欠けを防ぐ */
+.mll-wrow:focus-visible {
+  outline-offset: var(--focus-ring-offset-clipped);
 }
 .mll-wrow.is-on {
   background: var(--paper-4);
@@ -192,7 +203,8 @@
 }
 .mll-wrow__title {
   font-family: var(--font-jp);
-  font-size: 12px;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
   font-weight: 500;
   color: var(--ink-0);
   white-space: nowrap;
@@ -215,16 +227,18 @@
 }
 .mll-wrow__sub {
   font-family: var(--font-mono);
-  font-size: 9.5px;
-  color: var(--ink-3);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  color: var(--ink-2);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .mll-wrow__meta {
   font-family: var(--font-mono);
-  font-size: 9px;
-  color: var(--ink-3);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  color: var(--ink-2);
   text-align: right;
   display: flex;
   flex-direction: column;
@@ -238,7 +252,8 @@
   border-radius: 2px;
   font-weight: 600;
   letter-spacing: 0.04em;
-  font-size: 8.5px;
+  font-size: var(--fs-caption);
+  line-height: var(--lh-caption);
 }
 .mll-wrow__meta .fav {
   color: var(--r-mustard);
@@ -257,9 +272,10 @@
 }
 .mll-tagband__lbl {
   font-family: var(--font-sans);
-  font-size: 9.5px;
+  font-size: var(--fs-label);
+  line-height: var(--lh-label);
   letter-spacing: 0.06em;
-  color: var(--ink-3);
+  color: var(--ink-2);
   text-transform: uppercase;
   font-weight: 600;
   padding-right: 4px;
@@ -275,7 +291,8 @@
   border: 1px solid var(--acc-line);
   color: var(--acc-ink);
   font-family: var(--font-jp);
-  font-size: 11.5px;
+  font-size: var(--fs-control);
+  line-height: var(--lh-control);
   font-weight: 500;
 }
 .mll-tagband__chip .lbl {
@@ -309,7 +326,8 @@
   border: 1px dashed var(--line-strong);
   color: var(--ink-2);
   font-family: var(--font-jp);
-  font-size: 11px;
+  font-size: var(--fs-control);
+  line-height: var(--lh-control);
   font-weight: 500;
 }
 .mll-tagband__addbtn:hover {
@@ -318,10 +336,11 @@
 }
 .mll-tagband__and {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
   font-weight: 700;
   letter-spacing: 0.08em;
-  color: var(--ink-3);
+  color: var(--ink-2);
   padding: 0 2px;
 }
 .mll-tagband__tail {
@@ -332,12 +351,14 @@
 }
 .mll-tagband__count {
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
   color: var(--ink-2);
 }
 .mll-tagband__clear {
   font-family: var(--font-sans);
-  font-size: 10.5px;
+  font-size: var(--fs-caption);
+  line-height: var(--lh-caption);
   font-weight: 600;
   color: var(--ink-2);
   padding: 3px 6px;
@@ -384,7 +405,7 @@
   align-items: center;
   justify-content: center;
   background: var(--paper-2);
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 /* ── Axis value list ───────────────────────────────────── */
@@ -400,7 +421,8 @@
 .mll-vsearch input {
   flex: 1;
   min-width: 0;
-  font-size: 12px;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
   color: var(--ink-0);
   background: transparent;
 }
@@ -421,10 +443,11 @@
   justify-content: flex-end;
   gap: 3px;
   font-family: var(--font-sans);
-  font-size: 10px;
+  font-size: var(--fs-caption);
+  line-height: var(--lh-caption);
   font-weight: 600;
   letter-spacing: 0.04em;
-  color: var(--ink-3);
+  color: var(--ink-2);
   padding: 2px 4px;
   border-radius: 3px;
 }
@@ -448,7 +471,8 @@
 .mll-vrow {
   position: relative;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
   color: var(--ink-1);
 }
 .mll-vrow:hover {
@@ -476,13 +500,13 @@
   top: 50%;
   right: 4px;
   transform: translateY(-50%);
-  opacity: 0;
-  pointer-events: none;
+  /* ホバーせずとも見え、押せる（TASK-428.14: AND追加は非hover時・キーボードでも使える）。
+     行にマウスもフォーカスも無い間は目立たせず、hover/focus-withinで完全に見せる。 */
+  opacity: 0.35;
 }
 .mll-vrow:hover .mll-vrow__add,
 .mll-vrow:focus-within .mll-vrow__add {
   opacity: 1;
-  pointer-events: auto;
 }
 .mll-vrow__add:hover {
   background: var(--paper-3);
@@ -497,10 +521,11 @@
   padding-right: 4px;
   overflow: hidden;
   font-family: var(--font-sans);
-  font-size: 10.5px;
+  font-size: var(--fs-caption);
+  line-height: var(--lh-caption);
   font-weight: 600;
   letter-spacing: 0.03em;
-  color: var(--ink-3);
+  color: var(--ink-2);
   /* 値行（.mll-vrow__nm）と同じく折り返さない。仮想化が行高を固定値で見積もっているため、
        折り返すと translateY の計算がずれて以降の行が重なる。 */
   white-space: nowrap;
@@ -517,7 +542,8 @@
 .mll-vrow__count,
 .mll-vrow__dur {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
   color: var(--ink-2);
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -550,13 +576,12 @@
   position: absolute;
   top: 8px;
   right: 8px;
-  opacity: 0;
-  pointer-events: none;
+  /* ホバーせずとも見え、押せる（TASK-428.14: AND追加は非hover時・キーボードでも使える）。 */
+  opacity: 0.35;
 }
 .mll-vtile:hover .mll-vtile__add,
 .mll-vtile:focus-within .mll-vtile__add {
   opacity: 1;
-  pointer-events: auto;
 }
 .mll-vtile__add:hover {
   background: var(--paper-3);
@@ -570,8 +595,9 @@
 .mll-vtile__breadcrumb {
   margin: 8px 2px 0;
   overflow: hidden;
-  color: var(--ink-3);
-  font-size: 9.5px;
+  color: var(--ink-2);
+  font-size: var(--fs-caption);
+  line-height: var(--lh-caption);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -581,7 +607,7 @@
   margin: 8px 2px 0;
   overflow: hidden;
   color: var(--ink-0);
-  font-size: 12px;
+  font-size: var(--fs-body);
   font-weight: 600;
   line-height: 1.35;
   -webkit-box-orient: vertical;
@@ -593,8 +619,9 @@
 .mll-vtile__badge {
   margin: 3px 2px 0;
   font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--ink-3);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  color: var(--ink-2);
 }
 
 /* ── 軸のクイックオーバーレイ・チップの値ドロップダウン ─────── */
@@ -622,6 +649,13 @@
   flex-direction: column;
   min-height: 0;
 }
+.mll-qlist__count {
+  padding: 5px 8px 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  color: var(--ink-3);
+}
 .mll-qlist__search {
   display: flex;
   align-items: center;
@@ -634,7 +668,8 @@
   flex: 1;
   min-width: 0;
   padding: 0;
-  font-size: 12px;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
   color: var(--ink-0);
   background: transparent;
 }
@@ -645,7 +680,7 @@
   width: 20px;
   height: 20px;
   border-radius: 4px;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 .mll-qlist__sorttoggle:hover,
 .mll-qlist__sorttoggle.is-open {
@@ -663,9 +698,10 @@
   align-items: center;
   gap: 3px;
   font-family: var(--font-sans);
-  font-size: 10px;
+  font-size: var(--fs-caption);
+  line-height: var(--lh-caption);
   font-weight: 600;
-  color: var(--ink-3);
+  color: var(--ink-2);
   padding: 2px 6px;
   border-radius: 3px;
 }
@@ -686,7 +722,8 @@
 .mll-qlist__hint {
   padding: 5px 8px;
   font-family: var(--font-sans);
-  font-size: 10px;
+  font-size: var(--fs-caption);
+  line-height: var(--lh-caption);
   color: var(--ink-2);
   background: var(--paper-2);
   border-bottom: 1px solid var(--line-soft);
@@ -706,7 +743,8 @@
   box-sizing: border-box;
   padding: 6px 8px;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
   color: var(--ink-1);
   text-align: left;
 }
@@ -727,8 +765,9 @@
 .mll-qlist__item .count {
   flex-shrink: 0;
   font-family: var(--font-mono);
-  font-size: 10.5px;
-  color: var(--ink-3);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  color: var(--ink-2);
 }
 .mll-qlist__row {
   position: relative;
@@ -745,13 +784,12 @@
   top: 50%;
   right: 4px;
   transform: translateY(-50%);
-  opacity: 0;
-  pointer-events: none;
+  /* ホバーせずとも見え、押せる（TASK-428.14: AND追加は非hover時・キーボードでも使える）。 */
+  opacity: 0.35;
 }
 .mll-qlist__row:hover .mll-qlist__add,
 .mll-qlist__row:focus-within .mll-qlist__add {
   opacity: 1;
-  pointer-events: auto;
 }
 .mll-qlist__add:hover {
   background: var(--paper-3);
@@ -761,10 +799,11 @@
   padding: 6px 8px;
   overflow: hidden;
   font-family: var(--font-sans);
-  font-size: 10px;
+  font-size: var(--fs-caption);
+  line-height: var(--lh-caption);
   font-weight: 600;
   letter-spacing: 0.03em;
-  color: var(--ink-3);
+  color: var(--ink-2);
   /* .mll-qlist__item .nm と同じく折り返さない（仮想化の固定行高見積もりが崩れるため）。 */
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -772,8 +811,9 @@
 .mll-qlist__status {
   padding: 16px 8px;
   text-align: center;
-  font-size: 11px;
-  color: var(--ink-3);
+  font-size: var(--fs-secondary);
+  line-height: var(--lh-secondary);
+  color: var(--ink-2);
 }
 
 /* ── Drill header ─────────────────────────────────────────── */
@@ -813,16 +853,18 @@
 }
 .mle-drill__axis {
   font-family: var(--font-sans);
-  font-size: 9.5px;
+  font-size: var(--fs-label);
+  line-height: var(--lh-label);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   font-weight: 600;
-  color: var(--ink-3);
+  color: var(--ink-2);
   flex-shrink: 0;
 }
 .mle-drill__sep {
   color: var(--ink-4);
-  font-size: 11px;
+  font-size: var(--fs-secondary);
+  line-height: var(--lh-secondary);
 }
 .mle-drill__val {
   font-family: var(--font-jp);
@@ -844,8 +886,9 @@
 }
 .mle-drill__count {
   font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--ink-3);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  color: var(--ink-2);
   flex-shrink: 0;
 }
 .mle-drill__chev {

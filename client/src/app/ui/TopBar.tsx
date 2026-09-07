@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import { I } from "../../shared/ui/Icon";
 import IconButton from "../../shared/ui/IconButton";
-import { useAtom, useAtomValue } from "jotai";
+import { buttonClass } from "../../shared/ui/Button";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useMotionVariants } from "../../shared/ui/useMotionVariants";
 import {
   dlsiteBulkActiveAtom,
@@ -12,8 +13,13 @@ import {
 } from "../../entities/dlsite/model/bulkAtoms";
 import { useDlsiteBulkActions } from "../../entities/dlsite/useDlsiteBulkActions";
 import { librarySearchQueryAtom } from "../../entities/library/model/navigationAtoms";
-import { appModeAtom } from "../../shared/model/appModeAtoms";
-import { playerIsActiveAtom, playingTrackTitleAtom } from "../../entities/player/model/atoms";
+import { appModeAtom, setAppModeAtom } from "../../shared/model/appModeAtoms";
+import {
+  playerIsActiveAtom,
+  playerStatusAtom,
+  playingTrackTitleAtom,
+} from "../../entities/player/model/atoms";
+import { cn } from "../../shared/lib/cn";
 import { scanningAtom, scanProgressLabelAtom } from "../../entities/scan/model/atoms";
 import { useUnregisteredCandidateCount } from "../../features/scan/model/useScanCandidatesCache";
 
@@ -34,7 +40,7 @@ function DlsiteBulkCancelButton({ onClick }: { onClick: () => void }) {
       inert={!isPresent}
       {...v}
       onClick={onClick}
-      className="inline-flex h-7 items-center justify-center gap-1 rounded-[6px] border border-[color-mix(in_oklch,var(--r-coral)_45%,transparent)] bg-[color-mix(in_oklch,var(--r-coral)_10%,transparent)] px-2.5 font-sans text-[11px] font-medium text-ink-0 transition-colors hover:bg-[color-mix(in_oklch,var(--r-coral)_16%,transparent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
+      className={buttonClass("danger-quiet", "sm", { className: "justify-center" })}
     >
       <I.x size={11} />
       中止
@@ -52,9 +58,14 @@ export default function TopBar({ onOpenScan, onSettings, notificationBell }: Top
   const dlsiteBulkCancelling = useAtomValue(dlsiteBulkCancellingAtom);
   const { cancel: onCancelDlsiteBulk } = useDlsiteBulkActions();
   const mode = useAtomValue(appModeAtom);
+  const setAppMode = useSetAtom(setAppModeAtom);
   const [searchQuery, onSearchChange] = useAtom(librarySearchQueryAtom);
   const isPlaying = useAtomValue(playerIsActiveAtom);
   const playingTrack = useAtomValue(playingTrackTitleAtom);
+  const playerStatus = useAtomValue(playerStatusAtom);
+  const isActivelyPlaying = playerStatus === "playing";
+  const pulseLabel =
+    playerStatus === "error" ? "再生エラー" : isActivelyPlaying ? "再生中" : "一時停止中";
 
   const placeholder = "ライブラリを検索（タイトル · CV · タグ · RJ ...）";
 
@@ -63,6 +74,10 @@ export default function TopBar({ onOpenScan, onSettings, notificationBell }: Top
   const [draft, setDraft] = useState(searchQuery);
   const composingRef = useRef(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  // Escapeで空欄からblurするとき、直前にフォーカスしていた要素へ戻すための記憶
+  // （TASK-428.15）。フォーカスは検索欄へ移った時点ですでに切り替わっているため、
+  // FocusEvent.relatedTarget（移る前にフォーカスしていた要素）から取る。
+  const previousFocusRef = useRef<HTMLElement | null>(null);
 
   // クリアボタンやナビゲーション復元など、親側の値が外部要因で変わったときは draft を追従させる
   useEffect(() => {
@@ -71,7 +86,7 @@ export default function TopBar({ onOpenScan, onSettings, notificationBell }: Top
 
   // ⌘K / Ctrl+K で検索ボックスへフォーカスする。テキスト入力中は横取りしない。
   useEffect(() => {
-    if (mode !== "library") return;
+    if (mode !== "library" && mode !== "workDetail") return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() !== "k" || !(e.metaKey || e.ctrlKey)) return;
       const target = e.target as HTMLElement | null;
@@ -96,8 +111,15 @@ export default function TopBar({ onOpenScan, onSettings, notificationBell }: Top
       {isPlaying && playingTrack && (
         <>
           <div className="mll-bar__divider" />
-          <div className="mll-bar__pulse">
-            <span className="dot" />
+          <div className="mll-bar__pulse" title={pulseLabel}>
+            <span
+              className={cn(
+                "dot",
+                isActivelyPlaying && "is-playing",
+                playerStatus === "error" && "is-error",
+              )}
+              aria-label={pulseLabel}
+            />
             <span className="ch">1ch</span>
             <span className="sep">·</span>
             <span className="lbl">{playingTrack}</span>
@@ -107,7 +129,7 @@ export default function TopBar({ onOpenScan, onSettings, notificationBell }: Top
 
       <div className="mll-bar__spacer" />
 
-      {mode === "library" && (
+      {(mode === "library" || mode === "workDetail") && (
         <div className="mll-bar__search">
           <I.search size={13} />
           <input
@@ -117,12 +139,39 @@ export default function TopBar({ onOpenScan, onSettings, notificationBell }: Top
               setDraft(e.target.value);
               if (!composingRef.current) onSearchChange(e.target.value);
             }}
+            onFocus={(e) => {
+              previousFocusRef.current = (e.relatedTarget as HTMLElement | null) ?? null;
+            }}
             onCompositionStart={() => {
               composingRef.current = true;
             }}
             onCompositionEnd={(e) => {
               composingRef.current = false;
               onSearchChange(e.currentTarget.value);
+            }}
+            onKeyDown={(e) => {
+              if (e.nativeEvent.isComposing) return;
+
+              if (e.key === "Enter") {
+                // 作品詳細から確定したら検索結果（ライブラリ）へ移る（TASK-428.15）
+                if (mode === "workDetail") {
+                  e.preventDefault();
+                  setAppMode("library");
+                }
+                return;
+              }
+
+              if (e.key !== "Escape") return;
+              // 一段だけ閉じる: 値があればクリアに留め、空のときだけblurして直前の
+              // フォーカスへ戻す（TASK-428.13のEscape契約に合わせる）
+              e.preventDefault();
+              if (draft) {
+                setDraft("");
+                onSearchChange("");
+                return;
+              }
+              e.currentTarget.blur();
+              previousFocusRef.current?.focus();
             }}
             placeholder={placeholder}
           />
@@ -143,7 +192,7 @@ export default function TopBar({ onOpenScan, onSettings, notificationBell }: Top
       )}
 
       {scanning && (
-        <span className="font-mono text-[10.5px] text-ink-3" aria-live="polite">
+        <span className="font-mono text-mono text-ink-2" aria-live="polite">
           {scanProgressLabel ?? "スキャン中..."}
         </span>
       )}
@@ -174,7 +223,7 @@ export default function TopBar({ onOpenScan, onSettings, notificationBell }: Top
       {dlsiteBulkActive && (
         <>
           <span
-            className="flex min-w-0 items-center gap-1 text-[10.5px] text-ink-3"
+            className="flex min-w-0 items-center gap-1 text-caption text-ink-2"
             aria-live="polite"
           >
             <span className="whitespace-nowrap font-mono">{dlsiteBulkProgressLabel}</span>

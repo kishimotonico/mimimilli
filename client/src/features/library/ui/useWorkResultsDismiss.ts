@@ -1,9 +1,12 @@
 import { useEffect, type RefObject } from "react";
 
-export function useWorkGridDismiss(
+// 作品グリッド・作品リストの両方が使う結果面共通のEscape/背景クリック選択解除
+// （TASK-428.12。旧 workGrid/useWorkGridDismiss をグリッド専用から一般化）。
+export function useWorkResultsDismiss(
   isWorkSelected: boolean,
   onDeselect: () => void,
   scrollRef: RefObject<HTMLDivElement | null>,
+  itemSelector: string,
 ) {
   useEffect(() => {
     if (!isWorkSelected) return;
@@ -32,13 +35,13 @@ export function useWorkGridDismiss(
     const scroll = scrollRef.current;
     if (!scroll) return;
 
-    const handleGridBackgroundClick = (event: MouseEvent) => {
+    const handleBackgroundClick = (event: MouseEvent) => {
       const target = event.target;
-      if (target instanceof Element && target.closest(".mll-grid-tile")) return;
+      if (target instanceof Element && target.closest(itemSelector)) return;
       onDeselect();
     };
 
-    scroll.addEventListener("click", handleGridBackgroundClick);
-    return () => scroll.removeEventListener("click", handleGridBackgroundClick);
-  }, [isWorkSelected, onDeselect, scrollRef]);
+    scroll.addEventListener("click", handleBackgroundClick);
+    return () => scroll.removeEventListener("click", handleBackgroundClick);
+  }, [isWorkSelected, onDeselect, scrollRef, itemSelector]);
 }

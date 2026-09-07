@@ -1,4 +1,4 @@
-import type { TagPrefix } from "@mimimilli/shared";
+import { resolveTagPrefix, type TagPrefix } from "@mimimilli/shared";
 import { parseTag } from "../model";
 import { tagPrefixColorToCss } from "../tagPrefixColor";
 import { cn } from "../../../shared/lib/cn";
@@ -20,11 +20,11 @@ interface TagProps {
 }
 
 const TAG_BASE =
-  "group inline-flex h-5 items-center gap-[3px] whitespace-nowrap rounded-1 bg-paper-2 px-[7px] font-jp text-[10.5px] text-ink-1 hover:bg-paper-3";
+  "group inline-flex h-5 items-center gap-[3px] whitespace-nowrap rounded-1 bg-paper-2 px-[7px] font-jp text-secondary text-ink-1 hover:bg-paper-3";
 
 // 通常時は薄く、hover/focus時だけ強調する（誤操作の的にならないようにする）。
 const REMOVE_BUTTON =
-  "cursor-pointer bg-transparent p-0 text-[13px] leading-none text-ink-4 opacity-40 transition-opacity duration-150 group-hover:opacity-100 group-hover:text-ink-0 focus-visible:opacity-100 focus-visible:text-ink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-1";
+  "cursor-pointer bg-transparent p-0 text-[13px] leading-none text-ink-4 opacity-40 transition-opacity duration-150 group-hover:opacity-100 group-hover:text-ink-0 focus-visible:opacity-100 focus-visible:text-ink-0";
 
 function RemoveSlot({
   value,
@@ -108,12 +108,20 @@ export default function Tag({
     return <span className={tagClass}>{content}</span>;
   }
 
-  const catLabel = definition?.label ?? parsed.prefix.toUpperCase().slice(0, 4);
-  const valueStyle = { color: tagPrefixColorToCss(definition?.color) };
+  // ラベル・色の解決は resolveTagPrefix（shared/src/tagPrefix.ts）に集約し、
+  // axisDefinitions.getAxisLabel と結果を揃える。definition は呼び出し側が
+  // 既に見つけている単一の定義なので、それを1件のリストとして渡す。
+  const { label: catLabel, color } = resolveTagPrefix(
+    parsed.prefix,
+    definition ? [definition] : [],
+  );
+  const valueStyle = { color: tagPrefixColorToCss(color) };
 
   const content = (
     <>
-      <span className="font-mono text-[9.5px] uppercase text-ink-3">{catLabel}</span>
+      <span className="max-w-[64px] overflow-hidden text-ellipsis font-mono text-label uppercase text-ink-2">
+        {catLabel}
+      </span>
       <span className="font-medium" style={valueStyle}>
         {parsed.value}
       </span>

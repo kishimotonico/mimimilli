@@ -33,11 +33,16 @@
   --r-mustard: oklch(78% 0.135 88);
   --r-plum: oklch(64% 0.14 320);
 
-  /* Tag category — muted */
-  --cv-color: oklch(58% 0.14 350);
-  --circle-color: oklch(54% 0.11 195);
-  --series-color: oklch(58% 0.14 78);
-  --cat-color: oklch(58% 0.11 285);
+  /* Tag category — muted, tuned for 4.5:1+ on both paper-2 and paper-3 (hover) */
+  --cv-color: oklch(53% 0.14 350);
+  --circle-color: oklch(49% 0.11 195);
+  --series-color: oklch(51% 0.14 78);
+  --cat-color: oklch(52% 0.11 285);
+
+  /* Feedback state — success/warning/danger（トースト・インライン通知の種別区別用） */
+  --state-success: oklch(56% 0.13 150);
+  --state-warning: oklch(66% 0.15 75);
+  --state-danger: oklch(56% 0.19 25);
 
   /* Type stacks */
   --font-sans: "Geist", -apple-system, system-ui, "Segoe UI", sans-serif;
@@ -45,6 +50,28 @@
     "Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans CJK JP", system-ui,
     sans-serif;
   --font-mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+
+  /* Typography — 用途別スケール。個別コンポーネントでのpx直書きはやめてこれを使う。
+     body=主要本文, secondary=サブ情報, caption=補足・見出し, control=操作系ラベル,
+     label=セクション見出し・カテゴリラベル, mono=数値・時刻等（font-mono併用） */
+  --fs-body: 12px;
+  --lh-body: 1.4;
+  --fs-secondary: 11px;
+  --lh-secondary: 1.35;
+  --fs-caption: 10px;
+  --lh-caption: 1.3;
+  --fs-control: 11px;
+  --lh-control: 1;
+  --fs-label: 10px;
+  --lh-label: 1.2;
+  --fs-mono: 11px;
+  --lh-mono: 1.3;
+
+  /* Focus ring — 操作可能な要素すべてで共有する。行のように overflow: hidden で
+     切り抜かれる文脈だけ outline-offset を負値にする（shell/base.cssの例外規則） */
+  --focus-ring: 2px solid var(--acc);
+  --focus-ring-offset: 2px;
+  --focus-ring-offset-clipped: -2px;
 
   /* Radii */
   --r-1: 4px;
@@ -67,4 +94,8 @@
   --sp-5: 24px;
   --sp-6: 32px;
   --sp-7: 48px;
+
+  /* Layout — frame.cssのグリッド行など、複数箇所で値を合わせる必要がある寸法。
+     spacingスケールとは別軸（意味的に固定レイアウト値であり、間隔調整では動かない）。 */
+  --topbar-h: 48px;
 }

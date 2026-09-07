@@ -132,19 +132,81 @@ export const dlsiteWorkInfoSchema = z.object({
 });
 export type DlsiteWorkInfo = z.infer<typeof dlsiteWorkInfoSchema>;
 
+/** DLsite取得情報→タグの変換テーブル。cardinalityは `DlsiteWorkInfo` の型が表す事実
+ *  （circle・ageRatingは単一nullable、cvs・genreTagsは配列）をそのまま写したもので、
+ *  prefix名で分岐する判定はここに一度だけ書く。mergeロジック側はこのテーブルから
+ *  cardinalityを導出し、prefix名を直接分岐に使わない（ADR-0005） */
+const DLSITE_TAG_FIELDS: readonly {
+  prefix: string;
+  cardinality: "single" | "multi";
+  values: (info: DlsiteWorkInfo) => readonly string[];
+}[] = [
+  {
+    prefix: "サークル",
+    cardinality: "single",
+    values: (info) => (info.circle ? [info.circle] : []),
+  },
+  { prefix: "cv", cardinality: "multi", values: (info) => info.cvs },
+  { prefix: "genre", cardinality: "multi", values: (info) => info.genreTags },
+  {
+    prefix: "rating",
+    cardinality: "single",
+    values: (info) => (info.ageRating ? [info.ageRating] : []),
+  },
+];
+
 /** 取得情報を作品タグへ変換する（要件 v4 §4.4）。結果は正規形。 */
 export function dlsiteInfoTags(info: DlsiteWorkInfo): NormalizedTag[] {
-  const tags: string[] = [];
-  if (info.circle) tags.push(`サークル/${info.circle}`);
-  for (const cv of info.cvs) tags.push(`cv/${cv}`);
-  for (const genre of info.genreTags) tags.push(`genre/${genre}`);
-  if (info.ageRating) tags.push(`rating/${info.ageRating}`);
+  const tags = DLSITE_TAG_FIELDS.flatMap((field) =>
+    field.values(info).map((value) => `${field.prefix}/${value}`),
+  );
   return dedupeTags(normalizeTags(tags));
 }
 
-/** 取得情報を既存タグへ合流する。正規化後の重複は追加しない。 */
-export function mergeDlsiteTags(existing: NormalizedTag[], info: DlsiteWorkInfo): NormalizedTag[] {
-  return dedupeTags([...existing, ...dlsiteInfoTags(info)]);
+const SINGLE_VALUE_DLSITE_PREFIXES = new Set(
+  DLSITE_TAG_FIELDS.filter((field) => field.cardinality === "single").map((field) => field.prefix),
+);
+
+function tagPrefixOf(tag: string): string {
+  return tag.split("/", 1)[0] ?? "";
+}
+
+function hasTagWithPrefix(tags: readonly NormalizedTag[], prefix: string): boolean {
+  return tags.some((tag) => tagPrefixOf(tag) === prefix);
+}
+
+/** 一括適用（fill-unset）: 単一値prefix（サークル・rating）は、既存に同prefixのタグが
+ *  1つでもあれば追加しない。複数値prefix（cv・genre）は完全一致のみ除外して加算する。
+ *  返り値は既存タグへ新たに追加する分だけ（TASK-428.1: 既存値を上書きしない） */
+export function fillUnsetDlsiteTags(
+  existing: readonly NormalizedTag[],
+  info: DlsiteWorkInfo,
+): NormalizedTag[] {
+  return dlsiteInfoTags(info).filter((tag) => {
+    if (existing.includes(tag)) return false;
+    const prefix = tagPrefixOf(tag);
+    if (SINGLE_VALUE_DLSITE_PREFIXES.has(prefix)) return !hasTagWithPrefix(existing, prefix);
+    return true;
+  });
+}
+
+/** 単体適用（replace）: ユーザーが明示的に選んだタグ（applyTags）を既存タグへ反映する。
+ *  単一値prefixは既存の同prefixタグを置き換え、2値共存を作らない。複数値prefixは加算する。
+ *  既存タグと同じ値を選び直しただけの行は元の並び順のまま残す（不要な並べ替えをしない） */
+export function mergeAppliedDlsiteTags(
+  existing: readonly NormalizedTag[],
+  applyTags: readonly NormalizedTag[],
+): NormalizedTag[] {
+  const replacingPrefixes = new Set(
+    applyTags.map(tagPrefixOf).filter((prefix) => SINGLE_VALUE_DLSITE_PREFIXES.has(prefix)),
+  );
+  const applyTagSet = new Set(applyTags);
+  const kept = existing.filter(
+    (tag) => !replacingPrefixes.has(tagPrefixOf(tag)) || applyTagSet.has(tag),
+  );
+  const keptSet = new Set(kept);
+  const added = applyTags.filter((tag) => !keptSet.has(tag));
+  return dedupeTags([...kept, ...added]);
 }
 
 /** 作品ごとの取得結果確認に使う。sourceRevision は適用時のCASトークン。 */
@@ -193,6 +255,23 @@ export const dlsiteBulkApplyMissingResultSchema = z.object({
   failed: z.number().int().nonnegative(),
 });
 export type DlsiteBulkApplyMissingResult = z.infer<typeof dlsiteBulkApplyMissingResultSchema>;
+
+/** 「未設定項目をまとめて適用」の対象作品1件分の差分。既存値を上書きする項目は含まない
+ *  （TASK-428.1 Q-04: 適用前に差分を表示し、ユーザーが対象を選んでから適用する） */
+export const dlsiteApplyMissingPreviewItemSchema = z.object({
+  workId: z.string(),
+  title: z.string(),
+  newTags: normalizedTagArraySchema,
+  applyCover: z.boolean(),
+  applyUrl: z.boolean(),
+});
+export type DlsiteApplyMissingPreviewItem = z.infer<typeof dlsiteApplyMissingPreviewItemSchema>;
+
+/** POST /api/dlsite/apply-missing/preview の応答。何も変わらない作品は含まない */
+export const dlsiteApplyMissingPreviewSchema = z.object({
+  items: z.array(dlsiteApplyMissingPreviewItemSchema),
+});
+export type DlsiteApplyMissingPreview = z.infer<typeof dlsiteApplyMissingPreviewSchema>;
 
 /** RJ/VJコードの形式。DLsiteキャッシュが受け付ける形式（`^(RJ|VJ)\d{6,8}$`）と一致させる。 */
 export const RJ_CODE_PATTERN = /^(RJ|VJ)\d{6,8}$/i;

@@ -9,7 +9,11 @@ import { spyOn } from "bun:test";
 import { THUMBNAIL_WIDTHS } from "@mimimilli/shared";
 import type { WorkSummary } from "@mimimilli/shared";
 import sharp from "sharp";
-import { finalizeScan, LAST_SCAN_TIME_KEY } from "../../src/adapters/real/scanFinalize.ts";
+import {
+  finalizeScan,
+  LAST_SCAN_ROOT_KEY,
+  LAST_SCAN_TIME_KEY,
+} from "../../src/adapters/real/scanFinalize.ts";
 import { captureLogs, recordMessage, scanRecords } from "../helpers/logCapture.ts";
 import { makeTestDirectory } from "../helpers/sampleLibrary.ts";
 
@@ -65,11 +69,13 @@ test("finalizeScan: サムネイルGC後に last_scan_time を記録する", asy
     query,
     catalog,
     thumbnailCacheDir,
+    root: "/test/root",
     integrityLogContext: "scan-finalize-test",
   });
 
   assert.ok(scanStates.has(LAST_SCAN_TIME_KEY));
   assert.ok(scanStates.get(LAST_SCAN_TIME_KEY));
+  assert.equal(scanStates.get(LAST_SCAN_ROOT_KEY), "/test/root");
 });
 
 test("finalizeScan: throwIfCancelled が呼ばれたら last_scan_time を記録しない", async (t) => {
@@ -93,6 +99,7 @@ test("finalizeScan: throwIfCancelled が呼ばれたら last_scan_time を記録
         query,
         catalog,
         thumbnailCacheDir,
+        root: "/test/root",
         throwIfCancelled: () => {
           throw new Error("cancelled");
         },
@@ -131,6 +138,7 @@ test("finalizeScan: 作品0件でも既存キャッシュは削除されず、�
     query: { listSummaries: () => ({ summaries: [], skipped: [], unmeasuredCovers: [] }) },
     catalog,
     thumbnailCacheDir,
+    root: "/test/root",
   });
   assert.ok(existsSync(cachedFile), "全件メタ不正相当（作品0件）のスキャン後もキャッシュが残る");
 
@@ -154,6 +162,7 @@ test("finalizeScan: 作品0件でも既存キャッシュは削除されず、�
     },
     catalog,
     thumbnailCacheDir,
+    root: "/test/root",
   });
   assert.ok(existsSync(cachedFile), "メタ修正後の再スキャン後も既存キャッシュが残る");
 });
@@ -178,6 +187,7 @@ test("finalizeScan: listSummaries の skipped がある場合は削除されな�
     },
     catalog: { setScanState: () => {} },
     thumbnailCacheDir,
+    root: "/test/root",
   });
 
   assert.ok(existsSync(cachedFile));
@@ -213,6 +223,7 @@ test("finalizeScan: resolveWithin 失敗がある場合は削除されない", a
     },
     catalog: { setScanState: () => {} },
     thumbnailCacheDir,
+    root: "/test/root",
   });
 
   assert.ok(existsSync(cachedFile));
@@ -229,6 +240,7 @@ test("finalizeScan: GCスキップ時も last_scan_time を更新する", async 
     query: { listSummaries: () => ({ summaries: [], skipped: [], unmeasuredCovers: [] }) },
     catalog,
     thumbnailCacheDir,
+    root: "/test/root",
   });
 
   assert.ok(scanStates.has(LAST_SCAN_TIME_KEY));
@@ -250,6 +262,7 @@ test("finalizeScan: GCスキップ時に reason・件数・cacheDir を含む wa
       },
       catalog: { setScanState: () => {} },
       thumbnailCacheDir,
+      root: "/test/root",
     });
 
     const warned = scanRecords(records).filter(
@@ -285,6 +298,7 @@ test("finalizeScan: 作品あり・全作品カバーなしの場合はGCが実�
     },
     catalog: { setScanState: () => {} },
     thumbnailCacheDir,
+    root: "/test/root",
   });
 
   assert.ok(!existsSync(orphan), "カバーなし作品のみでも孤児キャッシュは削除される");
@@ -310,6 +324,7 @@ test("finalizeScan: 寸法未計測カバーがある場合は削除されない
     },
     catalog: { setScanState: () => {} },
     thumbnailCacheDir,
+    root: "/test/root",
   });
 
   assert.ok(existsSync(cachedFile));
@@ -334,6 +349,7 @@ test("finalizeScan: 寸法未計測カバーでGCスキップ時に unmeasured-c
       },
       catalog: { setScanState: () => {} },
       thumbnailCacheDir,
+      root: "/test/root",
     });
 
     const warned = scanRecords(records).filter(
@@ -367,6 +383,7 @@ test("finalizeScan: 寸法未計測カバーでGCスキップ時も last_scan_ti
     },
     catalog,
     thumbnailCacheDir,
+    root: "/test/root",
   });
 
   assert.ok(scanStates.has(LAST_SCAN_TIME_KEY));
@@ -412,6 +429,7 @@ test("finalizeScan: カバーの stat 失敗がある場合は削除されない
     },
     catalog: { setScanState: () => {} },
     thumbnailCacheDir,
+    root: "/test/root",
   });
 
   assert.ok(existsSync(cachedFile));

@@ -22,6 +22,8 @@ interface FileColumnProps {
   isLoading?: boolean;
   /** フォルダー一覧取得の失敗。無言で「空のフォルダー」にせず区別する */
   isError?: boolean;
+  /** 404（対象フォルダーが存在しない）。再試行しても直らないため isError と表示を分ける */
+  notFound?: boolean;
   onRetry?: () => void;
 }
 
@@ -37,6 +39,7 @@ export default function FileColumn({
   onPlayFile,
   isLoading,
   isError,
+  notFound,
   onRetry,
 }: FileColumnProps) {
   const sorted = sortEntries(entries);
@@ -49,6 +52,9 @@ export default function FileColumn({
       <div className="mle-col__list">
         {isLoading ? (
           <CollectionStatus variant="list" kind="loading" />
+        ) : notFound ? (
+          // 404は再試行しても直らないため、再試行ボタンを出さない（TASK-428.18）。
+          <CollectionStatus variant="list" kind="empty" message="このフォルダーは見つかりません" />
         ) : isError && entries.length === 0 ? (
           // キャッシュが無い＝初回取得失敗のときだけ一覧全体をエラー画面に置き換える。
           <CollectionStatus variant="list" kind="error" onRetry={onRetry} />

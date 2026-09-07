@@ -3,11 +3,16 @@
 // 位置は playerPopupOffsetAtom（localStorage）に確定値のみを書き込み、ドラッグ中は
 // motion value（x/y）だけで追従させる。初期位置付近での離しは吸着してオフセットをリセットする。
 
-import { useAtom } from "jotai";
+import { useAtom, useSetAtom } from "jotai";
 import { animate, useDragControls, useMotionValue, type PanInfo } from "motion/react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { playerPopupOffsetAtom, type PlayerPopupOffset } from "./playerPresentationAtoms";
+import {
+  playerPopupMeasuredHeightAtom,
+  playerPopupOffsetAtom,
+  type PlayerPopupOffset,
+} from "./playerPresentationAtoms";
 import { clamp } from "../../../shared/lib/clamp";
+import { isPrimaryPointerButton } from "../../../shared/lib/pointerButton";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 
 /** 離した位置が初期位置からこの距離(px)以内なら吸着して初期位置へ戻す。 */
@@ -15,6 +20,12 @@ const SNAP_DISTANCE_PX = 70;
 const RESET_DURATION_S = 0.22;
 /** ドラッグの起点判定から除外する操作系要素。 */
 const DRAG_IGNORE_SELECTOR = "button, input, a, [role='slider']";
+
+/** トップバー行の高さ（tokens.css の --topbar-h）。ここより上へはドラッグさせない。 */
+function readTopbarClearancePx(): number {
+  const value = getComputedStyle(document.documentElement).getPropertyValue("--topbar-h");
+  return Number.parseFloat(value) || 0;
+}
 
 interface DragConstraints {
   top: number;
@@ -72,7 +83,7 @@ export function usePopupDrag(): PopupDragBind {
     const current = offsetRef.current;
     const next: DragConstraints = {
       left: -(window.innerWidth - rightPx - width),
-      top: -(window.innerHeight - bottomPx - height),
+      top: -(window.innerHeight - bottomPx - height - readTopbarClearancePx()),
       right: rightPx,
       bottom: bottomPx,
     };
@@ -98,6 +109,24 @@ export function usePopupDrag(): PopupDragBind {
     return () => window.removeEventListener("resize", recomputeConstraints);
   }, [recomputeConstraints]);
 
+  // ポップアップの実測高さを結果面・右ペインの余白算出（has-docked-popup）に渡す。
+  // AppShell 側で「アプリ全体で1つ」の値として使うため、コンポーネントの祖先ではなく
+  // atom に書き込む。ResizeObserver の contentRect は padding/border を含まないため、
+  // 実際に画面上で占有する高さ（border-box）は offsetHeight から読む。
+  const setMeasuredHeight = useSetAtom(playerPopupMeasuredHeightAtom);
+  useLayoutEffect(() => {
+    const el = popupRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => {
+      setMeasuredHeight(el.offsetHeight);
+    });
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      setMeasuredHeight(0);
+    };
+  }, [setMeasuredHeight]);
+
   const resetToOrigin = useCallback(() => {
     const duration = reduced ? 0 : RESET_DURATION_S;
     animate(x, 0, { duration, ease: [0, 0, 0.2, 1] });
@@ -110,6 +139,7 @@ export function usePopupDrag(): PopupDragBind {
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
+      if (!isPrimaryPointerButton(e)) return;
       const target = e.target as HTMLElement;
       if (target.closest(DRAG_IGNORE_SELECTOR)) return;
       dragControls.start(e);

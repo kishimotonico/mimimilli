@@ -11,7 +11,8 @@ import {
   dlsiteInfoTags,
   normalizeDlsiteAgeRating,
   type DlsiteWorkInfo,
-  mergeDlsiteTags,
+  fillUnsetDlsiteTags,
+  mergeAppliedDlsiteTags,
 } from "@mimimilli/shared";
 import {
   detectRjCode,
@@ -376,7 +377,7 @@ test("dlsiteStatePatchSchema: RJ/VJコードの手動入力を受け付け、そ
   assert.equal(unknownPrefix.success, false);
 });
 
-test("mergeDlsiteTags: prefix 変換と重複排除", () => {
+test("fillUnsetDlsiteTags: 未設定prefixだけを新規タグとして返す", () => {
   const info: DlsiteWorkInfo = {
     rjCode: "RJ900002",
     title: "x",
@@ -387,17 +388,14 @@ test("mergeDlsiteTags: prefix 変換と重複排除", () => {
     coverUrl: null,
     url: "",
   };
-  const merged = mergeDlsiteTags(nts(["サークル/夜想曲", "cv/水瀬なずな", "バイノーラル"]), info);
-  assert.deepEqual(merged, [
-    "サークル/夜想曲",
-    "cv/水瀬なずな",
-    "バイノーラル",
-    "cv/新CV",
-    "genre/耳かき",
-  ]);
+  const added = fillUnsetDlsiteTags(
+    nts(["サークル/夜想曲", "cv/水瀬なずな", "バイノーラル"]),
+    info,
+  );
+  assert.deepEqual(added, nts(["cv/新CV", "genre/耳かき"]));
 });
 
-test("mergeDlsiteTags: ratingタグを追加する", () => {
+test("fillUnsetDlsiteTags: ratingタグを追加する", () => {
   const info: DlsiteWorkInfo = {
     rjCode: "RJ900002",
     title: "x",
@@ -409,9 +407,34 @@ test("mergeDlsiteTags: ratingタグを追加する", () => {
     url: "",
   };
   assert.deepEqual(dlsiteInfoTags(info), nts(["rating/R18"]));
+  assert.deepEqual(fillUnsetDlsiteTags(nts(["genre/耳かき"]), info), nts(["rating/R18"]));
+});
+
+test("fillUnsetDlsiteTags: サークル・ratingは既存に同prefixの値があれば異なる値でも追加しない（TASK-428.1）", () => {
+  const info: DlsiteWorkInfo = {
+    rjCode: "RJ900002",
+    title: "x",
+    circle: "満月堂",
+    cvs: [],
+    genreTags: [],
+    ageRating: "R15",
+    coverUrl: null,
+    url: "",
+  };
+  assert.deepEqual(fillUnsetDlsiteTags(nts(["サークル/夜想曲", "rating/R18"]), info), []);
+});
+
+test("mergeAppliedDlsiteTags: 複数値prefix（cv・genre）は加算する", () => {
   assert.deepEqual(
-    mergeDlsiteTags(nts(["genre/耳かき"]), info),
-    nts(["genre/耳かき", "rating/R18"]),
+    mergeAppliedDlsiteTags(nts(["cv/水瀬なずな"]), nts(["cv/新CV"])),
+    nts(["cv/水瀬なずな", "cv/新CV"]),
+  );
+});
+
+test("mergeAppliedDlsiteTags: 単一値prefix（サークル・rating）は既存の同prefixタグを置き換える", () => {
+  assert.deepEqual(
+    mergeAppliedDlsiteTags(nts(["サークル/夜想曲", "cv/水瀬なずな"]), nts(["サークル/満月堂"])),
+    nts(["cv/水瀬なずな", "サークル/満月堂"]),
   );
 });
 

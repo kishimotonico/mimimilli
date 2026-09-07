@@ -1,5 +1,12 @@
 import { basename } from "node:path";
-import { hasRjCode, type DlsiteFetchResult } from "@mimimilli/shared";
+import {
+  fillUnsetDlsiteTags,
+  hasRjCode,
+  type DlsiteApplyMissingPreviewItem,
+  type DlsiteFetchResult,
+  type DlsiteWorkInfo,
+  type Work,
+} from "@mimimilli/shared";
 import { detectRjCode } from "./dlsite.ts";
 import { DlsiteCache } from "./dlsiteCache.ts";
 import type { DlsiteCacheOptions } from "./dlsiteCache.ts";
@@ -14,12 +21,20 @@ import { getWorkWithLiveProbe } from "./workRefresh.ts";
 import { createDlsiteFetch } from "./dlsiteFetch.ts";
 import { createDlsiteApply } from "./dlsiteApply.ts";
 import { createDlsiteBulk } from "./dlsiteBulk.ts";
-import { mergeDlsiteTags } from "@mimimilli/shared";
 import { readMetaSource } from "./meta.ts";
 import {
   refreshWorkDlsiteProjection,
   shouldRefreshDlsiteProjectionAfterFetch,
 } from "./dlsiteProjection.ts";
+
+/** dlsiteApplyMissing / dlsiteApplyMissingPreview が共有する差分計算。
+ *  work に無いタグ・カバー・URLだけを対象にし、既存値は上書きしない */
+function computeMissingDiff(work: Work, info: DlsiteWorkInfo) {
+  const newTags = fillUnsetDlsiteTags(work.tags, info);
+  const applyCover = !work.cover && info.coverUrl !== null;
+  const applyUrl = !work.urls.some((entry) => entry.url.includes("dlsite.com"));
+  return { newTags, applyCover, applyUrl };
+}
 
 export function createDlsiteMethods(deps: {
   db: Db;
@@ -95,10 +110,8 @@ export function createDlsiteMethods(deps: {
           result.skipped += 1;
           continue;
         }
-        const tags = mergeDlsiteTags([], fetched.info).filter((tag) => !work.tags.includes(tag));
-        const applyCover = !work.cover && fetched.info.coverUrl !== null;
-        const applyUrl = !work.urls.some((entry) => entry.url.includes("dlsite.com"));
-        if (tags.length === 0 && !applyCover && !applyUrl) {
+        const { newTags, applyCover, applyUrl } = computeMissingDiff(work, fetched.info);
+        if (newTags.length === 0 && !applyCover && !applyUrl) {
           result.skipped += 1;
           continue;
         }
@@ -107,7 +120,7 @@ export function createDlsiteMethods(deps: {
             info: fetched.info,
             sourceRevision: readMetaSource(metaPath).sourceRevision,
             applyTitle: false,
-            applyTags: tags,
+            applyTags: newTags,
             applyCover,
             applyUrl,
           });
@@ -118,6 +131,25 @@ export function createDlsiteMethods(deps: {
         }
       }
       return result;
+    },
+
+    async dlsiteApplyMissingPreview(workIds?: string[]) {
+      const { summaries } = query.listSummaries(workIds);
+      const items: DlsiteApplyMissingPreviewItem[] = [];
+      for (const summary of summaries) {
+        if (!hasRjCode(summary.dlsite) || summary.dlsite.status === "skipped") continue;
+        const fetched = await fetch.fetchCachedDlsite(summary.dlsite.rjCode);
+        if (shouldRefreshDlsiteProjectionAfterFetch(fetched)) {
+          refreshWorkDlsiteProjection(catalog, summary.id, dlsiteCache);
+        }
+        if (!fetched.ok) continue;
+        const work = await getWorkWithLiveProbe(db, query, catalog, summary.id);
+        if (!work) continue;
+        const { newTags, applyCover, applyUrl } = computeMissingDiff(work, fetched.info);
+        if (newTags.length === 0 && !applyCover && !applyUrl) continue;
+        items.push({ workId: summary.id, title: work.title, newTags, applyCover, applyUrl });
+      }
+      return { items };
     },
 
     ...apply,

@@ -55,9 +55,9 @@ export default function NotificationListModal<T>({
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto px-[18px] py-3">
           {isLoading ? (
-            <p className="text-[11.5px] text-ink-3">読み込み中...</p>
+            <p className="text-secondary text-ink-2">読み込み中...</p>
           ) : items.length === 0 ? (
-            <p className="text-[11.5px] text-ink-3">{emptyMessage}</p>
+            <p className="text-secondary text-ink-2">{emptyMessage}</p>
           ) : (
             <ul className="flex list-none flex-col gap-1 p-0">
               {items.map((item) => (

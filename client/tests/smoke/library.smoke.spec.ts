@@ -118,7 +118,10 @@ test("詳細パネルの「その他」メニューから作品登録を解除�
   await dialog.getByRole("button", { name: "解除する" }).click();
 
   await expect(panel).toBeHidden();
-  await expect(page.getByText("添い寝カフェへようこそ", { exact: false })).toBeHidden();
+  await expect(
+    page.locator(".mll-results").getByText("添い寝カフェへようこそ", { exact: false }),
+  ).toBeHidden();
+  await expect(page.getByText("の登録を解除しました", { exact: false })).toBeVisible();
 
   assertNoErrors(tracker);
 });
@@ -266,7 +269,8 @@ test("スキャンダイアログが開いて完了し、閉じられる", async
     dialog.getByRole("button", { name: /ツンデレ後輩ちゃんの秘密のお世話ボイス/ }),
   ).toBeVisible({ timeout: 15_000 });
 
-  await dialog.getByRole("button", { name: "閉じる" }).click();
+  // スキャン完了トースト（TASK-428.4）も同じ「閉じる」ラベルを持つため、ヘッダーの閉じるボタンに絞る。
+  await dialog.getByRole("banner").getByRole("button", { name: "閉じる" }).click();
   await expect(dialog).toBeHidden();
 
   assertNoErrors(tracker);
@@ -339,13 +343,15 @@ test("スキャン完了後に候補を選択登録でき、問題をFilesで確
 
   await dialog.getByRole("tab", { name: /^要対応/ }).click();
   const attention = dialog.getByRole("tabpanel", { name: "要対応" });
-  const primaryRow = attention.getByRole("row", { name: /夜想曲スタジオ/ });
-  await expect(primaryRow.getByText("ID重複", { exact: true })).toBeVisible();
-  const conflictRow = attention.getByRole("row", { name: /copies\// });
-  await expect(conflictRow.getByText("競合相手", { exact: true })).toBeVisible();
+  // ID重複はworkId単位1行にまとまる（TASK-428.4）: 「登録中」「重複」双方のパスが同じ行に並ぶ。
+  const conflictRow = attention.getByRole("row", { name: /夜想曲スタジオ/ });
+  await expect(conflictRow.getByText("ID重複", { exact: true })).toBeVisible();
+  await expect(conflictRow.getByText("登録中:")).toBeVisible();
+  await expect(conflictRow.getByText("重複:")).toBeVisible();
+  await expect(conflictRow.getByText(/copies\//)).toBeVisible();
   await expect(attention.getByText("読み取り失敗", { exact: true })).toBeVisible();
 
-  await primaryRow.getByRole("button", { name: "Filesで開く" }).click();
+  await conflictRow.getByRole("button", { name: "Filesで開く" }).first().click();
   await expect(page.getByRole("button", { name: "ファイル", exact: true })).toHaveAttribute(
     "aria-pressed",
     "true",

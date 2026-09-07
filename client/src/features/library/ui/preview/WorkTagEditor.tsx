@@ -198,11 +198,6 @@ export function WorkTagEditor({
         </div>
       </div>
       <WorkSourcePatchBlockedNotice sourceRevision={work.sourceRevision} />
-      {patchTagsErrorMessage && (
-        <p className="mle-prv__edit-error" role="alert">
-          {patchTagsErrorMessage}
-        </p>
-      )}
       {confirmingRemoveTag && (
         <ConfirmDialog
           title="保護タグの削除"
@@ -213,10 +208,13 @@ export function WorkTagEditor({
         />
       )}
       <Toast
-        message={tagUndoToast ? `タグ「${tagUndoToast}」を削除しました` : null}
-        actionLabel="元に戻す"
-        onAction={() => void undoRemoveTag()}
-        onDismiss={dismissTagUndoToast}
+        message={
+          patchTagsErrorMessage ?? (tagUndoToast ? `タグ「${tagUndoToast}」を削除しました` : null)
+        }
+        variant={patchTagsErrorMessage ? "error" : "success"}
+        actionLabel={patchTagsErrorMessage ? undefined : "元に戻す"}
+        onAction={patchTagsErrorMessage ? undefined : () => void undoRemoveTag()}
+        onDismiss={patchTagsErrorMessage ? resetPatchTagsError : dismissTagUndoToast}
       />
     </>
   );

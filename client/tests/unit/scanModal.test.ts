@@ -189,6 +189,16 @@ function seedScanQueries(
   if (queryClient.getQueryData(SCAN_QUERY_KEYS.diagnostics()) === undefined) {
     queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), { diagnostics: [] });
   }
+  // 通知ベルと同じ要対応集計（TASK-428.4）。未シードだと実fetchへ落ちるため既定値で固定する。
+  if (queryClient.getQueryData(WORK_QUERY_KEYS.dlsiteNotificationSummary()) === undefined) {
+    queryClient.setQueryData(WORK_QUERY_KEYS.dlsiteNotificationSummary(), {
+      rjCodeMissingCount: 0,
+      fetchFailedCount: 0,
+      parseErrorCount: 0,
+      parseErrorAlert: false,
+      unlinkedCount: 0,
+    });
+  }
 }
 
 function openTab(name: string) {
@@ -221,7 +231,7 @@ function renderModal(
   const modalProps = {
     lastScanTime: null,
     onClose: vi.fn(),
-    onOpenRjCodeMissing: vi.fn(),
+    onOpenNotificationModal: vi.fn(),
     ...rest,
   };
 
@@ -546,8 +556,12 @@ describe("ScanModal", () => {
 
     await waitFor(() => expect(registerSpy).toHaveBeenCalled());
     expect(registerSpy.mock.calls[0]?.[0]).toEqual([
-      { path: candidateDetected.path, rjCode: candidateDetected.rjCode },
-      { path: candidateUndetected.path, rjCode: "" },
+      {
+        path: candidateDetected.path,
+        title: candidateDetected.inferredTitle,
+        rjCode: candidateDetected.rjCode,
+      },
+      { path: candidateUndetected.path, title: candidateUndetected.inferredTitle, rjCode: "" },
     ]);
 
     await waitFor(() =>
@@ -556,6 +570,71 @@ describe("ScanModal", () => {
     await waitFor(() =>
       expect(screen.getByRole("tabpanel", { name: /^新規登録済み/ })).toBeInTheDocument(),
     );
+  });
+
+  it("候補登録に成功すると作品一覧・軸件数・DLsite通知・スマートフォルダーのクエリを無効化する（TASK-428.3）", async () => {
+    vi.spyOn(scanApi, "registerScanCandidates").mockResolvedValue({
+      registered: [{ path: candidateDetected.path, workId: "w-detected" }],
+      failures: [],
+    });
+    const { queryClient } = renderModal({
+      lastResult: { ...scanResult, candidates: [candidateDetected] },
+    });
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });
+    await expect.poll(() => unregistered.textContent).toContain(candidateDetected.inferredTitle);
+    fireEvent.click(within(unregistered).getByRole("button", { name: "1件をライブラリに追加" }));
+
+    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["works"] }));
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["axisFacets"] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["dlsiteNotifications"] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["smartFolderWorks"] });
+  });
+
+  it("候補登録が部分失敗しても、成功分がある限り作品一覧等を無効化する（TASK-428.3）", async () => {
+    vi.spyOn(scanApi, "registerScanCandidates").mockResolvedValue({
+      registered: [{ path: candidateDetected.path, workId: "w-detected" }],
+      failures: [{ path: candidateUndetected.path, message: "失敗" }],
+    });
+    const { queryClient } = renderModal({
+      lastResult: { ...scanResult, candidates: [candidateDetected, candidateUndetected] },
+    });
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });
+    await expect.poll(() => unregistered.textContent).toContain(candidateDetected.inferredTitle);
+    fireEvent.click(within(unregistered).getByRole("button", { name: "2件をライブラリに追加" }));
+
+    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["works"] }));
+    await waitFor(() =>
+      expect(screen.getByText("1件はライブラリに追加できませんでした。")).toBeInTheDocument(),
+    );
+  });
+
+  it("候補の除外では作品一覧・軸件数・スマートフォルダーの再取得を行わない（AC#4）", async () => {
+    vi.spyOn(scanApi, "excludeScanCandidates").mockResolvedValue(undefined);
+    const { queryClient } = renderModal({
+      lastResult: { ...scanResult, candidates: [candidateUndetected] },
+    });
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });
+    await expect.poll(() => unregistered.textContent).toContain(candidateUndetected.inferredTitle);
+    fireEvent.click(
+      within(unregistered).getByRole("button", {
+        name: `「${candidateUndetected.inferredTitle}」を候補から外す`,
+      }),
+    );
+
+    await waitFor(() =>
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: SCAN_QUERY_KEYS.candidateExclusions(),
+      }),
+    );
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ["works"] });
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ["axisFacets"] });
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ["smartFolderWorks"] });
   });
 
   it("未検出のRJコードをクリックで編集し、編集した値を登録に送る", async () => {
@@ -585,7 +664,11 @@ describe("ScanModal", () => {
 
     await waitFor(() => expect(registerSpy).toHaveBeenCalled());
     expect(registerSpy.mock.calls[0]?.[0]).toEqual([
-      { path: candidateUndetected.path, rjCode: "RJ200002" },
+      {
+        path: candidateUndetected.path,
+        title: candidateUndetected.inferredTitle,
+        rjCode: "RJ200002",
+      },
     ]);
   });
 
@@ -677,6 +760,17 @@ describe("ScanModalと他画面が同じlibraryTotalQueryOptionsを共有する�
       if (url.pathname === "/api/scan/candidates") {
         return Promise.resolve(jsonResponse({ candidates: [] }));
       }
+      if (url.pathname === "/api/dlsite/notifications") {
+        return Promise.resolve(
+          jsonResponse({
+            rjCodeMissingCount: 0,
+            fetchFailedCount: 0,
+            parseErrorCount: 0,
+            parseErrorAlert: false,
+            unlinkedCount: 0,
+          }),
+        );
+      }
       return Promise.reject(new Error(`unexpected fetch: ${url.toString()}`));
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -710,7 +804,7 @@ describe("ScanModalと他画面が同じlibraryTotalQueryOptionsを共有する�
             createElement(ScanModal, {
               lastScanTime: null,
               onClose: vi.fn(),
-              onOpenRjCodeMissing: vi.fn(),
+              onOpenNotificationModal: vi.fn(),
             }),
           ),
         ),

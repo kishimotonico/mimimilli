@@ -40,6 +40,7 @@ export class ScanJobManager {
   private readonly adapter: DataAdapter;
   private readonly historyLimit: number;
   private readonly terminalLimit: number;
+  private readonly onCompleted: (insertedWorkIds: string[]) => void;
   private readonly jobs = new Map<string, Job>();
   private activeId: string | null = null;
   private runCompletion: Promise<void> | null = null;
@@ -47,10 +48,16 @@ export class ScanJobManager {
   // terminal job はpruneTerminalで消えるため、前回結果はディスク永続化せずここにだけ保持する（TASK-56）。
   private lastCompleted: ScanLastResultResponse | null = null;
 
-  constructor(adapter: DataAdapter, historyLimit = 128, terminalLimit = 16) {
+  constructor(
+    adapter: DataAdapter,
+    historyLimit = 128,
+    terminalLimit = 16,
+    onCompleted: (insertedWorkIds: string[]) => void = () => {},
+  ) {
     this.adapter = adapter;
     this.historyLimit = historyLimit;
     this.terminalLimit = terminalLimit;
+    this.onCompleted = onCompleted;
   }
 
   start(options?: { full?: boolean }): ScanJobSnapshot {
@@ -253,6 +260,7 @@ export class ScanJobManager {
     this.emit(job, { type: "completed", seq: 0, result });
     this.deactivate(job);
     this.pruneTerminal();
+    if (result.insertedWorkIds.length > 0) this.onCompleted(result.insertedWorkIds);
   }
 
   private finishFailed(job: Job, error: unknown): void {

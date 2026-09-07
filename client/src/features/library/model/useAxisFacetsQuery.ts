@@ -6,12 +6,13 @@ import { useQuery } from "@tanstack/react-query";
 import type { FacetAxisId, NormalizedTag } from "@mimimilli/shared";
 import { getAxisFacets } from "../api";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
-import { buildAxisFacetFilterParams, filterValidFacetItems } from "./libraryPresentation";
+import { buildTagFilterParams, filterValidFacetItems } from "./libraryPresentation";
 
-// selectedTags は自軸除外カウントの入力。省略時（[]）は無フィルタ集計になる
-// （呼び出し側が保持中のフィルタを意図的に渡さない場面は無い想定だが、型上は必須にしない）。
+// selectedTags は集計に含めるタグ。件数基準（何を含めて集計するか）は呼び出し側の責務で、
+// 値選択の契約（valueSelectionContract.ts の deriveFacetCountTags）から導出する。
+// このフック自体は渡されたタグをそのままAND条件として渡すだけで、軸やintentを見ない。
 export function useAxisFacetsQuery(axis: FacetAxisId | null, selectedTags: NormalizedTag[] = []) {
-  const filterParams = axis !== null ? buildAxisFacetFilterParams(axis, selectedTags) : {};
+  const filterParams = buildTagFilterParams(selectedTags);
   return useQuery({
     queryKey: WORK_QUERY_KEYS.facets(axis ?? "", filterParams),
     queryFn: async () => {

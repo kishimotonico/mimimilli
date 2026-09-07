@@ -1,5 +1,14 @@
 import { normalizeTag, type NormalizedTag } from "@mimimilli/shared";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useId,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+  type ForwardedRef,
+} from "react";
 import { cn } from "../lib/cn";
 
 export type TagComboboxOption =
@@ -71,24 +80,45 @@ export interface TagComboboxProps {
   /** px指定の固定幅、または親要素いっぱいに広げる "full"（狭幅レイアウト用） */
   width?: number | "full";
   canCreate?: (tag: string) => boolean;
+  /** 未一致の入力を候補末尾に添えるラベル。既定「新規作成」。呼び出し文脈によっては
+   *  新規タグ作成ではなく単なる値指定のため誤解を招く（例: スマートフォルダー条件） */
+  createLabel?: string;
   onSelect: (tag: string) => void;
   onCancel?: () => void;
 }
 
-export default function TagCombobox({
-  suggestions,
-  excludeTags = [],
-  disabled = false,
-  focusOnMount = false,
-  placeholder = "タグを追加",
-  label = "追加するタグ",
-  width = 220,
-  canCreate,
-  onSelect,
-  onCancel,
-}: TagComboboxProps) {
+/** commitPendingInput の結果。value が非nullのときだけ呼び出し側で確定値を反映する必要がある
+ *  （空入力・既存値との重複は反映不要のため null） */
+export type TagComboboxCommitResult =
+  | { status: "ok"; value: string | null }
+  | { status: "invalid" };
+
+export interface TagComboboxHandle {
+  /** 現在の未確定入力を、Enterキーと同じ規則（アクティブな候補の確定）で確定する。
+   *  候補が無い入力（正規化できない・空文字以外で一致なし）は入力へフォーカスして invalid を返す。
+   *  保存時に未確定文字列を黙って破棄しないために使う（TASK-428.24 SF-08） */
+  commitPendingInput: () => TagComboboxCommitResult;
+}
+
+function TagComboboxImpl(
+  {
+    suggestions,
+    excludeTags = [],
+    disabled = false,
+    focusOnMount = false,
+    placeholder = "タグを追加",
+    label = "追加するタグ",
+    width = 220,
+    canCreate,
+    createLabel = "新規作成",
+    onSelect,
+    onCancel,
+  }: TagComboboxProps,
+  ref: ForwardedRef<TagComboboxHandle>,
+) {
   const baseId = useId();
   const listboxId = `${baseId}-listbox`;
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [input, setInput] = useState("");
   const [isOpen, setIsOpen] = useState(false);
@@ -115,6 +145,37 @@ export default function TagCombobox({
     setActiveIndex(0);
   };
 
+  useImperativeHandle(
+    ref,
+    (): TagComboboxHandle => ({
+      commitPendingInput: () => {
+        const trimmed = input.trim();
+        if (trimmed.length === 0) return { status: "ok", value: null };
+
+        const normalized = normalizeTag(trimmed);
+        const isAlreadyAdded =
+          normalized !== null && excludeTags.some((tag) => normalizeTag(tag) === normalized);
+        if (isAlreadyAdded) {
+          setInput("");
+          setIsOpen(false);
+          setActiveIndex(0);
+          return { status: "ok", value: null };
+        }
+
+        if (options.length === 0) {
+          inputRef.current?.focus();
+          return { status: "invalid" };
+        }
+
+        const option = options[activeIndex] ?? options[0]!;
+        setInput("");
+        setIsOpen(false);
+        setActiveIndex(0);
+        return { status: "ok", value: option.value };
+      },
+    }),
+  );
+
   useEffect(() => {
     if (!focusOnMount || disabled) return;
 
@@ -125,11 +186,35 @@ export default function TagCombobox({
     return () => cancelAnimationFrame(frameId);
   }, [focusOnMount, disabled]);
 
+  // 候補表示中は外側クリック・スクロールで候補だけを閉じる（ダイアログやフォーム自体は閉じない）。
+  useEffect(() => {
+    if (!isExpanded) return;
+
+    const closeCandidates = () => setIsOpen(false);
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (containerRef.current?.contains(event.target as Node)) return;
+      closeCandidates();
+    };
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("scroll", closeCandidates, true);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("scroll", closeCandidates, true);
+    };
+  }, [isExpanded]);
+
   /* oxlint-disable jsx-a11y/prefer-tag-over-role -- Custom combobox needs ARIA listbox/option semantics and cannot use native select/datalist without changing tag creation behavior. */
   return (
     <div
+      ref={containerRef}
       className={cn("relative", width === "full" && "w-full")}
       style={width === "full" ? undefined : { width }}
+      onBlur={(event) => {
+        if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+        setIsOpen(false);
+      }}
     >
       <input
         ref={inputRef}
@@ -144,7 +229,7 @@ export default function TagCombobox({
         placeholder={placeholder}
         className={cn(
           "h-8 w-full rounded-[6px] border border-line bg-paper-1 px-2.5 font-jp text-[12px] text-ink-0",
-          "placeholder:text-ink-4 focus:border-acc focus:outline-none focus:ring-2 focus:ring-acc-soft",
+          "placeholder:text-ink-4 focus:border-acc",
           disabled && "cursor-not-allowed text-ink-4",
         )}
         onChange={(event) => openWithInput(event.target.value)}
@@ -167,15 +252,32 @@ export default function TagCombobox({
           }
 
           if (event.key === "Enter") {
+            // IME変換確定のEnterはタグ確定に使わない。変換だけを終わらせる。
+            if (event.nativeEvent.isComposing) return;
             event.preventDefault();
             if (activeOption) commitOption(activeOption);
             return;
           }
 
           if (event.key === "Escape") {
-            event.preventDefault();
-            setIsOpen(false);
-            onCancel?.();
+            // IME変換中のEscapeは変換取り消しに使う。候補やダイアログは閉じない。
+            if (event.nativeEvent.isComposing) return;
+
+            if (isExpanded) {
+              // 候補だけを閉じる。ダイアログのcancelやpopoverのdismissへ伝播させない。
+              event.preventDefault();
+              event.stopPropagation();
+              setIsOpen(false);
+              return;
+            }
+
+            // 候補が閉じている時は、このコンポーネントが持つ「編集キャンセル」に委譲する。
+            // onCancelが無い呼び出し元では何もせず、ネイティブdialogのEscapeキャンセルへ渡す。
+            if (onCancel) {
+              event.preventDefault();
+              event.stopPropagation();
+              onCancel();
+            }
           }
         }}
       />
@@ -199,7 +301,7 @@ export default function TagCombobox({
                 title={option.value}
                 className={cn(
                   "flex min-h-7 w-full min-w-0 items-center gap-2 px-2.5 text-left font-jp text-[12px] text-ink-1",
-                  "hover:bg-paper-2 focus:bg-paper-2 focus:outline-none",
+                  "hover:bg-paper-2 focus:bg-paper-2",
                   isActive && "bg-acc-soft text-acc-ink",
                 )}
                 onMouseEnter={() => setActiveIndex(index)}
@@ -209,8 +311,8 @@ export default function TagCombobox({
                 {/* タグ名を主情報として省略記号+tooltipで表示し、「新規作成」は補足として控えめに添える */}
                 <span className="min-w-0 flex-1 truncate">{option.value}</span>
                 {option.kind === "create" && (
-                  <span className="shrink-0 font-mono text-[9px] uppercase tracking-wide text-ink-3">
-                    新規作成
+                  <span className="shrink-0 font-mono text-label uppercase tracking-wide text-ink-2">
+                    {createLabel}
                   </span>
                 )}
               </button>
@@ -222,3 +324,6 @@ export default function TagCombobox({
   );
   /* oxlint-enable jsx-a11y/prefer-tag-over-role */
 }
+
+const TagCombobox = forwardRef(TagComboboxImpl);
+export default TagCombobox;

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  firstFlatIndexOfRow,
   getNextGridIndex,
   getNextJustifiedIndex,
+  rowIndexOfFlatIndex,
 } from "../../src/features/library/model/gridNavigation";
 
 describe("library grid keyboard navigation", () => {
@@ -17,6 +19,20 @@ describe("library grid keyboard navigation", () => {
     expect(getNextGridIndex(1, "ArrowUp", 3, 8)).toBe(1);
     expect(getNextGridIndex(6, "ArrowDown", 3, 8)).toBe(6);
     expect(getNextGridIndex(7, "ArrowRight", 3, 8)).toBe(7);
+  });
+
+  it("Home/Endで先頭・末尾へ移動する（TASK-428.12）", () => {
+    expect(getNextGridIndex(4, "Home", 3, 8)).toBe(0);
+    expect(getNextGridIndex(4, "End", 3, 8)).toBe(7);
+  });
+
+  it("列数1（リスト表示）ではArrowUp/Downが前後1件移動になる（TASK-428.12）", () => {
+    expect(getNextGridIndex(4, "ArrowDown", 1, 8)).toBe(5);
+    expect(getNextGridIndex(4, "ArrowUp", 1, 8)).toBe(3);
+  });
+
+  it("0件のときは常に現在位置に留まる", () => {
+    expect(getNextGridIndex(0, "End", 3, 0)).toBe(0);
   });
 });
 
@@ -52,5 +68,35 @@ describe("justified grid keyboard navigation", () => {
   it("returns the current index for an out-of-range start", () => {
     expect(getNextJustifiedIndex(tiles, 99, "ArrowRight")).toBe(99);
     expect(getNextJustifiedIndex([], 0, "ArrowDown")).toBe(0);
+  });
+
+  it("Home/Endで先頭・末尾へ移動する（TASK-428.12）", () => {
+    expect(getNextJustifiedIndex(tiles, 2, "Home")).toBe(0);
+    expect(getNextJustifiedIndex(tiles, 0, "End")).toBe(4);
+  });
+});
+
+describe("rowIndexOfFlatIndex / firstFlatIndexOfRow（TASK-428.12 roving tabindexのフォールバック用）", () => {
+  it("固定列グリッドでは列数で割った商が行インデックスになる", () => {
+    expect(rowIndexOfFlatIndex(7, false, null, 3)).toBe(2);
+    expect(firstFlatIndexOfRow(2, false, null, 3)).toBe(6);
+  });
+
+  it("ジャスティファイドグリッドではタイル配列のrowIndexをそのまま使う", () => {
+    const tiles = [
+      { rowIndex: 0 },
+      { rowIndex: 0 },
+      { rowIndex: 0 },
+      { rowIndex: 1 },
+      { rowIndex: 1 },
+    ];
+    expect(rowIndexOfFlatIndex(4, true, tiles, 3)).toBe(1);
+    expect(firstFlatIndexOfRow(1, true, tiles, 3)).toBe(3);
+    expect(firstFlatIndexOfRow(0, true, tiles, 3)).toBe(0);
+  });
+
+  it("ジャスティファイドで対応するタイルが無いflatIndexはundefinedを返す（レビュー対応: 行0への暗黙フォールバックをやめる）", () => {
+    const tiles = [{ rowIndex: 0 }, { rowIndex: 0 }];
+    expect(rowIndexOfFlatIndex(99, true, tiles, 3)).toBeUndefined();
   });
 });

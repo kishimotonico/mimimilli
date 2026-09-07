@@ -28,19 +28,17 @@ import { errorToastAtom } from "../shared/model/errorToastAtom";
 import { apiErrorMessage } from "../shared/lib/apiError";
 import type { ActiveModal } from "./model/activeModal";
 import { isDlsiteNotificationModal } from "./model/activeModal";
+import type { ScanTabKey } from "../features/scan/ui/scanModal/types";
 import type { Work, WorkListItem } from "@mimimilli/shared";
 import { getWork } from "../entities/work/api";
 import { useDownloadLibraryExport } from "../features/library/useDownloadLibraryExport";
 import { useScanActions } from "../entities/scan/useScanActions";
 import { setRootFolder } from "../entities/settings/api";
 import { useSettingsQuery } from "../entities/settings/useSettingsQuery";
+import { rootFolderChangedToastAtom } from "../entities/settings/model/rootFolderChangeAtoms";
 import NavigationHistorySync from "../features/navigation/ui/NavigationHistorySync";
 import { setAppModeAtom } from "../shared/model/appModeAtoms";
-import {
-  filesRelPathAtom,
-  filesSelectedPathAtom,
-} from "../entities/file-system/model/navigationAtoms";
-import { workspacePath } from "@mimimilli/shared";
+import { openPathInFilesAtom } from "../entities/file-system/model/navigationAtoms";
 import {
   setLibraryAxisAtom,
   selectLibraryWorkAtom,
@@ -55,23 +53,33 @@ export default function App() {
   const scanActions = useScanActions();
   const queryClient = useQueryClient();
   const setErrorToast = useSetAtom(errorToastAtom);
+  const setRootFolderChangedToast = useSetAtom(rootFolderChangedToastAtom);
   const setAppMode = useSetAtom(setAppModeAtom);
-  const setFilesRelPath = useSetAtom(filesRelPathAtom);
-  const setFilesSelectedPath = useSetAtom(filesSelectedPathAtom);
+  const openPathInFiles = useSetAtom(openPathInFilesAtom);
   const setLibraryAxis = useSetAtom(setLibraryAxisAtom);
   const selectLibraryWork = useSetAtom(selectLibraryWorkAtom);
   const openWorkDetail = useSetAtom(openWorkDetailAtom);
   const playRequestIdRef = useRef(0);
 
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
+  const [scanModalInitialTab, setScanModalInitialTab] = useState<ScanTabKey>("unregistered");
 
   // ── Settings ─────────────────────────────────────────────
   const settingsQuery = useSettingsQuery();
   const settings = settingsQuery.data;
+  // 再試行中（isPending===true・error===null に巻き戻る）でも起動エラー画面の文脈を保つため、
+  // 直近のエラーを保持する。成功したら破棄する
+  const [lastStartupError, setLastStartupError] = useState<unknown>(undefined);
+  if (settingsQuery.isError && settingsQuery.error !== lastStartupError) {
+    setLastStartupError(settingsQuery.error);
+  } else if (settingsQuery.isSuccess && lastStartupError !== undefined) {
+    setLastStartupError(undefined);
+  }
   const startupState = resolveAppStartupState({
     isPending: settingsQuery.isPending,
     isError: settingsQuery.isError,
     data: settings,
+    hasErroredBefore: lastStartupError !== undefined,
   });
 
   // ファイルモードのルートパス（FilesView に渡す）。
@@ -82,6 +90,7 @@ export default function App() {
     mutationFn: setRootFolder,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() });
+      setRootFolderChangedToast(true);
     },
   });
 
@@ -121,7 +130,15 @@ export default function App() {
   );
 
   // TopBarのスキャンボタンは即時実行せずモーダルを開く（TASK-56）。実行中なら実行中の表示に復帰する。
-  const handleOpenScanModal = useCallback(() => setActiveModal("scan"), []);
+  const handleOpenScanModal = useCallback(() => {
+    setScanModalInitialTab("unregistered");
+    setActiveModal("scan");
+  }, []);
+  // 通知ベルの要対応系の行から、スキャンモーダルを要対応タブで直接開く（TASK-428.4）。
+  const handleOpenScanNeedsAttention = useCallback(() => {
+    setScanModalInitialTab("needsAttention");
+    setActiveModal("scan");
+  }, []);
   const handleCloseModal = useCallback(() => setActiveModal(null), []);
 
   const handleSetupComplete = useCallback(
@@ -140,7 +157,7 @@ export default function App() {
   );
 
   const handleChangeFolder = useCallback(
-    (path: string) => changeFolderMutation.mutate(path),
+    (path: string) => changeFolderMutation.mutateAsync(path),
     [changeFolderMutation],
   );
 
@@ -162,14 +179,10 @@ export default function App() {
 
   const handleOpenScanProblemInFiles = useCallback(
     (path: string) => {
-      const segments = path.split("/").filter(Boolean);
-      const directory = segments.slice(0, -1);
-      setAppMode("files");
-      setFilesRelPath(directory);
-      setFilesSelectedPath(workspacePath(path));
+      openPathInFiles({ path, root: rootFolder });
       setActiveModal(null);
     },
-    [setAppMode, setFilesRelPath, setFilesSelectedPath],
+    [openPathInFiles, rootFolder],
   );
 
   if (startupState === "loading") {
@@ -186,7 +199,7 @@ export default function App() {
     return (
       <MotionConfig reducedMotion="user">
         <StartupErrorScreen
-          error={settingsQuery.error}
+          error={settingsQuery.error ?? lastStartupError}
           onRetry={() => {
             void settingsQuery.refetch();
           }}
@@ -215,6 +228,7 @@ export default function App() {
               notificationBell={
                 <NotificationBell
                   onOpenScanResult={handleOpenScanModal}
+                  onOpenNeedsAttention={handleOpenScanNeedsAttention}
                   onOpenNotificationModal={setActiveModal}
                 />
               }
@@ -242,6 +256,7 @@ export default function App() {
                   <SettingsModal
                     rootFolder={settings?.rootFolder ?? null}
                     lastScanTime={settings?.lastScanTime ?? null}
+                    lastScanRootFolder={settings?.lastScanRootFolder ?? null}
                     onClose={handleCloseModal}
                     onOpenScan={() => setActiveModal("scan")}
                     onChangeFolder={handleChangeFolder}
@@ -253,8 +268,9 @@ export default function App() {
                 <Suspense fallback={null}>
                   <ScanModal
                     lastScanTime={settings?.lastScanTime ?? null}
+                    initialTab={scanModalInitialTab}
                     onClose={handleCloseModal}
-                    onOpenRjCodeMissing={() => setActiveModal("rj-missing")}
+                    onOpenNotificationModal={setActiveModal}
                     onOpenFiles={handleOpenScanProblemInFiles}
                   />
                 </Suspense>
@@ -264,7 +280,11 @@ export default function App() {
                 onClose={handleCloseModal}
                 onOpenWork={handleOpenLibraryWork}
               />
-              <GlobalToast />
+              <GlobalToast
+                onOpenScan={handleOpenScanModal}
+                onOpenScanNeedsAttention={handleOpenScanNeedsAttention}
+                onRetrySkippedTrack={player.setTrackIndex}
+              />
             </>
           }
         />

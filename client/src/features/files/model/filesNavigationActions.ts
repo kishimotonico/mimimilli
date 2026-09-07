@@ -20,6 +20,12 @@ export const selectFilesEntryAtom = atom(null, (_get, set, absPath: WorkspacePat
   set(filesSelectedPathAtom, absPath);
 });
 
+/** 選択を解除し、カレントフォルダー自身のプレビューへ戻す（URLのselパラメータも消える） */
+export const clearFilesSelectionAtom = atom(null, (_get, set) => {
+  requestNavigationHistoryCommit(set, "replace");
+  set(filesSelectedPathAtom, null);
+});
+
 export const goToFilesSegmentAtom = atom(null, (get, set, index: number) => {
   const relPath = get(filesRelPathAtom);
   const selectedPath = get(filesSelectedPathAtom);

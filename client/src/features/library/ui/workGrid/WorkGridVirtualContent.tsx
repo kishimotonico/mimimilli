@@ -11,6 +11,7 @@ interface RowTileProps {
   playingWorkId: string | null;
   isPlaybackActive: boolean;
   safeTileSize: number;
+  rovingIndex: number;
   onWorkSelect: (id: string) => void;
   onWorkPlay: (work: WorkListItem) => void;
   onTileArrowKey: (flatIndex: number, key: GridArrowKey) => void;

@@ -1,19 +1,28 @@
 import { createElement, Fragment } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { DlsiteBulkResult } from "@mimimilli/shared";
+import type { DlsiteBulkResult, ScanResult } from "@mimimilli/shared";
 import GlobalToast from "../../src/app/ui/GlobalToast";
 import DlsiteBulkApplyRuntime from "../../src/features/dlsite/ui/DlsiteBulkApplyRuntime";
+
+const previewDlsiteMissing = vi.fn();
+
+vi.mock("../../src/entities/work/api", () => ({
+  applyDlsiteMissing: vi.fn(),
+  previewDlsiteMissing: (...args: unknown[]) => previewDlsiteMissing(...args),
+}));
 import { errorToastAtom } from "../../src/shared/model/errorToastAtom";
 import { playerSkipToastAtom } from "../../src/features/player/model/playerPresentationAtoms";
-import { scanErrorAtom } from "../../src/entities/scan/model/atoms";
+import { scanErrorAtom, scanResultToastAtom } from "../../src/entities/scan/model/atoms";
+import { workDeleteSuccessAtom } from "../../src/features/library/model/atoms";
 import {
   dlsiteBulkCancelledResultAtom,
   dlsiteBulkErrorAtom,
   dlsiteBulkResultAtom,
 } from "../../src/entities/dlsite/model/bulkAtoms";
+import { rootFolderChangedToastAtom } from "../../src/entities/settings/model/rootFolderChangeAtoms";
 
 const sampleDlsiteResult: DlsiteBulkResult = {
   fetched: 2,
@@ -22,18 +31,24 @@ const sampleDlsiteResult: DlsiteBulkResult = {
   skipped: 0,
 };
 
-function renderGlobalToast(store: ReturnType<typeof createStore>, withApplyRuntime = false) {
+function renderGlobalToast(
+  store: ReturnType<typeof createStore>,
+  withApplyRuntime = false,
+  onOpenScan = vi.fn(),
+  onOpenScanNeedsAttention = vi.fn(),
+  onRetrySkippedTrack = vi.fn(),
+) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
+  const toast = createElement(GlobalToast, {
+    onOpenScan,
+    onOpenScanNeedsAttention,
+    onRetrySkippedTrack,
+  });
   const children = withApplyRuntime
-    ? createElement(
-        Fragment,
-        null,
-        createElement(GlobalToast),
-        createElement(DlsiteBulkApplyRuntime),
-      )
-    : createElement(GlobalToast);
+    ? createElement(Fragment, null, toast, createElement(DlsiteBulkApplyRuntime))
+    : toast;
 
   render(
     createElement(
@@ -54,13 +69,19 @@ describe("GlobalToast", () => {
     expect(screen.getByText("ライブラリのエクスポートに失敗しました")).toBeTruthy();
   });
 
-  it("playerSkipToastAtom のメッセージを表示する", () => {
+  it("playerSkipToastAtom のメッセージを表示し、再試行で対象トラックを選び直す", () => {
     const store = createStore();
-    store.set(playerSkipToastAtom, "「Track 1」をスキップしました");
+    store.set(playerSkipToastAtom, {
+      message: "「Track 1」を読み込めなかったためスキップしました",
+      trackIndex: 0,
+    });
+    const onRetrySkippedTrack = vi.fn();
 
-    renderGlobalToast(store);
+    renderGlobalToast(store, false, vi.fn(), vi.fn(), onRetrySkippedTrack);
 
-    expect(screen.getByText("「Track 1」をスキップしました")).toBeTruthy();
+    expect(screen.getByText("「Track 1」を読み込めなかったためスキップしました")).toBeTruthy();
+    fireEvent.click(screen.getByText("このトラックを再試行"));
+    expect(onRetrySkippedTrack).toHaveBeenCalledWith(0);
   });
 
   it("scanErrorAtom のメッセージを表示する", () => {
@@ -70,6 +91,15 @@ describe("GlobalToast", () => {
     renderGlobalToast(store);
 
     expect(screen.getByText("start failed")).toBeTruthy();
+  });
+
+  it("workDeleteSuccessAtom のメッセージをsuccess variantで表示する", () => {
+    const store = createStore();
+    store.set(workDeleteSuccessAtom, "「作品X」の登録を解除しました");
+
+    renderGlobalToast(store);
+
+    expect(screen.getByText("「作品X」の登録を解除しました")).toBeTruthy();
   });
 
   it("dlsiteBulkErrorAtom のメッセージを表示する", () => {
@@ -92,7 +122,18 @@ describe("GlobalToast", () => {
       });
     });
 
-    it("完了時に「未設定項目を適用」を押すと確認ダイアログが開く", () => {
+    it("完了時に「未設定項目を適用」を押すと差分プレビュー付きの確認ダイアログが開く", async () => {
+      previewDlsiteMissing.mockResolvedValue({
+        items: [
+          {
+            workId: "RJ501001",
+            title: "作品A",
+            newTags: ["cv/新CV"],
+            applyCover: false,
+            applyUrl: false,
+          },
+        ],
+      });
       const store = createStore();
       store.set(dlsiteBulkResultAtom, sampleDlsiteResult);
 
@@ -100,8 +141,26 @@ describe("GlobalToast", () => {
 
       expect(screen.getByText(/DLsite一括取得:/)).toBeTruthy();
       fireEvent.click(screen.getByRole("button", { name: "未設定項目を適用" }));
-      expect(screen.getByRole("dialog", { name: "未設定項目をまとめて適用" })).toBeTruthy();
+      await waitFor(() =>
+        expect(screen.getByRole("dialog", { name: /未設定項目をまとめて適用/ })).toBeTruthy(),
+      );
     });
+  });
+
+  it("rootFolderChangedToastAtom がtrueのとき「今すぐスキャン」でonOpenScanを呼ぶ", () => {
+    const store = createStore();
+    store.set(rootFolderChangedToastAtom, true);
+    const onOpenScan = vi.fn();
+
+    renderGlobalToast(store, false, onOpenScan);
+
+    expect(
+      screen.getByText(
+        "ルートフォルダーを変更しました。新しいフォルダーを読み込むにはスキャンしてください。",
+      ),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "今すぐスキャン" }));
+    expect(onOpenScan).toHaveBeenCalledTimes(1);
   });
 
   it("dlsiteBulkCancelledResultAtom では「未設定項目を適用」を表示しない", () => {
@@ -112,5 +171,57 @@ describe("GlobalToast", () => {
 
     expect(screen.getByText(/DLsite一括取得を中断しました/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "未設定項目を適用" })).toBeNull();
+  });
+
+  describe("スキャン完了・中止トースト（TASK-428.4）", () => {
+    const baseResult: ScanResult = {
+      registered: 12,
+      insertedWorkIds: ["a", "b"],
+      updatedWorkIds: [],
+      errors: 0,
+      missing: 0,
+      rjCodeMissingCount: 0,
+      skipped: 0,
+      coverErrors: 0,
+      identityConflicts: [],
+      invalidMetaFiles: [],
+      candidates: [],
+    };
+
+    it("要対応が無ければ登録・新規・エラー・欠損数だけを出し、アクションは付けない", () => {
+      const store = createStore();
+      store.set(scanResultToastAtom, { kind: "completed", result: baseResult });
+
+      renderGlobalToast(store);
+
+      expect(
+        screen.getByText("スキャン完了: 登録 12件・新規 2件・エラー 0件・行方不明 0件"),
+      ).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "要対応を見る" })).toBeNull();
+    });
+
+    it("要対応があれば「要対応を見る」を出し、押すとコールバックとdismissが呼ばれる", () => {
+      const store = createStore();
+      const onOpenScanNeedsAttention = vi.fn();
+      store.set(scanResultToastAtom, {
+        kind: "completed",
+        result: { ...baseResult, rjCodeMissingCount: 1 },
+      });
+
+      renderGlobalToast(store, false, vi.fn(), onOpenScanNeedsAttention);
+      fireEvent.click(screen.getByRole("button", { name: "要対応を見る" }));
+
+      expect(onOpenScanNeedsAttention).toHaveBeenCalledTimes(1);
+      expect(store.get(scanResultToastAtom)).toBeNull();
+    });
+
+    it("中止時は「スキャンを中止しました」を出す", () => {
+      const store = createStore();
+      store.set(scanResultToastAtom, { kind: "cancelled" });
+
+      renderGlobalToast(store);
+
+      expect(screen.getByText("スキャンを中止しました")).toBeTruthy();
+    });
   });
 });

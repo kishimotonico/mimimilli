@@ -11,6 +11,7 @@ import {
   normalizeTags,
   isTagNormalized,
   parseStoredNormalizedTags,
+  resolveTagPrefix,
   TagNormalizationError,
   tagEquals,
   tagPrefixCreateSchema,
@@ -135,6 +136,19 @@ test("DEFAULT_TAG_PREFIXES: color は CSS 変数文字列ではなく semantic k
   for (const def of DEFAULT_TAG_PREFIXES) {
     assert.ok(def.color === null || !def.color.startsWith("var("), def.prefix);
   }
+});
+
+// ── prefix のラベル・色解決（複数画面で結果を揃える。TASK-428.7）──────
+
+test("resolveTagPrefix: 登録済み prefix はラベル・色をそのまま返す", () => {
+  assert.deepEqual(resolveTagPrefix("cv", DEFAULT_TAG_PREFIXES), { label: "CV", color: "cv" });
+});
+
+test("resolveTagPrefix: 未登録 prefix は prefix 文字列をラベルにし、色は null", () => {
+  assert.deepEqual(resolveTagPrefix("気分", DEFAULT_TAG_PREFIXES), {
+    label: "気分",
+    color: null,
+  });
 });
 
 // ── ファセット集計（動的 prefix 軸）──────────────────────────
@@ -464,6 +478,81 @@ test("PATCH・DELETE /api/tag-prefixes/:prefix は未登録なら404", async () 
 
   const deleted = await app.request("/api/tag-prefixes/unknown", { method: "DELETE" });
   assert.equal(deleted.status, 404);
+});
+
+test("POST /api/tag-prefixes: 新規は末尾へ自動採番され、一覧は order 昇順で返る（TASK-428.7）", async () => {
+  const app = buildApp();
+
+  const created = await app.request("/api/tag-prefixes", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prefix: "気分", label: "気分" }),
+  });
+  const createdBody = await created.json();
+  const maxSeedOrder = Math.max(...DEFAULT_TAG_PREFIXES.map((p) => p.order));
+  assert.equal(createdBody.order, maxSeedOrder + 1);
+
+  const list = await (await app.request("/api/tag-prefixes")).json();
+  assert.deepEqual(
+    list.map((p: { order: number }) => p.order),
+    [...list].map((p: { order: number }) => p.order).sort((a: number, b: number) => a - b),
+  );
+});
+
+test("PATCH /api/tag-prefixes/:prefix: order を直接更新できる（TASK-428.7）", async () => {
+  const app = buildApp();
+  const before = await (await app.request("/api/tag-prefixes")).json();
+  const [first] = before as Array<{ prefix: string; order: number }>;
+  assert.ok(first);
+
+  const patched = await app.request(`/api/tag-prefixes/${encodeURIComponent(first.prefix)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ order: 99 }),
+  });
+  const patchedBody = await patched.json();
+  assert.equal(patchedBody.order, 99);
+});
+
+test("PUT /api/tag-prefixes/order: 全prefixの新しい順序を一括・アトミックに適用する（TASK-428.7）", async () => {
+  const app = buildApp();
+  const before = (await (await app.request("/api/tag-prefixes")).json()) as Array<{
+    prefix: string;
+  }>;
+  const reversedOrder = [...before].reverse().map((p) => p.prefix);
+
+  const res = await app.request("/api/tag-prefixes/order", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prefixes: reversedOrder }),
+  });
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.deepEqual(
+    body.map((p: { prefix: string }) => p.prefix),
+    reversedOrder,
+  );
+
+  const after = await (await app.request("/api/tag-prefixes")).json();
+  assert.deepEqual(
+    after.map((p: { prefix: string }) => p.prefix),
+    reversedOrder,
+  );
+});
+
+test("PUT /api/tag-prefixes/order: prefix集合が一覧と一致しなければ400で、並び順は変わらない", async () => {
+  const app = buildApp();
+  const before = await (await app.request("/api/tag-prefixes")).json();
+
+  const res = await app.request("/api/tag-prefixes/order", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prefixes: ["cv", "存在しないprefix"] }),
+  });
+  assert.equal(res.status, 400);
+
+  const after = await (await app.request("/api/tag-prefixes")).json();
+  assert.deepEqual(after, before);
 });
 
 test("GET /api/tag-prefixes/candidates は未登録 prefix を返す", async () => {

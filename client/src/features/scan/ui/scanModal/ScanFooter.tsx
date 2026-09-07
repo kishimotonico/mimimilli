@@ -1,5 +1,6 @@
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import { useMotionVariants } from "../../../../shared/ui/useMotionVariants";
+import { buttonClass } from "../../../../shared/ui/Button";
 import { I } from "../../../../shared/ui/Icon";
 
 export interface ScanFooterProps {
@@ -44,7 +45,7 @@ function ScanFooterHint() {
   const isPresent = useIsPresent();
   const v = fade();
   return (
-    <motion.p className="m-0 font-jp text-[11px] text-ink-3" inert={!isPresent} {...v}>
+    <motion.p className="m-0 font-jp text-secondary text-ink-2" inert={!isPresent} {...v}>
       閉じてもバックグラウンドで続行します
     </motion.p>
   );
@@ -56,7 +57,7 @@ function ScanDiffHint() {
   const isPresent = useIsPresent();
   const v = fade();
   return (
-    <motion.p className="m-0 font-jp text-[11px] text-ink-3" inert={!isPresent} {...v}>
+    <motion.p className="m-0 font-jp text-secondary text-ink-2" inert={!isPresent} {...v}>
       変更のあったフォルダーだけを調べます
     </motion.p>
   );
@@ -72,7 +73,7 @@ function ScanCancelButton({ onClick }: { onClick: () => void }) {
       onClick={onClick}
       inert={!isPresent}
       {...v}
-      className="inline-flex h-9 min-w-[128px] items-center justify-center gap-1.5 rounded-[6px] border border-[color-mix(in_oklch,var(--r-coral)_45%,transparent)] bg-[color-mix(in_oklch,var(--r-coral)_10%,transparent)] px-4 font-sans text-[12.5px] font-medium text-ink-0 transition-colors hover:bg-[color-mix(in_oklch,var(--r-coral)_16%,transparent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
+      className={buttonClass("danger-quiet", "lg", { className: "min-w-[128px] justify-center" })}
     >
       <I.x size={12} />
       スキャンを中止
@@ -90,7 +91,7 @@ function ScanFullScanLink({ onClick }: { onClick: () => void }) {
       onClick={onClick}
       inert={!isPresent}
       {...v}
-      className="font-sans text-[12px] font-medium text-ink-3 underline-offset-2 transition-colors hover:text-ink-0 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
+      className="font-sans text-body font-medium text-ink-2 underline-offset-2 transition-colors hover:text-ink-0 hover:underline"
     >
       すべて読み直す
     </motion.button>
@@ -107,7 +108,7 @@ function ScanStartButton({ hasResult, onClick }: { hasResult: boolean; onClick: 
       onClick={onClick}
       inert={!isPresent}
       {...v}
-      className="inline-flex h-9 min-w-[128px] items-center justify-center gap-1.5 rounded-[6px] bg-ink-0 px-4 font-sans text-[12.5px] font-semibold text-paper-1 transition-colors hover:bg-acc focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
+      className={buttonClass("primary", "lg", { className: "min-w-[128px] justify-center" })}
     >
       <I.refresh size={12} />
       {hasResult ? "再スキャン" : "スキャン"}

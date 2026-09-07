@@ -27,13 +27,16 @@ export default function FileRow({
 }: FileRowProps) {
   const kind = classifyFile(entry);
   const Ic = I[FILE_KIND_ICON[kind]];
-  const isWorkFolder = entry.isDir && !!entry.workId;
-  const display = getWorkFolderDisplay(entry.name, isWorkFolder ? entry.workId : null);
+  // フォルダーは workId があれば登録済み、ファイル単体は workRelPath が自分自身を指す
+  // （"" または "."）ときだけ登録済み（TASK-428.18）。
+  const isRegisteredWork =
+    !!entry.workId && (entry.isDir || entry.workRelPath === "" || entry.workRelPath === ".");
+  const display = getWorkFolderDisplay(entry.name, isRegisteredWork ? entry.workId : null);
 
   const cls = [
     "mle-row",
     FILE_KIND_ROW_CLASS[kind],
-    isWorkFolder ? "is-folder-work" : "",
+    isRegisteredWork ? "is-work" : "",
     isFocused ? "is-on is-focused" : "",
     isPlaying ? "is-now" : "",
   ]

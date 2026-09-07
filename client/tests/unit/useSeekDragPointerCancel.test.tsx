@@ -17,6 +17,18 @@ function TestSeek({ onSeek = vi.fn() }: { onSeek?: (time: number) => void }) {
   });
 }
 
+describe("useSeekDrag の主ボタン判定", () => {
+  it("主ボタン以外のpointerdownではdragが始まらない", () => {
+    const onSeek = vi.fn();
+    render(createElement(TestSeek, { onSeek }));
+    const track = screen.getByTestId("seek");
+
+    fireEvent.pointerDown(track, { pointerId: 1, clientX: 10, button: 2 });
+    expect(track).toHaveAttribute("data-dragging", "false");
+    expect(onSeek).not.toHaveBeenCalled();
+  });
+});
+
 describe("useSeekDrag のpointercancel/lostpointercapture", () => {
   it("pointercancelでdragging状態が固まらず解除される", () => {
     render(createElement(TestSeek));

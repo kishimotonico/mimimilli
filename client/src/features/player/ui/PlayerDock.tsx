@@ -22,6 +22,8 @@ interface DockBarProps {
   onSwitchToPopup: () => void;
   onSetVolume: (v: number) => void;
   onStop: () => void;
+  onRetryError: () => void;
+  onDismissError: () => void;
 }
 
 function DockBar({ variant, switching, ...barProps }: DockBarProps) {
@@ -54,6 +56,8 @@ interface DockPopupProps {
   onOpenNowPlaying: () => void;
   onShowPlayingWork: () => void;
   onStop: () => void;
+  onRetryError: () => void;
+  onDismissError: () => void;
 }
 
 function DockPopup({ variant, switching, ...popupProps }: DockPopupProps) {
@@ -137,6 +141,8 @@ export default function PlayerDock({ onShowPlayingWork }: PlayerDockProps) {
             onSwitchToPopup={() => switchUiMode("popup")}
             onSetVolume={actions.setVolume}
             onStop={actions.stop}
+            onRetryError={actions.retryPlayback}
+            onDismissError={actions.dismissError}
           />
         )}
       </AnimatePresence>
@@ -159,6 +165,8 @@ export default function PlayerDock({ onShowPlayingWork }: PlayerDockProps) {
             onOpenNowPlaying={() => setAppMode("nowPlaying")}
             onShowPlayingWork={handleShowPlayingWork}
             onStop={actions.stop}
+            onRetryError={actions.retryPlayback}
+            onDismissError={actions.dismissError}
           />
         )}
       </AnimatePresence>

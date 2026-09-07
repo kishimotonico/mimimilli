@@ -4,7 +4,7 @@
 // （組み込みの "year" と任意の prefix 軸）。ラベル・軸レールへの表示は
 // サーバーの prefix 定義（GET /tag-prefixes）から引く。
 
-import type { TagPrefix } from "@mimimilli/shared";
+import { resolveTagPrefix, type TagPrefix } from "@mimimilli/shared";
 import type { AxisId } from "./types";
 import type { IconName } from "../../shared/ui/Icon";
 
@@ -38,6 +38,12 @@ export function isFacetAxis(axis: AxisId): boolean {
   return !isViewAxis(axis) && axis !== "tag" && !isSmartAxis(axis);
 }
 
+/** facet軸として実在するか。"year" は組み込みで常に有効、それ以外は登録済み prefix のみ。
+ *  URL由来の未登録軸を検出する用途（TASK-428.15） */
+export function isRegisteredFacetAxis(axis: AxisId, tagPrefixes: TagPrefix[]): boolean {
+  return axis === "year" || tagPrefixes.some((p) => p.prefix === axis);
+}
+
 export function getSmartFolderId(axis: AxisId): string {
   return axis.slice("smart-".length);
 }
@@ -46,7 +52,7 @@ export function getAxisLabel(axis: AxisId, tagPrefixes: TagPrefix[] = []): strin
   if (isSmartAxis(axis)) return "スマートフォルダー";
   const builtin = VIEW_AXIS_LABELS[axis] ?? BUILTIN_AXIS_LABELS[axis];
   if (builtin) return builtin;
-  return tagPrefixes.find((p) => p.prefix === axis)?.label ?? axis;
+  return resolveTagPrefix(axis, tagPrefixes).label;
 }
 
 const PREFIX_ICONS: Record<string, IconName> = {

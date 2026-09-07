@@ -12,9 +12,9 @@
   bottom: 24px;
   z-index: 32;
   width: 336px;
-  /* ビューポートが低い時、上端がはみ出さないよう高さを制限する。
-     万一それでも収まらない極端なケースの保険として overflow-y も許可する。 */
-  max-height: calc(100dvh - 32px);
+  /* ビューポートが低い時、上端がトップバー行（--topbar-h）に掛からないよう
+     高さを制限する。万一それでも収まらない極端なケースの保険として overflow-y も許可する。 */
+  max-height: calc(100dvh - var(--topbar-h) - 32px);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -81,7 +81,8 @@
   background: oklch(20% 0.02 70 / 0.5);
   color: var(--paper-1);
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
   font-weight: 700;
   opacity: 0.55;
   transition:
@@ -100,7 +101,13 @@
 .mle-popup__skip--fwd {
   right: 14px;
 }
+/* PlaybackRatePicker のルート。既定は非配置（inline）。ポップアップのカバー画像上では
+   .mle-popup__cover-wrap 側でカバー右下に重ねる（下の絶対配置ルール）。 */
 .mle-ratepick {
+  position: relative;
+  display: inline-flex;
+}
+.mle-popup__cover-wrap .mle-ratepick {
   position: absolute;
   right: 8px;
   bottom: 8px;
@@ -126,7 +133,8 @@
   padding: 6px 8px;
   border-radius: 4px;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
   font-weight: 600;
   color: var(--ink-1);
   text-align: left;
@@ -191,8 +199,9 @@
 }
 .mle-popup__work {
   font-family: var(--font-mono);
-  font-size: 10.5px;
-  color: var(--ink-3);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  color: var(--ink-2);
   margin-top: 2px;
   white-space: nowrap;
   overflow: hidden;
@@ -204,7 +213,8 @@
   justify-content: center;
   gap: 4px;
   font-family: var(--font-jp);
-  font-size: 10.5px;
+  font-size: var(--fs-caption);
+  line-height: var(--lh-caption);
   color: var(--r-coral);
   margin-top: 2px;
   white-space: nowrap;
@@ -212,6 +222,9 @@
   text-overflow: ellipsis;
 }
 .mle-popup__error svg {
+  flex-shrink: 0;
+}
+.mle-popup__error button {
   flex-shrink: 0;
 }
 .mle-popup__seek {
@@ -250,8 +263,9 @@
   display: flex;
   justify-content: space-between;
   font-family: var(--font-mono);
-  font-size: 10.5px;
-  color: var(--ink-3);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  color: var(--ink-2);
   margin-top: -4px;
 }
 .mle-popup__controls {
@@ -289,6 +303,10 @@
   color: var(--acc);
   background: var(--acc-soft);
 }
+.mle-popup__tbtn:disabled {
+  color: var(--ink-4);
+  cursor: not-allowed;
+}
 .mle-popup__row {
   flex-shrink: 0;
   display: flex;
@@ -304,8 +322,9 @@
 .mle-popup__volval {
   min-width: 3ch;
   font-family: var(--font-mono);
-  font-size: 10.5px;
-  color: var(--ink-3);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  color: var(--ink-2);
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
@@ -321,7 +340,8 @@
   background: var(--paper-2);
   color: var(--ink-1);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
   font-weight: 600;
 }
 .mle-ratepill:hover {

@@ -1,6 +1,9 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import Toast from "../../src/shared/ui/Toast";
+import Toast, {
+  TOAST_ACTION_AUTO_DISMISS_MS,
+  TOAST_AUTO_DISMISS_MS,
+} from "../../src/shared/ui/Toast";
 import { setMatchMediaReducedMotion } from "./setup";
 
 describe("Toast", () => {
@@ -76,5 +79,113 @@ describe("Toast", () => {
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(hidePopover).not.toHaveBeenCalled();
     expect(screen.getByText("トーストB")).toBeTruthy();
+  });
+
+  it("action無しは既定5秒で自動的に閉じる", () => {
+    vi.useFakeTimers();
+    vi.spyOn(HTMLElement.prototype, "showPopover").mockImplementation(() => {});
+    vi.spyOn(HTMLElement.prototype, "hidePopover").mockImplementation(() => {});
+    const onDismiss = vi.fn();
+
+    render(<Toast message="候補から外しました" variant="success" onDismiss={onDismiss} />);
+    act(() => vi.advanceTimersByTime(TOAST_AUTO_DISMISS_MS - 1));
+    expect(onDismiss).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(1));
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+
+    vi.useRealTimers();
+  });
+
+  it("action付きは既定10秒で自動的に閉じる", () => {
+    vi.useFakeTimers();
+    vi.spyOn(HTMLElement.prototype, "showPopover").mockImplementation(() => {});
+    vi.spyOn(HTMLElement.prototype, "hidePopover").mockImplementation(() => {});
+    const onDismiss = vi.fn();
+
+    render(
+      <Toast
+        message="タグ「ASMR」を削除しました"
+        variant="success"
+        actionLabel="元に戻す"
+        onAction={() => {}}
+        onDismiss={onDismiss}
+      />,
+    );
+    act(() => vi.advanceTimersByTime(TOAST_AUTO_DISMISS_MS));
+    expect(onDismiss).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(TOAST_ACTION_AUTO_DISMISS_MS - TOAST_AUTO_DISMISS_MS));
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+
+    vi.useRealTimers();
+  });
+
+  it("error variant は自動的に閉じない", () => {
+    vi.useFakeTimers();
+    vi.spyOn(HTMLElement.prototype, "showPopover").mockImplementation(() => {});
+    vi.spyOn(HTMLElement.prototype, "hidePopover").mockImplementation(() => {});
+    const onDismiss = vi.fn();
+
+    render(<Toast message="取得に失敗しました" variant="error" onDismiss={onDismiss} />);
+    act(() => vi.advanceTimersByTime(60_000));
+    expect(onDismiss).not.toHaveBeenCalled();
+
+    vi.useRealTimers();
+  });
+
+  it("hover中は消去を止め、離れると残り時間から再開する", () => {
+    vi.useFakeTimers();
+    vi.spyOn(HTMLElement.prototype, "showPopover").mockImplementation(() => {});
+    vi.spyOn(HTMLElement.prototype, "hidePopover").mockImplementation(() => {});
+    const onDismiss = vi.fn();
+
+    render(<Toast message="候補から外しました" variant="success" onDismiss={onDismiss} />);
+    const output = screen.getByText("候補から外しました").closest("output");
+    if (!output) throw new Error("toast output not found");
+
+    act(() => vi.advanceTimersByTime(TOAST_AUTO_DISMISS_MS - 500));
+    fireEvent.mouseEnter(output);
+    act(() => vi.advanceTimersByTime(10_000));
+    expect(onDismiss).not.toHaveBeenCalled();
+
+    fireEvent.mouseLeave(output);
+    act(() => vi.advanceTimersByTime(499));
+    expect(onDismiss).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(1));
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+
+    vi.useRealTimers();
+  });
+
+  it("hoverとfocusは独立に管理し、片方が外れても他方が残っていれば消去を止めたままにする", () => {
+    vi.useFakeTimers();
+    vi.spyOn(HTMLElement.prototype, "showPopover").mockImplementation(() => {});
+    vi.spyOn(HTMLElement.prototype, "hidePopover").mockImplementation(() => {});
+    const onDismiss = vi.fn();
+
+    render(
+      <Toast
+        message="候補から外しました"
+        variant="success"
+        actionLabel="元に戻す"
+        onAction={() => {}}
+        onDismiss={onDismiss}
+      />,
+    );
+    const output = screen.getByText("候補から外しました").closest("output");
+    if (!output) throw new Error("toast output not found");
+
+    // マウスでホバーしたままボタンへフォーカスし、その後マウスだけ離れる
+    fireEvent.mouseEnter(output);
+    fireEvent.focus(output);
+    fireEvent.mouseLeave(output);
+    act(() => vi.advanceTimersByTime(60_000));
+    expect(onDismiss).not.toHaveBeenCalled();
+
+    // 最後にフォーカスも外れたら残り時間から再開する
+    fireEvent.blur(output);
+    act(() => vi.advanceTimersByTime(TOAST_ACTION_AUTO_DISMISS_MS));
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+
+    vi.useRealTimers();
   });
 });

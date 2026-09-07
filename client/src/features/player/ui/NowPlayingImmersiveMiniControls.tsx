@@ -8,15 +8,20 @@
 
 import { I } from "../../../shared/ui/Icon";
 import { cn } from "../../../shared/lib/cn";
+import PlaybackRatePicker from "./PlaybackRatePicker";
 
 interface NowPlayingImmersiveMiniControlsProps {
   idle: boolean;
   isPlaying: boolean;
   volume: number;
+  playbackRate: number;
+  isFirstTrack: boolean;
+  isLastTrack: boolean;
   onTogglePlay: () => void;
   onNext: () => void;
   onPrev: () => void;
   onSetVolume: (v: number) => void;
+  onSetPlaybackRate: (r: number) => void;
 }
 
 const GHOST_BTN =
@@ -26,10 +31,14 @@ export default function NowPlayingImmersiveMiniControls({
   idle,
   isPlaying,
   volume,
+  playbackRate,
+  isFirstTrack,
+  isLastTrack,
   onTogglePlay,
   onNext,
   onPrev,
   onSetVolume,
+  onSetPlaybackRate,
 }: NowPlayingImmersiveMiniControlsProps) {
   return (
     <div
@@ -42,11 +51,13 @@ export default function NowPlayingImmersiveMiniControls({
           type="button"
           aria-label="前のトラック"
           title="前のトラック"
+          disabled={isFirstTrack}
+          data-player-control
           onClick={(e) => {
             e.stopPropagation();
             onPrev();
           }}
-          className={GHOST_BTN}
+          className={cn(GHOST_BTN, "disabled:cursor-not-allowed disabled:text-white/30")}
         >
           <I.prev size={15} />
         </button>
@@ -54,6 +65,7 @@ export default function NowPlayingImmersiveMiniControls({
           type="button"
           aria-label={isPlaying ? "一時停止" : "再生"}
           title={isPlaying ? "一時停止" : "再生"}
+          data-player-control
           onClick={(e) => {
             e.stopPropagation();
             onTogglePlay();
@@ -66,14 +78,28 @@ export default function NowPlayingImmersiveMiniControls({
           type="button"
           aria-label="次のトラック"
           title="次のトラック"
+          disabled={isLastTrack}
+          data-player-control
           onClick={(e) => {
             e.stopPropagation();
             onNext();
           }}
-          className={GHOST_BTN}
+          className={cn(GHOST_BTN, "disabled:cursor-not-allowed disabled:text-white/30")}
         >
           <I.next size={15} />
         </button>
+      </div>
+
+      {/* oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- 没入面全体のトグルクリックへの伝播を遮断するだけのラッパー */}
+      <div
+        className="mle-nowplaying__immersive-minicontrols-group"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <PlaybackRatePicker
+          playbackRate={playbackRate}
+          onSetPlaybackRate={onSetPlaybackRate}
+          overlay
+        />
       </div>
 
       <div className="mle-nowplaying__immersive-minicontrols-group">

@@ -1,9 +1,10 @@
 ---
 id: TASK-428.13
 title: グローバルショートカットとEscapeの有効範囲を制御する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-07 09:08'
+updated_date: '2026-09-07 19:32'
 labels:
   - ui
   - keyboard
@@ -25,9 +26,9 @@ responsive-keyboard-A-03/A-04/A-07、interaction-model-A-05。dialog内でもSpa
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 dialog・popover内でSpaceと左右キーが背後の再生やseekを変えない
-- [ ] #2 候補表示中のEscapeは候補だけを閉じる
-- [ ] #3 候補が閉じている時のEscapeは編集またはdialogへ伝わる
-- [ ] #4 input・slider・menuのネイティブ操作を壊さない
+- [x] #1 dialog・popover内でSpaceと左右キーが背後の再生やseekを変えない
+- [x] #2 候補表示中のEscapeは候補だけを閉じる
+- [x] #3 候補が閉じている時のEscapeは編集またはdialogへ伝わる
+- [x] #4 input・slider・menuのネイティブ操作を壊さない
 - [ ] #5 pnpm test:smokeに新規失敗がない
 <!-- AC:END -->

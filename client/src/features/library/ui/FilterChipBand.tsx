@@ -2,13 +2,14 @@ import { Fragment, useState } from "react";
 import { AnimatePresence } from "motion/react";
 import type { NormalizedTag, TagPrefix } from "@mimimilli/shared";
 import { getAxisLabel } from "../../../entities/library/axisDefinitions";
-import { axisOfFilterTag } from "../model/libraryPresentation";
+import { axisOfFilterTag, formatFilterChipLabel } from "../model/libraryPresentation";
 import { useAnchoredPopover } from "../../../shared/ui/useAnchoredPopover";
 import AxisValuePopoverPanel from "./AxisValuePopoverPanel";
 import FilterChipAddButton from "./FilterChipAddButton";
 import { I } from "../../../shared/ui/Icon";
 import {
   deriveValueSelectionHandlers,
+  getValueSelectionHint,
   type ValueSelectionIntent,
 } from "../model/valueSelectionContract";
 
@@ -45,7 +46,8 @@ function FilterChip({
 }: {
   tag: NormalizedTag;
   tagPrefixes: TagPrefix[];
-  /** 現在選択中の全タグ（自軸以外のフィルタを兄弟値の集計へ引き継ぐため。TASK-187） */
+  /** 現在選択中の全タグ。兄弟値ドロップダウンの選択中チェック表示にのみ使う
+   *  （件数は既定=置き換えの入口として無条件集計にする。TASK-428.14） */
   selectedTags: NormalizedTag[];
   onSelect: (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
   onAdd: (tag: NormalizedTag) => void;
@@ -62,12 +64,12 @@ function FilterChip({
   return (
     <span ref={setReference} className="mll-tagband__chip relative">
       <button type="button" className="lbl" onClick={() => (open ? close() : setOpen(true))}>
-        {tag}
+        {formatFilterChipLabel(tag)}
       </button>
       <button
         type="button"
         className="x"
-        aria-label={`${tag}を解除`}
+        aria-label={`${formatFilterChipLabel(tag)}を解除`}
         onClick={(e) => {
           e.stopPropagation();
           onRemove();
@@ -84,11 +86,14 @@ function FilterChip({
             floatingStyles={floatingStyles}
             setFloating={setFloating}
             selectedTags={selectedTags}
+            // 既定=置き換えの入口（ADR-0013）。件数基準は無条件集計にする（TASK-428.14）。
+            countTags={[]}
             onSelect={(nextTag, opts) => {
               onSelect(nextTag, opts);
               close();
             }}
             onAdd={onAdd}
+            hint={getValueSelectionHint("replace")}
             close={close}
           />
         )}

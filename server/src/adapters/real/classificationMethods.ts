@@ -3,6 +3,7 @@ import {
   type AxisFacetItem,
   type SmartFolder,
   type SmartFolderCreate,
+  type SmartFolderRule,
   type SmartFolderUpdate,
   type TagPrefix,
   type TagPrefixCandidate,
@@ -16,7 +17,7 @@ import { getCategoryLogger } from "../../lib/logger.ts";
 import { logDataIntegritySkips } from "./dataIntegrity.ts";
 import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";
-import { querySmartFolderWorks } from "./smartFolderWorks.ts";
+import { countSmartFolderRuleMatches, querySmartFolderWorks } from "./smartFolderWorks.ts";
 
 const scanLogger = getCategoryLogger("scan");
 const KEY_TAG_PREFIXES_SEEDED = "tag_prefixes_seeded";
@@ -48,6 +49,9 @@ export function createClassificationMethods(deps: {
     async updateTagPrefix(prefix: string, patch: TagPrefixUpdate): Promise<TagPrefix | null> {
       return user.updateTagPrefix(prefix, patch);
     },
+    async reorderTagPrefixes(order: string[]): Promise<TagPrefix[] | null> {
+      return user.reorderTagPrefixes(order);
+    },
     async deleteTagPrefix(prefix: string): Promise<boolean> {
       return user.deleteTagPrefix(prefix);
     },
@@ -76,6 +80,9 @@ export function createClassificationMethods(deps: {
       const folder = user.getSmartFolder(id);
       if (!folder) return null;
       return querySmartFolderWorks(query, folder, evalQuery, requireRoot());
+    },
+    async previewSmartFolderRuleCount(rules: SmartFolderRule[]): Promise<number> {
+      return countSmartFolderRuleMatches(query, rules);
     },
   };
 }

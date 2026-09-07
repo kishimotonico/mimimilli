@@ -4,9 +4,13 @@
 
 import { atom } from "jotai";
 import { atomWithStorage } from "jotai/utils";
-import type { TagPrefix } from "@mimimilli/shared";
+import type { SmartFolder, TagPrefix } from "@mimimilli/shared";
 import type { AxisId, GridLayoutMode, ViewMode } from "../../../entities/library/types";
-import { getAxisLabel } from "../../../entities/library/axisDefinitions";
+import {
+  getAxisLabel,
+  getSmartFolderId,
+  isSmartAxis,
+} from "../../../entities/library/axisDefinitions";
 import { DEFAULT_AXIS_VALUE_SORT, type AxisValueSortState } from "./axisValueSort";
 
 // 値一覧のソート状態。sortAtom（作品一覧）とは別に保持する（ADR-0012 帰結）。
@@ -22,11 +26,27 @@ export const libraryGridLayoutModeAtom = atomWithStorage<GridLayoutMode>(
   "square",
 );
 
+// 作品登録解除の成功通知。成功時にWorkDetailが遷移・アンマウントされるため、
+// ローカルstateではなくGlobalToastが拾えるグローバルatomに置く。
+export const workDeleteSuccessAtom = atom<string | null>(null);
+
+// 未登録軸・存在しないスマートフォルダーIDなど無効なURLから既定一覧へ自動で戻したときの
+// 警告通知（TASK-428.15）。LibraryView がURLの妥当性を検証した結果を持つグローバルatom。
+export const libraryInvalidUrlToastAtom = atom<string | null>(null);
+
 // ── アドレスバーパス（純粋計算）────────────────────────────────
 
 // パンくずは「ライブラリ > 軸名」までを表す。絞り込みはチップ列だけが表現する
 // （ADR-0012 §2・帰結）。
-export function buildLibraryAddressPath(axis: AxisId, tagPrefixes: TagPrefix[]): string[] {
+export function buildLibraryAddressPath(
+  axis: AxisId,
+  tagPrefixes: TagPrefix[],
+  smartFolders: SmartFolder[],
+): string[] {
   if (axis === "all") return ["ライブラリ"];
+  if (isSmartAxis(axis)) {
+    const folder = smartFolders.find((sf) => sf.id === getSmartFolderId(axis));
+    return ["ライブラリ", folder?.name ?? getAxisLabel(axis, tagPrefixes)];
+  }
   return ["ライブラリ", getAxisLabel(axis, tagPrefixes)];
 }

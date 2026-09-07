@@ -150,7 +150,9 @@ function createFetchMock(total = WORKS_DEFAULT_PAGE_SIZE + 50) {
       if (path === "/api/tags") return Promise.resolve(jsonResponse([]));
       if (path === "/api/smart-folders") return Promise.resolve(jsonResponse([]));
       if (path === "/api/settings") {
-        return Promise.resolve(jsonResponse({ rootFolder: "/lib", lastScanTime: null }));
+        return Promise.resolve(
+          jsonResponse({ rootFolder: "/lib", lastScanTime: null, lastScanRootFolder: null }),
+        );
       }
 
       return Promise.reject(new Error(`unexpected fetch: ${url.toString()}`));
@@ -302,7 +304,11 @@ describe("作品 PATCH 後の一覧キャッシュ同期", () => {
     });
 
     expect(worksCallUrls(fetchMock).length).toBe(worksCallsBeforePatch);
-    expect(worksCallUrls(fetchMock).some((u) => u.includes("view=fav"))).toBe(false);
+    // "view=fav&limit=1" は軸レールの件数取得（TASK-428.22）が別途発火するため、ここでの
+    // 判定対象は非表示キャッシュの再取得を示す一覧クエリ（limit=1ではない）に絞る
+    expect(
+      worksCallUrls(fetchMock).some((u) => u.includes("view=fav") && !u.includes("limit=1")),
+    ).toBe(false);
 
     const favQuery = queryClient.getQueryCache().find({ queryKey: favKey });
     expect(favQuery?.isStale()).toBe(true);

@@ -18,6 +18,6 @@ export function dlsiteApplyErrorMessage(error: unknown): string {
   if (error instanceof ApiRequestError && error.code === "source_changed") {
     return dlsiteSourceChangedMessage();
   }
-  if (error instanceof Error) return error.message;
+  if (!(error instanceof ApiRequestError)) console.error("DLsite情報の適用に失敗しました", error);
   return "DLsite情報を適用できませんでした";
 }

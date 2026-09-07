@@ -8,6 +8,7 @@ import { useAnchoredPopover } from "../../../shared/ui/useAnchoredPopover";
 import type { HoverGroupPanelHandlers } from "../../../shared/lib/useHoverGroupCoordinator";
 import AxisValueQuickList from "./AxisValueQuickList";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
+import { getValueSelectionHint } from "../model/valueSelectionContract";
 
 // 軸レール行のクイックオーバーレイ（ADR-0012 §7）。ホバー約200ms・フォーカス中の
 // ArrowRight で開く。軸行の右向き矢印・ArrowRightキーの操作方向と揃えて右側に出す。
@@ -49,7 +50,9 @@ export default function AxisQuickOverlay({
   onPanelElChange,
 }: AxisQuickOverlayProps) {
   const isPresent = useIsPresent();
-  const facetQuery = useAxisFacetsQuery(axis as FacetAxisId, selectedTags);
+  // クイックオーバーレイは既定=置き換えの入口（ADR-0013）なので、件数基準は無条件集計に
+  // する（主クリックの結果と一致させる。TASK-428.14）。isSelected は実際の selectedTags で行う。
+  const facetQuery = useAxisFacetsQuery(axis as FacetAxisId, []);
   const { popoverScale } = useMotionVariants();
   const variant = popoverScale({ origin: "left center" });
 
@@ -100,6 +103,7 @@ export default function AxisQuickOverlay({
         onAdd={(item) => {
           onAddValue(buildFilterTag(axis, item.value));
         }}
+        hint={getValueSelectionHint("replace")}
         close={close}
       />
     </motion.div>,

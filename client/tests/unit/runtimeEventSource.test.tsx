@@ -15,7 +15,13 @@ import {
   dlsiteBulkStartingAtom,
   dlsiteBulkResultAtom,
 } from "../../src/entities/dlsite/model/bulkAtoms";
-import { scanActionsAtom, scanCandidateHiddenPathsAtom } from "../../src/entities/scan/model/atoms";
+import {
+  scanActionsAtom,
+  scanCandidateHiddenPathsAtom,
+  scanJobAtom,
+  scanModalOpenAtom,
+  scanResultToastAtom,
+} from "../../src/entities/scan/model/atoms";
 
 class FakeEventSource extends EventTarget {
   static readonly CONNECTING = 0;
@@ -335,6 +341,8 @@ describe("Runtime間連携: ScanRuntime → DlsiteBulkRuntime", () => {
         if (url.endsWith("/scan/candidates")) {
           return response({ candidates: scanResultWithNewWorks.candidates });
         }
+        // attach() が実在確認する後乗り先ジョブ（scan-dlsite-A-01）。実行中を返す。
+        if (url.endsWith("/dlsite/bulk")) return response({ status: "running", progress: null });
         return response(null, 204);
       }),
     );
@@ -355,6 +363,53 @@ describe("Runtime間連携: ScanRuntime → DlsiteBulkRuntime", () => {
     await waitFor(() => expect(store.get(dlsiteBulkActiveAtom)).toBe(true));
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(2));
     expect(FakeEventSource.instances[1]!.url).toBe("/api/dlsite/events");
+  });
+});
+
+describe("ScanRuntime: 完了・中止トースト（TASK-428.4）", () => {
+  it("スキャンモーダルが閉じていれば完了・中止トーストを出す", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith("/scan/active")) return response(running);
+        if (url.endsWith("/scan/job-1")) return response(completedJob);
+        return response(null, 204);
+      }),
+    );
+
+    const { store } = renderRuntime(createElement(ScanRuntime));
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    const source = FakeEventSource.instances[0]!;
+
+    dispatchScan(source, { type: "completed", seq: 1, result: scanResult });
+    await waitFor(() =>
+      expect(store.get(scanResultToastAtom)).toEqual({
+        kind: "completed",
+        result: scanResult,
+      }),
+    );
+  });
+
+  it("スキャンモーダルが開いていれば完了トーストを出さない（サイドバーの完了表示に任せる）", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith("/scan/active")) return response(running);
+        if (url.endsWith("/scan/job-1")) return response(completedJob);
+        return response(null, 204);
+      }),
+    );
+
+    const { store } = renderRuntime(createElement(ScanRuntime));
+    store.set(scanModalOpenAtom, true);
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    const source = FakeEventSource.instances[0]!;
+
+    dispatchScan(source, { type: "completed", seq: 1, result: scanResult });
+    await waitFor(() => expect(store.get(scanJobAtom)?.status).toBe("completed"));
+    expect(store.get(scanResultToastAtom)).toBeNull();
   });
 });
 

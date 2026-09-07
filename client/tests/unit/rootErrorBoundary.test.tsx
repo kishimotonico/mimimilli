@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import RootErrorBoundary from "../../src/app/RootErrorBoundary";
 
@@ -36,6 +36,21 @@ describe("RootErrorBoundary", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("テスト用のレンダリングエラー");
     expect(screen.getByRole("button", { name: "再読み込み" })).toBeInTheDocument();
     expect(consoleError).toHaveBeenCalled();
+
+    consoleError.mockRestore();
+  });
+
+  it("技術的な詳細を展開するとスタックトレースが読める", () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    render(
+      <RootErrorBoundary>
+        <ThrowingChild message="スタック確認用エラー" />
+      </RootErrorBoundary>,
+    );
+
+    fireEvent.click(screen.getByText("技術的な詳細"));
+    expect(screen.getByText(/at ThrowingChild/)).toBeInTheDocument();
 
     consoleError.mockRestore();
   });

@@ -1,10 +1,11 @@
 // タグ prefix 定義（タグ設定）の CRUD と候補サジェスト（ADR-0005）。
 // GET /tag-prefixes | POST /tag-prefixes | PATCH・DELETE /tag-prefixes/:prefix
-// GET /tag-prefixes/candidates
+// PUT /tag-prefixes/order | GET /tag-prefixes/candidates
 import { Hono } from "hono";
 import {
   tagPrefixCreateSchema,
   tagPrefixNameSchema,
+  tagPrefixOrderSchema,
   tagPrefixUpdateSchema,
 } from "@mimimilli/shared";
 import type { DataAdapter } from "../adapter/index.ts";
@@ -30,6 +31,19 @@ export function tagPrefixesRoute(adapter: DataAdapter): Hono {
     const created = await adapter.createTagPrefix(parsed.data);
     if (!created) conflict(`prefix は既に登録されています: ${parsed.data.prefix}`);
     return c.json(created, 201);
+  });
+
+  app.put("/tag-prefixes/order", async (c) => {
+    const body = await c.req.json().catch(() => null);
+    const parsed = tagPrefixOrderSchema.safeParse(body);
+    if (!parsed.success) {
+      invalidRequest(`並び順が不正です: ${parsed.error.issues[0]?.message ?? ""}`);
+    }
+    const reordered = await adapter.reorderTagPrefixes(parsed.data.prefixes);
+    if (!reordered) {
+      invalidRequest("並び順の prefix 集合が現在の登録済み prefix と一致しません");
+    }
+    return c.json(reordered);
   });
 
   app.patch("/tag-prefixes/:prefix", async (c) => {

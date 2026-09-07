@@ -20,15 +20,17 @@
   align-items: center;
   gap: 8px;
   font-family: var(--font-sans);
-  font-size: 10.5px;
+  font-size: var(--fs-label);
+  line-height: var(--lh-label);
   letter-spacing: 0.08em;
-  color: var(--ink-3);
+  color: var(--ink-2);
   text-transform: uppercase;
   font-weight: 600;
 }
 .mll-smart__hd .pill {
   font-family: var(--font-mono);
-  font-size: 9.5px;
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
   background: var(--acc-soft);
   color: var(--acc-ink);
   padding: 1px 6px;
@@ -59,22 +61,26 @@
 }
 .mll-smart__rule {
   display: grid;
-  grid-template-columns: 28px 100px 60px 1fr auto;
+  /* WHERE/AND NOTが見切れないよう conj 列は内容に応じて広がる幅にする（TASK-428.11 SF-04） */
+  grid-template-columns: minmax(48px, auto) 100px auto 1fr auto;
   gap: 8px;
   align-items: center;
   padding: 5px 8px;
   border-radius: 4px;
   background: var(--paper-0);
   border: 1px solid var(--line-soft);
-  font-size: 12px;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
 }
 .mll-smart__rule .conj {
   font-family: var(--font-mono);
-  font-size: 9.5px;
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
   font-weight: 700;
   letter-spacing: 0.08em;
-  color: var(--ink-3);
+  color: var(--ink-2);
   text-align: center;
+  white-space: nowrap;
 }
 .mll-smart__rule .conj.first {
   color: var(--ink-4);
@@ -82,7 +88,8 @@
 }
 .mll-smart__rule .field {
   font-family: var(--font-sans);
-  font-size: 11px;
+  font-size: var(--fs-secondary);
+  line-height: var(--lh-secondary);
   color: var(--ink-1);
   font-weight: 500;
   display: inline-flex;
@@ -93,14 +100,18 @@
   padding: 2px 6px;
 }
 .mll-smart__rule .op {
-  font-family: var(--font-mono);
-  font-size: 10.5px;
+  /* 演算子は「を含む」等の日本語ラベルで表示するため font-jp（TASK-428.11 SF-04） */
+  font-family: var(--font-jp);
+  font-size: var(--fs-secondary);
+  line-height: var(--lh-secondary);
   color: var(--ink-2);
   text-align: center;
+  white-space: nowrap;
 }
 .mll-smart__rule .val {
   font-family: var(--font-jp);
-  font-size: 12px;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
   color: var(--ink-0);
   font-weight: 500;
   flex-wrap: wrap;
@@ -112,7 +123,7 @@
   display: grid;
   place-items: center;
   border-radius: 4px;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 .mll-smart__rule .x:hover {
   background: var(--paper-2);
@@ -122,7 +133,8 @@
    区切りとして視認できるよう背景・角丸を持たせる（幅に関わらず常時適用） */
 .mll-smart__rule .or-sep {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
   font-weight: 700;
   letter-spacing: 0.02em;
   color: var(--ink-2);
@@ -144,7 +156,7 @@
     text-align: left;
   }
   /* field/operator を装飾なしのテキストに戻し、conj → field → op → values が
-     ひと続きの文として読めるようにする（例:「WHERE 長さ ≥ 1:00:00」） */
+     ひと続きの文として読めるようにする（例:「WHERE タグ を含む ASMR」） */
   .mll-smart__rule .field {
     background: none;
     border-radius: 0;
@@ -172,7 +184,8 @@
 }
 .mll-smart__ft .hits {
   font-family: var(--font-mono);
-  font-size: 11.5px;
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
   color: var(--ink-0);
   font-weight: 500;
 }

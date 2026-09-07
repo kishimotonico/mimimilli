@@ -47,8 +47,11 @@ interface NowPlayingNormalBodyProps {
   onSetLoop: (l: boolean) => void;
   onSetChannelSwap: (enabled: boolean) => void;
   onSetVolume: (v: number) => void;
+  onSetPlaybackRate: (r: number) => void;
   onSetABPoint: (point: "a" | "b") => void;
   onClearABRepeat: () => void;
+  onRetryError: () => void;
+  onDismissError: () => void;
 }
 
 function NowPlayingNormalBody({
@@ -63,8 +66,11 @@ function NowPlayingNormalBody({
   onSetLoop,
   onSetChannelSwap,
   onSetVolume,
+  onSetPlaybackRate,
   onSetABPoint,
   onClearABRepeat,
+  onRetryError,
+  onDismissError,
 }: NowPlayingNormalBodyProps) {
   const isPresent = useIsPresent();
   const { fade } = useMotionVariants();
@@ -96,7 +102,7 @@ function NowPlayingNormalBody({
           </button>
 
           <div className="flex w-full min-w-0 shrink-0 flex-col items-center gap-1.5 text-center">
-            <div className="font-sans text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-3">
+            <div className="font-sans text-secondary font-semibold uppercase tracking-[0.16em] text-ink-2">
               {workTitle}
             </div>
             <h1 className="m-0 max-w-full text-balance font-jp text-[24px] font-semibold leading-[1.2] tracking-[-0.01em] text-ink-0">
@@ -107,6 +113,8 @@ function NowPlayingNormalBody({
           <PlaybackErrorNotice
             error={playbackError}
             className="inline-flex min-w-0 max-w-full shrink-0 items-center gap-1 font-jp text-[10.5px] text-[var(--r-coral)]"
+            onRetry={onRetryError}
+            onDismiss={onDismissError}
           />
 
           {!isFilePlayback && currentWork && (
@@ -145,6 +153,9 @@ function NowPlayingNormalBody({
           volume={state.volume}
           loop={state.loop}
           channelSwap={state.channelSwap}
+          playbackRate={state.playbackRate}
+          isFirstTrack={currentTrackIndex <= 0}
+          isLastTrack={currentTrackIndex >= tracks.length - 1}
           onTogglePlay={onTogglePlay}
           onSeekRelative={onSeekRelative}
           onNext={onNext}
@@ -152,6 +163,7 @@ function NowPlayingNormalBody({
           onSetLoop={onSetLoop}
           onSetChannelSwap={onSetChannelSwap}
           onSetVolume={onSetVolume}
+          onSetPlaybackRate={onSetPlaybackRate}
         />
         <ABRepeatBar
           abRepeat={state.abRepeat}
@@ -191,6 +203,7 @@ export default function NowPlayingView({ onOpenWork }: NowPlayingViewProps) {
             onNext={actions.nextTrack}
             onPrev={actions.prevTrack}
             onSetVolume={actions.setVolume}
+            onSetPlaybackRate={actions.setPlaybackRate}
           />
         ) : (
           <NowPlayingNormalBody
@@ -206,8 +219,11 @@ export default function NowPlayingView({ onOpenWork }: NowPlayingViewProps) {
             onSetLoop={actions.setLoop}
             onSetChannelSwap={actions.setChannelSwap}
             onSetVolume={actions.setVolume}
+            onSetPlaybackRate={actions.setPlaybackRate}
             onSetABPoint={actions.setABPoint}
             onClearABRepeat={actions.clearABRepeat}
+            onRetryError={actions.retryPlayback}
+            onDismissError={actions.dismissError}
           />
         )}
       </AnimatePresence>

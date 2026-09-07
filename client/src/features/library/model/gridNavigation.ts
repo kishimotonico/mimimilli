@@ -1,6 +1,6 @@
 import type { JustifiedTile } from "./justifiedLayout";
 
-export type GridArrowKey = "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown";
+export type GridArrowKey = "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown" | "Home" | "End";
 
 export function getNextGridIndex(
   currentIndex: number,
@@ -9,6 +9,8 @@ export function getNextGridIndex(
   itemCount: number,
 ): number {
   if (itemCount <= 0 || columnCount <= 0) return currentIndex;
+  if (key === "Home") return 0;
+  if (key === "End") return itemCount - 1;
 
   const delta =
     key === "ArrowLeft"
@@ -36,6 +38,8 @@ export function getNextJustifiedIndex(
   const current = tiles[currentIndex];
   if (!current) return currentIndex;
 
+  if (key === "Home") return 0;
+  if (key === "End") return tiles.length - 1;
   if (key === "ArrowLeft") return Math.max(0, currentIndex - 1);
   if (key === "ArrowRight") return Math.min(tiles.length - 1, currentIndex + 1);
 
@@ -51,4 +55,33 @@ export function getNextJustifiedIndex(
     }
   });
   return bestIndex === -1 ? currentIndex : bestIndex;
+}
+
+// 仮想化された行インデックス（virtualizerが実際にDOMへ描画する単位）とフラットな
+// タイル/行のインデックスを相互変換する。roving tabindexの対象（選択中の作品）が
+// 現在の描画範囲内にあるかどうかを判定するために使う（TASK-428.12）。
+// ジャスティファイドでflatIndexに対応するタイルが無い（範囲外）ときはundefinedを
+// 返す。フォールバックするか無視するかは呼び出し側の文脈で異なるため、ここでは
+// 判断しない（例: キーボード操作は無視、rovingIndexの解決は行0へフォールバック）。
+export function rowIndexOfFlatIndex(
+  flatIndex: number,
+  isJustified: boolean,
+  justifiedTiles: readonly Pick<JustifiedTile, "rowIndex">[] | null,
+  columnCount: number,
+): number | undefined {
+  if (isJustified && justifiedTiles) return justifiedTiles[flatIndex]?.rowIndex;
+  return Math.floor(flatIndex / Math.max(columnCount, 1));
+}
+
+export function firstFlatIndexOfRow(
+  rowIndex: number,
+  isJustified: boolean,
+  justifiedTiles: readonly Pick<JustifiedTile, "rowIndex">[] | null,
+  columnCount: number,
+): number {
+  if (isJustified && justifiedTiles) {
+    const found = justifiedTiles.findIndex((tile) => tile.rowIndex === rowIndex);
+    return found === -1 ? 0 : found;
+  }
+  return rowIndex * Math.max(columnCount, 1);
 }

@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { getDlsiteNotificationSummary } from "../../../entities/work/api";
-import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
+import { getDlsiteNotificationSummary } from "../../work/api";
+import { WORK_QUERY_KEYS } from "../../work/queryKeys";
 
 export function useDlsiteNotificationSummary() {
   const query = useQuery({

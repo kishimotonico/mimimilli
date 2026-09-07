@@ -27,15 +27,33 @@ export function resolveRegisteredRjCode(
   return itemRjCode === undefined ? candidateRjCode : itemRjCode;
 }
 
+/** 候補承認時のタイトル解決（候補登録APIの規約と同じ）。
+ *  title省略=候補の推定タイトル（inferredTitle）を採用 / 値あり=そのまま採用
+ *  （スキーマ側でtrim・非空を保証済みのため、ここでの正規化は不要）。 */
+export function resolveRegisteredTitle(
+  inferredTitle: string,
+  itemTitle: string | undefined,
+): string {
+  return itemTitle ?? inferredTitle;
+}
+
 export function createSettingsScanMethods(state: FixtureState): SettingsAdapter {
   return {
     async getSettings(): Promise<Settings> {
-      return { rootFolder: state.rootFolder, lastScanTime: state.lastScanTime };
+      return {
+        rootFolder: state.rootFolder,
+        lastScanTime: state.lastScanTime,
+        lastScanRootFolder: state.lastScanRootFolder,
+      };
     },
 
     async updateSettings(patch: SettingsUpdate): Promise<Settings> {
       state.rootFolder = patch.rootFolder;
-      return { rootFolder: state.rootFolder, lastScanTime: state.lastScanTime };
+      return {
+        rootFolder: state.rootFolder,
+        lastScanTime: state.lastScanTime,
+        lastScanRootFolder: state.lastScanRootFolder,
+      };
     },
 
     async scan(options?: ScanOptions): Promise<ScanResult> {
@@ -61,6 +79,7 @@ export function createSettingsScanMethods(state: FixtureState): SettingsAdapter 
       emit({ type: "progress", phase: "finalizing", processed: 1, total: 1 });
 
       state.lastScanTime = new Date().toISOString();
+      state.lastScanRootFolder = state.rootFolder;
       const excluded = new Set(state.scanCandidateExclusions);
       return {
         registered: state.works.length,
@@ -98,9 +117,10 @@ export function createSettingsScanMethods(state: FixtureState): SettingsAdapter 
         const candidate = candidatesByPath.get(item.path);
         if (!candidate) return [];
         const rjCode = resolveRegisteredRjCode(candidate.rjCode, item.rjCode);
+        const title = resolveRegisteredTitle(candidate.inferredTitle, item.title);
         const work: WorkSummary = {
           id: crypto.randomUUID(),
-          title: candidate.inferredTitle,
+          title,
           cover: null,
           status: "ok",
           physicalPath: normalizeFsPath(`${rootAbs}/${candidate.path}`),

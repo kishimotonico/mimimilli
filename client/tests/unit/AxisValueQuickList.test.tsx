@@ -323,3 +323,20 @@ describe("AxisValueQuickList の選択", () => {
     sizeMock.restore();
   });
 });
+
+describe("AxisValueQuickList の件数表示（TASK-428.22）", () => {
+  it("読み込み完了時、値の個数を単位付きで見出しに出す", () => {
+    renderQuickList({ items: makeItems(12) });
+
+    expect(screen.getByText("値 12件")).toBeTruthy();
+  });
+
+  it("読み込み中・取得失敗時は件数を出さない", () => {
+    renderQuickList({ items: [], isLoading: true });
+    expect(screen.queryByText(/^値 /)).toBeNull();
+
+    cleanup();
+    renderQuickList({ items: [], isError: true });
+    expect(screen.queryByText(/^値 /)).toBeNull();
+  });
+});
