@@ -79,6 +79,7 @@ export default function BarContent({
             aria-label="前のトラック"
             title="前のトラック"
             disabled={currentTrackIndex <= 0}
+            data-player-control
             onClick={(e) => {
               e.stopPropagation();
               onPrev();
@@ -90,6 +91,7 @@ export default function BarContent({
             className="mle-bar1__play"
             aria-label={isPlaying ? "一時停止" : "再生"}
             title={isPlaying ? "一時停止" : "再生"}
+            data-player-control
             onClick={(e) => {
               e.stopPropagation();
               onTogglePlay();
@@ -102,6 +104,7 @@ export default function BarContent({
             aria-label="次のトラック"
             title="次のトラック"
             disabled={currentTrackIndex >= tracks.length - 1}
+            data-player-control
             onClick={(e) => {
               e.stopPropagation();
               onNext();

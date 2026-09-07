@@ -135,6 +135,7 @@ export default function PopupContent({
               <button
                 className="mle-popup__skip mle-popup__skip--back"
                 title="10秒戻る"
+                data-player-control
                 onClick={() => onSeekRelative(-10)}
               >
                 <span>−10</span>
@@ -142,6 +143,7 @@ export default function PopupContent({
               <button
                 className="mle-popup__skip mle-popup__skip--fwd"
                 title="10秒進む"
+                data-player-control
                 onClick={() => onSeekRelative(10)}
               >
                 <span>+10</span>
@@ -176,6 +178,7 @@ export default function PopupContent({
               title="再生速度"
               aria-haspopup="menu"
               aria-expanded={rateMenuOpen}
+              data-player-control
               onClick={() => setRateMenuOpen((v) => !v)}
             >
               {rateLabel}
@@ -200,23 +203,35 @@ export default function PopupContent({
       <PopupSeek onSeek={onSeek} />
 
       <div className="mle-popup__controls">
-        <button className="mle-popup__tbtn" title="前のトラック" onClick={onPrev}>
+        <button
+          className="mle-popup__tbtn"
+          title="前のトラック"
+          data-player-control
+          onClick={onPrev}
+        >
           <I.prev size={16} />
         </button>
         <button
           className="mle-popup__play"
           title={isPlaying ? "一時停止" : "再生"}
+          data-player-control
           onClick={onTogglePlay}
         >
           {isPlaying ? <I.pause size={18} /> : <I.play size={18} />}
         </button>
-        <button className="mle-popup__tbtn" title="次のトラック" onClick={onNext}>
+        <button
+          className="mle-popup__tbtn"
+          title="次のトラック"
+          data-player-control
+          onClick={onNext}
+        >
           <I.next size={16} />
         </button>
         <button
           className={`mle-popup__tbtn ${loop ? "is-on" : ""}`}
           title="ループ"
           aria-pressed={loop}
+          data-player-control
           onClick={() => onSetLoop(!loop)}
         >
           <I.loopOne size={15} />

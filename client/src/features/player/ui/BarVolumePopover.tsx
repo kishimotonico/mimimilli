@@ -38,6 +38,7 @@ export default function BarVolumePopover({ volume, onSetVolume }: BarVolumePopov
         title={`音量 ${volume}%`}
         aria-haspopup="true"
         aria-expanded={isOpen}
+        data-player-control
         onClick={(e) => {
           e.stopPropagation();
           if (isOpen) close();

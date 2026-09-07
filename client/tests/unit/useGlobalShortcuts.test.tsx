@@ -30,6 +30,7 @@ function TestHost({
       { role: "listbox" },
       createElement("button", { type: "button", role: "option" }, "option"),
     ),
+    createElement("button", { type: "button", "data-player-control": true }, "player-control"),
     createElement("div", { "data-testid": "plain" }, "plain"),
   );
 }
@@ -97,6 +98,23 @@ describe("useGlobalShortcuts", () => {
 
     expect(onTogglePlay).toHaveBeenCalledTimes(1);
     expect(onSeekRelative).toHaveBeenCalledWith(10);
+  });
+
+  it("data-player-controlを持つボタンにフォーカスがあるとき、Spaceは常にグローバルの再生トグルを発火しpreventDefaultする（ボタン自身のSpace活性化と二重発火しない）", () => {
+    const onTogglePlay = vi.fn();
+    const onSeekRelative = vi.fn();
+    const { getByText } = render(createElement(TestHost, { onTogglePlay, onSeekRelative }));
+    const playerControl = getByText("player-control");
+
+    const spaceResult = fireEvent.keyDown(playerControl, { code: "Space" });
+    expect(onTogglePlay).toHaveBeenCalledTimes(1);
+    // preventDefaultされた（=false）ことで、ボタン自身のネイティブSpace活性化（click相当）が
+    // 抑止され、グローバル側のトグルとの二重発火が起きない。
+    expect(spaceResult).toBe(false);
+
+    // Spaceだけが特別扱いの対象。矢印キーは通常のボタンと同じくネイティブ動作優先のまま。
+    fireEvent.keyDown(playerControl, { code: "ArrowLeft" });
+    expect(onSeekRelative).not.toHaveBeenCalled();
   });
 
   it("モーダルdialogが開いている間は、どこにフォーカスがあってもショートカットが発火しない", () => {

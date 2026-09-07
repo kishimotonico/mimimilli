@@ -38,6 +38,7 @@ export default function PlayerTransportControls({
       <button
         aria-label="10秒戻る"
         title="10秒戻る"
+        data-player-control
         onClick={() => onSeekRelative(-10)}
         className={cn(ROUND_BTN, "text-ink-1")}
       >
@@ -46,6 +47,7 @@ export default function PlayerTransportControls({
       <button
         aria-label="前のトラック"
         title="前のトラック"
+        data-player-control
         onClick={onPrev}
         className={cn(ROUND_BTN, "text-ink-1")}
       >
@@ -54,6 +56,7 @@ export default function PlayerTransportControls({
       <button
         aria-label={isPlaying ? "一時停止" : "再生"}
         title={isPlaying ? "一時停止" : "再生"}
+        data-player-control
         onClick={onTogglePlay}
         className="grid h-[56px] w-[56px] cursor-pointer place-items-center rounded-full bg-ink-0 text-paper-1"
       >
@@ -62,6 +65,7 @@ export default function PlayerTransportControls({
       <button
         aria-label="次のトラック"
         title="次のトラック"
+        data-player-control
         onClick={onNext}
         className={cn(ROUND_BTN, "text-ink-1")}
       >
@@ -70,6 +74,7 @@ export default function PlayerTransportControls({
       <button
         aria-label="10秒進む"
         title="10秒進む"
+        data-player-control
         onClick={() => onSeekRelative(10)}
         className={cn(ROUND_BTN, "text-ink-1")}
       >
@@ -79,6 +84,7 @@ export default function PlayerTransportControls({
         aria-label="ループ"
         title="ループ"
         aria-pressed={loop}
+        data-player-control
         onClick={() => onSetLoop(!loop)}
         className={cn(ROUND_BTN, loop ? "bg-acc-soft text-acc" : "text-ink-1")}
       >
@@ -88,6 +94,7 @@ export default function PlayerTransportControls({
         aria-label="左右チャンネル入替"
         title="左右チャンネル入替"
         aria-pressed={channelSwap}
+        data-player-control
         onClick={() => onSetChannelSwap(!channelSwap)}
         className={cn(ROUND_BTN, channelSwap ? "bg-acc-soft text-acc" : "text-ink-1")}
       >
