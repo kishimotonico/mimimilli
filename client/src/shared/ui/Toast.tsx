@@ -59,6 +59,10 @@ function useAutoDismissTimer(
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const remainingRef = useRef(0);
   const startedAtRef = useRef(0);
+  // hover と focus は独立に外れうる（キーボードでボタンにフォーカスしたままマウスだけ
+  // 動かす等）。両方 false になったときだけ再開する
+  const hoveredRef = useRef(false);
+  const focusedRef = useRef(false);
 
   const clear = () => {
     if (timerRef.current == null) return;
@@ -78,7 +82,9 @@ function useAutoDismissTimer(
       return;
     }
     remainingRef.current = durationMs;
-    schedule(durationMs);
+    // message差し替え時にすでにhover/focus中なら（同一DOMノードなので再度enter/focusは
+    // 発火しない）、離れるまでスケジュールしない
+    if (!hoveredRef.current && !focusedRef.current) schedule(durationMs);
     return clear;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- onDismiss は同じ効果を持つ安定した呼び出し
   }, [durationMs, message]);
@@ -90,10 +96,28 @@ function useAutoDismissTimer(
   };
   const resume = () => {
     if (durationMs == null || timerRef.current != null) return;
+    if (hoveredRef.current || focusedRef.current) return;
     schedule(Math.max(remainingRef.current, 0));
   };
 
-  return { onMouseEnter: pause, onMouseLeave: resume, onFocus: pause, onBlur: resume };
+  return {
+    onMouseEnter: () => {
+      hoveredRef.current = true;
+      pause();
+    },
+    onMouseLeave: () => {
+      hoveredRef.current = false;
+      resume();
+    },
+    onFocus: () => {
+      focusedRef.current = true;
+      pause();
+    },
+    onBlur: () => {
+      focusedRef.current = false;
+      resume();
+    },
+  };
 }
 
 interface ToastContentProps {
@@ -192,7 +216,7 @@ export default function Toast({
           <div
             ref={popoverRef}
             popover={rendersAsDialogChild ? undefined : "manual"}
-            className="pointer-events-none fixed inset-x-0 top-[58px] m-0 w-screen max-w-none flex justify-center border-none bg-transparent p-0"
+            className="pointer-events-none fixed inset-x-0 top-[58px] m-0 w-full max-w-none flex justify-center border-none bg-transparent p-0"
           >
             <AnimatePresence onExitComplete={handleExitComplete}>
               {message != null && (

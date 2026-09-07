@@ -155,4 +155,37 @@ describe("Toast", () => {
 
     vi.useRealTimers();
   });
+
+  it("hoverとfocusは独立に管理し、片方が外れても他方が残っていれば消去を止めたままにする", () => {
+    vi.useFakeTimers();
+    vi.spyOn(HTMLElement.prototype, "showPopover").mockImplementation(() => {});
+    vi.spyOn(HTMLElement.prototype, "hidePopover").mockImplementation(() => {});
+    const onDismiss = vi.fn();
+
+    render(
+      <Toast
+        message="候補から外しました"
+        variant="success"
+        actionLabel="元に戻す"
+        onAction={() => {}}
+        onDismiss={onDismiss}
+      />,
+    );
+    const output = screen.getByText("候補から外しました").closest("output");
+    if (!output) throw new Error("toast output not found");
+
+    // マウスでホバーしたままボタンへフォーカスし、その後マウスだけ離れる
+    fireEvent.mouseEnter(output);
+    fireEvent.focus(output);
+    fireEvent.mouseLeave(output);
+    act(() => vi.advanceTimersByTime(60_000));
+    expect(onDismiss).not.toHaveBeenCalled();
+
+    // 最後にフォーカスも外れたら残り時間から再開する
+    fireEvent.blur(output);
+    act(() => vi.advanceTimersByTime(TOAST_ACTION_AUTO_DISMISS_MS));
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+
+    vi.useRealTimers();
+  });
 });
