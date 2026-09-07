@@ -3,10 +3,14 @@
 // 位置は playerPopupOffsetAtom（localStorage）に確定値のみを書き込み、ドラッグ中は
 // motion value（x/y）だけで追従させる。初期位置付近での離しは吸着してオフセットをリセットする。
 
-import { useAtom } from "jotai";
+import { useAtom, useSetAtom } from "jotai";
 import { animate, useDragControls, useMotionValue, type PanInfo } from "motion/react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { playerPopupOffsetAtom, type PlayerPopupOffset } from "./playerPresentationAtoms";
+import {
+  playerPopupMeasuredHeightAtom,
+  playerPopupOffsetAtom,
+  type PlayerPopupOffset,
+} from "./playerPresentationAtoms";
 import { clamp } from "../../../shared/lib/clamp";
 import { isPrimaryPointerButton } from "../../../shared/lib/pointerButton";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
@@ -16,6 +20,8 @@ const SNAP_DISTANCE_PX = 70;
 const RESET_DURATION_S = 0.22;
 /** ドラッグの起点判定から除外する操作系要素。 */
 const DRAG_IGNORE_SELECTOR = "button, input, a, [role='slider']";
+/** トップバー行の高さ（frame-a.css の grid-template-rows）。ここより上へはドラッグさせない。 */
+const TOPBAR_CLEARANCE_PX = 48;
 
 interface DragConstraints {
   top: number;
@@ -73,7 +79,7 @@ export function usePopupDrag(): PopupDragBind {
     const current = offsetRef.current;
     const next: DragConstraints = {
       left: -(window.innerWidth - rightPx - width),
-      top: -(window.innerHeight - bottomPx - height),
+      top: -(window.innerHeight - bottomPx - height - TOPBAR_CLEARANCE_PX),
       right: rightPx,
       bottom: bottomPx,
     };
@@ -98,6 +104,23 @@ export function usePopupDrag(): PopupDragBind {
     window.addEventListener("resize", recomputeConstraints);
     return () => window.removeEventListener("resize", recomputeConstraints);
   }, [recomputeConstraints]);
+
+  // ポップアップの実測高さを結果面・右ペインの余白算出（has-docked-popup）に渡す。
+  // AppShell 側で「アプリ全体で1つ」の値として使うため、コンポーネントの祖先ではなく
+  // atom に書き込む。
+  const setMeasuredHeight = useSetAtom(playerPopupMeasuredHeightAtom);
+  useLayoutEffect(() => {
+    const el = popupRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) setMeasuredHeight(entry.contentRect.height);
+    });
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      setMeasuredHeight(0);
+    };
+  }, [setMeasuredHeight]);
 
   const resetToOrigin = useCallback(() => {
     const duration = reduced ? 0 : RESET_DURATION_S;

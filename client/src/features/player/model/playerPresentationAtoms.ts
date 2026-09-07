@@ -21,6 +21,14 @@ export const playerDockBarVisibleAtom = atom(
   (get) => get(playerIsActiveAtom) && get(playerUiModeAtom) === "bar",
 );
 
+/**
+ * 再生中で uiMode が popup のとき、右下ポップアップが表示される。
+ * 再生中タブ（appMode）による抑制は AppShell / AppBody 側の合成に任せる。
+ */
+export const playerDockPopupVisibleAtom = atom(
+  (get) => get(playerIsActiveAtom) && get(playerUiModeAtom) === "popup",
+);
+
 /** ポップアップの初期位置（右下）からのドラッグ移動オフセット（px）。 */
 export interface PlayerPopupOffset {
   x: number;
@@ -40,6 +48,18 @@ export const playerPopupOffsetAtom = atomWithStorage<PlayerPopupOffset>(
   undefined,
   { getOnInit: true },
 );
+
+/** オフセットが初期位置のままか（ドラッグで動かされていないか）。 */
+export const playerPopupAtOriginAtom = atom((get) => {
+  const offset = get(playerPopupOffsetAtom);
+  return offset.x === 0 && offset.y === 0;
+});
+
+/**
+ * ポップアップの実測高さ（px）。ResizeObserver（usePopupDrag）が随時更新する。
+ * 未表示時・測定前は0で、その間 has-docked-popup は付与されないため参照されない。
+ */
+export const playerPopupMeasuredHeightAtom = atom(0);
 
 export type NowPlayingViewMode = "normal" | "immersive";
 
