@@ -20,6 +20,7 @@
   padding-left: 0;
 }
 .mle-crumbs {
+  position: relative;
   flex: 1;
   display: flex;
   align-items: center;
@@ -52,6 +53,20 @@
 .mle-crumbs__sep {
   color: var(--ink-4);
   padding: 0 2px;
+}
+.mle-crumbs__ellipsis {
+  color: var(--ink-4);
+  padding: 2px 4px;
+}
+/* 全セグメントを折返し無しで並べた自然幅を測るための不可視クローン
+   （Breadcrumbs.tsx の useNeedsCollapse が scrollWidth を読む） */
+.mle-crumbs__measure {
+  position: absolute;
+  top: 0;
+  left: 0;
+  visibility: hidden;
+  white-space: nowrap;
+  pointer-events: none;
 }
 .mle-grid-controls {
   display: grid;
