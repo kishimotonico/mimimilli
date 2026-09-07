@@ -98,32 +98,18 @@ function UnsavedChangesPrompt({
         <span className="font-sans text-[13.5px] font-semibold text-ink-0">
           未保存の変更があります
         </span>
-        <p className="m-0 text-[12px] leading-[1.7] text-ink-1">
+        <p className="m-0 text-body leading-[1.7] text-ink-1">
           保存せずに閉じると、入力した内容は失われます。
         </p>
         <div className="mt-1 flex justify-end gap-2">
-          {/* Button（shared/ui）はrefを受け取れず初期フォーカス対象にできないため、
-           *  quiet variantの見た目だけをここで複製する（ConfirmDialogと同じ理由）。 */}
-          <button
-            ref={cancelRef}
-            type="button"
-            onClick={onCancel}
-            disabled={isSaving}
-            className="inline-flex h-[26px] items-center gap-[5px] whitespace-nowrap rounded-pill px-[10px] font-sans text-control font-medium text-ink-2 transition-colors hover:bg-paper-2 hover:text-ink-0 disabled:cursor-not-allowed disabled:text-ink-4 disabled:hover:bg-transparent"
-          >
+          <Button ref={cancelRef} variant="quiet" size="md" onClick={onCancel} disabled={isSaving}>
             キャンセル
-          </button>
-          {/* 未保存内容を失う操作なのでdanger（solid塗り）扱いにする。Buttonにdanger variantが
-           *  無いため見た目だけをここで複製する。 */}
-          <button
-            type="button"
-            onClick={onDiscard}
-            disabled={isSaving}
-            className="inline-flex h-[26px] items-center gap-[5px] whitespace-nowrap rounded-pill border border-[color-mix(in_oklch,var(--r-coral)_45%,transparent)] bg-[var(--r-coral)] px-[10px] font-sans text-control font-medium text-paper-1 transition-colors hover:brightness-[0.92] disabled:cursor-not-allowed disabled:border-transparent disabled:bg-paper-2 disabled:text-ink-4"
-          >
+          </Button>
+          {/* 未保存内容を失う操作なのでdanger（solid塗り）扱いにする */}
+          <Button variant="danger" size="md" onClick={onDiscard} disabled={isSaving}>
             破棄する
-          </button>
-          <Button type="button" variant="primary" onClick={onSave} disabled={!canSave || isSaving}>
+          </Button>
+          <Button variant="primary" size="md" onClick={onSave} disabled={!canSave || isSaving}>
             保存する
           </Button>
         </div>
