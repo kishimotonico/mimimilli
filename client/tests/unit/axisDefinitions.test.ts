@@ -6,6 +6,7 @@ import {
   getAxisLabel,
   getSmartFolderId,
   isFacetAxis,
+  isRegisteredFacetAxis,
   isSmartAxis,
   isViewAxis,
 } from "../../src/entities/library/axisDefinitions";
@@ -47,6 +48,12 @@ describe("axisDefinitions", () => {
     expect(getAxisLabel("year")).toBe("追加日");
     expect(getAxisLabel("smart-abc")).toBe("スマートフォルダー");
     expect(getAxisLabel("all")).toBe("すべての作品");
+  });
+
+  it("isRegisteredFacetAxis: 組み込みのyearと登録済みprefixだけ実在扱い（TASK-428.15）", () => {
+    expect(isRegisteredFacetAxis("year", PREFIXES)).toBe(true);
+    expect(isRegisteredFacetAxis("cv", PREFIXES)).toBe(true);
+    expect(isRegisteredFacetAxis("気分", PREFIXES)).toBe(false);
   });
 
   it("buildViewAxisRows returns view axis rows from centralized definitions", () => {

@@ -3,7 +3,7 @@ import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import { I } from "../../shared/ui/Icon";
 import IconButton from "../../shared/ui/IconButton";
 import { buttonClass } from "../../shared/ui/Button";
-import { useAtom, useAtomValue } from "jotai";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useMotionVariants } from "../../shared/ui/useMotionVariants";
 import {
   dlsiteBulkActiveAtom,
@@ -13,7 +13,7 @@ import {
 } from "../../entities/dlsite/model/bulkAtoms";
 import { useDlsiteBulkActions } from "../../entities/dlsite/useDlsiteBulkActions";
 import { librarySearchQueryAtom } from "../../entities/library/model/navigationAtoms";
-import { appModeAtom } from "../../shared/model/appModeAtoms";
+import { appModeAtom, setAppModeAtom } from "../../shared/model/appModeAtoms";
 import { playerIsActiveAtom, playingTrackTitleAtom } from "../../entities/player/model/atoms";
 import { scanningAtom, scanProgressLabelAtom } from "../../entities/scan/model/atoms";
 import { useUnregisteredCandidateCount } from "../../features/scan/model/useScanCandidatesCache";
@@ -53,6 +53,7 @@ export default function TopBar({ onOpenScan, onSettings, notificationBell }: Top
   const dlsiteBulkCancelling = useAtomValue(dlsiteBulkCancellingAtom);
   const { cancel: onCancelDlsiteBulk } = useDlsiteBulkActions();
   const mode = useAtomValue(appModeAtom);
+  const setAppMode = useSetAtom(setAppModeAtom);
   const [searchQuery, onSearchChange] = useAtom(librarySearchQueryAtom);
   const isPlaying = useAtomValue(playerIsActiveAtom);
   const playingTrack = useAtomValue(playingTrackTitleAtom);
@@ -64,6 +65,10 @@ export default function TopBar({ onOpenScan, onSettings, notificationBell }: Top
   const [draft, setDraft] = useState(searchQuery);
   const composingRef = useRef(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  // Escapeで空欄からblurするとき、直前にフォーカスしていた要素へ戻すための記憶
+  // （TASK-428.15）。フォーカスは検索欄へ移った時点ですでに切り替わっているため、
+  // FocusEvent.relatedTarget（移る前にフォーカスしていた要素）から取る。
+  const previousFocusRef = useRef<HTMLElement | null>(null);
 
   // クリアボタンやナビゲーション復元など、親側の値が外部要因で変わったときは draft を追従させる
   useEffect(() => {
@@ -72,7 +77,7 @@ export default function TopBar({ onOpenScan, onSettings, notificationBell }: Top
 
   // ⌘K / Ctrl+K で検索ボックスへフォーカスする。テキスト入力中は横取りしない。
   useEffect(() => {
-    if (mode !== "library") return;
+    if (mode !== "library" && mode !== "workDetail") return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() !== "k" || !(e.metaKey || e.ctrlKey)) return;
       const target = e.target as HTMLElement | null;
@@ -108,7 +113,7 @@ export default function TopBar({ onOpenScan, onSettings, notificationBell }: Top
 
       <div className="mll-bar__spacer" />
 
-      {mode === "library" && (
+      {(mode === "library" || mode === "workDetail") && (
         <div className="mll-bar__search">
           <I.search size={13} />
           <input
@@ -118,12 +123,39 @@ export default function TopBar({ onOpenScan, onSettings, notificationBell }: Top
               setDraft(e.target.value);
               if (!composingRef.current) onSearchChange(e.target.value);
             }}
+            onFocus={(e) => {
+              previousFocusRef.current = (e.relatedTarget as HTMLElement | null) ?? null;
+            }}
             onCompositionStart={() => {
               composingRef.current = true;
             }}
             onCompositionEnd={(e) => {
               composingRef.current = false;
               onSearchChange(e.currentTarget.value);
+            }}
+            onKeyDown={(e) => {
+              if (e.nativeEvent.isComposing) return;
+
+              if (e.key === "Enter") {
+                // 作品詳細から確定したら検索結果（ライブラリ）へ移る（TASK-428.15）
+                if (mode === "workDetail") {
+                  e.preventDefault();
+                  setAppMode("library");
+                }
+                return;
+              }
+
+              if (e.key !== "Escape") return;
+              // 一段だけ閉じる: 値があればクリアに留め、空のときだけblurして直前の
+              // フォーカスへ戻す（TASK-428.13のEscape契約に合わせる）
+              e.preventDefault();
+              if (draft) {
+                setDraft("");
+                onSearchChange("");
+                return;
+              }
+              e.currentTarget.blur();
+              previousFocusRef.current?.focus();
             }}
             placeholder={placeholder}
           />

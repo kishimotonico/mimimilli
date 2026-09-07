@@ -105,4 +105,94 @@ describe("TopBar の検索入力", () => {
 
     document.body.removeChild(other);
   });
+
+  it("値がある状態のEscapeはクリアだけ行いフォーカスは検索欄に残る", () => {
+    const store = renderTopBar("asmr");
+    const input = screen.getByPlaceholderText(PLACEHOLDER) as HTMLInputElement;
+    input.focus();
+
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(input).toHaveValue("");
+    expect(store.get(librarySearchQueryAtom)).toBe("");
+    expect(document.activeElement).toBe(input);
+  });
+
+  it("空の状態のEscapeはblurして直前のフォーカス先へ戻す", () => {
+    renderTopBar("");
+    const input = screen.getByPlaceholderText(PLACEHOLDER) as HTMLInputElement;
+    const trigger = document.createElement("button");
+    document.body.appendChild(trigger);
+    trigger.focus();
+
+    fireEvent.focus(input, { relatedTarget: trigger });
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(document.activeElement).toBe(trigger);
+
+    document.body.removeChild(trigger);
+  });
+
+  it("IME変換中のEscapeは無視する", () => {
+    const store = renderTopBar("asmr");
+    const input = screen.getByPlaceholderText(PLACEHOLDER) as HTMLInputElement;
+
+    fireEvent.compositionStart(input);
+    fireEvent.keyDown(input, { key: "Escape", isComposing: true });
+    expect(input).toHaveValue("asmr");
+    expect(store.get(librarySearchQueryAtom)).toBe("asmr");
+  });
+
+  it("作品詳細でも検索欄が使える", () => {
+    const store = createStore();
+    store.set(appModeAtom, "workDetail");
+    store.set(librarySearchQueryAtom, "");
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
+    });
+    queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), []);
+    render(
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(
+          JotaiProvider,
+          { store },
+          createElement(TopBar, {
+            onOpenScan: vi.fn(),
+            onSettings: vi.fn(),
+            notificationBell: createElement("span", { "aria-label": "通知" }),
+          }),
+        ),
+      ),
+    );
+    expect(screen.getByPlaceholderText(PLACEHOLDER)).toBeInTheDocument();
+  });
+
+  it("作品詳細でEnterを確定するとライブラリへ移る", () => {
+    const store = createStore();
+    store.set(appModeAtom, "workDetail");
+    store.set(librarySearchQueryAtom, "");
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
+    });
+    queryClient.setQueryData(SCAN_QUERY_KEYS.candidates(), []);
+    render(
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(
+          JotaiProvider,
+          { store },
+          createElement(TopBar, {
+            onOpenScan: vi.fn(),
+            onSettings: vi.fn(),
+            notificationBell: createElement("span", { "aria-label": "通知" }),
+          }),
+        ),
+      ),
+    );
+    const input = screen.getByPlaceholderText(PLACEHOLDER);
+    fireEvent.change(input, { target: { value: "asmr" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(store.get(appModeAtom)).toBe("library");
+  });
 });

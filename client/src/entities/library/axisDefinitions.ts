@@ -38,6 +38,12 @@ export function isFacetAxis(axis: AxisId): boolean {
   return !isViewAxis(axis) && axis !== "tag" && !isSmartAxis(axis);
 }
 
+/** facet軸として実在するか。"year" は組み込みで常に有効、それ以外は登録済み prefix のみ。
+ *  URL由来の未登録軸を検出する用途（TASK-428.15） */
+export function isRegisteredFacetAxis(axis: AxisId, tagPrefixes: TagPrefix[]): boolean {
+  return axis === "year" || tagPrefixes.some((p) => p.prefix === axis);
+}
+
 export function getSmartFolderId(axis: AxisId): string {
   return axis.slice("smart-".length);
 }

@@ -13,6 +13,7 @@ import { activeAxisAtom } from "../../src/entities/library/model/navigationAtoms
 import {
   addLibraryTagAtom,
   clearLibraryTagsAtom,
+  recoverInvalidLibraryAxisAtom,
   replaceLibraryTagAtom,
   selectLibraryWorkAtom,
   setLibraryAxisAtom,
@@ -213,6 +214,29 @@ describe("addLibraryTagAtom は追加ボタン用の冪等なAND追加として�
     store.set(addLibraryTagAtom, nt("cv/藤田茜"));
 
     expect(store.get(selectedWorkIdAtom)).toBe("work-1");
+  });
+});
+
+describe("recoverInvalidLibraryAxisAtom: 無効な軸URLから既定一覧へ戻す（TASK-428.15）", () => {
+  it("軸をallへ戻し選択中の作品もクリアする", () => {
+    const store = createStore();
+    store.set(activeAxisAtom, "smart-missing");
+    store.set(selectedWorkIdAtom, "work-1");
+
+    store.set(recoverInvalidLibraryAxisAtom);
+
+    expect(store.get(activeAxisAtom)).toBe("all");
+    expect(store.get(selectedWorkIdAtom)).toBeNull();
+  });
+
+  it("履歴はreplace（戻るで無効なURLへ再度入らないように）", () => {
+    const store = createStore();
+    store.set(activeAxisAtom, "smart-missing");
+    store.set(consumeNavigationHistoryCommitAtom);
+
+    store.set(recoverInvalidLibraryAxisAtom);
+
+    expect(store.get(navigationHistoryCommitAtom).kind).toBe("replace");
   });
 });
 
