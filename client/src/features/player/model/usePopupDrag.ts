@@ -107,13 +107,14 @@ export function usePopupDrag(): PopupDragBind {
 
   // ポップアップの実測高さを結果面・右ペインの余白算出（has-docked-popup）に渡す。
   // AppShell 側で「アプリ全体で1つ」の値として使うため、コンポーネントの祖先ではなく
-  // atom に書き込む。
+  // atom に書き込む。ResizeObserver の contentRect は padding/border を含まないため、
+  // 実際に画面上で占有する高さ（border-box）は offsetHeight から読む。
   const setMeasuredHeight = useSetAtom(playerPopupMeasuredHeightAtom);
   useLayoutEffect(() => {
     const el = popupRef.current;
     if (!el) return;
-    const observer = new ResizeObserver(([entry]) => {
-      if (entry) setMeasuredHeight(entry.contentRect.height);
+    const observer = new ResizeObserver(() => {
+      setMeasuredHeight(el.offsetHeight);
     });
     observer.observe(el);
     return () => {

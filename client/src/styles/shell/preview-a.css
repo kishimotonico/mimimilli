@@ -130,10 +130,10 @@
 .mle-app.has-docked-bar .mle-prv__body {
   padding-bottom: 30px;
 }
-/* 作品詳細の右ペイン（.mll-results__preview）は frame-c.css 側で bottom を
-   ポップアップ実寸ぶん縮めており、主対応はそちらで完結する（player-A-11）。
-   ここは全画面作品詳細（.is-full、.mll-results__preview を経由しない独立ルート）
-   向けの保険で、末尾までスクロールで到達できるようにするだけ。 */
+/* 右ペイン（.mll-results__preview）は frame-c.css 側で bottom をポップアップ実寸ぶん
+   縮めるが、全画面作品詳細（.is-full）は .mll-results__preview を経由しない別ルートで
+   その縮小が効かない。トラック数が多い作品では実際に最終行がポップアップへ重なる
+   （player-A-11）ため、ここでも同様に padding-bottom を足して縮める。 */
 .mle-app.has-docked-popup .mle-prv__body {
   padding-bottom: calc(var(--popup-h, 0px) + 24px);
 }
