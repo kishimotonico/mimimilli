@@ -15,6 +15,7 @@ import { scanErrorAtom, scanResultToastAtom } from "../../entities/scan/model/at
 import { useScanActions } from "../../entities/scan/useScanActions";
 import { playerSkipToastAtom } from "../../features/player/model/playerPresentationAtoms";
 import { rootFolderChangedToastAtom } from "../../entities/settings/model/rootFolderChangeAtoms";
+import { workDeleteSuccessAtom } from "../../features/library/model/atoms";
 
 export interface GlobalToastProps {
   /** ルートフォルダー変更成功トーストの「今すぐスキャン」actionから呼ぶ */
@@ -33,6 +34,8 @@ export default function GlobalToast({ onOpenScan, onOpenScanNeedsAttention }: Gl
   const setRootFolderChangedToast = useSetAtom(rootFolderChangedToastAtom);
   const playerSkipToast = useAtomValue(playerSkipToastAtom);
   const setPlayerSkipToast = useSetAtom(playerSkipToastAtom);
+  const workDeleteSuccess = useAtomValue(workDeleteSuccessAtom);
+  const setWorkDeleteSuccess = useSetAtom(workDeleteSuccessAtom);
   const dlsiteBulkApplyResult = useAtomValue(dlsiteBulkApplyResultAtom);
   const dlsiteResult = useAtomValue(dlsiteBulkResultAtom);
   const dlsiteCancelledResult = useAtomValue(dlsiteBulkCancelledResultAtom);
@@ -103,6 +106,16 @@ export default function GlobalToast({ onOpenScan, onOpenScanNeedsAttention }: Gl
         message={playerSkipToast}
         variant="warning"
         onDismiss={() => setPlayerSkipToast(null)}
+      />
+    );
+  }
+
+  if (workDeleteSuccess) {
+    return (
+      <Toast
+        message={workDeleteSuccess}
+        variant="success"
+        onDismiss={() => setWorkDeleteSuccess(null)}
       />
     );
   }

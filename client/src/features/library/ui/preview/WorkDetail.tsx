@@ -3,6 +3,7 @@ import { useSetAtom } from "jotai";
 import type { UseMutationResult } from "@tanstack/react-query";
 import type { NormalizedTag, Work } from "@mimimilli/shared";
 import { errorToastAtom } from "../../../../shared/model/errorToastAtom";
+import { workDeleteSuccessAtom } from "../../model/atoms";
 import { apiErrorMessage } from "../../../../shared/lib/apiError";
 import ConfirmDialog from "../../../../shared/ui/ConfirmDialog";
 import CoverImg from "../../../../entities/work/ui/CoverImg";
@@ -85,9 +86,12 @@ export function WorkDetail({
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const hasKickerWarning = work.status === "missing" || work.status === "error";
   const setErrorToast = useSetAtom(errorToastAtom);
+  const setWorkDeleteSuccess = useSetAtom(workDeleteSuccessAtom);
 
   const handleDeleteConfirm = () => {
+    const title = work.title;
     deleteMutation.mutate(work.id, {
+      onSuccess: () => setWorkDeleteSuccess(`「${title}」の登録を解除しました`),
       onError: (cause) => setErrorToast(apiErrorMessage(cause, "作品登録の解除に失敗しました")),
     });
   };

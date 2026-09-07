@@ -73,4 +73,26 @@ describe("TagCombobox Escape", () => {
     expect(queryByRole("listbox")).not.toBeNull();
     expect(onCancel).not.toHaveBeenCalled();
   });
+
+  it("IME変換確定のEnterはタグを確定しない", () => {
+    const onSelect = vi.fn();
+    const { getByRole, queryByRole } = render(
+      createElement(TagCombobox, {
+        suggestions: ["ASMR", "睡眠用"],
+        onSelect,
+      }),
+    );
+    const input = getByRole("combobox");
+
+    fireEvent.change(input, { target: { value: "睡" } });
+    expect(queryByRole("listbox")).not.toBeNull();
+
+    fireEvent.keyDown(input, { key: "Enter", isComposing: true });
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(queryByRole("listbox")).not.toBeNull(); // 候補は開いたまま
+    expect(input).toHaveValue("睡"); // 入力もそのまま残る
+
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onSelect).toHaveBeenCalledWith("睡眠用");
+  });
 });

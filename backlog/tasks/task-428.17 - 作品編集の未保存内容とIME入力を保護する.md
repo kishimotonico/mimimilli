@@ -4,7 +4,7 @@ title: 作品編集の未保存内容とIME入力を保護する
 status: To Do
 assignee: []
 created_date: '2026-09-07 09:08'
-updated_date: '2026-09-07 09:12'
+updated_date: '2026-09-07 14:30'
 labels:
   - ui
   - editing
@@ -27,9 +27,9 @@ work-detail-A-02/A-04/A-09/A-12/A-13、states-feedback-A-09。IME確定Enterが�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 IME composition中のEnterでタグを確定しない
-- [ ] #2 dirty状態でEscape・×・背景クリックを行うと保存・破棄・取消を選べる
-- [ ] #3 保存失敗時に入力値とfocus対象が維持される
-- [ ] #4 登録解除成功と編集失敗を共通通知規約で確認できる
-- [ ] #5 pnpm test:smokeに新規失敗がない
+- [x] #1 IME composition中のEnterでタグを確定しない
+- [x] #2 dirty状態でEscape・×・背景クリックを行うと保存・破棄・取消を選べる
+- [x] #3 保存失敗時に入力値とfocus対象が維持される
+- [x] #4 登録解除成功と編集失敗を共通通知規約で確認できる
+- [x] #5 pnpm test:smokeに新規失敗がない
 <!-- AC:END -->

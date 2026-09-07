@@ -67,4 +67,17 @@ describe("WorkTagEditor", () => {
     expect(mutateAsync).not.toHaveBeenCalled();
     expect(screen.getByRole("alert")).toHaveTextContent(WORK_SOURCE_PATCH_BLOCKED_MESSAGE);
   });
+
+  it("タグ保存に失敗すると共通トースト（error variant・手動クローズ）で案内する", () => {
+    render(
+      <WorkTagEditor
+        work={makeWork()}
+        tagSuggestions={[]}
+        tagsMutation={makeTagsMutation({ error: new Error("network") })}
+        expanded
+      />,
+    );
+
+    expect(screen.getByText("タグを保存できませんでした。")).toBeTruthy();
+  });
 });

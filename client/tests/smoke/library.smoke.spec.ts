@@ -118,7 +118,10 @@ test("詳細パネルの「その他」メニューから作品登録を解除�
   await dialog.getByRole("button", { name: "解除する" }).click();
 
   await expect(panel).toBeHidden();
-  await expect(page.getByText("添い寝カフェへようこそ", { exact: false })).toBeHidden();
+  await expect(
+    page.locator(".mll-results").getByText("添い寝カフェへようこそ", { exact: false }),
+  ).toBeHidden();
+  await expect(page.getByText("の登録を解除しました", { exact: false })).toBeVisible();
 
   assertNoErrors(tracker);
 });

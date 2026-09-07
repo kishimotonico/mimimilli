@@ -167,6 +167,8 @@ export default function TagCombobox({
           }
 
           if (event.key === "Enter") {
+            // IME変換確定のEnterはタグ確定に使わない。変換だけを終わらせる。
+            if (event.nativeEvent.isComposing) return;
             event.preventDefault();
             if (activeOption) commitOption(activeOption);
             return;

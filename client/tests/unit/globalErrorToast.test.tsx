@@ -9,6 +9,7 @@ import DlsiteBulkApplyRuntime from "../../src/features/dlsite/ui/DlsiteBulkApply
 import { errorToastAtom } from "../../src/shared/model/errorToastAtom";
 import { playerSkipToastAtom } from "../../src/features/player/model/playerPresentationAtoms";
 import { scanErrorAtom, scanResultToastAtom } from "../../src/entities/scan/model/atoms";
+import { workDeleteSuccessAtom } from "../../src/features/library/model/atoms";
 import {
   dlsiteBulkCancelledResultAtom,
   dlsiteBulkErrorAtom,
@@ -72,6 +73,15 @@ describe("GlobalToast", () => {
     renderGlobalToast(store);
 
     expect(screen.getByText("start failed")).toBeTruthy();
+  });
+
+  it("workDeleteSuccessAtom のメッセージをsuccess variantで表示する", () => {
+    const store = createStore();
+    store.set(workDeleteSuccessAtom, "「作品X」の登録を解除しました");
+
+    renderGlobalToast(store);
+
+    expect(screen.getByText("「作品X」の登録を解除しました")).toBeTruthy();
   });
 
   it("dlsiteBulkErrorAtom のメッセージを表示する", () => {
