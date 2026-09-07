@@ -4,6 +4,7 @@ title: 作品・値・トラック一覧のキーボード操作を共通化す�
 status: To Do
 assignee: []
 created_date: '2026-09-07 09:08'
+updated_date: '2026-09-07 19:12'
 labels:
   - ui
   - keyboard
@@ -21,7 +22,11 @@ ordinal: 439000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-responsive-keyboard-A-01/A-02とinteraction-model重複。大量の行が個別Tab-stopとなり、一覧ごとに矢印・Enter・Escapeの意味が異なる。roving tabindexと仮想化focus処理を共通化する。Files一覧はDRAFT-51の範囲として除く。
+lib-browse-A-04/A-13/A-14、work-detail-A-13。作品・値・トラック一覧でキーボード操作の有無と挙動が揃わず、Enter・矢印・Home/Endの意味も一覧ごとに違う。共通のキーボード操作契約へ揃える。
+
+前提（統合済みの変更）: TASK-428.24 が WorkGrid.tsx / WorkListPane.tsx の works.length === 0 の分岐内にスマートフォルダー専用の空状態を追加済み（追加した3つのprops isSmartFolder / onEditSmartFolderRules / onClearAllFilters はすべて optional・デフォルト値あり。virtualizer・ジャスティファイドレイアウト・キーボードナビゲーション・タイル/行の描画には触れていない）。TASK-428.9 が同2ファイルから resultsBanner props を削除し、描画を LibraryView 側の1箇所へ集約済み（resultsBanner は .mll-results の外へ移動）。TASK-428.5 が WorkTile.tsx にダブルクリック/Enterでの再生ガード（isPlayable = work.status === "ok"）を追加済み。
+
+TASK-428.13 が確定させたショートカット・Escape契約に従うこと（モーダル dialog 中は全キー無効化、除外セレクタは input/textarea/select/[contenteditable]/[role=menu]/[role=listbox]/button/a、data-player-control 属性を持つプレイヤー操作ボタンにフォーカスがあるときだけ Space はグローバルの再生トグルへ、Escape はレイヤーごとに一段だけ閉じる、IME変換中は無視）。docs/design-system.md の「グローバルショートカット / Escape」節に記載がある。
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
