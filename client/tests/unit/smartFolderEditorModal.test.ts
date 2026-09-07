@@ -4,8 +4,10 @@ import type { ComponentProps } from "react";
 import type { SmartFolder } from "@mimimilli/shared";
 import { createElement } from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import SmartFolderEditorModal from "../../src/features/library/ui/SmartFolderEditorModal";
+import * as smartFolderApi from "../../src/entities/smart-folder/api";
 
 beforeEach(() => {
   HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) {
@@ -14,6 +16,8 @@ beforeEach(() => {
   HTMLDialogElement.prototype.close = vi.fn(function (this: HTMLDialogElement) {
     this.open = false;
   });
+  // ライブ件数プレビュー（TASK-428.11）はモーダル内でAPIを呼ぶため、テストでは常に固定値で応答する
+  vi.spyOn(smartFolderApi, "previewSmartFolderRuleCount").mockResolvedValue(0);
 });
 
 function renderModal({
@@ -26,16 +30,23 @@ function renderModal({
   onClose?: ReturnType<typeof vi.fn>;
 } = {}) {
   const onSave = props.onSave ?? vi.fn();
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   render(
-    createElement(SmartFolderEditorModal, {
-      folder: null,
-      tagSuggestions: [],
-      isSaving,
-      saveError: null,
-      onClose,
-      onSave,
-      ...props,
-    }),
+    createElement(
+      QueryClientProvider,
+      { client: queryClient },
+      createElement(SmartFolderEditorModal, {
+        folder: null,
+        tagSuggestions: [],
+        isSaving,
+        saveError: null,
+        onClose,
+        onSave,
+        ...props,
+      }),
+    ),
   );
   return { onClose, onSave };
 }
@@ -93,5 +104,59 @@ describe("SmartFolderEditorModal", () => {
 
     expect(screen.getByText("「cv/」は登録できないタグです")).toBeInTheDocument();
     expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it("名前が空で送信するとエラー件数alertを出し、名前欄へフォーカス・スクロールする", () => {
+    const scrollIntoView = vi.fn();
+    HTMLElement.prototype.scrollIntoView = scrollIntoView;
+    const { onSave } = renderModal();
+
+    fireEvent.click(screen.getByRole("button", { name: "作成" }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent("入力に不備があります（2件）");
+    expect(scrollIntoView).toHaveBeenCalled();
+    expect(document.activeElement).toBe(screen.getByPlaceholderText("例: 長時間 ASMR"));
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it("条件エラー時は条件カードにaria-invalidを付け、その入力へフォーカスする", () => {
+    const scrollIntoView = vi.fn();
+    HTMLElement.prototype.scrollIntoView = scrollIntoView;
+    const folder = {
+      id: "sf-1",
+      name: "テスト",
+      rules: [{ conjunction: "WHERE", field: "タグ", operator: "∋", values: ["cv/"] }],
+      sort: "added-desc",
+      createdAt: "2026-07-10T00:00:00.000Z",
+    } satisfies SmartFolder;
+    renderModal({ props: { folder } });
+
+    fireEvent.click(screen.getByRole("button", { name: "変更を保存" }));
+
+    const card = screen.getByText("「cv/」は登録できないタグです").closest("[data-rule-id]");
+    expect(card).toHaveAttribute("aria-invalid", "true");
+    expect(scrollIntoView).toHaveBeenCalled();
+  });
+
+  it("妥当な条件のときライブ件数プレビューを表示する", async () => {
+    vi.spyOn(smartFolderApi, "previewSmartFolderRuleCount").mockResolvedValue(7);
+    const folder = {
+      id: "sf-1",
+      name: "テスト",
+      rules: [{ conjunction: "WHERE", field: "タグ", operator: "∋", values: ["ASMR"] }],
+      sort: "added-desc",
+      createdAt: "2026-07-10T00:00:00.000Z",
+    } satisfies SmartFolder;
+    renderModal({ props: { folder } });
+
+    await screen.findByText((_, el) => el?.textContent === "条件一致 7件");
+  });
+
+  it("条件が妥当でない間はライブ件数プレビューを問い合わせない", () => {
+    const preview = vi.spyOn(smartFolderApi, "previewSmartFolderRuleCount");
+    preview.mockClear();
+    renderModal(); // 新規作成の初期ドラフトはタグ未選択で不正
+
+    expect(preview).not.toHaveBeenCalled();
   });
 });

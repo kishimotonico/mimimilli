@@ -4,6 +4,7 @@ import type {
   SmartFolder,
   SmartFolderCreate,
   SmartFolderEvalQuery,
+  SmartFolderRule,
   SmartFolderUpdate,
   TagPrefix,
   TagPrefixCandidate,
@@ -14,7 +15,7 @@ import type {
 import type { ClassificationAdapter } from "../../adapter/classification.ts";
 import { buildAxisFacets } from "../../core/axisFacets.ts";
 import { buildTagPrefixCandidates } from "../../core/tagPrefixCandidates.ts";
-import { evalSmartFolder } from "../../core/smartFolder.ts";
+import { evalSmartFolder, evalSmartFolderRules } from "../../core/smartFolder.ts";
 import { toWorksPage } from "../../core/worksQuery.ts";
 import type { FixtureState } from "./state.ts";
 
@@ -107,6 +108,10 @@ export function createClassificationMethods(state: FixtureState): Classification
         evalSmartFolder(folder, state.works, query),
         state.rootFolder ?? "/library",
       );
+    },
+
+    async previewSmartFolderRuleCount(rules: SmartFolderRule[]): Promise<number> {
+      return evalSmartFolderRules(rules, state.works).length;
     },
   };
 }

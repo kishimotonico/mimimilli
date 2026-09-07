@@ -9,6 +9,7 @@ import {
   useSuspenseInfiniteQuery,
   type UseMutationResult,
 } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { useAtomValue } from "jotai";
 import { randomSeedAtom } from "../../../entities/library/model/navigationAtoms";
 import {
@@ -16,6 +17,7 @@ import {
   type NormalizedTag,
   type SmartFolder,
   type SmartFolderCreate,
+  type SmartFolderRule,
   type UnregisterMissingWorksResult,
   type UrlEntry,
   type Work,
@@ -28,6 +30,7 @@ import {
   createSmartFolder,
   updateSmartFolder,
   evalSmartFolder,
+  previewSmartFolderRuleCount,
 } from "../../../entities/smart-folder/api";
 import { getAllTags } from "../../../entities/tag/api";
 import { deleteWork, getWork, patchWork, unregisterMissingWorks } from "../../../entities/work/api";
@@ -408,4 +411,36 @@ export function useSmartFolderMutation(callbacks: {
       callbacks.onError(folder === null, error);
     },
   });
+}
+
+/** ライブ件数プレビュー（保存前ルールの評価API、TASK-428.11）。300msデバウンス後に問い合わせ、
+ *  デバウンス待ち・取得中は isCounting=true を返す。rules が null（ルールが妥当でない）間は
+ *  問い合わせない */
+const SMART_FOLDER_PREVIEW_DEBOUNCE_MS = 300;
+
+export function useSmartFolderRuleMatchCountQuery(
+  rules: SmartFolderRule[] | null,
+  options?: { immediate?: boolean },
+) {
+  const rulesKey = rules ? JSON.stringify(rules) : null;
+  const debouncedKey = useDebouncedValue(
+    rulesKey,
+    SMART_FOLDER_PREVIEW_DEBOUNCE_MS,
+    rulesKey === null || (options?.immediate ?? false),
+  );
+  const debouncedRules = useMemo<SmartFolderRule[] | null>(
+    () => (debouncedKey ? (JSON.parse(debouncedKey) as SmartFolderRule[]) : null),
+    [debouncedKey],
+  );
+
+  const query = useQuery({
+    queryKey: SMART_FOLDER_QUERY_KEYS.preview(debouncedRules ?? []),
+    queryFn: ({ signal }) => previewSmartFolderRuleCount(debouncedRules!, { signal }),
+    enabled: debouncedRules !== null,
+  });
+
+  return {
+    total: query.data,
+    isCounting: debouncedRules !== null && (rulesKey !== debouncedKey || query.isFetching),
+  };
 }

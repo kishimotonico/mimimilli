@@ -4,6 +4,7 @@ import type {
   SmartFolder,
   SmartFolderCreate,
   SmartFolderEvalQuery,
+  SmartFolderRule,
   SmartFolderUpdate,
   TagPrefix,
   TagPrefixCandidate,
@@ -29,4 +30,7 @@ export interface ClassificationAdapter {
   updateSmartFolder(id: string, input: SmartFolderUpdate): Promise<SmartFolder | null>;
   deleteSmartFolder(id: string): Promise<boolean>;
   evalSmartFolder(id: string, query: SmartFolderEvalQuery): Promise<WorksPage | null>;
+  /** 未保存のドラフトルールを評価し、チップ絞り込みを適用しない純粋な一致件数を返す
+   *  （POST /smart-folders/preview、TASK-428.11） */
+  previewSmartFolderRuleCount(rules: SmartFolderRule[]): Promise<number>;
 }

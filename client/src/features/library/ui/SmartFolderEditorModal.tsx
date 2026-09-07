@@ -7,9 +7,16 @@ import {
   removeSmartFolderRule,
   updateSmartFolderRule,
   validateSmartFolderDraft,
+  validateSmartFolderDraftRules,
   type SmartFolderEditorErrors,
   type SmartFolderEditorRule,
 } from "../model/smartFolderEditor";
+import {
+  formatSmartFolderLengthValue,
+  formatSmartFolderOperatorLabel,
+} from "../model/smartFolderFormat";
+import { useSmartFolderRuleMatchCountQuery } from "../model/useLibraryQueries";
+import { cn } from "../../../shared/lib/cn";
 import Button from "../../../shared/ui/Button";
 import IconButton from "../../../shared/ui/IconButton";
 import { I } from "../../../shared/ui/Icon";
@@ -27,6 +34,10 @@ interface SmartFolderEditorModalProps {
 
 const inputClass =
   "h-8 rounded-[6px] border border-line bg-paper-1 px-2.5 font-jp text-body text-ink-0 focus:border-acc";
+
+// エディタと結果バナー（SmartFolderView）で列位置を揃えるための固定幅（TASK-428.11 SF-04）
+const CONJ_WIDTH_CLASS = "w-[92px]";
+const OP_WIDTH_CLASS = "w-[76px]";
 
 function DurationInput({
   rule,
@@ -49,26 +60,29 @@ function DurationInput({
   };
 
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-      {(
-        [
-          ["hours", "時間"],
-          ["minutes", "分"],
-          ["seconds", "秒"],
-        ] as const
-      ).map(([part, label]) => (
-        <label key={part} className="flex items-center gap-1 font-jp text-[11px] text-ink-2">
-          <input
-            type="number"
-            min={0}
-            value={parts[part]}
-            aria-label={`長さ（${label}）`}
-            className={`${inputClass} w-[68px] font-mono`}
-            onChange={(event) => setPart(part, event.target.value)}
-          />
-          {label}
-        </label>
-      ))}
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+        {(
+          [
+            ["hours", "時間"],
+            ["minutes", "分"],
+            ["seconds", "秒"],
+          ] as const
+        ).map(([part, label]) => (
+          <label key={part} className="flex items-center gap-1 font-jp text-[11px] text-ink-2">
+            <input
+              type="number"
+              min={0}
+              value={parts[part]}
+              aria-label={`長さ（${label}）`}
+              className={`${inputClass} w-[68px] font-mono`}
+              onChange={(event) => setPart(part, event.target.value)}
+            />
+            {label}
+          </label>
+        ))}
+      </div>
+      <span className="font-jp text-caption text-ink-2">{formatSmartFolderLengthValue(rule)}</span>
     </div>
   );
 }
@@ -85,6 +99,14 @@ export default function SmartFolderEditorModal({
   const [errors, setErrors] = useState<SmartFolderEditorErrors>({ ruleValues: {} });
   const nextRuleId = useRef(draft.rules.length);
   const nameInputRef = useRef<HTMLInputElement>(null);
+  const ruleCardRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  const rulesResult = validateSmartFolderDraftRules(draft.rules);
+  const matchCount = useSmartFolderRuleMatchCountQuery(
+    rulesResult.success ? rulesResult.rules : null,
+  );
+
+  const errorCount = Object.keys(errors.ruleValues).length + (errors.name ? 1 : 0);
 
   // 保存中はEscapeでもbackdropクリックでも閉じない（既存挙動を維持）
   const { dialogRef, handleCancel, handleBackdropClick } = useDialogModal({
@@ -105,11 +127,26 @@ export default function SmartFolderEditorModal({
     });
   };
 
+  const focusFirstInvalid = (invalidErrors: SmartFolderEditorErrors) => {
+    if (invalidErrors.name) {
+      nameInputRef.current?.scrollIntoView({ block: "center" });
+      nameInputRef.current?.focus();
+      return;
+    }
+    const firstInvalidRuleId = draft.rules.find((rule) => invalidErrors.ruleValues[rule.id])?.id;
+    if (firstInvalidRuleId === undefined) return;
+    const card = ruleCardRefs.current[firstInvalidRuleId];
+    if (!card) return;
+    card.scrollIntoView({ block: "center" });
+    (card.querySelector<HTMLElement>("[data-rule-value] input") ?? card).focus();
+  };
+
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
     const result = validateSmartFolderDraft(draft);
     if (!result.success) {
       setErrors(result.errors);
+      focusFirstInvalid(result.errors);
       return;
     }
     setErrors({ ruleValues: {} });
@@ -151,7 +188,7 @@ export default function SmartFolderEditorModal({
               ref={nameInputRef}
               value={draft.name}
               aria-invalid={Boolean(errors.name)}
-              className={`${inputClass} w-full`}
+              className={cn(inputClass, "w-full", errors.name && "border-[var(--r-coral)]")}
               placeholder="例: 長時間 ASMR"
               onChange={(event) => {
                 setDraft((current) => ({ ...current, name: event.target.value }));
@@ -172,158 +209,180 @@ export default function SmartFolderEditorModal({
                 条件
               </h3>
               <span className="font-jp text-caption text-ink-2">上から順に評価します</span>
+              <span className="ml-auto font-mono text-mono text-ink-2">
+                {matchCount.isCounting ? (
+                  "集計中…"
+                ) : matchCount.total !== undefined ? (
+                  <>
+                    条件一致 <b className="text-acc-ink">{matchCount.total}</b>件
+                  </>
+                ) : null}
+              </span>
             </div>
 
             <div className="mll-smart__rules gap-2 p-2.5">
-              {draft.rules.map((rule, index) => (
-                <div
-                  key={rule.id}
-                  className="rounded-[6px] border border-line-soft bg-paper-0 p-2.5"
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    {index === 0 ? (
-                      <span className="w-[76px] text-center font-mono text-[10px] font-bold text-ink-4">
-                        WHERE
-                      </span>
-                    ) : (
+              {draft.rules.map((rule, index) => {
+                const ruleError = errors.ruleValues[rule.id];
+                return (
+                  <div
+                    key={rule.id}
+                    ref={(el) => {
+                      ruleCardRefs.current[rule.id] = el;
+                    }}
+                    data-rule-id={rule.id}
+                    tabIndex={-1}
+                    aria-invalid={Boolean(ruleError)}
+                    className={cn(
+                      "rounded-[6px] border border-line-soft bg-paper-0 p-2.5 focus:outline-none",
+                      ruleError && "border-[var(--r-coral)] bg-[oklch(97%_0.02_25)]",
+                    )}
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      {index === 0 ? (
+                        <span
+                          className={`${CONJ_WIDTH_CLASS} text-center font-mono text-[10px] font-bold text-ink-4`}
+                        >
+                          WHERE
+                        </span>
+                      ) : (
+                        <select
+                          aria-label={`${index + 1}件目の条件の組み合わせ`}
+                          value={rule.conjunction}
+                          className={`${inputClass} ${CONJ_WIDTH_CLASS} font-mono text-[10px] font-bold`}
+                          onChange={(event) => {
+                            const conjunction = event.target.value;
+                            updateRule(rule.id, (current) =>
+                              current.field === "長さ"
+                                ? {
+                                    ...current,
+                                    conjunction: conjunction as "AND" | "OR",
+                                  }
+                                : {
+                                    ...current,
+                                    conjunction: conjunction as "AND" | "OR" | "AND NOT",
+                                  },
+                            );
+                          }}
+                        >
+                          <option value="AND">AND</option>
+                          <option value="OR">OR</option>
+                          {rule.field === "タグ" && <option value="AND NOT">AND NOT</option>}
+                        </select>
+                      )}
+
                       <select
-                        aria-label={`${index + 1}件目の条件の組み合わせ`}
-                        value={rule.conjunction}
-                        className={`${inputClass} w-[92px] font-mono text-[10px] font-bold`}
+                        aria-label={`${index + 1}件目の条件のフィールド`}
+                        value={rule.field}
+                        className={`${inputClass} w-[104px] font-sans`}
                         onChange={(event) => {
-                          const conjunction = event.target.value;
-                          updateRule(rule.id, (current) =>
-                            current.field === "長さ"
-                              ? {
-                                  ...current,
-                                  conjunction: conjunction as "AND" | "OR",
-                                }
-                              : {
-                                  ...current,
-                                  conjunction: conjunction as "AND" | "OR" | "AND NOT",
-                                },
+                          setDraft((current) =>
+                            changeSmartFolderRuleField(
+                              current,
+                              rule.id,
+                              event.target.value as SmartFolderEditorRule["field"],
+                            ),
                           );
+                          setErrors((current) => {
+                            const { [rule.id]: _removed, ...ruleValues } = current.ruleValues;
+                            return { ...current, ruleValues };
+                          });
                         }}
                       >
-                        <option value="AND">AND</option>
-                        <option value="OR">OR</option>
-                        {rule.field === "タグ" && <option value="AND NOT">AND NOT</option>}
+                        <option value="タグ">タグ</option>
+                        <option value="長さ">長さ</option>
                       </select>
-                    )}
 
-                    <select
-                      aria-label={`${index + 1}件目の条件のフィールド`}
-                      value={rule.field}
-                      className={`${inputClass} w-[104px] font-sans`}
-                      onChange={(event) => {
-                        setDraft((current) =>
-                          changeSmartFolderRuleField(
-                            current,
-                            rule.id,
-                            event.target.value as SmartFolderEditorRule["field"],
-                          ),
-                        );
-                        setErrors((current) => {
-                          const { [rule.id]: _removed, ...ruleValues } = current.ruleValues;
-                          return { ...current, ruleValues };
-                        });
-                      }}
-                    >
-                      <option value="タグ">タグ</option>
-                      <option value="長さ">長さ</option>
-                    </select>
+                      <span
+                        className={`${OP_WIDTH_CLASS} text-center font-jp text-secondary text-ink-2`}
+                      >
+                        {formatSmartFolderOperatorLabel(rule)}
+                      </span>
 
-                    <select
-                      aria-label={`${index + 1}件目の条件の演算子`}
-                      value={rule.operator}
-                      disabled
-                      className={`${inputClass} w-[68px] cursor-not-allowed font-mono text-ink-2`}
-                    >
-                      <option value={rule.operator}>{rule.operator}</option>
-                    </select>
+                      <IconButton
+                        icon={I.x}
+                        label={`${index + 1}件目の条件を削除`}
+                        size="sm"
+                        className="ml-auto"
+                        onClick={() => {
+                          setDraft((current) => removeSmartFolderRule(current, rule.id));
+                          setErrors((current) => {
+                            const { [rule.id]: _removed, ...ruleValues } = current.ruleValues;
+                            return { ...current, ruleValues };
+                          });
+                        }}
+                      />
+                    </div>
 
-                    <IconButton
-                      icon={I.x}
-                      label={`${index + 1}件目の条件を削除`}
-                      size="sm"
-                      className="ml-auto"
-                      onClick={() => {
-                        setDraft((current) => removeSmartFolderRule(current, rule.id));
-                        setErrors((current) => {
-                          const { [rule.id]: _removed, ...ruleValues } = current.ruleValues;
-                          return { ...current, ruleValues };
-                        });
-                      }}
-                    />
-                  </div>
-
-                  <div className="mt-2 border-t border-line-soft pt-2">
-                    {rule.field === "タグ" ? (
-                      <div className="flex flex-col gap-2">
-                        {rule.values.length > 0 && (
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            {rule.values.map((value) => (
-                              <span
-                                key={value}
-                                className="inline-flex h-7 min-w-0 items-center gap-1 rounded-[5px] border border-line-soft bg-paper-2 pl-2 font-jp text-[11px] text-ink-0"
-                              >
-                                <span className="max-w-[260px] truncate" title={value}>
-                                  {value}
+                    <div data-rule-value className="mt-2 border-t border-line-soft pt-2">
+                      {rule.field === "タグ" ? (
+                        <div className="flex flex-col gap-2">
+                          {rule.values.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {rule.values.map((value) => (
+                                <span
+                                  key={value}
+                                  className="inline-flex h-7 min-w-0 items-center gap-1 rounded-[5px] border border-line-soft bg-paper-2 pl-2 font-jp text-[11px] text-ink-0"
+                                >
+                                  <span className="max-w-[260px] truncate" title={value}>
+                                    {value}
+                                  </span>
+                                  <IconButton
+                                    icon={I.x}
+                                    label={`${value}を削除`}
+                                    size="sm"
+                                    onClick={() =>
+                                      updateRule(rule.id, (current) => {
+                                        if (current.field !== "タグ") return current;
+                                        return {
+                                          ...current,
+                                          values: current.values.filter((tag) => tag !== value),
+                                        };
+                                      })
+                                    }
+                                  />
                                 </span>
-                                <IconButton
-                                  icon={I.x}
-                                  label={`${value}を削除`}
-                                  size="sm"
-                                  onClick={() =>
-                                    updateRule(rule.id, (current) => {
-                                      if (current.field !== "タグ") return current;
-                                      return {
-                                        ...current,
-                                        values: current.values.filter((tag) => tag !== value),
-                                      };
-                                    })
-                                  }
-                                />
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                        <TagCombobox
-                          suggestions={tagSuggestions}
-                          excludeTags={rule.values}
-                          width="full"
-                          placeholder="タグ名を入力して追加"
-                          label={`${index + 1}件目の条件に追加するタグ`}
-                          canCreate={(tag) => normalizeTag(tag) !== null}
-                          onSelect={(tag) =>
-                            updateRule(rule.id, (current) => {
-                              if (current.field !== "タグ") return current;
-                              return { ...current, values: [...current.values, tag] };
-                            })
+                              ))}
+                            </div>
+                          )}
+                          <TagCombobox
+                            suggestions={tagSuggestions}
+                            excludeTags={rule.values}
+                            width="full"
+                            placeholder="タグ名を入力して追加"
+                            label={`${index + 1}件目の条件に追加するタグ`}
+                            canCreate={(tag) => normalizeTag(tag) !== null}
+                            onSelect={(tag) =>
+                              updateRule(rule.id, (current) => {
+                                if (current.field !== "タグ") return current;
+                                return { ...current, values: [...current.values, tag] };
+                              })
+                            }
+                          />
+                          <span className="font-jp text-caption text-ink-2">
+                            複数のタグは、いずれかを含む作品に一致します（OR）
+                          </span>
+                        </div>
+                      ) : (
+                        <DurationInput
+                          rule={rule}
+                          onChange={(seconds) =>
+                            updateRule(rule.id, (current) =>
+                              current.field === "長さ"
+                                ? { ...current, values: [seconds] }
+                                : current,
+                            )
                           }
                         />
-                        <span className="font-jp text-caption text-ink-2">
-                          複数のタグは、いずれかを含む作品に一致します（OR）
+                      )}
+                      {ruleError && (
+                        <span className="mt-1.5 block font-jp text-[11px] text-[var(--r-coral)]">
+                          {ruleError}
                         </span>
-                      </div>
-                    ) : (
-                      <DurationInput
-                        rule={rule}
-                        onChange={(seconds) =>
-                          updateRule(rule.id, (current) =>
-                            current.field === "長さ" ? { ...current, values: [seconds] } : current,
-                          )
-                        }
-                      />
-                    )}
-                    {errors.ruleValues[rule.id] && (
-                      <span className="mt-1.5 block font-jp text-[11px] text-[var(--r-coral)]">
-                        {errors.ruleValues[rule.id]}
-                      </span>
-                    )}
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <Button
@@ -344,6 +403,14 @@ export default function SmartFolderEditorModal({
             )}
           </section>
 
+          {errorCount > 0 && (
+            <div
+              role="alert"
+              className="mll-selectable rounded-[6px] border border-[var(--r-coral)] bg-paper-0 px-3 py-2 text-secondary text-[var(--r-coral)]"
+            >
+              入力に不備があります（{errorCount}件）
+            </div>
+          )}
           {saveError && (
             <div
               role="alert"

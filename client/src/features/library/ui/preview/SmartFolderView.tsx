@@ -1,7 +1,11 @@
 import { parseTag, type SmartFolder, type SmartFolderRule } from "@mimimilli/shared";
 import { I } from "../../../../shared/ui/Icon";
 import Button from "../../../../shared/ui/Button";
-import { formatDuration } from "../../../../shared/lib/format";
+import {
+  formatSmartFolderLengthValue,
+  formatSmartFolderOperatorLabel,
+} from "../../model/smartFolderFormat";
+import { useSmartFolderRuleMatchCountQuery } from "../../model/useLibraryQueries";
 
 const TAG_PREFIX_LABEL: Record<string, string> = {
   circle: "サークル",
@@ -13,10 +17,6 @@ const TAG_PREFIX_LABEL: Record<string, string> = {
   シリーズ: "シリーズ",
   カテゴリ: "カテゴリ",
 };
-
-function formatRuleDuration(value: string): string {
-  return formatDuration(Number(value)) ?? "--:--";
-}
 
 function TagValueChip({ value }: { value: string }) {
   const tag = parseTag(value);
@@ -42,11 +42,10 @@ function TagValueChip({ value }: { value: string }) {
 
 function RuleValue({ rule }: { rule: SmartFolderRule }) {
   if (rule.field === "長さ") {
-    const durationValue = rule.values[0];
-    if (durationValue === undefined) {
+    if (rule.values[0] === undefined) {
       throw new Error("長さルールに値がありません");
     }
-    return <span className="val">{formatRuleDuration(durationValue)}</span>;
+    return <span className="val">{formatSmartFolderLengthValue(rule)}</span>;
   }
 
   return (
@@ -70,6 +69,10 @@ export function SmartFolderView({
   total?: number;
   onEdit: () => void;
 }) {
+  // 条件一致（チップ絞り込み前の純粋なルール一致件数）と絞り込み後（total、チップ適用後）を
+  // 分けて表示する（TASK-428.11、DRAFT-74 Q-03）
+  const ruleMatchCount = useSmartFolderRuleMatchCountQuery(sf.rules, { immediate: true });
+
   return (
     <div className="mle-prv__body">
       <div className="mll-smart">
@@ -91,7 +94,7 @@ export function SmartFolderView({
                 <span className="field">
                   <I.filter size={10} /> {rule.field}
                 </span>
-                <span className="op">{rule.operator}</span>
+                <span className="op">{formatSmartFolderOperatorLabel(rule)}</span>
                 <RuleValue rule={rule} />
               </div>
             ))
@@ -99,11 +102,19 @@ export function SmartFolderView({
         </div>
         <div className="mll-smart__ft">
           <span className="hits">
-            {total != null ? (
+            {ruleMatchCount.isCounting ? (
+              "条件一致 集計中…"
+            ) : ruleMatchCount.total !== undefined ? (
               <>
-                <b>{total}</b> 件マッチ
+                条件一致 <b>{ruleMatchCount.total}</b>件
               </>
             ) : null}
+            {total != null && (
+              <>
+                {" "}
+                ・ 絞り込み後 <b>{total}</b>件
+              </>
+            )}
           </span>
           <span className="right">
             <Button variant="ghost" icon={I.cog} onClick={onEdit}>

@@ -1,7 +1,7 @@
 // エンドポイント横断の契約: 作品検索クエリ、ページングエンベロープ、部分更新、エラー形式。
 import { z } from "zod";
 import { dataIntegrityWarningSchema } from "./dataIntegrity.ts";
-import { sortIdSchema, viewIdSchema } from "./library.ts";
+import { smartFolderRuleSchema, sortIdSchema, viewIdSchema } from "./library.ts";
 import {
   dedupeTags,
   normalizeTags,
@@ -93,6 +93,18 @@ export type SmartFolderWorksQuery = z.infer<typeof smartFolderWorksQuerySchema>;
 /** adapter evalSmartFolder が受け取る正規化済みクエリ（page/limit は routes がデフォルト適用後） */
 export type SmartFolderEvalQuery = Required<Pick<SmartFolderWorksQuery, "page" | "limit">> &
   Partial<Pick<SmartFolderWorksQuery, "tags" | "tagOp" | "seed">>;
+
+/** POST /api/smart-folders/preview のリクエストボディ。保存前のドラフト条件（rules）を受け取り、
+ *  チップ絞り込みを適用しない純粋なルール一致件数を返す（TASK-428.11、条件エディタのライブ件数プレビュー用） */
+export const smartFolderPreviewRequestSchema = z.object({
+  rules: z.array(smartFolderRuleSchema),
+});
+export type SmartFolderPreviewRequest = z.infer<typeof smartFolderPreviewRequestSchema>;
+
+export const smartFolderPreviewResponseSchema = z.object({
+  total: z.number().int().nonnegative(),
+});
+export type SmartFolderPreviewResponse = z.infer<typeof smartFolderPreviewResponseSchema>;
 
 /** GET /api/axes/:axis のクエリパラメータ。値一覧の件数・総時間・代表カバーは、渡された
  *  tags による絞り込み後の集合から集計する（自軸除外カウント、TASK-187）。

@@ -61,7 +61,8 @@
 }
 .mll-smart__rule {
   display: grid;
-  grid-template-columns: 28px 100px 60px 1fr auto;
+  /* WHERE/AND NOTが見切れないよう conj 列は内容に応じて広がる幅にする（TASK-428.11 SF-04） */
+  grid-template-columns: minmax(48px, auto) 100px auto 1fr auto;
   gap: 8px;
   align-items: center;
   padding: 5px 8px;
@@ -79,6 +80,7 @@
   letter-spacing: 0.08em;
   color: var(--ink-2);
   text-align: center;
+  white-space: nowrap;
 }
 .mll-smart__rule .conj.first {
   color: var(--ink-4);
@@ -98,11 +100,13 @@
   padding: 2px 6px;
 }
 .mll-smart__rule .op {
-  font-family: var(--font-mono);
-  font-size: var(--fs-mono);
-  line-height: var(--lh-mono);
+  /* 演算子は「を含む」等の日本語ラベルで表示するため font-jp（TASK-428.11 SF-04） */
+  font-family: var(--font-jp);
+  font-size: var(--fs-secondary);
+  line-height: var(--lh-secondary);
   color: var(--ink-2);
   text-align: center;
+  white-space: nowrap;
 }
 .mll-smart__rule .val {
   font-family: var(--font-jp);
@@ -152,7 +156,7 @@
     text-align: left;
   }
   /* field/operator を装飾なしのテキストに戻し、conj → field → op → values が
-     ひと続きの文として読めるようにする（例:「WHERE 長さ ≥ 1:00:00」） */
+     ひと続きの文として読めるようにする（例:「WHERE タグ を含む ASMR」） */
   .mll-smart__rule .field {
     background: none;
     border-radius: 0;

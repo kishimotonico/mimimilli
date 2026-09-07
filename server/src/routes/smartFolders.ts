@@ -2,6 +2,7 @@
 import { Hono } from "hono";
 import {
   smartFolderCreateSchema,
+  smartFolderPreviewRequestSchema,
   smartFolderUpdateSchema,
   smartFolderWorksQuerySchema,
   WORKS_DEFAULT_PAGE_SIZE,
@@ -15,6 +16,16 @@ export function smartFoldersRoute(adapter: DataAdapter): Hono {
   app.get("/smart-folders", async (c) => {
     const folders = await adapter.listSmartFolders();
     return c.json(folders);
+  });
+
+  app.post("/smart-folders/preview", async (c) => {
+    const body = await c.req.json().catch(() => null);
+    const parsed = smartFolderPreviewRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      invalidRequest("スマートフォルダーのプレビュー条件が不正です");
+    }
+    const total = await adapter.previewSmartFolderRuleCount(parsed.data.rules);
+    return c.json({ total });
   });
 
   app.post("/smart-folders", async (c) => {
