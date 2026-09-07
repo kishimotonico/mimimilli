@@ -4,7 +4,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
-import type { ScanResult } from "@mimimilli/shared";
+import type { ScanDiagnostic, ScanResult } from "@mimimilli/shared";
 import NotificationBell from "../../src/app/ui/NotificationBell";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
@@ -44,6 +44,7 @@ function renderBell(
     progress?: import("@mimimilli/shared").DlsiteBulkProgressSnapshot | null;
   },
   scanResultOverride?: ScanResult | null,
+  identityConflicts: ScanDiagnostic[] = [],
 ) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -59,6 +60,8 @@ function renderBell(
       ? { result: scanResultOverride, finishedAt: "2026-01-01T00:00:00.000Z" }
       : null,
   );
+  // 要対応タブと同じ定義を使う（TASK-428.4）: ID重複は常に最新の診断クエリから拾う
+  queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), { diagnostics: identityConflicts });
 
   const store = createStore();
   const onStartDlsiteBulk = vi.fn();
@@ -77,6 +80,7 @@ function renderBell(
 
   const props = {
     onOpenScanResult: vi.fn(),
+    onOpenNeedsAttention: vi.fn(),
     onOpenNotificationModal: vi.fn(),
     ...bellOverrides,
   };
@@ -195,5 +199,38 @@ describe("NotificationBell", () => {
     expect(screen.getByText("直近のスキャン結果")).toBeInTheDocument();
     expect(screen.getByText("12")).toBeInTheDocument();
     expect(screen.getByText("3")).toBeInTheDocument();
+  });
+
+  describe("要対応タブとの件数統一（TASK-428.4）", () => {
+    it("ID重複はworkId単位で1件として数え、行クリックで要対応タブを開く", () => {
+      const { props } = renderBell({}, {}, undefined, undefined, [
+        { kind: "identity_conflict", workId: "RJ501001", paths: ["a/1", "a/2"] },
+      ]);
+      expect(screen.getByRole("button", { name: "通知（要対応1件）" })).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: /通知/ }));
+      fireEvent.click(screen.getByRole("menuitem", { name: /ID重複/ }));
+
+      expect(props.onOpenNeedsAttention).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole("menu", { name: "通知" })).toBeNull();
+    });
+
+    it("ID重複とRJコード未検出が両方あるとき、バッジは行の合算になる", () => {
+      renderBell({ rjCodeMissingCount: 2 }, {}, undefined, undefined, [
+        { kind: "identity_conflict", workId: "RJ501001", paths: ["a/1", "a/2"] },
+      ]);
+      expect(screen.getByRole("button", { name: "通知（要対応3件）" })).toBeInTheDocument();
+    });
+
+    it("読み取り失敗はスキャン結果のinvalidMetaFilesから行を作る", () => {
+      const { props } = renderBell({}, {}, undefined, {
+        ...scanResult,
+        rjCodeMissingCount: 0,
+        invalidMetaFiles: [{ path: "a/1", message: "壊れています" }],
+      });
+      fireEvent.click(screen.getByRole("button", { name: /通知/ }));
+      fireEvent.click(screen.getByRole("menuitem", { name: /読み取り失敗/ }));
+      expect(props.onOpenNeedsAttention).toHaveBeenCalledTimes(1);
+    });
   });
 });

@@ -2,7 +2,7 @@ import type { DlsiteNotificationItem, DlsiteNotificationKind } from "@mimimilli/
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { queryDlsiteNotifications } from "../../../entities/work/api";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
-import { useDlsiteNotificationSummary } from "./useDlsiteNotificationSummary";
+import { useDlsiteNotificationSummary } from "../../../entities/dlsite/model/useDlsiteNotificationSummary";
 
 const NOTIFICATION_PAGE_SIZE = 100;
 

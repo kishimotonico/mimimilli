@@ -28,6 +28,7 @@ import { errorToastAtom } from "../shared/model/errorToastAtom";
 import { apiErrorMessage } from "../shared/lib/apiError";
 import type { ActiveModal } from "./model/activeModal";
 import { isDlsiteNotificationModal } from "./model/activeModal";
+import type { ScanTabKey } from "../features/scan/ui/scanModal/types";
 import type { Work, WorkListItem } from "@mimimilli/shared";
 import { getWork } from "../entities/work/api";
 import { useDownloadLibraryExport } from "../features/library/useDownloadLibraryExport";
@@ -66,6 +67,7 @@ export default function App() {
   const playRequestIdRef = useRef(0);
 
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
+  const [scanModalInitialTab, setScanModalInitialTab] = useState<ScanTabKey>("unregistered");
 
   // ── Settings ─────────────────────────────────────────────
   const settingsQuery = useSettingsQuery();
@@ -124,7 +126,15 @@ export default function App() {
   );
 
   // TopBarのスキャンボタンは即時実行せずモーダルを開く（TASK-56）。実行中なら実行中の表示に復帰する。
-  const handleOpenScanModal = useCallback(() => setActiveModal("scan"), []);
+  const handleOpenScanModal = useCallback(() => {
+    setScanModalInitialTab("unregistered");
+    setActiveModal("scan");
+  }, []);
+  // 通知ベルの要対応系の行から、スキャンモーダルを要対応タブで直接開く（TASK-428.4）。
+  const handleOpenScanNeedsAttention = useCallback(() => {
+    setScanModalInitialTab("needsAttention");
+    setActiveModal("scan");
+  }, []);
   const handleCloseModal = useCallback(() => setActiveModal(null), []);
 
   const handleSetupComplete = useCallback(
@@ -218,6 +228,7 @@ export default function App() {
               notificationBell={
                 <NotificationBell
                   onOpenScanResult={handleOpenScanModal}
+                  onOpenNeedsAttention={handleOpenScanNeedsAttention}
                   onOpenNotificationModal={setActiveModal}
                 />
               }
@@ -257,8 +268,9 @@ export default function App() {
                 <Suspense fallback={null}>
                   <ScanModal
                     lastScanTime={settings?.lastScanTime ?? null}
+                    initialTab={scanModalInitialTab}
                     onClose={handleCloseModal}
-                    onOpenRjCodeMissing={() => setActiveModal("rj-missing")}
+                    onOpenNotificationModal={setActiveModal}
                     onOpenFiles={handleOpenScanProblemInFiles}
                   />
                 </Suspense>
@@ -268,7 +280,10 @@ export default function App() {
                 onClose={handleCloseModal}
                 onOpenWork={handleOpenLibraryWork}
               />
-              <GlobalToast onOpenScan={handleOpenScanModal} />
+              <GlobalToast
+                onOpenScan={handleOpenScanModal}
+                onOpenScanNeedsAttention={handleOpenScanNeedsAttention}
+              />
             </>
           }
         />

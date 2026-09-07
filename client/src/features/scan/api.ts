@@ -12,6 +12,7 @@ import {
 import { SCAN_QUERY_KEYS } from "../../entities/scan/queryKeys";
 import type { StartScanRequest } from "@mimimilli/shared";
 import {
+  identityConflictReassignResponseSchema,
   scanConflictResponseSchema,
   scanDiagnosticsResponseSchema,
   scanJobSnapshotSchema,
@@ -25,6 +26,8 @@ import {
   type ScanJobSnapshot,
   type ScanLastResultResponse,
   type ScanCandidatesRegisterResponse,
+  type Work,
+  type WorkspacePath,
 } from "@mimimilli/shared";
 
 export { SCAN_QUERY_KEYS };
@@ -95,4 +98,11 @@ export async function excludeScanCandidates(paths: string[]): Promise<void> {
 /** ID重複の診断。スキャン完了時点のスナップショットではなく常に最新を返す。 */
 export async function getScanDiagnostics() {
   return getParsed(scanDiagnosticsResponseSchema, "/scan/diagnostics");
+}
+
+/** ID重複しているフォルダーへ新しいWork IDを割り当て、競合を解消する */
+export async function reassignIdentityConflict(path: WorkspacePath): Promise<Work> {
+  return postParsed(identityConflictReassignResponseSchema, "/works/identity-conflicts/reassign", {
+    path,
+  });
 }

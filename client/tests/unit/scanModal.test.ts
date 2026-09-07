@@ -189,6 +189,16 @@ function seedScanQueries(
   if (queryClient.getQueryData(SCAN_QUERY_KEYS.diagnostics()) === undefined) {
     queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), { diagnostics: [] });
   }
+  // 通知ベルと同じ要対応集計（TASK-428.4）。未シードだと実fetchへ落ちるため既定値で固定する。
+  if (queryClient.getQueryData(WORK_QUERY_KEYS.dlsiteNotificationSummary()) === undefined) {
+    queryClient.setQueryData(WORK_QUERY_KEYS.dlsiteNotificationSummary(), {
+      rjCodeMissingCount: 0,
+      fetchFailedCount: 0,
+      parseErrorCount: 0,
+      parseErrorAlert: false,
+      unlinkedCount: 0,
+    });
+  }
 }
 
 function openTab(name: string) {
@@ -221,7 +231,7 @@ function renderModal(
   const modalProps = {
     lastScanTime: null,
     onClose: vi.fn(),
-    onOpenRjCodeMissing: vi.fn(),
+    onOpenNotificationModal: vi.fn(),
     ...rest,
   };
 
@@ -677,6 +687,17 @@ describe("ScanModalと他画面が同じlibraryTotalQueryOptionsを共有する�
       if (url.pathname === "/api/scan/candidates") {
         return Promise.resolve(jsonResponse({ candidates: [] }));
       }
+      if (url.pathname === "/api/dlsite/notifications") {
+        return Promise.resolve(
+          jsonResponse({
+            rjCodeMissingCount: 0,
+            fetchFailedCount: 0,
+            parseErrorCount: 0,
+            parseErrorAlert: false,
+            unlinkedCount: 0,
+          }),
+        );
+      }
       return Promise.reject(new Error(`unexpected fetch: ${url.toString()}`));
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -710,7 +731,7 @@ describe("ScanModalと他画面が同じlibraryTotalQueryOptionsを共有する�
             createElement(ScanModal, {
               lastScanTime: null,
               onClose: vi.fn(),
-              onOpenRjCodeMissing: vi.fn(),
+              onOpenNotificationModal: vi.fn(),
             }),
           ),
         ),

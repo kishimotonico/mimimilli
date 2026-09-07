@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useSetAtom } from "jotai";
+import { useAtomValue, useSetAtom } from "jotai";
 import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import type { ScanJobSnapshot, StartScanRequest } from "@mimimilli/shared";
 import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
@@ -13,6 +13,8 @@ import {
   scanCandidateHiddenPathsAtom,
   scanErrorAtom,
   scanJobAtom,
+  scanModalOpenAtom,
+  scanResultToastAtom,
   type ScanActions,
 } from "../../../entities/scan/model/atoms";
 import { useScanJob } from "../model/useScanJob";
@@ -25,9 +27,21 @@ export default function ScanRuntime() {
   const setError = useSetAtom(scanErrorAtom);
   const setActions = useSetAtom(scanActionsAtom);
   const setHiddenPaths = useSetAtom(scanCandidateHiddenPathsAtom);
+  const setResultToast = useSetAtom(scanResultToastAtom);
+  // モーダルが開いている間はサイドバーの「完了しました」が完了通知を担うため、
+  // トースト側は重ねて出さない（scan-dlsite-A-04/B-05）。SSEイベントの時点で最新値を見たいためrefで持つ。
+  const scanModalOpen = useAtomValue(scanModalOpenAtom);
+  const scanModalOpenRef = useRef(scanModalOpen);
+  useLayoutEffect(() => {
+    scanModalOpenRef.current = scanModalOpen;
+  }, [scanModalOpen]);
 
   const handleScanTerminal = useCallback(
     (job: ScanJobSnapshot) => {
+      if (job.status === "cancelled") {
+        if (!scanModalOpenRef.current) setResultToast({ kind: "cancelled" });
+        return;
+      }
       if (job.status !== "completed" || !job.result || !job.finishedAt) return;
       const result = job.result;
       queryClient.setQueryData(SCAN_QUERY_KEYS.last(), { result, finishedAt: job.finishedAt });
@@ -37,9 +51,10 @@ export default function ScanRuntime() {
       queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.allFacets() });
       queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.allWorks() });
       queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() });
+      if (!scanModalOpenRef.current) setResultToast({ kind: "completed", result });
       if (result.insertedWorkIds.length > 0) dlsiteBulk.attach();
     },
-    [dlsiteBulk, queryClient],
+    [dlsiteBulk, queryClient, setResultToast],
   );
 
   // 新しいスキャンの開始がサーバー側の真実の境界になるため、開始時点でそれ以前のローカル非表示を破棄する。

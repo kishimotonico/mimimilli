@@ -91,11 +91,42 @@ export default function DlsiteBulkRuntime() {
     }
   }, [resetTerminalState, setActive, setCancelling, setError, setStarting]);
 
+  // 既に走っているかもしれないジョブへの後乗り専用。ジョブの実在を確認してから
+  // activeにする（scan-dlsite-A-01）。running/cancellingのときだけSSEを購読し、
+  // 終端済みならその結果をそのまま反映、ジョブが無ければ何もしない。
   const attach = useCallback(() => {
     freshStartRef.current = false;
-    resetTerminalState();
-    setActive(true);
-  }, [resetTerminalState, setActive]);
+    void (async () => {
+      let snapshot: DlsiteBulkSnapshot | null;
+      try {
+        snapshot = await getDlsiteBulkStatus();
+      } catch {
+        return;
+      }
+      if (!snapshot) return;
+      if (snapshot.status === "running" || snapshot.status === "cancelling") {
+        resetTerminalState();
+        if (snapshot.status === "cancelling") setCancelling(true);
+        if (snapshot.progress) setProgress(snapshot.progress);
+        setActive(true);
+        return;
+      }
+      const terminal = terminalFromSnapshot(snapshot);
+      if (!terminal) return;
+      resetTerminalState();
+      if (terminal.type === "complete") setResult(terminal.result);
+      else if (terminal.type === "cancelled") setCancelledResult(terminal.result);
+      else setError(terminal.message);
+    })();
+  }, [
+    resetTerminalState,
+    setActive,
+    setCancelledResult,
+    setCancelling,
+    setError,
+    setProgress,
+    setResult,
+  ]);
 
   const dismiss = useCallback(() => {
     setResult(null);

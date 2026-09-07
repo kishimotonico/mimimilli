@@ -1,6 +1,7 @@
 import { useAtomValue, useSetAtom } from "jotai";
 import Toast from "../../shared/ui/Toast";
 import { formatDlsiteBulkResult } from "../../features/dlsite/model/formatDlsiteBulkResult";
+import { formatScanResult } from "../../features/scan/model/formatScanResult";
 import {
   dlsiteBulkApplyResultAtom,
   dlsiteBulkCancelledResultAtom,
@@ -10,18 +11,22 @@ import {
 import { useDlsiteBulkActions } from "../../entities/dlsite/useDlsiteBulkActions";
 import { useDlsiteBulkApplyActions } from "../../entities/dlsite/useDlsiteBulkApplyActions";
 import { errorToastAtom } from "../../shared/model/errorToastAtom";
-import { scanErrorAtom } from "../../entities/scan/model/atoms";
+import { scanErrorAtom, scanResultToastAtom } from "../../entities/scan/model/atoms";
 import { useScanActions } from "../../entities/scan/useScanActions";
 import { playerSkipToastAtom } from "../../features/player/model/playerPresentationAtoms";
 import { rootFolderChangedToastAtom } from "../../entities/settings/model/rootFolderChangeAtoms";
 
-interface GlobalToastProps {
+export interface GlobalToastProps {
   /** ルートフォルダー変更成功トーストの「今すぐスキャン」actionから呼ぶ */
   onOpenScan: () => void;
+  /** スキャン完了トーストの「要対応を見る」からスキャンモーダルの要対応タブを開く（TASK-428.4） */
+  onOpenScanNeedsAttention: () => void;
 }
 
-export default function GlobalToast({ onOpenScan }: GlobalToastProps) {
+export default function GlobalToast({ onOpenScan, onOpenScanNeedsAttention }: GlobalToastProps) {
   const scanError = useAtomValue(scanErrorAtom);
+  const scanResultToast = useAtomValue(scanResultToastAtom);
+  const setScanResultToast = useSetAtom(scanResultToastAtom);
   const errorToast = useAtomValue(errorToastAtom);
   const setErrorToast = useSetAtom(errorToastAtom);
   const rootFolderChangedToast = useAtomValue(rootFolderChangedToastAtom);
@@ -39,6 +44,41 @@ export default function GlobalToast({ onOpenScan }: GlobalToastProps) {
 
   if (scanError) {
     return <Toast message={scanError} variant="error" onDismiss={clearScanError} />;
+  }
+
+  if (scanResultToast) {
+    const dismissScanResultToast = () => setScanResultToast(null);
+    if (scanResultToast.kind === "cancelled") {
+      return (
+        <Toast
+          message="スキャンを中止しました"
+          variant="warning"
+          onDismiss={dismissScanResultToast}
+        />
+      );
+    }
+    const { result } = scanResultToast;
+    const hasNeedsAttention =
+      result.identityConflicts.length > 0 ||
+      result.invalidMetaFiles.length > 0 ||
+      result.rjCodeMissingCount > 0 ||
+      result.dataIntegrityWarning !== undefined;
+    return (
+      <Toast
+        message={`スキャン完了: ${formatScanResult(result)}`}
+        variant={result.errors > 0 || result.missing > 0 ? "warning" : "success"}
+        actionLabel={hasNeedsAttention ? "要対応を見る" : undefined}
+        onAction={
+          hasNeedsAttention
+            ? () => {
+                onOpenScanNeedsAttention();
+                dismissScanResultToast();
+              }
+            : undefined
+        }
+        onDismiss={dismissScanResultToast}
+      />
+    );
   }
 
   if (errorToast) {

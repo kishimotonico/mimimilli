@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useAtomValue } from "jotai";
+import { useAtomValue, useSetAtom } from "jotai";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { libraryTotalQueryOptions } from "../../../entities/work/libraryTotalQueryOptions";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
@@ -7,11 +7,17 @@ import { cn } from "../../../shared/lib/cn";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
 import Toast from "../../../shared/ui/Toast";
-import { scanningAtom, scanProgressAtom } from "../../../entities/scan/model/atoms";
+import {
+  scanModalOpenAtom,
+  scanningAtom,
+  scanProgressAtom,
+} from "../../../entities/scan/model/atoms";
 import { useScanActions } from "../../../entities/scan/useScanActions";
 import { getLastScanResult, getScanDiagnostics, SCAN_QUERY_KEYS } from "../api";
 import { refreshScanCandidates } from "../../../entities/scan/scanCandidatesCache";
 import { useScanCandidatesCache } from "../model/useScanCandidatesCache";
+import { useDlsiteNotificationSummary } from "../../../entities/dlsite/model/useDlsiteNotificationSummary";
+import type { DlsiteNotificationModalKind } from "../../../entities/dlsite/model/dlsiteNotificationModal";
 import ScanSidebar from "./scanModal/ScanSidebar";
 import UnregisteredTab from "./scanModal/UnregisteredTab";
 import NeedsAttentionTab from "./scanModal/NeedsAttentionTab";
@@ -20,13 +26,15 @@ import UpdatedWorksTab from "./scanModal/UpdatedWorksTab";
 import ScanFooter from "./scanModal/ScanFooter";
 import { dedupeIds } from "./scanModal/scanResultWorkIds";
 import { useScanCompletionHint } from "./scanModal/useScanCompletionHint";
+import { buildNeedsAttentionRows, countNeedsAttention } from "../model/needsAttention";
 import type { CandidatesRegisteredResult, ScanTabKey } from "./scanModal/types";
 
 interface ScanModalProps {
   lastScanTime: string | null;
   onClose: () => void;
-  /** RJコード未検出の作品一覧を開く（結果にrjCodeMissingCount > 0のときのみ表示） */
-  onOpenRjCodeMissing: () => void;
+  /** 開いた時点で選択するタブ。省略時は未登録タブ（TASK-428.4: 通知ベルから要対応タブへ直接遷移するため） */
+  initialTab?: ScanTabKey;
+  onOpenNotificationModal: (kind: DlsiteNotificationModalKind) => void;
   onOpenFiles: (path: string) => void;
 }
 
@@ -35,14 +43,20 @@ const EMPTY_WORK_IDS: string[] = [];
 export default function ScanModal({
   lastScanTime,
   onClose,
-  onOpenRjCodeMissing,
+  initialTab = "unregistered",
+  onOpenNotificationModal,
   onOpenFiles,
 }: ScanModalProps) {
   const queryClient = useQueryClient();
   const scanning = useAtomValue(scanningAtom);
   const progress = useAtomValue(scanProgressAtom);
   const { start, cancel } = useScanActions();
-  const [activeTab, setActiveTab] = useState<ScanTabKey>("unregistered");
+  const [activeTab, setActiveTab] = useState<ScanTabKey>(initialTab);
+  const setScanModalOpen = useSetAtom(scanModalOpenAtom);
+  useEffect(() => {
+    setScanModalOpen(true);
+    return () => setScanModalOpen(false);
+  }, [setScanModalOpen]);
   const [unregisteredToast, setUnregisteredToast] = useState<string | null>(null);
   const [unregisteredToastFailed, setUnregisteredToastFailed] = useState(false);
   // 候補承認で登録された作品ID（このモーダル表示中に蓄積、TASK-325の分離を踏まえクライアント側で
@@ -88,8 +102,15 @@ export default function ScanModal({
   });
   const identityConflicts = diagnosticsQuery.data?.diagnostics ?? [];
   const invalidMetaFiles = lastResult?.invalidMetaFiles ?? [];
-  const rjCodeMissingCount = lastResult?.rjCodeMissingCount ?? 0;
   const dataIntegrityWarning = lastResult?.dataIntegrityWarning;
+  // 通知ベルと同じ「要対応」定義を使うため、RJコード未検出・DLsite取得/パース失敗は
+  // スキャン結果のスナップショットではなく通知ベルと同じ集計クエリを参照する（TASK-428.4）。
+  const {
+    rjCodeMissingCount,
+    fetchFailedCount: dlsiteFetchFailedCount,
+    parseErrorCount: dlsiteParseErrorCount,
+    parseErrorAlert: dlsiteParseErrorAlert,
+  } = useDlsiteNotificationSummary();
 
   const insertedWorkIds = lastResult?.insertedWorkIds ?? EMPTY_WORK_IDS;
   const updatedWorkIds = lastResult?.updatedWorkIds ?? EMPTY_WORK_IDS;
@@ -105,15 +126,19 @@ export default function ScanModal({
 
   const { showCompletedHint } = useScanCompletionHint(scanning);
 
-  const needsAttentionCount =
-    identityConflicts.reduce((total, conflict) => total + conflict.paths.length, 0) +
-    invalidMetaFiles.length +
-    (rjCodeMissingCount > 0 ? 1 : 0) +
-    (dataIntegrityWarning ? 1 : 0);
+  const needsAttentionRows = buildNeedsAttentionRows({
+    identityConflicts,
+    invalidMetaFiles,
+    rjCodeMissingCount,
+    dlsiteFetchFailedCount,
+    dlsiteParseErrorCount,
+    dlsiteParseErrorAlert,
+    dataIntegrityWarning,
+  });
 
   const counts: Record<ScanTabKey, number> = {
     unregistered: candidates.length,
-    needsAttention: needsAttentionCount,
+    needsAttention: countNeedsAttention(needsAttentionRows),
     newlyRegistered: newlyRegisteredWorkIds.length,
     updated: updatedWorkIds.length,
   };
@@ -168,9 +193,12 @@ export default function ScanModal({
                 identityConflicts={identityConflicts}
                 invalidMetaFiles={invalidMetaFiles}
                 rjCodeMissingCount={rjCodeMissingCount}
+                dlsiteFetchFailedCount={dlsiteFetchFailedCount}
+                dlsiteParseErrorCount={dlsiteParseErrorCount}
+                dlsiteParseErrorAlert={dlsiteParseErrorAlert}
                 dataIntegrityWarning={dataIntegrityWarning}
                 onOpenFiles={onOpenFiles}
-                onOpenRjCodeMissing={onOpenRjCodeMissing}
+                onOpenNotificationModal={onOpenNotificationModal}
               />
             )}
             {activeTab === "newlyRegistered" && (
