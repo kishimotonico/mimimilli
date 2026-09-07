@@ -73,7 +73,7 @@ function ScanCancelButton({ onClick }: { onClick: () => void }) {
       onClick={onClick}
       inert={!isPresent}
       {...v}
-      className={buttonClass("danger", "lg", { className: "min-w-[128px] justify-center" })}
+      className={buttonClass("danger-quiet", "lg", { className: "min-w-[128px] justify-center" })}
     >
       <I.x size={12} />
       スキャンを中止

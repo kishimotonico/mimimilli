@@ -2,7 +2,7 @@ import type { ButtonHTMLAttributes, ReactNode, Ref } from "react";
 import { cn } from "../lib/cn";
 import type { IconFC } from "./Icon";
 
-export type ButtonVariant = "primary" | "ghost" | "quiet" | "danger";
+export type ButtonVariant = "primary" | "ghost" | "quiet" | "danger" | "danger-quiet";
 export type ButtonSize = "sm" | "md" | "lg";
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -24,7 +24,7 @@ const SIZE_CLASS: Record<ButtonSize, string> = {
 
 function stateClass(variant: ButtonVariant, active: boolean, disabled: boolean): string {
   if (disabled) {
-    return variant === "primary"
+    return variant === "primary" || variant === "danger"
       ? "cursor-not-allowed bg-paper-2 text-ink-4"
       : "cursor-not-allowed text-ink-4";
   }
@@ -37,6 +37,8 @@ function stateClass(variant: ButtonVariant, active: boolean, disabled: boolean):
     case "quiet":
       return "bg-transparent text-ink-2 hover:bg-paper-2 hover:text-ink-0";
     case "danger":
+      return "border border-[color-mix(in_oklch,var(--r-coral)_45%,transparent)] bg-[var(--r-coral)] text-paper-1 hover:brightness-[0.92]";
+    case "danger-quiet":
       return "border border-[color-mix(in_oklch,var(--r-coral)_45%,transparent)] bg-[color-mix(in_oklch,var(--r-coral)_10%,transparent)] text-ink-0 hover:bg-[color-mix(in_oklch,var(--r-coral)_16%,transparent)]";
   }
 }

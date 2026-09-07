@@ -35,7 +35,7 @@ function DlsiteBulkCancelButton({ onClick }: { onClick: () => void }) {
       inert={!isPresent}
       {...v}
       onClick={onClick}
-      className={buttonClass("danger", "sm", { className: "justify-center" })}
+      className={buttonClass("danger-quiet", "sm", { className: "justify-center" })}
     >
       <I.x size={11} />
       中止
