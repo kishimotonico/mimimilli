@@ -1,4 +1,4 @@
-import type { TagPrefix } from "@mimimilli/shared";
+import { resolveTagPrefix, type TagPrefix } from "@mimimilli/shared";
 import { parseTag } from "../model";
 import { tagPrefixColorToCss } from "../tagPrefixColor";
 import { cn } from "../../../shared/lib/cn";
@@ -108,10 +108,14 @@ export default function Tag({
     return <span className={tagClass}>{content}</span>;
   }
 
-  // 未登録 prefix は resolveTagPrefix と同じフォールバック（prefix文字列そのまま）にする。
-  // ラベル・色の解決はここと axisDefinitions.getAxisLabel で結果を揃える（shared/src/tagPrefix.ts）。
-  const catLabel = definition?.label ?? parsed.prefix;
-  const valueStyle = { color: tagPrefixColorToCss(definition?.color) };
+  // ラベル・色の解決は resolveTagPrefix（shared/src/tagPrefix.ts）に集約し、
+  // axisDefinitions.getAxisLabel と結果を揃える。definition は呼び出し側が
+  // 既に見つけている単一の定義なので、それを1件のリストとして渡す。
+  const { label: catLabel, color } = resolveTagPrefix(
+    parsed.prefix,
+    definition ? [definition] : [],
+  );
+  const valueStyle = { color: tagPrefixColorToCss(color) };
 
   const content = (
     <>

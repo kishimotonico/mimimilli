@@ -10,6 +10,7 @@ const listTagPrefixes = vi.fn();
 const listTagPrefixCandidates = vi.fn();
 const createTagPrefix = vi.fn();
 const updateTagPrefix = vi.fn();
+const reorderTagPrefixes = vi.fn();
 const deleteTagPrefix = vi.fn();
 
 vi.mock("../../src/entities/tag/api", () => ({
@@ -17,6 +18,7 @@ vi.mock("../../src/entities/tag/api", () => ({
   listTagPrefixCandidates: (...args: unknown[]) => listTagPrefixCandidates(...args),
   createTagPrefix: (...args: unknown[]) => createTagPrefix(...args),
   updateTagPrefix: (...args: unknown[]) => updateTagPrefix(...args),
+  reorderTagPrefixes: (...args: unknown[]) => reorderTagPrefixes(...args),
   deleteTagPrefix: (...args: unknown[]) => deleteTagPrefix(...args),
 }));
 
@@ -47,6 +49,7 @@ describe("TagPrefixSettings", () => {
     listTagPrefixCandidates.mockReset().mockResolvedValue([]);
     createTagPrefix.mockReset();
     updateTagPrefix.mockReset().mockResolvedValue(undefined);
+    reorderTagPrefixes.mockReset().mockResolvedValue(undefined);
     deleteTagPrefix.mockReset().mockResolvedValue(undefined);
     HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) {
       this.open = true;
@@ -80,14 +83,12 @@ describe("TagPrefixSettings", () => {
     await waitFor(() => expect(deleteTagPrefix).toHaveBeenCalledWith("気分"));
   });
 
-  it("上へ移動すると隣接する2件のorderが入れ替わる", async () => {
+  it("上へ移動すると全prefixの新しい順序を一括で送る", async () => {
     renderSettings();
     const upButton = await screen.findByRole("button", { name: "「気分」を上へ移動" });
     fireEvent.click(upButton);
 
-    await waitFor(() => {
-      expect(updateTagPrefix).toHaveBeenCalledWith("気分", { order: 0 });
-      expect(updateTagPrefix).toHaveBeenCalledWith("cv", { order: 1 });
-    });
+    await waitFor(() => expect(reorderTagPrefixes).toHaveBeenCalledWith(["気分", "cv"]));
+    expect(updateTagPrefix).not.toHaveBeenCalled();
   });
 });

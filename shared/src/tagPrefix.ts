@@ -68,6 +68,13 @@ export const tagPrefixUpdateSchema = z
   );
 export type TagPrefixUpdate = z.infer<typeof tagPrefixUpdateSchema>;
 
+/** 並び替え（PUT /tag-prefixes/order）のリクエスト。登録済み全 prefix を新しい順序で
+ *  過不足なく列挙する。サーバー側で集合の一致を検証し、一括・アトミックに適用する */
+export const tagPrefixOrderSchema = z.object({
+  prefixes: z.array(z.string()).min(1),
+});
+export type TagPrefixOrder = z.infer<typeof tagPrefixOrderSchema>;
+
 /** データ中に存在するが未登録の prefix（設定UIのサジェスト用） */
 export const tagPrefixCandidateSchema = z.object({
   prefix: z.string(),

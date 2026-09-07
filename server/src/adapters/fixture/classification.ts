@@ -47,6 +47,15 @@ export function createClassificationMethods(state: FixtureState): Classification
       return def;
     },
 
+    async reorderTagPrefixes(order: string[]): Promise<TagPrefix[] | null> {
+      const existing = new Set(state.tagPrefixes.map((p) => p.prefix));
+      if (order.length !== existing.size || new Set(order).size !== order.length) return null;
+      if (!order.every((prefix) => existing.has(prefix))) return null;
+      const orderIndex = new Map(order.map((prefix, index) => [prefix, index]));
+      for (const def of state.tagPrefixes) def.order = orderIndex.get(def.prefix)!;
+      return [...state.tagPrefixes].sort((a, b) => a.order - b.order);
+    },
+
     async deleteTagPrefix(prefix: string): Promise<boolean> {
       const before = state.tagPrefixes.length;
       state.tagPrefixes = state.tagPrefixes.filter((p) => p.prefix !== prefix);

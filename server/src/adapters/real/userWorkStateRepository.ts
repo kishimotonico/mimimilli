@@ -169,6 +169,30 @@ export class UserWorkStateRepository {
     return this.getTagPrefix(prefix);
   }
 
+  /** 登録済み全 prefix を渡された順序でアトミックに並び替える。渡された集合が現在の
+   *  登録済み prefix 集合と一致しない場合は null（部分適用はしない） */
+  reorderTagPrefixes(order: string[]): TagPrefix[] | null {
+    const existing = new Set(
+      this.db.user
+        .select({ prefix: tagPrefixes.prefix })
+        .from(tagPrefixes)
+        .all()
+        .map((r) => r.prefix),
+    );
+    if (order.length !== existing.size || new Set(order).size !== order.length) return null;
+    if (!order.every((prefix) => existing.has(prefix))) return null;
+    this.db.userTransaction(() => {
+      order.forEach((prefix, index) => {
+        this.db.user
+          .update(tagPrefixes)
+          .set({ sortOrder: index })
+          .where(eq(tagPrefixes.prefix, prefix))
+          .run();
+      });
+    });
+    return this.listTagPrefixes();
+  }
+
   deleteTagPrefix(prefix: string): boolean {
     return (
       this.db.user

@@ -48,6 +48,9 @@ export function createClassificationMethods(deps: {
     async updateTagPrefix(prefix: string, patch: TagPrefixUpdate): Promise<TagPrefix | null> {
       return user.updateTagPrefix(prefix, patch);
     },
+    async reorderTagPrefixes(order: string[]): Promise<TagPrefix[] | null> {
+      return user.reorderTagPrefixes(order);
+    },
     async deleteTagPrefix(prefix: string): Promise<boolean> {
       return user.deleteTagPrefix(prefix);
     },

@@ -9,6 +9,7 @@ import {
   deleteTagPrefix,
   listTagPrefixCandidates,
   listTagPrefixes,
+  reorderTagPrefixes,
   updateTagPrefix,
 } from "../../../entities/tag/api";
 import { TAG_QUERY_KEYS } from "../../../entities/tag/queryKeys";
@@ -130,12 +131,10 @@ export default function TagPrefixSettings() {
     onError: (e) => setError(apiErrorMessage(e, "prefix を更新できませんでした")),
   });
 
+  // 全 prefix の順序を一括・アトミックに送る（PUT /tag-prefixes/order）。
+  // 隣接2件だけPATCHで交換する方式は片方だけ失敗すると order が重複したまま残るため採らない。
   const reorderMutation = useMutation({
-    mutationFn: ([a, b]: [TagPrefix, TagPrefix]) =>
-      Promise.all([
-        updateTagPrefix(a.prefix, { order: b.order }),
-        updateTagPrefix(b.prefix, { order: a.order }),
-      ]),
+    mutationFn: (order: string[]) => reorderTagPrefixes(order),
     onSuccess: async () => {
       setError(null);
       await invalidate();
@@ -160,6 +159,12 @@ export default function TagPrefixSettings() {
     deleteMutation.isPending;
   const prefixes = prefixesQuery.data ?? [];
   const candidates = candidatesQuery.data ?? [];
+
+  const swapOrder = (index: number, otherIndex: number) => {
+    const order = prefixes.map((p) => p.prefix);
+    [order[index], order[otherIndex]] = [order[otherIndex]!, order[index]!];
+    reorderMutation.mutate(order);
+  };
 
   const submitNew = () => {
     const prefix = newPrefix.trim();
@@ -206,7 +211,7 @@ export default function TagPrefixSettings() {
                 size="xs"
                 className="h-[13px] rotate-180"
                 disabled={isMutating || index === 0}
-                onClick={() => reorderMutation.mutate([p, prefixes[index - 1]!])}
+                onClick={() => swapOrder(index, index - 1)}
               />
               <IconButton
                 icon={I.chevD}
@@ -214,7 +219,7 @@ export default function TagPrefixSettings() {
                 size="xs"
                 className="h-[13px]"
                 disabled={isMutating || index === prefixes.length - 1}
-                onClick={() => reorderMutation.mutate([p, prefixes[index + 1]!])}
+                onClick={() => swapOrder(index, index + 1)}
               />
             </div>
 

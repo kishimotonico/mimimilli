@@ -499,26 +499,60 @@ test("POST /api/tag-prefixes: 新規は末尾へ自動採番され、一覧は o
   );
 });
 
-test("PATCH /api/tag-prefixes/:prefix: order を更新すると並び順が入れ替わる（TASK-428.7）", async () => {
+test("PATCH /api/tag-prefixes/:prefix: order を直接更新できる（TASK-428.7）", async () => {
   const app = buildApp();
   const before = await (await app.request("/api/tag-prefixes")).json();
-  const [first, second] = before as Array<{ prefix: string; order: number }>;
-  assert.ok(first && second);
+  const [first] = before as Array<{ prefix: string; order: number }>;
+  assert.ok(first);
 
-  await app.request(`/api/tag-prefixes/${encodeURIComponent(first.prefix)}`, {
+  const patched = await app.request(`/api/tag-prefixes/${encodeURIComponent(first.prefix)}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ order: second.order }),
+    body: JSON.stringify({ order: 99 }),
   });
-  await app.request(`/api/tag-prefixes/${encodeURIComponent(second.prefix)}`, {
-    method: "PATCH",
+  const patchedBody = await patched.json();
+  assert.equal(patchedBody.order, 99);
+});
+
+test("PUT /api/tag-prefixes/order: 全prefixの新しい順序を一括・アトミックに適用する（TASK-428.7）", async () => {
+  const app = buildApp();
+  const before = (await (await app.request("/api/tag-prefixes")).json()) as Array<{
+    prefix: string;
+  }>;
+  const reversedOrder = [...before].reverse().map((p) => p.prefix);
+
+  const res = await app.request("/api/tag-prefixes/order", {
+    method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ order: first.order }),
+    body: JSON.stringify({ prefixes: reversedOrder }),
   });
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.deepEqual(
+    body.map((p: { prefix: string }) => p.prefix),
+    reversedOrder,
+  );
 
   const after = await (await app.request("/api/tag-prefixes")).json();
-  assert.equal(after[0].prefix, second.prefix);
-  assert.equal(after[1].prefix, first.prefix);
+  assert.deepEqual(
+    after.map((p: { prefix: string }) => p.prefix),
+    reversedOrder,
+  );
+});
+
+test("PUT /api/tag-prefixes/order: prefix集合が一覧と一致しなければ400で、並び順は変わらない", async () => {
+  const app = buildApp();
+  const before = await (await app.request("/api/tag-prefixes")).json();
+
+  const res = await app.request("/api/tag-prefixes/order", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prefixes: ["cv", "存在しないprefix"] }),
+  });
+  assert.equal(res.status, 400);
+
+  const after = await (await app.request("/api/tag-prefixes")).json();
+  assert.deepEqual(after, before);
 });
 
 test("GET /api/tag-prefixes/candidates は未登録 prefix を返す", async () => {
