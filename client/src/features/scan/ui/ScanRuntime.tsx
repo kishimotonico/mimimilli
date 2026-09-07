@@ -2,12 +2,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAtomValue, useSetAtom } from "jotai";
 import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import type { ScanJobSnapshot, StartScanRequest } from "@mimimilli/shared";
-import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
 import { SETTINGS_QUERY_KEYS } from "../../../entities/settings/queryKeys";
-import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { useDlsiteBulkActions } from "../../../entities/dlsite/useDlsiteBulkActions";
 import { SCAN_QUERY_KEYS } from "../api";
 import { refreshScanCandidates } from "../../../entities/scan/scanCandidatesCache";
+import { invalidateLibraryQueries } from "../model/libraryInvalidation";
 import {
   scanActionsAtom,
   scanCandidateHiddenPathsAtom,
@@ -46,10 +45,7 @@ export default function ScanRuntime() {
       const result = job.result;
       queryClient.setQueryData(SCAN_QUERY_KEYS.last(), { result, finishedAt: job.finishedAt });
       void refreshScanCandidates(queryClient).catch(() => {});
-      queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.all() });
-      queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.dlsiteNotifications() });
-      queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.allFacets() });
-      queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.allWorks() });
+      void invalidateLibraryQueries(queryClient);
       queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() });
       if (!scanModalOpenRef.current) setResultToast({ kind: "completed", result });
       if (result.insertedWorkIds.length > 0) dlsiteBulk.attach();

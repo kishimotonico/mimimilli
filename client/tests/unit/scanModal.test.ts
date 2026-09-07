@@ -572,6 +572,71 @@ describe("ScanModal", () => {
     );
   });
 
+  it("候補登録に成功すると作品一覧・軸件数・DLsite通知・スマートフォルダーのクエリを無効化する（TASK-428.3）", async () => {
+    vi.spyOn(scanApi, "registerScanCandidates").mockResolvedValue({
+      registered: [{ path: candidateDetected.path, workId: "w-detected" }],
+      failures: [],
+    });
+    const { queryClient } = renderModal({
+      lastResult: { ...scanResult, candidates: [candidateDetected] },
+    });
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });
+    await expect.poll(() => unregistered.textContent).toContain(candidateDetected.inferredTitle);
+    fireEvent.click(within(unregistered).getByRole("button", { name: "1件をライブラリに追加" }));
+
+    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["works"] }));
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["axisFacets"] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["dlsiteNotifications"] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["smartFolderWorks"] });
+  });
+
+  it("候補登録が部分失敗しても、成功分がある限り作品一覧等を無効化する（TASK-428.3）", async () => {
+    vi.spyOn(scanApi, "registerScanCandidates").mockResolvedValue({
+      registered: [{ path: candidateDetected.path, workId: "w-detected" }],
+      failures: [{ path: candidateUndetected.path, message: "失敗" }],
+    });
+    const { queryClient } = renderModal({
+      lastResult: { ...scanResult, candidates: [candidateDetected, candidateUndetected] },
+    });
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });
+    await expect.poll(() => unregistered.textContent).toContain(candidateDetected.inferredTitle);
+    fireEvent.click(within(unregistered).getByRole("button", { name: "2件をライブラリに追加" }));
+
+    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["works"] }));
+    await waitFor(() =>
+      expect(screen.getByText("1件はライブラリに追加できませんでした。")).toBeInTheDocument(),
+    );
+  });
+
+  it("候補の除外では作品一覧・軸件数・スマートフォルダーの再取得を行わない（AC#4）", async () => {
+    vi.spyOn(scanApi, "excludeScanCandidates").mockResolvedValue(undefined);
+    const { queryClient } = renderModal({
+      lastResult: { ...scanResult, candidates: [candidateUndetected] },
+    });
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });
+    await expect.poll(() => unregistered.textContent).toContain(candidateUndetected.inferredTitle);
+    fireEvent.click(
+      within(unregistered).getByRole("button", {
+        name: `「${candidateUndetected.inferredTitle}」を候補から外す`,
+      }),
+    );
+
+    await waitFor(() =>
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: SCAN_QUERY_KEYS.candidateExclusions(),
+      }),
+    );
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ["works"] });
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ["axisFacets"] });
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ["smartFolderWorks"] });
+  });
+
   it("未検出のRJコードをクリックで編集し、編集した値を登録に送る", async () => {
     const registerSpy = vi.spyOn(scanApi, "registerScanCandidates").mockResolvedValue({
       registered: [{ path: candidateUndetected.path, workId: "w-undetected" }],

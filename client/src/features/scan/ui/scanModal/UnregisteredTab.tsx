@@ -19,6 +19,7 @@ import { parentDirOf } from "../../../../shared/lib/workspacePath";
 import { excludeScanCandidates, registerScanCandidates, SCAN_QUERY_KEYS } from "../../api";
 import { restoreScanCandidateExclusions } from "../../../../entities/scan/api";
 import { refreshScanCandidates } from "../../../../entities/scan/scanCandidatesCache";
+import { invalidateLibraryQueries } from "../../model/libraryInvalidation";
 import { scanCandidateHiddenPathsAtom } from "../../../../entities/scan/model/atoms";
 import type { CandidatesRegisteredResult } from "./types";
 
@@ -102,6 +103,8 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
       setErrorMessage(
         failures.length > 0 ? `${failures.length}件はライブラリに追加できませんでした。` : null,
       );
+      // 部分失敗時も、実際に登録できた分だけがサーバー側の状態。再取得で正しい件数に揃える。
+      if (registered.length > 0) void invalidateLibraryQueries(queryClient);
       onRegistered({
         registeredWorkIds: registered.map((entry) => entry.workId),
         failedCount: failures.length,
