@@ -1,10 +1,8 @@
 import { useEffect, useRef, useCallback } from "react";
 
-/** ネイティブ操作を優先し、常に（全キー）グローバルショートカットの対象から外す要素。
- *  button/a は含めない: Spaceは「どこにフォーカスがあっても再生/一時停止」に一本化し、
- *  ボタンの活性化はEnterに任せる（フォーカスがボタンに残っているとSpaceが効かない問題の解消）。 */
+/** ネイティブ操作を優先し、常に（全キー）グローバルショートカットの対象から外す要素。 */
 const SHORTCUT_EXEMPT_SELECTOR =
-  'input, textarea, select, [contenteditable], [role="menu"], [role="listbox"]';
+  'input, textarea, select, [contenteditable], [role="menu"], [role="listbox"], button, a';
 
 /** カスタムスライダー（シーク行・ABハンドル）が自前で処理するキー。Spaceにはスライダー
  *  側のネイティブ動作がないため対象外にせず、従来どおりグローバル側で処理する。 */

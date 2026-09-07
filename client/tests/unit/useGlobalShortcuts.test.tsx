@@ -39,31 +39,25 @@ afterEach(() => {
 });
 
 describe("useGlobalShortcuts", () => {
-  it("フォーカスがinput・select・contentEditableにあるときはネイティブ動作を優先しショートカットを発火しない", () => {
+  it("フォーカスがボタン・リンク・select・contentEditableにあるときはネイティブ動作を優先しショートカットを発火しない", () => {
     const onTogglePlay = vi.fn();
     const onSeekRelative = vi.fn();
     const { getByRole, getByText } = render(
       createElement(TestHost, { onTogglePlay, onSeekRelative }),
     );
 
-    fireEvent.keyDown(getByRole("combobox"), { code: "Space" });
-    fireEvent.keyDown(getByRole("combobox"), { code: "ArrowLeft" });
+    for (const el of [
+      getByRole("button", { name: "button" }),
+      getByRole("link"),
+      getByRole("combobox"),
+    ]) {
+      fireEvent.keyDown(el, { code: "Space" });
+      fireEvent.keyDown(el, { code: "ArrowLeft" });
+    }
     fireEvent.keyDown(getByText("editable"), { code: "Space" });
 
     expect(onTogglePlay).not.toHaveBeenCalled();
     expect(onSeekRelative).not.toHaveBeenCalled();
-  });
-
-  it("フォーカスがボタン・リンクにあってもSpace/矢印は再生操作に一本化される（ボタン活性化はEnterのみ）", () => {
-    const onTogglePlay = vi.fn();
-    const onSeekRelative = vi.fn();
-    const { getByRole } = render(createElement(TestHost, { onTogglePlay, onSeekRelative }));
-
-    fireEvent.keyDown(getByRole("button", { name: "button" }), { code: "Space" });
-    fireEvent.keyDown(getByRole("link"), { code: "ArrowRight" });
-
-    expect(onTogglePlay).toHaveBeenCalledTimes(1);
-    expect(onSeekRelative).toHaveBeenCalledWith(10);
   });
 
   it('role="menu"・role="listbox"配下ではネイティブ操作を優先しショートカットを発火しない', () => {
