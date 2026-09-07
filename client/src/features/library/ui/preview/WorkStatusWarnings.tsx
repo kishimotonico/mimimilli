@@ -1,14 +1,21 @@
 import type { Work } from "@mimimilli/shared";
 import { isDlsiteFetchFailed, isDlsiteParseFailed, isRjCodeMissing } from "@mimimilli/shared";
 import { I } from "../../../../shared/ui/Icon";
+import Button from "../../../../shared/ui/Button";
 
 interface WorkStatusWarningsProps {
   work: Work;
   onEdit: () => void;
   onDelete: () => void;
+  onOpenFiles: () => void;
 }
 
-export function WorkStatusWarnings({ work, onEdit, onDelete }: WorkStatusWarningsProps) {
+export function WorkStatusWarnings({
+  work,
+  onEdit,
+  onDelete,
+  onOpenFiles,
+}: WorkStatusWarningsProps) {
   return (
     <>
       {work.status === "missing" && (
@@ -20,13 +27,20 @@ export function WorkStatusWarnings({ work, onEdit, onDelete }: WorkStatusWarning
               登録時のフォルダーが移動または削除された可能性があります。再生はできません。
             </p>
             <p className="mle-prv__warn-path">{work.physicalPath}</p>
-            <button
-              type="button"
-              className="mt-1 w-fit rounded-pill bg-paper-2 px-2.5 py-1 font-sans text-[10.5px] font-medium text-[color:var(--r-coral)] hover:bg-paper-3"
-              onClick={onDelete}
-            >
-              登録を解除
-            </button>
+            <div className="mt-1 flex w-fit gap-1.5">
+              <Button variant="ghost" size="sm" icon={I.folderO} onClick={onOpenFiles}>
+                Filesで開く
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={I.trash}
+                className="text-[color:var(--r-coral)]"
+                onClick={onDelete}
+              >
+                登録を解除
+              </Button>
+            </div>
           </div>
         </div>
       )}
@@ -37,9 +51,26 @@ export function WorkStatusWarnings({ work, onEdit, onDelete }: WorkStatusWarning
           <div className="mle-prv__warn-body">
             <p className="mle-prv__warn-title">メタデータの読み込みに失敗しました</p>
             <p className="mle-prv__warn-text">
+              作品フォルダーのファイルが壊れているか、対応していない形式の可能性があります。ファイルを直して再スキャンすると復帰します。
+            </p>
+            <p className="mle-prv__warn-text">
               {work.errorMessage ?? "詳細不明のエラーが発生しました。"}
             </p>
             <p className="mle-prv__warn-path">{work.physicalPath}</p>
+            <div className="mt-1 flex w-fit gap-1.5">
+              <Button variant="ghost" size="sm" icon={I.folderO} onClick={onOpenFiles}>
+                Filesで開く
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={I.trash}
+                className="text-[color:var(--r-coral)]"
+                onClick={onDelete}
+              >
+                登録を解除
+              </Button>
+            </div>
           </div>
         </div>
       )}
@@ -52,13 +83,9 @@ export function WorkStatusWarnings({ work, onEdit, onDelete }: WorkStatusWarning
             <p className="mle-prv__warn-text">
               フォルダー名からRJコードを自動検出できませんでした。RJコードを入力して取得するか、連携しない設定にできます。
             </p>
-            <button
-              type="button"
-              className="mt-1 w-fit rounded-pill bg-paper-2 px-2.5 py-1 font-sans text-[10.5px] font-medium text-ink-1 hover:bg-paper-3 hover:text-ink-0"
-              onClick={onEdit}
-            >
+            <Button variant="ghost" size="sm" className="mt-1 w-fit" onClick={onEdit}>
               連携設定を編集
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -71,13 +98,9 @@ export function WorkStatusWarnings({ work, onEdit, onDelete }: WorkStatusWarning
             <p className="mle-prv__warn-text">
               {work.dlsite.error ?? "作品ページのHTMLをパースできませんでした。"}
             </p>
-            <button
-              type="button"
-              className="mt-1 w-fit rounded-pill bg-paper-2 px-2.5 py-1 font-sans text-[10.5px] font-medium text-ink-1 hover:bg-paper-3 hover:text-ink-0"
-              onClick={onEdit}
-            >
+            <Button variant="ghost" size="sm" className="mt-1 w-fit" onClick={onEdit}>
               連携設定を編集
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -97,13 +120,9 @@ export function WorkStatusWarnings({ work, onEdit, onDelete }: WorkStatusWarning
                   ? "RJコードを確認してください。"
                   : "時間をおいて再試行してください。")}
             </p>
-            <button
-              type="button"
-              className="mt-1 w-fit rounded-pill bg-paper-2 px-2.5 py-1 font-sans text-[10.5px] font-medium text-ink-1 hover:bg-paper-3 hover:text-ink-0"
-              onClick={onEdit}
-            >
+            <Button variant="ghost" size="sm" className="mt-1 w-fit" onClick={onEdit}>
               連携設定を編集
-            </button>
+            </Button>
           </div>
         </div>
       )}

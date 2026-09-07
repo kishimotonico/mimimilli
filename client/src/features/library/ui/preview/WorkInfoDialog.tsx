@@ -8,11 +8,11 @@ import { useDialogModal } from "../../../../shared/ui/useDialogModal";
 import { STATUS_LABEL } from "./DlsiteEditor";
 import { formatDate, formatDateTime, formatDuration } from "../../../../shared/lib/format";
 import { formatCoverInfoLabel } from "../../../../shared/lib/coverLabel";
+import { WORK_STATUS_LABEL } from "../../../../entities/work/workStatusLabel";
 
 const STATUS_TEXT: Record<Work["status"], string> = {
   ok: "登録済み",
-  missing: "ファイル欠損",
-  error: "メタ読み込みエラー",
+  ...WORK_STATUS_LABEL,
 };
 
 interface WorkInfoDialogProps {

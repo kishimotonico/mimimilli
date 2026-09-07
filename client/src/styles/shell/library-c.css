@@ -199,6 +199,16 @@
   padding: 3px 4px;
   border-radius: 2px;
 }
+.mll-grid-tile__status {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  display: flex;
+  background: var(--r-coral);
+  color: var(--paper-1);
+  padding: 3px 4px;
+  border-radius: 2px;
+}
 .mll-grid-tile__title {
   display: -webkit-box;
   min-height: 2.7em;

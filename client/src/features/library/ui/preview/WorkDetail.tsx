@@ -6,6 +6,7 @@ import { errorToastAtom } from "../../../../shared/model/errorToastAtom";
 import { workDeleteSuccessAtom } from "../../model/atoms";
 import { apiErrorMessage } from "../../../../shared/lib/apiError";
 import ConfirmDialog from "../../../../shared/ui/ConfirmDialog";
+import { openPathInFilesAtom } from "../../../../entities/file-system/model/navigationAtoms";
 import CoverImg from "../../../../entities/work/ui/CoverImg";
 import { getCoverImageUrl } from "../../../../entities/work/api";
 import { selectFixedCoverThumbnailWidth } from "../../../../entities/work/ui/coverThumbnailWidth";
@@ -17,6 +18,7 @@ import {
 import { I } from "../../../../shared/ui/Icon";
 import Button from "../../../../shared/ui/Button";
 import { formatDuration, formatTime } from "../../../../shared/lib/format";
+import { getWorkStatusLabel } from "../../../../entities/work/workStatusLabel";
 import type { useLibraryWorkPatchMutations } from "../../model/useLibraryQueries";
 import { WorkMetadataActions } from "./WorkMetadataActions";
 import { WorkPlayButton } from "./WorkPlayButton";
@@ -84,9 +86,10 @@ export function WorkDetail({
   const [isInfoDialogOpen, setIsInfoDialogOpen] = useState(false);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-  const hasKickerWarning = work.status === "missing" || work.status === "error";
+  const statusLabel = getWorkStatusLabel(work.status);
   const setErrorToast = useSetAtom(errorToastAtom);
   const setWorkDeleteSuccess = useSetAtom(workDeleteSuccessAtom);
+  const openPathInFiles = useSetAtom(openPathInFilesAtom);
 
   const handleDeleteConfirm = () => {
     const title = work.title;
@@ -157,18 +160,11 @@ export function WorkDetail({
           />
         </div>
         <div className="mle-prv__meta">
-          {hasKickerWarning && (
+          {statusLabel && (
             <div className="mle-prv__kicker">
-              {work.status === "missing" && (
-                <span className="warn">
-                  <I.err size={11} /> ファイル欠損
-                </span>
-              )}
-              {work.status === "error" && (
-                <span className="warn">
-                  <I.err size={11} /> メタ読み込みエラー
-                </span>
-              )}
+              <span className="warn">
+                <I.err size={11} /> {statusLabel}
+              </span>
             </div>
           )}
           <div className="mle-prv__title-row">
@@ -221,6 +217,7 @@ export function WorkDetail({
         work={work}
         onEdit={() => setIsEditDialogOpen(true)}
         onDelete={() => setIsDeleteConfirmOpen(true)}
+        onOpenFiles={() => openPathInFiles(work.physicalPath)}
       />
 
       <WorkTrackList
@@ -263,7 +260,7 @@ export function WorkDetail({
       {isDeleteConfirmOpen && (
         <ConfirmDialog
           title="作品登録を解除"
-          message="この作品のデータ（再生履歴・タグを含む）と管理ファイル（mimimilli.json）を削除します。音声などの物理ファイルは削除されません。"
+          message={`「${work.title}」1件のライブラリ登録を解除します。再生履歴・タグなどのデータと管理ファイル（mimimilli.json）を削除します。音声などの物理ファイルは削除されません。ドライブ未接続などの一時的な欠損の場合、接続後に再スキャンすれば再登録できますが、削除したデータは戻りません。`}
           confirmLabel="解除する"
           onConfirm={() => {
             setIsDeleteConfirmOpen(false);

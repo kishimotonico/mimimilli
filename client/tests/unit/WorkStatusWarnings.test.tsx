@@ -31,30 +31,39 @@ function makeWork(overrides: Partial<Work> = {}): Work {
 }
 
 describe("WorkStatusWarnings", () => {
-  it("missing状態では登録解除ボタンを表示しonDeleteを呼ぶ", () => {
+  it("missing状態では登録解除・Filesで開くボタンを表示し、それぞれonDelete・onOpenFilesを呼ぶ", () => {
     const onDelete = vi.fn();
+    const onOpenFiles = vi.fn();
     render(
       <WorkStatusWarnings
         work={makeWork({ status: "missing" })}
         onEdit={vi.fn()}
         onDelete={onDelete}
+        onOpenFiles={onOpenFiles}
       />,
     );
 
-    const button = screen.getByRole("button", { name: "登録を解除" });
-    fireEvent.click(button);
+    fireEvent.click(screen.getByRole("button", { name: "登録を解除" }));
     expect(onDelete).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "Filesで開く" }));
+    expect(onOpenFiles).toHaveBeenCalledTimes(1);
   });
 
-  it("error状態では登録解除ボタンを表示しない", () => {
+  it("error状態でも登録解除・Filesで開くボタンを表示する（TASK-428.5でmissingと導線を統一）", () => {
+    const onDelete = vi.fn();
+    const onOpenFiles = vi.fn();
     render(
       <WorkStatusWarnings
         work={makeWork({ status: "error", errorMessage: "boom" })}
         onEdit={vi.fn()}
-        onDelete={vi.fn()}
+        onDelete={onDelete}
+        onOpenFiles={onOpenFiles}
       />,
     );
 
-    expect(screen.queryByRole("button", { name: "登録を解除" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "登録を解除" }));
+    expect(onDelete).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "Filesで開く" }));
+    expect(onOpenFiles).toHaveBeenCalledTimes(1);
   });
 });

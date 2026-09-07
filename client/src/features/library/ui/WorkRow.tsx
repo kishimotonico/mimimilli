@@ -1,6 +1,7 @@
 import type { WorkListItem } from "@mimimilli/shared";
 import CoverImg from "../../../entities/work/ui/CoverImg";
 import { selectFixedCoverThumbnailWidth } from "../../../entities/work/ui/coverThumbnailWidth";
+import { getWorkStatusLabel } from "../../../entities/work/workStatusLabel";
 import { I } from "../../../shared/ui/Icon";
 import { formatDuration } from "../../../shared/lib/format";
 import { cn } from "../../../shared/lib/cn";
@@ -30,12 +31,7 @@ export default function WorkRow({
     .filter(Boolean)
     .join(" · ");
 
-  const statusLabel =
-    work.status === "missing"
-      ? "ファイル欠損"
-      : work.status === "error"
-        ? "メタ読み込みエラー"
-        : null;
+  const statusLabel = getWorkStatusLabel(work.status);
 
   return (
     <button type="button" className={`mll-wrow ${isSelected ? "is-on" : ""}`} onClick={onSelect}>
