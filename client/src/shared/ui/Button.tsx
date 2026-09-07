@@ -22,6 +22,9 @@ const SIZE_CLASS: Record<ButtonSize, string> = {
   lg: "h-9 gap-1.5 px-4 text-body",
 };
 
+// 破壊的操作の確定はダイアログ内で最も目を引く必要があるため、太さだけbase(font-medium)を上書きする。
+const WEIGHT_CLASS: Partial<Record<ButtonVariant, string>> = { danger: "font-semibold" };
+
 function stateClass(variant: ButtonVariant, active: boolean, disabled: boolean): string {
   if (disabled) {
     return variant === "primary" || variant === "danger"
@@ -57,6 +60,7 @@ export function buttonClass(
     "inline-flex items-center whitespace-nowrap rounded-pill",
     "font-sans font-medium transition-colors",
     SIZE_CLASS[size],
+    WEIGHT_CLASS[variant],
     stateClass(variant, active, disabled),
     className,
   );
