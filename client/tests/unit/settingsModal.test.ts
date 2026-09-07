@@ -166,6 +166,35 @@ describe("SettingsModal", () => {
     });
   });
 
+  it("保存中はフッターの閉じるボタンもモーダルを閉じない（アンマウント後のstate更新を防ぐ）", async () => {
+    let resolveChange!: () => void;
+    const onChangeFolder = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveChange = resolve;
+        }),
+    );
+    const { onClose } = renderModal({ onChangeFolder });
+    fireEvent.click(screen.getByRole("button", { name: "変更" }));
+    fireEvent.change(screen.getByLabelText("ルートフォルダーのパス"), {
+      target: { value: "/new/root" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+    await screen.findByRole("button", { name: "保存中..." });
+
+    const footerCloseButton = screen
+      .getAllByRole("button", { name: "閉じる" })
+      .find((button) => button.tagName === "BUTTON" && button.textContent === "閉じる")!;
+    fireEvent.click(footerCloseButton);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("ルートフォルダーのパス")).toBeInTheDocument();
+
+    resolveChange();
+    await waitFor(() => {
+      expect(screen.queryByLabelText("ルートフォルダーのパス")).toBeNull();
+    });
+  });
+
   it("保存失敗時はエラーメッセージを表示し、編集フォームを開いたままにする", async () => {
     const onChangeFolder = vi.fn(() =>
       Promise.reject(
