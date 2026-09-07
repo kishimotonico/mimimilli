@@ -3,7 +3,7 @@
 // （没入モードのミニコントロール）で共用する。開閉・外側クリック/Escape/スクロール/
 // フォーカス外し時の挙動は元の PopupContent 実装を踏襲する。
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useIsPresent } from "motion/react";
 import { I } from "../../../shared/ui/Icon";
 import { cn } from "../../../shared/lib/cn";
@@ -28,6 +28,8 @@ interface PlaybackRatePickerProps {
   /** カバー画像等の暗い背景に重ねる表示（ポップアップ・没入ミニコントロール）。既定は素のピル */
   overlay?: boolean;
   className?: string;
+  /** メニューの開閉状態が変わるたびに呼ぶ。呼び出し側で周辺要素との重なりを避けたいときに使う */
+  onOpenChange?: (isOpen: boolean) => void;
 }
 
 export default function PlaybackRatePicker({
@@ -35,10 +37,22 @@ export default function PlaybackRatePicker({
   onSetPlaybackRate,
   overlay = false,
   className,
+  onOpenChange,
 }: PlaybackRatePickerProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpenState] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const isPresent = useIsPresent();
+
+  const setIsOpen = useCallback(
+    (next: boolean | ((prev: boolean) => boolean)) => {
+      setIsOpenState((prev) => {
+        const value = typeof next === "function" ? next(prev) : next;
+        onOpenChange?.(value);
+        return value;
+      });
+    },
+    [onOpenChange],
+  );
 
   useEffect(() => {
     if (!isOpen || !isPresent) return;
@@ -69,7 +83,7 @@ export default function PlaybackRatePicker({
       window.removeEventListener("scroll", closeMenu, true);
       document.removeEventListener("focusout", handleFocusOut);
     };
-  }, [isOpen, isPresent]);
+  }, [isOpen, isPresent, setIsOpen]);
 
   const rateLabel = RATE_LABELS[playbackRate] ?? `${playbackRate.toFixed(2)}×`;
 

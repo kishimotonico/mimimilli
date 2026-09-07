@@ -132,6 +132,20 @@ describe("PopupContent", () => {
     expect(handlers.onSetPlaybackRate).toHaveBeenCalledWith(1.5);
   });
 
+  it("速度メニューを開いている間は±10秒ボタンを隠し、閉じると戻す", () => {
+    renderPopup({ playbackRate: 1 });
+    expect(screen.getByTitle("10秒戻る")).toBeInTheDocument();
+    expect(screen.getByTitle("10秒進む")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTitle("再生速度"));
+    expect(screen.queryByTitle("10秒戻る")).not.toBeInTheDocument();
+    expect(screen.queryByTitle("10秒進む")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "1.5×" }));
+    expect(screen.getByTitle("10秒戻る")).toBeInTheDocument();
+    expect(screen.getByTitle("10秒進む")).toBeInTheDocument();
+  });
+
   it("再生速度メニューはスクロールで閉じる", () => {
     renderPopup({ playbackRate: 1 });
     fireEvent.click(screen.getByTitle("再生速度"));

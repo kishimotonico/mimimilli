@@ -1,6 +1,7 @@
 // 右下ポップアップの中身。日常操作（音量・トラック移動・ループ・再生速度）を厳選して置く。
 // channelSwap / abRepeat 等のニッチ機能は置かない（再生中タブ側の役割）。
 
+import { useState } from "react";
 import type { PlayerState } from "../model/usePlayerState";
 import PopupSeek from "./PopupSeek";
 import PlaybackErrorNotice from "./PlaybackErrorNotice";
@@ -59,6 +60,8 @@ export default function PopupContent({
   const track = tracks[currentTrackIndex] ?? null;
   const isFirstTrack = currentTrackIndex <= 0;
   const isLastTrack = currentTrackIndex >= tracks.length - 1;
+  // 速度メニューが開いている間はカバー右側の±10秒ボタンと縦位置が重なるため隠す
+  const [rateMenuOpen, setRateMenuOpen] = useState(false);
 
   return (
     <>
@@ -96,26 +99,31 @@ export default function PopupContent({
               requestWidth={selectFixedCoverThumbnailWidth(308, window.devicePixelRatio)}
             />
           )}
-          {/* ±10秒: 常時薄く表示し、ホバーで強調する */}
-          <button
-            className="mle-popup__skip mle-popup__skip--back"
-            title="10秒戻る"
-            data-player-control
-            onClick={() => onSeekRelative(-10)}
-          >
-            <span>−10</span>
-          </button>
-          <button
-            className="mle-popup__skip mle-popup__skip--fwd"
-            title="10秒進む"
-            data-player-control
-            onClick={() => onSeekRelative(10)}
-          >
-            <span>+10</span>
-          </button>
+          {/* ±10秒: 常時薄く表示し、ホバーで強調する。速度メニューが開くと縦位置が重なるため隠す */}
+          {!rateMenuOpen && (
+            <>
+              <button
+                className="mle-popup__skip mle-popup__skip--back"
+                title="10秒戻る"
+                data-player-control
+                onClick={() => onSeekRelative(-10)}
+              >
+                <span>−10</span>
+              </button>
+              <button
+                className="mle-popup__skip mle-popup__skip--fwd"
+                title="10秒進む"
+                data-player-control
+                onClick={() => onSeekRelative(10)}
+              >
+                <span>+10</span>
+              </button>
+            </>
+          )}
           <PlaybackRatePicker
             playbackRate={playbackRate}
             onSetPlaybackRate={onSetPlaybackRate}
+            onOpenChange={setRateMenuOpen}
             overlay
           />
         </div>
