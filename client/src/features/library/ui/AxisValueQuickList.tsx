@@ -47,7 +47,7 @@ interface AxisValueQuickListProps {
   /** ホバー/フォーカス時に出る＋ボタン（冪等なAND追加。選択済み行には出さない）。
    *  省略時はボタンを出さない（ADR-0013） */
   onAdd?: (item: AxisFacetItem) => void;
-  /** 既定動作の説明（例:「クリックで置き換え」「AND追加されます」） */
+  /** 既定動作の説明。両方向の操作方法を含む（getValueSelectionHint、ADR-0013） */
   hint?: string;
   /** useAnchoredPopover / usePopoverDismissal が返す close をそのまま渡す */
   close: () => void;

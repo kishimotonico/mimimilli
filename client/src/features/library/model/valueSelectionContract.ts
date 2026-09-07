@@ -74,5 +74,5 @@ export function getValueSelectionHint(
 ): string {
   return defaultAction === "replace"
     ? "クリックで置き換え・Ctrl+クリックでAND追加"
-    : "AND追加されます";
+    : "クリックでAND追加・Ctrl+クリックで置き換え";
 }

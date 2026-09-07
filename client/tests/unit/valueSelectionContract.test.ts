@@ -129,7 +129,7 @@ describe("getValueSelectionHint（ヒント文言。TASK-428.14）", () => {
     expect(getValueSelectionHint("replace")).toBe("クリックで置き換え・Ctrl+クリックでAND追加");
   });
 
-  it("既定=AND追加は追加されることの説明を返す", () => {
-    expect(getValueSelectionHint("add")).toBe("AND追加されます");
+  it("既定=AND追加は両方向（クリック=AND追加、Ctrl+クリック=置き換え）の説明を返す", () => {
+    expect(getValueSelectionHint("add")).toBe("クリックでAND追加・Ctrl+クリックで置き換え");
   });
 });
