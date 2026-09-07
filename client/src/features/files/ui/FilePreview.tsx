@@ -20,6 +20,7 @@ import { getWorkRegisterPreview, reassignIdentityConflict } from "../api";
 import { deleteWork, getWork } from "../../../entities/work/api";
 import { clampFilesPreviewWidth, filesPreviewWidthAtom } from "../model/previewLayoutAtoms";
 import { copyPathSuccessAtom } from "../model/atoms";
+import { isPrimaryPointerButton } from "../../../shared/lib/pointerButton";
 import RegisterWorkDialog from "./RegisterWorkDialog";
 import { Hero, WorkspaceMedia } from "./FilePreviewMedia";
 import type { ScanDiagnostic, WorkRegisterPreview, WorkspacePath } from "@mimimilli/shared";
@@ -103,6 +104,7 @@ export default function FilePreview({
 
   const onResizePointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (!isPrimaryPointerButton(event)) return;
       event.preventDefault();
       event.currentTarget.setPointerCapture(event.pointerId);
       resizeDragRef.current = { startX: event.clientX, startWidth: width };
