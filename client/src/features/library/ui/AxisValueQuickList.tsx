@@ -219,6 +219,9 @@ export default function AxisValueQuickList({
   return (
     // oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- 検索欄・ソート・一覧をまとめた矢印キー移動の委譲コンテナ（個々の子要素がフォーカス可能な実要素を持つ）
     <div className="mll-qlist" onKeyDown={handleListKeyDown}>
+      {/* 軸行の.countと同じ「値の個数」。単位を明示し、作品数（ビュー軸・スマートフォルダー行）
+          と取り違えないようにする（TASK-428.22） */}
+      {!isLoading && !isError && <div className="mll-qlist__count">値 {items.length}件</div>}
       <div className="mll-qlist__search">
         <I.search size={12} />
         <input

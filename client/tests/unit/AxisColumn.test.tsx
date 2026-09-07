@@ -226,4 +226,28 @@ describe("AxisColumn の件数表示（TASK-428.22）", () => {
     const newFolderButton = screen.getByRole("button", { name: "新規作成" });
     expect(newFolderButton.textContent).not.toContain("+");
   });
+
+  it("分類軸行のtitleは「値の個数」であることを単位付きで明示する", () => {
+    renderAxisColumn({
+      tagPrefixes: PREFIXES,
+      facetAxisValueCounts: { cv: 12 },
+    });
+
+    expect(screen.getByRole("button", { name: /^CV/ })).toHaveAttribute("title", "値 12件");
+  });
+
+  it("スマートフォルダー行のアイコンは「すべての作品」と異なる（AC#5）", () => {
+    renderAxisColumn({ smartFolders: SMART_FOLDERS });
+
+    const allIcon = screen
+      .getByRole("button", { name: /すべての作品/ })
+      .querySelector(".ic svg")?.outerHTML;
+    const smartFolderIcon = screen
+      .getByRole("button", { name: /長時間ASMR/ })
+      .querySelector(".ic svg")?.outerHTML;
+
+    expect(allIcon).toBeTruthy();
+    expect(smartFolderIcon).toBeTruthy();
+    expect(smartFolderIcon).not.toBe(allIcon);
+  });
 });

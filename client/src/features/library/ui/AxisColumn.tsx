@@ -30,6 +30,9 @@ interface AxisRow {
   count?: number;
   /** 要対応の強調表示（.badge、colored pill）。現状はエラービュー行のみが持つ */
   badge?: number;
+  /** count の単位を明示するhover文言（例:「値 42件」）。分類軸は値の個数、
+   *  ビュー軸・スマートフォルダーは作品数と単位が異なるため、誤読を防ぐ（TASK-428.22） */
+  title?: string;
   isAction?: boolean;
 }
 
@@ -95,6 +98,7 @@ function AxisRowItem({
       ref={rowRef}
       type="button"
       className={`mll-axis ${isActive ? "is-on" : ""}`}
+      title={ax.title}
       aria-current={isActive ? "true" : undefined}
       aria-expanded={hasQuickOverlay ? isOverlayOpen : undefined}
       onClick={onSelect}
@@ -148,10 +152,10 @@ export default function AxisColumn({
         ? { ...ax, badge: errorViewCount }
         : { ...ax, count: viewCountsById[ax.id] },
     );
-  const facetAxisRows = buildFacetAxisRows(tagPrefixes).map((ax) => ({
-    ...ax,
-    count: facetAxisValueCounts?.[ax.id],
-  }));
+  const facetAxisRows = buildFacetAxisRows(tagPrefixes).map((ax) => {
+    const count = facetAxisValueCounts?.[ax.id];
+    return { ...ax, count, title: count != null ? `値 ${count}件` : undefined };
+  });
   const {
     openKey: overlayAxis,
     openAnchorEl,
@@ -223,7 +227,7 @@ export default function AxisColumn({
             renderRow({
               id: `smart-${sf.id}` as AxisId,
               name: sf.name,
-              icon: "gridS",
+              icon: "smartFolder",
               count: smartFolderMatchCounts?.[sf.id],
             }),
           )}
