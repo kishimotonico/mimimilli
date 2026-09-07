@@ -100,7 +100,7 @@ export function WorkDetail({
             {work.cover ? (
               <button
                 type="button"
-                className="block h-full w-full cursor-zoom-in p-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
+                className="block h-full w-full cursor-zoom-in p-0"
                 aria-label="カバー画像を拡大表示"
                 onClick={() => setIsLightboxOpen(true)}
               >

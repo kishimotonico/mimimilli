@@ -8,10 +8,10 @@
 
 - `--paper-0〜4`: 背景・面。0=ページ床、1=カード等の浮いた面、2=hover、3=pressed/行の縞、4=selected
 - `--line` / `--line-soft` / `--line-strong`: 罫線。強調度の3段階
-- `--ink-0〜4`: 文字色。0=本文、1=セカンダリ、2=キャプション、3=プレースホルダー、4=ごく薄い
+- `--ink-0〜4`: 文字色。0=本文、1=セカンダリ、2=キャプション、3=プレースホルダー、4=ごく薄い。`--ink-3`はWCAG AAの4.5:1に届かないため、`::placeholder`と意図的にごく弱い装飾テキスト（空状態の補足・無効化アイコン等）以外の実コンテンツ（見出し・サブタイトル・件数・メタ情報等）には使わない。読ませる文字は最低でも`--ink-2`にする
 - `--acc` 系: アクセント（既定は柿色）。soft=淡色背景、line=枠線、ink=アクセント上の文字
 - riso 系（`--r-coral` / `-leaf` / `-mustard` / `-plum`）: カバーアートやマルチchミキサーの色分け用。リソグラフ風の彩度
-- タグカテゴリ色（`--cv-color` / `--circle-color` / `--series-color` / `--cat-color`）: 構造化タグ（`cv/` `サークル/` `シリーズ/` `カテゴリ/`）を視覚的に区別する専用色。フラットタグには使わない
+- タグカテゴリ色（`--cv-color` / `--circle-color` / `--series-color` / `--cat-color`）: 構造化タグ（`cv/` `サークル/` `シリーズ/` `カテゴリ/`）を視覚的に区別する専用色。フラットタグには使わない。値の実背景（`--paper-2`、hover時`--paper-3`）の両方で4.5:1以上を満たすよう明度を調整済み。色を変える場合は両背景で計算し直す
 - `--shadow-cover`: カバーアート専用の影（内側ハイライト付き）。通常の面には `--shadow-1/2/pop` を使う
 
 ## テーマとアクセント
@@ -25,6 +25,25 @@
 - OSゴシック（`--font-jp`）: 本文・日本語UIの既定書体。`"Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans CJK JP", system-ui, sans-serif`（Windows 11 24H2以降は Noto Sans JP、Mac は Hiragino、Linux 開発環境は Noto Sans CJK JP で描画）
 - `Geist`（`--font-sans`）: ブランド表記・操作系コントロールなど非本文
 - `JetBrains Mono`（`--font-mono`）: 時刻・件数・メタ情報などの数値表示
+
+### 文字サイズトークン
+
+サイズ・行高は用途別トークンに集約する（`tokens.css` の `--fs-*`/`--lh-*`、Tailwindでは `text-body` 等のユーティリティとして使える）。px直書き（`font-size: Npx` / `text-[Npx]`）は禁止で、新規UIもこの6段のいずれかへ丸める。フォントファミリー（`--font-jp`/`--font-sans`/`--font-mono`）とは独立した軸なので、`text-mono` に `font-mono` を組み合わせるなど併用する。
+
+| トークン         | 値               | 用途                                                 |
+| ---------------- | ---------------- | ---------------------------------------------------- |
+| `text-body`      | 12px / line 1.4  | 主要本文（作品タイトル・行の主テキストなど）         |
+| `text-secondary` | 11px / line 1.35 | セカンダリ情報（タグ値・補助テキスト）               |
+| `text-caption`   | 10px / line 1.3  | キャプション・空状態・補足ヒント                     |
+| `text-control`   | 11px / line 1    | ボタン・操作ラベル（`--font-sans`と併用）            |
+| `text-label`     | 10px / line 1.2  | セクション見出し・カテゴリラベル（uppercase等）      |
+| `text-mono`      | 11px / line 1.3  | 時刻・件数・パス等の数値/等幅表示（`font-mono`併用） |
+
+13px以上（モーダル見出し・大きい数字表示など）はこのスケールの対象外で、個別に決めてよい。
+
+## フォーカス表示
+
+操作可能な要素（`button` / `a` / `input` / `textarea` / `select` / `[tabindex]`）は `shell/base.css` の共通規則（`body :is(...):focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }`）で一律 `2px solid var(--acc)` のリングを表示する。個別コンポーネントで `focus-visible:outline-*` や `focus:ring-*` 等のTailwindユーティリティを重ねて再定義しない。`overflow: hidden` な一覧スクロール域内の行（`.mll-wrow` / `.mle-row`）だけ、リングが切り抜かれないよう `outline-offset` を `var(--focus-ring-offset-clipped)`（-2px）にする例外を個別に持つ。
 
 ## クラス命名
 

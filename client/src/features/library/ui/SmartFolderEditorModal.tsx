@@ -26,7 +26,7 @@ interface SmartFolderEditorModalProps {
 }
 
 const inputClass =
-  "h-8 rounded-[6px] border border-line bg-paper-1 px-2.5 font-jp text-[12px] text-ink-0 focus:border-acc focus:outline-none focus:ring-2 focus:ring-acc-soft";
+  "h-8 rounded-[6px] border border-line bg-paper-1 px-2.5 font-jp text-body text-ink-0 focus:border-acc";
 
 function DurationInput({
   rule,
@@ -171,7 +171,7 @@ export default function SmartFolderEditorModal({
               >
                 条件
               </h3>
-              <span className="font-jp text-[10px] text-ink-3">上から順に評価します</span>
+              <span className="font-jp text-caption text-ink-2">上から順に評価します</span>
             </div>
 
             <div className="mll-smart__rules gap-2 p-2.5">
@@ -302,7 +302,7 @@ export default function SmartFolderEditorModal({
                             })
                           }
                         />
-                        <span className="font-jp text-[10px] text-ink-3">
+                        <span className="font-jp text-caption text-ink-2">
                           複数のタグは、いずれかを含む作品に一致します（OR）
                         </span>
                       </div>
@@ -338,7 +338,7 @@ export default function SmartFolderEditorModal({
               条件を追加
             </Button>
             {draft.rules.length === 0 && (
-              <span className="font-jp text-[11px] text-ink-3">
+              <span className="font-jp text-secondary text-ink-2">
                 条件なし: すべての作品に一致します
               </span>
             )}

@@ -20,11 +20,11 @@ interface TagProps {
 }
 
 const TAG_BASE =
-  "group inline-flex h-5 items-center gap-[3px] whitespace-nowrap rounded-1 bg-paper-2 px-[7px] font-jp text-[10.5px] text-ink-1 hover:bg-paper-3";
+  "group inline-flex h-5 items-center gap-[3px] whitespace-nowrap rounded-1 bg-paper-2 px-[7px] font-jp text-secondary text-ink-1 hover:bg-paper-3";
 
 // 通常時は薄く、hover/focus時だけ強調する（誤操作の的にならないようにする）。
 const REMOVE_BUTTON =
-  "cursor-pointer bg-transparent p-0 text-[13px] leading-none text-ink-4 opacity-40 transition-opacity duration-150 group-hover:opacity-100 group-hover:text-ink-0 focus-visible:opacity-100 focus-visible:text-ink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-1";
+  "cursor-pointer bg-transparent p-0 text-[13px] leading-none text-ink-4 opacity-40 transition-opacity duration-150 group-hover:opacity-100 group-hover:text-ink-0 focus-visible:opacity-100 focus-visible:text-ink-0";
 
 function RemoveSlot({
   value,
@@ -113,7 +113,7 @@ export default function Tag({
 
   const content = (
     <>
-      <span className="font-mono text-[9.5px] uppercase text-ink-3">{catLabel}</span>
+      <span className="font-mono text-label uppercase text-ink-2">{catLabel}</span>
       <span className="font-medium" style={valueStyle}>
         {parsed.value}
       </span>

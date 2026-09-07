@@ -29,7 +29,7 @@ function TagValueChip({ value }: { value: string }) {
       title={value}
     >
       {prefixLabel && (
-        <span className="shrink-0 border-r border-line-soft px-[5px] py-[1px] font-sans text-[9px] font-semibold text-ink-3">
+        <span className="shrink-0 border-r border-line-soft px-[5px] py-[1px] font-sans text-label font-semibold text-ink-2">
           {prefixLabel}
         </span>
       )}

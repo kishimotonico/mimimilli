@@ -96,7 +96,7 @@ function NowPlayingNormalBody({
           </button>
 
           <div className="flex w-full min-w-0 shrink-0 flex-col items-center gap-1.5 text-center">
-            <div className="font-sans text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-3">
+            <div className="font-sans text-secondary font-semibold uppercase tracking-[0.16em] text-ink-2">
               {workTitle}
             </div>
             <h1 className="m-0 max-w-full text-balance font-jp text-[24px] font-semibold leading-[1.2] tracking-[-0.01em] text-ink-0">

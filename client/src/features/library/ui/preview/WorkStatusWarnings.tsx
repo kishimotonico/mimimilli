@@ -22,7 +22,7 @@ export function WorkStatusWarnings({ work, onEdit, onDelete }: WorkStatusWarning
             <p className="mle-prv__warn-path">{work.physicalPath}</p>
             <button
               type="button"
-              className="mt-1 w-fit rounded-pill bg-paper-2 px-2.5 py-1 font-sans text-[10.5px] font-medium text-[color:var(--r-coral)] hover:bg-paper-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
+              className="mt-1 w-fit rounded-pill bg-paper-2 px-2.5 py-1 font-sans text-[10.5px] font-medium text-[color:var(--r-coral)] hover:bg-paper-3"
               onClick={onDelete}
             >
               登録を解除
@@ -54,7 +54,7 @@ export function WorkStatusWarnings({ work, onEdit, onDelete }: WorkStatusWarning
             </p>
             <button
               type="button"
-              className="mt-1 w-fit rounded-pill bg-paper-2 px-2.5 py-1 font-sans text-[10.5px] font-medium text-ink-1 hover:bg-paper-3 hover:text-ink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
+              className="mt-1 w-fit rounded-pill bg-paper-2 px-2.5 py-1 font-sans text-[10.5px] font-medium text-ink-1 hover:bg-paper-3 hover:text-ink-0"
               onClick={onEdit}
             >
               連携設定を編集
@@ -73,7 +73,7 @@ export function WorkStatusWarnings({ work, onEdit, onDelete }: WorkStatusWarning
             </p>
             <button
               type="button"
-              className="mt-1 w-fit rounded-pill bg-paper-2 px-2.5 py-1 font-sans text-[10.5px] font-medium text-ink-1 hover:bg-paper-3 hover:text-ink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
+              className="mt-1 w-fit rounded-pill bg-paper-2 px-2.5 py-1 font-sans text-[10.5px] font-medium text-ink-1 hover:bg-paper-3 hover:text-ink-0"
               onClick={onEdit}
             >
               連携設定を編集
@@ -99,7 +99,7 @@ export function WorkStatusWarnings({ work, onEdit, onDelete }: WorkStatusWarning
             </p>
             <button
               type="button"
-              className="mt-1 w-fit rounded-pill bg-paper-2 px-2.5 py-1 font-sans text-[10.5px] font-medium text-ink-1 hover:bg-paper-3 hover:text-ink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
+              className="mt-1 w-fit rounded-pill bg-paper-2 px-2.5 py-1 font-sans text-[10.5px] font-medium text-ink-1 hover:bg-paper-3 hover:text-ink-0"
               onClick={onEdit}
             >
               連携設定を編集

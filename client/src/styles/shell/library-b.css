@@ -28,7 +28,8 @@
   padding: 6px 8px;
   border-radius: 4px;
   font-family: var(--font-jp);
-  font-size: 12px;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
   color: var(--ink-1);
   text-align: left;
   white-space: nowrap;
@@ -57,7 +58,8 @@
   gap: 7px;
   color: var(--ink-2);
   font-family: var(--font-sans);
-  font-size: 10px;
+  font-size: var(--fs-caption);
+  line-height: var(--lh-caption);
   white-space: nowrap;
 }
 .mll-grid-size input[type="range"] {
@@ -67,8 +69,9 @@
 }
 .mll-grid-size output {
   width: 34px;
-  color: var(--ink-3);
+  color: var(--ink-2);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
   text-align: right;
 }

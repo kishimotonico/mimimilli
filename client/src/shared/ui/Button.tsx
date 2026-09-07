@@ -46,8 +46,7 @@ export default function Button({
       disabled={disabled}
       className={cn(
         "inline-flex h-[26px] items-center gap-[5px] whitespace-nowrap rounded-pill px-[10px]",
-        "font-sans text-[11px] font-medium transition-colors",
-        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2",
+        "font-sans text-control font-medium transition-colors",
         stateClass(variant, active, disabled),
         className,
       )}

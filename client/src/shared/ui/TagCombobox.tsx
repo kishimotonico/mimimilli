@@ -144,7 +144,7 @@ export default function TagCombobox({
         placeholder={placeholder}
         className={cn(
           "h-8 w-full rounded-[6px] border border-line bg-paper-1 px-2.5 font-jp text-[12px] text-ink-0",
-          "placeholder:text-ink-4 focus:border-acc focus:outline-none focus:ring-2 focus:ring-acc-soft",
+          "placeholder:text-ink-4 focus:border-acc",
           disabled && "cursor-not-allowed text-ink-4",
         )}
         onChange={(event) => openWithInput(event.target.value)}
@@ -199,7 +199,7 @@ export default function TagCombobox({
                 title={option.value}
                 className={cn(
                   "flex min-h-7 w-full min-w-0 items-center gap-2 px-2.5 text-left font-jp text-[12px] text-ink-1",
-                  "hover:bg-paper-2 focus:bg-paper-2 focus:outline-none",
+                  "hover:bg-paper-2 focus:bg-paper-2",
                   isActive && "bg-acc-soft text-acc-ink",
                 )}
                 onMouseEnter={() => setActiveIndex(index)}
@@ -209,7 +209,7 @@ export default function TagCombobox({
                 {/* タグ名を主情報として省略記号+tooltipで表示し、「新規作成」は補足として控えめに添える */}
                 <span className="min-w-0 flex-1 truncate">{option.value}</span>
                 {option.kind === "create" && (
-                  <span className="shrink-0 font-mono text-[9px] uppercase tracking-wide text-ink-3">
+                  <span className="shrink-0 font-mono text-label uppercase tracking-wide text-ink-2">
                     新規作成
                   </span>
                 )}

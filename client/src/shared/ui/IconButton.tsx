@@ -65,7 +65,6 @@ export default function IconButton({
       disabled={disabled}
       className={cn(
         "inline-flex shrink-0 items-center justify-center transition-colors",
-        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2",
         BOX_CLASS[size],
         stateClass,
         className,

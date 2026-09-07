@@ -57,7 +57,7 @@ export default function ScanSidebar({
       </div>
 
       <div className="flex flex-col gap-1 border-t border-line-soft pt-2.5">
-        <p className="font-sans text-[9.5px] font-semibold tracking-[0.06em] text-ink-3 uppercase">
+        <p className="font-sans text-label font-semibold tracking-[0.06em] text-ink-2 uppercase">
           最終スキャン
         </p>
         <div className="relative flex min-h-[14px] flex-col gap-1.5">
@@ -143,7 +143,7 @@ function SidebarStatusScanning({ progress }: { progress: ScanProgress | null }) 
         <span className="font-mono text-[10.5px] text-ink-2">
           {progress ? scanPhaseLabel(progress.phase) : "準備中"}
         </span>
-        <span className="font-mono text-[10px] text-ink-3 tabular-nums">
+        <span className="font-mono text-caption text-ink-2 tabular-nums">
           {progress && progress.total > 0 ? `${progress.processed}/${progress.total}` : "…"}
         </span>
       </div>

@@ -27,7 +27,7 @@ interface WorkInfoDialogProps {
 function InfoRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex items-baseline gap-3 py-1.5">
-      <dt className="w-[96px] shrink-0 font-sans text-[11px] text-ink-3">{label}</dt>
+      <dt className="w-[96px] shrink-0 font-sans text-secondary text-ink-2">{label}</dt>
       <dd className="min-w-0 flex-1 break-words font-jp text-[12px] text-ink-0">{children}</dd>
     </div>
   );

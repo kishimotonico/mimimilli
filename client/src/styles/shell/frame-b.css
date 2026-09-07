@@ -25,7 +25,8 @@
   align-items: center;
   gap: 2px;
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
   color: var(--ink-1);
   padding: 0 8px;
   height: 28px;

@@ -26,7 +26,7 @@ import { apiErrorMessage } from "../../../shared/lib/apiError";
 import { createWork, fetchDlsiteInfoByCode } from "../api";
 
 const inputClass =
-  "h-8 min-w-0 w-full rounded-[6px] border border-line bg-paper-0 px-2.5 font-sans text-[12px] text-ink-0 placeholder:text-ink-4 focus:border-acc focus:outline-none focus:ring-2 focus:ring-acc-soft disabled:cursor-not-allowed disabled:text-ink-4";
+  "h-8 min-w-0 w-full rounded-[6px] border border-line bg-paper-0 px-2.5 font-sans text-body text-ink-0 placeholder:text-ink-4 focus:border-acc disabled:cursor-not-allowed disabled:text-ink-4";
 
 interface RegisterWorkDialogProps {
   folderPath: string;

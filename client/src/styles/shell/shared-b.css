@@ -7,9 +7,10 @@
 
 .mle-sect {
   font-family: var(--font-sans);
-  font-size: 10.5px;
+  font-size: var(--fs-label);
+  line-height: var(--lh-label);
   letter-spacing: 0.08em;
-  color: var(--ink-3);
+  color: var(--ink-2);
   text-transform: uppercase;
   font-weight: 600;
   display: flex;
@@ -24,8 +25,9 @@
 }
 .mle-sect .count {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
   letter-spacing: 0;
   text-transform: none;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }

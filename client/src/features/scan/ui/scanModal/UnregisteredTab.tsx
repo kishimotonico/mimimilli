@@ -178,7 +178,7 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
   return (
     <div className="flex flex-col gap-3">
       {candidates.length === 0 ? (
-        <p className="font-jp text-[12px] text-ink-3">未登録の候補はありません。</p>
+        <p className="font-jp text-body text-ink-2">未登録の候補はありません。</p>
       ) : (
         <>
           <p className="font-jp text-[11.5px] text-ink-2">
@@ -257,7 +257,7 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
                               if (event.key === "Enter") commitEdit();
                             }}
                             placeholder="RJコード"
-                            className="w-full min-w-0 rounded-[4px] border border-acc bg-paper-2 px-1.5 py-0.5 font-mono text-[10.5px] text-ink-0 outline-none"
+                            className="w-full min-w-0 rounded-[4px] border border-acc bg-paper-2 px-1.5 py-0.5 font-mono text-mono text-ink-0"
                           />
                         ) : (
                           <>
@@ -286,7 +286,7 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
                         )}
                       </td>
                       <td
-                        className="px-2.5 py-2 align-middle font-mono text-[10px] text-ink-3"
+                        className="px-2.5 py-2 align-middle font-mono text-caption text-ink-2"
                         title={parentFolder ?? undefined}
                       >
                         {parentFolder ? (

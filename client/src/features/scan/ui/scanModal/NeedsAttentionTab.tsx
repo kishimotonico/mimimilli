@@ -77,7 +77,7 @@ export default function NeedsAttentionTab(props: NeedsAttentionTabProps) {
   const rows = buildRows(props);
 
   if (rows.length === 0) {
-    return <p className="font-jp text-[12px] text-ink-3">要対応の項目はありません。</p>;
+    return <p className="font-jp text-body text-ink-2">要対応の項目はありません。</p>;
   }
 
   return (
@@ -107,7 +107,7 @@ export default function NeedsAttentionTab(props: NeedsAttentionTabProps) {
             {rows.map((row) => (
               <tr key={row.key}>
                 <td className="px-2.5 py-2 align-top text-ink-1 whitespace-nowrap">{row.kind}</td>
-                <td className="mll-selectable px-2.5 py-2 align-top break-all font-mono text-[10px] text-ink-3">
+                <td className="mll-selectable px-2.5 py-2 align-top break-all font-mono text-caption text-ink-2">
                   {row.target}
                 </td>
                 <td className="px-2.5 py-2 align-top text-ink-2">{row.detail}</td>

@@ -16,7 +16,7 @@ export default function ABRepeatBar({ abRepeat, onSetABPoint, onClearABRepeat }:
 
   return (
     <div className="mle-nowplaying__controls-ab flex items-center gap-2 whitespace-nowrap pt-2.5">
-      <span className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-ink-3">
+      <span className="font-mono text-label uppercase tracking-[0.08em] text-ink-2">
         A-Bリピート
       </span>
       <button
@@ -45,7 +45,7 @@ export default function ABRepeatBar({ abRepeat, onSetABPoint, onClearABRepeat }:
       </button>
       {(abRepeat.a !== null || abRepeat.b !== null) && (
         <>
-          <span className="font-mono text-[10.5px] text-ink-3">
+          <span className="font-mono text-mono text-ink-2">
             {abRepeat.a !== null ? formatTime(abRepeat.a) : "--:--"}
             {" – "}
             {abRepeat.b !== null ? formatTime(abRepeat.b) : "--:--"}

@@ -17,7 +17,7 @@ export default function NowPlayingTrackList({
     <div className="mle-nowplaying__tracklist-wrap">
       <div className="mle-nowplaying__tracklist-head">
         <b className="font-sans text-[13px] font-semibold text-ink-0">トラック</b>
-        <small className="font-mono text-[10.5px] text-ink-3">{tracks.length} 件</small>
+        <small className="font-mono text-mono text-ink-2">{tracks.length} 件</small>
       </div>
       <div
         className="mle-nowplaying__tracklist"
@@ -38,9 +38,7 @@ export default function NowPlayingTrackList({
                   isCurrent ? "bg-acc-soft" : "bg-transparent hover:bg-paper-2",
                 )}
               >
-                <span
-                  className={cn("font-mono text-[11px]", isCurrent ? "text-acc" : "text-ink-3")}
-                >
+                <span className={cn("font-mono text-mono", isCurrent ? "text-acc" : "text-ink-2")}>
                   {String(i + 1).padStart(2, "0")}
                 </span>
                 <span
@@ -51,7 +49,7 @@ export default function NowPlayingTrackList({
                 >
                   {t.title}
                 </span>
-                <span className="text-right font-mono text-[11px] text-ink-3">
+                <span className="text-right font-mono text-mono text-ink-2">
                   {t.end != null && t.start != null ? (formatDuration(t.end - t.start) ?? "") : ""}
                 </span>
               </button>

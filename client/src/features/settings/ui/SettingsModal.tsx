@@ -17,9 +17,9 @@ import { formatLastScanTime } from "../../../shared/lib/format";
 
 const SECTION_CLASS = "flex flex-col gap-2";
 const SECTION_LABEL_CLASS =
-  "font-sans text-[10.5px] font-semibold tracking-[0.08em] text-ink-3 uppercase";
+  "font-sans text-label font-semibold tracking-[0.08em] text-ink-2 uppercase";
 const SECTION_LABEL_NO_UPPERCASE_CLASS =
-  "font-sans text-[10.5px] font-semibold tracking-[0.08em] text-ink-3";
+  "font-sans text-label font-semibold tracking-[0.08em] text-ink-2";
 const ROW_CLASS = "flex items-center gap-2";
 const SECONDARY_BUTTON_CLASS =
   "h-[34px] cursor-pointer rounded-[6px] border border-line bg-paper-1 px-3 font-sans text-[12px] font-medium whitespace-nowrap text-ink-1";
@@ -120,7 +120,7 @@ export default function SettingsModal({
                 onChange={(e) => setFolderDraft(e.target.value)}
                 aria-label="ルートフォルダーのパス"
                 placeholder="ルートフォルダーのパスを入力"
-                className="h-[34px] flex-1 rounded-[6px] border border-acc bg-paper-0 px-3 font-mono text-[11px] text-ink-1 outline-none"
+                className="h-[34px] flex-1 rounded-[6px] border border-acc bg-paper-0 px-3 font-mono text-mono text-ink-1"
               />
               <button
                 type="button"

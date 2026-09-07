@@ -38,7 +38,7 @@ export default class RootErrorBoundary extends Component<Props, State> {
             {error.stack ? (
               <details className="w-full text-left">
                 <summary className="cursor-pointer text-[12px] text-ink-2">技術的な詳細</summary>
-                <pre className="mll-selectable mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all text-left text-[11px] text-ink-3">
+                <pre className="mll-selectable mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all text-left text-secondary text-ink-2">
                   {error.stack}
                 </pre>
               </details>

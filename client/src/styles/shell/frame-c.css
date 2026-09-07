@@ -76,7 +76,8 @@
   top: 2px;
   right: 2px;
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
   font-weight: 600;
   background: var(--acc);
   color: var(--paper-1);
@@ -184,9 +185,10 @@
   border-bottom: 1px solid var(--line-soft);
   background: var(--paper-1);
   font-family: var(--font-sans);
-  font-size: 10.5px;
+  font-size: var(--fs-label);
+  line-height: var(--lh-label);
   letter-spacing: 0.06em;
-  color: var(--ink-3);
+  color: var(--ink-2);
   text-transform: uppercase;
   font-weight: 600;
   position: sticky;
@@ -195,8 +197,9 @@
 }
 .mle-col__hd .count {
   font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--ink-3);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  color: var(--ink-2);
   margin-left: auto;
 }
 .mle-col__list {

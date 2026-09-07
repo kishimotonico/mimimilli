@@ -106,7 +106,7 @@ export default function PlayerTransportControls({
           onChange={(e) => onSetVolume(Number(e.target.value))}
           className="w-20 cursor-pointer accent-[var(--ink-2)]"
         />
-        <span className="w-[3ch] text-right font-mono text-[11px] tabular-nums text-ink-3">
+        <span className="w-[3ch] text-right font-mono text-mono tabular-nums text-ink-2">
           {volume}
         </span>
       </div>

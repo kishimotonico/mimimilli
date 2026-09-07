@@ -32,7 +32,8 @@
   display: grid;
   place-items: center;
   font-family: var(--font-sans);
-  font-size: 12px;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
   font-weight: 600;
   letter-spacing: -0.04em;
 }
@@ -58,7 +59,8 @@
   border: 1px solid var(--line);
   background: var(--paper-0);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
   color: var(--ink-1);
 }
 .mll-bar__pulse .dot {
@@ -98,7 +100,8 @@
   background: var(--paper-2);
   border-radius: 8px;
   color: var(--ink-2);
-  font-size: 12px;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
   min-width: 280px;
 }
 .mll-bar__search:focus-within {
@@ -113,7 +116,8 @@
 }
 .mll-bar__search .kbd {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
   color: var(--ink-2);
   background: var(--paper-1);
   border-radius: 4px;

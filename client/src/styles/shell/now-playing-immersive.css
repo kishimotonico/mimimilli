@@ -99,7 +99,8 @@
 
 .mle-nowplaying__immersive-eyebrow {
   font-family: var(--font-sans);
-  font-size: 10px;
+  font-size: var(--fs-label);
+  line-height: var(--lh-label);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.16em;

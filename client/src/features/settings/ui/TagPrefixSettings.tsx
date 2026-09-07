@@ -15,7 +15,7 @@ import { TAG_QUERY_KEYS } from "../../../entities/tag/queryKeys";
 import { I } from "../../../shared/ui/Icon";
 
 const SECTION_LABEL_CLASS =
-  "font-sans text-[10.5px] font-semibold tracking-[0.08em] text-ink-3 uppercase";
+  "font-sans text-label font-semibold tracking-[0.08em] text-ink-2 uppercase";
 
 const TOGGLE_LABEL_CLASS =
   "inline-flex items-center gap-1 font-sans text-[11px] text-ink-2 cursor-pointer whitespace-nowrap";
@@ -96,7 +96,7 @@ export default function TagPrefixSettings() {
       {/* 定義一覧 */}
       <div className="flex max-h-[180px] flex-col overflow-y-auto rounded-[6px] border border-line-soft bg-paper-0">
         {prefixes.length === 0 && (
-          <span className="px-3 py-2.5 text-[11.5px] text-ink-3">prefix 定義がありません</span>
+          <span className="px-3 py-2.5 text-secondary text-ink-2">prefix 定義がありません</span>
         )}
         {prefixes.map((p) => (
           <div
@@ -105,7 +105,7 @@ export default function TagPrefixSettings() {
           >
             <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-ink-1">
               {p.label}
-              <span className="ml-1.5 font-mono text-[10px] text-ink-3">{p.prefix}/</span>
+              <span className="ml-1.5 font-mono text-caption text-ink-2">{p.prefix}/</span>
             </span>
             <label className={TOGGLE_LABEL_CLASS}>
               <input
@@ -182,7 +182,7 @@ export default function TagPrefixSettings() {
       {/* 未登録 prefix のサジェスト */}
       {candidates.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[10.5px] text-ink-3">データ内の未登録 prefix:</span>
+          <span className="text-caption text-ink-2">データ内の未登録 prefix:</span>
           {candidates.map((c) => (
             <button
               key={c.prefix}
@@ -202,7 +202,7 @@ export default function TagPrefixSettings() {
             >
               <I.add size={10} />
               {c.prefix}
-              <span className="font-mono text-ink-3">{c.count}</span>
+              <span className="font-mono text-ink-2">{c.count}</span>
             </button>
           ))}
         </div>

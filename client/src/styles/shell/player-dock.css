@@ -70,8 +70,9 @@
 }
 .mle-bar1__work {
   font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--ink-3);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  color: var(--ink-2);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -83,7 +84,8 @@
   min-width: 0;
   max-width: 100%;
   font-family: var(--font-jp);
-  font-size: 10.5px;
+  font-size: var(--fs-caption);
+  line-height: var(--lh-caption);
   color: var(--r-coral);
   white-space: nowrap;
   overflow: hidden;
@@ -148,8 +150,9 @@
   margin-left: 8px;
   min-width: 3ch;
   font-family: var(--font-mono);
-  font-size: 10.5px;
-  color: var(--ink-3);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  color: var(--ink-2);
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
@@ -240,7 +243,8 @@
   background: var(--ink-0);
   color: var(--paper-1);
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
   font-weight: 600;
   padding: 3px 7px;
   border-radius: 5px;

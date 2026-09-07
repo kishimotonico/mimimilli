@@ -34,13 +34,13 @@ export default function ScanResultWorksTable({
   }
 
   if (totalIds === 0) {
-    return <p className="font-jp text-[12px] text-ink-3">{emptyMessage}</p>;
+    return <p className="font-jp text-body text-ink-2">{emptyMessage}</p>;
   }
 
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-baseline justify-between gap-2">
-        <p className="font-sans text-[10.5px] font-semibold tracking-[0.06em] text-ink-3 uppercase">
+        <p className="font-sans text-label font-semibold tracking-[0.06em] text-ink-2 uppercase">
           {caption}
         </p>
         <span className="font-mono text-[10px] text-ink-4 tabular-nums">
@@ -55,7 +55,7 @@ export default function ScanResultWorksTable({
           <col className="w-[12%]" />
         </colgroup>
         <thead>
-          <tr className="border-b border-line-soft text-left font-sans text-[10px] font-semibold tracking-[0.04em] whitespace-nowrap text-ink-3 uppercase">
+          <tr className="border-b border-line-soft text-left font-sans text-label font-semibold tracking-[0.04em] whitespace-nowrap text-ink-2 uppercase">
             <th className="px-2 py-1.5 font-semibold">タイトル</th>
             <th className="px-2 py-1.5 font-semibold">フォルダー</th>
             <th className="px-2 py-1.5 font-semibold">外部連携</th>
@@ -99,7 +99,7 @@ function WorkRow({ work, edit }: { work: WorkListItem; edit: InlineTitleEdit }) 
               }
             }}
             className={cn(
-              "min-w-0 w-full rounded-[4px] border bg-paper-2 px-2 py-0.5 font-jp text-[12px] text-ink-0 outline-none disabled:opacity-60",
+              "min-w-0 w-full rounded-[4px] border bg-paper-2 px-2 py-0.5 font-jp text-body text-ink-0 disabled:opacity-60",
               editError ? "border-[var(--r-coral)]" : "border-acc",
             )}
           />
@@ -122,7 +122,7 @@ function WorkRow({ work, edit }: { work: WorkListItem; edit: InlineTitleEdit }) 
           </span>
         )}
       </td>
-      <td className="min-w-0 px-2 py-1.5 font-mono text-[10.5px] text-ink-3">
+      <td className="min-w-0 px-2 py-1.5 font-mono text-mono text-ink-2">
         {/* 先頭側を省略し末尾（作品に近い部分）を残す。dir="rtl" + text-left の組み合わせで実現する */}
         <span dir="rtl" title={folderDisplay} className="block truncate text-left">
           {folderDisplay}

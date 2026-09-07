@@ -34,7 +34,7 @@ function DlsiteBulkCancelButton({ onClick }: { onClick: () => void }) {
       inert={!isPresent}
       {...v}
       onClick={onClick}
-      className="inline-flex h-7 items-center justify-center gap-1 rounded-[6px] border border-[color-mix(in_oklch,var(--r-coral)_45%,transparent)] bg-[color-mix(in_oklch,var(--r-coral)_10%,transparent)] px-2.5 font-sans text-[11px] font-medium text-ink-0 transition-colors hover:bg-[color-mix(in_oklch,var(--r-coral)_16%,transparent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
+      className="inline-flex h-7 items-center justify-center gap-1 rounded-[6px] border border-[color-mix(in_oklch,var(--r-coral)_45%,transparent)] bg-[color-mix(in_oklch,var(--r-coral)_10%,transparent)] px-2.5 font-sans text-[11px] font-medium text-ink-0 transition-colors hover:bg-[color-mix(in_oklch,var(--r-coral)_16%,transparent)]"
     >
       <I.x size={11} />
       中止
@@ -143,7 +143,7 @@ export default function TopBar({ onOpenScan, onSettings, notificationBell }: Top
       )}
 
       {scanning && (
-        <span className="font-mono text-[10.5px] text-ink-3" aria-live="polite">
+        <span className="font-mono text-mono text-ink-2" aria-live="polite">
           {scanProgressLabel ?? "スキャン中..."}
         </span>
       )}
@@ -174,7 +174,7 @@ export default function TopBar({ onOpenScan, onSettings, notificationBell }: Top
       {dlsiteBulkActive && (
         <>
           <span
-            className="flex min-w-0 items-center gap-1 text-[10.5px] text-ink-3"
+            className="flex min-w-0 items-center gap-1 text-caption text-ink-2"
             aria-live="polite"
           >
             <span className="whitespace-nowrap font-mono">{dlsiteBulkProgressLabel}</span>

@@ -94,7 +94,7 @@ export default function NotificationBell({
           className="absolute top-[calc(100%+8px)] right-0 z-30 w-[340px] max-w-[calc(100vw-32px)] overflow-hidden rounded-[10px] border border-line-soft bg-paper-1 shadow-pop"
         >
           {isEmpty ? (
-            <p className="px-3.5 py-4 text-center text-[11.5px] text-ink-3">
+            <p className="px-3.5 py-4 text-center text-caption text-ink-2">
               対応が必要な通知はありません
             </p>
           ) : (
@@ -133,8 +133,8 @@ export default function NotificationBell({
               {showUnlinkedRow && (
                 <div className="flex items-center justify-between gap-2 px-3.5 py-2.5">
                   <div className="min-w-0">
-                    <p className="text-[12px] text-ink-0">DLsite未連携</p>
-                    <p className="font-mono text-[10.5px] text-ink-3" aria-live="polite">
+                    <p className="text-body text-ink-0">DLsite未連携</p>
+                    <p className="font-mono text-mono text-ink-2" aria-live="polite">
                       {dlsiteBulkActive
                         ? dlsiteBulkProgress
                           ? `取得中 (${dlsiteBulkProgress.processed}/${dlsiteBulkProgress.total})`
@@ -154,16 +154,16 @@ export default function NotificationBell({
               {scanResult && (
                 <button
                   type="button"
-                  className="block w-full px-3.5 py-2.5 text-left hover:bg-paper-2 focus-visible:outline focus-visible:-outline-offset-2 focus-visible:outline-2 focus-visible:outline-acc"
+                  className="block w-full px-3.5 py-2.5 text-left hover:bg-paper-2 focus-visible:-outline-offset-2"
                   onClick={() => {
                     setIsOpen(false);
                     onOpenScanResult();
                   }}
                 >
-                  <p className="mb-1.5 font-sans text-[11px] font-medium text-ink-1">
+                  <p className="mb-1.5 font-sans text-secondary font-medium text-ink-1">
                     直近のスキャン結果
                   </p>
-                  <dl className="grid grid-cols-2 gap-x-3 gap-y-1 font-mono text-[10.5px]">
+                  <dl className="grid grid-cols-2 gap-x-3 gap-y-1 font-mono text-mono">
                     <ScanStat label="登録済み" value={scanResult.registered} />
                     <ScanStat label="新規" value={scanResult.insertedWorkIds.length} />
                     <ScanStat label="エラー" value={scanResult.errors} />
@@ -195,14 +195,14 @@ function NotifRow({
     <button
       type="button"
       role="menuitem"
-      className="flex items-center justify-between gap-2 px-3.5 py-2.5 text-left hover:bg-paper-2 focus-visible:outline focus-visible:-outline-offset-2 focus-visible:outline-2 focus-visible:outline-acc"
+      className="flex items-center justify-between gap-2 px-3.5 py-2.5 text-left hover:bg-paper-2 focus-visible:-outline-offset-2"
       onClick={onClick}
     >
-      <span className="flex items-center gap-1.5 text-[12px] text-ink-0">
+      <span className="flex items-center gap-1.5 text-body text-ink-0">
         <I.err size={13} style={{ color: iconColor }} />
         {label}
       </span>
-      <span className="flex items-center gap-1 font-mono text-[11px] text-ink-2">
+      <span className="flex items-center gap-1 font-mono text-mono text-ink-2">
         {count}件
         <I.chev size={12} className="text-ink-3" />
       </span>
@@ -213,7 +213,7 @@ function NotifRow({
 function ScanStat({ label, value }: { label: string; value: number }) {
   return (
     <div className="flex items-center justify-between gap-2">
-      <dt className="text-ink-3">{label}</dt>
+      <dt className="text-ink-2">{label}</dt>
       <dd className="text-ink-1">{value}</dd>
     </div>
   );

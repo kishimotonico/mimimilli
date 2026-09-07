@@ -37,7 +37,7 @@ body * {
   height: 100%;
   background: var(--paper-0);
   color: var(--ink-0);
-  font-size: 12.5px;
+  font-size: var(--fs-body);
   line-height: 1.5;
   overflow: hidden;
 }
@@ -57,7 +57,6 @@ body input {
   color: inherit;
   background: transparent;
   border: 0;
-  outline: 0;
   padding: 0;
 }
 body a {
@@ -67,4 +66,12 @@ body a {
 body ul,
 body ol {
   list-style: none;
+}
+/* フォーカスリングの共通規約（tokens.cssの--focus-ring/--focus-ring-offset）。
+   個別コンポーネントでoutline/ring系のTailwindユーティリティを重ねない。
+   overflow: hidden で切り抜かれる行は outline-offset を負値にする例外だけ
+   .mle-row/.mll-wrow等で個別に上書きする。 */
+body :is(button, a, input, textarea, select, [tabindex]):focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
 }

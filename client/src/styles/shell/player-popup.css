@@ -81,7 +81,8 @@
   background: oklch(20% 0.02 70 / 0.5);
   color: var(--paper-1);
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
   font-weight: 700;
   opacity: 0.55;
   transition:
@@ -126,7 +127,8 @@
   padding: 6px 8px;
   border-radius: 4px;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
   font-weight: 600;
   color: var(--ink-1);
   text-align: left;
@@ -191,8 +193,9 @@
 }
 .mle-popup__work {
   font-family: var(--font-mono);
-  font-size: 10.5px;
-  color: var(--ink-3);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  color: var(--ink-2);
   margin-top: 2px;
   white-space: nowrap;
   overflow: hidden;
@@ -204,7 +207,8 @@
   justify-content: center;
   gap: 4px;
   font-family: var(--font-jp);
-  font-size: 10.5px;
+  font-size: var(--fs-caption);
+  line-height: var(--lh-caption);
   color: var(--r-coral);
   margin-top: 2px;
   white-space: nowrap;
@@ -250,8 +254,9 @@
   display: flex;
   justify-content: space-between;
   font-family: var(--font-mono);
-  font-size: 10.5px;
-  color: var(--ink-3);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  color: var(--ink-2);
   margin-top: -4px;
 }
 .mle-popup__controls {
@@ -304,8 +309,9 @@
 .mle-popup__volval {
   min-width: 3ch;
   font-family: var(--font-mono);
-  font-size: 10.5px;
-  color: var(--ink-3);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  color: var(--ink-2);
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
@@ -321,7 +327,8 @@
   background: var(--paper-2);
   color: var(--ink-1);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
   font-weight: 600;
 }
 .mle-ratepill:hover {

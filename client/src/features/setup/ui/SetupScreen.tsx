@@ -72,7 +72,7 @@ export default function SetupScreen({ onComplete }: SetupScreenProps) {
               value={path}
               onChange={(e) => setPath(e.target.value)}
               placeholder="/Users/yourname/Music/ASMR"
-              className="min-w-0 flex-1 border-none bg-transparent font-mono text-xs text-ink-0 outline-none"
+              className="min-w-0 flex-1 border-none bg-transparent font-mono text-xs text-ink-0"
               disabled={scanning}
             />
           </div>
