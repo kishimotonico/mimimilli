@@ -45,9 +45,19 @@ interface EllipsisSpineProps {
 }
 
 /** 表示上限を超えた中間祖先を畳んだ背表紙。クリックで一覧メニューを開く。
+ *
  *  メニューは幅アニメーション・overflow:hiddenを持つ .mle-colstack の外
- *  （.mle-colstack-anchor）に置く。同じ要素の子だと、開いた瞬間に46px幅の
- *  ボックスへ視覚的にクリップされてしまう。 */
+ *  （.mle-colstack-anchor）に置く。理由: メニューを .mle-colstack の子のまま
+ *  開くと、開いた直後の「先頭項目へ.focus()」がブラウザ標準のscroll-into-view
+ *  （フォーカスした要素を含む祖先スクロールコンテナを自動スクロールする挙動）を
+ *  誘発する。メニュー幅（160px）は.mle-colstackの幅（46px）を超えて描画される
+ *  ため、overflow:hiddenでも.mle-colstack自身がスクロール対象になり、
+ *  scrollLeftが0→109pxへ動いてしまう（実測）。CSS上の`left:51px`は変わらないため
+ *  `getComputedStyle().left`は正しい値を返す一方、実際の描画位置は
+ *  `left - scrollLeft`（51-109=-58px）だけ左にずれる。
+ *  対処は2段構え: (1) 先頭項目へのfocusは`{preventScroll:true}`で自動スクロール
+ *  自体を止める、(2) メニューをoverflow:hiddenな要素の外に置き、万一
+ *  preventScrollを外しても祖先がスクロール対象にならない構造にする。 */
 function EllipsisSpine({ collapsed, onNavigate }: EllipsisSpineProps) {
   const { colstackWidth } = useMotionVariants();
   const isPresent = useIsPresent();
@@ -65,7 +75,7 @@ function EllipsisSpine({ collapsed, onNavigate }: EllipsisSpineProps) {
   useEffect(() => {
     if (!open) return;
     const items = anchorRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]');
-    items?.[0]?.focus();
+    items?.[0]?.focus({ preventScroll: true });
   }, [open]);
 
   const handleMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
