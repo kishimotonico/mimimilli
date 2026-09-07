@@ -303,10 +303,7 @@ describe("PlayerController scenarios", () => {
   });
 
   it("error状態以外でのretryRequestedは何もしない", () => {
-    const result = scenario([
-      { type: "startRequested", item: item() },
-      { type: "retryRequested" },
-    ]);
+    const result = scenario([{ type: "startRequested", item: item() }, { type: "retryRequested" }]);
 
     expect(result.commands).toEqual([]);
   });

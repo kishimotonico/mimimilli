@@ -79,9 +79,7 @@ describe("GlobalToast", () => {
 
     renderGlobalToast(store, false, vi.fn(), vi.fn(), onRetrySkippedTrack);
 
-    expect(
-      screen.getByText("「Track 1」を読み込めなかったためスキップしました"),
-    ).toBeTruthy();
+    expect(screen.getByText("「Track 1」を読み込めなかったためスキップしました")).toBeTruthy();
     fireEvent.click(screen.getByText("このトラックを再試行"));
     expect(onRetrySkippedTrack).toHaveBeenCalledWith(0);
   });

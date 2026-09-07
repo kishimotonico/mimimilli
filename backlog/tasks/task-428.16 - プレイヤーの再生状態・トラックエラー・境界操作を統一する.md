@@ -4,7 +4,7 @@ title: プレイヤーの再生状態・トラックエラー・境界操作を�
 status: To Do
 assignee: []
 created_date: '2026-09-07 09:08'
-updated_date: '2026-09-07 19:56'
+updated_date: '2026-09-07 20:16'
 labels:
   - ui
   - player
@@ -35,10 +35,10 @@ TASK-428.2 のトースト契約（action無し5秒 / action付き10秒、hover�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 paused・loading・error中にplaying用パルスを表示しない
-- [ ] #2 トラックエラーに対象・理由・可能な再試行・閉じる操作を表示する
-- [ ] #3 前後境界のdisabled状態と理由がバー・popup・再生中一覧で一致する
-- [ ] #4 再生中一覧のdurationが作品詳細と同じformatterを使う
-- [ ] #5 pnpm test:smokeに新規失敗がない
-- [ ] #6 再生速度を再生中タブのミニコントロール（通常・没入）で確認・変更でき、速度ボタンが現在値ラベルを常時表示する
+- [x] #1 paused・loading・error中にplaying用パルスを表示しない
+- [x] #2 トラックエラーに対象・理由・可能な再試行・閉じる操作を表示する
+- [x] #3 前後境界のdisabled状態と理由がバー・popup・再生中一覧で一致する
+- [x] #4 再生中一覧のdurationが作品詳細と同じformatterを使う
+- [x] #5 pnpm test:smokeに新規失敗がない
+- [x] #6 再生速度を再生中タブのミニコントロール（通常・没入）で確認・変更でき、速度ボタンが現在値ラベルを常時表示する
 <!-- AC:END -->
