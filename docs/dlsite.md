@@ -229,4 +229,4 @@ importはHTML snapshotを成功記録として書き直すため、取り込ん�
 - `DELETE /dlsite/bulk` — 実行中の一括取得をキャンセル（実行中ジョブがなければ404）
 - `GET /dlsite/events` — 一括取得の進捗をSSEで配信。ジョブ実行中に接続すると直近の進捗を再送し、実行中でなければ直近の完了/エラーを1件返す
 
-一括取得ジョブは `dlsiteProgress.ts` のFIFOキューで直列実行するが、投入経路によって挙動が非対称になっている。スキャン完了後の自動起動（`scanJobManager.ts`、`mode: "new"`）は `enqueueDlsiteJob` を直接呼ぶため、実行中のジョブがあってもキューに積まれ、順番に処理される。一方、手動の `POST /dlsite/bulk` は先に `isDlsiteJobInProgress()` を確認し、実行中ならキューに積まれずconflictエラーで即座に弾かれる。
+一括取得ジョブは `DlsiteJobManager` のFIFOキューで直列実行するが、投入経路によって挙動が非対称になっている。スキャン完了・候補登録の自動起動（`mode: "new"`）は `dlsiteJobs.enqueue()` を直接呼ぶため、実行中のジョブがあってもキューに積まれ、順番に処理される。スキャン完了時の配線は `app.ts` が `ScanJobManager` のコンストラクタへ渡す完了コールバックで行い（`ScanJobManager` は `DlsiteJobManager` を直接知らない）、`result.insertedWorkIds` が1件以上あるときだけ `enqueue("new", insertedWorkIds)` を呼ぶ。一方、手動の `POST /dlsite/bulk` は先に `isDlsiteJobInProgress()` を確認し、実行中ならキューに積まれずconflictエラーで即座に弾かれる。
