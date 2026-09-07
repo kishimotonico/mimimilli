@@ -400,7 +400,9 @@ export default function LibraryView({
                           isFetchingNextPage={result.isFetchingNextPage}
                           onLoadMore={() => void result.fetchNextPage()}
                           onWorkSelect={nav.selectWork}
+                          onWorkPlay={(work) => onPlay(work, 0)}
                           onClearSearch={() => setSearchQuery("")}
+                          onDeselect={() => nav.selectWork(null)}
                           isSmartFolder={Boolean(activeSmartFolder)}
                           onEditSmartFolderRules={handleEditSmartFolder}
                           onClearAllFilters={nav.clearTags}
