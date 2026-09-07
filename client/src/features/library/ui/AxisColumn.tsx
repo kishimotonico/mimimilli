@@ -26,6 +26,9 @@ interface AxisRow {
   id: AxisId;
   name: string;
   icon: IconName;
+  /** 通常件数（.count、mono・薄灰）。要対応を示すbadgeとは別の意味で併存させる */
+  count?: number;
+  /** 要対応の強調表示（.badge、colored pill）。現状はエラービュー行のみが持つ */
   badge?: number;
   isAction?: boolean;
 }
@@ -35,8 +38,16 @@ interface AxisColumnProps {
   tagPrefixes: TagPrefix[];
   smartFolders: SmartFolder[];
   selectedTags: NormalizedTag[];
+  /** 「すべての作品」行の件数 */
+  libraryTotal?: number;
   /** エラービュー（status !== "ok"）の件数。0またはundefined（未取得）の間は軸レールから隠す */
   errorViewCount?: number;
+  /** 「最近再生」「最近追加」「お気に入り」行の件数 */
+  viewCounts?: { recent?: number; added?: number; fav?: number };
+  /** 分類軸・タグ軸・年軸行の件数（無条件集計での値の個数、TASK-428.14と同じ集計基準） */
+  facetAxisValueCounts?: Record<string, number | undefined>;
+  /** スマートフォルダー行の件数（チップ絞り込み前のルール一致数、TASK-428.11と同じ意味） */
+  smartFolderMatchCounts?: Record<string, number | undefined>;
   /** ライブラリ全体の統計。軸レール下部に常時表示する */
   stats: CollectionStatsDisplay;
   /** 分類軸の元になる GET /tag-prefixes の取得失敗。無言でCV/サークル等の行が
@@ -94,6 +105,7 @@ function AxisRowItem({
         <Ic size={14} />
       </span>
       <span className="nm">{ax.name}</span>
+      {ax.count != null && <span className="count">{ax.count}</span>}
       {ax.badge != null && <span className="badge">{ax.badge}</span>}
       {!ax.isAction && (
         <span className="chev">
@@ -109,7 +121,11 @@ export default function AxisColumn({
   tagPrefixes,
   smartFolders,
   selectedTags,
+  libraryTotal,
   errorViewCount,
+  viewCounts,
+  facetAxisValueCounts,
+  smartFolderMatchCounts,
   stats,
   isTagPrefixesError,
   onSelectAxis,
@@ -119,10 +135,23 @@ export default function AxisColumn({
   onNewSmartFolder,
   onRetryTagPrefixes,
 }: AxisColumnProps) {
+  const viewCountsById: Partial<Record<AxisId, number>> = {
+    all: libraryTotal,
+    recent: viewCounts?.recent,
+    added: viewCounts?.added,
+    fav: viewCounts?.fav,
+  };
   const viewAxisRows = buildViewAxisRows()
     .filter((ax) => ax.id !== "error" || !!errorViewCount)
-    .map((ax) => (ax.id === "error" ? { ...ax, badge: errorViewCount } : ax));
-  const facetAxisRows = buildFacetAxisRows(tagPrefixes);
+    .map((ax) =>
+      ax.id === "error"
+        ? { ...ax, badge: errorViewCount }
+        : { ...ax, count: viewCountsById[ax.id] },
+    );
+  const facetAxisRows = buildFacetAxisRows(tagPrefixes).map((ax) => ({
+    ...ax,
+    count: facetAxisValueCounts?.[ax.id],
+  }));
   const {
     openKey: overlayAxis,
     openAnchorEl,
@@ -191,13 +220,23 @@ export default function AxisColumn({
         <div className="mll-axisgroup">
           <div className="mll-axisgroup__hd">スマートフォルダー</div>
           {smartFolders.map((sf) =>
-            renderRow({ id: `smart-${sf.id}` as AxisId, name: sf.name, icon: "gridS" }),
+            renderRow({
+              id: `smart-${sf.id}` as AxisId,
+              name: sf.name,
+              icon: "gridS",
+              count: smartFolderMatchCounts?.[sf.id],
+            }),
           )}
-          <button type="button" className="mll-axis is-action" onClick={onNewSmartFolder}>
+          <button
+            type="button"
+            className="mll-axis is-action"
+            title="新規スマートフォルダーを作成"
+            onClick={onNewSmartFolder}
+          >
             <span className="ic">
               <I.add size={14} />
             </span>
-            <span className="nm">+ 新規スマートフォルダー</span>
+            <span className="nm">新規作成</span>
           </button>
         </div>
       </div>

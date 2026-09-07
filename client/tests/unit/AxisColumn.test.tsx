@@ -2,7 +2,7 @@ import { describe, expect, it, vi, afterEach } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { TagPrefix } from "@mimimilli/shared";
+import type { SmartFolder, TagPrefix } from "@mimimilli/shared";
 import AxisColumn from "../../src/features/library/ui/AxisColumn";
 
 afterEach(() => {
@@ -12,6 +12,10 @@ afterEach(() => {
 
 const PREFIXES: TagPrefix[] = [
   { prefix: "cv", label: "CV", color: "cv", showAsAxis: true, protected: true },
+];
+
+const SMART_FOLDERS: SmartFolder[] = [
+  { id: "sf1", name: "長時間ASMR", rules: [], sort: "added-desc", createdAt: "" },
 ];
 
 function renderAxisColumn(props: Partial<React.ComponentProps<typeof AxisColumn>>) {
@@ -180,5 +184,46 @@ describe("AxisColumn", () => {
     });
     // 新パネルが開いたまま維持されている（閉じていない）。
     expect(screen.getByLabelText("追加日の値を検索")).toBeTruthy();
+  });
+});
+
+describe("AxisColumn の件数表示（TASK-428.22）", () => {
+  it("ビュー軸・分類軸・スマートフォルダーの各行に件数(.count)を表示する（AC#1）", () => {
+    renderAxisColumn({
+      tagPrefixes: PREFIXES,
+      smartFolders: SMART_FOLDERS,
+      libraryTotal: 42,
+      viewCounts: { recent: 3, added: 5, fav: 7 },
+      facetAxisValueCounts: { cv: 12 },
+      smartFolderMatchCounts: { sf1: 9 },
+    });
+
+    expect(screen.getByRole("button", { name: /すべての作品/ }).textContent).toContain("42");
+    expect(screen.getByRole("button", { name: /最近再生/ }).textContent).toContain("3");
+    expect(screen.getByRole("button", { name: /最近追加/ }).textContent).toContain("5");
+    expect(screen.getByRole("button", { name: /お気に入り/ }).textContent).toContain("7");
+    expect(screen.getByRole("button", { name: /^CV/ }).textContent).toContain("12");
+    expect(screen.getByRole("button", { name: /長時間ASMR/ }).textContent).toContain("9");
+  });
+
+  it("件数未取得の行は.countを出さない（0との区別）", () => {
+    renderAxisColumn({});
+
+    expect(screen.getByRole("button", { name: /すべての作品/ }).querySelector(".count")).toBeNull();
+  });
+
+  it("エラー行は通常件数(.count)ではなく要対応badge(.badge)を持つ（AC#2）", () => {
+    renderAxisColumn({ errorViewCount: 4 });
+
+    const errorRow = screen.getByRole("button", { name: /エラー/ });
+    expect(errorRow.querySelector(".badge")?.textContent).toBe("4");
+    expect(errorRow.querySelector(".count")).toBeNull();
+  });
+
+  it("新規作成行はプラス記号が重複せずラベルが省略されない（AC#3）", () => {
+    renderAxisColumn({});
+
+    const newFolderButton = screen.getByRole("button", { name: "新規作成" });
+    expect(newFolderButton.textContent).not.toContain("+");
   });
 });

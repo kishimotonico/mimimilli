@@ -105,7 +105,11 @@ export default function LibraryView({
   );
 
   const {
+    libraryTotal,
     errorViewCount,
+    viewCounts,
+    facetAxisValueCounts,
+    smartFolderMatchCounts,
     libraryStats,
     facetItems,
     isFacetLoading,
@@ -265,7 +269,11 @@ export default function LibraryView({
         onRetryTagPrefixes={refetchTagPrefixes}
         smartFolders={smartFolders}
         selectedTags={nav.selectedTags}
+        libraryTotal={libraryTotal}
         errorViewCount={errorViewCount}
+        viewCounts={viewCounts}
+        facetAxisValueCounts={facetAxisValueCounts}
+        smartFolderMatchCounts={smartFolderMatchCounts}
         stats={libraryStats}
         onSelectAxis={nav.setAxis}
         onToggleTag={nav.toggleTag}
