@@ -157,11 +157,16 @@ export default function FilesView({ rootFolder, onPlayFile, onTogglePlay }: File
         mediaKind: null,
         preview: null,
       };
-  const fileSelection =
-    !loadError && nav.selectedPath && nav.selectedPath !== nav.cwd
-      ? (cwdEntries.find((e) => e.path === nav.selectedPath) ?? null)
-      : null;
-  const previewEntry = fileSelection ?? cwdFolderEntry;
+  const hasSelection = !loadError && nav.selectedPath != null && nav.selectedPath !== nav.cwd;
+  const fileSelection = hasSelection
+    ? (cwdEntries.find((e) => e.path === nav.selectedPath) ?? null)
+    : null;
+  // ディレクトリ自体は正常に取得できたが、選択中パスがその中に存在しない
+  // （ライブラリのエラー詳細・スキャン要対応の「Filesで開く」で移動・削除済みの対象を
+  // 指すことがある）。この場合もフォルダーへ黙って差し替えず、対象なしを表示する
+  // （openPathInFilesAtom経由での到達を含む。TASK-428.18）。
+  const selectionMissing = hasSelection && !cwdQuery.isPending && fileSelection == null;
+  const previewEntry = selectionMissing ? null : (fileSelection ?? cwdFolderEntry);
   const folderEntries = previewEntry?.isDir ? cwdEntries : null;
 
   const hasAncestors = nav.relPath.length >= 1;
@@ -224,6 +229,8 @@ export default function FilesView({ rootFolder, onPlayFile, onTogglePlay }: File
             hasAncestors={hasAncestors}
             onGoUp={nav.goUp}
             onGoRoot={() => nav.goToSegment(0)}
+            missingSelectionPath={selectionMissing ? nav.selectedPath : null}
+            onClearSelection={() => selectFile(nav.cwd)}
             onClose={() => setPreviewOpen(false)}
           />
         )}

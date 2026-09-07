@@ -59,6 +59,12 @@ interface FilePreviewProps {
   hasAncestors: boolean;
   onGoUp: () => void;
   onGoRoot: () => void;
+  /** ディレクトリ自体は取得できたが選択中パスがその中に無いとき、そのパス（ライブラリの
+   *  エラー詳細・スキャン要対応からの「Filesで開く」で移動・削除済みの対象を指したときに
+   *  発生する。TASK-428.18） */
+  missingSelectionPath: string | null;
+  /** missingSelectionPath の表示から、選択を外してカレントフォルダーの表示へ戻る */
+  onClearSelection: () => void;
   onClose: () => void;
 }
 
@@ -79,6 +85,8 @@ export default function FilePreview({
   hasAncestors,
   onGoUp,
   onGoRoot,
+  missingSelectionPath,
+  onClearSelection,
   onClose,
 }: FilePreviewProps) {
   const queryClient = useQueryClient();
@@ -201,6 +209,10 @@ export default function FilePreview({
     !isDir && !!entry?.workId && (entry.workRelPath === "" || entry.workRelPath === ".");
   const canRegisterFolder = isDir && entry && !entry.workId;
   const canRegisterFile = kind === "audio" && entry && !entry.workId;
+  // フォルダー単位・単一ファイル単位を問わず「作品として登録済みか」。HeroのisWorkFolder
+  // 引数名はフォルダー単位限定の既存の意味のまま変えず、ここでは呼び出し側の値として
+  // 明確な名前を持たせる（TASK-428.18）。
+  const isRegisteredWork = isWorkFolder || isSingleFileWork;
 
   // 単一ファイル作品は物理ファイル名がタイトルと無関係なことが多く、フォルダー名からの
   // 推測（getWorkFolderDisplay）では実際の作品タイトルを表示できない。作品を直接引く
@@ -298,6 +310,8 @@ export default function FilePreview({
             onGoRoot={onGoRoot}
             onRetry={onRetryLoad}
           />
+        ) : missingSelectionPath ? (
+          <MissingSelectionPreview path={missingSelectionPath} onBack={onClearSelection} />
         ) : (
           <>
             <div className="mle-prv__hd">
@@ -317,14 +331,14 @@ export default function FilePreview({
                   {!isDir && entry.preview && entry.mediaKind ? (
                     <WorkspaceMedia
                       entry={entry}
-                      isWorkFolder={isWorkFolder || isSingleFileWork}
+                      isRegisteredWork={isRegisteredWork}
                       workTitle={workTitle}
                     />
                   ) : (
                     <Hero
                       kind={kind!}
                       entry={entry}
-                      isWorkFolder={isWorkFolder || isSingleFileWork}
+                      isWorkFolder={isRegisteredWork}
                       breakdown={isDir ? breakdown : undefined}
                       workTitle={workTitle}
                     />
@@ -486,6 +500,38 @@ function FileLoadErrorPreview({
   return (
     <div className="mle-prv__body">
       <CollectionStatus variant="list" kind="error" onRetry={onRetry} />
+    </div>
+  );
+}
+
+interface MissingSelectionPreviewProps {
+  path: string;
+  onBack: () => void;
+}
+
+/**
+ * カレントフォルダーの取得自体には成功したが、選択中パスがその中に存在しない場合の表示。
+ * ライブラリのエラー詳細・スキャン要対応の「Filesで開く」（openPathInFilesAtom）は
+ * 移動・削除済みの対象へ遷移することがあり、以前は選択解除扱いでカレントフォルダーの
+ * プレビューへ黙って差し替わっていた（TASK-428.18）。
+ */
+function MissingSelectionPreview({ path, onBack }: MissingSelectionPreviewProps) {
+  return (
+    <div className="mle-prv__body">
+      <CollectionStatus
+        variant="list"
+        kind="empty"
+        message="このファイルまたはフォルダーは見つかりません"
+        hint="移動・削除された可能性があります。"
+      />
+      <p className="mle-fprev__path" style={{ textAlign: "center" }}>
+        {path}
+      </p>
+      <div className="mle-fprev__actions" style={{ justifyContent: "center" }}>
+        <Button variant="ghost" onClick={onBack}>
+          この一覧の表示に戻る
+        </Button>
+      </div>
     </div>
   );
 }

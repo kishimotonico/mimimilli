@@ -53,12 +53,13 @@ export function Hero({
 
 export function WorkspaceMedia({
   entry,
-  isWorkFolder,
+  isRegisteredWork,
   workTitle,
 }: {
   entry: FsEntry;
-  /** 単一ファイル作品として登録済みか（TASK-428.18: 音声ヒーローの登録済みバッジ・タイトル表示に使う） */
-  isWorkFolder: boolean;
+  /** 作品として登録済みか（フォルダー単位・単一ファイル単位どちらも含む）。
+   *  Heroの isWorkFolder とは意味が異なる（あちらはフォルダー単位限定）ため名前を分ける（TASK-428.18） */
+  isRegisteredWork: boolean;
   workTitle?: string;
 }) {
   const kind = entry.mediaKind!;
@@ -71,7 +72,9 @@ export function WorkspaceMedia({
 
   switch (kind) {
     case "audio":
-      return <Hero kind="audio" entry={entry} isWorkFolder={isWorkFolder} workTitle={workTitle} />;
+      return (
+        <Hero kind="audio" entry={entry} isWorkFolder={isRegisteredWork} workTitle={workTitle} />
+      );
     case "image":
       return <ImageMedia entry={entry} src={src} />;
     case "pdf":
