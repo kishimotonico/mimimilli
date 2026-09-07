@@ -34,7 +34,7 @@ export default function AppBody({
   if (mode === "files") {
     return (
       <Suspense fallback={null}>
-        <FilesView rootFolder={rootFolder} onPlayFile={onPlayFile} />
+        <FilesView rootFolder={rootFolder} onPlayFile={onPlayFile} onTogglePlay={onTogglePlay} />
       </Suspense>
     );
   }

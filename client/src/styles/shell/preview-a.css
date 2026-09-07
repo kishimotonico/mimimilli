@@ -17,6 +17,27 @@
   min-width: 360px;
   min-height: 0;
 }
+/* Filesモードは一覧側がflex:1で残り幅を取る主役なので、プレビューはドラッグで確定した
+   固定幅（--files-prv-w、既定420px・クランプ済み）を持つ側にする（TASK-428.18）。 */
+.mle-prv-anchor.is-files {
+  flex: 0 0 var(--files-prv-w, 420px);
+  min-width: 320px;
+}
+/* プレビュー左端のドラッグリサイズハンドル。閉じるボタンと重ならないよう更に左へ。 */
+.mle-prv__resize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -3px;
+  width: 6px;
+  z-index: 2;
+  cursor: col-resize;
+  touch-action: none;
+}
+.mle-prv__resize:hover,
+.mle-prv__resize:active {
+  background: var(--line-strong);
+}
 .mle-prv {
   position: relative;
   flex: 1;

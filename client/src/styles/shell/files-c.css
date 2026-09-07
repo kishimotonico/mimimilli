@@ -7,10 +7,24 @@
 
 /* ── File mode — single column stage + preview ────────────── */
 
+/* 一覧(.mle-filestage)とプレビュー(.mle-prv-anchor)を束ねる舞台。
+   前者は残り幅いっぱい・後者はドラッグで確定した固定幅、という主従を持つ
+   （プレビューが常にflex:1で一覧が300px固定だった旧レイアウトの逆転。
+   files-A-06/files-B-01: 一覧幅が固定だと作品名が切れる一方プレビューに空白が残る問題の解消）。
+   container queryで幅を検知し、狭幅ではプレビューを全幅へ切り替える。 */
+.mle-files-layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  container: files-layout / inline-size;
+}
+
 /* 現在フォルダー1カラムを載せる舞台。出入りするカラムをクリップする */
 .mle-filestage {
   position: relative;
-  flex: 0 0 300px;
+  flex: 1 1 auto;
+  min-width: 260px;
   overflow: hidden;
   border-right: 1px solid var(--line);
   background: var(--paper-0);
@@ -23,10 +37,59 @@
   will-change: transform, opacity;
 }
 
+/* 狭幅ではプレビューを全幅へ切り替え、一覧は隠す（決定: DRAFT-74 Q-02, 2026-09-07）。
+   一覧は選択操作で自動的にプレビューを開き直す（FilesView側）ため、閉じている間だけ
+   一覧が全幅になる通常挙動と両立する。 */
+@container files-layout (max-width: 720px) {
+  .mle-files-layout[data-preview-open="true"] .mle-filestage {
+    display: none;
+  }
+  .mle-files-layout[data-preview-open="true"] .mle-prv-anchor {
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
+  }
+  .mle-prv__resize {
+    display: none;
+  }
+}
+
 .mle-fprev {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.mle-fprev__pathblock {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.mle-fprev__pathrow {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-2);
+  background: var(--paper-0);
+}
+.mle-fprev__pathrow-text {
+  flex: 1;
+  min-width: 0;
+  word-break: break-all;
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  color: var(--ink-2);
+  user-select: text;
+}
+.mle-fprev__pathblock-hint {
+  margin: 0;
+  padding: 0 2px;
+  font-size: var(--fs-caption);
+  line-height: var(--lh-caption);
+  color: var(--ink-4);
 }
 
 /* コンパクトなヒーロー（フォルダー・非画像ファイル）。巨大な空ボックスを置かない */

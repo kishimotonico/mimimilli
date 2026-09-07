@@ -49,7 +49,7 @@
 .mle-row.is-folder .ficon {
   color: var(--ink-1);
 }
-.mle-row.is-folder-work .ficon {
+.mle-row.is-work .ficon {
   color: var(--acc);
 }
 .mle-row.is-audio .ficon {

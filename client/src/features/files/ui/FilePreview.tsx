@@ -1,23 +1,42 @@
-import { useCallback, useState } from "react";
-import { useSetAtom } from "jotai";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useCallback,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
+import { useAtom, useSetAtom } from "jotai";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { errorToastAtom } from "../../../shared/model/errorToastAtom";
 import { I } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
+import IconButton from "../../../shared/ui/IconButton";
 import ConfirmDialog from "../../../shared/ui/ConfirmDialog";
+import CollectionStatus from "../../../shared/ui/CollectionStatus";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { SCAN_QUERY_KEYS } from "../../../entities/scan/queryKeys";
 import { FILE_SYSTEM_QUERY_KEYS } from "../../../entities/file-system/queryKeys";
 import { getWorkRegisterPreview, reassignIdentityConflict } from "../api";
-import { deleteWork } from "../../../entities/work/api";
+import { deleteWork, getWork } from "../../../entities/work/api";
+import { clampFilesPreviewWidth, filesPreviewWidthAtom } from "../model/previewLayoutAtoms";
+import { copyPathSuccessAtom } from "../model/atoms";
 import RegisterWorkDialog from "./RegisterWorkDialog";
 import { Hero, WorkspaceMedia } from "./FilePreviewMedia";
 import type { ScanDiagnostic, WorkRegisterPreview, WorkspacePath } from "@mimimilli/shared";
-import { classifyFile, summarizeKinds, FILE_KIND_LABEL, type FsEntry } from "../model/types";
+import {
+  classifyFile,
+  joinPath,
+  summarizeKinds,
+  FILE_KIND_LABEL,
+  type FsEntry,
+} from "../model/types";
 import { apiErrorMessage } from "../../../shared/lib/apiError";
 
+/** cwd取得の失敗種別。notFound=404（対象が存在しない）、error=5xx/通信失敗（再試行すれば回復しうる） */
+export type FileLoadError = "notFound" | "error";
+
 interface FilePreviewProps {
-  /** 選択中エントリ（ファイル or dir）。null ならプレビューなし */
+  /** 選択中エントリ（ファイル or dir）。loadError があるときは null */
   entry: FsEntry | null;
   /** entry が dir のときその直下エントリ（種別内訳・全wav再生に使用） */
   folderEntries: FsEntry[] | null;
@@ -25,11 +44,22 @@ interface FilePreviewProps {
   depth: number;
   /** 現在開いているディレクトリ（FS キャッシュ無効化用） */
   browsePath: string;
+  /** ワークスペースルートの絶対パス（entry.path はroot相対のportableパスなので、絶対パスコピーに使う） */
+  rootFolder: string;
   isPlayingEntry: boolean;
+  isPlaybackActive: boolean;
   onPlay: (entry: FsEntry) => void;
+  /** 再生中のエントリの一時停止・再開を切り替える（先頭からの再生し直しをしない） */
+  onTogglePlay: () => void;
   /** 作品登録・解除後にファイル一覧を再取得する */
   onWorkRegistered?: () => void | Promise<unknown>;
   identityConflict: ScanDiagnostic | null;
+  loadError: FileLoadError | null;
+  onRetryLoad: () => void;
+  hasAncestors: boolean;
+  onGoUp: () => void;
+  onGoRoot: () => void;
+  onClose: () => void;
 }
 
 export default function FilePreview({
@@ -37,17 +67,59 @@ export default function FilePreview({
   folderEntries,
   depth,
   browsePath,
+  rootFolder,
   isPlayingEntry,
+  isPlaybackActive,
   onPlay,
+  onTogglePlay,
   onWorkRegistered,
   identityConflict,
+  loadError,
+  onRetryLoad,
+  hasAncestors,
+  onGoUp,
+  onGoRoot,
+  onClose,
 }: FilePreviewProps) {
   const queryClient = useQueryClient();
   const setErrorToast = useSetAtom(errorToastAtom);
+  const setCopyPathSuccess = useSetAtom(copyPathSuccessAtom);
+  const [width, setWidth] = useAtom(filesPreviewWidthAtom);
   const [registerPreview, setRegisterPreview] = useState<WorkRegisterPreview | null>(null);
   const [showRegisterDialog, setShowRegisterDialog] = useState(false);
   const [showUnregisterConfirm, setShowUnregisterConfirm] = useState(false);
   const [showReassignConfirm, setShowReassignConfirm] = useState(false);
+
+  const anchorRef = useRef<HTMLDivElement>(null);
+  const resizeDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
+
+  const onResizePointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      event.currentTarget.setPointerCapture(event.pointerId);
+      resizeDragRef.current = { startX: event.clientX, startWidth: width };
+    },
+    [width],
+  );
+  const onResizePointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = resizeDragRef.current;
+    if (!drag) return;
+    // プレビューは右側パネルなので、左（ポインタのマイナス方向）へ動かすほど幅が増える
+    const next = clampFilesPreviewWidth(drag.startWidth + (drag.startX - event.clientX));
+    anchorRef.current?.style.setProperty("--files-prv-w", `${next}px`);
+  }, []);
+  const onResizePointerUp = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      const drag = resizeDragRef.current;
+      resizeDragRef.current = null;
+      event.currentTarget.releasePointerCapture(event.pointerId);
+      if (!drag) return;
+      const raw = anchorRef.current?.style.getPropertyValue("--files-prv-w") ?? "";
+      const parsed = Number.parseFloat(raw);
+      if (Number.isFinite(parsed)) setWidth(clampFilesPreviewWidth(parsed));
+    },
+    [setWidth],
+  );
 
   const refreshFsState = useCallback(async () => {
     const paths = new Set<string>();
@@ -102,6 +174,18 @@ export default function FilePreview({
     },
   });
 
+  const copyAbsolutePath = useCallback(
+    async (path: string) => {
+      try {
+        await navigator.clipboard.writeText(path);
+        setCopyPathSuccess("絶対パスをコピーしました");
+      } catch (cause) {
+        setErrorToast(apiErrorMessage(cause, "パスのコピーに失敗しました"));
+      }
+    },
+    [setCopyPathSuccess, setErrorToast],
+  );
+
   const kind = entry ? classifyFile(entry) : null;
   const isDir = kind === "dir";
   const label = isDir
@@ -118,14 +202,28 @@ export default function FilePreview({
   const canRegisterFolder = isDir && entry && !entry.workId;
   const canRegisterFile = kind === "audio" && entry && !entry.workId;
 
+  // 単一ファイル作品は物理ファイル名がタイトルと無関係なことが多く、フォルダー名からの
+  // 推測（getWorkFolderDisplay）では実際の作品タイトルを表示できない。作品を直接引く
+  // （TASK-428.18 / files-A-02）。
+  const singleFileWorkId = isSingleFileWork ? (entry?.workId ?? null) : null;
+  const singleFileWorkQuery = useQuery({
+    queryKey: WORK_QUERY_KEYS.detail(singleFileWorkId ?? ""),
+    queryFn: () => getWork(singleFileWorkId!),
+    enabled: singleFileWorkId != null,
+  });
+  const workTitle = singleFileWorkId ? singleFileWorkQuery.data?.title : undefined;
+
+  // 再生中エントリを押し直すと先頭から掛け直されてしまうため（TASK-428.18 / files-A-03）、
+  // ロード済みのときはトグル（一時停止・再開）にする。再生位置を変えない。
+  const isLoadedEntry = kind === "audio" && isPlayingEntry;
   const playActions =
     kind === "audio" ? (
       <Button
         variant="primary"
-        icon={isPlayingEntry ? I.audio : I.play}
-        onClick={() => onPlay(entry!)}
+        icon={isLoadedEntry ? (isPlaybackActive ? I.pause : I.play) : I.play}
+        onClick={() => (isLoadedEntry ? onTogglePlay() : onPlay(entry!))}
       >
-        {isPlayingEntry ? "再生中" : "このファイルを再生"}
+        {isLoadedEntry ? (isPlaybackActive ? "一時停止" : "再開") : "このファイルを再生"}
       </Button>
     ) : isDir && firstAudioFile ? (
       <Button variant="primary" icon={I.play} onClick={() => onPlay(firstAudioFile)}>
@@ -161,59 +259,122 @@ export default function FilePreview({
 
   const hasActions = playActions != null || workActions != null;
   const conflictingPaths = identityConflict?.paths.filter((path) => path !== entry?.path) ?? [];
+  const absolutePath = entry ? joinPath(rootFolder, entry.path.split("/").filter(Boolean)) : "";
 
   return (
-    <div className="mle-prv is-files">
-      <div className="mle-prv__hd">
-        <span className="label">{label}</span>
-        {entry && (
-          <span className="pill" style={{ marginLeft: "auto" }}>
-            {isDir ? `深さ ${depth} 階層` : kind?.toUpperCase()}
-          </span>
-        )}
-      </div>
+    <div
+      ref={anchorRef}
+      className="mle-prv-anchor is-files"
+      style={{ "--files-prv-w": `${width}px` } as CSSProperties}
+    >
+      <button
+        type="button"
+        className="mle-prv__close"
+        aria-label="プレビューを閉じる"
+        title="プレビューを閉じる"
+        onClick={onClose}
+      >
+        <I.chev size={14} />
+      </button>
+      <div
+        className="mle-prv__resize"
+        // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- hr は静的な区切り線の意味しか持たない。ここはドラッグでプレビュー幅を変えるsplitter（WAI-ARIA window-splitterパターン）なのでrole="separator"を使う
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="プレビュー幅"
+        onPointerDown={onResizePointerDown}
+        onPointerMove={onResizePointerMove}
+        onPointerUp={onResizePointerUp}
+      />
+      {/* ドラッグでの幅変更のみ対応。キーボード操作は未対応（TASK-428.18スコープ外） */}
 
-      <div className="mle-prv__body">
-        {!entry ? (
-          <EmptyPreview />
+      <div className="mle-prv is-files">
+        {loadError ? (
+          <FileLoadErrorPreview
+            kind={loadError}
+            path={browsePath}
+            hasAncestors={hasAncestors}
+            onGoUp={onGoUp}
+            onGoRoot={onGoRoot}
+            onRetry={onRetryLoad}
+          />
         ) : (
-          <div className="mle-fprev">
-            {!isDir && entry.preview && entry.mediaKind ? (
-              <WorkspaceMedia entry={entry} />
-            ) : (
-              <Hero
-                kind={kind!}
-                entry={entry}
-                isWorkFolder={isWorkFolder || isSingleFileWork}
-                breakdown={isDir ? breakdown : undefined}
-              />
-            )}
+          <>
+            <div className="mle-prv__hd">
+              <span className="label">{label}</span>
+              {entry && (
+                <span className="pill" style={{ marginLeft: "auto" }}>
+                  {isDir ? `深さ ${depth} 階層` : kind?.toUpperCase()}
+                </span>
+              )}
+            </div>
 
-            {hasActions && (
-              <div className="mle-fprev__actions">
-                {playActions}
-                {workActions}
-              </div>
-            )}
-            {identityConflict && entry?.isDir && (
-              <section className="mle-identity-conflict" aria-label="ID重複">
-                <span className="mle-identity-conflict-badge">ID重複</span>
-                <p>同じWork IDを持つフォルダーがあります。</p>
-                <div className="mle-identity-conflict__paths">
-                  {conflictingPaths.map((path) => (
-                    <code key={path}>{path}</code>
-                  ))}
+            <div className="mle-prv__body">
+              {!entry ? (
+                <EmptyPreview />
+              ) : (
+                <div className="mle-fprev">
+                  {!isDir && entry.preview && entry.mediaKind ? (
+                    <WorkspaceMedia
+                      entry={entry}
+                      isWorkFolder={isWorkFolder || isSingleFileWork}
+                      workTitle={workTitle}
+                    />
+                  ) : (
+                    <Hero
+                      kind={kind!}
+                      entry={entry}
+                      isWorkFolder={isWorkFolder || isSingleFileWork}
+                      breakdown={isDir ? breakdown : undefined}
+                      workTitle={workTitle}
+                    />
+                  )}
+
+                  {/* ローカル専用機能（絶対パスコピー）。TASK-428.18 決定事項 */}
+                  <div className="mle-fprev__pathblock">
+                    <div className="mle-fprev__pathrow">
+                      <code className="mle-fprev__pathrow-text">{absolutePath}</code>
+                      <IconButton
+                        icon={I.copy}
+                        label="絶対パスをコピー（ローカル専用）"
+                        title="絶対パスをコピー（この端末でのみ有効なパスです）"
+                        size="sm"
+                        onClick={() => copyAbsolutePath(absolutePath)}
+                      />
+                    </div>
+                    <p className="mle-fprev__pathblock-hint">
+                      この端末のローカルパスです。他の端末やクラウドでは無効です。
+                    </p>
+                  </div>
+
+                  {hasActions && (
+                    <div className="mle-fprev__actions">
+                      {playActions}
+                      {workActions}
+                    </div>
+                  )}
+                  {identityConflict && entry?.isDir && (
+                    <section className="mle-identity-conflict" aria-label="ID重複">
+                      <span className="mle-identity-conflict-badge">ID重複</span>
+                      <p>同じWork IDを持つフォルダーがあります。</p>
+                      <div className="mle-identity-conflict__paths">
+                        {conflictingPaths.map((path) => (
+                          <code key={path}>{path}</code>
+                        ))}
+                      </div>
+                      <Button
+                        variant="primary"
+                        disabled={reassignMutation.isPending}
+                        onClick={() => setShowReassignConfirm(true)}
+                      >
+                        別作品として取り込む
+                      </Button>
+                    </section>
+                  )}
                 </div>
-                <Button
-                  variant="primary"
-                  disabled={reassignMutation.isPending}
-                  onClick={() => setShowReassignConfirm(true)}
-                >
-                  別作品として取り込む
-                </Button>
-              </section>
-            )}
-          </div>
+              )}
+            </div>
+          </>
         )}
       </div>
 
@@ -275,6 +436,56 @@ function EmptyPreview() {
     >
       <I.folderO size={28} />
       <span style={{ fontSize: 12 }}>フォルダーまたはファイルを選択してください</span>
+    </div>
+  );
+}
+
+interface FileLoadErrorPreviewProps {
+  kind: FileLoadError;
+  path: string;
+  hasAncestors: boolean;
+  onGoUp: () => void;
+  onGoRoot: () => void;
+  onRetry: () => void;
+}
+
+/** 404（対象なし）と5xx/通信失敗（再試行可能）を区別して表示する（TASK-428.18 / files-A-01） */
+function FileLoadErrorPreview({
+  kind,
+  path,
+  hasAncestors,
+  onGoUp,
+  onGoRoot,
+  onRetry,
+}: FileLoadErrorPreviewProps) {
+  if (kind === "notFound") {
+    return (
+      <div className="mle-prv__body">
+        <CollectionStatus
+          variant="list"
+          kind="empty"
+          message="このフォルダーは見つかりません"
+          hint="移動・削除された可能性があります。"
+        />
+        <p className="mle-fprev__path" style={{ textAlign: "center" }}>
+          {path}
+        </p>
+        <div className="mle-fprev__actions" style={{ justifyContent: "center" }}>
+          {hasAncestors && (
+            <Button variant="ghost" onClick={onGoUp}>
+              1つ上の階層へ
+            </Button>
+          )}
+          <Button variant="ghost" onClick={onGoRoot}>
+            ルートへ
+          </Button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="mle-prv__body">
+      <CollectionStatus variant="list" kind="error" onRetry={onRetry} />
     </div>
   );
 }

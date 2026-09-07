@@ -16,14 +16,18 @@ export function Hero({
   entry,
   isWorkFolder,
   breakdown,
+  workTitle,
 }: {
   kind: FileKind;
   entry: FsEntry;
   isWorkFolder: boolean;
   breakdown?: { kind: FileKind; count: number }[];
+  /** 単一ファイル作品の実タイトル。物理ファイル名からの推測（getWorkFolderDisplay）より優先する（TASK-428.18） */
+  workTitle?: string;
 }) {
   const Ic = I[FILE_KIND_ICON[kind]];
   const display = getWorkFolderDisplay(entry.name, isWorkFolder ? entry.workId : null);
+  const name = workTitle ?? display.name;
   const metaLine =
     breakdown && breakdown.length > 0
       ? formatBreakdownLine(breakdown)
@@ -38,7 +42,7 @@ export function Hero({
       <div className="bd">
         <div className="mle-fprev__name">
           {display.badge && <span className="wbadge">{display.badge}</span>}
-          {display.name}
+          {name}
         </div>
         <div className="mle-fprev__path">{entry.path}</div>
         {metaLine && <div className="mle-fprev__meta">{metaLine}</div>}
@@ -47,7 +51,16 @@ export function Hero({
   );
 }
 
-export function WorkspaceMedia({ entry }: { entry: FsEntry }) {
+export function WorkspaceMedia({
+  entry,
+  isWorkFolder,
+  workTitle,
+}: {
+  entry: FsEntry;
+  /** 単一ファイル作品として登録済みか（TASK-428.18: 音声ヒーローの登録済みバッジ・タイトル表示に使う） */
+  isWorkFolder: boolean;
+  workTitle?: string;
+}) {
   const kind = entry.mediaKind!;
   const preview = entry.preview!;
   const src = getWorkspaceMediaUrl(entry.path);
@@ -58,7 +71,7 @@ export function WorkspaceMedia({ entry }: { entry: FsEntry }) {
 
   switch (kind) {
     case "audio":
-      return <Hero kind="audio" entry={entry} isWorkFolder={false} />;
+      return <Hero kind="audio" entry={entry} isWorkFolder={isWorkFolder} workTitle={workTitle} />;
     case "image":
       return <ImageMedia entry={entry} src={src} />;
     case "pdf":

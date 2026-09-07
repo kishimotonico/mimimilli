@@ -20,6 +20,7 @@ import {
   libraryInvalidUrlToastAtom,
   workDeleteSuccessAtom,
 } from "../../features/library/model/atoms";
+import { copyPathSuccessAtom } from "../../features/files/model/atoms";
 
 export interface GlobalToastProps {
   /** ルートフォルダー変更成功トーストの「今すぐスキャン」actionから呼ぶ */
@@ -44,6 +45,8 @@ export default function GlobalToast({ onOpenScan, onOpenScanNeedsAttention }: Gl
   const setWorkDeleteSuccess = useSetAtom(workDeleteSuccessAtom);
   const dlsiteApplyToast = useAtomValue(dlsiteApplyToastAtom);
   const setDlsiteApplyToast = useSetAtom(dlsiteApplyToastAtom);
+  const copyPathSuccess = useAtomValue(copyPathSuccessAtom);
+  const setCopyPathSuccess = useSetAtom(copyPathSuccessAtom);
   const dlsiteBulkApplyResult = useAtomValue(dlsiteBulkApplyResultAtom);
   const dlsiteResult = useAtomValue(dlsiteBulkResultAtom);
   const dlsiteCancelledResult = useAtomValue(dlsiteBulkCancelledResultAtom);
@@ -144,6 +147,16 @@ export default function GlobalToast({ onOpenScan, onOpenScanNeedsAttention }: Gl
         message={dlsiteApplyToast.message}
         variant={dlsiteApplyToast.variant}
         onDismiss={() => setDlsiteApplyToast(null)}
+      />
+    );
+  }
+
+  if (copyPathSuccess) {
+    return (
+      <Toast
+        message={copyPathSuccess}
+        variant="success"
+        onDismiss={() => setCopyPathSuccess(null)}
       />
     );
   }

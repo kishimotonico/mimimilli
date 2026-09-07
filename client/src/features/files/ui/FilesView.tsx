@@ -5,7 +5,7 @@
 
 import { useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useAtomValue } from "jotai";
+import { useAtom, useAtomValue } from "jotai";
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import { browseFs, getScanDiagnostics } from "../api";
 import { useFilesNavigation } from "../model/useFilesNavigation";
@@ -14,6 +14,8 @@ import { FILE_SYSTEM_QUERY_KEYS } from "../../../entities/file-system/queryKeys"
 import { SCAN_QUERY_KEYS } from "../../../entities/scan/queryKeys";
 import { buildFolderAudioQueue } from "../model/filePlayback";
 import { classifyFile } from "../model/types";
+import { filesPreviewOpenAtom } from "../model/previewLayoutAtoms";
+import { ApiRequestError } from "../../../shared/api/http";
 import type { PlaybackTrack } from "../../../entities/player/model/playbackTrack";
 import {
   playerIsPlayingOrLoadingAtom,
@@ -25,7 +27,7 @@ import { rootLabel, type FsEntry } from "../model/types";
 import { workspacePath } from "@mimimilli/shared";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 import FileColumn from "./FileColumn";
-import FilePreview from "./FilePreview";
+import FilePreview, { type FileLoadError } from "./FilePreview";
 import StackEdge from "./StackEdge";
 
 interface ColstackBackButtonProps {
@@ -56,21 +58,30 @@ function ColstackBackButton({ parentName, depth, onGoUp }: ColstackBackButtonPro
 interface FilesViewProps {
   rootFolder: string;
   onPlayFile: (tracks: PlaybackTrack[], trackIndex: number) => void;
+  onTogglePlay: () => void;
 }
 
-export default function FilesView({ rootFolder, onPlayFile }: FilesViewProps) {
+export default function FilesView({ rootFolder, onPlayFile, onTogglePlay }: FilesViewProps) {
   const nav = useFilesNavigation(rootFolder);
   const direction = useAtomValue(filesDirectionAtom);
   const playingWorkId = useAtomValue(playingWorkIdAtom);
   const playingRelPath = useAtomValue(playingTrackRelPathAtom);
   const playingFsPath = useAtomValue(playingFsPathAtom);
   const isPlaybackActive = useAtomValue(playerIsPlayingOrLoadingAtom);
+  const [previewOpen, setPreviewOpen] = useAtom(filesPreviewOpenAtom);
 
   const cwdQuery = useQuery({
     queryKey: FILE_SYSTEM_QUERY_KEYS.directory(nav.cwd),
     queryFn: () => browseFs(nav.cwd),
   });
   const cwdEntries = cwdQuery.data?.entries ?? [];
+  const cwdNotFound = cwdQuery.error instanceof ApiRequestError && cwdQuery.error.status === 404;
+  const loadError: FileLoadError | null = !cwdQuery.isError
+    ? null
+    : cwdNotFound
+      ? "notFound"
+      : "error";
+
   const diagnosticsQuery = useQuery({
     queryKey: SCAN_QUERY_KEYS.diagnostics(),
     queryFn: getScanDiagnostics,
@@ -108,29 +119,50 @@ export default function FilesView({ rootFolder, onPlayFile }: FilesViewProps) {
     [playingFsPath, playingWorkId, playingRelPath],
   );
 
+  // プレビューが閉じている間に別のエントリを選ぶ／フォルダーへ潜ったときは、
+  // 見たい対象があるという意思表示なので自動的に開き直す（files-A-06）。
+  const { openDir: navOpenDir, selectFile: navSelectFile } = nav;
+  const openDir = useCallback(
+    (path: Parameters<typeof navOpenDir>[0]) => {
+      setPreviewOpen(true);
+      navOpenDir(path);
+    },
+    [navOpenDir, setPreviewOpen],
+  );
+  const selectFile = useCallback(
+    (path: Parameters<typeof navSelectFile>[0]) => {
+      setPreviewOpen(true);
+      navSelectFile(path);
+    },
+    [navSelectFile, setPreviewOpen],
+  );
+
   const cwdTitle = nav.relPath.slice(-1)[0] ?? rootLabel(rootFolder);
   const parentName = nav.relPath.slice(-2, -1)[0] ?? rootLabel(rootFolder);
 
   // ── プレビュー対象 ────────────────────────────────────────
   // ファイル選択中はそのファイル、それ以外はカレント dir 自身。
-  const cwdFolderEntry: FsEntry = {
-    name: cwdTitle,
-    path: workspacePath(nav.relPath.join("/")),
-    isDir: true,
-    size: 0,
-    fileType: "dir",
-    childCount: cwdEntries.length,
-    workId: cwdQuery.data?.workId ?? null,
-    workRelPath: null,
-    mediaKind: null,
-    preview: null,
-  };
+  // cwd取得に失敗している間は、実在確認できていないエントリを合成表示しない（files-A-01）。
+  const cwdFolderEntry: FsEntry | null = loadError
+    ? null
+    : {
+        name: cwdTitle,
+        path: workspacePath(nav.relPath.join("/")),
+        isDir: true,
+        size: 0,
+        fileType: "dir",
+        childCount: cwdEntries.length,
+        workId: cwdQuery.data?.workId ?? null,
+        workRelPath: null,
+        mediaKind: null,
+        preview: null,
+      };
   const fileSelection =
-    nav.selectedPath && nav.selectedPath !== nav.cwd
+    !loadError && nav.selectedPath && nav.selectedPath !== nav.cwd
       ? (cwdEntries.find((e) => e.path === nav.selectedPath) ?? null)
       : null;
   const previewEntry = fileSelection ?? cwdFolderEntry;
-  const folderEntries = previewEntry.isDir ? cwdEntries : null;
+  const folderEntries = previewEntry?.isDir ? cwdEntries : null;
 
   const hasAncestors = nav.relPath.length >= 1;
 
@@ -147,39 +179,55 @@ export default function FilesView({ rootFolder, onPlayFile }: FilesViewProps) {
         )}
       </AnimatePresence>
 
-      <div className="mle-filestage">
-        <div
-          key={nav.cwd}
-          data-dir={direction >= 0 ? "forward" : "back"}
-          className="mle-col mle-filestage__col ml-file-col-enter"
-        >
-          <FileColumn
-            title={cwdTitle}
-            entries={cwdEntries}
-            identityConflictPaths={identityConflictPaths}
-            selectedPath={nav.selectedPath}
-            matchPlaying={matchPlaying}
-            isPlaybackActive={isPlaybackActive}
-            onOpenDir={nav.openDir}
-            onSelectFile={nav.selectFile}
-            onPlayFile={(entry) => handlePlayFile(entry, cwdEntries)}
-            isLoading={cwdQuery.isPending}
-            isError={cwdQuery.isError}
-            onRetry={() => cwdQuery.refetch()}
-          />
+      <div className="mle-files-layout" data-preview-open={previewOpen}>
+        <div className="mle-filestage">
+          <div
+            key={nav.cwd}
+            data-dir={direction >= 0 ? "forward" : "back"}
+            className="mle-col mle-filestage__col ml-file-col-enter"
+          >
+            <FileColumn
+              title={cwdTitle}
+              entries={cwdEntries}
+              identityConflictPaths={identityConflictPaths}
+              selectedPath={nav.selectedPath}
+              matchPlaying={matchPlaying}
+              isPlaybackActive={isPlaybackActive}
+              onOpenDir={openDir}
+              onSelectFile={selectFile}
+              onPlayFile={(entry) => handlePlayFile(entry, cwdEntries)}
+              isLoading={cwdQuery.isPending}
+              isError={cwdQuery.isError}
+              notFound={cwdNotFound}
+              onRetry={() => cwdQuery.refetch()}
+            />
+          </div>
         </div>
-      </div>
 
-      <FilePreview
-        entry={previewEntry}
-        folderEntries={folderEntries}
-        depth={nav.addressPath.length}
-        browsePath={nav.cwd}
-        isPlayingEntry={matchPlaying(previewEntry)}
-        onPlay={(entry) => handlePlayFile(entry, folderEntries ?? cwdEntries)}
-        onWorkRegistered={() => cwdQuery.refetch()}
-        identityConflict={identityConflictPaths.get(previewEntry.path) ?? null}
-      />
+        {previewOpen && (
+          <FilePreview
+            entry={previewEntry}
+            folderEntries={folderEntries}
+            depth={nav.addressPath.length}
+            browsePath={nav.cwd}
+            rootFolder={rootFolder}
+            isPlayingEntry={previewEntry != null && matchPlaying(previewEntry)}
+            isPlaybackActive={isPlaybackActive}
+            onPlay={(entry) => handlePlayFile(entry, folderEntries ?? cwdEntries)}
+            onTogglePlay={onTogglePlay}
+            onWorkRegistered={() => cwdQuery.refetch()}
+            identityConflict={
+              previewEntry ? (identityConflictPaths.get(previewEntry.path) ?? null) : null
+            }
+            loadError={loadError}
+            onRetryLoad={() => cwdQuery.refetch()}
+            hasAncestors={hasAncestors}
+            onGoUp={nav.goUp}
+            onGoRoot={() => nav.goToSegment(0)}
+            onClose={() => setPreviewOpen(false)}
+          />
+        )}
+      </div>
     </>
   );
 }
