@@ -20,8 +20,12 @@ const SNAP_DISTANCE_PX = 70;
 const RESET_DURATION_S = 0.22;
 /** ドラッグの起点判定から除外する操作系要素。 */
 const DRAG_IGNORE_SELECTOR = "button, input, a, [role='slider']";
-/** トップバー行の高さ（frame-a.css の grid-template-rows）。ここより上へはドラッグさせない。 */
-const TOPBAR_CLEARANCE_PX = 48;
+
+/** トップバー行の高さ（tokens.css の --topbar-h）。ここより上へはドラッグさせない。 */
+function readTopbarClearancePx(): number {
+  const value = getComputedStyle(document.documentElement).getPropertyValue("--topbar-h");
+  return Number.parseFloat(value) || 0;
+}
 
 interface DragConstraints {
   top: number;
@@ -79,7 +83,7 @@ export function usePopupDrag(): PopupDragBind {
     const current = offsetRef.current;
     const next: DragConstraints = {
       left: -(window.innerWidth - rightPx - width),
-      top: -(window.innerHeight - bottomPx - height - TOPBAR_CLEARANCE_PX),
+      top: -(window.innerHeight - bottomPx - height - readTopbarClearancePx()),
       right: rightPx,
       bottom: bottomPx,
     };

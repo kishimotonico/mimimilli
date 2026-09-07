@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import PlayerDock from "../../src/features/player/ui/PlayerDock";
@@ -129,6 +129,53 @@ describe("player popup docked layout（TASK-430）", () => {
     act(() => {
       store.set(playerUiModeAtom, "popup");
     });
+    const popupEl = document.querySelector(".mle-popup");
+    expect(popupEl).not.toBeNull();
+    Object.defineProperty(popupEl as HTMLElement, "offsetHeight", {
+      configurable: true,
+      value: 512,
+    });
+    flushAllResizeObservers();
+
+    expect(store.get(playerPopupMeasuredHeightAtom)).toBe(512);
+  });
+
+  it("バー表示中に「バーを展開」を実クリックしても実測高さが反映される", () => {
+    const store = createStore();
+    store.set(playerCoreAtom, {
+      ...PLAYER_CORE_INITIAL,
+      currentTrackIndex: 0,
+      currentWork: {
+        id: "work-1",
+        title: "Work 1",
+        cover: null,
+        status: "ok",
+        physicalPath: "/audio/work-1",
+        totalDurationSec: 120,
+        addedAt: "2026-01-01T00:00:00.000Z",
+        errorMessage: null,
+        urls: [],
+        tags: [],
+        trackCount: 1,
+        bookmarked: false,
+        lastPlayedAt: null,
+      },
+      tracks: [{ id: "track-1", title: "Track 1", file: "audio/track-1.wav" }],
+    });
+    // uiModeはマウント時点でデフォルトの"bar"のまま。store.setではなく実際の
+    // 「バーを展開」ボタンクリックで切り替える（switchUiModeのswitching状態も経由する）。
+    render(
+      <JotaiProvider store={store}>
+        <LibraryNavigationProvider>
+          <PlayerDock {...buildPlayerDockProps()} />
+        </LibraryNavigationProvider>
+      </JotaiProvider>,
+    );
+
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: /展開/ }));
+    });
+
     const popupEl = document.querySelector(".mle-popup");
     expect(popupEl).not.toBeNull();
     Object.defineProperty(popupEl as HTMLElement, "offsetHeight", {
