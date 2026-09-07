@@ -13,6 +13,7 @@ import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import {
   createFixtureScenario,
   LARGE_SCENARIO_WORK_COUNT,
+  SCENARIO_IDS,
 } from "../src/adapters/fixture/scenarios.ts";
 import {
   createSettingsScanMethods,
@@ -272,22 +273,19 @@ test("errors: エラー・行方不明の作品のみが含まれる", async () 
   assert.ok(statuses.has("error") || statuses.has("missing"));
 });
 
-test("errors: rootFolderが作品のphysicalPathの前方一致になっている（relativeToRootが正しく剥がせる前提）", async () => {
-  const app = buildApp("errors");
-
-  const settingsRes = await app.request("/api/settings");
-  const { rootFolder } = await settingsRes.json();
-
-  const worksRes = await app.request("/api/works");
-  const { items } = await worksRes.json();
-  assert.ok(items.length > 0);
-  for (const work of items) {
-    const detail = await app.request(`/api/works/${work.id}`);
-    const { physicalPath } = await detail.json();
-    assert.ok(
-      physicalPath.startsWith(rootFolder),
-      `${physicalPath} が rootFolder(${rootFolder}) 配下ではない`,
-    );
+test("全シナリオ: rootFolderが作品のphysicalPathの前方一致になっている（relativeToRootが正しく剥がせる前提）", () => {
+  // シナリオ追加・rootFolder変更のたびに手作業で気をつける前提を無くすため、
+  // 個別シナリオではなくSCENARIO_IDS全件をループする（TASK-428.5フォローアップ、
+  // errorsシナリオでrootFolderが実際のphysicalPathと前方一致していなかった実例あり）。
+  for (const id of SCENARIO_IDS) {
+    const scenario = createFixtureScenario(id, "2026-08-11T00:00:00.000Z");
+    if (scenario.works.length === 0) continue; // 例: empty
+    for (const work of scenario.works) {
+      assert.ok(
+        work.physicalPath.startsWith(scenario.rootFolder ?? ""),
+        `[${id}] ${work.physicalPath} が rootFolder(${scenario.rootFolder}) 配下ではない`,
+      );
+    }
   }
 });
 

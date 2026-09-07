@@ -19,7 +19,7 @@ export type FixtureScenarioId =
   | "large"
   | "scan-review";
 
-const SCENARIO_IDS: readonly FixtureScenarioId[] = [
+export const SCENARIO_IDS: readonly FixtureScenarioId[] = [
   "default",
   "empty",
   "new-work",
