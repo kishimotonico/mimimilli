@@ -67,8 +67,14 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
+  background: var(--ink-4);
+}
+.mll-bar__pulse .dot.is-playing {
   background: var(--r-leaf);
   animation: mll-pulse 1.8s ease-out infinite;
+}
+.mll-bar__pulse .dot.is-error {
+  background: var(--r-coral);
 }
 @keyframes mll-pulse {
   0% {

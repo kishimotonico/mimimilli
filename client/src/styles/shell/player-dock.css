@@ -94,6 +94,9 @@
 .mle-bar1__error svg {
   flex-shrink: 0;
 }
+.mle-bar1__error button {
+  flex-shrink: 0;
+}
 .mle-bar1__controls {
   display: flex;
   align-items: center;

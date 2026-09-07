@@ -14,7 +14,12 @@ import {
 import { useDlsiteBulkActions } from "../../entities/dlsite/useDlsiteBulkActions";
 import { librarySearchQueryAtom } from "../../entities/library/model/navigationAtoms";
 import { appModeAtom, setAppModeAtom } from "../../shared/model/appModeAtoms";
-import { playerIsActiveAtom, playingTrackTitleAtom } from "../../entities/player/model/atoms";
+import {
+  playerIsActiveAtom,
+  playerStatusAtom,
+  playingTrackTitleAtom,
+} from "../../entities/player/model/atoms";
+import { cn } from "../../shared/lib/cn";
 import { scanningAtom, scanProgressLabelAtom } from "../../entities/scan/model/atoms";
 import { useUnregisteredCandidateCount } from "../../features/scan/model/useScanCandidatesCache";
 
@@ -57,6 +62,10 @@ export default function TopBar({ onOpenScan, onSettings, notificationBell }: Top
   const [searchQuery, onSearchChange] = useAtom(librarySearchQueryAtom);
   const isPlaying = useAtomValue(playerIsActiveAtom);
   const playingTrack = useAtomValue(playingTrackTitleAtom);
+  const playerStatus = useAtomValue(playerStatusAtom);
+  const isActivelyPlaying = playerStatus === "playing";
+  const pulseLabel =
+    playerStatus === "error" ? "再生エラー" : isActivelyPlaying ? "再生中" : "一時停止中";
 
   const placeholder = "ライブラリを検索（タイトル · CV · タグ · RJ ...）";
 
@@ -102,8 +111,15 @@ export default function TopBar({ onOpenScan, onSettings, notificationBell }: Top
       {isPlaying && playingTrack && (
         <>
           <div className="mll-bar__divider" />
-          <div className="mll-bar__pulse">
-            <span className="dot" />
+          <div className="mll-bar__pulse" title={pulseLabel}>
+            <span
+              className={cn(
+                "dot",
+                isActivelyPlaying && "is-playing",
+                playerStatus === "error" && "is-error",
+              )}
+              aria-label={pulseLabel}
+            />
             <span className="ch">1ch</span>
             <span className="sep">·</span>
             <span className="lbl">{playingTrack}</span>

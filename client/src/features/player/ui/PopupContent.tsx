@@ -1,12 +1,11 @@
 // 右下ポップアップの中身。日常操作（音量・トラック移動・ループ・再生速度）を厳選して置く。
 // channelSwap / abRepeat 等のニッチ機能は置かない（再生中タブ側の役割）。
 
-import { useIsPresent } from "motion/react";
-import { useEffect, useRef, useState } from "react";
 import type { PlayerState } from "../model/usePlayerState";
 import PopupSeek from "./PopupSeek";
 import PlaybackErrorNotice from "./PlaybackErrorNotice";
 import PlaybackArtwork from "./PlaybackArtwork";
+import PlaybackRatePicker from "./PlaybackRatePicker";
 import { selectFixedCoverThumbnailWidth } from "../../../entities/work/ui/coverThumbnailWidth";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
@@ -25,19 +24,8 @@ interface PopupContentProps {
   onOpenNowPlaying: () => void;
   onShowPlayingWork: () => void;
   onStop: () => void;
-}
-
-const RATE_PRESETS = [0.75, 1, 1.25, 1.5, 2];
-const RATE_LABELS: Record<number, string> = {
-  1: "1.0x",
-  1.25: "1.25x",
-  1.5: "1.5x",
-  2: "2.0x",
-  0.75: "0.75x",
-};
-
-function isRateSelected(a: number, b: number): boolean {
-  return Math.abs(a - b) < 0.001;
+  onRetryError: () => void;
+  onDismissError: () => void;
 }
 
 export default function PopupContent({
@@ -54,6 +42,8 @@ export default function PopupContent({
   onOpenNowPlaying,
   onShowPlayingWork,
   onStop,
+  onRetryError,
+  onDismissError,
 }: PopupContentProps) {
   const {
     currentWork,
@@ -67,42 +57,8 @@ export default function PopupContent({
     playbackError,
   } = state;
   const track = tracks[currentTrackIndex] ?? null;
-  const [rateMenuOpen, setRateMenuOpen] = useState(false);
-  const rateMenuRef = useRef<HTMLDivElement>(null);
-  const isPresent = useIsPresent();
-
-  const rateLabel = RATE_LABELS[playbackRate] ?? `${playbackRate.toFixed(2)}x`;
-
-  useEffect(() => {
-    if (!rateMenuOpen || !isPresent) return;
-
-    const closeMenu = () => setRateMenuOpen(false);
-
-    const handlePointerDown = (e: PointerEvent) => {
-      if (rateMenuRef.current && !rateMenuRef.current.contains(e.target as Node)) {
-        closeMenu();
-      }
-    };
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closeMenu();
-    };
-    const handleFocusOut = (e: FocusEvent) => {
-      const next = e.relatedTarget as Node | null;
-      if (rateMenuRef.current && next && rateMenuRef.current.contains(next)) return;
-      closeMenu();
-    };
-
-    window.addEventListener("pointerdown", handlePointerDown);
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("scroll", closeMenu, true);
-    document.addEventListener("focusout", handleFocusOut);
-    return () => {
-      window.removeEventListener("pointerdown", handlePointerDown);
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("scroll", closeMenu, true);
-      document.removeEventListener("focusout", handleFocusOut);
-    };
-  }, [rateMenuOpen, isPresent]);
+  const isFirstTrack = currentTrackIndex <= 0;
+  const isLastTrack = currentTrackIndex >= tracks.length - 1;
 
   return (
     <>
@@ -141,60 +97,27 @@ export default function PopupContent({
             />
           )}
           {/* ±10秒: 常時薄く表示し、ホバーで強調する */}
-          {!rateMenuOpen && (
-            <>
-              <button
-                className="mle-popup__skip mle-popup__skip--back"
-                title="10秒戻る"
-                data-player-control
-                onClick={() => onSeekRelative(-10)}
-              >
-                <span>−10</span>
-              </button>
-              <button
-                className="mle-popup__skip mle-popup__skip--fwd"
-                title="10秒進む"
-                data-player-control
-                onClick={() => onSeekRelative(10)}
-              >
-                <span>+10</span>
-              </button>
-            </>
-          )}
-          <div className="mle-ratepick" ref={rateMenuRef}>
-            {rateMenuOpen && (
-              <div className="mle-ratepick__pop" role="menu" aria-label="再生速度">
-                {RATE_PRESETS.map((rate) => {
-                  const checked = isRateSelected(playbackRate, rate);
-                  return (
-                    <button
-                      key={rate}
-                      role="menuitemradio"
-                      aria-checked={checked}
-                      className={`mle-ratepick__item ${checked ? "is-checked" : ""}`}
-                      onClick={() => {
-                        onSetPlaybackRate(rate);
-                        setRateMenuOpen(false);
-                      }}
-                    >
-                      <span className="check">{checked && <I.check size={10} />}</span>
-                      <span className="label">{RATE_LABELS[rate]}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-            <button
-              className={`mle-ratepill is-overlay ${playbackRate !== 1 ? "is-on" : ""}`}
-              title="再生速度"
-              aria-haspopup="menu"
-              aria-expanded={rateMenuOpen}
-              data-player-control
-              onClick={() => setRateMenuOpen((v) => !v)}
-            >
-              {rateLabel}
-            </button>
-          </div>
+          <button
+            className="mle-popup__skip mle-popup__skip--back"
+            title="10秒戻る"
+            data-player-control
+            onClick={() => onSeekRelative(-10)}
+          >
+            <span>−10</span>
+          </button>
+          <button
+            className="mle-popup__skip mle-popup__skip--fwd"
+            title="10秒進む"
+            data-player-control
+            onClick={() => onSeekRelative(10)}
+          >
+            <span>+10</span>
+          </button>
+          <PlaybackRatePicker
+            playbackRate={playbackRate}
+            onSetPlaybackRate={onSetPlaybackRate}
+            overlay
+          />
         </div>
       </div>
 
@@ -203,7 +126,12 @@ export default function PopupContent({
           {track?.title ?? "—"}
         </div>
         {playbackError ? (
-          <PlaybackErrorNotice error={playbackError} className="mle-popup__error" />
+          <PlaybackErrorNotice
+            error={playbackError}
+            className="mle-popup__error"
+            onRetry={onRetryError}
+            onDismiss={onDismissError}
+          />
         ) : (
           <div className="mle-popup__work" title={isFilePlayback ? "" : (currentWork?.title ?? "")}>
             {isFilePlayback ? "ファイル" : (currentWork?.title ?? "")}
@@ -217,6 +145,7 @@ export default function PopupContent({
         <button
           className="mle-popup__tbtn"
           title="前のトラック"
+          disabled={isFirstTrack}
           data-player-control
           onClick={onPrev}
         >
@@ -233,6 +162,7 @@ export default function PopupContent({
         <button
           className="mle-popup__tbtn"
           title="次のトラック"
+          disabled={isLastTrack}
           data-player-control
           onClick={onNext}
         >

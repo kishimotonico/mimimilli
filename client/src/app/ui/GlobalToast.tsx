@@ -27,9 +27,15 @@ export interface GlobalToastProps {
   onOpenScan: () => void;
   /** スキャン完了トーストの「要対応を見る」からスキャンモーダルの要対応タブを開く（TASK-428.4） */
   onOpenScanNeedsAttention: () => void;
+  /** トラックスキップ通知の「このトラックを再試行」から、該当トラックを選択し直す */
+  onRetrySkippedTrack: (trackIndex: number) => void;
 }
 
-export default function GlobalToast({ onOpenScan, onOpenScanNeedsAttention }: GlobalToastProps) {
+export default function GlobalToast({
+  onOpenScan,
+  onOpenScanNeedsAttention,
+  onRetrySkippedTrack,
+}: GlobalToastProps) {
   const scanError = useAtomValue(scanErrorAtom);
   const scanResultToast = useAtomValue(scanResultToastAtom);
   const setScanResultToast = useSetAtom(scanResultToastAtom);
@@ -114,8 +120,13 @@ export default function GlobalToast({ onOpenScan, onOpenScanNeedsAttention }: Gl
   if (playerSkipToast) {
     return (
       <Toast
-        message={playerSkipToast}
+        message={playerSkipToast.message}
         variant="warning"
+        actionLabel="このトラックを再試行"
+        onAction={() => {
+          onRetrySkippedTrack(playerSkipToast.trackIndex);
+          setPlayerSkipToast(null);
+        }}
         onDismiss={() => setPlayerSkipToast(null)}
       />
     );

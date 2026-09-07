@@ -136,7 +136,10 @@ export function usePlayerRuntime() {
           loadTrack(command.item, command.autoplay);
           break;
         case "notifyTrackSkipped":
-          setSkipToast(formatSkippedTrackToast(command.trackTitle));
+          setSkipToast({
+            message: formatSkippedTrackToast(command.trackTitle),
+            trackIndex: command.trackIndex,
+          });
           break;
       }
     });

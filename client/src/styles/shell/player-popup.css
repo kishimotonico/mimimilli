@@ -101,7 +101,13 @@
 .mle-popup__skip--fwd {
   right: 14px;
 }
+/* PlaybackRatePicker のルート。既定は非配置（inline）。ポップアップのカバー画像上では
+   .mle-popup__cover-wrap 側でカバー右下に重ねる（下の絶対配置ルール）。 */
 .mle-ratepick {
+  position: relative;
+  display: inline-flex;
+}
+.mle-popup__cover-wrap .mle-ratepick {
   position: absolute;
   right: 8px;
   bottom: 8px;
@@ -218,6 +224,9 @@
 .mle-popup__error svg {
   flex-shrink: 0;
 }
+.mle-popup__error button {
+  flex-shrink: 0;
+}
 .mle-popup__seek {
   flex-shrink: 0;
   padding: 8px 0 2px;
@@ -293,6 +302,10 @@
 .mle-popup__tbtn.is-on {
   color: var(--acc);
   background: var(--acc-soft);
+}
+.mle-popup__tbtn:disabled {
+  color: var(--ink-4);
+  cursor: not-allowed;
 }
 .mle-popup__row {
   flex-shrink: 0;

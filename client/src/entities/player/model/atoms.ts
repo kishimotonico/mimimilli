@@ -22,6 +22,8 @@ export const playerIsActiveAtom = atom((get) => isPlayerActive(get(playerCoreAto
 
 export const playerIsPlayingOrLoadingAtom = atom((get) => get(playerCoreAtom).isPlaying);
 
+export const playerStatusAtom = atom((get) => get(playerCoreAtom).status);
+
 export const playingWorkIdAtom = atom((get) => get(playerCoreAtom).currentWork?.id);
 
 export const playingTrackIndexAtom = atom((get) => get(playerCoreAtom).currentTrackIndex);

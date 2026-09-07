@@ -1,11 +1,15 @@
 import { I } from "../../../shared/ui/Icon";
 import { cn } from "../../../shared/lib/cn";
+import PlaybackRatePicker from "./PlaybackRatePicker";
 
 interface PlayerTransportControlsProps {
   isPlaying: boolean;
   volume: number;
   loop: boolean;
   channelSwap: boolean;
+  playbackRate: number;
+  isFirstTrack: boolean;
+  isLastTrack: boolean;
   onTogglePlay: () => void;
   onSeekRelative: (d: number) => void;
   onNext: () => void;
@@ -13,6 +17,7 @@ interface PlayerTransportControlsProps {
   onSetLoop: (l: boolean) => void;
   onSetChannelSwap: (enabled: boolean) => void;
   onSetVolume: (v: number) => void;
+  onSetPlaybackRate: (r: number) => void;
 }
 
 // 円形のトランスポートボタン（±10秒 / prev / next / ループ / L⇄R入替）共通スタイル。
@@ -25,6 +30,9 @@ export default function PlayerTransportControls({
   volume,
   loop,
   channelSwap,
+  playbackRate,
+  isFirstTrack,
+  isLastTrack,
   onTogglePlay,
   onSeekRelative,
   onNext,
@@ -32,6 +40,7 @@ export default function PlayerTransportControls({
   onSetLoop,
   onSetChannelSwap,
   onSetVolume,
+  onSetPlaybackRate,
 }: PlayerTransportControlsProps) {
   return (
     <div className="mle-nowplaying__controls-transport flex items-center gap-3.5 pt-2">
@@ -47,9 +56,10 @@ export default function PlayerTransportControls({
       <button
         aria-label="前のトラック"
         title="前のトラック"
+        disabled={isFirstTrack}
         data-player-control
         onClick={onPrev}
-        className={cn(ROUND_BTN, "text-ink-1")}
+        className={cn(ROUND_BTN, "text-ink-1 disabled:cursor-not-allowed disabled:text-ink-4")}
       >
         <I.prev size={16} />
       </button>
@@ -65,9 +75,10 @@ export default function PlayerTransportControls({
       <button
         aria-label="次のトラック"
         title="次のトラック"
+        disabled={isLastTrack}
         data-player-control
         onClick={onNext}
-        className={cn(ROUND_BTN, "text-ink-1")}
+        className={cn(ROUND_BTN, "text-ink-1 disabled:cursor-not-allowed disabled:text-ink-4")}
       >
         <I.next size={16} />
       </button>
@@ -100,6 +111,7 @@ export default function PlayerTransportControls({
       >
         <I.swapLR size={16} />
       </button>
+      <PlaybackRatePicker playbackRate={playbackRate} onSetPlaybackRate={onSetPlaybackRate} />
 
       <div className="ml-auto flex items-center gap-2">
         <I.volume size={13} className="text-ink-3" />

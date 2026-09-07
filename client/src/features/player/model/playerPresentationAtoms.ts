@@ -50,4 +50,10 @@ export const nowPlayingViewModeAtom = atomWithStorage<NowPlayingViewMode>(
 );
 
 /** 壊れたトラックをスキップしたときの一時通知。GlobalToast が表示する。 */
-export const playerSkipToastAtom = atom<string | null>(null);
+export interface PlayerSkipToast {
+  message: string;
+  /** スキップされたトラックのindex。「このトラックを再試行」からの trackSelected 用。 */
+  trackIndex: number;
+}
+
+export const playerSkipToastAtom = atom<PlayerSkipToast | null>(null);

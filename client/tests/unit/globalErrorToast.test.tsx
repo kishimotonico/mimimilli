@@ -36,11 +36,16 @@ function renderGlobalToast(
   withApplyRuntime = false,
   onOpenScan = vi.fn(),
   onOpenScanNeedsAttention = vi.fn(),
+  onRetrySkippedTrack = vi.fn(),
 ) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  const toast = createElement(GlobalToast, { onOpenScan, onOpenScanNeedsAttention });
+  const toast = createElement(GlobalToast, {
+    onOpenScan,
+    onOpenScanNeedsAttention,
+    onRetrySkippedTrack,
+  });
   const children = withApplyRuntime
     ? createElement(Fragment, null, toast, createElement(DlsiteBulkApplyRuntime))
     : toast;
@@ -64,13 +69,21 @@ describe("GlobalToast", () => {
     expect(screen.getByText("ライブラリのエクスポートに失敗しました")).toBeTruthy();
   });
 
-  it("playerSkipToastAtom のメッセージを表示する", () => {
+  it("playerSkipToastAtom のメッセージを表示し、再試行で対象トラックを選び直す", () => {
     const store = createStore();
-    store.set(playerSkipToastAtom, "「Track 1」をスキップしました");
+    store.set(playerSkipToastAtom, {
+      message: "「Track 1」を読み込めなかったためスキップしました",
+      trackIndex: 0,
+    });
+    const onRetrySkippedTrack = vi.fn();
 
-    renderGlobalToast(store);
+    renderGlobalToast(store, false, vi.fn(), vi.fn(), onRetrySkippedTrack);
 
-    expect(screen.getByText("「Track 1」をスキップしました")).toBeTruthy();
+    expect(
+      screen.getByText("「Track 1」を読み込めなかったためスキップしました"),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByText("このトラックを再試行"));
+    expect(onRetrySkippedTrack).toHaveBeenCalledWith(0);
   });
 
   it("scanErrorAtom のメッセージを表示する", () => {

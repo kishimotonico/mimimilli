@@ -18,6 +18,8 @@ interface BarContentProps {
   onSwitchToPopup: () => void;
   onSetVolume: (volume: number) => void;
   onStop: () => void;
+  onRetryError: () => void;
+  onDismissError: () => void;
 }
 
 export default function BarContent({
@@ -29,6 +31,8 @@ export default function BarContent({
   onSwitchToPopup,
   onSetVolume,
   onStop,
+  onRetryError,
+  onDismissError,
 }: BarContentProps) {
   const {
     currentWork,
@@ -62,7 +66,12 @@ export default function BarContent({
             {track?.title ?? "—"}
           </span>
           {playbackError ? (
-            <PlaybackErrorNotice error={playbackError} className="mle-bar1__error" />
+            <PlaybackErrorNotice
+              error={playbackError}
+              className="mle-bar1__error"
+              onRetry={onRetryError}
+              onDismiss={onDismissError}
+            />
           ) : (
             <span
               className="mle-bar1__work"

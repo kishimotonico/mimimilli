@@ -283,6 +283,7 @@ export default function App() {
               <GlobalToast
                 onOpenScan={handleOpenScanModal}
                 onOpenScanNeedsAttention={handleOpenScanNeedsAttention}
+                onRetrySkippedTrack={player.setTrackIndex}
               />
             </>
           }

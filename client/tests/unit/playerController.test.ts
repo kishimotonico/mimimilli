@@ -204,7 +204,7 @@ describe("PlayerController scenarios", () => {
         item: { ...item(), trackIndex: 1 },
         autoplay: true,
       },
-      { type: "notifyTrackSkipped", trackTitle: "Track 1" },
+      { type: "notifyTrackSkipped", trackTitle: "Track 1", trackIndex: 0 },
     ]);
   });
 
@@ -248,6 +248,7 @@ describe("PlayerController scenarios", () => {
     expect(result.commands.at(-1)).toEqual({
       type: "notifyTrackSkipped",
       trackTitle: "Track 2",
+      trackIndex: 1,
     });
   });
 
@@ -277,6 +278,50 @@ describe("PlayerController scenarios", () => {
 
     expect(result.state.status).toBe("idle");
     expect(result.state.playbackError).toBeNull();
+    expect(result.commands).toEqual([]);
+  });
+
+  it("error状態でのretryRequestedは同じ項目を再読み込みする", () => {
+    const error = { source: "media" as const, code: 4, message: "unsupported" };
+    const result = scenario([
+      { type: "startRequested", item: { ...item(), trackIndex: 1 } },
+      { type: "audioFailed", error },
+      { type: "retryRequested" },
+    ]);
+
+    expect(result.state.status).toBe("loading");
+    expect(result.state.playbackError).toBeNull();
+    expect(result.state.consecutiveTrackFailures).toBe(0);
+    expect(result.commands).toEqual([
+      {
+        type: "loadTrack",
+        item: { ...item(), trackIndex: 1 },
+        positionSec: result.state.positionSec,
+        autoplay: true,
+      },
+    ]);
+  });
+
+  it("error状態以外でのretryRequestedは何もしない", () => {
+    const result = scenario([
+      { type: "startRequested", item: item() },
+      { type: "retryRequested" },
+    ]);
+
+    expect(result.commands).toEqual([]);
+  });
+
+  it("error状態のerrorDismissedはpausedへ戻りエラーを消す", () => {
+    const error = { source: "media" as const, code: 4, message: "unsupported" };
+    const result = scenario([
+      { type: "startRequested", item: { ...item(), trackIndex: 1 } },
+      { type: "audioFailed", error },
+      { type: "errorDismissed" },
+    ]);
+
+    expect(result.state.status).toBe("paused");
+    expect(result.state.playbackError).toBeNull();
+    expect(result.state.consecutiveTrackFailures).toBe(0);
     expect(result.commands).toEqual([]);
   });
 });

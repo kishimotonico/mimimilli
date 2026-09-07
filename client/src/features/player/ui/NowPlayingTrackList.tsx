@@ -1,6 +1,6 @@
-import { formatDuration } from "../../../shared/lib/format";
+import { formatTrackDuration } from "../../../shared/lib/trackDuration";
 import { cn } from "../../../shared/lib/cn";
-import type { PlaybackTrack } from "../model/trackTime";
+import { isResolvedTrack, type PlaybackTrack } from "../model/trackTime";
 
 interface NowPlayingTrackListProps {
   tracks: PlaybackTrack[];
@@ -50,7 +50,7 @@ export default function NowPlayingTrackList({
                   {t.title}
                 </span>
                 <span className="text-right font-mono text-mono text-ink-2">
-                  {t.end != null && t.start != null ? (formatDuration(t.end - t.start) ?? "") : ""}
+                  {isResolvedTrack(t) ? formatTrackDuration(t) : "--:--"}
                 </span>
               </button>
             );
