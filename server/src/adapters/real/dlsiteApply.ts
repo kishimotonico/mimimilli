@@ -1,6 +1,7 @@
 import {
   applyDlsiteStatePatch,
   dedupeTags,
+  mergeAppliedDlsiteTags,
   workMediaRoot,
   type DlsiteStatePatch,
   type NormalizedTag,
@@ -49,7 +50,7 @@ export function createDlsiteApply(deps: DlsiteApplyDeps) {
       } = {};
       if (body.applyTitle && body.info.title) patch.title = body.info.title;
       const { applyTags } = body;
-      if (applyTags.length > 0) patch.tags = dedupeTags([...work.tags, ...applyTags]);
+      if (applyTags.length > 0) patch.tags = mergeAppliedDlsiteTags(work.tags, applyTags);
       if (body.applyUrl && body.info.url) {
         patch.urls = [
           ...work.urls.filter((entry) => !entry.url.includes("dlsite.com")),

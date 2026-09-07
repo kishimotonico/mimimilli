@@ -1,4 +1,9 @@
-import { applyDlsiteStatePatch, dedupeTags, hasRjCode, mergeDlsiteTags } from "@mimimilli/shared";
+import {
+  applyDlsiteStatePatch,
+  fillUnsetDlsiteTags,
+  hasRjCode,
+  mergeAppliedDlsiteTags,
+} from "@mimimilli/shared";
 import type {
   DlsiteApplyMissingPreviewItem,
   DlsiteBulkResult,
@@ -16,7 +21,7 @@ import { buildFullWorkFromState } from "./playback.ts";
 
 /** dlsiteApplyMissing / dlsiteApplyMissingPreview が共有する差分計算。既存値は上書きしない */
 function computeMissingDiff(work: WorkSummary, info: DlsiteWorkInfo) {
-  const newTags = mergeDlsiteTags(work.tags, info).filter((tag) => !work.tags.includes(tag));
+  const newTags = fillUnsetDlsiteTags(work.tags, info);
   const applyCover = !work.cover && info.coverUrl !== null;
   const applyUrl = !work.urls.some((entry) => entry.url.includes("dlsite.com"));
   return { newTags, applyCover, applyUrl };
@@ -72,7 +77,7 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
           skipped += 1;
           continue;
         }
-        work.tags = dedupeTags([...work.tags, ...newTags]);
+        work.tags = mergeAppliedDlsiteTags(work.tags, newTags);
         if (applyUrl) {
           work.urls = [...work.urls, { label: "DLsite", url: fetched.info.url }];
         }
@@ -104,7 +109,7 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
       if (!work) return false;
       if (body.applyTitle) work.title = body.info.title;
       const { applyTags } = body;
-      work.tags = dedupeTags([...work.tags, ...applyTags]);
+      work.tags = mergeAppliedDlsiteTags(work.tags, applyTags);
       if (body.applyCover && body.info.coverUrl) {
         const dimensions = work.cover?.dimensions ?? { width: 900, height: 900 };
         const columns: FixtureCoverColumns = {
