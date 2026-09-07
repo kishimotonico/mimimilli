@@ -75,6 +75,7 @@ async function run(input: WorkerInput): Promise<void> {
         query,
         catalog,
         thumbnailCacheDir: input.thumbnailCacheDir,
+        root: input.root,
         throwIfCancelled: () => {
           if (cancelled(token)) throw new Error("スキャンはキャンセルされました");
         },

@@ -8,7 +8,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import SettingsModal from "../../src/features/settings/ui/SettingsModal";
 import { dlsiteBulkActionsAtom } from "../../src/entities/dlsite/model/bulkAtoms";
-import { rootFolderChangedAtAtom } from "../../src/entities/settings/model/rootFolderChangeAtoms";
 import { ApiRequestError } from "../../src/shared/api/http";
 
 beforeEach(() => {
@@ -29,7 +28,8 @@ interface RenderModalOptions {
   onOpenScan?: ReturnType<typeof vi.fn>;
   onChangeFolder?: ReturnType<typeof vi.fn>;
   lastScanTime?: string | null;
-  rootFolderChangedAt?: string | null;
+  /** 直近の完了スキャンが対象にしたルートフォルダー。既定は rootFolder と同一（notice非表示） */
+  lastScanRootFolder?: string | null;
 }
 
 function renderModal(options: RenderModalOptions = {}) {
@@ -46,10 +46,7 @@ function renderModal(options: RenderModalOptions = {}) {
     cancel: vi.fn(),
     dismiss: vi.fn(),
   });
-  if (options.rootFolderChangedAt !== undefined) {
-    store.set(rootFolderChangedAtAtom, options.rootFolderChangedAt);
-  }
-  render(
+  const tree = (opts: RenderModalOptions) =>
     createElement(
       QueryClientProvider,
       { client: queryClient },
@@ -58,16 +55,18 @@ function renderModal(options: RenderModalOptions = {}) {
         { store },
         createElement(SettingsModal, {
           rootFolder: "/audio",
-          lastScanTime: options.lastScanTime ?? null,
+          lastScanTime: opts.lastScanTime ?? null,
+          lastScanRootFolder: opts.lastScanRootFolder ?? "/audio",
           onClose,
           onOpenScan,
           onChangeFolder,
           onExport: vi.fn(),
         }),
       ),
-    ),
-  );
-  return { onClose, onOpenScan, onChangeFolder };
+    );
+  const { rerender: rtlRerender, unmount } = render(tree(options));
+  const rerender = (nextOptions: RenderModalOptions) => rtlRerender(tree(nextOptions));
+  return { onClose, onOpenScan, onChangeFolder, rerender, unmount };
 }
 
 function dispatchCancel(dialog: HTMLElement) {
@@ -214,27 +213,42 @@ describe("SettingsModal", () => {
     expect(screen.getByLabelText("ルートフォルダーのパス")).toBeInTheDocument();
   });
 
-  it("変更後・再スキャン完了前は一覧が古い内容であることを示すinline noticeを表示する", () => {
-    renderModal({
-      rootFolderChangedAt: "2026-09-07T12:00:00.000Z",
-      lastScanTime: "2026-09-07T11:00:00.000Z",
-    });
-    expect(
-      screen.getByText(
-        "一覧は変更前のフォルダーの内容です。再スキャンすると新しいフォルダーの内容に更新されます。",
-      ),
-    ).toBeInTheDocument();
+  const STALE_NOTICE_TEXT =
+    "一覧は変更前のフォルダーの内容です。再スキャンすると新しいフォルダーの内容に更新されます。";
+
+  it("直近スキャンのルートが現在のrootFolderと不一致ならinline noticeを表示する", () => {
+    renderModal({ lastScanRootFolder: "/old-root" });
+    expect(screen.getByText(STALE_NOTICE_TEXT)).toBeInTheDocument();
   });
 
-  it("変更後のlastScanTimeが変更時刻より新しければinline noticeを表示しない", () => {
-    renderModal({
-      rootFolderChangedAt: "2026-09-07T11:00:00.000Z",
-      lastScanTime: "2026-09-07T12:00:00.000Z",
-    });
-    expect(
-      screen.queryByText(
-        "一覧は変更前のフォルダーの内容です。再スキャンすると新しいフォルダーの内容に更新されます。",
-      ),
-    ).toBeNull();
+  it("直近スキャンのルートが現在のrootFolderと一致すればinline noticeを表示しない", () => {
+    renderModal({ lastScanRootFolder: "/audio" });
+    expect(screen.queryByText(STALE_NOTICE_TEXT)).toBeNull();
+  });
+
+  it("サーバーから返る値だけで判定するため、リロード相当（別クエリクライアントでの再取得）でも案内が出続ける", () => {
+    // クライアントのメモリ状態（jotai store・queryClient）を作り直しても、
+    // settings応答のlastScanRootFolderがrootFolderと不一致な限りnoticeは出続ける。
+    const { unmount } = renderModal({ lastScanRootFolder: "/old-root" });
+    expect(screen.getByText(STALE_NOTICE_TEXT)).toBeInTheDocument();
+    unmount();
+
+    renderModal({ lastScanRootFolder: "/old-root" });
+    expect(screen.getByText(STALE_NOTICE_TEXT)).toBeInTheDocument();
+  });
+
+  it("サーバー再起動相当（プロセスをまたぐgetSettings由来のprops）でも案内が出続ける", () => {
+    // rootFolderChangedAtのようなクライアントメモリの起点を持たないため、
+    // サーバープロセスが再起動してsettingsの応答だけが渡された場合でも同じ結果になる。
+    renderModal({ lastScanRootFolder: "/old-root", lastScanTime: "2026-09-01T00:00:00.000Z" });
+    expect(screen.getByText(STALE_NOTICE_TEXT)).toBeInTheDocument();
+  });
+
+  it("再スキャン完了後（lastScanRootFolderがrootFolderに追いつく）はinline noticeが消える", () => {
+    const { rerender } = renderModal({ lastScanRootFolder: "/old-root" });
+    expect(screen.getByText(STALE_NOTICE_TEXT)).toBeInTheDocument();
+
+    rerender({ lastScanRootFolder: "/audio" });
+    expect(screen.queryByText(STALE_NOTICE_TEXT)).toBeNull();
   });
 });

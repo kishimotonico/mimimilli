@@ -32,6 +32,7 @@ function renderSetupApp() {
   queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), {
     rootFolder: null,
     lastScanTime: null,
+    lastScanRootFolder: null,
   });
 
   function Wrapper() {
@@ -88,9 +89,11 @@ describe("SetupScreen 経路", () => {
   });
 
   it("パス送信で setRootFolder とスキャン開始を呼ぶ", async () => {
-    const setRootFolder = vi
-      .spyOn(settingsApi, "setRootFolder")
-      .mockResolvedValue({ rootFolder: "/audio/library", lastScanTime: null });
+    const setRootFolder = vi.spyOn(settingsApi, "setRootFolder").mockResolvedValue({
+      rootFolder: "/audio/library",
+      lastScanTime: null,
+      lastScanRootFolder: null,
+    });
     const startScan = vi.spyOn(scanApi, "startScan").mockResolvedValue(runningJob);
 
     renderSetupApp();
@@ -126,6 +129,7 @@ describe("SetupScreen 経路", () => {
     vi.spyOn(settingsApi, "setRootFolder").mockResolvedValue({
       rootFolder: "/audio/library",
       lastScanTime: null,
+      lastScanRootFolder: null,
     });
     vi.spyOn(scanApi, "startScan").mockRejectedValue(new Error("start failed"));
 
@@ -145,6 +149,7 @@ describe("SetupScreen 経路", () => {
     expect(queryClient.getQueryData(SETTINGS_QUERY_KEYS.all())).toEqual({
       rootFolder: null,
       lastScanTime: null,
+      lastScanRootFolder: null,
     });
   });
 
@@ -152,6 +157,7 @@ describe("SetupScreen 経路", () => {
     vi.spyOn(settingsApi, "setRootFolder").mockResolvedValue({
       rootFolder: "/audio/library",
       lastScanTime: null,
+      lastScanRootFolder: null,
     });
     vi.spyOn(scanApi, "startScan").mockRejectedValue(
       new Error("ルートフォルダーにアクセスできません: /audio/library"),

@@ -12,7 +12,6 @@ import {
 import { useDlsiteBulkActions } from "../../../entities/dlsite/useDlsiteBulkActions";
 import { useDlsiteBulkApplyActions } from "../../../entities/dlsite/useDlsiteBulkApplyActions";
 import { scanningAtom, scanProgressLabelAtom } from "../../../entities/scan/model/atoms";
-import { rootFolderChangedAtAtom } from "../../../entities/settings/model/rootFolderChangeAtoms";
 import TagPrefixSettings from "./TagPrefixSettings";
 import ExcludedFoldersSettings from "./ExcludedFoldersSettings";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
@@ -29,6 +28,8 @@ const ROW_CLASS = "flex items-center gap-2";
 interface SettingsModalProps {
   rootFolder: string | null;
   lastScanTime: string | null;
+  /** 直近の完了スキャンが対象にしたルートフォルダー。rootFolderと不一致なら一覧が未反映 */
+  lastScanRootFolder: string | null;
   onClose: () => void;
   /** TopBarのスキャンボタンと同じくスキャンモーダルを開く（即時実行はしない、TASK-56） */
   onOpenScan: () => void;
@@ -40,6 +41,7 @@ interface SettingsModalProps {
 export default function SettingsModal({
   rootFolder,
   lastScanTime,
+  lastScanRootFolder,
   onClose,
   onOpenScan,
   onChangeFolder,
@@ -59,9 +61,7 @@ export default function SettingsModal({
   const [savingFolder, setSavingFolder] = useState(false);
   const [folderError, setFolderError] = useState<string | null>(null);
   const folderInputRef = useRef<HTMLInputElement | null>(null);
-  const rootFolderChangedAt = useAtomValue(rootFolderChangedAtAtom);
-  const rootFolderStale =
-    rootFolderChangedAt !== null && (!lastScanTime || lastScanTime < rootFolderChangedAt);
+  const rootFolderStale = rootFolder !== null && rootFolder !== lastScanRootFolder;
 
   const dismiss = () => {
     if (isEditingFolder) {

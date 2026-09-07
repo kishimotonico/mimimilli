@@ -34,10 +34,7 @@ import { useDownloadLibraryExport } from "../features/library/useDownloadLibrary
 import { useScanActions } from "../entities/scan/useScanActions";
 import { setRootFolder } from "../entities/settings/api";
 import { useSettingsQuery } from "../entities/settings/useSettingsQuery";
-import {
-  rootFolderChangedAtAtom,
-  rootFolderChangedToastAtom,
-} from "../entities/settings/model/rootFolderChangeAtoms";
+import { rootFolderChangedToastAtom } from "../entities/settings/model/rootFolderChangeAtoms";
 import NavigationHistorySync from "../features/navigation/ui/NavigationHistorySync";
 import { setAppModeAtom } from "../shared/model/appModeAtoms";
 import {
@@ -59,7 +56,6 @@ export default function App() {
   const scanActions = useScanActions();
   const queryClient = useQueryClient();
   const setErrorToast = useSetAtom(errorToastAtom);
-  const setRootFolderChangedAt = useSetAtom(rootFolderChangedAtAtom);
   const setRootFolderChangedToast = useSetAtom(rootFolderChangedToastAtom);
   const setAppMode = useSetAtom(setAppModeAtom);
   const setFilesRelPath = useSetAtom(filesRelPathAtom);
@@ -88,7 +84,6 @@ export default function App() {
     mutationFn: setRootFolder,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() });
-      setRootFolderChangedAt(new Date().toISOString());
       setRootFolderChangedToast(true);
     },
   });
@@ -250,6 +245,7 @@ export default function App() {
                   <SettingsModal
                     rootFolder={settings?.rootFolder ?? null}
                     lastScanTime={settings?.lastScanTime ?? null}
+                    lastScanRootFolder={settings?.lastScanRootFolder ?? null}
                     onClose={handleCloseModal}
                     onOpenScan={() => setActiveModal("scan")}
                     onChangeFolder={handleChangeFolder}

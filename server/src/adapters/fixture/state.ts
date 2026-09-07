@@ -19,6 +19,8 @@ export interface PlaybackIds {
 export interface FixtureState {
   rootFolder: string | null;
   lastScanTime: string | null;
+  /** 直近の完了スキャンが対象にしたルートフォルダー。rootFolderと不一致なら一覧が未反映であることを示す */
+  lastScanRootFolder: string | null;
   works: WorkSummary[];
   /** 編集用カバー列（表示用 cover と独立。unmeasured を表現する） */
   coverColumns: Map<string, FixtureCoverColumns>;
@@ -62,6 +64,7 @@ export function createInitialState(options: FixtureAdapterOptions): FixtureState
   return {
     rootFolder: scenario.rootFolder,
     lastScanTime: scenario.lastScanTime,
+    lastScanRootFolder: scenario.rootFolder,
     works,
     coverColumns,
     tagPrefixes: DEFAULT_TAG_PREFIXES.map((def) => ({ ...def })),
