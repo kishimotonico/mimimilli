@@ -34,7 +34,8 @@ export interface UserErrorDisplay {
  * エラーを分類してユーザー向け表示に変換する。
  * - 通信不能（fetch自体が失敗）: サーバー起動確認を案内する固定文言、生の内容はdetailへ
  * - 契約エラー（ApiResponseSchemaError・レスポンス形状不一致）: 固定文言、生の内容はdetailへ
- * - それ以外（ApiRequestError等、既に人間可読なmessageを持つError・文字列）: messageをそのまま表示
+ * - それ以外（ApiRequestError等、既に人間可読なmessageを持つError・文字列）: messageをそのまま表示。
+ *   Errorであればスタックトレースをdetailへ添える（RootErrorBoundaryの描画クラッシュ調査に必須）
  * - messageが無い・分類できない値: fallbackを表示
  */
 export function formatUserError(error: unknown, fallback: string): UserErrorDisplay {
@@ -48,7 +49,7 @@ export function formatUserError(error: unknown, fallback: string): UserErrorDisp
     if (isContractMismatchMessage(error.message)) {
       return { message: CONTRACT_MISMATCH_MESSAGE, detail: error.message };
     }
-    return { message: error.message || fallback, detail: null };
+    return { message: error.message || fallback, detail: error.stack ?? null };
   }
   if (typeof error === "string") {
     if (isNetworkUnreachableMessage(error)) {

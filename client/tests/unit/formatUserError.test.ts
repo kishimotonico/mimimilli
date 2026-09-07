@@ -20,7 +20,7 @@ describe("formatUserError", () => {
     );
     const result = formatUserError(error, "fallback");
     expect(result.message).toBe("指定されたルートフォルダーが存在しません");
-    expect(result.detail).toBeNull();
+    expect(result.detail).toContain("指定されたルートフォルダーが存在しません");
   });
 
   it("ApiResponseSchemaErrorは契約エラーの固定文言にし、生の内容をdetailへ回す", () => {
@@ -34,11 +34,11 @@ describe("formatUserError", () => {
     expect(result.detail).toContain("rootFolder");
   });
 
-  it("既に人間可読なmessageを持つErrorはそのまま表示する（従来どおり）", () => {
+  it("既に人間可読なmessageを持つErrorはそのまま表示し、スタックトレースはdetailへ添える", () => {
     const error = new Error("テスト用のレンダリングエラー");
     const result = formatUserError(error, "予期しないエラーが発生しました");
     expect(result.message).toBe("テスト用のレンダリングエラー");
-    expect(result.detail).toBeNull();
+    expect(result.detail).toContain("テスト用のレンダリングエラー");
   });
 
   it("messageが空のErrorはfallbackを表示する", () => {
