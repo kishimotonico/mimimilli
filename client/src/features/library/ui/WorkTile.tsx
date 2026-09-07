@@ -7,11 +7,21 @@ import { cn } from "../../../shared/lib/cn";
 import { selectCoverThumbnailWidth } from "../model/gridSizing";
 import type { GridArrowKey } from "../model/gridNavigation";
 
-const GRID_ARROW_KEYS = new Set<GridArrowKey>(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"]);
+const GRID_ARROW_KEYS = new Set<GridArrowKey>([
+  "ArrowLeft",
+  "ArrowRight",
+  "ArrowUp",
+  "ArrowDown",
+  "Home",
+  "End",
+]);
 
 export interface WorkTileProps {
   work: WorkListItem;
   flatIndex: number;
+  /** roving tabindexの現在位置と一致する場合だけ0（それ以外は-1）。
+   *  一覧全体をTabストップ1個にする（TASK-428.12） */
+  tabIndex: 0 | -1;
   tileWidth?: number;
   coverHeight?: number;
   isSelected: boolean;
@@ -26,6 +36,7 @@ export interface WorkTileProps {
 function WorkTile({
   work,
   flatIndex,
+  tabIndex,
   tileWidth,
   coverHeight,
   isSelected,
@@ -48,6 +59,7 @@ function WorkTile({
       type="button"
       className={`mll-grid-tile ${isSelected ? "is-on" : ""}`}
       data-flat-index={flatIndex}
+      tabIndex={tabIndex}
       aria-label={
         statusLabel
           ? `${work.title}を選択（${statusLabel}のため再生できません）`

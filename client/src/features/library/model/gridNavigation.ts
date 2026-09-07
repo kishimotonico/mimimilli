@@ -1,6 +1,6 @@
 import type { JustifiedTile } from "./justifiedLayout";
 
-export type GridArrowKey = "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown";
+export type GridArrowKey = "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown" | "Home" | "End";
 
 export function getNextGridIndex(
   currentIndex: number,
@@ -9,6 +9,8 @@ export function getNextGridIndex(
   itemCount: number,
 ): number {
   if (itemCount <= 0 || columnCount <= 0) return currentIndex;
+  if (key === "Home") return 0;
+  if (key === "End") return itemCount - 1;
 
   const delta =
     key === "ArrowLeft"
@@ -36,6 +38,8 @@ export function getNextJustifiedIndex(
   const current = tiles[currentIndex];
   if (!current) return currentIndex;
 
+  if (key === "Home") return 0;
+  if (key === "End") return tiles.length - 1;
   if (key === "ArrowLeft") return Math.max(0, currentIndex - 1);
   if (key === "ArrowRight") return Math.min(tiles.length - 1, currentIndex + 1);
 

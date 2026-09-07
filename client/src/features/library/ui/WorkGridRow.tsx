@@ -14,6 +14,8 @@ interface WorkGridRowTileProps {
   playingWorkId: string | null;
   isPlaybackActive: boolean;
   safeTileSize: number;
+  /** roving tabindexの現在位置（一覧全体でTabストップ1個にする、TASK-428.12） */
+  rovingIndex: number;
   onWorkSelect: (id: string) => void;
   onWorkPlay: (work: WorkListItem) => void;
   onTileArrowKey: (flatIndex: number, key: GridArrowKey) => void;
@@ -40,6 +42,7 @@ export default function WorkGridRow(props: WorkGridRowProps) {
     playingWorkId,
     isPlaybackActive,
     safeTileSize,
+    rovingIndex,
     onWorkSelect,
     onWorkPlay,
     onTileArrowKey,
@@ -61,6 +64,7 @@ export default function WorkGridRow(props: WorkGridRowProps) {
             key={entry.work.id}
             work={entry.work}
             flatIndex={entry.flatIndex}
+            tabIndex={entry.flatIndex === rovingIndex ? 0 : -1}
             tileWidth={entry.width}
             coverHeight={props.rowHeight}
             isSelected={entry.work.id === selectedWorkId}
@@ -83,16 +87,20 @@ export default function WorkGridRow(props: WorkGridRowProps) {
         } as CSSProperties
       }
     >
-      {props.works.map((work, i) => (
-        <WorkTile
-          key={work.id}
-          work={work}
-          flatIndex={props.startIndex + i}
-          isSelected={work.id === selectedWorkId}
-          isPlaying={work.id === playingWorkId}
-          {...tileProps}
-        />
-      ))}
+      {props.works.map((work, i) => {
+        const flatIndex = props.startIndex + i;
+        return (
+          <WorkTile
+            key={work.id}
+            work={work}
+            flatIndex={flatIndex}
+            tabIndex={flatIndex === rovingIndex ? 0 : -1}
+            isSelected={work.id === selectedWorkId}
+            isPlaying={work.id === playingWorkId}
+            {...tileProps}
+          />
+        );
+      })}
     </div>
   );
 }

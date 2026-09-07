@@ -57,6 +57,16 @@
 - Escapeはレイヤーごとに一段だけ閉じる（`TagCombobox`）。候補表示中のEscapeは候補だけを閉じ、ダイアログのcancelや親popoverのdismissへは伝播させない。候補が閉じているときのEscapeは、呼び出し元が渡した`onCancel`があればそれ（編集キャンセル等）を呼び、`onCancel`が無ければ何もせずネイティブ`<dialog>`のcancelへ素通しする
 - IME変換中（`event.nativeEvent.isComposing`）はEscapeもEnterも無視する。変換の取り消し・確定はIME自身に任せ、候補の開閉・タグ確定・onCancelは発火させない
 
+## 作品一覧・トラック一覧のキーボード操作
+
+作品グリッド（`WorkGrid`）・作品リスト（`WorkListPane`）・トラック一覧（`WorkTrackList`）は共通のキーボード契約に従う（TASK-428.12）。
+
+- roving tabindex: 一覧内の各行/タイルは個別のTabストップにしない。「現在位置」に当たる1件だけ `tabIndex={0}`、他は `tabIndex={-1}` にし、一覧全体でTabストップを1個にする。作品グリッド・作品リストは「選択中の作品（無ければ先頭）」を現在位置にする（選択状態を持つため）。トラック一覧は選択の概念が無いため、初期値は「再生中のトラック（無ければ先頭）」とし、以降は行の`onFocus`で現在位置を更新する（フォーカスされた行がそのまま次のroving対象になる、標準的なroving tabindexの実装）
+- 矢印キー: 上下（グリッドは左右も）で隣接する行/タイルへ移動する。移動先へは選択も追従させる（`onWorkSelect`）。グリッドの列移動は `gridNavigation.ts` の `getNextGridIndex`（固定列）/`getNextJustifiedIndex`（ジャスティファイド、隣接行で横位置が最も近いタイルを選ぶ）、リスト・トラック一覧は同じ `getNextGridIndex` を列数1で流用する（Up/Downが±1になる）。Home/Endは各関数が先頭・末尾のインデックスを返す
+- 仮想化された一覧（グリッド・リスト）は、移動先が現在描画範囲外にあることがある。`virtualizer.scrollToIndex` でスクロールしてから、対象要素が実際にDOMへ現れるまで `requestAnimationFrame` でフォーカスをリトライする（`shared/lib/focusVirtualItem.ts`）。対象行は `data-flat-index` 属性（`works` 配列でのフラットな位置）で特定する。トラック一覧は仮想化していないため、行のrefへ直接 `.focus()` する
+- Enter: その行の主アクション（作品グリッド・リストは再生、`work.status === "ok"` のときだけ。トラックは常に再生）。ダブルクリックも同じ主アクションを呼ぶ（グリッド・リスト共通）
+- Escape: 作品グリッド・リストは、選択中の作品があるときだけ選択解除する（`useWorkResultsDismiss`、両者で共有）。モーダル`<dialog>`が開いている場合、フォーカスが `input`/`textarea`/`select`/`[contenteditable="true"]`/`[aria-expanded="true"]` の中にある場合は何もしない（他レイヤーの操作を横取りしない）。一覧の背景クリック（行/タイル以外）でも同じ選択解除を行う
+
 ## クラス命名
 
 - `mle-`: Explorer / 共通シェル系（フレーム・カラム・アドレスバー・行など File/Library 共通の骨格）

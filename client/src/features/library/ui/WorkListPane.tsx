@@ -12,6 +12,8 @@ import LoadMore from "./LoadMore";
 import { I } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
 import { useVirtualList } from "../../../shared/ui/useVirtualList";
+import { useWorkResultsDismiss } from "./useWorkResultsDismiss";
+import { useWorkListKeyboardNav } from "./useWorkListKeyboardNav";
 
 // 作品一覧のリスト表示（list/grid のうち list）。ADR-0012 §3 によりレイアウトを固定し、
 // 常に結果面全幅で表示する（旧 ContentColumn の300px固定・中間カラム役割は廃止）。
@@ -40,7 +42,10 @@ interface WorkListPaneProps {
   isFetchingNextPage?: boolean;
   onLoadMore?: () => void;
   onWorkSelect: (id: string) => void;
+  onWorkPlay: (work: WorkListItem) => void;
   onClearSearch: () => void;
+  /** Esc・リスト背景クリック時の選択解除 */
+  onDeselect: () => void;
   /** スマートフォルダー軸か。0件時に専用の空状態（条件を編集・絞り込みをすべてクリア）を
    *  出す（TASK-428.24 SF-05） */
   isSmartFolder?: boolean;
@@ -64,11 +69,14 @@ export default function WorkListPane({
   isFetchingNextPage = false,
   onLoadMore,
   onWorkSelect,
+  onWorkPlay,
   onClearSearch,
+  onDeselect,
   isSmartFolder = false,
   onEditSmartFolderRules,
   onClearAllFilters,
 }: WorkListPaneProps) {
+  const isWorkSelected = selectedWorkId !== null;
   const paddingEnd = dockedBarActive
     ? LIST_PADDING_END_BASE + LIST_DOCKED_BAR_EXTRA
     : LIST_PADDING_END_BASE;
@@ -93,6 +101,18 @@ export default function WorkListPane({
         : undefined,
   });
 
+  useWorkResultsDismiss(isWorkSelected, onDeselect, scrollRef, ".mll-wrow");
+  const moveRowFocus = useWorkListKeyboardNav({
+    listRef: scrollRef,
+    works,
+    onWorkSelect,
+    virtualizer,
+  });
+
+  // roving tabindexの現在位置。選択中の作品があればその位置、無ければ先頭（0）を
+  // Tabストップにする（一覧全体でTabストップ1個、TASK-428.12）。
+  const rovingIndex = works.length === 0 ? -1 : Math.max(0, works.findIndex((w) => w.id === selectedWorkId));
+
   const renderWorkRow = useCallback(
     (index: number) => {
       const work = works[index];
@@ -100,14 +120,18 @@ export default function WorkListPane({
       return (
         <WorkRow
           work={work}
+          flatIndex={index}
+          tabIndex={index === rovingIndex ? 0 : -1}
           isSelected={work.id === selectedWorkId}
           isPlaying={work.id === playingWorkId}
           isPlaybackActive={isPlaybackActive}
           onSelect={() => onWorkSelect(work.id)}
+          onPlay={() => onWorkPlay(work)}
+          onArrowKey={moveRowFocus}
         />
       );
     },
-    [works, selectedWorkId, playingWorkId, isPlaybackActive, onWorkSelect],
+    [works, rovingIndex, selectedWorkId, playingWorkId, isPlaybackActive, onWorkSelect, onWorkPlay, moveRowFocus],
   );
 
   return (

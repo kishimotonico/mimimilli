@@ -24,7 +24,7 @@ import {
   useWorkGridJustifiedRows,
 } from "./workGrid/useWorkGridJustifiedLayout";
 import { useWorkGridWheelZoom } from "./workGrid/useWorkGridWheelZoom";
-import { useWorkGridDismiss } from "./workGrid/useWorkGridDismiss";
+import { useWorkResultsDismiss } from "./useWorkResultsDismiss";
 import { useWorkGridKeyboardNav } from "./workGrid/useWorkGridKeyboardNav";
 import WorkGridVirtualContent from "./workGrid/WorkGridVirtualContent";
 
@@ -138,7 +138,7 @@ export default function WorkGrid({
   );
 
   useWorkGridWheelZoom(paneRef, safeTileSize, setTileSize);
-  useWorkGridDismiss(isWorkSelected, onDeselect, scrollRef);
+  useWorkResultsDismiss(isWorkSelected, onDeselect, scrollRef, ".mll-grid-tile");
   const moveTileFocus = useWorkGridKeyboardNav({
     gridEl,
     isJustified,
@@ -149,11 +149,16 @@ export default function WorkGrid({
     virtualizer,
   });
 
+  // roving tabindexの現在位置。選択中の作品があればその位置、無ければ先頭（0）を
+  // Tabストップにする（一覧全体でTabストップ1個、TASK-428.12）。
+  const rovingIndex = works.length === 0 ? -1 : Math.max(0, works.findIndex((w) => w.id === selectedWorkId));
+
   const rowTileProps = {
     selectedWorkId,
     playingWorkId,
     isPlaybackActive,
     safeTileSize: gridTileSize,
+    rovingIndex,
     onWorkSelect,
     onWorkPlay,
     onTileArrowKey: moveTileFocus,

@@ -7,6 +7,7 @@ import {
   type GridArrowKey,
 } from "../../model/gridNavigation";
 import type { JustifiedLayout } from "../../model/justifiedLayout";
+import { focusVirtualItem } from "../../../../shared/lib/focusVirtualItem";
 
 interface UseWorkGridKeyboardNavOptions {
   gridEl: HTMLDivElement | null;
@@ -46,20 +47,7 @@ export function useWorkGridKeyboardNav({
       const nextWork = works[nextIndex];
       if (nextWork) onWorkSelect(nextWork.id);
 
-      virtualizer.scrollToIndex(rowIndex, { align: "auto" });
-
-      let attempts = 0;
-      const tryFocus = () => {
-        if (attempts++ > 20) return;
-        const tile = gridEl.querySelector<HTMLElement>(`[data-flat-index="${nextIndex}"]`);
-        if (tile) {
-          tile.focus({ preventScroll: true });
-          tile.scrollIntoView({ block: "nearest", inline: "nearest" });
-        } else {
-          requestAnimationFrame(tryFocus);
-        }
-      };
-      requestAnimationFrame(tryFocus);
+      focusVirtualItem(gridEl, virtualizer, rowIndex, `[data-flat-index="${nextIndex}"]`);
     },
     [gridEl, isJustified, justifiedLayout, columnCount, works, onWorkSelect, virtualizer],
   );

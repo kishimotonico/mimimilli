@@ -5,21 +5,34 @@ import { getWorkStatusLabel } from "../../../entities/work/workStatusLabel";
 import { I } from "../../../shared/ui/Icon";
 import { formatDuration } from "../../../shared/lib/format";
 import { cn } from "../../../shared/lib/cn";
+import type { GridArrowKey } from "../model/gridNavigation";
+
+const LIST_ARROW_KEYS = new Set<GridArrowKey>(["ArrowUp", "ArrowDown", "Home", "End"]);
 
 interface WorkRowProps {
   work: WorkListItem;
+  flatIndex: number;
+  /** roving tabindexの現在位置と一致する場合だけ0（それ以外は-1）。
+   *  一覧全体をTabストップ1個にする（TASK-428.12） */
+  tabIndex: 0 | -1;
   isSelected: boolean;
   isPlaying?: boolean;
   isPlaybackActive?: boolean;
   onSelect: () => void;
+  onPlay: () => void;
+  onArrowKey: (flatIndex: number, key: GridArrowKey) => void;
 }
 
 export default function WorkRow({
   work,
+  flatIndex,
+  tabIndex,
   isSelected,
   isPlaying,
   isPlaybackActive,
   onSelect,
+  onPlay,
+  onArrowKey,
 }: WorkRowProps) {
   const sub = [
     work.circleName,
@@ -32,9 +45,35 @@ export default function WorkRow({
     .join(" · ");
 
   const statusLabel = getWorkStatusLabel(work.status);
+  const isPlayable = work.status === "ok";
 
   return (
-    <button type="button" className={`mll-wrow ${isSelected ? "is-on" : ""}`} onClick={onSelect}>
+    <button
+      type="button"
+      className={`mll-wrow ${isSelected ? "is-on" : ""}`}
+      data-flat-index={flatIndex}
+      tabIndex={tabIndex}
+      aria-label={
+        statusLabel
+          ? `${work.title}を選択（${statusLabel}のため再生できません）`
+          : `${work.title}を選択、Enterで再生`
+      }
+      aria-pressed={isSelected}
+      onClick={onSelect}
+      onDoubleClick={() => {
+        if (isPlayable) onPlay();
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          if (isPlayable) onPlay();
+          return;
+        }
+        if (!LIST_ARROW_KEYS.has(event.key as GridArrowKey)) return;
+        event.preventDefault();
+        onArrowKey(flatIndex, event.key as GridArrowKey);
+      }}
+    >
       <div className="mll-wrow__cv">
         <CoverImg
           id={work.id}

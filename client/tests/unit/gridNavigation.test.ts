@@ -18,6 +18,20 @@ describe("library grid keyboard navigation", () => {
     expect(getNextGridIndex(6, "ArrowDown", 3, 8)).toBe(6);
     expect(getNextGridIndex(7, "ArrowRight", 3, 8)).toBe(7);
   });
+
+  it("Home/Endで先頭・末尾へ移動する（TASK-428.12）", () => {
+    expect(getNextGridIndex(4, "Home", 3, 8)).toBe(0);
+    expect(getNextGridIndex(4, "End", 3, 8)).toBe(7);
+  });
+
+  it("列数1（リスト表示）ではArrowUp/Downが前後1件移動になる（TASK-428.12）", () => {
+    expect(getNextGridIndex(4, "ArrowDown", 1, 8)).toBe(5);
+    expect(getNextGridIndex(4, "ArrowUp", 1, 8)).toBe(3);
+  });
+
+  it("0件のときは常に現在位置に留まる", () => {
+    expect(getNextGridIndex(0, "End", 3, 0)).toBe(0);
+  });
 });
 
 describe("justified grid keyboard navigation", () => {
@@ -52,5 +66,10 @@ describe("justified grid keyboard navigation", () => {
   it("returns the current index for an out-of-range start", () => {
     expect(getNextJustifiedIndex(tiles, 99, "ArrowRight")).toBe(99);
     expect(getNextJustifiedIndex([], 0, "ArrowDown")).toBe(0);
+  });
+
+  it("Home/Endで先頭・末尾へ移動する（TASK-428.12）", () => {
+    expect(getNextJustifiedIndex(tiles, 2, "Home")).toBe(0);
+    expect(getNextJustifiedIndex(tiles, 0, "End")).toBe(4);
   });
 });
