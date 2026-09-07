@@ -43,7 +43,11 @@ https://www.dlsite.com/pro/work/=/product_id/VJ000000.html
 
 **手動プレビュー→適用**: `POST /dlsite/:id/fetch` で取得結果をプレビューし、ユーザーが選んだ項目だけを `POST /dlsite/:id/apply`（`DlsiteApplyBody`）で反映する。タイトル・タグ・カバーそれぞれに適用可否のフラグがあり、ユーザーが個別に選べる。
 
-**未設定項目をまとめて適用**（設定モーダル）: `POST /dlsite/apply-missing/preview` で対象作品ごとの差分（追加タグ・cover/url適用有無）を取得し、差分のある作品をユーザーが選んでから `POST /dlsite/apply-missing`（選択したworkIdsのみ）で反映する。差分計算は `fillUnsetDlsiteTags` を通した `computeMissingDiff`（`server/src/adapters/{real,fixture}/dlsiteMethods.ts`）で、プレビューと実適用が同じ関数を使うため食い違わない（TASK-428.1）。
+**未設定項目をまとめて適用**（設定モーダル）: `POST /dlsite/apply-missing/preview` で対象作品ごとの差分（追加タグ・cover/url適用有無）を取得し、差分のある作品をユーザーが選んでから `POST /dlsite/apply-missing`（選択したworkIdsのみ）で反映する。差分計算のロジックは `fillUnsetDlsiteTags` を通した `computeMissingDiff`（`server/src/adapters/{real,fixture}/dlsiteMethods.ts`）をプレビューと実適用で共有している（TASK-428.1）。
+
+ただし適用時に送るのは選択した workIds のみで、プレビュー時にクライアントが見た差分オブジェクト（`newTags` 等）そのものは送らない。適用実行時にサーバーが対象作品ごとの差分を独立に再計算するため、プレビュー取得後〜適用実行までの間に対象作品のタグやDLsite側の情報が変わっていた場合、ユーザーが見た内容と実際に適用される内容が食い違う余地がある。差分が消えていた分はskip扱いになり安全側に倒れるが、異なる内容が適用される場合でも警告・エラーは出ない。
+
+このデータドリフト自体への対応（単発適用の`sourceRevision`のようなCASチェック）は行っていない。理由: (1) このアプリはローカル単一ユーザー向けで、プレビュー取得から適用実行までの時間差が短い、(2) 差分が消えた場合はskipされるため壊れる方向には倒れない、(3) 一括適用は「未設定項目を埋める」操作なので、埋める先が既に埋まっていれば埋めない、という結果自体は妥当。将来複数クライアント・長時間放置されたプレビュー等でズレが問題になった場合は改めて検討する。
 
 **一括取得**: `POST /dlsite/bulk` が `runDlsiteBulk`（`index.ts`）を呼び、対象作品をまとめて処理する。`mode` には `new` と `existing` があり、スキャン直後の自動起動（`scanJobManager.ts`）は新規作品だけを対象に `new` で呼ぶ。手動の「まとめて取得」ボタンは `existing` で呼ぶ。
 
