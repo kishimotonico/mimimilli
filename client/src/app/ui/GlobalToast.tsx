@@ -150,7 +150,11 @@ export default function GlobalToast({ onOpenScan, onOpenScanNeedsAttention }: Gl
 
   if (dlsiteBulkApplyResult) {
     return (
-      <Toast message={dlsiteBulkApplyResult} variant="success" onDismiss={dismissDlsiteBulkApply} />
+      <Toast
+        message={dlsiteBulkApplyResult.message}
+        variant={dlsiteBulkApplyResult.variant}
+        onDismiss={dismissDlsiteBulkApply}
+      />
     );
   }
 

@@ -212,6 +212,23 @@ export const dlsiteBulkApplyMissingResultSchema = z.object({
 });
 export type DlsiteBulkApplyMissingResult = z.infer<typeof dlsiteBulkApplyMissingResultSchema>;
 
+/** 「未設定項目をまとめて適用」の対象作品1件分の差分。既存値を上書きする項目は含まない
+ *  （TASK-428.1 Q-04: 適用前に差分を表示し、ユーザーが対象を選んでから適用する） */
+export const dlsiteApplyMissingPreviewItemSchema = z.object({
+  workId: z.string(),
+  title: z.string(),
+  newTags: normalizedTagArraySchema,
+  applyCover: z.boolean(),
+  applyUrl: z.boolean(),
+});
+export type DlsiteApplyMissingPreviewItem = z.infer<typeof dlsiteApplyMissingPreviewItemSchema>;
+
+/** POST /api/dlsite/apply-missing/preview の応答。何も変わらない作品は含まない */
+export const dlsiteApplyMissingPreviewSchema = z.object({
+  items: z.array(dlsiteApplyMissingPreviewItemSchema),
+});
+export type DlsiteApplyMissingPreview = z.infer<typeof dlsiteApplyMissingPreviewSchema>;
+
 /** RJ/VJコードの形式。DLsiteキャッシュが受け付ける形式（`^(RJ|VJ)\d{6,8}$`）と一致させる。 */
 export const RJ_CODE_PATTERN = /^(RJ|VJ)\d{6,8}$/i;
 

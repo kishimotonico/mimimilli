@@ -1,5 +1,6 @@
 import type {
   DlsiteApplyBody,
+  DlsiteApplyMissingPreview,
   DlsiteBulkMode,
   DlsiteBulkApplyMissingResult,
   DlsiteBulkProgressEvent,
@@ -29,6 +30,8 @@ export interface DlsiteAdapter {
   ): Promise<boolean>;
   updateDlsiteState(workId: string, patch: DlsiteStatePatch): Promise<Work | null>;
   dlsiteApplyMissing(workIds?: string[]): Promise<DlsiteBulkApplyMissingResult>;
+  /** dlsiteApplyMissing のdry-run。書き込みはせず、対象作品ごとの差分だけを返す */
+  dlsiteApplyMissingPreview(workIds?: string[]): Promise<DlsiteApplyMissingPreview>;
   runDlsiteBulk(
     mode: DlsiteBulkMode,
     workIds: string[] | undefined,

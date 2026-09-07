@@ -1,7 +1,8 @@
 import { useSetAtom, useAtomValue } from "jotai";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback } from "react";
-import { applyDlsiteMissing } from "../../../entities/work/api";
+import { useCallback, useEffect, useState } from "react";
+import type { DlsiteApplyMissingPreviewItem } from "@mimimilli/shared";
+import { applyDlsiteMissing, previewDlsiteMissing } from "../../../entities/work/api";
 import {
   dlsiteBulkApplyBusyAtom,
   dlsiteBulkApplyOpenAtom,
@@ -21,27 +22,81 @@ export default function DlsiteBulkApplyRuntime() {
   const setBusy = useSetAtom(dlsiteBulkApplyBusyAtom);
   const setResult = useSetAtom(dlsiteBulkApplyResultAtom);
   const setErrorToast = useSetAtom(errorToastAtom);
+  const [items, setItems] = useState<DlsiteApplyMissingPreviewItem[] | null>(null);
+  const [selectedWorkIds, setSelectedWorkIds] = useState<Set<string>>(new Set());
 
-  const close = useCallback(() => {
-    if (!busy) setOpen(false);
-  }, [busy, setOpen]);
+  const reset = useCallback(() => {
+    setOpen(false);
+    setItems(null);
+    setSelectedWorkIds(new Set());
+  }, [setOpen]);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setBusy(true);
+    void previewDlsiteMissing()
+      .then((preview) => {
+        if (cancelled) return;
+        if (preview.items.length === 0) {
+          reset();
+          setResult({ message: "DLsiteの情報は現在の内容と同じでした", variant: "info" });
+          return;
+        }
+        setItems(preview.items);
+        setSelectedWorkIds(new Set(preview.items.map((item) => item.workId)));
+      })
+      .catch((cause: unknown) => {
+        if (cancelled) return;
+        reset();
+        setErrorToast(apiErrorMessage(cause, "適用対象の差分を取得できませんでした"));
+      })
+      .finally(() => {
+        if (!cancelled) setBusy(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- openの立ち上がり時だけ実行する
+  }, [open]);
+
+  const toggleWorkId = useCallback((workId: string, checked: boolean) => {
+    setSelectedWorkIds((current) => {
+      const next = new Set(current);
+      if (checked) next.add(workId);
+      else next.delete(workId);
+      return next;
+    });
+  }, []);
 
   const apply = useCallback(async () => {
     setBusy(true);
     try {
-      const result = await applyDlsiteMissing();
-      setOpen(false);
-      setResult(`未設定項目を適用: ${formatDlsiteBulkApplyMissingResult(result)}`);
-      await invalidateDlsiteCache(queryClient);
+      const result = await applyDlsiteMissing([...selectedWorkIds]);
+      reset();
+      setResult({
+        message: `未設定項目を適用: ${formatDlsiteBulkApplyMissingResult(result)}`,
+        variant: "success",
+      });
+      await invalidateDlsiteCache(queryClient, [...selectedWorkIds]);
     } catch (cause) {
-      setOpen(false);
+      reset();
       setErrorToast(apiErrorMessage(cause, "未設定項目の一括適用に失敗しました"));
     } finally {
       setBusy(false);
     }
-  }, [queryClient, setBusy, setErrorToast, setOpen, setResult]);
+  }, [queryClient, reset, selectedWorkIds, setBusy, setErrorToast, setResult]);
 
-  if (!open) return null;
+  if (!open || !items) return null;
 
-  return <DlsiteBulkApplyDialog busy={busy} onApply={() => void apply()} onClose={close} />;
+  return (
+    <DlsiteBulkApplyDialog
+      items={items}
+      selectedWorkIds={selectedWorkIds}
+      busy={busy}
+      onToggleWorkId={toggleWorkId}
+      onApply={() => void apply()}
+      onClose={reset}
+    />
+  );
 }

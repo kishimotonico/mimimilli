@@ -1,9 +1,11 @@
 import { applyDlsiteStatePatch, dedupeTags, hasRjCode, mergeDlsiteTags } from "@mimimilli/shared";
 import type {
+  DlsiteApplyMissingPreviewItem,
   DlsiteBulkResult,
   DlsiteFetchResult,
   DlsiteState,
   DlsiteStatePatch,
+  DlsiteWorkInfo,
   Work,
   WorkSummary,
 } from "@mimimilli/shared";
@@ -11,6 +13,14 @@ import type { DlsiteAdapter } from "../../adapter/dlsite.ts";
 import { fixtureCoverFromColumns, type FixtureCoverColumns } from "./data.ts";
 import type { FixtureState } from "./state.ts";
 import { buildFullWorkFromState } from "./playback.ts";
+
+/** dlsiteApplyMissing / dlsiteApplyMissingPreview が共有する差分計算。既存値は上書きしない */
+function computeMissingDiff(work: WorkSummary, info: DlsiteWorkInfo) {
+  const newTags = mergeDlsiteTags(work.tags, info).filter((tag) => !work.tags.includes(tag));
+  const applyCover = !work.cover && info.coverUrl !== null;
+  const applyUrl = !work.urls.some((entry) => entry.url.includes("dlsite.com"));
+  return { newTags, applyCover, applyUrl };
+}
 
 export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
   async function dlsiteFetchByCode(
@@ -57,17 +67,32 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
         }
         const fetched = await dlsiteFetchByCode(work.dlsite.rjCode);
         if (!fetched.ok) continue;
-        const tags = mergeDlsiteTags(work.tags, fetched.info).filter(
-          (tag) => !work.tags.includes(tag),
-        );
-        if (tags.length === 0) {
+        const { newTags, applyCover, applyUrl } = computeMissingDiff(work, fetched.info);
+        if (newTags.length === 0 && !applyCover && !applyUrl) {
           skipped += 1;
           continue;
         }
-        work.tags = dedupeTags([...work.tags, ...tags]);
+        work.tags = dedupeTags([...work.tags, ...newTags]);
+        if (applyUrl) {
+          work.urls = [...work.urls, { label: "DLsite", url: fetched.info.url }];
+        }
         applied += 1;
       }
       return { applied, skipped, failed: 0 };
+    },
+
+    async dlsiteApplyMissingPreview(workIds) {
+      const candidates = state.works.filter((work) => !workIds || workIds.includes(work.id));
+      const items: DlsiteApplyMissingPreviewItem[] = [];
+      for (const work of candidates) {
+        if (!hasRjCode(work.dlsite) || work.dlsite.status === "skipped") continue;
+        const fetched = await dlsiteFetchByCode(work.dlsite.rjCode);
+        if (!fetched.ok) continue;
+        const { newTags, applyCover, applyUrl } = computeMissingDiff(work, fetched.info);
+        if (newTags.length === 0 && !applyCover && !applyUrl) continue;
+        items.push({ workId: work.id, title: work.title, newTags, applyCover, applyUrl });
+      }
+      return { items };
     },
 
     async dlsiteApply(

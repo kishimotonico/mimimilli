@@ -1,11 +1,18 @@
 import { createElement, Fragment } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { DlsiteBulkResult, ScanResult } from "@mimimilli/shared";
 import GlobalToast from "../../src/app/ui/GlobalToast";
 import DlsiteBulkApplyRuntime from "../../src/features/dlsite/ui/DlsiteBulkApplyRuntime";
+
+const previewDlsiteMissing = vi.fn();
+
+vi.mock("../../src/entities/work/api", () => ({
+  applyDlsiteMissing: vi.fn(),
+  previewDlsiteMissing: (...args: unknown[]) => previewDlsiteMissing(...args),
+}));
 import { errorToastAtom } from "../../src/shared/model/errorToastAtom";
 import { playerSkipToastAtom } from "../../src/features/player/model/playerPresentationAtoms";
 import { scanErrorAtom, scanResultToastAtom } from "../../src/entities/scan/model/atoms";
@@ -104,7 +111,18 @@ describe("GlobalToast", () => {
       });
     });
 
-    it("完了時に「未設定項目を適用」を押すと確認ダイアログが開く", () => {
+    it("完了時に「未設定項目を適用」を押すと差分プレビュー付きの確認ダイアログが開く", async () => {
+      previewDlsiteMissing.mockResolvedValue({
+        items: [
+          {
+            workId: "RJ501001",
+            title: "作品A",
+            newTags: ["cv/新CV"],
+            applyCover: false,
+            applyUrl: false,
+          },
+        ],
+      });
       const store = createStore();
       store.set(dlsiteBulkResultAtom, sampleDlsiteResult);
 
@@ -112,7 +130,9 @@ describe("GlobalToast", () => {
 
       expect(screen.getByText(/DLsite一括取得:/)).toBeTruthy();
       fireEvent.click(screen.getByRole("button", { name: "未設定項目を適用" }));
-      expect(screen.getByRole("dialog", { name: "未設定項目をまとめて適用" })).toBeTruthy();
+      await waitFor(() =>
+        expect(screen.getByRole("dialog", { name: /未設定項目をまとめて適用/ })).toBeTruthy(),
+      );
     });
   });
 

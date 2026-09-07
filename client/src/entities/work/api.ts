@@ -16,6 +16,7 @@ import {
   worksPageSchema,
   dlsitePreviewSchema,
   dlsiteBulkStartResponseSchema,
+  dlsiteApplyMissingPreviewSchema,
   dlsiteBulkApplyMissingResultSchema,
   dlsiteBulkCancelResponseSchema,
   dlsiteBulkSnapshotSchema,
@@ -153,6 +154,14 @@ export async function applyDlsiteMissing(workIds?: string[]) {
   return postParsed(
     dlsiteBulkApplyMissingResultSchema,
     "/dlsite/apply-missing",
+    workIds ? { workIds } : undefined,
+  );
+}
+
+export async function previewDlsiteMissing(workIds?: string[]) {
+  return postParsed(
+    dlsiteApplyMissingPreviewSchema,
+    "/dlsite/apply-missing/preview",
     workIds ? { workIds } : undefined,
   );
 }

@@ -3,6 +3,7 @@
 
 import { atom } from "jotai";
 import type { DlsiteBulkProgressSnapshot, DlsiteBulkResult } from "@mimimilli/shared";
+import type { ToastVariant } from "../../../shared/ui/Toast";
 import { formatDlsiteBulkProgressLabel, formatDlsiteBulkWorkLabel } from "./dlsiteProgressLabel";
 
 export const dlsiteBulkActiveAtom = atom(false);
@@ -33,7 +34,9 @@ export const dlsiteBulkApplyOpenAtom = atom(false);
 
 export const dlsiteBulkApplyBusyAtom = atom(false);
 
-export const dlsiteBulkApplyResultAtom = atom<string | null>(null);
+export const dlsiteBulkApplyResultAtom = atom<{ message: string; variant: ToastVariant } | null>(
+  null,
+);
 
 export interface DlsiteBulkActions {
   start: () => Promise<void>;
