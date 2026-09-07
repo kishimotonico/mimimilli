@@ -44,6 +44,7 @@ export default function ScanModal({
   const { start, cancel } = useScanActions();
   const [activeTab, setActiveTab] = useState<ScanTabKey>("unregistered");
   const [unregisteredToast, setUnregisteredToast] = useState<string | null>(null);
+  const [unregisteredToastFailed, setUnregisteredToastFailed] = useState(false);
   // 候補承認で登録された作品ID（このモーダル表示中に蓄積、TASK-325の分離を踏まえクライアント側で
   // 集約する）。insertedWorkIds（スキャン時点の自動登録分）とは別経路のため、ここで結合する。
   const [approvedWorkIds, setApprovedWorkIds] = useState<string[]>([]);
@@ -55,6 +56,7 @@ export default function ScanModal({
   }: CandidatesRegisteredResult) => {
     // 承認分、先頭＝直近。
     setApprovedWorkIds((previous) => dedupeIds(registeredWorkIds, previous));
+    setUnregisteredToastFailed(failedCount > 0);
     setUnregisteredToast(
       failedCount > 0
         ? `${registeredWorkIds.length}件をライブラリに追加しました。${failedCount}件は追加できませんでした。`
@@ -188,6 +190,7 @@ export default function ScanModal({
       </div>
       <Toast
         message={unregisteredToast}
+        variant={unregisteredToastFailed ? "warning" : "success"}
         actionLabel="新規登録済みを見る"
         onAction={() => setActiveTab("newlyRegistered")}
         onDismiss={() => setUnregisteredToast(null)}

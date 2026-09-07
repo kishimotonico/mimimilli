@@ -87,10 +87,32 @@ dismissal に統一しており、3経路とも `useDialogModal` の `onClose` 1
 グローバルトーストは `popover="manual"` + `showPopover()` で同じ top layer に載せ、
 モーダル・ダイアログが開いていても通知が隠れないようにする（TASK-206）。表示は
 `client/src/shared/ui/Toast.tsx` が `document.body` へポータルし、z-index では
-モーダルより上に出せない制約を避ける。トースト表示中も背面のモーダル操作は
-ブロックしない（popover は dialog のようなモーダルフォーカストラップを持たない）。
-top layer 内の前後関係は表示タイミングの新しい方が手前になるため、モーダル表示後に
-トーストを出せば常に最前面に見える。
+モーダルより上に出せない制約を避ける。top layer 内の前後関係は表示タイミングの
+新しい方が手前になるため、モーダル表示後にトーストを出せば常に最前面に見える。
+
+ただし `showModal()` 中の dialog はブラウザが dialog 以外の全体を暗黙に inert 化するため、
+popover で top layer に載せてもクリックは通らない（TASK-327）。`Toast` はこれを2段階で
+回避する。(1) `<Toast>` がJSX上どこで宣言されているかで配置先を自動導出する。開いている
+dialog の中で宣言されていれば（例: ScanModal が自分のJSX内で描くトースト）その dialog
+自身の配下へポータルし、通常の子要素として inert 化の対象から外す（dialog が閉じると
+トーストも消える）。(2) dialog の外で宣言されたグローバルトースト（例: アプリルートの
+`GlobalToast`）は原則 `document.body` へポータルするが、その時点で開いているモーダル
+dialog があれば `useTopmostOpenModalDialog`（`shared/ui/`）で検出し、代わりにその dialog
+直下へポータルする。モーダルが閉じれば body へ戻る。呼び出し側にフラグで選ばせると
+既定値の選び間違いが起きうる（実際に一度回帰させた）ため、常にDOM上の状態から自動導出する。
+
+### Toast の表示寿命・種別（TASK-428.2）
+
+`variant`（`"info" | "success" | "warning" | "error"`）で成功・警告・失敗をアイコンと
+`--state-success` / `--state-warning` / `--state-danger`（`tokens.css`）の配色で区別する。
+表示寿命は種別ではなくaction有無で決まる： action無しは5秒（`TOAST_AUTO_DISMISS_MS`）、
+action付きは10秒（`TOAST_ACTION_AUTO_DISMISS_MS`）で自動的に閉じる。hover中・内部要素への
+focus中はタイマーを止め、離れると残り時間から再開する。`variant="error"` だけは自動消滅
+せず、× ボタンでの手動クローズのみとする（エラーは読み落とし厳禁のため）。
+
+同時に複数のトーストを表示するキューは持たない。`GlobalToast` のように呼び出し側が
+if連鎖で1件だけを選んで描画する運用とし、優先度の高い通知が消えるまで低優先の通知は
+その状態を保持したまま表示を待つ。
 
 ## ライブラリ: チップ列・値一覧行・オーバーレイ
 

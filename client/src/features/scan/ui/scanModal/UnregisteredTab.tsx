@@ -342,6 +342,7 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
       )}
       <Toast
         message={excludeToast ? `「${excludeToast.title}」を候補から外しました` : null}
+        variant="success"
         actionLabel="元に戻す"
         onAction={() => excludeToast && restoreMutation.mutate(excludeToast.path)}
         onDismiss={() => setExcludeToast(null)}

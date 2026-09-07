@@ -89,6 +89,7 @@ export default function ExcludedFoldersSettings() {
 
       <Toast
         message={restoredToast ? `「${restoredToast}」を候補に戻しました` : null}
+        variant="success"
         onDismiss={() => setRestoredToast(null)}
       />
     </div>

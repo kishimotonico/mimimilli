@@ -214,6 +214,7 @@ export function WorkTagEditor({
       )}
       <Toast
         message={tagUndoToast ? `タグ「${tagUndoToast}」を削除しました` : null}
+        variant="success"
         actionLabel="元に戻す"
         onAction={() => void undoRemoveTag()}
         onDismiss={dismissTagUndoToast}

@@ -30,25 +30,34 @@ export default function GlobalToast() {
     useDlsiteBulkApplyActions();
 
   if (scanError) {
-    return <Toast message={scanError} onDismiss={clearScanError} />;
+    return <Toast message={scanError} variant="error" onDismiss={clearScanError} />;
   }
 
   if (errorToast) {
-    return <Toast message={errorToast} onDismiss={() => setErrorToast(null)} />;
+    return <Toast message={errorToast} variant="error" onDismiss={() => setErrorToast(null)} />;
   }
 
   if (playerSkipToast) {
-    return <Toast message={playerSkipToast} onDismiss={() => setPlayerSkipToast(null)} />;
+    return (
+      <Toast
+        message={playerSkipToast}
+        variant="warning"
+        onDismiss={() => setPlayerSkipToast(null)}
+      />
+    );
   }
 
   if (dlsiteBulkApplyResult) {
-    return <Toast message={dlsiteBulkApplyResult} onDismiss={dismissDlsiteBulkApply} />;
+    return (
+      <Toast message={dlsiteBulkApplyResult} variant="success" onDismiss={dismissDlsiteBulkApply} />
+    );
   }
 
   if (dlsiteCancelledResult) {
     return (
       <Toast
         message={`DLsite一括取得を中断しました（${formatDlsiteBulkResult(dlsiteCancelledResult)}）`}
+        variant="warning"
         onDismiss={dismissDlsite}
       />
     );
@@ -58,6 +67,7 @@ export default function GlobalToast() {
     return (
       <Toast
         message={`DLsite一括取得: ${formatDlsiteBulkResult(dlsiteResult)}`}
+        variant={dlsiteResult.failed > 0 ? "warning" : "success"}
         actionLabel="未設定項目を適用"
         onAction={openDlsiteBulkApply}
         onDismiss={dismissDlsite}
@@ -66,7 +76,7 @@ export default function GlobalToast() {
   }
 
   if (dlsiteError) {
-    return <Toast message={dlsiteError} onDismiss={dismissDlsite} />;
+    return <Toast message={dlsiteError} variant="error" onDismiss={dismissDlsite} />;
   }
 
   return <Toast message={null} onDismiss={dismissDlsite} />;
