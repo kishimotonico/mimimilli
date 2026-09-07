@@ -108,12 +108,16 @@ export default function Tag({
     return <span className={tagClass}>{content}</span>;
   }
 
-  const catLabel = definition?.label ?? parsed.prefix.toUpperCase().slice(0, 4);
+  // 未登録 prefix は resolveTagPrefix と同じフォールバック（prefix文字列そのまま）にする。
+  // ラベル・色の解決はここと axisDefinitions.getAxisLabel で結果を揃える（shared/src/tagPrefix.ts）。
+  const catLabel = definition?.label ?? parsed.prefix;
   const valueStyle = { color: tagPrefixColorToCss(definition?.color) };
 
   const content = (
     <>
-      <span className="font-mono text-label uppercase text-ink-2">{catLabel}</span>
+      <span className="max-w-[64px] overflow-hidden text-ellipsis font-mono text-label uppercase text-ink-2">
+        {catLabel}
+      </span>
       <span className="font-medium" style={valueStyle}>
         {parsed.value}
       </span>

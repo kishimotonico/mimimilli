@@ -104,7 +104,7 @@ export class UserWorkStateRepository {
     return this.db.user
       .select()
       .from(tagPrefixes)
-      .orderBy(asc(tagPrefixes.id))
+      .orderBy(asc(tagPrefixes.sortOrder), asc(tagPrefixes.id))
       .all()
       .map((r) =>
         tagPrefixSchema.parse({
@@ -113,6 +113,7 @@ export class UserWorkStateRepository {
           color: r.color,
           showAsAxis: r.showAsAxis,
           protected: r.protected,
+          order: r.sortOrder,
         }),
       );
   }
@@ -126,7 +127,13 @@ export class UserWorkStateRepository {
       color: r.color,
       showAsAxis: r.showAsAxis,
       protected: r.protected,
+      order: r.sortOrder,
     });
+  }
+
+  private nextTagPrefixOrder(): number {
+    const r = this.db.user.select({ sortOrder: tagPrefixes.sortOrder }).from(tagPrefixes).all();
+    return r.reduce((max, row) => Math.max(max, row.sortOrder + 1), 0);
   }
 
   createTagPrefix(input: TagPrefixCreate): TagPrefix | null {
@@ -138,6 +145,7 @@ export class UserWorkStateRepository {
         color: input.color,
         showAsAxis: input.showAsAxis,
         protected: input.protected,
+        sortOrder: this.nextTagPrefixOrder(),
       })
       .onConflictDoNothing()
       .returning({ id: tagPrefixes.id })
@@ -154,6 +162,7 @@ export class UserWorkStateRepository {
     if (patch.color !== undefined) set.color = patch.color;
     if (patch.showAsAxis !== undefined) set.showAsAxis = patch.showAsAxis;
     if (patch.protected !== undefined) set.protected = patch.protected;
+    if (patch.order !== undefined) set.sortOrder = patch.order;
     if (Object.keys(set).length > 0) {
       this.db.user.update(tagPrefixes).set(set).where(eq(tagPrefixes.prefix, prefix)).run();
     }

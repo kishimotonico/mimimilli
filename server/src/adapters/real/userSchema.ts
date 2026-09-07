@@ -11,7 +11,8 @@ export const workStates = sqliteTable("work_states", {
   resumeOffsetSec: real("resume_offset_sec"),
 });
 
-/** タグ prefix 定義。id は表示順（登録順）の安定化用で、APIのキーは prefix。 */
+/** タグ prefix 定義。id は登録順の安定化用（同順位のタイブレーク）、表示順は sortOrder。
+ *  APIのキーは prefix。 */
 export const tagPrefixes = sqliteTable("tag_prefixes", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   prefix: text("prefix").notNull().unique(),
@@ -19,6 +20,7 @@ export const tagPrefixes = sqliteTable("tag_prefixes", {
   color: text("color"),
   showAsAxis: integer("show_as_axis", { mode: "boolean" }).notNull().default(true),
   protected: integer("protected", { mode: "boolean" }).notNull().default(false),
+  sortOrder: integer("sort_order").notNull().default(0),
 });
 
 /** userに分類済みのキーだけを保存するKV。 */

@@ -4,7 +4,7 @@
 // （組み込みの "year" と任意の prefix 軸）。ラベル・軸レールへの表示は
 // サーバーの prefix 定義（GET /tag-prefixes）から引く。
 
-import type { TagPrefix } from "@mimimilli/shared";
+import { resolveTagPrefix, type TagPrefix } from "@mimimilli/shared";
 import type { AxisId } from "./types";
 import type { IconName } from "../../shared/ui/Icon";
 
@@ -46,7 +46,7 @@ export function getAxisLabel(axis: AxisId, tagPrefixes: TagPrefix[] = []): strin
   if (isSmartAxis(axis)) return "スマートフォルダー";
   const builtin = VIEW_AXIS_LABELS[axis] ?? BUILTIN_AXIS_LABELS[axis];
   if (builtin) return builtin;
-  return tagPrefixes.find((p) => p.prefix === axis)?.label ?? axis;
+  return resolveTagPrefix(axis, tagPrefixes).label;
 }
 
 const PREFIX_ICONS: Record<string, IconName> = {

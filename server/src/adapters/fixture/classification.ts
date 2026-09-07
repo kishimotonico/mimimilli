@@ -25,12 +25,13 @@ export function createClassificationMethods(state: FixtureState): Classification
     },
 
     async listTagPrefixes(): Promise<TagPrefix[]> {
-      return state.tagPrefixes;
+      return [...state.tagPrefixes].sort((a, b) => a.order - b.order);
     },
 
     async createTagPrefix(input: TagPrefixCreate): Promise<TagPrefix | null> {
       if (state.tagPrefixes.some((p) => p.prefix === input.prefix)) return null;
-      const created: TagPrefix = { ...input };
+      const nextOrder = state.tagPrefixes.reduce((max, p) => Math.max(max, p.order + 1), 0);
+      const created: TagPrefix = { ...input, order: nextOrder };
       state.tagPrefixes.push(created);
       return created;
     },
@@ -42,6 +43,7 @@ export function createClassificationMethods(state: FixtureState): Classification
       if (patch.color !== undefined) def.color = patch.color;
       if (patch.showAsAxis !== undefined) def.showAsAxis = patch.showAsAxis;
       if (patch.protected !== undefined) def.protected = patch.protected;
+      if (patch.order !== undefined) def.order = patch.order;
       return def;
     },
 
