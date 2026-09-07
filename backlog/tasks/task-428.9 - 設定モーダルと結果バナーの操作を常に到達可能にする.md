@@ -4,7 +4,7 @@ title: 設定モーダルと結果バナーの操作を常に到達可能にす�
 status: To Do
 assignee: []
 created_date: '2026-09-07 09:08'
-updated_date: '2026-09-07 16:02'
+updated_date: '2026-09-07 19:05'
 labels:
   - ui
   - layout
@@ -28,9 +28,9 @@ settings-setup-errors-A/B-04/05。設定本文の固定上限と内側スクロ�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 設定モーダルのbodyだけがスクロールし、header/footerは維持される
-- [ ] #2 prefix・除外フォルダー・エクスポートへマウスとTabの両方で到達できる
-- [ ] #3 プレビュー表示中もエラー作品の一括操作が隠れずクリックできる
-- [ ] #4 pnpm test:smokeに新規失敗がない
-- [ ] #5 設定モーダルのbody以外に入れ子のスクロール領域を置かない（prefix一覧・除外フォルダー一覧はmax-heightと内側スクロールを持たず本文と一緒に伸びる）
+- [x] #1 設定モーダルのbodyだけがスクロールし、header/footerは維持される
+- [x] #2 prefix・除外フォルダー・エクスポートへマウスとTabの両方で到達できる
+- [x] #3 プレビュー表示中もエラー作品の一括操作が隠れずクリックできる
+- [x] #4 pnpm test:smokeに新規失敗がない
+- [x] #5 設定モーダルのbody以外に入れ子のスクロール領域を置かない（prefix一覧・除外フォルダー一覧はmax-heightと内側スクロールを持たず本文と一緒に伸びる）
 <!-- AC:END -->
