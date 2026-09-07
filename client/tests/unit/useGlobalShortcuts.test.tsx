@@ -1,6 +1,6 @@
 import { createElement } from "react";
 import { fireEvent, render } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { useGlobalShortcuts } from "../../src/features/player/model/useGlobalShortcuts";
 
 function TestHost({
@@ -20,26 +20,61 @@ function TestHost({
     createElement("select", null, createElement("option", null, "opt")),
     createElement("div", { role: "slider", tabIndex: 0 }, "slider"),
     createElement("div", { contentEditable: true }, "editable"),
+    createElement(
+      "div",
+      { role: "menu" },
+      createElement("button", { type: "button" }, "menu-item"),
+    ),
+    createElement(
+      "div",
+      { role: "listbox" },
+      createElement("button", { type: "button", role: "option" }, "option"),
+    ),
     createElement("div", { "data-testid": "plain" }, "plain"),
   );
 }
 
+afterEach(() => {
+  document.querySelectorAll("dialog").forEach((el) => el.remove());
+});
+
 describe("useGlobalShortcuts", () => {
-  it("フォーカスがボタン・リンク・select・contentEditableにあるときはネイティブ動作を優先しショートカットを発火しない", () => {
+  it("フォーカスがinput・select・contentEditableにあるときはネイティブ動作を優先しショートカットを発火しない", () => {
     const onTogglePlay = vi.fn();
     const onSeekRelative = vi.fn();
     const { getByRole, getByText } = render(
       createElement(TestHost, { onTogglePlay, onSeekRelative }),
     );
 
-    for (const el of [getByRole("button"), getByRole("link"), getByRole("combobox")]) {
-      fireEvent.keyDown(el, { code: "Space" });
-      fireEvent.keyDown(el, { code: "ArrowLeft" });
-    }
+    fireEvent.keyDown(getByRole("combobox"), { code: "Space" });
+    fireEvent.keyDown(getByRole("combobox"), { code: "ArrowLeft" });
     fireEvent.keyDown(getByText("editable"), { code: "Space" });
 
     expect(onTogglePlay).not.toHaveBeenCalled();
     expect(onSeekRelative).not.toHaveBeenCalled();
+  });
+
+  it("フォーカスがボタン・リンクにあってもSpace/矢印は再生操作に一本化される（ボタン活性化はEnterのみ）", () => {
+    const onTogglePlay = vi.fn();
+    const onSeekRelative = vi.fn();
+    const { getByRole } = render(createElement(TestHost, { onTogglePlay, onSeekRelative }));
+
+    fireEvent.keyDown(getByRole("button", { name: "button" }), { code: "Space" });
+    fireEvent.keyDown(getByRole("link"), { code: "ArrowRight" });
+
+    expect(onTogglePlay).toHaveBeenCalledTimes(1);
+    expect(onSeekRelative).toHaveBeenCalledWith(10);
+  });
+
+  it('role="menu"・role="listbox"配下ではネイティブ操作を優先しショートカットを発火しない', () => {
+    const onTogglePlay = vi.fn();
+    const onSeekRelative = vi.fn();
+    const { getByText } = render(createElement(TestHost, { onTogglePlay, onSeekRelative }));
+
+    fireEvent.keyDown(getByText("menu-item"), { code: "Space" });
+    fireEvent.keyDown(getByText("option"), { code: "Space" });
+
+    expect(onTogglePlay).not.toHaveBeenCalled();
   });
 
   it("フォーカスがsliderにあるとき、Spaceはトグル＋preventDefaultされ、矢印はスライダー側に委ねグローバル側は無反応", () => {
@@ -68,5 +103,21 @@ describe("useGlobalShortcuts", () => {
 
     expect(onTogglePlay).toHaveBeenCalledTimes(1);
     expect(onSeekRelative).toHaveBeenCalledWith(10);
+  });
+
+  it("モーダルdialogが開いている間は、どこにフォーカスがあってもショートカットが発火しない", () => {
+    const dialog = document.createElement("dialog");
+    dialog.setAttribute("open", "");
+    document.body.appendChild(dialog);
+
+    const onTogglePlay = vi.fn();
+    const onSeekRelative = vi.fn();
+    const { getByTestId } = render(createElement(TestHost, { onTogglePlay, onSeekRelative }));
+
+    fireEvent.keyDown(getByTestId("plain"), { code: "Space" });
+    fireEvent.keyDown(getByTestId("plain"), { code: "ArrowLeft" });
+
+    expect(onTogglePlay).not.toHaveBeenCalled();
+    expect(onSeekRelative).not.toHaveBeenCalled();
   });
 });

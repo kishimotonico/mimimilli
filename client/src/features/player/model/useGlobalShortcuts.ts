@@ -1,7 +1,10 @@
 import { useEffect, useRef, useCallback } from "react";
 
-/** ネイティブ操作を優先し、常に（全キー）グローバルショートカットの対象から外す要素。 */
-const SHORTCUT_EXEMPT_SELECTOR = "button, a, input, textarea, select, [contenteditable]";
+/** ネイティブ操作を優先し、常に（全キー）グローバルショートカットの対象から外す要素。
+ *  button/a は含めない: Spaceは「どこにフォーカスがあっても再生/一時停止」に一本化し、
+ *  ボタンの活性化はEnterに任せる（フォーカスがボタンに残っているとSpaceが効かない問題の解消）。 */
+const SHORTCUT_EXEMPT_SELECTOR =
+  'input, textarea, select, [contenteditable], [role="menu"], [role="listbox"]';
 
 /** カスタムスライダー（シーク行・ABハンドル）が自前で処理するキー。Spaceにはスライダー
  *  側のネイティブ動作がないため対象外にせず、従来どおりグローバル側で処理する。 */
@@ -37,6 +40,9 @@ export function useGlobalShortcuts({
   isActiveRef.current = isActive;
 
   const handler = useCallback((e: KeyboardEvent) => {
+    // モーダルdialogが開いている間は、フォーカス位置に関わらず背後の再生を操作しない。
+    if (document.querySelector("dialog[open]")) return;
+
     const target = e.target as HTMLElement;
     if (target.closest?.(SHORTCUT_EXEMPT_SELECTOR)) return;
     if (SLIDER_OWNED_KEYS.has(e.code) && target.closest?.(SLIDER_SELECTOR)) return;

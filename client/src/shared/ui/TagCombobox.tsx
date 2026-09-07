@@ -173,9 +173,24 @@ export default function TagCombobox({
           }
 
           if (event.key === "Escape") {
-            event.preventDefault();
-            setIsOpen(false);
-            onCancel?.();
+            // IME変換中のEscapeは変換取り消しに使う。候補やダイアログは閉じない。
+            if (event.nativeEvent.isComposing) return;
+
+            if (isExpanded) {
+              // 候補だけを閉じる。ダイアログのcancelやpopoverのdismissへ伝播させない。
+              event.preventDefault();
+              event.stopPropagation();
+              setIsOpen(false);
+              return;
+            }
+
+            // 候補が閉じている時は、このコンポーネントが持つ「編集キャンセル」に委譲する。
+            // onCancelが無い呼び出し元では何もせず、ネイティブdialogのEscapeキャンセルへ渡す。
+            if (onCancel) {
+              event.preventDefault();
+              event.stopPropagation();
+              onCancel();
+            }
           }
         }}
       />
