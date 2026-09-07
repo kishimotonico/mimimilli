@@ -13,6 +13,7 @@ import { I } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
 import {
   deriveValueSelectionHandlers,
+  getValueSelectionHint,
   type ValueSelectionIntent,
 } from "../model/valueSelectionContract";
 
@@ -102,6 +103,9 @@ export default function AxisValueList({
           placeholder="値を絞り込み"
           aria-label={`${getAxisLabel(axis, tagPrefixes)}の値を絞り込み`}
         />
+        <span className="font-jp text-caption text-ink-2 whitespace-nowrap">
+          {getValueSelectionHint(valueSelectionIntent.default)}
+        </span>
         {contextQuery && (
           <Button variant="ghost" icon={I.x} onClick={() => setContextQuery("")}>
             クリア

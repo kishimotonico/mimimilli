@@ -134,11 +134,13 @@ if連鎖で1件だけを選んで描画する運用とし、優先度の高い�
 
 方針の正は [ADR-0012](adr/0012-library-axis-as-value-browse.md)。実装からは読み取りにくい規約だけをここに記す。
 
-チップ列（`.mll-tagband`、`FilterChipBand`）は選択フィルタが0件でも常に表示し、末尾の「＋絞り込み」から最初の1件を追加できる。チップの表示文字列は軸を問わず常にフルパス（`buildFilterTag` の出力そのもの）で、省略や軸名の非表示は行わない。
+チップ列（`.mll-tagband`、`FilterChipBand`）は選択フィルタが0件でも常に表示し、末尾の「＋絞り込み」から最初の1件を追加できる。チップの表示文字列は軸を問わず常にフルパスで、省略や軸名の非表示は行わない。ただし組み込み軸の擬似タグ（`@year/2023`等、`buildFilterTag`の出力そのもの）は内部表現のため、`formatFilterChipLabel`（`libraryPresentation.ts`）で「軸ラベル/値」（例:「追加日/2023」）に変換してから表示する。実タグはこの変換を通しても`tag`のまま変わらない。
 
 値の選択操作（軸レールのクイックオーバーレイ・チップの兄弟値ドロップダウン・「＋絞り込み」・値一覧の行/タイル）は、`ValueSelectionIntent`（`client/src/features/library/model/valueSelectionContract.ts`）という単一の契約で表現する。各入口は「既定＝置き換え」「既定＝AND追加」のどちらかだけを宣言し、主クリックの意味・`Ctrl`/`Cmd`+クリックの反転先・追加ボタンの有無は `deriveValueSelectionHandlers` が一意に導出する。既定＝AND追加の入口では戻り値に追加ボタン用ハンドラが存在しないため、「AND追加が既定なのに追加ボタンあり」のような組み合わせは型で表現できない。置き換えは結果面を作品一覧へ進め、AND追加は現在の結果面に留まる（置き換え＝「見たいものが変わった」、AND追加＝「絞り込みを積んでいる途中」）。
 
 背後の action atom は3つある。`replaceLibraryTagAtom`（置き換え）、`toggleLibraryTagAtom`（`Ctrl`/`Cmd`+クリックによる反転先。選択済みなら解除する）、`addLibraryTagAtom`（追加ボタン・既定＝AND追加の主クリック用。冪等で、選択済みなら何もしない）。追加ボタンは常に `addLibraryTagAtom` を呼ぶため選択済みタグを解除せず、選択済みの行には追加ボタン自体を表示しない。コンポーネント側でこれらの action atom を直接分岐させず、必ず `ValueSelectionIntent` を宣言して `deriveValueSelectionHandlers` を経由する。
+
+軸ファセット件数（`GET /axes/:axis`）の「件数基準」も同じ契約から導出する（TASK-428.14）。既定＝置き換えの入口（軸レールのクイックオーバーレイ・チップの兄弟値ドロップダウン・値一覧の行/タイル）は無条件集計（現在の選択タグを一切渡さない）にし、その行を主クリックした結果（選択タグを丸ごと1件に置き換えた後の件数）と画面の表示件数を一致させる。既定＝AND追加の入口（「＋絞り込み」）は現在の選択タグ込みの集計のままにし、「追加したら何件になるか」を示す。どちらの集計を使うかは `deriveFacetCountTags(intent, selectedTags)` で導出し、呼び出し側でハードコードしない。ヒント文言（`.mll-qlist__hint` 等）も同様に `getValueSelectionHint(default)` から導出し、既定＝置き換えは「クリックで置き換え・Ctrl+クリックでAND追加」、既定＝AND追加は「AND追加されます」で統一する。
 
 値行（`AxisValueQuickList`・`AxisValueRows`・`AxisValueGrid`）は `role="listbox"` / `role="option"` を使わない。行は主選択ボタンとAND追加ボタンという2つのフォーカス可能要素を内包しており、ARIAのoption roleが想定するテキスト相当の内容とは合わないため、listboxパターン自体を採らない。行のコンテナは無地の `div`（仮想化の絶対配置ラッパーと責務が重なるため `ul`/`li` は使わない）で、選択状態は実際にフォーカスされる主選択ボタン自身の `aria-pressed` で表す（`WorkTile` の単一ボタンタイルと同じ表現）。矢印キーでの行移動は `data-index` / `data-quicklist-item` を目印にした自前のフォーカス制御で行い、ARIAのlistbox/optionキーボード規約には従わない。行をまとめるスクロールコンテナ（`.mll-qlist__body` / `.mle-col__list` / `.mll-grid-scroll`）には `role="group"` と `aria-label="{軸名}の値一覧"` を付け、複数のフォーカス可能要素を子に持てる集合として名前だけは伝える。軸名は各コンポーネントが `axis`（ID）から自前で `getAxisLabel(axis)` を呼ばず、呼び出し元が `getAxisLabel(axis, tagPrefixes)` で解決した表示ラベルを `axisLabel` propとして受け取る（tagPrefixesを渡さないと未登録prefixでIDがそのまま支援技術に通知されるため）。軸レールのトリガーボタン（`AxisColumn`）は開くパネルが `menu`/`listbox` いずれのパターンでもないため `aria-haspopup` を持たず、開閉状態は `aria-expanded` のみで表す（disclosureパターン）。
 

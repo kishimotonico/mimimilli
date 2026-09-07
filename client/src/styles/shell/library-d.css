@@ -500,13 +500,13 @@
   top: 50%;
   right: 4px;
   transform: translateY(-50%);
-  opacity: 0;
-  pointer-events: none;
+  /* ホバーせずとも見え、押せる（TASK-428.14: AND追加は非hover時・キーボードでも使える）。
+     行にマウスもフォーカスも無い間は目立たせず、hover/focus-withinで完全に見せる。 */
+  opacity: 0.35;
 }
 .mll-vrow:hover .mll-vrow__add,
 .mll-vrow:focus-within .mll-vrow__add {
   opacity: 1;
-  pointer-events: auto;
 }
 .mll-vrow__add:hover {
   background: var(--paper-3);
@@ -576,13 +576,12 @@
   position: absolute;
   top: 8px;
   right: 8px;
-  opacity: 0;
-  pointer-events: none;
+  /* ホバーせずとも見え、押せる（TASK-428.14: AND追加は非hover時・キーボードでも使える）。 */
+  opacity: 0.35;
 }
 .mll-vtile:hover .mll-vtile__add,
 .mll-vtile:focus-within .mll-vtile__add {
   opacity: 1;
-  pointer-events: auto;
 }
 .mll-vtile__add:hover {
   background: var(--paper-3);
@@ -778,13 +777,12 @@
   top: 50%;
   right: 4px;
   transform: translateY(-50%);
-  opacity: 0;
-  pointer-events: none;
+  /* ホバーせずとも見え、押せる（TASK-428.14: AND追加は非hover時・キーボードでも使える）。 */
+  opacity: 0.35;
 }
 .mll-qlist__row:hover .mll-qlist__add,
 .mll-qlist__row:focus-within .mll-qlist__add {
   opacity: 1;
-  pointer-events: auto;
 }
 .mll-qlist__add:hover {
   background: var(--paper-3);

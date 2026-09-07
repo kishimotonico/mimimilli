@@ -207,7 +207,10 @@ export function useLibrarySupportingQueries(nav: LibraryViewState) {
   const libraryStatsQuery = useQuery(libraryTotalQueryOptions);
   const errorViewCountQuery = useQuery(errorViewCountQueryOptions);
   const facetAxis = getFacetAxisForQuery(nav.activeAxis);
-  const facetQuery = useAxisFacetsQuery(facetAxis, nav.selectedTags);
+  // 結果面の値一覧（AxisValueList）は既定=置き換えの入口（ADR-0013）なので、件数基準は
+  // 無条件集計にする（主クリックの結果＝選択タグを丸ごと置き換えた後の件数と一致させる。
+  // TASK-428.14の件数基準。valueSelectionContract.ts の deriveFacetCountTags 参照）。
+  const facetQuery = useAxisFacetsQuery(facetAxis, []);
   const smartFoldersQuery = useQuery({
     queryKey: SMART_FOLDER_QUERY_KEYS.all(),
     queryFn: listSmartFolders,

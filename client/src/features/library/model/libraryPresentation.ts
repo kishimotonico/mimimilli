@@ -17,7 +17,7 @@ import {
 } from "@mimimilli/shared";
 import { ApiRequestError } from "../../../shared/api/http";
 import type { AxisId, SortId, ViewMode } from "../../../entities/library/types";
-import { isSmartAxis, isViewAxis } from "../../../entities/library/axisDefinitions";
+import { getAxisLabel, isSmartAxis, isViewAxis } from "../../../entities/library/axisDefinitions";
 import { computeResultsPaneKind } from "../../../entities/library/resultsPane";
 
 export { computeResultsPaneKind } from "../../../entities/library/resultsPane";
@@ -77,6 +77,15 @@ export function axisOfFilterTag(tag: NormalizedTag): AxisId {
   return parsed.kind === "flat" ? "tag" : parsed.prefix;
 }
 
+/** チップ表示用の文字列。design-system.md の「チップはフルパス表示」規約は維持しつつ、
+ *  組み込み軸の擬似タグ（@year/2023等）だけ内部表現ではなく「軸ラベル/値」（例:
+ *  「追加日/2023」）に変換する。実タグはそのまま tag を返す。 */
+export function formatFilterChipLabel(tag: NormalizedTag): string {
+  const builtin = parseBuiltinAxisTag(tag);
+  if (!builtin) return tag;
+  return `${getAxisLabel(builtin.axis)}/${builtin.value}`;
+}
+
 // ── works query のパラメータ ──────────────────────────────────
 
 interface WorksParamsInput {
@@ -93,12 +102,15 @@ interface WorksParamsInput {
  *  で共通のロジック。組み込み軸（year等）専用のクエリパラメータは持たない（ADR-0012 §2）。
  *  擬似タグの解釈（実タグ／yearへの分解）はサーバー側の共通フィルタ解釈層が一度だけ行う
  *  （shared/pseudoTag.ts、TASK-199） */
-interface TagFilterParams {
+export interface TagFilterParams {
   tags?: string[];
   tagOp?: "AND";
 }
 
-function buildTagFilterParams(selectedTags: NormalizedTag[]): TagFilterParams {
+/** works query・軸ファセットクエリ・スマートフォルダー評価が共通で使うタグ→クエリ変換。
+ *  渡すタグの取捨選択（無条件集計にするか現在の選択込みにするか）は呼び出し側の責務
+ *  （軸ファセットの件数基準は valueSelectionContract.ts の deriveFacetCountTags を参照）。 */
+export function buildTagFilterParams(selectedTags: NormalizedTag[]): TagFilterParams {
   return selectedTags.length > 0 ? { tags: selectedTags, tagOp: "AND" } : {};
 }
 
@@ -127,22 +139,6 @@ export function buildSmartFolderFilterParams(selectedTags: NormalizedTag[]): Tag
 /** ファセット一覧（GET /axes/:axis）を取得すべき軸。value-list 種の結果面のみ */
 export function getFacetAxisForQuery(activeAxis: AxisId): FacetAxisId | null {
   return computeResultsPaneKind(activeAxis) === "value-list" ? (activeAxis as FacetAxisId) : null;
-}
-
-/**
- * 軸ファセット取得API（GET /axes/:axis）へ渡す絞り込み。自軸除外カウント:
- * 軸Xの値一覧の件数・総時間・代表カバーは、現在のフィルタから軸X由来のフィルタ
- * （axisOfFilterTag(tag) === axis のもの）を除いた集合に対して集計する。同軸を乗り換える
- * ときの表示件数が、置き換え後（通常クリックは置き換え既定）の実結果と一致し、
- * 他軸フィルタによる0件だらけの空振りも防げる。「選択中の値は特別に残す」という例外は
- * 自軸除外なら不要（選択中の値自身も他軸フィルタだけを適用した普通の件数で残る）。
- */
-export function buildAxisFacetFilterParams(
-  axis: AxisId,
-  selectedTags: NormalizedTag[],
-): TagFilterParams {
-  const otherAxisTags = selectedTags.filter((tag) => axisOfFilterTag(tag) !== axis);
-  return buildTagFilterParams(otherAxisTags);
 }
 
 /**
