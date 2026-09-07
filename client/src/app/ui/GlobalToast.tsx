@@ -13,11 +13,19 @@ import { errorToastAtom } from "../../shared/model/errorToastAtom";
 import { scanErrorAtom } from "../../entities/scan/model/atoms";
 import { useScanActions } from "../../entities/scan/useScanActions";
 import { playerSkipToastAtom } from "../../features/player/model/playerPresentationAtoms";
+import { rootFolderChangedToastAtom } from "../../entities/settings/model/rootFolderChangeAtoms";
 
-export default function GlobalToast() {
+interface GlobalToastProps {
+  /** ルートフォルダー変更成功トーストの「今すぐスキャン」actionから呼ぶ */
+  onOpenScan: () => void;
+}
+
+export default function GlobalToast({ onOpenScan }: GlobalToastProps) {
   const scanError = useAtomValue(scanErrorAtom);
   const errorToast = useAtomValue(errorToastAtom);
   const setErrorToast = useSetAtom(errorToastAtom);
+  const rootFolderChangedToast = useAtomValue(rootFolderChangedToastAtom);
+  const setRootFolderChangedToast = useSetAtom(rootFolderChangedToastAtom);
   const playerSkipToast = useAtomValue(playerSkipToastAtom);
   const setPlayerSkipToast = useSetAtom(playerSkipToastAtom);
   const dlsiteBulkApplyResult = useAtomValue(dlsiteBulkApplyResultAtom);
@@ -35,6 +43,18 @@ export default function GlobalToast() {
 
   if (errorToast) {
     return <Toast message={errorToast} variant="error" onDismiss={() => setErrorToast(null)} />;
+  }
+
+  if (rootFolderChangedToast) {
+    return (
+      <Toast
+        message="ルートフォルダーを変更しました。新しいフォルダーを読み込むにはスキャンしてください。"
+        variant="success"
+        actionLabel="今すぐスキャン"
+        onAction={onOpenScan}
+        onDismiss={() => setRootFolderChangedToast(false)}
+      />
+    );
   }
 
   if (playerSkipToast) {

@@ -1,6 +1,6 @@
-import { realpathSync } from "node:fs";
+import { realpathSync, statSync } from "node:fs";
 import { resolve } from "node:path";
-import { NotConfiguredError } from "../../errors.ts";
+import { InvalidRootFolderError, NotConfiguredError } from "../../errors.ts";
 import type { ScanOptions } from "../../adapter/index.ts";
 import type {
   ScanCandidate,
@@ -92,8 +92,18 @@ export function createSettingsScanMethods(deps: {
           properties.code = (error as NodeJS.ErrnoException).code;
         }
         serverLogger.warn("ルートフォルダーの解決に失敗しました", properties);
-        throw new NotConfiguredError(
+        throw new InvalidRootFolderError(
           `指定されたルートフォルダーが存在しません: ${patch.rootFolder}`,
+        );
+      }
+      if (!statSync(absRoot).isDirectory()) {
+        serverLogger.warn("ルートフォルダーの解決に失敗しました", {
+          requestedPath: patch.rootFolder,
+          resolvedPath: absRoot,
+          reason: "not-a-directory",
+        });
+        throw new InvalidRootFolderError(
+          `指定されたパスはフォルダーではありません: ${patch.rootFolder}`,
         );
       }
       serverLogger.info("ルートフォルダーを解決しました", {

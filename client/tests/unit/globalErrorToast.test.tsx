@@ -14,6 +14,7 @@ import {
   dlsiteBulkErrorAtom,
   dlsiteBulkResultAtom,
 } from "../../src/entities/dlsite/model/bulkAtoms";
+import { rootFolderChangedToastAtom } from "../../src/entities/settings/model/rootFolderChangeAtoms";
 
 const sampleDlsiteResult: DlsiteBulkResult = {
   fetched: 2,
@@ -22,7 +23,11 @@ const sampleDlsiteResult: DlsiteBulkResult = {
   skipped: 0,
 };
 
-function renderGlobalToast(store: ReturnType<typeof createStore>, withApplyRuntime = false) {
+function renderGlobalToast(
+  store: ReturnType<typeof createStore>,
+  withApplyRuntime = false,
+  onOpenScan = vi.fn(),
+) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -30,10 +35,10 @@ function renderGlobalToast(store: ReturnType<typeof createStore>, withApplyRunti
     ? createElement(
         Fragment,
         null,
-        createElement(GlobalToast),
+        createElement(GlobalToast, { onOpenScan }),
         createElement(DlsiteBulkApplyRuntime),
       )
-    : createElement(GlobalToast);
+    : createElement(GlobalToast, { onOpenScan });
 
   render(
     createElement(
@@ -102,6 +107,22 @@ describe("GlobalToast", () => {
       fireEvent.click(screen.getByRole("button", { name: "未設定項目を適用" }));
       expect(screen.getByRole("dialog", { name: "未設定項目をまとめて適用" })).toBeTruthy();
     });
+  });
+
+  it("rootFolderChangedToastAtom がtrueのとき「今すぐスキャン」でonOpenScanを呼ぶ", () => {
+    const store = createStore();
+    store.set(rootFolderChangedToastAtom, true);
+    const onOpenScan = vi.fn();
+
+    renderGlobalToast(store, false, onOpenScan);
+
+    expect(
+      screen.getByText(
+        "ルートフォルダーを変更しました。新しいフォルダーを読み込むにはスキャンしてください。",
+      ),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "今すぐスキャン" }));
+    expect(onOpenScan).toHaveBeenCalledTimes(1);
   });
 
   it("dlsiteBulkCancelledResultAtom では「未設定項目を適用」を表示しない", () => {

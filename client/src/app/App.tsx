@@ -34,6 +34,10 @@ import { useDownloadLibraryExport } from "../features/library/useDownloadLibrary
 import { useScanActions } from "../entities/scan/useScanActions";
 import { setRootFolder } from "../entities/settings/api";
 import { useSettingsQuery } from "../entities/settings/useSettingsQuery";
+import {
+  rootFolderChangedAtAtom,
+  rootFolderChangedToastAtom,
+} from "../entities/settings/model/rootFolderChangeAtoms";
 import NavigationHistorySync from "../features/navigation/ui/NavigationHistorySync";
 import { setAppModeAtom } from "../shared/model/appModeAtoms";
 import {
@@ -55,6 +59,8 @@ export default function App() {
   const scanActions = useScanActions();
   const queryClient = useQueryClient();
   const setErrorToast = useSetAtom(errorToastAtom);
+  const setRootFolderChangedAt = useSetAtom(rootFolderChangedAtAtom);
+  const setRootFolderChangedToast = useSetAtom(rootFolderChangedToastAtom);
   const setAppMode = useSetAtom(setAppModeAtom);
   const setFilesRelPath = useSetAtom(filesRelPathAtom);
   const setFilesSelectedPath = useSetAtom(filesSelectedPathAtom);
@@ -82,6 +88,8 @@ export default function App() {
     mutationFn: setRootFolder,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() });
+      setRootFolderChangedAt(new Date().toISOString());
+      setRootFolderChangedToast(true);
     },
   });
 
@@ -140,7 +148,7 @@ export default function App() {
   );
 
   const handleChangeFolder = useCallback(
-    (path: string) => changeFolderMutation.mutate(path),
+    (path: string) => changeFolderMutation.mutateAsync(path),
     [changeFolderMutation],
   );
 
@@ -264,7 +272,7 @@ export default function App() {
                 onClose={handleCloseModal}
                 onOpenWork={handleOpenLibraryWork}
               />
-              <GlobalToast />
+              <GlobalToast onOpenScan={handleOpenScanModal} />
             </>
           }
         />

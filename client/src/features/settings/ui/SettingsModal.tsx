@@ -12,10 +12,12 @@ import {
 import { useDlsiteBulkActions } from "../../../entities/dlsite/useDlsiteBulkActions";
 import { useDlsiteBulkApplyActions } from "../../../entities/dlsite/useDlsiteBulkApplyActions";
 import { scanningAtom, scanProgressLabelAtom } from "../../../entities/scan/model/atoms";
+import { rootFolderChangedAtAtom } from "../../../entities/settings/model/rootFolderChangeAtoms";
 import TagPrefixSettings from "./TagPrefixSettings";
 import ExcludedFoldersSettings from "./ExcludedFoldersSettings";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
 import { formatLastScanTime } from "../../../shared/lib/format";
+import { apiErrorMessage } from "../../../shared/lib/apiError";
 
 const SECTION_CLASS = "flex flex-col gap-2";
 const SECTION_LABEL_CLASS =
@@ -30,7 +32,8 @@ interface SettingsModalProps {
   onClose: () => void;
   /** TopBarのスキャンボタンと同じくスキャンモーダルを開く（即時実行はしない、TASK-56） */
   onOpenScan: () => void;
-  onChangeFolder: (path: string) => void;
+  /** 失敗時はrejectする。成功を待ってから編集フォームを閉じる */
+  onChangeFolder: (path: string) => Promise<unknown>;
   onExport: () => void;
 }
 
@@ -53,10 +56,16 @@ export default function SettingsModal({
   const { openDialog: onOpenDlsiteBulkApply } = useDlsiteBulkApplyActions();
   const [isEditingFolder, setIsEditingFolder] = useState(false);
   const [folderDraft, setFolderDraft] = useState(rootFolder ?? "");
+  const [savingFolder, setSavingFolder] = useState(false);
+  const [folderError, setFolderError] = useState<string | null>(null);
   const folderInputRef = useRef<HTMLInputElement | null>(null);
+  const rootFolderChangedAt = useAtomValue(rootFolderChangedAtAtom);
+  const rootFolderStale =
+    rootFolderChangedAt !== null && (!lastScanTime || lastScanTime < rootFolderChangedAt);
 
   const dismiss = () => {
     if (isEditingFolder) {
+      if (savingFolder) return;
       setIsEditingFolder(false);
       return;
     }
@@ -70,13 +79,23 @@ export default function SettingsModal({
 
   const startEditingFolder = () => {
     setFolderDraft(rootFolder ?? "");
+    setFolderError(null);
     setIsEditingFolder(true);
   };
 
-  const saveFolder = () => {
+  const saveFolder = async () => {
     const path = folderDraft.trim();
-    if (path) onChangeFolder(path);
-    setIsEditingFolder(false);
+    if (!path || savingFolder) return;
+    setSavingFolder(true);
+    setFolderError(null);
+    try {
+      await onChangeFolder(path);
+      setIsEditingFolder(false);
+    } catch (error) {
+      setFolderError(apiErrorMessage(error, "ルートフォルダーを変更できませんでした"));
+    } finally {
+      setSavingFolder(false);
+    }
   };
 
   return (
@@ -100,28 +119,46 @@ export default function SettingsModal({
         <div className={SECTION_CLASS}>
           <span className={SECTION_LABEL_CLASS}>ルートフォルダー</span>
           {isEditingFolder ? (
-            <form
-              className={ROW_CLASS}
-              onSubmit={(e) => {
-                e.preventDefault();
-                saveFolder();
-              }}
-            >
-              <input
-                ref={folderInputRef}
-                value={folderDraft}
-                onChange={(e) => setFolderDraft(e.target.value)}
-                aria-label="ルートフォルダーのパス"
-                placeholder="ルートフォルダーのパスを入力"
-                className="h-[34px] flex-1 rounded-[6px] border border-acc bg-paper-0 px-3 font-mono text-mono text-ink-1"
-              />
-              <Button variant="quiet" size="md" onClick={() => setIsEditingFolder(false)}>
-                キャンセル
-              </Button>
-              <Button variant="primary" size="md" type="submit" disabled={!folderDraft.trim()}>
-                保存
-              </Button>
-            </form>
+            <>
+              <form
+                className={ROW_CLASS}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void saveFolder();
+                }}
+              >
+                <input
+                  ref={folderInputRef}
+                  value={folderDraft}
+                  onChange={(e) => setFolderDraft(e.target.value)}
+                  aria-label="ルートフォルダーのパス"
+                  placeholder="ルートフォルダーのパスを入力"
+                  disabled={savingFolder}
+                  className="h-[34px] flex-1 rounded-[6px] border border-acc bg-paper-0 px-3 font-mono text-mono text-ink-1 disabled:opacity-60"
+                />
+                <Button
+                  variant="quiet"
+                  size="md"
+                  disabled={savingFolder}
+                  onClick={() => setIsEditingFolder(false)}
+                >
+                  キャンセル
+                </Button>
+                <Button
+                  variant="primary"
+                  size="md"
+                  type="submit"
+                  disabled={!folderDraft.trim() || savingFolder}
+                >
+                  {savingFolder ? "保存中..." : "保存"}
+                </Button>
+              </form>
+              {folderError && (
+                <p role="alert" className="mll-selectable m-0 text-[11px] text-[var(--r-coral)]">
+                  {folderError}
+                </p>
+              )}
+            </>
           ) : (
             <div className={ROW_CLASS}>
               <div className="flex h-[34px] flex-1 items-center gap-2 overflow-hidden rounded-[6px] border border-line-soft bg-paper-0 px-3">
@@ -136,6 +173,11 @@ export default function SettingsModal({
                 変更
               </Button>
             </div>
+          )}
+          {rootFolderStale && (
+            <output className="m-0 block rounded-[6px] bg-paper-2 px-2.5 py-2 font-jp text-[11px] text-ink-2">
+              一覧は変更前のフォルダーの内容です。再スキャンすると新しいフォルダーの内容に更新されます。
+            </output>
           )}
         </div>
 
@@ -201,7 +243,7 @@ export default function SettingsModal({
 
       {/* Footer */}
       <div className="flex justify-end px-[18px] pt-3 pb-4">
-        <Button variant="ghost" size="md" onClick={onClose}>
+        <Button variant="ghost" size="md" onClick={dismiss}>
           閉じる
         </Button>
       </div>
