@@ -13,7 +13,7 @@ import { filesDirectionAtom } from "../../../entities/file-system/model/navigati
 import { FILE_SYSTEM_QUERY_KEYS } from "../../../entities/file-system/queryKeys";
 import { SCAN_QUERY_KEYS } from "../../../entities/scan/queryKeys";
 import { buildFolderAudioQueue } from "../model/filePlayback";
-import { classifyFile } from "../model/types";
+import { classifyFile, isFilesSelectionMissing, rootLabel, type FsEntry } from "../model/types";
 import { filesPreviewOpenAtom } from "../model/previewLayoutAtoms";
 import { ApiRequestError } from "../../../shared/api/http";
 import type { PlaybackTrack } from "../../../entities/player/model/playbackTrack";
@@ -23,7 +23,6 @@ import {
   playingTrackRelPathAtom,
   playingWorkIdAtom,
 } from "../../../entities/player/model/atoms";
-import { rootLabel, type FsEntry } from "../model/types";
 import { workspacePath } from "@mimimilli/shared";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 import FileColumn from "./FileColumn";
@@ -165,7 +164,13 @@ export default function FilesView({ rootFolder, onPlayFile, onTogglePlay }: File
   // （ライブラリのエラー詳細・スキャン要対応の「Filesで開く」で移動・削除済みの対象を
   // 指すことがある）。この場合もフォルダーへ黙って差し替えず、対象なしを表示する
   // （openPathInFilesAtom経由での到達を含む。TASK-428.18）。
-  const selectionMissing = hasSelection && !cwdQuery.isPending && fileSelection == null;
+  const selectionMissing = isFilesSelectionMissing({
+    hasLoadError: !!loadError,
+    isPending: cwdQuery.isPending,
+    selectedPath: nav.selectedPath,
+    cwd: nav.cwd,
+    entries: cwdEntries,
+  });
   const previewEntry = selectionMissing ? null : (fileSelection ?? cwdFolderEntry);
   const folderEntries = previewEntry?.isDir ? cwdEntries : null;
 
@@ -230,7 +235,7 @@ export default function FilesView({ rootFolder, onPlayFile, onTogglePlay }: File
             onGoUp={nav.goUp}
             onGoRoot={() => nav.goToSegment(0)}
             missingSelectionPath={selectionMissing ? nav.selectedPath : null}
-            onClearSelection={() => selectFile(nav.cwd)}
+            onClearSelection={nav.clearSelection}
             onClose={() => setPreviewOpen(false)}
           />
         )}

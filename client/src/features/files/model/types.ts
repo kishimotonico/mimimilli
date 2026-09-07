@@ -115,3 +115,32 @@ export function rootLabel(root: string): string {
   const normalized = trimTrailingSeparator(root, separator);
   return normalized.split(separator).filter(Boolean).pop() ?? separator;
 }
+
+export interface FilesSelectionMissingParams {
+  /** カレントディレクトリ取得自体が404・5xx・通信失敗のいずれか */
+  hasLoadError: boolean;
+  /** カレントディレクトリ取得が初回ロード中 */
+  isPending: boolean;
+  selectedPath: string | null;
+  cwd: string;
+  entries: { path: string }[];
+}
+
+/**
+ * カレントディレクトリの取得自体には成功したが、選択中パスがその一覧に存在しないかを判定する。
+ * ライブラリのエラー詳細・スキャン要対応の「Filesで開く」（openPathInFilesAtom）は
+ * 移動・削除済みの対象を指すことがある（TASK-428.18）。
+ * ディレクトリ取得自体の404/5xx/通信失敗（loadError）・初回ロード中は誤検知を避けるため false。
+ * 選択が無い、またはカレントディレクトリ自身を指す（＝選択なし扱い）ときも false。
+ */
+export function isFilesSelectionMissing({
+  hasLoadError,
+  isPending,
+  selectedPath,
+  cwd,
+  entries,
+}: FilesSelectionMissingParams): boolean {
+  if (hasLoadError || isPending) return false;
+  if (selectedPath == null || selectedPath === cwd) return false;
+  return !entries.some((entry) => entry.path === selectedPath);
+}
