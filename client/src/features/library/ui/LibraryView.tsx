@@ -48,7 +48,7 @@ import WorkListPane from "./WorkListPane";
 import SmartFolderEditorModal from "./SmartFolderEditorModal";
 import { SmartFolderView } from "./preview/SmartFolderView";
 import { DataIntegrityWarningBanner } from "./DataIntegrityWarningBanner";
-import { ErrorViewBulkDeleteBanner } from "./ErrorViewBulkDeleteBanner";
+import { ErrorViewBulkUnregisterBanner } from "./ErrorViewBulkUnregisterBanner";
 import LibraryWorksBoundary from "./LibraryWorksBoundary";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 
@@ -286,7 +286,7 @@ export default function LibraryView({
                   />
                 </div>
               ) : isErrorView ? (
-                <ErrorViewBulkDeleteBanner
+                <ErrorViewBulkUnregisterBanner
                   missingCount={missingWorksCountQuery.data}
                   mutation={bulkUnregisterMissingMutation}
                 />

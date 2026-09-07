@@ -368,7 +368,7 @@ export function useLibraryWorkDeleteMutation(onDeleted: (workId: string) => void
   });
 }
 
-/** エラービュー表示中だけ、missing件数を取得する（一括削除の導線・確認ダイアログ用） */
+/** エラービュー表示中だけ、missing件数を取得する（一括登録解除の導線・確認ダイアログ用） */
 export function useMissingWorksCountQuery(enabled: boolean) {
   return useQuery({ ...missingWorksCountQueryOptions, enabled });
 }
