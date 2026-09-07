@@ -433,14 +433,18 @@ export function useSmartFolderRuleMatchCountQuery(
     [debouncedKey],
   );
 
+  // debouncedRules が null（条件が妥当でない）のときも一意なキーにする。null を [] に潰すと
+  // 「条件0件（＝全作品に一致する妥当な状態）」のキャッシュと衝突し、無効な間も直前の件数が
+  // 表示され続けてしまう（レビュー指摘、TASK-428.11）
   const query = useQuery({
-    queryKey: SMART_FOLDER_QUERY_KEYS.preview(debouncedRules ?? []),
+    queryKey: SMART_FOLDER_QUERY_KEYS.preview(debouncedRules ?? { invalid: true }),
     queryFn: ({ signal }) => previewSmartFolderRuleCount(debouncedRules!, { signal }),
     enabled: debouncedRules !== null,
   });
 
   return {
-    total: query.data,
+    // 無効な間は同じキーに紐づくキャッシュが万一残っていても参照しない
+    total: debouncedRules === null ? undefined : query.data,
     isCounting: debouncedRules !== null && (rulesKey !== debouncedKey || query.isFetching),
   };
 }
