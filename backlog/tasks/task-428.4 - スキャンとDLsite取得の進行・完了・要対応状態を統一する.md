@@ -4,7 +4,7 @@ title: スキャンとDLsite取得の進行・完了・要対応状態を統一�
 status: To Do
 assignee: []
 created_date: '2026-09-07 09:08'
-updated_date: '2026-09-07 09:12'
+updated_date: '2026-09-07 14:45'
 labels:
   - ui
   - ux
@@ -29,9 +29,9 @@ scan-dlsite-A-01/A-04/A-05/A-06およびB重複。存在しないDLsiteジョブ
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 DLsiteジョブがない場合は進捗・中止操作を表示せず、running/cancellingだけをactive表示する
-- [ ] #2 モーダル外で完了・中止を1回通知し、登録数・新規数・エラー数・欠損数を表示する
-- [ ] #3 通知ベルと要対応タブが同じ問題一覧と件数を使う
-- [ ] #4 ID重複はworkId単位1行で全パスと解決導線を示す
-- [ ] #5 pnpm test:smokeに新規失敗がない
+- [x] #1 DLsiteジョブがない場合は進捗・中止操作を表示せず、running/cancellingだけをactive表示する
+- [x] #2 モーダル外で完了・中止を1回通知し、登録数・新規数・エラー数・欠損数を表示する
+- [x] #3 通知ベルと要対応タブが同じ問題一覧と件数を使う
+- [x] #4 ID重複はworkId単位1行で全パスと解決導線を示す
+- [x] #5 pnpm test:smokeに新規失敗がない
 <!-- AC:END -->
