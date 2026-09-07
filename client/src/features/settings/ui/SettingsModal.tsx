@@ -201,7 +201,7 @@ export default function SettingsModal({
 
       {/* Footer */}
       <div className="flex justify-end px-[18px] pt-3 pb-4">
-        <Button variant="quiet" size="md" onClick={onClose}>
+        <Button variant="ghost" size="md" onClick={onClose}>
           閉じる
         </Button>
       </div>

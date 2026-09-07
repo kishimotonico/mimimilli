@@ -168,7 +168,8 @@ UI 全体は `client/src/styles/shell/index.css` の `@layer base` で `body { u
 テキストラベルを持つ操作ボタンは `client/src/shared/ui/Button.tsx` に集約する（アイコンのみのボタンは `IconButton`）。生の `<button>` を都度スタイリングしない。
 
 - サイズは `sm`（既定・26px）/ `md`（34px）/ `lg`（36px）の3段。いずれも `rounded-pill` の錠剤形で統一し、サイズで角丸の形状は変えない
-- variantは `primary`（主操作）/ `ghost`（副操作）/ `quiet`（キャンセル・閉じる等の控えめな離脱操作）/ `danger`（破壊的操作の確定、coral塗り＋白文字）/ `danger-quiet`（進行中の操作を止めるだけの中止、coralアウトライン）の5種。キャンセル系は `quiet` に統一し、`ghost` を代用しない
+- variantは `primary`（主操作）/ `ghost`（副操作）/ `quiet`（主操作と対になるキャンセル）/ `danger`（破壊的操作の確定、coral塗り＋白文字）/ `danger-quiet`（進行中の操作を止めるだけの中止、coralアウトライン）の5種
+- `quiet` は「確定操作の隣に並ぶキャンセル」専用。単独で置かれるフッターの「閉じる」（対になる確定操作が無いモーダルの離脱ボタン）は `quiet` にしない。`quiet` は背景が透明でホバーするまでボタンと分かりにくいため、常時可視の背景が要る単独の離脱操作には `ghost` を使う（`SettingsModal` フッターの「閉じる」が実例）
 - `danger` と `danger-quiet` は重みが異なる。取り消せない操作の最終確定（`ConfirmDialog` の確定ボタン等）はダイアログ内で最も目を引く必要があるため `danger` を使う。進行中の処理をその場で止めるだけの操作（ツールバー・フッターの「中止」）はより控えめな `danger-quiet` を使う
 - モーダルのキャンセルは `quiet`、閉じる（×）は `IconButton` を使う。ヘッダーの×ボタン用に生の`<button>`でアイコンだけを描画しない
 - `motion.button` 等 `<button>` を直接使えない箇所は、`Button` と同じクラスを `buttonClass(variant, size, options)` から取得して適用する（`ScanFooter` / `TopBar` のAnimatePresence配下ボタンが実例）
