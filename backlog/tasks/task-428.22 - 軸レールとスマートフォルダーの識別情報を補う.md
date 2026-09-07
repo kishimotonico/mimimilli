@@ -1,10 +1,10 @@
 ---
 id: TASK-428.22
 title: 軸レールとスマートフォルダーの識別情報を補う
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-07 09:09'
-updated_date: '2026-09-07 19:24'
+updated_date: '2026-09-07 19:32'
 labels:
   - ui
   - library

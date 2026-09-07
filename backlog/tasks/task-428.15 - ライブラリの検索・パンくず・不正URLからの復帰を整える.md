@@ -1,10 +1,10 @@
 ---
 id: TASK-428.15
 title: ライブラリの検索・パンくず・不正URLからの復帰を整える
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-07 09:08'
-updated_date: '2026-09-07 16:16'
+updated_date: '2026-09-07 19:32'
 labels:
   - ui
   - navigation

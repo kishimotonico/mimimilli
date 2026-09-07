@@ -1,10 +1,10 @@
 ---
 id: TASK-428.8
 title: 起動・セットアップ・通信失敗に復旧可能なエラー表示を出す
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-07 09:08'
-updated_date: '2026-09-07 15:42'
+updated_date: '2026-09-07 19:32'
 labels:
   - ui
   - ux

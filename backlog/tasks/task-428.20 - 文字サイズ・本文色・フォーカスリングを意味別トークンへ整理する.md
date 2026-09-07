@@ -1,10 +1,10 @@
 ---
 id: TASK-428.20
 title: 文字サイズ・本文色・フォーカスリングを意味別トークンへ整理する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-07 09:08'
-updated_date: '2026-09-07 13:17'
+updated_date: '2026-09-07 19:32'
 labels:
   - ui
   - design-system

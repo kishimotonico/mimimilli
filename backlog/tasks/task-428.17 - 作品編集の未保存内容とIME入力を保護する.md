@@ -1,10 +1,10 @@
 ---
 id: TASK-428.17
 title: 作品編集の未保存内容とIME入力を保護する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-07 09:08'
-updated_date: '2026-09-07 14:30'
+updated_date: '2026-09-07 19:32'
 labels:
   - ui
   - editing

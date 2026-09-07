@@ -1,10 +1,10 @@
 ---
 id: TASK-428.13
 title: グローバルショートカットとEscapeの有効範囲を制御する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-07 09:08'
-updated_date: '2026-09-07 13:06'
+updated_date: '2026-09-07 19:32'
 labels:
   - ui
   - keyboard

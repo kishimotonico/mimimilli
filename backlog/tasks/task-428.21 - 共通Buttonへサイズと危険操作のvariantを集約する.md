@@ -1,10 +1,10 @@
 ---
 id: TASK-428.21
 title: 共通Buttonへサイズと危険操作のvariantを集約する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-07 09:09'
-updated_date: '2026-09-07 14:13'
+updated_date: '2026-09-07 19:32'
 labels:
   - ui
   - design-system

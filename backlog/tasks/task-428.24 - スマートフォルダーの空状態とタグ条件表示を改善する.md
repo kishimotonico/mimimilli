@@ -1,10 +1,10 @@
 ---
 id: TASK-428.24
 title: スマートフォルダーの空状態とタグ条件表示を改善する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-07 09:09'
-updated_date: '2026-09-07 15:45'
+updated_date: '2026-09-07 19:32'
 labels:
   - ui
   - smart-folder

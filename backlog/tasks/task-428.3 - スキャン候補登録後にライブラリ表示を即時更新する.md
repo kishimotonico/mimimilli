@@ -1,10 +1,10 @@
 ---
 id: TASK-428.3
 title: スキャン候補登録後にライブラリ表示を即時更新する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-07 09:08'
-updated_date: '2026-09-07 18:52'
+updated_date: '2026-09-07 19:32'
 labels:
   - ui
   - bug

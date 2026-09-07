@@ -1,10 +1,10 @@
 ---
 id: TASK-428.2
 title: トーストの表示寿命・配置・操作契約を共通化する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-07 09:08'
-updated_date: '2026-09-07 13:12'
+updated_date: '2026-09-07 19:32'
 labels:
   - ui
   - ux

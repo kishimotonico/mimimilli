@@ -1,10 +1,10 @@
 ---
 id: TASK-428.6
 title: ルートフォルダー変更を検証して再スキャンへ案内する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-07 09:08'
-updated_date: '2026-09-07 14:48'
+updated_date: '2026-09-07 19:32'
 labels:
   - ui
   - settings

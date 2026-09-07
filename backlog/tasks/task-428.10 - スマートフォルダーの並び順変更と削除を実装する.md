@@ -1,10 +1,10 @@
 ---
 id: TASK-428.10
 title: スマートフォルダーの並び順変更と削除を実装する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-07 09:08'
-updated_date: '2026-09-07 19:02'
+updated_date: '2026-09-07 19:32'
 labels:
   - ui
   - smart-folder

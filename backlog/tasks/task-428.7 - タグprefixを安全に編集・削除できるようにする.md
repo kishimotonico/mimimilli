@@ -1,10 +1,10 @@
 ---
 id: TASK-428.7
 title: タグprefixを安全に編集・削除できるようにする
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-07 09:08'
-updated_date: '2026-09-07 13:10'
+updated_date: '2026-09-07 19:32'
 labels:
   - ui
   - settings

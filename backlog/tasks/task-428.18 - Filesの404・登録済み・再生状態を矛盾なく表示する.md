@@ -1,10 +1,10 @@
 ---
 id: TASK-428.18
 title: Filesの404・登録済み・再生状態を矛盾なく表示する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-07 09:08'
-updated_date: '2026-09-07 16:39'
+updated_date: '2026-09-07 19:32'
 labels:
   - ui
   - files

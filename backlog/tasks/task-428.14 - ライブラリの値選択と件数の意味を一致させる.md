@@ -1,10 +1,10 @@
 ---
 id: TASK-428.14
 title: ライブラリの値選択と件数の意味を一致させる
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-07 09:08'
-updated_date: '2026-09-07 16:19'
+updated_date: '2026-09-07 19:32'
 labels:
   - ui
   - ux

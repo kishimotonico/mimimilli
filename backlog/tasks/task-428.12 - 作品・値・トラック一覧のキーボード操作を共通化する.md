@@ -1,10 +1,10 @@
 ---
 id: TASK-428.12
 title: 作品・値・トラック一覧のキーボード操作を共通化する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-07 09:08'
-updated_date: '2026-09-07 19:42'
+updated_date: '2026-09-07 20:13'
 labels:
   - ui
   - keyboard

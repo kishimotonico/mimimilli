@@ -1,10 +1,10 @@
 ---
 id: TASK-428.5
 title: エラー作品とファイル欠損作品の表示・復旧導線を統一する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-07 09:08'
-updated_date: '2026-09-07 15:54'
+updated_date: '2026-09-07 19:32'
 labels:
   - ui
   - ux

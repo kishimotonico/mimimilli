@@ -1,10 +1,10 @@
 ---
 id: TASK-428.19
 title: 未登録スキャン候補のタイトルとRJコード編集を安全にする
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-07 09:08'
-updated_date: '2026-09-07 15:38'
+updated_date: '2026-09-07 19:32'
 labels:
   - ui
   - scan

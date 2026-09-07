@@ -1,10 +1,10 @@
 ---
 id: TASK-428.9
 title: 設定モーダルと結果バナーの操作を常に到達可能にする
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-07 09:08'
-updated_date: '2026-09-07 19:05'
+updated_date: '2026-09-07 19:32'
 labels:
   - ui
   - layout

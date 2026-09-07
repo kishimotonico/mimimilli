@@ -1,10 +1,10 @@
 ---
 id: TASK-428.11
 title: スマートフォルダー条件の検証・意味表示を統一する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-07 09:08'
-updated_date: '2026-09-07 13:20'
+updated_date: '2026-09-07 19:32'
 labels:
   - ui
   - smart-folder

@@ -1,10 +1,10 @@
 ---
 id: TASK-428.1
 title: DLsite情報の保存・適用で発生する内部エラーを解消する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-07 09:08'
-updated_date: '2026-09-07 16:25'
+updated_date: '2026-09-07 19:32'
 labels:
   - ui
   - bug
