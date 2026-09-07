@@ -92,7 +92,7 @@ describe("UnregisteredTab タイトル編集", () => {
     fireEvent.keyDown(input, { key: "Enter" });
 
     expect(screen.getByPlaceholderText("タイトル")).not.toBeNull();
-    expect(screen.getByRole("alert")).toHaveTextContent("タイトルを入力してください");
+    expect(screen.getByText("タイトルを入力してください")).not.toBeNull();
   });
 });
 
@@ -120,7 +120,7 @@ describe("UnregisteredTab RJコード編集", () => {
 
     expect(screen.getByPlaceholderText("RJコード")).not.toBeNull();
     expect(input).toHaveValue("abc123");
-    expect(screen.getByRole("alert").textContent).toMatch(/RJ|VJ/);
+    expect(screen.getByText(/RJ\/VJコードは/)).not.toBeNull();
   });
 
   it("IME変換中のEnter・Escapeは確定・取消のどちらも行わない", () => {
@@ -136,7 +136,7 @@ describe("UnregisteredTab RJコード編集", () => {
     expect(screen.getByPlaceholderText("RJコード")).not.toBeNull(); // 編集中のまま
   });
 
-  it("1行のRJコードが不正でも、正常な行だけを選んで登録できる", async () => {
+  it("1行のRJコードが不正でも、正常な行だけを選んで登録できる（不正な行は自動的に除外される）", async () => {
     const registerSpy = vi
       .spyOn(scanApi, "registerScanCandidates")
       .mockResolvedValue({ registered: [{ path: candidateB.path, workId: "w2" }], failures: [] });
@@ -147,10 +147,12 @@ describe("UnregisteredTab RJコード編集", () => {
     fireEvent.change(input, { target: { value: "invalid" } });
     fireEvent.keyDown(input, { key: "Enter" });
 
-    // 不正な行を選択から外し、正常な行だけで登録する
-    fireEvent.click(screen.getByLabelText(`「${candidateA.inferredTitle}」を選択`));
+    // 不正な行は選択したままでもチェックボックスが無効化され、登録から自動的に除外される
+    const checkboxA = screen.getByLabelText(`「${candidateA.inferredTitle}」を選択`);
+    expect(checkboxA).toBeDisabled();
+    expect(screen.getByText(/エラーのある1件は登録から除外されます/)).not.toBeNull();
 
-    const registerButton = screen.getByRole("button", { name: /件をライブラリに追加/ });
+    const registerButton = screen.getByRole("button", { name: "1件をライブラリに追加" });
     expect(registerButton).not.toHaveAttribute("disabled");
     fireEvent.click(registerButton);
 
@@ -158,6 +160,39 @@ describe("UnregisteredTab RJコード編集", () => {
     expect(registerSpy.mock.calls[0]?.[0]).toEqual([
       { path: candidateB.path, title: candidateB.inferredTitle, rjCode: candidateB.rjCode },
     ]);
+  });
+
+  it("別の行を編集し始めても、エラー行の表示は消えたままにならない", () => {
+    renderTab([candidateA, candidateB]);
+
+    fireEvent.click(screen.getAllByTitle("クリックしてRJコードを編集")[0]);
+    const input = screen.getByPlaceholderText("RJコード");
+    fireEvent.change(input, { target: { value: "invalid" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(screen.getByText(/RJ\/VJコードは/)).not.toBeNull();
+
+    // 別の行（candidateB）のタイトル編集を開始する = candidateAのRJコード欄からフォーカスが離れる
+    fireEvent.click(screen.getAllByTitle("クリックしてタイトルを編集")[1]);
+
+    // candidateAのエラー表示・チェックボックス無効化は消えずに残る
+    expect(screen.getByText(/RJ\/VJコードは/)).not.toBeNull();
+    expect(screen.getByLabelText(`「${candidateA.inferredTitle}」を選択`)).toBeDisabled();
+  });
+
+  it("同じ不正値のままblurしても、そのたびに入力欄へフォーカスが戻る", () => {
+    renderTab([candidateA]);
+
+    fireEvent.click(screen.getByTitle("クリックしてRJコードを編集"));
+    const input = screen.getByPlaceholderText("RJコード") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "abc123" } });
+
+    input.focus();
+    input.blur();
+    expect(document.activeElement).toBe(input);
+
+    // 同じ不正値のまま再度blurしても、エラー文言が変化しないだけでフォーカスは戻る
+    input.blur();
+    expect(document.activeElement).toBe(input);
   });
 });
 
