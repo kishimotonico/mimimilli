@@ -67,10 +67,19 @@ export default function App() {
   // ── Settings ─────────────────────────────────────────────
   const settingsQuery = useSettingsQuery();
   const settings = settingsQuery.data;
+  // 再試行中（isPending===true・error===null に巻き戻る）でも起動エラー画面の文脈を保つため、
+  // 直近のエラーを保持する。成功したら破棄する
+  const [lastStartupError, setLastStartupError] = useState<unknown>(undefined);
+  if (settingsQuery.isError && settingsQuery.error !== lastStartupError) {
+    setLastStartupError(settingsQuery.error);
+  } else if (settingsQuery.isSuccess && lastStartupError !== undefined) {
+    setLastStartupError(undefined);
+  }
   const startupState = resolveAppStartupState({
     isPending: settingsQuery.isPending,
     isError: settingsQuery.isError,
     data: settings,
+    hasErroredBefore: lastStartupError !== undefined,
   });
 
   // ファイルモードのルートパス（FilesView に渡す）。
@@ -190,7 +199,7 @@ export default function App() {
     return (
       <MotionConfig reducedMotion="user">
         <StartupErrorScreen
-          error={settingsQuery.error}
+          error={settingsQuery.error ?? lastStartupError}
           onRetry={() => {
             void settingsQuery.refetch();
           }}
