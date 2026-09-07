@@ -17,6 +17,7 @@ import {
 import {
   createSettingsScanMethods,
   resolveRegisteredRjCode,
+  resolveRegisteredTitle,
 } from "../src/adapters/fixture/settingsScan.ts";
 import { createInitialState } from "../src/adapters/fixture/state.ts";
 import { createWorkMethods } from "../src/adapters/fixture/works.ts";
@@ -131,6 +132,61 @@ test("fixture: rjCode省略・空文字・指定を区別する", () => {
   assert.equal(resolveRegisteredRjCode("RJ999999", ""), "");
   assert.equal(resolveRegisteredRjCode("RJ999999", "RJ111111"), "RJ111111");
   assert.equal(resolveRegisteredRjCode(null, undefined), null);
+});
+
+test("fixture: title省略・指定を区別する", () => {
+  // 省略=候補の推定タイトル（inferredTitle）を採用、指定=そのまま採用（real adapterと同じく候補登録APIの規約）。
+  assert.equal(resolveRegisteredTitle("推定タイトル", undefined), "推定タイトル");
+  assert.equal(resolveRegisteredTitle("推定タイトル", "編集後のタイトル"), "編集後のタイトル");
+});
+
+test("候補登録APIはHTTP境界の正規化からfixture adapterの保存まで、titleの省略・指定をモックを挟まず通す", async () => {
+  const candidates = [
+    scanCandidateSchema.parse({
+      path: "推定タイトルのまま",
+      inferredTitle: "推定タイトルのまま",
+      audioFileCount: 1,
+      audioBreakdown: [{ extension: "wav", count: 1 }],
+      rjCode: null,
+    }),
+    scanCandidateSchema.parse({
+      path: "タイトル編集",
+      inferredTitle: "編集前のタイトル",
+      audioFileCount: 1,
+      audioBreakdown: [{ extension: "wav", count: 1 }],
+      rjCode: null,
+    }),
+  ];
+  const app = createApp(buildFixtureAdapterWithCandidates(candidates));
+  try {
+    const response = await app.request("/api/scan/candidates/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        items: [
+          { path: "推定タイトルのまま" },
+          { path: "タイトル編集", title: "編集後のタイトル" },
+        ],
+      }),
+    });
+    assert.equal(response.status, 201);
+    const { registered } = await response.json();
+    const workIdByPath = new Map<string, string>(
+      registered.map((entry: { path: string; workId: string }) => [entry.path, entry.workId]),
+    );
+
+    const titleOf = async (path: string) => {
+      const workId = workIdByPath.get(path);
+      assert.ok(workId, `${path}が登録されていません`);
+      const detail = await app.request(`/api/works/${workId}`);
+      assert.equal(detail.status, 200);
+      return (await detail.json()).title;
+    };
+    assert.equal(await titleOf("推定タイトルのまま"), "推定タイトルのまま");
+    assert.equal(await titleOf("タイトル編集"), "編集後のタイトル");
+  } finally {
+    await app.shutdown();
+  }
 });
 
 test("候補登録APIはHTTP境界の正規化からfixture adapterの保存まで、rjCodeの3状態をモックを挟まず通す", async () => {

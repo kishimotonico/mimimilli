@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
 import { useSetAtom } from "jotai";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { hasRjCode, rjCodeFormatSchema, type ScanCandidate } from "@mimimilli/shared";
@@ -26,18 +32,32 @@ interface ExcludeToast {
   title: string;
 }
 
+/** 候補行のインライン編集対象。1度に編集できるセルは1つだけ。 */
+interface EditingField {
+  path: string;
+  field: "title" | "rjCode";
+}
+
 export default function UnregisteredTab({ candidates, onRegistered }: UnregisteredTabProps) {
   const queryClient = useQueryClient();
   const setHiddenPaths = useSetAtom(scanCandidateHiddenPathsAtom);
   const [deselectedPaths, setDeselectedPaths] = useState<Set<string>>(() => new Set());
+  const [titleOverrides, setTitleOverrides] = useState<Map<string, string>>(() => new Map());
   const [rjCodeOverrides, setRjCodeOverrides] = useState<Map<string, string>>(() => new Map());
-  const [rjCodeErrors, setRjCodeErrors] = useState<Map<string, string>>(() => new Map());
-  const [editingPath, setEditingPath] = useState<string | null>(null);
+  const [editingField, setEditingField] = useState<EditingField | null>(null);
   const [editingValue, setEditingValue] = useState("");
+  const [editingError, setEditingError] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [excludeToast, setExcludeToast] = useState<ExcludeToast | null>(null);
   const headerCheckboxRef = useRef<HTMLInputElement>(null);
-  const rjCodeInputRef = useRef<HTMLInputElement>(null);
+  const editingInputRef = useRef<HTMLInputElement>(null);
+
+  const effectiveTitle = (candidate: ScanCandidate) =>
+    titleOverrides.get(candidate.path) ?? candidate.inferredTitle;
+  const effectiveRjCode = (candidate: ScanCandidate) =>
+    rjCodeOverrides.has(candidate.path)
+      ? (rjCodeOverrides.get(candidate.path) ?? "")
+      : candidate.rjCode;
 
   const selectedCandidates = useMemo(
     () => candidates.filter((candidate) => !deselectedPaths.has(candidate.path)),
@@ -50,9 +70,11 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
     if (headerCheckboxRef.current) headerCheckboxRef.current.indeterminate = partiallySelected;
   }, [partiallySelected]);
 
+  // 編集開始時にフォーカスする。不正値のまま確定・blurされたときはeditingFieldを維持したまま
+  // editingErrorだけが変わるので、この依存配列でフォーカスも一緒に戻す。
   useEffect(() => {
-    if (editingPath) rjCodeInputRef.current?.focus();
-  }, [editingPath]);
+    if (editingField) editingInputRef.current?.focus();
+  }, [editingField, editingError]);
 
   const registerMutation = useMutation({
     mutationFn: registerScanCandidates,
@@ -82,7 +104,7 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
     mutationFn: (candidate: ScanCandidate) => excludeScanCandidates([candidate.path]),
     onSuccess: async (_void, candidate) => {
       setHiddenPaths((previous) => new Set(previous).add(candidate.path));
-      setExcludeToast({ path: candidate.path, title: candidate.inferredTitle });
+      setExcludeToast({ path: candidate.path, title: effectiveTitle(candidate) });
       await queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.candidateExclusions() });
     },
     onError: (error) => setErrorMessage(apiErrorMessage(error, "候補から外せませんでした")),
@@ -120,57 +142,69 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
     });
   };
 
-  const startEdit = (candidate: ScanCandidate) => {
-    setEditingPath(candidate.path);
-    setEditingValue(rjCodeOverrides.get(candidate.path) ?? candidate.rjCode ?? "");
+  const startEdit = (candidate: ScanCandidate, field: EditingField["field"]) => {
+    setEditingField({ path: candidate.path, field });
+    setEditingValue(
+      field === "title" ? effectiveTitle(candidate) : (effectiveRjCode(candidate) ?? ""),
+    );
+    setEditingError(null);
+  };
+
+  /** Escapeでの取り消し。保存はせず編集モードだけを閉じる（TASK-428.13/17と同じ契約）。 */
+  const cancelEdit = () => {
+    setEditingField(null);
+    setEditingError(null);
   };
 
   const commitEdit = () => {
-    if (editingPath === null) return;
-    const path = editingPath;
-    const value = editingValue.trim();
-    if (value === "") {
-      setRjCodeOverrides((previous) => new Map(previous).set(path, ""));
-      setRjCodeErrors((previous) => {
-        if (!previous.has(path)) return previous;
-        const next = new Map(previous);
-        next.delete(path);
-        return next;
-      });
-      setEditingPath(null);
+    if (editingField === null) return;
+    const { path, field } = editingField;
+    const trimmed = editingValue.trim();
+
+    if (field === "title") {
+      if (!trimmed) {
+        setEditingError("タイトルを入力してください");
+        return;
+      }
+      setTitleOverrides((previous) => new Map(previous).set(path, trimmed));
+      setEditingField(null);
+      setEditingError(null);
       return;
     }
-    const parsed = rjCodeFormatSchema.safeParse(value);
+
+    if (trimmed === "") {
+      setRjCodeOverrides((previous) => new Map(previous).set(path, ""));
+      setEditingField(null);
+      setEditingError(null);
+      return;
+    }
+    const parsed = rjCodeFormatSchema.safeParse(trimmed);
     if (!parsed.success) {
-      setRjCodeOverrides((previous) => new Map(previous).set(path, value));
-      setRjCodeErrors((previous) =>
-        new Map(previous).set(
-          path,
-          parsed.error.issues[0]?.message ?? "RJ/VJコードの形式が正しくありません",
-        ),
-      );
-      setEditingPath(null);
+      setEditingError(parsed.error.issues[0]?.message ?? "RJ/VJコードの形式が正しくありません");
       return;
     }
     setRjCodeOverrides((previous) => new Map(previous).set(path, parsed.data));
-    setRjCodeErrors((previous) => {
-      if (!previous.has(path)) return previous;
-      const next = new Map(previous);
-      next.delete(path);
-      return next;
-    });
-    setEditingPath(null);
+    setEditingField(null);
+    setEditingError(null);
   };
 
-  const selectedRjCodeErrorCount = selectedCandidates.filter((candidate) =>
-    rjCodeErrors.has(candidate.path),
-  ).length;
+  const handleEditKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (event.nativeEvent.isComposing) return;
+    if (event.key === "Enter") commitEdit();
+    if (event.key === "Escape") {
+      // 入力欄側で編集を取り消し、モーダルのEscapeクローズ（<dialog>のcancel既定動作）
+      // まで伝播させない。親は編集中かどうかを知らなくてよい。
+      event.preventDefault();
+      event.stopPropagation();
+      cancelEdit();
+    }
+  };
 
   const handleRegisterSelected = () => {
-    if (selectedRjCodeErrorCount > 0) return;
     const items = selectedCandidates.map((candidate) => ({
       path: candidate.path,
-      rjCode: rjCodeOverrides.get(candidate.path) ?? candidate.rjCode ?? "",
+      title: effectiveTitle(candidate),
+      rjCode: effectiveRjCode(candidate) ?? "",
     }));
     registerMutation.mutate(items);
   };
@@ -183,14 +217,14 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
         <>
           <p className="font-jp text-[11.5px] text-ink-2">
             まだライブラリで管理していないフォルダーです。追加すると mimimilli.json
-            を作成して、作品として管理します。RJコードはフォルダー名から自動で拾い、未検出なら手入力できます。
+            を作成して、作品として管理します。タイトル・RJコードはフォルダー名から自動で拾い、クリックして直せます。
           </p>
           <div className="overflow-hidden rounded-[6px] border border-line-soft">
             <table className="w-full table-fixed border-collapse text-[11px]">
               <colgroup>
                 <col className="w-[32px]" />
                 <col className="w-[26%]" />
-                <col className="w-[104px]" />
+                <col className="w-[112px]" />
                 <col />
                 <col className="w-[56px]" />
                 <col className="w-[32px]" />
@@ -208,7 +242,7 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
                     />
                   </th>
                   <th className="border-b border-line-soft px-2.5 py-1.5 font-sans font-semibold text-ink-2">
-                    フォルダー名
+                    タイトル
                   </th>
                   <th className="border-b border-line-soft px-2.5 py-1.5 font-sans font-semibold text-ink-2">
                     RJコード
@@ -226,63 +260,87 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
               </thead>
               <tbody className="divide-y divide-line-soft">
                 {candidates.map((candidate) => {
-                  const editing = editingPath === candidate.path;
-                  const effectiveRjCode = rjCodeOverrides.has(candidate.path)
-                    ? (rjCodeOverrides.get(candidate.path) ?? "")
-                    : candidate.rjCode;
-                  const rjCodeError = rjCodeErrors.get(candidate.path);
+                  const titleEditing =
+                    editingField?.path === candidate.path && editingField.field === "title";
+                  const rjCodeEditing =
+                    editingField?.path === candidate.path && editingField.field === "rjCode";
+                  const title = effectiveTitle(candidate);
+                  const rjCode = effectiveRjCode(candidate);
                   const parentFolder = parentDirOf(candidate.path);
                   return (
                     <tr key={candidate.path}>
                       <td className="px-2.5 py-2 align-middle">
                         <input
                           type="checkbox"
-                          aria-label={`「${candidate.inferredTitle}」を選択`}
+                          aria-label={`「${title}」を選択`}
                           checked={!deselectedPaths.has(candidate.path)}
                           disabled={busy}
                           onChange={() => toggleRow(candidate.path)}
                         />
                       </td>
-                      <td className="truncate px-2.5 py-2 align-middle text-ink-0">
-                        {candidate.inferredTitle}
-                      </td>
                       <td className="px-2.5 py-2 align-middle">
-                        {editing ? (
+                        {titleEditing ? (
                           <input
-                            ref={rjCodeInputRef}
+                            ref={editingInputRef}
                             value={editingValue}
                             onChange={(event) => setEditingValue(event.target.value)}
                             onBlur={commitEdit}
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter") commitEdit();
-                            }}
-                            placeholder="RJコード"
-                            className="w-full min-w-0 rounded-[4px] border border-acc bg-paper-2 px-1.5 py-0.5 font-mono text-mono text-ink-0"
+                            onKeyDown={handleEditKeyDown}
+                            placeholder="タイトル"
+                            className={cn(
+                              "w-full min-w-0 rounded-[4px] border bg-paper-2 px-1.5 py-0.5 font-jp text-body text-ink-0",
+                              editingError ? "border-[var(--r-coral)]" : "border-acc",
+                            )}
                           />
                         ) : (
-                          <>
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() => startEdit(candidate)}
-                              title={rjCodeError ?? "クリックしてRJコードを編集"}
-                              className={cn(
-                                "font-mono text-[10.5px]",
-                                rjCodeError
-                                  ? "text-[var(--r-coral)]"
-                                  : hasRjCode({ rjCode: effectiveRjCode })
-                                    ? "text-ink-1"
-                                    : "text-ink-4",
-                              )}
-                            >
-                              {hasRjCode({ rjCode: effectiveRjCode }) ? effectiveRjCode : "未検出"}
-                            </button>
-                            {rjCodeError && (
-                              <p className="font-jp text-[9.5px] text-[var(--r-coral)]">
-                                {rjCodeError}
-                              </p>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => startEdit(candidate, "title")}
+                            title="クリックしてタイトルを編集"
+                            className="w-full min-w-0 truncate text-left font-jp text-ink-0"
+                          >
+                            {title}
+                          </button>
+                        )}
+                        {titleEditing && editingError && (
+                          <p role="alert" className="font-jp text-[9.5px] text-[var(--r-coral)]">
+                            {editingError}
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-2.5 py-2 align-middle">
+                        {rjCodeEditing ? (
+                          <input
+                            ref={editingInputRef}
+                            value={editingValue}
+                            onChange={(event) => setEditingValue(event.target.value)}
+                            onBlur={commitEdit}
+                            onKeyDown={handleEditKeyDown}
+                            placeholder="RJコード"
+                            className={cn(
+                              "w-full min-w-0 rounded-[4px] border bg-paper-2 px-1.5 py-0.5 font-mono text-mono text-ink-0",
+                              editingError ? "border-[var(--r-coral)]" : "border-acc",
                             )}
-                          </>
+                          />
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => startEdit(candidate, "rjCode")}
+                            title="クリックしてRJコードを編集"
+                            className={cn(
+                              "font-mono text-[10.5px]",
+                              hasRjCode({ rjCode }) ? "text-ink-1" : "text-ink-4",
+                            )}
+                          >
+                            {hasRjCode({ rjCode }) ? rjCode : "未検出"}
+                          </button>
+                        )}
+                        {rjCodeEditing && editingError && (
+                          <p role="alert" className="font-jp text-[9.5px] text-[var(--r-coral)]">
+                            {editingError}
+                          </p>
                         )}
                       </td>
                       <td
@@ -303,7 +361,7 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
                       <td className="px-2.5 py-2 align-middle">
                         <IconButton
                           icon={I.x}
-                          label={`「${candidate.inferredTitle}」を候補から外す`}
+                          label={`「${title}」を候補から外す`}
                           size="xs"
                           disabled={busy}
                           onClick={() => excludeMutation.mutate(candidate)}
@@ -321,17 +379,11 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
             </span>
             <Button
               variant="primary"
-              disabled={busy || selectedCandidates.length === 0 || selectedRjCodeErrorCount > 0}
+              disabled={busy || selectedCandidates.length === 0}
               onClick={handleRegisterSelected}
             >
               {selectedCandidates.length}件をライブラリに追加
             </Button>
-            {selectedRjCodeErrorCount > 0 && (
-              <span role="alert" className="font-jp text-[11px] text-[var(--r-coral)]">
-                RJコードの形式が正しくない項目が{selectedRjCodeErrorCount}
-                件あります。修正してください。
-              </span>
-            )}
           </div>
         </>
       )}

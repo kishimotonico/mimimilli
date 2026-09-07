@@ -4,7 +4,7 @@ title: 未登録スキャン候補のタイトルとRJコード編集を安全�
 status: To Do
 assignee: []
 created_date: '2026-09-07 09:08'
-updated_date: '2026-09-07 09:12'
+updated_date: '2026-09-07 15:38'
 labels:
   - ui
   - scan
@@ -26,9 +26,9 @@ VIS-10、scan-dlsite-A-09/A-10とB重複。一括登録前に推定タイトル�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 未登録候補のタイトルを編集・取消でき、登録payloadと登録後タイトルへ反映される
-- [ ] #2 RJコード編集のEscapeはmodalを閉じず編集を取消する
-- [ ] #3 不正値では値・focus・編集状態を保持して理由を表示する
-- [ ] #4 エラー行があっても正常行だけを選んで登録できる
-- [ ] #5 pnpm test:smokeに新規失敗がない
+- [x] #1 未登録候補のタイトルを編集・取消でき、登録payloadと登録後タイトルへ反映される
+- [x] #2 RJコード編集のEscapeはmodalを閉じず編集を取消する
+- [x] #3 不正値では値・focus・編集状態を保持して理由を表示する
+- [x] #4 エラー行があっても正常行だけを選んで登録できる
+- [x] #5 pnpm test:smokeに新規失敗がない
 <!-- AC:END -->

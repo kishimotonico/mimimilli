@@ -33,6 +33,8 @@ export const scanCandidateRegisterItemSchema = z.object({
   path: workspacePathSchema,
   /** 省略時はフォルダー名から自動検出。空文字はRJコードなしの明示。値ありは検証・正規化して mimimilli.json へ書き込む。 */
   rjCode: z.union([z.literal(""), rjCodeFormatSchema]).optional(),
+  /** 省略時は候補の推定タイトル（inferredTitle）をそのまま使う。指定する場合は前後の空白を除いて1文字以上必要。 */
+  title: z.string().trim().min(1).optional(),
 });
 export const scanCandidatesRegisterRequestSchema = z.object({
   items: z
