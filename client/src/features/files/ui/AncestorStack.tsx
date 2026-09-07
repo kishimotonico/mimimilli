@@ -78,6 +78,15 @@ function EllipsisSpine({ collapsed, onNavigate }: EllipsisSpineProps) {
     items?.[0]?.focus({ preventScroll: true });
   }, [open]);
 
+  // 開いたまま階層移動してこの背表紙自体が退出アニメへ入ると、.mle-colstack-anchor
+  // は子（.mle-colstack、幅アニメーション対象）の幅に追従する素朴なブロック要素なので、
+  // メニューが縮む背表紙に追従して横に動きながら消えてしまう（実機で再現・確認済み）。
+  // useIsPresentがfalseになった時点（退出が決まった瞬間）でメニューを閉じ、
+  // ずれた状態が見える前に消す。
+  useEffect(() => {
+    if (!isPresent) setOpen(false);
+  }, [isPresent]);
+
   const handleMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
     event.preventDefault();
