@@ -1,4 +1,4 @@
-import { useCallback, type ReactNode } from "react";
+import { useCallback } from "react";
 import type { WorkListItem } from "@mimimilli/shared";
 import type { AxisId } from "../../../entities/library/types";
 import { buildEmptyWorksHint, buildEmptyWorksMessage } from "../model/emptyWorks";
@@ -41,9 +41,6 @@ interface WorkListPaneProps {
   onLoadMore?: () => void;
   onWorkSelect: (id: string) => void;
   onClearSearch: () => void;
-  /** 結果面ヘッダー直下に置くバナー（スマートフォルダー軸のルール表示・編集導線、
-   *  エラービュー軸の一括登録解除導線など。プレビュー側ではなく結果面ヘッダー直下に置く） */
-  resultsBanner?: ReactNode;
   /** スマートフォルダー軸か。0件時に専用の空状態（条件を編集・絞り込みをすべてクリア）を
    *  出す（TASK-428.24 SF-05） */
   isSmartFolder?: boolean;
@@ -68,7 +65,6 @@ export default function WorkListPane({
   onLoadMore,
   onWorkSelect,
   onClearSearch,
-  resultsBanner,
   isSmartFolder = false,
   onEditSmartFolderRules,
   onClearAllFilters,
@@ -116,7 +112,6 @@ export default function WorkListPane({
 
   return (
     <div className={`mle-col is-results ${isPending ? "is-pending" : ""}`}>
-      {resultsBanner}
       <div ref={scrollRef} className="mle-col__list">
         {works.length === 0 ? (
           isSmartFolder ? (

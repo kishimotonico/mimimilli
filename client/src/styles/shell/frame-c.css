@@ -128,9 +128,10 @@
   opacity: 0.55;
   transition: opacity 150ms ease;
 }
-/* チップ列（.mll-tagband）は .mll-results の外、.mll-resultspane の通常フローに置く。
-     .mll-results 内の作品プレビューは absolute でスライドインするため、チップ列を
-     同じ .mll-results に同居させるとプレビューの下に隠れて操作できなくなる
+/* チップ列（.mll-tagband）・結果バナー（スマートフォルダーのルール表示、エラービューの
+     一括登録解除導線など）は .mll-results の外、.mll-resultspane の通常フローに置く。
+     .mll-results 内の作品プレビューは absolute でスライドインするため、同じ .mll-results に
+     同居させるとプレビューの下に隠れて操作できなくなる
      （チップ列はADR-0012 §2で選択フィルタの唯一の表現）。 */
 .mll-resultspane {
   flex: 1 1 0;

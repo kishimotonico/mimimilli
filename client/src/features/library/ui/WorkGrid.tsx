@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type ReactNode } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useAtom, useAtomValue } from "jotai";
 import type { AxisId } from "../../../entities/library/types";
 import { libraryGridLayoutModeAtom, libraryTileSizeAtom } from "../model/atoms";
@@ -53,10 +53,6 @@ interface WorkGridProps {
   onClearSearch: () => void;
   /** Esc・グリッド背景クリック時の選択解除 */
   onDeselect: () => void;
-  /** 結果面ヘッダー直下に置くバナー（スマートフォルダー軸のルール表示・編集導線、
-   *  エラービュー軸の一括登録解除導線など）。ADR-0012 §3 のレイアウト固定により、
-   *  プレビュー側ではなく結果面自体が持つ */
-  resultsBanner?: ReactNode;
   /** スマートフォルダー軸か。0件時に専用の空状態（条件を編集・絞り込みをすべてクリア）を
    *  出す（TASK-428.24 SF-05） */
   isSmartFolder?: boolean;
@@ -83,7 +79,6 @@ export default function WorkGrid({
   onWorkPlay,
   onClearSearch,
   onDeselect,
-  resultsBanner,
   isSmartFolder = false,
   onEditSmartFolderRules,
   onClearAllFilters,
@@ -170,7 +165,6 @@ export default function WorkGrid({
       className={`mll-grid-pane ${isPending ? "is-pending" : ""}`}
       aria-label="作品グリッド"
     >
-      {resultsBanner}
       <div className="mll-grid-body">
         <div ref={scrollRef} className="mll-grid-scroll">
           {works.length === 0 ? (
