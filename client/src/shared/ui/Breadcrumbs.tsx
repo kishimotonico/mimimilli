@@ -64,11 +64,18 @@ export default function Breadcrumbs({ path, onNavigate }: BreadcrumbsProps) {
           )}
         </span>
       ))}
+      {/* ラベルは data-label + ::before(content: attr()) で描画する（frame-b.css）。
+          テキストノードとして持たせると getByText 等のテスト用クエリが実体側の
+          ボタンとこのクローンの両方にヒットしてしまう（TASK-428.19で同種の事故あり）。
+          擬似要素の内容はDOMのテキストノードではないため二重ヒットしない。 */}
       <div className="mle-crumbs__measure" ref={measureRef} aria-hidden="true">
         {path.map((seg, i) => (
           <span key={i}>
-            {i > 0 && <span className="mle-crumbs__sep">/</span>}
-            <span className="mle-crumbs__seg">{seg}</span>
+            {i > 0 && <span className="mle-crumbs__sep" data-label="/" />}
+            <span
+              className={`mle-crumbs__seg ${i === path.length - 1 ? "is-last" : ""}`}
+              data-label={seg}
+            />
           </span>
         ))}
       </div>

@@ -67,4 +67,14 @@ describe("Breadcrumbs", () => {
     fireEvent.click(screen.getByRole("button", { name: "ルート" }));
     expect(onNavigate).toHaveBeenCalledWith(0);
   });
+
+  it("幅測定用クローンのラベルはテキストノードではないため、getByTextが実体と二重ヒットしない", () => {
+    const path = ["ルート", "現在地"];
+    render(<Breadcrumbs path={path} onNavigate={vi.fn()} />);
+
+    // 折返し不要な短いpathでもクローン自体は常に描画されるため、
+    // ::before(content: attr(data-label))化していないと本来ここで2件ヒットする
+    expect(screen.getAllByText("現在地")).toHaveLength(1);
+    expect(screen.getAllByText("ルート")).toHaveLength(1);
+  });
 });

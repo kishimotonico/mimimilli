@@ -59,7 +59,9 @@
   padding: 2px 4px;
 }
 /* 全セグメントを折返し無しで並べた自然幅を測るための不可視クローン
-   （Breadcrumbs.tsx の useNeedsCollapse が scrollWidth を読む） */
+   （Breadcrumbs.tsx の useNeedsCollapse が scrollWidth を読む）。ラベルは
+   テキストノードではなく::beforeで描画し、getByText等のテストクエリが
+   実体側と二重ヒットしないようにする */
 .mle-crumbs__measure {
   position: absolute;
   top: 0;
@@ -67,6 +69,10 @@
   visibility: hidden;
   white-space: nowrap;
   pointer-events: none;
+}
+.mle-crumbs__measure .mle-crumbs__seg::before,
+.mle-crumbs__measure .mle-crumbs__sep::before {
+  content: attr(data-label);
 }
 .mle-grid-controls {
   display: grid;
