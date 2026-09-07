@@ -179,10 +179,10 @@ export default function App() {
 
   const handleOpenScanProblemInFiles = useCallback(
     (path: string) => {
-      openPathInFiles(path);
+      openPathInFiles({ path, root: rootFolder });
       setActiveModal(null);
     },
-    [openPathInFiles],
+    [openPathInFiles, rootFolder],
   );
 
   if (startupState === "loading") {

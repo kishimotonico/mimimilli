@@ -272,6 +272,25 @@ test("errors: エラー・行方不明の作品のみが含まれる", async () 
   assert.ok(statuses.has("error") || statuses.has("missing"));
 });
 
+test("errors: rootFolderが作品のphysicalPathの前方一致になっている（relativeToRootが正しく剥がせる前提）", async () => {
+  const app = buildApp("errors");
+
+  const settingsRes = await app.request("/api/settings");
+  const { rootFolder } = await settingsRes.json();
+
+  const worksRes = await app.request("/api/works");
+  const { items } = await worksRes.json();
+  assert.ok(items.length > 0);
+  for (const work of items) {
+    const detail = await app.request(`/api/works/${work.id}`);
+    const { physicalPath } = await detail.json();
+    assert.ok(
+      physicalPath.startsWith(rootFolder),
+      `${physicalPath} が rootFolder(${rootFolder}) 配下ではない`,
+    );
+  }
+});
+
 test("large: 1000件の作品が生成され、IDが一意でスキーマ検証を通る", async () => {
   const app = buildApp("large");
 

@@ -19,6 +19,9 @@ vi.mock("../../src/features/library/ui/preview/WorkTrackList", () => ({
 vi.mock("../../src/features/library/ui/preview/WorkStatusWarnings", () => ({
   WorkStatusWarnings: () => null,
 }));
+vi.mock("../../src/entities/settings/useSettingsQuery", () => ({
+  useRootFolder: () => "/library",
+}));
 
 afterEach(cleanup);
 

@@ -7,6 +7,7 @@ import { workDeleteSuccessAtom } from "../../model/atoms";
 import { apiErrorMessage } from "../../../../shared/lib/apiError";
 import ConfirmDialog from "../../../../shared/ui/ConfirmDialog";
 import { openPathInFilesAtom } from "../../../../entities/file-system/model/navigationAtoms";
+import { useRootFolder } from "../../../../entities/settings/useSettingsQuery";
 import CoverImg from "../../../../entities/work/ui/CoverImg";
 import { getCoverImageUrl } from "../../../../entities/work/api";
 import { selectFixedCoverThumbnailWidth } from "../../../../entities/work/ui/coverThumbnailWidth";
@@ -90,6 +91,7 @@ export function WorkDetail({
   const setErrorToast = useSetAtom(errorToastAtom);
   const setWorkDeleteSuccess = useSetAtom(workDeleteSuccessAtom);
   const openPathInFiles = useSetAtom(openPathInFilesAtom);
+  const rootFolder = useRootFolder() ?? "/";
 
   const handleDeleteConfirm = () => {
     const title = work.title;
@@ -217,7 +219,7 @@ export function WorkDetail({
         work={work}
         onEdit={() => setIsEditDialogOpen(true)}
         onDelete={() => setIsDeleteConfirmOpen(true)}
-        onOpenFiles={() => openPathInFiles(work.physicalPath)}
+        onOpenFiles={() => openPathInFiles({ path: work.physicalPath, root: rootFolder })}
       />
 
       <WorkTrackList
