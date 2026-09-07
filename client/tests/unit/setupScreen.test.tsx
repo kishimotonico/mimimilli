@@ -10,6 +10,7 @@ import { PlayerRuntimeProvider } from "../../src/features/player/model/PlayerRun
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
 import * as settingsApi from "../../src/entities/settings/api";
 import * as scanApi from "../../src/features/scan/api";
+import { ApiRequestError } from "../../src/shared/api/http";
 
 const runningJob = {
   id: "job-1",
@@ -123,6 +124,33 @@ describe("SetupScreen 経路", () => {
     });
 
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("保存に失敗しました"));
+  });
+
+  it("ルートフォルダー検証エラー（InvalidRootFolderError由来のApiRequestError）はサーバーの文言をそのまま表示する", async () => {
+    vi.spyOn(settingsApi, "setRootFolder").mockRejectedValue(
+      new ApiRequestError(
+        400,
+        "invalid_request",
+        "指定されたルートフォルダーが存在しません: /no/such/path",
+      ),
+    );
+
+    renderSetupApp();
+    await waitFor(() => expect(screen.getByText("ようこそ")).toBeInTheDocument());
+
+    fireEvent.change(screen.getByPlaceholderText(/Users\/yourname/), {
+      target: { value: "/no/such/path" },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /スキャン開始/ }));
+    });
+
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "指定されたルートフォルダーが存在しません: /no/such/path",
+      ),
+    );
+    expect(screen.queryByText("初回セットアップに失敗しました")).not.toBeInTheDocument();
   });
 
   it("スキャン開始に失敗したら SetupScreen に留まり rootFolder を確定しない", async () => {
