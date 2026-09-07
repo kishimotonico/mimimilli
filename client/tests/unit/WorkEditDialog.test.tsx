@@ -3,7 +3,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Work } from "@mimimilli/shared";
 import { emptyDlsiteState } from "@mimimilli/shared";
 import { WORK_SOURCE_PATCH_BLOCKED_MESSAGE } from "../../src/entities/work/sourceRevision";
-import type { LibraryTitlePatchMutation } from "../../src/features/library/model/useLibraryQueries";
+import type {
+  LibraryTitlePatchMutation,
+  LibraryUrlsPatchMutation,
+} from "../../src/features/library/model/useLibraryQueries";
 import { WorkEditDialog } from "../../src/features/library/ui/preview/WorkEditDialog";
 
 vi.mock("../../src/features/library/ui/preview/WorkTagEditor", () => ({
@@ -59,6 +62,19 @@ function makeTitleMutation(
     mutateAsync: vi.fn(),
     ...overrides,
   } as LibraryTitlePatchMutation;
+}
+
+function makeUrlsMutation(
+  overrides: Partial<LibraryUrlsPatchMutation> = {},
+): LibraryUrlsPatchMutation {
+  return {
+    isPending: false,
+    error: null,
+    reset: vi.fn(),
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    ...overrides,
+  } as LibraryUrlsPatchMutation;
 }
 
 describe("WorkEditDialog", () => {
@@ -289,6 +305,41 @@ describe("WorkEditDialog", () => {
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
   });
 
+  it("保存処理中はキャンセルを押せない（後から成功した保存が続けていた編集ごと閉じる事故を防ぐ）", async () => {
+    const onClose = vi.fn();
+    let resolveMutate: ((work: ReturnType<typeof makeWork>) => void) | undefined;
+    const mutateAsync = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          resolveMutate = resolve;
+        }),
+    );
+    render(
+      <WorkEditDialog
+        work={makeWork()}
+        tagSuggestions={[]}
+        workPatchMutations={{
+          titleMutation: makeTitleMutation({ mutateAsync }),
+          tagsMutation: { mutateAsync: vi.fn() } as never,
+          urlsMutation: { mutate: vi.fn(), isPending: false, error: null } as never,
+        }}
+        onClose={onClose}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("タイトル"), { target: { value: "編集途中" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "閉じる" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "保存する" }));
+
+    // 保存が進行中の間、キャンセルは無効化される
+    await waitFor(() => expect(screen.getByRole("button", { name: "キャンセル" })).toBeDisabled());
+    fireEvent.click(screen.getByRole("button", { name: "キャンセル" }));
+    expect(screen.getByRole("alertdialog", { name: "未保存の変更があります" })).toBeTruthy();
+
+    resolveMutate?.(makeWork({ sourceRevision: "revision-2" }));
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+  });
+
   it("保存に失敗した場合は閉じずエラートーストを表示し、入力値を保持する", async () => {
     const onClose = vi.fn();
     const mutateAsync = vi.fn().mockRejectedValue(new Error("network"));
@@ -381,5 +432,66 @@ describe("WorkEditDialog", () => {
       />,
     );
     expect(document.activeElement).toBe(screen.getByLabelText("タイトル"));
+  });
+
+  it("URL保存も、保存中disabledでフォーカスが外れたら失敗後に先頭のURL欄へ戻す", () => {
+    const onClose = vi.fn();
+    // work は同一参照を使い回す（毎回 makeWork() すると urls: [] が新しい参照になり、
+    // work.urls 依存の同期effectがdraftを巻き戻してしまう）
+    const work = makeWork();
+    const { rerender } = render(
+      <WorkEditDialog
+        work={work}
+        tagSuggestions={[]}
+        workPatchMutations={{
+          titleMutation: makeTitleMutation(),
+          tagsMutation: { mutateAsync: vi.fn() } as never,
+          urlsMutation: makeUrlsMutation(),
+        }}
+        onClose={onClose}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "URLを追加" }));
+    const labelInput = screen.getByLabelText("URLラベル 1");
+    fireEvent.change(labelInput, { target: { value: "公式" } });
+    fireEvent.change(screen.getByLabelText("URL 1"), {
+      target: { value: "https://example.com" },
+    });
+    labelInput.focus();
+    expect(document.activeElement).toBe(labelInput);
+
+    // 保存中はdisabledになり、実ブラウザはフォーカスを外す（title側のテストと同様に模擬する）
+    rerender(
+      <WorkEditDialog
+        work={work}
+        tagSuggestions={[]}
+        workPatchMutations={{
+          titleMutation: makeTitleMutation(),
+          tagsMutation: { mutateAsync: vi.fn() } as never,
+          urlsMutation: makeUrlsMutation({ isPending: true }),
+        }}
+        onClose={onClose}
+      />,
+    );
+    screen.getAllByRole("button", { name: "閉じる" })[0]?.focus();
+    expect(document.activeElement).not.toBe(screen.getByLabelText("URLラベル 1"));
+
+    // 保存に失敗すると先頭のURLラベル欄へフォーカスが戻る
+    rerender(
+      <WorkEditDialog
+        work={work}
+        tagSuggestions={[]}
+        workPatchMutations={{
+          titleMutation: makeTitleMutation(),
+          tagsMutation: { mutateAsync: vi.fn() } as never,
+          urlsMutation: makeUrlsMutation({ isPending: false, error: new Error("network") }),
+        }}
+        onClose={onClose}
+      />,
+    );
+    expect(document.activeElement).toBe(screen.getByLabelText("URLラベル 1"));
+    expect(screen.getByLabelText("URLラベル 1")).toHaveValue("公式"); // 入力値は保持される
+    expect(screen.getByText("関連URLを保存できませんでした。")).toBeTruthy();
   });
 });

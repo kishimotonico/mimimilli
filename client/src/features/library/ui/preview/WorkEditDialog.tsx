@@ -108,7 +108,8 @@ function UnsavedChangesPrompt({
             ref={cancelRef}
             type="button"
             onClick={onCancel}
-            className="inline-flex h-[26px] items-center gap-[5px] whitespace-nowrap rounded-pill px-[10px] font-sans text-control font-medium text-ink-2 transition-colors hover:bg-paper-2 hover:text-ink-0"
+            disabled={isSaving}
+            className="inline-flex h-[26px] items-center gap-[5px] whitespace-nowrap rounded-pill px-[10px] font-sans text-control font-medium text-ink-2 transition-colors hover:bg-paper-2 hover:text-ink-0 disabled:cursor-not-allowed disabled:text-ink-4 disabled:hover:bg-transparent"
           >
             キャンセル
           </button>
@@ -143,6 +144,7 @@ export function WorkEditDialog({
   const [isUnsavedPromptOpen, setIsUnsavedPromptOpen] = useState(false);
   const [isSavingToClose, setIsSavingToClose] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const firstUrlInputRef = useRef<HTMLInputElement>(null);
 
   const requestClose = () => {
     if (isDirty) {
@@ -162,11 +164,14 @@ export function WorkEditDialog({
     setUrlDrafts(cloneUrls(work.urls));
     setUrlValidationError(null);
   }, [work.urls]);
-  // 保存に失敗しても入力値は残す（ドラフトを巻き戻さない）。ここでは失敗直後に
-  // フォーカスがbodyへ落ちないよう、タイトル欄へ戻す。
+  // 保存に失敗しても入力値は残す（ドラフトを巻き戻さない）。保存中はdisabledでフォーカスが
+  // bodyへ落ちるため、失敗確定時にフォーカスを戻す。
   useEffect(() => {
     if (titleMutation.error) titleInputRef.current?.focus();
   }, [titleMutation.error]);
+  useEffect(() => {
+    if (urlsMutation.error) firstUrlInputRef.current?.focus();
+  }, [urlsMutation.error]);
 
   const canEditSource = canPatchWorkSource(work.sourceRevision);
 
@@ -319,6 +324,7 @@ export function WorkEditDialog({
               {urlDrafts.map((entry, index) => (
                 <div key={index} className="flex items-center gap-2">
                   <input
+                    ref={index === 0 ? firstUrlInputRef : undefined}
                     className={inputClass}
                     value={entry.label}
                     aria-label={`URLラベル ${index + 1}`}
