@@ -156,7 +156,7 @@ export const tagListSchema = z.array(z.string());
 
 // ── 欠損作品の一括登録解除（GET /api/works/missing-count, POST /api/works/unregister-missing）──
 
-/** status === "missing" の作品数。一括削除の確認ダイアログが件数表示に使う */
+/** status === "missing" の作品数。一括登録解除の確認ダイアログが件数表示に使う */
 export const missingWorksCountSchema = z.object({
   count: z.number().int().nonnegative(),
 });
