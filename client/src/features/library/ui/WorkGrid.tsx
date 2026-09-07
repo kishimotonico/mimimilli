@@ -151,7 +151,13 @@ export default function WorkGrid({
 
   // roving tabindexの現在位置。選択中の作品があればその位置、無ければ先頭（0）を
   // Tabストップにする（一覧全体でTabストップ1個、TASK-428.12）。
-  const rovingIndex = works.length === 0 ? -1 : Math.max(0, works.findIndex((w) => w.id === selectedWorkId));
+  const rovingIndex =
+    works.length === 0
+      ? -1
+      : Math.max(
+          0,
+          works.findIndex((w) => w.id === selectedWorkId),
+        );
 
   const rowTileProps = {
     selectedWorkId,
