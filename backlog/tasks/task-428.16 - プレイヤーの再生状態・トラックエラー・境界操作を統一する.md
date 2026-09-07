@@ -1,10 +1,10 @@
 ---
 id: TASK-428.16
 title: プレイヤーの再生状態・トラックエラー・境界操作を統一する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-07 09:08'
-updated_date: '2026-09-07 20:16'
+updated_date: '2026-09-07 20:32'
 labels:
   - ui
   - player
