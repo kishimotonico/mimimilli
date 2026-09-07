@@ -67,7 +67,10 @@ export default function Breadcrumbs({ path, onNavigate }: BreadcrumbsProps) {
       {/* ラベルは data-label + ::before(content: attr()) で描画する（frame-b.css）。
           テキストノードとして持たせると getByText 等のテスト用クエリが実体側の
           ボタンとこのクローンの両方にヒットしてしまう（TASK-428.19で同種の事故あり）。
-          擬似要素の内容はDOMのテキストノードではないため二重ヒットしない。 */}
+          擬似要素の内容はDOMのテキストノードではないため二重ヒットしない。
+          このクローンはspan要素かつaria-hidden="true"なので、getByRole系のクエリには
+          そもそもヒットしない。role指定なしのgetByText系クエリを新たに使う場合だけ、
+          aria-hidden要素もマッチしうる点に注意（現状の全テストはroleクエリのため無関係）。 */}
       <div className="mle-crumbs__measure" ref={measureRef} aria-hidden="true">
         {path.map((seg, i) => (
           <span key={i}>
