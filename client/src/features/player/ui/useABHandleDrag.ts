@@ -3,6 +3,7 @@
 // abPointSet の positionSec を動かす点が異なるため、シーク本体のドラッグとは分離している。
 
 import { useCallback, useState } from "react";
+import { isPrimaryPointerButton } from "../../../shared/lib/pointerButton";
 import { releasePointerCaptureSafe, useRatioFromClientX } from "../model/ratioFromClientX";
 
 interface UseABHandleDragOptions {
@@ -31,7 +32,7 @@ export function useABHandleDrag({
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
-      if (!duration) return;
+      if (!duration || !isPrimaryPointerButton(e)) return;
       e.stopPropagation();
       e.currentTarget.setPointerCapture(e.pointerId);
       setDragging(true);

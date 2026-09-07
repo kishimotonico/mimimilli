@@ -118,6 +118,7 @@ function TagComboboxImpl(
 ) {
   const baseId = useId();
   const listboxId = `${baseId}-listbox`;
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [input, setInput] = useState("");
   const [isOpen, setIsOpen] = useState(false);
@@ -185,11 +186,35 @@ function TagComboboxImpl(
     return () => cancelAnimationFrame(frameId);
   }, [focusOnMount, disabled]);
 
+  // 候補表示中は外側クリック・スクロールで候補だけを閉じる（ダイアログやフォーム自体は閉じない）。
+  useEffect(() => {
+    if (!isExpanded) return;
+
+    const closeCandidates = () => setIsOpen(false);
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (containerRef.current?.contains(event.target as Node)) return;
+      closeCandidates();
+    };
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("scroll", closeCandidates, true);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("scroll", closeCandidates, true);
+    };
+  }, [isExpanded]);
+
   /* oxlint-disable jsx-a11y/prefer-tag-over-role -- Custom combobox needs ARIA listbox/option semantics and cannot use native select/datalist without changing tag creation behavior. */
   return (
     <div
+      ref={containerRef}
       className={cn("relative", width === "full" && "w-full")}
       style={width === "full" ? undefined : { width }}
+      onBlur={(event) => {
+        if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+        setIsOpen(false);
+      }}
     >
       <input
         ref={inputRef}

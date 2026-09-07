@@ -114,6 +114,24 @@ describe("PopupContent", () => {
     expect(handlers.onSetPlaybackRate).toHaveBeenCalledWith(1.5);
   });
 
+  it("再生速度メニューはスクロールで閉じる", () => {
+    renderPopup({ playbackRate: 1 });
+    fireEvent.click(screen.getByTitle("再生速度"));
+    expect(screen.getByRole("menu", { name: "再生速度" })).toBeInTheDocument();
+
+    fireEvent.scroll(window);
+    expect(screen.queryByRole("menu", { name: "再生速度" })).not.toBeInTheDocument();
+  });
+
+  it("再生速度メニューはフォーカスが外へ移ると閉じる", () => {
+    renderPopup({ playbackRate: 1 });
+    fireEvent.click(screen.getByTitle("再生速度"));
+    expect(screen.getByRole("menu", { name: "再生速度" })).toBeInTheDocument();
+
+    fireEvent.focusOut(screen.getByTitle("再生速度"), { relatedTarget: document.body });
+    expect(screen.queryByRole("menu", { name: "再生速度" })).not.toBeInTheDocument();
+  });
+
   it("停止ボタンでonStopを、バーへ戻るでonFoldを、再生中タブ表示でonOpenNowPlayingを呼ぶ", () => {
     const handlers = renderPopup();
     fireEvent.click(screen.getByRole("button", { name: "再生を停止" }));

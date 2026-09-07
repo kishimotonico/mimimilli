@@ -5,6 +5,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { formatDuration, formatTime } from "../../../shared/lib/format";
 import { clamp } from "../../../shared/lib/clamp";
+import { isPrimaryPointerButton } from "../../../shared/lib/pointerButton";
 import { releasePointerCaptureSafe, useRatioFromClientX } from "../model/ratioFromClientX";
 
 /** WAI-ARIA slider パターンの矢印キー刻み（秒） */
@@ -69,7 +70,7 @@ export function useSeekDrag({
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
-      if (!duration) return;
+      if (!duration || !isPrimaryPointerButton(e)) return;
       e.currentTarget.setPointerCapture(e.pointerId);
       setDragging(true);
       const ratio = ratioFromClientX(e.clientX);

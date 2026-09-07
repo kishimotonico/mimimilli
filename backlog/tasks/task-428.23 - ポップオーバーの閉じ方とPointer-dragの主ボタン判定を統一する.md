@@ -4,7 +4,7 @@ title: ポップオーバーの閉じ方とPointer dragの主ボタン判定を�
 status: To Do
 assignee: []
 created_date: '2026-09-07 09:09'
-updated_date: '2026-09-07 19:12'
+updated_date: '2026-09-07 19:33'
 labels:
   - ui
   - interaction
@@ -32,9 +32,9 @@ Escape の扱いは docs/design-system.md の「グローバルショートカ�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 TagComboboxと速度menuが外側クリック・focus移動・scroll・Escapeで閉じる
-- [ ] #2 候補選択・速度選択・矢印キー操作を維持する
-- [ ] #3 seek・AB・popup dragはmouse主ボタンだけで開始する
-- [ ] #4 右・中央クリックの標準動作を妨げない
-- [ ] #5 pnpm test:smokeに新規失敗がない
+- [x] #1 TagComboboxと速度menuが外側クリック・focus移動・scroll・Escapeで閉じる
+- [x] #2 候補選択・速度選択・矢印キー操作を維持する
+- [x] #3 seek・AB・popup dragはmouse主ボタンだけで開始する
+- [x] #4 右・中央クリックの標準動作を妨げない
+- [x] #5 pnpm test:smokeに新規失敗がない
 <!-- AC:END -->

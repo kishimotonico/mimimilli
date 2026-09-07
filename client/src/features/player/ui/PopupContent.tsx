@@ -76,20 +76,31 @@ export default function PopupContent({
   useEffect(() => {
     if (!rateMenuOpen || !isPresent) return;
 
+    const closeMenu = () => setRateMenuOpen(false);
+
     const handlePointerDown = (e: PointerEvent) => {
       if (rateMenuRef.current && !rateMenuRef.current.contains(e.target as Node)) {
-        setRateMenuOpen(false);
+        closeMenu();
       }
     };
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setRateMenuOpen(false);
+      if (e.key === "Escape") closeMenu();
+    };
+    const handleFocusOut = (e: FocusEvent) => {
+      const next = e.relatedTarget as Node | null;
+      if (rateMenuRef.current && next && rateMenuRef.current.contains(next)) return;
+      closeMenu();
     };
 
     window.addEventListener("pointerdown", handlePointerDown);
     window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("scroll", closeMenu, true);
+    document.addEventListener("focusout", handleFocusOut);
     return () => {
       window.removeEventListener("pointerdown", handlePointerDown);
       window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("scroll", closeMenu, true);
+      document.removeEventListener("focusout", handleFocusOut);
     };
   }, [rateMenuOpen, isPresent]);
 

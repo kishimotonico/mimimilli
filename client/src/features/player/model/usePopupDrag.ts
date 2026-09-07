@@ -8,6 +8,7 @@ import { animate, useDragControls, useMotionValue, type PanInfo } from "motion/r
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { playerPopupOffsetAtom, type PlayerPopupOffset } from "./playerPresentationAtoms";
 import { clamp } from "../../../shared/lib/clamp";
+import { isPrimaryPointerButton } from "../../../shared/lib/pointerButton";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 
 /** 離した位置が初期位置からこの距離(px)以内なら吸着して初期位置へ戻す。 */
@@ -110,6 +111,7 @@ export function usePopupDrag(): PopupDragBind {
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
+      if (!isPrimaryPointerButton(e)) return;
       const target = e.target as HTMLElement;
       if (target.closest(DRAG_IGNORE_SELECTOR)) return;
       dragControls.start(e);
