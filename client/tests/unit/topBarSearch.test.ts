@@ -6,7 +6,10 @@ import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import TopBar from "../../src/app/ui/TopBar";
-import { librarySearchQueryAtom } from "../../src/entities/library/model/navigationAtoms";
+import {
+  librarySearchQueryAtom,
+  selectedWorkIdAtom,
+} from "../../src/entities/library/model/navigationAtoms";
 import { appModeAtom } from "../../src/features/navigation/model/navigationAtoms";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
 
@@ -167,10 +170,13 @@ describe("TopBar の検索入力", () => {
     expect(screen.getByPlaceholderText(PLACEHOLDER)).toBeInTheDocument();
   });
 
-  it("作品詳細でEnterを確定するとライブラリへ移る", () => {
+  it("作品詳細でEnterを確定するとライブラリへ移り、直前の選択作品はプレビューに残す（意図した挙動）", () => {
     const store = createStore();
     store.set(appModeAtom, "workDetail");
     store.set(librarySearchQueryAtom, "");
+    // 全画面詳細を開く前にライブラリ側で選択していた作品。検索確定はプレビュー文脈を
+    // 壊さない設計とし、クリアしない（クリアしてもプレビューが空になるだけで得るものがない）。
+    store.set(selectedWorkIdAtom, "RJ501011");
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
     });
@@ -194,5 +200,6 @@ describe("TopBar の検索入力", () => {
     fireEvent.change(input, { target: { value: "asmr" } });
     fireEvent.keyDown(input, { key: "Enter" });
     expect(store.get(appModeAtom)).toBe("library");
+    expect(store.get(selectedWorkIdAtom)).toBe("RJ501011");
   });
 });

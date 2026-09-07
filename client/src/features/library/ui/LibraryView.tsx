@@ -36,12 +36,8 @@ import {
   shouldClearSelectionOnFilterMiss,
   shouldClearSelectionOnWorkNotFound,
 } from "../model/libraryPresentation";
-import {
-  isFacetAxis,
-  isRegisteredFacetAxis,
-  isSmartAxis,
-  getSmartFolderId,
-} from "../../../entities/library/axisDefinitions";
+import { isSmartAxis, getSmartFolderId } from "../../../entities/library/axisDefinitions";
+import { resolveInvalidLibraryAxisMessage } from "../model/libraryUrlRecovery";
 import { useRootFolder } from "../../../entities/settings/useSettingsQuery";
 import {
   type SmartFolderEditorState,
@@ -127,7 +123,7 @@ export default function LibraryView({
 
   // 無効な軸URLの検証専用（TASK-428.15）。tagPrefixes/smartFoldersは上と同じ
   // queryKeyでキャッシュを共有するため、追加のリクエストは発生しない。
-  // isPendingだけをここから取り、ロード中を未登録と誤判定しないようにする。
+  // isSuccessだけをここから取り、ロード中・取得失敗中を未登録と誤判定しないようにする。
   const tagPrefixesStatusQuery = useTagPrefixes();
   const smartFoldersStatusQuery = useQuery({
     queryKey: SMART_FOLDER_QUERY_KEYS.all(),
@@ -179,31 +175,28 @@ export default function LibraryView({
     : null;
 
   // 未登録軸・存在しないスマートフォルダーIDのURLを0件の偽ページにせず、警告付きで
-  // 既定一覧へ戻す（TASK-428.15、監査所見 smart-folders-B-15）。tagPrefixes/smartFolders
-  // が揃うまでは判定しない（ロード中はどちらも空配列を返すため、未ロードを未登録と
-  // 誤判定してしまう）。既定一覧へは履歴を積まず現在のエントリを置き換える
-  // （recoverInvalidLibraryAxisAtom）ため、「戻る」で無効なURLへ再度入ることはない。
+  // 既定一覧へ戻す（TASK-428.15、監査所見 smart-folders-B-15）。判定自体は
+  // resolveInvalidLibraryAxisMessage（純粋関数）に委ね、取得中・取得失敗中は
+  // 判定不能として何もしない（一時的なネットワーク不調で正当なURLを弾かない）。
+  // 既定一覧へは履歴を積まず現在のエントリを置き換える（recoverInvalidLibraryAxisAtom）
+  // ため、「戻る」で無効なURLへ再度入ることはない。
   useEffect(() => {
-    if (tagPrefixesStatusQuery.isPending || smartFoldersStatusQuery.isPending) return;
-    const axis = nav.activeAxis;
-    if (isSmartAxis(axis)) {
-      if (activeSmartFolder) return;
-      recoverInvalidLibraryAxis();
-      setLibraryInvalidUrlToast(
-        "指定されたスマートフォルダーが見つかりません。既定の一覧に戻りました",
-      );
-      return;
-    }
-    if (isFacetAxis(axis) && !isRegisteredFacetAxis(axis, tagPrefixes)) {
-      recoverInvalidLibraryAxis();
-      setLibraryInvalidUrlToast("指定された絞り込み軸が見つかりません。既定の一覧に戻りました");
-    }
+    const message = resolveInvalidLibraryAxisMessage(
+      nav.activeAxis,
+      tagPrefixesStatusQuery.isSuccess,
+      smartFoldersStatusQuery.isSuccess,
+      tagPrefixes,
+      smartFolders,
+    );
+    if (!message) return;
+    recoverInvalidLibraryAxis();
+    setLibraryInvalidUrlToast(message);
   }, [
     nav.activeAxis,
-    activeSmartFolder,
     tagPrefixes,
-    tagPrefixesStatusQuery.isPending,
-    smartFoldersStatusQuery.isPending,
+    smartFolders,
+    tagPrefixesStatusQuery.isSuccess,
+    smartFoldersStatusQuery.isSuccess,
     recoverInvalidLibraryAxis,
     setLibraryInvalidUrlToast,
   ]);
