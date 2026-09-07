@@ -3,7 +3,7 @@
 import type { ComponentProps } from "react";
 import type { SmartFolder } from "@mimimilli/shared";
 import { createElement } from "react";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import SmartFolderEditorModal from "../../src/features/library/ui/SmartFolderEditorModal";
@@ -43,6 +43,8 @@ function renderModal({
         tagPrefixes: [],
         isSaving,
         saveError: null,
+        isDeleting: false,
+        deleteError: null,
         onClose,
         onSave,
         ...props,
@@ -159,6 +161,71 @@ describe("SmartFolderEditorModal", () => {
     renderModal(); // 新規作成の初期ドラフトはタグ未選択で不正
 
     expect(preview).not.toHaveBeenCalled();
+  });
+
+  it("選択した並び順が再表示後も保持される", () => {
+    const folder = {
+      id: "sf-1",
+      name: "テスト",
+      rules: [],
+      sort: "added-desc",
+      createdAt: "2026-07-10T00:00:00.000Z",
+    } satisfies SmartFolder;
+    const { onSave } = renderModal({ props: { folder } });
+
+    fireEvent.change(screen.getByLabelText("並び順"), { target: { value: "title-asc" } });
+    fireEvent.click(screen.getByRole("button", { name: "変更を保存" }));
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ sort: "title-asc" }));
+  });
+});
+
+describe("SmartFolderEditorModal の削除（TASK-428.10）", () => {
+  it("作成モードでは削除操作を表示しない", () => {
+    renderModal();
+    expect(
+      screen.queryByRole("button", { name: "このスマートフォルダーを削除" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("編集モードで削除→確認の確定でonDeleteが呼ばれる", () => {
+    const folder = {
+      id: "sf-1",
+      name: "長時間ASMR",
+      rules: [],
+      sort: "added-desc",
+      createdAt: "2026-07-10T00:00:00.000Z",
+    } satisfies SmartFolder;
+    const onDelete = vi.fn();
+    renderModal({ props: { folder, onDelete } });
+
+    fireEvent.click(screen.getByRole("button", { name: "このスマートフォルダーを削除" }));
+
+    const confirmDialog = screen.getByRole("alertdialog");
+    expect(within(confirmDialog).getByText(/作品は削除されません/)).toBeInTheDocument();
+    fireEvent.click(within(confirmDialog).getByRole("button", { name: "削除" }));
+
+    expect(onDelete).toHaveBeenCalledTimes(1);
+  });
+
+  it("削除確認をキャンセルするとonDeleteを呼ばずフォルダーを変更しない", () => {
+    const folder = {
+      id: "sf-1",
+      name: "長時間ASMR",
+      rules: [],
+      sort: "added-desc",
+      createdAt: "2026-07-10T00:00:00.000Z",
+    } satisfies SmartFolder;
+    const onDelete = vi.fn();
+    renderModal({ props: { folder, onDelete } });
+
+    fireEvent.click(screen.getByRole("button", { name: "このスマートフォルダーを削除" }));
+    const confirmDialog = screen.getByRole("alertdialog");
+    fireEvent.click(within(confirmDialog).getByRole("button", { name: "キャンセル" }));
+
+    expect(onDelete).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(screen.getByDisplayValue("長時間ASMR")).toBeInTheDocument();
   });
 });
 

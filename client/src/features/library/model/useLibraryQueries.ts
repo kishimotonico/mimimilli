@@ -29,6 +29,7 @@ import {
   listSmartFolders,
   createSmartFolder,
   updateSmartFolder,
+  deleteSmartFolder,
   evalSmartFolder,
   previewSmartFolderRuleCount,
 } from "../../../entities/smart-folder/api";
@@ -412,6 +413,23 @@ export function useSmartFolderMutation(callbacks: {
     },
     onError: (error, { folder }) => {
       callbacks.onError(folder === null, error);
+    },
+  });
+}
+
+// setSmartFolderEditor / nav.setAxis は LibraryView 側の UI state のため、
+// 成功時コールバックとして呼び出し側から渡してもらう。
+export function useSmartFolderDeleteMutation(callbacks: { onDeleted: () => void }) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => deleteSmartFolder(id),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.all() }),
+        queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.allWorks() }),
+      ]);
+      callbacks.onDeleted();
     },
   });
 }

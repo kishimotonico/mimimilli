@@ -1,5 +1,5 @@
 import { dedupeTags, normalizeTags, TagNormalizationError } from "@mimimilli/shared";
-import type { SmartFolder, SmartFolderCreate, SmartFolderRule } from "@mimimilli/shared";
+import type { SmartFolder, SmartFolderCreate, SmartFolderRule, SortId } from "@mimimilli/shared";
 
 function invalidTagRuleError(tag: string): string {
   return `「${tag}」は登録できないタグです`;
@@ -26,6 +26,7 @@ export type SmartFolderEditorRule =
 export interface SmartFolderEditorDraft {
   name: string;
   rules: SmartFolderEditorRule[];
+  sort: SortId;
 }
 
 export interface SmartFolderEditorErrors {
@@ -58,7 +59,11 @@ export function createEmptySmartFolderRule(
 
 export function createSmartFolderDraft(folder?: SmartFolder): SmartFolderEditorDraft {
   if (!folder) {
-    return { name: "", rules: [createEmptySmartFolderRule("rule-0", "WHERE")] };
+    return {
+      name: "",
+      rules: [createEmptySmartFolderRule("rule-0", "WHERE")],
+      sort: "added-desc",
+    };
   }
 
   return {
@@ -69,6 +74,7 @@ export function createSmartFolderDraft(folder?: SmartFolder): SmartFolderEditorD
       values: [...rule.values],
       conjunction: index === 0 ? "WHERE" : rule.conjunction,
     })) as SmartFolderEditorRule[],
+    sort: folder.sort,
   };
 }
 
@@ -188,6 +194,6 @@ export function validateSmartFolderDraft(draft: SmartFolderEditorDraft): SmartFo
 
   return {
     success: true,
-    data: { name, rules: rulesResult.success ? rulesResult.rules : [], sort: "added-desc" },
+    data: { name, rules: rulesResult.success ? rulesResult.rules : [], sort: draft.sort },
   };
 }

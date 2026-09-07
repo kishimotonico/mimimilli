@@ -28,6 +28,7 @@ import {
   useLibraryDebouncedSearchQuery,
   useLibrarySupportingQueries,
   useMissingWorksCountQuery,
+  useSmartFolderDeleteMutation,
   useSmartFolderMutation,
 } from "../model/useLibraryQueries";
 import {
@@ -140,6 +141,13 @@ export default function LibraryView({
     onError: () => {},
   });
 
+  const deleteSmartFolderMutation = useSmartFolderDeleteMutation({
+    onDeleted: () => {
+      setSmartFolderEditor(closedSmartFolderEditorState);
+      nav.setAxis("all");
+    },
+  });
+
   const isErrorView = nav.activeAxis === "error";
   const missingWorksCountQuery = useMissingWorksCountQuery(isErrorView);
   const bulkUnregisterMissingMutation = useLibraryBulkUnregisterMissingMutation(() => {
@@ -243,8 +251,9 @@ export default function LibraryView({
   const handleEditSmartFolder = useCallback(() => {
     if (!activeSmartFolder) return;
     saveSmartFolderMutation.reset();
+    deleteSmartFolderMutation.reset();
     setSmartFolderEditor(editSmartFolderEditorState(activeSmartFolder));
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- saveSmartFolderMutation.reset は毎レンダー新規参照のため省く
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset系は毎レンダー新規参照のため省く
   }, [activeSmartFolder]);
 
   return (
@@ -444,8 +453,16 @@ export default function LibraryView({
                 ? "保存に失敗しました"
                 : null
           }
+          isDeleting={deleteSmartFolderMutation.isPending}
+          deleteError={
+            deleteSmartFolderMutation.error instanceof Error
+              ? deleteSmartFolderMutation.error.message
+              : deleteSmartFolderMutation.error
+                ? "削除に失敗しました"
+                : null
+          }
           onClose={() => {
-            if (saveSmartFolderMutation.isPending) return;
+            if (saveSmartFolderMutation.isPending || deleteSmartFolderMutation.isPending) return;
             setSmartFolderEditor(closedSmartFolderEditorState);
           }}
           onSave={(input) =>
@@ -453,6 +470,11 @@ export default function LibraryView({
               folder: smartFolderEditor.status === "edit" ? smartFolderEditor.folder : null,
               input,
             })
+          }
+          onDelete={
+            smartFolderEditor.status === "edit"
+              ? () => deleteSmartFolderMutation.mutate(smartFolderEditor.folder.id)
+              : undefined
           }
         />
       )}
