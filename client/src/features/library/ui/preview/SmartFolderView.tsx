@@ -1,46 +1,59 @@
-import { parseTag, type SmartFolder, type SmartFolderRule } from "@mimimilli/shared";
+import type { SmartFolder, SmartFolderRule, TagPrefix } from "@mimimilli/shared";
 import { I } from "../../../../shared/ui/Icon";
 import Button from "../../../../shared/ui/Button";
+import { tagPrefixColorToCss } from "../../../../entities/work/tagPrefixColor";
 import {
   formatSmartFolderLengthValue,
   formatSmartFolderOperatorLabel,
+  resolveSmartFolderTagChip,
 } from "../../model/smartFolderFormat";
 import { useSmartFolderRuleMatchCountQuery } from "../../model/useLibraryQueries";
 
-const TAG_PREFIX_LABEL: Record<string, string> = {
-  circle: "サークル",
-  cv: "CV",
-  series: "シリーズ",
-  cat: "カテゴリ",
-  genre: "ジャンル",
-  サークル: "サークル",
-  シリーズ: "シリーズ",
-  カテゴリ: "カテゴリ",
-};
-
-function TagValueChip({ value }: { value: string }) {
-  const tag = parseTag(value);
-  const prefixLabel =
-    tag.kind === "annotated" ? (TAG_PREFIX_LABEL[tag.prefix] ?? tag.prefix) : null;
+function TagValueChip({
+  value,
+  tagPrefixes,
+  tagSuggestions,
+}: {
+  value: string;
+  tagPrefixes: TagPrefix[];
+  tagSuggestions: string[];
+}) {
+  const { prefixLabel, color, displayValue, isUnknown } = resolveSmartFolderTagChip(
+    value,
+    tagPrefixes,
+    tagSuggestions,
+  );
 
   return (
     <span
-      className="inline-flex min-w-0 max-w-full items-center overflow-hidden rounded-1 border border-line-soft bg-paper-2 text-ink-0"
-      title={value}
+      className="inline-flex min-w-0 max-w-full items-center gap-1 overflow-hidden rounded-1 border border-line-soft bg-paper-2 text-ink-0"
+      title={isUnknown ? `${value}（このタグが付いた作品は現在ありません）` : value}
     >
       {prefixLabel && (
-        <span className="shrink-0 border-r border-line-soft px-[5px] py-[1px] font-sans text-label font-semibold text-ink-2">
+        <span
+          className="shrink-0 border-r border-line-soft px-[5px] py-[1px] font-sans text-label font-semibold text-ink-2"
+          style={{ color: tagPrefixColorToCss(color) }}
+        >
           {prefixLabel}
         </span>
       )}
-      <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap px-[6px] py-[1px]">
-        {tag.kind === "annotated" ? tag.value : tag.raw}
+      <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap py-[1px] pl-[6px] pr-[3px]">
+        {displayValue}
       </span>
+      {isUnknown && <I.err size={10} className="mr-[5px] shrink-0 text-[color:var(--r-coral)]" />}
     </span>
   );
 }
 
-function RuleValue({ rule }: { rule: SmartFolderRule }) {
+function RuleValue({
+  rule,
+  tagPrefixes,
+  tagSuggestions,
+}: {
+  rule: SmartFolderRule;
+  tagPrefixes: TagPrefix[];
+  tagSuggestions: string[];
+}) {
   if (rule.field === "長さ") {
     if (rule.values[0] === undefined) {
       throw new Error("長さルールに値がありません");
@@ -53,7 +66,7 @@ function RuleValue({ rule }: { rule: SmartFolderRule }) {
       {rule.values.map((value, i) => (
         <span key={`${value}-${i}`} className="inline-flex min-w-0 items-center gap-1">
           {i > 0 && <span className="or-sep shrink-0">OR</span>}
-          <TagValueChip value={value} />
+          <TagValueChip value={value} tagPrefixes={tagPrefixes} tagSuggestions={tagSuggestions} />
         </span>
       ))}
     </span>
@@ -63,10 +76,14 @@ function RuleValue({ rule }: { rule: SmartFolderRule }) {
 export function SmartFolderView({
   sf,
   total,
+  tagPrefixes,
+  tagSuggestions,
   onEdit,
 }: {
   sf: SmartFolder;
   total?: number;
+  tagPrefixes: TagPrefix[];
+  tagSuggestions: string[];
   onEdit: () => void;
 }) {
   // 条件一致（チップ絞り込み前の純粋なルール一致件数）と絞り込み後（total、チップ適用後）を
@@ -95,7 +112,7 @@ export function SmartFolderView({
                   <I.filter size={10} /> {rule.field}
                 </span>
                 <span className="op">{formatSmartFolderOperatorLabel(rule)}</span>
-                <RuleValue rule={rule} />
+                <RuleValue rule={rule} tagPrefixes={tagPrefixes} tagSuggestions={tagSuggestions} />
               </div>
             ))
           )}

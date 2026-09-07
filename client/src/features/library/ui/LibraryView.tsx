@@ -280,6 +280,8 @@ export default function LibraryView({
                   <SmartFolderView
                     sf={activeSmartFolder}
                     total={result.worksTotal}
+                    tagPrefixes={tagPrefixes}
+                    tagSuggestions={tagSuggestions}
                     onEdit={handleEditSmartFolder}
                   />
                 </div>
@@ -383,6 +385,7 @@ export default function LibraryView({
         <SmartFolderEditorModal
           folder={smartFolderEditor.status === "edit" ? smartFolderEditor.folder : null}
           tagSuggestions={tagSuggestions}
+          tagPrefixes={tagPrefixes}
           isSaving={saveSmartFolderMutation.isPending}
           saveError={
             saveSmartFolderMutation.error instanceof Error

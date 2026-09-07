@@ -1,5 +1,10 @@
 import { useRef, useState, type FormEvent } from "react";
-import { normalizeTag, type SmartFolder, type SmartFolderCreate } from "@mimimilli/shared";
+import {
+  normalizeTag,
+  type SmartFolder,
+  type SmartFolderCreate,
+  type TagPrefix,
+} from "@mimimilli/shared";
 import {
   addSmartFolderRule,
   changeSmartFolderRuleField,
@@ -14,18 +19,21 @@ import {
 import {
   formatSmartFolderLengthValue,
   formatSmartFolderOperatorLabel,
+  resolveSmartFolderTagChip,
 } from "../model/smartFolderFormat";
 import { useSmartFolderRuleMatchCountQuery } from "../model/useLibraryQueries";
 import { cn } from "../../../shared/lib/cn";
+import { tagPrefixColorToCss } from "../../../entities/work/tagPrefixColor";
 import Button from "../../../shared/ui/Button";
 import IconButton from "../../../shared/ui/IconButton";
 import { I } from "../../../shared/ui/Icon";
-import TagCombobox from "../../../shared/ui/TagCombobox";
+import TagCombobox, { type TagComboboxHandle } from "../../../shared/ui/TagCombobox";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
 
 interface SmartFolderEditorModalProps {
   folder: SmartFolder | null;
   tagSuggestions: string[];
+  tagPrefixes: TagPrefix[];
   isSaving: boolean;
   saveError: string | null;
   onClose: () => void;
@@ -90,6 +98,7 @@ function DurationInput({
 export default function SmartFolderEditorModal({
   folder,
   tagSuggestions,
+  tagPrefixes,
   isSaving,
   saveError,
   onClose,
@@ -100,6 +109,7 @@ export default function SmartFolderEditorModal({
   const nextRuleId = useRef(draft.rules.length);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const ruleCardRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const tagComboboxRefs = useRef<Record<string, TagComboboxHandle | null>>({});
 
   const rulesResult = validateSmartFolderDraftRules(draft.rules);
   const matchCount = useSmartFolderRuleMatchCountQuery(
@@ -143,12 +153,44 @@ export default function SmartFolderEditorModal({
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
-    const result = validateSmartFolderDraft(draft);
+
+    // 保存前に、タグ入力欄に残っている未確定文字列をEnterと同じ規則で確定する。
+    // 候補に一致しない入力は破棄せず、入力欄へ戻してエラーにする（TASK-428.24 SF-08）。
+    let workingDraft = draft;
+    const pendingInputErrors: SmartFolderEditorErrors["ruleValues"] = {};
+    for (const rule of workingDraft.rules) {
+      if (rule.field !== "タグ") continue;
+      const handle = tagComboboxRefs.current[rule.id];
+      if (!handle) continue;
+      const commitResult = handle.commitPendingInput();
+      if (commitResult.status === "invalid") {
+        pendingInputErrors[rule.id] = "入力中のタグを確定してください";
+        continue;
+      }
+      if (commitResult.value !== null) {
+        const value = commitResult.value;
+        workingDraft = updateSmartFolderRule(workingDraft, rule.id, (current) =>
+          current.field === "タグ" ? { ...current, values: [...current.values, value] } : current,
+        );
+      }
+    }
+
+    if (Object.keys(pendingInputErrors).length > 0) {
+      setDraft(workingDraft);
+      const nextErrors: SmartFolderEditorErrors = { ruleValues: pendingInputErrors };
+      setErrors(nextErrors);
+      focusFirstInvalid(nextErrors);
+      return;
+    }
+
+    const result = validateSmartFolderDraft(workingDraft);
     if (!result.success) {
+      setDraft(workingDraft);
       setErrors(result.errors);
       focusFirstInvalid(result.errors);
       return;
     }
+    setDraft(workingDraft);
     setErrors({ ruleValues: {} });
     onSave({ ...result.data, sort: folder?.sort ?? result.data.sort });
   };
@@ -318,39 +360,64 @@ export default function SmartFolderEditorModal({
                         <div className="flex flex-col gap-2">
                           {rule.values.length > 0 && (
                             <div className="flex flex-wrap items-center gap-1.5">
-                              {rule.values.map((value) => (
-                                <span
-                                  key={value}
-                                  className="inline-flex h-7 min-w-0 items-center gap-1 rounded-[5px] border border-line-soft bg-paper-2 pl-2 font-jp text-[11px] text-ink-0"
-                                >
-                                  <span className="max-w-[260px] truncate" title={value}>
-                                    {value}
-                                  </span>
-                                  <IconButton
-                                    icon={I.x}
-                                    label={`${value}を削除`}
-                                    size="sm"
-                                    onClick={() =>
-                                      updateRule(rule.id, (current) => {
-                                        if (current.field !== "タグ") return current;
-                                        return {
-                                          ...current,
-                                          values: current.values.filter((tag) => tag !== value),
-                                        };
-                                      })
+                              {rule.values.map((value) => {
+                                const { prefixLabel, color, displayValue, isUnknown } =
+                                  resolveSmartFolderTagChip(value, tagPrefixes, tagSuggestions);
+                                return (
+                                  <span
+                                    key={value}
+                                    className="inline-flex h-7 min-w-0 items-center gap-1 rounded-[5px] border border-line-soft bg-paper-2 pl-2 font-jp text-[11px] text-ink-0"
+                                    title={
+                                      isUnknown
+                                        ? `${value}（このタグが付いた作品は現在ありません）`
+                                        : undefined
                                     }
-                                  />
-                                </span>
-                              ))}
+                                  >
+                                    {prefixLabel && (
+                                      <span
+                                        className="shrink-0 font-mono text-label font-semibold uppercase text-ink-2"
+                                        style={{ color: tagPrefixColorToCss(color) }}
+                                      >
+                                        {prefixLabel}
+                                      </span>
+                                    )}
+                                    <span className="max-w-[260px] truncate">{displayValue}</span>
+                                    {isUnknown && (
+                                      <I.err
+                                        size={11}
+                                        className="shrink-0 text-[color:var(--r-coral)]"
+                                      />
+                                    )}
+                                    <IconButton
+                                      icon={I.x}
+                                      label={`${value}を削除`}
+                                      size="sm"
+                                      onClick={() =>
+                                        updateRule(rule.id, (current) => {
+                                          if (current.field !== "タグ") return current;
+                                          return {
+                                            ...current,
+                                            values: current.values.filter((tag) => tag !== value),
+                                          };
+                                        })
+                                      }
+                                    />
+                                  </span>
+                                );
+                              })}
                             </div>
                           )}
                           <TagCombobox
+                            ref={(el) => {
+                              tagComboboxRefs.current[rule.id] = el;
+                            }}
                             suggestions={tagSuggestions}
                             excludeTags={rule.values}
                             width="full"
                             placeholder="タグ名を入力して追加"
                             label={`${index + 1}件目の条件に追加するタグ`}
                             canCreate={(tag) => normalizeTag(tag) !== null}
+                            createLabel="該当タグなし"
                             onSelect={(tag) =>
                               updateRule(rule.id, (current) => {
                                 if (current.field !== "タグ") return current;

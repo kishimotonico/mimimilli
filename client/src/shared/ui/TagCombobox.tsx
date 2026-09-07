@@ -1,5 +1,14 @@
 import { normalizeTag, type NormalizedTag } from "@mimimilli/shared";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useId,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+  type ForwardedRef,
+} from "react";
 import { cn } from "../lib/cn";
 
 export type TagComboboxOption =
@@ -71,22 +80,42 @@ export interface TagComboboxProps {
   /** px指定の固定幅、または親要素いっぱいに広げる "full"（狭幅レイアウト用） */
   width?: number | "full";
   canCreate?: (tag: string) => boolean;
+  /** 未一致の入力を候補末尾に添えるラベル。既定「新規作成」。呼び出し文脈によっては
+   *  新規タグ作成ではなく単なる値指定のため誤解を招く（例: スマートフォルダー条件） */
+  createLabel?: string;
   onSelect: (tag: string) => void;
   onCancel?: () => void;
 }
 
-export default function TagCombobox({
-  suggestions,
-  excludeTags = [],
-  disabled = false,
-  focusOnMount = false,
-  placeholder = "タグを追加",
-  label = "追加するタグ",
-  width = 220,
-  canCreate,
-  onSelect,
-  onCancel,
-}: TagComboboxProps) {
+/** commitPendingInput の結果。value が非nullのときだけ呼び出し側で確定値を反映する必要がある
+ *  （空入力・既存値との重複は反映不要のため null） */
+export type TagComboboxCommitResult =
+  | { status: "ok"; value: string | null }
+  | { status: "invalid" };
+
+export interface TagComboboxHandle {
+  /** 現在の未確定入力を、Enterキーと同じ規則（アクティブな候補の確定）で確定する。
+   *  候補が無い入力（正規化できない・空文字以外で一致なし）は入力へフォーカスして invalid を返す。
+   *  保存時に未確定文字列を黙って破棄しないために使う（TASK-428.24 SF-08） */
+  commitPendingInput: () => TagComboboxCommitResult;
+}
+
+function TagComboboxImpl(
+  {
+    suggestions,
+    excludeTags = [],
+    disabled = false,
+    focusOnMount = false,
+    placeholder = "タグを追加",
+    label = "追加するタグ",
+    width = 220,
+    canCreate,
+    createLabel = "新規作成",
+    onSelect,
+    onCancel,
+  }: TagComboboxProps,
+  ref: ForwardedRef<TagComboboxHandle>,
+) {
   const baseId = useId();
   const listboxId = `${baseId}-listbox`;
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -114,6 +143,37 @@ export default function TagCombobox({
     setIsOpen(false);
     setActiveIndex(0);
   };
+
+  useImperativeHandle(
+    ref,
+    (): TagComboboxHandle => ({
+      commitPendingInput: () => {
+        const trimmed = input.trim();
+        if (trimmed.length === 0) return { status: "ok", value: null };
+
+        const normalized = normalizeTag(trimmed);
+        const isAlreadyAdded =
+          normalized !== null && excludeTags.some((tag) => normalizeTag(tag) === normalized);
+        if (isAlreadyAdded) {
+          setInput("");
+          setIsOpen(false);
+          setActiveIndex(0);
+          return { status: "ok", value: null };
+        }
+
+        if (options.length === 0) {
+          inputRef.current?.focus();
+          return { status: "invalid" };
+        }
+
+        const option = options[activeIndex] ?? options[0]!;
+        setInput("");
+        setIsOpen(false);
+        setActiveIndex(0);
+        return { status: "ok", value: option.value };
+      },
+    }),
+  );
 
   useEffect(() => {
     if (!focusOnMount || disabled) return;
@@ -227,7 +287,7 @@ export default function TagCombobox({
                 <span className="min-w-0 flex-1 truncate">{option.value}</span>
                 {option.kind === "create" && (
                   <span className="shrink-0 font-mono text-label uppercase tracking-wide text-ink-2">
-                    新規作成
+                    {createLabel}
                   </span>
                 )}
               </button>
@@ -239,3 +299,6 @@ export default function TagCombobox({
   );
   /* oxlint-enable jsx-a11y/prefer-tag-over-role */
 }
+
+const TagCombobox = forwardRef(TagComboboxImpl);
+export default TagCombobox;

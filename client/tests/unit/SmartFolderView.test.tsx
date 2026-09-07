@@ -30,7 +30,13 @@ function renderView(sf: SmartFolder, total?: number) {
     createElement(
       QueryClientProvider,
       { client: queryClient },
-      createElement(SmartFolderView, { sf, total, onEdit: () => {} }),
+      createElement(SmartFolderView, {
+        sf,
+        total,
+        tagPrefixes: [],
+        tagSuggestions: [],
+        onEdit: () => {},
+      }),
     ),
   );
 }

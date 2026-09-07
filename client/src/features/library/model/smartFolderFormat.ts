@@ -1,6 +1,14 @@
-// スマートフォルダーの条件表示文言（演算子・長さ）を一箇所に集約する。
+// スマートフォルダーの条件表示文言（演算子・長さ・タグ値）を一箇所に集約する。
 // SmartFolderEditorModal（エディタ）と SmartFolderView（結果バナー）は必ずこの関数経由で
-// 文言を生成し、画面間で表記が揺れないようにする（TASK-428.11）。
+// 文言を生成し、画面間で表記が揺れないようにする（TASK-428.11、TASK-428.24）。
+
+import {
+  normalizeTag,
+  parseTag,
+  resolveTagPrefix,
+  type TagPrefix,
+  type TagPrefixColorKey,
+} from "@mimimilli/shared";
 
 interface SmartFolderRuleLike {
   field: "タグ" | "長さ";
@@ -26,4 +34,34 @@ export function formatSmartFolderDuration(totalSec: number): string {
 export function formatSmartFolderLengthValue(rule: SmartFolderRuleLike): string {
   const seconds = Number(rule.values[0]);
   return `${formatSmartFolderDuration(seconds)}以上`;
+}
+
+export interface SmartFolderTagChipInfo {
+  /** prefix のラベル。フラットタグは null */
+  prefixLabel: string | null;
+  color: TagPrefixColorKey | null;
+  /** 表示する値本体（annotatedならprefixを除いた部分、flatならraw） */
+  displayValue: string;
+  /** ライブラリに現存しないタグ（tagSuggestions に無い）。条件の保存は妨げず警告のみ表示する */
+  isUnknown: boolean;
+}
+
+/** タグ条件値の表示情報を解決する。prefixのラベル・色は resolveTagPrefix（shared/tagPrefix.ts）
+ *  に委ね、エディタと結果バナーで同じ結果になるようにする。現存しないタグの判定は
+ *  tagSuggestions（ライブラリに現在存在する全タグ）との正規化済み比較で行う（TASK-428.24 SF-07） */
+export function resolveSmartFolderTagChip(
+  value: string,
+  tagPrefixes: readonly TagPrefix[],
+  tagSuggestions: readonly string[],
+): SmartFolderTagChipInfo {
+  const tag = parseTag(value);
+  const normalized = normalizeTag(value);
+  const isUnknown =
+    normalized === null || !tagSuggestions.some((t) => normalizeTag(t) === normalized);
+
+  if (tag.kind === "flat") {
+    return { prefixLabel: null, color: null, displayValue: tag.raw, isUnknown };
+  }
+  const { label, color } = resolveTagPrefix(tag.prefix, tagPrefixes);
+  return { prefixLabel: label, color, displayValue: tag.value, isUnknown };
 }

@@ -40,6 +40,7 @@ function renderModal({
       createElement(SmartFolderEditorModal, {
         folder: null,
         tagSuggestions: [],
+        tagPrefixes: [],
         isSaving,
         saveError: null,
         onClose,
@@ -158,5 +159,43 @@ describe("SmartFolderEditorModal", () => {
     renderModal(); // 新規作成の初期ドラフトはタグ未選択で不正
 
     expect(preview).not.toHaveBeenCalled();
+  });
+});
+
+describe("SmartFolderEditorModal の未確定タグ入力（TASK-428.24 SF-08）", () => {
+  it("候補に一致する未確定入力は保存時にEnterと同じ値で確定される", () => {
+    const { onSave } = renderModal({ props: { tagSuggestions: ["ASMR"] } });
+
+    fireEvent.change(screen.getByPlaceholderText("例: 長時間 ASMR"), {
+      target: { value: "テスト" },
+    });
+    fireEvent.change(screen.getByLabelText("1件目の条件に追加するタグ"), {
+      target: { value: "ASMR" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "作成" }));
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        rules: [expect.objectContaining({ field: "タグ", values: ["ASMR"] })],
+      }),
+    );
+  });
+
+  it("候補に一致しない未確定入力は破棄されず、入力欄へ戻ってエラーを示す", () => {
+    const { onSave } = renderModal({ props: { tagSuggestions: ["ASMR"] } });
+
+    fireEvent.change(screen.getByPlaceholderText("例: 長時間 ASMR"), {
+      target: { value: "テスト" },
+    });
+    const tagInput = screen.getByLabelText("1件目の条件に追加するタグ");
+    fireEvent.change(tagInput, { target: { value: "a/" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "作成" }));
+
+    expect(screen.getByText("入力中のタグを確定してください")).toBeInTheDocument();
+    expect(document.activeElement).toBe(tagInput);
+    expect(tagInput).toHaveValue("a/");
+    expect(onSave).not.toHaveBeenCalled();
   });
 });
