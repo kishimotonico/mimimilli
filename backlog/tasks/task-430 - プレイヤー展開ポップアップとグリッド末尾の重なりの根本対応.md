@@ -1,10 +1,10 @@
 ---
 id: TASK-430
 title: プレイヤー展開ポップアップとグリッド末尾の重なりの根本対応
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-01 16:46'
-updated_date: '2026-09-07 21:15'
+updated_date: '2026-09-07 21:21'
 labels:
   - ui
   - layout
