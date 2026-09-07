@@ -1,18 +1,21 @@
 // FilesView: ファイルモード = 物理ファイルシステムのファイラー。
 // 表示は「現在開いているフォルダー1階層のみ」。子へ潜ると、その時点のカラムは
-// 左の受動スタックへ吸い込まれ（exit アニメ）、子のカラムが右からスライドインする。
-// 階層を遡るのはパンくず（アドレスバー）のみ。再生エンジンは Library と共通・常駐。
+// 左の折り畳み帯（背表紙の束）へ吸い込まれ（exit アニメ）、子のカラムが右から
+// スライドインする。折り畳み帯は root〜現在地の親までを背表紙1枚ずつ束ねて表示し、
+// 各背表紙クリックでその階層へ直接移動できる（TASK-429、AncestorStack）。
+// パンくず（アドレスバー）も同じ祖先へ到達できる別導線として並立する。
+// 再生エンジンは Library と共通・常駐。
 
 import { useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAtom, useAtomValue } from "jotai";
-import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import { browseFs, getScanDiagnostics } from "../api";
 import { useFilesNavigation } from "../model/useFilesNavigation";
 import { filesDirectionAtom } from "../../../entities/file-system/model/navigationAtoms";
 import { FILE_SYSTEM_QUERY_KEYS } from "../../../entities/file-system/queryKeys";
 import { SCAN_QUERY_KEYS } from "../../../entities/scan/queryKeys";
 import { buildFolderAudioQueue } from "../model/filePlayback";
+import { buildAncestorSegments } from "../model/ancestorSpine";
 import { classifyFile, isFilesSelectionMissing, rootLabel, type FsEntry } from "../model/types";
 import { filesPreviewOpenAtom } from "../model/previewLayoutAtoms";
 import { ApiRequestError } from "../../../shared/api/http";
@@ -24,35 +27,9 @@ import {
   playingWorkIdAtom,
 } from "../../../entities/player/model/atoms";
 import { workspacePath } from "@mimimilli/shared";
-import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
+import AncestorStack from "./AncestorStack";
 import FileColumn from "./FileColumn";
 import FilePreview, { type FileLoadError } from "./FilePreview";
-import StackEdge from "./StackEdge";
-
-interface ColstackBackButtonProps {
-  parentName: string;
-  depth: number;
-  onGoUp: () => void;
-}
-
-/** パンくずの「1つ上の階層へ」ボタン。幅方向のcolstack-widthで出入りする。 */
-function ColstackBackButton({ parentName, depth, onGoUp }: ColstackBackButtonProps) {
-  const { colstackWidth } = useMotionVariants();
-  const isPresent = useIsPresent();
-  const v = colstackWidth();
-  return (
-    <motion.button
-      type="button"
-      className="mle-colstack"
-      title={`1つ上の階層（${parentName}）へ戻る`}
-      onClick={onGoUp}
-      inert={!isPresent}
-      {...v}
-    >
-      <StackEdge parentName={parentName} depth={depth} />
-    </motion.button>
-  );
-}
 
 interface FilesViewProps {
   rootFolder: string;
@@ -137,7 +114,7 @@ export default function FilesView({ rootFolder, onPlayFile, onTogglePlay }: File
   );
 
   const cwdTitle = nav.relPath.slice(-1)[0] ?? rootLabel(rootFolder);
-  const parentName = nav.relPath.slice(-2, -1)[0] ?? rootLabel(rootFolder);
+  const ancestorSegments = buildAncestorSegments(nav.addressPath);
 
   // ── プレビュー対象 ────────────────────────────────────────
   // ファイル選択中はそのファイル、それ以外はカレント dir 自身。
@@ -174,20 +151,11 @@ export default function FilesView({ rootFolder, onPlayFile, onTogglePlay }: File
   const previewEntry = selectionMissing ? null : (fileSelection ?? cwdFolderEntry);
   const folderEntries = previewEntry?.isDir ? cwdEntries : null;
 
-  const hasAncestors = nav.relPath.length >= 1;
+  const hasAncestors = ancestorSegments.length >= 1;
 
   return (
     <>
-      <AnimatePresence initial={false}>
-        {hasAncestors && (
-          <ColstackBackButton
-            key="colstack-back"
-            parentName={parentName}
-            depth={nav.relPath.length}
-            onGoUp={nav.goUp}
-          />
-        )}
-      </AnimatePresence>
+      <AncestorStack segments={ancestorSegments} onNavigate={nav.goToSegment} />
 
       <div className="mle-files-layout" data-preview-open={previewOpen}>
         <div className="mle-filestage">
