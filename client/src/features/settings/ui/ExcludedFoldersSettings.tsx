@@ -50,7 +50,8 @@ export default function ExcludedFoldersSettings() {
     <div className="flex flex-col gap-2">
       <span className={SECTION_LABEL_CLASS}>候補から外したフォルダー</span>
 
-      <div className="flex max-h-[160px] flex-col overflow-y-auto rounded-[6px] border border-line-soft bg-paper-0">
+      {/* 設定モーダルの本文スクロールに一本化。ここでは内側スクロールを持たない */}
+      <div className="flex flex-col rounded-[6px] border border-line-soft bg-paper-0">
         {exclusions.length === 0 ? (
           <span className="px-3 py-2.5 text-secondary text-ink-2">
             候補から外したフォルダーはありません
