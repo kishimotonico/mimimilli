@@ -4,6 +4,10 @@ import type { AxisId } from "../../../entities/library/types";
 import { buildEmptyWorksHint, buildEmptyWorksMessage } from "../model/emptyWorks";
 import WorkRow from "./WorkRow";
 import CollectionStatus from "../../../shared/ui/CollectionStatus";
+import SmartFolderEmptyAction, {
+  SMART_FOLDER_EMPTY_HINT,
+  SMART_FOLDER_EMPTY_MESSAGE,
+} from "./SmartFolderEmptyAction";
 import LoadMore from "./LoadMore";
 import { I } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
@@ -40,6 +44,11 @@ interface WorkListPaneProps {
   /** 結果面ヘッダー直下に置くバナー（スマートフォルダー軸のルール表示・編集導線、
    *  エラービュー軸の一括削除導線など。プレビュー側ではなく結果面ヘッダー直下に置く） */
   resultsBanner?: ReactNode;
+  /** スマートフォルダー軸か。0件時に専用の空状態（条件を編集・絞り込みをすべてクリア）を
+   *  出す（TASK-428.24 SF-05） */
+  isSmartFolder?: boolean;
+  onEditSmartFolderRules?: () => void;
+  onClearAllFilters?: () => void;
 }
 
 export default function WorkListPane({
@@ -60,6 +69,9 @@ export default function WorkListPane({
   onWorkSelect,
   onClearSearch,
   resultsBanner,
+  isSmartFolder = false,
+  onEditSmartFolderRules,
+  onClearAllFilters,
 }: WorkListPaneProps) {
   const paddingEnd = dockedBarActive
     ? LIST_PADDING_END_BASE + LIST_DOCKED_BAR_EXTRA
@@ -107,19 +119,35 @@ export default function WorkListPane({
       {resultsBanner}
       <div ref={scrollRef} className="mle-col__list">
         {works.length === 0 ? (
-          <CollectionStatus
-            variant="list"
-            kind="empty"
-            message={buildEmptyWorksMessage(searchQuery, hasSelectedTags)}
-            hint={buildEmptyWorksHint(axis, Boolean(searchQuery) || hasSelectedTags)}
-            action={
-              searchQuery ? (
-                <Button variant="ghost" icon={I.x} onClick={onClearSearch}>
-                  検索をクリア
-                </Button>
-              ) : undefined
-            }
-          />
+          isSmartFolder ? (
+            <CollectionStatus
+              variant="list"
+              kind="empty"
+              message={SMART_FOLDER_EMPTY_MESSAGE}
+              hint={SMART_FOLDER_EMPTY_HINT}
+              action={
+                <SmartFolderEmptyAction
+                  hasSelectedTags={hasSelectedTags}
+                  onEditRules={() => onEditSmartFolderRules?.()}
+                  onClearFilters={() => onClearAllFilters?.()}
+                />
+              }
+            />
+          ) : (
+            <CollectionStatus
+              variant="list"
+              kind="empty"
+              message={buildEmptyWorksMessage(searchQuery, hasSelectedTags)}
+              hint={buildEmptyWorksHint(axis, Boolean(searchQuery) || hasSelectedTags)}
+              action={
+                searchQuery ? (
+                  <Button variant="ghost" icon={I.x} onClick={onClearSearch}>
+                    検索をクリア
+                  </Button>
+                ) : undefined
+              }
+            />
+          )
         ) : (
           <div style={wrapperStyle}>
             {virtualItems.map((virtualRow) => (

@@ -315,6 +315,9 @@ export default function LibraryView({
                         onClearSearch={() => setSearchQuery("")}
                         onDeselect={() => nav.selectWork(null)}
                         resultsBanner={resultsBanner}
+                        isSmartFolder={Boolean(activeSmartFolder)}
+                        onEditSmartFolderRules={handleEditSmartFolder}
+                        onClearAllFilters={nav.clearTags}
                       />
                     ) : (
                       <WorkListPane
@@ -335,6 +338,9 @@ export default function LibraryView({
                         onWorkSelect={nav.selectWork}
                         onClearSearch={() => setSearchQuery("")}
                         resultsBanner={resultsBanner}
+                        isSmartFolder={Boolean(activeSmartFolder)}
+                        onEditSmartFolderRules={handleEditSmartFolder}
+                        onClearAllFilters={nav.clearTags}
                       />
                     )}
                   </div>

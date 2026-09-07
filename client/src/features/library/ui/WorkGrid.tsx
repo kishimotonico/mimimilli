@@ -8,6 +8,10 @@ import { I } from "../../../shared/ui/Icon";
 import { GRID_COLUMN_GAP, GRID_ROW_GAP, clampTileSize } from "../../../shared/lib/gridSizing";
 import { buildEmptyWorksHint, buildEmptyWorksMessage } from "../model/emptyWorks";
 import CollectionStatus from "../../../shared/ui/CollectionStatus";
+import SmartFolderEmptyAction, {
+  SMART_FOLDER_EMPTY_HINT,
+  SMART_FOLDER_EMPTY_MESSAGE,
+} from "./SmartFolderEmptyAction";
 import LoadMore from "./LoadMore";
 import { useVirtualGrid } from "../../../shared/ui/useVirtualGrid";
 import {
@@ -53,6 +57,11 @@ interface WorkGridProps {
    *  エラービュー軸の一括削除導線など）。ADR-0012 §3 のレイアウト固定により、
    *  プレビュー側ではなく結果面自体が持つ */
   resultsBanner?: ReactNode;
+  /** スマートフォルダー軸か。0件時に専用の空状態（条件を編集・絞り込みをすべてクリア）を
+   *  出す（TASK-428.24 SF-05） */
+  isSmartFolder?: boolean;
+  onEditSmartFolderRules?: () => void;
+  onClearAllFilters?: () => void;
 }
 
 export default function WorkGrid({
@@ -75,6 +84,9 @@ export default function WorkGrid({
   onClearSearch,
   onDeselect,
   resultsBanner,
+  isSmartFolder = false,
+  onEditSmartFolderRules,
+  onClearAllFilters,
 }: WorkGridProps) {
   const [tileSize, setTileSize] = useAtom(libraryTileSizeAtom);
   const gridLayoutMode = useAtomValue(libraryGridLayoutModeAtom);
@@ -162,19 +174,35 @@ export default function WorkGrid({
       <div className="mll-grid-body">
         <div ref={scrollRef} className="mll-grid-scroll">
           {works.length === 0 ? (
-            <CollectionStatus
-              variant="grid"
-              kind="empty"
-              message={buildEmptyWorksMessage(searchQuery, hasSelectedTags)}
-              hint={buildEmptyWorksHint(axis, Boolean(searchQuery) || hasSelectedTags)}
-              action={
-                searchQuery ? (
-                  <Button variant="ghost" icon={I.x} onClick={onClearSearch}>
-                    検索をクリア
-                  </Button>
-                ) : undefined
-              }
-            />
+            isSmartFolder ? (
+              <CollectionStatus
+                variant="grid"
+                kind="empty"
+                message={SMART_FOLDER_EMPTY_MESSAGE}
+                hint={SMART_FOLDER_EMPTY_HINT}
+                action={
+                  <SmartFolderEmptyAction
+                    hasSelectedTags={hasSelectedTags}
+                    onEditRules={() => onEditSmartFolderRules?.()}
+                    onClearFilters={() => onClearAllFilters?.()}
+                  />
+                }
+              />
+            ) : (
+              <CollectionStatus
+                variant="grid"
+                kind="empty"
+                message={buildEmptyWorksMessage(searchQuery, hasSelectedTags)}
+                hint={buildEmptyWorksHint(axis, Boolean(searchQuery) || hasSelectedTags)}
+                action={
+                  searchQuery ? (
+                    <Button variant="ghost" icon={I.x} onClick={onClearSearch}>
+                      検索をクリア
+                    </Button>
+                  ) : undefined
+                }
+              />
+            )
           ) : (
             <WorkGridVirtualContent
               isJustified={isJustified}
