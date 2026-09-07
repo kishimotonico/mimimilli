@@ -4,7 +4,7 @@ title: 作品・値・トラック一覧のキーボード操作を共通化す�
 status: To Do
 assignee: []
 created_date: '2026-09-07 09:08'
-updated_date: '2026-09-07 19:12'
+updated_date: '2026-09-07 19:42'
 labels:
   - ui
   - keyboard
@@ -31,9 +31,9 @@ TASK-428.13 が確定させたショートカット・Escape契約に従うこ�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 各一覧へTab一回で入り、Tab一回で次の領域へ離脱できる
-- [ ] #2 上下・グリッド左右・Home・Endで項目間を移動できる
-- [ ] #3 仮想化された項目へ移動後に表示とfocusが一致する
-- [ ] #4 Enterの主操作とEscapeの選択解除が一覧種別ごとの仕様どおり動く
-- [ ] #5 pnpm test:smokeに新規失敗がない
+- [x] #1 各一覧へTab一回で入り、Tab一回で次の領域へ離脱できる
+- [x] #2 上下・グリッド左右・Home・Endで項目間を移動できる
+- [x] #3 仮想化された項目へ移動後に表示とfocusが一致する
+- [x] #4 Enterの主操作とEscapeの選択解除が一覧種別ごとの仕様どおり動く
+- [x] #5 pnpm test:smokeに新規失敗がない
 <!-- AC:END -->
