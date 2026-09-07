@@ -105,16 +105,16 @@ export default function SettingsModal({
       aria-label="設定"
       onCancel={handleCancel}
       onClick={handleBackdropClick}
-      className="m-auto w-[440px] max-w-[calc(100vw-32px)] max-h-[calc(100vh-32px)] overflow-hidden rounded-[12px] border border-line-soft bg-paper-1 p-0 font-jp text-ink-0 shadow-pop backdrop:bg-[oklch(20%_0.020_70_/_0.3)]"
+      className="m-auto flex w-[440px] max-w-[calc(100vw-32px)] max-h-[calc(100vh-32px)] flex-col overflow-hidden rounded-[12px] border border-line-soft bg-paper-1 p-0 font-jp text-ink-0 shadow-pop backdrop:bg-[oklch(20%_0.020_70_/_0.3)]"
     >
       {/* Header */}
-      <div className="flex items-center border-b border-line-soft px-[18px] py-[14px]">
+      <div className="flex shrink-0 items-center border-b border-line-soft px-[18px] py-[14px]">
         <span className="flex-1 font-sans text-[14px] font-semibold text-ink-0">設定</span>
         <IconButton icon={I.x} label="閉じる" size="sm" onClick={dismiss} />
       </div>
 
       {/* Body */}
-      <div className="flex max-h-[min(72vh,640px)] flex-col gap-[18px] overflow-y-auto px-[18px] pt-[18px] pb-2">
+      <div className="flex min-h-0 flex-1 flex-col gap-[18px] overflow-y-auto px-[18px] pt-[18px] pb-2">
         {/* Root folder */}
         <div className={SECTION_CLASS}>
           <span className={SECTION_LABEL_CLASS}>ルートフォルダー</span>
@@ -242,7 +242,7 @@ export default function SettingsModal({
       </div>
 
       {/* Footer */}
-      <div className="flex justify-end px-[18px] pt-3 pb-4">
+      <div className="flex shrink-0 justify-end px-[18px] pt-3 pb-4">
         <Button variant="ghost" size="md" onClick={dismiss}>
           閉じる
         </Button>
