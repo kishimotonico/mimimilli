@@ -95,7 +95,9 @@ export function createDlsiteMethods(deps: {
           result.skipped += 1;
           continue;
         }
-        const tags = mergeDlsiteTags([], fetched.info).filter((tag) => !work.tags.includes(tag));
+        const tags = mergeDlsiteTags(work.tags, fetched.info).filter(
+          (tag) => !work.tags.includes(tag),
+        );
         const applyCover = !work.cover && fetched.info.coverUrl !== null;
         const applyUrl = !work.urls.some((entry) => entry.url.includes("dlsite.com"));
         if (tags.length === 0 && !applyCover && !applyUrl) {

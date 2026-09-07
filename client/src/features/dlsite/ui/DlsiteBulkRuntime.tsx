@@ -156,7 +156,7 @@ export default function DlsiteBulkRuntime() {
 
   useEffect(() => {
     const invalidate = (workIds?: string | string[]) => invalidateDlsiteCache(queryClient, workIds);
-    setInvalidate(invalidate);
+    setInvalidate({ run: invalidate });
     return () => setInvalidate(null);
   }, [queryClient, setInvalidate]);
 

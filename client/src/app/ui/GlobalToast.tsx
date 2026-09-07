@@ -8,6 +8,7 @@ import {
   dlsiteBulkErrorAtom,
   dlsiteBulkResultAtom,
 } from "../../entities/dlsite/model/bulkAtoms";
+import { dlsiteApplyToastAtom } from "../../entities/dlsite/model/dlsiteApplyToastAtom";
 import { useDlsiteBulkActions } from "../../entities/dlsite/useDlsiteBulkActions";
 import { useDlsiteBulkApplyActions } from "../../entities/dlsite/useDlsiteBulkApplyActions";
 import { errorToastAtom } from "../../shared/model/errorToastAtom";
@@ -41,6 +42,8 @@ export default function GlobalToast({ onOpenScan, onOpenScanNeedsAttention }: Gl
   const setLibraryInvalidUrlToast = useSetAtom(libraryInvalidUrlToastAtom);
   const workDeleteSuccess = useAtomValue(workDeleteSuccessAtom);
   const setWorkDeleteSuccess = useSetAtom(workDeleteSuccessAtom);
+  const dlsiteApplyToast = useAtomValue(dlsiteApplyToastAtom);
+  const setDlsiteApplyToast = useSetAtom(dlsiteApplyToastAtom);
   const dlsiteBulkApplyResult = useAtomValue(dlsiteBulkApplyResultAtom);
   const dlsiteResult = useAtomValue(dlsiteBulkResultAtom);
   const dlsiteCancelledResult = useAtomValue(dlsiteBulkCancelledResultAtom);
@@ -131,6 +134,16 @@ export default function GlobalToast({ onOpenScan, onOpenScanNeedsAttention }: Gl
         message={workDeleteSuccess}
         variant="success"
         onDismiss={() => setWorkDeleteSuccess(null)}
+      />
+    );
+  }
+
+  if (dlsiteApplyToast) {
+    return (
+      <Toast
+        message={dlsiteApplyToast.message}
+        variant={dlsiteApplyToast.variant}
+        onDismiss={() => setDlsiteApplyToast(null)}
       />
     );
   }

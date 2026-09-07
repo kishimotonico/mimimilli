@@ -11,7 +11,7 @@ export function useDlsiteInvalidation() {
       if (!invalidate) {
         throw new Error("DlsiteBulkRuntime が未マウントです（dlsiteInvalidateAtom が null）");
       }
-      await invalidate(workIds);
+      await invalidate.run(workIds);
     },
     [store],
   );

@@ -415,6 +415,23 @@ test("mergeDlsiteTags: ratingタグを追加する", () => {
   );
 });
 
+test("mergeDlsiteTags: サークルが既存と異なる値でも上書きしない（TASK-428.1）", () => {
+  const info: DlsiteWorkInfo = {
+    rjCode: "RJ900002",
+    title: "x",
+    circle: "満月堂",
+    cvs: [],
+    genreTags: [],
+    ageRating: "R15",
+    coverUrl: null,
+    url: "",
+  };
+  assert.deepEqual(
+    mergeDlsiteTags(nts(["サークル/夜想曲", "rating/R18"]), info),
+    nts(["サークル/夜想曲", "rating/R18"]),
+  );
+});
+
 test("dlsiteApply: タグマージとメタ書き戻し（カバー DL なし）", async (t) => {
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);

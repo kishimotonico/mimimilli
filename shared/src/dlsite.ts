@@ -142,9 +142,27 @@ export function dlsiteInfoTags(info: DlsiteWorkInfo): NormalizedTag[] {
   return dedupeTags(normalizeTags(tags));
 }
 
-/** 取得情報を既存タグへ合流する。正規化後の重複は追加しない。 */
+/** サークル・rating は DLsite 側も1作品につき1値しか持たない単値prefix。既存に同prefixの
+ *  タグが1つでもあれば「未設定」とみなさず、異なる値で書き換わる形の追加をしない */
+const SINGLE_VALUE_DLSITE_PREFIXES = ["サークル", "rating"] as const;
+
+function hasTagWithPrefix(tags: readonly NormalizedTag[], prefix: string): boolean {
+  return tags.some((tag) => tag.startsWith(`${prefix}/`));
+}
+
+/** 取得情報のうち、既存タグへ未設定の項目だけを合流する。cv・genreは複数値が正当なため
+ *  完全一致のみ重複排除する加算マージ、サークル・ratingは既存に同prefixの値があれば
+ *  一切追加しない（TASK-428.1: 既存値を上書きしない） */
 export function mergeDlsiteTags(existing: NormalizedTag[], info: DlsiteWorkInfo): NormalizedTag[] {
-  return dedupeTags([...existing, ...dlsiteInfoTags(info)]);
+  const missing = dlsiteInfoTags(info).filter((tag) => {
+    if (existing.includes(tag)) return false;
+    const prefix = tag.split("/", 1)[0] ?? "";
+    if ((SINGLE_VALUE_DLSITE_PREFIXES as readonly string[]).includes(prefix)) {
+      return !hasTagWithPrefix(existing, prefix);
+    }
+    return true;
+  });
+  return dedupeTags([...existing, ...missing]);
 }
 
 /** 作品ごとの取得結果確認に使う。sourceRevision は適用時のCASトークン。 */

@@ -22,10 +22,7 @@ function renderRuntime() {
   });
   const store = createStore();
   store.set(dlsiteBulkApplyOpenAtom, true);
-  store.set(
-    dlsiteInvalidateAtom,
-    vi.fn(async () => {}),
-  );
+  store.set(dlsiteInvalidateAtom, { run: vi.fn(async () => {}) });
 
   render(
     createElement(

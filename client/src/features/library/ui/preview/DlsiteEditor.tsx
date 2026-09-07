@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { dlsiteInfoTags, type DlsitePreview, type Work } from "@mimimilli/shared";
+import { useSetAtom } from "jotai";
+import type { DlsitePreview, Work } from "@mimimilli/shared";
 import { applyDlsiteInfo, fetchDlsiteInfo, updateDlsiteState } from "../../../../entities/work/api";
 import {
   dlsiteApplyErrorMessage,
@@ -13,8 +14,13 @@ import { I } from "../../../../shared/ui/Icon";
 import { useDialogModal } from "../../../../shared/ui/useDialogModal";
 import { WORK_QUERY_KEYS } from "../../../../entities/work/queryKeys";
 import { useDlsiteInvalidation } from "../../../../entities/dlsite/useDlsiteInvalidation";
-import { buildDlsiteApplyBody, unappliedDlsiteTags } from "../../../../entities/work/dlsitePreview";
-import { formatCoverEditLabel } from "../../../../shared/lib/coverLabel";
+import { dlsiteApplyToastAtom } from "../../../../entities/dlsite/model/dlsiteApplyToastAtom";
+import {
+  buildDlsiteApplyBody,
+  computeDlsiteApplyDiff,
+  type DlsiteApplyDiff,
+  type DlsiteFieldDiff,
+} from "../../../../entities/work/dlsitePreview";
 
 export const STATUS_LABEL = {
   none: "未連携",
@@ -27,9 +33,48 @@ export const STATUS_LABEL = {
 const inputClass =
   "h-8 min-w-0 rounded-[6px] border border-line bg-paper-0 px-2.5 font-mono text-mono text-ink-0 placeholder:text-ink-4 focus:border-acc disabled:cursor-not-allowed disabled:text-ink-4";
 
+interface DlsiteDiffRowProps {
+  label: string;
+  diff: DlsiteFieldDiff;
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+}
+
+/** 変更あり／変更なし／適用不可を見た目と操作で分ける1行（TASK-428.1） */
+function DlsiteDiffRow({ label, diff, checked, onCheckedChange }: DlsiteDiffRowProps) {
+  if (diff.kind === "unchanged") {
+    return (
+      <div className="grid grid-cols-[18px_60px_minmax(0,1fr)] items-center gap-1.5 border-b border-line-soft py-2 text-ink-2">
+        <span />
+        <span>{label}</span>
+        <span className="min-w-0 break-words">変更なし（{diff.value}）</span>
+      </div>
+    );
+  }
+  return (
+    <label className="grid grid-cols-[18px_60px_minmax(0,1fr)_18px_minmax(0,1fr)] items-center gap-1.5 border-b border-line-soft py-2">
+      <input
+        type="checkbox"
+        checked={diff.kind === "changed" && checked}
+        disabled={diff.kind === "unavailable"}
+        onChange={(event) => onCheckedChange(event.target.checked)}
+      />
+      <span>{label}</span>
+      <span className="min-w-0 break-words text-ink-2">{diff.current}</span>
+      <span className="text-ink-3">→</span>
+      <span className="min-w-0 break-words">
+        {diff.kind === "changed" ? (
+          <span className="font-medium text-ink-0">{diff.next}</span>
+        ) : (
+          diff.reason
+        )}
+      </span>
+    </label>
+  );
+}
+
 interface DlsiteApplyDialogProps {
-  work: Work;
-  preview: DlsitePreview;
+  diff: DlsiteApplyDiff;
   busy: boolean;
   applyTitle: boolean;
   applyCover: boolean;
@@ -44,8 +89,7 @@ interface DlsiteApplyDialogProps {
 }
 
 function DlsiteApplyDialog({
-  work,
-  preview,
+  diff,
   busy,
   applyTitle,
   applyCover,
@@ -58,8 +102,6 @@ function DlsiteApplyDialog({
   onApply,
   onClose,
 }: DlsiteApplyDialogProps) {
-  const { info } = preview;
-  const allInfoTags = useMemo(() => dlsiteInfoTags(info), [info]);
   const close = () => {
     if (!busy) onClose();
   };
@@ -85,52 +127,32 @@ function DlsiteApplyDialog({
           <IconButton icon={I.x} label="閉じる" size="sm" disabled={busy} onClick={close} />
         </header>
         <div className="mll-selectable min-h-0 flex-1 overflow-y-auto px-[18px] py-3 text-[11px]">
-          <label className="grid grid-cols-[18px_60px_minmax(0,1fr)_18px_minmax(0,1fr)] items-center gap-1.5 border-b border-line-soft py-2">
-            <input
-              type="checkbox"
-              checked={applyTitle}
-              onChange={(event) => onApplyTitleChange(event.target.checked)}
-            />
-            <span>タイトル</span>
-            <span className="min-w-0 break-words text-ink-2">{work.title}</span>
-            <span className="text-ink-3">→</span>
-            <span className="min-w-0 break-words">{info.title}</span>
-          </label>
-          <label className="grid grid-cols-[18px_60px_minmax(0,1fr)_18px_minmax(0,1fr)] items-center gap-1.5 border-b border-line-soft py-2">
-            <input
-              type="checkbox"
-              checked={applyUrl}
-              onChange={(event) => onApplyUrlChange(event.target.checked)}
-            />
-            <span>URL</span>
-            <span className="min-w-0 break-all text-ink-2">
-              {work.urls.find((entry) => entry.url.includes("dlsite.com"))?.url ?? "未設定"}
-            </span>
-            <span className="text-ink-3">→</span>
-            <span className="min-w-0 break-all">{info.url}</span>
-          </label>
-          <label className="grid grid-cols-[18px_60px_minmax(0,1fr)_18px_minmax(0,1fr)] items-center gap-1.5 border-b border-line-soft py-2">
-            <input
-              type="checkbox"
-              checked={applyCover}
-              disabled={!info.coverUrl}
-              onChange={(event) => onApplyCoverChange(event.target.checked)}
-            />
-            <span>カバー</span>
-            <span className="min-w-0 break-words text-ink-2">{formatCoverEditLabel(work)}</span>
-            <span className="text-ink-3">→</span>
-            <span>{info.coverUrl ? "DLsite画像" : "画像なし"}</span>
-          </label>
-          <fieldset className="grid gap-1.5 py-2.5">
-            <legend className="mb-1 font-sans font-medium">タグ</legend>
-            {allInfoTags.map((tag) => {
-              const applied = work.tags.includes(tag);
-              return (
+          <DlsiteDiffRow
+            label="タイトル"
+            diff={diff.title}
+            checked={applyTitle}
+            onCheckedChange={onApplyTitleChange}
+          />
+          <DlsiteDiffRow
+            label="URL"
+            diff={diff.url}
+            checked={applyUrl}
+            onCheckedChange={onApplyUrlChange}
+          />
+          <DlsiteDiffRow
+            label="カバー"
+            diff={diff.cover}
+            checked={applyCover}
+            onCheckedChange={onApplyCoverChange}
+          />
+          {diff.newTags.length > 0 && (
+            <fieldset className="grid gap-1.5 py-2.5">
+              <legend className="mb-1 font-sans font-medium">追加されるタグ</legend>
+              {diff.newTags.map((tag) => (
                 <label key={tag} className="flex items-center gap-1.5">
                   <input
                     type="checkbox"
-                    disabled={applied}
-                    checked={applied || selectedTags.includes(tag)}
+                    checked={selectedTags.includes(tag)}
                     onChange={(event) =>
                       onSelectedTagsChange(
                         event.target.checked
@@ -140,11 +162,22 @@ function DlsiteApplyDialog({
                     }
                   />
                   <span>{tag}</span>
-                  {applied && <small className="text-ink-2">適用済み</small>}
                 </label>
-              );
-            })}
-          </fieldset>
+              ))}
+            </fieldset>
+          )}
+          {diff.appliedTags.length > 0 && (
+            <details className="py-2 text-ink-2">
+              <summary className="cursor-pointer font-sans">
+                適用済みのタグ（{diff.appliedTags.length}）
+              </summary>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {diff.appliedTags.map((tag) => (
+                  <span key={tag}>{tag}</span>
+                ))}
+              </div>
+            </details>
+          )}
         </div>
         <footer className="flex shrink-0 justify-end gap-2 border-t border-line-soft px-[18px] py-3">
           <Button variant="quiet" disabled={busy} onClick={close}>
@@ -163,6 +196,7 @@ function DlsiteApplyDialog({
 export function DlsiteEditor({ work }: { work: Work }) {
   const queryClient = useQueryClient();
   const invalidateDlsiteCache = useDlsiteInvalidation();
+  const setApplyToast = useSetAtom(dlsiteApplyToastAtom);
   const [rjCode, setRjCode] = useState(work.dlsite.rjCode ?? "");
   const [preview, setPreview] = useState<DlsitePreview | null>(null);
   const [applyTitle, setApplyTitle] = useState(false);
@@ -171,6 +205,7 @@ export function DlsiteEditor({ work }: { work: Work }) {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const diff = preview ? computeDlsiteApplyDiff(work, preview.info) : null;
 
   useEffect(() => setRjCode(work.dlsite.rjCode ?? ""), [work.dlsite.rjCode]);
 
@@ -201,7 +236,12 @@ export function DlsiteEditor({ work }: { work: Work }) {
         queryClient.setQueryData(WORK_QUERY_KEYS.detail(work.id), updated);
       }
       const nextPreview = await fetchDlsiteInfo(work.id);
-      setSelectedTags(unappliedDlsiteTags(work, nextPreview.info));
+      const nextDiff = computeDlsiteApplyDiff(work, nextPreview.info);
+      if (!nextDiff.hasChanges) {
+        setApplyToast({ message: "DLsiteの情報は現在の内容と同じでした", variant: "info" });
+        return;
+      }
+      setSelectedTags(nextDiff.newTags);
       setApplyTitle(false);
       setApplyCover(!work.cover && Boolean(nextPreview.info.coverUrl));
       setApplyUrl(!work.urls.some((entry) => entry.url.includes("dlsite.com")));
@@ -231,6 +271,7 @@ export function DlsiteEditor({ work }: { work: Work }) {
       );
       setPreview(null);
       await refresh();
+      setApplyToast({ message: "DLsite情報を適用しました", variant: "success" });
     } catch (cause) {
       setError(dlsiteApplyErrorMessage(cause));
     } finally {
@@ -312,10 +353,9 @@ export function DlsiteEditor({ work }: { work: Work }) {
           {error}
         </p>
       )}
-      {preview && (
+      {diff && (
         <DlsiteApplyDialog
-          work={work}
-          preview={preview}
+          diff={diff}
           busy={busy}
           applyTitle={applyTitle}
           applyCover={applyCover}

@@ -47,5 +47,6 @@ export const dlsiteBulkActionsAtom = atom<DlsiteBulkActions | null>(null);
 
 export type DlsiteInvalidate = (workIds?: string | string[]) => Promise<void>;
 
-/** DlsiteBulkRuntime がマウント時に登録するキャッシュ無効化。未配線時は null */
-export const dlsiteInvalidateAtom = atom<DlsiteInvalidate | null>(null);
+/** DlsiteBulkRuntime がマウント時に登録するキャッシュ無効化。関数そのものを atom の値にすると
+ *  Jotai の set が updater と誤認するため、呼び出し口を1つだけ持つオブジェクトで包む。未配線時は null */
+export const dlsiteInvalidateAtom = atom<{ run: DlsiteInvalidate } | null>(null);

@@ -57,7 +57,9 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
         }
         const fetched = await dlsiteFetchByCode(work.dlsite.rjCode);
         if (!fetched.ok) continue;
-        const tags = mergeDlsiteTags([], fetched.info).filter((tag) => !work.tags.includes(tag));
+        const tags = mergeDlsiteTags(work.tags, fetched.info).filter(
+          (tag) => !work.tags.includes(tag),
+        );
         if (tags.length === 0) {
           skipped += 1;
           continue;
