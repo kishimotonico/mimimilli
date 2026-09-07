@@ -45,6 +45,7 @@ export function useWorkGridKeyboardNav({
         justifiedLayout?.tiles ?? null,
         columnCount,
       );
+      if (rowIndex === undefined) return;
 
       const nextWork = works[nextIndex];
       if (nextWork) onWorkSelect(nextWork.id);

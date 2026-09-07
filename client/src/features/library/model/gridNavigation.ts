@@ -60,13 +60,16 @@ export function getNextJustifiedIndex(
 // 仮想化された行インデックス（virtualizerが実際にDOMへ描画する単位）とフラットな
 // タイル/行のインデックスを相互変換する。roving tabindexの対象（選択中の作品）が
 // 現在の描画範囲内にあるかどうかを判定するために使う（TASK-428.12）。
+// ジャスティファイドでflatIndexに対応するタイルが無い（範囲外）ときはundefinedを
+// 返す。フォールバックするか無視するかは呼び出し側の文脈で異なるため、ここでは
+// 判断しない（例: キーボード操作は無視、rovingIndexの解決は行0へフォールバック）。
 export function rowIndexOfFlatIndex(
   flatIndex: number,
   isJustified: boolean,
   justifiedTiles: readonly Pick<JustifiedTile, "rowIndex">[] | null,
   columnCount: number,
-): number {
-  if (isJustified && justifiedTiles) return justifiedTiles[flatIndex]?.rowIndex ?? 0;
+): number | undefined {
+  if (isJustified && justifiedTiles) return justifiedTiles[flatIndex]?.rowIndex;
   return Math.floor(flatIndex / Math.max(columnCount, 1));
 }
 

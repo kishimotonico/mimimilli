@@ -163,8 +163,10 @@ export default function WorkGrid({
     targetIndex,
     virtualItems,
     virtualizer,
+    // 対象のタイルが（ジャスティファイドで）まだ存在しないときは行0へフォールバック
+    // する。useRovingIndexはこの行が現在の描画範囲内かどうかで対象を判定するため。
     toRowIndex: (flatIndex) =>
-      rowIndexOfFlatIndex(flatIndex, isJustified, justifiedLayout?.tiles ?? null, columnCount),
+      rowIndexOfFlatIndex(flatIndex, isJustified, justifiedLayout?.tiles ?? null, columnCount) ?? 0,
     firstFlatIndexOfRow: (rowIndex) =>
       firstFlatIndexOfRow(rowIndex, isJustified, justifiedLayout?.tiles ?? null, columnCount),
   });

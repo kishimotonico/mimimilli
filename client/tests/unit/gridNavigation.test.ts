@@ -94,4 +94,9 @@ describe("rowIndexOfFlatIndex / firstFlatIndexOfRow（TASK-428.12 roving tabinde
     expect(firstFlatIndexOfRow(1, true, tiles, 3)).toBe(3);
     expect(firstFlatIndexOfRow(0, true, tiles, 3)).toBe(0);
   });
+
+  it("ジャスティファイドで対応するタイルが無いflatIndexはundefinedを返す（レビュー対応: 行0への暗黙フォールバックをやめる）", () => {
+    const tiles = [{ rowIndex: 0 }, { rowIndex: 0 }];
+    expect(rowIndexOfFlatIndex(99, true, tiles, 3)).toBeUndefined();
+  });
 });
