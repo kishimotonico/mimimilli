@@ -4,6 +4,7 @@ import type { Virtualizer } from "@tanstack/react-virtual";
 import {
   getNextGridIndex,
   getNextJustifiedIndex,
+  rowIndexOfFlatIndex,
   type GridArrowKey,
 } from "../../model/gridNavigation";
 import type { JustifiedLayout } from "../../model/justifiedLayout";
@@ -38,11 +39,12 @@ export function useWorkGridKeyboardNav({
           : getNextGridIndex(currentIndex, key, columnCount, works.length);
       if (nextIndex === currentIndex) return;
 
-      const rowIndex =
-        isJustified && justifiedLayout
-          ? justifiedLayout.tiles[nextIndex]?.rowIndex
-          : Math.floor(nextIndex / columnCount);
-      if (rowIndex === undefined || rowIndex < 0) return;
+      const rowIndex = rowIndexOfFlatIndex(
+        nextIndex,
+        isJustified,
+        justifiedLayout?.tiles ?? null,
+        columnCount,
+      );
 
       const nextWork = works[nextIndex];
       if (nextWork) onWorkSelect(nextWork.id);

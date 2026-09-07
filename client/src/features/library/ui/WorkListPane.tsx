@@ -14,6 +14,7 @@ import Button from "../../../shared/ui/Button";
 import { useVirtualList } from "../../../shared/ui/useVirtualList";
 import { useWorkResultsDismiss } from "./useWorkResultsDismiss";
 import { useWorkListKeyboardNav } from "./useWorkListKeyboardNav";
+import { useRovingIndex } from "./useRovingIndex";
 
 // 作品一覧のリスト表示（list/grid のうち list）。ADR-0012 §3 によりレイアウトを固定し、
 // 常に結果面全幅で表示する（旧 ContentColumn の300px固定・中間カラム役割は廃止）。
@@ -110,14 +111,21 @@ export default function WorkListPane({
   });
 
   // roving tabindexの現在位置。選択中の作品があればその位置、無ければ先頭（0）を
-  // Tabストップにする（一覧全体でTabストップ1個、TASK-428.12）。
-  const rovingIndex =
-    works.length === 0
-      ? -1
-      : Math.max(
-          0,
-          works.findIndex((w) => w.id === selectedWorkId),
-        );
+  // 対象にする（一覧全体でTabストップ1個、TASK-428.12）。対象が仮想化の描画範囲外
+  // （深リンク復元・フィルター変更後の選択維持等）のときは、現在描画されている
+  // 先頭行へフォールバックしつつ対象行までスクロールする（useRovingIndex、
+  // WorkGridと共通のロジック、レビュー対応）。
+  const selectedIndex = works.length === 0 ? -1 : works.findIndex((w) => w.id === selectedWorkId);
+  const targetIndex = selectedIndex >= 0 ? selectedIndex : 0;
+  const rovingIndex = useRovingIndex({
+    itemCount: works.length,
+    targetIndex,
+    virtualItems,
+    virtualizer,
+    // リストは1件=virtualizerの1行なので恒等変換でよい
+    toRowIndex: (index) => index,
+    firstFlatIndexOfRow: (index) => index,
+  });
 
   const renderWorkRow = useCallback(
     (index: number) => {

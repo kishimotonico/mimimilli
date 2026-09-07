@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  firstFlatIndexOfRow,
   getNextGridIndex,
   getNextJustifiedIndex,
+  rowIndexOfFlatIndex,
 } from "../../src/features/library/model/gridNavigation";
 
 describe("library grid keyboard navigation", () => {
@@ -71,5 +73,25 @@ describe("justified grid keyboard navigation", () => {
   it("Home/Endで先頭・末尾へ移動する（TASK-428.12）", () => {
     expect(getNextJustifiedIndex(tiles, 2, "Home")).toBe(0);
     expect(getNextJustifiedIndex(tiles, 0, "End")).toBe(4);
+  });
+});
+
+describe("rowIndexOfFlatIndex / firstFlatIndexOfRow（TASK-428.12 roving tabindexのフォールバック用）", () => {
+  it("固定列グリッドでは列数で割った商が行インデックスになる", () => {
+    expect(rowIndexOfFlatIndex(7, false, null, 3)).toBe(2);
+    expect(firstFlatIndexOfRow(2, false, null, 3)).toBe(6);
+  });
+
+  it("ジャスティファイドグリッドではタイル配列のrowIndexをそのまま使う", () => {
+    const tiles = [
+      { rowIndex: 0 },
+      { rowIndex: 0 },
+      { rowIndex: 0 },
+      { rowIndex: 1 },
+      { rowIndex: 1 },
+    ];
+    expect(rowIndexOfFlatIndex(4, true, tiles, 3)).toBe(1);
+    expect(firstFlatIndexOfRow(1, true, tiles, 3)).toBe(3);
+    expect(firstFlatIndexOfRow(0, true, tiles, 3)).toBe(0);
   });
 });

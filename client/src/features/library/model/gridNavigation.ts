@@ -56,3 +56,29 @@ export function getNextJustifiedIndex(
   });
   return bestIndex === -1 ? currentIndex : bestIndex;
 }
+
+// 仮想化された行インデックス（virtualizerが実際にDOMへ描画する単位）とフラットな
+// タイル/行のインデックスを相互変換する。roving tabindexの対象（選択中の作品）が
+// 現在の描画範囲内にあるかどうかを判定するために使う（TASK-428.12）。
+export function rowIndexOfFlatIndex(
+  flatIndex: number,
+  isJustified: boolean,
+  justifiedTiles: readonly Pick<JustifiedTile, "rowIndex">[] | null,
+  columnCount: number,
+): number {
+  if (isJustified && justifiedTiles) return justifiedTiles[flatIndex]?.rowIndex ?? 0;
+  return Math.floor(flatIndex / Math.max(columnCount, 1));
+}
+
+export function firstFlatIndexOfRow(
+  rowIndex: number,
+  isJustified: boolean,
+  justifiedTiles: readonly Pick<JustifiedTile, "rowIndex">[] | null,
+  columnCount: number,
+): number {
+  if (isJustified && justifiedTiles) {
+    const found = justifiedTiles.findIndex((tile) => tile.rowIndex === rowIndex);
+    return found === -1 ? 0 : found;
+  }
+  return rowIndex * Math.max(columnCount, 1);
+}

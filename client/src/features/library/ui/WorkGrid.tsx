@@ -26,6 +26,8 @@ import {
 import { useWorkGridWheelZoom } from "./workGrid/useWorkGridWheelZoom";
 import { useWorkResultsDismiss } from "./useWorkResultsDismiss";
 import { useWorkGridKeyboardNav } from "./workGrid/useWorkGridKeyboardNav";
+import { useRovingIndex } from "./useRovingIndex";
+import { firstFlatIndexOfRow, rowIndexOfFlatIndex } from "../model/gridNavigation";
 import WorkGridVirtualContent from "./workGrid/WorkGridVirtualContent";
 
 interface WorkGridProps {
@@ -150,14 +152,22 @@ export default function WorkGrid({
   });
 
   // roving tabindexの現在位置。選択中の作品があればその位置、無ければ先頭（0）を
-  // Tabストップにする（一覧全体でTabストップ1個、TASK-428.12）。
-  const rovingIndex =
-    works.length === 0
-      ? -1
-      : Math.max(
-          0,
-          works.findIndex((w) => w.id === selectedWorkId),
-        );
+  // 対象にする（一覧全体でTabストップ1個、TASK-428.12）。対象が仮想化の描画範囲外
+  // （深リンク復元・フィルター変更後の選択維持等）のときは、現在描画されている
+  // 先頭行の先頭タイルへフォールバックしつつ対象行までスクロールする
+  // （useRovingIndex、レビュー対応）。
+  const selectedIndex = works.length === 0 ? -1 : works.findIndex((w) => w.id === selectedWorkId);
+  const targetIndex = selectedIndex >= 0 ? selectedIndex : 0;
+  const rovingIndex = useRovingIndex({
+    itemCount: works.length,
+    targetIndex,
+    virtualItems,
+    virtualizer,
+    toRowIndex: (flatIndex) =>
+      rowIndexOfFlatIndex(flatIndex, isJustified, justifiedLayout?.tiles ?? null, columnCount),
+    firstFlatIndexOfRow: (rowIndex) =>
+      firstFlatIndexOfRow(rowIndex, isJustified, justifiedLayout?.tiles ?? null, columnCount),
+  });
 
   const rowTileProps = {
     selectedWorkId,
