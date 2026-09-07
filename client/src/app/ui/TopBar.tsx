@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import { I } from "../../shared/ui/Icon";
 import IconButton from "../../shared/ui/IconButton";
+import { buttonClass } from "../../shared/ui/Button";
 import { useAtom, useAtomValue } from "jotai";
 import { useMotionVariants } from "../../shared/ui/useMotionVariants";
 import {
@@ -34,7 +35,7 @@ function DlsiteBulkCancelButton({ onClick }: { onClick: () => void }) {
       inert={!isPresent}
       {...v}
       onClick={onClick}
-      className="inline-flex h-7 items-center justify-center gap-1 rounded-[6px] border border-[color-mix(in_oklch,var(--r-coral)_45%,transparent)] bg-[color-mix(in_oklch,var(--r-coral)_10%,transparent)] px-2.5 font-sans text-[11px] font-medium text-ink-0 transition-colors hover:bg-[color-mix(in_oklch,var(--r-coral)_16%,transparent)]"
+      className={buttonClass("danger", "sm", { className: "justify-center" })}
     >
       <I.x size={11} />
       中止

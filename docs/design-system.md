@@ -163,6 +163,16 @@ UI 全体は `client/src/styles/shell/index.css` の `@layer base` で `body { u
 - サイズは `IconButton` のサイズ契約（`sm`/`md`/`lg` = 箱26/30/38px、アイコン14/16/20px）に従う。呼び出し側で独自の数値を散らさない
 - SVGは装飾（`aria-hidden`）とし、意味は `IconButton` 側の `aria-label` が担う。名前を持たないアイコン単体での使用を避ける
 
+## ボタン
+
+テキストラベルを持つ操作ボタンは `client/src/shared/ui/Button.tsx` に集約する（アイコンのみのボタンは `IconButton`）。生の `<button>` を都度スタイリングしない。
+
+- サイズは `sm`（既定・26px）/ `md`（34px）/ `lg`（36px）の3段。いずれも `rounded-pill` の錠剤形で統一し、サイズで角丸の形状は変えない
+- variantは `primary`（主操作）/ `ghost`（副操作）/ `quiet`（キャンセル・閉じる等の控えめな離脱操作）/ `danger`（危険・中止操作、coralアウトライン）の4種。キャンセル系は `quiet` に統一し、`ghost` を代用しない
+- モーダルのキャンセルは `quiet`、閉じる（×）は `IconButton` を使う。ヘッダーの×ボタン用に生の`<button>`でアイコンだけを描画しない
+- `motion.button` 等 `<button>` を直接使えない箇所は、`Button` と同じクラスを `buttonClass(variant, size, options)` から取得して適用する（`ScanFooter` / `TopBar` のAnimatePresence配下ボタンが実例）
+- 破壊的操作の確認ダイアログ `ConfirmDialog` は内部で `Button`（キャンセル=`quiet`、確定=`danger`、いずれも`size="md"`）を使う
+
 ## モバイルレイアウト
 
 方針の正は [ADR-0006](adr/0006-mobile-ui-strategy.md)。要点のみ:

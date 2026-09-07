@@ -1,6 +1,8 @@
 import { useAtomValue } from "jotai";
 import { useEffect, useRef, useState } from "react";
 import { I } from "../../../shared/ui/Icon";
+import Button from "../../../shared/ui/Button";
+import IconButton from "../../../shared/ui/IconButton";
 import {
   dlsiteBulkActiveAtom,
   dlsiteBulkApplyBusyAtom,
@@ -21,8 +23,6 @@ const SECTION_LABEL_CLASS =
 const SECTION_LABEL_NO_UPPERCASE_CLASS =
   "font-sans text-label font-semibold tracking-[0.08em] text-ink-2";
 const ROW_CLASS = "flex items-center gap-2";
-const SECONDARY_BUTTON_CLASS =
-  "h-[34px] cursor-pointer rounded-[6px] border border-line bg-paper-1 px-3 font-sans text-[12px] font-medium whitespace-nowrap text-ink-1";
 
 interface SettingsModalProps {
   rootFolder: string | null;
@@ -91,14 +91,7 @@ export default function SettingsModal({
       {/* Header */}
       <div className="flex items-center border-b border-line-soft px-[18px] py-[14px]">
         <span className="flex-1 font-sans text-[14px] font-semibold text-ink-0">設定</span>
-        <button
-          type="button"
-          aria-label="閉じる"
-          onClick={dismiss}
-          className="grid h-[26px] w-[26px] cursor-pointer place-items-center rounded-[6px] border-none bg-transparent text-ink-2"
-        >
-          <I.x size={14} />
-        </button>
+        <IconButton icon={I.x} label="閉じる" size="sm" onClick={dismiss} />
       </div>
 
       {/* Body */}
@@ -122,20 +115,12 @@ export default function SettingsModal({
                 placeholder="ルートフォルダーのパスを入力"
                 className="h-[34px] flex-1 rounded-[6px] border border-acc bg-paper-0 px-3 font-mono text-mono text-ink-1"
               />
-              <button
-                type="button"
-                onClick={() => setIsEditingFolder(false)}
-                className={SECONDARY_BUTTON_CLASS}
-              >
+              <Button variant="quiet" size="md" onClick={() => setIsEditingFolder(false)}>
                 キャンセル
-              </button>
-              <button
-                type="submit"
-                disabled={!folderDraft.trim()}
-                className="h-[34px] cursor-pointer rounded-[6px] border-none bg-ink-0 px-3 font-sans text-[12px] font-semibold whitespace-nowrap text-paper-1 disabled:cursor-not-allowed disabled:opacity-60"
-              >
+              </Button>
+              <Button variant="primary" size="md" type="submit" disabled={!folderDraft.trim()}>
                 保存
-              </button>
+              </Button>
             </form>
           ) : (
             <div className={ROW_CLASS}>
@@ -147,9 +132,9 @@ export default function SettingsModal({
                   {rootFolder ?? "未設定"}
                 </span>
               </div>
-              <button onClick={startEditingFolder} className={SECONDARY_BUTTON_CLASS}>
+              <Button variant="ghost" size="md" onClick={startEditingFolder}>
                 変更
-              </button>
+              </Button>
             </div>
           )}
         </div>
@@ -161,37 +146,36 @@ export default function SettingsModal({
             <span className="flex-1 font-mono text-[11px] text-ink-2">
               最終スキャン: {formatLastScanTime(lastScanTime)}
             </span>
-            <button
-              onClick={onOpenScan}
-              className="flex h-[34px] cursor-pointer items-center gap-1.5 rounded-[6px] border-none bg-ink-0 px-3.5 font-sans text-[12px] font-semibold text-paper-1"
-            >
+            <Button variant="primary" size="md" onClick={onOpenScan}>
               <I.refresh size={12} className={scanning ? "animate-spin" : undefined} />
               {scanning ? (scanProgressLabel ?? "スキャン中...") : "スキャン"}
-            </button>
+            </Button>
           </div>
         </div>
 
         {/* Tag prefixes（ADR-0005） */}
         <div className={SECTION_CLASS}>
           <span className={SECTION_LABEL_NO_UPPERCASE_CLASS}>DLSITE連携</span>
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="md"
+            className="self-start"
             disabled={dlsiteBulkBusy || dlsiteBulkApplyBusy}
             onClick={() => void onStartDlsiteBulk()}
-            className="h-[34px] cursor-pointer self-start rounded-[6px] border border-line bg-paper-1 px-3.5 font-sans text-[12px] text-ink-1 disabled:cursor-not-allowed"
           >
             {dlsiteBulkActive
               ? `取得中${dlsiteBulkProgress ? ` (${dlsiteBulkProgress.processed}/${dlsiteBulkProgress.total})` : "..."}`
               : "未連携をまとめて取得"}
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="ghost"
+            size="md"
+            className="self-start"
             disabled={dlsiteBulkBusy || dlsiteBulkApplyBusy}
             onClick={onOpenDlsiteBulkApply}
-            className="h-[34px] cursor-pointer self-start rounded-[6px] border border-line bg-paper-1 px-3.5 font-sans text-[12px] text-ink-1 disabled:cursor-not-allowed"
           >
             {dlsiteBulkApplyBusy ? "適用中..." : "未設定項目をまとめて適用"}
-          </button>
+          </Button>
         </div>
 
         {/* 候補から外したフォルダー（TASK-330） */}
@@ -203,23 +187,23 @@ export default function SettingsModal({
         {/* Export */}
         <div className={SECTION_CLASS}>
           <span className={SECTION_LABEL_CLASS}>データ</span>
-          <button
+          <Button
+            variant="ghost"
+            size="md"
+            icon={I.download}
+            className="self-start"
             onClick={onExport}
-            className="flex h-[34px] cursor-pointer items-center gap-1.5 self-start rounded-[6px] border border-line bg-paper-1 px-3.5 font-sans text-[12px] font-medium text-ink-1"
           >
-            <I.download size={12} /> ライブラリをエクスポート
-          </button>
+            ライブラリをエクスポート
+          </Button>
         </div>
       </div>
 
       {/* Footer */}
       <div className="flex justify-end px-[18px] pt-3 pb-4">
-        <button
-          onClick={onClose}
-          className="h-8 cursor-pointer rounded-[6px] border-none bg-paper-2 px-4 font-sans text-[12px] font-medium text-ink-1"
-        >
+        <Button variant="quiet" size="md" onClick={onClose}>
           閉じる
-        </button>
+        </Button>
       </div>
     </dialog>
   );

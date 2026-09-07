@@ -1,5 +1,6 @@
 // 破壊的操作の確認ダイアログ。保護タグの削除（ADR-0005: ソフトガード）などに使う。
 import { useRef } from "react";
+import Button from "./Button";
 import { useDialogModal } from "./useDialogModal";
 
 interface ConfirmDialogProps {
@@ -36,23 +37,14 @@ export default function ConfirmDialog({
     >
       <div className="flex flex-col gap-2.5">
         <span className="font-sans text-[13.5px] font-semibold text-ink-0">{title}</span>
-        <p className="m-0 text-[12px] leading-[1.7] text-ink-1">{message}</p>
+        <p className="m-0 text-body leading-[1.7] text-ink-1">{message}</p>
         <div className="mt-1 flex justify-end gap-2">
-          <button
-            ref={cancelRef}
-            type="button"
-            onClick={onCancel}
-            className="h-8 cursor-pointer rounded-[6px] border border-line bg-paper-1 px-[14px] font-sans text-[12px] font-medium text-ink-1"
-          >
+          <Button ref={cancelRef} variant="quiet" size="md" onClick={onCancel}>
             キャンセル
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            className="h-8 cursor-pointer rounded-[6px] border border-[color-mix(in_oklch,var(--r-coral)_45%,transparent)] bg-[var(--r-coral)] px-[14px] font-sans text-[12px] font-semibold text-paper-1 transition-colors hover:brightness-[0.92]"
-          >
+          </Button>
+          <Button variant="danger" size="md" onClick={onConfirm}>
             {confirmLabel}
-          </button>
+          </Button>
         </div>
       </div>
     </dialog>

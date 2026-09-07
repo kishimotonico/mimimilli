@@ -285,7 +285,7 @@ export default function RegisterWorkDialog({
         </div>
 
         <footer className="flex shrink-0 justify-end gap-2 border-t border-line-soft px-[18px] py-3">
-          <Button variant="ghost" disabled={submitBusy} onClick={close}>
+          <Button variant="quiet" disabled={submitBusy} onClick={close}>
             キャンセル
           </Button>
           <Button
