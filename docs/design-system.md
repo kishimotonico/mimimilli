@@ -28,7 +28,7 @@
 
 ### 文字サイズトークン
 
-サイズ・行高は用途別トークンに集約する（`tokens.css` の `--fs-*`/`--lh-*`、Tailwindでは `text-body` 等のユーティリティとして使える）。px直書き（`font-size: Npx` / `text-[Npx]`）は禁止で、新規UIもこの6段のいずれかへ丸める。フォントファミリー（`--font-jp`/`--font-sans`/`--font-mono`）とは独立した軸なので、`text-mono` に `font-mono` を組み合わせるなど併用する。
+サイズ・行高は用途別トークンに集約する（`tokens.css` の `--fs-*`/`--lh-*`、Tailwindでは `text-body` 等のユーティリティとして使える）。px直書き（`font-size: Npx` / `text-[Npx]`）は禁止で、新規UIもこの6段のいずれかへ丸める。フォントファミリー（`--font-jp`/`--font-sans`/`--font-mono`）とは独立した軸なので、`text-mono` に `font-mono` を組み合わせるなど併用する。既存コードに残る px直書きの移行は TASK-431 で対応する。新規追加分はこの6段のトークンを使う。
 
 | トークン         | 値               | 用途                                                 |
 | ---------------- | ---------------- | ---------------------------------------------------- |
@@ -45,6 +45,18 @@
 
 操作可能な要素（`button` / `a` / `input` / `textarea` / `select` / `[tabindex]`）は `shell/base.css` の共通規則（`body :is(...):focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }`）で一律 `2px solid var(--acc)` のリングを表示する。個別コンポーネントで `focus-visible:outline-*` や `focus:ring-*` 等のTailwindユーティリティを重ねて再定義しない。`overflow: hidden` な一覧スクロール域内の行（`.mll-wrow` / `.mle-row`）だけ、リングが切り抜かれないよう `outline-offset` を `var(--focus-ring-offset-clipped)`（-2px）にする例外を個別に持つ。
 
+## グローバルショートカット / Escape
+
+再生系のグローバルショートカット（`useGlobalShortcuts`、Space=再生/一時停止、←→=±10秒シーク）とEscapeは、フォーカス位置・ダイアログの有無によって有効範囲が変わる。実装からは読み取りにくい規約なので明記する。
+
+- モーダル `<dialog open>` が開いている間は、フォーカス位置に関わらずグローバルショートカットを全キー無効化する（dialog内でSpaceや矢印キーが背後の再生・seekを変えない）
+- 除外セレクタ（ネイティブ操作を優先する）: `input, textarea, select, [contenteditable], [role="menu"], [role="listbox"], button, a`。フォーカスがこれらの中にあれば、Web標準どおりその要素自身の操作（テキスト入力・メニュー操作・ボタン活性化等）を優先し、グローバルショートカットは発火しない
+- ただし常設プレイヤーの操作ボタン（再生/一時停止・前後トラック・±10秒・ループ・チャンネル入替・速度トリガー・音量トリガー）には `data-player-control` 属性を付与しており、この属性を持つ要素にフォーカスがあるときだけ、Spaceは通常のbutton除外をバイパスして常にグローバルの再生/一時停止に回る（矢印キーは対象外で、通常のbuttonと同じくネイティブ動作優先のまま）。判定は`data-player-control`属性で行い、クラス名の文字列一致やDOM構造の推測には頼らない。ボタン自身のネイティブSpace活性化とグローバル側の再生トグルが二重発火しないよう、preventDefaultでボタンの既定動作を止める
+  - 付与した対象: `BarContent`（下部バー）・`PlayerTransportControls`（再生中タブ）・`PopupContent`（ポップアップ）・`NowPlayingImmersiveMiniControls`（没入モード）の各再生/一時停止・前後トラック・±10秒・ループ・チャンネル入替ボタン、`PopupContent`の速度トリガー（`mle-ratepill`、速度メニュー項目自体は`role="menu"`配下として従来どおり除外）、`BarVolumePopover`の音量トリガー
+  - 意図的に付与しなかった対象: 停止・展開・折りたたみ・「再生中の作品を表示」等のナビゲーション系ボタン（再生状態を切り替える操作ではないため）、`ABRepeatBar`のA/B地点設定ボタン（再生状態を切り替える連続操作ではなく、その場で状態を確定させる一回限りのアクションのため、標準のSpace活性化のままでよい）
+- Escapeはレイヤーごとに一段だけ閉じる（`TagCombobox`）。候補表示中のEscapeは候補だけを閉じ、ダイアログのcancelや親popoverのdismissへは伝播させない。候補が閉じているときのEscapeは、呼び出し元が渡した`onCancel`があればそれ（編集キャンセル等）を呼び、`onCancel`が無ければ何もせずネイティブ`<dialog>`のcancelへ素通しする
+- IME変換中（`event.nativeEvent.isComposing`）はEscapeもEnterも無視する。変換の取り消し・確定はIME自身に任せ、候補の開閉・タグ確定・onCancelは発火させない
+
 ## クラス命名
 
 - `mle-`: Explorer / 共通シェル系（フレーム・カラム・アドレスバー・行など File/Library 共通の骨格）
@@ -54,6 +66,10 @@
 `client/src/styles/shell/index.css`（および同ディレクトリ配下の分割 CSS）は全規則がカスケードレイヤー内にある。UA要素のリセット（`button` / `input` / `a` / `ul` / `ol` 等）は `@layer base`、`mle-`/`mll-` のコンポーネント規則は `@layer components` に置く。Tailwind v4 のレイヤー順（`theme, base, components, utilities`）により、`@layer utilities`（Tailwindユーティリティ）が `components` より強く効くため、tsx側で `mle-`/`mll-` クラスと Tailwind ユーティリティを併用すると、ユーティリティ側で局所的に上書きできる。レイヤー外に素のセレクタを書くと、レイヤーの規則（unlayered が常に layered に勝つ）で utilities を問答無用で潰してしまうため、セレクタを足すときは必ずどちらかのレイヤー内に置く。
 
 フォント指定とUA要素のリセット（`@layer base` の `button` / `input` / `a` / `ul` / `ol`）は `body` セレクタでスコープする（`.mle-app` ではない）。アプリの DOM は `body` 直下に `#root`（= `.mle-app`）と、`createPortal(..., document.body)` で出すポータル要素しかないため、`body` にスコープしておけば新しくポータルを追加しても個別に打ち消しCSSを書く必要がない。ポータルを新規に追加するときはこの前提を壊さないこと（ラッパー要素にあえて別のフォント・リセットを指定したい場合を除き、何もしなくてよい）。
+
+## 用語
+
+ライブラリからの操作は常に「登録解除」と呼ぶ。ボタン・見出し・確認ダイアログ・トースト・結果文言すべてで統一し、「削除」は使わない。「削除」は物理ファイルに言及する文脈にだけ使う（例: 「音声などの物理ファイルは削除されません」）。コンポーネント名にも同じルールを適用する（`ErrorViewBulkUnregisterBanner` が実例）。
 
 ## Overlay / z-index の現在の階層
 
@@ -168,7 +184,7 @@ UI 全体は `client/src/styles/shell/index.css` の `@layer base` で `body { u
 テキストラベルを持つ操作ボタンは `client/src/shared/ui/Button.tsx` に集約する（アイコンのみのボタンは `IconButton`）。生の `<button>` を都度スタイリングしない。
 
 - サイズは `sm`（既定・26px）/ `md`（34px）/ `lg`（36px）の3段。いずれも `rounded-pill` の錠剤形で統一し、サイズで角丸の形状は変えない
-- variantは `primary`（主操作）/ `ghost`（副操作）/ `quiet`（主操作と対になるキャンセル）/ `danger`（破壊的操作の確定、coral塗り＋白文字）/ `danger-quiet`（進行中の操作を止めるだけの中止、coralアウトライン）の5種
+- variantは `primary`（主操作）/ `ghost`（副操作）/ `quiet`（主操作と対になるキャンセル）/ `danger`（破壊的操作の確定、coral塗り＋白文字）/ `danger-quiet`（進行中の操作を止めるだけの中止、coralの淡い背景＋アウトライン）の5種
 - `quiet` は「確定操作の隣に並ぶキャンセル」専用。単独で置かれるフッターの「閉じる」（対になる確定操作が無いモーダルの離脱ボタン）は `quiet` にしない。`quiet` は背景が透明でホバーするまでボタンと分かりにくいため、常時可視の背景が要る単独の離脱操作には `ghost` を使う（`SettingsModal` フッターの「閉じる」が実例）
 - `danger` と `danger-quiet` は重みが異なる。取り消せない操作の最終確定（`ConfirmDialog` の確定ボタン等）はダイアログ内で最も目を引く必要があるため `danger` を使う。進行中の処理をその場で止めるだけの操作（ツールバー・フッターの「中止」）はより控えめな `danger-quiet` を使う
 - モーダルのキャンセルは `quiet`、閉じる（×）は `IconButton` を使う。ヘッダーの×ボタン用に生の`<button>`でアイコンだけを描画しない
