@@ -66,8 +66,9 @@ export default function GlobalToast({
   const toastRequests = useAtomValue(toastRequestsAtom);
   const setToastRequests = useSetAtom(toastRequestsAtom);
 
-  // 各呼び出し側（useToast）からの表示要求のうち、指定した優先度で最後に届いたものを1件選ぶ。
-  // 他の要求は表示せず破棄する（design-system.md「単一ホストの優先順位チェーン」）。
+  // 各呼び出し側（useToast）からの表示要求のうち、指定した優先度で最後に登録されたid
+  // （Mapの挿入順で最後のエントリ）を1件選ぶ。他の要求は表示せず破棄する
+  // （design-system.md「単一ホストの優先順位チェーン」）。
   const pickToastRequest = (priority: ToastRequest["priority"]): [string, ToastRequest] | null => {
     let picked: [string, ToastRequest] | null = null;
     for (const entry of toastRequests) {
@@ -94,10 +95,11 @@ export default function GlobalToast({
   // 実際に表示される1件のIDを求める。それ以外の要求はキューに積まず即座に破棄する
   // （design-system.md）。「表示されて初めて寿命が動く」構造はそのままに、表示されない
   // 要求を待機状態のまま残さない。
-  const higherThanActionActive = Boolean(scanError || scanResultToast || errorToast);
+  const higherThanActionActive = Boolean(scanError || errorToast || dlsiteError);
   const higherThanBackgroundActive =
     higherThanActionActive ||
     Boolean(actionRequestEntry) ||
+    Boolean(scanResultToast) ||
     Boolean(rootFolderChangedToast) ||
     Boolean(playerSkipToast) ||
     Boolean(libraryInvalidUrlToast) ||
@@ -127,6 +129,27 @@ export default function GlobalToast({
 
   if (scanError) {
     return <Toast message={scanError} variant="error" onDismiss={clearScanError} />;
+  }
+
+  if (errorToast) {
+    return <Toast message={errorToast} variant="error" onDismiss={() => setErrorToast(null)} />;
+  }
+
+  if (dlsiteError) {
+    return <Toast message={dlsiteError} variant="error" onDismiss={dismissDlsite} />;
+  }
+
+  if (actionRequestEntry) {
+    const [id, request] = actionRequestEntry;
+    return (
+      <Toast
+        message={request.message}
+        variant={request.variant}
+        actionLabel={request.actionLabel}
+        onAction={request.onAction}
+        onDismiss={() => dismissToastRequest(id, request)}
+      />
+    );
   }
 
   if (scanResultToast) {
@@ -160,23 +183,6 @@ export default function GlobalToast({
             : undefined
         }
         onDismiss={dismissScanResultToast}
-      />
-    );
-  }
-
-  if (errorToast) {
-    return <Toast message={errorToast} variant="error" onDismiss={() => setErrorToast(null)} />;
-  }
-
-  if (actionRequestEntry) {
-    const [id, request] = actionRequestEntry;
-    return (
-      <Toast
-        message={request.message}
-        variant={request.variant}
-        actionLabel={request.actionLabel}
-        onAction={request.onAction}
-        onDismiss={() => dismissToastRequest(id, request)}
       />
     );
   }
@@ -291,10 +297,6 @@ export default function GlobalToast({
         onDismiss={() => dismissToastRequest(id, request)}
       />
     );
-  }
-
-  if (dlsiteError) {
-    return <Toast message={dlsiteError} variant="error" onDismiss={dismissDlsite} />;
   }
 
   return <Toast message={null} onDismiss={dismissDlsite} />;
