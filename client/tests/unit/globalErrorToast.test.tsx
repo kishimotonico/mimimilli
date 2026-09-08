@@ -296,4 +296,53 @@ describe("GlobalToast", () => {
       expect(screen.queryByText("候補から外しました")).toBeNull();
     });
   });
+
+  // design-system.md「単一ホストの優先順位チェーン」の契約
+  // （error > action要求 > 個別グローバル通知 > background要求）そのものを固定する。
+  // 網羅はしない（AGENTS.md「テストは網羅性より実行速度」）。今回if連鎖の並びが
+  // 契約と食い違っていた境界（TASK-440レビュー指摘）だけを対象にする。
+  describe("優先順位チェーンの契約（docs/design-system.md）", () => {
+    it("errorToast（1: error）はaction要求（2）より優先される", () => {
+      const store = createStore();
+      store.set(errorToastAtom, "既存のエラー");
+      const onDismiss = vi.fn();
+
+      renderGlobalToast(
+        store,
+        false,
+        vi.fn(),
+        vi.fn(),
+        vi.fn(),
+        <ToastRequester priority="action" message="候補から外しました" onDismiss={onDismiss} />,
+      );
+      fireEvent.click(screen.getByRole("button", { name: "要求を出す" }));
+
+      expect(screen.getByText("既存のエラー")).toBeTruthy();
+      expect(screen.queryByText("候補から外しました")).toBeNull();
+    });
+
+    it("dlsiteError（1: error）はscanResultToast（3: 個別グローバル通知）より優先される", () => {
+      const scanResult: ScanResult = {
+        registered: 12,
+        insertedWorkIds: ["a", "b"],
+        updatedWorkIds: [],
+        errors: 0,
+        missing: 0,
+        rjCodeMissingCount: 0,
+        skipped: 0,
+        coverErrors: 0,
+        identityConflicts: [],
+        invalidMetaFiles: [],
+        candidates: [],
+      };
+      const store = createStore();
+      store.set(dlsiteBulkErrorAtom, "一括取得に失敗しました");
+      store.set(scanResultToastAtom, { kind: "completed", result: scanResult });
+
+      renderGlobalToast(store);
+
+      expect(screen.getByText("一括取得に失敗しました")).toBeTruthy();
+      expect(screen.queryByText(/^スキャン完了:/)).toBeNull();
+    });
+  });
 });
