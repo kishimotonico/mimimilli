@@ -41,39 +41,45 @@ function fifoAdapter(fifoPath: string): DataAdapter {
   } as unknown as DataAdapter;
 }
 
-test("音声配信: 配信中に無通信期間が続いても切断されず全量受信できる（defer再現）", async (t: TestContext) => {
-  const dir = makeTestDirectory("media-idle-timeout");
-  t.after(dir.cleanup);
-  const fifoPath = join(dir.path, "stream.fifo");
-  execFileSync("mkfifo", [fifoPath]);
+// STALL_MSがidleTimeoutを跨ぐこと自体が検証対象なので4秒超の実時間コストは削れない。
+// テストランナーの既定タイムアウト（5000ms）は起動オーバーヘッド込みで薄いためここだけ明示的に広げる。
+test(
+  "音声配信: 配信中に無通信期間が続いても切断されず全量受信できる（defer再現）",
+  { timeout: 15_000 },
+  async (t: TestContext) => {
+    const dir = makeTestDirectory("media-idle-timeout");
+    t.after(dir.cleanup);
+    const fifoPath = join(dir.path, "stream.fifo");
+    execFileSync("mkfifo", [fifoPath]);
 
-  const app = mediaRoute(fifoAdapter(fifoPath));
-  const server = dir.ownFn(
-    Bun.serve({
-      fetch: app.fetch,
-      hostname: "127.0.0.1",
-      port: 0,
-      idleTimeout: IDLE_TIMEOUT_SECONDS,
-    }),
-    (s) => s.stop(true),
-  );
+    const app = mediaRoute(fifoAdapter(fifoPath));
+    const server = dir.ownFn(
+      Bun.serve({
+        fetch: app.fetch,
+        hostname: "127.0.0.1",
+        port: 0,
+        idleTimeout: IDLE_TIMEOUT_SECONDS,
+      }),
+      (s) => s.stop(true),
+    );
 
-  const responsePromise = fetch(`http://127.0.0.1:${server.port}/media/cover/w`);
+    const responsePromise = fetch(`http://127.0.0.1:${server.port}/media/cover/w`);
 
-  const writer = createWriteStream(fifoPath);
-  await new Promise<void>((resolve, reject) => {
-    writer.on("open", () => resolve());
-    writer.on("error", reject);
-  });
-  writer.write(FIRST_CHUNK);
+    const writer = createWriteStream(fifoPath);
+    await new Promise<void>((resolve, reject) => {
+      writer.on("open", () => resolve());
+      writer.on("error", reject);
+    });
+    writer.write(FIRST_CHUNK);
 
-  // Chromeのdeferを模して、idleTimeoutを超える時間まったく書き込まない。
-  await sleep(STALL_MS);
+    // Chromeのdeferを模して、idleTimeoutを超える時間まったく書き込まない。
+    await sleep(STALL_MS);
 
-  writer.end(SECOND_CHUNK);
+    writer.end(SECOND_CHUNK);
 
-  const response = await responsePromise;
-  assert.equal(response.status, 200);
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  assert.equal(bytes.length, TOTAL_BYTES, "無通信期間の後も残りバイトを全量受信できること");
-});
+    const response = await responsePromise;
+    assert.equal(response.status, 200);
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    assert.equal(bytes.length, TOTAL_BYTES, "無通信期間の後も残りバイトを全量受信できること");
+  },
+);

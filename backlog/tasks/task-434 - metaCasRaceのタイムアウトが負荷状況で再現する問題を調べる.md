@@ -4,7 +4,7 @@ title: metaCasRaceのタイムアウトが負荷状況で再現する問題を�
 status: To Do
 assignee: []
 created_date: '2026-09-07 16:47'
-updated_date: '2026-09-07 19:04'
+updated_date: '2026-09-08 00:55'
 labels:
   - test
   - flaky
@@ -31,10 +31,12 @@ TASK-428系の改修中、複数の担当から `server/tests/real/metaCasRace.t
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 metaCasRaceのタイムアウトが、テストの構造・閾値・実装のいずれに起因するかを切り分けて記録する
-- [ ] #2 負荷がかかった状態でも安定して結果が出る形になっている（閾値を上げるだけの対処なら、その根拠を記録する）
-- [ ] #3 同じ原因で他のテストが落ちていないかを確認する
+- [x] #1 metaCasRaceのタイムアウトが、テストの構造・閾値・実装のいずれに起因するかを切り分けて記録する
+- [x] #2 負荷がかかった状態でも安定して結果が出る形になっている（閾値を上げるだけの対処なら、その根拠を記録する）
+- [x] #3 同じ原因で他のテストが落ちていないかを確認する
 <!-- AC:END -->
+
+
 
 ## Implementation Notes
 
