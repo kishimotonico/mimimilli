@@ -4,6 +4,7 @@ title: smokeのポート導出がNodeのforbidden portに当たり得る問題�
 status: To Do
 assignee: []
 created_date: '2026-09-07 15:46'
+updated_date: '2026-09-08 00:51'
 labels:
   - test
   - smoke
@@ -25,7 +26,7 @@ TASK-428.8 の作業中に発見。`client/tests/smoke/fixtures.ts` の derivePo
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 derivePort の算出結果が Node fetch の forbidden port list を避ける
-- [ ] #2 forbidden port に当たるパスを模した入力で、避けた結果が返ることをテストで確認できる
-- [ ] #3 既存のポート導出の性質（同じパスなら同じポート、worker毎に別ポート）が維持されている
+- [x] #1 derivePort の算出結果が Node fetch の forbidden port list を避ける
+- [x] #2 forbidden port に当たるパスを模した入力で、避けた結果が返ることをテストで確認できる
+- [x] #3 既存のポート導出の性質（同じパスなら同じポート、worker毎に別ポート）が維持されている
 <!-- AC:END -->
