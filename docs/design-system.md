@@ -117,15 +117,44 @@ dismissal に統一しており、3経路とも `useDialogModal` の `onClose` 1
 新しい方が手前になるため、モーダル表示後にトーストを出せば常に最前面に見える。
 
 ただし `showModal()` 中の dialog はブラウザが dialog 以外の全体を暗黙に inert 化するため、
-popover で top layer に載せてもクリックは通らない（TASK-327）。`Toast` はこれを2段階で
-回避する。(1) `<Toast>` がJSX上どこで宣言されているかで配置先を自動導出する。開いている
-dialog の中で宣言されていれば（例: ScanModal が自分のJSX内で描くトースト）その dialog
-自身の配下へポータルし、通常の子要素として inert 化の対象から外す（dialog が閉じると
-トーストも消える）。(2) dialog の外で宣言されたグローバルトースト（例: アプリルートの
-`GlobalToast`）は原則 `document.body` へポータルするが、その時点で開いているモーダル
-dialog があれば `useTopmostOpenModalDialog`（`shared/ui/`）で検出し、代わりにその dialog
-直下へポータルする。モーダルが閉じれば body へ戻る。呼び出し側にフラグで選ばせると
-既定値の選び間違いが起きうる（実際に一度回帰させた）ため、常にDOM上の状態から自動導出する。
+popover で top layer に載せてもクリックは通らない（TASK-327）。`Toast` は開いているモーダル
+dialog を `useTopmostOpenModalDialog`（`shared/ui/`）で検出し、そのdialog直下へポータルする
+ことでこれを回避する（inert化の対象から外れる）。モーダルが無ければ `document.body` へ
+ポータルする。モーダルが閉じれば body へ戻る。
+
+### Toast は単一ホスト（GlobalToast）に集約する（TASK-440）
+
+`Toast`（`shared/ui/Toast.tsx`）を描画する場所は `GlobalToast`（`app/ui/`）1箇所だけに
+限定する。個々の画面が独自に `<Toast>` を宣言することは禁止する（`rg "<Toast\b" client/src`
+で `GlobalToast.tsx` 以外に一致しないことを常に保つ）。表示を出したい側は
+`useToast`（`shared/ui/useToast.ts`）フックで表示要求を出す。要求は
+`{ message, variant, actionLabel?, onAction?, onDismiss?, priority }` の形で、
+`priority` は次の2値のいずれか。
+
+- `"action"`: ユーザーが直前に行った操作の直接の結果（元に戻す・完了フィードバック等）
+- `"background"`: スキャン・DLsite一括取得等、非同期ジョブの結果通知
+
+以前は「各画面が自分の判断でdialog内かdocument.bodyかを選ぶ」形だったため、GlobalToast
+（アプリルート）が偶然同じタイミングで表示要求を出すと、2つの独立したToastインスタンスが
+同じ固定位置（モーダルdialog直下）へ同時にポータルされ、一方が他方のボタンを覆って操作
+できなくなる不具合があった（TASK-440。スキャンダイアログでDLsite一括取得完了トーストと
+候補除外のUndoトーストが重なるケースで発生）。単一ホストに集約し、`GlobalToast` が
+「今どの1件を表示するか」を優先度チェーンで決めることでこの衝突を構造的に無くす。
+
+優先度チェーンは次の順（上が勝つ）。
+
+1. `variant === "error"` の通知（読み落とし厳禁のため自動消滅せず手動クローズのみ）
+2. `useToast` の `priority: "action"` 要求
+3. その他の個別グローバル通知（ルートフォルダー変更・トラックスキップ・ライブラリURL修復・
+   DLsite関連の完了/中断/エラー等）
+4. `useToast` の `priority: "background"` 要求
+
+同時に複数の要求が同じ優先度で届いた場合は直近の1件だけを表示し、それ以外は表示しない
+（キューに積まない）。表示されなかった `background` 要求の内容は、破棄してよい代わりに
+別の場所から辿れることを要求元が保証する（例: DLsite一括取得の結果は `GET /dlsite/bulk` の
+直近結果と通知ベルから確認できる）。表示されなかった通知は、より高い優先度の要求が消えた
+時点で改めて表示されうる（要求自体は明示的に `dismiss()` されるまで残るため、消えるのでは
+なく順番待ちになる）。
 
 ### Toast の表示寿命・種別（TASK-428.2）
 
@@ -135,10 +164,6 @@ dialog があれば `useTopmostOpenModalDialog`（`shared/ui/`）で検出し、
 action付きは10秒（`TOAST_ACTION_AUTO_DISMISS_MS`）で自動的に閉じる。hover中・内部要素への
 focus中はタイマーを止め、離れると残り時間から再開する。`variant="error"` だけは自動消滅
 せず、× ボタンでの手動クローズのみとする（エラーは読み落とし厳禁のため）。
-
-同時に複数のトーストを表示するキューは持たない。`GlobalToast` のように呼び出し側が
-if連鎖で1件だけを選んで描画する運用とし、優先度の高い通知が消えるまで低優先の通知は
-その状態を保持したまま表示を待つ。
 
 ## ライブラリ: チップ列・値一覧行・オーバーレイ
 
