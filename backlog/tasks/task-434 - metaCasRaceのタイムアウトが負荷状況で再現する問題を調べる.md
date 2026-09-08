@@ -1,10 +1,10 @@
 ---
 id: TASK-434
 title: metaCasRaceのタイムアウトが負荷状況で再現する問題を調べる
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-07 16:47'
-updated_date: '2026-09-08 00:55'
+updated_date: '2026-09-08 01:09'
 labels:
   - test
   - flaky
