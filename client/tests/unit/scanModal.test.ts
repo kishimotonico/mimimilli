@@ -1,6 +1,6 @@
 // ScanModal のEsc/backdrop挙動（TASK-56: NewWorkPopupの統合先）のコンポーネントテスト。
 // happy-dom は <dialog> の showModal/close を実装していないため、テスト対象に必要な分だけ差し替える。
-import { createElement } from "react";
+import { createElement, Fragment } from "react";
 import { render, screen, fireEvent, waitFor, act, within } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
@@ -16,6 +16,7 @@ import {
   type WorksPage,
 } from "@mimimilli/shared";
 import ScanModal from "../../src/features/scan/ui/ScanModal";
+import GlobalToast from "../../src/app/ui/GlobalToast";
 import * as workApi from "../../src/entities/work/api";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { scanActionsAtom, scanJobAtom } from "../../src/entities/scan/model/atoms";
@@ -235,11 +236,24 @@ function renderModal(
     ...rest,
   };
 
+  // Toastは単一ホスト（GlobalToast）へ集約されているため（TASK-440）、ScanModal・
+  // UnregisteredTabの表示要求を目に見える形で検証するにはGlobalToastも一緒に描画する。
+  const globalToast = () =>
+    createElement(GlobalToast, {
+      onOpenScan: () => {},
+      onOpenScanNeedsAttention: () => {},
+      onRetrySkippedTrack: () => {},
+    });
+
   const view = render(
     createElement(
       QueryClientProvider,
       { client: queryClient },
-      createElement(JotaiProvider, { store }, createElement(ScanModal, modalProps)),
+      createElement(
+        JotaiProvider,
+        { store },
+        createElement(Fragment, null, createElement(ScanModal, modalProps), globalToast()),
+      ),
     ),
   );
 
@@ -253,7 +267,12 @@ function renderModal(
         createElement(
           JotaiProvider,
           { store },
-          createElement(ScanModal, { ...modalProps, ...newRest }),
+          createElement(
+            Fragment,
+            null,
+            createElement(ScanModal, { ...modalProps, ...newRest }),
+            globalToast(),
+          ),
         ),
       ),
     );

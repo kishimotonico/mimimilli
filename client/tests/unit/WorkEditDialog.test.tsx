@@ -1,4 +1,6 @@
+import type { ReactElement } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Work } from "@mimimilli/shared";
 import { emptyDlsiteState } from "@mimimilli/shared";
@@ -8,6 +10,33 @@ import type {
   LibraryUrlsPatchMutation,
 } from "../../src/features/library/model/useLibraryQueries";
 import { WorkEditDialog } from "../../src/features/library/ui/preview/WorkEditDialog";
+import GlobalToast from "../../src/app/ui/GlobalToast";
+
+// Toastは単一ホスト（GlobalToast）へ集約されているため（TASK-440）、WorkEditDialogの表示要求を
+// 目に見える形で検証するにはGlobalToastも一緒に描画する必要がある。
+function withToast(queryClient: QueryClient, ui: ReactElement) {
+  return (
+    <QueryClientProvider client={queryClient}>
+      {ui}
+      <GlobalToast
+        onOpenScan={() => {}}
+        onOpenScanNeedsAttention={() => {}}
+        onRetrySkippedTrack={() => {}}
+      />
+    </QueryClientProvider>
+  );
+}
+
+function renderWithToast(ui: ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  const view = render(withToast(queryClient, ui));
+  return {
+    ...view,
+    rerenderWithToast: (nextUi: ReactElement) => view.rerender(withToast(queryClient, nextUi)),
+  };
+}
 
 vi.mock("../../src/features/library/ui/preview/WorkTagEditor", () => ({
   WorkTagEditor: () => <div data-testid="tag-editor" />,
@@ -343,7 +372,7 @@ describe("WorkEditDialog", () => {
   it("保存に失敗した場合は閉じずエラートーストを表示し、入力値を保持する", async () => {
     const onClose = vi.fn();
     const mutateAsync = vi.fn().mockRejectedValue(new Error("network"));
-    const { rerender } = render(
+    const { rerenderWithToast } = renderWithToast(
       <WorkEditDialog
         work={makeWork()}
         tagSuggestions={[]}
@@ -366,7 +395,7 @@ describe("WorkEditDialog", () => {
     expect(screen.getByLabelText("タイトル")).toHaveValue("編集途中"); // 入力値は保持される
 
     // 呼び出し側（react-queryのuseMutation実体）がerrorを反映した状態を模して再描画する
-    rerender(
+    rerenderWithToast(
       <WorkEditDialog
         work={makeWork()}
         tagSuggestions={[]}
@@ -439,7 +468,7 @@ describe("WorkEditDialog", () => {
     // work は同一参照を使い回す（毎回 makeWork() すると urls: [] が新しい参照になり、
     // work.urls 依存の同期effectがdraftを巻き戻してしまう）
     const work = makeWork();
-    const { rerender } = render(
+    const { rerenderWithToast } = renderWithToast(
       <WorkEditDialog
         work={work}
         tagSuggestions={[]}
@@ -462,7 +491,7 @@ describe("WorkEditDialog", () => {
     expect(document.activeElement).toBe(labelInput);
 
     // 保存中はdisabledになり、実ブラウザはフォーカスを外す（title側のテストと同様に模擬する）
-    rerender(
+    rerenderWithToast(
       <WorkEditDialog
         work={work}
         tagSuggestions={[]}
@@ -478,7 +507,7 @@ describe("WorkEditDialog", () => {
     expect(document.activeElement).not.toBe(screen.getByLabelText("URLラベル 1"));
 
     // 保存に失敗すると先頭のURLラベル欄へフォーカスが戻る
-    rerender(
+    rerenderWithToast(
       <WorkEditDialog
         work={work}
         tagSuggestions={[]}

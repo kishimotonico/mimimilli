@@ -1,11 +1,12 @@
 // 未登録候補のタイトル・RJコード編集の安全性（TASK-428.19）。
-import { createElement } from "react";
+import { createElement, Fragment } from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { workspacePath, type ScanCandidate } from "@mimimilli/shared";
 import UnregisteredTab from "../../src/features/scan/ui/scanModal/UnregisteredTab";
+import GlobalToast from "../../src/app/ui/GlobalToast";
 import * as scanApi from "../../src/features/scan/api";
 import * as scanEntityApi from "../../src/entities/scan/api";
 import * as scanCandidatesCache from "../../src/entities/scan/scanCandidatesCache";
@@ -42,7 +43,18 @@ function renderTab(candidates: ScanCandidate[] = [candidateA, candidateB]) {
       createElement(
         JotaiProvider,
         { store },
-        createElement(UnregisteredTab, { candidates, onRegistered }),
+        createElement(
+          Fragment,
+          null,
+          createElement(UnregisteredTab, { candidates, onRegistered }),
+          // Toastは単一ホスト（GlobalToast）へ集約されているため（TASK-440）、UnregisteredTabの
+          // 表示要求を目に見える形で検証するにはGlobalToastも一緒に描画する必要がある。
+          createElement(GlobalToast, {
+            onOpenScan: () => {},
+            onOpenScanNeedsAttention: () => {},
+            onRetrySkippedTrack: () => {},
+          }),
+        ),
       ),
     ),
   );
