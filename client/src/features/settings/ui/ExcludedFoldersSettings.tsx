@@ -12,7 +12,7 @@ import {
 import { refreshScanCandidates } from "../../../entities/scan/scanCandidatesCache";
 import { scanCandidateHiddenPathsAtom } from "../../../entities/scan/model/atoms";
 import Button from "../../../shared/ui/Button";
-import Toast from "../../../shared/ui/Toast";
+import { useToast } from "../../../shared/ui/useToast";
 import { apiErrorMessage } from "../../../shared/lib/apiError";
 
 const SECTION_LABEL_CLASS =
@@ -22,7 +22,7 @@ export default function ExcludedFoldersSettings() {
   const queryClient = useQueryClient();
   const setHiddenPaths = useSetAtom(scanCandidateHiddenPathsAtom);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [restoredToast, setRestoredToast] = useState<string | null>(null);
+  const toast = useToast();
 
   const exclusionsQuery = useQuery({
     queryKey: SCAN_CANDIDATE_EXCLUSIONS_QUERY_KEY,
@@ -34,7 +34,11 @@ export default function ExcludedFoldersSettings() {
     mutationFn: (path: string) => restoreScanCandidateExclusions([path]),
     onSuccess: async (_void, path) => {
       setErrorMessage(null);
-      setRestoredToast(path);
+      toast.show({
+        message: `「${path}」を候補に戻しました`,
+        variant: "success",
+        priority: "action",
+      });
       setHiddenPaths((previous) => {
         if (!previous.has(path)) return previous;
         const next = new Set(previous);
@@ -87,12 +91,6 @@ export default function ExcludedFoldersSettings() {
           {errorMessage}
         </p>
       )}
-
-      <Toast
-        message={restoredToast ? `「${restoredToast}」を候補に戻しました` : null}
-        variant="success"
-        onDismiss={() => setRestoredToast(null)}
-      />
     </div>
   );
 }

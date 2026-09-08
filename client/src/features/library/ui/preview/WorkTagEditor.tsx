@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { normalizeTag } from "@mimimilli/shared";
 import type { NormalizedTag, Work } from "@mimimilli/shared";
 import { sortTagsForDisplay } from "../../../../entities/work/sortTagsForDisplay";
@@ -7,7 +7,7 @@ import { I } from "../../../../shared/ui/Icon";
 import ConfirmDialog from "../../../../shared/ui/ConfirmDialog";
 import IconButton from "../../../../shared/ui/IconButton";
 import TagCombobox from "../../../../shared/ui/TagCombobox";
-import Toast from "../../../../shared/ui/Toast";
+import { useToast } from "../../../../shared/ui/useToast";
 import { apiErrorMessage } from "../../../../shared/lib/apiError";
 import { canPatchWorkSource } from "../../../../entities/work/sourceRevision";
 import type { LibraryTagsPatchMutation } from "../../model/useLibraryQueries";
@@ -111,6 +111,37 @@ export function WorkTagEditor({
     ? apiErrorMessage(patchTagsError, "タグを保存できませんでした。")
     : null;
 
+  const { show: showToast, dismiss: dismissToast } = useToast();
+  useEffect(() => {
+    if (patchTagsErrorMessage) {
+      showToast({
+        message: patchTagsErrorMessage,
+        variant: "error",
+        priority: "action",
+        onDismiss: resetPatchTagsError,
+      });
+    } else if (tagUndoToast) {
+      showToast({
+        message: `タグ「${tagUndoToast}」を削除しました`,
+        variant: "success",
+        actionLabel: "元に戻す",
+        onAction: () => void undoRemoveTag(),
+        priority: "action",
+        onDismiss: dismissTagUndoToast,
+      });
+    } else {
+      dismissToast();
+    }
+  }, [
+    patchTagsErrorMessage,
+    tagUndoToast,
+    undoRemoveTag,
+    dismissTagUndoToast,
+    resetPatchTagsError,
+    showToast,
+    dismissToast,
+  ]);
+
   return (
     <>
       <div className="mle-prv__tag-row">
@@ -207,15 +238,6 @@ export function WorkTagEditor({
           onCancel={cancelRemoveTag}
         />
       )}
-      <Toast
-        message={
-          patchTagsErrorMessage ?? (tagUndoToast ? `タグ「${tagUndoToast}」を削除しました` : null)
-        }
-        variant={patchTagsErrorMessage ? "error" : "success"}
-        actionLabel={patchTagsErrorMessage ? undefined : "元に戻す"}
-        onAction={patchTagsErrorMessage ? undefined : () => void undoRemoveTag()}
-        onDismiss={patchTagsErrorMessage ? resetPatchTagsError : dismissTagUndoToast}
-      />
     </>
   );
 }

@@ -1,5 +1,7 @@
 import { useAtomValue, useSetAtom } from "jotai";
+import { useCallback } from "react";
 import Toast from "../../shared/ui/Toast";
+import { toastRequestsAtom, type ToastRequest } from "../../shared/model/toastRequestsAtom";
 import { formatDlsiteBulkResult } from "../../features/dlsite/model/formatDlsiteBulkResult";
 import { formatScanResult } from "../../features/scan/model/formatScanResult";
 import {
@@ -61,6 +63,32 @@ export default function GlobalToast({
   const { dismiss: dismissDlsite } = useDlsiteBulkActions();
   const { openDialog: openDlsiteBulkApply, dismissResult: dismissDlsiteBulkApply } =
     useDlsiteBulkApplyActions();
+  const toastRequests = useAtomValue(toastRequestsAtom);
+  const setToastRequests = useSetAtom(toastRequestsAtom);
+
+  // 各呼び出し側（useToast）からの表示要求のうち、指定した優先度で最後に届いたものを1件選ぶ。
+  // 他の要求は表示せず破棄する（design-system.md「単一ホストの優先順位チェーン」）。
+  const pickToastRequest = (priority: ToastRequest["priority"]): [string, ToastRequest] | null => {
+    let picked: [string, ToastRequest] | null = null;
+    for (const entry of toastRequests) {
+      if (entry[1].priority === priority) picked = entry;
+    }
+    return picked;
+  };
+  const dismissToastRequest = useCallback(
+    (id: string, request: ToastRequest) => {
+      setToastRequests((current) => {
+        if (!current.has(id)) return current;
+        const next = new Map(current);
+        next.delete(id);
+        return next;
+      });
+      request.onDismiss?.();
+    },
+    [setToastRequests],
+  );
+  const actionRequestEntry = pickToastRequest("action");
+  const backgroundRequestEntry = pickToastRequest("background");
 
   if (scanError) {
     return <Toast message={scanError} variant="error" onDismiss={clearScanError} />;
@@ -103,6 +131,19 @@ export default function GlobalToast({
 
   if (errorToast) {
     return <Toast message={errorToast} variant="error" onDismiss={() => setErrorToast(null)} />;
+  }
+
+  if (actionRequestEntry) {
+    const [id, request] = actionRequestEntry;
+    return (
+      <Toast
+        message={request.message}
+        variant={request.variant}
+        actionLabel={request.actionLabel}
+        onAction={request.onAction}
+        onDismiss={() => dismissToastRequest(id, request)}
+      />
+    );
   }
 
   if (rootFolderChangedToast) {
@@ -200,6 +241,19 @@ export default function GlobalToast({
         actionLabel="未設定項目を適用"
         onAction={openDlsiteBulkApply}
         onDismiss={dismissDlsite}
+      />
+    );
+  }
+
+  if (backgroundRequestEntry) {
+    const [id, request] = backgroundRequestEntry;
+    return (
+      <Toast
+        message={request.message}
+        variant={request.variant}
+        actionLabel={request.actionLabel}
+        onAction={request.onAction}
+        onDismiss={() => dismissToastRequest(id, request)}
       />
     );
   }

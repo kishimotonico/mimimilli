@@ -17,7 +17,7 @@ import { tagPrefixColorToCss } from "../../../entities/work/tagPrefixColor";
 import { apiErrorMessage } from "../../../shared/lib/apiError";
 import ConfirmDialog from "../../../shared/ui/ConfirmDialog";
 import IconButton from "../../../shared/ui/IconButton";
-import Toast from "../../../shared/ui/Toast";
+import { useToast } from "../../../shared/ui/useToast";
 import { I } from "../../../shared/ui/Icon";
 
 const SECTION_LABEL_CLASS =
@@ -80,7 +80,7 @@ export default function TagPrefixSettings() {
   const [newLabel, setNewLabel] = useState("");
   const [newColor, setNewColor] = useState<TagPrefixColorKey | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const toast = useToast();
   const [editingPrefix, setEditingPrefix] = useState<string | null>(null);
   const [editingLabel, setEditingLabel] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<TagPrefix | null>(null);
@@ -110,7 +110,11 @@ export default function TagPrefixSettings() {
       setNewPrefix("");
       setNewLabel("");
       setNewColor(null);
-      setToast(`prefix「${created.label}」を追加しました`);
+      toast.show({
+        message: `prefix「${created.label}」を追加しました`,
+        variant: "info",
+        priority: "action",
+      });
       await invalidate();
     },
     onError: (e) => setError(apiErrorMessage(e, "prefix を追加できませんでした")),
@@ -146,7 +150,11 @@ export default function TagPrefixSettings() {
     mutationFn: (prefix: string) => deleteTagPrefix(prefix),
     onSuccess: async (_void, prefix) => {
       setError(null);
-      setToast(`prefix「${prefix}」を削除しました`);
+      toast.show({
+        message: `prefix「${prefix}」を削除しました`,
+        variant: "info",
+        priority: "action",
+      });
       await invalidate();
     },
     onError: (e) => setError(apiErrorMessage(e, "prefix を削除できませんでした")),
@@ -376,8 +384,6 @@ export default function TagPrefixSettings() {
           }}
         />
       )}
-
-      <Toast message={toast} onDismiss={() => setToast(null)} />
     </div>
   );
 }
