@@ -1,10 +1,10 @@
 ---
 id: TASK-433
 title: smokeのポート導出がNodeのforbidden portに当たり得る問題を直す
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-07 15:46'
-updated_date: '2026-09-08 00:51'
+updated_date: '2026-09-08 00:57'
 labels:
   - test
   - smoke
