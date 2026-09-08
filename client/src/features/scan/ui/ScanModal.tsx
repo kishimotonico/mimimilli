@@ -6,7 +6,7 @@ import { useDialogModal } from "../../../shared/ui/useDialogModal";
 import { cn } from "../../../shared/lib/cn";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
-import Toast from "../../../shared/ui/Toast";
+import { useToast } from "../../../shared/ui/useToast";
 import {
   scanModalOpenAtom,
   scanningAtom,
@@ -57,8 +57,7 @@ export default function ScanModal({
     setScanModalOpen(true);
     return () => setScanModalOpen(false);
   }, [setScanModalOpen]);
-  const [unregisteredToast, setUnregisteredToast] = useState<string | null>(null);
-  const [unregisteredToastFailed, setUnregisteredToastFailed] = useState(false);
+  const toast = useToast();
   // 候補承認で登録された作品ID（このモーダル表示中に蓄積、TASK-325の分離を踏まえクライアント側で
   // 集約する）。insertedWorkIds（スキャン時点の自動登録分）とは別経路のため、ここで結合する。
   const [approvedWorkIds, setApprovedWorkIds] = useState<string[]>([]);
@@ -70,12 +69,16 @@ export default function ScanModal({
   }: CandidatesRegisteredResult) => {
     // 承認分、先頭＝直近。
     setApprovedWorkIds((previous) => dedupeIds(registeredWorkIds, previous));
-    setUnregisteredToastFailed(failedCount > 0);
-    setUnregisteredToast(
-      failedCount > 0
-        ? `${registeredWorkIds.length}件をライブラリに追加しました。${failedCount}件は追加できませんでした。`
-        : `${registeredWorkIds.length}件をライブラリに追加しました`,
-    );
+    toast.show({
+      message:
+        failedCount > 0
+          ? `${registeredWorkIds.length}件をライブラリに追加しました。${failedCount}件は追加できませんでした。`
+          : `${registeredWorkIds.length}件をライブラリに追加しました`,
+      variant: failedCount > 0 ? "warning" : "success",
+      actionLabel: "新規登録済みを見る",
+      onAction: () => setActiveTab("newlyRegistered"),
+      priority: "action",
+    });
     if (remainingCount === 0) setActiveTab("newlyRegistered");
   };
 
@@ -216,13 +219,6 @@ export default function ScanModal({
           onStart={() => void start()}
         />
       </div>
-      <Toast
-        message={unregisteredToast}
-        variant={unregisteredToastFailed ? "warning" : "success"}
-        actionLabel="新規登録済みを見る"
-        onAction={() => setActiveTab("newlyRegistered")}
-        onDismiss={() => setUnregisteredToast(null)}
-      />
     </dialog>
   );
 }

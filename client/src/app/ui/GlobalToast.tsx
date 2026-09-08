@@ -1,5 +1,7 @@
 import { useAtomValue, useSetAtom } from "jotai";
+import { useCallback, useLayoutEffect } from "react";
 import Toast from "../../shared/ui/Toast";
+import { toastRequestsAtom, type ToastRequest } from "../../shared/model/toastRequestsAtom";
 import { formatDlsiteBulkResult } from "../../features/dlsite/model/formatDlsiteBulkResult";
 import { formatScanResult } from "../../features/scan/model/formatScanResult";
 import {
@@ -61,9 +63,93 @@ export default function GlobalToast({
   const { dismiss: dismissDlsite } = useDlsiteBulkActions();
   const { openDialog: openDlsiteBulkApply, dismissResult: dismissDlsiteBulkApply } =
     useDlsiteBulkApplyActions();
+  const toastRequests = useAtomValue(toastRequestsAtom);
+  const setToastRequests = useSetAtom(toastRequestsAtom);
+
+  // 各呼び出し側（useToast）からの表示要求のうち、指定した優先度で最後に登録されたid
+  // （Mapの挿入順で最後のエントリ）を1件選ぶ。他の要求は表示せず破棄する
+  // （design-system.md「単一ホストの優先順位チェーン」）。
+  const pickToastRequest = (priority: ToastRequest["priority"]): [string, ToastRequest] | null => {
+    let picked: [string, ToastRequest] | null = null;
+    for (const entry of toastRequests) {
+      if (entry[1].priority === priority) picked = entry;
+    }
+    return picked;
+  };
+  const dismissToastRequest = useCallback(
+    (id: string, request: ToastRequest) => {
+      setToastRequests((current) => {
+        if (!current.has(id)) return current;
+        const next = new Map(current);
+        next.delete(id);
+        return next;
+      });
+      request.onDismiss?.();
+    },
+    [setToastRequests],
+  );
+  const actionRequestEntry = pickToastRequest("action");
+  const backgroundRequestEntry = pickToastRequest("background");
+
+  // 優先順位チェーン（error > action要求 > 個別グローバル通知 > background要求）で今回
+  // 実際に表示される1件のIDを求める。それ以外の要求はキューに積まず即座に破棄する
+  // （design-system.md）。「表示されて初めて寿命が動く」構造はそのままに、表示されない
+  // 要求を待機状態のまま残さない。
+  const higherThanActionActive = Boolean(scanError || errorToast || dlsiteError);
+  const higherThanBackgroundActive =
+    higherThanActionActive ||
+    Boolean(actionRequestEntry) ||
+    Boolean(scanResultToast) ||
+    Boolean(rootFolderChangedToast) ||
+    Boolean(playerSkipToast) ||
+    Boolean(libraryInvalidUrlToast) ||
+    Boolean(workDeleteSuccess) ||
+    Boolean(dlsiteApplyToast) ||
+    Boolean(copyPathSuccess) ||
+    Boolean(dlsiteBulkApplyResult) ||
+    Boolean(dlsiteCancelledResult) ||
+    Boolean(dlsiteResult);
+  const renderedRequestId =
+    !higherThanActionActive && actionRequestEntry
+      ? actionRequestEntry[0]
+      : !higherThanBackgroundActive && backgroundRequestEntry
+        ? backgroundRequestEntry[0]
+        : null;
+
+  useLayoutEffect(() => {
+    const discarded = [...toastRequests].filter(([id]) => id !== renderedRequestId);
+    if (discarded.length === 0) return;
+    setToastRequests((current) => {
+      const next = new Map(current);
+      for (const [id] of discarded) next.delete(id);
+      return next;
+    });
+    for (const [, request] of discarded) request.onDismiss?.();
+  }, [toastRequests, renderedRequestId, setToastRequests]);
 
   if (scanError) {
     return <Toast message={scanError} variant="error" onDismiss={clearScanError} />;
+  }
+
+  if (errorToast) {
+    return <Toast message={errorToast} variant="error" onDismiss={() => setErrorToast(null)} />;
+  }
+
+  if (dlsiteError) {
+    return <Toast message={dlsiteError} variant="error" onDismiss={dismissDlsite} />;
+  }
+
+  if (actionRequestEntry) {
+    const [id, request] = actionRequestEntry;
+    return (
+      <Toast
+        message={request.message}
+        variant={request.variant}
+        actionLabel={request.actionLabel}
+        onAction={request.onAction}
+        onDismiss={() => dismissToastRequest(id, request)}
+      />
+    );
   }
 
   if (scanResultToast) {
@@ -99,10 +185,6 @@ export default function GlobalToast({
         onDismiss={dismissScanResultToast}
       />
     );
-  }
-
-  if (errorToast) {
-    return <Toast message={errorToast} variant="error" onDismiss={() => setErrorToast(null)} />;
   }
 
   if (rootFolderChangedToast) {
@@ -204,8 +286,17 @@ export default function GlobalToast({
     );
   }
 
-  if (dlsiteError) {
-    return <Toast message={dlsiteError} variant="error" onDismiss={dismissDlsite} />;
+  if (backgroundRequestEntry) {
+    const [id, request] = backgroundRequestEntry;
+    return (
+      <Toast
+        message={request.message}
+        variant={request.variant}
+        actionLabel={request.actionLabel}
+        onAction={request.onAction}
+        onDismiss={() => dismissToastRequest(id, request)}
+      />
+    );
   }
 
   return <Toast message={null} onDismiss={dismissDlsite} />;

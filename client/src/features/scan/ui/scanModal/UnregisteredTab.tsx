@@ -10,7 +10,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { hasRjCode, rjCodeFormatSchema, type ScanCandidate } from "@mimimilli/shared";
 import Button from "../../../../shared/ui/Button";
 import IconButton from "../../../../shared/ui/IconButton";
-import Toast from "../../../../shared/ui/Toast";
+import { useToast } from "../../../../shared/ui/useToast";
 import { I } from "../../../../shared/ui/Icon";
 import { cn } from "../../../../shared/lib/cn";
 import { ApiRequestError } from "../../../../shared/api/http";
@@ -26,11 +26,6 @@ import type { CandidatesRegisteredResult } from "./types";
 export interface UnregisteredTabProps {
   candidates: ScanCandidate[];
   onRegistered: (result: CandidatesRegisteredResult) => void;
-}
-
-interface ExcludeToast {
-  path: string;
-  title: string;
 }
 
 type EditingFieldKind = "title" | "rjCode";
@@ -62,7 +57,7 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
   const [editingField, setEditingField] = useState<EditingField | null>(null);
   const [editingValue, setEditingValue] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [excludeToast, setExcludeToast] = useState<ExcludeToast | null>(null);
+  const toast = useToast();
   const headerCheckboxRef = useRef<HTMLInputElement>(null);
   const editingInputRef = useRef<HTMLInputElement>(null);
 
@@ -125,7 +120,14 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
     mutationFn: (candidate: ScanCandidate) => excludeScanCandidates([candidate.path]),
     onSuccess: async (_void, candidate) => {
       setHiddenPaths((previous) => new Set(previous).add(candidate.path));
-      setExcludeToast({ path: candidate.path, title: effectiveTitle(candidate) });
+      const title = effectiveTitle(candidate);
+      toast.show({
+        message: `「${title}」を候補から外しました`,
+        variant: "success",
+        actionLabel: "元に戻す",
+        onAction: () => restoreMutation.mutate(candidate.path),
+        priority: "action",
+      });
       await queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.candidateExclusions() });
     },
     onError: (error) => setErrorMessage(apiErrorMessage(error, "候補から外せませんでした")),
@@ -134,7 +136,7 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
   const restoreMutation = useMutation({
     mutationFn: (path: string) => restoreScanCandidateExclusions([path]),
     onSuccess: async (_void, path) => {
-      setExcludeToast(null);
+      toast.dismiss();
       setHiddenPaths((previous) => {
         if (!previous.has(path)) return previous;
         const next = new Set(previous);
@@ -469,13 +471,6 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
           {errorMessage}
         </p>
       )}
-      <Toast
-        message={excludeToast ? `「${excludeToast.title}」を候補から外しました` : null}
-        variant="success"
-        actionLabel="元に戻す"
-        onAction={() => excludeToast && restoreMutation.mutate(excludeToast.path)}
-        onDismiss={() => setExcludeToast(null)}
-      />
     </div>
   );
 }

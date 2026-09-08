@@ -1,4 +1,4 @@
-import { createElement, Fragment } from "react";
+import { createElement, Fragment, type ReactNode } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -6,6 +6,29 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { DlsiteBulkResult, ScanResult } from "@mimimilli/shared";
 import GlobalToast from "../../src/app/ui/GlobalToast";
 import DlsiteBulkApplyRuntime from "../../src/features/dlsite/ui/DlsiteBulkApplyRuntime";
+import { useToast } from "../../src/shared/ui/useToast";
+import type { ToastPriority } from "../../src/shared/model/toastRequestsAtom";
+
+/** useToastの表示要求を任意のタイミングで発火するテスト用ハーネス */
+function ToastRequester({
+  priority,
+  message,
+  onDismiss,
+}: {
+  priority: ToastPriority;
+  message: string;
+  onDismiss: () => void;
+}) {
+  const toast = useToast();
+  return (
+    <button
+      type="button"
+      onClick={() => toast.show({ message, variant: "success", priority, onDismiss })}
+    >
+      要求を出す
+    </button>
+  );
+}
 
 const previewDlsiteMissing = vi.fn();
 
@@ -37,6 +60,7 @@ function renderGlobalToast(
   onOpenScan = vi.fn(),
   onOpenScanNeedsAttention = vi.fn(),
   onRetrySkippedTrack = vi.fn(),
+  extraChildren?: ReactNode,
 ) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -46,9 +70,13 @@ function renderGlobalToast(
     onOpenScanNeedsAttention,
     onRetrySkippedTrack,
   });
-  const children = withApplyRuntime
-    ? createElement(Fragment, null, toast, createElement(DlsiteBulkApplyRuntime))
-    : toast;
+  const children = createElement(
+    Fragment,
+    null,
+    toast,
+    withApplyRuntime ? createElement(DlsiteBulkApplyRuntime) : null,
+    extraChildren,
+  );
 
   render(
     createElement(
@@ -222,6 +250,99 @@ describe("GlobalToast", () => {
       renderGlobalToast(store);
 
       expect(screen.getByText("スキャンを中止しました")).toBeTruthy();
+    });
+  });
+
+  describe("useToast要求の優先順位（TASK-440）", () => {
+    it("上位（error）が表示中にaction要求を出すと、描画されずonDismissが同期的に呼ばれる", () => {
+      const store = createStore();
+      store.set(errorToastAtom, "既存のエラー");
+      const onDismiss = vi.fn();
+
+      renderGlobalToast(
+        store,
+        false,
+        vi.fn(),
+        vi.fn(),
+        vi.fn(),
+        <ToastRequester priority="action" message="候補から外しました" onDismiss={onDismiss} />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "要求を出す" }));
+
+      expect(screen.queryByText("候補から外しました")).toBeNull();
+      expect(onDismiss).toHaveBeenCalledTimes(1);
+    });
+
+    it("上位（error）が消えた後も、破棄済みのaction要求は現れない", () => {
+      const store = createStore();
+      store.set(errorToastAtom, "既存のエラー");
+      const onDismiss = vi.fn();
+
+      renderGlobalToast(
+        store,
+        false,
+        vi.fn(),
+        vi.fn(),
+        vi.fn(),
+        <ToastRequester priority="action" message="候補から外しました" onDismiss={onDismiss} />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "要求を出す" }));
+      expect(onDismiss).toHaveBeenCalledTimes(1);
+
+      store.set(errorToastAtom, null);
+
+      expect(screen.queryByText("候補から外しました")).toBeNull();
+    });
+  });
+
+  // design-system.md「単一ホストの優先順位チェーン」の契約
+  // （error > action要求 > 個別グローバル通知 > background要求）そのものを固定する。
+  // 網羅はしない（AGENTS.md「テストは網羅性より実行速度」）。今回if連鎖の並びが
+  // 契約と食い違っていた境界（TASK-440レビュー指摘）だけを対象にする。
+  describe("優先順位チェーンの契約（docs/design-system.md）", () => {
+    it("errorToast（1: error）はaction要求（2）より優先される", () => {
+      const store = createStore();
+      store.set(errorToastAtom, "既存のエラー");
+      const onDismiss = vi.fn();
+
+      renderGlobalToast(
+        store,
+        false,
+        vi.fn(),
+        vi.fn(),
+        vi.fn(),
+        <ToastRequester priority="action" message="候補から外しました" onDismiss={onDismiss} />,
+      );
+      fireEvent.click(screen.getByRole("button", { name: "要求を出す" }));
+
+      expect(screen.getByText("既存のエラー")).toBeTruthy();
+      expect(screen.queryByText("候補から外しました")).toBeNull();
+    });
+
+    it("dlsiteError（1: error）はscanResultToast（3: 個別グローバル通知）より優先される", () => {
+      const scanResult: ScanResult = {
+        registered: 12,
+        insertedWorkIds: ["a", "b"],
+        updatedWorkIds: [],
+        errors: 0,
+        missing: 0,
+        rjCodeMissingCount: 0,
+        skipped: 0,
+        coverErrors: 0,
+        identityConflicts: [],
+        invalidMetaFiles: [],
+        candidates: [],
+      };
+      const store = createStore();
+      store.set(dlsiteBulkErrorAtom, "一括取得に失敗しました");
+      store.set(scanResultToastAtom, { kind: "completed", result: scanResult });
+
+      renderGlobalToast(store);
+
+      expect(screen.getByText("一括取得に失敗しました")).toBeTruthy();
+      expect(screen.queryByText(/^スキャン完了:/)).toBeNull();
     });
   });
 });

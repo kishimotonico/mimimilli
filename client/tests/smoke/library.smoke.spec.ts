@@ -300,6 +300,13 @@ test("未登録タブでRJコードを編集でき、候補を1件ずつ除外�
   await rjInput.press("Enter");
   await expect(editRow.getByRole("button", { name: "RJ999999" })).toBeVisible();
 
+  // スキャンでの新規登録に連動してDLsite一括取得が自動開始する（server/src/app.ts）。
+  // 除外操作（action優先度のトースト）がジョブ結果（background優先度のトースト）に
+  // 割り込まれず勝つことを検証するため、先にbackground側が実際に表示されていることを
+  // 確定させてから除外操作に進む。タイミングに依存せず衝突を毎回発生させて検証する
+  // （TASK-440: 単体実行時にのみ再現していた表示位置の衝突の回帰防止）。
+  await expect(dialog.getByText(/^DLsite一括取得:/)).toBeVisible();
+
   const excludeRowName = /^「候補」を選択/;
   const excludeRow = unregistered.getByRole("row", { name: excludeRowName });
   await excludeRow.getByRole("button", { name: "「候補」を候補から外す" }).click();

@@ -63,41 +63,44 @@ function writeSampleMeta(metaPath: string): Buffer {
   return bytes;
 }
 
+async function createWorkerPair(): Promise<[Worker, Worker]> {
+  const workers: [Worker, Worker] = [
+    new Worker(new URL("./metaCasRaceWorker.ts", import.meta.url), { type: "module" }),
+    new Worker(new URL("./metaCasRaceWorker.ts", import.meta.url), { type: "module" }),
+  ];
+  await Promise.all(workers.map((worker) => waitForWorkerMessage(worker, "ready", "start")));
+  return workers;
+}
+
+/**
+ * worker起動（~100ms/対）は並行書き込みの検証と無関係なオーバーヘッドなので、
+ * 呼び出し側でworkerを使い回し、反復のたびに作り直さない。
+ */
 async function runConcurrentPatches(
+  workers: [Worker, Worker],
   metaPath: string,
   expectedSourceRevision: string,
 ): Promise<[WorkerDone, WorkerDone]> {
   const gate = new SharedArrayBuffer(8);
   const flags = new Int32Array(gate);
-  const workers = [0, 1].map(
-    () =>
-      new Worker(new URL("./metaCasRaceWorker.ts", import.meta.url), {
-        type: "module",
-      }),
+  const done = workers.map((worker) =>
+    waitForWorkerMessage<WorkerDone & { type: "done" }>(worker, "done", "patch"),
   );
-  try {
-    await Promise.all(workers.map((worker) => waitForWorkerMessage(worker, "ready", "start")));
-    const done = workers.map((worker) =>
-      waitForWorkerMessage<WorkerDone & { type: "done" }>(worker, "done", "patch"),
-    );
-    const inputs: MetaCasRaceInput[] = [
-      { metaPath, expectedSourceRevision, patch: TITLE_PATCH, gate },
-      { metaPath, expectedSourceRevision, patch: TAGS_PATCH, gate },
-    ];
-    for (const [index, worker] of workers.entries()) {
-      worker.postMessage({ type: "run", input: inputs[index] });
-    }
-    while (Atomics.load(flags, 1) < 2) {
-      Atomics.wait(flags, 1, Atomics.load(flags, 1), 100);
-    }
-    Atomics.store(flags, 0, 1);
-    Atomics.notify(flags, 0, 2);
-    const results = await Promise.all(done);
-    assert.equal(results.length, 2);
-    return [results[0]!, results[1]!];
-  } finally {
-    for (const worker of workers) worker.terminate();
+  const inputs: MetaCasRaceInput[] = [
+    { metaPath, expectedSourceRevision, patch: TITLE_PATCH, gate },
+    { metaPath, expectedSourceRevision, patch: TAGS_PATCH, gate },
+  ];
+  for (const [index, worker] of workers.entries()) {
+    worker.postMessage({ type: "run", input: inputs[index] });
   }
+  while (Atomics.load(flags, 1) < 2) {
+    Atomics.wait(flags, 1, Atomics.load(flags, 1), 100);
+  }
+  Atomics.store(flags, 0, 1);
+  Atomics.notify(flags, 0, 2);
+  const results = await Promise.all(done);
+  assert.equal(results.length, 2);
+  return [results[0]!, results[1]!];
 }
 
 function assertSingleCompleteWrite(metaPath: string, results: [WorkerDone, WorkerDone]): void {
@@ -136,10 +139,15 @@ test("CASとrenameの間に並行書き込みがあっても後勝ち消失し�
   mkdirSync(workDir);
   const metaPath = join(workDir, "mimimilli.json");
 
+  const workers = await createWorkerPair();
+  t.after(() => {
+    for (const worker of workers) worker.terminate();
+  });
+
   await withCasDelay(30, async () => {
     for (let i = 0; i < 10; i++) {
       const bytes = writeSampleMeta(metaPath);
-      const results = await runConcurrentPatches(metaPath, sourceRevision(bytes));
+      const results = await runConcurrentPatches(workers, metaPath, sourceRevision(bytes));
       assertSingleCompleteWrite(metaPath, results);
     }
   });
@@ -147,7 +155,7 @@ test("CASとrenameの間に並行書き込みがあっても後勝ち消失し�
   await withCasDelay(0, async () => {
     for (let i = 0; i < 20; i++) {
       const bytes = writeSampleMeta(metaPath);
-      const results = await runConcurrentPatches(metaPath, sourceRevision(bytes));
+      const results = await runConcurrentPatches(workers, metaPath, sourceRevision(bytes));
       assertSingleCompleteWrite(metaPath, results);
     }
   });

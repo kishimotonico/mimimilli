@@ -5,7 +5,7 @@ import { isHttpAbsoluteUrl } from "@mimimilli/shared";
 import Button from "../../../../shared/ui/Button";
 import IconButton from "../../../../shared/ui/IconButton";
 import { I } from "../../../../shared/ui/Icon";
-import Toast from "../../../../shared/ui/Toast";
+import { useToast } from "../../../../shared/ui/useToast";
 import { useDialogModal } from "../../../../shared/ui/useDialogModal";
 import type { useLibraryWorkPatchMutations } from "../../model/useLibraryQueries";
 import { apiErrorMessage } from "../../../../shared/lib/apiError";
@@ -235,6 +235,28 @@ export function WorkEditDialog({
     ? apiErrorMessage(urlsMutation.error, "関連URLを保存できませんでした。")
     : null;
 
+  const { show: showToast, dismiss: dismissToast } = useToast();
+  useEffect(() => {
+    const message = titleError ?? urlsMutationError;
+    if (!message) {
+      dismissToast();
+      return;
+    }
+    showToast({
+      message,
+      variant: "error",
+      priority: "action",
+      onDismiss: titleError ? titleMutation.reset : urlsMutation.reset,
+    });
+  }, [
+    titleError,
+    urlsMutationError,
+    titleMutation.reset,
+    urlsMutation.reset,
+    showToast,
+    dismissToast,
+  ]);
+
   return (
     <>
       {/* oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- backdropクリックはuseDialogModalで判定する。 */}
@@ -392,11 +414,6 @@ export function WorkEditDialog({
             </Button>
           </footer>
         </div>
-        <Toast
-          message={titleError ?? urlsMutationError}
-          variant="error"
-          onDismiss={titleError ? titleMutation.reset : urlsMutation.reset}
-        />
       </dialog>
       {isUnsavedPromptOpen && (
         <UnsavedChangesPrompt
