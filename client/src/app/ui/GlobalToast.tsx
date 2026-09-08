@@ -1,5 +1,5 @@
 import { useAtomValue, useSetAtom } from "jotai";
-import { useCallback } from "react";
+import { useCallback, useLayoutEffect } from "react";
 import Toast from "../../shared/ui/Toast";
 import { toastRequestsAtom, type ToastRequest } from "../../shared/model/toastRequestsAtom";
 import { formatDlsiteBulkResult } from "../../features/dlsite/model/formatDlsiteBulkResult";
@@ -89,6 +89,41 @@ export default function GlobalToast({
   );
   const actionRequestEntry = pickToastRequest("action");
   const backgroundRequestEntry = pickToastRequest("background");
+
+  // 優先順位チェーン（error > action要求 > 個別グローバル通知 > background要求）で今回
+  // 実際に表示される1件のIDを求める。それ以外の要求はキューに積まず即座に破棄する
+  // （design-system.md）。「表示されて初めて寿命が動く」構造はそのままに、表示されない
+  // 要求を待機状態のまま残さない。
+  const higherThanActionActive = Boolean(scanError || scanResultToast || errorToast);
+  const higherThanBackgroundActive =
+    higherThanActionActive ||
+    Boolean(actionRequestEntry) ||
+    Boolean(rootFolderChangedToast) ||
+    Boolean(playerSkipToast) ||
+    Boolean(libraryInvalidUrlToast) ||
+    Boolean(workDeleteSuccess) ||
+    Boolean(dlsiteApplyToast) ||
+    Boolean(copyPathSuccess) ||
+    Boolean(dlsiteBulkApplyResult) ||
+    Boolean(dlsiteCancelledResult) ||
+    Boolean(dlsiteResult);
+  const renderedRequestId =
+    !higherThanActionActive && actionRequestEntry
+      ? actionRequestEntry[0]
+      : !higherThanBackgroundActive && backgroundRequestEntry
+        ? backgroundRequestEntry[0]
+        : null;
+
+  useLayoutEffect(() => {
+    const discarded = [...toastRequests].filter(([id]) => id !== renderedRequestId);
+    if (discarded.length === 0) return;
+    setToastRequests((current) => {
+      const next = new Map(current);
+      for (const [id] of discarded) next.delete(id);
+      return next;
+    });
+    for (const [, request] of discarded) request.onDismiss?.();
+  }, [toastRequests, renderedRequestId, setToastRequests]);
 
   if (scanError) {
     return <Toast message={scanError} variant="error" onDismiss={clearScanError} />;

@@ -4,8 +4,10 @@ import type { ToastVariant } from "../ui/Toast";
 /**
  * "action": ユーザーが直前に行った操作の直接の結果（元に戻す・完了フィードバック等）。
  * "background": スキャン・DLsite一括取得等の非同期ジョブの結果通知。
- * 同時に両方が要求されたら action が勝つ。負けた background は表示されず破棄する
- * （別の場所から辿れることが前提。design-system.md参照）。
+ * 優先順位（error > action > 個別グローバル通知 > background）で選ばれなかった要求は
+ * キューに積まず即座に破棄する（design-system.md「単一ホストの優先順位チェーン」）。
+ * 負けた情報は別の場所から辿れることが前提（AC参照）。破棄された要求も表示されて
+ * 消えた要求と同じく onDismiss が呼ばれる。
  */
 export type ToastPriority = "action" | "background";
 
@@ -14,7 +16,8 @@ export interface ToastRequest {
   variant: ToastVariant;
   actionLabel?: string;
   onAction?: () => void;
-  /** GlobalToastがこの要求を手放す（手動close・自動消滅）ときに呼ぶ。呼び出し側の状態をここで消す */
+  /** GlobalToastがこの要求を手放す（表示後の手動close・自動消滅、または表示されないままの
+   *  即時破棄）ときに呼ぶ。呼び出し側の状態をここで消す */
   onDismiss?: () => void;
   priority: ToastPriority;
 }
