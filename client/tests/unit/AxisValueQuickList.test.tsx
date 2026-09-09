@@ -76,6 +76,32 @@ describe("AxisValueQuickList のキーボード移動", () => {
     sizeMock.restore();
   });
 
+  it("矢印キーによる値行間のフォーカス移動もpreventScroll:trueで祖先を自動スクロールしない（TASK-439）", async () => {
+    const sizeMock = mockElementSize(260, 260);
+    const user = userEvent.setup();
+    renderQuickList({ items: makeItems(3) });
+    await flushVirtualizer();
+
+    const input = screen.getByPlaceholderText("CVを検索");
+    input.focus();
+    const focusSpy = vi.spyOn(HTMLElement.prototype, "focus");
+    await user.keyboard("{ArrowDown}");
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(focusSpy).toHaveBeenLastCalledWith({ preventScroll: true });
+
+    focusSpy.mockClear();
+    await user.keyboard("{ArrowDown}");
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(focusSpy).toHaveBeenLastCalledWith({ preventScroll: true });
+
+    focusSpy.mockRestore();
+    sizeMock.restore();
+  });
+
   it("検索欄からArrowDownで最初の値行にフォーカスする", async () => {
     const sizeMock = mockElementSize(260, 260);
     const user = userEvent.setup();

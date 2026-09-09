@@ -176,7 +176,7 @@ export default function AxisValueQuickList({
       requestAnimationFrame(() => {
         scrollRef.current
           ?.querySelector<HTMLElement>(`[data-index="${index}"] [data-quicklist-item]`)
-          ?.focus();
+          ?.focus({ preventScroll: true });
       });
     });
   };
