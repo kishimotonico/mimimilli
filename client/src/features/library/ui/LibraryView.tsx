@@ -292,6 +292,7 @@ export default function LibraryView({
         <FilterChipBand
           tagPrefixes={tagPrefixes}
           selectedTags={nav.selectedTags}
+          smartFolderId={activeSmartFolder?.id}
           onReplace={nav.replaceTag}
           onToggle={nav.toggleTag}
           onAddTag={nav.addTag}

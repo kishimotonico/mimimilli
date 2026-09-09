@@ -26,6 +26,8 @@ const AND_ADD_HINT = getValueSelectionHint("add");
 interface FilterChipAddButtonProps {
   tagPrefixes: TagPrefix[];
   selectedTags: NormalizedTag[];
+  /** 表示中のスマートフォルダーID。候補件数をフォルダー条件適用後にする（TASK-432） */
+  smartFolderId?: string;
   onAddValue: (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
 }
 
@@ -74,6 +76,7 @@ function AxisPickerStage({
 export default function FilterChipAddButton({
   tagPrefixes,
   selectedTags,
+  smartFolderId,
   onAddValue,
 }: FilterChipAddButtonProps) {
   const [open, setOpen] = useState(false);
@@ -128,8 +131,9 @@ export default function FilterChipAddButton({
             setFloating={setFloating}
             selectedTags={selectedTags}
             // 既定=AND追加の入口（ADR-0013）。件数基準は現在の選択タグ込みの集計にする
-            // （「追加したら何件になるか」を示す。TASK-428.14。TASK-432でsmartFolder条件を追加予定）。
+            // （「追加したら何件になるか」を示す。TASK-428.14）
             countTags={selectedTags}
+            smartFolderId={smartFolderId}
             hint={AND_ADD_HINT}
             onSelect={(tag, opts) => {
               onAddValue(tag, opts);

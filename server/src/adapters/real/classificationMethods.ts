@@ -17,7 +17,11 @@ import { getCategoryLogger } from "../../lib/logger.ts";
 import { logDataIntegritySkips } from "./dataIntegrity.ts";
 import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";
-import { countSmartFolderRuleMatches, querySmartFolderWorks } from "./smartFolderWorks.ts";
+import {
+  countSmartFolderRuleMatches,
+  getSmartFolderAxisFacets,
+  querySmartFolderWorks,
+} from "./smartFolderWorks.ts";
 
 const scanLogger = getCategoryLogger("scan");
 const KEY_TAG_PREFIXES_SEEDED = "tag_prefixes_seeded";
@@ -37,6 +41,14 @@ export function createClassificationMethods(deps: {
   const { query, user, requireRoot } = deps;
   return {
     async getAxisFacets(axis: string, filter?: Partial<AxisFacetsQuery>): Promise<AxisFacetItem[]> {
+      if (filter?.smartFolder) {
+        const folder = user.getSmartFolder(filter.smartFolder);
+        // 表示中に削除される等で解決できない場合は、通常軸と同じ形（空配列）で返す。
+        // 個々の値の有無を判定するファセット集計にとって404化は過剰であり、
+        // 呼び出し側（結果面）は既にフォルダー解決不可を別経路で検知している。
+        if (!folder) return [];
+        return getSmartFolderAxisFacets(query, axis, folder, filter);
+      }
       return query.getAxisFacets(axis, filter);
     },
 

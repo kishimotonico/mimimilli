@@ -1,10 +1,13 @@
 import {
   EMPTY_TAG_FILTERS,
+  type AxisFacetItem,
+  type AxisFacetsQuery,
   type SmartFolder,
   type SmartFolderRule,
   type WorksPage,
 } from "@mimimilli/shared";
 import { evalSmartFolder, evalSmartFolderRules } from "../../core/smartFolder.ts";
+import { buildAxisFacets } from "../../core/axisFacets.ts";
 import { toWorksPage } from "../../core/worksQuery.ts";
 import type { SmartFolderEvalQuery } from "@mimimilli/shared";
 import { getCategoryLogger } from "../../lib/logger.ts";
@@ -54,4 +57,25 @@ export function countSmartFolderRuleMatches(
   const { summaries, skipped } = query.listSummaries([...candidateIds]);
   logDataIntegritySkips(smartFolderLogger, "smart-folder-preview", skipped);
   return evalSmartFolderRules(rules, summaries).length;
+}
+
+/** スマートフォルダー表示中の軸ファセット集計（GET /axes/:axis?smartFolder=<id>）。
+ *  フォルダー条件に一致する作品だけを対象に集計し、チップ選択タグとのANDは
+ *  buildAxisFacets（作品一覧・条件プレビューと同じ core 関数）に委ねる（TASK-432）。
+ *  ルール評価そのものは resolveSmartFolderCandidateIds によるSQL候補抽出と
+ *  evalSmartFolderRules による最終評価という、他の2経路と同じ2段構成を使う（ADR-0008）。 */
+export function getSmartFolderAxisFacets(
+  query: WorkQueryRepository,
+  axis: string,
+  folder: Pick<SmartFolder, "rules">,
+  filter: Partial<AxisFacetsQuery>,
+): AxisFacetItem[] {
+  if (folder.rules.length === 0) {
+    return query.getAxisFacets(axis, filter);
+  }
+  const candidateIds = query.resolveSmartFolderCandidateIds(folder.rules)!;
+  const { summaries, skipped } = query.listSummaries([...candidateIds]);
+  logDataIntegritySkips(smartFolderLogger, "smart-folder-axis-facets", skipped);
+  const matched = evalSmartFolderRules(folder.rules, summaries);
+  return buildAxisFacets(axis, matched, filter);
 }

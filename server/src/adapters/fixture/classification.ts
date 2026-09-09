@@ -22,6 +22,12 @@ import type { FixtureState } from "./state.ts";
 export function createClassificationMethods(state: FixtureState): ClassificationAdapter {
   return {
     async getAxisFacets(axis: string, filter?: Partial<AxisFacetsQuery>): Promise<AxisFacetItem[]> {
+      if (filter?.smartFolder) {
+        const folder = state.smartFolders.find((f) => f.id === filter.smartFolder);
+        if (!folder) return [];
+        const matched = evalSmartFolderRules(folder.rules, state.works);
+        return buildAxisFacets(axis, matched, filter);
+      }
       return buildAxisFacets(axis, state.works, filter);
     },
 
