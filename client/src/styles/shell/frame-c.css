@@ -172,9 +172,7 @@
   min-width: 0;
   border-right: none;
 }
-/* 通常時は結果面の実レイアウトに参加する（絶対配置で一覧に重ねない）。基準420px・
-   伸びない・prv最低幅までは縮む。一覧側の min-width（.mll-results__content）と
-   合わせて「一覧が読める幅を割るまではプレビューだけが縮む」順序になる。 */
+/* 通常時は結果面の実レイアウトに参加するflex項目（絶対配置で一覧に重ねない）。 */
 .mll-results__preview {
   position: relative;
   flex: 0 1 420px;
@@ -184,8 +182,7 @@
   box-shadow: var(--shadow-pop);
   border-left: 1px solid var(--line-soft);
 }
-/* 一覧最低幅とプレビュー最低幅の両方を確保できない幅（usePreviewOverlayMode）では、
-   プレビューを結果面上の全幅オーバーレイへ切り替える。 */
+/* 一覧最低幅とプレビュー最低幅の両方を確保できない幅では全幅オーバーレイになる。 */
 .mll-results--overlay .mll-results__preview {
   position: absolute;
   inset: 0;
@@ -200,8 +197,7 @@
 .mle-app.has-docked-popup .mll-results--overlay .mll-results__preview {
   bottom: calc(var(--popup-h, 0px) + 24px);
 }
-/* 非オーバーレイ時は結果面の実レイアウトに参加するflex項目なので、bottomではなく
-   padding-bottomで同じ縮小を行う（.mll-results__content と同じ考え方）。 */
+/* 非オーバーレイ時はflex項目なので、bottomではなくpadding-bottomで同じ縮小を行う。 */
 .mle-app.has-docked-popup .mll-results:not(.mll-results--overlay) .mll-results__preview {
   padding-bottom: calc(var(--popup-h, 0px) + 24px);
 }
