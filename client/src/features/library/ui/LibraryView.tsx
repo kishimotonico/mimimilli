@@ -23,6 +23,7 @@ import {
   playingWorkIdAtom,
 } from "../../../entities/player/model/atoms";
 import { useLibraryNavigation } from "../model/useLibraryNavigation";
+import { usePreviewOverlayMode } from "../model/usePreviewOverlayMode";
 import {
   useLibraryBulkUnregisterMissingMutation,
   useLibraryDebouncedSearchQuery,
@@ -58,6 +59,7 @@ import { DataIntegrityWarningBanner } from "./DataIntegrityWarningBanner";
 import { ErrorViewBulkUnregisterBanner } from "./ErrorViewBulkUnregisterBanner";
 import LibraryWorksBoundary from "./LibraryWorksBoundary";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
+import { cn } from "../../../shared/lib/cn";
 
 interface LibraryViewProps {
   onPlay: (work: WorkListItem, trackIndex: number) => void;
@@ -100,6 +102,7 @@ export default function LibraryView({
   const playingTrackIndex = useAtomValue(playingTrackIndexAtom);
   const isPlaybackActive = useAtomValue(playerIsPlayingOrLoadingAtom);
   const nav = useLibraryNavigation();
+  const { ref: resultsRef, isOverlay: isPreviewOverlay } = usePreviewOverlayMode();
   const [smartFolderEditor, setSmartFolderEditor] = useState<SmartFolderEditorState>(
     closedSmartFolderEditorState,
   );
@@ -353,13 +356,17 @@ export default function LibraryView({
                   mutation={bulkUnregisterMissingMutation}
                 />
               ) : undefined;
+              const previewOverlayActive = isPreviewOverlay && nav.selectedWorkId !== null;
               return (
                 <>
                   {/* チップ列と同じ理由で .mll-results の外（.mll-resultspane の通常フロー）に置く。
                       プレビューが右からスライドインしても結果面の幅が縮むだけで隠れない。 */}
                   {resultsBanner}
-                  <div className="mll-results">
-                    <div className="mll-results__content">
+                  <div
+                    className={cn("mll-results", previewOverlayActive && "mll-results--overlay")}
+                    ref={resultsRef}
+                  >
+                    <div className="mll-results__content" inert={previewOverlayActive || undefined}>
                       {showGrid ? (
                         <WorkGrid
                           axis={nav.activeAxis}
