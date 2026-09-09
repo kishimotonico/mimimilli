@@ -1,5 +1,6 @@
 import { DEFAULT_TAG_PREFIXES } from "@mimimilli/shared";
 import type {
+  DataIntegrityWarning,
   InvalidMetaFile,
   ResumeBody,
   ScanCandidate,
@@ -40,7 +41,14 @@ export interface FixtureState {
   scanCandidates: ScanCandidate[];
   scanIdentityConflicts: ScanDiagnostic[];
   scanInvalidMetaFiles: InvalidMetaFile[];
+  /** listSummaries 相当（real adapter の toDataIntegrityWarning）でタグ等の不整合により
+   *  除外した作品の報告。real はDB行のパースエラーから動的に出るが、fixtureには実DBが
+   *  無いため固定のダミー除外として表現する（シナリオ new-work のみ）。 */
+  dataIntegrityWarning: DataIntegrityWarning | undefined;
 }
+
+/** dataIntegrityWarning のダミー除外対象workId（実在の works には含めない） */
+const DATA_INTEGRITY_WARNING_SKIPPED_WORK_ID = "RJ501099";
 
 export interface FixtureAdapterOptions {
   /** データシナリオ（省略時 "default"）。不明なIDはエラー */
@@ -91,6 +99,10 @@ export function createInitialState(options: FixtureAdapterOptions): FixtureState
     scanCandidates: scenario.scanCandidates,
     scanIdentityConflicts: scenario.scanIdentityConflicts,
     scanInvalidMetaFiles: scenario.scanInvalidMetaFiles,
+    dataIntegrityWarning:
+      scenario.id === "new-work"
+        ? { skippedCount: 1, skippedWorkIds: [DATA_INTEGRITY_WARNING_SKIPPED_WORK_ID] }
+        : undefined,
   };
 }
 

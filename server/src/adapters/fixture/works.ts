@@ -7,6 +7,7 @@ import {
   isRjCodeMissing,
 } from "@mimimilli/shared";
 import type {
+  DataIntegrityWarning,
   DlsiteNotificationKind,
   DlsiteNotificationPage,
   DlsiteNotificationQuery,
@@ -62,7 +63,13 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
 
   return {
     async queryWorks(params: WorksQuery): Promise<WorksPage> {
-      return toWorksPage(applyWorksQuery(state.works, params), state.rootFolder ?? "/library");
+      const page = toWorksPage(
+        applyWorksQuery(state.works, params),
+        state.rootFolder ?? "/library",
+      );
+      return state.dataIntegrityWarning
+        ? { ...page, dataIntegrityWarning: state.dataIntegrityWarning }
+        : page;
     },
 
     getWorkRegisterPreview,
@@ -237,8 +244,11 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
       return [...new Set(state.works.flatMap((w) => w.tags))].sort();
     },
 
-    async exportLibrary(): Promise<{ data: string }> {
-      return { data: JSON.stringify({ version: 1, works: state.works }, null, 2) };
+    async exportLibrary(): Promise<{ data: string; dataIntegrityWarning?: DataIntegrityWarning }> {
+      return {
+        data: JSON.stringify({ version: 1, works: state.works }, null, 2),
+        ...(state.dataIntegrityWarning ? { dataIntegrityWarning: state.dataIntegrityWarning } : {}),
+      };
     },
   };
 }

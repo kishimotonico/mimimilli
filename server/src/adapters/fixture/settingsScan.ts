@@ -94,6 +94,7 @@ export function createSettingsScanMethods(state: FixtureState): SettingsAdapter 
         identityConflicts: state.scanIdentityConflicts,
         invalidMetaFiles: state.scanInvalidMetaFiles,
         candidates: state.scanCandidates.filter((candidate) => !excluded.has(candidate.path)),
+        ...(state.dataIntegrityWarning ? { dataIntegrityWarning: state.dataIntegrityWarning } : {}),
       };
     },
 

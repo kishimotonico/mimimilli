@@ -127,6 +127,76 @@ test("new-work: Files用診断とscan確認用の候補・問題を独立して�
   );
 });
 
+test("new-work: identityConflicts・invalidMetaFilesが指すパスは/fsツリー上に実在する（TASK-435）", async () => {
+  const app = buildApp("new-work");
+
+  const canonical = await app.request(
+    "/api/fs?path=dlsite/夜想曲スタジオ/RJ501001_夜更けの図書室で囁き朗読",
+  );
+  assert.equal(canonical.status, 200);
+  assert.equal((await canonical.json()).workId, "RJ501001");
+
+  // TASK-428.5フォローアップで発覚: identityConflictsの重複コピー側は/fsツリーに
+  // 実体が無く404だった
+  const duplicate = await app.request("/api/fs?path=copies/RJ501001_夜更けの図書室で囁き朗読");
+  assert.equal(duplicate.status, 200);
+  const duplicateBody = await duplicate.json();
+  assert.equal(duplicateBody.workId, "RJ501001");
+  assert.ok(duplicateBody.entries.length > 0);
+
+  // scanIdentityConflicts側の"壊れた/mimimilli.json"（invalidMetaFiles）も同種の不整合
+  const metaFileDir = await app.request("/api/fs?path=壊れた");
+  assert.equal(metaFileDir.status, 200);
+  const metaEntry = (await metaFileDir.json()).entries.find(
+    (entry: { name: string }) => entry.name === "mimimilli.json",
+  );
+  assert.ok(metaEntry, "壊れた/mimimilli.json が/fsツリーに存在しない");
+});
+
+test("new-work: dataIntegrityWarningがWorksPage・スキャン結果・エクスポート・スマートフォルダー・DLsite一括のいずれからも取得できる（TASK-435）", async () => {
+  const adapter = createFixtureAdapter({ scenario: "new-work" });
+
+  const worksPage = await adapter.queryWorks({
+    q: "",
+    tags: { tags: [], yearValue: null },
+    tagOp: "AND",
+    sort: "id-asc",
+  });
+  assert.deepEqual(worksPage.dataIntegrityWarning, {
+    skippedCount: 1,
+    skippedWorkIds: ["RJ501099"],
+  });
+
+  const scanResult = await adapter.scan();
+  assert.deepEqual(scanResult.dataIntegrityWarning, worksPage.dataIntegrityWarning);
+
+  const exported = await adapter.exportLibrary();
+  assert.deepEqual(exported.dataIntegrityWarning, worksPage.dataIntegrityWarning);
+
+  const smartFolders = await adapter.listSmartFolders();
+  const smartFolderWorks = await adapter.evalSmartFolder(smartFolders[0]!.id, {
+    tags: { tags: [], yearValue: null },
+    tagOp: "AND",
+    page: 1,
+    limit: 50,
+  });
+  assert.deepEqual(smartFolderWorks?.dataIntegrityWarning, worksPage.dataIntegrityWarning);
+
+  const bulk = await adapter.runDlsiteBulk("existing", ["RJ501001"]);
+  assert.deepEqual(bulk.dataIntegrityWarning, worksPage.dataIntegrityWarning);
+});
+
+test("default: dataIntegrityWarningは付かない", async () => {
+  const adapter = createFixtureAdapter();
+  const worksPage = await adapter.queryWorks({
+    q: "",
+    tags: { tags: [], yearValue: null },
+    tagOp: "AND",
+    sort: "id-asc",
+  });
+  assert.equal(worksPage.dataIntegrityWarning, undefined);
+});
+
 test("fixture: rjCode省略・空文字・指定を区別する", () => {
   // 省略=候補が検出した値を採用、空文字=明示的になし（real adapterと同じく""のまま）、値=そのまま採用（候補登録APIの規約）。
   assert.equal(resolveRegisteredRjCode("RJ999999", undefined), "RJ999999");
