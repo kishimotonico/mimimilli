@@ -102,7 +102,7 @@ export default function SetupScreen({ onComplete }: SetupScreenProps) {
               type="button"
               variant="ghost"
               onClick={() => void cancel()}
-              className="h-9 w-full justify-center rounded-[8px] border border-line bg-paper-1 text-[12px] font-semibold text-ink-2 hover:bg-paper-1 hover:text-ink-2"
+              className="h-9 w-full justify-center rounded-[8px] border border-line bg-paper-1 text-control font-semibold text-ink-2 hover:bg-paper-1 hover:text-ink-2"
             >
               スキャンを中止
             </Button>
@@ -114,8 +114,10 @@ export default function SetupScreen({ onComplete }: SetupScreenProps) {
               </p>
               {alertDisplay.detail ? (
                 <details className="w-full text-left">
-                  <summary className="cursor-pointer text-[11px] text-ink-3">技術的な詳細</summary>
-                  <pre className="mll-selectable mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-all text-left text-[11px] text-ink-3">
+                  <summary className="cursor-pointer text-secondary text-ink-3">
+                    技術的な詳細
+                  </summary>
+                  <pre className="mll-selectable mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-all text-left text-secondary text-ink-3">
                     {alertDisplay.detail}
                   </pre>
                 </details>
@@ -124,7 +126,7 @@ export default function SetupScreen({ onComplete }: SetupScreenProps) {
           )}
         </form>
 
-        <p className="text-center text-[11px] text-ink-4">
+        <p className="text-center text-caption text-ink-4">
           フォルダーパスはあとから設定で変更できます
         </p>
       </div>

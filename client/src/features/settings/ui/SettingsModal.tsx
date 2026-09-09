@@ -154,7 +154,7 @@ export default function SettingsModal({
                 </Button>
               </form>
               {folderError && (
-                <p role="alert" className="mll-selectable m-0 text-[11px] text-[var(--r-coral)]">
+                <p role="alert" className="mll-selectable m-0 text-secondary text-[var(--r-coral)]">
                   {folderError}
                 </p>
               )}
@@ -164,7 +164,7 @@ export default function SettingsModal({
               <div className="flex h-[34px] flex-1 items-center gap-2 overflow-hidden rounded-[6px] border border-line-soft bg-paper-0 px-3">
                 <I.folder size={13} className="shrink-0 text-ink-3" />
                 <span
-                  className={`mll-selectable overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[11px] ${rootFolder ? "text-ink-1" : "text-ink-4"}`}
+                  className={`mll-selectable overflow-hidden text-ellipsis whitespace-nowrap font-mono text-mono ${rootFolder ? "text-ink-1" : "text-ink-4"}`}
                 >
                   {rootFolder ?? "未設定"}
                 </span>
@@ -175,7 +175,7 @@ export default function SettingsModal({
             </div>
           )}
           {rootFolderStale && (
-            <output className="m-0 block rounded-[6px] bg-paper-2 px-2.5 py-2 font-jp text-[11px] text-ink-2">
+            <output className="m-0 block rounded-[6px] bg-paper-2 px-2.5 py-2 font-jp text-secondary text-ink-2">
               一覧は変更前のフォルダーの内容です。再スキャンすると新しいフォルダーの内容に更新されます。
             </output>
           )}
@@ -185,7 +185,7 @@ export default function SettingsModal({
         <div className={SECTION_CLASS}>
           <span className={SECTION_LABEL_CLASS}>スキャン</span>
           <div className={ROW_CLASS}>
-            <span className="flex-1 font-mono text-[11px] text-ink-2">
+            <span className="flex-1 font-mono text-mono text-ink-2">
               最終スキャン: {formatLastScanTime(lastScanTime)}
             </span>
             <Button variant="primary" size="md" onClick={onOpenScan}>

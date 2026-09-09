@@ -51,7 +51,7 @@ export default function PlayerTransportControls({
         onClick={() => onSeekRelative(-10)}
         className={cn(ROUND_BTN, "text-ink-1")}
       >
-        <span className="font-mono text-[11px] font-bold">−10</span>
+        <span className="font-mono text-mono font-bold">−10</span>
       </button>
       <button
         aria-label="前のトラック"
@@ -89,7 +89,7 @@ export default function PlayerTransportControls({
         onClick={() => onSeekRelative(10)}
         className={cn(ROUND_BTN, "text-ink-1")}
       >
-        <span className="font-mono text-[11px] font-bold">+10</span>
+        <span className="font-mono text-mono font-bold">+10</span>
       </button>
       <button
         aria-label="ループ"

@@ -126,7 +126,7 @@ function DlsiteApplyDialog({
           </h2>
           <IconButton icon={I.x} label="閉じる" size="sm" disabled={busy} onClick={close} />
         </header>
-        <div className="mll-selectable min-h-0 flex-1 overflow-y-auto px-[18px] py-3 text-[11px]">
+        <div className="mll-selectable min-h-0 flex-1 overflow-y-auto px-[18px] py-3 text-secondary">
           <DlsiteDiffRow
             label="タイトル"
             diff={diff.title}
@@ -305,20 +305,17 @@ export function DlsiteEditor({ work }: { work: Work }) {
     <section aria-labelledby="work-edit-dlsite-title" className="flex flex-col gap-2.5">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <h3
-            id="work-edit-dlsite-title"
-            className="font-sans text-[11px] font-semibold text-ink-1"
-          >
+          <h3 id="work-edit-dlsite-title" className="font-sans text-label font-semibold text-ink-1">
             DLsite連携
           </h3>
           <span
-            className={`rounded-pill px-2 py-0.5 font-sans text-[10px] ${statusTone}`}
+            className={`rounded-pill px-2 py-0.5 font-sans text-label ${statusTone}`}
             title={work.dlsite.error ?? undefined}
           >
             {STATUS_LABEL[work.dlsite.status]}
           </span>
         </div>
-        <label className="flex items-center gap-1.5 font-jp text-[10.5px] text-ink-2">
+        <label className="flex items-center gap-1.5 font-jp text-secondary text-ink-2">
           <input
             type="checkbox"
             checked={work.dlsite.status === "skipped"}

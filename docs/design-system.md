@@ -39,7 +39,14 @@
 | `text-label`     | 10px / line 1.2  | セクション見出し・カテゴリラベル（uppercase等）      |
 | `text-mono`      | 11px / line 1.3  | 時刻・件数・パス等の数値/等幅表示（`font-mono`併用） |
 
-13px以上（モーダル見出し・大きい数字表示など）はこのスケールの対象外で、個別に決めてよい。
+13px以上（モーダル見出し・大きい数字表示など）はこのスケールの対象外で、個別に決めてよい。TASK-431でtsxのpx直書きを一括移行した際、以下は据え置いた（正は実装）。
+
+- モーダル見出し（`h2`/`header`内のタイトル）: 14px（例: `WorkEditDialog`・`WorkInfoDialog`・`SmartFolderEditorModal`・`ScanModal`・`SettingsModal`・`RegisterWorkDialog`・`DlsiteEditor`・`DlsiteBulkApplyDialog`・`NotificationListModal`）
+- 確認ダイアログの見出し（`ConfirmDialog`・`WorkEditDialog`の未保存確認）: 13.5px
+- 起動時エラー画面（`RootErrorBoundary`・`StartupErrorScreen`）: ロゴのアバター文字 20px、見出し15px、本文13px
+- セットアップ画面（`SetupScreen`）: ロゴのアバター文字20px、見出し22px、本文・送信ボタン13px
+- トラックリスト見出し・トラックタイトル（`NowPlayingTrackList`）、タグ削除ボタン記号（`Tag`）、起動中表示（`App`）: 13px
+- 再生画面のトラックタイトル見出し（`NowPlayingView`）: 24px
 
 ## フォーカス表示
 

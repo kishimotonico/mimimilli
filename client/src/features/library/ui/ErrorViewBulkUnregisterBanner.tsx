@@ -23,7 +23,7 @@ export function ErrorViewBulkUnregisterBanner({
 
   return (
     <div className="flex items-center justify-between gap-3 rounded-[6px] border border-line-soft bg-paper-2 px-3 py-2">
-      <span className="font-jp text-[12px] text-ink-1">
+      <span className="font-jp text-body text-ink-1">
         ファイル欠損した作品が <b className="text-ink-0">{missingCount}</b> 件あります
       </span>
       <Button

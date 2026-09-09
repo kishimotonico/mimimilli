@@ -268,12 +268,12 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
         <p className="font-jp text-body text-ink-2">未登録の候補はありません。</p>
       ) : (
         <>
-          <p className="font-jp text-[11.5px] text-ink-2">
+          <p className="font-jp text-secondary text-ink-2">
             まだライブラリで管理していないフォルダーです。追加すると mimimilli.json
             を作成して、作品として管理します。タイトル・RJコードはフォルダー名から自動で拾い、クリックして直せます。
           </p>
           <div className="overflow-hidden rounded-[6px] border border-line-soft">
-            <table className="w-full table-fixed border-collapse text-[11px]">
+            <table className="w-full table-fixed border-collapse text-secondary">
               <colgroup>
                 <col className="w-[32px]" />
                 <col className="w-[26%]" />
@@ -370,7 +370,7 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
                           </button>
                         )}
                         {titleError && (
-                          <p role="alert" className="font-jp text-[9.5px] text-[var(--r-coral)]">
+                          <p role="alert" className="font-jp text-caption text-[var(--r-coral)]">
                             {titleError.message}
                           </p>
                         )}
@@ -396,7 +396,7 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
                             onClick={() => startEdit(candidate, "rjCode")}
                             title={rjCodeError?.message ?? "クリックしてRJコードを編集"}
                             className={cn(
-                              "font-mono text-[10.5px]",
+                              "font-mono text-mono",
                               rjCodeError
                                 ? "text-[var(--r-coral)]"
                                 : hasRjCode({ rjCode })
@@ -412,7 +412,7 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
                           </button>
                         )}
                         {rjCodeError && (
-                          <p role="alert" className="font-jp text-[9.5px] text-[var(--r-coral)]">
+                          <p role="alert" className="font-jp text-caption text-[var(--r-coral)]">
                             {rjCodeError.message}
                           </p>
                         )}
@@ -448,7 +448,7 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
             </table>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-jp text-[11px] text-ink-2">
+            <span className="font-jp text-secondary text-ink-2">
               {selectedCandidates.length}件選択中
             </span>
             <Button
@@ -459,7 +459,7 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
               {registerableCandidates.length}件をライブラリに追加
             </Button>
             {excludedByErrorCount > 0 && (
-              <span role="alert" className="font-jp text-[11px] text-[var(--r-coral)]">
+              <span role="alert" className="font-jp text-secondary text-[var(--r-coral)]">
                 エラーのある{excludedByErrorCount}件は登録から除外されます。
               </span>
             )}
@@ -467,7 +467,7 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
         </>
       )}
       {errorMessage && (
-        <p role="alert" className="font-jp text-[11px] text-[var(--r-coral)]">
+        <p role="alert" className="font-jp text-secondary text-[var(--r-coral)]">
           {errorMessage}
         </p>
       )}

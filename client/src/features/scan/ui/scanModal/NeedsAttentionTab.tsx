@@ -62,11 +62,11 @@ export default function NeedsAttentionTab(props: NeedsAttentionTabProps) {
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="font-jp text-[11.5px] text-ink-2">
+      <p className="font-jp text-secondary text-ink-2">
         自動では直しません。内容を確認してから対応してください。
       </p>
       <div className="overflow-hidden rounded-[6px] border border-line-soft">
-        <table className="w-full border-collapse text-[11px]">
+        <table className="w-full border-collapse text-secondary">
           <thead>
             <tr className="bg-paper-0 text-left">
               <th className="border-b border-line-soft px-2.5 py-1.5 font-sans font-semibold text-ink-2">

@@ -36,7 +36,7 @@ export default function DlsiteParseFailedModal({
           onClick={() => onOpenWork(work.id)}
         >
           <span className="min-w-0 flex-1">
-            <span className="block w-full truncate text-[12px]">{work.title}</span>
+            <span className="block w-full truncate text-body">{work.title}</span>
             <span className="mll-selectable mt-0.5 block font-mono text-mono text-ink-2">
               {work.rjCode}
             </span>

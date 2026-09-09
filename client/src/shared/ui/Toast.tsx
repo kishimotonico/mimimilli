@@ -145,7 +145,7 @@ function ToastContent({ message, variant, actionLabel, onAction, onDismiss }: To
       className="pointer-events-auto flex items-center gap-2 rounded-2 border border-line-soft bg-paper-1 px-3 py-2 shadow-pop"
     >
       <VariantIcon size={14} style={{ color: VARIANT_COLOR[variant] }} />
-      <span className="font-jp text-[12px] text-ink-1">{message}</span>
+      <span className="font-jp text-body text-ink-1">{message}</span>
       {hasAction && (
         <Button variant="ghost" onClick={onAction}>
           {actionLabel}
