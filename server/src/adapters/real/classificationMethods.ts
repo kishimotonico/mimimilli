@@ -40,13 +40,14 @@ export function createClassificationMethods(deps: {
 }) {
   const { query, user, requireRoot } = deps;
   return {
-    async getAxisFacets(axis: string, filter?: Partial<AxisFacetsQuery>): Promise<AxisFacetItem[]> {
+    async getAxisFacets(
+      axis: string,
+      filter?: Partial<AxisFacetsQuery>,
+    ): Promise<AxisFacetItem[] | null> {
       if (filter?.smartFolder) {
         const folder = user.getSmartFolder(filter.smartFolder);
-        // 表示中に削除される等で解決できない場合は、通常軸と同じ形（空配列）で返す。
-        // 個々の値の有無を判定するファセット集計にとって404化は過剰であり、
-        // 呼び出し側（結果面）は既にフォルダー解決不可を別経路で検知している。
-        if (!folder) return [];
+        // /smart-folders/:id/works と同じ「解決できない」応答（404）に揃える
+        if (!folder) return null;
         return getSmartFolderAxisFacets(query, axis, folder, filter);
       }
       return query.getAxisFacets(axis, filter);

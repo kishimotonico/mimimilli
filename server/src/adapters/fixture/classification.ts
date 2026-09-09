@@ -21,10 +21,14 @@ import type { FixtureState } from "./state.ts";
 
 export function createClassificationMethods(state: FixtureState): ClassificationAdapter {
   return {
-    async getAxisFacets(axis: string, filter?: Partial<AxisFacetsQuery>): Promise<AxisFacetItem[]> {
+    async getAxisFacets(
+      axis: string,
+      filter?: Partial<AxisFacetsQuery>,
+    ): Promise<AxisFacetItem[] | null> {
       if (filter?.smartFolder) {
         const folder = state.smartFolders.find((f) => f.id === filter.smartFolder);
-        if (!folder) return [];
+        // /smart-folders/:id/works と同じ「解決できない」応答（404）に揃える
+        if (!folder) return null;
         const matched = evalSmartFolderRules(folder.rules, state.works);
         return buildAxisFacets(axis, matched, filter);
       }

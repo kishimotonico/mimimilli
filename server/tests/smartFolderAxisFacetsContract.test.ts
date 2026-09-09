@@ -96,13 +96,13 @@ test("smartFolderスコープの軸ファセットはフォルダー条件適用
   const scoped = await adapter.getAxisFacets("cv", { smartFolder: smartFolderId });
   // rule(長さ≥20分)に一致するのは w-a・w-b・w-d のみ。w-c は cv/藤田茜 を持つが除外される。
   assert.deepEqual(
-    scoped.map((item) => [item.value, item.count]),
+    scoped!.map((item) => [item.value, item.count]),
     [["水瀬なずな", 2]],
   );
 
   const unscoped = await adapter.getAxisFacets("cv");
   assert.deepEqual(
-    unscoped.map((item) => item.value).sort(),
+    unscoped!.map((item) => item.value).sort(),
     ["水瀬なずな", "藤田茜"],
     "smartFolder未指定時は従来通り全作品を集計する",
   );
@@ -118,11 +118,12 @@ test("smartFolderスコープの軸ファセットはチップ選択タグとAND
     tagOp: "AND",
   });
   assert.deepEqual(
-    scopedWithTag.map((item) => [item.value, item.count]),
+    scopedWithTag!.map((item) => [item.value, item.count]),
     [["水瀬なずな", 1]],
   );
 
-  // 同じ tags/tagOp を渡した作品一覧（evalSmartFolder）でも該当は w-d のみのはず
+  // 同じ tags/tagOp を渡した作品一覧（evalSmartFolder）でも該当は w-b・w-d の2件
+  // （cv軸に絞ると w-d のみだが、作品一覧はcvを持たない w-b も含む。意味論が一致することの確認）
   const page = await adapter.evalSmartFolder(smartFolderId, {
     page: 1,
     limit: 10,
@@ -132,10 +133,21 @@ test("smartFolderスコープの軸ファセットはチップ選択タグとAND
   assert.deepEqual(page!.items.map((w) => w.id).sort(), ["w-b", "w-d"]);
 });
 
-test("smartFolderが解決できない場合は空配列を返す（fixture）", async () => {
-  const { adapter } = buildFixtureAdapter();
-  const result = await adapter.getAxisFacets("cv", { smartFolder: "sf-does-not-exist" });
-  assert.deepEqual(result, []);
+test("smartFolderが解決できない場合はnullを返す（ルートが404に変換する。/smart-folders/:id/worksと同じ応答に揃える）", async () => {
+  const fixtureResult = await buildFixtureAdapter().adapter.getAxisFacets("cv", {
+    smartFolder: "sf-does-not-exist",
+  });
+  assert.equal(fixtureResult, null);
+
+  const real = buildRealAdapter();
+  try {
+    const realResult = await real.adapter.getAxisFacets("cv", {
+      smartFolder: "sf-does-not-exist",
+    });
+    assert.equal(realResult, null);
+  } finally {
+    real.cleanup();
+  }
 });
 
 test("smartFolderスコープの軸ファセットはfixtureとrealで同値（TASK-432契約）", async (t) => {
@@ -149,8 +161,8 @@ test("smartFolderスコープの軸ファセットはfixtureとrealで同値（T
     });
     const realScoped = await real.adapter.getAxisFacets(axis, { smartFolder: real.smartFolderId });
     assert.deepEqual(
-      realScoped.map(({ value, count, durationSec }) => ({ value, count, durationSec })),
-      fixtureScoped.map(({ value, count, durationSec }) => ({ value, count, durationSec })),
+      realScoped!.map(({ value, count, durationSec }) => ({ value, count, durationSec })),
+      fixtureScoped!.map(({ value, count, durationSec }) => ({ value, count, durationSec })),
       `axis=${axis}`,
     );
   }
@@ -168,8 +180,8 @@ test("smartFolderスコープの軸ファセットはfixtureとrealで同値（T
       ...filter,
     });
     assert.deepEqual(
-      realScoped.map(({ value, count, durationSec }) => ({ value, count, durationSec })),
-      fixtureScoped.map(({ value, count, durationSec }) => ({ value, count, durationSec })),
+      realScoped!.map(({ value, count, durationSec }) => ({ value, count, durationSec })),
+      fixtureScoped!.map(({ value, count, durationSec }) => ({ value, count, durationSec })),
       `filter=${JSON.stringify(filter)}`,
     );
   }
