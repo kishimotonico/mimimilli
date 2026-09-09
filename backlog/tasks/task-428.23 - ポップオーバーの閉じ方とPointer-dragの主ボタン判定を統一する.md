@@ -1,10 +1,10 @@
 ---
 id: TASK-428.23
 title: ポップオーバーの閉じ方とPointer dragの主ボタン判定を統一する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-07 09:09'
-updated_date: '2026-09-07 19:33'
+updated_date: '2026-09-09 14:57'
 labels:
   - ui
   - interaction
