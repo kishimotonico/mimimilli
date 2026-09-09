@@ -25,7 +25,7 @@ export default function ABRepeatBar({ abRepeat, onSetABPoint, onClearABRepeat }:
         title="A地点を設定"
         onClick={() => onSetABPoint("a")}
         className={cn(
-          "grid h-[26px] w-[26px] cursor-pointer place-items-center rounded-2 font-mono text-[11px] font-bold",
+          "grid h-[26px] w-[26px] cursor-pointer place-items-center rounded-2 font-mono text-mono font-bold",
           abRepeat.a !== null ? "bg-acc-soft text-acc" : "text-ink-1 hover:bg-paper-2",
         )}
       >
@@ -37,7 +37,7 @@ export default function ABRepeatBar({ abRepeat, onSetABPoint, onClearABRepeat }:
         title="B地点を設定"
         onClick={() => onSetABPoint("b")}
         className={cn(
-          "grid h-[26px] w-[26px] cursor-pointer place-items-center rounded-2 font-mono text-[11px] font-bold",
+          "grid h-[26px] w-[26px] cursor-pointer place-items-center rounded-2 font-mono text-mono font-bold",
           abRepeat.b !== null ? "bg-acc-soft text-acc" : "text-ink-1 hover:bg-paper-2",
         )}
       >
@@ -54,7 +54,7 @@ export default function ABRepeatBar({ abRepeat, onSetABPoint, onClearABRepeat }:
         </>
       )}
       {hasABRepeat && (
-        <span className="font-mono text-[10.5px] text-acc" aria-live="polite">
+        <span className="font-mono text-mono text-acc" aria-live="polite">
           リピート中
         </span>
       )}

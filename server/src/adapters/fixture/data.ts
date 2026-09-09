@@ -7,7 +7,13 @@ import {
   normalizeTags,
   TEXT_PREVIEW_LIMIT_BYTES,
 } from "@mimimilli/shared";
-import type { CoverValueBase, SmartFolder, WorkSummary } from "@mimimilli/shared";
+import type {
+  CoverValueBase,
+  InvalidMetaFile,
+  ScanDiagnostic,
+  SmartFolder,
+  WorkSummary,
+} from "@mimimilli/shared";
 import { fixtureCoverFromColumns } from "./coverDto.ts";
 
 /** fixture 内部のカバー列（real の cover_image / cover_width / cover_height に相当） */
@@ -454,9 +460,16 @@ export function buildWorkFileTree(work: WorkSummary, coverImage: string | null):
   return children;
 }
 
-/** 作品フォルダーノードを構築する（workId 付き dir。配下は buildWorkFileTree を相対パス付きで展開） */
-function fsWorkFolder(work: WorkSummary, coverImage: string | null): FsNode {
-  const folderName = work.physicalPath.split("/").filter(Boolean).pop() ?? work.id;
+/** 作品フォルダーノードを構築する（workId 付き dir。配下は buildWorkFileTree を相対パス付きで展開）。
+ *  folderNameOverride は同一作品を別の物理パス（identityConflicts の重複コピー等）に
+ *  配置するときに使う。 */
+function fsWorkFolder(
+  work: WorkSummary,
+  coverImage: string | null,
+  folderNameOverride?: string,
+): FsNode {
+  const folderName =
+    folderNameOverride ?? work.physicalPath.split("/").filter(Boolean).pop() ?? work.id;
 
   function annotate(nodes: FsNode[]): FsNode[] {
     return nodes.map(
@@ -488,10 +501,36 @@ function circleFromPhysicalPath(physicalPath: string): string {
   return "_その他";
 }
 
-/** /fs のルートツリーを構築する。works はその時点の最新状態を渡す */
+/** dir 配下に path のノードが無ければ作る（中間ディレクトリも補う）。既にあれば何もしない。
+ *  identityConflicts / invalidMetaFiles など、固定データが参照するパスを /fs ツリーへ
+ *  必ず存在させるために使う。 */
+function ensurePath(
+  dir: FsNode,
+  segments: readonly string[],
+  makeLeaf: (name: string) => FsNode,
+): void {
+  const [head, ...rest] = segments;
+  if (head === undefined) return;
+  let child = dir.children.find((c) => c.name === head);
+  if (rest.length === 0) {
+    if (!child) dir.children.push(makeLeaf(head));
+    return;
+  }
+  if (!child) {
+    child = fsDir(head, []);
+    dir.children.push(child);
+  }
+  if (child.isDir) ensurePath(child, rest, makeLeaf);
+}
+
+/** /fs のルートツリーを構築する。works はその時点の最新状態を渡す。
+ *  identityConflicts / invalidMetaFiles は、それぞれが指す重複コピーフォルダー・
+ *  壊れたメタファイルを /fs ツリー上に実体化するために使う。 */
 export function buildFsRoot(
   works: WorkSummary[],
   coverColumns: ReadonlyMap<string, FixtureCoverColumns>,
+  identityConflicts: ScanDiagnostic[] = [],
+  invalidMetaFiles: InvalidMetaFile[] = [],
 ): FsNode {
   const folderWorks = works.filter((work) => !isAudioWorkPath(work.physicalPath));
   const fileWorks = works.filter((work) => isAudioWorkPath(work.physicalPath));
@@ -520,7 +559,7 @@ export function buildFsRoot(
     ? { ...fanzaAudio, workId: fanzaWork.id, workRelPath: "" }
     : fanzaAudio;
 
-  return fsDir("library", [
+  const root = fsDir("library", [
     fsDir("dlsite", circleDirs),
     fsDir("fanza", [fanzaNode]),
     fsDir("viewer", [
@@ -533,6 +572,27 @@ export function buildFsRoot(
     ]),
     fsFile("readme.txt", "text", 512),
   ]);
+
+  for (const conflict of identityConflicts) {
+    const work = works.find((w) => w.id === conflict.workId);
+    if (!work) continue;
+    const coverImage = coverColumns.get(work.id)?.image ?? fixtureCoverColumnsForWork(work).image;
+    for (const path of conflict.paths) {
+      const segments = path.split("/").filter(Boolean);
+      const name = segments.at(-1);
+      if (name === undefined) continue;
+      ensurePath(root, segments, () => fsWorkFolder(work, coverImage, name));
+    }
+  }
+
+  for (const metaFile of invalidMetaFiles) {
+    const segments = metaFile.path.split("/").filter(Boolean);
+    const name = segments.at(-1);
+    if (name === undefined) continue;
+    ensurePath(root, segments, () => fsFile(name, "text", 128));
+  }
+
+  return root;
 }
 
 /** スマートフォルダーのシード（2件） */

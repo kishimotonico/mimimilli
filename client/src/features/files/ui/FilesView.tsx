@@ -173,6 +173,7 @@ export default function FilesView({ rootFolder, onPlayFile, onTogglePlay }: File
               isPlaybackActive={isPlaybackActive}
               onOpenDir={openDir}
               onSelectFile={selectFile}
+              onFocusEntry={selectFile}
               onPlayFile={(entry) => handlePlayFile(entry, cwdEntries)}
               isLoading={cwdQuery.isPending}
               isError={cwdQuery.isError}

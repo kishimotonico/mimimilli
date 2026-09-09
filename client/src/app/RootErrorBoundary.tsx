@@ -44,7 +44,7 @@ export default class RootErrorBoundary extends Component<Props, State> {
             </p>
             {detail ? (
               <details className="w-full text-left">
-                <summary className="cursor-pointer text-[12px] text-ink-2">技術的な詳細</summary>
+                <summary className="cursor-pointer text-secondary text-ink-2">技術的な詳細</summary>
                 <pre className="mll-selectable mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all text-left text-secondary text-ink-2">
                   {detail}
                 </pre>

@@ -14,7 +14,7 @@
   position: relative;
   display: flex;
   flex: 1;
-  min-width: 360px;
+  min-width: var(--lib-results-preview-min-w);
   min-height: 0;
 }
 /* Filesモードは一覧側がflex:1で残り幅を取る主役なので、プレビューはドラッグで確定した
@@ -70,6 +70,12 @@
 .mle-prv__close:hover {
   color: var(--ink-0);
   background: var(--paper-3);
+}
+/* 全幅オーバーレイ時は左外側に一覧が無いため、内側右上へ寄せる。 */
+.mll-results--overlay .mle-prv__close {
+  left: auto;
+  right: 10px;
+  top: 10px;
 }
 .mle-prv__hd {
   display: flex;

@@ -16,7 +16,7 @@ export default function NewlyRegisteredTab({ workIds }: NewlyRegisteredTabProps)
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="font-jp text-[11.5px] text-ink-2">
+      <p className="font-jp text-secondary text-ink-2">
         今回ライブラリに入った作品です。作品情報ファイルがあったものは自動で、未登録から追加したものはその操作で入りました。タイトルをクリックすると直せます。
       </p>
       <ScanResultWorksTable

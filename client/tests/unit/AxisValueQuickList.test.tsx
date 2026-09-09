@@ -64,6 +64,44 @@ describe("AxisValueQuickList の仮想化", () => {
 });
 
 describe("AxisValueQuickList のキーボード移動", () => {
+  it("開いたときの検索欄への初期フォーカスはpreventScroll:trueで祖先を自動スクロールしない（TASK-439）", async () => {
+    const sizeMock = mockElementSize(260, 260);
+    const focusSpy = vi.spyOn(HTMLElement.prototype, "focus");
+    renderQuickList({ items: makeItems(5), isOpen: true });
+    await flushVirtualizer();
+
+    expect(focusSpy).toHaveBeenLastCalledWith({ preventScroll: true });
+
+    focusSpy.mockRestore();
+    sizeMock.restore();
+  });
+
+  it("矢印キーによる値行間のフォーカス移動もpreventScroll:trueで祖先を自動スクロールしない（TASK-439）", async () => {
+    const sizeMock = mockElementSize(260, 260);
+    const user = userEvent.setup();
+    renderQuickList({ items: makeItems(3) });
+    await flushVirtualizer();
+
+    const input = screen.getByPlaceholderText("CVを検索");
+    input.focus();
+    const focusSpy = vi.spyOn(HTMLElement.prototype, "focus");
+    await user.keyboard("{ArrowDown}");
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(focusSpy).toHaveBeenLastCalledWith({ preventScroll: true });
+
+    focusSpy.mockClear();
+    await user.keyboard("{ArrowDown}");
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(focusSpy).toHaveBeenLastCalledWith({ preventScroll: true });
+
+    focusSpy.mockRestore();
+    sizeMock.restore();
+  });
+
   it("検索欄からArrowDownで最初の値行にフォーカスする", async () => {
     const sizeMock = mockElementSize(260, 260);
     const user = userEvent.setup();
@@ -111,7 +149,10 @@ describe("AxisValueQuickList のキーボード移動", () => {
     sizeMock.restore();
   });
 
-  it("ArrowUp/ArrowDownで値行間をラップアラウンドしながら移動する", async () => {
+  // TASK-436: 作品一覧の矢印キー（gridNavigation.ts の getNextGridIndex）は境界で
+  // ラップアラウンドせずクランプする。値一覧も同じ規則に揃えるため、旧実装の
+  // ラップアラウンド挙動をやめた（getNextAxisValueRowIndex）。
+  it("ArrowUp/ArrowDownで値行間を移動し、端ではクランプする（作品一覧と同じ規則、TASK-436）", async () => {
     const sizeMock = mockElementSize(260, 260);
     const user = userEvent.setup();
     renderQuickList({ items: makeItems(3) });
@@ -130,12 +171,12 @@ describe("AxisValueQuickList のキーボード移動", () => {
     await act(async () => {
       await new Promise((r) => setTimeout(r, 50));
     });
-    // 先頭からArrowUpするとラップして末尾（最小件数）の行へ移る。
-    expect(document.activeElement?.textContent).toContain("値0000");
+    // 先頭でArrowUpしても、末尾へラップせず先頭に留まる。
+    expect(document.activeElement?.textContent).toContain("値0002");
     sizeMock.restore();
   });
 
-  it("位置未確定の状態からのArrowUpは末尾の値行へ着地する", async () => {
+  it("位置未確定の状態からのArrowUpは何も起こさない（クランプ、TASK-436）", async () => {
     const sizeMock = mockElementSize(260, 260);
     const user = userEvent.setup();
     renderQuickList({ items: makeItems(3) });
@@ -148,8 +189,57 @@ describe("AxisValueQuickList のキーボード移動", () => {
       await new Promise((r) => setTimeout(r, 50));
     });
 
-    // 件数降順の既定ソート: 値0002 > 値0001 > 値0000。末尾は最小件数の値0000。
+    expect(document.activeElement).toBe(input);
+    sizeMock.restore();
+  });
+
+  it("Homeで先頭の値行へ、Endで末尾の値行へ移動する（TASK-436）", async () => {
+    const sizeMock = mockElementSize(260, 260);
+    const user = userEvent.setup();
+    renderQuickList({ items: makeItems(3) });
+    await flushVirtualizer();
+
+    const input = screen.getByPlaceholderText("CVを検索");
+    input.focus();
+    await user.keyboard("{ArrowDown}");
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(document.activeElement?.textContent).toContain("値0002");
+
+    await user.keyboard("{End}");
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
     expect(document.activeElement?.textContent).toContain("値0000");
+
+    await user.keyboard("{Home}");
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(document.activeElement?.textContent).toContain("値0002");
+    sizeMock.restore();
+  });
+
+  it("roving tabindex: フォーカス移動中は現在位置の行だけがtabIndex 0になる（TASK-436）", async () => {
+    const sizeMock = mockElementSize(260, 260);
+    const user = userEvent.setup();
+    renderQuickList({ items: makeItems(3) });
+    await flushVirtualizer();
+
+    const input = screen.getByPlaceholderText("CVを検索");
+    input.focus();
+    await user.keyboard("{ArrowDown}");
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+
+    const rowButtons = Array.from(
+      document.querySelectorAll<HTMLButtonElement>("[data-quicklist-item]"),
+    );
+    const tabbable = rowButtons.filter((el) => el.tabIndex === 0);
+    expect(tabbable.length).toBe(1);
+    expect(tabbable[0]).toBe(document.activeElement);
     sizeMock.restore();
   });
 

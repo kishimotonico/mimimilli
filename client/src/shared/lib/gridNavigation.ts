@@ -1,5 +1,3 @@
-import type { JustifiedTile } from "./justifiedLayout";
-
 export type GridArrowKey = "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown" | "Home" | "End";
 
 export function getNextGridIndex(
@@ -25,13 +23,17 @@ export function getNextGridIndex(
   return nextIndex < 0 || nextIndex >= itemCount ? currentIndex : nextIndex;
 }
 
+interface JustifiedTilePosition {
+  readonly rowIndex: number;
+  readonly centerX: number;
+}
+
 // ジャスティファイドグリッド用のキーボードナビ（TASK-45）。
 // 行ごとのアイテム数が不揃いなため、getNextGridIndex の「固定列数ぶんインデックスを
-// ずらす」方式は使えない。代わりに justifiedLayout.ts が計算した各タイルの行内
-// 中心x座標（centerX）を使い、上下移動では「隣接する行の中で横位置が最も近い
-// タイル」を選ぶ（DOM計測不要・純粋関数）。左右移動は表示順（=入力順）で±1。
+// ずらす」方式は使えない。代わりに各タイルの行内中心x座標（centerX）を使い、上下移動
+// では「隣接する行の中で横位置が最も近いタイル」を選ぶ（DOM計測不要・純粋関数）。
 export function getNextJustifiedIndex(
-  tiles: readonly Pick<JustifiedTile, "rowIndex" | "centerX">[],
+  tiles: readonly JustifiedTilePosition[],
   currentIndex: number,
   key: GridArrowKey,
 ): number {
@@ -57,8 +59,12 @@ export function getNextJustifiedIndex(
   return bestIndex === -1 ? currentIndex : bestIndex;
 }
 
+interface JustifiedTileRow {
+  readonly rowIndex: number;
+}
+
 // 仮想化された行インデックス（virtualizerが実際にDOMへ描画する単位）とフラットな
-// タイル/行のインデックスを相互変換する。roving tabindexの対象（選択中の作品）が
+// タイル/行のインデックスを相互変換する。roving tabindexの対象（選択中の項目）が
 // 現在の描画範囲内にあるかどうかを判定するために使う（TASK-428.12）。
 // ジャスティファイドでflatIndexに対応するタイルが無い（範囲外）ときはundefinedを
 // 返す。フォールバックするか無視するかは呼び出し側の文脈で異なるため、ここでは
@@ -66,7 +72,7 @@ export function getNextJustifiedIndex(
 export function rowIndexOfFlatIndex(
   flatIndex: number,
   isJustified: boolean,
-  justifiedTiles: readonly Pick<JustifiedTile, "rowIndex">[] | null,
+  justifiedTiles: readonly JustifiedTileRow[] | null,
   columnCount: number,
 ): number | undefined {
   if (isJustified && justifiedTiles) return justifiedTiles[flatIndex]?.rowIndex;
@@ -76,7 +82,7 @@ export function rowIndexOfFlatIndex(
 export function firstFlatIndexOfRow(
   rowIndex: number,
   isJustified: boolean,
-  justifiedTiles: readonly Pick<JustifiedTile, "rowIndex">[] | null,
+  justifiedTiles: readonly JustifiedTileRow[] | null,
   columnCount: number,
 ): number {
   if (isJustified && justifiedTiles) {

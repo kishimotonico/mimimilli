@@ -228,7 +228,7 @@ function TagComboboxImpl(
         value={input}
         placeholder={placeholder}
         className={cn(
-          "h-8 w-full rounded-[6px] border border-line bg-paper-1 px-2.5 font-jp text-[12px] text-ink-0",
+          "h-8 w-full rounded-[6px] border border-line bg-paper-1 px-2.5 font-jp text-body text-ink-0",
           "placeholder:text-ink-4 focus:border-acc",
           disabled && "cursor-not-allowed text-ink-4",
         )}
@@ -300,7 +300,7 @@ function TagComboboxImpl(
                 aria-selected={isActive}
                 title={option.value}
                 className={cn(
-                  "flex min-h-7 w-full min-w-0 items-center gap-2 px-2.5 text-left font-jp text-[12px] text-ink-1",
+                  "flex min-h-7 w-full min-w-0 items-center gap-2 px-2.5 text-left font-jp text-body text-ink-1",
                   "hover:bg-paper-2 focus:bg-paper-2",
                   isActive && "bg-acc-soft text-acc-ink",
                 )}

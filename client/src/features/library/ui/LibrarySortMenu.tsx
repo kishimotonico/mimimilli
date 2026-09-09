@@ -93,7 +93,7 @@ export default function LibrarySortMenu() {
     const items = sortRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]');
     if (!items || items.length === 0) return;
     const checked = Array.from(items).find((item) => item.getAttribute("aria-checked") === "true");
-    (checked ?? items[0])?.focus();
+    (checked ?? items[0])?.focus({ preventScroll: true });
   }, [sortMenuOpen, disabled]);
 
   const handleMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -106,7 +106,7 @@ export default function LibrarySortMenu() {
     const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
     const delta = event.key === "ArrowDown" ? 1 : -1;
     const nextIndex = (currentIndex + delta + items.length) % items.length;
-    items[nextIndex]?.focus();
+    items[nextIndex]?.focus({ preventScroll: true });
   };
 
   const showReshuffle = !disabled && !isValueListPane && sort === "random";

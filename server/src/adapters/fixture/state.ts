@@ -1,5 +1,6 @@
 import { DEFAULT_TAG_PREFIXES } from "@mimimilli/shared";
 import type {
+  DataIntegrityWarning,
   InvalidMetaFile,
   ResumeBody,
   ScanCandidate,
@@ -40,7 +41,17 @@ export interface FixtureState {
   scanCandidates: ScanCandidate[];
   scanIdentityConflicts: ScanDiagnostic[];
   scanInvalidMetaFiles: InvalidMetaFile[];
+  /** listSummaries 相当（real adapter の toDataIntegrityWarning）でタグ等の不整合により
+   *  除外した作品の報告。real はDB行のパースエラーから動的に出るが、fixtureには実DBが
+   *  無いため固定のダミー除外として表現する（シナリオ errors のみ。real の意味論は
+   *  「クエリのたびに破損行があれば毎回付く劣化状態の表示」であり、errorsシナリオの
+   *  目的と一致する。new-work・default 等の既定シナリオに常設すると smoke・worktree確認の
+   *  土台が常時バナー込みになってしまうため避ける）。 */
+  dataIntegrityWarning: DataIntegrityWarning | undefined;
 }
+
+/** dataIntegrityWarning のダミー除外対象workId（実在の works には含めない） */
+const DATA_INTEGRITY_WARNING_SKIPPED_WORK_ID = "RJ501099";
 
 export interface FixtureAdapterOptions {
   /** データシナリオ（省略時 "default"）。不明なIDはエラー */
@@ -91,6 +102,10 @@ export function createInitialState(options: FixtureAdapterOptions): FixtureState
     scanCandidates: scenario.scanCandidates,
     scanIdentityConflicts: scenario.scanIdentityConflicts,
     scanInvalidMetaFiles: scenario.scanInvalidMetaFiles,
+    dataIntegrityWarning:
+      scenario.id === "errors"
+        ? { skippedCount: 1, skippedWorkIds: [DATA_INTEGRITY_WARNING_SKIPPED_WORK_ID] }
+        : undefined,
   };
 }
 

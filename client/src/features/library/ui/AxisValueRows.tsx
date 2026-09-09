@@ -1,8 +1,13 @@
-import { useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { AxisFacetItem } from "@mimimilli/shared";
 import type { AxisValueSortKey, AxisValueSortState } from "../model/axisValueSort";
 import { AXIS_VALUE_SORT_OPTIONS, toggleAxisValueSort } from "../model/axisValueSort";
 import type { AxisValueHierarchyRow } from "../model/axisValueHierarchy";
+import {
+  getNextAxisValueRowIndex,
+  nearestValueRowIndex,
+  type AxisValueRowArrowKey,
+} from "../model/axisValueRowNav";
 import { formatDuration } from "../../../shared/lib/format";
 import { I } from "../../../shared/ui/Icon";
 import { selectFixedCoverThumbnailWidth } from "../../../entities/work/ui/coverThumbnailWidth";
@@ -10,6 +15,10 @@ import CoverCollage from "./CoverCollage";
 import IconButton from "../../../shared/ui/IconButton";
 import type { IconName } from "../../../shared/ui/Icon";
 import { useVirtualList } from "../../../shared/ui/useVirtualList";
+import { useRovingIndex } from "./useRovingIndex";
+import { focusVirtualItem } from "../../../shared/lib/focusVirtualItem";
+
+const ROW_ARROW_KEYS = new Set<AxisValueRowArrowKey>(["ArrowUp", "ArrowDown", "Home", "End"]);
 
 const ROW_COLLAGE_SIZE = 32;
 /** 階層1段あたりのインデント幅。深さに制限は設けない（4階層以上でも破綻しない）。 */
@@ -103,6 +112,34 @@ export default function AxisValueRows({
     measureElement,
   });
 
+  // roving tabindexの現在位置。値の選択は多重（タグ集合）で「現在の1件」が無いため、
+  // 作品一覧の選択追従（useRovingIndex+selectedWorkId）とは異なり、フォーカス移動
+  // だけで独立管理する。-1は「まだ矢印キー・Tabで触れていない」を表す。
+  const [activeIndex, setActiveIndex] = useState(-1);
+  useEffect(() => {
+    setActiveIndex(-1);
+  }, [resetKey]);
+  const firstValueIndex = rows.findIndex((row) => row.kind === "value");
+  const targetIndex = activeIndex >= 0 ? activeIndex : firstValueIndex;
+  const rawRovingIndex = useRovingIndex({
+    itemCount: rows.length,
+    targetIndex,
+    virtualItems,
+    virtualizer,
+    toRowIndex: (index) => index,
+    firstFlatIndexOfRow: (index) => index,
+  });
+  const rovingIndex = nearestValueRowIndex(rows, rawRovingIndex);
+
+  const moveRowFocus = (currentIndex: number, key: AxisValueRowArrowKey) => {
+    const listEl = scrollRef.current;
+    if (!listEl) return;
+    const nextIndex = getNextAxisValueRowIndex(rows, currentIndex, key);
+    if (nextIndex === -1 || nextIndex === currentIndex) return;
+    setActiveIndex(nextIndex);
+    focusVirtualItem(listEl, virtualizer, nextIndex, `[data-flat-index="${nextIndex}"]`);
+  };
+
   return (
     <>
       <div className="mll-vlist-hd">
@@ -118,6 +155,7 @@ export default function AxisValueRows({
           />
         ))}
       </div>
+      {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- onFocusはキーボード移動位置の追従用。フォーカスは子のボタンが受ける */}
       <div
         ref={scrollRef}
         className="mle-col__list"
@@ -125,6 +163,10 @@ export default function AxisValueRows({
         // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- 値ボタン集合を名前付き集合として表す。fieldset等の代替タグは適合しない
         role="group"
         aria-label={`${axisLabel}の値一覧`}
+        onFocus={(e) => {
+          const indexAttr = e.target.closest("[data-flat-index]")?.getAttribute("data-flat-index");
+          if (indexAttr !== null && indexAttr !== undefined) setActiveIndex(Number(indexAttr));
+        }}
       >
         <div style={wrapperStyle}>
           {virtualItems.map((virtualRow) => {
@@ -150,12 +192,19 @@ export default function AxisValueRows({
                         <button
                           type="button"
                           className="mll-vrow__main"
+                          data-flat-index={virtualRow.index}
+                          tabIndex={virtualRow.index === rovingIndex ? 0 : -1}
                           style={{ paddingLeft: 4 + indent }}
                           title={row.depth > 0 ? row.item.value : undefined}
                           aria-pressed={on}
                           onClick={(e) =>
                             onSelect(row.item, { ctrlKey: e.ctrlKey, metaKey: e.metaKey })
                           }
+                          onKeyDown={(e) => {
+                            if (!ROW_ARROW_KEYS.has(e.key as AxisValueRowArrowKey)) return;
+                            e.preventDefault();
+                            moveRowFocus(virtualRow.index, e.key as AxisValueRowArrowKey);
+                          }}
                         >
                           <CoverCollage
                             covers={row.item.covers}

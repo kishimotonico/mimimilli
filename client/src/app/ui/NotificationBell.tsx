@@ -97,7 +97,7 @@ export default function NotificationBell({
       {badgeCount > 0 && (
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute top-0 right-0 flex h-[15px] min-w-[15px] items-center justify-center rounded-pill px-[3px] font-mono text-[9px] font-bold text-paper-1"
+          className="pointer-events-none absolute top-0 right-0 flex h-[15px] min-w-[15px] items-center justify-center rounded-pill px-[3px] font-mono text-caption font-bold text-paper-1"
           style={{ background: "var(--r-coral)" }}
         >
           {badgeCount > 99 ? "99+" : badgeCount}

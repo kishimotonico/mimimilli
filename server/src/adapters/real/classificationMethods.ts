@@ -17,7 +17,11 @@ import { getCategoryLogger } from "../../lib/logger.ts";
 import { logDataIntegritySkips } from "./dataIntegrity.ts";
 import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";
-import { countSmartFolderRuleMatches, querySmartFolderWorks } from "./smartFolderWorks.ts";
+import {
+  countSmartFolderRuleMatches,
+  getSmartFolderAxisFacets,
+  querySmartFolderWorks,
+} from "./smartFolderWorks.ts";
 
 const scanLogger = getCategoryLogger("scan");
 const KEY_TAG_PREFIXES_SEEDED = "tag_prefixes_seeded";
@@ -36,7 +40,16 @@ export function createClassificationMethods(deps: {
 }) {
   const { query, user, requireRoot } = deps;
   return {
-    async getAxisFacets(axis: string, filter?: Partial<AxisFacetsQuery>): Promise<AxisFacetItem[]> {
+    async getAxisFacets(
+      axis: string,
+      filter?: Partial<AxisFacetsQuery>,
+    ): Promise<AxisFacetItem[] | null> {
+      if (filter?.smartFolder) {
+        const folder = user.getSmartFolder(filter.smartFolder);
+        // /smart-folders/:id/works と同じ「解決できない」応答（404）に揃える
+        if (!folder) return null;
+        return getSmartFolderAxisFacets(query, axis, folder, filter);
+      }
       return query.getAxisFacets(axis, filter);
     },
 

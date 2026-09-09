@@ -4,7 +4,7 @@ import { I } from "../../../../shared/ui/Icon";
 import { formatTime } from "../../../../shared/lib/format";
 import { formatTrackDuration, trackDurationAriaLabel } from "../../../../shared/lib/trackDuration";
 import { cn } from "../../../../shared/lib/cn";
-import { getNextGridIndex, type GridArrowKey } from "../../model/gridNavigation";
+import { getNextGridIndex, type GridArrowKey } from "../../../../shared/lib/gridNavigation";
 
 const TRACK_ARROW_KEYS = new Set<GridArrowKey>(["ArrowUp", "ArrowDown", "Home", "End"]);
 

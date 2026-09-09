@@ -1,58 +1,60 @@
 import { renderHook } from "@testing-library/react";
 import { describe, expect, it, vi, type Mock } from "vitest";
-import type { WorkListItem } from "@mimimilli/shared";
-import { useWorkGridKeyboardNav } from "../../src/features/library/ui/workGrid/useWorkGridKeyboardNav";
-import * as gridNavigation from "../../src/features/library/model/gridNavigation";
+import { useGridKeyboardNav } from "../../src/features/library/ui/useGridKeyboardNav";
+import * as gridNavigation from "../../src/shared/lib/gridNavigation";
 
-vi.mock("../../src/features/library/model/gridNavigation", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("../../src/features/library/model/gridNavigation")>();
+vi.mock("../../src/shared/lib/gridNavigation", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../src/shared/lib/gridNavigation")>();
   return { ...actual, rowIndexOfFlatIndex: vi.fn(actual.rowIndexOfFlatIndex) };
 });
 
-function makeWork(id: string): WorkListItem {
-  return { id } as WorkListItem;
+interface Item {
+  id: string;
 }
 
-describe("useWorkGridKeyboardNav", () => {
-  it("rowIndexOfFlatIndexが解決できたときは選択とscrollToIndexを行う", () => {
+function makeItem(id: string): Item {
+  return { id };
+}
+
+describe("useGridKeyboardNav", () => {
+  it("rowIndexOfFlatIndexが解決できたときはフォーカス移動とscrollToIndexを行う", () => {
     const scrollToIndex = vi.fn();
-    const onWorkSelect = vi.fn();
+    const onFocusItem = vi.fn();
     const gridEl = document.createElement("div");
-    const work0 = makeWork("w0");
-    const work1 = makeWork("w1");
+    const item0 = makeItem("w0");
+    const item1 = makeItem("w1");
 
     const { result } = renderHook(() =>
-      useWorkGridKeyboardNav({
+      useGridKeyboardNav({
         gridEl,
         isJustified: false,
         justifiedLayout: null,
         columnCount: 3,
-        works: [work0, work1],
-        onWorkSelect,
+        items: [item0, item1],
+        onFocusItem,
         virtualizer: { scrollToIndex } as never,
       }),
     );
 
     result.current(0, "ArrowRight");
 
-    expect(onWorkSelect).toHaveBeenCalledWith("w1");
+    expect(onFocusItem).toHaveBeenCalledWith(item1, 1);
     expect(scrollToIndex).toHaveBeenCalled();
   });
 
   // レビュー対応: rowIndexOfFlatIndexがundefinedを返す（対応するタイルが無い）とき、
   // 旧実装と同じく「行0として扱いscrollToIndexする」のではなく何もしない。
-  it("rowIndexOfFlatIndexがundefinedのときは選択もscrollToIndexも行わない", () => {
+  it("rowIndexOfFlatIndexがundefinedのときはフォーカス移動もscrollToIndexも行わない", () => {
     (gridNavigation.rowIndexOfFlatIndex as Mock).mockReturnValue(undefined);
 
     const scrollToIndex = vi.fn();
-    const onWorkSelect = vi.fn();
+    const onFocusItem = vi.fn();
     const gridEl = document.createElement("div");
-    const work0 = makeWork("w0");
-    const work1 = makeWork("w1");
+    const item0 = makeItem("w0");
+    const item1 = makeItem("w1");
 
     const { result } = renderHook(() =>
-      useWorkGridKeyboardNav({
+      useGridKeyboardNav({
         gridEl,
         isJustified: true,
         justifiedLayout: {
@@ -62,15 +64,15 @@ describe("useWorkGridKeyboardNav", () => {
           ],
         } as never,
         columnCount: 3,
-        works: [work0, work1],
-        onWorkSelect,
+        items: [item0, item1],
+        onFocusItem,
         virtualizer: { scrollToIndex } as never,
       }),
     );
 
     result.current(0, "ArrowRight");
 
-    expect(onWorkSelect).not.toHaveBeenCalled();
+    expect(onFocusItem).not.toHaveBeenCalled();
     expect(scrollToIndex).not.toHaveBeenCalled();
   });
 });

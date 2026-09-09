@@ -43,9 +43,9 @@ export default function DlsiteFetchFailedModal({
           onClick={() => onOpenWork(work.id)}
         >
           <span className="min-w-0 flex-1">
-            <span className="block w-full truncate text-[12px]">{work.title}</span>
+            <span className="block w-full truncate text-body">{work.title}</span>
           </span>
-          <span className="mt-0.5 shrink-0 rounded-pill bg-[color-mix(in_oklch,var(--r-coral)_12%,transparent)] px-2 py-0.5 font-sans text-[10px] text-[var(--r-coral)]">
+          <span className="mt-0.5 shrink-0 rounded-pill bg-[color-mix(in_oklch,var(--r-coral)_12%,transparent)] px-2 py-0.5 font-sans text-label text-[var(--r-coral)]">
             {STATUS_LABEL[work.status] ?? "取得失敗"}
           </span>
         </button>

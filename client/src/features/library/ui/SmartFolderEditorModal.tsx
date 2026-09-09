@@ -84,7 +84,7 @@ function DurationInput({
             ["seconds", "秒"],
           ] as const
         ).map(([part, label]) => (
-          <label key={part} className="flex items-center gap-1 font-jp text-[11px] text-ink-2">
+          <label key={part} className="flex items-center gap-1 font-jp text-secondary text-ink-2">
             <input
               type="number"
               min={0}
@@ -223,7 +223,7 @@ export default function SmartFolderEditorModal({
         >
           <div className="flex shrink-0 items-center border-b border-line-soft px-[18px] py-[14px]">
             <div className="min-w-0 flex-1">
-              <span className="font-mono text-[9px] font-semibold tracking-[0.08em] text-acc-ink">
+              <span className="font-mono text-label font-semibold tracking-[0.08em] text-acc-ink">
                 SMART
               </span>
               <h2
@@ -237,7 +237,7 @@ export default function SmartFolderEditorModal({
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-[18px] py-4">
-            <label className="flex flex-col gap-1.5 font-sans text-[11px] font-medium text-ink-1">
+            <label className="flex flex-col gap-1.5 font-sans text-label font-medium text-ink-1">
               名前
               <input
                 ref={nameInputRef}
@@ -251,11 +251,11 @@ export default function SmartFolderEditorModal({
                 }}
               />
               {errors.name && (
-                <span className="text-[11px] text-[var(--r-coral)]">{errors.name}</span>
+                <span className="text-secondary text-[var(--r-coral)]">{errors.name}</span>
               )}
             </label>
 
-            <label className="flex flex-col gap-1.5 font-sans text-[11px] font-medium text-ink-1">
+            <label className="flex flex-col gap-1.5 font-sans text-label font-medium text-ink-1">
               並び順
               <select
                 value={draft.sort}
@@ -276,7 +276,7 @@ export default function SmartFolderEditorModal({
               <div className="flex items-center gap-2">
                 <h3
                   id="smart-folder-rules-title"
-                  className="font-sans text-[11px] font-medium text-ink-1"
+                  className="font-sans text-label font-medium text-ink-1"
                 >
                   条件
                 </h3>
@@ -312,7 +312,7 @@ export default function SmartFolderEditorModal({
                       <div className="flex flex-wrap items-center gap-2">
                         {index === 0 ? (
                           <span
-                            className={`${CONJ_WIDTH_CLASS} text-center font-mono text-[10px] font-bold text-ink-4`}
+                            className={`${CONJ_WIDTH_CLASS} text-center font-mono text-label font-bold text-ink-4`}
                           >
                             WHERE
                           </span>
@@ -320,7 +320,7 @@ export default function SmartFolderEditorModal({
                           <select
                             aria-label={`${index + 1}件目の条件の組み合わせ`}
                             value={rule.conjunction}
-                            className={`${inputClass} ${CONJ_WIDTH_CLASS} font-mono text-[10px] font-bold`}
+                            className={`${inputClass} ${CONJ_WIDTH_CLASS} font-mono text-label font-bold`}
                             onChange={(event) => {
                               const conjunction = event.target.value;
                               updateRule(rule.id, (current) =>
@@ -396,7 +396,7 @@ export default function SmartFolderEditorModal({
                                   return (
                                     <span
                                       key={value}
-                                      className="inline-flex h-7 min-w-0 items-center gap-1 rounded-[5px] border border-line-soft bg-paper-2 pl-2 font-jp text-[11px] text-ink-0"
+                                      className="inline-flex h-7 min-w-0 items-center gap-1 rounded-[5px] border border-line-soft bg-paper-2 pl-2 font-jp text-secondary text-ink-0"
                                       title={
                                         isUnknown
                                           ? `${value}（このタグが付いた作品は現在ありません）`
@@ -472,7 +472,7 @@ export default function SmartFolderEditorModal({
                           />
                         )}
                         {ruleError && (
-                          <span className="mt-1.5 block font-jp text-[11px] text-[var(--r-coral)]">
+                          <span className="mt-1.5 block font-jp text-secondary text-[var(--r-coral)]">
                             {ruleError}
                           </span>
                         )}
@@ -511,7 +511,7 @@ export default function SmartFolderEditorModal({
             {saveError && (
               <div
                 role="alert"
-                className="mll-selectable rounded-[6px] border border-[var(--r-coral)] bg-paper-0 px-3 py-2 text-[11px] text-[var(--r-coral)]"
+                className="mll-selectable rounded-[6px] border border-[var(--r-coral)] bg-paper-0 px-3 py-2 text-secondary text-[var(--r-coral)]"
               >
                 {saveError}
               </div>
@@ -519,7 +519,7 @@ export default function SmartFolderEditorModal({
             {deleteError && (
               <div
                 role="alert"
-                className="mll-selectable rounded-[6px] border border-[var(--r-coral)] bg-paper-0 px-3 py-2 text-[11px] text-[var(--r-coral)]"
+                className="mll-selectable rounded-[6px] border border-[var(--r-coral)] bg-paper-0 px-3 py-2 text-secondary text-[var(--r-coral)]"
               >
                 {deleteError}
               </div>

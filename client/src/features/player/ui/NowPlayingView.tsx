@@ -112,7 +112,7 @@ function NowPlayingNormalBody({
 
           <PlaybackErrorNotice
             error={playbackError}
-            className="inline-flex min-w-0 max-w-full shrink-0 items-center gap-1 font-jp text-[10.5px] text-[var(--r-coral)]"
+            className="inline-flex min-w-0 max-w-full shrink-0 items-center gap-1 font-jp text-secondary text-[var(--r-coral)]"
             onRetry={onRetryError}
             onDismiss={onDismissError}
           />

@@ -11,8 +11,18 @@ import { buildTagFilterParams, filterValidFacetItems } from "./libraryPresentati
 // selectedTags は集計に含めるタグ。件数基準（何を含めて集計するか）は呼び出し側の責務で、
 // 値選択の契約（valueSelectionContract.ts の deriveFacetCountTags）から導出する。
 // このフック自体は渡されたタグをそのままAND条件として渡すだけで、軸やintentを見ない。
-export function useAxisFacetsQuery(axis: FacetAxisId | null, selectedTags: NormalizedTag[] = []) {
-  const filterParams = buildTagFilterParams(selectedTags);
+//
+// smartFolderId はスマートフォルダー表示中だけ渡す。生のルールではなくIDをサーバーへ渡し、
+// フォルダー条件適用後の集合を集計元にする。
+export function useAxisFacetsQuery(
+  axis: FacetAxisId | null,
+  selectedTags: NormalizedTag[] = [],
+  smartFolderId?: string,
+) {
+  const filterParams = {
+    ...buildTagFilterParams(selectedTags),
+    ...(smartFolderId ? { smartFolderId } : {}),
+  };
   return useQuery({
     queryKey: WORK_QUERY_KEYS.facets(axis ?? "", filterParams),
     queryFn: async () => {

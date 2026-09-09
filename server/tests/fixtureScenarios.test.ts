@@ -127,6 +127,87 @@ test("new-work: Files用診断とscan確認用の候補・問題を独立して�
   );
 });
 
+test("new-work: identityConflicts・invalidMetaFilesが指すパスは/fsツリー上に実在する（TASK-435）", async () => {
+  const app = buildApp("new-work");
+
+  const canonical = await app.request(
+    "/api/fs?path=dlsite/夜想曲スタジオ/RJ501001_夜更けの図書室で囁き朗読",
+  );
+  assert.equal(canonical.status, 200);
+  assert.equal((await canonical.json()).workId, "RJ501001");
+
+  // TASK-428.5フォローアップで発覚: identityConflictsの重複コピー側は/fsツリーに
+  // 実体が無く404だった
+  const duplicate = await app.request("/api/fs?path=copies/RJ501001_夜更けの図書室で囁き朗読");
+  assert.equal(duplicate.status, 200);
+  const duplicateBody = await duplicate.json();
+  assert.equal(duplicateBody.workId, "RJ501001");
+  assert.ok(duplicateBody.entries.length > 0);
+
+  // scanIdentityConflicts側の"壊れた/mimimilli.json"（invalidMetaFiles）も同種の不整合
+  const metaFileDir = await app.request("/api/fs?path=壊れた");
+  assert.equal(metaFileDir.status, 200);
+  const metaEntry = (await metaFileDir.json()).entries.find(
+    (entry: { name: string }) => entry.name === "mimimilli.json",
+  );
+  assert.ok(metaEntry, "壊れた/mimimilli.json が/fsツリーに存在しない");
+});
+
+test("errors: dataIntegrityWarningがWorksPage・スキャン結果・エクスポート・スマートフォルダー・DLsite一括のいずれからも取得できる（TASK-435）", async () => {
+  // real adapterの意味論（DB破損行があればクエリのたびに毎回付く劣化状態の表示）に
+  // 合わせ、劣化状態を確認するためのシナリオ errors に置く。new-work・default等の
+  // 既定シナリオへ置くとsmoke・worktree確認の土台が常時バナー込みになってしまうため避ける
+  const adapter = createFixtureAdapter({ scenario: "errors" });
+
+  const worksPage = await adapter.queryWorks({
+    q: "",
+    tags: { tags: [], yearValue: null },
+    tagOp: "AND",
+    sort: "id-asc",
+  });
+  assert.deepEqual(worksPage.dataIntegrityWarning, {
+    skippedCount: 1,
+    skippedWorkIds: ["RJ501099"],
+  });
+
+  const scanResult = await adapter.scan();
+  assert.deepEqual(scanResult.dataIntegrityWarning, worksPage.dataIntegrityWarning);
+
+  const exported = await adapter.exportLibrary();
+  assert.deepEqual(exported.dataIntegrityWarning, worksPage.dataIntegrityWarning);
+
+  // errorsシナリオはスマートフォルダーを持たないため、evalSmartFolderへの伝播確認用に
+  // その場で1件作る
+  const smartFolder = await adapter.createSmartFolder({
+    name: "全件",
+    rules: [],
+    sort: "added-desc",
+  });
+  const smartFolderWorks = await adapter.evalSmartFolder(smartFolder.id, {
+    tags: { tags: [], yearValue: null },
+    tagOp: "AND",
+    page: 1,
+    limit: 50,
+  });
+  assert.deepEqual(smartFolderWorks?.dataIntegrityWarning, worksPage.dataIntegrityWarning);
+
+  const bulk = await adapter.runDlsiteBulk("existing", undefined);
+  assert.deepEqual(bulk.dataIntegrityWarning, worksPage.dataIntegrityWarning);
+});
+
+test("new-work・default: dataIntegrityWarningは付かない（TASK-435 AC#3）", async () => {
+  for (const scenario of [undefined, "new-work"] as const) {
+    const adapter = createFixtureAdapter({ scenario });
+    const worksPage = await adapter.queryWorks({
+      q: "",
+      tags: { tags: [], yearValue: null },
+      tagOp: "AND",
+      sort: "id-asc",
+    });
+    assert.equal(worksPage.dataIntegrityWarning, undefined, `scenario=${scenario ?? "default"}`);
+  }
+});
+
 test("fixture: rjCode省略・空文字・指定を区別する", () => {
   // 省略=候補が検出した値を採用、空文字=明示的になし（real adapterと同じく""のまま）、値=そのまま採用（候補登録APIの規約）。
   assert.equal(resolveRegisteredRjCode("RJ999999", undefined), "RJ999999");

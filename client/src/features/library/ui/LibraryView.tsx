@@ -23,6 +23,7 @@ import {
   playingWorkIdAtom,
 } from "../../../entities/player/model/atoms";
 import { useLibraryNavigation } from "../model/useLibraryNavigation";
+import { usePreviewOverlayMode } from "../model/usePreviewOverlayMode";
 import {
   useLibraryBulkUnregisterMissingMutation,
   useLibraryDebouncedSearchQuery,
@@ -58,6 +59,7 @@ import { DataIntegrityWarningBanner } from "./DataIntegrityWarningBanner";
 import { ErrorViewBulkUnregisterBanner } from "./ErrorViewBulkUnregisterBanner";
 import LibraryWorksBoundary from "./LibraryWorksBoundary";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
+import { cn } from "../../../shared/lib/cn";
 
 interface LibraryViewProps {
   onPlay: (work: WorkListItem, trackIndex: number) => void;
@@ -100,6 +102,12 @@ export default function LibraryView({
   const playingTrackIndex = useAtomValue(playingTrackIndexAtom);
   const isPlaybackActive = useAtomValue(playerIsPlayingOrLoadingAtom);
   const nav = useLibraryNavigation();
+  const { ref: resultsRef, isOverlay: isPreviewOverlay } = usePreviewOverlayMode();
+  // プレビューの退出アニメーション中もオーバーレイ配置のままにする（開くときは即座にtrueへ）。
+  const [previewMounted, setPreviewMounted] = useState(nav.selectedWorkId !== null);
+  if (nav.selectedWorkId !== null && !previewMounted) {
+    setPreviewMounted(true);
+  }
   const [smartFolderEditor, setSmartFolderEditor] = useState<SmartFolderEditorState>(
     closedSmartFolderEditorState,
   );
@@ -292,6 +300,7 @@ export default function LibraryView({
         <FilterChipBand
           tagPrefixes={tagPrefixes}
           selectedTags={nav.selectedTags}
+          smartFolderId={activeSmartFolder?.id}
           onReplace={nav.replaceTag}
           onToggle={nav.toggleTag}
           onAddTag={nav.addTag}
@@ -352,13 +361,18 @@ export default function LibraryView({
                   mutation={bulkUnregisterMissingMutation}
                 />
               ) : undefined;
+              const previewOverlayActive = isPreviewOverlay && previewMounted;
+              const contentInertActive = isPreviewOverlay && nav.selectedWorkId !== null;
               return (
                 <>
                   {/* チップ列と同じ理由で .mll-results の外（.mll-resultspane の通常フロー）に置く。
                       プレビューが右からスライドインしても結果面の幅が縮むだけで隠れない。 */}
                   {resultsBanner}
-                  <div className="mll-results">
-                    <div className="mll-results__content">
+                  <div
+                    className={cn("mll-results", previewOverlayActive && "mll-results--overlay")}
+                    ref={resultsRef}
+                  >
+                    <div className="mll-results__content" inert={contentInertActive || undefined}>
                       {showGrid ? (
                         <WorkGrid
                           axis={nav.activeAxis}
@@ -414,7 +428,7 @@ export default function LibraryView({
                         selectedWorkId が非nullの間だけマウントする境界にすることで、退出中も
                         AnimatePresenceが凍結した最後のselectedWorkを表示し続ける（RQキャッシュへの
                         暗黙依存を断つ）。 */}
-                    <AnimatePresence>
+                    <AnimatePresence onExitComplete={() => setPreviewMounted(false)}>
                       {nav.selectedWorkId !== null && (
                         <PreviewPaneSlide
                           key="preview"

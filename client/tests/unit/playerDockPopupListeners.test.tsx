@@ -7,7 +7,7 @@ import { PLAYER_CORE_INITIAL, playerCoreAtom } from "../../src/entities/player/m
 import { playerUiModeAtom } from "../../src/features/player/model/playerPresentationAtoms";
 import { buildPlayerDockProps } from "./fixtures/playerDock";
 
-// PopupContent はモックしない: 再生速度メニューの window リスナーが
+// PopupContent はモックしない: 再生速度メニュー（usePopoverDismissal 経由）のリスナーが
 // 退出中（useIsPresent() === false）に解除されることを実物のコンポーネントで検証する。
 vi.mock("../../src/features/player/ui/BarContent", () => ({
   default: ({ onSwitchToPopup }: { onSwitchToPopup: () => void }) => (
@@ -62,38 +62,42 @@ function renderPlayerDock() {
   );
 }
 
-describe("PlayerDock popup: 再生速度メニューの window リスナー", () => {
+describe("PlayerDock popup: 再生速度メニューのリスナー", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("退出開始（useIsPresent()===false）と同時に pointerdown/keydown リスナーが解除される", () => {
-    const addSpy = vi.spyOn(window, "addEventListener");
-    const removeSpy = vi.spyOn(window, "removeEventListener");
+  it("退出開始（useIsPresent()===false）と同時に outside press/keydown/scroll リスナーが解除される", () => {
+    const docAddSpy = vi.spyOn(document, "addEventListener");
+    const docRemoveSpy = vi.spyOn(document, "removeEventListener");
+    const winAddSpy = vi.spyOn(window, "addEventListener");
+    const winRemoveSpy = vi.spyOn(window, "removeEventListener");
 
     renderPlayerDock();
     fireEvent.click(screen.getByTitle("再生速度"));
 
-    expect(addSpy.mock.calls.some(([type]) => type === "pointerdown")).toBe(true);
-    expect(addSpy.mock.calls.some(([type]) => type === "keydown")).toBe(true);
-    const removedBefore = removeSpy.mock.calls.filter(
-      ([type]) => type === "pointerdown" || type === "keydown",
-    ).length;
+    expect(docAddSpy.mock.calls.some(([type]) => type === "pointerdown")).toBe(true);
+    expect(docAddSpy.mock.calls.some(([type]) => type === "keydown")).toBe(true);
+    expect(winAddSpy.mock.calls.some(([type]) => type === "scroll")).toBe(true);
+    const removedBefore =
+      docRemoveSpy.mock.calls.filter(([type]) => type === "pointerdown" || type === "keydown")
+        .length + winRemoveSpy.mock.calls.filter(([type]) => type === "scroll").length;
 
     // バーへ戻る => popup 境界が退出開始。isPresent は退出開始と同時に false になるため、
     // アニメーション完了を待たずにここでリスナーが外れているはず。
     fireEvent.click(screen.getByRole("button", { name: "バーへ戻る" }));
 
-    const removedAfter = removeSpy.mock.calls.filter(
-      ([type]) => type === "pointerdown" || type === "keydown",
-    ).length;
+    const removedAfter =
+      docRemoveSpy.mock.calls.filter(([type]) => type === "pointerdown" || type === "keydown")
+        .length + winRemoveSpy.mock.calls.filter(([type]) => type === "scroll").length;
     expect(removedAfter).toBeGreaterThan(removedBefore);
 
-    // 退出中に外部から pointerdown/keydown を飛ばしても、もはや古いリスナーには届かない
+    // 退出中に外部から pointerdown/keydown/scroll を飛ばしても、もはや古いリスナーには届かない
     // （そのため rateMenuOpen が再オープンされたりせずクラッシュもしない）ことを確認する。
     expect(() => {
       fireEvent.pointerDown(document.body);
       fireEvent.keyDown(window, { key: "Escape" });
+      fireEvent.scroll(window);
     }).not.toThrow();
   });
 });

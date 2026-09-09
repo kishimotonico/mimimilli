@@ -25,6 +25,8 @@ import {
 interface FilterChipBandProps {
   tagPrefixes: TagPrefix[];
   selectedTags: NormalizedTag[];
+  /** 表示中のスマートフォルダーID。チップの候補件数をフォルダー条件適用後にする */
+  smartFolderId?: string;
   /** 置き換え選択（結果面を作品一覧へ遷移させる。ADR-0012 §8） */
   onReplace: (tag: NormalizedTag) => void;
   /** Ctrl/Cmd+クリックによる反転先・チップの解除に使うトグル（結果面はそのまま） */
@@ -40,6 +42,7 @@ function FilterChip({
   tag,
   tagPrefixes,
   selectedTags,
+  smartFolderId,
   onSelect,
   onAdd,
   onRemove,
@@ -49,6 +52,7 @@ function FilterChip({
   /** 現在選択中の全タグ。兄弟値ドロップダウンの選択中チェック表示にのみ使う
    *  （件数は既定=置き換えの入口として無条件集計にする。TASK-428.14） */
   selectedTags: NormalizedTag[];
+  smartFolderId?: string;
   onSelect: (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
   onAdd: (tag: NormalizedTag) => void;
   onRemove: () => void;
@@ -88,6 +92,7 @@ function FilterChip({
             selectedTags={selectedTags}
             // 既定=置き換えの入口（ADR-0013）。件数基準は無条件集計にする（TASK-428.14）。
             countTags={[]}
+            smartFolderId={smartFolderId}
             onSelect={(nextTag, opts) => {
               onSelect(nextTag, opts);
               close();
@@ -105,6 +110,7 @@ function FilterChip({
 export default function FilterChipBand({
   tagPrefixes,
   selectedTags,
+  smartFolderId,
   onReplace,
   onToggle,
   onAddTag,
@@ -139,6 +145,7 @@ export default function FilterChipBand({
             tag={tag}
             tagPrefixes={tagPrefixes}
             selectedTags={selectedTags}
+            smartFolderId={smartFolderId}
             onSelect={handleSelectSibling}
             onAdd={handleAddSibling}
             onRemove={() => onToggle(tag)}
@@ -148,6 +155,7 @@ export default function FilterChipBand({
       <FilterChipAddButton
         tagPrefixes={tagPrefixes}
         selectedTags={selectedTags}
+        smartFolderId={smartFolderId}
         onAddValue={handleAddFilterSelect}
       />
       <div className="mll-tagband__tail">

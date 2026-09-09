@@ -279,7 +279,7 @@ export function WorkEditDialog({
               <WorkSourcePatchBlockedNotice sourceRevision={work.sourceRevision} />
               <label
                 htmlFor="work-title-input"
-                className="font-sans text-[11px] font-semibold text-ink-1"
+                className="font-sans text-label font-semibold text-ink-1"
               >
                 タイトル
               </label>
@@ -310,7 +310,7 @@ export function WorkEditDialog({
             <section aria-labelledby="work-edit-tags-title" className="flex flex-col gap-2">
               <h3
                 id="work-edit-tags-title"
-                className="font-sans text-[11px] font-semibold text-ink-1"
+                className="font-sans text-label font-semibold text-ink-1"
               >
                 タグ
               </h3>
@@ -325,7 +325,7 @@ export function WorkEditDialog({
             <form className="flex flex-col gap-2" onSubmit={saveUrls}>
               <h3
                 id="work-edit-urls-title"
-                className="font-sans text-[11px] font-semibold text-ink-1"
+                className="font-sans text-label font-semibold text-ink-1"
               >
                 関連URL
               </h3>
@@ -347,7 +347,7 @@ export function WorkEditDialog({
                     }}
                   />
                   <input
-                    className={`${inputClass} font-mono text-[11px]`}
+                    className={`${inputClass} font-mono text-mono`}
                     value={entry.url}
                     aria-label={`URL ${index + 1}`}
                     placeholder="https://"

@@ -69,7 +69,7 @@ export default function ExcludedFoldersSettings() {
               <span
                 dir="rtl"
                 title={path}
-                className="mll-selectable min-w-0 flex-1 overflow-hidden text-left font-mono text-[11px] text-ellipsis whitespace-nowrap text-ink-2"
+                className="mll-selectable min-w-0 flex-1 overflow-hidden text-left font-mono text-mono text-ellipsis whitespace-nowrap text-ink-2"
               >
                 {path}
               </span>
@@ -87,7 +87,7 @@ export default function ExcludedFoldersSettings() {
       </div>
 
       {errorMessage && (
-        <p role="alert" className="mll-selectable m-0 text-[11px] text-[var(--r-coral)]">
+        <p role="alert" className="mll-selectable m-0 text-secondary text-[var(--r-coral)]">
           {errorMessage}
         </p>
       )}

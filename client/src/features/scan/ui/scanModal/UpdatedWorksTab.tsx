@@ -16,7 +16,7 @@ export default function UpdatedWorksTab({ workIds }: UpdatedWorksTabProps) {
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="font-jp text-[11.5px] text-ink-2">
+      <p className="font-jp text-secondary text-ink-2">
         スキャン時に作品情報ファイルの変更を取り込みました。
       </p>
       <ScanResultWorksTable

@@ -47,7 +47,7 @@ export default function DlsiteBulkApplyDialog({
           </h2>
           <IconButton icon={I.x} label="閉じる" size="sm" disabled={busy} onClick={close} />
         </header>
-        <div className="mll-selectable min-h-0 flex-1 overflow-y-auto px-[18px] py-3 text-[12px] leading-relaxed text-ink-1">
+        <div className="mll-selectable min-h-0 flex-1 overflow-y-auto px-[18px] py-3 text-body leading-relaxed text-ink-1">
           <p className="pb-2 text-ink-2">
             すでに値が入っている項目は対象に含めていません。適用する作品を選んでください。
           </p>

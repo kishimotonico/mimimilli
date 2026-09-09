@@ -28,7 +28,7 @@ function InfoRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex items-baseline gap-3 py-1.5">
       <dt className="w-[96px] shrink-0 font-sans text-secondary text-ink-2">{label}</dt>
-      <dd className="min-w-0 flex-1 break-words font-jp text-[12px] text-ink-0">{children}</dd>
+      <dd className="min-w-0 flex-1 break-words font-jp text-body text-ink-0">{children}</dd>
     </div>
   );
 }
@@ -71,7 +71,7 @@ export function WorkInfoDialog({
           <section aria-labelledby="work-info-basic-title" className="flex flex-col gap-1">
             <h3
               id="work-info-basic-title"
-              className="mb-1 font-sans text-[11px] font-semibold text-ink-1"
+              className="mb-1 font-sans text-label font-semibold text-ink-1"
             >
               基本情報
             </h3>
@@ -103,7 +103,7 @@ export function WorkInfoDialog({
               <InfoRow label="プレイリスト">{playlistLabel}</InfoRow>
               <InfoRow label="カバー画像">{formatCoverInfoLabel(work.coverKind)}</InfoRow>
               <InfoRow label="物理パス">
-                <span className="break-all font-mono text-[11px]">{work.physicalPath}</span>
+                <span className="break-all font-mono text-mono">{work.physicalPath}</span>
               </InfoRow>
               <InfoRow label="外部リンク">
                 {work.urls.length > 0 ? (
@@ -141,14 +141,14 @@ export function WorkInfoDialog({
           >
             <h3
               id="work-info-dlsite-title"
-              className="mb-1 font-sans text-[11px] font-semibold text-ink-1"
+              className="mb-1 font-sans text-label font-semibold text-ink-1"
             >
               DLsite連携
             </h3>
             <dl className="flex flex-col divide-y divide-line-soft">
               <InfoRow label="状態">{STATUS_LABEL[work.dlsite.status]}</InfoRow>
               <InfoRow label="RJコード">
-                <span className="font-mono text-[11px]">{work.dlsite.rjCode ?? "未設定"}</span>
+                <span className="font-mono text-mono">{work.dlsite.rjCode ?? "未設定"}</span>
               </InfoRow>
               <InfoRow label="最終取得日時">
                 {work.dlsite.lastAttemptAt ? formatDateTime(work.dlsite.lastAttemptAt) : "未取得"}

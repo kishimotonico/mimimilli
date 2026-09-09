@@ -24,10 +24,10 @@ const SECTION_LABEL_CLASS =
   "font-sans text-label font-semibold tracking-[0.08em] text-ink-2 uppercase";
 
 const TOGGLE_LABEL_CLASS =
-  "inline-flex items-center gap-1 font-sans text-[11px] text-ink-2 cursor-pointer whitespace-nowrap";
+  "inline-flex items-center gap-1 font-sans text-secondary text-ink-2 cursor-pointer whitespace-nowrap";
 
 const INPUT_CLASS =
-  "h-[30px] min-w-0 flex-1 rounded-[6px] border border-line-soft bg-paper-0 px-2.5 font-jp text-[11.5px] text-ink-1";
+  "h-[30px] min-w-0 flex-1 rounded-[6px] border border-line-soft bg-paper-0 px-2.5 font-jp text-secondary text-ink-1";
 
 /** 保護中の prefix を削除できない理由。削除ボタンの title に出す */
 const PROTECTED_DELETE_TITLE =
@@ -242,14 +242,14 @@ export default function TagPrefixSettings() {
                   if (e.key === "Escape") setEditingPrefix(null);
                 }}
                 aria-label={`「${p.prefix}」のラベル`}
-                className="h-[24px] min-w-0 flex-1 rounded-1 border border-line bg-paper-0 px-1.5 font-jp text-[12px] text-ink-1"
+                className="h-[24px] min-w-0 flex-1 rounded-1 border border-line bg-paper-0 px-1.5 font-jp text-body text-ink-1"
               />
             ) : (
               <button
                 type="button"
                 onClick={() => startEditLabel(p)}
                 title="クリックしてラベルを編集"
-                className="min-w-0 flex-1 cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap rounded-1 px-1 py-0.5 text-left text-[12px] text-ink-1 hover:bg-paper-2"
+                className="min-w-0 flex-1 cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap rounded-1 px-1 py-0.5 text-left text-body text-ink-1 hover:bg-paper-2"
               >
                 {p.label}
                 <span className="ml-1.5 font-mono text-caption text-ink-2">{p.prefix}/</span>
@@ -331,7 +331,7 @@ export default function TagPrefixSettings() {
         <button
           type="submit"
           disabled={!newPrefix.trim() || isMutating}
-          className="h-[30px] cursor-pointer rounded-[6px] border border-line bg-paper-1 px-3 font-sans text-[12px] font-medium whitespace-nowrap text-ink-1 disabled:cursor-not-allowed"
+          className="h-[30px] cursor-pointer rounded-[6px] border border-line bg-paper-1 px-3 font-sans text-control font-medium whitespace-nowrap text-ink-1 disabled:cursor-not-allowed"
         >
           追加
         </button>
@@ -356,7 +356,7 @@ export default function TagPrefixSettings() {
                 })
               }
               title={`「${c.prefix}/」を prefix 定義に登録`}
-              className="inline-flex h-[22px] cursor-pointer items-center gap-1 rounded-[11px] border border-dashed border-line bg-paper-0 px-2 font-jp text-[10.5px] text-ink-2 disabled:cursor-not-allowed"
+              className="inline-flex h-[22px] cursor-pointer items-center gap-1 rounded-[11px] border border-dashed border-line bg-paper-0 px-2 font-jp text-control text-ink-2 disabled:cursor-not-allowed"
             >
               <I.add size={10} />
               {c.prefix}
@@ -367,7 +367,7 @@ export default function TagPrefixSettings() {
       )}
 
       {error && (
-        <p role="alert" className="mll-selectable m-0 text-[11px] text-[var(--r-coral)]">
+        <p role="alert" className="mll-selectable m-0 text-secondary text-[var(--r-coral)]">
           {error}
         </p>
       )}

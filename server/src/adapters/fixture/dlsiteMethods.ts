@@ -143,6 +143,7 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
         failed: 0,
         parseErrors: 0,
         skipped: requested.length - targets.length,
+        ...(state.dataIntegrityWarning ? { dataIntegrityWarning: state.dataIntegrityWarning } : {}),
       };
       for (let index = 0; index < targets.length; index++) {
         if (options?.signal?.aborted) return result;

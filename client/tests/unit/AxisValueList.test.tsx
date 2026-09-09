@@ -228,6 +228,58 @@ describe("AxisValueList list 表示（ADR-0012 §5）", () => {
   });
 });
 
+describe("AxisValueList list 表示の矢印キー・roving tabindex（TASK-436）", () => {
+  it("ArrowDownで次の行へ、Home/Endで先頭・末尾へ移動する（作品一覧と同じ規則）", async () => {
+    const sizeMock = mockElementSize(600, 600);
+    const user = userEvent.setup();
+    renderAxisValueList({
+      facetItems: [
+        makeItem({ value: "a", count: 3 }),
+        makeItem({ value: "b", count: 2 }),
+        makeItem({ value: "c", count: 1 }),
+      ],
+    });
+    await flushVirtualizer();
+
+    const first = getRow(".mll-vrow", "a").querySelector(".mll-vrow__main") as HTMLElement;
+    first.focus();
+    expect(document.activeElement).toBe(first);
+
+    await user.keyboard("{ArrowDown}");
+    expect(document.activeElement?.closest(".mll-vrow")?.textContent).toContain("b");
+
+    await user.keyboard("{End}");
+    expect(document.activeElement?.closest(".mll-vrow")?.textContent).toContain("c");
+
+    await user.keyboard("{Home}");
+    expect(document.activeElement?.closest(".mll-vrow")?.textContent).toContain("a");
+
+    // 端でのArrowUpはラップアラウンドせずクランプする（作品一覧と同じ規則）。
+    await user.keyboard("{ArrowUp}");
+    expect(document.activeElement?.closest(".mll-vrow")?.textContent).toContain("a");
+    sizeMock.restore();
+  });
+
+  it("roving tabindex: 現在位置の行だけがtabIndex 0になる", async () => {
+    const sizeMock = mockElementSize(600, 600);
+    const user = userEvent.setup();
+    renderAxisValueList({
+      facetItems: [makeItem({ value: "a" }), makeItem({ value: "b" }), makeItem({ value: "c" })],
+    });
+    await flushVirtualizer();
+
+    const first = getRow(".mll-vrow", "a").querySelector(".mll-vrow__main") as HTMLElement;
+    first.focus();
+    await user.keyboard("{ArrowDown}");
+
+    const mains = Array.from(document.querySelectorAll<HTMLButtonElement>(".mll-vrow__main"));
+    const tabbable = mains.filter((el) => el.tabIndex === 0);
+    expect(tabbable.length).toBe(1);
+    expect(tabbable[0]).toBe(document.activeElement);
+    sizeMock.restore();
+  });
+});
+
 describe("AxisValueList grid 表示", () => {
   it("代表カバー2×2コラージュ・名前・件数バッジのタイルとして並ぶ", async () => {
     const sizeMock = mockElementSize(600, 600);
@@ -263,6 +315,33 @@ describe("AxisValueList grid 表示", () => {
 
     const grid = document.querySelector(".mll-grid") as HTMLElement | null;
     expect(grid?.style.getPropertyValue("--tile-size")).toBe("200px");
+    sizeMock.restore();
+  });
+});
+
+describe("AxisValueList grid 表示の矢印キー・roving tabindex（TASK-436）", () => {
+  it("Home/Endで先頭・末尾のタイルへ移動し、現在位置だけがtabIndex 0になる", async () => {
+    const sizeMock = mockElementSize(600, 600);
+    const user = userEvent.setup();
+    const items = Array.from({ length: 8 }, (_, i) => makeItem({ value: `値${i}`, count: i }));
+    renderAxisValueList({ facetItems: items }, "grid");
+    await flushVirtualizer();
+
+    const tiles = () =>
+      Array.from(document.querySelectorAll<HTMLButtonElement>(".mll-vtile__main"));
+    const first = tiles()[0]!;
+    first.focus();
+    expect(document.activeElement).toBe(first);
+
+    await user.keyboard("{End}");
+    expect(document.activeElement).toBe(tiles().at(-1));
+
+    await user.keyboard("{Home}");
+    expect(document.activeElement).toBe(tiles()[0]);
+
+    const tabbable = tiles().filter((el) => el.tabIndex === 0);
+    expect(tabbable.length).toBe(1);
+    expect(tabbable[0]).toBe(document.activeElement);
     sizeMock.restore();
   });
 });

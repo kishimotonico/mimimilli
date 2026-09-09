@@ -33,7 +33,7 @@ export default function RjCodeMissingModal({ onClose, onOpenWork }: RjCodeMissin
           className="flex w-full flex-col items-start gap-0.5 rounded-[6px] border border-line-soft bg-paper-0 px-2.5 py-2 text-left hover:bg-paper-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-acc focus-visible:outline-offset-2"
           onClick={() => onOpenWork(work.id)}
         >
-          <span className="w-full truncate text-[12px]">{work.title}</span>
+          <span className="w-full truncate text-body">{work.title}</span>
         </button>
       )}
     />

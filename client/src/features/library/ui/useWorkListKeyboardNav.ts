@@ -1,7 +1,7 @@
 import { useCallback, type RefObject } from "react";
 import type { WorkListItem } from "@mimimilli/shared";
 import type { Virtualizer } from "@tanstack/react-virtual";
-import { getNextGridIndex, type GridArrowKey } from "../model/gridNavigation";
+import { getNextGridIndex, type GridArrowKey } from "../../../shared/lib/gridNavigation";
 import { focusVirtualItem } from "../../../shared/lib/focusVirtualItem";
 
 interface UseWorkListKeyboardNavOptions {
