@@ -25,9 +25,9 @@ import {
 } from "./workGrid/useWorkGridJustifiedLayout";
 import { useWorkGridWheelZoom } from "./workGrid/useWorkGridWheelZoom";
 import { useWorkResultsDismiss } from "./useWorkResultsDismiss";
-import { useWorkGridKeyboardNav } from "./workGrid/useWorkGridKeyboardNav";
+import { useGridKeyboardNav } from "./useGridKeyboardNav";
 import { useRovingIndex } from "./useRovingIndex";
-import { firstFlatIndexOfRow, rowIndexOfFlatIndex } from "../model/gridNavigation";
+import { firstFlatIndexOfRow, rowIndexOfFlatIndex } from "../../../shared/lib/gridNavigation";
 import WorkGridVirtualContent from "./workGrid/WorkGridVirtualContent";
 
 interface WorkGridProps {
@@ -141,13 +141,13 @@ export default function WorkGrid({
 
   useWorkGridWheelZoom(paneRef, safeTileSize, setTileSize);
   useWorkResultsDismiss(isWorkSelected, onDeselect, scrollRef, ".mll-grid-tile");
-  const moveTileFocus = useWorkGridKeyboardNav({
+  const moveTileFocus = useGridKeyboardNav({
     gridEl,
     isJustified,
     justifiedLayout,
     columnCount,
-    works,
-    onWorkSelect,
+    items: works,
+    onFocusItem: (work) => onWorkSelect(work.id),
     virtualizer,
   });
 

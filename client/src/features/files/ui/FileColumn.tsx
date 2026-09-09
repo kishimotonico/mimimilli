@@ -1,6 +1,7 @@
 // カラムの中身（ヘッダー + 行リスト）。外側の .mle-col 枠と出入りアニメーションは
 // FilesView 側の motion.div が担うため、ここはフラグメントを返す。
 
+import { useRef } from "react";
 import Button from "../../../shared/ui/Button";
 import { I } from "../../../shared/ui/Icon";
 import CollectionStatus from "../../../shared/ui/CollectionStatus";
@@ -8,6 +9,7 @@ import { classifyFile, sortEntries, type FsEntry } from "../model/types";
 import type { WorkspacePath } from "@mimimilli/shared";
 import type { ScanDiagnostic } from "@mimimilli/shared";
 import FileRow from "./FileRow";
+import { useFileListKeyboardNav } from "./useFileListKeyboardNav";
 
 interface FileColumnProps {
   title: string;
@@ -18,6 +20,9 @@ interface FileColumnProps {
   isPlaybackActive?: boolean;
   onOpenDir: (absPath: WorkspacePath) => void;
   onSelectFile: (absPath: WorkspacePath) => void;
+  /** 矢印キーでの行移動。クリックと違いフォルダーへは潜らず、プレビュー対象を移すだけ
+   *  （作品一覧の矢印キー移動が選択を追従させるのと同じ規則、TASK-436） */
+  onFocusEntry: (absPath: WorkspacePath) => void;
   onPlayFile: (entry: FsEntry, folderEntries: FsEntry[]) => void;
   isLoading?: boolean;
   /** フォルダー一覧取得の失敗。無言で「空のフォルダー」にせず区別する */
@@ -36,6 +41,7 @@ export default function FileColumn({
   isPlaybackActive,
   onOpenDir,
   onSelectFile,
+  onFocusEntry,
   onPlayFile,
   isLoading,
   isError,
@@ -43,13 +49,24 @@ export default function FileColumn({
   onRetry,
 }: FileColumnProps) {
   const sorted = sortEntries(entries);
+  const listRef = useRef<HTMLDivElement>(null);
+  const moveRowFocus = useFileListKeyboardNav({
+    listRef,
+    entries: sorted,
+    onFocusEntry,
+  });
+  // roving tabindexの現在位置。選択中エントリがあればその位置、無ければ先頭（0）を
+  // 対象にする（一覧全体でTabストップ1個、作品一覧と同じ規則。仮想化していないため
+  // useRovingIndexの描画範囲フォールバックは不要）。
+  const selectedIndex = sorted.findIndex((entry) => entry.path === selectedPath);
+  const rovingIndex = sorted.length === 0 ? -1 : selectedIndex >= 0 ? selectedIndex : 0;
   return (
     <>
       <div className="mle-col__hd">
         <span>{title}</span>
         <span className="count">{entries.length}</span>
       </div>
-      <div className="mle-col__list">
+      <div ref={listRef} className="mle-col__list">
         {isLoading ? (
           <CollectionStatus variant="list" kind="loading" />
         ) : notFound ? (
@@ -77,7 +94,7 @@ export default function FileColumn({
             {sorted.length === 0 ? (
               <CollectionStatus variant="list" kind="empty" message="空のフォルダー" />
             ) : (
-              sorted.map((entry) => {
+              sorted.map((entry, index) => {
                 const onClick = () =>
                   entry.isDir ? onOpenDir(entry.path) : onSelectFile(entry.path);
                 const onActivate = () => {
@@ -89,12 +106,15 @@ export default function FileColumn({
                   <FileRow
                     key={entry.path}
                     entry={entry}
+                    flatIndex={index}
+                    tabIndex={index === rovingIndex ? 0 : -1}
                     identityConflict={identityConflictPaths.get(entry.path) ?? null}
                     isFocused={entry.path === selectedPath}
                     isPlaying={matchPlaying(entry)}
                     isPlaybackActive={isPlaybackActive}
                     onClick={onClick}
                     onActivate={onActivate}
+                    onArrowKey={moveRowFocus}
                   />
                 );
               })

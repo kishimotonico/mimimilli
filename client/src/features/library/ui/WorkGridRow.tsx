@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import type { WorkListItem } from "@mimimilli/shared";
-import type { GridArrowKey } from "../model/gridNavigation";
+import type { GridArrowKey } from "../../../shared/lib/gridNavigation";
 import WorkTile from "./WorkTile";
 
 export interface JustifiedRowEntry {

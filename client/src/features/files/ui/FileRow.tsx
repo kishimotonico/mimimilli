@@ -3,10 +3,17 @@ import { formatFileSize } from "../../../shared/lib/format";
 import { classifyFile, FILE_KIND_ICON, FILE_KIND_ROW_CLASS, type FsEntry } from "../model/types";
 import { getWorkFolderDisplay } from "../model/workFolderDisplay";
 import type { ScanDiagnostic } from "@mimimilli/shared";
+import type { GridArrowKey } from "../../../shared/lib/gridNavigation";
+
+const LIST_ARROW_KEYS = new Set<GridArrowKey>(["ArrowUp", "ArrowDown", "Home", "End"]);
 
 interface FileRowProps {
   entry: FsEntry;
   identityConflict: ScanDiagnostic | null;
+  flatIndex: number;
+  /** roving tabindexの現在位置と一致する場合だけ0（それ以外は-1）。
+   *  一覧全体をTabストップ1個にする（作品一覧と同じ規則、TASK-436） */
+  tabIndex: 0 | -1;
   /** 選択中エントリ本体（濃いハイライト） */
   isFocused: boolean;
   /** このファイルが今再生中 */
@@ -14,16 +21,20 @@ interface FileRowProps {
   isPlaybackActive?: boolean;
   onClick: () => void;
   onActivate: () => void;
+  onArrowKey: (flatIndex: number, key: GridArrowKey) => void;
 }
 
 export default function FileRow({
   entry,
   identityConflict,
+  flatIndex,
+  tabIndex,
   isFocused,
   isPlaying,
   isPlaybackActive,
   onClick,
   onActivate,
+  onArrowKey,
 }: FileRowProps) {
   const kind = classifyFile(entry);
   const Ic = I[FILE_KIND_ICON[kind]];
@@ -47,8 +58,15 @@ export default function FileRow({
     <button
       type="button"
       className={cls}
+      data-flat-index={flatIndex}
+      tabIndex={tabIndex}
       onClick={onClick}
       onDoubleClick={onActivate}
+      onKeyDown={(event) => {
+        if (!LIST_ARROW_KEYS.has(event.key as GridArrowKey)) return;
+        event.preventDefault();
+        onArrowKey(flatIndex, event.key as GridArrowKey);
+      }}
       title={entry.name}
     >
       <span className="ficon">

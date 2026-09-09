@@ -5,7 +5,7 @@ import { getWorkStatusLabel } from "../../../entities/work/workStatusLabel";
 import { I } from "../../../shared/ui/Icon";
 import { formatDuration } from "../../../shared/lib/format";
 import { cn } from "../../../shared/lib/cn";
-import type { GridArrowKey } from "../model/gridNavigation";
+import type { GridArrowKey } from "../../../shared/lib/gridNavigation";
 
 const LIST_ARROW_KEYS = new Set<GridArrowKey>(["ArrowUp", "ArrowDown", "Home", "End"]);
 

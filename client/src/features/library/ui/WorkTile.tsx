@@ -5,7 +5,7 @@ import { getWorkStatusLabel } from "../../../entities/work/workStatusLabel";
 import { I } from "../../../shared/ui/Icon";
 import { cn } from "../../../shared/lib/cn";
 import { selectCoverThumbnailWidth } from "../model/gridSizing";
-import type { GridArrowKey } from "../model/gridNavigation";
+import type { GridArrowKey } from "../../../shared/lib/gridNavigation";
 
 const GRID_ARROW_KEYS = new Set<GridArrowKey>([
   "ArrowLeft",

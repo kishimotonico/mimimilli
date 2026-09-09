@@ -4,7 +4,7 @@ import {
   getNextGridIndex,
   getNextJustifiedIndex,
   rowIndexOfFlatIndex,
-} from "../../src/features/library/model/gridNavigation";
+} from "../../src/shared/lib/gridNavigation";
 
 describe("library grid keyboard navigation", () => {
   it("moves horizontally by one and vertically by the rendered column count", () => {
