@@ -20,7 +20,7 @@ function flushWidth(width: number) {
   });
 }
 
-describe("usePreviewOverlayMode（TASK-438）", () => {
+describe("usePreviewOverlayMode", () => {
   beforeEach(() => {
     // tokens.css相当。テストでも実際のトークンと同じ値を使い、閾値320+360=680pxを固定しない。
     document.documentElement.style.setProperty("--lib-results-list-min-w", "320px");

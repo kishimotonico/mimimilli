@@ -71,7 +71,7 @@
   color: var(--ink-0);
   background: var(--paper-3);
 }
-/* 全幅オーバーレイ時（TASK-438）は左外側に一覧が無いため、内側右上へ寄せる。 */
+/* 全幅オーバーレイ時は左外側に一覧が無いため、内側右上へ寄せる。 */
 .mll-results--overlay .mle-prv__close {
   left: auto;
   right: 10px;

@@ -2,10 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
  * 結果面（.mll-results）の幅が一覧最低幅とプレビュー最低幅の両方を確保できないとき、
- * プレビューを全幅オーバーレイへ切り替える判定（TASK-438）。
+ * プレビューを全幅オーバーレイへ切り替える判定。
  *
- * 閾値は固定pxで書かず、tokens.css の --lib-results-list-min-w /
- * --lib-results-preview-min-w を都度読み取って導出する（値の単一の出所をCSS側に置く）。
+ * 閾値は固定pxで書かず、要素が接続されるたびに tokens.css の --lib-results-list-min-w /
+ * --lib-results-preview-min-w を読み取って導出する（値の単一の出所をCSS側に置く）。
  */
 export function usePreviewOverlayMode() {
   const [isOverlay, setIsOverlay] = useState(false);
