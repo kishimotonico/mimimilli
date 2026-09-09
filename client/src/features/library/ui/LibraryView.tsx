@@ -103,6 +103,11 @@ export default function LibraryView({
   const isPlaybackActive = useAtomValue(playerIsPlayingOrLoadingAtom);
   const nav = useLibraryNavigation();
   const { ref: resultsRef, isOverlay: isPreviewOverlay } = usePreviewOverlayMode();
+  // プレビューの退出アニメーション中もオーバーレイ配置のままにする（開くときは即座にtrueへ）。
+  const [previewMounted, setPreviewMounted] = useState(nav.selectedWorkId !== null);
+  if (nav.selectedWorkId !== null && !previewMounted) {
+    setPreviewMounted(true);
+  }
   const [smartFolderEditor, setSmartFolderEditor] = useState<SmartFolderEditorState>(
     closedSmartFolderEditorState,
   );
@@ -356,7 +361,8 @@ export default function LibraryView({
                   mutation={bulkUnregisterMissingMutation}
                 />
               ) : undefined;
-              const previewOverlayActive = isPreviewOverlay && nav.selectedWorkId !== null;
+              const previewOverlayActive = isPreviewOverlay && previewMounted;
+              const contentInertActive = isPreviewOverlay && nav.selectedWorkId !== null;
               return (
                 <>
                   {/* チップ列と同じ理由で .mll-results の外（.mll-resultspane の通常フロー）に置く。
@@ -366,7 +372,7 @@ export default function LibraryView({
                     className={cn("mll-results", previewOverlayActive && "mll-results--overlay")}
                     ref={resultsRef}
                   >
-                    <div className="mll-results__content" inert={previewOverlayActive || undefined}>
+                    <div className="mll-results__content" inert={contentInertActive || undefined}>
                       {showGrid ? (
                         <WorkGrid
                           axis={nav.activeAxis}
@@ -422,7 +428,7 @@ export default function LibraryView({
                         selectedWorkId が非nullの間だけマウントする境界にすることで、退出中も
                         AnimatePresenceが凍結した最後のselectedWorkを表示し続ける（RQキャッシュへの
                         暗黙依存を断つ）。 */}
-                    <AnimatePresence>
+                    <AnimatePresence onExitComplete={() => setPreviewMounted(false)}>
                       {nav.selectedWorkId !== null && (
                         <PreviewPaneSlide
                           key="preview"
