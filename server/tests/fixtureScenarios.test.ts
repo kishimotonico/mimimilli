@@ -153,8 +153,11 @@ test("new-work: identityConflicts・invalidMetaFilesが指すパスは/fsツリ�
   assert.ok(metaEntry, "壊れた/mimimilli.json が/fsツリーに存在しない");
 });
 
-test("new-work: dataIntegrityWarningがWorksPage・スキャン結果・エクスポート・スマートフォルダー・DLsite一括のいずれからも取得できる（TASK-435）", async () => {
-  const adapter = createFixtureAdapter({ scenario: "new-work" });
+test("errors: dataIntegrityWarningがWorksPage・スキャン結果・エクスポート・スマートフォルダー・DLsite一括のいずれからも取得できる（TASK-435）", async () => {
+  // real adapterの意味論（DB破損行があればクエリのたびに毎回付く劣化状態の表示）に
+  // 合わせ、劣化状態を確認するためのシナリオ errors に置く。new-work・default等の
+  // 既定シナリオへ置くとsmoke・worktree確認の土台が常時バナー込みになってしまうため避ける
+  const adapter = createFixtureAdapter({ scenario: "errors" });
 
   const worksPage = await adapter.queryWorks({
     q: "",
@@ -173,8 +176,14 @@ test("new-work: dataIntegrityWarningがWorksPage・スキャン結果・エク�
   const exported = await adapter.exportLibrary();
   assert.deepEqual(exported.dataIntegrityWarning, worksPage.dataIntegrityWarning);
 
-  const smartFolders = await adapter.listSmartFolders();
-  const smartFolderWorks = await adapter.evalSmartFolder(smartFolders[0]!.id, {
+  // errorsシナリオはスマートフォルダーを持たないため、evalSmartFolderへの伝播確認用に
+  // その場で1件作る
+  const smartFolder = await adapter.createSmartFolder({
+    name: "全件",
+    rules: [],
+    sort: "added-desc",
+  });
+  const smartFolderWorks = await adapter.evalSmartFolder(smartFolder.id, {
     tags: { tags: [], yearValue: null },
     tagOp: "AND",
     page: 1,
@@ -182,19 +191,21 @@ test("new-work: dataIntegrityWarningがWorksPage・スキャン結果・エク�
   });
   assert.deepEqual(smartFolderWorks?.dataIntegrityWarning, worksPage.dataIntegrityWarning);
 
-  const bulk = await adapter.runDlsiteBulk("existing", ["RJ501001"]);
+  const bulk = await adapter.runDlsiteBulk("existing", undefined);
   assert.deepEqual(bulk.dataIntegrityWarning, worksPage.dataIntegrityWarning);
 });
 
-test("default: dataIntegrityWarningは付かない", async () => {
-  const adapter = createFixtureAdapter();
-  const worksPage = await adapter.queryWorks({
-    q: "",
-    tags: { tags: [], yearValue: null },
-    tagOp: "AND",
-    sort: "id-asc",
-  });
-  assert.equal(worksPage.dataIntegrityWarning, undefined);
+test("new-work・default: dataIntegrityWarningは付かない（TASK-435 AC#3）", async () => {
+  for (const scenario of [undefined, "new-work"] as const) {
+    const adapter = createFixtureAdapter({ scenario });
+    const worksPage = await adapter.queryWorks({
+      q: "",
+      tags: { tags: [], yearValue: null },
+      tagOp: "AND",
+      sort: "id-asc",
+    });
+    assert.equal(worksPage.dataIntegrityWarning, undefined, `scenario=${scenario ?? "default"}`);
+  }
 });
 
 test("fixture: rjCode省略・空文字・指定を区別する", () => {
