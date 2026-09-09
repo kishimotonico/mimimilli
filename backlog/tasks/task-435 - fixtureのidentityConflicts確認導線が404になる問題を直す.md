@@ -1,10 +1,10 @@
 ---
 id: TASK-435
 title: fixtureのidentityConflicts確認導線が404になる問題を直す
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-07 18:51'
-updated_date: '2026-09-07 19:10'
+updated_date: '2026-09-09 16:26'
 labels:
   - test
   - fixture
@@ -31,9 +31,17 @@ TASK-428.5 とは独立した既存の問題（該当2ファイルには 428.5 �
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 fixture の new-work シナリオで identityConflicts の両方のパスが Files ツリーに存在し、「Filesで開く」で開ける
-- [ ] #2 同種の不整合（固定データが参照するパスが buildFsRoot に無い）が他に無いか確認し、あれば同時に直すか記録する
+- [x] #1 fixture の new-work シナリオで identityConflicts の両方のパスが Files ツリーに存在し、「Filesで開く」で開ける
+- [x] #2 同種の不整合（固定データが参照するパスが buildFsRoot に無い）が他に無いか確認し、あれば同時に直すか記録する
+- [x] #3 new-work と default シナリオで DataIntegrityWarningBanner が表示されない
+- [x] #4 errors シナリオで DataIntegrityWarningBanner が表示される
 <!-- AC:END -->
+
+
+
+
+
+
 
 ## Implementation Notes
 

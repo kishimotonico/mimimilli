@@ -1,10 +1,10 @@
 ---
 id: TASK-438
 title: 狭幅でライブラリの一覧最低幅を保ちプレビューを全幅オーバーレイへ切り替える
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-07 20:52'
-updated_date: '2026-09-07 20:52'
+updated_date: '2026-09-09 16:06'
 labels:
   - ui
   - layout
@@ -31,10 +31,16 @@ responsive-keyboard-A / work-detail-A、および TASK-430 から分離した受
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 一覧が最低幅を下回らず、狭幅でもlist行が読める
-- [ ] #2 一覧最低幅とプレビュー最小360pxを確保できない幅で、プレビューが結果面上の全幅オーバーレイへ切り替わる
-- [ ] #3 全幅オーバーレイをEscと×で閉じられる
-- [ ] #4 切り替え閾値が固定pxではなく、tokens.cssに置いた一覧最低幅とプレビュー最小幅から導出されている
-- [ ] #5 800・1000・1280pxで切り替えが仕様どおりに動く
-- [ ] #6 pnpm test:smokeに新規失敗がない
+- [x] #1 一覧が最低幅を下回らず、狭幅でもlist行が読める
+- [x] #2 一覧最低幅とプレビュー最小360pxを確保できない幅で、プレビューが結果面上の全幅オーバーレイへ切り替わる
+- [x] #3 全幅オーバーレイをEscと×で閉じられる
+- [x] #4 切り替え閾値が固定pxではなく、tokens.cssに置いた一覧最低幅とプレビュー最小幅から導出されている
+- [x] #5 800・1000・1280pxで切り替えが仕様どおりに動く
+- [x] #6 pnpm test:smokeに新規失敗がない
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+ResizeObserver 初回発火前の1フレームについて（2026-09-10、統括判断で対応なし）: usePreviewOverlayMode は useState(false) 起点のため、初回コールバックまで非overlay。600px幅で新規ロード直後に行をクリックする経路を実機計測し、20ms後には既に mll-results--overlay が付与されていること、視覚的な跳ねが無いことを確認した。ResizeObserver の初回通知が React のコミットより早く発火するため、実用上の操作速度では顕在化しない。フォールバックや初期値の推測は入れない。
+<!-- SECTION:NOTES:END -->
