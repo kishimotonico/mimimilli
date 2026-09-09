@@ -64,6 +64,18 @@ describe("AxisValueQuickList の仮想化", () => {
 });
 
 describe("AxisValueQuickList のキーボード移動", () => {
+  it("開いたときの検索欄への初期フォーカスはpreventScroll:trueで祖先を自動スクロールしない（TASK-439）", async () => {
+    const sizeMock = mockElementSize(260, 260);
+    const focusSpy = vi.spyOn(HTMLElement.prototype, "focus");
+    renderQuickList({ items: makeItems(5), isOpen: true });
+    await flushVirtualizer();
+
+    expect(focusSpy).toHaveBeenLastCalledWith({ preventScroll: true });
+
+    focusSpy.mockRestore();
+    sizeMock.restore();
+  });
+
   it("検索欄からArrowDownで最初の値行にフォーカスする", async () => {
     const sizeMock = mockElementSize(260, 260);
     const user = userEvent.setup();

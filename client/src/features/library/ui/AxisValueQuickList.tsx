@@ -134,7 +134,7 @@ export default function AxisValueQuickList({
     // なったときは axis が変わっていなくても改めて発火させたいので、依存配列に
     // axis だけでなく isOpen も含める。
     if (!isOpen) return;
-    searchRef.current?.focus();
+    searchRef.current?.focus({ preventScroll: true });
     setQuery("");
     setSortMenuOpen(false);
   }, [axis, isOpen]);

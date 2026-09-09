@@ -62,7 +62,9 @@ export function WorkPlayButton(props: WorkPlayButtonProps) {
 
   useEffect(() => {
     if (!isMenuOpen) return;
-    rootRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();
+    rootRef.current
+      ?.querySelector<HTMLButtonElement>('[role="menuitem"]')
+      ?.focus({ preventScroll: true });
   }, [isMenuOpen]);
 
   const handleMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -75,7 +77,7 @@ export function WorkPlayButton(props: WorkPlayButtonProps) {
     const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
     const delta = event.key === "ArrowDown" ? 1 : -1;
     const nextIndex = (currentIndex + delta + items.length) % items.length;
-    items[nextIndex]?.focus();
+    items[nextIndex]?.focus({ preventScroll: true });
   };
 
   const main = getMainAction(props);
