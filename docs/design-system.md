@@ -28,7 +28,7 @@
 
 ### 文字サイズトークン
 
-サイズ・行高は用途別トークンに集約する（`tokens.css` の `--fs-*`/`--lh-*`、Tailwindでは `text-body` 等のユーティリティとして使える）。px直書き（`font-size: Npx` / `text-[Npx]`）は禁止で、新規UIもこの6段のいずれかへ丸める。フォントファミリー（`--font-jp`/`--font-sans`/`--font-mono`）とは独立した軸なので、`text-mono` に `font-mono` を組み合わせるなど併用する。既存コードに残る px直書きの移行は TASK-431 で対応する。新規追加分はこの6段のトークンを使う。
+サイズ・行高は用途別トークンに集約する（`tokens.css` の `--fs-*`/`--lh-*`、Tailwindでは `text-body` 等のユーティリティとして使える）。px直書き（`font-size: Npx` / `text-[Npx]`）は禁止で、この6段のいずれかへ丸める。フォントファミリー（`--font-jp`/`--font-sans`/`--font-mono`）とは独立した軸なので、`text-mono` に `font-mono` を組み合わせるなど併用する。
 
 | トークン         | 値               | 用途                                                 |
 | ---------------- | ---------------- | ---------------------------------------------------- |
@@ -39,7 +39,7 @@
 | `text-label`     | 10px / line 1.2  | セクション見出し・カテゴリラベル（uppercase等）      |
 | `text-mono`      | 11px / line 1.3  | 時刻・件数・パス等の数値/等幅表示（`font-mono`併用） |
 
-13px以上（モーダル見出し・大きい数字表示など）はこのスケールの対象外で、個別に決めてよい。TASK-431でtsxのpx直書きを一括移行した際、以下は据え置いた（正は実装）。
+13px以上（モーダル見出し・大きい数字表示など）はこのスケールの対象外で、個別に決めてよい。現在このスケールの外にあるのは以下（正は実装）。
 
 - モーダル見出し（`h2`/`header`内のタイトル）: 14px（例: `WorkEditDialog`・`WorkInfoDialog`・`SmartFolderEditorModal`・`ScanModal`・`SettingsModal`・`RegisterWorkDialog`・`DlsiteEditor`・`DlsiteBulkApplyDialog`・`NotificationListModal`）
 - 確認ダイアログの見出し（`ConfirmDialog`・`WorkEditDialog`の未保存確認）: 13.5px
