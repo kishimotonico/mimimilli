@@ -8,7 +8,7 @@ function isValueRow(row: AxisValueHierarchyRow | undefined): boolean {
 
 // 値一覧（AxisValueRows・AxisValueQuickList）の矢印キーナビ。見出し行（選択不可）は
 // 対象から飛ばす点だけが gridNavigation.ts の getNextGridIndex と異なる
-// （境界での挙動は同じくクランプ。作品一覧と同じ規則に揃える。TASK-436）。
+// （境界での挙動は同じくクランプ。作品一覧と同じ規則に揃える）。
 export function getNextAxisValueRowIndex(
   rows: readonly AxisValueHierarchyRow[],
   currentIndex: number,

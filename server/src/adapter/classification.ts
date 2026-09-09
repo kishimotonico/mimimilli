@@ -16,7 +16,7 @@ import type {
 export interface ClassificationAdapter {
   /** axis は "tag" / "year" / 任意の prefix 文字列（正規形・小文字）（ADR-0005）。
    *  filter.smartFolder を指定したのに解決できない場合は null（ルートが 404 を返す。
-   *  /smart-folders/:id/works と同じ「解決できない」応答に揃える。TASK-432） */
+   *  /smart-folders/:id/works と同じ「解決できない」応答に揃える） */
   getAxisFacets(axis: string, filter?: Partial<AxisFacetsQuery>): Promise<AxisFacetItem[] | null>;
   listTagPrefixes(): Promise<TagPrefix[]>;
   /** 既存の prefix と重複する場合は null（ルートが 409 を返す） */

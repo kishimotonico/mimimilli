@@ -97,7 +97,7 @@ export default function AxisValueGrid({
 
   // roving tabindexの現在位置。値の選択は多重（タグ集合）で「現在の1件」が無いため、
   // 作品グリッドの選択追従（useRovingIndex+selectedWorkId）とは異なり、フォーカス移動
-  // だけで独立管理する（TASK-436）。
+  // だけで独立管理する。
   const [activeIndex, setActiveIndex] = useState(-1);
   useEffect(() => {
     setActiveIndex(-1);

@@ -13,7 +13,7 @@ import { buildTagFilterParams, filterValidFacetItems } from "./libraryPresentati
 // このフック自体は渡されたタグをそのままAND条件として渡すだけで、軸やintentを見ない。
 //
 // smartFolderId はスマートフォルダー表示中だけ渡す。生のルールではなくIDをサーバーへ渡し、
-// フォルダー条件適用後の集合を集計元にする（TASK-432）。
+// フォルダー条件適用後の集合を集計元にする。
 export function useAxisFacetsQuery(
   axis: FacetAxisId | null,
   selectedTags: NormalizedTag[] = [],

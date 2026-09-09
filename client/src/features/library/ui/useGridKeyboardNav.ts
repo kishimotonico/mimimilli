@@ -22,7 +22,7 @@ interface UseGridKeyboardNavOptions<T> {
   virtualizer: Virtualizer<HTMLDivElement, Element>;
 }
 
-// 作品グリッド（TASK-428.12）・値グリッド（TASK-436）が共有するグリッドの矢印キーナビ。
+// 作品グリッド・値グリッドが共有するグリッドの矢印キーナビ。
 export function useGridKeyboardNav<T>({
   gridEl,
   isJustified,

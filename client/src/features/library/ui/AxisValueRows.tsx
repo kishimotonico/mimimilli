@@ -114,7 +114,7 @@ export default function AxisValueRows({
 
   // roving tabindexの現在位置。値の選択は多重（タグ集合）で「現在の1件」が無いため、
   // 作品一覧の選択追従（useRovingIndex+selectedWorkId）とは異なり、フォーカス移動
-  // だけで独立管理する（TASK-436）。-1は「まだ矢印キー・Tabで触れていない」を表す。
+  // だけで独立管理する。-1は「まだ矢印キー・Tabで触れていない」を表す。
   const [activeIndex, setActiveIndex] = useState(-1);
   useEffect(() => {
     setActiveIndex(-1);

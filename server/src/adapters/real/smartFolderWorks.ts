@@ -61,7 +61,7 @@ export function countSmartFolderRuleMatches(
 
 /** スマートフォルダー表示中の軸ファセット集計（GET /axes/:axis?smartFolder=<id>）。
  *  フォルダー条件に一致する作品だけを対象に集計し、チップ選択タグとのANDは
- *  buildAxisFacets（作品一覧・条件プレビューと同じ core 関数）に委ねる（TASK-432）。
+ *  buildAxisFacets（作品一覧・条件プレビューと同じ core 関数）に委ねる。
  *  ルール評価そのものは resolveSmartFolderCandidateIds によるSQL候補抽出と
  *  evalSmartFolderRules による最終評価という、他の2経路と同じ2段構成を使う（ADR-0008）。 */
 export function getSmartFolderAxisFacets(

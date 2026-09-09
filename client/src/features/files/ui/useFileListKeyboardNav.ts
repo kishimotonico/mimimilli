@@ -11,7 +11,7 @@ interface UseFileListKeyboardNavOptions {
 
 // ファイル一覧は仮想化していない（フォルダー1階層ぶんのエントリ数は仮想化を要する規模に
 // 通常ならない）ため、移動先の行は常にDOMに存在する。focusVirtualItemのscrollToIndex待ち
-// （仮想化用のダブルrAF）は不要で、対象行を直接focusできる（TASK-436）。
+// （仮想化用のダブルrAF）は不要で、対象行を直接focusできる。
 export function useFileListKeyboardNav({
   listRef,
   entries,

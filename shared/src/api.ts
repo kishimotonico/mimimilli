@@ -110,7 +110,7 @@ export type SmartFolderPreviewResponse = z.infer<typeof smartFolderPreviewRespon
  *  tags による絞り込み後の集合から集計する（自軸除外カウント、TASK-187）。
  *  自軸由来のフィルタを除外した集合を渡すのは呼び出し側（client）の責務。
  *  smartFolder はスマートフォルダー表示中の集計元をフォルダー条件適用後の集合に絞る
- *  （生のルールではなくIDを渡し、サーバー側で解決する。TASK-432） */
+ *  （生のルールではなくIDを渡し、サーバー側で解決する） */
 export const axisFacetsQuerySchema = worksQueryBaseSchema
   .pick({
     tags: true,

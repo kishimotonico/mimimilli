@@ -26,7 +26,7 @@ const AND_ADD_HINT = getValueSelectionHint("add");
 interface FilterChipAddButtonProps {
   tagPrefixes: TagPrefix[];
   selectedTags: NormalizedTag[];
-  /** 表示中のスマートフォルダーID。候補件数をフォルダー条件適用後にする（TASK-432） */
+  /** 表示中のスマートフォルダーID。候補件数をフォルダー条件適用後にする */
   smartFolderId?: string;
   onAddValue: (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
 }

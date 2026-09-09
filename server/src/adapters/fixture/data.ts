@@ -525,7 +525,7 @@ function ensurePath(
 
 /** /fs のルートツリーを構築する。works はその時点の最新状態を渡す。
  *  identityConflicts / invalidMetaFiles は、それぞれが指す重複コピーフォルダー・
- *  壊れたメタファイルを /fs ツリー上に実体化するために使う（TASK-435）。 */
+ *  壊れたメタファイルを /fs ツリー上に実体化するために使う。 */
 export function buildFsRoot(
   works: WorkSummary[],
   coverColumns: ReadonlyMap<string, FixtureCoverColumns>,

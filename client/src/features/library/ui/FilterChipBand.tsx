@@ -25,7 +25,7 @@ import {
 interface FilterChipBandProps {
   tagPrefixes: TagPrefix[];
   selectedTags: NormalizedTag[];
-  /** 表示中のスマートフォルダーID。チップの候補件数をフォルダー条件適用後にする（TASK-432） */
+  /** 表示中のスマートフォルダーID。チップの候補件数をフォルダー条件適用後にする */
   smartFolderId?: string;
   /** 置き換え選択（結果面を作品一覧へ遷移させる。ADR-0012 §8） */
   onReplace: (tag: NormalizedTag) => void;

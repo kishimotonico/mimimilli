@@ -150,7 +150,7 @@ export default function AxisValueQuickList({
   // document.activeElement から逆算すると、フォーカス確定（下記のダブルrAF）より速く
   // 次のキー入力が来た場合に取りこぼす（キーリピート等）。scrollToIndex/focus の実際の
   // 完了を待たず、常にこの ref を正として次の移動先を決める。ref とは別に activeIndex
-  // state も並行して持ち、roving tabindex（各行の tabIndex）の再描画に使う（TASK-436）。
+  // state も並行して持ち、roving tabindex（各行の tabIndex）の再描画に使う。
   const activeIndexRef = useRef(-1);
   const [activeIndex, setActiveIndex] = useState(-1);
   useEffect(() => {

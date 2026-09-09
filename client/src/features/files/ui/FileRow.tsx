@@ -12,7 +12,7 @@ interface FileRowProps {
   identityConflict: ScanDiagnostic | null;
   flatIndex: number;
   /** roving tabindexの現在位置と一致する場合だけ0（それ以外は-1）。
-   *  一覧全体をTabストップ1個にする（作品一覧と同じ規則、TASK-436） */
+   *  一覧全体をTabストップ1個にする（作品一覧と同じ規則） */
   tabIndex: 0 | -1;
   /** 選択中エントリ本体（濃いハイライト） */
   isFocused: boolean;

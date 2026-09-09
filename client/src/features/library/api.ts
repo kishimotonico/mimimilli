@@ -22,7 +22,7 @@ function appendTagsTagOp(
 
 /** 自軸除外後のフィルタ。フォルダー評価API同様 tags/tagOp を渡す。
  *  smartFolderId はスマートフォルダー表示中の集計元をフォルダー条件適用後の集合に絞る
- *  （生のルールは渡さず、サーバー側で smartFolderId からルールを解決する。TASK-432） */
+ *  （生のルールは渡さず、サーバー側で smartFolderId からルールを解決する） */
 export interface AxisFacetsParams {
   tags?: string[];
   tagOp?: "AND" | "OR";

@@ -21,7 +21,7 @@ interface FileColumnProps {
   onOpenDir: (absPath: WorkspacePath) => void;
   onSelectFile: (absPath: WorkspacePath) => void;
   /** 矢印キーでの行移動。クリックと違いフォルダーへは潜らず、プレビュー対象を移すだけ
-   *  （作品一覧の矢印キー移動が選択を追従させるのと同じ規則、TASK-436） */
+   *  （作品一覧の矢印キー移動が選択を追従させるのと同じ規則） */
   onFocusEntry: (absPath: WorkspacePath) => void;
   onPlayFile: (entry: FsEntry, folderEntries: FsEntry[]) => void;
   isLoading?: boolean;
