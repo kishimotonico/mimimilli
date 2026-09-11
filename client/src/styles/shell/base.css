@@ -73,8 +73,10 @@ body ol {
    .mle-row/.mll-wrow等で個別に上書きする。文字入力（テキスト系inputとtextarea）は
    キャレットで入力位置が分かるためアクセント色のリングを出さず、境界線色の弱い変化
    （--line → --line-strong）だけで示す（チェックボックス等は対象外でリングのまま）。
-   ここは layer(base) なので、枠線色をユーティリティで指定した入力は
-   focus-visible:border-line-strong を併記する。 */
+   border-line で枠線を持つ通常の文字入力は shared/ui/TextInput がこの表現を自前で
+   定義するためここには依存しない。ここに残っているのは TextInput の形に合わない
+   文字入力（アクティブ編集中を border-acc で示すインライン編集欄、枠線をラッパー側に
+   持つコンテナ型検索欄）向けの outline:none の土台。 */
 body :is(button, a, select, [tabindex]):focus-visible,
 body
   input:is(

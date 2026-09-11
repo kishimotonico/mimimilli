@@ -44,7 +44,7 @@
 
 ## フォーカス表示
 
-操作可能な要素のうち、文字入力ではないもの（`button` / `a` / `select` / `[tabindex]` / チェックボックス・ラジオ・レンジ等の非テキスト系`input`）は `shell/base.css` の共通規則で一律 `2px solid var(--acc)` のリングを表示する。文字入力（`input[type=text]`相当・`textarea`）はキャレットで位置が分かるためアクセント色のリングを出さず、境界線色の弱い変化（`--line-strong`）だけで示す。共通規則は `layer(base)` にあり、枠線色を `border-line` 等のユーティリティで指定した入力には負けるため、そうした入力には `focus-visible:border-line-strong` を併記する。それ以外に個別コンポーネントで `focus-visible:outline-*` や `focus:ring-*` 等のTailwindユーティリティを重ねて再定義しない。`overflow: hidden` な一覧スクロール域内の行（`.mll-wrow` / `.mle-row`）だけ、リングが切り抜かれないよう `outline-offset` を `var(--focus-ring-offset-clipped)`（-2px）にする例外を個別に持つ。
+操作可能な要素のうち、文字入力ではないもの（`button` / `a` / `select` / `[tabindex]` / チェックボックス・ラジオ・レンジ等の非テキスト系`input`）は `shell/base.css` の共通規則で一律 `2px solid var(--acc)` のリングを表示する。文字入力（`input[type=text]`相当・`textarea`）はキャレットで位置が分かるためアクセント色のリングを出さず、境界線色の弱い変化（`--line-strong`）だけで示す。この境界線表現は `shared/ui/TextInput` の中で1回だけ定義しているため、`border-line` で枠線を持つ通常の文字入力は TextInput を使う。アクティブ編集中を `border-acc` で示すインライン編集欄や、枠線をラッパー側に持つコンテナ型の検索欄など TextInput の形に合わない文字入力は対象外で、各コンポーネントが自分で表現を決める。それ以外に個別コンポーネントで `focus-visible:outline-*` や `focus:ring-*` 等のTailwindユーティリティを重ねて再定義しない。`overflow: hidden` な一覧スクロール域内の行（`.mll-wrow` / `.mle-row`）だけ、リングが切り抜かれないよう `outline-offset` を `var(--focus-ring-offset-clipped)`（-2px）にする例外を個別に持つ。
 
 ## グローバルショートカット / Escape
 
