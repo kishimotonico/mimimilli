@@ -1,10 +1,10 @@
 ---
 id: TASK-447.22
 title: SmartFolderEditorModal と TagPrefixSettings から1件ぶんの UI を切り出す
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-11 08:05'
-updated_date: '2026-09-11 08:18'
+updated_date: '2026-09-11 08:23'
 labels:
   - refactor
   - triage
