@@ -17,6 +17,7 @@ import {
   type ScanActions,
 } from "../../../entities/scan/model/atoms";
 import { useScanJob } from "../model/useScanJob";
+import { useToast } from "../../../shared/ui/useToast";
 
 // SSE 購読の単一所有者。scanJobAtom / scanActionsAtom をここで配線する。
 export default function ScanRuntime() {
@@ -27,6 +28,7 @@ export default function ScanRuntime() {
   const setActions = useSetAtom(scanActionsAtom);
   const setHiddenPaths = useSetAtom(scanCandidateHiddenPathsAtom);
   const setResultToast = useSetAtom(scanResultToastAtom);
+  const toast = useToast();
   // モーダルが開いている間はサイドバーの「完了しました」が完了通知を担うため、
   // トースト側は重ねて出さない。SSEイベントの時点で最新値を見たいためrefで持つ。
   const scanModalOpen = useAtomValue(scanModalOpenAtom);
@@ -72,7 +74,16 @@ export default function ScanRuntime() {
 
   useEffect(() => {
     setError(scanJob.error);
-  }, [scanJob.error, setError]);
+    if (!scanJob.error) return;
+    // scanErrorAtomはSetupScreenがインライン表示にも使う「エラー状態」として残す
+    // （AC参照）。表示自体はここからuseToastへ出す
+    toast.show({
+      message: scanJob.error,
+      variant: "error",
+      priority: "notice",
+      onDismiss: () => scanJobRef.current.clearError(),
+    });
+  }, [scanJob.error, setError, toast]);
 
   const actionsRef = useRef<ScanActions>({
     start: async (options?: StartScanRequest) => scanJobRef.current.start(options),
