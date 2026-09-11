@@ -17,7 +17,6 @@ import { getLastScanResult, getScanDiagnostics, SCAN_QUERY_KEYS } from "../api";
 import { refreshScanCandidates } from "../../../entities/scan/scanCandidatesCache";
 import { useScanCandidatesCache } from "../model/useScanCandidatesCache";
 import { useDlsiteNotificationSummary } from "../../../entities/dlsite/model/useDlsiteNotificationSummary";
-import type { DlsiteNotificationModalKind } from "../../../entities/dlsite/model/dlsiteNotificationModal";
 import ScanSidebar from "./scanModal/ScanSidebar";
 import UnregisteredTab from "./scanModal/UnregisteredTab";
 import NeedsAttentionTab from "./scanModal/NeedsAttentionTab";
@@ -34,7 +33,6 @@ interface ScanModalProps {
   onClose: () => void;
   /** 開いた時点で選択するタブ。省略時は未登録タブ（通知ベルから要対応タブへ直接遷移するため） */
   initialTab?: ScanTabKey;
-  onOpenNotificationModal: (kind: DlsiteNotificationModalKind) => void;
   onOpenFiles: (path: string) => void;
 }
 
@@ -44,7 +42,6 @@ export default function ScanModal({
   lastScanTime,
   onClose,
   initialTab = "unregistered",
-  onOpenNotificationModal,
   onOpenFiles,
 }: ScanModalProps) {
   const queryClient = useQueryClient();
@@ -201,7 +198,6 @@ export default function ScanModal({
                 dlsiteParseErrorAlert={dlsiteParseErrorAlert}
                 dataIntegrityWarning={dataIntegrityWarning}
                 onOpenFiles={onOpenFiles}
-                onOpenNotificationModal={onOpenNotificationModal}
               />
             )}
             {activeTab === "newlyRegistered" && (

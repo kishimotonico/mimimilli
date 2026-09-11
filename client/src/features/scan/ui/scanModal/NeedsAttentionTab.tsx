@@ -1,6 +1,7 @@
+import { useSetAtom } from "jotai";
 import type { DataIntegrityWarning, InvalidMetaFile, ScanDiagnostic } from "@mimimilli/shared";
 import Button from "../../../../shared/ui/Button";
-import type { DlsiteNotificationModalKind } from "../../../../entities/dlsite/model/dlsiteNotificationModal";
+import { activeModalAtom, type ActiveModal } from "../../../../shared/model/activeModalAtom";
 import { buildNeedsAttentionRows, type NeedsAttentionRow } from "../../model/needsAttention";
 
 export interface NeedsAttentionTabProps {
@@ -12,7 +13,6 @@ export interface NeedsAttentionTabProps {
   dlsiteParseErrorAlert: boolean;
   dataIntegrityWarning: DataIntegrityWarning | undefined;
   onOpenFiles: (path: string) => void;
-  onOpenNotificationModal: (kind: DlsiteNotificationModalKind) => void;
 }
 
 const KIND_LABEL: Record<NeedsAttentionRow["kind"], string> = {
@@ -25,6 +25,7 @@ const KIND_LABEL: Record<NeedsAttentionRow["kind"], string> = {
 };
 
 export default function NeedsAttentionTab(props: NeedsAttentionTabProps) {
+  const setActiveModal = useSetAtom(activeModalAtom);
   const rows = buildNeedsAttentionRows(props);
 
   if (rows.length === 0) {
@@ -60,7 +61,7 @@ export default function NeedsAttentionTab(props: NeedsAttentionTabProps) {
                 key={row.key}
                 row={row}
                 onOpenFiles={props.onOpenFiles}
-                onOpenNotificationModal={props.onOpenNotificationModal}
+                onOpenNotificationModal={setActiveModal}
               />
             ))}
           </tbody>
@@ -77,7 +78,7 @@ function AttentionRow({
 }: {
   row: NeedsAttentionRow;
   onOpenFiles: (path: string) => void;
-  onOpenNotificationModal: (kind: DlsiteNotificationModalKind) => void;
+  onOpenNotificationModal: (modal: ActiveModal) => void;
 }) {
   if (row.kind === "identityConflict") {
     return (
@@ -123,11 +124,17 @@ function AttentionRow({
         {row.kind === "invalidMetaFile" ? (
           <Button onClick={() => onOpenFiles(row.path)}>Filesで開く</Button>
         ) : row.kind === "rjCodeMissing" ? (
-          <Button onClick={() => onOpenNotificationModal("rj-missing")}>一覧を見る</Button>
+          <Button onClick={() => onOpenNotificationModal({ kind: "rj-missing" })}>
+            一覧を見る
+          </Button>
         ) : row.kind === "dlsiteFetchFailed" ? (
-          <Button onClick={() => onOpenNotificationModal("fetch-failed")}>一覧を見る</Button>
+          <Button onClick={() => onOpenNotificationModal({ kind: "fetch-failed" })}>
+            一覧を見る
+          </Button>
         ) : row.kind === "dlsiteParseFailed" ? (
-          <Button onClick={() => onOpenNotificationModal("parse-failed")}>一覧を見る</Button>
+          <Button onClick={() => onOpenNotificationModal({ kind: "parse-failed" })}>
+            一覧を見る
+          </Button>
         ) : (
           <span className="text-ink-4">—</span>
         )}

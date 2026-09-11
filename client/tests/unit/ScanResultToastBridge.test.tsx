@@ -6,6 +6,7 @@ import type { ScanResult } from "@mimimilli/shared";
 import ScanResultToastBridge from "../../src/app/ui/ScanResultToastBridge";
 import GlobalToast from "../../src/app/ui/GlobalToast";
 import { scanResultToastAtom } from "../../src/entities/scan/model/atoms";
+import { activeModalAtom } from "../../src/shared/model/activeModalAtom";
 
 const baseResult: ScanResult = {
   registered: 12,
@@ -21,7 +22,7 @@ const baseResult: ScanResult = {
   candidates: [],
 };
 
-function renderBridge(store: ReturnType<typeof createStore>, onOpenScanNeedsAttention = vi.fn()) {
+function renderBridge(store: ReturnType<typeof createStore>) {
   render(
     createElement(
       JotaiProvider,
@@ -29,12 +30,11 @@ function renderBridge(store: ReturnType<typeof createStore>, onOpenScanNeedsAtte
       createElement(
         Fragment,
         null,
-        createElement(ScanResultToastBridge, { onOpenScanNeedsAttention }),
+        createElement(ScanResultToastBridge),
         createElement(GlobalToast),
       ),
     ),
   );
-  return onOpenScanNeedsAttention;
 }
 
 describe("ScanResultToastBridge", () => {
@@ -61,11 +61,11 @@ describe("ScanResultToastBridge", () => {
       kind: "completed",
       result: { ...baseResult, rjCodeMissingCount: 1 },
     });
-    const onOpenScanNeedsAttention = renderBridge(store);
+    renderBridge(store);
 
     fireEvent.click(screen.getByRole("button", { name: "要対応を見る" }));
 
-    expect(onOpenScanNeedsAttention).toHaveBeenCalledTimes(1);
+    expect(store.get(activeModalAtom)).toEqual({ kind: "scan", tab: "needsAttention" });
     // 退出アニメーション中はボタンが残るため、消えるまで待つ（motion）
     await waitFor(() => expect(screen.queryByRole("button", { name: "要対応を見る" })).toBeNull());
   });

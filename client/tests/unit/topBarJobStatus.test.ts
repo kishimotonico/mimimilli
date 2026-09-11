@@ -50,8 +50,6 @@ function renderTopBar(atomState?: {
         JotaiProvider,
         { store },
         createElement(TopBar, {
-          onOpenScan: vi.fn(),
-          onSettings: vi.fn(),
           notificationBell: createElement("span", { "aria-label": "通知" }),
         }),
       ),

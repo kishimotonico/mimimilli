@@ -2,10 +2,10 @@
 // 集約する通知ベルパネル（TASK-44）。開閉・外側クリック/Escapeでの閉じ方は
 // AddressBar の並び替えメニュー（.mle-sortmenu）と同じ「position:relative + absolute」の
 // 素朴な実装に倣う（work-preview専用の useAnchoredPopover は左寄せクランプ前提でここには合わない）。
-import { useAtomValue } from "jotai";
+import { useAtomValue, useSetAtom } from "jotai";
 import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { DlsiteNotificationModalKind } from "../../entities/dlsite/model/dlsiteNotificationModal";
+import { activeModalAtom } from "../../shared/model/activeModalAtom";
 import {
   dlsiteBulkActiveAtom,
   dlsiteBulkProgressAtom,
@@ -25,19 +25,8 @@ import { I } from "../../shared/ui/Icon";
 import IconButton from "../../shared/ui/IconButton";
 import { usePopoverDismissal } from "../../shared/ui/usePopoverDismissal";
 
-export interface NotificationBellProps {
-  /** 直近のスキャン結果クリックでスキャンモーダルの結果表示を開く（TASK-56） */
-  onOpenScanResult: () => void;
-  /** ID重複・読み取り失敗・データ不整合の行からスキャンモーダルの要対応タブを開く */
-  onOpenNeedsAttention: () => void;
-  onOpenNotificationModal: (kind: DlsiteNotificationModalKind) => void;
-}
-
-export default function NotificationBell({
-  onOpenScanResult,
-  onOpenNeedsAttention,
-  onOpenNotificationModal,
-}: NotificationBellProps) {
+export default function NotificationBell() {
+  const setActiveModal = useSetAtom(activeModalAtom);
   const dlsiteBulkActive = useAtomValue(dlsiteBulkActiveAtom);
   const dlsiteBulkStarting = useAtomValue(dlsiteBulkStartingAtom);
   const dlsiteBulkProgress = useAtomValue(dlsiteBulkProgressAtom);
@@ -125,16 +114,16 @@ export default function NotificationBell({
                     setIsOpen(false);
                     switch (row.kind) {
                       case "rjCodeMissing":
-                        onOpenNotificationModal("rj-missing");
+                        setActiveModal({ kind: "rj-missing" });
                         break;
                       case "dlsiteFetchFailed":
-                        onOpenNotificationModal("fetch-failed");
+                        setActiveModal({ kind: "fetch-failed" });
                         break;
                       case "dlsiteParseFailed":
-                        onOpenNotificationModal("parse-failed");
+                        setActiveModal({ kind: "parse-failed" });
                         break;
                       default:
-                        onOpenNeedsAttention();
+                        setActiveModal({ kind: "scan", tab: "needsAttention" });
                     }
                   }}
                 />
@@ -166,7 +155,7 @@ export default function NotificationBell({
                   className="block w-full px-3.5 py-2.5 text-left hover:bg-paper-2 focus-visible:-outline-offset-2"
                   onClick={() => {
                     setIsOpen(false);
-                    onOpenScanResult();
+                    setActiveModal({ kind: "scan" });
                   }}
                 >
                   <p className="mb-1.5 font-sans text-secondary font-medium text-ink-1">

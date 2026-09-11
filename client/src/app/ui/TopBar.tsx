@@ -5,6 +5,7 @@ import IconButton from "../../shared/ui/IconButton";
 import { buttonClass } from "../../shared/ui/Button";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useMotionVariants } from "../../shared/ui/useMotionVariants";
+import { activeModalAtom } from "../../shared/model/activeModalAtom";
 import {
   dlsiteBulkActiveAtom,
   dlsiteBulkCancellingAtom,
@@ -24,9 +25,6 @@ import { scanningAtom, scanProgressLabelAtom } from "../../entities/scan/model/a
 import { useUnregisteredCandidateCount } from "../../features/scan/model/useScanCandidatesCache";
 
 interface TopBarProps {
-  /** スキャンボタン押下時。即時実行はせずスキャンモーダルを開く（TASK-56） */
-  onOpenScan: () => void;
-  onSettings: () => void;
   notificationBell: ReactNode;
 }
 
@@ -48,7 +46,8 @@ function DlsiteBulkCancelButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-export default function TopBar({ onOpenScan, onSettings, notificationBell }: TopBarProps) {
+export default function TopBar({ notificationBell }: TopBarProps) {
+  const setActiveModal = useSetAtom(activeModalAtom);
   const scanning = useAtomValue(scanningAtom);
   const scanProgressLabel = useAtomValue(scanProgressLabelAtom);
   const unregisteredCount = useUnregisteredCandidateCount();
@@ -207,7 +206,7 @@ export default function TopBar({ onOpenScan, onSettings, notificationBell }: Top
                 ? `スキャン（未登録${unregisteredCount}件）`
                 : "スキャン"
           }
-          onClick={onOpenScan}
+          onClick={() => setActiveModal({ kind: "scan" })}
           className={scanning ? "animate-spin" : undefined}
         />
         {!scanning && unregisteredCount > 0 && (
@@ -241,7 +240,12 @@ export default function TopBar({ onOpenScan, onSettings, notificationBell }: Top
         </>
       )}
       {notificationBell}
-      <IconButton size="md" icon={I.cog} label="設定" onClick={onSettings} />
+      <IconButton
+        size="md"
+        icon={I.cog}
+        label="設定"
+        onClick={() => setActiveModal({ kind: "settings" })}
+      />
     </header>
   );
 }

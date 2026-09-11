@@ -1,4 +1,6 @@
-export type DlsiteNotificationModalKind = "rj-missing" | "fetch-failed" | "parse-failed";
+import type { DlsiteNotificationModalKind } from "../../../shared/model/activeModalAtom";
+
+export type { DlsiteNotificationModalKind };
 
 export function isDlsiteNotificationModal(
   modal: string | null,

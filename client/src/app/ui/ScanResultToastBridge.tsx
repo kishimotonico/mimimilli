@@ -2,22 +2,17 @@ import { useAtomValue, useSetAtom } from "jotai";
 import { useEffect } from "react";
 import { scanResultToastAtom } from "../../entities/scan/model/atoms";
 import { formatScanResult } from "../../features/scan/model/formatScanResult";
+import { activeModalAtom } from "../../shared/model/activeModalAtom";
 import { useToast } from "../../shared/ui/useToast";
-
-interface ScanResultToastBridgeProps {
-  /** 要対応ありの完了トーストから、スキャンモーダルを要対応タブで開く */
-  onOpenScanNeedsAttention: () => void;
-}
 
 // ScanRuntime（entities/scan配下、スキャンモーダルのタブ状態を知らない）がセットする
 // scanResultToastAtomを一度きりの信号として消費し、useToastの表示要求へ変換する。
 // App.tsxはJotaiの読み取りAPI・features/*/model配下を直接importしない方針
 // （.oxlintrc.json）のため、この変換をapp/ui配下の小さな橋渡しコンポーネントに閉じる。
-export default function ScanResultToastBridge({
-  onOpenScanNeedsAttention,
-}: ScanResultToastBridgeProps) {
+export default function ScanResultToastBridge() {
   const scanResultToast = useAtomValue(scanResultToastAtom);
   const setScanResultToast = useSetAtom(scanResultToastAtom);
+  const setActiveModal = useSetAtom(activeModalAtom);
   const toast = useToast();
 
   useEffect(() => {
@@ -42,12 +37,12 @@ export default function ScanResultToastBridge({
       // 完結する操作なので押した直後に閉じる
       onAction: hasNeedsAttention
         ? () => {
-            onOpenScanNeedsAttention();
+            setActiveModal({ kind: "scan", tab: "needsAttention" });
             toast.dismiss();
           }
         : undefined,
     });
-  }, [scanResultToast, setScanResultToast, onOpenScanNeedsAttention, toast]);
+  }, [scanResultToast, setScanResultToast, setActiveModal, toast]);
 
   return null;
 }

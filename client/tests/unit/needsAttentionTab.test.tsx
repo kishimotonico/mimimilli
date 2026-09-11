@@ -2,11 +2,14 @@
 import { createElement } from "react";
 import { render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Provider as JotaiProvider, createStore } from "jotai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import NeedsAttentionTab from "../../src/features/scan/ui/scanModal/NeedsAttentionTab";
+import { activeModalAtom } from "../../src/shared/model/activeModalAtom";
 
 function renderTab(overrides: Partial<Parameters<typeof NeedsAttentionTab>[0]> = {}) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const store = createStore();
   const props = {
     identityConflicts: [],
     invalidMetaFiles: [],
@@ -16,17 +19,16 @@ function renderTab(overrides: Partial<Parameters<typeof NeedsAttentionTab>[0]> =
     dlsiteParseErrorAlert: false,
     dataIntegrityWarning: undefined,
     onOpenFiles: vi.fn(),
-    onOpenNotificationModal: vi.fn(),
     ...overrides,
   };
   render(
     createElement(
       QueryClientProvider,
       { client: queryClient },
-      createElement(NeedsAttentionTab, props),
+      createElement(JotaiProvider, { store }, createElement(NeedsAttentionTab, props)),
     ),
   );
-  return { props, queryClient };
+  return { props, queryClient, store };
 }
 
 describe("NeedsAttentionTab", () => {

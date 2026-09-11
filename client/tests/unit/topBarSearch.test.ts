@@ -33,8 +33,6 @@ function renderTopBar(initialQuery = "") {
         JotaiProvider,
         { store },
         createElement(TopBar, {
-          onOpenScan: vi.fn(),
-          onSettings: vi.fn(),
           notificationBell: createElement("span", { "aria-label": "通知" }),
         }),
       ),
@@ -160,8 +158,6 @@ describe("TopBar の検索入力", () => {
           JotaiProvider,
           { store },
           createElement(TopBar, {
-            onOpenScan: vi.fn(),
-            onSettings: vi.fn(),
             notificationBell: createElement("span", { "aria-label": "通知" }),
           }),
         ),
@@ -189,8 +185,6 @@ describe("TopBar の検索入力", () => {
           JotaiProvider,
           { store },
           createElement(TopBar, {
-            onOpenScan: vi.fn(),
-            onSettings: vi.fn(),
             notificationBell: createElement("span", { "aria-label": "通知" }),
           }),
         ),

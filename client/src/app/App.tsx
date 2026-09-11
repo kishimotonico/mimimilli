@@ -3,7 +3,7 @@
 // - 再生開始は usePlayerActions のみ利用（state は leaf で購読）
 // - レイアウトは AppShell に委譲
 
-import { lazy, Suspense, useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef } from "react";
 import { MotionConfig } from "motion/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSetAtom } from "jotai";
@@ -21,16 +21,14 @@ import PlayerDock from "../features/player/ui/PlayerDock";
 import { resolveAppStartupState } from "./model/resolveAppStartupState";
 import SetupScreen from "../features/setup/ui/SetupScreen";
 import StartupErrorScreen from "./ui/StartupErrorScreen";
-import DlsiteNotificationModals from "../features/dlsite/ui/DlsiteNotificationModals";
 import { LibraryNavigationProvider } from "../features/library/ui/LibraryNavigationProvider";
 import GlobalToast from "./ui/GlobalToast";
 import ScanResultToastBridge from "./ui/ScanResultToastBridge";
+import AppModals from "./ui/AppModals";
 import { useToast } from "../shared/ui/useToast";
 import { apiErrorMessage } from "../shared/lib/apiError";
-import type { ActiveModal } from "./model/activeModal";
-import { isDlsiteNotificationModal } from "./model/activeModal";
+import { activeModalAtom } from "../shared/model/activeModalAtom";
 import { buildRootFolderChangedToastRequest } from "./model/rootFolderChangedToast";
-import type { ScanTabKey } from "../features/scan/ui/scanModal/types";
 import type { Work, WorkListItem } from "@mimimilli/shared";
 import { getWork } from "../entities/work/api";
 import { useDownloadLibraryExport } from "../features/library/useDownloadLibraryExport";
@@ -46,9 +44,6 @@ import {
 } from "../entities/library/model/navigationActions";
 import { openWorkDetailAtom } from "../entities/work/model/navigationActions";
 
-const SettingsModal = lazy(() => import("../features/settings/ui/SettingsModal"));
-const ScanModal = lazy(() => import("../features/scan/ui/ScanModal"));
-
 export default function App() {
   const player = usePlayerActions();
   const scanActions = useScanActions();
@@ -59,10 +54,8 @@ export default function App() {
   const setLibraryAxis = useSetAtom(setLibraryAxisAtom);
   const selectLibraryWork = useSetAtom(selectLibraryWorkAtom);
   const openWorkDetail = useSetAtom(openWorkDetailAtom);
+  const setActiveModal = useSetAtom(activeModalAtom);
   const playRequestIdRef = useRef(0);
-
-  const [activeModal, setActiveModal] = useState<ActiveModal>(null);
-  const [scanModalInitialTab, setScanModalInitialTab] = useState<ScanTabKey>("unregistered");
 
   // ── Settings ─────────────────────────────────────────────
   const settingsQuery = useSettingsQuery();
@@ -129,17 +122,10 @@ export default function App() {
     [player],
   );
 
-  // TopBarのスキャンボタンは即時実行せずモーダルを開く（TASK-56）。実行中なら実行中の表示に復帰する。
+  // ルートフォルダー変更トーストの「今すぐスキャン」から開く。
   const handleOpenScanModal = useCallback(() => {
-    setScanModalInitialTab("unregistered");
-    setActiveModal("scan");
-  }, []);
-  // 通知ベルの要対応系の行から、スキャンモーダルを要対応タブで直接開く。
-  const handleOpenScanNeedsAttention = useCallback(() => {
-    setScanModalInitialTab("needsAttention");
-    setActiveModal("scan");
-  }, []);
-  const handleCloseModal = useCallback(() => setActiveModal(null), []);
+    setActiveModal({ kind: "scan" });
+  }, [setActiveModal]);
 
   const handleSetupComplete = useCallback(
     async (path: string) => {
@@ -182,7 +168,7 @@ export default function App() {
       openPathInFiles({ path, root: rootFolder });
       setActiveModal(null);
     },
-    [openPathInFiles, rootFolder],
+    [openPathInFiles, rootFolder, setActiveModal],
   );
 
   if (startupState === "loading") {
@@ -221,19 +207,7 @@ export default function App() {
     <MotionConfig reducedMotion="user">
       <LibraryNavigationProvider>
         <AppShell
-          topBar={
-            <TopBar
-              onOpenScan={handleOpenScanModal}
-              onSettings={() => setActiveModal("settings")}
-              notificationBell={
-                <NotificationBell
-                  onOpenScanResult={handleOpenScanModal}
-                  onOpenNeedsAttention={handleOpenScanNeedsAttention}
-                  onOpenNotificationModal={setActiveModal}
-                />
-              }
-            />
-          }
+          topBar={<TopBar notificationBell={<NotificationBell />} />}
           addressBar={<AddressBar />}
           leftNav={<LeftNav />}
           body={
@@ -251,36 +225,16 @@ export default function App() {
             <>
               <PlayerRuntime />
               <NavigationHistorySync />
-              {activeModal === "settings" && (
-                <Suspense fallback={null}>
-                  <SettingsModal
-                    rootFolder={settings?.rootFolder ?? null}
-                    lastScanTime={settings?.lastScanTime ?? null}
-                    lastScanRootFolder={settings?.lastScanRootFolder ?? null}
-                    onClose={handleCloseModal}
-                    onOpenScan={() => setActiveModal("scan")}
-                    onChangeFolder={handleChangeFolder}
-                    onExport={handleExport}
-                  />
-                </Suspense>
-              )}
-              {activeModal === "scan" && (
-                <Suspense fallback={null}>
-                  <ScanModal
-                    lastScanTime={settings?.lastScanTime ?? null}
-                    initialTab={scanModalInitialTab}
-                    onClose={handleCloseModal}
-                    onOpenNotificationModal={setActiveModal}
-                    onOpenFiles={handleOpenScanProblemInFiles}
-                  />
-                </Suspense>
-              )}
-              <DlsiteNotificationModals
-                activeModal={isDlsiteNotificationModal(activeModal) ? activeModal : null}
-                onClose={handleCloseModal}
+              <AppModals
+                rootFolder={settings?.rootFolder ?? null}
+                lastScanTime={settings?.lastScanTime ?? null}
+                lastScanRootFolder={settings?.lastScanRootFolder ?? null}
+                onChangeFolder={handleChangeFolder}
+                onExport={handleExport}
+                onOpenFiles={handleOpenScanProblemInFiles}
                 onOpenWork={handleOpenLibraryWork}
               />
-              <ScanResultToastBridge onOpenScanNeedsAttention={handleOpenScanNeedsAttention} />
+              <ScanResultToastBridge />
               <GlobalToast />
             </>
           }

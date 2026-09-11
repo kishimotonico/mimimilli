@@ -232,7 +232,6 @@ function renderModal(
   const modalProps = {
     lastScanTime: null,
     onClose: vi.fn(),
-    onOpenNotificationModal: vi.fn(),
     ...rest,
   };
 
@@ -815,7 +814,6 @@ describe("ScanModalと他画面が同じlibraryTotalQueryOptionsを共有する�
             createElement(ScanModal, {
               lastScanTime: null,
               onClose: vi.fn(),
-              onOpenNotificationModal: vi.fn(),
             }),
           ),
         ),
