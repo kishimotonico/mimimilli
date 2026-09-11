@@ -38,7 +38,14 @@ export default function ScanResultToastBridge({
       variant: result.errors > 0 || result.missing > 0 ? "warning" : "success",
       priority: "notice",
       actionLabel: hasNeedsAttention ? "要対応を見る" : undefined,
-      onAction: hasNeedsAttention ? onOpenScanNeedsAttention : undefined,
+      // onActionはトーストを自動では閉じない契約（design-system.md）。ここは同期的に
+      // 完結する操作なので押した直後に閉じる
+      onAction: hasNeedsAttention
+        ? () => {
+            onOpenScanNeedsAttention();
+            toast.dismiss();
+          }
+        : undefined,
     });
   }, [scanResultToast, setScanResultToast, onOpenScanNeedsAttention, toast]);
 

@@ -142,7 +142,12 @@ export function usePlayerRuntime() {
             variant: "warning",
             priority: "notice",
             actionLabel: "このトラックを再試行",
-            onAction: () => setTrackIndex(command.trackIndex),
+            // onActionはトーストを自動では閉じない契約（design-system.md）。ここは同期的に
+            // 完結する操作なので押した直後に閉じる
+            onAction: () => {
+              setTrackIndex(command.trackIndex);
+              toast.dismiss();
+            },
           });
           break;
       }

@@ -1,5 +1,5 @@
-import { StrictMode, createElement, useState, type ReactNode } from "react";
-import { act, render, renderHook, waitFor } from "@testing-library/react";
+import { Fragment, StrictMode, createElement, useState, type ReactNode } from "react";
+import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore, useAtomValue } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -8,6 +8,7 @@ import { NOT_REGISTERED_ERROR } from "../../src/features/player/model/PlayerRunt
 import { usePlayerRuntime } from "../../src/features/player/model/usePlayer";
 import { usePlayerActions } from "../../src/features/player/model/usePlayerActions";
 import { usePlayerState } from "../../src/features/player/model/usePlayerState";
+import GlobalToast from "../../src/app/ui/GlobalToast";
 import {
   playerCurrentTimeAtom,
   playerDurationAtom,
@@ -100,6 +101,29 @@ function makeWrapper({
 function PlayerRuntimeHarness({ children }: { children: ReactNode }) {
   usePlayerRuntime();
   return children;
+}
+
+/** GlobalToastも同じstoreで併設し、notifyTrackSkippedが出すトーストをDOMから検証できるようにする */
+function makeWrapperWithToast(store: ReturnType<typeof createStore> = createStore()) {
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return createElement(
+      QueryClientProvider,
+      { client: new QueryClient() },
+      createElement(
+        JotaiProvider,
+        { store },
+        createElement(
+          PlayerRuntimeProvider,
+          null,
+          createElement(
+            PlayerRuntimeHarness,
+            null,
+            createElement(Fragment, null, children, createElement(GlobalToast)),
+          ),
+        ),
+      ),
+    );
+  };
 }
 
 function usePlayerWithClock() {
@@ -686,6 +710,51 @@ describe("usePlayer adapters", () => {
 
     expect(result.current.player.state.status).not.toBe("error");
     expect(result.current.player.state.playbackError).toBeNull();
+  });
+
+  it("トラックスキップでトーストを出し、「このトラックを再試行」で元のトラックへ選び直してトーストを閉じる", async () => {
+    vi.spyOn(HTMLElement.prototype, "showPopover").mockImplementation(() => {});
+    vi.spyOn(HTMLElement.prototype, "hidePopover").mockImplementation(() => {});
+    const tracks: ResolvedTrack[] = [
+      {
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        title: "壊れたトラック",
+        file: "audio/track-a.wav",
+        durationSec: 30,
+        durationKind: "resolved",
+      },
+      {
+        id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        title: "Track B",
+        file: "audio/track-b.wav",
+        durationSec: 30,
+        durationKind: "resolved",
+      },
+    ];
+    const { result } = renderHook(() => usePlayerWithClock(), {
+      wrapper: makeWrapperWithToast(),
+    });
+
+    act(() => result.current.player.play(work, tracks, 0, playlistId));
+    await waitFor(() => expect(latestAudio().play).toHaveBeenCalled());
+
+    act(() => latestAudio().dispatchEvent(new Event("error")));
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("「壊れたトラック」を読み込めなかったためスキップしました"),
+      ).toBeTruthy(),
+    );
+    expect(result.current.player.state.currentTrackIndex).toBe(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "このトラックを再試行" }));
+
+    await waitFor(() => expect(result.current.player.state.currentTrackIndex).toBe(0));
+    await waitFor(() =>
+      expect(
+        screen.queryByText("「壊れたトラック」を読み込めなかったためスキップしました"),
+      ).toBeNull(),
+    );
   });
 
   it("再生中に同一作品・同一トラックへ再度「最初から再生」すると先頭へシークする", async () => {
