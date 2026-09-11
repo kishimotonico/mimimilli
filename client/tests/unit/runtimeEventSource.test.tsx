@@ -10,10 +10,8 @@ import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
 import {
   dlsiteBulkActiveAtom,
   dlsiteBulkActionsAtom,
-  dlsiteBulkErrorAtom,
   dlsiteBulkProgressAtom,
   dlsiteBulkStartingAtom,
-  dlsiteBulkResultAtom,
 } from "../../src/entities/dlsite/model/bulkAtoms";
 import {
   scanActionsAtom,
@@ -22,6 +20,13 @@ import {
   scanModalOpenAtom,
   scanResultToastAtom,
 } from "../../src/entities/scan/model/atoms";
+import { toastRequestsAtom } from "../../src/shared/model/toastRequestsAtom";
+import { formatDlsiteBulkResult } from "../../src/features/dlsite/model/formatDlsiteBulkResult";
+
+/** DlsiteBulkRuntimeは単一のuseToast()しか持たないため、要求は高々1件 */
+function latestToastRequest(store: ReturnType<typeof createStore>) {
+  return [...store.get(toastRequestsAtom).values()][0];
+}
 
 class FakeEventSource extends EventTarget {
   static readonly CONNECTING = 0;
@@ -448,7 +453,9 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
 
     await waitFor(() => expect(invalidateQueries).toHaveBeenCalled());
     const callsAfterFirst = invalidateQueries.mock.calls.length;
-    expect(store.get(dlsiteBulkResultAtom)).toEqual(dlsiteResult);
+    expect(latestToastRequest(store)?.message).toBe(
+      `DLsite一括取得: ${formatDlsiteBulkResult(dlsiteResult)}`,
+    );
 
     dispatchDlsite(source, "complete", complete);
     await act(async () => {
@@ -619,7 +626,10 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
     });
 
     await waitFor(() => expect(store.get(dlsiteBulkActiveAtom)).toBe(false));
-    expect(store.get(dlsiteBulkErrorAtom)).toBe("DLsite一括取得の接続が切断されました");
+    await waitFor(() =>
+      expect(latestToastRequest(store)?.message).toBe("DLsite一括取得の接続が切断されました"),
+    );
+    expect(latestToastRequest(store)?.variant).toBe("error");
   });
 
   it("start の多重呼び出しで POST は1回だけ", async () => {
@@ -715,7 +725,10 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
     });
 
     await waitFor(() => expect(store.get(dlsiteBulkActiveAtom)).toBe(false));
-    expect(store.get(dlsiteBulkErrorAtom)).toBe("DLsite一括取得の接続が切断されました");
+    await waitFor(() =>
+      expect(latestToastRequest(store)?.message).toBe("DLsite一括取得の接続が切断されました"),
+    );
+    expect(latestToastRequest(store)?.variant).toBe("error");
   });
 
   it("一時切断中は error リスナー経由のネイティブ Event でも active を維持する", async () => {
@@ -743,7 +756,7 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
       await Promise.resolve();
     });
     expect(store.get(dlsiteBulkActiveAtom)).toBe(true);
-    expect(store.get(dlsiteBulkErrorAtom)).toBeNull();
+    expect(latestToastRequest(store)).toBeUndefined();
     expect(source.closed).toBe(false);
   });
 
@@ -789,7 +802,7 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
       total: 5,
       work: { id: "work-1", rjCode: "RJ111111", title: "作品1" },
     });
-    expect(store.get(dlsiteBulkResultAtom)).toBeNull();
+    expect(latestToastRequest(store)).toBeUndefined();
   });
 
   it("不正な terminal イベントで active が固着しない", async () => {
@@ -807,8 +820,10 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
     dispatchDlsite(source, "complete", { type: "complete", result: "invalid" });
 
     await waitFor(() => expect(store.get(dlsiteBulkActiveAtom)).toBe(false));
-    expect(store.get(dlsiteBulkErrorAtom)).toBe("DLsite進捗イベントの形式が不正です");
-    expect(store.get(dlsiteBulkResultAtom)).toBeNull();
+    await waitFor(() =>
+      expect(latestToastRequest(store)?.message).toBe("DLsite進捗イベントの形式が不正です"),
+    );
+    expect(latestToastRequest(store)?.variant).toBe("error");
   });
   it("キャッシュ無効化が失敗しても unhandled rejection にならない", async () => {
     vi.stubGlobal(

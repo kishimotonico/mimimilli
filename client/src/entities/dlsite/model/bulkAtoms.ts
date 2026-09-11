@@ -1,9 +1,9 @@
 // DLsite 一括取得ジョブの Jotai atoms。
 // SSE 購読は DlsiteBulkRuntime が単一所有者。表示側は必要な atom だけ subscribe する。
+// 完了・中断・エラーの通知はここに atom を持たず、DlsiteBulkRuntime が useToast で直接出す。
 
 import { atom } from "jotai";
-import type { DlsiteBulkProgressSnapshot, DlsiteBulkResult } from "@mimimilli/shared";
-import type { ToastVariant } from "../../../shared/ui/Toast";
+import type { DlsiteBulkProgressSnapshot } from "@mimimilli/shared";
 import { formatDlsiteBulkProgressLabel, formatDlsiteBulkWorkLabel } from "./dlsiteProgressLabel";
 
 export const dlsiteBulkActiveAtom = atom(false);
@@ -24,25 +24,14 @@ export const dlsiteBulkCurrentWorkLabelAtom = atom(
   (get) => formatDlsiteBulkWorkLabel(get(dlsiteBulkProgressAtom)?.work ?? null) ?? null,
 );
 
-export const dlsiteBulkResultAtom = atom<DlsiteBulkResult | null>(null);
-
-export const dlsiteBulkCancelledResultAtom = atom<DlsiteBulkResult | null>(null);
-
-export const dlsiteBulkErrorAtom = atom<string | null>(null);
-
 export const dlsiteBulkApplyOpenAtom = atom(false);
 
 export const dlsiteBulkApplyBusyAtom = atom(false);
-
-export const dlsiteBulkApplyResultAtom = atom<{ message: string; variant: ToastVariant } | null>(
-  null,
-);
 
 export interface DlsiteBulkActions {
   start: () => Promise<void>;
   attach: () => void;
   cancel: () => Promise<void>;
-  dismiss: () => void;
 }
 
 /** DlsiteBulkRuntime がマウント時に登録する操作群。未配線時は null */

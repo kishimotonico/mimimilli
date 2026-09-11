@@ -6,9 +6,8 @@ import { applyDlsiteMissing, previewDlsiteMissing } from "../../../entities/work
 import {
   dlsiteBulkApplyBusyAtom,
   dlsiteBulkApplyOpenAtom,
-  dlsiteBulkApplyResultAtom,
 } from "../../../entities/dlsite/model/bulkAtoms";
-import { errorToastAtom } from "../../../shared/model/errorToastAtom";
+import { useToast } from "../../../shared/ui/useToast";
 import { apiErrorMessage } from "../../../shared/lib/apiError";
 import { formatDlsiteBulkApplyMissingResult } from "../model/formatDlsiteBulkApplyMissingResult";
 import { invalidateDlsiteCache } from "../model/dlsiteInvalidation";
@@ -20,8 +19,7 @@ export default function DlsiteBulkApplyRuntime() {
   const busy = useAtomValue(dlsiteBulkApplyBusyAtom);
   const setOpen = useSetAtom(dlsiteBulkApplyOpenAtom);
   const setBusy = useSetAtom(dlsiteBulkApplyBusyAtom);
-  const setResult = useSetAtom(dlsiteBulkApplyResultAtom);
-  const setErrorToast = useSetAtom(errorToastAtom);
+  const toast = useToast();
   const [items, setItems] = useState<DlsiteApplyMissingPreviewItem[] | null>(null);
   const [selectedWorkIds, setSelectedWorkIds] = useState<Set<string>>(new Set());
 
@@ -40,7 +38,11 @@ export default function DlsiteBulkApplyRuntime() {
         if (cancelled) return;
         if (preview.items.length === 0) {
           reset();
-          setResult({ message: "DLsiteの情報は現在の内容と同じでした", variant: "info" });
+          toast.show({
+            message: "DLsiteの情報は現在の内容と同じでした",
+            variant: "info",
+            priority: "notice",
+          });
           return;
         }
         setItems(preview.items);
@@ -49,7 +51,7 @@ export default function DlsiteBulkApplyRuntime() {
       .catch((cause: unknown) => {
         if (cancelled) return;
         reset();
-        setErrorToast(apiErrorMessage(cause, "適用対象の差分を取得できませんでした"));
+        toast.error(apiErrorMessage(cause, "適用対象の差分を取得できませんでした"));
       })
       .finally(() => {
         if (!cancelled) setBusy(false);
@@ -74,18 +76,19 @@ export default function DlsiteBulkApplyRuntime() {
     try {
       const result = await applyDlsiteMissing([...selectedWorkIds]);
       reset();
-      setResult({
+      toast.show({
         message: `未設定項目を適用: ${formatDlsiteBulkApplyMissingResult(result)}`,
         variant: "success",
+        priority: "notice",
       });
       await invalidateDlsiteCache(queryClient, [...selectedWorkIds]);
     } catch (cause) {
       reset();
-      setErrorToast(apiErrorMessage(cause, "未設定項目の一括適用に失敗しました"));
+      toast.error(apiErrorMessage(cause, "未設定項目の一括適用に失敗しました"));
     } finally {
       setBusy(false);
     }
-  }, [queryClient, reset, selectedWorkIds, setBusy, setErrorToast, setResult]);
+  }, [queryClient, reset, selectedWorkIds, setBusy, toast]);
 
   if (!open || !items) return null;
 

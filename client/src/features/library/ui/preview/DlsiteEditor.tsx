@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { useSetAtom } from "jotai";
 import type { DlsitePreview, Work } from "@mimimilli/shared";
 import { applyDlsiteInfo, fetchDlsiteInfo, updateDlsiteState } from "../../../../entities/work/api";
 import {
@@ -14,7 +13,7 @@ import { I } from "../../../../shared/ui/Icon";
 import { useDialogModal } from "../../../../shared/ui/useDialogModal";
 import { WORK_QUERY_KEYS } from "../../../../entities/work/queryKeys";
 import { useDlsiteInvalidation } from "../../../../entities/dlsite/useDlsiteInvalidation";
-import { dlsiteApplyToastAtom } from "../../../../entities/dlsite/model/dlsiteApplyToastAtom";
+import { useToast } from "../../../../shared/ui/useToast";
 import {
   buildDlsiteApplyBody,
   computeDlsiteApplyDiff,
@@ -196,7 +195,7 @@ function DlsiteApplyDialog({
 export function DlsiteEditor({ work }: { work: Work }) {
   const queryClient = useQueryClient();
   const invalidateDlsiteCache = useDlsiteInvalidation();
-  const setApplyToast = useSetAtom(dlsiteApplyToastAtom);
+  const toast = useToast();
   const [rjCode, setRjCode] = useState(work.dlsite.rjCode ?? "");
   const [preview, setPreview] = useState<DlsitePreview | null>(null);
   const [applyTitle, setApplyTitle] = useState(false);
@@ -238,7 +237,11 @@ export function DlsiteEditor({ work }: { work: Work }) {
       const nextPreview = await fetchDlsiteInfo(work.id);
       const nextDiff = computeDlsiteApplyDiff(work, nextPreview.info);
       if (!nextDiff.hasChanges) {
-        setApplyToast({ message: "DLsiteの情報は現在の内容と同じでした", variant: "info" });
+        toast.show({
+          message: "DLsiteの情報は現在の内容と同じでした",
+          variant: "info",
+          priority: "notice",
+        });
         return;
       }
       setSelectedTags(nextDiff.newTags);
@@ -271,7 +274,7 @@ export function DlsiteEditor({ work }: { work: Work }) {
       );
       setPreview(null);
       await refresh();
-      setApplyToast({ message: "DLsite情報を適用しました", variant: "success" });
+      toast.show({ message: "DLsite情報を適用しました", variant: "success", priority: "notice" });
     } catch (cause) {
       setError(dlsiteApplyErrorMessage(cause));
     } finally {

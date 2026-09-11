@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { emptyDlsiteState, type DlsitePreview, type Work } from "@mimimilli/shared";
 import { DlsiteEditor } from "../../src/features/library/ui/preview/DlsiteEditor";
 import { dlsiteInvalidateAtom } from "../../src/entities/dlsite/model/bulkAtoms";
-import { dlsiteApplyToastAtom } from "../../src/entities/dlsite/model/dlsiteApplyToastAtom";
+import GlobalToast from "../../src/app/ui/GlobalToast";
 
 const fetchDlsiteInfo = vi.fn();
 const applyDlsiteInfo = vi.fn();
@@ -56,7 +56,13 @@ function renderEditor(work: Work) {
       createElement(JotaiProvider, { store }, children),
     );
 
-  render(<DlsiteEditor work={work} />, { wrapper });
+  render(
+    <>
+      <DlsiteEditor work={work} />
+      <GlobalToast />
+    </>,
+    { wrapper },
+  );
   return store;
 }
 
@@ -71,6 +77,8 @@ describe("DlsiteEditor", () => {
     HTMLDialogElement.prototype.close = vi.fn(function (this: HTMLDialogElement) {
       this.open = false;
     });
+    vi.spyOn(HTMLElement.prototype, "showPopover").mockImplementation(() => {});
+    vi.spyOn(HTMLElement.prototype, "hidePopover").mockImplementation(() => {});
   });
 
   it("成功: 差分ありの適用でダイアログが閉じ、内部エラーを出さず成功トーストを出す", async () => {
@@ -91,7 +99,7 @@ describe("DlsiteEditor", () => {
     fetchDlsiteInfo.mockResolvedValue(preview);
     applyDlsiteInfo.mockResolvedValue(undefined);
 
-    const store = renderEditor(work);
+    renderEditor(work);
     fireEvent.click(screen.getByRole("button", { name: "取得結果を確認" }));
     await waitFor(() => expect(screen.getByText("DLsite情報の適用")).toBeInTheDocument());
 
@@ -100,12 +108,7 @@ describe("DlsiteEditor", () => {
     await waitFor(() => expect(applyDlsiteInfo).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(screen.queryByText("DLsite情報の適用")).not.toBeInTheDocument());
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    await waitFor(() =>
-      expect(store.get(dlsiteApplyToastAtom)).toEqual({
-        message: "DLsite情報を適用しました",
-        variant: "success",
-      }),
-    );
+    await waitFor(() => expect(screen.getByText("DLsite情報を適用しました")).toBeInTheDocument());
   });
 
   it("失敗: 適用が例外を投げても生のエラーメッセージを画面に出さない", async () => {
@@ -192,14 +195,11 @@ describe("DlsiteEditor", () => {
     };
     fetchDlsiteInfo.mockResolvedValue(preview);
 
-    const store = renderEditor(work);
+    renderEditor(work);
     fireEvent.click(screen.getByRole("button", { name: "取得結果を確認" }));
 
     await waitFor(() =>
-      expect(store.get(dlsiteApplyToastAtom)).toEqual({
-        message: "DLsiteの情報は現在の内容と同じでした",
-        variant: "info",
-      }),
+      expect(screen.getByText("DLsiteの情報は現在の内容と同じでした")).toBeInTheDocument(),
     );
     expect(screen.queryByText("DLsite情報の適用")).not.toBeInTheDocument();
   });

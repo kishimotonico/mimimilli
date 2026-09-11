@@ -7,9 +7,14 @@ import type { DlsiteApplyMissingPreview } from "@mimimilli/shared";
 import DlsiteBulkApplyRuntime from "../../src/features/dlsite/ui/DlsiteBulkApplyRuntime";
 import {
   dlsiteBulkApplyOpenAtom,
-  dlsiteBulkApplyResultAtom,
   dlsiteInvalidateAtom,
 } from "../../src/entities/dlsite/model/bulkAtoms";
+import { toastRequestsAtom } from "../../src/shared/model/toastRequestsAtom";
+
+/** DlsiteBulkApplyRuntimeは単一のuseToast()しか持たないため、要求は高々1件 */
+function latestToastRequest(store: ReturnType<typeof createStore>) {
+  return [...store.get(toastRequestsAtom).values()][0];
+}
 
 const applyDlsiteMissing = vi.fn();
 const previewDlsiteMissing = vi.fn();
@@ -69,11 +74,11 @@ describe("DlsiteBulkApplyDialog", () => {
 
     await waitFor(() => expect(applyDlsiteMissing).toHaveBeenCalledWith(["RJ501001", "RJ501002"]));
     await waitFor(() =>
-      expect(store.get(dlsiteBulkApplyResultAtom)).toEqual({
-        message: "未設定項目を適用: 適用 2件・スキップ 0件・失敗 0件",
-        variant: "success",
-      }),
+      expect(latestToastRequest(store)?.message).toBe(
+        "未設定項目を適用: 適用 2件・スキップ 0件・失敗 0件",
+      ),
     );
+    expect(latestToastRequest(store)?.variant).toBe("success");
   });
 
   it("チェックを外した作品はapplyDlsiteMissingの引数から除かれる", async () => {
@@ -103,11 +108,9 @@ describe("DlsiteBulkApplyDialog", () => {
     const store = renderRuntime();
 
     await waitFor(() =>
-      expect(store.get(dlsiteBulkApplyResultAtom)).toEqual({
-        message: "DLsiteの情報は現在の内容と同じでした",
-        variant: "info",
-      }),
+      expect(latestToastRequest(store)?.message).toBe("DLsiteの情報は現在の内容と同じでした"),
     );
+    expect(latestToastRequest(store)?.variant).toBe("info");
     expect(screen.queryByRole("button", { name: /選択した/ })).not.toBeInTheDocument();
   });
 });
