@@ -36,7 +36,7 @@ export function ErrorViewBulkUnregisterBanner({
       {isConfirmOpen && (
         <ConfirmDialog
           title="登録を解除"
-          message={`${missingCount}件の作品をライブラリから外します。タグや再生履歴は消え、音声などのファイルは残ります。`}
+          message={`${missingCount}件の作品をライブラリから外します。タグや再生履歴（mimimilli.json）は消え、音声などのファイルは残ります。`}
           confirmLabel="まとめて解除する"
           onConfirm={() => {
             setIsConfirmOpen(false);

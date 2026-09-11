@@ -262,7 +262,7 @@ export function WorkDetail({
       {isDeleteConfirmOpen && (
         <ConfirmDialog
           title="登録を解除"
-          message={`「${work.title}」をライブラリから外します。タグや再生履歴は消え、音声などのファイルは残ります。`}
+          message={`「${work.title}」をライブラリから外します。タグや再生履歴（mimimilli.json）は消え、音声などのファイルは残ります。`}
           confirmLabel="解除する"
           onConfirm={() => {
             setIsDeleteConfirmOpen(false);
