@@ -2,7 +2,7 @@
 // SSE 購読は ScanRuntime が単一所有者。表示側は必要な atom だけ subscribe する。
 
 import { atom } from "jotai";
-import type { ScanJobSnapshot, ScanResult, StartScanRequest } from "@mimimilli/shared";
+import type { ScanJobSnapshot, StartScanRequest } from "@mimimilli/shared";
 import { formatScanProgressLabel, type ScanProgress } from "./scanProgressLabel";
 import { isTerminalScanJob } from "./scanJob";
 
@@ -21,12 +21,6 @@ export const scanProgressAtom = atom<ScanProgress | null>((get) => {
 export const scanProgressLabelAtom = atom((get) => formatScanProgressLabel(get(scanProgressAtom)));
 
 export const scanErrorAtom = atom<string | null>(null);
-
-/** スキャン完了・中止のトースト表示用。GlobalToastが消費する。
- *  モーダルが開いている間はサイドバーの「完了しました」が同じ役割を担うため出さない */
-export type ScanResultToast = { kind: "completed"; result: ScanResult } | { kind: "cancelled" };
-
-export const scanResultToastAtom = atom<ScanResultToast | null>(null);
 
 /** ScanModal がマウント中かどうか */
 export const scanModalOpenAtom = atom(false);

@@ -18,9 +18,9 @@ import {
   scanCandidateHiddenPathsAtom,
   scanJobAtom,
   scanModalOpenAtom,
-  scanResultToastAtom,
 } from "../../src/entities/scan/model/atoms";
 import { toastRequestsAtom } from "../../src/shared/model/toastRequestsAtom";
+import { activeModalAtom } from "../../src/shared/model/activeModalAtom";
 import { formatDlsiteBulkResult } from "../../src/features/dlsite/model/formatDlsiteBulkResult";
 
 /** DlsiteBulkRuntimeは単一のuseToast()しか持たないため、要求は高々1件 */
@@ -389,11 +389,58 @@ describe("ScanRuntime: 完了・中止トースト", () => {
 
     dispatchScan(source, { type: "completed", seq: 1, result: scanResult });
     await waitFor(() =>
-      expect(store.get(scanResultToastAtom)).toEqual({
-        kind: "completed",
-        result: scanResult,
+      expect(latestToastRequest(store)?.message).toBe(
+        "スキャン完了: 登録 1件・新規 0件・エラー 0件・行方不明 0件",
+      ),
+    );
+    // 要対応が無ければアクションは付けない
+    expect(latestToastRequest(store)?.actionLabel).toBeUndefined();
+  });
+
+  it("要対応があれば「要対応を見る」アクションを付け、押すとactiveModalAtomを書き換えてトーストを閉じる", async () => {
+    const needsAttentionResult = { ...scanResult, rjCodeMissingCount: 1 };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith("/scan/active")) return response(running);
+        if (url.endsWith("/scan/job-1"))
+          return response({ ...completedJob, result: needsAttentionResult });
+        return response(null, 204);
       }),
     );
+
+    const { store } = renderRuntime(createElement(ScanRuntime));
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    const source = FakeEventSource.instances[0]!;
+
+    dispatchScan(source, { type: "completed", seq: 1, result: needsAttentionResult });
+    await waitFor(() => expect(latestToastRequest(store)?.actionLabel).toBe("要対応を見る"));
+
+    latestToastRequest(store)!.onAction!();
+
+    expect(store.get(activeModalAtom)).toEqual({ kind: "scan", tab: "needsAttention" });
+    expect(latestToastRequest(store)).toBeUndefined();
+  });
+
+  it("中止時は「スキャンを中止しました」トーストを出す", async () => {
+    const cancelledJob: ScanJobSnapshot = { ...running, status: "cancelled", result: null };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith("/scan/active")) return response(running);
+        if (url.endsWith("/scan/job-1")) return response(cancelledJob);
+        return response(null, 204);
+      }),
+    );
+
+    const { store } = renderRuntime(createElement(ScanRuntime));
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    const source = FakeEventSource.instances[0]!;
+
+    dispatchScan(source, { type: "cancelled", seq: 1 });
+    await waitFor(() => expect(latestToastRequest(store)?.message).toBe("スキャンを中止しました"));
   });
 
   it("スキャンモーダルが開いていれば完了トーストを出さない（サイドバーの完了表示に任せる）", async () => {
@@ -414,7 +461,7 @@ describe("ScanRuntime: 完了・中止トースト", () => {
 
     dispatchScan(source, { type: "completed", seq: 1, result: scanResult });
     await waitFor(() => expect(store.get(scanJobAtom)?.status).toBe("completed"));
-    expect(store.get(scanResultToastAtom)).toBeNull();
+    expect(latestToastRequest(store)).toBeUndefined();
   });
 });
 

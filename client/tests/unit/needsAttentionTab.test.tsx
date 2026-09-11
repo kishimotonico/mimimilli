@@ -5,7 +5,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import NeedsAttentionTab from "../../src/features/scan/ui/scanModal/NeedsAttentionTab";
-import { activeModalAtom } from "../../src/shared/model/activeModalAtom";
 
 function renderTab(overrides: Partial<Parameters<typeof NeedsAttentionTab>[0]> = {}) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });

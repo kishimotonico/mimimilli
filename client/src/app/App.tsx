@@ -23,7 +23,6 @@ import SetupScreen from "../features/setup/ui/SetupScreen";
 import StartupErrorScreen from "./ui/StartupErrorScreen";
 import { LibraryNavigationProvider } from "../features/library/ui/LibraryNavigationProvider";
 import GlobalToast from "./ui/GlobalToast";
-import ScanResultToastBridge from "./ui/ScanResultToastBridge";
 import AppModals from "./ui/AppModals";
 import { useToast } from "../shared/ui/useToast";
 import { apiErrorMessage } from "../shared/lib/apiError";
@@ -234,7 +233,6 @@ export default function App() {
                 onOpenFiles={handleOpenScanProblemInFiles}
                 onOpenWork={handleOpenLibraryWork}
               />
-              <ScanResultToastBridge />
               <GlobalToast />
             </>
           }

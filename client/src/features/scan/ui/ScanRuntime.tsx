@@ -13,10 +13,11 @@ import {
   scanErrorAtom,
   scanJobAtom,
   scanModalOpenAtom,
-  scanResultToastAtom,
   type ScanActions,
 } from "../../../entities/scan/model/atoms";
 import { useScanJob } from "../model/useScanJob";
+import { formatScanResult } from "../model/formatScanResult";
+import { activeModalAtom } from "../../../shared/model/activeModalAtom";
 import { useToast } from "../../../shared/ui/useToast";
 
 // SSE 購読の単一所有者。scanJobAtom / scanActionsAtom をここで配線する。
@@ -27,7 +28,7 @@ export default function ScanRuntime() {
   const setError = useSetAtom(scanErrorAtom);
   const setActions = useSetAtom(scanActionsAtom);
   const setHiddenPaths = useSetAtom(scanCandidateHiddenPathsAtom);
-  const setResultToast = useSetAtom(scanResultToastAtom);
+  const setActiveModal = useSetAtom(activeModalAtom);
   const toast = useToast();
   // モーダルが開いている間はサイドバーの「完了しました」が完了通知を担うため、
   // トースト側は重ねて出さない。SSEイベントの時点で最新値を見たいためrefで持つ。
@@ -40,7 +41,9 @@ export default function ScanRuntime() {
   const handleScanTerminal = useCallback(
     (job: ScanJobSnapshot) => {
       if (job.status === "cancelled") {
-        if (!scanModalOpenRef.current) setResultToast({ kind: "cancelled" });
+        if (!scanModalOpenRef.current) {
+          toast.show({ message: "スキャンを中止しました", variant: "warning", priority: "notice" });
+        }
         return;
       }
       if (job.status !== "completed" || !job.result || !job.finishedAt) return;
@@ -49,10 +52,30 @@ export default function ScanRuntime() {
       void refreshScanCandidates(queryClient).catch(() => {});
       void invalidateLibraryQueries(queryClient);
       queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() });
-      if (!scanModalOpenRef.current) setResultToast({ kind: "completed", result });
+      if (!scanModalOpenRef.current) {
+        const hasNeedsAttention =
+          result.identityConflicts.length > 0 ||
+          result.invalidMetaFiles.length > 0 ||
+          result.rjCodeMissingCount > 0 ||
+          result.dataIntegrityWarning !== undefined;
+        toast.show({
+          message: `スキャン完了: ${formatScanResult(result)}`,
+          variant: result.errors > 0 || result.missing > 0 ? "warning" : "success",
+          priority: "notice",
+          actionLabel: hasNeedsAttention ? "要対応を見る" : undefined,
+          // onActionはトーストを自動では閉じない契約（design-system.md）。ここは同期的に
+          // 完結する操作なので押した直後に閉じる
+          onAction: hasNeedsAttention
+            ? () => {
+                setActiveModal({ kind: "scan", tab: "needsAttention" });
+                toast.dismiss();
+              }
+            : undefined,
+        });
+      }
       if (result.insertedWorkIds.length > 0) dlsiteBulk.attach();
     },
-    [dlsiteBulk, queryClient, setResultToast],
+    [dlsiteBulk, queryClient, setActiveModal, toast],
   );
 
   // 新しいスキャンの開始がサーバー側の真実の境界になるため、開始時点でそれ以前のローカル非表示を破棄する。
