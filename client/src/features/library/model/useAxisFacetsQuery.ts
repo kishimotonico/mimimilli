@@ -23,8 +23,13 @@ export function useAxisFacetsQuery(
     ...buildTagFilterParams(selectedTags),
     ...(smartFolderId ? { smartFolderId } : {}),
   };
+  // smartFolderId 付きはキーの依存関係をそのフォルダーIDで表し、フォルダー保存・削除時に
+  // そのフォルダーの分だけを無効化できるようにする（通常のfacetsとは別系統）
+  const queryKey = smartFolderId
+    ? WORK_QUERY_KEYS.scopedFacets(smartFolderId, axis ?? "", buildTagFilterParams(selectedTags))
+    : WORK_QUERY_KEYS.facets(axis ?? "", filterParams);
   return useQuery({
-    queryKey: WORK_QUERY_KEYS.facets(axis ?? "", filterParams),
+    queryKey,
     queryFn: async () => {
       const items = await getAxisFacets(axis!, filterParams);
       return filterValidFacetItems(axis!, items);

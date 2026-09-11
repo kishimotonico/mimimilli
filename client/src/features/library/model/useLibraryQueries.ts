@@ -40,6 +40,7 @@ import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { useRootFolder } from "../../../entities/settings/useSettingsQuery";
 import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
 import { TAG_QUERY_KEYS } from "../../../entities/tag/queryKeys";
+import { invalidateSmartFolderSaveQueries } from "./smartFolderInvalidation";
 
 type LibraryTitlePatchVariables = { workId: string; title: string; sourceRevision: string };
 type LibraryBookmarkPatchVariables = {
@@ -405,10 +406,7 @@ export function useSmartFolderMutation(callbacks: {
     mutationFn: ({ folder, input }: { folder: SmartFolder | null; input: SmartFolderCreate }) =>
       folder ? updateSmartFolder(folder.id, input) : createSmartFolder(input),
     onSuccess: async (savedFolder, { folder }) => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.all() }),
-        queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.allWorks() }),
-      ]);
+      await invalidateSmartFolderSaveQueries(queryClient, savedFolder.id);
       callbacks.onSaved(savedFolder, folder === null);
     },
     onError: (error, { folder }) => {
@@ -424,11 +422,8 @@ export function useSmartFolderDeleteMutation(callbacks: { onDeleted: () => void 
 
   return useMutation({
     mutationFn: (id: string) => deleteSmartFolder(id),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.all() }),
-        queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.allWorks() }),
-      ]);
+    onSuccess: async (_result, id) => {
+      await invalidateSmartFolderSaveQueries(queryClient, id);
       callbacks.onDeleted();
     },
   });
