@@ -34,7 +34,6 @@ export function WorkStatusWarnings({
               <Button
                 variant="ghost"
                 size="sm"
-                icon={I.trash}
                 className="text-[color:var(--r-coral)]"
                 onClick={onDelete}
               >
@@ -64,7 +63,6 @@ export function WorkStatusWarnings({
               <Button
                 variant="ghost"
                 size="sm"
-                icon={I.trash}
                 className="text-[color:var(--r-coral)]"
                 onClick={onDelete}
               >

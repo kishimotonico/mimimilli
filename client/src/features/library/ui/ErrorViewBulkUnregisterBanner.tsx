@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useSetAtom } from "jotai";
-import { I } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
 import ConfirmDialog from "../../../shared/ui/ConfirmDialog";
 import { errorToastAtom } from "../../../shared/model/errorToastAtom";
@@ -28,7 +27,6 @@ export function ErrorViewBulkUnregisterBanner({
       </span>
       <Button
         variant="ghost"
-        icon={I.trash}
         onClick={() => setIsConfirmOpen(true)}
         disabled={mutation.isPending}
         className="shrink-0 text-[color:var(--r-coral)]"
