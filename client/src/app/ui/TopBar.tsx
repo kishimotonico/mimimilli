@@ -74,8 +74,8 @@ export default function TopBar({ onOpenScan, onSettings, notificationBell }: Top
   const [draft, setDraft] = useState(searchQuery);
   const composingRef = useRef(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  // Escapeで空欄からblurするとき、直前にフォーカスしていた要素へ戻すための記憶
-  // （TASK-428.15）。フォーカスは検索欄へ移った時点ですでに切り替わっているため、
+  // Escapeで空欄からblurするとき、直前にフォーカスしていた要素へ戻すための記憶。
+  // フォーカスは検索欄へ移った時点ですでに切り替わっているため、
   // FocusEvent.relatedTarget（移る前にフォーカスしていた要素）から取る。
   const previousFocusRef = useRef<HTMLElement | null>(null);
 
@@ -153,7 +153,7 @@ export default function TopBar({ onOpenScan, onSettings, notificationBell }: Top
               if (e.nativeEvent.isComposing) return;
 
               if (e.key === "Enter") {
-                // 作品詳細から確定したら検索結果（ライブラリ）へ移る（TASK-428.15）
+                // 作品詳細から確定したら検索結果（ライブラリ）へ移る
                 if (mode === "workDetail") {
                   e.preventDefault();
                   setAppMode("library");
@@ -163,7 +163,7 @@ export default function TopBar({ onOpenScan, onSettings, notificationBell }: Top
 
               if (e.key !== "Escape") return;
               // 一段だけ閉じる: 値があればクリアに留め、空のときだけblurして直前の
-              // フォーカスへ戻す（TASK-428.13のEscape契約に合わせる）
+              // フォーカスへ戻す
               e.preventDefault();
               if (draft) {
                 setDraft("");

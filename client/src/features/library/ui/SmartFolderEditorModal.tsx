@@ -50,7 +50,7 @@ interface SmartFolderEditorModalProps {
 const inputClass =
   "h-8 rounded-[6px] border border-line bg-paper-1 px-2.5 font-jp text-body text-ink-0 focus:border-acc";
 
-// エディタと結果バナー（SmartFolderView）で列位置を揃えるための固定幅（TASK-428.11 SF-04）
+// エディタと結果バナー（SmartFolderView）で列位置を揃えるための固定幅
 const CONJ_WIDTH_CLASS = "w-[92px]";
 const OP_WIDTH_CLASS = "w-[76px]";
 
@@ -167,7 +167,7 @@ export default function SmartFolderEditorModal({
     event.preventDefault();
 
     // 保存前に、タグ入力欄に残っている未確定文字列をEnterと同じ規則で確定する。
-    // 候補に一致しない入力は破棄せず、入力欄へ戻してエラーにする（TASK-428.24 SF-08）。
+    // 候補に一致しない入力は破棄せず、入力欄へ戻してエラーにする。
     let workingDraft = draft;
     const pendingInputErrors: SmartFolderEditorErrors["ruleValues"] = {};
     for (const rule of workingDraft.rules) {

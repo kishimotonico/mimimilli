@@ -61,7 +61,7 @@ describe("DLsite適用プレビュー", () => {
     ]);
   });
 
-  it("変更あり・変更なし・適用不可を行ごとに区別する（TASK-428.1）", () => {
+  it("変更あり・変更なし・適用不可を行ごとに区別する", () => {
     const sameTitleInfo: DlsiteWorkInfo = { ...info, title: work.title, coverUrl: null };
     const diff = computeDlsiteApplyDiff(work, sameTitleInfo);
     expect(diff.title).toEqual({ kind: "unchanged", value: work.title });

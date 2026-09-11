@@ -32,7 +32,7 @@ interface FileLoadErrorPreviewProps {
   onRetry: () => void;
 }
 
-/** 404（対象なし）と5xx/通信失敗（再試行可能）を区別して表示する（TASK-428.18 / files-A-01） */
+/** 404（対象なし）と5xx/通信失敗（再試行可能）を区別して表示する */
 export function FileLoadErrorPreview({
   kind,
   path,
@@ -81,8 +81,8 @@ interface MissingSelectionPreviewProps {
 /**
  * カレントフォルダーの取得自体には成功したが、選択中パスがその中に存在しない場合の表示。
  * ライブラリのエラー詳細・スキャン要対応の「Filesで開く」（openPathInFilesAtom）は
- * 移動・削除済みの対象へ遷移することがあり、以前は選択解除扱いでカレントフォルダーの
- * プレビューへ黙って差し替わっていた（TASK-428.18）。
+ * 移動・削除済みの対象へ遷移することがあるため、フォルダーへ黙って差し替えず
+ * 対象なしを表示する。
  */
 export function MissingSelectionPreview({ path, onBack }: MissingSelectionPreviewProps) {
   return (

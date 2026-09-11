@@ -1,4 +1,4 @@
-// 要対応タブ（TASK-428.4）: ID重複はパスごとに1行、Filesで開く導線のみを示す。
+// 要対応タブ: ID重複はパスごとに1行、Filesで開く導線のみを示す。
 import { createElement } from "react";
 import { render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";

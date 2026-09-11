@@ -67,7 +67,7 @@
 
 ## 作品一覧・トラック一覧のキーボード操作
 
-作品グリッド（`WorkGrid`）・作品リスト（`WorkListPane`）・トラック一覧（`WorkTrackList`）は共通のキーボード契約に従う（TASK-428.12）。
+作品グリッド（`WorkGrid`）・作品リスト（`WorkListPane`）・トラック一覧（`WorkTrackList`）は共通のキーボード契約に従う。
 
 - roving tabindex: 一覧内の各行/タイルは個別のTabストップにしない。「現在位置」に当たる1件だけ `tabIndex={0}`、他は `tabIndex={-1}` にし、一覧全体でTabストップを1個にする。作品グリッド・作品リストは「選択中の作品（無ければ先頭）」を現在位置にする（選択状態を持つため）。トラック一覧は選択の概念が無いため、初期値は「再生中のトラック（無ければ先頭）」とし、以降は行の`onFocus`で現在位置を更新する（フォーカスされた行がそのまま次のroving対象になる、標準的なroving tabindexの実装）
 - 矢印キー: 上下（グリッドは左右も）で隣接する行/タイルへ移動する。移動先へは選択も追従させる（`onWorkSelect`）。グリッドの列移動は `gridNavigation.ts` の `getNextGridIndex`（固定列）/`getNextJustifiedIndex`（ジャスティファイド、隣接行で横位置が最も近いタイルを選ぶ）、リスト・トラック一覧は同じ `getNextGridIndex` を列数1で流用する（Up/Downが±1になる）。Home/Endは各関数が先頭・末尾のインデックスを返す
@@ -125,12 +125,12 @@ dismissal に統一しており、3経路とも `useDialogModal` の `onClose` 1
 新しい方が手前になるため、モーダル表示後にトーストを出せば常に最前面に見える。
 
 ただし `showModal()` 中の dialog はブラウザが dialog 以外の全体を暗黙に inert 化するため、
-popover で top layer に載せてもクリックは通らない（TASK-327）。`Toast` は開いているモーダル
+popover で top layer に載せてもクリックは通らない。`Toast` は開いているモーダル
 dialog を `useTopmostOpenModalDialog`（`shared/ui/`）で検出し、そのdialog直下へポータルする
 ことでこれを回避する（inert化の対象から外れる）。モーダルが無ければ `document.body` へ
 ポータルする。モーダルが閉じれば body へ戻る。
 
-### Toast は単一ホスト（GlobalToast）に集約する（TASK-440）
+### Toast は単一ホスト（GlobalToast）に集約する
 
 `Toast`（`shared/ui/Toast.tsx`）を描画する場所は `GlobalToast`（`app/ui/`）1箇所だけに
 限定する。個々の画面が独自に `<Toast>` を宣言することは禁止する（`rg "<Toast\b" client/src`
@@ -145,7 +145,7 @@ dialog を `useTopmostOpenModalDialog`（`shared/ui/`）で検出し、そのdia
 以前は「各画面が自分の判断でdialog内かdocument.bodyかを選ぶ」形だったため、GlobalToast
 （アプリルート）が偶然同じタイミングで表示要求を出すと、2つの独立したToastインスタンスが
 同じ固定位置（モーダルdialog直下）へ同時にポータルされ、一方が他方のボタンを覆って操作
-できなくなる不具合があった（TASK-440。スキャンダイアログでDLsite一括取得完了トーストと
+できなくなる不具合があった（スキャンダイアログでDLsite一括取得完了トーストと
 候補除外のUndoトーストが重なるケースで発生）。単一ホストに集約し、`GlobalToast` が
 「今どの1件を表示するか」を優先度チェーンで決めることでこの衝突を構造的に無くす。
 
@@ -171,14 +171,14 @@ dialog を `useTopmostOpenModalDialog`（`shared/ui/`）で検出し、そのdia
 取り除いて `onDismiss` を呼ぶ）。上位の要求が消えても、既に破棄した要求が後から
 改めて表示されることはない。待機（キュー）にすると「表示される前の待ち時間には寿命が
 無く、上位が消えたタイミングで文脈を失った古い状態のトーストが不意に出る」問題が起きる
-ため採らない（TASK-440）。破棄した要求の内容は、必ず別の場所から辿れることを要求元が
+ため採らない。破棄した要求の内容は、必ず別の場所から辿れることを要求元が
 保証する（例: DLsite一括取得の結果は `GET /dlsite/bulk` の直近結果と通知ベルから確認
-できる。候補除外のUndoは設定モーダル「候補から外したフォルダー」で後から取り消せる、
-TASK-330）。別の場所から辿れない一度きりの操作（例: タグ削除のUndo）は、破棄されても
+できる。候補除外のUndoは設定モーダル「候補から外したフォルダー」で後から取り消せる）。
+別の場所から辿れない一度きりの操作（例: タグ削除のUndo）は、破棄されても
 致命的ではないと判断できる場合に限り許容する（負ける相手が手動クローズのみのerrorに
 限られ、再実行が1操作で済むなど）。
 
-### Toast の表示寿命・種別（TASK-428.2）
+### Toast の表示寿命・種別
 
 `variant`（`"info" | "success" | "warning" | "error"`）で成功・警告・失敗をアイコンと
 `--state-success` / `--state-warning` / `--state-danger`（`tokens.css`）の配色で区別する。
@@ -197,7 +197,7 @@ focus中はタイマーを止め、離れると残り時間から再開する。
 
 背後の action atom は3つある。`replaceLibraryTagAtom`（置き換え）、`toggleLibraryTagAtom`（`Ctrl`/`Cmd`+クリックによる反転先。選択済みなら解除する）、`addLibraryTagAtom`（追加ボタン・既定＝AND追加の主クリック用。冪等で、選択済みなら何もしない）。追加ボタンは常に `addLibraryTagAtom` を呼ぶため選択済みタグを解除せず、選択済みの行には追加ボタン自体を表示しない。コンポーネント側でこれらの action atom を直接分岐させず、必ず `ValueSelectionIntent` を宣言して `deriveValueSelectionHandlers` を経由する。
 
-軸ファセット件数（`GET /axes/:axis`）の「件数基準」も同じ契約から導出する（TASK-428.14）。既定＝置き換えの入口（軸レールのクイックオーバーレイ・チップの兄弟値ドロップダウン・値一覧の行/タイル）は無条件集計（現在の選択タグを一切渡さない）にし、その行を主クリックした結果（選択タグを丸ごと1件に置き換えた後の件数）と画面の表示件数を一致させる。既定＝AND追加の入口（「＋絞り込み」）は現在の選択タグ込みの集計のままにし、「追加したら何件になるか」を示す。どちらの集計を使うかは `deriveFacetCountTags(intent, selectedTags)` で導出し、呼び出し側でハードコードしない。ヒント文言（`.mll-qlist__hint` 等）も同様に `getValueSelectionHint(default)` から導出する。どちらの既定でも両方向の操作（主クリックの意味・`Ctrl`/`Cmd`+クリックでの反転先）が分かる文言にし、片方向だけの説明（反転できることに触れない）にしない。既定＝置き換えは「クリックで置き換え・Ctrl+クリックでAND追加」、既定＝AND追加は「クリックでAND追加・Ctrl+クリックで置き換え」で統一する。
+軸ファセット件数（`GET /axes/:axis`）の「件数基準」も同じ契約から導出する。既定＝置き換えの入口（軸レールのクイックオーバーレイ・チップの兄弟値ドロップダウン・値一覧の行/タイル）は無条件集計（現在の選択タグを一切渡さない）にし、その行を主クリックした結果（選択タグを丸ごと1件に置き換えた後の件数）と画面の表示件数を一致させる。既定＝AND追加の入口（「＋絞り込み」）は現在の選択タグ込みの集計のままにし、「追加したら何件になるか」を示す。どちらの集計を使うかは `deriveFacetCountTags(intent, selectedTags)` で導出し、呼び出し側でハードコードしない。ヒント文言（`.mll-qlist__hint` 等）も同様に `getValueSelectionHint(default)` から導出する。どちらの既定でも両方向の操作（主クリックの意味・`Ctrl`/`Cmd`+クリックでの反転先）が分かる文言にし、片方向だけの説明（反転できることに触れない）にしない。既定＝置き換えは「クリックで置き換え・Ctrl+クリックでAND追加」、既定＝AND追加は「クリックでAND追加・Ctrl+クリックで置き換え」で統一する。
 
 値行（`AxisValueQuickList`・`AxisValueRows`・`AxisValueGrid`）は `role="listbox"` / `role="option"` を使わない。行は主選択ボタンとAND追加ボタンという2つのフォーカス可能要素を内包しており、ARIAのoption roleが想定するテキスト相当の内容とは合わないため、listboxパターン自体を採らない。行のコンテナは無地の `div`（仮想化の絶対配置ラッパーと責務が重なるため `ul`/`li` は使わない）で、選択状態は実際にフォーカスされる主選択ボタン自身の `aria-pressed` で表す（`WorkTile` の単一ボタンタイルと同じ表現）。3コンポーネントとも roving tabindex で、一覧内の各行を個別のTabストップにせず「現在位置」の1行だけ `tabIndex={0}`、他は `tabIndex={-1}` にする（作品一覧・トラック一覧と同じ規約）。一覧全体でTabストップは1個になり、Tabで一覧へ入ると現在位置の行にフォーカスし、もう一度Tabすると一覧全体を抜ける。矢印キーでの行移動は自前のフォーカス制御で行い、ARIAのlistbox/optionキーボード規約には従わない。移動先を特定する目印は統一されておらず、`AxisValueQuickList` は `data-index` / `data-quicklist-item`、`AxisValueRows` と `AxisValueGrid` は `data-flat-index` を使う。行をまとめるスクロールコンテナ（`.mll-qlist__body` / `.mle-col__list` / `.mll-grid-scroll`）には `role="group"` と `aria-label="{軸名}の値一覧"` を付け、複数のフォーカス可能要素を子に持てる集合として名前だけは伝える。軸名は各コンポーネントが `axis`（ID）から自前で `getAxisLabel(axis)` を呼ばず、呼び出し元が `getAxisLabel(axis, tagPrefixes)` で解決した表示ラベルを `axisLabel` propとして受け取る（tagPrefixesを渡さないと未登録prefixでIDがそのまま支援技術に通知されるため）。軸レールのトリガーボタン（`AxisColumn`）は開くパネルが `menu`/`listbox` いずれのパターンでもないため `aria-haspopup` を持たず、開閉状態は `aria-expanded` のみで表す（disclosureパターン）。
 

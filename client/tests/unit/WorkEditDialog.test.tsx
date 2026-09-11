@@ -12,7 +12,7 @@ import type {
 import { WorkEditDialog } from "../../src/features/library/ui/preview/WorkEditDialog";
 import GlobalToast from "../../src/app/ui/GlobalToast";
 
-// Toastは単一ホスト（GlobalToast）へ集約されているため（TASK-440）、WorkEditDialogの表示要求を
+// Toastは単一ホスト（GlobalToast）へ集約されているため、WorkEditDialogの表示要求を
 // 目に見える形で検証するにはGlobalToastも一緒に描画する必要がある。
 function withToast(queryClient: QueryClient, ui: ReactElement) {
   return (

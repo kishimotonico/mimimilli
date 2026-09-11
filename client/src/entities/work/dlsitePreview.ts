@@ -38,7 +38,7 @@ export function unappliedDlsiteTags(work: Work, info: DlsiteWorkInfo): Normalize
   return dlsiteInfoTags(info).filter((tag) => !existing.has(tag));
 }
 
-/** DLsite適用ダイアログの1行の状態。変更あり・変更なし・適用不可を区別する（TASK-428.1） */
+/** DLsite適用ダイアログの1行の状態。変更あり・変更なし・適用不可を区別する */
 export type DlsiteFieldDiff =
   | { kind: "unchanged"; value: string }
   | { kind: "changed"; current: string; next: string }

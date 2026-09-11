@@ -32,7 +32,7 @@ import type { CandidatesRegisteredResult, ScanTabKey } from "./scanModal/types";
 interface ScanModalProps {
   lastScanTime: string | null;
   onClose: () => void;
-  /** 開いた時点で選択するタブ。省略時は未登録タブ（TASK-428.4: 通知ベルから要対応タブへ直接遷移するため） */
+  /** 開いた時点で選択するタブ。省略時は未登録タブ（通知ベルから要対応タブへ直接遷移するため） */
   initialTab?: ScanTabKey;
   onOpenNotificationModal: (kind: DlsiteNotificationModalKind) => void;
   onOpenFiles: (path: string) => void;
@@ -107,7 +107,7 @@ export default function ScanModal({
   const invalidMetaFiles = lastResult?.invalidMetaFiles ?? [];
   const dataIntegrityWarning = lastResult?.dataIntegrityWarning;
   // 通知ベルと同じ「要対応」定義を使うため、RJコード未検出・DLsite取得/パース失敗は
-  // スキャン結果のスナップショットではなく通知ベルと同じ集計クエリを参照する（TASK-428.4）。
+  // スキャン結果のスナップショットではなく通知ベルと同じ集計クエリを参照する。
   const {
     rjCodeMissingCount,
     fetchFailedCount: dlsiteFetchFailedCount,

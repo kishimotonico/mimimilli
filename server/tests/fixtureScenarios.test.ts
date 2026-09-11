@@ -126,7 +126,7 @@ test("new-work: Files用診断とscan確認用の候補・問題を独立して�
   );
 });
 
-test("new-work: identityConflicts・invalidMetaFilesが指すパスは/fsツリー上に実在する（TASK-435）", async () => {
+test("new-work: identityConflicts・invalidMetaFilesが指すパスは/fsツリー上に実在する", async () => {
   const app = buildApp("new-work");
 
   const canonical = await app.request(
@@ -135,8 +135,7 @@ test("new-work: identityConflicts・invalidMetaFilesが指すパスは/fsツリ�
   assert.equal(canonical.status, 200);
   assert.equal((await canonical.json()).workId, "RJ501001");
 
-  // TASK-428.5フォローアップで発覚: identityConflictsの重複コピー側は/fsツリーに
-  // 実体が無く404だった
+  // identityConflictsの重複コピー側も/fsツリーに実体があり200で返る必要がある
   const duplicate = await app.request("/api/fs?path=copies/RJ501001_夜更けの図書室で囁き朗読");
   assert.equal(duplicate.status, 200);
   const duplicateBody = await duplicate.json();
@@ -152,7 +151,7 @@ test("new-work: identityConflicts・invalidMetaFilesが指すパスは/fsツリ�
   assert.ok(metaEntry, "壊れた/mimimilli.json が/fsツリーに存在しない");
 });
 
-test("errors: dataIntegrityWarningがWorksPage・スキャン結果・エクスポート・スマートフォルダー・DLsite一括のいずれからも取得できる（TASK-435）", async () => {
+test("errors: dataIntegrityWarningがWorksPage・スキャン結果・エクスポート・スマートフォルダー・DLsite一括のいずれからも取得できる", async () => {
   // real adapterの意味論（DB破損行があればクエリのたびに毎回付く劣化状態の表示）に
   // 合わせ、劣化状態を確認するためのシナリオ errors に置く。new-work・default等の
   // 既定シナリオへ置くとsmoke・worktree確認の土台が常時バナー込みになってしまうため避ける
@@ -194,7 +193,7 @@ test("errors: dataIntegrityWarningがWorksPage・スキャン結果・エクス�
   assert.deepEqual(bulk.dataIntegrityWarning, worksPage.dataIntegrityWarning);
 });
 
-test("new-work・default: dataIntegrityWarningは付かない（TASK-435 AC#3）", async () => {
+test("new-work・default: dataIntegrityWarningは付かない", async () => {
   for (const scenario of [undefined, "new-work"] as const) {
     const adapter = createFixtureAdapter({ scenario });
     const worksPage = await adapter.queryWorks({
@@ -300,8 +299,7 @@ test("errors: エラー・行方不明の作品のみが含まれる", async () 
 
 test("全シナリオ: rootFolderが作品のphysicalPathの前方一致になっている（relativeToRootが正しく剥がせる前提）", () => {
   // シナリオ追加・rootFolder変更のたびに手作業で気をつける前提を無くすため、
-  // 個別シナリオではなくSCENARIO_IDS全件をループする（TASK-428.5フォローアップ、
-  // errorsシナリオでrootFolderが実際のphysicalPathと前方一致していなかった実例あり）。
+  // 個別シナリオではなくSCENARIO_IDS全件をループする。
   for (const id of SCENARIO_IDS) {
     const scenario = createFixtureScenario(id, "2026-08-11T00:00:00.000Z");
     if (scenario.works.length === 0) continue; // 例: empty

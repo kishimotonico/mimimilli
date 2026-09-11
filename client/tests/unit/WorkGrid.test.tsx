@@ -252,7 +252,7 @@ describe("WorkGrid empty states", () => {
     expect(screen.getByText("作品詳細の☆ボタンでお気に入りに追加できます")).toBeTruthy();
   });
 
-  it("スマートフォルダーが0件のとき専用の見出しと「条件を編集」を出す（TASK-428.24 SF-05）", () => {
+  it("スマートフォルダーが0件のとき専用の見出しと「条件を編集」を出す", () => {
     const onEditSmartFolderRules = vi.fn();
     renderWorkGrid({
       props: { works: [], isSmartFolder: true, onEditSmartFolderRules },

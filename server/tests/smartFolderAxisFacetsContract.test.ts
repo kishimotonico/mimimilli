@@ -1,4 +1,4 @@
-// スマートフォルダー表示中の軸ファセット（GET /axes/:axis?smartFolder=<id>）の契約テスト（TASK-432）。
+// スマートフォルダー表示中の軸ファセット（GET /axes/:axis?smartFolder=<id>）の契約テスト。
 // fixture/real 両アダプタの ClassificationAdapter.getAxisFacets を実際に通し、
 // 1) フォルダー条件で候補件数が絞り込まれること、2) チップ選択タグとのANDが
 // スマートフォルダー結果一覧（evalSmartFolder）と同じ意味論であること、
@@ -150,7 +150,7 @@ test("smartFolderが解決できない場合はnullを返す（ルートが404�
   }
 });
 
-test("smartFolderスコープの軸ファセットはfixtureとrealで同値（TASK-432契約）", async (t) => {
+test("smartFolderスコープの軸ファセットはfixtureとrealで同値", async (t) => {
   const fixture = buildFixtureAdapter();
   const real = buildRealAdapter();
   t.after(real.cleanup);

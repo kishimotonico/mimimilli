@@ -40,7 +40,7 @@ interface DlsiteDiffRowProps {
   onCheckedChange: (checked: boolean) => void;
 }
 
-/** 変更あり／変更なし／適用不可を見た目と操作で分ける1行（TASK-428.1） */
+/** 変更あり／変更なし／適用不可を見た目と操作で分ける1行 */
 function DlsiteDiffRow({ label, diff, checked, onCheckedChange }: DlsiteDiffRowProps) {
   const current = diff.kind === "unchanged" ? diff.value : diff.current;
   const stateWord =

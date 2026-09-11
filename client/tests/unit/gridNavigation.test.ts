@@ -21,12 +21,12 @@ describe("library grid keyboard navigation", () => {
     expect(getNextGridIndex(7, "ArrowRight", 3, 8)).toBe(7);
   });
 
-  it("Home/Endで先頭・末尾へ移動する（TASK-428.12）", () => {
+  it("Home/Endで先頭・末尾へ移動する", () => {
     expect(getNextGridIndex(4, "Home", 3, 8)).toBe(0);
     expect(getNextGridIndex(4, "End", 3, 8)).toBe(7);
   });
 
-  it("列数1（リスト表示）ではArrowUp/Downが前後1件移動になる（TASK-428.12）", () => {
+  it("列数1（リスト表示）ではArrowUp/Downが前後1件移動になる", () => {
     expect(getNextGridIndex(4, "ArrowDown", 1, 8)).toBe(5);
     expect(getNextGridIndex(4, "ArrowUp", 1, 8)).toBe(3);
   });
@@ -70,13 +70,13 @@ describe("justified grid keyboard navigation", () => {
     expect(getNextJustifiedIndex([], 0, "ArrowDown")).toBe(0);
   });
 
-  it("Home/Endで先頭・末尾へ移動する（TASK-428.12）", () => {
+  it("Home/Endで先頭・末尾へ移動する", () => {
     expect(getNextJustifiedIndex(tiles, 2, "Home")).toBe(0);
     expect(getNextJustifiedIndex(tiles, 0, "End")).toBe(4);
   });
 });
 
-describe("rowIndexOfFlatIndex / firstFlatIndexOfRow（TASK-428.12 roving tabindexのフォールバック用）", () => {
+describe("rowIndexOfFlatIndex / firstFlatIndexOfRow（roving tabindexのフォールバック用）", () => {
   it("固定列グリッドでは列数で割った商が行インデックスになる", () => {
     expect(rowIndexOfFlatIndex(7, false, null, 3)).toBe(2);
     expect(firstFlatIndexOfRow(2, false, null, 3)).toBe(6);
@@ -95,7 +95,7 @@ describe("rowIndexOfFlatIndex / firstFlatIndexOfRow（TASK-428.12 roving tabinde
     expect(firstFlatIndexOfRow(0, true, tiles, 3)).toBe(0);
   });
 
-  it("ジャスティファイドで対応するタイルが無いflatIndexはundefinedを返す（レビュー対応: 行0への暗黙フォールバックをやめる）", () => {
+  it("ジャスティファイドで対応するタイルが無いflatIndexはundefinedを返す（行0へ暗黙にフォールバックしない）", () => {
     const tiles = [{ rowIndex: 0 }, { rowIndex: 0 }];
     expect(rowIndexOfFlatIndex(99, true, tiles, 3)).toBeUndefined();
   });

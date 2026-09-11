@@ -1,4 +1,4 @@
-// スキャン完了で新規作品があるとDLsite一括取得ジョブが1件積まれる（TASK-428.4）。
+// スキャン完了で新規作品があるとDLsite一括取得ジョブが1件積まれる。
 // scanJobManagerはDlsiteJobManagerを直接知らず、コンストラクタへ渡した完了コールバック経由で通知する。
 import assert from "node:assert/strict";
 import { test } from "node:test";

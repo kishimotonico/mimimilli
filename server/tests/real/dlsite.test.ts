@@ -410,7 +410,7 @@ test("fillUnsetDlsiteTags: ratingタグを追加する", () => {
   assert.deepEqual(fillUnsetDlsiteTags(nts(["genre/耳かき"]), info), nts(["rating/R18"]));
 });
 
-test("fillUnsetDlsiteTags: サークル・ratingは既存に同prefixの値があれば異なる値でも追加しない（TASK-428.1）", () => {
+test("fillUnsetDlsiteTags: サークル・ratingは既存に同prefixの値があれば異なる値でも追加しない", () => {
   const info: DlsiteWorkInfo = {
     rjCode: "RJ900002",
     title: "x",

@@ -1,6 +1,6 @@
 // openPathInFilesAtom は要対応タブ（root相対パス）とエラー作品のwork.physicalPath
 // （絶対パス）の両方から呼ばれる。絶対パスがroot相対へ正しく変換されることを固定する
-// （TASK-428.5フォローアップ: work.physicalPathを素通ししてroot名が二重に混入するバグを修正）。
+// （work.physicalPathを素通ししてroot名が二重に混入するバグの回帰防止）。
 import { describe, expect, it } from "vitest";
 import { createStore } from "jotai";
 import {

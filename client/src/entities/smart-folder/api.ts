@@ -31,7 +31,7 @@ export async function deleteSmartFolder(id: string): Promise<void> {
 }
 
 /** 未保存のドラフト条件（rules）をチップ絞り込みなしで評価し、一致件数だけ返す
- *  （条件エディタのライブ件数プレビュー・結果バナーの「条件一致」件数、TASK-428.11） */
+ *  （条件エディタのライブ件数プレビュー・結果バナーの「条件一致」件数） */
 export async function previewSmartFolderRuleCount(
   rules: SmartFolderRule[],
   options?: { signal?: AbortSignal },

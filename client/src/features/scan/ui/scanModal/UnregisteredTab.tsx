@@ -164,7 +164,7 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
   };
 
   /** Escapeでの取り消し。保存はせず、書きかけの不正値も含めて編集を破棄する
-   *  （TASK-428.13/17と同じ「1段だけ閉じる」契約）。 */
+   *  （検索欄と同じ「1段だけ閉じる」契約）。 */
   const cancelEdit = () => {
     if (editingPath) clearFieldError(editingPath);
     setEditingPath(null);

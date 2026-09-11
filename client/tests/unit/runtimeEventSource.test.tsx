@@ -341,7 +341,7 @@ describe("Runtime間連携: ScanRuntime → DlsiteBulkRuntime", () => {
         if (url.endsWith("/scan/candidates")) {
           return response({ candidates: scanResultWithNewWorks.candidates });
         }
-        // attach() が実在確認する後乗り先ジョブ（scan-dlsite-A-01）。実行中を返す。
+        // attach() が実在確認する後乗り先ジョブ。実行中を返す。
         if (url.endsWith("/dlsite/bulk")) return response({ status: "running", progress: null });
         return response(null, 204);
       }),
@@ -366,7 +366,7 @@ describe("Runtime間連携: ScanRuntime → DlsiteBulkRuntime", () => {
   });
 });
 
-describe("ScanRuntime: 完了・中止トースト（TASK-428.4）", () => {
+describe("ScanRuntime: 完了・中止トースト", () => {
   it("スキャンモーダルが閉じていれば完了・中止トーストを出す", async () => {
     vi.stubGlobal(
       "fetch",

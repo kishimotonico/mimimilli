@@ -134,7 +134,7 @@ export default function App() {
     setScanModalInitialTab("unregistered");
     setActiveModal("scan");
   }, []);
-  // 通知ベルの要対応系の行から、スキャンモーダルを要対応タブで直接開く（TASK-428.4）。
+  // 通知ベルの要対応系の行から、スキャンモーダルを要対応タブで直接開く。
   const handleOpenScanNeedsAttention = useCallback(() => {
     setScanModalInitialTab("needsAttention");
     setActiveModal("scan");

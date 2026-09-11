@@ -49,7 +49,7 @@ describe("WorkStatusWarnings", () => {
     expect(onOpenFiles).toHaveBeenCalledTimes(1);
   });
 
-  it("error状態でも登録解除・Filesで開くボタンを表示する（TASK-428.5でmissingと導線を統一）", () => {
+  it("error状態でも登録解除・Filesで開くボタンを表示する（missingと導線を統一）", () => {
     const onDelete = vi.fn();
     const onOpenFiles = vi.fn();
     render(

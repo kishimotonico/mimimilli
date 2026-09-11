@@ -22,7 +22,7 @@ export function Hero({
   entry: FsEntry;
   isWorkFolder: boolean;
   breakdown?: { kind: FileKind; count: number }[];
-  /** 単一ファイル作品の実タイトル。物理ファイル名からの推測（getWorkFolderDisplay）より優先する（TASK-428.18） */
+  /** 単一ファイル作品の実タイトル。物理ファイル名からの推測（getWorkFolderDisplay）より優先する */
   workTitle?: string;
 }) {
   const Ic = I[FILE_KIND_ICON[kind]];
@@ -58,7 +58,7 @@ export function WorkspaceMedia({
 }: {
   entry: FsEntry;
   /** 作品として登録済みか（フォルダー単位・単一ファイル単位どちらも含む）。
-   *  Heroの isWorkFolder とは意味が異なる（あちらはフォルダー単位限定）ため名前を分ける（TASK-428.18） */
+   *  Heroの isWorkFolder とは意味が異なる（あちらはフォルダー単位限定）ため名前を分ける */
   isRegisteredWork: boolean;
   workTitle?: string;
 }) {

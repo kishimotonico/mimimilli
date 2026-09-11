@@ -190,7 +190,7 @@ function seedScanQueries(
   if (queryClient.getQueryData(SCAN_QUERY_KEYS.diagnostics()) === undefined) {
     queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), { diagnostics: [] });
   }
-  // 通知ベルと同じ要対応集計（TASK-428.4）。未シードだと実fetchへ落ちるため既定値で固定する。
+  // 通知ベルと同じ要対応集計。未シードだと実fetchへ落ちるため既定値で固定する。
   if (queryClient.getQueryData(WORK_QUERY_KEYS.dlsiteNotificationSummary()) === undefined) {
     queryClient.setQueryData(WORK_QUERY_KEYS.dlsiteNotificationSummary(), {
       rjCodeMissingCount: 0,
@@ -236,7 +236,7 @@ function renderModal(
     ...rest,
   };
 
-  // Toastは単一ホスト（GlobalToast）へ集約されているため（TASK-440）、ScanModal・
+  // Toastは単一ホスト（GlobalToast）へ集約されているため、ScanModal・
   // UnregisteredTabの表示要求を目に見える形で検証するにはGlobalToastも一緒に描画する。
   const globalToast = () =>
     createElement(GlobalToast, {
@@ -587,7 +587,7 @@ describe("ScanModal", () => {
     );
   });
 
-  it("候補登録に成功すると作品一覧・軸件数・DLsite通知・スマートフォルダーのクエリを無効化する（TASK-428.3）", async () => {
+  it("候補登録に成功すると作品一覧・軸件数・DLsite通知・スマートフォルダーのクエリを無効化する", async () => {
     vi.spyOn(scanApi, "registerScanCandidates").mockResolvedValue({
       registered: [{ path: candidateDetected.path, workId: "w-detected" }],
       failures: [],
@@ -607,7 +607,7 @@ describe("ScanModal", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["smartFolderWorks"] });
   });
 
-  it("候補登録が部分失敗しても、成功分がある限り作品一覧等を無効化する（TASK-428.3）", async () => {
+  it("候補登録が部分失敗しても、成功分がある限り作品一覧等を無効化する", async () => {
     vi.spyOn(scanApi, "registerScanCandidates").mockResolvedValue({
       registered: [{ path: candidateDetected.path, workId: "w-detected" }],
       failures: [{ path: candidateUndetected.path, message: "失敗" }],

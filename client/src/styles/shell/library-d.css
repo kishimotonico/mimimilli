@@ -500,7 +500,7 @@
   top: 50%;
   right: 4px;
   transform: translateY(-50%);
-  /* ホバーせずとも見え、押せる（TASK-428.14: AND追加は非hover時・キーボードでも使える）。
+  /* ホバーせずとも見え、押せる。AND追加は非hover時・キーボードでも使える。
      行にマウスもフォーカスも無い間は目立たせず、hover/focus-withinで完全に見せる。 */
   opacity: 0.35;
 }
@@ -576,7 +576,7 @@
   position: absolute;
   top: 8px;
   right: 8px;
-  /* ホバーせずとも見え、押せる（TASK-428.14: AND追加は非hover時・キーボードでも使える）。 */
+  /* ホバーせずとも見え、押せる。AND追加は非hover時・キーボードでも使える。 */
   opacity: 0.35;
 }
 .mll-vtile:hover .mll-vtile__add,
@@ -777,7 +777,7 @@
   top: 50%;
   right: 4px;
   transform: translateY(-50%);
-  /* ホバーせずとも見え、押せる（TASK-428.14: AND追加は非hover時・キーボードでも使える）。 */
+  /* ホバーせずとも見え、押せる。AND追加は非hover時・キーボードでも使える。 */
   opacity: 0.35;
 }
 .mll-qlist__row:hover .mll-qlist__add,

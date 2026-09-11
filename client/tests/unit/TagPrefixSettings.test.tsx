@@ -1,4 +1,4 @@
-// TagPrefixSettings（TASK-428.7）: 削除確認・保護中の削除禁止・並び順入れ替えを確認する。
+// TagPrefixSettings: 削除確認・保護中の削除禁止・並び順入れ替えを確認する。
 import { createElement } from "react";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";

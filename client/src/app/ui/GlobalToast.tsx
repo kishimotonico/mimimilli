@@ -24,7 +24,7 @@ import { copyPathSuccessAtom } from "../../features/files/model/atoms";
 export interface GlobalToastProps {
   /** ルートフォルダー変更成功トーストの「今すぐスキャン」actionから呼ぶ */
   onOpenScan: () => void;
-  /** スキャン完了トーストの「要対応を見る」からスキャンモーダルの要対応タブを開く（TASK-428.4） */
+  /** スキャン完了トーストの「要対応を見る」からスキャンモーダルの要対応タブを開く */
   onOpenScanNeedsAttention: () => void;
   /** トラックスキップ通知の「このトラックを再試行」から、該当トラックを選択し直す */
   onRetrySkippedTrack: (trackIndex: number) => void;

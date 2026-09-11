@@ -28,7 +28,7 @@ import { usePopoverDismissal } from "../../shared/ui/usePopoverDismissal";
 export interface NotificationBellProps {
   /** 直近のスキャン結果クリックでスキャンモーダルの結果表示を開く（TASK-56） */
   onOpenScanResult: () => void;
-  /** ID重複・読み取り失敗・データ不整合の行からスキャンモーダルの要対応タブを開く（TASK-428.4） */
+  /** ID重複・読み取り失敗・データ不整合の行からスキャンモーダルの要対応タブを開く */
   onOpenNeedsAttention: () => void;
   onOpenNotificationModal: (kind: DlsiteNotificationModalKind) => void;
 }
@@ -48,7 +48,7 @@ export default function NotificationBell({
     queryFn: getLastScanResult,
   });
   const scanResult = lastScanQuery.data?.result ?? null;
-  // ID重複はスキャン時点のスナップショットではなく常に最新を見る（要対応タブと同じクエリキー、TASK-428.4）。
+  // ID重複はスキャン時点のスナップショットではなく常に最新を見る（要対応タブと同じクエリキー）。
   const diagnosticsQuery = useQuery({
     queryKey: SCAN_QUERY_KEYS.diagnostics(),
     queryFn: getScanDiagnostics,
@@ -69,7 +69,7 @@ export default function NotificationBell({
     anchorRef: rootRef,
   });
 
-  // 要対応タブと同じ定義・同じ件数を使う（TASK-428.4 / scan-dlsite-A-05）。
+  // 要対応タブと同じ定義・同じ件数を使う。
   const needsAttentionRows = buildNeedsAttentionRows({
     identityConflicts: diagnosticsQuery.data?.diagnostics ?? [],
     invalidMetaFiles: scanResult?.invalidMetaFiles ?? [],

@@ -22,13 +22,13 @@ export const scanProgressLabelAtom = atom((get) => formatScanProgressLabel(get(s
 
 export const scanErrorAtom = atom<string | null>(null);
 
-/** スキャン完了・中止のトースト表示用（TASK-428.4）。GlobalToastが消費する。
+/** スキャン完了・中止のトースト表示用。GlobalToastが消費する。
  *  モーダルが開いている間はサイドバーの「完了しました」が同じ役割を担うため出さない */
 export type ScanResultToast = { kind: "completed"; result: ScanResult } | { kind: "cancelled" };
 
 export const scanResultToastAtom = atom<ScanResultToast | null>(null);
 
-/** ScanModal がマウント中かどうか（TASK-428.4） */
+/** ScanModal がマウント中かどうか */
 export const scanModalOpenAtom = atom(false);
 
 export type ScanActionResult =

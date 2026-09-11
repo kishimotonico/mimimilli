@@ -1,4 +1,4 @@
-// TagComboboxのEscape有効範囲（TASK-428.13）。候補表示中は候補だけを閉じ、
+// TagComboboxのEscape有効範囲。候補表示中は候補だけを閉じ、
 // 候補が閉じている時は編集キャンセル（onCancel）か、無ければ親のdialogへ委ねる。
 import { createElement } from "react";
 import { fireEvent, render } from "@testing-library/react";

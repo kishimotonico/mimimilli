@@ -1,5 +1,5 @@
 // 単一値prefix（サークル・rating）の非破壊マージ・置換セマンティクスを、
-// real・fixture 両adapterで同じ結果になることを縛る契約テスト（TASK-428.1）。
+// real・fixture 両adapterで同じ結果になることを縛る契約テスト。
 // 片方のadapterだけをモックしたテストでは、adapter間の意味論のずれを検知できない。
 import assert from "node:assert/strict";
 import { join } from "node:path";

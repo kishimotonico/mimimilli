@@ -1,4 +1,4 @@
-// 「要対応」の一元定義（TASK-428.4）。通知ベルと要対応タブが同じ入力から同じ件数を出すことを検証する。
+// 「要対応」の一元定義。通知ベルと要対応タブが同じ入力から同じ件数を出すことを検証する。
 import { describe, expect, it } from "vitest";
 import {
   buildNeedsAttentionRows,

@@ -160,7 +160,7 @@ function ToastContent({ message, variant, actionLabel, onAction, onDismiss }: To
 // 優先順位づけ（1件だけを選ぶ）はGlobalToast側が担う（design-system.md「単一ホストの
 // 優先順位チェーン」）。showModal() の dialog より前面に出すため popover=manual で
 // top layer に載せる。ただし showModal() 中の dialog はブラウザが dialog 以外の全体を
-// 暗黙にinert化するため、popoverをtop layerに載せてもクリックは通らない（TASK-327で実測）。
+// 暗黙にinert化するため、popoverをtop layerに載せてもクリックは通らない。
 // 開いているモーダルdialogがあれば useTopmostOpenModalDialog（shared/ui/）で検出し、
 // 代わりにそのdialog直下へポータルしてinert化を避ける（閉じればbodyへ戻る）。
 export default function Toast({

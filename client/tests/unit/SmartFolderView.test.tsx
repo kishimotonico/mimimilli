@@ -43,7 +43,7 @@ function renderView(sf: SmartFolder, total?: number) {
 
 describe("SmartFolderView の件数表示", () => {
   beforeEach(() => {
-    // 条件一致件数はライブ件数プレビューAPI（TASK-428.11）を叩く。テストでは固定値を返す
+    // 条件一致件数はライブ件数プレビューAPIを叩く。テストでは固定値を返す
     vi.spyOn(smartFolderApi, "previewSmartFolderRuleCount").mockResolvedValue(120);
   });
 
@@ -73,7 +73,7 @@ describe("SmartFolderView の件数表示", () => {
   });
 });
 
-describe("SmartFolderView の長さ条件表示（TASK-428.11 formatter統一）", () => {
+describe("SmartFolderView の長さ条件表示（formatter統一）", () => {
   beforeEach(() => {
     vi.spyOn(smartFolderApi, "previewSmartFolderRuleCount").mockResolvedValue(1);
   });

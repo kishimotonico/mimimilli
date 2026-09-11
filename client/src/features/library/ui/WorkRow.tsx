@@ -13,7 +13,7 @@ interface WorkRowProps {
   work: WorkListItem;
   flatIndex: number;
   /** roving tabindexの現在位置と一致する場合だけ0（それ以外は-1）。
-   *  一覧全体をTabストップ1個にする（TASK-428.12） */
+   *  一覧全体をTabストップ1個にする */
   tabIndex: 0 | -1;
   isSelected: boolean;
   isPlaying?: boolean;

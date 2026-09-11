@@ -93,7 +93,7 @@ describe("LibrarySortMenu", () => {
     expect(items[items.length - 1]).toHaveFocus();
   });
 
-  it("初期フォーカス・ArrowキーによるフォーカスはpreventScroll:trueで祖先を自動スクロールしない（TASK-439）", () => {
+  it("初期フォーカス・ArrowキーによるフォーカスはpreventScroll:trueで祖先を自動スクロールしない", () => {
     const focusSpy = vi.spyOn(HTMLElement.prototype, "focus");
     renderSortMenu({ sort: "title-asc" });
     fireEvent.click(screen.getByRole("button", { name: "並び替え" }));

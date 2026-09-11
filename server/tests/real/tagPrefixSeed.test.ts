@@ -75,7 +75,7 @@ test("real アダプタで prefix 定義の CRUD が動く", async (t) => {
   assert.equal(await adapter.updateTagPrefix("気分", { label: "x" }), null);
 });
 
-test("real アダプタ: reorderTagPrefixes は一致しない集合を null で拒否し、状態を変えない（TASK-428.7）", async (t) => {
+test("real アダプタ: reorderTagPrefixes は一致しない集合を null で拒否し、状態を変えない", async (t) => {
   const directory = makeTestDirectory("tagprefix-reorder");
   t.after(directory.cleanup);
   const adapter = directory.own(

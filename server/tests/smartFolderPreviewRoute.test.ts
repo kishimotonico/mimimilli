@@ -1,4 +1,4 @@
-// TASK-428.11: POST /api/smart-folders/preview（保存前ルールのライブ件数プレビュー）を検証。
+// POST /api/smart-folders/preview（保存前ルールのライブ件数プレビュー）を検証。
 // マッチングロジック自体は evalSmartFolderRules 側（smartFolder.test.ts）で担保済みのため、
 // ここではルート層の配線（バリデーション・adapterへの委譲・レスポンス形）だけを確認する。
 import { test } from "node:test";

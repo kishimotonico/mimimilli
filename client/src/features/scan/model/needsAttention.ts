@@ -1,4 +1,4 @@
-// 「要対応」の一元定義（TASK-428.4）。通知ベルのバッジと要対応タブのバッジが
+// 「要対応」の一元定義。通知ベルのバッジと要対応タブのバッジが
 // 同じ問題一覧・同じ件数を出すよう、両方がこのビルダーの結果だけを見る。
 // 件数は「問題の件数（行数）」で数える。ID重複は競合（workId）単位で1件。
 import type { DataIntegrityWarning, InvalidMetaFile, ScanDiagnostic } from "@mimimilli/shared";
@@ -88,7 +88,7 @@ export function needsAttentionRowWeight(row: NeedsAttentionRow): number {
   }
 }
 
-/** 通知ベルのバッジと要対応タブが同じ件数を出すための唯一の集計関数（TASK-428.4）。 */
+/** 通知ベルのバッジと要対応タブが同じ件数を出すための唯一の集計関数。 */
 export function countNeedsAttention(rows: NeedsAttentionRow[]): number {
   return rows.reduce((total, row) => total + needsAttentionRowWeight(row), 0);
 }

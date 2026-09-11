@@ -95,7 +95,7 @@ export type SmartFolderEvalQuery = Required<Pick<SmartFolderWorksQuery, "page" |
   Partial<Pick<SmartFolderWorksQuery, "tags" | "tagOp" | "seed">>;
 
 /** POST /api/smart-folders/preview のリクエストボディ。保存前のドラフト条件（rules）を受け取り、
- *  チップ絞り込みを適用しない純粋なルール一致件数を返す（TASK-428.11、条件エディタのライブ件数プレビュー用） */
+ *  チップ絞り込みを適用しない純粋なルール一致件数を返す（条件エディタのライブ件数プレビュー用） */
 export const smartFolderPreviewRequestSchema = z.object({
   rules: z.array(smartFolderRuleSchema),
 });

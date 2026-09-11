@@ -39,7 +39,7 @@ interface FilePreviewProps {
   onGoRoot: () => void;
   /** ディレクトリ自体は取得できたが選択中パスがその中に無いとき、そのパス（ライブラリの
    *  エラー詳細・スキャン要対応からの「Filesで開く」で移動・削除済みの対象を指したときに
-   *  発生する。TASK-428.18） */
+   *  発生する） */
   missingSelectionPath: string | null;
   /** missingSelectionPath の表示から、選択を外してカレントフォルダーの表示へ戻る */
   onClearSelection: () => void;
@@ -84,12 +84,12 @@ export default function FilePreview({
     !isDir && !!entry?.workId && (entry.workRelPath === "" || entry.workRelPath === ".");
   // フォルダー単位・単一ファイル単位を問わず「作品として登録済みか」。HeroのisWorkFolder
   // 引数名はフォルダー単位限定の既存の意味のまま変えず、ここでは呼び出し側の値として
-  // 明確な名前を持たせる（TASK-428.18）。
+  // 明確な名前を持たせる。
   const isRegisteredWork = isWorkFolder || isSingleFileWork;
 
   const workTitle = useSingleFileWorkTitle(isSingleFileWork ? (entry?.workId ?? null) : null);
 
-  // 再生中エントリを押し直すと先頭から掛け直されてしまうため（TASK-428.18 / files-A-03）、
+  // 再生中エントリを押し直すと先頭から掛け直されてしまうため、
   // ロード済みのときはトグル（一時停止・再開）にする。再生位置を変えない。
   const isLoadedEntry = kind === "audio" && isPlayingEntry;
   const playActions =
@@ -132,7 +132,7 @@ export default function FilePreview({
         onPointerMove={onResizePointerMove}
         onPointerUp={onResizePointerUp}
       />
-      {/* ドラッグでの幅変更のみ対応。キーボード操作は未対応（TASK-428.18スコープ外） */}
+      {/* ドラッグでの幅変更のみ対応。キーボード操作は未対応 */}
 
       <div className="mle-prv is-files">
         {loadError ? (

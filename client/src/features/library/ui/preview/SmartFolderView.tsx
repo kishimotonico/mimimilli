@@ -87,7 +87,7 @@ export function SmartFolderView({
   onEdit: () => void;
 }) {
   // 条件一致（チップ絞り込み前の純粋なルール一致件数）と絞り込み後（total、チップ適用後）を
-  // 分けて表示する（TASK-428.11、DRAFT-74 Q-03）
+  // 分けて表示する
   const ruleMatchCount = useSmartFolderRuleMatchCountQuery(sf.rules, { immediate: true });
 
   return (

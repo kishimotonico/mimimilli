@@ -14,7 +14,7 @@ interface WorkGridRowTileProps {
   playingWorkId: string | null;
   isPlaybackActive: boolean;
   safeTileSize: number;
-  /** roving tabindexの現在位置（一覧全体でTabストップ1個にする、TASK-428.12） */
+  /** roving tabindexの現在位置（一覧全体でTabストップ1個にする） */
   rovingIndex: number;
   onWorkSelect: (id: string) => void;
   onWorkPlay: (work: WorkListItem) => void;

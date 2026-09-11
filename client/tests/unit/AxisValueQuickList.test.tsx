@@ -64,7 +64,7 @@ describe("AxisValueQuickList の仮想化", () => {
 });
 
 describe("AxisValueQuickList のキーボード移動", () => {
-  it("開いたときの検索欄への初期フォーカスはpreventScroll:trueで祖先を自動スクロールしない（TASK-439）", async () => {
+  it("開いたときの検索欄への初期フォーカスはpreventScroll:trueで祖先を自動スクロールしない", async () => {
     const sizeMock = mockElementSize(260, 260);
     const focusSpy = vi.spyOn(HTMLElement.prototype, "focus");
     renderQuickList({ items: makeItems(5), isOpen: true });
@@ -76,7 +76,7 @@ describe("AxisValueQuickList のキーボード移動", () => {
     sizeMock.restore();
   });
 
-  it("矢印キーによる値行間のフォーカス移動もpreventScroll:trueで祖先を自動スクロールしない（TASK-439）", async () => {
+  it("矢印キーによる値行間のフォーカス移動もpreventScroll:trueで祖先を自動スクロールしない", async () => {
     const sizeMock = mockElementSize(260, 260);
     const user = userEvent.setup();
     renderQuickList({ items: makeItems(3) });
@@ -149,10 +149,9 @@ describe("AxisValueQuickList のキーボード移動", () => {
     sizeMock.restore();
   });
 
-  // TASK-436: 作品一覧の矢印キー（gridNavigation.ts の getNextGridIndex）は境界で
-  // ラップアラウンドせずクランプする。値一覧も同じ規則に揃えるため、旧実装の
-  // ラップアラウンド挙動をやめた（getNextAxisValueRowIndex）。
-  it("ArrowUp/ArrowDownで値行間を移動し、端ではクランプする（作品一覧と同じ規則、TASK-436）", async () => {
+  // 作品一覧の矢印キー（gridNavigation.ts の getNextGridIndex）は境界で
+  // ラップアラウンドせずクランプする。値一覧も同じ規則に揃える（getNextAxisValueRowIndex）。
+  it("ArrowUp/ArrowDownで値行間を移動し、端ではクランプする（作品一覧と同じ規則）", async () => {
     const sizeMock = mockElementSize(260, 260);
     const user = userEvent.setup();
     renderQuickList({ items: makeItems(3) });
@@ -176,7 +175,7 @@ describe("AxisValueQuickList のキーボード移動", () => {
     sizeMock.restore();
   });
 
-  it("位置未確定の状態からのArrowUpは何も起こさない（クランプ、TASK-436）", async () => {
+  it("位置未確定の状態からのArrowUpは何も起こさない（クランプ）", async () => {
     const sizeMock = mockElementSize(260, 260);
     const user = userEvent.setup();
     renderQuickList({ items: makeItems(3) });
@@ -193,7 +192,7 @@ describe("AxisValueQuickList のキーボード移動", () => {
     sizeMock.restore();
   });
 
-  it("Homeで先頭の値行へ、Endで末尾の値行へ移動する（TASK-436）", async () => {
+  it("Homeで先頭の値行へ、Endで末尾の値行へ移動する", async () => {
     const sizeMock = mockElementSize(260, 260);
     const user = userEvent.setup();
     renderQuickList({ items: makeItems(3) });
@@ -221,7 +220,7 @@ describe("AxisValueQuickList のキーボード移動", () => {
     sizeMock.restore();
   });
 
-  it("roving tabindex: フォーカス移動中は現在位置の行だけがtabIndex 0になる（TASK-436）", async () => {
+  it("roving tabindex: フォーカス移動中は現在位置の行だけがtabIndex 0になる", async () => {
     const sizeMock = mockElementSize(260, 260);
     const user = userEvent.setup();
     renderQuickList({ items: makeItems(3) });

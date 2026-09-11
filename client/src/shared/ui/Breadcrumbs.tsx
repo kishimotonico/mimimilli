@@ -6,7 +6,7 @@ interface BreadcrumbsProps {
 }
 
 /** 中間階層を省略した表示に切り替えるべきか判定する。コンテナ幅は狭幅化・ペイン
- *  リサイズ（TASK-428.18のプレビュー幅ドラッグ等）で動的に変わるため、常設の
+ *  リサイズ（プレビュー幅ドラッグ等）で動的に変わるため、常設の
  *  非表示クローン（measureRef、全セグメントを折返し無しで並べた自然幅）と
  *  実表示コンテナの clientWidth を ResizeObserver で比較する。 */
 function useNeedsCollapse(path: string[]) {
@@ -66,7 +66,7 @@ export default function Breadcrumbs({ path, onNavigate }: BreadcrumbsProps) {
       ))}
       {/* ラベルは data-label + ::before(content: attr()) で描画する（frame-b.css）。
           テキストノードとして持たせると getByText 等のテスト用クエリが実体側の
-          ボタンとこのクローンの両方にヒットしてしまう（TASK-428.19で同種の事故あり）。
+          ボタンとこのクローンの両方にヒットしてしまう。
           擬似要素の内容はDOMのテキストノードではないため二重ヒットしない。
           このクローンはspan要素かつaria-hidden="true"なので、getByRole系のクエリには
           そもそもヒットしない。role指定なしのgetByText系クエリを新たに使う場合だけ、

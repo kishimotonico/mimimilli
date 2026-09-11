@@ -10,7 +10,7 @@ afterEach(() => {
 
 /** コンテナ・測定用クローンの幅を直接スタブしてから ResizeObserver を発火させる。
  *  Breadcrumbs は contentRect ではなく実 DOM の clientWidth/scrollWidth を読み直すため、
- *  発火自体はきっかけとして使えればよい（TASK-429）。 */
+ *  発火自体はきっかけとして使えればよい。 */
 function stubWidths(container: HTMLElement, containerWidth: number, measureWidth: number) {
   const crumbs = container.querySelector(".mle-crumbs") as HTMLElement;
   const measure = container.querySelector(".mle-crumbs__measure") as HTMLElement;

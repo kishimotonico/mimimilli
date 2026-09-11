@@ -1,4 +1,4 @@
-// TASK-428.15: スマートフォルダーのパンくずに対象名が表示されることの検証。
+// スマートフォルダーのパンくずに対象名が表示されることの検証。
 
 import { describe, expect, it } from "vitest";
 import type { SmartFolder } from "@mimimilli/shared";

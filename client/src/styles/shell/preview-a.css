@@ -18,7 +18,7 @@
   min-height: 0;
 }
 /* Filesモードは一覧側がflex:1で残り幅を取る主役なので、プレビューはドラッグで確定した
-   固定幅（--files-prv-w、既定420px・クランプ済み）を持つ側にする（TASK-428.18）。 */
+   固定幅（--files-prv-w、既定420px・クランプ済み）を持つ側にする。 */
 .mle-prv-anchor.is-files {
   flex: 0 0 var(--files-prv-w, 420px);
   min-width: 320px;

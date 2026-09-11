@@ -26,7 +26,7 @@ interface AxisValuePopoverPanelProps {
   selectedTags: NormalizedTag[];
   /** 件数集計に使うタグ。既定=置き換えの呼び出し元（FilterChipBandの兄弟値ドロップダウン）は
    *  空配列、既定=AND追加の呼び出し元（FilterChipAddButton）は selectedTags を渡す
-   *  （件数基準はvalueSelectionContract.tsのderiveFacetCountTagsで導出する。TASK-428.14） */
+   *  （件数基準はvalueSelectionContract.tsのderiveFacetCountTagsで導出する） */
   countTags: NormalizedTag[];
   /** 表示中のスマートフォルダーID。指定時は候補件数の集計元をフォルダー条件適用後の
    *  集合に絞る */

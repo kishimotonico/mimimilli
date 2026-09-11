@@ -16,7 +16,7 @@ beforeEach(() => {
   HTMLDialogElement.prototype.close = vi.fn(function (this: HTMLDialogElement) {
     this.open = false;
   });
-  // ライブ件数プレビュー（TASK-428.11）はモーダル内でAPIを呼ぶため、テストでは常に固定値で応答する
+  // ライブ件数プレビューはモーダル内でAPIを呼ぶため、テストでは常に固定値で応答する
   vi.spyOn(smartFolderApi, "previewSmartFolderRuleCount").mockResolvedValue(0);
 });
 
@@ -180,7 +180,7 @@ describe("SmartFolderEditorModal", () => {
   });
 });
 
-describe("SmartFolderEditorModal の削除（TASK-428.10）", () => {
+describe("SmartFolderEditorModal の削除", () => {
   it("作成モードでは削除操作を表示しない", () => {
     renderModal();
     expect(
@@ -229,7 +229,7 @@ describe("SmartFolderEditorModal の削除（TASK-428.10）", () => {
   });
 });
 
-describe("SmartFolderEditorModal の未確定タグ入力（TASK-428.24 SF-08）", () => {
+describe("SmartFolderEditorModal の未確定タグ入力", () => {
   it("候補に一致する未確定入力は保存時にEnterと同じ値で確定される", () => {
     const { onSave } = renderModal({ props: { tagSuggestions: ["ASMR"] } });
 

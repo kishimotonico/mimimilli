@@ -1,4 +1,4 @@
-// FilePreviewのプレビュー幅リサイズ（role="separator"）はmouse主ボタンのみでdragを開始する（TASK-428.23）。
+// FilePreviewのプレビュー幅リサイズ（role="separator"）はmouse主ボタンのみでdragを開始する。
 import { createElement } from "react";
 import { fireEvent, render, screen, cleanup } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";

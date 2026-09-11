@@ -138,7 +138,7 @@ test("DEFAULT_TAG_PREFIXES: color は CSS 変数文字列ではなく semantic k
   }
 });
 
-// ── prefix のラベル・色解決（複数画面で結果を揃える。TASK-428.7）──────
+// ── prefix のラベル・色解決（複数画面で結果を揃える）──────
 
 test("resolveTagPrefix: 登録済み prefix はラベル・色をそのまま返す", () => {
   assert.deepEqual(resolveTagPrefix("cv", DEFAULT_TAG_PREFIXES), { label: "CV", color: "cv" });
@@ -480,7 +480,7 @@ test("PATCH・DELETE /api/tag-prefixes/:prefix は未登録なら404", async () 
   assert.equal(deleted.status, 404);
 });
 
-test("POST /api/tag-prefixes: 新規は末尾へ自動採番され、一覧は order 昇順で返る（TASK-428.7）", async () => {
+test("POST /api/tag-prefixes: 新規は末尾へ自動採番され、一覧は order 昇順で返る", async () => {
   const app = buildApp();
 
   const created = await app.request("/api/tag-prefixes", {
@@ -499,7 +499,7 @@ test("POST /api/tag-prefixes: 新規は末尾へ自動採番され、一覧は o
   );
 });
 
-test("PATCH /api/tag-prefixes/:prefix: order を直接更新できる（TASK-428.7）", async () => {
+test("PATCH /api/tag-prefixes/:prefix: order を直接更新できる", async () => {
   const app = buildApp();
   const before = await (await app.request("/api/tag-prefixes")).json();
   const [first] = before as Array<{ prefix: string; order: number }>;
@@ -514,7 +514,7 @@ test("PATCH /api/tag-prefixes/:prefix: order を直接更新できる（TASK-428
   assert.equal(patchedBody.order, 99);
 });
 
-test("PUT /api/tag-prefixes/order: 全prefixの新しい順序を一括・アトミックに適用する（TASK-428.7）", async () => {
+test("PUT /api/tag-prefixes/order: 全prefixの新しい順序を一括・アトミックに適用する", async () => {
   const app = buildApp();
   const before = (await (await app.request("/api/tag-prefixes")).json()) as Array<{
     prefix: string;

@@ -1,6 +1,6 @@
 // スマートフォルダーの条件表示文言（演算子・長さ・タグ値）を一箇所に集約する。
 // SmartFolderEditorModal（エディタ）と SmartFolderView（結果バナー）は必ずこの関数経由で
-// 文言を生成し、画面間で表記が揺れないようにする（TASK-428.11、TASK-428.24）。
+// 文言を生成し、画面間で表記が揺れないようにする。
 
 import {
   normalizeTag,
@@ -48,7 +48,7 @@ export interface SmartFolderTagChipInfo {
 
 /** タグ条件値の表示情報を解決する。prefixのラベル・色は resolveTagPrefix（shared/tagPrefix.ts）
  *  に委ね、エディタと結果バナーで同じ結果になるようにする。現存しないタグの判定は
- *  tagSuggestions（ライブラリに現在存在する全タグ）との正規化済み比較で行う（TASK-428.24 SF-07） */
+ *  tagSuggestions（ライブラリに現在存在する全タグ）との正規化済み比較で行う */
 export function resolveSmartFolderTagChip(
   value: string,
   tagPrefixes: readonly TagPrefix[],

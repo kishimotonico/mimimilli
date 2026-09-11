@@ -29,7 +29,7 @@ interface FilePreviewWorkActionsProps {
 }
 
 /** 作品登録ワークフロー（登録・解除・ID重複の取り込み）を一括で扱う。mutation・確認/登録
- *  ダイアログ・アクション行・ID重複セクションの描画までをここに閉じる（TASK-415: メディア
+ *  ダイアログ・アクション行・ID重複セクションの描画までをここに閉じる（メディア
  *  描画（FilePreviewMedia.tsx）とはここで境界を分ける）。 */
 export default function FilePreviewWorkActions({
   entry,

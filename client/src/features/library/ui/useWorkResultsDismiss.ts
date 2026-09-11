@@ -1,7 +1,6 @@
 import { useEffect, type RefObject } from "react";
 
-// 作品グリッド・作品リストの両方が使う結果面共通のEscape/背景クリック選択解除
-// （TASK-428.12。旧 workGrid/useWorkGridDismiss をグリッド専用から一般化）。
+// 作品グリッド・作品リストの両方が使う結果面共通のEscape/背景クリック選択解除。
 export function useWorkResultsDismiss(
   isWorkSelected: boolean,
   onDeselect: () => void,

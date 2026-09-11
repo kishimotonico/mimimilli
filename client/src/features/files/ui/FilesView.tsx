@@ -120,7 +120,7 @@ export default function FilesView({ rootFolder, onPlayFile, onTogglePlay }: File
   );
 
   // プレビューが閉じている間に別のエントリを選ぶ／フォルダーへ潜ったときは、
-  // 見たい対象があるという意思表示なので自動的に開き直す（files-A-06）。
+  // 見たい対象があるという意思表示なので自動的に開き直す。
   const { openDir: navOpenDir, selectFile: navSelectFile } = nav;
   const openDir = useCallback(
     (path: Parameters<typeof navOpenDir>[0]) => {
@@ -142,7 +142,7 @@ export default function FilesView({ rootFolder, onPlayFile, onTogglePlay }: File
 
   // ── プレビュー対象 ────────────────────────────────────────
   // ファイル選択中はそのファイル、それ以外はカレント dir 自身。
-  // cwd取得に失敗している間は、実在確認できていないエントリを合成表示しない（files-A-01）。
+  // cwd取得に失敗している間は、実在確認できていないエントリを合成表示しない。
   const cwdFolderEntry: FsEntry | null = loadError
     ? null
     : {
@@ -164,7 +164,7 @@ export default function FilesView({ rootFolder, onPlayFile, onTogglePlay }: File
   // ディレクトリ自体は正常に取得できたが、選択中パスがその中に存在しない
   // （ライブラリのエラー詳細・スキャン要対応の「Filesで開く」で移動・削除済みの対象を
   // 指すことがある）。この場合もフォルダーへ黙って差し替えず、対象なしを表示する
-  // （openPathInFilesAtom経由での到達を含む。TASK-428.18）。
+  // （openPathInFilesAtom経由での到達を含む）。
   const selectionMissing = isFilesSelectionMissing({
     hasLoadError: !!loadError,
     isPending: cwdQuery.isPending,

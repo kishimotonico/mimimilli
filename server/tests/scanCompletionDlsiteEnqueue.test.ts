@@ -1,4 +1,4 @@
-// app.ts の配線: スキャン完了で新規作品があるとDLsite一括取得ジョブが1件積まれる（TASK-428.4）。
+// app.ts の配線: スキャン完了で新規作品があるとDLsite一括取得ジョブが1件積まれる。
 // ScanJobManager単体の挙動はscanJobManagerDlsiteEnqueue.test.tsで検証済み。ここではapp.ts経由の
 // 実配線（ScanJobManager→完了コールバック→DlsiteJobManager.enqueue）を確認する。
 import assert from "node:assert/strict";

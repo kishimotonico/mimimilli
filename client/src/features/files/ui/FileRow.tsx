@@ -39,7 +39,7 @@ export default function FileRow({
   const kind = classifyFile(entry);
   const Ic = I[FILE_KIND_ICON[kind]];
   // フォルダーは workId があれば登録済み、ファイル単体は workRelPath が自分自身を指す
-  // （"" または "."）ときだけ登録済み（TASK-428.18）。
+  // （"" または "."）ときだけ登録済み。
   const isRegisteredWork =
     !!entry.workId && (entry.isDir || entry.workRelPath === "" || entry.workRelPath === ".");
   const display = getWorkFolderDisplay(entry.name, isRegisteredWork ? entry.workId : null);

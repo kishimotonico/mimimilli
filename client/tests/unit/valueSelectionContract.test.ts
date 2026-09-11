@@ -100,7 +100,7 @@ describe("deriveValueSelectionHandlers（値選択の契約。ADR-0013）", () =
   });
 });
 
-describe("deriveFacetCountTags（件数基準。TASK-428.14）", () => {
+describe("deriveFacetCountTags（件数基準）", () => {
   it("既定=置き換えは無条件集計（選択タグを渡さない）", () => {
     const intent: ValueSelectionIntent<string> = {
       default: "replace",
@@ -124,7 +124,7 @@ describe("deriveFacetCountTags（件数基準。TASK-428.14）", () => {
   });
 });
 
-describe("getValueSelectionHint（ヒント文言。TASK-428.14）", () => {
+describe("getValueSelectionHint（ヒント文言）", () => {
   it("既定=置き換えは操作方法の説明を返す", () => {
     expect(getValueSelectionHint("replace")).toBe("クリックで置き換え・Ctrl+クリックでAND追加");
   });

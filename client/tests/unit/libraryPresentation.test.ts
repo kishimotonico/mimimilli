@@ -329,7 +329,7 @@ describe("buildTagFilterParams", () => {
   });
 });
 
-describe("formatFilterChipLabel（TASK-428.14: チップの内部表現を隠す）", () => {
+describe("formatFilterChipLabel（チップの内部表現を隠す）", () => {
   it("組み込み軸の擬似タグは「軸ラベル/値」に変換する", () => {
     expect(formatFilterChipLabel(nt("@year/2024"))).toBe("追加日/2024");
   });

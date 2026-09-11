@@ -85,7 +85,7 @@ describe("FileColumn", () => {
   });
 });
 
-describe("FileColumn の矢印キー・roving tabindex（TASK-436）", () => {
+describe("FileColumn の矢印キー・roving tabindex", () => {
   it("ArrowDown/Home/Endが作品一覧と同じ規則で動き、フォーカス移動先でonFocusEntryを呼ぶ", async () => {
     const user = userEvent.setup();
     const onFocusEntry = vi.fn();

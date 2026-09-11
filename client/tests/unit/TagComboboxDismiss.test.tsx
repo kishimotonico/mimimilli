@@ -1,4 +1,4 @@
-// TagComboboxの候補は外側クリック・フォーカス移動・スクロールでも閉じる（TASK-428.23）。
+// TagComboboxの候補は外側クリック・フォーカス移動・スクロールでも閉じる。
 import { createElement } from "react";
 import { fireEvent, render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";

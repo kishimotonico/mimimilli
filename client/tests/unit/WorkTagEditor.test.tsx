@@ -9,7 +9,7 @@ import type { LibraryTagsPatchMutation } from "../../src/features/library/model/
 import { WorkTagEditor } from "../../src/features/library/ui/preview/WorkTagEditor";
 import GlobalToast from "../../src/app/ui/GlobalToast";
 
-// Toastは単一ホスト（GlobalToast）へ集約されているため（TASK-440）、WorkTagEditorの表示要求を
+// Toastは単一ホスト（GlobalToast）へ集約されているため、WorkTagEditorの表示要求を
 // 目に見える形で検証するにはGlobalToastも一緒に描画する必要がある。
 function renderWithToast(ui: ReactElement) {
   const queryClient = new QueryClient({

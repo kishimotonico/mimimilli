@@ -201,7 +201,7 @@ describe("GlobalToast", () => {
     expect(screen.queryByRole("button", { name: "未設定項目を適用" })).toBeNull();
   });
 
-  describe("スキャン完了・中止トースト（TASK-428.4）", () => {
+  describe("スキャン完了・中止トースト", () => {
     const baseResult: ScanResult = {
       registered: 12,
       insertedWorkIds: ["a", "b"],
@@ -253,7 +253,7 @@ describe("GlobalToast", () => {
     });
   });
 
-  describe("useToast要求の優先順位（TASK-440）", () => {
+  describe("useToast要求の優先順位", () => {
     it("上位（error）が表示中にaction要求を出すと、描画されずonDismissが同期的に呼ばれる", () => {
       const store = createStore();
       store.set(errorToastAtom, "既存のエラー");
@@ -299,8 +299,8 @@ describe("GlobalToast", () => {
 
   // design-system.md「単一ホストの優先順位チェーン」の契約
   // （error > action要求 > 個別グローバル通知 > background要求）そのものを固定する。
-  // 網羅はしない（AGENTS.md「テストは網羅性より実行速度」）。今回if連鎖の並びが
-  // 契約と食い違っていた境界（TASK-440レビュー指摘）だけを対象にする。
+  // 網羅はしない（AGENTS.md「テストは網羅性より実行速度」）。if連鎖の並びが
+  // 契約と食い違いうる境界だけを対象にする。
   describe("優先順位チェーンの契約（docs/design-system.md）", () => {
     it("errorToast（1: error）はaction要求（2）より優先される", () => {
       const store = createStore();

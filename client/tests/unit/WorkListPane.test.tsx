@@ -170,7 +170,7 @@ describe("WorkListPane 空状態", () => {
     expect(onClearSearch).toHaveBeenCalledTimes(1);
   });
 
-  it("スマートフォルダーが0件のとき専用の見出しと「条件を編集」を出す（TASK-428.24 SF-05）", async () => {
+  it("スマートフォルダーが0件のとき専用の見出しと「条件を編集」を出す", async () => {
     const onEditSmartFolderRules = vi.fn();
     const user = userEvent.setup();
     renderWorkListPane({ works: [], isSmartFolder: true, onEditSmartFolderRules });

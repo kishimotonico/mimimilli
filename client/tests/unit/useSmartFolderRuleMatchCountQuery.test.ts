@@ -1,5 +1,5 @@
-// TASK-428.11 レビュー指摘の回帰テスト: 「条件0件（妥当）」と「無効なドラフト（rules=null）」の
-// queryKeyが衝突し、無効な間も直前の妥当な件数が表示され続けるバグを固定する。
+// 「条件0件（妥当）」と「無効なドラフト（rules=null）」のqueryKeyが衝突し、
+// 無効な間も直前の妥当な件数が表示され続けるバグの回帰テスト。
 import { createElement, type ReactNode } from "react";
 import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";

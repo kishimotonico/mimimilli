@@ -32,7 +32,7 @@ https://www.dlsite.com/pro/work/=/product_id/VJ000000.html
 
 変換後は `normalizeTags` で正規形にする。既存タグとの合流には2つの関数があり、prefix名で分岐する判定はマージ関数側に書かない（`DLSITE_TAG_FIELDS` の cardinality から導出する）。
 
-- `fillUnsetDlsiteTags(existing, info)`: 一括適用（fill-unset）用。single prefixは既存に同prefixのタグが1つでもあれば追加しない（既存値を上書きしない、TASK-428.1）。multi prefixは完全一致のみ除外して加算する。`POST /dlsite/apply-missing` とそのdry-run `POST /dlsite/apply-missing/preview` が共有する
+- `fillUnsetDlsiteTags(existing, info)`: 一括適用（fill-unset）用。single prefixは既存に同prefixのタグが1つでもあれば追加しない（既存値を上書きしない）。multi prefixは完全一致のみ除外して加算する。`POST /dlsite/apply-missing` とそのdry-run `POST /dlsite/apply-missing/preview` が共有する
 - `mergeAppliedDlsiteTags(existing, applyTags)`: 単体適用（replace）用。ユーザーが `POST /dlsite/:id/apply` で明示的に選んだタグを反映する際に使う。single prefixは既存の同prefixタグを置き換え（2値共存を作らない）、multi prefixは加算する
 
 既存作品へ後からratingタグを足す場合は、キャッシュ済みHTMLを再パースする `POST /dlsite/apply-missing` を使う。prefix定義 `rating`（ラベル: レーティング）は初回起動のseedに含まれる。すでにseed済みのライブラリには自動追加しないので、軸表示が必要ならタグ設定の候補から登録する。
@@ -43,7 +43,7 @@ https://www.dlsite.com/pro/work/=/product_id/VJ000000.html
 
 **手動プレビュー→適用**: `POST /dlsite/:id/fetch` で取得結果をプレビューし、ユーザーが選んだ項目だけを `POST /dlsite/:id/apply`（`DlsiteApplyBody`）で反映する。タイトル・タグ・カバーそれぞれに適用可否のフラグがあり、ユーザーが個別に選べる。
 
-**未設定項目をまとめて適用**（設定モーダル）: `POST /dlsite/apply-missing/preview` で対象作品ごとの差分（追加タグ・cover/url適用有無）を取得し、差分のある作品をユーザーが選んでから `POST /dlsite/apply-missing`（選択したworkIdsのみ）で反映する。差分計算のロジックは `fillUnsetDlsiteTags` を通した `computeMissingDiff`（`server/src/adapters/{real,fixture}/dlsiteMethods.ts`）をプレビューと実適用で共有している（TASK-428.1）。
+**未設定項目をまとめて適用**（設定モーダル）: `POST /dlsite/apply-missing/preview` で対象作品ごとの差分（追加タグ・cover/url適用有無）を取得し、差分のある作品をユーザーが選んでから `POST /dlsite/apply-missing`（選択したworkIdsのみ）で反映する。差分計算のロジックは `fillUnsetDlsiteTags` を通した `computeMissingDiff`（`server/src/adapters/{real,fixture}/dlsiteMethods.ts`）をプレビューと実適用で共有している。
 
 ただし適用時に送るのは選択した workIds のみで、プレビュー時にクライアントが見た差分オブジェクト（`newTags` 等）そのものは送らない。適用実行時にサーバーが対象作品ごとの差分を独立に再計算するため、プレビュー取得後〜適用実行までの間に対象作品のタグやDLsite側の情報が変わっていた場合、ユーザーが見た内容と実際に適用される内容が食い違う余地がある。差分が消えていた分はskip扱いになり安全側に倒れるが、異なる内容が適用される場合でも警告・エラーは出ない。
 

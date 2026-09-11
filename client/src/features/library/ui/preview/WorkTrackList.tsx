@@ -30,7 +30,7 @@ export function WorkTrackList({
   onPlay,
 }: WorkTrackListProps) {
   // roving tabindexの現在位置。トラックに「選択」概念は無いため、初期値は再生中の
-  // トラック（無ければ先頭）。フォーカス移動のたびにonFocusで更新する（TASK-428.12）。
+  // トラック（無ければ先頭）。フォーカス移動のたびにonFocusで更新する。
   const [activeIndex, setActiveIndex] = useState(() => playingTrackIndex ?? 0);
   const rowRefs = useRef<(HTMLButtonElement | null)[]>([]);
 

@@ -56,7 +56,7 @@ interface WorkGridProps {
   /** Esc・グリッド背景クリック時の選択解除 */
   onDeselect: () => void;
   /** スマートフォルダー軸か。0件時に専用の空状態（条件を編集・絞り込みをすべてクリア）を
-   *  出す（TASK-428.24 SF-05） */
+   *  出す */
   isSmartFolder?: boolean;
   onEditSmartFolderRules?: () => void;
   onClearAllFilters?: () => void;
@@ -152,10 +152,10 @@ export default function WorkGrid({
   });
 
   // roving tabindexの現在位置。選択中の作品があればその位置、無ければ先頭（0）を
-  // 対象にする（一覧全体でTabストップ1個、TASK-428.12）。対象が仮想化の描画範囲外
+  // 対象にする（一覧全体でTabストップ1個）。対象が仮想化の描画範囲外
   // （深リンク復元・フィルター変更後の選択維持等）のときは、現在描画されている
   // 先頭行の先頭タイルへフォールバックしつつ対象行までスクロールする
-  // （useRovingIndex、レビュー対応）。
+  // （useRovingIndex、WorkListPaneと共通のロジック）。
   const selectedIndex = works.length === 0 ? -1 : works.findIndex((w) => w.id === selectedWorkId);
   const targetIndex = selectedIndex >= 0 ? selectedIndex : 0;
   const rovingIndex = useRovingIndex({

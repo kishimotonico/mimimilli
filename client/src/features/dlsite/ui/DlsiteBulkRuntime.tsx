@@ -92,7 +92,7 @@ export default function DlsiteBulkRuntime() {
   }, [resetTerminalState, setActive, setCancelling, setError, setStarting]);
 
   // 既に走っているかもしれないジョブへの後乗り専用。ジョブの実在を確認してから
-  // activeにする（scan-dlsite-A-01）。running/cancellingのときだけSSEを購読し、
+  // activeにする。running/cancellingのときだけSSEを購読し、
   // 終端済みならその結果をそのまま反映、ジョブが無ければ何もしない。
   const attach = useCallback(() => {
     freshStartRef.current = false;

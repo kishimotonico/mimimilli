@@ -60,7 +60,7 @@ function renderBell(
       ? { result: scanResultOverride, finishedAt: "2026-01-01T00:00:00.000Z" }
       : null,
   );
-  // 要対応タブと同じ定義を使う（TASK-428.4）: ID重複は常に最新の診断クエリから拾う
+  // 要対応タブと同じ定義を使う: ID重複は常に最新の診断クエリから拾う
   queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), { diagnostics: identityConflicts });
 
   const store = createStore();
@@ -201,7 +201,7 @@ describe("NotificationBell", () => {
     expect(screen.getByText("3")).toBeInTheDocument();
   });
 
-  describe("要対応タブとの件数統一（TASK-428.4）", () => {
+  describe("要対応タブとの件数統一", () => {
     it("ID重複はworkId単位で1件として数え、行クリックで要対応タブを開く", () => {
       const { props } = renderBell({}, {}, undefined, undefined, [
         { kind: "identity_conflict", workId: "RJ501001", paths: ["a/1", "a/2"] },

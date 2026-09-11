@@ -210,7 +210,7 @@ export function useLibrarySupportingQueries(nav: LibraryViewState) {
   const facetAxis = getFacetAxisForQuery(nav.activeAxis);
   // 結果面の値一覧（AxisValueList）は既定=置き換えの入口（ADR-0013）なので、件数基準は
   // 無条件集計にする（主クリックの結果＝選択タグを丸ごと置き換えた後の件数と一致させる。
-  // TASK-428.14の件数基準。valueSelectionContract.ts の deriveFacetCountTags 参照）。
+  // valueSelectionContract.ts の deriveFacetCountTags 参照）。
   const facetQuery = useAxisFacetsQuery(facetAxis, []);
   const smartFoldersQuery = useQuery({
     queryKey: SMART_FOLDER_QUERY_KEYS.all(),
@@ -434,7 +434,7 @@ export function useSmartFolderDeleteMutation(callbacks: { onDeleted: () => void 
   });
 }
 
-/** ライブ件数プレビュー（保存前ルールの評価API、TASK-428.11）。300msデバウンス後に問い合わせ、
+/** ライブ件数プレビュー（保存前ルールの評価API）。300msデバウンス後に問い合わせ、
  *  デバウンス待ち・取得中は isCounting=true を返す。rules が null（ルールが妥当でない）間は
  *  問い合わせない */
 const SMART_FOLDER_PREVIEW_DEBOUNCE_MS = 300;
@@ -456,7 +456,7 @@ export function useSmartFolderRuleMatchCountQuery(
 
   // debouncedRules が null（条件が妥当でない）のときも一意なキーにする。null を [] に潰すと
   // 「条件0件（＝全作品に一致する妥当な状態）」のキャッシュと衝突し、無効な間も直前の件数が
-  // 表示され続けてしまう（レビュー指摘、TASK-428.11）
+  // 表示され続けてしまう
   const query = useQuery({
     queryKey: SMART_FOLDER_QUERY_KEYS.preview(debouncedRules ?? { invalid: true }),
     queryFn: ({ signal }) => previewSmartFolderRuleCount(debouncedRules!, { signal }),

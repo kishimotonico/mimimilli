@@ -1,4 +1,4 @@
-// 未登録候補のRJコード編集の安全性（TASK-428.19）。
+// 未登録候補のRJコード編集の安全性。
 import { createElement, Fragment } from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
@@ -47,7 +47,7 @@ function renderTab(candidates: ScanCandidate[] = [candidateA, candidateB]) {
           Fragment,
           null,
           createElement(UnregisteredTab, { candidates, onRegistered }),
-          // Toastは単一ホスト（GlobalToast）へ集約されているため（TASK-440）、UnregisteredTabの
+          // Toastは単一ホスト（GlobalToast）へ集約されているため、UnregisteredTabの
           // 表示要求を目に見える形で検証するにはGlobalToastも一緒に描画する必要がある。
           createElement(GlobalToast, {
             onOpenScan: () => {},

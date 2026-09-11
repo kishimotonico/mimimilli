@@ -122,7 +122,7 @@ describe("WorkPlayButton", () => {
     expect(screen.getByRole("button", { name: "続きから再生" })).toHaveFocus();
   });
 
-  it("初期フォーカス・ArrowキーによるフォーカスはpreventScroll:trueで祖先を自動スクロールしない（TASK-439）", async () => {
+  it("初期フォーカス・ArrowキーによるフォーカスはpreventScroll:trueで祖先を自動スクロールしない", async () => {
     const user = userEvent.setup();
     const focusSpy = vi.spyOn(HTMLElement.prototype, "focus");
     renderButton({ hasResume: true, isLoaded: false });

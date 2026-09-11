@@ -266,7 +266,7 @@ test("missing-only一括適用はcache結果だけを使い、既存フィール
   });
 });
 
-test("missing-only一括適用プレビューは書き込みをせず、適用と同じ差分を返す（TASK-428.1）", async (t) => {
+test("missing-only一括適用プレビューは書き込みをせず、適用と同じ差分を返す", async (t) => {
   const lib = makeSampleLibrary();
   const dir = makeTestDirectory("dlsite-apply-missing-preview");
   t.after(lib.cleanup);

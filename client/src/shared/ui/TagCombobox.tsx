@@ -96,7 +96,7 @@ export type TagComboboxCommitResult =
 export interface TagComboboxHandle {
   /** 現在の未確定入力を、Enterキーと同じ規則（アクティブな候補の確定）で確定する。
    *  候補が無い入力（正規化できない・空文字以外で一致なし）は入力へフォーカスして invalid を返す。
-   *  保存時に未確定文字列を黙って破棄しないために使う（TASK-428.24 SF-08） */
+   *  保存時に未確定文字列を黙って破棄しないために使う */
   commitPendingInput: () => TagComboboxCommitResult;
 }
 

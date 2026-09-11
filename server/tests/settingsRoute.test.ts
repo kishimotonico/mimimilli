@@ -1,4 +1,4 @@
-// PUT /settings の検証契約（TASK-428.6）。fixture/real 両アダプタで同じ形式チェックを通ることを確認する。
+// PUT /settings の検証契約。fixture/real 両アダプタで同じ形式チェックを通ることを確認する。
 import assert from "node:assert/strict";
 import { mkdtempSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";

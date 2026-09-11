@@ -228,7 +228,7 @@ describe("AxisValueList list 表示（ADR-0012 §5）", () => {
   });
 });
 
-describe("AxisValueList list 表示の矢印キー・roving tabindex（TASK-436）", () => {
+describe("AxisValueList list 表示の矢印キー・roving tabindex", () => {
   it("ArrowDownで次の行へ、Home/Endで先頭・末尾へ移動する（作品一覧と同じ規則）", async () => {
     const sizeMock = mockElementSize(600, 600);
     const user = userEvent.setup();
@@ -319,7 +319,7 @@ describe("AxisValueList grid 表示", () => {
   });
 });
 
-describe("AxisValueList grid 表示の矢印キー・roving tabindex（TASK-436）", () => {
+describe("AxisValueList grid 表示の矢印キー・roving tabindex", () => {
   it("Home/Endで先頭・末尾のタイルへ移動し、現在位置だけがtabIndex 0になる", async () => {
     const sizeMock = mockElementSize(600, 600);
     const user = userEvent.setup();
@@ -439,7 +439,7 @@ describe("AxisValueList の件数表示", () => {
   });
 });
 
-describe("AxisValueList の操作ヒント（TASK-428.14: 既定=置き換えの説明を出す）", () => {
+describe("AxisValueList の操作ヒント（既定=置き換えの説明を出す）", () => {
   it("置き換え・AND追加の操作方法を検索欄の隣に表示する", () => {
     renderAxisValueList({ facetItems: [makeItem()] });
     expect(screen.getByText("クリックで置き換え・Ctrl+クリックでAND追加")).toBeTruthy();

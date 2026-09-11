@@ -177,7 +177,7 @@ function hasTagWithPrefix(tags: readonly NormalizedTag[], prefix: string): boole
 
 /** 一括適用（fill-unset）: 単一値prefix（サークル・rating）は、既存に同prefixのタグが
  *  1つでもあれば追加しない。複数値prefix（cv・genre）は完全一致のみ除外して加算する。
- *  返り値は既存タグへ新たに追加する分だけ（TASK-428.1: 既存値を上書きしない） */
+ *  返り値は既存タグへ新たに追加する分だけ（既存値は上書きしない） */
 export function fillUnsetDlsiteTags(
   existing: readonly NormalizedTag[],
   info: DlsiteWorkInfo,
@@ -257,7 +257,7 @@ export const dlsiteBulkApplyMissingResultSchema = z.object({
 export type DlsiteBulkApplyMissingResult = z.infer<typeof dlsiteBulkApplyMissingResultSchema>;
 
 /** 「未設定項目をまとめて適用」の対象作品1件分の差分。既存値を上書きする項目は含まない
- *  （TASK-428.1 Q-04: 適用前に差分を表示し、ユーザーが対象を選んでから適用する） */
+ *  （適用前に差分を表示し、ユーザーが対象を選んでから適用する） */
 export const dlsiteApplyMissingPreviewItemSchema = z.object({
   workId: z.string(),
   title: z.string(),

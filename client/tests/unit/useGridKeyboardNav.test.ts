@@ -42,8 +42,8 @@ describe("useGridKeyboardNav", () => {
     expect(scrollToIndex).toHaveBeenCalled();
   });
 
-  // レビュー対応: rowIndexOfFlatIndexがundefinedを返す（対応するタイルが無い）とき、
-  // 旧実装と同じく「行0として扱いscrollToIndexする」のではなく何もしない。
+  // rowIndexOfFlatIndexがundefinedを返す（対応するタイルが無い）とき、
+  // 行0として扱わず、scrollToIndexも呼ばない。
   it("rowIndexOfFlatIndexがundefinedのときはフォーカス移動もscrollToIndexも行わない", () => {
     (gridNavigation.rowIndexOfFlatIndex as Mock).mockReturnValue(undefined);
 

@@ -22,9 +22,9 @@ describe("useRovingIndex", () => {
     expect(result.current).toBe(5);
   });
 
-  // TASK-428.12 レビュー対応: 選択中の作品が仮想化の描画範囲外
-  // （URLからの深リンク復元・フィルター変更後に選択だけ残る等）だと、roving
-  // tabindex(=0)を持つ要素が一覧に一つも無くなりTabで一覧へ入れなくなっていた。
+  // 選択中の作品が仮想化の描画範囲外（URLからの深リンク復元・フィルター変更後に
+  // 選択だけ残る等）だと、roving tabindex(=0)を持つ要素が一覧に一つも無くなり
+  // Tabで一覧へ入れなくなる。
   it("選択中の作品が描画範囲外なら、描画されている先頭行の先頭項目へフォールバックする", () => {
     const scrollToIndex = vi.fn();
     const { result } = renderHook(() =>

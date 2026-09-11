@@ -50,7 +50,7 @@ function FilterChip({
   tag: NormalizedTag;
   tagPrefixes: TagPrefix[];
   /** 現在選択中の全タグ。兄弟値ドロップダウンの選択中チェック表示にのみ使う
-   *  （件数は既定=置き換えの入口として無条件集計にする。TASK-428.14） */
+   *  （件数は既定=置き換えの入口として無条件集計にする） */
   selectedTags: NormalizedTag[];
   smartFolderId?: string;
   onSelect: (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
@@ -90,7 +90,7 @@ function FilterChip({
             floatingStyles={floatingStyles}
             setFloating={setFloating}
             selectedTags={selectedTags}
-            // 既定=置き換えの入口（ADR-0013）。件数基準は無条件集計にする（TASK-428.14）。
+            // 既定=置き換えの入口（ADR-0013）。件数基準は無条件集計にする。
             countTags={[]}
             smartFolderId={smartFolderId}
             onSelect={(nextTag, opts) => {

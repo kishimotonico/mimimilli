@@ -28,7 +28,7 @@ export default function ScanRuntime() {
   const setHiddenPaths = useSetAtom(scanCandidateHiddenPathsAtom);
   const setResultToast = useSetAtom(scanResultToastAtom);
   // モーダルが開いている間はサイドバーの「完了しました」が完了通知を担うため、
-  // トースト側は重ねて出さない（scan-dlsite-A-04/B-05）。SSEイベントの時点で最新値を見たいためrefで持つ。
+  // トースト側は重ねて出さない。SSEイベントの時点で最新値を見たいためrefで持つ。
   const scanModalOpen = useAtomValue(scanModalOpenAtom);
   const scanModalOpenRef = useRef(scanModalOpen);
   useLayoutEffect(() => {

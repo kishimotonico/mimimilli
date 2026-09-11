@@ -269,7 +269,7 @@ test("スキャンダイアログが開いて完了し、閉じられる", async
     dialog.getByRole("button", { name: /ツンデレ後輩ちゃんの秘密のお世話ボイス/ }),
   ).toBeVisible({ timeout: 15_000 });
 
-  // スキャン完了トースト（TASK-428.4）も同じ「閉じる」ラベルを持つため、ヘッダーの閉じるボタンに絞る。
+  // スキャン完了トーストも同じ「閉じる」ラベルを持つため、ヘッダーの閉じるボタンに絞る。
   await dialog.getByRole("banner").getByRole("button", { name: "閉じる" }).click();
   await expect(dialog).toBeHidden();
 
@@ -303,8 +303,7 @@ test("未登録タブでRJコードを編集でき、候補を1件ずつ除外�
   // スキャンでの新規登録に連動してDLsite一括取得が自動開始する（server/src/app.ts）。
   // 除外操作（action優先度のトースト）がジョブ結果（background優先度のトースト）に
   // 割り込まれず勝つことを検証するため、先にbackground側が実際に表示されていることを
-  // 確定させてから除外操作に進む。タイミングに依存せず衝突を毎回発生させて検証する
-  // （TASK-440: 単体実行時にのみ再現していた表示位置の衝突の回帰防止）。
+  // 確定させてから除外操作に進む。タイミングに依存せず衝突を毎回発生させて検証する。
   await expect(dialog.getByText(/^DLsite一括取得:/)).toBeVisible();
 
   const excludeRowName = /^「候補」を選択/;

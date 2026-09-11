@@ -1,4 +1,4 @@
-// FilePreview: missingSelectionPath（TASK-428.18）専用のテスト。
+// FilePreview: missingSelectionPath 専用のテスト。
 // ディレクトリ取得自体は成功したが選択中パスが一覧に無いケースを、404（loadError）と
 // 区別して「対象なし」表示にすることを確認する。
 import { createElement } from "react";

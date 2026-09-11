@@ -70,7 +70,7 @@ export default function FileColumn({
         {isLoading ? (
           <CollectionStatus variant="list" kind="loading" />
         ) : notFound ? (
-          // 404は再試行しても直らないため、再試行ボタンを出さない（TASK-428.18）。
+          // 404は再試行しても直らないため、再試行ボタンを出さない。
           <CollectionStatus variant="list" kind="empty" message="このフォルダーは見つかりません" />
         ) : isError && entries.length === 0 ? (
           // キャッシュが無い＝初回取得失敗のときだけ一覧全体をエラー画面に置き換える。
