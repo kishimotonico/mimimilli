@@ -4,7 +4,7 @@ title: feat/ui-ux-update の取捨選択結果を取り込み、没案を記録�
 status: In Progress
 assignee: []
 created_date: '2026-09-10 18:05'
-updated_date: '2026-09-11 02:26'
+updated_date: '2026-09-11 05:35'
 labels:
   - ui
   - ux
@@ -72,4 +72,6 @@ UI/UX監査で実装した36タスク（TASK-428.1〜428.24、429〜440、118コ
 AC#5 計測結果（TASK-447.8、fixture large を 20000件に水増し、本番ビルド）: スマートフォルダー（20000件中2267件一致）内の軸切替は facets API 30〜42ms、longtask なし。フォルダー内の2段JS走査は eval 18〜29ms＋build 4〜37ms。重いのはフォルダー外（全作品）のタグ軸 226ms で、432 由来ではなく既存経路。real adapter は SQL で候補を絞ってから同じ core 関数を通すので、fixture の値は上限の目安。432 は現状のまま残してよいと判断。詳細は TASK-447.8 のメモ。
 
 取り込み完了（2026-09-11、feat/ui-ux-intake 7b6c074）: 子タスク 447.1〜447.10 すべて Done。戻す判定は 447.1 でタスク単位の revert（429 は背表紙のみ、パンくず中間省略は残す）、直す判定は 447.2〜447.7 で UI 変更1つにつき1コミット、見送ったUI案は design-system.md（447.9）、横断レビューで見つかったタスクID・経緯コメントは 447.10 で除去。統合ブランチで pnpm check / pnpm test（server 795・client 1085）/ pnpm test:smoke（25）通過。master へのマージはユーザーの実機確認後。実機で見てほしい点: TagPrefixSettings 行ボタンの hover 時の見え方（headless で未検証）。未確認の観察として残るもの: End 押下後にリスト本文が空白のまま戻らない現象（再現条件未特定）。
+
+DRAFT-47（作品編集UIの保存モデル見直し）着手時の申し送り: 作品編集ダイアログの未保存保護（dirty 判定、saveAndClose での sourceRevision の直列引き継ぎ）は、保存モデルを変えるときに作り直す。SmartFolderEditorModal・TagPrefixSettings の子コンポーネント分割は次に触るタスクで行う。
 <!-- SECTION:NOTES:END -->
