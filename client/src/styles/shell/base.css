@@ -70,8 +70,31 @@ body ol {
 /* フォーカスリングの共通規約（tokens.cssの--focus-ring/--focus-ring-offset）。
    個別コンポーネントでoutline/ring系のTailwindユーティリティを重ねない。
    overflow: hidden で切り抜かれる行は outline-offset を負値にする例外だけ
-   .mle-row/.mll-wrow等で個別に上書きする。 */
-body :is(button, a, input, textarea, select, [tabindex]):focus-visible {
+   .mle-row/.mll-wrow等で個別に上書きする。文字入力（テキスト系inputとtextarea）は
+   キャレットで入力位置が分かるためアクセント色のリングを出さず、境界線色の弱い変化
+   （--line → --line-strong）だけで示す（チェックボックス等は対象外でリングのまま）。
+   ここは layer(base) なので、枠線色をユーティリティで指定した入力は
+   focus-visible:border-line-strong を併記する。 */
+body :is(button, a, select, [tabindex]):focus-visible,
+body
+  input:is(
+    [type="checkbox"],
+    [type="radio"],
+    [type="range"],
+    [type="file"],
+    [type="color"]
+  ):focus-visible {
   outline: var(--focus-ring);
   outline-offset: var(--focus-ring-offset);
+}
+body
+  :is(input, textarea):not(
+    [type="checkbox"],
+    [type="radio"],
+    [type="range"],
+    [type="file"],
+    [type="color"]
+  ):focus-visible {
+  outline: none;
+  border-color: var(--line-strong);
 }

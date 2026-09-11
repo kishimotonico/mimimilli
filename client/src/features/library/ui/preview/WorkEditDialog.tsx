@@ -15,7 +15,7 @@ import { DlsiteEditor } from "./DlsiteEditor";
 import { WorkTagEditor } from "./WorkTagEditor";
 
 const inputClass =
-  "h-8 min-w-0 w-full rounded-[6px] border border-line bg-paper-0 px-2.5 font-jp text-body text-ink-0 placeholder:text-ink-4 focus:border-acc disabled:cursor-not-allowed disabled:text-ink-4";
+  "h-8 min-w-0 w-full rounded-[6px] border border-line bg-paper-0 px-2.5 font-jp text-body text-ink-0 placeholder:text-ink-4 focus-visible:border-line-strong disabled:cursor-not-allowed disabled:text-ink-4";
 
 interface WorkEditDialogProps {
   work: Work;
@@ -287,7 +287,7 @@ export function WorkEditDialog({
                 <input
                   ref={titleInputRef}
                   id="work-title-input"
-                  className="h-8 min-w-0 flex-1 rounded-[6px] border border-line bg-paper-0 px-2.5 font-jp text-body text-ink-0 focus:border-acc disabled:cursor-not-allowed disabled:text-ink-4"
+                  className="h-8 min-w-0 flex-1 rounded-[6px] border border-line bg-paper-0 px-2.5 font-jp text-body text-ink-0 focus-visible:border-line-strong disabled:cursor-not-allowed disabled:text-ink-4"
                   value={titleDraft}
                   aria-invalid={titleDraft.trim().length === 0}
                   disabled={titleMutation.isPending || !canEditSource}

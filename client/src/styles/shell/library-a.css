@@ -104,6 +104,7 @@
   height: 30px;
   padding: 0 10px 0 12px;
   background: var(--paper-2);
+  border: 1px solid transparent;
   border-radius: 8px;
   color: var(--ink-2);
   font-size: var(--fs-body);
@@ -112,7 +113,7 @@
 }
 .mll-bar__search:focus-within {
   background: var(--paper-1);
-  box-shadow: 0 0 0 1.5px var(--acc-line);
+  border-color: var(--line-strong);
 }
 .mll-bar__search input {
   flex: 1;

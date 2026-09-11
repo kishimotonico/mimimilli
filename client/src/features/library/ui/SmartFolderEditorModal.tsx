@@ -48,7 +48,7 @@ interface SmartFolderEditorModalProps {
 }
 
 const inputClass =
-  "h-8 rounded-[6px] border border-line bg-paper-1 px-2.5 font-jp text-body text-ink-0 focus:border-acc";
+  "h-8 rounded-[6px] border border-line bg-paper-1 px-2.5 font-jp text-body text-ink-0 focus-visible:border-line-strong";
 
 // エディタと結果バナー（SmartFolderView）で列位置を揃えるための固定幅
 const CONJ_WIDTH_CLASS = "w-[92px]";

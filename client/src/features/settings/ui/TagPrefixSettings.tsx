@@ -27,7 +27,7 @@ const TOGGLE_LABEL_CLASS =
   "inline-flex items-center gap-1 font-sans text-secondary text-ink-2 cursor-pointer whitespace-nowrap";
 
 const INPUT_CLASS =
-  "h-[30px] min-w-0 flex-1 rounded-[6px] border border-line-soft bg-paper-0 px-2.5 font-jp text-secondary text-ink-1";
+  "h-[30px] min-w-0 flex-1 rounded-[6px] border border-line-soft bg-paper-0 px-2.5 font-jp text-secondary text-ink-1 focus-visible:border-line-strong";
 
 /** 行の上移動・下移動・削除ボタン共通。通常時は控えめな色、hover/focus時だけ濃くする */
 const ROW_ICON_CLASS = "text-ink-3 hover:text-ink-1 focus-visible:text-ink-1";
@@ -249,7 +249,7 @@ export default function TagPrefixSettings() {
                     if (e.key === "Escape") setEditingPrefix(null);
                   }}
                   aria-label={`「${p.prefix}」のラベル`}
-                  className="h-[24px] min-w-0 flex-1 rounded-1 border border-line bg-paper-0 px-1.5 font-jp text-body text-ink-1"
+                  className="h-[24px] min-w-0 flex-1 rounded-1 border border-line bg-paper-0 px-1.5 font-jp text-body text-ink-1 focus-visible:border-line-strong"
                 />
               ) : (
                 <button

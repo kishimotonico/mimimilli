@@ -229,7 +229,7 @@ function TagComboboxImpl(
         placeholder={placeholder}
         className={cn(
           "h-8 w-full rounded-[6px] border border-line bg-paper-1 px-2.5 font-jp text-body text-ink-0",
-          "placeholder:text-ink-4 focus:border-acc",
+          "placeholder:text-ink-4 focus-visible:border-line-strong",
           disabled && "cursor-not-allowed text-ink-4",
         )}
         onChange={(event) => openWithInput(event.target.value)}

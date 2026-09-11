@@ -69,7 +69,7 @@ export default function SetupScreen({ onComplete }: SetupScreenProps) {
         </div>
 
         <form onSubmit={(e) => void handleSubmit(e)} className="flex w-full flex-col gap-3">
-          <div className="flex h-10 items-center gap-2 rounded-[8px] border border-line bg-paper-1 px-[14px]">
+          <div className="flex h-10 items-center gap-2 rounded-[8px] border border-line bg-paper-1 px-[14px] focus-within:border-line-strong">
             <I.folder size={14} className="shrink-0 text-ink-3" />
             <input
               ref={pathInputRef}

@@ -417,6 +417,9 @@
   border-bottom: 1px solid var(--line-soft);
   background: var(--paper-1);
 }
+.mll-vsearch:focus-within {
+  border-bottom-color: var(--line-strong);
+}
 .mll-vsearch input {
   flex: 1;
   min-width: 0;
@@ -655,6 +658,9 @@
   padding: 6px 8px;
   border-bottom: 1px solid var(--line-soft);
   color: var(--ink-3);
+}
+.mll-qlist__search:focus-within {
+  border-bottom-color: var(--line-strong);
 }
 .mll-qlist__search input {
   flex: 1;

@@ -31,7 +31,7 @@ export const STATUS_LABEL = {
 } as const;
 
 const inputClass =
-  "h-8 min-w-0 rounded-[6px] border border-line bg-paper-0 px-2.5 font-mono text-mono text-ink-0 placeholder:text-ink-4 focus:border-acc disabled:cursor-not-allowed disabled:text-ink-4";
+  "h-8 min-w-0 rounded-[6px] border border-line bg-paper-0 px-2.5 font-mono text-mono text-ink-0 placeholder:text-ink-4 focus-visible:border-line-strong disabled:cursor-not-allowed disabled:text-ink-4";
 
 interface DlsiteDiffRowProps {
   label: string;
