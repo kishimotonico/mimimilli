@@ -4,6 +4,7 @@ title: FilePreview の props を Files のナビゲーション状態のモデ�
 status: To Do
 assignee: []
 created_date: '2026-09-11 08:05'
+updated_date: '2026-09-11 08:28'
 labels:
   - refactor
   - triage
@@ -21,9 +22,9 @@ ordinal: 489000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 設計案（18項目の分類、ナビゲーション状態のモデルの置き場所と API、再生状態のまとめ方、FilePreviewWorkActions の見直し）が filepreview-design.md にあり、アドバイザーの承認を得ている
-- [ ] #2 Files のナビゲーション状態が features/files/model の単一のモデル（例: useFilesNavigation）に置かれ、FilesView と FilePreview が同じものを読み、二重管理がない
-- [ ] #3 FilePreview の props が6個以下になり、FilePreviewWorkActions の props も同じ観点で減っている
-- [ ] #4 ファイル移動だけのコミットと中身を変えるコミットが分かれている
-- [ ] #5 挙動は変わらず、既存テストの期待値を変えていない（テストの統合・名前変更だけ許容し、タスクメモに列挙）。pnpm check（レイヤー境界含む）・pnpm test・pnpm test:smoke が通る
+- [x] #1 設計案（18項目の分類、ナビゲーション状態のモデルの置き場所と API、再生状態のまとめ方、FilePreviewWorkActions の見直し）が filepreview-design.md にあり、アドバイザーの承認を得ている
+- [x] #2 Files のナビゲーション状態が features/files/model の単一のモデル（例: useFilesNavigation）に置かれ、FilesView と FilePreview が同じものを読み、二重管理がない
+- [x] #3 FilePreview の props が6個以下になり、FilePreviewWorkActions の props も同じ観点で減っている
+- [x] #4 ファイル移動だけのコミットと中身を変えるコミットが分かれている
+- [x] #5 挙動は変わらず、既存テストの期待値を変えていない（テストの統合・名前変更だけ許容し、タスクメモに列挙）。pnpm check（レイヤー境界含む）・pnpm test・pnpm test:smoke が通る
 <!-- AC:END -->
