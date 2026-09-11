@@ -42,6 +42,8 @@
   --text-label--line-height: var(--lh-label);
   --text-mono: var(--fs-mono);
   --text-mono--line-height: var(--lh-mono);
+  --text-badge: var(--fs-badge);
+  --text-badge--line-height: var(--lh-badge);
   --shadow-1: var(--shadow-1);
   --shadow-2: var(--shadow-2);
   --shadow-pop: var(--shadow-pop);

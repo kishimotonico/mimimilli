@@ -66,6 +66,8 @@
   --lh-label: 1.2;
   --fs-mono: 11px;
   --lh-mono: 1.3;
+  --fs-badge: 9px;
+  --lh-badge: 1;
 
   /* Focus ring — 操作可能な要素すべてで共有する。行のように overflow: hidden で
      切り抜かれる文脈だけ outline-offset を負値にする（shell/base.cssの例外規則） */
