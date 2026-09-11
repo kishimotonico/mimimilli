@@ -1,4 +1,4 @@
-// 未登録候補のタイトル・RJコード編集の安全性（TASK-428.19）。
+// 未登録候補のRJコード編集の安全性（TASK-428.19）。
 import { createElement, Fragment } from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
@@ -60,53 +60,6 @@ function renderTab(candidates: ScanCandidate[] = [candidateA, candidateB]) {
   );
   return { ...view, onRegistered };
 }
-
-describe("UnregisteredTab タイトル編集", () => {
-  it("タイトルをクリックして編集し、確定すると表示と登録payloadへ反映される", async () => {
-    const registerSpy = vi
-      .spyOn(scanApi, "registerScanCandidates")
-      .mockResolvedValue({ registered: [{ path: candidateA.path, workId: "w1" }], failures: [] });
-    renderTab([candidateA]);
-
-    fireEvent.click(screen.getByTitle("クリックしてタイトルを編集"));
-    const input = screen.getByPlaceholderText("タイトル");
-    fireEvent.change(input, { target: { value: "直したタイトル" } });
-    fireEvent.keyDown(input, { key: "Enter" });
-
-    expect(screen.getByText("直したタイトル")).not.toBeNull();
-
-    fireEvent.click(screen.getByRole("button", { name: /件をライブラリに追加/ }));
-    await waitFor(() => expect(registerSpy).toHaveBeenCalled());
-    expect(registerSpy.mock.calls[0]?.[0]).toEqual([
-      { path: candidateA.path, title: "直したタイトル", rjCode: "" },
-    ]);
-  });
-
-  it("Escapeは編集だけを取り消し、タイトルを元に戻す", () => {
-    renderTab([candidateA]);
-
-    fireEvent.click(screen.getByTitle("クリックしてタイトルを編集"));
-    const input = screen.getByPlaceholderText("タイトル");
-    fireEvent.change(input, { target: { value: "書きかけの内容" } });
-    const result = fireEvent.keyDown(input, { key: "Escape" });
-
-    expect(result).toBe(false); // preventDefaultされ、モーダルのcancelへは伝播しない
-    expect(screen.queryByPlaceholderText("タイトル")).toBeNull();
-    expect(screen.getByText(candidateA.inferredTitle)).not.toBeNull();
-  });
-
-  it("空のタイトルでは確定できず、値と編集状態を保持する", () => {
-    renderTab([candidateA]);
-
-    fireEvent.click(screen.getByTitle("クリックしてタイトルを編集"));
-    const input = screen.getByPlaceholderText("タイトル");
-    fireEvent.change(input, { target: { value: "   " } });
-    fireEvent.keyDown(input, { key: "Enter" });
-
-    expect(screen.getByPlaceholderText("タイトル")).not.toBeNull();
-    expect(screen.getByText("タイトルを入力してください")).not.toBeNull();
-  });
-});
 
 describe("UnregisteredTab RJコード編集", () => {
   it("Escapeはモーダルを閉じず編集だけを取り消す", () => {
@@ -170,7 +123,7 @@ describe("UnregisteredTab RJコード編集", () => {
 
     await waitFor(() => expect(registerSpy).toHaveBeenCalledTimes(1));
     expect(registerSpy.mock.calls[0]?.[0]).toEqual([
-      { path: candidateB.path, title: candidateB.inferredTitle, rjCode: candidateB.rjCode },
+      { path: candidateB.path, rjCode: candidateB.rjCode },
     ]);
   });
 
@@ -183,8 +136,8 @@ describe("UnregisteredTab RJコード編集", () => {
     fireEvent.keyDown(input, { key: "Enter" });
     expect(screen.getByText(/RJ\/VJコードは/)).not.toBeNull();
 
-    // 別の行（candidateB）のタイトル編集を開始する = candidateAのRJコード欄からフォーカスが離れる
-    fireEvent.click(screen.getAllByTitle("クリックしてタイトルを編集")[1]);
+    // 別の行（candidateB）のRJコード編集を開始する = candidateAのRJコード欄からフォーカスが離れる
+    fireEvent.click(screen.getByTitle("クリックしてRJコードを編集"));
 
     // candidateAのエラー表示・チェックボックス無効化は消えずに残る
     expect(screen.getByText(/RJ\/VJコードは/)).not.toBeNull();

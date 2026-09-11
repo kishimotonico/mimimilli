@@ -27,16 +27,6 @@ export function resolveRegisteredRjCode(
   return itemRjCode === undefined ? candidateRjCode : itemRjCode;
 }
 
-/** 候補承認時のタイトル解決（候補登録APIの規約と同じ）。
- *  title省略=候補の推定タイトル（inferredTitle）を採用 / 値あり=そのまま採用
- *  （スキーマ側でtrim・非空を保証済みのため、ここでの正規化は不要）。 */
-export function resolveRegisteredTitle(
-  inferredTitle: string,
-  itemTitle: string | undefined,
-): string {
-  return itemTitle ?? inferredTitle;
-}
-
 export function createSettingsScanMethods(state: FixtureState): SettingsAdapter {
   return {
     async getSettings(): Promise<Settings> {
@@ -118,10 +108,9 @@ export function createSettingsScanMethods(state: FixtureState): SettingsAdapter 
         const candidate = candidatesByPath.get(item.path);
         if (!candidate) return [];
         const rjCode = resolveRegisteredRjCode(candidate.rjCode, item.rjCode);
-        const title = resolveRegisteredTitle(candidate.inferredTitle, item.title);
         const work: WorkSummary = {
           id: crypto.randomUUID(),
-          title,
+          title: candidate.inferredTitle,
           cover: null,
           status: "ok",
           physicalPath: normalizeFsPath(`${rootAbs}/${candidate.path}`),

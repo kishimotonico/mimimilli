@@ -95,38 +95,6 @@ test("選択した候補だけを登録し、除外した候補は以後返さ�
   );
 });
 
-test("タイトル省略時は推定タイトルを使い、指定時はそのタイトルで登録する", async (t) => {
-  const directory = makeTestDirectory("scan-candidates-title");
-  t.after(directory.cleanup);
-  const root = join(directory.path, "lib");
-  const inferred = join(root, "推定タイトル作品");
-  const overridden = join(root, "上書き対象");
-  mkdirSync(inferred, { recursive: true });
-  mkdirSync(overridden, { recursive: true });
-  writeWav(join(inferred, "track.wav"), 1);
-  writeWav(join(overridden, "track.wav"), 1);
-
-  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
-  await adapter.updateSettings({ rootFolder: root });
-  await adapter.scan();
-
-  const result = await adapter.registerScanCandidates([
-    { path: workspacePath("推定タイトル作品") },
-    { path: workspacePath("上書き対象"), title: "編集後のタイトル" },
-  ]);
-  assert.equal(result.failures.length, 0);
-  const workIdByPath = new Map<string, string>(
-    result.registered.map((entry) => [entry.path, entry.workId]),
-  );
-
-  const inferredWorkId = workIdByPath.get("推定タイトル作品");
-  const overriddenWorkId = workIdByPath.get("上書き対象");
-  assert.ok(inferredWorkId);
-  assert.ok(overriddenWorkId);
-  assert.equal((await adapter.getWork(inferredWorkId!))?.title, "推定タイトル作品");
-  assert.equal((await adapter.getWork(overriddenWorkId!))?.title, "編集後のタイトル");
-});
-
 test("root変更後の候補登録・除外はCandidatePoolChangedErrorで拒否する", async (t) => {
   const directory = makeTestDirectory("scan-candidate-root-mismatch");
   t.after(directory.cleanup);

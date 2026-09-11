@@ -209,48 +209,6 @@ test("scanCandidateRegisterItemSchema: RJ/VJコードの形式を検証・正規
   assert.equal(tooShort.success, false);
 });
 
-test("scanCandidateRegisterItemSchema: titleは前後の空白をtrimし、空・省略を区別する", () => {
-  const padded = scanCandidateRegisterItemSchema.safeParse({
-    path: "候補作品",
-    title: "  編集後のタイトル  ",
-  });
-  assert.equal(padded.success, true);
-  if (padded.success) assert.equal(padded.data.title, "編集後のタイトル");
-
-  const omitted = scanCandidateRegisterItemSchema.safeParse({ path: "候補作品" });
-  assert.equal(omitted.success, true);
-  if (omitted.success) assert.equal(omitted.data.title, undefined);
-
-  const blank = scanCandidateRegisterItemSchema.safeParse({ path: "候補作品", title: "   " });
-  assert.equal(blank.success, false);
-
-  const empty = scanCandidateRegisterItemSchema.safeParse({ path: "候補作品", title: "" });
-  assert.equal(empty.success, false);
-});
-
-test("候補登録APIは空白のみのtitleを4xxで拒否し、adapterへ渡さない", async () => {
-  const fixture = createFixtureAdapter();
-  let called = false;
-  const app = createApp({
-    ...fixture,
-    registerScanCandidates: async () => {
-      called = true;
-      return { registered: [], failures: [] };
-    },
-  });
-  try {
-    const response = await app.request("/api/scan/candidates/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ items: [{ path: "候補作品", title: "   " }] }),
-    });
-    assert.equal(response.status, 400);
-    assert.equal(called, false);
-  } finally {
-    await app.shutdown();
-  }
-});
-
 test("候補登録APIは不正な形式のRJコードを4xxで拒否し、adapterへ渡さない", async () => {
   const fixture = createFixtureAdapter();
   let called = false;

@@ -575,12 +575,8 @@ describe("ScanModal", () => {
 
     await waitFor(() => expect(registerSpy).toHaveBeenCalled());
     expect(registerSpy.mock.calls[0]?.[0]).toEqual([
-      {
-        path: candidateDetected.path,
-        title: candidateDetected.inferredTitle,
-        rjCode: candidateDetected.rjCode,
-      },
-      { path: candidateUndetected.path, title: candidateUndetected.inferredTitle, rjCode: "" },
+      { path: candidateDetected.path, rjCode: candidateDetected.rjCode },
+      { path: candidateUndetected.path, rjCode: "" },
     ]);
 
     await waitFor(() =>
@@ -683,11 +679,7 @@ describe("ScanModal", () => {
 
     await waitFor(() => expect(registerSpy).toHaveBeenCalled());
     expect(registerSpy.mock.calls[0]?.[0]).toEqual([
-      {
-        path: candidateUndetected.path,
-        title: candidateUndetected.inferredTitle,
-        rjCode: "RJ200002",
-      },
+      { path: candidateUndetected.path, rjCode: "RJ200002" },
     ]);
   });
 
