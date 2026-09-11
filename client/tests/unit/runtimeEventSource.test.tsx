@@ -17,7 +17,6 @@ import {
   scanActionsAtom,
   scanCandidateHiddenPathsAtom,
   scanJobAtom,
-  scanModalOpenAtom,
 } from "../../src/entities/scan/model/atoms";
 import { toastRequestsAtom } from "../../src/shared/model/toastRequestsAtom";
 import { activeModalAtom } from "../../src/shared/model/activeModalAtom";
@@ -455,7 +454,7 @@ describe("ScanRuntime: 完了・中止トースト", () => {
     );
 
     const { store } = renderRuntime(createElement(ScanRuntime));
-    store.set(scanModalOpenAtom, true);
+    store.set(activeModalAtom, { kind: "scan" });
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
     const source = FakeEventSource.instances[0]!;
 

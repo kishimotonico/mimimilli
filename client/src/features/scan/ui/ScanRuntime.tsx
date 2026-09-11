@@ -31,17 +31,13 @@ export default function ScanRuntime() {
   const setActiveModal = useSetAtom(activeModalAtom);
   const toast = useToast();
   // モーダルが開いている間はサイドバーの「完了しました」が完了通知を担うため、
-  // トースト側は重ねて出さない。SSEイベントの時点で最新値を見たいためrefで持つ。
+  // トースト側は重ねて出さない。
   const scanModalOpen = useAtomValue(scanModalOpenAtom);
-  const scanModalOpenRef = useRef(scanModalOpen);
-  useLayoutEffect(() => {
-    scanModalOpenRef.current = scanModalOpen;
-  }, [scanModalOpen]);
 
   const handleScanTerminal = useCallback(
     (job: ScanJobSnapshot) => {
       if (job.status === "cancelled") {
-        if (!scanModalOpenRef.current) {
+        if (!scanModalOpen) {
           toast.show({ message: "スキャンを中止しました", variant: "warning", priority: "notice" });
         }
         return;
@@ -52,7 +48,7 @@ export default function ScanRuntime() {
       void refreshScanCandidates(queryClient).catch(() => {});
       void invalidateLibraryQueries(queryClient);
       queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() });
-      if (!scanModalOpenRef.current) {
+      if (!scanModalOpen) {
         const hasNeedsAttention =
           result.identityConflicts.length > 0 ||
           result.invalidMetaFiles.length > 0 ||
@@ -75,7 +71,7 @@ export default function ScanRuntime() {
       }
       if (result.insertedWorkIds.length > 0) dlsiteBulk.attach();
     },
-    [dlsiteBulk, queryClient, setActiveModal, toast],
+    [dlsiteBulk, queryClient, scanModalOpen, setActiveModal, toast],
   );
 
   // 新しいスキャンの開始がサーバー側の真実の境界になるため、開始時点でそれ以前のローカル非表示を破棄する。

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useAtomValue, useSetAtom } from "jotai";
+import { useAtomValue } from "jotai";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { libraryTotalQueryOptions } from "../../../entities/work/libraryTotalQueryOptions";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
@@ -7,11 +7,7 @@ import { cn } from "../../../shared/lib/cn";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
 import { useToast } from "../../../shared/ui/useToast";
-import {
-  scanModalOpenAtom,
-  scanningAtom,
-  scanProgressAtom,
-} from "../../../entities/scan/model/atoms";
+import { scanningAtom, scanProgressAtom } from "../../../entities/scan/model/atoms";
 import { useScanActions } from "../../../entities/scan/useScanActions";
 import { getLastScanResult, getScanDiagnostics, SCAN_QUERY_KEYS } from "../api";
 import { refreshScanCandidates } from "../../../entities/scan/scanCandidatesCache";
@@ -49,11 +45,6 @@ export default function ScanModal({
   const progress = useAtomValue(scanProgressAtom);
   const { start, cancel } = useScanActions();
   const [activeTab, setActiveTab] = useState<ScanTabKey>(initialTab);
-  const setScanModalOpen = useSetAtom(scanModalOpenAtom);
-  useEffect(() => {
-    setScanModalOpen(true);
-    return () => setScanModalOpen(false);
-  }, [setScanModalOpen]);
   const toast = useToast();
   // 候補承認で登録された作品ID（このモーダル表示中に蓄積、TASK-325の分離を踏まえクライアント側で
   // 集約する）。insertedWorkIds（スキャン時点の自動登録分）とは別経路のため、ここで結合する。

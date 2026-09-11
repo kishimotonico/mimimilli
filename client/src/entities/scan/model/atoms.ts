@@ -3,6 +3,7 @@
 
 import { atom } from "jotai";
 import type { ScanJobSnapshot, StartScanRequest } from "@mimimilli/shared";
+import { activeModalAtom } from "../../../shared/model/activeModalAtom";
 import { formatScanProgressLabel, type ScanProgress } from "./scanProgressLabel";
 import { isTerminalScanJob } from "./scanJob";
 
@@ -22,8 +23,8 @@ export const scanProgressLabelAtom = atom((get) => formatScanProgressLabel(get(s
 
 export const scanErrorAtom = atom<string | null>(null);
 
-/** ScanModal がマウント中かどうか */
-export const scanModalOpenAtom = atom(false);
+/** ScanModal がマウント中かどうか。activeModalAtomから導出する（読み取り専用） */
+export const scanModalOpenAtom = atom((get) => get(activeModalAtom)?.kind === "scan");
 
 export type ScanActionResult =
   | { ok: true; job: ScanJobSnapshot | null }
