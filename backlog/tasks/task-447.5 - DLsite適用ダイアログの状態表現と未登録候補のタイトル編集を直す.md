@@ -4,6 +4,7 @@ title: DLsite適用ダイアログの状態表現と未登録候補のタイト�
 status: To Do
 assignee: []
 created_date: '2026-09-11 00:52'
+updated_date: '2026-09-11 01:33'
 labels:
   - ui
   - ux
@@ -23,9 +24,19 @@ TASK-447 の「直す」判定のうち 428.1・428.19 を直す。428.1 のユ�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 DLsite 適用ダイアログの「変更なし」「適用不可」の行が減光とチェック不可で区別され、説明文の行が無い。行末に短い1語（「同一」「対象外」）を残し、詳しい理由はツールチップ等で見られる
-- [ ] #2 スキャンの未登録タブで候補のタイトルをその場で編集できない（master と同じ表示）
-- [ ] #3 RJコード欄の Escape で編集だけが取り消されモーダルが開いたままの挙動と、DLsite 一括適用の非破壊・差分選択式は残っている
-- [ ] #4 着手前後のスクリーンショット（fixture、1440x900）を tmp/uiux-triage-2026-09-11/shots-intake/447.5-before.jpg と tmp/uiux-triage-2026-09-11/shots-intake/447.5-after.jpg に置き、タスクメモから参照している
-- [ ] #5 変更範囲のテストが通り、既存テストの期待値を削除・緩和していない（仕様変更で書き換えた期待値はタスクメモに列挙）
+- [x] #1 DLsite 適用ダイアログの「変更なし」「適用不可」の行が減光とチェック不可で区別され、説明文の行が無い。行末に短い1語（「同一」「対象外」）を残し、詳しい理由はツールチップ等で見られる
+- [x] #2 スキャンの未登録タブで候補のタイトルをその場で編集できない（master と同じ表示）
+- [x] #3 RJコード欄の Escape で編集だけが取り消されモーダルが開いたままの挙動と、DLsite 一括適用の非破壊・差分選択式は残っている
+- [x] #4 着手前後のスクリーンショット（fixture、1440x900）を tmp/uiux-triage-2026-09-11/shots-intake/447.5-before.jpg と tmp/uiux-triage-2026-09-11/shots-intake/447.5-after.jpg に置き、タスクメモから参照している
+- [x] #5 変更範囲のテストが通り、既存テストの期待値を削除・緩和していない（仕様変更で書き換えた期待値はタスクメモに列挙）
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+実装完了。変更範囲テスト・oxlintはPASS。pnpm check/test:smokeは統括側の最終レビューで実施を推奨（作業中は変更範囲のみ実行方針のため）。
+
+サーバー側の title フィールド（shared/src/scan.ts の scanCandidateRegisterItemSchema.title、server/src/adapters/real/scanCandidateSession.ts:82、server/src/adapters/fixture/settingsScan.ts:121 resolveRegisteredTitle）はタイトル編集専用に追加されたもので、クライアントからは呼ばれなくなった。除去するかは統括判断のため未着手（report参照）。
+
+pnpm check / pnpm test（1084件）/ pnpm test:smoke（25件）すべてPASS。client/tests/unit/scanModal.test.ts の登録payload期待値からもtitleフィールドを削除（タイトル編集撤去に伴う辻褄合わせではなく仕様変更）。
+<!-- SECTION:NOTES:END -->
