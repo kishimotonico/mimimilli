@@ -1,9 +1,12 @@
-import { useCallback, useEffect, useId } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef } from "react";
 import { useSetAtom } from "jotai";
 import { toastRequestsAtom, type ToastRequest } from "../model/toastRequestsAtom";
 
 export interface UseToastResult {
   show: (request: ToastRequest) => void;
+  /** variant="error"（自動消滅せず手動クローズのみ）で表示する。priorityは選択に関与しない
+   *  （variant="error"が発行元のpriorityに関わらず最優先されるため）ので呼び出し側では指定しない */
+  error: (message: string) => void;
   dismiss: () => void;
 }
 
@@ -16,16 +19,27 @@ export interface UseToastResult {
 export function useToast(): UseToastResult {
   const id = useId();
   const setRequests = useSetAtom(toastRequestsAtom);
+  // 同じ呼び出し元から文面が同じ要求が続けて来ても別の要求として扱えるよう、
+  // show() のたびに増える発行カウンタをキーへ含める（Toast.tsx側でReactのkeyとして
+  // 使い、寿命タイマー・onDismissを要求ごとに独立させる）。
+  const issueCountRef = useRef(0);
 
   const show = useCallback(
     (request: ToastRequest) => {
+      issueCountRef.current += 1;
+      const requestKey = `${id}:${issueCountRef.current}`;
       setRequests((current) => {
         const next = new Map(current);
-        next.set(id, request);
+        next.set(id, { ...request, requestKey });
         return next;
       });
     },
     [id, setRequests],
+  );
+
+  const error = useCallback(
+    (message: string) => show({ message, variant: "error", priority: "notice" }),
+    [show],
   );
 
   const dismiss = useCallback(() => {
@@ -39,5 +53,5 @@ export function useToast(): UseToastResult {
 
   useEffect(() => dismiss, [dismiss]);
 
-  return { show, dismiss };
+  return useMemo(() => ({ show, error, dismiss }), [show, error, dismiss]);
 }

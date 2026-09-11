@@ -2,75 +2,39 @@ import { useAtomValue, useSetAtom } from "jotai";
 import { useCallback, useLayoutEffect } from "react";
 import Toast from "../../shared/ui/Toast";
 import { toastRequestsAtom, type ToastRequest } from "../../shared/model/toastRequestsAtom";
-import { formatDlsiteBulkResult } from "../../features/dlsite/model/formatDlsiteBulkResult";
-import { formatScanResult } from "../../features/scan/model/formatScanResult";
-import {
-  dlsiteBulkApplyResultAtom,
-  dlsiteBulkCancelledResultAtom,
-  dlsiteBulkErrorAtom,
-  dlsiteBulkResultAtom,
-} from "../../entities/dlsite/model/bulkAtoms";
-import { dlsiteApplyToastAtom } from "../../entities/dlsite/model/dlsiteApplyToastAtom";
-import { useDlsiteBulkActions } from "../../entities/dlsite/useDlsiteBulkActions";
-import { useDlsiteBulkApplyActions } from "../../entities/dlsite/useDlsiteBulkApplyActions";
-import { errorToastAtom } from "../../shared/model/errorToastAtom";
-import { scanErrorAtom, scanResultToastAtom } from "../../entities/scan/model/atoms";
-import { useScanActions } from "../../entities/scan/useScanActions";
-import { playerSkipToastAtom } from "../../features/player/model/playerPresentationAtoms";
-import { rootFolderChangedToastAtom } from "../../entities/settings/model/rootFolderChangeAtoms";
-import { workDeleteSuccessAtom } from "../../features/library/model/atoms";
-import { copyPathSuccessAtom } from "../../features/files/model/atoms";
 
-export interface GlobalToastProps {
-  /** ルートフォルダー変更成功トーストの「今すぐスキャン」actionから呼ぶ */
-  onOpenScan: () => void;
-  /** スキャン完了トーストの「要対応を見る」からスキャンモーダルの要対応タブを開く */
-  onOpenScanNeedsAttention: () => void;
-  /** トラックスキップ通知の「このトラックを再試行」から、該当トラックを選択し直す */
-  onRetrySkippedTrack: (trackIndex: number) => void;
+const PRIORITY_ORDER = ["action", "notice", "background"] as const;
+
+/**
+ * 要求集合から今回表示する1件を選ぶ。variant="error"は発行元のpriorityに関わらず
+ * 最優先（design-system.md「単一ホストの優先順位チェーン」）。同順位内はMapの挿入順で
+ * 最後に登録されたものを選ぶ。
+ */
+function pickToastRequest(requests: Map<string, ToastRequest>): [string, ToastRequest] | null {
+  let errorEntry: [string, ToastRequest] | null = null;
+  const byPriority = new Map<(typeof PRIORITY_ORDER)[number], [string, ToastRequest]>();
+  for (const entry of requests) {
+    const [, request] = entry;
+    if (request.variant === "error") {
+      errorEntry = entry;
+      continue;
+    }
+    byPriority.set(request.priority, entry);
+  }
+  if (errorEntry) return errorEntry;
+  for (const priority of PRIORITY_ORDER) {
+    const entry = byPriority.get(priority);
+    if (entry) return entry;
+  }
+  return null;
 }
 
-export default function GlobalToast({
-  onOpenScan,
-  onOpenScanNeedsAttention,
-  onRetrySkippedTrack,
-}: GlobalToastProps) {
-  const scanError = useAtomValue(scanErrorAtom);
-  const scanResultToast = useAtomValue(scanResultToastAtom);
-  const setScanResultToast = useSetAtom(scanResultToastAtom);
-  const errorToast = useAtomValue(errorToastAtom);
-  const setErrorToast = useSetAtom(errorToastAtom);
-  const rootFolderChangedToast = useAtomValue(rootFolderChangedToastAtom);
-  const setRootFolderChangedToast = useSetAtom(rootFolderChangedToastAtom);
-  const playerSkipToast = useAtomValue(playerSkipToastAtom);
-  const setPlayerSkipToast = useSetAtom(playerSkipToastAtom);
-  const workDeleteSuccess = useAtomValue(workDeleteSuccessAtom);
-  const setWorkDeleteSuccess = useSetAtom(workDeleteSuccessAtom);
-  const dlsiteApplyToast = useAtomValue(dlsiteApplyToastAtom);
-  const setDlsiteApplyToast = useSetAtom(dlsiteApplyToastAtom);
-  const copyPathSuccess = useAtomValue(copyPathSuccessAtom);
-  const setCopyPathSuccess = useSetAtom(copyPathSuccessAtom);
-  const dlsiteBulkApplyResult = useAtomValue(dlsiteBulkApplyResultAtom);
-  const dlsiteResult = useAtomValue(dlsiteBulkResultAtom);
-  const dlsiteCancelledResult = useAtomValue(dlsiteBulkCancelledResultAtom);
-  const dlsiteError = useAtomValue(dlsiteBulkErrorAtom);
-  const { clearError: clearScanError } = useScanActions();
-  const { dismiss: dismissDlsite } = useDlsiteBulkActions();
-  const { openDialog: openDlsiteBulkApply, dismissResult: dismissDlsiteBulkApply } =
-    useDlsiteBulkApplyActions();
+// GlobalToastは要求集合（toastRequestsAtom）から1件を選んでToastへ渡すだけ。画面遷移
+// 等の個別の振る舞いは各要求のonActionに閉じる（design-system.md「単一ホストの優先順位チェーン」）。
+export default function GlobalToast() {
   const toastRequests = useAtomValue(toastRequestsAtom);
   const setToastRequests = useSetAtom(toastRequestsAtom);
 
-  // 各呼び出し側（useToast）からの表示要求のうち、指定した優先度で最後に登録されたid
-  // （Mapの挿入順で最後のエントリ）を1件選ぶ。他の要求は表示せず破棄する
-  // （design-system.md「単一ホストの優先順位チェーン」）。
-  const pickToastRequest = (priority: ToastRequest["priority"]): [string, ToastRequest] | null => {
-    let picked: [string, ToastRequest] | null = null;
-    for (const entry of toastRequests) {
-      if (entry[1].priority === priority) picked = entry;
-    }
-    return picked;
-  };
   const dismissToastRequest = useCallback(
     (id: string, request: ToastRequest) => {
       setToastRequests((current) => {
@@ -83,35 +47,12 @@ export default function GlobalToast({
     },
     [setToastRequests],
   );
-  const actionRequestEntry = pickToastRequest("action");
-  const backgroundRequestEntry = pickToastRequest("background");
 
-  // 優先順位チェーン（error > action要求 > 個別グローバル通知 > background要求）で今回
-  // 実際に表示される1件のIDを求める。それ以外の要求はキューに積まず即座に破棄する
-  // （design-system.md）。「表示されて初めて寿命が動く」構造はそのままに、表示されない
-  // 要求を待機状態のまま残さない。
-  const higherThanActionActive = Boolean(scanError || errorToast || dlsiteError);
-  const higherThanBackgroundActive =
-    higherThanActionActive ||
-    Boolean(actionRequestEntry) ||
-    Boolean(scanResultToast) ||
-    Boolean(rootFolderChangedToast) ||
-    Boolean(playerSkipToast) ||
-    Boolean(workDeleteSuccess) ||
-    Boolean(dlsiteApplyToast) ||
-    Boolean(copyPathSuccess) ||
-    Boolean(dlsiteBulkApplyResult) ||
-    Boolean(dlsiteCancelledResult) ||
-    Boolean(dlsiteResult);
-  const renderedRequestId =
-    !higherThanActionActive && actionRequestEntry
-      ? actionRequestEntry[0]
-      : !higherThanBackgroundActive && backgroundRequestEntry
-        ? backgroundRequestEntry[0]
-        : null;
+  const pickedEntry = pickToastRequest(toastRequests);
+  const pickedId = pickedEntry?.[0] ?? null;
 
   useLayoutEffect(() => {
-    const discarded = [...toastRequests].filter(([id]) => id !== renderedRequestId);
+    const discarded = [...toastRequests].filter(([id]) => id !== pickedId);
     if (discarded.length === 0) return;
     setToastRequests((current) => {
       const next = new Map(current);
@@ -119,169 +60,19 @@ export default function GlobalToast({
       return next;
     });
     for (const [, request] of discarded) request.onDismiss?.();
-  }, [toastRequests, renderedRequestId, setToastRequests]);
+  }, [toastRequests, pickedId, setToastRequests]);
 
-  if (scanError) {
-    return <Toast message={scanError} variant="error" onDismiss={clearScanError} />;
-  }
+  if (!pickedEntry) return <Toast message={null} onDismiss={() => {}} />;
 
-  if (errorToast) {
-    return <Toast message={errorToast} variant="error" onDismiss={() => setErrorToast(null)} />;
-  }
-
-  if (dlsiteError) {
-    return <Toast message={dlsiteError} variant="error" onDismiss={dismissDlsite} />;
-  }
-
-  if (actionRequestEntry) {
-    const [id, request] = actionRequestEntry;
-    return (
-      <Toast
-        message={request.message}
-        variant={request.variant}
-        actionLabel={request.actionLabel}
-        onAction={request.onAction}
-        onDismiss={() => dismissToastRequest(id, request)}
-      />
-    );
-  }
-
-  if (scanResultToast) {
-    const dismissScanResultToast = () => setScanResultToast(null);
-    if (scanResultToast.kind === "cancelled") {
-      return (
-        <Toast
-          message="スキャンを中止しました"
-          variant="warning"
-          onDismiss={dismissScanResultToast}
-        />
-      );
-    }
-    const { result } = scanResultToast;
-    const hasNeedsAttention =
-      result.identityConflicts.length > 0 ||
-      result.invalidMetaFiles.length > 0 ||
-      result.rjCodeMissingCount > 0 ||
-      result.dataIntegrityWarning !== undefined;
-    return (
-      <Toast
-        message={`スキャン完了: ${formatScanResult(result)}`}
-        variant={result.errors > 0 || result.missing > 0 ? "warning" : "success"}
-        actionLabel={hasNeedsAttention ? "要対応を見る" : undefined}
-        onAction={
-          hasNeedsAttention
-            ? () => {
-                onOpenScanNeedsAttention();
-                dismissScanResultToast();
-              }
-            : undefined
-        }
-        onDismiss={dismissScanResultToast}
-      />
-    );
-  }
-
-  if (rootFolderChangedToast) {
-    return (
-      <Toast
-        message="ルートフォルダーを変更しました。新しいフォルダーを読み込むにはスキャンしてください。"
-        variant="success"
-        actionLabel="今すぐスキャン"
-        onAction={onOpenScan}
-        onDismiss={() => setRootFolderChangedToast(false)}
-      />
-    );
-  }
-
-  if (playerSkipToast) {
-    return (
-      <Toast
-        message={playerSkipToast.message}
-        variant="warning"
-        actionLabel="このトラックを再試行"
-        onAction={() => {
-          onRetrySkippedTrack(playerSkipToast.trackIndex);
-          setPlayerSkipToast(null);
-        }}
-        onDismiss={() => setPlayerSkipToast(null)}
-      />
-    );
-  }
-
-  if (workDeleteSuccess) {
-    return (
-      <Toast
-        message={workDeleteSuccess}
-        variant="success"
-        onDismiss={() => setWorkDeleteSuccess(null)}
-      />
-    );
-  }
-
-  if (dlsiteApplyToast) {
-    return (
-      <Toast
-        message={dlsiteApplyToast.message}
-        variant={dlsiteApplyToast.variant}
-        onDismiss={() => setDlsiteApplyToast(null)}
-      />
-    );
-  }
-
-  if (copyPathSuccess) {
-    return (
-      <Toast
-        message={copyPathSuccess}
-        variant="success"
-        onDismiss={() => setCopyPathSuccess(null)}
-      />
-    );
-  }
-
-  if (dlsiteBulkApplyResult) {
-    return (
-      <Toast
-        message={dlsiteBulkApplyResult.message}
-        variant={dlsiteBulkApplyResult.variant}
-        onDismiss={dismissDlsiteBulkApply}
-      />
-    );
-  }
-
-  if (dlsiteCancelledResult) {
-    return (
-      <Toast
-        message={`DLsite一括取得を中断しました（${formatDlsiteBulkResult(dlsiteCancelledResult)}）`}
-        variant="warning"
-        onDismiss={dismissDlsite}
-      />
-    );
-  }
-
-  if (dlsiteResult) {
-    return (
-      <Toast
-        message={`DLsite一括取得: ${formatDlsiteBulkResult(dlsiteResult)}`}
-        variant={dlsiteResult.failed > 0 ? "warning" : "success"}
-        actionLabel="未設定項目を適用"
-        onAction={openDlsiteBulkApply}
-        onDismiss={dismissDlsite}
-      />
-    );
-  }
-
-  if (backgroundRequestEntry) {
-    const [id, request] = backgroundRequestEntry;
-    return (
-      <Toast
-        message={request.message}
-        variant={request.variant}
-        actionLabel={request.actionLabel}
-        onAction={request.onAction}
-        onDismiss={() => dismissToastRequest(id, request)}
-      />
-    );
-  }
-
-  return <Toast message={null} onDismiss={dismissDlsite} />;
+  const [id, request] = pickedEntry;
+  return (
+    <Toast
+      requestKey={request.requestKey}
+      message={request.message}
+      variant={request.variant}
+      actionLabel={request.actionLabel}
+      onAction={request.onAction}
+      onDismiss={() => dismissToastRequest(id, request)}
+    />
+  );
 }
