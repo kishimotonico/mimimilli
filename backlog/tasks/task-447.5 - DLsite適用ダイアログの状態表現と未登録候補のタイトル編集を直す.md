@@ -1,10 +1,10 @@
 ---
 id: TASK-447.5
 title: DLsite適用ダイアログの状態表現と未登録候補のタイトル編集を直す
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-11 00:52'
-updated_date: '2026-09-11 01:33'
+updated_date: '2026-09-11 01:57'
 labels:
   - ui
   - ux
@@ -39,4 +39,11 @@ TASK-447 の「直す」判定のうち 428.1・428.19 を直す。428.1 のユ�
 サーバー側の title フィールド（shared/src/scan.ts の scanCandidateRegisterItemSchema.title、server/src/adapters/real/scanCandidateSession.ts:82、server/src/adapters/fixture/settingsScan.ts:121 resolveRegisteredTitle）はタイトル編集専用に追加されたもので、クライアントからは呼ばれなくなった。除去するかは統括判断のため未着手（report参照）。
 
 pnpm check / pnpm test（1084件）/ pnpm test:smoke（25件）すべてPASS。client/tests/unit/scanModal.test.ts の登録payload期待値からもtitleフィールドを削除（タイトル編集撤去に伴う辻褄合わせではなく仕様変更）。
+
+サーバー側title除去対応（統括依頼）完了。
+- shared/src/scan.ts: scanCandidateRegisterItemSchema.title を削除
+- server/src/adapters/real/scanCandidateSession.ts: title: item.title ?? current.inferredTitle → title: current.inferredTitle（master 1c64edaと一致確認）
+- server/src/adapters/fixture/settingsScan.ts: resolveRegisteredTitle関数と呼び出しを削除、title: candidate.inferredTitleへ戻す（master相当）
+- 削除したテスト: server/tests/fixtureScenarios.test.ts の「fixture: title省略・指定を区別する」「候補登録APIはHTTP境界の正規化からfixture adapterの保存まで、titleの省略・指定をモックを挟まず通す」、server/tests/real/scanCandidates.test.ts の「タイトル省略時は推定タイトルを使い、指定時はそのタイトルで登録する」、server/tests/scanCandidatesRoute.test.ts の「scanCandidateRegisterItemSchema: titleは前後の空白をtrimし、空・省略を区別する」「候補登録APIは空白のみのtitleを4xxで拒否し、adapterへ渡さない」（計5件）
+- pnpm check: PASS / pnpm test: server 795件（旧800件、-5）・client 1084件（変更なし）全PASS
 <!-- SECTION:NOTES:END -->
