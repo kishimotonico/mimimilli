@@ -160,4 +160,9 @@ ScanSidebar.tsx:108-114の件数バッジは、同一構造のTopBar/Notificatio
 pnpm --filter client exec vitest run tests/unit/cn.test.ts 通過（7件）。cn.test.ts以外はコード変更なしのため、フルのpnpm check/test/smokeは前回報告時点の結果（全通過）から変わりません。
 
 統括判断（トークン用途の不一致の疑い2件）: ScanSidebar の件数バッジ（text-caption、10px）と ABRepeatBar の A/B ボタン（text-mono、11px）は、いずれも master の px 値と同値で見た目が master と一致しているため変更しない。
+
+【統括判断】用途の不一致疑い2件は「変更なし（masterと同値）」。
+- ScanSidebar.tsx:108-114の件数バッジ: masterでもtext-caption(10px)。見た目はmasterと一致するため変更なし
+- ABRepeatBar.tsx:27/39のA/Bボタン: masterでもtext-mono(11px)の等幅表示。見た目はmasterと一致するため変更なし
+判断: 変更なし（masterと同値）
 <!-- SECTION:NOTES:END -->
