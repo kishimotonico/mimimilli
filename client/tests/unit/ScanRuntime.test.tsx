@@ -1,6 +1,6 @@
 // ScanRuntime（entities/scan配下）が出すエラートーストの単体テスト。scanErrorAtomは
 // SetupScreenがインライン表示にも使う「エラー状態」として残し、表示自体はuseToastへ
-// 出す契約（TASK-447.15）を固定する。
+// 出す契約を固定する。
 import { createElement, Fragment, useMemo } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
