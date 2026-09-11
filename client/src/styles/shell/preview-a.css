@@ -130,13 +130,6 @@
 .mle-app.has-docked-bar .mle-prv__body {
   padding-bottom: 30px;
 }
-/* 右ペイン（.mll-results__preview）は frame-c.css 側で bottom をポップアップ実寸ぶん
-   縮めるが、全画面作品詳細（.is-full）は .mll-results__preview を経由しない別ルートで
-   その縮小が効かない。トラック数が多い作品では実際に最終行がポップアップへ重なる
-   （player-A-11）ため、ここでも同様に padding-bottom を足して縮める。 */
-.mle-app.has-docked-popup .mle-prv__body {
-  padding-bottom: calc(var(--popup-h, 0px) + 24px);
-}
 /* カバー画像の直下に再生スプリットボタンだけを置く（.mle-prv__coverwrap）。
      ハート・鉛筆・その他は従来どおりmeta列側（タグの下）に残す。 */
 .mle-prv__hero {

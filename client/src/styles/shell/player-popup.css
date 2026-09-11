@@ -12,9 +12,9 @@
   bottom: 24px;
   z-index: 32;
   width: 336px;
-  /* ビューポートが低い時、上端がトップバー行（--topbar-h）に掛からないよう
-     高さを制限する。万一それでも収まらない極端なケースの保険として overflow-y も許可する。 */
-  max-height: calc(100dvh - var(--topbar-h) - 32px);
+  /* ビューポートが低い時、上端がはみ出さないよう高さを制限する。
+     万一それでも収まらない極端なケースの保険として overflow-y も許可する。 */
+  max-height: calc(100dvh - 32px);
   display: flex;
   flex-direction: column;
   gap: 10px;
