@@ -1,6 +1,6 @@
 import {
   applyDlsiteStatePatch,
-  fillUnsetDlsiteTags,
+  computeMissingDiff,
   hasRjCode,
   mergeAppliedDlsiteTags,
 } from "@mimimilli/shared";
@@ -10,7 +10,6 @@ import type {
   DlsiteFetchResult,
   DlsiteState,
   DlsiteStatePatch,
-  DlsiteWorkInfo,
   Work,
   WorkSummary,
 } from "@mimimilli/shared";
@@ -19,13 +18,8 @@ import { fixtureCoverFromColumns, type FixtureCoverColumns } from "./data.ts";
 import type { FixtureState } from "./state.ts";
 import { buildFullWorkFromState } from "./playback.ts";
 
-/** dlsiteApplyMissing / dlsiteApplyMissingPreview が共有する差分計算。既存値は上書きしない */
-function computeMissingDiff(work: WorkSummary, info: DlsiteWorkInfo) {
-  const newTags = fillUnsetDlsiteTags(work.tags, info);
-  const applyCover = !work.cover && info.coverUrl !== null;
-  const applyUrl = !work.urls.some((entry) => entry.url.includes("dlsite.com"));
-  return { newTags, applyCover, applyUrl };
-}
+/** このRJコードを持つ作品は dlsiteFetchByCode が常に取得失敗を返す（real/fixture契約テスト用） */
+export const FIXTURE_DLSITE_FETCH_FAILURE_RJ_CODE = "RJ000404";
 
 export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
   async function dlsiteFetchByCode(
@@ -33,6 +27,9 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
     _force?: boolean,
     _options?: { signal?: AbortSignal },
   ): Promise<DlsiteFetchResult> {
+    if (rjCode === FIXTURE_DLSITE_FETCH_FAILURE_RJ_CODE) {
+      return { ok: false, kind: "error", message: `fixture: 取得に失敗する作品（${rjCode}）` };
+    }
     return {
       ok: true,
       info: {
@@ -65,13 +62,17 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
       const candidates = state.works.filter((work) => !workIds || workIds.includes(work.id));
       let applied = 0;
       let skipped = 0;
+      let failed = 0;
       for (const work of candidates) {
         if (!hasRjCode(work.dlsite) || work.dlsite.status === "skipped") {
           skipped += 1;
           continue;
         }
         const fetched = await dlsiteFetchByCode(work.dlsite.rjCode);
-        if (!fetched.ok) continue;
+        if (!fetched.ok) {
+          failed += 1;
+          continue;
+        }
         const { newTags, applyCover, applyUrl } = computeMissingDiff(work, fetched.info);
         if (newTags.length === 0 && !applyCover && !applyUrl) {
           skipped += 1;
@@ -83,7 +84,7 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
         }
         applied += 1;
       }
-      return { applied, skipped, failed: 0 };
+      return { applied, skipped, failed };
     },
 
     async dlsiteApplyMissingPreview(workIds) {

@@ -8,6 +8,7 @@ import {
   normalizedTagInputArraySchema,
   type NormalizedTag,
 } from "./tagNormalize.ts";
+import type { WorkSummary } from "./work.ts";
 
 export const dlsiteStatusSchema = z.enum(["none", "applied", "not_found", "error", "skipped"]);
 export type DlsiteStatus = z.infer<typeof dlsiteStatusSchema>;
@@ -188,6 +189,18 @@ export function fillUnsetDlsiteTags(
     if (SINGLE_VALUE_DLSITE_PREFIXES.has(prefix)) return !hasTagWithPrefix(existing, prefix);
     return true;
   });
+}
+
+/** dlsiteApplyMissing / dlsiteApplyMissingPreview が real/fixture 両 adapter で共有する差分計算。
+ *  既存値は上書きしない */
+export function computeMissingDiff(
+  work: Pick<WorkSummary, "tags" | "cover" | "urls">,
+  info: DlsiteWorkInfo,
+): { newTags: NormalizedTag[]; applyCover: boolean; applyUrl: boolean } {
+  const newTags = fillUnsetDlsiteTags(work.tags, info);
+  const applyCover = !work.cover && info.coverUrl !== null;
+  const applyUrl = !work.urls.some((entry) => entry.url.includes("dlsite.com"));
+  return { newTags, applyCover, applyUrl };
 }
 
 /** 単体適用（replace）: ユーザーが明示的に選んだタグ（applyTags）を既存タグへ反映する。

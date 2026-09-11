@@ -1,11 +1,9 @@
 import { basename } from "node:path";
 import {
-  fillUnsetDlsiteTags,
+  computeMissingDiff,
   hasRjCode,
   type DlsiteApplyMissingPreviewItem,
   type DlsiteFetchResult,
-  type DlsiteWorkInfo,
-  type Work,
 } from "@mimimilli/shared";
 import { detectRjCode } from "./dlsite.ts";
 import { DlsiteCache } from "./dlsiteCache.ts";
@@ -26,15 +24,6 @@ import {
   refreshWorkDlsiteProjection,
   shouldRefreshDlsiteProjectionAfterFetch,
 } from "./dlsiteProjection.ts";
-
-/** dlsiteApplyMissing / dlsiteApplyMissingPreview が共有する差分計算。
- *  work に無いタグ・カバー・URLだけを対象にし、既存値は上書きしない */
-function computeMissingDiff(work: Work, info: DlsiteWorkInfo) {
-  const newTags = fillUnsetDlsiteTags(work.tags, info);
-  const applyCover = !work.cover && info.coverUrl !== null;
-  const applyUrl = !work.urls.some((entry) => entry.url.includes("dlsite.com"));
-  return { newTags, applyCover, applyUrl };
-}
 
 export function createDlsiteMethods(deps: {
   db: Db;
