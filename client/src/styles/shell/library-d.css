@@ -649,13 +649,6 @@
   flex-direction: column;
   min-height: 0;
 }
-.mll-qlist__count {
-  padding: 5px 8px 0;
-  font-family: var(--font-mono);
-  font-size: var(--fs-mono);
-  line-height: var(--lh-mono);
-  color: var(--ink-3);
-}
 .mll-qlist__search {
   display: flex;
   align-items: center;

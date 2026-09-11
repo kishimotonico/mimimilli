@@ -94,7 +94,6 @@ export function SmartFolderView({
     <div className="mle-prv__body">
       <div className="mll-smart">
         <div className="mll-smart__hd">
-          <I.smartFolder size={14} className="shrink-0" />
           <span className="pill">SMART</span>
           <span className="name">{sf.name}</span>
         </div>

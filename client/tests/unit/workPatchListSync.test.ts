@@ -304,11 +304,7 @@ describe("作品 PATCH 後の一覧キャッシュ同期", () => {
     });
 
     expect(worksCallUrls(fetchMock).length).toBe(worksCallsBeforePatch);
-    // "view=fav&limit=1" は軸レールの件数取得（TASK-428.22）が別途発火するため、ここでの
-    // 判定対象は非表示キャッシュの再取得を示す一覧クエリ（limit=1ではない）に絞る
-    expect(
-      worksCallUrls(fetchMock).some((u) => u.includes("view=fav") && !u.includes("limit=1")),
-    ).toBe(false);
+    expect(worksCallUrls(fetchMock).some((u) => u.includes("view=fav"))).toBe(false);
 
     const favQuery = queryClient.getQueryCache().find({ queryKey: favKey });
     expect(favQuery?.isStale()).toBe(true);

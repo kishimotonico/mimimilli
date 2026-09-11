@@ -20,7 +20,6 @@ import {
   Filter,
   Folder,
   FolderOpen,
-  FolderSearch,
   Grid3x3,
   Heart,
   Home,
@@ -194,7 +193,6 @@ export const I = {
   trash: lucideIcon(Trash2),
   minimize: lucideIcon(Minimize),
   locate: lucideIcon(Locate),
-  smartFolder: lucideIcon(FolderSearch),
   swapLR: (p) => <Svg {...p} d={["M4 8h13", "M14 4l3 4 -3 4", "M20 16H7", "M10 12l-3 4 3 4"]} />,
 } as const satisfies Record<string, IconFC>;
 
