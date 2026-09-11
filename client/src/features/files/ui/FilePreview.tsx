@@ -10,7 +10,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { errorToastAtom } from "../../../shared/model/errorToastAtom";
 import { I } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
-import IconButton from "../../../shared/ui/IconButton";
 import ConfirmDialog from "../../../shared/ui/ConfirmDialog";
 import CollectionStatus from "../../../shared/ui/CollectionStatus";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
@@ -19,18 +18,11 @@ import { FILE_SYSTEM_QUERY_KEYS } from "../../../entities/file-system/queryKeys"
 import { getWorkRegisterPreview, reassignIdentityConflict } from "../api";
 import { deleteWork, getWork } from "../../../entities/work/api";
 import { clampFilesPreviewWidth, filesPreviewWidthAtom } from "../model/previewLayoutAtoms";
-import { copyPathSuccessAtom } from "../model/atoms";
 import { isPrimaryPointerButton } from "../../../shared/lib/pointerButton";
 import RegisterWorkDialog from "./RegisterWorkDialog";
 import { Hero, WorkspaceMedia } from "./FilePreviewMedia";
 import type { ScanDiagnostic, WorkRegisterPreview, WorkspacePath } from "@mimimilli/shared";
-import {
-  classifyFile,
-  joinPath,
-  summarizeKinds,
-  FILE_KIND_LABEL,
-  type FsEntry,
-} from "../model/types";
+import { classifyFile, summarizeKinds, FILE_KIND_LABEL, type FsEntry } from "../model/types";
 import { apiErrorMessage } from "../../../shared/lib/apiError";
 
 /** cwd取得の失敗種別。notFound=404（対象が存在しない）、error=5xx/通信失敗（再試行すれば回復しうる） */
@@ -45,8 +37,6 @@ interface FilePreviewProps {
   depth: number;
   /** 現在開いているディレクトリ（FS キャッシュ無効化用） */
   browsePath: string;
-  /** ワークスペースルートの絶対パス（entry.path はroot相対のportableパスなので、絶対パスコピーに使う） */
-  rootFolder: string;
   isPlayingEntry: boolean;
   isPlaybackActive: boolean;
   onPlay: (entry: FsEntry) => void;
@@ -74,7 +64,6 @@ export default function FilePreview({
   folderEntries,
   depth,
   browsePath,
-  rootFolder,
   isPlayingEntry,
   isPlaybackActive,
   onPlay,
@@ -92,7 +81,6 @@ export default function FilePreview({
 }: FilePreviewProps) {
   const queryClient = useQueryClient();
   const setErrorToast = useSetAtom(errorToastAtom);
-  const setCopyPathSuccess = useSetAtom(copyPathSuccessAtom);
   const [width, setWidth] = useAtom(filesPreviewWidthAtom);
   const [registerPreview, setRegisterPreview] = useState<WorkRegisterPreview | null>(null);
   const [showRegisterDialog, setShowRegisterDialog] = useState(false);
@@ -184,18 +172,6 @@ export default function FilePreview({
     },
   });
 
-  const copyAbsolutePath = useCallback(
-    async (path: string) => {
-      try {
-        await navigator.clipboard.writeText(path);
-        setCopyPathSuccess("絶対パスをコピーしました");
-      } catch (cause) {
-        setErrorToast(apiErrorMessage(cause, "パスのコピーに失敗しました"));
-      }
-    },
-    [setCopyPathSuccess, setErrorToast],
-  );
-
   const kind = entry ? classifyFile(entry) : null;
   const isDir = kind === "dir";
   const label = isDir
@@ -273,7 +249,6 @@ export default function FilePreview({
 
   const hasActions = playActions != null || workActions != null;
   const conflictingPaths = identityConflict?.paths.filter((path) => path !== entry?.path) ?? [];
-  const absolutePath = entry ? joinPath(rootFolder, entry.path.split("/").filter(Boolean)) : "";
 
   return (
     <div
@@ -345,23 +320,6 @@ export default function FilePreview({
                       workTitle={workTitle}
                     />
                   )}
-
-                  {/* ローカル専用機能（絶対パスコピー）。TASK-428.18 決定事項 */}
-                  <div className="mle-fprev__pathblock">
-                    <div className="mle-fprev__pathrow">
-                      <code className="mle-fprev__pathrow-text">{absolutePath}</code>
-                      <IconButton
-                        icon={I.copy}
-                        label="絶対パスをコピー（ローカル専用）"
-                        title="絶対パスをコピー（この端末でのみ有効なパスです）"
-                        size="sm"
-                        onClick={() => copyAbsolutePath(absolutePath)}
-                      />
-                    </div>
-                    <p className="mle-fprev__pathblock-hint">
-                      この端末のローカルパスです。他の端末やクラウドでは無効です。
-                    </p>
-                  </div>
 
                   {hasActions && (
                     <div className="mle-fprev__actions">

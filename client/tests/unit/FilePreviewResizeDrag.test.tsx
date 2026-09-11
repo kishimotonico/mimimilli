@@ -12,7 +12,6 @@ function renderPreview(overrides: Partial<React.ComponentProps<typeof FilePrevie
     folderEntries: null,
     depth: 1,
     browsePath: "dlsite/夜想曲スタジオ",
-    rootFolder: "/library",
     isPlayingEntry: false,
     isPlaybackActive: false,
     onPlay: vi.fn(),

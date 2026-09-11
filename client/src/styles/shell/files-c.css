@@ -60,38 +60,6 @@
   gap: 16px;
 }
 
-.mle-fprev__pathblock {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.mle-fprev__pathrow {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  padding: 8px 10px;
-  border: 1px solid var(--line-soft);
-  border-radius: var(--r-2);
-  background: var(--paper-0);
-}
-.mle-fprev__pathrow-text {
-  flex: 1;
-  min-width: 0;
-  word-break: break-all;
-  font-family: var(--font-mono);
-  font-size: var(--fs-mono);
-  line-height: var(--lh-mono);
-  color: var(--ink-2);
-  user-select: text;
-}
-.mle-fprev__pathblock-hint {
-  margin: 0;
-  padding: 0 2px;
-  font-size: var(--fs-caption);
-  line-height: var(--lh-caption);
-  color: var(--ink-4);
-}
-
 /* コンパクトなヒーロー（フォルダー・非画像ファイル）。巨大な空ボックスを置かない */
 .mle-fprev__hero {
   display: flex;

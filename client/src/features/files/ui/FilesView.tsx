@@ -221,7 +221,6 @@ export default function FilesView({ rootFolder, onPlayFile, onTogglePlay }: File
             folderEntries={folderEntries}
             depth={nav.addressPath.length}
             browsePath={nav.cwd}
-            rootFolder={rootFolder}
             isPlayingEntry={previewEntry != null && matchPlaying(previewEntry)}
             isPlaybackActive={isPlaybackActive}
             onPlay={(entry) => handlePlayFile(entry, folderEntries ?? cwdEntries)}
