@@ -220,7 +220,6 @@
   color: var(--r-coral);
   margin-right: 4px;
   flex-shrink: 0;
-  vertical-align: -1px;
 }
 .mll-wrow.is-on.is-focused .mll-wrow__status {
   color: oklch(80% 0.12 25);

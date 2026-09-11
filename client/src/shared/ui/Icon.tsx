@@ -37,7 +37,6 @@ import {
   Search,
   Star,
   Trash2,
-  TriangleAlert,
   User,
   Video,
   Volume2,
@@ -54,6 +53,8 @@ interface SvgProps extends IconProps {
   d: string | string[];
   fill?: string;
   viewBox?: string;
+  /** グリフを viewBox 座標系で動かす（例: "translate(0 -2)"）。視覚重心の補正など。 */
+  transform?: string;
 }
 
 // 小サイズでも実効線幅が 1px 未満にならないよう viewBox 上の stroke を補正する
@@ -61,7 +62,8 @@ function strokeWidthForSize(size: number): number {
   return Math.max(1.5, 24 / size);
 }
 
-function Svg({ d, size = 16, fill, viewBox = "0 0 24 24", className, style }: SvgProps) {
+function Svg({ d, size = 16, fill, viewBox = "0 0 24 24", transform, className, style }: SvgProps) {
+  const paths = Array.isArray(d) ? d.map((path, i) => <path key={i} d={path} />) : <path d={d} />;
   return (
     <svg
       width={size}
@@ -76,7 +78,7 @@ function Svg({ d, size = 16, fill, viewBox = "0 0 24 24", className, style }: Sv
       className={className}
       style={style}
     >
-      {Array.isArray(d) ? d.map((path, i) => <path key={i} d={path} />) : <path d={d} />}
+      {transform ? <g transform={transform}>{paths}</g> : paths}
     </svg>
   );
 }
@@ -184,7 +186,20 @@ export const I = {
   filter: lucideIcon(Filter),
   check: lucideIcon(Check),
   x: lucideIcon(X),
-  err: lucideIcon(TriangleAlert),
+  // TriangleAlertは24x24の幾何中心には収まるが、下部の三角ベースと感嘆符のドットに
+  // 視覚的な重心が寄り、他のアイコンより低く見える。
+  // グリフを viewBox 上で2単位上へ寄せて視覚重心を他アイコンと揃える。
+  err: (p) => (
+    <Svg
+      {...p}
+      transform="translate(0 -2)"
+      d={[
+        "m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3",
+        "M12 9v4",
+        "M12 17h.01",
+      ]}
+    />
+  ),
   info: lucideIcon(Info),
   heart: lucideIcon(Heart),
   bell: lucideIcon(Bell),
