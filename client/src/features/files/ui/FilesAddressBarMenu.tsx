@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { useAtomValue, useSetAtom } from "jotai";
-import { errorToastAtom } from "../../../shared/model/errorToastAtom";
+import { useAtomValue } from "jotai";
 import { apiErrorMessage } from "../../../shared/lib/apiError";
+import { useToast } from "../../../shared/ui/useToast";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
 import {
@@ -11,7 +11,6 @@ import {
 import { useRootFolder } from "../../../entities/settings/useSettingsQuery";
 import { filesRelPathAtom } from "../../../entities/file-system/model/navigationAtoms";
 import { joinPath } from "../model/types";
-import { copyPathSuccessAtom } from "../model/atoms";
 
 const MENU_POPOVER_WIDTH = 200;
 
@@ -24,8 +23,7 @@ export default function FilesAddressBarMenu() {
   const [isOpen, setIsOpen] = useState(false);
   const rootFolder = useRootFolder();
   const relPath = useAtomValue(filesRelPathAtom);
-  const setCopyPathSuccess = useSetAtom(copyPathSuccessAtom);
-  const setErrorToast = useSetAtom(errorToastAtom);
+  const toast = useToast();
 
   const { setReference, setFloating, floatingStyles, close } = useAnchoredPopover({
     isOpen,
@@ -40,9 +38,9 @@ export default function FilesAddressBarMenu() {
     const path = joinPath(rootFolder, relPath);
     try {
       await navigator.clipboard.writeText(path);
-      setCopyPathSuccess("絶対パスをコピーしました");
+      toast.show({ message: "絶対パスをコピーしました", variant: "success", priority: "notice" });
     } catch (cause) {
-      setErrorToast(apiErrorMessage(cause, "パスのコピーに失敗しました"));
+      toast.error(apiErrorMessage(cause, "パスのコピーに失敗しました"));
     }
   };
 

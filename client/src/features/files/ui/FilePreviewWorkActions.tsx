@@ -1,7 +1,6 @@
 import { useCallback, useState, type ReactNode } from "react";
-import { useSetAtom } from "jotai";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { errorToastAtom } from "../../../shared/model/errorToastAtom";
+import { useToast } from "../../../shared/ui/useToast";
 import { I } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
 import ConfirmDialog from "../../../shared/ui/ConfirmDialog";
@@ -43,7 +42,7 @@ export default function FilePreviewWorkActions({
   onWorkRegistered,
 }: FilePreviewWorkActionsProps) {
   const queryClient = useQueryClient();
-  const setErrorToast = useSetAtom(errorToastAtom);
+  const toast = useToast();
   const [registerPreview, setRegisterPreview] = useState<WorkRegisterPreview | null>(null);
   const [showRegisterDialog, setShowRegisterDialog] = useState(false);
   const [showUnregisterConfirm, setShowUnregisterConfirm] = useState(false);
@@ -70,7 +69,7 @@ export default function FilePreviewWorkActions({
       await refreshFsState();
     },
     onError: (cause) => {
-      setErrorToast(apiErrorMessage(cause, "作品登録の解除に失敗しました"));
+      toast.error(apiErrorMessage(cause, "作品登録の解除に失敗しました"));
     },
   });
 
@@ -81,7 +80,7 @@ export default function FilePreviewWorkActions({
       await refreshFsState();
     },
     onError: (cause) => {
-      setErrorToast(apiErrorMessage(cause, "別作品としての取り込みに失敗しました"));
+      toast.error(apiErrorMessage(cause, "別作品としての取り込みに失敗しました"));
     },
   });
 
@@ -89,7 +88,7 @@ export default function FilePreviewWorkActions({
     mutationFn: (path: WorkspacePath) => getWorkRegisterPreview(path),
     onSuccess: async (preview) => {
       if (preview.alreadyRegistered) {
-        setErrorToast("この場所は既に作品として登録されています");
+        toast.error("この場所は既に作品として登録されています");
         await refreshFsState();
         return;
       }
@@ -97,7 +96,7 @@ export default function FilePreviewWorkActions({
       setShowRegisterDialog(true);
     },
     onError: (cause) => {
-      setErrorToast(apiErrorMessage(cause, "登録情報の取得に失敗しました"));
+      toast.error(apiErrorMessage(cause, "登録情報の取得に失敗しました"));
     },
   });
 
@@ -111,7 +110,7 @@ export default function FilePreviewWorkActions({
         icon={I.add}
         disabled={registerPreviewMutation.isPending}
         onClick={() => {
-          setErrorToast(null);
+          toast.dismiss();
           registerPreviewMutation.mutate(entry.path);
         }}
       >
@@ -122,7 +121,7 @@ export default function FilePreviewWorkActions({
         variant="ghost"
         disabled={unregisterMutation.isPending}
         onClick={() => {
-          setErrorToast(null);
+          toast.dismiss();
           setShowUnregisterConfirm(true);
         }}
       >
