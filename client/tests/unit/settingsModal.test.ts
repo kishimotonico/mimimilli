@@ -8,6 +8,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import SettingsModal from "../../src/features/settings/ui/SettingsModal";
 import { dlsiteBulkActionsAtom } from "../../src/entities/dlsite/model/bulkAtoms";
+import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
 import { ApiRequestError } from "../../src/shared/api/http";
 
 beforeEach(() => {
@@ -39,6 +40,11 @@ function renderModal(options: RenderModalOptions = {}) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
+  queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), {
+    rootFolder: "/audio",
+    lastScanTime: null,
+    lastScanRootFolder: null,
+  });
   const store = createStore();
   store.set(dlsiteBulkActionsAtom, {
     start: vi.fn(),
@@ -54,7 +60,6 @@ function renderModal(options: RenderModalOptions = {}) {
         JotaiProvider,
         { store },
         createElement(SettingsModal, {
-          rootFolder: "/audio",
           lastScanTime: opts.lastScanTime ?? null,
           lastScanRootFolder: opts.lastScanRootFolder ?? "/audio",
           onClose,

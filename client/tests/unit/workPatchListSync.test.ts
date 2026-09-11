@@ -14,6 +14,7 @@ import {
   type WorkListItem,
 } from "@mimimilli/shared";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
+import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
 import {
   useLibraryWorkPatchMutations,
   useLibrarySupportingQueries,
@@ -174,6 +175,11 @@ function renderLibraryHooks(nav: LibraryViewState, options?: { queryClient?: Que
     new QueryClient({
       defaultOptions: { queries: { retry: false, staleTime: Infinity } },
     });
+  queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), {
+    rootFolder: "/lib",
+    lastScanTime: null,
+    lastScanRootFolder: null,
+  });
   const wrapper = ({ children }: { children: ReactNode }) =>
     createElement(
       QueryClientProvider,

@@ -167,7 +167,7 @@ export default function LibraryView({
 
   const handlePlay = useCallback(
     (trackIndex: number) => {
-      if (selectedWork && rootFolder !== null) {
+      if (selectedWork) {
         onPlay(
           toWorkListItem(
             {

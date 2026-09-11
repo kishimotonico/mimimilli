@@ -30,7 +30,7 @@ interface FilePreviewProps {
 }
 
 export default function FilePreview({ onPlayFile, onTogglePlay }: FilePreviewProps) {
-  const root = useRootFolder() ?? "/";
+  const root = useRootFolder();
   const browse = useFilesBrowse(root);
   const matchPlaying = useFilesPlayingMatcher();
   const isPlaybackActive = useAtomValue(playerIsPlayingOrLoadingAtom);

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { emptyDlsiteState, type Work } from "@mimimilli/shared";
 import type { LibraryViewState } from "../../src/features/library/model/useLibraryNavigation";
 import { WorkDetailPatchScope } from "../../src/features/library/ui/preview/WorkDetailPatchScope";
+import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
 
 vi.mock("../../src/features/library/ui/preview/WorkTagEditor", () => ({
   WorkTagEditor: () => <div data-testid="tag-editor" />,
@@ -74,6 +75,11 @@ function jsonResponse(data: unknown): Response {
 function renderScopedDetail(workId: string) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), {
+    rootFolder: "/lib",
+    lastScanTime: null,
+    lastScanRootFolder: null,
   });
   const wrapper = ({ children }: { children: ReactNode }) =>
     createElement(QueryClientProvider, { client: queryClient }, children);

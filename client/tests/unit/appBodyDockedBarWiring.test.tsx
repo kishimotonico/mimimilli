@@ -75,7 +75,6 @@ function renderAppBody(store: ReturnType<typeof createStore>) {
       <JotaiProvider store={store}>
         <LibraryNavigationProvider>
           <AppBody
-            rootFolder="/root"
             onPlay={vi.fn()}
             onResume={vi.fn()}
             onTogglePlay={vi.fn()}

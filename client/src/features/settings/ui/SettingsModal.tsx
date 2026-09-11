@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { I } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
 import IconButton from "../../../shared/ui/IconButton";
+import { useRootFolder } from "../../../entities/settings/useSettingsQuery";
 import {
   dlsiteBulkActiveAtom,
   dlsiteBulkApplyBusyAtom,
@@ -26,7 +27,6 @@ const SECTION_LABEL_NO_UPPERCASE_CLASS =
 const ROW_CLASS = "flex items-center gap-2";
 
 interface SettingsModalProps {
-  rootFolder: string | null;
   lastScanTime: string | null;
   /** 直近の完了スキャンが対象にしたルートフォルダー。rootFolderと不一致なら一覧が未反映 */
   lastScanRootFolder: string | null;
@@ -39,7 +39,6 @@ interface SettingsModalProps {
 }
 
 export default function SettingsModal({
-  rootFolder,
   lastScanTime,
   lastScanRootFolder,
   onClose,
@@ -47,6 +46,7 @@ export default function SettingsModal({
   onChangeFolder,
   onExport,
 }: SettingsModalProps) {
+  const rootFolder = useRootFolder();
   const scanning = useAtomValue(scanningAtom);
   const scanProgressLabel = useAtomValue(scanProgressLabelAtom);
   const dlsiteBulkActive = useAtomValue(dlsiteBulkActiveAtom);
@@ -57,11 +57,11 @@ export default function SettingsModal({
   const { start: onStartDlsiteBulk } = useDlsiteBulkActions();
   const { openDialog: onOpenDlsiteBulkApply } = useDlsiteBulkApplyActions();
   const [isEditingFolder, setIsEditingFolder] = useState(false);
-  const [folderDraft, setFolderDraft] = useState(rootFolder ?? "");
+  const [folderDraft, setFolderDraft] = useState(rootFolder);
   const [savingFolder, setSavingFolder] = useState(false);
   const [folderError, setFolderError] = useState<string | null>(null);
   const folderInputRef = useRef<HTMLInputElement | null>(null);
-  const rootFolderStale = rootFolder !== null && rootFolder !== lastScanRootFolder;
+  const rootFolderStale = rootFolder !== lastScanRootFolder;
 
   const dismiss = () => {
     if (isEditingFolder) {
@@ -78,7 +78,7 @@ export default function SettingsModal({
   }, [isEditingFolder]);
 
   const startEditingFolder = () => {
-    setFolderDraft(rootFolder ?? "");
+    setFolderDraft(rootFolder);
     setFolderError(null);
     setIsEditingFolder(true);
   };
@@ -163,10 +163,8 @@ export default function SettingsModal({
             <div className={ROW_CLASS}>
               <div className="flex h-[34px] flex-1 items-center gap-2 overflow-hidden rounded-[6px] border border-line-soft bg-paper-0 px-3">
                 <I.folder size={13} className="shrink-0 text-ink-3" />
-                <span
-                  className={`mll-selectable overflow-hidden text-ellipsis whitespace-nowrap font-mono text-mono ${rootFolder ? "text-ink-1" : "text-ink-4"}`}
-                >
-                  {rootFolder ?? "未設定"}
+                <span className="mll-selectable overflow-hidden text-ellipsis whitespace-nowrap font-mono text-mono text-ink-1">
+                  {rootFolder}
                 </span>
               </div>
               <Button variant="ghost" size="md" onClick={startEditingFolder}>

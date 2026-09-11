@@ -34,7 +34,6 @@ export default function FilesAddressBarMenu() {
 
   const copyCurrentFolderPath = async () => {
     close();
-    if (!rootFolder) return;
     const path = joinPath(rootFolder, relPath);
     try {
       await navigator.clipboard.writeText(path);

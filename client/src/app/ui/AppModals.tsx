@@ -8,7 +8,6 @@ const SettingsModal = lazy(() => import("../../features/settings/ui/SettingsModa
 const ScanModal = lazy(() => import("../../features/scan/ui/ScanModal"));
 
 interface AppModalsProps {
-  rootFolder: string | null;
   lastScanTime: string | null;
   lastScanRootFolder: string | null;
   onChangeFolder: (path: string) => Promise<unknown>;
@@ -20,7 +19,6 @@ interface AppModalsProps {
 // activeModalAtom を読む唯一の場所。どのモーダルを表示するかの判断をここへ集約し、
 // 各モーダル本体（SettingsModal / ScanModal / DlsiteNotificationModals）は props 駆動のまま保つ。
 export default function AppModals({
-  rootFolder,
   lastScanTime,
   lastScanRootFolder,
   onChangeFolder,
@@ -39,7 +37,6 @@ export default function AppModals({
       {activeModal?.kind === "settings" && (
         <Suspense fallback={null}>
           <SettingsModal
-            rootFolder={rootFolder}
             lastScanTime={lastScanTime}
             lastScanRootFolder={lastScanRootFolder}
             onClose={handleClose}

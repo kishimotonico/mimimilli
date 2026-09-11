@@ -89,7 +89,7 @@ export function WorkDetail({
   const statusLabel = getWorkStatusLabel(work.status);
   const toast = useToast();
   const openPathInFiles = useSetAtom(openPathInFilesAtom);
-  const rootFolder = useRootFolder() ?? "/";
+  const rootFolder = useRootFolder();
 
   const handleDeleteConfirm = () => {
     const title = work.title;

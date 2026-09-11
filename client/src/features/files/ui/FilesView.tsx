@@ -6,6 +6,7 @@
 import { useCallback } from "react";
 import { useAtom, useAtomValue } from "jotai";
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
+import { useRootFolder } from "../../../entities/settings/useSettingsQuery";
 import { useFilesBrowse } from "../model/useFilesBrowse";
 import { useFilesPlayingMatcher } from "../model/useFilesPlayingMatcher";
 import { useIdentityConflictMap } from "../model/useIdentityConflict";
@@ -46,12 +47,12 @@ function ColstackBackButton({ parentName, depth, onGoUp }: ColstackBackButtonPro
 }
 
 interface FilesViewProps {
-  rootFolder: string;
   onPlayFile: (tracks: PlaybackTrack[], trackIndex: number) => void;
   onTogglePlay: () => void;
 }
 
-export default function FilesView({ rootFolder, onPlayFile, onTogglePlay }: FilesViewProps) {
+export default function FilesView({ onPlayFile, onTogglePlay }: FilesViewProps) {
+  const rootFolder = useRootFolder();
   const browse = useFilesBrowse(rootFolder);
   const { nav } = browse;
   const direction = useAtomValue(filesDirectionAtom);

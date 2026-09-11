@@ -291,7 +291,7 @@ function useWorkPatchMutationContext(nav: LibraryViewState, searchQuery: string)
       : worksParams !== null
         ? WORK_QUERY_KEYS.list(worksParams)
         : null;
-    if (targets.patchActiveListCache && activeListQueryKey !== null && rootFolder !== null) {
+    if (targets.patchActiveListCache && activeListQueryKey !== null) {
       patchWorkInQueryCache(
         queryClient,
         activeListQueryKey,

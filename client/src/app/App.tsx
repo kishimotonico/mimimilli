@@ -33,7 +33,11 @@ import { getWork } from "../entities/work/api";
 import { useDownloadLibraryExport } from "../features/library/useDownloadLibraryExport";
 import { useScanActions } from "../entities/scan/useScanActions";
 import { setRootFolder } from "../entities/settings/api";
-import { useSettingsQuery } from "../entities/settings/useSettingsQuery";
+import {
+  useSettingsQuery,
+  useRootFolderOrNull,
+  requireRootFolder,
+} from "../entities/settings/useSettingsQuery";
 import NavigationHistorySync from "../features/navigation/ui/NavigationHistorySync";
 import { setAppModeAtom } from "../shared/model/appModeAtoms";
 import { openPathInFilesAtom } from "../entities/file-system/model/navigationAtoms";
@@ -59,6 +63,7 @@ export default function App() {
   // ── Settings ─────────────────────────────────────────────
   const settingsQuery = useSettingsQuery();
   const settings = settingsQuery.data;
+  const rootFolderOrNull = useRootFolderOrNull();
   // 再試行中（isPending===true・error===null に巻き戻る）でも起動エラー画面の文脈を保つため、
   // 直近のエラーを保持する。成功したら破棄する
   const [lastStartupError, setLastStartupError] = useState<unknown>(undefined);
@@ -73,9 +78,6 @@ export default function App() {
     data: settings,
     hasErroredBefore: lastStartupError !== undefined,
   });
-
-  // ファイルモードのルートパス（FilesView に渡す）。
-  const rootFolder = settings?.rootFolder ?? "/";
 
   // ── Change folder mutation ────────────────────────────────
   const changeFolderMutation = useMutation({
@@ -164,10 +166,10 @@ export default function App() {
 
   const handleOpenScanProblemInFiles = useCallback(
     (path: string) => {
-      openPathInFiles({ path, root: rootFolder });
+      openPathInFiles({ path, root: requireRootFolder(rootFolderOrNull) });
       setActiveModal(null);
     },
-    [openPathInFiles, rootFolder, setActiveModal],
+    [openPathInFiles, rootFolderOrNull, setActiveModal],
   );
 
   if (startupState === "loading") {
@@ -211,7 +213,6 @@ export default function App() {
           leftNav={<LeftNav />}
           body={
             <AppBody
-              rootFolder={rootFolder}
               onPlay={handlePlay}
               onResume={handleResume}
               onTogglePlay={player.togglePlay}
@@ -225,7 +226,6 @@ export default function App() {
               <PlayerRuntime />
               <NavigationHistorySync />
               <AppModals
-                rootFolder={settings?.rootFolder ?? null}
                 lastScanTime={settings?.lastScanTime ?? null}
                 lastScanRootFolder={settings?.lastScanRootFolder ?? null}
                 onChangeFolder={handleChangeFolder}

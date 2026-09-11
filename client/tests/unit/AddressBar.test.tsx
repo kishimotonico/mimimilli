@@ -32,13 +32,11 @@ function renderAddressBar(options?: {
   if (options?.filesRelPath) store.set(filesRelPathAtom, options.filesRelPath);
 
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  if (options?.rootFolder) {
-    queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), {
-      rootFolder: options.rootFolder,
-      lastScanTime: null,
-      lastScanRootFolder: null,
-    });
-  }
+  queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), {
+    rootFolder: options?.rootFolder ?? "/library",
+    lastScanTime: null,
+    lastScanRootFolder: null,
+  });
 
   render(
     createElement(
