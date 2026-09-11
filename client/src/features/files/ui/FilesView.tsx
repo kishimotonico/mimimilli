@@ -26,8 +26,9 @@ import {
 import { workspacePath } from "@mimimilli/shared";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 import FileColumn from "./FileColumn";
-import FilePreview, { type FileLoadError } from "./FilePreview";
+import FilePreview from "./FilePreview";
 import StackEdge from "./StackEdge";
+import type { FileLoadError } from "../model/types";
 
 interface ColstackBackButtonProps {
   parentName: string;

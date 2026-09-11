@@ -109,6 +109,9 @@ export function joinPath(root: string, segments: string[]): string {
   return prefix + segments.join(separator);
 }
 
+/** カレントディレクトリ取得の失敗種別。notFound=404（対象が存在しない）、error=5xx/通信失敗（再試行すれば回復しうる） */
+export type FileLoadError = "notFound" | "error";
+
 /** ルートの表示名（末尾セグメント。空なら "/"） */
 export function rootLabel(root: string): string {
   const separator = pathSeparator(root);

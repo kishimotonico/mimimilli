@@ -88,6 +88,39 @@ export function WorkspaceMedia({
   }
 }
 
+/** entryがメディアプレビュー対応ファイル（preview/mediaKind有り）ならWorkspaceMedia、
+ *  それ以外（フォルダー・非対応ファイル）ならHeroへ振り分ける。 */
+export function FilePreviewMediaSlot({
+  entry,
+  isDir,
+  kind,
+  isRegisteredWork,
+  breakdown,
+  workTitle,
+}: {
+  entry: FsEntry;
+  isDir: boolean;
+  kind: FileKind;
+  isRegisteredWork: boolean;
+  breakdown: { kind: FileKind; count: number }[];
+  workTitle?: string;
+}) {
+  if (!isDir && entry.preview && entry.mediaKind) {
+    return (
+      <WorkspaceMedia entry={entry} isRegisteredWork={isRegisteredWork} workTitle={workTitle} />
+    );
+  }
+  return (
+    <Hero
+      kind={kind}
+      entry={entry}
+      isWorkFolder={isRegisteredWork}
+      breakdown={isDir ? breakdown : undefined}
+      workTitle={workTitle}
+    />
+  );
+}
+
 function MediaCaption({ entry }: { entry: FsEntry }) {
   return (
     <div className="mle-fprev__caption">
