@@ -42,31 +42,31 @@ interface DlsiteDiffRowProps {
 
 /** 変更あり／変更なし／適用不可を見た目と操作で分ける1行（TASK-428.1） */
 function DlsiteDiffRow({ label, diff, checked, onCheckedChange }: DlsiteDiffRowProps) {
-  if (diff.kind === "unchanged") {
-    return (
-      <div className="grid grid-cols-[18px_60px_minmax(0,1fr)] items-center gap-1.5 border-b border-line-soft py-2 text-ink-2">
-        <span />
-        <span>{label}</span>
-        <span className="min-w-0 break-words">変更なし（{diff.value}）</span>
-      </div>
-    );
-  }
+  const current = diff.kind === "unchanged" ? diff.value : diff.current;
+  const stateWord =
+    diff.kind === "unchanged" ? "同一" : diff.kind === "unavailable" ? "対象外" : null;
+  const tooltip = diff.kind === "unavailable" ? diff.reason : undefined;
   return (
-    <label className="grid grid-cols-[18px_60px_minmax(0,1fr)_18px_minmax(0,1fr)] items-center gap-1.5 border-b border-line-soft py-2">
+    <label
+      title={tooltip}
+      className={`grid grid-cols-[18px_60px_minmax(0,1fr)_18px_minmax(0,1fr)] items-center gap-1.5 border-b border-line-soft py-2 ${
+        diff.kind === "changed" ? "" : "opacity-50"
+      }`}
+    >
       <input
         type="checkbox"
         checked={diff.kind === "changed" && checked}
-        disabled={diff.kind === "unavailable"}
+        disabled={diff.kind !== "changed"}
         onChange={(event) => onCheckedChange(event.target.checked)}
       />
       <span>{label}</span>
-      <span className="min-w-0 break-words text-ink-2">{diff.current}</span>
-      <span className="text-ink-3">→</span>
+      <span className="min-w-0 break-words text-ink-2">{current}</span>
+      <span className="text-ink-3">{diff.kind === "changed" ? "→" : ""}</span>
       <span className="min-w-0 break-words">
         {diff.kind === "changed" ? (
           <span className="font-medium text-ink-0">{diff.next}</span>
         ) : (
-          diff.reason
+          stateWord
         )}
       </span>
     </label>

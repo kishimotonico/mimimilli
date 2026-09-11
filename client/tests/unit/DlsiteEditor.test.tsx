@@ -160,8 +160,11 @@ describe("DlsiteEditor", () => {
     fireEvent.click(screen.getByRole("button", { name: "取得結果を確認" }));
     await waitFor(() => expect(screen.getByText("DLsite情報の適用")).toBeInTheDocument());
 
-    expect(screen.getByText("DLsiteに画像がありません")).toBeInTheDocument();
-    expect(screen.getByText("変更なし（現在タイトル）")).toBeInTheDocument();
+    expect(screen.getByText("対象外").closest("label")).toHaveAttribute(
+      "title",
+      "DLsiteに画像がありません",
+    );
+    expect(screen.getByText("同一")).toBeInTheDocument();
   });
 
   it("差分0件: 確認ダイアログを開かず結果をトーストで通知する", async () => {
