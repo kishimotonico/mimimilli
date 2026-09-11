@@ -173,14 +173,20 @@
   position: relative;
   background: oklch(20% 0.02 70 / 0.55);
   color: var(--paper-1);
+  opacity: 0.6;
 }
 .mle-ratepill.is-overlay:hover {
   background: oklch(20% 0.02 70 / 0.75);
   color: var(--paper-1);
+  opacity: 1;
+}
+.mle-ratepill.is-overlay:focus-visible {
+  opacity: 1;
 }
 .mle-ratepill.is-overlay.is-on {
   background: var(--acc);
   color: var(--paper-1);
+  opacity: 1;
 }
 
 .mle-popup__meta {
@@ -328,7 +334,8 @@
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
-/* 再生速度ピル（ポップアップ専用。.mle-ratepill.is-overlay がカバー画像上に重ねて使う）。 */
+/* 再生速度ピル。等倍（.is-on なし）のときは周囲の操作ボタンより弱い色で表示する。
+   .mle-ratepill.is-overlay がカバー画像上・没入モードに重ねて使う。 */
 .mle-ratepill {
   display: inline-flex;
   align-items: center;
@@ -338,7 +345,7 @@
   padding: 0 9px;
   border-radius: var(--r-pill);
   background: var(--paper-2);
-  color: var(--ink-1);
+  color: var(--ink-2);
   font-family: var(--font-mono);
   font-size: var(--fs-mono);
   line-height: var(--lh-mono);
