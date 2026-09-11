@@ -1,10 +1,10 @@
 ---
 id: TASK-447.25
 title: トーストの優先度から未使用の background を取り除く
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-11 08:18'
-updated_date: '2026-09-11 08:21'
+updated_date: '2026-09-11 08:37'
 labels:
   - refactor
   - triage

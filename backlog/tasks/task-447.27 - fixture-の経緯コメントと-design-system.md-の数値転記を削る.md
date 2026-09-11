@@ -1,10 +1,10 @@
 ---
 id: TASK-447.27
 title: fixture の経緯コメントと design-system.md の数値転記を削る
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-11 08:19'
-updated_date: '2026-09-11 08:30'
+updated_date: '2026-09-11 08:37'
 labels:
   - docs
   - triage

@@ -1,10 +1,10 @@
 ---
 id: TASK-447.26
 title: DLsite の欠落差分計算を shared に一本化し、適用失敗の意味論を両 adapter の契約テストで縛る
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-11 08:19'
-updated_date: '2026-09-11 08:28'
+updated_date: '2026-09-11 08:37'
 labels:
   - refactor
   - server
