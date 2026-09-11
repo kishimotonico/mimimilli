@@ -136,12 +136,19 @@ dialog を `useTopmostOpenModalDialog`（`shared/ui/`）で検出し、そのdia
 限定する。個々の画面が独自に `<Toast>` を宣言することは禁止する（`rg "<Toast\b" client/src`
 で `GlobalToast.tsx` 以外に一致しないことを常に保つ）。表示を出したい側は例外なく
 `useToast`（`shared/ui/useToast.ts`）フックで表示要求を出す。要求は
-`{ message, variant, actionLabel?, onAction?, onDismiss?, priority }` の形で、
-`priority` は次の3値のいずれか。
+`{ message, variant, actionLabel?, onAction?, onDismiss?, priority, dismissOnUnmount? }`
+の形で、`priority` は次の3値のいずれか。
 
 - `"action"`: ユーザーが直前に行った操作の直接の結果（元に戻す・完了フィードバック等）
 - `"notice"`: スキャン完了・ルートフォルダー変更等、アプリ全体に関わる単発の通知
 - `"background"`: スキャン・DLsite一括取得等、非同期ジョブの結果通知
+
+`dismissOnUnmount`（既定true）は発行元のアンマウントで要求を取り下げるかどうか。
+ダイアログ内のUndo通知のように発行元の生存期間だけ意味を持つ要求は既定のままでよいが、
+操作の結果を伝えるだけの通知（例: 作品登録解除の成功）は発行元が直後の画面遷移で
+アンマウントされても表示を続けたいため `false` を渡す。`onAction` はトーストを自動では
+閉じない。閉じたい場合は呼び出し側が `onAction` 内で明示的に `toast.dismiss()` を呼ぶ
+（非同期操作なら完了後でよい）。
 
 以前は「各画面が自分の判断でdialog内かdocument.bodyかを選ぶ」形だったため、GlobalToast
 （アプリルート）が偶然同じタイミングで表示要求を出すと、2つの独立したToastインスタンスが

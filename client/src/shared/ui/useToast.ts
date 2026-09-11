@@ -14,7 +14,12 @@ export interface UseToastResult {
  * ローカルなトースト表示要求を単一ホスト（GlobalToast）へ届けるフック。表示位置
  * （dialog内/全体）の判定・複数要求が重なったときの優先順位・寿命管理はホスト側に一任し、
  * 呼び出し側は「何を表示したいか」だけを宣言する（design-system.md「単一ホストの優先順位チェーン」）。
- * アンマウント時は自分の要求を取り下げる。
+ *
+ * 既定ではアンマウント時に自分の要求を取り下げる（`dismissOnUnmount`未指定=true）。
+ * ダイアログ内のUndo通知等、発行元の生存期間だけ意味を持つ要求はこれでよいが、
+ * 「操作の結果を伝えるだけの通知」は発行元が直後に画面遷移で消えても表示を続けたい
+ * （例: 作品登録解除の成功通知）。そういう要求は`show({ ..., dismissOnUnmount: false })`で
+ * 明示的にオプトアウトする。
  */
 export function useToast(): UseToastResult {
   const id = useId();
@@ -23,11 +28,13 @@ export function useToast(): UseToastResult {
   // show() のたびに増える発行カウンタをキーへ含める（Toast.tsx側でReactのkeyとして
   // 使い、寿命タイマー・onDismissを要求ごとに独立させる）。
   const issueCountRef = useRef(0);
+  const dismissOnUnmountRef = useRef(true);
 
   const show = useCallback(
     (request: ToastRequest) => {
       issueCountRef.current += 1;
       const requestKey = `${id}:${issueCountRef.current}`;
+      dismissOnUnmountRef.current = request.dismissOnUnmount ?? true;
       setRequests((current) => {
         const next = new Map(current);
         next.set(id, { ...request, requestKey });
@@ -51,7 +58,12 @@ export function useToast(): UseToastResult {
     });
   }, [id, setRequests]);
 
-  useEffect(() => dismiss, [dismiss]);
+  useEffect(
+    () => () => {
+      if (dismissOnUnmountRef.current) dismiss();
+    },
+    [dismiss],
+  );
 
   return useMemo(() => ({ show, error, dismiss }), [show, error, dismiss]);
 }

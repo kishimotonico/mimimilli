@@ -99,6 +99,9 @@ export function WorkDetail({
           message: `「${title}」の登録を解除しました`,
           variant: "success",
           priority: "notice",
+          // 解除成功で画面遷移してWorkDetailが直後にアンマウントされるため、
+          // 通知は発行元の生存に縛らない
+          dismissOnUnmount: false,
         }),
       onError: (cause) => toast.error(apiErrorMessage(cause, "作品登録の解除に失敗しました")),
     });

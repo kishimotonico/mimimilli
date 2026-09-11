@@ -24,6 +24,9 @@ export interface ToastRequest {
   /** useToastが発行する一意キー（呼び出し元ID＋発行カウンタ）。Reactのkeyとして使い、
    *  同じ文面の再通知でも寿命タイマー・onDismissを新しい要求として独立させる */
   requestKey?: string;
+  /** 既定(true)では発行元のアンマウント時にこの要求を取り下げる。操作の結果を伝えるだけの
+   *  通知（発行元が直後に画面遷移で消えても表示を続けたいもの）はfalseを渡す */
+  dismissOnUnmount?: boolean;
 }
 
 /** 呼び出し側ごとに一意なID（useToastのuseId）をキーにした表示要求の集合。GlobalToastが唯一の読み手 */
