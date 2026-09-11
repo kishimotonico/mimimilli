@@ -1,10 +1,10 @@
 ---
 id: TASK-447.7
 title: 再生速度が1.0×のとき速度ボタンを目立たせない
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-11 00:52'
-updated_date: '2026-09-11 01:29'
+updated_date: '2026-09-11 01:54'
 labels:
   - ui
   - ux

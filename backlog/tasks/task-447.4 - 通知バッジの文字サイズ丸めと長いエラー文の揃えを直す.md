@@ -1,10 +1,10 @@
 ---
 id: TASK-447.4
 title: 通知バッジの文字サイズ丸めと長いエラー文の揃えを直す
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-11 00:52'
-updated_date: '2026-09-11 01:28'
+updated_date: '2026-09-11 01:54'
 labels:
   - ui
   - ux
