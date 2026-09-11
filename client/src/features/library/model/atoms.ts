@@ -26,10 +26,6 @@ export const libraryGridLayoutModeAtom = atomWithStorage<GridLayoutMode>(
   "square",
 );
 
-// 作品登録解除の成功通知。成功時にWorkDetailが遷移・アンマウントされるため、
-// ローカルstateではなくGlobalToastが拾えるグローバルatomに置く。
-export const workDeleteSuccessAtom = atom<string | null>(null);
-
 // ── アドレスバーパス（純粋計算）────────────────────────────────
 
 // パンくずは「ライブラリ > 軸名」までを表す。絞り込みはチップ列だけが表現する

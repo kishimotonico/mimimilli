@@ -2,8 +2,7 @@ import { useState } from "react";
 import { useSetAtom } from "jotai";
 import type { UseMutationResult } from "@tanstack/react-query";
 import type { NormalizedTag, Work } from "@mimimilli/shared";
-import { errorToastAtom } from "../../../../shared/model/errorToastAtom";
-import { workDeleteSuccessAtom } from "../../model/atoms";
+import { useToast } from "../../../../shared/ui/useToast";
 import { apiErrorMessage } from "../../../../shared/lib/apiError";
 import ConfirmDialog from "../../../../shared/ui/ConfirmDialog";
 import { openPathInFilesAtom } from "../../../../entities/file-system/model/navigationAtoms";
@@ -88,16 +87,20 @@ export function WorkDetail({
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const statusLabel = getWorkStatusLabel(work.status);
-  const setErrorToast = useSetAtom(errorToastAtom);
-  const setWorkDeleteSuccess = useSetAtom(workDeleteSuccessAtom);
+  const toast = useToast();
   const openPathInFiles = useSetAtom(openPathInFilesAtom);
   const rootFolder = useRootFolder() ?? "/";
 
   const handleDeleteConfirm = () => {
     const title = work.title;
     deleteMutation.mutate(work.id, {
-      onSuccess: () => setWorkDeleteSuccess(`「${title}」の登録を解除しました`),
-      onError: (cause) => setErrorToast(apiErrorMessage(cause, "作品登録の解除に失敗しました")),
+      onSuccess: () =>
+        toast.show({
+          message: `「${title}」の登録を解除しました`,
+          variant: "success",
+          priority: "notice",
+        }),
+      onError: (cause) => toast.error(apiErrorMessage(cause, "作品登録の解除に失敗しました")),
     });
   };
 

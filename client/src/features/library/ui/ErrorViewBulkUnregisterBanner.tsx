@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { useSetAtom } from "jotai";
 import Button from "../../../shared/ui/Button";
 import ConfirmDialog from "../../../shared/ui/ConfirmDialog";
-import { errorToastAtom } from "../../../shared/model/errorToastAtom";
+import { useToast } from "../../../shared/ui/useToast";
 import { apiErrorMessage } from "../../../shared/lib/apiError";
 import type { useLibraryBulkUnregisterMissingMutation } from "../model/useLibraryQueries";
 
@@ -17,7 +16,7 @@ export function ErrorViewBulkUnregisterBanner({
   mutation,
 }: ErrorViewBulkUnregisterBannerProps) {
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  const setErrorToast = useSetAtom(errorToastAtom);
+  const toast = useToast();
   if (!missingCount) return null;
 
   return (
@@ -42,7 +41,7 @@ export function ErrorViewBulkUnregisterBanner({
             setIsConfirmOpen(false);
             mutation.mutate(undefined, {
               onError: (cause) =>
-                setErrorToast(apiErrorMessage(cause, "欠損作品の一括登録解除に失敗しました")),
+                toast.error(apiErrorMessage(cause, "欠損作品の一括登録解除に失敗しました")),
             });
           }}
           onCancel={() => setIsConfirmOpen(false)}
