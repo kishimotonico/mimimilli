@@ -1,6 +1,6 @@
-// useTopmostOpenModalDialog（TASK-447.15: MutationObserver廃止）の単体テスト。
-// useDialogModal がshowModal()/close()の度にopenModalDialogsAtomへpush/popするスタックを
-// このフックが読むだけになったため、useDialogModalと組み合わせて開閉順を検証する。
+// useTopmostOpenModalDialogの単体テスト。useDialogModalがshowModal()/close()の度に
+// openModalDialogsAtomへpush/popするスタックをこのフックが読むだけになったため、
+// useDialogModalと組み合わせて開閉順を検証する。
 import { createElement, useState } from "react";
 import { render, fireEvent, cleanup } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
