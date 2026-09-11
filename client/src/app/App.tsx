@@ -29,6 +29,7 @@ import { useToast } from "../shared/ui/useToast";
 import { apiErrorMessage } from "../shared/lib/apiError";
 import type { ActiveModal } from "./model/activeModal";
 import { isDlsiteNotificationModal } from "./model/activeModal";
+import { buildRootFolderChangedToastRequest } from "./model/rootFolderChangedToast";
 import type { ScanTabKey } from "../features/scan/ui/scanModal/types";
 import type { Work, WorkListItem } from "@mimimilli/shared";
 import { getWork } from "../entities/work/api";
@@ -89,14 +90,7 @@ export default function App() {
     mutationFn: setRootFolder,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() });
-      toast.show({
-        message:
-          "ルートフォルダーを変更しました。新しいフォルダーを読み込むにはスキャンしてください。",
-        variant: "success",
-        priority: "notice",
-        actionLabel: "今すぐスキャン",
-        onAction: handleOpenScanModal,
-      });
+      toast.show(buildRootFolderChangedToastRequest(handleOpenScanModal));
     },
   });
 
