@@ -1,10 +1,10 @@
 ---
 id: TASK-447.3
 title: エラー作品の登録解除ダイアログ文言と警告ボタンのアイコンを簡素にする
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-11 00:52'
-updated_date: '2026-09-11 01:26'
+updated_date: '2026-09-11 01:56'
 labels:
   - ui
   - ux
@@ -38,4 +38,6 @@ TASK-447 の「直す」判定のうちエラー作品表示に関わる 428.5�
 書き換えたテスト期待値: WorkDetail.test.tsx（alertdialog名を「作品登録を解除」→「登録を解除」）、library.smoke.spec.ts（同）。仕様変更（AC#1）に伴う辻褄合わせ。
 スクリーンショット: tmp/uiux-triage-2026-09-11/shots-intake/447.3-before.jpg/-before-2.jpg/-before-3.jpg/-before-3-dialog.jpg、対応する -after 系。
 check/unit/smoke すべて成功。
+
+統括からの修正依頼を反映: 単体・一括ダイアログのmessageを「〜をライブラリから外します。タグや再生履歴は消え、音声などのファイルは残ります。」に変更（フォルダーやファイルが消えない旨だけでなくデータ消失も明示）。タイトル・ボタン文言は変更なし。本文をアサートするテストは無く、テスト修正不要。after-2/after-3-dialogスクショ再撮影済み。pnpm checkとunit（WorkDetail.test.tsx）再実行し成功。
 <!-- SECTION:NOTES:END -->
