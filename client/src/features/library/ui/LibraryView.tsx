@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState, type ComponentProps } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
-import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import {
   getDefaultPlaylistTrackCount,
@@ -9,14 +8,10 @@ import {
   type Work,
   type WorkListItem,
 } from "@mimimilli/shared";
-import { libraryInvalidUrlToastAtom, libraryViewModeAtom } from "../model/atoms";
+import { libraryViewModeAtom } from "../model/atoms";
 import { librarySearchQueryAtom } from "../../../entities/library/model/navigationAtoms";
 import { setAppModeAtom } from "../../../shared/model/appModeAtoms";
 import { openWorkDetailAtom } from "../../../entities/work/model/navigationActions";
-import { recoverInvalidLibraryAxisAtom } from "../../../entities/library/model/navigationActions";
-import { useTagPrefixes } from "../../../entities/tag/useTagPrefixes";
-import { listSmartFolders } from "../../../entities/smart-folder/api";
-import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
 import {
   playerIsPlayingOrLoadingAtom,
   playingTrackIndexAtom,
@@ -38,7 +33,6 @@ import {
   shouldClearSelectionOnWorkNotFound,
 } from "../model/libraryPresentation";
 import { isSmartAxis, getSmartFolderId } from "../../../entities/library/axisDefinitions";
-import { resolveInvalidLibraryAxisMessage } from "../model/libraryUrlRecovery";
 import { useRootFolder } from "../../../entities/settings/useSettingsQuery";
 import {
   type SmartFolderEditorState,
@@ -122,17 +116,6 @@ export default function LibraryView({
   const [isNoResultsDueToFilter, setIsNoResultsDueToFilter] = useState(false);
   const [worksTotal, setWorksTotal] = useState<number | undefined>(undefined);
 
-  // 無効な軸URLの検証専用（TASK-428.15）。tagPrefixes/smartFoldersは上と同じ
-  // queryKeyでキャッシュを共有するため、追加のリクエストは発生しない。
-  // isSuccessだけをここから取り、ロード中・取得失敗中を未登録と誤判定しないようにする。
-  const tagPrefixesStatusQuery = useTagPrefixes();
-  const smartFoldersStatusQuery = useQuery({
-    queryKey: SMART_FOLDER_QUERY_KEYS.all(),
-    queryFn: listSmartFolders,
-  });
-  const recoverInvalidLibraryAxis = useSetAtom(recoverInvalidLibraryAxisAtom);
-  const setLibraryInvalidUrlToast = useSetAtom(libraryInvalidUrlToastAtom);
-
   const saveSmartFolderMutation = useSmartFolderMutation({
     onSaved: (savedFolder, wasNew) => {
       setSmartFolderEditor(closedSmartFolderEditorState);
@@ -181,33 +164,6 @@ export default function LibraryView({
   const activeSmartFolder = isSmartAxis(nav.activeAxis)
     ? (smartFolders.find((sf) => sf.id === getSmartFolderId(nav.activeAxis)) ?? null)
     : null;
-
-  // 未登録軸・存在しないスマートフォルダーIDのURLを0件の偽ページにせず、警告付きで
-  // 既定一覧へ戻す（TASK-428.15、監査所見 smart-folders-B-15）。判定自体は
-  // resolveInvalidLibraryAxisMessage（純粋関数）に委ね、取得中・取得失敗中は
-  // 判定不能として何もしない（一時的なネットワーク不調で正当なURLを弾かない）。
-  // 既定一覧へは履歴を積まず現在のエントリを置き換える（recoverInvalidLibraryAxisAtom）
-  // ため、「戻る」で無効なURLへ再度入ることはない。
-  useEffect(() => {
-    const message = resolveInvalidLibraryAxisMessage(
-      nav.activeAxis,
-      tagPrefixesStatusQuery.isSuccess,
-      smartFoldersStatusQuery.isSuccess,
-      tagPrefixes,
-      smartFolders,
-    );
-    if (!message) return;
-    recoverInvalidLibraryAxis();
-    setLibraryInvalidUrlToast(message);
-  }, [
-    nav.activeAxis,
-    tagPrefixes,
-    smartFolders,
-    tagPrefixesStatusQuery.isSuccess,
-    smartFoldersStatusQuery.isSuccess,
-    recoverInvalidLibraryAxis,
-    setLibraryInvalidUrlToast,
-  ]);
 
   const handlePlay = useCallback(
     (trackIndex: number) => {

@@ -18,10 +18,7 @@ import { scanErrorAtom, scanResultToastAtom } from "../../entities/scan/model/at
 import { useScanActions } from "../../entities/scan/useScanActions";
 import { playerSkipToastAtom } from "../../features/player/model/playerPresentationAtoms";
 import { rootFolderChangedToastAtom } from "../../entities/settings/model/rootFolderChangeAtoms";
-import {
-  libraryInvalidUrlToastAtom,
-  workDeleteSuccessAtom,
-} from "../../features/library/model/atoms";
+import { workDeleteSuccessAtom } from "../../features/library/model/atoms";
 import { copyPathSuccessAtom } from "../../features/files/model/atoms";
 
 export interface GlobalToastProps {
@@ -47,8 +44,6 @@ export default function GlobalToast({
   const setRootFolderChangedToast = useSetAtom(rootFolderChangedToastAtom);
   const playerSkipToast = useAtomValue(playerSkipToastAtom);
   const setPlayerSkipToast = useSetAtom(playerSkipToastAtom);
-  const libraryInvalidUrlToast = useAtomValue(libraryInvalidUrlToastAtom);
-  const setLibraryInvalidUrlToast = useSetAtom(libraryInvalidUrlToastAtom);
   const workDeleteSuccess = useAtomValue(workDeleteSuccessAtom);
   const setWorkDeleteSuccess = useSetAtom(workDeleteSuccessAtom);
   const dlsiteApplyToast = useAtomValue(dlsiteApplyToastAtom);
@@ -102,7 +97,6 @@ export default function GlobalToast({
     Boolean(scanResultToast) ||
     Boolean(rootFolderChangedToast) ||
     Boolean(playerSkipToast) ||
-    Boolean(libraryInvalidUrlToast) ||
     Boolean(workDeleteSuccess) ||
     Boolean(dlsiteApplyToast) ||
     Boolean(copyPathSuccess) ||
@@ -210,16 +204,6 @@ export default function GlobalToast({
           setPlayerSkipToast(null);
         }}
         onDismiss={() => setPlayerSkipToast(null)}
-      />
-    );
-  }
-
-  if (libraryInvalidUrlToast) {
-    return (
-      <Toast
-        message={libraryInvalidUrlToast}
-        variant="warning"
-        onDismiss={() => setLibraryInvalidUrlToast(null)}
       />
     );
   }

@@ -30,10 +30,6 @@ export const libraryGridLayoutModeAtom = atomWithStorage<GridLayoutMode>(
 // ローカルstateではなくGlobalToastが拾えるグローバルatomに置く。
 export const workDeleteSuccessAtom = atom<string | null>(null);
 
-// 未登録軸・存在しないスマートフォルダーIDなど無効なURLから既定一覧へ自動で戻したときの
-// 警告通知（TASK-428.15）。LibraryView がURLの妥当性を検証した結果を持つグローバルatom。
-export const libraryInvalidUrlToastAtom = atom<string | null>(null);
-
 // ── アドレスバーパス（純粋計算）────────────────────────────────
 
 // パンくずは「ライブラリ > 軸名」までを表す。絞り込みはチップ列だけが表現する

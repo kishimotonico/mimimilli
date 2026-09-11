@@ -88,12 +88,3 @@ export const goToLibrarySegmentAtom = atom(null, (get, set, index: number) => {
   const activeAxis = get(activeAxisAtom);
   if (index <= 0 && activeAxis !== "all") set(setLibraryAxisAtom, "all");
 });
-
-/** 未登録軸・存在しないスマートフォルダーIDなど無効なURLから既定一覧へ戻す
- *  （TASK-428.15）。履歴をpushすると「戻る」で無効なURLへ再度入ってしまうため、
- *  現在のエントリを置き換える。 */
-export const recoverInvalidLibraryAxisAtom = atom(null, (_get, set) => {
-  requestNavigationHistoryCommit(set, "replace");
-  set(activeAxisAtom, "all");
-  set(selectedWorkIdAtom, null);
-});
