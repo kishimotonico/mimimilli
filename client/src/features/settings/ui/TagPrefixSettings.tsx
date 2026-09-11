@@ -29,6 +29,9 @@ const TOGGLE_LABEL_CLASS =
 const INPUT_CLASS =
   "h-[30px] min-w-0 flex-1 rounded-[6px] border border-line-soft bg-paper-0 px-2.5 font-jp text-secondary text-ink-1";
 
+/** 行の上移動・下移動・削除ボタン共通。通常時は控えめな色、hover/focus時だけ濃くする */
+const ROW_ICON_CLASS = "text-ink-3 hover:text-ink-1 focus-visible:text-ink-1";
+
 /** 保護中の prefix を削除できない理由。削除ボタンの title に出す */
 const PROTECTED_DELETE_TITLE =
   "保護中のprefixは削除できません。削除するには「保護」のチェックを外してください";
@@ -207,102 +210,108 @@ export default function TagPrefixSettings() {
         {prefixes.length === 0 && (
           <span className="px-3 py-2.5 text-secondary text-ink-2">prefix 定義がありません</span>
         )}
-        {prefixes.map((p, index) => (
-          <div
-            key={p.prefix}
-            className="flex items-center gap-2 border-b border-line-soft px-2.5 py-1.5 last:border-b-0"
-          >
-            <div className="flex shrink-0 flex-col">
-              <IconButton
-                icon={I.chevD}
-                label={`「${p.label}」を上へ移動`}
-                size="xs"
-                className="h-[13px] rotate-180"
-                disabled={isMutating || index === 0}
-                onClick={() => swapOrder(index, index - 1)}
+        {prefixes.map((p, index) => {
+          const moveUpDisabled = isMutating || index === 0;
+          const moveDownDisabled = isMutating || index === prefixes.length - 1;
+          const deleteDisabled = isMutating || p.protected;
+          return (
+            <div
+              key={p.prefix}
+              className="flex items-center gap-2 border-b border-line-soft px-2.5 py-1.5 last:border-b-0"
+            >
+              <div className="flex shrink-0 flex-col">
+                <IconButton
+                  icon={I.chevD}
+                  label={`「${p.label}」を上へ移動`}
+                  size="xs"
+                  className={`h-[13px] rotate-180${moveUpDisabled ? "" : ` ${ROW_ICON_CLASS}`}`}
+                  disabled={moveUpDisabled}
+                  onClick={() => swapOrder(index, index - 1)}
+                />
+                <IconButton
+                  icon={I.chevD}
+                  label={`「${p.label}」を下へ移動`}
+                  size="xs"
+                  className={`h-[13px]${moveDownDisabled ? "" : ` ${ROW_ICON_CLASS}`}`}
+                  disabled={moveDownDisabled}
+                  onClick={() => swapOrder(index, index + 1)}
+                />
+              </div>
+
+              {editingPrefix === p.prefix ? (
+                <input
+                  ref={editingLabelInputRef}
+                  value={editingLabel}
+                  onChange={(e) => setEditingLabel(e.target.value)}
+                  onBlur={() => commitEditLabel(p)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") commitEditLabel(p);
+                    if (e.key === "Escape") setEditingPrefix(null);
+                  }}
+                  aria-label={`「${p.prefix}」のラベル`}
+                  className="h-[24px] min-w-0 flex-1 rounded-1 border border-line bg-paper-0 px-1.5 font-jp text-body text-ink-1"
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => startEditLabel(p)}
+                  title="クリックしてラベルを編集"
+                  className="min-w-0 flex-1 cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap rounded-1 px-1 py-0.5 text-left text-body text-ink-1 hover:bg-paper-2"
+                >
+                  {p.label}
+                  <span className="ml-1.5 font-mono text-caption text-ink-2">{p.prefix}/</span>
+                </button>
+              )}
+
+              <ColorSwatches
+                value={p.color}
+                disabled={isMutating}
+                onChange={(color) => updateMutation.mutate({ prefix: p.prefix, patch: { color } })}
               />
+
+              <label className={TOGGLE_LABEL_CLASS} title="軸レールにこのprefixの軸を表示する">
+                <input
+                  type="checkbox"
+                  checked={p.showAsAxis}
+                  disabled={isMutating}
+                  onChange={(e) =>
+                    updateMutation.mutate({
+                      prefix: p.prefix,
+                      patch: { showAsAxis: e.target.checked },
+                    })
+                  }
+                />
+                軸
+              </label>
+              <label
+                className={TOGGLE_LABEL_CLASS}
+                title="このprefixのタグを削除・編集するとき確認を挟む"
+              >
+                <input
+                  type="checkbox"
+                  checked={p.protected}
+                  disabled={isMutating}
+                  onChange={(e) =>
+                    updateMutation.mutate({
+                      prefix: p.prefix,
+                      patch: { protected: e.target.checked },
+                    })
+                  }
+                />
+                保護
+              </label>
               <IconButton
-                icon={I.chevD}
-                label={`「${p.label}」を下へ移動`}
+                icon={I.x}
+                label={`prefix「${p.prefix}」を削除`}
+                title={p.protected ? PROTECTED_DELETE_TITLE : undefined}
                 size="xs"
-                className="h-[13px]"
-                disabled={isMutating || index === prefixes.length - 1}
-                onClick={() => swapOrder(index, index + 1)}
+                className={deleteDisabled ? undefined : ROW_ICON_CLASS}
+                disabled={deleteDisabled}
+                onClick={() => setDeleteTarget(p)}
               />
             </div>
-
-            {editingPrefix === p.prefix ? (
-              <input
-                ref={editingLabelInputRef}
-                value={editingLabel}
-                onChange={(e) => setEditingLabel(e.target.value)}
-                onBlur={() => commitEditLabel(p)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") commitEditLabel(p);
-                  if (e.key === "Escape") setEditingPrefix(null);
-                }}
-                aria-label={`「${p.prefix}」のラベル`}
-                className="h-[24px] min-w-0 flex-1 rounded-1 border border-line bg-paper-0 px-1.5 font-jp text-body text-ink-1"
-              />
-            ) : (
-              <button
-                type="button"
-                onClick={() => startEditLabel(p)}
-                title="クリックしてラベルを編集"
-                className="min-w-0 flex-1 cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap rounded-1 px-1 py-0.5 text-left text-body text-ink-1 hover:bg-paper-2"
-              >
-                {p.label}
-                <span className="ml-1.5 font-mono text-caption text-ink-2">{p.prefix}/</span>
-              </button>
-            )}
-
-            <ColorSwatches
-              value={p.color}
-              disabled={isMutating}
-              onChange={(color) => updateMutation.mutate({ prefix: p.prefix, patch: { color } })}
-            />
-
-            <label className={TOGGLE_LABEL_CLASS} title="軸レールにこのprefixの軸を表示する">
-              <input
-                type="checkbox"
-                checked={p.showAsAxis}
-                disabled={isMutating}
-                onChange={(e) =>
-                  updateMutation.mutate({
-                    prefix: p.prefix,
-                    patch: { showAsAxis: e.target.checked },
-                  })
-                }
-              />
-              軸
-            </label>
-            <label
-              className={TOGGLE_LABEL_CLASS}
-              title="このprefixのタグを削除・編集するとき確認を挟む"
-            >
-              <input
-                type="checkbox"
-                checked={p.protected}
-                disabled={isMutating}
-                onChange={(e) =>
-                  updateMutation.mutate({
-                    prefix: p.prefix,
-                    patch: { protected: e.target.checked },
-                  })
-                }
-              />
-              保護
-            </label>
-            <IconButton
-              icon={I.trash}
-              label={`prefix「${p.prefix}」を削除`}
-              title={p.protected ? PROTECTED_DELETE_TITLE : undefined}
-              size="xs"
-              disabled={isMutating || p.protected}
-              onClick={() => setDeleteTarget(p)}
-            />
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* 新規追加 */}
