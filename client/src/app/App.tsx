@@ -24,7 +24,8 @@ import StartupErrorScreen from "./ui/StartupErrorScreen";
 import DlsiteNotificationModals from "../features/dlsite/ui/DlsiteNotificationModals";
 import { LibraryNavigationProvider } from "../features/library/ui/LibraryNavigationProvider";
 import GlobalToast from "./ui/GlobalToast";
-import { errorToastAtom } from "../shared/model/errorToastAtom";
+import ScanResultToastBridge from "./ui/ScanResultToastBridge";
+import { useToast } from "../shared/ui/useToast";
 import { apiErrorMessage } from "../shared/lib/apiError";
 import type { ActiveModal } from "./model/activeModal";
 import { isDlsiteNotificationModal } from "./model/activeModal";
@@ -35,7 +36,6 @@ import { useDownloadLibraryExport } from "../features/library/useDownloadLibrary
 import { useScanActions } from "../entities/scan/useScanActions";
 import { setRootFolder } from "../entities/settings/api";
 import { useSettingsQuery } from "../entities/settings/useSettingsQuery";
-import { rootFolderChangedToastAtom } from "../entities/settings/model/rootFolderChangeAtoms";
 import NavigationHistorySync from "../features/navigation/ui/NavigationHistorySync";
 import { setAppModeAtom } from "../shared/model/appModeAtoms";
 import { openPathInFilesAtom } from "../entities/file-system/model/navigationAtoms";
@@ -52,8 +52,7 @@ export default function App() {
   const player = usePlayerActions();
   const scanActions = useScanActions();
   const queryClient = useQueryClient();
-  const setErrorToast = useSetAtom(errorToastAtom);
-  const setRootFolderChangedToast = useSetAtom(rootFolderChangedToastAtom);
+  const toast = useToast();
   const setAppMode = useSetAtom(setAppModeAtom);
   const openPathInFiles = useSetAtom(openPathInFilesAtom);
   const setLibraryAxis = useSetAtom(setLibraryAxisAtom);
@@ -90,7 +89,14 @@ export default function App() {
     mutationFn: setRootFolder,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() });
-      setRootFolderChangedToast(true);
+      toast.show({
+        message:
+          "ルートフォルダーを変更しました。新しいフォルダーを読み込むにはスキャンしてください。",
+        variant: "success",
+        priority: "notice",
+        actionLabel: "今すぐスキャン",
+        onAction: handleOpenScanModal,
+      });
     },
   });
 
@@ -114,10 +120,10 @@ export default function App() {
           player.play(work, tracks, Math.min(trackIndex, tracks.length - 1), playlist!.id);
         }
       } catch (err) {
-        setErrorToast(apiErrorMessage(err, "作品の再生に失敗しました"));
+        toast.error(apiErrorMessage(err, "作品の再生に失敗しました"));
       }
     },
-    [player, queryClient, setErrorToast],
+    [player, queryClient, toast],
   );
 
   const handleResume = useCallback(
@@ -280,11 +286,8 @@ export default function App() {
                 onClose={handleCloseModal}
                 onOpenWork={handleOpenLibraryWork}
               />
-              <GlobalToast
-                onOpenScan={handleOpenScanModal}
-                onOpenScanNeedsAttention={handleOpenScanNeedsAttention}
-                onRetrySkippedTrack={player.setTrackIndex}
-              />
+              <ScanResultToastBridge onOpenScanNeedsAttention={handleOpenScanNeedsAttention} />
+              <GlobalToast />
             </>
           }
         />
