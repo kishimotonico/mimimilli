@@ -19,7 +19,9 @@
   container: files-layout / inline-size;
 }
 
-/* 現在フォルダー1カラムを載せる舞台。出入りするカラムをクリップする */
+/* 現在フォルダー1カラムを載せる舞台。出入りするカラムをクリップする。
+   min-widthはpreviewLayoutAtoms.tsのFILES_LIST_MIN_WIDTHと値を揃える
+   （プレビュー幅の実効上限の算出元）。 */
 .mle-filestage {
   position: relative;
   flex: 1 1 auto;
