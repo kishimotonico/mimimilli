@@ -28,26 +28,19 @@
 
 ### 文字サイズトークン
 
-サイズ・行高は用途別トークンに集約する（`tokens.css` の `--fs-*`/`--lh-*`、Tailwindでは `text-body` 等のユーティリティとして使える）。px直書き（`font-size: Npx` / `text-[Npx]`）は禁止で、この7段のいずれかへ丸める。フォントファミリー（`--font-jp`/`--font-sans`/`--font-mono`）とは独立した軸なので、`text-mono` に `font-mono` を組み合わせるなど併用する。
+サイズ・行高は用途別トークンに集約する（`tokens.css` の `--fs-*`/`--lh-*`、Tailwindでは `text-body` 等のユーティリティとして使える）。px直書き（`font-size: Npx` / `text-[Npx]`）は禁止で、この7段のいずれかへ丸める。フォントファミリー（`--font-jp`/`--font-sans`/`--font-mono`）とは独立した軸なので、`text-mono` に `font-mono` を組み合わせるなど併用する。値は `tokens.css` を参照し、ここでは用途の対応だけを記す。
 
-| トークン         | 値               | 用途                                                 |
-| ---------------- | ---------------- | ---------------------------------------------------- |
-| `text-body`      | 12px / line 1.4  | 主要本文（作品タイトル・行の主テキストなど）         |
-| `text-secondary` | 11px / line 1.35 | セカンダリ情報（タグ値・補助テキスト）               |
-| `text-caption`   | 10px / line 1.3  | キャプション・空状態・補足ヒント                     |
-| `text-control`   | 11px / line 1    | ボタン・操作ラベル（`--font-sans`と併用）            |
-| `text-label`     | 10px / line 1.2  | セクション見出し・カテゴリラベル（uppercase等）      |
-| `text-mono`      | 11px / line 1.3  | 時刻・件数・パス等の数値/等幅表示（`font-mono`併用） |
-| `text-badge`     | 9px / line 1     | 通知バッジ等、丸ピル内の極小数字                     |
+| トークン         | 用途                                                 |
+| ---------------- | ---------------------------------------------------- |
+| `text-body`      | 主要本文（作品タイトル・行の主テキストなど）         |
+| `text-secondary` | セカンダリ情報（タグ値・補助テキスト）               |
+| `text-caption`   | キャプション・空状態・補足ヒント                     |
+| `text-control`   | ボタン・操作ラベル（`--font-sans`と併用）            |
+| `text-label`     | セクション見出し・カテゴリラベル（uppercase等）      |
+| `text-mono`      | 時刻・件数・パス等の数値/等幅表示（`font-mono`併用） |
+| `text-badge`     | 通知バッジ等、丸ピル内の極小数字                     |
 
-13px以上（モーダル見出し・大きい数字表示など）はこのスケールの対象外で、個別に決めてよい。現在このスケールの外にあるのは以下（正は実装）。
-
-- モーダル見出し（`h2`/`header`内のタイトル）: 14px（例: `WorkEditDialog`・`WorkInfoDialog`・`SmartFolderEditorModal`・`ScanModal`・`SettingsModal`・`RegisterWorkDialog`・`DlsiteEditor`・`DlsiteBulkApplyDialog`・`NotificationListModal`）
-- 確認ダイアログの見出し（`ConfirmDialog`・`WorkEditDialog`の未保存確認）: 13.5px
-- 起動時エラー画面（`RootErrorBoundary`・`StartupErrorScreen`）: ロゴのアバター文字 20px、見出し15px、本文13px
-- セットアップ画面（`SetupScreen`）: ロゴのアバター文字20px、見出し22px、本文・送信ボタン13px
-- トラックリスト見出し・トラックタイトル（`NowPlayingTrackList`）、タグ削除ボタン記号（`Tag`）、起動中表示（`App`）: 13px
-- 再生画面のトラックタイトル見出し（`NowPlayingView`）: 24px
+13px以上（モーダル見出し・大きい数字表示など）はこのスケールの対象外で、個別に決めてよい。スケール外の現在値は `tokens.css` に無い `text-[Npx]` を `rg 'text-\[\d' client/src` で探すと拾える（正は実装）。
 
 ## フォーカス表示
 
@@ -269,7 +262,7 @@ UI 全体は `client/src/styles/shell/index.css` の `@layer base` で `body { u
 
 ## 見送ったUI案
 
-同じ提案を繰り返さないための記録。案と却下理由だけを書く。
+同じ提案を繰り返さないための記録。案と却下理由だけを書く。10件を上限とし、超えたら古いものから削る。復活提案が出なくなった案も削る。
 
 - ファイルモードの折り畳み帯に、ルートから現在地の親までの祖先を背表紙で積み上げる — 見た目が重い。祖先へ戻る導線はアドレスバーのパンくずで足りる
 - プレイヤー展開ポップアップの占有高さを測り、グリッド末尾と右ペインにその分の余白を足して重なりを避ける — 画面下の大部分が空いて意味の分からないUIになる

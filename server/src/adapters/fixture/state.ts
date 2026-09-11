@@ -41,12 +41,7 @@ export interface FixtureState {
   scanCandidates: ScanCandidate[];
   scanIdentityConflicts: ScanDiagnostic[];
   scanInvalidMetaFiles: InvalidMetaFile[];
-  /** listSummaries 相当（real adapter の toDataIntegrityWarning）でタグ等の不整合により
-   *  除外した作品の報告。real はDB行のパースエラーから動的に出るが、fixtureには実DBが
-   *  無いため固定のダミー除外として表現する（シナリオ errors のみ。real の意味論は
-   *  「クエリのたびに破損行があれば毎回付く劣化状態の表示」であり、errorsシナリオの
-   *  目的と一致する。new-work・default 等の既定シナリオに常設すると smoke・worktree確認の
-   *  土台が常時バナー込みになってしまうため避ける）。 */
+  /** listSummaries でタグ等の不整合により除外した作品の報告（シナリオ errors のみ） */
   dataIntegrityWarning: DataIntegrityWarning | undefined;
 }
 
