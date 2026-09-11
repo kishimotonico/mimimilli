@@ -155,7 +155,7 @@ describe("WorkDetail: 作品登録の解除", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "その他" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "作品登録を解除" }));
-    expect(screen.getByRole("alertdialog", { name: "作品登録を解除" })).toBeTruthy();
+    expect(screen.getByRole("alertdialog", { name: "登録を解除" })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "解除する" }));
     expect(mutate).toHaveBeenCalledWith("w1", expect.anything());

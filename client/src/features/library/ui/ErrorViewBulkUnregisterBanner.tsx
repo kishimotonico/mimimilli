@@ -35,8 +35,8 @@ export function ErrorViewBulkUnregisterBanner({
       </Button>
       {isConfirmOpen && (
         <ConfirmDialog
-          title="欠損作品をまとめて登録解除"
-          message={`ファイル欠損した作品 ${missingCount} 件のライブラリ登録を解除します。再生履歴・ブックマーク・タグなどのデータも消えます。音声などの物理ファイルは削除されません。ドライブ未接続などの一時的な欠損の場合、接続後に再スキャンすれば再登録できますが、解除した登録情報（タグ・レジューム位置など）は戻りません。`}
+          title="登録を解除"
+          message={`${missingCount}件の作品をライブラリから外します。タグや再生履歴は消え、音声などのファイルは残ります。`}
           confirmLabel="まとめて解除する"
           onConfirm={() => {
             setIsConfirmOpen(false);

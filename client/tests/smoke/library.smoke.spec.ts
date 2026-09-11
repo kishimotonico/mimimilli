@@ -113,7 +113,7 @@ test("詳細パネルの「その他」メニューから作品登録を解除�
   await panel.getByRole("button", { name: "その他" }).click();
   await panel.getByRole("menuitem", { name: "作品登録を解除" }).click();
 
-  const dialog = page.getByRole("alertdialog", { name: "作品登録を解除" });
+  const dialog = page.getByRole("alertdialog", { name: "登録を解除" });
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "解除する" }).click();
 

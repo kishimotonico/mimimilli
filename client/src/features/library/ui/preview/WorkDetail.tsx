@@ -261,8 +261,8 @@ export function WorkDetail({
       )}
       {isDeleteConfirmOpen && (
         <ConfirmDialog
-          title="作品登録を解除"
-          message={`「${work.title}」1件のライブラリ登録を解除します。再生履歴・タグなどのデータと管理ファイル（mimimilli.json）は消えます。音声などの物理ファイルは削除されません。ドライブ未接続などの一時的な欠損の場合、接続後に再スキャンすれば再登録できますが、解除した登録情報（タグ・レジューム位置など）は戻りません。`}
+          title="登録を解除"
+          message={`「${work.title}」をライブラリから外します。タグや再生履歴は消え、音声などのファイルは残ります。`}
           confirmLabel="解除する"
           onConfirm={() => {
             setIsDeleteConfirmOpen(false);
