@@ -15,8 +15,9 @@ import {
   openFilesDirAtom,
   selectFilesEntryAtom,
 } from "./filesNavigationActions";
+import { useFilesCwd } from "./useFilesCwd";
 import { rootLabel } from "./types";
-import { workspacePath, type WorkspacePath } from "@mimimilli/shared";
+import type { WorkspacePath } from "@mimimilli/shared";
 
 export interface FilesNav {
   /** Workspace root の表示名 */
@@ -51,7 +52,7 @@ export function useFilesNavigation(root: string): FilesNav {
   const goToSegment = useSetAtom(goToFilesSegmentAtom);
   const goUp = useSetAtom(goUpFilesAtom);
 
-  const cwd = workspacePath(relPath.join("/"));
+  const cwd = useFilesCwd();
   const addressPath = [rootLabel(root), ...relPath];
 
   const openDir = useCallback((path: WorkspacePath) => openDirAction(path), [openDirAction]);
