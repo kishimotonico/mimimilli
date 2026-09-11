@@ -64,15 +64,3 @@ export function deriveFacetCountTags<T>(
 ): NormalizedTag[] {
   return intent.default === "replace" ? [] : selectedTags;
 }
-
-/** 既定動作の説明文。全ての値選択入口（軸レールのクイックオーバーレイ・チップの兄弟値
- *  ドロップダウン・「＋絞り込み」・結果面の値一覧）で共通のヒント表示に使う。
- *  文言を各入口で直書きせず、ここから一意に導出する。intent 全体を組み立てる前
- *  （「＋絞り込み」の軸選択ステージ等）でも使えるよう default だけを受け取る。 */
-export function getValueSelectionHint(
-  defaultAction: ValueSelectionIntent<unknown>["default"],
-): string {
-  return defaultAction === "replace"
-    ? "クリックで置き換え・Ctrl+クリックでAND追加"
-    : "クリックでAND追加・Ctrl+クリックで置き換え";
-}

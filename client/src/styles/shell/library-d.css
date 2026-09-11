@@ -711,15 +711,6 @@
 .mll-qlist__sortbtn .chev.is-asc {
   transform: rotate(180deg);
 }
-.mll-qlist__hint {
-  padding: 5px 8px;
-  font-family: var(--font-sans);
-  font-size: var(--fs-caption);
-  line-height: var(--lh-caption);
-  color: var(--ink-2);
-  background: var(--paper-2);
-  border-bottom: 1px solid var(--line-soft);
-}
 .mll-qlist__body {
   flex: 1;
   min-height: 0;

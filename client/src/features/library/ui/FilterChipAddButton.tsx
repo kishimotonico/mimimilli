@@ -10,13 +10,11 @@ import {
 import AxisValuePopoverPanel from "./AxisValuePopoverPanel";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 import { I } from "../../../shared/ui/Icon";
-import { getValueSelectionHint } from "../model/valueSelectionContract";
 
 const POPOVER_WIDTH = 240;
-const AND_ADD_HINT = getValueSelectionHint("add");
 
 // チップ列の「＋絞り込み」（ADR-0012 §2）。軸→値の2段オーバーレイ。
-// 既定は AND 追加（ヒント表示つき）、Ctrl/Cmd+クリックで置き換えへ反転する。
+// 既定は AND 追加、Ctrl/Cmd+クリックで置き換えへ反転する。
 //
 // 軸選択ステージ・値ステージともに、それぞれ独立した `<AnimatePresence>` で
 // 条件レンダーする。軸を選ぶと軸選択ステージが退出し値ステージが入場する
@@ -54,7 +52,6 @@ function AxisPickerStage({
       inert={!isPresent}
       {...variant}
     >
-      <div className="mll-qlist__hint">{AND_ADD_HINT}・軸を選択</div>
       {/* oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- AxisValueQuickList の一覧と表現を揃えるため<select>ではなくボタン一覧にする */}
       <div className="mll-qlist__body" role="listbox" aria-label="絞り込む軸">
         {facetAxisRows.map((ax) => (
@@ -134,7 +131,6 @@ export default function FilterChipAddButton({
             // （「追加したら何件になるか」を示す）
             countTags={selectedTags}
             smartFolderId={smartFolderId}
-            hint={AND_ADD_HINT}
             onSelect={(tag, opts) => {
               onAddValue(tag, opts);
               close();

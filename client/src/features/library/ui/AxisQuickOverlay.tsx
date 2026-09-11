@@ -8,7 +8,6 @@ import { useAnchoredPopover } from "../../../shared/ui/useAnchoredPopover";
 import type { HoverGroupPanelHandlers } from "../../../shared/lib/useHoverGroupCoordinator";
 import AxisValueQuickList from "./AxisValueQuickList";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
-import { getValueSelectionHint } from "../model/valueSelectionContract";
 
 // 軸レール行のクイックオーバーレイ（ADR-0012 §7）。ホバー約200ms・フォーカス中の
 // ArrowRight で開く。軸行の右向き矢印・ArrowRightキーの操作方向と揃えて右側に出す。
@@ -103,7 +102,6 @@ export default function AxisQuickOverlay({
         onAdd={(item) => {
           onAddValue(buildFilterTag(axis, item.value));
         }}
-        hint={getValueSelectionHint("replace")}
         close={close}
       />
     </motion.div>,

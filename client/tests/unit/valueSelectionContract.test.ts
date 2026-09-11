@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 import {
   deriveFacetCountTags,
   deriveValueSelectionHandlers,
-  getValueSelectionHint,
   type ValueSelectionIntent,
 } from "../../src/features/library/model/valueSelectionContract";
 
@@ -121,15 +120,5 @@ describe("deriveFacetCountTags（件数基準）", () => {
       "cv/藤田茜",
       "サークル/月白製作所",
     ]);
-  });
-});
-
-describe("getValueSelectionHint（ヒント文言）", () => {
-  it("既定=置き換えは操作方法の説明を返す", () => {
-    expect(getValueSelectionHint("replace")).toBe("クリックで置き換え・Ctrl+クリックでAND追加");
-  });
-
-  it("既定=AND追加は両方向（クリック=AND追加、Ctrl+クリック=置き換え）の説明を返す", () => {
-    expect(getValueSelectionHint("add")).toBe("クリックでAND追加・Ctrl+クリックで置き換え");
   });
 });

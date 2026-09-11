@@ -9,7 +9,6 @@ import FilterChipAddButton from "./FilterChipAddButton";
 import { I } from "../../../shared/ui/Icon";
 import {
   deriveValueSelectionHandlers,
-  getValueSelectionHint,
   type ValueSelectionIntent,
 } from "../model/valueSelectionContract";
 
@@ -98,7 +97,6 @@ function FilterChip({
               close();
             }}
             onAdd={onAdd}
-            hint={getValueSelectionHint("replace")}
             close={close}
           />
         )}

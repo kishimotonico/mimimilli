@@ -35,7 +35,6 @@ interface AxisValuePopoverPanelProps {
   /** ホバー/フォーカス時の＋ボタン（冪等なAND追加）。省略時はボタンを出さない（ADR-0013） */
   onAdd?: (tag: NormalizedTag) => void;
   close: () => void;
-  hint?: string;
 }
 
 export default function AxisValuePopoverPanel({
@@ -49,7 +48,6 @@ export default function AxisValuePopoverPanel({
   onSelect,
   onAdd,
   close,
-  hint,
 }: AxisValuePopoverPanelProps) {
   const isPresent = useIsPresent();
   const facetQuery = useAxisFacetsQuery(axis as FacetAxisId, countTags, smartFolderId);
@@ -77,7 +75,6 @@ export default function AxisValuePopoverPanel({
         }
         onAdd={onAdd ? (item) => onAdd(buildFilterTag(axis, item.value)) : undefined}
         close={close}
-        hint={hint}
       />
     </motion.div>
   );

@@ -52,8 +52,6 @@ interface AxisValueQuickListProps {
   /** ホバー/フォーカス時に出る＋ボタン（冪等なAND追加。選択済み行には出さない）。
    *  省略時はボタンを出さない（ADR-0013） */
   onAdd?: (item: AxisFacetItem) => void;
-  /** 既定動作の説明。両方向の操作方法を含む（getValueSelectionHint、ADR-0013） */
-  hint?: string;
   /** useAnchoredPopover / usePopoverDismissal が返す close をそのまま渡す */
   close: () => void;
   emptyLabel?: string;
@@ -111,7 +109,6 @@ export default function AxisValueQuickList({
   isSelected,
   onSelect,
   onAdd,
-  hint,
   close,
   emptyLabel = "項目がありません",
 }: AxisValueQuickListProps) {
@@ -264,7 +261,6 @@ export default function AxisValueQuickList({
           />
         )}
       </AnimatePresence>
-      {hint && <div className="mll-qlist__hint">{hint}</div>}
       {isLoading ? (
         <div className="mll-qlist__status">読み込み中…</div>
       ) : isError ? (
