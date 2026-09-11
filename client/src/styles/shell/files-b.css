@@ -1,18 +1,11 @@
 /* mimimilli shell — files-b
-   所有範囲: カラムスタック(.mle-colstack*、root〜現在地の親までを背表紙1枚ずつ束ねて
-   表示し、各背表紙クリックでその階層へ直接移動するナビゲーション、TASK-429)。
-   パルス演出の transition/[data-pulse] 修飾は files-c.css 側にある
+   所有範囲: カラムスタック(.mle-colstack*、祖先カラムを束ねて表示し、クリックで1階層
+   戻るナビゲーション)。パルス演出の transition/[data-pulse] 修飾は files-c.css 側にある
    （元ファイルでファイルモード区画の末尾に離れて存在するため）。
    files-a〜cの分割理由はfiles-a.css冒頭コメント参照。
    import順: library-d.cssの次、preview-a.cssより前。 */
 
-/* ── Column stack (ancestor spine — root〜現在地の親まで、背表紙1枚ずつ並べる) ─ */
-
-/* 背表紙の束。root側から現在地に近い側まで左から並ぶ（TASK-429）。 */
-.mle-colstack-group {
-  flex: 0 0 auto;
-  display: flex;
-}
+/* ── Column stack (ancestor spine — click to go up one level) ─ */
 
 .mle-colstack {
   flex: 0 0 auto;
@@ -28,22 +21,6 @@
 }
 .mle-colstack:hover {
   background: var(--paper-3);
-}
-/* 省略スロットの外枠。.mle-colstack 自体は overflow:hidden なので、
-   一覧メニューはこの外側（overflow指定なし）に置いてクリップされないようにする。
-   幅は中の .mle-colstack（幅アニメーション対象）へ委ねる。 */
-.mle-colstack-anchor {
-  flex: 0 0 auto;
-  position: relative;
-}
-/* 省略スロットはクリック領域が div (menu の兄弟) になるため、フルサイズの透明button。 */
-.mle-colstack__trigger {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  padding: 0;
-  cursor: pointer;
 }
 .mle-colstack__edges {
   position: absolute;
@@ -75,14 +52,6 @@
 }
 .mle-colstack__edges span:nth-child(4) {
   transform: translateX(0);
-}
-/* 束の先頭（root側）以外はフラットな単一カード（4層の縁の演出は先頭だけに残す）。
-   見た目は__edgesの前面カード（nth-child(4)）に合わせる。 */
-.mle-colstack__card {
-  position: absolute;
-  inset: 0;
-  background: var(--paper-0);
-  border-left: 1px solid var(--line);
 }
 /* ラベルは束の一番右＝前面カードの上に重ねる */
 .mle-colstack__label {
@@ -122,39 +91,4 @@
   max-height: calc(100% - 26px);
   overflow: hidden;
   white-space: nowrap;
-  /* 縦書きの長い階層名は高さ方向でellipsisになる（AC#5） */
-  text-overflow: ellipsis;
-}
-
-/* 省略スロットの一覧メニュー（並び替えメニューと同じ意匠、右側に開く） */
-.mle-colstack__menu {
-  position: absolute;
-  top: 0;
-  left: calc(100% + 6px);
-  z-index: 30;
-  min-width: 160px;
-  max-width: 260px;
-  padding: 4px;
-  background: var(--paper-1);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--r-2);
-  box-shadow: var(--shadow-pop);
-}
-.mle-colstack__menuitem {
-  display: block;
-  width: 100%;
-  padding: 6px 8px;
-  border-radius: 4px;
-  font-family: var(--font-jp);
-  font-size: var(--fs-body);
-  line-height: var(--lh-body);
-  color: var(--ink-1);
-  text-align: left;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.mle-colstack__menuitem:hover {
-  background: var(--paper-2);
-  color: var(--ink-0);
 }

@@ -2,7 +2,7 @@
 
 - ステータス: 承認
 - 日付: 2026-08-08
-- 関連: backlog TASK-238〜245（実装8フェーズ）、TASK-156（覆される決定）、TASK-237（手動値退避の導入元）、TASK-429（原則6・useIsPresentの用途をさらに拡張）、[design-system.md](../design-system.md)
+- 関連: backlog TASK-238〜245（実装8フェーズ）、TASK-156（覆される決定）、TASK-237（手動値退避の導入元）、[design-system.md](../design-system.md)
 
 ## 文脈
 
@@ -27,7 +27,7 @@ motion を再導入し、出現・退出アニメーションの基盤を `Anima
 
 1. **Presenceの置換だけでは退避は消えない**。マウント境界を `{open && <Child />}` の条件レンダーへ移し、`AnimatePresence` で包む。手動値退避ref（`AxisQuickOverlay.lastResultRef` / `AxisValuePopoverPanel.lastResultRef` / `FilterChipAddButton.lastPickedAxisRef` / `AxisColumn.lastOverlayAxisRef` / `AxisColumn.lastAnchorElRef`）の削除を受け入れ条件とする
 2. **クエリ購読は条件境界の内側に置き、開閉状態に連動させない**。`useAxisFacetsQuery(isOpen ? axis : null)` のように引数のnull切替でquery keyを変えるパターンが退避の直接原因（このフックに `enabled` オプションは無い）。子がマウントされている間は常に有効な引数で購読する
-3. **AP境界の子は必ずコンポーネントとして切り出し、内部で `useIsPresent()` を呼ぶ**。用途は (a) ルート要素への `inert={!isPresent}`、(b) document/windowレベルのリスナー（outside click / Escape / pointermove 等）の退出中解除、の2つに**限定**する。**フォーカス復帰には使わない**（軸A→B切替時に旧Aが新Bからフォーカスを奪うため。復帰は現行どおり activeElement を検査して reason を渡す close ハンドラ側の責務のまま）※用途はTASK-240で3つ、TASK-429で4つへ拡張（下記「実装時に判明した訂正」参照）
+3. **AP境界の子は必ずコンポーネントとして切り出し、内部で `useIsPresent()` を呼ぶ**。用途は (a) ルート要素への `inert={!isPresent}`、(b) document/windowレベルのリスナー（outside click / Escape / pointermove 等）の退出中解除、の2つに**限定**する。**フォーカス復帰には使わない**（軸A→B切替時に旧Aが新Bからフォーカスを奪うため。復帰は現行どおり activeElement を検査して reason を渡す close ハンドラ側の責務のまま）※用途はTASK-240で3つへ拡張（下記「実装時に判明した訂正」参照）
 4. **variantトークンモジュール**（`presenceDurations.ts` の後継、`useMotionVariants()` フック + booleanを受けるbuilderのペア）に duration・easing・delay・transform-origin を集約する。プロパティ別duration・enter/exitの非対称scale・overshoot easing（cubic-bezier(0.34,1.2,0.64,1)）を表現できる形式にする。**delayを含む全パラメータをbuilder経由にし、コンポーネント側の `transition.delay` 直書きは禁止**（reduced-motion時の0化を迂回するため）
 5. **汎用ラッパーコンポーネントは作らない**。TASK-156でAnimatePresence相当（TransitionPresence）の自作がレビュー5巡で破綻した教訓。共有するのはトークンと原則3の規約のみで、各所で motion コンポーネントを直接使う
 6. **既存ルート要素を直接 `motion.div` 等に置き換える**（ラッパーDOMを被せない）。`position: fixed` オーバーレイの座標系・stacking context破壊を防ぐ
@@ -105,19 +105,3 @@ collapseの確定事項に「対象3箇所（ScanModal警告・新規作品、Ax
 原則3が禁じたかったのは**閉じたときのフォーカス復帰**であり、これは「軸A→B切替時に旧Aが新Bからフォーカスを奪う」ことを防ぐための制約だった。再オープン時に自分の入力欄へフォーカスを入れる用途はこの失敗モードを起こさない（フォーカスを入れる先が、いま開いている要素自身のため）。実際、軸A→B高速切替のrapid reopenテストで新パネルの検索欄フォーカスが維持されることを確認している。
 
 よって用途を3つに拡張し、禁止事項を「閉じたときのフォーカス復帰に使わない」へ精密化した。復帰は `activeElement` を検査して reason を渡す close ハンドラ側の責務のまま。
-
-### 省略メニューのラッパーは、幅アニメーション対象とoverflow:hiddenの影響を受けない配置基準を分離するための例外（TASK-429）
-
-ファイルモードの折り畳み帯（`AncestorStack`）で、表示上限（3枚）を超えた祖先を1枚に畳む省略スロット（`EllipsisSpine`）は、幅アニメーション対象の `motion.div`（`.mle-colstack`、`overflow: hidden`）をAnimatePresenceの直接の子にせず、無地のプレーンdiv（`.mle-colstack-anchor`）でくるみ、その中に `motion.div` と一覧メニュー（`role="menu"`）を兄弟として置いている。これも原則6（既存ルート要素を直接motion化し、ラッパーDOMを被せない）の例外である。
-
-理由はTASK-243（collapse対象のpadding/border）とは異なる。一覧メニューの幅（160px）は `.mle-colstack` の幅（46px）を超えて描画される必要があるが、`.mle-colstack` はwidthアニメーションのために `overflow: hidden` を持つ。メニューをこの子のまま置くと、開いた直後に行う先頭項目への `.focus()` がブラウザ標準のscroll-into-view挙動を誘発し、`.mle-colstack` 自身が（`overflow:hidden` であっても）スクロール対象と判定されて `scrollLeft` が動いてしまい、メニューの描画位置が大きくずれる不具合を実機で確認した（`AncestorStack.tsx` のコメント・コミットログ参照）。アンカー自体をmotion化して幅アニメーションを持たせる案は採らなかった。幅アニメーションする要素とメニューの配置基準を同一要素にすると、この `overflow:hidden`・`scrollLeft` の問題が再発するため、「幅アニメーションする要素」と「`overflow:hidden` の影響を受けないメニューの配置基準」を兄弟として分離する必要があった。
-
-TASK-243と合わせて、ラッパー例外は次のいずれかの条件で許容する。**(1) ルート要素にpadding/borderがありcollapseで見切れる場合は `overflow: hidden` だけを持つ無地のラッパーを外側に1枚被せる。(2) ルート要素が `overflow: hidden` かつ幅/高さアニメーション対象で、その内側に置けない子（自身の確定幅/高さを超える絶対配置のポップオーバー等）を持つ場合は、位置決め基準を無地の兄弟ラッパーへ分離する。**
-
-### useIsPresent の用途に「退出時の子ポップオーバーの強制close」を追加（TASK-429）
-
-原則3は `useIsPresent()` の用途を (a) `inert`、(b) リスナーの退出中解除に限定し、TASK-240で (c) 再オープン時の初期フォーカスへ拡張した。TASK-429で4つ目の用途が生じた。
-
-`EllipsisSpine` は自身の一覧メニュー（`role="menu"`）をローカルstate（`open`）で開閉する。メニューを開いたまま階層移動してこの背表紙自体がAnimatePresenceの退出アニメへ入ると、`.mle-colstack-anchor` は子（幅アニメーション対象の `.mle-colstack`）の幅に追従する素朴なブロック要素であるため、メニューが縮む背表紙に追従して横に動きながら消える見た目の不具合が実機で再現した（実測: `history.back()` で退出をトリガーし、退出アニメ中の複数フレームでメニューの座標が連続的にずれることを確認）。
-
-`isPresent` が `false` になった時点（退出が確定した瞬間）で `setOpen(false)` し、ずれた状態が見える前にメニューを閉じることで対処した。原則3の禁止事項（「閉じたときのフォーカス復帰に使わない」）が想定していた失敗モード（軸A→B切替時に旧Aが新Bからフォーカスを奪う）とは無関係の用途であり、フォーカス復帰も行わないため、この禁止事項には抵触しない。よって用途を4つに拡張する。
