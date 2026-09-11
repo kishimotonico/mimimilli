@@ -3,32 +3,22 @@
 // 左の受動スタックへ吸い込まれ（exit アニメ）、子のカラムが右からスライドインする。
 // 階層を遡るのはパンくず（アドレスバー）のみ。再生エンジンは Library と共通・常駐。
 
-import { useMemo, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useCallback } from "react";
 import { useAtom, useAtomValue } from "jotai";
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
-import { browseFs, getScanDiagnostics } from "../api";
-import { useFilesNavigation } from "../model/useFilesNavigation";
+import { useFilesBrowse } from "../model/useFilesBrowse";
+import { useFilesPlayingMatcher } from "../model/useFilesPlayingMatcher";
+import { useIdentityConflictMap } from "../model/useIdentityConflict";
 import { filesDirectionAtom } from "../../../entities/file-system/model/navigationAtoms";
-import { FILE_SYSTEM_QUERY_KEYS } from "../../../entities/file-system/queryKeys";
-import { SCAN_QUERY_KEYS } from "../../../entities/scan/queryKeys";
 import { buildFolderAudioQueue } from "../model/filePlayback";
-import { classifyFile, isFilesSelectionMissing, rootLabel, type FsEntry } from "../model/types";
+import { classifyFile, rootLabel, type FsEntry } from "../model/types";
 import { filesPreviewOpenAtom } from "../model/previewLayoutAtoms";
-import { ApiRequestError } from "../../../shared/api/http";
 import type { PlaybackTrack } from "../../../entities/player/model/playbackTrack";
-import {
-  playerIsPlayingOrLoadingAtom,
-  playingFsPathAtom,
-  playingTrackRelPathAtom,
-  playingWorkIdAtom,
-} from "../../../entities/player/model/atoms";
-import { workspacePath } from "@mimimilli/shared";
+import { playerIsPlayingOrLoadingAtom } from "../../../entities/player/model/atoms";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 import FileColumn from "./FileColumn";
 import FilePreview from "./FilePreview";
 import StackEdge from "./StackEdge";
-import type { FileLoadError } from "../model/types";
 
 interface ColstackBackButtonProps {
   parentName: string;
@@ -62,39 +52,13 @@ interface FilesViewProps {
 }
 
 export default function FilesView({ rootFolder, onPlayFile, onTogglePlay }: FilesViewProps) {
-  const nav = useFilesNavigation(rootFolder);
+  const browse = useFilesBrowse(rootFolder);
+  const { nav } = browse;
   const direction = useAtomValue(filesDirectionAtom);
-  const playingWorkId = useAtomValue(playingWorkIdAtom);
-  const playingRelPath = useAtomValue(playingTrackRelPathAtom);
-  const playingFsPath = useAtomValue(playingFsPathAtom);
   const isPlaybackActive = useAtomValue(playerIsPlayingOrLoadingAtom);
   const [previewOpen, setPreviewOpen] = useAtom(filesPreviewOpenAtom);
-
-  const cwdQuery = useQuery({
-    queryKey: FILE_SYSTEM_QUERY_KEYS.directory(nav.cwd),
-    queryFn: () => browseFs(nav.cwd),
-  });
-  const cwdEntries = cwdQuery.data?.entries ?? [];
-  const cwdNotFound = cwdQuery.error instanceof ApiRequestError && cwdQuery.error.status === 404;
-  const loadError: FileLoadError | null = !cwdQuery.isError
-    ? null
-    : cwdNotFound
-      ? "notFound"
-      : "error";
-
-  const diagnosticsQuery = useQuery({
-    queryKey: SCAN_QUERY_KEYS.diagnostics(),
-    queryFn: getScanDiagnostics,
-  });
-  const identityConflictPaths = useMemo(
-    () =>
-      new Map(
-        (diagnosticsQuery.data?.diagnostics ?? []).flatMap((diagnostic) =>
-          diagnostic.paths.map((path) => [path, diagnostic] as const),
-        ),
-      ),
-    [diagnosticsQuery.data],
-  );
+  const matchPlaying = useFilesPlayingMatcher();
+  const identityConflictPaths = useIdentityConflictMap();
 
   const handlePlayFile = useCallback(
     (entry: FsEntry, folderEntries: FsEntry[]) => {
@@ -104,19 +68,6 @@ export default function FilesView({ rootFolder, onPlayFile, onTogglePlay }: File
       onPlayFile(tracks, trackIndex);
     },
     [onPlayFile],
-  );
-
-  const matchPlaying = useMemo(
-    () => (entry: FsEntry) => {
-      if (playingFsPath) return entry.path === playingFsPath;
-      return (
-        !!playingWorkId &&
-        entry.workId === playingWorkId &&
-        entry.workRelPath != null &&
-        entry.workRelPath === playingRelPath
-      );
-    },
-    [playingFsPath, playingWorkId, playingRelPath],
   );
 
   // プレビューが閉じている間に別のエントリを選ぶ／フォルダーへ潜ったときは、
@@ -140,47 +91,10 @@ export default function FilesView({ rootFolder, onPlayFile, onTogglePlay }: File
   const cwdTitle = nav.relPath.slice(-1)[0] ?? rootLabel(rootFolder);
   const parentName = nav.relPath.slice(-2, -1)[0] ?? rootLabel(rootFolder);
 
-  // ── プレビュー対象 ────────────────────────────────────────
-  // ファイル選択中はそのファイル、それ以外はカレント dir 自身。
-  // cwd取得に失敗している間は、実在確認できていないエントリを合成表示しない。
-  const cwdFolderEntry: FsEntry | null = loadError
-    ? null
-    : {
-        name: cwdTitle,
-        path: workspacePath(nav.relPath.join("/")),
-        isDir: true,
-        size: 0,
-        fileType: "dir",
-        childCount: cwdEntries.length,
-        workId: cwdQuery.data?.workId ?? null,
-        workRelPath: null,
-        mediaKind: null,
-        preview: null,
-      };
-  const hasSelection = !loadError && nav.selectedPath != null && nav.selectedPath !== nav.cwd;
-  const fileSelection = hasSelection
-    ? (cwdEntries.find((e) => e.path === nav.selectedPath) ?? null)
-    : null;
-  // ディレクトリ自体は正常に取得できたが、選択中パスがその中に存在しない
-  // （ライブラリのエラー詳細・スキャン要対応の「Filesで開く」で移動・削除済みの対象を
-  // 指すことがある）。この場合もフォルダーへ黙って差し替えず、対象なしを表示する
-  // （openPathInFilesAtom経由での到達を含む）。
-  const selectionMissing = isFilesSelectionMissing({
-    hasLoadError: !!loadError,
-    isPending: cwdQuery.isPending,
-    selectedPath: nav.selectedPath,
-    cwd: nav.cwd,
-    entries: cwdEntries,
-  });
-  const previewEntry = selectionMissing ? null : (fileSelection ?? cwdFolderEntry);
-  const folderEntries = previewEntry?.isDir ? cwdEntries : null;
-
-  const hasAncestors = nav.relPath.length >= 1;
-
   return (
     <>
       <AnimatePresence initial={false}>
-        {hasAncestors && (
+        {browse.hasAncestors && (
           <ColstackBackButton
             key="colstack-back"
             parentName={parentName}
@@ -199,7 +113,7 @@ export default function FilesView({ rootFolder, onPlayFile, onTogglePlay }: File
           >
             <FileColumn
               title={cwdTitle}
-              entries={cwdEntries}
+              entries={browse.entries}
               identityConflictPaths={identityConflictPaths}
               selectedPath={nav.selectedPath}
               matchPlaying={matchPlaying}
@@ -207,39 +121,16 @@ export default function FilesView({ rootFolder, onPlayFile, onTogglePlay }: File
               onOpenDir={openDir}
               onSelectFile={selectFile}
               onFocusEntry={selectFile}
-              onPlayFile={(entry) => handlePlayFile(entry, cwdEntries)}
-              isLoading={cwdQuery.isPending}
-              isError={cwdQuery.isError}
-              notFound={cwdNotFound}
-              onRetry={() => cwdQuery.refetch()}
+              onPlayFile={(entry) => handlePlayFile(entry, browse.entries)}
+              isLoading={browse.isPending}
+              isError={browse.isError}
+              notFound={browse.notFound}
+              onRetry={browse.refetchCwd}
             />
           </div>
         </div>
 
-        {previewOpen && (
-          <FilePreview
-            entry={previewEntry}
-            folderEntries={folderEntries}
-            depth={nav.addressPath.length}
-            browsePath={nav.cwd}
-            isPlayingEntry={previewEntry != null && matchPlaying(previewEntry)}
-            isPlaybackActive={isPlaybackActive}
-            onPlay={(entry) => handlePlayFile(entry, folderEntries ?? cwdEntries)}
-            onTogglePlay={onTogglePlay}
-            onWorkRegistered={() => cwdQuery.refetch()}
-            identityConflict={
-              previewEntry ? (identityConflictPaths.get(previewEntry.path) ?? null) : null
-            }
-            loadError={loadError}
-            onRetryLoad={() => cwdQuery.refetch()}
-            hasAncestors={hasAncestors}
-            onGoUp={nav.goUp}
-            onGoRoot={() => nav.goToSegment(0)}
-            missingSelectionPath={selectionMissing ? nav.selectedPath : null}
-            onClearSelection={nav.clearSelection}
-            onClose={() => setPreviewOpen(false)}
-          />
-        )}
+        {previewOpen && <FilePreview onPlayFile={onPlayFile} onTogglePlay={onTogglePlay} />}
       </div>
     </>
   );

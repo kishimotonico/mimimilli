@@ -25,6 +25,23 @@ export function classifyFile(entry: Classifiable): FileKind {
   return entry.mediaKind ?? "other";
 }
 
+/** 登録済み判定に使う最小構造 */
+interface RegistrableEntry {
+  isDir: boolean;
+  workId: string | null;
+  workRelPath: string | null;
+}
+
+/** フォルダー単位で作品登録済みか */
+export function isWorkFolder(entry: RegistrableEntry): boolean {
+  return entry.isDir && !!entry.workId;
+}
+
+/** 単一ファイル単位で作品登録済みか */
+export function isSingleFileWork(entry: RegistrableEntry): boolean {
+  return !entry.isDir && !!entry.workId && (entry.workRelPath === "" || entry.workRelPath === ".");
+}
+
 /** 種別 → Icon キー（shared/ui/Icon の I[...] に対応） */
 export const FILE_KIND_ICON: Record<FileKind, IconName> = {
   dir: "folder",

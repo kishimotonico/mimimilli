@@ -10,21 +10,49 @@ import { FILE_SYSTEM_QUERY_KEYS } from "../../../entities/file-system/queryKeys"
 import { deleteWork } from "../../../entities/work/api";
 import { getWorkRegisterPreview, reassignIdentityConflict } from "../api";
 import { apiErrorMessage } from "../../../shared/lib/apiError";
+import { useFilesCwd } from "../model/useFilesCwd";
+import { useIdentityConflictFor } from "../model/useIdentityConflict";
 import RegisterWorkDialog from "./RegisterWorkDialog";
 import type { ScanDiagnostic, WorkRegisterPreview, WorkspacePath } from "@mimimilli/shared";
-import type { FileKind, FsEntry } from "../model/types";
+import { classifyFile, isWorkFolder, isSingleFileWork, type FsEntry } from "../model/types";
 
 interface FilePreviewWorkActionsProps {
   entry: FsEntry;
-  isDir: boolean;
-  kind: FileKind;
-  browsePath: string;
-  isWorkFolder: boolean;
-  isSingleFileWork: boolean;
-  identityConflict: ScanDiagnostic | null;
   /** 再生ボタン等、登録ワークフロー以外のアクション。存在すれば登録ボタンと同じ行に並ぶ */
   playActions: ReactNode;
   onWorkRegistered?: () => void | Promise<unknown>;
+}
+
+interface IdentityConflictSectionProps {
+  identityConflict: ScanDiagnostic;
+  currentPath: string;
+  reassignDisabled: boolean;
+  onReassign: () => void;
+}
+
+/** ID重複セクション。identityConflictがある（＝entryがdirで重複がある）ときだけ描画される
+ *  ので、他のpathsとの絞り込みをnon-nullな引数として受け取れる */
+function IdentityConflictSection({
+  identityConflict,
+  currentPath,
+  reassignDisabled,
+  onReassign,
+}: IdentityConflictSectionProps) {
+  const conflictingPaths = identityConflict.paths.filter((path) => path !== currentPath);
+  return (
+    <section className="mle-identity-conflict" aria-label="ID重複">
+      <span className="mle-identity-conflict-badge">ID重複</span>
+      <p>同じWork IDを持つフォルダーがあります。</p>
+      <div className="mle-identity-conflict__paths">
+        {conflictingPaths.map((path) => (
+          <code key={path}>{path}</code>
+        ))}
+      </div>
+      <Button variant="primary" disabled={reassignDisabled} onClick={onReassign}>
+        別作品として取り込む
+      </Button>
+    </section>
+  );
 }
 
 /** 作品登録ワークフロー（登録・解除・ID重複の取り込み）を一括で扱う。mutation・確認/登録
@@ -32,15 +60,15 @@ interface FilePreviewWorkActionsProps {
  *  描画（FilePreviewMedia.tsx）とはここで境界を分ける）。 */
 export default function FilePreviewWorkActions({
   entry,
-  isDir,
-  kind,
-  browsePath,
-  isWorkFolder,
-  isSingleFileWork,
-  identityConflict,
   playActions,
   onWorkRegistered,
 }: FilePreviewWorkActionsProps) {
+  const browsePath = useFilesCwd();
+  const identityConflict = useIdentityConflictFor(entry.path);
+  const isDir = classifyFile(entry) === "dir";
+  const kind = classifyFile(entry);
+  const isWorkFolderEntry = isWorkFolder(entry);
+  const isSingleFileWorkEntry = isSingleFileWork(entry);
   const queryClient = useQueryClient();
   const toast = useToast();
   const [registerPreview, setRegisterPreview] = useState<WorkRegisterPreview | null>(null);
@@ -116,7 +144,7 @@ export default function FilePreviewWorkActions({
       >
         {isDir ? "このフォルダーを作品として登録" : "このファイルを作品として登録"}
       </Button>
-    ) : (isWorkFolder || isSingleFileWork) && entry.workId ? (
+    ) : (isWorkFolderEntry || isSingleFileWorkEntry) && entry.workId ? (
       <Button
         variant="ghost"
         disabled={unregisterMutation.isPending}
@@ -129,8 +157,6 @@ export default function FilePreviewWorkActions({
       </Button>
     ) : null;
 
-  const conflictingPaths = identityConflict?.paths.filter((path) => path !== entry.path) ?? [];
-
   return (
     <>
       {(playActions != null || workActions != null) && (
@@ -140,22 +166,12 @@ export default function FilePreviewWorkActions({
         </div>
       )}
       {identityConflict && entry.isDir && (
-        <section className="mle-identity-conflict" aria-label="ID重複">
-          <span className="mle-identity-conflict-badge">ID重複</span>
-          <p>同じWork IDを持つフォルダーがあります。</p>
-          <div className="mle-identity-conflict__paths">
-            {conflictingPaths.map((path) => (
-              <code key={path}>{path}</code>
-            ))}
-          </div>
-          <Button
-            variant="primary"
-            disabled={reassignMutation.isPending}
-            onClick={() => setShowReassignConfirm(true)}
-          >
-            別作品として取り込む
-          </Button>
-        </section>
+        <IdentityConflictSection
+          identityConflict={identityConflict}
+          currentPath={entry.path}
+          reassignDisabled={reassignMutation.isPending}
+          onReassign={() => setShowReassignConfirm(true)}
+        />
       )}
 
       {showRegisterDialog && registerPreview && (
@@ -175,7 +191,7 @@ export default function FilePreviewWorkActions({
         <ConfirmDialog
           title="作品登録を解除"
           message={
-            isSingleFileWork
+            isSingleFileWorkEntry
               ? "このファイルの作品データ（再生履歴・タグを含む）と管理ファイル（.mimimilli.json）を削除します。音声ファイル自体は削除されません。"
               : "このフォルダーの作品データ（再生履歴・タグを含む）と管理ファイル（mimimilli.json）を削除します。音声などの物理ファイルは削除されません。"
           }

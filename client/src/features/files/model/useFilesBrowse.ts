@@ -24,6 +24,9 @@ export interface FilesBrowse {
   previewEntry: FsEntry | null;
   /** previewEntryがdirのときその直下エントリ */
   folderEntries: FsEntry[] | null;
+  /** 再生キューの材料。previewEntryがdirならその直下エントリ、fileならカレントディレクトリの
+   *  一覧（同じフォルダー内の他の音声を次トラックとして繋ぐ） */
+  playbackSourceEntries: FsEntry[];
   /** ディレクトリ取得は成功したが選択中パスがその中に無いとき、そのパス */
   missingSelectionPath: string | null;
   hasAncestors: boolean;
@@ -81,6 +84,7 @@ export function useFilesBrowse(root: string): FilesBrowse {
   });
   const previewEntry = selectionMissing ? null : (fileSelection ?? cwdFolderEntry);
   const folderEntries = previewEntry?.isDir ? entries : null;
+  const playbackSourceEntries = folderEntries ?? entries;
 
   const hasAncestors = nav.relPath.length >= 1;
 
@@ -93,6 +97,7 @@ export function useFilesBrowse(root: string): FilesBrowse {
     loadError,
     previewEntry,
     folderEntries,
+    playbackSourceEntries,
     missingSelectionPath: selectionMissing ? nav.selectedPath : null,
     hasAncestors,
     refetchCwd: () => {

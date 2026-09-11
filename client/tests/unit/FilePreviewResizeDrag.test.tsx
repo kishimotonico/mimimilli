@@ -1,35 +1,37 @@
 // FilePreviewのプレビュー幅リサイズ（role="separator"）はmouse主ボタンのみでdragを開始する。
-import { createElement } from "react";
+import { createElement, type ReactNode } from "react";
 import { fireEvent, render, screen, cleanup } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Provider as JotaiProvider, createStore } from "jotai";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import FilePreview from "../../src/features/files/ui/FilePreview";
 
-function renderPreview(overrides: Partial<React.ComponentProps<typeof FilePreview>> = {}) {
+const browseFs = vi.fn();
+const getScanDiagnostics = vi.fn();
+
+vi.mock("../../src/features/files/api", () => ({
+  browseFs: (...args: unknown[]) => browseFs(...args),
+  getScanDiagnostics: (...args: unknown[]) => getScanDiagnostics(...args),
+}));
+
+vi.mock("../../src/entities/settings/useSettingsQuery", () => ({
+  useRootFolder: () => "/lib",
+}));
+
+function renderPreview() {
+  browseFs.mockResolvedValue({ entries: [], workId: null });
+  getScanDiagnostics.mockResolvedValue({ diagnostics: [] });
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const props: React.ComponentProps<typeof FilePreview> = {
-    entry: null,
-    folderEntries: null,
-    depth: 1,
-    browsePath: "dlsite/夜想曲スタジオ",
-    isPlayingEntry: false,
-    isPlaybackActive: false,
-    onPlay: vi.fn(),
-    onTogglePlay: vi.fn(),
-    identityConflict: null,
-    loadError: null,
-    onRetryLoad: vi.fn(),
-    hasAncestors: true,
-    onGoUp: vi.fn(),
-    onGoRoot: vi.fn(),
-    missingSelectionPath: null,
-    onClearSelection: vi.fn(),
-    onClose: vi.fn(),
-    ...overrides,
-  };
-  return render(
-    createElement(QueryClientProvider, { client: queryClient }, createElement(FilePreview, props)),
-  );
+  const store = createStore();
+  const wrapper = ({ children }: { children: ReactNode }) =>
+    createElement(
+      QueryClientProvider,
+      { client: queryClient },
+      createElement(JotaiProvider, { store }, children),
+    );
+  return render(createElement(FilePreview, { onPlayFile: vi.fn(), onTogglePlay: vi.fn() }), {
+    wrapper,
+  });
 }
 
 afterEach(cleanup);
