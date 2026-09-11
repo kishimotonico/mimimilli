@@ -137,11 +137,10 @@ dialog を `useTopmostOpenModalDialog`（`shared/ui/`）で検出し、そのdia
 で `GlobalToast.tsx` 以外に一致しないことを常に保つ）。表示を出したい側は例外なく
 `useToast`（`shared/ui/useToast.ts`）フックで表示要求を出す。要求は
 `{ message, variant, actionLabel?, onAction?, onDismiss?, priority, dismissOnUnmount? }`
-の形で、`priority` は次の3値のいずれか。
+の形で、`priority` は次の2値のいずれか。
 
 - `"action"`: ユーザーが直前に行った操作の直接の結果（元に戻す・完了フィードバック等）
-- `"notice"`: スキャン完了・ルートフォルダー変更等、アプリ全体に関わる単発の通知
-- `"background"`: スキャン・DLsite一括取得等、非同期ジョブの結果通知
+- `"notice"`: スキャン完了・DLsite一括取得完了・ルートフォルダー変更等、アプリ全体に関わる単発の通知
 
 `dismissOnUnmount`（既定true）は発行元のアンマウントで要求を取り下げるかどうか。
 ダイアログ内のUndo通知のように発行元の生存期間だけ意味を持つ要求は既定のままでよいが、
@@ -163,7 +162,6 @@ dialog を `useTopmostOpenModalDialog`（`shared/ui/`）で検出し、そのdia
    （読み落とし厳禁のため自動消滅せず手動クローズのみ）
 2. `priority: "action"` の要求
 3. `priority: "notice"` の要求
-4. `priority: "background"` の要求
 
 選ばれなかった要求はキューに積まず**即座に破棄する**（`GlobalToast` が
 `useLayoutEffect` で毎回どの1件が表示対象かを求め、それ以外を `toastRequestsAtom` から

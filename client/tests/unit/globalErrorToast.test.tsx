@@ -40,7 +40,7 @@ function renderGlobalToast(store: ReturnType<typeof createStore>, requesters: Re
 }
 
 // design-system.md「単一ホストの優先順位チェーン」の契約
-// （error > action > notice > background）そのものを固定する。網羅はしない
+// （error > action > notice）そのものを固定する。網羅はしない
 // （AGENTS.md「テストは網羅性より実行速度」）。個々のfeatureがuseToastを正しい引数で
 // 呼んでいるかは各featureのテスト・実機確認で見る。
 describe("GlobalToast", () => {
@@ -50,25 +50,21 @@ describe("GlobalToast", () => {
     expect(screen.queryByRole("output")).toBeNull();
   });
 
-  it("優先度の異なる要求からpriorityの高い方を選ぶ（action > notice > background）", async () => {
+  it("優先度の異なる要求からpriorityの高い方を選ぶ（action > notice）", async () => {
     const store = createStore();
     renderGlobalToast(
       store,
       <>
-        <ToastRequester priority="background" message="背景の通知" />
         <ToastRequester priority="notice" message="単発の通知" />
         <ToastRequester priority="action" message="操作の結果" />
       </>,
     );
-    fireEvent.click(screen.getByText("要求を出す: 背景の通知"));
     fireEvent.click(screen.getByText("要求を出す: 単発の通知"));
     fireEvent.click(screen.getByText("要求を出す: 操作の結果"));
 
     // 破棄された要求のToastContentは退場アニメーション中は残る（motion）ため、
     // 最終的に1件だけになるのを待つ
-    await waitFor(() =>
-      expect(screen.getAllByText(/^(操作の結果|単発の通知|背景の通知)$/)).toHaveLength(1),
-    );
+    await waitFor(() => expect(screen.getAllByText(/^(操作の結果|単発の通知)$/)).toHaveLength(1));
     expect(screen.getByText("操作の結果")).toBeTruthy();
   });
 
@@ -78,7 +74,7 @@ describe("GlobalToast", () => {
       store,
       <>
         <ToastRequester priority="action" message="操作の結果" />
-        <ToastRequester priority="background" variant="error" message="致命的なエラー" />
+        <ToastRequester priority="notice" variant="error" message="致命的なエラー" />
       </>,
     );
     fireEvent.click(screen.getByText("要求を出す: 操作の結果"));

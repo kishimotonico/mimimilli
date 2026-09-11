@@ -3,14 +3,13 @@ import type { ToastVariant } from "../ui/Toast";
 
 /**
  * "action": ユーザーが直前に行った操作の直接の結果（元に戻す・完了フィードバック等）。
- * "notice": スキャン完了・ルートフォルダー変更等、アプリ全体に関わる単発の通知。
- * "background": スキャン・DLsite一括取得等の非同期ジョブの結果通知。
+ * "notice": スキャン完了・DLsite一括取得完了等、アプリ全体に関わる単発の通知。
  * `variant: "error"` の要求は発行元がどの priority を渡しても最優先で選ばれる
  * （design-system.md「単一ホストの優先順位チェーン」）。
  * 優先順位で選ばれなかった要求はキューに積まず即座に破棄する。負けた情報は別の場所から
  * 辿れることが前提（AC参照）。破棄された要求も表示されて消えた要求と同じく onDismiss が呼ばれる。
  */
-export type ToastPriority = "action" | "notice" | "background";
+export type ToastPriority = "action" | "notice";
 
 export interface ToastRequest {
   message: string;

@@ -3,7 +3,7 @@ import { useCallback, useLayoutEffect } from "react";
 import Toast from "../../shared/ui/Toast";
 import { toastRequestsAtom, type ToastRequest } from "../../shared/model/toastRequestsAtom";
 
-const PRIORITY_ORDER = ["action", "notice", "background"] as const;
+const PRIORITY_ORDER = ["action", "notice"] as const;
 
 /**
  * 要求集合から今回表示する1件を選ぶ。variant="error"は発行元のpriorityに関わらず
