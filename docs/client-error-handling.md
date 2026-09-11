@@ -4,11 +4,11 @@ client のエラー所有権・Promise 契約・best-effort 失敗の基準。�
 
 ## ユーザーに見せる操作失敗
 
-- **スキャン start / cancel**: 所有者は `ScanRuntime` → `scanErrorAtom`。`GlobalToast` で表示。Promise は reject しない
-- **DLsite 一括 start / cancel**: 所有者は `DlsiteBulkRuntime` → `dlsiteBulkErrorAtom`。`GlobalToast` で表示。Promise は reject しない
-- **その他の mutation**（再生・エクスポート等）: 呼び出し側が `errorToastAtom` 等へ保存し、呼び出し側で catch して toast
+- **スキャン start / cancel**: 所有者は `ScanRuntime`。エラー状態は `scanErrorAtom`（`SetupScreen` のインライン表示にも使う）に保持しつつ、表示は `useToast().show({ variant: "error", ... })` で行う。Promise は reject しない
+- **DLsite 一括 start / cancel**: 所有者は `DlsiteBulkRuntime`。専用の error atom は持たず `useToast().error(...)` で表示する。Promise は reject しない
+- **その他の mutation**（再生・エクスポート等）: 呼び出し側が catch し `useToast().error(...)` で表示する
 
-scan / DLsite の SSE 由来の失敗（イベント解析エラー・接続切断等）も runtime が同じ error atom へ保存する。
+表示は単一ホストの `GlobalToast`（`toastRequestsAtom` の要求を受けて描画）に集約される。variant="error" は発行元の priority に関わらず最優先で表示される。scan / DLsite の SSE 由来の失敗（イベント解析エラー・接続切断等）も、それぞれの runtime が上記と同じ経路（ScanRuntimeはscanErrorAtomへの保存＋useToast表示、DlsiteBulkRuntimeはuseToastのみ）で扱う。
 
 初回セットアップ（`App.handleSetupComplete`）だけは例外。`scanActions.start()` の戻り値が `{ ok: false, error }` のときは `error` を throw し `rootFolder` をキャッシュへ確定しない。SetupScreen には `GlobalToast` が無いため、失敗理由は戻り値の `error` 文字列で渡す。runtime の操作 Promise は reject しない契約は変えない。
 
