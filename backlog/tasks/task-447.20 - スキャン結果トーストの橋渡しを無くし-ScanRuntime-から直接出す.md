@@ -4,10 +4,12 @@ title: スキャン結果トーストの橋渡しを無くし ScanRuntime から
 status: To Do
 assignee: []
 created_date: '2026-09-11 08:05'
+updated_date: '2026-09-11 08:10'
 labels:
   - refactor
   - triage
-dependencies: []
+dependencies:
+  - TASK-447.23
 parent_task_id: TASK-447
 priority: high
 ordinal: 488000
@@ -26,3 +28,9 @@ ordinal: 488000
 - [ ] #3 結果トーストの文面・variant・アクション（要対応があるときだけ「要対応を見る」、押すと閉じる、中止時の警告）が現状どおりで、それをテストで縛っている
 - [ ] #4 挙動は変わらず、既存テストの期待値を変えていない（テストの統合・名前変更だけ許容し、タスクメモに列挙）。pnpm check（レイヤー境界含む）・pnpm test・pnpm test:smoke が通る
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+前提変更（アドバイザー判断）: ScanRuntime は Providers でマウントされ App から props を渡せないため、TASK-447.23 でモーダル状態を atom 化してから、ScanRuntime が useToast を直接呼び onAction でその atom を書く形にする。AC#1 の「App から props で渡された onOpenNeedsAttention」は「モーダル状態の atom への書き込み」と読み替える。
+<!-- SECTION:NOTES:END -->
