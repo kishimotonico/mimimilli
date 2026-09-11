@@ -134,12 +134,13 @@ dialog を `useTopmostOpenModalDialog`（`shared/ui/`）で検出し、そのdia
 
 `Toast`（`shared/ui/Toast.tsx`）を描画する場所は `GlobalToast`（`app/ui/`）1箇所だけに
 限定する。個々の画面が独自に `<Toast>` を宣言することは禁止する（`rg "<Toast\b" client/src`
-で `GlobalToast.tsx` 以外に一致しないことを常に保つ）。表示を出したい側は
+で `GlobalToast.tsx` 以外に一致しないことを常に保つ）。表示を出したい側は例外なく
 `useToast`（`shared/ui/useToast.ts`）フックで表示要求を出す。要求は
 `{ message, variant, actionLabel?, onAction?, onDismiss?, priority }` の形で、
-`priority` は次の2値のいずれか。
+`priority` は次の3値のいずれか。
 
 - `"action"`: ユーザーが直前に行った操作の直接の結果（元に戻す・完了フィードバック等）
+- `"notice"`: スキャン完了・ルートフォルダー変更等、アプリ全体に関わる単発の通知
 - `"background"`: スキャン・DLsite一括取得等、非同期ジョブの結果通知
 
 以前は「各画面が自分の判断でdialog内かdocument.bodyかを選ぶ」形だったため、GlobalToast
@@ -149,24 +150,15 @@ dialog を `useTopmostOpenModalDialog`（`shared/ui/`）で検出し、そのdia
 候補除外のUndoトーストが重なるケースで発生）。単一ホストに集約し、`GlobalToast` が
 「今どの1件を表示するか」を優先度チェーンで決めることでこの衝突を構造的に無くす。
 
-優先度チェーンは次の順（上が勝つ）。`GlobalToast.tsx` の if 連鎖の並びそのものが正で、
-このリストは実装から乖離させない。
+優先度チェーンは次の順（上が勝つ）。
 
-1. `variant === "error"` の通知（`scanError`・`errorToast`・DLsite一括取得のエラー。
-   読み落とし厳禁のため自動消滅せず手動クローズのみ）
-2. `useToast` の `priority: "action"` 要求
-3. その他の個別グローバル通知（スキャン完了/中止・ルートフォルダー変更・トラック
-   スキップ・ライブラリURL修復・DLsite関連の完了/中断/適用結果等。いずれも
-   `variant !== "error"`）
-4. `useToast` の `priority: "background"` 要求
+1. `variant === "error"` の要求。発行元が宣言した `priority` に関わらず最優先で選ぶ
+   （読み落とし厳禁のため自動消滅せず手動クローズのみ）
+2. `priority: "action"` の要求
+3. `priority: "notice"` の要求
+4. `priority: "background"` の要求
 
-**2と4（`useToast` 経由の要求）は選ばれなければ即座に破棄する。3（atomで保持する
-個別グローバル通知）は選ばれなくても消えず、上位が消えるまで待ってから表示される。**
-この違いは、2と4がその場限りの呼び出し側ローカル状態と1対1で結び付く要求
-（呼び出し元コンポーネントが生きている間だけ意味を持つ）なのに対し、3はアプリ全体で
-保持される状態（コンポーネントの生死と無関係に、消すまで居座る）だから生じる。
-
-2・4が選ばれなかった場合、キューに積まず**即座に破棄する**（`GlobalToast` が
+選ばれなかった要求はキューに積まず**即座に破棄する**（`GlobalToast` が
 `useLayoutEffect` で毎回どの1件が表示対象かを求め、それ以外を `toastRequestsAtom` から
 取り除いて `onDismiss` を呼ぶ）。上位の要求が消えても、既に破棄した要求が後から
 改めて表示されることはない。待機（キュー）にすると「表示される前の待ち時間には寿命が

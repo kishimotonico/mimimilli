@@ -186,9 +186,7 @@ export const I = {
   filter: lucideIcon(Filter),
   check: lucideIcon(Check),
   x: lucideIcon(X),
-  // TriangleAlertは24x24の幾何中心には収まるが、下部の三角ベースと感嘆符のドットに
-  // 視覚的な重心が寄り、他のアイコンより低く見える。
-  // グリフを viewBox 上で2単位上へ寄せて視覚重心を他アイコンと揃える。
+  // TriangleAlertは視覚重心が下寄りなのでグリフを viewBox 上で2単位上げる。
   err: (p) => (
     <Svg
       {...p}
