@@ -1,7 +1,6 @@
 import { lazy, Suspense, useCallback } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
-import { activeModalAtom } from "../../shared/model/activeModalAtom";
-import { isDlsiteNotificationModal } from "../../entities/dlsite/model/dlsiteNotificationModal";
+import { activeModalAtom, isDlsiteNotificationModal } from "../../shared/model/activeModalAtom";
 import DlsiteNotificationModals from "../../features/dlsite/ui/DlsiteNotificationModals";
 
 const SettingsModal = lazy(() => import("../../features/settings/ui/SettingsModal"));

@@ -1,6 +1,6 @@
 import { useCallback } from "react";
-import type { DlsiteNotificationModalKind } from "../../../entities/dlsite/model/dlsiteNotificationModal";
-import { isDlsiteNotificationModal } from "../../../entities/dlsite/model/dlsiteNotificationModal";
+import type { DlsiteNotificationModalKind } from "../../../shared/model/activeModalAtom";
+import { isDlsiteNotificationModal } from "../../../shared/model/activeModalAtom";
 import DlsiteFetchFailedModal from "./DlsiteFetchFailedModal";
 import DlsiteParseFailedModal from "./DlsiteParseFailedModal";
 import RjCodeMissingModal from "./RjCodeMissingModal";
