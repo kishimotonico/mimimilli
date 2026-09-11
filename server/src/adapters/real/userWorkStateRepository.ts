@@ -162,7 +162,6 @@ export class UserWorkStateRepository {
     if (patch.color !== undefined) set.color = patch.color;
     if (patch.showAsAxis !== undefined) set.showAsAxis = patch.showAsAxis;
     if (patch.protected !== undefined) set.protected = patch.protected;
-    if (patch.order !== undefined) set.sortOrder = patch.order;
     if (Object.keys(set).length > 0) {
       this.db.user.update(tagPrefixes).set(set).where(eq(tagPrefixes.prefix, prefix)).run();
     }

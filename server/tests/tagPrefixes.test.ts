@@ -499,7 +499,7 @@ test("POST /api/tag-prefixes: 新規は末尾へ自動採番され、一覧は o
   );
 });
 
-test("PATCH /api/tag-prefixes/:prefix: order を直接更新できる", async () => {
+test("PATCH /api/tag-prefixes/:prefix: order のみを送っても無視され、実質空更新として400になる（並び替えは一括APIのみ）", async () => {
   const app = buildApp();
   const before = await (await app.request("/api/tag-prefixes")).json();
   const [first] = before as Array<{ prefix: string; order: number }>;
@@ -510,8 +510,27 @@ test("PATCH /api/tag-prefixes/:prefix: order を直接更新できる", async ()
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ order: 99 }),
   });
+  assert.equal(patched.status, 400);
+
+  const after = await (await app.request("/api/tag-prefixes")).json();
+  assert.deepEqual(after, before);
+});
+
+test("PATCH /api/tag-prefixes/:prefix: order を他フィールドと同時に送っても無視され、並び順は変わらない", async () => {
+  const app = buildApp();
+  const before = await (await app.request("/api/tag-prefixes")).json();
+  const [first] = before as Array<{ prefix: string; order: number }>;
+  assert.ok(first);
+
+  const patched = await app.request(`/api/tag-prefixes/${encodeURIComponent(first.prefix)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ label: "更新後ラベル", order: 99 }),
+  });
+  assert.equal(patched.status, 200);
   const patchedBody = await patched.json();
-  assert.equal(patchedBody.order, 99);
+  assert.equal(patchedBody.label, "更新後ラベル");
+  assert.equal(patchedBody.order, first.order);
 });
 
 test("PUT /api/tag-prefixes/order: 全prefixの新しい順序を一括・アトミックに適用する", async () => {

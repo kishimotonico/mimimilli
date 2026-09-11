@@ -50,21 +50,20 @@ export const tagPrefixCreateSchema = z.object({
 });
 export type TagPrefixCreate = z.infer<typeof tagPrefixCreateSchema>;
 
+/** 並び順は含まない。並び替えは一括 API（tagPrefixOrderSchema）だけで行う */
 export const tagPrefixUpdateSchema = z
   .object({
     label: z.string().trim().min(1).optional(),
     color: tagPrefixColorKeySchema.nullable().optional(),
     showAsAxis: z.boolean().optional(),
     protected: z.boolean().optional(),
-    order: z.number().int().optional(),
   })
   .refine(
     (patch) =>
       patch.label !== undefined ||
       patch.color !== undefined ||
       patch.showAsAxis !== undefined ||
-      patch.protected !== undefined ||
-      patch.order !== undefined,
+      patch.protected !== undefined,
   );
 export type TagPrefixUpdate = z.infer<typeof tagPrefixUpdateSchema>;
 

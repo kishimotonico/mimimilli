@@ -54,7 +54,6 @@ export function createClassificationMethods(state: FixtureState): Classification
       if (patch.color !== undefined) def.color = patch.color;
       if (patch.showAsAxis !== undefined) def.showAsAxis = patch.showAsAxis;
       if (patch.protected !== undefined) def.protected = patch.protected;
-      if (patch.order !== undefined) def.order = patch.order;
       return def;
     },
 
