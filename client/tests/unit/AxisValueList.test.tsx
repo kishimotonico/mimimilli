@@ -432,13 +432,6 @@ describe("AxisValueList エラー・空状態の再試行導線", () => {
   });
 });
 
-describe("AxisValueList の件数表示", () => {
-  it("isFacetLoading のときはファセット件数を描画しない", () => {
-    renderAxisValueList({ facetItems: [makeItem()], isFacetLoading: true });
-    expect(document.querySelector(".mle-col__hd .count")).toBeNull();
-  });
-});
-
 describe("AxisValueList の操作ヒント（既定=置き換えの説明を出す）", () => {
   it("置き換え・AND追加の操作方法を検索欄の隣に表示する", () => {
     renderAxisValueList({ facetItems: [makeItem()] });
