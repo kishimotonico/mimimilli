@@ -1,8 +1,8 @@
 import type { TagPrefixColorKey } from "@mimimilli/shared";
+import TextInput from "../../../shared/ui/TextInput";
 import { ColorSwatches } from "./ColorSwatches";
 
-const INPUT_CLASS =
-  "h-[30px] min-w-0 flex-1 rounded-[6px] border border-line-soft bg-paper-0 px-2.5 font-jp text-secondary text-ink-1 focus-visible:border-line-strong";
+const COMPACT_INPUT_CLASS = "h-[30px] flex-1 border-line-soft text-secondary text-ink-1";
 
 interface TagPrefixAddFormProps {
   prefix: string;
@@ -33,19 +33,21 @@ export default function TagPrefixAddForm({
         onSubmit();
       }}
     >
-      <input
+      <TextInput
         value={prefix}
         onChange={(e) => onPrefixChange(e.target.value)}
         aria-label="新しい prefix"
         placeholder="prefix（例: 気分）"
-        className={INPUT_CLASS}
+        font="jp"
+        className={COMPACT_INPUT_CLASS}
       />
-      <input
+      <TextInput
         value={label}
         onChange={(e) => onLabelChange(e.target.value)}
         aria-label="表示ラベル"
         placeholder="ラベル（省略可）"
-        className={INPUT_CLASS}
+        font="jp"
+        className={COMPACT_INPUT_CLASS}
       />
       <ColorSwatches value={color} onChange={onColorChange} disabled={isMutating} />
       <button

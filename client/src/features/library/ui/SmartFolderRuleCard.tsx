@@ -10,8 +10,9 @@ import { tagPrefixColorToCss } from "../../../entities/work/tagPrefixColor";
 import IconButton from "../../../shared/ui/IconButton";
 import { I } from "../../../shared/ui/Icon";
 import TagCombobox, { type TagComboboxHandle } from "../../../shared/ui/TagCombobox";
+import TextInput from "../../../shared/ui/TextInput";
 
-const inputClass =
+const selectClass =
   "h-8 rounded-[6px] border border-line bg-paper-1 px-2.5 font-jp text-body text-ink-0 focus-visible:border-line-strong";
 
 // エディタと結果バナー（SmartFolderView）で列位置を揃えるための固定幅
@@ -49,12 +50,14 @@ function DurationInput({
           ] as const
         ).map(([part, label]) => (
           <label key={part} className="flex items-center gap-1 font-jp text-secondary text-ink-2">
-            <input
+            <TextInput
               type="number"
               min={0}
               value={parts[part]}
               aria-label={`長さ（${label}）`}
-              className={`${inputClass} w-[68px] font-mono`}
+              font="mono"
+              surface={1}
+              className="w-[68px]"
               onChange={(event) => setPart(part, event.target.value)}
             />
             {label}
@@ -113,7 +116,7 @@ export default function SmartFolderRuleCard({
           <select
             aria-label={`${index + 1}件目の条件の組み合わせ`}
             value={rule.conjunction}
-            className={`${inputClass} ${CONJ_WIDTH_CLASS} font-mono text-label font-bold`}
+            className={`${selectClass} ${CONJ_WIDTH_CLASS} font-mono text-label font-bold`}
             onChange={(event) => {
               const conjunction = event.target.value;
               onUpdate((current) =>
@@ -132,7 +135,7 @@ export default function SmartFolderRuleCard({
         <select
           aria-label={`${index + 1}件目の条件のフィールド`}
           value={rule.field}
-          className={`${inputClass} w-[104px] font-sans`}
+          className={`${selectClass} w-[104px] font-sans`}
           onChange={(event) => onFieldChange(event.target.value as SmartFolderEditorRule["field"])}
         >
           <option value="タグ">タグ</option>

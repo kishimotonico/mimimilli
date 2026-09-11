@@ -12,6 +12,7 @@ import Button from "../../../shared/ui/Button";
 import IconButton from "../../../shared/ui/IconButton";
 import { I } from "../../../shared/ui/Icon";
 import TagCombobox from "../../../shared/ui/TagCombobox";
+import TextInput from "../../../shared/ui/TextInput";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
 import { getAllTags } from "../../../entities/tag/api";
 import { TAG_QUERY_KEYS } from "../../../entities/tag/queryKeys";
@@ -24,9 +25,6 @@ import { buildDlsiteRegistrationBody } from "../../../entities/work/dlsitePrevie
 import { dlsiteFetchErrorMessage } from "../../../entities/work/dlsiteFetchError";
 import { apiErrorMessage } from "../../../shared/lib/apiError";
 import { createWork, fetchDlsiteInfoByCode } from "../api";
-
-const inputClass =
-  "h-8 min-w-0 w-full rounded-[6px] border border-line bg-paper-0 px-2.5 font-sans text-body text-ink-0 placeholder:text-ink-4 focus-visible:border-line-strong disabled:cursor-not-allowed disabled:text-ink-4";
 
 interface RegisterWorkDialogProps {
   folderPath: string;
@@ -188,8 +186,8 @@ export default function RegisterWorkDialog({
           <div className="mb-3 flex flex-col gap-2 rounded-[8px] border border-line-soft p-3">
             <span className="font-sans text-label font-medium text-ink-2">DLsite連携（任意）</span>
             <div className="flex gap-2">
-              <input
-                className={`${inputClass} font-mono text-mono`}
+              <TextInput
+                font="mono"
                 value={rjCode}
                 disabled={submitBusy || dlsiteBusy}
                 placeholder="RJ123456"
@@ -240,8 +238,7 @@ export default function RegisterWorkDialog({
                 <I.refresh size={11} className="text-ink-3 motion-safe:animate-spin" />
               )}
             </span>
-            <input
-              className={inputClass}
+            <TextInput
               value={title}
               disabled={submitBusy}
               onChange={(event) => setTitle(event.target.value)}

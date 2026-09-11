@@ -19,6 +19,7 @@ import ConfirmDialog from "../../../shared/ui/ConfirmDialog";
 import IconButton from "../../../shared/ui/IconButton";
 import { I } from "../../../shared/ui/Icon";
 import { type TagComboboxHandle } from "../../../shared/ui/TagCombobox";
+import TextInput from "../../../shared/ui/TextInput";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
 import SmartFolderRuleCard from "./SmartFolderRuleCard";
 
@@ -36,7 +37,7 @@ interface SmartFolderEditorModalProps {
   onDelete?: () => void;
 }
 
-const inputClass =
+const selectClass =
   "h-8 rounded-[6px] border border-line bg-paper-1 px-2.5 font-jp text-body text-ink-0 focus-visible:border-line-strong";
 
 export default function SmartFolderEditorModal({
@@ -176,11 +177,13 @@ export default function SmartFolderEditorModal({
           <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-[18px] py-4">
             <label className="flex flex-col gap-1.5 font-sans text-label font-medium text-ink-1">
               名前
-              <input
+              <TextInput
                 ref={nameInputRef}
                 value={draft.name}
+                font="jp"
+                surface={1}
                 aria-invalid={Boolean(errors.name)}
-                className={cn(inputClass, "w-full", errors.name && "border-[var(--r-coral)]")}
+                className={cn(errors.name && "border-[var(--r-coral)]")}
                 placeholder="例: 長時間 ASMR"
                 onChange={(event) => {
                   setDraft((current) => ({ ...current, name: event.target.value }));
@@ -196,7 +199,7 @@ export default function SmartFolderEditorModal({
               並び順
               <select
                 value={draft.sort}
-                className={`${inputClass} w-[200px] font-jp`}
+                className={`${selectClass} w-[200px]`}
                 onChange={(event) =>
                   setDraft((current) => ({ ...current, sort: event.target.value as SortId }))
                 }

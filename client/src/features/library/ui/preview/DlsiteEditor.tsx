@@ -10,6 +10,7 @@ import {
 import Button from "../../../../shared/ui/Button";
 import IconButton from "../../../../shared/ui/IconButton";
 import { I } from "../../../../shared/ui/Icon";
+import TextInput from "../../../../shared/ui/TextInput";
 import { useDialogModal } from "../../../../shared/ui/useDialogModal";
 import { WORK_QUERY_KEYS } from "../../../../entities/work/queryKeys";
 import { useDlsiteInvalidation } from "../../../../entities/dlsite/useDlsiteInvalidation";
@@ -28,9 +29,6 @@ export const STATUS_LABEL = {
   error: "取得エラー",
   skipped: "連携しない",
 } as const;
-
-const inputClass =
-  "h-8 min-w-0 rounded-[6px] border border-line bg-paper-0 px-2.5 font-mono text-mono text-ink-0 placeholder:text-ink-4 focus-visible:border-line-strong disabled:cursor-not-allowed disabled:text-ink-4";
 
 interface DlsiteDiffRowProps {
   label: string;
@@ -329,9 +327,10 @@ export function DlsiteEditor({ work }: { work: Work }) {
         </label>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <input
+        <TextInput
           aria-label="DLsite RJ/VJコード"
-          className={`${inputClass} min-w-[150px] flex-1`}
+          font="mono"
+          className="min-w-[150px] flex-1"
           value={rjCode}
           disabled={busy}
           placeholder="RJ123456 / VJ123456"

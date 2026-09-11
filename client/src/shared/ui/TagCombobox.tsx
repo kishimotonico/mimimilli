@@ -10,6 +10,7 @@ import {
   type ForwardedRef,
 } from "react";
 import { cn } from "../lib/cn";
+import TextInput from "./TextInput";
 
 export type TagComboboxOption =
   | { kind: "suggestion"; value: string }
@@ -216,7 +217,7 @@ function TagComboboxImpl(
         setIsOpen(false);
       }}
     >
-      <input
+      <TextInput
         ref={inputRef}
         role="combobox"
         aria-label={label}
@@ -227,11 +228,8 @@ function TagComboboxImpl(
         disabled={disabled}
         value={input}
         placeholder={placeholder}
-        className={cn(
-          "h-8 w-full rounded-[6px] border border-line bg-paper-1 px-2.5 font-jp text-body text-ink-0",
-          "placeholder:text-ink-4 focus-visible:border-line-strong",
-          disabled && "cursor-not-allowed text-ink-4",
-        )}
+        font="jp"
+        surface={1}
         onChange={(event) => openWithInput(event.target.value)}
         onFocus={() => setIsOpen(input.trim().length > 0)}
         onKeyDown={(event) => {

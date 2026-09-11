@@ -2,6 +2,7 @@ import type { RefObject } from "react";
 import type { TagPrefix, TagPrefixColorKey } from "@mimimilli/shared";
 import IconButton from "../../../shared/ui/IconButton";
 import { I } from "../../../shared/ui/Icon";
+import TextInput from "../../../shared/ui/TextInput";
 import { ColorSwatches } from "./ColorSwatches";
 
 const TOGGLE_LABEL_CLASS =
@@ -76,7 +77,7 @@ export default function TagPrefixRow({
       </div>
 
       {isEditing ? (
-        <input
+        <TextInput
           ref={editingLabelInputRef}
           value={editingLabel}
           onChange={(e) => onEditingLabelChange(e.target.value)}
@@ -86,7 +87,8 @@ export default function TagPrefixRow({
             if (e.key === "Escape") onCancelEditLabel();
           }}
           aria-label={`「${p.prefix}」のラベル`}
-          className="h-[24px] min-w-0 flex-1 rounded-1 border border-line bg-paper-0 px-1.5 font-jp text-body text-ink-1 focus-visible:border-line-strong"
+          font="jp"
+          className="h-[24px] flex-1 rounded-1 px-1.5 text-ink-1"
         />
       ) : (
         <button

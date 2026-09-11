@@ -5,6 +5,7 @@ import { isHttpAbsoluteUrl } from "@mimimilli/shared";
 import Button from "../../../../shared/ui/Button";
 import IconButton from "../../../../shared/ui/IconButton";
 import { I } from "../../../../shared/ui/Icon";
+import TextInput from "../../../../shared/ui/TextInput";
 import { useToast } from "../../../../shared/ui/useToast";
 import { useDialogModal } from "../../../../shared/ui/useDialogModal";
 import type { useLibraryWorkPatchMutations } from "../../model/useLibraryQueries";
@@ -13,9 +14,6 @@ import { canPatchWorkSource } from "../../../../entities/work/sourceRevision";
 import { WorkSourcePatchBlockedNotice } from "./WorkSourcePatchBlockedNotice";
 import { DlsiteEditor } from "./DlsiteEditor";
 import { WorkTagEditor } from "./WorkTagEditor";
-
-const inputClass =
-  "h-8 min-w-0 w-full rounded-[6px] border border-line bg-paper-0 px-2.5 font-jp text-body text-ink-0 placeholder:text-ink-4 focus-visible:border-line-strong disabled:cursor-not-allowed disabled:text-ink-4";
 
 interface WorkEditDialogProps {
   work: Work;
@@ -284,10 +282,11 @@ export function WorkEditDialog({
                 タイトル
               </label>
               <div className="flex items-center gap-2">
-                <input
+                <TextInput
                   ref={titleInputRef}
                   id="work-title-input"
-                  className="h-8 min-w-0 flex-1 rounded-[6px] border border-line bg-paper-0 px-2.5 font-jp text-body text-ink-0 focus-visible:border-line-strong disabled:cursor-not-allowed disabled:text-ink-4"
+                  font="jp"
+                  className="flex-1"
                   value={titleDraft}
                   aria-invalid={titleDraft.trim().length === 0}
                   disabled={titleMutation.isPending || !canEditSource}
@@ -331,9 +330,9 @@ export function WorkEditDialog({
               </h3>
               {urlDrafts.map((entry, index) => (
                 <div key={index} className="flex items-center gap-2">
-                  <input
+                  <TextInput
                     ref={index === 0 ? firstUrlInputRef : undefined}
-                    className={inputClass}
+                    font="jp"
                     value={entry.label}
                     aria-label={`URLラベル ${index + 1}`}
                     placeholder="ラベル"
@@ -346,8 +345,8 @@ export function WorkEditDialog({
                       if (urlValidationError) setUrlValidationError(null);
                     }}
                   />
-                  <input
-                    className={`${inputClass} font-mono text-mono`}
+                  <TextInput
+                    font="mono"
                     value={entry.url}
                     aria-label={`URL ${index + 1}`}
                     placeholder="https://"
