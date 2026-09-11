@@ -176,7 +176,7 @@ export default function SettingsModal({
           )}
           {rootFolderStale && (
             <output className="m-0 block rounded-[6px] bg-paper-2 px-2.5 py-2 font-jp text-secondary text-ink-2">
-              一覧は変更前のフォルダーの内容です。再スキャンすると新しいフォルダーの内容に更新されます。
+              再スキャンすると新しいフォルダーの内容になります。
             </output>
           )}
         </div>

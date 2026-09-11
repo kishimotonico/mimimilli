@@ -213,8 +213,7 @@ describe("SettingsModal", () => {
     expect(screen.getByLabelText("ルートフォルダーのパス")).toBeInTheDocument();
   });
 
-  const STALE_NOTICE_TEXT =
-    "一覧は変更前のフォルダーの内容です。再スキャンすると新しいフォルダーの内容に更新されます。";
+  const STALE_NOTICE_TEXT = "再スキャンすると新しいフォルダーの内容になります。";
 
   it("直近スキャンのルートが現在のrootFolderと不一致ならinline noticeを表示する", () => {
     renderModal({ lastScanRootFolder: "/old-root" });
