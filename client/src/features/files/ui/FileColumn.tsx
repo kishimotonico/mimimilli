@@ -1,7 +1,7 @@
 // カラムの中身（ヘッダー + 行リスト）。外側の .mle-col 枠と出入りアニメーションは
 // FilesView 側の motion.div が担うため、ここはフラグメントを返す。
 
-import { useRef } from "react";
+import { useState } from "react";
 import Button from "../../../shared/ui/Button";
 import { I } from "../../../shared/ui/Icon";
 import CollectionStatus from "../../../shared/ui/CollectionStatus";
@@ -9,7 +9,7 @@ import { classifyFile, sortEntries, type FsEntry } from "../model/types";
 import type { WorkspacePath } from "@mimimilli/shared";
 import type { ScanDiagnostic } from "@mimimilli/shared";
 import FileRow from "./FileRow";
-import { useFileListKeyboardNav } from "./useFileListKeyboardNav";
+import { useListKeyboardNav } from "../../../shared/ui/useListKeyboardNav";
 
 interface FileColumnProps {
   title: string;
@@ -49,11 +49,12 @@ export default function FileColumn({
   onRetry,
 }: FileColumnProps) {
   const sorted = sortEntries(entries);
-  const listRef = useRef<HTMLDivElement>(null);
-  const moveRowFocus = useFileListKeyboardNav({
-    listRef,
-    entries: sorted,
-    onFocusEntry,
+  const [listEl, setListEl] = useState<HTMLDivElement | null>(null);
+  const moveRowFocus = useListKeyboardNav({
+    containerEl: listEl,
+    columnCount: 1,
+    items: sorted,
+    onFocusItem: (entry) => onFocusEntry(entry.path),
   });
   // roving tabindexの現在位置。選択中エントリがあればその位置、無ければ先頭（0）を
   // 対象にする（一覧全体でTabストップ1個、作品一覧と同じ規則。仮想化していないため
@@ -66,7 +67,7 @@ export default function FileColumn({
         <span>{title}</span>
         <span className="count">{entries.length}</span>
       </div>
-      <div ref={listRef} className="mle-col__list">
+      <div ref={setListEl} className="mle-col__list">
         {isLoading ? (
           <CollectionStatus variant="list" kind="loading" />
         ) : notFound ? (

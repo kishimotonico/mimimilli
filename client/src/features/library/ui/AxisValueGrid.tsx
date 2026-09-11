@@ -12,7 +12,7 @@ import { selectFixedCoverThumbnailWidth } from "../../../entities/work/ui/coverT
 import CoverCollage from "./CoverCollage";
 import IconButton from "../../../shared/ui/IconButton";
 import { useVirtualGrid } from "../../../shared/ui/useVirtualGrid";
-import { useGridKeyboardNav } from "./useGridKeyboardNav";
+import { useListKeyboardNav } from "../../../shared/ui/useListKeyboardNav";
 import { useRovingIndex } from "./useRovingIndex";
 
 // 値一覧の grid 表示（ADR-0012 §5）。代表カバー2×2コラージュ＋名前＋件数バッジのタイル。
@@ -112,10 +112,8 @@ export default function AxisValueGrid({
     firstFlatIndexOfRow: (rowIndex) => firstFlatIndexOfRow(rowIndex, false, null, columnCount),
   });
 
-  const moveTileFocus = useGridKeyboardNav({
-    gridEl,
-    isJustified: false,
-    justifiedLayout: null,
+  const moveTileFocus = useListKeyboardNav({
+    containerEl: gridEl,
     columnCount,
     items,
     onFocusItem: (_item, index) => setActiveIndex(index),

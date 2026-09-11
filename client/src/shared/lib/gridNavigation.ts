@@ -23,7 +23,7 @@ export function getNextGridIndex(
   return nextIndex < 0 || nextIndex >= itemCount ? currentIndex : nextIndex;
 }
 
-interface JustifiedTilePosition {
+export interface JustifiedTilePosition {
   readonly rowIndex: number;
   readonly centerX: number;
 }

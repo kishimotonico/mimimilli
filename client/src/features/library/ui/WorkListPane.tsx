@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import type { WorkListItem } from "@mimimilli/shared";
 import type { AxisId } from "../../../entities/library/types";
 import { buildEmptyWorksHint, buildEmptyWorksMessage } from "../model/emptyWorks";
@@ -13,7 +13,7 @@ import { I } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
 import { useVirtualList } from "../../../shared/ui/useVirtualList";
 import { useWorkResultsDismiss } from "./useWorkResultsDismiss";
-import { useWorkListKeyboardNav } from "./useWorkListKeyboardNav";
+import { useListKeyboardNav } from "../../../shared/ui/useListKeyboardNav";
 import { useRovingIndex } from "./useRovingIndex";
 
 // 作品一覧のリスト表示（list/grid のうち list）。ADR-0012 §3 によりレイアウトを固定し、
@@ -103,10 +103,20 @@ export default function WorkListPane({
   });
 
   useWorkResultsDismiss(isWorkSelected, onDeselect, scrollRef, ".mll-wrow");
-  const moveRowFocus = useWorkListKeyboardNav({
-    listRef: scrollRef,
-    works,
-    onWorkSelect,
+
+  const [listEl, setListEl] = useState<HTMLDivElement | null>(null);
+  const setListContainer = useCallback(
+    (el: HTMLDivElement | null) => {
+      scrollRef.current = el;
+      setListEl(el);
+    },
+    [scrollRef],
+  );
+  const moveRowFocus = useListKeyboardNav({
+    containerEl: listEl,
+    columnCount: 1,
+    items: works,
+    onFocusItem: (work) => onWorkSelect(work.id),
     virtualizer,
   });
 
@@ -159,7 +169,7 @@ export default function WorkListPane({
 
   return (
     <div className={`mle-col is-results ${isPending ? "is-pending" : ""}`}>
-      <div ref={scrollRef} className="mle-col__list">
+      <div ref={setListContainer} className="mle-col__list">
         {works.length === 0 ? (
           isSmartFolder ? (
             <CollectionStatus
