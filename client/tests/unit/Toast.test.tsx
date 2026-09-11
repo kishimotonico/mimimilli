@@ -156,6 +156,43 @@ describe("Toast", () => {
     vi.useRealTimers();
   });
 
+  it("同じ文面でもrequestKeyが変われば寿命タイマーを取り直す", () => {
+    vi.useFakeTimers();
+    vi.spyOn(HTMLElement.prototype, "showPopover").mockImplementation(() => {});
+    vi.spyOn(HTMLElement.prototype, "hidePopover").mockImplementation(() => {});
+    const onDismissA = vi.fn();
+    const onDismissB = vi.fn();
+
+    const { rerender } = render(
+      <Toast
+        message="候補から外しました"
+        variant="success"
+        onDismiss={onDismissA}
+        requestKey="a"
+      />,
+    );
+    act(() => vi.advanceTimersByTime(TOAST_AUTO_DISMISS_MS - 1));
+    // 文面が同じ別要求（requestKeyだけ変わる）に差し替わる
+    rerender(
+      <Toast
+        message="候補から外しました"
+        variant="success"
+        onDismiss={onDismissB}
+        requestKey="b"
+      />,
+    );
+    act(() => vi.advanceTimersByTime(1));
+    // 旧要求の寿命が引き継がれていれば、この時点で発火してしまう
+    expect(onDismissA).not.toHaveBeenCalled();
+    expect(onDismissB).not.toHaveBeenCalled();
+
+    act(() => vi.advanceTimersByTime(TOAST_AUTO_DISMISS_MS - 1));
+    expect(onDismissB).toHaveBeenCalledTimes(1);
+    expect(onDismissA).not.toHaveBeenCalled();
+
+    vi.useRealTimers();
+  });
+
   it("hoverとfocusは独立に管理し、片方が外れても他方が残っていれば消去を止めたままにする", () => {
     vi.useFakeTimers();
     vi.spyOn(HTMLElement.prototype, "showPopover").mockImplementation(() => {});

@@ -35,6 +35,9 @@ interface ToastProps {
   actionLabel?: string;
   onAction?: () => void;
   onDismiss: () => void;
+  /** 要求ごとに一意な値。Reactのkeyとして使い、文面が同じでも別要求なら寿命タイマーを
+   *  独立させる（未指定時はmessageで代用する） */
+  requestKey?: string;
 }
 
 function syncPopoverVisibility(el: HTMLElement, visible: boolean) {
@@ -50,10 +53,13 @@ function syncPopoverVisibility(el: HTMLElement, visible: boolean) {
 /**
  * 表示寿命タイマー。hover/focus中は一時停止し、離れたら残り時間から再開する。
  * durationMs が null（error variant）のときは何もしない＝手動クローズのみ。
+ * requestKeyが変われば（文面が同じ再通知でも）別要求として寿命タイマーを取り直す。
+ * onDismissは常にrefで最新を持ち、既にスケジュール済みのタイマーが発火しても
+ * 古い（既に差し替わった）要求のonDismissを呼ばないようにする。
  */
 function useAutoDismissTimer(
   durationMs: number | null,
-  message: string,
+  requestKey: string,
   onDismiss: () => void,
 ): { onMouseEnter: () => void; onMouseLeave: () => void; onFocus: () => void; onBlur: () => void } {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -63,6 +69,10 @@ function useAutoDismissTimer(
   // 動かす等）。両方 false になったときだけ再開する
   const hoveredRef = useRef(false);
   const focusedRef = useRef(false);
+  const onDismissRef = useRef(onDismiss);
+  useEffect(() => {
+    onDismissRef.current = onDismiss;
+  }, [onDismiss]);
 
   const clear = () => {
     if (timerRef.current == null) return;
@@ -73,7 +83,7 @@ function useAutoDismissTimer(
   const schedule = (ms: number) => {
     clear();
     startedAtRef.current = Date.now();
-    timerRef.current = setTimeout(onDismiss, ms);
+    timerRef.current = setTimeout(() => onDismissRef.current(), ms);
   };
 
   useEffect(() => {
@@ -82,12 +92,11 @@ function useAutoDismissTimer(
       return;
     }
     remainingRef.current = durationMs;
-    // message差し替え時にすでにhover/focus中なら（同一DOMノードなので再度enter/focusは
-    // 発火しない）、離れるまでスケジュールしない
+    // hover/focus中にrequestKeyだけが変わる（同じ文面の再通知）ケースは無い想定
+    // （再通知は新しい要求としてGlobalToast側でhover状態ごと作り直される）
     if (!hoveredRef.current && !focusedRef.current) schedule(durationMs);
     return clear;
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- onDismiss は同じ効果を持つ安定した呼び出し
-  }, [durationMs, message]);
+  }, [durationMs, requestKey]);
 
   const pause = () => {
     if (timerRef.current == null) return;
@@ -126,16 +135,24 @@ interface ToastContentProps {
   actionLabel?: string;
   onAction?: () => void;
   onDismiss: () => void;
+  requestKey: string;
 }
 
-function ToastContent({ message, variant, actionLabel, onAction, onDismiss }: ToastContentProps) {
+function ToastContent({
+  message,
+  variant,
+  actionLabel,
+  onAction,
+  onDismiss,
+  requestKey,
+}: ToastContentProps) {
   const { fadeSlideUp } = useMotionVariants();
   const isPresent = useIsPresent();
   const v = fadeSlideUp();
   const hasAction = Boolean(actionLabel && onAction);
   const durationMs =
     variant === "error" ? null : hasAction ? TOAST_ACTION_AUTO_DISMISS_MS : TOAST_AUTO_DISMISS_MS;
-  const timerHandlers = useAutoDismissTimer(durationMs, message, onDismiss);
+  const timerHandlers = useAutoDismissTimer(durationMs, requestKey, onDismiss);
   const VariantIcon = VARIANT_ICON[variant];
   return (
     <motion.output
@@ -169,6 +186,7 @@ export default function Toast({
   actionLabel,
   onAction,
   onDismiss,
+  requestKey,
 }: ToastProps) {
   const popoverRef = useRef<HTMLDivElement>(null);
   const topmostOpenDialog = useTopmostOpenModalDialog();
@@ -200,6 +218,7 @@ export default function Toast({
             actionLabel={actionLabel}
             onAction={onAction}
             onDismiss={onDismiss}
+            requestKey={requestKey ?? message}
           />
         )}
       </AnimatePresence>
