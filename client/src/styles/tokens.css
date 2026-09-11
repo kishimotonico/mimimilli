@@ -98,10 +98,4 @@
   /* Layout — frame.cssのグリッド行など、複数箇所で値を合わせる必要がある寸法。
      spacingスケールとは別軸（意味的に固定レイアウト値であり、間隔調整では動かない）。 */
   --topbar-h: 48px;
-
-  /* Library結果面 — 一覧の最低幅（list行が読める幅）とプレビューの最低幅
-     （要件v4 §7.3「可変幅・最小360px」）。結果面の幅がこの2つの和を下回るとき、
-     プレビューは結果面上の全幅オーバーレイへ切り替わる（usePreviewOverlayMode）。 */
-  --lib-results-list-min-w: 320px;
-  --lib-results-preview-min-w: 360px;
 }

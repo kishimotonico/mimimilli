@@ -152,7 +152,7 @@
 }
 .mll-results__content {
   flex: 1 1 0;
-  min-width: var(--lib-results-list-min-w);
+  min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -172,34 +172,21 @@
   min-width: 0;
   border-right: none;
 }
-/* 通常時は結果面の実レイアウトに参加するflex項目（絶対配置で一覧に重ねない）。 */
 .mll-results__preview {
-  position: relative;
-  flex: 0 1 420px;
-  min-width: var(--lib-results-preview-min-w);
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 420px;
   max-width: 90%;
   display: flex;
   box-shadow: var(--shadow-pop);
   border-left: 1px solid var(--line-soft);
 }
-/* 一覧最低幅とプレビュー最低幅の両方を確保できない幅では全幅オーバーレイになる。 */
-.mll-results--overlay .mll-results__preview {
-  position: absolute;
-  inset: 0;
-  flex: none;
-  width: 100%;
-  min-width: 0;
-  max-width: 100%;
-  border-left: none;
-}
 /* 右ペインは position: absolute; bottom: 0 で高さが決まるため、bottom側を
    ポップアップ実寸ぶん引き上げて同様にクライアント高さを縮める。 */
-.mle-app.has-docked-popup .mll-results--overlay .mll-results__preview {
+.mle-app.has-docked-popup .mll-results__preview {
   bottom: calc(var(--popup-h, 0px) + 24px);
-}
-/* 非オーバーレイ時はflex項目なので、bottomではなくpadding-bottomで同じ縮小を行う。 */
-.mle-app.has-docked-popup .mll-results:not(.mll-results--overlay) .mll-results__preview {
-  padding-bottom: calc(var(--popup-h, 0px) + 24px);
 }
 .mle-col.is-axis .mle-col__list {
   gap: 0;
