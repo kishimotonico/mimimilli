@@ -350,15 +350,15 @@ test("スキャン完了後に候補を選択登録でき、問題をFilesで確
 
   await dialog.getByRole("tab", { name: /^要対応/ }).click();
   const attention = dialog.getByRole("tabpanel", { name: "要対応" });
-  // ID重複はworkId単位1行にまとまる（TASK-428.4）: 「登録中」「重複」双方のパスが同じ行に並ぶ。
+  // ID重複はパスごとに1行（master同様）: 1件目がworkId表示、以降は競合相手表示。
   const conflictRow = attention.getByRole("row", { name: /夜想曲スタジオ/ });
   await expect(conflictRow.getByText("ID重複", { exact: true })).toBeVisible();
-  await expect(conflictRow.getByText("登録中:")).toBeVisible();
-  await expect(conflictRow.getByText("重複:")).toBeVisible();
-  await expect(conflictRow.getByText(/copies\//)).toBeVisible();
+  await expect(conflictRow.getByText(/workId: RJ501001/)).toBeVisible();
+  await expect(attention.getByText("競合相手")).toBeVisible();
+  await expect(attention.getByText(/copies\//)).toBeVisible();
   await expect(attention.getByText("読み取り失敗", { exact: true })).toBeVisible();
 
-  await conflictRow.getByRole("button", { name: "Filesで開く" }).first().click();
+  await conflictRow.getByRole("button", { name: "Filesで開く" }).click();
   await expect(page.getByRole("button", { name: "ファイル", exact: true })).toHaveAttribute(
     "aria-pressed",
     "true",
