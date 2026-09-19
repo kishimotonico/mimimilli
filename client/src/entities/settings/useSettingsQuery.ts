@@ -10,6 +10,25 @@ export function useSettingsQuery() {
   });
 }
 
-export function useRootFolder(): string | null {
+export class RootFolderNotSetError extends Error {
+  constructor() {
+    super("ルートフォルダーが未設定です。アプリを再起動してください。");
+    this.name = "RootFolderNotSetError";
+  }
+}
+
+/** 通常画面の前提（起動ゲート通過後は rootFolder が必ずある）を型で表す。前提が崩れていれば投げる */
+export function requireRootFolder(rootFolder: string | null | undefined): string {
+  if (!rootFolder) throw new RootFolderNotSetError();
+  return rootFolder;
+}
+
+/** 通常画面専用。settings 未取得・rootFolder 未設定なら投げる */
+export function useRootFolder(): string {
+  return requireRootFolder(useSettingsQuery().data?.rootFolder);
+}
+
+/** 起動ゲート（App の startupState 判定・SetupScreen）専用。root がまだ無い状態を扱う */
+export function useRootFolderOrNull(): string | null {
   return useSettingsQuery().data?.rootFolder ?? null;
 }

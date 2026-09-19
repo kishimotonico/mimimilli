@@ -11,7 +11,6 @@ import type { PlaybackTrack } from "../entities/player/model/playbackTrack";
 const FilesView = lazy(() => import("../features/files/ui/FilesView"));
 
 interface AppBodyProps {
-  rootFolder: string;
   onPlay: (work: WorkListItem, trackIndex: number) => void;
   onResume: (work: Work) => void;
   onTogglePlay: () => void;
@@ -21,7 +20,6 @@ interface AppBodyProps {
 }
 
 export default function AppBody({
-  rootFolder,
   onPlay,
   onResume,
   onTogglePlay,
@@ -34,7 +32,7 @@ export default function AppBody({
   if (mode === "files") {
     return (
       <Suspense fallback={null}>
-        <FilesView rootFolder={rootFolder} onPlayFile={onPlayFile} />
+        <FilesView onPlayFile={onPlayFile} onTogglePlay={onTogglePlay} />
       </Suspense>
     );
   }

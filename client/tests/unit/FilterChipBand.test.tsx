@@ -29,16 +29,13 @@ function renderFilterChipBand(worksTotal?: number) {
 }
 
 describe("FilterChipBand のチップクリック", () => {
-  it("兄弟値ドロップダウンの facet 集計に、自分のタグを除く現在選択中の全タグを渡す（他軸フィルタの引き継ぎ）", async () => {
+  it("兄弟値ドロップダウンは既定=置き換えの入口なので、facet 集計を無条件（フィルタ無し）で行う（件数基準を主クリックの結果と一致させる）", async () => {
     renderFilterChipBand();
 
     await userEvent.click(screen.getByRole("button", { name: "cv/藤田茜" }));
 
     await waitFor(() => {
-      expect(getAxisFacets).toHaveBeenCalledWith("cv", {
-        tags: ["サークル/月白製作所"],
-        tagOp: "AND",
-      });
+      expect(getAxisFacets).toHaveBeenCalledWith("cv", {});
     });
   });
 });

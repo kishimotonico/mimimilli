@@ -101,7 +101,7 @@ export function WorkMetadataActions({
               <button
                 type="button"
                 role="menuitem"
-                className="flex min-h-7 w-full items-center gap-2 rounded-1 px-2 font-jp text-[12px] text-ink-1 hover:bg-paper-2 hover:text-ink-0 focus:bg-paper-2 focus:outline-none"
+                className="flex min-h-7 w-full items-center gap-2 rounded-1 px-2 font-jp text-body text-ink-1 hover:bg-paper-2 hover:text-ink-0 focus:bg-paper-2"
                 onClick={() => {
                   close();
                   onShowInfo();
@@ -121,7 +121,7 @@ export function WorkMetadataActions({
                         <a
                           key={u.url}
                           role="menuitem"
-                          className="flex min-h-7 w-full items-center gap-2 rounded-1 px-2 font-jp text-[12px] text-ink-1 hover:bg-paper-2 hover:text-ink-0 focus:bg-paper-2 focus:outline-none"
+                          className="flex min-h-7 w-full items-center gap-2 rounded-1 px-2 font-jp text-body text-ink-1 hover:bg-paper-2 hover:text-ink-0 focus:bg-paper-2"
                           href={href}
                           target="_blank"
                           rel="noreferrer"
@@ -137,7 +137,7 @@ export function WorkMetadataActions({
                         key={u.url}
                         role="menuitem"
                         aria-disabled="true"
-                        className="flex min-h-7 w-full items-center gap-2 rounded-1 px-2 font-jp text-[12px] text-ink-2"
+                        className="flex min-h-7 w-full items-center gap-2 rounded-1 px-2 font-jp text-body text-ink-2"
                       >
                         <I.ext size={13} />
                         <span className="min-w-0 flex-1 truncate">{label}</span>
@@ -150,7 +150,7 @@ export function WorkMetadataActions({
               <button
                 type="button"
                 role="menuitem"
-                className="flex min-h-7 w-full items-center gap-2 rounded-1 px-2 font-jp text-[12px] text-[color:var(--r-coral)] hover:bg-paper-2 focus:bg-paper-2 focus:outline-none"
+                className="flex min-h-7 w-full items-center gap-2 rounded-1 px-2 font-jp text-body text-[color:var(--r-coral)] hover:bg-paper-2 focus:bg-paper-2"
                 onClick={() => {
                   close();
                   onDelete();

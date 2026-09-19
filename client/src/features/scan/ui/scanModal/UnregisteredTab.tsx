@@ -1,10 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
 import { useSetAtom } from "jotai";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { hasRjCode, rjCodeFormatSchema, type ScanCandidate } from "@mimimilli/shared";
 import Button from "../../../../shared/ui/Button";
 import IconButton from "../../../../shared/ui/IconButton";
-import Toast from "../../../../shared/ui/Toast";
+import { useToast } from "../../../../shared/ui/useToast";
 import { I } from "../../../../shared/ui/Icon";
 import { cn } from "../../../../shared/lib/cn";
 import { ApiRequestError } from "../../../../shared/api/http";
@@ -13,6 +19,7 @@ import { parentDirOf } from "../../../../shared/lib/workspacePath";
 import { excludeScanCandidates, registerScanCandidates, SCAN_QUERY_KEYS } from "../../api";
 import { restoreScanCandidateExclusions } from "../../../../entities/scan/api";
 import { refreshScanCandidates } from "../../../../entities/scan/scanCandidatesCache";
+import { invalidateLibraryQueries } from "../../model/libraryInvalidation";
 import { scanCandidateHiddenPathsAtom } from "../../../../entities/scan/model/atoms";
 import type { CandidatesRegisteredResult } from "./types";
 
@@ -21,9 +28,11 @@ export interface UnregisteredTabProps {
   onRegistered: (result: CandidatesRegisteredResult) => void;
 }
 
-interface ExcludeToast {
-  path: string;
-  title: string;
+/** 不正値の入力欄を離れても消えない、行単位のRJコードエラー。値も一緒に保持し、
+ *  再度そのセルを開いたときに書きかけの内容から続けられるようにする。 */
+interface FieldError {
+  value: string;
+  message: string;
 }
 
 export default function UnregisteredTab({ candidates, onRegistered }: UnregisteredTabProps) {
@@ -31,27 +40,38 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
   const setHiddenPaths = useSetAtom(scanCandidateHiddenPathsAtom);
   const [deselectedPaths, setDeselectedPaths] = useState<Set<string>>(() => new Set());
   const [rjCodeOverrides, setRjCodeOverrides] = useState<Map<string, string>>(() => new Map());
-  const [rjCodeErrors, setRjCodeErrors] = useState<Map<string, string>>(() => new Map());
+  const [fieldErrors, setFieldErrors] = useState<Map<string, FieldError>>(() => new Map());
   const [editingPath, setEditingPath] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [excludeToast, setExcludeToast] = useState<ExcludeToast | null>(null);
+  const toast = useToast();
   const headerCheckboxRef = useRef<HTMLInputElement>(null);
-  const rjCodeInputRef = useRef<HTMLInputElement>(null);
+  const editingInputRef = useRef<HTMLInputElement>(null);
+
+  const effectiveRjCode = (candidate: ScanCandidate) =>
+    rjCodeOverrides.has(candidate.path)
+      ? (rjCodeOverrides.get(candidate.path) ?? "")
+      : candidate.rjCode;
+  const hasFieldError = (path: string) => fieldErrors.has(path);
 
   const selectedCandidates = useMemo(
     () => candidates.filter((candidate) => !deselectedPaths.has(candidate.path)),
     [candidates, deselectedPaths],
   );
+  // 不正な値が残っている行は、選択済みでも登録対象から外す（値を確定できていないため）。
+  const registerableCandidates = selectedCandidates.filter(
+    (candidate) => !hasFieldError(candidate.path),
+  );
   const allSelected = candidates.length > 0 && selectedCandidates.length === candidates.length;
   const partiallySelected = selectedCandidates.length > 0 && !allSelected;
+  const excludedByErrorCount = selectedCandidates.length - registerableCandidates.length;
 
   useEffect(() => {
     if (headerCheckboxRef.current) headerCheckboxRef.current.indeterminate = partiallySelected;
   }, [partiallySelected]);
 
   useEffect(() => {
-    if (editingPath) rjCodeInputRef.current?.focus();
+    if (editingPath) editingInputRef.current?.focus();
   }, [editingPath]);
 
   const registerMutation = useMutation({
@@ -62,6 +82,8 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
       setErrorMessage(
         failures.length > 0 ? `${failures.length}件はライブラリに追加できませんでした。` : null,
       );
+      // 部分失敗時も、実際に登録できた分だけがサーバー側の状態。再取得で正しい件数に揃える。
+      if (registered.length > 0) void invalidateLibraryQueries(queryClient);
       onRegistered({
         registeredWorkIds: registered.map((entry) => entry.workId),
         failedCount: failures.length,
@@ -82,7 +104,13 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
     mutationFn: (candidate: ScanCandidate) => excludeScanCandidates([candidate.path]),
     onSuccess: async (_void, candidate) => {
       setHiddenPaths((previous) => new Set(previous).add(candidate.path));
-      setExcludeToast({ path: candidate.path, title: candidate.inferredTitle });
+      toast.show({
+        message: `「${candidate.inferredTitle}」を候補から外しました`,
+        variant: "success",
+        actionLabel: "元に戻す",
+        onAction: () => restoreMutation.mutate(candidate.path),
+        priority: "action",
+      });
       await queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.candidateExclusions() });
     },
     onError: (error) => setErrorMessage(apiErrorMessage(error, "候補から外せませんでした")),
@@ -91,7 +119,7 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
   const restoreMutation = useMutation({
     mutationFn: (path: string) => restoreScanCandidateExclusions([path]),
     onSuccess: async (_void, path) => {
-      setExcludeToast(null);
+      toast.dismiss();
       setHiddenPaths((previous) => {
         if (!previous.has(path)) return previous;
         const next = new Set(previous);
@@ -120,57 +148,73 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
     });
   };
 
-  const startEdit = (candidate: ScanCandidate) => {
-    setEditingPath(candidate.path);
-    setEditingValue(rjCodeOverrides.get(candidate.path) ?? candidate.rjCode ?? "");
-  };
-
-  const commitEdit = () => {
-    if (editingPath === null) return;
-    const path = editingPath;
-    const value = editingValue.trim();
-    if (value === "") {
-      setRjCodeOverrides((previous) => new Map(previous).set(path, ""));
-      setRjCodeErrors((previous) => {
-        if (!previous.has(path)) return previous;
-        const next = new Map(previous);
-        next.delete(path);
-        return next;
-      });
-      setEditingPath(null);
-      return;
-    }
-    const parsed = rjCodeFormatSchema.safeParse(value);
-    if (!parsed.success) {
-      setRjCodeOverrides((previous) => new Map(previous).set(path, value));
-      setRjCodeErrors((previous) =>
-        new Map(previous).set(
-          path,
-          parsed.error.issues[0]?.message ?? "RJ/VJコードの形式が正しくありません",
-        ),
-      );
-      setEditingPath(null);
-      return;
-    }
-    setRjCodeOverrides((previous) => new Map(previous).set(path, parsed.data));
-    setRjCodeErrors((previous) => {
+  const clearFieldError = (path: string) => {
+    setFieldErrors((previous) => {
       if (!previous.has(path)) return previous;
       const next = new Map(previous);
       next.delete(path);
       return next;
     });
+  };
+
+  const startEdit = (candidate: ScanCandidate) => {
+    const pending = fieldErrors.get(candidate.path);
+    setEditingPath(candidate.path);
+    setEditingValue(pending ? pending.value : (effectiveRjCode(candidate) ?? ""));
+  };
+
+  /** Escapeでの取り消し。保存はせず、書きかけの不正値も含めて編集を破棄する
+   *  （検索欄と同じ「1段だけ閉じる」契約）。 */
+  const cancelEdit = () => {
+    if (editingPath) clearFieldError(editingPath);
     setEditingPath(null);
   };
 
-  const selectedRjCodeErrorCount = selectedCandidates.filter((candidate) =>
-    rjCodeErrors.has(candidate.path),
-  ).length;
+  const commitEdit = () => {
+    if (editingPath === null) return;
+    const path = editingPath;
+    const trimmed = editingValue.trim();
+
+    if (trimmed === "") {
+      setRjCodeOverrides((previous) => new Map(previous).set(path, ""));
+      clearFieldError(path);
+      setEditingPath(null);
+      return;
+    }
+    const parsed = rjCodeFormatSchema.safeParse(trimmed);
+    if (!parsed.success) {
+      setFieldErrors((previous) =>
+        new Map(previous).set(path, {
+          value: editingValue,
+          message: parsed.error.issues[0]?.message ?? "RJ/VJコードの形式が正しくありません",
+        }),
+      );
+      // blurで抜けても、行を離れたあともエラーが残るよう state で保持する一方、
+      // 今まさに編集中のこの入力欄へは同期的にフォーカスを戻す（値の変化に依らず毎回効かせる）。
+      editingInputRef.current?.focus();
+      return;
+    }
+    setRjCodeOverrides((previous) => new Map(previous).set(path, parsed.data));
+    clearFieldError(path);
+    setEditingPath(null);
+  };
+
+  const handleEditKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (event.nativeEvent.isComposing) return;
+    if (event.key === "Enter") commitEdit();
+    if (event.key === "Escape") {
+      // 入力欄側で編集を取り消し、モーダルのEscapeクローズ（<dialog>のcancel既定動作）
+      // まで伝播させない。親は編集中かどうかを知らなくてよい。
+      event.preventDefault();
+      event.stopPropagation();
+      cancelEdit();
+    }
+  };
 
   const handleRegisterSelected = () => {
-    if (selectedRjCodeErrorCount > 0) return;
-    const items = selectedCandidates.map((candidate) => ({
+    const items = registerableCandidates.map((candidate) => ({
       path: candidate.path,
-      rjCode: rjCodeOverrides.get(candidate.path) ?? candidate.rjCode ?? "",
+      rjCode: effectiveRjCode(candidate) ?? "",
     }));
     registerMutation.mutate(items);
   };
@@ -178,19 +222,19 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
   return (
     <div className="flex flex-col gap-3">
       {candidates.length === 0 ? (
-        <p className="font-jp text-[12px] text-ink-3">未登録の候補はありません。</p>
+        <p className="font-jp text-body text-ink-2">未登録の候補はありません。</p>
       ) : (
         <>
-          <p className="font-jp text-[11.5px] text-ink-2">
+          <p className="font-jp text-secondary text-ink-2">
             まだライブラリで管理していないフォルダーです。追加すると mimimilli.json
-            を作成して、作品として管理します。RJコードはフォルダー名から自動で拾い、未検出なら手入力できます。
+            を作成して、作品として管理します。RJコードはフォルダー名から自動で拾い、未検出ならクリックして直せます。
           </p>
           <div className="overflow-hidden rounded-[6px] border border-line-soft">
-            <table className="w-full table-fixed border-collapse text-[11px]">
+            <table className="w-full table-fixed border-collapse text-secondary">
               <colgroup>
                 <col className="w-[32px]" />
                 <col className="w-[26%]" />
-                <col className="w-[104px]" />
+                <col className="w-[112px]" />
                 <col />
                 <col className="w-[56px]" />
                 <col className="w-[32px]" />
@@ -226,11 +270,11 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
               </thead>
               <tbody className="divide-y divide-line-soft">
                 {candidates.map((candidate) => {
-                  const editing = editingPath === candidate.path;
-                  const effectiveRjCode = rjCodeOverrides.has(candidate.path)
-                    ? (rjCodeOverrides.get(candidate.path) ?? "")
-                    : candidate.rjCode;
-                  const rjCodeError = rjCodeErrors.get(candidate.path);
+                  const rjCodeEditing = editingPath === candidate.path;
+                  const rjCodeError = fieldErrors.get(candidate.path);
+                  const rjCode = effectiveRjCode(candidate);
+                  const rjCodeDisplayValue = rjCodeError ? rjCodeError.value : rjCode;
+                  const rowHasError = Boolean(rjCodeError);
                   const parentFolder = parentDirOf(candidate.path);
                   return (
                     <tr key={candidate.path}>
@@ -239,54 +283,62 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
                           type="checkbox"
                           aria-label={`「${candidate.inferredTitle}」を選択`}
                           checked={!deselectedPaths.has(candidate.path)}
-                          disabled={busy}
+                          disabled={busy || rowHasError}
+                          title={
+                            rowHasError
+                              ? "値にエラーがあるため、直すまで登録から除外されます"
+                              : undefined
+                          }
                           onChange={() => toggleRow(candidate.path)}
                         />
                       </td>
-                      <td className="truncate px-2.5 py-2 align-middle text-ink-0">
+                      <td className="truncate px-2.5 py-2 align-middle font-jp text-ink-0">
                         {candidate.inferredTitle}
                       </td>
                       <td className="px-2.5 py-2 align-middle">
-                        {editing ? (
+                        {rjCodeEditing ? (
                           <input
-                            ref={rjCodeInputRef}
+                            ref={editingInputRef}
                             value={editingValue}
                             onChange={(event) => setEditingValue(event.target.value)}
                             onBlur={commitEdit}
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter") commitEdit();
-                            }}
+                            onKeyDown={handleEditKeyDown}
                             placeholder="RJコード"
-                            className="w-full min-w-0 rounded-[4px] border border-acc bg-paper-2 px-1.5 py-0.5 font-mono text-[10.5px] text-ink-0 outline-none"
+                            className={cn(
+                              "w-full min-w-0 rounded-[4px] border bg-paper-2 px-1.5 py-0.5 font-mono text-mono text-ink-0",
+                              rjCodeError ? "border-[var(--r-coral)]" : "border-acc",
+                            )}
                           />
                         ) : (
-                          <>
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() => startEdit(candidate)}
-                              title={rjCodeError ?? "クリックしてRJコードを編集"}
-                              className={cn(
-                                "font-mono text-[10.5px]",
-                                rjCodeError
-                                  ? "text-[var(--r-coral)]"
-                                  : hasRjCode({ rjCode: effectiveRjCode })
-                                    ? "text-ink-1"
-                                    : "text-ink-4",
-                              )}
-                            >
-                              {hasRjCode({ rjCode: effectiveRjCode }) ? effectiveRjCode : "未検出"}
-                            </button>
-                            {rjCodeError && (
-                              <p className="font-jp text-[9.5px] text-[var(--r-coral)]">
-                                {rjCodeError}
-                              </p>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => startEdit(candidate)}
+                            title={rjCodeError?.message ?? "クリックしてRJコードを編集"}
+                            className={cn(
+                              "font-mono text-mono",
+                              rjCodeError
+                                ? "text-[var(--r-coral)]"
+                                : hasRjCode({ rjCode })
+                                  ? "text-ink-1"
+                                  : "text-ink-4",
                             )}
-                          </>
+                          >
+                            {rjCodeError
+                              ? rjCodeDisplayValue
+                              : hasRjCode({ rjCode })
+                                ? rjCode
+                                : "未検出"}
+                          </button>
+                        )}
+                        {rjCodeError && (
+                          <p role="alert" className="font-jp text-caption text-[var(--r-coral)]">
+                            {rjCodeError.message}
+                          </p>
                         )}
                       </td>
                       <td
-                        className="px-2.5 py-2 align-middle font-mono text-[10px] text-ink-3"
+                        className="px-2.5 py-2 align-middle font-mono text-caption text-ink-2"
                         title={parentFolder ?? undefined}
                       >
                         {parentFolder ? (
@@ -316,36 +368,29 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
             </table>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-jp text-[11px] text-ink-2">
+            <span className="font-jp text-secondary text-ink-2">
               {selectedCandidates.length}件選択中
             </span>
             <Button
               variant="primary"
-              disabled={busy || selectedCandidates.length === 0 || selectedRjCodeErrorCount > 0}
+              disabled={busy || registerableCandidates.length === 0}
               onClick={handleRegisterSelected}
             >
-              {selectedCandidates.length}件をライブラリに追加
+              {registerableCandidates.length}件をライブラリに追加
             </Button>
-            {selectedRjCodeErrorCount > 0 && (
-              <span role="alert" className="font-jp text-[11px] text-[var(--r-coral)]">
-                RJコードの形式が正しくない項目が{selectedRjCodeErrorCount}
-                件あります。修正してください。
+            {excludedByErrorCount > 0 && (
+              <span role="alert" className="font-jp text-secondary text-[var(--r-coral)]">
+                エラーのある{excludedByErrorCount}件は登録から除外されます。
               </span>
             )}
           </div>
         </>
       )}
       {errorMessage && (
-        <p role="alert" className="font-jp text-[11px] text-[var(--r-coral)]">
+        <p role="alert" className="font-jp text-secondary text-[var(--r-coral)]">
           {errorMessage}
         </p>
       )}
-      <Toast
-        message={excludeToast ? `「${excludeToast.title}」を候補から外しました` : null}
-        actionLabel="元に戻す"
-        onAction={() => excludeToast && restoreMutation.mutate(excludeToast.path)}
-        onDismiss={() => setExcludeToast(null)}
-      />
     </div>
   );
 }

@@ -12,17 +12,17 @@ import {
 import { refreshScanCandidates } from "../../../entities/scan/scanCandidatesCache";
 import { scanCandidateHiddenPathsAtom } from "../../../entities/scan/model/atoms";
 import Button from "../../../shared/ui/Button";
-import Toast from "../../../shared/ui/Toast";
+import { useToast } from "../../../shared/ui/useToast";
 import { apiErrorMessage } from "../../../shared/lib/apiError";
 
 const SECTION_LABEL_CLASS =
-  "font-sans text-[10.5px] font-semibold tracking-[0.08em] text-ink-3 uppercase";
+  "font-sans text-label font-semibold tracking-[0.08em] text-ink-2 uppercase";
 
 export default function ExcludedFoldersSettings() {
   const queryClient = useQueryClient();
   const setHiddenPaths = useSetAtom(scanCandidateHiddenPathsAtom);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [restoredToast, setRestoredToast] = useState<string | null>(null);
+  const toast = useToast();
 
   const exclusionsQuery = useQuery({
     queryKey: SCAN_CANDIDATE_EXCLUSIONS_QUERY_KEY,
@@ -34,7 +34,11 @@ export default function ExcludedFoldersSettings() {
     mutationFn: (path: string) => restoreScanCandidateExclusions([path]),
     onSuccess: async (_void, path) => {
       setErrorMessage(null);
-      setRestoredToast(path);
+      toast.show({
+        message: `「${path}」を候補に戻しました`,
+        variant: "success",
+        priority: "action",
+      });
       setHiddenPaths((previous) => {
         if (!previous.has(path)) return previous;
         const next = new Set(previous);
@@ -50,9 +54,10 @@ export default function ExcludedFoldersSettings() {
     <div className="flex flex-col gap-2">
       <span className={SECTION_LABEL_CLASS}>候補から外したフォルダー</span>
 
-      <div className="flex max-h-[160px] flex-col overflow-y-auto rounded-[6px] border border-line-soft bg-paper-0">
+      {/* 設定モーダルの本文スクロールに一本化。ここでは内側スクロールを持たない */}
+      <div className="flex flex-col rounded-[6px] border border-line-soft bg-paper-0">
         {exclusions.length === 0 ? (
-          <span className="px-3 py-2.5 text-[11.5px] text-ink-3">
+          <span className="px-3 py-2.5 text-secondary text-ink-2">
             候補から外したフォルダーはありません
           </span>
         ) : (
@@ -64,7 +69,7 @@ export default function ExcludedFoldersSettings() {
               <span
                 dir="rtl"
                 title={path}
-                className="mll-selectable min-w-0 flex-1 overflow-hidden text-left font-mono text-[11px] text-ellipsis whitespace-nowrap text-ink-2"
+                className="mll-selectable min-w-0 flex-1 overflow-hidden text-left font-mono text-mono text-ellipsis whitespace-nowrap text-ink-2"
               >
                 {path}
               </span>
@@ -82,15 +87,10 @@ export default function ExcludedFoldersSettings() {
       </div>
 
       {errorMessage && (
-        <p role="alert" className="mll-selectable m-0 text-[11px] text-[var(--r-coral)]">
+        <p role="alert" className="mll-selectable m-0 text-secondary text-[var(--r-coral)]">
           {errorMessage}
         </p>
       )}
-
-      <Toast
-        message={restoredToast ? `「${restoredToast}」を候補に戻しました` : null}
-        onDismiss={() => setRestoredToast(null)}
-      />
     </div>
   );
 }

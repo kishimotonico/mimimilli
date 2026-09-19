@@ -1,6 +1,6 @@
 // ScanModal のEsc/backdrop挙動（TASK-56: NewWorkPopupの統合先）のコンポーネントテスト。
 // happy-dom は <dialog> の showModal/close を実装していないため、テスト対象に必要な分だけ差し替える。
-import { createElement } from "react";
+import { createElement, Fragment } from "react";
 import { render, screen, fireEvent, waitFor, act, within } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
@@ -16,6 +16,7 @@ import {
   type WorksPage,
 } from "@mimimilli/shared";
 import ScanModal from "../../src/features/scan/ui/ScanModal";
+import GlobalToast from "../../src/app/ui/GlobalToast";
 import * as workApi from "../../src/entities/work/api";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { scanActionsAtom, scanJobAtom } from "../../src/entities/scan/model/atoms";
@@ -189,6 +190,16 @@ function seedScanQueries(
   if (queryClient.getQueryData(SCAN_QUERY_KEYS.diagnostics()) === undefined) {
     queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), { diagnostics: [] });
   }
+  // 通知ベルと同じ要対応集計。未シードだと実fetchへ落ちるため既定値で固定する。
+  if (queryClient.getQueryData(WORK_QUERY_KEYS.dlsiteNotificationSummary()) === undefined) {
+    queryClient.setQueryData(WORK_QUERY_KEYS.dlsiteNotificationSummary(), {
+      rjCodeMissingCount: 0,
+      fetchFailedCount: 0,
+      parseErrorCount: 0,
+      parseErrorAlert: false,
+      unlinkedCount: 0,
+    });
+  }
 }
 
 function openTab(name: string) {
@@ -221,15 +232,27 @@ function renderModal(
   const modalProps = {
     lastScanTime: null,
     onClose: vi.fn(),
-    onOpenRjCodeMissing: vi.fn(),
     ...rest,
   };
+
+  // Toastは単一ホスト（GlobalToast）へ集約されているため、ScanModal・
+  // UnregisteredTabの表示要求を目に見える形で検証するにはGlobalToastも一緒に描画する。
+  const globalToast = () =>
+    createElement(GlobalToast, {
+      onOpenScan: () => {},
+      onOpenScanNeedsAttention: () => {},
+      onRetrySkippedTrack: () => {},
+    });
 
   const view = render(
     createElement(
       QueryClientProvider,
       { client: queryClient },
-      createElement(JotaiProvider, { store }, createElement(ScanModal, modalProps)),
+      createElement(
+        JotaiProvider,
+        { store },
+        createElement(Fragment, null, createElement(ScanModal, modalProps), globalToast()),
+      ),
     ),
   );
 
@@ -243,7 +266,12 @@ function renderModal(
         createElement(
           JotaiProvider,
           { store },
-          createElement(ScanModal, { ...modalProps, ...newRest }),
+          createElement(
+            Fragment,
+            null,
+            createElement(ScanModal, { ...modalProps, ...newRest }),
+            globalToast(),
+          ),
         ),
       ),
     );
@@ -558,6 +586,71 @@ describe("ScanModal", () => {
     );
   });
 
+  it("候補登録に成功すると作品一覧・軸件数・DLsite通知・スマートフォルダーのクエリを無効化する", async () => {
+    vi.spyOn(scanApi, "registerScanCandidates").mockResolvedValue({
+      registered: [{ path: candidateDetected.path, workId: "w-detected" }],
+      failures: [],
+    });
+    const { queryClient } = renderModal({
+      lastResult: { ...scanResult, candidates: [candidateDetected] },
+    });
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });
+    await expect.poll(() => unregistered.textContent).toContain(candidateDetected.inferredTitle);
+    fireEvent.click(within(unregistered).getByRole("button", { name: "1件をライブラリに追加" }));
+
+    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["works"] }));
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["axisFacets"] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["dlsiteNotifications"] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["smartFolderWorks"] });
+  });
+
+  it("候補登録が部分失敗しても、成功分がある限り作品一覧等を無効化する", async () => {
+    vi.spyOn(scanApi, "registerScanCandidates").mockResolvedValue({
+      registered: [{ path: candidateDetected.path, workId: "w-detected" }],
+      failures: [{ path: candidateUndetected.path, message: "失敗" }],
+    });
+    const { queryClient } = renderModal({
+      lastResult: { ...scanResult, candidates: [candidateDetected, candidateUndetected] },
+    });
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });
+    await expect.poll(() => unregistered.textContent).toContain(candidateDetected.inferredTitle);
+    fireEvent.click(within(unregistered).getByRole("button", { name: "2件をライブラリに追加" }));
+
+    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["works"] }));
+    await waitFor(() =>
+      expect(screen.getByText("1件はライブラリに追加できませんでした。")).toBeInTheDocument(),
+    );
+  });
+
+  it("候補の除外では作品一覧・軸件数・スマートフォルダーの再取得を行わない（AC#4）", async () => {
+    vi.spyOn(scanApi, "excludeScanCandidates").mockResolvedValue(undefined);
+    const { queryClient } = renderModal({
+      lastResult: { ...scanResult, candidates: [candidateUndetected] },
+    });
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    const unregistered = screen.getByRole("tabpanel", { name: /^未登録/ });
+    await expect.poll(() => unregistered.textContent).toContain(candidateUndetected.inferredTitle);
+    fireEvent.click(
+      within(unregistered).getByRole("button", {
+        name: `「${candidateUndetected.inferredTitle}」を候補から外す`,
+      }),
+    );
+
+    await waitFor(() =>
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: SCAN_QUERY_KEYS.candidateExclusions(),
+      }),
+    );
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ["works"] });
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ["axisFacets"] });
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ["smartFolderWorks"] });
+  });
+
   it("未検出のRJコードをクリックで編集し、編集した値を登録に送る", async () => {
     const registerSpy = vi.spyOn(scanApi, "registerScanCandidates").mockResolvedValue({
       registered: [{ path: candidateUndetected.path, workId: "w-undetected" }],
@@ -677,6 +770,17 @@ describe("ScanModalと他画面が同じlibraryTotalQueryOptionsを共有する�
       if (url.pathname === "/api/scan/candidates") {
         return Promise.resolve(jsonResponse({ candidates: [] }));
       }
+      if (url.pathname === "/api/dlsite/notifications") {
+        return Promise.resolve(
+          jsonResponse({
+            rjCodeMissingCount: 0,
+            fetchFailedCount: 0,
+            parseErrorCount: 0,
+            parseErrorAlert: false,
+            unlinkedCount: 0,
+          }),
+        );
+      }
       return Promise.reject(new Error(`unexpected fetch: ${url.toString()}`));
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -710,7 +814,6 @@ describe("ScanModalと他画面が同じlibraryTotalQueryOptionsを共有する�
             createElement(ScanModal, {
               lastScanTime: null,
               onClose: vi.fn(),
-              onOpenRjCodeMissing: vi.fn(),
             }),
           ),
         ),

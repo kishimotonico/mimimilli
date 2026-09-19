@@ -4,6 +4,7 @@ import type {
   SmartFolder,
   SmartFolderCreate,
   SmartFolderEvalQuery,
+  SmartFolderRule,
   SmartFolderUpdate,
   TagPrefix,
   TagPrefixCandidate,
@@ -13,12 +14,17 @@ import type {
 } from "@mimimilli/shared";
 
 export interface ClassificationAdapter {
-  /** axis は "tag" / "year" / 任意の prefix 文字列（正規形・小文字）（ADR-0005） */
-  getAxisFacets(axis: string, filter?: Partial<AxisFacetsQuery>): Promise<AxisFacetItem[]>;
+  /** axis は "tag" / "year" / 任意の prefix 文字列（正規形・小文字）（ADR-0005）。
+   *  filter.smartFolder を指定したのに解決できない場合は null（ルートが 404 を返す。
+   *  /smart-folders/:id/works と同じ「解決できない」応答に揃える） */
+  getAxisFacets(axis: string, filter?: Partial<AxisFacetsQuery>): Promise<AxisFacetItem[] | null>;
   listTagPrefixes(): Promise<TagPrefix[]>;
   /** 既存の prefix と重複する場合は null（ルートが 409 を返す） */
   createTagPrefix(input: TagPrefixCreate): Promise<TagPrefix | null>;
   updateTagPrefix(prefix: string, patch: TagPrefixUpdate): Promise<TagPrefix | null>;
+  /** 登録済み全 prefix を渡された順序でアトミックに並び替える。渡された集合が現在の
+   *  登録済み prefix 集合と一致しない場合は null（ルートが 400 を返す） */
+  reorderTagPrefixes(order: string[]): Promise<TagPrefix[] | null>;
   deleteTagPrefix(prefix: string): Promise<boolean>;
   listTagPrefixCandidates(): Promise<TagPrefixCandidate[]>;
   listSmartFolders(): Promise<SmartFolder[]>;
@@ -26,4 +32,7 @@ export interface ClassificationAdapter {
   updateSmartFolder(id: string, input: SmartFolderUpdate): Promise<SmartFolder | null>;
   deleteSmartFolder(id: string): Promise<boolean>;
   evalSmartFolder(id: string, query: SmartFolderEvalQuery): Promise<WorksPage | null>;
+  /** 未保存のドラフトルールを評価し、チップ絞り込みを適用しない純粋な一致件数を返す
+   *  （POST /smart-folders/preview） */
+  previewSmartFolderRuleCount(rules: SmartFolderRule[]): Promise<number>;
 }

@@ -1,92 +1,44 @@
+import { useSetAtom } from "jotai";
 import type { DataIntegrityWarning, InvalidMetaFile, ScanDiagnostic } from "@mimimilli/shared";
 import Button from "../../../../shared/ui/Button";
+import { activeModalAtom, type ActiveModal } from "../../../../shared/model/activeModalAtom";
+import { buildNeedsAttentionRows, type NeedsAttentionRow } from "../../model/needsAttention";
 
 export interface NeedsAttentionTabProps {
   identityConflicts: ScanDiagnostic[];
   invalidMetaFiles: InvalidMetaFile[];
   rjCodeMissingCount: number;
+  dlsiteFetchFailedCount: number;
+  dlsiteParseErrorCount: number;
+  dlsiteParseErrorAlert: boolean;
   dataIntegrityWarning: DataIntegrityWarning | undefined;
   onOpenFiles: (path: string) => void;
-  onOpenRjCodeMissing: () => void;
 }
 
-interface AttentionRow {
-  key: string;
-  kind: string;
-  target: string;
-  detail: string;
-  action: { label: string; onClick: () => void } | null;
-}
-
-function buildRows({
-  identityConflicts,
-  invalidMetaFiles,
-  rjCodeMissingCount,
-  dataIntegrityWarning,
-  onOpenFiles,
-  onOpenRjCodeMissing,
-}: NeedsAttentionTabProps): AttentionRow[] {
-  const rows: AttentionRow[] = [];
-
-  for (const conflict of identityConflicts) {
-    conflict.paths.forEach((path, index) => {
-      rows.push({
-        key: `${conflict.workId}-${path}`,
-        kind: "ID重複",
-        target: path,
-        detail: index === 0 ? `workId: ${conflict.workId}` : "競合相手",
-        action: { label: "Filesで開く", onClick: () => onOpenFiles(path) },
-      });
-    });
-  }
-
-  for (const metaFile of invalidMetaFiles) {
-    rows.push({
-      key: metaFile.path,
-      kind: "読み取り失敗",
-      target: metaFile.path,
-      detail: metaFile.message,
-      action: { label: "Filesで開く", onClick: () => onOpenFiles(metaFile.path) },
-    });
-  }
-
-  if (rjCodeMissingCount > 0) {
-    rows.push({
-      key: "rj-code-missing",
-      kind: "RJコード未検出",
-      target: `${rjCodeMissingCount}件の作品`,
-      detail: "フォルダー名からRJコードを検出できませんでした",
-      action: { label: "一覧を見る", onClick: onOpenRjCodeMissing },
-    });
-  }
-
-  if (dataIntegrityWarning) {
-    rows.push({
-      key: "data-integrity",
-      kind: "データ不整合",
-      target: `${dataIntegrityWarning.skippedCount}件の作品`,
-      detail: "タグ等の不整合のため除外されました",
-      action: null,
-    });
-  }
-
-  return rows;
-}
+const KIND_LABEL: Record<NeedsAttentionRow["kind"], string> = {
+  identityConflict: "ID重複",
+  invalidMetaFile: "読み取り失敗",
+  rjCodeMissing: "RJコード未検出",
+  dlsiteFetchFailed: "DLsite取得失敗",
+  dlsiteParseFailed: "DLsiteパース失敗",
+  dataIntegrity: "データ不整合",
+};
 
 export default function NeedsAttentionTab(props: NeedsAttentionTabProps) {
-  const rows = buildRows(props);
+  const setActiveModal = useSetAtom(activeModalAtom);
+  const rows = buildNeedsAttentionRows(props);
 
   if (rows.length === 0) {
-    return <p className="font-jp text-[12px] text-ink-3">要対応の項目はありません。</p>;
+    return <p className="font-jp text-body text-ink-2">要対応の項目はありません。</p>;
   }
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="font-jp text-[11.5px] text-ink-2">
+      <p className="font-jp text-secondary text-ink-2">
         自動では直しません。内容を確認してから対応してください。
       </p>
       <div className="overflow-hidden rounded-[6px] border border-line-soft">
-        <table className="w-full border-collapse text-[11px]">
+        <table className="w-full border-collapse text-secondary">
           <thead>
             <tr className="bg-paper-0 text-left">
               <th className="border-b border-line-soft px-2.5 py-1.5 font-sans font-semibold text-ink-2">
@@ -105,24 +57,88 @@ export default function NeedsAttentionTab(props: NeedsAttentionTabProps) {
           </thead>
           <tbody className="divide-y divide-line-soft">
             {rows.map((row) => (
-              <tr key={row.key}>
-                <td className="px-2.5 py-2 align-top text-ink-1 whitespace-nowrap">{row.kind}</td>
-                <td className="mll-selectable px-2.5 py-2 align-top break-all font-mono text-[10px] text-ink-3">
-                  {row.target}
-                </td>
-                <td className="px-2.5 py-2 align-top text-ink-2">{row.detail}</td>
-                <td className="px-2.5 py-2 align-top whitespace-nowrap">
-                  {row.action ? (
-                    <Button onClick={row.action.onClick}>{row.action.label}</Button>
-                  ) : (
-                    <span className="text-ink-4">—</span>
-                  )}
-                </td>
-              </tr>
+              <AttentionRow
+                key={row.key}
+                row={row}
+                onOpenFiles={props.onOpenFiles}
+                onOpenNotificationModal={setActiveModal}
+              />
             ))}
           </tbody>
         </table>
       </div>
     </div>
+  );
+}
+
+function AttentionRow({
+  row,
+  onOpenFiles,
+  onOpenNotificationModal,
+}: {
+  row: NeedsAttentionRow;
+  onOpenFiles: (path: string) => void;
+  onOpenNotificationModal: (modal: ActiveModal) => void;
+}) {
+  if (row.kind === "identityConflict") {
+    return (
+      <>
+        {row.paths.map((path, index) => (
+          <tr key={path}>
+            <td className="px-2.5 py-2 align-top text-ink-1 whitespace-nowrap">
+              {KIND_LABEL.identityConflict}
+            </td>
+            <td className="mll-selectable px-2.5 py-2 align-top break-all font-mono text-caption text-ink-2">
+              {path}
+            </td>
+            <td className="px-2.5 py-2 align-top text-ink-2">
+              {index === 0 ? `workId: ${row.workId}` : "競合相手"}
+            </td>
+            <td className="px-2.5 py-2 align-top whitespace-nowrap">
+              <Button onClick={() => onOpenFiles(path)}>Filesで開く</Button>
+            </td>
+          </tr>
+        ))}
+      </>
+    );
+  }
+
+  return (
+    <tr>
+      <td className="px-2.5 py-2 align-top text-ink-1 whitespace-nowrap">{KIND_LABEL[row.kind]}</td>
+      <td className="mll-selectable px-2.5 py-2 align-top break-all font-mono text-caption text-ink-2">
+        {row.kind === "invalidMetaFile" ? row.path : `${row.count}件の作品`}
+      </td>
+      <td className="px-2.5 py-2 align-top text-ink-2">
+        {row.kind === "invalidMetaFile"
+          ? `${row.message}。mimimilli.jsonを直すか、削除して再スキャンしてください。`
+          : row.kind === "rjCodeMissing"
+            ? "フォルダー名からRJコードを検出できませんでした"
+            : row.kind === "dlsiteFetchFailed"
+              ? "DLsiteから作品情報を取得できませんでした"
+              : row.kind === "dlsiteParseFailed"
+                ? "DLsiteの応答を解析できませんでした"
+                : "タグ等の不整合のため除外されました"}
+      </td>
+      <td className="px-2.5 py-2 align-top whitespace-nowrap">
+        {row.kind === "invalidMetaFile" ? (
+          <Button onClick={() => onOpenFiles(row.path)}>Filesで開く</Button>
+        ) : row.kind === "rjCodeMissing" ? (
+          <Button onClick={() => onOpenNotificationModal({ kind: "rj-missing" })}>
+            一覧を見る
+          </Button>
+        ) : row.kind === "dlsiteFetchFailed" ? (
+          <Button onClick={() => onOpenNotificationModal({ kind: "fetch-failed" })}>
+            一覧を見る
+          </Button>
+        ) : row.kind === "dlsiteParseFailed" ? (
+          <Button onClick={() => onOpenNotificationModal({ kind: "parse-failed" })}>
+            一覧を見る
+          </Button>
+        ) : (
+          <span className="text-ink-4">—</span>
+        )}
+      </td>
+    </tr>
   );
 }

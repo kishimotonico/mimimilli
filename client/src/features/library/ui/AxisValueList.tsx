@@ -88,11 +88,6 @@ export default function AxisValueList({
 
   return (
     <div className={`mle-col is-results is-axis-values ${viewMode === "grid" ? "is-grid" : ""}`}>
-      <div className="mle-col__hd">
-        <span>{getAxisLabel(axis, tagPrefixes)}</span>
-        {!isFacetLoading && <span className="count">{facetItems.length} 件</span>}
-      </div>
-
       <div className="mll-vsearch">
         <I.search size={13} />
         <input

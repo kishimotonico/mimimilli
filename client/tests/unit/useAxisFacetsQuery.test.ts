@@ -1,5 +1,7 @@
-// 軸ファセット取得（GET /axes/:axis）が自軸除外後のフィルタをクエリへ渡し、
-// フィルタが変わるとクエリキーが変わって再フェッチされる（キャッシュ分離）ことを検証する。
+// 軸ファセット取得（GET /axes/:axis）が渡された selectedTags をそのままAND条件として
+// クエリへ渡す（軸による除外はしない）ことを検証する。件数基準（どのタグを渡すか）は
+// 呼び出し側の責務（valueSelectionContract.ts の deriveFacetCountTags）で、
+// このフック自体は素通しするだけ。
 
 import { createElement, type ReactNode } from "react";
 import { renderHook, waitFor } from "@testing-library/react";
@@ -47,7 +49,7 @@ function renderFacets(axis: string | null, selectedTags: string[]) {
   );
 }
 
-describe("useAxisFacetsQuery の自軸除外フィルタ適用", () => {
+describe("useAxisFacetsQuery のタグ素通し", () => {
   let fetchMock: ReturnType<typeof createFetchMock>;
 
   beforeEach(() => {
@@ -59,7 +61,7 @@ describe("useAxisFacetsQuery の自軸除外フィルタ適用", () => {
     vi.unstubAllGlobals();
   });
 
-  it("軸X由来の選択タグは除外し、他軸のフィルタはクエリへ渡す", async () => {
+  it("selectedTagsを軸に関わらずそのままAND条件として渡す（自軸除外はしない）", async () => {
     const { result } = renderFacets("cv", ["cv/藤田茜", "サークル/月白製作所"]);
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
@@ -67,12 +69,12 @@ describe("useAxisFacetsQuery の自軸除外フィルタ適用", () => {
     const urls = axesCallUrls(fetchMock);
     expect(urls).toHaveLength(1);
     expect(urls[0]).toContain("/api/axes/cv?");
-    expect(urls[0]).not.toContain("cv%2F"); // 自軸(cv)由来の選択タグは含まれない
+    expect(urls[0]).toContain("cv%2F"); // 自軸(cv)由来の選択タグも渡される
     expect(urls[0]).toContain("tags=");
   });
 
-  it("フィルタが自軸だけなら無絞り込みでフェッチする（クエリ文字列なし）", async () => {
-    const { result } = renderFacets("cv", ["cv/藤田茜"]);
+  it("selectedTagsが空なら無絞り込みでフェッチする（クエリ文字列なし）", async () => {
+    const { result } = renderFacets("cv", []);
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 

@@ -18,7 +18,6 @@ export function useDlsiteBulkActions() {
       start: () => requireActions(store).start(),
       attach: () => requireActions(store).attach(),
       cancel: () => requireActions(store).cancel(),
-      dismiss: () => requireActions(store).dismiss(),
     }),
     [store],
   );

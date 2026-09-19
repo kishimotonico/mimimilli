@@ -52,7 +52,7 @@ export const PLAYER_CONTROLLER_INITIAL: PlayerControllerState = {
 export const MAX_CONSECUTIVE_TRACK_FAILURES = 2;
 
 export function formatSkippedTrackToast(trackTitle: string): string {
-  return `「${trackTitle}」をスキップしました`;
+  return `「${trackTitle}」を読み込めなかったためスキップしました`;
 }
 
 const EMPTY_TRACKS: PlaybackTrack[] = [];
@@ -123,7 +123,9 @@ export type PlayerControllerInput =
   | { type: "audioDurationChanged"; durationSec: number | null }
   | { type: "audioEnded" }
   | { type: "audioFailed"; error: AudioEngineError }
-  | { type: "persistTick" };
+  | { type: "persistTick" }
+  | { type: "retryRequested" }
+  | { type: "errorDismissed" };
 
 export type PlayerControllerCommand =
   | { type: "playAudio" }
@@ -136,7 +138,7 @@ export type PlayerControllerCommand =
   | { type: "persistResume"; reason: "track-change" | "pause" | "stop" | "interval" | "error" }
   | { type: "workCompleted"; item: PlaybackItem }
   | { type: "releaseLoadedTrack" }
-  | { type: "notifyTrackSkipped"; trackTitle: string };
+  | { type: "notifyTrackSkipped"; trackTitle: string; trackIndex: number };
 
 export interface PlayerTransition {
   state: PlayerControllerState;
@@ -370,7 +372,11 @@ export function reducePlayer(
         state: { ...skipped.state, consecutiveTrackFailures },
         commands: [
           ...skipped.commands,
-          { type: "notifyTrackSkipped", trackTitle: failedTrack?.title ?? "" },
+          {
+            type: "notifyTrackSkipped",
+            trackTitle: failedTrack?.title ?? "",
+            trackIndex: failedItem.trackIndex,
+          },
         ],
       };
     }
@@ -378,6 +384,31 @@ export function reducePlayer(
       return state.status === "playing" && state.item
         ? { state, commands: [{ type: "persistResume", reason: "interval" }] }
         : { state, commands: [] };
+    case "retryRequested": {
+      if (!state.item || state.status !== "error") return { state, commands: [] };
+      return {
+        state: {
+          ...state,
+          status: "loading",
+          playbackError: null,
+          consecutiveTrackFailures: 0,
+        },
+        commands: [
+          { type: "loadTrack", item: state.item, positionSec: state.positionSec, autoplay: true },
+        ],
+      };
+    }
+    case "errorDismissed":
+      if (state.status !== "error") return { state, commands: [] };
+      return {
+        state: {
+          ...state,
+          status: "paused",
+          playbackError: null,
+          consecutiveTrackFailures: 0,
+        },
+        commands: [],
+      };
   }
 }
 

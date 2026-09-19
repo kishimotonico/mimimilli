@@ -11,9 +11,9 @@ test("設定モーダルから未設定項目の一括適用ができる", async
 
   await settings.getByRole("button", { name: "未設定項目をまとめて適用", exact: true }).click();
 
-  const dialog = page.getByRole("dialog", { name: "未設定項目をまとめて適用" });
+  const dialog = page.getByRole("dialog", { name: /未設定項目をまとめて適用/ });
   await expect(dialog).toBeVisible();
-  await dialog.getByRole("button", { name: "適用", exact: true }).click();
+  await dialog.getByRole("button", { name: /選択した\d+件に適用/ }).click();
 
   await expect(
     page.getByText(/未設定項目を適用: 適用 \d+件・スキップ \d+件・失敗 \d+件/),

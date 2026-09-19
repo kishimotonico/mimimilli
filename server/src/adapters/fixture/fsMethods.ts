@@ -64,7 +64,12 @@ export function createFsMethods(
       const rootAbs = normalizeFsPath(state.rootFolder ?? "/library");
       const target = path ? `${rootAbs}/${path}` : rootAbs;
 
-      const root = buildFsRoot(state.works, state.coverColumns);
+      const root = buildFsRoot(
+        state.works,
+        state.coverColumns,
+        state.identityConflicts,
+        state.scanInvalidMetaFiles,
+      );
       const dir = resolveFsDir(root, rootAbs, target);
       if (!dir) return null;
 
@@ -95,7 +100,12 @@ export function createFsMethods(
     async locateWorkspaceMedia(ref: WorkspaceResourceRef) {
       const rootAbs = normalizeFsPath(state.rootFolder ?? "/library");
       const target = `${rootAbs}/${ref.path}`;
-      const root = buildFsRoot(state.works, state.coverColumns);
+      const root = buildFsRoot(
+        state.works,
+        state.coverColumns,
+        state.identityConflicts,
+        state.scanInvalidMetaFiles,
+      );
       const node = resolveFsPath(root, rootAbs, target);
       if (!node || node.isDir) return null;
       const result = metadata(node);

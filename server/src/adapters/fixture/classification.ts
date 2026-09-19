@@ -4,6 +4,7 @@ import type {
   SmartFolder,
   SmartFolderCreate,
   SmartFolderEvalQuery,
+  SmartFolderRule,
   SmartFolderUpdate,
   TagPrefix,
   TagPrefixCandidate,
@@ -14,23 +15,34 @@ import type {
 import type { ClassificationAdapter } from "../../adapter/classification.ts";
 import { buildAxisFacets } from "../../core/axisFacets.ts";
 import { buildTagPrefixCandidates } from "../../core/tagPrefixCandidates.ts";
-import { evalSmartFolder } from "../../core/smartFolder.ts";
+import { evalSmartFolder, evalSmartFolderRules } from "../../core/smartFolder.ts";
 import { toWorksPage } from "../../core/worksQuery.ts";
 import type { FixtureState } from "./state.ts";
 
 export function createClassificationMethods(state: FixtureState): ClassificationAdapter {
   return {
-    async getAxisFacets(axis: string, filter?: Partial<AxisFacetsQuery>): Promise<AxisFacetItem[]> {
+    async getAxisFacets(
+      axis: string,
+      filter?: Partial<AxisFacetsQuery>,
+    ): Promise<AxisFacetItem[] | null> {
+      if (filter?.smartFolder) {
+        const folder = state.smartFolders.find((f) => f.id === filter.smartFolder);
+        // /smart-folders/:id/works と同じ「解決できない」応答（404）に揃える
+        if (!folder) return null;
+        const matched = evalSmartFolderRules(folder.rules, state.works);
+        return buildAxisFacets(axis, matched, filter);
+      }
       return buildAxisFacets(axis, state.works, filter);
     },
 
     async listTagPrefixes(): Promise<TagPrefix[]> {
-      return state.tagPrefixes;
+      return [...state.tagPrefixes].sort((a, b) => a.order - b.order);
     },
 
     async createTagPrefix(input: TagPrefixCreate): Promise<TagPrefix | null> {
       if (state.tagPrefixes.some((p) => p.prefix === input.prefix)) return null;
-      const created: TagPrefix = { ...input };
+      const nextOrder = state.tagPrefixes.reduce((max, p) => Math.max(max, p.order + 1), 0);
+      const created: TagPrefix = { ...input, order: nextOrder };
       state.tagPrefixes.push(created);
       return created;
     },
@@ -43,6 +55,15 @@ export function createClassificationMethods(state: FixtureState): Classification
       if (patch.showAsAxis !== undefined) def.showAsAxis = patch.showAsAxis;
       if (patch.protected !== undefined) def.protected = patch.protected;
       return def;
+    },
+
+    async reorderTagPrefixes(order: string[]): Promise<TagPrefix[] | null> {
+      const existing = new Set(state.tagPrefixes.map((p) => p.prefix));
+      if (order.length !== existing.size || new Set(order).size !== order.length) return null;
+      if (!order.every((prefix) => existing.has(prefix))) return null;
+      const orderIndex = new Map(order.map((prefix, index) => [prefix, index]));
+      for (const def of state.tagPrefixes) def.order = orderIndex.get(def.prefix)!;
+      return [...state.tagPrefixes].sort((a, b) => a.order - b.order);
     },
 
     async deleteTagPrefix(prefix: string): Promise<boolean> {
@@ -92,10 +113,17 @@ export function createClassificationMethods(state: FixtureState): Classification
     async evalSmartFolder(id: string, query: SmartFolderEvalQuery): Promise<WorksPage | null> {
       const folder = state.smartFolders.find((f) => f.id === id);
       if (!folder) return null;
-      return toWorksPage(
+      const page = toWorksPage(
         evalSmartFolder(folder, state.works, query),
         state.rootFolder ?? "/library",
       );
+      return state.dataIntegrityWarning
+        ? { ...page, dataIntegrityWarning: state.dataIntegrityWarning }
+        : page;
+    },
+
+    async previewSmartFolderRuleCount(rules: SmartFolderRule[]): Promise<number> {
+      return evalSmartFolderRules(rules, state.works).length;
     },
   };
 }

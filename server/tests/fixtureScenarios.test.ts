@@ -13,6 +13,7 @@ import { createFixtureAdapter } from "../src/adapters/fixture/index.ts";
 import {
   createFixtureScenario,
   LARGE_SCENARIO_WORK_COUNT,
+  SCENARIO_IDS,
 } from "../src/adapters/fixture/scenarios.ts";
 import {
   createSettingsScanMethods,
@@ -125,6 +126,86 @@ test("new-work: Files用診断とscan確認用の候補・問題を独立して�
   );
 });
 
+test("new-work: identityConflicts・invalidMetaFilesが指すパスは/fsツリー上に実在する", async () => {
+  const app = buildApp("new-work");
+
+  const canonical = await app.request(
+    "/api/fs?path=dlsite/夜想曲スタジオ/RJ501001_夜更けの図書室で囁き朗読",
+  );
+  assert.equal(canonical.status, 200);
+  assert.equal((await canonical.json()).workId, "RJ501001");
+
+  // identityConflictsの重複コピー側も/fsツリーに実体があり200で返る必要がある
+  const duplicate = await app.request("/api/fs?path=copies/RJ501001_夜更けの図書室で囁き朗読");
+  assert.equal(duplicate.status, 200);
+  const duplicateBody = await duplicate.json();
+  assert.equal(duplicateBody.workId, "RJ501001");
+  assert.ok(duplicateBody.entries.length > 0);
+
+  // scanIdentityConflicts側の"壊れた/mimimilli.json"（invalidMetaFiles）も同種の不整合
+  const metaFileDir = await app.request("/api/fs?path=壊れた");
+  assert.equal(metaFileDir.status, 200);
+  const metaEntry = (await metaFileDir.json()).entries.find(
+    (entry: { name: string }) => entry.name === "mimimilli.json",
+  );
+  assert.ok(metaEntry, "壊れた/mimimilli.json が/fsツリーに存在しない");
+});
+
+test("errors: dataIntegrityWarningがWorksPage・スキャン結果・エクスポート・スマートフォルダー・DLsite一括のいずれからも取得できる", async () => {
+  // real adapterの意味論（DB破損行があればクエリのたびに毎回付く劣化状態の表示）に
+  // 合わせ、劣化状態を確認するためのシナリオ errors に置く。new-work・default等の
+  // 既定シナリオへ置くとsmoke・worktree確認の土台が常時バナー込みになってしまうため避ける
+  const adapter = createFixtureAdapter({ scenario: "errors" });
+
+  const worksPage = await adapter.queryWorks({
+    q: "",
+    tags: { tags: [], yearValue: null },
+    tagOp: "AND",
+    sort: "id-asc",
+  });
+  assert.deepEqual(worksPage.dataIntegrityWarning, {
+    skippedCount: 1,
+    skippedWorkIds: ["RJ501099"],
+  });
+
+  const scanResult = await adapter.scan();
+  assert.deepEqual(scanResult.dataIntegrityWarning, worksPage.dataIntegrityWarning);
+
+  const exported = await adapter.exportLibrary();
+  assert.deepEqual(exported.dataIntegrityWarning, worksPage.dataIntegrityWarning);
+
+  // errorsシナリオはスマートフォルダーを持たないため、evalSmartFolderへの伝播確認用に
+  // その場で1件作る
+  const smartFolder = await adapter.createSmartFolder({
+    name: "全件",
+    rules: [],
+    sort: "added-desc",
+  });
+  const smartFolderWorks = await adapter.evalSmartFolder(smartFolder.id, {
+    tags: { tags: [], yearValue: null },
+    tagOp: "AND",
+    page: 1,
+    limit: 50,
+  });
+  assert.deepEqual(smartFolderWorks?.dataIntegrityWarning, worksPage.dataIntegrityWarning);
+
+  const bulk = await adapter.runDlsiteBulk("existing", undefined);
+  assert.deepEqual(bulk.dataIntegrityWarning, worksPage.dataIntegrityWarning);
+});
+
+test("new-work・default: dataIntegrityWarningは付かない", async () => {
+  for (const scenario of [undefined, "new-work"] as const) {
+    const adapter = createFixtureAdapter({ scenario });
+    const worksPage = await adapter.queryWorks({
+      q: "",
+      tags: { tags: [], yearValue: null },
+      tagOp: "AND",
+      sort: "id-asc",
+    });
+    assert.equal(worksPage.dataIntegrityWarning, undefined, `scenario=${scenario ?? "default"}`);
+  }
+});
+
 test("fixture: rjCode省略・空文字・指定を区別する", () => {
   // 省略=候補が検出した値を採用、空文字=明示的になし（real adapterと同じく""のまま）、値=そのまま採用（候補登録APIの規約）。
   assert.equal(resolveRegisteredRjCode("RJ999999", undefined), "RJ999999");
@@ -214,6 +295,21 @@ test("errors: エラー・行方不明の作品のみが含まれる", async () 
   }
   const statuses = new Set(items.map((w: { status: string }) => w.status));
   assert.ok(statuses.has("error") || statuses.has("missing"));
+});
+
+test("全シナリオ: rootFolderが作品のphysicalPathの前方一致になっている（relativeToRootが正しく剥がせる前提）", () => {
+  // シナリオ追加・rootFolder変更のたびに手作業で気をつける前提を無くすため、
+  // 個別シナリオではなくSCENARIO_IDS全件をループする。
+  for (const id of SCENARIO_IDS) {
+    const scenario = createFixtureScenario(id, "2026-08-11T00:00:00.000Z");
+    if (scenario.works.length === 0) continue; // 例: empty
+    for (const work of scenario.works) {
+      assert.ok(
+        work.physicalPath.startsWith(scenario.rootFolder ?? ""),
+        `[${id}] ${work.physicalPath} が rootFolder(${scenario.rootFolder}) 配下ではない`,
+      );
+    }
+  }
 });
 
 test("large: 1000件の作品が生成され、IDが一意でスキーマ検証を通る", async () => {

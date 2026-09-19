@@ -18,6 +18,8 @@ interface BarContentProps {
   onSwitchToPopup: () => void;
   onSetVolume: (volume: number) => void;
   onStop: () => void;
+  onRetryError: () => void;
+  onDismissError: () => void;
 }
 
 export default function BarContent({
@@ -29,6 +31,8 @@ export default function BarContent({
   onSwitchToPopup,
   onSetVolume,
   onStop,
+  onRetryError,
+  onDismissError,
 }: BarContentProps) {
   const {
     currentWork,
@@ -62,7 +66,12 @@ export default function BarContent({
             {track?.title ?? "—"}
           </span>
           {playbackError ? (
-            <PlaybackErrorNotice error={playbackError} className="mle-bar1__error" />
+            <PlaybackErrorNotice
+              error={playbackError}
+              className="mle-bar1__error"
+              onRetry={onRetryError}
+              onDismiss={onDismissError}
+            />
           ) : (
             <span
               className="mle-bar1__work"
@@ -79,6 +88,7 @@ export default function BarContent({
             aria-label="前のトラック"
             title="前のトラック"
             disabled={currentTrackIndex <= 0}
+            data-player-control
             onClick={(e) => {
               e.stopPropagation();
               onPrev();
@@ -90,6 +100,7 @@ export default function BarContent({
             className="mle-bar1__play"
             aria-label={isPlaying ? "一時停止" : "再生"}
             title={isPlaying ? "一時停止" : "再生"}
+            data-player-control
             onClick={(e) => {
               e.stopPropagation();
               onTogglePlay();
@@ -102,6 +113,7 @@ export default function BarContent({
             aria-label="次のトラック"
             title="次のトラック"
             disabled={currentTrackIndex >= tracks.length - 1}
+            data-player-control
             onClick={(e) => {
               e.stopPropagation();
               onNext();

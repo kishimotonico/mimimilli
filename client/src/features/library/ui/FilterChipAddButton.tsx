@@ -12,10 +12,9 @@ import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 import { I } from "../../../shared/ui/Icon";
 
 const POPOVER_WIDTH = 240;
-const AND_ADD_HINT = "AND追加されます";
 
 // チップ列の「＋絞り込み」（ADR-0012 §2）。軸→値の2段オーバーレイ。
-// 既定は AND 追加（ヒント表示つき）、Ctrl/Cmd+クリックで置き換えへ反転する。
+// 既定は AND 追加、Ctrl/Cmd+クリックで置き換えへ反転する。
 //
 // 軸選択ステージ・値ステージともに、それぞれ独立した `<AnimatePresence>` で
 // 条件レンダーする。軸を選ぶと軸選択ステージが退出し値ステージが入場する
@@ -25,6 +24,8 @@ const AND_ADD_HINT = "AND追加されます";
 interface FilterChipAddButtonProps {
   tagPrefixes: TagPrefix[];
   selectedTags: NormalizedTag[];
+  /** 表示中のスマートフォルダーID。候補件数をフォルダー条件適用後にする */
+  smartFolderId?: string;
   onAddValue: (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
 }
 
@@ -51,7 +52,6 @@ function AxisPickerStage({
       inert={!isPresent}
       {...variant}
     >
-      <div className="mll-qlist__hint">{AND_ADD_HINT}・軸を選択</div>
       {/* oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- AxisValueQuickList の一覧と表現を揃えるため<select>ではなくボタン一覧にする */}
       <div className="mll-qlist__body" role="listbox" aria-label="絞り込む軸">
         {facetAxisRows.map((ax) => (
@@ -73,6 +73,7 @@ function AxisPickerStage({
 export default function FilterChipAddButton({
   tagPrefixes,
   selectedTags,
+  smartFolderId,
   onAddValue,
 }: FilterChipAddButtonProps) {
   const [open, setOpen] = useState(false);
@@ -126,7 +127,10 @@ export default function FilterChipAddButton({
             floatingStyles={floatingStyles}
             setFloating={setFloating}
             selectedTags={selectedTags}
-            hint={AND_ADD_HINT}
+            // 既定=AND追加の入口（ADR-0013）。件数基準は現在の選択タグ込みの集計にする
+            // （「追加したら何件になるか」を示す）
+            countTags={selectedTags}
+            smartFolderId={smartFolderId}
             onSelect={(tag, opts) => {
               onAddValue(tag, opts);
               close();

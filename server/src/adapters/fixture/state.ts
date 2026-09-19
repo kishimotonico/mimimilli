@@ -1,5 +1,6 @@
 import { DEFAULT_TAG_PREFIXES } from "@mimimilli/shared";
 import type {
+  DataIntegrityWarning,
   InvalidMetaFile,
   ResumeBody,
   ScanCandidate,
@@ -19,6 +20,8 @@ export interface PlaybackIds {
 export interface FixtureState {
   rootFolder: string | null;
   lastScanTime: string | null;
+  /** 直近の完了スキャンが対象にしたルートフォルダー。rootFolderと不一致なら一覧が未反映であることを示す */
+  lastScanRootFolder: string | null;
   works: WorkSummary[];
   /** 編集用カバー列（表示用 cover と独立。unmeasured を表現する） */
   coverColumns: Map<string, FixtureCoverColumns>;
@@ -38,7 +41,12 @@ export interface FixtureState {
   scanCandidates: ScanCandidate[];
   scanIdentityConflicts: ScanDiagnostic[];
   scanInvalidMetaFiles: InvalidMetaFile[];
+  /** listSummaries でタグ等の不整合により除外した作品の報告（シナリオ errors のみ） */
+  dataIntegrityWarning: DataIntegrityWarning | undefined;
 }
+
+/** dataIntegrityWarning のダミー除外対象workId（実在の works には含めない） */
+const DATA_INTEGRITY_WARNING_SKIPPED_WORK_ID = "RJ501099";
 
 export interface FixtureAdapterOptions {
   /** データシナリオ（省略時 "default"）。不明なIDはエラー */
@@ -62,6 +70,7 @@ export function createInitialState(options: FixtureAdapterOptions): FixtureState
   return {
     rootFolder: scenario.rootFolder,
     lastScanTime: scenario.lastScanTime,
+    lastScanRootFolder: scenario.rootFolder,
     works,
     coverColumns,
     tagPrefixes: DEFAULT_TAG_PREFIXES.map((def) => ({ ...def })),
@@ -88,6 +97,10 @@ export function createInitialState(options: FixtureAdapterOptions): FixtureState
     scanCandidates: scenario.scanCandidates,
     scanIdentityConflicts: scenario.scanIdentityConflicts,
     scanInvalidMetaFiles: scenario.scanInvalidMetaFiles,
+    dataIntegrityWarning:
+      scenario.id === "errors"
+        ? { skippedCount: 1, skippedWorkIds: [DATA_INTEGRITY_WARNING_SKIPPED_WORK_ID] }
+        : undefined,
   };
 }
 

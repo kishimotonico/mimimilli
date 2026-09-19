@@ -4,9 +4,11 @@
 // 再生ボタンまわりの配線だけを検証する。
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { getDefaultStore } from "jotai";
 import type { Work } from "@mimimilli/shared";
 import { emptyDlsiteState } from "@mimimilli/shared";
 import { WorkDetail } from "../../src/features/library/ui/preview/WorkDetail";
+import { toastRequestsAtom } from "../../src/shared/model/toastRequestsAtom";
 
 vi.mock("../../src/features/library/ui/preview/WorkTagEditor", () => ({
   WorkTagEditor: () => <div data-testid="tag-editor" />,
@@ -16,6 +18,9 @@ vi.mock("../../src/features/library/ui/preview/WorkTrackList", () => ({
 }));
 vi.mock("../../src/features/library/ui/preview/WorkStatusWarnings", () => ({
   WorkStatusWarnings: () => null,
+}));
+vi.mock("../../src/entities/settings/useSettingsQuery", () => ({
+  useRootFolder: () => "/library",
 }));
 
 afterEach(cleanup);
@@ -150,7 +155,7 @@ describe("WorkDetail: 作品登録の解除", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "その他" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "作品登録を解除" }));
-    expect(screen.getByRole("alertdialog", { name: "作品登録を解除" })).toBeTruthy();
+    expect(screen.getByRole("alertdialog", { name: "登録を解除" })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "解除する" }));
     expect(mutate).toHaveBeenCalledWith("w1", expect.anything());
@@ -166,5 +171,28 @@ describe("WorkDetail: 作品登録の解除", () => {
 
     expect(mutate).not.toHaveBeenCalled();
     expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
+  it("解除に成功するとuseToast経由でsuccessトーストの表示要求を出す", () => {
+    const mutate = vi.fn();
+    const store = getDefaultStore();
+    renderDetail({
+      work: makeWork({ title: "作品X" }),
+      deleteMutation: makeDeleteMutationStub({ mutate }),
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "その他" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "作品登録を解除" }));
+    fireEvent.click(screen.getByRole("button", { name: "解除する" }));
+
+    const [, options] = mutate.mock.calls[0] as [string, { onSuccess: () => void }];
+    options.onSuccess();
+    const requests = [...store.get(toastRequestsAtom).values()];
+    expect(requests).toContainEqual(
+      expect.objectContaining({
+        message: "「作品X」の登録を解除しました",
+        variant: "success",
+      }),
+    );
   });
 });

@@ -30,12 +30,20 @@ export function resolveRegisteredRjCode(
 export function createSettingsScanMethods(state: FixtureState): SettingsAdapter {
   return {
     async getSettings(): Promise<Settings> {
-      return { rootFolder: state.rootFolder, lastScanTime: state.lastScanTime };
+      return {
+        rootFolder: state.rootFolder,
+        lastScanTime: state.lastScanTime,
+        lastScanRootFolder: state.lastScanRootFolder,
+      };
     },
 
     async updateSettings(patch: SettingsUpdate): Promise<Settings> {
       state.rootFolder = patch.rootFolder;
-      return { rootFolder: state.rootFolder, lastScanTime: state.lastScanTime };
+      return {
+        rootFolder: state.rootFolder,
+        lastScanTime: state.lastScanTime,
+        lastScanRootFolder: state.lastScanRootFolder,
+      };
     },
 
     async scan(options?: ScanOptions): Promise<ScanResult> {
@@ -61,6 +69,7 @@ export function createSettingsScanMethods(state: FixtureState): SettingsAdapter 
       emit({ type: "progress", phase: "finalizing", processed: 1, total: 1 });
 
       state.lastScanTime = new Date().toISOString();
+      state.lastScanRootFolder = state.rootFolder;
       const excluded = new Set(state.scanCandidateExclusions);
       return {
         registered: state.works.length,
@@ -75,6 +84,7 @@ export function createSettingsScanMethods(state: FixtureState): SettingsAdapter 
         identityConflicts: state.scanIdentityConflicts,
         invalidMetaFiles: state.scanInvalidMetaFiles,
         candidates: state.scanCandidates.filter((candidate) => !excluded.has(candidate.path)),
+        ...(state.dataIntegrityWarning ? { dataIntegrityWarning: state.dataIntegrityWarning } : {}),
       };
     },
 

@@ -57,7 +57,7 @@ export default function ScanSidebar({
       </div>
 
       <div className="flex flex-col gap-1 border-t border-line-soft pt-2.5">
-        <p className="font-sans text-[9.5px] font-semibold tracking-[0.06em] text-ink-3 uppercase">
+        <p className="font-sans text-label font-semibold tracking-[0.06em] text-ink-2 uppercase">
           最終スキャン
         </p>
         <div className="relative flex min-h-[14px] flex-col gap-1.5">
@@ -96,7 +96,7 @@ function ScanSidebarTab({
       aria-label={`${label}（${count}件）`}
       onClick={() => onSelect(tab)}
       className={cn(
-        "flex items-center justify-between gap-2 rounded-[6px] px-2 py-1.5 text-left font-jp text-[12px] transition-colors",
+        "flex items-center justify-between gap-2 rounded-[6px] px-2 py-1.5 text-left font-jp text-control transition-colors",
         selected ? "bg-paper-2 text-ink-0" : "text-ink-2 hover:bg-paper-2 hover:text-ink-0",
       )}
     >
@@ -106,7 +106,7 @@ function ScanSidebarTab({
       <span
         aria-hidden="true"
         className={cn(
-          "shrink-0 rounded-pill px-1.5 py-0.5 font-mono text-[10px] font-semibold tabular-nums",
+          "shrink-0 rounded-pill px-1.5 py-0.5 font-mono text-caption font-semibold tabular-nums",
           tab === "needsAttention" && count > 0
             ? "bg-[color-mix(in_oklch,var(--r-coral)_20%,transparent)] text-[var(--r-coral)]"
             : "bg-paper-3 text-ink-2",
@@ -121,8 +121,8 @@ function ScanSidebarTab({
 function SidebarSummaryRow({ label, value }: { label: string; value: number | null }) {
   return (
     <div className="flex items-baseline justify-between gap-2">
-      <span className="font-jp text-[10.5px] text-ink-2">{label}</span>
-      <span className="font-mono text-[11px] font-semibold text-ink-0 tabular-nums">
+      <span className="font-jp text-label text-ink-2">{label}</span>
+      <span className="font-mono text-mono font-semibold text-ink-0 tabular-nums">
         {value ?? "—"}
       </span>
     </div>
@@ -140,10 +140,10 @@ function SidebarStatusScanning({ progress }: { progress: ScanProgress | null }) 
   return (
     <motion.div className="flex flex-col gap-1" inert={!isPresent} {...v}>
       <div className="flex items-baseline justify-between gap-2">
-        <span className="font-mono text-[10.5px] text-ink-2">
+        <span className="font-mono text-caption text-ink-2">
           {progress ? scanPhaseLabel(progress.phase) : "準備中"}
         </span>
-        <span className="font-mono text-[10px] text-ink-3 tabular-nums">
+        <span className="font-mono text-caption text-ink-2 tabular-nums">
           {progress && progress.total > 0 ? `${progress.processed}/${progress.total}` : "…"}
         </span>
       </div>
@@ -165,7 +165,7 @@ function SidebarStatusCompleted() {
   const isPresent = useIsPresent();
   const v = fade();
   return (
-    <motion.span className="font-mono text-[10.5px] text-[var(--r-leaf)]" inert={!isPresent} {...v}>
+    <motion.span className="font-mono text-caption text-[var(--r-leaf)]" inert={!isPresent} {...v}>
       完了しました
     </motion.span>
   );
@@ -176,7 +176,7 @@ function SidebarStatusLastScan({ lastScanTime }: { lastScanTime: string | null }
   const isPresent = useIsPresent();
   const v = fade();
   return (
-    <motion.span className="font-mono text-[10.5px] text-ink-2" inert={!isPresent} {...v}>
+    <motion.span className="font-mono text-mono text-ink-2" inert={!isPresent} {...v}>
       {formatScanSidebarTime(lastScanTime)}
     </motion.span>
   );

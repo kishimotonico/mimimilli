@@ -17,6 +17,27 @@
   min-width: 360px;
   min-height: 0;
 }
+/* Filesモードは一覧側がflex:1で残り幅を取る主役なので、プレビューはドラッグで確定した
+   固定幅（--files-prv-w、既定420px・クランプ済み）を持つ側にする。 */
+.mle-prv-anchor.is-files {
+  flex: 0 0 var(--files-prv-w, 420px);
+  min-width: 320px;
+}
+/* プレビュー左端のドラッグリサイズハンドル。閉じるボタンと重ならないよう更に左へ。 */
+.mle-prv__resize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -3px;
+  width: 6px;
+  z-index: 2;
+  cursor: col-resize;
+  touch-action: none;
+}
+.mle-prv__resize:hover,
+.mle-prv__resize:active {
+  background: var(--line-strong);
+}
 .mle-prv {
   position: relative;
   flex: 1;
@@ -57,9 +78,10 @@
   padding: 12px 18px;
   border-bottom: 1px solid var(--line-soft);
   font-family: var(--font-sans);
-  font-size: 10.5px;
+  font-size: var(--fs-label);
+  line-height: var(--lh-label);
   letter-spacing: 0.08em;
-  color: var(--ink-3);
+  color: var(--ink-2);
   text-transform: uppercase;
   font-weight: 600;
 }
@@ -68,7 +90,8 @@
 }
 .mle-prv__hd .pill {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
   background: var(--paper-2);
   border: 1px solid var(--line-soft);
   color: var(--ink-2);
@@ -172,9 +195,10 @@
   align-items: center;
   gap: 6px;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
   letter-spacing: 0.08em;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 .mle-prv__kicker .warn {
   display: inline-flex;
@@ -209,7 +233,8 @@
   align-items: center;
   gap: 10px;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
   color: var(--ink-2);
 }
 .mle-prv__row b {
@@ -236,7 +261,8 @@
   margin: 0;
   color: var(--r-coral);
   font-family: var(--font-jp);
-  font-size: 10.5px;
+  font-size: var(--fs-caption);
+  line-height: var(--lh-caption);
 }
 
 .mle-prv__actions {
@@ -276,7 +302,8 @@
   background: var(--ink-0);
   color: var(--paper-1);
   font-family: var(--font-sans);
-  font-size: 11px;
+  font-size: var(--fs-control);
+  line-height: var(--lh-control);
   font-weight: 500;
   white-space: nowrap;
   transition: background-color 0.12s ease;
@@ -331,7 +358,8 @@
   padding: 6px 8px;
   border-radius: var(--r-1);
   font-family: var(--font-jp);
-  font-size: 12px;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
   color: var(--ink-1);
   text-align: left;
   white-space: nowrap;
@@ -360,20 +388,23 @@
 }
 .mle-prv__warn-title {
   font-family: var(--font-jp);
-  font-size: 12.5px;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
   font-weight: 600;
   color: var(--ink-0);
   margin: 0;
 }
 .mle-prv__warn-text {
-  font-size: 12px;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
   color: var(--ink-1);
   margin: 0;
 }
 .mle-prv__warn-path {
   font-family: var(--font-mono);
-  font-size: 10.5px;
-  color: var(--ink-3);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  color: var(--ink-2);
   margin: 2px 0 0;
   word-break: break-all;
 }
@@ -392,7 +423,8 @@
   min-width: 0;
   padding: 7px 8px;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
   color: var(--ink-1);
 }
 .mle-prv__trk:hover {
@@ -400,8 +432,9 @@
 }
 .mle-prv__trk .num {
   font-family: var(--font-mono);
-  font-size: 10.5px;
-  color: var(--ink-3);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  color: var(--ink-2);
   text-align: center;
 }
 .mle-prv__trk .name {
@@ -420,12 +453,14 @@
 .mle-prv__trk .resume {
   flex: none;
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
   color: var(--acc-ink);
 }
 .mle-prv__trk .dur {
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
   color: var(--ink-2);
   text-align: right;
 }

@@ -14,6 +14,7 @@ describe("smart folder editor state", () => {
     expect(draft).toEqual({
       name: "",
       rules: [{ id: "rule-0", conjunction: "WHERE", field: "タグ", operator: "∋", values: [] }],
+      sort: "added-desc",
     });
   });
 
@@ -52,12 +53,13 @@ describe("smart folder editor state", () => {
         { conjunction: "WHERE", field: "長さ", operator: "≥", values: ["3600"] },
         { conjunction: "OR", field: "タグ", operator: "∋", values: ["ASMR"] },
       ],
-      sort: "added-desc",
+      sort: "title-asc",
       createdAt: "2026-07-10T00:00:00.000Z",
     };
     expect(createSmartFolderDraft(folder).rules.map(({ id: _id, ...rule }) => rule)).toEqual(
       folder.rules,
     );
+    expect(createSmartFolderDraft(folder).sort).toBe("title-asc");
   });
 });
 
@@ -72,7 +74,7 @@ describe("smart folder editor validation", () => {
   });
 
   test("条件0件は「すべての作品に一致」として保存できる", () => {
-    const result = validateSmartFolderDraft({ name: "テスト", rules: [] });
+    const result = validateSmartFolderDraft({ name: "テスト", rules: [], sort: "added-desc" });
     expect(result).toEqual({
       success: true,
       data: { name: "テスト", rules: [], sort: "added-desc" },

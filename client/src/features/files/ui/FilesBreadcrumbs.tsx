@@ -8,7 +8,7 @@ import { rootLabel } from "../model/types";
 export default function FilesBreadcrumbs() {
   const relPath = useAtomValue(filesRelPathAtom);
   const goToSegment = useSetAtom(goToFilesSegmentAtom);
-  const rootFolder = useRootFolder() ?? "/";
+  const rootFolder = useRootFolder();
   const path = [rootLabel(rootFolder), ...relPath];
 
   return <Breadcrumbs path={path} onNavigate={goToSegment} />;

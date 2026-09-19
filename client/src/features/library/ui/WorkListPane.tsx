@@ -1,13 +1,20 @@
-import { useCallback, type ReactNode } from "react";
+import { useCallback, useState } from "react";
 import type { WorkListItem } from "@mimimilli/shared";
 import type { AxisId } from "../../../entities/library/types";
 import { buildEmptyWorksHint, buildEmptyWorksMessage } from "../model/emptyWorks";
 import WorkRow from "./WorkRow";
 import CollectionStatus from "../../../shared/ui/CollectionStatus";
+import SmartFolderEmptyAction, {
+  SMART_FOLDER_EMPTY_HINT,
+  SMART_FOLDER_EMPTY_MESSAGE,
+} from "./SmartFolderEmptyAction";
 import LoadMore from "./LoadMore";
 import { I } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
 import { useVirtualList } from "../../../shared/ui/useVirtualList";
+import { useWorkResultsDismiss } from "./useWorkResultsDismiss";
+import { useListKeyboardNav } from "../../../shared/ui/useListKeyboardNav";
+import { useRovingIndex } from "./useRovingIndex";
 
 // 作品一覧のリスト表示（list/grid のうち list）。ADR-0012 §3 によりレイアウトを固定し、
 // 常に結果面全幅で表示する（旧 ContentColumn の300px固定・中間カラム役割は廃止）。
@@ -36,10 +43,15 @@ interface WorkListPaneProps {
   isFetchingNextPage?: boolean;
   onLoadMore?: () => void;
   onWorkSelect: (id: string) => void;
+  onWorkPlay: (work: WorkListItem) => void;
   onClearSearch: () => void;
-  /** 結果面ヘッダー直下に置くバナー（スマートフォルダー軸のルール表示・編集導線、
-   *  エラービュー軸の一括削除導線など。プレビュー側ではなく結果面ヘッダー直下に置く） */
-  resultsBanner?: ReactNode;
+  /** Esc・リスト背景クリック時の選択解除 */
+  onDeselect: () => void;
+  /** スマートフォルダー軸か。0件時に専用の空状態（条件を編集・絞り込みをすべてクリア）を
+   *  出す */
+  isSmartFolder?: boolean;
+  onEditSmartFolderRules?: () => void;
+  onClearAllFilters?: () => void;
 }
 
 export default function WorkListPane({
@@ -58,9 +70,14 @@ export default function WorkListPane({
   isFetchingNextPage = false,
   onLoadMore,
   onWorkSelect,
+  onWorkPlay,
   onClearSearch,
-  resultsBanner,
+  onDeselect,
+  isSmartFolder = false,
+  onEditSmartFolderRules,
+  onClearAllFilters,
 }: WorkListPaneProps) {
+  const isWorkSelected = selectedWorkId !== null;
   const paddingEnd = dockedBarActive
     ? LIST_PADDING_END_BASE + LIST_DOCKED_BAR_EXTRA
     : LIST_PADDING_END_BASE;
@@ -85,6 +102,41 @@ export default function WorkListPane({
         : undefined,
   });
 
+  useWorkResultsDismiss(isWorkSelected, onDeselect, scrollRef, ".mll-wrow");
+
+  const [listEl, setListEl] = useState<HTMLDivElement | null>(null);
+  const setListContainer = useCallback(
+    (el: HTMLDivElement | null) => {
+      scrollRef.current = el;
+      setListEl(el);
+    },
+    [scrollRef],
+  );
+  const moveRowFocus = useListKeyboardNav({
+    containerEl: listEl,
+    columnCount: 1,
+    items: works,
+    onFocusItem: (work) => onWorkSelect(work.id),
+    virtualizer,
+  });
+
+  // roving tabindexの現在位置。選択中の作品があればその位置、無ければ先頭（0）を
+  // 対象にする（一覧全体でTabストップ1個）。対象が仮想化の描画範囲外
+  // （深リンク復元・フィルター変更後の選択維持等）のときは、現在描画されている
+  // 先頭行へフォールバックしつつ対象行までスクロールする
+  // （useRovingIndex、WorkGridと共通のロジック）。
+  const selectedIndex = works.length === 0 ? -1 : works.findIndex((w) => w.id === selectedWorkId);
+  const targetIndex = selectedIndex >= 0 ? selectedIndex : 0;
+  const rovingIndex = useRovingIndex({
+    itemCount: works.length,
+    targetIndex,
+    virtualItems,
+    virtualizer,
+    // リストは1件=virtualizerの1行なので恒等変換でよい
+    toRowIndex: (index) => index,
+    firstFlatIndexOfRow: (index) => index,
+  });
+
   const renderWorkRow = useCallback(
     (index: number) => {
       const work = works[index];
@@ -92,34 +144,62 @@ export default function WorkListPane({
       return (
         <WorkRow
           work={work}
+          flatIndex={index}
+          tabIndex={index === rovingIndex ? 0 : -1}
           isSelected={work.id === selectedWorkId}
           isPlaying={work.id === playingWorkId}
           isPlaybackActive={isPlaybackActive}
           onSelect={() => onWorkSelect(work.id)}
+          onPlay={() => onWorkPlay(work)}
+          onArrowKey={moveRowFocus}
         />
       );
     },
-    [works, selectedWorkId, playingWorkId, isPlaybackActive, onWorkSelect],
+    [
+      works,
+      rovingIndex,
+      selectedWorkId,
+      playingWorkId,
+      isPlaybackActive,
+      onWorkSelect,
+      onWorkPlay,
+      moveRowFocus,
+    ],
   );
 
   return (
     <div className={`mle-col is-results ${isPending ? "is-pending" : ""}`}>
-      {resultsBanner}
-      <div ref={scrollRef} className="mle-col__list">
+      <div ref={setListContainer} className="mle-col__list">
         {works.length === 0 ? (
-          <CollectionStatus
-            variant="list"
-            kind="empty"
-            message={buildEmptyWorksMessage(searchQuery, hasSelectedTags)}
-            hint={buildEmptyWorksHint(axis, Boolean(searchQuery) || hasSelectedTags)}
-            action={
-              searchQuery ? (
-                <Button variant="ghost" icon={I.x} onClick={onClearSearch}>
-                  検索をクリア
-                </Button>
-              ) : undefined
-            }
-          />
+          isSmartFolder ? (
+            <CollectionStatus
+              variant="list"
+              kind="empty"
+              message={SMART_FOLDER_EMPTY_MESSAGE}
+              hint={SMART_FOLDER_EMPTY_HINT}
+              action={
+                <SmartFolderEmptyAction
+                  hasSelectedTags={hasSelectedTags}
+                  onEditRules={() => onEditSmartFolderRules?.()}
+                  onClearFilters={() => onClearAllFilters?.()}
+                />
+              }
+            />
+          ) : (
+            <CollectionStatus
+              variant="list"
+              kind="empty"
+              message={buildEmptyWorksMessage(searchQuery, hasSelectedTags)}
+              hint={buildEmptyWorksHint(axis, Boolean(searchQuery) || hasSelectedTags)}
+              action={
+                searchQuery ? (
+                  <Button variant="ghost" icon={I.x} onClick={onClearSearch}>
+                    検索をクリア
+                  </Button>
+                ) : undefined
+              }
+            />
+          )
         ) : (
           <div style={wrapperStyle}>
             {virtualItems.map((virtualRow) => (

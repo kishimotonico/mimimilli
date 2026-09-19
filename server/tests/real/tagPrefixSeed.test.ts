@@ -74,3 +74,33 @@ test("real アダプタで prefix 定義の CRUD が動く", async (t) => {
   assert.ok(await adapter.deleteTagPrefix("気分"));
   assert.equal(await adapter.updateTagPrefix("気分", { label: "x" }), null);
 });
+
+test("real アダプタ: reorderTagPrefixes は一致しない集合を null で拒否し、状態を変えない", async (t) => {
+  const directory = makeTestDirectory("tagprefix-reorder");
+  t.after(directory.cleanup);
+  const adapter = directory.own(
+    createTestRealAdapter({
+      database: {
+        kind: "files",
+        catalogPath: join(directory.path, "catalog.sqlite"),
+        userPath: join(directory.path, "user.sqlite"),
+      },
+    }),
+  );
+
+  const before = await adapter.listTagPrefixes();
+  const reversed = [...before].reverse().map((p) => p.prefix);
+
+  assert.equal(await adapter.reorderTagPrefixes([...reversed, "存在しないprefix"]), null);
+  assert.deepEqual(await adapter.listTagPrefixes(), before);
+
+  const reordered = await adapter.reorderTagPrefixes(reversed);
+  assert.deepEqual(
+    reordered?.map((p) => p.prefix),
+    reversed,
+  );
+  assert.deepEqual(
+    (await adapter.listTagPrefixes()).map((p) => p.prefix),
+    reversed,
+  );
+});

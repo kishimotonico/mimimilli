@@ -72,7 +72,7 @@ export default function WorkDetailPage({ onPlay, onResume, onTogglePlay }: WorkD
 
   const handlePlay = useCallback(
     (trackIndex: number) => {
-      if (work && rootFolder !== null) {
+      if (work) {
         onPlay(
           toWorkListItem({ ...work, trackCount: getDefaultPlaylistTrackCount(work) }, rootFolder),
           trackIndex,

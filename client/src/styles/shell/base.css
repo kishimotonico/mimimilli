@@ -37,7 +37,7 @@ body * {
   height: 100%;
   background: var(--paper-0);
   color: var(--ink-0);
-  font-size: 12.5px;
+  font-size: var(--fs-body);
   line-height: 1.5;
   overflow: hidden;
 }
@@ -57,7 +57,6 @@ body input {
   color: inherit;
   background: transparent;
   border: 0;
-  outline: 0;
   padding: 0;
 }
 body a {
@@ -67,4 +66,37 @@ body a {
 body ul,
 body ol {
   list-style: none;
+}
+/* フォーカスリングの共通規約（tokens.cssの--focus-ring/--focus-ring-offset）。
+   個別コンポーネントでoutline/ring系のTailwindユーティリティを重ねない。
+   overflow: hidden で切り抜かれる行は outline-offset を負値にする例外だけ
+   .mle-row/.mll-wrow等で個別に上書きする。文字入力（テキスト系inputとtextarea）は
+   キャレットで入力位置が分かるためアクセント色のリングを出さず、境界線色の弱い変化
+   （--line → --line-strong）だけで示す（チェックボックス等は対象外でリングのまま）。
+   border-line で枠線を持つ通常の文字入力は shared/ui/TextInput がこの表現を自前で
+   定義するためここには依存しない。ここに残っているのは TextInput の形に合わない
+   文字入力（アクティブ編集中を border-acc で示すインライン編集欄、枠線をラッパー側に
+   持つコンテナ型検索欄）向けの outline:none の土台。 */
+body :is(button, a, select, [tabindex]):focus-visible,
+body
+  input:is(
+    [type="checkbox"],
+    [type="radio"],
+    [type="range"],
+    [type="file"],
+    [type="color"]
+  ):focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+body
+  :is(input, textarea):not(
+    [type="checkbox"],
+    [type="radio"],
+    [type="range"],
+    [type="file"],
+    [type="color"]
+  ):focus-visible {
+  outline: none;
+  border-color: var(--line-strong);
 }

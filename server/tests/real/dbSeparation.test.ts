@@ -87,7 +87,11 @@ test("catalog削除後の再スキャンでもuser状態を保持し、ATTACH JO
 
   rmSync(catalogPath);
   const rebuilt = library.own(createTestRealAdapter({ database }));
-  assert.deepEqual(await rebuilt.getSettings(), { rootFolder: library.root, lastScanTime: null });
+  assert.deepEqual(await rebuilt.getSettings(), {
+    rootFolder: library.root,
+    lastScanTime: null,
+    lastScanRootFolder: null,
+  });
   await rebuilt.scan();
 
   const after = await rebuilt.getWork(library.existingWorkId);

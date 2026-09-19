@@ -1,10 +1,31 @@
+import type { ReactElement } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import type { Work } from "@mimimilli/shared";
 import { emptyDlsiteState } from "@mimimilli/shared";
 import { WORK_SOURCE_PATCH_BLOCKED_MESSAGE } from "../../src/entities/work/sourceRevision";
 import type { LibraryTagsPatchMutation } from "../../src/features/library/model/useLibraryQueries";
 import { WorkTagEditor } from "../../src/features/library/ui/preview/WorkTagEditor";
+import GlobalToast from "../../src/app/ui/GlobalToast";
+
+// Toastは単一ホスト（GlobalToast）へ集約されているため、WorkTagEditorの表示要求を
+// 目に見える形で検証するにはGlobalToastも一緒に描画する必要がある。
+function renderWithToast(ui: ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      {ui}
+      <GlobalToast
+        onOpenScan={() => {}}
+        onOpenScanNeedsAttention={() => {}}
+        onRetrySkippedTrack={() => {}}
+      />
+    </QueryClientProvider>,
+  );
+}
 
 function makeWork(overrides: Partial<Work> = {}): Work {
   return {
@@ -66,5 +87,18 @@ describe("WorkTagEditor", () => {
     fireEvent.click(addButton);
     expect(mutateAsync).not.toHaveBeenCalled();
     expect(screen.getByRole("alert")).toHaveTextContent(WORK_SOURCE_PATCH_BLOCKED_MESSAGE);
+  });
+
+  it("タグ保存に失敗すると共通トースト（error variant・手動クローズ）で案内する", () => {
+    renderWithToast(
+      <WorkTagEditor
+        work={makeWork()}
+        tagSuggestions={[]}
+        tagsMutation={makeTagsMutation({ error: new Error("network") })}
+        expanded
+      />,
+    );
+
+    expect(screen.getByText("タグを保存できませんでした。")).toBeTruthy();
   });
 });

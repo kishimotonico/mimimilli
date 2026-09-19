@@ -1,15 +1,27 @@
 import { memo } from "react";
 import type { WorkListItem } from "@mimimilli/shared";
 import CoverImg from "../../../entities/work/ui/CoverImg";
+import { getWorkStatusLabel } from "../../../entities/work/workStatusLabel";
+import { I } from "../../../shared/ui/Icon";
 import { cn } from "../../../shared/lib/cn";
 import { selectCoverThumbnailWidth } from "../model/gridSizing";
-import type { GridArrowKey } from "../model/gridNavigation";
+import type { GridArrowKey } from "../../../shared/lib/gridNavigation";
 
-const GRID_ARROW_KEYS = new Set<GridArrowKey>(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"]);
+const GRID_ARROW_KEYS = new Set<GridArrowKey>([
+  "ArrowLeft",
+  "ArrowRight",
+  "ArrowUp",
+  "ArrowDown",
+  "Home",
+  "End",
+]);
 
 export interface WorkTileProps {
   work: WorkListItem;
   flatIndex: number;
+  /** roving tabindexの現在位置と一致する場合だけ0（それ以外は-1）。
+   *  一覧全体をTabストップ1個にする */
+  tabIndex: 0 | -1;
   tileWidth?: number;
   coverHeight?: number;
   isSelected: boolean;
@@ -24,6 +36,7 @@ export interface WorkTileProps {
 function WorkTile({
   work,
   flatIndex,
+  tabIndex,
   tileWidth,
   coverHeight,
   isSelected,
@@ -38,21 +51,30 @@ function WorkTile({
     tileWidth ?? safeTileSize,
     window.devicePixelRatio,
   );
+  const statusLabel = getWorkStatusLabel(work.status);
+  const isPlayable = work.status === "ok";
 
   return (
     <button
       type="button"
       className={`mll-grid-tile ${isSelected ? "is-on" : ""}`}
       data-flat-index={flatIndex}
-      aria-label={`${work.title}を選択、Enterで再生`}
+      tabIndex={tabIndex}
+      aria-label={
+        statusLabel
+          ? `${work.title}を選択（${statusLabel}のため再生できません）`
+          : `${work.title}を選択、Enterで再生`
+      }
       aria-pressed={isSelected}
       style={tileWidth !== undefined ? { width: tileWidth } : undefined}
       onClick={() => onSelect(work.id)}
-      onDoubleClick={() => onPlay(work)}
+      onDoubleClick={() => {
+        if (isPlayable) onPlay(work);
+      }}
       onKeyDown={(event) => {
         if (event.key === "Enter") {
           event.preventDefault();
-          onPlay(work);
+          if (isPlayable) onPlay(work);
           return;
         }
         if (!GRID_ARROW_KEYS.has(event.key as GridArrowKey)) return;
@@ -73,6 +95,11 @@ function WorkTile({
           requestWidth={requestWidth}
           loading="lazy"
         />
+        {statusLabel && (
+          <span className="mll-grid-tile__status" title={statusLabel}>
+            <I.err size={12} />
+          </span>
+        )}
         {isPlaying && (
           <span
             className="mll-grid-tile__now inline-flex items-center gap-[1px]"

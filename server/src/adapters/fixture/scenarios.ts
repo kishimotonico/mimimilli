@@ -19,7 +19,7 @@ export type FixtureScenarioId =
   | "large"
   | "scan-review";
 
-const SCENARIO_IDS: readonly FixtureScenarioId[] = [
+export const SCENARIO_IDS: readonly FixtureScenarioId[] = [
   "default",
   "empty",
   "new-work",
@@ -146,7 +146,8 @@ export function createFixtureScenario(rawId: string | undefined, now: string): F
       id,
       works: cloneWorks(SEED_WORKS.filter((w) => w.status !== "ok")),
       smartFolders: [],
-      rootFolder: "/library/error-library",
+      // SEED_WORKS の physicalPath は "/library/..." 固定なのでrootFolderも合わせる。
+      rootFolder: "/library",
       lastScanTime: now,
       scanInsertedWorkIds: [],
       scanUpdatedWorkIds: [],

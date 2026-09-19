@@ -169,6 +169,33 @@ describe("WorkListPane 空状態", () => {
     await user.click(screen.getByRole("button", { name: "検索をクリア" }));
     expect(onClearSearch).toHaveBeenCalledTimes(1);
   });
+
+  it("スマートフォルダーが0件のとき専用の見出しと「条件を編集」を出す", async () => {
+    const onEditSmartFolderRules = vi.fn();
+    const user = userEvent.setup();
+    renderWorkListPane({ works: [], isSmartFolder: true, onEditSmartFolderRules });
+
+    expect(screen.getByText("条件に一致する作品がありません")).toBeTruthy();
+    expect(screen.getByText("条件を見直すか、絞り込みを外してください。")).toBeTruthy();
+    expect(screen.queryByText("絞り込みをすべてクリア")).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "条件を編集" }));
+    expect(onEditSmartFolderRules).toHaveBeenCalledTimes(1);
+  });
+
+  it("スマートフォルダーが0件・チップ絞り込み中のとき「絞り込みをすべてクリア」も出す", async () => {
+    const onClearAllFilters = vi.fn();
+    const user = userEvent.setup();
+    renderWorkListPane({
+      works: [],
+      isSmartFolder: true,
+      hasSelectedTags: true,
+      onClearAllFilters,
+    });
+
+    await user.click(screen.getByRole("button", { name: "絞り込みをすべてクリア" }));
+    expect(onClearAllFilters).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("WorkListPane の末尾余白（docked bar）", () => {

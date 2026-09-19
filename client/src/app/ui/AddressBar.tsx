@@ -8,6 +8,7 @@ import LibraryBreadcrumbs from "../../features/library/ui/LibraryBreadcrumbs";
 import WorkDetailBreadcrumbs from "../../features/library/ui/WorkDetailBreadcrumbs";
 import LibrarySortMenu from "../../features/library/ui/LibrarySortMenu";
 import FilesBreadcrumbs from "../../features/files/ui/FilesBreadcrumbs";
+import FilesAddressBarMenu from "../../features/files/ui/FilesAddressBarMenu";
 import NavigationHistoryButtons from "./NavigationHistoryButtons";
 import { I } from "../../shared/ui/Icon";
 import IconButton from "../../shared/ui/IconButton";
@@ -70,7 +71,11 @@ export default function AddressBar() {
       )}
 
       {mode === "library" && <LibrarySortMenu />}
-      <IconButton size="sm" icon={I.more} label="その他" disabled title="近日実装" />
+      {mode === "files" ? (
+        <FilesAddressBarMenu />
+      ) : (
+        <IconButton size="sm" icon={I.more} label="その他" disabled title="近日実装" />
+      )}
     </div>
   );
 }

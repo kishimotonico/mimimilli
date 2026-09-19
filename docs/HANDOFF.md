@@ -102,7 +102,8 @@ smokeテストの注意:
 | POST         | `/dlsite/fetch-by-code`                      | RJ/VJコード指定のプレビュー取得                                                                                           |
 | POST         | `/dlsite/:id/fetch`                          | DLsite情報のプレビュー取得。失敗分類は `not_found / parse_error / error`                                                  |
 | POST         | `/dlsite/:id/apply`                          | タイトル・カバー・選択タグを適用し、連携状態をメタへ保存                                                                  |
-| POST         | `/dlsite/apply-missing`                      | 未取得作品への一括適用                                                                                                    |
+| POST         | `/dlsite/apply-missing`                      | 未取得作品への一括適用（既存値は上書きしない。dry-runとcomputeMissingDiffを共有）                                         |
+| POST         | `/dlsite/apply-missing/preview`              | `/dlsite/apply-missing` のdry-run。作品ごとの追加タグ・cover/url適用有無を書き込みせず返す                                |
 | PATCH        | `/dlsite/:id`                                | RJコード修正・skipped切替                                                                                                 |
 | GET          | `/dlsite/bulk`                               | 実行中または直近の一括取得ジョブスナップショット。なければ204                                                             |
 | POST         | `/dlsite/bulk`                               | none/error作品の一括取得ジョブを開始                                                                                      |

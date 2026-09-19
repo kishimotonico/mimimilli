@@ -164,6 +164,14 @@ export function usePlayerActions() {
     controller.dispatch({ type: "abCleared" });
   }, [controller]);
 
+  const retryPlayback = useCallback(() => {
+    controller.dispatch({ type: "retryRequested" });
+  }, [controller]);
+
+  const dismissError = useCallback(() => {
+    controller.dispatch({ type: "errorDismissed" });
+  }, [controller]);
+
   return useMemo(
     () => ({
       play,
@@ -185,6 +193,8 @@ export function usePlayerActions() {
       clearABRepeat,
       resume,
       pause,
+      retryPlayback,
+      dismissError,
     }),
     [
       play,
@@ -206,6 +216,8 @@ export function usePlayerActions() {
       clearABRepeat,
       resume,
       pause,
+      retryPlayback,
+      dismissError,
     ],
   );
 }

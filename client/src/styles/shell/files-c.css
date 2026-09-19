@@ -7,10 +7,25 @@
 
 /* ── File mode — single column stage + preview ────────────── */
 
-/* 現在フォルダー1カラムを載せる舞台。出入りするカラムをクリップする */
+/* 一覧(.mle-filestage)とプレビュー(.mle-prv-anchor)を束ねる舞台。
+   前者は残り幅いっぱい・後者はドラッグで確定した固定幅、という主従を持つ
+   （一覧幅を固定すると作品名が切れる一方プレビューに空白が残るため、この配分にする）。
+   container queryで幅を検知し、狭幅ではプレビューを全幅へ切り替える。 */
+.mle-files-layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  container: files-layout / inline-size;
+}
+
+/* 現在フォルダー1カラムを載せる舞台。出入りするカラムをクリップする。
+   min-widthはpreviewLayoutAtoms.tsのFILES_LIST_MIN_WIDTHと値を揃える
+   （プレビュー幅の実効上限の算出元）。 */
 .mle-filestage {
   position: relative;
-  flex: 0 0 300px;
+  flex: 1 1 auto;
+  min-width: 260px;
   overflow: hidden;
   border-right: 1px solid var(--line);
   background: var(--paper-0);
@@ -21,6 +36,23 @@
   width: 100%;
   border-right: none;
   will-change: transform, opacity;
+}
+
+/* 狭幅ではプレビューを全幅へ切り替え、一覧は隠す。
+   一覧は選択操作で自動的にプレビューを開き直す（FilesView側）ため、閉じている間だけ
+   一覧が全幅になる通常挙動と両立する。 */
+@container files-layout (max-width: 720px) {
+  .mle-files-layout[data-preview-open="true"] .mle-filestage {
+    display: none;
+  }
+  .mle-files-layout[data-preview-open="true"] .mle-prv-anchor {
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
+  }
+  .mle-prv__resize {
+    display: none;
+  }
 }
 
 .mle-fprev {
@@ -113,7 +145,7 @@
   background: var(--paper-0);
   color: var(--ink-0);
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: var(--fs-mono);
   line-height: 1.6;
   text-align: start;
   user-select: text;
@@ -128,14 +160,15 @@
 }
 .mle-fprev__path {
   font-family: var(--font-mono);
-  font-size: 10.5px;
-  color: var(--ink-3);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  color: var(--ink-2);
   word-break: break-all;
   margin-top: 3px;
 }
 .mle-fprev__meta {
   font-family: var(--font-sans);
-  font-size: 11.5px;
+  font-size: var(--fs-secondary);
   color: var(--ink-2);
   margin-top: 6px;
   line-height: 1.4;
@@ -162,7 +195,8 @@
 }
 .mle-identity-conflict p {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
   color: var(--ink-1);
 }
 .mle-identity-conflict__paths {
@@ -173,7 +207,8 @@
 .mle-identity-conflict__paths code {
   color: var(--ink-2);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
   user-select: text;
 }
 .mle-identity-conflict-badge {
@@ -185,11 +220,12 @@
   background: oklch(72% 0.165 25 / 0.12);
   color: var(--r-coral);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
   font-weight: 600;
 }
 .mle-fprev__note {
-  font-size: 11.5px;
+  font-size: var(--fs-secondary);
   color: var(--ink-2);
   line-height: 1.6;
   background: var(--paper-0);

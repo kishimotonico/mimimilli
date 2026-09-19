@@ -1,6 +1,8 @@
 import { useLayoutEffect, useRef } from "react";
 import type { MouseEvent as ReactMouseEvent, RefObject, SyntheticEvent } from "react";
+import { useSetAtom } from "jotai";
 import { FOCUSABLE_SELECTOR } from "./focusable";
+import { openModalDialogsAtom } from "../model/openModalDialogsAtom";
 
 interface UseDialogModalOptions {
   /**
@@ -20,6 +22,7 @@ interface UseDialogModalOptions {
  */
 export function useDialogModal({ onClose, initialFocusRef }: UseDialogModalOptions) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const setOpenDialogs = useSetAtom(openModalDialogsAtom);
 
   useLayoutEffect(() => {
     const dialog = dialogRef.current;
@@ -30,6 +33,8 @@ export function useDialogModal({ onClose, initialFocusRef }: UseDialogModalOptio
 
     dialog.showModal();
     (initialFocusRef?.current ?? dialog).focus({ preventScroll: true });
+    // 開いた順（末尾が最前面）で積む。useTopmostOpenModalDialog はこのスタックの末尾を読む
+    setOpenDialogs((current) => [...current, dialog]);
 
     // ネイティブのフォーカストラップに加えて手動で補完する（Tab循環を保険として持つ）。
     // dialog直下の要素（fixed配置のToastなど）も含めて対象にするため querySelector で毎回集める。
@@ -56,6 +61,7 @@ export function useDialogModal({ onClose, initialFocusRef }: UseDialogModalOptio
     return () => {
       dialog.removeEventListener("keydown", handleTabKeyDown);
       dialog.close();
+      setOpenDialogs((current) => current.filter((entry) => entry !== dialog));
       if (previousActiveElement?.isConnected) {
         previousActiveElement.focus({ preventScroll: true });
       }

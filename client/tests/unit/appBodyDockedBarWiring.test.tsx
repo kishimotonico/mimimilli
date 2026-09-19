@@ -53,6 +53,7 @@ vi.mock("../../src/features/library/model/useLibraryQueries", () => ({
   useMissingWorksCountQuery: () => ({ data: undefined }),
   useLibraryBulkUnregisterMissingMutation: () => ({ isPending: false, mutate: vi.fn() }),
   useSmartFolderMutation: () => ({ isPending: false, reset: vi.fn(), mutate: vi.fn() }),
+  useSmartFolderDeleteMutation: () => ({ isPending: false, reset: vi.fn(), mutate: vi.fn() }),
 }));
 
 vi.mock("../../src/features/library/ui/WorkGrid", () => ({
@@ -74,7 +75,6 @@ function renderAppBody(store: ReturnType<typeof createStore>) {
       <JotaiProvider store={store}>
         <LibraryNavigationProvider>
           <AppBody
-            rootFolder="/root"
             onPlay={vi.fn()}
             onResume={vi.fn()}
             onTogglePlay={vi.fn()}

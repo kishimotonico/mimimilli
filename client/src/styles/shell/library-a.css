@@ -32,7 +32,8 @@
   display: grid;
   place-items: center;
   font-family: var(--font-sans);
-  font-size: 12px;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
   font-weight: 600;
   letter-spacing: -0.04em;
 }
@@ -58,15 +59,22 @@
   border: 1px solid var(--line);
   background: var(--paper-0);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
   color: var(--ink-1);
 }
 .mll-bar__pulse .dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
+  background: var(--ink-4);
+}
+.mll-bar__pulse .dot.is-playing {
   background: var(--r-leaf);
   animation: mll-pulse 1.8s ease-out infinite;
+}
+.mll-bar__pulse .dot.is-error {
+  background: var(--r-coral);
 }
 @keyframes mll-pulse {
   0% {
@@ -96,14 +104,16 @@
   height: 30px;
   padding: 0 10px 0 12px;
   background: var(--paper-2);
+  border: 1px solid transparent;
   border-radius: 8px;
   color: var(--ink-2);
-  font-size: 12px;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
   min-width: 280px;
 }
 .mll-bar__search:focus-within {
   background: var(--paper-1);
-  box-shadow: 0 0 0 1.5px var(--acc-line);
+  border-color: var(--line-strong);
 }
 .mll-bar__search input {
   flex: 1;
@@ -113,7 +123,8 @@
 }
 .mll-bar__search .kbd {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
   color: var(--ink-2);
   background: var(--paper-1);
   border-radius: 4px;

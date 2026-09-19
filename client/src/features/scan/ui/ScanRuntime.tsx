@@ -1,21 +1,24 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useSetAtom } from "jotai";
+import { useAtomValue, useSetAtom } from "jotai";
 import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import type { ScanJobSnapshot, StartScanRequest } from "@mimimilli/shared";
-import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
 import { SETTINGS_QUERY_KEYS } from "../../../entities/settings/queryKeys";
-import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { useDlsiteBulkActions } from "../../../entities/dlsite/useDlsiteBulkActions";
 import { SCAN_QUERY_KEYS } from "../api";
 import { refreshScanCandidates } from "../../../entities/scan/scanCandidatesCache";
+import { invalidateLibraryQueries } from "../model/libraryInvalidation";
 import {
   scanActionsAtom,
   scanCandidateHiddenPathsAtom,
   scanErrorAtom,
   scanJobAtom,
+  scanModalOpenAtom,
   type ScanActions,
 } from "../../../entities/scan/model/atoms";
 import { useScanJob } from "../model/useScanJob";
+import { formatScanResult } from "../model/formatScanResult";
+import { activeModalAtom } from "../../../shared/model/activeModalAtom";
+import { useToast } from "../../../shared/ui/useToast";
 
 // SSE 購読の単一所有者。scanJobAtom / scanActionsAtom をここで配線する。
 export default function ScanRuntime() {
@@ -25,21 +28,59 @@ export default function ScanRuntime() {
   const setError = useSetAtom(scanErrorAtom);
   const setActions = useSetAtom(scanActionsAtom);
   const setHiddenPaths = useSetAtom(scanCandidateHiddenPathsAtom);
+  const setActiveModal = useSetAtom(activeModalAtom);
+  // dismiss()は発行元（useToastの呼び出し）単位でしか効かないため、終了通知用とエラー用で分ける。
+  const terminalToast = useToast();
+  const errorToast = useToast();
+  // モーダルが開いている間はサイドバーの「完了しました」が完了通知を担うため、
+  // トースト側は重ねて出さない。
+  const scanModalOpen = useAtomValue(scanModalOpenAtom);
 
   const handleScanTerminal = useCallback(
     (job: ScanJobSnapshot) => {
+      if (job.status === "cancelled") {
+        // 終了通知を出すのと同じ同期経路でエラー要求を取り下げる
+        errorToast.dismiss();
+        if (!scanModalOpen) {
+          terminalToast.show({
+            message: "スキャンを中止しました",
+            variant: "warning",
+            priority: "notice",
+          });
+        }
+        return;
+      }
       if (job.status !== "completed" || !job.result || !job.finishedAt) return;
+      errorToast.dismiss();
       const result = job.result;
       queryClient.setQueryData(SCAN_QUERY_KEYS.last(), { result, finishedAt: job.finishedAt });
       void refreshScanCandidates(queryClient).catch(() => {});
-      queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.all() });
-      queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.dlsiteNotifications() });
-      queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.allFacets() });
-      queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.allWorks() });
+      void invalidateLibraryQueries(queryClient);
       queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() });
+      if (!scanModalOpen) {
+        const hasNeedsAttention =
+          result.identityConflicts.length > 0 ||
+          result.invalidMetaFiles.length > 0 ||
+          result.rjCodeMissingCount > 0 ||
+          result.dataIntegrityWarning !== undefined;
+        terminalToast.show({
+          message: `スキャン完了: ${formatScanResult(result)}`,
+          variant: result.errors > 0 || result.missing > 0 ? "warning" : "success",
+          priority: "notice",
+          actionLabel: hasNeedsAttention ? "要対応を見る" : undefined,
+          // onActionはトーストを自動では閉じない契約（design-system.md）。ここは同期的に
+          // 完結する操作なので押した直後に閉じる
+          onAction: hasNeedsAttention
+            ? () => {
+                setActiveModal({ kind: "scan", tab: "needsAttention" });
+                terminalToast.dismiss();
+              }
+            : undefined,
+        });
+      }
       if (result.insertedWorkIds.length > 0) dlsiteBulk.attach();
     },
-    [dlsiteBulk, queryClient],
+    [dlsiteBulk, errorToast, queryClient, scanModalOpen, setActiveModal, terminalToast],
   );
 
   // 新しいスキャンの開始がサーバー側の真実の境界になるため、開始時点でそれ以前のローカル非表示を破棄する。
@@ -61,7 +102,19 @@ export default function ScanRuntime() {
 
   useEffect(() => {
     setError(scanJob.error);
-  }, [scanJob.error, setError]);
+    if (!scanJob.error) {
+      errorToast.dismiss();
+      return;
+    }
+    // scanErrorAtomはSetupScreenがインライン表示にも使う「エラー状態」として残す
+    // （AC参照）。表示自体はここからuseToastへ出す
+    errorToast.show({
+      message: scanJob.error,
+      variant: "error",
+      priority: "notice",
+      onDismiss: () => scanJobRef.current.clearError(),
+    });
+  }, [scanJob.error, setError, errorToast]);
 
   const actionsRef = useRef<ScanActions>({
     start: async (options?: StartScanRequest) => scanJobRef.current.start(options),

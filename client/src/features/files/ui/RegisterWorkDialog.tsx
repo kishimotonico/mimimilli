@@ -12,6 +12,7 @@ import Button from "../../../shared/ui/Button";
 import IconButton from "../../../shared/ui/IconButton";
 import { I } from "../../../shared/ui/Icon";
 import TagCombobox from "../../../shared/ui/TagCombobox";
+import TextInput from "../../../shared/ui/TextInput";
 import { useDialogModal } from "../../../shared/ui/useDialogModal";
 import { getAllTags } from "../../../entities/tag/api";
 import { TAG_QUERY_KEYS } from "../../../entities/tag/queryKeys";
@@ -24,9 +25,6 @@ import { buildDlsiteRegistrationBody } from "../../../entities/work/dlsitePrevie
 import { dlsiteFetchErrorMessage } from "../../../entities/work/dlsiteFetchError";
 import { apiErrorMessage } from "../../../shared/lib/apiError";
 import { createWork, fetchDlsiteInfoByCode } from "../api";
-
-const inputClass =
-  "h-8 min-w-0 w-full rounded-[6px] border border-line bg-paper-0 px-2.5 font-sans text-[12px] text-ink-0 placeholder:text-ink-4 focus:border-acc focus:outline-none focus:ring-2 focus:ring-acc-soft disabled:cursor-not-allowed disabled:text-ink-4";
 
 interface RegisterWorkDialogProps {
   folderPath: string;
@@ -169,9 +167,9 @@ export default function RegisterWorkDialog({
           <IconButton icon={I.x} label="閉じる" size="sm" disabled={submitBusy} onClick={close} />
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-[18px] py-3 text-[12px]">
+        <div className="min-h-0 flex-1 overflow-y-auto px-[18px] py-3 text-body">
           {preview.orphanedMeta && (
-            <p className="mb-3 rounded-[6px] border border-line-soft bg-paper-0 px-3 py-2 text-[11px] leading-[1.6] text-ink-1">
+            <p className="mb-3 rounded-[6px] border border-line-soft bg-paper-0 px-3 py-2 text-secondary leading-[1.6] text-ink-1">
               {targetKind === "file"
                 ? "このファイルには以前の登録情報が残っています。内容を引き継いで復元します。"
                 : "このフォルダーには以前の登録情報が残っています。内容を引き継いで復元します。"}
@@ -179,17 +177,17 @@ export default function RegisterWorkDialog({
           )}
 
           {preview.descendantWorkCount > 0 && (
-            <p className="mb-3 rounded-[6px] border border-[color-mix(in_oklch,var(--r-coral)_35%,transparent)] bg-[color-mix(in_oklch,var(--r-coral)_8%,transparent)] px-3 py-2 text-[11px] leading-[1.6] text-ink-1">
+            <p className="mb-3 rounded-[6px] border border-[color-mix(in_oklch,var(--r-coral)_35%,transparent)] bg-[color-mix(in_oklch,var(--r-coral)_8%,transparent)] px-3 py-2 text-secondary leading-[1.6] text-ink-1">
               登録済み作品 <b>{preview.descendantWorkCount}</b> 件を解除して統合します。
               子作品の履歴・タグは引き継がれません。
             </p>
           )}
 
           <div className="mb-3 flex flex-col gap-2 rounded-[8px] border border-line-soft p-3">
-            <span className="font-sans text-[11px] font-medium text-ink-2">DLsite連携（任意）</span>
+            <span className="font-sans text-label font-medium text-ink-2">DLsite連携（任意）</span>
             <div className="flex gap-2">
-              <input
-                className={`${inputClass} font-mono text-[11px]`}
+              <TextInput
+                font="mono"
                 value={rjCode}
                 disabled={submitBusy || dlsiteBusy}
                 placeholder="RJ123456"
@@ -202,7 +200,9 @@ export default function RegisterWorkDialog({
                 {dlsiteBusy ? <I.refresh size={12} className="motion-safe:animate-spin" /> : "取得"}
               </Button>
             </div>
-            {dlsiteError && <p className="m-0 text-[11px] text-[var(--r-coral)]">{dlsiteError}</p>}
+            {dlsiteError && (
+              <p className="m-0 text-secondary text-[var(--r-coral)]">{dlsiteError}</p>
+            )}
 
             <div className="flex items-center gap-2.5">
               {dlsiteInfo?.coverUrl ? (
@@ -214,11 +214,11 @@ export default function RegisterWorkDialog({
               ) : (
                 <div className="flex h-[104px] w-[104px] shrink-0 flex-col items-center justify-center gap-1 rounded-[6px] border border-line-soft bg-paper-0 text-ink-4">
                   <I.image size={20} />
-                  <span className="font-sans text-[10px]">なし</span>
+                  <span className="font-sans text-caption">なし</span>
                 </div>
               )}
               <label
-                className={`flex items-center gap-1.5 text-[11px] ${dlsiteInfo?.coverUrl ? "text-ink-1" : "text-ink-4"}`}
+                className={`flex items-center gap-1.5 text-secondary ${dlsiteInfo?.coverUrl ? "text-ink-1" : "text-ink-4"}`}
               >
                 <input
                   type="checkbox"
@@ -232,14 +232,13 @@ export default function RegisterWorkDialog({
           </div>
 
           <label className="mb-3 flex flex-col gap-1">
-            <span className="flex items-center gap-1.5 font-sans text-[11px] font-medium text-ink-2">
+            <span className="flex items-center gap-1.5 font-sans text-label font-medium text-ink-2">
               タイトル
               {dlsiteBusy && (
                 <I.refresh size={11} className="text-ink-3 motion-safe:animate-spin" />
               )}
             </span>
-            <input
-              className={inputClass}
+            <TextInput
               value={title}
               disabled={submitBusy}
               onChange={(event) => setTitle(event.target.value)}
@@ -247,7 +246,7 @@ export default function RegisterWorkDialog({
           </label>
 
           <div className="mb-3 flex flex-col gap-1">
-            <span className="font-sans text-[11px] font-medium text-ink-2">タグ</span>
+            <span className="font-sans text-label font-medium text-ink-2">タグ</span>
             <div className="flex flex-wrap items-start gap-1.5">
               {tags.map((tag) => (
                 <Tag
@@ -281,11 +280,11 @@ export default function RegisterWorkDialog({
             </div>
           </div>
 
-          {submitError && <p className="m-0 text-[11px] text-[var(--r-coral)]">{submitError}</p>}
+          {submitError && <p className="m-0 text-secondary text-[var(--r-coral)]">{submitError}</p>}
         </div>
 
         <footer className="flex shrink-0 justify-end gap-2 border-t border-line-soft px-[18px] py-3">
-          <Button variant="ghost" disabled={submitBusy} onClick={close}>
+          <Button variant="quiet" disabled={submitBusy} onClick={close}>
             キャンセル
           </Button>
           <Button

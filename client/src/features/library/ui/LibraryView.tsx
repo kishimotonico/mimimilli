@@ -23,6 +23,7 @@ import {
   useLibraryDebouncedSearchQuery,
   useLibrarySupportingQueries,
   useMissingWorksCountQuery,
+  useSmartFolderDeleteMutation,
   useSmartFolderMutation,
 } from "../model/useLibraryQueries";
 import {
@@ -48,7 +49,7 @@ import WorkListPane from "./WorkListPane";
 import SmartFolderEditorModal from "./SmartFolderEditorModal";
 import { SmartFolderView } from "./preview/SmartFolderView";
 import { DataIntegrityWarningBanner } from "./DataIntegrityWarningBanner";
-import { ErrorViewBulkDeleteBanner } from "./ErrorViewBulkDeleteBanner";
+import { ErrorViewBulkUnregisterBanner } from "./ErrorViewBulkUnregisterBanner";
 import LibraryWorksBoundary from "./LibraryWorksBoundary";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 
@@ -123,6 +124,13 @@ export default function LibraryView({
     onError: () => {},
   });
 
+  const deleteSmartFolderMutation = useSmartFolderDeleteMutation({
+    onDeleted: () => {
+      setSmartFolderEditor(closedSmartFolderEditorState);
+      nav.setAxis("all");
+    },
+  });
+
   const isErrorView = nav.activeAxis === "error";
   const missingWorksCountQuery = useMissingWorksCountQuery(isErrorView);
   const bulkUnregisterMissingMutation = useLibraryBulkUnregisterMissingMutation(() => {
@@ -159,7 +167,7 @@ export default function LibraryView({
 
   const handlePlay = useCallback(
     (trackIndex: number) => {
-      if (selectedWork && rootFolder !== null) {
+      if (selectedWork) {
         onPlay(
           toWorkListItem(
             {
@@ -199,8 +207,9 @@ export default function LibraryView({
   const handleEditSmartFolder = useCallback(() => {
     if (!activeSmartFolder) return;
     saveSmartFolderMutation.reset();
+    deleteSmartFolderMutation.reset();
     setSmartFolderEditor(editSmartFolderEditorState(activeSmartFolder));
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- saveSmartFolderMutation.reset は毎レンダー新規参照のため省く
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset系は毎レンダー新規参照のため省く
   }, [activeSmartFolder]);
 
   return (
@@ -231,6 +240,7 @@ export default function LibraryView({
         <FilterChipBand
           tagPrefixes={tagPrefixes}
           selectedTags={nav.selectedTags}
+          smartFolderId={activeSmartFolder?.id}
           onReplace={nav.replaceTag}
           onToggle={nav.toggleTag}
           onAddTag={nav.addTag}
@@ -280,99 +290,112 @@ export default function LibraryView({
                   <SmartFolderView
                     sf={activeSmartFolder}
                     total={result.worksTotal}
+                    tagPrefixes={tagPrefixes}
+                    tagSuggestions={tagSuggestions}
                     onEdit={handleEditSmartFolder}
                   />
                 </div>
               ) : isErrorView ? (
-                <ErrorViewBulkDeleteBanner
+                <ErrorViewBulkUnregisterBanner
                   missingCount={missingWorksCountQuery.data}
                   mutation={bulkUnregisterMissingMutation}
                 />
               ) : undefined;
               return (
-                <div className="mll-results">
-                  <div className="mll-results__content">
-                    {showGrid ? (
-                      <WorkGrid
-                        axis={nav.activeAxis}
-                        works={result.works}
-                        worksQueryKey={worksQueryKey}
-                        selectedWorkId={nav.selectedWorkId}
-                        searchQuery={searchQuery}
-                        hasSelectedTags={nav.selectedTags.length > 0}
-                        playingWorkId={playingWorkId}
-                        isPlaybackActive={isPlaybackActive}
-                        dockedBarActive={dockedBarActive}
-                        hasNextPage={result.hasNextPage}
-                        worksTotal={result.worksTotal}
-                        isFetchingNextPage={result.isFetchingNextPage}
-                        onLoadMore={() => void result.fetchNextPage()}
-                        isPending={isPending}
-                        onWorkSelect={nav.selectWork}
-                        onWorkPlay={(work) => onPlay(work, 0)}
-                        onClearSearch={() => setSearchQuery("")}
-                        onDeselect={() => nav.selectWork(null)}
-                        resultsBanner={resultsBanner}
-                      />
-                    ) : (
-                      <WorkListPane
-                        axis={nav.activeAxis}
-                        works={result.works}
-                        worksQueryKey={worksQueryKey}
-                        selectedWorkId={nav.selectedWorkId}
-                        searchQuery={searchQuery}
-                        hasSelectedTags={nav.selectedTags.length > 0}
-                        playingWorkId={playingWorkId}
-                        isPlaybackActive={isPlaybackActive}
-                        dockedBarActive={dockedBarActive}
-                        isPending={isPending}
-                        hasNextPage={result.hasNextPage}
-                        worksTotal={result.worksTotal}
-                        isFetchingNextPage={result.isFetchingNextPage}
-                        onLoadMore={() => void result.fetchNextPage()}
-                        onWorkSelect={nav.selectWork}
-                        onClearSearch={() => setSearchQuery("")}
-                        resultsBanner={resultsBanner}
-                      />
-                    )}
-                  </div>
+                <>
+                  {/* チップ列と同じ理由で .mll-results の外（.mll-resultspane の通常フロー）に置く。
+                      プレビューが右からスライドインしても結果面の幅が縮むだけで隠れない。 */}
+                  {resultsBanner}
+                  <div className="mll-results">
+                    <div className="mll-results__content">
+                      {showGrid ? (
+                        <WorkGrid
+                          axis={nav.activeAxis}
+                          works={result.works}
+                          worksQueryKey={worksQueryKey}
+                          selectedWorkId={nav.selectedWorkId}
+                          searchQuery={searchQuery}
+                          hasSelectedTags={nav.selectedTags.length > 0}
+                          playingWorkId={playingWorkId}
+                          isPlaybackActive={isPlaybackActive}
+                          dockedBarActive={dockedBarActive}
+                          hasNextPage={result.hasNextPage}
+                          worksTotal={result.worksTotal}
+                          isFetchingNextPage={result.isFetchingNextPage}
+                          onLoadMore={() => void result.fetchNextPage()}
+                          isPending={isPending}
+                          onWorkSelect={nav.selectWork}
+                          onWorkPlay={(work) => onPlay(work, 0)}
+                          onClearSearch={() => setSearchQuery("")}
+                          onDeselect={() => nav.selectWork(null)}
+                          isSmartFolder={Boolean(activeSmartFolder)}
+                          onEditSmartFolderRules={handleEditSmartFolder}
+                          onClearAllFilters={nav.clearTags}
+                        />
+                      ) : (
+                        <WorkListPane
+                          axis={nav.activeAxis}
+                          works={result.works}
+                          worksQueryKey={worksQueryKey}
+                          selectedWorkId={nav.selectedWorkId}
+                          searchQuery={searchQuery}
+                          hasSelectedTags={nav.selectedTags.length > 0}
+                          playingWorkId={playingWorkId}
+                          isPlaybackActive={isPlaybackActive}
+                          dockedBarActive={dockedBarActive}
+                          isPending={isPending}
+                          hasNextPage={result.hasNextPage}
+                          worksTotal={result.worksTotal}
+                          isFetchingNextPage={result.isFetchingNextPage}
+                          onLoadMore={() => void result.fetchNextPage()}
+                          onWorkSelect={nav.selectWork}
+                          onWorkPlay={(work) => onPlay(work, 0)}
+                          onClearSearch={() => setSearchQuery("")}
+                          onDeselect={() => nav.selectWork(null)}
+                          isSmartFolder={Boolean(activeSmartFolder)}
+                          onEditSmartFolderRules={handleEditSmartFolder}
+                          onClearAllFilters={nav.clearTags}
+                        />
+                      )}
+                    </div>
 
-                  {/* 作品選択時のみスライドイン（ADR-0012 §3）。list/grid どちらでも同じ配線。
-                      selectedWorkId が非nullの間だけマウントする境界にすることで、退出中も
-                      AnimatePresenceが凍結した最後のselectedWorkを表示し続ける（RQキャッシュへの
-                      暗黙依存を断つ）。 */}
-                  <AnimatePresence>
-                    {nav.selectedWorkId !== null && (
-                      <PreviewPaneSlide
-                        key="preview"
-                        onClose={() => nav.selectWork(null)}
-                        selectedWork={selectedWork}
-                        isSelectedWorkLoading={workDetailQuery.isPending}
-                        isSelectedWorkError={workDetailQuery.isError}
-                        onRetrySelectedWork={workDetailQuery.refetch}
-                        playingTrackIndex={
-                          selectedWork && playingWorkId === selectedWork.id
-                            ? (playingTrackIndex ?? null)
-                            : null
-                        }
-                        isPlaybackActive={isPlaybackActive}
-                        onPlay={handlePlay}
-                        onResume={handleResume}
-                        onTogglePlay={onTogglePlay}
-                        onTagClick={handleTagClick}
-                        tagSuggestions={tagSuggestions}
-                        nav={nav}
-                        searchQuery={searchQuery}
-                        onExpand={handleExpand}
-                        onGoToPlayingScreen={
-                          selectedWork && playingWorkId === selectedWork.id
-                            ? handleGoToPlayingScreen
-                            : undefined
-                        }
-                      />
-                    )}
-                  </AnimatePresence>
-                </div>
+                    {/* 作品選択時のみスライドイン（ADR-0012 §3）。list/grid どちらでも同じ配線。
+                        selectedWorkId が非nullの間だけマウントする境界にすることで、退出中も
+                        AnimatePresenceが凍結した最後のselectedWorkを表示し続ける（RQキャッシュへの
+                        暗黙依存を断つ）。 */}
+                    <AnimatePresence>
+                      {nav.selectedWorkId !== null && (
+                        <PreviewPaneSlide
+                          key="preview"
+                          onClose={() => nav.selectWork(null)}
+                          selectedWork={selectedWork}
+                          isSelectedWorkLoading={workDetailQuery.isPending}
+                          isSelectedWorkError={workDetailQuery.isError}
+                          onRetrySelectedWork={workDetailQuery.refetch}
+                          playingTrackIndex={
+                            selectedWork && playingWorkId === selectedWork.id
+                              ? (playingTrackIndex ?? null)
+                              : null
+                          }
+                          isPlaybackActive={isPlaybackActive}
+                          onPlay={handlePlay}
+                          onResume={handleResume}
+                          onTogglePlay={onTogglePlay}
+                          onTagClick={handleTagClick}
+                          tagSuggestions={tagSuggestions}
+                          nav={nav}
+                          searchQuery={searchQuery}
+                          onExpand={handleExpand}
+                          onGoToPlayingScreen={
+                            selectedWork && playingWorkId === selectedWork.id
+                              ? handleGoToPlayingScreen
+                              : undefined
+                          }
+                        />
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </>
               );
             }}
           </LibraryWorksBoundary>
@@ -383,6 +406,7 @@ export default function LibraryView({
         <SmartFolderEditorModal
           folder={smartFolderEditor.status === "edit" ? smartFolderEditor.folder : null}
           tagSuggestions={tagSuggestions}
+          tagPrefixes={tagPrefixes}
           isSaving={saveSmartFolderMutation.isPending}
           saveError={
             saveSmartFolderMutation.error instanceof Error
@@ -391,8 +415,16 @@ export default function LibraryView({
                 ? "保存に失敗しました"
                 : null
           }
+          isDeleting={deleteSmartFolderMutation.isPending}
+          deleteError={
+            deleteSmartFolderMutation.error instanceof Error
+              ? deleteSmartFolderMutation.error.message
+              : deleteSmartFolderMutation.error
+                ? "削除に失敗しました"
+                : null
+          }
           onClose={() => {
-            if (saveSmartFolderMutation.isPending) return;
+            if (saveSmartFolderMutation.isPending || deleteSmartFolderMutation.isPending) return;
             setSmartFolderEditor(closedSmartFolderEditorState);
           }}
           onSave={(input) =>
@@ -400,6 +432,11 @@ export default function LibraryView({
               folder: smartFolderEditor.status === "edit" ? smartFolderEditor.folder : null,
               input,
             })
+          }
+          onDelete={
+            smartFolderEditor.status === "edit"
+              ? () => deleteSmartFolderMutation.mutate(smartFolderEditor.folder.id)
+              : undefined
           }
         />
       )}

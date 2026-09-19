@@ -76,7 +76,8 @@
   top: 2px;
   right: 2px;
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
   font-weight: 600;
   background: var(--acc);
   color: var(--paper-1);
@@ -127,9 +128,10 @@
   opacity: 0.55;
   transition: opacity 150ms ease;
 }
-/* チップ列（.mll-tagband）は .mll-results の外、.mll-resultspane の通常フローに置く。
-     .mll-results 内の作品プレビューは absolute でスライドインするため、チップ列を
-     同じ .mll-results に同居させるとプレビューの下に隠れて操作できなくなる
+/* チップ列（.mll-tagband）・結果バナー（スマートフォルダーのルール表示、エラービューの
+     一括登録解除導線など）は .mll-results の外、.mll-resultspane の通常フローに置く。
+     .mll-results 内の作品プレビューは absolute でスライドインするため、同じ .mll-results に
+     同居させるとプレビューの下に隠れて操作できなくなる
      （チップ列はADR-0012 §2で選択フィルタの唯一の表現）。 */
 .mll-resultspane {
   flex: 1 1 0;
@@ -184,9 +186,10 @@
   border-bottom: 1px solid var(--line-soft);
   background: var(--paper-1);
   font-family: var(--font-sans);
-  font-size: 10.5px;
+  font-size: var(--fs-label);
+  line-height: var(--lh-label);
   letter-spacing: 0.06em;
-  color: var(--ink-3);
+  color: var(--ink-2);
   text-transform: uppercase;
   font-weight: 600;
   position: sticky;
@@ -195,8 +198,9 @@
 }
 .mle-col__hd .count {
   font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--ink-3);
+  font-size: var(--fs-mono);
+  line-height: var(--lh-mono);
+  color: var(--ink-2);
   margin-left: auto;
 }
 .mle-col__list {

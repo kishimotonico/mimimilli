@@ -113,12 +113,15 @@ test("詳細パネルの「その他」メニューから作品登録を解除�
   await panel.getByRole("button", { name: "その他" }).click();
   await panel.getByRole("menuitem", { name: "作品登録を解除" }).click();
 
-  const dialog = page.getByRole("alertdialog", { name: "作品登録を解除" });
+  const dialog = page.getByRole("alertdialog", { name: "登録を解除" });
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "解除する" }).click();
 
   await expect(panel).toBeHidden();
-  await expect(page.getByText("添い寝カフェへようこそ", { exact: false })).toBeHidden();
+  await expect(
+    page.locator(".mll-results").getByText("添い寝カフェへようこそ", { exact: false }),
+  ).toBeHidden();
+  await expect(page.getByText("の登録を解除しました", { exact: false })).toBeVisible();
 
   assertNoErrors(tracker);
 });
@@ -266,7 +269,8 @@ test("スキャンダイアログが開いて完了し、閉じられる", async
     dialog.getByRole("button", { name: /ツンデレ後輩ちゃんの秘密のお世話ボイス/ }),
   ).toBeVisible({ timeout: 15_000 });
 
-  await dialog.getByRole("button", { name: "閉じる" }).click();
+  // スキャン完了トーストも同じ「閉じる」ラベルを持つため、ヘッダーの閉じるボタンに絞る。
+  await dialog.getByRole("banner").getByRole("button", { name: "閉じる" }).click();
   await expect(dialog).toBeHidden();
 
   assertNoErrors(tracker);
@@ -295,6 +299,12 @@ test("未登録タブでRJコードを編集でき、候補を1件ずつ除外�
   await rjInput.fill("RJ999999");
   await rjInput.press("Enter");
   await expect(editRow.getByRole("button", { name: "RJ999999" })).toBeVisible();
+
+  // スキャンでの新規登録に連動してDLsite一括取得が自動開始する（server/src/app.ts）。
+  // 除外操作（action優先度のトースト）がジョブ結果（notice優先度のトースト）に
+  // 割り込まれず勝つことを検証するため、先にジョブ結果側が実際に表示されていることを
+  // 確定させてから除外操作に進む。タイミングに依存せず衝突を毎回発生させて検証する。
+  await expect(dialog.getByText(/^DLsite一括取得:/)).toBeVisible();
 
   const excludeRowName = /^「候補」を選択/;
   const excludeRow = unregistered.getByRole("row", { name: excludeRowName });
@@ -339,13 +349,15 @@ test("スキャン完了後に候補を選択登録でき、問題をFilesで確
 
   await dialog.getByRole("tab", { name: /^要対応/ }).click();
   const attention = dialog.getByRole("tabpanel", { name: "要対応" });
-  const primaryRow = attention.getByRole("row", { name: /夜想曲スタジオ/ });
-  await expect(primaryRow.getByText("ID重複", { exact: true })).toBeVisible();
-  const conflictRow = attention.getByRole("row", { name: /copies\// });
-  await expect(conflictRow.getByText("競合相手", { exact: true })).toBeVisible();
+  // ID重複はパスごとに1行（master同様）: 1件目がworkId表示、以降は競合相手表示。
+  const conflictRow = attention.getByRole("row", { name: /夜想曲スタジオ/ });
+  await expect(conflictRow.getByText("ID重複", { exact: true })).toBeVisible();
+  await expect(conflictRow.getByText(/workId: RJ501001/)).toBeVisible();
+  await expect(attention.getByText("競合相手")).toBeVisible();
+  await expect(attention.getByText(/copies\//)).toBeVisible();
   await expect(attention.getByText("読み取り失敗", { exact: true })).toBeVisible();
 
-  await primaryRow.getByRole("button", { name: "Filesで開く" }).click();
+  await conflictRow.getByRole("button", { name: "Filesで開く" }).click();
   await expect(page.getByRole("button", { name: "ファイル", exact: true })).toHaveAttribute(
     "aria-pressed",
     "true",

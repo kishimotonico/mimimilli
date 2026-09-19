@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 import type { WorkListItem } from "@mimimilli/shared";
 import type { VirtualItem, Virtualizer } from "@tanstack/react-virtual";
 import type { JustifiedLayout } from "../../model/justifiedLayout";
-import type { GridArrowKey } from "../../model/gridNavigation";
+import type { GridArrowKey } from "../../../../shared/lib/gridNavigation";
 import WorkGridRow from "../WorkGridRow";
 import type { JustifiedRowGroup } from "./justifiedRows";
 
@@ -11,6 +11,7 @@ interface RowTileProps {
   playingWorkId: string | null;
   isPlaybackActive: boolean;
   safeTileSize: number;
+  rovingIndex: number;
   onWorkSelect: (id: string) => void;
   onWorkPlay: (work: WorkListItem) => void;
   onTileArrowKey: (flatIndex: number, key: GridArrowKey) => void;

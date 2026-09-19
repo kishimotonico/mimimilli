@@ -251,4 +251,33 @@ describe("WorkGrid empty states", () => {
     renderWorkGrid({ props: { axis: "fav", works: [] } });
     expect(screen.getByText("作品詳細の☆ボタンでお気に入りに追加できます")).toBeTruthy();
   });
+
+  it("スマートフォルダーが0件のとき専用の見出しと「条件を編集」を出す", () => {
+    const onEditSmartFolderRules = vi.fn();
+    renderWorkGrid({
+      props: { works: [], isSmartFolder: true, onEditSmartFolderRules },
+    });
+
+    expect(screen.getByText("条件に一致する作品がありません")).toBeTruthy();
+    expect(screen.getByText("条件を見直すか、絞り込みを外してください。")).toBeTruthy();
+    expect(screen.queryByText("絞り込みをすべてクリア")).toBeNull();
+
+    screen.getByRole("button", { name: "条件を編集" }).click();
+    expect(onEditSmartFolderRules).toHaveBeenCalled();
+  });
+
+  it("スマートフォルダーが0件・チップ絞り込み中のとき「絞り込みをすべてクリア」も出す", () => {
+    const onClearAllFilters = vi.fn();
+    renderWorkGrid({
+      props: {
+        works: [],
+        isSmartFolder: true,
+        hasSelectedTags: true,
+        onClearAllFilters,
+      },
+    });
+
+    screen.getByRole("button", { name: "絞り込みをすべてクリア" }).click();
+    expect(onClearAllFilters).toHaveBeenCalled();
+  });
 });

@@ -75,7 +75,7 @@
 .mle-colstack__label .up {
   display: grid;
   place-items: center;
-  color: var(--ink-3);
+  color: var(--ink-2);
   flex-shrink: 0;
 }
 .mle-colstack:hover .mle-colstack__label .up {
@@ -85,7 +85,8 @@
   writing-mode: vertical-rl;
   text-orientation: mixed;
   font-family: var(--font-jp);
-  font-size: 11px;
+  font-size: var(--fs-secondary);
+  line-height: var(--lh-secondary);
   font-weight: 500;
   max-height: calc(100% - 26px);
   overflow: hidden;

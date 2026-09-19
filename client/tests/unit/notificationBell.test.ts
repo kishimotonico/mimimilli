@@ -4,10 +4,11 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
-import type { ScanResult } from "@mimimilli/shared";
+import type { ScanDiagnostic, ScanResult } from "@mimimilli/shared";
 import NotificationBell from "../../src/app/ui/NotificationBell";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
+import { activeModalAtom } from "../../src/shared/model/activeModalAtom";
 import {
   dlsiteBulkActionsAtom,
   dlsiteBulkActiveAtom,
@@ -38,12 +39,12 @@ const summaryDefaults = {
 
 function renderBell(
   summaryOverrides: Partial<typeof summaryDefaults> = {},
-  bellOverrides: Partial<Parameters<typeof NotificationBell>[0]> = {},
   atomOverrides?: {
     active?: boolean;
     progress?: import("@mimimilli/shared").DlsiteBulkProgressSnapshot | null;
   },
   scanResultOverride?: ScanResult | null,
+  identityConflicts: ScanDiagnostic[] = [],
 ) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -59,6 +60,8 @@ function renderBell(
       ? { result: scanResultOverride, finishedAt: "2026-01-01T00:00:00.000Z" }
       : null,
   );
+  // 要対応タブと同じ定義を使う: ID重複は常に最新の診断クエリから拾う
+  queryClient.setQueryData(SCAN_QUERY_KEYS.diagnostics(), { diagnostics: identityConflicts });
 
   const store = createStore();
   const onStartDlsiteBulk = vi.fn();
@@ -75,20 +78,14 @@ function renderBell(
     store.set(dlsiteBulkProgressAtom, atomOverrides.progress);
   }
 
-  const props = {
-    onOpenScanResult: vi.fn(),
-    onOpenNotificationModal: vi.fn(),
-    ...bellOverrides,
-  };
-
   render(
     createElement(
       QueryClientProvider,
       { client: queryClient },
-      createElement(JotaiProvider, { store }, createElement(NotificationBell, props)),
+      createElement(JotaiProvider, { store }, createElement(NotificationBell)),
     ),
   );
-  return { props, queryClient, onStartDlsiteBulk };
+  return { store, queryClient, onStartDlsiteBulk };
 }
 
 describe("NotificationBell", () => {
@@ -134,20 +131,20 @@ describe("NotificationBell", () => {
   });
 
   it("RJコード未検出の行クリックで通知モーダルを開き、パネルを閉じる", () => {
-    const { props } = renderBell({ rjCodeMissingCount: 3 });
+    const { store } = renderBell({ rjCodeMissingCount: 3 });
     fireEvent.click(screen.getByRole("button", { name: /通知/ }));
     fireEvent.click(screen.getByRole("menuitem", { name: /RJコード未検出/ }));
 
-    expect(props.onOpenNotificationModal).toHaveBeenCalledWith("rj-missing");
+    expect(store.get(activeModalAtom)).toEqual({ kind: "rj-missing" });
     expect(screen.queryByRole("menu", { name: "通知" })).toBeNull();
   });
 
   it("DLsite取得失敗の行クリックで通知モーダルを開く", () => {
-    const { props } = renderBell({ fetchFailedCount: 2 });
+    const { store } = renderBell({ fetchFailedCount: 2 });
     fireEvent.click(screen.getByRole("button", { name: /通知/ }));
     fireEvent.click(screen.getByRole("menuitem", { name: /DLsite取得失敗/ }));
 
-    expect(props.onOpenNotificationModal).toHaveBeenCalledWith("fetch-failed");
+    expect(store.get(activeModalAtom)).toEqual({ kind: "fetch-failed" });
   });
 
   it("パース失敗アラート時だけバッジにパース失敗件数を加算する", () => {
@@ -160,10 +157,10 @@ describe("NotificationBell", () => {
   });
 
   it("パース失敗アラートの行クリックで通知モーダルを開く", () => {
-    const { props } = renderBell({ parseErrorAlert: true, parseErrorCount: 3 });
+    const { store } = renderBell({ parseErrorAlert: true, parseErrorCount: 3 });
     fireEvent.click(screen.getByRole("button", { name: /通知/ }));
     fireEvent.click(screen.getByRole("menuitem", { name: /DLsiteパース失敗/ }));
-    expect(props.onOpenNotificationModal).toHaveBeenCalledWith("parse-failed");
+    expect(store.get(activeModalAtom)).toEqual({ kind: "parse-failed" });
   });
 
   it("DLsite未連携: 件数がある場合はまとめて取得ボタンを表示し、押すとコールバックを呼ぶ", () => {
@@ -178,7 +175,6 @@ describe("NotificationBell", () => {
   it("DLsite未連携: 実行中は進捗を表示し、ボタンをdisabledにする", () => {
     renderBell(
       { unlinkedCount: 0 },
-      {},
       {
         active: true,
         progress: { processed: 3, total: 8, work: null },
@@ -190,10 +186,43 @@ describe("NotificationBell", () => {
   });
 
   it("scanResultがあれば直近のスキャン結果サマリを表示する", () => {
-    renderBell({}, {}, undefined, scanResult);
+    renderBell({}, undefined, scanResult);
     fireEvent.click(screen.getByRole("button", { name: /通知/ }));
     expect(screen.getByText("直近のスキャン結果")).toBeInTheDocument();
     expect(screen.getByText("12")).toBeInTheDocument();
     expect(screen.getByText("3")).toBeInTheDocument();
+  });
+
+  describe("要対応タブとの件数統一", () => {
+    it("ID重複はworkId単位で1件として数え、行クリックで要対応タブを開く", () => {
+      const { store } = renderBell({}, undefined, undefined, [
+        { kind: "identity_conflict", workId: "RJ501001", paths: ["a/1", "a/2"] },
+      ]);
+      expect(screen.getByRole("button", { name: "通知（要対応1件）" })).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: /通知/ }));
+      fireEvent.click(screen.getByRole("menuitem", { name: /ID重複/ }));
+
+      expect(store.get(activeModalAtom)).toEqual({ kind: "scan", tab: "needsAttention" });
+      expect(screen.queryByRole("menu", { name: "通知" })).toBeNull();
+    });
+
+    it("ID重複とRJコード未検出が両方あるとき、バッジは行の合算になる", () => {
+      renderBell({ rjCodeMissingCount: 2 }, undefined, undefined, [
+        { kind: "identity_conflict", workId: "RJ501001", paths: ["a/1", "a/2"] },
+      ]);
+      expect(screen.getByRole("button", { name: "通知（要対応3件）" })).toBeInTheDocument();
+    });
+
+    it("読み取り失敗はスキャン結果のinvalidMetaFilesから行を作る", () => {
+      const { store } = renderBell({}, undefined, {
+        ...scanResult,
+        rjCodeMissingCount: 0,
+        invalidMetaFiles: [{ path: "a/1", message: "壊れています" }],
+      });
+      fireEvent.click(screen.getByRole("button", { name: /通知/ }));
+      fireEvent.click(screen.getByRole("menuitem", { name: /読み取り失敗/ }));
+      expect(store.get(activeModalAtom)).toEqual({ kind: "scan", tab: "needsAttention" });
+    });
   });
 });

@@ -2,10 +2,9 @@
 // fixtureアダプタはBunサーバー1インスタンスにつき可変状態を1つ持つため、workerごとに
 // 独立したBun+Viteのペアを立て、各テスト開始前にサーバー側の状態をリセットして分離する。
 import { type ChildProcess, spawn } from "node:child_process";
-import { createHash } from "node:crypto";
 import { createServer } from "node:net";
 import { chromium, test as base } from "@playwright/test";
-import { SMOKE_WORKERS } from "./workerCount.ts";
+import { derivePort } from "./derivePort.ts";
 
 const VITE_PORT_RANGE_START = 4200;
 const VITE_PORT_RANGE_SIZE = 500;
@@ -15,15 +14,6 @@ const BUN_PORT_RANGE_SIZE = 500;
 // fixture状態リセットのHTTP待ちがADR-0020のWSL blackhole（未使用ポートへの接続が
 // 約2分ハングする既知障害）を踏まないよう、明示的に短いタイムアウトで打ち切る。
 const RESET_FETCH_TIMEOUT_MS = 5_000;
-
-// worktreeの絶対パスから決定的にブロックを選び、そこへworkerIndexを足してworkerごとの
-// ポートへ分散する。SMOKE_WORKERS個ぶんを1ブロックとして割り当てるため、
-// 異なるworktree同士でもブロック境界がずれない限りworker間のポートが重ならない。
-function derivePort(rangeStart: number, rangeSize: number, workerIndex: number): number {
-  const blockCount = Math.floor(rangeSize / SMOKE_WORKERS);
-  const block = createHash("sha256").update(process.cwd()).digest().readUInt32BE(0) % blockCount;
-  return rangeStart + block * SMOKE_WORKERS + workerIndex;
-}
 
 // 直前の実行のサーバーがkillされてからOSがポートを実際に解放するまでにわずかな遅延が
 // あるため、次のサーバーをspawnする前にbindを試して空きを確認する。接続（connect）は
@@ -139,8 +129,15 @@ export const test = base.extend<{ resetFixtureState: void }, { workerServers: Wo
     // 依存fixtureがなくても{}が必須。
     // oxlint-disable-next-line no-empty-pattern
     async ({}, use, workerInfo) => {
-      const bunPort = derivePort(BUN_PORT_RANGE_START, BUN_PORT_RANGE_SIZE, workerInfo.workerIndex);
+      const cwd = process.cwd();
+      const bunPort = derivePort(
+        cwd,
+        BUN_PORT_RANGE_START,
+        BUN_PORT_RANGE_SIZE,
+        workerInfo.workerIndex,
+      );
       const vitePort = derivePort(
+        cwd,
         VITE_PORT_RANGE_START,
         VITE_PORT_RANGE_SIZE,
         workerInfo.workerIndex,

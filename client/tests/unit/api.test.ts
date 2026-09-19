@@ -100,14 +100,18 @@ describe("settings api", () => {
   });
 
   it("getSettings returns rootFolder from /api/settings", async () => {
-    mockFetch.mockResolvedValue(makeResponse({ rootFolder: "/test/path", lastScanTime: null }));
+    mockFetch.mockResolvedValue(
+      makeResponse({ rootFolder: "/test/path", lastScanTime: null, lastScanRootFolder: null }),
+    );
     const result = await settingsApi.getSettings();
     expect(mockFetch).toHaveBeenCalledWith("/api/settings");
     expect(result.rootFolder).toBe("/test/path");
   });
 
   it("setRootFolder PUTs to /api/settings", async () => {
-    mockFetch.mockResolvedValue(makeResponse({ rootFolder: "/new/path", lastScanTime: null }));
+    mockFetch.mockResolvedValue(
+      makeResponse({ rootFolder: "/new/path", lastScanTime: null, lastScanRootFolder: null }),
+    );
     await settingsApi.setRootFolder("/new/path");
     expect(mockFetch).toHaveBeenCalledWith(
       "/api/settings",

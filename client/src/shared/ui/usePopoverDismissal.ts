@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, type RefObject } from 
 import { useDismiss, useFloating, useInteractions } from "@floating-ui/react";
 import { FOCUSABLE_SELECTOR } from "./focusable";
 
-export type PopoverCloseReason = "escape" | "outside" | "direct";
+export type PopoverCloseReason = "escape" | "outside" | "direct" | "scroll" | "focus-out";
 
 export interface UsePopoverDismissalOptions {
   isOpen: boolean;
@@ -10,6 +10,10 @@ export interface UsePopoverDismissalOptions {
   boundaryRef?: RefObject<HTMLElement | null>;
   additionalBoundaryRefs?: RefObject<HTMLElement | null>[];
   anchorRef: RefObject<HTMLElement | null>;
+  /** スクロールで自動的に閉じる。既定は無効（呼び出し側が明示的に有効化する） */
+  closeOnScroll?: boolean;
+  /** フォーカスが境界外へ外れたら自動的に閉じる。既定は無効（呼び出し側が明示的に有効化する） */
+  closeOnFocusOut?: boolean;
 }
 
 export interface UsePopoverDismissalResult {
@@ -68,6 +72,8 @@ export function usePopoverDismissal({
   boundaryRef,
   additionalBoundaryRefs,
   anchorRef,
+  closeOnScroll = false,
+  closeOnFocusOut = false,
 }: UsePopoverDismissalOptions): UsePopoverDismissalResult {
   const isOpenRef = useRef(isOpen);
   isOpenRef.current = isOpen;
@@ -109,6 +115,29 @@ export function usePopoverDismissal({
   });
 
   useInteractions([dismiss]);
+
+  useEffect(() => {
+    if (!isOpen || !closeOnScroll) return;
+    const handleScroll = () => close("scroll");
+    window.addEventListener("scroll", handleScroll, true);
+    return () => window.removeEventListener("scroll", handleScroll, true);
+  }, [isOpen, closeOnScroll, close]);
+
+  useEffect(() => {
+    if (!isOpen || !closeOnFocusOut) return;
+    const handleFocusOut = (event: FocusEvent) => {
+      const next = event.relatedTarget;
+      if (
+        next instanceof Node &&
+        isInsideBoundaries(next, anchorRef, boundaryRef, additionalBoundaryRefs)
+      ) {
+        return;
+      }
+      close("focus-out");
+    };
+    document.addEventListener("focusout", handleFocusOut);
+    return () => document.removeEventListener("focusout", handleFocusOut);
+  }, [isOpen, closeOnFocusOut, anchorRef, boundaryRef, additionalBoundaryRefs, close]);
 
   return { close };
 }

@@ -9,13 +9,15 @@ import {
   filesSelectedPathAtom,
 } from "../../../entities/file-system/model/navigationAtoms";
 import {
+  clearFilesSelectionAtom,
   goToFilesSegmentAtom,
   goUpFilesAtom,
   openFilesDirAtom,
   selectFilesEntryAtom,
 } from "./filesNavigationActions";
+import { useFilesCwd } from "./useFilesCwd";
 import { rootLabel } from "./types";
-import { workspacePath, type WorkspacePath } from "@mimimilli/shared";
+import type { WorkspacePath } from "@mimimilli/shared";
 
 export interface FilesNav {
   /** Workspace root の表示名 */
@@ -33,6 +35,8 @@ export interface FilesNav {
   openDir: (absPath: WorkspacePath) => void;
   /** ファイルを選択する */
   selectFile: (absPath: WorkspacePath) => void;
+  /** 選択を解除する（見つからない選択からカレントフォルダー自身の表示へ戻る等） */
+  clearSelection: () => void;
   /** パンくず index へ移動（0 = ルート） */
   goToSegment: (index: number) => void;
   /** 1つ上の階層へ（受動スタックのクリック用） */
@@ -44,10 +48,11 @@ export function useFilesNavigation(root: string): FilesNav {
   const selectedPath = useAtomValue(filesSelectedPathAtom);
   const openDirAction = useSetAtom(openFilesDirAtom);
   const selectFileAction = useSetAtom(selectFilesEntryAtom);
+  const clearSelection = useSetAtom(clearFilesSelectionAtom);
   const goToSegment = useSetAtom(goToFilesSegmentAtom);
   const goUp = useSetAtom(goUpFilesAtom);
 
-  const cwd = workspacePath(relPath.join("/"));
+  const cwd = useFilesCwd();
   const addressPath = [rootLabel(root), ...relPath];
 
   const openDir = useCallback((path: WorkspacePath) => openDirAction(path), [openDirAction]);
@@ -57,5 +62,16 @@ export function useFilesNavigation(root: string): FilesNav {
     [selectFileAction],
   );
 
-  return { root, cwd, relPath, selectedPath, addressPath, openDir, selectFile, goToSegment, goUp };
+  return {
+    root,
+    cwd,
+    relPath,
+    selectedPath,
+    addressPath,
+    openDir,
+    selectFile,
+    clearSelection,
+    goToSegment,
+    goUp,
+  };
 }

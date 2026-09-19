@@ -292,26 +292,6 @@ describe("useWorkTagEditor", () => {
     expect(result.current.tagUndoToast).toBe("ASMR");
   });
 
-  it("アンマウント時にundoタイマーを解放する", async () => {
-    vi.useFakeTimers();
-    const work = makeWork(["ASMR"]);
-    const onPatchTags = vi.fn(async (): Promise<Work> => ({ ...work, tags: [] }));
-    const clearTimeoutSpy = vi.spyOn(globalThis, "clearTimeout");
-
-    const { result, unmount } = renderTagEditor(work, onPatchTags);
-
-    await act(async () => {
-      await result.current.requestRemoveTag("ASMR");
-    });
-    expect(result.current.tagUndoToast).toBe("ASMR");
-
-    unmount();
-    expect(clearTimeoutSpy).toHaveBeenCalled();
-
-    clearTimeoutSpy.mockRestore();
-    vi.useRealTimers();
-  });
-
   it("sourceRevision未設定時はタグ保存を実行しない", async () => {
     const work = makeWork(["ASMR"]);
     delete work.sourceRevision;

@@ -1,5 +1,5 @@
 import { dedupeTags, normalizeTags, TagNormalizationError } from "@mimimilli/shared";
-import type { SmartFolder, SmartFolderCreate, SmartFolderRule } from "@mimimilli/shared";
+import type { SmartFolder, SmartFolderCreate, SmartFolderRule, SortId } from "@mimimilli/shared";
 
 function invalidTagRuleError(tag: string): string {
   return `「${tag}」は登録できないタグです`;
@@ -26,6 +26,7 @@ export type SmartFolderEditorRule =
 export interface SmartFolderEditorDraft {
   name: string;
   rules: SmartFolderEditorRule[];
+  sort: SortId;
 }
 
 export interface SmartFolderEditorErrors {
@@ -58,7 +59,11 @@ export function createEmptySmartFolderRule(
 
 export function createSmartFolderDraft(folder?: SmartFolder): SmartFolderEditorDraft {
   if (!folder) {
-    return { name: "", rules: [createEmptySmartFolderRule("rule-0", "WHERE")] };
+    return {
+      name: "",
+      rules: [createEmptySmartFolderRule("rule-0", "WHERE")],
+      sort: "added-desc",
+    };
   }
 
   return {
@@ -69,6 +74,7 @@ export function createSmartFolderDraft(folder?: SmartFolder): SmartFolderEditorD
       values: [...rule.values],
       conjunction: index === 0 ? "WHERE" : rule.conjunction,
     })) as SmartFolderEditorRule[],
+    sort: folder.sort,
   };
 }
 
@@ -124,16 +130,18 @@ export function changeSmartFolderRuleField(
   });
 }
 
-export function validateSmartFolderDraft(draft: SmartFolderEditorDraft): SmartFolderEditorResult {
-  const errors: SmartFolderEditorErrors = { ruleValues: {} };
-  const name = draft.name.trim();
+/** 条件行だけを検証し、API契約の SmartFolderRule[] へ変換する。名前の検証を含まないため、
+ *  ライブ件数プレビュー（保存前に条件だけが妥当か確認したい場面）と validateSmartFolderDraft の
+ *  両方から共有する */
+export function validateSmartFolderDraftRules(
+  rules: SmartFolderEditorRule[],
+):
+  | { success: true; rules: SmartFolderRule[] }
+  | { success: false; ruleValues: Record<string, string> } {
+  const ruleValues: Record<string, string> = {};
+  const result: SmartFolderRule[] = [];
 
-  // 条件0件は「すべての作品に一致する」正式な仕様として保存を許可する
-  // （shared契約・server評価・SmartFolderView表示のいずれも rules: [] を全作品として扱う）。
-  if (name.length === 0) errors.name = "名前を入力してください";
-
-  const rules: SmartFolderRule[] = [];
-  draft.rules.forEach((rule, index) => {
+  rules.forEach((rule, index) => {
     const conjunction = index === 0 ? "WHERE" : rule.conjunction;
     if (rule.field === "タグ") {
       let values;
@@ -141,31 +149,51 @@ export function validateSmartFolderDraft(draft: SmartFolderEditorDraft): SmartFo
         values = dedupeTags(normalizeTags(rule.values));
       } catch (error) {
         if (error instanceof TagNormalizationError) {
-          errors.ruleValues[rule.id] = invalidTagRuleError(error.tag);
+          ruleValues[rule.id] = invalidTagRuleError(error.tag);
           return;
         }
         throw error;
       }
       if (values.length === 0) {
-        errors.ruleValues[rule.id] = "タグを1つ以上選択してください";
+        ruleValues[rule.id] = "タグを1つ以上選択してください";
         return;
       }
-      rules.push({ conjunction, field: "タグ", operator: "∋", values });
+      result.push({ conjunction, field: "タグ", operator: "∋", values });
       return;
     }
 
     const value = rule.values[0].trim();
     if (!/^\d+$/.test(value)) {
-      errors.ruleValues[rule.id] = "長さを0以上の整数で入力してください";
+      ruleValues[rule.id] = "長さを0以上の整数で入力してください";
       return;
     }
     const lengthConjunction = conjunction === "AND NOT" ? "AND" : conjunction;
-    rules.push({ conjunction: lengthConjunction, field: "長さ", operator: "≥", values: [value] });
+    result.push({ conjunction: lengthConjunction, field: "長さ", operator: "≥", values: [value] });
   });
+
+  if (Object.keys(ruleValues).length > 0) {
+    return { success: false, ruleValues };
+  }
+  return { success: true, rules: result };
+}
+
+export function validateSmartFolderDraft(draft: SmartFolderEditorDraft): SmartFolderEditorResult {
+  const name = draft.name.trim();
+  const rulesResult = validateSmartFolderDraftRules(draft.rules);
+
+  // 条件0件は「すべての作品に一致する」正式な仕様として保存を許可する
+  // （shared契約・server評価・SmartFolderView表示のいずれも rules: [] を全作品として扱う）。
+  const errors: SmartFolderEditorErrors = {
+    ruleValues: rulesResult.success ? {} : rulesResult.ruleValues,
+  };
+  if (name.length === 0) errors.name = "名前を入力してください";
 
   if (errors.name || Object.keys(errors.ruleValues).length > 0) {
     return { success: false, errors };
   }
 
-  return { success: true, data: { name, rules, sort: "added-desc" } };
+  return {
+    success: true,
+    data: { name, rules: rulesResult.success ? rulesResult.rules : [], sort: draft.sort },
+  };
 }

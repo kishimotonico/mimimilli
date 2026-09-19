@@ -121,4 +121,19 @@ describe("WorkPlayButton", () => {
     // 最初のフォーカス可能要素（=主ボタン）へ戻す
     expect(screen.getByRole("button", { name: "続きから再生" })).toHaveFocus();
   });
+
+  it("初期フォーカス・ArrowキーによるフォーカスはpreventScroll:trueで祖先を自動スクロールしない", async () => {
+    const user = userEvent.setup();
+    const focusSpy = vi.spyOn(HTMLElement.prototype, "focus");
+    renderButton({ hasResume: true, isLoaded: false });
+
+    await user.click(screen.getByRole("button", { name: "再生メニュー" }));
+    expect(focusSpy).toHaveBeenLastCalledWith({ preventScroll: true });
+
+    focusSpy.mockClear();
+    await user.keyboard("{ArrowDown}");
+    expect(focusSpy).toHaveBeenLastCalledWith({ preventScroll: true });
+
+    focusSpy.mockRestore();
+  });
 });

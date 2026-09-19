@@ -9,12 +9,17 @@ import {
 } from "../model/axisValueSort";
 import { axisValueSortAtom } from "../model/atoms";
 import { buildAxisValueDisplayRows } from "../model/axisValueDisplayRows";
-import type { AxisValueHierarchyRow } from "../model/axisValueHierarchy";
+import {
+  getNextAxisValueRowIndex,
+  nearestValueRowIndex,
+  type AxisValueRowArrowKey,
+} from "../model/axisValueRowNav";
 import type { AxisId } from "../../../entities/library/types";
 import { I } from "../../../shared/ui/Icon";
 import IconButton from "../../../shared/ui/IconButton";
 import { useMotionVariants } from "../../../shared/ui/useMotionVariants";
 import { useVirtualList } from "../../../shared/ui/useVirtualList";
+import { useRovingIndex } from "./useRovingIndex";
 
 // 軸レールのクイックオーバーレイ・「＋絞り込み」・チップの兄弟値ドロップダウン
 // が共有する簡易値リスト。データ取得・フィルタ・ソートは値一覧本体
@@ -47,8 +52,6 @@ interface AxisValueQuickListProps {
   /** ホバー/フォーカス時に出る＋ボタン（冪等なAND追加。選択済み行には出さない）。
    *  省略時はボタンを出さない（ADR-0013） */
   onAdd?: (item: AxisFacetItem) => void;
-  /** 既定動作の説明（例:「クリックで置き換え」「AND追加されます」） */
-  hint?: string;
   /** useAnchoredPopover / usePopoverDismissal が返す close をそのまま渡す */
   close: () => void;
   emptyLabel?: string;
@@ -96,19 +99,6 @@ function SortMenu({ sort, onToggle }: SortMenuProps) {
   );
 }
 
-/** 見出し行（選択不可）を飛ばして次の値行のインデックスを探す。ラップアラウンドする。 */
-function findNextValueIndex(rows: AxisValueHierarchyRow[], from: number, delta: 1 | -1): number {
-  if (rows.length === 0) return -1;
-  let index = from;
-  for (let step = 0; step < rows.length; step++) {
-    index = index + delta;
-    if (index < 0) index = rows.length - 1;
-    if (index >= rows.length) index = 0;
-    if (rows[index]?.kind === "value") return index;
-  }
-  return -1;
-}
-
 export default function AxisValueQuickList({
   axis,
   axisLabel,
@@ -119,7 +109,6 @@ export default function AxisValueQuickList({
   isSelected,
   onSelect,
   onAdd,
-  hint,
   close,
   emptyLabel = "項目がありません",
 }: AxisValueQuickListProps) {
@@ -134,7 +123,7 @@ export default function AxisValueQuickList({
     // なったときは axis が変わっていなくても改めて発火させたいので、依存配列に
     // axis だけでなく isOpen も含める。
     if (!isOpen) return;
-    searchRef.current?.focus();
+    searchRef.current?.focus({ preventScroll: true });
     setQuery("");
     setSortMenuOpen(false);
   }, [axis, isOpen]);
@@ -157,26 +146,42 @@ export default function AxisValueQuickList({
   // キーボード移動中の「現在位置」を自前で追跡する（rows のインデックス、未選択は-1）。
   // document.activeElement から逆算すると、フォーカス確定（下記のダブルrAF）より速く
   // 次のキー入力が来た場合に取りこぼす（キーリピート等）。scrollToIndex/focus の実際の
-  // 完了を待たず、常にこの ref を正として次の移動先を決める。
+  // 完了を待たず、常にこの ref を正として次の移動先を決める。ref とは別に activeIndex
+  // state も並行して持ち、roving tabindex（各行の tabIndex）の再描画に使う。
   const activeIndexRef = useRef(-1);
+  const [activeIndex, setActiveIndex] = useState(-1);
   useEffect(() => {
     // resetKey（軸・ソート・検索語）が変わらない限りリセットしない。AND追加ボタンで
     // selectedTags が変わると facet データが再取得され items の参照だけ変わるが、
     // 見ている対象は変わっていないためスクロール位置・キーボード位置は維持する
     // （ADR-0013: AND追加はオーバーレイを開いたまま連続で行える）。
     activeIndexRef.current = -1;
+    setActiveIndex(-1);
   }, [resetKey]);
+
+  const firstValueIndex = rows.findIndex((row) => row.kind === "value");
+  const targetIndex = activeIndex >= 0 ? activeIndex : firstValueIndex;
+  const rawRovingIndex = useRovingIndex({
+    itemCount: rows.length,
+    targetIndex,
+    virtualItems,
+    virtualizer,
+    toRowIndex: (index) => index,
+    firstFlatIndexOfRow: (index) => index,
+  });
+  const rovingIndex = nearestValueRowIndex(rows, rawRovingIndex);
 
   // 仮想化中は範囲外の行がDOMに無いため、scrollToIndexで画面内へ入れてから
   // レイアウト確定後（ダブルrAF）にフォーカスする。
   const focusRowAfterRender = (index: number) => {
     activeIndexRef.current = index;
+    setActiveIndex(index);
     virtualizer.scrollToIndex(index, { align: "auto" });
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         scrollRef.current
           ?.querySelector<HTMLElement>(`[data-index="${index}"] [data-quicklist-item]`)
-          ?.focus();
+          ?.focus({ preventScroll: true });
       });
     });
   };
@@ -187,14 +192,14 @@ export default function AxisValueQuickList({
       close();
       return;
     }
-    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+    const key = event.key as AxisValueRowArrowKey;
+    if (key !== "ArrowDown" && key !== "ArrowUp" && key !== "Home" && key !== "End") return;
+    // Home/Endは検索入力欄のカーソル移動（ネイティブ動作）を横取りしない。矢印キーは
+    // 検索欄側が個別処理する（handleSearchKeyDown）ため、ここへは既に処理済みで届かない。
+    if ((key === "Home" || key === "End") && event.target instanceof HTMLInputElement) return;
     event.preventDefault();
-    const nextIndex = findNextValueIndex(
-      rows,
-      activeIndexRef.current,
-      event.key === "ArrowDown" ? 1 : -1,
-    );
-    if (nextIndex === -1) return;
+    const nextIndex = getNextAxisValueRowIndex(rows, activeIndexRef.current, key);
+    if (nextIndex === -1 || nextIndex === activeIndexRef.current) return;
     focusRowAfterRender(nextIndex);
   };
 
@@ -210,7 +215,7 @@ export default function AxisValueQuickList({
       // activeIndexRef を使う（ハードコードで-1から始めない）。フォーカス移動が非同期
       // （ダブルrAF）のため、キーリピート等でこのハンドラが連続して呼ばれても
       // 常に「実際の現在位置」から次へ進む。
-      const nextIndex = findNextValueIndex(rows, activeIndexRef.current, 1);
+      const nextIndex = getNextAxisValueRowIndex(rows, activeIndexRef.current, "ArrowDown");
       if (nextIndex === -1) return;
       focusRowAfterRender(nextIndex);
     }
@@ -256,7 +261,6 @@ export default function AxisValueQuickList({
           />
         )}
       </AnimatePresence>
-      {hint && <div className="mll-qlist__hint">{hint}</div>}
       {isLoading ? (
         <div className="mll-qlist__status">読み込み中…</div>
       ) : isError ? (
@@ -277,6 +281,7 @@ export default function AxisValueQuickList({
             const indexAttr = e.target.closest("[data-index]")?.getAttribute("data-index");
             if (indexAttr !== null && indexAttr !== undefined) {
               activeIndexRef.current = Number(indexAttr);
+              setActiveIndex(Number(indexAttr));
             }
           }}
         >
@@ -304,6 +309,7 @@ export default function AxisValueQuickList({
                             type="button"
                             data-quicklist-item
                             className={`mll-qlist__item ${on ? "is-on" : ""}`}
+                            tabIndex={virtualRow.index === rovingIndex ? 0 : -1}
                             style={{ paddingLeft: 8 + indent, paddingRight: onAdd ? 26 : 8 }}
                             title={row.depth > 0 ? row.item.value : undefined}
                             aria-pressed={on}

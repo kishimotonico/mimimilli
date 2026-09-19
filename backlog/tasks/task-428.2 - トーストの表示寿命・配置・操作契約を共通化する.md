@@ -1,9 +1,10 @@
 ---
 id: TASK-428.2
 title: トーストの表示寿命・配置・操作契約を共通化する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-07 09:08'
+updated_date: '2026-09-07 19:32'
 labels:
   - ui
   - ux
@@ -25,9 +26,9 @@ scan-dlsite-A/B-02/03、states-feedback-A-01/A-02等。操作結果のトース�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 通常通知は5秒、action付きは10秒を既定としhover/focus中は消去を止める
-- [ ] #2 エラーと継続操作が必要な通知は手動で閉じられる
-- [ ] #3 dialog内通知はdialog内、全体通知はviewport上端中央に表示され操作を遮らない
-- [ ] #4 成功・警告・失敗が視覚と文言で区別できる
-- [ ] #5 pnpm test:smokeに新規失敗がない
+- [x] #1 通常通知は5秒、action付きは10秒を既定としhover/focus中は消去を止める
+- [x] #2 エラーと継続操作が必要な通知は手動で閉じられる
+- [x] #3 dialog内通知はdialog内、全体通知はviewport上端中央に表示され操作を遮らない
+- [x] #4 成功・警告・失敗が視覚と文言で区別できる
+- [x] #5 pnpm test:smokeに新規失敗がない
 <!-- AC:END -->

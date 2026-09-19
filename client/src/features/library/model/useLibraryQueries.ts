@@ -9,6 +9,7 @@ import {
   useSuspenseInfiniteQuery,
   type UseMutationResult,
 } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { useAtomValue } from "jotai";
 import { randomSeedAtom } from "../../../entities/library/model/navigationAtoms";
 import {
@@ -16,6 +17,7 @@ import {
   type NormalizedTag,
   type SmartFolder,
   type SmartFolderCreate,
+  type SmartFolderRule,
   type UnregisterMissingWorksResult,
   type UrlEntry,
   type Work,
@@ -27,7 +29,9 @@ import {
   listSmartFolders,
   createSmartFolder,
   updateSmartFolder,
+  deleteSmartFolder,
   evalSmartFolder,
+  previewSmartFolderRuleCount,
 } from "../../../entities/smart-folder/api";
 import { getAllTags } from "../../../entities/tag/api";
 import { deleteWork, getWork, patchWork, unregisterMissingWorks } from "../../../entities/work/api";
@@ -36,6 +40,7 @@ import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { useRootFolder } from "../../../entities/settings/useSettingsQuery";
 import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
 import { TAG_QUERY_KEYS } from "../../../entities/tag/queryKeys";
+import { invalidateSmartFolderSaveQueries } from "./smartFolderInvalidation";
 
 type LibraryTitlePatchVariables = { workId: string; title: string; sourceRevision: string };
 type LibraryBookmarkPatchVariables = {
@@ -204,7 +209,10 @@ export function useLibrarySupportingQueries(nav: LibraryViewState) {
   const libraryStatsQuery = useQuery(libraryTotalQueryOptions);
   const errorViewCountQuery = useQuery(errorViewCountQueryOptions);
   const facetAxis = getFacetAxisForQuery(nav.activeAxis);
-  const facetQuery = useAxisFacetsQuery(facetAxis, nav.selectedTags);
+  // 結果面の値一覧（AxisValueList）は既定=置き換えの入口（ADR-0013）なので、件数基準は
+  // 無条件集計にする（主クリックの結果＝選択タグを丸ごと置き換えた後の件数と一致させる。
+  // valueSelectionContract.ts の deriveFacetCountTags 参照）。
+  const facetQuery = useAxisFacetsQuery(facetAxis, []);
   const smartFoldersQuery = useQuery({
     queryKey: SMART_FOLDER_QUERY_KEYS.all(),
     queryFn: listSmartFolders,
@@ -283,7 +291,7 @@ function useWorkPatchMutationContext(nav: LibraryViewState, searchQuery: string)
       : worksParams !== null
         ? WORK_QUERY_KEYS.list(worksParams)
         : null;
-    if (targets.patchActiveListCache && activeListQueryKey !== null && rootFolder !== null) {
+    if (targets.patchActiveListCache && activeListQueryKey !== null) {
       patchWorkInQueryCache(
         queryClient,
         activeListQueryKey,
@@ -365,7 +373,7 @@ export function useLibraryWorkDeleteMutation(onDeleted: (workId: string) => void
   });
 }
 
-/** エラービュー表示中だけ、missing件数を取得する（一括削除の導線・確認ダイアログ用） */
+/** エラービュー表示中だけ、missing件数を取得する（一括登録解除の導線・確認ダイアログ用） */
 export function useMissingWorksCountQuery(enabled: boolean) {
   return useQuery({ ...missingWorksCountQueryOptions, enabled });
 }
@@ -398,14 +406,61 @@ export function useSmartFolderMutation(callbacks: {
     mutationFn: ({ folder, input }: { folder: SmartFolder | null; input: SmartFolderCreate }) =>
       folder ? updateSmartFolder(folder.id, input) : createSmartFolder(input),
     onSuccess: async (savedFolder, { folder }) => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.all() }),
-        queryClient.invalidateQueries({ queryKey: SMART_FOLDER_QUERY_KEYS.allWorks() }),
-      ]);
+      await invalidateSmartFolderSaveQueries(queryClient, savedFolder.id);
       callbacks.onSaved(savedFolder, folder === null);
     },
     onError: (error, { folder }) => {
       callbacks.onError(folder === null, error);
     },
   });
+}
+
+// setSmartFolderEditor / nav.setAxis は LibraryView 側の UI state のため、
+// 成功時コールバックとして呼び出し側から渡してもらう。
+export function useSmartFolderDeleteMutation(callbacks: { onDeleted: () => void }) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => deleteSmartFolder(id),
+    onSuccess: async (_result, id) => {
+      await invalidateSmartFolderSaveQueries(queryClient, id);
+      callbacks.onDeleted();
+    },
+  });
+}
+
+/** ライブ件数プレビュー（保存前ルールの評価API）。300msデバウンス後に問い合わせ、
+ *  デバウンス待ち・取得中は isCounting=true を返す。rules が null（ルールが妥当でない）間は
+ *  問い合わせない */
+const SMART_FOLDER_PREVIEW_DEBOUNCE_MS = 300;
+
+export function useSmartFolderRuleMatchCountQuery(
+  rules: SmartFolderRule[] | null,
+  options?: { immediate?: boolean },
+) {
+  const rulesKey = rules ? JSON.stringify(rules) : null;
+  const debouncedKey = useDebouncedValue(
+    rulesKey,
+    SMART_FOLDER_PREVIEW_DEBOUNCE_MS,
+    rulesKey === null || (options?.immediate ?? false),
+  );
+  const debouncedRules = useMemo<SmartFolderRule[] | null>(
+    () => (debouncedKey ? (JSON.parse(debouncedKey) as SmartFolderRule[]) : null),
+    [debouncedKey],
+  );
+
+  // debouncedRules が null（条件が妥当でない）のときも一意なキーにする。null を [] に潰すと
+  // 「条件0件（＝全作品に一致する妥当な状態）」のキャッシュと衝突し、無効な間も直前の件数が
+  // 表示され続けてしまう
+  const query = useQuery({
+    queryKey: SMART_FOLDER_QUERY_KEYS.preview(debouncedRules ?? { invalid: true }),
+    queryFn: ({ signal }) => previewSmartFolderRuleCount(debouncedRules!, { signal }),
+    enabled: debouncedRules !== null,
+  });
+
+  return {
+    // 無効な間は同じキーに紐づくキャッシュが万一残っていても参照しない
+    total: debouncedRules === null ? undefined : query.data,
+    isCounting: debouncedRules !== null && (rulesKey !== debouncedKey || query.isFetching),
+  };
 }

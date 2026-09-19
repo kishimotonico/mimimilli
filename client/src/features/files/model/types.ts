@@ -25,6 +25,23 @@ export function classifyFile(entry: Classifiable): FileKind {
   return entry.mediaKind ?? "other";
 }
 
+/** 登録済み判定に使う最小構造 */
+interface RegistrableEntry {
+  isDir: boolean;
+  workId: string | null;
+  workRelPath: string | null;
+}
+
+/** フォルダー単位で作品登録済みか */
+export function isWorkFolder(entry: RegistrableEntry): boolean {
+  return entry.isDir && !!entry.workId;
+}
+
+/** 単一ファイル単位で作品登録済みか */
+export function isSingleFileWork(entry: RegistrableEntry): boolean {
+  return !entry.isDir && !!entry.workId && (entry.workRelPath === "" || entry.workRelPath === ".");
+}
+
 /** 種別 → Icon キー（shared/ui/Icon の I[...] に対応） */
 export const FILE_KIND_ICON: Record<FileKind, IconName> = {
   dir: "folder",
@@ -109,9 +126,41 @@ export function joinPath(root: string, segments: string[]): string {
   return prefix + segments.join(separator);
 }
 
+/** カレントディレクトリ取得の失敗種別。notFound=404（対象が存在しない）、error=5xx/通信失敗（再試行すれば回復しうる） */
+export type FileLoadError = "notFound" | "error";
+
 /** ルートの表示名（末尾セグメント。空なら "/"） */
 export function rootLabel(root: string): string {
   const separator = pathSeparator(root);
   const normalized = trimTrailingSeparator(root, separator);
   return normalized.split(separator).filter(Boolean).pop() ?? separator;
+}
+
+export interface FilesSelectionMissingParams {
+  /** カレントディレクトリ取得自体が404・5xx・通信失敗のいずれか */
+  hasLoadError: boolean;
+  /** カレントディレクトリ取得が初回ロード中 */
+  isPending: boolean;
+  selectedPath: string | null;
+  cwd: string;
+  entries: { path: string }[];
+}
+
+/**
+ * カレントディレクトリの取得自体には成功したが、選択中パスがその一覧に存在しないかを判定する。
+ * ライブラリのエラー詳細・スキャン要対応の「Filesで開く」（openPathInFilesAtom）は
+ * 移動・削除済みの対象を指すことがある。
+ * ディレクトリ取得自体の404/5xx/通信失敗（loadError）・初回ロード中は誤検知を避けるため false。
+ * 選択が無い、またはカレントディレクトリ自身を指す（＝選択なし扱い）ときも false。
+ */
+export function isFilesSelectionMissing({
+  hasLoadError,
+  isPending,
+  selectedPath,
+  cwd,
+  entries,
+}: FilesSelectionMissingParams): boolean {
+  if (hasLoadError || isPending) return false;
+  if (selectedPath == null || selectedPath === cwd) return false;
+  return !entries.some((entry) => entry.path === selectedPath);
 }

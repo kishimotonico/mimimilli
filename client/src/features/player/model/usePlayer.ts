@@ -29,7 +29,7 @@ import {
   type PlayerControllerState,
 } from "./playerController";
 import { usePlayerActions } from "./usePlayerActions";
-import { playerSkipToastAtom } from "./playerPresentationAtoms";
+import { useToast } from "../../../shared/ui/useToast";
 
 export function usePlayerRuntime() {
   const queryClient = useQueryClient();
@@ -38,7 +38,8 @@ export function usePlayerRuntime() {
   const [coreState, setCoreState] = useAtom(playerCoreAtom);
   const setCurrentTime = useSetAtom(playerCurrentTimeAtom);
   const setDuration = useSetAtom(playerDurationAtom);
-  const setSkipToast = useSetAtom(playerSkipToastAtom);
+  const { setTrackIndex } = usePlayerActions();
+  const toast = useToast();
   const lastCoreStateRef = useRef(coreState);
 
   useEffect(() => {
@@ -136,7 +137,18 @@ export function usePlayerRuntime() {
           loadTrack(command.item, command.autoplay);
           break;
         case "notifyTrackSkipped":
-          setSkipToast(formatSkippedTrackToast(command.trackTitle));
+          toast.show({
+            message: formatSkippedTrackToast(command.trackTitle),
+            variant: "warning",
+            priority: "notice",
+            actionLabel: "このトラックを再試行",
+            // onActionはトーストを自動では閉じない契約（design-system.md）。ここは同期的に
+            // 完結する操作なので押した直後に閉じる
+            onAction: () => {
+              setTrackIndex(command.trackIndex);
+              toast.dismiss();
+            },
+          });
           break;
       }
     });
@@ -148,7 +160,8 @@ export function usePlayerRuntime() {
     runtimeRefs,
     saveCurrentResume,
     setCurrentTime,
-    setSkipToast,
+    setTrackIndex,
+    toast,
   ]);
 
   useEffect(() => {

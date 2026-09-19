@@ -36,8 +36,8 @@ export default function DlsiteParseFailedModal({
           onClick={() => onOpenWork(work.id)}
         >
           <span className="min-w-0 flex-1">
-            <span className="block w-full truncate text-[12px]">{work.title}</span>
-            <span className="mll-selectable mt-0.5 block font-mono text-[10.5px] text-ink-3">
+            <span className="block w-full truncate text-body">{work.title}</span>
+            <span className="mll-selectable mt-0.5 block font-mono text-mono text-ink-2">
               {work.rjCode}
             </span>
           </span>
@@ -45,7 +45,7 @@ export default function DlsiteParseFailedModal({
       )}
       footer={
         <footer className="flex shrink-0 flex-col gap-2 border-t border-line-soft px-[18px] py-3">
-          <p className="mll-selectable font-mono text-[10px] leading-relaxed text-ink-3">
+          <p className="mll-selectable font-mono text-caption leading-relaxed text-ink-2">
             pnpm --filter @mimimilli/server dlsite-cache -- export --product-code RJ000000 --file
             ./work.html
           </p>

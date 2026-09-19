@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdirSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
-import { NotConfiguredError } from "../../src/errors.ts";
+import { InvalidRootFolderError } from "../../src/errors.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { captureLogs, categoryRecords, recordMessage } from "../helpers/logCapture.ts";
 import { makeTestDirectory, makeTestScope } from "../helpers/sampleLibrary.ts";
@@ -16,7 +16,7 @@ test("存在しないパスを updateSettings に渡すと server カテゴリ�
       await assert.rejects(
         () => adapter.updateSettings({ rootFolder: "/path/does/not/exist/for-mimimilli" }),
         (error: unknown) => {
-          assert.ok(error instanceof NotConfiguredError);
+          assert.ok(error instanceof InvalidRootFolderError);
           return true;
         },
       );

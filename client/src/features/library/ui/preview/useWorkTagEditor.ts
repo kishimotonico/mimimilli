@@ -1,11 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { parseTag, tagEquals } from "@mimimilli/shared";
 import type { NormalizedTag, TagPrefix, Work } from "@mimimilli/shared";
 import { buildTagsWithAdded, buildTagsWithRemoved } from "../../../../entities/work/editableTags";
 import { canPatchWorkSource } from "../../../../entities/work/sourceRevision";
 import type { LibraryTagsPatchMutation } from "../../model/useLibraryQueries";
-
-const TAG_UNDO_TOAST_MS = 6000;
 
 export interface UseWorkTagEditorOptions {
   work: Work;
@@ -50,13 +48,6 @@ export function useWorkTagEditor({
   const [failedRemoveTag, setFailedRemoveTag] = useState<NormalizedTag | null>(null);
   const [confirmingRemoveTag, setConfirmingRemoveTag] = useState<NormalizedTag | null>(null);
   const [tagUndoToast, setTagUndoToast] = useState<NormalizedTag | null>(null);
-  const tagUndoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (tagUndoTimerRef.current) clearTimeout(tagUndoTimerRef.current);
-    };
-  }, []);
 
   const isProtectedTag = (tag: NormalizedTag): boolean => {
     const parsed = parseTag(tag);
@@ -85,12 +76,6 @@ export function useWorkTagEditor({
     await patchTags(nextTags);
   };
 
-  const showTagUndoToast = (tag: NormalizedTag) => {
-    if (tagUndoTimerRef.current) clearTimeout(tagUndoTimerRef.current);
-    setTagUndoToast(tag);
-    tagUndoTimerRef.current = setTimeout(() => setTagUndoToast(null), TAG_UNDO_TOAST_MS);
-  };
-
   const removeTag = async (tag: NormalizedTag) => {
     if (tagsMutation.isPending) return;
     setPendingRemoveTag(tag);
@@ -98,7 +83,7 @@ export function useWorkTagEditor({
     const ok = await patchTags(buildTagsWithRemoved(work.tags, tag));
     setPendingRemoveTag(null);
     if (ok) {
-      showTagUndoToast(tag);
+      setTagUndoToast(tag);
     } else {
       setFailedRemoveTag(tag);
     }
@@ -132,10 +117,7 @@ export function useWorkTagEditor({
       ? work.tags
       : [...work.tags, tag];
     const ok = await patchTags(restored);
-    if (ok) {
-      if (tagUndoTimerRef.current) clearTimeout(tagUndoTimerRef.current);
-      setTagUndoToast(null);
-    }
+    if (ok) setTagUndoToast(null);
   };
 
   const dismissTagUndoToast = () => setTagUndoToast(null);

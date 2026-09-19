@@ -266,6 +266,46 @@ test("missing-only一括適用はcache結果だけを使い、既存フィール
   });
 });
 
+test("missing-only一括適用プレビューは書き込みをせず、適用と同じ差分を返す", async (t) => {
+  const lib = makeSampleLibrary();
+  const dir = makeTestDirectory("dlsite-apply-missing-preview");
+  t.after(lib.cleanup);
+  t.after(dir.cleanup);
+  const adapter = dir.own(
+    createRealAdapter({
+      database: { kind: "memory" },
+      dlsiteCache: { path: join(dir.path, "cache.sqlite") },
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: (code) => htmlResponse(sampleWorkHtml(code, { title: "取得タイトル", cover: false })),
+      }),
+    }),
+  );
+  await adapter.updateSettings({ rootFolder: lib.root });
+  await adapter.scan();
+  const before = await adapter.getWork(lib.existingWorkId);
+  const metaPath = join(before!.physicalPath, META_FILE_NAME);
+  const bytesBefore = readFileSync(metaPath);
+
+  await adapter.runDlsiteBulk("existing", [lib.existingWorkId]);
+
+  const preview = await adapter.dlsiteApplyMissingPreview([lib.existingWorkId]);
+  assert.equal(preview.items.length, 1);
+  assert.equal(preview.items[0]?.workId, lib.existingWorkId);
+  assert.ok(preview.items[0]!.newTags.length > 0);
+  assert.deepEqual(readFileSync(metaPath), bytesBefore, "プレビューはmetaを書き換えない");
+
+  const applied = await adapter.dlsiteApplyMissing([lib.existingWorkId]);
+  assert.equal(applied.applied, 1);
+  const after = await adapter.getWork(lib.existingWorkId);
+  assert.deepEqual(
+    preview.items[0]!.newTags.sort(),
+    after!.tags.filter((tag) => !before!.tags.includes(tag)).sort(),
+  );
+
+  assert.deepEqual(await adapter.dlsiteApplyMissingPreview([lib.existingWorkId]), { items: [] });
+});
+
 test("missing-only一括適用はCAS競合を集計して後続作品を続行する", async (t) => {
   const directory = makeTestDirectory("dlsite-apply-missing-cas");
   const library = makeSampleLibrary();

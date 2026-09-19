@@ -8,6 +8,7 @@ import {
   scanProgressLabelAtom,
 } from "../../../entities/scan/model/atoms";
 import { useScanActions } from "../../../entities/scan/useScanActions";
+import { formatUserError, type UserErrorDisplay } from "../../../shared/lib/formatUserError";
 
 interface SetupScreenProps {
   onComplete: (path: string) => Promise<void>;
@@ -20,10 +21,13 @@ export default function SetupScreen({ onComplete }: SetupScreenProps) {
   const { cancel } = useScanActions();
   const [path, setPath] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [setupError, setSetupError] = useState<string | null>(null);
+  const [setupError, setSetupError] = useState<UserErrorDisplay | null>(null);
   const pathInputRef = useRef<HTMLInputElement | null>(null);
   const scanning = isSubmitting || scanningFromJob;
-  const alertMessage = scanError ?? setupError;
+  // scanErrorはuseScanJob側で既にformatUserErrorを通した分類済みメッセージ（詳細は持たない）
+  const alertDisplay: UserErrorDisplay | null = scanError
+    ? { message: scanError, detail: null }
+    : setupError;
   const canSubmit = Boolean(path.trim()) && !scanning;
 
   useEffect(() => {
@@ -39,7 +43,7 @@ export default function SetupScreen({ onComplete }: SetupScreenProps) {
     try {
       await onComplete(path.trim());
     } catch (error) {
-      setSetupError(error instanceof Error ? error.message : "初回セットアップに失敗しました");
+      setSetupError(formatUserError(error, "初回セットアップに失敗しました"));
     } finally {
       setIsSubmitting(false);
     }
@@ -65,14 +69,14 @@ export default function SetupScreen({ onComplete }: SetupScreenProps) {
         </div>
 
         <form onSubmit={(e) => void handleSubmit(e)} className="flex w-full flex-col gap-3">
-          <div className="flex h-10 items-center gap-2 rounded-[8px] border border-line bg-paper-1 px-[14px]">
+          <div className="flex h-10 items-center gap-2 rounded-[8px] border border-line bg-paper-1 px-[14px] focus-within:border-line-strong">
             <I.folder size={14} className="shrink-0 text-ink-3" />
             <input
               ref={pathInputRef}
               value={path}
               onChange={(e) => setPath(e.target.value)}
               placeholder="/Users/yourname/Music/ASMR"
-              className="min-w-0 flex-1 border-none bg-transparent font-mono text-xs text-ink-0 outline-none"
+              className="min-w-0 flex-1 border-none bg-transparent font-mono text-xs text-ink-0"
               disabled={scanning}
             />
           </div>
@@ -80,7 +84,7 @@ export default function SetupScreen({ onComplete }: SetupScreenProps) {
             type="submit"
             variant="primary"
             disabled={!canSubmit}
-            className="h-10 w-full justify-center gap-2 rounded-[8px] text-[13px] font-semibold disabled:bg-paper-3 disabled:text-ink-3"
+            className="h-10 w-full justify-center gap-2 rounded-[8px] text-[13px] font-semibold"
           >
             {scanning ? (
               <>
@@ -98,19 +102,31 @@ export default function SetupScreen({ onComplete }: SetupScreenProps) {
               type="button"
               variant="ghost"
               onClick={() => void cancel()}
-              className="h-9 w-full justify-center rounded-[8px] border border-line bg-paper-1 text-[12px] font-semibold text-ink-2 hover:bg-paper-1 hover:text-ink-2"
+              className="h-9 w-full justify-center rounded-[8px] border border-line bg-paper-1 text-control font-semibold text-ink-2 hover:bg-paper-1 hover:text-ink-2"
             >
               スキャンを中止
             </Button>
           )}
-          {alertMessage && (
-            <p role="alert" className="mll-selectable m-0 text-xs text-[var(--r-coral)]">
-              {alertMessage}
-            </p>
+          {alertDisplay && (
+            <div className="flex flex-col gap-1">
+              <p role="alert" className="mll-selectable m-0 text-xs text-[var(--r-coral)]">
+                {alertDisplay.message}
+              </p>
+              {alertDisplay.detail ? (
+                <details className="w-full text-left">
+                  <summary className="cursor-pointer text-secondary text-ink-3">
+                    技術的な詳細
+                  </summary>
+                  <pre className="mll-selectable mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-all text-left text-secondary text-ink-3">
+                    {alertDisplay.detail}
+                  </pre>
+                </details>
+              ) : null}
+            </div>
           )}
         </form>
 
-        <p className="text-center text-[11px] text-ink-4">
+        <p className="text-center text-caption text-ink-4">
           フォルダーパスはあとから設定で変更できます
         </p>
       </div>

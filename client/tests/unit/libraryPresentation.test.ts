@@ -4,14 +4,15 @@ import { ApiRequestError } from "../../src/shared/api/http";
 import { nt } from "../helpers/tag";
 import {
   axisOfFilterTag,
-  buildAxisFacetFilterParams,
   buildFilterTag,
   buildSmartFolderFilterParams,
+  buildTagFilterParams,
   buildWorksParams,
   computeCollectionStatsDisplay,
   computeIsNoResultsDueToFilter,
   computeResultsPaneKind,
   filterValidFacetItems,
+  formatFilterChipLabel,
   getFacetAxisForQuery,
   isGridViewActive,
   shouldClearSelectionOnFilterMiss,
@@ -315,45 +316,26 @@ describe("computeCollectionStatsDisplay", () => {
   });
 });
 
-describe("buildAxisFacetFilterParams（自軸除外カウント）", () => {
-  it("軸Xの値一覧では、軸X由来の実タグを除外してから残りをtags/tagOpへ渡す", () => {
-    // cv 軸を見ているときは cv/* を除外し、他軸（サークル）のフィルタは残す
-    expect(buildAxisFacetFilterParams("cv", ["cv/藤田茜", "サークル/月白製作所"])).toEqual({
-      tags: ["サークル/月白製作所"],
+describe("buildTagFilterParams", () => {
+  it("タグが1件以上あればtags/tagOpへそのまま渡す（軸による絞り込みはしない）", () => {
+    expect(buildTagFilterParams(["cv/藤田茜", "サークル/月白製作所"])).toEqual({
+      tags: ["cv/藤田茜", "サークル/月白製作所"],
       tagOp: "AND",
     });
   });
 
-  it("フラットタグは tag 軸由来として扱う", () => {
-    expect(buildAxisFacetFilterParams("tag", ["ASMR", "cv/藤田茜"])).toEqual({
-      tags: ["cv/藤田茜"],
-      tagOp: "AND",
-    });
-    expect(buildAxisFacetFilterParams("cv", ["ASMR", "cv/藤田茜"])).toEqual({
-      tags: ["ASMR"],
-      tagOp: "AND",
-    });
+  it("タグが無ければ空オブジェクトを返す", () => {
+    expect(buildTagFilterParams([])).toEqual({});
+  });
+});
+
+describe("formatFilterChipLabel（チップの内部表現を隠す）", () => {
+  it("組み込み軸の擬似タグは「軸ラベル/値」に変換する", () => {
+    expect(formatFilterChipLabel(nt("@year/2024"))).toBe("追加日/2024");
   });
 
-  it("year 軸を見ているときは @year 擬似タグを除外し、他のフィルタは axis/axisValue へ残す", () => {
-    expect(buildAxisFacetFilterParams("year", ["@year/2024", "cv/藤田茜"])).toEqual({
-      tags: ["cv/藤田茜"],
-      tagOp: "AND",
-    });
-  });
-
-  it("他軸を見ているときは year 擬似タグも tags に残す（サーバー側で解釈する）", () => {
-    expect(buildAxisFacetFilterParams("cv", ["@year/2024", "サークル/月白製作所"])).toEqual({
-      tags: ["@year/2024", "サークル/月白製作所"],
-      tagOp: "AND",
-    });
-  });
-
-  it("軸由来のフィルタしか無ければ空オブジェクトを返す（自軸除外後は無フィルタ集計）", () => {
-    expect(buildAxisFacetFilterParams("cv", ["cv/藤田茜", "cv/霧島レイ"])).toEqual({});
-  });
-
-  it("フィルタが無ければ空オブジェクトを返す", () => {
-    expect(buildAxisFacetFilterParams("cv", [])).toEqual({});
+  it("実タグはフルパスのまま変更しない", () => {
+    expect(formatFilterChipLabel(nt("cv/藤田茜"))).toBe("cv/藤田茜");
+    expect(formatFilterChipLabel(nt("ASMR"))).toBe("ASMR");
   });
 });

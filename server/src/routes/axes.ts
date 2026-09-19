@@ -4,7 +4,7 @@
 import { Hono } from "hono";
 import { axisFacetsQuerySchema, facetAxisIdSchema } from "@mimimilli/shared";
 import type { DataAdapter } from "../adapter/index.ts";
-import { invalidRequest } from "../lib/httpError.ts";
+import { invalidRequest, notFound } from "../lib/httpError.ts";
 
 export function axesRoute(adapter: DataAdapter): Hono {
   const app = new Hono();
@@ -22,6 +22,9 @@ export function axesRoute(adapter: DataAdapter): Hono {
       invalidRequest("軸ファセットのクエリパラメータが不正です");
     }
     const items = await adapter.getAxisFacets(parsed.data, queryParsed.data);
+    if (items === null) {
+      notFound(`スマートフォルダーが見つかりません: ${queryParsed.data.smartFolder}`);
+    }
     return c.json(items);
   });
 

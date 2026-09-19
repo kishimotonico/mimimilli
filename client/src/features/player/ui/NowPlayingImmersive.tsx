@@ -26,13 +26,20 @@ const BURST_HOLD_MS = 380;
 interface NowPlayingImmersiveProps {
   state: Pick<
     PlayerState,
-    "currentWork" | "isFilePlayback" | "tracks" | "currentTrackIndex" | "isPlaying" | "volume"
+    | "currentWork"
+    | "isFilePlayback"
+    | "tracks"
+    | "currentTrackIndex"
+    | "isPlaying"
+    | "volume"
+    | "playbackRate"
   >;
   onTogglePlay: () => void;
   onExit: () => void;
   onNext: () => void;
   onPrev: () => void;
   onSetVolume: (v: number) => void;
+  onSetPlaybackRate: (r: number) => void;
 }
 
 function ImmersivePlaybackBurst({ isPlaying, active }: { isPlaying: boolean; active: boolean }) {
@@ -80,11 +87,20 @@ export default function NowPlayingImmersive({
   onNext,
   onPrev,
   onSetVolume,
+  onSetPlaybackRate,
 }: NowPlayingImmersiveProps) {
   const isPresent = useIsPresent();
   const { fade } = useMotionVariants();
   const toggleRef = useRef<HTMLButtonElement>(null);
-  const { currentWork, isFilePlayback, currentTrackIndex, isPlaying, volume } = state;
+  const {
+    currentWork,
+    isFilePlayback,
+    tracks,
+    currentTrackIndex,
+    isPlaying,
+    volume,
+    playbackRate,
+  } = state;
   // マウス移動・キー操作の監視は1箇所（このidle）に集約し、ミニコントロールへは
   // 表示用の値だけをpropsで渡す（window listener・timerの二重化を避ける）。
   const idle = useImmersiveIdle(isPresent);
@@ -162,10 +178,14 @@ export default function NowPlayingImmersive({
         idle={idle}
         isPlaying={isPlaying}
         volume={volume}
+        playbackRate={playbackRate}
+        isFirstTrack={currentTrackIndex <= 0}
+        isLastTrack={currentTrackIndex >= tracks.length - 1}
         onTogglePlay={onTogglePlay}
         onNext={onNext}
         onPrev={onPrev}
         onSetVolume={onSetVolume}
+        onSetPlaybackRate={onSetPlaybackRate}
       />
     </motion.div>
   );

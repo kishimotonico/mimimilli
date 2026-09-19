@@ -4,10 +4,12 @@
 import { deleteVoid, getParsed, postParsed, putParsed } from "../../shared/api/http";
 import {
   worksPageSchema,
+  smartFolderPreviewResponseSchema,
   smartFolderSchema,
   smartFolderListSchema,
   type SmartFolder,
   type SmartFolderCreate,
+  type SmartFolderRule,
   type SmartFolderUpdate,
   type WorksPage,
 } from "@mimimilli/shared";
@@ -26,6 +28,21 @@ export async function updateSmartFolder(id: string, data: SmartFolderUpdate): Pr
 
 export async function deleteSmartFolder(id: string): Promise<void> {
   await deleteVoid(`/smart-folders/${encodeURIComponent(id)}`);
+}
+
+/** 未保存のドラフト条件（rules）をチップ絞り込みなしで評価し、一致件数だけ返す
+ *  （条件エディタのライブ件数プレビュー・結果バナーの「条件一致」件数） */
+export async function previewSmartFolderRuleCount(
+  rules: SmartFolderRule[],
+  options?: { signal?: AbortSignal },
+): Promise<number> {
+  const { total } = await postParsed(
+    smartFolderPreviewResponseSchema,
+    "/smart-folders/preview",
+    { rules },
+    options,
+  );
+  return total;
 }
 
 /** tags はフォルダーのルールに対する追加の AND 条件（ADR-0012） */

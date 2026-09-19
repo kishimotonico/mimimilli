@@ -1,5 +1,11 @@
-import { applyDlsiteStatePatch, dedupeTags, hasRjCode, mergeDlsiteTags } from "@mimimilli/shared";
+import {
+  applyDlsiteStatePatch,
+  computeMissingDiff,
+  hasRjCode,
+  mergeAppliedDlsiteTags,
+} from "@mimimilli/shared";
 import type {
+  DlsiteApplyMissingPreviewItem,
   DlsiteBulkResult,
   DlsiteFetchResult,
   DlsiteState,
@@ -12,12 +18,18 @@ import { fixtureCoverFromColumns, type FixtureCoverColumns } from "./data.ts";
 import type { FixtureState } from "./state.ts";
 import { buildFullWorkFromState } from "./playback.ts";
 
+/** このRJコードを持つ作品は dlsiteFetchByCode が常に取得失敗を返す（real/fixture契約テスト用） */
+export const FIXTURE_DLSITE_FETCH_FAILURE_RJ_CODE = "RJ000404";
+
 export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
   async function dlsiteFetchByCode(
     rjCode: string,
     _force?: boolean,
     _options?: { signal?: AbortSignal },
   ): Promise<DlsiteFetchResult> {
+    if (rjCode === FIXTURE_DLSITE_FETCH_FAILURE_RJ_CODE) {
+      return { ok: false, kind: "error", message: `fixture: 取得に失敗する作品（${rjCode}）` };
+    }
     return {
       ok: true,
       info: {
@@ -50,22 +62,43 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
       const candidates = state.works.filter((work) => !workIds || workIds.includes(work.id));
       let applied = 0;
       let skipped = 0;
+      let failed = 0;
       for (const work of candidates) {
         if (!hasRjCode(work.dlsite) || work.dlsite.status === "skipped") {
           skipped += 1;
           continue;
         }
         const fetched = await dlsiteFetchByCode(work.dlsite.rjCode);
-        if (!fetched.ok) continue;
-        const tags = mergeDlsiteTags([], fetched.info).filter((tag) => !work.tags.includes(tag));
-        if (tags.length === 0) {
+        if (!fetched.ok) {
+          failed += 1;
+          continue;
+        }
+        const { newTags, applyCover, applyUrl } = computeMissingDiff(work, fetched.info);
+        if (newTags.length === 0 && !applyCover && !applyUrl) {
           skipped += 1;
           continue;
         }
-        work.tags = dedupeTags([...work.tags, ...tags]);
+        work.tags = mergeAppliedDlsiteTags(work.tags, newTags);
+        if (applyUrl) {
+          work.urls = [...work.urls, { label: "DLsite", url: fetched.info.url }];
+        }
         applied += 1;
       }
-      return { applied, skipped, failed: 0 };
+      return { applied, skipped, failed };
+    },
+
+    async dlsiteApplyMissingPreview(workIds) {
+      const candidates = state.works.filter((work) => !workIds || workIds.includes(work.id));
+      const items: DlsiteApplyMissingPreviewItem[] = [];
+      for (const work of candidates) {
+        if (!hasRjCode(work.dlsite) || work.dlsite.status === "skipped") continue;
+        const fetched = await dlsiteFetchByCode(work.dlsite.rjCode);
+        if (!fetched.ok) continue;
+        const { newTags, applyCover, applyUrl } = computeMissingDiff(work, fetched.info);
+        if (newTags.length === 0 && !applyCover && !applyUrl) continue;
+        items.push({ workId: work.id, title: work.title, newTags, applyCover, applyUrl });
+      }
+      return { items };
     },
 
     async dlsiteApply(
@@ -77,7 +110,7 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
       if (!work) return false;
       if (body.applyTitle) work.title = body.info.title;
       const { applyTags } = body;
-      work.tags = dedupeTags([...work.tags, ...applyTags]);
+      work.tags = mergeAppliedDlsiteTags(work.tags, applyTags);
       if (body.applyCover && body.info.coverUrl) {
         const dimensions = work.cover?.dimensions ?? { width: 900, height: 900 };
         const columns: FixtureCoverColumns = {
@@ -111,6 +144,7 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
         failed: 0,
         parseErrors: 0,
         skipped: requested.length - targets.length,
+        ...(state.dataIntegrityWarning ? { dataIntegrityWarning: state.dataIntegrityWarning } : {}),
       };
       for (let index = 0; index < targets.length; index++) {
         if (options?.signal?.aborted) return result;

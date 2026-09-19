@@ -4,6 +4,7 @@ import { streamSSE } from "hono/streaming";
 import {
   dlsiteApplyBodySchema,
   dlsiteApplyMissingBodySchema,
+  dlsiteApplyMissingPreviewSchema,
   dlsiteBulkApplyMissingResultSchema,
   dlsiteBulkCancelResponseSchema,
   dlsiteFetchByCodeBodySchema,
@@ -127,6 +128,19 @@ export function dlsiteRoute(adapter: DataAdapter, dlsiteJobs: DlsiteJobManager):
     return c.json(
       dlsiteBulkApplyMissingResultSchema.parse(
         await adapter.dlsiteApplyMissing(parsed.data.workIds),
+      ),
+    );
+  });
+
+  app.post("/dlsite/apply-missing/preview", async (c) => {
+    const body = await readOptionalJsonBody(c, "workIds は文字列配列で指定してください");
+    const parsed = dlsiteApplyMissingBodySchema.safeParse(body);
+    if (!parsed.success) {
+      invalidRequest("workIds は文字列配列で指定してください");
+    }
+    return c.json(
+      dlsiteApplyMissingPreviewSchema.parse(
+        await adapter.dlsiteApplyMissingPreview(parsed.data.workIds),
       ),
     );
   });

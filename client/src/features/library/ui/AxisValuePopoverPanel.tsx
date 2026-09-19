@@ -22,12 +22,19 @@ interface AxisValuePopoverPanelProps {
   axisLabel: string;
   floatingStyles: CSSProperties;
   setFloating: AnchoredPopoverFloatingRefCallback;
+  /** 選択中判定（チェック表示）に使う実際の選択タグ */
   selectedTags: NormalizedTag[];
+  /** 件数集計に使うタグ。既定=置き換えの呼び出し元（FilterChipBandの兄弟値ドロップダウン）は
+   *  空配列、既定=AND追加の呼び出し元（FilterChipAddButton）は selectedTags を渡す
+   *  （件数基準はvalueSelectionContract.tsのderiveFacetCountTagsで導出する） */
+  countTags: NormalizedTag[];
+  /** 表示中のスマートフォルダーID。指定時は候補件数の集計元をフォルダー条件適用後の
+   *  集合に絞る */
+  smartFolderId?: string;
   onSelect: (tag: NormalizedTag, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
   /** ホバー/フォーカス時の＋ボタン（冪等なAND追加）。省略時はボタンを出さない（ADR-0013） */
   onAdd?: (tag: NormalizedTag) => void;
   close: () => void;
-  hint?: string;
 }
 
 export default function AxisValuePopoverPanel({
@@ -36,13 +43,14 @@ export default function AxisValuePopoverPanel({
   floatingStyles,
   setFloating,
   selectedTags,
+  countTags,
+  smartFolderId,
   onSelect,
   onAdd,
   close,
-  hint,
 }: AxisValuePopoverPanelProps) {
   const isPresent = useIsPresent();
-  const facetQuery = useAxisFacetsQuery(axis as FacetAxisId, selectedTags);
+  const facetQuery = useAxisFacetsQuery(axis as FacetAxisId, countTags, smartFolderId);
   const { popoverScale } = useMotionVariants();
   const variant = popoverScale({ origin: "top left" });
 
@@ -67,7 +75,6 @@ export default function AxisValuePopoverPanel({
         }
         onAdd={onAdd ? (item) => onAdd(buildFilterTag(axis, item.value)) : undefined}
         close={close}
-        hint={hint}
       />
     </motion.div>
   );

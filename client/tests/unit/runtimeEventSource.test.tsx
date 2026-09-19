@@ -10,12 +10,22 @@ import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
 import {
   dlsiteBulkActiveAtom,
   dlsiteBulkActionsAtom,
-  dlsiteBulkErrorAtom,
   dlsiteBulkProgressAtom,
   dlsiteBulkStartingAtom,
-  dlsiteBulkResultAtom,
 } from "../../src/entities/dlsite/model/bulkAtoms";
-import { scanActionsAtom, scanCandidateHiddenPathsAtom } from "../../src/entities/scan/model/atoms";
+import {
+  scanActionsAtom,
+  scanCandidateHiddenPathsAtom,
+  scanJobAtom,
+} from "../../src/entities/scan/model/atoms";
+import { toastRequestsAtom } from "../../src/shared/model/toastRequestsAtom";
+import { activeModalAtom } from "../../src/shared/model/activeModalAtom";
+import { formatDlsiteBulkResult } from "../../src/features/dlsite/model/formatDlsiteBulkResult";
+
+/** DlsiteBulkRuntimeは単一のuseToast()しか持たないため、要求は高々1件 */
+function latestToastRequest(store: ReturnType<typeof createStore>) {
+  return [...store.get(toastRequestsAtom).values()][0];
+}
 
 class FakeEventSource extends EventTarget {
   static readonly CONNECTING = 0;
@@ -335,6 +345,8 @@ describe("Runtime間連携: ScanRuntime → DlsiteBulkRuntime", () => {
         if (url.endsWith("/scan/candidates")) {
           return response({ candidates: scanResultWithNewWorks.candidates });
         }
+        // attach() が実在確認する後乗り先ジョブ。実行中を返す。
+        if (url.endsWith("/dlsite/bulk")) return response({ status: "running", progress: null });
         return response(null, 204);
       }),
     );
@@ -355,6 +367,100 @@ describe("Runtime間連携: ScanRuntime → DlsiteBulkRuntime", () => {
     await waitFor(() => expect(store.get(dlsiteBulkActiveAtom)).toBe(true));
     await waitFor(() => expect(FakeEventSource.instances).toHaveLength(2));
     expect(FakeEventSource.instances[1]!.url).toBe("/api/dlsite/events");
+  });
+});
+
+describe("ScanRuntime: 完了・中止トースト", () => {
+  it("スキャンモーダルが閉じていれば完了・中止トーストを出す", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith("/scan/active")) return response(running);
+        if (url.endsWith("/scan/job-1")) return response(completedJob);
+        return response(null, 204);
+      }),
+    );
+
+    const { store } = renderRuntime(createElement(ScanRuntime));
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    const source = FakeEventSource.instances[0]!;
+
+    dispatchScan(source, { type: "completed", seq: 1, result: scanResult });
+    await waitFor(() =>
+      expect(latestToastRequest(store)?.message).toBe(
+        "スキャン完了: 登録 1件・新規 0件・エラー 0件・行方不明 0件",
+      ),
+    );
+    // 要対応が無ければアクションは付けない
+    expect(latestToastRequest(store)?.actionLabel).toBeUndefined();
+  });
+
+  it("要対応があれば「要対応を見る」アクションを付け、押すとactiveModalAtomを書き換えてトーストを閉じる", async () => {
+    const needsAttentionResult = { ...scanResult, rjCodeMissingCount: 1 };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith("/scan/active")) return response(running);
+        if (url.endsWith("/scan/job-1"))
+          return response({ ...completedJob, result: needsAttentionResult });
+        return response(null, 204);
+      }),
+    );
+
+    const { store } = renderRuntime(createElement(ScanRuntime));
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    const source = FakeEventSource.instances[0]!;
+
+    dispatchScan(source, { type: "completed", seq: 1, result: needsAttentionResult });
+    await waitFor(() => expect(latestToastRequest(store)?.actionLabel).toBe("要対応を見る"));
+
+    latestToastRequest(store)!.onAction!();
+
+    expect(store.get(activeModalAtom)).toEqual({ kind: "scan", tab: "needsAttention" });
+    expect(latestToastRequest(store)).toBeUndefined();
+  });
+
+  it("中止時は「スキャンを中止しました」トーストを出す", async () => {
+    const cancelledJob: ScanJobSnapshot = { ...running, status: "cancelled", result: null };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith("/scan/active")) return response(running);
+        if (url.endsWith("/scan/job-1")) return response(cancelledJob);
+        return response(null, 204);
+      }),
+    );
+
+    const { store } = renderRuntime(createElement(ScanRuntime));
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    const source = FakeEventSource.instances[0]!;
+
+    dispatchScan(source, { type: "cancelled", seq: 1 });
+    await waitFor(() => expect(latestToastRequest(store)?.message).toBe("スキャンを中止しました"));
+  });
+
+  it("スキャンモーダルが開いていれば完了トーストを出さない（サイドバーの完了表示に任せる）", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith("/scan/active")) return response(running);
+        if (url.endsWith("/scan/job-1")) return response(completedJob);
+        return response(null, 204);
+      }),
+    );
+
+    const { store } = renderRuntime(createElement(ScanRuntime));
+    store.set(activeModalAtom, { kind: "scan" });
+    await waitFor(() => expect(FakeEventSource.instances).toHaveLength(1));
+    const source = FakeEventSource.instances[0]!;
+
+    dispatchScan(source, { type: "completed", seq: 1, result: scanResult });
+    await waitFor(() => expect(store.get(scanJobAtom)?.status).toBe("completed"));
+    expect(latestToastRequest(store)).toBeUndefined();
   });
 });
 
@@ -393,7 +499,9 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
 
     await waitFor(() => expect(invalidateQueries).toHaveBeenCalled());
     const callsAfterFirst = invalidateQueries.mock.calls.length;
-    expect(store.get(dlsiteBulkResultAtom)).toEqual(dlsiteResult);
+    expect(latestToastRequest(store)?.message).toBe(
+      `DLsite一括取得: ${formatDlsiteBulkResult(dlsiteResult)}`,
+    );
 
     dispatchDlsite(source, "complete", complete);
     await act(async () => {
@@ -564,7 +672,10 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
     });
 
     await waitFor(() => expect(store.get(dlsiteBulkActiveAtom)).toBe(false));
-    expect(store.get(dlsiteBulkErrorAtom)).toBe("DLsite一括取得の接続が切断されました");
+    await waitFor(() =>
+      expect(latestToastRequest(store)?.message).toBe("DLsite一括取得の接続が切断されました"),
+    );
+    expect(latestToastRequest(store)?.variant).toBe("error");
   });
 
   it("start の多重呼び出しで POST は1回だけ", async () => {
@@ -660,7 +771,10 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
     });
 
     await waitFor(() => expect(store.get(dlsiteBulkActiveAtom)).toBe(false));
-    expect(store.get(dlsiteBulkErrorAtom)).toBe("DLsite一括取得の接続が切断されました");
+    await waitFor(() =>
+      expect(latestToastRequest(store)?.message).toBe("DLsite一括取得の接続が切断されました"),
+    );
+    expect(latestToastRequest(store)?.variant).toBe("error");
   });
 
   it("一時切断中は error リスナー経由のネイティブ Event でも active を維持する", async () => {
@@ -688,7 +802,7 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
       await Promise.resolve();
     });
     expect(store.get(dlsiteBulkActiveAtom)).toBe(true);
-    expect(store.get(dlsiteBulkErrorAtom)).toBeNull();
+    expect(latestToastRequest(store)).toBeUndefined();
     expect(source.closed).toBe(false);
   });
 
@@ -734,7 +848,7 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
       total: 5,
       work: { id: "work-1", rjCode: "RJ111111", title: "作品1" },
     });
-    expect(store.get(dlsiteBulkResultAtom)).toBeNull();
+    expect(latestToastRequest(store)).toBeUndefined();
   });
 
   it("不正な terminal イベントで active が固着しない", async () => {
@@ -752,8 +866,10 @@ describe("DlsiteBulkRuntime EventSource ownership", () => {
     dispatchDlsite(source, "complete", { type: "complete", result: "invalid" });
 
     await waitFor(() => expect(store.get(dlsiteBulkActiveAtom)).toBe(false));
-    expect(store.get(dlsiteBulkErrorAtom)).toBe("DLsite進捗イベントの形式が不正です");
-    expect(store.get(dlsiteBulkResultAtom)).toBeNull();
+    await waitFor(() =>
+      expect(latestToastRequest(store)?.message).toBe("DLsite進捗イベントの形式が不正です"),
+    );
+    expect(latestToastRequest(store)?.variant).toBe("error");
   });
   it("キャッシュ無効化が失敗しても unhandled rejection にならない", async () => {
     vi.stubGlobal(

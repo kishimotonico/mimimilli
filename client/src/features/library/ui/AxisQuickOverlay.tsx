@@ -49,7 +49,9 @@ export default function AxisQuickOverlay({
   onPanelElChange,
 }: AxisQuickOverlayProps) {
   const isPresent = useIsPresent();
-  const facetQuery = useAxisFacetsQuery(axis as FacetAxisId, selectedTags);
+  // クイックオーバーレイは既定=置き換えの入口（ADR-0013）なので、件数基準は無条件集計に
+  // する（主クリックの結果と一致させる）。isSelected は実際の selectedTags で行う。
+  const facetQuery = useAxisFacetsQuery(axis as FacetAxisId, []);
   const { popoverScale } = useMotionVariants();
   const variant = popoverScale({ origin: "left center" });
 
