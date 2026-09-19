@@ -29,7 +29,9 @@ export default function ScanRuntime() {
   const setActions = useSetAtom(scanActionsAtom);
   const setHiddenPaths = useSetAtom(scanCandidateHiddenPathsAtom);
   const setActiveModal = useSetAtom(activeModalAtom);
-  const toast = useToast();
+  // dismiss()は発行元（useToastの呼び出し）単位でしか効かないため、終了通知用とエラー用で分ける。
+  const terminalToast = useToast();
+  const errorToast = useToast();
   // モーダルが開いている間はサイドバーの「完了しました」が完了通知を担うため、
   // トースト側は重ねて出さない。
   const scanModalOpen = useAtomValue(scanModalOpenAtom);
@@ -37,12 +39,19 @@ export default function ScanRuntime() {
   const handleScanTerminal = useCallback(
     (job: ScanJobSnapshot) => {
       if (job.status === "cancelled") {
+        // 終了通知を出すのと同じ同期経路でエラー要求を取り下げる
+        errorToast.dismiss();
         if (!scanModalOpen) {
-          toast.show({ message: "スキャンを中止しました", variant: "warning", priority: "notice" });
+          terminalToast.show({
+            message: "スキャンを中止しました",
+            variant: "warning",
+            priority: "notice",
+          });
         }
         return;
       }
       if (job.status !== "completed" || !job.result || !job.finishedAt) return;
+      errorToast.dismiss();
       const result = job.result;
       queryClient.setQueryData(SCAN_QUERY_KEYS.last(), { result, finishedAt: job.finishedAt });
       void refreshScanCandidates(queryClient).catch(() => {});
@@ -54,7 +63,7 @@ export default function ScanRuntime() {
           result.invalidMetaFiles.length > 0 ||
           result.rjCodeMissingCount > 0 ||
           result.dataIntegrityWarning !== undefined;
-        toast.show({
+        terminalToast.show({
           message: `スキャン完了: ${formatScanResult(result)}`,
           variant: result.errors > 0 || result.missing > 0 ? "warning" : "success",
           priority: "notice",
@@ -64,14 +73,14 @@ export default function ScanRuntime() {
           onAction: hasNeedsAttention
             ? () => {
                 setActiveModal({ kind: "scan", tab: "needsAttention" });
-                toast.dismiss();
+                terminalToast.dismiss();
               }
             : undefined,
         });
       }
       if (result.insertedWorkIds.length > 0) dlsiteBulk.attach();
     },
-    [dlsiteBulk, queryClient, scanModalOpen, setActiveModal, toast],
+    [dlsiteBulk, errorToast, queryClient, scanModalOpen, setActiveModal, terminalToast],
   );
 
   // 新しいスキャンの開始がサーバー側の真実の境界になるため、開始時点でそれ以前のローカル非表示を破棄する。
@@ -94,18 +103,18 @@ export default function ScanRuntime() {
   useEffect(() => {
     setError(scanJob.error);
     if (!scanJob.error) {
-      toast.dismiss();
+      errorToast.dismiss();
       return;
     }
     // scanErrorAtomはSetupScreenがインライン表示にも使う「エラー状態」として残す
     // （AC参照）。表示自体はここからuseToastへ出す
-    toast.show({
+    errorToast.show({
       message: scanJob.error,
       variant: "error",
       priority: "notice",
       onDismiss: () => scanJobRef.current.clearError(),
     });
-  }, [scanJob.error, setError, toast]);
+  }, [scanJob.error, setError, errorToast]);
 
   const actionsRef = useRef<ScanActions>({
     start: async (options?: StartScanRequest) => scanJobRef.current.start(options),
