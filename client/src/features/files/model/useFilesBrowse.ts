@@ -83,7 +83,21 @@ export function useFilesBrowse(root: string): FilesBrowse {
     entries,
   });
   const previewEntry = selectionMissing ? null : (fileSelection ?? cwdFolderEntry);
-  const folderEntries = previewEntry?.isDir ? entries : null;
+  // previewEntryは選択（矢印キー移動含む）だけで決まり、実際に潜ったディレクトリ
+  // （cwd）とは食い違いうる。cwd自身を指すときはcwdQueryの一覧をそのまま使えるが、
+  // 矢印キーで選んだ子フォルダーはその中身を別途取得しないと親の一覧のままになる。
+  const previewDirPath =
+    previewEntry?.isDir && previewEntry.path !== nav.cwd ? previewEntry.path : null;
+  const previewDirQuery = useQuery({
+    queryKey: FILE_SYSTEM_QUERY_KEYS.directory(previewDirPath ?? nav.cwd),
+    queryFn: () => browseFs(previewDirPath ?? nav.cwd),
+    enabled: previewDirPath !== null,
+  });
+  const folderEntries = !previewEntry?.isDir
+    ? null
+    : previewEntry.path === nav.cwd
+      ? entries
+      : (previewDirQuery.data?.entries ?? null);
   const playbackSourceEntries = folderEntries ?? entries;
 
   const hasAncestors = nav.relPath.length >= 1;
