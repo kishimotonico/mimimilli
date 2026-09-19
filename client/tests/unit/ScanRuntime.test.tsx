@@ -9,6 +9,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ScanRuntime from "../../src/features/scan/ui/ScanRuntime";
 import GlobalToast from "../../src/app/ui/GlobalToast";
 import { scanActionsAtom, scanErrorAtom } from "../../src/entities/scan/model/atoms";
+import { activeModalAtom } from "../../src/shared/model/activeModalAtom";
+import type { ScanResult } from "@mimimilli/shared";
 
 function response(body: unknown, status = 200): Response {
   return new Response(status === 204 ? null : JSON.stringify(body), {
@@ -73,6 +75,66 @@ describe("ScanRuntime", () => {
     expect(screen.getByText(message)).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "閉じる" }));
+
+    await waitFor(() => expect(store.get(scanErrorAtom)).toBeNull());
+    await waitFor(() => expect(screen.queryByText(message)).toBeNull());
+  });
+
+  it("モーダルを開いたまま失敗→再試行→成功すると古いエラートーストが残らない", async () => {
+    const scanResult: ScanResult = {
+      registered: 1,
+      insertedWorkIds: [],
+      updatedWorkIds: [],
+      errors: 0,
+      missing: 0,
+      rjCodeMissingCount: 0,
+      skipped: 0,
+      coverErrors: 0,
+      identityConflicts: [],
+      invalidMetaFiles: [],
+      candidates: [],
+    };
+    let scanCallCount = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith("/scan/active")) return response(null, 204);
+        if (url.endsWith("/scan")) {
+          scanCallCount += 1;
+          if (scanCallCount === 1) return response({ message: "開始できませんでした" }, 500);
+          return response({
+            job: {
+              id: "job-2",
+              status: "completed",
+              createdAt: new Date().toISOString(),
+              startedAt: new Date().toISOString(),
+              finishedAt: new Date().toISOString(),
+              progress: null,
+              result: scanResult,
+              error: null,
+            },
+          });
+        }
+        return response(null, 204);
+      }),
+    );
+
+    const { store } = renderRuntime();
+    store.set(activeModalAtom, { kind: "scan" });
+    await waitFor(() => expect(store.get(scanActionsAtom)).not.toBeNull());
+
+    await act(async () => {
+      await store.get(scanActionsAtom)!.start();
+    });
+
+    await waitFor(() => expect(store.get(scanErrorAtom)).not.toBeNull());
+    const message = store.get(scanErrorAtom)!;
+    expect(screen.getByText(message)).toBeTruthy();
+
+    await act(async () => {
+      await store.get(scanActionsAtom)!.start();
+    });
 
     await waitFor(() => expect(store.get(scanErrorAtom)).toBeNull());
     await waitFor(() => expect(screen.queryByText(message)).toBeNull());

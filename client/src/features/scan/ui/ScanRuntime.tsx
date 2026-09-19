@@ -93,7 +93,10 @@ export default function ScanRuntime() {
 
   useEffect(() => {
     setError(scanJob.error);
-    if (!scanJob.error) return;
+    if (!scanJob.error) {
+      toast.dismiss();
+      return;
+    }
     // scanErrorAtomはSetupScreenがインライン表示にも使う「エラー状態」として残す
     // （AC参照）。表示自体はここからuseToastへ出す
     toast.show({
