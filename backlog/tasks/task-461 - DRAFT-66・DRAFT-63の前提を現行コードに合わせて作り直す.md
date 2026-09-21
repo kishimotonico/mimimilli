@@ -4,6 +4,7 @@ title: DRAFT-66・DRAFT-63の前提を現行コードに合わせて作り直す
 status: To Do
 assignee: []
 created_date: '2026-09-21 10:49'
+updated_date: '2026-09-21 13:44'
 labels: []
 dependencies: []
 ordinal: 515000
@@ -22,5 +23,11 @@ ordinal: 515000
 - [ ] #3 DRAFT-66 の対象が Work ID か root+path かが明示されている
 - [ ] #4 DRAFT-63 の mode別再適用とTTL経過の記述が現行コードと照合のうえ修正されている
 - [ ] #5 DRAFT-63 で「直近jobの結果を見返す」「現在の取得状態を表示する」「取得履歴を保持する」が分けて記述されている
-- [ ] #6 古いDRAFT-66・DRAFT-63がarchiveされている
+- [ ] #6 旧前提のドラフトが現行のドラフトとして残らず、後継を辿れる状態になっている
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+TASK-451（スキャンとDLsite連携の現行フロー調査、Done）の最新判断と照合してから確定する。調査時点の現行コードと将来仕様を混ぜない。
+<!-- SECTION:NOTES:END -->

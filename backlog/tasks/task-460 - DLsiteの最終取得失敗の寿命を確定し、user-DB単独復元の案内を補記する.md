@@ -1,9 +1,10 @@
 ---
 id: TASK-460
-title: DLsiteの最終取得失敗の寿命を確定し、user DB単独復元の案内を補記する
+title: DLsiteの最終取得失敗の寿命を確定する
 status: To Do
 assignee: []
 created_date: '2026-09-21 10:49'
+updated_date: '2026-09-21 13:44'
 labels: []
 dependencies: []
 documentation:
@@ -19,8 +20,7 @@ ordinal: 514000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 最終取得失敗の表示が catalog 再構築で失われることが仕様として記述されている
-- [ ] #2 cache の TTL と結果表示の保持が別の寿命として説明されている
-- [ ] #3 user DB 単独復元時に catalog との整合を取る手順が ADR-0023 に記載されている
-- [ ] #4 user の不足値を自動で補完しない
+- [ ] #1 cache の TTL と結果表示の保持が別の寿命として説明されている
+- [ ] #2 最終取得失敗の表示について、catalog再構築後の保持を保証しないことが仕様として記述されている
+- [ ] #3 有効なcacheから同じ失敗表示が再び得られることを禁止していない
 <!-- AC:END -->

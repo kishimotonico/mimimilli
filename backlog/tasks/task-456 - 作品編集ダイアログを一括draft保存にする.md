@@ -4,10 +4,11 @@ title: 作品編集ダイアログを一括draft保存にする
 status: To Do
 assignee: []
 created_date: '2026-09-21 10:49'
-updated_date: '2026-09-21 10:49'
+updated_date: '2026-09-21 13:45'
 labels: []
 dependencies:
   - TASK-452
+  - TASK-455
 documentation:
   - docs/adr/0025-source-mutation-projection-read-separation.md
 ordinal: 510000
@@ -22,8 +23,9 @@ ADR-0025 で一括draft保存を採る決定に対応する。DRAFT-47 の保存
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 編集ダイアログの title・tags・urls が一括で保存される
-- [ ] #2 背景取得で dirty な入力が消えない
-- [ ] #3 閉じる際の保存・破棄の挙動が一括draft方式と一致する
-- [ ] #4 保護タグの確認と undo の意味が一括保存後も成立する
-- [ ] #5 bookmark の更新が編集draftと混ざらない
+- [ ] #2 閉じる際の保存・破棄の挙動が一括draft方式と一致する
+- [ ] #3 bookmark の更新が編集draftと混ざらない
+- [ ] #4 背景取得とDLsiteの独立適用のいずれも、dirtyな入力を上書きしない
+- [ ] #5 保護タグの確認時点と、undoが保存前draftへの取り消しか保存後の別コマンドかが決まっている
+- [ ] #6 source確定済みで投影未反映の状態を、閉じる操作が未保存へ戻して再送しない
 <!-- AC:END -->
