@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
 import TopBar from "../../src/app/ui/TopBar";
 import {
+  activeAxisAtom,
   librarySearchQueryAtom,
   selectedWorkIdAtom,
 } from "../../src/entities/library/model/navigationAtoms";
@@ -195,5 +196,34 @@ describe("TopBar の検索入力", () => {
     fireEvent.keyDown(input, { key: "Enter" });
     expect(store.get(appModeAtom)).toBe("library");
     expect(store.get(selectedWorkIdAtom)).toBe("RJ501011");
+  });
+});
+
+describe("値一覧ペイン表示中は作品検索を無効化する（ADR-0026、TASK-457）", () => {
+  it("value-list種の軸（facet軸）ではdisabled・tooltipを出す", () => {
+    const store = renderTopBar("");
+    act(() => store.set(activeAxisAtom, "cv"));
+    const input = screen.getByPlaceholderText(PLACEHOLDER) as HTMLInputElement;
+
+    expect(input).toBeDisabled();
+    expect(input.title).toBe("値一覧では作品を検索できません");
+  });
+
+  it("works種の軸（all等）では従来どおり有効", () => {
+    const store = renderTopBar("");
+    act(() => store.set(activeAxisAtom, "all"));
+    const input = screen.getByPlaceholderText(PLACEHOLDER) as HTMLInputElement;
+
+    expect(input).not.toBeDisabled();
+  });
+
+  it("value-list表示中は⌘Kでフォーカスしない", () => {
+    const store = renderTopBar("");
+    act(() => store.set(activeAxisAtom, "cv"));
+    const input = screen.getByPlaceholderText(PLACEHOLDER) as HTMLInputElement;
+    input.blur();
+
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+    expect(document.activeElement).not.toBe(input);
   });
 });

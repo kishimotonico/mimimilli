@@ -11,10 +11,6 @@ import AxisValueRows from "./AxisValueRows";
 import AxisValueGrid from "./AxisValueGrid";
 import { I } from "../../../shared/ui/Icon";
 import Button from "../../../shared/ui/Button";
-import {
-  deriveValueSelectionHandlers,
-  type ValueSelectionIntent,
-} from "../model/valueSelectionContract";
 
 // 軸の値一覧の本実装（ADR-0012 §5）。grid/list はユーザーの libraryViewModeAtom に
 // 従い、値のソートは axisValueSortAtom（ソートメニュー・list列見出しの二重入口・単一state。
@@ -31,10 +27,9 @@ interface AxisValueListProps {
   isTagPrefixesError?: boolean;
   /** 既定=置き換え（クリック。ADR-0012 §7） */
   onReplace: (tag: NormalizedTag) => void;
-  /** Ctrl/Cmd+クリックによる反転先（選択済みなら解除できる） */
+  /** Ctrl/Cmd+クリックによる反転先（トグル。値一覧はAND追加ボタンを持たないため、
+   *  ADR-0013の作品詳細タグクリックと同型の「ボタン無しの反転」になる。TASK-457） */
   onToggle: (tag: NormalizedTag) => void;
-  /** ホバー時の＋ボタン用の冪等なAND追加（ADR-0013） */
-  onAddTag: (tag: NormalizedTag) => void;
   onRetryFacets?: () => void;
   onRetryTagPrefixes?: () => void;
 }
@@ -49,7 +44,6 @@ export default function AxisValueList({
   isTagPrefixesError,
   onReplace,
   onToggle,
-  onAddTag,
   onRetryFacets,
   onRetryTagPrefixes,
 }: AxisValueListProps) {
@@ -71,18 +65,13 @@ export default function AxisValueList({
 
   const isSelected = (item: AxisFacetItem) =>
     selectedTags.includes(buildFilterTag(axis, item.value));
-  // 値一覧のタイル・行は既定=置き換えの入口（値選択の契約。design-system.md）。
-  const valueSelectionIntent: ValueSelectionIntent<NormalizedTag> = {
-    default: "replace",
-    onReplace,
-    onToggle,
-    onAdd: onAddTag,
+  // 値一覧のタイル・行は既定=置き換え、AND追加ボタンは持たない独立入口（ADR-0026、TASK-457）。
+  // Ctrl/Cmd+クリックのトグル反転はADR-0012 §7の全入口共通則として維持する。
+  const handleSelect = (item: AxisFacetItem, opts: { ctrlKey: boolean; metaKey: boolean }) => {
+    const tag = buildFilterTag(axis, item.value);
+    if (opts.ctrlKey || opts.metaKey) onToggle(tag);
+    else onReplace(tag);
   };
-  const { onSelect: handleSelectTag, onAddButton: handleAddTag } =
-    deriveValueSelectionHandlers(valueSelectionIntent);
-  const handleSelect = (item: AxisFacetItem, opts: { ctrlKey: boolean; metaKey: boolean }) =>
-    handleSelectTag(buildFilterTag(axis, item.value), opts);
-  const handleAdd = (item: AxisFacetItem) => handleAddTag(buildFilterTag(axis, item.value));
 
   const showSearchMiss = facetItems.length > 0 && rows.length === 0 && contextQuery.length > 0;
 
@@ -165,7 +154,6 @@ export default function AxisValueList({
                 fallbackIcon={fallbackIcon}
                 resetKey={resetKey}
                 onSelect={handleSelect}
-                onAdd={handleAdd}
               />
             ) : (
               <AxisValueRows
@@ -177,7 +165,6 @@ export default function AxisValueList({
                 fallbackIcon={fallbackIcon}
                 resetKey={resetKey}
                 onSelect={handleSelect}
-                onAdd={handleAdd}
               />
             )}
           </>

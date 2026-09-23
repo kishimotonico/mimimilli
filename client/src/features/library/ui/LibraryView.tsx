@@ -247,6 +247,7 @@ export default function LibraryView({
           onAddTag={nav.addTag}
           onClearAll={nav.clearTags}
           worksTotal={paneKind === "value-list" ? undefined : worksTotal}
+          valueListItemCount={paneKind === "value-list" ? facetItems.length : undefined}
         />
         {paneKind === "value-list" ? (
           <div className="mll-results">
@@ -261,7 +262,6 @@ export default function LibraryView({
                 isTagPrefixesError={isTagPrefixesError}
                 onReplace={nav.replaceTag}
                 onToggle={nav.toggleTag}
-                onAddTag={nav.addTag}
                 onRetryFacets={refetchFacets}
                 onRetryTagPrefixes={refetchTagPrefixes}
               />

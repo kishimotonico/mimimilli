@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  deriveFacetCountTags,
   deriveValueSelectionHandlers,
   type ValueSelectionIntent,
 } from "../../src/features/library/model/valueSelectionContract";
@@ -96,29 +95,5 @@ describe("deriveValueSelectionHandlers（値選択の契約。ADR-0013）", () =
     const handlers = deriveValueSelectionHandlers(intent);
 
     expect("onAddButton" in handlers).toBe(false);
-  });
-});
-
-describe("deriveFacetCountTags（件数基準）", () => {
-  it("既定=置き換えは無条件集計（選択タグを渡さない）", () => {
-    const intent: ValueSelectionIntent<string> = {
-      default: "replace",
-      onReplace: vi.fn(),
-      onToggle: vi.fn(),
-      onAdd: vi.fn(),
-    };
-    expect(deriveFacetCountTags(intent, ["cv/藤田茜", "サークル/月白製作所"])).toEqual([]);
-  });
-
-  it("既定=AND追加は現在の選択タグ込みで集計する", () => {
-    const intent: ValueSelectionIntent<string> = {
-      default: "add",
-      onAdd: vi.fn(),
-      onReplace: vi.fn(),
-    };
-    expect(deriveFacetCountTags(intent, ["cv/藤田茜", "サークル/月白製作所"])).toEqual([
-      "cv/藤田茜",
-      "サークル/月白製作所",
-    ]);
   });
 });

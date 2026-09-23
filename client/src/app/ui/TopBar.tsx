@@ -13,7 +13,11 @@ import {
   dlsiteBulkProgressLabelAtom,
 } from "../../entities/dlsite/model/bulkAtoms";
 import { useDlsiteBulkActions } from "../../entities/dlsite/useDlsiteBulkActions";
-import { librarySearchQueryAtom } from "../../entities/library/model/navigationAtoms";
+import {
+  activeAxisAtom,
+  librarySearchQueryAtom,
+} from "../../entities/library/model/navigationAtoms";
+import { computeResultsPaneKind } from "../../entities/library/resultsPane";
 import { appModeAtom, setAppModeAtom } from "../../shared/model/appModeAtoms";
 import {
   playerIsActiveAtom,
@@ -59,6 +63,10 @@ export default function TopBar({ notificationBell }: TopBarProps) {
   const mode = useAtomValue(appModeAtom);
   const setAppMode = useSetAtom(setAppModeAtom);
   const [searchQuery, onSearchChange] = useAtom(librarySearchQueryAtom);
+  const activeAxis = useAtomValue(activeAxisAtom);
+  // 値一覧は現在の絞り込みと独立した全作品の入口で、作品検索は効かない（ADR-0026）。
+  // 効かない入力欄を空のまま出し続けない（TASK-457、LibrarySortMenuのスマート軸disabledと同型）。
+  const isValueListPane = mode === "library" && computeResultsPaneKind(activeAxis) === "value-list";
   const isPlaying = useAtomValue(playerIsActiveAtom);
   const playingTrack = useAtomValue(playingTrackTitleAtom);
   const playerStatus = useAtomValue(playerStatusAtom);
@@ -86,6 +94,7 @@ export default function TopBar({ notificationBell }: TopBarProps) {
   // ⌘K / Ctrl+K で検索ボックスへフォーカスする。テキスト入力中は横取りしない。
   useEffect(() => {
     if (mode !== "library" && mode !== "workDetail") return;
+    if (isValueListPane) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() !== "k" || !(e.metaKey || e.ctrlKey)) return;
       const target = e.target as HTMLElement | null;
@@ -98,7 +107,7 @@ export default function TopBar({ notificationBell }: TopBarProps) {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [mode]);
+  }, [mode, isValueListPane]);
 
   return (
     <header className="mll-bar">
@@ -173,8 +182,10 @@ export default function TopBar({ notificationBell }: TopBarProps) {
               previousFocusRef.current?.focus();
             }}
             placeholder={placeholder}
+            disabled={isValueListPane}
+            title={isValueListPane ? "値一覧では作品を検索できません" : undefined}
           />
-          {draft ? (
+          {isValueListPane ? null : draft ? (
             <IconButton
               size="sm"
               icon={I.x}

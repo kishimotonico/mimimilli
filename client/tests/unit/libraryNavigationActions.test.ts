@@ -3,7 +3,10 @@ import { createStore } from "jotai";
 import {
   selectedWorkIdAtom,
   selectedTagsAtom,
+  librarySearchQueryAtom,
+  sortAtom,
 } from "../../src/entities/library/model/navigationAtoms";
+import { libraryViewModeAtom } from "../../src/features/library/model/atoms";
 import { nt, nts } from "../helpers/tag";
 import {
   consumeNavigationHistoryCommitAtom,
@@ -13,6 +16,7 @@ import { activeAxisAtom } from "../../src/entities/library/model/navigationAtoms
 import {
   addLibraryTagAtom,
   clearLibraryTagsAtom,
+  goToLibrarySegmentAtom,
   replaceLibraryTagAtom,
   selectLibraryWorkAtom,
   setLibraryAxisAtom,
@@ -48,13 +52,79 @@ describe("ナビゲーション操作は選択中の作品をクリアする", (
   });
 });
 
-describe("軸を切り替えても選択中のフィルタは維持される（ADR-0012 §1）", () => {
-  it("setLibraryAxisAtom は selectedTagsAtom に触れない", () => {
+describe("軸切り替え時のq・tagsの扱い（ADR-0012 §1・ADR-0026、TASK-457）", () => {
+  it("作品一覧種の軸どうしを切り替えてもselectedTagsAtom/qは維持される", () => {
+    const store = createStore();
+    store.set(activeAxisAtom, "all");
+    store.set(selectedTagsAtom, nts(["cv/藤田茜"]));
+    store.set(librarySearchQueryAtom, "藤田");
+
+    store.set(setLibraryAxisAtom, "recent");
+
+    expect(store.get(selectedTagsAtom)).toEqual(["cv/藤田茜"]);
+    expect(store.get(librarySearchQueryAtom)).toBe("藤田");
+  });
+
+  it("値一覧種の軸（facet軸）へ切り替えるとselectedTagsAtom・qは消去される（ADR-0026）", () => {
     const store = createStore();
     store.set(selectedTagsAtom, nts(["cv/藤田茜"]));
+    store.set(librarySearchQueryAtom, "藤田");
 
     store.set(setLibraryAxisAtom, "サークル");
 
+    expect(store.get(selectedTagsAtom)).toEqual([]);
+    expect(store.get(librarySearchQueryAtom)).toBe("");
+  });
+
+  it("値一覧種の軸へ切り替えてもsortAtom・libraryViewModeAtomは変えない", () => {
+    const store = createStore();
+    store.set(sortAtom, "title-asc");
+    const viewModeBefore = store.get(libraryViewModeAtom);
+
+    store.set(setLibraryAxisAtom, "サークル");
+
+    expect(store.get(sortAtom)).toBe("title-asc");
+    expect(store.get(libraryViewModeAtom)).toBe(viewModeBefore);
+  });
+
+  it("tag軸へ切り替えても値一覧扱いでselectedTagsAtom・qは消去される", () => {
+    const store = createStore();
+    store.set(selectedTagsAtom, nts(["cv/藤田茜"]));
+    store.set(librarySearchQueryAtom, "藤田");
+
+    store.set(setLibraryAxisAtom, "tag");
+
+    expect(store.get(selectedTagsAtom)).toEqual([]);
+    expect(store.get(librarySearchQueryAtom)).toBe("");
+  });
+
+  it("値を選ばず戻る: パンくずの「ライブラリ」セグメント（goToLibrarySegmentAtom）で全作品一覧へ戻り、q・tagsは条件なしのまま（TASK-457追加確認）", () => {
+    const store = createStore();
+    // 値一覧へ入る直前の状態（他の軸で選択していたタグ・検索語）から、
+    // まず値一覧軸（cv）へ遷移して消去されることを再現する。
+    store.set(selectedTagsAtom, nts(["サークル/月白製作所"]));
+    store.set(librarySearchQueryAtom, "藤田");
+    store.set(setLibraryAxisAtom, "cv");
+    expect(store.get(selectedTagsAtom)).toEqual([]);
+    expect(store.get(librarySearchQueryAtom)).toBe("");
+
+    // 値一覧ページ自体には戻る専用UIを新設しない。常設のパンくず「ライブラリ」
+    // セグメント（index 0）が「値を選ばず戻る」の実体になる（統括決定）。
+    store.set(goToLibrarySegmentAtom, 0);
+
+    expect(store.get(activeAxisAtom)).toBe("all");
+    expect(store.get(selectedTagsAtom)).toEqual([]);
+    expect(store.get(librarySearchQueryAtom)).toBe("");
+  });
+
+  it("すでに全作品一覧のときは「ライブラリ」セグメントを押しても何もしない（回帰確認）", () => {
+    const store = createStore();
+    store.set(activeAxisAtom, "all");
+    store.set(selectedTagsAtom, nts(["cv/藤田茜"]));
+
+    store.set(goToLibrarySegmentAtom, 0);
+
+    expect(store.get(activeAxisAtom)).toBe("all");
     expect(store.get(selectedTagsAtom)).toEqual(["cv/藤田茜"]);
   });
 });

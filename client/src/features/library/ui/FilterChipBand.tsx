@@ -35,6 +35,10 @@ interface FilterChipBandProps {
   onClearAll: () => void;
   /** 絞り込み後の作品件数。作品一覧を出さない結果面では undefined */
   worksTotal?: number;
+  /** 値一覧ペインの分類数。指定時は作品件数の代わりに「ライブラリ全体」件数であることを
+   *  明示するラベルを出し、「＋絞り込み」ボタンも隠す（値一覧はAND追加を提供しない独立した
+   *  全作品入口のため。ADR-0026、TASK-457） */
+  valueListItemCount?: number;
 }
 
 function FilterChip({
@@ -114,7 +118,9 @@ export default function FilterChipBand({
   onAddTag,
   onClearAll,
   worksTotal,
+  valueListItemCount,
 }: FilterChipBandProps) {
+  const isValueListPane = valueListItemCount !== undefined;
   // チップの兄弟値ドロップダウンは既定=置き換えの入口、「＋絞り込み」は既定=AND追加の入口
   // （値選択の契約。design-system.md）。
   const siblingDropdownIntent: ValueSelectionIntent<NormalizedTag> = {
@@ -150,19 +156,27 @@ export default function FilterChipBand({
           />
         </Fragment>
       ))}
-      <FilterChipAddButton
-        tagPrefixes={tagPrefixes}
-        selectedTags={selectedTags}
-        smartFolderId={smartFolderId}
-        onAddValue={handleAddFilterSelect}
-      />
+      {!isValueListPane && (
+        <FilterChipAddButton
+          tagPrefixes={tagPrefixes}
+          selectedTags={selectedTags}
+          smartFolderId={smartFolderId}
+          onAddValue={handleAddFilterSelect}
+        />
+      )}
       <div className="mll-tagband__tail">
         {selectedTags.length > 0 && (
           <button type="button" className="mll-tagband__clear" onClick={onClearAll}>
             すべてクリア
           </button>
         )}
-        {worksTotal != null && <span className="mll-tagband__count">{worksTotal} 件</span>}
+        {isValueListPane ? (
+          <span className="mll-tagband__count">
+            {valueListItemCount}分類（件数はライブラリ全体）
+          </span>
+        ) : (
+          worksTotal != null && <span className="mll-tagband__count">{worksTotal} 件</span>
+        )}
       </div>
     </div>
   );
