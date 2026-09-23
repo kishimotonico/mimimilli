@@ -7,17 +7,22 @@ import { emptyDlsiteState } from "@mimimilli/shared";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
 import type { LibraryWorkEditMutation } from "../../src/features/library/model/useLibraryQueries";
+import { useLibraryWorkPatchMutations } from "../../src/features/library/model/useLibraryQueries";
+import type { LibraryViewState } from "../../src/features/library/model/useLibraryNavigation";
 import { WorkEditDialog } from "../../src/features/library/ui/preview/WorkEditDialog";
 import GlobalToast from "../../src/app/ui/GlobalToast";
 import { ApiRequestError } from "../../src/shared/api/http";
 
-const { mockGetWorkEditSnapshot, mockProjectWorkSource } = vi.hoisted(() => ({
+const { mockGetWorkEditSnapshot, mockProjectWorkSource, mockPatchWorkSource } = vi.hoisted(() => ({
   mockGetWorkEditSnapshot: vi.fn(),
   mockProjectWorkSource: vi.fn(),
+  mockPatchWorkSource: vi.fn(),
 }));
-vi.mock("../../src/entities/work/api", () => ({
+vi.mock("../../src/entities/work/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/entities/work/api")>()),
   getWorkEditSnapshot: (...args: unknown[]) => mockGetWorkEditSnapshot(...args),
   projectWorkSource: (...args: unknown[]) => mockProjectWorkSource(...args),
+  patchWorkSource: (...args: unknown[]) => mockPatchWorkSource(...args),
 }));
 vi.mock("../../src/entities/tag/useTagPrefixes", () => ({
   useTagPrefixes: () => ({ tagPrefixes: [{ prefix: "cv", protected: true }] }),
@@ -51,6 +56,7 @@ beforeEach(() => {
   mockGetWorkEditSnapshot.mockReset();
   mockGetWorkEditSnapshot.mockResolvedValue(makeSnapshot());
   mockProjectWorkSource.mockReset();
+  mockPatchWorkSource.mockReset();
 });
 
 function makeWork(overrides: Partial<Work> = {}): Work {
@@ -144,6 +150,31 @@ function renderEditDialog(
     />,
   );
   return { ...view, work, onClose, editMutation };
+}
+
+/** editMutation自体をモックせず、useLibraryWorkPatchMutationsが返す実物を渡す。
+ *  保存成功時のonSuccess（setQueryData）とダイアログのcommitSavedSnapshotの
+ *  実行順に依存しないことを確認するためのラッパー。 */
+function EditDialogWithRealMutation(props: {
+  work: Work;
+  tagSuggestions?: string[];
+  onClose?: () => void;
+}) {
+  const nav: LibraryViewState = {
+    activeAxis: "all",
+    selectedTags: [],
+    selectedWorkId: props.work.id,
+    sort: "added-desc",
+  };
+  const { editMutation } = useLibraryWorkPatchMutations(nav, "");
+  return (
+    <WorkEditDialog
+      work={props.work}
+      tagSuggestions={props.tagSuggestions ?? []}
+      workPatchMutations={{ editMutation }}
+      onClose={props.onClose ?? vi.fn()}
+    />
+  );
 }
 
 describe("WorkEditDialog", () => {
@@ -597,5 +628,24 @@ describe("WorkEditDialog", () => {
     expect(screen.getByLabelText("タイトル")).toHaveValue("編集途中");
     // 保存ボタンはまだdirtyなので有効なまま（自動再送はしない。ユーザーの再操作に任せる）
     expect(screen.getByRole("button", { name: "保存" })).not.toBeDisabled();
+  });
+
+  it("実際のeditMutation経由で保存しても、自分の保存応答が外部変更として衝突通知にならない", async () => {
+    const work = makeWork({ title: "元タイトル" });
+    mockGetWorkEditSnapshot.mockResolvedValue(makeSnapshot(work, "revision-1"));
+    mockPatchWorkSource.mockResolvedValue({
+      snapshot: makeSnapshot(makeWork({ title: "編集後タイトル" }), "revision-2"),
+      projection: { status: "published" },
+    });
+    renderDialog(<EditDialogWithRealMutation work={work} />);
+    await waitForReady();
+
+    fireEvent.change(screen.getByLabelText("タイトル"), { target: { value: "編集後タイトル" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => expect(mockPatchWorkSource).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByRole("button", { name: "保存" })).toBeDisabled());
+    expect(screen.getByLabelText("タイトル")).toHaveValue("編集後タイトル");
+    expect(screen.queryByText(/保存後に別の変更がありました/)).toBeNull();
   });
 });

@@ -18,14 +18,7 @@ import {
 } from "@mimimilli/shared";
 import { InvalidResumeError, WorkRegisterError } from "../errors.ts";
 import type { DataAdapter } from "../adapter/index.ts";
-import {
-  apiError,
-  conflict,
-  invalidRequest,
-  notFound,
-  throwSourceCommandError,
-} from "../lib/httpError.ts";
-import { SourceChangedError } from "../errors.ts";
+import { conflict, invalidRequest, notFound, throwSourceCommandError } from "../lib/httpError.ts";
 
 function parseWorkTagPath(c: {
   req: { path: string; param: (name: string) => string };
@@ -119,13 +112,14 @@ export function worksRoute(
     const body = await c.req.json().catch(() => null);
     const parsed = identityConflictReassignBodySchema.safeParse(body);
     if (!parsed.success) invalidRequest("再取り込み対象のパスが不正です");
-    const result = await adapter.reassignIdentityConflict(parsed.data).catch((error) => {
-      if (error instanceof SourceChangedError) throw apiError("source_changed", error.message);
-      throw error;
-    });
-    if (!result) notFound("指定されたパスはidentity_conflict診断の対象ではありません");
-    if (result.projection.status === "published") onWorkRegistered(result.snapshot.id);
-    return c.json(workSourceMutationResultSchema.parse(result), 201);
+    try {
+      const result = await adapter.reassignIdentityConflict(parsed.data);
+      if (!result) notFound("指定されたパスはidentity_conflict診断の対象ではありません");
+      if (result.projection.status === "published") onWorkRegistered(result.snapshot.id);
+      return c.json(workSourceMutationResultSchema.parse(result), 201);
+    } catch (error) {
+      throwSourceCommandError(error);
+    }
   });
 
   // ":id" と衝突するため、GET /works/:id より前で定義する

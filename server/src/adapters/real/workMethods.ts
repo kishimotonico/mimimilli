@@ -191,7 +191,12 @@ export function createWorkMethods(deps: {
       const workDir = resolveWithin(root, join(root, body.path));
       if (!workDir) return null;
       const metaPath = join(workDir, META_FILE_NAME);
-      const source = readMetaSource(metaPath);
+      let source;
+      try {
+        source = readMetaSource(metaPath);
+      } catch (error) {
+        mapMetaReadError(error);
+      }
       if (source.meta.id !== diagnostic.workId) return null;
 
       const updated = patchMetaFileCas(metaPath, source.sourceRevision, {

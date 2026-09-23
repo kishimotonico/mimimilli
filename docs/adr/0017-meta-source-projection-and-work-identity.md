@@ -2,7 +2,7 @@
 
 - ステータス: 承認
 - 日付: 2026-08-12
-- 関連: [ADR-0008](0008-persistence-topology-query-ownership-playback-ids.md)、[ADR-0010](0010-meta-file-rename-mimimilli-json.md)、[アプリケーション設計レビュー 2026-08-12](../application-architecture-review-2026-08-12.md)、backlog TASK-311〜320
+- 関連: [ADR-0008](0008-persistence-topology-query-ownership-playback-ids.md)、[ADR-0010](0010-meta-file-rename-mimimilli-json.md)、[ADR-0025](0025-source-mutation-projection-read-separation.md)（取得APIのsourceRevisionを編集用読取りに限定）、[アプリケーション設計レビュー 2026-08-12](../application-architecture-review-2026-08-12.md)、backlog TASK-311〜320
 
 ## 用語
 
@@ -32,7 +32,7 @@
 
 アプリの作品編集はsource-firstにする。
 
-1. 取得APIは`mimimilli.json`のexact bytesから得た`sourceRevision`を返す。
+1. 編集用の取得API（`GET /works/:id/source`）は`mimimilli.json`のexact bytesから得た`sourceRevision`を返す。閲覧用の取得API（`GET /works/:id`等）は返さない。この項はADR-0025で上書きした。
 2. 更新APIは`sourceRevision`を必須とし、現在の`mimimilli.json`と一致しなければHTTP 409 `source_changed`を返す。
 3. 読み込んだJSON objectへ対象フィールドだけをpatchする。schemaが知らないフィールド、キー順、対象外の値を捨てない。
 4. 同じディレクトリの一意な一時ファイルへ書き、ファイルをfsyncしてからatomic replaceする。replace前にも`mimimilli.json`のbytesを再確認し、変化していれば上書きしない。

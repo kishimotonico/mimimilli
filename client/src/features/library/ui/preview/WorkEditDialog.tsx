@@ -240,6 +240,7 @@ export function WorkEditDialog({
         acceptedSnapshot,
         incoming,
         { title: isTitleDirty, tags: isTagsDirty, urls: isUrlsDirty },
+        { title: trimmedTitle, tags: tagsDraft, urls: normalizedUrlDrafts },
       );
       if (nextConflicts.length === 0) {
         setAcceptedSnapshot(incoming);

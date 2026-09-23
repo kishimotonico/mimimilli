@@ -141,7 +141,7 @@ smokeテストの注意:
 
 編集UIでは両方のタグを追加・削除できる。prefix定義で保護されたタグを削除するときだけ確認ダイアログを表示し、確認後は削除できる。prefix定義は軸表示・保護・ラベル・色を持つユーザー編集可能な設定データであり、特定prefixをコードで分岐しない。
 
-タグは `shared/src/work.ts` の `normalizeTag` で正規化する。Annotatedタグはprefixをtrimして小文字化し、値をtrimする。フラットタグは全体をtrimする。`shared/src/api.ts` の `workPatchSchema` がPATCH契約の入口で正規化を適用する。
+タグは `shared/src/work.ts` の `normalizeTag` で正規化する。Annotatedタグはprefixをtrimして小文字化し、値をtrimする。フラットタグは全体をtrimする。`shared/src/api.ts` の `workSourcePatchSchema` がPATCH契約の入口で正規化を適用する。
 
 クライアントの追加・削除ロジックは `entities/work/editableTags.ts` の `buildTagsWithAdded` / `buildTagsWithRemoved`、編集フローと保護確認は `features/library/ui/preview/useWorkTagEditor.ts` を参照する。PATCHの `tags` は全置換なので、変更後の全タグを送る。
 
