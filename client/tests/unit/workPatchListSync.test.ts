@@ -257,8 +257,9 @@ describe("作品 PATCH 後の一覧キャッシュ同期", () => {
     const worksCallsBeforePatch = worksCallUrls(fetchMock).length;
 
     await act(async () => {
-      await result.current.workPatchMutations.titleMutation.mutateAsync({
+      await result.current.workPatchMutations.editMutation.mutateAsync({
         workId: "p1-w1",
+        sourceRevision: "revision-1",
         title: "更新後タイトル",
       });
     });

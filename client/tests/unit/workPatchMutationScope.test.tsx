@@ -241,11 +241,12 @@ describe("WorkDetailPatchScope", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "作品を編集" }));
     const titleInput = await screen.findByLabelText("タイトル");
+    await waitFor(() => expect(titleInput).not.toBeDisabled());
     fireEvent.change(titleInput, { target: { value: "新しいタイトル" } });
-    fireEvent.click(screen.getByRole("button", { name: "タイトルを保存" }));
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "タイトルを保存" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
     });
     expect(screen.getByRole("button", { name: "ブックマークに追加" })).not.toBeDisabled();
 

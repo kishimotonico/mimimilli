@@ -14,6 +14,7 @@ import { useAtomValue } from "jotai";
 import { randomSeedAtom } from "../../../entities/library/model/navigationAtoms";
 import {
   WORKS_DEFAULT_PAGE_SIZE,
+  type NormalizedTag,
   type SmartFolder,
   type SmartFolderCreate,
   type SmartFolderRule,
@@ -46,16 +47,17 @@ import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKey
 import { TAG_QUERY_KEYS } from "../../../entities/tag/queryKeys";
 import { invalidateSmartFolderSaveQueries } from "./smartFolderInvalidation";
 
-type LibraryTitlePatchVariables = { workId: string; title: string; sourceRevision: string };
 type LibraryBookmarkPatchVariables = { workId: string; bookmarked: boolean };
 type LibraryTagIntentVariables = { workId: string; tag: string };
-type LibraryUrlsPatchVariables = { workId: string; urls: UrlEntry[]; sourceRevision: string };
-
-export type LibraryTitlePatchMutation = UseMutationResult<
-  WorkSourceMutationResult,
-  Error,
-  LibraryTitlePatchVariables
->;
+/** 一括draft保存（ADR-0025）のPATCH変数。未変更のフィールドはキー自体を含めない
+ *  （呼び出し側=WorkEditDialogがdirtyなフィールドだけ渡す） */
+type LibraryWorkEditVariables = {
+  workId: string;
+  sourceRevision: string;
+  title?: string;
+  tags?: NormalizedTag[];
+  urls?: UrlEntry[];
+};
 
 export type LibraryBookmarkPatchMutation = UseMutationResult<
   { bookmarked: boolean },
@@ -68,10 +70,10 @@ export type LibraryTagIntentMutation = UseMutationResult<
   Error,
   LibraryTagIntentVariables
 >;
-export type LibraryUrlsPatchMutation = UseMutationResult<
+export type LibraryWorkEditMutation = UseMutationResult<
   WorkSourceMutationResult,
   Error,
-  LibraryUrlsPatchVariables
+  LibraryWorkEditVariables
 >;
 import {
   buildSmartFolderFilterParams,
@@ -277,7 +279,8 @@ function useWorkPatchMutationContext(nav: LibraryViewState, searchQuery: string)
   return { queryClient, activeListQueryKey };
 }
 
-/** タイトル・ブックマーク・タグ・関連URL編集を独立した mutation として提供する */
+/** 編集ダイアログの一括保存（title・tags・urls）・ブックマーク・詳細ペイン常駐タグの
+ *  意図コマンドを独立した mutation として提供する */
 export function useLibraryWorkPatchMutations(nav: LibraryViewState, searchQuery: string) {
   const { queryClient, activeListQueryKey } = useWorkPatchMutationContext(nav, searchQuery);
   const refetchAfterSourceError = (_error: unknown, variables: { workId: string }) =>
@@ -286,9 +289,10 @@ export function useLibraryWorkPatchMutations(nav: LibraryViewState, searchQuery:
       exact: true,
     });
 
-  const titleMutation = useMutation<WorkSourceMutationResult, Error, LibraryTitlePatchVariables>({
-    mutationFn: ({ workId, title, sourceRevision }) =>
-      patchWorkSource(workId, { title, sourceRevision }),
+  /** 作品編集ダイアログの一括draft保存（ADR-0025）。dirtyなフィールドだけ渡す。 */
+  const editMutation = useMutation<WorkSourceMutationResult, Error, LibraryWorkEditVariables>({
+    mutationFn: ({ workId, sourceRevision, title, tags, urls }) =>
+      patchWorkSource(workId, { sourceRevision, title, tags, urls }),
     onSuccess: async (result, { workId }) => {
       queryClient.setQueryData(WORK_QUERY_KEYS.source(workId), result.snapshot);
       await invalidateWorkViewQueries(queryClient, workId);
@@ -335,17 +339,7 @@ export function useLibraryWorkPatchMutations(nav: LibraryViewState, searchQuery:
     },
   );
 
-  const urlsMutation = useMutation<WorkSourceMutationResult, Error, LibraryUrlsPatchVariables>({
-    mutationFn: ({ workId, urls, sourceRevision }) =>
-      patchWorkSource(workId, { urls, sourceRevision }),
-    onSuccess: async (result, { workId }) => {
-      queryClient.setQueryData(WORK_QUERY_KEYS.source(workId), result.snapshot);
-      await invalidateWorkViewQueries(queryClient, workId);
-    },
-    onError: refetchAfterSourceError,
-  });
-
-  return { titleMutation, bookmarkMutation, addTagMutation, removeTagMutation, urlsMutation };
+  return { editMutation, bookmarkMutation, addTagMutation, removeTagMutation };
 }
 
 /** 作品登録の解除（削除）mutation。成功時に一覧系クエリを無効化し、詳細キャッシュを

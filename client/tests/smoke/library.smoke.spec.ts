@@ -299,11 +299,39 @@ test("作品編集: 関連URLを追加できる", async ({ page }) => {
     .getByLabel(/^URL \d+$/)
     .last()
     .fill("https://example.com/work");
-  await dialog.getByRole("button", { name: "関連URLを保存" }).click();
+  await dialog.locator("footer").getByRole("button", { name: "保存" }).click();
   await dialog.locator("footer").getByRole("button", { name: "閉じる" }).click();
 
   await panel.getByRole("button", { name: "その他" }).click();
   await expect(panel.getByRole("menuitem", { name: "公式を開く" })).toBeVisible();
+
+  assertNoErrors(tracker);
+});
+
+test("作品編集: タイトルとタグをまとめて1回の保存で確定できる（一括draft保存。TASK-456）", async ({
+  page,
+}) => {
+  const tracker = trackErrors(page);
+  await openApp(page);
+
+  await page.getByText("夜更けの図書室で囁き朗読", { exact: false }).click();
+  const panel = page.locator(".mle-prv");
+  await panel.getByRole("button", { name: "作品を編集" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "作品を編集" });
+  const titleInput = dialog.getByLabel("タイトル");
+  await expect(titleInput).toBeEnabled();
+  await titleInput.fill("改題した朗読劇");
+
+  // タグのdraft操作（既存タグの削除）もタイトルと一緒に1回の保存でまとめて確定する。
+  await dialog.getByRole("button", { name: "タグ「癒し系」を削除" }).click();
+
+  await dialog.locator("footer").getByRole("button", { name: "保存" }).click();
+  await expect(dialog.locator("footer").getByRole("button", { name: "保存" })).toBeDisabled();
+  await dialog.locator("footer").getByRole("button", { name: "閉じる" }).click();
+
+  await expect(panel.getByText("改題した朗読劇", { exact: false })).toBeVisible();
+  await expect(panel.getByRole("button", { name: "タグ「癒し系」で絞り込む" })).toBeHidden();
 
   assertNoErrors(tracker);
 });

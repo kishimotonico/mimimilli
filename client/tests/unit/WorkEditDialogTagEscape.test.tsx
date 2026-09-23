@@ -83,10 +83,7 @@ function renderDialog(onClose: () => void) {
         work={work}
         tagSuggestions={["ASMR", "睡眠用"]}
         workPatchMutations={{
-          titleMutation: noop as never,
-          addTagMutation: noop as never,
-          removeTagMutation: noop as never,
-          urlsMutation: { mutate: vi.fn(), isPending: false, error: null } as never,
+          editMutation: noop as never,
         }}
         onClose={onClose}
       />

@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { normalizeTag, parseTag, tagEquals } from "@mimimilli/shared";
+import { normalizeTag, tagEquals } from "@mimimilli/shared";
 import type { NormalizedTag, TagPrefix } from "@mimimilli/shared";
+import { isProtectedTag } from "../../../../entities/tag/isProtectedTag";
 import type { LibraryTagIntentMutation } from "../../model/useLibraryQueries";
 
 export interface UseWorkTagEditorOptions {
@@ -50,12 +51,6 @@ export function useWorkTagEditor({
   const [confirmingRemoveTag, setConfirmingRemoveTag] = useState<NormalizedTag | null>(null);
   const [tagUndoToast, setTagUndoToast] = useState<NormalizedTag | null>(null);
 
-  const isProtectedTag = (tag: NormalizedTag): boolean => {
-    const parsed = parseTag(tag);
-    if (parsed.kind !== "annotated") return false;
-    return tagPrefixes.some((p) => p.prefix === parsed.prefix && p.protected);
-  };
-
   const isSaving = addTagMutation.isPending || removeTagMutation.isPending;
 
   const addTag = async (tag: string) => {
@@ -90,7 +85,7 @@ export function useWorkTagEditor({
 
   const requestRemoveTag = async (tag: NormalizedTag) => {
     if (isSaving) return;
-    if (isProtectedTag(tag)) {
+    if (isProtectedTag(tag, tagPrefixes)) {
       setConfirmingRemoveTag(tag);
       return;
     }
