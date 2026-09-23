@@ -4,7 +4,7 @@ title: DRAFT-66・DRAFT-63の前提を現行コードに合わせて作り直す
 status: To Do
 assignee: []
 created_date: '2026-09-21 10:49'
-updated_date: '2026-09-21 13:44'
+updated_date: '2026-09-21 16:21'
 labels: []
 dependencies: []
 ordinal: 515000
@@ -29,5 +29,5 @@ ordinal: 515000
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
-TASK-451（スキャンとDLsite連携の現行フロー調査、Done）の最新判断と照合してから確定する。調査時点の現行コードと将来仕様を混ぜない。
+TASK-451（Done）が DRAFT-63 の論点に先行して結論を出している。結果の見返しはジョブID・作品別結果・専用管理ビュー案まで具体化済み、一括refreshは「選択作品から始め、全作品の定期refreshは必須にしない」方向。「TTL切れで自然に取り直される」が適用済み作品に当てはまらないことも TASK-451 側で確認済み。このタスクの範囲は、それらを踏まえた DRAFT-63・66 本文の作り直しに限る。DRAFT-66（missing除外フラグ・再登録ブロック）は TASK-451 が扱っていないため全面的にこのタスクの範囲。調査時点の現行コードと将来仕様を混ぜない。
 <!-- SECTION:NOTES:END -->
