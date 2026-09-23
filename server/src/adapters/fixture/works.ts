@@ -163,6 +163,11 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
       return work ? buildFullWorkFromState(state, work) : null;
     },
 
+    async prepareWorkPlayback(id: string): Promise<Work | null> {
+      const work = state.works.find((w) => w.id === id);
+      return work ? buildFullWorkFromState(state, work) : null;
+    },
+
     async createWork(body: WorkCreateBody): Promise<Work | null> {
       const preview = await getWorkRegisterPreview(body.path);
       if (!preview) return null;

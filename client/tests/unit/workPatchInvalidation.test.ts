@@ -4,10 +4,8 @@ import { emptyDlsiteState, type Work } from "@mimimilli/shared";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { SMART_FOLDER_QUERY_KEYS } from "../../src/entities/smart-folder/queryKeys";
 import { TAG_QUERY_KEYS } from "../../src/entities/tag/queryKeys";
-import {
-  applyBookmarkToWorkCache,
-  invalidateWorkViewQueries,
-} from "../../src/features/library/model/workPatchInvalidation";
+import { invalidateWorkViewQueries } from "../../src/entities/work/invalidateWorkViewQueries";
+import { applyBookmarkToWorkCache } from "../../src/features/library/model/workPatchInvalidation";
 
 const playlistId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 

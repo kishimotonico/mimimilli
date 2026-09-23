@@ -6,7 +6,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import type { WorksQuery } from "@mimimilli/shared";
-import { EMPTY_TAG_FILTERS } from "@mimimilli/shared";
+import { EMPTY_TAG_FILTERS, workspacePath } from "@mimimilli/shared";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
 
@@ -90,9 +90,13 @@ test("durationSec: end-start / end有start無 / start有end無 / 両無 / 同一
   assert.equal(startOnly?.durationSec, 2);
   // 両無: ファイル全体長そのもの
   assert.equal(wholeFile?.durationSec, 5);
-  // probe失敗（ファイル欠損）: 0埋めせず null、durationKind は missing
+  // probe失敗（ファイル欠損）: GET は cache が無いので unprobed。live 観測は missing。
   assert.equal(probeFailed?.durationSec, null);
-  assert.equal(probeFailed?.durationKind, "missing");
+  assert.equal(probeFailed?.durationKind, "unprobed");
+  const liveWork = await adapter.prepareWorkPlayback(id);
+  const liveFailed = liveWork?.playlists.find((p) => p.id === defaultPlaylistId)?.tracks[4];
+  assert.equal(liveFailed?.durationSec, null);
+  assert.equal(liveFailed?.durationKind, "missing");
 
   // デフォルト外playlistも全playlistのprobe対象としてdurationSecが解決されている
   const extraPlaylist = work.playlists.find((p) => p.id === extraPlaylistId);
@@ -300,14 +304,13 @@ test("endがファイル実測長をわずかに超えるだけの正常デー�
   assert.equal(track?.durationSec, 5.04);
 });
 
-test("rescan無しのファイル差し替え後、getWorkのtotalDurationSecはトラック合計と一致し保存列にも同期する", async (t) => {
-  const directory = makeTestDirectory("track-duration-total-sync");
+test("rescan無しのファイル差し替え後、getWorkはcatalogの総時間を変えずprobe cacheも書かない", async (t) => {
+  const directory = makeTestDirectory("track-duration-get-no-sync");
   t.after(directory.cleanup);
   const root = join(directory.path, "lib");
   const workDir = join(root, "RJ900013_総時間同期");
   mkdirSync(workDir, { recursive: true });
 
-  // end未指定（ファイル全体を使う）トラック1本。ファイル全体長がそのままtotalDurationSecになる。
   writeWav(join(workDir, "whole.wav"), 5);
 
   const id = crypto.randomUUID();
@@ -352,18 +355,114 @@ test("rescan無しのファイル差し替え後、getWorkのtotalDurationSecは
   const beforePage = await adapter.queryWorks(baseQuery);
   assert.equal(beforePage.items.find((item) => item.id === id)?.totalDurationSec, 5);
 
-  // rescanせずにファイルを差し替える（8秒に変わる＝サイズもmtimeも変わる）。
   writeWav(join(workDir, "whole.wav"), 8);
 
   const afterWork = await adapter.getWork(id);
   assert.ok(afterWork);
   const track = afterWork.playlists.find((p) => p.id === defaultPlaylistId)?.tracks[0];
-  // トラックのdurationSecはstat照合による再probeでライブに8秒へ更新される。
-  assert.equal(track?.durationSec, 8);
-  // totalDurationSecはスキャン時点の保存値(5)ではなく、トラック合計(8)と一致する。
-  assert.equal(afterWork.totalDurationSec, 8);
+  assert.equal(track?.durationSec, 5);
+  assert.equal(afterWork.totalDurationSec, 5);
 
-  // 一覧のソート・フィルタが読む保存列(works.total_duration_sec)も、getWorkの読み取り時に同期される。
   const afterPage = await adapter.queryWorks(baseQuery);
-  assert.equal(afterPage.items.find((item) => item.id === id)?.totalDurationSec, 8);
+  assert.equal(afterPage.items.find((item) => item.id === id)?.totalDurationSec, 5);
+});
+
+test("rescan無しのファイル差し替え後、prepareWorkPlaybackは総時間を公開し一覧と一致する", async (t) => {
+  const directory = makeTestDirectory("track-duration-prepare-sync");
+  t.after(directory.cleanup);
+  const root = join(directory.path, "lib");
+  const workDir = join(root, "RJ900013_総時間再生準備");
+  mkdirSync(workDir, { recursive: true });
+
+  writeWav(join(workDir, "whole.wav"), 5);
+
+  const id = crypto.randomUUID();
+  const defaultPlaylistId = crypto.randomUUID();
+  const trackId = crypto.randomUUID();
+  writeFileSync(
+    join(workDir, "mimimilli.json"),
+    JSON.stringify(
+      {
+        formatVersion: 1,
+        id,
+        title: "総時間再生準備",
+        tags: [],
+        defaultPlaylistId,
+        playlists: [
+          {
+            id: defaultPlaylistId,
+            name: "default",
+            tracks: [{ id: trackId, title: "whole", file: "whole.wav" }],
+          },
+        ],
+      },
+      null,
+      2,
+    ),
+  );
+
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
+  await adapter.updateSettings({ rootFolder: root });
+  await adapter.scan();
+
+  writeWav(join(workDir, "whole.wav"), 8);
+
+  const prepared = await adapter.prepareWorkPlayback(id);
+  assert.ok(prepared);
+  const track = prepared.playlists.find((p) => p.id === defaultPlaylistId)?.tracks[0];
+  assert.equal(track?.durationSec, 8);
+  assert.equal(prepared.totalDurationSec, 8);
+
+  const page = await adapter.queryWorks({
+    q: "",
+    tags: EMPTY_TAG_FILTERS,
+    tagOp: "AND",
+    sort: "added-desc",
+  });
+  assert.equal(page.items.find((item) => item.id === id)?.totalDurationSec, 8);
+
+  const viewed = await adapter.getWork(id);
+  assert.equal(viewed?.totalDurationSec, 8);
+  assert.equal(
+    viewed?.playlists.find((p) => p.id === defaultPlaylistId)?.tracks[0]?.durationSec,
+    8,
+  );
+});
+
+test("createWorkの応答取得は登録時の投影総時間を変えない", async (t) => {
+  const directory = makeTestDirectory("track-duration-create-no-sync");
+  t.after(directory.cleanup);
+  const root = join(directory.path, "lib");
+  const workDir = join(root, "RJ900015_登録総時間");
+  mkdirSync(workDir, { recursive: true });
+  writeWav(join(workDir, "whole.wav"), 5);
+
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
+  await adapter.updateSettings({ rootFolder: root });
+
+  const created = await adapter.createWork({
+    path: workspacePath("RJ900015_登録総時間"),
+    title: "登録総時間",
+    tags: [],
+  });
+  assert.ok(created);
+  assert.equal(created.totalDurationSec, 5);
+
+  const page = await adapter.queryWorks({
+    q: "",
+    tags: EMPTY_TAG_FILTERS,
+    tagOp: "AND",
+    sort: "added-desc",
+  });
+  assert.equal(page.items.find((item) => item.id === created.id)?.totalDurationSec, 5);
+
+  const viewed = await adapter.getWork(created.id);
+  assert.equal(viewed?.totalDurationSec, 5);
+  const afterPage = await adapter.queryWorks({
+    q: "",
+    tags: EMPTY_TAG_FILTERS,
+    tagOp: "AND",
+    sort: "added-desc",
+  });
+  assert.equal(afterPage.items.find((item) => item.id === created.id)?.totalDurationSec, 5);
 });

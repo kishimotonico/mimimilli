@@ -37,6 +37,8 @@ export interface WorkAdapter {
     query: Required<DlsiteNotificationQuery>,
   ): Promise<DlsiteNotificationPage>;
   getWork(id: string): Promise<Work | null>;
+  /** 再生準備。対象作品を live probe し、総時間を catalog へ公開する。存在しなければ null */
+  prepareWorkPlayback(id: string): Promise<Work | null>;
   getWorkEditSnapshot(id: string): Promise<WorkEditSnapshot | null>;
   /** 正本の部分更新。存在しなければ null */
   patchWorkSource(id: string, patch: WorkSourcePatch): Promise<WorkSourceMutationResult | null>;

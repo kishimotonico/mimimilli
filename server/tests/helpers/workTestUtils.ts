@@ -9,7 +9,7 @@ import type { Db } from "../../src/adapters/real/db.ts";
 import { CatalogWorkRepository } from "../../src/adapters/real/catalogWorkRepository.ts";
 import { UserWorkStateRepository } from "../../src/adapters/real/userWorkStateRepository.ts";
 import { WorkQueryRepository } from "../../src/adapters/real/workQueryRepository.ts";
-import { getWorkWithLiveProbe } from "../../src/adapters/real/workRefresh.ts";
+import { getWorkFromCatalog } from "../../src/adapters/real/workRefresh.ts";
 
 export function makeWork(overrides: Partial<Work> & Pick<Work, "id">): Work {
   const playlistId = crypto.randomUUID();
@@ -83,8 +83,8 @@ export function saveTestResume(
 }
 
 export async function getTestWork(db: Db, id: string) {
-  const { query, catalog } = createWorkRepos(db);
-  return getWorkWithLiveProbe(db, query, catalog, id);
+  const { query } = createWorkRepos(db);
+  return getWorkFromCatalog(query, id);
 }
 
 export function createWorkRepos(db: Db) {

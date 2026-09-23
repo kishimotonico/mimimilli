@@ -30,7 +30,7 @@ import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";
 import type { Scanner } from "./scanner.ts";
 import type { ProjectOutcome } from "./scanTypes.ts";
-import { getWorkWithLiveProbe } from "./workRefresh.ts";
+import { getWorkFromCatalog } from "./workRefresh.ts";
 
 async function workFromProjectOutcome(
   repos: { db: Db; query: WorkQueryRepository; catalog: CatalogWorkRepository },
@@ -40,12 +40,7 @@ async function workFromProjectOutcome(
   if (outcome.status !== "published") {
     throw new Error(notFoundMessage);
   }
-  const work = await getWorkWithLiveProbe(
-    repos.db,
-    repos.query,
-    repos.catalog,
-    outcome.snapshot.meta.id,
-  );
+  const work = getWorkFromCatalog(repos.query, outcome.snapshot.meta.id);
   if (!work) throw new Error(notFoundMessage);
   return work;
 }

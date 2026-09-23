@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import {
   isInvalidTrackStart,
+  probeResultFromCache,
   resolveTrackDuration,
   toTrackDurationFields,
   workMediaRoot,
@@ -28,6 +29,14 @@ async function mapWithConcurrency<T>(
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
 }
 
+function trackFilePaths(
+  physicalPath: string,
+  playlists: Array<{ tracks: Array<{ file: string }> }>,
+): string[] {
+  const mediaRoot = workMediaRoot(physicalPath);
+  return [...new Set(playlists.flatMap((p) => p.tracks).map((t) => join(mediaRoot, t.file)))];
+}
+
 /**
  * トラックが参照するファイルの現在のプローブ結果を返す。
  * DBキャッシュを土台に stat 照合し、不一致なら再probeする。
@@ -38,16 +47,29 @@ export async function liveFileProbeMap(
   playlists: Array<{ tracks: Array<{ file: string }> }>,
   fetchProbeCache: (paths: string[]) => Map<string, ProbeCacheEntry>,
 ): Promise<Map<string, ProbeDurationResult>> {
-  const mediaRoot = workMediaRoot(physicalPath);
-  const paths = [
-    ...new Set(playlists.flatMap((p) => p.tracks).map((t) => join(mediaRoot, t.file))),
-  ];
+  const paths = trackFilePaths(physicalPath, playlists);
   const map = new Map<string, ProbeDurationResult>();
   if (paths.length === 0) return map;
   const cache = fetchProbeCache(paths);
   await mapWithConcurrency(paths, PROBE_CONCURRENCY, async (path) => {
     map.set(path, await probeDurationSec(db.catalog, path, cache));
   });
+  return map;
+}
+
+/** probe cache を読むだけ。stat / parse / cache 書込みはしない。 */
+export function cachedFileProbeMap(
+  physicalPath: string,
+  playlists: Array<{ tracks: Array<{ file: string }> }>,
+  fetchProbeCache: (paths: string[]) => Map<string, ProbeCacheEntry>,
+): Map<string, ProbeDurationResult> {
+  const paths = trackFilePaths(physicalPath, playlists);
+  const map = new Map<string, ProbeDurationResult>();
+  if (paths.length === 0) return map;
+  const cache = fetchProbeCache(paths);
+  for (const path of paths) {
+    map.set(path, probeResultFromCache(cache.get(path)));
+  }
   return map;
 }
 

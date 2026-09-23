@@ -82,10 +82,10 @@ import {
 import { useTagPrefixes } from "../../../entities/tag/useTagPrefixes";
 import { useAxisFacetsQuery } from "./useAxisFacetsQuery";
 import { useDebouncedValue } from "../../../shared/lib/useDebouncedValue";
+import { invalidateWorkViewQueries } from "../../../entities/work/invalidateWorkViewQueries";
 import {
   applyBookmarkListCaches,
   applyBookmarkToWorkCache,
-  invalidateWorkViewQueries,
   smartOrWorksListKey,
 } from "./workPatchInvalidation";
 import { getSmartFolderId } from "../../../entities/library/axisDefinitions";

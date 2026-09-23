@@ -575,6 +575,26 @@ describe("レスポンス検証（getParsed等）", () => {
     await expect(workApi.getWork("work-1")).rejects.toThrow(/GET \/works\/work-1/);
   });
 
+  it("prepareWorkPlayback: 200かつ契約に適合するレスポンスはWorkとして解決する", async () => {
+    const mockWork = makeWork({ id: "work-1" });
+    mockFetch.mockResolvedValue(makeResponse(mockWork));
+    const result = await workApi.prepareWorkPlayback("work-1");
+    expect(result).toEqual(mockWork);
+    expect(mockFetch).toHaveBeenCalledWith(
+      "/api/works/work-1/playback-preparation",
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("prepareWorkPlayback: 404はnullへフォールバックせずApiRequestErrorとして伝播する", async () => {
+    mockFetch.mockResolvedValue(
+      makeResponse({ error: { code: "not_found", message: "作品が見つかりません: work-1" } }, 404),
+    );
+    await expect(workApi.prepareWorkPlayback("work-1")).rejects.toThrow(
+      /作品が見つかりません: work-1/,
+    );
+  });
+
   it("searchWorks: 契約に適合しないitemsは検証エラーになる", async () => {
     mockFetch.mockResolvedValue(
       makeResponse({

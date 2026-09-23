@@ -88,6 +88,10 @@ export async function getWork(id: string): Promise<Work> {
   return getParsed(workSchema, `/works/${encodeURIComponent(id)}`);
 }
 
+export async function prepareWorkPlayback(id: string): Promise<Work> {
+  return postParsed(workSchema, `/works/${encodeURIComponent(id)}/playback-preparation`);
+}
+
 export async function getDlsiteNotificationSummary(): Promise<DlsiteNotificationSummary> {
   return getParsed(dlsiteNotificationSummarySchema, "/dlsite/notifications");
 }

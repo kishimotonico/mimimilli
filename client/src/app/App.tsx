@@ -30,7 +30,8 @@ import { apiErrorMessage } from "../shared/lib/apiError";
 import { activeModalAtom } from "../shared/model/activeModalAtom";
 import { buildRootFolderChangedToastRequest } from "./model/rootFolderChangedToast";
 import type { Work, WorkListItem } from "@mimimilli/shared";
-import { getWork } from "../entities/work/api";
+import { prepareWorkPlayback } from "../entities/work/api";
+import { invalidateWorkViewQueries } from "../entities/work/invalidateWorkViewQueries";
 import { useDownloadLibraryExport } from "../features/library/useDownloadLibraryExport";
 import { useScanActions } from "../entities/scan/useScanActions";
 import { setRootFolder } from "../entities/settings/api";
@@ -97,10 +98,10 @@ export default function App() {
       if (work.status !== "ok") return;
       const requestId = ++playRequestIdRef.current;
       try {
-        const fullWork = await queryClient.ensureQueryData({
-          queryKey: WORK_QUERY_KEYS.detail(work.id),
-          queryFn: () => getWork(work.id),
-        });
+        const fullWork = await prepareWorkPlayback(work.id);
+        if (requestId !== playRequestIdRef.current) return;
+        queryClient.setQueryData(WORK_QUERY_KEYS.detail(work.id), fullWork);
+        await invalidateWorkViewQueries(queryClient, work.id);
         if (requestId !== playRequestIdRef.current) return;
         const playlist =
           fullWork.playlists.find((p) => p.id === fullWork.defaultPlaylistId) ??
@@ -117,12 +118,21 @@ export default function App() {
   );
 
   const handleResume = useCallback(
-    (work: Work) => {
+    async (work: Work) => {
       if (work.status !== "ok") return;
-      ++playRequestIdRef.current;
-      player.playWithResume(work);
+      const requestId = ++playRequestIdRef.current;
+      try {
+        const fullWork = await prepareWorkPlayback(work.id);
+        if (requestId !== playRequestIdRef.current) return;
+        queryClient.setQueryData(WORK_QUERY_KEYS.detail(work.id), fullWork);
+        await invalidateWorkViewQueries(queryClient, work.id);
+        if (requestId !== playRequestIdRef.current) return;
+        player.playWithResume(fullWork);
+      } catch (err) {
+        toast.error(apiErrorMessage(err, "作品の再生に失敗しました"));
+      }
     },
-    [player],
+    [player, queryClient, toast],
   );
 
   // ルートフォルダー変更トーストの「今すぐスキャン」から開く。

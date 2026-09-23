@@ -295,20 +295,24 @@ export function rowToWork(
   rawPlaylists: RawPlaylistRow[],
   tagNames: string[],
   dlsite: DlsiteState,
-  liveFileProbes: Map<string, ProbeDurationResult>,
+  fileProbes: Map<string, ProbeDurationResult>,
+  options?: { totalDurationFromCatalog?: boolean },
 ): Work {
   const playlists: ResolvedPlaylist[] = rowsToPlaylists(rawPlaylists).map((playlist) => ({
     id: playlist.id,
     name: playlist.name,
     tracks: playlist.tracks.map((track) => {
-      const probe = liveFileProbes.get(join(workMediaRoot(row.physicalPath), track.file)) ?? {
+      const probe = fileProbes.get(join(workMediaRoot(row.physicalPath), track.file)) ?? {
         kind: "unprobed",
       };
       return { ...track, ...toTrackDurationFields(resolveTrackDuration(track, probe)) };
     }),
   }));
   const resume = resolveResume(row, playlists);
-  const totalDurationSec = sumDefaultPlaylistDuration(row, playlists);
+  defaultPlaylistOf(row, playlists);
+  const totalDurationSec = options?.totalDurationFromCatalog
+    ? row.totalDurationSec
+    : sumDefaultPlaylistDuration(row, playlists);
   const coverFields = coverFieldsFromColumns(row.coverImage, row.coverWidth, row.coverHeight);
   const cover = coverDtoFromColumns(
     row.id,

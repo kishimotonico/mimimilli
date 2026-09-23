@@ -1,4 +1,5 @@
 // 作品関連: GET/PATCH/DELETE /works, /works/:id/resume, /works/:id/last-played,
+//          POST /works/:id/playback-preparation,
 //          GET /tags, POST /export, POST /works, GET /works/register-preview
 import { Hono } from "hono";
 import {
@@ -134,6 +135,12 @@ export function worksRoute(
 
   app.get("/works/:id", async (c) => {
     const work = await adapter.getWork(c.req.param("id"));
+    if (!work) notFound(`作品が見つかりません: ${c.req.param("id")}`);
+    return c.json(work);
+  });
+
+  app.post("/works/:id/playback-preparation", async (c) => {
+    const work = await adapter.prepareWorkPlayback(c.req.param("id"));
     if (!work) notFound(`作品が見つかりません: ${c.req.param("id")}`);
     return c.json(work);
   });

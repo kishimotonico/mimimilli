@@ -15,7 +15,7 @@ import type { Db } from "./db.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";
 import type { Scanner } from "./scanner.ts";
-import { getWorkWithLiveProbe } from "./workRefresh.ts";
+import { getWorkFromCatalog } from "./workRefresh.ts";
 import { createDlsiteFetch } from "./dlsiteFetch.ts";
 import { createDlsiteApply } from "./dlsiteApply.ts";
 import { createDlsiteBulk } from "./dlsiteBulk.ts";
@@ -57,7 +57,7 @@ export function createDlsiteMethods(deps: {
       force = false,
       options?: { signal?: AbortSignal },
     ): Promise<DlsiteFetchResult> {
-      const work = await getWorkWithLiveProbe(db, query, catalog, workId);
+      const work = getWorkFromCatalog(query, workId);
       if (!work)
         return { ok: false, kind: "not_found", message: `作品が見つかりません: ${workId}` };
       const rjCode = work.dlsite.rjCode ?? detectRjCode([basename(work.physicalPath), work.title]);

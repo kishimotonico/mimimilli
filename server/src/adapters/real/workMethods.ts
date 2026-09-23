@@ -32,7 +32,7 @@ import { getCategoryLogger } from "../../lib/logger.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";
-import { getWorkWithLiveProbe } from "./workRefresh.ts";
+import { getWorkFromCatalog, getWorkWithLiveProbe } from "./workRefresh.ts";
 import {
   mutateVerifiedMetaSource,
   projectVerifiedSource,
@@ -83,6 +83,10 @@ export function createWorkMethods(deps: {
     },
 
     async getWork(id: string): Promise<Work | null> {
+      return getWorkFromCatalog(query, id);
+    },
+
+    async prepareWorkPlayback(id: string): Promise<Work | null> {
       return getWorkWithLiveProbe(db, query, catalog, id);
     },
 
@@ -139,7 +143,7 @@ export function createWorkMethods(deps: {
       if (outcome.status !== "published") {
         throw new Error("再投影した作品の取得に失敗しました");
       }
-      const work = await getWorkWithLiveProbe(db, query, catalog, updated.meta.id);
+      const work = getWorkFromCatalog(query, updated.meta.id);
       if (!work) throw new Error("再投影した作品の取得に失敗しました");
       const remaining = catalog.listIdentityConflicts().flatMap((candidate) => {
         if (candidate.workId !== diagnostic.workId) return [candidate];

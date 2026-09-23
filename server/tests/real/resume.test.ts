@@ -5,7 +5,8 @@ import type { Work } from "@mimimilli/shared";
 import { eq } from "drizzle-orm";
 import { InvalidResumeError } from "../../src/errors.ts";
 import { openDb } from "../../src/adapters/real/db.ts";
-import { probeDurationSec } from "../../src/adapters/real/probe.ts";
+import { fetchProbeCache, probeDurationSec } from "../../src/adapters/real/probe.ts";
+import { getWorkWithLiveProbe } from "../../src/adapters/real/workRefresh.ts";
 import { workStates } from "../../src/adapters/real/userSchema.ts";
 import {
   upsertTestWork,
@@ -183,14 +184,14 @@ test("end省略Trackは音声ファイルを300秒から60秒へ差し替えた�
   );
 });
 
-test("end省略Trackはrescan・明示probeなしでもgetWork読み取り時にファイル差し替えを検知する", async (t) => {
+test("end省略Trackのファイル差し替え後もgetWorkはprobe cacheを書かず保存列を変えない", async (t) => {
   const scope = makeTestScope();
   t.after(scope.cleanup);
-  const directory = makeTestDirectory("resume-file-replacement-live-read");
+  const directory = makeTestDirectory("resume-file-replacement-get-no-write");
   t.after(directory.cleanup);
   const db = scope.own(openDb({ kind: "memory" }));
-  const { catalog, user } = createWorkRepos(db);
-  const base = sampleWork("resume-live-read-duration");
+  const { query, catalog, user } = createWorkRepos(db);
+  const base = sampleWork("resume-get-no-write");
   const playlist = base.playlists[0]!;
   const track = { ...playlist.tracks[0]!, start: 0, end: undefined };
   const work = {
@@ -202,12 +203,48 @@ test("end省略Trackはrescan・明示probeなしでもgetWork読み取り時に
   const cachePath = join(work.physicalPath, track.file);
   writeWav(cachePath, 300);
 
-  // getWorkの読み取りだけでprobe cacheが作られる（明示的なprobeDurationSec呼び出しはしない）。
-  const first = await getTestWork(db, work.id);
-  assert.equal(first?.playlists[0]?.tracks[0]?.durationSec, 300);
+  assert.equal((await getTestWork(db, work.id))?.playlists[0]?.tracks[0]?.durationSec, null);
+  assert.equal(fetchProbeCache(db, [cachePath]).size, 0);
 
-  // rescanを挟まずファイルだけ差し替える。
+  const prepared = await getWorkWithLiveProbe(db, query, catalog, work.id);
+  assert.equal(prepared?.playlists[0]?.tracks[0]?.durationSec, 300);
+  const cached = fetchProbeCache(db, [cachePath]).get(cachePath);
+  assert.ok(cached);
+  const cachedSize = cached.size;
+  const cachedMtime = cached.mtimeMs;
+
   writeWav(cachePath, 60);
-  const second = await getTestWork(db, work.id);
-  assert.equal(second?.playlists[0]?.tracks[0]?.durationSec, 60);
+  const afterGet = await getTestWork(db, work.id);
+  assert.equal(afterGet?.playlists[0]?.tracks[0]?.durationSec, 300);
+  const afterCache = fetchProbeCache(db, [cachePath]).get(cachePath);
+  assert.equal(afterCache?.size, cachedSize);
+  assert.equal(afterCache?.mtimeMs, cachedMtime);
+  assert.equal(afterCache?.durationSec, 300);
+});
+
+test("end省略Trackのファイル差し替え後、prepareWorkPlaybackはprobe cacheとdurationを更新する", async (t) => {
+  const scope = makeTestScope();
+  t.after(scope.cleanup);
+  const directory = makeTestDirectory("resume-file-replacement-prepare");
+  t.after(directory.cleanup);
+  const db = scope.own(openDb({ kind: "memory" }));
+  const { query, catalog, user } = createWorkRepos(db);
+  const base = sampleWork("resume-prepare-duration");
+  const playlist = base.playlists[0]!;
+  const track = { ...playlist.tracks[0]!, start: 0, end: undefined };
+  const work = {
+    ...base,
+    physicalPath: directory.path,
+    playlists: [{ ...playlist, tracks: [track] }],
+  };
+  upsertTestWork(catalog, user, work);
+  const cachePath = join(work.physicalPath, track.file);
+  writeWav(cachePath, 300);
+  await getWorkWithLiveProbe(db, query, catalog, work.id);
+
+  writeWav(cachePath, 60);
+  const prepared = await getWorkWithLiveProbe(db, query, catalog, work.id);
+  assert.equal(prepared?.playlists[0]?.tracks[0]?.durationSec, 60);
+  assert.equal(fetchProbeCache(db, [cachePath]).get(cachePath)?.durationSec, 60);
+  assert.equal((await getTestWork(db, work.id))?.playlists[0]?.tracks[0]?.durationSec, 60);
 });
