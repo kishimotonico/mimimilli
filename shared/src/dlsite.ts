@@ -51,6 +51,15 @@ export function isRjCodeMissing(state: DlsiteState): boolean {
   return state.rjCode === null && state.status !== "skipped";
 }
 
+/** 候補文字列（フォルダー名 → タイトルの順）から RJ コードを検出する。VJ は検出しない。 */
+export function detectRjCode(candidates: string[]): string | null {
+  for (const candidate of candidates) {
+    const match = candidate.match(/RJ\d{6,8}/i);
+    if (match) return match[0].toUpperCase();
+  }
+  return null;
+}
+
 /** DLsiteのHTMLパースに失敗したまま残っている作品か */
 export function isDlsiteParseFailed(state: DlsiteState): boolean {
   return state.status === "error" && state.errorKind === "parse_error";

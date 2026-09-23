@@ -14,14 +14,7 @@ import {
 } from "node:fs";
 import { createHash } from "node:crypto";
 import { basename, dirname, join } from "node:path";
-import {
-  META_FILE_NAME,
-  metaFileSchema,
-  applyDlsiteStatePatch,
-  type MetaFile,
-} from "@mimimilli/shared";
-import { detectRjCode } from "./dlsite.ts";
-import { toMetaDlsiteState } from "./dlsiteProjection.ts";
+import { META_FILE_NAME, metaFileSchema, type MetaFile } from "@mimimilli/shared";
 import { SourceChangedError } from "../../errors.ts";
 
 export { SourceChangedError } from "../../errors.ts";
@@ -230,13 +223,14 @@ function writeBytesAtomic(filePath: string, bytes: Buffer, expectedBytes?: Buffe
   }
 }
 
-function writeJsonAtomic(filePath: string, value: unknown): void {
-  writeBytesAtomic(filePath, Buffer.from(JSON.stringify(value, null, 2) + "\n", "utf-8"));
-}
-
 /** メタファイルを新規作成する（自動生成用） */
-export function writeMetaFile(metaPath: string, meta: MetaFile): void {
-  writeJsonAtomic(metaPath, meta);
+export function writeMetaFile(
+  metaPath: string,
+  meta: MetaFile,
+): { meta: MetaFile; bytes: Buffer; sourceRevision: string } {
+  const bytes = Buffer.from(JSON.stringify(meta, null, 2) + "\n", "utf-8");
+  writeBytesAtomic(metaPath, bytes);
+  return { meta, bytes, sourceRevision: sourceRevision(bytes) };
 }
 
 /**
@@ -299,14 +293,14 @@ function playlistsOfRaw(raw: JsonObject): JsonObject[] | null {
 export function reassignMetaIdsOnDbCollision(
   metaPath: string,
   shouldReassign: (workId: string) => boolean,
-): string {
+): { meta: MetaFile; bytes: Buffer; sourceRevision: string } {
   const source = readMetaSource(metaPath);
   const raw = JSON.parse(source.bytes.toString("utf-8")) as JsonObject;
   if (typeof raw.id !== "string") {
     throw new MetaParseError(metaPath, "id が不正です");
   }
   if (!shouldReassign(raw.id)) {
-    return raw.id;
+    return source;
   }
 
   const oldDefaultPlaylistId =
@@ -343,25 +337,7 @@ export function reassignMetaIdsOnDbCollision(
       typeof raw.id === "string" ? raw.id : null,
     );
   }
-  writeBytesAtomic(
-    metaPath,
-    Buffer.from(JSON.stringify(raw, null, 2) + "\n", "utf-8"),
-    source.bytes,
-  );
-  return raw.id as string;
-}
-
-/** フォルダー名・タイトルから RJ コードを検出し、メタと異なる場合は書き戻す。 */
-export function syncDetectedRjCode(metaPath: string, workDirName: string): MetaFile["dlsite"] {
-  const source = readMetaSource(metaPath);
-  const detectedRjCode =
-    source.meta.dlsite.rjCode ?? detectRjCode([workDirName, source.meta.title]);
-  if (detectedRjCode === source.meta.dlsite.rjCode) {
-    return source.meta.dlsite;
-  }
-  const dlsite = toMetaDlsiteState(
-    applyDlsiteStatePatch(source.meta.dlsite, { rjCode: detectedRjCode }),
-  );
-  patchMetaFileCas(metaPath, source.sourceRevision, { dlsite });
-  return dlsite;
+  const bytes = Buffer.from(JSON.stringify(raw, null, 2) + "\n", "utf-8");
+  writeBytesAtomic(metaPath, bytes, source.bytes);
+  return { meta: parsed.data, bytes, sourceRevision: sourceRevision(bytes) };
 }

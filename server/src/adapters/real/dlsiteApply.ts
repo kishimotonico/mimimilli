@@ -93,7 +93,7 @@ export function createDlsiteApply(deps: DlsiteApplyDeps) {
       if (!metaPath) return null;
       const source = readMetaSource(metaPath);
       const updated = patchMetaFileCas(metaPath, source.sourceRevision, { dlsite });
-      await scanner.projectMetaFile(metaPath, updated.meta);
+      await scanner.projectMetaFile(metaPath, updated);
       return getWorkWithLiveProbe(db, query, catalog, workId);
     },
   };

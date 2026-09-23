@@ -75,15 +75,6 @@ export function dlsiteWorkUrl(code: string): string {
   return `https://www.dlsite.com/${category}/work/=/product_id/${code}.html`;
 }
 
-/** 候補文字列（フォルダー名 → タイトルの順）から RJ コードを検出する */
-export function detectRjCode(candidates: string[]): string | null {
-  for (const candidate of candidates) {
-    const m = candidate.match(/RJ\d{6,8}/i);
-    if (m) return m[0].toUpperCase();
-  }
-  return null;
-}
-
 export const DLSITE_OPTIONAL_FIELDS = [
   "circle",
   "cvs",

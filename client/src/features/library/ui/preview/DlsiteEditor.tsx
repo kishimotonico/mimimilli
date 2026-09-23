@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import type { DlsitePreview, Work } from "@mimimilli/shared";
+import { detectRjCode, type DlsitePreview, type Work } from "@mimimilli/shared";
 import { applyDlsiteInfo, fetchDlsiteInfo, updateDlsiteState } from "../../../../entities/work/api";
 import {
   dlsiteApplyErrorMessage,
@@ -190,11 +190,21 @@ function DlsiteApplyDialog({
   );
 }
 
+function folderNameOf(physicalPath: string): string {
+  const cut = Math.max(physicalPath.lastIndexOf("/"), physicalPath.lastIndexOf("\\"));
+  return cut < 0 ? physicalPath : physicalPath.slice(cut + 1);
+}
+
+function initialRjCode(work: Work): string {
+  if (work.dlsite.rjCode !== null) return work.dlsite.rjCode;
+  return detectRjCode([folderNameOf(work.physicalPath), work.title]) ?? "";
+}
+
 export function DlsiteEditor({ work }: { work: Work }) {
   const queryClient = useQueryClient();
   const invalidateDlsiteCache = useDlsiteInvalidation();
   const toast = useToast();
-  const [rjCode, setRjCode] = useState(work.dlsite.rjCode ?? "");
+  const [rjCode, setRjCode] = useState(initialRjCode(work));
   const [preview, setPreview] = useState<DlsitePreview | null>(null);
   const [applyTitle, setApplyTitle] = useState(false);
   const [applyCover, setApplyCover] = useState(true);
@@ -204,7 +214,8 @@ export function DlsiteEditor({ work }: { work: Work }) {
   const [error, setError] = useState<string | null>(null);
   const diff = preview ? computeDlsiteApplyDiff(work, preview.info) : null;
 
-  useEffect(() => setRjCode(work.dlsite.rjCode ?? ""), [work.dlsite.rjCode]);
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- 検出の再計算は作品切替と保存済みコードだけ
+  useEffect(() => setRjCode(initialRjCode(work)), [work.id, work.dlsite.rjCode]);
 
   const refresh = async (updated?: Work) => {
     if (updated) queryClient.setQueryData(WORK_QUERY_KEYS.detail(work.id), updated);

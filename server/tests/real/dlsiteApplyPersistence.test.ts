@@ -317,7 +317,7 @@ test("missing-only一括適用はCAS競合を集計して後続作品を続行�
   const firstDir = join(root, "RJ900101_conflict");
   const secondDir = join(root, "RJ900102_continue");
   const firstMetaPath = join(firstDir, META_FILE_NAME);
-  const createWork = (directory: string, id: string, title: string) => {
+  const createWork = (directory: string, id: string, title: string, rjCode: string) => {
     mkdirSync(directory, { recursive: true });
     writeWav(join(directory, "track.wav"), 1);
     writeFileSync(
@@ -341,14 +341,22 @@ test("missing-only一括適用はCAS競合を集計して後続作品を続行�
             },
           ],
           defaultPlaylistId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          dlsite: {
+            rjCode,
+            status: "none",
+            lastAttemptAt: null,
+            error: null,
+            errorKind: null,
+            appliedTags: [],
+          },
         },
         null,
         2,
       )}\n`,
     );
   };
-  createWork(firstDir, firstId, "競合する作品");
-  createWork(secondDir, secondId, "後続の作品");
+  createWork(firstDir, firstId, "競合する作品", "RJ900101");
+  createWork(secondDir, secondId, "後続の作品", "RJ900102");
 
   let changedSource = false;
   const coverBody = new Uint8Array(

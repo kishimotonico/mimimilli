@@ -67,7 +67,7 @@ test("dlsiteApplyMissing: 取得失敗はfailedへ数え、他の作品の適用
   const failId = "44444444-4444-4444-8444-444444444444";
   const okDir = join(root, "RJ900201_成功する作品");
   const failDir = join(root, "RJ900202_失敗する作品");
-  const createWork = (workDir: string, id: string, title: string) => {
+  const createWork = (workDir: string, id: string, title: string, rjCode: string) => {
     mkdirSync(workDir, { recursive: true });
     writeWav(join(workDir, "track.wav"), 1);
     writeFileSync(
@@ -87,14 +87,18 @@ test("dlsiteApplyMissing: 取得失敗はfailedへ数え、他の作品の適用
             },
           ],
           defaultPlaylistId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          dlsite: {
+            ...emptyDlsiteState(),
+            rjCode,
+          },
         },
         null,
         2,
       )}\n`,
     );
   };
-  createWork(okDir, okId, "成功する作品");
-  createWork(failDir, failId, "失敗する作品");
+  createWork(okDir, okId, "成功する作品", "RJ900201");
+  createWork(failDir, failId, "失敗する作品", "RJ900202");
 
   const adapter = dir.own(
     createRealAdapter({

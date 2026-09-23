@@ -7,6 +7,7 @@ import { gunzipSync, gzipSync } from "node:zlib";
 import { test } from "node:test";
 import { Database } from "bun:sqlite";
 import {
+  detectRjCode,
   dlsiteStatePatchSchema,
   dlsiteInfoTags,
   normalizeDlsiteAgeRating,
@@ -15,7 +16,6 @@ import {
   mergeAppliedDlsiteTags,
 } from "@mimimilli/shared";
 import {
-  detectRjCode,
   fetchDlsiteCover,
   fetchDlsiteHtml,
   dlsiteWorkUrl,

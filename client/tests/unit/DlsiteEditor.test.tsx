@@ -56,14 +56,24 @@ function renderEditor(work: Work) {
       createElement(JotaiProvider, { store }, children),
     );
 
-  render(
+  const view = render(
     <>
       <DlsiteEditor work={work} />
       <GlobalToast />
     </>,
     { wrapper },
   );
-  return store;
+  return {
+    store,
+    rerender(next: Work) {
+      view.rerender(
+        <>
+          <DlsiteEditor work={next} />
+          <GlobalToast />
+        </>,
+      );
+    },
+  };
 }
 
 describe("DlsiteEditor", () => {
@@ -202,5 +212,41 @@ describe("DlsiteEditor", () => {
       expect(screen.getByText("DLsiteの情報は現在の内容と同じでした")).toBeInTheDocument(),
     );
     expect(screen.queryByText("DLsite情報の適用")).not.toBeInTheDocument();
+  });
+
+  it("rjCodeがnullのときフォルダー名から検出した値を初期表示する", () => {
+    renderEditor(
+      makeWork({
+        physicalPath: "/lib/RJ900001_作品",
+        title: "作品",
+        dlsite: emptyDlsiteState(),
+      }),
+    );
+    expect(screen.getByLabelText("DLsite RJ/VJコード")).toHaveValue("RJ900001");
+  });
+
+  it("明示の空RJコードではフォルダー名から検出しない", () => {
+    renderEditor(
+      makeWork({
+        physicalPath: "/lib/RJ900001_作品",
+        dlsite: { ...emptyDlsiteState(), rjCode: "" },
+      }),
+    );
+    expect(screen.getByLabelText("DLsite RJ/VJコード")).toHaveValue("");
+  });
+
+  it("タイトル保存でwork参照が変わっても入力中のRJコードは残る", () => {
+    const work = makeWork({
+      physicalPath: "/lib/RJ900001_作品",
+      title: "作品",
+      dlsite: emptyDlsiteState(),
+    });
+    const { rerender } = renderEditor(work);
+    const input = screen.getByLabelText("DLsite RJ/VJコード");
+    expect(input).toHaveValue("RJ900001");
+    fireEvent.change(input, { target: { value: "RJ111111" } });
+    expect(input).toHaveValue("RJ111111");
+    rerender({ ...work, title: "保存したタイトル" });
+    expect(screen.getByLabelText("DLsite RJ/VJコード")).toHaveValue("RJ111111");
   });
 });

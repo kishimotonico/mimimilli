@@ -9,7 +9,7 @@ import {
 import type { Cover, MetaFile, ScanDiagnostic, ScanResult, Work } from "@mimimilli/shared";
 import type { Db } from "./db.ts";
 import { computeWorkRevisions } from "./fingerprint.ts";
-import { MetaParseError, readMetaFile, readMetaSource, syncDetectedRjCode } from "./meta.ts";
+import { MetaParseError } from "./meta.ts";
 import type { SeenMetaIds } from "./duplicateMetaIdRepair.ts";
 import type { ProbeCacheEntry } from "./probe.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
@@ -105,13 +105,9 @@ async function assembleWorkForUpsert(
   checkAbort: () => void,
   dlsiteCache?: DlsiteCache | null,
 ): Promise<{ assembled: AssembledWork; coverErrors: number }> {
-  const { metaPath } = prepared;
+  const { metaPath, meta, revisions } = prepared;
   const workDir = dirname(metaPath);
-  const physicalPath = physicalPathForMeta(metaPath, prepared.meta);
-
-  syncDetectedRjCode(metaPath, basename(physicalPath));
-  const source = readMetaSource(metaPath);
-  const meta = source.meta;
+  const physicalPath = physicalPathForMeta(metaPath, meta);
   const id = meta.id;
   checkAbort();
 
@@ -136,7 +132,6 @@ async function assembleWorkForUpsert(
     cover.dimensions?.height ?? null,
   );
 
-  const revisions = computeWorkRevisions(metaPath, meta, source.bytes);
   const work: Work = {
     id,
     title: meta.title,
@@ -178,7 +173,8 @@ export function prepareMetaEntries(
   for (const metaPath of metaPaths) {
     checkAbort();
     try {
-      const content = readFileSync(metaPath, "utf-8");
+      const bytes = readFileSync(metaPath);
+      const content = bytes.toString("utf-8");
       const initialRaw = (() => {
         try {
           return JSON.parse(content) as unknown;
@@ -227,7 +223,7 @@ export function prepareMetaEntries(
         );
       }
       const meta = parsed.data;
-      const revisions = computeWorkRevisions(metaPath, meta, Buffer.from(content));
+      const revisions = computeWorkRevisions(metaPath, meta, bytes);
       const state = existingWorks.get(meta.id);
       const cachedRevisions =
         state && state.sourceRevision && state.projectionRevision && state.mediaRevision
@@ -249,6 +245,7 @@ export function prepareMetaEntries(
         kind: "ok",
         metaPath,
         meta,
+        bytes,
         revisions,
         cachedRevisions,
         cachedStatus: state?.status,
@@ -266,14 +263,16 @@ export function prepareMetaEntries(
   return prepared;
 }
 
-export function prepareSingleMeta(metaPath: string, suppliedMeta?: MetaFile): PreparedMeta {
-  const meta = suppliedMeta ?? readMetaFile(metaPath);
-  const source = readMetaSource(metaPath);
-  const revisions = computeWorkRevisions(metaPath, meta, source.bytes);
+export function prepareSingleMeta(
+  metaPath: string,
+  snapshot: { meta: MetaFile; bytes: Buffer },
+): PreparedMeta {
+  const revisions = computeWorkRevisions(metaPath, snapshot.meta, snapshot.bytes);
   return {
     kind: "ok",
     metaPath,
-    meta,
+    meta: snapshot.meta,
+    bytes: snapshot.bytes,
     revisions,
     cachedRevisions: undefined,
     cachedStatus: undefined,

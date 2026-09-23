@@ -934,7 +934,7 @@ test("単一作品再投影は他作品のpresenceとidentity conflict診断を�
   source.title = "a updated";
   writeFileSync(join(workA, "mimimilli.json"), JSON.stringify(source));
   const metaPath = join(workA, "mimimilli.json");
-  await scanner.projectMetaFile(metaPath, readMetaSource(metaPath).meta);
+  await scanner.projectMetaFile(metaPath, readMetaSource(metaPath));
   assert.equal((await getTestWork(db, idB))?.status, "ok");
   assert.deepEqual(repos.catalog.listIdentityConflicts(), [
     { kind: "identity_conflict", workId: idB, paths: ["b", "copy"] },

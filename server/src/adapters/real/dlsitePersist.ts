@@ -50,6 +50,6 @@ export async function persistDlsiteAppliedWork(
       appliedTags: dedupeTags(appliedTags),
     }),
   });
-  await scanner.projectMetaFile(metaPath, updated.meta);
-  return true;
+  const outcome = await scanner.projectMetaFile(metaPath, updated);
+  return outcome.status === "published";
 }

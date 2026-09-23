@@ -9,21 +9,42 @@ import type {
   WorkRegisterPreview,
 } from "@mimimilli/shared";
 import {
+  detectRjCode,
   emptyDlsiteState,
   isAudioFileName,
   isAudioWorkPath,
   sidecarMetaFileName,
 } from "@mimimilli/shared";
-import { detectRjCode } from "./dlsite.ts";
 import { toMetaDlsiteState } from "./dlsiteProjection.ts";
 import { META_FILE_NAME, MetaParseError, readMetaFile, readMetaFileRaw } from "./meta.ts";
 import { metaStagingPath } from "./metaStaging.ts";
 import { resolveWithin } from "./paths.ts";
 import { WorkRegisterError } from "../../errors.ts";
+import type { Db } from "./db.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";
 import type { Scanner } from "./scanner.ts";
+import type { ProjectOutcome } from "./scanTypes.ts";
+import { getWorkWithLiveProbe } from "./workRefresh.ts";
+
+async function workFromProjectOutcome(
+  repos: { db: Db; query: WorkQueryRepository; catalog: CatalogWorkRepository },
+  outcome: ProjectOutcome,
+  notFoundMessage: string,
+): Promise<Work> {
+  if (outcome.status !== "published") {
+    throw new Error(notFoundMessage);
+  }
+  const work = await getWorkWithLiveProbe(
+    repos.db,
+    repos.query,
+    repos.catalog,
+    outcome.snapshot.meta.id,
+  );
+  if (!work) throw new Error(notFoundMessage);
+  return work;
+}
 
 function isDirectory(path: string): boolean {
   try {
@@ -288,6 +309,7 @@ interface DlsiteAppliedMeta {
 
 export async function createWorkFromFolder(
   repos: {
+    db: Db;
     query: WorkQueryRepository;
     catalog: CatalogWorkRepository;
     user: UserWorkStateRepository;
@@ -360,7 +382,11 @@ export async function createWorkFromFolder(
       metaPatch.dlsite = applied.dlsite;
     }
 
-    const work = await scanner.restoreFolderWork(workDir, metaPatch);
+    const work = await workFromProjectOutcome(
+      repos,
+      await scanner.restoreFolderWork(workDir, metaPatch),
+      "復元した作品の取得に失敗しました",
+    );
     unregisterDescendantWorks(query, catalog, user, descendants);
     return work;
   }
@@ -382,19 +408,24 @@ export async function createWorkFromFolder(
     if (detectedRjCode) dlsite = { ...emptyDlsiteState(), rjCode: detectedRjCode };
   }
 
-  const work = await scanner.registerFolderWork(workDir, {
-    title,
-    tags,
-    urls,
-    coverImage,
-    dlsite,
-  });
+  const work = await workFromProjectOutcome(
+    repos,
+    await scanner.registerFolderWork(workDir, {
+      title,
+      tags,
+      urls,
+      coverImage,
+      dlsite,
+    }),
+    "登録した作品の取得に失敗しました",
+  );
   unregisterDescendantWorks(query, catalog, user, descendants);
   return work;
 }
 
 export async function createWorkFromPath(
   repos: {
+    db: Db;
     query: WorkQueryRepository;
     catalog: CatalogWorkRepository;
     user: UserWorkStateRepository;
@@ -425,6 +456,7 @@ export async function createWorkFromPath(
 
 async function createWorkFromAudioFile(
   repos: {
+    db: Db;
     query: WorkQueryRepository;
     catalog: CatalogWorkRepository;
     user: UserWorkStateRepository;
@@ -481,7 +513,11 @@ async function createWorkFromAudioFile(
       metaPatch.dlsite = applied.dlsite;
     }
 
-    return await scanner.restoreSidecarWork(audioPath, metaPatch);
+    return await workFromProjectOutcome(
+      repos,
+      await scanner.restoreSidecarWork(audioPath, metaPatch),
+      "復元した作品の取得に失敗しました",
+    );
   }
 
   const title = body.title;
@@ -500,13 +536,17 @@ async function createWorkFromAudioFile(
     if (detectedRjCode) dlsite = { ...emptyDlsiteState(), rjCode: detectedRjCode };
   }
 
-  return await scanner.registerFileWork(audioPath, {
-    title,
-    tags,
-    urls,
-    coverImage,
-    dlsite,
-  });
+  return await workFromProjectOutcome(
+    repos,
+    await scanner.registerFileWork(audioPath, {
+      title,
+      tags,
+      urls,
+      coverImage,
+      dlsite,
+    }),
+    "登録した作品の取得に失敗しました",
+  );
 }
 
 async function buildMetaFromDlsiteApply(

@@ -78,12 +78,19 @@ export class ScanCandidateSession {
     for (const { item, candidate } of selected) {
       const current = candidate!;
       try {
-        const work = await scanner.registerFolderWork(resolve(root, current.path), {
+        const outcome = await scanner.registerFolderWork(resolve(root, current.path), {
           title: current.inferredTitle,
           rjCode: item.rjCode,
         });
-        registered.push({ path: current.path, workId: work.id });
-        onRegistered(work.id);
+        if (outcome.status !== "published") {
+          failures.push({
+            path: current.path,
+            message: "登録した作品の取得に失敗しました",
+          });
+          continue;
+        }
+        registered.push({ path: current.path, workId: outcome.snapshot.meta.id });
+        onRegistered(outcome.snapshot.meta.id);
       } catch (error) {
         failures.push({
           path: current.path,

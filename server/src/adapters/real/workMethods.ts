@@ -96,7 +96,7 @@ export function createWorkMethods(deps: {
     async createWork(body: WorkCreateBody): Promise<Work | null> {
       const root = requireRoot();
       return await createWorkFromPath(
-        { query, catalog, user },
+        { db, query, catalog, user },
         scanner,
         root,
         body,
@@ -120,7 +120,12 @@ export function createWorkMethods(deps: {
       const updated = patchMetaFileCas(metaPath, source.sourceRevision, {
         id: crypto.randomUUID(),
       });
-      const work = await scanner.projectMetaFile(metaPath, updated.meta);
+      const outcome = await scanner.projectMetaFile(metaPath, updated);
+      if (outcome.status !== "published") {
+        throw new Error("再投影した作品の取得に失敗しました");
+      }
+      const work = await getWorkWithLiveProbe(db, query, catalog, updated.meta.id);
+      if (!work) throw new Error("再投影した作品の取得に失敗しました");
       const remaining = catalog.listIdentityConflicts().flatMap((candidate) => {
         if (candidate.workId !== diagnostic.workId) return [candidate];
         const paths = candidate.paths.filter((path) => path !== body.path);
@@ -172,7 +177,10 @@ export function createWorkMethods(deps: {
         tags: patch.tags,
         urls: patch.urls,
       });
-      const work = await scanner.projectMetaFile(metaPath, updated.meta);
+      const outcome = await scanner.projectMetaFile(metaPath, updated);
+      const work = await getWorkWithLiveProbe(db, query, catalog, id);
+      if (!work) return null;
+      if (outcome.status !== "published") return work;
       return { ...work, sourceRevision: updated.sourceRevision };
     },
 

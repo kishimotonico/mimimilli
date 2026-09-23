@@ -66,4 +66,36 @@ describe("WorkStatusWarnings", () => {
     fireEvent.click(screen.getByRole("button", { name: "Filesで開く" }));
     expect(onOpenFiles).toHaveBeenCalledTimes(1);
   });
+
+  it("フォルダー名からRJコードを検出できるときは保存を促す", () => {
+    render(
+      <WorkStatusWarnings
+        work={makeWork({ physicalPath: "/lib/RJ123456_作品" })}
+        onEdit={vi.fn()}
+        onDelete={vi.fn()}
+        onOpenFiles={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByText(
+        "フォルダー名から RJ123456 を検出しました。DLsite連携で保存すると確定します",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("フォルダー名から検出できないときは従来の未検出文面を出す", () => {
+    render(
+      <WorkStatusWarnings
+        work={makeWork()}
+        onEdit={vi.fn()}
+        onDelete={vi.fn()}
+        onOpenFiles={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByText(
+        "フォルダー名からRJコードを自動検出できませんでした。RJコードを入力して取得するか、連携しない設定にできます。",
+      ),
+    ).toBeInTheDocument();
+  });
 });

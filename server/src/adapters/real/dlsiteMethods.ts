@@ -1,11 +1,11 @@
 import { basename } from "node:path";
 import {
   computeMissingDiff,
+  detectRjCode,
   hasRjCode,
   type DlsiteApplyMissingPreviewItem,
   type DlsiteFetchResult,
 } from "@mimimilli/shared";
-import { detectRjCode } from "./dlsite.ts";
 import { DlsiteCache } from "./dlsiteCache.ts";
 import type { DlsiteCacheOptions } from "./dlsiteCache.ts";
 import type { DlsiteRequestConfig } from "./dlsiteConfig.ts";
