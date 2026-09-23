@@ -1,0 +1,199 @@
+# コア設計レビュー 2026-09-20
+
+対象: master `119aef15fa640b97fcbd5c507ecbd98dde1db411`。静的なコード・設計レビューであり、以下は仕様変更の提案です。現行仕様の正典ではありません。
+
+[調査方針](core-design-review-scope-2026-09-20.md)に沿って、変更の反映、操作結果、検索の意味を追いました。ユーザーが混乱した具体例はスキャン→DLsite取得ですが、その導線は別途見直す予定のため、今回はアプリ全体の契約を優先しています。
+
+## 結論
+
+正本ファイル、再構築可能なcatalog、耐久性が必要なuser DBという分離は維持する価値があります。大きく見直したいのは保存先の構成ではなく、それらをまたぐ「作品の読み取り」「一度の編集」「操作完了」「現在の検索対象」の定義です。
+
+| 論点 | 現状の構造 | 推奨する方向 |
+| --- | --- | --- |
+| C1. 編集の基準 | catalog由来の編集値と、現在のsourceから読んだrevisionが同じWorkに載る | 編集値とrevisionを同じsource読取りから作る |
+| C2. 編集の単位 | 同じダイアログに未保存draft・即時保存・複数回の保存が共存する | draft保護を明確にし、一括保存か項目別保存かを仕様として選ぶ |
+| C3. 操作の結果 | 正本確定後の投影失敗も、確定前の失敗も、一般的な失敗として返り得る | 保存の成否と投影・表示への反映を分ける |
+| C4. 検索の対象 | 通常一覧、保存ルール、facetが異なる条件集合を受け取る | 検索対象と追加条件を共通に定義し、表示形式から分離する |
+
+C1と、C3の単体メタ保存後の投影失敗は優先度が高い確認済みの問題です。C2の保存方式統一とC4の検索モデル全体の変更は仕様案であり、必須の改修ではありません。独立反証レビューを踏まえ、確認済みの不整合と設計上の好みを分けて判断します。再生系については別の同期機構への刷新を推奨しません。
+
+## C1. 編集値とrevisionは一つの読取り単位でなければならない
+
+### 根拠と意味
+
+`server/src/adapters/real/workMethods.ts:66` の `getWork` は、まず `getWorkWithLiveProbe` でcatalogの値を組み立て、その後 `readMetaSource(metaPath).sourceRevision` だけを差し替えます。タイトル・タグ・URLを同じsourceから読み直す処理ではありません。
+
+このため、通常の外部編集だけでも次の組み合わせになります。非常に短い競合窓を仮定する必要はありません。
+
+1. catalogにはタイトル・タグAとrevision Aがある。
+2. 外部ツールでmetaをBへ変更し、まだscanしていない。
+3. 詳細APIはタイトル・タグAとrevision Bを返す。
+4. 画面はAを編集の基準として、revision Bを付けて保存する。
+
+`patchMetaFileCas` は渡されたrevisionと現在のbytesを照合し、未知フィールドも保持します。この保護自体は有用です。しかし、トークンが一致していても「ユーザーが見た値の版と一致する」とは言えません。タグ・URLは配列全体を置き換えるので、編集の基準が古いことは単なる表示遅延では済みません。
+
+根拠: `server/src/adapters/real/meta.ts:259`、`server/src/adapters/real/workMethods.ts:156`、`client/src/features/library/ui/preview/useWorkTagEditor.ts:62`。
+
+さらにclientの `mergeWorkPatchResponse` は、応答のWork全体ではなくリクエストで指定したフィールドとrevisionだけを取り込みます。resume表示を無関係な保存で動かさない意図は妥当ですが、一つのWorkに複数時点の値を保持する設計になっています。正本の編集snapshotと、再生履歴の表示snapshotを同じ更新規則で扱うことが問題の背景です。
+
+根拠: `client/src/features/library/model/workPatchInvalidation.ts:93`、同 `:157`、`client/src/features/library/model/useLibraryQueries.ts:272`。
+
+### 推奨する契約
+
+- 一覧はcatalogの検索用snapshotでよい。外部変更の反映はscanまで遅れてよい。
+- 編集開始時は、metaの編集対象値とrevisionを同じ `readMetaSource` の結果から取得する。編集用の型にはuser状態やライブprobe結果を含めない。
+- 保存には、その編集snapshotのrevisionを送る。保存後は確定した編集snapshotを一体で置き換える。
+- 外部変更との競合は自動マージせず、入力を保持したまま再読込み・やり直しを選べるようにする。
+- bookmark、resume、lastPlayedAtは別の正本の状態として更新する。メタのrevisionで保護しない。
+
+編集専用の読取りを設けず、catalogの値とcatalogに記録したrevisionをそのまま返す案も整合性はあります。ただし外部変更後は更新を拒否し、再投影してから編集し直す必要があります。外部編集を前提とする本アプリでは、編集用source snapshotの方を推奨します。
+
+不要になるのは「Work全体を返すが、一部だけ採用して編集基準を維持する」調整です。CAS・schema検証・未知フィールド保持は残します。全DTOの正規化ストア化や、フィールドごとのrevision追加は必要ありません。
+
+### 表示の鮮度も役割別に決める
+
+| 値 | 現在の読取り・更新 | 推奨する扱い |
+| --- | --- | --- |
+| タイトル・タグ・playlist定義 | catalogから読取り、scan・個別投影で更新 | 閲覧は投影、編集はsource snapshot |
+| 詳細の音声尺 | 現在のファイルをprobeし、GET中にcatalogの合計尺も更新 | 再生用の観測と、検索用の合計尺更新を区別 |
+| cover | 画像の寸法等はcatalog、versionは現在のファイルstat | ライブ配信と検索用メタが同一時点でないことを前提にする |
+| resume・履歴 | user DBとclient cache、再生中の進行状態が別に存在 | 保存値と現在の再生位置を別の値として扱う |
+
+根拠: `server/src/adapters/real/workRefresh.ts:8`、`server/src/adapters/real/coverDto.ts:19`、`client/src/features/player/model/useResumePersistence.ts:22`。
+
+特に `resolveWorkWithLiveProbe` は詳細GETで `syncTotalDurationSec` まで行います。詳細を読むことがduration順・長さ条件・総時間集計の根拠を変える一方、clientの詳細queryは一覧・facetの更新とは別です。ここは「GETに副作用があるから禁止」という話ではなく、検索対象が変わる経路の所有者が見えにくいという問題です。
+
+単純な案は、検索用の合計尺はscan・明示更新で確定し、再生時probeは再生用の観測に留めることです。外部の音声差し替えが一覧へ即時反映されなくなる点は仕様として受け入れる必要があります。ライブ反映を維持するなら、詳細取得とは別に投影更新を一つの操作として扱い、その完了で一覧・集計を無効化します。「全画面を常に最新にする」保証は不要です。
+
+## C2. 「作品を編集」の確定単位を揃える
+
+### 現状
+
+`WorkEditDialog` はタイトル・URLのdraftを保持し、各項目に保存ボタンを持ちます。一方、同じ画面のタグは `useWorkTagEditor` を通じて即時保存されます。未保存判定はタイトルとURLだけで、「保存して閉じる」はタイトル、URLの順に独立したmutationを実行し、返ったrevisionを次へ渡します。
+
+根拠: `client/src/features/library/ui/preview/WorkEditDialog.tsx:149`、同 `:165`、同 `:194`、同 `:318`、`client/src/features/library/ui/preview/useWorkTagEditor.ts:55`。
+
+これは各ボタンが間違っているという指摘ではありません。個別保存を示す文言や失敗時の入力保持はあります。「保存して閉じる」は常設の一括保存ではなく、未保存のまま閉じようとしたときの確認操作です。タグには保護タグの確認と削除undoもあり、一括draftへの変更で同じ価値を保てるとは限りません。ただし、実装はdirty・pending・error・revisionの受け渡しを項目ごとに持ち、閉じる際の連続保存は途中まで成立し得ます。
+
+またdraftは `work.title` / `work.urls` の変化にeffectで追従します。再取得されたサーバー値と、ユーザーが入力中の値をどう扱うかが、編集セッションの契約ではなく各effectに委ねられています。
+
+### 推奨する契約
+
+案の一つは、編集ダイアログでC1のsnapshotを基準にタイトル・タグ・URLを一つのdraftとして保持し、一度のPATCHで確定することです。既存PATCHとmeta更新関数は複数フィールドを受け付けるため、保存方式を揃えるために汎用フォーム基盤や新しいトランザクション機構を作る必要はありません。ただし混在だけを根拠にこの方式を必須とはしません。確実に見直したいのは、編集中draftの保護と、閉じる際の部分成功の扱いです。
+
+編集中の再取得はdraftを上書きせず、「元データが変わった」として扱います。破棄は未確定draftを捨てるだけです。保存成功後は次のsnapshotへ移り、投影の未反映はC3の状態として別に扱います。
+
+詳細ペインのクイックタグ操作を即時保存として残すことは可能です。ただし編集ダイアログに同じ即時保存コントローラーを埋め込まず、タグ入力部品と保存処理を分けます。bookmarkも独立した即時操作で構いません。
+
+DLsiteプレビューは、編集draftへ候補を取り込むか、独立した適用操作として編集を区切るかを選びます。未保存draftがある状態で、別の保存操作が同じメタを書き換えることを暗黙に許さない方が分かりやすいです。DLsite導線全体の設計は別途の見直しに委ねます。
+
+失うのはダイアログ内で一項目ずつ確定する利便性です。それを重視するなら、全項目を独立した即時保存に統一し、画面全体の「保存／破棄」をなくす案も成立します。現状の混在をそのまま共通コンポーネント化するだけでは、この問題は残ります。
+
+## C3. 保存済み・未反映・中断を操作結果として区別する
+
+### 確定点の比較
+
+| 操作 | コード上の主な順序 | 後段が失敗・中断したとき |
+| --- | --- | --- |
+| メタ編集 | CASでmeta確定 → 個別投影 → Work読取り | metaは新しいままでもPATCHは失敗し得る |
+| 新規登録 | meta生成 → 投影 → 結果読取り。親統合時はさらに子の解除 | metaが残る、または親が成立した後に全体の応答が失敗し得る |
+| 登録解除 | meta退避 → catalog削除 → user削除 → 退避meta削除 | catchはmeta復元を試みるが、成立したDB削除まで一括で戻す処理ではない |
+| DLsite適用 | cover取得等 → meta確定 → 投影 | source確定前後で残る効果が異なる |
+| scan | 走査・準備 → user初期化 → catalog世代公開 | catalog公開はtransactionで保護。取消がそれ以前の全効果の巻戻しを意味するわけではない |
+| DLsite一括取得 | codeごとのcache取得 → workごとの投影・結果計上 | 途中取消でも取得済みcacheは残る。結果件数はcache書込み全体の台帳ではない |
+
+根拠: `server/src/adapters/real/workMethods.ts:156`、`scanner.ts:464`・`:491`、`workRegister.ts:166`・`:194`・`:385`、`dlsiteApply.ts:39`、`dlsitePersist.ts:25`、`scanUpsertBatch.ts:94`、`dlsiteBulk.ts:160`。以上の短いファイル名は同じ `server/src/adapters/real/` 配下です。
+
+既存の対策もあります。source-first、atomic replace、scanのcatalog transaction、解除時の退避metaと次回scanでの回収、batchの件数結果、ジョブのcancelling状態は残すべきです。問題はそれらがないことではなく、個々の処理結果がAPIの汎用的な成功・失敗へ畳まれることです。
+
+例えばメタ保存後の投影失敗は `workMethods.patchWork` からそのまま伝播します。HTTPのエラー契約には `source_changed` はありますが、sourceが確定済みかを表す情報はありません。clientができるのは詳細の無効化とエラー表示で、同じ「保存失敗」に対して再送すべきなのか再投影すべきなのかを区別できません。
+
+根拠: `server/src/routes/works.ts:100`、`server/src/lib/httpError.ts:6`、`client/src/features/library/model/useLibraryQueries.ts:324`。解除の回収機構は `server/src/adapters/real/scanMetaStagingRecovery.ts:34`。
+
+### 推奨する契約
+
+まず単体メタPATCHについて、少なくとも次を区別します。登録など他のsource変更へ適用する際は、その操作で同じ区別が必要かを個別に判断します。全操作を同じ巨大な結果型へ統一する必要はありません。scan・DLsiteジョブの既存の結果契約を全面変更する根拠にはしません。
+
+- 未確定: 入力不正・競合・書込み前の失敗。入力を保持し、必要なら再読込みしてやり直す。
+- 保存済み・反映済み: 確定したsource snapshotを返す。
+- 保存済み・投影未反映: 保存したrevisionと、反映を再試行する手段を返す。同じ編集を再送させない。
+- 応答を受け取れず結果不明: 保存失敗と断定せず、sourceを読み直して判断する。
+
+「保存済み・投影未反映」の回復は、正本を再度書く操作ではなく、確定済み正本からの再投影です。まずは対象作品の再読込み・再投影または明示scanで十分です。永続ジョブ台帳、汎用saga、自動補償、無制限リトライを導入する提案ではありません。ADR-0017にも投影失敗後に正本を残す方針はあるので、その帰結をAPIと画面まで通します。
+
+登録解除は別契約にします。「作品メタ・登録・user状態を削除する」という現行の意味を維持するなら、どの段階以降は元へ戻さず解除を完了させるのかを明示し、退避metaを使った再開もその判断に従わせます。catalogの削除後まで同じcatchでsourceを復元する方式では、「失敗したので操作前のまま」という説明はできません。解除をDB非表示とメタ削除に分割するかは別の製品判断であり、単純化の必須条件ではありません。
+
+複数作品の操作は全件rollbackを約束せず、作品単位の成立・未成立・未処理を結果とします。再試行が必要な結果には対象と理由を残します。親登録＋子解除は、既存レビューS4の通り複合操作自体をやめるか、親成立と残った子を別々に返します。
+
+取消は「以後の処理を止める」であり「元に戻す」ではありません。ただしscanのcatalog世代公開のような局所的なatomicityは維持します。cacheが残ることまで毎回ユーザーへ列挙する必要はなく、作品の正本・登録状態・利用者データの変化を説明できることが重要です。
+
+画面の再取得失敗も保存失敗とは区別します。現行のエラー表示所有者の整理（[clientエラー処理](client-error-handling.md)）は有用ですが、それだけではサーバーの確定点は表現できません。再生履歴のbest-effort保存まで毎回エラー通知へ変える提案ではありません。
+
+## C4. 検索対象を表示形式から分離する
+
+### 現状の意味の違い
+
+| 経路 | 対象を決める条件 | 並び順・件数 |
+| --- | --- | --- |
+| 通常作品一覧 | view、q、実タグ・year、ids | リクエストのsort。絞込み後のtotal・stats |
+| スマートフォルダー一覧 | 保存ルール＋実タグ・year | 保存したsort。qと一時sortはAPI契約にない |
+| facet | 実タグ・year、任意のsmartFolder | q・通常viewはAPI契約にない。値ごとの件数・時間・cover |
+| 値一覧の文字絞込み | 取得済みfacetの値名 | client内の表示用絞込み。作品検索とは別 |
+
+根拠: `shared/src/api.ts:42`・`:84`・`:114`、`server/src/core/worksQuery.ts:50`、`server/src/core/smartFolder.ts:85`、`client/src/features/library/model/axisValueFilter.ts`。
+
+タグの正規化・擬似タグの解釈はsharedに集約され、通常SQLとcoreの同値性確認もあります。スマートフォルダーの一覧・条件プレビュー・facetが同じルール評価を利用する点も良い設計です。問題を「検索ロジックが全部ばらばら」とまとめるのは不正確です。
+
+一方、検索対象の上位概念は揃っていません。TopBarの検索語はLibraryで共通に入力・保持できますが、smart queryはそれを受け取らず、facet queryにも渡りません。view・smart folder・facetの表示軸が一つの `activeAxis` に入り、画面種別によって有効な検索条件が変わります。
+
+根拠: `client/src/app/ui/TopBar.tsx:61`・`:128`、`client/src/features/library/model/libraryPresentation.ts:130`、`client/src/features/library/model/useLibraryQueries.ts:161`、`client/src/entities/library/model/navigationAtoms.ts:8`。
+
+件数にはさらに操作の意味が関係します。既定の「置き換え」では選択タグを外して集計し、「追加」では現在のタグを含める設計は意図的であり、それ自体を廃止する理由はありません。しかし通常のviewとqはfacet契約に含まれず、タグ選択後には保持されます。したがって件数を「この操作後の件数」と説明するには、タグ以外の検索対象も必要です。smart folderだけ対象を渡す例外が既にあります。
+
+根拠: `client/src/features/library/model/valueSelectionContract.ts:72`、`client/src/features/library/model/useAxisFacetsQuery.ts:20`、`client/src/entities/library/model/navigationActions.ts:63`、`client/src/features/library/ui/FilterChipBand.tsx:80`。
+
+独立反証レビューでも、この件数の対象不足は支持されました。チップ経由でsmart folderを渡す対策がある一方、`client/src/features/library/ui/AxisQuickOverlay.tsx:52` は無条件のfacet取得です。「表示された件数が主クリック後の集合を表す」という既存の説明に入力を合わせる問題として扱えます。作品検索と値名検索を別にするADR-0012の方針を否定するものではありません。
+
+### 推奨する契約
+
+最小の対応は、表示される検索語と実際の適用条件を一致させ、件数が表す対象を明確にすることです。以下の有限な検索コンテキストは、その対応を複数経路に通すための設計案であり、全面導入を必須とするものではありません。概念上は次を分けます。APIを必ず一つにする提案でもありません。
+
+- 対象集合: 全作品、通常view、保存した条件のいずれか。
+- 追加条件: q、タグ、yearなど。
+- 表示: 作品一覧か分類値一覧か、対象の分類軸、sort、page。
+
+通常一覧と保存した条件の一覧には同じ追加条件を適用します。保存されたsortは既定値とし、その場の表示順変更を保存条件の編集と区別する案を推奨します。保存フォルダーでは検索・順序変更を認めない仕様を選ぶなら、無効な状態を保持させず、UIでもその制約を明示します。
+
+facetも同じ対象集合を使い、置き換え／追加で変えるのは明示した条件だけにします。件数はその主操作後の集合と対応させます。値名の絞込みは従来通り表示用の別処理で構いません。分類値画面をライブラリ全体の独立した入口にしたい場合は、その遷移時に対象を全作品へ切り替えると定義します。
+
+この定義をquery key・URL・API入力・一覧の無効化判断の基準にします。現在の `getWorkPatchInvalidationTargets` はactiveAxis・q・sort・tagsを見て再評価の必要性を判断しており、検索条件を増やすほどclient側の知識も増えます。最初は検索に関わるメタ編集後に表示中一覧を再評価する保守的な方針でもよく、所属や順位をclientで完全再現する必要はありません。ただし一覧resetによるスクロール位置への影響は選択すべきUX上の代償です。
+
+根拠: `client/src/features/library/model/workPatchInvalidation.ts:33`、`client/src/features/library/model/useLibraryQueries.ts:272`。
+
+スマートフォルダーの式そのものは、行順に集合演算する現在の言語です（`A OR B AND C` は `(A OR B) AND C`）。通常検索を保存する機能とは表現力が異なります。保存検索へ寄せるときはこの差を明示し、OR・除外が必要なら保存ルール評価は残します。今回、任意の式木・汎用query compiler・全条件のSQL化を導入すべき根拠まではありません。
+
+## 再生はsnapshotとして独立させる方がよい
+
+`usePlayerActions` は開始時にWorkとtrack配列を `PlaybackItem` に渡し、controllerはそのキューを保持します。編集やscanに追従してキューを入れ替える入力はありません。resumeはWork・Playlist・Track IDで保存されます。この分離は妥当です。
+
+根拠: `client/src/features/player/model/usePlayerActions.ts:10`、`playerController.ts:16`・`:115`、`useResumePersistence.ts:22`。以上の短いファイル名は同じ `client/src/features/player/model/` 配下です。
+
+推奨するのは「再生中の曲順・区間は開始時点の定義を保持し、再開始時に新しい定義を取得する」という契約です。タイトルやタグが変わるたびにキューを再構成する必要はありません。現在の開始経路は `ensureQueryData` や渡されたWorkを使うため、再開始のたびに最新情報を取得する保証が既にあるとは言えません。その保証を選ぶ場合は開始境界で読取りを揃えます（`client/src/app/App.tsx:92`）。
+
+ただし定義のsnapshotと音声bytesのsnapshotは別です。音声URLはwork IDと相対パスで構成され、ロード時に解決されます。外部で差し替え・削除されたファイルや解除済み作品の再生継続を保証する仕組みではありません（`client/src/features/player/model/useAudioEngineLifecycle.ts:149`、`client/src/entities/work/api.ts:124`）。
+
+登録解除時は対象の再生を止める、参照先が失われたら再読込みを案内する、といった狭い仕様でよく、音声の全コピーや古い世代の保持は不要です。resume保存失敗を再生成功と別扱いにする現行方針も維持できます。ここは新たな大規模改修の指摘ではなく、C1の「すべてを同時に最新にしない」方針を成立させる境界です。
+
+## 他のレビューとの関係と引き継ぎ
+
+今回のC1は第1回R1の「メタとuserの更新分離」を、読取りとrevisionの意味まで掘り下げたものです。C2は共通エディター化の前提となる仕様判断、C3は既存S3・S4・S6をまたぐ操作結果の契約、C4は以前の検索の処理量評価とは別の意味論の問題です。同じ原因を別々の改善タスクとして重複計上しないでください。
+
+別エージェントが判断すべき点は、編集の確定単位、一覧に求める鮮度、保存済み未反映の扱い、検索対象を維持したまま分類を閲覧するか、の4点です。これらを先に決めると、mutationの共有化・型の分離・API変更で何を減らすべきかが定まります。現行UIの保存方式を保ったまま抽象化を足す順序は推奨しません。
+
+正本とuser DBの分離、CAS、タグ正規化、queryのcore/SQL契約、scanの世代公開、player controllerは維持候補です。イベントバス、汎用ワークフローエンジン、全面的な正規化cacheへの置換を必要とする根拠は見つかっていません。
+
+## 調査の到達点と制約
+
+3領域の代表経路と、再生のsnapshot境界を確認しました。仕様意図を説明できる箇所は反証として各節に併記し、個別の競合窓や障害再現を追加指摘の根拠にはしていません。十分な判断材料が揃ったため、今回の調査はここで完了とします。
+
+静的調査のみで、実データ操作・動作確認・テスト・実装変更は行っていません。初回は委譲したSol/Lunaが利用枠エラーで停止し、主担当が調査しました。その後、Sol(medium)による独立反証レビューを実施しました。C1は維持、C2〜C4は確認済みの問題と仕様案を区別する形に限定し、本書へ反映しています。継続レビューの対象と完了条件は[レビューTODO](review-todo-2026-09-20.md)を参照してください。
