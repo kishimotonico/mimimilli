@@ -1,6 +1,6 @@
 import { buildBuiltinAxisTag, splitSelectedTags, type NormalizedTag } from "@mimimilli/shared";
 import type { AppMode } from "../../../shared/model/appMode";
-import { isViewAxis } from "../../../entities/library/axisDefinitions";
+import { isSmartAxis, isViewAxis } from "../../../entities/library/axisDefinitions";
 import type { AxisId, SortId } from "../../../entities/library/types";
 
 export type { AppMode };
@@ -221,7 +221,9 @@ export function serializeNavigationUrl(state: NavigationUrlState): string {
     const pathname = `/library/${encodeURIComponent(activeAxis)}`;
     for (const tag of selectedTags) params.append("tags", tag);
     if (selectedWorkId) params.set("work", selectedWorkId);
-    if (sort !== DEFAULT_SORT) params.set("sort", sort);
+    // スマート軸の sort はフォルダー自身が保持し、この URL の sort= は効かない
+    // （LibrarySortMenu 参照）。効いていない値をURLへ残さない（TASK-462）
+    if (!isSmartAxis(activeAxis) && sort !== DEFAULT_SORT) params.set("sort", sort);
     if (q) params.set("q", q);
     const search = params.toString();
     return search ? `${pathname}?${search}` : pathname;

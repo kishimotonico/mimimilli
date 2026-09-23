@@ -208,6 +208,49 @@ test("保持中フィルタが無ければルール適用結果をそのまま�
   assert.deepEqual(result.items.map((w) => w.id).sort(), ["RJ001", "RJ002"]);
 });
 
+test("作品検索q: ルール適用結果全体への追加のAND条件として適用する（TASK-462）", () => {
+  const result = evalSmartFolder({ rules: [], sort: "added-desc" }, WORKS, {
+    page: 1,
+    limit: 100,
+    q: "RJ001",
+  });
+  assert.deepEqual(
+    result.items.map((w) => w.id),
+    ["RJ001"],
+  );
+  assert.equal(result.total, 1);
+});
+
+test("作品検索q: OR・AND NOTを含むルール式の評価結果全体にANDで重なり、内部のOR・除外の意味は変えない（TASK-462）", () => {
+  const rules: SmartFolderRule[] = [
+    { conjunction: "WHERE", field: "タグ", operator: "∋", values: nts(["催眠"]) },
+    { conjunction: "OR", field: "長さ", operator: "≥", values: ["3600"] },
+  ];
+  // ルール単体（OR）の結果は RJ001/RJ003/RJ004（"OR: 直前までの結果と条件に一致する作品を
+  // 和集合にする" と同じ）。qで"環境音"タグに絞ると、そのうちタグを持つRJ001/RJ004だけになる。
+  const withoutQuery = evalSmartFolderRules(rules, WORKS);
+  assert.deepEqual(withoutQuery.map((w) => w.id).sort(), ["RJ001", "RJ003", "RJ004"]);
+
+  const result = evalSmartFolder({ rules, sort: "added-desc" }, WORKS, {
+    page: 1,
+    limit: 100,
+    q: "環境音",
+  });
+  assert.deepEqual(result.items.map((w) => w.id).sort(), ["RJ001", "RJ004"]);
+});
+
+test("作品検索qが空文字なら絞り込まない（回帰確認）", () => {
+  const rules: SmartFolderRule[] = [
+    { conjunction: "WHERE", field: "タグ", operator: "∋", values: nts(["ASMR"]) },
+  ];
+  const result = evalSmartFolder({ rules, sort: "added-desc" }, WORKS, {
+    page: 1,
+    limit: 100,
+    q: "",
+  });
+  assert.deepEqual(result.items.map((w) => w.id).sort(), ["RJ001", "RJ002"]);
+});
+
 test("stats: ルール適用後（ページング前）の集合から集計する", () => {
   const statsWorks: WorkSummary[] = [
     work({ id: "RJ001", tags: ["ASMR"], totalDurationSec: 1800, trackCount: 3 }),

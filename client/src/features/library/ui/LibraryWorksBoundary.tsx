@@ -7,12 +7,15 @@ import {
   useSuspenseNormalLibraryWorks,
   useSuspenseSmartLibraryWorks,
 } from "../model/useLibraryQueries";
-import { computeIsNoResultsDueToFilter, isGridViewActive } from "../model/libraryPresentation";
+import {
+  buildWorksResetKey,
+  computeIsNoResultsDueToFilter,
+  isGridViewActive,
+} from "../model/libraryPresentation";
 import CollectionStatus from "../../../shared/ui/CollectionStatus";
 
 interface WorksResult {
   works: WorkListItem[];
-  worksParams: unknown;
   hasNextPage: boolean;
   worksTotal: number | undefined;
   worksStats: { trackCount: number; durationSec: number } | undefined;
@@ -83,7 +86,9 @@ function NormalWorks(props: Props) {
 }
 
 function SmartWorks(props: Props) {
-  return <ResolvedWorks {...props} result={useSuspenseSmartLibraryWorks(props.nav)} />;
+  return (
+    <ResolvedWorks {...props} result={useSuspenseSmartLibraryWorks(props.nav, props.searchQuery)} />
+  );
 }
 
 function ResolvedWorks({
@@ -127,11 +132,11 @@ function LoadingFallback({ variant, onShow }: { variant: "list" | "grid"; onShow
 
 export default function LibraryWorksBoundary(props: Props) {
   const variant = isGridViewActive(props.nav.activeAxis, props.viewMode) ? "grid" : "list";
-  const resetKey = JSON.stringify({
-    axis: props.nav.activeAxis,
-    tags: props.nav.selectedTags,
+  const resetKey = buildWorksResetKey({
+    activeAxis: props.nav.activeAxis,
+    selectedTags: props.nav.selectedTags,
     sort: props.nav.sort,
-    search: props.searchQuery,
+    searchQuery: props.searchQuery,
   });
   return (
     <QueryErrorResetBoundary>

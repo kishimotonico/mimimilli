@@ -108,7 +108,7 @@ function smartFolderCallUrls(fetchMock: ReturnType<typeof createFetchMock>): str
     .filter((u) => u.startsWith(`/api/smart-folders/${SMART_FOLDER_ID}/works`));
 }
 
-function renderWorks(nav: LibraryViewState, initialQuery = "") {
+function renderWorks(nav: LibraryViewState, searchQuery = "") {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -122,10 +122,7 @@ function renderWorks(nav: LibraryViewState, initialQuery = "") {
         createElement(Suspense, { fallback: null }, children),
       ),
     );
-  return renderHook(() => useSuspenseSmartLibraryWorks(nav), {
-    wrapper,
-    initialProps: { q: initialQuery },
-  });
+  return renderHook(() => useSuspenseSmartLibraryWorks(nav, searchQuery), { wrapper });
 }
 
 describe("スマートフォルダー軸のページング", () => {
@@ -238,6 +235,53 @@ describe("スマートフォルダー軸への保持中フィルタの適用", (
     expect(urls.some((u) => u.includes("tags=%40year%2F2024"))).toBe(true);
   });
 
+  it("作品検索qをフォルダーのルール全体への追加AND条件としてクエリに渡す（TASK-462）", async () => {
+    const { result } = renderWorks(baseNav, "藤田茜");
+
+    await waitFor(() => expect(result.current.works.length).toBeGreaterThan(0));
+
+    const urls = smartFolderCallUrls(fetchMock);
+    expect(urls.some((u) => u.includes("q=" + encodeURIComponent("藤田茜")))).toBe(true);
+  });
+
+  it("qが空文字ならクエリパラメータへ含めない（既存挙動との回帰確認）", async () => {
+    const { result } = renderWorks(baseNav, "");
+
+    await waitFor(() => expect(result.current.works.length).toBeGreaterThan(0));
+
+    const urls = smartFolderCallUrls(fetchMock);
+    expect(urls.every((u) => !u.includes("q="))).toBe(true);
+  });
+
+  it("qが変わるとクエリキーが変わり、別クエリとしてフェッチし直す（キャッシュ分離）", async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: { children: ReactNode }) =>
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(
+          JotaiProvider,
+          { store: createStore() },
+          createElement(Suspense, { fallback: null }, children),
+        ),
+      );
+
+    const { result, rerender } = renderHook(
+      ({ searchQuery }: { searchQuery: string }) =>
+        useSuspenseSmartLibraryWorks(baseNav, searchQuery),
+      { wrapper, initialProps: { searchQuery: "" } },
+    );
+
+    await waitFor(() => expect(result.current.works.length).toBeGreaterThan(0));
+    await waitFor(() => expect(queryClient.isFetching()).toBe(0));
+    fetchMock.mockClear();
+
+    rerender({ searchQuery: "藤田茜" });
+
+    await waitFor(() => expect(smartFolderCallUrls(fetchMock)).toHaveLength(1));
+    expect(smartFolderCallUrls(fetchMock)[0]).toContain("q=" + encodeURIComponent("藤田茜"));
+  });
+
   it("フィルタが変わるとクエリキーが変わり、別クエリとしてフェッチし直す（キャッシュ分離）", async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const wrapper = ({ children }: { children: ReactNode }) =>
@@ -252,15 +296,16 @@ describe("スマートフォルダー軸への保持中フィルタの適用", (
       );
 
     const { result, rerender } = renderHook(
-      (nav: LibraryViewState) => useSuspenseSmartLibraryWorks(nav),
-      { wrapper, initialProps: baseNav },
+      ({ nav, searchQuery }: { nav: LibraryViewState; searchQuery: string }) =>
+        useSuspenseSmartLibraryWorks(nav, searchQuery),
+      { wrapper, initialProps: { nav: baseNav, searchQuery: "" } },
     );
 
     await waitFor(() => expect(result.current.works.length).toBeGreaterThan(0));
     await waitFor(() => expect(queryClient.isFetching()).toBe(0));
     fetchMock.mockClear();
 
-    rerender({ ...baseNav, selectedTags: ["cv/藤田茜"] });
+    rerender({ nav: { ...baseNav, selectedTags: ["cv/藤田茜"] }, searchQuery: "" });
 
     await waitFor(() => expect(smartFolderCallUrls(fetchMock)).toHaveLength(1));
     expect(smartFolderCallUrls(fetchMock)[0]).toContain("tags=cv%2F");

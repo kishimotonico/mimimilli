@@ -21,7 +21,6 @@ vi.mock("../../src/entities/settings/useSettingsQuery", () => ({
 
 const fakeWorksResult = {
   works: [] as WorkListItem[],
-  worksParams: {},
   hasNextPage: false,
   worksTotal: 0,
   worksStats: undefined,

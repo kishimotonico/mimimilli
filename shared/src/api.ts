@@ -80,8 +80,10 @@ export type WorksPage = z.infer<typeof worksPageSchema>;
 
 /** GET /api/smart-folders/:id/works のクエリパラメータ。
  *  ソートはフォルダー自身が保持するため含まない。tags はフォルダーのルールに対する
- *  追加の AND 条件として適用する（ADR-0012、TASK-185） */
+ *  追加の AND 条件として、q はフォルダーのルール（OR・除外を含む）全体に対する
+ *  追加の AND 条件として適用する（ADR-0012、TASK-185、TASK-462） */
 export const smartFolderWorksQuerySchema = worksQueryBaseSchema.pick({
+  q: true,
   tags: true,
   tagOp: true,
   page: true,
@@ -92,7 +94,7 @@ export type SmartFolderWorksQuery = z.infer<typeof smartFolderWorksQuerySchema>;
 
 /** adapter evalSmartFolder が受け取る正規化済みクエリ（page/limit は routes がデフォルト適用後） */
 export type SmartFolderEvalQuery = Required<Pick<SmartFolderWorksQuery, "page" | "limit">> &
-  Partial<Pick<SmartFolderWorksQuery, "tags" | "tagOp" | "seed">>;
+  Partial<Pick<SmartFolderWorksQuery, "q" | "tags" | "tagOp" | "seed">>;
 
 /** POST /api/smart-folders/preview のリクエストボディ。保存前のドラフト条件（rules）を受け取り、
  *  チップ絞り込みを適用しない純粋なルール一致件数を返す（条件エディタのライブ件数プレビュー用） */

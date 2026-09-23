@@ -11,6 +11,7 @@ import type { WorkSummaryPage } from "./worksQuery.ts";
 import { tagEquals } from "@mimimilli/shared";
 import {
   computeCollectionStats,
+  filterByQuery,
   filterByTags,
   filterByYear,
   sortWorkSummaries,
@@ -74,8 +75,8 @@ export function evalSmartFolderRules(
 }
 
 /** 保存済みルールと sort を一体で評価し、ページングエンベロープを返す。
- *  tags はルールに対する追加の AND 条件として適用する（ADR-0012、TASK-185）。組み込み軸の
- *  year 値も TagFilters 経由で渡る（TASK-199）。
+ *  tags と q はルール（OR・除外を含む）全体に対する追加の AND 条件として適用する
+ *  （ADR-0012、TASK-185、TASK-462）。組み込み軸の year 値も TagFilters 経由で渡る（TASK-199）。
  *  total はソート後・ページング前の評価結果件数。random ソート時は seed を発行・継承する。 */
 export function evalSmartFolder(
   folder: Pick<SmartFolder, "rules" | "sort">,
@@ -85,6 +86,7 @@ export function evalSmartFolder(
   const seed = folder.sort === "random" ? (query.seed ?? createRandomSeed()) : undefined;
   const { tags, yearValue } = query.tags ?? EMPTY_TAG_FILTERS;
   let matched = evalSmartFolderRules(folder.rules, works);
+  matched = filterByQuery(matched, query.q ?? "");
   matched = filterByTags(matched, tags, query.tagOp ?? "AND");
   matched = filterByYear(matched, yearValue);
   matched = sortWorkSummaries(matched, folder.sort, seed);

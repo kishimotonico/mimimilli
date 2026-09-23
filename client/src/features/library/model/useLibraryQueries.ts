@@ -140,7 +140,7 @@ export function useSuspenseNormalLibraryWorks(nav: LibraryViewState, searchQuery
     initialPageParam: { page: 1, seed: normalWorksParams.seed } as WorksPageParam,
     getNextPageParam: getNextWorksPageParam,
   });
-  return toSuspenseWorksResult(query, normalWorksParams);
+  return toSuspenseWorksResult(query);
 }
 
 /** 作品クエリのキーに渡す検索語。Suspense境界の外で維持して連続入力を間引く。 */
@@ -149,10 +149,12 @@ export function useLibraryDebouncedSearchQuery(searchQuery: string) {
 }
 
 /** Suspense 境界配下でのみ使うスマートフォルダー作品一覧。
- *  保持中のタグ/組み込み軸フィルタをフォルダーのルールへの追加 AND として渡す（ADR-0012）。 */
-export function useSuspenseSmartLibraryWorks(nav: LibraryViewState) {
+ *  保持中のタグ/組み込み軸フィルタと作品検索 q を、フォルダーのルール（OR・除外を含む）
+ *  全体への追加 AND として渡す（ADR-0012、TASK-462）。sort はフォルダー自身が保持し、
+ *  この評価APIへは渡さない（LibrarySortMenu 参照）。 */
+export function useSuspenseSmartLibraryWorks(nav: LibraryViewState, searchQuery: string) {
   const smartAxisId = getSmartFolderId(nav.activeAxis);
-  const filterParams = buildSmartFolderFilterParams(nav.selectedTags);
+  const filterParams = buildSmartFolderFilterParams(nav.selectedTags, searchQuery);
   const query = useSuspenseInfiniteQuery({
     queryKey: SMART_FOLDER_QUERY_KEYS.works(smartAxisId, filterParams),
     queryFn: ({ pageParam, signal }) =>
@@ -169,27 +171,19 @@ export function useSuspenseSmartLibraryWorks(nav: LibraryViewState) {
     initialPageParam: { page: 1, seed: undefined } as WorksPageParam,
     getNextPageParam: getNextWorksPageParam,
   });
-  return toSuspenseWorksResult(query, {
-    smartFolderId: smartAxisId,
-    sort: nav.sort,
-    ...filterParams,
-  });
+  return toSuspenseWorksResult(query);
 }
 
-function toSuspenseWorksResult(
-  query: {
-    data: { pages: WorksPage[] };
-    hasNextPage: boolean;
-    isFetchingNextPage: boolean;
-    fetchNextPage: () => Promise<unknown>;
-    refetch: () => Promise<unknown>;
-  },
-  worksParams: unknown,
-) {
+function toSuspenseWorksResult(query: {
+  data: { pages: WorksPage[] };
+  hasNextPage: boolean;
+  isFetchingNextPage: boolean;
+  fetchNextPage: () => Promise<unknown>;
+  refetch: () => Promise<unknown>;
+}) {
   const lastPage = query.data.pages[query.data.pages.length - 1];
   return {
     works: query.data.pages.flatMap((page) => page.items),
-    worksParams,
     hasNextPage: query.hasNextPage,
     worksTotal: lastPage?.total,
     worksStats: lastPage?.stats,
@@ -286,7 +280,7 @@ function useWorkPatchMutationContext(nav: LibraryViewState, searchQuery: string)
     const activeListQueryKey = isSmartAxis(nav.activeAxis)
       ? SMART_FOLDER_QUERY_KEYS.works(
           getSmartFolderId(nav.activeAxis),
-          buildSmartFolderFilterParams(nav.selectedTags),
+          buildSmartFolderFilterParams(nav.selectedTags, debouncedSearchQuery),
         )
       : worksParams !== null
         ? WORK_QUERY_KEYS.list(worksParams)

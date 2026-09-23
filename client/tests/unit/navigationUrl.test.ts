@@ -86,6 +86,26 @@ describe("navigation URL codec", () => {
     });
   });
 
+  it("omits sort= for a smart folder axis, since its sort is not the effective one (TASK-462)", () => {
+    const state: NavigationUrlState = {
+      mode: "library",
+      library: { ...DEFAULT_LIBRARY_URL_STATE, activeAxis: "smart-sleep-long", sort: "title-asc" },
+    };
+
+    const url = serializeNavigationUrl(state);
+    expect(url).toBe("/library/smart-sleep-long");
+  });
+
+  it("still writes sort= for a normal axis (regression check for the smart-axis suppression)", () => {
+    const state: NavigationUrlState = {
+      mode: "library",
+      library: { ...DEFAULT_LIBRARY_URL_STATE, activeAxis: "all", sort: "title-asc" },
+    };
+
+    const url = serializeNavigationUrl(state);
+    expect(url).toBe("/library/all?sort=title-asc");
+  });
+
   it("round-trips file segments and a root-relative selection", () => {
     const state: NavigationUrlState = {
       mode: "files",

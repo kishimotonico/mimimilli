@@ -420,6 +420,7 @@ function assertSmartFolderEquivalent(
     page: number;
     limit: number;
     seed?: number;
+    q?: string;
     tags?: import("@mimimilli/shared").TagFilters;
     tagOp?: "AND" | "OR";
   },
@@ -515,6 +516,24 @@ test("スマートフォルダーのSQL候補絞り込み(第1段)とcore純粋�
     tags: tf(`@year/${recent.slice(0, 4)}`),
   });
 
+  // 作品検索qはルール全体への追加のAND条件（TASK-462）。ルールなし（SQLの通常経路へ委譲）
+  // ・ルールあり（core側でルール結果へさらにフィルタ）の両方でreal⇔fixtureが同値になることを
+  // 確認する。RJコード一致も含める（filterByQuery/textSearchConditionの両方が対応する経路）。
+  assertSmartFolderEquivalent(queryRepo, [], "added-desc", { page: 1, limit: 7, q: "ＡＳＭＲ" });
+  assertSmartFolderEquivalent(queryRepo, [], "added-desc", { page: 1, limit: 7, q: "RJ01000003" });
+  assertSmartFolderEquivalent(queryRepo, [tagRule(["ASMR", "催眠"])], "duration-desc", {
+    page: 1,
+    limit: 7,
+    q: "カタカナ",
+  });
+  assertSmartFolderEquivalent(queryRepo, [lengthRule(1200)], "title-asc", {
+    page: 1,
+    limit: 7,
+    q: "存在しない検索語のはず",
+    tags: tf("ASMR"),
+    tagOp: "AND",
+  });
+
   let state = 0x1234abcd;
   const next = (): number => {
     state = Math.imul(state ^ (state >>> 15), state | 1);
@@ -522,6 +541,7 @@ test("スマートフォルダーのSQL候補絞り込み(第1段)とcore純粋�
     return (state ^ (state >>> 14)) >>> 0;
   };
   const tagPool = ["ASMR", "asmr", "催眠", "添い寝", "耳かき", "cv/水瀬なずな", "存在しない"];
+  const queryTerms = ["", "ＡＳＭＲ", "カタカナ", "RJ01000003", "01000003", "存在しない検索語"];
   const conjunctions: SmartFolderRule["conjunction"][] = ["AND", "OR", "AND NOT"];
   // 先頭ルールも "WHERE" 固定にせず全conjunctionから選ぶ（index===0はconjunctionを無視して
   // WHERE相当に振る舞うため、"先頭AND NOT"のようなエッジも生成テストへ混ぜる）。
@@ -545,6 +565,7 @@ test("スマートフォルダーのSQL候補絞り込み(第1段)とcore純粋�
       page: (next() % 4) + 1,
       limit: (next() % 6) + 1,
       seed: sort === "random" ? next() & 0x7fffffff : undefined,
+      q: queryTerms[next() % queryTerms.length]!,
     });
   }
 });
