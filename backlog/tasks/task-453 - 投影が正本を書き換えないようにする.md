@@ -4,7 +4,7 @@ title: 投影が正本を書き換えないようにする
 status: To Do
 assignee: []
 created_date: '2026-09-21 10:48'
-updated_date: '2026-09-21 13:44'
+updated_date: '2026-09-23 18:12'
 labels: []
 dependencies: []
 documentation:
@@ -32,4 +32,6 @@ ADR-0025 の「投影」契約。syncDetectedRjCode が scan と単作品投影�
 
 <!-- SECTION:NOTES:BEGIN -->
 入力変更の検知は、外部書込みを永久にロックする要求ではない。確認後の将来変更まで防ぐ保証や無限再試行は求めない。
+
+RJコード確定の受け皿（2026-09-24決定）: 登録コマンドがフォルダー名等から検出したコードを1回の正本確定に含める。既存作品でコードが空のものは、scanは候補の検出までに留め、確定は作品編集（RJ/VJコード入力）での明示操作とする。新しい一括操作は追加しない。
 <!-- SECTION:NOTES:END -->
