@@ -28,7 +28,12 @@ import type {
   WorksQuery,
   WorkSummary,
 } from "@mimimilli/shared";
-import { descendantsRegisteredError, InvalidResumeError, SourceChangedError, WorkRegisterError } from "../../errors.ts";
+import {
+  descendantsRegisteredError,
+  InvalidResumeError,
+  SourceChangedError,
+  WorkRegisterError,
+} from "../../errors.ts";
 import type { WorkAdapter } from "../../adapter/work.ts";
 import { summarizeDlsiteNotifications } from "../../core/dlsiteNotifications.ts";
 import { compareJapaneseSortKeys, compareUtf8Bytes } from "../../core/japaneseSortKey.ts";
@@ -278,16 +283,21 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
     async addWorkTag(id: string, tag: NormalizedTag): Promise<WorkSourceMutationResult | null> {
       const work = state.works.find((candidate) => candidate.id === id);
       if (!work) return null;
-      if (!work.tags.some((existing) => tagEquals(existing, tag))) {
-        work.tags = [...work.tags, tag];
+      if (work.tags.some((existing) => tagEquals(existing, tag))) {
+        return { snapshot: fixtureEditSnapshot(state, work) };
       }
+      work.tags = [...work.tags, tag];
       return fixtureSourceMutation(state, work);
     },
 
     async removeWorkTag(id: string, tag: NormalizedTag): Promise<WorkSourceMutationResult | null> {
       const work = state.works.find((candidate) => candidate.id === id);
       if (!work) return null;
-      work.tags = work.tags.filter((existing) => !tagEquals(existing, tag));
+      const nextTags = work.tags.filter((existing) => !tagEquals(existing, tag));
+      if (nextTags.length === work.tags.length) {
+        return { snapshot: fixtureEditSnapshot(state, work) };
+      }
+      work.tags = nextTags;
       return fixtureSourceMutation(state, work);
     },
 

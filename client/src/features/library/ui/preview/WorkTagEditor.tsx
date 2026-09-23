@@ -14,6 +14,10 @@ import { useTagPrefixes } from "../../../../entities/tag/useTagPrefixes";
 import { tagPrefixDefinition } from "../../../../entities/tag/tagPrefixDefinition";
 import { useAnchoredPopover } from "../../../../shared/ui/useAnchoredPopover";
 import { useWorkTagEditor } from "./useWorkTagEditor";
+import {
+  sourceCommandBlockMessage,
+  WorkSourcePatchBlockedNotice,
+} from "./WorkSourcePatchBlockedNotice";
 
 const TAG_POPOVER_WIDTH = 260;
 // 詳細ペインをタグで圧迫せず、優先度の高い分類を一目で確認できる表示上限。
@@ -77,6 +81,32 @@ export function WorkTagEditor({
     removeTagMutation,
   });
 
+  const [blockedMessage, setBlockedMessage] = useState<string | null>(() =>
+    sourceCommandBlockMessage(patchTagsError),
+  );
+  const [blockEpoch, setBlockEpoch] = useState({
+    id: work.id,
+    title: work.title,
+    tags: work.tags,
+    urls: work.urls,
+  });
+  if (
+    blockEpoch.id !== work.id ||
+    blockEpoch.title !== work.title ||
+    blockEpoch.tags !== work.tags ||
+    blockEpoch.urls !== work.urls
+  ) {
+    setBlockEpoch({ id: work.id, title: work.title, tags: work.tags, urls: work.urls });
+    setBlockedMessage(null);
+  }
+
+  useEffect(() => {
+    const message = sourceCommandBlockMessage(patchTagsError);
+    if (message) setBlockedMessage(message);
+  }, [patchTagsError]);
+
+  const canEditTags = blockedMessage === null;
+
   const closeTagPopover = () => setIsTagPopoverOpen(false);
   const {
     setReference: setTagPopoverAnchorRef,
@@ -98,12 +128,11 @@ export function WorkTagEditor({
 
   const selectTag = (tag: string) => {
     close();
+    if (!canEditTags) return;
     void addTag(tag);
   };
 
   const definitionOf = (tag: string) => tagPrefixDefinition(tag, tagPrefixes);
-
-  const canEditTags = true;
 
   const comboboxProps = {
     suggestions,
@@ -114,9 +143,10 @@ export function WorkTagEditor({
     onCancel: close,
   };
 
-  const patchTagsErrorMessage = patchTagsError
-    ? apiErrorMessage(patchTagsError, "タグを保存できませんでした。")
-    : null;
+  const patchTagsErrorMessage =
+    sourceCommandBlockMessage(patchTagsError) === null && patchTagsError
+      ? apiErrorMessage(patchTagsError, "タグを保存できませんでした。")
+      : null;
 
   const { show: showToast, dismiss: dismissToast } = useToast();
   useEffect(() => {
@@ -148,6 +178,10 @@ export function WorkTagEditor({
     showToast,
     dismissToast,
   ]);
+
+  useEffect(() => {
+    if (!canEditTags) setIsTagPopoverOpen(false);
+  }, [canEditTags]);
 
   return (
     <>
@@ -235,6 +269,7 @@ export function WorkTagEditor({
           </div>
         </div>
       </div>
+      <WorkSourcePatchBlockedNotice message={blockedMessage} />
       {confirmingRemoveTag && (
         <ConfirmDialog
           title="保護タグの削除"

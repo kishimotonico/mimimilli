@@ -19,6 +19,7 @@ import { getWorkWithLiveProbe } from "./workRefresh.ts";
 import { createDlsiteFetch } from "./dlsiteFetch.ts";
 import { createDlsiteApply } from "./dlsiteApply.ts";
 import { createDlsiteBulk } from "./dlsiteBulk.ts";
+import { MetaParseError } from "./meta.ts";
 import { readVerifiedEditSource } from "./workEditSource.ts";
 import { SourceConflictError, SourceParseError } from "../../errors.ts";
 import {
@@ -86,23 +87,19 @@ export function createDlsiteMethods(deps: {
           result.skipped += 1;
           continue;
         }
-        const fetched = await fetch.fetchCachedDlsite(summary.dlsite.rjCode);
-        if (shouldRefreshDlsiteProjectionAfterFetch(fetched)) {
-          refreshWorkDlsiteProjection(catalog, summary.id, dlsiteCache);
-        }
-        if (!fetched.ok) {
-          result.failed += 1;
-          continue;
-        }
         try {
-          const outcome = await apply.applyDlsiteMissingItem(summary.id, fetched.info);
-          if (outcome === "applied") result.applied += 1;
-          else result.skipped += 1;
-        } catch (error) {
-          if (error instanceof SourceParseError || error instanceof SourceConflictError) {
+          const fetched = await fetch.fetchCachedDlsite(summary.dlsite.rjCode);
+          if (shouldRefreshDlsiteProjectionAfterFetch(fetched)) {
+            refreshWorkDlsiteProjection(catalog, summary.id, dlsiteCache);
+          }
+          if (!fetched.ok) {
             result.failed += 1;
             continue;
           }
+          const outcome = await apply.applyDlsiteMissingItem(summary.id, fetched.info);
+          if (outcome === "applied") result.applied += 1;
+          else result.skipped += 1;
+        } catch {
           result.failed += 1;
         }
       }
@@ -114,19 +111,26 @@ export function createDlsiteMethods(deps: {
       const items: DlsiteApplyMissingPreviewItem[] = [];
       for (const summary of summaries) {
         if (!hasRjCode(summary.dlsite) || summary.dlsite.status === "skipped") continue;
-        const fetched = await fetch.fetchCachedDlsite(summary.dlsite.rjCode);
-        if (shouldRefreshDlsiteProjectionAfterFetch(fetched)) {
-          refreshWorkDlsiteProjection(catalog, summary.id, dlsiteCache);
-        }
-        if (!fetched.ok) continue;
+        let fetched: DlsiteFetchResult | undefined;
         let verified;
         try {
+          fetched = await fetch.fetchCachedDlsite(summary.dlsite.rjCode);
+          if (shouldRefreshDlsiteProjectionAfterFetch(fetched)) {
+            refreshWorkDlsiteProjection(catalog, summary.id, dlsiteCache);
+          }
+          if (!fetched.ok) continue;
           verified = readVerifiedEditSource(catalog, summary.id);
         } catch (error) {
-          if (error instanceof SourceParseError || error instanceof SourceConflictError) continue;
+          if (
+            error instanceof SourceParseError ||
+            error instanceof SourceConflictError ||
+            error instanceof MetaParseError
+          ) {
+            continue;
+          }
           throw error;
         }
-        if (!verified) continue;
+        if (!fetched?.ok || !verified) continue;
         const { newTags, applyCover, applyUrl } = computeMissingDiff(
           {
             tags: verified.source.meta.tags,

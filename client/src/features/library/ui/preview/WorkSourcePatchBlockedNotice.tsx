@@ -13,7 +13,8 @@ export function WorkSourcePatchBlockedNotice({ message }: WorkSourcePatchBlocked
   );
 }
 
-export function sourceCommandAlertMessage(error: unknown): string | null {
-  if (error instanceof ApiRequestError) return error.message;
-  return null;
+export function sourceCommandBlockMessage(error: unknown): string | null {
+  if (!(error instanceof ApiRequestError)) return null;
+  if (error.code !== "parse_error" && error.code !== "conflict") return null;
+  return error.message;
 }

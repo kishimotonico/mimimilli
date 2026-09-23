@@ -1,22 +1,10 @@
 // 新規登録済み・更新された作品タブ共通: タイトルのインライン編集。
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { useMutation, useQueryClient, type QueryKey } from "@tanstack/react-query";
-import type { WorkListItem, WorksPage } from "@mimimilli/shared";
+import type { WorkListItem } from "@mimimilli/shared";
 import { getWorkEditSnapshot, patchWorkSource } from "../../../../entities/work/api";
 import { WORK_QUERY_KEYS } from "../../../../entities/work/queryKeys";
 import { apiErrorMessage } from "../../../../shared/lib/apiError";
-
-function patchTitleInWorksPage(
-  prev: WorksPage | undefined,
-  workId: string,
-  title: string,
-): WorksPage | undefined {
-  if (!prev) return prev;
-  return {
-    ...prev,
-    items: prev.items.map((item) => (item.id === workId ? { ...item, title } : item)),
-  };
-}
 
 export interface InlineTitleEdit {
   editingId: string | null;
@@ -31,7 +19,7 @@ export interface InlineTitleEdit {
   cancelEdit: () => void;
 }
 
-/** タイトルのインライン編集state。表示中のWorksPageクエリキャッシュを保存成功時に直接パッチする。 */
+/** タイトルのインライン編集state。保存成功時は source キャッシュを更新し、一覧は invalidate する。 */
 export function useInlineTitleEdit(queryKey: QueryKey): InlineTitleEdit {
   const queryClient = useQueryClient();
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -49,9 +37,7 @@ export function useInlineTitleEdit(queryKey: QueryKey): InlineTitleEdit {
     onSuccess: (result, { workId }) => {
       queryClient.setQueryData(WORK_QUERY_KEYS.source(workId), result.snapshot);
       void queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.detail(workId), exact: true });
-      queryClient.setQueryData<WorksPage>(queryKey, (prev) =>
-        patchTitleInWorksPage(prev, workId, result.snapshot.title),
-      );
+      void queryClient.invalidateQueries({ queryKey });
       setEditingId(null);
     },
     onError: (_error, { workId }) => {

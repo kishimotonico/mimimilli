@@ -113,6 +113,15 @@ function scanSnapshot(title: string) {
   };
 }
 
+function mockSuccessfulScanTitleSave(title: string) {
+  vi.spyOn(workApi, "getWorkEditSnapshot").mockResolvedValue(scanSnapshot(work.title));
+  vi.spyOn(workApi, "patchWorkSource").mockImplementation(async () => {
+    const item = worksById.get(newWork.id);
+    if (item) worksById.set(newWork.id, { ...item, title });
+    return { snapshot: scanSnapshot(title) };
+  });
+}
+
 const scanResult: ScanResult = {
   registered: 10,
   insertedWorkIds: [newWork.id],
@@ -515,10 +524,7 @@ describe("ScanModal", () => {
   });
 
   it("タイトル保存に成功したとき表示名が更新され編集モードが閉じる", async () => {
-    vi.spyOn(workApi, "getWorkEditSnapshot").mockResolvedValue(scanSnapshot(work.title));
-    vi.spyOn(workApi, "patchWorkSource").mockResolvedValue({
-      snapshot: scanSnapshot("新しいタイトル"),
-    });
+    mockSuccessfulScanTitleSave("新しいタイトル");
     renderModal();
     openTab("新規登録済み");
 
@@ -532,15 +538,13 @@ describe("ScanModal", () => {
     expect(screen.queryByDisplayValue("新しいタイトル")).toBeNull();
   });
 
-  it("タイトル保存に成功すると正本キャッシュとスキャン一覧キャッシュの両方に反映される", async () => {
-    vi.spyOn(workApi, "getWorkEditSnapshot").mockResolvedValue(scanSnapshot(work.title));
-    vi.spyOn(workApi, "patchWorkSource").mockResolvedValue({
-      snapshot: scanSnapshot("新しいタイトル"),
-    });
+  it("タイトル保存に成功すると正本キャッシュを更新し、一覧クエリを再取得する", async () => {
+    mockSuccessfulScanTitleSave("新しいタイトル");
     const { queryClient } = renderModal();
     openTab("新規登録済み");
 
     await waitFor(() => screen.getByText(newWork.title));
+    const searchCallsBefore = searchWorksSpy.mock.calls.length;
     fireEvent.click(screen.getByText(newWork.title));
     const input = screen.getByDisplayValue(newWork.title);
     fireEvent.change(input, { target: { value: "新しいタイトル" } });
@@ -551,6 +555,7 @@ describe("ScanModal", () => {
     expect(queryClient.getQueryData(WORK_QUERY_KEYS.source(newWork.id))).toMatchObject({
       title: "新しいタイトル",
     });
+    expect(searchWorksSpy.mock.calls.length).toBeGreaterThan(searchCallsBefore);
     const cachedList = queryClient.getQueryData<WorksPage>(
       WORK_QUERY_KEYS.list({ ids: [newWork.id] }),
     );

@@ -13,7 +13,7 @@ import {
 import { createApp } from "../../src/app.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
 import { makeSampleLibrary, makeTestDirectory, writeWav } from "../helpers/sampleLibrary.ts";
-import { nts } from "../helpers/tag.ts";
+import { nt, nts } from "../helpers/tag.ts";
 import { emptyDlsiteState } from "@mimimilli/shared";
 
 async function setup(t: TestContext) {
@@ -212,4 +212,20 @@ test("タグパスは正規化し、スラッシュ・パーセント・全角�
     assert.equal(delRes.status, 200, "DELETE " + tag);
     assert.equal((await delRes.json()).snapshot.tags.includes(tag), false);
   }
+});
+
+test("no-op の PUT/DELETE は sourceRevision を変えない", async (t) => {
+  const { adapter, existingWorkId } = await setup(t);
+  const before = await adapter.getWorkEditSnapshot(existingWorkId);
+  assert.ok(before);
+  const existing = nt("cv/水瀬なずな");
+  const putSame = await adapter.addWorkTag(existingWorkId, existing);
+  assert.ok(putSame);
+  assert.equal(putSame.snapshot.sourceRevision, before.sourceRevision);
+  const delMissing = await adapter.removeWorkTag(existingWorkId, nt("存在しないタグ"));
+  assert.ok(delMissing);
+  assert.equal(delMissing.snapshot.sourceRevision, before.sourceRevision);
+  const putNew = await adapter.addWorkTag(existingWorkId, nt("新しいタグ"));
+  assert.ok(putNew);
+  assert.notEqual(putNew.snapshot.sourceRevision, before.sourceRevision);
 });
