@@ -17,6 +17,7 @@ import AddressBar from "./ui/AddressBar";
 import NotificationBell from "./ui/NotificationBell";
 import { WORK_QUERY_KEYS } from "../entities/work/queryKeys";
 import { SETTINGS_QUERY_KEYS } from "../entities/settings/queryKeys";
+import { SCAN_QUERY_KEYS } from "../entities/scan/queryKeys";
 import PlayerDock from "../features/player/ui/PlayerDock";
 import { resolveAppStartupState } from "./model/resolveAppStartupState";
 import SetupScreen from "../features/setup/ui/SetupScreen";
@@ -84,6 +85,7 @@ export default function App() {
     mutationFn: setRootFolder,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: SETTINGS_QUERY_KEYS.all() });
+      queryClient.invalidateQueries({ queryKey: SCAN_QUERY_KEYS.candidates() });
       toast.show(buildRootFolderChangedToastRequest(handleOpenScanModal));
     },
   });

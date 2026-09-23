@@ -424,3 +424,19 @@ test("fixture: 単一音声ファイルのregister-previewと登録ができる"
   });
   assert.equal(again.status, 409);
 });
+
+test("fixture: 異なるrootへの変更で候補除外を破棄し、同一rootの再保存では破棄しない（TASK-459）", async () => {
+  const state = createInitialState({ scenario: "empty" });
+  const { updateSettings, excludeScanCandidates, listScanCandidateExclusions } =
+    createSettingsScanMethods(state);
+
+  await updateSettings({ rootFolder: "/library/root-a" });
+  await excludeScanCandidates(["候補"]);
+  assert.deepEqual(await listScanCandidateExclusions(), ["候補"]);
+
+  await updateSettings({ rootFolder: "/library/root-a" });
+  assert.deepEqual(await listScanCandidateExclusions(), ["候補"]);
+
+  await updateSettings({ rootFolder: "/library/root-b" });
+  assert.deepEqual(await listScanCandidateExclusions(), []);
+});

@@ -35,6 +35,7 @@ export function createSettingsScanMethods(deps: {
     | "listScanCandidateExclusions"
     | "excludeScanCandidates"
     | "restoreScanCandidateExclusions"
+    | "setUserSettingDiscardingScanCandidateExclusions"
   >;
   scanner: Scanner;
   thumbnailCacheDir: string;
@@ -77,6 +78,7 @@ export function createSettingsScanMethods(deps: {
     async updateSettings(patch: SettingsUpdate): Promise<Settings> {
       // 正規化した絶対パスで保存する。スキャンが記録する physicalPath / fs ブラウズの
       // realpath と表現を一致させるため（相対パスのまま保存すると突合に失敗する）
+      const previousRoot = user.getUserSetting(KEY_ROOT_FOLDER);
       let absRoot: string;
       try {
         absRoot = realpathSync(resolve(patch.rootFolder));
@@ -111,7 +113,12 @@ export function createSettingsScanMethods(deps: {
         requestedPath: patch.rootFolder,
         resolvedPath: absRoot,
       });
-      user.setUserSetting(KEY_ROOT_FOLDER, absRoot);
+      if (previousRoot !== null && previousRoot !== absRoot) {
+        user.setUserSettingDiscardingScanCandidateExclusions(KEY_ROOT_FOLDER, absRoot);
+        candidateSession = ScanCandidateSession.empty();
+      } else {
+        user.setUserSetting(KEY_ROOT_FOLDER, absRoot);
+      }
       return getSettings();
     },
 
