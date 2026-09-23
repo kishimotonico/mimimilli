@@ -2,7 +2,7 @@
 
 - ステータス: 承認
 - 日付: 2026-08-20
-- 関連: [ADR-0008](0008-persistence-topology-query-ownership-playback-ids.md)、[ADR-0017](0017-meta-source-projection-and-work-identity.md)、[ADR-0021](0021-custom-sqlite-migration-executor.md)、TASK-356、TASK-460
+- 関連: [ADR-0008](0008-persistence-topology-query-ownership-playback-ids.md)、[ADR-0017](0017-meta-source-projection-and-work-identity.md)、[ADR-0021](0021-custom-sqlite-migration-executor.md)、TASK-356、TASK-460、TASK-463
 
 ## 文脈
 
@@ -72,6 +72,43 @@ Copy-Item "$dataRoot\backup\user-YYYY-MM-DDTHH-MM-SS-mmm-pre-migration.sqlite" "
 
 catalog DB も同様に `catalog.sqlite` と `backup/catalog-…-pre-migration.sqlite` で行う。
 
+### user DB単独復元時のcatalog整合
+
+`user.sqlite` だけを`backup/`のスナップショットや外部退避から復元し、`catalog.sqlite`はそのままにして起動すると、`openDb`（`server/src/adapters/real/db.ts:193-213`）が`catalog.works`と`user.work_states`の左外部結合でuser状態を欠く作品を検出し、起動時にfail-fastする。復元したuser.sqliteが、現在のcatalog.sqliteより古い時点のスナップショットで、その後に登録された作品のuser行を持たないときに起きる。これはADR-0008が定める「catalogにuser行がない状態は許容しない」という非対称設計どおりの挙動であり、自動でuser行を埋めて起動を通す処理は追加しない。
+
+整合を取る手順は次のいずれかを選ぶ。
+
+1. 復元したuserと同じ生成時刻のcatalogバックアップが残っている場合は、catalogも同じタイムスタンプのバックアップへ復元する（前節の手動リストア手順に従う）。この場合は追加の整合作業は不要
+2. 同世代のcatalogバックアップがない場合は、catalogを削除して再構築しuserへ合わせる
+
+手順2はserverを完全停止したうえで、`catalog.sqlite`本体・`-wal`・`-shm`を退避または削除してから起動し、full scanを実行する。
+
+Linux（開発・WSL）:
+
+```bash
+# server停止後
+DATA_ROOT=~/.local/share/mimimilli   # 実際の dataRoot に合わせる
+mkdir -p /tmp/catalog-rebuild-backup
+mv "$DATA_ROOT/db/catalog.sqlite"{,-wal,-shm} /tmp/catalog-rebuild-backup/ 2>/dev/null || true
+# 起動後、full scanを実行
+curl -X POST http://127.0.0.1:<port>/api/scan -H 'content-type: application/json' -d '{"full":true}'
+```
+
+Windows:
+
+```powershell
+# server停止後
+$dataRoot = "$env:LOCALAPPDATA\mimimilli"
+New-Item -ItemType Directory -Force -Path "$env:TEMP\catalog-rebuild-backup" | Out-Null
+Move-Item "$dataRoot\db\catalog.sqlite*" "$env:TEMP\catalog-rebuild-backup\" -ErrorAction SilentlyContinue
+# 起動後、full scanを実行
+Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:<port>/api/scan" -ContentType "application/json" -Body '{"full":true}'
+```
+
+full scanは現存する`mimimilli.json`から作品を再投影し、Work IDが一致する既存user行へ再接続する（ADR-0017のidentity節）。catalogにはあるがuser行がない作品は、`onConflictDoNothing`により新規のuser行が現在時刻を初期値として作成される（`server/src/adapters/real/scanUpsertBatch.ts:94`、`userWorkStateRepository.ts:31`）。これは新規登録時と同じ既定動作であり、復元前の値を推測して埋め合わせるものではない。復元したuserにあるがcatalogにない作品の行は、同じWork IDが再scanで見つかるまで孤児として保持され、自動削除しない（ADR-0008）。
+
+再構築したcatalogは、missing作品の過去表示や、TASK-460で補記したDLsite取得失敗の投影表示を保持しない。復元前の状態をそのまま再現したい場合は手順1を使う。
+
 ### DLsite取得失敗表示の寿命
 
 DLsiteの取得失敗（`not_found` / `error`）は `db/dlsite-cache.sqlite`（`dlsite_fetch_failures` 等、ADR-0008）に記録し、`failure_expires_at` のTTLで管理する（既定値は`server/src/adapters/real/dlsiteCache.ts`の`DEFAULT_DLSITE_CACHE_TTLS_MS`）。このTTLは再取得を抑止する期間だけを制御し、catalog投影（`work_dlsite.state_json`）に表示済みの失敗結果を消す契機にはしない。TTLが切れても、既存の投影表示は次の取得・再合成まで残る。
@@ -86,3 +123,4 @@ DLsiteの取得失敗（`not_found` / `error`）は `db/dlsite-cache.sqlite`（`
 - DB がアプリより新しい場合はデータを書き換えず fail-fast する
 - 失敗時の復旧は手動リストアに委ねる。運用は単純化される一方、自動ロールバックは提供しない
 - DLsite取得失敗の表示は一時的な観測であり、catalog再構築後の保持を保証しない。cacheのTTL（再取得の可否）と表示の保持は別の寿命として扱う
+- user DB単独復元でcatalogとの不整合が起きた場合、同世代のcatalogバックアップへの復元、またはcatalog再構築＋full scanのいずれかで整合を取る。userの不足値を現在時刻等で自動補完する処理は追加しない
