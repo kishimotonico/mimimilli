@@ -93,4 +93,24 @@ describe("RegisterWorkDialog", () => {
     expect(screen.getByText("RJ/VJコードを入力してください")).toBeTruthy();
     expect(screen.queryByText("DLsite情報の取得に失敗しました")).toBeNull();
   });
+
+  it("配下に子作品があるとき警告を出し登録ボタンを無効化する", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    const wrapper = ({ children }: { children: ReactNode }) =>
+      createElement(QueryClientProvider, { client: queryClient }, children);
+    render(
+      <RegisterWorkDialog
+        folderPath="/music/parent"
+        preview={{ ...preview, descendantWorkCount: 2 }}
+        onRegistered={vi.fn()}
+        onClose={vi.fn()}
+      />,
+      { wrapper },
+    );
+    expect(screen.getByText(/先に子作品の登録を解除してから親を登録してください/)).toBeTruthy();
+    expect(screen.getByText("2")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "登録" })).toBeDisabled();
+  });
 });

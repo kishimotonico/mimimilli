@@ -183,3 +183,27 @@ describe("UnregisteredTab 候補から外す", () => {
     await waitFor(() => expect(restoreSpy).toHaveBeenCalledWith([candidateA.path]));
   });
 });
+
+describe("UnregisteredTab 登録失敗", () => {
+  it("サーバーの失敗理由をそのまま表示する", async () => {
+    vi.spyOn(scanApi, "registerScanCandidates").mockResolvedValue({
+      registered: [],
+      failures: [
+        {
+          path: candidateA.path,
+          message:
+            "配下に登録済み作品が1件あります。先に子作品の登録を解除してから親を登録してください",
+        },
+      ],
+    });
+    renderTab([candidateA]);
+    fireEvent.click(screen.getByRole("button", { name: "1件をライブラリに追加" }));
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          "配下に登録済み作品が1件あります。先に子作品の登録を解除してから親を登録してください",
+        ),
+      ).not.toBeNull(),
+    );
+  });
+});

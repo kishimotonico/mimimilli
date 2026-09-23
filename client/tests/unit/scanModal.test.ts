@@ -621,9 +621,7 @@ describe("ScanModal", () => {
     fireEvent.click(within(unregistered).getByRole("button", { name: "2件をライブラリに追加" }));
 
     await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["works"] }));
-    await waitFor(() =>
-      expect(screen.getByText("1件はライブラリに追加できませんでした。")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText("失敗")).toBeInTheDocument());
   });
 
   it("候補の除外では作品一覧・軸件数・スマートフォルダーの再取得を行わない（AC#4）", async () => {

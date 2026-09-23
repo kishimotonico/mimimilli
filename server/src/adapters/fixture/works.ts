@@ -22,7 +22,7 @@ import type {
   WorksQuery,
   WorkSummary,
 } from "@mimimilli/shared";
-import { InvalidResumeError, WorkRegisterError } from "../../errors.ts";
+import { descendantsRegisteredError, InvalidResumeError, WorkRegisterError } from "../../errors.ts";
 import type { WorkAdapter } from "../../adapter/work.ts";
 import { summarizeDlsiteNotifications } from "../../core/dlsiteNotifications.ts";
 import { compareJapaneseSortKeys, compareUtf8Bytes } from "../../core/japaneseSortKey.ts";
@@ -121,18 +121,11 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
           "この場所は既に作品として登録されています",
         );
       }
-      if (preview.descendantWorkCount > 0 && !body.mergeDescendantWorks) {
-        throw new WorkRegisterError(
-          "descendants_require_merge",
-          `配下に登録済み作品が${preview.descendantWorkCount}件あります`,
-          preview.descendantWorkCount,
-        );
+      if (preview.descendantWorkCount > 0) {
+        throw descendantsRegisteredError(preview.descendantWorkCount);
       }
       const rootAbs = normalizeFsPath(state.rootFolder ?? "/library");
       const workDir = normalizeFsPath(`${rootAbs}/${body.path}`);
-      state.works = state.works.filter(
-        (work) => !(work.physicalPath.startsWith(`${workDir}/`) && work.physicalPath !== workDir),
-      );
       const now = new Date().toISOString();
       const applyTags = body.dlsite?.applyTags ?? [];
       const work: WorkSummary = {

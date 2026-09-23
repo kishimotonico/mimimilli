@@ -18,12 +18,12 @@ import {
 } from "@mimimilli/shared";
 import type { Db } from "./db.ts";
 import type { ScanOptions } from "../../adapter/index.ts";
+import { descendantsRegisteredError, restoreIdentityConflictError } from "../../errors.ts";
 import {
   META_FILE_NAME,
   MetaParseError,
   patchMetaFileCas,
   readMetaSource,
-  reassignMetaIdsOnDbCollision,
   writeMetaFile,
 } from "./meta.ts";
 import type { SeenMetaIds } from "./duplicateMetaIdRepair.ts";
@@ -500,6 +500,42 @@ export class Scanner {
     return { status: "published", snapshot };
   }
 
+  private assertNoRegisteredDescendants(workDir: string): void {
+    const descendants = this.query.listDescendantWorkRefs(workDir);
+    if (descendants.length > 0) throw descendantsRegisteredError(descendants.length);
+  }
+
+  private snapshotForRestore(
+    metaPath: string,
+    physicalPath: string,
+    patch: {
+      title?: string;
+      tags?: string[];
+      urls?: UrlEntry[];
+      coverImage?: string | null;
+      dlsite?: MetaFile["dlsite"];
+    },
+  ): { meta: MetaFile; bytes: Buffer; sourceRevision: string } {
+    if (!existsSync(metaPath)) {
+      throw new Error("復元対象のメタファイルがありません");
+    }
+    const source = readMetaSource(metaPath);
+    const existing = this.query.getScanWorkMap().get(source.meta.id);
+    if (existing && existing.physicalPath !== physicalPath && existing.status !== "missing") {
+      throw restoreIdentityConflictError();
+    }
+    const metaPatch: typeof patch = {};
+    if (patch.title !== undefined) metaPatch.title = patch.title;
+    if (patch.tags !== undefined) metaPatch.tags = patch.tags;
+    if (patch.urls !== undefined) metaPatch.urls = patch.urls;
+    if (patch.coverImage !== undefined) metaPatch.coverImage = patch.coverImage;
+    if (patch.dlsite !== undefined) metaPatch.dlsite = patch.dlsite;
+    if (Object.keys(metaPatch).length > 0) {
+      return patchMetaFileCas(metaPath, source.sourceRevision, metaPatch);
+    }
+    return source;
+  }
+
   async registerFolderWork(
     workDir: string,
     options: {
@@ -511,6 +547,7 @@ export class Scanner {
       rjCode?: string;
     },
   ): Promise<ProjectOutcome> {
+    this.assertNoRegisteredDescendants(workDir);
     const metaPath = join(workDir, META_FILE_NAME);
     if (existsSync(metaPath)) {
       throw new Error("このフォルダーには既にメタファイルがあります");
@@ -558,26 +595,9 @@ export class Scanner {
       dlsite?: MetaFile["dlsite"];
     },
   ): Promise<ProjectOutcome> {
+    this.assertNoRegisteredDescendants(workDir);
     const metaPath = join(workDir, META_FILE_NAME);
-    if (!existsSync(metaPath)) {
-      throw new Error("復元対象のメタファイルがありません");
-    }
-
-    const metaPatch: typeof patch = {};
-    if (patch.title !== undefined) metaPatch.title = patch.title;
-    if (patch.tags !== undefined) metaPatch.tags = patch.tags;
-    if (patch.urls !== undefined) metaPatch.urls = patch.urls;
-    if (patch.coverImage !== undefined) metaPatch.coverImage = patch.coverImage;
-    if (patch.dlsite !== undefined) metaPatch.dlsite = patch.dlsite;
-    if (Object.keys(metaPatch).length > 0) {
-      const source = readMetaSource(metaPath);
-      patchMetaFileCas(metaPath, source.sourceRevision, metaPatch);
-    }
-
-    const snapshot = reassignMetaIdsOnDbCollision(metaPath, (id) => {
-      const existing = this.query.getScanWorkMap().get(id);
-      return existing !== undefined && existing.physicalPath !== workDir;
-    });
+    const snapshot = this.snapshotForRestore(metaPath, workDir, patch);
     return this.registerSingleWorkFromPrepared(prepareSingleMeta(metaPath, snapshot));
   }
 
@@ -629,25 +649,7 @@ export class Scanner {
     },
   ): Promise<ProjectOutcome> {
     const metaPath = join(dirname(audioPath), sidecarMetaFileName(basename(audioPath)));
-    if (!existsSync(metaPath)) {
-      throw new Error("復元対象のメタファイルがありません");
-    }
-
-    const metaPatch: typeof patch = {};
-    if (patch.title !== undefined) metaPatch.title = patch.title;
-    if (patch.tags !== undefined) metaPatch.tags = patch.tags;
-    if (patch.urls !== undefined) metaPatch.urls = patch.urls;
-    if (patch.coverImage !== undefined) metaPatch.coverImage = patch.coverImage;
-    if (patch.dlsite !== undefined) metaPatch.dlsite = patch.dlsite;
-    if (Object.keys(metaPatch).length > 0) {
-      const source = readMetaSource(metaPath);
-      patchMetaFileCas(metaPath, source.sourceRevision, metaPatch);
-    }
-
-    const snapshot = reassignMetaIdsOnDbCollision(metaPath, (id) => {
-      const existing = this.query.getScanWorkMap().get(id);
-      return existing !== undefined && existing.physicalPath !== audioPath;
-    });
+    const snapshot = this.snapshotForRestore(metaPath, audioPath, patch);
     return this.registerSingleWorkFromPrepared(prepareSingleMeta(metaPath, snapshot));
   }
 }

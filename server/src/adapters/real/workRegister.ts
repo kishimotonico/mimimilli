@@ -1,4 +1,4 @@
-// ファイルモードからの手動作品登録。メタファイル生成と子作品の登録解除のみ行い、物理ファイルは移動しない。
+// ファイルモードからの手動作品登録。メタファイル生成のみ行い、物理ファイルは移動しない。
 import { existsSync, renameSync, statSync, unlinkSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import type {
@@ -19,7 +19,11 @@ import { toMetaDlsiteState } from "./dlsiteProjection.ts";
 import { META_FILE_NAME, MetaParseError, readMetaFile, readMetaFileRaw } from "./meta.ts";
 import { metaStagingPath } from "./metaStaging.ts";
 import { resolveWithin } from "./paths.ts";
-import { WorkRegisterError } from "../../errors.ts";
+import {
+  descendantsRegisteredError,
+  restoreIdentityConflictError,
+  WorkRegisterError,
+} from "../../errors.ts";
 import type { Db } from "./db.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
@@ -212,29 +216,6 @@ export function unregisterWork(
   }
 }
 
-function unregisterDescendantWorks(
-  query: WorkQueryRepository,
-  catalog: CatalogWorkRepository,
-  user: UserWorkStateRepository,
-  descendants: Array<{ id: string }>,
-): void {
-  const remaining: string[] = [];
-  for (const child of descendants) {
-    try {
-      if (!unregisterWork(query, catalog, user, child.id)) {
-        remaining.push(child.id);
-      }
-    } catch {
-      remaining.push(child.id);
-    }
-  }
-  if (remaining.length > 0) {
-    throw new Error(
-      `親作品の登録は完了しましたが、子作品の登録解除に失敗しました。残存した子作品ID: ${remaining.join(", ")}`,
-    );
-  }
-}
-
 export function buildWorkRegisterPreview(
   query: WorkQueryRepository,
   workDir: string,
@@ -319,7 +300,7 @@ export async function createWorkFromFolder(
   body: WorkCreateBody,
   applyDlsiteCover?: (coverUrl: string, workDir: string) => Promise<string | null>,
 ): Promise<Work> {
-  const { query, catalog, user } = repos;
+  const { query } = repos;
   const workDir = resolveWithin(root, join(root, body.path));
   if (!workDir || !isDirectory(workDir)) {
     throw new WorkRegisterError(
@@ -338,13 +319,7 @@ export async function createWorkFromFolder(
   }
 
   const descendants = query.listDescendantWorkRefs(workDir);
-  if (descendants.length > 0 && !body.mergeDescendantWorks) {
-    throw new WorkRegisterError(
-      "descendants_require_merge",
-      `配下に登録済み作品が${descendants.length}件あります。統合するには mergeDescendantWorks を指定してください`,
-      descendants.length,
-    );
-  }
+  if (descendants.length > 0) throw descendantsRegisteredError(descendants.length);
 
   const orphanedMeta = existsSync(metaPath);
   if (orphanedMeta) {
@@ -356,6 +331,11 @@ export async function createWorkFromFolder(
         throw new WorkRegisterError("invalid_meta", "メタファイルが不正なため復元できません");
       }
       throw error;
+    }
+
+    const existing = query.getScanWorkMap().get(meta.id);
+    if (existing && existing.physicalPath !== workDir && existing.status !== "missing") {
+      throw restoreIdentityConflictError();
     }
 
     const metaPatch: {
@@ -387,7 +367,6 @@ export async function createWorkFromFolder(
       await scanner.restoreFolderWork(workDir, metaPatch),
       "復元した作品の取得に失敗しました",
     );
-    unregisterDescendantWorks(query, catalog, user, descendants);
     return work;
   }
 
@@ -419,7 +398,6 @@ export async function createWorkFromFolder(
     }),
     "登録した作品の取得に失敗しました",
   );
-  unregisterDescendantWorks(query, catalog, user, descendants);
   return work;
 }
 
@@ -488,6 +466,11 @@ async function createWorkFromAudioFile(
         throw new WorkRegisterError("invalid_meta", "メタファイルが不正なため復元できません");
       }
       throw error;
+    }
+
+    const existing = query.getScanWorkMap().get(meta.id);
+    if (existing && existing.physicalPath !== audioPath && existing.status !== "missing") {
+      throw restoreIdentityConflictError();
     }
 
     const metaPatch: {

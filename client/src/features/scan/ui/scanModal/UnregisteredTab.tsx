@@ -80,7 +80,7 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
       const registeredPaths = new Set(registered.map((entry) => entry.path));
       setHiddenPaths((previous) => new Set([...previous, ...registeredPaths]));
       setErrorMessage(
-        failures.length > 0 ? `${failures.length}件はライブラリに追加できませんでした。` : null,
+        failures.length > 0 ? failures.map((failure) => failure.message).join("\n") : null,
       );
       // 部分失敗時も、実際に登録できた分だけがサーバー側の状態。再取得で正しい件数に揃える。
       if (registered.length > 0) void invalidateLibraryQueries(queryClient);
@@ -387,7 +387,10 @@ export default function UnregisteredTab({ candidates, onRegistered }: Unregister
         </>
       )}
       {errorMessage && (
-        <p role="alert" className="font-jp text-secondary text-[var(--r-coral)]">
+        <p
+          role="alert"
+          className="whitespace-pre-line font-jp text-secondary text-[var(--r-coral)]"
+        >
           {errorMessage}
         </p>
       )}

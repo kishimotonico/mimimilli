@@ -228,7 +228,6 @@ export const workCreateBodySchema = z.object({
     .array(tagSchema)
     .default([])
     .transform((tags) => dedupeTags(normalizeTags(tags))),
-  mergeDescendantWorks: z.boolean().default(false),
   dlsite: dlsiteRegistrationBodySchema.optional(),
 });
 /** クライアントが送信するリクエストボディ（tags は正規化前の生 string[]） */

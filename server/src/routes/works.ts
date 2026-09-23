@@ -60,7 +60,8 @@ export function worksRoute(
     } catch (error) {
       if (error instanceof WorkRegisterError) {
         if (error.code === "already_registered") conflict(error.message);
-        if (error.code === "descendants_require_merge") conflict(error.message);
+        if (error.code === "descendants_registered") conflict(error.message);
+        if (error.code === "identity_conflict") conflict(error.message);
         if (error.code === "invalid_meta") conflict(error.message);
         if (error.code === "not_configured") notFound(error.message);
       }
