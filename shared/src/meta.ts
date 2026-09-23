@@ -17,7 +17,7 @@ export const metaFileSchema = z
     id: z.uuid(),
     title: z.string().min(1),
     urls: z.array(urlEntrySchema).default([]),
-    // Source of Truth。API経由の書き込み（workPatchSchema/workCreateBodySchema）と同じ
+    // Source of Truth。API経由の書き込み（workSourcePatchSchema/workCreateBodySchema）と同じ
     // tagSchema + normalizeTags を通す。外部からの直接編集や旧データにも予約文字契約を効かせる。
     tags: z
       .array(tagSchema)

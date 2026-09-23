@@ -117,22 +117,21 @@ test("POST /api/works/:id/resume は存在しない作品を 404 で返す", asy
 test("PATCH /api/works/:id は title/tags を mimimilli.json へ書き戻す", async (t) => {
   const { app, existingWorkId, metaPath } = await setup(t);
 
-  const detailRes = await app.request(`/api/works/${existingWorkId}`);
-  assert.equal(detailRes.status, 200);
-  const detail = (await detailRes.json()) as Work;
-  assert.ok(detail.sourceRevision);
+  const sourceRes = await app.request(`/api/works/${existingWorkId}/source`);
+  assert.equal(sourceRes.status, 200);
+  const source = (await sourceRes.json()) as { sourceRevision: string };
 
   const patchRes = await jsonRequest(app, `/api/works/${existingWorkId}`, {
     method: "PATCH",
     body: {
       title: "改題された作品",
       tags: nts(["cv/水瀬なずな", "新タグ"]),
-      sourceRevision: detail.sourceRevision,
+      sourceRevision: source.sourceRevision,
     },
   });
   assert.equal(patchRes.status, 200);
-  const patched = (await patchRes.json()) as Work;
-  assert.equal(patched.title, "改題された作品");
+  const patched = (await patchRes.json()) as { snapshot: { title: string } };
+  assert.equal(patched.snapshot.title, "改題された作品");
 
   await pollUntil(() => {
     const meta = JSON.parse(readFileSync(metaPath, "utf-8"));

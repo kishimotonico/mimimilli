@@ -107,9 +107,14 @@ export interface TagFilterParams {
   tagOp?: "AND";
 }
 
+export interface SmartFolderFilterParams extends TagFilterParams {
+  q?: string;
+}
+
 /** works query・軸ファセットクエリ・スマートフォルダー評価が共通で使うタグ→クエリ変換。
- *  渡すタグの取捨選択（無条件集計にするか現在の選択込みにするか）は呼び出し側の責務
- *  （軸ファセットの件数基準は valueSelectionContract.ts の deriveFacetCountTags を参照）。 */
+ *  渡すタグの取捨選択は呼び出し側の責務で、値一覧本体（AxisValueRows/AxisValueGrid）は
+ *  常に無条件集計、「＋絞り込み」ポップオーバー（AxisValuePopoverPanel）は現在の選択
+ *  タグ込みで呼び分ける。 */
 export function buildTagFilterParams(selectedTags: NormalizedTag[]): TagFilterParams {
   return selectedTags.length > 0 ? { tags: selectedTags, tagOp: "AND" } : {};
 }
@@ -130,10 +135,37 @@ export function buildWorksParams(input: WorksParamsInput): WorksQueryInput | nul
 }
 
 /** スマートフォルダー評価API（GET /smart-folders/:id/works）へ渡す追加フィルタ。
- *  フォルダーのルールに対する追加の AND 条件として適用される（ADR-0012）。
- *  フィルタが無ければキーを持たない空オブジェクトを返す（クエリキーの安定のため）。 */
-export function buildSmartFolderFilterParams(selectedTags: NormalizedTag[]): TagFilterParams {
-  return buildTagFilterParams(selectedTags);
+ *  tags・q いずれもフォルダーのルール（OR・除外を含む）全体に対する追加の AND 条件として
+ *  適用される（ADR-0012）。フィルタが無ければキーを持たないオブジェクトを返す
+ *  （クエリキーの安定のため）。 */
+export function buildSmartFolderFilterParams(
+  selectedTags: NormalizedTag[],
+  searchQuery: string,
+): SmartFolderFilterParams {
+  const params: SmartFolderFilterParams = buildTagFilterParams(selectedTags);
+  if (searchQuery) params.q = searchQuery;
+  return params;
+}
+
+/** 作品一覧の描画結果（グリッド・リスト・エラー境界）を再マウントすべきタイミングを表す
+ *  安定なキー。スマート軸は sort をフォルダー自身が保持し、この sort が API へ渡らない
+ *  （LibrarySortMenu も参照）ため、nav.sort をキーへ混ぜると効いていない変化で無意味な
+ *  再マウントが起きる。 */
+export interface WorksResetKeyInput {
+  activeAxis: AxisId;
+  selectedTags: NormalizedTag[];
+  sort: SortId;
+  searchQuery: string;
+}
+
+export function buildWorksResetKey(input: WorksResetKeyInput): string {
+  const { activeAxis, selectedTags, sort, searchQuery } = input;
+  return JSON.stringify({
+    axis: activeAxis,
+    tags: selectedTags,
+    sort: isSmartAxis(activeAxis) ? undefined : sort,
+    search: searchQuery,
+  });
 }
 
 /** ファセット一覧（GET /axes/:axis）を取得すべき軸。value-list 種の結果面のみ */

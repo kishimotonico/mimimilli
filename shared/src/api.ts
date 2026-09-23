@@ -1,7 +1,9 @@
 // エンドポイント横断の契約: 作品検索クエリ、ページングエンベロープ、部分更新、エラー形式。
 import { z } from "zod";
 import { dataIntegrityWarningSchema } from "./dataIntegrity.ts";
+import { dlsiteStateSchema } from "./dlsite.ts";
 import { smartFolderRuleSchema, sortIdSchema, viewIdSchema } from "./library.ts";
+import { normalizedTagArraySchema } from "./tagNormalize.ts";
 import {
   dedupeTags,
   normalizeTags,
@@ -9,7 +11,6 @@ import {
   tagSchema,
   urlEntrySchema,
   workListItemSchema,
-  workSchema,
 } from "./work.ts";
 import { splitSelectedTags, type TagFilters } from "./pseudoTag.ts";
 import { dlsiteRegistrationBodySchema, dlsiteStatusSchema, rjCodeFormatSchema } from "./dlsite.ts";
@@ -80,8 +81,10 @@ export type WorksPage = z.infer<typeof worksPageSchema>;
 
 /** GET /api/smart-folders/:id/works のクエリパラメータ。
  *  ソートはフォルダー自身が保持するため含まない。tags はフォルダーのルールに対する
+ *  追加の AND 条件として、q はフォルダーのルール（OR・除外を含む）全体に対する
  *  追加の AND 条件として適用する（ADR-0012、TASK-185） */
 export const smartFolderWorksQuerySchema = worksQueryBaseSchema.pick({
+  q: true,
   tags: true,
   tagOp: true,
   page: true,
@@ -92,7 +95,7 @@ export type SmartFolderWorksQuery = z.infer<typeof smartFolderWorksQuerySchema>;
 
 /** adapter evalSmartFolder が受け取る正規化済みクエリ（page/limit は routes がデフォルト適用後） */
 export type SmartFolderEvalQuery = Required<Pick<SmartFolderWorksQuery, "page" | "limit">> &
-  Partial<Pick<SmartFolderWorksQuery, "tags" | "tagOp" | "seed">>;
+  Partial<Pick<SmartFolderWorksQuery, "q" | "tags" | "tagOp" | "seed">>;
 
 /** POST /api/smart-folders/preview のリクエストボディ。保存前のドラフト条件（rules）を受け取り、
  *  チップ絞り込みを適用しない純粋なルール一致件数を返す（条件エディタのライブ件数プレビュー用） */
@@ -174,31 +177,73 @@ export const unregisterMissingWorksResultSchema = z.object({
 });
 export type UnregisterMissingWorksResult = z.infer<typeof unregisterMissingWorksResultSchema>;
 
-// ── 作品の部分更新（PATCH /api/works/:id）────────────────────
+// ── 編集 snapshot（GET /api/works/:id/source）────────────────
 
-export const workPatchSchema = z
+/** 1回の readMetaSource からだけ組む。閲覧 Work の複製ではない。 */
+export const workEditSnapshotSchema = z.object({
+  sourceRevision: z.string().min(1),
+  id: z.string().min(1),
+  physicalPath: z.string().min(1),
+  title: z.string().min(1),
+  tags: normalizedTagArraySchema,
+  urls: z.array(urlEntrySchema),
+  coverImage: z.string().nullable(),
+  dlsite: dlsiteStateSchema,
+});
+export type WorkEditSnapshot = z.infer<typeof workEditSnapshotSchema>;
+
+export const workProjectionSchema = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("published") }),
+  z.object({
+    status: z.literal("pending"),
+    reason: z.enum(["source_changed", "error", "identity_conflict"]),
+  }),
+]);
+export type WorkProjection = z.infer<typeof workProjectionSchema>;
+
+export const workSourceMutationResultSchema = z.object({
+  snapshot: workEditSnapshotSchema,
+  projection: workProjectionSchema,
+});
+export type WorkSourceMutationResult = z.infer<typeof workSourceMutationResultSchema>;
+
+/** POST /api/works/projection。register-preview と同じ root 相対 path。 */
+export const workProjectionBodySchema = z.object({
+  path: workspacePathSchema,
+});
+export type WorkProjectionBody = z.infer<typeof workProjectionBodySchema>;
+
+// ── 作品正本の部分更新（PATCH /api/works/:id）────────────────
+
+const workSourceTagsSchema = z
+  .array(tagSchema)
+  .transform((tags) => dedupeTags(normalizeTags(tags)));
+
+export const workSourcePatchSchema = z
   .object({
-    sourceRevision: z.string().min(1).optional(),
+    sourceRevision: z.string().min(1),
     title: z.string().min(1).optional(),
     /** タグは契約の入口で正規形へ寄せる（ADR-0005 決定5。prefix 小文字化・trim・重複排除） */
-    tags: z
-      .array(tagSchema)
-      .transform((tags) => dedupeTags(normalizeTags(tags)))
-      .optional(),
-    bookmarked: z.boolean().optional(),
+    tags: workSourceTagsSchema.optional(),
     urls: z.array(urlEntrySchema).optional(),
   })
   .refine(
-    (patch) =>
-      patch.title !== undefined ||
-      patch.tags !== undefined ||
-      patch.bookmarked !== undefined ||
-      patch.urls !== undefined,
+    (patch) => patch.title !== undefined || patch.tags !== undefined || patch.urls !== undefined,
   );
 /** クライアントが送信するリクエストボディ（tags は正規化前の生 string[]） */
-export type WorkPatchInput = z.input<typeof workPatchSchema>;
+export type WorkSourcePatchInput = z.input<typeof workSourcePatchSchema>;
 /** サーバーがパース後に扱う型（tags は正規化済み NormalizedTag[]） */
-export type WorkPatch = z.output<typeof workPatchSchema>;
+export type WorkSourcePatch = z.output<typeof workSourcePatchSchema>;
+
+export const workBookmarkPatchSchema = z.object({
+  bookmarked: z.boolean(),
+});
+export type WorkBookmarkPatch = z.infer<typeof workBookmarkPatchSchema>;
+
+export const workBookmarkResultSchema = z.object({
+  bookmarked: z.boolean(),
+});
+export type WorkBookmarkResult = z.infer<typeof workBookmarkResultSchema>;
 
 // ── 作品の手動登録（POST /api/works, GET /api/works/register-preview）────
 
@@ -226,7 +271,6 @@ export const workCreateBodySchema = z.object({
     .array(tagSchema)
     .default([])
     .transform((tags) => dedupeTags(normalizeTags(tags))),
-  mergeDescendantWorks: z.boolean().default(false),
   dlsite: dlsiteRegistrationBodySchema.optional(),
 });
 /** クライアントが送信するリクエストボディ（tags は正規化前の生 string[]） */
@@ -240,14 +284,14 @@ export const dlsiteFetchByCodeBodySchema = z.object({
 export type DlsiteFetchByCodeBody = z.infer<typeof dlsiteFetchByCodeBodySchema>;
 
 /** POST /api/works のレスポンス */
-export const workCreateResponseSchema = workSchema;
+export const workCreateResponseSchema = workSourceMutationResultSchema;
 export type WorkCreateResponse = z.infer<typeof workCreateResponseSchema>;
 
 export const identityConflictReassignBodySchema = z.object({
   path: workspacePathSchema,
 });
 export type IdentityConflictReassignBody = z.infer<typeof identityConflictReassignBodySchema>;
-export const identityConflictReassignResponseSchema = workSchema;
+export const identityConflictReassignResponseSchema = workSourceMutationResultSchema;
 export type IdentityConflictReassignResponse = z.infer<
   typeof identityConflictReassignResponseSchema
 >;
@@ -299,7 +343,8 @@ export type ExportResponse = z.infer<typeof exportResponseSchema>;
 
 // ── エラー形式 ───────────────────────────────────────────────
 // 4xx/5xx は常にこの形で返す。ステータスコードと code の対応:
-//   404 not_found / 400 invalid_request / 409 conflict|source_changed / 500 internal
+//   404 not_found / 400 invalid_request / 409 conflict|source_changed
+//   / 502 parse_error|error / 503 offline / 500 internal
 
 export const apiErrorSchema = z.object({
   error: z.object({

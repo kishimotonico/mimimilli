@@ -360,8 +360,6 @@ export const workSchema = workSummarySchema
     createdAt: z.string().nullable(),
     playlists: z.array(resolvedPlaylistSchema),
     resume: resumeSchema.nullable(),
-    /** 編集時のmimimilli.json CASに使う、取得時点の正確なsource bytesのrevision。 */
-    sourceRevision: z.string().optional(),
   })
   .superRefine((work, ctx) => {
     refinePlaylistCollection(work.playlists, work.defaultPlaylistId, ctx);

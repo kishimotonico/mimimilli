@@ -33,7 +33,7 @@ test("fixture: カバー内容が変わると version が変わる", async () =>
     applyTags: [],
     applyCover: false,
     applyUrl: false,
-    sourceRevision: before.sourceRevision!,
+    sourceRevision: (await adapter.getWorkEditSnapshot("RJ501001"))!.sourceRevision,
     info: {
       rjCode: "RJ501001",
       title: "カバー内容更新後タイトル",

@@ -38,6 +38,9 @@ export function createSettingsScanMethods(state: FixtureState): SettingsAdapter 
     },
 
     async updateSettings(patch: SettingsUpdate): Promise<Settings> {
+      if (state.rootFolder !== null && state.rootFolder !== patch.rootFolder) {
+        state.scanCandidateExclusions = [];
+      }
       state.rootFolder = patch.rootFolder;
       return {
         rootFolder: state.rootFolder,

@@ -190,24 +190,34 @@ describe("buildWorksParams", () => {
 
 describe("buildSmartFolderFilterParams（スマートフォルダー評価APIへの追加AND条件）", () => {
   it("フィルタが無ければキーの無い空オブジェクトを返す（クエリキーの安定のため）", () => {
-    expect(buildSmartFolderFilterParams([])).toEqual({});
+    expect(buildSmartFolderFilterParams([], "")).toEqual({});
   });
   it("実タグは tags/tagOp として渡す", () => {
-    expect(buildSmartFolderFilterParams(["cv/藤田茜", "サークル/月白製作所"])).toEqual({
+    expect(buildSmartFolderFilterParams(["cv/藤田茜", "サークル/月白製作所"], "")).toEqual({
       tags: ["cv/藤田茜", "サークル/月白製作所"],
       tagOp: "AND",
     });
   });
   it("year 擬似タグも tags にそのまま渡す（サーバー側で解釈する、TASK-199）", () => {
-    expect(buildSmartFolderFilterParams(["@year/2024"])).toEqual({
+    expect(buildSmartFolderFilterParams(["@year/2024"], "")).toEqual({
       tags: ["@year/2024"],
       tagOp: "AND",
     });
   });
   it("実タグとyear擬似タグを同時に渡せる", () => {
-    expect(buildSmartFolderFilterParams(["cv/藤田茜", "@year/2024"])).toEqual({
+    expect(buildSmartFolderFilterParams(["cv/藤田茜", "@year/2024"], "")).toEqual({
       tags: ["cv/藤田茜", "@year/2024"],
       tagOp: "AND",
+    });
+  });
+  it("作品検索qはフォルダーのルール全体への追加AND条件としてqに渡す", () => {
+    expect(buildSmartFolderFilterParams([], "藤田茜")).toEqual({ q: "藤田茜" });
+  });
+  it("qとタグを同時に渡せる", () => {
+    expect(buildSmartFolderFilterParams(["cv/藤田茜"], "ASMR")).toEqual({
+      tags: ["cv/藤田茜"],
+      tagOp: "AND",
+      q: "ASMR",
     });
   });
 });

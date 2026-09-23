@@ -43,6 +43,9 @@ export interface FixtureState {
   scanInvalidMetaFiles: InvalidMetaFile[];
   /** listSummaries でタグ等の不整合により除外した作品の報告（シナリオ errors のみ） */
   dataIntegrityWarning: DataIntegrityWarning | undefined;
+  /** 編集 snapshot の CAS トークン（ファイルが無い fixture 用） */
+  sourceRevisions: Map<string, string>;
+  sourceRevisionSeq: number;
 }
 
 /** dataIntegrityWarning のダミー除外対象workId（実在の works には含めない） */
@@ -101,6 +104,8 @@ export function createInitialState(options: FixtureAdapterOptions): FixtureState
       scenario.id === "errors"
         ? { skippedCount: 1, skippedWorkIds: [DATA_INTEGRITY_WARNING_SKIPPED_WORK_ID] }
         : undefined,
+    sourceRevisions: new Map(works.map((work) => [work.id, "fixture"])),
+    sourceRevisionSeq: 0,
   };
 }
 

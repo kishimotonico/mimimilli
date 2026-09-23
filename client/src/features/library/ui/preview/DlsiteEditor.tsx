@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import type { DlsitePreview, Work } from "@mimimilli/shared";
+import {
+  detectRjCode,
+  type DlsitePreview,
+  type Work,
+  type WorkEditSnapshot,
+  type WorkProjection,
+} from "@mimimilli/shared";
 import { applyDlsiteInfo, fetchDlsiteInfo, updateDlsiteState } from "../../../../entities/work/api";
 import {
   dlsiteApplyErrorMessage,
@@ -13,6 +19,12 @@ import { I } from "../../../../shared/ui/Icon";
 import TextInput from "../../../../shared/ui/TextInput";
 import { useDialogModal } from "../../../../shared/ui/useDialogModal";
 import { WORK_QUERY_KEYS } from "../../../../entities/work/queryKeys";
+import { SourceProjectionNotice } from "../../../../entities/work/ui/SourceProjectionNotice";
+import {
+  projectionWorkspacePath,
+  sourceMutationErrorMessage,
+} from "../../../../entities/work/sourceMutation";
+import { useRootFolderOrNull } from "../../../../entities/settings/useSettingsQuery";
 import { useDlsiteInvalidation } from "../../../../entities/dlsite/useDlsiteInvalidation";
 import { useToast } from "../../../../shared/ui/useToast";
 import {
@@ -29,6 +41,16 @@ export const STATUS_LABEL = {
   error: "取得エラー",
   skipped: "連携しない",
 } as const;
+
+function folderNameOf(physicalPath: string): string {
+  const cut = Math.max(physicalPath.lastIndexOf("/"), physicalPath.lastIndexOf("\\"));
+  return cut < 0 ? physicalPath : physicalPath.slice(cut + 1);
+}
+
+function initialRjCode(snapshot: WorkEditSnapshot): string {
+  if (snapshot.dlsite.rjCode !== null) return snapshot.dlsite.rjCode;
+  return detectRjCode([folderNameOf(snapshot.physicalPath), snapshot.title]) ?? "";
+}
 
 interface DlsiteDiffRowProps {
   label: string;
@@ -190,11 +212,11 @@ function DlsiteApplyDialog({
   );
 }
 
-export function DlsiteEditor({ work }: { work: Work }) {
+export function DlsiteEditor({ workId, snapshot }: { workId: string; snapshot: WorkEditSnapshot }) {
   const queryClient = useQueryClient();
   const invalidateDlsiteCache = useDlsiteInvalidation();
   const toast = useToast();
-  const [rjCode, setRjCode] = useState(work.dlsite.rjCode ?? "");
+  const [rjCode, setRjCode] = useState(initialRjCode(snapshot));
   const [preview, setPreview] = useState<DlsitePreview | null>(null);
   const [applyTitle, setApplyTitle] = useState(false);
   const [applyCover, setApplyCover] = useState(true);
@@ -202,23 +224,45 @@ export function DlsiteEditor({ work }: { work: Work }) {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const diff = preview ? computeDlsiteApplyDiff(work, preview.info) : null;
+  const [projection, setProjection] = useState<WorkProjection | null>(null);
+  const rootFolder = useRootFolderOrNull();
+  const diffSource: Pick<Work, "title" | "tags" | "urls" | "coverKind" | "coverImage" | "cover"> = {
+    title: snapshot.title,
+    tags: snapshot.tags,
+    urls: snapshot.urls,
+    coverKind: snapshot.coverImage ? "unmeasured" : "none",
+    coverImage: snapshot.coverImage,
+    cover: null,
+  };
+  const diff = preview ? computeDlsiteApplyDiff(diffSource, preview.info) : null;
 
-  useEffect(() => setRjCode(work.dlsite.rjCode ?? ""), [work.dlsite.rjCode]);
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- 検出の再計算は作品切替と保存済みコードだけ
+  useEffect(() => setRjCode(initialRjCode(snapshot)), [snapshot.id, snapshot.dlsite.rjCode]);
 
-  const refresh = async (updated?: Work) => {
-    if (updated) queryClient.setQueryData(WORK_QUERY_KEYS.detail(work.id), updated);
-    await invalidateDlsiteCache(updated ? undefined : work.id);
+  const rememberSnapshot = (next: WorkEditSnapshot) => {
+    queryClient.setQueryData(WORK_QUERY_KEYS.source(workId), next);
+  };
+
+  const refresh = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.detail(workId), exact: true }),
+      invalidateDlsiteCache(workId),
+    ]);
   };
 
   const saveCode = async () => {
     setBusy(true);
     setError(null);
     try {
-      const updated = await updateDlsiteState(work.id, { rjCode: rjCode.trim() || null });
-      await refresh(updated);
+      const result = await updateDlsiteState(workId, {
+        sourceRevision: snapshot.sourceRevision,
+        rjCode: rjCode.trim() || null,
+      });
+      rememberSnapshot(result.snapshot);
+      setProjection(result.projection);
+      await refresh();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "コードを保存できませんでした");
+      setError(sourceMutationErrorMessage(cause, "コードを保存できませんでした"));
     } finally {
       setBusy(false);
     }
@@ -228,12 +272,27 @@ export function DlsiteEditor({ work }: { work: Work }) {
     setBusy(true);
     setError(null);
     try {
-      if (rjCode.trim().toUpperCase() !== work.dlsite.rjCode) {
-        const updated = await updateDlsiteState(work.id, { rjCode: rjCode.trim() || null });
-        queryClient.setQueryData(WORK_QUERY_KEYS.detail(work.id), updated);
+      let current = snapshot;
+      if (rjCode.trim().toUpperCase() !== snapshot.dlsite.rjCode) {
+        const updated = await updateDlsiteState(workId, {
+          sourceRevision: snapshot.sourceRevision,
+          rjCode: rjCode.trim() || null,
+        });
+        rememberSnapshot(updated.snapshot);
+        current = updated.snapshot;
       }
-      const nextPreview = await fetchDlsiteInfo(work.id);
-      const nextDiff = computeDlsiteApplyDiff(work, nextPreview.info);
+      const nextPreview = await fetchDlsiteInfo(workId);
+      const nextDiff = computeDlsiteApplyDiff(
+        {
+          title: current.title,
+          tags: current.tags,
+          urls: current.urls,
+          coverKind: current.coverImage ? "unmeasured" : "none",
+          coverImage: current.coverImage,
+          cover: null,
+        },
+        nextPreview.info,
+      );
       if (!nextDiff.hasChanges) {
         toast.show({
           message: "DLsiteの情報は現在の内容と同じでした",
@@ -244,8 +303,8 @@ export function DlsiteEditor({ work }: { work: Work }) {
       }
       setSelectedTags(nextDiff.newTags);
       setApplyTitle(false);
-      setApplyCover(!work.cover && Boolean(nextPreview.info.coverUrl));
-      setApplyUrl(!work.urls.some((entry) => entry.url.includes("dlsite.com")));
+      setApplyCover(!current.coverImage && Boolean(nextPreview.info.coverUrl));
+      setApplyUrl(!current.urls.some((entry) => entry.url.includes("dlsite.com")));
       setPreview(nextPreview);
     } catch (cause) {
       setError(dlsiteFetchErrorMessage(cause));
@@ -260,8 +319,8 @@ export function DlsiteEditor({ work }: { work: Work }) {
     setBusy(true);
     setError(null);
     try {
-      await applyDlsiteInfo(
-        work.id,
+      const result = await applyDlsiteInfo(
+        workId,
         buildDlsiteApplyBody(preview.info, {
           sourceRevision: preview.sourceRevision,
           applyTitle,
@@ -270,6 +329,8 @@ export function DlsiteEditor({ work }: { work: Work }) {
           applyTags: selectedTags,
         }),
       );
+      rememberSnapshot(result.snapshot);
+      setProjection(result.projection);
       setPreview(null);
       await refresh();
       toast.show({ message: "DLsite情報を適用しました", variant: "success", priority: "notice" });
@@ -284,21 +345,24 @@ export function DlsiteEditor({ work }: { work: Work }) {
     setBusy(true);
     setError(null);
     try {
-      const updated = await updateDlsiteState(work.id, {
-        skipped: work.dlsite.status !== "skipped",
+      const result = await updateDlsiteState(workId, {
+        sourceRevision: snapshot.sourceRevision,
+        skipped: snapshot.dlsite.status !== "skipped",
       });
-      await refresh(updated);
+      rememberSnapshot(result.snapshot);
+      setProjection(result.projection);
+      await refresh();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "連携設定を変更できませんでした");
+      setError(sourceMutationErrorMessage(cause, "連携設定を変更できませんでした"));
     } finally {
       setBusy(false);
     }
   };
 
   const statusTone =
-    work.dlsite.status === "applied"
+    snapshot.dlsite.status === "applied"
       ? "bg-[color-mix(in_oklch,var(--r-leaf)_12%,transparent)] text-[var(--r-leaf)]"
-      : work.dlsite.status === "error" || work.dlsite.status === "not_found"
+      : snapshot.dlsite.status === "error" || snapshot.dlsite.status === "not_found"
         ? "bg-[color-mix(in_oklch,var(--r-coral)_12%,transparent)] text-[var(--r-coral)]"
         : "bg-paper-3 text-ink-2";
 
@@ -311,15 +375,15 @@ export function DlsiteEditor({ work }: { work: Work }) {
           </h3>
           <span
             className={`rounded-pill px-2 py-0.5 font-sans text-label ${statusTone}`}
-            title={work.dlsite.error ?? undefined}
+            title={snapshot.dlsite.error ?? undefined}
           >
-            {STATUS_LABEL[work.dlsite.status]}
+            {STATUS_LABEL[snapshot.dlsite.status]}
           </span>
         </div>
         <label className="flex items-center gap-1.5 font-jp text-secondary text-ink-2">
           <input
             type="checkbox"
-            checked={work.dlsite.status === "skipped"}
+            checked={snapshot.dlsite.status === "skipped"}
             disabled={busy}
             onChange={() => void toggleSkipped()}
           />
@@ -341,7 +405,7 @@ export function DlsiteEditor({ work }: { work: Work }) {
         </Button>
         <Button
           variant="primary"
-          disabled={busy || !rjCode.trim() || work.dlsite.status === "skipped"}
+          disabled={busy || !rjCode.trim() || snapshot.dlsite.status === "skipped"}
           onClick={() => void fetchInfo()}
         >
           取得結果を確認
@@ -352,6 +416,14 @@ export function DlsiteEditor({ work }: { work: Work }) {
           {error}
         </p>
       )}
+      <SourceProjectionNotice
+        projection={projection}
+        path={rootFolder ? projectionWorkspacePath(snapshot, rootFolder) : null}
+        onProjected={(result) => {
+          rememberSnapshot(result.snapshot);
+          setProjection(result.projection);
+        }}
+      />
       {diff && (
         <DlsiteApplyDialog
           diff={diff}

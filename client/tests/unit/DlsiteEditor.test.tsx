@@ -3,7 +3,12 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { emptyDlsiteState, type DlsitePreview, type Work } from "@mimimilli/shared";
+import {
+  emptyDlsiteState,
+  type DlsitePreview,
+  type Work,
+  type WorkEditSnapshot,
+} from "@mimimilli/shared";
 import { DlsiteEditor } from "../../src/features/library/ui/preview/DlsiteEditor";
 import { dlsiteInvalidateAtom } from "../../src/entities/dlsite/model/bulkAtoms";
 import GlobalToast from "../../src/app/ui/GlobalToast";
@@ -43,6 +48,19 @@ function makeWork(overrides: Partial<Work> = {}): Work {
   };
 }
 
+function makeSnapshot(work: Work): WorkEditSnapshot {
+  return {
+    sourceRevision: "rev-1",
+    id: work.id,
+    physicalPath: work.physicalPath,
+    title: work.title,
+    tags: work.tags,
+    urls: work.urls,
+    coverImage: work.coverImage,
+    dlsite: work.dlsite,
+  };
+}
+
 function renderEditor(work: Work) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -56,14 +74,24 @@ function renderEditor(work: Work) {
       createElement(JotaiProvider, { store }, children),
     );
 
-  render(
+  const view = render(
     <>
-      <DlsiteEditor work={work} />
+      <DlsiteEditor workId={work.id} snapshot={makeSnapshot(work)} />
       <GlobalToast />
     </>,
     { wrapper },
   );
-  return store;
+  return {
+    store,
+    rerender(next: Work) {
+      view.rerender(
+        <>
+          <DlsiteEditor workId={next.id} snapshot={makeSnapshot(next)} />
+          <GlobalToast />
+        </>,
+      );
+    },
+  };
 }
 
 describe("DlsiteEditor", () => {
@@ -97,7 +125,10 @@ describe("DlsiteEditor", () => {
       sourceRevision: "rev-1",
     };
     fetchDlsiteInfo.mockResolvedValue(preview);
-    applyDlsiteInfo.mockResolvedValue(undefined);
+    applyDlsiteInfo.mockResolvedValue({
+      snapshot: makeSnapshot(makeWork({ title: "取得タイトル" })),
+      projection: { status: "published" },
+    });
 
     renderEditor(work);
     fireEvent.click(screen.getByRole("button", { name: "取得結果を確認" }));
@@ -202,5 +233,41 @@ describe("DlsiteEditor", () => {
       expect(screen.getByText("DLsiteの情報は現在の内容と同じでした")).toBeInTheDocument(),
     );
     expect(screen.queryByText("DLsite情報の適用")).not.toBeInTheDocument();
+  });
+
+  it("rjCodeがnullのときフォルダー名から検出した値を初期表示する", () => {
+    renderEditor(
+      makeWork({
+        physicalPath: "/lib/RJ900001_作品",
+        title: "作品",
+        dlsite: emptyDlsiteState(),
+      }),
+    );
+    expect(screen.getByLabelText("DLsite RJ/VJコード")).toHaveValue("RJ900001");
+  });
+
+  it("明示の空RJコードではフォルダー名から検出しない", () => {
+    renderEditor(
+      makeWork({
+        physicalPath: "/lib/RJ900001_作品",
+        dlsite: { ...emptyDlsiteState(), rjCode: "" },
+      }),
+    );
+    expect(screen.getByLabelText("DLsite RJ/VJコード")).toHaveValue("");
+  });
+
+  it("タイトル保存でwork参照が変わっても入力中のRJコードは残る", () => {
+    const work = makeWork({
+      physicalPath: "/lib/RJ900001_作品",
+      title: "作品",
+      dlsite: emptyDlsiteState(),
+    });
+    const { rerender } = renderEditor(work);
+    const input = screen.getByLabelText("DLsite RJ/VJコード");
+    expect(input).toHaveValue("RJ900001");
+    fireEvent.change(input, { target: { value: "RJ111111" } });
+    expect(input).toHaveValue("RJ111111");
+    rerender({ ...work, title: "保存したタイトル" });
+    expect(screen.getByLabelText("DLsite RJ/VJコード")).toHaveValue("RJ111111");
   });
 });

@@ -8,14 +8,21 @@ import ConfirmDialog from "../../../../shared/ui/ConfirmDialog";
 import IconButton from "../../../../shared/ui/IconButton";
 import TagCombobox from "../../../../shared/ui/TagCombobox";
 import { useToast } from "../../../../shared/ui/useToast";
-import { apiErrorMessage } from "../../../../shared/lib/apiError";
-import { canPatchWorkSource } from "../../../../entities/work/sourceRevision";
-import type { LibraryTagsPatchMutation } from "../../model/useLibraryQueries";
+import {
+  sourceMutationErrorMessage,
+  projectionWorkspacePath,
+} from "../../../../entities/work/sourceMutation";
+import { SourceProjectionNotice } from "../../../../entities/work/ui/SourceProjectionNotice";
+import { useRootFolderOrNull } from "../../../../entities/settings/useSettingsQuery";
+import type { LibraryTagIntentMutation } from "../../model/useLibraryQueries";
 import { useTagPrefixes } from "../../../../entities/tag/useTagPrefixes";
 import { tagPrefixDefinition } from "../../../../entities/tag/tagPrefixDefinition";
 import { useAnchoredPopover } from "../../../../shared/ui/useAnchoredPopover";
 import { useWorkTagEditor } from "./useWorkTagEditor";
-import { WorkSourcePatchBlockedNotice } from "./WorkSourcePatchBlockedNotice";
+import {
+  sourceCommandBlockMessage,
+  WorkSourcePatchBlockedNotice,
+} from "./WorkSourcePatchBlockedNotice";
 
 const TAG_POPOVER_WIDTH = 260;
 // 詳細ペインをタグで圧迫せず、優先度の高い分類を一目で確認できる表示上限。
@@ -27,7 +34,8 @@ const NARROW_TAG_PANE_PX = 320;
 interface WorkTagEditorProps {
   work: Work;
   tagSuggestions: string[];
-  tagsMutation: LibraryTagsPatchMutation;
+  addTagMutation: LibraryTagIntentMutation;
+  removeTagMutation: LibraryTagIntentMutation;
   /** 編集ダイアログなど、折りたたむ必要がない場所では全タグを表示する。
    *  この場合は編集ダイアログ自体が明示的な編集操作なので削除ボタンは常時表示のまま。 */
   expanded?: boolean;
@@ -39,10 +47,12 @@ interface WorkTagEditorProps {
 export function WorkTagEditor({
   work,
   tagSuggestions,
-  tagsMutation,
+  addTagMutation,
+  removeTagMutation,
   expanded = false,
   onTagClick,
 }: WorkTagEditorProps) {
+  const rootFolder = useRootFolderOrNull();
   const [isTagPopoverOpen, setIsTagPopoverOpen] = useState(false);
   const [areAllTagsVisible, setAreAllTagsVisible] = useState(false);
   // 削除✕ボタンは誤操作防止のため既定で非表示（追加の2段階フローと対称にする）。
@@ -68,7 +78,40 @@ export function WorkTagEditor({
     undoRemoveTag,
     dismissTagUndoToast,
     resetPatchTagsError,
-  } = useWorkTagEditor({ work, tagSuggestions, tagPrefixes, tagsMutation });
+  } = useWorkTagEditor({
+    workId: work.id,
+    tags: work.tags,
+    tagSuggestions,
+    tagPrefixes,
+    addTagMutation,
+    removeTagMutation,
+  });
+
+  const [blockedMessage, setBlockedMessage] = useState<string | null>(() =>
+    sourceCommandBlockMessage(patchTagsError),
+  );
+  const [blockEpoch, setBlockEpoch] = useState({
+    id: work.id,
+    title: work.title,
+    tags: work.tags,
+    urls: work.urls,
+  });
+  if (
+    blockEpoch.id !== work.id ||
+    blockEpoch.title !== work.title ||
+    blockEpoch.tags !== work.tags ||
+    blockEpoch.urls !== work.urls
+  ) {
+    setBlockEpoch({ id: work.id, title: work.title, tags: work.tags, urls: work.urls });
+    setBlockedMessage(null);
+  }
+
+  useEffect(() => {
+    const message = sourceCommandBlockMessage(patchTagsError);
+    if (message) setBlockedMessage(message);
+  }, [patchTagsError]);
+
+  const canEditTags = blockedMessage === null;
 
   const closeTagPopover = () => setIsTagPopoverOpen(false);
   const {
@@ -91,12 +134,11 @@ export function WorkTagEditor({
 
   const selectTag = (tag: string) => {
     close();
+    if (!canEditTags) return;
     void addTag(tag);
   };
 
   const definitionOf = (tag: string) => tagPrefixDefinition(tag, tagPrefixes);
-
-  const canEditTags = canPatchWorkSource(work.sourceRevision);
 
   const comboboxProps = {
     suggestions,
@@ -107,9 +149,10 @@ export function WorkTagEditor({
     onCancel: close,
   };
 
-  const patchTagsErrorMessage = patchTagsError
-    ? apiErrorMessage(patchTagsError, "タグを保存できませんでした。")
-    : null;
+  const patchTagsErrorMessage =
+    sourceCommandBlockMessage(patchTagsError) === null && patchTagsError
+      ? sourceMutationErrorMessage(patchTagsError, "タグを保存できませんでした。")
+      : null;
 
   const { show: showToast, dismiss: dismissToast } = useToast();
   useEffect(() => {
@@ -141,6 +184,10 @@ export function WorkTagEditor({
     showToast,
     dismissToast,
   ]);
+
+  useEffect(() => {
+    if (!canEditTags) setIsTagPopoverOpen(false);
+  }, [canEditTags]);
 
   return (
     <>
@@ -228,7 +275,20 @@ export function WorkTagEditor({
           </div>
         </div>
       </div>
-      <WorkSourcePatchBlockedNotice sourceRevision={work.sourceRevision} />
+      <WorkSourcePatchBlockedNotice message={blockedMessage} />
+      <SourceProjectionNotice
+        projection={
+          (addTagMutation.submittedAt >= removeTagMutation.submittedAt
+            ? addTagMutation.data
+            : removeTagMutation.data
+          )?.projection
+        }
+        path={
+          rootFolder
+            ? projectionWorkspacePath({ physicalPath: work.physicalPath }, rootFolder)
+            : null
+        }
+      />
       {confirmingRemoveTag && (
         <ConfirmDialog
           title="保護タグの削除"

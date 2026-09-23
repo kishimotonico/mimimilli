@@ -6,6 +6,7 @@ import type {
   DlsiteRegistrationBody,
   DlsiteWorkInfo,
   WorkRegisterPreview,
+  WorkSourceMutationResult,
 } from "@mimimilli/shared";
 import { ApiRequestError } from "../../../shared/api/http";
 import Button from "../../../shared/ui/Button";
@@ -24,13 +25,14 @@ import { dlsiteInfoTags } from "@mimimilli/shared";
 import { buildDlsiteRegistrationBody } from "../../../entities/work/dlsitePreview";
 import { dlsiteFetchErrorMessage } from "../../../entities/work/dlsiteFetchError";
 import { apiErrorMessage } from "../../../shared/lib/apiError";
+import { sourceMutationErrorMessage } from "../../../entities/work/sourceMutation";
 import { createWork, fetchDlsiteInfoByCode } from "../api";
 
 interface RegisterWorkDialogProps {
   folderPath: string;
   targetKind?: "folder" | "file";
   preview: WorkRegisterPreview;
-  onRegistered: () => void;
+  onRegistered: (result: WorkSourceMutationResult) => void;
   onClose: () => void;
 }
 
@@ -80,12 +82,11 @@ export default function RegisterWorkDialog({
         path: folderPath,
         title: title.trim(),
         tags,
-        mergeDescendantWorks: preview.descendantWorkCount > 0,
         dlsite,
       });
     },
-    onSuccess: () => {
-      onRegistered();
+    onSuccess: (result) => {
+      onRegistered(result);
       onClose();
     },
   });
@@ -142,7 +143,7 @@ export default function RegisterWorkDialog({
         : apiErrorMessage(dlsiteMutation.error, "DLsite情報の取得に失敗しました")
       : null);
   const submitError = registerMutation.error
-    ? apiErrorMessage(registerMutation.error, "作品の登録に失敗しました")
+    ? sourceMutationErrorMessage(registerMutation.error, "作品の登録に失敗しました")
     : null;
 
   return createPortal(
@@ -178,8 +179,8 @@ export default function RegisterWorkDialog({
 
           {preview.descendantWorkCount > 0 && (
             <p className="mb-3 rounded-[6px] border border-[color-mix(in_oklch,var(--r-coral)_35%,transparent)] bg-[color-mix(in_oklch,var(--r-coral)_8%,transparent)] px-3 py-2 text-secondary leading-[1.6] text-ink-1">
-              登録済み作品 <b>{preview.descendantWorkCount}</b> 件を解除して統合します。
-              子作品の履歴・タグは引き継がれません。
+              配下に登録済み作品が <b>{preview.descendantWorkCount}</b>{" "}
+              件あります。先に子作品の登録を解除してから親を登録してください。
             </p>
           )}
 
@@ -289,7 +290,7 @@ export default function RegisterWorkDialog({
           </Button>
           <Button
             variant="primary"
-            disabled={submitBusy || title.trim().length === 0}
+            disabled={submitBusy || title.trim().length === 0 || preview.descendantWorkCount > 0}
             onClick={() => registerMutation.mutate()}
           >
             登録

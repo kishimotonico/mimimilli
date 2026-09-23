@@ -45,11 +45,13 @@ export async function previewSmartFolderRuleCount(
   return total;
 }
 
-/** tags はフォルダーのルールに対する追加の AND 条件（ADR-0012） */
+/** tags と q はフォルダーのルール（OR・除外を含む）全体に対する追加の AND 条件
+ *  （ADR-0012） */
 export interface SmartFolderWorksParams {
   page: number;
   limit: number;
   seed?: number;
+  q?: string;
   tags?: string[];
   tagOp?: "AND" | "OR";
 }
@@ -60,6 +62,7 @@ export async function evalSmartFolder(
   options?: { signal?: AbortSignal },
 ): Promise<WorksPage> {
   const p = new URLSearchParams();
+  if (params.q) p.set("q", params.q);
   for (const tag of params.tags ?? []) p.append("tags", tag);
   if (params.tagOp) p.set("tagOp", params.tagOp);
   if (params.seed !== undefined) p.set("seed", String(params.seed));

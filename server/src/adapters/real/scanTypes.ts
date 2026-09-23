@@ -9,10 +9,28 @@ import type { MetaParseError } from "./meta.ts";
 import type { CoverColumns, ScanWorkState } from "./workRowMapping.ts";
 import type { WorkRevisions } from "./fingerprint.ts";
 
+export type ProjectOutcome =
+  | {
+      status: "published";
+      snapshot: { meta: MetaFile; bytes: Buffer; sourceRevision: string };
+    }
+  | {
+      status: "unpublished";
+      reason: "source_changed";
+      snapshot: { meta: MetaFile; bytes: Buffer; sourceRevision: string };
+      currentSourceRevision: string | null;
+    }
+  | {
+      status: "unpublished";
+      reason: "error";
+      snapshot: { meta: MetaFile; bytes: Buffer; sourceRevision: string };
+    };
+
 export interface PreparedMeta {
   kind: "ok";
   metaPath: string;
   meta: MetaFile;
+  bytes: Buffer;
   revisions: WorkRevisions;
   cachedRevisions: WorkRevisions | undefined;
   /** DB上の前回スキャン時の status。error は fingerprint スキップの対象外。 */

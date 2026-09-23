@@ -32,7 +32,7 @@ test("POST /api/dlsite/apply-missing: 空 body と {} は全件適用", async ()
     let received: string[] | undefined = ["not-called"];
     adapter.dlsiteApplyMissing = async (workIds) => {
       received = workIds;
-      return { applied: 0, skipped: 0, failed: 0 };
+      return { applied: 0, pending: 0, skipped: 0, failed: 0 };
     };
     const res = await postApplyMissing(createApp(adapter), { body });
     assert.equal(res.status, 200, body ?? "empty");
@@ -45,7 +45,7 @@ test("POST /api/dlsite/apply-missing: workIds 指定時はその配列を渡す"
   let received: string[] | undefined;
   adapter.dlsiteApplyMissing = async (workIds) => {
     received = workIds;
-    return { applied: 1, skipped: 0, failed: 0 };
+    return { applied: 1, pending: 0, skipped: 0, failed: 0 };
   };
   const res = await postApplyMissing(createApp(adapter), {
     body: JSON.stringify({ workIds: ["RJ501001"] }),
@@ -71,7 +71,7 @@ test("POST /api/dlsite/apply-missing: 不正 JSON・null・型不正 workIds は
     let called = false;
     adapter.dlsiteApplyMissing = async () => {
       called = true;
-      return { applied: 0, skipped: 0, failed: 0 };
+      return { applied: 0, pending: 0, skipped: 0, failed: 0 };
     };
     const res = await postApplyMissing(createApp(adapter), {
       body,

@@ -1,6 +1,7 @@
 import { buildBuiltinAxisTag, splitSelectedTags, type NormalizedTag } from "@mimimilli/shared";
 import type { AppMode } from "../../../shared/model/appMode";
-import { isViewAxis } from "../../../entities/library/axisDefinitions";
+import { isSmartAxis, isViewAxis } from "../../../entities/library/axisDefinitions";
+import { computeResultsPaneKind } from "../../../entities/library/resultsPane";
 import type { AxisId, SortId } from "../../../entities/library/types";
 
 export type { AppMode };
@@ -148,7 +149,10 @@ export function parseNavigationUrl(input: string | URL): NavigationParseResult {
       return defaultResult(warnings);
     }
 
-    const selectedTags = parseAndValidateSelectedTags(url.searchParams.getAll("tags"), warnings);
+    const isValueList = computeResultsPaneKind(axis) === "value-list";
+    const selectedTags = isValueList
+      ? []
+      : parseAndValidateSelectedTags(url.searchParams.getAll("tags"), warnings);
 
     const selectedWorkId = url.searchParams.get("work") || null;
     const sortValue = url.searchParams.get("sort");
@@ -156,7 +160,9 @@ export function parseNavigationUrl(input: string | URL): NavigationParseResult {
     if (sortValue && sort === DEFAULT_SORT && sortValue !== DEFAULT_SORT) {
       warnings.push(`存在しない sort を既定値へ戻しました: ${sortValue}`);
     }
-    const q = url.searchParams.get("q") ?? "";
+    // 値一覧は現在の絞り込みと独立した全作品の入口（ADR-0026）。効かないq・tagsを
+    // URLから復元しない。
+    const q = isValueList ? "" : (url.searchParams.get("q") ?? "");
 
     const state: NavigationUrlState = {
       mode: "library",
@@ -221,7 +227,9 @@ export function serializeNavigationUrl(state: NavigationUrlState): string {
     const pathname = `/library/${encodeURIComponent(activeAxis)}`;
     for (const tag of selectedTags) params.append("tags", tag);
     if (selectedWorkId) params.set("work", selectedWorkId);
-    if (sort !== DEFAULT_SORT) params.set("sort", sort);
+    // スマート軸の sort はフォルダー自身が保持し、この URL の sort= は効かない
+    // （LibrarySortMenu 参照）。効いていない値をURLへ残さない
+    if (!isSmartAxis(activeAxis) && sort !== DEFAULT_SORT) params.set("sort", sort);
     if (q) params.set("q", q);
     const search = params.toString();
     return search ? `${pathname}?${search}` : pathname;

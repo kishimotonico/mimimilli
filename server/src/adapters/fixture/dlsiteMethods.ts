@@ -9,14 +9,14 @@ import type {
   DlsiteBulkResult,
   DlsiteFetchResult,
   DlsiteState,
-  DlsiteStatePatch,
-  Work,
+  DlsiteStateUpdateBody,
+  WorkSourceMutationResult,
   WorkSummary,
 } from "@mimimilli/shared";
 import type { DlsiteAdapter } from "../../adapter/dlsite.ts";
 import { fixtureCoverFromColumns, type FixtureCoverColumns } from "./data.ts";
 import type { FixtureState } from "./state.ts";
-import { buildFullWorkFromState } from "./playback.ts";
+import { fixtureSourceMutation, requireFixtureRevision } from "./works.ts";
 
 /** このRJコードを持つ作品は dlsiteFetchByCode が常に取得失敗を返す（real/fixture契約テスト用） */
 export const FIXTURE_DLSITE_FETCH_FAILURE_RJ_CODE = "RJ000404";
@@ -61,6 +61,7 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
     async dlsiteApplyMissing(workIds) {
       const candidates = state.works.filter((work) => !workIds || workIds.includes(work.id));
       let applied = 0;
+      let pending = 0;
       let skipped = 0;
       let failed = 0;
       for (const work of candidates) {
@@ -84,7 +85,7 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
         }
         applied += 1;
       }
-      return { applied, skipped, failed };
+      return { applied, pending, skipped, failed };
     },
 
     async dlsiteApplyMissingPreview(workIds) {
@@ -105,12 +106,19 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
       workId: string,
       body: import("@mimimilli/shared").DlsiteApplyBody,
       _options?: { signal?: AbortSignal },
-    ): Promise<boolean> {
+    ): Promise<WorkSourceMutationResult | null> {
       const work = state.works.find((w) => w.id === workId);
-      if (!work) return false;
+      if (!work) return null;
+      requireFixtureRevision(state, workId, body.sourceRevision);
       if (body.applyTitle) work.title = body.info.title;
       const { applyTags } = body;
       work.tags = mergeAppliedDlsiteTags(work.tags, applyTags);
+      if (body.applyUrl && body.info.url) {
+        work.urls = [
+          ...work.urls.filter((entry) => !entry.url.includes("dlsite.com")),
+          { label: "DLsite", url: body.info.url },
+        ];
+      }
       if (body.applyCover && body.info.coverUrl) {
         const dimensions = work.cover?.dimensions ?? { width: 900, height: 900 };
         const columns: FixtureCoverColumns = {
@@ -120,14 +128,19 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
         state.coverColumns.set(workId, columns);
         work.cover = fixtureCoverFromColumns(work, columns);
       }
-      return true;
+      return fixtureSourceMutation(state, work);
     },
 
-    async updateDlsiteState(workId: string, patch: DlsiteStatePatch): Promise<Work | null> {
+    async updateDlsiteState(
+      workId: string,
+      body: DlsiteStateUpdateBody,
+    ): Promise<WorkSourceMutationResult | null> {
       const work = state.works.find((candidate) => candidate.id === workId);
       if (!work) return null;
+      requireFixtureRevision(state, workId, body.sourceRevision);
+      const { sourceRevision: _sourceRevision, ...patch } = body;
       work.dlsite = applyDlsiteStatePatch(work.dlsite, patch);
-      return buildFullWorkFromState(state, work);
+      return fixtureSourceMutation(state, work);
     },
 
     async runDlsiteBulk(_mode, workIds, options) {

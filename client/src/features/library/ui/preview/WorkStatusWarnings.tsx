@@ -1,7 +1,17 @@
 import type { Work } from "@mimimilli/shared";
-import { isDlsiteFetchFailed, isDlsiteParseFailed, isRjCodeMissing } from "@mimimilli/shared";
+import {
+  detectRjCode,
+  isDlsiteFetchFailed,
+  isDlsiteParseFailed,
+  isRjCodeMissing,
+} from "@mimimilli/shared";
 import { I } from "../../../../shared/ui/Icon";
 import Button from "../../../../shared/ui/Button";
+
+function folderNameOf(physicalPath: string): string {
+  const cut = Math.max(physicalPath.lastIndexOf("/"), physicalPath.lastIndexOf("\\"));
+  return cut < 0 ? physicalPath : physicalPath.slice(cut + 1);
+}
 
 interface WorkStatusWarningsProps {
   work: Work;
@@ -16,6 +26,10 @@ export function WorkStatusWarnings({
   onDelete,
   onOpenFiles,
 }: WorkStatusWarningsProps) {
+  const detectedRjCode = isRjCodeMissing(work.dlsite)
+    ? detectRjCode([folderNameOf(work.physicalPath), work.title])
+    : null;
+
   return (
     <>
       {work.status === "missing" && (
@@ -79,7 +93,9 @@ export function WorkStatusWarnings({
           <div className="mle-prv__warn-body">
             <p className="mle-prv__warn-title">DLsite未連携（RJコード未検出）</p>
             <p className="mle-prv__warn-text">
-              フォルダー名からRJコードを自動検出できませんでした。RJコードを入力して取得するか、連携しない設定にできます。
+              {detectedRjCode
+                ? `フォルダー名から ${detectedRjCode} を検出しました。DLsite連携で保存すると確定します`
+                : "フォルダー名からRJコードを自動検出できませんでした。RJコードを入力して取得するか、連携しない設定にできます。"}
             </p>
             <Button variant="ghost" size="sm" className="mt-1 w-fit" onClick={onEdit}>
               連携設定を編集

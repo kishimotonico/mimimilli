@@ -11,7 +11,10 @@ vi.mock("../../src/features/library/api", () => ({
   getAxisFacets: vi.fn(() => Promise.resolve([])),
 }));
 
-function renderFilterChipBand(worksTotal?: number) {
+function renderFilterChipBand(
+  worksTotal?: number,
+  overrides: Partial<React.ComponentProps<typeof FilterChipBand>> = {},
+) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
@@ -23,6 +26,7 @@ function renderFilterChipBand(worksTotal?: number) {
         onAddTag={() => {}}
         onClearAll={() => {}}
         worksTotal={worksTotal}
+        {...overrides}
       />
     </QueryClientProvider>,
   );
@@ -49,5 +53,29 @@ describe("FilterChipBand の件数表示", () => {
   it("worksTotal が渡されたとき、絞り込み後件数を表示する", () => {
     renderFilterChipBand(120);
     expect(screen.getByText("120 件")).toBeTruthy();
+  });
+});
+
+describe("値一覧ペイン表示中の件数ラベルと＋絞り込みの扱い（ADR-0026）", () => {
+  it("valueListItemCount指定時は絞り込み後件数の代わりにライブラリ全体である旨のラベルを出す", () => {
+    renderFilterChipBand(undefined, { valueListItemCount: 12 });
+    expect(screen.getByText("12分類（件数はライブラリ全体）")).toBeTruthy();
+    expect(screen.queryByText(/^\d+ 件$/)).toBeNull();
+  });
+
+  it("valueListItemCount指定時は worksTotal が渡っても絞り込み後件数を出さない", () => {
+    renderFilterChipBand(120, { valueListItemCount: 12 });
+    expect(screen.queryByText("120 件")).toBeNull();
+    expect(screen.getByText("12分類（件数はライブラリ全体）")).toBeTruthy();
+  });
+
+  it("valueListItemCount指定時は「＋絞り込み」ボタンを出さない（値一覧はAND追加を提供しない）", () => {
+    renderFilterChipBand(undefined, { valueListItemCount: 12 });
+    expect(screen.queryByRole("button", { name: /絞り込み$/ })).toBeNull();
+  });
+
+  it("valueListItemCount未指定時は従来どおり「＋絞り込み」ボタンを出す（回帰確認）", () => {
+    renderFilterChipBand();
+    expect(screen.getByRole("button", { name: /絞り込み$/ })).toBeTruthy();
   });
 });

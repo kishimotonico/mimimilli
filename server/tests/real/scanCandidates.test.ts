@@ -241,3 +241,38 @@ test("候補除外はuser DBを再オープンしても保持される", async (
   const reopened = directory.own(createTestRealAdapter(options));
   assert.deepEqual(await reopened.listScanCandidates(), []);
 });
+
+test("スキャン候補の親登録は配下の子作品がある場合に失敗し子は残る", async (t) => {
+  const directory = makeTestDirectory("scan-candidate-parent-descendants");
+  t.after(directory.cleanup);
+  const root = join(directory.path, "lib");
+  const parent = join(root, "親フォルダー");
+  const child = join(parent, "子作品");
+  mkdirSync(child, { recursive: true });
+  writeWav(join(parent, "intro.wav"), 1);
+  writeWav(join(child, "track.wav"), 1);
+
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
+  await adapter.updateSettings({ rootFolder: root });
+  const app = createApp(adapter);
+  const childRes = await app.request("/api/works", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: workspacePath("親フォルダー/子作品"), title: "子作品" }),
+  });
+  assert.equal(childRes.status, 201);
+  const childWork = await childRes.json();
+
+  await adapter.scan();
+  const candidates = await adapter.listScanCandidates();
+  assert.ok(candidates.some((candidate) => candidate.path === "親フォルダー"));
+
+  const result = await adapter.registerScanCandidates([{ path: workspacePath("親フォルダー") }]);
+  assert.deepEqual(result.registered, []);
+  assert.equal(result.failures.length, 1);
+  assert.match(result.failures[0]?.message ?? "", /配下に登録済み作品が1件あります/);
+
+  assert.ok(await adapter.getWork(childWork.snapshot.id));
+  assert.equal(existsSync(join(child, "mimimilli.json")), true);
+  assert.equal(existsSync(join(parent, "mimimilli.json")), false);
+});

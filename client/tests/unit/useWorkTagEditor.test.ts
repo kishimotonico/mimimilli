@@ -1,7 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { TagPrefix, Work } from "@mimimilli/shared";
-import type { LibraryTagsPatchMutation } from "../../src/features/library/model/useLibraryQueries";
+import type { TagPrefix } from "@mimimilli/shared";
+import type { LibraryTagIntentMutation } from "../../src/features/library/model/useLibraryQueries";
 import { useWorkTagEditor } from "../../src/features/library/ui/preview/useWorkTagEditor";
 
 const PREFIXES: TagPrefix[] = [
@@ -9,33 +9,7 @@ const PREFIXES: TagPrefix[] = [
   { prefix: "カテゴリ", label: "カテゴリ", color: null, showAsAxis: true, protected: false },
 ];
 
-function makeWork(tags: string[]): Work {
-  return {
-    id: "work-1",
-    title: "作品1",
-    cover: null,
-    coverKind: "none",
-    coverImage: null,
-    status: "ok",
-    physicalPath: "/works/work-1",
-    totalDurationSec: 120,
-    addedAt: "2026-01-01T00:00:00.000Z",
-    errorMessage: null,
-    urls: [],
-    tags,
-    bookmarked: false,
-    lastPlayedAt: null,
-    defaultPlaylistId: null,
-    createdAt: "2026-01-01T00:00:00.000Z",
-    playlists: [],
-    resume: null,
-    sourceRevision: "revision-1",
-  };
-}
-
-function createTagsMutation(
-  onPatchTags: (tags: string[]) => Promise<Work>,
-): LibraryTagsPatchMutation {
+function createIntentMutation(onIntent: (tag: string) => Promise<void>): LibraryTagIntentMutation {
   const state = { isPending: false, error: null as Error | null };
   return {
     get isPending() {
@@ -47,11 +21,12 @@ function createTagsMutation(
     reset: vi.fn(() => {
       state.error = null;
     }),
-    mutateAsync: vi.fn(async ({ tags }: { workId: string; tags: string[] }) => {
+    mutateAsync: vi.fn(async ({ tag }: { workId: string; tag: string }) => {
       state.isPending = true;
       state.error = null;
       try {
-        return await onPatchTags(tags);
+        await onIntent(tag);
+        return { snapshot: {} };
       } catch (error) {
         state.error = error instanceof Error ? error : new Error(String(error));
         throw error;
@@ -59,88 +34,90 @@ function createTagsMutation(
         state.isPending = false;
       }
     }),
-  } as unknown as LibraryTagsPatchMutation;
+  } as unknown as LibraryTagIntentMutation;
 }
 
-// 実際のUIでは work は PreviewPane から渡される props で、保存成功後は
-// 親側がクエリキャッシュを更新して新しい work を渡し直す。フックのテストでも
-// その挙動を rerender で模してから tags 等を検証する。
-function renderTagEditor(initialWork: Work, onPatchTags: (tags: string[]) => Promise<Work>) {
-  const tagsMutation = createTagsMutation(onPatchTags);
+function renderTagEditor(
+  tags: string[],
+  onAdd: (tag: string) => Promise<void>,
+  onRemove: (tag: string) => Promise<void>,
+) {
+  const addTagMutation = createIntentMutation(onAdd);
+  const removeTagMutation = createIntentMutation(onRemove);
   const rendered = renderHook(
-    (props: { work: Work }) =>
+    (props: { tags: string[] }) =>
       useWorkTagEditor({
-        work: props.work,
+        workId: "work-1",
+        tags: props.tags,
         tagSuggestions: [],
         tagPrefixes: PREFIXES,
-        tagsMutation,
+        addTagMutation,
+        removeTagMutation,
       }),
-    { initialProps: { work: initialWork } },
+    { initialProps: { tags } },
   );
-  return { ...rendered, tagsMutation };
+  return { ...rendered, addTagMutation, removeTagMutation };
 }
 
 describe("useWorkTagEditor", () => {
   it("削除に成功するとundoトーストが出て、undoで元のタグ集合へ戻す", async () => {
-    const work = makeWork(["cv/水瀬なずな", "ASMR", "癒し系"]);
-    let currentTags = work.tags;
-    const onPatchTags = vi.fn(async (tags: string[]): Promise<Work> => {
-      currentTags = tags;
-      return { ...work, tags: currentTags };
+    let currentTags = ["cv/水瀬なずな", "ASMR", "癒し系"];
+    const onAdd = vi.fn(async (tag: string) => {
+      currentTags = [...currentTags, tag];
+    });
+    const onRemove = vi.fn(async (tag: string) => {
+      currentTags = currentTags.filter((item) => item !== tag);
     });
 
-    const { result, rerender } = renderTagEditor(work, onPatchTags);
+    const { result, rerender } = renderTagEditor(currentTags, onAdd, onRemove);
 
     await act(async () => {
       await result.current.requestRemoveTag("ASMR");
     });
-    rerender({ work: { ...work, tags: currentTags } });
+    rerender({ tags: currentTags });
 
-    expect(onPatchTags).toHaveBeenCalledWith(["cv/水瀬なずな", "癒し系"]);
+    expect(onRemove).toHaveBeenCalledWith("ASMR");
     expect(result.current.tagUndoToast).toBe("ASMR");
     expect(result.current.tags).toEqual(["cv/水瀬なずな", "癒し系"]);
 
     await act(async () => {
       await result.current.undoRemoveTag();
     });
-    rerender({ work: { ...work, tags: currentTags } });
+    rerender({ tags: currentTags });
 
-    expect(onPatchTags).toHaveBeenLastCalledWith(["cv/水瀬なずな", "癒し系", "ASMR"]);
+    expect(onAdd).toHaveBeenLastCalledWith("ASMR");
     expect(result.current.tagUndoToast).toBeNull();
   });
 
   it("保護prefixのタグは即削除せず確認待ちになり、confirmで削除される", async () => {
-    const work = makeWork(["cv/水瀬なずな", "ASMR"]);
-    let currentTags = work.tags;
-    const onPatchTags = vi.fn(async (tags: string[]): Promise<Work> => {
-      currentTags = tags;
-      return { ...work, tags: currentTags };
+    let currentTags = ["cv/水瀬なずな", "ASMR"];
+    const onAdd = vi.fn(async () => {});
+    const onRemove = vi.fn(async (tag: string) => {
+      currentTags = currentTags.filter((item) => item !== tag);
     });
 
-    const { result, rerender } = renderTagEditor(work, onPatchTags);
+    const { result, rerender } = renderTagEditor(currentTags, onAdd, onRemove);
 
     await act(async () => {
       await result.current.requestRemoveTag("cv/水瀬なずな");
     });
-    // まだ削除されず確認待ち
-    expect(onPatchTags).not.toHaveBeenCalled();
+    expect(onRemove).not.toHaveBeenCalled();
     expect(result.current.confirmingRemoveTag).toBe("cv/水瀬なずな");
 
     await act(async () => {
       await result.current.confirmRemoveTag();
     });
-    rerender({ work: { ...work, tags: currentTags } });
+    rerender({ tags: currentTags });
 
-    expect(onPatchTags).toHaveBeenCalledWith(["ASMR"]);
+    expect(onRemove).toHaveBeenCalledWith("cv/水瀬なずな");
     expect(result.current.confirmingRemoveTag).toBeNull();
     expect(result.current.tagUndoToast).toBe("cv/水瀬なずな");
   });
 
   it("保護prefixのタグ削除確認はキャンセルできる", async () => {
-    const work = makeWork(["cv/水瀬なずな"]);
-    const onPatchTags = vi.fn();
-
-    const { result } = renderTagEditor(work, onPatchTags);
+    const onAdd = vi.fn();
+    const onRemove = vi.fn();
+    const { result } = renderTagEditor(["cv/水瀬なずな"], onAdd, onRemove);
 
     await act(async () => {
       await result.current.requestRemoveTag("cv/水瀬なずな");
@@ -150,55 +127,58 @@ describe("useWorkTagEditor", () => {
     });
 
     expect(result.current.confirmingRemoveTag).toBeNull();
-    expect(onPatchTags).not.toHaveBeenCalled();
+    expect(onRemove).not.toHaveBeenCalled();
   });
 
   it("非保護prefixの構造化タグは確認なしで削除される", async () => {
-    const work = makeWork(["カテゴリ/音声作品", "ASMR"]);
-    let currentTags = work.tags;
-    const onPatchTags = vi.fn(async (tags: string[]): Promise<Work> => {
-      currentTags = tags;
-      return { ...work, tags: currentTags };
+    let currentTags = ["カテゴリ/音声作品", "ASMR"];
+    const onRemove = vi.fn(async (tag: string) => {
+      currentTags = currentTags.filter((item) => item !== tag);
     });
-
-    const { result } = renderTagEditor(work, onPatchTags);
+    const { result } = renderTagEditor(
+      currentTags,
+      vi.fn(async () => {}),
+      onRemove,
+    );
 
     await act(async () => {
       await result.current.requestRemoveTag("カテゴリ/音声作品");
     });
 
     expect(result.current.confirmingRemoveTag).toBeNull();
-    expect(onPatchTags).toHaveBeenCalledWith(["ASMR"]);
+    expect(onRemove).toHaveBeenCalledWith("カテゴリ/音声作品");
   });
 
   it("構造化タグを追加できる（正規化・重複チェックあり）", async () => {
-    const work = makeWork(["ASMR"]);
-    let currentTags = work.tags;
-    const onPatchTags = vi.fn(async (tags: string[]): Promise<Work> => {
-      currentTags = tags;
-      return { ...work, tags: currentTags };
+    let currentTags = ["ASMR"];
+    const onAdd = vi.fn(async (tag: string) => {
+      currentTags = [...currentTags, tag];
     });
-
-    const { result, rerender } = renderTagEditor(work, onPatchTags);
+    const { result, rerender } = renderTagEditor(
+      currentTags,
+      onAdd,
+      vi.fn(async () => {}),
+    );
 
     await act(async () => {
       await result.current.addTag("CV/ 新人 ");
     });
-    rerender({ work: { ...work, tags: currentTags } });
-    expect(onPatchTags).toHaveBeenCalledWith(["ASMR", "cv/新人"]);
+    rerender({ tags: currentTags });
+    expect(onAdd).toHaveBeenCalledWith("cv/新人");
 
-    // 正規化後に重複する追加は何もしない
     await act(async () => {
       await result.current.addTag("cv/新人");
     });
-    expect(onPatchTags).toHaveBeenCalledTimes(1);
+    expect(onAdd).toHaveBeenCalledTimes(1);
   });
 
   it("削除に失敗するとfailedRemoveTagが立ち、undoトーストは出ない", async () => {
-    const work = makeWork(["ASMR", "癒し系"]);
-    const onPatchTags = vi.fn(() => Promise.reject(new Error("network error")));
-
-    const { result } = renderTagEditor(work, onPatchTags);
+    const onRemove = vi.fn(() => Promise.reject(new Error("network error")));
+    const { result } = renderTagEditor(
+      ["ASMR", "癒し系"],
+      vi.fn(async () => {}),
+      onRemove,
+    );
 
     await act(async () => {
       await result.current.requestRemoveTag("ASMR");
@@ -211,40 +191,39 @@ describe("useWorkTagEditor", () => {
   });
 
   it("undo待ちの間に別のタグを追加していても、undoはundo対象のタグだけを戻す", async () => {
-    const work = makeWork(["ASMR", "癒し系"]);
-    let currentTags = work.tags;
-    const onPatchTags = vi.fn(async (tags: string[]): Promise<Work> => {
-      currentTags = tags;
-      return { ...work, tags: currentTags };
+    let currentTags = ["ASMR", "癒し系"];
+    const onAdd = vi.fn(async (tag: string) => {
+      currentTags = [...currentTags, tag];
     });
-
-    const { result, rerender } = renderTagEditor(work, onPatchTags);
+    const onRemove = vi.fn(async (tag: string) => {
+      currentTags = currentTags.filter((item) => item !== tag);
+    });
+    const { result, rerender } = renderTagEditor(currentTags, onAdd, onRemove);
 
     await act(async () => {
       await result.current.requestRemoveTag("ASMR");
     });
     expect(result.current.tagUndoToast).toBe("ASMR");
 
-    // undo待ちの間に別のタグを追加（別編集はundoで巻き戻さない）
-    rerender({ work: { ...work, tags: currentTags } });
+    rerender({ tags: currentTags });
     await act(async () => {
       await result.current.addTag("新規タグ");
     });
-    rerender({ work: { ...work, tags: currentTags } });
+    rerender({ tags: currentTags });
     expect(result.current.tags).toEqual(["癒し系", "新規タグ"]);
     await act(async () => {
       await result.current.undoRemoveTag();
     });
-    rerender({ work: { ...work, tags: currentTags } });
+    rerender({ tags: currentTags });
 
     expect(result.current.tags).toEqual(["癒し系", "新規タグ", "ASMR"]);
   });
 
   it("保存中はundo要求を無視し、トーストを残す", async () => {
-    const work = makeWork(["ASMR"]);
+    const workTags = ["ASMR"];
     let resolveRemove: (() => void) | null = null;
     const state = { isPending: false, error: null as Error | null };
-    const tagsMutation = {
+    const removeTagMutation = {
       get isPending() {
         return state.isPending;
       },
@@ -254,22 +233,25 @@ describe("useWorkTagEditor", () => {
       reset: vi.fn(),
       mutateAsync: vi.fn(
         () =>
-          new Promise<Work>((resolve) => {
+          new Promise((resolve) => {
             state.isPending = true;
             resolveRemove = () => {
               state.isPending = false;
-              resolve({ ...work, tags: [] });
+              resolve({ snapshot: {} });
             };
           }),
       ),
-    } as unknown as LibraryTagsPatchMutation;
+    } as unknown as LibraryTagIntentMutation;
+    const addTagMutation = createIntentMutation(async () => {});
 
     const { result } = renderHook(() =>
       useWorkTagEditor({
-        work,
+        workId: "work-1",
+        tags: workTags,
         tagSuggestions: [],
         tagPrefixes: PREFIXES,
-        tagsMutation,
+        addTagMutation,
+        removeTagMutation,
       }),
     );
 
@@ -279,31 +261,16 @@ describe("useWorkTagEditor", () => {
     });
     expect(result.current.isTagSaving).toBe(true);
 
-    // 保存中にundoを呼んでも何も起きない（トーストはまだ出ていない）
     await act(async () => {
       await result.current.undoRemoveTag();
     });
-    expect(tagsMutation.mutateAsync).toHaveBeenCalledTimes(1);
+    expect(removeTagMutation.mutateAsync).toHaveBeenCalledTimes(1);
+    expect(addTagMutation.mutateAsync).not.toHaveBeenCalled();
 
     await act(async () => {
       resolveRemove?.();
       await removePromise;
     });
     expect(result.current.tagUndoToast).toBe("ASMR");
-  });
-
-  it("sourceRevision未設定時はタグ保存を実行しない", async () => {
-    const work = makeWork(["ASMR"]);
-    delete work.sourceRevision;
-    const onPatchTags = vi.fn(async (): Promise<Work> => work);
-
-    const { result, tagsMutation } = renderTagEditor(work, onPatchTags);
-
-    await act(async () => {
-      await result.current.addTag("cv/新人");
-    });
-
-    expect(tagsMutation.mutateAsync).not.toHaveBeenCalled();
-    expect(onPatchTags).not.toHaveBeenCalled();
   });
 });

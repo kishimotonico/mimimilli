@@ -8,9 +8,9 @@ import type {
   ScanDiagnostic,
   ScanResult,
   UrlEntry,
-  Work,
 } from "@mimimilli/shared";
 import {
+  detectRjCode,
   emptyDlsiteState,
   isRjCodeMissing,
   sidecarMetaFileName,
@@ -18,12 +18,12 @@ import {
 } from "@mimimilli/shared";
 import type { Db } from "./db.ts";
 import type { ScanOptions } from "../../adapter/index.ts";
+import { descendantsRegisteredError, restoreIdentityConflictError } from "../../errors.ts";
 import {
   META_FILE_NAME,
   MetaParseError,
   patchMetaFileCas,
   readMetaSource,
-  reassignMetaIdsOnDbCollision,
   writeMetaFile,
 } from "./meta.ts";
 import type { SeenMetaIds } from "./duplicateMetaIdRepair.ts";
@@ -35,7 +35,6 @@ import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";
 import type { ScanWorkState } from "./workRowMapping.ts";
-import { getWorkWithLiveProbe } from "./workRefresh.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
 import { logDataIntegritySkips, toDataIntegrityWarning } from "./dataIntegrity.ts";
 import { naturalCompare } from "./naturalCompare.ts";
@@ -49,10 +48,9 @@ import {
   registerMetaFile,
   type RegisterMetaFileOptions,
 } from "./scanRegister.ts";
-import type { PreparedMeta } from "./scanTypes.ts";
+import type { PreparedMeta, ProjectOutcome, ScanExecutionResult } from "./scanTypes.ts";
 import type { ProbeCacheEntry } from "./probe.ts";
 import { ScanUpsertBatch } from "./scanUpsertBatch.ts";
-import type { ScanExecutionResult } from "./scanTypes.ts";
 import {
   findWorkRoot,
   isCoveredByMeta,
@@ -62,11 +60,19 @@ import {
   type WalkResult,
 } from "./scanWalk.ts";
 import type { DlsiteCache } from "./dlsiteCache.ts";
-import { detectRjCode } from "./dlsite.ts";
+import { computeSourceRevision } from "./fingerprint.ts";
 
 const scanLogger = getCategoryLogger("scan");
 
 const PROGRESS_MIN_INTERVAL_MS = 200;
+
+function currentSourceRevision(metaPath: string): string | null {
+  try {
+    return computeSourceRevision(readFileSync(metaPath));
+  } catch {
+    return null;
+  }
+}
 
 function emptyRegisterTracking(): Pick<
   ScanResult,
@@ -463,29 +469,79 @@ export class Scanner {
     );
   }
 
-  private async registerSingleWorkFromPrepared(
-    prepared: PreparedMeta,
-    workId: string,
-    notFoundMessage: string,
-  ): Promise<Work> {
-    const existingWorks = this.query.getScanWorkMap();
-    const batch = new ScanUpsertBatch(this.db, this.catalog, this.user, () => {});
-    const scanResult = emptyRegisterTracking();
-    const seenIds: SeenMetaIds = { work: new Set() };
-    await this.invokeRegisterMetaFile({
-      prepared,
-      seenIds,
-      probeCache: new Map(),
-      batch,
-      existingWorks,
-      result: scanResult,
-      options: { full: true, idsAlreadyRegistered: false },
-    });
-    batch.publishWork();
+  private async registerSingleWorkFromPrepared(prepared: PreparedMeta): Promise<ProjectOutcome> {
+    const snapshot = {
+      meta: prepared.meta,
+      bytes: prepared.bytes,
+      sourceRevision: prepared.revisions.sourceRevision,
+    };
+    try {
+      const existingWorks = this.query.getScanWorkMap();
+      const batch = new ScanUpsertBatch(this.db, this.catalog, this.user, () => {});
+      const scanResult = emptyRegisterTracking();
+      const seenIds: SeenMetaIds = { work: new Set() };
+      await this.invokeRegisterMetaFile({
+        prepared,
+        seenIds,
+        probeCache: new Map(),
+        batch,
+        existingWorks,
+        result: scanResult,
+        options: { full: true, idsAlreadyRegistered: false },
+      });
+      const changedIds = batch.publishWork();
+      if (changedIds.includes(prepared.meta.id)) {
+        return {
+          status: "unpublished",
+          reason: "source_changed",
+          snapshot,
+          currentSourceRevision: currentSourceRevision(prepared.metaPath),
+        };
+      }
+      return { status: "published", snapshot };
+    } catch (error) {
+      scanLogger.error("作品の一覧反映に失敗しました", {
+        workId: prepared.meta.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return { status: "unpublished", reason: "error", snapshot };
+    }
+  }
 
-    const work = await getWorkWithLiveProbe(this.db, this.query, this.catalog, workId);
-    if (!work) throw new Error(notFoundMessage);
-    return work;
+  private assertNoRegisteredDescendants(workDir: string): void {
+    const descendants = this.query.listDescendantWorkRefs(workDir);
+    if (descendants.length > 0) throw descendantsRegisteredError(descendants.length);
+  }
+
+  private snapshotForRestore(
+    metaPath: string,
+    physicalPath: string,
+    patch: {
+      title?: string;
+      tags?: string[];
+      urls?: UrlEntry[];
+      coverImage?: string | null;
+      dlsite?: MetaFile["dlsite"];
+    },
+  ): { meta: MetaFile; bytes: Buffer; sourceRevision: string } {
+    if (!existsSync(metaPath)) {
+      throw new Error("復元対象のメタファイルがありません");
+    }
+    const source = readMetaSource(metaPath);
+    const existing = this.query.getScanWorkMap().get(source.meta.id);
+    if (existing && existing.physicalPath !== physicalPath && existing.status !== "missing") {
+      throw restoreIdentityConflictError();
+    }
+    const metaPatch: typeof patch = {};
+    if (patch.title !== undefined) metaPatch.title = patch.title;
+    if (patch.tags !== undefined) metaPatch.tags = patch.tags;
+    if (patch.urls !== undefined) metaPatch.urls = patch.urls;
+    if (patch.coverImage !== undefined) metaPatch.coverImage = patch.coverImage;
+    if (patch.dlsite !== undefined) metaPatch.dlsite = patch.dlsite;
+    if (Object.keys(metaPatch).length > 0) {
+      return patchMetaFileCas(metaPath, source.sourceRevision, metaPatch);
+    }
+    return source;
   }
 
   async registerFolderWork(
@@ -498,7 +554,8 @@ export class Scanner {
       dlsite?: MetaFile["dlsite"];
       rjCode?: string;
     },
-  ): Promise<Work> {
+  ): Promise<ProjectOutcome> {
+    this.assertNoRegisteredDescendants(workDir);
     const metaPath = join(workDir, META_FILE_NAME);
     if (existsSync(metaPath)) {
       throw new Error("このフォルダーには既にメタファイルがあります");
@@ -524,24 +581,16 @@ export class Scanner {
       coverImage: options.coverImage,
       dlsite,
     });
-    writeMetaFile(metaPath, meta);
-
-    const prepared = prepareSingleMeta(metaPath);
-    return this.registerSingleWorkFromPrepared(
-      prepared,
-      meta.id,
-      "登録した作品の取得に失敗しました",
-    );
+    const snapshot = writeMetaFile(metaPath, meta);
+    return this.registerSingleWorkFromPrepared(prepareSingleMeta(metaPath, snapshot));
   }
 
   /** 確定済みmimimilli.jsonを入力に、対象作品だけをcatalogへ投影する。 */
-  async projectMetaFile(metaPath: string, meta: MetaFile): Promise<Work> {
-    const prepared = prepareSingleMeta(metaPath, meta);
-    return this.registerSingleWorkFromPrepared(
-      prepared,
-      meta.id,
-      "再投影した作品の取得に失敗しました",
-    );
+  async projectMetaFile(
+    metaPath: string,
+    snapshot: { meta: MetaFile; bytes: Buffer; sourceRevision: string },
+  ): Promise<ProjectOutcome> {
+    return this.registerSingleWorkFromPrepared(prepareSingleMeta(metaPath, snapshot));
   }
 
   async restoreFolderWork(
@@ -553,33 +602,11 @@ export class Scanner {
       coverImage?: string | null;
       dlsite?: MetaFile["dlsite"];
     },
-  ): Promise<Work> {
+  ): Promise<ProjectOutcome> {
+    this.assertNoRegisteredDescendants(workDir);
     const metaPath = join(workDir, META_FILE_NAME);
-    if (!existsSync(metaPath)) {
-      throw new Error("復元対象のメタファイルがありません");
-    }
-
-    const metaPatch: typeof patch = {};
-    if (patch.title !== undefined) metaPatch.title = patch.title;
-    if (patch.tags !== undefined) metaPatch.tags = patch.tags;
-    if (patch.urls !== undefined) metaPatch.urls = patch.urls;
-    if (patch.coverImage !== undefined) metaPatch.coverImage = patch.coverImage;
-    if (patch.dlsite !== undefined) metaPatch.dlsite = patch.dlsite;
-    if (Object.keys(metaPatch).length > 0) {
-      const source = readMetaSource(metaPath);
-      patchMetaFileCas(metaPath, source.sourceRevision, metaPatch);
-    }
-
-    const workId = reassignMetaIdsOnDbCollision(metaPath, (id) => {
-      const existing = this.query.getScanWorkMap().get(id);
-      return existing !== undefined && existing.physicalPath !== workDir;
-    });
-    const prepared = prepareSingleMeta(metaPath);
-    return this.registerSingleWorkFromPrepared(
-      prepared,
-      workId,
-      "復元した作品の取得に失敗しました",
-    );
+    const snapshot = this.snapshotForRestore(metaPath, workDir, patch);
+    return this.registerSingleWorkFromPrepared(prepareSingleMeta(metaPath, snapshot));
   }
 
   async registerFileWork(
@@ -591,7 +618,7 @@ export class Scanner {
       coverImage?: string | null;
       dlsite?: MetaFile["dlsite"];
     },
-  ): Promise<Work> {
+  ): Promise<ProjectOutcome> {
     const audioName = basename(audioPath);
     const metaPath = join(dirname(audioPath), sidecarMetaFileName(audioName));
     if (existsSync(metaPath)) {
@@ -615,14 +642,8 @@ export class Scanner {
       dlsite,
       tracks: [{ id: crypto.randomUUID(), title: stem, file: audioName }],
     });
-    writeMetaFile(metaPath, meta);
-
-    const prepared = prepareSingleMeta(metaPath);
-    return this.registerSingleWorkFromPrepared(
-      prepared,
-      meta.id,
-      "登録した作品の取得に失敗しました",
-    );
+    const snapshot = writeMetaFile(metaPath, meta);
+    return this.registerSingleWorkFromPrepared(prepareSingleMeta(metaPath, snapshot));
   }
 
   async restoreSidecarWork(
@@ -634,32 +655,9 @@ export class Scanner {
       coverImage?: string | null;
       dlsite?: MetaFile["dlsite"];
     },
-  ): Promise<Work> {
+  ): Promise<ProjectOutcome> {
     const metaPath = join(dirname(audioPath), sidecarMetaFileName(basename(audioPath)));
-    if (!existsSync(metaPath)) {
-      throw new Error("復元対象のメタファイルがありません");
-    }
-
-    const metaPatch: typeof patch = {};
-    if (patch.title !== undefined) metaPatch.title = patch.title;
-    if (patch.tags !== undefined) metaPatch.tags = patch.tags;
-    if (patch.urls !== undefined) metaPatch.urls = patch.urls;
-    if (patch.coverImage !== undefined) metaPatch.coverImage = patch.coverImage;
-    if (patch.dlsite !== undefined) metaPatch.dlsite = patch.dlsite;
-    if (Object.keys(metaPatch).length > 0) {
-      const source = readMetaSource(metaPath);
-      patchMetaFileCas(metaPath, source.sourceRevision, metaPatch);
-    }
-
-    const workId = reassignMetaIdsOnDbCollision(metaPath, (id) => {
-      const existing = this.query.getScanWorkMap().get(id);
-      return existing !== undefined && existing.physicalPath !== audioPath;
-    });
-    const prepared = prepareSingleMeta(metaPath);
-    return this.registerSingleWorkFromPrepared(
-      prepared,
-      workId,
-      "復元した作品の取得に失敗しました",
-    );
+    const snapshot = this.snapshotForRestore(metaPath, audioPath, patch);
+    return this.registerSingleWorkFromPrepared(prepareSingleMeta(metaPath, snapshot));
   }
 }

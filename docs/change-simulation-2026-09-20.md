@@ -16,15 +16,15 @@
 
 ### 自然に必要となる変更
 
-| 層 | 主な根拠 | 変更の意味 |
-| --- | --- | --- |
-| 共有契約 | `shared/src/work.ts:167`、`shared/src/library.ts:10,70` | 読み取りDTOへ評価を追加し、ソートと評価条件を定義する |
-| user DB | `server/src/adapters/real/userSchema.ts:3`、`userWorkStateRepository.ts:31` | nullableな評価列と更新処理を追加する。user migrationの既存方式を使う |
-| 検索の読み取り | `workQuerySql.ts:150`、`workQueryRepository.ts:211,369`、`workRowMapping.ts:187`（いずれもreal配下） | ATTACH済みuser状態から評価を読み、一覧・詳細へ合成する |
-| 評価順 | `server/src/adapters/real/workQuerySql.ts:22`、`server/src/core/worksQuery.ts:152` | SQLと参照実装へ同じnull順・同値順を定義する |
-| 保存済み条件 | `server/src/core/smartFolder.ts:28`、`server/src/adapters/real/workQuerySql.ts:247` | 評価条件を最終評価とSQL候補抽出へ追加する |
-| 条件編集UI | `client/src/features/library/model/smartFolderEditor.ts:10,114`、`ui/SmartFolderRuleCard.tsx:108` | 評価用の入力と検証を追加する |
-| 表示UI | `client/src/features/library/ui/WorkRow.tsx`、`WorkTile.tsx`、`preview/WorkDetail.tsx` | 一覧表示と詳細での評価操作を追加する |
+| 層             | 主な根拠                                                                                             | 変更の意味                                                           |
+| -------------- | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| 共有契約       | `shared/src/work.ts:167`、`shared/src/library.ts:10,70`                                              | 読み取りDTOへ評価を追加し、ソートと評価条件を定義する                |
+| user DB        | `server/src/adapters/real/userSchema.ts:3`、`userWorkStateRepository.ts:31`                          | nullableな評価列と更新処理を追加する。user migrationの既存方式を使う |
+| 検索の読み取り | `workQuerySql.ts:150`、`workQueryRepository.ts:211,369`、`workRowMapping.ts:187`（いずれもreal配下） | ATTACH済みuser状態から評価を読み、一覧・詳細へ合成する               |
+| 評価順         | `server/src/adapters/real/workQuerySql.ts:22`、`server/src/core/worksQuery.ts:152`                   | SQLと参照実装へ同じnull順・同値順を定義する                          |
+| 保存済み条件   | `server/src/core/smartFolder.ts:28`、`server/src/adapters/real/workQuerySql.ts:247`                  | 評価条件を最終評価とSQL候補抽出へ追加する                            |
+| 条件編集UI     | `client/src/features/library/model/smartFolderEditor.ts:10,114`、`ui/SmartFolderRuleCard.tsx:108`    | 評価用の入力と検証を追加する                                         |
+| 表示UI         | `client/src/features/library/ui/WorkRow.tsx`、`WorkTile.tsx`、`preview/WorkDetail.tsx`               | 一覧表示と詳細での評価操作を追加する                                 |
 
 複数の層が変わるのは、保存・検索・編集・表示を含む機能だからです。この変更地図の広さ自体を欠陥とは評価しません。特にSQLとcoreの比較規則を両方変えることは、実行方式を分け、契約テストで一致を確認する既存設計に沿っています。
 
@@ -85,11 +85,11 @@ Filesの登録済み作品に「作品の詳細を開く」を置き、既存の
 
 適切な変更は、作品編集をLibraryから共有の編集機能へ切り出すことです。共通のWorkEditorとmutationをLibrary・Filesがそれぞれ局所的にmountする形でも成立します。アプリ全体で編集モーダルを一つにするなら、Work IDを指定して編集を要求し、appの合成点に置くeditor hostが詳細取得、編集内容、未保存確認、保存、必要なキャッシュ更新を所有する案もあります。hostの有無より、共有編集機能がLibraryのnavigationを要求しないことが重要です。汎用コマンドバスは不要です。
 
-| 変更するもの | この要件では変えなくてよいもの |
-| --- | --- |
-| Filesの編集操作、編集対象のWork ID | Filesの場所・選択のモデル |
-| 共通editorと作品編集mutation。必要なら共通host | `/work/:id`のURL契約、履歴の同期方式 |
-| Libraryの編集トリガーを共通入口へ接続 | player、音声の所有権 |
+| 変更するもの                                         | この要件では変えなくてよいもの                |
+| ---------------------------------------------------- | --------------------------------------------- |
+| Filesの編集操作、編集対象のWork ID                   | Filesの場所・選択のモデル                     |
+| 共通editorと作品編集mutation。必要なら共通host       | `/work/:id`のURL契約、履歴の同期方式          |
+| Libraryの編集トリガーを共通入口へ接続                | player、音声の所有権                          |
 | 保存後の必須キャッシュ整合性と画面固有の最適化の接続 | サーバーのmeta編集仕様、catalog/user DBの構成 |
 
 未保存内容の確認、IME処理、フォーカス復帰など既存の編集・ダイアログ動作は維持します。Library専用のnavigation型を共通editorへ渡してしまうと、ファイルを移しただけで責務の分散が残ります。

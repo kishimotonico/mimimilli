@@ -12,7 +12,6 @@ import { formatDuration } from "../../../shared/lib/format";
 import { I } from "../../../shared/ui/Icon";
 import { selectFixedCoverThumbnailWidth } from "../../../entities/work/ui/coverThumbnailWidth";
 import CoverCollage from "./CoverCollage";
-import IconButton from "../../../shared/ui/IconButton";
 import type { IconName } from "../../../shared/ui/Icon";
 import { useVirtualList } from "../../../shared/ui/useVirtualList";
 import { useRovingIndex } from "./useRovingIndex";
@@ -44,10 +43,10 @@ interface AxisValueRowsProps {
   fallbackIcon: IconName;
   /** 軸・並び順・検索語が変わったらスクロール位置をリセットするための key */
   resetKey: string;
-  /** クリック（既定=置き換え）・Ctrl/Cmd+クリック（AND追加）（ADR-0012 §7） */
+  /** クリック（既定=置き換え）・Ctrl/Cmd+クリック（トグル、ADR-0012 §7・ADR-0013の
+   *  作品詳細タグクリックと同型）。値一覧は独立した全作品入口のためAND追加ボタンは
+   *  持たない。 */
   onSelect: (item: AxisFacetItem, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
-  /** ホバー/フォーカス時に出る＋ボタン（冪等なAND追加。選択済み行には出さない） */
-  onAdd: (item: AxisFacetItem) => void;
 }
 
 function SortHeaderButton({
@@ -92,7 +91,6 @@ export default function AxisValueRows({
   fallbackIcon,
   resetKey,
   onSelect,
-  onAdd,
 }: AxisValueRowsProps) {
   // コラージュは32pxを2×2に分割するので、各セルの要求サムネイル幅は半分の16pxを基準にする
   const collageRequestWidth = selectFixedCoverThumbnailWidth(
@@ -218,16 +216,6 @@ export default function AxisValueRows({
                             {formatDuration(row.item.durationSec) ?? "0:00"}
                           </span>
                         </button>
-                        {!on && (
-                          <IconButton
-                            icon={I.add}
-                            label={`${row.item.value}をAND追加`}
-                            size="xs"
-                            variant="bare"
-                            className="mll-vrow__add"
-                            onClick={() => onAdd(row.item)}
-                          />
-                        )}
                       </div>
                     );
                   })()

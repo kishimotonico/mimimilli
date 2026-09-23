@@ -90,13 +90,19 @@ smokeテストの注意:
 | POST         | `/scan/candidates/register`                  | 候補の登録                                                                                                                |
 | GET          | `/works`                                     | **ページングエンベロープ `{ items, total }`**（page/limit省略時は page=1, limit=200）                                     |
 | GET          | `/works/register-preview`                    | 未登録候補の登録プレビュー                                                                                                |
-| POST         | `/works`                                     | 候補から作品を登録                                                                                                        |
-| POST         | `/works/identity-conflicts/reassign`         | identity conflict の再採番                                                                                                |
+| POST         | `/works/projection`                          | `{ path }`（root相対）で正本を再投影し catalog へ反映。応答は `{ snapshot, projection }`                                  |
+| POST         | `/works`                                     | 候補から作品を登録。応答は `{ snapshot, projection }`                                                                     |
+| POST         | `/works/identity-conflicts/reassign`         | identity conflict の再採番。応答は `{ snapshot, projection }`                                                             |
 | GET          | `/works/missing-count`                       | 行方不明作品の件数                                                                                                        |
 | POST         | `/works/unregister-missing`                  | 行方不明作品の登録解除                                                                                                    |
-| GET          | `/works/:id`                                 | 完全な Work（playlists・defaultPlaylistId・resume 含む）                                                                  |
-| PATCH        | `/works/:id`                                 | `{ title?, tags?, bookmarked? }` を統合（旧 PUT tags/title・POST bookmark を廃止）                                        |
+| GET          | `/works/:id/source`                          | 編集用の正本スナップショット（`WorkEditSnapshot`。`sourceRevision` を含む）                                               |
+| GET          | `/works/:id`                                 | 完全な Work（playlists・defaultPlaylistId・resume 含む）。総時間は同期しない                                              |
+| PATCH        | `/works/:id`                                 | `{ sourceRevision, title?, tags?, urls? }`（正本の部分更新。応答は `{ snapshot, projection }`）                           |
+| PATCH        | `/works/:id/bookmark`                        | `{ bookmarked }`                                                                                                          |
+| PUT          | `/works/:id/tags/:tag`                       | タグ追加。応答は `{ snapshot, projection }`                                                                               |
+| DELETE       | `/works/:id/tags/:tag`                       | タグ削除。応答は `{ snapshot, projection }`                                                                               |
 | DELETE       | `/works/:id`                                 | 作品の登録解除                                                                                                            |
+| POST         | `/works/:id/playback-preparation`            | 再生準備。live probe を行い総時間を catalog へ公開する                                                                    |
 | POST         | `/works/:id/resume`                          | `{ playlistId, trackId, offsetSec }`（`shared/src/work.ts` の `resumeSchema`。高頻度のため PATCH と分離）                 |
 | POST         | `/works/:id/last-played`                     |                                                                                                                           |
 | POST         | `/dlsite/fetch-by-code`                      | RJ/VJコード指定のプレビュー取得                                                                                           |
@@ -135,7 +141,7 @@ smokeテストの注意:
 
 編集UIでは両方のタグを追加・削除できる。prefix定義で保護されたタグを削除するときだけ確認ダイアログを表示し、確認後は削除できる。prefix定義は軸表示・保護・ラベル・色を持つユーザー編集可能な設定データであり、特定prefixをコードで分岐しない。
 
-タグは `shared/src/work.ts` の `normalizeTag` で正規化する。Annotatedタグはprefixをtrimして小文字化し、値をtrimする。フラットタグは全体をtrimする。`shared/src/api.ts` の `workPatchSchema` がPATCH契約の入口で正規化を適用する。
+タグは `shared/src/work.ts` の `normalizeTag` で正規化する。Annotatedタグはprefixをtrimして小文字化し、値をtrimする。フラットタグは全体をtrimする。`shared/src/api.ts` の `workSourcePatchSchema` がPATCH契約の入口で正規化を適用する。
 
 クライアントの追加・削除ロジックは `entities/work/editableTags.ts` の `buildTagsWithAdded` / `buildTagsWithRemoved`、編集フローと保護確認は `features/library/ui/preview/useWorkTagEditor.ts` を参照する。PATCHの `tags` は全置換なので、変更後の全タグを送る。
 

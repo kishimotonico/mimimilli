@@ -25,7 +25,7 @@ export function querySmartFolderWorks(
   if (folder.rules.length === 0) {
     return query.queryWorks(
       {
-        q: "",
+        q: evalQuery.q ?? "",
         tags: evalQuery.tags ?? EMPTY_TAG_FILTERS,
         tagOp: evalQuery.tagOp ?? "AND",
         sort: folder.sort,

@@ -70,10 +70,10 @@ function makeWorkPatchMutationsStub() {
     mutateAsync: vi.fn(),
   };
   return {
-    titleMutation: noopMutation,
+    editMutation: noopMutation,
     bookmarkMutation: noopMutation,
-    tagsMutation: noopMutation,
-    urlsMutation: noopMutation,
+    addTagMutation: noopMutation,
+    removeTagMutation: noopMutation,
   };
 }
 

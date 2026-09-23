@@ -7,10 +7,9 @@ import {
   rowIndexOfFlatIndex,
   type GridArrowKey,
 } from "../../../shared/lib/gridNavigation";
-import { I, type IconName } from "../../../shared/ui/Icon";
+import type { IconName } from "../../../shared/ui/Icon";
 import { selectFixedCoverThumbnailWidth } from "../../../entities/work/ui/coverThumbnailWidth";
 import CoverCollage from "./CoverCollage";
-import IconButton from "../../../shared/ui/IconButton";
 import { useVirtualGrid } from "../../../shared/ui/useVirtualGrid";
 import { useListKeyboardNav } from "../../../shared/ui/useListKeyboardNav";
 import { useRovingIndex } from "./useRovingIndex";
@@ -47,10 +46,10 @@ interface AxisValueGridProps {
   isSelected: (item: AxisFacetItem) => boolean;
   fallbackIcon: IconName;
   resetKey: string;
-  /** クリック（既定=置き換え）・Ctrl/Cmd+クリック（AND追加）（ADR-0012 §7） */
+  /** クリック（既定=置き換え）・Ctrl/Cmd+クリック（トグル、ADR-0012 §7・ADR-0013の
+   *  作品詳細タグクリックと同型）。値一覧は独立した全作品入口のためAND追加ボタンは
+   *  持たない。 */
   onSelect: (item: AxisFacetItem, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
-  /** ホバー/フォーカス時に出る＋ボタン（冪等なAND追加。選択済み行には出さない） */
-  onAdd: (item: AxisFacetItem) => void;
 }
 
 export default function AxisValueGrid({
@@ -61,7 +60,6 @@ export default function AxisValueGrid({
   fallbackIcon,
   resetKey,
   onSelect,
-  onAdd,
 }: AxisValueGridProps) {
   const items = useMemo(
     () => rows.filter((row): row is AxisValueValueRow => row.kind === "value"),
@@ -178,16 +176,6 @@ export default function AxisValueGrid({
                         <span className="mll-vtile__nm">{row.label}</span>
                         <span className="mll-vtile__badge">{row.item.count} 件</span>
                       </button>
-                      {!on && (
-                        <IconButton
-                          icon={I.add}
-                          label={`${row.item.value}をAND追加`}
-                          size="xs"
-                          variant="bare"
-                          className="mll-vtile__add"
-                          onClick={() => onAdd(row.item)}
-                        />
-                      )}
                     </div>
                   );
                 })}

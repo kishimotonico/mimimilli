@@ -153,6 +153,9 @@ export default function SettingsModal({
                   {savingFolder ? "保存中..." : "保存"}
                 </Button>
               </form>
+              <output className="m-0 block rounded-[6px] bg-paper-2 px-2.5 py-2 font-jp text-secondary text-ink-2">
+                変更すると、候補から外したフォルダーの設定は破棄されます。作品の履歴（ブックマーク・再生位置など）には影響しません。
+              </output>
               {folderError && (
                 <p role="alert" className="mll-selectable m-0 text-secondary text-[var(--r-coral)]">
                   {folderError}

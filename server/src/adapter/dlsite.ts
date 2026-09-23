@@ -6,8 +6,8 @@ import type {
   DlsiteBulkProgressEvent,
   DlsiteBulkResult,
   DlsiteFetchResult,
-  DlsiteStatePatch,
-  Work,
+  DlsiteStateUpdateBody,
+  WorkSourceMutationResult,
 } from "@mimimilli/shared";
 
 export interface DlsiteAdapter {
@@ -27,8 +27,11 @@ export interface DlsiteAdapter {
     workId: string,
     body: DlsiteApplyBody,
     options?: { signal?: AbortSignal },
-  ): Promise<boolean>;
-  updateDlsiteState(workId: string, patch: DlsiteStatePatch): Promise<Work | null>;
+  ): Promise<WorkSourceMutationResult | null>;
+  updateDlsiteState(
+    workId: string,
+    body: DlsiteStateUpdateBody,
+  ): Promise<WorkSourceMutationResult | null>;
   dlsiteApplyMissing(workIds?: string[]): Promise<DlsiteBulkApplyMissingResult>;
   /** dlsiteApplyMissing のdry-run。書き込みはせず、対象作品ごとの差分だけを返す */
   dlsiteApplyMissingPreview(workIds?: string[]): Promise<DlsiteApplyMissingPreview>;

@@ -9,7 +9,7 @@ import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
 import { buildTagFilterParams, filterValidFacetItems } from "./libraryPresentation";
 
 // selectedTags は集計に含めるタグ。件数基準（何を含めて集計するか）は呼び出し側の責務で、
-// 値選択の契約（valueSelectionContract.ts の deriveFacetCountTags）から導出する。
+// 値一覧本体は無条件集計として空配列を、「＋絞り込み」ポップオーバーは現在の選択タグを渡す。
 // このフック自体は渡されたタグをそのままAND条件として渡すだけで、軸やintentを見ない。
 //
 // smartFolderId はスマートフォルダー表示中だけ渡す。生のルールではなくIDをサーバーへ渡し、

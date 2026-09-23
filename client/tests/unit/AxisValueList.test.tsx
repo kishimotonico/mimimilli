@@ -32,7 +32,6 @@ function renderAxisValueList(
         selectedTags={[]}
         onReplace={vi.fn()}
         onToggle={vi.fn()}
-        onAddTag={vi.fn()}
         {...props}
       />
     </JotaiProvider>,
@@ -188,20 +187,17 @@ describe("AxisValueList list 表示（ADR-0012 §5）", () => {
     sizeMock.restore();
   });
 
-  it("ホバー時の＋ボタンは冪等なAND追加（onAddTag）を呼ぶ", async () => {
+  it("値一覧の行にはAND追加ボタンが無い（値一覧は独立した全作品入口。ADR-0026）", async () => {
     const sizeMock = mockElementSize(600, 600);
-    const onAddTag = vi.fn();
-    const user = userEvent.setup();
-    renderAxisValueList({ axis: "cv", facetItems: [makeItem({ value: "藤田茜" })], onAddTag });
+    renderAxisValueList({ axis: "cv", facetItems: [makeItem({ value: "藤田茜" })] });
     await flushVirtualizer();
 
     const row = getRow(".mll-vrow", "藤田茜");
-    await user.click(row.querySelector(".mll-vrow__add") as HTMLElement);
-    expect(onAddTag).toHaveBeenCalledWith("cv/藤田茜");
+    expect(row.querySelector(".mll-vrow__add")).toBeNull();
     sizeMock.restore();
   });
 
-  it("選択済みの行には追加ボタンが表示されない（ADR-0013）", async () => {
+  it("選択済みの行にもAND追加ボタンは表示されない", async () => {
     const sizeMock = mockElementSize(600, 600);
     renderAxisValueList({
       axis: "cv",
@@ -307,7 +303,6 @@ describe("AxisValueList grid 表示", () => {
           selectedTags={[]}
           onReplace={vi.fn()}
           onToggle={vi.fn()}
-          onAddTag={vi.fn()}
         />
       </JotaiProvider>,
     );
@@ -381,7 +376,6 @@ describe("AxisValueList コンテキスト検索（ADR-0012 §6）", () => {
           selectedTags={[]}
           onReplace={vi.fn()}
           onToggle={vi.fn()}
-          onAddTag={vi.fn()}
         />
       </JotaiProvider>,
     );
@@ -400,7 +394,6 @@ describe("AxisValueList コンテキスト検索（ADR-0012 §6）", () => {
           selectedTags={[]}
           onReplace={vi.fn()}
           onToggle={vi.fn()}
-          onAddTag={vi.fn()}
         />
       </JotaiProvider>,
     );

@@ -90,7 +90,7 @@ function filterByIds(works: WorkSummary[], ids: string[] | undefined): WorkSumma
   return works.filter((work) => idSet.has(work.id));
 }
 
-function filterByQuery(works: WorkSummary[], q: string): WorkSummary[] {
+export function filterByQuery(works: WorkSummary[], q: string): WorkSummary[] {
   if (!q) return works;
   const normalizedQuery = japaneseSortKey(q);
   const rjQuery = normalizeRjCode(q);

@@ -3,9 +3,11 @@
 // 競合しないことを確認する（WorkEditDialog.test.tsxはWorkTagEditorをモックしているため
 // この組み合わせだけはそちらではカバーできない）。
 import { fireEvent, render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Work } from "@mimimilli/shared";
+import type { Work, WorkEditSnapshot } from "@mimimilli/shared";
 import { emptyDlsiteState } from "@mimimilli/shared";
+import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { WorkEditDialog } from "../../src/features/library/ui/preview/WorkEditDialog";
 
 vi.mock("../../src/features/library/ui/preview/DlsiteEditor", () => ({
@@ -45,28 +47,47 @@ function makeWork(overrides: Partial<Work> = {}): Work {
     createdAt: null,
     playlists: [],
     resume: null,
-    sourceRevision: "revision-1",
     ...overrides,
   };
 }
 
+function makeSnapshot(work: Work): WorkEditSnapshot {
+  return {
+    sourceRevision: "revision-1",
+    id: work.id,
+    physicalPath: work.physicalPath,
+    title: work.title,
+    tags: work.tags,
+    urls: work.urls,
+    coverImage: work.coverImage,
+    dlsite: work.dlsite,
+  };
+}
+
 function renderDialog(onClose: () => void) {
+  const work = makeWork();
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  queryClient.setQueryData(WORK_QUERY_KEYS.source(work.id), makeSnapshot(work));
+  const noop = {
+    isPending: false,
+    error: null,
+    reset: vi.fn(),
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+  };
   return render(
-    <WorkEditDialog
-      work={makeWork()}
-      tagSuggestions={["ASMR", "睡眠用"]}
-      workPatchMutations={{
-        titleMutation: { isPending: false, error: null, reset: vi.fn(), mutate: vi.fn() } as never,
-        tagsMutation: {
-          isPending: false,
-          error: null,
-          reset: vi.fn(),
-          mutateAsync: vi.fn(),
-        } as never,
-        urlsMutation: { mutate: vi.fn(), isPending: false, error: null } as never,
-      }}
-      onClose={onClose}
-    />,
+    <QueryClientProvider client={queryClient}>
+      <WorkEditDialog
+        work={work}
+        tagSuggestions={["ASMR", "睡眠用"]}
+        workPatchMutations={{
+          editMutation: noop as never,
+        }}
+        onClose={onClose}
+      />
+    </QueryClientProvider>,
   );
 }
 

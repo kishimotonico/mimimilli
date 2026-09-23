@@ -27,6 +27,7 @@ import {
   useSmartFolderMutation,
 } from "../model/useLibraryQueries";
 import {
+  buildWorksResetKey,
   computeResultsPaneKind,
   isGridViewActive,
   shouldClearSelectionOnFilterMiss,
@@ -246,6 +247,7 @@ export default function LibraryView({
           onAddTag={nav.addTag}
           onClearAll={nav.clearTags}
           worksTotal={paneKind === "value-list" ? undefined : worksTotal}
+          valueListItemCount={paneKind === "value-list" ? facetItems.length : undefined}
         />
         {paneKind === "value-list" ? (
           <div className="mll-results">
@@ -260,7 +262,6 @@ export default function LibraryView({
                 isTagPrefixesError={isTagPrefixesError}
                 onReplace={nav.replaceTag}
                 onToggle={nav.toggleTag}
-                onAddTag={nav.addTag}
                 onRetryFacets={refetchFacets}
                 onRetryTagPrefixes={refetchTagPrefixes}
               />
@@ -276,9 +277,11 @@ export default function LibraryView({
             onWorksTotalChange={setWorksTotal}
           >
             {(result, isPending) => {
-              const worksQueryKey = JSON.stringify({
-                axis: nav.activeAxis,
-                params: result.worksParams,
+              const worksQueryKey = buildWorksResetKey({
+                activeAxis: nav.activeAxis,
+                selectedTags: nav.selectedTags,
+                sort: nav.sort,
+                searchQuery: debouncedSearchQuery,
               });
               const resultsBanner = activeSmartFolder ? (
                 <div className="flex flex-col gap-2">

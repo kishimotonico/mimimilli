@@ -264,6 +264,25 @@
   font-size: var(--fs-caption);
   line-height: var(--lh-caption);
 }
+.mle-prv__edit-conflict {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: color-mix(in oklch, var(--acc) 10%, transparent);
+  font-family: var(--font-jp);
+  font-size: var(--fs-caption);
+  line-height: var(--lh-caption);
+  color: var(--ink-1);
+}
+.mle-prv__edit-conflict p {
+  margin: 0;
+}
+.mle-prv__edit-conflict .actions {
+  display: flex;
+  gap: 6px;
+}
 
 .mle-prv__actions {
   display: flex;

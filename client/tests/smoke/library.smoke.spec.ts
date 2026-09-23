@@ -71,18 +71,74 @@ test("軸をまたいだAND絞り込みでチップが積み上がる", async ({
     .getByRole("group", { name: "CVの値一覧" })
     .getByRole("button", { name: /^霧島レイ(?!を)/ })
     .click();
+  await expect(page.getByRole("button", { name: "すべての作品" })).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
 
-  await page.getByRole("button", { name: "サークル" }).click();
-  const circleList = page.getByRole("group", { name: "サークルの値一覧" });
-  await circleList.getByRole("button", { name: /^月白製作所(?!を)/ }).hover();
-  await circleList.getByRole("button", { name: "月白製作所をAND追加" }).click();
+  // AND追加は値一覧では提供せず、作品一覧のチップ内候補（「＋絞り込み」）だけで
+  // 行う（ADR-0026）。
+  await page.getByRole("button", { name: "絞り込み" }).click();
+  await page
+    .getByRole("listbox", { name: "絞り込む軸" })
+    .getByRole("button", { name: "サークル" })
+    .click();
+  await page
+    .getByRole("group", { name: "サークルの値一覧" })
+    .getByRole("button", { name: /^月白製作所/ })
+    .click();
 
-  await page.getByRole("button", { name: "すべての作品" }).click();
   await expect(page.locator(".mll-tagband .mll-tagband__chip")).toHaveText([
     "cv/霧島レイ",
     "サークル/月白製作所",
   ]);
   await expect(page.locator(".mll-results")).toBeVisible();
+
+  assertNoErrors(tracker);
+});
+
+test("値一覧では作品検索が無効化され、AND追加ボタンを提供しない（ADR-0026）", async ({ page }) => {
+  const tracker = trackErrors(page);
+  await openApp(page);
+
+  await page.getByRole("button", { name: "CV" }).click();
+  const valueList = page.getByRole("group", { name: "CVの値一覧" });
+  await expect(valueList.getByRole("button").first()).toBeVisible();
+
+  await expect(page.getByPlaceholder(/ライブラリを検索/)).toBeDisabled();
+  await expect(valueList.getByRole("button", { name: /をAND追加/ })).toHaveCount(0);
+  await expect(page.locator(".mll-tagband__count")).toHaveText(/分類（件数はライブラリ全体）/);
+
+  assertNoErrors(tracker);
+});
+
+test("値一覧に入ると効かない検索語・チップが残らない（ADR-0026）", async ({ page }) => {
+  const tracker = trackErrors(page);
+  await openApp(page);
+
+  await page.getByPlaceholder(/ライブラリを検索/).fill("霧島");
+  await page.getByRole("button", { name: "CV" }).click();
+
+  await expect(page.getByPlaceholder(/ライブラリを検索/)).toHaveValue("");
+  await expect(page.locator(".mll-tagband .mll-tagband__chip")).toHaveCount(0);
+
+  // 値一覧へ入った時点で条件は消去済みなので、レールの「すべての作品」に戻れば
+  // 条件なしの全作品一覧になる（「値を選ばず戻る」の実体）。
+  await page.getByRole("button", { name: "すべての作品" }).click();
+  await expect(page.getByPlaceholder(/ライブラリを検索/)).toHaveValue("");
+  await expect(page.locator(".mll-tagband .mll-tagband__chip")).toHaveCount(0);
+
+  // 「値を選ばず戻る」のもう一つの実体: 常設のパンくず「ライブラリ」セグメント
+  // からも同じく条件なしの全作品一覧へ戻れる。
+  await page.locator(".mle-col.is-axis").getByRole("button", { name: "CV" }).click();
+  await expect(page.getByPlaceholder(/ライブラリを検索/)).toBeDisabled();
+  await page.locator(".mle-crumbs").getByRole("button", { name: "ライブラリ" }).click();
+  await expect(page.getByRole("button", { name: "すべての作品" })).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
+  await expect(page.getByPlaceholder(/ライブラリを検索/)).toHaveValue("");
+  await expect(page.locator(".mll-tagband .mll-tagband__chip")).toHaveCount(0);
 
   assertNoErrors(tracker);
 });
@@ -241,11 +297,39 @@ test("作品編集: 関連URLを追加できる", async ({ page }) => {
     .getByLabel(/^URL \d+$/)
     .last()
     .fill("https://example.com/work");
-  await dialog.getByRole("button", { name: "関連URLを保存" }).click();
+  await dialog.locator("footer").getByRole("button", { name: "保存" }).click();
   await dialog.locator("footer").getByRole("button", { name: "閉じる" }).click();
 
   await panel.getByRole("button", { name: "その他" }).click();
   await expect(panel.getByRole("menuitem", { name: "公式を開く" })).toBeVisible();
+
+  assertNoErrors(tracker);
+});
+
+test("作品編集: タイトルとタグをまとめて1回の保存で確定できる（一括draft保存）", async ({
+  page,
+}) => {
+  const tracker = trackErrors(page);
+  await openApp(page);
+
+  await page.getByText("夜更けの図書室で囁き朗読", { exact: false }).click();
+  const panel = page.locator(".mle-prv");
+  await panel.getByRole("button", { name: "作品を編集" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "作品を編集" });
+  const titleInput = dialog.getByLabel("タイトル");
+  await expect(titleInput).toBeEnabled();
+  await titleInput.fill("改題した朗読劇");
+
+  // タグのdraft操作（既存タグの削除）もタイトルと一緒に1回の保存でまとめて確定する。
+  await dialog.getByRole("button", { name: "タグ「癒し系」を削除" }).click();
+
+  await dialog.locator("footer").getByRole("button", { name: "保存" }).click();
+  await expect(dialog.locator("footer").getByRole("button", { name: "保存" })).toBeDisabled();
+  await dialog.locator("footer").getByRole("button", { name: "閉じる" }).click();
+
+  await expect(panel.getByText("改題した朗読劇", { exact: false })).toBeVisible();
+  await expect(panel.getByRole("button", { name: "タグ「癒し系」で絞り込む" })).toBeHidden();
 
   assertNoErrors(tracker);
 });

@@ -238,6 +238,16 @@ export class UserWorkStateRepository {
     }
   }
 
+  /** root再設定の確定に使う。除外はroot相対pathのみを主キーに持ちrootを識別しないため、
+   *  無関係なrootへ意図が漏れないよう全件破棄した上でroot設定を保存する。片方だけが
+   *  失敗して中途半端な状態にならないよう、1トランザクションで行う。 */
+  setUserSettingDiscardingScanCandidateExclusions(key: string, value: string): void {
+    this.db.userTransaction(() => {
+      this.db.user.delete(scanCandidateExclusions).run();
+      this.setUserSetting(key, value);
+    });
+  }
+
   listSmartFolders(): SmartFolder[] {
     return this.db.user
       .select()

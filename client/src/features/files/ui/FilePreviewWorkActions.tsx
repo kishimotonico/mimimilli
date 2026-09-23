@@ -13,7 +13,14 @@ import { apiErrorMessage } from "../../../shared/lib/apiError";
 import { useFilesCwd } from "../model/useFilesCwd";
 import { useIdentityConflictFor } from "../model/useIdentityConflict";
 import RegisterWorkDialog from "./RegisterWorkDialog";
-import type { ScanDiagnostic, WorkRegisterPreview, WorkspacePath } from "@mimimilli/shared";
+import { SourceProjectionNotice } from "../../../entities/work/ui/SourceProjectionNotice";
+import { sourceMutationErrorMessage } from "../../../entities/work/sourceMutation";
+import type {
+  ScanDiagnostic,
+  WorkRegisterPreview,
+  WorkSourceMutationResult,
+  WorkspacePath,
+} from "@mimimilli/shared";
 import { classifyFile, isWorkFolder, isSingleFileWork, type FsEntry } from "../model/types";
 
 interface FilePreviewWorkActionsProps {
@@ -75,6 +82,7 @@ export default function FilePreviewWorkActions({
   const [showRegisterDialog, setShowRegisterDialog] = useState(false);
   const [showUnregisterConfirm, setShowUnregisterConfirm] = useState(false);
   const [showReassignConfirm, setShowReassignConfirm] = useState(false);
+  const [pendingProjection, setPendingProjection] = useState<WorkSourceMutationResult | null>(null);
 
   const refreshFsState = useCallback(async () => {
     const paths = new Set<string>([entry.path]);
@@ -103,12 +111,13 @@ export default function FilePreviewWorkActions({
 
   const reassignMutation = useMutation({
     mutationFn: (path: WorkspacePath) => reassignIdentityConflict(path),
-    onSuccess: async () => {
+    onSuccess: async (result) => {
       setShowReassignConfirm(false);
+      setPendingProjection(result);
       await refreshFsState();
     },
     onError: (cause) => {
-      toast.error(apiErrorMessage(cause, "別作品としての取り込みに失敗しました"));
+      toast.error(sourceMutationErrorMessage(cause, "別作品としての取り込みに失敗しました"));
     },
   });
 
@@ -165,6 +174,13 @@ export default function FilePreviewWorkActions({
           {workActions}
         </div>
       )}
+      {pendingProjection && (
+        <SourceProjectionNotice
+          projection={pendingProjection.projection}
+          path={entry.path}
+          onProjected={setPendingProjection}
+        />
+      )}
       {identityConflict && entry.isDir && (
         <IdentityConflictSection
           identityConflict={identityConflict}
@@ -179,7 +195,10 @@ export default function FilePreviewWorkActions({
           folderPath={entry.path}
           targetKind={isDir ? "folder" : "file"}
           preview={registerPreview}
-          onRegistered={refreshFsState}
+          onRegistered={(result) => {
+            setPendingProjection(result);
+            void refreshFsState();
+          }}
           onClose={() => {
             setShowRegisterDialog(false);
             setRegisterPreview(null);

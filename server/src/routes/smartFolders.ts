@@ -67,6 +67,7 @@ export function smartFoldersRoute(adapter: DataAdapter): Hono {
       page: parsed.data.page ?? 1,
       limit: parsed.data.limit ?? WORKS_DEFAULT_PAGE_SIZE,
       seed: parsed.data.seed,
+      q: parsed.data.q,
       tags: parsed.data.tags,
       tagOp: parsed.data.tagOp,
     });

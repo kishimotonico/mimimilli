@@ -8,6 +8,7 @@ import {
   patchParsed,
   postParsed,
   postVoid,
+  putParsed,
   deleteParsed,
   deleteVoid,
 } from "../../shared/api/http";
@@ -25,19 +26,27 @@ import {
   createRandomSeed,
   type DlsiteBulkSnapshot,
   type Work,
+  workBookmarkResultSchema,
+  workEditSnapshotSchema,
+  workSourceMutationResultSchema,
   dlsiteNotificationPageSchema,
   dlsiteNotificationSummarySchema,
   type DlsiteNotificationKind,
   type DlsiteNotificationPage,
   type DlsiteNotificationSummary,
-  type WorkPatchInput,
+  type WorkBookmarkPatch,
+  type WorkBookmarkResult,
+  type WorkEditSnapshot,
+  type WorkSourceMutationResult,
+  type WorkSourcePatchInput,
   type DlsitePreview,
   type DlsiteApplyBody,
-  type DlsiteStatePatch,
+  type DlsiteStateUpdateBody,
   type ResumeBody,
   type UnregisterMissingWorksResult,
   type WorksPage,
   type WorksQueryInput,
+  type WorkspacePath,
 } from "@mimimilli/shared";
 
 function appendTagsTagOp(
@@ -80,6 +89,10 @@ export async function getWork(id: string): Promise<Work> {
   return getParsed(workSchema, `/works/${encodeURIComponent(id)}`);
 }
 
+export async function prepareWorkPlayback(id: string): Promise<Work> {
+  return postParsed(workSchema, `/works/${encodeURIComponent(id)}/playback-preparation`);
+}
+
 export async function getDlsiteNotificationSummary(): Promise<DlsiteNotificationSummary> {
   return getParsed(dlsiteNotificationSummarySchema, "/dlsite/notifications");
 }
@@ -92,8 +105,51 @@ export async function queryDlsiteNotifications(
   return getParsed(dlsiteNotificationPageSchema, `/dlsite/notifications/${kind}?${query}`);
 }
 
-export async function patchWork(workId: string, body: WorkPatchInput): Promise<Work> {
-  return patchParsed(workSchema, `/works/${encodeURIComponent(workId)}`, body);
+export async function getWorkEditSnapshot(id: string): Promise<WorkEditSnapshot> {
+  return getParsed(workEditSnapshotSchema, `/works/${encodeURIComponent(id)}/source`);
+}
+
+export async function projectWorkSource(path: WorkspacePath): Promise<WorkSourceMutationResult> {
+  return postParsed(workSourceMutationResultSchema, "/works/projection", { path });
+}
+
+export async function patchWorkSource(
+  workId: string,
+  body: WorkSourcePatchInput,
+): Promise<WorkSourceMutationResult> {
+  return patchParsed(workSourceMutationResultSchema, `/works/${encodeURIComponent(workId)}`, body);
+}
+
+export async function patchWorkBookmark(
+  workId: string,
+  body: WorkBookmarkPatch,
+): Promise<WorkBookmarkResult> {
+  return patchParsed(
+    workBookmarkResultSchema,
+    `/works/${encodeURIComponent(workId)}/bookmark`,
+    body,
+  );
+}
+
+export function encodeWorkTagPath(tag: string): string {
+  return encodeURIComponent(tag);
+}
+
+export async function addWorkTag(workId: string, tag: string): Promise<WorkSourceMutationResult> {
+  return putParsed(
+    workSourceMutationResultSchema,
+    `/works/${encodeURIComponent(workId)}/tags/${encodeWorkTagPath(tag)}`,
+  );
+}
+
+export async function removeWorkTag(
+  workId: string,
+  tag: string,
+): Promise<WorkSourceMutationResult> {
+  return deleteParsed(
+    workSourceMutationResultSchema,
+    `/works/${encodeURIComponent(workId)}/tags/${encodeWorkTagPath(tag)}`,
+  );
 }
 
 /** 作品登録を解除する（DB・メタファイルのみ。物理ファイルは残す） */
@@ -138,12 +194,22 @@ export async function fetchDlsiteInfo(workId: string): Promise<DlsitePreview> {
   return postParsed(dlsitePreviewSchema, `/dlsite/${encodeURIComponent(workId)}/fetch`);
 }
 
-export async function applyDlsiteInfo(workId: string, body: DlsiteApplyBody): Promise<void> {
-  await postVoid(`/dlsite/${encodeURIComponent(workId)}/apply`, body);
+export async function applyDlsiteInfo(
+  workId: string,
+  body: DlsiteApplyBody,
+): Promise<WorkSourceMutationResult> {
+  return postParsed(
+    workSourceMutationResultSchema,
+    `/dlsite/${encodeURIComponent(workId)}/apply`,
+    body,
+  );
 }
 
-export async function updateDlsiteState(workId: string, body: DlsiteStatePatch): Promise<Work> {
-  return patchParsed(workSchema, `/dlsite/${encodeURIComponent(workId)}`, body);
+export async function updateDlsiteState(
+  workId: string,
+  body: DlsiteStateUpdateBody,
+): Promise<WorkSourceMutationResult> {
+  return patchParsed(workSourceMutationResultSchema, `/dlsite/${encodeURIComponent(workId)}`, body);
 }
 
 export async function startDlsiteBulk(): Promise<void> {

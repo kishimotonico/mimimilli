@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { createApp } from "../../src/app.ts";
@@ -123,9 +123,12 @@ test("identity_conflictの指定pathだけを別作品として取り込み、Wo
     body: JSON.stringify({ path: "work-copy" }),
   });
   assert.equal(response.status, 201);
-  const work = await response.json();
-  assert.notEqual(work.id, WORK_ID);
-  assert.equal(work.title, "複製側");
+  const body = await response.json();
+  assert.notEqual(body.snapshot.id, WORK_ID);
+  assert.equal(body.snapshot.title, "複製側");
+  assert.equal(body.projection.status, "published");
+  const work = await adapter.getWork(body.snapshot.id);
+  assert.ok(work);
   assert.equal(work.bookmarked, false);
   assert.equal(work.resume, null);
 
@@ -133,7 +136,7 @@ test("identity_conflictの指定pathだけを別作品として取り込み、Wo
   assert.notEqual(after.id, before.id);
   assert.deepEqual({ ...after, id: before.id }, before);
   assert.deepEqual(await adapter.listScanDiagnostics(), []);
-  assert.equal((await adapter.getWork(work.id))?.physicalPath, join(root, "work-copy"));
+  assert.equal(work.physicalPath, join(root, "work-copy"));
 });
 
 test("壊れたコピーのcandidateIdで既存作品の投影を乗っ取らない", async (t) => {
@@ -226,6 +229,39 @@ test("root変更後、旧rootの作品IDと衝突する壊れたメタがあっ�
   const response = await app.request("/api/scan/diagnostics");
   assert.equal(response.status, 200);
   assert.deepEqual((await response.json()).diagnostics, []);
+});
+
+test("reassign対象のmimimilli.jsonが削除・破損していると構造化エラーを返す", async (t) => {
+  const directory = makeTestDirectory("identity-conflict-reassign-broken-meta");
+  t.after(directory.cleanup);
+  const root = join(directory.path, "library");
+  makeWork(root, "work-owner", "元作品");
+  const copy = makeWork(root, "work-copy", "複製側");
+  const adapter = directory.own(createTestRealAdapter({ database: { kind: "memory" } }));
+  await adapter.updateSettings({ rootFolder: root });
+  await adapter.scan({ full: true });
+
+  const app = directory.ownFn(createApp(adapter), (a) => a.shutdown());
+
+  unlinkSync(copy);
+  const missing = await app.request("/api/works/identity-conflicts/reassign", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: "work-copy" }),
+  });
+  assert.equal(missing.status, 409);
+  const missingBody = await missing.json();
+  assert.equal(missingBody.error.code, "conflict");
+
+  writeFileSync(copy, "{ 不正なJSON");
+  const broken = await app.request("/api/works/identity-conflicts/reassign", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: "work-copy" }),
+  });
+  assert.equal(broken.status, 502);
+  const brokenBody = await broken.json();
+  assert.equal(brokenBody.error.code, "parse_error");
 });
 
 test("同一ディレクトリの壊れたメタは従来どおり作品をerrorにする", async (t) => {

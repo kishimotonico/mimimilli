@@ -7,12 +7,15 @@ import {
 } from "../../src/features/navigation/model/navigationUrl";
 
 describe("navigation URL codec", () => {
+  // "cv"・"tag"は値一覧種の軸（tags/qを消去する独立入口）になったため、
+  // タグ・work・sortのエンコード/デコード自体を検証するこれらのテストはworks種の
+  // 軸（all）で行う。
   it("round-trips a Japanese library axis with a tag filter, work, and sort", () => {
     const state: NavigationUrlState = {
       mode: "library",
       library: {
         ...DEFAULT_LIBRARY_URL_STATE,
-        activeAxis: "cv",
+        activeAxis: "all",
         selectedTags: ["cv/水瀬なずな"],
         selectedWorkId: "RJ01234567",
         sort: "title-asc",
@@ -21,7 +24,7 @@ describe("navigation URL codec", () => {
 
     const url = serializeNavigationUrl(state);
     expect(url).toBe(
-      "/library/cv?tags=cv%2F%E6%B0%B4%E7%80%AC%E3%81%AA%E3%81%9A%E3%81%AA&work=RJ01234567&sort=title-asc",
+      "/library/all?tags=cv%2F%E6%B0%B4%E7%80%AC%E3%81%AA%E3%81%9A%E3%81%AA&work=RJ01234567&sort=title-asc",
     );
     expect(parseNavigationUrl(url)).toMatchObject({ state, warnings: [] });
   });
@@ -31,13 +34,13 @@ describe("navigation URL codec", () => {
       mode: "library",
       library: {
         ...DEFAULT_LIBRARY_URL_STATE,
-        activeAxis: "tag",
+        activeAxis: "all",
         selectedTags: ["ASMR", "癒し系"],
       },
     };
 
     const url = serializeNavigationUrl(state);
-    expect(url).toBe("/library/tag?tags=ASMR&tags=%E7%99%92%E3%81%97%E7%B3%BB");
+    expect(url).toBe("/library/all?tags=ASMR&tags=%E7%99%92%E3%81%97%E7%B3%BB");
     expect(parseNavigationUrl(url)).toMatchObject({ state, warnings: [] });
   });
 
@@ -52,25 +55,27 @@ describe("navigation URL codec", () => {
     expect(parseNavigationUrl(url)).toMatchObject({ state, warnings: [] });
   });
 
+  // 値一覧種の軸（year・tag等）はtags/qを消去する独立入口になったため、
+  // タグ保持のround-tripはworks種の軸（all）で検証する。
   it("round-trips a year pseudo-tag filter as the reserved @ form (ADR-0012 §2)", () => {
     const state: NavigationUrlState = {
       mode: "library",
-      library: { ...DEFAULT_LIBRARY_URL_STATE, activeAxis: "year", selectedTags: ["@year/2024"] },
+      library: { ...DEFAULT_LIBRARY_URL_STATE, activeAxis: "all", selectedTags: ["@year/2024"] },
     };
 
     const url = serializeNavigationUrl(state);
-    expect(url).toBe("/library/year?tags=%40year%2F2024");
+    expect(url).toBe("/library/all?tags=%40year%2F2024");
     expect(parseNavigationUrl(url)).toMatchObject({ state, warnings: [] });
   });
 
   it("round-trips a real tag literally named year/2025 distinctly from the pseudo-tag form", () => {
     const state: NavigationUrlState = {
       mode: "library",
-      library: { ...DEFAULT_LIBRARY_URL_STATE, activeAxis: "tag", selectedTags: ["year/2025"] },
+      library: { ...DEFAULT_LIBRARY_URL_STATE, activeAxis: "all", selectedTags: ["year/2025"] },
     };
 
     const url = serializeNavigationUrl(state);
-    expect(url).toBe("/library/tag?tags=year%2F2025");
+    expect(url).toBe("/library/all?tags=year%2F2025");
     expect(parseNavigationUrl(url)).toMatchObject({ state, warnings: [] });
   });
 
@@ -83,6 +88,51 @@ describe("navigation URL codec", () => {
     expect(parseNavigationUrl(serializeNavigationUrl(state))).toMatchObject({
       state,
       warnings: [],
+    });
+  });
+
+  it("omits sort= for a smart folder axis, since its sort is not the effective one", () => {
+    const state: NavigationUrlState = {
+      mode: "library",
+      library: { ...DEFAULT_LIBRARY_URL_STATE, activeAxis: "smart-sleep-long", sort: "title-asc" },
+    };
+
+    const url = serializeNavigationUrl(state);
+    expect(url).toBe("/library/smart-sleep-long");
+  });
+
+  it("still writes sort= for a normal axis (regression check for the smart-axis suppression)", () => {
+    const state: NavigationUrlState = {
+      mode: "library",
+      library: { ...DEFAULT_LIBRARY_URL_STATE, activeAxis: "all", sort: "title-asc" },
+    };
+
+    const url = serializeNavigationUrl(state);
+    expect(url).toBe("/library/all?sort=title-asc");
+  });
+
+  it("strips tags= and q= for a value-list axis URL, even if present (ADR-0026)", () => {
+    const result = parseNavigationUrl("/library/cv?tags=cv%2F%E8%97%A4%E7%94%B0%E8%8C%9C&q=foo");
+    expect(result.state).toMatchObject({
+      mode: "library",
+      library: { activeAxis: "cv", selectedTags: [], q: "" },
+    });
+    expect(result.canonicalUrl).toBe("/library/cv");
+  });
+
+  it("keeps tags= and q= for a normal (works) axis URL (regression)", () => {
+    const result = parseNavigationUrl("/library/all?tags=ASMR&q=foo");
+    expect(result.state).toMatchObject({
+      mode: "library",
+      library: { activeAxis: "all", selectedTags: ["ASMR"], q: "foo" },
+    });
+  });
+
+  it("keeps tags= and q= for a smart-folder axis URL (regression)", () => {
+    const result = parseNavigationUrl("/library/smart-sleep-long?tags=ASMR&q=foo");
+    expect(result.state).toMatchObject({
+      mode: "library",
+      library: { activeAxis: "smart-sleep-long", selectedTags: ["ASMR"], q: "foo" },
     });
   });
 
@@ -204,11 +254,12 @@ describe("navigation URL codec", () => {
   });
 
   it("normalizes multiple year pseudo-tags to the first one with a warning, matching the single-selection UI constraint", () => {
-    const result = parseNavigationUrl("/library/year?tags=%40year%2F2023&tags=%40year%2F2024");
+    // 値一覧種の軸（year）はtagsを消去するため、works種の軸（all）で検証する。
+    const result = parseNavigationUrl("/library/all?tags=%40year%2F2023&tags=%40year%2F2024");
 
     expect(result.state).toEqual({
       mode: "library",
-      library: { ...DEFAULT_LIBRARY_URL_STATE, activeAxis: "year", selectedTags: ["@year/2023"] },
+      library: { ...DEFAULT_LIBRARY_URL_STATE, activeAxis: "all", selectedTags: ["@year/2023"] },
     });
     expect(result.warnings[0]).toContain("選択タグを検証しました");
     expect(result.warnings[0]).toContain("@year/2024");

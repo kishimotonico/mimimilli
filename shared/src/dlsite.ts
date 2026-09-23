@@ -51,6 +51,15 @@ export function isRjCodeMissing(state: DlsiteState): boolean {
   return state.rjCode === null && state.status !== "skipped";
 }
 
+/** 候補文字列（フォルダー名 → タイトルの順）から RJ コードを検出する。VJ は検出しない。 */
+export function detectRjCode(candidates: string[]): string | null {
+  for (const candidate of candidates) {
+    const match = candidate.match(/RJ\d{6,8}/i);
+    if (match) return match[0].toUpperCase();
+  }
+  return null;
+}
+
 /** DLsiteのHTMLパースに失敗したまま残っている作品か */
 export function isDlsiteParseFailed(state: DlsiteState): boolean {
   return state.status === "error" && state.errorKind === "parse_error";
@@ -264,6 +273,7 @@ export type DlsiteApplyMissingBody = z.infer<typeof dlsiteApplyMissingBodySchema
 
 export const dlsiteBulkApplyMissingResultSchema = z.object({
   applied: z.number().int().nonnegative(),
+  pending: z.number().int().nonnegative(),
   skipped: z.number().int().nonnegative(),
   failed: z.number().int().nonnegative(),
 });
@@ -304,6 +314,16 @@ export const dlsiteStatePatchSchema = z
   })
   .refine((patch) => patch.rjCode !== undefined || patch.skipped !== undefined);
 export type DlsiteStatePatch = z.infer<typeof dlsiteStatePatchSchema>;
+
+/** PATCH /api/dlsite/:id。状態変更は正本 CAS のため sourceRevision 必須。 */
+export const dlsiteStateUpdateBodySchema = z
+  .object({
+    sourceRevision: z.string().min(1),
+    rjCode: rjCodeFormatSchema.nullable().optional(),
+    skipped: z.boolean().optional(),
+  })
+  .refine((patch) => patch.rjCode !== undefined || patch.skipped !== undefined);
+export type DlsiteStateUpdateBody = z.infer<typeof dlsiteStateUpdateBodySchema>;
 
 /** updateDlsiteState の状態遷移（real/fixture 共通）。
  *  RJコードが変わったときだけ旧コード由来の取得結果を捨てて未取得に戻す。

@@ -132,6 +132,16 @@ test("スマートフォルダー固有の sort が維持される", async () =>
   assert.equal(body.total, 210);
 });
 
+test("作品検索qがHTTPクエリからルート・evalSmartFolderまで渡る", async () => {
+  const app = buildAppWithManyWorks(210);
+  const body = await getSmartFolderWorks(app, "?q=work-0005&limit=10");
+  assert.deepEqual(
+    body.items.map((w) => w.id),
+    ["work-0005"],
+  );
+  assert.equal(body.total, 1);
+});
+
 test("クエリパラメータ不正は400", async () => {
   const app = buildAppWithManyWorks(10);
   const res = await app.request("/api/smart-folders/sf-pagination/works?page=0");

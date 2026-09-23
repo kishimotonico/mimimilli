@@ -9,6 +9,7 @@ import {
 } from "../../../entities/dlsite/model/bulkAtoms";
 import { useToast } from "../../../shared/ui/useToast";
 import { apiErrorMessage } from "../../../shared/lib/apiError";
+import { sourceMutationErrorMessage } from "../../../entities/work/sourceMutation";
 import { formatDlsiteBulkApplyMissingResult } from "../model/formatDlsiteBulkApplyMissingResult";
 import { invalidateDlsiteCache } from "../model/dlsiteInvalidation";
 import DlsiteBulkApplyDialog from "./DlsiteBulkApplyDialog";
@@ -84,7 +85,7 @@ export default function DlsiteBulkApplyRuntime() {
       await invalidateDlsiteCache(queryClient, [...selectedWorkIds]);
     } catch (cause) {
       reset();
-      toast.error(apiErrorMessage(cause, "未設定項目の一括適用に失敗しました"));
+      toast.error(sourceMutationErrorMessage(cause, "未設定項目の一括適用に失敗しました"));
     } finally {
       setBusy(false);
     }

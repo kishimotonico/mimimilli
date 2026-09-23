@@ -1,4 +1,5 @@
 import { ApiRequestError } from "../../shared/api/http";
+import { sourceMutationErrorMessage } from "./sourceMutation";
 
 function dlsiteSourceChangedMessage(): string {
   return "作品データが変更されました。取得結果を確認し直してから適用してください。";
@@ -18,6 +19,5 @@ export function dlsiteApplyErrorMessage(error: unknown): string {
   if (error instanceof ApiRequestError && error.code === "source_changed") {
     return dlsiteSourceChangedMessage();
   }
-  if (!(error instanceof ApiRequestError)) console.error("DLsite情報の適用に失敗しました", error);
-  return "DLsite情報を適用できませんでした";
+  return sourceMutationErrorMessage(error, "DLsite情報を適用できませんでした");
 }

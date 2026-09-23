@@ -98,8 +98,29 @@ const work: Work = {
   createdAt: null,
   playlists: [],
   resume: null,
-  sourceRevision: "revision-1",
 };
+
+function scanSnapshot(title: string) {
+  return {
+    sourceRevision: "revision-1",
+    id: work.id,
+    physicalPath: work.physicalPath,
+    title,
+    tags: work.tags,
+    urls: work.urls,
+    coverImage: work.coverImage,
+    dlsite: work.dlsite,
+  };
+}
+
+function mockSuccessfulScanTitleSave(title: string) {
+  vi.spyOn(workApi, "getWorkEditSnapshot").mockResolvedValue(scanSnapshot(work.title));
+  vi.spyOn(workApi, "patchWorkSource").mockImplementation(async () => {
+    const item = worksById.get(newWork.id);
+    if (item) worksById.set(newWork.id, { ...item, title });
+    return { snapshot: scanSnapshot(title), projection: { status: "published" as const } };
+  });
+}
 
 const scanResult: ScanResult = {
   registered: 10,
@@ -483,7 +504,8 @@ describe("ScanModal", () => {
   });
 
   it("タイトル保存に失敗したときエラーを表示し、ローカル表示は更新されない", async () => {
-    vi.spyOn(workApi, "patchWork").mockRejectedValue(new Error("network error"));
+    vi.spyOn(workApi, "getWorkEditSnapshot").mockResolvedValue(scanSnapshot(work.title));
+    vi.spyOn(workApi, "patchWorkSource").mockRejectedValue(new Error("network error"));
     renderModal();
     openTab("新規登録済み");
 
@@ -502,7 +524,7 @@ describe("ScanModal", () => {
   });
 
   it("タイトル保存に成功したとき表示名が更新され編集モードが閉じる", async () => {
-    vi.spyOn(workApi, "patchWork").mockResolvedValue({ ...work, title: "新しいタイトル" });
+    mockSuccessfulScanTitleSave("新しいタイトル");
     renderModal();
     openTab("新規登録済み");
 
@@ -516,13 +538,13 @@ describe("ScanModal", () => {
     expect(screen.queryByDisplayValue("新しいタイトル")).toBeNull();
   });
 
-  it("タイトル保存に成功すると作品詳細キャッシュと一覧クエリキャッシュの両方に反映される", async () => {
-    const updatedWork: Work = { ...work, title: "新しいタイトル" };
-    vi.spyOn(workApi, "patchWork").mockResolvedValue(updatedWork);
+  it("タイトル保存に成功すると正本キャッシュを更新し、一覧クエリを再取得する", async () => {
+    mockSuccessfulScanTitleSave("新しいタイトル");
     const { queryClient } = renderModal();
     openTab("新規登録済み");
 
     await waitFor(() => screen.getByText(newWork.title));
+    const searchCallsBefore = searchWorksSpy.mock.calls.length;
     fireEvent.click(screen.getByText(newWork.title));
     const input = screen.getByDisplayValue(newWork.title);
     fireEvent.change(input, { target: { value: "新しいタイトル" } });
@@ -530,7 +552,10 @@ describe("ScanModal", () => {
 
     await waitFor(() => expect(screen.getByText("新しいタイトル")).toBeInTheDocument());
 
-    expect(queryClient.getQueryData(WORK_QUERY_KEYS.detail(newWork.id))).toEqual(updatedWork);
+    expect(queryClient.getQueryData(WORK_QUERY_KEYS.source(newWork.id))).toMatchObject({
+      title: "新しいタイトル",
+    });
+    expect(searchWorksSpy.mock.calls.length).toBeGreaterThan(searchCallsBefore);
     const cachedList = queryClient.getQueryData<WorksPage>(
       WORK_QUERY_KEYS.list({ ids: [newWork.id] }),
     );
@@ -538,7 +563,8 @@ describe("ScanModal", () => {
   });
 
   it("空文字・空白のみのタイトルは保存されず編集モードだけ閉じる", async () => {
-    const patchSpy = vi.spyOn(workApi, "patchWork");
+    vi.spyOn(workApi, "getWorkEditSnapshot").mockResolvedValue(scanSnapshot(work.title));
+    const patchSpy = vi.spyOn(workApi, "patchWorkSource");
     renderModal();
     openTab("新規登録済み");
 
@@ -621,9 +647,7 @@ describe("ScanModal", () => {
     fireEvent.click(within(unregistered).getByRole("button", { name: "2件をライブラリに追加" }));
 
     await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["works"] }));
-    await waitFor(() =>
-      expect(screen.getByText("1件はライブラリに追加できませんでした。")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText("失敗")).toBeInTheDocument());
   });
 
   it("候補の除外では作品一覧・軸件数・スマートフォルダーの再取得を行わない（AC#4）", async () => {

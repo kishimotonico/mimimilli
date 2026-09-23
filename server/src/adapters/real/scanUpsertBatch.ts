@@ -68,7 +68,8 @@ export class ScanUpsertBatch {
     return changed;
   }
 
-  publishWork(): void {
+  publishWork(): string[] {
+    const changed = this.discardChangedSources();
     this.checkAbort();
     this.db.userTransaction(() => {
       for (const item of this.queue) this.user.upsertWorkUserState(item.work);
@@ -87,6 +88,7 @@ export class ScanUpsertBatch {
         this.catalog.markWorkError(error.id, error.physicalPath, error.metaPath, error.message);
       }
     });
+    return changed;
   }
 
   publishScanGeneration(input: {

@@ -3,8 +3,8 @@ import { formatDlsiteBulkApplyMissingResult } from "../../src/features/dlsite/mo
 
 describe("formatDlsiteBulkApplyMissingResult", () => {
   it("適用・スキップ・失敗件数を整形する", () => {
-    expect(formatDlsiteBulkApplyMissingResult({ applied: 3, skipped: 5, failed: 1 })).toBe(
-      "適用 3件・スキップ 5件・失敗 1件",
-    );
+    expect(
+      formatDlsiteBulkApplyMissingResult({ applied: 3, pending: 0, skipped: 5, failed: 1 }),
+    ).toBe("適用 3件・未反映 0件・スキップ 5件・失敗 1件");
   });
 });

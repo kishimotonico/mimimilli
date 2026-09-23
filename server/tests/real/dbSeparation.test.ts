@@ -21,7 +21,7 @@ test("catalog削除後の再スキャンでもuser状態を保持し、ATTACH JO
   const addedAt = before.addedAt;
   const playlist = before.playlists[0]!;
   const resumedTrack = playlist.tracks[1]!;
-  assert.ok(await adapter.patchWork(library.existingWorkId, { bookmarked: true }));
+  assert.ok(await adapter.patchWorkBookmark(library.existingWorkId, { bookmarked: true }));
   assert.ok(
     await adapter.saveResume(library.existingWorkId, {
       playlistId: playlist.id,

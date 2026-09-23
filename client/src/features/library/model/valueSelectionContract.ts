@@ -8,8 +8,6 @@
 // （選択タグを丸ごと置き換えた後の件数）と一致させるため無条件集計、既定=AND追加の入口は
 // 「今の選択に追加したら何件になるか」を示すため現在の選択タグ込みの集計にする。
 
-import type { NormalizedTag } from "@mimimilli/shared";
-
 type ClickModifiers = { ctrlKey: boolean; metaKey: boolean };
 
 export type ValueSelectionIntent<T> =
@@ -54,13 +52,4 @@ export function deriveValueSelectionHandlers<T>(intent: ValueSelectionIntent<T>)
     onSelect: (value, opts) =>
       isModifierClick(opts) ? intent.onReplace(value) : intent.onAdd(value),
   };
-}
-
-/** 軸ファセット件数（GET /axes/:axis）の集計に使うタグ。件数基準（本ファイル冒頭）を
- *  intent から一意に導出する。呼び出し側でハードコードしない。 */
-export function deriveFacetCountTags<T>(
-  intent: ValueSelectionIntent<T>,
-  selectedTags: NormalizedTag[],
-): NormalizedTag[] {
-  return intent.default === "replace" ? [] : selectedTags;
 }

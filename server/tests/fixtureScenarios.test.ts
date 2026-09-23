@@ -354,7 +354,10 @@ test("register-preview: ルート境界の前方一致だけでは配下扱い�
 test("fixtureのDLsite取得は保存済みRJコードの修正を反映する", async () => {
   const adapter = createFixtureAdapter();
   const workId = "RJ501001";
-  await adapter.updateDlsiteState(workId, { rjCode: "RJ7654321" });
+  await adapter.updateDlsiteState(workId, {
+    sourceRevision: (await adapter.getWorkEditSnapshot(workId))!.sourceRevision,
+    rjCode: "RJ7654321",
+  });
 
   const result = await adapter.dlsiteFetch(workId);
 
@@ -372,16 +375,22 @@ test("fixture: RJコード変更で旧状態をリセットし一括取得対象
   assert.equal(before?.dlsite.status, "applied");
   assert.ok((before?.dlsite.appliedTags.length ?? 0) > 0);
 
-  const unchanged = await adapter.updateDlsiteState(workId, { rjCode: "RJ501001" });
-  assert.equal(unchanged?.dlsite.status, "applied");
-  assert.deepEqual(unchanged?.dlsite.appliedTags, before?.dlsite.appliedTags);
+  const unchanged = await adapter.updateDlsiteState(workId, {
+    sourceRevision: (await adapter.getWorkEditSnapshot(workId))!.sourceRevision,
+    rjCode: "RJ501001",
+  });
+  assert.equal(unchanged?.snapshot.dlsite.status, "applied");
+  assert.deepEqual(unchanged?.snapshot.dlsite.appliedTags, before?.dlsite.appliedTags);
 
-  const updated = await adapter.updateDlsiteState(workId, { rjCode: "RJ7654321" });
-  assert.equal(updated?.dlsite.rjCode, "RJ7654321");
-  assert.equal(updated?.dlsite.status, "none");
-  assert.equal(updated?.dlsite.error, null);
-  assert.equal(updated?.dlsite.errorKind, null);
-  assert.deepEqual(updated?.dlsite.appliedTags, []);
+  const updated = await adapter.updateDlsiteState(workId, {
+    sourceRevision: (await adapter.getWorkEditSnapshot(workId))!.sourceRevision,
+    rjCode: "RJ7654321",
+  });
+  assert.equal(updated?.snapshot.dlsite.rjCode, "RJ7654321");
+  assert.equal(updated?.snapshot.dlsite.status, "none");
+  assert.equal(updated?.snapshot.dlsite.error, null);
+  assert.equal(updated?.snapshot.dlsite.errorKind, null);
+  assert.deepEqual(updated?.snapshot.dlsite.appliedTags, []);
 
   const bulk = await adapter.runDlsiteBulk("existing", [workId]);
   assert.equal(bulk.fetched, 1);
@@ -403,9 +412,13 @@ test("fixture: 単一音声ファイルのregister-previewと登録ができる"
     body: JSON.stringify({ path: "fanza/d00001.mp3", title: "FANZA単一ファイル" }),
   });
   assert.equal(created.status, 201);
-  const work = await created.json();
-  assert.equal(work.title, "FANZA単一ファイル");
-  assert.ok(work.physicalPath.endsWith("/fanza/d00001.mp3"));
+  const createdBody = await created.json();
+  assert.equal(createdBody.snapshot.title, "FANZA単一ファイル");
+  assert.ok(createdBody.snapshot.physicalPath.endsWith("/fanza/d00001.mp3"));
+  assert.equal(createdBody.projection.status, "published");
+  const workRes = await app.request(`/api/works/${createdBody.snapshot.id}`);
+  assert.equal(workRes.status, 200);
+  const work = await workRes.json();
   assert.equal(work.playlists[0].tracks.length, 1);
   assert.equal(work.playlists[0].tracks[0].file, "d00001.mp3");
 
@@ -414,7 +427,7 @@ test("fixture: 単一音声ファイルのregister-previewと登録ができる"
   const file = (await listing.json()).entries.find(
     (entry: { name: string }) => entry.name === "d00001.mp3",
   );
-  assert.equal(file?.workId, work.id);
+  assert.equal(file?.workId, createdBody.snapshot.id);
   assert.equal(file?.workRelPath, "");
 
   const again = await app.request("/api/works", {
@@ -423,4 +436,20 @@ test("fixture: 単一音声ファイルのregister-previewと登録ができる"
     body: JSON.stringify({ path: "fanza/d00001.mp3", title: "再登録" }),
   });
   assert.equal(again.status, 409);
+});
+
+test("fixture: 異なるrootへの変更で候補除外を破棄し、同一rootの再保存では破棄しない", async () => {
+  const state = createInitialState({ scenario: "empty" });
+  const { updateSettings, excludeScanCandidates, listScanCandidateExclusions } =
+    createSettingsScanMethods(state);
+
+  await updateSettings({ rootFolder: "/library/root-a" });
+  await excludeScanCandidates(["候補"]);
+  assert.deepEqual(await listScanCandidateExclusions(), ["候補"]);
+
+  await updateSettings({ rootFolder: "/library/root-a" });
+  assert.deepEqual(await listScanCandidateExclusions(), ["候補"]);
+
+  await updateSettings({ rootFolder: "/library/root-b" });
+  assert.deepEqual(await listScanCandidateExclusions(), []);
 });

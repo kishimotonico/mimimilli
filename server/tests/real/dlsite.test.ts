@@ -7,6 +7,7 @@ import { gunzipSync, gzipSync } from "node:zlib";
 import { test } from "node:test";
 import { Database } from "bun:sqlite";
 import {
+  detectRjCode,
   dlsiteStatePatchSchema,
   dlsiteInfoTags,
   normalizeDlsiteAgeRating,
@@ -15,7 +16,6 @@ import {
   mergeAppliedDlsiteTags,
 } from "@mimimilli/shared";
 import {
-  detectRjCode,
   fetchDlsiteCover,
   fetchDlsiteHtml,
   dlsiteWorkUrl,
@@ -461,9 +461,9 @@ test("dlsiteApply: タグマージとメタ書き戻し（カバー DL なし）
     applyTags: nts(["サークル/夜想曲", "cv/水瀬なずな", "genre/耳かき", "genre/睡眠"]),
     applyCover: false,
     applyUrl: true,
-    sourceRevision: (await adapter.getWork(lib.existingWorkId))!.sourceRevision!,
+    sourceRevision: (await adapter.getWorkEditSnapshot(lib.existingWorkId))!.sourceRevision,
   });
-  assert.equal(ok, true);
+  assert.ok(ok);
 
   const work = await adapter.getWork(lib.existingWorkId);
   assert.equal(work?.title, "DLsite から取得したタイトル");
@@ -498,16 +498,22 @@ test("updateDlsiteState: RJコード修正とskipped切替をメタへ保存す�
   await adapter.scan();
 
   const skipped = await adapter.updateDlsiteState(lib.existingWorkId, {
+    sourceRevision: (await adapter.getWorkEditSnapshot(lib.existingWorkId))!.sourceRevision,
     rjCode: "RJ1234567",
     skipped: true,
   });
-  assert.equal(skipped?.dlsite.rjCode, "RJ1234567");
-  assert.equal(skipped?.dlsite.status, "skipped");
-  const meta = JSON.parse(readFileSync(join(skipped!.physicalPath, "mimimilli.json"), "utf-8"));
-  assert.deepEqual(meta.dlsite, skipped?.dlsite);
+  assert.equal(skipped?.snapshot.dlsite.rjCode, "RJ1234567");
+  assert.equal(skipped?.snapshot.dlsite.status, "skipped");
+  const meta = JSON.parse(
+    readFileSync(join(skipped!.snapshot.physicalPath, "mimimilli.json"), "utf-8"),
+  );
+  assert.deepEqual(meta.dlsite, skipped?.snapshot.dlsite);
 
-  const enabled = await adapter.updateDlsiteState(lib.existingWorkId, { skipped: false });
-  assert.equal(enabled?.dlsite.status, "none");
+  const enabled = await adapter.updateDlsiteState(lib.existingWorkId, {
+    sourceRevision: (await adapter.getWorkEditSnapshot(lib.existingWorkId))!.sourceRevision,
+    skipped: false,
+  });
+  assert.equal(enabled?.snapshot.dlsite.status, "none");
 });
 
 test("updateDlsiteState: RJコード変更で旧状態をリセットし一括取得対象に戻す", async (t) => {
@@ -539,16 +545,22 @@ test("updateDlsiteState: RJコード変更で旧状態をリセットし一括�
   writeFileSync(metaPath, JSON.stringify(meta, null, 2));
   await adapter.scan();
 
-  const unchanged = await adapter.updateDlsiteState(lib.existingWorkId, { rjCode: "RJ900002" });
-  assert.equal(unchanged?.dlsite.status, "applied");
-  assert.deepEqual(unchanged?.dlsite.appliedTags, ["genre/旧タグ"]);
+  const unchanged = await adapter.updateDlsiteState(lib.existingWorkId, {
+    sourceRevision: (await adapter.getWorkEditSnapshot(lib.existingWorkId))!.sourceRevision,
+    rjCode: "RJ900002",
+  });
+  assert.equal(unchanged?.snapshot.dlsite.status, "applied");
+  assert.deepEqual(unchanged?.snapshot.dlsite.appliedTags, ["genre/旧タグ"]);
 
-  const updated = await adapter.updateDlsiteState(lib.existingWorkId, { rjCode: "RJ888888" });
-  assert.equal(updated?.dlsite.rjCode, "RJ888888");
-  assert.equal(updated?.dlsite.status, "none");
-  assert.equal(updated?.dlsite.error, null);
-  assert.equal(updated?.dlsite.errorKind, null);
-  assert.deepEqual(updated?.dlsite.appliedTags, []);
+  const updated = await adapter.updateDlsiteState(lib.existingWorkId, {
+    sourceRevision: (await adapter.getWorkEditSnapshot(lib.existingWorkId))!.sourceRevision,
+    rjCode: "RJ888888",
+  });
+  assert.equal(updated?.snapshot.dlsite.rjCode, "RJ888888");
+  assert.equal(updated?.snapshot.dlsite.status, "none");
+  assert.equal(updated?.snapshot.dlsite.error, null);
+  assert.equal(updated?.snapshot.dlsite.errorKind, null);
+  assert.deepEqual(updated?.snapshot.dlsite.appliedTags, []);
 
   const bulk = await adapter.runDlsiteBulk("existing", [lib.existingWorkId]);
   assert.equal(bulk.fetched, 1);
@@ -562,7 +574,11 @@ test("dlsiteFetch: 存在しない作品はnot_found", async (t) => {
   await adapter.updateSettings({ rootFolder: lib.root });
   await adapter.scan();
   // 既存メタ作品はフォルダー名 RJ900002… なので、タイトル・パスとも RJ なしに変更してから検証
-  await adapter.patchWork(lib.existingWorkId, { title: "コードなし作品" });
+  const snap = await adapter.getWorkEditSnapshot(lib.existingWorkId);
+  await adapter.patchWorkSource(lib.existingWorkId, {
+    sourceRevision: snap!.sourceRevision,
+    title: "コードなし作品",
+  });
   const generatedFree = await adapter.dlsiteFetch("no-such-work");
   assert.equal(generatedFree.ok, false);
   if (!generatedFree.ok) assert.equal(generatedFree.kind, "not_found");
@@ -646,7 +662,10 @@ test("bulk取得はcache TTLとskipped状態を利用し、mimimilli.jsonを変�
     scan.candidates.map((candidate) => ({ path: candidate.path })),
   );
   const candidateId = registered.registered[0]!.workId;
-  await adapter.updateDlsiteState(candidateId!, { skipped: true });
+  await adapter.updateDlsiteState(candidateId!, {
+    sourceRevision: (await adapter.getWorkEditSnapshot(candidateId!))!.sourceRevision,
+    skipped: true,
+  });
   const first = await adapter.runDlsiteBulk("existing", undefined);
   assert.equal(first.failed, 1);
   assert.equal(first.skipped, 1);
@@ -1101,7 +1120,7 @@ test("dlsiteApply: abort済みsignalではDB・メタを更新しない", async 
         applyTags: [],
         applyCover: false,
         applyUrl: true,
-        sourceRevision: before!.sourceRevision!,
+        sourceRevision: (await adapter.getWorkEditSnapshot(lib.existingWorkId))!.sourceRevision,
       },
       { signal: controller.signal },
     ),
@@ -1241,16 +1260,17 @@ test("DLsiteカバー: キャッシュから各作品フォルダーへコピー
   const first = makeAdapter();
   await first.updateSettings({ rootFolder: lib.root });
   await first.scan();
-  assert.equal(
-    await first.dlsiteApply(lib.existingWorkId, {
-      info,
-      applyTitle: false,
-      applyTags: [],
-      applyCover: true,
-      applyUrl: true,
-      sourceRevision: (await first.getWork(lib.existingWorkId))!.sourceRevision!,
-    }),
-    true,
+  assert.ok(
+    (
+      await first.dlsiteApply(lib.existingWorkId, {
+        info,
+        applyTitle: false,
+        applyTags: [],
+        applyCover: true,
+        applyUrl: true,
+        sourceRevision: (await first.getWorkEditSnapshot(lib.existingWorkId))!.sourceRevision,
+      })
+    )?.snapshot,
   );
   const applied = await first.getWork(lib.existingWorkId);
   assert.ok(applied?.cover);
@@ -1264,16 +1284,18 @@ test("DLsiteカバー: キャッシュから各作品フォルダーへコピー
   rmSync(database.catalogPath);
   const reregistered = makeAdapter();
   await reregistered.scan();
-  assert.equal(
-    await reregistered.dlsiteApply(lib.existingWorkId, {
-      info,
-      applyTitle: false,
-      applyTags: [],
-      applyCover: true,
-      applyUrl: true,
-      sourceRevision: (await reregistered.getWork(lib.existingWorkId))!.sourceRevision!,
-    }),
-    true,
+  assert.ok(
+    (
+      await reregistered.dlsiteApply(lib.existingWorkId, {
+        info,
+        applyTitle: false,
+        applyTags: [],
+        applyCover: true,
+        applyUrl: true,
+        sourceRevision: (await reregistered.getWorkEditSnapshot(lib.existingWorkId))!
+          .sourceRevision,
+      })
+    )?.snapshot,
   );
   assert.equal(coverHttpCalls, 1);
   reregistered.close();
@@ -1499,7 +1521,7 @@ test("DLsiteカバー: 同じURLを2作品へ同時適用してもHTTPは1回で
       applyTags: [],
       applyCover: true,
       applyUrl: true,
-      sourceRevision: (await adapter.getWork(workAId))!.sourceRevision!,
+      sourceRevision: (await adapter.getWorkEditSnapshot(workAId))!.sourceRevision,
     }),
     adapter.dlsiteApply(workBId, {
       info: infoFor("RJ900001"),
@@ -1507,11 +1529,11 @@ test("DLsiteカバー: 同じURLを2作品へ同時適用してもHTTPは1回で
       applyTags: [],
       applyCover: true,
       applyUrl: true,
-      sourceRevision: (await adapter.getWork(workBId))!.sourceRevision!,
+      sourceRevision: (await adapter.getWorkEditSnapshot(workBId))!.sourceRevision,
     }),
   ]);
-  assert.equal(okA, true);
-  assert.equal(okB, true);
+  assert.ok(okA?.snapshot);
+  assert.ok(okB?.snapshot);
   assert.equal(coverCalls, 1);
   const workA = await adapter.getWork(workAId);
   const workB = await adapter.getWork(workBId);
@@ -1677,9 +1699,9 @@ test("DLsite apply: カバーはcache transportを通る", async (t) => {
     applyTags: [],
     applyCover: true,
     applyUrl: true,
-    sourceRevision: (await adapter.getWork(lib.existingWorkId))!.sourceRevision!,
+    sourceRevision: (await adapter.getWorkEditSnapshot(lib.existingWorkId))!.sourceRevision,
   });
-  assert.equal(ok, true);
+  assert.ok(ok);
   assert.equal(coverCalls, 1);
 });
 
@@ -1946,9 +1968,9 @@ test("DLsite通知: 適用後は未連携件数から外れる", async (t) => {
     applyTags: nts(["genre/耳かき"]),
     applyCover: false,
     applyUrl: true,
-    sourceRevision: work!.sourceRevision!,
+    sourceRevision: (await adapter.getWorkEditSnapshot(work!.id))!.sourceRevision,
   });
-  assert.equal(ok, true);
+  assert.ok(ok);
   const after = await adapter.getDlsiteNotificationSummary();
   assert.equal(after.unlinkedCount, before.unlinkedCount - 1);
 });

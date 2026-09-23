@@ -33,7 +33,10 @@ export function buildDlsiteRegistrationBody(
   return body;
 }
 
-export function unappliedDlsiteTags(work: Work, info: DlsiteWorkInfo): NormalizedTag[] {
+export function unappliedDlsiteTags(
+  work: Pick<Work, "tags">,
+  info: DlsiteWorkInfo,
+): NormalizedTag[] {
   const existing = new Set(work.tags);
   return dlsiteInfoTags(info).filter((tag) => !existing.has(tag));
 }
@@ -55,7 +58,10 @@ export interface DlsiteApplyDiff {
   hasChanges: boolean;
 }
 
-export function computeDlsiteApplyDiff(work: Work, info: DlsiteWorkInfo): DlsiteApplyDiff {
+export function computeDlsiteApplyDiff(
+  work: Pick<Work, "title" | "tags" | "urls" | "coverKind" | "coverImage" | "cover">,
+  info: DlsiteWorkInfo,
+): DlsiteApplyDiff {
   const currentUrl = work.urls.find((entry) => entry.url.includes("dlsite.com"))?.url ?? "";
   const title: DlsiteFieldDiff =
     work.title === info.title

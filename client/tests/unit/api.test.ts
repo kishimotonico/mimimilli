@@ -241,22 +241,62 @@ describe("work api", () => {
     mockFetch.mockReset();
   });
 
-  it("patchWork PATCHes to /api/works/:id with the given fields", async () => {
-    const mockWork = makeWork({ title: "new title", tags: ["tag1", "tag2"], bookmarked: true });
-    mockFetch.mockResolvedValue(makeResponse(mockWork));
-    const result = await workApi.patchWork("work-1", {
+  it("patchWorkSource PATCHes to /api/works/:id and returns snapshot", async () => {
+    const snapshot = {
+      sourceRevision: "rev-2",
+      id: "work-1",
+      physicalPath: "/library/work-1",
       title: "new title",
       tags: ["tag1", "tag2"],
-      bookmarked: true,
+      urls: [],
+      coverImage: null,
+      dlsite: emptyDlsiteState(),
+    };
+    mockFetch.mockResolvedValue(makeResponse({ snapshot, projection: { status: "published" } }));
+    const result = await workApi.patchWorkSource("work-1", {
+      sourceRevision: "rev-1",
+      title: "new title",
     });
     expect(mockFetch).toHaveBeenCalledWith(
       "/api/works/work-1",
       expect.objectContaining({
         method: "PATCH",
-        body: JSON.stringify({ title: "new title", tags: ["tag1", "tag2"], bookmarked: true }),
+        body: JSON.stringify({ sourceRevision: "rev-1", title: "new title" }),
       }),
     );
-    expect(result).toEqual(mockWork);
+    expect(result).toEqual({ snapshot, projection: { status: "published" } });
+  });
+
+  it("patchWorkBookmark PATCHes /api/works/:id/bookmark", async () => {
+    mockFetch.mockResolvedValue(makeResponse({ bookmarked: true }));
+    const result = await workApi.patchWorkBookmark("work-1", { bookmarked: true });
+    expect(mockFetch).toHaveBeenCalledWith(
+      "/api/works/work-1/bookmark",
+      expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify({ bookmarked: true }),
+      }),
+    );
+    expect(result).toEqual({ bookmarked: true });
+  });
+
+  it("addWorkTag PUTs encoded tag path", async () => {
+    const snapshot = {
+      sourceRevision: "rev-2",
+      id: "work-1",
+      physicalPath: "/library/work-1",
+      title: "テスト作品",
+      tags: ["a/b"],
+      urls: [],
+      coverImage: null,
+      dlsite: emptyDlsiteState(),
+    };
+    mockFetch.mockResolvedValue(makeResponse({ snapshot, projection: { status: "published" } }));
+    await workApi.addWorkTag("work-1", "a/b");
+    expect(mockFetch).toHaveBeenCalledWith(
+      "/api/works/work-1/tags/a%2Fb",
+      expect.objectContaining({ method: "PUT" }),
+    );
   });
 
   it("saveResumePosition POSTs to /api/works/:id/resume", async () => {
@@ -533,6 +573,26 @@ describe("レスポンス検証（getParsed等）", () => {
   it("getWork: 200だが契約に適合しないレスポンスは握りつぶさずエンドポイント名を含むエラーを投げる", async () => {
     mockFetch.mockResolvedValue(makeResponse({ id: "work-1" }));
     await expect(workApi.getWork("work-1")).rejects.toThrow(/GET \/works\/work-1/);
+  });
+
+  it("prepareWorkPlayback: 200かつ契約に適合するレスポンスはWorkとして解決する", async () => {
+    const mockWork = makeWork({ id: "work-1" });
+    mockFetch.mockResolvedValue(makeResponse(mockWork));
+    const result = await workApi.prepareWorkPlayback("work-1");
+    expect(result).toEqual(mockWork);
+    expect(mockFetch).toHaveBeenCalledWith(
+      "/api/works/work-1/playback-preparation",
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("prepareWorkPlayback: 404はnullへフォールバックせずApiRequestErrorとして伝播する", async () => {
+    mockFetch.mockResolvedValue(
+      makeResponse({ error: { code: "not_found", message: "作品が見つかりません: work-1" } }, 404),
+    );
+    await expect(workApi.prepareWorkPlayback("work-1")).rejects.toThrow(
+      /作品が見つかりません: work-1/,
+    );
   });
 
   it("searchWorks: 契約に適合しないitemsは検証エラーになる", async () => {

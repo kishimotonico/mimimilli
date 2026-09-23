@@ -273,23 +273,23 @@ test("buildTagPrefixCandidates: 登録できない予約 prefix と禁止形を�
 
 // ── fixture アダプタ ─────────────────────────────────────────
 
-// 生の（空白混じり・大文字小文字混在の）タグ文字列の正規化は、adapter.patchWork の内部
-// ではなく HTTP 境界（workPatchSchema + normalizeTags）で行う。実際にその境界を通す。
+// 生の（空白混じり・大文字小文字混在の）タグ文字列の正規化は、adapter の内部ではなく
+// HTTP 境界（workSourcePatchSchema + normalizeTags）で行う。実際にその境界を通す。
 test("PATCH /api/works/:id: タグを正規化して保存する", async () => {
   const app = buildApp();
   const listRes = await app.request("/api/works");
   const { items } = await listRes.json();
   const workId: string = items[0].id;
-  const sourceRevision = "fixture";
+  const source = await (await app.request(`/api/works/${workId}/source`)).json();
 
   const patched = await app.request(`/api/works/${workId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sourceRevision, tags: ["CV/ x ", "cv/x"] }),
+    body: JSON.stringify({ sourceRevision: source.sourceRevision, tags: ["CV/ x ", "cv/x"] }),
   });
   assert.equal(patched.status, 200);
   const body = await patched.json();
-  assert.deepEqual(body.tags, ["cv/x"]);
+  assert.deepEqual(body.snapshot.tags, ["cv/x"]);
 });
 
 test("PATCH /api/works/:id: 正規化後に空になるタグは400で拒否する（隠蔽しない）", async () => {
@@ -301,7 +301,7 @@ test("PATCH /api/works/:id: 正規化後に空になるタグは400で拒否す�
   const patched = await app.request(`/api/works/${workId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ tags: ["cv/x", "  "] }),
+    body: JSON.stringify({ sourceRevision: "fixture", tags: ["cv/x", "  "] }),
   });
   assert.equal(patched.status, 400);
 });
@@ -334,7 +334,7 @@ test("POST /api/dlsite/:id/apply: applyTags を正規化して保存する", asy
       applyTags: ["Genre/ 耳かき ", "genre/耳かき"],
     }),
   });
-  assert.equal(applied.status, 204);
+  assert.equal(applied.status, 200);
 
   const work = await app.request(`/api/works/${workId}`);
   const body = await work.json();
@@ -599,5 +599,5 @@ test("PATCH /api/works/:id のタグは正規形で保存される", async () =>
   });
   assert.equal(res.status, 200);
   const body = await res.json();
-  assert.deepEqual(body.tags, ["cv/新人", "ASMR", "asmr"]);
+  assert.deepEqual(body.snapshot.tags, ["cv/新人", "ASMR", "asmr"]);
 });

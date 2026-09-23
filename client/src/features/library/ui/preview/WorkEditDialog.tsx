@@ -1,36 +1,56 @@
 import { useEffect, useRef, useState } from "react";
-import type { FormEvent } from "react";
-import type { UrlEntry, Work } from "@mimimilli/shared";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type {
+  NormalizedTag,
+  UrlEntry,
+  Work,
+  WorkEditSnapshot,
+  WorkProjection,
+} from "@mimimilli/shared";
 import { isHttpAbsoluteUrl } from "@mimimilli/shared";
 import Button from "../../../../shared/ui/Button";
 import IconButton from "../../../../shared/ui/IconButton";
 import { I } from "../../../../shared/ui/Icon";
 import TextInput from "../../../../shared/ui/TextInput";
-import { useToast } from "../../../../shared/ui/useToast";
+import { ApiRequestError } from "../../../../shared/api/http";
 import { useDialogModal } from "../../../../shared/ui/useDialogModal";
 import type { useLibraryWorkPatchMutations } from "../../model/useLibraryQueries";
-import { apiErrorMessage } from "../../../../shared/lib/apiError";
-import { canPatchWorkSource } from "../../../../entities/work/sourceRevision";
+import { getWorkEditSnapshot } from "../../../../entities/work/api";
+import { WORK_QUERY_KEYS } from "../../../../entities/work/queryKeys";
+import {
+  projectionWorkspacePath,
+  sourceMutationErrorMessage,
+} from "../../../../entities/work/sourceMutation";
+import { SourceProjectionNotice } from "../../../../entities/work/ui/SourceProjectionNotice";
+import { useRootFolderOrNull } from "../../../../entities/settings/useSettingsQuery";
+import { useTagPrefixes } from "../../../../entities/tag/useTagPrefixes";
+import {
+  reconcileWorkEditSnapshot,
+  tagsEqual,
+  urlsEqual,
+  type WorkEditField,
+} from "../../model/workEditReconcile";
+import { interpretWorkEditSaveResult } from "../../model/workEditSaveResult";
 import { WorkSourcePatchBlockedNotice } from "./WorkSourcePatchBlockedNotice";
 import { DlsiteEditor } from "./DlsiteEditor";
-import { WorkTagEditor } from "./WorkTagEditor";
+import { WorkEditTagsField } from "./WorkEditTagsField";
+import { useWorkEditTagsDraft } from "./useWorkEditTagsDraft";
 
 interface WorkEditDialogProps {
   work: Work;
   tagSuggestions: string[];
-  workPatchMutations: Pick<
-    ReturnType<typeof useLibraryWorkPatchMutations>,
-    "titleMutation" | "tagsMutation" | "urlsMutation"
-  >;
+  workPatchMutations: Pick<ReturnType<typeof useLibraryWorkPatchMutations>, "editMutation">;
   onClose: () => void;
 }
 
+const FIELD_LABEL: Record<WorkEditField, string> = {
+  title: "タイトル",
+  tags: "タグ",
+  urls: "関連URL",
+};
+
 function cloneUrls(urls: UrlEntry[]): UrlEntry[] {
   return urls.map((entry) => ({ label: entry.label, url: entry.url }));
-}
-
-function urlsEqual(left: UrlEntry[], right: UrlEntry[]): boolean {
-  return JSON.stringify(left) === JSON.stringify(right);
 }
 
 /** ラベル・URLの入力欄群を検証済みのUrlEntry[]へ正規化する。不正な入力があれば
@@ -116,19 +136,221 @@ function UnsavedChangesPrompt({
   );
 }
 
+/** 保存後に外部（DlsiteEditorの独立適用・409後の再取得など）で編集中のフィールドが
+ *  さらに変わったときの選び直し導線。 */
+function FieldConflictNotice({
+  field,
+  onUseLatest,
+  onKeepMine,
+}: {
+  field: WorkEditField;
+  onUseLatest: () => void;
+  onKeepMine: () => void;
+}) {
+  return (
+    <div className="mle-prv__edit-conflict" role="alert">
+      <p>保存後に別の変更がありました（{FIELD_LABEL[field]}）</p>
+      <div className="actions">
+        <Button variant="ghost" size="sm" onClick={onUseLatest}>
+          最新の値を使う
+        </Button>
+        <Button variant="ghost" size="sm" onClick={onKeepMine}>
+          自分の編集で上書きする
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function WorkEditDialog({
   work,
   tagSuggestions,
-  workPatchMutations: { titleMutation, tagsMutation, urlsMutation },
+  workPatchMutations: { editMutation },
   onClose,
 }: WorkEditDialogProps) {
+  const queryClient = useQueryClient();
+  const sourceQuery = useQuery({
+    queryKey: WORK_QUERY_KEYS.source(work.id),
+    queryFn: () => getWorkEditSnapshot(work.id),
+  });
+  const { tagPrefixes } = useTagPrefixes();
+
+  const [acceptedSnapshot, setAcceptedSnapshot] = useState<WorkEditSnapshot | null>(null);
+  const [processedRevision, setProcessedRevision] = useState<string | null>(null);
   const [titleDraft, setTitleDraft] = useState(work.title);
+  const [tagsDraft, setTagsDraft] = useState<NormalizedTag[]>(work.tags);
   const [urlDrafts, setUrlDrafts] = useState<UrlEntry[]>(() => cloneUrls(work.urls));
   const [urlValidationError, setUrlValidationError] = useState<string | null>(null);
   const [isUnsavedPromptOpen, setIsUnsavedPromptOpen] = useState(false);
-  const [isSavingToClose, setIsSavingToClose] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  // source確定（保存成功）とcatalog反映は別の事実（ADR-0025）。
+  // projectionがpendingでも保存自体は成功として扱い、反映状況だけをここに残す。
+  const [projection, setProjection] = useState<WorkProjection | null>(null);
+  const rootFolder = useRootFolderOrNull();
+
+  // 保存後・DlsiteEditorの独立適用・409後の再取得などで届いた新しいsnapshotを
+  // 基準へ取り込むかどうかの状態。
+  const [pendingSnapshot, setPendingSnapshot] = useState<WorkEditSnapshot | null>(null);
+  const [pendingChangedFields, setPendingChangedFields] = useState<WorkEditField[]>([]);
+  const [conflictFields, setConflictFields] = useState<WorkEditField[]>([]);
+  const [keepMineFields, setKeepMineFields] = useState<ReadonlySet<WorkEditField>>(new Set());
+
   const titleInputRef = useRef<HTMLInputElement>(null);
   const firstUrlInputRef = useRef<HTMLInputElement>(null);
+
+  const trimmedTitle = titleDraft.trim();
+  const currentTitle = acceptedSnapshot?.title ?? work.title;
+  const currentTags = acceptedSnapshot?.tags ?? work.tags;
+  const currentUrls = acceptedSnapshot?.urls ?? work.urls;
+  const isTitleDirty = trimmedTitle !== currentTitle;
+  const isTagsDirty = !tagsEqual(tagsDraft, currentTags);
+  const normalizedUrlDrafts = urlDrafts
+    .map((entry) => ({ label: entry.label.trim(), url: entry.url.trim() }))
+    .filter((entry) => entry.label || entry.url);
+  const isUrlsDirty = !urlsEqual(normalizedUrlDrafts, currentUrls);
+  const isDirty = isTitleDirty || isTagsDirty || isUrlsDirty;
+
+  // タグのdraft操作（追加・削除・保護タグ確認・undo）。undoableTag/confirmingRemoveTagは
+  // ここ（ダイアログ側）で保持し、保存開始時にundo導線を無効化できるようにする
+  // （keyでの再マウントはdraft自体まで捨ててしまうため避ける）。
+  const {
+    addTag,
+    requestRemoveTag,
+    confirmingRemoveTag,
+    confirmRemoveTag,
+    cancelRemoveTag,
+    undoableTag,
+    undoRemoveTag,
+    dismissUndo,
+  } = useWorkEditTagsDraft({ tags: tagsDraft, onChange: setTagsDraft, tagPrefixes });
+
+  // 新しいsnapshotが届いたときの取り込み判定。React本体が推奨する「レンダー中に
+  // 前回値と比較してstateを調整する」パターン（useEffectの1tick遅延を避ける。
+  // WorkTagEditor.tsxのblockEpochと同型）。
+  const incoming = sourceQuery.data;
+  if (incoming && incoming.sourceRevision !== processedRevision) {
+    setProcessedRevision(incoming.sourceRevision);
+    if (!acceptedSnapshot) {
+      setAcceptedSnapshot(incoming);
+      setTitleDraft(incoming.title);
+      setTagsDraft(incoming.tags);
+      setUrlDrafts(cloneUrls(incoming.urls));
+    } else {
+      const { changedFields, conflictFields: nextConflicts } = reconcileWorkEditSnapshot(
+        acceptedSnapshot,
+        incoming,
+        { title: isTitleDirty, tags: isTagsDirty, urls: isUrlsDirty },
+        { title: trimmedTitle, tags: tagsDraft, urls: normalizedUrlDrafts },
+      );
+      if (nextConflicts.length === 0) {
+        setAcceptedSnapshot(incoming);
+        if (changedFields.includes("title")) setTitleDraft(incoming.title);
+        if (changedFields.includes("tags")) setTagsDraft(incoming.tags);
+        if (changedFields.includes("urls")) setUrlDrafts(cloneUrls(incoming.urls));
+      } else {
+        setPendingSnapshot(incoming);
+        setPendingChangedFields(changedFields);
+        setConflictFields(nextConflicts);
+        setKeepMineFields(new Set());
+      }
+    }
+  }
+
+  const sourceErrorMessage = sourceQuery.error
+    ? sourceMutationErrorMessage(sourceQuery.error, "作品情報を読み込めないため編集できません。")
+    : null;
+  const canEditSource = Boolean(acceptedSnapshot) && !sourceQuery.isError;
+  const hasUnresolvedConflicts = conflictFields.length > 0;
+
+  function applyFieldToDraft(field: WorkEditField, snapshot: WorkEditSnapshot) {
+    if (field === "title") setTitleDraft(snapshot.title);
+    else if (field === "tags") setTagsDraft(snapshot.tags);
+    else setUrlDrafts(cloneUrls(snapshot.urls));
+  }
+
+  function resolveConflictField(field: WorkEditField, useLatest: boolean) {
+    if (!pendingSnapshot) return;
+    if (useLatest) applyFieldToDraft(field, pendingSnapshot);
+    const nextKeepMine = useLatest ? keepMineFields : new Set(keepMineFields).add(field);
+    const remaining = conflictFields.filter((f) => f !== field);
+    if (remaining.length === 0) {
+      for (const changedField of pendingChangedFields) {
+        if (!nextKeepMine.has(changedField)) applyFieldToDraft(changedField, pendingSnapshot);
+      }
+      setAcceptedSnapshot(pendingSnapshot);
+      setPendingSnapshot(null);
+      setPendingChangedFields([]);
+      setConflictFields([]);
+      setKeepMineFields(new Set());
+    } else {
+      setConflictFields(remaining);
+      setKeepMineFields(nextKeepMine);
+    }
+  }
+
+  function commitSavedSnapshot(snapshot: WorkEditSnapshot) {
+    setAcceptedSnapshot(snapshot);
+    setProcessedRevision(snapshot.sourceRevision);
+    setTitleDraft(snapshot.title);
+    setTagsDraft(snapshot.tags);
+    setUrlDrafts(cloneUrls(snapshot.urls));
+    setUrlValidationError(null);
+  }
+
+  function handleSaveError(cause: unknown) {
+    if (cause instanceof ApiRequestError && cause.code === "source_changed") {
+      setSaveError("作品データが他で更新されました。最新の内容を確認しています…");
+      void sourceQuery.refetch();
+      return;
+    }
+    // ApiTransportError（通信断・中断）は他の失敗と区別し、成功とも失敗とも推測しない
+    // 「結果を確認できませんでした」文言を出す（sourceMutationErrorMessage）。
+    // draftはどちらの場合も保持する（この関数はdraftを一切書き換えない）。
+    setSaveError(sourceMutationErrorMessage(cause, "保存できませんでした。"));
+  }
+
+  /** dirtyなフィールドだけを1回のPATCHへ含める（ADR-0025）。成功後は保存した値を
+   *  基準へ反映し、closeAfterSaveならダイアログを閉じる。 */
+  const save = async (options: { closeAfterSave: boolean }): Promise<boolean> => {
+    // 送信開始時点でタグのundo導線を無効化する（保存後に別コマンドで戻す形は採らないため、
+    // 保存を試みた時点で「取り消せる」という前提自体が崩れる）。
+    dismissUndo();
+    if (!acceptedSnapshot || hasUnresolvedConflicts) return false;
+    if (isTitleDirty && !trimmedTitle) return false;
+    const filledUrls = isUrlsDirty ? buildFilledUrls(urlDrafts, setUrlValidationError) : null;
+    if (isUrlsDirty && filledUrls === null) return false;
+    if (!isDirty) return false;
+
+    try {
+      const result = await editMutation.mutateAsync({
+        workId: work.id,
+        sourceRevision: acceptedSnapshot.sourceRevision,
+        title: isTitleDirty ? trimmedTitle : undefined,
+        tags: isTagsDirty ? tagsDraft : undefined,
+        urls: isUrlsDirty && filledUrls ? filledUrls : undefined,
+      });
+      const outcome = interpretWorkEditSaveResult(result);
+      // source確定はここで完了。catalog反映（projection）がpendingでも保存成功として扱い、
+      // draftを解除する。反映状況はSourceProjectionNoticeへ委ねる。
+      commitSavedSnapshot(outcome.snapshot);
+      setProjection(outcome.projection);
+      setSaveError(null);
+      if (options.closeAfterSave) onClose();
+      return true;
+    } catch (cause) {
+      handleSaveError(cause);
+      return false;
+    }
+  };
+
+  // 保存中はdisabledでフォーカスがbodyへ落ちるため、失敗確定時にフォーカスを戻す
+  // （dirtyなフィールドのうち先に見つかったもの優先。titleが最優先）。
+  useEffect(() => {
+    if (!saveError) return;
+    if (isTitleDirty) titleInputRef.current?.focus();
+    else if (isUrlsDirty) firstUrlInputRef.current?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- saveErrorが立った瞬間だけ発火させる
+  }, [saveError]);
 
   const requestClose = () => {
     if (isDirty) {
@@ -143,117 +365,19 @@ export function WorkEditDialog({
     initialFocusRef: titleInputRef,
   });
 
-  useEffect(() => setTitleDraft(work.title), [work.title]);
-  useEffect(() => {
-    setUrlDrafts(cloneUrls(work.urls));
-    setUrlValidationError(null);
-  }, [work.urls]);
-  // 保存に失敗しても入力値は残す（ドラフトを巻き戻さない）。保存中はdisabledでフォーカスが
-  // bodyへ落ちるため、失敗確定時にフォーカスを戻す。
-  useEffect(() => {
-    if (titleMutation.error) titleInputRef.current?.focus();
-  }, [titleMutation.error]);
-  useEffect(() => {
-    if (urlsMutation.error) firstUrlInputRef.current?.focus();
-  }, [urlsMutation.error]);
-
-  const canEditSource = canPatchWorkSource(work.sourceRevision);
-
-  const trimmedTitle = titleDraft.trim();
-  const isTitleDirty = trimmedTitle !== work.title;
-  const normalizedUrlDrafts = urlDrafts
-    .map((entry) => ({ label: entry.label.trim(), url: entry.url.trim() }))
-    .filter((entry) => entry.label || entry.url);
-  const isUrlsDirty = !urlsEqual(normalizedUrlDrafts, work.urls);
-  const isDirty = isTitleDirty || isUrlsDirty;
-
-  const saveTitle = (event: FormEvent) => {
-    event.preventDefault();
-    if (titleMutation.isPending || !trimmedTitle || trimmedTitle === work.title) return;
-    if (!canPatchWorkSource(work.sourceRevision)) return;
-    titleMutation.mutate({
-      workId: work.id,
-      title: trimmedTitle,
-      sourceRevision: work.sourceRevision,
-    });
-  };
-
-  const saveUrls = (event: FormEvent) => {
-    event.preventDefault();
-    if (urlsMutation.isPending || !canPatchWorkSource(work.sourceRevision)) return;
-    const filled = buildFilledUrls(urlDrafts, setUrlValidationError);
-    if (filled === null) return;
-    if (urlsEqual(filled, work.urls)) return;
-    urlsMutation.mutate({ workId: work.id, urls: filled, sourceRevision: work.sourceRevision });
-  };
-
   const discardAndClose = () => {
     setIsUnsavedPromptOpen(false);
     onClose();
   };
 
   const saveAndClose = async () => {
-    if (!canPatchWorkSource(work.sourceRevision)) return;
-    if (isTitleDirty && !trimmedTitle) return;
-    const filledUrls = isUrlsDirty ? buildFilledUrls(urlDrafts, setUrlValidationError) : null;
-    if (isUrlsDirty && filledUrls === null) {
-      setIsUnsavedPromptOpen(false);
-      return;
-    }
-    setIsSavingToClose(true);
-    try {
-      let sourceRevision = work.sourceRevision;
-      if (isTitleDirty) {
-        const updated = await titleMutation.mutateAsync({
-          workId: work.id,
-          title: trimmedTitle,
-          sourceRevision,
-        });
-        if (!canPatchWorkSource(updated.sourceRevision)) return;
-        sourceRevision = updated.sourceRevision;
-      }
-      if (isUrlsDirty && filledUrls) {
-        await urlsMutation.mutateAsync({ workId: work.id, urls: filledUrls, sourceRevision });
-      }
-      setIsUnsavedPromptOpen(false);
-      onClose();
-    } catch {
-      // 失敗理由はtitleMutation.error / urlsMutation.errorのToastで案内する。
-      // プロンプトだけ閉じ、ダイアログは開いたまま入力値を保持する。
-      setIsUnsavedPromptOpen(false);
-    } finally {
-      setIsSavingToClose(false);
-    }
+    const ok = await save({ closeAfterSave: true });
+    if (!ok) setIsUnsavedPromptOpen(false);
   };
 
-  const titleError = titleMutation.error
-    ? apiErrorMessage(titleMutation.error, "タイトルを保存できませんでした。")
-    : null;
-  const urlsMutationError = urlsMutation.error
-    ? apiErrorMessage(urlsMutation.error, "関連URLを保存できませんでした。")
-    : null;
-
-  const { show: showToast, dismiss: dismissToast } = useToast();
-  useEffect(() => {
-    const message = titleError ?? urlsMutationError;
-    if (!message) {
-      dismissToast();
-      return;
-    }
-    showToast({
-      message,
-      variant: "error",
-      priority: "action",
-      onDismiss: titleError ? titleMutation.reset : urlsMutation.reset,
-    });
-  }, [
-    titleError,
-    urlsMutationError,
-    titleMutation.reset,
-    urlsMutation.reset,
-    showToast,
-    dismissToast,
-  ]);
+  const handleSaveClick = () => {
+    void save({ closeAfterSave: false });
+  };
 
   return (
     <>
@@ -266,158 +390,189 @@ export function WorkEditDialog({
         className="m-auto w-[min(640px,calc(100vw-32px))] overflow-hidden rounded-[12px] border border-line-soft bg-paper-1 p-0 font-jp text-ink-0 shadow-pop backdrop:bg-[oklch(20%_0.020_70_/_0.3)]"
       >
         <div className="flex max-h-[calc(100vh-32px)] min-h-0 flex-col overflow-hidden">
-          <header className="flex shrink-0 items-center border-b border-line-soft px-[18px] py-[14px]">
+          <header className="flex shrink-0 items-center gap-2 border-b border-line-soft px-[18px] py-3">
             <h2 id="work-edit-title" className="min-w-0 flex-1 font-sans text-[14px] font-semibold">
               作品を編集
             </h2>
             <IconButton icon={I.x} label="閉じる" size="sm" onClick={requestClose} />
           </header>
           <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-[18px] py-4">
-            <form className="flex flex-col gap-2" onSubmit={saveTitle}>
-              <WorkSourcePatchBlockedNotice sourceRevision={work.sourceRevision} />
-              <label
-                htmlFor="work-title-input"
-                className="font-sans text-label font-semibold text-ink-1"
-              >
-                タイトル
-              </label>
-              <div className="flex items-center gap-2">
+            <WorkSourcePatchBlockedNotice message={sourceErrorMessage} />
+            {saveError && (
+              <p className="mle-prv__edit-error" role="alert">
+                {saveError}
+              </p>
+            )}
+            <SourceProjectionNotice
+              projection={projection}
+              path={
+                acceptedSnapshot && rootFolder
+                  ? projectionWorkspacePath(acceptedSnapshot, rootFolder)
+                  : null
+              }
+              onProjected={(result) => {
+                queryClient.setQueryData(WORK_QUERY_KEYS.source(work.id), result.snapshot);
+                setProjection(result.projection);
+              }}
+            />
+            <div className="flex flex-col gap-5">
+              <div className="flex flex-col gap-2">
+                <label
+                  htmlFor="work-title-input"
+                  className="font-sans text-label font-semibold text-ink-1"
+                >
+                  タイトル
+                </label>
                 <TextInput
                   ref={titleInputRef}
                   id="work-title-input"
                   font="jp"
-                  className="flex-1"
                   value={titleDraft}
                   aria-invalid={titleDraft.trim().length === 0}
-                  disabled={titleMutation.isPending || !canEditSource}
+                  disabled={editMutation.isPending || !canEditSource}
                   onChange={(event) => setTitleDraft(event.target.value)}
                 />
-                <Button
-                  type="submit"
-                  disabled={
-                    titleDraft.trim().length === 0 ||
-                    trimmedTitle === work.title ||
-                    titleMutation.isPending ||
-                    !canEditSource
-                  }
-                >
-                  タイトルを保存
-                </Button>
+                {conflictFields.includes("title") && (
+                  <FieldConflictNotice
+                    field="title"
+                    onUseLatest={() => resolveConflictField("title", true)}
+                    onKeepMine={() => resolveConflictField("title", false)}
+                  />
+                )}
               </div>
-            </form>
 
-            <section aria-labelledby="work-edit-tags-title" className="flex flex-col gap-2">
-              <h3
-                id="work-edit-tags-title"
-                className="font-sans text-label font-semibold text-ink-1"
-              >
-                タグ
-              </h3>
-              <WorkTagEditor
-                work={work}
-                tagSuggestions={tagSuggestions}
-                tagsMutation={tagsMutation}
-                expanded
-              />
-            </section>
+              <section aria-labelledby="work-edit-tags-title" className="flex flex-col gap-2">
+                <h3
+                  id="work-edit-tags-title"
+                  className="font-sans text-label font-semibold text-ink-1"
+                >
+                  タグ
+                </h3>
+                <WorkEditTagsField
+                  tags={tagsDraft}
+                  tagSuggestions={tagSuggestions}
+                  tagPrefixes={tagPrefixes}
+                  disabled={editMutation.isPending || !canEditSource}
+                  onAddTag={addTag}
+                  onRequestRemoveTag={requestRemoveTag}
+                  confirmingRemoveTag={confirmingRemoveTag}
+                  onConfirmRemoveTag={confirmRemoveTag}
+                  onCancelRemoveTag={cancelRemoveTag}
+                  undoableTag={undoableTag}
+                  onUndoRemoveTag={undoRemoveTag}
+                  onDismissUndo={dismissUndo}
+                />
+                {conflictFields.includes("tags") && (
+                  <FieldConflictNotice
+                    field="tags"
+                    onUseLatest={() => resolveConflictField("tags", true)}
+                    onKeepMine={() => resolveConflictField("tags", false)}
+                  />
+                )}
+              </section>
 
-            <form className="flex flex-col gap-2" onSubmit={saveUrls}>
-              <h3
-                id="work-edit-urls-title"
-                className="font-sans text-label font-semibold text-ink-1"
-              >
-                関連URL
-              </h3>
-              {urlDrafts.map((entry, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <TextInput
-                    ref={index === 0 ? firstUrlInputRef : undefined}
-                    font="jp"
-                    value={entry.label}
-                    aria-label={`URLラベル ${index + 1}`}
-                    placeholder="ラベル"
-                    disabled={urlsMutation.isPending || !canEditSource}
-                    onChange={(event) => {
-                      const label = event.target.value;
-                      setUrlDrafts((prev) =>
-                        prev.map((item, i) => (i === index ? { ...item, label } : item)),
-                      );
-                      if (urlValidationError) setUrlValidationError(null);
-                    }}
-                  />
-                  <TextInput
-                    font="mono"
-                    value={entry.url}
-                    aria-label={`URL ${index + 1}`}
-                    placeholder="https://"
-                    disabled={urlsMutation.isPending || !canEditSource}
-                    onChange={(event) => {
-                      const url = event.target.value;
-                      setUrlDrafts((prev) =>
-                        prev.map((item, i) => (i === index ? { ...item, url } : item)),
-                      );
-                      if (urlValidationError) setUrlValidationError(null);
-                    }}
-                  />
-                  <IconButton
-                    icon={I.x}
-                    label={`URL ${index + 1} を削除`}
-                    size="xs"
-                    disabled={urlsMutation.isPending || !canEditSource}
-                    onClick={() => {
-                      setUrlDrafts((prev) => prev.filter((_, i) => i !== index));
-                      if (urlValidationError) setUrlValidationError(null);
-                    }}
-                  />
+              <div className="flex flex-col gap-2">
+                <h3
+                  id="work-edit-urls-title"
+                  className="font-sans text-label font-semibold text-ink-1"
+                >
+                  関連URL
+                </h3>
+                {urlDrafts.map((entry, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <TextInput
+                      ref={index === 0 ? firstUrlInputRef : undefined}
+                      font="jp"
+                      value={entry.label}
+                      aria-label={`URLラベル ${index + 1}`}
+                      placeholder="ラベル"
+                      disabled={editMutation.isPending || !canEditSource}
+                      onChange={(event) => {
+                        const label = event.target.value;
+                        setUrlDrafts((prev) =>
+                          prev.map((item, i) => (i === index ? { ...item, label } : item)),
+                        );
+                        if (urlValidationError) setUrlValidationError(null);
+                      }}
+                    />
+                    <TextInput
+                      font="mono"
+                      value={entry.url}
+                      aria-label={`URL ${index + 1}`}
+                      placeholder="https://"
+                      disabled={editMutation.isPending || !canEditSource}
+                      onChange={(event) => {
+                        const url = event.target.value;
+                        setUrlDrafts((prev) =>
+                          prev.map((item, i) => (i === index ? { ...item, url } : item)),
+                        );
+                        if (urlValidationError) setUrlValidationError(null);
+                      }}
+                    />
+                    <IconButton
+                      icon={I.x}
+                      label={`URL ${index + 1} を削除`}
+                      size="xs"
+                      disabled={editMutation.isPending || !canEditSource}
+                      onClick={() => {
+                        setUrlDrafts((prev) => prev.filter((_, i) => i !== index));
+                        if (urlValidationError) setUrlValidationError(null);
+                      }}
+                    />
+                  </div>
+                ))}
+                <div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    disabled={editMutation.isPending || !canEditSource}
+                    onClick={() => setUrlDrafts((prev) => [...prev, { label: "", url: "" }])}
+                  >
+                    URLを追加
+                  </Button>
                 </div>
-              ))}
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  disabled={urlsMutation.isPending || !canEditSource}
-                  onClick={() => setUrlDrafts((prev) => [...prev, { label: "", url: "" }])}
-                >
-                  URLを追加
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={
-                    urlsMutation.isPending ||
-                    !canEditSource ||
-                    urlsEqual(
-                      urlDrafts
-                        .map((entry) => ({ label: entry.label.trim(), url: entry.url.trim() }))
-                        .filter((entry) => entry.label || entry.url),
-                      work.urls,
-                    )
-                  }
-                >
-                  関連URLを保存
-                </Button>
+                {urlValidationError && (
+                  <p className="mle-prv__edit-error" role="alert">
+                    {urlValidationError}
+                  </p>
+                )}
+                {conflictFields.includes("urls") && (
+                  <FieldConflictNotice
+                    field="urls"
+                    onUseLatest={() => resolveConflictField("urls", true)}
+                    onKeepMine={() => resolveConflictField("urls", false)}
+                  />
+                )}
               </div>
-              {urlValidationError && (
-                <p className="mle-prv__edit-error" role="alert">
-                  {urlValidationError}
-                </p>
-              )}
-            </form>
+            </div>
 
             <div className="border-t border-line-soft pt-4">
-              <DlsiteEditor work={work} />
+              {acceptedSnapshot ? (
+                <DlsiteEditor workId={work.id} snapshot={acceptedSnapshot} />
+              ) : null}
             </div>
           </div>
-          <footer className="flex shrink-0 justify-end border-t border-line-soft px-[18px] py-3">
+          <footer className="flex shrink-0 justify-end gap-2 border-t border-line-soft px-[18px] py-3">
             <Button variant="quiet" onClick={requestClose}>
               閉じる
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              disabled={
+                !canEditSource || !isDirty || hasUnresolvedConflicts || editMutation.isPending
+              }
+              onClick={handleSaveClick}
+            >
+              保存
             </Button>
           </footer>
         </div>
       </dialog>
       {isUnsavedPromptOpen && (
         <UnsavedChangesPrompt
-          canSave={canEditSource && !(isTitleDirty && !trimmedTitle)}
-          isSaving={isSavingToClose}
+          canSave={canEditSource && !hasUnresolvedConflicts && !(isTitleDirty && !trimmedTitle)}
+          isSaving={editMutation.isPending}
           onSave={() => void saveAndClose()}
           onDiscard={discardAndClose}
           onCancel={() => setIsUnsavedPromptOpen(false)}

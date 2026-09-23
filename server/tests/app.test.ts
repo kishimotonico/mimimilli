@@ -194,17 +194,16 @@ test("PATCH /api/works/:id でタグ更新が反映される", async () => {
   const listRes = await app.request("/api/works");
   const { items } = await listRes.json();
   const targetId: string = items[0].id;
-  const detailRes = await app.request(`/api/works/${targetId}`);
-  const detail = await detailRes.json();
+  const source = await (await app.request(`/api/works/${targetId}/source`)).json();
 
   const patchRes = await app.request(`/api/works/${targetId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ tags: ["テスト用タグ"], sourceRevision: detail.sourceRevision }),
+    body: JSON.stringify({ tags: ["テスト用タグ"], sourceRevision: source.sourceRevision }),
   });
   assert.equal(patchRes.status, 200);
   const patched = await patchRes.json();
-  assert.deepEqual(patched.tags, ["テスト用タグ"]);
+  assert.deepEqual(patched.snapshot.tags, ["テスト用タグ"]);
 
   // 再取得しても反映されている
   const getRes = await app.request(`/api/works/${targetId}`);
@@ -217,31 +216,72 @@ test("PATCH /api/works/:id でurls更新が反映される", async () => {
   const listRes = await app.request("/api/works");
   const { items } = await listRes.json();
   const targetId = items[0].id;
-  const detail = await (await app.request(`/api/works/${targetId}`)).json();
+  const source = await (await app.request(`/api/works/${targetId}/source`)).json();
   const urls = [{ label: "公式", url: "https://example.com/work" }];
   const patchRes = await app.request(`/api/works/${targetId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ urls, sourceRevision: detail.sourceRevision }),
+    body: JSON.stringify({ urls, sourceRevision: source.sourceRevision }),
   });
   assert.equal(patchRes.status, 200);
-  assert.deepEqual((await patchRes.json()).urls, urls);
+  assert.deepEqual((await patchRes.json()).snapshot.urls, urls);
 });
 
 test("PATCH /api/works/:id は危険スキームのurlsを400で拒否する", async () => {
   const app = buildApp();
   const listRes = await app.request("/api/works");
   const { items } = await listRes.json();
-  const detail = await (await app.request(`/api/works/${items[0].id}`)).json();
+  const source = await (await app.request(`/api/works/${items[0].id}/source`)).json();
   const patchRes = await app.request(`/api/works/${items[0].id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       urls: [{ label: "evil", url: "javascript:alert(1)" }],
-      sourceRevision: detail.sourceRevision,
+      sourceRevision: source.sourceRevision,
     }),
   });
   assert.equal(patchRes.status, 400);
+});
+
+test("GET /api/works/:id の JSON に sourceRevision は無い", async () => {
+  const app = buildApp();
+  const list = await app.request("/api/works");
+  const { items } = await list.json();
+  const detail = await (await app.request(`/api/works/${items[0].id}`)).json();
+  assert.equal("sourceRevision" in detail, false);
+  const sourceRes = await app.request(`/api/works/${items[0].id}/source`);
+  assert.equal(sourceRes.status, 200);
+  const source = await sourceRes.json();
+  assert.equal(typeof source.sourceRevision, "string");
+  assert.ok(source.sourceRevision.length > 0);
+});
+
+test("PATCH /api/works/:id/bookmark は sourceRevision なしで通る", async () => {
+  const app = buildApp();
+  const list = await app.request("/api/works");
+  const { items } = await list.json();
+  const res = await app.request(`/api/works/${items[0].id}/bookmark`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ bookmarked: true }),
+  });
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { bookmarked: true });
+});
+
+test("PUT/DELETE /api/works/:id/tags/:tag はパスのタグを正規化する", async () => {
+  const app = buildApp();
+  const list = await app.request("/api/works");
+  const { items } = await list.json();
+  const id = items[0].id;
+  const slashTag = encodeURIComponent("cv/foo");
+  const putRes = await app.request(`/api/works/${id}/tags/${slashTag}`, { method: "PUT" });
+  assert.equal(putRes.status, 200);
+  const putBody = await putRes.json();
+  assert.ok(putBody.snapshot.tags.includes("cv/foo"));
+  const delRes = await app.request(`/api/works/${id}/tags/${slashTag}`, { method: "DELETE" });
+  assert.equal(delRes.status, 200);
+  assert.equal((await delRes.json()).snapshot.tags.includes("cv/foo"), false);
 });
 
 test("PATCH /api/works/:id はsourceRevisionなしを400で拒否する", async () => {
@@ -259,7 +299,7 @@ test("PATCH /api/works/:id はsourceRevisionなしを400で拒否する", async 
 
 test("PATCH /api/works/:id はmimimilli.json競合を409 source_changedで返す", async () => {
   const adapter = createFixtureAdapter();
-  adapter.patchWork = async () => {
+  adapter.patchWorkSource = async () => {
     throw new SourceChangedError();
   };
   const app = createApp(adapter);

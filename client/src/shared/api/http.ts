@@ -19,6 +19,30 @@ export class ApiRequestError extends Error {
   }
 }
 
+/** fetch が応答を得られなかった切断・中断。正本はサーバに届いていないか不明。 */
+export class ApiTransportError extends Error {
+  constructor(
+    readonly kind: "unreachable" | "aborted",
+    readonly cause?: unknown,
+  ) {
+    super(kind === "aborted" ? "リクエストが中断されました" : "サーバに接続できませんでした");
+  }
+}
+
+async function fetchApi(input: string, init?: RequestInit): Promise<Response> {
+  try {
+    return init === undefined ? await fetch(input) : await fetch(input, init);
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new ApiTransportError("aborted", error);
+    }
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new ApiTransportError("aborted", error);
+    }
+    throw new ApiTransportError("unreachable", error);
+  }
+}
+
 /** レスポンスがshared契約のスキーマに適合しない場合に投げる。原因（どのエンドポイントの何が不正か）を隠さず伝える */
 export class ApiResponseSchemaError extends Error {
   constructor(
@@ -132,8 +156,8 @@ export async function getParsed<T>(
   options?: ParsedRequestOptions,
 ): Promise<T | null> {
   const res = options?.signal
-    ? await fetch(API_BASE + path, { signal: options.signal })
-    : await fetch(API_BASE + path);
+    ? await fetchApi(API_BASE + path, { signal: options.signal })
+    : await fetchApi(API_BASE + path);
   return handleParsedResponse("GET", path, res, schema, options);
 }
 
@@ -156,7 +180,7 @@ export async function postParsed<T>(
   body?: unknown,
   options?: ParsedRequestOptions,
 ): Promise<T | null> {
-  const res = await fetch(API_BASE + path, {
+  const res = await fetchApi(API_BASE + path, {
     method: "POST",
     headers: body !== undefined ? { "Content-Type": "application/json" } : {},
     body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -167,7 +191,7 @@ export async function postParsed<T>(
 
 /** レスポンスボディを持たない POST。成功時のステータスも204であることを検証する */
 export async function postVoid(path: string, body?: unknown): Promise<void> {
-  const res = await fetch(API_BASE + path, {
+  const res = await fetchApi(API_BASE + path, {
     method: "POST",
     headers: body !== undefined ? { "Content-Type": "application/json" } : {},
     body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -180,7 +204,7 @@ export async function postVoid(path: string, body?: unknown): Promise<void> {
 export async function putParsed<T>(
   schema: z.ZodType<T>,
   path: string,
-  body: unknown,
+  body?: unknown,
   options?: ParsedRequestOptions & { noContentAsNull?: false | undefined },
 ): Promise<T>;
 export async function putParsed<T>(
@@ -192,13 +216,14 @@ export async function putParsed<T>(
 export async function putParsed<T>(
   schema: z.ZodType<T>,
   path: string,
-  body: unknown,
+  body?: unknown,
   options?: ParsedRequestOptions,
 ): Promise<T | null> {
-  const res = await fetch(API_BASE + path, {
+  const res = await fetchApi(API_BASE + path, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    ...(body === undefined
+      ? {}
+      : { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }),
     signal: options?.signal,
   });
   return handleParsedResponse("PUT", path, res, schema, options);
@@ -223,7 +248,7 @@ export async function patchParsed<T>(
   body: unknown,
   options?: ParsedRequestOptions,
 ): Promise<T | null> {
-  const res = await fetch(API_BASE + path, {
+  const res = await fetchApi(API_BASE + path, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -248,7 +273,7 @@ export async function deleteParsed<T>(
   path: string,
   options?: ParsedRequestOptions,
 ): Promise<T | null> {
-  const res = await fetch(API_BASE + path, {
+  const res = await fetchApi(API_BASE + path, {
     method: "DELETE",
     signal: options?.signal,
   });
@@ -257,7 +282,7 @@ export async function deleteParsed<T>(
 
 /** レスポンスボディを持たない DELETE。成功時のステータスも204であることを検証する */
 export async function deleteVoid(path: string): Promise<void> {
-  const res = await fetch(API_BASE + path, { method: "DELETE" });
+  const res = await fetchApi(API_BASE + path, { method: "DELETE" });
   if (!res.ok) return throwApiError("DELETE", path, res, await readResponseBody(res));
   assertNoContent("DELETE", path, res);
 }

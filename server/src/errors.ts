@@ -14,6 +14,32 @@ export class SourceChangedError extends Error {
   }
 }
 
+export const SOURCE_FILE_MISSING_MESSAGE = "作品情報ファイルが見つからないため編集できません。";
+export const SOURCE_FILE_BROKEN_MESSAGE =
+  "作品情報ファイルが壊れているため編集できません。表示は前回スキャン時点の内容です。";
+export const SOURCE_FORMAT_UNSUPPORTED_MESSAGE =
+  "この作品情報の形式には未対応のため編集できません。";
+export const SOURCE_IDENTITY_MISMATCH_MESSAGE =
+  "作品情報の識別子が一致しないため、この操作は適用できません。";
+export const SOURCE_LOCATION_MISMATCH_MESSAGE =
+  "作品の場所が一致しないため、この操作は適用できません。";
+
+/** JSON 不正・スキーマ不正・formatVersion 非対応。HTTP は parse_error。 */
+export class SourceParseError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SourceParseError";
+  }
+}
+
+/** ファイル欠損・identity/location 不一致。HTTP は conflict。 */
+export class SourceConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SourceConflictError";
+  }
+}
+
 export class CandidatePoolChangedError extends Error {
   constructor() {
     super("候補が更新されています。再スキャンして選び直してください");
@@ -24,13 +50,19 @@ export class CandidatePoolChangedError extends Error {
 export class WorkRegisterError extends Error {
   readonly code:
     | "already_registered"
-    | "descendants_require_merge"
+    | "descendants_registered"
+    | "identity_conflict"
     | "not_configured"
     | "invalid_meta";
   readonly descendantCount?: number;
 
   constructor(
-    code: "already_registered" | "descendants_require_merge" | "not_configured" | "invalid_meta",
+    code:
+      | "already_registered"
+      | "descendants_registered"
+      | "identity_conflict"
+      | "not_configured"
+      | "invalid_meta",
     message: string,
     descendantCount?: number,
   ) {
@@ -39,6 +71,21 @@ export class WorkRegisterError extends Error {
     this.code = code;
     this.descendantCount = descendantCount;
   }
+}
+
+export function descendantsRegisteredError(count: number): WorkRegisterError {
+  return new WorkRegisterError(
+    "descendants_registered",
+    `配下に登録済み作品が${count}件あります。先に子作品の登録を解除してから親を登録してください`,
+    count,
+  );
+}
+
+export function restoreIdentityConflictError(): WorkRegisterError {
+  return new WorkRegisterError(
+    "identity_conflict",
+    "同じ Work ID が別の場所で登録済みです。移動の再接続なら先にスキャンしてください。複製なら Files で「別作品として取り込む」を使ってください",
+  );
 }
 
 export class DlsiteOfflineError extends Error {

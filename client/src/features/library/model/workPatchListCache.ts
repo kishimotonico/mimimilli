@@ -62,6 +62,28 @@ export function patchWorkInQueryCache(
   }
 }
 
+export function patchBookmarkedInQueryCache(
+  queryClient: QueryClient,
+  queryKey: QueryKey,
+  workId: string,
+  bookmarked: boolean,
+): void {
+  const data = queryClient.getQueryData<InfiniteData<WorksPage>>(queryKey);
+  if (!isInfiniteWorksData(data)) return;
+  let changed = false;
+  const pages = data.pages.map((page) => {
+    const items = page.items.map((item) => {
+      if (item.id !== workId || item.bookmarked === bookmarked) return item;
+      changed = true;
+      return { ...item, bookmarked };
+    });
+    return items === page.items ? page : { ...page, items };
+  });
+  if (changed) {
+    queryClient.setQueryData(queryKey, { ...data, pages });
+  }
+}
+
 function isInactiveInfiniteListQuery(query: Query): boolean {
   return isInfiniteWorksData(query.state.data) && query.getObserversCount() === 0;
 }
