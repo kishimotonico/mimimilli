@@ -1,9 +1,10 @@
 ---
 id: TASK-463
 title: user DB単独復元時のcatalog整合手順をADR-0023へ補記する
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-21 13:44'
+updated_date: '2026-09-23 22:17'
 labels: []
 dependencies: []
 documentation:
@@ -19,7 +20,7 @@ user.sqlite だけを復元した場合に catalog との整合をどう取る�
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 user DB単独復元時にcatalogとの整合を取る手順がADR-0023に記載されている
-- [ ] #2 userの不足値を自動で補完しない
-- [ ] #3 手順がADR-0008・ADR-0017・ADR-0023と整合している
+- [x] #1 user DB単独復元時にcatalogとの整合を取る手順がADR-0023に記載されている
+- [x] #2 userの不足値を自動で補完しない
+- [x] #3 手順がADR-0008・ADR-0017・ADR-0023と整合している
 <!-- AC:END -->
