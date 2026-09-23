@@ -52,7 +52,7 @@ describe("ナビゲーション操作は選択中の作品をクリアする", (
   });
 });
 
-describe("軸切り替え時のq・tagsの扱い（ADR-0012 §1・ADR-0026、TASK-457）", () => {
+describe("軸切り替え時のq・tagsの扱い（ADR-0012 §1・ADR-0026）", () => {
   it("作品一覧種の軸どうしを切り替えてもselectedTagsAtom/qは維持される", () => {
     const store = createStore();
     store.set(activeAxisAtom, "all");
@@ -98,7 +98,7 @@ describe("軸切り替え時のq・tagsの扱い（ADR-0012 §1・ADR-0026、TAS
     expect(store.get(librarySearchQueryAtom)).toBe("");
   });
 
-  it("値を選ばず戻る: パンくずの「ライブラリ」セグメント（goToLibrarySegmentAtom）で全作品一覧へ戻り、q・tagsは条件なしのまま（TASK-457追加確認）", () => {
+  it("値を選ばず戻る: パンくずの「ライブラリ」セグメント（goToLibrarySegmentAtom）で全作品一覧へ戻り、q・tagsは条件なしのまま", () => {
     const store = createStore();
     // 値一覧へ入る直前の状態（他の軸で選択していたタグ・検索語）から、
     // まず値一覧軸（cv）へ遷移して消去されることを再現する。
@@ -109,7 +109,7 @@ describe("軸切り替え時のq・tagsの扱い（ADR-0012 §1・ADR-0026、TAS
     expect(store.get(librarySearchQueryAtom)).toBe("");
 
     // 値一覧ページ自体には戻る専用UIを新設しない。常設のパンくず「ライブラリ」
-    // セグメント（index 0）が「値を選ばず戻る」の実体になる（統括決定）。
+    // セグメント（index 0）が「値を選ばず戻る」の実体になる。
     store.set(goToLibrarySegmentAtom, 0);
 
     expect(store.get(activeAxisAtom)).toBe("all");

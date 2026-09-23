@@ -187,7 +187,7 @@ describe("AxisValueList list 表示（ADR-0012 §5）", () => {
     sizeMock.restore();
   });
 
-  it("値一覧の行にはAND追加ボタンが無い（値一覧は独立した全作品入口。ADR-0026、TASK-457）", async () => {
+  it("値一覧の行にはAND追加ボタンが無い（値一覧は独立した全作品入口。ADR-0026）", async () => {
     const sizeMock = mockElementSize(600, 600);
     renderAxisValueList({ axis: "cv", facetItems: [makeItem({ value: "藤田茜" })] });
     await flushVirtualizer();
@@ -197,7 +197,7 @@ describe("AxisValueList list 表示（ADR-0012 §5）", () => {
     sizeMock.restore();
   });
 
-  it("選択済みの行にもAND追加ボタンは表示されない（TASK-457）", async () => {
+  it("選択済みの行にもAND追加ボタンは表示されない", async () => {
     const sizeMock = mockElementSize(600, 600);
     renderAxisValueList({
       axis: "cv",

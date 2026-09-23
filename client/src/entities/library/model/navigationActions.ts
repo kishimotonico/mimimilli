@@ -19,7 +19,7 @@ import {
 
 /** 値一覧（分類値ブラウズ）は現在の絞り込みと独立した全作品の入口（ADR-0026）。
  *  効かない条件を入力欄・チップに残さないよう、遷移時にq・tags（yearの擬似タグ込み）を
- *  消去する。sort・表示モードは軸に依存しないため触らない（TASK-457）。 */
+ *  消去する。sort・表示モードは軸に依存しないため触らない。 */
 export const setLibraryAxisAtom = atom(null, (_get, set, axis: AxisId) => {
   requestNavigationHistoryCommit(set, "push");
   set(activeAxisAtom, axis);

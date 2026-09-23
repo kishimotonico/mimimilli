@@ -7,7 +7,7 @@ import {
 } from "../../src/features/navigation/model/navigationUrl";
 
 describe("navigation URL codec", () => {
-  // "cv"・"tag"は値一覧種の軸（TASK-457でtags/qを消去する独立入口）になったため、
+  // "cv"・"tag"は値一覧種の軸（tags/qを消去する独立入口）になったため、
   // タグ・work・sortのエンコード/デコード自体を検証するこれらのテストはworks種の
   // 軸（all）で行う。
   it("round-trips a Japanese library axis with a tag filter, work, and sort", () => {
@@ -55,7 +55,7 @@ describe("navigation URL codec", () => {
     expect(parseNavigationUrl(url)).toMatchObject({ state, warnings: [] });
   });
 
-  // 値一覧種の軸（year・tag等）はTASK-457でtags/qを消去する独立入口になったため、
+  // 値一覧種の軸（year・tag等）はtags/qを消去する独立入口になったため、
   // タグ保持のround-tripはworks種の軸（all）で検証する。
   it("round-trips a year pseudo-tag filter as the reserved @ form (ADR-0012 §2)", () => {
     const state: NavigationUrlState = {
@@ -91,7 +91,7 @@ describe("navigation URL codec", () => {
     });
   });
 
-  it("omits sort= for a smart folder axis, since its sort is not the effective one (TASK-462)", () => {
+  it("omits sort= for a smart folder axis, since its sort is not the effective one", () => {
     const state: NavigationUrlState = {
       mode: "library",
       library: { ...DEFAULT_LIBRARY_URL_STATE, activeAxis: "smart-sleep-long", sort: "title-asc" },
@@ -111,7 +111,7 @@ describe("navigation URL codec", () => {
     expect(url).toBe("/library/all?sort=title-asc");
   });
 
-  it("strips tags= and q= for a value-list axis URL, even if present (ADR-0026, TASK-457)", () => {
+  it("strips tags= and q= for a value-list axis URL, even if present (ADR-0026)", () => {
     const result = parseNavigationUrl("/library/cv?tags=cv%2F%E8%97%A4%E7%94%B0%E8%8C%9C&q=foo");
     expect(result.state).toMatchObject({
       mode: "library",
@@ -254,7 +254,7 @@ describe("navigation URL codec", () => {
   });
 
   it("normalizes multiple year pseudo-tags to the first one with a warning, matching the single-selection UI constraint", () => {
-    // 値一覧種の軸（year）はtagsを消去するため、works種の軸（all）で検証する（TASK-457）。
+    // 値一覧種の軸（year）はtagsを消去するため、works種の軸（all）で検証する。
     const result = parseNavigationUrl("/library/all?tags=%40year%2F2023&tags=%40year%2F2024");
 
     expect(result.state).toEqual({

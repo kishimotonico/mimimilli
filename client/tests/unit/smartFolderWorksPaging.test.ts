@@ -235,7 +235,7 @@ describe("スマートフォルダー軸への保持中フィルタの適用", (
     expect(urls.some((u) => u.includes("tags=%40year%2F2024"))).toBe(true);
   });
 
-  it("作品検索qをフォルダーのルール全体への追加AND条件としてクエリに渡す（TASK-462）", async () => {
+  it("作品検索qをフォルダーのルール全体への追加AND条件としてクエリに渡す", async () => {
     const { result } = renderWorks(baseNav, "藤田茜");
 
     await waitFor(() => expect(result.current.works.length).toBeGreaterThan(0));

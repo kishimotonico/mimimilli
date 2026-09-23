@@ -82,7 +82,7 @@ export type WorksPage = z.infer<typeof worksPageSchema>;
 /** GET /api/smart-folders/:id/works のクエリパラメータ。
  *  ソートはフォルダー自身が保持するため含まない。tags はフォルダーのルールに対する
  *  追加の AND 条件として、q はフォルダーのルール（OR・除外を含む）全体に対する
- *  追加の AND 条件として適用する（ADR-0012、TASK-185、TASK-462） */
+ *  追加の AND 条件として適用する（ADR-0012、TASK-185） */
 export const smartFolderWorksQuerySchema = worksQueryBaseSchema.pick({
   q: true,
   tags: true,

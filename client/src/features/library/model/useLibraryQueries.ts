@@ -164,7 +164,7 @@ export function useLibraryDebouncedSearchQuery(searchQuery: string) {
 
 /** Suspense 境界配下でのみ使うスマートフォルダー作品一覧。
  *  保持中のタグ/組み込み軸フィルタと作品検索 q を、フォルダーのルール（OR・除外を含む）
- *  全体への追加 AND として渡す（ADR-0012、TASK-462）。sort はフォルダー自身が保持し、
+ *  全体への追加 AND として渡す（ADR-0012）。sort はフォルダー自身が保持し、
  *  この評価APIへは渡さない（LibrarySortMenu 参照）。 */
 export function useSuspenseSmartLibraryWorks(nav: LibraryViewState, searchQuery: string) {
   const smartAxisId = getSmartFolderId(nav.activeAxis);
@@ -218,8 +218,7 @@ export function useLibrarySupportingQueries(nav: LibraryViewState) {
   const errorViewCountQuery = useQuery(errorViewCountQueryOptions);
   const facetAxis = getFacetAxisForQuery(nav.activeAxis);
   // 結果面の値一覧（AxisValueList）は既定=置き換えの入口（ADR-0013）なので、件数基準は
-  // 無条件集計にする（主クリックの結果＝選択タグを丸ごと置き換えた後の件数と一致させる。
-  // valueSelectionContract.ts の deriveFacetCountTags 参照）。
+  // 無条件集計にする（主クリックの結果＝選択タグを丸ごと置き換えた後の件数と一致させる）。
   const facetQuery = useAxisFacetsQuery(facetAxis, []);
   const smartFoldersQuery = useQuery({
     queryKey: SMART_FOLDER_QUERY_KEYS.all(),

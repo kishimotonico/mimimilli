@@ -37,7 +37,7 @@ interface FilterChipBandProps {
   worksTotal?: number;
   /** 値一覧ペインの分類数。指定時は作品件数の代わりに「ライブラリ全体」件数であることを
    *  明示するラベルを出し、「＋絞り込み」ボタンも隠す（値一覧はAND追加を提供しない独立した
-   *  全作品入口のため。ADR-0026、TASK-457） */
+   *  全作品入口のため。ADR-0026） */
   valueListItemCount?: number;
 }
 

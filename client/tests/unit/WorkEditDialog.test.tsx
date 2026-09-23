@@ -9,6 +9,7 @@ import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
 import type { LibraryWorkEditMutation } from "../../src/features/library/model/useLibraryQueries";
 import { WorkEditDialog } from "../../src/features/library/ui/preview/WorkEditDialog";
 import GlobalToast from "../../src/app/ui/GlobalToast";
+import { ApiRequestError } from "../../src/shared/api/http";
 
 const { mockGetWorkEditSnapshot, mockProjectWorkSource } = vi.hoisted(() => ({
   mockGetWorkEditSnapshot: vi.fn(),
@@ -148,7 +149,7 @@ function renderEditDialog(
 describe("WorkEditDialog", () => {
   it("正本が読めないときは入力を無効化し理由を表示する", async () => {
     mockGetWorkEditSnapshot.mockRejectedValue(
-      new Error("作品の正本が壊れているため編集できません。"),
+      new ApiRequestError(502, "parse_error", "作品の正本が壊れているため編集できません。"),
     );
     const { onClose } = renderEditDialog({ onClose: vi.fn() });
 

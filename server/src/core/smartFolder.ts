@@ -76,7 +76,7 @@ export function evalSmartFolderRules(
 
 /** 保存済みルールと sort を一体で評価し、ページングエンベロープを返す。
  *  tags と q はルール（OR・除外を含む）全体に対する追加の AND 条件として適用する
- *  （ADR-0012、TASK-185、TASK-462）。組み込み軸の year 値も TagFilters 経由で渡る（TASK-199）。
+ *  （ADR-0012、TASK-185）。組み込み軸の year 値も TagFilters 経由で渡る（TASK-199）。
  *  total はソート後・ページング前の評価結果件数。random ソート時は seed を発行・継承する。 */
 export function evalSmartFolder(
   folder: Pick<SmartFolder, "rules" | "sort">,

@@ -161,7 +161,7 @@ export function parseNavigationUrl(input: string | URL): NavigationParseResult {
       warnings.push(`存在しない sort を既定値へ戻しました: ${sortValue}`);
     }
     // 値一覧は現在の絞り込みと独立した全作品の入口（ADR-0026）。効かないq・tagsを
-    // URLから復元しない（TASK-457）。
+    // URLから復元しない。
     const q = isValueList ? "" : (url.searchParams.get("q") ?? "");
 
     const state: NavigationUrlState = {
@@ -228,7 +228,7 @@ export function serializeNavigationUrl(state: NavigationUrlState): string {
     for (const tag of selectedTags) params.append("tags", tag);
     if (selectedWorkId) params.set("work", selectedWorkId);
     // スマート軸の sort はフォルダー自身が保持し、この URL の sort= は効かない
-    // （LibrarySortMenu 参照）。効いていない値をURLへ残さない（TASK-462）
+    // （LibrarySortMenu 参照）。効いていない値をURLへ残さない
     if (!isSmartAxis(activeAxis) && sort !== DEFAULT_SORT) params.set("sort", sort);
     if (q) params.set("q", q);
     const search = params.toString();

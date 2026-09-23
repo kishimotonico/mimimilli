@@ -208,7 +208,7 @@ test("保持中フィルタが無ければルール適用結果をそのまま�
   assert.deepEqual(result.items.map((w) => w.id).sort(), ["RJ001", "RJ002"]);
 });
 
-test("作品検索q: ルール適用結果全体への追加のAND条件として適用する（TASK-462）", () => {
+test("作品検索q: ルール適用結果全体への追加のAND条件として適用する", () => {
   const result = evalSmartFolder({ rules: [], sort: "added-desc" }, WORKS, {
     page: 1,
     limit: 100,
@@ -221,7 +221,7 @@ test("作品検索q: ルール適用結果全体への追加のAND条件とし�
   assert.equal(result.total, 1);
 });
 
-test("作品検索q: OR・AND NOTを含むルール式の評価結果全体にANDで重なり、内部のOR・除外の意味は変えない（TASK-462）", () => {
+test("作品検索q: OR・AND NOTを含むルール式の評価結果全体にANDで重なり、内部のOR・除外の意味は変えない", () => {
   const rules: SmartFolderRule[] = [
     { conjunction: "WHERE", field: "タグ", operator: "∋", values: nts(["催眠"]) },
     { conjunction: "OR", field: "長さ", operator: "≥", values: ["3600"] },

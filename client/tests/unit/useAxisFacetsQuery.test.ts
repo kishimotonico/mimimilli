@@ -1,7 +1,6 @@
 // 軸ファセット取得（GET /axes/:axis）が渡された selectedTags をそのままAND条件として
 // クエリへ渡す（軸による除外はしない）ことを検証する。件数基準（どのタグを渡すか）は
-// 呼び出し側の責務（valueSelectionContract.ts の deriveFacetCountTags）で、
-// このフック自体は素通しするだけ。
+// 呼び出し側の責務で、このフック自体は素通しするだけ。
 
 import { createElement, type ReactNode } from "react";
 import { renderHook, waitFor } from "@testing-library/react";

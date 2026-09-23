@@ -68,7 +68,7 @@ test("updateSettings は receiver なしで呼び出せる", async () => {
   }
 });
 
-test("同一rootの再保存（正規化後一致）では候補除外を破棄しない（TASK-459 AC4）", async (t) => {
+test("同一rootの再保存（正規化後一致）では候補除外を破棄しない", async (t) => {
   const directory = makeTestDirectory("settings-same-root-keep-exclusions");
   t.after(directory.cleanup);
   const root = join(directory.path, "lib");
@@ -87,7 +87,7 @@ test("同一rootの再保存（正規化後一致）では候補除外を破棄�
   assert.deepEqual(await adapter.listScanCandidateExclusions(), ["候補"]);
 });
 
-test("異なるrootへの変更で候補除外とScanCandidateSessionを破棄する（TASK-459 AC1〜3・6）", async (t) => {
+test("異なるrootへの変更で候補除外とScanCandidateSessionを破棄する", async (t) => {
   const directory = makeTestDirectory("settings-root-change-discards-exclusions");
   t.after(directory.cleanup);
   const rootA = join(directory.path, "lib-a");
@@ -116,7 +116,7 @@ test("異なるrootへの変更で候補除外とScanCandidateSessionを破棄�
   assert.deepEqual(await adapter.listScanCandidates(), []);
 });
 
-test("失敗したroot変更では候補除外を破棄しない（TASK-459 AC5）", async (t) => {
+test("失敗したroot変更では候補除外を破棄しない", async (t) => {
   const directory = makeTestDirectory("settings-failed-root-change-keeps-exclusions");
   t.after(directory.cleanup);
   const root = join(directory.path, "lib");
@@ -138,7 +138,7 @@ test("失敗したroot変更では候補除外を破棄しない（TASK-459 AC5�
   assert.deepEqual(await adapter.listScanCandidateExclusions(), ["候補"]);
 });
 
-test("setUserSettingDiscardingScanCandidateExclusionsは途中で失敗すると除外の削除もroot保存もロールバックする（TASK-459 AC5）", () => {
+test("setUserSettingDiscardingScanCandidateExclusionsは途中で失敗すると除外の削除もroot保存もロールバックする", () => {
   const db = openDb({ kind: "memory" });
   try {
     const repo = new UserWorkStateRepository(db);

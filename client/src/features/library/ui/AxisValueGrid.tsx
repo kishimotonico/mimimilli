@@ -48,7 +48,7 @@ interface AxisValueGridProps {
   resetKey: string;
   /** クリック（既定=置き換え）・Ctrl/Cmd+クリック（トグル、ADR-0012 §7・ADR-0013の
    *  作品詳細タグクリックと同型）。値一覧は独立した全作品入口のためAND追加ボタンは
-   *  持たない（TASK-457）。 */
+   *  持たない。 */
   onSelect: (item: AxisFacetItem, opts: { ctrlKey: boolean; metaKey: boolean }) => void;
 }
 

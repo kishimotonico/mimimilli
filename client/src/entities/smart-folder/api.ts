@@ -46,7 +46,7 @@ export async function previewSmartFolderRuleCount(
 }
 
 /** tags と q はフォルダーのルール（OR・除外を含む）全体に対する追加の AND 条件
- *  （ADR-0012、TASK-462） */
+ *  （ADR-0012） */
 export interface SmartFolderWorksParams {
   page: number;
   limit: number;

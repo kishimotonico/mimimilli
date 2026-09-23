@@ -17,7 +17,6 @@ import { useDialogModal } from "../../../../shared/ui/useDialogModal";
 import type { useLibraryWorkPatchMutations } from "../../model/useLibraryQueries";
 import { getWorkEditSnapshot } from "../../../../entities/work/api";
 import { WORK_QUERY_KEYS } from "../../../../entities/work/queryKeys";
-import { sourceEditErrorMessage } from "../../../../entities/work/sourceRevision";
 import {
   projectionWorkspacePath,
   sourceMutationErrorMessage,
@@ -257,7 +256,7 @@ export function WorkEditDialog({
   }
 
   const sourceErrorMessage = sourceQuery.error
-    ? sourceEditErrorMessage(sourceQuery.error, "作品情報を読み込めないため編集できません。")
+    ? sourceMutationErrorMessage(sourceQuery.error, "作品情報を読み込めないため編集できません。")
     : null;
   const canEditSource = Boolean(acceptedSnapshot) && !sourceQuery.isError;
   const hasUnresolvedConflicts = conflictFields.length > 0;

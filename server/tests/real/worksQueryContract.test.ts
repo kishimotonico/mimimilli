@@ -516,7 +516,7 @@ test("スマートフォルダーのSQL候補絞り込み(第1段)とcore純粋�
     tags: tf(`@year/${recent.slice(0, 4)}`),
   });
 
-  // 作品検索qはルール全体への追加のAND条件（TASK-462）。ルールなし（SQLの通常経路へ委譲）
+  // 作品検索qはルール全体への追加のAND条件。ルールなし（SQLの通常経路へ委譲）
   // ・ルールあり（core側でルール結果へさらにフィルタ）の両方でreal⇔fixtureが同値になることを
   // 確認する。RJコード一致も含める（filterByQuery/textSearchConditionの両方が対応する経路）。
   assertSmartFolderEquivalent(queryRepo, [], "added-desc", { page: 1, limit: 7, q: "ＡＳＭＲ" });

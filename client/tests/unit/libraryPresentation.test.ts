@@ -210,7 +210,7 @@ describe("buildSmartFolderFilterParams（スマートフォルダー評価APIへ
       tagOp: "AND",
     });
   });
-  it("作品検索qはフォルダーのルール全体への追加AND条件としてqに渡す（TASK-462）", () => {
+  it("作品検索qはフォルダーのルール全体への追加AND条件としてqに渡す", () => {
     expect(buildSmartFolderFilterParams([], "藤田茜")).toEqual({ q: "藤田茜" });
   });
   it("qとタグを同時に渡せる", () => {

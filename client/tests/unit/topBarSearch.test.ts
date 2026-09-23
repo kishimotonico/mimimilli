@@ -199,7 +199,7 @@ describe("TopBar の検索入力", () => {
   });
 });
 
-describe("値一覧ペイン表示中は作品検索を無効化する（ADR-0026、TASK-457）", () => {
+describe("値一覧ペイン表示中は作品検索を無効化する（ADR-0026）", () => {
   it("value-list種の軸（facet軸）ではdisabled・tooltipを出す", () => {
     const store = renderTopBar("");
     act(() => store.set(activeAxisAtom, "cv"));

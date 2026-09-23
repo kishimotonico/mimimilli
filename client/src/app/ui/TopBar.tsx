@@ -65,7 +65,7 @@ export default function TopBar({ notificationBell }: TopBarProps) {
   const [searchQuery, onSearchChange] = useAtom(librarySearchQueryAtom);
   const activeAxis = useAtomValue(activeAxisAtom);
   // 値一覧は現在の絞り込みと独立した全作品の入口で、作品検索は効かない（ADR-0026）。
-  // 効かない入力欄を空のまま出し続けない（TASK-457、LibrarySortMenuのスマート軸disabledと同型）。
+  // 効かない入力欄を空のまま出し続けない（LibrarySortMenuのスマート軸disabledと同型）。
   const isValueListPane = mode === "library" && computeResultsPaneKind(activeAxis) === "value-list";
   const isPlaying = useAtomValue(playerIsActiveAtom);
   const playingTrack = useAtomValue(playingTrackTitleAtom);

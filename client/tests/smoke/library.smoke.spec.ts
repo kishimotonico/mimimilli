@@ -77,7 +77,7 @@ test("軸をまたいだAND絞り込みでチップが積み上がる", async ({
   );
 
   // AND追加は値一覧では提供せず、作品一覧のチップ内候補（「＋絞り込み」）だけで
-  // 行う（ADR-0026、TASK-457）。
+  // 行う（ADR-0026）。
   await page.getByRole("button", { name: "絞り込み" }).click();
   await page
     .getByRole("listbox", { name: "絞り込む軸" })
@@ -97,9 +97,7 @@ test("軸をまたいだAND絞り込みでチップが積み上がる", async ({
   assertNoErrors(tracker);
 });
 
-test("値一覧では作品検索が無効化され、AND追加ボタンを提供しない（ADR-0026、TASK-457）", async ({
-  page,
-}) => {
+test("値一覧では作品検索が無効化され、AND追加ボタンを提供しない（ADR-0026）", async ({ page }) => {
   const tracker = trackErrors(page);
   await openApp(page);
 
@@ -114,7 +112,7 @@ test("値一覧では作品検索が無効化され、AND追加ボタンを提�
   assertNoErrors(tracker);
 });
 
-test("値一覧に入ると効かない検索語・チップが残らない（ADR-0026、TASK-457）", async ({ page }) => {
+test("値一覧に入ると効かない検索語・チップが残らない（ADR-0026）", async ({ page }) => {
   const tracker = trackErrors(page);
   await openApp(page);
 
@@ -125,13 +123,13 @@ test("値一覧に入ると効かない検索語・チップが残らない（AD
   await expect(page.locator(".mll-tagband .mll-tagband__chip")).toHaveCount(0);
 
   // 値一覧へ入った時点で条件は消去済みなので、レールの「すべての作品」に戻れば
-  // 条件なしの全作品一覧になる（「値を選ばず戻る」の実体。TASK-457決定）。
+  // 条件なしの全作品一覧になる（「値を選ばず戻る」の実体）。
   await page.getByRole("button", { name: "すべての作品" }).click();
   await expect(page.getByPlaceholder(/ライブラリを検索/)).toHaveValue("");
   await expect(page.locator(".mll-tagband .mll-tagband__chip")).toHaveCount(0);
 
   // 「値を選ばず戻る」のもう一つの実体: 常設のパンくず「ライブラリ」セグメント
-  // からも同じく条件なしの全作品一覧へ戻れる（アドバイザー所見。TASK-457追加確認）。
+  // からも同じく条件なしの全作品一覧へ戻れる。
   await page.locator(".mle-col.is-axis").getByRole("button", { name: "CV" }).click();
   await expect(page.getByPlaceholder(/ライブラリを検索/)).toBeDisabled();
   await page.locator(".mle-crumbs").getByRole("button", { name: "ライブラリ" }).click();
@@ -308,7 +306,7 @@ test("作品編集: 関連URLを追加できる", async ({ page }) => {
   assertNoErrors(tracker);
 });
 
-test("作品編集: タイトルとタグをまとめて1回の保存で確定できる（一括draft保存。TASK-456）", async ({
+test("作品編集: タイトルとタグをまとめて1回の保存で確定できる（一括draft保存）", async ({
   page,
 }) => {
   const tracker = trackErrors(page);

@@ -56,7 +56,7 @@ describe("FilterChipBand の件数表示", () => {
   });
 });
 
-describe("値一覧ペイン表示中の件数ラベルと＋絞り込みの扱い（ADR-0026、TASK-457）", () => {
+describe("値一覧ペイン表示中の件数ラベルと＋絞り込みの扱い（ADR-0026）", () => {
   it("valueListItemCount指定時は絞り込み後件数の代わりにライブラリ全体である旨のラベルを出す", () => {
     renderFilterChipBand(undefined, { valueListItemCount: 12 });
     expect(screen.getByText("12分類（件数はライブラリ全体）")).toBeTruthy();

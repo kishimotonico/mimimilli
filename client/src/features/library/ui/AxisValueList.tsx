@@ -28,7 +28,7 @@ interface AxisValueListProps {
   /** 既定=置き換え（クリック。ADR-0012 §7） */
   onReplace: (tag: NormalizedTag) => void;
   /** Ctrl/Cmd+クリックによる反転先（トグル。値一覧はAND追加ボタンを持たないため、
-   *  ADR-0013の作品詳細タグクリックと同型の「ボタン無しの反転」になる。TASK-457） */
+   *  ADR-0013の作品詳細タグクリックと同型の「ボタン無しの反転」になる） */
   onToggle: (tag: NormalizedTag) => void;
   onRetryFacets?: () => void;
   onRetryTagPrefixes?: () => void;
@@ -65,7 +65,7 @@ export default function AxisValueList({
 
   const isSelected = (item: AxisFacetItem) =>
     selectedTags.includes(buildFilterTag(axis, item.value));
-  // 値一覧のタイル・行は既定=置き換え、AND追加ボタンは持たない独立入口（ADR-0026、TASK-457）。
+  // 値一覧のタイル・行は既定=置き換え、AND追加ボタンは持たない独立入口（ADR-0026）。
   // Ctrl/Cmd+クリックのトグル反転はADR-0012 §7の全入口共通則として維持する。
   const handleSelect = (item: AxisFacetItem, opts: { ctrlKey: boolean; metaKey: boolean }) => {
     const tag = buildFilterTag(axis, item.value);
