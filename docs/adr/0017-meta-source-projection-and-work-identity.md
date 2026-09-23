@@ -32,7 +32,7 @@
 
 アプリの作品編集はsource-firstにする。
 
-1. 編集用の取得API（`GET /works/:id/source`）は`mimimilli.json`のexact bytesから得た`sourceRevision`を返す。閲覧用の取得API（`GET /works/:id`等）は返さない。この項はADR-0025で上書きした。
+1. 編集用の取得API（`GET /works/:id/source`）は`mimimilli.json`のexact bytesから得た同一読取りの値と`sourceRevision`を返す。閲覧DTOには載せない（この項はADR-0025が上書きした）。
 2. 更新APIは`sourceRevision`を必須とし、現在の`mimimilli.json`と一致しなければHTTP 409 `source_changed`を返す。
 3. 読み込んだJSON objectへ対象フィールドだけをpatchする。schemaが知らないフィールド、キー順、対象外の値を捨てない。
 4. 同じディレクトリの一意な一時ファイルへ書き、ファイルをfsyncしてからatomic replaceする。replace前にも`mimimilli.json`のbytesを再確認し、変化していれば上書きしない。
