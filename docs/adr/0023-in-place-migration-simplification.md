@@ -2,7 +2,7 @@
 
 - ステータス: 承認
 - 日付: 2026-08-20
-- 関連: [ADR-0008](0008-persistence-topology-query-ownership-playback-ids.md)、[ADR-0021](0021-custom-sqlite-migration-executor.md)、TASK-356
+- 関連: [ADR-0008](0008-persistence-topology-query-ownership-playback-ids.md)、[ADR-0017](0017-meta-source-projection-and-work-identity.md)、[ADR-0021](0021-custom-sqlite-migration-executor.md)、TASK-356、TASK-460
 
 ## 文脈
 
@@ -72,6 +72,12 @@ Copy-Item "$dataRoot\backup\user-YYYY-MM-DDTHH-MM-SS-mmm-pre-migration.sqlite" "
 
 catalog DB も同様に `catalog.sqlite` と `backup/catalog-…-pre-migration.sqlite` で行う。
 
+### DLsite取得失敗表示の寿命
+
+DLsiteの取得失敗（`not_found` / `error`）は `db/dlsite-cache.sqlite`（`dlsite_fetch_failures` 等、ADR-0008）に記録し、`failure_expires_at` のTTLで管理する（既定値は`server/src/adapters/real/dlsiteCache.ts`の`DEFAULT_DLSITE_CACHE_TTLS_MS`）。このTTLは再取得を抑止する期間だけを制御し、catalog投影（`work_dlsite.state_json`）に表示済みの失敗結果を消す契機にはしない。TTLが切れても、既存の投影表示は次の取得・再合成まで残る。
+
+`catalog.sqlite` を本ADRの対象であるin-place適用のマイグレーションではなく、ファイルごと削除して再構築した場合（開発中の再作成、配布後に提供する再構築手順のいずれも）、DLsite失敗の投影は最後の取得結果の保持を保証しない。投影はmimimilli.jsonとキャッシュから再合成される値であり、キャッシュが既に期限切れ、または`dlsite-cache.sqlite`自体を失っていれば`none`に戻る。一方、`dlsite-cache.sqlite`はcatalogと物理的に別ファイルでありcatalog再構築の対象外のため、再構築時点でキャッシュが有効期限内であれば、再構築後の再scanで同じ失敗表示が再び得られる場合がある。これは禁止しない。
+
 ## 帰結
 
 - 旧スキーマの pre-migration バックアップが検証で落ちる矛盾が解消され、既存DB環境でも起動できる
@@ -79,3 +85,4 @@ catalog DB も同様に `catalog.sqlite` と `backup/catalog-…-pre-migration.s
 - FK を伴うテーブル再作成 migration が意図どおり動作する
 - DB がアプリより新しい場合はデータを書き換えず fail-fast する
 - 失敗時の復旧は手動リストアに委ねる。運用は単純化される一方、自動ロールバックは提供しない
+- DLsite取得失敗の表示は一時的な観測であり、catalog再構築後の保持を保証しない。cacheのTTL（再取得の可否）と表示の保持は別の寿命として扱う
