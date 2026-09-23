@@ -19,6 +19,11 @@ export type ProjectOutcome =
       reason: "source_changed";
       snapshot: { meta: MetaFile; bytes: Buffer; sourceRevision: string };
       currentSourceRevision: string | null;
+    }
+  | {
+      status: "unpublished";
+      reason: "error";
+      snapshot: { meta: MetaFile; bytes: Buffer; sourceRevision: string };
     };
 
 export interface PreparedMeta {

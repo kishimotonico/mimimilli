@@ -1,5 +1,5 @@
-import { statSync } from "node:fs";
-import { basename, join } from "node:path";
+import { existsSync, statSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import type {
   DataIntegrityWarning,
   DlsiteNotificationKind,
@@ -7,6 +7,7 @@ import type {
   DlsiteNotificationQuery,
   DlsiteNotificationSummary,
   IdentityConflictReassignBody,
+  ScanDiagnostic,
   NormalizedTag,
   ResumeBody,
   Work,
@@ -21,11 +22,18 @@ import type {
   WorksPage,
   WorksQuery,
 } from "@mimimilli/shared";
-import { isAudioFileName, tagEquals } from "@mimimilli/shared";
+import type { WorkSourceProjectionResult } from "../../adapter/work.ts";
+import { isAudioFileName, sidecarMetaFileName, tagEquals } from "@mimimilli/shared";
 import { type Db } from "./db.ts";
-import { MetaMutationReject, encodeMetaRaw, patchMetaFileCas, readMetaSource } from "./meta.ts";
+import {
+  META_FILE_NAME,
+  MetaMutationReject,
+  encodeMetaRaw,
+  patchMetaFileCas,
+  readMetaSource,
+} from "./meta.ts";
 import { SourceChangedError } from "../../errors.ts";
-import { resolveWithin } from "./paths.ts";
+import { resolveWithin, toPortableRelativePath } from "./paths.ts";
 import { Scanner } from "./scanner.ts";
 import { logDataIntegritySkips, toDataIntegrityWarning } from "./dataIntegrity.ts";
 import { getCategoryLogger } from "../../lib/logger.ts";
@@ -33,8 +41,12 @@ import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";
 import { getWorkFromCatalog, getWorkWithLiveProbe } from "./workRefresh.ts";
+import { physicalPathForMeta } from "./scanRegister.ts";
+import { naturalCompare } from "./naturalCompare.ts";
 import {
+  mapMetaReadError,
   mutateVerifiedMetaSource,
+  mutationResultFromOutcome,
   projectVerifiedSource,
   readVerifiedEditSource,
   toEditSnapshot,
@@ -59,11 +71,55 @@ export function createWorkMethods(deps: {
 }) {
   const { db, query, catalog, user, scanner, requireRoot, cachedCover } = deps;
 
+  function recordIdentityConflict(
+    workId: string,
+    ownerPhysicalPath: string,
+    conflictPhysicalPath: string,
+  ) {
+    const root = requireRoot();
+    const ownerPath = toPortableRelativePath(root, ownerPhysicalPath);
+    const conflictPath = toPortableRelativePath(root, conflictPhysicalPath);
+    const diagnostics = catalog.listIdentityConflicts();
+    const existing = diagnostics.find(
+      (diagnostic): diagnostic is Extract<ScanDiagnostic, { kind: "identity_conflict" }> =>
+        diagnostic.kind === "identity_conflict" && diagnostic.workId === workId,
+    );
+    if (existing) {
+      existing.paths = [...new Set([...existing.paths, ownerPath, conflictPath])].sort(
+        naturalCompare,
+      );
+    } else {
+      diagnostics.push({
+        kind: "identity_conflict",
+        workId,
+        paths: [ownerPath, conflictPath].sort(naturalCompare),
+      });
+    }
+    catalog.replaceIdentityConflicts(diagnostics);
+  }
+
+  function metaPathForTarget(target: string): string | null {
+    try {
+      const stat = statSync(target);
+      if (stat.isDirectory()) {
+        const metaPath = join(target, META_FILE_NAME);
+        return existsSync(metaPath) ? metaPath : null;
+      }
+      if (stat.isFile() && isAudioFileName(basename(target))) {
+        const metaPath = join(dirname(target), sidecarMetaFileName(basename(target)));
+        return existsSync(metaPath) ? metaPath : null;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
   async function persistSourceMutation(
     verified: ReturnType<typeof mutateVerifiedMetaSource>,
   ): Promise<WorkSourceMutationResult | null> {
     if (!verified) return null;
-    return { snapshot: await projectVerifiedSource(scanner, verified) };
+    return projectVerifiedSource(scanner, verified);
   }
 
   return {
@@ -112,7 +168,7 @@ export function createWorkMethods(deps: {
       }
     },
 
-    async createWork(body: WorkCreateBody): Promise<Work | null> {
+    async createWork(body: WorkCreateBody): Promise<WorkSourceMutationResult | null> {
       const root = requireRoot();
       return await createWorkFromPath(
         { db, query, catalog, user },
@@ -123,7 +179,9 @@ export function createWorkMethods(deps: {
       );
     },
 
-    async reassignIdentityConflict(body: IdentityConflictReassignBody): Promise<Work | null> {
+    async reassignIdentityConflict(
+      body: IdentityConflictReassignBody,
+    ): Promise<WorkSourceMutationResult | null> {
       const diagnostic = catalog
         .listIdentityConflicts()
         .find((candidate) => candidate.paths.includes(body.path));
@@ -132,26 +190,63 @@ export function createWorkMethods(deps: {
       const root = requireRoot();
       const workDir = resolveWithin(root, join(root, body.path));
       if (!workDir) return null;
-      const metaPath = join(workDir, "mimimilli.json");
+      const metaPath = join(workDir, META_FILE_NAME);
       const source = readMetaSource(metaPath);
       if (source.meta.id !== diagnostic.workId) return null;
 
       const updated = patchMetaFileCas(metaPath, source.sourceRevision, {
         id: crypto.randomUUID(),
       });
+      const physicalPath = physicalPathForMeta(metaPath, updated.meta);
       const outcome = await scanner.projectMetaFile(metaPath, updated);
-      if (outcome.status !== "published") {
-        throw new Error("再投影した作品の取得に失敗しました");
-      }
-      const work = getWorkFromCatalog(query, updated.meta.id);
-      if (!work) throw new Error("再投影した作品の取得に失敗しました");
       const remaining = catalog.listIdentityConflicts().flatMap((candidate) => {
         if (candidate.workId !== diagnostic.workId) return [candidate];
         const paths = candidate.paths.filter((path) => path !== body.path);
         return paths.length >= 2 ? [{ ...candidate, paths }] : [];
       });
       catalog.replaceIdentityConflicts(remaining);
-      return work;
+      return mutationResultFromOutcome(toEditSnapshot(updated, physicalPath), outcome);
+    },
+
+    async projectWorkSource(path: WorkspacePath): Promise<WorkSourceProjectionResult | null> {
+      const root = requireRoot();
+      const target = resolveWithin(root, join(root, path));
+      if (!target) return null;
+      const metaPath = metaPathForTarget(target);
+      if (!metaPath) return null;
+      let source;
+      try {
+        source = readMetaSource(metaPath);
+      } catch (error) {
+        mapMetaReadError(error);
+      }
+      const physicalPath = physicalPathForMeta(metaPath, source.meta);
+      const existing = query.getScanWorkMap().get(source.meta.id);
+      const hadCatalogRow = existing !== undefined;
+      if (existing && existing.physicalPath !== physicalPath && existing.status !== "missing") {
+        recordIdentityConflict(source.meta.id, existing.physicalPath, physicalPath);
+        return {
+          snapshot: toEditSnapshot(source, physicalPath),
+          projection: { status: "pending", reason: "identity_conflict" },
+        };
+      }
+      try {
+        const outcome = await scanner.projectMetaFile(metaPath, source);
+        const result = mutationResultFromOutcome(toEditSnapshot(source, physicalPath), outcome);
+        if (result.projection.status === "published" && !hadCatalogRow) {
+          return { ...result, catalogInserted: true };
+        }
+        return result;
+      } catch (error) {
+        scanLogger.error("作品の一覧反映に失敗しました", {
+          workId: source.meta.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return {
+          snapshot: toEditSnapshot(source, physicalPath),
+          projection: { status: "pending", reason: "error" },
+        };
+      }
     },
 
     async deleteWork(id: string): Promise<boolean> {

@@ -82,15 +82,10 @@ export class ScanCandidateSession {
           title: current.inferredTitle,
           rjCode: item.rjCode,
         });
-        if (outcome.status !== "published") {
-          failures.push({
-            path: current.path,
-            message: "登録した作品の取得に失敗しました",
-          });
-          continue;
-        }
         registered.push({ path: current.path, workId: outcome.snapshot.meta.id });
-        onRegistered(outcome.snapshot.meta.id);
+        if (outcome.status === "published") {
+          onRegistered(outcome.snapshot.meta.id);
+        }
       } catch (error) {
         failures.push({
           path: current.path,

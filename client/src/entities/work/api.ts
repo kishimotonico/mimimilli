@@ -46,6 +46,7 @@ import {
   type UnregisterMissingWorksResult,
   type WorksPage,
   type WorksQueryInput,
+  type WorkspacePath,
 } from "@mimimilli/shared";
 
 function appendTagsTagOp(
@@ -106,6 +107,10 @@ export async function queryDlsiteNotifications(
 
 export async function getWorkEditSnapshot(id: string): Promise<WorkEditSnapshot> {
   return getParsed(workEditSnapshotSchema, `/works/${encodeURIComponent(id)}/source`);
+}
+
+export async function projectWorkSource(path: WorkspacePath): Promise<WorkSourceMutationResult> {
+  return postParsed(workSourceMutationResultSchema, "/works/projection", { path });
 }
 
 export async function patchWorkSource(

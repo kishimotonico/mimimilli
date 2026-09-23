@@ -1,4 +1,4 @@
-import type { WorkEditSnapshot } from "@mimimilli/shared";
+import type { WorkEditSnapshot, WorkSourceMutationResult } from "@mimimilli/shared";
 import {
   SOURCE_FILE_BROKEN_MESSAGE,
   SOURCE_FILE_MISSING_MESSAGE,
@@ -8,6 +8,7 @@ import {
   SourceConflictError,
   SourceParseError,
 } from "../../errors.ts";
+import { getCategoryLogger } from "../../lib/logger.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import {
   MetaMutationReject,
@@ -19,6 +20,7 @@ import {
 } from "./meta.ts";
 import { physicalPathForMeta } from "./scanRegister.ts";
 import type { Scanner } from "./scanner.ts";
+import type { ProjectOutcome } from "./scanTypes.ts";
 
 export type WorkSourceLocation = {
   metaPath: string;
@@ -109,12 +111,39 @@ export function mutateVerifiedMetaSource(
   return { source, ...location };
 }
 
+export function mutationResultFromOutcome(
+  snapshot: WorkEditSnapshot,
+  outcome: ProjectOutcome,
+): WorkSourceMutationResult {
+  if (outcome.status === "published") {
+    return { snapshot, projection: { status: "published" } };
+  }
+  return {
+    snapshot,
+    projection: {
+      status: "pending",
+      reason: outcome.reason === "error" ? "error" : "source_changed",
+    },
+  };
+}
+
+const scanLogger = getCategoryLogger("scan");
+
 export async function projectVerifiedSource(
   scanner: Scanner,
   verified: VerifiedMetaSource,
-): Promise<WorkEditSnapshot> {
-  await scanner.projectMetaFile(verified.metaPath, verified.source);
-  return toEditSnapshot(verified.source, verified.physicalPath);
+): Promise<WorkSourceMutationResult> {
+  const snapshot = toEditSnapshot(verified.source, verified.physicalPath);
+  try {
+    const outcome = await scanner.projectMetaFile(verified.metaPath, verified.source);
+    return mutationResultFromOutcome(snapshot, outcome);
+  } catch (error) {
+    scanLogger.error("作品の一覧反映に失敗しました", {
+      workId: snapshot.id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return { snapshot, projection: { status: "pending", reason: "error" } };
+  }
 }
 
 export { encodeMetaRaw, MetaMutationReject };

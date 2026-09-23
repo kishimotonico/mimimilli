@@ -11,7 +11,6 @@ import {
   tagSchema,
   urlEntrySchema,
   workListItemSchema,
-  workSchema,
 } from "./work.ts";
 import { splitSelectedTags, type TagFilters } from "./pseudoTag.ts";
 import { dlsiteRegistrationBodySchema, dlsiteStatusSchema, rjCodeFormatSchema } from "./dlsite.ts";
@@ -193,10 +192,26 @@ export const workEditSnapshotSchema = z.object({
 });
 export type WorkEditSnapshot = z.infer<typeof workEditSnapshotSchema>;
 
+export const workProjectionSchema = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("published") }),
+  z.object({
+    status: z.literal("pending"),
+    reason: z.enum(["source_changed", "error", "identity_conflict"]),
+  }),
+]);
+export type WorkProjection = z.infer<typeof workProjectionSchema>;
+
 export const workSourceMutationResultSchema = z.object({
   snapshot: workEditSnapshotSchema,
+  projection: workProjectionSchema,
 });
 export type WorkSourceMutationResult = z.infer<typeof workSourceMutationResultSchema>;
+
+/** POST /api/works/projection。register-preview と同じ root 相対 path。 */
+export const workProjectionBodySchema = z.object({
+  path: workspacePathSchema,
+});
+export type WorkProjectionBody = z.infer<typeof workProjectionBodySchema>;
 
 // ── 作品正本の部分更新（PATCH /api/works/:id）────────────────
 
@@ -269,14 +284,14 @@ export const dlsiteFetchByCodeBodySchema = z.object({
 export type DlsiteFetchByCodeBody = z.infer<typeof dlsiteFetchByCodeBodySchema>;
 
 /** POST /api/works のレスポンス */
-export const workCreateResponseSchema = workSchema;
+export const workCreateResponseSchema = workSourceMutationResultSchema;
 export type WorkCreateResponse = z.infer<typeof workCreateResponseSchema>;
 
 export const identityConflictReassignBodySchema = z.object({
   path: workspacePathSchema,
 });
 export type IdentityConflictReassignBody = z.infer<typeof identityConflictReassignBodySchema>;
-export const identityConflictReassignResponseSchema = workSchema;
+export const identityConflictReassignResponseSchema = workSourceMutationResultSchema;
 export type IdentityConflictReassignResponse = z.infer<
   typeof identityConflictReassignResponseSchema
 >;

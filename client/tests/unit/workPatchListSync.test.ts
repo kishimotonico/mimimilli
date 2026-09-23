@@ -164,6 +164,7 @@ function createFetchMock(total = WORKS_DEFAULT_PAGE_SIZE + 50) {
                 coverImage: updated.coverImage,
                 dlsite: updated.dlsite,
               },
+              projection: { status: "published" },
             }),
           );
         }

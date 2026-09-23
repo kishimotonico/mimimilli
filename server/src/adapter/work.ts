@@ -20,11 +20,19 @@ import type {
   WorksQuery,
 } from "@mimimilli/shared";
 
+/** 投影前に catalog 行が無く、今回 published になった新規登録の完了。HTTP 応答には載せない。 */
+export type WorkSourceProjectionResult = WorkSourceMutationResult & {
+  catalogInserted?: true;
+};
+
 export interface WorkAdapter {
   queryWorks(params: WorksQuery): Promise<WorksPage>;
   getWorkRegisterPreview(path: WorkspacePath): Promise<WorkRegisterPreview | null>;
-  createWork(body: WorkCreateBody): Promise<Work | null>;
-  reassignIdentityConflict(body: IdentityConflictReassignBody): Promise<Work | null>;
+  createWork(body: WorkCreateBody): Promise<WorkSourceMutationResult | null>;
+  reassignIdentityConflict(
+    body: IdentityConflictReassignBody,
+  ): Promise<WorkSourceMutationResult | null>;
+  projectWorkSource(path: WorkspacePath): Promise<WorkSourceProjectionResult | null>;
   /** 作品を DB とメタファイルから削除する。物理ファイルは触らない。存在しなければ false */
   deleteWork(id: string): Promise<boolean>;
   /** status === "missing" の作品数 */

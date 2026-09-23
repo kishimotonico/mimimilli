@@ -81,7 +81,7 @@ export function createDlsiteMethods(deps: {
 
     async dlsiteApplyMissing(workIds?: string[]) {
       const { summaries } = query.listSummaries(workIds);
-      const result = { applied: 0, skipped: 0, failed: 0 };
+      const result = { applied: 0, pending: 0, skipped: 0, failed: 0 };
       for (const summary of summaries) {
         if (!hasRjCode(summary.dlsite) || summary.dlsite.status === "skipped") {
           result.skipped += 1;
@@ -98,6 +98,7 @@ export function createDlsiteMethods(deps: {
           }
           const outcome = await apply.applyDlsiteMissingItem(summary.id, fetched.info);
           if (outcome === "applied") result.applied += 1;
+          else if (outcome === "pending") result.pending += 1;
           else result.skipped += 1;
         } catch {
           result.failed += 1;

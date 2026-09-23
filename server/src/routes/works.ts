@@ -11,6 +11,8 @@ import {
   workCreateBodySchema,
   identityConflictReassignBodySchema,
   workRegisterPreviewQuerySchema,
+  workProjectionBodySchema,
+  workSourceMutationResultSchema,
   workSourcePatchSchema,
   worksQuerySchema,
 } from "@mimimilli/shared";
@@ -78,15 +80,29 @@ export function worksRoute(
     return c.json(preview);
   });
 
+  app.post("/works/projection", async (c) => {
+    const body = await c.req.json().catch(() => null);
+    const parsed = workProjectionBodySchema.safeParse(body);
+    if (!parsed.success) invalidRequest("projection のパスが不正です");
+    try {
+      const result = await adapter.projectWorkSource(parsed.data.path);
+      if (!result) invalidRequest("指定されたパスは存在しないか、ルート配下ではありません");
+      if (result.catalogInserted) onWorkRegistered(result.snapshot.id);
+      return c.json(workSourceMutationResultSchema.parse(result));
+    } catch (error) {
+      throwSourceCommandError(error);
+    }
+  });
+
   app.post("/works", async (c) => {
     const body = await c.req.json().catch(() => null);
     const parsed = workCreateBodySchema.safeParse(body);
     if (!parsed.success) invalidRequest("作品の登録内容が不正です");
     try {
-      const work = await adapter.createWork(parsed.data);
-      if (!work) notFound("指定されたパスは存在しないか、ルート配下ではありません");
-      onWorkRegistered(work.id);
-      return c.json(work, 201);
+      const result = await adapter.createWork(parsed.data);
+      if (!result) notFound("指定されたパスは存在しないか、ルート配下ではありません");
+      if (result.projection.status === "published") onWorkRegistered(result.snapshot.id);
+      return c.json(workSourceMutationResultSchema.parse(result), 201);
     } catch (error) {
       if (error instanceof WorkRegisterError) {
         if (error.code === "already_registered") conflict(error.message);
@@ -103,12 +119,13 @@ export function worksRoute(
     const body = await c.req.json().catch(() => null);
     const parsed = identityConflictReassignBodySchema.safeParse(body);
     if (!parsed.success) invalidRequest("再取り込み対象のパスが不正です");
-    const work = await adapter.reassignIdentityConflict(parsed.data).catch((error) => {
+    const result = await adapter.reassignIdentityConflict(parsed.data).catch((error) => {
       if (error instanceof SourceChangedError) throw apiError("source_changed", error.message);
       throw error;
     });
-    if (!work) notFound("指定されたパスはidentity_conflict診断の対象ではありません");
-    return c.json(work, 201);
+    if (!result) notFound("指定されたパスはidentity_conflict診断の対象ではありません");
+    if (result.projection.status === "published") onWorkRegistered(result.snapshot.id);
+    return c.json(workSourceMutationResultSchema.parse(result), 201);
   });
 
   // ":id" と衝突するため、GET /works/:id より前で定義する

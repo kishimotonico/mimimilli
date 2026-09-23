@@ -412,9 +412,13 @@ test("fixture: 単一音声ファイルのregister-previewと登録ができる"
     body: JSON.stringify({ path: "fanza/d00001.mp3", title: "FANZA単一ファイル" }),
   });
   assert.equal(created.status, 201);
-  const work = await created.json();
-  assert.equal(work.title, "FANZA単一ファイル");
-  assert.ok(work.physicalPath.endsWith("/fanza/d00001.mp3"));
+  const createdBody = await created.json();
+  assert.equal(createdBody.snapshot.title, "FANZA単一ファイル");
+  assert.ok(createdBody.snapshot.physicalPath.endsWith("/fanza/d00001.mp3"));
+  assert.equal(createdBody.projection.status, "published");
+  const workRes = await app.request(`/api/works/${createdBody.snapshot.id}`);
+  assert.equal(workRes.status, 200);
+  const work = await workRes.json();
   assert.equal(work.playlists[0].tracks.length, 1);
   assert.equal(work.playlists[0].tracks[0].file, "d00001.mp3");
 
@@ -423,7 +427,7 @@ test("fixture: 単一音声ファイルのregister-previewと登録ができる"
   const file = (await listing.json()).entries.find(
     (entry: { name: string }) => entry.name === "d00001.mp3",
   );
-  assert.equal(file?.workId, work.id);
+  assert.equal(file?.workId, createdBody.snapshot.id);
   assert.equal(file?.workRelPath, "");
 
   const again = await app.request("/api/works", {

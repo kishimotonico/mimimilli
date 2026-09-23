@@ -1,10 +1,19 @@
 // 新規登録済み・更新された作品タブ共通: タイトルのインライン編集。
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { useMutation, useQueryClient, type QueryKey } from "@tanstack/react-query";
-import type { WorkListItem } from "@mimimilli/shared";
+import type {
+  WorkListItem,
+  WorkProjection,
+  WorkSourceMutationResult,
+  WorkspacePath,
+} from "@mimimilli/shared";
 import { getWorkEditSnapshot, patchWorkSource } from "../../../../entities/work/api";
 import { WORK_QUERY_KEYS } from "../../../../entities/work/queryKeys";
-import { apiErrorMessage } from "../../../../shared/lib/apiError";
+import {
+  sourceMutationErrorMessage,
+  projectionWorkspacePath,
+} from "../../../../entities/work/sourceMutation";
+import { useRootFolderOrNull } from "../../../../entities/settings/useSettingsQuery";
 
 export interface InlineTitleEdit {
   editingId: string | null;
@@ -17,13 +26,18 @@ export interface InlineTitleEdit {
   saveTitle: (workId: string) => void;
   /** Escapeでの取り消し。保存はせず編集モードだけを閉じる。 */
   cancelEdit: () => void;
+  projection: WorkProjection | null;
+  projectionPath: WorkspacePath | null;
+  applyProjected: (result: WorkSourceMutationResult) => void;
 }
 
 /** タイトルのインライン編集state。保存成功時は source キャッシュを更新し、一覧は invalidate する。 */
 export function useInlineTitleEdit(queryKey: QueryKey): InlineTitleEdit {
   const queryClient = useQueryClient();
+  const rootFolder = useRootFolderOrNull();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
+  const [pendingResult, setPendingResult] = useState<WorkSourceMutationResult | null>(null);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
 
   const saveTitleMutation = useMutation({
@@ -39,6 +53,7 @@ export function useInlineTitleEdit(queryKey: QueryKey): InlineTitleEdit {
       void queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.detail(workId), exact: true });
       void queryClient.invalidateQueries({ queryKey });
       setEditingId(null);
+      setPendingResult(result.projection.status === "pending" ? result : null);
     },
     onError: (_error, { workId }) => {
       void queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.detail(workId), exact: true });
@@ -68,7 +83,7 @@ export function useInlineTitleEdit(queryKey: QueryKey): InlineTitleEdit {
   };
 
   const editError = saveTitleMutation.error
-    ? apiErrorMessage(saveTitleMutation.error, "タイトルの保存に失敗しました")
+    ? sourceMutationErrorMessage(saveTitleMutation.error, "タイトルの保存に失敗しました")
     : null;
 
   const cancelEdit = () => {
@@ -86,5 +101,13 @@ export function useInlineTitleEdit(queryKey: QueryKey): InlineTitleEdit {
     changeTitle: setEditTitle,
     saveTitle,
     cancelEdit,
+    projection: pendingResult?.projection ?? null,
+    projectionPath:
+      pendingResult && rootFolder
+        ? projectionWorkspacePath(pendingResult.snapshot, rootFolder)
+        : null,
+    applyProjected: (result) => {
+      setPendingResult(result.projection.status === "pending" ? result : null);
+    },
   };
 }

@@ -155,6 +155,7 @@ describe("WorkDetailPatchScope", () => {
               coverImage: work.coverImage,
               dlsite: work.dlsite,
             },
+            projection: { status: "published" },
           }),
         );
       }
@@ -261,6 +262,7 @@ describe("WorkDetailPatchScope", () => {
             coverImage: null,
             dlsite: emptyDlsiteState(),
           },
+          projection: { status: "published" },
         }),
       );
     });

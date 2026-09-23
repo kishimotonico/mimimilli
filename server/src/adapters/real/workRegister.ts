@@ -7,6 +7,7 @@ import type {
   Work,
   WorkCreateBody,
   WorkRegisterPreview,
+  WorkSourceMutationResult,
 } from "@mimimilli/shared";
 import {
   detectRjCode,
@@ -30,19 +31,23 @@ import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";
 import type { Scanner } from "./scanner.ts";
 import type { ProjectOutcome } from "./scanTypes.ts";
-import { getWorkFromCatalog } from "./workRefresh.ts";
+import { mutationResultFromOutcome, toEditSnapshot } from "./workEditSource.ts";
 
-async function workFromProjectOutcome(
-  repos: { db: Db; query: WorkQueryRepository; catalog: CatalogWorkRepository },
+function mutationResultFromProjectOutcome(
   outcome: ProjectOutcome,
-  notFoundMessage: string,
-): Promise<Work> {
-  if (outcome.status !== "published") {
-    throw new Error(notFoundMessage);
-  }
-  const work = getWorkFromCatalog(repos.query, outcome.snapshot.meta.id);
-  if (!work) throw new Error(notFoundMessage);
-  return work;
+  physicalPath: string,
+): WorkSourceMutationResult {
+  return mutationResultFromOutcome(
+    toEditSnapshot(
+      {
+        bytes: outcome.snapshot.bytes,
+        meta: outcome.snapshot.meta,
+        sourceRevision: outcome.snapshot.sourceRevision,
+      },
+      physicalPath,
+    ),
+    outcome,
+  );
 }
 
 function isDirectory(path: string): boolean {
@@ -294,7 +299,7 @@ export async function createWorkFromFolder(
   root: string,
   body: WorkCreateBody,
   applyDlsiteCover?: (coverUrl: string, workDir: string) => Promise<string | null>,
-): Promise<Work> {
+): Promise<WorkSourceMutationResult> {
   const { query } = repos;
   const workDir = resolveWithin(root, join(root, body.path));
   if (!workDir || !isDirectory(workDir)) {
@@ -357,12 +362,10 @@ export async function createWorkFromFolder(
       metaPatch.dlsite = applied.dlsite;
     }
 
-    const work = await workFromProjectOutcome(
-      repos,
+    return mutationResultFromProjectOutcome(
       await scanner.restoreFolderWork(workDir, metaPatch),
-      "復元した作品の取得に失敗しました",
+      workDir,
     );
-    return work;
   }
 
   const title = body.title;
@@ -382,8 +385,7 @@ export async function createWorkFromFolder(
     if (detectedRjCode) dlsite = { ...emptyDlsiteState(), rjCode: detectedRjCode };
   }
 
-  const work = await workFromProjectOutcome(
-    repos,
+  return mutationResultFromProjectOutcome(
     await scanner.registerFolderWork(workDir, {
       title,
       tags,
@@ -391,9 +393,8 @@ export async function createWorkFromFolder(
       coverImage,
       dlsite,
     }),
-    "登録した作品の取得に失敗しました",
+    workDir,
   );
-  return work;
 }
 
 export async function createWorkFromPath(
@@ -407,7 +408,7 @@ export async function createWorkFromPath(
   root: string,
   body: WorkCreateBody,
   applyDlsiteCover?: (coverUrl: string, workDir: string) => Promise<string | null>,
-): Promise<Work> {
+): Promise<WorkSourceMutationResult> {
   const target = resolveWithin(root, join(root, body.path));
   if (!target) {
     throw new WorkRegisterError(
@@ -439,7 +440,7 @@ async function createWorkFromAudioFile(
   audioPath: string,
   body: WorkCreateBody,
   applyDlsiteCover?: (coverUrl: string, workDir: string) => Promise<string | null>,
-): Promise<Work> {
+): Promise<WorkSourceMutationResult> {
   const { query } = repos;
   const dbWork = query.getWorkByPhysicalPathSync(audioPath);
   if (dbWork !== null || ancestorFolderIsRegistered(query, audioPath, root)) {
@@ -491,10 +492,9 @@ async function createWorkFromAudioFile(
       metaPatch.dlsite = applied.dlsite;
     }
 
-    return await workFromProjectOutcome(
-      repos,
+    return mutationResultFromProjectOutcome(
       await scanner.restoreSidecarWork(audioPath, metaPatch),
-      "復元した作品の取得に失敗しました",
+      audioPath,
     );
   }
 
@@ -514,8 +514,7 @@ async function createWorkFromAudioFile(
     if (detectedRjCode) dlsite = { ...emptyDlsiteState(), rjCode: detectedRjCode };
   }
 
-  return await workFromProjectOutcome(
-    repos,
+  return mutationResultFromProjectOutcome(
     await scanner.registerFileWork(audioPath, {
       title,
       tags,
@@ -523,7 +522,7 @@ async function createWorkFromAudioFile(
       coverImage,
       dlsite,
     }),
-    "登録した作品の取得に失敗しました",
+    audioPath,
   );
 }
 

@@ -252,7 +252,7 @@ describe("work api", () => {
       coverImage: null,
       dlsite: emptyDlsiteState(),
     };
-    mockFetch.mockResolvedValue(makeResponse({ snapshot }));
+    mockFetch.mockResolvedValue(makeResponse({ snapshot, projection: { status: "published" } }));
     const result = await workApi.patchWorkSource("work-1", {
       sourceRevision: "rev-1",
       title: "new title",
@@ -264,7 +264,7 @@ describe("work api", () => {
         body: JSON.stringify({ sourceRevision: "rev-1", title: "new title" }),
       }),
     );
-    expect(result).toEqual({ snapshot });
+    expect(result).toEqual({ snapshot, projection: { status: "published" } });
   });
 
   it("patchWorkBookmark PATCHes /api/works/:id/bookmark", async () => {
@@ -291,7 +291,7 @@ describe("work api", () => {
       coverImage: null,
       dlsite: emptyDlsiteState(),
     };
-    mockFetch.mockResolvedValue(makeResponse({ snapshot }));
+    mockFetch.mockResolvedValue(makeResponse({ snapshot, projection: { status: "published" } }));
     await workApi.addWorkTag("work-1", "a/b");
     expect(mockFetch).toHaveBeenCalledWith(
       "/api/works/work-1/tags/a%2Fb",

@@ -222,7 +222,7 @@ test("登録時のDLsite指定はregistration bodyでタイトルを上書きし
   });
   assert.equal(res.status, 201);
   const body = await res.json();
-  assert.equal(body.title, formTitle);
+  assert.equal(body.snapshot.title, formTitle);
 
   const meta = JSON.parse(readFileSync(join(folder, META_FILE_NAME), "utf-8")) as { title: string };
   assert.equal(meta.title, formTitle);
@@ -267,6 +267,7 @@ test("missing-only一括適用はcache結果だけを使い、既存フィール
 
   assert.deepEqual(await adapter.dlsiteApplyMissing([lib.existingWorkId]), {
     applied: 0,
+    pending: 0,
     skipped: 1,
     failed: 0,
   });
@@ -389,6 +390,7 @@ test("missing-only一括適用は1件のidentity不一致を集計して後続�
 
   assert.deepEqual(await adapter.dlsiteApplyMissing([firstId, secondId]), {
     applied: 1,
+    pending: 0,
     skipped: 0,
     failed: 1,
   });
@@ -405,6 +407,7 @@ test("missing-only一括適用は1件の壊れたJSONをfailedに数え後続作
 
   assert.deepEqual(await adapter.dlsiteApplyMissing([firstId, secondId]), {
     applied: 1,
+    pending: 0,
     skipped: 0,
     failed: 1,
   });
@@ -434,6 +437,7 @@ test("missing-only一括適用: 取得失敗後もcatalog投影で通知集計�
 
   assert.deepEqual(await adapter.dlsiteApplyMissing([lib.existingWorkId]), {
     applied: 0,
+    pending: 0,
     skipped: 0,
     failed: 1,
   });

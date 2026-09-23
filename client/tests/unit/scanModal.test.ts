@@ -118,7 +118,7 @@ function mockSuccessfulScanTitleSave(title: string) {
   vi.spyOn(workApi, "patchWorkSource").mockImplementation(async () => {
     const item = worksById.get(newWork.id);
     if (item) worksById.set(newWork.id, { ...item, title });
-    return { snapshot: scanSnapshot(title) };
+    return { snapshot: scanSnapshot(title), projection: { status: "published" as const } };
   });
 }
 

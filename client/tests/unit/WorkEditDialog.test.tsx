@@ -377,9 +377,10 @@ describe("WorkEditDialog", () => {
 
   it("プロンプトの保存するはタイトルを保存してから閉じる", async () => {
     const onClose = vi.fn();
-    const mutateAsync = vi
-      .fn()
-      .mockResolvedValue({ snapshot: makeSnapshot(makeWork({ title: "編集途中" }), "revision-2") });
+    const mutateAsync = vi.fn().mockResolvedValue({
+      snapshot: makeSnapshot(makeWork({ title: "編集途中" }), "revision-2"),
+      projection: { status: "published" },
+    });
     renderDialog(
       <WorkEditDialog
         work={makeWork()}
@@ -407,7 +408,9 @@ describe("WorkEditDialog", () => {
 
   it("保存処理中はキャンセルを押せない（後から成功した保存が続けていた編集ごと閉じる事故を防ぐ）", async () => {
     const onClose = vi.fn();
-    let resolveMutate: ((result: { snapshot: WorkEditSnapshot }) => void) | undefined;
+    let resolveMutate:
+      | ((result: { snapshot: WorkEditSnapshot; projection: { status: "published" } }) => void)
+      | undefined;
     const mutateAsync = vi.fn(
       () =>
         new Promise((resolve) => {
@@ -436,7 +439,10 @@ describe("WorkEditDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "キャンセル" }));
     expect(screen.getByRole("alertdialog", { name: "未保存の変更があります" })).toBeTruthy();
 
-    resolveMutate?.({ snapshot: makeSnapshot(makeWork({ title: "編集途中" }), "revision-2") });
+    resolveMutate?.({
+      snapshot: makeSnapshot(makeWork({ title: "編集途中" }), "revision-2"),
+      projection: { status: "published" },
+    });
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
   });
 

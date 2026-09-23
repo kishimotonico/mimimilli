@@ -8,7 +8,12 @@ import ConfirmDialog from "../../../../shared/ui/ConfirmDialog";
 import IconButton from "../../../../shared/ui/IconButton";
 import TagCombobox from "../../../../shared/ui/TagCombobox";
 import { useToast } from "../../../../shared/ui/useToast";
-import { apiErrorMessage } from "../../../../shared/lib/apiError";
+import {
+  sourceMutationErrorMessage,
+  projectionWorkspacePath,
+} from "../../../../entities/work/sourceMutation";
+import { SourceProjectionNotice } from "../../../../entities/work/ui/SourceProjectionNotice";
+import { useRootFolderOrNull } from "../../../../entities/settings/useSettingsQuery";
 import type { LibraryTagIntentMutation } from "../../model/useLibraryQueries";
 import { useTagPrefixes } from "../../../../entities/tag/useTagPrefixes";
 import { tagPrefixDefinition } from "../../../../entities/tag/tagPrefixDefinition";
@@ -47,6 +52,7 @@ export function WorkTagEditor({
   expanded = false,
   onTagClick,
 }: WorkTagEditorProps) {
+  const rootFolder = useRootFolderOrNull();
   const [isTagPopoverOpen, setIsTagPopoverOpen] = useState(false);
   const [areAllTagsVisible, setAreAllTagsVisible] = useState(false);
   // 削除✕ボタンは誤操作防止のため既定で非表示（追加の2段階フローと対称にする）。
@@ -145,7 +151,7 @@ export function WorkTagEditor({
 
   const patchTagsErrorMessage =
     sourceCommandBlockMessage(patchTagsError) === null && patchTagsError
-      ? apiErrorMessage(patchTagsError, "タグを保存できませんでした。")
+      ? sourceMutationErrorMessage(patchTagsError, "タグを保存できませんでした。")
       : null;
 
   const { show: showToast, dismiss: dismissToast } = useToast();
@@ -270,6 +276,19 @@ export function WorkTagEditor({
         </div>
       </div>
       <WorkSourcePatchBlockedNotice message={blockedMessage} />
+      <SourceProjectionNotice
+        projection={
+          (addTagMutation.submittedAt >= removeTagMutation.submittedAt
+            ? addTagMutation.data
+            : removeTagMutation.data
+          )?.projection
+        }
+        path={
+          rootFolder
+            ? projectionWorkspacePath({ physicalPath: work.physicalPath }, rootFolder)
+            : null
+        }
+      />
       {confirmingRemoveTag && (
         <ConfirmDialog
           title="保護タグの削除"

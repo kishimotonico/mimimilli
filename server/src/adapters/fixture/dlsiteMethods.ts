@@ -61,6 +61,7 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
     async dlsiteApplyMissing(workIds) {
       const candidates = state.works.filter((work) => !workIds || workIds.includes(work.id));
       let applied = 0;
+      let pending = 0;
       let skipped = 0;
       let failed = 0;
       for (const work of candidates) {
@@ -84,7 +85,7 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
         }
         applied += 1;
       }
-      return { applied, skipped, failed };
+      return { applied, pending, skipped, failed };
     },
 
     async dlsiteApplyMissingPreview(workIds) {

@@ -446,7 +446,9 @@ test("createWorkの応答取得は登録時の投影総時間を変えない", a
     tags: [],
   });
   assert.ok(created);
-  assert.equal(created.totalDurationSec, 5);
+  assert.equal(created.projection.status, "published");
+  const createdWork = await adapter.getWork(created.snapshot.id);
+  assert.equal(createdWork?.totalDurationSec, 5);
 
   const page = await adapter.queryWorks({
     q: "",
@@ -454,9 +456,9 @@ test("createWorkの応答取得は登録時の投影総時間を変えない", a
     tagOp: "AND",
     sort: "added-desc",
   });
-  assert.equal(page.items.find((item) => item.id === created.id)?.totalDurationSec, 5);
+  assert.equal(page.items.find((item) => item.id === created.snapshot.id)?.totalDurationSec, 5);
 
-  const viewed = await adapter.getWork(created.id);
+  const viewed = await adapter.getWork(created.snapshot.id);
   assert.equal(viewed?.totalDurationSec, 5);
   const afterPage = await adapter.queryWorks({
     q: "",
@@ -464,5 +466,8 @@ test("createWorkの応答取得は登録時の投影総時間を変えない", a
     tagOp: "AND",
     sort: "added-desc",
   });
-  assert.equal(afterPage.items.find((item) => item.id === created.id)?.totalDurationSec, 5);
+  assert.equal(
+    afterPage.items.find((item) => item.id === created.snapshot.id)?.totalDurationSec,
+    5,
+  );
 });

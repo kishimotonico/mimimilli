@@ -16,7 +16,7 @@ test("設定モーダルから未設定項目の一括適用ができる", async
   await dialog.getByRole("button", { name: /選択した\d+件に適用/ }).click();
 
   await expect(
-    page.getByText(/未設定項目を適用: 適用 \d+件・スキップ \d+件・失敗 \d+件/),
+    page.getByText(/未設定項目を適用: 適用 \d+件・未反映 \d+件・スキップ \d+件・失敗 \d+件/),
   ).toBeVisible();
   await expect(dialog).toBeHidden();
 

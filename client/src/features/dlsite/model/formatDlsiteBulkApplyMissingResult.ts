@@ -1,5 +1,5 @@
 import type { DlsiteBulkApplyMissingResult } from "@mimimilli/shared";
 
 export function formatDlsiteBulkApplyMissingResult(result: DlsiteBulkApplyMissingResult): string {
-  return `適用 ${result.applied}件・スキップ ${result.skipped}件・失敗 ${result.failed}件`;
+  return `適用 ${result.applied}件・未反映 ${result.pending}件・スキップ ${result.skipped}件・失敗 ${result.failed}件`;
 }

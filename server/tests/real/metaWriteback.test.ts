@@ -93,17 +93,17 @@ test("catalog再投影に失敗しても確定済みmimimilli.jsonは残り、sc
   CatalogWorkRepository.prototype.upsertWorkCatalog = () => {
     throw new Error("catalog projection failed");
   };
+  let result;
   try {
-    await assert.rejects(
-      adapter.patchWorkSource(existingWorkId, {
-        title: "mimimilli.jsonだけは確定する",
-        sourceRevision: snapshot.sourceRevision,
-      }),
-      /catalog projection failed/,
-    );
+    result = await adapter.patchWorkSource(existingWorkId, {
+      title: "mimimilli.jsonだけは確定する",
+      sourceRevision: snapshot.sourceRevision,
+    });
   } finally {
     CatalogWorkRepository.prototype.upsertWorkCatalog = originalUpsert;
   }
+  assert.equal(result?.snapshot.title, "mimimilli.jsonだけは確定する");
+  assert.deepEqual(result?.projection, { status: "pending", reason: "error" });
   assert.equal(JSON.parse(readFileSync(metaPath, "utf-8")).title, "mimimilli.jsonだけは確定する");
   assert.equal((await adapter.getWork(existingWorkId))?.title, "既存メタの作品");
   await adapter.scan({ full: true });

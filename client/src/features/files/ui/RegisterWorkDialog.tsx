@@ -6,6 +6,7 @@ import type {
   DlsiteRegistrationBody,
   DlsiteWorkInfo,
   WorkRegisterPreview,
+  WorkSourceMutationResult,
 } from "@mimimilli/shared";
 import { ApiRequestError } from "../../../shared/api/http";
 import Button from "../../../shared/ui/Button";
@@ -24,13 +25,14 @@ import { dlsiteInfoTags } from "@mimimilli/shared";
 import { buildDlsiteRegistrationBody } from "../../../entities/work/dlsitePreview";
 import { dlsiteFetchErrorMessage } from "../../../entities/work/dlsiteFetchError";
 import { apiErrorMessage } from "../../../shared/lib/apiError";
+import { sourceMutationErrorMessage } from "../../../entities/work/sourceMutation";
 import { createWork, fetchDlsiteInfoByCode } from "../api";
 
 interface RegisterWorkDialogProps {
   folderPath: string;
   targetKind?: "folder" | "file";
   preview: WorkRegisterPreview;
-  onRegistered: () => void;
+  onRegistered: (result: WorkSourceMutationResult) => void;
   onClose: () => void;
 }
 
@@ -83,8 +85,8 @@ export default function RegisterWorkDialog({
         dlsite,
       });
     },
-    onSuccess: () => {
-      onRegistered();
+    onSuccess: (result) => {
+      onRegistered(result);
       onClose();
     },
   });
@@ -141,7 +143,7 @@ export default function RegisterWorkDialog({
         : apiErrorMessage(dlsiteMutation.error, "DLsite情報の取得に失敗しました")
       : null);
   const submitError = registerMutation.error
-    ? apiErrorMessage(registerMutation.error, "作品の登録に失敗しました")
+    ? sourceMutationErrorMessage(registerMutation.error, "作品の登録に失敗しました")
     : null;
 
   return createPortal(

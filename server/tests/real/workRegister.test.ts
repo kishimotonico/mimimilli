@@ -149,8 +149,9 @@ test("POST /works: 未登録フォルダーを作品として登録できる", a
   });
   assert.equal(res.status, 201);
   const body = await res.json();
-  assert.equal(body.title, "親作品タイトル");
-  assert.equal(body.physicalPath, parent);
+  assert.equal(body.snapshot.title, "親作品タイトル");
+  assert.equal(body.snapshot.physicalPath, parent);
+  assert.equal(body.projection.status, "published");
   assert.ok(existsSync(join(parent, META_FILE_NAME)));
 
   const after = snapshotFiles(parent, true);
@@ -219,12 +220,12 @@ test("POST /works: 配下に子作品がある親の登録は拒否し、子を�
   const previewBody = await preview.json();
   assert.equal(previewBody.descendantWorkCount, 1);
 
-  const childRes = await app.request(`/api/works/${childWork.id}`);
+  const childRes = await app.request(`/api/works/${childWork.snapshot.id}`);
   assert.equal(childRes.status, 200);
   assert.ok(existsSync(folderMetaPath(child)));
   assert.ok(!existsSync(join(parent, META_FILE_NAME)));
 
-  const deleted = await app.request(`/api/works/${childWork.id}`, { method: "DELETE" });
+  const deleted = await app.request(`/api/works/${childWork.snapshot.id}`, { method: "DELETE" });
   assert.equal(deleted.status, 204);
 
   const res = await app.request("/api/works", {
@@ -233,7 +234,7 @@ test("POST /works: 配下に子作品がある親の登録は拒否し、子を�
     body: JSON.stringify({ path: workspace(root, parent), title: "親作品" }),
   });
   assert.equal(res.status, 201);
-  assert.equal((await res.json()).title, "親作品");
+  assert.equal((await res.json()).snapshot.title, "親作品");
   assert.ok(existsSync(join(parent, META_FILE_NAME)));
 });
 
@@ -277,7 +278,7 @@ test("POST /works: フォームで入力したタグを登録する", async (t) 
   });
   assert.equal(res.status, 201);
   const body = await res.json();
-  assert.deepEqual(body.tags, ["voice", "ASMR"]);
+  assert.deepEqual(body.snapshot.tags, ["voice", "ASMR"]);
 });
 
 test("GET /works/register-preview: RJコードをフォルダ名から検出する", async (t) => {
@@ -333,9 +334,10 @@ test("POST /works: 孤立メタを復元登録し id を保持する", async (t)
   });
   assert.equal(res.status, 201);
   const body = await res.json();
-  assert.equal(body.id, orphanedId);
-  assert.equal(body.title, "復元後タイトル");
-  assert.equal(body.physicalPath, parent);
+  assert.equal(body.snapshot.id, orphanedId);
+  assert.equal(body.snapshot.title, "復元後タイトル");
+  assert.equal(body.snapshot.physicalPath, parent);
+  assert.equal(body.projection.status, "published");
 
   const get = await app.request(`/api/works/${orphanedId}`);
   assert.equal(get.status, 200);
@@ -370,8 +372,8 @@ test("POST /works: 孤立メタ復元時、フォームで編集したタグを�
   });
   assert.equal(res.status, 201);
   const body = await res.json();
-  assert.equal(body.id, orphanedId);
-  assert.deepEqual(body.tags, ["new-tag"]);
+  assert.equal(body.snapshot.id, orphanedId);
+  assert.deepEqual(body.snapshot.tags, ["new-tag"]);
 
   const get = await app.request(`/api/works/${orphanedId}`);
   assert.equal(get.status, 200);
@@ -494,7 +496,7 @@ test("POST /works: 孤立メタが不正でも子がある親の登録は拒否�
   assert.equal(body.error.code, "conflict");
   assert.match(body.error.message, /配下に登録済み作品が1件あります/);
 
-  const childRes = await app.request(`/api/works/${childWork.id}`);
+  const childRes = await app.request(`/api/works/${childWork.snapshot.id}`);
   assert.equal(childRes.status, 200);
   const childBody = await childRes.json();
   assert.equal(childBody.physicalPath, child);
@@ -510,7 +512,8 @@ test("POST /works: 別パスのライブ作品と同一IDの孤立メタ復元�
     body: JSON.stringify({ path: workspace(root, sibling), title: "既存作品" }),
   });
   assert.equal(siblingRes.status, 201);
-  const existingWork = await siblingRes.json();
+  const createdSibling = await siblingRes.json();
+  const existingWork = await (await app.request(`/api/works/${createdSibling.snapshot.id}`)).json();
   const playlistId = existingWork.playlists[0]?.id as string;
   const trackId = existingWork.playlists[0]?.tracks[0]?.id as string;
   assert.ok(playlistId);
@@ -588,7 +591,7 @@ test("POST /works: missing の同一IDを別パスから復元すると再接続
     body: JSON.stringify({ path: workspace(root, sibling), title: "移動前作品" }),
   });
   assert.equal(siblingRes.status, 201);
-  const existingWork = await siblingRes.json();
+  const existingWork = (await siblingRes.json()).snapshot;
 
   const lastPlayedRes = await app.request(`/api/works/${existingWork.id}/last-played`, {
     method: "POST",
@@ -613,10 +616,11 @@ test("POST /works: missing の同一IDを別パスから復元すると再接続
     body: JSON.stringify({ path: workspace(root, movedDir), title: "再接続タイトル" }),
   });
   assert.equal(res.status, 201);
-  const restored = await res.json();
-  assert.equal(restored.id, existingWork.id);
-  assert.equal(restored.physicalPath, movedDir);
-  assert.equal(restored.title, "再接続タイトル");
+  const restoredBody = await res.json();
+  assert.equal(restoredBody.snapshot.id, existingWork.id);
+  assert.equal(restoredBody.snapshot.physicalPath, movedDir);
+  assert.equal(restoredBody.snapshot.title, "再接続タイトル");
+  const restored = await (await app.request(`/api/works/${restoredBody.snapshot.id}`)).json();
   assert.equal(restored.lastPlayedAt, before.lastPlayedAt);
 });
 
@@ -671,7 +675,7 @@ test("POST /works: 孤立メタ復元時もスキーマ外フィールドを保�
     body: JSON.stringify({ path: workspace(root, orphanDir), title: "復元後タイトル" }),
   });
   assert.equal(res.status, 201);
-  const restored = await res.json();
+  const restored = (await res.json()).snapshot;
   assert.equal(restored.id, orphanedId);
 
   const restoredMeta = JSON.parse(readFileSync(join(orphanDir, META_FILE_NAME), "utf-8")) as {
@@ -705,8 +709,8 @@ test("POST /works: 配下に子が2件ある親の登録は拒否し両方残る
   assert.equal(body.error.code, "conflict");
   assert.match(body.error.message, /配下に登録済み作品が2件あります/);
 
-  assert.ok(await adapter.getWork(childAWork.id));
-  assert.ok(await adapter.getWork(childBWork.id));
+  assert.ok(await adapter.getWork(childAWork.snapshot.id));
+  assert.ok(await adapter.getWork(childBWork.snapshot.id));
   assert.ok(existsSync(folderMetaPath(childA)));
   assert.ok(existsSync(folderMetaPath(childB)));
 
@@ -757,7 +761,7 @@ test("POST /works: 孤立メタ復元時も defaultPlaylist キーを保持す�
     body: JSON.stringify({ path: workspace(root, orphanDir), title: "復元後タイトル" }),
   });
   assert.equal(res.status, 201);
-  const restored = await res.json();
+  const restored = (await res.json()).snapshot;
   assert.equal(restored.id, orphanedId);
 
   const restoredMeta = JSON.parse(readFileSync(join(orphanDir, META_FILE_NAME), "utf-8")) as {
@@ -808,11 +812,15 @@ test("POST /works: 未登録の音声ファイルを単一ファイル作品と�
   });
   assert.equal(res.status, 201);
   const body = await res.json();
-  assert.equal(body.title, "単一ファイル作品");
-  assert.equal(body.physicalPath, audio);
-  assert.equal(body.playlists.length, 1);
-  assert.equal(body.playlists[0].tracks.length, 1);
-  const track = body.playlists[0].tracks[0];
+  assert.equal(body.snapshot.title, "単一ファイル作品");
+  assert.equal(body.snapshot.physicalPath, audio);
+  assert.equal(body.projection.status, "published");
+  const workRes = await app.request(`/api/works/${body.snapshot.id}`);
+  assert.equal(workRes.status, 200);
+  const workBody = await workRes.json();
+  assert.equal(workBody.playlists.length, 1);
+  assert.equal(workBody.playlists[0].tracks.length, 1);
+  const track = workBody.playlists[0].tracks[0];
   assert.equal(track.file, "d00001.wav");
   assert.equal(track.title, "d00001");
   assert.equal(track.start, undefined);
@@ -821,7 +829,7 @@ test("POST /works: 未登録の音声ファイルを単一ファイル作品と�
   const sidecar = join(fanza, sidecarMetaFileName("d00001.wav"));
   assert.ok(existsSync(sidecar));
   const meta = JSON.parse(readFileSync(sidecar, "utf-8")) as MetaFile;
-  assert.equal(meta.id, body.id);
+  assert.equal(meta.id, body.snapshot.id);
   assert.equal(meta.coverImage, null);
   assert.equal(meta.playlists[0]?.tracks[0]?.file, "d00001.wav");
   assert.equal(meta.playlists[0]?.tracks[0]?.start, undefined);
@@ -831,7 +839,7 @@ test("POST /works: 未登録の音声ファイルを単一ファイル作品と�
   assert.equal(listing.status, 200);
   const fsBody = await listing.json();
   const fileEntry = fsBody.entries.find((entry: { name: string }) => entry.name === "d00001.wav");
-  assert.equal(fileEntry?.workId, body.id);
+  assert.equal(fileEntry?.workId, body.snapshot.id);
   assert.equal(fileEntry?.workRelPath, "");
   assert.ok(
     !fsBody.entries.some((entry: { name: string }) => entry.name.endsWith(".mimimilli.json")),
@@ -913,7 +921,7 @@ test("DELETE /works: 単一ファイル作品の解除はサイドカーだけ�
   const sidecar = join(fanza, sidecarMetaFileName("d00001.wav"));
   assert.ok(existsSync(sidecar));
 
-  const deleted = await app.request(`/api/works/${work.id}`, { method: "DELETE" });
+  const deleted = await app.request(`/api/works/${work.snapshot.id}`, { method: "DELETE" });
   assert.equal(deleted.status, 204);
   assert.ok(!existsSync(sidecar));
   assert.ok(existsSync(audio));

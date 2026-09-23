@@ -5,6 +5,7 @@ import { cn } from "../../../../shared/lib/cn";
 import { parentDirOf } from "../../../../shared/lib/workspacePath";
 import { DLSITE_LINK_STATUS_LABEL, DLSITE_LINK_STATUS_TONE } from "./dlsiteLinkStatus";
 import type { InlineTitleEdit } from "./useInlineTitleEdit";
+import { SourceProjectionNotice } from "../../../../entities/work/ui/SourceProjectionNotice";
 
 export interface ScanResultWorksTableProps {
   works: WorkListItem[];
@@ -39,6 +40,11 @@ export default function ScanResultWorksTable({
 
   return (
     <div className="flex flex-col gap-2">
+      <SourceProjectionNotice
+        projection={edit.projection}
+        path={edit.projectionPath}
+        onProjected={edit.applyProjected}
+      />
       <div className="flex items-baseline justify-between gap-2">
         <p className="font-sans text-label font-semibold tracking-[0.06em] text-ink-2 uppercase">
           {caption}

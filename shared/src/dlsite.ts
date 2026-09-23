@@ -273,6 +273,7 @@ export type DlsiteApplyMissingBody = z.infer<typeof dlsiteApplyMissingBodySchema
 
 export const dlsiteBulkApplyMissingResultSchema = z.object({
   applied: z.number().int().nonnegative(),
+  pending: z.number().int().nonnegative(),
   skipped: z.number().int().nonnegative(),
   failed: z.number().int().nonnegative(),
 });

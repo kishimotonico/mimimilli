@@ -123,9 +123,12 @@ test("identity_conflictの指定pathだけを別作品として取り込み、Wo
     body: JSON.stringify({ path: "work-copy" }),
   });
   assert.equal(response.status, 201);
-  const work = await response.json();
-  assert.notEqual(work.id, WORK_ID);
-  assert.equal(work.title, "複製側");
+  const body = await response.json();
+  assert.notEqual(body.snapshot.id, WORK_ID);
+  assert.equal(body.snapshot.title, "複製側");
+  assert.equal(body.projection.status, "published");
+  const work = await adapter.getWork(body.snapshot.id);
+  assert.ok(work);
   assert.equal(work.bookmarked, false);
   assert.equal(work.resume, null);
 
@@ -133,7 +136,7 @@ test("identity_conflictの指定pathだけを別作品として取り込み、Wo
   assert.notEqual(after.id, before.id);
   assert.deepEqual({ ...after, id: before.id }, before);
   assert.deepEqual(await adapter.listScanDiagnostics(), []);
-  assert.equal((await adapter.getWork(work.id))?.physicalPath, join(root, "work-copy"));
+  assert.equal(work.physicalPath, join(root, "work-copy"));
 });
 
 test("壊れたコピーのcandidateIdで既存作品の投影を乗っ取らない", async (t) => {

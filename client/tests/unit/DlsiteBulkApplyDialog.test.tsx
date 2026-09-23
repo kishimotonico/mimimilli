@@ -64,7 +64,7 @@ describe("DlsiteBulkApplyDialog", () => {
 
   it("差分ありの対象を全選択した状態で開き、選択したworkIdだけをapplyDlsiteMissingへ渡す", async () => {
     previewDlsiteMissing.mockResolvedValue(twoItemPreview);
-    applyDlsiteMissing.mockResolvedValue({ applied: 2, skipped: 0, failed: 0 });
+    applyDlsiteMissing.mockResolvedValue({ applied: 2, pending: 0, skipped: 0, failed: 0 });
     const store = renderRuntime();
 
     await waitFor(() => expect(screen.getByText("作品A")).toBeInTheDocument());
@@ -75,7 +75,7 @@ describe("DlsiteBulkApplyDialog", () => {
     await waitFor(() => expect(applyDlsiteMissing).toHaveBeenCalledWith(["RJ501001", "RJ501002"]));
     await waitFor(() =>
       expect(latestToastRequest(store)?.message).toBe(
-        "未設定項目を適用: 適用 2件・スキップ 0件・失敗 0件",
+        "未設定項目を適用: 適用 2件・未反映 0件・スキップ 0件・失敗 0件",
       ),
     );
     expect(latestToastRequest(store)?.variant).toBe("success");
@@ -83,7 +83,7 @@ describe("DlsiteBulkApplyDialog", () => {
 
   it("チェックを外した作品はapplyDlsiteMissingの引数から除かれる", async () => {
     previewDlsiteMissing.mockResolvedValue(twoItemPreview);
-    applyDlsiteMissing.mockResolvedValue({ applied: 1, skipped: 0, failed: 0 });
+    applyDlsiteMissing.mockResolvedValue({ applied: 1, pending: 0, skipped: 0, failed: 0 });
     renderRuntime();
 
     await waitFor(() => expect(screen.getByText("作品B")).toBeInTheDocument());

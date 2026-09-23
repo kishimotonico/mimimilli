@@ -475,29 +475,37 @@ export class Scanner {
       bytes: prepared.bytes,
       sourceRevision: prepared.revisions.sourceRevision,
     };
-    const existingWorks = this.query.getScanWorkMap();
-    const batch = new ScanUpsertBatch(this.db, this.catalog, this.user, () => {});
-    const scanResult = emptyRegisterTracking();
-    const seenIds: SeenMetaIds = { work: new Set() };
-    await this.invokeRegisterMetaFile({
-      prepared,
-      seenIds,
-      probeCache: new Map(),
-      batch,
-      existingWorks,
-      result: scanResult,
-      options: { full: true, idsAlreadyRegistered: false },
-    });
-    const changedIds = batch.publishWork();
-    if (changedIds.includes(prepared.meta.id)) {
-      return {
-        status: "unpublished",
-        reason: "source_changed",
-        snapshot,
-        currentSourceRevision: currentSourceRevision(prepared.metaPath),
-      };
+    try {
+      const existingWorks = this.query.getScanWorkMap();
+      const batch = new ScanUpsertBatch(this.db, this.catalog, this.user, () => {});
+      const scanResult = emptyRegisterTracking();
+      const seenIds: SeenMetaIds = { work: new Set() };
+      await this.invokeRegisterMetaFile({
+        prepared,
+        seenIds,
+        probeCache: new Map(),
+        batch,
+        existingWorks,
+        result: scanResult,
+        options: { full: true, idsAlreadyRegistered: false },
+      });
+      const changedIds = batch.publishWork();
+      if (changedIds.includes(prepared.meta.id)) {
+        return {
+          status: "unpublished",
+          reason: "source_changed",
+          snapshot,
+          currentSourceRevision: currentSourceRevision(prepared.metaPath),
+        };
+      }
+      return { status: "published", snapshot };
+    } catch (error) {
+      scanLogger.error("作品の一覧反映に失敗しました", {
+        workId: prepared.meta.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return { status: "unpublished", reason: "error", snapshot };
     }
-    return { status: "published", snapshot };
   }
 
   private assertNoRegisteredDescendants(workDir: string): void {

@@ -272,7 +272,7 @@ test("スキャン候補の親登録は配下の子作品がある場合に失�
   assert.equal(result.failures.length, 1);
   assert.match(result.failures[0]?.message ?? "", /配下に登録済み作品が1件あります/);
 
-  assert.ok(await adapter.getWork(childWork.id));
+  assert.ok(await adapter.getWork(childWork.snapshot.id));
   assert.equal(existsSync(join(child, "mimimilli.json")), true);
   assert.equal(existsSync(join(parent, "mimimilli.json")), false);
 });

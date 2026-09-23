@@ -6,6 +6,7 @@ import {
   type DlsitePreview,
   type Work,
   type WorkEditSnapshot,
+  type WorkProjection,
 } from "@mimimilli/shared";
 import { applyDlsiteInfo, fetchDlsiteInfo, updateDlsiteState } from "../../../../entities/work/api";
 import {
@@ -18,6 +19,12 @@ import { I } from "../../../../shared/ui/Icon";
 import TextInput from "../../../../shared/ui/TextInput";
 import { useDialogModal } from "../../../../shared/ui/useDialogModal";
 import { WORK_QUERY_KEYS } from "../../../../entities/work/queryKeys";
+import { SourceProjectionNotice } from "../../../../entities/work/ui/SourceProjectionNotice";
+import {
+  projectionWorkspacePath,
+  sourceMutationErrorMessage,
+} from "../../../../entities/work/sourceMutation";
+import { useRootFolderOrNull } from "../../../../entities/settings/useSettingsQuery";
 import { useDlsiteInvalidation } from "../../../../entities/dlsite/useDlsiteInvalidation";
 import { useToast } from "../../../../shared/ui/useToast";
 import {
@@ -217,6 +224,8 @@ export function DlsiteEditor({ workId, snapshot }: { workId: string; snapshot: W
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [projection, setProjection] = useState<WorkProjection | null>(null);
+  const rootFolder = useRootFolderOrNull();
   const diffSource: Pick<Work, "title" | "tags" | "urls" | "coverKind" | "coverImage" | "cover"> = {
     title: snapshot.title,
     tags: snapshot.tags,
@@ -250,9 +259,10 @@ export function DlsiteEditor({ workId, snapshot }: { workId: string; snapshot: W
         rjCode: rjCode.trim() || null,
       });
       rememberSnapshot(result.snapshot);
+      setProjection(result.projection);
       await refresh();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "コードを保存できませんでした");
+      setError(sourceMutationErrorMessage(cause, "コードを保存できませんでした"));
     } finally {
       setBusy(false);
     }
@@ -320,6 +330,7 @@ export function DlsiteEditor({ workId, snapshot }: { workId: string; snapshot: W
         }),
       );
       rememberSnapshot(result.snapshot);
+      setProjection(result.projection);
       setPreview(null);
       await refresh();
       toast.show({ message: "DLsite情報を適用しました", variant: "success", priority: "notice" });
@@ -339,9 +350,10 @@ export function DlsiteEditor({ workId, snapshot }: { workId: string; snapshot: W
         skipped: snapshot.dlsite.status !== "skipped",
       });
       rememberSnapshot(result.snapshot);
+      setProjection(result.projection);
       await refresh();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "連携設定を変更できませんでした");
+      setError(sourceMutationErrorMessage(cause, "連携設定を変更できませんでした"));
     } finally {
       setBusy(false);
     }
@@ -404,6 +416,14 @@ export function DlsiteEditor({ workId, snapshot }: { workId: string; snapshot: W
           {error}
         </p>
       )}
+      <SourceProjectionNotice
+        projection={projection}
+        path={rootFolder ? projectionWorkspacePath(snapshot, rootFolder) : null}
+        onProjected={(result) => {
+          rememberSnapshot(result.snapshot);
+          setProjection(result.projection);
+        }}
+      />
       {diff && (
         <DlsiteApplyDialog
           diff={diff}

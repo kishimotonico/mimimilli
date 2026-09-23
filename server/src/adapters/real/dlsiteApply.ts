@@ -62,7 +62,7 @@ export function createDlsiteApply(deps: DlsiteApplyDeps) {
     verified: ReturnType<typeof mutateVerifiedMetaSource>,
   ): Promise<WorkSourceMutationResult | null> {
     if (!verified) return null;
-    return { snapshot: await projectVerifiedSource(scanner, verified) };
+    return projectVerifiedSource(scanner, verified);
   }
 
   return {
@@ -124,7 +124,7 @@ export function createDlsiteApply(deps: DlsiteApplyDeps) {
     async applyDlsiteMissingItem(
       workId: string,
       info: DlsiteWorkInfo,
-    ): Promise<"applied" | "skipped" | "missing"> {
+    ): Promise<"applied" | "skipped" | "missing" | "pending"> {
       const current = readVerifiedEditSource(catalog, workId);
       if (!current) return "missing";
       const planned = computeMissingDiff(
@@ -187,8 +187,8 @@ export function createDlsiteApply(deps: DlsiteApplyDeps) {
       });
       if (!verified) return "missing";
       if (!wrote) return "skipped";
-      await projectVerifiedSource(scanner, verified);
-      return "applied";
+      const projected = await projectVerifiedSource(scanner, verified);
+      return projected.projection.status === "published" ? "applied" : "pending";
     },
 
     async updateDlsiteState(

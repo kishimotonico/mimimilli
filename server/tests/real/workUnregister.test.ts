@@ -77,8 +77,8 @@ async function setupRegisteredWork(t: TestContext) {
     body: JSON.stringify({ path: workspace(root, folder), title: "解除テスト作品" }),
   });
   assert.equal(createRes.status, 201);
-  const created = (await createRes.json()) as Work;
-  const detailRes = await app.request(`/api/works/${created.id}`);
+  const created = await createRes.json();
+  const detailRes = await app.request(`/api/works/${created.snapshot.id}`);
   assert.equal(detailRes.status, 200);
   const work = (await detailRes.json()) as Work;
 
@@ -208,8 +208,8 @@ test("DELETE /works/:id: 解除後に同じフォルダーを再登録できる"
   });
   assert.equal(reRegRes.status, 201);
   const reRegBody = await reRegRes.json();
-  assert.equal(reRegBody.title, "再登録作品");
-  assert.equal(reRegBody.physicalPath, folder);
+  assert.equal(reRegBody.snapshot.title, "再登録作品");
+  assert.equal(reRegBody.snapshot.physicalPath, folder);
   assert.ok(existsSync(folderMetaPath(folder)));
 });
 
@@ -257,7 +257,7 @@ test("DELETE /works/:id: DBのmeta_pathが古い場合でもid一致のmimimilli
     body: JSON.stringify({ path: workspace(root, folder), title: "古いmeta_pathテスト" }),
   });
   assert.equal(createRes.status, 201);
-  const work = (await createRes.json()) as Work;
+  const work = { id: (await createRes.json()).snapshot.id } as Work;
   const actualMetaPath = folderMetaPath(folder);
   assert.ok(existsSync(actualMetaPath));
 
@@ -295,7 +295,7 @@ test("DELETE /works/:id: id不一致のmimimilli.jsonは削除しない", async 
     body: JSON.stringify({ path: workspace(root, folder), title: "id不一致テスト" }),
   });
   assert.equal(createRes.status, 201);
-  const work = (await createRes.json()) as Work;
+  const work = { id: (await createRes.json()).snapshot.id } as Work;
   const actualMetaPath = folderMetaPath(folder);
   assert.ok(existsSync(actualMetaPath));
 
@@ -340,7 +340,7 @@ test("unregisterWork: DB削除失敗時に退避したメタ正本を復元す�
     body: JSON.stringify({ path: workspace(root, folder), title: "DB失敗テスト" }),
   });
   assert.equal(createRes.status, 201);
-  const work = (await createRes.json()) as Work;
+  const work = { id: (await createRes.json()).snapshot.id } as Work;
   const metaPath = folderMetaPath(folder);
   const metaBefore = readFileSync(metaPath, "utf-8");
   assert.ok(existsSync(metaPath));
@@ -389,7 +389,7 @@ test("unregisterWork: catalog削除後のuser削除失敗時はメタを復元�
     body: JSON.stringify({ path: workspace(root, folder), title: "user削除失敗テスト" }),
   });
   assert.equal(createRes.status, 201);
-  const work = (await createRes.json()) as Work;
+  const work = { id: (await createRes.json()).snapshot.id } as Work;
   const metaPath = folderMetaPath(folder);
   const metaBefore = readFileSync(metaPath, "utf-8");
   const stagedPath = join(folder, `.${META_FILE_NAME}.unregistering`);
@@ -458,7 +458,7 @@ test("unregisterWork: 退避済みメタのまま再実行するとDB削除後�
     body: JSON.stringify({ path: workspace(root, folder), title: "退避再実行テスト" }),
   });
   assert.equal(createRes.status, 201);
-  const work = (await createRes.json()) as Work;
+  const work = { id: (await createRes.json()).snapshot.id } as Work;
   const metaPath = folderMetaPath(folder);
   const stagedPath = join(folder, `.${META_FILE_NAME}.unregistering`);
   renameSync(metaPath, stagedPath);
@@ -500,7 +500,7 @@ test("スキャン: 退避のみ残存（catalogあり）でメタ正本を復�
     body: JSON.stringify({ path: workspace(root, folder), title: "退避復元テスト" }),
   });
   assert.equal(createRes.status, 201);
-  const work = (await createRes.json()) as Work;
+  const work = { id: (await createRes.json()).snapshot.id } as Work;
 
   const metaPath = folderMetaPath(folder);
   const stagedPath = metaStagingPath(metaPath);
@@ -544,7 +544,7 @@ test("スキャン: 退避のみ残存（catalogなし）で孤児退避ファ�
     body: JSON.stringify({ path: workspace(root, folder), title: "孤児退避テスト" }),
   });
   assert.equal(createRes.status, 201);
-  const work = (await createRes.json()) as Work;
+  const work = { id: (await createRes.json()).snapshot.id } as Work;
   const metaPath = folderMetaPath(folder);
   const stagedPath = metaStagingPath(metaPath);
   renameSync(metaPath, stagedPath);
@@ -584,7 +584,7 @@ test("スキャン: 正本と退避の併存では退避を削除し、その後
     body: JSON.stringify({ path: workspace(root, folder), title: "併存退避テスト" }),
   });
   assert.equal(createRes.status, 201);
-  const work = (await createRes.json()) as Work;
+  const work = { id: (await createRes.json()).snapshot.id } as Work;
 
   const metaPath = folderMetaPath(folder);
   const stagedPath = metaStagingPath(metaPath);
@@ -626,7 +626,7 @@ test("スキャン: 退避メタの回収でfs操作が失敗してもスキャ�
     body: JSON.stringify({ path: workspace(root, folder), title: "回収fs失敗テスト" }),
   });
   assert.equal(createRes.status, 201);
-  const work = (await createRes.json()) as Work;
+  const work = { id: (await createRes.json()).snapshot.id } as Work;
 
   const metaPath = folderMetaPath(folder);
   const stagedPath = metaStagingPath(metaPath);

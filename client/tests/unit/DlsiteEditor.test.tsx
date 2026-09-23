@@ -127,6 +127,7 @@ describe("DlsiteEditor", () => {
     fetchDlsiteInfo.mockResolvedValue(preview);
     applyDlsiteInfo.mockResolvedValue({
       snapshot: makeSnapshot(makeWork({ title: "取得タイトル" })),
+      projection: { status: "published" },
     });
 
     renderEditor(work);

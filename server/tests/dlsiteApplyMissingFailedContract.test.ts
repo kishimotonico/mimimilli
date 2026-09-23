@@ -51,7 +51,7 @@ test("dlsiteApplyMissing: 取得失敗はfailedへ数え、他の作品の適用
   const adapter = createFixtureAdapter({ works });
 
   const result = await adapter.dlsiteApplyMissing(["ok-1", "fail-1"]);
-  assert.deepEqual(result, { applied: 1, skipped: 0, failed: 1 });
+  assert.deepEqual(result, { applied: 1, pending: 0, skipped: 0, failed: 1 });
 
   const applied = await adapter.getWork("ok-1");
   assert.ok(applied!.tags.length > 0, "取得できた作品は適用が続く");
@@ -117,5 +117,5 @@ test("dlsiteApplyMissing: 取得失敗はfailedへ数え、他の作品の適用
   await adapter.scan();
 
   const result = await adapter.dlsiteApplyMissing();
-  assert.deepEqual(result, { applied: 1, skipped: 0, failed: 1 });
+  assert.deepEqual(result, { applied: 1, pending: 0, skipped: 0, failed: 1 });
 });

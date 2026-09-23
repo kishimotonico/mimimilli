@@ -101,7 +101,7 @@ test("POST /api/works/unregister-missing: realアダプタでmissingのみを一
       body: JSON.stringify({ path: workspace(root, folder), title: name }),
     });
     assert.equal(res.status, 201);
-    ids.push(((await res.json()) as Work).id);
+    ids.push(((await res.json()) as { snapshot: { id: string } }).snapshot.id);
   }
   const [okId, errorId, missing1Id, missing2Id] = ids as [string, string, string, string];
 

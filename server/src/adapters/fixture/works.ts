@@ -80,7 +80,7 @@ export function fixtureSourceMutation(
   work: WorkSummary,
 ): WorkSourceMutationResult {
   bumpFixtureRevision(state, work.id);
-  return { snapshot: fixtureEditSnapshot(state, work) };
+  return { snapshot: fixtureEditSnapshot(state, work), projection: { status: "published" } };
 }
 
 export function createWorkMethods(state: FixtureState): WorkAdapter {
@@ -168,7 +168,7 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
       return work ? buildFullWorkFromState(state, work) : null;
     },
 
-    async createWork(body: WorkCreateBody): Promise<Work | null> {
+    async createWork(body: WorkCreateBody): Promise<WorkSourceMutationResult | null> {
       const preview = await getWorkRegisterPreview(body.path);
       if (!preview) return null;
       if (preview.alreadyRegistered) {
@@ -216,10 +216,12 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
       };
       state.works.push(work);
       state.sourceRevisions.set(work.id, "fixture");
-      return buildFullWorkFromState(state, work);
+      return { snapshot: fixtureEditSnapshot(state, work), projection: { status: "published" } };
     },
 
-    async reassignIdentityConflict(_body: IdentityConflictReassignBody): Promise<Work | null> {
+    async reassignIdentityConflict(
+      _body: IdentityConflictReassignBody,
+    ): Promise<WorkSourceMutationResult | null> {
       const diagnostic = state.identityConflicts.find((candidate) =>
         candidate.paths.includes(_body.path),
       );
@@ -237,7 +239,16 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
         const paths = candidate.paths.filter((path) => path !== _body.path);
         return paths.length >= 2 ? [{ ...candidate, paths }] : [];
       });
-      return buildFullWorkFromState(state, work);
+      return { snapshot: fixtureEditSnapshot(state, work), projection: { status: "published" } };
+    },
+
+    async projectWorkSource(path: WorkspacePath): Promise<WorkSourceMutationResult | null> {
+      const rootAbs = normalizeFsPath(state.rootFolder ?? "/library");
+      const target = normalizeFsPath(`${rootAbs}/${path}`);
+      if (!isPathWithin(rootAbs, target, posix)) return null;
+      const work = state.works.find((candidate) => candidate.physicalPath === target);
+      if (!work) return null;
+      return { snapshot: fixtureEditSnapshot(state, work), projection: { status: "published" } };
     },
 
     async deleteWork(id: string): Promise<boolean> {
@@ -289,7 +300,7 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
       const work = state.works.find((candidate) => candidate.id === id);
       if (!work) return null;
       if (work.tags.some((existing) => tagEquals(existing, tag))) {
-        return { snapshot: fixtureEditSnapshot(state, work) };
+        return { snapshot: fixtureEditSnapshot(state, work), projection: { status: "published" } };
       }
       work.tags = [...work.tags, tag];
       return fixtureSourceMutation(state, work);
@@ -300,7 +311,7 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
       if (!work) return null;
       const nextTags = work.tags.filter((existing) => !tagEquals(existing, tag));
       if (nextTags.length === work.tags.length) {
-        return { snapshot: fixtureEditSnapshot(state, work) };
+        return { snapshot: fixtureEditSnapshot(state, work), projection: { status: "published" } };
       }
       work.tags = nextTags;
       return fixtureSourceMutation(state, work);
