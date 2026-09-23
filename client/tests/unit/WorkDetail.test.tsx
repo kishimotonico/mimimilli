@@ -72,7 +72,8 @@ function makeWorkPatchMutationsStub() {
   return {
     titleMutation: noopMutation,
     bookmarkMutation: noopMutation,
-    tagsMutation: noopMutation,
+    addTagMutation: noopMutation,
+    removeTagMutation: noopMutation,
     urlsMutation: noopMutation,
   };
 }

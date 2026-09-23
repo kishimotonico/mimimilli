@@ -194,7 +194,8 @@ export function WorkDetail({
           <WorkTagEditor
             work={work}
             tagSuggestions={tagSuggestions}
-            tagsMutation={workPatchMutations.tagsMutation}
+            addTagMutation={workPatchMutations.addTagMutation}
+            removeTagMutation={workPatchMutations.removeTagMutation}
             onTagClick={onTagClick}
           />
           <WorkMetadataActions

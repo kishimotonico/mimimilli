@@ -14,14 +14,12 @@ import { useAtomValue } from "jotai";
 import { randomSeedAtom } from "../../../entities/library/model/navigationAtoms";
 import {
   WORKS_DEFAULT_PAGE_SIZE,
-  type NormalizedTag,
   type SmartFolder,
   type SmartFolderCreate,
   type SmartFolderRule,
   type UnregisterMissingWorksResult,
   type UrlEntry,
-  type Work,
-  type WorkPatchInput,
+  type WorkSourceMutationResult,
   type WorksPage,
 } from "@mimimilli/shared";
 import { searchWorks } from "../../../entities/work/api";
@@ -34,33 +32,47 @@ import {
   previewSmartFolderRuleCount,
 } from "../../../entities/smart-folder/api";
 import { getAllTags } from "../../../entities/tag/api";
-import { deleteWork, getWork, patchWork, unregisterMissingWorks } from "../../../entities/work/api";
-import { assertWorkSourceRevision } from "../../../entities/work/sourceRevision";
+import {
+  addWorkTag,
+  deleteWork,
+  getWork,
+  patchWorkBookmark,
+  patchWorkSource,
+  removeWorkTag,
+  unregisterMissingWorks,
+} from "../../../entities/work/api";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";
-import { useRootFolder } from "../../../entities/settings/useSettingsQuery";
 import { SMART_FOLDER_QUERY_KEYS } from "../../../entities/smart-folder/queryKeys";
 import { TAG_QUERY_KEYS } from "../../../entities/tag/queryKeys";
 import { invalidateSmartFolderSaveQueries } from "./smartFolderInvalidation";
 
 type LibraryTitlePatchVariables = { workId: string; title: string; sourceRevision: string };
-type LibraryBookmarkPatchVariables = {
-  workId: string;
-  bookmarked: boolean;
-  sourceRevision: string;
-};
-type LibraryTagsPatchVariables = { workId: string; tags: NormalizedTag[]; sourceRevision: string };
+type LibraryBookmarkPatchVariables = { workId: string; bookmarked: boolean };
+type LibraryTagIntentVariables = { workId: string; tag: string };
 type LibraryUrlsPatchVariables = { workId: string; urls: UrlEntry[]; sourceRevision: string };
 
-export type LibraryTitlePatchMutation = UseMutationResult<Work, Error, LibraryTitlePatchVariables>;
+export type LibraryTitlePatchMutation = UseMutationResult<
+  WorkSourceMutationResult,
+  Error,
+  LibraryTitlePatchVariables
+>;
 
 export type LibraryBookmarkPatchMutation = UseMutationResult<
-  Work,
+  { bookmarked: boolean },
   Error,
   LibraryBookmarkPatchVariables
 >;
 
-export type LibraryTagsPatchMutation = UseMutationResult<Work, Error, LibraryTagsPatchVariables>;
-export type LibraryUrlsPatchMutation = UseMutationResult<Work, Error, LibraryUrlsPatchVariables>;
+export type LibraryTagIntentMutation = UseMutationResult<
+  WorkSourceMutationResult,
+  Error,
+  LibraryTagIntentVariables
+>;
+export type LibraryUrlsPatchMutation = UseMutationResult<
+  WorkSourceMutationResult,
+  Error,
+  LibraryUrlsPatchVariables
+>;
 import {
   buildSmartFolderFilterParams,
   buildWorksParams,
@@ -70,13 +82,13 @@ import {
 import { useTagPrefixes } from "../../../entities/tag/useTagPrefixes";
 import { useAxisFacetsQuery } from "./useAxisFacetsQuery";
 import { useDebouncedValue } from "../../../shared/lib/useDebouncedValue";
-import { getWorkPatchInvalidationTargets, mergeWorkPatchResponse } from "./workPatchInvalidation";
 import {
-  patchWorkInQueryCache,
-  staleInactiveListCaches,
-  workToListItem,
-} from "./workPatchListCache";
-import { isSmartAxis, getSmartFolderId } from "../../../entities/library/axisDefinitions";
+  applyBookmarkListCaches,
+  applyBookmarkToWorkCache,
+  invalidateWorkViewQueries,
+  smartOrWorksListKey,
+} from "./workPatchInvalidation";
+import { getSmartFolderId } from "../../../entities/library/axisDefinitions";
 import type { LibraryViewState } from "./useLibraryNavigation";
 
 /** 検索クエリのデバウンス時間（TASK-61）。1文字ごとの全件検索発行を間引く */
@@ -248,7 +260,6 @@ export function useLibrarySupportingQueries(nav: LibraryViewState) {
 
 function useWorkPatchMutationContext(nav: LibraryViewState, searchQuery: string) {
   const queryClient = useQueryClient();
-  const rootFolder = useRootFolder();
   const randomSeed = useAtomValue(randomSeedAtom);
   const debouncedSearchQuery = useDebouncedValue(
     searchQuery,
@@ -262,94 +273,79 @@ function useWorkPatchMutationContext(nav: LibraryViewState, searchQuery: string)
     selectedTags: nav.selectedTags,
     randomSeed,
   });
-
-  const applyPatchSuccess = async (
-    updatedWork: Work,
-    workId: string,
-    body: WorkPatchInput,
-  ): Promise<void> => {
-    queryClient.setQueryData<Work>(WORK_QUERY_KEYS.detail(workId), (prev) =>
-      mergeWorkPatchResponse(prev, body, updatedWork),
-    );
-    const targets = getWorkPatchInvalidationTargets(body, {
-      activeAxis: nav.activeAxis,
-      sort: nav.sort,
-      searchQuery: debouncedSearchQuery,
-      selectedTags: nav.selectedTags,
-    });
-    const activeListQueryKey = isSmartAxis(nav.activeAxis)
-      ? SMART_FOLDER_QUERY_KEYS.works(
-          getSmartFolderId(nav.activeAxis),
-          buildSmartFolderFilterParams(nav.selectedTags, debouncedSearchQuery),
-        )
-      : worksParams !== null
-        ? WORK_QUERY_KEYS.list(worksParams)
-        : null;
-    if (targets.patchActiveListCache && activeListQueryKey !== null) {
-      patchWorkInQueryCache(
-        queryClient,
-        activeListQueryKey,
-        workId,
-        workToListItem(updatedWork, rootFolder),
-      );
-    }
-    await Promise.all([
-      targets.staleInactiveListCaches ? staleInactiveListCaches(queryClient) : null,
-      targets.resetActiveWorksList && activeListQueryKey !== null
-        ? queryClient.resetQueries({ queryKey: activeListQueryKey, exact: true })
-        : null,
-      targets.facets
-        ? queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.allFacets() })
-        : null,
-      targets.tags ? queryClient.invalidateQueries({ queryKey: TAG_QUERY_KEYS.all() }) : null,
-    ]);
-  };
-
-  return { applyPatchSuccess, queryClient };
+  const activeListQueryKey = smartOrWorksListKey(nav, worksParams, debouncedSearchQuery);
+  return { queryClient, activeListQueryKey };
 }
 
 /** タイトル・ブックマーク・タグ・関連URL編集を独立した mutation として提供する */
 export function useLibraryWorkPatchMutations(nav: LibraryViewState, searchQuery: string) {
-  const { applyPatchSuccess, queryClient } = useWorkPatchMutationContext(nav, searchQuery);
-  const refetchAfterPatchError = (_error: unknown, variables: { workId: string }) =>
-    queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.detail(variables.workId) });
+  const { queryClient, activeListQueryKey } = useWorkPatchMutationContext(nav, searchQuery);
+  const refetchAfterSourceError = (_error: unknown, variables: { workId: string }) =>
+    queryClient.invalidateQueries({
+      queryKey: WORK_QUERY_KEYS.detail(variables.workId),
+      exact: true,
+    });
 
-  const titleMutation = useMutation<Work, Error, LibraryTitlePatchVariables>({
+  const titleMutation = useMutation<WorkSourceMutationResult, Error, LibraryTitlePatchVariables>({
     mutationFn: ({ workId, title, sourceRevision }) =>
-      patchWork(workId, { title, sourceRevision: assertWorkSourceRevision(sourceRevision) }),
-    onSuccess: (updatedWork, { workId, title, sourceRevision }) =>
-      applyPatchSuccess(updatedWork, workId, { title, sourceRevision }),
-    onError: refetchAfterPatchError,
+      patchWorkSource(workId, { title, sourceRevision }),
+    onSuccess: async (result, { workId }) => {
+      queryClient.setQueryData(WORK_QUERY_KEYS.source(workId), result.snapshot);
+      await invalidateWorkViewQueries(queryClient, workId);
+    },
+    onError: refetchAfterSourceError,
   });
 
-  const bookmarkMutation = useMutation<Work, Error, LibraryBookmarkPatchVariables>({
-    mutationFn: ({ workId, bookmarked, sourceRevision }) =>
-      patchWork(workId, {
-        bookmarked,
-        sourceRevision: assertWorkSourceRevision(sourceRevision),
-      }),
-    onSuccess: (updatedWork, { workId, bookmarked, sourceRevision }) =>
-      applyPatchSuccess(updatedWork, workId, { bookmarked, sourceRevision }),
-    onError: refetchAfterPatchError,
+  const bookmarkMutation = useMutation<
+    { bookmarked: boolean },
+    Error,
+    LibraryBookmarkPatchVariables
+  >({
+    mutationFn: ({ workId, bookmarked }) => patchWorkBookmark(workId, { bookmarked }),
+    onSuccess: async (result, { workId }) => {
+      applyBookmarkToWorkCache(queryClient, workId, result.bookmarked);
+      await applyBookmarkListCaches({
+        queryClient,
+        workId,
+        bookmarked: result.bookmarked,
+        nav,
+        activeListQueryKey,
+      });
+    },
+    onError: refetchAfterSourceError,
   });
 
-  const tagsMutation = useMutation<Work, Error, LibraryTagsPatchVariables>({
-    mutationFn: ({ workId, tags, sourceRevision }) =>
-      patchWork(workId, { tags, sourceRevision: assertWorkSourceRevision(sourceRevision) }),
-    onSuccess: (updatedWork, { workId, tags, sourceRevision }) =>
-      applyPatchSuccess(updatedWork, workId, { tags, sourceRevision }),
-    onError: refetchAfterPatchError,
+  const addTagMutation = useMutation<WorkSourceMutationResult, Error, LibraryTagIntentVariables>({
+    mutationFn: ({ workId, tag }) => addWorkTag(workId, tag),
+    onSuccess: async (result, { workId }) => {
+      queryClient.setQueryData(WORK_QUERY_KEYS.source(workId), result.snapshot);
+      await invalidateWorkViewQueries(queryClient, workId);
+    },
+    onError: refetchAfterSourceError,
   });
 
-  const urlsMutation = useMutation<Work, Error, LibraryUrlsPatchVariables>({
+  const removeTagMutation = useMutation<WorkSourceMutationResult, Error, LibraryTagIntentVariables>(
+    {
+      mutationFn: ({ workId, tag }) => removeWorkTag(workId, tag),
+      onSuccess: async (result, { workId }) => {
+        queryClient.setQueryData(WORK_QUERY_KEYS.source(workId), result.snapshot);
+        await invalidateWorkViewQueries(queryClient, workId);
+      },
+      onError: refetchAfterSourceError,
+    },
+  );
+
+  const urlsMutation = useMutation<WorkSourceMutationResult, Error, LibraryUrlsPatchVariables>({
     mutationFn: ({ workId, urls, sourceRevision }) =>
-      patchWork(workId, { urls, sourceRevision: assertWorkSourceRevision(sourceRevision) }),
-    onSuccess: (updatedWork, { workId, urls, sourceRevision }) =>
-      applyPatchSuccess(updatedWork, workId, { urls, sourceRevision }),
-    onError: refetchAfterPatchError,
+      patchWorkSource(workId, { urls, sourceRevision }),
+    onSuccess: async (result, { workId }) => {
+      queryClient.setQueryData(WORK_QUERY_KEYS.source(workId), result.snapshot);
+      await invalidateWorkViewQueries(queryClient, workId);
+    },
+    onError: refetchAfterSourceError,
   });
 
-  return { titleMutation, bookmarkMutation, tagsMutation, urlsMutation };
+  return { titleMutation, bookmarkMutation, addTagMutation, removeTagMutation, urlsMutation };
 }
 
 /** 作品登録の解除（削除）mutation。成功時に一覧系クエリを無効化し、詳細キャッシュを

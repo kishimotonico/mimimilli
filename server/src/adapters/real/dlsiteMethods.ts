@@ -19,7 +19,8 @@ import { getWorkWithLiveProbe } from "./workRefresh.ts";
 import { createDlsiteFetch } from "./dlsiteFetch.ts";
 import { createDlsiteApply } from "./dlsiteApply.ts";
 import { createDlsiteBulk } from "./dlsiteBulk.ts";
-import { readMetaSource } from "./meta.ts";
+import { readVerifiedEditSource } from "./workEditSource.ts";
+import { SourceConflictError, SourceParseError } from "../../errors.ts";
 import {
   refreshWorkDlsiteProjection,
   shouldRefreshDlsiteProjectionAfterFetch,
@@ -38,7 +39,7 @@ export function createDlsiteMethods(deps: {
 }) {
   const { db, query, catalog, dlsiteCache } = deps;
   const fetch = createDlsiteFetch(deps);
-  const apply = createDlsiteApply({ db, query, catalog, scanner: deps.scanner, fetch });
+  const apply = createDlsiteApply({ catalog, scanner: deps.scanner, fetch });
   const bulk = createDlsiteBulk({
     db,
     query,
@@ -93,29 +94,15 @@ export function createDlsiteMethods(deps: {
           result.failed += 1;
           continue;
         }
-        const work = await getWorkWithLiveProbe(db, query, catalog, summary.id);
-        const metaPath = catalog.getWorkMetaPath(summary.id);
-        if (!work || !metaPath) {
-          result.skipped += 1;
-          continue;
-        }
-        const { newTags, applyCover, applyUrl } = computeMissingDiff(work, fetched.info);
-        if (newTags.length === 0 && !applyCover && !applyUrl) {
-          result.skipped += 1;
-          continue;
-        }
         try {
-          const applied = await apply.dlsiteApply(summary.id, {
-            info: fetched.info,
-            sourceRevision: readMetaSource(metaPath).sourceRevision,
-            applyTitle: false,
-            applyTags: newTags,
-            applyCover,
-            applyUrl,
-          });
-          if (applied) result.applied += 1;
+          const outcome = await apply.applyDlsiteMissingItem(summary.id, fetched.info);
+          if (outcome === "applied") result.applied += 1;
           else result.skipped += 1;
-        } catch {
+        } catch (error) {
+          if (error instanceof SourceParseError || error instanceof SourceConflictError) {
+            result.failed += 1;
+            continue;
+          }
           result.failed += 1;
         }
       }
@@ -132,11 +119,36 @@ export function createDlsiteMethods(deps: {
           refreshWorkDlsiteProjection(catalog, summary.id, dlsiteCache);
         }
         if (!fetched.ok) continue;
-        const work = await getWorkWithLiveProbe(db, query, catalog, summary.id);
-        if (!work) continue;
-        const { newTags, applyCover, applyUrl } = computeMissingDiff(work, fetched.info);
+        let verified;
+        try {
+          verified = readVerifiedEditSource(catalog, summary.id);
+        } catch (error) {
+          if (error instanceof SourceParseError || error instanceof SourceConflictError) continue;
+          throw error;
+        }
+        if (!verified) continue;
+        const { newTags, applyCover, applyUrl } = computeMissingDiff(
+          {
+            tags: verified.source.meta.tags,
+            urls: verified.source.meta.urls,
+            cover: verified.source.meta.coverImage
+              ? {
+                  image: verified.source.meta.coverImage,
+                  dimensions: { width: 1, height: 1 },
+                  version: "source",
+                }
+              : null,
+          },
+          fetched.info,
+        );
         if (newTags.length === 0 && !applyCover && !applyUrl) continue;
-        items.push({ workId: summary.id, title: work.title, newTags, applyCover, applyUrl });
+        items.push({
+          workId: summary.id,
+          title: verified.source.meta.title,
+          newTags,
+          applyCover,
+          applyUrl,
+        });
       }
       return { items };
     },

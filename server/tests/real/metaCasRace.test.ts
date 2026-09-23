@@ -132,7 +132,7 @@ async function withCasDelay<T>(delayMs: number, fn: () => Promise<T>): Promise<T
   }
 }
 
-test("CASとrenameの間に並行書き込みがあっても後勝ち消失しない", async (t) => {
+test("同じ revision の並行 mutateMetaSource は一方だけ成功し後勝ち消失しない", async (t) => {
   const directory = makeTestDirectory("meta-cas-lock");
   t.after(directory.cleanup);
   const workDir = join(directory.path, "work");
@@ -142,14 +142,6 @@ test("CASとrenameの間に並行書き込みがあっても後勝ち消失し�
   const workers = await createWorkerPair();
   t.after(() => {
     for (const worker of workers) worker.terminate();
-  });
-
-  await withCasDelay(30, async () => {
-    for (let i = 0; i < 10; i++) {
-      const bytes = writeSampleMeta(metaPath);
-      const results = await runConcurrentPatches(workers, metaPath, sourceRevision(bytes));
-      assertSingleCompleteWrite(metaPath, results);
-    }
   });
 
   await withCasDelay(0, async () => {

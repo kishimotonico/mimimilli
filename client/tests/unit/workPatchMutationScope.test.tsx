@@ -61,7 +61,6 @@ function makeWork(id: string): Work {
       },
     ],
     resume: null,
-    sourceRevision: "revision-1",
   };
 }
 
@@ -113,9 +112,9 @@ describe("WorkDetailPatchScope", () => {
     });
     fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = new URL(typeof input === "string" ? input : input.toString(), "http://localhost");
-      const workId = url.pathname.match(/^\/api\/works\/([^/]+)$/)?.[1];
-      if (workId && init?.method === "PATCH") {
-        if (workId === "work-a") {
+      const bookmarkId = url.pathname.match(/^\/api\/works\/([^/]+)\/bookmark$/)?.[1];
+      if (bookmarkId && init?.method === "PATCH") {
+        if (bookmarkId === "work-a") {
           return Promise.resolve(
             new Response(JSON.stringify({ error: "server error" }), {
               status: 500,
@@ -123,9 +122,40 @@ describe("WorkDetailPatchScope", () => {
             }),
           );
         }
-        const body = JSON.parse(init.body as string) as { bookmarked?: boolean };
+        return Promise.resolve(jsonResponse({ bookmarked: true }));
+      }
+      const sourceId = url.pathname.match(/^\/api\/works\/([^/]+)\/source$/)?.[1];
+      if (sourceId) {
+        const work = makeWork(sourceId);
         return Promise.resolve(
-          jsonResponse({ ...makeWork(workId), bookmarked: body.bookmarked ?? false }),
+          jsonResponse({
+            sourceRevision: "revision-1",
+            id: work.id,
+            physicalPath: work.physicalPath,
+            title: work.title,
+            tags: work.tags,
+            urls: work.urls,
+            coverImage: work.coverImage,
+            dlsite: work.dlsite,
+          }),
+        );
+      }
+      const workId = url.pathname.match(/^\/api\/works\/([^/]+)$/)?.[1];
+      if (workId && init?.method === "PATCH") {
+        const work = makeWork(workId);
+        return Promise.resolve(
+          jsonResponse({
+            snapshot: {
+              sourceRevision: "revision-2",
+              id: work.id,
+              physicalPath: work.physicalPath,
+              title: work.title,
+              tags: work.tags,
+              urls: work.urls,
+              coverImage: work.coverImage,
+              dlsite: work.dlsite,
+            },
+          }),
         );
       }
       if (workId) {
@@ -172,17 +202,35 @@ describe("WorkDetailPatchScope", () => {
     let resolvePatch: ((value: Response) => void) | undefined;
     fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
       const url = new URL(typeof input === "string" ? input : input.toString(), "http://localhost");
+      const bookmarkId = url.pathname.match(/^\/api\/works\/([^/]+)\/bookmark$/)?.[1];
+      if (bookmarkId && init?.method === "PATCH") {
+        return Promise.resolve(jsonResponse({ bookmarked: true }));
+      }
+      const sourceId = url.pathname.match(/^\/api\/works\/([^/]+)\/source$/)?.[1];
+      if (sourceId) {
+        const work = makeWork(sourceId);
+        return Promise.resolve(
+          jsonResponse({
+            sourceRevision: "revision-1",
+            id: work.id,
+            physicalPath: work.physicalPath,
+            title: work.title,
+            tags: work.tags,
+            urls: work.urls,
+            coverImage: work.coverImage,
+            dlsite: work.dlsite,
+          }),
+        );
+      }
       const workId = url.pathname.match(/^\/api\/works\/([^/]+)$/)?.[1];
       if (workId && init?.method === "PATCH") {
-        const body = JSON.parse(init.body as string) as { title?: string; bookmarked?: boolean };
+        const body = JSON.parse(init.body as string) as { title?: string };
         if (body.title !== undefined) {
           return new Promise<Response>((resolve) => {
             resolvePatch = resolve;
           });
         }
-        return Promise.resolve(
-          jsonResponse({ ...makeWork(workId), bookmarked: body.bookmarked ?? false }),
-        );
+        return Promise.resolve(jsonResponse({ bookmarked: true }));
       }
       if (workId) return Promise.resolve(jsonResponse(makeWork(workId)));
       return Promise.reject(new Error(`unexpected fetch: ${url.toString()}`));
@@ -201,7 +249,20 @@ describe("WorkDetailPatchScope", () => {
     expect(screen.getByRole("button", { name: "ブックマークに追加" })).not.toBeDisabled();
 
     await act(async () => {
-      resolvePatch?.(jsonResponse({ ...makeWork("work-a"), title: "新しいタイトル" }));
+      resolvePatch?.(
+        jsonResponse({
+          snapshot: {
+            sourceRevision: "revision-2",
+            id: "work-a",
+            physicalPath: "/lib/work-a",
+            title: "新しいタイトル",
+            tags: [],
+            urls: [],
+            coverImage: null,
+            dlsite: emptyDlsiteState(),
+          },
+        }),
+      );
     });
   });
 });

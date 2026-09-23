@@ -87,7 +87,8 @@ async function setupRegisteredWork(t: TestContext) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       tags: ["ジャンル/テスト", "サークル/解除用"],
-      sourceRevision: work.sourceRevision,
+      sourceRevision: (await (await app.request(`/api/works/${work.id}/source`)).json())
+        .sourceRevision,
     }),
   });
   assert.equal(patchRes.status, 200);

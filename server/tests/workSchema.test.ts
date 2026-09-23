@@ -5,7 +5,7 @@ import {
   tagSchema,
   trackSchema,
   urlEntrySchema,
-  workPatchSchema,
+  workSourcePatchSchema,
 } from "@mimimilli/shared";
 
 const PLAYLIST_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -178,15 +178,17 @@ test("metaFileSchema.urlsでも危険スキームを拒否する", () => {
   assert.equal(metaFileSchema.safeParse(meta).success, false);
 });
 
-test("workPatchSchemaはurlsを受け付け、危険スキームを拒否する", () => {
+test("workSourcePatchSchemaはurlsを受け付け、危険スキームを拒否する", () => {
   assert.equal(
-    workPatchSchema.safeParse({
+    workSourcePatchSchema.safeParse({
+      sourceRevision: "rev-1",
       urls: [{ label: "公式", url: "https://example.com" }],
     }).success,
     true,
   );
   assert.equal(
-    workPatchSchema.safeParse({
+    workSourcePatchSchema.safeParse({
+      sourceRevision: "rev-1",
       urls: [{ label: "evil", url: "javascript:alert(1)" }],
     }).success,
     false,

@@ -2,6 +2,7 @@
 // shared の apiErrorSchema 形式 `{error: {code, message}}` で常に返す。
 import type { ApiError } from "@mimimilli/shared";
 import { HTTPException } from "hono/http-exception";
+import { SourceChangedError, SourceConflictError, SourceParseError } from "../errors.ts";
 
 const STATUS_BY_CODE = {
   not_found: 404,
@@ -38,4 +39,12 @@ export function invalidRequest(message: string): never {
 /** 409 conflict を投げる */
 export function conflict(message: string): never {
   throw apiError("conflict", message);
+}
+
+/** 正本コマンドの既知エラーを HTTP へ写す。未知のエラーはそのまま再throw。 */
+export function throwSourceCommandError(error: unknown): never {
+  if (error instanceof SourceChangedError) throw apiError("source_changed", error.message);
+  if (error instanceof SourceParseError) throw apiError("parse_error", error.message);
+  if (error instanceof SourceConflictError) throw apiError("conflict", error.message);
+  throw error;
 }

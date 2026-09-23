@@ -354,7 +354,10 @@ test("register-preview: ルート境界の前方一致だけでは配下扱い�
 test("fixtureのDLsite取得は保存済みRJコードの修正を反映する", async () => {
   const adapter = createFixtureAdapter();
   const workId = "RJ501001";
-  await adapter.updateDlsiteState(workId, { rjCode: "RJ7654321" });
+  await adapter.updateDlsiteState(workId, {
+    sourceRevision: (await adapter.getWorkEditSnapshot(workId))!.sourceRevision,
+    rjCode: "RJ7654321",
+  });
 
   const result = await adapter.dlsiteFetch(workId);
 
@@ -372,16 +375,22 @@ test("fixture: RJコード変更で旧状態をリセットし一括取得対象
   assert.equal(before?.dlsite.status, "applied");
   assert.ok((before?.dlsite.appliedTags.length ?? 0) > 0);
 
-  const unchanged = await adapter.updateDlsiteState(workId, { rjCode: "RJ501001" });
-  assert.equal(unchanged?.dlsite.status, "applied");
-  assert.deepEqual(unchanged?.dlsite.appliedTags, before?.dlsite.appliedTags);
+  const unchanged = await adapter.updateDlsiteState(workId, {
+    sourceRevision: (await adapter.getWorkEditSnapshot(workId))!.sourceRevision,
+    rjCode: "RJ501001",
+  });
+  assert.equal(unchanged?.snapshot.dlsite.status, "applied");
+  assert.deepEqual(unchanged?.snapshot.dlsite.appliedTags, before?.dlsite.appliedTags);
 
-  const updated = await adapter.updateDlsiteState(workId, { rjCode: "RJ7654321" });
-  assert.equal(updated?.dlsite.rjCode, "RJ7654321");
-  assert.equal(updated?.dlsite.status, "none");
-  assert.equal(updated?.dlsite.error, null);
-  assert.equal(updated?.dlsite.errorKind, null);
-  assert.deepEqual(updated?.dlsite.appliedTags, []);
+  const updated = await adapter.updateDlsiteState(workId, {
+    sourceRevision: (await adapter.getWorkEditSnapshot(workId))!.sourceRevision,
+    rjCode: "RJ7654321",
+  });
+  assert.equal(updated?.snapshot.dlsite.rjCode, "RJ7654321");
+  assert.equal(updated?.snapshot.dlsite.status, "none");
+  assert.equal(updated?.snapshot.dlsite.error, null);
+  assert.equal(updated?.snapshot.dlsite.errorKind, null);
+  assert.deepEqual(updated?.snapshot.dlsite.appliedTags, []);
 
   const bulk = await adapter.runDlsiteBulk("existing", [workId]);
   assert.equal(bulk.fetched, 1);

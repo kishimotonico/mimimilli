@@ -5,11 +5,16 @@ import type {
   DlsiteNotificationQuery,
   DlsiteNotificationSummary,
   IdentityConflictReassignBody,
+  NormalizedTag,
   ResumeBody,
   Work,
+  WorkBookmarkPatch,
+  WorkBookmarkResult,
   WorkCreateBody,
-  WorkPatch,
+  WorkEditSnapshot,
   WorkRegisterPreview,
+  WorkSourceMutationResult,
+  WorkSourcePatch,
   WorkspacePath,
   WorksPage,
   WorksQuery,
@@ -32,8 +37,12 @@ export interface WorkAdapter {
     query: Required<DlsiteNotificationQuery>,
   ): Promise<DlsiteNotificationPage>;
   getWork(id: string): Promise<Work | null>;
-  /** 更新後の Work を返す。存在しなければ null */
-  patchWork(id: string, patch: WorkPatch): Promise<Work | null>;
+  getWorkEditSnapshot(id: string): Promise<WorkEditSnapshot | null>;
+  /** 正本の部分更新。存在しなければ null */
+  patchWorkSource(id: string, patch: WorkSourcePatch): Promise<WorkSourceMutationResult | null>;
+  patchWorkBookmark(id: string, patch: WorkBookmarkPatch): Promise<WorkBookmarkResult | null>;
+  addWorkTag(id: string, tag: NormalizedTag): Promise<WorkSourceMutationResult | null>;
+  removeWorkTag(id: string, tag: NormalizedTag): Promise<WorkSourceMutationResult | null>;
   saveResume(id: string, body: ResumeBody): Promise<boolean>;
   touchLastPlayed(id: string): Promise<boolean>;
   listTags(): Promise<string[]>;

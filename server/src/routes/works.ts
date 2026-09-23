@@ -2,18 +2,47 @@
 //          GET /tags, POST /export, POST /works, GET /works/register-preview
 import { Hono } from "hono";
 import {
+  normalizeTag,
   resumeBodySchema,
+  tagSchema,
   WORKS_DEFAULT_PAGE_SIZE,
+  workBookmarkPatchSchema,
   workCreateBodySchema,
   identityConflictReassignBodySchema,
-  workPatchSchema,
   workRegisterPreviewQuerySchema,
+  workSourcePatchSchema,
   worksQuerySchema,
 } from "@mimimilli/shared";
 import { InvalidResumeError, WorkRegisterError } from "../errors.ts";
 import type { DataAdapter } from "../adapter/index.ts";
-import { apiError, conflict, invalidRequest, notFound } from "../lib/httpError.ts";
+import {
+  apiError,
+  conflict,
+  invalidRequest,
+  notFound,
+  throwSourceCommandError,
+} from "../lib/httpError.ts";
 import { SourceChangedError } from "../errors.ts";
+
+function parseWorkTagPath(c: {
+  req: { path: string; param: (name: string) => string };
+}): import("@mimimilli/shared").NormalizedTag {
+  const workId = c.req.param("id");
+  const marker = `/works/${workId}/tags/`;
+  const index = c.req.path.indexOf(marker);
+  const encoded = index >= 0 ? c.req.path.slice(index + marker.length) : "";
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(encoded);
+  } catch {
+    invalidRequest("タグが不正です");
+  }
+  const parsed = tagSchema.safeParse(decoded);
+  if (!parsed.success) invalidRequest(parsed.error.issues[0]?.message ?? "タグが不正です");
+  const normalized = normalizeTag(parsed.data);
+  if (normalized === null) invalidRequest("空になるタグは登録できません");
+  return normalized;
+}
 
 export function worksRoute(
   adapter: DataAdapter,
@@ -92,29 +121,70 @@ export function worksRoute(
     return c.json(result);
   });
 
+  app.get("/works/:id/source", async (c) => {
+    const workId = c.req.param("id");
+    try {
+      const snapshot = await adapter.getWorkEditSnapshot(workId);
+      if (!snapshot) notFound(`作品が見つかりません: ${workId}`);
+      return c.json(snapshot);
+    } catch (error) {
+      throwSourceCommandError(error);
+    }
+  });
+
   app.get("/works/:id", async (c) => {
     const work = await adapter.getWork(c.req.param("id"));
     if (!work) notFound(`作品が見つかりません: ${c.req.param("id")}`);
     return c.json(work);
   });
 
+  app.patch("/works/:id/bookmark", async (c) => {
+    const body = await c.req.json().catch(() => null);
+    const parsed = workBookmarkPatchSchema.safeParse(body);
+    if (!parsed.success) invalidRequest("ブックマークの更新内容が不正です");
+    const result = await adapter.patchWorkBookmark(c.req.param("id"), parsed.data);
+    if (!result) notFound(`作品が見つかりません: ${c.req.param("id")}`);
+    return c.json(result);
+  });
+
   app.patch("/works/:id", async (c) => {
     const body = await c.req.json().catch(() => null);
-    const parsed = workPatchSchema.safeParse(body);
+    const parsed = workSourcePatchSchema.safeParse(body);
     if (!parsed.success) {
       invalidRequest("作品の更新内容が不正です");
     }
-    if (parsed.data.sourceRevision === undefined) {
-      invalidRequest("sourceRevision は必須です");
+    const workId = c.req.param("id");
+    try {
+      const result = await adapter.patchWorkSource(workId, parsed.data);
+      if (!result) notFound(`作品が見つかりません: ${workId}`);
+      return c.json(result);
+    } catch (error) {
+      throwSourceCommandError(error);
     }
-    const work = await adapter.patchWork(c.req.param("id"), parsed.data).catch((error) => {
-      if (error instanceof SourceChangedError) {
-        throw apiError("source_changed", error.message);
-      }
-      throw error;
-    });
-    if (!work) notFound(`作品が見つかりません: ${c.req.param("id")}`);
-    return c.json(work);
+  });
+
+  app.put("/works/:id/tags/*", async (c) => {
+    const workId = c.req.param("id");
+    const tag = parseWorkTagPath(c);
+    try {
+      const result = await adapter.addWorkTag(workId, tag);
+      if (!result) notFound(`作品が見つかりません: ${workId}`);
+      return c.json(result);
+    } catch (error) {
+      throwSourceCommandError(error);
+    }
+  });
+
+  app.delete("/works/:id/tags/*", async (c) => {
+    const workId = c.req.param("id");
+    const tag = parseWorkTagPath(c);
+    try {
+      const result = await adapter.removeWorkTag(workId, tag);
+      if (!result) notFound(`作品が見つかりません: ${workId}`);
+      return c.json(result);
+    } catch (error) {
+      throwSourceCommandError(error);
+    }
   });
 
   app.delete("/works/:id", async (c) => {

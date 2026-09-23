@@ -1,13 +1,8 @@
-export const WORK_SOURCE_PATCH_BLOCKED_MESSAGE =
-  "作品情報の同期が完了していません。画面上部の「スキャン」からライブラリをスキャンしてから編集してください。";
+import { ApiRequestError } from "../../shared/api/http";
 
-export function assertWorkSourceRevision(sourceRevision: string | undefined): string {
-  if (!sourceRevision) {
-    throw new Error(WORK_SOURCE_PATCH_BLOCKED_MESSAGE);
-  }
-  return sourceRevision;
-}
-
-export function canPatchWorkSource(sourceRevision: string | undefined): sourceRevision is string {
-  return Boolean(sourceRevision);
+/** GET /source および正本コマンドが返せないときの表示。サーバーの message をそのまま出す。 */
+export function sourceEditErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof ApiRequestError) return error.message;
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
 }

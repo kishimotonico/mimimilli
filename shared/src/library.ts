@@ -72,7 +72,7 @@ export const smartFolderRuleSchema = z.discriminatedUnion("field", [
     conjunction: smartFolderConjunctionSchema,
     field: z.literal("タグ"),
     operator: z.literal("∋"),
-    // 作品側（workPatchSchema 等）と同じく正規形（prefix小文字化・trim・重複排除）で保存する
+    // 作品側（workSourcePatchSchema 等）と同じく正規形（prefix小文字化・trim・重複排除）で保存する
     values: z
       .array(tagSchema)
       .min(1)

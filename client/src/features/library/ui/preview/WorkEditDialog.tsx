@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
+import { useQuery } from "@tanstack/react-query";
 import type { UrlEntry, Work } from "@mimimilli/shared";
 import { isHttpAbsoluteUrl } from "@mimimilli/shared";
 import Button from "../../../../shared/ui/Button";
@@ -10,7 +11,9 @@ import { useToast } from "../../../../shared/ui/useToast";
 import { useDialogModal } from "../../../../shared/ui/useDialogModal";
 import type { useLibraryWorkPatchMutations } from "../../model/useLibraryQueries";
 import { apiErrorMessage } from "../../../../shared/lib/apiError";
-import { canPatchWorkSource } from "../../../../entities/work/sourceRevision";
+import { getWorkEditSnapshot } from "../../../../entities/work/api";
+import { WORK_QUERY_KEYS } from "../../../../entities/work/queryKeys";
+import { sourceEditErrorMessage } from "../../../../entities/work/sourceRevision";
 import { WorkSourcePatchBlockedNotice } from "./WorkSourcePatchBlockedNotice";
 import { DlsiteEditor } from "./DlsiteEditor";
 import { WorkTagEditor } from "./WorkTagEditor";
@@ -20,7 +23,7 @@ interface WorkEditDialogProps {
   tagSuggestions: string[];
   workPatchMutations: Pick<
     ReturnType<typeof useLibraryWorkPatchMutations>,
-    "titleMutation" | "tagsMutation" | "urlsMutation"
+    "titleMutation" | "addTagMutation" | "removeTagMutation" | "urlsMutation"
   >;
   onClose: () => void;
 }
@@ -119,9 +122,19 @@ function UnsavedChangesPrompt({
 export function WorkEditDialog({
   work,
   tagSuggestions,
-  workPatchMutations: { titleMutation, tagsMutation, urlsMutation },
+  workPatchMutations: { titleMutation, addTagMutation, removeTagMutation, urlsMutation },
   onClose,
 }: WorkEditDialogProps) {
+  const sourceQuery = useQuery({
+    queryKey: WORK_QUERY_KEYS.source(work.id),
+    queryFn: () => getWorkEditSnapshot(work.id),
+  });
+  const snapshot = sourceQuery.data;
+  const sourceErrorMessage = sourceQuery.error
+    ? sourceEditErrorMessage(sourceQuery.error, "作品情報を読み込めないため編集できません。")
+    : null;
+  const canEditSource = Boolean(snapshot) && !sourceQuery.isError;
+
   const [titleDraft, setTitleDraft] = useState(work.title);
   const [urlDrafts, setUrlDrafts] = useState<UrlEntry[]>(() => cloneUrls(work.urls));
   const [urlValidationError, setUrlValidationError] = useState<string | null>(null);
@@ -143,13 +156,16 @@ export function WorkEditDialog({
     initialFocusRef: titleInputRef,
   });
 
-  useEffect(() => setTitleDraft(work.title), [work.title]);
+  const snapshotTitle = snapshot?.title;
+  const snapshotUrls = snapshot?.urls;
   useEffect(() => {
-    setUrlDrafts(cloneUrls(work.urls));
+    if (snapshotTitle !== undefined) setTitleDraft(snapshotTitle);
+  }, [snapshotTitle]);
+  useEffect(() => {
+    if (!snapshotUrls) return;
+    setUrlDrafts(cloneUrls(snapshotUrls));
     setUrlValidationError(null);
-  }, [work.urls]);
-  // 保存に失敗しても入力値は残す（ドラフトを巻き戻さない）。保存中はdisabledでフォーカスが
-  // bodyへ落ちるため、失敗確定時にフォーカスを戻す。
+  }, [snapshotUrls]);
   useEffect(() => {
     if (titleMutation.error) titleInputRef.current?.focus();
   }, [titleMutation.error]);
@@ -157,34 +173,34 @@ export function WorkEditDialog({
     if (urlsMutation.error) firstUrlInputRef.current?.focus();
   }, [urlsMutation.error]);
 
-  const canEditSource = canPatchWorkSource(work.sourceRevision);
-
+  const currentTitle = snapshot?.title ?? work.title;
+  const currentUrls = snapshot?.urls ?? work.urls;
   const trimmedTitle = titleDraft.trim();
-  const isTitleDirty = trimmedTitle !== work.title;
+  const isTitleDirty = trimmedTitle !== currentTitle;
   const normalizedUrlDrafts = urlDrafts
     .map((entry) => ({ label: entry.label.trim(), url: entry.url.trim() }))
     .filter((entry) => entry.label || entry.url);
-  const isUrlsDirty = !urlsEqual(normalizedUrlDrafts, work.urls);
+  const isUrlsDirty = !urlsEqual(normalizedUrlDrafts, currentUrls);
   const isDirty = isTitleDirty || isUrlsDirty;
 
   const saveTitle = (event: FormEvent) => {
     event.preventDefault();
-    if (titleMutation.isPending || !trimmedTitle || trimmedTitle === work.title) return;
-    if (!canPatchWorkSource(work.sourceRevision)) return;
+    if (!snapshot || titleMutation.isPending || !trimmedTitle || trimmedTitle === snapshot.title)
+      return;
     titleMutation.mutate({
       workId: work.id,
       title: trimmedTitle,
-      sourceRevision: work.sourceRevision,
+      sourceRevision: snapshot.sourceRevision,
     });
   };
 
   const saveUrls = (event: FormEvent) => {
     event.preventDefault();
-    if (urlsMutation.isPending || !canPatchWorkSource(work.sourceRevision)) return;
+    if (!snapshot || urlsMutation.isPending) return;
     const filled = buildFilledUrls(urlDrafts, setUrlValidationError);
     if (filled === null) return;
-    if (urlsEqual(filled, work.urls)) return;
-    urlsMutation.mutate({ workId: work.id, urls: filled, sourceRevision: work.sourceRevision });
+    if (urlsEqual(filled, snapshot.urls)) return;
+    urlsMutation.mutate({ workId: work.id, urls: filled, sourceRevision: snapshot.sourceRevision });
   };
 
   const discardAndClose = () => {
@@ -193,7 +209,7 @@ export function WorkEditDialog({
   };
 
   const saveAndClose = async () => {
-    if (!canPatchWorkSource(work.sourceRevision)) return;
+    if (!snapshot) return;
     if (isTitleDirty && !trimmedTitle) return;
     const filledUrls = isUrlsDirty ? buildFilledUrls(urlDrafts, setUrlValidationError) : null;
     if (isUrlsDirty && filledUrls === null) {
@@ -202,15 +218,14 @@ export function WorkEditDialog({
     }
     setIsSavingToClose(true);
     try {
-      let sourceRevision = work.sourceRevision;
+      let sourceRevision = snapshot.sourceRevision;
       if (isTitleDirty) {
         const updated = await titleMutation.mutateAsync({
           workId: work.id,
           title: trimmedTitle,
           sourceRevision,
         });
-        if (!canPatchWorkSource(updated.sourceRevision)) return;
-        sourceRevision = updated.sourceRevision;
+        sourceRevision = updated.snapshot.sourceRevision;
       }
       if (isUrlsDirty && filledUrls) {
         await urlsMutation.mutateAsync({ workId: work.id, urls: filledUrls, sourceRevision });
@@ -218,8 +233,6 @@ export function WorkEditDialog({
       setIsUnsavedPromptOpen(false);
       onClose();
     } catch {
-      // 失敗理由はtitleMutation.error / urlsMutation.errorのToastで案内する。
-      // プロンプトだけ閉じ、ダイアログは開いたまま入力値を保持する。
       setIsUnsavedPromptOpen(false);
     } finally {
       setIsSavingToClose(false);
@@ -255,6 +268,10 @@ export function WorkEditDialog({
     dismissToast,
   ]);
 
+  const editorWork = snapshot
+    ? { ...work, title: snapshot.title, tags: snapshot.tags, urls: snapshot.urls }
+    : work;
+
   return (
     <>
       {/* oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- backdropクリックはuseDialogModalで判定する。 */}
@@ -266,7 +283,7 @@ export function WorkEditDialog({
         className="m-auto w-[min(640px,calc(100vw-32px))] overflow-hidden rounded-[12px] border border-line-soft bg-paper-1 p-0 font-jp text-ink-0 shadow-pop backdrop:bg-[oklch(20%_0.020_70_/_0.3)]"
       >
         <div className="flex max-h-[calc(100vh-32px)] min-h-0 flex-col overflow-hidden">
-          <header className="flex shrink-0 items-center border-b border-line-soft px-[18px] py-[14px]">
+          <header className="flex shrink-0 items-center gap-2 border-b border-line-soft px-[18px] py-3">
             <h2 id="work-edit-title" className="min-w-0 flex-1 font-sans text-[14px] font-semibold">
               作品を編集
             </h2>
@@ -274,7 +291,7 @@ export function WorkEditDialog({
           </header>
           <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-[18px] py-4">
             <form className="flex flex-col gap-2" onSubmit={saveTitle}>
-              <WorkSourcePatchBlockedNotice sourceRevision={work.sourceRevision} />
+              <WorkSourcePatchBlockedNotice message={sourceErrorMessage} />
               <label
                 htmlFor="work-title-input"
                 className="font-sans text-label font-semibold text-ink-1"
@@ -296,7 +313,7 @@ export function WorkEditDialog({
                   type="submit"
                   disabled={
                     titleDraft.trim().length === 0 ||
-                    trimmedTitle === work.title ||
+                    trimmedTitle === currentTitle ||
                     titleMutation.isPending ||
                     !canEditSource
                   }
@@ -314,9 +331,10 @@ export function WorkEditDialog({
                 タグ
               </h3>
               <WorkTagEditor
-                work={work}
+                work={editorWork}
                 tagSuggestions={tagSuggestions}
-                tagsMutation={tagsMutation}
+                addTagMutation={addTagMutation}
+                removeTagMutation={removeTagMutation}
                 expanded
               />
             </section>
@@ -389,7 +407,7 @@ export function WorkEditDialog({
                       urlDrafts
                         .map((entry) => ({ label: entry.label.trim(), url: entry.url.trim() }))
                         .filter((entry) => entry.label || entry.url),
-                      work.urls,
+                      currentUrls,
                     )
                   }
                 >
@@ -404,7 +422,7 @@ export function WorkEditDialog({
             </form>
 
             <div className="border-t border-line-soft pt-4">
-              <DlsiteEditor work={work} />
+              {snapshot ? <DlsiteEditor workId={work.id} snapshot={snapshot} /> : null}
             </div>
           </div>
           <footer className="flex shrink-0 justify-end border-t border-line-soft px-[18px] py-3">

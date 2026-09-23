@@ -111,6 +111,15 @@ export class CatalogWorkRepository {
     return row?.metaPath ?? null;
   }
 
+  getWorkSourceLocation(id: string): { metaPath: string; physicalPath: string } | null {
+    const row = this.db.catalog
+      .select({ metaPath: works.metaPath, physicalPath: works.physicalPath })
+      .from(works)
+      .where(eq(works.id, id))
+      .get();
+    return row ?? null;
+  }
+
   getWorkDeleteTarget(id: string): { metaPath: string } | null {
     const row = this.db.catalog
       .select({ id: works.id, metaPath: works.metaPath })

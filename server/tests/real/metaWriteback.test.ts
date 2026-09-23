@@ -4,7 +4,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test, type TestContext } from "node:test";
 import { emptyDlsiteState } from "@mimimilli/shared";
-import { SourceChangedError } from "../../src/errors.ts";
+import { SourceChangedError, SourceConflictError } from "../../src/errors.ts";
 import { CatalogWorkRepository } from "../../src/adapters/real/catalogWorkRepository.ts";
 import { replaceWithRollback } from "../../src/adapters/real/meta.ts";
 import { createTestRealAdapter } from "../helpers/realAdapter.ts";
@@ -26,14 +26,22 @@ async function setup(t: TestContext) {
   return { ...lib, adapter, metaPath };
 }
 
+async function sourceOf(adapter: Awaited<ReturnType<typeof setup>>["adapter"], id: string) {
+  const snapshot = await adapter.getWorkEditSnapshot(id);
+  if (!snapshot) throw new Error(`snapshot missing: ${id}`);
+  return snapshot;
+}
+
 test("patchWork の title / tags がメタファイルへ反映され、スキーマ外フィールドは保持される", async (t) => {
   const { adapter, existingWorkId, metaPath } = await setup(t);
 
-  const updated = await adapter.patchWork(existingWorkId, {
+  const snapshot = await sourceOf(adapter, existingWorkId);
+  const updated = await adapter.patchWorkSource(existingWorkId, {
+    sourceRevision: snapshot.sourceRevision,
     title: "改題された作品",
     tags: nts(["cv/水瀬なずな", "新タグ"]),
   });
-  assert.equal(updated?.title, "改題された作品");
+  assert.equal(updated?.snapshot.title, "改題された作品");
 
   const meta = JSON.parse(readFileSync(metaPath, "utf-8"));
   assert.equal(meta.title, "改題された作品");
@@ -44,16 +52,15 @@ test("patchWork の title / tags がメタファイルへ反映され、スキ�
 
 test("mimimilli.jsonの外部更新後は古いsourceRevisionで上書きしない", async (t) => {
   const { adapter, existingWorkId, metaPath } = await setup(t);
-  const work = await adapter.getWork(existingWorkId);
-  assert.ok(work?.sourceRevision);
+  const snapshot = await sourceOf(adapter, existingWorkId);
   const raw = JSON.parse(readFileSync(metaPath, "utf-8"));
   raw.title = "外部で変更したタイトル";
   writeFileSync(metaPath, JSON.stringify(raw, null, 2));
 
   await assert.rejects(
-    adapter.patchWork(existingWorkId, {
+    adapter.patchWorkSource(existingWorkId, {
       title: "アプリからのタイトル",
-      sourceRevision: work.sourceRevision,
+      sourceRevision: snapshot.sourceRevision,
     }),
     SourceChangedError,
   );
@@ -81,17 +88,16 @@ test("Windows互換置換でinstallと復元が失敗してもrollbackを保持�
 
 test("catalog再投影に失敗しても確定済みmimimilli.jsonは残り、scanで収束する", async (t) => {
   const { adapter, existingWorkId, metaPath } = await setup(t);
-  const work = await adapter.getWork(existingWorkId);
-  assert.ok(work?.sourceRevision);
+  const snapshot = await sourceOf(adapter, existingWorkId);
   const originalUpsert = CatalogWorkRepository.prototype.upsertWorkCatalog;
   CatalogWorkRepository.prototype.upsertWorkCatalog = () => {
     throw new Error("catalog projection failed");
   };
   try {
     await assert.rejects(
-      adapter.patchWork(existingWorkId, {
+      adapter.patchWorkSource(existingWorkId, {
         title: "mimimilli.jsonだけは確定する",
-        sourceRevision: work.sourceRevision,
+        sourceRevision: snapshot.sourceRevision,
       }),
       /catalog projection failed/,
     );
@@ -107,8 +113,12 @@ test("catalog再投影に失敗しても確定済みmimimilli.jsonは残り、sc
 test("patchWork の urls がメタファイルへ反映される", async (t) => {
   const { adapter, existingWorkId, metaPath } = await setup(t);
   const urls = [{ label: "公式", url: "https://example.com/work" }];
-  const updated = await adapter.patchWork(existingWorkId, { urls });
-  assert.deepEqual(updated?.urls, urls);
+  const snapshot = await sourceOf(adapter, existingWorkId);
+  const updated = await adapter.patchWorkSource(existingWorkId, {
+    sourceRevision: snapshot.sourceRevision,
+    urls,
+  });
+  assert.deepEqual(updated?.snapshot.urls, urls);
   const meta = JSON.parse(readFileSync(metaPath, "utf-8"));
   assert.deepEqual(meta.urls, urls);
   assert.equal(meta.myNote, "ユーザーの手書きメモ");
@@ -118,14 +128,17 @@ test("bookmarked の PATCH はメタファイルを変更しない（DB 固有�
   const { adapter, existingWorkId, metaPath } = await setup(t);
   const before = readFileSync(metaPath, "utf-8");
 
-  const updated = await adapter.patchWork(existingWorkId, { bookmarked: true });
+  const updated = await adapter.patchWorkBookmark(existingWorkId, { bookmarked: true });
   assert.equal(updated?.bookmarked, true);
   assert.equal(readFileSync(metaPath, "utf-8"), before);
 });
 
 test("存在しない作品の patchWork は null", async (t) => {
   const { adapter } = await setup(t);
-  assert.equal(await adapter.patchWork("no-such-id", { title: "x" }), null);
+  assert.equal(
+    await adapter.patchWorkSource("no-such-id", { sourceRevision: "x", title: "x" }),
+    null,
+  );
 });
 
 test("メタ書き戻し失敗時は DB の title / tags もロールバックされる", async (t) => {
@@ -134,11 +147,12 @@ test("メタ書き戻し失敗時は DB の title / tags もロールバック�
   rmSync(metaPath);
 
   await assert.rejects(
-    adapter.patchWork(existingWorkId, {
+    adapter.patchWorkSource(existingWorkId, {
+      sourceRevision: "stale",
       title: "反映されないタイトル",
       tags: nts(["反映されないタグ"]),
     }),
-    /ENOENT/,
+    SourceConflictError,
   );
 
   const after = await adapter.getWork(existingWorkId);
@@ -218,11 +232,14 @@ test("単一ファイル形式作品の patch が同居する mimimilli.json を
 
   const folderMetaBefore = readFileSync(folderMetaPath, "utf-8");
 
-  const updated = await adapter.patchWork(singleWorkId, {
+  const snapshot = await adapter.getWorkEditSnapshot(singleWorkId);
+  assert.ok(snapshot);
+  const updated = await adapter.patchWorkSource(singleWorkId, {
+    sourceRevision: snapshot.sourceRevision,
     title: "単一ファイル改題",
     tags: nts(["単一タグ", "追記タグ"]),
   });
-  assert.equal(updated?.title, "単一ファイル改題");
+  assert.equal(updated?.snapshot.title, "単一ファイル改題");
   assert.equal(readFileSync(folderMetaPath, "utf-8"), folderMetaBefore);
 
   const singleAfter = JSON.parse(readFileSync(singleMetaPath, "utf-8"));

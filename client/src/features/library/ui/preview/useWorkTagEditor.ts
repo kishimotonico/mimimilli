@@ -1,23 +1,23 @@
 import { useState } from "react";
-import { parseTag, tagEquals } from "@mimimilli/shared";
-import type { NormalizedTag, TagPrefix, Work } from "@mimimilli/shared";
-import { buildTagsWithAdded, buildTagsWithRemoved } from "../../../../entities/work/editableTags";
-import { canPatchWorkSource } from "../../../../entities/work/sourceRevision";
-import type { LibraryTagsPatchMutation } from "../../model/useLibraryQueries";
+import { normalizeTag, parseTag, tagEquals } from "@mimimilli/shared";
+import type { NormalizedTag, TagPrefix } from "@mimimilli/shared";
+import type { LibraryTagIntentMutation } from "../../model/useLibraryQueries";
 
 export interface UseWorkTagEditorOptions {
-  work: Work;
+  workId: string;
+  tags: NormalizedTag[];
   tagSuggestions: string[];
   /** 保護判定（protected な prefix のタグは削除前に確認を挟む。ADR-0005） */
   tagPrefixes: TagPrefix[];
-  tagsMutation: LibraryTagsPatchMutation;
+  addTagMutation: LibraryTagIntentMutation;
+  removeTagMutation: LibraryTagIntentMutation;
 }
 
 export interface UseWorkTagEditorResult {
   tags: NormalizedTag[];
   suggestions: string[];
   isTagSaving: boolean;
-  patchTagsError: LibraryTagsPatchMutation["error"];
+  patchTagsError: LibraryTagIntentMutation["error"];
   pendingRemoveTag: NormalizedTag | null;
   failedRemoveTag: NormalizedTag | null;
   /** 保護タグの削除確認待ち。ConfirmDialog の表示トリガー */
@@ -35,14 +35,15 @@ export interface UseWorkTagEditorResult {
 
 /**
  * タグの追加・削除・削除の undo（トースト経由）と、保護タグの削除確認をまとめて扱うフック。
- * 全タグが編集対象（ADR-0005）。undo は非同期の再保存トランザクションなので、
- * pending/failed/トースト表示までここで完結させる。
+ * 全タグが編集対象（ADR-0005）。undo は削除したタグをもう一度 PUT する。
  */
 export function useWorkTagEditor({
-  work,
+  workId,
+  tags,
   tagSuggestions,
   tagPrefixes,
-  tagsMutation,
+  addTagMutation,
+  removeTagMutation,
 }: UseWorkTagEditorOptions): UseWorkTagEditorResult {
   const [pendingRemoveTag, setPendingRemoveTag] = useState<NormalizedTag | null>(null);
   const [failedRemoveTag, setFailedRemoveTag] = useState<NormalizedTag | null>(null);
@@ -55,42 +56,40 @@ export function useWorkTagEditor({
     return tagPrefixes.some((p) => p.prefix === parsed.prefix && p.protected);
   };
 
-  const patchTags = async (nextTags: NormalizedTag[]): Promise<boolean> => {
-    if (tagsMutation.isPending || !canPatchWorkSource(work.sourceRevision)) return false;
-    tagsMutation.reset();
+  const isSaving = addTagMutation.isPending || removeTagMutation.isPending;
+
+  const addTag = async (tag: string) => {
+    const normalized = normalizeTag(tag);
+    if (!normalized) return;
+    if (tags.some((existing) => tagEquals(existing, normalized))) return;
+    if (isSaving) return;
+    addTagMutation.reset();
+    removeTagMutation.reset();
     try {
-      await tagsMutation.mutateAsync({
-        workId: work.id,
-        tags: nextTags,
-        sourceRevision: work.sourceRevision,
-      });
-      return true;
+      await addTagMutation.mutateAsync({ workId, tag: normalized });
     } catch {
-      return false;
+      /* エラーは mutation.error で表示する */
     }
   };
 
-  const addTag = async (tag: string) => {
-    const nextTags = buildTagsWithAdded(work.tags, tag);
-    if (!nextTags) return;
-    await patchTags(nextTags);
-  };
-
   const removeTag = async (tag: NormalizedTag) => {
-    if (tagsMutation.isPending) return;
+    if (isSaving) return;
     setPendingRemoveTag(tag);
     setFailedRemoveTag(null);
-    const ok = await patchTags(buildTagsWithRemoved(work.tags, tag));
-    setPendingRemoveTag(null);
-    if (ok) {
+    addTagMutation.reset();
+    removeTagMutation.reset();
+    try {
+      await removeTagMutation.mutateAsync({ workId, tag });
+      setPendingRemoveTag(null);
       setTagUndoToast(tag);
-    } else {
+    } catch {
+      setPendingRemoveTag(null);
       setFailedRemoveTag(tag);
     }
   };
 
   const requestRemoveTag = async (tag: NormalizedTag) => {
-    if (tagsMutation.isPending) return;
+    if (isSaving) return;
     if (isProtectedTag(tag)) {
       setConfirmingRemoveTag(tag);
       return;
@@ -108,25 +107,24 @@ export function useWorkTagEditor({
 
   const undoRemoveTag = async () => {
     const tag = tagUndoToast;
-    if (!tag) return;
-    // 別の保存が進行中の間は何もしない（トーストを消さず、undo要求を黙って捨てない）
-    if (tagsMutation.isPending) return;
-    // 削除したタグだけを現在の集合へ戻す。undo待ちの間に行われた他のタグ編集は巻き戻さない。
-    // 復元に失敗した場合はトーストを残して再試行可能にする
-    const restored = work.tags.some((current) => tagEquals(current, tag))
-      ? work.tags
-      : [...work.tags, tag];
-    const ok = await patchTags(restored);
-    if (ok) setTagUndoToast(null);
+    if (!tag || isSaving) return;
+    addTagMutation.reset();
+    removeTagMutation.reset();
+    try {
+      await addTagMutation.mutateAsync({ workId, tag });
+      setTagUndoToast(null);
+    } catch {
+      /* トーストを残して再試行可能にする */
+    }
   };
 
   const dismissTagUndoToast = () => setTagUndoToast(null);
 
   return {
-    tags: work.tags,
+    tags,
     suggestions: [...new Set(tagSuggestions)],
-    isTagSaving: tagsMutation.isPending,
-    patchTagsError: tagsMutation.error,
+    isTagSaving: isSaving,
+    patchTagsError: addTagMutation.error ?? removeTagMutation.error,
     pendingRemoveTag,
     failedRemoveTag,
     confirmingRemoveTag,
@@ -137,6 +135,9 @@ export function useWorkTagEditor({
     cancelRemoveTag,
     undoRemoveTag,
     dismissTagUndoToast,
-    resetPatchTagsError: tagsMutation.reset,
+    resetPatchTagsError: () => {
+      addTagMutation.reset();
+      removeTagMutation.reset();
+    },
   };
 }

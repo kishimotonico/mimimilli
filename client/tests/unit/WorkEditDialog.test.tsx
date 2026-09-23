@@ -2,9 +2,9 @@ import type { ReactElement } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Work } from "@mimimilli/shared";
+import type { Work, WorkEditSnapshot } from "@mimimilli/shared";
 import { emptyDlsiteState } from "@mimimilli/shared";
-import { WORK_SOURCE_PATCH_BLOCKED_MESSAGE } from "../../src/entities/work/sourceRevision";
+import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import type {
   LibraryTitlePatchMutation,
   LibraryUrlsPatchMutation,
@@ -12,9 +12,17 @@ import type {
 import { WorkEditDialog } from "../../src/features/library/ui/preview/WorkEditDialog";
 import GlobalToast from "../../src/app/ui/GlobalToast";
 
+const { mockGetWorkEditSnapshot } = vi.hoisted(() => ({
+  mockGetWorkEditSnapshot: vi.fn(),
+}));
+vi.mock("../../src/entities/work/api", () => ({
+  getWorkEditSnapshot: (...args: unknown[]) => mockGetWorkEditSnapshot(...args),
+}));
+
 // Toastは単一ホスト（GlobalToast）へ集約されているため、WorkEditDialogの表示要求を
 // 目に見える形で検証するにはGlobalToastも一緒に描画する必要がある。
 function withToast(queryClient: QueryClient, ui: ReactElement) {
+  seedSource(queryClient);
   return (
     <QueryClientProvider client={queryClient}>
       {ui}
@@ -52,6 +60,8 @@ beforeEach(() => {
   HTMLDialogElement.prototype.close = vi.fn(function (this: HTMLDialogElement) {
     this.open = false;
   });
+  mockGetWorkEditSnapshot.mockReset();
+  mockGetWorkEditSnapshot.mockResolvedValue(makeSnapshot());
 });
 
 function makeWork(overrides: Partial<Work> = {}): Work {
@@ -75,8 +85,56 @@ function makeWork(overrides: Partial<Work> = {}): Work {
     createdAt: null,
     playlists: [],
     resume: null,
-    sourceRevision: "revision-1",
     ...overrides,
+  };
+}
+
+function makeSnapshot(work: Work = makeWork(), revision = "revision-1"): WorkEditSnapshot {
+  return {
+    sourceRevision: revision,
+    id: work.id,
+    physicalPath: work.physicalPath,
+    title: work.title,
+    tags: work.tags,
+    urls: work.urls,
+    coverImage: work.coverImage,
+    dlsite: work.dlsite,
+  };
+}
+
+function seedSource(queryClient: QueryClient, work: Work = makeWork()) {
+  queryClient.setQueryData(WORK_QUERY_KEYS.source(work.id), makeSnapshot(work));
+}
+
+function renderDialog(ui: ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  seedSource(queryClient);
+  const wrap = (node: ReactElement) => (
+    <QueryClientProvider client={queryClient}>{node}</QueryClientProvider>
+  );
+  const view = render(wrap(ui));
+  return {
+    ...view,
+    rerender: (next: ReactElement) => view.rerender(wrap(next)),
+  };
+}
+
+function tagMutations() {
+  return {
+    addTagMutation: {
+      mutateAsync: vi.fn(),
+      isPending: false,
+      error: null,
+      reset: vi.fn(),
+    } as never,
+    removeTagMutation: {
+      mutateAsync: vi.fn(),
+      isPending: false,
+      error: null,
+      reset: vi.fn(),
+    } as never,
   };
 }
 
@@ -107,38 +165,49 @@ function makeUrlsMutation(
 }
 
 describe("WorkEditDialog", () => {
-  it("sourceRevision未設定時はタイトル保存を実行せず理由を表示する", () => {
+  it("正本が読めないときはタイトル保存を実行せず理由を表示する", async () => {
     const mutate = vi.fn();
+    mockGetWorkEditSnapshot.mockRejectedValue(
+      new Error("作品の正本が壊れているため編集できません。"),
+    );
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
     render(
-      <WorkEditDialog
-        work={makeWork({ sourceRevision: undefined })}
-        tagSuggestions={[]}
-        workPatchMutations={{
-          titleMutation: makeTitleMutation({ mutate }),
-          tagsMutation: { mutateAsync: vi.fn() } as never,
-          urlsMutation: { mutate: vi.fn(), isPending: false, error: null } as never,
-        }}
-        onClose={vi.fn()}
-      />,
+      <QueryClientProvider client={queryClient}>
+        <WorkEditDialog
+          work={makeWork()}
+          tagSuggestions={[]}
+          workPatchMutations={{
+            titleMutation: makeTitleMutation({ mutate }),
+            ...tagMutations(),
+            urlsMutation: { mutate: vi.fn(), isPending: false, error: null } as never,
+          }}
+          onClose={vi.fn()}
+        />
+      </QueryClientProvider>,
     );
 
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "作品の正本が壊れているため編集できません。",
+      ),
+    );
     const input = screen.getByLabelText("タイトル");
     expect(input).toBeDisabled();
-    fireEvent.change(input, { target: { value: "新しいタイトル" } });
     fireEvent.click(screen.getByRole("button", { name: "タイトルを保存" }));
     expect(mutate).not.toHaveBeenCalled();
-    expect(screen.getByRole("alert")).toHaveTextContent(WORK_SOURCE_PATCH_BLOCKED_MESSAGE);
   });
 
   it("javascript: のURLは保存せずバリデーション文言を出す", () => {
     const mutate = vi.fn();
-    render(
+    renderDialog(
       <WorkEditDialog
         work={makeWork()}
         tagSuggestions={[]}
         workPatchMutations={{
           titleMutation: makeTitleMutation(),
-          tagsMutation: { mutateAsync: vi.fn() } as never,
+          ...tagMutations(),
           urlsMutation: { mutate, isPending: false, error: null } as never,
         }}
         onClose={vi.fn()}
@@ -156,13 +225,13 @@ describe("WorkEditDialog", () => {
 
   it("http(s)のURLを保存できる", () => {
     const mutate = vi.fn();
-    render(
+    renderDialog(
       <WorkEditDialog
         work={makeWork()}
         tagSuggestions={[]}
         workPatchMutations={{
           titleMutation: makeTitleMutation(),
-          tagsMutation: { mutateAsync: vi.fn() } as never,
+          ...tagMutations(),
           urlsMutation: { mutate, isPending: false, error: null } as never,
         }}
         onClose={vi.fn()}
@@ -185,13 +254,13 @@ describe("WorkEditDialog", () => {
 
   it("未編集ならEscapeで確認なく即座に閉じる", () => {
     const onClose = vi.fn();
-    const { container } = render(
+    const { container } = renderDialog(
       <WorkEditDialog
         work={makeWork()}
         tagSuggestions={[]}
         workPatchMutations={{
           titleMutation: makeTitleMutation(),
-          tagsMutation: { mutateAsync: vi.fn() } as never,
+          ...tagMutations(),
           urlsMutation: { mutate: vi.fn(), isPending: false, error: null } as never,
         }}
         onClose={onClose}
@@ -207,13 +276,13 @@ describe("WorkEditDialog", () => {
 
   it("未保存の変更があるときEscapeで即座に閉じず、保存/破棄/取消のプロンプトを出す", () => {
     const onClose = vi.fn();
-    const { container } = render(
+    const { container } = renderDialog(
       <WorkEditDialog
         work={makeWork()}
         tagSuggestions={[]}
         workPatchMutations={{
           titleMutation: makeTitleMutation(),
-          tagsMutation: { mutateAsync: vi.fn() } as never,
+          ...tagMutations(),
           urlsMutation: { mutate: vi.fn(), isPending: false, error: null } as never,
         }}
         onClose={onClose}
@@ -233,13 +302,13 @@ describe("WorkEditDialog", () => {
 
   it("×ボタン・フッターの閉じるボタンも未保存時は同じプロンプトへ合流する", () => {
     const onClose = vi.fn();
-    render(
+    renderDialog(
       <WorkEditDialog
         work={makeWork()}
         tagSuggestions={[]}
         workPatchMutations={{
           titleMutation: makeTitleMutation(),
-          tagsMutation: { mutateAsync: vi.fn() } as never,
+          ...tagMutations(),
           urlsMutation: { mutate: vi.fn(), isPending: false, error: null } as never,
         }}
         onClose={onClose}
@@ -262,13 +331,13 @@ describe("WorkEditDialog", () => {
 
   it("プロンプトの破棄するで入力を捨てて閉じる", () => {
     const onClose = vi.fn();
-    render(
+    renderDialog(
       <WorkEditDialog
         work={makeWork()}
         tagSuggestions={[]}
         workPatchMutations={{
           titleMutation: makeTitleMutation(),
-          tagsMutation: { mutateAsync: vi.fn() } as never,
+          ...tagMutations(),
           urlsMutation: { mutate: vi.fn(), isPending: false, error: null } as never,
         }}
         onClose={onClose}
@@ -284,13 +353,13 @@ describe("WorkEditDialog", () => {
 
   it("プロンプトの取消は何もせず編集ダイアログへ戻る", () => {
     const onClose = vi.fn();
-    render(
+    renderDialog(
       <WorkEditDialog
         work={makeWork()}
         tagSuggestions={[]}
         workPatchMutations={{
           titleMutation: makeTitleMutation(),
-          tagsMutation: { mutateAsync: vi.fn() } as never,
+          ...tagMutations(),
           urlsMutation: { mutate: vi.fn(), isPending: false, error: null } as never,
         }}
         onClose={onClose}
@@ -308,14 +377,16 @@ describe("WorkEditDialog", () => {
 
   it("プロンプトの保存するはタイトルを保存してから閉じる", async () => {
     const onClose = vi.fn();
-    const mutateAsync = vi.fn().mockResolvedValue(makeWork({ sourceRevision: "revision-2" }));
-    render(
+    const mutateAsync = vi
+      .fn()
+      .mockResolvedValue({ snapshot: makeSnapshot(makeWork({ title: "編集途中" }), "revision-2") });
+    renderDialog(
       <WorkEditDialog
         work={makeWork()}
         tagSuggestions={[]}
         workPatchMutations={{
           titleMutation: makeTitleMutation({ mutateAsync }),
-          tagsMutation: { mutateAsync: vi.fn() } as never,
+          ...tagMutations(),
           urlsMutation: { mutate: vi.fn(), isPending: false, error: null } as never,
         }}
         onClose={onClose}
@@ -336,20 +407,20 @@ describe("WorkEditDialog", () => {
 
   it("保存処理中はキャンセルを押せない（後から成功した保存が続けていた編集ごと閉じる事故を防ぐ）", async () => {
     const onClose = vi.fn();
-    let resolveMutate: ((work: ReturnType<typeof makeWork>) => void) | undefined;
+    let resolveMutate: ((result: { snapshot: WorkEditSnapshot }) => void) | undefined;
     const mutateAsync = vi.fn(
       () =>
         new Promise((resolve) => {
           resolveMutate = resolve;
         }),
     );
-    render(
+    renderDialog(
       <WorkEditDialog
         work={makeWork()}
         tagSuggestions={[]}
         workPatchMutations={{
           titleMutation: makeTitleMutation({ mutateAsync }),
-          tagsMutation: { mutateAsync: vi.fn() } as never,
+          ...tagMutations(),
           urlsMutation: { mutate: vi.fn(), isPending: false, error: null } as never,
         }}
         onClose={onClose}
@@ -365,7 +436,7 @@ describe("WorkEditDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "キャンセル" }));
     expect(screen.getByRole("alertdialog", { name: "未保存の変更があります" })).toBeTruthy();
 
-    resolveMutate?.(makeWork({ sourceRevision: "revision-2" }));
+    resolveMutate?.({ snapshot: makeSnapshot(makeWork({ title: "編集途中" }), "revision-2") });
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
   });
 
@@ -378,7 +449,7 @@ describe("WorkEditDialog", () => {
         tagSuggestions={[]}
         workPatchMutations={{
           titleMutation: makeTitleMutation({ mutateAsync }),
-          tagsMutation: { mutateAsync: vi.fn() } as never,
+          ...tagMutations(),
           urlsMutation: { mutate: vi.fn(), isPending: false, error: null } as never,
         }}
         onClose={onClose}
@@ -401,7 +472,7 @@ describe("WorkEditDialog", () => {
         tagSuggestions={[]}
         workPatchMutations={{
           titleMutation: makeTitleMutation({ mutateAsync, error: new Error("network") }),
-          tagsMutation: { mutateAsync: vi.fn() } as never,
+          ...tagMutations(),
           urlsMutation: { mutate: vi.fn(), isPending: false, error: null } as never,
         }}
         onClose={onClose}
@@ -412,13 +483,13 @@ describe("WorkEditDialog", () => {
 
   it("保存中disabledでフォーカスが外れても、失敗後にタイトル欄へ戻す", () => {
     const onClose = vi.fn();
-    const { rerender } = render(
+    const { rerender } = renderDialog(
       <WorkEditDialog
         work={makeWork()}
         tagSuggestions={[]}
         workPatchMutations={{
           titleMutation: makeTitleMutation(),
-          tagsMutation: { mutateAsync: vi.fn() } as never,
+          ...tagMutations(),
           urlsMutation: { mutate: vi.fn(), isPending: false, error: null } as never,
         }}
         onClose={onClose}
@@ -438,7 +509,7 @@ describe("WorkEditDialog", () => {
         tagSuggestions={[]}
         workPatchMutations={{
           titleMutation: makeTitleMutation({ isPending: true }),
-          tagsMutation: { mutateAsync: vi.fn() } as never,
+          ...tagMutations(),
           urlsMutation: { mutate: vi.fn(), isPending: false, error: null } as never,
         }}
         onClose={onClose}
@@ -454,7 +525,7 @@ describe("WorkEditDialog", () => {
         tagSuggestions={[]}
         workPatchMutations={{
           titleMutation: makeTitleMutation({ isPending: false, error: new Error("network") }),
-          tagsMutation: { mutateAsync: vi.fn() } as never,
+          ...tagMutations(),
           urlsMutation: { mutate: vi.fn(), isPending: false, error: null } as never,
         }}
         onClose={onClose}
@@ -474,7 +545,7 @@ describe("WorkEditDialog", () => {
         tagSuggestions={[]}
         workPatchMutations={{
           titleMutation: makeTitleMutation(),
-          tagsMutation: { mutateAsync: vi.fn() } as never,
+          ...tagMutations(),
           urlsMutation: makeUrlsMutation(),
         }}
         onClose={onClose}
@@ -497,7 +568,7 @@ describe("WorkEditDialog", () => {
         tagSuggestions={[]}
         workPatchMutations={{
           titleMutation: makeTitleMutation(),
-          tagsMutation: { mutateAsync: vi.fn() } as never,
+          ...tagMutations(),
           urlsMutation: makeUrlsMutation({ isPending: true }),
         }}
         onClose={onClose}
@@ -513,7 +584,7 @@ describe("WorkEditDialog", () => {
         tagSuggestions={[]}
         workPatchMutations={{
           titleMutation: makeTitleMutation(),
-          tagsMutation: { mutateAsync: vi.fn() } as never,
+          ...tagMutations(),
           urlsMutation: makeUrlsMutation({ isPending: false, error: new Error("network") }),
         }}
         onClose={onClose}

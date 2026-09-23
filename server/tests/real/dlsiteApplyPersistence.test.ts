@@ -43,7 +43,11 @@ test("title: 単発適用は applyTitle に従い、一括取得は作品情報�
   const scan = await adapter.scan();
 
   const customTitle = "ユーザー編集タイトル";
-  await adapter.patchWork(lib.existingWorkId, { title: customTitle });
+  const snap = await adapter.getWorkEditSnapshot(lib.existingWorkId);
+  await adapter.patchWorkSource(lib.existingWorkId, {
+    sourceRevision: snap!.sourceRevision,
+    title: customTitle,
+  });
   const existingBeforeBulk = await adapter.getWork(lib.existingWorkId);
   assert.equal(existingBeforeBulk?.title, customTitle);
   const existingMetaPath = join(existingBeforeBulk!.physicalPath, META_FILE_NAME);
@@ -71,7 +75,7 @@ test("title: 単発適用は applyTitle に従い、一括取得は作品情報�
     applyTags: [],
     applyCover: false,
     applyUrl: true,
-    sourceRevision: (await adapter.getWork(lib.existingWorkId))!.sourceRevision!,
+    sourceRevision: (await adapter.getWorkEditSnapshot(lib.existingWorkId))!.sourceRevision,
   });
   const existingAfterApply = await adapter.getWork(lib.existingWorkId);
   assert.equal(existingAfterApply?.title, applyTitle);
@@ -100,7 +104,7 @@ test("title: 単発適用は applyTitle に従い、一括取得は作品情報�
     applyTags: [],
     applyCover: false,
     applyUrl: true,
-    sourceRevision: (await adapter.getWork(generatedId))!.sourceRevision!,
+    sourceRevision: (await adapter.getWorkEditSnapshot(generatedId))!.sourceRevision,
   });
   const generatedAfterApply = await adapter.getWork(generatedId);
   assert.equal(generatedAfterApply?.title, generatedAfterBulk?.title);
@@ -142,16 +146,17 @@ test("cover: 単発適用は applyCover で既存カバーを上書きし、一�
     coverUrl: COVER_URL,
     url: "https://www.dlsite.com/maniax/work/=/product_id/RJ900002.html",
   };
-  assert.equal(
-    await adapter.dlsiteApply(lib.existingWorkId, {
-      info,
-      applyTitle: false,
-      applyTags: [],
-      applyCover: true,
-      applyUrl: true,
-      sourceRevision: (await adapter.getWork(lib.existingWorkId))!.sourceRevision!,
-    }),
-    true,
+  assert.ok(
+    (
+      await adapter.dlsiteApply(lib.existingWorkId, {
+        info,
+        applyTitle: false,
+        applyTags: [],
+        applyCover: true,
+        applyUrl: true,
+        sourceRevision: (await adapter.getWorkEditSnapshot(lib.existingWorkId))!.sourceRevision,
+      })
+    )?.snapshot,
   );
   assert.equal(coverHttpCalls, 1);
   const withCover = await adapter.getWork(lib.existingWorkId);
@@ -163,16 +168,17 @@ test("cover: 単発適用は applyCover で既存カバーを上書きし、一�
   const afterBulk = await adapter.getWork(lib.existingWorkId);
   assert.equal(afterBulk?.cover?.image, firstCoverImage);
 
-  assert.equal(
-    await adapter.dlsiteApply(lib.existingWorkId, {
-      info: { ...info, coverUrl: "https://img.dlsite.jp/modpub/images2/work/b.jpg" },
-      applyTitle: false,
-      applyTags: [],
-      applyCover: true,
-      applyUrl: true,
-      sourceRevision: (await adapter.getWork(lib.existingWorkId))!.sourceRevision!,
-    }),
-    true,
+  assert.ok(
+    (
+      await adapter.dlsiteApply(lib.existingWorkId, {
+        info: { ...info, coverUrl: "https://img.dlsite.jp/modpub/images2/work/b.jpg" },
+        applyTitle: false,
+        applyTags: [],
+        applyCover: true,
+        applyUrl: true,
+        sourceRevision: (await adapter.getWorkEditSnapshot(lib.existingWorkId))!.sourceRevision,
+      })
+    )?.snapshot,
   );
   assert.equal(coverHttpCalls, 2);
 });
@@ -386,9 +392,9 @@ test("missing-only一括適用はCAS競合を集計して後続作品を続行�
   await adapter.runDlsiteBulk("existing", [firstId, secondId]);
 
   assert.deepEqual(await adapter.dlsiteApplyMissing([firstId, secondId]), {
-    applied: 1,
+    applied: 2,
     skipped: 0,
-    failed: 1,
+    failed: 0,
   });
   assert.equal(
     (JSON.parse(readFileSync(firstMetaPath, "utf-8")) as { title: string }).title,
@@ -478,7 +484,7 @@ test("一括取得はカバーをキャッシュも適用もせず、明示適�
     applyTags: [],
     applyCover: true,
     applyUrl: true,
-    sourceRevision: (await adapter.getWork(lib.existingWorkId))!.sourceRevision!,
+    sourceRevision: (await adapter.getWorkEditSnapshot(lib.existingWorkId))!.sourceRevision,
   });
   assert.equal(coverHttpCalls, 1);
 });

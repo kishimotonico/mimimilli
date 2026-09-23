@@ -7,18 +7,23 @@ import type {
   DlsiteNotificationQuery,
   DlsiteNotificationSummary,
   IdentityConflictReassignBody,
+  NormalizedTag,
   ResumeBody,
   Work,
+  WorkBookmarkPatch,
+  WorkBookmarkResult,
   WorkCreateBody,
-  WorkPatch,
+  WorkEditSnapshot,
   WorkRegisterPreview,
+  WorkSourceMutationResult,
+  WorkSourcePatch,
   WorkspacePath,
   WorksPage,
   WorksQuery,
 } from "@mimimilli/shared";
-import { isAudioFileName } from "@mimimilli/shared";
+import { isAudioFileName, tagEquals } from "@mimimilli/shared";
 import { type Db } from "./db.ts";
-import { MetaParseError, patchMetaFileCas, readMetaSource } from "./meta.ts";
+import { MetaMutationReject, encodeMetaRaw, patchMetaFileCas, readMetaSource } from "./meta.ts";
 import { SourceChangedError } from "../../errors.ts";
 import { resolveWithin } from "./paths.ts";
 import { Scanner } from "./scanner.ts";
@@ -28,6 +33,12 @@ import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import type { UserWorkStateRepository } from "./userWorkStateRepository.ts";
 import type { WorkQueryRepository } from "./workQueryRepository.ts";
 import { getWorkWithLiveProbe } from "./workRefresh.ts";
+import {
+  mutateVerifiedMetaSource,
+  projectVerifiedSource,
+  readVerifiedEditSource,
+  toEditSnapshot,
+} from "./workEditSource.ts";
 import {
   buildFileWorkRegisterPreview,
   buildWorkRegisterPreview,
@@ -47,6 +58,14 @@ export function createWorkMethods(deps: {
   cachedCover: (coverUrl: string, workDir: string, signal?: AbortSignal) => Promise<string>;
 }) {
   const { db, query, catalog, user, scanner, requireRoot, cachedCover } = deps;
+
+  async function persistSourceMutation(
+    verified: ReturnType<typeof mutateVerifiedMetaSource>,
+  ): Promise<WorkSourceMutationResult | null> {
+    if (!verified) return null;
+    return { snapshot: await projectVerifiedSource(scanner, verified) };
+  }
+
   return {
     async queryWorks(params: WorksQuery): Promise<WorksPage> {
       return query.queryWorks(params, requireRoot());
@@ -64,17 +83,13 @@ export function createWorkMethods(deps: {
     },
 
     async getWork(id: string): Promise<Work | null> {
-      const work = await getWorkWithLiveProbe(db, query, catalog, id);
-      if (!work) return null;
-      const metaPath = catalog.getWorkMetaPath(id);
-      if (!metaPath) return null;
-      try {
-        return { ...work, sourceRevision: readMetaSource(metaPath).sourceRevision };
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === "ENOENT" || error instanceof MetaParseError)
-          return work;
-        throw error;
-      }
+      return getWorkWithLiveProbe(db, query, catalog, id);
+    },
+
+    async getWorkEditSnapshot(id: string): Promise<WorkEditSnapshot | null> {
+      const verified = readVerifiedEditSource(catalog, id);
+      if (!verified) return null;
+      return toEditSnapshot(verified.source, verified.physicalPath);
     },
 
     async getWorkRegisterPreview(path: WorkspacePath): Promise<WorkRegisterPreview | null> {
@@ -132,7 +147,7 @@ export function createWorkMethods(deps: {
         return paths.length >= 2 ? [{ ...candidate, paths }] : [];
       });
       catalog.replaceIdentityConflicts(remaining);
-      return { ...work, sourceRevision: updated.sourceRevision };
+      return work;
     },
 
     async deleteWork(id: string): Promise<boolean> {
@@ -158,30 +173,57 @@ export function createWorkMethods(deps: {
       return { deletedCount, failedCount };
     },
 
-    async patchWork(id: string, patch: WorkPatch): Promise<Work | null> {
-      const metaPath = catalog.getWorkMetaPath(id);
-      if (!metaPath) return null;
-      const source = readMetaSource(metaPath);
-      if (patch.sourceRevision !== undefined && source.sourceRevision !== patch.sourceRevision) {
-        throw new SourceChangedError();
-      }
-      if (patch.bookmarked !== undefined) {
-        user.patchBookmarked(id, patch.bookmarked);
-      }
-      if (patch.title === undefined && patch.tags === undefined && patch.urls === undefined) {
-        const work = await getWorkWithLiveProbe(db, query, catalog, id);
-        return work ? { ...work, sourceRevision: source.sourceRevision } : null;
-      }
-      const updated = patchMetaFileCas(metaPath, patch.sourceRevision ?? source.sourceRevision, {
-        title: patch.title,
-        tags: patch.tags,
-        urls: patch.urls,
-      });
-      const outcome = await scanner.projectMetaFile(metaPath, updated);
-      const work = await getWorkWithLiveProbe(db, query, catalog, id);
-      if (!work) return null;
-      if (outcome.status !== "published") return work;
-      return { ...work, sourceRevision: updated.sourceRevision };
+    async patchWorkSource(
+      id: string,
+      patch: WorkSourcePatch,
+    ): Promise<WorkSourceMutationResult | null> {
+      return persistSourceMutation(
+        mutateVerifiedMetaSource(catalog, id, (source) => {
+          if (source.sourceRevision !== patch.sourceRevision) {
+            return new MetaMutationReject(new SourceChangedError());
+          }
+          const raw = JSON.parse(source.bytes.toString("utf-8")) as Record<string, unknown>;
+          if (patch.title !== undefined) raw.title = patch.title;
+          if (patch.tags !== undefined) raw.tags = patch.tags;
+          if (patch.urls !== undefined) raw.urls = patch.urls;
+          return encodeMetaRaw(raw);
+        }),
+      );
+    },
+
+    async patchWorkBookmark(
+      id: string,
+      patch: WorkBookmarkPatch,
+    ): Promise<WorkBookmarkResult | null> {
+      if (!catalog.workExists(id)) return null;
+      user.patchBookmarked(id, patch.bookmarked);
+      return { bookmarked: patch.bookmarked };
+    },
+
+    async addWorkTag(id: string, tag: NormalizedTag): Promise<WorkSourceMutationResult | null> {
+      return persistSourceMutation(
+        mutateVerifiedMetaSource(catalog, id, (source) => {
+          if (source.meta.tags.some((existing) => tagEquals(existing, tag))) {
+            return source.bytes;
+          }
+          const raw = JSON.parse(source.bytes.toString("utf-8")) as Record<string, unknown>;
+          raw.tags = [...source.meta.tags, tag];
+          return encodeMetaRaw(raw);
+        }),
+      );
+    },
+
+    async removeWorkTag(id: string, tag: NormalizedTag): Promise<WorkSourceMutationResult | null> {
+      return persistSourceMutation(
+        mutateVerifiedMetaSource(catalog, id, (source) => {
+          if (!source.meta.tags.some((existing) => tagEquals(existing, tag))) {
+            return source.bytes;
+          }
+          const raw = JSON.parse(source.bytes.toString("utf-8")) as Record<string, unknown>;
+          raw.tags = source.meta.tags.filter((existing) => !tagEquals(existing, tag));
+          return encodeMetaRaw(raw);
+        }),
+      );
     },
 
     async saveResume(id: string, body: ResumeBody): Promise<boolean> {

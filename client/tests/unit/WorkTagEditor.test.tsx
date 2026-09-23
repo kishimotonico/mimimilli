@@ -1,16 +1,13 @@
 import type { ReactElement } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import type { Work } from "@mimimilli/shared";
 import { emptyDlsiteState } from "@mimimilli/shared";
-import { WORK_SOURCE_PATCH_BLOCKED_MESSAGE } from "../../src/entities/work/sourceRevision";
-import type { LibraryTagsPatchMutation } from "../../src/features/library/model/useLibraryQueries";
+import type { LibraryTagIntentMutation } from "../../src/features/library/model/useLibraryQueries";
 import { WorkTagEditor } from "../../src/features/library/ui/preview/WorkTagEditor";
 import GlobalToast from "../../src/app/ui/GlobalToast";
 
-// Toastは単一ホスト（GlobalToast）へ集約されているため、WorkTagEditorの表示要求を
-// 目に見える形で検証するにはGlobalToastも一緒に描画する必要がある。
 function renderWithToast(ui: ReactElement) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -48,14 +45,13 @@ function makeWork(overrides: Partial<Work> = {}): Work {
     createdAt: null,
     playlists: [],
     resume: null,
-    sourceRevision: "revision-1",
     ...overrides,
   };
 }
 
-function makeTagsMutation(
-  overrides: Partial<LibraryTagsPatchMutation> = {},
-): LibraryTagsPatchMutation {
+function makeTagMutation(
+  overrides: Partial<LibraryTagIntentMutation> = {},
+): LibraryTagIntentMutation {
   return {
     isPending: false,
     error: null,
@@ -63,7 +59,7 @@ function makeTagsMutation(
     mutate: vi.fn(),
     mutateAsync: vi.fn(),
     ...overrides,
-  } as LibraryTagsPatchMutation;
+  } as LibraryTagIntentMutation;
 }
 
 vi.mock("../../src/entities/tag/useTagPrefixes", () => ({
@@ -71,30 +67,13 @@ vi.mock("../../src/entities/tag/useTagPrefixes", () => ({
 }));
 
 describe("WorkTagEditor", () => {
-  it("sourceRevision未設定時はタグ追加を実行せず理由を表示する", () => {
-    const mutateAsync = vi.fn();
-    render(
-      <WorkTagEditor
-        work={makeWork({ sourceRevision: undefined })}
-        tagSuggestions={[]}
-        tagsMutation={makeTagsMutation({ mutateAsync })}
-        expanded
-      />,
-    );
-
-    const addButton = screen.getByRole("button", { name: "タグを追加" });
-    expect(addButton).toBeDisabled();
-    fireEvent.click(addButton);
-    expect(mutateAsync).not.toHaveBeenCalled();
-    expect(screen.getByRole("alert")).toHaveTextContent(WORK_SOURCE_PATCH_BLOCKED_MESSAGE);
-  });
-
   it("タグ保存に失敗すると共通トースト（error variant・手動クローズ）で案内する", () => {
     renderWithToast(
       <WorkTagEditor
         work={makeWork()}
         tagSuggestions={[]}
-        tagsMutation={makeTagsMutation({ error: new Error("network") })}
+        addTagMutation={makeTagMutation({ error: new Error("network") })}
+        removeTagMutation={makeTagMutation()}
         expanded
       />,
     );

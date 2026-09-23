@@ -139,7 +139,7 @@ test("DLsite状態: mimimilli.jsonの旧errorは投影でnone、RJコードとap
 test("移動追従: フォルダー移動後も同一 ID で path 更新・DB固有情報を保持", async (t) => {
   const { adapter, existingWorkId, root } = await setup(t);
   await adapter.scan();
-  await adapter.patchWork(existingWorkId, { bookmarked: true });
+  await adapter.patchWorkBookmark(existingWorkId, { bookmarked: true });
 
   const oldDir = join(root, "dlsite", "RJ900002_既存メタ");
   const newDir = join(root, "RJ900002_移動先");
@@ -502,7 +502,7 @@ test("カバー計測失敗: 画像が読めない場合は寸法NULLでcoverErr
 test("増分スキャン: ディレクトリ移動を同一 UUID で追跡し fingerprint を再計算する", async (t) => {
   const { adapter, existingWorkId, root } = await setup(t);
   await adapter.scan();
-  await adapter.patchWork(existingWorkId, { bookmarked: true });
+  await adapter.patchWorkBookmark(existingWorkId, { bookmarked: true });
 
   const oldDir = join(root, "dlsite", "RJ900002_既存メタ");
   const newDir = join(root, "RJ900002_移動先");

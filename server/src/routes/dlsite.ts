@@ -10,12 +10,12 @@ import {
   dlsiteFetchByCodeBodySchema,
   dlsiteNotificationKindSchema,
   dlsiteNotificationQuerySchema,
-  dlsiteStatePatchSchema,
+  dlsiteStateUpdateBodySchema,
+  workSourceMutationResultSchema,
 } from "@mimimilli/shared";
 import { DlsiteOfflineError } from "../errors.ts";
-import { SourceChangedError } from "../errors.ts";
 import type { DataAdapter } from "../adapter/index.ts";
-import { apiError, invalidRequest, notFound } from "../lib/httpError.ts";
+import { apiError, invalidRequest, notFound, throwSourceCommandError } from "../lib/httpError.ts";
 import { readOptionalJsonBody } from "../lib/jsonBody.ts";
 import { getCategoryLogger } from "../lib/logger.ts";
 import type { DlsiteJobManager } from "../dlsiteJobManager.ts";
@@ -84,9 +84,13 @@ export function dlsiteRoute(adapter: DataAdapter, dlsiteJobs: DlsiteJobManager):
         signal: c.req.raw.signal,
       });
       if (!result.ok) throw apiError(result.kind, result.message);
-      const work = await adapter.getWork(workId);
-      if (!work?.sourceRevision) notFound(`作品が見つかりません: ${workId}`);
-      return c.json({ info: result.info, sourceRevision: work.sourceRevision });
+      try {
+        const snapshot = await adapter.getWorkEditSnapshot(workId);
+        if (!snapshot) notFound(`作品が見つかりません: ${workId}`);
+        return c.json({ info: result.info, sourceRevision: snapshot.sourceRevision });
+      } catch (error) {
+        throwSourceCommandError(error);
+      }
     } catch (error) {
       if (isClientAbort(error)) {
         dlsiteLogger.info("クライアント切断によりDLsite取得を中断しました", { workId });
@@ -103,20 +107,19 @@ export function dlsiteRoute(adapter: DataAdapter, dlsiteJobs: DlsiteJobManager):
       invalidRequest("DLsite適用内容が不正です");
     }
     const workId = c.req.param("id");
-    let ok: boolean;
+    let result;
     try {
-      ok = await adapter.dlsiteApply(workId, parsed.data, { signal: c.req.raw.signal });
+      result = await adapter.dlsiteApply(workId, parsed.data, { signal: c.req.raw.signal });
     } catch (error) {
       if (isClientAbort(error)) {
         dlsiteLogger.info("クライアント切断によりDLsite適用を中断しました", { workId });
         return;
       }
       if (error instanceof DlsiteOfflineError) throw apiError("offline", error.message);
-      if (error instanceof SourceChangedError) throw apiError("source_changed", error.message);
-      throw error;
+      throwSourceCommandError(error);
     }
-    if (!ok) notFound(`作品が見つかりません: ${workId}`);
-    return c.body(null, 204);
+    if (!result) notFound(`作品が見つかりません: ${workId}`);
+    return c.json(workSourceMutationResultSchema.parse(result));
   });
 
   app.post("/dlsite/apply-missing", async (c) => {
@@ -147,11 +150,15 @@ export function dlsiteRoute(adapter: DataAdapter, dlsiteJobs: DlsiteJobManager):
 
   app.patch("/dlsite/:id", async (c) => {
     const body = await c.req.json().catch(() => null);
-    const parsed = dlsiteStatePatchSchema.safeParse(body);
+    const parsed = dlsiteStateUpdateBodySchema.safeParse(body);
     if (!parsed.success) invalidRequest(parsed.error.issues[0]?.message ?? "DLsite状態が不正です");
-    const work = await adapter.updateDlsiteState(c.req.param("id"), parsed.data);
-    if (!work) notFound(`作品が見つかりません: ${c.req.param("id")}`);
-    return c.json(work);
+    try {
+      const result = await adapter.updateDlsiteState(c.req.param("id"), parsed.data);
+      if (!result) notFound(`作品が見つかりません: ${c.req.param("id")}`);
+      return c.json(workSourceMutationResultSchema.parse(result));
+    } catch (error) {
+      throwSourceCommandError(error);
+    }
   });
 
   app.get("/dlsite/bulk", (c) => {

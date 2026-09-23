@@ -2,8 +2,7 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { useMutation, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import type { WorkListItem, WorksPage } from "@mimimilli/shared";
-import { getWork, patchWork } from "../../../../entities/work/api";
-import { assertWorkSourceRevision } from "../../../../entities/work/sourceRevision";
+import { getWorkEditSnapshot, patchWorkSource } from "../../../../entities/work/api";
 import { WORK_QUERY_KEYS } from "../../../../entities/work/queryKeys";
 import { apiErrorMessage } from "../../../../shared/lib/apiError";
 
@@ -41,21 +40,22 @@ export function useInlineTitleEdit(queryKey: QueryKey): InlineTitleEdit {
 
   const saveTitleMutation = useMutation({
     mutationFn: async ({ workId, title }: { workId: string; title: string }) => {
-      const work = await getWork(workId);
-      return patchWork(workId, {
+      const snapshot = await getWorkEditSnapshot(workId);
+      return patchWorkSource(workId, {
         title,
-        sourceRevision: assertWorkSourceRevision(work.sourceRevision),
+        sourceRevision: snapshot.sourceRevision,
       });
     },
-    onSuccess: (updatedWork, { workId }) => {
-      queryClient.setQueryData(WORK_QUERY_KEYS.detail(workId), updatedWork);
+    onSuccess: (result, { workId }) => {
+      queryClient.setQueryData(WORK_QUERY_KEYS.source(workId), result.snapshot);
+      void queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.detail(workId), exact: true });
       queryClient.setQueryData<WorksPage>(queryKey, (prev) =>
-        patchTitleInWorksPage(prev, workId, updatedWork.title),
+        patchTitleInWorksPage(prev, workId, result.snapshot.title),
       );
       setEditingId(null);
     },
     onError: (_error, { workId }) => {
-      void queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.detail(workId) });
+      void queryClient.invalidateQueries({ queryKey: WORK_QUERY_KEYS.detail(workId), exact: true });
     },
   });
 

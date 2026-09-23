@@ -25,7 +25,6 @@ function makeWork(overrides: Partial<Work> = {}): Work {
     createdAt: null,
     playlists: [],
     resume: null,
-    sourceRevision: "revision-1",
     ...overrides,
   };
 }

@@ -314,6 +314,16 @@ export const dlsiteStatePatchSchema = z
   .refine((patch) => patch.rjCode !== undefined || patch.skipped !== undefined);
 export type DlsiteStatePatch = z.infer<typeof dlsiteStatePatchSchema>;
 
+/** PATCH /api/dlsite/:id。状態変更は正本 CAS のため sourceRevision 必須。 */
+export const dlsiteStateUpdateBodySchema = z
+  .object({
+    sourceRevision: z.string().min(1),
+    rjCode: rjCodeFormatSchema.nullable().optional(),
+    skipped: z.boolean().optional(),
+  })
+  .refine((patch) => patch.rjCode !== undefined || patch.skipped !== undefined);
+export type DlsiteStateUpdateBody = z.infer<typeof dlsiteStateUpdateBodySchema>;
+
 /** updateDlsiteState の状態遷移（real/fixture 共通）。
  *  RJコードが変わったときだけ旧コード由来の取得結果を捨てて未取得に戻す。
  *  skipped 指定時は従来どおり status/error/errorKind を上書きする（rjCode 変更より後に適用）。 */

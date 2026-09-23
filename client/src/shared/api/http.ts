@@ -180,7 +180,7 @@ export async function postVoid(path: string, body?: unknown): Promise<void> {
 export async function putParsed<T>(
   schema: z.ZodType<T>,
   path: string,
-  body: unknown,
+  body?: unknown,
   options?: ParsedRequestOptions & { noContentAsNull?: false | undefined },
 ): Promise<T>;
 export async function putParsed<T>(
@@ -192,13 +192,14 @@ export async function putParsed<T>(
 export async function putParsed<T>(
   schema: z.ZodType<T>,
   path: string,
-  body: unknown,
+  body?: unknown,
   options?: ParsedRequestOptions,
 ): Promise<T | null> {
   const res = await fetch(API_BASE + path, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    ...(body === undefined
+      ? {}
+      : { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }),
     signal: options?.signal,
   });
   return handleParsedResponse("PUT", path, res, schema, options);

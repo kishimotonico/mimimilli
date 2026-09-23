@@ -5,6 +5,8 @@ import {
   isDlsiteFetchFailed,
   isDlsiteParseFailed,
   isRjCodeMissing,
+  tagEquals,
+  type NormalizedTag,
 } from "@mimimilli/shared";
 import type {
   DataIntegrityWarning,
@@ -14,15 +16,19 @@ import type {
   DlsiteNotificationSummary,
   IdentityConflictReassignBody,
   Work,
+  WorkBookmarkPatch,
+  WorkBookmarkResult,
   WorkCreateBody,
-  WorkPatch,
+  WorkEditSnapshot,
   WorkRegisterPreview,
+  WorkSourceMutationResult,
+  WorkSourcePatch,
   WorkspacePath,
   WorksPage,
   WorksQuery,
   WorkSummary,
 } from "@mimimilli/shared";
-import { descendantsRegisteredError, InvalidResumeError, WorkRegisterError } from "../../errors.ts";
+import { descendantsRegisteredError, InvalidResumeError, SourceChangedError, WorkRegisterError } from "../../errors.ts";
 import type { WorkAdapter } from "../../adapter/work.ts";
 import { summarizeDlsiteNotifications } from "../../core/dlsiteNotifications.ts";
 import { compareJapaneseSortKeys, compareUtf8Bytes } from "../../core/japaneseSortKey.ts";
@@ -30,7 +36,47 @@ import { applyWorksQuery, toWorksPage } from "../../core/worksQuery.ts";
 import { isPathWithin } from "../../lib/path.ts";
 import { buildFullWorkFromState } from "./playback.ts";
 import { normalizeFsPath } from "./fsResolve.ts";
-import { type FixtureState } from "./state.ts";
+import { type FixtureState, coverColumnsOf } from "./state.ts";
+
+export function fixtureRevisionOf(state: FixtureState, workId: string): string {
+  return state.sourceRevisions.get(workId) ?? "fixture";
+}
+
+export function bumpFixtureRevision(state: FixtureState, workId: string): string {
+  state.sourceRevisionSeq += 1;
+  const token = `fixture-${state.sourceRevisionSeq}`;
+  state.sourceRevisions.set(workId, token);
+  return token;
+}
+
+export function requireFixtureRevision(
+  state: FixtureState,
+  workId: string,
+  expected: string,
+): void {
+  if (fixtureRevisionOf(state, workId) !== expected) throw new SourceChangedError();
+}
+
+export function fixtureEditSnapshot(state: FixtureState, work: WorkSummary): WorkEditSnapshot {
+  return {
+    sourceRevision: fixtureRevisionOf(state, work.id),
+    id: work.id,
+    physicalPath: work.physicalPath,
+    title: work.title,
+    tags: work.tags,
+    urls: work.urls,
+    coverImage: coverColumnsOf(state, work.id).image,
+    dlsite: work.dlsite,
+  };
+}
+
+export function fixtureSourceMutation(
+  state: FixtureState,
+  work: WorkSummary,
+): WorkSourceMutationResult {
+  bumpFixtureRevision(state, work.id);
+  return { snapshot: fixtureEditSnapshot(state, work) };
+}
 
 export function createWorkMethods(state: FixtureState): WorkAdapter {
   async function getWorkRegisterPreview(path: WorkspacePath): Promise<WorkRegisterPreview | null> {
@@ -159,6 +205,7 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
             : emptyDlsiteState(),
       };
       state.works.push(work);
+      state.sourceRevisions.set(work.id, "fixture");
       return buildFullWorkFromState(state, work);
     },
 
@@ -200,14 +247,48 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
       return { deletedCount, failedCount: 0 };
     },
 
-    async patchWork(id: string, patch: WorkPatch): Promise<Work | null> {
-      const work = state.works.find((w) => w.id === id);
+    async getWorkEditSnapshot(id: string): Promise<WorkEditSnapshot | null> {
+      const work = state.works.find((candidate) => candidate.id === id);
+      return work ? fixtureEditSnapshot(state, work) : null;
+    },
+
+    async patchWorkSource(
+      id: string,
+      patch: WorkSourcePatch,
+    ): Promise<WorkSourceMutationResult | null> {
+      const work = state.works.find((candidate) => candidate.id === id);
       if (!work) return null;
+      requireFixtureRevision(state, id, patch.sourceRevision);
       if (patch.title !== undefined) work.title = patch.title;
       if (patch.tags !== undefined) work.tags = patch.tags;
-      if (patch.bookmarked !== undefined) work.bookmarked = patch.bookmarked;
       if (patch.urls !== undefined) work.urls = patch.urls;
-      return buildFullWorkFromState(state, work);
+      return fixtureSourceMutation(state, work);
+    },
+
+    async patchWorkBookmark(
+      id: string,
+      patch: WorkBookmarkPatch,
+    ): Promise<WorkBookmarkResult | null> {
+      const work = state.works.find((candidate) => candidate.id === id);
+      if (!work) return null;
+      work.bookmarked = patch.bookmarked;
+      return { bookmarked: patch.bookmarked };
+    },
+
+    async addWorkTag(id: string, tag: NormalizedTag): Promise<WorkSourceMutationResult | null> {
+      const work = state.works.find((candidate) => candidate.id === id);
+      if (!work) return null;
+      if (!work.tags.some((existing) => tagEquals(existing, tag))) {
+        work.tags = [...work.tags, tag];
+      }
+      return fixtureSourceMutation(state, work);
+    },
+
+    async removeWorkTag(id: string, tag: NormalizedTag): Promise<WorkSourceMutationResult | null> {
+      const work = state.works.find((candidate) => candidate.id === id);
+      if (!work) return null;
+      work.tags = work.tags.filter((existing) => !tagEquals(existing, tag));
+      return fixtureSourceMutation(state, work);
     },
 
     async saveResume(id: string, body: import("@mimimilli/shared").ResumeBody): Promise<boolean> {

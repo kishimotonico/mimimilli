@@ -78,13 +78,13 @@ test("replace: 単体適用で明示的に選んだサークルは既存の同pr
   const fixtureAdapter = createFixtureAdapter();
   const fixtureApplied = await fixtureAdapter.dlsiteApply("RJ501011", {
     info: fixtureInfo,
-    sourceRevision: "unused-by-fixture",
+    sourceRevision: "fixture",
     applyTitle: false,
     applyTags: nts(["サークル/fixtureサークル"]),
     applyCover: false,
     applyUrl: false,
   });
-  assert.equal(fixtureApplied, true);
+  assert.ok(fixtureApplied?.snapshot);
   const fixtureWork = await fixtureAdapter.getWork("RJ501011");
   assert.equal(countCircleTags(fixtureWork!.tags), 1, "fixture: 置換後もサークルは1値");
   assert.ok(fixtureWork!.tags.includes(nt("サークル/fixtureサークル")));
@@ -106,7 +106,6 @@ test("replace: 単体適用で明示的に選んだサークルは既存の同pr
   );
   await realAdapter.updateSettings({ rootFolder: lib.root });
   await realAdapter.scan();
-  const before = await realAdapter.getWork(lib.existingWorkId);
   const realInfo: DlsiteWorkInfo = {
     rjCode: "RJ900002",
     title: "x",
@@ -119,13 +118,13 @@ test("replace: 単体適用で明示的に選んだサークルは既存の同pr
   };
   const realApplied = await realAdapter.dlsiteApply(lib.existingWorkId, {
     info: realInfo,
-    sourceRevision: before!.sourceRevision!,
+    sourceRevision: (await realAdapter.getWorkEditSnapshot(lib.existingWorkId))!.sourceRevision,
     applyTitle: false,
     applyTags: nts(["サークル/満月堂"]),
     applyCover: false,
     applyUrl: false,
   });
-  assert.equal(realApplied, true);
+  assert.ok(realApplied?.snapshot);
   const realWork = await realAdapter.getWork(lib.existingWorkId);
   assert.equal(countCircleTags(realWork!.tags), 1, "real: 置換後もサークルは1値");
   assert.ok(realWork!.tags.includes(nt("サークル/満月堂")));

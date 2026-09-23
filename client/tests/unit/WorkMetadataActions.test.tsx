@@ -2,7 +2,6 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { Work } from "@mimimilli/shared";
 import { emptyDlsiteState } from "@mimimilli/shared";
-import { WORK_SOURCE_PATCH_BLOCKED_MESSAGE } from "../../src/entities/work/sourceRevision";
 import type { LibraryBookmarkPatchMutation } from "../../src/features/library/model/useLibraryQueries";
 import { WorkMetadataActions } from "../../src/features/library/ui/preview/WorkMetadataActions";
 
@@ -78,27 +77,7 @@ describe("WorkMetadataActions", () => {
     expect(mutate).toHaveBeenCalledWith({
       workId: "w1",
       bookmarked: true,
-      sourceRevision: "revision-1",
     });
-  });
-
-  it("sourceRevision未設定時はブックマークを実行せず理由を表示する", () => {
-    const mutate = vi.fn();
-    render(
-      <WorkMetadataActions
-        work={makeWork({ sourceRevision: undefined })}
-        bookmarkMutation={makeBookmarkMutation({ mutate })}
-        onEdit={vi.fn()}
-        onShowInfo={vi.fn()}
-        onDelete={vi.fn()}
-      />,
-    );
-
-    const bookmarkButton = screen.getByRole("button", { name: "ブックマークに追加" });
-    expect(bookmarkButton).toBeDisabled();
-    fireEvent.click(bookmarkButton);
-    expect(mutate).not.toHaveBeenCalled();
-    expect(screen.getByRole("alert")).toHaveTextContent(WORK_SOURCE_PATCH_BLOCKED_MESSAGE);
   });
 
   it("その他メニューから作品登録を解除を選ぶと onDelete を呼ぶ", () => {

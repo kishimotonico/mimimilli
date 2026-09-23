@@ -94,7 +94,6 @@ function makeWorkDetail(id: string, title = `作品 ${id}`): Work {
       },
     ],
     resume: null,
-    sourceRevision: "revision-1",
   };
 }
 
@@ -124,6 +123,19 @@ function createFetchMock(total = WORKS_DEFAULT_PAGE_SIZE + 50) {
         );
       }
 
+      const bookmarkMatch = path.match(/^\/api\/works\/([^/]+)\/bookmark$/);
+      if (bookmarkMatch && init?.method === "PATCH") {
+        const id = bookmarkMatch[1];
+        const body = JSON.parse(init.body as string) as { bookmarked: boolean };
+        const current = detailsById.get(id) ?? makeWorkDetail(id);
+        const updated = { ...current, bookmarked: body.bookmarked };
+        detailsById.set(id, updated);
+        const listItem = worksById.get(id) ?? makeWorkListItem(id, updated.title);
+        listItem.bookmarked = body.bookmarked;
+        worksById.set(id, listItem);
+        return Promise.resolve(jsonResponse({ bookmarked: body.bookmarked }));
+      }
+
       const workIdMatch = path.match(/^\/api\/works\/([^/]+)$/);
       if (workIdMatch) {
         const id = workIdMatch[1];
@@ -133,14 +145,27 @@ function createFetchMock(total = WORKS_DEFAULT_PAGE_SIZE + 50) {
           const updated: Work = {
             ...current,
             ...(body.title !== undefined ? { title: body.title as string } : {}),
-            ...(body.bookmarked !== undefined ? { bookmarked: body.bookmarked as boolean } : {}),
             ...(body.tags !== undefined ? { tags: body.tags as string[] } : {}),
+            ...(body.urls !== undefined ? { urls: body.urls as Work["urls"] } : {}),
           };
           detailsById.set(id, updated);
           const listItem = makeWorkListItem(id, updated.title);
           listItem.bookmarked = updated.bookmarked;
           worksById.set(id, listItem);
-          return Promise.resolve(jsonResponse(updated));
+          return Promise.resolve(
+            jsonResponse({
+              snapshot: {
+                sourceRevision: "revision-2",
+                id: updated.id,
+                physicalPath: updated.physicalPath,
+                title: updated.title,
+                tags: updated.tags,
+                urls: updated.urls,
+                coverImage: updated.coverImage,
+                dlsite: updated.dlsite,
+              },
+            }),
+          );
         }
         const detail = detailsById.get(id) ?? makeWorkDetail(id);
         if (!detailsById.has(id)) detailsById.set(id, detail);
@@ -217,8 +242,8 @@ describe("作品 PATCH 後の一覧キャッシュ同期", () => {
     vi.unstubAllGlobals();
   });
 
-  it("タイトル変更（影響しない条件）ではアクティブ一覧のみ更新し再フェッチしない", async () => {
-    const { result, queryClient } = renderLibraryHooks(baseNav);
+  it("タイトル変更後は閲覧一覧を invalidate して再フェッチし、新しいタイトルが出る", async () => {
+    const { result } = renderLibraryHooks(baseNav);
 
     await waitFor(() => expect(result.current.works).toHaveLength(WORKS_DEFAULT_PAGE_SIZE));
 
@@ -234,22 +259,18 @@ describe("作品 PATCH 後の一覧キャッシュ同期", () => {
       await result.current.workPatchMutations.titleMutation.mutateAsync({
         workId: "p1-w1",
         title: "更新後タイトル",
-        sourceRevision: "revision-1",
       });
     });
 
-    expect(worksCallUrls(fetchMock).length).toBe(worksCallsBeforePatch);
+    await waitFor(() => {
+      expect(worksCallUrls(fetchMock).length).toBeGreaterThan(worksCallsBeforePatch);
+    });
     await waitFor(() => {
       expect(result.current.works.find((w) => w.id === "p1-w1")?.title).toBe("更新後タイトル");
     });
-    expect(result.current.selectedWork?.title).toBe("更新後タイトル");
-
-    const worksQueries = queryClient.getQueryCache().findAll({ queryKey: ["works"] });
-    const activeInfinite = worksQueries.find((q) =>
-      Array.isArray((q.state.data as { pages?: unknown })?.pages),
-    );
-    expect(activeInfinite?.getObserversCount()).toBeGreaterThan(0);
-    expect(activeInfinite?.isStale()).toBe(false);
+    await waitFor(() => {
+      expect(result.current.selectedWork?.title).toBe("更新後タイトル");
+    });
   });
 
   it("ブックマークPATCH後もresumeはサーバーの最新値へ差し替わらずキャッシュ側を維持する（resumeはPATCHと別経路のため）", async () => {
@@ -273,7 +294,6 @@ describe("作品 PATCH 後の一覧キャッシュ同期", () => {
       await result.current.workPatchMutations.bookmarkMutation.mutateAsync({
         workId: "p1-w1",
         bookmarked: true,
-        sourceRevision: "revision-1",
       });
     });
 
@@ -305,7 +325,6 @@ describe("作品 PATCH 後の一覧キャッシュ同期", () => {
       await result.current.workPatchMutations.bookmarkMutation.mutateAsync({
         workId: "p1-w1",
         bookmarked: false,
-        sourceRevision: "revision-1",
       });
     });
 
@@ -345,7 +364,6 @@ describe("作品 PATCH 後の一覧キャッシュ同期", () => {
       await result.current.workPatchMutations.bookmarkMutation.mutateAsync({
         workId: "p1-w1",
         bookmarked: false,
-        sourceRevision: "revision-1",
       });
     });
 

@@ -1,19 +1,22 @@
 import { describe, expect, it } from "vitest";
-import {
-  WORK_SOURCE_PATCH_BLOCKED_MESSAGE,
-  assertWorkSourceRevision,
-  canPatchWorkSource,
-} from "../../src/entities/work/sourceRevision";
+import { ApiRequestError } from "../../src/shared/api/http";
+import { sourceEditErrorMessage } from "../../src/entities/work/sourceRevision";
 
-describe("sourceRevision", () => {
-  it("canPatchWorkSource は未設定を false、非空文字列を true とする", () => {
-    expect(canPatchWorkSource(undefined)).toBe(false);
-    expect(canPatchWorkSource("")).toBe(false);
-    expect(canPatchWorkSource("revision-1")).toBe(true);
+describe("sourceEditErrorMessage", () => {
+  it("ApiRequestError はサーバー message をそのまま出す", () => {
+    expect(
+      sourceEditErrorMessage(
+        new ApiRequestError(502, "parse_error", "作品の正本が壊れているため編集できません。"),
+        "fallback",
+      ),
+    ).toBe("作品の正本が壊れているため編集できません。");
   });
 
-  it("assertWorkSourceRevision は未設定時に統一メッセージで throw する", () => {
-    expect(() => assertWorkSourceRevision(undefined)).toThrow(WORK_SOURCE_PATCH_BLOCKED_MESSAGE);
-    expect(assertWorkSourceRevision("revision-1")).toBe("revision-1");
+  it("通常の Error は message を出す", () => {
+    expect(sourceEditErrorMessage(new Error("network"), "fallback")).toBe("network");
+  });
+
+  it("不明な値は fallback", () => {
+    expect(sourceEditErrorMessage(null, "fallback")).toBe("fallback");
   });
 });

@@ -9,13 +9,11 @@ import IconButton from "../../../../shared/ui/IconButton";
 import TagCombobox from "../../../../shared/ui/TagCombobox";
 import { useToast } from "../../../../shared/ui/useToast";
 import { apiErrorMessage } from "../../../../shared/lib/apiError";
-import { canPatchWorkSource } from "../../../../entities/work/sourceRevision";
-import type { LibraryTagsPatchMutation } from "../../model/useLibraryQueries";
+import type { LibraryTagIntentMutation } from "../../model/useLibraryQueries";
 import { useTagPrefixes } from "../../../../entities/tag/useTagPrefixes";
 import { tagPrefixDefinition } from "../../../../entities/tag/tagPrefixDefinition";
 import { useAnchoredPopover } from "../../../../shared/ui/useAnchoredPopover";
 import { useWorkTagEditor } from "./useWorkTagEditor";
-import { WorkSourcePatchBlockedNotice } from "./WorkSourcePatchBlockedNotice";
 
 const TAG_POPOVER_WIDTH = 260;
 // 詳細ペインをタグで圧迫せず、優先度の高い分類を一目で確認できる表示上限。
@@ -27,7 +25,8 @@ const NARROW_TAG_PANE_PX = 320;
 interface WorkTagEditorProps {
   work: Work;
   tagSuggestions: string[];
-  tagsMutation: LibraryTagsPatchMutation;
+  addTagMutation: LibraryTagIntentMutation;
+  removeTagMutation: LibraryTagIntentMutation;
   /** 編集ダイアログなど、折りたたむ必要がない場所では全タグを表示する。
    *  この場合は編集ダイアログ自体が明示的な編集操作なので削除ボタンは常時表示のまま。 */
   expanded?: boolean;
@@ -39,7 +38,8 @@ interface WorkTagEditorProps {
 export function WorkTagEditor({
   work,
   tagSuggestions,
-  tagsMutation,
+  addTagMutation,
+  removeTagMutation,
   expanded = false,
   onTagClick,
 }: WorkTagEditorProps) {
@@ -68,7 +68,14 @@ export function WorkTagEditor({
     undoRemoveTag,
     dismissTagUndoToast,
     resetPatchTagsError,
-  } = useWorkTagEditor({ work, tagSuggestions, tagPrefixes, tagsMutation });
+  } = useWorkTagEditor({
+    workId: work.id,
+    tags: work.tags,
+    tagSuggestions,
+    tagPrefixes,
+    addTagMutation,
+    removeTagMutation,
+  });
 
   const closeTagPopover = () => setIsTagPopoverOpen(false);
   const {
@@ -96,7 +103,7 @@ export function WorkTagEditor({
 
   const definitionOf = (tag: string) => tagPrefixDefinition(tag, tagPrefixes);
 
-  const canEditTags = canPatchWorkSource(work.sourceRevision);
+  const canEditTags = true;
 
   const comboboxProps = {
     suggestions,
@@ -228,7 +235,6 @@ export function WorkTagEditor({
           </div>
         </div>
       </div>
-      <WorkSourcePatchBlockedNotice sourceRevision={work.sourceRevision} />
       {confirmingRemoveTag && (
         <ConfirmDialog
           title="保護タグの削除"

@@ -1,19 +1,19 @@
-import {
-  WORK_SOURCE_PATCH_BLOCKED_MESSAGE,
-  canPatchWorkSource,
-} from "../../../../entities/work/sourceRevision";
+import { ApiRequestError } from "../../../../shared/api/http";
 
 interface WorkSourcePatchBlockedNoticeProps {
-  sourceRevision: string | undefined;
+  message: string | null;
 }
 
-export function WorkSourcePatchBlockedNotice({
-  sourceRevision,
-}: WorkSourcePatchBlockedNoticeProps) {
-  if (canPatchWorkSource(sourceRevision)) return null;
+export function WorkSourcePatchBlockedNotice({ message }: WorkSourcePatchBlockedNoticeProps) {
+  if (!message) return null;
   return (
     <p className="mle-prv__edit-error" role="alert">
-      {WORK_SOURCE_PATCH_BLOCKED_MESSAGE}
+      {message}
     </p>
   );
+}
+
+export function sourceCommandAlertMessage(error: unknown): string | null {
+  if (error instanceof ApiRequestError) return error.message;
+  return null;
 }
