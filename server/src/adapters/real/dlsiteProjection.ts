@@ -1,102 +1,14 @@
 import {
   hasRjCode,
-  type DlsiteFetchErrorKind,
+  projectDlsiteState,
   type DlsiteFetchResult,
   type DlsiteState,
   type MetaDlsiteState,
 } from "@mimimilli/shared";
 import { readMetaSource } from "./meta.ts";
-import type { DlsiteCache, DlsiteCacheResolution } from "./dlsiteCache.ts";
+import type { DlsiteCache } from "./dlsiteCache.ts";
 
-function isoFromEpochMs(epochMs: number): string {
-  return new Date(epochMs).toISOString();
-}
-
-function failureMessage(rjCode: string, outcome: "not_found" | "error"): string {
-  return outcome === "not_found"
-    ? `DLsite作品が見つかりません（${rjCode}）`
-    : `DLsite取得に失敗しました（${rjCode}）`;
-}
-
-function parseErrorMessage(rjCode: string): string {
-  return `DLsiteのHTMLを解析できませんでした（${rjCode}）`;
-}
-
-function projectedFetchFailure(
-  base: Pick<DlsiteState, "rjCode" | "appliedTags">,
-  status: "not_found" | "error",
-  errorKind: DlsiteFetchErrorKind,
-  message: string,
-  lastAttemptAt: string,
-): DlsiteState {
-  return {
-    ...base,
-    status,
-    lastAttemptAt,
-    error: message,
-    errorKind,
-  };
-}
-
-/**
- * mimimilli.json正本とDLsiteキャッシュを合成し、catalog・APIが読む DlsiteState を組み立てる。
- * applied/skipped はmimimilli.jsonの連携分類が優先し、none のときだけキャッシュの取得結果を反映する。
- */
-export function projectDlsiteState(
-  metaDlsite: MetaDlsiteState,
-  cacheResolution: DlsiteCacheResolution | null,
-): DlsiteState {
-  const base = {
-    rjCode: metaDlsite.rjCode,
-    appliedTags: metaDlsite.appliedTags,
-  };
-  if (metaDlsite.status === "applied" || metaDlsite.status === "skipped") {
-    return {
-      ...base,
-      status: metaDlsite.status,
-      lastAttemptAt: null,
-      error: null,
-      errorKind: null,
-    };
-  }
-  if (!hasRjCode(metaDlsite) || !cacheResolution) {
-    return {
-      ...base,
-      status: "none",
-      lastAttemptAt: null,
-      error: null,
-      errorKind: null,
-    };
-  }
-  const rjCode = metaDlsite.rjCode;
-  if (cacheResolution.kind === "failure") {
-    const status = cacheResolution.outcome === "not_found" ? "not_found" : "error";
-    const errorKind = cacheResolution.outcome === "not_found" ? "not_found" : "error";
-    return projectedFetchFailure(
-      base,
-      status,
-      errorKind,
-      failureMessage(rjCode, cacheResolution.outcome),
-      isoFromEpochMs(cacheResolution.attemptedAt),
-    );
-  }
-  if (cacheResolution.kind === "html" && cacheResolution.outcome === "parse_error") {
-    return projectedFetchFailure(
-      base,
-      "error",
-      "parse_error",
-      parseErrorMessage(rjCode),
-      isoFromEpochMs(cacheResolution.fetchedAt),
-    );
-  }
-  return {
-    ...base,
-    status: "none",
-    lastAttemptAt: null,
-    error: null,
-    errorKind: null,
-  };
-}
+export { projectDlsiteState };
 
 export function resolveMetaDlsiteProjection(
   metaDlsite: MetaDlsiteState,

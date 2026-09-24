@@ -61,6 +61,88 @@ export function toDlsiteLinkageStatus(status: DlsiteStatus): DlsiteLinkageStatus
   return status === "applied" || status === "skipped" ? status : "none";
 }
 
+export type DlsiteHtmlOutcome = "ok" | "parse_error";
+export type DlsiteFailureOutcome = "not_found" | "error";
+export type DlsiteCacheMissReason = "not_cached" | "ttl_expired" | "snapshot_body_missing";
+
+/** DLsite取得キャッシュの通常取得判断結果。fresh HTML / 有効な失敗記録 / miss のいずれか。
+ *  real adapterのDlsiteCache（SQLite実装）とfixture adapterの両方が、この型を通じて
+ *  projectDlsiteStateと合成する（real/fixtureで合成ロジックを重複実装しない）。 */
+export type DlsiteCacheResolution =
+  | {
+      kind: "html";
+      outcome: DlsiteHtmlOutcome;
+      fetchedAt: number;
+      expiresAt: number;
+      html: string;
+    }
+  | { kind: "failure"; outcome: DlsiteFailureOutcome; attemptedAt: number; expiresAt: number }
+  | { kind: "miss"; reason: DlsiteCacheMissReason };
+
+function isoFromEpochMs(epochMs: number): string {
+  return new Date(epochMs).toISOString();
+}
+
+function dlsiteFailureMessage(rjCode: string, outcome: DlsiteFailureOutcome): string {
+  return outcome === "not_found"
+    ? `DLsite作品が見つかりません（${rjCode}）`
+    : `DLsite取得に失敗しました（${rjCode}）`;
+}
+
+function dlsiteParseErrorMessage(rjCode: string): string {
+  return `DLsiteのHTMLを解析できませんでした（${rjCode}）`;
+}
+
+function projectedDlsiteFetchFailure(
+  base: Pick<DlsiteState, "rjCode" | "appliedTags">,
+  status: "not_found" | "error",
+  errorKind: DlsiteFetchErrorKind,
+  message: string,
+  lastAttemptAt: string,
+): DlsiteState {
+  return { ...base, status, lastAttemptAt, error: message, errorKind };
+}
+
+/**
+ * mimimilli.json正本とDLsite取得キャッシュを合成し、catalog・APIが読む DlsiteState を組み立てる。
+ * applied/skipped はmimimilli.jsonの連携分類が優先し、none のときだけキャッシュの取得結果を反映する。
+ * real（DlsiteCacheの解決結果）・fixture（seedのキャッシュ相当）が共通で使う（TASK-468）。
+ */
+export function projectDlsiteState(
+  metaDlsite: MetaDlsiteState,
+  cacheResolution: DlsiteCacheResolution | null,
+): DlsiteState {
+  const base = { rjCode: metaDlsite.rjCode, appliedTags: metaDlsite.appliedTags };
+  if (metaDlsite.status === "applied" || metaDlsite.status === "skipped") {
+    return { ...base, status: metaDlsite.status, lastAttemptAt: null, error: null, errorKind: null };
+  }
+  if (!hasRjCode(metaDlsite) || !cacheResolution) {
+    return { ...base, status: "none", lastAttemptAt: null, error: null, errorKind: null };
+  }
+  const rjCode = metaDlsite.rjCode;
+  if (cacheResolution.kind === "failure") {
+    const status = cacheResolution.outcome === "not_found" ? "not_found" : "error";
+    const errorKind = cacheResolution.outcome === "not_found" ? "not_found" : "error";
+    return projectedDlsiteFetchFailure(
+      base,
+      status,
+      errorKind,
+      dlsiteFailureMessage(rjCode, cacheResolution.outcome),
+      isoFromEpochMs(cacheResolution.attemptedAt),
+    );
+  }
+  if (cacheResolution.kind === "html" && cacheResolution.outcome === "parse_error") {
+    return projectedDlsiteFetchFailure(
+      base,
+      "error",
+      "parse_error",
+      dlsiteParseErrorMessage(rjCode),
+      isoFromEpochMs(cacheResolution.fetchedAt),
+    );
+  }
+  return { ...base, status: "none", lastAttemptAt: null, error: null, errorKind: null };
+}
+
 /** RJコードが非空文字列として設定されているか。`null` と明示的な `""` は含まない。 */
 export function hasRjCode<T extends Pick<DlsiteState, "rjCode">>(
   state: T,

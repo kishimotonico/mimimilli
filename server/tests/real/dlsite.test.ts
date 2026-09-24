@@ -519,6 +519,47 @@ test("updateDlsiteState: RJコード修正とskipped切替をメタへ保存す�
   assert.equal(enabled?.snapshot.dlsite.status, "none");
 });
 
+test("updateDlsiteState: 同じRJコードの再送信ではcache由来の取得失敗表示を保持する", async (t) => {
+  const lib = makeSampleLibrary();
+  t.after(lib.cleanup);
+  const adapter = lib.own(
+    createTestRealAdapter({
+      database: { kind: "memory" },
+      dlsiteRequestConfig: FAST_DLSITE_REQUEST_CONFIG,
+      dlsiteSchedulerDependencies: mockDlsiteTransport({
+        html: () => htmlResponse("<html>404</html>", 404),
+      }),
+    }),
+  );
+  await adapter.updateSettings({ rootFolder: lib.root });
+  await adapter.scan();
+
+  // 一括取得を失敗させ、DLsiteキャッシュへ not_found を記録する。
+  const bulk = await adapter.runDlsiteBulk("existing", [lib.existingWorkId]);
+  assert.equal(bulk.failed, 1);
+  const before = await adapter.getWork(lib.existingWorkId);
+  assert.equal(before?.dlsite.status, "not_found");
+  assert.ok(before?.dlsite.error);
+
+  // 同じRJコードを再送信するだけの操作（DlsiteEditorの「コードを保存」相当）。
+  const snapshot = await adapter.getWorkEditSnapshot(lib.existingWorkId);
+  const rjCode = snapshot!.dlsite.rjCode;
+  assert.equal(rjCode, "RJ900002");
+  await adapter.updateDlsiteState(lib.existingWorkId, {
+    sourceRevision: snapshot!.sourceRevision,
+    rjCode: rjCode!,
+  });
+
+  // meta正本の連携分類はnoneのまま（cacheの失敗はmetaへ書かない）。
+  const afterSnapshot = await adapter.getWorkEditSnapshot(lib.existingWorkId);
+  assert.equal(afterSnapshot?.dlsite.status, "none");
+
+  // catalog投影はmeta linkage(none) + cacheの失敗記録を合成するため、取得失敗表示が残る。
+  const after = await adapter.getWork(lib.existingWorkId);
+  assert.equal(after?.dlsite.status, "not_found");
+  assert.ok(after?.dlsite.error);
+});
+
 test("updateDlsiteState: RJコード変更で旧状態をリセットし一括取得対象に戻す", async (t) => {
   const lib = makeSampleLibrary();
   t.after(lib.cleanup);
