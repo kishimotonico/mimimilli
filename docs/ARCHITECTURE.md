@@ -72,7 +72,7 @@ oxlint の `overrides[].files` は `**/…` 形式で書く（複数セグメン
 - DLsite取得キャッシュだけは独立ファイル `dlsite-cache.sqlite`（`DlsiteCache`）に分ける。外部サイトのHTML・カバー画像が中身で、catalogからは計算し直せず寿命も無関係なため。自前DDLで作りmigration executorの対象外なので、スキーマを変えたらファイルごと作り直す（[ADR-0008](adr/0008-persistence-topology-query-ownership-playback-ids.md)、運用は [dlsite.md](dlsite.md)）
 - catalog接続をmainとしてuser DBを `user` でATTACHし、作品とuser状態をJOINして読む。DB間外部キーとcascade deleteは使わない
 - 作品詳細のトラック尺は、音声ファイルの size/mtime と `audio_probe_cache` を照合し、不一致なら再プローブする（`workProbe.ts`）。`GET /works/:id` は読み取り専用で `catalog.total_duration_sec` を変更しない。総時間の公開はスキャンと `POST /works/:id/playback-preparation`（再生準備。live probe を行う）に限る（`workRefresh.ts`）。一覧の `totalDurationSec` ソート・表示はこの保存列を読む
-- UI からの編集は `mimimilli.json` へ即時書き戻す
+- UI からの編集はdraftとして溜め、保存時にrevision付きで `mimimilli.json` へ書き戻す。catalogへの反映（投影）はその後段で、未反映は単作品の再投影で回復する（[ADR-0025](adr/0025-source-mutation-projection-read-separation.md)）
 - スキーマの正本は `catalogSchema.ts` / `userSchema.ts` のDrizzle定義。`pnpm --filter @mimimilli/server db:generate` で生成したSQLを、起動時に自前のmigration executor（`sqliteMigrationExecutor.ts`、[ADR-0021](adr/0021-custom-sqlite-migration-executor.md)）で適用する。catalog / user とも、pre-migrationバックアップ後にin-placeでforward migrationを適用する。DBがアプリより新しい場合はfail-fast（[ADR-0023](adr/0023-in-place-migration-simplification.md)、[ADR-0008](adr/0008-persistence-topology-query-ownership-playback-ids.md)）
 - データルートはADR-0007に従い、Linuxでは `${XDG_DATA_HOME:-$HOME/.local/share}/mimimilli`、Windowsでは `%LOCALAPPDATA%\mimimilli`。`MIMIMILLI_DATA_DIR` で上書きできる
 
@@ -100,6 +100,8 @@ oxlint の `overrides[].files` は `**/…` 形式で書く（複数セグメン
 - [ADR-0002: モックを本実装サーバーの fixture アダプタとして統合する](adr/0002-mock-as-fixture-adapter.md)
 - [ADR-0007: Windows配布ランタイムにBunを使う](adr/0007-bun-distribution-runtime.md)
 - [ADR-0008: 永続化トポロジー・検索所有権・再生IDを分離する](adr/0008-persistence-topology-query-ownership-playback-ids.md)
+- [ADR-0025: 正本の変更・投影・閲覧を責務として分離する](adr/0025-source-mutation-projection-read-separation.md)
+- [ADR-0026: 分類値の一覧を全作品への独立した入口とする](adr/0026-value-list-as-global-entry.md)
 - [requirements-v4.md](requirements-v4.md) — 機能・UX 要件
 - [HANDOFF.md](HANDOFF.md) — 開発の現状・引き継ぎ
 - [design-system.md](design-system.md) — フロントエンドのデザイン規約
