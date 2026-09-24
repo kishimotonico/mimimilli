@@ -1,10 +1,10 @@
 ---
 id: TASK-447
 title: feat/ui-ux-update の取捨選択結果を取り込み、没案を記録する
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-10 18:05'
-updated_date: '2026-09-11 05:35'
+updated_date: '2026-09-24 06:06'
 labels:
   - ui
   - ux
@@ -75,3 +75,9 @@ AC#5 計測結果（TASK-447.8、fixture large を 20000件に水増し、本番
 
 DRAFT-47（作品編集UIの保存モデル見直し）着手時の申し送り: 作品編集ダイアログの未保存保護（dirty 判定、saveAndClose での sourceRevision の直列引き継ぎ）は、保存モデルを変えるときに作り直す。SmartFolderEditorModal・TagPrefixSettings の子コンポーネント分割は次に触るタスクで行う。
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+feat/ui-ux-intake は master に 119aef15 Merge feat/ui-ux-intake でマージ済み。子タスク447.1〜447.29（29件）すべてDone、AC#1〜#6すべて満たされている（判定シート反映、drop理由記録、fix取り込み、依存順維持、実データ規模計測、pnpm check/test/test:smoke通過）。DRAFT-47への申し送り事項はTASK-456で対応済み。
+<!-- SECTION:FINAL_SUMMARY:END -->
