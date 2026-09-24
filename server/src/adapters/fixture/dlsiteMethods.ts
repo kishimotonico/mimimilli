@@ -1,7 +1,7 @@
 import {
   applyDlsiteStatePatch,
+  buildDlsiteApplyPatch,
   computeMissingDiff,
-  dedupeTags,
   hasRjCode,
   mergeAppliedDlsiteTags,
 } from "@mimimilli/shared";
@@ -112,15 +112,18 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
       const work = state.works.find((w) => w.id === workId);
       if (!work) return null;
       requireFixtureRevision(state, workId, body.sourceRevision);
-      if (body.applyTitle) work.title = body.info.title;
-      const { applyTags } = body;
-      work.tags = mergeAppliedDlsiteTags(work.tags, applyTags);
-      if (body.applyUrl && body.info.url) {
-        work.urls = [
-          ...work.urls.filter((entry) => !entry.url.includes("dlsite.com")),
-          { label: "DLsite", url: body.info.url },
-        ];
-      }
+      const patch = buildDlsiteApplyPatch(
+        {
+          title: work.title,
+          tags: work.tags,
+          urls: work.urls,
+          dlsite: dlsiteLinkageOf(state, workId),
+        },
+        body,
+      );
+      if (patch.title !== undefined) work.title = patch.title;
+      if (patch.tags !== undefined) work.tags = patch.tags;
+      if (patch.urls !== undefined) work.urls = patch.urls;
       if (body.applyCover && body.info.coverUrl) {
         const dimensions = work.cover?.dimensions ?? { width: 900, height: 900 };
         const columns: FixtureCoverColumns = {
@@ -130,12 +133,7 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
         state.coverColumns.set(workId, columns);
         work.cover = fixtureCoverFromColumns(work, columns);
       }
-      const currentLinkage = dlsiteLinkageOf(state, workId);
-      setDlsiteLinkage(state, workId, {
-        rjCode: body.info.rjCode,
-        status: "applied",
-        appliedTags: dedupeTags([...currentLinkage.appliedTags, ...applyTags]),
-      });
+      setDlsiteLinkage(state, workId, patch.dlsite);
       return fixtureSourceMutation(state, work);
     },
 

@@ -333,6 +333,44 @@ export function computeMissingDiff(
   return { newTags, applyCover, applyUrl };
 }
 
+/** dlsiteApply（単体適用）のパッチ。cover は非同期I/Oを伴うため呼び出し側が別途解決し、
+ *  {@link buildDlsiteApplyPatch} には含めない。title/tags/urls は未変更なら undefined。 */
+export interface DlsiteApplyPatch {
+  title?: string;
+  tags?: NormalizedTag[];
+  urls?: { label: string; url: string }[];
+  dlsite: MetaDlsiteState;
+}
+
+/** dlsiteApply（単体適用）のtitle/tags/urlsパッチを組み立てる。real/fixture 両adapterが共有する。 */
+export function buildDlsiteApplyPatch(
+  current: {
+    title: string;
+    tags: readonly NormalizedTag[];
+    urls: readonly { label: string; url: string }[];
+    dlsite: MetaDlsiteState;
+  },
+  body: DlsiteApplyBody,
+): DlsiteApplyPatch {
+  const { applyTags } = body;
+  return {
+    title: body.applyTitle && body.info.title ? body.info.title : undefined,
+    tags: applyTags.length > 0 ? mergeAppliedDlsiteTags(current.tags, applyTags) : undefined,
+    urls:
+      body.applyUrl && body.info.url
+        ? [
+            ...current.urls.filter((entry) => !entry.url.includes("dlsite.com")),
+            { label: "DLsite", url: body.info.url },
+          ]
+        : undefined,
+    dlsite: {
+      rjCode: body.info.rjCode,
+      status: "applied",
+      appliedTags: dedupeTags([...current.dlsite.appliedTags, ...applyTags]),
+    },
+  };
+}
+
 /** 単体適用（replace）: ユーザーが明示的に選んだタグ（applyTags）を既存タグへ反映する。
  *  単一値prefixは既存の同prefixタグを置き換え、2値共存を作らない。複数値prefixは加算する。
  *  既存タグと同じ値を選び直しただけの行は元の並び順のまま残す（不要な並べ替えをしない） */

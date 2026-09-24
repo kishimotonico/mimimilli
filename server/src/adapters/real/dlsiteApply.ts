@@ -1,5 +1,6 @@
 import {
   applyDlsiteStatePatch,
+  buildDlsiteApplyPatch,
   computeMissingDiff,
   dedupeTags,
   mergeAppliedDlsiteTags,
@@ -93,27 +94,16 @@ export function createDlsiteApply(deps: DlsiteApplyDeps) {
           if (source.sourceRevision !== body.sourceRevision) {
             return new MetaMutationReject(new SourceChangedError());
           }
-          const { applyTags } = body;
-          return applyDlsiteMergeToRaw(source.bytes, {
-            title: body.applyTitle && body.info.title ? body.info.title : undefined,
-            tags:
-              applyTags.length > 0
-                ? mergeAppliedDlsiteTags(source.meta.tags, applyTags)
-                : undefined,
-            urls:
-              body.applyUrl && body.info.url
-                ? [
-                    ...source.meta.urls.filter((entry) => !entry.url.includes("dlsite.com")),
-                    { label: "DLsite", url: body.info.url },
-                  ]
-                : undefined,
-            coverImage,
-            dlsite: {
-              rjCode: body.info.rjCode,
-              status: "applied",
-              appliedTags: dedupeTags([...source.meta.dlsite.appliedTags, ...applyTags]),
+          const patch = buildDlsiteApplyPatch(
+            {
+              title: source.meta.title,
+              tags: source.meta.tags,
+              urls: source.meta.urls,
+              dlsite: source.meta.dlsite,
             },
-          });
+            body,
+          );
+          return applyDlsiteMergeToRaw(source.bytes, { ...patch, coverImage });
         }),
       );
     },
