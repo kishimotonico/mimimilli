@@ -445,24 +445,29 @@ describe("WorkEditDialog", () => {
     await waitFor(() => expect(document.activeElement).toBe(input));
   });
 
-  it("409 source_changedを受けたときdraftは消えず、最新を確認中の文言が出る", async () => {
+  it("409 source_changedを受けたときdraftは消えず、最新の確認中だけ文言が出る", async () => {
     const editMutation = makeEditMutation({
-      mutateAsync: vi
-        .fn()
-        .mockRejectedValue(Object.assign(new Error("changed"), { code: "source_changed" })),
+      mutateAsync: vi.fn().mockRejectedValue(new ApiRequestError(409, "source_changed", "changed")),
     });
-    // ApiRequestError のインスタンスとして扱えるよう、実クラスを使う
-    const { ApiRequestError } = await import("../../src/shared/api/http");
-    editMutation.mutateAsync = vi
-      .fn()
-      .mockRejectedValue(new ApiRequestError("changed", "source_changed", 409));
-    renderEditDialog({ editMutation });
+    const { work } = renderEditDialog({ editMutation });
     await waitForReady();
+
+    let resolveRefetch: (snapshot: ReturnType<typeof makeSnapshot>) => void = () => {};
+    mockGetWorkEditSnapshot.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveRefetch = resolve;
+        }),
+    );
 
     fireEvent.change(screen.getByLabelText("タイトル"), { target: { value: "編集途中" } });
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
 
     await waitFor(() => expect(screen.getByText(/作品データが他で更新されました/)).toBeTruthy());
+    expect(screen.getByLabelText("タイトル")).toHaveValue("編集途中");
+
+    resolveRefetch(makeSnapshot(work, "revision-2"));
+    await waitFor(() => expect(screen.queryByText(/作品データが他で更新されました/)).toBeNull());
     expect(screen.getByLabelText("タイトル")).toHaveValue("編集途中");
   });
 

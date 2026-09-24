@@ -453,3 +453,19 @@ test("fixture: 異なるrootへの変更で候補除外を破棄し、同一root
   await updateSettings({ rootFolder: "/library/root-b" });
   assert.deepEqual(await listScanCandidateExclusions(), []);
 });
+
+test("fixture: 異なるrootへの変更で候補sessionを破棄し、次のscanで作り直す", async () => {
+  const adapter = createFixtureAdapter({ scenario: "new-work" });
+  const paths = async () => (await adapter.listScanCandidates()).map((c) => c.path);
+  assert.deepEqual(await paths(), ["未登録作品", "朗読/候補"]);
+
+  await adapter.updateSettings({ rootFolder: "/library/root-b" });
+  assert.deepEqual(await paths(), []);
+
+  const result = await adapter.scan();
+  assert.deepEqual(
+    result.candidates.map((c) => c.path),
+    ["未登録作品", "朗読/候補"],
+  );
+  assert.deepEqual(await paths(), ["未登録作品", "朗読/候補"]);
+});

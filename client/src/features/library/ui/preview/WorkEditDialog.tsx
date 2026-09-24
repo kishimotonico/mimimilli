@@ -43,6 +43,8 @@ interface WorkEditDialogProps {
   onClose: () => void;
 }
 
+const SOURCE_CHANGED_MESSAGE = "作品データが他で更新されました。最新の内容を確認しています…";
+
 const FIELD_LABEL: Record<WorkEditField, string> = {
   title: "タイトル",
   tags: "タグ",
@@ -299,8 +301,10 @@ export function WorkEditDialog({
 
   function handleSaveError(cause: unknown) {
     if (cause instanceof ApiRequestError && cause.code === "source_changed") {
-      setSaveError("作品データが他で更新されました。最新の内容を確認しています…");
-      void sourceQuery.refetch();
+      setSaveError(SOURCE_CHANGED_MESSAGE);
+      void sourceQuery.refetch().finally(() => {
+        setSaveError((current) => (current === SOURCE_CHANGED_MESSAGE ? null : current));
+      });
       return;
     }
     // ApiTransportError（通信断・中断）は他の失敗と区別し、成功とも失敗とも推測しない

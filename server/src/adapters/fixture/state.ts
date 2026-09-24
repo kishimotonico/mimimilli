@@ -38,6 +38,9 @@ export interface FixtureState {
   /** 永続化された候補除外パス */
   scanCandidateExclusions: string[];
   identityConflicts: ScanDiagnostic[];
+  /** scan() が見つける候補。rootを変えても変わらない（fixtureには物理FSがない） */
+  scanCandidatePool: ScanCandidate[];
+  /** 直近のscan以降に有効な候補session。root変更で破棄し、次のscanで作り直す */
   scanCandidates: ScanCandidate[];
   scanIdentityConflicts: ScanDiagnostic[];
   scanInvalidMetaFiles: InvalidMetaFile[];
@@ -97,6 +100,7 @@ export function createInitialState(options: FixtureAdapterOptions): FixtureState
             },
           ]
         : [],
+    scanCandidatePool: scenario.scanCandidates,
     scanCandidates: scenario.scanCandidates,
     scanIdentityConflicts: scenario.scanIdentityConflicts,
     scanInvalidMetaFiles: scenario.scanInvalidMetaFiles,

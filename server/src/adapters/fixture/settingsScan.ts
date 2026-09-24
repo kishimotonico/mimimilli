@@ -40,6 +40,7 @@ export function createSettingsScanMethods(state: FixtureState): SettingsAdapter 
     async updateSettings(patch: SettingsUpdate): Promise<Settings> {
       if (state.rootFolder !== null && state.rootFolder !== patch.rootFolder) {
         state.scanCandidateExclusions = [];
+        state.scanCandidates = [];
       }
       state.rootFolder = patch.rootFolder;
       return {
@@ -73,6 +74,7 @@ export function createSettingsScanMethods(state: FixtureState): SettingsAdapter 
 
       state.lastScanTime = new Date().toISOString();
       state.lastScanRootFolder = state.rootFolder;
+      state.scanCandidates = [...state.scanCandidatePool];
       const excluded = new Set(state.scanCandidateExclusions);
       return {
         registered: state.works.length,
@@ -136,9 +138,9 @@ export function createSettingsScanMethods(state: FixtureState): SettingsAdapter 
           : [{ path: workspacePath(item.path), message: "候補が見つかりません" }],
       );
       const registeredPaths = new Set(registered.map((candidate) => candidate.path));
-      state.scanCandidates = state.scanCandidates.filter(
-        (candidate) => !registeredPaths.has(candidate.path),
-      );
+      const unregistered = (candidate: ScanCandidate) => !registeredPaths.has(candidate.path);
+      state.scanCandidatePool = state.scanCandidatePool.filter(unregistered);
+      state.scanCandidates = state.scanCandidates.filter(unregistered);
       return { registered, failures };
     },
     async excludeScanCandidates(paths): Promise<void> {
