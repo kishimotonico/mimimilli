@@ -1,4 +1,4 @@
-// TASK-338: resume検証・DLsite適用パッチ・登録重複チェックが real/fixture 両adapterで
+// resume検証・DLsite適用パッチ・登録重複チェックが real/fixture 両adapterで
 // 同じ意味になることを縛る契約テスト。境界より手前のモックではなく、両adapterを
 // DataAdapter インターフェース経由で実際に通して結果を比較する。
 import assert from "node:assert/strict";
