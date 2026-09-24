@@ -4,9 +4,10 @@ title: DataAdapterの業務規則をfixture/real共通のapplication serviceへ�
 status: To Do
 assignee: []
 created_date: '2026-08-14 10:27'
+updated_date: '2026-09-24 07:23'
 labels: []
 dependencies: []
-priority: low
+priority: medium
 ordinal: 348000
 ---
 
@@ -22,6 +23,8 @@ ADR-0018で今回のtransport統一の対象外とした、fixture/real両adapte
 共通化可能な規則をapplication service（またはshared/core）へ移し、adapterは保存・取得の低水準portに専念させる。applyDlsiteStatePatchのようにshared側へ切り出し済みの部分はその形を踏襲する。検索・分類軸集計のcore純粋関数版とSQL版は性能上必要な二実装なので統合しない（契約テストで同値性を維持）。
 
 参照: docs/adr/0018-vite-client-bun-server-separation.md、server/src/adapter/index.ts、server/tests/real/worksQueryContract.test.ts
+
+2026-09-24追記: architecture-review-2026-09-20.md R3の再確認。「登録後にDLsite取得へ渡す」フロー（SettingsAdapter.registerScanCandidatesのonRegistered callback等、app.tsでDLsite enqueueへ接続している経路）の共通化・置き換えは本タスクの範囲外とする。この扱いはDLsite導線再設計（DRAFT-74）で決める。
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
