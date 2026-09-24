@@ -1,9 +1,8 @@
 import {
   applyDlsiteStatePatch,
   buildDlsiteApplyPatch,
+  buildDlsiteMissingApplyPatch,
   computeMissingDiff,
-  dedupeTags,
-  mergeAppliedDlsiteTags,
   workMediaRoot,
   type DlsiteApplyBody,
   type DlsiteStateUpdateBody,
@@ -144,28 +143,16 @@ export function createDlsiteApply(deps: DlsiteApplyDeps) {
           },
           info,
         );
-        if (diff.newTags.length === 0 && !diff.applyCover && !diff.applyUrl) {
-          return source.bytes;
-        }
+        const patch = buildDlsiteMissingApplyPatch(
+          { tags: source.meta.tags, urls: source.meta.urls, dlsite: source.meta.dlsite },
+          info,
+          diff,
+        );
+        if (!patch) return source.bytes;
         wrote = true;
         return applyDlsiteMergeToRaw(source.bytes, {
-          tags:
-            diff.newTags.length > 0
-              ? mergeAppliedDlsiteTags(source.meta.tags, diff.newTags)
-              : undefined,
-          urls:
-            diff.applyUrl && info.url
-              ? [
-                  ...source.meta.urls.filter((entry) => !entry.url.includes("dlsite.com")),
-                  { label: "DLsite", url: info.url },
-                ]
-              : undefined,
+          ...patch,
           coverImage: diff.applyCover ? coverImage : undefined,
-          dlsite: {
-            rjCode: info.rjCode,
-            status: "applied",
-            appliedTags: dedupeTags([...source.meta.dlsite.appliedTags, ...diff.newTags]),
-          },
         });
       });
       if (!verified) return "missing";

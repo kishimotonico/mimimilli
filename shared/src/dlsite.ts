@@ -333,6 +333,36 @@ export function computeMissingDiff(
   return { newTags, applyCover, applyUrl };
 }
 
+/** dlsiteApplyMissing（未設定項目まとめ適用）のtags/urls/linkageパッチを組み立てる。
+ *  real/fixture 両adapterが共有する。差分が無ければnull（何も書かない）。
+ *  linkageは単体適用と同じ規則で status: "applied" にする（title/coverはこの関数の対象外）。 */
+export function buildDlsiteMissingApplyPatch(
+  current: {
+    tags: readonly NormalizedTag[];
+    urls: readonly { label: string; url: string }[];
+    dlsite: MetaDlsiteState;
+  },
+  info: DlsiteWorkInfo,
+  diff: { newTags: readonly NormalizedTag[]; applyCover: boolean; applyUrl: boolean },
+): Omit<DlsiteApplyPatch, "title"> | null {
+  if (diff.newTags.length === 0 && !diff.applyCover && !diff.applyUrl) return null;
+  return {
+    tags: diff.newTags.length > 0 ? mergeAppliedDlsiteTags(current.tags, diff.newTags) : undefined,
+    urls:
+      diff.applyUrl && info.url
+        ? [
+            ...current.urls.filter((entry) => !entry.url.includes("dlsite.com")),
+            { label: "DLsite", url: info.url },
+          ]
+        : undefined,
+    dlsite: {
+      rjCode: info.rjCode,
+      status: "applied",
+      appliedTags: dedupeTags([...current.dlsite.appliedTags, ...diff.newTags]),
+    },
+  };
+}
+
 /** dlsiteApply（単体適用）のパッチ。cover は非同期I/Oを伴うため呼び出し側が別途解決し、
  *  {@link buildDlsiteApplyPatch} には含めない。title/tags/urls は未変更なら undefined。 */
 export interface DlsiteApplyPatch {

@@ -1,9 +1,9 @@
 import {
   applyDlsiteStatePatch,
   buildDlsiteApplyPatch,
+  buildDlsiteMissingApplyPatch,
   computeMissingDiff,
   hasRjCode,
-  mergeAppliedDlsiteTags,
 } from "@mimimilli/shared";
 import type {
   DlsiteApplyMissingPreviewItem,
@@ -75,15 +75,19 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
           failed += 1;
           continue;
         }
-        const { newTags, applyCover, applyUrl } = computeMissingDiff(work, fetched.info);
-        if (newTags.length === 0 && !applyCover && !applyUrl) {
+        const diff = computeMissingDiff(work, fetched.info);
+        const patch = buildDlsiteMissingApplyPatch(
+          { tags: work.tags, urls: work.urls, dlsite: linkage },
+          fetched.info,
+          diff,
+        );
+        if (!patch) {
           skipped += 1;
           continue;
         }
-        work.tags = mergeAppliedDlsiteTags(work.tags, newTags);
-        if (applyUrl) {
-          work.urls = [...work.urls, { label: "DLsite", url: fetched.info.url }];
-        }
+        if (patch.tags !== undefined) work.tags = patch.tags;
+        if (patch.urls !== undefined) work.urls = patch.urls;
+        setDlsiteLinkage(state, work.id, patch.dlsite);
         applied += 1;
       }
       return { applied, pending, skipped, failed };
