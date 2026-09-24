@@ -6,6 +6,7 @@ import {
   isDlsiteParseFailed,
   isRjCodeMissing,
   tagEquals,
+  toDlsiteLinkageStatus,
   type NormalizedTag,
 } from "@mimimilli/shared";
 import type {
@@ -71,7 +72,11 @@ export function fixtureEditSnapshot(state: FixtureState, work: WorkSummary): Wor
     tags: work.tags,
     urls: work.urls,
     coverImage: coverColumnsOf(state, work.id).image,
-    dlsite: work.dlsite,
+    dlsite: {
+      rjCode: work.dlsite.rjCode,
+      status: toDlsiteLinkageStatus(work.dlsite.status),
+      appliedTags: work.dlsite.appliedTags,
+    },
   };
 }
 

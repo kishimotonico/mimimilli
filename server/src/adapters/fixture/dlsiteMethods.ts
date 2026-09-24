@@ -3,6 +3,7 @@ import {
   computeMissingDiff,
   hasRjCode,
   mergeAppliedDlsiteTags,
+  toDlsiteLinkageStatus,
 } from "@mimimilli/shared";
 import type {
   DlsiteApplyMissingPreviewItem,
@@ -10,6 +11,7 @@ import type {
   DlsiteFetchResult,
   DlsiteState,
   DlsiteStateUpdateBody,
+  MetaDlsiteState,
   WorkSourceMutationResult,
   WorkSummary,
 } from "@mimimilli/shared";
@@ -139,7 +141,13 @@ export function createDlsiteMethods(state: FixtureState): DlsiteAdapter {
       if (!work) return null;
       requireFixtureRevision(state, workId, body.sourceRevision);
       const { sourceRevision: _sourceRevision, ...patch } = body;
-      work.dlsite = applyDlsiteStatePatch(work.dlsite, patch);
+      const currentLinkage: MetaDlsiteState = {
+        rjCode: work.dlsite.rjCode,
+        status: toDlsiteLinkageStatus(work.dlsite.status),
+        appliedTags: work.dlsite.appliedTags,
+      };
+      const nextLinkage = applyDlsiteStatePatch(currentLinkage, patch);
+      work.dlsite = { ...nextLinkage, lastAttemptAt: null, error: null, errorKind: null };
       return fixtureSourceMutation(state, work);
     },
 
