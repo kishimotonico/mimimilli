@@ -31,7 +31,9 @@ ADR-0017 は `mimimilli.json` へ永続化するDLsite連携状態（`rjCode`・
 
 ### 変換関数を型に置き換える
 
-`toMetaDlsiteState`と`metaLinkageStatus`（`server/src/adapters/real/dlsiteProjection.ts`）を廃止する。書込み側の呼び出し元（`dlsiteApply.ts`、`workRegister.ts`）は、最初から`MetaDlsiteState`のリテラルを直接組み立てる。`applyDlsiteStatePatch`（`shared/src/dlsite.ts`）は`MetaDlsiteState`を受け取り`MetaDlsiteState`を返すよう変更し、`lastAttemptAt`/`error`/`errorKind`を「持っていないので触らない」形にする。読取り側の`projectDlsiteState`は`metaDlsite: MetaDlsiteState`を受け取り、`metaDlsite.status`を直接分岐に使う（3値であることが型で保証されるため、読み替え関数が不要になる）。
+`toMetaDlsiteState`と`metaLinkageStatus`（元`server/src/adapters/real/dlsiteProjection.ts`）を廃止する。書込み側の呼び出し元（`dlsiteApply.ts`、`workRegister.ts`）は、最初から`MetaDlsiteState`のリテラルを直接組み立てる。`applyDlsiteStatePatch`（`shared/src/dlsite.ts`）は`MetaDlsiteState`を受け取り`MetaDlsiteState`を返すよう変更し、`lastAttemptAt`/`error`/`errorKind`を「持っていないので触らない」形にする。
+
+meta linkageとDLsite取得キャッシュの解決結果を合成する`projectDlsiteState`（と入力型`DlsiteCacheResolution`）は、`server/src/adapters/real/dlsiteProjection.ts`から`shared/src/dlsite.ts`へ移す。real（`DlsiteCache`が返す`DlsiteCacheResolution`）とfixture（seedから逆算した`DlsiteCacheResolution`相当）の両方がこの同一関数を呼ぶ。real/fixture間の直接importはlayer境界チェック（`scripts/layer-boundary-rules.mjs`）で禁止されているため、合成ロジックを重複実装せずに両adapterで一致させるには、pure functionとして両者が依存できるsharedへ置くのが筋が良い。`projectDlsiteState`は`metaDlsite: MetaDlsiteState`を受け取り、`metaDlsite.status`を直接分岐に使う（3値であることが型で保証されるため、読み替え関数が不要になる）。
 
 ### 非対応値は診断対象にする（丸めない）
 
@@ -62,24 +64,35 @@ while IFS= read -r -d '' meta; do
 done
 ```
 
-Windows（PowerShell、`jq`がPATHにあること）:
+Windows（**PowerShell 7以降（`pwsh`）専用**。Windows PowerShell 5.1は既定の出力エンコーディングが異なり、`jq`のUTF-8出力の読み取り・書き込み双方で日本語を含む`mimimilli.json`を壊す恐れがあるため対象外。`jq`がPATHにあること）:
 
 ```powershell
+# jqの標準出力（UTF-8）をシステムのコードページ等で誤って解釈しないよう、読み取り側の
+# エンコーディングを明示する。pwsh 7でも既定値は環境（chcp・ロケール）に依存するため省略しない。
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+
 $libraryRoot = "<ライブラリルート>"
+$filter = 'if .dlsite.status == "not_found" or .dlsite.status == "error"' +
+  ' then .dlsite.status = "none" | .dlsite.appliedTags = (.dlsite.appliedTags // [])' +
+  ' else . end' +
+  ' | .dlsite |= del(.lastAttemptAt, .error, .errorKind)'
+
 Get-ChildItem -Path $libraryRoot -Recurse -File |
   Where-Object { $_.Name -eq "mimimilli.json" -or $_.Name -like "*.mimimilli.json" } |
   ForEach-Object {
     $meta = $_.FullName
+    $json = (& jq $filter $meta) -join "`n"
+    if ($LASTEXITCODE -ne 0) { throw "jqの実行に失敗しました: $meta" }
     $temporary = "$meta.dlsite-status-migration.tmp"
-    $filter = 'if .dlsite.status == "not_found" or .dlsite.status == "error"' +
-      ' then .dlsite.status = "none" | .dlsite.appliedTags = (.dlsite.appliedTags // [])' +
-      ' else . end' +
-      ' | .dlsite |= del(.lastAttemptAt, .error, .errorKind)'
-    jq $filter $meta > $temporary
-    if ($LASTEXITCODE -ne 0) { Remove-Item $temporary -ErrorAction SilentlyContinue; exit 1 }
+    # BOM付きUTF-8はmimimilli.jsonの読み取り（JSON.parse）が拒否するため、
+    # 明示的にBOMなしUTF8Encodingで書く（Set-Content -Encoding utf8既定のBOM付与を避ける）。
+    [System.IO.File]::WriteAllText($temporary, $json + "`n", $utf8NoBom)
     Move-Item -Force $temporary $meta
   }
 ```
+
+`mimimilli.json`の読取り（`readMetaSource`/`readMetaFile`）は`Buffer.toString("utf-8")`してから`JSON.parse`するため、先頭にBOM（`U+FEFF`）があると`Unexpected token`でJSONパースエラーになり、`MetaParseError`（`invalidMetaFiles`診断）扱いになることを確認済み。BOMを出さない書き方は移行後にファイルを壊さないための必須条件であり、単なる見た目の問題ではない。
 
 移行後はフルスキャンまたは`POST /api/scan`でcatalogを再投影する。ADR-0017が既に持っていた移行例（`lastAttemptAt`/`error`/`errorKind`をnullにして`status`を`none`へ寄せるもの）は、今回`status`が非対応値のときにスキーマ検証そのものが失敗するようになったため、このADRの例で置き換える。
 
@@ -90,6 +103,6 @@ ADR-0017「DLsite `status` の正本と投影」の表と、「既存の`mimimil
 ## 帰結
 
 - `MetaFile["dlsite"]`と`WorkEditSnapshot["dlsite"]`は`MetaDlsiteState`になり、`not_found`/`error`・`lastAttemptAt`・`error`・`errorKind`を型として持てない。`DlsiteEditor`（client）が持っていた、実際には出ない`not_found`/`error`表示分岐は削除する。
-- `applyDlsiteStatePatch`は`MetaDlsiteState`だけを対象にする。fixtureアダプタの`work.dlsite`（合成済み・単一フラット値）を書き換える箇所は、`toDlsiteLinkageStatus`で連携分類を取り出してから`applyDlsiteStatePatch`を適用し、結果へ`lastAttemptAt`/`error`/`errorKind: null`を合成して戻す。real/fixtureとも、パッチ後は一時状態フィールドが常に空になる（fixtureは従来skip切替時に`lastAttemptAt`を保持していたが、real（`toMetaDlsiteState`経由で常にnull化）と食い違っていたため、この決定で挙動を揃える）。
+- `applyDlsiteStatePatch`は`MetaDlsiteState`だけを対象にする。fixtureアダプタもrealと同じ「正本／cacheの分離」構造にする。`FixtureState`は`works`（DLsite合成状態を持たない作品レコード）、`dlsiteLinkages`（workId→`MetaDlsiteState`、realのmeta linkageに対応）、`dlsiteFetchFailures`（rjCode→`DlsiteCacheResolution`、realの`DlsiteCache`に対応）の3つだけをDLsiteの正本として持つ。API向けの合成状態（`WorkSummary.dlsite`）はどこにも保存せず、`composeWork`/`composeWorks`が読み出しのたびに`projectDlsiteState(linkage, cacheの解決結果)`で組み立てる。シード（`data.ts`・`bulkData.ts`・`scenarios.ts`）も、合成済みDlsiteStateから取得失敗を逆算するのではなく、`SEED_DLSITE_LINKAGES`・`SEED_DLSITE_FAILURES`として最初から作品ごとのlinkageとrjCodeごとの取得キャッシュを別に書く。`updateDlsiteState`は現在のlinkageを`applyDlsiteStatePatch`でパッチし、`dlsiteLinkages`へ書き戻すだけで、合成は次の読み出し時に`composeWork`が行う。これによりrealと同じ意味論になる: 同じRJコードを再送信しただけならキャッシュの取得失敗表示（`not_found`/`error`）は保持され、RJコードを変更すれば新しいコードのキャッシュ（miss）に切り替わりnoneへ戻り、skip切替はキャッシュより優先されてtransientフィールドがnullになる。real・fixture双方をこの3操作で通す契約テスト（`server/tests/dlsiteUpdateStateProjectionContract.test.ts`）で固定する。一覧・詳細・DLsite通知・facet・`dlsiteFetch`・`dlsiteApply`・`runDlsiteBulk`など`work.dlsite`を読む全経路も、同じ`composeWork`／`dlsiteLinkageOf`へ揃える。
 - 既存の`mimimilli.json`に`status: not_found`/`error`が残っている場合、次回scanから読み取れなくなり、該当作品はscan結果・Filesの診断に現れる。ユーザーが上記の移行コマンドを実行するまで、その作品のcatalog投影は更新されない（正本は保持されたままなので、データは失われない）。
 - `toMetaDlsiteState`・`metaLinkageStatus`という変換関数は廃止する。「meta正本に何を書いてよいか」は型で保証され、変換関数の呼び出し漏れという失敗様式が構造的になくなる。
