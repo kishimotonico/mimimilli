@@ -37,6 +37,30 @@ export function emptyDlsiteState(): DlsiteState {
   };
 }
 
+/** mimimilli.json正本が持つ連携分類。取得失敗（not_found/error）は正本の値になり得ない
+ *  （ADR-0017 DLsite `status` の正本と投影）。 */
+export const dlsiteLinkageStatusSchema = z.enum(["none", "applied", "skipped"]);
+export type DlsiteLinkageStatus = z.infer<typeof dlsiteLinkageStatusSchema>;
+
+/** mimimilli.json正本の `dlsite` フィールド専用の型。cacheと合成したAPI向けの `DlsiteState`
+ *  とは別型にし、取得失敗・試行時刻などの一時状態を型として持てないようにする。 */
+export const metaDlsiteStateSchema = z.object({
+  rjCode: z.string().nullable(),
+  status: dlsiteLinkageStatusSchema,
+  appliedTags: normalizedTagArraySchema.default([]),
+});
+export type MetaDlsiteState = z.infer<typeof metaDlsiteStateSchema>;
+
+export function emptyMetaDlsiteState(): MetaDlsiteState {
+  return { rjCode: null, status: "none", appliedTags: [] };
+}
+
+/** 合成済みAPI状態から、正本が持てる連携分類だけを取り出す。取得失敗（not_found/error）は
+ *  連携未確定として none に丸める。 */
+export function toDlsiteLinkageStatus(status: DlsiteStatus): DlsiteLinkageStatus {
+  return status === "applied" || status === "skipped" ? status : "none";
+}
+
 /** RJコードが非空文字列として設定されているか。`null` と明示的な `""` は含まない。 */
 export function hasRjCode<T extends Pick<DlsiteState, "rjCode">>(
   state: T,
@@ -325,33 +349,24 @@ export const dlsiteStateUpdateBodySchema = z
   .refine((patch) => patch.rjCode !== undefined || patch.skipped !== undefined);
 export type DlsiteStateUpdateBody = z.infer<typeof dlsiteStateUpdateBodySchema>;
 
-/** updateDlsiteState の状態遷移（real/fixture 共通）。
- *  RJコードが変わったときだけ旧コード由来の取得結果を捨てて未取得に戻す。
- *  skipped 指定時は従来どおり status/error/errorKind を上書きする（rjCode 変更より後に適用）。 */
-export function applyDlsiteStatePatch(current: DlsiteState, patch: DlsiteStatePatch): DlsiteState {
-  let next: DlsiteState = { ...current };
+/** updateDlsiteState の状態遷移（real/fixture 共通）。正本の連携分類（rjCode/status/
+ *  appliedTags）だけを対象にする。RJコードが変わったときだけ旧コード由来の適用済みタグを捨てて
+ *  未取得に戻す。skipped 指定時は従来どおり status を上書きする（rjCode 変更より後に適用）。 */
+export function applyDlsiteStatePatch(
+  current: MetaDlsiteState,
+  patch: DlsiteStatePatch,
+): MetaDlsiteState {
+  let next: MetaDlsiteState = { ...current };
 
   if (patch.rjCode !== undefined) {
     next.rjCode = patch.rjCode;
     if (patch.rjCode !== current.rjCode) {
-      next = {
-        ...next,
-        status: "none",
-        lastAttemptAt: null,
-        error: null,
-        errorKind: null,
-        appliedTags: [],
-      };
+      next = { ...next, status: "none", appliedTags: [] };
     }
   }
 
   if (patch.skipped !== undefined) {
-    next = {
-      ...next,
-      status: patch.skipped ? "skipped" : "none",
-      error: null,
-      errorKind: null,
-    };
+    next = { ...next, status: patch.skipped ? "skipped" : "none" };
   }
 
   return next;
