@@ -7,12 +7,12 @@ import {
   type DlsiteApplyBody,
   type DlsiteStateUpdateBody,
   type DlsiteWorkInfo,
+  type MetaDlsiteState,
   type NormalizedTag,
   type WorkSourceMutationResult,
 } from "@mimimilli/shared";
 import { MetaMutationReject, encodeMetaRaw } from "./meta.ts";
 import { SourceChangedError } from "../../errors.ts";
-import { toMetaDlsiteState } from "./dlsiteProjection.ts";
 import { throwIfAborted } from "./sharedFlight.ts";
 import type { CatalogWorkRepository } from "./catalogWorkRepository.ts";
 import {
@@ -42,7 +42,7 @@ function applyDlsiteMergeToRaw(
     tags?: NormalizedTag[];
     urls?: { label: string; url: string }[];
     coverImage?: string;
-    dlsite: ReturnType<typeof toMetaDlsiteState>;
+    dlsite: MetaDlsiteState;
   },
 ): Buffer {
   const raw = JSON.parse(sourceBytes.toString("utf-8")) as Record<string, unknown>;
@@ -108,14 +108,11 @@ export function createDlsiteApply(deps: DlsiteApplyDeps) {
                   ]
                 : undefined,
             coverImage,
-            dlsite: toMetaDlsiteState({
+            dlsite: {
               rjCode: body.info.rjCode,
               status: "applied",
-              lastAttemptAt: null,
-              error: null,
-              errorKind: null,
               appliedTags: dedupeTags([...source.meta.dlsite.appliedTags, ...applyTags]),
-            }),
+            },
           });
         }),
       );
@@ -174,15 +171,11 @@ export function createDlsiteApply(deps: DlsiteApplyDeps) {
                 ]
               : undefined,
           coverImage: diff.applyCover ? coverImage : undefined,
-          dlsite: toMetaDlsiteState({
-            ...source.meta.dlsite,
+          dlsite: {
             rjCode: info.rjCode,
             status: "applied",
-            lastAttemptAt: null,
-            error: null,
-            errorKind: null,
             appliedTags: dedupeTags([...source.meta.dlsite.appliedTags, ...diff.newTags]),
-          }),
+          },
         });
       });
       if (!verified) return "missing";
@@ -201,7 +194,7 @@ export function createDlsiteApply(deps: DlsiteApplyDeps) {
           if (source.sourceRevision !== sourceRevision) {
             return new MetaMutationReject(new SourceChangedError());
           }
-          const dlsite = toMetaDlsiteState(applyDlsiteStatePatch(source.meta.dlsite, patch));
+          const dlsite = applyDlsiteStatePatch(source.meta.dlsite, patch);
           const raw = JSON.parse(source.bytes.toString("utf-8")) as Record<string, unknown>;
           raw.dlsite = dlsite;
           return encodeMetaRaw(raw);

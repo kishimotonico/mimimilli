@@ -3,28 +3,10 @@ import {
   type DlsiteFetchErrorKind,
   type DlsiteFetchResult,
   type DlsiteState,
+  type MetaDlsiteState,
 } from "@mimimilli/shared";
 import { readMetaSource } from "./meta.ts";
 import type { DlsiteCache, DlsiteCacheResolution } from "./dlsiteCache.ts";
-
-export type MetaLinkageStatus = "none" | "applied" | "skipped";
-
-export function metaLinkageStatus(status: DlsiteState["status"]): MetaLinkageStatus {
-  if (status === "applied" || status === "skipped") return status;
-  return "none";
-}
-
-/** mimimilli.jsonへ書くDLsite状態。取得失敗の一時情報は含めない。 */
-export function toMetaDlsiteState(state: DlsiteState): DlsiteState {
-  return {
-    rjCode: state.rjCode,
-    status: metaLinkageStatus(state.status),
-    appliedTags: state.appliedTags,
-    lastAttemptAt: null,
-    error: null,
-    errorKind: null,
-  };
-}
 
 function isoFromEpochMs(epochMs: number): string {
   return new Date(epochMs).toISOString();
@@ -61,18 +43,17 @@ function projectedFetchFailure(
  * applied/skipped はmimimilli.jsonの連携分類が優先し、none のときだけキャッシュの取得結果を反映する。
  */
 export function projectDlsiteState(
-  metaDlsite: DlsiteState,
+  metaDlsite: MetaDlsiteState,
   cacheResolution: DlsiteCacheResolution | null,
 ): DlsiteState {
-  const linkage = metaLinkageStatus(metaDlsite.status);
   const base = {
     rjCode: metaDlsite.rjCode,
     appliedTags: metaDlsite.appliedTags,
   };
-  if (linkage === "applied" || linkage === "skipped") {
+  if (metaDlsite.status === "applied" || metaDlsite.status === "skipped") {
     return {
       ...base,
-      status: linkage,
+      status: metaDlsite.status,
       lastAttemptAt: null,
       error: null,
       errorKind: null,
@@ -118,7 +99,7 @@ export function projectDlsiteState(
 }
 
 export function resolveMetaDlsiteProjection(
-  metaDlsite: DlsiteState,
+  metaDlsite: MetaDlsiteState,
   cache: DlsiteCache | null | undefined,
 ): DlsiteState {
   if (!cache || !hasRjCode(metaDlsite)) return projectDlsiteState(metaDlsite, null);
@@ -131,7 +112,7 @@ export function refreshCatalogDlsiteProjection(
     setDlsiteState(workId: string, state: DlsiteState): void;
   },
   workId: string,
-  metaDlsite: DlsiteState,
+  metaDlsite: MetaDlsiteState,
   cache: DlsiteCache | null | undefined,
 ): void {
   catalog.setDlsiteState(workId, resolveMetaDlsiteProjection(metaDlsite, cache));

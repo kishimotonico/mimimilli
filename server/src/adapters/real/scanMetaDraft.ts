@@ -1,5 +1,5 @@
 import type { MetaFile, NormalizedTag, Track, UrlEntry } from "@mimimilli/shared";
-import { emptyDlsiteState } from "@mimimilli/shared";
+import { emptyMetaDlsiteState } from "@mimimilli/shared";
 import { buildDefaultTracks, findCoverImage } from "./scanAudio.ts";
 
 export function createDraftMetaFile(
@@ -26,6 +26,6 @@ export function createDraftMetaFile(
     playlists: playlistId ? [{ id: playlistId, name: "default", tracks }] : [],
     defaultPlaylistId: playlistId,
     createdAt: new Date().toISOString(),
-    dlsite: fields.dlsite ?? emptyDlsiteState(),
+    dlsite: fields.dlsite ?? emptyMetaDlsiteState(),
   };
 }
