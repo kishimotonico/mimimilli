@@ -2,7 +2,7 @@
 
 - ステータス: 承認
 - 日付: 2026-08-12
-- 関連: [ADR-0008](0008-persistence-topology-query-ownership-playback-ids.md)、[ADR-0010](0010-meta-file-rename-mimimilli-json.md)、[ADR-0025](0025-source-mutation-projection-read-separation.md)（取得APIのsourceRevisionを編集用読取りに限定）、[アプリケーション設計レビュー 2026-08-12](../application-architecture-review-2026-08-12.md)、backlog TASK-311〜320
+- 関連: [ADR-0008](0008-persistence-topology-query-ownership-playback-ids.md)、[ADR-0010](0010-meta-file-rename-mimimilli-json.md)、[ADR-0025](0025-source-mutation-projection-read-separation.md)（取得APIのsourceRevisionを編集用読取りに限定）、[ADR-0027](0027-dlsite-meta-state-type-separation.md)（DLsite `status` の正本と投影の一部を上書き）、[アプリケーション設計レビュー 2026-08-12](../application-architecture-review-2026-08-12.md)、backlog TASK-311〜320
 
 ## 用語
 
@@ -58,21 +58,7 @@ catalogでは検索に必要な正規化表を投影する。PlaylistとTrackは
 
 失敗記録のTTLは再取得の可否だけを制御し、catalog投影の表示は制御しない。TTLが切れてもcatalog投影は最後の取得結果を保持し続ける。「最後の試行が失敗した」という事実はTTL経過後も変わらないため、表示を空へ戻す理由はない。一括取得の対象選定は失敗状態（`not_found` / `error`）の作品を含み、TTL切れの作品はそこで再取得され `refreshWorkProjection` の再合成で投影が更新される。期限切れの失敗投影は次回の一括取得で自己修復するため、増分スキャンのスキップ判定（`canSkipIncremental`）に再投影処理を追加しない。追加すると投影が「取得待ち」相当の状態に戻り表示がかえって不正確になるうえ、再合成の経路が増える。
 
-既存の `mimimilli.json` に `not_found` / `error` が残っている場合は、投影時に連携分類 `none` として扱いcacheから再合成する。`mimimilli.json` から一時状態を除去する手動例:
-
-```bash
-library_root=<ライブラリルート>
-rg --files -0 "$library_root" -g 'mimimilli.json' -g '*.mimimilli.json' | while IFS= read -r -d '' meta; do
-  temporary=$(mktemp "${meta}.dlsite-meta.XXXXXX")
-  if jq 'if .dlsite.status == "applied" or .dlsite.status == "skipped" then . else .dlsite.lastAttemptAt = null | .dlsite.error = null | .dlsite.errorKind = null | if .dlsite.status != "applied" and .dlsite.status != "skipped" then .dlsite.status = "none" else . end end' "$meta" > "$temporary" && mv "$temporary" "$meta"; then
-    continue
-  fi
-  rm -f "$temporary"
-  exit 1
-done
-```
-
-移行後はフルスキャンまたは `POST /api/scan` でcatalogを再投影する。
+`mimimilli.json` の `dlsite` に `not_found` / `error` や `lastAttemptAt` / `error` / `errorKind` が残っている場合の扱いは、[ADR-0027](0027-dlsite-meta-state-type-separation.md) が上書きした。現在は投影時に `none` へ読み替えず、スキーマ検証エラー（診断対象）として扱う。既存 `mimimilli.json` の手動移行コマンドもADR-0027に記載する。
 
 scanは`mimimilli.json`のないフォルダーを自動登録しない。未登録候補を提示し、ユーザーが登録を実行したときにだけ`mimimilli.json`生成、catalog投影、DLsite取得ジョブのenqueueを行う。取得結果はcacheに留め、`mimimilli.json`への適用はpreviewを経た明示承認とこの節のsource-first経路を通す。登録済み作品のDLsite取得は維持する。候補提示と登録実行はTASK-318、確認UIはTASK-319、適用内容はTASK-320で実装する。
 
