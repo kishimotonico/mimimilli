@@ -98,7 +98,7 @@ F14は `client/src/features/dlsite/ui/DlsiteBulkRuntime.tsx:57` 付近の完了�
 
 現行の一括取得はcacheの取得と表示用状態の更新だけで、タイトル・タグ・URL・カバーを自動適用しません。`new` / `existing` は現行bulkではログ以外に使われません（`dlsiteBulk.ts:148` 以降）。[DLsiteの説明](dlsite.md)の「newは全タグ適用、existingは差分適用」「一括取得成功でappliedへ遷移」は旧仕様です。
 
-DRAFT-63の「TTL切れで通常一括から自然に取り直される」も、適用済み作品には当てはまりません。通常一括はapplied/skippedを対象外にするためです。9月21日の[引き継ぎ回答](review-handoff-answers-2026-09-21.md)もこの点を指摘しています。
+DRAFT-63の「TTL切れで通常一括から自然に取り直される」も、適用済み作品には当てはまりません。通常一括はapplied/skippedを対象外にするためです。
 
 また、[デザインシステム](design-system.md)には直近結果APIと通知ベルからDLsite結果を確認できるとありますが、APIで保持される結果、現在の失敗一覧、UIで任意に開ける過去結果は同じものではありません。今回の実操作では、通知から現在の失敗一覧は開けましたが、任意に直近ジョブの完了結果を開く入口は見つかりませんでした。
 

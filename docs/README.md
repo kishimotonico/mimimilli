@@ -17,16 +17,9 @@ API 契約の正典はドキュメントではなく **`shared/src/`（Zod ス�
 
 ## 設計検討資料
 
-- [後任レビュー担当への回答 2026-09-21](review-handoff-answers-2026-09-21.md) — 確認経路、反証での変更、推奨理由・優先順位、DLsiteへ渡す契約とドラフト照合
-- [データの寿命と作品identityのレビュー 2026-09-21](data-lifecycle-review-2026-09-21.md) — 再構築・復元・root変更で保持する状態と、作品の所有範囲
-- [正本編集と検索の契約比較 2026-09-21](design-contract-review-2026-09-21.md) — 編集snapshot、保存単位、反映失敗、分類の対象についての仕様案比較
-- [設計レビューの引き継ぎTODO 2026-09-20](review-todo-2026-09-20.md) — 次のレビューの優先順、調査対象、コード入口、完了条件
-- [コア設計レビュー 2026-09-20](core-design-review-2026-09-20.md) — 編集snapshot・保存単位・操作結果・検索対象の契約を横断評価
-- [コア設計レビューの調査方針 2026-09-20](core-design-review-scope-2026-09-20.md) — 並行調査向けに公開した対象と方法。調査完了
-- [アーキテクチャレビュー 2026-09-20](architecture-review-2026-09-20.md) — master `119aef15` の静的レビュー。改善案と既存設計の評価であり、現行仕様の正典ではない
-- [仕様・拡張性レビュー 2026-09-20](specification-review-2026-09-20.md) — 仕様の単純化、状態の寿命、データ量に応じた処理構造、UIの複雑さの評価
-- [スキャンとDLsite連携の調査・再設計案 2026-09-21](dlsite-flow-review-2026-09-21.md) — 調査・再設計案、未採用
-- [機能追加の変更シミュレーション 2026-09-20](change-simulation-2026-09-20.md) — 個人評価とFilesからの作品編集を題材に、必要な変更と構造による余計な波及を区別
+- [アーキテクチャレビュー 2026-09-20](architecture-review-2026-09-20.md) — master `119aef15` の静的レビュー。改善案と既存設計の評価であり、現行仕様の正典ではない。未処理の指摘はTASK-465〜468・338
+- [仕様・拡張性レビュー 2026-09-20](specification-review-2026-09-20.md) — 仕様の単純化、状態の寿命、データ量に応じた処理構造、UIの複雑さの評価。未処理の指摘はTASK-469・470
+- [スキャンとDLsite連携の調査・再設計案 2026-09-21](dlsite-flow-review-2026-09-21.md) — 調査・再設計案、未採用。DRAFT-74・76の前提資料
 
 ## 規約として参照するもの
 
@@ -39,6 +32,8 @@ API 契約の正典はドキュメントではなく **`shared/src/`（Zod ス�
 
 ## 削除済み（Git 履歴に残る）
 
+- `review-todo-2026-09-20.md`、`core-design-review-2026-09-20.md`、`core-design-review-scope-2026-09-20.md`、`data-lifecycle-review-2026-09-21.md`、`design-contract-review-2026-09-21.md`、`review-handoff-answers-2026-09-21.md`、`review-handoff-answers-2-2026-09-21.md`、`change-simulation-2026-09-20.md` — 2026-09-20〜21のAstra設計レビュー群のうち、指摘がADR-0025・0026・TASK-452〜463へ実装済み、またはTASK-465〜470・338へ引き継ぎ済みのもの（2026-09-24削除）
+- `application-architecture-review-2026-08-12.md` — 2026-08-12の設計レビュー。指摘はADR-0006・0017・0023・0025・0026とTASK群（309・310・313・315・317〜320・324・356・452〜470・338）へ移行済み（2026-09-24削除）
 - `web-architecture-proposal.md` — のちの architecture-v2 提案（これも削除済み）が置き換えた旧提案（2026-07-03 削除）
 - `architecture-v2-proposal.md` — 移行完了により ARCHITECTURE.md へ再構成（2026-07-04 削除）
 - `design-brief.md` — デザイン依頼書。役目を終えた（2026-07-03 削除）

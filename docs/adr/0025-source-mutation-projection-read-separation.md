@@ -2,7 +2,7 @@
 
 - ステータス: 承認
 - 日付: 2026-09-21
-- 関連: [ADR-0017](0017-meta-source-projection-and-work-identity.md)、[ADR-0008](0008-persistence-topology-query-ownership-playback-ids.md)、[ADR-0015](0015-client-error-contracts.md)、[設計レビューの引き継ぎTODO](../review-todo-2026-09-20.md)、backlog TASK-452〜456
+- 関連: [ADR-0017](0017-meta-source-projection-and-work-identity.md)、[ADR-0008](0008-persistence-topology-query-ownership-playback-ids.md)、[ADR-0015](0015-client-error-contracts.md)、[アーキテクチャレビュー 2026-09-20](../architecture-review-2026-09-20.md)、backlog TASK-452〜456
 
 ## 文脈
 

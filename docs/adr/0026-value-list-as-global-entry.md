@@ -2,7 +2,7 @@
 
 - ステータス: 承認
 - 日付: 2026-09-21
-- 関連: [ADR-0012](0012-library-axis-as-value-browse.md)（決定1を本ADRで限定）、[ADR-0013](0013-tag-click-replaces-all.md)、[ADR-0016](0016-view-axis-consolidation.md)、[設計レビューの引き継ぎTODO](../review-todo-2026-09-20.md)、backlog TASK-457
+- 関連: [ADR-0012](0012-library-axis-as-value-browse.md)（決定1を本ADRで限定）、[ADR-0013](0013-tag-click-replaces-all.md)、[ADR-0016](0016-view-axis-consolidation.md)、backlog TASK-457
 
 ## 文脈
 
