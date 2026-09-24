@@ -4,27 +4,27 @@ import { createHash } from "node:crypto";
 import { gunzipSync, gzipSync } from "node:zlib";
 import { Database } from "bun:sqlite";
 import {
+  DEFAULT_DLSITE_CACHE_TTLS_MS,
   RJ_CODE_PATTERN,
+  type DlsiteCacheOutcome,
   type DlsiteCacheResolution,
   type DlsiteFailureOutcome,
   type DlsiteHtmlOutcome,
 } from "@mimimilli/shared";
 import { applySqliteBusyTimeout } from "./sqliteConnection.ts";
 
-export type { DlsiteCacheMissReason, DlsiteCacheResolution } from "@mimimilli/shared";
+export type {
+  DlsiteCacheMissReason,
+  DlsiteCacheOutcome,
+  DlsiteCacheResolution,
+} from "@mimimilli/shared";
+export { DEFAULT_DLSITE_CACHE_TTLS_MS };
 
 export const DLSITE_CACHE_MEMORY_PATH = ":memory:" as const;
 export const DLSITE_CACHE_REPRESENTATION = "work-html-ja-adultchecked-v1";
-export const DEFAULT_DLSITE_CACHE_TTLS_MS = {
-  ok: 30 * 24 * 60 * 60 * 1000,
-  parse_error: 60 * 60 * 1000,
-  not_found: 3 * 24 * 60 * 60 * 1000,
-  error: 60 * 60 * 1000,
-} as const;
 export const DEFAULT_DLSITE_CACHE_MAX_TRANSFER_BYTES = 2 * 1024 * 1024;
 export const DEFAULT_DLSITE_CACHE_MAX_EXPANDED_BYTES = 8 * 1024 * 1024;
 
-export type DlsiteCacheOutcome = keyof typeof DEFAULT_DLSITE_CACHE_TTLS_MS;
 export type DlsiteStore = "maniax" | "pro";
 
 export interface DlsiteCacheKey {

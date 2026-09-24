@@ -2,14 +2,16 @@
 // client/mocks からは import せず、本ファイル内で完結させる。
 import {
   dedupeTags,
-  emptyDlsiteState,
   isAudioWorkPath,
   normalizeTags,
   TEXT_PREVIEW_LIMIT_BYTES,
+  DEFAULT_DLSITE_CACHE_TTLS_MS,
 } from "@mimimilli/shared";
 import type {
   CoverValueBase,
+  DlsiteCacheResolution,
   InvalidMetaFile,
+  MetaDlsiteState,
   ScanDiagnostic,
   SmartFolder,
   WorkSummary,
@@ -21,6 +23,11 @@ export interface FixtureCoverColumns {
   image: string | null;
   dimensions: { width: number; height: number } | null;
 }
+
+/** state.works が持つ作品レコード。DLsite合成状態（dlsite）を含まない。
+ *  meta linkageはFixtureState.dlsiteLinkages、取得キャッシュ相当はdlsiteFetchFailuresが正本で、
+ *  API向けの合成状態（WorkSummary.dlsite）はcomposeWorkが読み出し時に組み立てる（TASK-468 R6）。 */
+export type FixtureWorkRecord = Omit<WorkSummary, "dlsite">;
 
 /** シード作品のカバー列。表示用 cover とは別に保持し unmeasured 等を表現する */
 export const SEED_COVER_COLUMNS: Partial<Record<string, FixtureCoverColumns>> = {
@@ -293,36 +300,52 @@ const RAW_SEED_WORKS: Array<
   },
 ];
 
-export const SEED_WORKS: WorkSummary[] = RAW_SEED_WORKS.map((work, index) => {
+export const SEED_WORKS: FixtureWorkRecord[] = RAW_SEED_WORKS.map((work) => {
   const columns = fixtureCoverColumnsForWork(work);
   const cover = fixtureCoverFromColumns(work, columns);
   const tags = dedupeTags(normalizeTags(work.tags));
-  return {
-    ...work,
-    tags,
-    cover,
-    dlsite:
-      index === 0
-        ? {
-            rjCode: work.id,
-            status: "applied",
-            lastAttemptAt: "2026-06-10T12:00:00.000Z",
-            error: null,
-            errorKind: null,
-            appliedTags: tags.filter((tag) => /^(?:cv|genre|サークル)\//.test(tag)),
-          }
-        : index === 2
-          ? {
-              ...emptyDlsiteState(),
-              rjCode: work.id,
-              status: "not_found",
-              error: "作品が見つかりません",
-            }
-          : index === 6
-            ? { ...emptyDlsiteState(), rjCode: work.id, status: "skipped" }
-            : { ...emptyDlsiteState(), rjCode: /^RJ\d+$/i.test(work.id) ? work.id : null },
-  };
+  return { ...work, tags, cover };
 });
+
+/** シード作品のDLsite連携分類（meta linkage）。取得失敗はここには持たせず
+ *  SEED_DLSITE_FAILURESに分ける（TASK-468 R6）。 */
+export const SEED_DLSITE_LINKAGES: ReadonlyMap<string, MetaDlsiteState> = new Map(
+  SEED_WORKS.map((work, index): [string, MetaDlsiteState] => {
+    if (index === 0) {
+      return [
+        work.id,
+        {
+          rjCode: work.id,
+          status: "applied",
+          appliedTags: work.tags.filter((tag) => /^(?:cv|genre|サークル)\//.test(tag)),
+        },
+      ];
+    }
+    if (index === 6) {
+      return [work.id, { rjCode: work.id, status: "skipped", appliedTags: [] }];
+    }
+    return [
+      work.id,
+      { rjCode: /^RJ\d+$/i.test(work.id) ? work.id : null, status: "none", appliedTags: [] },
+    ];
+  }),
+);
+
+const SEED_DLSITE_NOT_FOUND_ATTEMPTED_AT = Date.now();
+
+/** シードのDLsite取得キャッシュ相当（rjCode→取得失敗）。realのDlsiteCacheに対応する。
+ *  RJ501003は一覧・通知の「取得失敗」表示をカバーする（TASK-468 R6）。 */
+export const SEED_DLSITE_FAILURES: ReadonlyMap<string, DlsiteCacheResolution> = new Map([
+  [
+    "RJ501003",
+    {
+      kind: "failure",
+      outcome: "not_found",
+      attemptedAt: SEED_DLSITE_NOT_FOUND_ATTEMPTED_AT,
+      expiresAt: SEED_DLSITE_NOT_FOUND_ATTEMPTED_AT + DEFAULT_DLSITE_CACHE_TTLS_MS.not_found,
+    },
+  ],
+]);
 
 /** 各作品のトラック名（収録曲名）。trackCount に満たない分は呼び出し側で `Track N` を補う */
 export const SEED_TRACK_NAMES: Record<string, string[]> = {
@@ -436,7 +459,7 @@ const fsDir = (name: string, children: FsNode[]): FsNode => ({
 
 /** 作品配下のファイルツリーを構築する（/fs でも使う）。
  *  coverImage は表示用 cover が null（unmeasured）でもファイル実体がある場合に指定する。 */
-export function buildWorkFileTree(work: WorkSummary, coverImage: string | null): FsNode[] {
+export function buildWorkFileTree(work: FixtureWorkRecord, coverImage: string | null): FsNode[] {
   const children: FsNode[] = [];
 
   if (coverImage) {
@@ -464,7 +487,7 @@ export function buildWorkFileTree(work: WorkSummary, coverImage: string | null):
  *  folderNameOverride は同一作品を別の物理パス（identityConflicts の重複コピー等）に
  *  配置するときに使う。 */
 function fsWorkFolder(
-  work: WorkSummary,
+  work: FixtureWorkRecord,
   coverImage: string | null,
   folderNameOverride?: string,
 ): FsNode {
@@ -527,14 +550,14 @@ function ensurePath(
  *  identityConflicts / invalidMetaFiles は、それぞれが指す重複コピーフォルダー・
  *  壊れたメタファイルを /fs ツリー上に実体化するために使う。 */
 export function buildFsRoot(
-  works: WorkSummary[],
+  works: FixtureWorkRecord[],
   coverColumns: ReadonlyMap<string, FixtureCoverColumns>,
   identityConflicts: ScanDiagnostic[] = [],
   invalidMetaFiles: InvalidMetaFile[] = [],
 ): FsNode {
   const folderWorks = works.filter((work) => !isAudioWorkPath(work.physicalPath));
   const fileWorks = works.filter((work) => isAudioWorkPath(work.physicalPath));
-  const byCircle = new Map<string, WorkSummary[]>();
+  const byCircle = new Map<string, FixtureWorkRecord[]>();
   for (const work of folderWorks) {
     const circle = circleFromPhysicalPath(work.physicalPath);
     const list = byCircle.get(circle) ?? [];

@@ -65,6 +65,15 @@ export type DlsiteHtmlOutcome = "ok" | "parse_error";
 export type DlsiteFailureOutcome = "not_found" | "error";
 export type DlsiteCacheMissReason = "not_cached" | "ttl_expired" | "snapshot_body_missing";
 
+/** DLsite取得キャッシュの既定TTL。real（DlsiteCache）・fixture（seedのキャッシュ相当）で共有する。 */
+export const DEFAULT_DLSITE_CACHE_TTLS_MS = {
+  ok: 30 * 24 * 60 * 60 * 1000,
+  parse_error: 60 * 60 * 1000,
+  not_found: 3 * 24 * 60 * 60 * 1000,
+  error: 60 * 60 * 1000,
+} as const;
+export type DlsiteCacheOutcome = keyof typeof DEFAULT_DLSITE_CACHE_TTLS_MS;
+
 /** DLsite取得キャッシュの通常取得判断結果。fresh HTML / 有効な失敗記録 / miss のいずれか。
  *  real adapterのDlsiteCache（SQLite実装）とfixture adapterの両方が、この型を通じて
  *  projectDlsiteStateと合成する（real/fixtureで合成ロジックを重複実装しない）。 */
@@ -114,7 +123,13 @@ export function projectDlsiteState(
 ): DlsiteState {
   const base = { rjCode: metaDlsite.rjCode, appliedTags: metaDlsite.appliedTags };
   if (metaDlsite.status === "applied" || metaDlsite.status === "skipped") {
-    return { ...base, status: metaDlsite.status, lastAttemptAt: null, error: null, errorKind: null };
+    return {
+      ...base,
+      status: metaDlsite.status,
+      lastAttemptAt: null,
+      error: null,
+      errorKind: null,
+    };
   }
   if (!hasRjCode(metaDlsite) || !cacheResolution) {
     return { ...base, status: "none", lastAttemptAt: null, error: null, errorKind: null };
@@ -153,7 +168,7 @@ export function hasRjCode<T extends Pick<DlsiteState, "rjCode">>(
 /** RJコードが未検出のまま放置されている作品か（ユーザーが明示的にスキップした作品は除く）。
  *  `rjCode === ""` はユーザーが明示的にRJコードなしとした状態であり、未検出には含めない。
  *  スキャン完了通知・一覧の両方で判定基準を一致させるための正典 */
-export function isRjCodeMissing(state: DlsiteState): boolean {
+export function isRjCodeMissing(state: Pick<DlsiteState, "rjCode" | "status">): boolean {
   return state.rjCode === null && state.status !== "skipped";
 }
 
