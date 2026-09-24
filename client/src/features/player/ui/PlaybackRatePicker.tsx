@@ -1,12 +1,5 @@
-// 再生速度ピル＋メニュー。PopupContent（カバー画像上のオーバーレイ）、
-// PlayerTransportControls（再生中タブ通常モード）、NowPlayingImmersiveMiniControls
-// （没入モードのミニコントロール）で共用する。後2者はメニューが z-index 41 の
-// シーク行（.mle-nowplaying__seek）より下のスタッキングコンテキスト
-// （.mle-nowplaying__controls / .mle-nowplaying__immersive-minicontrols、共に
-// position+z-index持ち）に閉じ込められるため、メニュー自身の z-index をいくら
-// 上げても勝てない。useAnchoredPopover(placement:"above") で document.body へ
-// ポータルし、祖先のスタッキングコンテキストごと抜ける。開閉・外側クリック/Escape
-// はこのフックに集約する。
+// 再生速度ピル＋メニュー。PopupContent・PlayerTransportControls・
+// NowPlayingImmersiveMiniControlsで共用する。
 
 import { useCallback, useState } from "react";
 import { createPortal } from "react-dom";

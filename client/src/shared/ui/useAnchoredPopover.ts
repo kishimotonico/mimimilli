@@ -97,8 +97,6 @@ export function useAnchoredPopover({
   const floatingBoundaryRef = useRef<HTMLElement | null>(null);
   const dismissalBoundaryRefs = useMemo(
     () =>
-      // "right"/"above" はポータル先(document.body)がboundaryRefの外に出るため、
-      // フローティングパネル自身を境界へ加えないと自分の中のクリックを外側扱いしてしまう。
       placement !== "below"
         ? [...(additionalBoundaryRefs ?? []), floatingBoundaryRef]
         : additionalBoundaryRefs,
@@ -261,7 +259,6 @@ export function useAnchoredPopover({
     setFloating,
     floatingStyles: {
       ...floatingStyles,
-      // "above" は幅を持たない実寸のメニュー（例: 再生速度）を想定し、preferredWidth を強制しない。
       width:
         placement === "below" ? popoverWidth : placement === "right" ? preferredWidth : undefined,
     },

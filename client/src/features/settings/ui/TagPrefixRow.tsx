@@ -58,8 +58,6 @@ export default function TagPrefixRow({
   const deleteDisabled = isMutating || p.protected;
   return (
     <div className="flex items-center gap-2 border-b border-line-soft px-2.5 py-1.5 last:border-b-0">
-      {/* 上下ボタンを詰めすぎると回転差（rotate-180）が視認しづらくなるため、
-          1px の隙間を空けて2つの独立したボタンだと分かるようにする */}
       <div className="flex shrink-0 flex-col gap-px">
         <IconButton
           icon={I.chevD}
