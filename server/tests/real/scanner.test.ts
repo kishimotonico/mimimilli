@@ -78,9 +78,6 @@ test("初回スキャン: 登録済みmimimilli.jsonを投影し、候補を自�
   assert.deepEqual(meta.dlsite, {
     rjCode: "RJ900001",
     status: "none",
-    lastAttemptAt: null,
-    error: null,
-    errorKind: null,
     appliedTags: [],
   });
 
@@ -107,9 +104,10 @@ test("初回スキャン: 登録済みmimimilli.jsonを投影し、候補を自�
   assert.equal(existing.dlsite.rjCode, "RJ900002");
 });
 
-test("DLsite状態: mimimilli.jsonの旧errorは投影でnone、RJコードとappliedTagsは維持する", async (t) => {
+test("DLsite状態: mimimilli.jsonのdlsite.statusに取得失敗の一時値が残っていると丸めず投影を更新しない", async (t) => {
   const { adapter, existingWorkId, root } = await setup(t);
   await adapter.scan();
+  const before = await adapter.getWork(existingWorkId);
   const metaPath = join(root, "dlsite", "RJ900002_既存メタ", "mimimilli.json");
   const meta = JSON.parse(readFileSync(metaPath, "utf-8"));
   meta.dlsite = {
@@ -122,16 +120,15 @@ test("DLsite状態: mimimilli.jsonの旧errorは投影でnone、RJコードとap
   };
   writeFileSync(metaPath, JSON.stringify(meta, null, 2));
 
-  await adapter.scan();
+  const result = await adapter.scan();
+  assert.equal(result.invalidMetaFiles.length, 1);
+  assert.equal(result.invalidMetaFiles[0]?.path, "dlsite/RJ900002_既存メタ/mimimilli.json");
+
+  // 検証に失敗したmimimilli.jsonは再投影されず、既存のcatalog投影がそのまま残る。
   const restored = await adapter.getWork(existingWorkId);
-  assert.deepEqual(restored?.dlsite, {
-    rjCode: "RJ7654321",
-    status: "none",
-    lastAttemptAt: null,
-    error: null,
-    errorKind: null,
-    appliedTags: ["genre/耳かき"],
-  });
+  assert.deepEqual(restored?.dlsite, before?.dlsite);
+
+  // 自動修復はしない。旧状態値はユーザーの手動移行コマンドで除去する（ADR-0027）。
   const rawMeta = JSON.parse(readFileSync(metaPath, "utf-8"));
   assert.equal(rawMeta.dlsite.status, "error");
 });
@@ -225,6 +222,29 @@ test("メタ不正: 壊れた JSON は errors にカウントされスキャン�
   assert.equal(result.insertedWorkIds.length, 0);
   assert.equal(result.invalidMetaFiles.length, 1);
   assert.equal(result.invalidMetaFiles[0]?.path, "broken-work/mimimilli.json");
+  assert.match(result.invalidMetaFiles[0]?.message ?? "", /メタファイルが不正です/);
+});
+
+test("メタ不正: mimimilli.jsonのdlsite.statusに取得失敗の一時値（not_found/error）が残っていると丸めず invalidMetaFiles として診断する", async (t) => {
+  const { adapter, root } = await setup(t);
+  const staleDir = join(root, "stale-dlsite-status");
+  mkdirSync(staleDir, { recursive: true });
+  writeWav(join(staleDir, "track.wav"), 1);
+  writeFileSync(
+    join(staleDir, "mimimilli.json"),
+    JSON.stringify({
+      formatVersion: 1,
+      id: "99999999-9999-4999-8999-999999999999",
+      title: "旧DLsite状態が残った作品",
+      dlsite: { rjCode: "RJ123456", status: "error", appliedTags: [] },
+    }),
+  );
+
+  const result = await adapter.scan();
+  assert.equal(result.registered, 1); // 既存メタ作品は通常どおり登録される
+  assert.equal(result.insertedWorkIds.length, 0);
+  assert.equal(result.invalidMetaFiles.length, 1);
+  assert.equal(result.invalidMetaFiles[0]?.path, "stale-dlsite-status/mimimilli.json");
   assert.match(result.invalidMetaFiles[0]?.message ?? "", /メタファイルが不正です/);
 });
 

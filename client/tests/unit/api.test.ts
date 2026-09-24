@@ -7,6 +7,7 @@ import * as settingsApi from "../../src/features/settings/api";
 import * as scanApi from "../../src/features/scan/api";
 import {
   emptyDlsiteState,
+  emptyMetaDlsiteState,
   coverFieldsFromCover,
   workspacePath,
   type Work,
@@ -250,7 +251,7 @@ describe("work api", () => {
       tags: ["tag1", "tag2"],
       urls: [],
       coverImage: null,
-      dlsite: emptyDlsiteState(),
+      dlsite: emptyMetaDlsiteState(),
     };
     mockFetch.mockResolvedValue(makeResponse({ snapshot, projection: { status: "published" } }));
     const result = await workApi.patchWorkSource("work-1", {
@@ -289,7 +290,7 @@ describe("work api", () => {
       tags: ["a/b"],
       urls: [],
       coverImage: null,
-      dlsite: emptyDlsiteState(),
+      dlsite: emptyMetaDlsiteState(),
     };
     mockFetch.mockResolvedValue(makeResponse({ snapshot, projection: { status: "published" } }));
     await workApi.addWorkTag("work-1", "a/b");

@@ -388,8 +388,6 @@ test("fixture: RJコード変更で旧状態をリセットし一括取得対象
   });
   assert.equal(updated?.snapshot.dlsite.rjCode, "RJ7654321");
   assert.equal(updated?.snapshot.dlsite.status, "none");
-  assert.equal(updated?.snapshot.dlsite.error, null);
-  assert.equal(updated?.snapshot.dlsite.errorKind, null);
   assert.deepEqual(updated?.snapshot.dlsite.appliedTags, []);
 
   const bulk = await adapter.runDlsiteBulk("existing", [workId]);

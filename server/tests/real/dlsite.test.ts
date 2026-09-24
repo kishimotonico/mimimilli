@@ -484,10 +484,13 @@ test("dlsiteApply: タグマージとメタ書き戻し（カバー DL なし）
   assert.equal(work?.dlsite.status, "applied");
   assert.ok(work?.dlsite.appliedTags.length > 0);
   const metaDlsite = JSON.parse(readFileSync(join(work!.physicalPath, "mimimilli.json"), "utf-8"))
-    .dlsite as { status: string; lastAttemptAt: string | null; error: string | null };
+    .dlsite as Record<string, unknown>;
   assert.equal(metaDlsite.status, "applied");
-  assert.equal(metaDlsite.lastAttemptAt, null);
-  assert.equal(metaDlsite.error, null);
+  // meta正本のdlsiteはrjCode/status/appliedTagsだけを持つ専用型で、取得失敗・試行時刻などの
+  // 一時状態はそもそもフィールドとして書き込まれない（ADR-0027）。
+  assert.equal("lastAttemptAt" in metaDlsite, false);
+  assert.equal("error" in metaDlsite, false);
+  assert.equal("errorKind" in metaDlsite, false);
 });
 
 test("updateDlsiteState: RJコード修正とskipped切替をメタへ保存する", async (t) => {
@@ -558,8 +561,6 @@ test("updateDlsiteState: RJコード変更で旧状態をリセットし一括�
   });
   assert.equal(updated?.snapshot.dlsite.rjCode, "RJ888888");
   assert.equal(updated?.snapshot.dlsite.status, "none");
-  assert.equal(updated?.snapshot.dlsite.error, null);
-  assert.equal(updated?.snapshot.dlsite.errorKind, null);
   assert.deepEqual(updated?.snapshot.dlsite.appliedTags, []);
 
   const bulk = await adapter.runDlsiteBulk("existing", [lib.existingWorkId]);

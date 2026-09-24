@@ -5,6 +5,7 @@ import { Provider as JotaiProvider, createStore } from "jotai";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   emptyDlsiteState,
+  toDlsiteLinkageStatus,
   type DlsitePreview,
   type Work,
   type WorkEditSnapshot,
@@ -57,7 +58,11 @@ function makeSnapshot(work: Work): WorkEditSnapshot {
     tags: work.tags,
     urls: work.urls,
     coverImage: work.coverImage,
-    dlsite: work.dlsite,
+    dlsite: {
+      rjCode: work.dlsite.rjCode,
+      status: toDlsiteLinkageStatus(work.dlsite.status),
+      appliedTags: work.dlsite.appliedTags,
+    },
   };
 }
 

@@ -14,7 +14,7 @@ import { join } from "node:path";
 import { test, type TestContext } from "node:test";
 import {
   META_FILE_NAME,
-  emptyDlsiteState,
+  emptyMetaDlsiteState,
   sidecarMetaFileName,
   type MetaFile,
   workspacePath,
@@ -303,7 +303,7 @@ function writeOrphanedMeta(folder: string, id: string, title: string): void {
     playlists: [],
     defaultPlaylistId: null,
     createdAt: new Date().toISOString(),
-    dlsite: emptyDlsiteState(),
+    dlsite: emptyMetaDlsiteState(),
   });
 }
 
@@ -396,7 +396,7 @@ test("POST /works: 孤立メタ復元でDLsite URLの選択外は保持し、選
     playlists: [],
     defaultPlaylistId: null,
     createdAt: new Date().toISOString(),
-    dlsite: emptyDlsiteState(),
+    dlsite: emptyMetaDlsiteState(),
     customTopLevel: "preserved",
   };
   writeMetaFile(join(parent, META_FILE_NAME), orphanedMeta);
@@ -452,7 +452,7 @@ test("POST /works: 孤立メタ復元でDLsite URLの選択外は保持し、選
     playlists: [],
     defaultPlaylistId: null,
     createdAt: new Date().toISOString(),
-    dlsite: emptyDlsiteState(),
+    dlsite: emptyMetaDlsiteState(),
   });
   const replaced = await restore(replacementFolder, true);
   assert.equal(replaced.status, 201);
@@ -548,7 +548,7 @@ test("POST /works: 別パスのライブ作品と同一IDの孤立メタ復元�
         ],
         defaultPlaylistId: playlistId,
         createdAt: new Date().toISOString(),
-        dlsite: emptyDlsiteState(),
+        dlsite: emptyMetaDlsiteState(),
       },
       null,
       2,
@@ -661,7 +661,7 @@ test("POST /works: 孤立メタ復元時もスキーマ外フィールドを保�
         ],
         defaultPlaylistId: playlistId,
         createdAt: new Date().toISOString(),
-        dlsite: emptyDlsiteState(),
+        dlsite: emptyMetaDlsiteState(),
         customTopLevel: "top-extra",
       },
       null,
@@ -748,7 +748,7 @@ test("POST /works: 孤立メタ復元時も defaultPlaylist キーを保持す�
         defaultPlaylist: "default",
         defaultPlaylistId: playlistId,
         createdAt: new Date().toISOString(),
-        dlsite: emptyDlsiteState(),
+        dlsite: emptyMetaDlsiteState(),
       },
       null,
       2,

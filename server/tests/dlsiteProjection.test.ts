@@ -1,51 +1,17 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { emptyDlsiteState } from "@mimimilli/shared";
+import { emptyMetaDlsiteState } from "@mimimilli/shared";
 import {
   projectDlsiteState,
   shouldRefreshDlsiteProjectionAfterFetch,
-  metaLinkageStatus,
-  toMetaDlsiteState,
 } from "../src/adapters/real/dlsiteProjection.ts";
 import { nts } from "./helpers/tag.ts";
-
-test("metaLinkageStatus: 取得失敗は none として扱う", () => {
-  assert.equal(metaLinkageStatus("none"), "none");
-  assert.equal(metaLinkageStatus("applied"), "applied");
-  assert.equal(metaLinkageStatus("skipped"), "skipped");
-  assert.equal(metaLinkageStatus("not_found"), "none");
-  assert.equal(metaLinkageStatus("error"), "none");
-});
-
-test("toMetaDlsiteState: 一時状態フィールドを落とす", () => {
-  assert.deepEqual(
-    toMetaDlsiteState({
-      rjCode: "RJ123456",
-      status: "error",
-      lastAttemptAt: "2026-01-01T00:00:00.000Z",
-      error: "failed",
-      errorKind: "parse_error",
-      appliedTags: nts(["genre/耳かき"]),
-    }),
-    {
-      rjCode: "RJ123456",
-      status: "none",
-      lastAttemptAt: null,
-      error: null,
-      errorKind: null,
-      appliedTags: nts(["genre/耳かき"]),
-    },
-  );
-});
 
 test("projectDlsiteState: applied は cache 失敗より優先する", () => {
   const projected = projectDlsiteState(
     {
       rjCode: "RJ123456",
       status: "applied",
-      lastAttemptAt: null,
-      error: null,
-      errorKind: null,
       appliedTags: nts(["genre/耳かき"]),
     },
     {
@@ -61,7 +27,7 @@ test("projectDlsiteState: applied は cache 失敗より優先する", () => {
 
 test("projectDlsiteState: cache の not_found を none 作品へ投影する", () => {
   const projected = projectDlsiteState(
-    { ...emptyDlsiteState(), rjCode: "RJ123456" },
+    { ...emptyMetaDlsiteState(), rjCode: "RJ123456" },
     {
       kind: "failure",
       outcome: "not_found",
@@ -76,7 +42,7 @@ test("projectDlsiteState: cache の not_found を none 作品へ投影する", (
 
 test("projectDlsiteState: cache の parse_error を投影する", () => {
   const projected = projectDlsiteState(
-    { ...emptyDlsiteState(), rjCode: "RJ123456" },
+    { ...emptyMetaDlsiteState(), rjCode: "RJ123456" },
     {
       kind: "html",
       outcome: "parse_error",
@@ -110,7 +76,7 @@ test("shouldRefreshDlsiteProjectionAfterFetch: offline は投影しない", () =
 
 test("projectDlsiteState: cache ok は none のまま", () => {
   const projected = projectDlsiteState(
-    { ...emptyDlsiteState(), rjCode: "RJ123456" },
+    { ...emptyMetaDlsiteState(), rjCode: "RJ123456" },
     {
       kind: "html",
       outcome: "ok",

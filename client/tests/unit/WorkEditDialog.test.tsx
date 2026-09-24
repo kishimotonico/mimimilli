@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Work, WorkEditSnapshot } from "@mimimilli/shared";
-import { emptyDlsiteState } from "@mimimilli/shared";
+import { emptyDlsiteState, toDlsiteLinkageStatus } from "@mimimilli/shared";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
 import type { LibraryWorkEditMutation } from "../../src/features/library/model/useLibraryQueries";
@@ -93,7 +93,11 @@ function makeSnapshot(work: Work = makeWork(), revision = "revision-1"): WorkEdi
     tags: work.tags,
     urls: work.urls,
     coverImage: work.coverImage,
-    dlsite: work.dlsite,
+    dlsite: {
+      rjCode: work.dlsite.rjCode,
+      status: toDlsiteLinkageStatus(work.dlsite.status),
+      appliedTags: work.dlsite.appliedTags,
+    },
   };
 }
 
