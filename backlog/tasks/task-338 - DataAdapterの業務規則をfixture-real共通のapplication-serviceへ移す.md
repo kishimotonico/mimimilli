@@ -1,10 +1,11 @@
 ---
 id: TASK-338
 title: DataAdapterの業務規則をfixture/real共通のapplication serviceへ移す
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@koni524361'
 created_date: '2026-08-14 10:27'
-updated_date: '2026-09-24 07:23'
+updated_date: '2026-09-24 08:57'
 labels: []
 dependencies: []
 priority: medium
@@ -29,8 +30,18 @@ ADR-0018で今回のtransport統一の対象外とした、fixture/real両adapte
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 resume検証の条件とエラーメッセージが単一実装になり、fixture/real両adapterがそれを利用する
-- [ ] #2 DLsite適用のパッチ構築（tags/title/url）が単一実装になる
-- [ ] #3 作品登録の重複・マージ要求チェックが単一実装になる
-- [ ] #4 既存のserverテストと契約テストが全てパスする
+- [x] #1 resume検証の条件とエラーメッセージが単一実装になり、fixture/real両adapterがそれを利用する
+- [x] #2 DLsite適用のパッチ構築（tags/title/url）が単一実装になる
+- [x] #3 作品登録の重複・マージ要求チェックが単一実装になる
+- [x] #4 既存のserverテストと契約テストが全てパスする
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+fixture/real両adapterで重複していた業務規則を共通化した。resume検証（server/src/core/resumeValidation.ts）と作品登録の重複・マージ要求チェック（server/src/core/workRegistrationGuard.ts）をserver/coreへ移し、DLsite単体適用・まとめ適用のパッチ構築（buildDlsiteApplyPatch / buildDlsiteMissingApplyPatch）をsharedへ共通化。移行過程でfixture側の不具合3件（負のoffsetSecを通していた、空titleで上書きしていた、まとめ適用でlinkageがappliedにならない）をrealに揃えて修正。adapterRulesContract.test.tsほかの契約テストでfixture/realの同値性を確認。pnpm check / pnpm test 通過（統合ブランチfeat/astra-followupで実施）。
+
+範囲外: 登録後にDLsite取得へ渡すフロー（onRegistered、app.tsのDLsite enqueue接続）はDLsite導線再設計（DRAFT-74）で決める。検索・分類軸集計のcore純粋関数版とSQL版は性能上必要な二実装のため統合対象外（契約テストで同値性を維持）。
+
+統合ブランチfeat/astra-followupに取り込み済み、master未マージ（ユーザーの実機確認後に統括がマージ）。
+<!-- SECTION:FINAL_SUMMARY:END -->
