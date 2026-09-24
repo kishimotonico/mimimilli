@@ -113,10 +113,12 @@
   bottom: 8px;
   z-index: 4;
 }
+/* document.body へポータルし floating-ui が position/top/left を inline style で
+   与える（useAnchoredPopover placement:"above"）。祖先のスタッキングコンテキストの
+   外に出るため、z-index は docs/design-system.md の一覧上で最も手前
+   （再生中タブ・シーク行 z-index 41）より高い値にする。 */
 .mle-ratepick__pop {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 7px);
+  z-index: 50;
   min-width: 112px;
   padding: 4px;
   background: var(--paper-1);

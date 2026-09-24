@@ -95,6 +95,7 @@
 | 再生中タブ・トランスポート/AB行（`.mle-nowplaying__controls`）        | z-index 33            |
 | 再生中タブ・没入モード面（`.mle-nowplaying__immersive`）              | z-index 40            |
 | 再生中タブ・シーク行（`.mle-nowplaying__seek`、没入面より常に手前）   | z-index 41            |
+| 再生速度メニュー（`.mle-ratepick__pop`、`document.body`へポータル）   | z-index 50            |
 | 設定モーダル                                                          | top layer（下記）     |
 | スキャンモーダル                                                      | top layer（下記）     |
 | スマートフォルダーエディタ                                            | top layer（下記）     |
