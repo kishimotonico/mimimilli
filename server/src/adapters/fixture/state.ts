@@ -35,8 +35,8 @@ export interface FixtureState {
   lastScanTime: string | null;
   /** 直近の完了スキャンが対象にしたルートフォルダー。rootFolderと不一致なら一覧が未反映であることを示す */
   lastScanRootFolder: string | null;
-  /** DLsite合成状態（dlsite）を含まない作品レコード。正本は works + dlsiteLinkages + dlsiteFetchFailures
-   *  の3つで、合成済みのAPI向け状態はどこにも保存しない（TASK-468 R6）。 */
+  /** DLsite合成状態（dlsite）を含まない作品レコード。正本は works・dlsiteLinkages・
+   *  dlsiteFetchFailures の3つで、合成済みのAPI向け状態はどこにも保存しない。 */
   works: FixtureWorkRecord[];
   /** workIdごとのDLsite連携分類（meta linkage相当）。realのmimimilli.json.dlsiteに対応する。 */
   dlsiteLinkages: Map<string, MetaDlsiteState>;
@@ -83,6 +83,19 @@ export function setDlsiteLinkage(
   state.dlsiteLinkages.set(workId, linkage);
 }
 
+/** works からidが一致するレコードを取り除き、dlsiteLinkagesの対応エントリも消す。 */
+export function removeWorks(state: FixtureState, ids: ReadonlySet<string>): void {
+  if (ids.size === 0) return;
+  state.works = state.works.filter((work) => !ids.has(work.id));
+  for (const id of ids) state.dlsiteLinkages.delete(id);
+}
+
+/** workのidを付け替え、dlsiteLinkagesも新idへ移す。 */
+export function reassignWorkId(state: FixtureState, oldId: string, newId: string): void {
+  setDlsiteLinkage(state, newId, dlsiteLinkageOf(state, oldId));
+  state.dlsiteLinkages.delete(oldId);
+}
+
 /** rjCodeに対応するDLsite取得キャッシュの解決結果。realのDlsiteCache.resolveと同じくTTL切れはmiss扱い。 */
 export function dlsiteFetchFailureFor(
   state: FixtureState,
@@ -95,7 +108,7 @@ export function dlsiteFetchFailureFor(
 }
 
 /** 作品レコードとlinkage・取得キャッシュから、API向けの合成済みWorkSummaryを読み出し時に組み立てる。
- *  合成結果はどこにも保存しない（TASK-468 R6）。 */
+ *  合成結果はどこにも保存しない。 */
 export function composeWork(state: FixtureState, record: FixtureWorkRecord): WorkSummary {
   const linkage = dlsiteLinkageOf(state, record.id);
   return {

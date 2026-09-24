@@ -45,6 +45,8 @@ import {
   composeWorks,
   coverColumnsOf,
   dlsiteLinkageOf,
+  reassignWorkId,
+  removeWorks,
   setDlsiteLinkage,
   type FixtureState,
 } from "./state.ts";
@@ -236,8 +238,7 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
       work.id = crypto.randomUUID();
       work.bookmarked = false;
       work.lastPlayedAt = null;
-      setDlsiteLinkage(state, work.id, dlsiteLinkageOf(state, oldId));
-      state.dlsiteLinkages.delete(oldId);
+      reassignWorkId(state, oldId, work.id);
       state.resumes.delete(diagnostic.workId);
       state.identityConflicts = state.identityConflicts.flatMap((candidate) => {
         if (candidate.workId !== diagnostic.workId) return [candidate];
@@ -257,9 +258,8 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
     },
 
     async deleteWork(id: string): Promise<boolean> {
-      const index = state.works.findIndex((w) => w.id === id);
-      if (index === -1) return false;
-      state.works.splice(index, 1);
+      if (!state.works.some((w) => w.id === id)) return false;
+      removeWorks(state, new Set([id]));
       return true;
     },
 
@@ -268,9 +268,11 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
     },
 
     async unregisterMissingWorks(): Promise<{ deletedCount: number; failedCount: number }> {
-      const deletedCount = state.works.filter((w) => w.status === "missing").length;
-      state.works = state.works.filter((w) => w.status !== "missing");
-      return { deletedCount, failedCount: 0 };
+      const missingIds = new Set(
+        state.works.filter((w) => w.status === "missing").map((w) => w.id),
+      );
+      removeWorks(state, missingIds);
+      return { deletedCount: missingIds.size, failedCount: 0 };
     },
 
     async getWorkEditSnapshot(id: string): Promise<WorkEditSnapshot | null> {
