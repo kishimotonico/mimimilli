@@ -115,7 +115,7 @@ function projectedDlsiteFetchFailure(
 /**
  * mimimilli.json正本とDLsite取得キャッシュを合成し、catalog・APIが読む DlsiteState を組み立てる。
  * applied/skipped はmimimilli.jsonの連携分類が優先し、none のときだけキャッシュの取得結果を反映する。
- * real（DlsiteCacheの解決結果）・fixture（seedのキャッシュ相当）が共通で使う（TASK-468）。
+ * real（DlsiteCacheの解決結果）・fixture（seedのキャッシュ相当）が共通で使う。
  */
 export function projectDlsiteState(
   metaDlsite: MetaDlsiteState,

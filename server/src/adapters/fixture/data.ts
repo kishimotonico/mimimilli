@@ -26,7 +26,7 @@ export interface FixtureCoverColumns {
 
 /** state.works が持つ作品レコード。DLsite合成状態（dlsite）を含まない。
  *  meta linkageはFixtureState.dlsiteLinkages、取得キャッシュ相当はdlsiteFetchFailuresが正本で、
- *  API向けの合成状態（WorkSummary.dlsite）はcomposeWorkが読み出し時に組み立てる（TASK-468 R6）。 */
+ *  API向けの合成状態（WorkSummary.dlsite）はcomposeWorkが読み出し時に組み立てる。 */
 export type FixtureWorkRecord = Omit<WorkSummary, "dlsite">;
 
 /** シード作品のカバー列。表示用 cover とは別に保持し unmeasured 等を表現する */
@@ -308,7 +308,7 @@ export const SEED_WORKS: FixtureWorkRecord[] = RAW_SEED_WORKS.map((work) => {
 });
 
 /** シード作品のDLsite連携分類（meta linkage）。取得失敗はここには持たせず
- *  SEED_DLSITE_FAILURESに分ける（TASK-468 R6）。 */
+ *  SEED_DLSITE_FAILURESに分ける。 */
 export const SEED_DLSITE_LINKAGES: ReadonlyMap<string, MetaDlsiteState> = new Map(
   SEED_WORKS.map((work, index): [string, MetaDlsiteState] => {
     if (index === 0) {
@@ -331,21 +331,21 @@ export const SEED_DLSITE_LINKAGES: ReadonlyMap<string, MetaDlsiteState> = new Ma
   }),
 );
 
-const SEED_DLSITE_NOT_FOUND_ATTEMPTED_AT = Date.now();
-
 /** シードのDLsite取得キャッシュ相当（rjCode→取得失敗）。realのDlsiteCacheに対応する。
- *  RJ501003は一覧・通知の「取得失敗」表示をカバーする（TASK-468 R6）。 */
-export const SEED_DLSITE_FAILURES: ReadonlyMap<string, DlsiteCacheResolution> = new Map([
-  [
-    "RJ501003",
-    {
-      kind: "failure",
-      outcome: "not_found",
-      attemptedAt: SEED_DLSITE_NOT_FOUND_ATTEMPTED_AT,
-      expiresAt: SEED_DLSITE_NOT_FOUND_ATTEMPTED_AT + DEFAULT_DLSITE_CACHE_TTLS_MS.not_found,
-    },
-  ],
-]);
+ *  nowMsは状態生成時刻（呼び出し側が決める）を使い、モジュール読込時刻には依存しない。 */
+export function buildSeedDlsiteFailures(nowMs: number): Map<string, DlsiteCacheResolution> {
+  return new Map([
+    [
+      "RJ501003",
+      {
+        kind: "failure",
+        outcome: "not_found",
+        attemptedAt: nowMs,
+        expiresAt: nowMs + DEFAULT_DLSITE_CACHE_TTLS_MS.not_found,
+      },
+    ],
+  ]);
+}
 
 /** 各作品のトラック名（収録曲名）。trackCount に満たない分は呼び出し側で `Track N` を補う */
 export const SEED_TRACK_NAMES: Record<string, string[]> = {

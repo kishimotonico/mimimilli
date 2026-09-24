@@ -1,5 +1,5 @@
 // updateDlsiteState後の投影（meta linkageとDLsite取得キャッシュの合成）が、
-// real・fixture 両adapterで同じ結果になることを縛る契約テスト（TASK-468 レビュー指摘）。
+// real・fixture 両adapterで同じ結果になることを縛る契約テスト。
 // 3操作（同一RJコード再送信・RJコード変更・スキップ切替）を、キャッシュ済みの取得失敗
 // （not_found）がある状態から行い、composited dlsiteの投影が一致することを確認する。
 import assert from "node:assert/strict";

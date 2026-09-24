@@ -189,7 +189,7 @@ const START_MS = Date.UTC(2021, 0, 1);
 const END_MS = Date.UTC(2026, 5, 1);
 
 /** 作品ごとのmeta linkageと、あれば取得キャッシュ相当の失敗記録を組み立てる。
- *  取得失敗（not_found/parse_error）はlinkageではなくfailureへ持たせる（TASK-468 R6）。 */
+ *  取得失敗（not_found/parse_error）はlinkageではなくfailureへ持たせる。 */
 function buildDlsiteLinkageAndFailure(
   random: () => number,
   id: string,
