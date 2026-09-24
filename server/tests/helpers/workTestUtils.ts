@@ -10,6 +10,7 @@ import { CatalogWorkRepository } from "../../src/adapters/real/catalogWorkReposi
 import { UserWorkStateRepository } from "../../src/adapters/real/userWorkStateRepository.ts";
 import { WorkQueryRepository } from "../../src/adapters/real/workQueryRepository.ts";
 import { getWorkFromCatalog } from "../../src/adapters/real/workRefresh.ts";
+import { validateResumeRequest } from "../../src/core/resumeValidation.ts";
 
 export function makeWork(overrides: Partial<Work> & Pick<Work, "id">): Work {
   const playlistId = crypto.randomUUID();
@@ -79,7 +80,8 @@ export function saveTestResume(
   body: ResumeBody,
 ): boolean {
   const track = catalog.resolveResumeTrackDuration(id, body.playlistId, body.trackId);
-  return user.saveResume(id, body, track);
+  validateResumeRequest(track, body.offsetSec);
+  return user.saveResume(id, body);
 }
 
 export async function getTestWork(db: Db, id: string) {

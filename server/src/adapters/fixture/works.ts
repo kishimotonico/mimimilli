@@ -27,15 +27,12 @@ import type {
   WorksPage,
   WorksQuery,
 } from "@mimimilli/shared";
-import {
-  descendantsRegisteredError,
-  InvalidResumeError,
-  SourceChangedError,
-  WorkRegisterError,
-} from "../../errors.ts";
+import { SourceChangedError } from "../../errors.ts";
 import type { WorkAdapter } from "../../adapter/work.ts";
 import { summarizeDlsiteNotifications } from "../../core/dlsiteNotifications.ts";
 import { compareJapaneseSortKeys, compareUtf8Bytes } from "../../core/japaneseSortKey.ts";
+import { validateResumeRequest } from "../../core/resumeValidation.ts";
+import { assertRegistrationAllowed } from "../../core/workRegistrationGuard.ts";
 import { applyWorksQuery, toWorksPage } from "../../core/worksQuery.ts";
 import { isPathWithin } from "../../lib/path.ts";
 import { buildFullWorkFromState } from "./playback.ts";
@@ -183,17 +180,13 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
     async createWork(body: WorkCreateBody): Promise<WorkSourceMutationResult | null> {
       const preview = await getWorkRegisterPreview(body.path);
       if (!preview) return null;
-      if (preview.alreadyRegistered) {
-        throw new WorkRegisterError(
-          "already_registered",
-          "この場所は既に作品として登録されています",
-        );
-      }
-      if (preview.descendantWorkCount > 0) {
-        throw descendantsRegisteredError(preview.descendantWorkCount);
-      }
       const rootAbs = normalizeFsPath(state.rootFolder ?? "/library");
       const workDir = normalizeFsPath(`${rootAbs}/${body.path}`);
+      assertRegistrationAllowed({
+        alreadyRegistered: preview.alreadyRegistered,
+        descendantWorkCount: preview.descendantWorkCount,
+        kind: isAudioWorkPath(workDir) ? "file" : "folder",
+      });
       const now = new Date().toISOString();
       const applyTags = body.dlsite?.applyTags ?? [];
       const work: FixtureWorkRecord = {
@@ -330,12 +323,7 @@ export function createWorkMethods(state: FixtureState): WorkAdapter {
       const fullWork = buildFullWorkFromState(state, composeWork(state, work));
       const playlist = fullWork.playlists.find((candidate) => candidate.id === body.playlistId);
       const track = playlist?.tracks.find((candidate) => candidate.id === body.trackId);
-      if (!track) {
-        throw new InvalidResumeError("resumeのPlaylistまたはTrackが作品に属していません");
-      }
-      if (track.durationSec !== null && body.offsetSec > track.durationSec) {
-        throw new InvalidResumeError("resumeのoffsetSecがトラック区間外です");
-      }
+      validateResumeRequest(track ? { durationSec: track.durationSec } : null, body.offsetSec);
       state.resumes.set(id, body);
       return true;
     },

@@ -10,7 +10,6 @@ import type {
   TagPrefixUpdate,
   Work,
 } from "@mimimilli/shared";
-import { InvalidResumeError } from "../../errors.ts";
 import type { Db } from "./db.ts";
 import {
   appSettings,
@@ -63,20 +62,7 @@ export class UserWorkStateRepository {
     return r !== undefined;
   }
 
-  saveResume(
-    id: string,
-    body: ResumeBody,
-    trackDuration: { durationSec: number | null } | null,
-  ): boolean {
-    if (!trackDuration) {
-      throw new InvalidResumeError("resumeのPlaylistまたはTrackが作品に属していません");
-    }
-    if (
-      body.offsetSec < 0 ||
-      (trackDuration.durationSec !== null && body.offsetSec > trackDuration.durationSec)
-    ) {
-      throw new InvalidResumeError("resumeのoffsetSecがトラック区間外です");
-    }
+  saveResume(id: string, body: ResumeBody): boolean {
     const r = this.db.user
       .update(workStates)
       .set({
