@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { resolveAppStartupState } from "../../src/app/model/resolveAppStartupState";
 
-const IDLE = { status: "idle" as const };
+const IDLE = { status: "idle" as const, completedAt: null };
 const RUNNING = { status: "running" as const, rootFolder: "/audio/library", progress: null };
 const FAILED = { status: "failed" as const, rootFolder: "/audio/library", message: "失敗しました" };
 

@@ -123,7 +123,7 @@ describe("root再設定中の画面", () => {
     renderAppWithSettings({
       rootFolder: "/audio/library",
       lastScanTime: "2026-01-01T00:00:00.000Z",
-      rootReconfiguration: { status: "idle" },
+      rootReconfiguration: { status: "idle", completedAt: null },
     });
 
     await waitFor(() => expect(screen.queryByRole("navigation")).toBeInTheDocument());
@@ -160,7 +160,7 @@ describe("root再設定完了後のDLsite自動取得attach", () => {
     queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), {
       rootFolder: "/audio/library",
       lastScanTime: "2026-01-01T00:00:00.000Z",
-      rootReconfiguration: { status: "idle" },
+      rootReconfiguration: { status: "idle", completedAt: null },
     });
 
     await waitFor(() => expect(getDlsiteBulkStatus).toHaveBeenCalled(), { timeout: 5000 });
@@ -189,7 +189,7 @@ describe("root再設定完了後のDLsite自動取得attach", () => {
     queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), {
       rootFolder: "/audio/library",
       lastScanTime: "2026-01-01T00:00:00.000Z",
-      rootReconfiguration: { status: "idle" },
+      rootReconfiguration: { status: "idle", completedAt: null },
     });
 
     // getDlsiteBulkStatusが呼ばれないことの確認は「呼ばれる経路自体は完了した」ことを
@@ -208,7 +208,7 @@ describe("root再設定突入時のモーダル初期化", () => {
     const { queryClient } = renderAppWithSettings({
       rootFolder: "/audio/library",
       lastScanTime: "2026-01-01T00:00:00.000Z",
-      rootReconfiguration: { status: "idle" },
+      rootReconfiguration: { status: "idle", completedAt: null },
     });
     await waitFor(() => expect(screen.queryByRole("navigation")).toBeInTheDocument());
 
@@ -233,7 +233,7 @@ describe("root再設定突入時のモーダル初期化", () => {
     queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), {
       rootFolder: "/audio/library",
       lastScanTime: "2026-01-01T00:00:00.000Z",
-      rootReconfiguration: { status: "idle" },
+      rootReconfiguration: { status: "idle", completedAt: null },
     });
 
     await waitFor(() => expect(screen.queryByRole("navigation")).toBeInTheDocument());
@@ -250,7 +250,7 @@ describe("root再設定突入時のDLsite一括適用ダイアログ初期化", 
     const { queryClient, store } = renderAppWithSettings({
       rootFolder: "/audio/library",
       lastScanTime: "2026-01-01T00:00:00.000Z",
-      rootReconfiguration: { status: "idle" },
+      rootReconfiguration: { status: "idle", completedAt: null },
     });
     await waitFor(() => expect(screen.queryByRole("navigation")).toBeInTheDocument());
 
@@ -283,11 +283,11 @@ describe("root再設定の高速完了（runningが描画されない）競合",
     });
     // invalidateSettings（GET /api/settings再取得）が即座にidleを返す競合を模す。
     // Reactが中間状態（running）の描画を挟まないケースでも、performEntryReset・
-    // reconfigurationExitPendingAtomは描画観測に依存せず必ず実行される想定。
+    // reconfigurationExitEpochAtomは描画観測に依存せず必ず進む想定。
     vi.spyOn(settingsApi, "getSettings").mockResolvedValue({
       rootFolder: "/new/root",
       lastScanTime: "2026-01-01T00:00:00.000Z",
-      rootReconfiguration: { status: "idle" },
+      rootReconfiguration: { status: "idle", completedAt: null },
     });
     vi.spyOn(scanApi, "getLastScanResult").mockResolvedValue({
       result: { ...EMPTY_SCAN_RESULT, insertedWorkIds: ["work-2"] },
@@ -298,7 +298,7 @@ describe("root再設定の高速完了（runningが描画されない）競合",
     const { queryClient } = renderAppWithSettings({
       rootFolder: "/audio/library",
       lastScanTime: "2026-01-01T00:00:00.000Z",
-      rootReconfiguration: { status: "idle" },
+      rootReconfiguration: { status: "idle", completedAt: null },
     });
     await waitFor(() => expect(screen.queryByRole("navigation")).toBeInTheDocument());
     queryClient.setQueryData(WORK_QUERY_KEYS.detail("work-1"), { id: "work-1" });

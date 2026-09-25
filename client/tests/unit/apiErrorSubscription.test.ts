@@ -54,7 +54,7 @@ describe("useRootReconfiguringApiErrorHandler（app/model）", () => {
           return jsonResponse({
             rootFolder: "/audio/library",
             lastScanTime: null,
-            rootReconfiguration: { status: "idle" },
+            rootReconfiguration: { status: "idle", completedAt: null },
           });
         }
         return jsonResponse(

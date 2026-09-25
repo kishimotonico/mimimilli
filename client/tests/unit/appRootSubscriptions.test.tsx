@@ -93,7 +93,7 @@ function seedQueryCache(queryClient: QueryClient) {
   queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), {
     rootFolder: "/test-library",
     lastScanTime: null,
-    rootReconfiguration: { status: "idle" },
+    rootReconfiguration: { status: "idle", completedAt: null },
   });
   queryClient.setQueryData(SCAN_QUERY_KEYS.last(), {
     result: {
@@ -205,7 +205,7 @@ describe("App root subscriptions", () => {
         queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), {
           rootFolder: "/changed-root",
           lastScanTime: null,
-          rootReconfiguration: { status: "idle" },
+          rootReconfiguration: { status: "idle", completedAt: null },
         });
       });
 

@@ -92,7 +92,7 @@ describe("root再設定に入ったときの再生停止（自分で開始して
     const { queryClient } = renderAppWithSettings({
       rootFolder: "/audio/library",
       lastScanTime: "2026-01-01T00:00:00.000Z",
-      rootReconfiguration: { status: "idle" },
+      rootReconfiguration: { status: "idle", completedAt: null },
     });
 
     await waitFor(() => expect(screen.queryByRole("navigation")).toBeInTheDocument());
