@@ -39,6 +39,7 @@ import { startRootReconfiguration } from "../entities/settings/api";
 import { runStartRootReconfiguration } from "./model/runStartRootReconfiguration";
 import { markReconfigurationAffectedQueriesStale } from "./model/resetLibraryForReconfiguration";
 import { resetLibraryNavigationUrl } from "./model/resetLibraryNavigationUrl";
+import { resetNavigationToDefaultAtom } from "./model/resetNavigationToDefault";
 import { createPlayRequestGuard } from "./model/playRequestGuard";
 import {
   useSettingsQuery,
@@ -68,6 +69,7 @@ export default function App() {
   const setLibraryAxis = useSetAtom(setLibraryAxisAtom);
   const selectLibraryWork = useSetAtom(selectLibraryWorkAtom);
   const resetLibraryNavigation = useSetAtom(resetLibraryNavigationAtom);
+  const resetNavigationToDefault = useSetAtom(resetNavigationToDefaultAtom);
   const setScanCandidateHiddenPaths = useSetAtom(scanCandidateHiddenPathsAtom);
   const openWorkDetail = useSetAtom(openWorkDetailAtom);
   const setActiveModal = useSetAtom(activeModalAtom);
@@ -103,14 +105,17 @@ export default function App() {
   }, [player, playRequestGuard]);
 
   // 突入側の非破壊な後処理。自分で開始した経路・起動時に既にrunning/failedだった経路・
-  // 他所からの409検知の経路で共有する。作品系クエリの実際の破棄（removeQueries）は
-  // 通常UIのobserverがまだ生きている可能性があるためここではしない
+  // DriftEffect（別タブでの完了検知）で共有する。作品系クエリの実際の破棄
+  // （removeQueries）は通常UIのobserverがまだ生きている可能性があるためここではしない
   // （stale化のみ。実際の破棄はReconfigurationEntryEffect/ReconfigurationExitEffect）。
+  // appMode・Filesのパス・作品詳細IDはURLと同期する状態のため、resetNavigationToDefault
+  // でLibraryモード内部の状態（resetLibraryNavigation）とは別に既定へ戻す。
   const performReconfigurationEntryReset = useCallback(() => {
     stopPlaybackAndInvalidateGuard();
     setActiveModal(null);
     setDlsiteBulkApplyOpen(false);
     scanActions.reset();
+    resetNavigationToDefault();
     resetLibraryNavigation();
     resetLibraryNavigationUrl();
     setScanCandidateHiddenPaths(new Set());
@@ -119,6 +124,7 @@ export default function App() {
   }, [
     queryClient,
     resetLibraryNavigation,
+    resetNavigationToDefault,
     scanActions,
     setActiveModal,
     setDlsiteBulkApplyOpen,

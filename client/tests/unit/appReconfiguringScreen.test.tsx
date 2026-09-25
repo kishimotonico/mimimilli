@@ -11,10 +11,15 @@ import { PlayerRuntimeProvider } from "../../src/features/player/model/PlayerRun
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { dlsiteBulkApplyOpenAtom } from "../../src/entities/dlsite/model/bulkAtoms";
+import { appModeAtom } from "../../src/shared/model/appModeAtoms";
+import {
+  filesRelPathAtom,
+  filesSelectedPathAtom,
+} from "../../src/entities/file-system/model/navigationAtoms";
 import * as workApi from "../../src/entities/work/api";
 import * as scanApi from "../../src/features/scan/api";
 import * as settingsApi from "../../src/entities/settings/api";
-import type { Settings } from "@mimimilli/shared";
+import { workspacePath, type Settings } from "@mimimilli/shared";
 
 const EMPTY_SCAN_RESULT = {
   registered: 0,
@@ -313,5 +318,32 @@ describe("root再設定の高速完了（runningが描画されない）競合",
 
     await waitFor(() => expect(getDlsiteBulkStatus).toHaveBeenCalled(), { timeout: 5000 });
     expect(queryClient.getQueryData(WORK_QUERY_KEYS.detail("work-1"))).toBeUndefined();
+  });
+});
+
+describe("別タブでの再設定完了検知（drift）時のナビゲーション初期化", () => {
+  it("Files表示中にdriftが起きるとLibrary既定画面に戻る", async () => {
+    const { queryClient, store } = renderAppWithSettings({
+      rootFolder: "/audio/library",
+      lastScanTime: "2026-01-01T00:00:00.000Z",
+      rootReconfiguration: { status: "idle", completedAt: "2026-01-01T00:00:00.000Z" },
+    });
+    await waitFor(() => expect(screen.queryByRole("navigation")).toBeInTheDocument());
+
+    store.set(appModeAtom, "files");
+    store.set(filesRelPathAtom, ["dlsite"]);
+    store.set(filesSelectedPathAtom, workspacePath("dlsite/work.mp3"));
+    expect(store.get(appModeAtom)).toBe("files");
+
+    // 別タブが同じrootFolderへ再設定を完了させた体（rootFolderは変わらずcompletedAtだけ進む）。
+    queryClient.setQueryData(SETTINGS_QUERY_KEYS.all(), {
+      rootFolder: "/audio/library",
+      lastScanTime: "2026-01-01T00:00:00.000Z",
+      rootReconfiguration: { status: "idle", completedAt: "2026-01-01T00:05:00.000Z" },
+    });
+
+    await waitFor(() => expect(store.get(appModeAtom)).toBe("library"));
+    expect(store.get(filesRelPathAtom)).toEqual([]);
+    expect(store.get(filesSelectedPathAtom)).toBeNull();
   });
 });
