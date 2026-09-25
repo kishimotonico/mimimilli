@@ -8,11 +8,14 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { Provider as JotaiProvider } from "jotai";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 import App from "../../src/app/App";
 import DlsiteBulkRuntime from "../../src/features/dlsite/ui/DlsiteBulkRuntime";
 import ScanRuntime from "../../src/features/scan/ui/ScanRuntime";
 import { PlayerRuntimeProvider } from "../../src/features/player/model/PlayerRuntimeProvider";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
+import { getParsed } from "../../src/shared/api/http";
+import { useRootReconfiguringApiErrorHandler } from "../../src/app/model/useRootReconfiguringApiErrorHandler";
 import type { Settings } from "@mimimilli/shared";
 
 const stopSpy = vi.fn();
@@ -44,7 +47,17 @@ vi.mock("../../src/features/player/model/usePlayerActions", () => ({
   usePlayerActions: () => playerActionsStub,
 }));
 
-function renderAppWithSettings(settings: Settings) {
+// Providers.tsxは通さず手組みするため、409購読（useRootReconfiguringApiErrorHandler）は
+// 既定では配線しない。実際の409を模す個別のテストでだけwithApiErrorHandlerを立てる。
+function ApiErrorSubscriber({ client }: { client: QueryClient }) {
+  useRootReconfiguringApiErrorHandler(client);
+  return null;
+}
+
+function renderAppWithSettings(
+  settings: Settings,
+  options: { withApiErrorHandler?: boolean } = {},
+) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false, staleTime: Number.POSITIVE_INFINITY },
@@ -64,6 +77,7 @@ function renderAppWithSettings(settings: Settings) {
         createElement(
           PlayerRuntimeProvider,
           null,
+          options.withApiErrorHandler ? createElement(ApiErrorSubscriber, { client }) : null,
           createElement(DlsiteBulkRuntime),
           createElement(ScanRuntime),
           createElement(App),
@@ -107,6 +121,51 @@ describe("root再設定に入ったときの再生停止（自分で開始して
         progress: null,
       },
     });
+
+    await waitFor(() =>
+      expect(screen.getByText("ライブラリを再構築しています")).toBeInTheDocument(),
+    );
+    expect(stopSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("実際の409（root_reconfiguring）を観測後、settings再取得がrunningを返すとstopが呼ばれる", async () => {
+    renderAppWithSettings(
+      {
+        rootFolder: "/audio/library",
+        lastScanTime: "2026-01-01T00:00:00.000Z",
+        rootReconfiguration: { status: "idle", completedAt: null },
+      },
+      { withApiErrorHandler: true },
+    );
+    await waitFor(() => expect(screen.queryByRole("navigation")).toBeInTheDocument());
+    expect(stopSpy).not.toHaveBeenCalled();
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith("/settings")) {
+          return new Response(
+            JSON.stringify({
+              rootFolder: "/audio/library",
+              lastScanTime: "2026-01-01T00:00:00.000Z",
+              rootReconfiguration: {
+                status: "running",
+                rootFolder: "/audio/library",
+                progress: null,
+              },
+            }),
+            { headers: { "Content-Type": "application/json" } },
+          );
+        }
+        return new Response(
+          JSON.stringify({ error: { code: "root_reconfiguring", message: "再設定中です" } }),
+          { status: 409, headers: { "Content-Type": "application/json" } },
+        );
+      }),
+    );
+
+    await expect(getParsed(z.object({}), "/works/some-work/playback")).rejects.toThrow();
 
     await waitFor(() =>
       expect(screen.getByText("ライブラリを再構築しています")).toBeInTheDocument(),

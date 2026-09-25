@@ -1,13 +1,12 @@
-import { QueryClientProvider, useQueryClient } from "@tanstack/react-query";
-import { Provider as JotaiProvider, useSetAtom } from "jotai";
-import { lazy, Suspense, useCallback, type ReactNode } from "react";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { Provider as JotaiProvider } from "jotai";
+import { lazy, Suspense, type ReactNode } from "react";
 import DlsiteBulkRuntime from "../features/dlsite/ui/DlsiteBulkRuntime";
 import DlsiteBulkApplyRuntime from "../features/dlsite/ui/DlsiteBulkApplyRuntime";
 import ScanRuntime from "../features/scan/ui/ScanRuntime";
 import { PlayerRuntimeProvider } from "../features/player/model/PlayerRuntimeProvider";
 import { queryClient } from "./model/queryClient";
 import { useRootReconfiguringApiErrorHandler } from "./model/useRootReconfiguringApiErrorHandler";
-import { reconfigurationExitEpochAtom } from "../entities/settings/reconfigurationExitAtom";
 
 interface ProvidersProps {
   children: ReactNode;
@@ -28,20 +27,6 @@ const ReactQueryDevtools =
       )
     : null;
 
-// useRootReconfiguringApiErrorHandlerはreconfigurationExitEpochAtomを書くため、
-// JotaiProviderの内側（子として）でマウントする必要がある。Providers自身の関数本体は
-// 自分が返すJotaiProviderの外側にあたるので、ここで呼んではいけない。
-function RootApiErrorSubscription() {
-  const client = useQueryClient();
-  const bumpReconfigurationExitEpoch = useSetAtom(reconfigurationExitEpochAtom);
-  const onRootReconfiguring = useCallback(
-    () => bumpReconfigurationExitEpoch((epoch) => epoch + 1),
-    [bumpReconfigurationExitEpoch],
-  );
-  useRootReconfiguringApiErrorHandler(client, onRootReconfiguring);
-  return null;
-}
-
 /**
  * アプリ全体の Provider をまとめたコンポーネント。
  *
@@ -56,10 +41,10 @@ function RootApiErrorSubscription() {
  *   Query 結合は当面行わない（issue 参照）。
  */
 export default function Providers({ children }: ProvidersProps) {
+  useRootReconfiguringApiErrorHandler(queryClient);
   return (
     <QueryClientProvider client={queryClient}>
       <JotaiProvider>
-        <RootApiErrorSubscription />
         <PlayerRuntimeProvider>
           <DlsiteBulkRuntime />
           <DlsiteBulkApplyRuntime />

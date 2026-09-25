@@ -72,8 +72,7 @@ describe("useRootReconfiguringApiErrorHandler（app/model）", () => {
     });
     expect(client.getQueryState(SETTINGS_QUERY_KEYS.all())?.isInvalidated).toBe(false);
 
-    const onRootReconfiguring = vi.fn();
-    renderHook(() => useRootReconfiguringApiErrorHandler(client, onRootReconfiguring));
+    renderHook(() => useRootReconfiguringApiErrorHandler(client));
 
     // TanStack Queryを経由しない直接呼び出し（prepareWorkPlaybackのような呼び出し方を模す）。
     await expect(getParsed(z.object({}), "/works/some-work/playback")).rejects.toThrow();
@@ -81,12 +80,11 @@ describe("useRootReconfiguringApiErrorHandler（app/model）", () => {
     await vi.waitFor(() =>
       expect(client.getQueryState(SETTINGS_QUERY_KEYS.all())?.isInvalidated).toBe(true),
     );
-    expect(onRootReconfiguring).toHaveBeenCalledTimes(1);
 
     vi.unstubAllGlobals();
   });
 
-  it("unmountすると購読が外れ、以降のエラーでinvalidate・onRootReconfiguringのどちらも呼ばない", async () => {
+  it("409はinvalidateQueriesのみでresetQueriesは呼ばない（ロック中の空回り防止）", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
@@ -96,16 +94,33 @@ describe("useRootReconfiguringApiErrorHandler（app/model）", () => {
 
     const client = createQueryClient();
     const invalidateSpy = vi.spyOn(client, "invalidateQueries");
-    const onRootReconfiguring = vi.fn();
-    const { unmount } = renderHook(() =>
-      useRootReconfiguringApiErrorHandler(client, onRootReconfiguring),
+    const resetSpy = vi.spyOn(client, "resetQueries");
+    renderHook(() => useRootReconfiguringApiErrorHandler(client));
+
+    await expect(getParsed(z.object({}), "/works/some-work/playback")).rejects.toThrow();
+
+    await vi.waitFor(() => expect(invalidateSpy).toHaveBeenCalled());
+    expect(resetSpy).not.toHaveBeenCalled();
+
+    vi.unstubAllGlobals();
+  });
+
+  it("unmountすると購読が外れ、以降のエラーでinvalidateしない", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        jsonResponse({ error: { code: "root_reconfiguring", message: "再設定中です" } }, 409),
+      ),
     );
+
+    const client = createQueryClient();
+    const invalidateSpy = vi.spyOn(client, "invalidateQueries");
+    const { unmount } = renderHook(() => useRootReconfiguringApiErrorHandler(client));
     unmount();
 
     await expect(getParsed(z.object({}), "/works/some-work/playback")).rejects.toThrow();
 
     expect(invalidateSpy).not.toHaveBeenCalled();
-    expect(onRootReconfiguring).not.toHaveBeenCalled();
 
     vi.unstubAllGlobals();
   });
