@@ -1,5 +1,5 @@
 import { useAtomValue, useSetAtom } from "jotai";
-import { appModeAtom, setAppModeAtom } from "../../shared/model/appModeAtoms";
+import { appModeAtom, setAppModeAtom } from "../../entities/navigation/model/appRouteStore";
 import { playerIsActiveAtom } from "../../entities/player/model/atoms";
 import { I, type IconName } from "../../shared/ui/Icon";
 

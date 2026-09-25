@@ -1,7 +1,7 @@
 import { useAtomValue, useSetAtom } from "jotai";
 import { useQuery } from "@tanstack/react-query";
 import Breadcrumbs from "../../../shared/ui/Breadcrumbs";
-import { setAppModeAtom } from "../../../shared/model/appModeAtoms";
+import { setAppModeAtom } from "../../../entities/navigation/model/appRouteStore";
 import { workDetailIdAtom } from "../../../entities/work/model/navigationAtoms";
 import { getWork } from "../../../entities/work/api";
 import { WORK_QUERY_KEYS } from "../../../entities/work/queryKeys";

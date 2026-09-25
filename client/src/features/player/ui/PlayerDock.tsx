@@ -3,7 +3,7 @@ import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import { useCallback, useState } from "react";
 import { type MotionVariant, useMotionVariants } from "../../../shared/ui/useMotionVariants";
 import { playerIsActiveAtom } from "../../../entities/player/model/atoms";
-import { appModeAtom, setAppModeAtom } from "../../../shared/model/appModeAtoms";
+import { appModeAtom, setAppModeAtom } from "../../../entities/navigation/model/appRouteStore";
 import { usePlayerActions } from "../model/usePlayerActions";
 import { usePlayerState, type PlayerState } from "../model/usePlayerState";
 import { usePopupDrag } from "../model/usePopupDrag";

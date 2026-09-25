@@ -8,7 +8,7 @@
 import { useAtomValue } from "jotai";
 import type { ReactNode } from "react";
 import { playerDockBarVisibleAtom } from "../features/player/model/playerPresentationAtoms";
-import { appModeAtom } from "../shared/model/appModeAtoms";
+import { appModeAtom } from "../entities/navigation/model/appRouteStore";
 
 interface AppShellProps {
   topBar: ReactNode;

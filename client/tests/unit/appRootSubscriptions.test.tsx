@@ -6,15 +6,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "../../src/app/App";
 import DlsiteBulkRuntime from "../../src/features/dlsite/ui/DlsiteBulkRuntime";
 import ScanRuntime from "../../src/features/scan/ui/ScanRuntime";
+import NavigationHistorySync from "../../src/features/navigation/ui/NavigationHistorySync";
 import { PlayerRuntimeProvider } from "../../src/features/player/model/PlayerRuntimeProvider";
 import { dlsiteBulkProgressAtom } from "../../src/entities/dlsite/model/bulkAtoms";
-import { librarySearchQueryAtom } from "../../src/entities/library/model/navigationAtoms";
 import { PLAYER_CORE_INITIAL, playerCoreAtom } from "../../src/entities/player/model/atoms";
 import { scanJobAtom } from "../../src/entities/scan/model/atoms";
 import { SETTINGS_QUERY_KEYS } from "../../src/entities/settings/queryKeys";
 import { WORK_QUERY_KEYS } from "../../src/entities/work/queryKeys";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
 import type { WorkSummary } from "../../src/entities/work/model";
+import { seedLibraryRoute } from "../helpers/route";
 
 let appShellCallCount = 0;
 let jotaiProbeRenderCount = 0;
@@ -145,6 +146,7 @@ function renderApp() {
           PlayerRuntimeProvider,
           null,
           createElement(DlsiteBulkRuntime),
+          createElement(NavigationHistorySync),
           createElement(ScanRuntime),
           createElement(JotaiSubscriptionProbe),
           children,
@@ -288,7 +290,7 @@ describe("App root subscriptions", () => {
       const baseline = await waitForAppShellBaseline();
 
       act(() => {
-        store.set(librarySearchQueryAtom, "asmr");
+        seedLibraryRoute(store, { q: "asmr" });
       });
 
       expect(appShellCallCount).toBe(baseline);

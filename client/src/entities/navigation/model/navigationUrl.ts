@@ -1,10 +1,7 @@
 import { buildBuiltinAxisTag, splitSelectedTags, type NormalizedTag } from "@mimimilli/shared";
-import type { AppMode } from "../../../shared/model/appMode";
-import { isSmartAxis, isViewAxis } from "../../../entities/library/axisDefinitions";
-import { computeResultsPaneKind } from "../../../entities/library/resultsPane";
-import type { AxisId, SortId } from "../../../entities/library/types";
-
-export type { AppMode };
+import { isSmartAxis, isViewAxis } from "../../library/axisDefinitions";
+import { computeResultsPaneKind } from "../../library/resultsPane";
+import type { AxisId, SortId } from "../../library/types";
 
 export interface LibraryUrlState {
   activeAxis: AxisId;

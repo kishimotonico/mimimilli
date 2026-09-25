@@ -8,7 +8,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Provider as JotaiProvider, createStore } from "jotai";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import FilePreview from "../../src/features/files/ui/FilePreview";
-import { filesSelectedPathAtom } from "../../src/entities/file-system/model/navigationAtoms";
+import { toSelectedRelPath } from "../../src/entities/file-system/model/navigationAtoms";
+import { seedFilesRoute } from "../helpers/route";
 import type { FsEntry } from "../../src/features/files/model/types";
 
 const browseFs = vi.fn();
@@ -42,7 +43,7 @@ function renderPreview(selectedPath: string | null, onPlayFile = vi.fn()) {
   getScanDiagnostics.mockResolvedValue({ diagnostics: [] });
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const store = createStore();
-  store.set(filesSelectedPathAtom, selectedPath as never);
+  seedFilesRoute(store, { selectedRelPath: toSelectedRelPath(selectedPath) });
   const wrapper = ({ children }: { children: ReactNode }) =>
     createElement(
       QueryClientProvider,

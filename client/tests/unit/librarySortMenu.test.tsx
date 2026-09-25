@@ -9,13 +9,10 @@ import type { SmartFolder } from "@mimimilli/shared";
 import LibrarySortMenu from "../../src/features/library/ui/LibrarySortMenu";
 import { LibraryNavigationProvider } from "../../src/features/library/ui/LibraryNavigationProvider";
 import { LibraryTransitionContext } from "../../src/features/library/model/libraryTransitionContext";
-import {
-  activeAxisAtom,
-  randomSeedAtom,
-  sortAtom,
-} from "../../src/entities/library/model/navigationAtoms";
-import { axisValueSortAtom } from "../../src/features/library/model/atoms";
+import { sortAtom } from "../../src/entities/library/model/navigationAtoms";
+import { axisValueSortAtom, randomSeedAtom } from "../../src/features/library/model/atoms";
 import { SMART_FOLDER_QUERY_KEYS } from "../../src/entities/smart-folder/queryKeys";
+import { seedLibraryRoute } from "../helpers/route";
 
 const SMART_FOLDER: SmartFolder = {
   id: "sf-1",
@@ -26,8 +23,10 @@ const SMART_FOLDER: SmartFolder = {
 
 function renderSortMenu(options?: { axis?: string; sort?: string; smartFolders?: SmartFolder[] }) {
   const store = createStore();
-  store.set(activeAxisAtom, options?.axis ?? "all");
-  store.set(sortAtom, (options?.sort ?? "added-desc") as "added-desc");
+  seedLibraryRoute(store, {
+    activeAxis: options?.axis ?? "all",
+    sort: (options?.sort ?? "added-desc") as "added-desc",
+  });
 
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -166,7 +165,7 @@ describe("LibrarySortMenu", () => {
 
     // 値一覧の軸へ遷移（同じメニューコンポーネントが接続先を切り替える）
     act(() => {
-      store.set(activeAxisAtom, "cv");
+      seedLibraryRoute(store, { activeAxis: "cv" });
     });
     fireEvent.click(screen.getByRole("button", { name: "並び替え" }));
     fireEvent.click(screen.getByRole("menuitemradio", { name: "総時間" }));
@@ -176,7 +175,7 @@ describe("LibrarySortMenu", () => {
 
     // 作品一覧の軸へ戻る
     act(() => {
-      store.set(activeAxisAtom, "all");
+      seedLibraryRoute(store, { activeAxis: "all" });
     });
     expect(screen.getByRole("button", { name: "並び替え" })).toHaveAttribute(
       "title",
@@ -189,7 +188,7 @@ describe("LibrarySortMenu", () => {
     expect(screen.queryByRole("button", { name: "再シャッフル" })).not.toBeInTheDocument();
 
     act(() => {
-      store.set(sortAtom, "random");
+      seedLibraryRoute(store, { sort: "random" });
     });
     const reshuffleButton = screen.getByRole("button", { name: "再シャッフル" });
     const seedBefore = store.get(randomSeedAtom);
@@ -198,7 +197,7 @@ describe("LibrarySortMenu", () => {
     expect(store.get(randomSeedAtom)).not.toBe(seedBefore);
 
     act(() => {
-      store.set(sortAtom, "added-desc");
+      seedLibraryRoute(store, { sort: "added-desc" });
     });
     expect(screen.queryByRole("button", { name: "再シャッフル" })).not.toBeInTheDocument();
   });
@@ -216,8 +215,7 @@ describe("LibrarySortMenu", () => {
     // ソートメニューだけの独立した遷移を持つと、他コンポーネントの遷移中表示
     // （WorkListPaneのis-pending暗転）にこの操作が反映されなくなる。
     const store = createStore();
-    store.set(activeAxisAtom, "all");
-    store.set(sortAtom, "added-desc");
+    seedLibraryRoute(store, { activeAxis: "all", sort: "added-desc" });
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const startTransition = vi.fn((action: () => void) => action());
 

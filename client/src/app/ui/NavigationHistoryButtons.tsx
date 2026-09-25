@@ -1,14 +1,14 @@
 import { useAtomValue } from "jotai";
+import { navigationHistoryAvailabilityAtom } from "../../entities/navigation/model/appRouteStore";
 import {
   navigationHistoryBack,
   navigationHistoryForward,
-} from "../../features/navigation/model/useNavigationHistory";
-import { navigationHistoryStateAtom } from "../../shared/model/navigationHistoryAtoms";
+} from "../../shared/model/useRouteHistorySync";
 import { I } from "../../shared/ui/Icon";
 import IconButton from "../../shared/ui/IconButton";
 
 export default function NavigationHistoryButtons() {
-  const { canBack, canForward } = useAtomValue(navigationHistoryStateAtom);
+  const { canBack, canForward } = useAtomValue(navigationHistoryAvailabilityAtom);
 
   return (
     <>

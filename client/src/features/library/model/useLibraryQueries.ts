@@ -10,7 +10,7 @@ import {
 } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useAtomValue } from "jotai";
-import { randomSeedAtom } from "../../../entities/library/model/navigationAtoms";
+import { randomSeedAtom } from "./atoms";
 import {
   WORKS_DEFAULT_PAGE_SIZE,
   type SmartFolder,

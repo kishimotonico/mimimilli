@@ -1,6 +1,8 @@
-import { useNavigationHistory } from "../model/useNavigationHistory";
+import { appRouteCodec } from "../../../entities/navigation/model/appRoute";
+import { appRouteStore } from "../../../entities/navigation/model/appRouteStore";
+import { useRouteHistorySync } from "../../../shared/model/useRouteHistorySync";
 
 export default function NavigationHistorySync() {
-  useNavigationHistory();
+  useRouteHistorySync(appRouteStore, appRouteCodec);
   return null;
 }

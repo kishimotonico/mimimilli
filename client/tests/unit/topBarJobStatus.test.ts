@@ -9,9 +9,9 @@ import {
   dlsiteBulkJobIdAtom,
   dlsiteBulkProgressAtom,
 } from "../../src/entities/dlsite/model/bulkAtoms";
-import { appModeAtom } from "../../src/features/navigation/model/navigationAtoms";
 import { scanJobAtom } from "../../src/entities/scan/model/atoms";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
+import { seedAppMode } from "../helpers/route";
 
 function renderTopBar(atomState?: {
   scanJob?: import("@mimimilli/shared").ScanJobSnapshot | null;
@@ -19,7 +19,7 @@ function renderTopBar(atomState?: {
   dlsiteProgress?: import("@mimimilli/shared").DlsiteBulkProgressSnapshot | null;
 }) {
   const store = createStore();
-  store.set(appModeAtom, "library");
+  seedAppMode(store, "library");
   store.set(dlsiteBulkActionsAtom, {
     start: vi.fn(),
     attach: vi.fn(),

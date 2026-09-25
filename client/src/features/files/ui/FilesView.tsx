@@ -3,14 +3,14 @@
 // 左の受動スタックへ吸い込まれ（exit アニメ）、子のカラムが右からスライドインする。
 // 階層を遡るのはパンくず（アドレスバー）のみ。再生エンジンは Library と共通・常駐。
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useAtom, useAtomValue } from "jotai";
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import { useRootFolder } from "../../../entities/settings/useSettingsQuery";
 import { useFilesBrowse } from "../model/useFilesBrowse";
 import { useFilesPlayingMatcher } from "../model/useFilesPlayingMatcher";
 import { useIdentityConflictMap } from "../model/useIdentityConflict";
-import { filesDirectionAtom } from "../../../entities/file-system/model/navigationAtoms";
+import { navigationDirectionAtom } from "../../../entities/navigation/model/appRouteStore";
 import { buildFolderAudioQueue } from "../model/filePlayback";
 import { classifyFile, rootLabel, type FsEntry } from "../model/types";
 import { filesPreviewOpenAtom } from "../model/previewLayoutAtoms";
@@ -55,7 +55,11 @@ export default function FilesView({ onPlayFile, onTogglePlay }: FilesViewProps) 
   const rootFolder = useRootFolder();
   const browse = useFilesBrowse(rootFolder);
   const { nav } = browse;
-  const direction = useAtomValue(filesDirectionAtom);
+  const direction = useAtomValue(navigationDirectionAtom);
+  // 遷移の向きは表示中のフォルダーが変わった時点のものを保つ（同じカラムで選択を変えても
+  // 入場アニメーションをやり直さない）
+  const [column, setColumn] = useState({ cwd: nav.cwd, direction });
+  if (column.cwd !== nav.cwd) setColumn({ cwd: nav.cwd, direction });
   const isPlaybackActive = useAtomValue(playerIsPlayingOrLoadingAtom);
   const [previewOpen, setPreviewOpen] = useAtom(filesPreviewOpenAtom);
   const matchPlaying = useFilesPlayingMatcher();
@@ -109,7 +113,7 @@ export default function FilesView({ onPlayFile, onTogglePlay }: FilesViewProps) 
         <div className="mle-filestage">
           <div
             key={nav.cwd}
-            data-dir={direction >= 0 ? "forward" : "back"}
+            data-dir={column.direction}
             className="mle-col mle-filestage__col ml-file-col-enter"
           >
             <FileColumn

@@ -4,7 +4,7 @@ import {
   parseNavigationUrl,
   serializeNavigationUrl,
   type NavigationUrlState,
-} from "../../src/features/navigation/model/navigationUrl";
+} from "../../src/entities/navigation/model/navigationUrl";
 
 describe("navigation URL codec", () => {
   // "cv"・"tag"は値一覧種の軸（tags/qを消去する独立入口）になったため、

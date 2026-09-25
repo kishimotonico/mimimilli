@@ -7,19 +7,19 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
 import TopBar from "../../src/app/ui/TopBar";
 import {
-  activeAxisAtom,
   librarySearchQueryAtom,
   selectedWorkIdAtom,
 } from "../../src/entities/library/model/navigationAtoms";
-import { appModeAtom } from "../../src/features/navigation/model/navigationAtoms";
+import { appModeAtom } from "../../src/entities/navigation/model/appRouteStore";
 import { SCAN_QUERY_KEYS } from "../../src/features/scan/api";
+import { seedAppMode, seedLibraryRoute } from "../helpers/route";
 
 const PLACEHOLDER = /ライブラリを検索/;
 
 function renderTopBar(initialQuery = "") {
   const store = createStore();
-  store.set(appModeAtom, "library");
-  store.set(librarySearchQueryAtom, initialQuery);
+  seedAppMode(store, "library");
+  seedLibraryRoute(store, { q: initialQuery });
 
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
@@ -81,7 +81,7 @@ describe("TopBar の検索入力", () => {
     const input = screen.getByPlaceholderText(PLACEHOLDER);
 
     act(() => {
-      store.set(librarySearchQueryAtom, "復元された語");
+      seedLibraryRoute(store, { q: "復元された語" });
     });
     expect(input).toHaveValue("復元された語");
   });
@@ -145,8 +145,7 @@ describe("TopBar の検索入力", () => {
 
   it("作品詳細でも検索欄が使える", () => {
     const store = createStore();
-    store.set(appModeAtom, "workDetail");
-    store.set(librarySearchQueryAtom, "");
+    seedAppMode(store, { workDetail: "RJ501012" });
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
     });
@@ -169,11 +168,10 @@ describe("TopBar の検索入力", () => {
 
   it("作品詳細でEnterを確定するとライブラリへ移り、直前の選択作品はプレビューに残す（意図した挙動）", () => {
     const store = createStore();
-    store.set(appModeAtom, "workDetail");
-    store.set(librarySearchQueryAtom, "");
+    seedAppMode(store, { workDetail: "RJ501012" });
     // 全画面詳細を開く前にライブラリ側で選択していた作品。検索確定はプレビュー文脈を
     // 壊さない設計とし、クリアしない（クリアしてもプレビューが空になるだけで得るものがない）。
-    store.set(selectedWorkIdAtom, "RJ501011");
+    seedLibraryRoute(store, { selectedWorkId: "RJ501011" });
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
     });
@@ -202,7 +200,7 @@ describe("TopBar の検索入力", () => {
 describe("値一覧ペイン表示中は作品検索を無効化する（ADR-0026）", () => {
   it("value-list種の軸（facet軸）ではdisabled・tooltipを出す", () => {
     const store = renderTopBar("");
-    act(() => store.set(activeAxisAtom, "cv"));
+    act(() => seedLibraryRoute(store, { activeAxis: "cv" }));
     const input = screen.getByPlaceholderText(PLACEHOLDER) as HTMLInputElement;
 
     expect(input).toBeDisabled();
@@ -211,7 +209,7 @@ describe("値一覧ペイン表示中は作品検索を無効化する（ADR-002
 
   it("works種の軸（all等）では従来どおり有効", () => {
     const store = renderTopBar("");
-    act(() => store.set(activeAxisAtom, "all"));
+    act(() => seedLibraryRoute(store, { activeAxis: "all" }));
     const input = screen.getByPlaceholderText(PLACEHOLDER) as HTMLInputElement;
 
     expect(input).not.toBeDisabled();
@@ -219,7 +217,7 @@ describe("値一覧ペイン表示中は作品検索を無効化する（ADR-002
 
   it("value-list表示中は⌘Kでフォーカスしない", () => {
     const store = renderTopBar("");
-    act(() => store.set(activeAxisAtom, "cv"));
+    act(() => seedLibraryRoute(store, { activeAxis: "cv" }));
     const input = screen.getByPlaceholderText(PLACEHOLDER) as HTMLInputElement;
     input.blur();
 

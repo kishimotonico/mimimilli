@@ -6,13 +6,14 @@ import { describe, expect, it, vi } from "vitest";
 import LibraryBreadcrumbs from "../../src/features/library/ui/LibraryBreadcrumbs";
 import { LibraryTransitionContext } from "../../src/features/library/model/libraryTransitionContext";
 import { activeAxisAtom } from "../../src/entities/library/model/navigationAtoms";
+import { seedLibraryRoute } from "../helpers/route";
 
 describe("LibraryBreadcrumbs", () => {
   it("パンくずのクリックはLibraryNavigationProviderが持つ単一のstartTransitionを経由する（TASK-381）", () => {
     // パンくずだけの独立した遷移を持つと、他コンポーネントの遷移中表示
     // （WorkListPaneのis-pending暗転）にこの操作が反映されなくなる。
     const store = createStore();
-    store.set(activeAxisAtom, "cv");
+    seedLibraryRoute(store, { activeAxis: "cv" });
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const startTransition = vi.fn((action: () => void) => action());
 
